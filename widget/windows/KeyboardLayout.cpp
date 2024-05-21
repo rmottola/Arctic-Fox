@@ -677,6 +677,7 @@ uint8_t NativeKey::sDispatchedKeyOfAppCommand = 0;
 NativeKey::NativeKey(nsWindowBase* aWidget,
                      const MSG& aMessage,
                      const ModifierKeyState& aModKeyState,
+                     HKL aOverrideKeyboardLayout,
                      nsTArray<FakeCharMsg>* aFakeCharMsgs)
   : mWidget(aWidget)
   , mDispatcher(aWidget->GetTextEventDispatcher())
@@ -699,6 +700,14 @@ NativeKey::NativeKey(nsWindowBase* aWidget,
   MOZ_ASSERT(mDispatcher);
   KeyboardLayout* keyboardLayout = KeyboardLayout::GetInstance();
   mKeyboardLayout = keyboardLayout->GetLayout();
+  if (aOverrideKeyboardLayout && mKeyboardLayout != aOverrideKeyboardLayout) {
+    keyboardLayout->OverrideLayout(aOverrideKeyboardLayout);
+    mKeyboardLayout = keyboardLayout->GetLayout();
+    MOZ_ASSERT(mKeyboardLayout == aOverrideKeyboardLayout);
+    mIsOverridingKeyboardLayout = true;
+  } else {
+    mIsOverridingKeyboardLayout = false;
+  }
 
   if (mMsg.message == WM_APPCOMMAND) {
     InitWithAppCommand();
@@ -710,14 +719,19 @@ NativeKey::NativeKey(nsWindowBase* aWidget,
   switch (mMsg.message) {
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
+    case MOZ_WM_KEYDOWN:
     case WM_KEYUP:
-    case WM_SYSKEYUP: {
+    case WM_SYSKEYUP:
+    case MOZ_WM_KEYUP: {
       // If the key message is sent from other application like a11y tools, the
       // scancode value might not be set proper value.  Then, probably the value
       // is 0.
       // NOTE: If the virtual keycode can be caused by both non-extended key
       //       and extended key, the API returns the non-extended key's
       //       scancode.  E.g., VK_LEFT causes "4" key on numpad.
+      // NOTE: Cannot compute scancode from keycode if the key message comes
+      //       from plugin process since active keyboard layout may be
+      //       different.
       if (!mScanCode) {
         uint16_t scanCodeEx = ComputeScanCodeExFromVirtualKeyCode(mMsg.wParam);
         if (scanCodeEx) {
@@ -887,6 +901,14 @@ NativeKey::NativeKey(nsWindowBase* aWidget,
   }
 }
 
+NativeKey::~NativeKey()
+{
+  if (mIsOverridingKeyboardLayout) {
+    KeyboardLayout* keyboardLayout = KeyboardLayout::GetInstance();
+    keyboardLayout->RestoreLayout();
+  }
+}
+
 void
 NativeKey::InitWithAppCommand()
 {
@@ -989,6 +1011,8 @@ NativeKey::IsFollowedByDeadCharMessage() const
   MSG nextMsg;
   if (mFakeCharMsgs) {
     nextMsg = mFakeCharMsgs->ElementAt(0).GetCharMsg(mMsg.hwnd);
+  } else if (IsKeyMessageOnPlugin()) {
+    return false;
   } else {
     if (!WinUtils::PeekMessage(&nextMsg, mMsg.hwnd, WM_KEYFIRST, WM_KEYLAST,
                                PM_NOREMOVE | PM_NOYIELD)) {
@@ -1173,12 +1197,14 @@ NativeKey::InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
 
   switch (aKeyEvent.mMessage) {
     case eKeyDown:
+    case eKeyDownOnPlugin:
       aKeyEvent.keyCode = mDOMKeyCode;
       // Unique id for this keydown event and its associated keypress.
       sUniqueKeyEventId++;
       aKeyEvent.mUniqueId = sUniqueKeyEventId;
       break;
     case eKeyUp:
+    case eKeyUpOnPlugin:
       aKeyEvent.keyCode = mDOMKeyCode;
       // Set defaultPrevented of the key event if the VK_MENU is not a system
       // key release, so that the menu bar does not trigger.  This helps avoid
@@ -1452,7 +1478,7 @@ NativeKey::HandleKeyDownMessage(bool* aEventDispatched) const
   }
 
   bool defaultPrevented = false;
-  if (mFakeCharMsgs ||
+  if (mFakeCharMsgs || IsKeyMessageOnPlugin() ||
       !RedirectedKeyDownMessageManager::IsRedirectedMessage(mMsg)) {
     // Ignore [shift+]alt+space so the OS can handle it.
     if (mModKeyState.IsAlt() && !mModKeyState.IsControl() &&
@@ -1466,7 +1492,9 @@ NativeKey::HandleKeyDownMessage(bool* aEventDispatched) const
     }
 
     bool isIMEEnabled = WinUtils::IsIMEEnabled(mWidget->GetInputContext());
-    WidgetKeyboardEvent keydownEvent(true, eKeyDown, mWidget);
+    EventMessage keyDownMessage =
+      IsKeyMessageOnPlugin() ? eKeyDownOnPlugin : eKeyDown;
+    WidgetKeyboardEvent keydownEvent(true, keyDownMessage, mWidget);
     nsEventStatus status = InitKeyEvent(keydownEvent, mModKeyState, &mMsg);
     bool dispatched =
       mDispatcher->DispatchKeyboardEvent(eKeyDown, keydownEvent, status,
@@ -1481,6 +1509,12 @@ NativeKey::HandleKeyDownMessage(bool* aEventDispatched) const
     }
     defaultPrevented = status == nsEventStatus_eConsumeNoDefault;
 
+    // We don't need to handle key messages on plugin for eKeyPress since
+    // eKeyDownOnPlugin is handled as both eKeyDown and eKeyPress.
+    if (IsKeyMessageOnPlugin()) {
+      return defaultPrevented;
+    }
+
     if (mWidget->Destroyed()) {
       return true;
     }
@@ -1494,8 +1528,8 @@ NativeKey::HandleKeyDownMessage(bool* aEventDispatched) const
     // application, we shouldn't redirect the message to it because the keydown
     // message is processed by us, so, nobody shouldn't process it.
     HWND focusedWnd = ::GetFocus();
-    if (!defaultPrevented && !mFakeCharMsgs && focusedWnd &&
-        !mWidget->PluginHasFocus() && !isIMEEnabled &&
+    if (!defaultPrevented && !mFakeCharMsgs && !IsKeyMessageOnPlugin() &&
+        focusedWnd && !mWidget->PluginHasFocus() && !isIMEEnabled &&
         WinUtils::IsIMEEnabled(mWidget->GetInputContext())) {
       RedirectedKeyDownMessageManager::RemoveNextCharMessage(focusedWnd);
 
@@ -1723,6 +1757,7 @@ NativeKey::HandleKeyUpMessage(bool* aEventDispatched) const
 
   WidgetKeyboardEvent keyupEvent(true, eKeyUp, mWidget);
   nsEventStatus status = InitKeyEvent(keyupEvent, mModKeyState, &mMsg);
+  EventMessage keyUpMessage = IsKeyMessageOnPlugin() ? eKeyUpOnPlugin : eKeyUp;
   bool dispatched =
     mDispatcher->DispatchKeyboardEvent(eKeyUp, keyupEvent, status,
                                        const_cast<NativeKey*>(this));
@@ -1736,6 +1771,13 @@ bool
 NativeKey::NeedsToHandleWithoutFollowingCharMessages() const
 {
   MOZ_ASSERT(IsKeyDownMessage());
+
+  // We cannot know following char messages of key messages in a plugin
+  // process.  So, let's compute the character to be inputted with every
+  // printable key should be computed with the keyboard layout.
+  if (IsKeyMessageOnPlugin()) {
+    return true;
+  }
 
   // Enter and backspace are always handled here to avoid for example the
   // confusion between ctrl-enter and ctrl-J.
@@ -1785,6 +1827,7 @@ bool
 NativeKey::GetFollowingCharMessage(MSG& aCharMsg) const
 {
   MOZ_ASSERT(IsKeyDownMessage());
+  MOZ_ASSERT(!IsKeyMessageOnPlugin());
 
   aCharMsg.message = WM_NULL;
 
@@ -1889,6 +1932,7 @@ bool
 NativeKey::DispatchPluginEventsAndDiscardsCharMessages() const
 {
   MOZ_ASSERT(IsKeyDownMessage());
+  MOZ_ASSERT(!IsKeyMessageOnPlugin());
 
   // Remove a possible WM_CHAR or WM_SYSCHAR messages from the message queue.
   // They can be more than one because of:
@@ -3132,6 +3176,8 @@ KeyboardLayout::SynthesizeNativeKeyEvent(nsWindowBase* aWidget,
   keySequence.AppendElement(KeyPair(aNativeKeyCode, argumentKeySpecific));
 
   // Simulate the pressing of each modifier key and then the real key
+  // FYI: Each NativeKey instance here doesn't need to override keyboard layout
+  //      since this method overrides and restores the keyboard layout.
   for (uint32_t i = 0; i < keySequence.Length(); ++i) {
     uint8_t key = keySequence[i].mGeneral;
     uint8_t keySpecific = keySequence[i].mSpecific;
@@ -3173,7 +3219,7 @@ KeyboardLayout::SynthesizeNativeKeyEvent(nsWindowBase* aWidget,
           fakeCharMsg->mScanCode = scanCode;
           fakeCharMsg->mIsDeadKey = makeDeadCharMsg;
         }
-        NativeKey nativeKey(aWidget, keyDownMsg, modKeyState, &fakeCharMsgs);
+        NativeKey nativeKey(aWidget, keyDownMsg, modKeyState, 0, &fakeCharMsgs);
         bool dispatched;
         nativeKey.HandleKeyDownMessage(&dispatched);
         // If some char messages are not consumed, let's emulate the widget
