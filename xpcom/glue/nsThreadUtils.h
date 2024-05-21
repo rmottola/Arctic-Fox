@@ -352,6 +352,7 @@ struct nsRunnableMethodTraits<R(NS_STDCALL C::*)(), Owning>
 };
 #endif
 
+
 // IsParameterStorageClass<T>::value is true if T is a parameter-storage class
 // that will be recognized by NS_New[NonOwning]RunnableMethodWithArg[s] to
 // force a specific storage&passing strategy (instead of inferring one,
