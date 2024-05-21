@@ -360,12 +360,6 @@ ModifierKeyState::IsScrollLocked() const
   return (mModifiers & MODIFIER_SCROLLLOCK) != 0;
 }
 
-Modifiers
-ModifierKeyState::GetModifiers() const
-{
-  return mModifiers;
-}
-
 void
 ModifierKeyState::EnsureAltGr()
 {
