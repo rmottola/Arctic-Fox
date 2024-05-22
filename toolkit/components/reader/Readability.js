@@ -1636,6 +1636,7 @@ Readability.prototype = {
 
     var tagsList = e.getElementsByTagName(tag);
     var curTagsLength = tagsList.length;
+    var isList = tag === "ul" || tag === "ol";
 
     // Gather counts for other typical elements embedded within.
     // Traverse backwards so we can remove nodes at the same time
