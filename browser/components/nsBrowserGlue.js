@@ -28,6 +28,13 @@ XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
 XPCOMUtils.defineLazyModuleGetter(this, "NewTabPrefsProvider",
                                   "resource:///modules/NewTabPrefsProvider.jsm");
 
+
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabWebChannel",
+                                  "resource:///modules/NewTabWebChannel.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabMessages",
+                                  "resource:///modules/NewTabMessages.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
                                   "resource://gre/modules/AddonManager.jsm");
 
@@ -708,6 +715,8 @@ BrowserGlue.prototype = {
     NewTabUtils.links.addProvider(DirectoryLinksProvider);
     AboutNewTab.init();
     NewTabPrefsProvider.prefs.init();
+    NewTabWebChannel.init();
+    NewTabMessages.init();
 
     SessionStore.init();
     BrowserUITelemetry.init();
@@ -986,6 +995,9 @@ BrowserGlue.prototype = {
     UserAgentOverrides.uninit();
 
     NewTabPrefsProvider.prefs.uninit();
+    NewTabWebChannel.uninit();
+    NewTabMessages.uninit();
+
     AboutNewTab.uninit();
     webrtcUI.uninit();
     FormValidationHandler.uninit();
