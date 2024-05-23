@@ -1337,24 +1337,16 @@ private:
 class ImportKeyTask : public WebCryptoTask
 {
 public:
-  void Init(JSContext* aCx,
-      const nsAString& aFormat,
-      const ObjectOrString& aAlgorithm, bool aExtractable,
-      const Sequence<nsString>& aKeyUsages)
+  void Init(nsIGlobalObject* aGlobal, JSContext* aCx,
+      const nsAString& aFormat, const ObjectOrString& aAlgorithm,
+      bool aExtractable, const Sequence<nsString>& aKeyUsages)
   {
     mFormat = aFormat;
     mDataIsSet = false;
     mDataIsJwk = false;
 
-    // Get the current global object from the context
-    nsIGlobalObject *global = xpc::NativeGlobal(JS::CurrentGlobalOrNull(aCx));
-    if (!global) {
-      mEarlyRv = NS_ERROR_DOM_UNKNOWN_ERR;
-      return;
-    }
-
     // This stuff pretty much always happens, so we'll do it here
-    mKey = new CryptoKey(global);
+    mKey = new CryptoKey(aGlobal);
     mKey->SetExtractable(aExtractable);
     mKey->ClearUsages();
     for (uint32_t i = 0; i < aKeyUsages.Length(); ++i) {
@@ -1477,20 +1469,20 @@ private:
 class ImportSymmetricKeyTask : public ImportKeyTask
 {
 public:
-  ImportSymmetricKeyTask(JSContext* aCx,
+  ImportSymmetricKeyTask(nsIGlobalObject* aGlobal, JSContext* aCx,
       const nsAString& aFormat,
       const ObjectOrString& aAlgorithm, bool aExtractable,
       const Sequence<nsString>& aKeyUsages)
   {
-    Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
   }
 
-  ImportSymmetricKeyTask(JSContext* aCx,
+  ImportSymmetricKeyTask(nsIGlobalObject* aGlobal, JSContext* aCx,
       const nsAString& aFormat, const JS::Handle<JSObject*> aKeyData,
       const ObjectOrString& aAlgorithm, bool aExtractable,
       const Sequence<nsString>& aKeyUsages)
   {
-    Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
     if (NS_FAILED(mEarlyRv)) {
       return;
     }
@@ -1503,12 +1495,11 @@ public:
     }
   }
 
-  void Init(JSContext* aCx,
-      const nsAString& aFormat,
+  void Init(nsIGlobalObject* aGlobal, JSContext* aCx, const nsAString& aFormat,
       const ObjectOrString& aAlgorithm, bool aExtractable,
       const Sequence<nsString>& aKeyUsages)
   {
-    ImportKeyTask::Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    ImportKeyTask::Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
     if (NS_FAILED(mEarlyRv)) {
       return;
     }
@@ -1635,20 +1626,20 @@ private:
 class ImportRsaKeyTask : public ImportKeyTask
 {
 public:
-  ImportRsaKeyTask(JSContext* aCx,
+  ImportRsaKeyTask(nsIGlobalObject* aGlobal, JSContext* aCx,
       const nsAString& aFormat,
       const ObjectOrString& aAlgorithm, bool aExtractable,
       const Sequence<nsString>& aKeyUsages)
   {
-    Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
   }
 
-  ImportRsaKeyTask(JSContext* aCx,
+  ImportRsaKeyTask(nsIGlobalObject* aGlobal, JSContext* aCx,
       const nsAString& aFormat, JS::Handle<JSObject*> aKeyData,
       const ObjectOrString& aAlgorithm, bool aExtractable,
       const Sequence<nsString>& aKeyUsages)
   {
-    Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
     if (NS_FAILED(mEarlyRv)) {
       return;
     }
@@ -1661,12 +1652,12 @@ public:
     }
   }
 
-  void Init(JSContext* aCx,
+  void Init(nsIGlobalObject* aGlobal, JSContext* aCx,
       const nsAString& aFormat,
       const ObjectOrString& aAlgorithm, bool aExtractable,
       const Sequence<nsString>& aKeyUsages)
   {
-    ImportKeyTask::Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    ImportKeyTask::Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
     if (NS_FAILED(mEarlyRv)) {
       return;
     }
@@ -1803,19 +1794,19 @@ private:
 class ImportEcKeyTask : public ImportKeyTask
 {
 public:
-  ImportEcKeyTask(JSContext* aCx, const nsAString& aFormat,
-                  const ObjectOrString& aAlgorithm, bool aExtractable,
-                  const Sequence<nsString>& aKeyUsages)
+  ImportEcKeyTask(nsIGlobalObject* aGlobal, JSContext* aCx,
+                  const nsAString& aFormat, const ObjectOrString& aAlgorithm,
+                  bool aExtractable, const Sequence<nsString>& aKeyUsages)
   {
-    Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
   }
 
-  ImportEcKeyTask(JSContext* aCx, const nsAString& aFormat,
-                  JS::Handle<JSObject*> aKeyData,
+  ImportEcKeyTask(nsIGlobalObject* aGlobal, JSContext* aCx,
+                  const nsAString& aFormat, JS::Handle<JSObject*> aKeyData,
                   const ObjectOrString& aAlgorithm, bool aExtractable,
                   const Sequence<nsString>& aKeyUsages)
   {
-    Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
     if (NS_FAILED(mEarlyRv)) {
       return;
     }
@@ -1824,11 +1815,11 @@ public:
     NS_ENSURE_SUCCESS_VOID(mEarlyRv);
   }
 
-  void Init(JSContext* aCx, const nsAString& aFormat,
+  void Init(nsIGlobalObject* aGlobal, JSContext* aCx, const nsAString& aFormat,
             const ObjectOrString& aAlgorithm, bool aExtractable,
             const Sequence<nsString>& aKeyUsages)
   {
-    ImportKeyTask::Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    ImportKeyTask::Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
     if (NS_FAILED(mEarlyRv)) {
       return;
     }
@@ -1956,30 +1947,30 @@ private:
 class ImportDhKeyTask : public ImportKeyTask
 {
 public:
-  ImportDhKeyTask(JSContext* aCx, const nsAString& aFormat,
-                  const ObjectOrString& aAlgorithm, bool aExtractable,
-                  const Sequence<nsString>& aKeyUsages)
+  ImportDhKeyTask(nsIGlobalObject* aGlobal, JSContext* aCx,
+                  const nsAString& aFormat, const ObjectOrString& aAlgorithm,
+                  bool aExtractable, const Sequence<nsString>& aKeyUsages)
   {
-    Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
   }
 
-  ImportDhKeyTask(JSContext* aCx, const nsAString& aFormat,
-                  JS::Handle<JSObject*> aKeyData,
+  ImportDhKeyTask(nsIGlobalObject* aGlobal, JSContext* aCx,
+                  const nsAString& aFormat, JS::Handle<JSObject*> aKeyData,
                   const ObjectOrString& aAlgorithm, bool aExtractable,
                   const Sequence<nsString>& aKeyUsages)
   {
-    Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
     if (NS_SUCCEEDED(mEarlyRv)) {
       SetKeyData(aCx, aKeyData);
       NS_ENSURE_SUCCESS_VOID(mEarlyRv);
     }
   }
 
-  void Init(JSContext* aCx, const nsAString& aFormat,
+  void Init(nsIGlobalObject* aGlobal, JSContext* aCx, const nsAString& aFormat,
             const ObjectOrString& aAlgorithm, bool aExtractable,
             const Sequence<nsString>& aKeyUsages)
   {
-    ImportKeyTask::Init(aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
+    ImportKeyTask::Init(aGlobal, aCx, aFormat, aAlgorithm, aExtractable, aKeyUsages);
     if (NS_FAILED(mEarlyRv)) {
       return;
     }
@@ -2858,7 +2849,7 @@ template<class DeriveBitsTask>
 class DeriveKeyTask : public DeriveBitsTask
 {
 public:
-  DeriveKeyTask(JSContext* aCx,
+  DeriveKeyTask(nsIGlobalObject* aGlobal, JSContext* aCx,
                 const ObjectOrString& aAlgorithm, CryptoKey& aBaseKey,
                 const ObjectOrString& aDerivedKeyType, bool aExtractable,
                 const Sequence<nsString>& aKeyUsages)
@@ -2870,7 +2861,7 @@ public:
     }
 
     NS_NAMED_LITERAL_STRING(format, WEBCRYPTO_KEY_FORMAT_RAW);
-    mTask = new ImportSymmetricKeyTask(aCx, format, aDerivedKeyType,
+    mTask = new ImportSymmetricKeyTask(aGlobal, aCx, format, aDerivedKeyType,
                                        aExtractable, aKeyUsages);
   }
 
@@ -3300,7 +3291,8 @@ WebCryptoTask::CreateDigestTask(JSContext* aCx,
 }
 
 WebCryptoTask*
-WebCryptoTask::CreateImportKeyTask(JSContext* aCx,
+WebCryptoTask::CreateImportKeyTask(nsIGlobalObject* aGlobal,
+                                   JSContext* aCx,
                                    const nsAString& aFormat,
                                    JS::Handle<JSObject*> aKeyData,
                                    const ObjectOrString& aAlgorithm,
@@ -3338,19 +3330,19 @@ WebCryptoTask::CreateImportKeyTask(JSContext* aCx,
       algName.EqualsLiteral(WEBCRYPTO_ALG_PBKDF2) ||
       algName.EqualsLiteral(WEBCRYPTO_ALG_HKDF) ||
       algName.EqualsLiteral(WEBCRYPTO_ALG_HMAC)) {
-    return new ImportSymmetricKeyTask(aCx, aFormat, aKeyData, aAlgorithm,
-                                      aExtractable, aKeyUsages);
+    return new ImportSymmetricKeyTask(aGlobal, aCx, aFormat, aKeyData,
+                                      aAlgorithm, aExtractable, aKeyUsages);
   } else if (algName.EqualsLiteral(WEBCRYPTO_ALG_RSASSA_PKCS1) ||
              algName.EqualsLiteral(WEBCRYPTO_ALG_RSA_OAEP) ||
              algName.EqualsLiteral(WEBCRYPTO_ALG_RSA_PSS)) {
-    return new ImportRsaKeyTask(aCx, aFormat, aKeyData, aAlgorithm,
+    return new ImportRsaKeyTask(aGlobal, aCx, aFormat, aKeyData, aAlgorithm,
                                 aExtractable, aKeyUsages);
   } else if (algName.EqualsLiteral(WEBCRYPTO_ALG_ECDH) ||
              algName.EqualsLiteral(WEBCRYPTO_ALG_ECDSA)) {
-    return new ImportEcKeyTask(aCx, aFormat, aKeyData, aAlgorithm,
+    return new ImportEcKeyTask(aGlobal, aCx, aFormat, aKeyData, aAlgorithm,
                                aExtractable, aKeyUsages);
   } else if (algName.EqualsLiteral(WEBCRYPTO_ALG_DH)) {
-    return new ImportDhKeyTask(aCx, aFormat, aKeyData, aAlgorithm,
+    return new ImportDhKeyTask(aGlobal, aCx, aFormat, aKeyData, aAlgorithm,
                                aExtractable, aKeyUsages);
   } else {
     return new FailureTask(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
@@ -3439,7 +3431,8 @@ WebCryptoTask::CreateGenerateKeyTask(JSContext* aCx,
 }
 
 WebCryptoTask*
-WebCryptoTask::CreateDeriveKeyTask(JSContext* aCx,
+WebCryptoTask::CreateDeriveKeyTask(nsIGlobalObject* aGlobal,
+                                   JSContext* aCx,
                                    const ObjectOrString& aAlgorithm,
                                    CryptoKey& aBaseKey,
                                    const ObjectOrString& aDerivedKeyType,
@@ -3465,21 +3458,21 @@ WebCryptoTask::CreateDeriveKeyTask(JSContext* aCx,
   }
 
   if (algName.EqualsASCII(WEBCRYPTO_ALG_HKDF)) {
-    return new DeriveKeyTask<DeriveHkdfBitsTask>(aCx, aAlgorithm, aBaseKey,
-                                                 aDerivedKeyType, aExtractable,
-                                                 aKeyUsages);
+    return new DeriveKeyTask<DeriveHkdfBitsTask>(aGlobal, aCx, aAlgorithm,
+                                                 aBaseKey, aDerivedKeyType,
+                                                 aExtractable, aKeyUsages);
   }
 
   if (algName.EqualsASCII(WEBCRYPTO_ALG_PBKDF2)) {
-    return new DeriveKeyTask<DerivePbkdfBitsTask>(aCx, aAlgorithm, aBaseKey,
-                                                  aDerivedKeyType, aExtractable,
-                                                  aKeyUsages);
+    return new DeriveKeyTask<DerivePbkdfBitsTask>(aGlobal, aCx, aAlgorithm,
+                                                  aBaseKey, aDerivedKeyType,
+                                                  aExtractable, aKeyUsages);
   }
 
   if (algName.EqualsASCII(WEBCRYPTO_ALG_ECDH)) {
-    return new DeriveKeyTask<DeriveEcdhBitsTask>(aCx, aAlgorithm, aBaseKey,
-                                                 aDerivedKeyType, aExtractable,
-                                                 aKeyUsages);
+    return new DeriveKeyTask<DeriveEcdhBitsTask>(aGlobal, aCx, aAlgorithm,
+                                                 aBaseKey, aDerivedKeyType,
+                                                 aExtractable, aKeyUsages);
   }
 
   return new FailureTask(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
@@ -3573,7 +3566,8 @@ WebCryptoTask::CreateWrapKeyTask(JSContext* aCx,
 }
 
 WebCryptoTask*
-WebCryptoTask::CreateUnwrapKeyTask(JSContext* aCx,
+WebCryptoTask::CreateUnwrapKeyTask(nsIGlobalObject* aGlobal,
+                                   JSContext* aCx,
                                    const nsAString& aFormat,
                                    const ArrayBufferViewOrArrayBuffer& aWrappedKey,
                                    CryptoKey& aUnwrappingKey,
@@ -3607,13 +3601,13 @@ WebCryptoTask::CreateUnwrapKeyTask(JSContext* aCx,
       keyAlgName.EqualsASCII(WEBCRYPTO_ALG_AES_GCM) ||
       keyAlgName.EqualsASCII(WEBCRYPTO_ALG_HKDF) ||
       keyAlgName.EqualsASCII(WEBCRYPTO_ALG_HMAC)) {
-    importTask = new ImportSymmetricKeyTask(aCx, aFormat,
+    importTask = new ImportSymmetricKeyTask(aGlobal, aCx, aFormat,
                                             aUnwrappedKeyAlgorithm,
                                             aExtractable, aKeyUsages);
   } else if (keyAlgName.EqualsASCII(WEBCRYPTO_ALG_RSASSA_PKCS1) ||
              keyAlgName.EqualsASCII(WEBCRYPTO_ALG_RSA_OAEP) ||
              keyAlgName.EqualsASCII(WEBCRYPTO_ALG_RSA_PSS)) {
-    importTask = new ImportRsaKeyTask(aCx, aFormat,
+    importTask = new ImportRsaKeyTask(aGlobal, aCx, aFormat,
                                       aUnwrappedKeyAlgorithm,
                                       aExtractable, aKeyUsages);
   } else {
