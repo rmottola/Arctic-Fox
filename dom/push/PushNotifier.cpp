@@ -15,8 +15,8 @@
 #include "mozilla/Services.h"
 #include "mozilla/unused.h"
 
+#include "mozilla/dom/BodyUtil.h"
 #include "mozilla/dom/ContentParent.h"
-#include "mozilla/dom/FetchUtil.h"
 
 namespace mozilla {
 namespace dom {
@@ -341,7 +341,7 @@ PushMessage::EnsureDecodedText()
   if (mData.IsEmpty() || !mDecodedText.IsEmpty()) {
     return NS_OK;
   }
-  nsresult rv = FetchUtil::ConsumeText(
+  nsresult rv = BodyUtil::ConsumeText(
     mData.Length(),
     reinterpret_cast<uint8_t*>(mData.Elements()),
     mDecodedText
@@ -373,7 +373,7 @@ PushMessage::Json(JSContext* aCx,
     return rv;
   }
   ErrorResult error;
-  FetchUtil::ConsumeJson(aCx, aResult, mDecodedText, error);
+  BodyUtil::ConsumeJson(aCx, aResult, mDecodedText, error);
   if (error.Failed()) {
     return error.StealNSResult();
   }
