@@ -973,6 +973,11 @@ TestArray.addTest(
 TestArray.addTest(
   "Test that we check keys before using them for encryption/signatures",
   function() {
+    // This test isn't supported in workers.
+    if (window.importScripts) {
+      return this.complete(true);
+    }
+
     var that = this;
 
     function doCheckRSASSA() {
