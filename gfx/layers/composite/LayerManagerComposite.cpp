@@ -349,7 +349,7 @@ LayerManagerComposite::PostProcessLayers(Layer* aLayer,
   if (integerTranslation &&
       !aLayer->HasMaskLayers() &&
       aLayer->IsOpaqueForVisibility()) {
-    if (aLayer->GetContentFlags() & Layer::CONTENT_OPAQUE) {
+    if (aLayer->IsOpaque()) {
       localOpaque.OrWith(composite->GetFullyRenderedRegion());
     }
     localOpaque.MoveBy(*integerTranslation);

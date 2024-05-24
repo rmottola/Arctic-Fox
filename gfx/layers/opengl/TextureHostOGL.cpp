@@ -533,7 +533,6 @@ SurfaceTextureHost::SetCompositor(Compositor* aCompositor)
 gfx::SurfaceFormat
 SurfaceTextureHost::GetFormat() const
 {
-  MOZ_ASSERT(mTextureSource);
   return mTextureSource ? mTextureSource->GetFormat() : gfx::SurfaceFormat::UNKNOWN;
 }
 
