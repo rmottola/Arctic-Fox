@@ -104,6 +104,7 @@ static const char *sExtensionNames[] = {
     "GL_ARB_texture_float",
     "GL_ARB_texture_non_power_of_two",
     "GL_ARB_texture_rectangle",
+    "GL_ARB_texture_rg",
     "GL_ARB_texture_storage",
     "GL_ARB_texture_swizzle",
     "GL_ARB_timer_query",
