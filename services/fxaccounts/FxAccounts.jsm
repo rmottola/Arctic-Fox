@@ -30,6 +30,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "FxAccountsOAuthGrantClient",
 XPCOMUtils.defineLazyModuleGetter(this, "FxAccountsProfile",
   "resource://gre/modules/FxAccountsProfile.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "Utils",
+  "resource://services-sync/util.js");
+
 // All properties exposed by the public FxAccounts API.
 var publicProperties = [
   "accountStatus",
