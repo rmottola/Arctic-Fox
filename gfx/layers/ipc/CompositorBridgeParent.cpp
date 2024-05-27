@@ -829,22 +829,6 @@ CompositorBridgeParent::RecvMakeSnapshot(const SurfaceDescriptor& aInSnapshot,
 }
 
 bool
-CompositorBridgeParent::RecvMakeWidgetSnapshot(const SurfaceDescriptor& aInSnapshot)
-{
-  if (!mCompositor || !mCompositor->GetWidget()) {
-    return false;
-  }
-
-  RefPtr<DrawTarget> target = GetDrawTargetForDescriptor(aInSnapshot, gfx::BackendType::CAIRO);
-  MOZ_ASSERT(target);
-  if (!target) {
-    return false;
-  }
-  mCompositor->GetWidget()->CaptureWidgetOnScreen(target);
-  return true;
-}
-
-bool
 CompositorBridgeParent::RecvFlushRendering()
 {
   if (mCompositorScheduler->NeedsComposite())
@@ -1962,8 +1946,6 @@ public:
   virtual bool RecvAdoptChild(const uint64_t& child) override { return false; }
   virtual bool RecvMakeSnapshot(const SurfaceDescriptor& aInSnapshot,
                                 const gfx::IntRect& aRect) override
-  { return true; }
-  virtual bool RecvMakeWidgetSnapshot(const SurfaceDescriptor& aInSnapshot) override
   { return true; }
   virtual bool RecvFlushRendering() override { return true; }
   virtual bool RecvForcePresent() override { return true; }
