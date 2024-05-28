@@ -59,8 +59,6 @@ NON_DIST_FILES = \
   classes.dex \
   $(NULL)
 
-UPLOAD_EXTRA_FILES += gecko-unsigned-unaligned.apk
-
 DIST_FILES += $(MOZ_CHILD_PROCESS_NAME)
 
 GECKO_APP_AP_PATH = $(topobjdir)/mobile/android/base
@@ -69,7 +67,6 @@ ifdef ENABLE_TESTS
 INNER_ROBOCOP_PACKAGE=true
 ifeq ($(MOZ_BUILD_APP),mobile/android)
 UPLOAD_EXTRA_FILES += robocop.apk
-UPLOAD_EXTRA_FILES += fennec_ids.txt
 UPLOAD_EXTRA_FILES += geckoview_library/geckoview_library.zip
 UPLOAD_EXTRA_FILES += geckoview_library/geckoview_assets.zip
 
@@ -82,11 +79,7 @@ else
 robocop_apk := $(topobjdir)/gradle/build/mobile/android/app/outputs/apk/app-automation-debug-androidTest-unaligned.apk
 endif
 
-# Normally, $(NSINSTALL) would be used instead of cp, but INNER_ROBOCOP_PACKAGE
-# is used in a series of commands that run under a "cd something", while
-# $(NSINSTALL) is relative.
 INNER_ROBOCOP_PACKAGE= \
-  cp $(GECKO_APP_AP_PATH)/fennec_ids.txt $(ABS_DIST) && \
   $(call RELEASE_SIGN_ANDROID_APK,$(robocop_apk),$(ABS_DIST)/robocop.apk)
 endif
 else
@@ -255,7 +248,6 @@ INNER_MAKE_APK = \
   rm -f $(ABS_DIST)/gecko.apk && \
   cp $(ABS_DIST)/gecko.ap_ $(ABS_DIST)/gecko.apk && \
   $(ZIP) -j0 $(ABS_DIST)/gecko.apk $(STAGEPATH)$(MOZ_PKG_DIR)$(_BINPATH)/classes.dex && \
-  cp $(ABS_DIST)/gecko.apk $(ABS_DIST)/gecko-unsigned-unaligned.apk && \
   $(RELEASE_JARSIGNER) $(ABS_DIST)/gecko.apk && \
   $(ZIPALIGN) -f -v 4 $(ABS_DIST)/gecko.apk $(PACKAGE)
 
@@ -270,14 +262,6 @@ INNER_MAKE_PACKAGE = \
   $(INNER_INSTALL_BOUNCER_PACKAGE) && \
   $(INNER_MAKE_GECKOLIBS_AAR) && \
   $(INNER_MAKE_GECKOVIEW_LIBRARY)
-endif
-
-ifeq ($(MOZ_BUILD_APP),mobile/android/b2gdroid)
-INNER_MAKE_PACKAGE = \
-  $(INNER_SZIP_LIBRARIES) && \
-  cp $(topobjdir)/mobile/android/b2gdroid/app/classes.dex $(ABS_DIST)/classes.dex && \
-  cp $(topobjdir)/mobile/android/b2gdroid/app/b2gdroid-unsigned-unaligned.apk $(ABS_DIST)/gecko.ap_ && \
-  $(INNER_MAKE_APK)
 endif
 
 # Language repacks root the resources contained in assets/omni.ja
