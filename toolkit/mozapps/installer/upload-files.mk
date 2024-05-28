@@ -82,6 +82,11 @@ ifdef MSVC_CXX_RUNTIME_DLL
   JSSHELL_BINS += $(MSVC_CXX_RUNTIME_DLL)
 endif
 
+ifdef WIN_UCRT_REDIST_DIR
+  JSSHELL_BINS += $(notdir $(wildcard $(DIST)/bin/api-ms-win-*.dll))
+  JSSHELL_BINS += ucrtbase.dll
+endif
+
 MAKE_JSSHELL  = $(call py_action,zip,-C $(DIST)/bin $(abspath $(PKG_JSSHELL)) $(JSSHELL_BINS))
 
 JARLOG_DIR = $(topobjdir)/jarlog/
