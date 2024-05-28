@@ -62,22 +62,23 @@ JSSHELL_BINS  = \
   js$(BIN_SUFFIX) \
   $(DLL_PREFIX)mozglue$(DLL_SUFFIX) \
   $(NULL)
+
 ifndef MOZ_SYSTEM_NSPR
-ifdef MSVC_C_RUNTIME_DLL
-JSSHELL_BINS += $(MSVC_C_RUNTIME_DLL)
-endif
-ifdef MSVC_CXX_RUNTIME_DLL
-JSSHELL_BINS += $(MSVC_CXX_RUNTIME_DLL)
-endif
-ifdef MOZ_FOLD_LIBS
-JSSHELL_BINS += $(DLL_PREFIX)nss3$(DLL_SUFFIX)
-else
-JSSHELL_BINS += \
-  $(DLL_PREFIX)nspr4$(DLL_SUFFIX) \
-  $(DLL_PREFIX)plds4$(DLL_SUFFIX) \
-  $(DLL_PREFIX)plc4$(DLL_SUFFIX) \
-  $(NULL)
-endif # MOZ_FOLD_LIBS
+  ifdef MSVC_C_RUNTIME_DLL
+    JSSHELL_BINS += $(MSVC_C_RUNTIME_DLL)
+  endif
+  ifdef MSVC_CXX_RUNTIME_DLL
+    JSSHELL_BINS += $(MSVC_CXX_RUNTIME_DLL)
+  endif
+  ifdef MOZ_FOLD_LIBS
+    JSSHELL_BINS += $(DLL_PREFIX)nss3$(DLL_SUFFIX)
+  else
+    JSSHELL_BINS += \
+      $(DLL_PREFIX)nspr4$(DLL_SUFFIX) \
+      $(DLL_PREFIX)plds4$(DLL_SUFFIX) \
+      $(DLL_PREFIX)plc4$(DLL_SUFFIX) \
+      $(NULL)
+  endif # MOZ_FOLD_LIBS
 endif # MOZ_SYSTEM_NSPR
 
 MAKE_JSSHELL  = $(call py_action,zip,-C $(DIST)/bin $(abspath $(PKG_JSSHELL)) $(JSSHELL_BINS))
