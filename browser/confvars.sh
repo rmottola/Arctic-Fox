@@ -46,12 +46,10 @@ if test "$MOZ_OFFICIAL_BRANDING"; then
 fi
 
 # MOZ_APP_DISPLAYNAME will be set by branding/configure.sh
-# Changing MOZ_*BRANDING_DIRECTORY requires a clobber to ensure correct results,
-# because branding dependencies are broken.
 # MOZ_BRANDING_DIRECTORY is the default branding directory used when none is
 # specified. It should never point to the "official" branding directory.
 # For mozilla-beta, mozilla-release, or mozilla-central repositories, use
-# "nightly" branding (until bug 659568 is fixed).
+# "unofficial" branding.
 # For the mozilla-aurora repository, use "aurora".
 MOZ_BRANDING_DIRECTORY=browser/branding/arcticfox
 MOZ_OFFICIAL_BRANDING_DIRECTORY=browser/branding/arcticfox
