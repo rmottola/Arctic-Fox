@@ -13,7 +13,9 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#if !defined(XP_MACOSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__)
 #include <sys/sysmacros.h>
+#endif
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
