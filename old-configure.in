@@ -3603,13 +3603,6 @@ if test -n "$MOZ_ANDROID_SHARE_OVERLAY"; then
     AC_DEFINE(MOZ_ANDROID_SHARE_OVERLAY)
 fi
 
-dnl = Include Tab Queue on Android
-dnl = Temporary build flag to allow development in Nightly
-dnl ========================================================
-if test -n "$MOZ_ANDROID_TAB_QUEUE"; then
-    AC_DEFINE(MOZ_ANDROID_TAB_QUEUE)
-fi
-
 dnl ========================================================
 dnl = Enable IPDL's "expensive" unit tests
 dnl ========================================================
@@ -6826,7 +6819,6 @@ AC_SUBST(MOZ_DISABLE_GECKOVIEW)
 AC_SUBST(MOZ_ANDROID_GECKOLIBS_AAR)
 AC_SUBST(MOZ_ANDROID_READING_LIST_SERVICE)
 AC_SUBST(MOZ_ANDROID_SHARE_OVERLAY)
-AC_SUBST(MOZ_ANDROID_TAB_QUEUE)
 AC_SUBST(MOZ_EXCLUDE_HYPHENATION_DICTIONARIES)
 AC_SUBST(ENABLE_STRIP)
 AC_SUBST(PKG_SKIP_STRIP)
