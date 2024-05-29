@@ -1046,12 +1046,6 @@ else
     _DEFINES_CXXFLAGS='-DMOZILLA_CLIENT -D_MOZILLA_CONFIG_H_ $(ACDEFINES)'
 fi
 
-#FIXME: Work around breaking optimizations performed by GCC 6 and later
-if test "$GCC_MAJOR_VERSION" -ge "6" ; then
-    CFLAGS="$CFLAGS -fno-delete-null-pointer-checks -fno-lifetime-dse -fno-schedule-insns2"
-    CXXFLAGS="$CXXFLAGS -fno-delete-null-pointer-checks -fno-lifetime-dse -fno-schedule-insns2"
-fi
-
 dnl ========================================================
 dnl Checking for 64-bit OS
 dnl ========================================================
