@@ -9,18 +9,9 @@ GNU_LD=
 
 GNU_CC=
 GNU_CXX=
-dnl moz.configure ensures that the compilers have the same version
-CXX_VERSION=$CC_VERSION
 if test "$CC_TYPE" = "gcc"; then
     GNU_CC=1
     GNU_CXX=1
-    changequote(<<,>>)
-    GCC_VERSION_FULL="$CXX_VERSION"
-    GCC_VERSION=`echo "$GCC_VERSION_FULL" | $PERL -pe '(split(/\./))[0]>=4&&s/(^\d*\.\d*).*/<<$>>1/;'`
-
-    GCC_MAJOR_VERSION=`echo ${GCC_VERSION} | $AWK -F\. '{ print <<$>>1 }'`
-    GCC_MINOR_VERSION=`echo ${GCC_VERSION} | $AWK -F\. '{ print <<$>>2 }'`
-    changequote([,])
 fi
 
 if test "`echo | $AS -o conftest.out -v 2>&1 | grep -c GNU`" != "0"; then
@@ -29,12 +20,6 @@ fi
 rm -f conftest.out
 if test "`echo | $LD -v 2>&1 | grep -c GNU`" != "0"; then
     GNU_LD=1
-fi
-
-if test "$CC_TYPE" = "msvc"; then
-     MSVC_VERSION_FULL="$CXX_VERSION"
-     CC_VERSION=`echo ${CC_VERSION} | cut -c 1-4`
-     CXX_VERSION=`echo ${CXX_VERSION} | cut -c 1-4`
 fi
 
 CLANG_CC=
@@ -148,20 +133,6 @@ if test "$GNU_CXX"; then
       MOZ_NEEDS_LIBATOMIC=
     fi
     AC_SUBST(MOZ_NEEDS_LIBATOMIC)
-fi
-
-if test -n "$CROSS_COMPILE"; then
-    dnl moz.configure ensures that the compilers have the same version
-    HOST_CXX_VERSION=$HOST_CC_VERSION
-    if test "$HOST_CC_TYPE" = "gcc" ; then
-	changequote(<<,>>)
-	HOST_GCC_VERSION_FULL="$HOST_CXX_VERSION"
-	HOST_GCC_VERSION=`echo "$HOST_GCC_VERSION_FULL" | $PERL -pe '(split(/\./))[0]>=4&&s/(^\d*\.\d*).*/<<$>>1/;'`
-
-	HOST_GCC_MAJOR_VERSION=`echo ${HOST_GCC_VERSION} | $AWK -F\. '{ print <<$>>1 }'`
-	HOST_GCC_MINOR_VERSION=`echo ${HOST_GCC_VERSION} | $AWK -F\. '{ print <<$>>2 }'`
-	changequote([,])
-    fi
 fi
 AC_LANG_C
 ])
