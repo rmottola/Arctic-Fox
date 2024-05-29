@@ -6874,7 +6874,16 @@ AC_SUBST(MOZ_CHILD_PROCESS_BUNDLE)
 # profile name and remoting. If not set, defaults to MOZ_APP_NAME.
 # - MOZ_APP_PROFILE: When set, used for application.ini's
 # "Profile" field, which controls profile location.
-# - MOZ_APP_ID: When set, used for application.ini's "ID" field.
+# - MOZ_APP_ID: When set, used for application.ini's "ID" field, and
+# crash reporter server url.
+# - MOZ_APP_ANDROID_VERSION_CODE: On Android, "android:versionCode" for
+# the main application is set to the value of this variable.  If not
+# set, it falls back to a Mozilla-specific value derived from the
+# build ID.
+# - MOZ_ANDROID_SHARED_ID: On Android, "android:sharedUserId" for all Android
+# packages produced.
+# - MOZ_ANDROID_GCM_SENDERID: On Android, the Android GCM Sender ID used.  GCM
+# sender IDs are not sensitive: see, http://stackoverflow.com/a/18216063.
 # - MOZ_PROFILE_MIGRATOR: When set, enables profile migrator.
 
 if test -z "$MOZ_APP_NAME"; then
