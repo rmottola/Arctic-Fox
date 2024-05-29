@@ -2821,7 +2821,6 @@ MOZ_USE_NATIVE_POPUP_WINDOWS=
 MOZ_ANDROID_HISTORY=
 MOZ_WEBSMS_BACKEND=
 MOZ_ANDROID_READING_LIST_SERVICE=
-MOZ_ANDROID_SHARE_OVERLAY=
 MOZ_EXCLUDE_HYPHENATION_DICTIONARIES=
 ACCESSIBILITY=
 MOZ_TIME_MANAGER=
@@ -3594,13 +3593,6 @@ dnl = Whether to exclude hyphenations files in the build
 dnl =========================================================
 if test -n "$MOZ_EXCLUDE_HYPHENATION_DICTIONARIES"; then
     AC_DEFINE(MOZ_EXCLUDE_HYPHENATION_DICTIONARIES)
-fi
-
-dnl ========================================================
-dnl = Include share overlay on Android
-dnl ========================================================
-if test -n "$MOZ_ANDROID_SHARE_OVERLAY"; then
-    AC_DEFINE(MOZ_ANDROID_SHARE_OVERLAY)
 fi
 
 dnl ========================================================
@@ -6818,7 +6810,6 @@ AC_SUBST(MOZ_WEBSMS_BACKEND)
 AC_SUBST(MOZ_DISABLE_GECKOVIEW)
 AC_SUBST(MOZ_ANDROID_GECKOLIBS_AAR)
 AC_SUBST(MOZ_ANDROID_READING_LIST_SERVICE)
-AC_SUBST(MOZ_ANDROID_SHARE_OVERLAY)
 AC_SUBST(MOZ_EXCLUDE_HYPHENATION_DICTIONARIES)
 AC_SUBST(ENABLE_STRIP)
 AC_SUBST(PKG_SKIP_STRIP)
