@@ -585,7 +585,6 @@ if test -n "$_WIN32_MSVC"; then
     # Since we're skipping compiler and library checks, hard-code
     # some facts here.
     AC_DEFINE(HAVE_IO_H)
-    AC_DEFINE(HAVE_SETBUF)
     AC_DEFINE(HAVE_ISATTY)
 fi
 
@@ -1576,8 +1575,6 @@ case "$target" in
         dnl allow AVX2 code from VS2012
         HAVE_X86_AVX2=1
     fi
-    AC_DEFINE(HAVE_SNPRINTF)
-    AC_DEFINE(HW_THREADS)
     AC_DEFINE(STDC_HEADERS)
     AC_DEFINE(WIN32_LEAN_AND_MEAN)
     dnl See http://support.microsoft.com/kb/143208 to use STL
@@ -2819,7 +2816,6 @@ NECKO_PROTOCOLS_DEFAULT="about app data file ftp http res viewsource websocket w
 if test -n "$MOZ_RTSP"; then
   NECKO_PROTOCOLS_DEFAULT="$NECKO_PROTOCOLS_DEFAULT rtsp"
 fi
-USE_ARM_KUSER=
 BUILD_CTYPES=1
 MOZ_USE_NATIVE_POPUP_WINDOWS=
 MOZ_ANDROID_HISTORY=
@@ -3101,17 +3097,6 @@ if test "$COMPILE_ENVIRONMENT"; then
 fi # COMPILE_ENVIRONMENT
 
 AC_SUBST(MOZ_FS_LAYOUT)
-
-dnl ========================================================
-dnl Use ARM userspace kernel helpers; tell NSPR to enable
-dnl their usage and use them in spidermonkey.
-dnl ========================================================
-MOZ_ARG_WITH_BOOL(arm-kuser,
-[  --with-arm-kuser         Use kuser helpers (Linux/ARM only -- requires kernel 2.6.13 or later)],
-    USE_ARM_KUSER=1,)
-if test -n "$USE_ARM_KUSER"; then
-   AC_DEFINE(USE_ARM_KUSER)
-fi
 
 dnl ========================================================
 dnl = startup-notification support module
