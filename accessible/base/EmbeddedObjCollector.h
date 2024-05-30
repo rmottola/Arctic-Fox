@@ -24,11 +24,6 @@ public:
   AccCollector(Accessible* aRoot, filters::FilterFuncPtr aFilterFunc);
   virtual ~AccCollector();
 
-  /**
-   * Return an accessible from the collection at the given index.
-   */
-  Accessible* GetAccessibleAt(uint32_t aIndex);
-
 protected:
   /**
    * Ensure accessible at the given index is stored and return it.
@@ -73,6 +68,12 @@ public:
    * Return accessible count within the collection.
    */
   uint32_t Count();
+
+
+  /**
+   * Return an accessible from the collection at the given index.
+   */
+  Accessible* GetAccessibleAt(uint32_t aIndex);
 
 protected:
   // Make sure it's used by Accessible class only.
