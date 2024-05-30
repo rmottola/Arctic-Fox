@@ -34,11 +34,6 @@ public:
    */
   Accessible* GetAccessibleAt(uint32_t aIndex);
 
-  /**
-   * Return index of the given accessible within the collection.
-   */
-  virtual int32_t GetIndexAt(Accessible* aAccessible);
-
 protected:
   /**
    * Ensure accessible at the given index is stored and return it.
@@ -84,7 +79,10 @@ protected:
   explicit EmbeddedObjCollector(Accessible* aRoot) :
     AccCollector(aRoot, filters::GetEmbeddedObject) { }
 
-  virtual void AppendObject(Accessible* aAccessible) override;
+  /**
+   * Append the object to collection.
+   */
+  void AppendObject(Accessible* aAccessible);
 
   friend class Accessible;
 };
