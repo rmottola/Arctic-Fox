@@ -99,6 +99,9 @@ AccShowEvent::
   AccShowEvent(Accessible* aTarget) :
   AccMutationEvent(::nsIAccessibleEvent::EVENT_SHOW, aTarget)
 {
+  int32_t idx = aTarget->IndexInParent();
+  MOZ_ASSERT(idx >= 0);
+  mInsertionIndex = idx;
 }
 
 

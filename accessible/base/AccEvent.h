@@ -286,6 +286,11 @@ public:
   {
     return AccMutationEvent::GetEventGroups() | (1U << eShowEvent);
   }
+
+  uint32_t InsertionIndex() const { return mInsertionIndex; }
+
+private:
+  uint32_t mInsertionIndex;
 };
 
 
