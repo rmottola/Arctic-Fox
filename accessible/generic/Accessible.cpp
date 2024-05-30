@@ -2075,7 +2075,7 @@ Accessible::InsertChildAt(uint32_t aIndex, Accessible* aChild)
     MOZ_ASSERT(mStateFlags & eKidsMutating, "Illicit children change");
   }
 
-  if (!nsAccUtils::IsEmbeddedObject(aChild)) {
+  if (aChild->IsText()) {
     mStateFlags |= eHasTextKids;
   }
 
@@ -2234,7 +2234,7 @@ Accessible::IsLink()
 {
   // Every embedded accessible within hypertext accessible implements
   // hyperlink interface.
-  return mParent && mParent->IsHyperText() && nsAccUtils::IsEmbeddedObject(this);
+  return mParent && mParent->IsHyperText() && !IsText();
 }
 
 uint32_t
