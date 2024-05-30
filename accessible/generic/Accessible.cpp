@@ -855,7 +855,7 @@ Accessible::HandleAccEvent(AccEvent* aEvent)
           break;
 
         case nsIAccessibleEvent::EVENT_HIDE:
-          ipcDoc->SendHideEvent(id);
+          ipcDoc->SendHideEvent(id, aEvent->IsFromUserInput());
           break;
 
         case nsIAccessibleEvent::EVENT_REORDER:
