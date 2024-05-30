@@ -62,7 +62,10 @@ public:
   virtual ~EmbeddedObjCollector() { }
 
 public:
-  virtual int32_t GetIndexAt(Accessible* aAccessible) override;
+  /**
+   * Return index of the given accessible within the collection.
+   */
+  int32_t GetIndexAt(Accessible* aAccessible);
 
   /**
    * Return accessible count within the collection.
