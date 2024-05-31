@@ -7,7 +7,7 @@ EXTRA_COMPONENTS += [
     'ExperimentsService.js',
 ]
 
-EXTRA_JS_MODULES.experiments += [
+EXTRA_PP_JS_MODULES.experiments += [
   'Experiments.jsm',
 ]
 
