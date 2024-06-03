@@ -1874,7 +1874,7 @@ ExperimentsProvider.prototype = Object.freeze({
 
   recordLastActiveExperiment: function () {
     if (!gExperimentsEnabled) {
-      return;
+      return Promise.resolve();
     }
 
     if (!this._experiments) {
