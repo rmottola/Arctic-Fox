@@ -94,6 +94,9 @@ const gPrefsTelemetry = new Preferences(PREF_BRANCH_TELEMETRY);
 let gExperimentsEnabled = false;
 let gExperiments = null;
 let gLogAppenderDump = null;
+let gPolicyCounter = 0;
+let gExperimentsCounter = 0;
+let gExperimentEntryCounter = 0;
 
 let gLogger;
 let gLogDumping = false;
@@ -235,7 +238,8 @@ let Experiments = {
 
 Experiments.Policy = function () {
   this._log = Log.repository.getLoggerWithMessagePrefix(
-    "Browser.Experiments.Policy", "Experiments::Policy::");
+    "Browser.Experiments.Policy",
+    "Policy #" + gPolicyCounter++ + "::");
 };
 
 Experiments.Policy.prototype = {
@@ -302,7 +306,8 @@ Experiments.Policy.prototype = {
 
 Experiments.Experiments = function (policy=new Experiments.Policy()) {
   this._log = Log.repository.getLoggerWithMessagePrefix(
-    "Browser.Experiments.Experiments", "Experiments::");
+    "Browser.Experiments.Experiments",
+    "Experiments #" + gExperimentsCounter++ + "::");
 
   this._policy = policy;
 
@@ -1011,7 +1016,8 @@ Experiments.Experiments.prototype = {
 Experiments.ExperimentEntry = function (policy) {
   this._policy = policy || new Experiments.Policy();
   this._log = Log.repository.getLoggerWithMessagePrefix(
-    "Browser.Experiments.Experiments", "ExperimentEntry::");
+    "Browser.Experiments.Experiments",
+    "ExperimentEntry #" + gExperimentEntryCounter++ + "::");
 
   // Is this experiment running?
   this._enabled = false;
