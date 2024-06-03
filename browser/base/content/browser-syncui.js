@@ -278,7 +278,7 @@ var gSyncUI = {
       if (needsSetup || this._loginFailed()) {
         this.openSetup();
       } else {
-        return this.doSync();
+        this.doSync();
       }
     }).catch(err => {
       this.log.error("Failed to handle toolbar button command", err);
