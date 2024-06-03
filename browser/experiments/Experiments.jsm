@@ -58,6 +58,7 @@ const MIN_EXPERIMENT_ACTIVE_SECONDS = 60;
 
 const PREF_BRANCH               = "experiments.";
 const PREF_ENABLED              = "enabled"; // experiments.enabled
+const PREF_ACTIVE_EXPERIMENT    = "activeExperiment"; // whether we have an active experiment
 const PREF_LOGGING              = "logging";
 const PREF_LOGGING_LEVEL        = PREF_LOGGING + ".level"; // experiments.logging.level
 const PREF_LOGGING_DUMP         = PREF_LOGGING + ".dump"; // experiments.logging.dump
@@ -967,6 +968,11 @@ Experiments.Experiments.prototype = {
     let activeChanged = false;
     let now = this._policy.now();
 
+    if (!activeExperiment) {
+      // Avoid this pref staying out of sync if there were e.g. crashes.
+      gPrefs.set(PREF_ACTIVE_EXPERIMENT, false);
+    }
+
     if (activeExperiment) {
       this._pendingUninstall = activeExperiment._addonId;
       try {
@@ -1474,6 +1480,7 @@ Experiments.ExperimentEntry.prototype = {
       }
 
       yield this._installAddon();
+      gPrefs.set(PREF_ACTIVE_EXPERIMENT, true);
     }.bind(this));
   },
 
@@ -1594,6 +1601,8 @@ Experiments.ExperimentEntry.prototype = {
     }
 
     this._enabled = false;
+    gPrefs.set(PREF_ACTIVE_EXPERIMENT, false);
+
     let deferred = Promise.defer();
     let updateDates = () => {
       let now = this._policy.now();
@@ -1836,8 +1845,6 @@ ExperimentsProvider.prototype = Object.freeze({
   ],
 
   postInit: function () {
-    this._experiments = Experiments.instance();
-
     for (let o of this._OBSERVERS) {
       Services.obs.addObserver(this, o, false);
     }
@@ -1866,6 +1873,14 @@ ExperimentsProvider.prototype = Object.freeze({
   },
 
   recordLastActiveExperiment: function () {
+    if (!gExperimentsEnabled) {
+      return;
+    }
+
+    if (!this._experiments) {
+      this._experiments = Experiments.instance();
+    }
+
     let m = this.getMeasurement(ExperimentsLastActiveMeasurement1.prototype.name,
                                 ExperimentsLastActiveMeasurement1.prototype.version);
 
