@@ -145,7 +145,7 @@ function CreatePocketWidget(reason) {
     }
   });
 
-};
+}
 
 // PocketContextMenu
 // When the context menu is opened check if we need to build and enable pocket UI.
@@ -167,7 +167,7 @@ var PocketContextMenu = {
     }
   },
   observe: function(aSubject, aTopic, aData) {
-    let subject = aSubject.wrappedJSObject;;
+    let subject = aSubject.wrappedJSObject;
     let document = subject.menu.ownerDocument;
     let window = document.defaultView;
     let pocketEnabled = CustomizableUI.getPlacementOfWidget("pocket-button");

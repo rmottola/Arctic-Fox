@@ -168,7 +168,7 @@ let Screenshot = {
           default:
             reject(topic);
             break;
-        };
+        }
       },
     };
   },
