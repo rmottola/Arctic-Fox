@@ -387,7 +387,7 @@ function BrowserListener(aBrowser, aInstallingPrincipal, aInstalls) {
   this.installCount = aInstalls.length;
 
   aBrowser.addProgressListener(this, Ci.nsIWebProgress.NOTIFY_LOCATION);
-  Services.obs.addObserver(this, "message-manager-disconnect", true);
+  Services.obs.addObserver(this, "message-manager-close", true);
 
   for (let install of this.installs)
     install.addListener(this);
@@ -406,7 +406,7 @@ BrowserListener.prototype = {
       return;
     this.registered = false;
 
-    Services.obs.removeObserver(this, "message-manager-disconnect");
+    Services.obs.removeObserver(this, "message-manager-close");
     // The browser may have already been detached
     if (this.browser.removeProgressListener)
       this.browser.removeProgressListener(this);
