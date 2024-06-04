@@ -3969,6 +3969,8 @@ this.XPIProvider = {
                                              oldAddon ? oldAddon.wrapper : null,
                                              false);
     AddonManagerPrivate.callAddonListeners("onInstalled", addon.wrapper);
+
+    return addon.wrapper;
   }),
 
   /**
