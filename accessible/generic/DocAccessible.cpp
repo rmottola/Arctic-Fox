@@ -1857,8 +1857,6 @@ DocAccessible::FireEventsOnInsertion(Accessible* aContainer,
     }
     while ((ancestor = ancestor->Parent()));
   }
-
-  MaybeNotifyOfValueChange(aContainer);
 }
 
 void
@@ -1880,12 +1878,10 @@ DocAccessible::UpdateTreeOnRemoval(Accessible* aContainer, nsIContent* aChildNod
   }
 #endif
 
-  uint32_t updateFlags = eNoAccessible;
   TreeMutation mt(aContainer);
-
   if (child) {
     mt.BeforeRemoval(child);
-    updateFlags |= UpdateTreeInternal(child, false);
+    UpdateTreeInternal(child, false);
   }
   else {
     TreeWalker walker(aContainer, aChildNode, TreeWalker::eWalkCache);
@@ -1893,17 +1889,12 @@ DocAccessible::UpdateTreeOnRemoval(Accessible* aContainer, nsIContent* aChildNod
     if (child) {
       do {
         mt.BeforeRemoval(child);
-        updateFlags |= UpdateTreeInternal(child, false);
+        UpdateTreeInternal(child, false);
       }
       while ((child = walker.Next()));
     }
   }
   mt.Done();
-
-  // Content insertion/removal is not cause of accessible tree change.
-  if (updateFlags != eNoAccessible) {
-    MaybeNotifyOfValueChange(aContainer);
-  }
 }
 
 uint32_t
@@ -2173,9 +2164,7 @@ DocAccessible::MoveChild(Accessible* aChild, Accessible* aNewParent,
 
   if (curParent == aNewParent) {
     MOZ_ASSERT(aChild->IndexInParent() != aIdxInParent, "No move case");
-
     curParent->MoveChild(aIdxInParent, aChild);
-    MaybeNotifyOfValueChange(curParent);
 
 #ifdef A11Y_LOG
     logging::TreeInfo("move child: parent tree after",
@@ -2193,8 +2182,6 @@ DocAccessible::MoveChild(Accessible* aChild, Accessible* aNewParent,
   curParent->RemoveChild(aChild);
   rmut.Done();
 
-  MaybeNotifyOfValueChange(curParent);
-
   // No insertion point for the child.
   if (aIdxInParent == -1) {
     return true;
@@ -2204,8 +2191,6 @@ DocAccessible::MoveChild(Accessible* aChild, Accessible* aNewParent,
   aNewParent->InsertChildAt(aIdxInParent, aChild);
   imut.AfterInsertion(aChild);
   imut.Done();
-
-  MaybeNotifyOfValueChange(aNewParent);
 
 #ifdef A11Y_LOG
   logging::TreeInfo("move child: old parent tree after",
