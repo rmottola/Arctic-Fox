@@ -711,6 +711,7 @@ function PeerConnectionWrapper(label, configuration) {
   this.disableRtpCountChecking = false;
 
   this.iceCheckingRestartExpected = false;
+  this.iceCheckingIceRollbackExpected = false;
 
   info("Creating " + this);
   this._pc = new RTCPeerConnection(this.configuration);
@@ -1199,6 +1200,11 @@ PeerConnectionWrapper.prototype = {
              "iceconnectionstate event \'" + newstate +
              "\' matches expected state \'checking\'");
           this.iceCheckingRestartExpected = false;
+        } else if (this.iceCheckingIceRollbackExpected) {
+          is(newstate, "connected",
+             "iceconnectionstate event \'" + newstate +
+             "\' matches expected state \'connected\'");
+          this.iceCheckingIceRollbackExpected = false;
         } else {
           ok(iceStateTransitions[oldstate].indexOf(newstate) != -1, this + ": legal ICE state transition from " + oldstate + " to " + newstate);
         }
