@@ -434,7 +434,7 @@ int nr_ice_ctx_create_with_credentials(char *label, UINT4 flags, char *ufrag, ch
 
     _status=0;
   abort:
-    if(_status)
+    if(_status && ctx)
       nr_ice_ctx_destroy_cb(0,0,ctx);
 
     return(_status);
