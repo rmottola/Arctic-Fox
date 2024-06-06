@@ -1186,7 +1186,7 @@ static void StoreLongTermICEStatisticsImpl_m(
 
 static void GetStatsForLongTermStorage_s(
     nsAutoPtr<RTCStatsQuery> query,
-    bool aIsLoop) {
+    const bool aIsLoop) {
 
   MOZ_ASSERT(query);
 
