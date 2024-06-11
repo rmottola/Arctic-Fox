@@ -75,7 +75,7 @@ SwapScaleWidthHeightForRotation(IntSize& aSize, VideoInfo::Rotation aDegrees)
 }
 
 nsVideoFrame::nsVideoFrame(nsStyleContext* aContext)
-  : nsVideoFrameBase(aContext)
+  : nsContainerFrame(aContext)
 {
   EnableVisibilityTracking();
 }
@@ -87,7 +87,7 @@ nsVideoFrame::~nsVideoFrame()
 NS_QUERYFRAME_HEAD(nsVideoFrame)
   NS_QUERYFRAME_ENTRY(nsVideoFrame)
   NS_QUERYFRAME_ENTRY(nsIAnonymousContentCreator)
-NS_QUERYFRAME_TAIL_INHERITING(nsVideoFrameBase)
+NS_QUERYFRAME_TAIL_INHERITING(nsContainerFrame)
 
 nsresult
 nsVideoFrame::CreateAnonymousContent(nsTArray<ContentInfo>& aElements)
@@ -178,7 +178,7 @@ nsVideoFrame::DestroyFrom(nsIFrame* aDestructRoot)
   nsContentUtils::DestroyAnonymousContent(&mCaptionDiv);
   nsContentUtils::DestroyAnonymousContent(&mVideoControls);
   nsContentUtils::DestroyAnonymousContent(&mPosterImage);
-  nsVideoFrameBase::DestroyFrom(aDestructRoot);
+  nsContainerFrame::DestroyFrom(aDestructRoot);
 }
 
 bool
@@ -655,7 +655,7 @@ nsVideoFrame::AttributeChanged(int32_t aNameSpaceID,
   if (aAttribute == nsGkAtoms::poster && HasVideoElement()) {
     UpdatePosterSource(true);
   }
-  return nsVideoFrameBase::AttributeChanged(aNameSpaceID,
+  return nsContainerFrame::AttributeChanged(aNameSpaceID,
                                             aAttribute,
                                             aModType);
 }
@@ -666,13 +666,13 @@ nsVideoFrame::OnVisibilityChange(Visibility aNewVisibility,
 {
   nsCOMPtr<nsIImageLoadingContent> imageLoader = do_QueryInterface(mPosterImage);
   if (!imageLoader) {
-    nsVideoFrameBase::OnVisibilityChange(aNewVisibility, aNonvisibleAction);
+    nsContainerFrame::OnVisibilityChange(aNewVisibility, aNonvisibleAction);
     return;
   }
 
   imageLoader->OnVisibilityChange(aNewVisibility, aNonvisibleAction);
 
-  nsVideoFrameBase::OnVisibilityChange(aNewVisibility, aNonvisibleAction);
+  nsContainerFrame::OnVisibilityChange(aNewVisibility, aNonvisibleAction);
 }
 
 bool nsVideoFrame::HasVideoElement() {
