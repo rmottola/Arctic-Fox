@@ -339,7 +339,7 @@ CSS_PROP_ALIAS(-webkit-box-flex,
                WebkitBoxFlex,
                WEBKIT_PREFIX_PREF)
 CSS_PROP_ALIAS(-webkit-box-ordinal-group,
-               order,
+               box_ordinal_group,
                WebkitBoxOrdinalGroup,
                WEBKIT_PREFIX_PREF)
 CSS_PROP_ALIAS(-webkit-box-align,
