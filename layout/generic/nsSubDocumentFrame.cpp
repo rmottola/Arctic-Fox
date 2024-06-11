@@ -945,18 +945,16 @@ public:
     if (!mPresShell->IsDestroying()) {
       mPresShell->FlushPendingNotifications(Flush_Frames);
     }
-    
-    // Either the frame has been constructed by now, or it never will be.
-    // Either way, we want to clear the stashed views.
+
+    // Either the frame has been constructed by now, or it never will be,
+    // either way we want to clear the stashed views.
     mFrameLoader->SetDetachedSubdocFrame(nullptr, nullptr);
 
-    
     nsSubDocumentFrame* frame = do_QueryFrame(mFrameElement->GetPrimaryFrame());
     if ((!frame && mHideViewerIfFrameless) ||
         mPresShell->IsDestroying()) {
       // Either the frame element has no nsIFrame or the presshell is being
-      // destroyed. Hide the nsFrameLoader, which destroys the presentation,
-      // and clear our references to the stashed presentation.
+      // destroyed. Hide the nsFrameLoader, which destroys the presentation.
       mFrameLoader->Hide();
     }
     return NS_OK;
