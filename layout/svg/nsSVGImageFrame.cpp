@@ -237,6 +237,7 @@ nsSVGImageFrame::OnVisibilityChange(Visibility aNewVisibility,
 {
   nsCOMPtr<nsIImageLoadingContent> imageLoader = do_QueryInterface(mContent);
   if (!imageLoader) {
+    nsSVGImageFrameBase::OnVisibilityChange(aNewVisibility, aNonvisibleAction);
     return;
   }
 
