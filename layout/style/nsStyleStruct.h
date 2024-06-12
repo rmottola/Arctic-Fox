@@ -152,7 +152,7 @@ static_assert(offsetof(nsRect_Simple, width) == offsetof(nsRect, width), "Wrong 
 static_assert(offsetof(nsRect_Simple, height) == offsetof(nsRect, height), "Wrong nsRect_Simple member alignment");
 
 // The lifetime of these objects is managed by the presshell's arena.
-struct nsStyleFont
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleFont
 {
   nsStyleFont(const nsFont& aFont, StyleStructContext aContext);
   nsStyleFont(const nsStyleFont& aStyleFont);
@@ -421,7 +421,7 @@ private:
 #endif
 };
 
-struct nsStyleColor
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleColor
 {
   explicit nsStyleColor(StyleStructContext aContext);
   nsStyleColor(const nsStyleColor& aOther);
@@ -783,7 +783,7 @@ struct nsStyleImageLayers {
     for (uint32_t var_ = (start_) + 1; var_-- != (uint32_t)((start_) + 1 - (count_)); )
 };
 
-struct nsStyleBackground {
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleBackground {
   explicit nsStyleBackground(StyleStructContext aContext);
   nsStyleBackground(const nsStyleBackground& aOther);
   ~nsStyleBackground();
@@ -836,7 +836,7 @@ struct nsStyleBackground {
 #define NS_SPACING_BORDER   2
 
 
-struct nsStyleMargin
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleMargin
 {
   explicit nsStyleMargin(StyleStructContext aContext);
   nsStyleMargin(const nsStyleMargin& aMargin);
@@ -882,7 +882,7 @@ protected:
 };
 
 
-struct nsStylePadding
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStylePadding
 {
   explicit nsStylePadding(StyleStructContext aContext);
   nsStylePadding(const nsStylePadding& aPadding);
@@ -1085,7 +1085,7 @@ static bool IsVisibleBorderStyle(uint8_t aStyle)
           aStyle != NS_STYLE_BORDER_STYLE_HIDDEN);
 }
 
-struct nsStyleBorder
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleBorder
 {
   explicit nsStyleBorder(StyleStructContext aContext);
   nsStyleBorder(const nsStyleBorder& aBorder);
@@ -1312,7 +1312,7 @@ private:
 };
 
 
-struct nsStyleOutline
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleOutline
 {
   explicit nsStyleOutline(StyleStructContext aContext);
   nsStyleOutline(const nsStyleOutline& aOutline);
@@ -1423,7 +1423,7 @@ private:
   ~nsStyleQuoteValues() {}
 };
 
-struct nsStyleList
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleList
 {
   explicit nsStyleList(StyleStructContext aContext);
   nsStyleList(const nsStyleList& aStyleList);
@@ -1649,7 +1649,7 @@ struct nsStyleGridTemplate
   }
 };
 
-struct nsStylePosition
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStylePosition
 {
   explicit nsStylePosition(StyleStructContext aContext);
   nsStylePosition(const nsStylePosition& aOther);
@@ -1900,7 +1900,7 @@ struct nsStyleTextOverflow
   bool mLogicalDirections;  // true when only one value was specified
 };
 
-struct nsStyleTextReset
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleTextReset
 {
   explicit nsStyleTextReset(StyleStructContext aContext);
   nsStyleTextReset(const nsStyleTextReset& aOther);
@@ -1985,7 +1985,7 @@ protected:
   nscolor mTextDecorationColor;         // [reset] the colors to use for a decoration lines, not used at currentColor
 };
 
-struct nsStyleText
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleText
 {
   explicit nsStyleText(StyleStructContext aContext);
   nsStyleText(const nsStyleText& aOther);
@@ -2202,7 +2202,7 @@ protected:
   uint8_t mOrientation;
 };
 
-struct nsStyleVisibility
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleVisibility
 {
   explicit nsStyleVisibility(StyleStructContext aContext);
   nsStyleVisibility(const nsStyleVisibility& aVisibility);
@@ -2483,7 +2483,7 @@ private:
 
 } // namespace mozilla
 
-struct nsStyleDisplay
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleDisplay
 {
   explicit nsStyleDisplay(StyleStructContext aContext);
   nsStyleDisplay(const nsStyleDisplay& aOther);
@@ -2755,7 +2755,7 @@ struct nsStyleDisplay
   inline uint8_t PhysicalBreakType(mozilla::WritingMode aWM) const;
 };
 
-struct nsStyleTable
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleTable
 {
   explicit nsStyleTable(StyleStructContext aContext);
   nsStyleTable(const nsStyleTable& aOther);
@@ -2788,7 +2788,7 @@ struct nsStyleTable
   int32_t       mSpan;          // [reset] the number of columns spanned by a colgroup or col
 };
 
-struct nsStyleTableBorder
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleTableBorder
 {
   explicit nsStyleTableBorder(StyleStructContext aContext);
   nsStyleTableBorder(const nsStyleTableBorder& aOther);
@@ -2888,7 +2888,7 @@ struct nsStyleCounterData
 
 #define DELETE_ARRAY_IF(array)  if (array) { delete[] array; array = nullptr; }
 
-struct nsStyleContent
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleContent
 {
   explicit nsStyleContent(StyleStructContext aContext);
   nsStyleContent(const nsStyleContent& aContent);
@@ -2999,7 +2999,7 @@ protected:
   uint32_t            mResetCount;
 };
 
-struct nsStyleUIReset
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleUIReset
 {
   explicit nsStyleUIReset(StyleStructContext aContext);
   nsStyleUIReset(const nsStyleUIReset& aOther);
@@ -3065,7 +3065,7 @@ private:
   nsCOMPtr<imgIRequest> mImage;
 };
 
-struct nsStyleUserInterface
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleUserInterface
 {
   explicit nsStyleUserInterface(StyleStructContext aContext);
   nsStyleUserInterface(const nsStyleUserInterface& aOther);
@@ -3116,7 +3116,7 @@ struct nsStyleUserInterface
   inline uint8_t GetEffectivePointerEvents(nsIFrame* aFrame) const;
 };
 
-struct nsStyleXUL
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleXUL
 {
   explicit nsStyleXUL(StyleStructContext aContext);
   nsStyleXUL(const nsStyleXUL& aSource);
@@ -3154,7 +3154,7 @@ struct nsStyleXUL
   bool          mStretchStack;          // [reset] see nsStyleConsts.h
 };
 
-struct nsStyleColumn
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleColumn
 {
   explicit nsStyleColumn(StyleStructContext aContext);
   nsStyleColumn(const nsStyleColumn& aSource);
@@ -3249,7 +3249,7 @@ struct nsStyleSVGPaint
   }
 };
 
-struct nsStyleSVG
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleSVG
 {
   explicit nsStyleSVG(StyleStructContext aContext);
   nsStyleSVG(const nsStyleSVG& aSource);
@@ -3535,7 +3535,7 @@ struct nsTArray_CopyChooser<nsStyleFilter>
   typedef nsTArray_CopyWithConstructors<nsStyleFilter> Type;
 };
 
-struct nsStyleSVGReset
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleSVGReset
 {
   explicit nsStyleSVGReset(StyleStructContext aContext);
   nsStyleSVGReset(const nsStyleSVGReset& aSource);
@@ -3585,7 +3585,7 @@ struct nsStyleSVGReset
   uint8_t          mMaskType;         // [reset] see nsStyleConsts.h
 };
 
-struct nsStyleVariables
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleVariables
 {
   explicit nsStyleVariables(StyleStructContext aContext);
   nsStyleVariables(const nsStyleVariables& aSource);
@@ -3615,7 +3615,7 @@ struct nsStyleVariables
   mozilla::CSSVariableValues mVariables;
 };
 
-struct nsStyleEffects
+struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleEffects
 {
   explicit nsStyleEffects(StyleStructContext aContext);
   nsStyleEffects(const nsStyleEffects& aSource);
