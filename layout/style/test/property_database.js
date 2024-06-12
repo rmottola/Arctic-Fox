@@ -4331,7 +4331,7 @@ var gCSSProperties = {
     initial_values: [ "auto", "normal" ],
     other_values: [ "start", "end", "flex-start", "flex-end", "self-start",
                     "self-end", "center", "left", "right", "baseline",
-                    "last-baseline", "stretch", "left true", "true right",
+                    "last-baseline", "stretch", "left unsafe", "unsafe right",
                     "safe right", "center safe" ],
     invalid_values: [ "space-between", "abc", "30px", "none",
                       "legacy left", "right legacy" ]
@@ -6568,17 +6568,6 @@ if (IsCSSPropertyPrefEnabled("layout.css.background-blend-mode.enabled")) {
     other_values: [ "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn",
       "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity" ],
     invalid_values: ["none", "10px", "multiply multiply"]
-  };
-}
-
-if (SpecialPowers.getBoolPref("layout.css.will-change.enabled")) {
-  gCSSProperties["will-change"] = {
-    domProp: "willChange",
-    inherited: false,
-    type: CSS_TYPE_LONGHAND,
-    initial_values: [ "auto" ],
-    other_values: [ "scroll-position", "contents", "transform", "opacity", "scroll-position, transform", "transform, opacity", "contents, transform", "property-that-doesnt-exist-yet" ],
-    invalid_values: [ "none", "all", "default", "auto, scroll-position", "scroll-position, auto", "transform scroll-position", ",", "trailing,", "will-change", "transform, will-change" ]
   };
 }
 
