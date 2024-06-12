@@ -1343,7 +1343,7 @@ nsIPresShell::SetAuthorStyleDisabled(bool aStyleDisabled)
 {
   if (aStyleDisabled != mStyleSet->GetAuthorStyleDisabled()) {
     mStyleSet->SetAuthorStyleDisabled(aStyleDisabled);
-    ReconstructStyleData();
+    RestyleForCSSRuleChanges();
 
     nsCOMPtr<nsIObserverService> observerService =
       mozilla::services::GetObserverService();
@@ -1452,7 +1452,7 @@ PresShell::AddUserSheet(nsISupports* aSheet)
 
   mStyleSet->EndUpdate();
 
-  ReconstructStyleData();
+  RestyleForCSSRuleChanges();
 }
 
 void
@@ -1468,7 +1468,7 @@ PresShell::AddAgentSheet(nsISupports* aSheet)
   }
 
   mStyleSet->AppendStyleSheet(SheetType::Agent, sheet);
-  ReconstructStyleData();
+  RestyleForCSSRuleChanges();
 }
 
 void
@@ -1491,7 +1491,7 @@ PresShell::AddAuthorSheet(nsISupports* aSheet)
     mStyleSet->AppendStyleSheet(SheetType::Doc, sheet);
   }
 
-  ReconstructStyleData();
+  RestyleForCSSRuleChanges();
 }
 
 void
@@ -1504,7 +1504,7 @@ PresShell::RemoveSheet(SheetType aType, nsISupports* aSheet)
   }
 
   mStyleSet->RemoveStyleSheet(aType, sheet);
-  ReconstructStyleData();
+  RestyleForCSSRuleChanges();
 }
 
 NS_IMETHODIMP
@@ -2398,7 +2398,7 @@ PresShell::EndUpdate(nsIDocument *aDocument, nsUpdateType aUpdateType)
   if (aUpdateType & UPDATE_STYLE) {
     mStyleSet->EndUpdate();
     if (mStylesHaveChanged || !mChangedScopeStyleRoots.IsEmpty())
-      ReconstructStyleData();
+      RestyleForCSSRuleChanges();
   }
 
   mFrameConstructor->EndUpdate();
@@ -4429,7 +4429,7 @@ PresShell::ReconstructFrames(void)
 }
 
 void
-nsIPresShell::ReconstructStyleData()
+nsIPresShell::RestyleForCSSRuleChanges()
 {
   AutoTArray<RefPtr<mozilla::dom::Element>,1> scopeRoots;
   mChangedScopeStyleRoots.SwapElements(scopeRoots);
