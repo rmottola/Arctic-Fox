@@ -155,6 +155,12 @@ nsSVGImageFrame::Init(nsIContent*       aContent,
 
   nsSVGPathGeometryFrame::Init(aContent, aParent, aPrevInFlow);
 
+  if (GetStateBits() & NS_FRAME_IS_NONDISPLAY) {
+    // Non-display frames are likely to be patterns, masks or the like.
+    // Treat them as always visible.
+    IncApproximateVisibleCount();
+  }
+
   mListener = new nsSVGImageListener(this);
   nsCOMPtr<nsIImageLoadingContent> imageLoader = do_QueryInterface(mContent);
   if (!imageLoader) {
@@ -171,6 +177,10 @@ nsSVGImageFrame::Init(nsIContent*       aContent,
 /* virtual */ void
 nsSVGImageFrame::DestroyFrom(nsIFrame* aDestructRoot)
 {
+  if (GetStateBits() & NS_FRAME_IS_NONDISPLAY) {
+    DecApproximateVisibleCount();
+  }
+
   if (mReflowCallbackPosted) {
     PresContext()->PresShell()->CancelReflowCallback(this);
     mReflowCallbackPosted = false;
