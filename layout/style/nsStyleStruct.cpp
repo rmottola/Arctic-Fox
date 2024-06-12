@@ -2387,7 +2387,8 @@ nsStyleImageLayers::CalcDifference(const nsStyleImageLayers& aOther) const
     return hint;
   }
 
-  if (mBlendModeCount != aOther.mBlendModeCount ||
+  if (mAttachmentCount != aOther.mAttachmentCount ||
+      mBlendModeCount != aOther.mBlendModeCount ||
       mClipCount != aOther.mClipCount ||
       mCompositeCount != aOther.mCompositeCount ||
       mMaskModeCount != aOther.mMaskModeCount ||
