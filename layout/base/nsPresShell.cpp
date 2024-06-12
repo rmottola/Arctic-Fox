@@ -4890,12 +4890,12 @@ PresShell::CreateRangePaintInfo(nsIDOMRange* aRange,
       ancestorFrame = ancestorFrame->GetParent();
   }
 
-  if (!ancestorFrame)
+  if (!ancestorFrame) {
     return nullptr;
-
-  auto info = MakeUnique<RangePaintInfo>(range, ancestorFrame);
+  }
 
   // get a display list containing the range
+  auto info = MakeUnique<RangePaintInfo>(range, ancestorFrame);
   info->mBuilder.SetIncludeAllOutOfFlows();
   if (aForPrimarySelection) {
     info->mBuilder.SetSelectedFramesOnly();
