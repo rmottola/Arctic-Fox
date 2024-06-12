@@ -784,6 +784,8 @@ CompositorBridgeParent::RecvWillClose()
 
   if (mCompositor) {
     mCompositor->DetachWidget();
+    mCompositor->Destroy();
+    mCompositor = nullptr;
   }
 
   return true;
