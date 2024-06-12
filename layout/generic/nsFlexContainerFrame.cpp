@@ -4203,6 +4203,7 @@ nsFlexContainerFrame::MoveFlexItemToFinalPosition(
                                               logicalOffsets, &aFramePos,
                                               aContainerSize);
   aItem.Frame()->SetPosition(outerWM, aFramePos, aContainerSize);
+  PositionFrameView(aItem.Frame());
   PositionChildViews(aItem.Frame());
 }
 
