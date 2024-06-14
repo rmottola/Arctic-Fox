@@ -129,6 +129,7 @@ GetPluginFile(const nsAString& aPluginPath,
   return true;
 }
 
+#if !defined(XP_MACOSX) || !defined(MOZ_GMP_SANDBOX)
 static bool
 GetPluginFile(const nsAString& aPluginPath,
               nsCOMPtr<nsIFile>& aLibFile)
@@ -136,22 +137,7 @@ GetPluginFile(const nsAString& aPluginPath,
   nsCOMPtr<nsIFile> unusedlibDir;
   return GetPluginFile(aPluginPath, unusedlibDir, aLibFile);
 }
-
-static bool
-GetInfoFile(const nsAString& aPluginPath,
-            nsCOMPtr<nsIFile>& aInfoFile)
-{
-  nsAutoString baseName;
-#if defined(XP_MACOSX) && defined(MOZ_GMP_SANDBOX)
-  nsCOMPtr<nsIFile> unusedLibDir;
-  GetFileBase(aPluginPath, unusedLibDir, aInfoFile, baseName);
-#else
-  GetFileBase(aPluginPath, aInfoFile, baseName);
 #endif
-  nsAutoString infoFileName = baseName + NS_LITERAL_STRING(".info");
-  aInfoFile->AppendRelativePath(infoFileName);
-  return true;
-}
 
 #if defined(XP_MACOSX) && defined(MOZ_GMP_SANDBOX)
 static nsCString
@@ -273,14 +259,6 @@ GMPChild::Init(const nsAString& aPluginPath,
   mPluginPath = aPluginPath;
   mSandboxVoucherPath = aVoucherPath;
 
-  nsCOMPtr<nsIFile> infoFile;
-  if (!GetInfoFile(mPluginPath, infoFile) || !infoFile) {
-    return false;
-  }
-  if (!mInfoParser.Init(infoFile)) {
-    return false;
-  }
-
   return true;
 }
 
@@ -305,12 +283,12 @@ GMPChild::GetAPI(const char* aAPIName, void* aHostAPI, void** aPluginAPI)
   return mGMPLoader->GetAPI(aAPIName, aHostAPI, aPluginAPI);
 }
 
-#ifdef XP_WIN
-// Pre-load DLLs that need to be used by the EME plugin but that can't be
-// loaded after the sandbox has started
 bool
-GMPChild::PreLoadLibraries()
+GMPChild::RecvPreloadLibs(const nsCString& aLibs)
 {
+#ifdef XP_WIN
+  // Pre-load DLLs that need to be used by the EME plugin but that can't be
+  // loaded after the sandbox has started
   // Items in this must be lowercase!
   static const char* whitelist[] = {
     "d3d9.dll", // Create an `IDirect3D9` to get adapter information
@@ -324,12 +302,8 @@ GMPChild::PreLoadLibraries()
     "msmpeg2vdec.dll", // H.264 decoder
   };
 
-  if (!mInfoParser.Contains(NS_LITERAL_CSTRING("libraries"))) {
-    return false;
-  }
-
   nsTArray<nsCString> libs;
-  SplitAt(", ", mInfoParser.Get(NS_LITERAL_CSTRING("libraries")), libs);
+  SplitAt(", ", aLibs, libs);
   for (nsCString lib : libs) {
     ToLowerCase(lib);
     for (const char* whiteListedLib : whitelist) {
@@ -339,10 +313,9 @@ GMPChild::PreLoadLibraries()
       }
     }
   }
-
+#endif
   return true;
 }
-#endif
 
 bool
 GMPChild::GetUTF8LibPath(nsACString& aOutLibPath)
@@ -378,9 +351,6 @@ GMPChild::AnswerStartPlugin()
 {
   LOGD("%s", __FUNCTION__);
 
-#if defined(XP_WIN)
-  PreLoadLibraries();
-#endif
   if (!PreLoadPluginVoucher()) {
     NS_WARNING("Plugin voucher failed to load!");
     return false;
