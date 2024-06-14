@@ -347,7 +347,7 @@ GMPChild::GetUTF8LibPath(nsACString& aOutLibPath)
 }
 
 bool
-GMPChild::AnswerStartPlugin()
+GMPChild::AnswerStartPlugin(const nsString& aAdapter)
 {
   LOGD("%s", __FUNCTION__);
 
@@ -378,11 +378,13 @@ GMPChild::AnswerStartPlugin()
   }
 #endif
 
+  GMPAdapter* adapter = nullptr;
   if (!mGMPLoader->Load(libPath.get(),
                         libPath.Length(),
                         mNodeId.BeginWriting(),
                         mNodeId.Length(),
-                        platformAPI)) {
+                        platformAPI,
+                        adapter)) {
     NS_WARNING("Failed to load GMP");
     return false;
   }

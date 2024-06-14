@@ -93,6 +93,7 @@ GMPParent::CloneFrom(const GMPParent* aOther)
   for (const GMPCapability* cap : aOther->mCapabilities) {
     mCapabilities.AppendElement(new GMPCapability(*cap));
   }
+  mAdapter = aOther->mAdapter;
   return NS_OK;
 }
 
@@ -188,7 +189,7 @@ GMPParent::LoadProcess()
 #endif
 
     // Intr call to block initialization on plugin load.
-    ok = CallStartPlugin();
+    ok = CallStartPlugin(mAdapter);
     if (!ok) {
       LOGD("%s: Failed to send start to child process", __FUNCTION__);
       return NS_ERROR_FAILURE;
