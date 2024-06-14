@@ -19,9 +19,11 @@
 #include "gmp-video-encode.h"
 #include "GMPPlatform.h"
 #include "mozilla/dom/CrashReporterChild.h"
+#include "mozilla/ipc/ProcessChild.h"
 #include "GMPUtils.h"
 #include "prio.h"
 
+using namespace mozilla::ipc;
 using mozilla::dom::CrashReporterChild;
 
 static const int MAX_VOUCHER_LENGTH = 500000;
@@ -500,7 +502,7 @@ GMPChild::ActorDestroy(ActorDestroyReason aWhy)
   }
   if (AbnormalShutdown == aWhy) {
     NS_WARNING("Abnormal shutdown of GMP process!");
-    _exit(0);
+    ProcessChild::QuickExit();
   }
 
   XRE_ShutdownChildProcess();
