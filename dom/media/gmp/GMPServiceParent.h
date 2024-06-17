@@ -58,6 +58,8 @@ public:
   void SetAsyncShutdownPluginState(GMPParent* aGMPParent, char aId, const nsCString& aState);
 #endif // MOZ_CRASHREPORTER
   RefPtr<GenericPromise> EnsureInitialized();
+  RefPtr<GenericPromise> AsyncAddPluginDirectory(const nsAString& aDirectory);
+
 private:
   friend class GMPServiceParent;
 
@@ -106,7 +108,7 @@ protected:
   void PluginTerminated(const RefPtr<GMPParent>& aOld);
   void InitializePlugins() override;
   RefPtr<GenericPromise::AllPromiseType> LoadFromEnvironment();
-  RefPtr<GenericPromise> AddOnGMPThread(const nsAString& aDirectory);
+  RefPtr<GenericPromise> AddOnGMPThread(nsString aDirectory);
   bool GetContentParentFrom(const nsACString& aNodeId,
                             const nsCString& aAPI,
                             const nsTArray<nsCString>& aTags,
@@ -121,7 +123,6 @@ private:
   {
   public:
     enum EOperation {
-      ADD,
       REMOVE,
       REMOVE_AND_DELETE_FROM_DISK,
     };
