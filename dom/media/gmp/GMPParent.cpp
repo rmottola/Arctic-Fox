@@ -97,7 +97,7 @@ GMPParent::CloneFrom(const GMPParent* aOther)
   return NS_OK;
 }
 
-RefPtr<GMPParent::InitPromise>
+RefPtr<GenericPromise>
 GMPParent::Init(GeckoMediaPluginServiceParent* aService, nsIFile* aPluginDir)
 {
   MOZ_ASSERT(aPluginDir);
@@ -112,12 +112,12 @@ GMPParent::Init(GeckoMediaPluginServiceParent* aService, nsIFile* aPluginDir)
   nsCOMPtr<nsIFile> parent;
   nsresult rv = aPluginDir->GetParent(getter_AddRefs(parent));
   if (NS_FAILED(rv)) {
-    return InitPromise::CreateAndReject(rv, __func__);
+    return GenericPromise::CreateAndReject(rv, __func__);
   }
   nsAutoString parentLeafName;
   rv = parent->GetLeafName(parentLeafName);
   if (NS_FAILED(rv)) {
-    return InitPromise::CreateAndReject(rv, __func__);
+    return GenericPromise::CreateAndReject(rv, __func__);
   }
   LOGD("%s: for %s", __FUNCTION__, NS_LossyConvertUTF16toASCII(parentLeafName).get());
 
@@ -766,7 +766,7 @@ ReadInfoField(GMPInfoFileParser& aParser, const nsCString& aKey, nsACString& aOu
   return true;
 }
 
-RefPtr<GMPParent::InitPromise>
+RefPtr<GenericPromise>
 GMPParent::ReadGMPMetaData()
 {
   MOZ_ASSERT(mDirectory, "Plugin directory cannot be NULL!");
@@ -775,7 +775,7 @@ GMPParent::ReadGMPMetaData()
   nsCOMPtr<nsIFile> infoFile;
   nsresult rv = mDirectory->Clone(getter_AddRefs(infoFile));
   if (NS_FAILED(rv)) {
-    return InitPromise::CreateAndReject(rv, __func__);
+    return GenericPromise::CreateAndReject(rv, __func__);
   }
   infoFile->AppendRelativePath(mName + NS_LITERAL_STRING(".info"));
 
@@ -783,15 +783,15 @@ GMPParent::ReadGMPMetaData()
     return ReadGMPInfoFile(infoFile);
   }
 
-  return InitPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
+  return GenericPromise::CreateAndReject(rv, __func__);
 }
 
-RefPtr<GMPParent::InitPromise>
+RefPtr<GenericPromise>
 GMPParent::ReadGMPInfoFile(nsIFile* aFile)
 {
   GMPInfoFileParser parser;
   if (!parser.Init(aFile)) {
-    return InitPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
+    return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
   }
 
   nsAutoCString apis;
@@ -799,7 +799,7 @@ GMPParent::ReadGMPInfoFile(nsIFile* aFile)
       !ReadInfoField(parser, NS_LITERAL_CSTRING("description"), mDescription) ||
       !ReadInfoField(parser, NS_LITERAL_CSTRING("version"), mVersion) ||
       !ReadInfoField(parser, NS_LITERAL_CSTRING("apis"), apis)) {
-    return InitPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
+    return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
   }
 
 #ifdef XP_WIN
@@ -854,7 +854,7 @@ GMPParent::ReadGMPInfoFile(nsIFile* aFile)
         printf_stderr("GMPParent::ReadGMPMetaData: Plugin \"%s\" is an EME CDM"
                       " but this system can't sandbox it; not loading.\n",
                       mDisplayName.get());
-        return InitPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
+        return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
       }
 #endif
 #ifdef XP_WIN
@@ -863,7 +863,7 @@ GMPParent::ReadGMPInfoFile(nsIFile* aFile)
       // SSE2 isn't supported.
       if (cap.mAPITags.Contains(NS_LITERAL_CSTRING("com.adobe.primetime")) &&
           !mozilla::supports_sse2()) {
-        return InitPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
+        return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
       }
 #endif // XP_WIN
     }
@@ -891,10 +891,10 @@ GMPParent::ReadGMPInfoFile(nsIFile* aFile)
   }
 
   if (mCapabilities.IsEmpty()) {
-    return InitPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
+    return GenericPromise::CreateAndReject(NS_ERROR_FAILURE, __func__);
   }
 
-  return InitPromise::CreateAndResolve(NS_OK, __func__);
+  return GenericPromise::CreateAndResolve(true, __func__);
 }
 
 bool
