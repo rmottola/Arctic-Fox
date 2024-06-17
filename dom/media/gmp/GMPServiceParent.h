@@ -147,7 +147,9 @@ private:
   nsTArray<RefPtr<GMPParent>> mPlugins;
   bool mShuttingDown;
   nsTArray<RefPtr<GMPParent>> mAsyncShutdownPlugins;
+
 #ifdef MOZ_CRASHREPORTER
+  Mutex mAsyncShutdownPluginStatesMutex; // Protects mAsyncShutdownPluginStates.
   class AsyncShutdownPluginStates
   {
   public:
