@@ -368,12 +368,14 @@ GMPChild::AnswerStartPlugin(const nsString& aAdapter)
   mGMPLoader = GMPProcessChild::GetGMPLoader();
   if (!mGMPLoader) {
     NS_WARNING("Failed to get GMPLoader");
+    delete platformAPI;
     return false;
   }
 
 #if defined(MOZ_GMP_SANDBOX) && defined(XP_MACOSX)
   if (!SetMacSandboxInfo()) {
     NS_WARNING("Failed to set Mac GMP sandbox info");
+    delete platformAPI;
     return false;
   }
 #endif
@@ -386,6 +388,7 @@ GMPChild::AnswerStartPlugin(const nsString& aAdapter)
                         platformAPI,
                         adapter)) {
     NS_WARNING("Failed to load GMP");
+    delete platformAPI;
     return false;
   }
 
