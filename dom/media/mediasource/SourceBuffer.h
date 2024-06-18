@@ -260,8 +260,6 @@ private:
 
   RefPtr<MediaSource> mMediaSource;
 
-  uint32_t mEvictionThreshold;
-
   RefPtr<SourceBufferContentManager> mContentManager;
   RefPtr<SourceBufferAttributes> mAttributes;
 
