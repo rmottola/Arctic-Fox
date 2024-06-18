@@ -1465,6 +1465,11 @@ TEST(GeckoMediaPlugins, GMPPluginVoucher) {
 
 #if defined(XP_WIN)
 TEST(GeckoMediaPlugins, GMPOutputProtection) {
+  // Output Protection is not available pre-Vista.
+  if (!IsVistaOrLater()) {
+    return;
+  }
+
   RefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestOutputProtection);
 }
