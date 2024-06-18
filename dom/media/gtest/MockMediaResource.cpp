@@ -64,7 +64,6 @@ MockMediaResource::GetLength()
   if (mFileHandle == nullptr) {
     return -1;
   }
-
   fseek(mFileHandle, 0, SEEK_END);
   return ftell(mFileHandle);
 }
