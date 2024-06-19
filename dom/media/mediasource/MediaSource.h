@@ -105,11 +105,6 @@ public:
     return mPrincipal;
   }
 
-  // Called by SourceBuffers to notify this MediaSource that data has
-  // been evicted from the buffered data. The start and end times
-  // that were evicted are provided.
-  void NotifyEvicted(double aStart, double aEnd);
-
   // Returns a string describing the state of the MediaSource internal
   // buffered data. Used for debugging purposes.
   void GetMozDebugReaderData(nsAString& aString);
