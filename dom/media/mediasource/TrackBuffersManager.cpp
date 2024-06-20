@@ -931,7 +931,7 @@ TrackBuffersManager::OnDemuxerInitDone(nsresult)
   if (!mInputDemuxer) {
     // mInputDemuxer shouldn't have been destroyed while a demuxer init/reset
     // request was being processed. See bug 1239983.
-    NS_WARNING("mInputDemuxer has been destroyed");
+    NS_ASSERTION("mInputDemuxer has been destroyed");
     RejectAppend(NS_ERROR_ABORT, __func__);
   }
 
