@@ -928,6 +928,13 @@ TrackBuffersManager::OnDemuxerInitDone(nsresult)
 
   mDemuxerInitRequest.Complete();
 
+  if (!mInputDemuxer) {
+    // mInputDemuxer shouldn't have been destroyed while a demuxer init/reset
+    // request was being processed. See bug 1239983.
+    NS_WARNING("mInputDemuxer has been destroyed");
+    RejectAppend(NS_ERROR_ABORT, __func__);
+  }
+
   MediaInfo info;
 
   uint32_t numVideos = mInputDemuxer->GetNumberTracks(TrackInfo::kVideoTrack);
@@ -939,9 +946,6 @@ TrackBuffersManager::OnDemuxerInitDone(nsresult)
     info.mVideo = *mVideoTracks.mDemuxer->GetInfo()->GetAsVideoInfo();
     info.mVideo.mTrackId = 2;
   }
-  // mInputDemuxer shouldn't have been destroyed while a demuxer init/reset
-  // request was being processed. See bug 1239983.
-  MOZ_DIAGNOSTIC_ASSERT(mInputDemuxer);
 
   uint32_t numAudios = mInputDemuxer->GetNumberTracks(TrackInfo::kAudioTrack);
   if (numAudios) {
