@@ -928,14 +928,6 @@ TrackBuffersManager::OnDemuxerInitDone(nsresult)
 
   mDemuxerInitRequest.Complete();
 
-  if (!mInputDemuxer) {
-    // mInputDemuxer shouldn't have been destroyed while a demuxer init/reset
-    // request was being processed. See bug 1239983.
-    NS_ASSERTION("mInputDemuxer has been destroyed");
-    RejectAppend(NS_ERROR_ABORT, __func__);
-    return;
-  }
-
   MediaInfo info;
 
   uint32_t numVideos = mInputDemuxer->GetNumberTracks(TrackInfo::kVideoTrack);
