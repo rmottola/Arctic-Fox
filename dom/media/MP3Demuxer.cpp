@@ -148,6 +148,15 @@ MP3TrackDemuxer::Init() {
   return mSamplesPerSecond && mChannels;
 }
 
+media::TimeUnit
+MP3TrackDemuxer::SeekPosition() const {
+  TimeUnit pos = Duration(mFrameIndex);
+  if (Duration() > TimeUnit()) {
+    pos = std::min(Duration(), pos);
+  }
+  return pos;
+}
+
 const FrameParser::Frame&
 MP3TrackDemuxer::LastFrame() const {
   return mParser.PrevFrame();
@@ -156,15 +165,6 @@ MP3TrackDemuxer::LastFrame() const {
 RefPtr<MediaRawData>
 MP3TrackDemuxer::DemuxSample() {
   return GetNextFrame(FindNextFrame());
-}
-
-media::TimeUnit
-MP3TrackDemuxer::SeekPosition() const {
-  TimeUnit pos = Duration(mFrameIndex);
-  if (Duration() > TimeUnit()) {
-    pos = std::min(Duration(), pos);
-  }
-  return pos;
 }
 
 const ID3Parser::ID3Header&
