@@ -1424,56 +1424,10 @@ Column.prototype = {
         return;
       }
 
-      let dataid = closest.getAttribute("data-id");
+      let dataid = target.getAttribute("data-id");
       this.table.emit(EVENTS.ROW_SELECTED, dataid);
     }
   },
-
-  /**
-   * Keydown event handler for the column. Used for keyboard navigation amongst
-   * rows.
-   */
-  onKeydown: function(event) {
-    if (event.originalTarget == this.column ||
-        event.originalTarget == this.header) {
-      return;
-    }
-
-    switch (event.keyCode) {
-      case event.DOM_VK_ESCAPE:
-      case event.DOM_VK_LEFT:
-      case event.DOM_VK_RIGHT:
-        return;
-      case event.DOM_VK_HOME:
-      case event.DOM_VK_END:
-        return;
-      case event.DOM_VK_UP:
-        event.preventDefault();
-        let prevRow = event.originalTarget.previousSibling;
-        if (this.header == prevRow) {
-          prevRow = this.column.lastChild;
-        }
-        while (prevRow.hasAttribute("hidden")) {
-          prevRow = prevRow.previousSibling;
-          if (this.header == prevRow) {
-            prevRow = this.column.lastChild;
-          }
-        }
-        this.table.emit(EVENTS.ROW_SELECTED, prevRow.getAttribute("data-id"));
-        break;
-
-      case event.DOM_VK_DOWN:
-        event.preventDefault();
-        let nextRow = event.originalTarget.nextSibling ||
-                      this.header.nextSibling;
-        while (nextRow.hasAttribute("hidden")) {
-          nextRow = nextRow.nextSibling ||
-                    this.header.nextSibling;
-        }
-        this.table.emit(EVENTS.ROW_SELECTED, nextRow.getAttribute("data-id"));
-        break;
-    }
-  }
 };
 
 /**
@@ -1576,6 +1530,9 @@ Cell.prototype = {
    * columns, makes it look like the row is being highlighted/flashed.
    */
   flash: function() {
+    if (!this.label.parentNode) {
+      return;
+    }
     this.label.classList.remove("flash-out");
     // Cause a reflow so that the animation retriggers on adding back the class
     let a = this.label.parentNode.offsetWidth; // eslint-disable-line
