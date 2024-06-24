@@ -488,7 +488,7 @@ StorageActors.createActor({
   },
 
   destroy: function() {
-    this.hostVsStores = null;
+    this.hostVsStores.clear();
 
     // We need to remove the cookie listeners early in E10S mode so we need to
     // use a conditional here to ensure that we only attempt to remove them in
