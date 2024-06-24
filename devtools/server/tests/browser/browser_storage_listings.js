@@ -646,7 +646,8 @@ let testIDBEntries = Task.async(function*(index, hosts, indexedDBActor) {
 });
 
 function test() {
-  addTab(MAIN_DOMAIN + "storage-listings.html").then(function(doc) {
+  addTab(MAIN_DOMAIN + "storage-listings.html").then(function(browser) {
+    let doc = browser.contentDocument;
     initDebuggerServer();
 
     let createConnection = () => {

@@ -8,10 +8,11 @@
  */
 
 const { PerformanceFront } = require("devtools/server/actors/performance");
-const { PMM_isProfilerActive, PMM_stopProfiler, PMM_loadFrameScripts } = require("devtools/client/performance/test/helpers/profiler-mm-utils");
+const { sendProfilerCommand, PMM_isProfilerActive, PMM_stopProfiler, PMM_loadFrameScripts } = require("devtools/shared/performance/process-communication");
 
 add_task(function*() {
-  let doc = yield addTab(MAIN_DOMAIN + "doc_perf.html");
+  let browser = yield addTab(MAIN_DOMAIN + "doc_perf.html");
+  let doc = browser.contentDocument;
 
   initDebuggerServer();
   let client = new DebuggerClient(DebuggerServer.connectPipe());
