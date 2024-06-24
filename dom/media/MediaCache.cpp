@@ -1975,6 +1975,9 @@ MediaCacheStream::Close()
 {
   NS_ASSERTION(NS_IsMainThread(), "Only call on main thread");
 
+  if (!mInitialized)
+    return;
+
   if (gMediaCache) {
     ReentrantMonitorAutoEnter mon(gMediaCache->GetReentrantMonitor());
     CloseInternal(mon);
