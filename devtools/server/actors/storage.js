@@ -877,7 +877,7 @@ var cookieHelpers = {
       case "path":
         // Remove the edited cookie.
         Services.cookies.remove(origHost, origName, origPath,
-                                cookie.originAttributes, false);
+                                false, cookie.originAttributes);
         break;
     }
 
@@ -922,8 +922,8 @@ var cookieHelpers = {
           cookie.host,
           cookie.name,
           cookie.path,
-          cookie.originAttributes,
-          false
+          false,
+          cookie.originAttributes
         );
       }
     }

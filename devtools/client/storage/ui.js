@@ -194,14 +194,12 @@ StorageUI.prototype = {
     return this.storageTypes[type];
   },
 
-  makeFieldsEditable: function() {
+  makeFieldsEditable: function* () {
     let actor = this.getCurrentActor();
 
-    if (typeof actor.getEditableFields !== "undefined" &&
-        this.table.datatype !== "sessionStorage") {
-      actor.getEditableFields().then(fields => {
-        this.table.makeFieldsEditable(fields);
-      });
+    if (typeof actor.getEditableFields !== "undefined") {
+      let fields = yield actor.getEditableFields();
+      this.table.makeFieldsEditable(fields);
     } else if (this.table._editableFieldsEngine) {
       this.table._editableFieldsEngine.destroy();
     }
