@@ -981,6 +981,12 @@ Column.prototype = {
         if (this.header == prevRow) {
           prevRow = this.column.lastChild;
         }
+        while (prevRow.hasAttribute("hidden")) {
+          prevRow = prevRow.previousSibling;
+          if (this.header == prevRow) {
+            prevRow = this.column.lastChild;
+          }
+        }
         this.table.emit(EVENTS.ROW_SELECTED, prevRow.getAttribute("data-id"));
         break;
 
@@ -988,6 +994,10 @@ Column.prototype = {
         event.preventDefault();
         let nextRow = event.originalTarget.nextSibling ||
                       this.header.nextSibling;
+        while (nextRow.hasAttribute("hidden")) {
+          nextRow = nextRow.nextSibling ||
+                    this.header.nextSibling;
+        }
         this.table.emit(EVENTS.ROW_SELECTED, nextRow.getAttribute("data-id"));
         break;
     }
