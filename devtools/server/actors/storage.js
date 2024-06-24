@@ -907,7 +907,7 @@ var cookieHelpers = {
         return matchHost == null;
       }
       if (cookieHost.startsWith(".")) {
-        return matchHost.endsWith(cookieHost);
+        return ("." + matchHost).endsWith(cookieHost);
       }
       return cookieHost == host;
     }
