@@ -97,6 +97,7 @@ RuleEditor.prototype = {
     this.element = this.doc.createElementNS(HTML_NS, "div");
     this.element.className = "ruleview-rule theme-separator";
     this.element.setAttribute("uneditable", !this.isEditable);
+    this.element.setAttribute("unmatched", this.rule.isUnmatched);
     this.element._ruleEditor = this;
 
     // Give a relative position for the inplace editor's measurement
@@ -516,6 +517,7 @@ RuleEditor.prototype = {
         return;
       }
 
+      ruleProps.isUnmatched = !isMatching;
       let newRule = new Rule(elementStyle, ruleProps);
       let editor = new RuleEditor(ruleView, newRule);
       let rules = elementStyle.rules;
@@ -525,7 +527,6 @@ RuleEditor.prototype = {
       elementStyle._changed();
       elementStyle.markOverriddenAll();
 
-      editor.element.setAttribute("unmatched", !isMatching);
       this.element.parentNode.replaceChild(editor.element, this.element);
 
       // Remove highlight for modified selector
