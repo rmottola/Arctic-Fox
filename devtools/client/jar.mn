@@ -147,6 +147,7 @@ devtools.jar:
     skin/splitters.css (themes/splitters.css)
     skin/dark-theme.css (themes/dark-theme.css)
     skin/light-theme.css (themes/light-theme.css)
+    skin/firebug-theme.css (themes/firebug-theme.css)
     skin/toolbars.css (themes/toolbars.css)
     skin/variables.css (themes/variables.css)
     skin/images/add.svg (themes/images/add.svg)
