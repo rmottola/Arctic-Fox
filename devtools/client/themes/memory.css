@@ -502,16 +502,12 @@ html, body, #app, #memory-tool {
 }
 
 .heap-tree-percent {
-  flex: 0 0 3.5em;
+  width: 4ch;
 }
 
 .heap-tree-item.focused .heap-tree-number,
 .heap-tree-item.focused .heap-tree-percent {
   color: inherit;
-}
-
-.spacer {
-  flex: 1;
 }
 
 /**
