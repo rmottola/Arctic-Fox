@@ -1181,7 +1181,6 @@ Toolbox.prototype = {
       label.setAttribute("crop", "end");
       label.setAttribute("flex", "1");
       radio.appendChild(label);
-      radio.setAttribute("flex", "1");
     }
 
     if (!toolDefinition.bgTheme) {
