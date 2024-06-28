@@ -374,8 +374,6 @@ browser/chrome/devtools/skin/images/animation-fast-track.svg
 browser/chrome/devtools/skin/themes/images/animation-fast-track.svg
 browser/chrome/devtools/skin/images/tool-network.svg
 browser/chrome/devtools/skin/themes/images/tool-network.svg
-browser/chrome/devtools/skin/floating-scrollbars.css
-browser/chrome/devtools/skin/themes/floating-scrollbars.css
 browser/chrome/devtools/skin/images/tool-debugger.svg
 browser/chrome/devtools/skin/themes/images/tool-debugger.svg
 browser/chrome/devtools/skin/images/tool-debugger-paused.svg
