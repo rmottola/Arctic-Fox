@@ -367,7 +367,6 @@ private:
     RefPtr<SharedTrackInfo> mInfo;
   };
 
-  template<typename PromiseType>
   struct DecoderDataWithPromise : public DecoderData {
     DecoderDataWithPromise(MediaFormatReader* aOwner,
                            MediaData::Type aType,
@@ -375,7 +374,7 @@ private:
       DecoderData(aOwner, aType, aDecodeAhead)
     {}
 
-    MozPromiseHolder<PromiseType> mPromise;
+    MozPromiseHolder<MediaDataPromise> mPromise;
 
     bool HasPromise() override
     {
@@ -392,8 +391,8 @@ private:
     }
   };
 
-  DecoderDataWithPromise<MediaDataPromise> mAudio;
-  DecoderDataWithPromise<MediaDataPromise> mVideo;
+  DecoderDataWithPromise mAudio;
+  DecoderDataWithPromise mVideo;
 
   // Returns true when the decoder for this track needs input.
   bool NeedInput(DecoderData& aDecoder);
