@@ -71,7 +71,7 @@ public:
 
   bool VideoIsHardwareAccelerated() const override;
 
-  bool IsWaitForDataSupported() override { return true; }
+  bool IsWaitForDataSupported() const override { return true; }
   RefPtr<WaitForDataPromise> WaitForData(MediaData::Type aType) override;
 
   // MediaFormatReader supports demuxed-only mode.
@@ -88,7 +88,7 @@ public:
     OwnerThread()->Dispatch(r.forget());
   }
 
-  bool UseBufferingHeuristics() override
+  bool UseBufferingHeuristics() const override
   {
     return mTrackDemuxersMayBlock;
   }
