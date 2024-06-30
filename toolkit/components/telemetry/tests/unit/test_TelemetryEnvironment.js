@@ -418,7 +418,7 @@ function checkSystemSection(data) {
     Assert.ok(Number.isFinite(osData["servicePackMinor"]),
               "ServicePackMinor must be a number.");
   } else if (gIsAndroid || gIsGonk) {
-    Assert.ok(checkString(osData.kernelVersion));
+    Assert.ok(checkNullOrString(osData.kernelVersion));
   }
 
   let check = gIsWindows ? checkString : checkNullOrString;
@@ -600,8 +600,12 @@ function checkAddonsSection(data) {
 
   // Check active GMPlugins
   let activeGMPlugins = data.addons.activeGMPlugins;
-  for (let gmPlugin in activeGMPlugins) {
-    checkActiveGMPlugin(activeGMPlugins[gmPlugin]);
+  if (!gIsAndroid) {
+    // We don't check for data validity on Android here since XPCSHELL tests on Android
+    // report one valid (plugin.isValid == true) GMPlugin with a "null" version field.
+    for (let gmPlugin in activeGMPlugins) {
+      checkActiveGMPlugin(activeGMPlugins[gmPlugin]);
+    }
   }
 
   // Check the active Experiment
@@ -828,6 +832,11 @@ add_task(function* test_addonsWatch_InterestingChange() {
 });
 
 add_task(function* test_pluginsWatch_Add() {
+  if (gIsAndroid) {
+    Assert.ok(true, "Skipping: there is no Plugin Manager on Android.");
+    return;
+  }
+
   gNow = futureDate(gNow, 10 * MILLISECONDS_PER_MINUTE);
   fakeNow(gNow);
 
@@ -856,6 +865,11 @@ add_task(function* test_pluginsWatch_Add() {
 });
 
 add_task(function* test_pluginsWatch_Remove() {
+  if (gIsAndroid) {
+    Assert.ok(true, "Skipping: there is no Plugin Manager on Android.");
+    return;
+  }
+
   gNow = futureDate(gNow, 10 * MILLISECONDS_PER_MINUTE);
   fakeNow(gNow);
 
