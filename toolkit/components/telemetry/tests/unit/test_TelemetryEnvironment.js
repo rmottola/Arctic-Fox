@@ -5,7 +5,6 @@ Cu.import("resource://gre/modules/AddonManager.jsm");
 Cu.import("resource://gre/modules/TelemetryEnvironment.jsm", this);
 Cu.import("resource://gre/modules/Preferences.jsm", this);
 Cu.import("resource://gre/modules/PromiseUtils.jsm", this);
-Cu.import("resource://gre/modules/services/healthreport/profile.jsm", this);
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 Cu.import("resource://testing-common/AddonManagerTesting.jsm");
 Cu.import("resource://testing-common/httpd.js");
@@ -218,7 +217,7 @@ function createMockAddonProvider(aName) {
   };
 
   return mockProvider;
-};
+}
 
 /**
  * Used to spoof the Persona Id.
@@ -707,12 +706,8 @@ function checkAddonsSection(data, expectBrokenAddons) {
 
   // Check active GMPlugins
   let activeGMPlugins = data.addons.activeGMPlugins;
-  if (!gIsAndroid) {
-    // We don't check for data validity on Android here since XPCSHELL tests on Android
-    // report one valid (plugin.isValid == true) GMPlugin with a "null" version field.
-    for (let gmPlugin in activeGMPlugins) {
-      checkActiveGMPlugin(activeGMPlugins[gmPlugin]);
-    }
+  for (let gmPlugin in activeGMPlugins) {
+    checkActiveGMPlugin(activeGMPlugins[gmPlugin]);
   }
 
   // Check the active Experiment
