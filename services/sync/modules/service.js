@@ -50,20 +50,6 @@ const STORAGE_INFO_TYPES = [INFO_COLLECTIONS,
                             INFO_COLLECTION_COUNTS,
                             INFO_QUOTA];
 
-// A structure mapping a (boolean) telemetry probe name to a preference name.
-// The probe will record true if the pref is modified, false otherwise.
-const TELEMETRY_CUSTOM_SERVER_PREFS = {
-  WEAVE_CUSTOM_LEGACY_SERVER_CONFIGURATION: "services.sync.serverURL",
-  WEAVE_CUSTOM_FXA_SERVER_CONFIGURATION: "identity.fxaccounts.auth.uri",
-  WEAVE_CUSTOM_TOKEN_SERVER_CONFIGURATION: [
-    // The new prefname we use for the tokenserver URI.
-    "identity.sync.tokenserver.uri",
-    // The old deprecated prefname we previously used for the tokenserver URI.
-    "services.sync.tokenServerURI",
-  ],
-};
-
-
 function Sync11Service() {
   this._notify = Utils.notify("weave:service:");
 }
@@ -383,13 +369,6 @@ Sync11Service.prototype = {
     let status = this._checkSetup();
     if (status != STATUS_DISABLED && status != CLIENT_NOT_CONFIGURED) {
       Svc.Obs.notify("weave:engine:start-tracking");
-    }
-
-    // Telemetry probes to indicate if the user is using custom servers.
-    for (let [probeName, prefName] of Iterator(TELEMETRY_CUSTOM_SERVER_PREFS)) {
-      let prefNames = Array.isArray(prefName) ? prefName : [prefName];
-      let isCustomized = prefNames.some(pref => Services.prefs.prefHasUserValue(pref));
-      Services.telemetry.getHistogramById(probeName).add(isCustomized);
     }
 
     // Send an event now that Weave service is ready.  We don't do this
