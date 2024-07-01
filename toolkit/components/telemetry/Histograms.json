@@ -545,16 +545,6 @@
     "n_buckets": 100,
     "description": "Total Memory Across All Processes (KB)"
   },
-  "MEMORY_TOTAL": {
-    "alert_emails": ["memshrink-telemetry-alerts@mozilla.com"],
-    "bug_numbers": [1198209],
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "low": "32 * 1024",
-    "high": "16 * 1024 * 1024",
-    "n_buckets": 100,
-    "description": "Total Memory Across All Processes (KB)"
-  },
   "MEMORY_UNIQUE": {
     "alert_emails": ["memshrink-telemetry-alerts@mozilla.com"],
     "bug_numbers": [1198209],
@@ -827,7 +817,7 @@
     "high": 30000,
     "n_buckets": 10,
     "description": "gfxMacPlatformFontList::InitFontList Total (ms)",
-    "cpp_guard": "XP_MACOSX"
+    "cpp_guard": "XP_DARWIN"
   },
   "SYSTEM_FONT_FALLBACK": {
     "expires_in_version": "never",
@@ -872,7 +862,7 @@
   },
   "STARTUP_CACHE_INVALID": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "flag",
     "description": "Was the disk startup cache file detected as invalid"
   },
@@ -920,7 +910,7 @@
     "description": "Did the browser start after a successful shutdown"
   },
   "IMAGE_DECODE_LATENCY_US": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "low": 50,
     "high": 5000000,
@@ -928,7 +918,7 @@
     "description": "Time spent decoding an image chunk (us)"
   },
   "IMAGE_DECODE_TIME": {
-    "expires_in_version": "default",
+    "expires_in_version": "never",
     "kind": "exponential",
     "low": 50,
     "high": 50000000,
@@ -936,7 +926,7 @@
     "description": "Time spent decoding an image (us)"
   },
   "IMAGE_DECODE_ON_DRAW_LATENCY": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "low": 50,
     "high": 50000000,
@@ -944,28 +934,28 @@
     "description": "Time from starting a decode to it showing up on the screen (us)"
   },
   "IMAGE_DECODE_CHUNKS": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": 500,
     "n_buckets": 50,
     "description": "Number of chunks per decode attempt"
   },
   "IMAGE_DECODE_COUNT": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": 500,
     "n_buckets": 50,
     "description": "Decode count"
   },
   "IMAGE_MAX_DECODE_COUNT": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": 10000,
     "n_buckets": 100,
     "description": "Max decode count over all images"
   },
   "IMAGE_DECODE_SPEED_JPEG": {
-    "expires_in_version": "default",
+    "expires_in_version": "never",
     "kind": "exponential",
     "low": 500,
     "high": 50000000,
@@ -973,7 +963,7 @@
     "description": "JPEG image decode speed (Kbytes/sec)"
   },
   "IMAGE_DECODE_SPEED_GIF": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "low": 500,
     "high": 50000000,
@@ -981,7 +971,7 @@
     "description": "GIF image decode speed (Kbytes/sec)"
   },
   "IMAGE_DECODE_SPEED_PNG": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "low": 500,
     "high": 50000000,
@@ -989,12 +979,12 @@
     "description": "PNG image decode speed (Kbytes/sec)"
   },
   "CANVAS_2D_USED": {
-    "expires_in_version": "default",
+    "expires_in_version": "never",
     "kind": "boolean",
     "description": "2D canvas used"
   },
   "CANVAS_WEBGL_USED": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "boolean",
     "description": "WebGL canvas used"
   },
@@ -1014,7 +1004,7 @@
   },
   "TOTAL_CONTENT_PAGE_LOAD_TIME": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "low": 100,
     "high": 30000,
@@ -2511,7 +2501,7 @@
   "PREDICTOR_CLEANUP_DELTA": {
       "expires_in_version": "40",
       "kind": "exponential",
-      "high": "60000",
+      "high": 60000,
       "n_buckets": 50,
       "description": "How long between predictor db cleanups, in ms"
   },
@@ -2523,7 +2513,7 @@
   "PREDICTOR_CLEANUP_TIME": {
       "expires_in_version": "40",
       "kind": "exponential",
-      "high": "5000",
+      "high": 5000,
       "n_buckets": 10,
       "description": "How long it takes to run the predictor cleanup"
   },
@@ -2535,28 +2525,28 @@
   "PREDICTOR_LOAD_COUNT_IS_ZERO": {
       "expires_in_version": "40",
       "kind": "linear",
-      "high": "100",
+      "high": 100,
       "n_buckets": 50,
       "description": "Number of times load count is zero"
   },
   "PREDICTOR_LOAD_COUNT_OVERFLOWS": {
       "expires_in_version": "40",
       "kind": "linear",
-      "high": "100",
+      "high": 100,
       "n_buckets": 50,
       "description": "Number of times load count overflowed"
   },
   "PREDICTOR_STARTUP_COUNT_IS_ZERO": {
       "expires_in_version": "40",
       "kind": "linear",
-      "high": "100",
+      "high": 100,
       "n_buckets": 50,
       "description": "Number of times startup count is zero"
   },
   "PREDICTOR_STARTUP_COUNT_OVERFLOWS": {
       "expires_in_version": "40",
       "kind": "linear",
-      "high": "100",
+      "high": 100,
       "n_buckets": 50,
       "description": "Number of times startup count overflowed"
   },
@@ -2832,6 +2822,7 @@
     "description": "Value of dom.ipc.plugins.hangUITimeoutSecs plus time spent in Plugin Hang UI (ms)"
   },
   "PLUGIN_LOAD_METADATA": {
+    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
     "expires_in_version": "never",
     "kind": "exponential",
     "high": 5000,
@@ -2841,7 +2832,7 @@
   "PLUGIN_STARTUP_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "5000",
+    "high": 5000,
     "n_buckets": 20,
     "description": "Time spent starting up plugins (ms)"
   },
@@ -3307,7 +3298,7 @@
     "description": "Time spent loading PrefixSet from file (ms)"
   },
   "URLCLASSIFIER_PS_FALLOCATE_TIME": {
-    "expires_in_version": "40",
+    "expires_in_version": "default",
     "kind": "exponential",
     "high": 1000,
     "n_buckets": 10,
@@ -3335,7 +3326,7 @@
     "description": "Size of the completion cache in entries"
   },
   "URLCLASSIFIER_PS_FAILURE": {
-    "expires_in_version": "40",
+    "expires_in_version": "default",
     "kind": "boolean",
     "description": "Did UrlClassifier fail to construct the PrefixSet?"
   },
@@ -3504,12 +3495,6 @@
     "description": "Time taken to download a specified distribution file (msec)",
     "cpp_guard": "ANDROID"
   },
-  "PLACES_BACKUPS_DAYSFROMLAST": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 15,
-    "description": "PLACES: Days from last backup"
-  },
   "PLACES_BACKUPS_BOOKMARKSTREE_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -3526,24 +3511,8 @@
     "n_buckets": 10,
     "description": "PLACES: Time to convert and write the backup"
   },
-  "FENNEC_FAVICONS_COUNT": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "2000",
-    "n_buckets": 10,
-    "cpp_guard": "ANDROID",
-    "description": "Number of favicons stored in the browser DB"
-  },
-  "FENNEC_THUMBNAILS_COUNT": {
-    "expires_in_version": "40",
-    "kind": "exponential",
-    "high": "2000",
-    "n_buckets": 10,
-    "cpp_guard": "ANDROID",
-    "description": "Number of thumbnails stored in the browser DB"
-  },
   "FENNEC_READING_LIST_COUNT": {
-    "expires_in_version": "40",
+    "expires_in_version": "50",
     "kind": "exponential",
     "high": 1000,
     "n_buckets": 10,
@@ -3677,45 +3646,53 @@
   "UPDATE_CHECK_NO_UPDATE_EXTERNAL" : {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of no updates were found for a background update check (externally initiated)"
   },
   "UPDATE_CHECK_NO_UPDATE_NOTIFY" : {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of no updates were found for a background update check (timer initiated)"
   },
   "UPDATE_CHECK_CODE_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 50,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: background update check result code except for no updates found (externally initiated)"
   },
   "UPDATE_CHECK_CODE_NOTIFY": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 50,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: background update check result code except for no updates found (timer initiated)"
   },
   "UPDATE_CHECK_EXTENDED_ERROR_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "count",
     "keyed": true,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: keyed count (key names are prefixed with AUS_CHECK_EX_ERR_) of background update check extended error code (externally initiated)"
   },
   "UPDATE_CHECK_EXTENDED_ERROR_NOTIFY": {
     "expires_in_version": "never",
     "kind": "count",
     "keyed": true,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: keyed count (key names are prefixed with AUS_CHECK_EX_ERR_) of background update check extended error code (timer initiated)"
   },
   "UPDATE_INVALID_LASTUPDATETIME_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of systems that have a last update time greater than the current time (externally initiated)"
   },
   "UPDATE_INVALID_LASTUPDATETIME_NOTIFY": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of systems that have a last update time greater than the current time (timer initiated)"
   },
   "UPDATE_LAST_NOTIFY_INTERVAL_DAYS_EXTERNAL": {
@@ -3723,6 +3700,7 @@
     "kind": "exponential",
     "n_buckets": 60,
     "high": 365,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: interval in days since the last background update check (externally initiated)"
   },
   "UPDATE_LAST_NOTIFY_INTERVAL_DAYS_NOTIFY": {
@@ -3730,6 +3708,7 @@
     "kind": "exponential",
     "n_buckets": 30,
     "high": 180,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: interval in days since the last background update check (timer initiated)"
   },
   "UPDATE_PING_COUNT_EXTERNAL": {
@@ -3747,51 +3726,61 @@
   "UPDATE_SERVICE_INSTALLED_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "boolean",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: whether the service is installed (externally initiated)"
   },
   "UPDATE_SERVICE_INSTALLED_NOTIFY": {
     "expires_in_version": "never",
     "kind": "boolean",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: whether the service is installed (timer initiated)"
   },
   "UPDATE_SERVICE_MANUALLY_UNINSTALLED_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of systems that manually uninstalled the service (externally initiated)"
   },
   "UPDATE_SERVICE_MANUALLY_UNINSTALLED_NOTIFY": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of systems that manually uninstalled the service (timer initiated)"
   },
   "UPDATE_UNABLE_TO_APPLY_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of systems that cannot apply updates (externally initiated)"
   },
   "UPDATE_UNABLE_TO_APPLY_NOTIFY": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of systems that cannot apply updates (timer initiated)"
   },
   "UPDATE_CANNOT_STAGE_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of systems that cannot stage updates (externally initiated)"
   },
   "UPDATE_CANNOT_STAGE_NOTIFY": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of systems that cannot stage updates (timer initiated)"
   },
   "UPDATE_HAS_PREF_URL_OVERRIDE_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of systems that have an app.update.url.override preference (externally initiated)"
   },
   "UPDATE_HAS_PREF_URL_OVERRIDE_NOTIFY": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of systems that have an app.update.url.override preference (timer initiated)"
   },
   "UPDATE_PREF_UPDATE_CANCELATIONS_EXTERNAL": {
@@ -3804,142 +3793,167 @@
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 100,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: number of sequential update elevation request cancelations greater than 0 (timer initiated)"
   },
   "UPDATE_PREF_SERVICE_ERRORS_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 30,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: number of sequential update service errors greater than 0 (externally initiated)"
   },
   "UPDATE_PREF_SERVICE_ERRORS_NOTIFY": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 30,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: number of sequential update service errors greater than 0 (timer initiated)"
   },
   "UPDATE_NOT_PREF_UPDATE_AUTO_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of when the app.update.auto boolean preference is not the default value of true (true values are not submitted)"
   },
   "UPDATE_NOT_PREF_UPDATE_AUTO_NOTIFY": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of when the app.update.auto boolean preference is not the default value of true (true values are not submitted)"
   },
   "UPDATE_NOT_PREF_UPDATE_ENABLED_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of when the app.update.enabled boolean preference is not the default value of true (true values are not submitted)"
   },
   "UPDATE_NOT_PREF_UPDATE_ENABLED_NOTIFY": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of when the app.update.enabled boolean preference is not the default value of true (true values are not submitted)"
   },
   "UPDATE_NOT_PREF_UPDATE_STAGING_ENABLED_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of when the app.update.staging.enabled boolean preference is not the default value of true (true values are not submitted)"
   },
   "UPDATE_NOT_PREF_UPDATE_STAGING_ENABLED_NOTIFY": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of when the app.update.staging.enabled boolean preference is not the default value of true (true values are not submitted)"
   },
   "UPDATE_NOT_PREF_UPDATE_SERVICE_ENABLED_EXTERNAL": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of when the app.update.service.enabled boolean preference is not the default value of true (true values are not submitted)"
   },
   "UPDATE_NOT_PREF_UPDATE_SERVICE_ENABLED_NOTIFY": {
     "expires_in_version": "never",
     "kind": "count",
+    "releaseChannelCollection": "opt-out",
     "description": "Update: count of when the app.update.service.enabled boolean preference is not the default value of true (true values are not submitted)"
   },
   "UPDATE_DOWNLOAD_CODE_COMPLETE": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 50,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: complete patch download result code"
   },
   "UPDATE_DOWNLOAD_CODE_PARTIAL": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 50,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: complete patch download result code"
   },
   "UPDATE_STATE_CODE_COMPLETE_STARTUP": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 20,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the state of a complete update from update.status on startup"
   },
   "UPDATE_STATE_CODE_PARTIAL_STARTUP": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 20,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the state of a partial patch update from update.status on startup"
   },
   "UPDATE_STATE_CODE_UNKNOWN_STARTUP": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 20,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the state of an unknown patch update from update.status on startup"
   },
   "UPDATE_STATE_CODE_COMPLETE_STAGE": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 20,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the state of a complete patch update from update.status after staging"
   },
   "UPDATE_STATE_CODE_PARTIAL_STAGE": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 20,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the state of a partial patch update from update.status after staging"
   },
   "UPDATE_STATE_CODE_UNKNOWN_STAGE": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 20,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the state of an unknown patch update from update.status after staging"
   },
   "UPDATE_STATUS_ERROR_CODE_COMPLETE_STARTUP": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 100,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the status error code for a failed complete patch update from update.status on startup"
   },
   "UPDATE_STATUS_ERROR_CODE_PARTIAL_STARTUP": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 100,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the status error code for a failed partial patch update from update.status on startup"
   },
   "UPDATE_STATUS_ERROR_CODE_UNKNOWN_STARTUP": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 100,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the status error code for a failed unknown patch update from update.status on startup"
   },
   "UPDATE_STATUS_ERROR_CODE_COMPLETE_STAGE": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 100,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the status error code for a failed complete patch update from update.status after staging"
   },
   "UPDATE_STATUS_ERROR_CODE_PARTIAL_STAGE": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 100,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the status error code for a failed partial patch update from update.status after staging"
   },
   "UPDATE_STATUS_ERROR_CODE_UNKNOWN_STAGE": {
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 100,
+    "releaseChannelCollection": "opt-out",
     "description": "Update: the status error code for a failed unknown patch update from update.status after staging"
   },
   "UPDATE_WIZ_LAST_PAGE_CODE": {
@@ -3949,21 +3963,21 @@
     "description": "Update: the update wizard page displayed when the UI was closed (mapped in toolkit/mozapps/update/UpdateTelemetry.jsm)"
   },
   "THUNDERBIRD_GLODA_SIZE_MB": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "linear",
-    "high": "1000",
+    "high": 1000,
     "n_buckets": 40,
     "description": "Gloda: size of global-messages-db.sqlite (MB)"
   },
   "THUNDERBIRD_CONVERSATIONS_TIME_TO_2ND_GLODA_QUERY_MS": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 30,
     "description": "Conversations: time between the moment we click and the second gloda query returns (ms)"
   },
   "THUNDERBIRD_INDEXING_RATE_MSG_PER_S": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "linear",
     "high": 100,
     "n_buckets": 20,
@@ -3977,14 +3991,14 @@
     "description": "Firefox: Time taken to capture the page to a canvas, for reuse while swiping through history (ms)."
   },
   "FX_GESTURE_INSTALL_SNAPSHOT_OF_PAGE": {
-    "expires_in_version": "40",
+    "expires_in_version": "50",
     "kind": "exponential",
     "high": 1000,
     "n_buckets": 30,
     "description": "Firefox: Time taken to store the image capture of the page to a canvas, for reuse while swiping through history (ms)."
   },
   "FX_GESTURE_COMPRESS_SNAPSHOT_OF_PAGE": {
-    "expires_in_version": "40",
+    "expires_in_version": "50",
     "kind": "exponential",
     "high": 1000,
     "n_buckets": 30,
@@ -4066,7 +4080,7 @@
   },
   "FX_TAB_SWITCH_UPDATE_MS": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": 1000,
     "n_buckets": 20,
@@ -4140,7 +4154,7 @@
     "description": "Count the number of times a new top page was starting to load"
   },
   "FX_THUMBNAILS_CAPTURE_TIME_MS": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": 500,
     "n_buckets": 15,
@@ -4200,7 +4214,7 @@
     "expires_in_version": "never",
     "kind": "exponential",
     "low": 50,
-    "high": "60000",
+    "high": 60000,
     "n_buckets": 20,
     "description": "Widget: Time it takes for the message before a UI message (ms)"
   },
@@ -4209,7 +4223,7 @@
     "bug_numbers": [1235908],
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "10000",
+    "high": 10000,
     "n_buckets": 50,
     "description": "Time (ms) from the Input event being created to the end of it being handled"
   },
@@ -4289,7 +4303,7 @@
   "FX_SESSION_RESTORE_SEND_SERIALIZED_STATE_LONGEST_OP_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "3000",
+    "high": 3000,
     "n_buckets": 10,
     "description": "Session restore: Time spent on the main thread sending the session data off the main thread for writing (ms)"
   },
@@ -4388,16 +4402,20 @@
     "description": "Windows only. Counts occurrences of touch events"
   },
   "FX_URLBAR_SELECTED_RESULT_INDEX": {
-    "expires_in_version": "45",
+    "alert_emails": ["mbonardo@mozilla.com"],
+    "expires_in_version": "50",
     "kind": "enumerated",
     "n_values": 17,
+    "bug_numbers": [775825],
     "description": "Firefox: The index of the selected result in the URL bar popup"
   },
   "FX_URLBAR_SELECTED_RESULT_TYPE": {
-    "expires_in_version": "45",
+    "alert_emails": ["mbonardo@mozilla.com"],
+    "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 14,
-    "description": "Firefox: The type of the selected result in the URL bar popup"
+    "bug_numbers": [775825],
+    "description": "Firefox: The type of the selected result in the URL bar popup. See nsBrowserGlue.js::_handleURLBarTelemetry for the result types."
   },
   "INNERWINDOWS_WITH_MUTATION_LISTENERS": {
     "expires_in_version": "never",
@@ -5254,6 +5272,7 @@
     "expires_in_version": "never",
     "kind": "count",
     "keyed": true,
+    "releaseChannelCollection": "opt-out",
     "description": "Record the search counts for search engines"
   },
   "SEARCH_SERVICE_INIT_MS": {
@@ -5392,9 +5411,73 @@
   "CRASH_STORE_COMPRESSED_BYTES": {
     "expires_in_version": "never",
     "kind": "exponential",
-    "high": "1000000",
+    "high": 1000000,
     "n_buckets": 202,
     "description": "Size (in bytes) of the compressed crash store JSON file."
+  },
+  "PDF_VIEWER_USED": {
+    "expires_in_version": "default",
+    "kind": "boolean",
+    "description": "How many times PDF Viewer was used"
+  },
+  "PDF_VIEWER_FALLBACK_SHOWN": {
+    "expires_in_version": "default",
+    "kind": "boolean",
+    "description": "How many times PDF Viewer fallback bar was shown"
+  },
+  "PDF_VIEWER_PRINT": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "How many times PDF Viewer print functionality was used"
+  },
+  "PDF_VIEWER_DOCUMENT_VERSION": {
+    "expires_in_version": "default",
+    "kind": "enumerated",
+    "n_values": 20,
+    "description": "The PDF document version (1.1, 1.2, etc.)"
+  },
+  "PDF_VIEWER_DOCUMENT_GENERATOR": {
+    "expires_in_version": "default",
+    "kind": "enumerated",
+    "n_values": 30,
+    "description": "The PDF document generator"
+  },
+  "PDF_VIEWER_DOCUMENT_SIZE_KB": {
+    "expires_in_version": "default",
+    "kind": "exponential",
+    "low": 2,
+    "high": 65536,
+    "n_buckets": 20,
+    "description": "The PDF document size (KB)"
+  },
+  "PDF_VIEWER_FONT_TYPES": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 19,
+    "description": "The PDF document font types used"
+  },
+  "PDF_VIEWER_EMBED": {
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "description": "A PDF document was embedded: true using OBJECT/EMBED and false using IFRAME"
+  },
+  "PDF_VIEWER_FORM": {
+    "expires_in_version": "default",
+    "kind": "boolean",
+    "description": "A PDF form expected: true for AcroForm and false for XFA"
+  },
+  "PDF_VIEWER_STREAM_TYPES": {
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 19,
+    "description": "The PDF document compression stream types used"
+  },
+  "PDF_VIEWER_TIME_TO_VIEW_MS": {
+    "expires_in_version": "default",
+    "kind": "exponential",
+    "high": 10000,
+    "n_buckets": 50,
+    "description": "Time spent to display first page in PDF Viewer (ms)"
   },
   "PLUGINS_NOTIFICATION_SHOWN": {
     "expires_in_version": "never",
@@ -5429,8 +5512,10 @@
     "description": "Count the number of times the user clicked 'allow' on the hidden-plugin infobar."
   },
   "POPUP_NOTIFICATION_STATS": {
+    "releaseChannelCollection": "opt-out",
     "alert_emails": ["firefox-dev@mozilla.org"],
-    "expires_in_version": "48",
+    "bug_numbers": [1207089],
+    "expires_in_version": "50",
     "kind": "enumerated",
     "keyed": true,
     "n_values": 40,
@@ -5438,7 +5523,8 @@
   },
   "POPUP_NOTIFICATION_MAIN_ACTION_MS": {
     "alert_emails": ["firefox-dev@mozilla.org"],
-    "expires_in_version": "48",
+    "bug_numbers": [1207089],
+    "expires_in_version": "52",
     "kind": "exponential",
     "keyed": true,
     "low": 100,
@@ -5448,7 +5534,8 @@
   },
   "POPUP_NOTIFICATION_DISMISSAL_MS": {
     "alert_emails": ["firefox-dev@mozilla.org"],
-    "expires_in_version": "48",
+    "bug_numbers": [1207089],
+    "expires_in_version": "52",
     "kind": "exponential",
     "keyed": true,
     "low": 200,
@@ -6550,7 +6637,7 @@
     "description": "The total number of distinct attempts by third-party sites to place cookies which have been accepted.  Measures are normalized per 24h. *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
   },
   "COOKIES_3RDPARTY_NUM_ATTEMPTS_BLOCKED": {
-    "expires_in_version": "default",
+    "expires_in_version": "40",
     "kind": "linear",
     "low": 10,
     "high": 500,
@@ -8012,7 +8099,7 @@
   },
   "SSL_PERMANENT_CERT_ERROR_OVERRIDES": {
     "alert_emails": ["seceng@mozilla.org"],
-    "expires_in_version": "42",
+    "expires_in_version": "default",
     "kind": "exponential",
     "high": 1024,
     "n_buckets": 10,
@@ -8140,7 +8227,8 @@
   "WEAVE_CONFIGURED": {
     "expires_in_version": "default",
     "kind": "boolean",
-    "description": "If any version of Firefox Sync is configured for this device"
+    "description": "If any version of Firefox Sync is configured for this device",
+    "releaseChannelCollection": "opt-out"
   },
   "WEAVE_CONFIGURED_MASTER_PASSWORD": {
     "expires_in_version": "never",
@@ -8218,13 +8306,6 @@
     "kind": "flag",
     "description": "If a master-password is enabled for this profile"
   },
-  "FENNEC_TILES_CACHE_HIT": {
-    "expires_in_version": "40",
-    "kind": "linear",
-    "high": "13",
-    "n_buckets": 12,
-    "description": "Cache hits on the tile-info metadata database"
-  },
   "DISPLAY_SCALING_OSX" : {
     "expires_in_version": "never",
     "kind": "linear",
@@ -8250,24 +8331,24 @@
     "cpp_guard": "XP_LINUX"
   },
   "SOCIAL_SIDEBAR_STATE": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "boolean",
     "description": "Social Sidebar state 0: closed, 1: opened.  Toggling between providers will result in a higher opened rate."
   },
   "SOCIAL_TOOLBAR_BUTTONS": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 3,
     "description": "Social toolbar button has been used (0:share, 1:status, 2:bookmark)"
   },
   "SOCIAL_PANEL_CLICKS": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 4,
     "description": "Social content has been interacted with (0:share, 1:status, 2:bookmark, 3: sidebar)"
   },
   "SOCIAL_SIDEBAR_OPEN_DURATION": {
-    "expires_in_version": "40",
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": 10000000,
     "n_buckets": 10,
@@ -8385,7 +8466,8 @@
     "description": "Whether the e10s pref was set but it was blocked from running due to blacklisted conditions"
   },
   "BLOCKED_ON_PLUGIN_MODULE_INIT_MS": {
-    "expires_in_version": "40",
+    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": 10000,
     "n_buckets": 20,
@@ -8393,7 +8475,8 @@
     "description": "Time (ms) that the main thread has been blocked on LoadModule and NP_Initialize in PluginModuleParent"
   },
   "BLOCKED_ON_PLUGIN_INSTANCE_INIT_MS": {
-    "expires_in_version": "40",
+    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": 10000,
     "n_buckets": 20,
@@ -8401,7 +8484,8 @@
     "description": "Time (ms) that the main thread has been blocked on NPP_New in an IPC plugin"
   },
   "BLOCKED_ON_PLUGIN_STREAM_INIT_MS": {
-    "expires_in_version": "40",
+    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": 10000,
     "n_buckets": 20,
@@ -8409,7 +8493,8 @@
     "description": "Time (ms) that the main thread has been blocked on NPP_NewStream in an IPC plugin"
   },
   "BLOCKED_ON_PLUGINASYNCSURROGATE_WAITFORINIT_MS": {
-    "expires_in_version": "40",
+    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "50",
     "kind": "exponential",
     "high": 10000,
     "n_buckets": 20,
@@ -8417,7 +8502,8 @@
     "description": "Time (ms) that the main thread has been blocked on PluginAsyncSurrogate::WaitForInit in an IPC plugin"
   },
   "BLOCKED_ON_PLUGIN_INSTANCE_DESTROY_MS": {
-    "expires_in_version": "40",
+    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
+    "expires_in_version": "never",
     "kind": "exponential",
     "high": 10000,
     "n_buckets": 20,
@@ -8565,7 +8651,7 @@
     "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "30000",
+    "high": 30000,
     "n_buckets": 20,
     "description": "Sanitize: Total time it takes to sanitize (ms)"
   },
@@ -8573,7 +8659,7 @@
     "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "30000",
+    "high": 30000,
     "n_buckets": 20,
     "description": "Sanitize: Time it takes to sanitize the cache (ms)"
   },
@@ -8637,7 +8723,7 @@
     "alert_emails": ["firefox-dev@mozilla.org", "gavin@mozilla.com"],
     "expires_in_version": "40",
     "kind": "exponential",
-    "high": "30000",
+    "high": 30000,
     "n_buckets": 20,
     "description": "Sanitize: Time it takes to sanitize the open windows list (ms)"
   },
@@ -8988,14 +9074,14 @@
   "UDP_SOCKET_PARALLEL_CLOSE_COUNT": {
     "expires_in_version": "41",
     "kind": "linear",
-    "high": "20",
+    "high": 20,
     "n_buckets": 19,
     "description": "Number of concurrent UDP socket closing threads"
   },
   "UDP_SOCKET_CLOSE_TIME": {
     "expires_in_version": "45",
     "kind": "exponential",
-    "high": "60000",
+    "high": 60000,
     "n_buckets": 30,
     "description": "Time PR_Close of a UDP socket taken (ms)"
   },
@@ -9577,7 +9663,8 @@
   },
   "FXA_CONFIGURED": {
     "alert_emails": ["fx-team@mozilla.com"],
-    "expires_in_version": "45",
+    "bug_numbers": [1236383],
+    "expires_in_version": "never",
     "kind": "flag",
     "releaseChannelCollection": "opt-out",
     "description": "If the user is signed in to a Firefox Account on this device"
@@ -9632,7 +9719,8 @@
   },
   "WEAVE_ENGINE_SYNC_ERRORS": {
     "alert_emails": ["fx-team@mozilla.com"],
-    "expires_in_version": "45",
+    "bug_numbers": [1236383],
+    "expires_in_version": "never",
     "kind": "count",
     "keyed": true,
     "releaseChannelCollection": "opt-out",
@@ -9805,7 +9893,7 @@
     "alert_emails": ["gfx-telemetry-alerts@mozilla.com"],
     "expires_in_version": "never",
     "kind": "enumerated",
-    "n_values": "6",
+    "n_values": 6,
     "description": "Failed to create a gfx content device. 0=content d3d11, 1=image d3d11, 2=d2d1."
   },
   "GFX_CRASH": {
@@ -9817,10 +9905,11 @@
   },
   "PLUGIN_ACTIVATION_COUNT": {
     "alert_emails": ["cpeterson@mozilla.com"],
-    "expires_in_version": "48",
+    "expires_in_version": "53",
     "kind": "count",
     "keyed": true,
     "releaseChannelCollection": "opt-out",
+    "bug_numbers": [722110,1260065],
     "description": "Counts number of times a certain plugin has been activated."
   },
   "SCROLL_LINKED_EFFECT_FOUND": {
@@ -9854,6 +9943,7 @@
     "description": "Count of times a contextual menu item was used from a Notification (0: DND, 1: Disable, 2: Settings)"
   },
   "WEB_NOTIFICATION_SHOWN": {
+    "releaseChannelCollection": "opt-out",
     "alert_emails": ["firefox-dev@mozilla.org"],
     "bug_numbers": [1225336],
     "expires_in_version": "50",
@@ -9955,6 +10045,7 @@
     "description": "Number of times the Notification Permissions dialog has been opened."
   },
   "WEB_NOTIFICATION_PERMISSIONS": {
+    "releaseChannelCollection": "opt-out",
     "alert_emails": ["firefox-dev@mozilla.org"],
     "bug_numbers": [1219030],
     "expires_in_version": "50",
@@ -9971,6 +10062,7 @@
     "description": "Number of removed web notifications permissions (0 = remove deny, 1 = remove allow)."
   },
   "WEB_NOTIFICATION_SENDERS": {
+    "releaseChannelCollection": "opt-out",
     "alert_emails": ["firefox-dev@mozilla.org"],
     "bug_numbers": [1219030],
     "expires_in_version": "50",
@@ -9979,16 +10071,18 @@
   },
   "YOUTUBE_REWRITABLE_EMBED_SEEN": {
     "alert_emails": ["cpeterson@mozilla.com"],
-    "expires_in_version": "48",
+    "expires_in_version": "53",
     "kind": "flag",
     "bug_numbers": [1229971],
+    "releaseChannelCollection": "opt-out",
     "description": "Flag activated whenever a rewritable youtube flash embed is seen during a session."
   },
   "YOUTUBE_NONREWRITABLE_EMBED_SEEN": {
     "alert_emails": ["cpeterson@mozilla.com"],
-    "expires_in_version": "48",
+    "expires_in_version": "53",
     "kind": "flag",
     "bug_numbers": [1237401],
+    "releaseChannelCollection": "opt-out",
     "description": "Flag activated whenever a non-rewritable (enablejsapi=1) youtube flash embed is seen during a session."
   },
   "PLUGIN_DRAWING_MODEL": {
