@@ -1139,7 +1139,7 @@ MediaDecoderStateMachine::SetDormant(bool aDormant)
         mQueuedSeek.mTarget = SeekTarget(mCurrentPosition,
                                          SeekTarget::Accurate,
                                          MediaDecoderEventVisibility::Suppressed);
-        // Nobody is listening to this promise. Do we need to pass it
+        // XXXbholley - Nobody is listening to this promise. Do we need to pass it
         // back to MediaDecoder when we come out of dormant?
         RefPtr<MediaDecoder::SeekPromise> unused = mQueuedSeek.mPromise.Ensure(__func__);
       }
@@ -1147,7 +1147,7 @@ MediaDecoderStateMachine::SetDormant(bool aDormant)
       mQueuedSeek.mTarget = SeekTarget(mCurrentPosition,
                                        SeekTarget::Accurate,
                                        MediaDecoderEventVisibility::Suppressed);
-      // Nobody is listening to this promise. Do we need to pass it
+      // XXXbholley - Nobody is listening to this promise. Do we need to pass it
       // back to MediaDecoder when we come out of dormant?
       RefPtr<MediaDecoder::SeekPromise> unused = mQueuedSeek.mPromise.Ensure(__func__);
     }
@@ -1257,8 +1257,8 @@ void MediaDecoderStateMachine::StartDecoding()
   }
 
   // Reset other state to pristine values before starting decode.
-  mIsAudioPrerolling = !DonePrerollingAudio();
-  mIsVideoPrerolling = !DonePrerollingVideo();
+  mIsAudioPrerolling = !DonePrerollingAudio() && !mAudioWaitRequest.Exists();
+  mIsVideoPrerolling = !DonePrerollingVideo() && !mVideoWaitRequest.Exists();
 
   // Ensure that we've got tasks enqueued to decode data if we need to.
   DispatchDecodeTasksIfNeeded();
