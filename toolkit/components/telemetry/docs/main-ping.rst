@@ -57,7 +57,7 @@ Structure::
       lateWrites: {...},
       addonDetails: {...},
       addonHistograms: {...},
-      UIMeasurements: {...},
+      UIMeasurements: [...],
       slowSQL: {...},
       slowSQLstartup: {...},
     }
