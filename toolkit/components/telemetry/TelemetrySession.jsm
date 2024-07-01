@@ -716,6 +716,7 @@ var Impl = {
   _childrenToHearFrom: null,
   // monotonically-increasing id for USS reports
   _nextTotalMemoryId: 1,
+  _testing: false,
 
 
   get _log() {
@@ -907,7 +908,12 @@ var Impl = {
     for (let name of registered) {
       for (let n of [name, "STARTUP_" + name]) {
         if (n in hls) {
-          ret[n] = this.packHistogram(hls[n]);
+          // Omit telemetry test histograms outside of tests.
+          if (n.startsWith('TELEMETRY_TEST_') && this._testing == false) {
+            this._log.trace("getHistograms - Skipping test histogram: " + n);
+          } else {
+            ret[n] = this.packHistogram(hls[n]);
+          }
         }
       }
     }
@@ -942,6 +948,11 @@ var Impl = {
     let ret = {};
 
     for (let id of registered) {
+      // Omit telemetry test histograms outside of tests.
+      if (id.startsWith('TELEMETRY_TEST_') && this._testing == false) {
+        this._log.trace("getKeyedHistograms - Skipping test histogram: " + id);
+        continue;
+      }
       ret[id] = {};
       let keyed = Telemetry.getKeyedHistogramById(id);
       let snapshot = null;
@@ -1360,6 +1371,7 @@ var Impl = {
   setupChromeProcess: function setupChromeProcess(testing) {
     this._initStarted = true;
     this._log.trace("setupChromeProcess");
+    this._testing = testing;
 
     if (this._delayedInitTask) {
       this._log.error("setupChromeProcess - init task already running");
@@ -1472,6 +1484,7 @@ var Impl = {
    */
   setupContentProcess: function setupContentProcess(testing) {
     this._log.trace("setupContentProcess");
+    this._testing = testing;
 
     if (!Telemetry.canRecordBase) {
       this._log.trace("setupContentProcess - base recording is disabled, not initializing");
