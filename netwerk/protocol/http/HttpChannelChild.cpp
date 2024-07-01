@@ -1923,7 +1923,6 @@ HttpChannelChild::ContinueAsyncOpen()
   openArgs.allowSpdy() = mAllowSpdy;
   openArgs.allowAltSvc() = mAllowAltSvc;
   openArgs.initialRwin() = mInitialRwin;
-  openArgs.allowStaleCacheContent() = mAllowStaleCacheContent;
 
   uint32_t cacheKey = 0;
   if (mCacheKey) {
@@ -1940,6 +1939,8 @@ HttpChannelChild::ContinueAsyncOpen()
   openArgs.cacheKey() = cacheKey;
 
   openArgs.blockAuthPrompt() = mBlockAuthPrompt;
+
+  openArgs.allowStaleCacheContent() = mAllowStaleCacheContent;
 
   openArgs.contentTypeHint() = mContentTypeHint;
 
@@ -2088,20 +2089,6 @@ HttpChannelChild::IsFromCache(bool *value)
 }
 
 NS_IMETHODIMP
-HttpChannelChild::SetAllowStaleCacheContent(bool aAllowStaleCacheContent)
-{
-  mAllowStaleCacheContent = aAllowStaleCacheContent;
-  return NS_OK;
-}
-NS_IMETHODIMP
-HttpChannelChild::GetAllowStaleCacheContent(bool *aAllowStaleCacheContent)
-{
-  NS_ENSURE_ARG(aAllowStaleCacheContent);
-  *aAllowStaleCacheContent = mAllowStaleCacheContent;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 HttpChannelChild::GetCacheKey(nsISupports **cacheKey)
 {
   NS_IF_ADDREF(*cacheKey = mCacheKey);
@@ -2113,6 +2100,20 @@ HttpChannelChild::SetCacheKey(nsISupports *cacheKey)
   ENSURE_CALLED_BEFORE_ASYNC_OPEN();
 
   mCacheKey = cacheKey;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+HttpChannelChild::SetAllowStaleCacheContent(bool aAllowStaleCacheContent)
+{
+  mAllowStaleCacheContent = aAllowStaleCacheContent;
+  return NS_OK;
+}
+NS_IMETHODIMP
+HttpChannelChild::GetAllowStaleCacheContent(bool *aAllowStaleCacheContent)
+{
+  NS_ENSURE_ARG(aAllowStaleCacheContent);
+  *aAllowStaleCacheContent = mAllowStaleCacheContent;
   return NS_OK;
 }
 
