@@ -41,12 +41,9 @@ waitForExplicitFinish();
 var EXPECTED_DTU_ASSERT_FAILURE_COUNT = 0;
 
 registerCleanupFunction(function() {
-  if (DevToolsUtils.assertionFailureCount !==
-      EXPECTED_DTU_ASSERT_FAILURE_COUNT) {
-    ok(false,
-      "Should have had the expected number of DevToolsUtils.assert() failures."
-      + " Expected " + EXPECTED_DTU_ASSERT_FAILURE_COUNT
-      + ", got " + DevToolsUtils.assertionFailureCount);
+  if (DevToolsUtils.assertionFailureCount !== EXPECTED_DTU_ASSERT_FAILURE_COUNT) {
+    ok(false, "Should have had the expected number of DevToolsUtils.assert() failures. Expected " +
+      EXPECTED_DTU_ASSERT_FAILURE_COUNT + ", got " + DevToolsUtils.assertionFailureCount);
   }
 });
 
