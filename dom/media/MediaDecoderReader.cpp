@@ -106,7 +106,6 @@ MediaDecoderReader::InitializationTask()
 MediaDecoderReader::~MediaDecoderReader()
 {
   MOZ_ASSERT(mShutdown);
-  ResetDecode();
   MOZ_COUNT_DTOR(MediaDecoderReader);
 }
 
