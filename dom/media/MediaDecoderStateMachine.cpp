@@ -397,7 +397,7 @@ bool MediaDecoderStateMachine::HasFutureAudio()
   //    we've completely decoded all audio (but not finished playing it yet
   //    as per 1).
   return !mAudioCompleted &&
-         (AudioDecodedUsecs() >
+         (GetDecodedAudioDuration() >
             mLowAudioThresholdUsecs * mPlaybackRate ||
           AudioQueue().IsFinished());
 }
@@ -1716,18 +1716,6 @@ MediaDecoderStateMachine::StartMediaSink()
   }
 }
 
-int64_t MediaDecoderStateMachine::AudioDecodedUsecs()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  NS_ASSERTION(HasAudio(),
-               "Should only call AudioDecodedUsecs() when we have audio");
-  // The amount of audio we have decoded is the amount of audio data we've
-  // already decoded and pushed to the hardware, plus the amount of audio
-  // data waiting to be pushed to the hardware.
-  int64_t pushed = mMediaSink->IsStarted() ? (AudioEndTime() - GetMediaTime()) : 0;
-  return pushed + AudioQueue().Duration();
-}
-
 bool MediaDecoderStateMachine::HasLowDecodedData(int64_t aAudioUsecs)
 {
   MOZ_ASSERT(OnTaskQueue());
@@ -1736,7 +1724,7 @@ bool MediaDecoderStateMachine::HasLowDecodedData(int64_t aAudioUsecs)
   // provided we've not decoded to the end of the audio stream, or
   // if we're low on video frames, provided
   // we've not decoded to the end of the video stream.
-  return ((IsAudioDecoding() && AudioDecodedUsecs() < aAudioUsecs) ||
+  return ((IsAudioDecoding() && GetDecodedAudioDuration() < aAudioUsecs) ||
          (IsVideoDecoding() &&
           static_cast<uint32_t>(VideoQueue().GetSize()) < LOW_VIDEO_FRAMES));
 }
