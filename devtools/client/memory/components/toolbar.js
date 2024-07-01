@@ -243,6 +243,13 @@ module.exports = createClass({
           },
 
           dom.button({
+            id: "clear-snapshots",
+            className: "clear-snapshots devtools-button",
+            onClick: onClearSnapshotsClick,
+            title: L10N.getStr("clear-snapshots.tooltip")
+          }),
+
+          dom.button({
             id: "take-snapshot",
             className: "take-snapshot devtools-button",
             onClick: onTakeSnapshotClick,
@@ -268,14 +275,7 @@ module.exports = createClass({
               "data-text-only": true,
             },
             L10N.getStr("import-snapshot")
-          ),
-
-          dom.button({
-            id: "clear-snapshots",
-            className: "clear-snapshots devtools-button",
-            onClick: onClearSnapshotsClick,
-            title: L10N.getStr("clear-snapshots.tooltip")
-          })
+          )
         ),
 
         dom.label(
