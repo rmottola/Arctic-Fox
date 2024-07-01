@@ -1098,11 +1098,14 @@ void
 HttpChannelChild::DoNotifyListenerCleanup()
 {
   LOG(("HttpChannelChild::DoNotifyListenerCleanup [this=%p]\n", this));
-  if (mIPCOpen)
-    PHttpChannelChild::Send__delete__(this);
+
   if (mInterceptListener) {
     mInterceptListener->Cleanup();
     mInterceptListener = nullptr;
+  }
+
+  if (mIPCOpen) {
+    PHttpChannelChild::Send__delete__(this);
   }
 }
 
