@@ -1660,12 +1660,6 @@
     "n_values": 5,
     "description": "HTTP Disk Cache Hit, Reval, Failed-Reval, Miss"
   },
-  "HTTP_CACHE_MISS_HALFLIFE_EXPERIMENT": {
-    "expires_in_version": "40",
-    "kind": "enumerated",
-    "n_values": 4,
-    "description": "HTTP Cache v2 Miss by half-life value (6h, 1d, 7d, 50d)"
-  },
   "HTTP_CACHE_MISS_HALFLIFE_EXPERIMENT_2": {
     "expires_in_version": "never",
     "kind": "enumerated",
@@ -2525,58 +2519,6 @@
     "high": 3000,
     "n_buckets": 10,
     "description": "How long it takes from the time Predict() is called to the time we figure out there's nothing to do"
-  },
-  "PREDICTOR_CLEANUP_DELTA": {
-      "expires_in_version": "40",
-      "kind": "exponential",
-      "high": 60000,
-      "n_buckets": 50,
-      "description": "How long between predictor db cleanups, in ms"
-  },
-  "PREDICTOR_CLEANUP_SUCCEEDED": {
-      "expires_in_version": "40",
-      "kind": "boolean",
-      "description": "Whether or not the predictor cleanup succeeded"
-  },
-  "PREDICTOR_CLEANUP_TIME": {
-      "expires_in_version": "40",
-      "kind": "exponential",
-      "high": 5000,
-      "n_buckets": 10,
-      "description": "How long it takes to run the predictor cleanup"
-  },
-  "PREDICTOR_CLEANUP_SCHEDULED": {
-      "expires_in_version": "40",
-      "kind": "boolean",
-      "description": "Whether or not we actually try the cleanup method when we think about it"
-  },
-  "PREDICTOR_LOAD_COUNT_IS_ZERO": {
-      "expires_in_version": "40",
-      "kind": "linear",
-      "high": 100,
-      "n_buckets": 50,
-      "description": "Number of times load count is zero"
-  },
-  "PREDICTOR_LOAD_COUNT_OVERFLOWS": {
-      "expires_in_version": "40",
-      "kind": "linear",
-      "high": 100,
-      "n_buckets": 50,
-      "description": "Number of times load count overflowed"
-  },
-  "PREDICTOR_STARTUP_COUNT_IS_ZERO": {
-      "expires_in_version": "40",
-      "kind": "linear",
-      "high": 100,
-      "n_buckets": 50,
-      "description": "Number of times startup count is zero"
-  },
-  "PREDICTOR_STARTUP_COUNT_OVERFLOWS": {
-      "expires_in_version": "40",
-      "kind": "linear",
-      "high": 100,
-      "n_buckets": 50,
-      "description": "Number of times startup count overflowed"
   },
   "HTTPCONNMGR_TOTAL_SPECULATIVE_CONN": {
     "expires_in_version": "never",
@@ -4290,15 +4232,6 @@
     "releaseChannelCollection": "opt-out",
     "description": "Whether the homepage was imported during browser migration. Only available on release builds during firstrun."
   },
-  "EVENTLOOP_UI_LAG_EXP_MS": {
-    "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "low": 50,
-    "high": 60000,
-    "n_buckets": 20,
-    "description": "Widget: Time it takes for the message before a UI message (ms)"
-  },
   "INPUT_EVENT_RESPONSE_MS": {
     "alert_emails": ["perf-telemetry-alerts@mozilla.com"],
     "bug_numbers": [1235908],
@@ -4388,13 +4321,6 @@
     "high": 3000,
     "n_buckets": 10,
     "description": "Session restore: Time to read the session data from the file on disk (ms)"
-  },
-  "FX_SESSION_RESTORE_SEND_SERIALIZED_STATE_LONGEST_OP_MS": {
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "high": 3000,
-    "n_buckets": 10,
-    "description": "Session restore: Time spent on the main thread sending the session data off the main thread for writing (ms)"
   },
   "FX_SESSION_RESTORE_WRITE_FILE_MS": {
     "alert_emails": ["session-restore-telemetry-alerts@mozilla.com"],
@@ -5301,13 +5227,6 @@
     "high": 20000,
     "n_buckets": 20,
     "description": "Time for a URL bar DB search to return (ms)",
-    "cpp_guard": "ANDROID"
-  },
-  "FENNEC_STARTUP_GECKOAPP_ACTION": {
-    "expires_in_version": "never",
-    "kind": "enumerated",
-    "n_values": 4,
-    "description": "The way the GeckoApp was launched. (Normal, URL, Prefetch, Redirector)",
     "cpp_guard": "ANDROID"
   },
   "FENNEC_STARTUP_TIME_GECKOREADY": {
@@ -8051,12 +7970,16 @@
     "description": "The number of errors using the HomeProvider due to a locked DB."
   },
   "SSL_TLS13_INTOLERANCE_REASON_PRE": {
+    "alert_emails": ["seceng-telemetry@mozilla.com"],
+    "bug_numbers": [1250568],
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 64,
     "description": "Potential TLS 1.3 intolerance, before considering historical info (see tlsIntoleranceTelemetryBucket() in nsNSSIOLayer.cpp)."
   },
   "SSL_TLS13_INTOLERANCE_REASON_POST": {
+    "alert_emails": ["seceng-telemetry@mozilla.com"],
+    "bug_numbers": [1250568],
     "expires_in_version": "never",
     "kind": "enumerated",
     "n_values": 64,
@@ -8371,21 +8294,6 @@
     "n_buckets": 10,
     "description": "The number of times a sync successfully completed in this session"
   },
-  "WEAVE_CUSTOM_LEGACY_SERVER_CONFIGURATION": {
-    "expires_in_version": "default",
-    "kind": "boolean",
-    "description": "Whether legacy Sync is configured to use a custom server"
-  },
-  "WEAVE_CUSTOM_FXA_SERVER_CONFIGURATION": {
-    "expires_in_version": "default",
-    "kind": "boolean",
-    "description": "Whether FxA Sync is configured to use a custom authentication server"
-  },
-  "WEAVE_CUSTOM_TOKEN_SERVER_CONFIGURATION": {
-    "expires_in_version": "40",
-    "kind": "boolean",
-    "description": "Whether FxA Sync is configured to use a custom token server"
-  },
   "WEBCRYPTO_EXTRACTABLE_IMPORT": {
     "expires_in_version": "never",
     "kind": "boolean",
@@ -8554,14 +8462,6 @@
     "expires_in_version": "never",
     "kind": "boolean",
     "description": "Stores 1 every time the URL is copied or shared."
-  },
-  "LOOP_SHARING_STATE_CHANGE": {
-    "alert_emails": ["firefox-dev@mozilla.org", "mdeboer@mozilla.com"],
-    "expires_in_version": "43",
-    "kind": "count",
-    "keyed": true,
-    "releaseChannelCollection": "opt-in",
-    "description": "Number of times the sharing feature has been enabled and disabled"
   },
   "E10S_STATUS": {
     "alert_emails": ["firefox-dev@mozilla.org"],
@@ -9193,20 +9093,6 @@
     "releaseChannelCollection": "opt-out",
     "description": "Reports results from the graphics sanity test to track which drivers are having problems (0=TEST_PASSED, 1=TEST_FAILED_RENDER, 2=TEST_FAILED_VIDEO, 3=TEST_CRASHED)"
   },
-  "UDP_SOCKET_PARALLEL_CLOSE_COUNT": {
-    "expires_in_version": "41",
-    "kind": "linear",
-    "high": 20,
-    "n_buckets": 19,
-    "description": "Number of concurrent UDP socket closing threads"
-  },
-  "UDP_SOCKET_CLOSE_TIME": {
-    "expires_in_version": "45",
-    "kind": "exponential",
-    "high": 60000,
-    "n_buckets": 30,
-    "description": "Time PR_Close of a UDP socket taken (ms)"
-  },
   "PERMISSIONS_SQL_CORRUPTED": {
     "expires_in_version": "never",
     "kind": "count",
@@ -9343,8 +9229,9 @@
     "high": 30000,
     "n_buckets": 30
   },
-  "DEVTOOLS_HUD_APP_MEMORY_CONTENTINTERACTIVE": {
-    "expires_in_version": "never",
+  "DEVTOOLS_HUD_APP_MEMORY_CONTENTINTERACTIVE_V2": {
+    "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
+    "expires_in_version": "52",
     "kind": "linear",
     "keyed": true,
     "description": "The USS memory consumed by an application at the time of the 'contentInteractive' performance mark, keyed by appName.",
@@ -9352,8 +9239,9 @@
     "high": 30000000,
     "n_buckets": 10
   },
-  "DEVTOOLS_HUD_APP_MEMORY_NAVIGATIONINTERACTIVE": {
-    "expires_in_version": "never",
+  "DEVTOOLS_HUD_APP_MEMORY_NAVIGATIONINTERACTIVE_V2": {
+    "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
+    "expires_in_version": "52",
     "kind": "linear",
     "keyed": true,
     "description": "The USS memory consumed by an application at the time of the 'navigationInteractive' performance mark, keyed by appName.",
@@ -9361,8 +9249,9 @@
     "high": 30000000,
     "n_buckets": 10
   },
-  "DEVTOOLS_HUD_APP_MEMORY_NAVIGATIONLOADED": {
-    "expires_in_version": "never",
+  "DEVTOOLS_HUD_APP_MEMORY_NAVIGATIONLOADED_V2": {
+    "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
+    "expires_in_version": "52",
     "kind": "linear",
     "keyed": true,
     "description": "The USS memory consumed by an application at the time of the 'navigationLoaded' performance mark, keyed by appName.",
@@ -9370,8 +9259,9 @@
     "high": 30000000,
     "n_buckets": 10
   },
-  "DEVTOOLS_HUD_APP_MEMORY_VISUALLYLOADED": {
-    "expires_in_version": "never",
+  "DEVTOOLS_HUD_APP_MEMORY_VISUALLYLOADED_V2": {
+    "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
+    "expires_in_version": "52",
     "kind": "linear",
     "keyed": true,
     "description": "The USS memory consumed by an application at the time of the 'visuallyLoaded' performance mark, keyed by appName.",
@@ -9379,8 +9269,9 @@
     "high": 30000000,
     "n_buckets": 10
   },
-  "DEVTOOLS_HUD_APP_MEMORY_MEDIAENUMERATED": {
-    "expires_in_version": "never",
+  "DEVTOOLS_HUD_APP_MEMORY_MEDIAENUMERATED_V2": {
+    "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
+    "expires_in_version": "52",
     "kind": "linear",
     "keyed": true,
     "description": "The USS memory consumed by an application at the time of the 'mediaEnumerated' performance mark, keyed by appName.",
@@ -9388,8 +9279,9 @@
     "high": 40000000,
     "n_buckets": 10
   },
-  "DEVTOOLS_HUD_APP_MEMORY_FULLYLOADED": {
-    "expires_in_version": "never",
+  "DEVTOOLS_HUD_APP_MEMORY_FULLYLOADED_V2": {
+    "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
+    "expires_in_version": "52",
     "kind": "linear",
     "keyed": true,
     "description": "The USS memory consumed by an application at the time of the 'fullyLoaded' performance mark, keyed by appName.",
@@ -9397,8 +9289,9 @@
     "high": 40000000,
     "n_buckets": 20
   },
-  "DEVTOOLS_HUD_APP_MEMORY_SCANEND": {
-    "expires_in_version": "never",
+  "DEVTOOLS_HUD_APP_MEMORY_SCANEND_V2": {
+    "alert_emails": ["rnicoletti@mozilla.com","thills@mozilla.com"],
+    "expires_in_version": "52",
     "kind": "linear",
     "keyed": true,
     "description": "The USS memory consumed by an application at the time of the 'scanEnd' performance mark, keyed by appName.",
@@ -9806,6 +9699,7 @@
   },
   "FXA_UNVERIFIED_ACCOUNT_ERRORS": {
     "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1236383],
     "expires_in_version": "45",
     "kind": "count",
     "keyed": true,
@@ -9814,6 +9708,7 @@
   },
   "FXA_HAWK_ERRORS": {
     "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1236383],
     "expires_in_version": "45",
     "kind": "count",
     "keyed": true,
@@ -9821,6 +9716,7 @@
     "description": "FxA error responses caused by invalid Hawk credentials. Keyed on the FxA auth server endpoint."
   },
   "FXA_SERVER_ERRORS": {
+    "bug_numbers": [1236383],
     "alert_emails": ["fx-team@mozilla.com"],
     "expires_in_version": "45",
     "kind": "count",
@@ -9830,6 +9726,7 @@
   },
   "TOKENSERVER_AUTH_ERRORS": {
     "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1236383],
     "expires_in_version": "45",
     "kind": "count",
     "keyed": true,
@@ -9838,6 +9735,7 @@
   },
   "WEAVE_ENGINE_APPLY_NEW_FAILURES": {
     "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1236383],
     "expires_in_version": "45",
     "kind": "count",
     "keyed": true,
@@ -9846,6 +9744,7 @@
   },
   "WEAVE_ENGINE_APPLY_FAILURES": {
     "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1236383],
     "expires_in_version": "45",
     "kind": "count",
     "keyed": true,
@@ -9863,6 +9762,7 @@
   },
   "WEAVE_CAN_FETCH_KEYS": {
     "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1236383],
     "expires_in_version": "45",
     "kind": "flag",
     "releaseChannelCollection": "opt-out",
@@ -9870,6 +9770,7 @@
   },
   "WEAVE_FXA_KEY_FETCH_ERRORS": {
     "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1236383],
     "expires_in_version": "45",
     "kind": "count",
     "releaseChannelCollection": "opt-out",
@@ -9877,6 +9778,7 @@
   },
   "WEAVE_STORAGE_AUTH_ERRORS": {
     "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1236383],
     "expires_in_version": "45",
     "kind": "count",
     "keyed": true,
@@ -9885,6 +9787,7 @@
   },
   "WEAVE_HMAC_ERRORS": {
     "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1236383],
     "expires_in_version": "45",
     "kind": "count",
     "releaseChannelCollection": "opt-out",
