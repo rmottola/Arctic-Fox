@@ -2400,6 +2400,10 @@ void MediaDecoderStateMachine::StartBuffering()
     return;
   }
 
+  // Update playback position again before entering BUFFERING so the currentTime
+  // of the media element is more accurate during buffering.
+  UpdatePlaybackPositionPeriodically();
+
   if (IsPlaying()) {
     StopPlayback();
   }
