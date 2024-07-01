@@ -2493,6 +2493,13 @@ MediaDecoderStateMachine::LogicalPlaybackRateChanged()
   mPlaybackRate = mLogicalPlaybackRate;
   mMediaSink->SetPlaybackRate(mPlaybackRate);
 
+  if (mIsAudioPrerolling && DonePrerollingAudio()) {
+    StopPrerollingAudio();
+  }
+  if (mIsVideoPrerolling && DonePrerollingVideo()) {
+    StopPrerollingVideo();
+  }
+
   ScheduleStateMachine();
 }
 
