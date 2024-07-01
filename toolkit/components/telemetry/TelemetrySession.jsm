@@ -953,7 +953,6 @@ var Impl = {
         this._log.trace("getKeyedHistograms - Skipping test histogram: " + id);
         continue;
       }
-      ret[id] = {};
       let keyed = Telemetry.getKeyedHistogramById(id);
       let snapshot = null;
       if (subsession) {
@@ -962,7 +961,15 @@ var Impl = {
       } else {
         snapshot = keyed.snapshot();
       }
-      for (let key of Object.keys(snapshot)) {
+
+      let keys = Object.keys(snapshot);
+      if (keys.length == 0) {
+        // Skip empty keyed histogram.
+        continue;
+      }
+
+      ret[id] = {};
+      for (let key of keys) {
         ret[id][key] = this.packHistogram(snapshot[key]);
       }
     }
