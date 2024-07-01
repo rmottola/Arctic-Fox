@@ -140,21 +140,6 @@ html, body, #app, #memory-tool {
  * Container (sidebar + main panel)
  */
 
-.devtools-toolbar .toolbar-group {
-  position: absolute;
-  left: var(--sidebar-width);
-  top: -2px;
-  white-space: nowrap;
-}
-
-.toolbar-group > label {
-  margin-right: 5px;
-}
-
-.toolbar-group .breakdown-by span {
-  margin-right: 5px;
-}
-
 #memory-tool-container {
   /**
    * Flex: contains two children: .list (sidebar) and #heap-view (main panel),
@@ -513,13 +498,12 @@ html, body, #app, #memory-tool {
 
 .heap-tree-number,
 .heap-tree-percent {
-  padding-inline-end: 5px;
+  font-family: var(--monospace-font-family);
 }
 
 .heap-tree-number {
   flex: 1;
   color: var(--theme-content-color3);
-  padding-right: 5px;
 }
 
 .heap-tree-percent {
@@ -554,8 +538,6 @@ html, body, #app, #memory-tool {
   height: 100%;
   position: relative;
   overflow: hidden;
-  margin-top: -1em;
-  padding-bottom: 1em;
 }
 
 /**
