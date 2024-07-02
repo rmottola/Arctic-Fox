@@ -4,14 +4,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* globals overlays, StyleInspectorMenu, loader, clipboardHelper,
-  _Iterator, StopIteration */
+/* globals _Iterator, StopIteration */
 
 "use strict";
 
 const {Cc, Ci, Cu} = require("chrome");
 
-const ToolDefinitions = require("devtools/client/main").Tools;
+const ToolDefinitions = require("devtools/client/definitions").Tools;
 const {CssLogic} = require("devtools/shared/inspector/css-logic");
 const {ELEMENT_STYLE} = require("devtools/server/actors/styles");
 const promise = require("promise");
