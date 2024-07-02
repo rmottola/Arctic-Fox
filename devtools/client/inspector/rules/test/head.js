@@ -41,23 +41,6 @@ addTab = function(url) {
 }
 
 /**
- * Open the toolbox, with the inspector tool visible, and the rule-view
- * sidebar tab selected.
- *
- * @return a promise that resolves when the inspector is ready and the rule
- * view is visible and ready
- */
-function openRuleView() {
-  return openInspectorSidebarTab("ruleview").then(({toolbox, inspector}) => {
-    return {
-      toolbox,
-      inspector,
-      view: inspector.ruleview.view
-    };
-  });
-}
-
-/**
  * Simple DOM node accesor function that takes either a node or a string css
  * selector as argument and returns the corresponding node
  *

@@ -220,22 +220,84 @@ var clickOnInspectMenuItem = Task.async(function*(testActor, selector) {
 /**
  * Open the toolbox, with the inspector tool visible, and the one of the sidebar
  * tabs selected.
- * @param {String} id The ID of the sidebar tab to be opened
- * @param {String} hostType Optional hostType, as defined in Toolbox.HostType
+ *
+ * @param {String} id
+ *        The ID of the sidebar tab to be opened
  * @return a promise that resolves when the inspector is ready and the tab is
  * visible and ready
  */
-var openInspectorSidebarTab = Task.async(function*(id, hostType) {
-  let {toolbox, inspector} = yield openInspector();
+var openInspectorSidebarTab = Task.async(function* (id) {
+  let {toolbox, inspector, testActor} = yield openInspector();
 
   info("Selecting the " + id + " sidebar");
   inspector.sidebar.select(id);
 
   return {
     toolbox,
-    inspector
+    inspector,
+    testActor
   };
 });
+
+/**
+ * Open the toolbox, with the inspector tool visible, and the rule-view
+ * sidebar tab selected.
+ *
+ * @return a promise that resolves when the inspector is ready and the rule view
+ * is visible and ready
+ */
+function openRuleView() {
+  return openInspectorSidebarTab("ruleview").then(data => {
+    return {
+      toolbox: data.toolbox,
+      inspector: data.inspector,
+      testActor: data.testActor,
+      view: data.inspector.ruleview.view
+    };
+  });
+}
+
+/**
+ * Open the toolbox, with the inspector tool visible, and the computed-view
+ * sidebar tab selected.
+ *
+ * @return a promise that resolves when the inspector is ready and the computed
+ * view is visible and ready
+ */
+function openComputedView() {
+  return openInspectorSidebarTab("computedview").then(data => {
+    return {
+      toolbox: data.toolbox,
+      inspector: data.inspector,
+      testActor: data.testActor,
+      view: data.inspector.computedview.view
+    };
+  });
+}
+
+/**
+ * Select the rule view sidebar tab on an already opened inspector panel.
+ *
+ * @param {InspectorPanel} inspector
+ *        The opened inspector panel
+ * @return {CssRuleView} the rule view
+ */
+function selectRuleView(inspector) {
+  inspector.sidebar.select("ruleview");
+  return inspector.ruleview.view;
+}
+
+/**
+ * Select the computed view sidebar tab on an already opened inspector panel.
+ *
+ * @param {InspectorPanel} inspector
+ *        The opened inspector panel
+ * @return {CssComputedView} the computed view
+ */
+function selectComputedView(inspector) {
+  inspector.sidebar.select("computedview");
+  return inspector.computedview.view;
+}
 
 /**
  * Get the NodeFront for a node that matches a given css selector, via the
