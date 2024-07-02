@@ -1495,8 +1495,7 @@ nsDocShell::LoadURI(nsIURI* aURI,
       }
       // Don't inherit from the current page.  Just do the safe thing
       // and pretend that we were loaded by a nullprincipal.
-      owner = do_CreateInstance("@mozilla.org/nullprincipal;1");
-      NS_ENSURE_TRUE(owner, NS_ERROR_FAILURE);
+      owner = nsNullPrincipal::Create();
       inheritOwner = false;
     }
   }
