@@ -12,7 +12,7 @@ const {ResponsiveUIManager} = Cu.import(mgr, {});
 const TESTCASE_URI = TEST_BASE_HTTPS + "media-rules.html";
 const responsiveModeToggleClass = ".media-responsive-mode-toggle";
 
-add_task(function*() {
+add_task(function* () {
   let {ui} = yield openStyleEditorForURL(TESTCASE_URI);
 
   let editor = ui.editors[1];
@@ -46,19 +46,17 @@ function* testMediaLink(editor, tab, ui, itemIndex, type, value) {
   let sidebar = editor.details.querySelector(".stylesheet-sidebar");
   let conditions = sidebar.querySelectorAll(".media-rule-condition");
 
-  let onMediaChange = once("media-list-changed", ui);
-  let ruiEvent = !ResponsiveUIManager.isActiveForTab(tab) ?
-                    once("on", ResponsiveUIManager) :
-                    once("contentResize", ResponsiveUIManager);
+  let onMediaChange = once(ui, "media-list-changed");
+  let onContentResize = waitForResizeTo(ResponsiveUIManager, type, value);
 
   info("Launching responsive mode");
   conditions[itemIndex].querySelector(responsiveModeToggleClass).click();
 
-  info("Waiting for the @media list to update");
-  yield ruiEvent;
-  yield onMediaChange;
-
   ResponsiveUIManager.getResponsiveUIForTab(tab).transitionsEnabled = false;
+
+  info("Waiting for the @media list to update");
+  yield onMediaChange;
+  yield onContentResize;
 
   ok(ResponsiveUIManager.isActiveForTab(tab),
     "Responsive mode should be active.");
@@ -73,8 +71,8 @@ function* testMediaLink(editor, tab, ui, itemIndex, type, value) {
 function* closeRDM(tab, ui) {
   info("Closing responsive mode");
   ResponsiveUIManager.toggle(window, tab);
-  let onMediaChange = once("media-list-changed", ui);
-  yield once("off", ResponsiveUIManager);
+  let onMediaChange = once(ui, "media-list-changed");
+  yield once(ResponsiveUIManager, "off");
   yield onMediaChange;
   ok(!ResponsiveUIManager.isActiveForTab(tab),
      "Responsive mode should no longer be active.");
@@ -100,14 +98,6 @@ function* getSizing() {
     };
   });
   return sizing;
-}
-
-function once(event, target) {
-  let deferred = promise.defer();
-  target.once(event, () => {
-    deferred.resolve();
-  });
-  return deferred.promise;
 }
 
 function openEditor(editor) {
