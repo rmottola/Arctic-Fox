@@ -41,9 +41,12 @@ waitForExplicitFinish();
 var EXPECTED_DTU_ASSERT_FAILURE_COUNT = 0;
 
 registerCleanupFunction(function() {
-  if (DevToolsUtils.assertionFailureCount !== EXPECTED_DTU_ASSERT_FAILURE_COUNT) {
-    ok(false, "Should have had the expected number of DevToolsUtils.assert() failures. Expected " +
-      EXPECTED_DTU_ASSERT_FAILURE_COUNT + ", got " + DevToolsUtils.assertionFailureCount);
+  if (DevToolsUtils.assertionFailureCount !==
+      EXPECTED_DTU_ASSERT_FAILURE_COUNT) {
+    ok(false,
+      "Should have had the expected number of DevToolsUtils.assert() failures."
+      + " Expected " + EXPECTED_DTU_ASSERT_FAILURE_COUNT
+      + ", got " + DevToolsUtils.assertionFailureCount);
   }
 });
 
@@ -304,16 +307,30 @@ var openNewTabAndToolbox = Task.async(function* (url, toolId, hostType) {
 });
 
 /**
+ * Close a tab and if necessary, the toolbox that belongs to it
+ * @param {Tab} tab The tab to close.
+ * @return {Promise} Resolves when the toolbox and tab have been destroyed and
+ * closed.
+ */
+var closeTabAndToolbox = Task.async(function*(tab = gBrowser.selectedTab) {
+  let target = TargetFactory.forTab(gBrowser.selectedTab);
+  if (target) {
+    yield gDevTools.closeToolbox(target);
+  }
+
+  yield removeTab(gBrowser.selectedTab);
+});
+
+/**
  * Close a toolbox and the current tab.
  * @param {Toolbox} toolbox The toolbox to close.
  * @return {Promise} Resolves when the toolbox and tab have been destroyed and
  * closed.
  */
-function closeToolboxAndTab(toolbox) {
-  return toolbox.destroy().then(function() {
-    gBrowser.removeCurrentTab();
-  });
-}
+var closeToolboxAndTab = Task.async(function*(toolbox) {
+  yield toolbox.destroy();
+  yield removeTab(gBrowser.selectedTab);
+});
 
 /**
  * Waits until a predicate returns true.
