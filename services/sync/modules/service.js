@@ -627,8 +627,6 @@ Sync11Service.prototype = {
 
             // One kind of exception: HMAC failure.
             if (Utils.isHMACMismatch(ex)) {
-              Services.telemetry.getHistogramById(
-                "WEAVE_HMAC_ERRORS").add();
               this.status.login = LOGIN_FAILED_INVALID_PASSPHRASE;
               this.status.sync = CREDENTIALS_CHANGED;
             }
@@ -735,8 +733,6 @@ Sync11Service.prototype = {
 
         case 401:
           this._log.warn("401: login failed.");
-          Services.telemetry.getKeyedHistogramById(
-            "WEAVE_STORAGE_AUTH_ERRORS").add("info/collections");
           // Fall through to the 404 case.
 
         case 404:
