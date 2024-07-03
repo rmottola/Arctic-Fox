@@ -25,6 +25,7 @@
 #include "mozilla/Telemetry.h"
 #include "nsThreadUtils.h"
 #include "nsIFile.h"
+#include "nsIWidget.h"
 
 using namespace mozilla;
 using namespace mozilla::net;
@@ -112,6 +113,7 @@ nsSocketTransportService::nsSocketTransportService()
     , mMaxTimePerPollIter(100)
     , mTelemetryEnabledPref(false)
     , mMaxTimeForPrClosePref(PR_SecondsToInterval(5))
+    , mSleepPhase(false)
     , mProbedMaxCount(false)
 {
     NS_ASSERTION(NS_IsMainThread(), "wrong thread");
@@ -559,6 +561,8 @@ nsSocketTransportService::Init()
     if (obsSvc) {
         obsSvc->AddObserver(this, "profile-initial-state", false);
         obsSvc->AddObserver(this, "last-pb-context-exited", false);
+        obsSvc->AddObserver(this, NS_WIDGET_SLEEP_OBSERVER_TOPIC, true);
+        obsSvc->AddObserver(this, NS_WIDGET_WAKE_OBSERVER_TOPIC, true);
     }
 
     mInitialized = true;
@@ -607,6 +611,13 @@ nsSocketTransportService::Shutdown()
     if (obsSvc) {
         obsSvc->RemoveObserver(this, "profile-initial-state");
         obsSvc->RemoveObserver(this, "last-pb-context-exited");
+        obsSvc->RemoveObserver(this, NS_WIDGET_SLEEP_OBSERVER_TOPIC);
+        obsSvc->RemoveObserver(this, NS_WIDGET_WAKE_OBSERVER_TOPIC);
+    }
+
+    if (mAfterWakeUpTimer) {
+        mAfterWakeUpTimer->Cancel();
+        mAfterWakeUpTimer = nullptr;
     }
 
     mozilla::net::NetworkActivityMonitor::Shutdown();
@@ -1270,6 +1281,27 @@ nsSocketTransportService::Observe(nsISupports *subject,
                                &nsSocketTransportService::ClosePrivateConnections);
         nsresult rv = Dispatch(ev, nsIEventTarget::DISPATCH_NORMAL);
         NS_ENSURE_SUCCESS(rv, rv);
+    }
+
+    if (!strcmp(topic, NS_TIMER_CALLBACK_TOPIC)) {
+        nsCOMPtr<nsITimer> timer = do_QueryInterface(subject);
+        if (timer == mAfterWakeUpTimer) {
+            mAfterWakeUpTimer = nullptr;
+            mSleepPhase = false;
+        }
+    } else if (!strcmp(topic, NS_WIDGET_SLEEP_OBSERVER_TOPIC)) {
+        mSleepPhase = true;
+        if (mAfterWakeUpTimer) {
+            mAfterWakeUpTimer->Cancel();
+            mAfterWakeUpTimer = nullptr;
+        }
+    } else if (!strcmp(topic, NS_WIDGET_WAKE_OBSERVER_TOPIC)) {
+        if (mSleepPhase && !mAfterWakeUpTimer) {
+            mAfterWakeUpTimer = do_CreateInstance("@mozilla.org/timer;1");
+            if (mAfterWakeUpTimer) {
+                mAfterWakeUpTimer->Init(this, 2000, nsITimer::TYPE_ONE_SHOT);
+            }
+        }
     }
 
     return NS_OK;
