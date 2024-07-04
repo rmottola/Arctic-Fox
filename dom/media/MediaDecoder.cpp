@@ -1233,7 +1233,6 @@ MediaDecoder::OnSeekResolved(SeekResolveValue aVal)
     return;
 
   bool fireEnded = false;
-  bool seekWasAborted = false;
   {
     // An additional seek was requested while the current seek was
     // in operation.
