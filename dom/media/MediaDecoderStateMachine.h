@@ -493,7 +493,7 @@ protected:
   // decode thread.
   void DecodeError();
 
-  // Dispatches a task to the state machine thread to begin decoding content.
+  // Dispatches a task to the decode task queue to begin decoding metadata.
   // This is threadsafe and can be called on any thread.
   // The decoder monitor must be held.
   nsresult EnqueueDecodeMetadataTask();
