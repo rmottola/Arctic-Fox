@@ -58,6 +58,12 @@ var gVideoTests = [
   { name:"bogus.duh", type:"bogus/duh" }
 ];
 
+// Temp hack for trackIDs and captureStream() -- bug 1215769
+var gLongerTests = [
+  { name:"seek.webm", type:"video/webm", width:320, height:240, duration:3.966 },
+  { name:"gizmo.mp4", type:"video/mp4", width:560, height:320, duration:5.56 },
+];
+
 // Used by test_progress to ensure we get the correct progress information
 // during resource download.
 var gProgressTests = [
@@ -214,6 +220,9 @@ var gPlayTests = [
   // Test playback of a WebM file with non-zero start time.
   { name:"split.webm", type:"video/webm", duration:1.967 },
 
+  // Test playback of a WebM file with resolution changes.
+  { name:"resolution-change.webm", type:"video/webm", duration:6.533 },
+
   // Test playback of a raw file
   { name:"seek.yuv", type:"video/x-raw-yuv", duration:1.833 },
 
@@ -239,7 +248,6 @@ var gPlayTests = [
   { name:"test-8-7.1.opus", type:"audio/ogg; codecs=opus", duration:13.478 },
 
   { name:"gizmo.mp4", type:"video/mp4", duration:5.56 },
-
   // Test playback of a MP4 file with a non-zero start time (and audio starting
   // a second later).
   { name:"bipbop-lateaudio.mp4", type:"video/mp4" },
@@ -277,6 +285,11 @@ var gSnifferTests = [
   // A mp3 file with id3 tags.
   { name:"id3tags.mp3", type:"audio/mpeg", duration:0.28, size:3530},
   { name:"bogus.duh", type:"bogus/duh" }
+];
+
+// Files that contain resolution changes
+var gResolutionChangeTests = [
+  { name:"resolution-change.webm", type:"video/webm", duration:6.533 },
 ];
 
 // Files we must reject as invalid.
@@ -479,7 +492,10 @@ var gSeekTests = [
   { name:"detodos.opus", type:"audio/ogg; codecs=opus", duration:2.9135 },
   { name:"gizmo.mp4", type:"video/mp4", duration:5.56 },
   { name:"owl.mp3", type:"audio/mpeg", duration:3.343 },
-  { name:"bogus.duh", type:"bogus/duh", duration:123 }
+  { name:"bogus.duh", type:"bogus/duh", duration:123 },
+
+  // Bug 1242338: hit a numerical problem while seeking to the duration.
+  { name:"bug482461-theora.ogv", type:"video/ogg", duration:4.138 },
 ];
 
 var gFastSeekTests = [
@@ -498,10 +514,16 @@ function IsWindows8OrLater() {
   return winver && winver.length == 2 && parseFloat(winver[1]) >= 6.2;
 }
 
+// These files are WebMs without cues. They're seekable within their buffered
+// ranges. If work renders WebMs fully seekable these files should be moved
+// into gSeekTests
+var gCuelessWebMTests = [
+  { name:"no-cues.webm", type:"video/webm", duration:3.967 },
+];
+
 // These are files that are non seekable, due to problems with the media,
 // for example broken or missing indexes.
 var gUnseekableTests = [
-  { name:"no-cues.webm", type:"video/webm" },
   { name:"bogus.duh", type:"bogus/duh"}
 ];
 
@@ -695,6 +717,602 @@ var gMetadataTests = [
   },
 ];
 
+// Test files for Encrypted Media Extensions
+var gEMETests = [
+  {
+    name:"video-only with 2 keys",
+    tracks: [
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop-cenc-videoinit.mp4",
+                    "bipbop-cenc-video1.m4s",
+                    "bipbop-cenc-video2.m4s",
+                  ]
+      }
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d03" : "7e5733337e5733337e5733337e573333",
+      "7e571d047e571d047e571d047e571d04" : "7e5744447e5744447e5744447e574444",
+    },
+    sessionType:"temporary",
+    sessionCount:1,
+    duration:1.60,
+  },
+  {
+    name:"video-only with 2 keys, CORS",
+    tracks: [
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop-cenc-videoinit.mp4",
+                    "bipbop-cenc-video1.m4s",
+                    "bipbop-cenc-video2.m4s",
+                  ]
+      }
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d03" : "7e5733337e5733337e5733337e573333",
+      "7e571d047e571d047e571d047e571d04" : "7e5744447e5744447e5744447e574444",
+    },
+    sessionType:"temporary",
+    sessionCount:1,
+    crossOrigin:true,
+    duration:1.60,
+  },
+  {
+    name:"audio&video tracks, both with all keys",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop-cenc-audioinit.mp4",
+                    "bipbop-cenc-audio1.m4s",
+                    "bipbop-cenc-audio2.m4s",
+                    "bipbop-cenc-audio3.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop-cenc-videoinit.mp4",
+                    "bipbop-cenc-video1.m4s",
+                    "bipbop-cenc-video2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d03" : "7e5733337e5733337e5733337e573333",
+      "7e571d047e571d047e571d047e571d04" : "7e5744447e5744447e5744447e574444",
+    },
+    sessionType:"temporary",
+    sessionCount:2,
+    duration:1.60,
+  },
+  {
+    name:"audio&video tracks, both with all keys, CORS",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop-cenc-audioinit.mp4",
+                    "bipbop-cenc-audio1.m4s",
+                    "bipbop-cenc-audio2.m4s",
+                    "bipbop-cenc-audio3.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop-cenc-videoinit.mp4",
+                    "bipbop-cenc-video1.m4s",
+                    "bipbop-cenc-video2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d03" : "7e5733337e5733337e5733337e573333",
+      "7e571d047e571d047e571d047e571d04" : "7e5744447e5744447e5744447e574444",
+    },
+    sessionType:"temporary",
+    sessionCount:2,
+    crossOrigin:true,
+    duration:1.60,
+  },
+  {
+    name:"400x300 audio&video tracks, each with its key",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_300_215kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_300_215kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_300_215kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_300_215kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_300_215kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_300_215kbps-cenc-video-key1-init.mp4",
+                    "bipbop_300_215kbps-cenc-video-key1-1.m4s",
+                    "bipbop_300_215kbps-cenc-video-key1-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:2,
+    duration:1.60,
+  },
+  {
+    name:"640x480@624kbps audio&video tracks, each with its key",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_480_624kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_480_624kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_480_624kbps-cenc-video-key1-init.mp4",
+                    "bipbop_480_624kbps-cenc-video-key1-1.m4s",
+                    "bipbop_480_624kbps-cenc-video-key1-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:2,
+    duration:1.60,
+  },
+  {
+    name:"640x480@959kbps audio&video tracks, each with its key",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_480_959kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_480_959kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_480_959kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_480_959kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_480_959kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_480_959kbps-cenc-video-key1-init.mp4",
+                    "bipbop_480_959kbps-cenc-video-key1-1.m4s",
+                    "bipbop_480_959kbps-cenc-video-key1-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:2,
+    duration:1.60,
+  },
+  {
+    name:"640x480 then 400x300, same key (1st) per track",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_480_624kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_480_624kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_480_624kbps-cenc-video-key1-init.mp4",
+                    "bipbop_480_624kbps-cenc-video-key1-1.m4s",
+                    "bipbop_300_215kbps-cenc-video-key1-init.mp4",
+                    "bipbop_300_215kbps-cenc-video-key1-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:3,
+    duration:1.60,
+  },
+  {
+    name:"640x480 then 400x300, same key (2nd) per track",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_480_624kbps-cenc-audio-key2-init.mp4",
+                    "bipbop_480_624kbps-cenc-audio-key2-1.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key2-2.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key2-3.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key2-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_480_624kbps-cenc-video-key2-init.mp4",
+                    "bipbop_480_624kbps-cenc-video-key2-1.m4s",
+                    "bipbop_300_215kbps-cenc-video-key2-init.mp4",
+                    "bipbop_300_215kbps-cenc-video-key2-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d12" : "7e5733337e5733337e5733337e573312",
+      "7e571d047e571d047e571d047e571d22" : "7e5744447e5744447e5744447e574422",
+    },
+    sessionType:"temporary",
+    sessionCount:3,
+    duration:1.60,
+  },
+  {
+    name:"640x480 with 1st keys then 400x300 with 2nd keys",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_480_624kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_480_624kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_480_624kbps-cenc-video-key1-init.mp4",
+                    "bipbop_480_624kbps-cenc-video-key1-1.m4s",
+                    "bipbop_300_215kbps-cenc-video-key2-init.mp4",
+                    "bipbop_300_215kbps-cenc-video-key2-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d037e571d037e571d037e571d12" : "7e5733337e5733337e5733337e573312",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:3,
+    duration:1.60,
+  },
+  {
+    name:"400x300 with 1st keys then 640x480 with 2nd keys",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_300_215kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_300_215kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_300_215kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_300_215kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_300_215kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_300_215kbps-cenc-video-key1-init.mp4",
+                    "bipbop_300_215kbps-cenc-video-key1-1.m4s",
+                    "bipbop_480_624kbps-cenc-video-key2-init.mp4",
+                    "bipbop_480_624kbps-cenc-video-key2-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d037e571d037e571d037e571d12" : "7e5733337e5733337e5733337e573312",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:3,
+    duration:1.60,
+  },
+  {
+    name:"640x480@959kbps with 1st keys then 640x480@624kbps with 2nd keys",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_480_959kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_480_959kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_480_959kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_480_959kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_480_959kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_480_959kbps-cenc-video-key1-init.mp4",
+                    "bipbop_480_959kbps-cenc-video-key1-1.m4s",
+                    "bipbop_480_624kbps-cenc-video-key2-init.mp4",
+                    "bipbop_480_624kbps-cenc-video-key2-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d037e571d037e571d037e571d12" : "7e5733337e5733337e5733337e573312",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:3,
+    duration:1.60,
+  },
+  {
+    name:"640x480@624kbps with 1st keys then 640x480@959kbps with 2nd keys",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_480_624kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_480_624kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_480_624kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_480_624kbps-cenc-video-key1-init.mp4",
+                    "bipbop_480_624kbps-cenc-video-key1-1.m4s",
+                    "bipbop_480_959kbps-cenc-video-key2-init.mp4",
+                    "bipbop_480_959kbps-cenc-video-key2-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d037e571d037e571d037e571d12" : "7e5733337e5733337e5733337e573312",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:3,
+    duration:1.60,
+  },
+  {
+    name:"400x300 with presentation size 533x300",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_300wp_227kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_300wp_227kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_300wp_227kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_300wp_227kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_300wp_227kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_300wp_227kbps-cenc-video-key1-init.mp4",
+                    "bipbop_300wp_227kbps-cenc-video-key1-1.m4s",
+                    "bipbop_300wp_227kbps-cenc-video-key1-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:2,
+    duration:1.60,
+  },
+  {
+    name:"400x300 as-is then 400x300 presented as 533x300",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[
+                    "bipbop_300_215kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_300_215kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_300_215kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_300_215kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_300_215kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_300_215kbps-cenc-video-key1-init.mp4",
+                    "bipbop_300_215kbps-cenc-video-key1-1.m4s",
+                    "bipbop_300wp_227kbps-cenc-video-key1-init.mp4",
+                    "bipbop_300wp_227kbps-cenc-video-key1-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:3,
+    duration:1.60,
+  },
+  {
+    name:"400x225",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_225w_175kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_225w_175kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_225w_175kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_225w_175kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_225w_175kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_225w_175kbps-cenc-video-key1-init.mp4",
+                    "bipbop_225w_175kbps-cenc-video-key1-1.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:2,
+    duration:1.60,
+  },
+  {
+    name:"640x360",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_360w_253kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_360w_253kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_360w_253kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_360w_253kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_360w_253kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_360w_253kbps-cenc-video-key1-init.mp4",
+                    "bipbop_360w_253kbps-cenc-video-key1-1.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+    },
+    sessionType:"temporary",
+    sessionCount:2,
+    duration:1.60,
+  },
+  {
+    name:"400x225 then 640x360",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_225w_175kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_225w_175kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_225w_175kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_225w_175kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_225w_175kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_225w_175kbps-cenc-video-key1-init.mp4",
+                    "bipbop_225w_175kbps-cenc-video-key1-1.m4s",
+                    "bipbop_360w_253kbps-cenc-video-key2-init.mp4",
+                    "bipbop_360w_253kbps-cenc-video-key2-1.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+      "7e571d037e571d037e571d037e571d12" : "7e5733337e5733337e5733337e573312",
+    },
+    sessionType:"temporary",
+    sessionCount:3,
+    duration:1.60,
+  },
+  {
+    name:"640x360 then 640x480",
+    tracks: [
+      {
+        name:"audio",
+        type:"audio/mp4; codecs=\"mp4a.40.2\"",
+        fragments:[ "bipbop_360w_253kbps-cenc-audio-key1-init.mp4",
+                    "bipbop_360w_253kbps-cenc-audio-key1-1.m4s",
+                    "bipbop_360w_253kbps-cenc-audio-key1-2.m4s",
+                    "bipbop_360w_253kbps-cenc-audio-key1-3.m4s",
+                    "bipbop_360w_253kbps-cenc-audio-key1-4.m4s",
+                  ],
+      },
+      {
+        name:"video",
+        type:"video/mp4; codecs=\"avc1.64000d\"",
+        fragments:[ "bipbop_360w_253kbps-cenc-video-key1-init.mp4",
+                    "bipbop_360w_253kbps-cenc-video-key1-1.m4s",
+                    "bipbop_480_624kbps-cenc-video-key2-init.mp4",
+                    "bipbop_480_624kbps-cenc-video-key2-2.m4s",
+                  ],
+      },
+    ],
+    keys: {
+      // "keyid" : "key"
+      "7e571d037e571d037e571d037e571d11" : "7e5733337e5733337e5733337e573311",
+      "7e571d047e571d047e571d047e571d21" : "7e5744447e5744447e5744447e574421",
+      "7e571d037e571d037e571d037e571d12" : "7e5733337e5733337e5733337e573312",
+    },
+    sessionType:"temporary",
+    sessionCount:3,
+    duration:1.60,
+  },
+];
+
+var gEMENonMSEFailTests = [
+  {
+    name:"short-cenc.mp4",
+    audioType:"audio/mp4; codecs=\"mp4a.40.2\"",
+    videoType:"video/mp4; codecs=\"avc1.64000d\"",
+    duration:0.47,
+  },
+];
+
 function checkMetadata(msg, e, test) {
   if (test.width) {
     is(e.videoWidth, test.width, msg + " video width");
@@ -822,6 +1440,11 @@ const DEBUG_TEST_LOOP_FOREVER = false;
 //      or end the mochitest if all the tests are done.
 function MediaTestManager() {
 
+  // Return how many seconds elapsed since |begin|.
+  function elapsedTime(begin) {
+    var end = new Date();
+    return (end.getTime() - begin.getTime()) / 1000;
+  }
   // Sets up a MediaTestManager to runs through the 'tests' array, which needs
   // to be one of, or have the same fields as, the g*Test arrays of tests. Uses
   // the user supplied 'startTest' function to initialize the test. This
@@ -866,7 +1489,8 @@ function MediaTestManager() {
     this.tokens.push(token);
     this.numTestsRunning++;
     this.handlers[token] = handler;
-    is(this.numTestsRunning, this.tokens.length, "[started " + token + "] Length of array should match number of running tests");
+    is(this.numTestsRunning, this.tokens.length,
+       "[started " + token + " t=" + elapsedTime(this.startTime) + "] Length of array should match number of running tests");
   }
 
   // Registers that the test corresponding to 'token' has finished. Call when
@@ -882,7 +1506,8 @@ function MediaTestManager() {
 
     info("[finished " + token + "] remaining= " + this.tokens);
     this.numTestsRunning--;
-    is(this.numTestsRunning, this.tokens.length, "[finished " + token + "] Length of array should match number of running tests");
+    is(this.numTestsRunning, this.tokens.length,
+       "[finished " + token + " t=" + elapsedTime(this.startTime) + "] Length of array should match number of running tests");
     if (this.tokens.length < PARALLEL_TESTS) {
       this.nextTest();
     }
@@ -920,7 +1545,7 @@ function MediaTestManager() {
       var onCleanup = function() {
         var end = new Date();
         SimpleTest.info("Finished at " + end + " (" + (end.getTime() / 1000) + "s)");
-        SimpleTest.info("Running time: " + (end.getTime() - this.startTime.getTime())/1000 + "s");
+        SimpleTest.info("Running time: " + elapsedTime(this.startTime) + "s");
         SimpleTest.finish();
       }.bind(this);
       mediaTestCleanup(onCleanup);

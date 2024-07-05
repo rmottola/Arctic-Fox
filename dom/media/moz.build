@@ -62,8 +62,6 @@ TEST_DIRS += [
     'gtest',
 ]
 
-MOCHITEST_CHROME_MANIFESTS += ['test/chrome.ini']
-
 MOCHITEST_MANIFESTS += [
     'test/mochitest.ini',
     'tests/mochitest/identity/mochitest.ini',
