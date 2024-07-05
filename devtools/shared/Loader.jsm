@@ -364,6 +364,9 @@ DevToolsLoader.prototype = {
     Object.getOwnPropertyNames(this._main).forEach(key => {
       XPCOMUtils.defineLazyGetter(this, key, () => this._main[key]);
     });
+
+    var events = this.require("sdk/system/events");
+    events.emit("devtools-loaded", {});
   },
 
   /**
