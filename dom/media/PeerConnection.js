@@ -617,8 +617,8 @@ RTCPeerConnection.prototype = {
 
   dispatchEvent: function(event) {
     // PC can close while events are firing if there is an async dispatch
-    // in c++ land
-    if (!this._closed) {
+    // in c++ land. But let through "closed" signaling and ice connection events.
+    if (!this._closed || this._inClose) {
       this.__DOM_IMPL__.dispatchEvent(event);
     }
   },
@@ -1134,11 +1134,13 @@ RTCPeerConnection.prototype = {
     if (this._closed) {
       return;
     }
+    this._closed = true;
+    this._inClose = true;
     this.changeIceConnectionState("closed");
     this._localIdp.close();
     this._remoteIdp.close();
     this._impl.close();
-    this._closed = true;
+    this._inClose = false;
   },
 
   getLocalStreams: function() {
