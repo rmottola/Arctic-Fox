@@ -400,8 +400,8 @@
 @RESPATH@/components/jsconsole-clhandler.manifest
 @RESPATH@/components/jsconsole-clhandler.js
 #ifdef MOZ_DEVTOOLS
-@RESPATH@/browser/components/devtools-clhandler.manifest
-@RESPATH@/browser/components/devtools-clhandler.js
+@RESPATH@/browser/components/devtools-startup.manifest
+@RESPATH@/browser/components/devtools-startup.js
 #endif
 @RESPATH@/components/webvtt.xpt
 @RESPATH@/components/WebVTT.manifest
