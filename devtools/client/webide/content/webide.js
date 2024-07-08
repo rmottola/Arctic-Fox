@@ -1135,12 +1135,5 @@ var Cmds = {
   resetZoom: function() {
     UI.contentViewer.fullZoom = 1;
     Services.prefs.setCharPref("devtools.webide.zoom", 1);
-  },
-
-  reloadDevtools: function(event) {
-    if (Services.prefs.prefHasUserValue("devtools.loader.srcdir")) {
-      let {devtools} = Cu.import("resource://devtools/shared/Loader.jsm", {});
-      devtools.reload();
-    }
   }
 };
