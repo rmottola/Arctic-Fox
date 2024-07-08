@@ -63,17 +63,19 @@ add_task(function* testThemes() {
 
   Services.prefs.setCharPref(PREF_DEVTOOLS_THEME, "dark");
 
-  yield DeveloperToolbar.display.inputter.setInput("");
-  yield DeveloperToolbar.display.inputter.setInput("help help");
+  yield DeveloperToolbar.inputter.setInput("");
+  yield DeveloperToolbar.inputter.setInput("help help");
   is(tooltipPanel.document.documentElement.getAttribute("devtoolstheme"),
      "dark", "Tooltip panel has correct theme");
 
   Services.prefs.setCharPref(PREF_DEVTOOLS_THEME, "light");
 
-  yield DeveloperToolbar.display.inputter.setInput("");
-  yield DeveloperToolbar.display.inputter.setInput("help help");
+  yield DeveloperToolbar.inputter.setInput("");
+  yield DeveloperToolbar.inputter.setInput("help help");
   is(tooltipPanel.document.documentElement.getAttribute("devtoolstheme"),
      "light", "Tooltip panel has correct theme");
+});
+
 
 add_task(function* hideToolbar() {
   info("Ending browser_toolbar_tooltip.js");
