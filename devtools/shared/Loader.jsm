@@ -325,9 +325,10 @@ DevToolsLoader.prototype = {
 
     this._provider.unload("reload");
     delete this._provider;
+    let mainid = this._mainid;
     delete this._mainid;
     this._loadProvider();
-    this.main("devtools/client/main");
+    this.main(mainid);
   },
 
   /**
