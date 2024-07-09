@@ -365,6 +365,12 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
   _registerBrowserWindow: function(win) {
     BrowserMenus.addMenus(win.document);
 
+    // Inject lazily DeveloperToolbar on the chrome window
+    loader.lazyGetter(win, "DeveloperToolbar", function() {
+      let { DeveloperToolbar } = require("devtools/client/shared/developer-toolbar");
+      return new DeveloperToolbar(win);
+    });
+
     this.updateCommandAvailability(win);
     this.ensurePrefObserver();
     gDevToolsBrowser._trackedBrowserWindows.add(win);
@@ -565,6 +571,9 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
    *         The window containing the menu entry
    */
   _forgetBrowserWindow: function(win) {
+    if (!gDevToolsBrowser._trackedBrowserWindows.has(win)) {
+      return;
+    }
     gDevToolsBrowser._trackedBrowserWindows.delete(win);
     win.removeEventListener("unload", this);
 
@@ -573,6 +582,12 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
       if (toolbox.frame && toolbox.frame.ownerDocument.defaultView == win) {
         toolbox.destroy();
       }
+    }
+
+    // Destroy the Developer toolbar if it has been accessed
+    let desc = Object.getOwnPropertyDescriptor(win, "DeveloperToolbar");
+    if (desc && !desc.get) {
+      win.DeveloperToolbar.destroy();
     }
 
     let tabContainer = win.gBrowser.tabContainer;
