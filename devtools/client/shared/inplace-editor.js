@@ -225,7 +225,7 @@ function InplaceEditor(options, event) {
     for (let i = 0; i < advanceChars.length; i++) {
       advanceCharcodes[advanceChars.charCodeAt(i)] = true;
     }
-    this._advanceChars = aCharCode => aCharCode in advanceCharcodes;
+    this._advanceChars = charCode => charCode in advanceCharcodes;
   }
 
   // Hide the provided element and add our editor.
@@ -299,9 +299,11 @@ InplaceEditor.prototype = {
     this.input.removeEventListener("keypress", this._onKeyPress, false);
     this.input.removeEventListener("keyup", this._onKeyup, false);
     this.input.removeEventListener("input", this._onInput, false);
-    this.input.removeEventListener("dblclick", this._stopEventPropagation, false);
+    this.input.removeEventListener("dblclick", this._stopEventPropagation,
+      false);
     this.input.removeEventListener("click", this._stopEventPropagation, false);
-    this.input.removeEventListener("mousedown", this._stopEventPropagation, false);
+    this.input.removeEventListener("mousedown", this._stopEventPropagation,
+      false);
 
     this._stopAutosize();
 
@@ -465,13 +467,15 @@ InplaceEditor.prototype = {
       if (type === "rgb" || type === "hsl") {
         info = {};
         let part = value.substring(range.start, selStart).split(",").length - 1;
-        if (part === 3) { // alpha
+        if (part === 3) {
+          // alpha
           info.minValue = 0;
           info.maxValue = 1;
         } else if (type === "rgb") {
           info.minValue = 0;
           info.maxValue = 255;
-        } else if (part !== 0) { // hsl percentage
+        } else if (part !== 0) {
+          // hsl percentage
           info.minValue = 0;
           info.maxValue = 100;
 
@@ -510,7 +514,7 @@ InplaceEditor.prototype = {
    * @return {Object} object with properties 'value', 'start', 'end', and
    *         'type'.
    */
-   _parseCSSValue: function(value, offset) {
+  _parseCSSValue: function(value, offset) {
     const reSplitCSS = /(url\("?[^"\)]+"?\)?)|(rgba?\([^)]*\)?)|(hsla?\([^)]*\)?)|(#[\dA-Fa-f]+)|(-?\d*\.?\d+(%|[a-z]{1,4})?)|"([^"]*)"?|'([^']*)'?|([^,\s\/!\(\)]+)|(!(.*)?)/;
     let start = 0;
     let m;
@@ -579,8 +583,10 @@ InplaceEditor.prototype = {
       // Parse periods as belonging to the number only if we are in a known
       // number context. (This makes incrementing the 1 in 'image1.gif' work.)
       let pattern = "[" + (info ? "0-9." : "0-9") + "]*";
-      let before = new RegExp(pattern + "$").exec(value.substr(0, offset))[0].length;
-      let after = new RegExp("^" + pattern).exec(value.substr(offset))[0].length;
+      let before = new RegExp(pattern + "$")
+        .exec(value.substr(0, offset))[0].length;
+      let after = new RegExp("^" + pattern)
+        .exec(value.substr(offset))[0].length;
 
       start = offset - before;
       end = offset + after;
@@ -1148,7 +1154,8 @@ InplaceEditor.prototype = {
         // Detecting if cursor is at property or value;
         let match = query.match(/([:;"'=]?)\s*([^"';:=]+)?$/);
         if (match && match.length >= 2) {
-          if (match[1] == ":") { // We are in CSS value completion
+          if (match[1] == ":") {
+            // We are in CSS value completion
             let propertyName =
               query.match(/[;"'=]\s*([^"';:= ]+)\s*:\s*[^"';:=]*$/)[1];
             list =
@@ -1164,7 +1171,8 @@ InplaceEditor.prototype = {
               // Don't suggest '!important' without any manually typed character
               list.splice(0, 1);
             }
-          } else if (match[1]) { // We are in CSS property name completion
+          } else if (match[1]) {
+            // We are in CSS property name completion
             list = CSSPropertyList;
             startCheckQuery = match[2];
           }
