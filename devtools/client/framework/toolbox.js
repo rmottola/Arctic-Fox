@@ -367,7 +367,7 @@ Toolbox.prototype = {
       iframe.setAttribute("src", this._URL);
       iframe.setAttribute("aria-label", toolboxStrings("toolbox.label"));
       let domHelper = new DOMHelpers(iframe.contentWindow);
-      domHelper.onceDOMReady(() => domReady.resolve());
+      domHelper.onceDOMReady(() => domReady.resolve(), this._URL);
       // Optimization: fire up a few other things before waiting on
       // the iframe being ready (makes startup faster)
 
@@ -376,7 +376,6 @@ Toolbox.prototype = {
 
       // Attach the thread
       this._threadClient = yield attachThread(this);
-
       yield domReady.promise;
 
       this.isReady = true;
