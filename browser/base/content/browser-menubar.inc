@@ -572,7 +572,7 @@
                             accesskey="&browserConsoleCmd.accesskey;"/>
                   <menuitem id="menu_responsiveUI"
                             observes="devtoolsMenuBroadcaster_ResponsiveUI"
-                            accesskey="&responsiveDesignTool.accesskey;"/>
+                            accesskey="&responsiveDesignMode.accesskey;"/>
                   <menuitem id="menu_eyedropper"
                             observes="devtoolsMenuBroadcaster_Eyedropper"
                             accesskey="&eyedropper.accesskey;"/>
