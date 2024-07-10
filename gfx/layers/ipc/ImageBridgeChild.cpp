@@ -444,8 +444,9 @@ static void ReleaseImageClientNow(ImageClient* aClient,
   if (aClient) {
     aClient->Release();
   }
-  if (aChild && ImageBridgeChild::IsCreated() && !ImageBridgeChild::IsShutDown()) {
-    aChild->SendAsyncDelete();
+
+  if (aChild) {
+    ImageContainer::AsyncDestroyActor(aChild);
   }
 }
 
@@ -1091,7 +1092,7 @@ ImageBridgeChild::AllocPImageContainerChild()
 bool
 ImageBridgeChild::DeallocPImageContainerChild(PImageContainerChild* actor)
 {
-  delete actor;
+  ImageContainer::DeallocActor(actor);
   return true;
 }
 
