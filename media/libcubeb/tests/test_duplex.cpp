@@ -10,7 +10,7 @@
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
-#define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 600
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -92,7 +92,7 @@ void state_cb(cubeb_stream *stream, void *user, cubeb_state state)
 int main(int argc, char *argv[])
 {
 #ifdef CUBEB_GECKO_BUILD
-  ScopedXPCOM xpcom("test_record");
+  ScopedXPCOM xpcom("test_duplex");
 #endif
 
   cubeb *ctx;
