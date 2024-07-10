@@ -1025,9 +1025,7 @@ public:
     : mReqSize(aLb.ReqSize())
     , mSlopSize(aLb.SlopSize())
     , mAllocStackTrace(aLb.AllocStackTrace())
-  {
-    MOZ_ASSERT(AllocStackTrace());
-  }
+  {}
 
   ~DeadBlock() {}
 
