@@ -2751,7 +2751,6 @@ MOZ_WEBSPEECH=1
 MOZ_WEBSPEECH_MODELS=
 MOZ_WEBSPEECH_POCKETSPHINX=
 MOZ_WEBSPEECH_TEST_BACKEND=1
-MOZ_JXR=1
 VPX_USE_YASM=
 VPX_ASFLAGS=
 VPX_AS_CONVERSION=
@@ -3768,21 +3767,6 @@ if test -n "$MOZ_WEBSPEECH_MODELS"; then
 fi
 
 AC_SUBST(MOZ_WEBSPEECH_MODELS)
-
-dnl ========================================================
-dnl = Disable JPEG-XR (JXR) decoder support
-dnl ========================================================
-
-MOZ_ARG_DISABLE_BOOL(jxr,
-[  --disable-jxr           Disable support for JPEG-XR (JXR) image format],
-    MOZ_JXR=,
-    MOZ_JXR=1)
-
-if test -n "$MOZ_JXR"; then
-    AC_DEFINE(MOZ_JXR)
-fi
-
-AC_SUBST(MOZ_JXR)
 
 dnl ========================================================
 dnl = Enable Raw Codecs

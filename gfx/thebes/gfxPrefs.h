@@ -410,11 +410,6 @@ private:
   DECL_GFX_PREF(Live, "layout.event-regions.enabled",          LayoutEventRegionsEnabledDoNotUseDirectly, bool, false);
   DECL_GFX_PREF(Once, "layout.frame_rate",                     LayoutFrameRate, int32_t, -1);
   DECL_GFX_PREF(Once, "layout.paint_rects_separately",         LayoutPaintRectsSeparately, bool, true);
-#ifdef MOZ_JXR
-  DECL_GFX_PREF(Live, "media.jxr.enabled",                     MediaJXREnabled, bool, false);
-  DECL_GFX_PREF(Live, "media.jxr.workaround_alphaplane_bug",   MediaJXRWorkaroundAlphaplaneBug, bool, false);
-#endif
-
 
   // This and code dependent on it should be removed once containerless scrolling looks stable.
   DECL_GFX_PREF(Once, "layout.scroll.root-frame-containers",   LayoutUseContainersForRootFrames, bool, true);

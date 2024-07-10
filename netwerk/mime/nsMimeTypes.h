@@ -93,10 +93,6 @@
 #define IMAGE_GIF                           "image/gif"
 #define IMAGE_JPEG                          "image/jpeg"
 #define IMAGE_JPG                           "image/jpg"
-#ifdef MOZ_JXR
-#define IMAGE_JXR                           "image/jxr"
-#define IMAGE_MS_PHOTO                      "image/vnd.ms-photo"
-#endif
 #define IMAGE_PJPEG                         "image/pjpeg"
 #define IMAGE_PNG                           "image/png"
 #define IMAGE_X_PNG                         "image/x-png"

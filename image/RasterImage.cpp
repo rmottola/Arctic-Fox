@@ -32,9 +32,6 @@
 #include "nsPNGDecoder.h"
 #include "nsGIFDecoder2.h"
 #include "nsJPEGDecoder.h"
-#ifdef MOZ_JXR
-#include "nsJXRDecoder.h"
-#endif
 #include "nsBMPDecoder.h"
 #include "nsICODecoder.h"
 #include "nsIconDecoder.h"

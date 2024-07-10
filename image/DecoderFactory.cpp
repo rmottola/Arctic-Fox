@@ -13,9 +13,6 @@
 #include "nsPNGDecoder.h"
 #include "nsGIFDecoder2.h"
 #include "nsJPEGDecoder.h"
-#ifdef MOZ_JXR
-#include "nsJXRDecoder.h"
-#endif
 #include "nsBMPDecoder.h"
 #include "nsICODecoder.h"
 #include "nsIconDecoder.h"
@@ -71,14 +68,6 @@ DecoderFactory::GetDecoderType(const char* aMimeType)
   } else if (!strcmp(aMimeType, IMAGE_WEBP) &&
              gfxPrefs::ImageWebPEnabled()) {
     type = DecoderType::WEBP;
-
-#ifdef MOZ_JXR
-  } else if (!strcmp(aMimeType, IMAGE_JXR) || !strcmp(aMimeType, IMAGE_MS_PHOTO)) {
-    if (gfxPrefs::MediaJXREnabled()) {
-      type = DecoderType::JXR;
-    }
-#endif
-
   }
 
   return type;
@@ -117,11 +106,6 @@ DecoderFactory::GetDecoder(DecoderType aType,
     case DecoderType::WEBP:
       decoder = new nsWEBPDecoder(aImage);
       break;
-#ifdef MOZ_JXR
-    case DecoderType::JXR:
-      decoder = new nsJXRDecoder(aImage, aIsRedecode);
-      break;
-#endif
     default:
       MOZ_ASSERT_UNREACHABLE("Unknown decoder type");
   }

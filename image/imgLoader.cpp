@@ -1276,29 +1276,9 @@ imgLoader::Init()
 {
   InitCache();
 
-#ifdef MOZ_JXR
-  nsAdoptingCString advertisedJxrMimeType = Preferences::GetCString(
-      "media.jxr.advertised_mime_type");
-  if (!advertisedJxrMimeType) {
-    mLastJxrMimeType = "";
-  } else {
-    advertisedJxrMimeType.Trim(" \t\n\v\f\r");
-    mLastJxrMimeType = advertisedJxrMimeType;
-  }
-
-  if (Preferences::GetBool("media.jxr.autoaccept", false)) {
-    UpdateJXRAcceptHeader(Preferences::GetBool("media.jxr.enabled", false));
-  }
-
-  Preferences::AddWeakObserver(this, "media.jxr.enabled");
-  Preferences::AddWeakObserver(this, "media.jxr.advertised_mime_type");
-  Preferences::AddWeakObserver(this, "media.jxr.autoaccept");
-#endif
-
   ReadAcceptHeaderPref();
 
   Preferences::AddWeakObserver(this, "image.http.accept");
-
 
     return NS_OK;
 }
@@ -1319,20 +1299,6 @@ imgLoader::Observe(nsISupports* aSubject, const char* aTopic,
     if (!NS_strcmp(aData, MOZ_UTF16("image.http.accept"))) {
       ReadAcceptHeaderPref();
     }
-#ifdef MOZ_JXR
-    else if (!NS_strcmp(aData, MOZ_UTF16("media.jxr.enabled"))) {
-      if (Preferences::GetBool("media.jxr.autoaccept", false)) {
-        UpdateJXRAcceptHeader(Preferences::GetBool("media.jxr.enabled",
-            false));
-      }
-    } else if (!NS_strcmp(aData, MOZ_UTF16("media.jxr.advertised_mime_type"))) {
-      if (Preferences::GetBool("media.jxr.enabled", false) &&
-          Preferences::GetBool("media.jxr.autoaccept", false)) {
-        UpdateJXRAcceptHeader(false);
-        UpdateJXRAcceptHeader(true);
-      }
-    }
-#endif
 
   } else if (strcmp(aTopic, "memory-pressure") == 0) {
     MinimizeCaches();
@@ -2624,164 +2590,6 @@ imgLoader::GetMimeTypeFromContent(const char* aContents,
 
   return NS_OK;
 }
-
-#ifdef MOZ_JXR
-// In the Accept header passed in by the 'start' and 'end' pointers, finds a
-// portion containing the first occurrence of the MIME type and retuns it as
-// a pair of pointers in the subStart and subEnd out parameters. The returned
-// span will also contain any paramters (HTTP term) the MIME type might have
-// and a delimiter and surrounding whitespace so that it can directly be used
-// to cut the MIME type information from the header field. In case of no match,
-// *subEnd will be NULL.
-void imgLoader::FindMIMETypeInAcceptHeader(const char* mimeType, char* start,
-    char* end, char** subStart, char** subEnd)
-{
-  MOZ_ASSERT(mimeType);
-  MOZ_ASSERT(start);
-  MOZ_ASSERT(end);
-  MOZ_ASSERT(subStart);
-  MOZ_ASSERT(subEnd);
-
-  size_t mimeTypeLen = strlen(mimeType);
-  bool isEscaped = false;
-  bool inQuoted = false;
-  *subStart = NULL;
-  *subEnd = NULL;
-
-  for (char* current = start; current < end; ) {
-    // Only examine the header at points of interest.
-    if (current == start || *current++ == ',') {
-      *subStart = current;
-      while (current != end && isspace(*current)) {
-        ++current;
-      }
-      if (size_t(end - current) < mimeTypeLen) {
-        break;
-      }
-      if (!strncmp(current, mimeType, mimeTypeLen)) {
-        current += mimeTypeLen;
-        while (current != end && isspace(*current)) {
-          ++current;
-        }
-        // Also include parameters in the result if there are any present.
-        if (current != end && *current == ';') {
-          do {
-            if (*current == ',') {
-              if (!inQuoted) {
-                break;
-              }
-            } else if (*current == '"') {
-              if (!isEscaped) {
-                inQuoted = !inQuoted;
-              }
-            }
-            if (isEscaped) {
-              isEscaped = false;
-            } else if (*current == '\\') {
-              isEscaped = true;
-            }
-          } while (++current != end);
-        }
-        if (current != end && *current != ',') {
-          // These are not the droids you are looking for.
-          ++current;
-          continue;
-        }
-        *subEnd = current;
-        // Also include the comma delimiter and surrounding whitespace to avoid
-        // accumulating it over time.
-        if (*subEnd != end) {
-          ++*subEnd;
-          while (*subEnd != end && isspace(**subEnd)) {
-            ++*subEnd;
-          }
-        } else if (*subStart != start) {
-          --*subStart;
-          while (*subStart != start && isspace(**subStart)) {
-            --*subStart;
-          }
-        }
-        break;
-      } // if strncmp
-      ++current;
-    } // if start or comma
-  } // for
-}
-
-// Adds/removes the JPEG XR MIME type to/from the "image.http.accept" pref.
-void imgLoader::UpdateJXRAcceptHeader(bool enabled)
-{
-  nsAdoptingCString accept = Preferences::GetCString("image.http.accept");
-  if (!accept) {
-    return;
-  }
-
-  char* start = accept.BeginWriting();
-  char* end = accept.EndWriting();
-  char* subStart = NULL;
-  char* subEnd = NULL;
-
-  nsAdoptingCString jxrMimeType = Preferences::GetCString(
-      "media.jxr.advertised_mime_type");
-
-  if (enabled) { // Adding the MIME type.
-    if (!jxrMimeType) {
-      return;
-    }
-
-    jxrMimeType.Trim(" \t\n\v\f\r");
-    if (jxrMimeType.IsEmpty()) {
-      return;
-    }
-    mLastJxrMimeType = jxrMimeType;
-
-    FindMIMETypeInAcceptHeader(jxrMimeType.get(), start, end,
-        &subStart, &subEnd);
-
-    if (subEnd) {
-      // MIME type already present.
-      return;
-    }
-
-    // Try inserting after the WebP MIME type to have a canonical header if
-    // possible. If this fails, the JPEG XR MIME type will be "aggressively"
-    // inserted at the beginning.
-    FindMIMETypeInAcceptHeader("image/webp", start, end, &subStart, &subEnd);
-
-    if (subEnd) {
-      if (subEnd == end) {
-        accept.Insert(NS_LITERAL_CSTRING(",") + jxrMimeType, subEnd - start);
-      } else {
-        accept.Insert(jxrMimeType + NS_LITERAL_CSTRING(","), subEnd - start);
-      }
-    } else {
-      subStart = start;
-      while (subStart != end && isspace(*subStart)) {
-        ++subStart;
-      }
-      if (subStart == end) {
-        accept.Insert(jxrMimeType, 0);
-      } else {
-        accept.Insert(jxrMimeType + NS_LITERAL_CSTRING(","), 0);
-      }
-    }
-  } else { // Removing the MIME type.
-    if (mLastJxrMimeType.IsEmpty()) {
-      return;
-    }
-
-    FindMIMETypeInAcceptHeader(mLastJxrMimeType.get(), start, end,
-        &subStart, &subEnd);
-
-    if (!subEnd) {
-      return;
-    }
-
-    accept.Cut(subStart - start, subEnd - subStart);
-  }
-  Preferences::SetCString("image.http.accept", accept);
-}
-#endif // MOZ_JXR
 
 /**
  * proxy stream listener class used to handle multipart/x-mixed-replace
