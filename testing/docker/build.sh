@@ -38,6 +38,7 @@ build() {
   local folder="$gecko_root/testing/docker/$image_name"
   local folder_reg="$folder/REGISTRY"
   local folder_ver="$folder/VERSION"
+  local could_deploy=false
 
   if [ "$image_name" == "" ];
   then
