@@ -42,20 +42,28 @@ build() {
   fi
 
   test -d "$folder" || usage_err "Unknown folder: $folder"
-  test -f "$folder_ver" || usage_err "$folder must contain VERSION file"
 
-  # Fallback to default registry if one is not in the folder...
-  if [ ! -f "$folder_reg" ]; then
-    folder_reg=$PWD/REGISTRY
+  # Assume that if an image context directory does not contain a VERSION file then
+  # it is not suitable for deploying.  Default to using 'latest' as the tag and
+  # warn the user at the end.
+  if [ ! -f $folder_ver ]; then
+    echo "This image does not container a VERSION file.  Will use 'latest' as the image version"
+    local tag="$image_name:latest"
+  else
+    local version=$(cat $folder_ver)
+    test -n "$version" || usage_err "$folder_ver is empty aborting..."
+
+    # Fallback to default registry if one is not in the folder...
+    if [ ! -f "$folder_reg" ]; then
+      folder_reg=$PWD/REGISTRY
+    fi
+
+    local registry=$(cat $folder_reg)
+    test -n "$registry" || usage_err "$folder_reg is empty aborting..."
+
+    local tag="$registry/$image_name:$version"
+    local could_deploy=true
   fi
-
-  local registry=$(cat $folder_reg)
-  local version=$(cat $folder_ver)
-
-  test -n "$registry" || usage_err "$folder_reg is empty aborting..."
-  test -n "$version" || usage_err "$folder_ver is empty aborting..."
-
-  local tag="$registry/$folder:$version"
 
   if [ -f $folder/build.sh ]; then
     shift
@@ -67,7 +75,18 @@ build() {
   fi
 
   echo "Success built $folder and tagged with $tag"
-  echo "If deploying now you can run 'docker push $tag'"
+  if [ "$could_deploy" = true ]; then
+    echo "If deploying now you can run 'docker push $tag'"
+  else
+    echo "*****************************************************************"
+    echo "WARNING: No VERSION file was found in the image directory."
+    echo "Image has not been prepared for deploying at this time."
+    echo "However, the image can be run locally. To prepare to "
+    echo "push to a user account on a docker registry, tag the image "
+    echo "by running 'docker tag $tag [REGISTRYHOST/][USERNAME/]NAME[:TAG]"
+    echo "prior to running 'docker push'."
+    echo "*****************************************************************"
+  fi
 }
 
 if ! which docker > /dev/null; then
