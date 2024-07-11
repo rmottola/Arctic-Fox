@@ -365,7 +365,7 @@ class Graph(object):
                 graph['scopes'].append(route)
 
         graph['metadata'] = {
-            'source': 'http://todo.com/what/goes/here',
+            'source': '{repo}file/{rev}/testing/taskcluster/mach_commands.py'.format(repo=params['head_repository'], rev=params['head_rev']),
             'owner': params['owner'],
             # TODO: Add full mach commands to this example?
             'description': 'Task graph generated via ./mach taskcluster-graph',
@@ -378,6 +378,7 @@ class Graph(object):
             interactive = cmdline_interactive or build["interactive"]
             build_parameters = dict(parameters)
             build_parameters['build_slugid'] = slugid()
+            build_parameters['source'] = '{repo}file/{rev}/testing/taskcluster/{file}'.format(repo=params['head_repository'], rev=params['head_rev'], file=build['task'])
             build_task = templates.load(build['task'], build_parameters)
 
             # Copy build_* attributes to expose them to post-build tasks
