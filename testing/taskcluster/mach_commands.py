@@ -315,6 +315,9 @@ class Graph(object):
     @CommandArgument('--owner',
         required=True,
         help='email address of who owns this graph')
+    @CommandArgument('--level',
+        default="1",
+        help='SCM level of this repository')
     @CommandArgument('--extend-graph',
         action="store_true", dest="ci", help='Omit create graph arguments')
     @CommandArgument('--interactive',
@@ -379,6 +382,7 @@ class Graph(object):
             'month': pushdate[4:6],
             'day': pushdate[6:8],
             'owner': params['owner'],
+            'level': params['level'],
             'from_now': json_time_from_now,
             'now': current_json_time(),
             'revision_hash': params['revision_hash']
@@ -623,6 +627,9 @@ class CIBuild(object):
     @CommandArgument('--owner',
         default='foobar@mozilla.com',
         help='email address of who owns this graph')
+    @CommandArgument('--level',
+        default="1",
+        help='SCM level of this repository')
     @CommandArgument('build_task',
         help='path to build task definition')
     @CommandArgument('--interactive',
@@ -654,6 +661,7 @@ class CIBuild(object):
         build_parameters = dict(gaia_info().items() + {
             'docker_image': docker_image,
             'owner': params['owner'],
+            'level': params['level'],
             'from_now': json_time_from_now,
             'now': current_json_time(),
             'base_repository': params['base_repository'] or head_repository,
