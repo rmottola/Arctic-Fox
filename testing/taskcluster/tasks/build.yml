@@ -54,6 +54,7 @@ task:
       GECKO_HEAD_REF: '{{head_ref}}'
       TOOLTOOL_REPO: 'https://github.com/mozilla/build-tooltool'
       TOOLTOOL_REV: 'master'
+      MOZ_SCM_LEVEL: '{{level}}'
 
   extra:
     build_product: '{{build_product}}'
