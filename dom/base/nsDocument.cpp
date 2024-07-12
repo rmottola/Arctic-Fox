@@ -3200,6 +3200,16 @@ nsDocument::GetUndoManager()
 }
 
 bool
+nsDocument::IsElementAnimateEnabled(JSContext* /*unused*/, JSObject* /*unused*/)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  return nsContentUtils::IsCallerChrome() ||
+         Preferences::GetBool("dom.animations-api.core.enabled") ||
+         Preferences::GetBool("dom.animations-api.element-animate.enabled");
+}
+
+bool
 nsDocument::IsWebAnimationsEnabled(JSContext* /*unused*/, JSObject* /*unused*/)
 {
   MOZ_ASSERT(NS_IsMainThread());
