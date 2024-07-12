@@ -1290,16 +1290,16 @@ NS_LogCOMPtrAddRef(void* aCOMPtr, nsISupports* aObject)
   if (!gTypesToLog || !gSerialNumbers) {
     return;
   }
-  intptr_t serialno = GetSerialNumber(object, false);
-  if (serialno == 0) {
-    return;
-  }
-
   if (!gInitialized) {
     InitTraceLog();
   }
   if (gLogging == FullLogging) {
     AutoTraceLogLock lock;
+
+    intptr_t serialno = GetSerialNumber(object, false);
+    if (serialno == 0) {
+      return;
+    }
 
     int32_t* count = GetCOMPtrCount(object);
     if (count) {
@@ -1331,16 +1331,16 @@ NS_LogCOMPtrRelease(void* aCOMPtr, nsISupports* aObject)
   if (!gTypesToLog || !gSerialNumbers) {
     return;
   }
-  intptr_t serialno = GetSerialNumber(object, false);
-  if (serialno == 0) {
-    return;
-  }
-
   if (!gInitialized) {
     InitTraceLog();
   }
   if (gLogging == FullLogging) {
     AutoTraceLogLock lock;
+
+    intptr_t serialno = GetSerialNumber(object, false);
+    if (serialno == 0) {
+      return;
+    }
 
     int32_t* count = GetCOMPtrCount(object);
     if (count) {
