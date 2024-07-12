@@ -3882,8 +3882,8 @@ if test -n "$MOZ_OMX_PLUGIN"; then
         dnl Only allow building OMX plugin on Gonk (B2G) or Android
         AC_DEFINE(MOZ_OMX_PLUGIN)
     else
-       dnl fail if we're not building on Gonk or Android
-       AC_MSG_ERROR([OMX media plugin can only be built on B2G or Android])
+        dnl fail if we're not building on Gonk or Android
+        AC_MSG_ERROR([OMX media plugin can only be built on B2G or Android])
     fi
 fi
 
@@ -4423,7 +4423,6 @@ dnl Gamepad support
 dnl ========================================================
 MOZ_GAMEPAD=
 MOZ_GAMEPAD_BACKEND=stub
-
 
 # Gamepad DOM is built on supported platforms by default.
 case "$OS_TARGET" in
@@ -6767,8 +6766,6 @@ AC_SUBST(MOZ_COMPONENTS_VERSION_SCRIPT_LDFLAGS)
 
 AC_SUBST(MOZ_FIX_LINK_PATHS)
 
-AC_SUBST(USE_DEPENDENT_LIBS)
-
 AC_SUBST(MOZ_POST_PROGRAM_COMMAND)
 AC_SUBST(MOZ_LINKER_EXTRACT)
 
@@ -7423,6 +7420,7 @@ export MOZ_ZLIB_CFLAGS
 export MOZ_ZLIB_LIBS
 export MOZ_APP_NAME
 export MOZ_APP_REMOTINGNAME
+export RUSTC
 export MOZILLA_CENTRAL_PATH=$_topsrcdir
 export STLPORT_CPPFLAGS
 export STLPORT_LIBS
