@@ -131,7 +131,13 @@ interface nsIXULRuntime : nsISupports
    */
   readonly attribute PRTime replacedLockTime;
 
-    /**
+  /**
+   * Local ID of the minidump generated when the process crashed
+   * on the previous run. Can be passed directly to CrashSubmit.submit.
+   */
+  readonly attribute DOMString lastRunCrashID;
+
+  /**
    * True if this is a RELEASE_BUILD.
    */
   readonly attribute boolean isReleaseBuild;

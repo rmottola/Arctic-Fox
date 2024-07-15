@@ -1055,6 +1055,179 @@ bool MinidumpCallback(
   return returnValue;
 }
 
+#if defined(XP_MACOSX) || defined(__ANDROID__)
+static size_t
+EnsureTrailingSlash(XP_CHAR* aBuf, size_t aBufLen)
+{
+  size_t len = XP_STRLEN(aBuf);
+  if ((len + 2) < aBufLen && aBuf[len - 1] != XP_PATH_SEPARATOR_CHAR) {
+    aBuf[len] = XP_PATH_SEPARATOR_CHAR;
+    ++len;
+    aBuf[len] = 0;
+  }
+  return len;
+}
+#endif
+
+#if defined(XP_WIN32)
+
+static size_t
+BuildTempPath(wchar_t* aBuf, size_t aBufLen)
+{
+  // first figure out buffer size
+  DWORD pathLen = GetTempPath(0, nullptr);
+  if (pathLen == 0 || pathLen >= aBufLen) {
+    return 0;
+  }
+
+  return GetTempPath(pathLen, aBuf);
+}
+
+#ifdef MOZ_CHAR16_IS_NOT_WCHAR
+static size_t
+BuildTempPath(char16_t* aBuf, size_t aBufLen)
+{
+  return BuildTempPath(reinterpret_cast<wchar_t*>(aBuf), aBufLen);
+}
+#endif
+
+#elif defined(XP_MACOSX)
+
+static size_t
+BuildTempPath(char* aBuf, size_t aBufLen)
+{
+  if (aBufLen < PATH_MAX) {
+    return 0;
+  }
+
+  FSRef fsRef;
+  OSErr err = FSFindFolder(kUserDomain, kTemporaryFolderType,
+                           kCreateFolder, &fsRef);
+  if (err != noErr) {
+    return 0;
+  }
+
+  OSStatus status = FSRefMakePath(&fsRef, (UInt8*)aBuf, PATH_MAX);
+  if (status != noErr) {
+    return 0;
+  }
+
+  return EnsureTrailingSlash(aBuf, aBufLen);
+}
+
+#elif defined(__ANDROID__)
+
+static size_t
+BuildTempPath(char* aBuf, size_t aBufLen)
+{
+  // GeckoAppShell or Gonk's init.rc sets this in the environment
+  const char *tempenv = PR_GetEnv("TMPDIR");
+  if (!tempenv) {
+    return false;
+  }
+  int size = (int)aBufLen;
+  Concat(aBuf, tempenv, &size);
+  return EnsureTrailingSlash(aBuf, aBufLen);
+}
+
+#elif defined(XP_UNIX)
+
+static size_t
+BuildTempPath(char* aBuf, size_t aBufLen)
+{
+  // we assume it's always /tmp on unix systems
+  NS_NAMED_LITERAL_CSTRING(tmpPath, "/tmp/");
+  int size = (int)aBufLen;
+  Concat(aBuf, tmpPath.get(), &size);
+  return tmpPath.Length();
+}
+
+#else
+#error "Implement this for your platform"
+#endif
+
+template <typename CharT, size_t N>
+static size_t
+BuildTempPath(CharT (&aBuf)[N])
+{
+  static_assert(N >= XP_PATH_MAX, "char array length is too small");
+  return BuildTempPath(&aBuf[0], N);
+}
+
+template <typename PathStringT>
+static bool
+BuildTempPath(PathStringT& aResult)
+{
+  aResult.SetLength(XP_PATH_MAX);
+  size_t actualLen = BuildTempPath(aResult.BeginWriting(), XP_PATH_MAX);
+  if (!actualLen) {
+    return false;
+  }
+  aResult.SetLength(actualLen);
+  return true;
+}
+
+static void
+PrepareChildExceptionTimeAnnotations()
+{
+  MOZ_ASSERT(!XRE_IsParentProcess());
+  static XP_CHAR tempPath[XP_PATH_MAX] = {0};
+
+  // Get the temp path
+  int charsAvailable = XP_PATH_MAX;
+  XP_CHAR* p = tempPath;
+#if (defined(XP_MACOSX) || defined(XP_WIN))
+  if (!childProcessTmpDir || childProcessTmpDir->empty()) {
+    return;
+  }
+  p = Concat(p, childProcessTmpDir->c_str(), &charsAvailable);
+  // Ensure that this path ends with a path separator
+  if (p > tempPath && *(p - 1) != XP_PATH_SEPARATOR_CHAR) {
+    p = Concat(p, XP_PATH_SEPARATOR, &charsAvailable);
+  }
+#else
+  size_t tempPathLen = BuildTempPath(tempPath);
+  if (!tempPathLen) {
+    return;
+  }
+  p += tempPathLen;
+  charsAvailable -= tempPathLen;
+#endif
+
+  // Generate and append the file name
+  p = Concat(p, childCrashAnnotationBaseName, &charsAvailable);
+  XP_CHAR pidBuffer[32] = XP_TEXT("");
+#if defined(XP_WIN32)
+  _ui64tow(GetCurrentProcessId(), pidBuffer, 10);
+#else
+  XP_STOA(getpid(), pidBuffer, 10);
+#endif
+  p = Concat(p, pidBuffer, &charsAvailable);
+
+  // Now open the file...
+  PlatformWriter apiData;
+  OpenAPIData(apiData, tempPath);
+
+  // ...and write out any annotations. These must be escaped if necessary
+  // (but don't call EscapeAnnotation here, because it touches the heap).
+#ifdef XP_WIN
+  WriteGlobalMemoryStatus(&apiData, nullptr);
+#endif
+
+  char oomAllocationSizeBuffer[32] = "";
+  if (gOOMAllocationSize) {
+    XP_STOA(gOOMAllocationSize, oomAllocationSizeBuffer, 10);
+  }
+
+  if (oomAllocationSizeBuffer[0]) {
+    WriteAnnotation(apiData, "OOMAllocationSize", oomAllocationSizeBuffer);
+  }
+
+  if (gMozCrashReason) {
+    WriteAnnotation(apiData, "MozCrashReason", gMozCrashReason);
+  }
+}
+
 #ifdef XP_WIN
 static void
 ReserveBreakpadVM()
