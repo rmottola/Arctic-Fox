@@ -149,6 +149,7 @@ protected:
       sCurrentThreadTLS.set(nullptr);
       mQueue->mTailDispatcher = nullptr;
     }
+
   private:
   TaskQueue* mQueue;
   };

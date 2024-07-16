@@ -156,7 +156,7 @@ TaskQueue::Runner::Run()
       mon.NotifyAll();
       return NS_OK;
     }
-    event = mQueue->mTasks.front();
+    event = mQueue->mTasks.front().forget();
     mQueue->mTasks.pop();
   }
   MOZ_ASSERT(event);
