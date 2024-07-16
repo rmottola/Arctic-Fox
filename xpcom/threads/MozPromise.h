@@ -84,7 +84,7 @@ struct ReturnTypeIs {
  *       if it has not already occurred, via Disconnect() (this must be done on
  *       the target thread to avoid racing).
  *
- *   (2) It provides access to a "Completion Promise", which is roughly analogous
+ *   (2) It provides access to a "Completion Promise", which is roughly analagous
  *       to the Promise returned directly by ->then() calls on JS promises. If
  *       the resolve/reject callback returns a new MozPromise, that promise is
  *       chained to the completion promise, such that its resolve/reject value
@@ -97,6 +97,7 @@ struct ReturnTypeIs {
  * chaining of calls without cluttering up the code with intermediate variables, and
  * without introducing separate API variants for callers that want a return value
  * (from, say, ->Then()) from those that don't.
+ *
  * When IsExclusive is true, the MozPromise does a release-mode assertion that
  * there is at most one call to either Then(...) or ChainTo(...).
  */
@@ -106,7 +107,7 @@ class MozPromiseRefcountable
 public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(MozPromiseRefcountable)
 protected:
- virtual ~MozPromiseRefcountable() {}
+  virtual ~MozPromiseRefcountable() {}
 };
 
 template<typename T> class MozPromiseHolder;
@@ -152,6 +153,7 @@ public:
     bool IsResolve() const { return mResolveValue.isSome(); }
     bool IsReject() const { return mRejectValue.isSome(); }
     bool IsNothing() const { return mResolveValue.isNothing() && mRejectValue.isNothing(); }
+
     const ResolveValueType& ResolveValue() const { return mResolveValue.ref(); }
     const RejectValueType& RejectValue() const { return mRejectValue.ref(); }
 
@@ -163,10 +165,11 @@ public:
 protected:
   // MozPromise is the public type, and never constructed directly. Construct
   // a MozPromise::Private, defined below.
-  explicit MozPromise(const char* aCreationSite)
+  MozPromise(const char* aCreationSite, bool aIsCompletionPromise)
     : mCreationSite(aCreationSite)
     , mMutex("MozPromise Mutex")
     , mHaveRequest(false)
+    , mIsCompletionPromise(aIsCompletionPromise)
   {
     PROMISE_LOG("%s creating MozPromise (%p)", mCreationSite, this);
   }
@@ -276,6 +279,8 @@ public:
 
     virtual MozPromise* CompletionPromise() = 0;
 
+    virtual void AssertIsDead() = 0;
+
   protected:
     Request() : mComplete(false), mDisconnected(false) {}
     virtual ~Request() {}
@@ -307,7 +312,9 @@ protected:
 
       ~ResolveOrRejectRunnable()
       {
-        MOZ_DIAGNOSTIC_ASSERT(!mThenValue || mThenValue->IsDisconnected());
+        if (mThenValue) {
+          mThenValue->AssertIsDead();
+        }
       }
 
       NS_IMETHODIMP Run()
@@ -332,9 +339,26 @@ protected:
       MOZ_DIAGNOSTIC_ASSERT(mResponseTarget->IsCurrentThreadIn());
       MOZ_DIAGNOSTIC_ASSERT(!Request::mComplete);
       if (!mCompletionPromise) {
-        mCompletionPromise = new MozPromise::Private("<completion promise>");
+        mCompletionPromise = new MozPromise::Private(
+          "<completion promise>", true /* aIsCompletionPromise */);
       }
       return mCompletionPromise;
+    }
+
+    void AssertIsDead() override
+    {
+      // We want to assert that this ThenValues is dead - that is to say, that
+      // there are no consumers waiting for the result. In the case of a normal
+      // ThenValue, we check that it has been disconnected, which is the way
+      // that the consumer signals that it no longer wishes to hear about the
+      // result. If this ThenValue has a completion promise (which is mutually
+      // exclusive with being disconnectable), we recursively assert that every
+      // ThenValue associated with the completion promise is dead.
+      if (mCompletionPromise) {
+        mCompletionPromise->AssertIsDead();
+      } else {
+        MOZ_DIAGNOSTIC_ASSERT(Request::mDisconnected);
+      }
     }
 
     void Dispatch(MozPromise *aPromise)
@@ -611,6 +635,21 @@ public:
     }
   }
 
+  // Note we expose the function AssertIsDead() instead of IsDead() since
+  // checking IsDead() is a data race in the situation where the request is not
+  // dead. Therefore we enforce the form |Assert(IsDead())| by exposing
+  // AssertIsDead() only.
+  void AssertIsDead()
+  {
+    MutexAutoLock lock(mMutex);
+    for (auto&& then : mThenValues) {
+      then->AssertIsDead();
+    }
+    for (auto&& chained : mChainedPromises) {
+      chained->AssertIsDead();
+    }
+  }
+
 protected:
   bool IsPending() const { return mValue.IsNothing(); }
   const ResolveOrRejectValue& Value() const
@@ -648,9 +687,14 @@ protected:
   virtual ~MozPromise()
   {
     PROMISE_LOG("MozPromise::~MozPromise [this=%p]", this);
-    MOZ_ASSERT(!IsPending());
-    MOZ_ASSERT(mThenValues.IsEmpty());
-    MOZ_ASSERT(mChainedPromises.IsEmpty());
+    AssertIsDead();
+    // We can't guarantee a completion promise will always be revolved or
+    // rejected since ResolveOrRejectRunnable might not run when dispatch fails.
+    if (!mIsCompletionPromise) {
+      MOZ_ASSERT(!IsPending());
+      MOZ_ASSERT(mThenValues.IsEmpty());
+      MOZ_ASSERT(mChainedPromises.IsEmpty());
+    }
   };
 
   const char* mCreationSite; // For logging
@@ -659,6 +703,7 @@ protected:
   nsTArray<RefPtr<ThenValueBase>> mThenValues;
   nsTArray<RefPtr<Private>> mChainedPromises;
   bool mHaveRequest;
+  const bool mIsCompletionPromise;
 };
 
 template<typename ResolveValueT, typename RejectValueT, bool IsExclusive>
@@ -666,7 +711,8 @@ class MozPromise<ResolveValueT, RejectValueT, IsExclusive>::Private
   : public MozPromise<ResolveValueT, RejectValueT, IsExclusive>
 {
 public:
-  explicit Private(const char* aCreationSite) : MozPromise(aCreationSite) {}
+  explicit Private(const char* aCreationSite, bool aIsCompletionPromise = false)
+    : MozPromise(aCreationSite, aIsCompletionPromise) {}
 
   template<typename ResolveValueT_>
   void Resolve(ResolveValueT_&& aResolveValue, const char* aResolveSite)
@@ -769,6 +815,7 @@ public:
     mPromise = nullptr;
   }
 
+
   void ResolveIfExists(typename PromiseType::ResolveValueType aResolveValue,
                        const char* aMethodName)
   {
@@ -787,6 +834,7 @@ public:
     mPromise->Reject(aRejectValue, aMethodName);
     mPromise = nullptr;
   }
+
 
   void RejectIfExists(typename PromiseType::RejectValueType aRejectValue,
                       const char* aMethodName)
