@@ -31,6 +31,3 @@ if CONFIG['OS_TARGET'] == 'Darwin':
 LOCAL_INCLUDES += [
     '..',
 ]
-
-if not CONFIG['GNU_CXX']:
-    ALLOW_COMPILER_WARNINGS = True
