@@ -9,7 +9,7 @@
     <Description>
         <em:id>{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}</em:id>
         <em:minVersion>1.5</em:minVersion>
-        <em:maxVersion>99.0.*</em:maxVersion>
+        <em:maxVersion>*</em:maxVersion>
     </Description>
 </em:targetApplication>
 
