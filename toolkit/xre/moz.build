@@ -155,6 +155,7 @@ LOCAL_INCLUDES += [
     '/dom/base',
     '/dom/ipc',
     '/testing/gtest/mozilla',
+    '/toolkit/crashreporter',
     '/xpcom/build',
 ]
 

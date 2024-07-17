@@ -35,6 +35,7 @@
 #include "nsAppRunner.h"
 #include "nsAutoRef.h"
 #include "nsDirectoryServiceDefs.h"
+#include "nsExceptionHandler.h"
 #include "nsString.h"
 #include "nsThreadUtils.h"
 #include "nsJSUtils.h"
@@ -592,7 +593,7 @@ XRE_InitChildProcess(int aArgc,
       case GeckoProcessType_IPDLUnitTest:
 #ifdef MOZ_IPDL_TESTS
         process = new IPDLUnitTestProcessChild(parentPID);
-#else
+#else 
         NS_RUNTIMEABORT("rebuild with --enable-ipdl-tests");
 #endif
         break;
@@ -668,7 +669,7 @@ public:
                        void* aData)
   : mFunction(aFunction),
     mData(aData)
-  {
+  { 
     NS_ASSERTION(aFunction, "Don't give me a null pointer!");
   }
 
@@ -765,7 +766,7 @@ XRE_RunAppShell()
       // Cocoa nsAppShell impl, however, implements its own Run()
       // that's unaware of MessagePump.  That's all rather suboptimal,
       // but oddly enough not a problem... usually.
-      //
+      // 
       // The problem with this setup comes during startup.
       // XPCOM-in-subprocesses depends on IPC, e.g. to init the pref
       // service, so we have to init IPC first.  But, IPC also
@@ -781,7 +782,7 @@ XRE_RunAppShell()
       // run], because it's not aware that MessagePump has work that
       // needs to be processed; that was supposed to be signaled by
       // nsIRunnable(s).
-      //
+      // 
       // So instead of hacking Cocoa nsAppShell or rewriting the
       // event-loop system, we compromise here by processing any tasks
       // that might have been enqueued on MessagePump, *before*
