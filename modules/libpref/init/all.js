@@ -2823,6 +2823,7 @@ pref("layout.frame_rate", -1);
 
 // pref to dump the display list to the log. Useful for debugging drawing.
 pref("layout.display-list.dump", false);
+pref("layout.display-list.dump-content", false);
 
 // pref to control whether layout warnings that are hit quite often are enabled
 pref("layout.spammy_warnings.enabled", true);
