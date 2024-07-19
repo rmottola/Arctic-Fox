@@ -16,6 +16,7 @@
 <?xml-stylesheet href="chrome://browser/skin/controlcenter/panel.css" type="text/css"?>
 <?xml-stylesheet href="chrome://browser/skin/customizableui/panelUIOverlay.css" type="text/css"?>
 <?xml-stylesheet href="chrome://browser/skin/" type="text/css"?>
+<?xml-stylesheet href="chrome://browser/skin/browser-lightweightTheme.css" type="text/css"?>
 
 <?xul-overlay href="chrome://global/content/editMenuOverlay.xul"?>
 <?xul-overlay href="chrome://browser/content/baseMenuOverlay.xul"?>
@@ -50,6 +51,14 @@
         titlemodifier="&mainWindow.titlemodifier;"
         titlemodifier_normal="&mainWindow.titlemodifier;"
         titlemodifier_privatebrowsing="&mainWindow.titlemodifier; &mainWindow.titlePrivateBrowsingSuffix;"
+#endif
+#ifdef CAN_DRAW_IN_TITLEBAR
+#ifdef XP_WIN
+        chromemargin="0,2,2,2"
+#else
+        chromemargin="0,-1,-1,-1"
+#endif
+        tabsintitlebar="true"
 #endif
         titlemenuseparator="&mainWindow.titlemodifiermenuseparator;"
         lightweightthemes="true"
@@ -207,6 +216,7 @@
       <menuitem oncommand="gCustomizeMode.removeFromArea(document.popupNode)"
                 accesskey="&customizeMenu.removeFromToolbar.accesskey;"
                 label="&customizeMenu.removeFromToolbar.label;"
+                contexttype="toolbaritem"
                 class="customize-context-removeFromToolbar"/>
       <menuitem id="toolbar-context-reloadAllTabs"
                 class="toolbaritem-tabsmenu"

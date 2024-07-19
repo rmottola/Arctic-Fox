@@ -57,6 +57,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "NewTabURL",
 XPCOMUtils.defineLazyServiceGetter(this, "gAboutNewTabService",
                                    "@mozilla.org/browser/aboutnewtab-service;1",
                                    "nsIAboutNewTabService");
+XPCOMUtils.defineLazyGetter(this, "gBrowserBundle", function() {
+  return Services.strings.createBundle('chrome://browser/locale/browser.properties');
+});
 
 const nsIWebNavigation = Ci.nsIWebNavigation;
 const gToolbarInfoSeparators = ["|", "-"];
@@ -204,6 +207,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "SimpleServiceDiscovery",
 
 XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",
   "resource:///modules/ReaderParent.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
+  "resource://gre/modules/LoginManagerParent.jsm");
 
 var gInitialPages = [
   "about:blank",
@@ -1471,6 +1477,23 @@ var gBrowserInit = {
 
       // Enable the Restore Last Session command if needed
       RestoreLastSessionObserver.init();
+
+      // Telemetry for master-password - we do this after 5 seconds as it
+      // can cause IO if NSS/PSM has not already initialized.
+      setTimeout(() => {
+        if (window.closed) {
+          return;
+        }
+        let secmodDB = Cc["@mozilla.org/security/pkcs11moduledb;1"]
+                       .getService(Ci.nsIPKCS11ModuleDB);
+        let slot = secmodDB.findSlotByName("");
+        let mpEnabled = slot &&
+                        slot.status != Ci.nsIPKCS11Slot.SLOT_UNINITIALIZED &&
+                        slot.status != Ci.nsIPKCS11Slot.SLOT_READY;
+        if (mpEnabled) {
+          Services.telemetry.getHistogramById("MASTER_PASSWORD_ENABLED").add(mpEnabled);
+        }
+      }, 5000);
 
       PanicButtonNotifier.init();
     });
