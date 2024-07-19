@@ -139,7 +139,7 @@ var PlacesOrganizer = {
         aIID.equals(Components.interfaces.nsISupports))
       return this;
 
-    throw new Components.Exception("", Components.results.NS_NOINTERFACE);
+    throw Components.results.NS_NOINTERFACE;
   },
 
   handleEvent: function PO_handleEvent(aEvent) {
@@ -1243,8 +1243,7 @@ var ViewMenu = {
 
     // Make sure we have a valid column.
     if (!colLookupTable.hasOwnProperty(columnId))
-      throw new Components.Exception("Invalid column",
-                                     Components.results.NS_ERROR_INVALID_ARG);
+      throw("Invalid column");
 
     // Use a default sort direction if none has been specified.  If aDirection
     // is invalid, result.sortingMode will be undefined, which has the effect
@@ -1310,8 +1309,7 @@ var ContentArea = {
   function CA_setContentViewForQueryString(aQueryString, aView, aOptions) {
     if (!aQueryString ||
         typeof aView != "object" && typeof aView != "function")
-      throw new Components.Exception("Invalid arguments",
-                                     Components.results.NS_ERROR_INVALID_ARG);
+      throw new Error("Invalid arguments");
 
     this._specialViews.set(aQueryString, { view: aView,
                                            options: aOptions || new Object() });
