@@ -762,6 +762,10 @@ ClientLayerManager::ClearCachedResources(Layer* aSubtree)
 void
 ClientLayerManager::HandleMemoryPressure()
 {
+  if (mRoot) {
+    HandleMemoryPressureLayer(mRoot);
+  }
+
   for (size_t i = 0; i < mTexturePools.Length(); i++) {
     mTexturePools[i]->ShrinkToMinimumSize();
   }
@@ -774,6 +778,16 @@ ClientLayerManager::ClearLayer(Layer* aLayer)
   for (Layer* child = aLayer->GetFirstChild(); child;
        child = child->GetNextSibling()) {
     ClearLayer(child);
+  }
+}
+
+void
+ClientLayerManager::HandleMemoryPressureLayer(Layer* aLayer)
+{
+  ClientLayer::ToClientLayer(aLayer)->HandleMemoryPressure();
+  for (Layer* child = aLayer->GetFirstChild(); child;
+       child = child->GetNextSibling()) {
+    HandleMemoryPressureLayer(child);
   }
 }
 

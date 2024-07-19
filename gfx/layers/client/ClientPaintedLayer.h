@@ -76,7 +76,14 @@ public:
     mValidRegion.SetEmpty();
     DestroyBackBuffer();
   }
-  
+
+  virtual void HandleMemoryPressure() override
+  {
+    if (mContentClient) {
+      mContentClient->HandleMemoryPressure();
+    }
+  }
+
   virtual void FillSpecificAttributes(SpecificLayerAttributes& aAttrs) override
   {
     aAttrs = PaintedLayerAttributes(GetValidRegion());
