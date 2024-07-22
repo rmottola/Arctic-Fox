@@ -332,5 +332,11 @@ FatalError(const char* aProtocolName, const char* aMsg, bool aIsParent)
   }
 }
 
+void
+LogicError(const char* aMsg)
+{
+  NS_RUNTIMEABORT(aMsg);
+}
+
 } // namespace ipc
 } // namespace mozilla

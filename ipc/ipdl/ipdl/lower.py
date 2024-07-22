@@ -314,12 +314,6 @@ def _abortIfFalse(cond, msg):
         ExprVar('MOZ_DIAGNOSTIC_ASSERT'),
         [ cond, ExprLiteral.String(msg) ]))
 
-def _runtimeAbort(msg):
-    if isinstance(msg, str):
-        msg = ExprLiteral.String(msg)
-    return StmtExpr(
-        ExprCall(ExprVar('NS_RUNTIMEABORT'), args=[ msg ]))
-
 def _refptr(T):
     return Type('RefPtr', T=T)
 
@@ -416,6 +410,10 @@ def _printWarningMessage(msg):
 def _fatalError(msg):
     return StmtExpr(
         ExprCall(ExprVar('FatalError'), args=[ ExprLiteral.String(msg) ]))
+
+def _logicError(msg):
+    return StmtExpr(
+        ExprCall(ExprVar('mozilla::ipc::LogicError'), args=[ ExprLiteral.String(msg) ]))
 
 def _killProcess(pid):
     return ExprCall(
@@ -1848,7 +1846,7 @@ class _GenerateProtocolCode(ipdl.ast.Visitor):
         # special case for Dead
         deadblock = Block()
         deadblock.addstmts([
-            _runtimeAbort('__delete__()d actor'),
+            _logicError('__delete__()d actor'),
             StmtReturn(ExprLiteral.FALSE) ])
         fromswitch.addcase(CaseLabel(_deadState().name), deadblock)
 
@@ -1863,13 +1861,13 @@ class _GenerateProtocolCode(ipdl.ast.Visitor):
                 StmtReturn(ExprLiteral.TRUE))
         else:
             dyingblock.addstmts([
-                _runtimeAbort('__delete__()d (and unexpectedly dying) actor'),
+                _logicError('__delete__()d (and unexpectedly dying) actor'),
                 StmtReturn(ExprLiteral.FALSE) ])
         fromswitch.addcase(CaseLabel(_dyingState().name), dyingblock)
 
         unreachedblock = Block()
         unreachedblock.addstmts([
-            _runtimeAbort('corrupted actor state'),
+            _logicError('corrupted actor state'),
             StmtReturn(ExprLiteral.FALSE) ])
         fromswitch.addcase(DefaultLabel(), unreachedblock)
 
@@ -2345,7 +2343,7 @@ def _generateCxxUnion(ud):
                         StmtBreak() ]))
     dtorswitch.addcase(
         DefaultLabel(),
-        StmtBlock([ _runtimeAbort("not reached"), StmtBreak() ]))
+        StmtBlock([ _logicError("not reached"), StmtBreak() ]))
     maybedtor.addstmts([
         ifnone,
         ifnochange,
@@ -2416,7 +2414,7 @@ def _generateCxxUnion(ud):
                        StmtBlock([ StmtBreak() ]))
     copyswitch.addcase(
         DefaultLabel(),
-        StmtBlock([ _runtimeAbort('unreached'), StmtReturn() ]))
+        StmtBlock([ _logicError('unreached'), StmtReturn() ]))
     copyctor.addstmts([
         StmtExpr(callAssertSanity(uvar=othervar)),
         copyswitch,
@@ -2472,7 +2470,7 @@ def _generateCxxUnion(ud):
                                    StmtBreak() ]))
     opeqswitch.addcase(
         DefaultLabel(),
-        StmtBlock([ _runtimeAbort('unreached'), StmtBreak() ]))
+        StmtBlock([ _logicError('unreached'), StmtBreak() ]))
     opeq.addstmts([
         StmtExpr(callAssertSanity(uvar=rhsvar)),
         StmtDecl(Decl(typetype, rhstypevar.name), init=ud.callType(rhsvar)),
@@ -2513,7 +2511,7 @@ def _generateCxxUnion(ud):
         opeqeqswitch.addcase(CaseLabel(c.enum()), case)
     opeqeqswitch.addcase(
         DefaultLabel(),
-        StmtBlock([ _runtimeAbort('unreached'),
+        StmtBlock([ _logicError('unreached'),
                     StmtReturn.FALSE ]))
     opeqeq.addstmt(opeqeqswitch)
 
