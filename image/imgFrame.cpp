@@ -999,6 +999,13 @@ imgFrame::Abort()
 }
 
 bool
+imgFrame::IsAborted() const
+{
+  MonitorAutoLock lock(mMonitor);
+  return mAborted;
+}
+
+bool
 imgFrame::IsFinished() const
 {
   MonitorAutoLock lock(mMonitor);
