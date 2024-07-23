@@ -56,7 +56,8 @@
 #ifdef XP_WIN
         chromemargin="0,2,2,2"
 #else
-        chromemargin="0,-1,-1,-1"
+# Remove, or MacOS looses title bar
+#        chromemargin="0,-1,-1,-1"
 #endif
         tabsintitlebar="true"
 #endif
