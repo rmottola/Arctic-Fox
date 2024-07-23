@@ -1349,11 +1349,12 @@ imgLoader::ClearCache(bool chrome)
 
 NS_IMETHODIMP
 imgLoader::FindEntryProperties(nsIURI* uri,
-                               nsIDOMDocument* doc,
+                               nsIDOMDocument* aDOMDoc,
                                nsIProperties** _retval)
 {
   *_retval = nullptr;
 
+  nsCOMPtr<nsIDocument> doc = do_QueryInterface(aDOMDoc);
   ImageCacheKey key(uri, doc);
   imgCacheTable& cache = GetCache(key);
 
@@ -2120,8 +2121,7 @@ imgLoader::LoadImage(nsIURI* aURI,
   // XXX For now ignore aCacheKey. We will need it in the future
   // for correctly dealing with image load requests that are a result
   // of post data.
-  nsCOMPtr<nsIDOMDocument> doc = do_QueryInterface(aLoadingDocument);
-  ImageCacheKey key(aURI, doc);
+  ImageCacheKey key(aURI, aLoadingDocument);
   imgCacheTable& cache = GetCache(key);
 
   if (cache.Get(key, getter_AddRefs(entry)) && entry) {
@@ -2346,7 +2346,7 @@ imgLoader::LoadImageWithChannel(nsIChannel* channel,
 
   nsCOMPtr<nsIURI> uri;
   channel->GetURI(getter_AddRefs(uri));
-  nsCOMPtr<nsIDOMDocument> doc = do_QueryInterface(aCX);
+  nsCOMPtr<nsIDocument> doc = do_QueryInterface(aCX);
   ImageCacheKey key(uri, doc);
 
   nsLoadFlags requestFlags = nsIRequest::LOAD_NORMAL;
