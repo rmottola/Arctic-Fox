@@ -198,8 +198,9 @@ DataTransfer::SetDropEffect(const nsAString& aDropEffect)
     if (aDropEffect.EqualsASCII(sEffects[e])) {
       // don't allow copyMove
       if (e != (nsIDragService::DRAGDROP_ACTION_COPY |
-                nsIDragService::DRAGDROP_ACTION_MOVE))
+                nsIDragService::DRAGDROP_ACTION_MOVE)) {
         mDropEffect = e;
+      }
       break;
     }
   }
@@ -307,14 +308,16 @@ DataTransfer::GetFileListInternal(ErrorResult& aRv,
         return nullptr;
       }
 
-      if (!variant)
+      if (!variant) {
         continue;
+      }
 
       nsCOMPtr<nsISupports> supports;
       nsresult rv = variant->GetAsISupports(getter_AddRefs(supports));
 
-      if (NS_FAILED(rv))
+      if (NS_WARN_IF(NS_FAILED(rv))) {
         continue;
+      }
 
       nsCOMPtr<nsIFile> file = do_QueryInterface(supports);
 
@@ -357,7 +360,8 @@ NS_IMETHODIMP
 DataTransfer::GetFiles(nsIDOMFileList** aFileList)
 {
   ErrorResult rv;
-  NS_IF_ADDREF(*aFileList = GetFileListInternal(rv, nsContentUtils::GetSystemPrincipal()));
+  NS_IF_ADDREF(*aFileList =
+    GetFileListInternal(rv, nsContentUtils::GetSystemPrincipal()));
   return rv.StealNSResult();
 }
 
@@ -385,7 +389,9 @@ DataTransfer::GetData(const nsAString& aFormat, nsAString& aData,
   aData.Truncate();
 
   nsCOMPtr<nsIVariant> data;
-  nsresult rv = GetDataAtInternal(aFormat, 0, nsContentUtils::SubjectPrincipal(), getter_AddRefs(data));
+  nsresult rv =
+    GetDataAtInternal(aFormat, 0, nsContentUtils::SubjectPrincipal(),
+                      getter_AddRefs(data));
   if (NS_FAILED(rv)) {
     if (rv != NS_ERROR_DOM_INDEX_SIZE_ERR) {
       aRv.Throw(rv);
@@ -409,15 +415,18 @@ DataTransfer::GetData(const nsAString& aFormat, nsAString& aData,
         idx = stringdata.FindChar('\n', lastidx);
         // lines beginning with # are comments
         if (stringdata[lastidx] == '#') {
-          if (idx == -1)
+          if (idx == -1) {
             break;
+          }
         }
         else {
-          if (idx == -1)
+          if (idx == -1) {
             aData.Assign(Substring(stringdata, lastidx));
-          else
+          } else {
             aData.Assign(Substring(stringdata, lastidx, idx - lastidx));
-          aData = nsContentUtils::TrimWhitespace<nsCRT::IsAsciiSpace>(aData, true);
+          }
+          aData = nsContentUtils::TrimWhitespace<nsCRT::IsAsciiSpace>(aData,
+                                                                      true);
           return;
         }
         lastidx = idx + 1;
@@ -444,7 +453,8 @@ DataTransfer::SetData(const nsAString& aFormat, const nsAString& aData,
   RefPtr<nsVariantCC> variant = new nsVariantCC();
   variant->SetAsAString(aData);
 
-  aRv = SetDataAtInternal(aFormat, variant, 0, nsContentUtils::SubjectPrincipal());
+  aRv = SetDataAtInternal(aFormat, variant, 0,
+                          nsContentUtils::SubjectPrincipal());
 }
 
 void
@@ -582,20 +592,24 @@ DataTransfer::MozTypesAt(uint32_t aIndex, nsISupports** aTypes)
 }
 
 nsresult
-DataTransfer::GetDataAtNoSecurityCheck(const nsAString& aFormat, uint32_t aIndex,
+DataTransfer::GetDataAtNoSecurityCheck(const nsAString& aFormat,
+                                       uint32_t aIndex,
                                        nsIVariant** aData)
 {
-  return GetDataAtInternal(aFormat, aIndex, nsContentUtils::GetSystemPrincipal(), aData);
+  return GetDataAtInternal(aFormat, aIndex,
+                           nsContentUtils::GetSystemPrincipal(), aData);
 }
 
 nsresult
 DataTransfer::GetDataAtInternal(const nsAString& aFormat, uint32_t aIndex,
-                                nsIPrincipal* aSubjectPrincipal, nsIVariant** aData)
+                                nsIPrincipal* aSubjectPrincipal,
+                                nsIVariant** aData)
 {
   *aData = nullptr;
 
-  if (aFormat.IsEmpty())
+  if (aFormat.IsEmpty()) {
     return NS_OK;
+  }
 
   if (aIndex >= mItems.Length()) {
     return NS_ERROR_DOM_INDEX_SIZE_ERR;
@@ -607,6 +621,7 @@ DataTransfer::GetDataAtInternal(const nsAString& aFormat, uint32_t aIndex,
        mEventMessage == ePaste)) {
     return NS_ERROR_DOM_INDEX_SIZE_ERR;
   }
+
 
   nsAutoString format;
   GetRealFormat(aFormat, format);
@@ -661,7 +676,8 @@ DataTransfer::GetDataAtInternal(const nsAString& aFormat, uint32_t aIndex,
           MOZ_ASSERT(sp, "This cannot fail on the main thread.");
           nsIPrincipal* dataPrincipal = sp->GetPrincipal();
           NS_ENSURE_TRUE(dataPrincipal, NS_ERROR_DOM_SECURITY_ERR);
-          NS_ENSURE_TRUE(aSubjectPrincipal->Subsumes(dataPrincipal), NS_ERROR_DOM_SECURITY_ERR);
+          NS_ENSURE_TRUE(aSubjectPrincipal->Subsumes(dataPrincipal),
+                                                     NS_ERROR_DOM_SECURITY_ERR);
         }
       }
       *aData = formatitem.mData;
@@ -680,7 +696,8 @@ DataTransfer::MozGetDataAt(JSContext* aCx, const nsAString& aFormat,
                            mozilla::ErrorResult& aRv)
 {
   nsCOMPtr<nsIVariant> data;
-  aRv = GetDataAtInternal(aFormat, aIndex, nsContentUtils::SubjectPrincipal(), getter_AddRefs(data));
+  aRv = GetDataAtInternal(aFormat, aIndex, nsContentUtils::SubjectPrincipal(),
+                          getter_AddRefs(data));
   if (aRv.Failed()) {
     return;
   }
@@ -699,7 +716,8 @@ DataTransfer::MozGetDataAt(JSContext* aCx, const nsAString& aFormat,
 
 nsresult
 DataTransfer::SetDataAtInternal(const nsAString& aFormat, nsIVariant* aData,
-                                uint32_t aIndex, nsIPrincipal* aSubjectPrincipal)
+                                uint32_t aIndex,
+                                nsIPrincipal* aSubjectPrincipal)
 {
   if (aFormat.IsEmpty()) {
     return NS_OK;
