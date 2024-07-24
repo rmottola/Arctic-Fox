@@ -314,7 +314,7 @@ DataTransfer::GetFileListInternal(ErrorResult& aRv,
       nsCOMPtr<nsIVariant> variant;
       aRv = GetDataAtInternal(NS_ConvertUTF8toUTF16(kFileMime), i,
                               aSubjectPrincipal, getter_AddRefs(variant));
-      if (aRv.Failed()) {
+      if (NS_WARN_IF(aRv.Failed())) {
         return nullptr;
       }
 
@@ -376,7 +376,7 @@ DataTransfer::GetFiles(nsIDOMFileList** aFileList)
 }
 
 already_AddRefed<DOMStringList>
-DataTransfer::Types()
+DataTransfer::Types() const
 {
   ErrorResult rv;
   return MozTypesAt(0, rv);
@@ -1097,9 +1097,9 @@ DataTransfer::GetTransferable(uint32_t aIndex, nsILoadContext* aLoadContext)
         // When handling custom types, add the data to the stream if this is a
         // custom type.
         if (isCustomFormat) {
-          // If it isn't a string, just ignore it. The dataTransfer is cached in the
-          // drag sesion during drag-and-drop, so non-strings will be available when
-          // dragging locally.
+          // If it isn't a string, just ignore it. The dataTransfer is cached in
+          // the drag sesion during drag-and-drop, so non-strings will be
+          // available when dragging locally.
           nsCOMPtr<nsISupportsString> str(do_QueryInterface(convertedData));
           if (str) {
             nsAutoString data;
@@ -1126,8 +1126,9 @@ DataTransfer::GetTransferable(uint32_t aIndex, nsILoadContext* aLoadContext)
             stream->Write32(lengthInBytes);
             stream->WriteBytes((const char *)data.get(), lengthInBytes);
 
-            // The total size of the stream is the format length, the data length,
-            // two integers to hold the lengths and one integer for the string flag.
+            // The total size of the stream is the format length, the data
+            // length, two integers to hold the lengths and one integer for the
+            // string flag.
             totalCustomLength +=
               formatLength + lengthInBytes + (sizeof(uint32_t) * 3);
           }
@@ -1223,7 +1224,7 @@ DataTransfer::GetTransferable(uint32_t aIndex, nsILoadContext* aLoadContext)
 bool
 DataTransfer::ConvertFromVariant(nsIVariant* aVariant,
                                  nsISupports** aSupports,
-                                 uint32_t* aLength)
+                                 uint32_t* aLength) const
 {
   *aSupports = nullptr;
   *aLength = 0;
@@ -1361,30 +1362,44 @@ DataTransfer::SetDataWithPrincipalFromOtherProcess(const nsAString& aFormat,
 }
 
 void
-DataTransfer::GetRealFormat(const nsAString& aInFormat, nsAString& aOutFormat)
+DataTransfer::GetRealFormat(const nsAString& aInFormat,
+                            nsAString& aOutFormat) const
 {
   // treat text/unicode as equivalent to text/plain
   nsAutoString lowercaseFormat;
   nsContentUtils::ASCIIToLower(aInFormat, lowercaseFormat);
-  if (lowercaseFormat.EqualsLiteral("text") || lowercaseFormat.EqualsLiteral("text/unicode"))
+  if (lowercaseFormat.EqualsLiteral("text") ||
+      lowercaseFormat.EqualsLiteral("text/unicode")) {
     aOutFormat.AssignLiteral("text/plain");
-  else if (lowercaseFormat.EqualsLiteral("url"))
+    return;
+  }
+
+  if (lowercaseFormat.EqualsLiteral("url")) {
     aOutFormat.AssignLiteral("text/uri-list");
-  else
-    aOutFormat.Assign(lowercaseFormat);
+    return;
+  }
+
+  aOutFormat.Assign(lowercaseFormat);
 }
 
 void
-DataTransfer::CacheExternalData(const char* aFormat, uint32_t aIndex, nsIPrincipal* aPrincipal)
+DataTransfer::CacheExternalData(const char* aFormat, uint32_t aIndex,
+                                nsIPrincipal* aPrincipal)
 {
   if (strcmp(aFormat, kUnicodeMime) == 0) {
-    SetDataWithPrincipal(NS_LITERAL_STRING("text/plain"), nullptr, aIndex, aPrincipal);
-  } else {
-    if (strcmp(aFormat, kURLDataMime) == 0) {
-      SetDataWithPrincipal(NS_LITERAL_STRING("text/uri-list"), nullptr, aIndex, aPrincipal);
-    }
-    SetDataWithPrincipal(NS_ConvertUTF8toUTF16(aFormat), nullptr, aIndex, aPrincipal);
+    SetDataWithPrincipal(NS_LITERAL_STRING("text/plain"), nullptr, aIndex,
+                         aPrincipal);
+    return;
   }
+
+  if (strcmp(aFormat, kURLDataMime) == 0) {
+    SetDataWithPrincipal(NS_LITERAL_STRING("text/uri-list"), nullptr, aIndex,
+                         aPrincipal);
+    return;
+  }
+
+  SetDataWithPrincipal(NS_ConvertUTF8toUTF16(aFormat), nullptr, aIndex,
+                       aPrincipal);
 }
 
 void
