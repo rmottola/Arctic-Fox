@@ -4122,7 +4122,7 @@ ScrollFrameHelper::FireScrollPortEvent()
     (orient == InternalScrollPortEvent::eHorizontal ? mHorizontalOverflow :
                                                       mVerticalOverflow) ?
     eScrollPortOverflow : eScrollPortUnderflow, nullptr);
-  event.orient = orient;
+  event.mOrient = orient;
   return EventDispatcher::Dispatch(mOuter->GetContent(),
                                    mOuter->PresContext(), &event);
 }
