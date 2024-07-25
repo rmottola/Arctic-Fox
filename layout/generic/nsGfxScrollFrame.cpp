@@ -4099,7 +4099,7 @@ ScrollFrameHelper::FireScrollPortEvent()
                 newVerticalOverflow == newHorizontalOverflow;
   InternalScrollPortEvent::OrientType orient;
   if (both) {
-    orient = InternalScrollPortEvent::both;
+    orient = InternalScrollPortEvent::eBoth;
     mHorizontalOverflow = newHorizontalOverflow;
     mVerticalOverflow = newVerticalOverflow;
   }
