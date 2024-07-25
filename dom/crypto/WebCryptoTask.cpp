@@ -2316,16 +2316,10 @@ private:
 };
 
 GenerateAsymmetricKeyTask::GenerateAsymmetricKeyTask(
-    JSContext* aCx, const ObjectOrString& aAlgorithm, bool aExtractable,
-    const Sequence<nsString>& aKeyUsages)
+    nsIGlobalObject* aGlobal, JSContext* aCx, const ObjectOrString& aAlgorithm,
+    bool aExtractable, const Sequence<nsString>& aKeyUsages)
   : mKeyPair(new CryptoKeyPair())
 {
-  nsIGlobalObject* global = xpc::NativeGlobal(JS::CurrentGlobalOrNull(aCx));
-  if (!global) {
-    mEarlyRv = NS_ERROR_DOM_UNKNOWN_ERR;
-    return;
-  }
-
   mArena = PORT_NewArena(DER_DEFAULT_CHUNKSIZE);
   if (!mArena) {
     mEarlyRv = NS_ERROR_DOM_UNKNOWN_ERR;
@@ -2333,8 +2327,8 @@ GenerateAsymmetricKeyTask::GenerateAsymmetricKeyTask(
   }
 
   // Create an empty key pair and set easy attributes
-  mKeyPair->mPrivateKey = new CryptoKey(global);
-  mKeyPair->mPublicKey = new CryptoKey(global);
+  mKeyPair->mPrivateKey = new CryptoKey(aGlobal);
+  mKeyPair->mPublicKey = new CryptoKey(aGlobal);
 
   // Extract algorithm name
   mEarlyRv = GetAlgorithmName(aCx, aAlgorithm, mAlgName);
@@ -3420,7 +3414,8 @@ WebCryptoTask::CreateGenerateKeyTask(nsIGlobalObject* aGlobal,
              algName.EqualsASCII(WEBCRYPTO_ALG_ECDH) ||
              algName.EqualsASCII(WEBCRYPTO_ALG_ECDSA) ||
              algName.EqualsASCII(WEBCRYPTO_ALG_DH)) {
-    return new GenerateAsymmetricKeyTask(aCx, aAlgorithm, aExtractable, aKeyUsages);
+    return new GenerateAsymmetricKeyTask(aGlobal, aCx, aAlgorithm, aExtractable,
+                                         aKeyUsages);
   } else {
     return new FailureTask(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
   }
