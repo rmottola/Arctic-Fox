@@ -1811,7 +1811,8 @@ WebGLContext::DidRefresh()
 bool
 WebGLContext::ValidateCurFBForRead(const char* funcName,
                                    const webgl::FormatUsageInfo** const out_format,
-                                   uint32_t* const out_width, uint32_t* const out_height)
+                                   uint32_t* const out_width, uint32_t* const out_height,
+                                   GLenum* const out_mode)
 {
     if (!mBoundReadFramebuffer) {
         ClearBackbufferIfNeeded();
@@ -1827,11 +1828,12 @@ WebGLContext::ValidateCurFBForRead(const char* funcName,
 
         *out_width = mWidth;
         *out_height = mHeight;
+        *out_mode = gl->Screen()->GetReadBufferMode();
         return true;
     }
 
     return mBoundReadFramebuffer->ValidateForRead(funcName, out_format, out_width,
-                                                  out_height);
+                                                  out_height, out_mode);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
