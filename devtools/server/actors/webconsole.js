@@ -1029,6 +1029,9 @@ WebConsoleActor.prototype =
       if (key == "NetworkMonitor.saveRequestAndResponseBodies" &&
           this.networkMonitor) {
         this.networkMonitor.saveRequestAndResponseBodies = this._prefs[key];
+        if (this.networkMonitorChild) {
+          this.networkMonitorChild.saveRequestAndResponseBodies = this._prefs[key];
+        }
       }
     }
     return { updated: Object.keys(aRequest.preferences) };
