@@ -308,8 +308,8 @@ LayoutView.prototype = {
       element: element,
       initial: initialValue,
 
-      start: editor => {
-        editor.elt.parentNode.classList.add("layout-editing");
+      start: self => {
+        self.elt.parentNode.classList.add("layout-editing");
       },
 
       change: value => {
@@ -458,7 +458,7 @@ LayoutView.prototype = {
   update: function() {
     let lastRequest = Task.spawn((function*() {
       if (!this.isViewVisibleAndNodeValid()) {
-        return;
+        return null;
       }
 
       let node = this.inspector.selection.nodeFront;
@@ -547,7 +547,8 @@ LayoutView.prototype = {
       this.inspector.emit("layoutview-updated");
     }).bind(this)).then(null, console.error);
 
-    return this._lastRequest = lastRequest;
+    this._lastRequest = lastRequest;
+    return this._lastRequest;
   },
 
   /**
@@ -588,7 +589,7 @@ LayoutView.prototype = {
    * Show the box-model highlighter on the currently selected element
    * @param {Object} options Options passed to the highlighter actor
    */
-  showBoxModel: function(options={}) {
+  showBoxModel: function(options = {}) {
     let toolbox = this.inspector.toolbox;
     let nodeFront = this.inspector.selection.nodeFront;
 
