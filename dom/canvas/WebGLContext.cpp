@@ -578,19 +578,19 @@ static already_AddRefed<gl::GLContext>
 CreateGLWithEGL(const gl::SurfaceCaps& caps, gl::CreateContextFlags flags,
                 WebGLContext* webgl)
 {
-    RefPtr<GLContext> gl;
-#ifndef XP_MACOSX // Mac doesn't have GLContextProviderEGL.
-    gfx::IntSize dummySize(16, 16);
-    gl = gl::GLContextProviderEGL::CreateOffscreen(dummySize, caps,
+    const gfx::IntSize dummySize(16, 16);
+    RefPtr<GLContext> gl = gl::GLContextProviderEGL::CreateOffscreen(dummySize, caps,
                                                                      flags);
+
+    if (gl && gl->IsANGLE()) {
+        gl = nullptr;
+    }
+
     if (!gl) {
         webgl->GenerateWarning("Error during EGL OpenGL init.");
         return nullptr;
     }
 
-    if (gl->IsANGLE())
-        return nullptr;
-#endif // XP_MACOSX
     return gl.forget();
 }
 
@@ -598,19 +598,18 @@ static already_AddRefed<GLContext>
 CreateGLWithANGLE(const gl::SurfaceCaps& caps, gl::CreateContextFlags flags,
                   WebGLContext* webgl)
 {
-    RefPtr<GLContext> gl;
+    const gfx::IntSize dummySize(16, 16);
+    RefPtr<GLContext> gl = gl::GLContextProviderEGL::CreateOffscreen(dummySize, caps,
+                                                                     flags);
 
-#ifdef XP_WIN
-    gfx::IntSize dummySize(16, 16);
-    gl = gl::GLContextProviderEGL::CreateOffscreen(dummySize, caps, flags);
+    if (gl && !gl->IsANGLE()) {
+        gl = nullptr;
+    }
+
     if (!gl) {
         webgl->GenerateWarning("Error during ANGLE OpenGL init.");
         return nullptr;
     }
-
-    if (!gl->IsANGLE())
-        return nullptr;
-#endif
 
     return gl.forget();
 }
@@ -629,15 +628,17 @@ CreateGLWithDefault(const gl::SurfaceCaps& caps, gl::CreateContextFlags flags,
         return nullptr;
     }
 
-    gfx::IntSize dummySize(16, 16);
+    const gfx::IntSize dummySize(16, 16);
     RefPtr<GLContext> gl = gl::GLContextProvider::CreateOffscreen(dummySize, caps, flags);
+
+    if (gl && gl->IsANGLE()) {
+        gl = nullptr;
+    }
+
     if (!gl) {
         webgl->GenerateWarning("Error during native OpenGL init.");
         return nullptr;
     }
-
-    if (gl->IsANGLE())
-        return nullptr;
 
     return gl.forget();
 }
@@ -649,11 +650,10 @@ WebGLContext::CreateAndInitGLWith(FnCreateGL_T fnCreateGL,
                                   const gl::SurfaceCaps& baseCaps,
                                   gl::CreateContextFlags flags)
 {
-    MOZ_ASSERT(!gl);
-
     std::queue<gl::SurfaceCaps> fallbackCaps;
     PopulateCapFallbackQueue(baseCaps, &fallbackCaps);
 
+    MOZ_RELEASE_ASSERT(!gl);
     gl = nullptr;
     while (!fallbackCaps.empty()) {
         gl::SurfaceCaps& caps = fallbackCaps.front();
@@ -678,11 +678,14 @@ WebGLContext::CreateAndInitGLWith(FnCreateGL_T fnCreateGL,
 bool
 WebGLContext::CreateAndInitGL(bool forceEnabled)
 {
-    bool preferEGL = PR_GetEnv("MOZ_WEBGL_PREFER_EGL");
-    bool disableANGLE = gfxPrefs::WebGLDisableANGLE();
+    const bool useEGL = PR_GetEnv("MOZ_WEBGL_PREFER_EGL");
 
-    if (PR_GetEnv("MOZ_WEBGL_FORCE_OPENGL"))
-        disableANGLE = true;
+    bool useANGLE = false;
+#ifdef XP_WIN
+    const bool disableANGLE = (gfxPrefs::WebGLDisableANGLE() ||
+                               PR_GetEnv("MOZ_WEBGL_FORCE_OPENGL"));
+    useANGLE = !disableANGLE;
+#endif
 
     gl::CreateContextFlags flags = gl::CreateContextFlags::NONE;
     if (forceEnabled) flags |= gl::CreateContextFlags::FORCE_ENABLE_HARDWARE;
@@ -691,29 +694,13 @@ WebGLContext::CreateAndInitGL(bool forceEnabled)
 
     const gl::SurfaceCaps baseCaps = BaseCaps(mOptions, this);
 
-    MOZ_ASSERT(!gl);
+    if (useEGL)
+        return CreateAndInitGLWith(CreateGLWithEGL, baseCaps, flags);
 
-    if (preferEGL) {
-        if (CreateAndInitGLWith(CreateGLWithEGL, baseCaps, flags))
-            return true;
-    }
+    if (useANGLE)
+        return CreateAndInitGLWith(CreateGLWithANGLE, baseCaps, flags);
 
-    MOZ_ASSERT(!gl);
-
-    if (!disableANGLE) {
-        if (CreateAndInitGLWith(CreateGLWithANGLE, baseCaps, flags))
-            return true;
-    }
-
-    MOZ_ASSERT(!gl);
-
-    if (CreateAndInitGLWith(CreateGLWithDefault, baseCaps, flags))
-        return true;
-
-    MOZ_ASSERT(!gl);
-    gl = nullptr;
-
-    return false;
+    return CreateAndInitGLWith(CreateGLWithDefault, baseCaps, flags);
 }
 
 // Fallback for resizes:
