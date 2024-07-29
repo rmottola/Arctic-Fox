@@ -631,6 +631,10 @@ public:
   { return NSAppUnitsToFloatPixels(aAppUnits,
              float(AppUnitsPerCSSPixel())); }
 
+  static double AppUnitsToDoubleCSSPixels(nscoord aAppUnits)
+  { return NSAppUnitsToDoublePixels(aAppUnits,
+             double(AppUnitsPerCSSPixel())); }
+
   nscoord DevPixelsToAppUnits(int32_t aPixels) const
   { return NSIntPixelsToAppUnits(aPixels, AppUnitsPerDevPixel()); }
 
