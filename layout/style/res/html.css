@@ -771,6 +771,16 @@ video > .caption-box {
 }
 
 /* details & summary */
+/* Need to revert Bug 1259889 Part 2 when removing details preference. */
+@supports -moz-bool-pref("dom.details_element.enabled") {
+  details > summary::-moz-list-bullet {
+    list-style-type: disclosure-closed;
+  }
+
+  details[open] > summary::-moz-list-bullet {
+    list-style-type: disclosure-open;
+  }
+}
 
 details > summary:first-of-type,
 details > summary:-moz-native-anonymous {
