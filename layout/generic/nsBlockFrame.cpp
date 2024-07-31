@@ -358,7 +358,7 @@ nsBlockFrame::DestroyFrom(nsIFrame* aDestructRoot)
     RemoveStateBits(NS_BLOCK_FRAME_HAS_OUTSIDE_BULLET);
   }
 
-  nsBlockFrameSuper::DestroyFrom(aDestructRoot);
+  nsContainerFrame::DestroyFrom(aDestructRoot);
 }
 
 /* virtual */ nsILineIterator*
@@ -379,7 +379,7 @@ nsBlockFrame::GetLineIterator()
 
 NS_QUERYFRAME_HEAD(nsBlockFrame)
   NS_QUERYFRAME_ENTRY(nsBlockFrame)
-NS_QUERYFRAME_TAIL_INHERITING(nsBlockFrameSuper)
+NS_QUERYFRAME_TAIL_INHERITING(nsContainerFrame)
 
 nsSplittableType
 nsBlockFrame::GetSplittableType() const
@@ -458,7 +458,7 @@ nsBlockFrame::GetDebugStateBits() const
 {
   // We don't want to include our cursor flag in the bits the
   // regression tester looks at
-  return nsBlockFrameSuper::GetDebugStateBits() & ~NS_BLOCK_HAS_LINE_CURSOR;
+  return nsContainerFrame::GetDebugStateBits() & ~NS_BLOCK_HAS_LINE_CURSOR;
 }
 #endif
 
@@ -477,7 +477,7 @@ nsBlockFrame::InvalidateFrame(uint32_t aDisplayItemKey)
     GetParent()->InvalidateFrame();
     return;
   }
-  nsBlockFrameSuper::InvalidateFrame(aDisplayItemKey);
+  nsContainerFrame::InvalidateFrame(aDisplayItemKey);
 }
 
 void
@@ -489,7 +489,7 @@ nsBlockFrame::InvalidateFrameWithRect(const nsRect& aRect, uint32_t aDisplayItem
     GetParent()->InvalidateFrame();
     return;
   }
-  nsBlockFrameSuper::InvalidateFrameWithRect(aRect, aDisplayItemKey);
+  nsContainerFrame::InvalidateFrameWithRect(aRect, aDisplayItemKey);
 }
 
 nscoord
@@ -648,7 +648,7 @@ nsBlockFrame::MarkIntrinsicISizesDirty()
     }
   }
 
-  nsBlockFrameSuper::MarkIntrinsicISizesDirty();
+  nsContainerFrame::MarkIntrinsicISizesDirty();
 }
 
 void
@@ -2930,8 +2930,8 @@ nsBlockFrame::AttributeChanged(int32_t         aNameSpaceID,
                                nsIAtom*        aAttribute,
                                int32_t         aModType)
 {
-  nsresult rv = nsBlockFrameSuper::AttributeChanged(aNameSpaceID,
-                                                    aAttribute, aModType);
+  nsresult rv = nsContainerFrame::AttributeChanged(aNameSpaceID,
+                                                   aAttribute, aModType);
 
   if (NS_FAILED(rv)) {
     return rv;
@@ -3317,7 +3317,7 @@ nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
     }
 
     aLine->SetLineIsImpactedByFloat(false);
-    
+
     // Here aState.mBCoord is the block-start border-edge of the block.
     // Compute the available space for the block
     nsFlowAreaRect floatAvailableSpace = aState.GetFloatAvailableSpace();
@@ -6800,7 +6800,7 @@ nsBlockFrame::ChildIsDirty(nsIFrame* aChild)
     }
   }
 
-  nsBlockFrameSuper::ChildIsDirty(aChild);
+  nsContainerFrame::ChildIsDirty(aChild);
 }
 
 void
@@ -6814,7 +6814,7 @@ nsBlockFrame::Init(nsIContent*       aContent,
              (NS_BLOCK_FLAGS_MASK & ~NS_BLOCK_FLAGS_NON_INHERITED_MASK));
   }
 
-  nsBlockFrameSuper::Init(aContent, aParent, aPrevInFlow);
+  nsContainerFrame::Init(aContent, aParent, aPrevInFlow);
 
   if (!aPrevInFlow ||
       aPrevInFlow->GetStateBits() & NS_BLOCK_NEEDS_BIDI_RESOLUTION) {
