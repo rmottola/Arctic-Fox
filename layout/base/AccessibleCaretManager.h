@@ -205,7 +205,11 @@ protected:
                                    nsIFrame* aEndFrame) const;
 
   // Check if the two carets is overlapping to become tilt.
-  virtual void UpdateCaretsForTilt();
+  virtual void UpdateCaretsForOverlappingTilt();
+
+  // Make the two carets always tilt.
+  virtual void UpdateCaretsForAlwaysTilt(nsIFrame* aStartFrame,
+                                         nsIFrame* aEndFrame);
 
   // Check whether AccessibleCaret is displayable in cursor mode or not.
   // @param aOutFrame returns frame of the cursor if it's displayable.
@@ -277,6 +281,10 @@ protected:
   // Android specific visibility extensions correct compatibility issues
   // with ActionBar visibility during page scroll.
   static bool sCaretsExtendedVisibility;
+
+  // Preference to make carets always tilt in selection mode. By default, the
+  // carets become tilt only when they are overlapping.
+  static bool sCaretsAlwaysTilt;
 
   // By default, javascript content selection changes closes AccessibleCarets and
   // UI interactions. Optionally, we can try to maintain the active UI, keeping
