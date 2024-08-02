@@ -1398,6 +1398,10 @@ pref("dom.forms.autocomplete.experimental", false);
 // Enables requestAutocomplete DOM API on forms.
 pref("dom.forms.requestAutocomplete", false);
 
+#ifdef NIGHTLY_BUILD
+pref("dom.input.dirpicker", true);
+#endif
+
 // Enables system messages and activities
 pref("dom.sysmsg.enabled", false);
 
@@ -1494,14 +1498,14 @@ pref("javascript.options.mem.gc_max_empty_chunk_count", 30);
 
 pref("javascript.options.showInConsole", false);
 
-pref("javascript.options.throw_on_debuggee_would_run", false);
-pref("javascript.options.dump_stack_on_debuggee_would_run", false);
-
 #ifdef NIGHTLY_BUILD
 pref("javascript.options.shared_memory", true);
 #else
 pref("javascript.options.shared_memory", false);
 #endif
+
+pref("javascript.options.throw_on_debuggee_would_run", false);
+pref("javascript.options.dump_stack_on_debuggee_would_run", false);
 
 // advanced prefs
 pref("advanced.mailftp",                    false);
@@ -2617,9 +2621,6 @@ pref("layout.css.isolation.enabled", true);
 
 // Is support for CSS Filters enabled?
 pref("layout.css.filters.enabled", true);
-
-// Is support for scroll-snap enabled?
-pref("layout.css.scroll-snap.enabled", false);
 
 // Set the threshold distance in CSS pixels below which scrolling will snap to
 // an edge, when scroll snapping is set to "proximity".
