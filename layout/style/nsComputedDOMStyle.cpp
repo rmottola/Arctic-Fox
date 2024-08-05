@@ -453,7 +453,7 @@ nsComputedDOMStyle::GetStyleContextForElementNoFlush(Element* aElement,
   }
 
   // XXX the !aElement->IsHTMLElement(nsGkAtoms::area)
-  // check is needed due to bug 135040 (to avoid using 
+  // check is needed due to bug 135040 (to avoid using
   // mPrimaryFrame). Remove it once that's fixed.
   if (!aPseudo && aStyleType == eAll && inDocWithShell &&
       !aElement->IsHTMLElement(nsGkAtoms::area)) {
