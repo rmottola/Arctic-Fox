@@ -18901,55 +18901,84 @@
         "url": "/web-animations/animation-effect-timing/getComputedStyle.html"
       },
       {
-        "path": "web-animations/animation-effect-timing/iterations.html",
-        "url": "/web-animations/animation-effect-timing/iterations.html"
-      },
-      {
         "path": "web-animations/animation-effect-timing/iterationStart.html",
         "url": "/web-animations/animation-effect-timing/iterationStart.html"
       },
       {
-        "path": "web-animations/animation-node/animation-node-after.html",
-        "url": "/web-animations/animation-node/animation-node-after.html"
+        "path": "web-animations/animation-effect-timing/iterations.html",
+        "url": "/web-animations/animation-effect-timing/iterations.html"
       },
       {
-        "path": "web-animations/animation-node/animation-node-before.html",
-        "url": "/web-animations/animation-node/animation-node-before.html"
+        "path": "web-animations/animation-model/animation-types/discrete-animation.html",
+        "url": "/web-animations/animation-model/animation-types/discrete-animation.html"
       },
       {
-        "path": "web-animations/animation-node/animation-node-next-sibling.html",
-        "url": "/web-animations/animation-node/animation-node-next-sibling.html"
+        "path": "web-animations/animation-model/animation-types/not-animatable.html",
+        "url": "/web-animations/animation-model/animation-types/not-animatable.html"
       },
       {
-        "path": "web-animations/animation-node/animation-node-parent.html",
-        "url": "/web-animations/animation-node/animation-node-parent.html"
+        "path": "web-animations/animation-model/keyframes/effect-value-context.html",
+        "url": "/web-animations/animation-model/keyframes/effect-value-context.html"
       },
       {
-        "path": "web-animations/animation-node/animation-node-previous-sibling.html",
-        "url": "/web-animations/animation-node/animation-node-previous-sibling.html"
-      },
-      {
-        "path": "web-animations/animation-node/animation-node-remove.html",
-        "url": "/web-animations/animation-node/animation-node-remove.html"
-      },
-      {
-        "path": "web-animations/animation-node/animation-node-replace.html",
-        "url": "/web-animations/animation-node/animation-node-replace.html"
-      },
-      {
-        "path": "web-animations/animation-node/idlharness.html",
-        "url": "/web-animations/animation-node/idlharness.html"
-      },
-      {
-        "url": "/web-animations/animation-timeline/animation-timeline.html"
+        "path": "web-animations/animation-timeline/document-timeline.html",
+        "url": "/web-animations/animation-timeline/document-timeline.html"
       },
       {
         "path": "web-animations/animation-timeline/idlharness.html",
         "url": "/web-animations/animation-timeline/idlharness.html"
       },
       {
+        "path": "web-animations/animation/cancel.html",
+        "url": "/web-animations/animation/cancel.html"
+      },
+      {
         "path": "web-animations/animation/constructor.html",
         "url": "/web-animations/animation/constructor.html"
+      },
+      {
+        "path": "web-animations/animation/finish.html",
+        "url": "/web-animations/animation/finish.html"
+      },
+      {
+        "path": "web-animations/animation/finished.html",
+        "url": "/web-animations/animation/finished.html"
+      },
+      {
+        "path": "web-animations/animation/id.html",
+        "url": "/web-animations/animation/id.html"
+      },
+      {
+        "path": "web-animations/animation/oncancel.html",
+        "url": "/web-animations/animation/oncancel.html"
+      },
+      {
+        "path": "web-animations/animation/onfinish.html",
+        "url": "/web-animations/animation/onfinish.html"
+      },
+      {
+        "path": "web-animations/animation/pause.html",
+        "url": "/web-animations/animation/pause.html"
+      },
+      {
+        "path": "web-animations/animation/play.html",
+        "url": "/web-animations/animation/play.html"
+      },
+      {
+        "path": "web-animations/animation/playState.html",
+        "url": "/web-animations/animation/playState.html"
+      },
+      {
+        "path": "web-animations/animation/playbackRate.html",
+        "url": "/web-animations/animation/playbackRate.html"
+      },
+      {
+        "path": "web-animations/animation/ready.html",
+        "url": "/web-animations/animation/ready.html"
+      },
+      {
+        "path": "web-animations/animation/reverse.html",
+        "url": "/web-animations/animation/reverse.html"
       },
       {
         "path": "web-animations/keyframe-effect/constructor.html",

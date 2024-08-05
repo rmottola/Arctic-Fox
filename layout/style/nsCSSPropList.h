@@ -1644,7 +1644,7 @@ CSS_PROP_DISPLAY(
     VARIANT_HK,
     kDisplayKTable,
     offsetof(nsStyleDisplay, mDisplay),
-    eStyleAnimType_EnumU8)
+    eStyleAnimType_None)
 CSS_PROP_SVGRESET(
     dominant-baseline,
     dominant_baseline,
