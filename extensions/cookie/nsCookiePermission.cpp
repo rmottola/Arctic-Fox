@@ -110,8 +110,7 @@ nsCookiePermission::PrefChanged(nsIPrefBranch *aPrefBranch,
 
   if (PREF_CHANGED(kCookiesLifetimePolicy) &&
       NS_SUCCEEDED(aPrefBranch->GetIntPref(kCookiesLifetimePolicy, &val))) {
-    if (val != static_cast<int32_t>(ACCEPT_SESSION) &&
-        val != static_cast<int32_t>(ACCEPT_FOR_N_DAYS)) {
+    if (val != static_cast<int32_t>(ACCEPT_SESSION) && val != static_cast<int32_t>(ACCEPT_FOR_N_DAYS)) {
       val = ACCEPT_NORMALLY;
     }
     mCookiesLifetimePolicy = val;
@@ -228,23 +227,23 @@ nsCookiePermission::CanSetCookie(nsIURI     *aURI,
     break;
 
   default:
-    // The permission manager has nothing to say about this cookie
-    // so we apply the default prefs to it.
+    // the permission manager has nothing to say about this cookie -
+    // so, we apply the default prefs to it.
     NS_ASSERTION(perm == nsIPermissionManager::UNKNOWN_ACTION, "unknown permission");
 
-    // Now we need to figure out what type of accept policy we're dealing with.
-    // If we accept cookies normally, just bail and return.
+    // now we need to figure out what type of accept policy we're dealing with
+    // if we accept cookies normally, just bail and return
     if (mCookiesLifetimePolicy == ACCEPT_NORMALLY) {
       *aResult = true;
       return NS_OK;
     }
 
-    // Declare this here since it'll be used in all of the remaining cases.
+    // declare this here since it'll be used in all of the remaining cases
     int64_t currentTime = PR_Now() / PR_USEC_PER_SEC;
     int64_t delta = *aExpiry - currentTime;
 
-    // We are accepting the cookie, but if it's not a session cookie,
-    // we may have to limit its lifetime.
+    // We are accepting the cookie, but,
+    // if it's not a session cookie, we may have to limit its lifetime.
     if (!*aIsSession && delta > 0) {
       if (mCookiesLifetimePolicy == ACCEPT_SESSION) {
         // limit lifetime to session
