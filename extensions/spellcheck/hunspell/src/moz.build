@@ -17,10 +17,6 @@ SOURCES += [
     'suggestmgr.cxx',
 ]
 
-# This variable is referenced in configure.in.  Make sure to change that file
-# too if you need to change this variable.
-DEFINES['HUNSPELL_STATIC'] = True
-
 FINAL_LIBRARY = 'xul'
 
 LOCAL_INCLUDES += [
