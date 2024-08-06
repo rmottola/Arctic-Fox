@@ -395,8 +395,7 @@ nsTreeColumn::Invalidate(mozilla::ErrorResult& aRv)
 }
 
 nsTreeColumns::nsTreeColumns(nsTreeBodyFrame* aTree)
-  : mTree(aTree),
-    mFirstColumn(nullptr)
+  : mTree(aTree)
 {
 }
 
@@ -671,7 +670,7 @@ nsTreeColumns::InvalidateColumns()
        currCol = currCol->GetNext()) {
     currCol->SetColumns(nullptr);
   }
-  NS_IF_RELEASE(mFirstColumn);
+  mFirstColumn = nullptr;
   return NS_OK;
 }
 
@@ -761,7 +760,7 @@ nsTreeColumns::EnsureColumns()
           col->SetPrevious(currCol);
         }
         else {
-          NS_ADDREF(mFirstColumn = col);
+          mFirstColumn = col;
         }
         currCol = col;
       }
