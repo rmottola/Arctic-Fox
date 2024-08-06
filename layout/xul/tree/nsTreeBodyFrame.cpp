@@ -1190,7 +1190,7 @@ nsTreeBodyFrame::GetCoordsForCellItem(int32_t aRow, nsITreeColumn* aCol, const n
       nsRect twistyRect(cellRect);
       nsStyleContext* twistyContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreetwisty);
       GetTwistyRect(aRow, currCol, imageRect, twistyRect, presContext,
-                    rc, twistyContext);
+                    twistyContext);
 
       if (NS_LITERAL_CSTRING("twisty").Equals(aElement)) {
         // If we're looking for the twisty Rect, just return the size
@@ -1555,7 +1555,7 @@ nsTreeBodyFrame::GetItemWithinCellAt(nscoord aX, const nsRect& aCellRect,
 
     nsRect imageSize;
     GetTwistyRect(aRowIndex, aColumn, imageSize, twistyRect, presContext,
-                  rc, twistyContext);
+                  twistyContext);
 
     // We will treat a click as hitting the twisty if it happens on the margins, borders, padding,
     // or content of the twisty object.  By allowing a "slop" into the margin, we make it a little
@@ -1714,7 +1714,7 @@ nsTreeBodyFrame::GetCellWidth(int32_t aRow, nsTreeColumn* aCol,
     nsRect imageSize;
     nsRect twistyRect(cellRect);
     GetTwistyRect(aRow, aCol, imageSize, twistyRect, PresContext(),
-                  *aRenderingContext, twistyContext);
+                  twistyContext);
 
     // Add in the margins of the twisty element.
     nsMargin twistyMargin;
@@ -2058,7 +2058,6 @@ nsTreeBodyFrame::GetTwistyRect(int32_t aRowIndex,
                                nsRect& aImageRect,
                                nsRect& aTwistyRect,
                                nsPresContext* aPresContext,
-                               nsRenderingContext& aRenderingContext,
                                nsStyleContext* aTwistyContext)
 {
   // The twisty rect extends all the way to the end of the cell.  This is incorrect.  We need to
@@ -3260,7 +3259,7 @@ nsTreeBodyFrame::PaintCell(int32_t              aRowIndex,
       nsRect imageSize;
       nsRect twistyRect(aCellRect);
       GetTwistyRect(aRowIndex, aColumn, imageSize, twistyRect, aPresContext,
-                    aRenderingContext, twistyContext);
+                    twistyContext);
 
       nsMargin twistyMargin;
       twistyContext->StyleMargin()->GetMargin(twistyMargin);
@@ -3436,7 +3435,7 @@ nsTreeBodyFrame::PaintTwisty(int32_t              aRowIndex,
 
   nsRect imageSize;
   nsITheme* theme = GetTwistyRect(aRowIndex, aColumn, imageSize, twistyRect,
-                                  aPresContext, aRenderingContext, twistyContext);
+                                  aPresContext, twistyContext);
 
   // Subtract out the remaining width.  This is done even when we don't actually paint a twisty in 
   // this cell, so that cells in different rows still line up.
@@ -4022,8 +4021,8 @@ nsTreeBodyFrame::PaintDropFeedback(const nsRect&        aDropFeedbackRect,
       nsStyleContext* twistyContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreetwisty);
       nsRect imageSize;
       nsRect twistyRect;
-      GetTwistyRect(mSlots->mDropRow, primaryCol, imageSize, twistyRect, aPresContext,
-                    aRenderingContext, twistyContext);
+      GetTwistyRect(mSlots->mDropRow, primaryCol, imageSize, twistyRect,
+                    aPresContext, twistyContext);
       nsMargin twistyMargin;
       twistyContext->StyleMargin()->GetMargin(twistyMargin);
       twistyRect.Inflate(twistyMargin);
