@@ -395,9 +395,7 @@ let testCookiesObjects = Task.async(function*(index, hosts, cookiesActor) {
           break;
         }
       }
-      if (!found) {
-        ok(false, "cookie " + item.name + " should not exist in response;");
-      }
+      ok(found, "cookie " + item.name + " should exist in response");
     }
   };
 
@@ -434,10 +432,7 @@ let testLocalStorageObjects = Task.async(function*(index, hosts, localStorageAct
           break;
         }
       }
-      if (!found) {
-        ok(false, "local storage item " + item.name +
-                  " should not exist in response;");
-      }
+      ok(found, "local storage item " + item.name + " should exist in response");
     }
   };
 
@@ -475,10 +470,7 @@ let testSessionStorageObjects = Task.async(function*(index, hosts, sessionStorag
           break;
         }
       }
-      if (!found) {
-        ok(false, "session storage item " + item.name +
-                  " should not exist in response;");
-      }
+      ok(found, "session storage item " + item.name + " should exist in response");
     }
   };
 
@@ -504,12 +496,7 @@ let testIndexedDB = Task.async(function*(indexedDBActor) {
           break;
         }
       }
-      if (!found) {
-        ok (false, item + " should not be present in list stores response");
-      }
-      else {
-        ok (true, item + " found from indexedDB list stores response");
-      }
+      ok(found, item + " should exist in list stores response");
     }
   }
 
@@ -536,9 +523,7 @@ let testIndexedDBs = Task.async(function*(index, hosts, indexedDBActor) {
           break;
         }
       }
-      if (!found) {
-        ok(false, "indexed db " + item.name + " should not exist in response");
-      }
+      ok(found, "indexed db " + item.name + " should exist in response");
     }
   };
 
@@ -579,16 +564,12 @@ let testObjectStores = Task.async(function*(index, hosts, indexedDBActor) {
                 break;
               }
             }
-            if (!indexFound) {
-              ok(false, "Index " + index + " should not be present in response");
-            }
+            ok(indexFound, "Index " + index + " should exist in response");
           }
           break;
         }
       }
-      if (!found) {
-        ok(false, "indexed db " + item.name + " should not exist in response");
-      }
+      ok(found, "indexed db " + item.name + " should exist in response");
     }
   };
 
@@ -626,9 +607,7 @@ let testIDBEntries = Task.async(function*(index, hosts, indexedDBActor) {
           break;
         }
       }
-      if (!found) {
-        ok(false, "indexed db item " + item.name + " should not exist in response");
-      }
+      ok(found, "indexed db item " + item.name + " should exist in response");
     }
   };
 
