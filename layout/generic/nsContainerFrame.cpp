@@ -372,7 +372,7 @@ nsContainerFrame::PeekOffsetCharacter(bool aForward, int32_t* aOffset,
 /////////////////////////////////////////////////////////////////////////////
 // Helper member functions
 
-static nsresult
+static void
 ReparentFrameViewTo(nsIFrame*       aFrame,
                     nsViewManager* aViewManager,
                     nsView*        aNewParentView,
@@ -387,7 +387,7 @@ ReparentFrameViewTo(nsIFrame*       aFrame,
 #ifdef MOZ_XUL
     if (aFrame->GetType() == nsGkAtoms::menuPopupFrame) {
       // This view must be parented by the root view, don't reparent it.
-      return NS_OK;
+      return;
     }
 #endif
     nsView* view = aFrame->GetView();
@@ -412,8 +412,6 @@ ReparentFrameViewTo(nsIFrame*       aFrame,
       }
     }
   }
-
-  return NS_OK;
 }
 
 void
@@ -545,8 +543,8 @@ nsContainerFrame::ReparentFrameView(nsIFrame* aChildFrame,
   // anything
   if (oldParentView != newParentView) {
     // They're not so we need to reparent any child views
-    return ReparentFrameViewTo(aChildFrame, oldParentView->GetViewManager(), newParentView,
-                               oldParentView);
+    ReparentFrameViewTo(aChildFrame, oldParentView->GetViewManager(), newParentView,
+                        oldParentView);
   }
 
   return NS_OK;
