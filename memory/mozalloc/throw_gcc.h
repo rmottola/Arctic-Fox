@@ -8,6 +8,8 @@
 #ifndef mozilla_throw_gcc_h
 #define mozilla_throw_gcc_h
 
+#if !defined(_LIBCPP_VERSION) || _LIBCPP_VERSION < 14000
+
 #include "mozilla/Attributes.h"
 
 #include <stdio.h>              // snprintf
@@ -150,5 +152,10 @@ __throw_system_error(int err)
 }
 
 } // namespace std
+
+#undef MOZ_THROW_NORETURN
+#undef MOZ_THROW_INLINE
+
+#endif
 
 #endif  // mozilla_throw_gcc_h
