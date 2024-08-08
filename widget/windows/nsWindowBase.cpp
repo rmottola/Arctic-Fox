@@ -113,6 +113,7 @@ void nsWindowBase::ChangedDPI()
     if (presShell) {
       presShell->BackingScaleFactorChanged();
     }
+    mWidgetListener->UIResolutionChanged();
   }
 }
 
