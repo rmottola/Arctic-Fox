@@ -8,23 +8,23 @@ The goal is to implement specific security updates and bug fixes to keep this br
 
 Arctic Fox will build for Mac OS X 10.6 and up, Windows XP, i386/x86_64/PowerPC-BE, MIPS-el, ARM  on Linux, and more than likely any other Unix/BSD varient.
 Ideally, we'd like to get it working on PowerPC 10.5 as well.
-An older *very unofficial* 27.9.15 build can be found here: [Arctic Fox for 10.4/10.5](https://forums.macrumors.com/threads/so-this-finally-happened-sort-of.2172031/)
 
 Compared to PaleMoon 27 some major changes:
 * ARM support has been reinstantiated, including JIT!
 * MIPS support reinstantiated, too (less tested and only on Little Endian)
 * WebRTC has been reinstantiated
-* vast improvement in compiler support, up to gcc 13
+* PDF reader has been reinstantiated
+* vast improvement in compiler support, up to gcc 14
 
 ## Build tips
 
 With enough swap, 1.2GB of RAM are the absolute minimum tested, 1.5GB is acceptable, 2GB is comfortable, 4GB is recommended. For some tricks, read below.
 
-* To build on MacOSX:
-  * Requires OS X 10.6 as a minimum build environment.
+* To build on MacOS:
+  * Requires MacOS-X 10.6 as a minimum build environment.
   * Install xcode, command line tools and macports. 
   * Install these via macports: 
-  * sudo port -v install autoconf213 python27 libidl ccache yasm clang-3.7 (clang-3.7 is the minimum known to work). 
+  *     sudo port -v install autoconf213 python27 libidl ccache yasm clang-3.7 (clang-3.7 is the minimum known to work). 
   * Extract source archive somewhere convenient. 
   * Add a sane .mozconfig (i've included some samples). 
   * From the source directory type: ./mach build 
@@ -32,9 +32,6 @@ With enough swap, 1.2GB of RAM are the absolute minimum tested, 1.5GB is accepta
   * Now package it: ./mach package 
   * The built package will be in /obj_blah_blah/dist 
 
-
-If you are under memory pressure, try:
-* use -g0 in your optimization flags (removes debug information, greatly reducing file sizes)
 
 ## What has been removed compared to FireFox?
 * translation support through translations services
