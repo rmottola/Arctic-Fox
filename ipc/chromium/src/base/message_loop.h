@@ -27,6 +27,8 @@
 
 #include "nsAutoPtr.h"
 
+class nsIThread;
+
 namespace mozilla {
 namespace ipc {
 
@@ -109,7 +111,7 @@ public:
   // NOTE: These methods may be called on any thread.  The Task will be invoked
   // on the thread that executes MessageLoop::Run().
 
-  B2G_ACL_EXPORT void PostTask(
+  void PostTask(
       const tracked_objects::Location& from_here, Task* task);
 
   void PostDelayedTask(
@@ -199,7 +201,7 @@ public:
   //   This type of ML is used in Mozilla child processes which initialize
   //   XPCOM and use the gecko event loop.
   //
-  // TYPE_MOZILLA_UI
+  // TYPE_MOZILLA_PARENT
   //   This type of ML is used in Mozilla parent processes which initialize
   //   XPCOM and use the gecko event loop.
   //
@@ -216,14 +218,14 @@ public:
     TYPE_UI,
     TYPE_IO,
     TYPE_MOZILLA_CHILD,
-    TYPE_MOZILLA_UI,
+    TYPE_MOZILLA_PARENT,
     TYPE_MOZILLA_NONMAINTHREAD,
     TYPE_MOZILLA_NONMAINUITHREAD
   };
 
   // Normally, it is not necessary to instantiate a MessageLoop.  Instead, it
   // is typical to make use of the current thread's MessageLoop instance.
-  explicit MessageLoop(Type type = TYPE_DEFAULT);
+  explicit MessageLoop(Type type = TYPE_DEFAULT, nsIThread* aThread = nullptr);
   ~MessageLoop();
 
   // Returns the type passed to the constructor.
@@ -473,7 +475,7 @@ class MessageLoopForUI : public MessageLoop {
       return NULL;
     Type type = loop->type();
     DCHECK(type == MessageLoop::TYPE_UI ||
-           type == MessageLoop::TYPE_MOZILLA_UI ||
+           type == MessageLoop::TYPE_MOZILLA_PARENT ||
            type == MessageLoop::TYPE_MOZILLA_CHILD);
     return static_cast<MessageLoopForUI*>(loop);
   }

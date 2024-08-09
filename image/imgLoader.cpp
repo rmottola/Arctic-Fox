@@ -8,6 +8,7 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Move.h"
 #include "mozilla/Preferences.h"
+ #include "mozilla/ChaosMode.h"
 
 #include "ImageLogging.h"
 #include "nsPrintfCString.h"
@@ -716,7 +717,8 @@ NewImageChannel(nsIChannel** aResult,
                 nsLoadFlags aLoadFlags,
                 nsContentPolicyType aPolicyType,
                 nsIPrincipal* aLoadingPrincipal,
-                nsISupports* aRequestingContext)
+                nsISupports* aRequestingContext,
+                bool aRespectPrivacy)
 {
   MOZ_ASSERT(aResult);
 
@@ -761,6 +763,10 @@ NewImageChannel(nsIChannel** aResult,
   nsSecurityFlags securityFlags = nsILoadInfo::SEC_NORMAL;
   if (inherit) {
     securityFlags |= nsILoadInfo::SEC_FORCE_INHERIT_PRINCIPAL;
+  }
+
+  if (aRespectPrivacy) {
+    securityFlags |= nsILoadInfo::SEC_FORCE_PRIVATE_BROWSING;
   }
 
   // Note we are calling NS_NewChannelWithTriggeringPrincipal() here with a
@@ -838,6 +844,21 @@ NewImageChannel(nsIChannel** aResult,
     childLoadGroup->SetParentLoadGroup(aLoadGroup);
   }
   (*aResult)->SetLoadGroup(loadGroup);
+
+  // This is a workaround and a real fix in bug 1264231.
+  if (callbacks) {
+    nsCOMPtr<nsILoadContext> loadContext = do_GetInterface(callbacks);
+    if (loadContext) {
+      nsCOMPtr<nsILoadInfo> loadInfo;
+      rv = (*aResult)->GetLoadInfo(getter_AddRefs(loadInfo));
+      NS_ENSURE_SUCCESS(rv, rv);
+      DocShellOriginAttributes originAttrs;
+      loadContext->GetOriginAttributes(originAttrs);
+      NeckoOriginAttributes neckoOriginAttrs;
+      neckoOriginAttrs.InheritFromDocShellToNecko(originAttrs);
+      loadInfo->SetOriginAttributes(neckoOriginAttrs);
+    }
+  }
 
   return NS_OK;
 }
@@ -1115,7 +1136,7 @@ imgLoader*
 imgLoader::Singleton()
 {
   if (!gSingleton) {
-    gSingleton = imgLoader::Create();
+    gSingleton = imgLoader::Create().take();
   }
   return gSingleton;
 }
@@ -1124,7 +1145,7 @@ imgLoader*
 imgLoader::PBSingleton()
 {
   if (!gPBSingleton) {
-    gPBSingleton = imgLoader::Create();
+    gPBSingleton = imgLoader::Create().take();
     gPBSingleton->RespectPrivacyNotifications();
   }
   return gPBSingleton;
@@ -1255,29 +1276,9 @@ imgLoader::Init()
 {
   InitCache();
 
-#ifdef MOZ_JXR
-  nsAdoptingCString advertisedJxrMimeType = Preferences::GetCString(
-      "media.jxr.advertised_mime_type");
-  if (!advertisedJxrMimeType) {
-    mLastJxrMimeType = "";
-  } else {
-    advertisedJxrMimeType.Trim(" \t\n\v\f\r");
-    mLastJxrMimeType = advertisedJxrMimeType;
-  }
-
-  if (Preferences::GetBool("media.jxr.autoaccept", false)) {
-    UpdateJXRAcceptHeader(Preferences::GetBool("media.jxr.enabled", false));
-  }
-
-  Preferences::AddWeakObserver(this, "media.jxr.enabled");
-  Preferences::AddWeakObserver(this, "media.jxr.advertised_mime_type");
-  Preferences::AddWeakObserver(this, "media.jxr.autoaccept");
-#endif
-
   ReadAcceptHeaderPref();
 
   Preferences::AddWeakObserver(this, "image.http.accept");
-
 
     return NS_OK;
 }
@@ -1298,20 +1299,6 @@ imgLoader::Observe(nsISupports* aSubject, const char* aTopic,
     if (!NS_strcmp(aData, MOZ_UTF16("image.http.accept"))) {
       ReadAcceptHeaderPref();
     }
-#ifdef MOZ_JXR
-    else if (!NS_strcmp(aData, MOZ_UTF16("media.jxr.enabled"))) {
-      if (Preferences::GetBool("media.jxr.autoaccept", false)) {
-        UpdateJXRAcceptHeader(Preferences::GetBool("media.jxr.enabled",
-            false));
-      }
-    } else if (!NS_strcmp(aData, MOZ_UTF16("media.jxr.advertised_mime_type"))) {
-      if (Preferences::GetBool("media.jxr.enabled", false) &&
-          Preferences::GetBool("media.jxr.autoaccept", false)) {
-        UpdateJXRAcceptHeader(false);
-        UpdateJXRAcceptHeader(true);
-      }
-    }
-#endif
 
   } else if (strcmp(aTopic, "memory-pressure") == 0) {
     MinimizeCaches();
@@ -1362,11 +1349,12 @@ imgLoader::ClearCache(bool chrome)
 
 NS_IMETHODIMP
 imgLoader::FindEntryProperties(nsIURI* uri,
-                               nsIDOMDocument* doc,
+                               nsIDOMDocument* aDOMDoc,
                                nsIProperties** _retval)
 {
   *_retval = nullptr;
 
+  nsCOMPtr<nsIDocument> doc = do_QueryInterface(aDOMDoc);
   ImageCacheKey key(uri, doc);
   imgCacheTable& cache = GetCache(key);
 
@@ -1653,7 +1641,8 @@ imgLoader::ValidateRequestWithNewChannel(imgRequest* request,
                          aLoadFlags,
                          aLoadPolicyType,
                          aLoadingPrincipal,
-                         aCX);
+                         aCX,
+                         mRespectPrivacy);
     if (NS_FAILED(rv)) {
       return false;
     }
@@ -1804,6 +1793,12 @@ imgLoader::ValidateEntry(imgCacheEntry* aEntry,
     // bypass the cache, we don't allow this entry to be used.
     if (aLoadFlags & nsIRequest::LOAD_BYPASS_CACHE) {
       return false;
+    }
+
+    if (MOZ_UNLIKELY(ChaosMode::isActive(ChaosFeature::ImageCache))) {
+      if (ChaosMode::randomUint32LessThan(4) < 1) {
+        return false;
+      }
     }
 
     // Determine whether the cache aEntry must be revalidated...
@@ -2018,6 +2013,8 @@ imgLoader::LoadImageXPCOM(nsIURI* aURI,
     }
     imgRequestProxy* proxy;
     ReferrerPolicy refpol = ReferrerPolicyFromString(aReferrerPolicy);
+    nsCOMPtr<nsINode> node = do_QueryInterface(aCX);
+    nsCOMPtr<nsIDocument> doc = do_QueryInterface(aCX);
     nsresult rv = LoadImage(aURI,
                             aInitialDocumentURI,
                             aReferrerURI,
@@ -2025,7 +2022,8 @@ imgLoader::LoadImageXPCOM(nsIURI* aURI,
                             aLoadingPrincipal,
                             aLoadGroup,
                             aObserver,
-                            aCX,
+                            node,
+                            doc,
                             aLoadFlags,
                             aCacheKey,
                             aContentPolicyType,
@@ -2043,7 +2041,8 @@ imgLoader::LoadImage(nsIURI* aURI,
                      nsIPrincipal* aLoadingPrincipal,
                      nsILoadGroup* aLoadGroup,
                      imgINotificationObserver* aObserver,
-                     nsISupports* aCX,
+                     nsINode *aContext,
+                     nsIDocument* aLoadingDocument,
                      nsLoadFlags aLoadFlags,
                      nsISupports* aCacheKey,
                      nsContentPolicyType aContentPolicyType,
@@ -2122,13 +2121,12 @@ imgLoader::LoadImage(nsIURI* aURI,
   // XXX For now ignore aCacheKey. We will need it in the future
   // for correctly dealing with image load requests that are a result
   // of post data.
-  nsCOMPtr<nsIDOMDocument> doc = do_QueryInterface(aCX);
-  ImageCacheKey key(aURI, doc);
+  ImageCacheKey key(aURI, aLoadingDocument);
   imgCacheTable& cache = GetCache(key);
 
   if (cache.Get(key, getter_AddRefs(entry)) && entry) {
     if (ValidateEntry(entry, aURI, aInitialDocumentURI, aReferrerURI,
-                      aReferrerPolicy, aLoadGroup, aObserver, aCX,
+                      aReferrerPolicy, aLoadGroup, aObserver, aLoadingDocument,
                       requestFlags, aContentPolicyType, true, _retval,
                       aLoadingPrincipal, corsmode)) {
       request = entry->GetRequest();
@@ -2179,7 +2177,8 @@ imgLoader::LoadImage(nsIURI* aURI,
                          requestFlags,
                          aContentPolicyType,
                          aLoadingPrincipal,
-                         aCX);
+                         aContext,
+                         mRespectPrivacy);
     if (NS_FAILED(rv)) {
       return NS_ERROR_FAILURE;
     }
@@ -2197,7 +2196,7 @@ imgLoader::LoadImage(nsIURI* aURI,
     nsCOMPtr<nsILoadGroup> channelLoadGroup;
     newChannel->GetLoadGroup(getter_AddRefs(channelLoadGroup));
     request->Init(aURI, aURI, /* aHadInsecureRedirect = */ false,
-                  channelLoadGroup, newChannel, entry, aCX,
+                  channelLoadGroup, newChannel, entry, aLoadingDocument,
                   aLoadingPrincipal, corsmode, aReferrerPolicy);
 
     // Add the initiator type for this image load
@@ -2269,7 +2268,7 @@ imgLoader::LoadImage(nsIURI* aURI,
     // URL maps to the same image on a page) if we load the same image in a
     // different tab (see bug 528003), because its load id will get re-set, and
     // that'll cause us to validate over the network.
-    request->SetLoadId(aCX);
+    request->SetLoadId(aLoadingDocument);
 
     LOG_MSG(gImgLog, "imgLoader::LoadImage", "creating proxy request.");
     rv = CreateNewProxyForRequest(request, aLoadGroup, aObserver,
@@ -2347,7 +2346,7 @@ imgLoader::LoadImageWithChannel(nsIChannel* channel,
 
   nsCOMPtr<nsIURI> uri;
   channel->GetURI(getter_AddRefs(uri));
-  nsCOMPtr<nsIDOMDocument> doc = do_QueryInterface(aCX);
+  nsCOMPtr<nsIDocument> doc = do_QueryInterface(aCX);
   ImageCacheKey key(uri, doc);
 
   nsLoadFlags requestFlags = nsIRequest::LOAD_NORMAL;
@@ -2591,164 +2590,6 @@ imgLoader::GetMimeTypeFromContent(const char* aContents,
 
   return NS_OK;
 }
-
-#ifdef MOZ_JXR
-// In the Accept header passed in by the 'start' and 'end' pointers, finds a
-// portion containing the first occurrence of the MIME type and retuns it as
-// a pair of pointers in the subStart and subEnd out parameters. The returned
-// span will also contain any paramters (HTTP term) the MIME type might have
-// and a delimiter and surrounding whitespace so that it can directly be used
-// to cut the MIME type information from the header field. In case of no match,
-// *subEnd will be NULL.
-void imgLoader::FindMIMETypeInAcceptHeader(const char* mimeType, char* start,
-    char* end, char** subStart, char** subEnd)
-{
-  MOZ_ASSERT(mimeType);
-  MOZ_ASSERT(start);
-  MOZ_ASSERT(end);
-  MOZ_ASSERT(subStart);
-  MOZ_ASSERT(subEnd);
-
-  size_t mimeTypeLen = strlen(mimeType);
-  bool isEscaped = false;
-  bool inQuoted = false;
-  *subStart = NULL;
-  *subEnd = NULL;
-
-  for (char* current = start; current < end; ) {
-    // Only examine the header at points of interest.
-    if (current == start || *current++ == ',') {
-      *subStart = current;
-      while (current != end && isspace(*current)) {
-        ++current;
-      }
-      if (size_t(end - current) < mimeTypeLen) {
-        break;
-      }
-      if (!strncmp(current, mimeType, mimeTypeLen)) {
-        current += mimeTypeLen;
-        while (current != end && isspace(*current)) {
-          ++current;
-        }
-        // Also include parameters in the result if there are any present.
-        if (current != end && *current == ';') {
-          do {
-            if (*current == ',') {
-              if (!inQuoted) {
-                break;
-              }
-            } else if (*current == '"') {
-              if (!isEscaped) {
-                inQuoted = !inQuoted;
-              }
-            }
-            if (isEscaped) {
-              isEscaped = false;
-            } else if (*current == '\\') {
-              isEscaped = true;
-            }
-          } while (++current != end);
-        }
-        if (current != end && *current != ',') {
-          // These are not the droids you are looking for.
-          ++current;
-          continue;
-        }
-        *subEnd = current;
-        // Also include the comma delimiter and surrounding whitespace to avoid
-        // accumulating it over time.
-        if (*subEnd != end) {
-          ++*subEnd;
-          while (*subEnd != end && isspace(**subEnd)) {
-            ++*subEnd;
-          }
-        } else if (*subStart != start) {
-          --*subStart;
-          while (*subStart != start && isspace(**subStart)) {
-            --*subStart;
-          }
-        }
-        break;
-      } // if strncmp
-      ++current;
-    } // if start or comma
-  } // for
-}
-
-// Adds/removes the JPEG XR MIME type to/from the "image.http.accept" pref.
-void imgLoader::UpdateJXRAcceptHeader(bool enabled)
-{
-  nsAdoptingCString accept = Preferences::GetCString("image.http.accept");
-  if (!accept) {
-    return;
-  }
-
-  char* start = accept.BeginWriting();
-  char* end = accept.EndWriting();
-  char* subStart = NULL;
-  char* subEnd = NULL;
-
-  nsAdoptingCString jxrMimeType = Preferences::GetCString(
-      "media.jxr.advertised_mime_type");
-
-  if (enabled) { // Adding the MIME type.
-    if (!jxrMimeType) {
-      return;
-    }
-
-    jxrMimeType.Trim(" \t\n\v\f\r");
-    if (jxrMimeType.IsEmpty()) {
-      return;
-    }
-    mLastJxrMimeType = jxrMimeType;
-
-    FindMIMETypeInAcceptHeader(jxrMimeType.get(), start, end,
-        &subStart, &subEnd);
-
-    if (subEnd) {
-      // MIME type already present.
-      return;
-    }
-
-    // Try inserting after the WebP MIME type to have a canonical header if
-    // possible. If this fails, the JPEG XR MIME type will be "aggressively"
-    // inserted at the beginning.
-    FindMIMETypeInAcceptHeader("image/webp", start, end, &subStart, &subEnd);
-
-    if (subEnd) {
-      if (subEnd == end) {
-        accept.Insert(NS_LITERAL_CSTRING(",") + jxrMimeType, subEnd - start);
-      } else {
-        accept.Insert(jxrMimeType + NS_LITERAL_CSTRING(","), subEnd - start);
-      }
-    } else {
-      subStart = start;
-      while (subStart != end && isspace(*subStart)) {
-        ++subStart;
-      }
-      if (subStart == end) {
-        accept.Insert(jxrMimeType, 0);
-      } else {
-        accept.Insert(jxrMimeType + NS_LITERAL_CSTRING(","), 0);
-      }
-    }
-  } else { // Removing the MIME type.
-    if (mLastJxrMimeType.IsEmpty()) {
-      return;
-    }
-
-    FindMIMETypeInAcceptHeader(mLastJxrMimeType.get(), start, end,
-        &subStart, &subEnd);
-
-    if (!subEnd) {
-      return;
-    }
-
-    accept.Cut(subStart - start, subEnd - subStart);
-  }
-  Preferences::SetCString("image.http.accept", accept);
-}
-#endif // MOZ_JXR
 
 /**
  * proxy stream listener class used to handle multipart/x-mixed-replace

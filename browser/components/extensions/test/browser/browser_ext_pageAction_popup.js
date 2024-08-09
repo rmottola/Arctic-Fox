@@ -2,20 +2,6 @@
 /* vim: set sts=2 sw=2 et tw=80: */
 "use strict";
 
-function promisePopupShown(popup) {
-  return new Promise(resolve => {
-    if (popup.popupOpen) {
-      resolve();
-    } else {
-      let onPopupShown = event => {
-        popup.removeEventListener("popupshown", onPopupShown);
-        resolve();
-      };
-      popup.addEventListener("popupshown", onPopupShown);
-    }
-  });
-}
-
 add_task(function* testPageActionPopup() {
   let scriptPage = url => `<html><head><meta charset="utf-8"><script src="${url}"></script></head></html>`;
 
@@ -33,6 +19,11 @@ add_task(function* testPageActionPopup() {
       "popup-a.html": scriptPage("popup-a.js"),
       "popup-a.js": function() {
         browser.runtime.sendMessage("from-popup-a");
+        browser.runtime.onMessage.addListener(msg => {
+          if (msg == "close-popup") {
+            window.close();
+          }
+        });
       },
 
       "data/popup-b.html": scriptPage("popup-b.js"),
@@ -69,26 +60,36 @@ add_task(function* testPageActionPopup() {
           },
           () => {
             browser.pageAction.setPopup({tabId, popup: "/popup-a.html"});
-            sendClick({expectEvent: false, expectPopup: "a"});
+            sendClick({expectEvent: false, expectPopup: "a", runNextTest: true});
+          },
+          () => {
+            browser.test.sendMessage("next-test", {expectClosed: true});
           },
         ];
 
         let expect = {};
-        sendClick = ({expectEvent, expectPopup}) => {
-          expect = {event: expectEvent, popup: expectPopup};
+        sendClick = ({expectEvent, expectPopup, runNextTest}) => {
+          expect = {event: expectEvent, popup: expectPopup, runNextTest};
           browser.test.sendMessage("send-click");
         };
 
         browser.runtime.onMessage.addListener(msg => {
-          if (expect.popup) {
+          if (msg == "close-popup") {
+            return;
+          } else if (expect.popup) {
             browser.test.assertEq(msg, `from-popup-${expect.popup}`,
                                   "expected popup opened");
           } else {
-            browser.test.fail("unexpected popup");
+            browser.test.fail(`unexpected popup: ${msg}`);
           }
 
           expect.popup = null;
-          browser.test.sendMessage("next-test");
+          if (expect.runNextTest) {
+            expect.runNextTest = false;
+            tests.shift()();
+          } else {
+            browser.test.sendMessage("next-test");
+          }
         });
 
         browser.pageAction.onClicked.addListener(() => {
@@ -103,6 +104,11 @@ add_task(function* testPageActionPopup() {
         });
 
         browser.test.onMessage.addListener((msg) => {
+          if (msg == "close-popup") {
+            browser.runtime.sendMessage("close-popup");
+            return;
+          }
+
           if (msg != "next-test") {
             browser.test.fail("Expecting 'next-test' message");
           }
@@ -132,12 +138,22 @@ add_task(function* testPageActionPopup() {
     clickPageAction(extension);
   });
 
-  extension.onMessage("next-test", Task.async(function* () {
+  extension.onMessage("next-test", Task.async(function* (expecting = {}) {
     let panel = document.getElementById(panelId);
-    if (panel) {
+    if (expecting.expectClosed) {
+      ok(panel, "Expect panel to exist");
+      yield promisePopupShown(panel);
+
+      extension.sendMessage("close-popup");
+
+      yield promisePopupHidden(panel);
+      ok(true, `Panel is closed`);
+    } else if (panel) {
       yield promisePopupShown(panel);
       panel.hidePopup();
+    }
 
+    if (panel) {
       panel = document.getElementById(panelId);
       is(panel, null, "panel successfully removed from document after hiding");
     }

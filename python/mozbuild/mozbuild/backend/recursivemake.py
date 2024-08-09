@@ -23,6 +23,7 @@ from mozpack.manifests import (
 import mozpack.path as mozpath
 
 from mozbuild.frontend.context import (
+    AbsolutePath,
     Path,
     RenamedSourcePath,
     SourcePath,
@@ -56,8 +57,11 @@ from ..frontend.data import (
     JavaJarData,
     Library,
     LocalInclude,
+    ObjdirFiles,
+    ObjdirPreprocessedFiles,
     PerSourceFlag,
     Program,
+    RustRlibLibrary,
     SharedLibrary,
     SimpleProgram,
     Sources,
@@ -570,6 +574,10 @@ class RecursiveMakeBackend(CommonBackend):
             else:
                 return False
 
+        elif isinstance(obj, RustRlibLibrary):
+            # Nothing to do because |Sources| has done the work for us.
+            pass
+
         elif isinstance(obj, SharedLibrary):
             self._process_shared_library(obj, backend_file)
             self._process_linked_libraries(obj, backend_file)
@@ -586,7 +594,13 @@ class RecursiveMakeBackend(CommonBackend):
             self._process_final_target_files(obj, obj.files, backend_file)
 
         elif isinstance(obj, FinalTargetPreprocessedFiles):
-            self._process_final_target_pp_files(obj, obj.files, backend_file)
+            self._process_final_target_pp_files(obj, obj.files, backend_file, 'DIST_FILES')
+
+        elif isinstance(obj, ObjdirFiles):
+            self._process_objdir_files(obj, obj.files, backend_file)
+
+        elif isinstance(obj, ObjdirPreprocessedFiles):
+            self._process_final_target_pp_files(obj, obj.files, backend_file, 'OBJDIR_PP_FILES')
 
         elif isinstance(obj, AndroidResDirs):
             # Order matters.
@@ -1038,14 +1052,14 @@ class RecursiveMakeBackend(CommonBackend):
         # the manifest is listed as a duplicate.
         for source, (dest, is_test) in obj.installs.items():
             try:
-                self._install_manifests['_tests'].add_symlink(source, dest)
+                self._install_manifests['_test_files'].add_symlink(source, dest)
             except ValueError:
                 if not obj.dupe_manifest and is_test:
                     raise
 
         for base, pattern, dest in obj.pattern_installs:
             try:
-                self._install_manifests['_tests'].add_pattern_symlink(base,
+                self._install_manifests['_test_files'].add_pattern_symlink(base,
                     pattern, dest)
             except ValueError:
                 if not obj.dupe_manifest:
@@ -1053,7 +1067,7 @@ class RecursiveMakeBackend(CommonBackend):
 
         for dest in obj.external_installs:
             try:
-                self._install_manifests['_tests'].add_optional_exists(dest)
+                self._install_manifests['_test_files'].add_optional_exists(dest)
             except ValueError:
                 if not obj.dupe_manifest:
                     raise
@@ -1138,6 +1152,17 @@ class RecursiveMakeBackend(CommonBackend):
         if libdef.symbols_file:
             backend_file.write('SYMBOLS_FILE := %s\n' % libdef.symbols_file)
 
+        rust_rlibs = [o for o in libdef.linked_libraries if isinstance(o, RustRlibLibrary)]
+        if rust_rlibs:
+            # write out Rust file with extern crate declarations.
+            extern_crate_file = mozpath.join(libdef.objdir, 'rul.rs')
+            with self._write_file(extern_crate_file) as f:
+                f.write('// AUTOMATICALLY GENERATED.  DO NOT EDIT.\n\n')
+                for rlib in rust_rlibs:
+                    f.write('extern crate %s;\n' % rlib.crate_name)
+
+            backend_file.write('RS_STATICLIB_CRATE_SRC := %s\n' % extern_crate_file)
+
     def _process_static_library(self, libdef, backend_file):
         backend_file.write_once('LIBRARY_NAME := %s\n' % libdef.basename)
         backend_file.write('FORCE_STATIC_LIB := 1\n')
@@ -1184,6 +1209,9 @@ class RecursiveMakeBackend(CommonBackend):
                                         % (relpath, lib.import_name))
                     if isinstance(obj, SharedLibrary):
                         write_shared_and_system_libs(lib)
+                elif isinstance(lib, RustRlibLibrary):
+                    backend_file.write_once('RLIB_EXTERN_CRATE_OPTIONS += --extern %s=%s/%s\n'
+                                            % (lib.crate_name, relpath, lib.rlib_filename))
                 elif isinstance(obj, SharedLibrary):
                     assert lib.variant != lib.COMPONENT
                     backend_file.write_once('SHARED_LIBS += %s/%s\n'
@@ -1201,6 +1229,14 @@ class RecursiveMakeBackend(CommonBackend):
                 assert isinstance(lib, HostLibrary)
                 backend_file.write_once('HOST_LIBS += %s/%s\n'
                                    % (relpath, lib.import_name))
+
+        # We have to link the Rust super-crate after all intermediate static
+        # libraries have been listed to ensure that the Rust objects are
+        # searched after the C/C++ objects that might reference Rust symbols.
+        # Building the Rust super-crate will take care of Rust->Rust linkage.
+        if isinstance(obj, SharedLibrary) and any(isinstance(o, RustRlibLibrary)
+                                                  for o in obj.linked_libraries):
+            backend_file.write('STATIC_LIBS += librul.$(LIB_SUFFIX)\n')
 
         for lib in obj.linked_system_libs:
             if obj.KIND == 'target':
@@ -1245,12 +1281,15 @@ class RecursiveMakeBackend(CommonBackend):
                 dest = mozpath.join(reltarget, path, f.target_basename)
                 if not isinstance(f, ObjDirPath):
                     if '*' in f:
-                        if not isinstance(f, SourcePath):
-                            raise Exception("Wildcards are only supported in "
-                                            "SourcePath objects in %s. Path is: %s" % (
-                                                type(obj), f
-                                            ))
-                        install_manifest.add_pattern_symlink(f.srcdir, f, path)
+                        if f.startswith('/') or isinstance(f, AbsolutePath):
+                            basepath, wild = os.path.split(f.full_path)
+                            if '*' in basepath:
+                                raise Exception("Wildcards are only supported in the filename part of "
+                                                "srcdir-relative or absolute paths.")
+
+                            install_manifest.add_pattern_symlink(basepath, wild, path)
+                        else:
+                            install_manifest.add_pattern_symlink(f.srcdir, f, path)
                     else:
                         install_manifest.add_symlink(f.full_path, dest)
                 else:
@@ -1267,20 +1306,38 @@ class RecursiveMakeBackend(CommonBackend):
                 backend_file.write('%s_TARGET := %s\n' % (target_var, tier))
                 backend_file.write('INSTALL_TARGETS += %s\n' % target_var)
 
-    def _process_final_target_pp_files(self, obj, files, backend_file):
+    def _process_final_target_pp_files(self, obj, files, backend_file, name):
         # Bug 1177710 - We'd like to install these via manifests as
         # preprocessed files. But they currently depend on non-standard flags
         # being added via some Makefiles, so for now we just pass them through
         # to the underlying Makefile.in.
+        #
+        # Note that if this becomes a manifest, OBJDIR_PP_FILES will likely
+        # still need to use PP_TARGETS internally because we can't have an
+        # install manifest for the root of the objdir.
+        for i, (path, files) in enumerate(files.walk()):
+            self._no_skip['misc'].add(backend_file.relobjdir)
+            var = '%s_%d' % (name, i)
+            for f in files:
+                backend_file.write('%s += %s\n' % (
+                    var, self._pretty_path(f, backend_file)))
+            backend_file.write('%s_PATH := $(DEPTH)/%s\n'
+                               % (var, mozpath.join(obj.install_target, path)))
+            backend_file.write('%s_TARGET := misc\n' % var)
+            backend_file.write('PP_TARGETS += %s\n' % var)
+
+    def _process_objdir_files(self, obj, files, backend_file):
+        # We can't use an install manifest for the root of the objdir, since it
+        # would delete all the other files that get put there by the build
+        # system.
         for i, (path, files) in enumerate(files.walk()):
             self._no_skip['misc'].add(backend_file.relobjdir)
             for f in files:
-                backend_file.write('DIST_FILES_%d += %s\n' % (
+                backend_file.write('OBJDIR_%d_FILES += %s\n' % (
                     i, self._pretty_path(f, backend_file)))
-            backend_file.write('DIST_FILES_%d_PATH := $(DEPTH)/%s\n'
-                               % (i, mozpath.join(obj.install_target, path)))
-            backend_file.write('DIST_FILES_%d_TARGET := misc\n' % i)
-            backend_file.write('PP_TARGETS += DIST_FILES_%d\n' % i)
+            backend_file.write('OBJDIR_%d_DEST := $(topobjdir)/%s\n' % (i, path))
+            backend_file.write('OBJDIR_%d_TARGET := misc\n' % i)
+            backend_file.write('INSTALL_TARGETS += OBJDIR_%d\n' % i)
 
     def _process_chrome_manifest_entry(self, obj, backend_file):
         fragment = Makefile()
@@ -1367,6 +1424,12 @@ class RecursiveMakeBackend(CommonBackend):
             self.backend_input_files.add(obj.input_path)
 
         self._makefile_out_count += 1
+
+    def _handle_linked_rust_crates(self, obj, extern_crate_file):
+        backend_file = self._get_backend_file_for(obj)
+
+        backend_file.write('RS_STATICLIB_CRATE_SRC := %s\n' % extern_crate_file)
+        backend_file.write('STATIC_LIBS += librul.$(LIB_SUFFIX)\n')
 
     def _handle_ipdl_sources(self, ipdl_dir, sorted_ipdl_sources,
                              unified_ipdl_cppsrcs_mapping):

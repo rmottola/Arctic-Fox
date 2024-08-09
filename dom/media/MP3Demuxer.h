@@ -372,9 +372,11 @@ public:
   // or a 0-duration if unknown.
   media::TimeUnit Duration(int64_t aNumFrames) const;
 
+  // Returns the estimated current seek position time.
+  media::TimeUnit SeekPosition() const;
+
   const FrameParser::Frame& LastFrame() const;
   RefPtr<MediaRawData> DemuxSample();
-  media::TimeUnit SeekPosition() const;
 
   const ID3Parser::ID3Header& ID3Header() const;
   const FrameParser::VBRHeader& VBRInfo() const;
@@ -422,7 +424,7 @@ private:
   // Returns the estimated frame index for the given offset.
   int64_t FrameIndexFromOffset(int64_t aOffset) const;
 
- // Returns the estimated frame index for the given time.
+  // Returns the estimated frame index for the given time.
   int64_t FrameIndexFromTime(const media::TimeUnit& aTime) const;
 
   // Restricts the read size aSize to prevent blocking reads past stream length.

@@ -27,6 +27,8 @@
 #include "nsNSSShutDown.h"
 #include "nsXULAppAPI.h"
 
+#include "mozilla/Telemetry.h"
+
 //These defines are taken from the PKCS#11 spec
 #define CKM_RSA_PKCS_KEY_PAIR_GEN     0x00000000
 #define CKM_DH_PKCS_KEY_PAIR_GEN      0x00000020
@@ -468,8 +470,7 @@ nsKeygenFormProcessor::GetPublicKey(const nsAString& aValue,
     SECKEYPrivateKey *privateKey = nullptr;
     SECKEYPublicKey *publicKey = nullptr;
     CERTSubjectPublicKeyInfo *spkInfo = nullptr;
-    PLArenaPool *arena = nullptr;
-    SECStatus sec_rv = SECFailure;
+    SECStatus srv = SECFailure;
     SECItem spkiItem;
     SECItem pkacItem;
     SECItem signedItem;
@@ -482,6 +483,11 @@ nsKeygenFormProcessor::GetPublicKey(const nsAString& aValue,
     // permanent and sensitive flags for keygen
     PK11AttrFlags attrFlags = PK11_ATTR_TOKEN | PK11_ATTR_SENSITIVE | PK11_ATTR_PRIVATE;
 
+    UniquePLArenaPool arena(PORT_NewArena(DER_DEFAULT_CHUNKSIZE));
+    if (!arena) {
+        goto loser;
+    }
+
     // Get the key size //
     for (size_t i = 0; i < number_of_key_size_choices; ++i) {
         if (aValue.Equals(mSECKeySizeChoiceList[i].name)) {
@@ -490,11 +496,6 @@ nsKeygenFormProcessor::GetPublicKey(const nsAString& aValue,
         }
     }
     if (!keysize) {
-        goto loser;
-    }
-
-    arena = PORT_NewArena(DER_DEFAULT_CHUNKSIZE);
-    if (!arena) {
         goto loser;
     }
 
@@ -577,8 +578,8 @@ nsKeygenFormProcessor::GetPublicKey(const nsAString& aValue,
     if (NS_FAILED(rv))
         goto loser;
 
-    sec_rv = PK11_Authenticate(slot, true, m_ctx);
-    if (sec_rv != SECSuccess) {
+    srv = PK11_Authenticate(slot, true, m_ctx);
+    if (srv != SECSuccess) {
         goto loser;
     }
 
@@ -631,12 +632,13 @@ nsKeygenFormProcessor::GetPublicKey(const nsAString& aValue,
     if ( !spkInfo ) {
         goto loser;
     }
-    
+
     /*
      * Now DER encode the whole subjectPublicKeyInfo.
      */
-    sec_rv=DER_Encode(arena, &spkiItem, CERTSubjectPublicKeyInfoTemplate, spkInfo);
-    if (sec_rv != SECSuccess) {
+    srv = DER_Encode(arena.get(), &spkiItem, CERTSubjectPublicKeyInfoTemplate,
+                     spkInfo);
+    if (srv != SECSuccess) {
         goto loser;
     }
 
@@ -650,21 +652,22 @@ nsKeygenFormProcessor::GetPublicKey(const nsAString& aValue,
         rv = NS_ERROR_OUT_OF_MEMORY;
         goto loser;
     }
-    
-    sec_rv = DER_Encode(arena, &pkacItem, CERTPublicKeyAndChallengeTemplate, &pkac);
-    if ( sec_rv != SECSuccess ) {
+
+    srv = DER_Encode(arena.get(), &pkacItem, CERTPublicKeyAndChallengeTemplate,
+                     &pkac);
+    if (srv != SECSuccess) {
         goto loser;
     }
 
     /*
      * now sign the DER encoded PublicKeyAndChallenge
      */
-    sec_rv = SEC_DerSignData(arena, &signedItem, pkacItem.data, pkacItem.len,
-			 privateKey, algTag);
-    if ( sec_rv != SECSuccess ) {
+    srv = SEC_DerSignData(arena.get(), &signedItem, pkacItem.data, pkacItem.len,
+                          privateKey, algTag);
+    if (srv != SECSuccess) {
         goto loser;
     }
-    
+
     /*
      * Convert the signed public key and challenge into base64/ascii.
      */
@@ -678,8 +681,10 @@ nsKeygenFormProcessor::GetPublicKey(const nsAString& aValue,
     free(keystring);
 
     rv = NS_OK;
+
+    GatherKeygenTelemetry(keyGenMechanism, keysize, keyparamsString);
 loser:
-    if ( sec_rv != SECSuccess ) {
+    if (srv != SECSuccess) {
         if ( privateKey ) {
             PK11_DestroyTokenObject(privateKey->pkcs11Slot,privateKey->pkcs11ID);
         }
@@ -695,9 +700,6 @@ loser:
     }
     if ( privateKey ) {
         SECKEY_DestroyPrivateKey(privateKey);
-    }
-    if ( arena ) {
-        PORT_FreeArena(arena, true);
     }
     if (slot) {
         PK11_FreeSlot(slot);

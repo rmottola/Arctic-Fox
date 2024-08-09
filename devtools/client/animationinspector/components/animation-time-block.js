@@ -1,14 +1,19 @@
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 "use strict";
 
 const {Cu} = require("chrome");
 Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
-const {
-  createNode,
-  TimeScale
-} = require("devtools/client/animationinspector/utils");
+const {createNode, TimeScale} = require("devtools/client/animationinspector/utils");
+
+const { LocalizationHelper } = require("devtools/client/shared/l10n");
 
 const STRINGS_URI = "chrome://devtools/locale/animationinspector.properties";
-const L10N = new ViewHelpers.L10N(STRINGS_URI);
+const L10N = new LocalizationHelper(STRINGS_URI);
 
 /**
  * UI component responsible for displaying a single animation timeline, which
@@ -49,33 +54,43 @@ AnimationTimeBlock.prototype = {
     // Create a container element to hold the delay and iterations.
     // It is positioned according to its delay (divided by the playbackrate),
     // and its width is according to its duration (divided by the playbackrate).
-    let {x, iterationW, delayX, delayW, negativeDelayW} =
+    let {x, iterationW, delayX, delayW, negativeDelayW, endDelayX, endDelayW} =
       TimeScale.getAnimationDimensions(animation);
 
-    let iterations = createNode({
+    // background properties for .iterations element
+    let backgroundIterations = TimeScale.getIterationsBackgroundData(animation);
+
+    createNode({
       parent: this.containerEl,
       attributes: {
-        "class": state.type + " iterations" +
-                 (state.iterationCount ? "" : " infinite"),
+        "class": "iterations" + (state.iterationCount ? "" : " infinite"),
         // Individual iterations are represented by setting the size of the
         // repeating linear-gradient.
+        // The background-size, background-position, background-repeat represent
+        // iterationCount and iterationStart.
         "style": `left:${x}%;
                   width:${iterationW}%;
-                  background-size:${100 / (state.iterationCount || 1)}% 100%;`
+                  background-size:${backgroundIterations.size}% 100%;
+                  background-position:${backgroundIterations.position}% 0;
+                  background-repeat:${backgroundIterations.repeat};`
       }
     });
 
     // The animation name is displayed over the iterations.
-    // Note that in case of negative delay, we push the name towards the right
-    // so the delay can be shown.
+    // Note that in case of negative delay, it is pushed towards the right so
+    // the delay element does not overlap.
     createNode({
-      parent: iterations,
-      attributes: {
-        "class": "name",
-        "title": this.getTooltipText(state),
-        // Make space for the negative delay with a margin-left.
-        "style": `margin-left:${negativeDelayW}%`
-      },
+      parent: createNode({
+        parent: this.containerEl,
+        attributes: {
+          "class": "name",
+          "title": this.getTooltipText(state),
+          // Place the name at the same position as the iterations, but make
+          // space for the negative delay if any.
+          "style": `left:${x + negativeDelayW}%;
+                    width:${iterationW - negativeDelayW}%;`
+        },
+      }),
       textContent: state.name
     });
 
@@ -83,11 +98,23 @@ AnimationTimeBlock.prototype = {
     if (state.delay) {
       // Negative delays need to start at 0.
       createNode({
-        parent: iterations,
+        parent: this.containerEl,
         attributes: {
           "class": "delay" + (state.delay < 0 ? " negative" : ""),
-          "style": `left:-${delayX}%;
+          "style": `left:${delayX}%;
                     width:${delayW}%;`
+        }
+      });
+    }
+
+    // endDelay
+    if (state.endDelay) {
+      createNode({
+        parent: this.containerEl,
+        attributes: {
+          "class": "end-delay" + (state.endDelay < 0 ? " negative" : ""),
+          "style": `left:${endDelayX}%;
+                    width:${endDelayW}%;`
         }
       });
     }
@@ -104,20 +131,38 @@ AnimationTimeBlock.prototype = {
     text += "\n";
 
     // Adding the delay.
-    text += L10N.getStr("player.animationDelayLabel") + " ";
-    text += getTime(state.delay);
-    text += "\n";
+    if (state.delay) {
+      text += L10N.getStr("player.animationDelayLabel") + " ";
+      text += getTime(state.delay);
+      text += "\n";
+    }
 
     // Adding the duration.
     text += L10N.getStr("player.animationDurationLabel") + " ";
     text += getTime(state.duration);
     text += "\n";
 
+    // Adding the endDelay.
+    if (state.endDelay) {
+      text += L10N.getStr("player.animationEndDelayLabel") + " ";
+      text += getTime(state.endDelay);
+      text += "\n";
+    }
+
     // Adding the iteration count (the infinite symbol, or an integer).
     if (state.iterationCount !== 1) {
       text += L10N.getStr("player.animationIterationCountLabel") + " ";
       text += state.iterationCount ||
               L10N.getStr("player.infiniteIterationCountText");
+      text += "\n";
+    }
+
+    // Adding the iteration start.
+    if (state.iterationStart !== 0) {
+      let iterationStartTime = state.iterationStart * state.duration / 1000;
+      text += L10N.getFormatStr("player.animationIterationStartLabel",
+                                state.iterationStart,
+                                L10N.numberWithDecimals(iterationStartTime, 2));
       text += "\n";
     }
 
@@ -145,13 +190,24 @@ AnimationTimeBlock.prototype = {
 
 /**
  * Get a formatted title for this animation. This will be either:
- * "some-name", "some-name : CSS Transition", or "some-name : CSS Animation",
- * depending if the server provides the type, and what type it is.
+ * "some-name", "some-name : CSS Transition", "some-name : CSS Animation",
+ * "some-name : Script Animation", or "Script Animation", depending
+ * if the server provides the type, what type it is and if the animation
+ * has a name
  * @param {AnimationPlayerFront} animation
  */
 function getFormattedAnimationTitle({state}) {
-  // Older servers don't send the type.
-  return state.type
-    ? L10N.getFormatStr("timeline." + state.type + ".nameLabel", state.name)
-    : state.name;
+  // Older servers don't send a type, and only know about
+  // CSSAnimations and CSSTransitions, so it's safe to use
+  // just the name.
+  if (!state.type) {
+    return state.name;
+  }
+
+  // Script-generated animations may not have a name.
+  if (state.type === "scriptanimation" && !state.name) {
+    return L10N.getStr("timeline.scriptanimation.unnamedLabel");
+  }
+
+  return L10N.getFormatStr(`timeline.${state.type}.nameLabel`, state.name);
 }

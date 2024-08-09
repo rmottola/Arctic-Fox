@@ -9,7 +9,8 @@
 const Services = require("Services");
 const { Cc, Ci, Cu } = require("chrome");
 const { DebuggerServer, ActorPool } = require("devtools/server/main");
-const { EnvironmentActor, ThreadActor } = require("devtools/server/actors/script");
+const { EnvironmentActor } = require("devtools/server/actors/environment");
+const { ThreadActor } = require("devtools/server/actors/script");
 const { ObjectActor, LongStringActor, createValueGrip, stringIsLong } = require("devtools/server/actors/object");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 
@@ -281,6 +282,11 @@ WebConsoleActor.prototype =
   networkMonitor: null,
 
   /**
+   * The NetworkMonitor instance living in the same (child) process.
+   */
+  networkMonitorChild: null,
+
+  /**
    * The ConsoleProgressListener instance.
    */
   consoleProgressListener: null,
@@ -339,6 +345,10 @@ WebConsoleActor.prototype =
     if (this.networkMonitor) {
       this.networkMonitor.destroy();
       this.networkMonitor = null;
+    }
+    if (this.networkMonitorChild) {
+      this.networkMonitorChild.destroy();
+      this.networkMonitorChild = null;
     }
     if (this.consoleProgressListener) {
       this.consoleProgressListener.destroy();
@@ -584,14 +594,21 @@ WebConsoleActor.prototype =
         case "NetworkActivity":
           if (!this.networkMonitor) {
             if (appId || messageManager) {
+              // Start a network monitor in the parent process to listen to
+              // most requests than happen in parent
               this.networkMonitor =
                 new NetworkMonitorChild(appId, messageManager,
                                         this.parentActor.actorID, this);
+              this.networkMonitor.init();
+              // Spawn also one in the child to listen to service workers
+              this.networkMonitorChild = new NetworkMonitor({ window: window },
+                                                            this);
+              this.networkMonitorChild.init();
             }
             else {
               this.networkMonitor = new NetworkMonitor({ window: window }, this);
+              this.networkMonitor.init();
             }
-            this.networkMonitor.init();
           }
           startedListeners.push(listener);
           break;
@@ -674,6 +691,10 @@ WebConsoleActor.prototype =
             this.networkMonitor.destroy();
             this.networkMonitor = null;
           }
+          if (this.networkMonitorChild) {
+            this.networkMonitorChild.destroy();
+            this.networkMonitorChild = null;
+          }
           stoppedListeners.push(listener);
           break;
         case "FileActivity":
@@ -736,9 +757,20 @@ WebConsoleActor.prototype =
           if (!this.consoleAPIListener) {
             break;
           }
+
+          let requestStartTime = this.window ?
+            this.window.performance.timing.requestStart : 0;
+
           let cache = this.consoleAPIListener
                       .getCachedMessages(!this.parentActor.isRootActor);
           cache.forEach((aMessage) => {
+            // Filter out messages that came from a ServiceWorker but happened
+            // before the page was requested.
+            if (aMessage.innerID === "ServiceWorker" &&
+                requestStartTime > aMessage.timeStamp) {
+              return;
+            }
+
             let message = this.prepareConsoleMessageForRemote(aMessage);
             message._type = type;
             messages.push(message);
@@ -997,6 +1029,9 @@ WebConsoleActor.prototype =
       if (key == "NetworkMonitor.saveRequestAndResponseBodies" &&
           this.networkMonitor) {
         this.networkMonitor.saveRequestAndResponseBodies = this._prefs[key];
+        if (this.networkMonitorChild) {
+          this.networkMonitorChild.saveRequestAndResponseBodies = this._prefs[key];
+        }
       }
     }
     return { updated: Object.keys(aRequest.preferences) };
@@ -1351,6 +1386,7 @@ WebConsoleActor.prototype =
 
     return {
       errorMessage: this._createStringGrip(aPageError.errorMessage),
+      errorMessageName: aPageError.errorMessageName,
       sourceName: aPageError.sourceName,
       lineText: lineText,
       lineNumber: aPageError.lineNumber,
@@ -1740,6 +1776,7 @@ NetworkEventActor.prototype =
       method: this._request.method,
       isXHR: this._isXHR,
       fromCache: this._fromCache,
+      fromServiceWorker: this._fromServiceWorker,
       private: this._private,
     };
   },
@@ -1784,6 +1821,7 @@ NetworkEventActor.prototype =
     this._startedDateTime = aNetworkEvent.startedDateTime;
     this._isXHR = aNetworkEvent.isXHR;
     this._fromCache = aNetworkEvent.fromCache;
+    this._fromServiceWorker = aNetworkEvent.fromServiceWorker;
 
     for (let prop of ['method', 'url', 'httpVersion', 'headersSize']) {
       this._request[prop] = aNetworkEvent[prop];
@@ -2110,7 +2148,7 @@ NetworkEventActor.prototype =
       type: "networkEventUpdate",
       updateType: "responseContent",
       mimeType: aContent.mimeType,
-      contentSize: aContent.text.length,
+      contentSize: aContent.size,
       transferredSize: aContent.transferredSize,
       discardResponseBody: aDiscardedResponseBody,
     };

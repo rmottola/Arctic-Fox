@@ -1,14 +1,14 @@
 /* vim: set ts=2 et sw=2 tw=80: */
 /* Any copyright is dedicated to the Public Domain.
  http://creativecommons.org/publicdomain/zero/1.0/ */
-
+/* import-globals-from helper_attributes_test_runner.js */
 "use strict";
 
 // Test editing various markup-containers' attribute fields
 
 loadHelperScript("helper_attributes_test_runner.js");
 
-const TEST_URL = TEST_URL_ROOT + "doc_markup_edit.html";
+const TEST_URL = URL_ROOT + "doc_markup_edit.html";
 var TEST_DATA = [{
   desc: "Change an attribute",
   node: "#node1",
@@ -23,8 +23,8 @@ var TEST_DATA = [{
     class: "changednode1"
   }
 }, {
-  desc: 'Try changing an attribute to a quote (") - this should result ' +
-        'in it being set to an empty string',
+  desc: "Try changing an attribute to a quote (\") - this should result " +
+        "in it being set to an empty string",
   node: "#node22",
   originalAttributes: {
     id: "node22",
@@ -63,6 +63,6 @@ var TEST_DATA = [{
 }];
 
 add_task(function*() {
-  let {inspector} = yield addTab(TEST_URL).then(openInspector);
-  yield runEditAttributesTests(TEST_DATA, inspector);
+  let {inspector, testActor} = yield openInspectorForURL(TEST_URL);
+  yield runEditAttributesTests(TEST_DATA, inspector, testActor);
 });

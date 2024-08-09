@@ -25,8 +25,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "DirectoryLinksProvider",
 XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
                                   "resource://gre/modules/NewTabUtils.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "NewTabPrefsProvider",
-                                  "resource:///modules/NewTabPrefsProvider.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabMessages",
+                                  "resource:///modules/NewTabMessages.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
                                   "resource://gre/modules/AddonManager.jsm");
@@ -91,20 +91,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "Feeds",
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
                                   "resource://gre/modules/LoginManagerParent.jsm");
 
-XPCOMUtils.defineLazyGetter(this, "gBrandBundle", function() {
-  return Services.strings.createBundle('chrome://branding/locale/brand.properties');
-});
-
-XPCOMUtils.defineLazyGetter(this, "gBrowserBundle", function() {
-  return Services.strings.createBundle('chrome://browser/locale/browser.properties');
-});
-
-XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
-                                  "resource:///modules/FormValidationHandler.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "AddonWatcher",
-                                  "resource://gre/modules/AddonWatcher.jsm");
-
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
                                   "resource:///modules/sessionstore/SessionStore.jsm");
 
@@ -135,8 +121,23 @@ if (AppConstants.MOZ_CRASHREPORTER) {
                                     "resource:///modules/ContentCrashHandlers.jsm");
 }
 
+XPCOMUtils.defineLazyGetter(this, "gBrandBundle", function() {
+  return Services.strings.createBundle('chrome://branding/locale/brand.properties');
+});
+
+XPCOMUtils.defineLazyGetter(this, "gBrowserBundle", function() {
+  return Services.strings.createBundle('chrome://browser/locale/browser.properties');
+});
+
+
+XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
+                                  "resource:///modules/FormValidationHandler.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",
                                   "resource:///modules/ReaderParent.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "AddonWatcher",
+                                  "resource://gre/modules/AddonWatcher.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
                                   "resource://gre/modules/LightweightThemeManager.jsm");
@@ -530,21 +531,23 @@ BrowserGlue.prototype = {
       os.addObserver(this, AddonWatcher.TOPIC_SLOW_ADDON_DETECTED, false);
     }
 
-    ExtensionManagement.registerScript("chrome://browser/content/ext-utils.js");
+    ExtensionManagement.registerScript("chrome://browser/content/ext-bookmarks.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-browserAction.js");
-    ExtensionManagement.registerScript("chrome://browser/content/ext-pageAction.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-commands.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-contextMenus.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-desktop-runtime.js");
+    ExtensionManagement.registerScript("chrome://browser/content/ext-history.js");
+    ExtensionManagement.registerScript("chrome://browser/content/ext-pageAction.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-tabs.js");
+    ExtensionManagement.registerScript("chrome://browser/content/ext-utils.js");
     ExtensionManagement.registerScript("chrome://browser/content/ext-windows.js");
-    ExtensionManagement.registerScript("chrome://browser/content/ext-bookmarks.js");
 
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/bookmarks.json");
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/browser_action.json");
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/commands.json");
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/context_menus.json");
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/context_menus_internal.json");
+    ExtensionManagement.registerSchema("chrome://browser/content/schemas/history.json");
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/page_action.json");
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/tabs.json");
     ExtensionManagement.registerSchema("chrome://browser/content/schemas/windows.json");
@@ -583,6 +586,9 @@ BrowserGlue.prototype = {
       os.removeObserver(this, "places-shutdown");
     os.removeObserver(this, "handle-xul-text-link");
     os.removeObserver(this, "profile-before-change");
+    if (AppConstants.MOZ_TELEMETRY_REPORTING) {
+      os.removeObserver(this, "keyword-search");
+    }
     os.removeObserver(this, "browser-search-engine-modified");
     os.removeObserver(this, "flash-plugin-hang");
     os.removeObserver(this, "xpi-signature-changed");
@@ -701,7 +707,8 @@ BrowserGlue.prototype = {
     NewTabUtils.init();
     NewTabUtils.links.addProvider(DirectoryLinksProvider);
     AboutNewTab.init();
-    NewTabPrefsProvider.prefs.init();
+
+    NewTabMessages.init();
 
     SessionStore.init();
     BrowserUITelemetry.init();
@@ -979,7 +986,8 @@ BrowserGlue.prototype = {
   _onProfileShutdown: function BG__onProfileShutdown() {
     UserAgentOverrides.uninit();
 
-    NewTabPrefsProvider.prefs.uninit();
+    NewTabMessages.uninit();
+
     AboutNewTab.uninit();
     webrtcUI.uninit();
     FormValidationHandler.uninit();
@@ -1159,7 +1167,8 @@ BrowserGlue.prototype = {
     if (AppConstants.E10S_TESTING_ONLY) {
       E10SUINotification.checkStatus();
     }
-    if (AppConstants.platform == "win") {
+    if (AppConstants.platform == "win" ||
+        AppConstants.platform == "macosx") {
       // Handles prompting to inform about incompatibilites when accessibility
       // and e10s are active together.
       E10SAccessibilityCheck.init();

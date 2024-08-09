@@ -552,6 +552,14 @@ SpecialPowersAPI.prototype = {
     return this.wrap(chromeScript);
   },
 
+  importInMainProcess: function (importString) {
+    var message = this._sendSyncMessage("SPImportInMainProcess", importString)[0];
+    if (message.hadError) {
+      throw "SpecialPowers.importInMainProcess failed with error " + message.errorMessage;
+    }
+    return;
+  },
+
   get Services() {
     return wrapPrivileged(Services);
   },
@@ -1145,6 +1153,9 @@ SpecialPowersAPI.prototype = {
       let uri = aMessage.json.uri;
       Services.obs.notifyObservers(null, "specialpowers-http-notify-request", uri);
     },
+    "specialpowers-browser-fullZoom:zoomReset": function() {
+      Services.obs.notifyObservers(null, "specialpowers-browser-fullZoom:zoomReset", null);
+    },
   },
 
   _addObserverProxy: function(notification) {
@@ -1152,7 +1163,6 @@ SpecialPowersAPI.prototype = {
       this._addMessageListener(notification, this._proxiedObservers[notification]);
     }
   },
-
   _removeObserverProxy: function(notification) {
     if (notification in this._proxiedObservers) {
       this._removeMessageListener(notification, this._proxiedObservers[notification]);
@@ -1860,15 +1870,20 @@ SpecialPowersAPI.prototype = {
     ext = Cu.waiveXrays(ext);
 
     let sp = this;
+    let state = "uninitialized";
     let extension = {
       id,
 
+      get state() { return state; },
+
       startup() {
+        state = "pending";
         sp._sendAsyncMessage("SPStartupExtension", {id});
         return startupPromise;
       },
 
       unload() {
+        state = "unloading";
         sp._sendAsyncMessage("SPUnloadExtension", {id});
         return unloadPromise;
       },
@@ -1883,11 +1898,14 @@ SpecialPowersAPI.prototype = {
     let listener = (msg) => {
       if (msg.data.id == id) {
         if (msg.data.type == "extensionStarted") {
+          state = "running";
           resolveStartup();
         } else if (msg.data.type == "extensionFailed") {
+          state = "failed";
           rejectStartup("startup failed");
         } else if (msg.data.type == "extensionUnloaded") {
           this._removeMessageListener("SPExtensionMessage", listener);
+          state = "unloaded";
           resolveUnload();
         } else if (msg.data.type in handler) {
           handler[msg.data.type](...msg.data.args);

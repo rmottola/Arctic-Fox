@@ -183,7 +183,7 @@ nsTreeBodyFrame::Init(nsIContent*       aContent,
 }
 
 nsSize
-nsTreeBodyFrame::GetMinSize(nsBoxLayoutState& aBoxLayoutState)
+nsTreeBodyFrame::GetXULMinSize(nsBoxLayoutState& aBoxLayoutState)
 {
   EnsureView();
 
@@ -226,7 +226,7 @@ nsTreeBodyFrame::GetMinSize(nsBoxLayoutState& aBoxLayoutState)
 
   AddBorderAndPadding(min);
   bool widthSet, heightSet;
-  nsIFrame::AddCSSMinSize(aBoxLayoutState, this, min, widthSet, heightSet);
+  nsIFrame::AddXULMinSize(aBoxLayoutState, this, min, widthSet, heightSet);
 
   return min;
 }
@@ -404,14 +404,14 @@ nsTreeBodyFrame::ManageReflowCallback(const nsRect& aRect, nscoord aHorzWidth)
 }
 
 void
-nsTreeBodyFrame::SetBounds(nsBoxLayoutState& aBoxLayoutState, const nsRect& aRect,
-                           bool aRemoveOverflowArea)
+nsTreeBodyFrame::SetXULBounds(nsBoxLayoutState& aBoxLayoutState, const nsRect& aRect,
+                              bool aRemoveOverflowArea)
 {
   nscoord horzWidth = CalcHorzWidth(GetScrollParts());
   ManageReflowCallback(aRect, horzWidth);
   mHorzWidth = horzWidth;
 
-  nsLeafBoxFrame::SetBounds(aBoxLayoutState, aRect, aRemoveOverflowArea);
+  nsLeafBoxFrame::SetXULBounds(aBoxLayoutState, aRect, aRemoveOverflowArea);
 }
 
 
@@ -802,7 +802,7 @@ FindScrollParts(nsIFrame* aCurrFrame, nsTreeBodyFrame::ScrollParts* aResult)
   
   nsScrollbarFrame *sf = do_QueryFrame(aCurrFrame);
   if (sf) {
-    if (!aCurrFrame->IsHorizontal()) {
+    if (!aCurrFrame->IsXULHorizontal()) {
       if (!aResult->mVScrollbar) {
         aResult->mVScrollbar = sf;
       }
@@ -919,7 +919,7 @@ nsTreeBodyFrame::CheckOverflow(const ScrollParts& aParts)
     InternalScrollPortEvent event(true,
       mVerticalOverflow ? eScrollPortOverflow : eScrollPortUnderflow,
       nullptr);
-    event.orient = InternalScrollPortEvent::vertical;
+    event.mOrient = InternalScrollPortEvent::eVertical;
     EventDispatcher::Dispatch(content, presContext, &event);
   }
 
@@ -927,7 +927,7 @@ nsTreeBodyFrame::CheckOverflow(const ScrollParts& aParts)
     InternalScrollPortEvent event(true,
       mHorizontalOverflow ? eScrollPortOverflow : eScrollPortUnderflow,
       nullptr);
-    event.orient = InternalScrollPortEvent::horizontal;
+    event.mOrient = InternalScrollPortEvent::eHorizontal;
     EventDispatcher::Dispatch(content, presContext, &event);
   }
 
@@ -1190,7 +1190,7 @@ nsTreeBodyFrame::GetCoordsForCellItem(int32_t aRow, nsITreeColumn* aCol, const n
       nsRect twistyRect(cellRect);
       nsStyleContext* twistyContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreetwisty);
       GetTwistyRect(aRow, currCol, imageRect, twistyRect, presContext,
-                    rc, twistyContext);
+                    twistyContext);
 
       if (NS_LITERAL_CSTRING("twisty").Equals(aElement)) {
         // If we're looking for the twisty Rect, just return the size
@@ -1555,7 +1555,7 @@ nsTreeBodyFrame::GetItemWithinCellAt(nscoord aX, const nsRect& aCellRect,
 
     nsRect imageSize;
     GetTwistyRect(aRowIndex, aColumn, imageSize, twistyRect, presContext,
-                  rc, twistyContext);
+                  twistyContext);
 
     // We will treat a click as hitting the twisty if it happens on the margins, borders, padding,
     // or content of the twisty object.  By allowing a "slop" into the margin, we make it a little
@@ -1714,7 +1714,7 @@ nsTreeBodyFrame::GetCellWidth(int32_t aRow, nsTreeColumn* aCol,
     nsRect imageSize;
     nsRect twistyRect(cellRect);
     GetTwistyRect(aRow, aCol, imageSize, twistyRect, PresContext(),
-                  *aRenderingContext, twistyContext);
+                  twistyContext);
 
     // Add in the margins of the twisty element.
     nsMargin twistyMargin;
@@ -2058,7 +2058,6 @@ nsTreeBodyFrame::GetTwistyRect(int32_t aRowIndex,
                                nsRect& aImageRect,
                                nsRect& aTwistyRect,
                                nsPresContext* aPresContext,
-                               nsRenderingContext& aRenderingContext,
                                nsStyleContext* aTwistyContext)
 {
   // The twisty rect extends all the way to the end of the cell.  This is incorrect.  We need to
@@ -2192,6 +2191,7 @@ nsTreeBodyFrame::GetImage(int32_t aRowIndex, nsTreeColumn* aCol, bool aUseContex
       if (nsContentUtils::CanLoadImage(srcURI, mContent, doc,
                                        mContent->NodePrincipal())) {
         nsresult rv = nsContentUtils::LoadImage(srcURI,
+                                                mContent,
                                                 doc,
                                                 mContent->NodePrincipal(),
                                                 doc->GetDocumentURI(),
@@ -2552,8 +2552,9 @@ static uint32_t GetDropEffect(WidgetGUIEvent* aEvent)
   nsContentUtils::SetDataTransferInEvent(dragEvent);
 
   uint32_t action = 0;
-  if (dragEvent->dataTransfer)
-    dragEvent->dataTransfer->GetDropEffectInt(&action);
+  if (dragEvent->mDataTransfer) {
+    dragEvent->mDataTransfer->GetDropEffectInt(&action);
+  }
   return action;
 }
 
@@ -2692,7 +2693,7 @@ nsTreeBodyFrame::HandleEvent(nsPresContext* aPresContext,
         // The dataTransfer was initialized by the call to GetDropEffect above.
         bool canDropAtNewLocation = false;
         mView->CanDrop(mSlots->mDropRow, mSlots->mDropOrient,
-                       aEvent->AsDragEvent()->dataTransfer,
+                       aEvent->AsDragEvent()->mDataTransfer,
                        &canDropAtNewLocation);
 
         if (canDropAtNewLocation) {
@@ -2725,7 +2726,8 @@ nsTreeBodyFrame::HandleEvent(nsPresContext* aPresContext,
     WidgetDragEvent* dragEvent = aEvent->AsDragEvent();
     nsContentUtils::SetDataTransferInEvent(dragEvent);
 
-    mView->Drop(mSlots->mDropRow, mSlots->mDropOrient, dragEvent->dataTransfer);
+    mView->Drop(mSlots->mDropRow, mSlots->mDropOrient,
+                dragEvent->mDataTransfer);
     mSlots->mDropRow = -1;
     mSlots->mDropOrient = -1;
     mSlots->mIsDragging = false;
@@ -3257,7 +3259,7 @@ nsTreeBodyFrame::PaintCell(int32_t              aRowIndex,
       nsRect imageSize;
       nsRect twistyRect(aCellRect);
       GetTwistyRect(aRowIndex, aColumn, imageSize, twistyRect, aPresContext,
-                    aRenderingContext, twistyContext);
+                    twistyContext);
 
       nsMargin twistyMargin;
       twistyContext->StyleMargin()->GetMargin(twistyMargin);
@@ -3363,7 +3365,8 @@ nsTreeBodyFrame::PaintCell(int32_t              aRowIndex,
       switch (aColumn->GetType()) {
         case nsITreeColumn::TYPE_TEXT:
         case nsITreeColumn::TYPE_PASSWORD:
-          PaintText(aRowIndex, aColumn, elementRect, aPresContext, aRenderingContext, aDirtyRect, currX);
+          result &= PaintText(aRowIndex, aColumn, elementRect, aPresContext,
+                              aRenderingContext, aDirtyRect, currX);
           break;
         case nsITreeColumn::TYPE_CHECKBOX:
           result &= PaintCheckbox(aRowIndex, aColumn, elementRect, aPresContext,
@@ -3381,7 +3384,8 @@ nsTreeBodyFrame::PaintCell(int32_t              aRowIndex,
               break;
             case nsITreeView::PROGRESS_NONE:
             default:
-              PaintText(aRowIndex, aColumn, elementRect, aPresContext, aRenderingContext, aDirtyRect, currX);
+              result &= PaintText(aRowIndex, aColumn, elementRect, aPresContext,
+                                  aRenderingContext, aDirtyRect, currX);
               break;
           }
           break;
@@ -3431,7 +3435,7 @@ nsTreeBodyFrame::PaintTwisty(int32_t              aRowIndex,
 
   nsRect imageSize;
   nsITheme* theme = GetTwistyRect(aRowIndex, aColumn, imageSize, twistyRect,
-                                  aPresContext, aRenderingContext, twistyContext);
+                                  aPresContext, twistyContext);
 
   // Subtract out the remaining width.  This is done even when we don't actually paint a twisty in 
   // this cell, so that cells in different rows still line up.
@@ -3513,7 +3517,7 @@ nsTreeBodyFrame::PaintImage(int32_t              aRowIndex,
   nsStyleContext* imageContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreeimage);
 
   // Obtain opacity value for the image.
-  float opacity = imageContext->StyleDisplay()->mOpacity;
+  float opacity = imageContext->StyleEffects()->mOpacity;
 
   // Obtain the margins for the image and then deflate our rect by that
   // amount.  The image is assumed to be contained within the deflated rect.
@@ -3606,26 +3610,44 @@ nsTreeBodyFrame::PaintImage(int32_t              aRowIndex,
     // Deflate destRect for the border and padding.
     destRect.Deflate(bp);
 
-    // Get the image source rectangle - the rectangle containing the part of
-    // the image that we are going to display.
-    // sourceRect will be passed as the aSrcRect argument in the DrawImage method.
-    nsRect sourceRect = GetImageSourceRect(imageContext, useImageRegion, image);
-
-    // Let's say that the image is 100 pixels tall and
-    // that the CSS has specified that the destination height should be 50
-    // pixels tall. Let's say that the cell height is only 20 pixels. So, in
-    // those 20 visible pixels, we want to see the top 20/50ths of the image.
-    // So, the sourceRect.height should be 100 * 20 / 50, which is 40 pixels.
-    // Essentially, we are scaling the image as dictated by the CSS destination
-    // height and width, and we are then clipping the scaled image by the cell
-    // width and height.
+    // Compute the area where our whole image would be mapped, to get the
+    // desired subregion onto our actual destRect:
+    nsRect wholeImageDest;
     CSSIntSize rawImageCSSIntSize;
-    image->GetWidth(&rawImageCSSIntSize.width);
-    image->GetHeight(&rawImageCSSIntSize.height);
-    nsSize rawImageSize(CSSPixel::ToAppUnits(rawImageCSSIntSize));
-    nsRect wholeImageDest =
-      nsLayoutUtils::GetWholeImageDestination(rawImageSize, sourceRect,
-          nsRect(destRect.TopLeft(), imageDestSize));
+    if (NS_SUCCEEDED(image->GetWidth(&rawImageCSSIntSize.width)) &&
+        NS_SUCCEEDED(image->GetHeight(&rawImageCSSIntSize.height))) {
+      // Get the image source rectangle - the rectangle containing the part of
+      // the image that we are going to display.  sourceRect will be passed as
+      // the aSrcRect argument in the DrawImage method.
+      nsRect sourceRect = GetImageSourceRect(imageContext, useImageRegion, image);
+
+      // Let's say that the image is 100 pixels tall and that the CSS has
+      // specified that the destination height should be 50 pixels tall. Let's
+      // say that the cell height is only 20 pixels. So, in those 20 visible
+      // pixels, we want to see the top 20/50ths of the image.  So, the
+      // sourceRect.height should be 100 * 20 / 50, which is 40 pixels.
+      // Essentially, we are scaling the image as dictated by the CSS
+      // destination height and width, and we are then clipping the scaled
+      // image by the cell width and height.
+      nsSize rawImageSize(CSSPixel::ToAppUnits(rawImageCSSIntSize));
+      wholeImageDest =
+        nsLayoutUtils::GetWholeImageDestination(rawImageSize, sourceRect,
+                                                nsRect(destRect.TopLeft(),
+                                                       imageDestSize));
+    } else {
+      // GetWidth/GetHeight failed, so we can't easily map a subregion of the
+      // source image onto the destination area.
+      // * If this happens with a RasterImage, it probably means the image is
+      // in an error state, and we shouldn't draw anything. Hence, we leave
+      // wholeImageDest as an empty rect (its initial state).
+      // * If this happens with a VectorImage, it probably means the image has
+      // no explicit width or height attribute -- but we can still proceed and
+      // just treat the destination area as our whole SVG image area. Hence, we
+      // set wholeImageDest to the full destRect.
+      if (image->GetType() == imgIContainer::TYPE_VECTOR) {
+        wholeImageDest = destRect;
+      }
+    }
 
     gfxContext* ctx = aRenderingContext.ThebesContext();
     if (opacity != 1.0f) {
@@ -3653,7 +3675,7 @@ nsTreeBodyFrame::PaintImage(int32_t              aRowIndex,
   return result;
 }
 
-void
+DrawResult
 nsTreeBodyFrame::PaintText(int32_t              aRowIndex,
                            nsTreeColumn*        aColumn,
                            const nsRect&        aTextRect,
@@ -3678,8 +3700,12 @@ nsTreeBodyFrame::PaintText(int32_t              aRowIndex,
   // necessary
   CheckTextForBidi(text);
 
-  if (text.Length() == 0)
-    return; // Don't paint an empty string. XXX What about background/borders? Still paint?
+  DrawResult result = DrawResult::SUCCESS;
+
+  if (text.Length() == 0) {
+    // Don't paint an empty string. XXX What about background/borders? Still paint?
+    return result;
+  }
 
   int32_t appUnitsPerDevPixel = PresContext()->AppUnitsPerDevPixel();
   DrawTarget* drawTarget = aRenderingContext.GetDrawTarget();
@@ -3689,7 +3715,7 @@ nsTreeBodyFrame::PaintText(int32_t              aRowIndex,
   nsStyleContext* textContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreecelltext);
 
   // Obtain opacity value for the image.
-  float opacity = textContext->StyleDisplay()->mOpacity;
+  float opacity = textContext->StyleEffects()->mOpacity;
 
   // Obtain the margins for the text and then deflate our rect by that 
   // amount.  The text is assumed to be contained within the deflated rect.
@@ -3724,7 +3750,8 @@ nsTreeBodyFrame::PaintText(int32_t              aRowIndex,
   if (!isRTL)
     aCurrX += textRect.width + textMargin.LeftRight();
 
-  PaintBackgroundLayer(textContext, aPresContext, aRenderingContext, textRect, aDirtyRect);
+  result &= PaintBackgroundLayer(textContext, aPresContext, aRenderingContext,
+                                 textRect, aDirtyRect);
 
   // Time to paint our text.
   textRect.Deflate(bp);
@@ -3778,6 +3805,7 @@ nsTreeBodyFrame::PaintText(int32_t              aRowIndex,
     ctx->PopGroupAndBlend();
   }
 
+  return result;
 }
 
 DrawResult
@@ -4011,8 +4039,8 @@ nsTreeBodyFrame::PaintDropFeedback(const nsRect&        aDropFeedbackRect,
       nsStyleContext* twistyContext = GetPseudoStyleContext(nsCSSAnonBoxes::moztreetwisty);
       nsRect imageSize;
       nsRect twistyRect;
-      GetTwistyRect(mSlots->mDropRow, primaryCol, imageSize, twistyRect, aPresContext,
-                    aRenderingContext, twistyContext);
+      GetTwistyRect(mSlots->mDropRow, primaryCol, imageSize, twistyRect,
+                    aPresContext, twistyContext);
       nsMargin twistyMargin;
       twistyContext->StyleMargin()->GetMargin(twistyMargin);
       twistyRect.Inflate(twistyMargin);
@@ -4335,7 +4363,7 @@ nsTreeBodyFrame::RepeatButtonScroll(nsScrollbarFrame* aScrollbar)
   } else if (increment > 0) {
     direction = 1;
   }
-  bool isHorizontal = aScrollbar->IsHorizontal();
+  bool isHorizontal = aScrollbar->IsXULHorizontal();
 
   nsWeakFrame weakFrame(this);
   if (isHorizontal) {

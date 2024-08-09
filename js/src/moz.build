@@ -33,7 +33,7 @@ with Files('jit/**'):
 for gcfile in ['jsgc*', 'devtools/rootAnalysis', 'devtools/gc-ubench', 'devtools/gctrace']:
     with Files(gcfile):
         BUG_COMPONENT = component_gc
-for header in ('GCAnnotations.h', 'GCAPI.h', 'HeapAPI.h', 'RootingAPI.h', 'SliceBudget.h', 'TraceKind.h', 'TracingAPI.h', 'WeakMapPtr.h'):
+for header in ('GCAnnotations.h', 'GCAPI.h', 'HeapAPI.h', 'RootingAPI.h', 'SliceBudget.h', 'SweepingAPI.h', 'TraceKind.h', 'TracingAPI.h', 'WeakMapPtr.h'):
     with Files('../public/' + header):
         BUG_COMPONENT = component_gc
 
@@ -77,10 +77,16 @@ CONFIGURE_DEFINE_FILES += [
     'js-config.h',
 ]
 
+if CONFIG['HAVE_DTRACE']:
+    GENERATED_FILES += ['javascript-trace.h']
+
+    EXPORTS += ['!javascript-trace.h']
+
 # Changes to internal header files, used externally, massively slow down
 # browser builds.  Don't add new files here unless you know what you're
 # doing!
 EXPORTS += [
+    '!js-config.h',
     'js.msg',
     'jsalloc.h',
     'jsapi.h',
@@ -128,6 +134,7 @@ EXPORTS.js += [
     '../public/RootingAPI.h',
     '../public/SliceBudget.h',
     '../public/StructuredClone.h',
+    '../public/SweepingAPI.h',
     '../public/TraceKind.h',
     '../public/TracingAPI.h',
     '../public/TrackedOptimizationInfo.h',
@@ -165,6 +172,7 @@ UNIFIED_SOURCES += [
     'builtin/ModuleObject.cpp',
     'builtin/Object.cpp',
     'builtin/Profilers.cpp',
+    'builtin/Promise.cpp',
     'builtin/Reflect.cpp',
     'builtin/ReflectParse.cpp',
     'builtin/SIMD.cpp',
@@ -609,11 +617,20 @@ if CONFIG['JS_HAS_CTYPES']:
     ]
 
 if CONFIG['ENABLE_INTL_API']:
-    USE_LIBS += [
-        'icu',
-    ]
+    if not CONFIG['MOZ_ICU_DATA_ARCHIVE']:
+        USE_LIBS += [
+            'icu',
+        ]
+    else:
+        # Linking 'icu' will pull in the stubdata library,
+        # which the shell doesn't want, so link the other bits.
+        USE_LIBS += [
+            'icui18n',
+            'icuuc',
+        ]
 
 USE_LIBS += [
+    'fdlibm',
     'nspr',
     'zlib',
 ]
@@ -663,12 +680,12 @@ if CONFIG['_MSC_VER']:
     CXXFLAGS += ['-wd4661']
     CXXFLAGS += ['-we4067', '-we4258', '-we4275']
     CXXFLAGS += ['-wd4146'] # FIXME: unary minus operator applied to unsigned type (bug 1229189)
-    CXXFLAGS += ['-wd4273'] # FIXME: inconsistent dll linkage (bug 1229666)
 
     # This is intended as a temporary hack to support building with VS2015.
     # 'noexcept' used with no exception handling mode specified;
     # termination on exception is not guaranteed. Specify /EHsc
     CXXFLAGS += ['-wd4577']
+    CXXFLAGS += ['-wd4312']
 
 if CONFIG['OS_ARCH'] not in ('WINNT', 'HP-UX'):
     OS_LIBS += [
@@ -725,6 +742,8 @@ selfhosted.inputs = [
     'builtin/Object.js',
     'builtin/Reflect.js',
     'builtin/RegExp.js',
+    'builtin/RegExpGlobalReplaceOpt.h.js',
+    'builtin/RegExpLocalReplaceOpt.h.js',
     'builtin/String.js',
     'builtin/Set.js',
     'builtin/Sorting.js',
@@ -732,6 +751,9 @@ selfhosted.inputs = [
     'builtin/TypedObject.js',
     'builtin/WeakSet.js'
 ]
+
+if CONFIG['SPIDERMONKEY_PROMISE']:
+    selfhosted.inputs += ['builtin/Promise.js']
 
 if CONFIG['JS_HAS_CTYPES']:
     if CONFIG['MOZ_SYSTEM_FFI']:

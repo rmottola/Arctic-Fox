@@ -29,8 +29,10 @@
 #include "nsIInterfaceRequestor.h"
 #include "nsIInterfaceRequestorUtils.h"
 #include "nsILoadContext.h"
+#include "nsITextControlFrame.h"
 #include "nsUnicharUtils.h"
 #include "nsContentList.h"
+#include "nsCSSPseudoElements.h"
 #include "nsIObserver.h"
 #include "nsIBaseWindow.h"
 #include "mozilla/css/Loader.h"
@@ -198,7 +200,9 @@
 #include "imgRequestProxy.h"
 #include "nsWrapperCacheInlines.h"
 #include "nsSandboxFlags.h"
+#include "nsIAddonPolicyService.h"
 #include "nsIAppsService.h"
+#include "mozilla/dom/AnimatableBinding.h"
 #include "mozilla/dom/AnonymousContent.h"
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/DocumentFragment.h"
@@ -252,9 +256,7 @@
 
 #include "nsISpeculativeConnect.h"
 
-#ifdef MOZ_MEDIA_NAVIGATOR
 #include "mozilla/MediaManager.h"
-#endif // MOZ_MEDIA_NAVIGATOR
 #ifdef MOZ_WEBRTC
 #include "IPeerConnection.h"
 #endif // MOZ_WEBRTC
@@ -1457,7 +1459,7 @@ nsIDocument::nsIDocument()
 {
   SetInDocument();
 
-  PR_INIT_CLIST(&mDOMMediaQueryLists);  
+  PR_INIT_CLIST(&mDOMMediaQueryLists);
 }
 
 // NOTE! nsDocument::operator new() zeroes out all members, so don't
@@ -1677,11 +1679,6 @@ nsDocument::~nsDocument()
   mImageTracker.Clear();
 
   mPlugins.Clear();
-
-  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
-  if (os) {
-    os->RemoveObserver(this, "service-worker-get-client");
-  }
 }
 
 NS_INTERFACE_TABLE_HEAD(nsDocument)
@@ -2082,11 +2079,6 @@ nsDocument::Init()
   mScriptLoader = new nsScriptLoader(this);
 
   mozilla::HoldJSObjects(this);
-
-  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
-  if (os) {
-    os->AddObserver(this, "service-worker-get-client", /* ownsWeak */ true);
-  }
 
   return NS_OK;
 }
@@ -2813,12 +2805,18 @@ nsDocument::InitCSP(nsIChannel* aChannel)
     }
   }
 
- // Check if this is part of the Loop/Hello service
- bool applyLoopCSP = IsLoopDocument(aChannel);
+  // Check if this is a document from a WebExtension.
+  nsString addonId;
+  principal->GetAddonId(addonId);
+  bool applyAddonCSP = !addonId.IsEmpty();
+
+  // Check if this is part of the Loop/Hello service
+  bool applyLoopCSP = IsLoopDocument(aChannel);
 
   // If there's no CSP to apply, go ahead and return early
   if (!applyAppDefaultCSP &&
       !applyAppManifestCSP &&
+      !applyAddonCSP &&
       !applyLoopCSP &&
       cspHeaderValue.IsEmpty() &&
       cspROHeaderValue.IsEmpty()) {
@@ -2874,6 +2872,22 @@ nsDocument::InitCSP(nsIChannel* aChannel)
   // ----- if the doc is an app and specifies a CSP in its manifest, apply it.
   if (applyAppManifestCSP) {
     csp->AppendPolicy(appManifestCSP, false, false);
+  }
+
+  // ----- if the doc is an addon, apply its CSP.
+  if (applyAddonCSP) {
+    nsCOMPtr<nsIAddonPolicyService> aps = do_GetService("@mozilla.org/addons/policy-service;1");
+
+    nsAutoString addonCSP;
+    rv = aps->GetBaseCSP(addonCSP);
+    if (NS_SUCCEEDED(rv)) {
+      csp->AppendPolicy(addonCSP, false, false);
+    }
+
+    rv = aps->GetAddonCSP(addonId, addonCSP);
+    if (NS_SUCCEEDED(rv)) {
+      csp->AppendPolicy(addonCSP, false, false);
+    }
   }
 
   // ----- if the doc is part of Loop, apply the loop CSP
@@ -3177,6 +3191,16 @@ nsDocument::GetUndoManager()
 }
 
 bool
+nsDocument::IsElementAnimateEnabled(JSContext* /*unused*/, JSObject* /*unused*/)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  return nsContentUtils::IsCallerChrome() ||
+         Preferences::GetBool("dom.animations-api.core.enabled") ||
+         Preferences::GetBool("dom.animations-api.element-animate.enabled");
+}
+
+bool
 nsDocument::IsWebAnimationsEnabled(JSContext* /*unused*/, JSObject* /*unused*/)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -3198,27 +3222,13 @@ nsDocument::Timeline()
 void
 nsDocument::GetAnimations(nsTArray<RefPtr<Animation>>& aAnimations)
 {
-  FlushPendingNotifications(Flush_Style);
-
-  // Bug 1174575: Until we implement a suitable PseudoElement interface we
-  // don't have anything to return for the |target| attribute of
-  // KeyframeEffect(ReadOnly) objects that refer to pseudo-elements.
-  // Rather than return some half-baked version of these objects (e.g.
-  // we a null effect attribute) we simply don't provide access to animations
-  // whose effect refers to a pseudo-element until we can support them
-  // properly.
-  for (nsIContent* node = nsINode::GetFirstChild();
-       node;
-       node = node->GetNextNode(this)) {
-    if (!node->IsElement()) {
-      continue;
-    }
-
-    node->AsElement()->GetAnimationsUnsorted(aAnimations);
+  Element* root = GetRootElement();
+  if (!root) {
+    return;
   }
-
-  // Sort animations by priority
-  aAnimations.Sort(AnimationPtrComparator<RefPtr<Animation>>());
+  AnimationFilter filter;
+  filter.mSubtree = true;
+  root->GetAnimations(filter, aAnimations);
 }
 
 /* Return true if the document is in the focused top-level window, and is an
@@ -4646,6 +4656,48 @@ nsDocument::SetScriptGlobalObject(nsIScriptGlobalObject *aScriptGlobalObject)
         loadGroup->RemoveRequest(mOnloadBlocker, nullptr, NS_OK);
       }
     }
+
+    using mozilla::dom::workers::ServiceWorkerManager;
+    RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+    if (swm) {
+      ErrorResult error;
+      if (swm->IsControlled(this, error)) {
+        imgLoader* loader = nsContentUtils::GetImgLoaderForDocument(this);
+        if (loader) {
+          loader->ClearCacheForControlledDocument(this);
+        }
+
+        // We may become controlled again if this document comes back out
+        // of bfcache.  Clear our state to allow that to happen.  Only
+        // clear this flag if we are actually controlled, though, so pages
+        // that were force reloaded don't become controlled when they
+        // come out of bfcache.
+        mMaybeServiceWorkerControlled = false;
+      }
+      swm->MaybeStopControlling(this);
+    }
+
+    // Remove ourself from the list of clients.  We only register
+    // content principal documents in this list.
+    if (!nsContentUtils::IsSystemPrincipal(GetPrincipal()) &&
+        !GetPrincipal()->GetIsNullPrincipal()) {
+      nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+      if (os) {
+        os->RemoveObserver(this, "service-worker-get-client");
+      }
+    }
+
+  } else if (!mScriptGlobalObject && aScriptGlobalObject &&
+             mDocumentContainer && GetChannel() &&
+             !nsContentUtils::IsSystemPrincipal(GetPrincipal()) &&
+             !GetPrincipal()->GetIsNullPrincipal()) {
+    // This document is being activated.  Register it in the list of
+    // clients.  We only do this for content principal documents
+    // since we can never observe system or null principals.
+    nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+    if (os) {
+      os->AddObserver(this, "service-worker-get-client", /* ownsWeak */ false);
+    }
   }
 
   // BlockOnload() might be called before mScriptGlobalObject is set.
@@ -4759,8 +4811,13 @@ nsDocument::SetScriptGlobalObject(nsIScriptGlobalObject *aScriptGlobalObject)
 
     nsCOMPtr<nsIServiceWorkerManager> swm = mozilla::services::GetServiceWorkerManager();
     if (swm) {
-      nsAutoString documentId;
-      static_cast<nsDocShell*>(docShell.get())->GetInterceptedDocumentId(documentId);
+      // If this document is being resurrected from the bfcache, then we may
+      // already have a document ID.  In that case reuse the same ID.  Otherwise
+      // get our document ID from the docshell.
+      nsString documentId(GetId());
+      if (documentId.IsEmpty()) {
+        static_cast<nsDocShell*>(docShell.get())->GetInterceptedDocumentId(documentId);
+      }
 
       swm->MaybeStartControlling(this, documentId);
       mMaybeServiceWorkerControlled = true;
@@ -5505,7 +5562,7 @@ nsDocument::SetupCustomElement(Element* aElement,
 
   nsCOMPtr<nsIAtom> tagAtom = aElement->NodeInfo()->NameAtom();
   nsCOMPtr<nsIAtom> typeAtom = aTypeExtension ?
-    do_GetAtom(*aTypeExtension) : tagAtom;
+    NS_Atomize(*aTypeExtension) : tagAtom;
 
   if (aTypeExtension && !aElement->HasAttr(kNameSpaceID_None, nsGkAtoms::is)) {
     // Custom element setup in the parser happens after the "is"
@@ -5832,7 +5889,7 @@ nsDocument::CustomElementConstructor(JSContext* aCx, unsigned aArgc, JS::Value* 
     return true;
   }
 
-  nsCOMPtr<nsIAtom> typeAtom(do_GetAtom(elemName));
+  nsCOMPtr<nsIAtom> typeAtom(NS_Atomize(elemName));
   CustomElementHashKey key(kNameSpaceID_Unknown, typeAtom);
   CustomElementDefinition* definition;
   if (!document->mRegistry ||
@@ -6126,7 +6183,7 @@ nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
     lcName.Assign(aOptions.mExtends);
   }
 
-  nsCOMPtr<nsIAtom> typeAtom(do_GetAtom(lcType));
+  nsCOMPtr<nsIAtom> typeAtom(NS_Atomize(lcType));
   if (!nsContentUtils::IsCustomElementName(typeAtom)) {
     rv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
     return;
@@ -6247,7 +6304,7 @@ nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
     if (!lcName.IsEmpty()) {
       // Let BASE be the element interface for NAME and NAMESPACE.
       bool known = false;
-      nameAtom = do_GetAtom(lcName);
+      nameAtom = NS_Atomize(lcName);
       if (namespaceID == kNameSpaceID_XHTML) {
         nsIParserService* ps = nsContentUtils::GetParserService();
         if (!ps) {
@@ -6864,7 +6921,7 @@ nsIDocument::GetAnonymousElementByAttribute(Element& aElement,
                                             const nsAString& aAttrName,
                                             const nsAString& aAttrValue)
 {
-  nsCOMPtr<nsIAtom> attribute = do_GetAtom(aAttrName);
+  nsCOMPtr<nsIAtom> attribute = NS_Atomize(aAttrName);
 
   return GetAnonymousElementByAttribute(&aElement, attribute, aAttrValue);
 }
@@ -7789,7 +7846,7 @@ nsIDocument::AdoptNode(nsINode& aAdoptedNode, ErrorResult& rv)
         MOZ_ASSERT(idx >= 0);
         parent->RemoveChildAt(idx, true);
       } else {
-        MOZ_ASSERT(!adoptedNode->IsInDoc());
+        MOZ_ASSERT(!adoptedNode->IsInUncomposedDoc());
 
         // If we're adopting a node that's not in a document, it might still
         // have a binding applied. Remove the binding from the element now
@@ -8613,7 +8670,7 @@ nsDocument::RetrieveRelevantHeaders(nsIChannel *aChannel)
       rv =
         httpChannel->GetResponseHeader(nsDependentCString(*name), headerVal);
       if (NS_SUCCEEDED(rv) && !headerVal.IsEmpty()) {
-        nsCOMPtr<nsIAtom> key = do_GetAtom(*name);
+        nsCOMPtr<nsIAtom> key = NS_Atomize(*name);
         SetHeaderData(key, NS_ConvertASCIItoUTF16(headerVal));
       }
       ++name;
@@ -8834,13 +8891,11 @@ nsDocument::CanSavePresentation(nsIRequest *aNewRequest)
     }
   }
 
-#ifdef MOZ_MEDIA_NAVIGATOR
   // Check if we have active GetUserMedia use
   if (MediaManager::Exists() && win &&
       MediaManager::Get()->IsWindowStillActive(win->WindowID())) {
     return false;
   }
-#endif // MOZ_MEDIA_NAVIGATOR
 
 #ifdef MOZ_WEBRTC
   // Check if we have active PeerConnections
@@ -8897,6 +8952,7 @@ nsDocument::Destroy()
 
   mIsGoingAway = true;
 
+  SetScriptGlobalObject(nullptr);
   RemovedFromDocShell();
 
   bool oldVal = mInUnlinkOrDeletion;
@@ -8915,10 +8971,6 @@ nsDocument::Destroy()
   mExternalResourceMap.Shutdown();
 
   mRegistry = nullptr;
-
-  // XXX We really should let cycle collection do this, but that currently still
-  //     leaks (see https://bugzilla.mozilla.org/show_bug.cgi?id=406684).
-  ReleaseWrapper(static_cast<nsINode*>(this));
 }
 
 void
@@ -8926,19 +8978,6 @@ nsDocument::RemovedFromDocShell()
 {
   if (mRemovedFromDocShell)
     return;
-
-  using mozilla::dom::workers::ServiceWorkerManager;
-  RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
-  if (swm) {
-    ErrorResult error;
-    if (swm->IsControlled(this, error)) {
-      imgLoader* loader = nsContentUtils::GetImgLoaderForDocument(this);
-      if (loader) {
-        loader->ClearCacheForControlledDocument(this);
-      }
-    }
-    swm->MaybeStopControlling(this);
-  }
 
   mRemovedFromDocShell = true;
   EnumerateActivityObservers(NotifyActivityChanged, nullptr);
@@ -9816,6 +9855,7 @@ nsDocument::MaybePreLoadImage(nsIURI* uri, const nsAString &aCrossOriginAttr,
   RefPtr<imgRequestProxy> request;
   nsresult rv =
     nsContentUtils::LoadImage(uri,
+                              static_cast<nsINode*>(this),
                               this,
                               NodePrincipal(),
                               mDocumentURI, // uri of document used as referrer
@@ -10819,10 +10859,8 @@ nsIDocument::CaretPositionFromPoint(float aX, float aY)
     nsIContent* nonanon = node->FindFirstNonChromeOnlyAccessContent();
     nsCOMPtr<nsIDOMHTMLInputElement> input = do_QueryInterface(nonanon);
     nsCOMPtr<nsIDOMHTMLTextAreaElement> textArea = do_QueryInterface(nonanon);
-    bool isText;
-    if (textArea || (input &&
-                     NS_SUCCEEDED(input->MozIsTextField(false, &isText)) &&
-                     isText)) {
+    nsITextControlFrame* textFrame = do_QueryFrame(nonanon->GetPrimaryFrame());
+    if (!!textFrame) {
       // If the anonymous content node has a child, then we need to make sure
       // that we get the appropriate child, as otherwise the offset may not be
       // correct when we construct a range for it.
@@ -11536,7 +11574,7 @@ nsDocument::FullScreenStackPop()
   // no longer in this document.
   while (!mFullScreenStack.IsEmpty()) {
     Element* element = FullScreenStackTop();
-    if (!element || !element->IsInDoc() || element->OwnerDoc() != this) {
+    if (!element || !element->IsInUncomposedDoc() || element->OwnerDoc() != this) {
       NS_ASSERTION(!element->IsFullScreenAncestor(),
                    "Should have already removed full-screen styles");
       uint32_t last = mFullScreenStack.Length() - 1;
@@ -11559,7 +11597,7 @@ nsDocument::FullScreenStackTop()
   uint32_t last = mFullScreenStack.Length() - 1;
   nsCOMPtr<Element> element(do_QueryReferent(mFullScreenStack[last]));
   NS_ASSERTION(element, "Should have full-screen element!");
-  NS_ASSERTION(element->IsInDoc(), "Full-screen element should be in doc");
+  NS_ASSERTION(element->IsInUncomposedDoc(), "Full-screen element should be in doc");
   NS_ASSERTION(element->OwnerDoc() == this, "Full-screen element should be in this doc");
   return element;
 }
@@ -11695,7 +11733,7 @@ nsDocument::FullscreenElementReadyCheck(Element* aElement,
   if (!aElement || aElement == GetFullscreenElement()) {
     return false;
   }
-  if (!aElement->IsInDoc()) {
+  if (!aElement->IsInUncomposedDoc()) {
     DispatchFullscreenError("FullscreenDeniedNotInDocument");
     return false;
   }
@@ -12417,11 +12455,18 @@ nsDocument::Observe(nsISupports *aSubject,
       OnAppThemeChanged();
     }
   } else if (strcmp("service-worker-get-client", aTopic) == 0) {
-    nsAutoString clientId;
-    GetOrCreateId(clientId);
+    // No need to generate the ID if it doesn't exist here.  The ID being
+    // requested must already be generated in order to passed in as
+    // aSubject.
+    nsString clientId = GetId();
     if (!clientId.IsEmpty() && clientId.Equals(aData)) {
       nsCOMPtr<nsISupportsInterfacePointer> ifptr = do_QueryInterface(aSubject);
       if (ifptr) {
+#ifdef DEBUG
+        nsCOMPtr<nsISupports> value;
+        MOZ_ALWAYS_SUCCEEDS(ifptr->GetData(getter_AddRefs(value)));
+        MOZ_ASSERT(!value);
+#endif
         ifptr->SetData(static_cast<nsIDocument*>(this));
         ifptr->SetDataIID(&NS_GET_IID(nsIDocument));
       }
@@ -12513,7 +12558,7 @@ nsDocument::ShouldLockPointer(Element* aElement, Element* aCurrentLock,
     return false;
   }
 
-  if (!aElement->IsInDoc()) {
+  if (!aElement->IsInUncomposedDoc()) {
     NS_WARNING("ShouldLockPointer(): Element without Document");
     return false;
   }
@@ -12560,49 +12605,37 @@ nsDocument::ShouldLockPointer(Element* aElement, Element* aCurrentLock,
 bool
 nsDocument::SetPointerLock(Element* aElement, int aCursorStyle)
 {
-  // NOTE: aElement will be nullptr when unlocking.
-  nsCOMPtr<nsPIDOMWindowOuter> window = GetWindow();
-  if (!window) {
-    NS_WARNING("SetPointerLock(): No Window");
-    return false;
+  MOZ_ASSERT(!aElement || aElement->OwnerDoc() == this,
+             "We should be either unlocking pointer (aElement is nullptr), "
+             "or locking pointer to an element in this document");
+#ifdef DEBUG
+  if (!aElement) {
+    nsCOMPtr<nsIDocument> pointerLockedDoc =
+      do_QueryReferent(EventStateManager::sPointerLockedDoc);
+    MOZ_ASSERT(pointerLockedDoc == this);
   }
+#endif
 
-  nsIDocShell *docShell = window->GetDocShell();
-  if (!docShell) {
-    NS_WARNING("SetPointerLock(): No DocShell (window already closed?)");
-    return false;
-  }
-
-  RefPtr<nsPresContext> presContext;
-  docShell->GetPresContext(getter_AddRefs(presContext));
-  if (!presContext) {
-    NS_WARNING("SetPointerLock(): Unable to get presContext in \
-                domWindow->GetDocShell()->GetPresContext()");
-    return false;
-  }
-
-  nsCOMPtr<nsIPresShell> shell = presContext->PresShell();
+  nsIPresShell* shell = GetShell();
   if (!shell) {
-    NS_WARNING("SetPointerLock(): Unable to find presContext->PresShell()");
+    NS_WARNING("SetPointerLock(): No PresShell");
+    return false;
+  }
+  nsPresContext* presContext = shell->GetPresContext();
+  if (!presContext) {
+    NS_WARNING("SetPointerLock(): Unable to get PresContext");
     return false;
   }
 
+  nsCOMPtr<nsIWidget> widget;
   nsIFrame* rootFrame = shell->GetRootFrame();
-  if (!rootFrame) {
-    NS_WARNING("SetPointerLock(): Unable to get root frame");
-    return false;
-  }
-
-  nsCOMPtr<nsIWidget> widget = rootFrame->GetNearestWidget();
-  if (!widget) {
-    NS_WARNING("SetPointerLock(): Unable to find widget in \
-                shell->GetRootFrame()->GetNearestWidget();");
-    return false;
-  }
-
-  if (aElement && (aElement->OwnerDoc() != this)) {
-    NS_WARNING("SetPointerLock(): Element not in this document.");
-    return false;
+  if (!NS_WARN_IF(!rootFrame)) {
+    widget = rootFrame->GetNearestWidget();
+    NS_WARN_IF_FALSE(widget, "SetPointerLock(): Unable to find widget "
+                     "in shell->GetRootFrame()->GetNearestWidget();");
+    if (aElement && !widget) {
+      return false;
+    }
   }
 
   // Hide the cursor and set pointer lock for future mouse events
@@ -13177,7 +13210,7 @@ nsDocument::ReportUseCounters()
     for (int32_t c = 0;
          c < eUseCounter_Count; ++c) {
       UseCounter uc = static_cast<UseCounter>(c);
-      
+
       Telemetry::ID id =
         static_cast<Telemetry::ID>(Telemetry::HistogramFirstUseCounter + uc * 2);
       bool value = GetUseCounter(uc);
@@ -13320,7 +13353,9 @@ nsIDocument::GetOrCreateId(nsAString& aId)
 void
 nsIDocument::SetId(const nsAString& aId)
 {
-  MOZ_ASSERT(mId.IsEmpty(), "Cannot set the document ID after we have one");
+  // The ID should only be set one time, but we may get the same value
+  // more than once if the document is controlled coming out of bfcache.
+  MOZ_ASSERT_IF(mId != aId, mId.IsEmpty());
   mId = aId;
 }
 

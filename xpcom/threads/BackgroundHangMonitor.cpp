@@ -29,7 +29,9 @@
 #include <algorithm>
 
 // Activate BHR only for one every BHR_BETA_MOD users.
-#define BHR_BETA_MOD 100;
+// This is now 100% of Beta population for the Beta 45/46 e10s A/B trials
+// It can be scaled back again in the future
+#define BHR_BETA_MOD 1;
 
 // Maximum depth of the call stack in the reported thread hangs. This value represents
 // the 99.9th percentile of the thread hangs stack depths reported by Telemetry.
@@ -338,9 +340,11 @@ BackgroundHangManager::RunMonitorThread()
       }
       recheckTimeout = std::min(recheckTimeout, nextRecheck - hangTime);
 
-      /* We wait for a quarter of the shortest timeout
-         value to give mIntervalNow enough granularity. */
-      waitTime = std::min(waitTime, currentThread->mTimeout / 4);
+      if (currentThread->mTimeout != PR_INTERVAL_NO_TIMEOUT) {
+        /* We wait for a quarter of the shortest timeout
+           value to give mIntervalNow enough granularity. */
+        waitTime = std::min(waitTime, currentThread->mTimeout / 4);
+      }
     }
   }
 

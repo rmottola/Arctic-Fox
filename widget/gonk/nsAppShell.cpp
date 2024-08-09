@@ -313,9 +313,9 @@ KeyEventDispatcher::DispatchKeyEventInternal(EventMessage aEventMessage)
         event.mKeyValue = mDOMPrintableKeyValue;
     }
     event.mCodeNameIndex = mDOMCodeNameIndex;
-    event.modifiers = getDOMModifiers(mData.metaState);
+    event.mModifiers = getDOMModifiers(mData.metaState);
     event.location = mDOMKeyLocation;
-    event.time = mData.timeMs;
+    event.mTime = mData.timeMs;
     return nsWindow::DispatchKeyInput(event);
 }
 

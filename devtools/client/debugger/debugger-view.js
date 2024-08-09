@@ -47,6 +47,13 @@ var constants = require('./content/constants');
  * Object defining the debugger view components.
  */
 var DebuggerView = {
+
+  /**
+   * This is attached so tests can change it without needing to load an
+   * actual large file in automation
+   */
+  LARGE_FILE_SIZE: 1048576, // 1 MB in bytes
+
   /**
    * Initializes the debugger view.
    *
@@ -93,6 +100,7 @@ var DebuggerView = {
       "breakpoint-enabled": this.addEditorBreakpoint,
       "breakpoint-disabled": this.removeEditorBreakpoint,
       "breakpoint-removed": this.removeEditorBreakpoint,
+      "breakpoint-condition-updated": this.renderEditorBreakpointCondition,
       "breakpoint-moved": ({ breakpoint, prevLocation }) => {
         const selectedSource = queries.getSelectedSource(getState());
         const { location } = breakpoint;
@@ -351,13 +359,13 @@ var DebuggerView = {
   },
 
   addEditorBreakpoint: function(breakpoint) {
-    const { location } = breakpoint;
+    const { location, condition } = breakpoint;
     const source = queries.getSelectedSource(this.controller.getState());
 
     if (source &&
        source.actor === location.actor &&
        !breakpoint.disabled) {
-      this.editor.addBreakpoint(location.line - 1);
+      this.editor.addBreakpoint(location.line - 1, condition);
     }
   },
 
@@ -367,6 +375,19 @@ var DebuggerView = {
 
     if (source && source.actor === location.actor) {
       this.editor.removeBreakpoint(location.line - 1);
+    }
+  },
+
+  renderEditorBreakpointCondition: function (breakpoint) {
+    const { location, condition } = breakpoint;
+    const source = queries.getSelectedSource(this.controller.getState());
+
+    if (source && source.actor === location.actor) {
+      if (condition) {
+        this.editor.setBreakpointCondition(location.line - 1);
+      } else {
+        this.editor.removeBreakpointCondition(location.line - 1);
+      }
     }
   },
 
@@ -486,8 +507,7 @@ var DebuggerView = {
       return;
     }
     else if (textInfo.error) {
-      let url = textInfo.error;
-      let msg = L10N.getFormatStr("errorLoadingText2", url);
+      let msg = L10N.getFormatStr("errorLoadingText2", textInfo.error);
       this._setEditorText(msg);
       Cu.reportError(msg);
       dumpn(msg);

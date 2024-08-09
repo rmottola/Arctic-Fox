@@ -190,7 +190,7 @@ a_name##tsd_boot0(void)							\
 	return (false);							\
 }									\
 a_attr void								\
-a_name##tsd_boot1()							\
+a_name##tsd_boot1(void)							\
 {									\
 									\
 	/* Do nothing. */						\
@@ -235,7 +235,7 @@ a_name##tsd_boot0(void)							\
 	return (false);							\
 }									\
 a_attr void								\
-a_name##tsd_boot1()							\
+a_name##tsd_boot1(void)							\
 {									\
 									\
 	/* Do nothing. */						\
@@ -345,7 +345,7 @@ a_name##tsd_boot0(void)							\
 	return (false);							\
 }									\
 a_attr void								\
-a_name##tsd_boot1()							\
+a_name##tsd_boot1(void)							\
 {									\
 	a_name##tsd_wrapper_t *wrapper;					\
 	wrapper = (a_name##tsd_wrapper_t *)				\
@@ -467,7 +467,7 @@ a_name##tsd_boot0(void)							\
 	return (false);							\
 }									\
 a_attr void								\
-a_name##tsd_boot1()							\
+a_name##tsd_boot1(void)							\
 {									\
 	a_name##tsd_wrapper_t *wrapper;					\
 	wrapper = (a_name##tsd_wrapper_t *)				\
@@ -537,9 +537,9 @@ struct tsd_init_head_s {
     O(thread_deallocated,	uint64_t)				\
     O(prof_tdata,		prof_tdata_t *)				\
     O(arena,			arena_t *)				\
-    O(arenas_cache,		arena_t **)				\
-    O(narenas_cache,		unsigned)				\
-    O(arenas_cache_bypass,	bool)					\
+    O(arenas_tdata,		arena_tdata_t *)			\
+    O(narenas_tdata,		unsigned)				\
+    O(arenas_tdata_bypass,	bool)					\
     O(tcache_enabled,		tcache_enabled_t)			\
     O(quarantine,		quarantine_t *)				\
 

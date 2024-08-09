@@ -77,7 +77,7 @@
                 return null;
 
               let jsm = "resource://gre/modules/RemoteWebProgress.jsm";
-              let { RemoteWebProgressManager } = Cu.import(jsm, {});
+              let { RemoteWebProgressManager } = Components.utils.import(jsm, {});
               this._remoteWebProgressManager = new RemoteWebProgressManager(this);
               this._remoteWebProgress = this._remoteWebProgressManager.topLevelWebProgress;
             }
@@ -97,7 +97,7 @@
               return null;
 
             let jsm = "resource://gre/modules/RemoteFinder.jsm";
-            let { RemoteFinder } = Cu.import(jsm, {});
+            let { RemoteFinder } = Components.utils.import(jsm, {});
             this._remoteFinder = new RemoteFinder(this);
           }
           return this._remoteFinder;
@@ -401,11 +401,22 @@
            Note: This overrides the destroy() method from browser.xml. -->
       <method name="destroy">
         <body><![CDATA[
+          // Make sure that any open select is closed.
+          if (this._selectParentHelper) {
+            let menulist = document.getElementById(this.getAttribute("selectmenulist"));
+            this._selectParentHelper.hide(menulist, this);
+          }
+
           if (this.mDestroyed)
             return;
           this.mDestroyed = true;
 
-          this.controllers.removeController(this._controller);
+          try {
+            this.controllers.removeController(this._controller);
+          } catch (ex) {
+            // This can fail when this browser element is not attached to a
+            // BrowserDOMWindow.
+          }
 
           if (!this.hasAttribute("disablehistory")) {
             let Services = Components.utils.import("resource://gre/modules/Services.jsm", {}).Services;
@@ -425,10 +436,9 @@
           switch (aMessage.name) {
             case "Browser:Init":
               this._outerWindowID = data.outerWindowID;
-              let result = {};
-              result.useGlobalHistory = !this.hasAttribute("disableglobalhistory");
-              result.initPopup = this.autoCompletePopup != null;
-              return result;
+              this.messageManager.sendAsyncMessage("Browser:InitReceived", {
+                initPopup: this.autoCompletePopup != null,
+              });
               break;
             case "DOMTitleChanged":
               this._contentTitle = data.title;
@@ -479,7 +489,7 @@
             case "Forms:HideDropDown": {
               if (this._selectParentHelper) {
                 let menulist = document.getElementById(this.getAttribute("selectmenulist"));
-                this._selectParentHelper.hide(menulist);
+                this._selectParentHelper.hide(menulist, this);
               }
               break;
             }
@@ -507,19 +517,7 @@
               return this._receiveMessage(aMessage);
               break;
           }
-        ]]></body>
-      </method>
-
-      <method name="observe">
-        <parameter name="aSubject"/>
-        <parameter name="aTopic"/>
-        <parameter name="aData"/>
-        <body><![CDATA[
-          if (aTopic == "ask-children-to-exit-fullscreen") {
-            if (aSubject == window.document) {
-              this.messageManager.sendAsyncMessage("DOMFullscreen:ChildrenMustExit");
-            }
-          }
+          return undefined;
         ]]></body>
       </method>
 
@@ -535,27 +533,6 @@
                                                    aEnabledLength, aEnabledCommands,
                                                    aDisabledLength, aDisabledCommands);
           }
-        </body>
-      </method>
-
-      <!--
-        For out-of-process code, event.screen[XY] is relative to the
-        left/top of the content view. For in-process code,
-        event.screen[XY] is relative to the left/top of the screen. We
-        use this method to map screen coordinates received from a
-        (possibly out-of-process) <browser> element to coordinates
-        that are relative to the screen. This code handles the
-        out-of-process case, where we need to translate by the screen
-        position of the <browser> element.
-      -->
-      <method name="mapScreenCoordinatesFromContent">
-        <parameter name="aScreenX"/>
-        <parameter name="aScreenY"/>
-        <body>
-        <![CDATA[
-          return { x: aScreenX + this.boxObject.screenX,
-                   y: aScreenY + this.boxObject.screenY };
-        ]]>
         </body>
       </method>
 
@@ -576,6 +553,16 @@
         </body>
       </method>
     </implementation>
+    <handlers>
+      <handler event="dragstart">
+      <![CDATA[
+        // If we're a remote browser dealing with a dragstart, stop it
+        // from propagating up, since our content process should be dealing
+        // with the mouse movement.
+        event.stopPropagation();
+      ]]>
+      </handler>
+    </handlers>
 
   </binding>
 

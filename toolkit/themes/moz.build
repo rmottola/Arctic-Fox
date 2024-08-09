@@ -14,6 +14,7 @@
 # GNOME/Linux             linux (toolkit/themes/linux)
 #                         non-mac (toolkit/themes/shared/non-mac)
 # faststripe              windows + faststripe (no native theme components)
+# mobile                  native UIs that do not use XUL for UI
 
 toolkit = CONFIG['MOZ_WIDGET_TOOLKIT']
 app = CONFIG['MOZ_BUILD_APP']
@@ -22,6 +23,8 @@ if toolkit == 'cocoa':
     DIRS += ['osx']
 elif toolkit in ('gtk2', 'gtk3', 'qt'):
     DIRS += ['linux']
+elif app == 'mobile/android' and CONFIG['NIGHTLY_BUILD']:
+    DIRS += ['mobile']
 else:
     DIRS += ['windows']
 

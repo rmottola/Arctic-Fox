@@ -28,6 +28,22 @@
   border-bottom-width: 0;
 }
 
+.devtools-responsiveui-textinput {
+  -moz-appearance: none;
+  background: #333;
+  color: #fff;
+  border: 1px solid #111;
+  border-radius: 2px;
+  padding: 5px;
+  width: 200px;
+  margin: 0;
+}
+
+.devtools-responsiveui-textinput[attention] {
+  border-color: #38ace6;
+  background: rgba(56,172,230,0.4);
+}
+
 .devtools-responsiveui-menulist,
 .devtools-responsiveui-toolbarbutton {
   -moz-appearance: none;
@@ -148,7 +164,7 @@
 }
 
 .devtools-responsiveui-close {
-  list-style-image: url("chrome://devtools/skin/images/close.png");
+  list-style-image: url("chrome://devtools/skin/images/close.svg");
 }
 
 .devtools-responsiveui-rotate {
@@ -156,10 +172,6 @@
 }
 
 @media (min-resolution: 1.1dppx) {
-  .devtools-responsiveui-close {
-    list-style-image: url("chrome://devtools/skin/images/close@2x.png");
-  }
-
   .devtools-responsiveui-rotate {
     list-style-image: url("chrome://devtools/skin/images/responsivemode/responsiveui-rotate@2x.png");
   }

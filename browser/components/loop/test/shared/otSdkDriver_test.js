@@ -524,44 +524,6 @@ describe("loop.OTSdkDriver", function () {
       });
   });
 
-  describe("#_noteSharingState", function() {
-    it("should record enabled sharing states for window", function() {
-      driver._noteSharingState("window", true);
-
-      sinon.assert.calledOnce(mozLoop.telemetryAddValue);
-      sinon.assert.calledWithExactly(mozLoop.telemetryAddValue,
-        "LOOP_SHARING_STATE_CHANGE_1",
-        mozLoop.SHARING_STATE_CHANGE.WINDOW_ENABLED);
-    });
-
-    it("should record enabled sharing states for browser", function() {
-      driver._noteSharingState("browser", true);
-
-      sinon.assert.calledOnce(mozLoop.telemetryAddValue);
-      sinon.assert.calledWithExactly(mozLoop.telemetryAddValue,
-        "LOOP_SHARING_STATE_CHANGE_1",
-        mozLoop.SHARING_STATE_CHANGE.BROWSER_ENABLED);
-    });
-
-    it("should record disabled sharing states for window", function() {
-      driver._noteSharingState("window", false);
-
-      sinon.assert.calledOnce(mozLoop.telemetryAddValue);
-      sinon.assert.calledWithExactly(mozLoop.telemetryAddValue,
-        "LOOP_SHARING_STATE_CHANGE_1",
-        mozLoop.SHARING_STATE_CHANGE.WINDOW_DISABLED);
-    });
-
-    it("should record disabled sharing states for browser", function() {
-      driver._noteSharingState("browser", false);
-
-      sinon.assert.calledOnce(mozLoop.telemetryAddValue);
-      sinon.assert.calledWithExactly(mozLoop.telemetryAddValue,
-        "LOOP_SHARING_STATE_CHANGE_1",
-        mozLoop.SHARING_STATE_CHANGE.BROWSER_DISABLED);
-    });
-  });
-
   describe("#forceDisconnectAll", function() {
     it("should not disconnect anything when not connected", function() {
       driver.session = session;

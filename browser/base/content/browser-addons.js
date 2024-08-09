@@ -259,9 +259,11 @@ const gXPInstallObserver = {
                               action, null, options);
       break; }
     case "addon-install-origin-blocked": {
-      messageString = gNavigatorBundle.getFormattedString("xpinstallPromptWarningOrigin",
+      messageString = gNavigatorBundle.getFormattedString("xpinstallPromptMessage",
                         [brandShortName]);
 
+      let secHistogram = Components.classes["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry).getHistogramById("SECURITY_UI");
+      secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_ADDON_ASKING_PREVENTED);
       let popup = PopupNotifications.show(browser, notificationID,
                                           messageString, anchorID,
                                           null, null, options);
@@ -271,10 +273,12 @@ const gXPInstallObserver = {
       messageString = gNavigatorBundle.getFormattedString("xpinstallPromptMessage",
                         [brandShortName]);
 
+      let secHistogram = Components.classes["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry).getHistogramById("SECURITY_UI");
       action = {
         label: gNavigatorBundle.getString("xpinstallPromptAllowButton"),
         accessKey: gNavigatorBundle.getString("xpinstallPromptAllowButton.accesskey"),
         callback: function() {
+          secHistogram.add(Ci.nsISecurityUITelemetry.WARNING_ADDON_ASKING_PREVENTED_CLICK_THROUGH);
           installInfo.install();
         }
       };
@@ -656,6 +660,7 @@ var LightweightThemeListener = {
         if (sheet.href == "chrome://browser/skin/browser-lightweightTheme.css")
           return sheet;
       }
+      return undefined;
     });
 
     Services.obs.addObserver(this, "lightweight-theme-styling-update", false);

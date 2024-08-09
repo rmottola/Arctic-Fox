@@ -49,6 +49,13 @@ public:
    */
   void UpdateWithTouchAtDevicePoint(ParentLayerCoord aPos, ParentLayerCoord aAdditionalDelta, uint32_t aTimestampMs);
 
+protected:
+  float ApplyFlingCurveToVelocity(float aVelocity) const;
+  void AddVelocityToQueue(uint32_t aTimestampMs, float aVelocity);
+
+public:
+  void HandleTouchVelocity(uint32_t aTimestampMs, float aSpeed);
+
   /**
    * Notify this Axis that a touch has begun, i.e. the user has put their finger
    * on the screen but has not yet tried to pan.
@@ -251,7 +258,14 @@ public:
 
 protected:
   ParentLayerCoord mPos;
-  uint32_t mPosTimeMs;
+
+  // mVelocitySampleTimeMs and mVelocitySamplePos are the time and position
+  // used in the last velocity sampling. They get updated when a new sample is
+  // taken (which may not happen on every input event, if the time delta is too
+  // small).
+  uint32_t mVelocitySampleTimeMs;
+  ParentLayerCoord mVelocitySamplePos;
+
   ParentLayerCoord mStartPos;
   float mVelocity;      // Units: ParentLayerCoords per millisecond
   bool mAxisLocked;     // Whether movement on this axis is locked.

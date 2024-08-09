@@ -1,6 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* eslint no-unused-vars: [2, {"vars": "local"}] */
+/* import-globals-from head.js */
+"use strict";
 
 /**
  * Run a series of edit-outer-html tests.
@@ -13,13 +16,14 @@
  * @param {Array} tests See runEditOuterHTMLTest for the structure
  * @param {InspectorPanel} inspector The instance of InspectorPanel currently
  * opened
+ * @param {TestActorFront} testActor The current TestActorFront instance
  * @return a promise that resolves when the tests have run
  */
-function runEditOuterHTMLTests(tests, inspector) {
+function runEditOuterHTMLTests(tests, inspector, testActor) {
   info("Running " + tests.length + " edit-outer-html tests");
   return Task.spawn(function* () {
     for (let step of TEST_DATA) {
-      yield runEditOuterHTMLTest(step, inspector);
+      yield runEditOuterHTMLTest(step, inspector, testActor);
     }
   });
 }
@@ -35,12 +39,12 @@ function runEditOuterHTMLTests(tests, inspector) {
  *        after the new outer-html has been inserted. Should be used to verify
  *        the actual DOM, see if it corresponds to the newHTML string provided
  * @param {InspectorPanel} inspector The instance of InspectorPanel currently
+ * @param {TestActorFront} testActor The current TestActorFront instance
  * opened
  */
-function* runEditOuterHTMLTest(test, inspector) {
+function* runEditOuterHTMLTest(test, inspector, testActor) {
   info("Running an edit outerHTML test on '" + test.selector + "'");
   yield selectNode(test.selector, inspector);
-  let oldNodeFront = inspector.selection.nodeFront;
 
   let onUpdated = inspector.once("inspector-updated");
 
@@ -53,14 +57,16 @@ function* runEditOuterHTMLTest(test, inspector) {
   // Typically selectedNode will === pageNode, but if a new element has been
   // injected in front of it, this will not be the case. If this happens.
   let selectedNodeFront = inspector.selection.nodeFront;
-  let pageNodeFront = yield inspector.walker.querySelector(inspector.walker.rootNode, test.selector);
+  let pageNodeFront = yield inspector.walker.querySelector(
+    inspector.walker.rootNode, test.selector);
   let pageNode = getNode(test.selector);
 
   if (test.validate) {
     yield test.validate(pageNode, pageNodeFront, selectedNodeFront, inspector);
   } else {
-    is(pageNodeFront, selectedNodeFront, "Original node (grabbed by selector) is selected");
-    let {outerHTML} = yield getNodeInfo(test.selector);
+    is(pageNodeFront, selectedNodeFront,
+       "Original node (grabbed by selector) is selected");
+    let {outerHTML} = yield getNodeInfo(test.selector, testActor);
     is(outerHTML, test.newHTML, "Outer HTML has been updated");
   }
 

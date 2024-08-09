@@ -9,7 +9,7 @@ interface nsIURI;
 interface nsIChannel;
 interface nsILoadInfo;
 
-[scriptable, uuid(0ca881e4-bec7-45a4-a970-970b343f34aa)]
+[scriptable, uuid(c0c19db9-1b5a-4ac5-b656-ed6f8149fa48)]
 interface nsIAboutModule : nsISupports 
 {
 
@@ -25,10 +25,10 @@ interface nsIAboutModule : nsISupports
     /**
      * A flag that indicates whether a URI should be run with content
      * privileges. If it is, the about: protocol handler will enforce that
-     * the principal of channels created for it are based on their
-     * originalURI or URI (depending on the channel flags) by setting
+     * the principal of channels created for it be based on their
+     * originalURI or URI (depending on the channel flags), by setting
      * their "owner" to null.
-     * If content needs to be able to link to this URI, you must specify
+     * If content needs to be able to link to this URI, specify
      * URI_CONTENT_LINKABLE as well.
      */
     const unsigned long URI_SAFE_FOR_UNTRUSTED_CONTENT = (1 << 0);

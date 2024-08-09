@@ -360,6 +360,13 @@ NS_IMETHODIMP nsXULPopupShownEvent::Run()
 NS_IMETHODIMP nsXULPopupShownEvent::HandleEvent(nsIDOMEvent* aEvent)
 {
   nsMenuPopupFrame* popup = do_QueryFrame(mPopup->GetPrimaryFrame());
+  nsCOMPtr<nsIDOMEventTarget> eventTarget;
+  aEvent->GetTarget(getter_AddRefs(eventTarget));
+  // Ignore events not targeted at the popup itself (ie targeted at
+  // descendants):
+  if (!SameCOMIdentity(mPopup, eventTarget)) {
+    return NS_OK;
+  }
   if (popup) {
     // ResetPopupShownDispatcher will delete the reference to this, so keep
     // another one until Run is finished.
@@ -438,7 +445,7 @@ nsMenuPopupFrame::LayoutPopup(nsBoxLayoutState& aState, nsIFrame* aParentMenu,
 
   // if the popup has just been opened, make sure the scrolled window is at 0,0
   if (mIsOpenChanged) {
-    nsIScrollableFrame *scrollframe = do_QueryFrame(nsBox::GetChildBox(this));
+    nsIScrollableFrame *scrollframe = do_QueryFrame(nsBox::GetChildXULBox(this));
     if (scrollframe) {
       nsWeakFrame weakFrame(this);
       scrollframe->ScrollTo(nsPoint(0,0), nsIScrollableFrame::INSTANT);
@@ -450,9 +457,9 @@ nsMenuPopupFrame::LayoutPopup(nsBoxLayoutState& aState, nsIFrame* aParentMenu,
 
   // get the preferred, minimum and maximum size. If the menu is sized to the
   // popup, then the popup's width is the menu's width.
-  nsSize prefSize = GetPrefSize(aState);
-  nsSize minSize = GetMinSize(aState); 
-  nsSize maxSize = GetMaxSize(aState);
+  nsSize prefSize = GetXULPrefSize(aState);
+  nsSize minSize = GetXULMinSize(aState); 
+  nsSize maxSize = GetXULMaxSize(aState);
 
   if (aSizedToPopup) {
     prefSize.width = aParentMenu->GetRect().width;
@@ -462,7 +469,7 @@ nsMenuPopupFrame::LayoutPopup(nsBoxLayoutState& aState, nsIFrame* aParentMenu,
   // if the size changed then set the bounds to be the preferred size
   bool sizeChanged = (mPrefSize != prefSize);
   if (sizeChanged) {
-    SetBounds(aState, nsRect(0, 0, prefSize.width, prefSize.height), false);
+    SetXULBounds(aState, nsRect(0, 0, prefSize.width, prefSize.height), false);
     mPrefSize = prefSize;
   }
 
@@ -474,7 +481,7 @@ nsMenuPopupFrame::LayoutPopup(nsBoxLayoutState& aState, nsIFrame* aParentMenu,
   }
 
   nsRect bounds(GetRect());
-  Layout(aState);
+  XULLayout(aState);
 
   // if the width or height changed, readjust the popup position. This is a
   // special case for tooltips where the preferred height doesn't include the
@@ -882,7 +889,7 @@ nsMenuPopupFrame::HidePopup(bool aDeselectMenu, nsPopupState aNewState)
     // if the popup had a trigger node set, clear the global window popup node
     // as well
     if (mTriggerContent) {
-      nsIDocument* doc = mContent->GetCurrentDoc();
+      nsIDocument* doc = mContent->GetUncomposedDoc();
       if (doc) {
         if (nsPIDOMWindowOuter* win = doc->GetWindow()) {
           nsCOMPtr<nsPIWindowRoot> root = win->GetTopWindowRoot();
@@ -1301,6 +1308,13 @@ nsMenuPopupFrame::SetPopupPosition(nsIFrame* aAnchorFrame, bool aIsMove, bool aS
   mRect.width = aSizedToPopup ? parentWidth : mPrefSize.width;
   mRect.height = mPrefSize.height;
 
+  // If we're anchoring to a rect, and the rect is smaller than the preferred size
+  // of the popup, change its width accordingly.
+  if (mAnchorType == MenuPopupAnchorType_Rect &&
+      parentWidth < mPrefSize.width) {
+    mRect.width = mPrefSize.width;
+  }
+
   // the screen position in app units where the popup should appear
   nsPoint screenPoint;
 
@@ -1399,8 +1413,17 @@ nsMenuPopupFrame::SetPopupPosition(nsIFrame* aAnchorFrame, bool aIsMove, bool aS
     screenPoint.MoveBy(margin.left + offsetForContextMenu.x,
                        margin.top + offsetForContextMenu.y);
 
-    // screen positioned popups can be flipped vertically but never horizontally
+#ifdef XP_MACOSX
+    // OSX tooltips follow standard flip rule but other popups flip horizontally not vertically
+    if (mPopupType == ePopupTypeTooltip) {
+        vFlip = FlipStyle_Outside;
+    } else {
+        hFlip = FlipStyle_Outside;
+    }
+#else
+    // Other OS screen positioned popups can be flipped vertically but never horizontally
     vFlip = FlipStyle_Outside;
+#endif // #ifdef XP_MACOSX
   }
 
   // If a panel is being moved or has flip="none", don't constrain or flip it. But always do this for
@@ -1501,7 +1524,7 @@ nsMenuPopupFrame::SetPopupPosition(nsIFrame* aAnchorFrame, bool aIsMove, bool aS
   if (aSizedToPopup) {
     nsBoxLayoutState state(PresContext());
     // XXXndeakin can parentSize.width still extend outside?
-    SetBounds(state, nsRect(mRect.x, mRect.y, parentWidth, mRect.height));
+    SetXULBounds(state, mRect);
   }
 
   return NS_OK;
@@ -1530,9 +1553,12 @@ nsMenuPopupFrame::GetConstraintRect(const LayoutDeviceIntRect& aAnchorRect,
     // This is because we need to constrain the content to this content area,
     // so we should use the same screen. Otherwise, use the screen where the
     // anchor is located.
-    LayoutDeviceIntRect rect = mInContentShell ? aRootScreenRect : aAnchorRect;
-    int32_t width = std::max(1, rect.width);
-    int32_t height = std::max(1, rect.height);
+    DesktopToLayoutDeviceScale scale =
+      PresContext()->DeviceContext()->GetDesktopToDeviceScale();
+    DesktopRect rect =
+      (mInContentShell ? aRootScreenRect : aAnchorRect) / scale;
+    int32_t width = std::max(1, NSToIntRound(rect.width));
+    int32_t height = std::max(1, NSToIntRound(rect.height));
     sm->ScreenForRect(rect.x, rect.y, width, height, getter_AddRefs(screen));
     if (screen) {
       // Non-top-level popups (which will always be panels)
@@ -1831,8 +1857,7 @@ nsMenuPopupFrame::ChangeMenuItem(nsMenuFrame* aMenuItem,
           // Fire a command event as the new item, but we don't want to close
           // the menu, blink it, or update any other state of the menuitem. The
           // command event will cause the item to be selected.
-          nsContentUtils::DispatchXULCommand(aMenuItem->GetContent(),
-                                             nsContentUtils::IsCallerChrome(),
+          nsContentUtils::DispatchXULCommand(aMenuItem->GetContent(), /* aTrusted = */ true,
                                              nullptr, PresContext()->PresShell(),
                                              false, false, false, false);
         }
@@ -2079,6 +2104,14 @@ nsMenuPopupFrame::AttributeChanged(int32_t aNameSpaceID,
   if (aAttribute == nsGkAtoms::left || aAttribute == nsGkAtoms::top)
     MoveToAttributePosition();
 
+#ifndef MOZ_GTK2
+  if (aAttribute == nsGkAtoms::noautohide) {
+    nsXULPopupManager* pm = nsXULPopupManager::GetInstance();
+    if (pm)
+      pm->EnableRollup(mContent, !IsNoAutoHide());
+  }
+#endif
+
   if (aAttribute == nsGkAtoms::label) {
     // set the label for the titlebar
     nsView* view = GetView();
@@ -2170,8 +2203,7 @@ nsMenuPopupFrame::MoveTo(const CSSIntPoint& aPos, bool aUpdateAttrs)
   }
 
   nsPresContext* presContext = PresContext();
-  mAnchorType = aPos.x == -1 || aPos.y == -1 ?
-                MenuPopupAnchorType_Node : MenuPopupAnchorType_Point;
+  mAnchorType = MenuPopupAnchorType_Point;
   mScreenRect.x = aPos.x - presContext->AppUnitsToIntCSSPixels(margin.left);
   mScreenRect.y = aPos.y - presContext->AppUnitsToIntCSSPixels(margin.top);
 

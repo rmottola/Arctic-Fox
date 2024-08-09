@@ -158,8 +158,9 @@ private:
   bool mInitOkay;
 };
 
-CompositorD3D11::CompositorD3D11(nsIWidget* aWidget)
-  : mAttachments(nullptr)
+CompositorD3D11::CompositorD3D11(CompositorBridgeParent* aParent, nsIWidget* aWidget)
+  : Compositor(aParent)
+  , mAttachments(nullptr)
   , mWidget(aWidget)
   , mHwnd(nullptr)
   , mDisableSequenceForNextFrame(false)
@@ -203,9 +204,7 @@ CompositorD3D11::Initialize()
 
   HRESULT hr;
 
-  mDevice = gfxWindowsPlatform::GetPlatform()->GetD3D11Device();
-
-  if (!mDevice) {
+  if (!gfxWindowsPlatform::GetPlatform()->GetD3D11Device(&mDevice)) {
     return false;
   }
 
@@ -495,10 +494,6 @@ CompositorD3D11::CreateRenderTarget(const gfx::IntRect& aRect,
   CD3D11_TEXTURE2D_DESC desc(DXGI_FORMAT_B8G8R8A8_UNORM, aRect.width, aRect.height, 1, 1,
                              D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET);
 
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in CreateRenderTarget";
-  }
-
   RefPtr<ID3D11Texture2D> texture;
   HRESULT hr = mDevice->CreateTexture2D(&desc, nullptr, getter_AddRefs(texture));
   if (FAILED(hr) || !texture) {
@@ -531,10 +526,6 @@ CompositorD3D11::CreateTexture(const gfx::IntRect& aRect,
   CD3D11_TEXTURE2D_DESC desc(DXGI_FORMAT_B8G8R8A8_UNORM,
                              aRect.width, aRect.height, 1, 1,
                              D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET);
-
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in CreateRenderTargetFromSource";
-  }
 
   RefPtr<ID3D11Texture2D> texture;
   HRESULT hr = mDevice->CreateTexture2D(&desc, nullptr, getter_AddRefs(texture));
@@ -1124,14 +1115,10 @@ void
 CompositorD3D11::BeginFrame(const nsIntRegion& aInvalidRegion,
                             const Rect* aClipRectIn,
                             const Rect& aRenderBounds,
-                            bool aOpaque,
+                            const nsIntRegion& aOpaqueRegion,
                             Rect* aClipRectOut,
                             Rect* aRenderBoundsOut)
 {
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in BeginFrame";
-  }
-
   // Don't composite if we are minimised. Other than for the sake of efficency,
   // this is important because resizing our buffers when mimised will fail and
   // cause a crash when we're restored.
@@ -1398,10 +1385,6 @@ CompositorD3D11::VerifyBufferSize()
 bool
 CompositorD3D11::UpdateRenderTarget()
 {
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in UpdateRenderTarget";
-  }
-
   EnsureSize();
   if (!VerifyBufferSize()) {
     gfxCriticalNote << "Failed VerifyBufferSize in UpdateRenderTarget " << mSize;
@@ -1455,10 +1438,6 @@ DeviceAttachmentsD3D11::InitSyncObject()
                              D3D11_BIND_SHADER_RESOURCE |
                              D3D11_BIND_RENDER_TARGET);
   desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
-
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in InitSyncObject";
-  }
 
   RefPtr<ID3D11Texture2D> texture;
   HRESULT hr = mDevice->CreateTexture2D(&desc, nullptr, getter_AddRefs(texture));
@@ -1602,10 +1581,6 @@ CompositorD3D11::PaintToTarget()
 
   RefPtr<ID3D11Texture2D> readTexture;
 
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in PaintToTarget";
-  }
-
   hr = mDevice->CreateTexture2D(&softDesc, nullptr, getter_AddRefs(readTexture));
   if (FAILED(hr)) {
     gfxCriticalErrorOnce(gfxCriticalError::DefaultOptions(false)) << "Failed in PaintToTarget 2";
@@ -1655,7 +1630,8 @@ CompositorD3D11::HandleError(HRESULT hr, Severity aSeverity)
     MOZ_CRASH("GFX: Unrecoverable D3D11 error");
   }
 
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
+  RefPtr<ID3D11Device> device;
+  if (!gfxWindowsPlatform::GetPlatform()->GetD3D11Device(&device) || device != mDevice) {
     gfxCriticalError() << "Out of sync D3D11 devices in HandleError, " << (int)mVerifyBuffersFailed;
   }
 

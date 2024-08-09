@@ -6,4 +6,5 @@
 
 DIRS += [
     'pdfjs',
+    'pocket',
 ]

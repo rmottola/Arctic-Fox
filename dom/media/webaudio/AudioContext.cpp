@@ -243,8 +243,8 @@ AudioContext::CreateBufferSource(ErrorResult& aRv)
 }
 
 already_AddRefed<AudioBuffer>
-AudioContext::CreateBuffer(JSContext* aJSContext, uint32_t aNumberOfChannels,
-                           uint32_t aLength, float aSampleRate,
+AudioContext::CreateBuffer(uint32_t aNumberOfChannels, uint32_t aLength,
+                           float aSampleRate,
                            ErrorResult& aRv)
 {
   if (!aNumberOfChannels) {
@@ -253,7 +253,7 @@ AudioContext::CreateBuffer(JSContext* aJSContext, uint32_t aNumberOfChannels,
   }
 
   return AudioBuffer::Create(this, aNumberOfChannels, aLength,
-                             aSampleRate, aJSContext, aRv);
+                             aSampleRate, aRv);
 }
 
 namespace {
@@ -567,7 +567,7 @@ AudioContext::DecodeAudioData(const ArrayBuffer& aBuffer,
     return nullptr;
   }
 
-  // Neuter the array buffer
+  // Detach the array buffer
   size_t length = aBuffer.Length();
   JS::RootedObject obj(cx, aBuffer.Obj());
 

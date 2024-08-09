@@ -680,6 +680,7 @@ ConstraintTypeSet::addType(ExclusiveContext* cxArg, Type type)
 void
 TypeSet::print(FILE* fp)
 {
+    bool fromDebugger = !fp;
     if (!fp)
         fp = stderr;
 
@@ -730,6 +731,9 @@ TypeSet::print(FILE* fp)
                 fprintf(fp, " %s", TypeString(ObjectType(key)));
         }
     }
+
+    if (fromDebugger)
+        fprintf(fp, "\n");
 }
 
 /* static */ void
@@ -2305,8 +2309,7 @@ TemporaryTypeSet::forAllClasses(CompilerConstraintList* constraints,
             true_results = true;
             if (false_results)
                 return ForAllResult::MIXED;
-        }
-        else {
+        } else {
             false_results = true;
             if (true_results)
                 return ForAllResult::MIXED;
@@ -2465,9 +2468,9 @@ js::ClassCanHaveExtraProperties(const Class* clasp)
 {
     if (clasp == &UnboxedPlainObject::class_ || clasp == &UnboxedArrayObject::class_)
         return false;
-    return clasp->resolve
-        || clasp->ops.lookupProperty
-        || clasp->ops.getProperty
+    return clasp->getResolve()
+        || clasp->getOpsLookupProperty()
+        || clasp->getOpsGetProperty()
         || IsTypedArrayClass(clasp);
 }
 
@@ -3408,7 +3411,7 @@ PreliminaryObjectArray::sweep()
                 obj->setGroup(objectProto->groupRaw());
                 MOZ_ASSERT(obj->is<NativeObject>());
                 MOZ_ASSERT(obj->getClass() == objectProto->getClass());
-                MOZ_ASSERT(!obj->getClass()->finalize);
+                MOZ_ASSERT(!obj->getClass()->hasFinalize());
             }
 
             *ptr = nullptr;
@@ -3419,8 +3422,7 @@ PreliminaryObjectArray::sweep()
 void
 PreliminaryObjectArrayWithTemplate::trace(JSTracer* trc)
 {
-    if (shape_)
-        TraceEdge(trc, &shape_, "PreliminaryObjectArrayWithTemplate_shape");
+    TraceNullableEdge(trc, &shape_, "PreliminaryObjectArrayWithTemplate_shape");
 }
 
 /* static */ void
@@ -3990,15 +3992,9 @@ void
 TypeNewScript::trace(JSTracer* trc)
 {
     TraceEdge(trc, &function_, "TypeNewScript_function");
-
-    if (templateObject_)
-        TraceEdge(trc, &templateObject_, "TypeNewScript_templateObject");
-
-    if (initializedShape_)
-        TraceEdge(trc, &initializedShape_, "TypeNewScript_initializedShape");
-
-    if (initializedGroup_)
-        TraceEdge(trc, &initializedGroup_, "TypeNewScript_initializedGroup");
+    TraceNullableEdge(trc, &templateObject_, "TypeNewScript_templateObject");
+    TraceNullableEdge(trc, &initializedShape_, "TypeNewScript_initializedShape");
+    TraceNullableEdge(trc, &initializedGroup_, "TypeNewScript_initializedGroup");
 }
 
 /* static */ void

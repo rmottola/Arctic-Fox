@@ -133,6 +133,17 @@ struct Imm64
 
     explicit Imm64(uint64_t value) : value(value)
     { }
+
+    Imm32 low() const {
+        return Imm32(int32_t(value));
+    }
+
+    Imm32 hi() const {
+        return Imm32(int32_t(value >> 32));
+    }
+
+    inline Imm32 firstHalf() const;
+    inline Imm32 secondHalf() const;
 };
 
 #ifdef DEBUG
@@ -546,7 +557,7 @@ class CodeLocationJump
         raw_ = nullptr;
         setUninitialized();
 #ifdef JS_SMALL_BRANCH
-        jumpTableEntry_ = (uint8_t*) 0xdeadab1e;
+        jumpTableEntry_ = (uint8_t*) uintptr_t(0xdeadab1e);
 #endif
     }
     CodeLocationJump(JitCode* code, CodeOffsetJump base) {

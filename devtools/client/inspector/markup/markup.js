@@ -28,6 +28,7 @@ const {editableField, InplaceEditor} =
       require("devtools/client/shared/inplace-editor");
 const {HTMLEditor} = require("devtools/client/inspector/markup/html-editor");
 const promise = require("promise");
+const Services = require("Services");
 const {Tooltip} = require("devtools/client/shared/widgets/Tooltip");
 const EventEmitter = require("devtools/shared/event-emitter");
 const Heritage = require("sdk/core/heritage");
@@ -208,6 +209,8 @@ MarkupView.prototype = {
       }
     }
     this._showContainerAsHovered(container.node);
+
+    this.emit("node-hover");
   },
 
   /**
@@ -340,6 +343,8 @@ MarkupView.prototype = {
       this.getContainer(this._hoveredNode).hovered = false;
     }
     this._hoveredNode = null;
+
+    this.emit("leave");
   },
 
   /**
@@ -1948,7 +1953,7 @@ MarkupContainer.prototype = {
    * Check if element is draggable.
    */
   isDraggable: function() {
-    let tagName = this.node.tagName.toLowerCase();
+    let tagName = this.node.tagName && this.node.tagName.toLowerCase();
 
     return !this.node.isPseudoElement &&
            !this.node.isAnonymous &&

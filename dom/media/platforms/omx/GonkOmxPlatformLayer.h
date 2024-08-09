@@ -153,13 +153,13 @@ public:
 
   nsresult Shutdown() override;
 
-  // TODO:
-  // There is another InitOmxParameter in OmxDataDecoder. They need to combine
-  // to one function.
-  template<class T> void InitOmxParameter(T* aParam);
-
   static bool FindComponents(const nsACString& aMimeType,
                              nsTArray<ComponentInfo>* aComponents = nullptr);
+
+  // Android/QCOM decoder uses its own OMX_VIDEO_CodingVP8 definition in
+  // frameworks/native/media/include/openmax/OMX_Video.h, not the one defined
+  // in OpenMAX v1.1.2 OMX_VideoExt.h
+  OMX_VIDEO_CODINGTYPE CompressionFormat() override;
 
 protected:
   friend GonkBufferData;
@@ -193,8 +193,6 @@ protected:
   android::IOMX::node_id mNode;
 
   android::OMXClient mOmxClient;
-
-  const TrackInfo* mInfo;
 
   Quirks mQuirks;
 };

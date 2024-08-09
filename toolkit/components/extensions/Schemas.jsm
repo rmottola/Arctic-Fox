@@ -9,24 +9,28 @@ const Cc = Components.classes;
 const Cu = Components.utils;
 const Cr = Components.results;
 
+Cu.importGlobalProperties(["URL"]);
+
+Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   instanceOf,
 } = ExtensionUtils;
 
+XPCOMUtils.defineLazyServiceGetter(this, "contentPolicyService",
+                                   "@mozilla.org/addons/content-policy;1",
+                                   "nsIAddonContentPolicy");
+
 this.EXPORTED_SYMBOLS = ["Schemas"];
 
 /* globals Schemas, URL */
 
-Cu.import("resource://gre/modules/NetUtil.jsm");
-
-Cu.importGlobalProperties(["URL"]);
-
-function readJSON(uri) {
+function readJSON(url) {
   return new Promise((resolve, reject) => {
-    NetUtil.asyncFetch({uri, loadUsingSystemPrincipal: true}, (inputStream, status) => {
+    NetUtil.asyncFetch({uri: url, loadUsingSystemPrincipal: true}, (inputStream, status) => {
       if (!Components.isSuccessCode(status)) {
         reject(new Error(status));
         return;
@@ -83,19 +87,32 @@ class Context {
     this.params = params;
 
     this.path = [];
+    this.preprocessors = {
+      localize(value, context) {
+        return value;
+      },
+    };
 
-    let props = ["addListener", "callFunction", "callAsyncFunction",
-                 "hasListener", "removeListener",
-                 "getProperty", "setProperty"];
+    let methods = ["addListener", "callFunction",
+                   "callFunctionNoReturn", "callAsyncFunction",
+                   "hasListener", "removeListener",
+                   "getProperty", "setProperty",
+                   "checkLoadURL", "logError"];
+    for (let method of methods) {
+      if (method in params) {
+        this[method] = params[method].bind(params);
+      }
+    }
+
+    let props = ["preprocessors"];
     for (let prop of props) {
-      this[prop] = params[prop];
-    }
-
-    if ("checkLoadURL" in params) {
-      this.checkLoadURL = params.checkLoadURL;
-    }
-    if ("logError" in params) {
-      this.logError = params.logError;
+      if (prop in params) {
+        if (prop in this && typeof this[prop] == "object") {
+          Object.assign(this[prop], params[prop]);
+        } else {
+          this[prop] = params[prop];
+        }
+      }
     }
   }
 
@@ -243,6 +260,29 @@ const FORMATS = {
 
     throw new SyntaxError(`String ${JSON.stringify(string)} must be a relative URL`);
   },
+
+  contentSecurityPolicy(string, context) {
+    let error = contentPolicyService.validateAddonCSP(string);
+    if (error != null) {
+      throw new SyntaxError(error);
+    }
+    return string;
+  },
+
+  date(string, context) {
+    // A valid ISO 8601 timestamp.
+    const PATTERN = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|([-+]\d{2}:?\d{2})))?$/;
+    if (!PATTERN.test(string)) {
+      throw new Error(`Invalid date string ${string}`);
+    }
+    // Our pattern just checks the format, we could still have invalid
+    // values (e.g., month=99 or month=02 and day=31).  Let the Date
+    // constructor do the dirty work of validating.
+    if (isNaN(new Date(string))) {
+      throw new Error(`Invalid date string ${string}`);
+    }
+    return string;
+  },
 };
 
 // Schema files contain namespaces, and each namespace contains types,
@@ -267,6 +307,24 @@ class Entry {
     if ("deprecated" in schema) {
       this.deprecated = schema.deprecated;
     }
+
+    /**
+     * If set to a string value, and a preprocessor of the same is
+     * defined in the validation context, it will be applied to this
+     * value prior to any normalization.
+     */
+    this.preprocessor = schema.preprocess || null;
+  }
+
+  /**
+   * Preprocess the given value with the preprocessor declared in
+   * `preprocessor`.
+   */
+  preprocess(value, context) {
+    if (this.preprocessor) {
+      return context.preprocessors[this.preprocessor](value, context);
+    }
+    return value;
   }
 
   /**
@@ -335,7 +393,7 @@ class Type extends Entry {
   normalizeBase(type, value, context) {
     if (this.checkBaseType(getValueBaseType(value))) {
       this.checkDeprecated(context, value);
-      return {value};
+      return {value: this.preprocess(value, context)};
     }
     return context.error(`Expected ${type} instead of ${JSON.stringify(value)}`);
   }
@@ -434,6 +492,7 @@ class StringType extends Type {
     if (r.error) {
       return r;
     }
+    value = r.value;
 
     if (this.enumeration) {
       if (this.enumeration.includes(value)) {
@@ -505,11 +564,13 @@ class ObjectType extends Type {
     return baseType == "object";
   }
 
-  normalize(value, context) {
+  // FIXME: Bug 1265371 - Refactor normalize and parseType in Schemas.jsm to reduce complexity
+  normalize(value, context) { // eslint-disable-line complexity
     let v = this.normalizeBase("object", value, context);
     if (v.error) {
       return v;
     }
+    value = v.value;
 
     if (this.isInstanceOf) {
       if (Object.keys(this.properties).length ||
@@ -589,7 +650,15 @@ class ObjectType extends Type {
     for (let prop of Object.keys(this.properties)) {
       let error = checkProperty(prop, this.properties[prop], result);
       if (error) {
-        return error;
+        let {onError} = this.properties[prop];
+        if (onError == "warn") {
+          context.logError(error.error);
+        } else if (onError != "ignore") {
+          return error;
+        }
+
+        result[prop] = null;
+        remainingProps.delete(prop);
       }
     }
 
@@ -639,7 +708,7 @@ class NumberType extends Type {
       return r;
     }
 
-    if (isNaN(value) || !Number.isFinite(value)) {
+    if (isNaN(r.value) || !Number.isFinite(r.value)) {
       return context.error("NaN or infinity are not valid");
     }
 
@@ -663,9 +732,10 @@ class IntegerType extends Type {
     if (r.error) {
       return r;
     }
+    value = r.value;
 
     // Ensure it's between -2**31 and 2**31-1
-    if ((value | 0) !== value) {
+    if (!Number.isSafeInteger(value)) {
       return context.error("Integer is out of range");
     }
 
@@ -707,6 +777,7 @@ class ArrayType extends Type {
     if (v.error) {
       return v;
     }
+    value = v.value;
 
     let result = [];
     for (let [i, element] of value.entries()) {
@@ -958,6 +1029,12 @@ class FunctionEntry extends CallEntry {
         let callback = actuals.pop();
         return context.callAsyncFunction(path, name, actuals, callback);
       };
+    } else if (!this.returns) {
+      stub = (...args) => {
+        this.checkDeprecated(context);
+        let actuals = this.checkParameters(args, context);
+        return context.callFunctionNoReturn(path, name, actuals);
+      };
     } else {
       stub = (...args) => {
         this.checkDeprecated(context);
@@ -1014,6 +1091,15 @@ class Event extends CallEntry {
 }
 
 this.Schemas = {
+  initialized: false,
+
+  // Set of URLs that we have loaded via the load() method.
+  loadedUrls: new Set(),
+
+  // Maps a schema URL to the JSON contained in that schema file. This
+  // is useful for sending the JSON across processes.
+  schemaJSON: new Map(),
+
   // Map[<schema-name> -> Map[<symbol-name> -> Entry]]
   // This keeps track of all the schemas that have been loaded so far.
   namespaces: new Map(),
@@ -1027,12 +1113,13 @@ this.Schemas = {
     ns.set(symbol, value);
   },
 
-  parseType(path, type, extraProperties = []) {
+  // FIXME: Bug 1265371 - Refactor normalize and parseType in Schemas.jsm to reduce complexity
+  parseType(path, type, extraProperties = []) { // eslint-disable-line complexity
     let allowedProperties = new Set(extraProperties);
 
     // Do some simple validation of our own schemas.
     function checkTypeProperties(...extra) {
-      let allowedSet = new Set([...allowedProperties, ...extra, "description", "deprecated"]);
+      let allowedSet = new Set([...allowedProperties, ...extra, "description", "deprecated", "preprocess"]);
       for (let prop of Object.keys(type)) {
         if (!allowedSet.has(prop)) {
           throw new Error(`Internal error: Namespace ${path.join(".")} has invalid type property "${prop}" in type "${type.id || JSON.stringify(type)}"`);
@@ -1111,9 +1198,10 @@ this.Schemas = {
       let parseProperty = (type, extraProps = []) => {
         return {
           type: this.parseType(path, type,
-                               ["unsupported", ...extraProps]),
+                               ["unsupported", "onError", ...extraProps]),
           optional: type.optional || false,
           unsupported: type.unsupported || false,
+          onError: type.onError || null,
         };
       };
 
@@ -1287,8 +1375,32 @@ this.Schemas = {
     this.register(namespaceName, event.name, e);
   },
 
-  load(uri) {
-    return readJSON(uri).then(json => {
+  init() {
+    if (this.initialized) {
+      return;
+    }
+    this.initialized = true;
+
+    if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
+      let data = Services.cpmm.initialProcessData;
+      let schemas = data["Extension:Schemas"];
+      if (schemas) {
+        this.schemaJSON = schemas;
+      }
+      Services.cpmm.addMessageListener("Schema:Add", this);
+    }
+  },
+
+  receiveMessage(msg) {
+    switch (msg.name) {
+      case "Schema:Add":
+        this.schemaJSON.set(msg.data.url, msg.data.schema);
+        break;
+    }
+  },
+
+  load(url) {
+    let loadFromJSON = json => {
       for (let namespace of json) {
         let name = namespace.namespace;
 
@@ -1312,14 +1424,37 @@ this.Schemas = {
           this.loadEvent(name, event);
         }
       }
-    });
+    };
+
+    if (Services.appinfo.processType != Services.appinfo.PROCESS_TYPE_CONTENT) {
+      return readJSON(url).then(json => {
+        this.schemaJSON.set(url, json);
+
+        let data = Services.ppmm.initialProcessData;
+        data["Extension:Schemas"] = this.schemaJSON;
+
+        Services.ppmm.broadcastAsyncMessage("Schema:Add", {url, schema: json});
+
+        loadFromJSON(json);
+      });
+    } else {
+      if (this.loadedUrls.has(url)) {
+        return;
+      }
+      this.loadedUrls.add(url);
+
+      let schema = this.schemaJSON.get(url);
+      loadFromJSON(schema);
+    }
   },
 
   inject(dest, wrapperFuncs) {
     for (let [namespace, ns] of this.namespaces) {
       let obj = Cu.createObjectIn(dest, {defineAs: namespace});
       for (let [name, entry] of ns) {
-        entry.inject([namespace], name, obj, new Context(wrapperFuncs));
+        if (wrapperFuncs.shouldInject(namespace, name)) {
+          entry.inject([namespace], name, obj, new Context(wrapperFuncs));
+        }
       }
 
       if (!Object.keys(obj).length) {

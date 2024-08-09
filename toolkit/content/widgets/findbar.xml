@@ -832,6 +832,7 @@
 
             return false;
           }
+          return undefined;
         ]]></body>
       </method>
 
@@ -852,6 +853,7 @@
               return this._onBrowserKeypress(aMessage.data.fakeEvent,
                                              aMessage.data.shouldFastFind);
           }
+          return undefined;
         ]]></body>
       </method>
 
@@ -1152,11 +1154,8 @@
             this._find(this._findField.value);
           else
             this._findAgain(aFindPrevious);
-            
-          // Fix ignoring the "highlight all" option when page changes
-          // and the "find again" command gets executed afterwards
-          if (this.getElement("highlight").checked)
-            this.toggleHighlight(true);
+
+          return undefined;
         ]]></body>
       </method>
 

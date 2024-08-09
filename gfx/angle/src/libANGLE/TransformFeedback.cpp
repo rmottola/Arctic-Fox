@@ -13,9 +13,10 @@
 namespace gl
 {
 
-TransformFeedback::TransformFeedback(rx::TransformFeedbackImpl* impl, GLuint id, const Caps &caps)
+TransformFeedback::TransformFeedback(rx::TransformFeedbackImpl *impl, GLuint id, const Caps &caps)
     : RefCountObject(id),
       mImplementation(impl),
+      mLabel(),
       mActive(false),
       mPrimitiveMode(GL_NONE),
       mPaused(false),
@@ -34,6 +35,16 @@ TransformFeedback::~TransformFeedback()
     }
 
     SafeDelete(mImplementation);
+}
+
+void TransformFeedback::setLabel(const std::string &label)
+{
+    mLabel = label;
+}
+
+const std::string &TransformFeedback::getLabel() const
+{
+    return mLabel;
 }
 
 void TransformFeedback::begin(GLenum primitiveMode)
@@ -83,6 +94,24 @@ void TransformFeedback::bindGenericBuffer(Buffer *buffer)
 {
     mGenericBuffer.set(buffer);
     mImplementation->bindGenericBuffer(mGenericBuffer);
+}
+
+void TransformFeedback::detachBuffer(GLuint bufferName)
+{
+    for (size_t index = 0; index < mIndexedBuffers.size(); index++)
+    {
+        if (mIndexedBuffers[index].id() == bufferName)
+        {
+            mIndexedBuffers[index].set(nullptr);
+            mImplementation->bindIndexedBuffer(index, mIndexedBuffers[index]);
+        }
+    }
+
+    if (mGenericBuffer.id() == bufferName)
+    {
+        mGenericBuffer.set(nullptr);
+        mImplementation->bindGenericBuffer(mGenericBuffer);
+    }
 }
 
 const BindingPointer<Buffer> &TransformFeedback::getGenericBuffer() const

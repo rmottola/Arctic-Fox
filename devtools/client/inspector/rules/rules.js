@@ -10,7 +10,7 @@
 const {Cc, Ci, Cu} = require("chrome");
 const promise = require("promise");
 const Services = require("Services");
-const {Tools} = require("devtools/client/main");
+const {Tools} = require("devtools/client/definitions");
 const {setTimeout, clearTimeout} =
       Cu.import("resource://gre/modules/Timer.jsm", {});
 const {CssLogic} = require("devtools/shared/inspector/css-logic");
@@ -961,12 +961,13 @@ CssRuleView.prototype = {
       }
 
       this._clearRules();
-      this._createEditors();
-
+      let onEditorsReady = this._createEditors();
       this.refreshPseudoClassPanel();
 
       // Notify anyone that cares that we refreshed.
-      this.emit("ruleview-refreshed");
+      return onEditorsReady.then(() => {
+        this.emit("ruleview-refreshed");
+      }, e => console.error(e));
     }).then(null, promiseWarn);
   },
 
@@ -1146,9 +1147,10 @@ CssRuleView.prototype = {
     let container = null;
 
     if (!this._elementStyle.rules) {
-      return;
+      return promise.resolve();
     }
 
+    let editorReadyPromises = [];
     for (let rule of this._elementStyle.rules) {
       if (rule.domRule.system) {
         continue;
@@ -1157,6 +1159,7 @@ CssRuleView.prototype = {
       // Initialize rule editor
       if (!rule.editor) {
         rule.editor = new RuleEditor(this, rule);
+        editorReadyPromises.push(rule.editor.once("source-link-updated"));
       }
 
       // Filter the rules and highlight any matches if there is a search input
@@ -1210,6 +1213,8 @@ CssRuleView.prototype = {
     } else {
       this.searchField.classList.remove("devtools-style-searchbox-no-match");
     }
+
+    return promise.all(editorReadyPromises);
   },
 
   /**
@@ -1495,11 +1500,15 @@ CssRuleView.prototype = {
    * Handle the keypress event in the rule view.
    */
   _onKeypress: function(event) {
+    if (!event.target.closest("#sidebar-panel-ruleview")) {
+      return;
+    }
+
     let isOSX = Services.appinfo.OS === "Darwin";
 
     if (((isOSX && event.metaKey && !event.ctrlKey && !event.altKey) ||
         (!isOSX && event.ctrlKey && !event.metaKey && !event.altKey)) &&
-        event.code === "KeyF") {
+        event.key === "f") {
       this.searchField.focus();
       event.preventDefault();
     }

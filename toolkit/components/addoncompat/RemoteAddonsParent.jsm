@@ -86,6 +86,7 @@ var NotificationTracker = {
     if (msg.name == "Addons:GetNotifications") {
       return this._paths;
     }
+    return undefined;
   }
 };
 NotificationTracker.init();
@@ -136,6 +137,7 @@ var ContentPolicyParent = {
         return this.shouldLoad(aMessage.data, aMessage.objects);
         break;
     }
+    return undefined;
   },
 
   shouldLoad: function(aData, aObjects) {
@@ -233,6 +235,7 @@ var AboutProtocolParent = {
         return this.openChannel(msg);
         break;
     }
+    return undefined;
   },
 
   getURIFlags: function(msg) {
@@ -243,6 +246,7 @@ var AboutProtocolParent = {
       return module.getURIFlags(uri);
     } catch (e) {
       Cu.reportError(e);
+      return undefined;
     }
   },
 
@@ -273,7 +277,7 @@ var AboutProtocolParent = {
       } else {
         channel.loadGroup = null;
       }
-      let stream = channel.open();
+      let stream = channel.open2();
       let data = NetUtil.readInputStreamToString(stream, stream.available(), {});
       return {
         data: data,
@@ -281,6 +285,7 @@ var AboutProtocolParent = {
       };
     } catch (e) {
       Cu.reportError(e);
+      return undefined;
     }
   },
 };

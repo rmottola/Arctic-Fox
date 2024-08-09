@@ -19,7 +19,6 @@
 #undef GetBinaryType
 #undef RemoveDirectory
 
-#include "nsAutoPtr.h"
 #include "nsString.h"
 #include "nsRegion.h"
 #include "nsRect.h"
@@ -405,6 +404,18 @@ public:
   static uint32_t GetMaxTouchPoints();
 
   /**
+   * Detect if path is within the Users folder and Users is actually a junction
+   * point to another folder.
+   * If this is detected it will change the path to the actual path.
+   *
+   * @param aPath path to be resolved.
+   * @return true if successful, including if nothing needs to be changed.
+   *         false if something failed or aPath does not exist, aPath will
+   *               remain unchanged.
+   */
+  static bool ResolveMovedUsersFolder(std::wstring& aPath);
+
+  /**
   * dwmapi.dll function typedefs and declarations
   */
   typedef HRESULT (WINAPI*DwmExtendFrameIntoClientAreaProc)(HWND hWnd, const MARGINS *pMarInset);
@@ -433,6 +444,18 @@ public:
 
   static bool ShouldHideScrollbars();
 
+  /**
+   * This function normalizes the input path, converts short filenames to long
+   * filenames, and substitutes environment variables for system paths.
+   * The resulting output string length is guaranteed to be <= MAX_PATH.
+   */
+  static bool SanitizePath(const wchar_t* aInputPath, nsAString& aOutput);
+
+  /**
+   * Retrieve a semicolon-delimited list of DLL files derived from AppInit_DLLs
+   */
+  static bool GetAppInitDLLs(nsAString& aOutput);
+
 private:
   typedef HRESULT (WINAPI * SHCreateItemFromParsingNamePtr)(PCWSTR pszPath,
                                                             IBindCtx *pbc,
@@ -444,6 +467,9 @@ private:
                                                      HANDLE hToken,
                                                      PWSTR *ppszPath);
   static SHGetKnownFolderPathPtr sGetKnownFolderPath;
+
+  static void GetWhitelistedPaths(
+      nsTArray<mozilla::Pair<nsString,nsDependentString>>& aOutput);
 };
 
 #ifdef MOZ_PLACES
@@ -478,7 +504,7 @@ public:
 
   // Warning: AsyncEncodeAndWriteIcon assumes ownership of the aData buffer passed in
   AsyncEncodeAndWriteIcon(const nsAString &aIconPath,
-                          UniquePtr<uint8_t[]> aData, uint32_t aDataLen,
+                          UniquePtr<uint8_t[]> aData,
                           uint32_t aStride, uint32_t aWidth, uint32_t aHeight,
                           const bool aURLShortcut);
 
@@ -487,8 +513,6 @@ private:
 
   nsAutoString mIconPath;
   UniquePtr<uint8_t[]> mBuffer;
-  HMODULE sDwmDLL;
-  uint32_t mBufferLength;
   uint32_t mStride;
   uint32_t mWidth;
   uint32_t mHeight;

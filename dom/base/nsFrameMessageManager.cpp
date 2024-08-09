@@ -69,6 +69,8 @@ using namespace mozilla;
 using namespace mozilla::dom;
 using namespace mozilla::dom::ipc;
 
+static const size_t kMinTelemetryMessageSize = 8192;
+
 nsFrameMessageManager::nsFrameMessageManager(mozilla::dom::ipc::MessageManagerCallback* aCallback,
                                              nsFrameMessageManager* aParentManager,
                                              /* mozilla::dom::ipc::MessageManagerFlags */ uint32_t aFlags)
@@ -730,6 +732,12 @@ nsFrameMessageManager::SendMessage(const nsAString& aMessageName,
     return NS_ERROR_DOM_DATA_CLONE_ERR;
   }
 
+  if (data.DataLength() >= kMinTelemetryMessageSize) {
+    Telemetry::Accumulate(Telemetry::MESSAGE_MANAGER_MESSAGE_SIZE,
+                          NS_ConvertUTF16toUTF8(aMessageName),
+                          data.DataLength());
+  }
+
   JS::Rooted<JSObject*> objects(aCx);
   if (aArgc >= 3 && aObjects.isObject()) {
     objects = &aObjects.toObject();
@@ -808,6 +816,12 @@ nsFrameMessageManager::DispatchAsyncMessage(const nsAString& aMessageName,
   StructuredCloneData data;
   if (aArgc >= 2 && !GetParamsForMessage(aCx, aJSON, aTransfers, data)) {
     return NS_ERROR_DOM_DATA_CLONE_ERR;
+  }
+
+  if (data.DataLength() >= kMinTelemetryMessageSize) {
+    Telemetry::Accumulate(Telemetry::MESSAGE_MANAGER_MESSAGE_SIZE,
+                          NS_ConvertUTF16toUTF8(aMessageName),
+                          data.DataLength());
   }
 
   JS::Rooted<JSObject*> objects(aCx);
@@ -1643,7 +1657,7 @@ nsMessageManagerScriptExecutor::DidCreateGlobal()
 
 // static
 void
-nsMessageManagerScriptExecutor::Shutdown()
+nsMessageManagerScriptExecutor::PurgeCache()
 {
   if (sCachedScripts) {
     NS_ASSERTION(sCachedScripts != nullptr, "Need cached scripts");
@@ -1651,6 +1665,15 @@ nsMessageManagerScriptExecutor::Shutdown()
       delete iter.Data();
       iter.Remove();
     }
+  }
+}
+
+// static
+void
+nsMessageManagerScriptExecutor::Shutdown()
+{
+  if (sCachedScripts) {
+    PurgeCache();
 
     delete sCachedScripts;
     sCachedScripts = nullptr;
@@ -1776,25 +1799,21 @@ nsMessageManagerScriptExecutor::TryCacheLoadAndCompileScript(
       if (!JS::Compile(cx, options, srcBuf, &script)) {
         return;
       }
-    } else {
-      // We're going to run these against some non-global scope.
-      if (!JS::CompileForNonSyntacticScope(cx, options, srcBuf, &script)) {
-        return;
-      }
+    // We're going to run these against some non-global scope.
+    } else if (!JS::CompileForNonSyntacticScope(cx, options, srcBuf, &script)) {
+      return;
     }
 
+    MOZ_ASSERT(script);
     aScriptp.set(script);
 
     nsAutoCString scheme;
     uri->GetScheme(scheme);
     // We don't cache data: scripts!
     if (aShouldCache && !scheme.EqualsLiteral("data")) {
-      nsMessageManagerScriptHolder* holder;
-
       // Root the object also for caching.
-      if (script) {
-        holder = new nsMessageManagerScriptHolder(cx, script, aRunInGlobalScope);
-      }
+      nsMessageManagerScriptHolder* holder =
+        new nsMessageManagerScriptHolder(cx, script, aRunInGlobalScope);
       sCachedScripts->Put(aURL, holder);
     }
   }
@@ -2019,8 +2038,8 @@ public:
     if (aCpows && !cc->GetCPOWManager()->Wrap(aCx, aCpows, &cpows)) {
       return NS_ERROR_UNEXPECTED;
     }
-    if (!cc->SendAsyncMessage(PromiseFlatString(aMessage), data, cpows,
-                              IPC::Principal(aPrincipal))) {
+    if (!cc->SendAsyncMessage(PromiseFlatString(aMessage), cpows,
+                              IPC::Principal(aPrincipal), data)) {
       return NS_ERROR_UNEXPECTED;
     }
 

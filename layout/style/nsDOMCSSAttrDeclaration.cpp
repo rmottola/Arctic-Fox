@@ -80,7 +80,7 @@ nsDOMCSSAttributeDeclaration::SetCSSDeclaration(css::Declaration* aDecl)
 nsIDocument*
 nsDOMCSSAttributeDeclaration::DocToUpdate()
 {
-  // We need OwnerDoc() rather than GetCurrentDoc() because it might
+  // We need OwnerDoc() rather than GetUncomposedDoc() because it might
   // be the BeginUpdate call that inserts mElement into the document.
   return mElement->OwnerDoc();
 }
@@ -186,7 +186,7 @@ nsDOMCSSAttributeDeclaration::SetPropertyValue(const nsCSSProperty aPropID,
       aPropID == eCSSProperty_background_position) {
     nsIFrame* frame = mElement->GetPrimaryFrame();
     if (frame) {
-      ActiveLayerTracker::NotifyInlineStyleRuleModified(frame, aPropID);
+      ActiveLayerTracker::NotifyInlineStyleRuleModified(frame, aPropID, aValue, this);
     }
   }
   return nsDOMCSSDeclaration::SetPropertyValue(aPropID, aValue);

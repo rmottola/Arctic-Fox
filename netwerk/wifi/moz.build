@@ -25,17 +25,17 @@ else:
         'nsWifiMonitor.cpp',
     ]
 
-# osx_corewlan.mm has warnings I don't understand.
-if CONFIG['OS_ARCH'] == 'Darwin':
-    ALLOW_COMPILER_WARNINGS = True
-
 if CONFIG['OS_ARCH'] == 'Darwin':
     UNIFIED_SOURCES += [
         'nsWifiScannerMac.cpp',
     ]
-    UNIFIED_SOURCES += [
+    SOURCES += [
         'osx_corewlan.mm',
     ]
+    # osx_corewlan.mm has warnings about scanForNetworksWithParameters,
+    # bssidData and rssi. These are APIs that were removed in 10.7, so we need
+    # to accept the warnings when targeting the newer SDKs.
+    SOURCES['osx_corewlan.mm'].flags += ['-Wno-error=objc-method-access']
 elif CONFIG['OS_ARCH'] in ('DragonFly', 'FreeBSD'):
     UNIFIED_SOURCES += [
         'nsWifiScannerFreeBSD.cpp',

@@ -8,8 +8,6 @@
 #include "AccessCheck.h"
 #include "WrapperFactory.h"
 
-#include "nsContentUtils.h"
-#include "nsIControllers.h"
 #include "nsDependentString.h"
 #include "nsIScriptError.h"
 #include "mozilla/dom/Element.h"
@@ -86,6 +84,7 @@ IsJSXraySupported(JSProtoKey key)
       case JSProto_TypedArray:
       case JSProto_SavedFrame:
       case JSProto_RegExp:
+      case JSProto_Promise:
         return true;
       default:
         return false;
@@ -574,11 +573,11 @@ JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
 
                     if (ShouldResolveStaticProperties(standardConstructor)) {
                         const js::Class* clasp = js::ProtoKeyToClass(standardConstructor);
-                        MOZ_ASSERT(clasp->spec.defined());
+                        MOZ_ASSERT(clasp->specDefined());
 
                         if (!TryResolvePropertyFromSpecs(cx, id, holder,
-                               clasp->spec.constructorFunctions(),
-                               clasp->spec.constructorProperties(), desc)) {
+                               clasp->specConstructorFunctions(),
+                               clasp->specConstructorProperties(), desc)) {
                             return false;
                         }
 
@@ -657,13 +656,13 @@ JSXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper,
 
     // Grab the JSClass. We require all Xrayable classes to have a ClassSpec.
     const js::Class* clasp = js::GetObjectClass(target);
-    MOZ_ASSERT(clasp->spec.defined());
+    MOZ_ASSERT(clasp->specDefined());
 
     // Indexed array properties are handled above, so we can just work with the
     // class spec here.
     if (!TryResolvePropertyFromSpecs(cx, id, holder,
-                                     clasp->spec.prototypeFunctions(),
-                                     clasp->spec.prototypeProperties(),
+                                     clasp->specPrototypeFunctions(),
+                                     clasp->specPrototypeProperties(),
                                      desc)) {
         return false;
     }
@@ -865,11 +864,11 @@ JSXrayTraits::enumerateNames(JSContext* cx, HandleObject wrapper, unsigned flags
 
                 if (ShouldResolveStaticProperties(standardConstructor)) {
                     const js::Class* clasp = js::ProtoKeyToClass(standardConstructor);
-                    MOZ_ASSERT(clasp->spec.defined());
+                    MOZ_ASSERT(clasp->specDefined());
 
                     if (!AppendNamesFromFunctionAndPropertySpecs(
-                           cx, clasp->spec.constructorFunctions(),
-                           clasp->spec.constructorProperties(), flags, props)) {
+                           cx, clasp->specConstructorFunctions(),
+                           clasp->specConstructorProperties(), flags, props)) {
                         return false;
                     }
                 }
@@ -906,11 +905,11 @@ JSXrayTraits::enumerateNames(JSContext* cx, HandleObject wrapper, unsigned flags
 
     // Grab the JSClass. We require all Xrayable classes to have a ClassSpec.
     const js::Class* clasp = js::GetObjectClass(target);
-    MOZ_ASSERT(clasp->spec.defined());
+    MOZ_ASSERT(clasp->specDefined());
 
     return AppendNamesFromFunctionAndPropertySpecs(
-        cx, clasp->spec.prototypeFunctions(),
-        clasp->spec.prototypeProperties(), flags, props);
+        cx, clasp->specPrototypeFunctions(),
+        clasp->specPrototypeProperties(), flags, props);
 }
 
 bool
@@ -1056,11 +1055,15 @@ ExpandoObjectFinalize(JSFreeOp* fop, JSObject* obj)
     NS_RELEASE(principal);
 }
 
+static const JSClassOps ExpandoObjectClassOps = {
+    nullptr, nullptr, nullptr, nullptr,
+    nullptr, nullptr, nullptr, ExpandoObjectFinalize
+};
+
 const JSClass ExpandoObjectClass = {
     "XrayExpandoObject",
     JSCLASS_HAS_RESERVED_SLOTS(JSSLOT_EXPANDO_COUNT),
-    nullptr, nullptr, nullptr, nullptr,
-    nullptr, nullptr, nullptr, ExpandoObjectFinalize
+    &ExpandoObjectClassOps
 };
 
 bool
@@ -1297,17 +1300,10 @@ IsXPCWNHolderClass(const JSClass* clasp)
 static nsGlobalWindow*
 AsWindow(JSContext* cx, JSObject* wrapper)
 {
-  nsGlobalWindow* win;
   // We want to use our target object here, since we don't want to be
   // doing a security check while unwrapping.
   JSObject* target = XrayTraits::getTargetObject(wrapper);
-  nsresult rv = UNWRAP_OBJECT(Window, target, win);
-  if (NS_SUCCEEDED(rv))
-      return win;
-
-  nsCOMPtr<nsPIDOMWindowInner> piWin = do_QueryInterface(
-      nsContentUtils::XPConnect()->GetNativeOfWrapper(cx, target));
-  return nsGlobalWindow::Cast(piWin);
+  return WindowOrNull(target);
 }
 
 static bool
@@ -1346,53 +1342,6 @@ XPCWrappedNativeXrayTraits::resolveNativeProperty(JSContext* cx, HandleObject wr
     // shortcut here. We will not find the property.
     if (!JSID_IS_STRING(id))
         return true;
-
-    // The |controllers| property is accessible as a [ChromeOnly] property on
-    // Window.WebIDL, and [noscript] in XPIDL. Chrome needs to see this over
-    // Xray, so we need to special-case it until we move |Window| to WebIDL.
-    nsGlobalWindow* win = nullptr;
-    if (id == GetRTIdByIndex(cx, XPCJSRuntime::IDX_CONTROLLERS) &&
-        AccessCheck::isChrome(wrapper) &&
-        (win = AsWindow(cx, wrapper)))
-    {
-        nsCOMPtr<nsIControllers> c;
-        nsresult rv = win->GetControllers(getter_AddRefs(c));
-        if (NS_SUCCEEDED(rv) && c) {
-            rv = nsXPConnect::XPConnect()->WrapNativeToJSVal(cx, CurrentGlobalOrNull(cx),
-                                                             c, nullptr, nullptr, true,
-                                                             desc.value());
-        }
-
-        if (NS_FAILED(rv) || !c) {
-            JS_ReportError(cx, "Failed to invoke GetControllers via Xrays");
-            return false;
-        }
-
-        desc.object().set(wrapper);
-        return true;
-    }
-
-    // The |realFrameElement| property is accessible as a [ChromeOnly] property
-    // on Window.WebIDL, and [noscript] in XPIDL. Chrome needs to see this over
-    // Xray, so we need to special-case it until we move |Window| to WebIDL.
-    if (id == GetRTIdByIndex(cx, XPCJSRuntime::IDX_REALFRAMEELEMENT) &&
-        AccessCheck::isChrome(wrapper) &&
-        (win = AsWindow(cx, wrapper)))
-    {
-        ErrorResult rv;
-        Element* f = win->GetRealFrameElement(rv);
-        if (!f) {
-          desc.object().set(nullptr);
-          return true;
-        }
-
-        if (!GetOrCreateDOMReflector(cx, f, desc.value())) {
-          return false;
-        }
-
-        desc.object().set(wrapper);
-        return true;
-    }
 
     XPCNativeInterface* iface;
     XPCNativeMember* member;
@@ -1574,53 +1523,11 @@ XPCWrappedNativeXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsW
     if (!ok || desc.object())
         return ok;
 
-    // Check for indexed access on a window.
-    uint32_t index = GetArrayIndexFromId(cx, id);
-    if (IsArrayIndex(index)) {
-        nsGlobalWindow* win = AsWindow(cx, wrapper);
-        // Note: As() unwraps outer windows to get to the inner window.
-        if (win) {
-            nsCOMPtr<nsPIDOMWindowOuter> subframe = win->IndexedGetter(index);
-            if (subframe) {
-                subframe->EnsureInnerWindow();
-                nsGlobalWindow* global = nsGlobalWindow::Cast(subframe);
-                JSObject* obj = global->FastGetGlobalJSObject();
-                if (MOZ_UNLIKELY(!obj)) {
-                    // It's gone?
-                    return xpc::Throw(cx, NS_ERROR_FAILURE);
-                }
-                desc.value().setObject(*obj);
-                FillPropertyDescriptor(desc, wrapper, true);
-                return JS_WrapPropertyDescriptor(cx, desc);
-            }
-        }
-    }
-
     // Xray wrappers don't use the regular wrapper hierarchy, so we should be
     // in the wrapper's compartment here, not the wrappee.
     MOZ_ASSERT(js::IsObjectInContextCompartment(wrapper, cx));
 
     return JS_GetOwnPropertyDescriptorById(cx, holder, id, desc);
-}
-
-bool
-XPCWrappedNativeXrayTraits::defineProperty(JSContext* cx, HandleObject wrapper, HandleId id,
-                                           Handle<PropertyDescriptor> desc,
-                                           Handle<PropertyDescriptor> existingDesc,
-                                           JS::ObjectOpResult& result, bool* defined)
-{
-    *defined = false;
-    RootedObject holder(cx, singleton.ensureHolder(cx, wrapper));
-
-    // Check for an indexed property on a Window.  If that's happening, do
-    // nothing but claim we defined it so it won't get added as an expando.
-    int32_t index = GetArrayIndexFromId(cx, id);
-    if (IsArrayIndex(index) && IsWindow(cx, wrapper)) {
-        *defined = true;
-        return result.succeed();
-    }
-
-    return true;
 }
 
 bool
@@ -1721,7 +1628,7 @@ DOMXrayTraits::resolveOwnProperty(JSContext* cx, const Wrapper& jsWrapper, Handl
         return ok;
 
     // Check for indexed access on a window.
-    int32_t index = GetArrayIndexFromId(cx, id);
+    uint32_t index = GetArrayIndexFromId(cx, id);
     if (IsArrayIndex(index)) {
         nsGlobalWindow* win = AsWindow(cx, wrapper);
         // Note: As() unwraps outer windows to get to the inner window.
@@ -1803,14 +1710,15 @@ DOMXrayTraits::call(JSContext* cx, HandleObject wrapper,
     // are using "legacycaller", which basically means plug-ins.  We want to
     // call those on the content compartment.
     if (clasp->flags & JSCLASS_IS_DOMIFACEANDPROTOJSCLASS) {
-        if (!clasp->call) {
+        if (JSNative call = clasp->getCall()) {
+            // call it on the Xray compartment
+            if (!call(cx, args.length(), args.base()))
+                return false;
+        } else {
             RootedValue v(cx, ObjectValue(*wrapper));
             js::ReportIsNotFunction(cx, v);
             return false;
         }
-        // call it on the Xray compartment
-        if (!clasp->call(cx, args.length(), args.base()))
-            return false;
     } else {
         // This is only reached for WebIDL instance objects, and in practice
         // only for plugins.  Just call them on the content compartment.
@@ -1829,13 +1737,14 @@ DOMXrayTraits::construct(JSContext* cx, HandleObject wrapper,
     const js::Class* clasp = js::GetObjectClass(obj);
     // See comments in DOMXrayTraits::call() explaining what's going on here.
     if (clasp->flags & JSCLASS_IS_DOMIFACEANDPROTOJSCLASS) {
-        if (!clasp->construct) {
+        if (JSNative construct = clasp->getConstruct()) {
+            if (!construct(cx, args.length(), args.base()))
+                return false;
+        } else {
             RootedValue v(cx, ObjectValue(*wrapper));
             js::ReportIsNotFunction(cx, v);
             return false;
         }
-        if (!clasp->construct(cx, args.length(), args.base()))
-            return false;
     } else {
         if (!baseInstance.construct(cx, wrapper, args))
             return false;
@@ -2315,8 +2224,14 @@ bool
 XrayWrapper<Base, Traits>::has(JSContext* cx, HandleObject wrapper,
                                HandleId id, bool* bp) const
 {
-    // Skip our Base if it isn't already ProxyHandler.
-    return js::BaseProxyHandler::has(cx, wrapper, id, bp);
+    // This uses getPropertyDescriptor for backward compatibility with
+    // the old BaseProxyHandler::has implementation.
+    Rooted<PropertyDescriptor> desc(cx);
+    if (!getPropertyDescriptor(cx, wrapper, id, &desc))
+        return false;
+
+    *bp = !!desc.object();
+    return true;
 }
 
 template <typename Base, typename Traits>

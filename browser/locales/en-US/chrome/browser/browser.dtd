@@ -156,6 +156,7 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY addCurPagesCmd.label "Bookmark All Tabs…">
 <!ENTITY showAllBookmarks2.label "Show All Bookmarks">
 <!ENTITY organizeBookmarks.label "Organize Bookmarks">
+<!ENTITY recentBookmarks.label "Recently Bookmarked">
 <!ENTITY unsortedBookmarksCmd.label "Unsorted Bookmarks">
 <!ENTITY bookmarksToolbarChevron.tooltip "Show more bookmarks">
 
@@ -235,6 +236,12 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY webDeveloperMenu.label       "Web Developer">
 <!ENTITY webDeveloperMenu.accesskey   "W">
 
+<!ENTITY devToolsCmd.keycode          "VK_F12">
+<!ENTITY devToolsCmd.keytext          "F12">
+
+<!ENTITY devtoolsServiceWorkers.label      "Service Workers">
+<!ENTITY devtoolsServiceWorkers.accesskey  "k">
+
 <!ENTITY devtoolsConnect.label        "Connect…">
 <!ENTITY devtoolsConnect.accesskey    "e">
 
@@ -250,9 +257,9 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY inspectContextMenu.label     "Inspect Element">
 <!ENTITY inspectContextMenu.accesskey "Q">
 
-<!ENTITY responsiveDesignTool.label   "Responsive Design View">
-<!ENTITY responsiveDesignTool.accesskey "R">
-<!ENTITY responsiveDesignTool.commandkey "M">
+<!ENTITY responsiveDesignMode.label   "Responsive Design Mode">
+<!ENTITY responsiveDesignMode.accesskey "R">
+<!ENTITY responsiveDesignMode.commandkey "M">
 
 <!ENTITY eyedropper.label   "Eyedropper">
 <!ENTITY eyedropper.accesskey "Y">
@@ -699,7 +706,6 @@ you can use these alternative items. Otherwise, their values should be empty.  -
 <!ENTITY spellAddDictionaries.accesskey "A">
 
 <!ENTITY editBookmark.done.label                     "Done">
-<!ENTITY editBookmark.cancel.label                   "Cancel">
 <!ENTITY editBookmark.removeBookmark.accessKey       "R">
 
 <!ENTITY identity.connectionSecure "Secure Connection">
@@ -727,6 +733,20 @@ you can use these alternative items. Otherwise, their values should be empty.  -
 <!ENTITY syncReAuthItem.label         "Reconnect to &syncBrand.shortName.label;…">
 <!ENTITY syncReAuthItem.accesskey     "R">
 <!ENTITY syncToolbarButton.label      "Sync">
+
+<!ENTITY customizeMode.menuAndToolbars.header2 "Additional Tools and Features">
+<!ENTITY customizeMode.menuAndToolbars.empty "Want more tools?">
+<!ENTITY customizeMode.menuAndToolbars.emptyLink "Choose from thousands of add-ons">
+<!ENTITY customizeMode.restoreDefaults "Restore Defaults">
+<!ENTITY customizeMode.toolbars "Show / Hide Toolbars">
+<!ENTITY customizeMode.titlebar "Title Bar">
+<!ENTITY customizeMode.lwthemes "Themes">
+<!ENTITY customizeMode.lwthemes.myThemes "My Themes">
+<!ENTITY customizeMode.lwthemes.recommended "Recommended">
+<!ENTITY customizeMode.lwthemes.menuManage "Manage">
+<!ENTITY customizeMode.lwthemes.menuManage.accessKey "M">
+<!ENTITY customizeMode.lwthemes.menuGetMore "Get More Themes">
+<!ENTITY customizeMode.lwthemes.menuGetMore.accessKey "G">
 
 <!ENTITY getUserMedia.selectCamera.label "Camera to share:">
 <!ENTITY getUserMedia.selectCamera.accesskey "C">
@@ -791,10 +811,3 @@ you can use these alternative items. Otherwise, their values should be empty.  -
 <!-- Pre-landed strings for bug 1123519 -->
 <!ENTITY readingList.sidebar.add.label            "Add to Reading List">
 <!ENTITY readingList.sidebar.add.tooltip          "Add this page to your Reading List">
-
-<!-- LOCALIZATION NOTE (saveToPocketCmd.label, saveLinkToPocketCmd.label, pocketMenuitem.label): Pocket is a brand name -->
-<!ENTITY saveToPocketCmd.label     "Save Page to Pocket">
-<!ENTITY saveToPocketCmd.accesskey "k">
-<!ENTITY saveLinkToPocketCmd.label     "Save Link to Pocket">
-<!ENTITY saveLinkToPocketCmd.accesskey "o">
-<!ENTITY pocketMenuitem.label      "View Pocket List">

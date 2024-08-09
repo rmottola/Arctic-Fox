@@ -14,7 +14,6 @@ Cu.import("resource://gre/modules/Services.jsm", this);
 Cu.import("resource://gre/modules/Task.jsm", this);
 Cu.import("resource://gre/modules/Timer.jsm", this);
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
-Cu.import("resource://services-common/utils.js", this);
 Cu.import("resource://gre/modules/TelemetryController.jsm");
 Cu.import("resource://gre/modules/KeyValueParser.jsm");
 
@@ -532,6 +531,7 @@ this.CrashManager.prototype = Object.freeze({
           // If we have a saved environment, use it. Otherwise report
           // the current environment.
           let crashEnvironment = null;
+          let sessionId = null;
           let reportMeta = Cu.cloneInto(metadata, myScope);
           if ('TelemetryEnvironment' in reportMeta) {
             try {
@@ -541,10 +541,15 @@ this.CrashManager.prototype = Object.freeze({
             }
             delete reportMeta.TelemetryEnvironment;
           }
+          if ('TelemetrySessionId' in reportMeta) {
+            sessionId = reportMeta.TelemetrySessionId;
+            delete reportMeta.TelemetrySessionId;
+          }
           TelemetryController.submitExternalPing("crash",
             {
               version: 1,
               crashDate: date.toISOString().slice(0, 10), // YYYY-MM-DD
+              sessionId: sessionId,
               metadata: reportMeta,
               hasCrashEnvironment: (crashEnvironment !== null),
             },

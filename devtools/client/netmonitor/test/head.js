@@ -283,7 +283,7 @@ function verifyRequestItemTarget(aRequestItem, aMethod, aUrl, aData = {}) {
   info("Visible index of item: " + visibleIndex);
 
   let { fuzzyUrl, status, statusText, type, fullMimeType,
-        transferred, size, time, fromCache } = aData;
+        transferred, size, time, displayedStatus } = aData;
   let { attachment, target } = aRequestItem
 
   let uri = Services.io.newURI(aUrl, null, null).QueryInterface(Ci.nsIURL);
@@ -330,7 +330,7 @@ function verifyRequestItemTarget(aRequestItem, aMethod, aUrl, aData = {}) {
     info("Displayed status: " + value);
     info("Displayed code: " + codeValue);
     info("Tooltip status: " + tooltip);
-    is(value, fromCache ? "cached" : status, "The displayed status is correct.");
+    is(value, displayedStatus ? displayedStatus : status, "The displayed status is correct.");
     is(codeValue, status, "The displayed status code is correct.");
     is(tooltip, status + " " + statusText, "The tooltip status is correct.");
   }
@@ -425,7 +425,7 @@ function testFilterButtons(aMonitor, aFilterType) {
  */
 function testFilterButtonsCustom(aMonitor, aIsChecked) {
   let doc = aMonitor.panelWin.document;
-  let buttons = doc.querySelectorAll(".requests-menu-footer-button");
+  let buttons = doc.querySelectorAll(".requests-menu-filter-button");
   for (let i = 0; i < aIsChecked.length; i++) {
     let button = buttons[i];
     if (aIsChecked[i]) {

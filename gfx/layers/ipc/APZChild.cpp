@@ -78,12 +78,17 @@ APZChild::Create(const dom::TabId& aTabId)
   return apz.forget();
 }
 
+APZChild::APZChild()
+  : mDestroyed(false)
+{
+}
+
 APZChild::~APZChild()
 {
   if (mObserver) {
     nsCOMPtr<nsIObserverService> os = services::GetObserverService();
     os->RemoveObserver(mObserver, "tab-child-created");
-  } else {
+  } else if (mBrowser) {
     mBrowser->SetAPZChild(nullptr);
   }
 }
@@ -92,14 +97,6 @@ bool
 APZChild::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
 {
   return mBrowser->UpdateFrame(aFrameMetrics);
-}
-
-bool
-APZChild::RecvRequestFlingSnap(const FrameMetrics::ViewID& aScrollId,
-                               const mozilla::CSSPoint& aDestination)
-{
-  APZCCallbackHelper::RequestFlingSnap(aScrollId, aDestination);
-  return true;
 }
 
 bool
@@ -159,6 +156,18 @@ APZChild::RecvNotifyFlushComplete()
   return true;
 }
 
+bool
+APZChild::RecvDestroy()
+{
+  mDestroyed = true;
+  if (mBrowser) {
+    mBrowser->SetAPZChild(nullptr);
+    mBrowser = nullptr;
+  }
+  PAPZChild::Send__delete__(this);
+  return true;
+}
+
 void
 APZChild::SetObserver(nsIObserver* aObserver)
 {
@@ -175,8 +184,13 @@ APZChild::SetBrowser(dom::TabChild* aBrowser)
     os->RemoveObserver(mObserver, "tab-child-created");
     mObserver = nullptr;
   }
-  mBrowser = aBrowser;
-  mBrowser->SetAPZChild(this);
+  // We might get the tab-child-created notification after we receive a
+  // Destroy message from the parent. In that case we don't want to install
+  // ourselves with the browser.
+  if (!mDestroyed) {
+    mBrowser = aBrowser;
+    mBrowser->SetAPZChild(this);
+  }
 }
 
 } // namespace layers

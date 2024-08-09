@@ -24,7 +24,6 @@ NS_NewHTMLDetailsElement(already_AddRefed<mozilla::dom::NodeInfo>&& aNodeInfo,
 namespace mozilla {
 namespace dom {
 
-
 /* static */ bool
 HTMLDetailsElement::IsDetailsEnabled()
 {
@@ -74,8 +73,7 @@ HTMLDetailsElement::GetAttributeChangeHint(const nsIAtom* aAttribute,
 
 nsresult
 HTMLDetailsElement::BeforeSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
-                                  nsAttrValueOrString* aValue,
-                                  bool aNotify)
+                                  nsAttrValueOrString* aValue, bool aNotify)
 {
   if (aNameSpaceID == kNameSpaceID_None && aName == nsGkAtoms::open) {
     bool setOpen = aValue != nullptr;

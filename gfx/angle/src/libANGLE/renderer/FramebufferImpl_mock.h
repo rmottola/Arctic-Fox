@@ -23,23 +23,15 @@ class MockFramebufferImpl : public rx::FramebufferImpl
     MockFramebufferImpl() : rx::FramebufferImpl(gl::Framebuffer::Data()) {}
     virtual ~MockFramebufferImpl() { destroy(); }
 
-    MOCK_METHOD1(onUpdateColorAttachment, void(size_t));
-    MOCK_METHOD0(onUpdateDepthAttachment, void());
-    MOCK_METHOD0(onUpdateStencilAttachment, void());
-    MOCK_METHOD0(onUpdateDepthStencilAttachment, void());
-
-    MOCK_METHOD2(setDrawBuffers, void(size_t, const GLenum *));
-    MOCK_METHOD1(setReadBuffer, void(GLenum));
-
     MOCK_METHOD2(discard, gl::Error(size_t, const GLenum *));
     MOCK_METHOD2(invalidate, gl::Error(size_t, const GLenum *));
     MOCK_METHOD3(invalidateSub, gl::Error(size_t, const GLenum *, const gl::Rectangle &));
 
     MOCK_METHOD2(clear, gl::Error(const gl::Data &, GLbitfield));
-    MOCK_METHOD4(clearBufferfv, gl::Error(const gl::State &, GLenum, GLint, const GLfloat *));
-    MOCK_METHOD4(clearBufferuiv, gl::Error(const gl::State &, GLenum, GLint, const GLuint *));
-    MOCK_METHOD4(clearBufferiv, gl::Error(const gl::State &, GLenum, GLint, const GLint *));
-    MOCK_METHOD5(clearBufferfi, gl::Error(const gl::State &, GLenum, GLint, GLfloat, GLint));
+    MOCK_METHOD4(clearBufferfv, gl::Error(const gl::Data &, GLenum, GLint, const GLfloat *));
+    MOCK_METHOD4(clearBufferuiv, gl::Error(const gl::Data &, GLenum, GLint, const GLuint *));
+    MOCK_METHOD4(clearBufferiv, gl::Error(const gl::Data &, GLenum, GLint, const GLint *));
+    MOCK_METHOD5(clearBufferfi, gl::Error(const gl::Data &, GLenum, GLint, GLfloat, GLint));
 
     MOCK_CONST_METHOD0(getImplementationColorReadFormat, GLenum());
     MOCK_CONST_METHOD0(getImplementationColorReadType, GLenum());
@@ -55,10 +47,25 @@ class MockFramebufferImpl : public rx::FramebufferImpl
                            GLenum,
                            const gl::Framebuffer *));
 
-    MOCK_CONST_METHOD0(checkStatus, GLenum());
+    MOCK_CONST_METHOD0(checkStatus, bool());
+
+    MOCK_METHOD1(syncState, void(const gl::Framebuffer::DirtyBits &));
 
     MOCK_METHOD0(destroy, void());
 };
+
+inline ::testing::NiceMock<MockFramebufferImpl> *MakeFramebufferMock()
+{
+    ::testing::NiceMock<MockFramebufferImpl> *framebufferImpl =
+        new ::testing::NiceMock<MockFramebufferImpl>();
+    // TODO(jmadill): add ON_CALLS for other returning methods
+    ON_CALL(*framebufferImpl, checkStatus()).WillByDefault(::testing::Return(true));
+
+    // We must mock the destructor since NiceMock doesn't work for destructors.
+    EXPECT_CALL(*framebufferImpl, destroy()).Times(1).RetiresOnSaturation();
+
+    return framebufferImpl;
+}
 
 }  // namespace rx
 

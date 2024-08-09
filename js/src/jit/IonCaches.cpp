@@ -383,6 +383,12 @@ IonCache::updateBaseAddress(JitCode* code, MacroAssembler& masm)
     rejoinLabel_.repoint(code, &masm);
 }
 
+void IonCache::trace(JSTracer* trc)
+{
+    if (script_)
+        TraceManuallyBarrieredEdge(trc, &script_, "IonCache::script_");
+}
+
 static void*
 GetReturnAddressToIonCode(JSContext* cx)
 {
@@ -484,7 +490,7 @@ IsCacheableNoProperty(JSObject* obj, JSObject* holder, Shape* shape, jsbytecode*
 
     // Just because we didn't find the property on the object doesn't mean it
     // won't magically appear through various engine hacks.
-    if (obj->getClass()->getProperty)
+    if (obj->getClass()->getGetProperty())
         return false;
 
     // Don't generate missing property ICs if we skipped a non-native object, as
@@ -700,10 +706,10 @@ CheckDOMProxyExpandoDoesNotShadow(JSContext* cx, MacroAssembler& masm, JSObject*
         ExpandoAndGeneration* expandoAndGeneration = (ExpandoAndGeneration*)expandoVal.toPrivate();
         masm.movePtr(ImmPtr(expandoAndGeneration), tempVal.scratchReg());
 
-        masm.branch32(Assembler::NotEqual,
+        masm.branch64(Assembler::NotEqual,
                       Address(tempVal.scratchReg(),
                               ExpandoAndGeneration::offsetOfGeneration()),
-                      Imm32(expandoAndGeneration->generation),
+                      Imm64(expandoAndGeneration->generation),
                       &failDOMProxyCheck);
 
         expandoVal = expandoAndGeneration->expando;
@@ -3294,7 +3300,7 @@ IsPropertyAddInlineable(JSContext* cx, NativeObject* obj, HandleId id, ConstantO
         return false;
 
     // Likewise for an addProperty hook, since we'll need to invoke it.
-    if (obj->getClass()->addProperty)
+    if (obj->getClass()->getAddProperty())
         return false;
 
     if (!obj->nonProxyIsExtensible() || !shape->writable())

@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* import-globals-from ../../debugger-controller.js */
 "use strict";
 
 const utils = require('../utils');
@@ -239,6 +240,18 @@ SourcesView.prototype = Heritage.extend(WidgetMethods, {
     contents.setAttribute("crop", "start");
     contents.setAttribute("flex", "1");
     contents.setAttribute("tooltiptext", unicodeUrl);
+
+    if (aSource.introductionType === "wasm") {
+      const wasm = document.createElement("box");
+      wasm.className = "dbg-wasm-item";
+      const icon = document.createElement("box");
+      icon.setAttribute("tooltiptext", L10N.getStr("experimental"));
+      icon.className = "icon";
+      wasm.appendChild(icon);
+      wasm.appendChild(contents);
+
+      contents = wasm;
+    }
 
     // If the source is blackboxed, apply the appropriate style.
     if (gThreadClient.source(aSource).isBlackBoxed) {

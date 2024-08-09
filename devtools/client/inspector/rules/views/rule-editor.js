@@ -25,6 +25,9 @@ const {
   SELECTOR_ELEMENT,
   SELECTOR_PSEUDO_CLASS
 } = require("devtools/client/shared/css-parsing-utils");
+const promise = require("promise");
+const Services = require("Services");
+const EventEmitter = require("devtools/shared/event-emitter");
 
 XPCOMUtils.defineLazyGetter(this, "_strings", function() {
   return Services.strings.createBundle(
@@ -40,12 +43,20 @@ const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
  *     for its TextProperties.
  *   Manages creation of new text properties.
  *
+ * One step of a RuleEditor's instantiation is figuring out what's the original
+ * source link to the parent stylesheet (in case of source maps). This step is
+ * asynchronous and is triggered as soon as the RuleEditor is instantiated (see
+ * updateSourceLink). If you need to know when the RuleEditor is done with this,
+ * you need to listen to the source-link-updated event.
+ *
  * @param {CssRuleView} ruleView
  *        The CssRuleView containg the document holding this rule editor.
  * @param {Rule} rule
  *        The Rule object we're editing.
  */
 function RuleEditor(ruleView, rule) {
+  EventEmitter.decorate(this);
+
   this.ruleView = ruleView;
   this.doc = this.ruleView.styleDocument;
   this.rule = rule;
@@ -86,6 +97,7 @@ RuleEditor.prototype = {
     this.element = this.doc.createElementNS(HTML_NS, "div");
     this.element.className = "ruleview-rule theme-separator";
     this.element.setAttribute("uneditable", !this.isEditable);
+    this.element.setAttribute("unmatched", this.rule.isUnmatched);
     this.element._ruleEditor = this;
 
     // Give a relative position for the inplace editor's measurement
@@ -166,11 +178,22 @@ RuleEditor.prototype = {
     });
 
     if (this.isEditable) {
+      // A newProperty editor should only be created when no editor was
+      // previously displayed. Since the editors are cleared on blur,
+      // check this.ruleview.isEditing on mousedown
+      this._ruleViewIsEditing = false;
+
+      code.addEventListener("mousedown", () => {
+        this._ruleViewIsEditing = this.ruleView.isEditing;
+      });
+
       code.addEventListener("click", () => {
         let selection = this.doc.defaultView.getSelection();
-        if (selection.isCollapsed) {
+        if (selection.isCollapsed && !this._ruleViewIsEditing) {
           this.newProperty();
         }
+        // Cleanup the _ruleViewIsEditing flag
+        this._ruleViewIsEditing = false;
       }, false);
 
       this.element.addEventListener("mousedown", () => {
@@ -223,10 +246,21 @@ RuleEditor.prototype = {
     let showOrig = Services.prefs.getBoolPref(PREF_ORIG_SOURCES);
     if (showOrig && !this.rule.isSystem &&
         this.rule.domRule.type !== ELEMENT_STYLE) {
+      // Only get the original source link if the right pref is set, if the rule
+      // isn't a system rule and if it isn't an inline rule.
       this.rule.getOriginalSourceStrings().then((strings) => {
         sourceLabel.setAttribute("value", strings.short);
         sourceLabel.setAttribute("tooltiptext", strings.full);
-      }, console.error);
+      }, e => console.error(e)).then(() => {
+        this.emit("source-link-updated");
+      });
+    } else {
+      // If we're not getting the original source link, then we can emit the
+      // event immediately (but still asynchronously to give consumers a chance
+      // to register it after having instantiated the RuleEditor).
+      promise.resolve().then(() => {
+        this.emit("source-link-updated");
+      });
     }
   },
 
@@ -309,13 +343,16 @@ RuleEditor.prototype = {
    *        Property value.
    * @param {String} priority
    *        Property priority.
+   * @param {Boolean} enabled
+   *        True if the property should be enabled.
    * @param {TextProperty} siblingProp
    *        Optional, property next to which the new property will be added.
    * @return {TextProperty}
    *        The new property
    */
-  addProperty: function(name, value, priority, siblingProp) {
-    let prop = this.rule.createProperty(name, value, priority, siblingProp);
+  addProperty: function(name, value, priority, enabled, siblingProp) {
+    let prop = this.rule.createProperty(name, value, priority, enabled,
+      siblingProp);
     let index = this.rule.textProps.indexOf(prop);
     let editor = new TextPropertyEditor(this, prop);
 
@@ -352,7 +389,10 @@ RuleEditor.prototype = {
 
     let lastProp = siblingProp;
     for (let p of properties) {
-      lastProp = this.addProperty(p.name, p.value, p.priority, lastProp);
+      let isCommented = Boolean(p.commentOffsets);
+      let enabled = !isCommented;
+      lastProp = this.addProperty(p.name, p.value, p.priority, enabled,
+        lastProp);
     }
 
     // Either focus on the last value if incomplete, or start a new one.
@@ -421,7 +461,7 @@ RuleEditor.prototype = {
     // case, we're creating a new declaration, it doesn't make sense to accept
     // these entries
     this.multipleAddedProperties =
-      parseDeclarations(value).filter(d => d.name);
+      parseDeclarations(value, true).filter(d => d.name);
 
     // Blur the editor field now and deal with adding declarations later when
     // the field gets destroyed (see _newPropertyDestroy)
@@ -494,6 +534,7 @@ RuleEditor.prototype = {
         return;
       }
 
+      ruleProps.isUnmatched = !isMatching;
       let newRule = new Rule(elementStyle, ruleProps);
       let editor = new RuleEditor(ruleView, newRule);
       let rules = elementStyle.rules;
@@ -503,7 +544,6 @@ RuleEditor.prototype = {
       elementStyle._changed();
       elementStyle.markOverriddenAll();
 
-      editor.element.setAttribute("unmatched", !isMatching);
       this.element.parentNode.replaceChild(editor.element, this.element);
 
       // Remove highlight for modified selector

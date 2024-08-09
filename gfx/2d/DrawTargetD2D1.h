@@ -164,6 +164,7 @@ private:
   // This function will mark the surface as changing, and make sure any
   // copy-on-write snapshots are notified.
   void MarkChanged();
+  bool ShouldClipTemporarySurfaceDrawing(CompositionOp aOp, const Pattern& aPattern, bool aClipIsComplex);
   void PrepareForDrawing(CompositionOp aOp, const Pattern &aPattern);
   void FinalizeDrawing(CompositionOp aOp, const Pattern &aPattern);
   void FlushTransformToDC() {
@@ -265,6 +266,8 @@ private:
   TargetSet mDependentTargets;
   // A list of targets which have this object in their mDependentTargets set
   TargetSet mDependingOnTargets;
+
+  uint32_t mUsedCommandListsSincePurge;
 
   static ID2D1Factory1 *mFactory;
   static IDWriteFactory *mDWriteFactory;

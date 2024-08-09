@@ -259,6 +259,11 @@ nsresult nsJSThunk::EvaluateScript(nsIChannel *aChannel,
         return NS_ERROR_DOM_RETVAL_UNDEFINED;
     }
 
+    // Fail if someone tries to execute in a global with system principal.
+    if (nsContentUtils::IsSystemPrincipal(objectPrincipal)) {
+        return NS_ERROR_DOM_SECURITY_ERR;
+    }
+
     JS::Rooted<JS::Value> v (cx, JS::UndefinedValue());
     // Finally, we have everything needed to evaluate the expression.
     JS::CompileOptions options(cx);
@@ -1222,6 +1227,7 @@ nsJSProtocolHandler::NewChannel2(nsIURI* uri,
                                  nsIChannel** result)
 {
     nsresult rv;
+
     NS_ENSURE_ARG_POINTER(uri);
 
     RefPtr<nsJSChannel> channel = new nsJSChannel();
@@ -1237,7 +1243,6 @@ nsJSProtocolHandler::NewChannel2(nsIURI* uri,
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (NS_SUCCEEDED(rv)) {
-        *result = channel;
         channel.forget(result);
     }
     return rv;

@@ -28,6 +28,7 @@ class APZEventState;
 // tree.
 class ChromeProcessController : public mozilla::layers::GeckoContentController
 {
+protected:
   typedef mozilla::layers::FrameMetrics FrameMetrics;
   typedef mozilla::layers::ScrollableLayerGuid ScrollableLayerGuid;
 
@@ -39,8 +40,6 @@ public:
   // GeckoContentController interface
   virtual void RequestContentRepaint(const FrameMetrics& aFrameMetrics) override;
   virtual void PostDelayedTask(Task* aTask, int aDelayMs) override;
-  virtual void RequestFlingSnap(const FrameMetrics::ViewID& aScrollId,
-                                const mozilla::CSSPoint& aDestination) override;
   virtual void AcknowledgeScrollUpdate(const FrameMetrics::ViewID& aScrollId,
                                        const uint32_t& aScrollGeneration) override;
 

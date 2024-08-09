@@ -1,5 +1,7 @@
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 /* Any copyright is dedicated to the Public Domain.
-   http://creativecommons.org/publicdomain/zero/1.0/ */
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
 /**
  * Make sure that switching the displayed source in the UI works as advertised.
@@ -131,11 +133,11 @@ function test() {
          "The second source is not displayed.");
 
       // The editor's debug location takes a tick to update.
-      ok(isCaretPos(gPanel, 5),
+      ok(isCaretPos(gPanel, 6),
          "Editor caret location is correct.");
-      is(gEditor.getDebugLocation(), 4,
+      is(gEditor.getDebugLocation(), 5,
          "Editor debugger location is correct.");
-      ok(gEditor.hasLineClass(4, "debug-line"),
+      ok(gEditor.hasLineClass(5, "debug-line"),
          "The debugged line is highlighted appropriately.");
 
       deferred.resolve();

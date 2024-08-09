@@ -15,8 +15,7 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Rect", "resource://gre/modules/Geometry.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task", "resource://gre/modules/Task.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "UITelemetry", "resource://gre/modules/UITelemetry.jsm");
-
-const READINGLIST_COMMAND_ID = "readingListSidebar";
+XPCOMUtils.defineLazyModuleGetter(this, "NarrateControls", "resource://gre/modules/narrate/NarrateControls.jsm");
 
 var gStrings = Services.strings.createBundle("chrome://global/locale/aboutReader.properties");
 
@@ -31,10 +30,9 @@ var AboutReader = function(mm, win, articlePromise) {
   let doc = win.document;
 
   this._mm = mm;
-  this._mm.addMessageListener("Reader:Added", this);
-  this._mm.addMessageListener("Reader:Removed", this);
-  this._mm.addMessageListener("Sidebar:VisibilityChange", this);
-  this._mm.addMessageListener("ReadingList:VisibilityStatus", this);
+  this._mm.addMessageListener("Reader:CloseDropdown", this);
+  this._mm.addMessageListener("Reader:AddButton", this);
+  this._mm.addMessageListener("Reader:RemoveButton", this);
 
   this._docRef = Cu.getWeakReference(doc);
   this._winRef = Cu.getWeakReference(win);
@@ -65,22 +63,11 @@ var AboutReader = function(mm, win, articlePromise) {
 
   this._setupStyleDropdown();
   this._setupButton("close-button", this._onReaderClose.bind(this), "aboutReader.toolbar.close");
-  this._setupButton("share-button", this._onShare.bind(this), "aboutReader.toolbar.share");
 
-  try {
-#ifdef MOZ_FENNEC
-    if (Services.prefs.getBoolPref("browser.readinglist.enabled")) {
-#else
-    if (false) {
-#endif
-      this._setupButton("toggle-button", this._onReaderToggle.bind(this, "button"), "aboutReader.toolbar.addToReadingList");
-      this._setupButton("list-button", this._onList.bind(this), "aboutReader.toolbar.openReadingList");
-      this._setupButton("remove-button", this._onReaderToggle.bind(this, "footer"),
-        "aboutReader.footer.deleteThisArticle", "aboutReader.footer.deleteThisArticle");
-      this._doc.getElementById("reader-footer").setAttribute('readinglist-enabled', "true");
-    }
-  } catch (e) {
-    // Pref doesn't exist.
+  const gIsFirefoxDesktop = Services.appinfo.ID == "{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}";
+  if (gIsFirefoxDesktop) {
+    // we're ready for any external setup, send a signal for that.
+    this._mm.sendAsyncMessage("Reader:OnSetup");
   }
 
   let colorSchemeValues = JSON.parse(Services.prefs.getCharPref("reader.color_scheme.values"));
@@ -113,12 +100,9 @@ var AboutReader = function(mm, win, articlePromise) {
 
   this._setupFontSizeButtons();
 
-  // Track status of reader toolbar add/remove toggle button
-  this._isReadingListItem = -1;
-  this._updateToggleButton();
-
-  // Setup initial ReadingList button styles.
-  this._updateListButton();
+  if (win.speechSynthesis && Services.prefs.getBoolPref("narrate.enabled")) {
+    new NarrateControls(mm, win);
+  }
 
   this._loadArticle();
 }
@@ -172,18 +156,49 @@ AboutReader.prototype = {
     return this._toolbarVertical = Services.prefs.getBoolPref("reader.toolbar.vertical");
   },
 
+  // Provides unique view Id.
+  get viewId() {
+    let _viewId = Cc["@mozilla.org/uuid-generator;1"].
+      getService(Ci.nsIUUIDGenerator).generateUUID().toString();
+    Object.defineProperty(this, "viewId", { value: _viewId });
+
+    return _viewId;
+  },
+
   receiveMessage: function (message) {
     switch (message.name) {
-      case "Reader:Added": {
-        // Page can be added by long-press pageAction, or by tap on banner icon.
-        if (message.data.url == this._article.url) {
-          if (this._isReadingListItem != 1) {
-            this._isReadingListItem = 1;
-            this._updateToggleButton();
-          }
+      // Triggered by Android user pressing BACK while the banner font-dropdown is open.
+      case "Reader:CloseDropdown": {
+        // Just close it.
+        this._closeDropdowns();
+        break;
+      }
+      case "Reader:AddButton": {
+        if (message.data.id && message.data.image) {
+          let btn = this._doc.createElement("button");
+          btn.setAttribute("class", "button");
+          btn.setAttribute("style", "background-image: url('" + message.data.image + "')");
+          btn.setAttribute("id", message.data.id);
+          if (message.data.title)
+            btn.setAttribute("title", message.data.title);
+          if (message.data.text)
+            btn.textContent = message.data.text;
+          let tb = this._doc.getElementById("reader-toolbar");
+          tb.appendChild(btn);
+          this._setupButton(message.data.id, button => {
+            this._mm.sendAsyncMessage("Reader:Clicked-" + button.getAttribute("id"), { article: this._article });
+          });
         }
         break;
       }
+      case "Reader:RemoveButton": {
+        if (message.data.id) {
+          let btn = this._doc.getElementById(message.data.id);
+          btn.remove();
+        }
+        break;
+      }
+
       case "Reader:Removed": {
         if (message.data.url == this._article.url) {
           if (this._isReadingListItem != 0) {
@@ -193,42 +208,37 @@ AboutReader.prototype = {
         }
         break;
       }
-
-      // Notifys us of Sidebar updates, user clicks X to close,
-      // checks View -> Sidebar -> (Bookmarks, Histroy, Readinglist, etc).
-      case "Sidebar:VisibilityChange": {
-        let data = message.data;
-        this._updateListButtonStyle(data.isOpen && data.commandID === READINGLIST_COMMAND_ID);
-        break;
-      }
-
-      // Returns requested status of current ReadingList Sidebar.
-      case "ReadingList:VisibilityStatus": {
-        this._updateListButtonStyle(message.data.isOpen);
-        break;
-      }
     }
   },
 
-  handleEvent: function Reader_handleEvent(aEvent) {
+  handleEvent: function(aEvent) {
     if (!aEvent.isTrusted)
       return;
 
     switch (aEvent.type) {
       case "click":
         let target = aEvent.target;
-        while (target && target.id != "reader-popup")
-          target = target.parentNode;
-        if (!target)
-          this._toggleToolbarVisibility();
+        if (target.classList.contains('dropdown-toggle')) {
+          this._toggleDropdownClicked(aEvent);
+        } else if (!target.closest('.dropdown-popup')) {
+          this._closeDropdowns();
+        }
         break;
       case "scroll":
+        this._closeDropdowns();
         let isScrollingUp = this._scrollOffset > aEvent.pageY;
-        this._setToolbarVisibility(isScrollingUp);
+        this._setSystemUIVisibility(isScrollingUp);
         this._scrollOffset = aEvent.pageY;
         break;
       case "resize":
         this._updateImageMargins();
+        if (this._isToolbarVertical) {
+          this._win.setTimeout(() => {
+            for (let dropdown of this._doc.querySelectorAll('.dropdown.open')) {
+              this._updatePopupPosition(dropdown);
+            }
+          }, 0);
+        }
         break;
 
       case "devicelight":
@@ -240,129 +250,22 @@ AboutReader.prototype = {
         break;
 
       case "unload":
-        this._mm.removeMessageListener("Reader:Added", this);
-        this._mm.removeMessageListener("Reader:Removed", this);
-        this._mm.removeMessageListener("Sidebar:VisibilityChange", this);
-        this._mm.removeMessageListener("ReadingList:VisibilityStatus", this);
+        // Close the Banners Font-dropdown, cleanup Android BackPressListener.
+        this._closeDropdowns();
+
+        this._mm.removeMessageListener("Reader:CloseDropdown", this);
+        this._mm.removeMessageListener("Reader:AddButton", this);
+        this._mm.removeMessageListener("Reader:RemoveButton", this);
         this._windowUnloaded = true;
         break;
     }
   },
 
-  _updateToggleButton: function Reader_updateToggleButton() {
-    let button = this._doc.getElementById("toggle-button");
-
-    if (this._isReadingListItem == 1) {
-      button.classList.add("on");
-      button.setAttribute("title", gStrings.GetStringFromName("aboutReader.toolbar.removeFromReadingList"));
-    } else {
-      button.classList.remove("on");
-      button.setAttribute("title", gStrings.GetStringFromName("aboutReader.toolbar.addToReadingList"));
-    }
-    this._updateFooter();
-  },
-
-  _requestReadingListStatus: function Reader_requestReadingListStatus() {
-    let handleListStatusData = (message) => {
-      this._mm.removeMessageListener("Reader:ListStatusData", handleListStatusData);
-
-      let args = message.data;
-      if (args.url == this._article.url) {
-        if (this._isReadingListItem != args.inReadingList) {
-          let isInitialStateChange = (this._isReadingListItem == -1);
-          this._isReadingListItem = args.inReadingList;
-          this._updateToggleButton();
-
-          // Display the toolbar when all its initial component states are known
-          if (isInitialStateChange) {
-            // Toolbar display is updated here to avoid it appearing in the middle of the screen on page load. See bug 1145567.
-            this._win.setTimeout(() => {
-              this._toolbarElement.style.display = "block";
-              // Delay showing the toolbar to have a nice slide from bottom animation.
-              this._win.setTimeout(() => this._setToolbarVisibility(true), 200);
-            }, 500);
-          }
-        }
-      }
-    };
-
-    this._mm.addMessageListener("Reader:ListStatusData", handleListStatusData);
-    this._mm.sendAsyncMessage("Reader:ListStatusRequest", { url: this._article.url });
-  },
-
-  _onReaderClose: function Reader_onToggle() {
+  _onReaderClose: function() {
     this._win.location.href = this._getOriginalUrl();
   },
 
-  _onReaderToggle: function Reader_onToggle(aMethod) {
-    if (!this._article)
-      return;
-
-    if (this._isReadingListItem == 0) {
-      this._mm.sendAsyncMessage("Reader:AddToList", { article: this._article });
-      UITelemetry.addEvent("save.1", aMethod, null, "reader");
-    } else {
-      this._mm.sendAsyncMessage("Reader:RemoveFromList", { url: this._article.url });
-      UITelemetry.addEvent("unsave.1", aMethod, null, "reader");
-    }
-  },
-
-  _onShare: function Reader_onShare() {
-    if (!this._article)
-      return;
-
-    this._mm.sendAsyncMessage("Reader:Share", {
-      url: this._article.url,
-      title: this._article.title
-    });
-    UITelemetry.addEvent("share.1", "list", null);
-  },
-
-  /**
-   * To help introduce ReadingList, we want to automatically
-   * open the Desktop sidebar the first time ReaderMode is used.
-   */
-  _showListIntro: function() {
-    this._mm.sendAsyncMessage("ReadingList:ShowIntro");
-  },
-
-  /**
-   * Toggle ReadingList Sidebar visibility. SidebarUI will trigger
-   * _updateListButtonStyle().
-   */
-  _onList: function() {
-    this._mm.sendAsyncMessage("ReadingList:ToggleVisibility");
-  },
-
-  /**
-   * Request ReadingList Sidebar-button visibility status update.
-   * Only desktop currently responds to this message.
-   */
-  _updateListButton: function() {
-    this._mm.sendAsyncMessage("ReadingList:GetVisibility");
-  },
-
-  /**
-   * Update ReadingList toggle button styles.
-   * @param   isVisible
-   *          What Sidebar ReadingList visibility style the List
-   *          toggle-button should be set to reflect, and what
-   *          button-action the tip will provide.
-   */
-  _updateListButtonStyle: function(isVisible) {
-    let classes = this._doc.getElementById("list-button").classList;
-    if (isVisible) {
-      classes.add("on");
-      // When on, action tip is "close".
-      this._setButtonTip("list-button", "aboutReader.toolbar.closeReadingList");
-    } else {
-      classes.remove("on");
-      // When off, action tip is "open".
-      this._setButtonTip("list-button", "aboutReader.toolbar.openReadingList");
-    }
-  },
-
-  _setFontSize: function Reader_setFontSize(newFontSize) {
+  _setFontSize: function(newFontSize) {
     let containerClasses = this._doc.getElementById("container").classList;
 
     if (this._fontSize > 0)
@@ -438,17 +341,7 @@ AboutReader.prototype = {
     }, true);
   },
 
-  _updateFooter: function RupdateFooter() {
-    let footer = this._doc.getElementById("reader-footer");
-    if (!this._article || this._isReadingListItem == 0 ||
-        footer.getAttribute("readinglist-enabled") != "true") {
-      footer.style.display = "none";
-      return;
-    }
-    footer.style.display = null;
-  },
-
-  _handleDeviceLight: function Reader_handleDeviceLight(newLux) {
+  _handleDeviceLight: function(newLux) {
     // Desired size of the this._luxValues array.
     let luxValuesSize = 10;
     // Add new lux value at the front of the array.
@@ -474,12 +367,7 @@ AboutReader.prototype = {
     this._totalLux -= oldLux;
   },
 
-  _handleVisibilityChange: function Reader_handleVisibilityChange() {
-    // ReadingList / Sidebar state might change while we're not the selected tab.
-    if (this._doc.visibilityState === "visible") {
-      this._updateListButton();
-    }
-
+  _handleVisibilityChange: function() {
     let colorScheme = Services.prefs.getCharPref("reader.color_scheme");
     if (colorScheme != "auto") {
       return;
@@ -490,7 +378,7 @@ AboutReader.prototype = {
   },
 
   // Setup or teardown the ambient light tracking system.
-  _enableAmbientLighting: function Reader_enableAmbientLighting(enable) {
+  _enableAmbientLighting: function(enable) {
     if (enable) {
       this._win.addEventListener("devicelight", this, false);
       this._luxValues = [];
@@ -502,7 +390,7 @@ AboutReader.prototype = {
     }
   },
 
-  _updateColorScheme: function Reader_updateColorScheme(luxValue) {
+  _updateColorScheme: function(luxValue) {
     // Upper bound value for "dark" color scheme beyond which it changes to "light".
     let upperBoundDark = 50;
     // Lower bound value for "light" color scheme beyond which it changes to "dark".
@@ -521,7 +409,7 @@ AboutReader.prototype = {
       this._setColorScheme("light");
   },
 
-  _setColorScheme: function Reader_setColorScheme(newColorScheme) {
+  _setColorScheme: function(newColorScheme) {
     // "auto" is not a real color scheme
     if (this._colorScheme === newColorScheme || newColorScheme === "auto")
       return;
@@ -537,7 +425,7 @@ AboutReader.prototype = {
 
   // Pref values include "dark", "light", and "auto", which automatically switches
   // between light and dark color schemes based on the ambient light level.
-  _setColorSchemePref: function Reader_setColorSchemePref(colorSchemePref) {
+  _setColorSchemePref: function(colorSchemePref) {
     this._enableAmbientLighting(colorSchemePref === "auto");
     this._setColorScheme(colorSchemePref);
 
@@ -547,7 +435,7 @@ AboutReader.prototype = {
     });
   },
 
-  _setFontType: function Reader_setFontType(newFontType) {
+  _setFontType: function(newFontType) {
     if (this._fontType === newFontType)
       return;
 
@@ -565,36 +453,7 @@ AboutReader.prototype = {
     });
   },
 
-  _getToolbarVisibility: function Reader_getToolbarVisibility() {
-    return this._toolbarElement.hasAttribute("visible");
-  },
-
-  _setToolbarVisibility: function Reader_setToolbarVisibility(visible) {
-    let dropdown = this._doc.getElementById("style-dropdown");
-    dropdown.classList.remove("open");
-
-    if (this._getToolbarVisibility() === visible) {
-      return;
-    }
-
-    if (visible) {
-      this._toolbarElement.setAttribute("visible", true);
-    } else {
-      this._toolbarElement.removeAttribute("visible");
-    }
-    this._setSystemUIVisibility(visible);
-
-    if (!visible) {
-      this._mm.sendAsyncMessage("Reader:ToolbarHidden");
-    }
-    this._updateFooter();
-  },
-
-  _toggleToolbarVisibility: function Reader_toggleToolbarVisibility() {
-    this._setToolbarVisibility(!this._getToolbarVisibility());
-  },
-
-  _setSystemUIVisibility: function Reader_setSystemUIVisibility(visible) {
+  _setSystemUIVisibility: function(visible) {
     this._mm.sendAsyncMessage("Reader:SystemUIVisibility", { visible: visible });
   },
 
@@ -636,7 +495,7 @@ AboutReader.prototype = {
     });
   },
 
-  _requestFavicon: function Reader_requestFavicon() {
+  _requestFavicon: function() {
     let handleFaviconReturn = (message) => {
       this._mm.removeMessageListener("Reader:FaviconReturn", handleFaviconReturn);
       this._loadFavicon(message.data.url, message.data.faviconUrl);
@@ -646,7 +505,7 @@ AboutReader.prototype = {
     this._mm.sendAsyncMessage("Reader:FaviconRequest", { url: this._article.url });
   },
 
-  _loadFavicon: function Reader_loadFavicon(url, faviconUrl) {
+  _loadFavicon: function(url, faviconUrl) {
     if (this._article.url !== url)
       return;
 
@@ -659,7 +518,7 @@ AboutReader.prototype = {
     doc.getElementsByTagName('head')[0].appendChild(link);
   },
 
-  _updateImageMargins: function Reader_updateImageMargins() {
+  _updateImageMargins: function() {
     let windowWidth = this._win.innerWidth;
     let bodyWidth = this._doc.body.clientWidth;
 
@@ -716,7 +575,7 @@ AboutReader.prototype = {
   },
 
   // This function is the JS version of Java's StringUtils.stripCommonSubdomains.
-  _stripHost: function Reader_stripHost(host) {
+  _stripHost: function(host) {
     if (!host)
       return host;
 
@@ -732,7 +591,7 @@ AboutReader.prototype = {
     return host.substring(start);
   },
 
-  _showContent: function Reader_showContent(article) {
+  _showContent: function(article) {
     this._messageElement.style.display = "none";
 
     this._article = article;
@@ -757,19 +616,17 @@ AboutReader.prototype = {
 
     this._contentElement.style.display = "block";
     this._updateImageMargins();
-    this._requestReadingListStatus();
 
-    this._showListIntro();
     this._requestFavicon();
     this._doc.body.classList.add("loaded");
   },
 
-  _hideContent: function Reader_hideContent() {
+  _hideContent: function() {
     this._headerElement.style.display = "none";
     this._contentElement.style.display = "none";
   },
 
-  _showProgressDelayed: function Reader_showProgressDelayed() {
+  _showProgressDelayed: function() {
     this._win.setTimeout(function() {
       // No need to show progress if the article has been loaded,
       // if the window has been unloaded, or if there was an error
@@ -781,7 +638,7 @@ AboutReader.prototype = {
       this._headerElement.style.display = "none";
       this._contentElement.style.display = "none";
 
-      this._messageElement.textContent = gStrings.GetStringFromName("aboutReader.loading");
+      this._messageElement.textContent = gStrings.GetStringFromName("aboutReader.loading2");
       this._messageElement.style.display = "block";
     }.bind(this), 300);
   },
@@ -794,7 +651,7 @@ AboutReader.prototype = {
     return ReaderMode.getOriginalUrl(url) || url;
   },
 
-  _setupSegmentedButton: function Reader_setupSegmentedButton(id, options, initialValue, callback) {
+  _setupSegmentedButton: function(id, options, initialValue, callback) {
     let doc = this._doc;
     let segmentedButton = doc.getElementById(id);
 
@@ -857,7 +714,8 @@ AboutReader.prototype = {
         return;
 
       aEvent.stopPropagation();
-      callback();
+      let btn = aEvent.target;
+      callback(btn);
     }, true);
   },
 
@@ -871,48 +729,67 @@ AboutReader.prototype = {
     button.setAttribute("title", gStrings.GetStringFromName(titleEntity));
   },
 
-  _setupStyleDropdown: function Reader_setupStyleDropdown() {
-    let doc = this._doc;
-    let win = this._win;
+  _setupStyleDropdown: function() {
+    let dropdownToggle = this._doc.querySelector("#style-dropdown .dropdown-toggle");
+    dropdownToggle.setAttribute("title", gStrings.GetStringFromName("aboutReader.toolbar.typeControls"));
+  },
 
-    let dropdown = doc.getElementById("style-dropdown");
+  _updatePopupPosition: function(dropdown) {
     let dropdownToggle = dropdown.querySelector(".dropdown-toggle");
     let dropdownPopup = dropdown.querySelector(".dropdown-popup");
 
-    // Helper function used to position the popup on desktop,
-    // where there is a vertical toolbar.
-    function updatePopupPosition() {
-      let toggleHeight = dropdownToggle.offsetHeight;
-      let toggleTop = dropdownToggle.offsetTop;
-      let popupTop = toggleTop - toggleHeight / 2;
-      dropdownPopup.style.top = popupTop + "px";
-    }
+    let toggleHeight = dropdownToggle.offsetHeight;
+    let toggleTop = dropdownToggle.offsetTop;
+    let popupTop = toggleTop - toggleHeight / 2;
 
-    if (this._isToolbarVertical) {
-      win.addEventListener("resize", event => {
-        if (!event.isTrusted)
-          return;
-
-        // Wait for reflow before calculating the new position of the popup.
-        win.setTimeout(updatePopupPosition, 0);
-      }, true);
-    }
-
-    dropdownToggle.setAttribute("title", gStrings.GetStringFromName("aboutReader.toolbar.typeControls"));
-    dropdownToggle.addEventListener("click", event => {
-      if (!event.isTrusted)
-        return;
-
-      event.stopPropagation();
-
-      if (dropdown.classList.contains("open")) {
-        dropdown.classList.remove("open");
-      } else {
-        dropdown.classList.add("open");
-        if (this._isToolbarVertical) {
-          updatePopupPosition();
-        }
-      }
-    }, true);
+    dropdownPopup.style.top = popupTop + "px";
   },
+
+  _toggleDropdownClicked: function(event) {
+    let dropdown = event.target.closest('.dropdown');
+
+    if (!dropdown)
+      return;
+
+    event.stopPropagation();
+
+    if (dropdown.classList.contains("open")) {
+      this._closeDropdowns();
+    } else {
+      this._openDropdown(dropdown);
+      if (this._isToolbarVertical) {
+        this._updatePopupPosition(dropdown);
+      }
+    }
+  },
+
+  /*
+   * If the ReaderView banner font-dropdown is closed, open it.
+   */
+  _openDropdown: function(dropdown) {
+    if (dropdown.classList.contains("open")) {
+      return;
+    }
+
+    this._closeDropdowns();
+
+    // Trigger BackPressListener initialization in Android.
+    dropdown.classList.add("open");
+    this._mm.sendAsyncMessage("Reader:DropdownOpened", this.viewId);
+  },
+
+  /*
+   * If the ReaderView has open dropdowns, close them.
+   */
+  _closeDropdowns: function() {
+    let openDropdowns = this._doc.querySelectorAll(".dropdown.open:not(.keep-open)");
+    for (let dropdown of openDropdowns) {
+      dropdown.classList.remove("open");
+    }
+
+    // Trigger BackPressListener cleanup in Android.
+    if (openDropdowns.length) {
+      this._mm.sendAsyncMessage("Reader:DropdownClosed", this.viewId);
+    }
+  }
 };

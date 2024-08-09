@@ -2,8 +2,11 @@
 
 var { Ci, Cu } = require("chrome");
 var { DebuggerServer } = require("devtools/server/main");
+var Services = require("Services");
 const protocol = require("devtools/server/protocol");
 const { Arg, method, RetVal } = protocol;
+
+loader.lazyRequireGetter(this, "ChromeUtils");
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
@@ -137,6 +140,20 @@ let WorkerActor = protocol.ActorClass({
     request: {
       options: Arg(0, "json"),
     },
+    response: RetVal("json")
+  }),
+
+  push: method(function () {
+    if (this._dbg.type !== Ci.nsIWorkerDebugger.TYPE_SERVICE) {
+      return { error: "wrongType" };
+    }
+    let registration = this._getServiceWorkerRegistrationInfo();
+    let originAttributes = ChromeUtils.originAttributesToSuffix(
+      this._dbg.principal.originAttributes);
+    swm.sendPushEvent(originAttributes, registration.scope);
+    return { type: "pushed" };
+  }, {
+    request: {},
     response: RetVal("json")
   }),
 
@@ -287,6 +304,9 @@ WorkerActorList.prototype = {
 
 exports.WorkerActorList = WorkerActorList;
 
+// Lazily load the service-worker-child.js process script only once.
+let _serviceWorkerProcessScriptLoaded = false;
+
 let ServiceWorkerRegistrationActor = protocol.ActorClass({
   typeName: "serviceWorkerRegistration",
 
@@ -307,6 +327,38 @@ let ServiceWorkerRegistrationActor = protocol.ActorClass({
     };
   },
 
+  start: method(function() {
+    if (!_serviceWorkerProcessScriptLoaded) {
+      Services.ppmm.loadProcessScript(
+        "resource://devtools/server/service-worker-child.js", true);
+      _serviceWorkerProcessScriptLoaded = true;
+    }
+    Services.ppmm.broadcastAsyncMessage("serviceWorkerRegistration:start", {
+      scope: this._registration.scope
+    });
+    return { type: "started" };
+  }, {
+    request: {},
+    response: RetVal("json")
+  }),
+
+  unregister: method(function() {
+    let { principal, scope } = this._registration;
+    let unregisterCallback = {
+      unregisterSucceeded: function() {},
+      unregisterFailed: function() {
+        console.error("Failed to unregister the service worker for " + scope);
+      },
+      QueryInterface: XPCOMUtils.generateQI(
+        [Ci.nsIServiceWorkerUnregisterCallback])
+    };
+    swm.propagateUnregister(principal, unregisterCallback, scope);
+
+    return { type: "unregistered" };
+  }, {
+    request: {},
+    response: RetVal("json")
+  }),
 });
 
 function ServiceWorkerRegistrationActorList(conn) {

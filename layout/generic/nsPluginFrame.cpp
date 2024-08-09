@@ -150,7 +150,7 @@ protected:
 };
 
 nsPluginFrame::nsPluginFrame(nsStyleContext* aContext)
-  : nsPluginFrameSuper(aContext)
+  : nsFrame(aContext)
   , mInstanceOwner(nullptr)
   , mReflowCallbackPosted(false)
   , mIsHiddenDueToScroll(false)
@@ -168,7 +168,7 @@ nsPluginFrame::~nsPluginFrame()
 NS_QUERYFRAME_HEAD(nsPluginFrame)
   NS_QUERYFRAME_ENTRY(nsPluginFrame)
   NS_QUERYFRAME_ENTRY(nsIObjectFrame)
-NS_QUERYFRAME_TAIL_INHERITING(nsPluginFrameSuper)
+NS_QUERYFRAME_TAIL_INHERITING(nsFrame)
 
 #ifdef ACCESSIBILITY
 a11y::AccType
@@ -194,7 +194,7 @@ nsPluginFrame::Init(nsIContent*       aContent,
   MOZ_LOG(sPluginFrameLog, LogLevel::Debug,
          ("Initializing nsPluginFrame %p for content %p\n", this, aContent));
 
-  nsPluginFrameSuper::Init(aContent, aParent, aPrevInFlow);
+  nsFrame::Init(aContent, aParent, aPrevInFlow);
 }
 
 void
@@ -223,7 +223,7 @@ nsPluginFrame::DestroyFrom(nsIFrame* aDestructRoot)
     mBackgroundSink->Destroy();
   }
 
-  nsPluginFrameSuper::DestroyFrom(aDestructRoot);
+  nsFrame::DestroyFrom(aDestructRoot);
 }
 
 /* virtual */ void
@@ -239,7 +239,7 @@ nsPluginFrame::DidSetStyleContext(nsStyleContext* aOldStyleContext)
     }
   }
 
-  nsPluginFrameSuper::DidSetStyleContext(aOldStyleContext);
+  nsFrame::DidSetStyleContext(aOldStyleContext);
 }
 
 nsIAtom*
@@ -737,7 +737,7 @@ nsPluginFrame::IsFocusable(int32_t *aTabIndex, bool aWithMouse)
 {
   if (aTabIndex)
     *aTabIndex = -1;
-  return nsPluginFrameSuper::IsFocusable(aTabIndex, aWithMouse);
+  return nsFrame::IsFocusable(aTabIndex, aWithMouse);
 }
 
 bool
@@ -851,7 +851,7 @@ nsPluginFrame::DidReflow(nsPresContext*            aPresContext,
     objContent->HasNewFrame(this);
   }
 
-  nsPluginFrameSuper::DidReflow(aPresContext, aReflowState, aStatus);
+  nsFrame::DidReflow(aPresContext, aReflowState, aStatus);
 
   // The view is created hidden; once we have reflowed it and it has been
   // positioned then we show it.
@@ -1672,7 +1672,7 @@ nsPluginFrame::HandleEvent(nsPresContext* aPresContext,
   }
 
 #ifdef XP_WIN
-  rv = nsPluginFrameSuper::HandleEvent(aPresContext, anEvent, anEventStatus);
+  rv = nsFrame::HandleEvent(aPresContext, anEvent, anEventStatus);
   return rv;
 #endif
 
@@ -1696,10 +1696,10 @@ nsPluginFrame::HandleEvent(nsPresContext* aPresContext,
   }
 #endif
 
-  rv = nsPluginFrameSuper::HandleEvent(aPresContext, anEvent, anEventStatus);
+  rv = nsFrame::HandleEvent(aPresContext, anEvent, anEventStatus);
 
   // We need to be careful from this point because the call to
-  // nsPluginFrameSuper::HandleEvent() might have killed us.
+  // nsFrame::HandleEvent() might have killed us.
 
 #ifdef XP_MACOSX
   if (anEvent->mMessage == eMouseUp) {
@@ -1714,7 +1714,7 @@ void
 nsPluginFrame::HandleWheelEventAsDefaultAction(WidgetWheelEvent* aWheelEvent)
 {
   MOZ_ASSERT(WantsToHandleWheelEventAsDefaultAction());
-  MOZ_ASSERT(!aWheelEvent->mFlags.mDefaultPrevented);
+  MOZ_ASSERT(!aWheelEvent->DefaultPrevented());
 
   if (NS_WARN_IF(!mInstanceOwner) ||
       NS_WARN_IF(aWheelEvent->mMessage != eWheel)) {
@@ -1731,8 +1731,8 @@ nsPluginFrame::HandleWheelEventAsDefaultAction(WidgetWheelEvent* aWheelEvent)
   // We need to assume that the event is always consumed/handled by the
   // plugin.  There is no way to know if it's actually consumed/handled.
   aWheelEvent->mViewPortIsOverscrolled = false;
-  aWheelEvent->overflowDeltaX = 0;
-  aWheelEvent->overflowDeltaY = 0;
+  aWheelEvent->mOverflowDeltaX = 0;
+  aWheelEvent->mOverflowDeltaY = 0;
   // Consume the event explicitly.
   aWheelEvent->PreventDefault();
 }
@@ -1784,7 +1784,7 @@ nsPluginFrame::GetCursor(const nsPoint& aPoint, nsIFrame::Cursor& aCursor)
     return NS_ERROR_FAILURE;
   }
 
-  return nsPluginFrameSuper::GetCursor(aPoint, aCursor);
+  return nsFrame::GetCursor(aPoint, aCursor);
 }
 
 void
@@ -1868,7 +1868,9 @@ nsPluginFrame::EndSwapDocShells(nsISupports* aSupports, void*)
     }
   }
 
-  objectFrame->RegisterPluginForGeometryUpdates();
+  if (objectFrame->mInstanceOwner) {
+    objectFrame->RegisterPluginForGeometryUpdates();
+  }
 }
 
 nsIFrame*

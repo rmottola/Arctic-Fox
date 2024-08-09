@@ -19,6 +19,9 @@
 <!ENTITY fileNotFound.title "File Not Found">
 <!ENTITY fileNotFound.longDesc "<ul><li>Could the item have been renamed, removed, or relocated?</li><li>Is there a spelling, capitalization, or other typographical error in the address?</li><li>Do you have sufficient access permissions to the requested item?</li></ul>">
 
+<!ENTITY fileAccessDenied.title "Access to the file was denied">
+<!ENTITY fileAccessDenied.longDesc "<ul><li>It may have been removed, moved, or file permissions may be preventing access.</li></ul>">
+
 <!ENTITY generic.title "Cannot Complete Request">
 <!ENTITY generic.longDesc "<p>Additional information about this problem or error is currently unavailable.</p>">
 
@@ -75,27 +78,6 @@
 </ul>
 ">
 
-<!ENTITY malwareBlocked.title "Suspected Attack Site!">
-<!ENTITY malwareBlocked.longDesc "
-<p>Attack sites try to install programs that steal private information, use your computer to attack others, or damage your system.</p>
-<p>Website owners who believe their site has been reported as an attack site in error may <a href='https://www.stopbadware.org/request-review' >request a review</a>.</p>
-">
-
-<!ENTITY unwantedBlocked.title "Suspected Unwanted Software Site!">
-<!ENTITY unwantedBlocked.longDesc "
-<p>Unwanted software pages try to install software that can be deceptive and affect your system in unexpected ways.</p>
-">
-
-<!ENTITY phishingBlocked.title "Suspected Web Forgery!">
-<!ENTITY phishingBlocked.longDesc "
-<p>Entering any personal information on this page may result in identity theft or other fraud.</p>
-<p>These types of web forgeries are used in scams known as phishing attacks, in which fraudulent web pages and emails are used to imitate sources you may trust.</p>
-">
-
-<!ENTITY forbiddenBlocked.title "Forbidden Site">
-<!ENTITY forbiddenBlocked.longDesc "<p>The browser prevented this page from loading because it is configured to block it.</p>
-">
-
 <!ENTITY securityOverride.linkText "Or you can add an exception…">
 <!ENTITY securityOverride.warningContent "
 <p>You should not add an exception if you are using an internet connection that you do not trust completely or if you are not used to seeing a warning for this server.</p>
@@ -110,3 +92,8 @@
 
 <!ENTITY remoteXUL.title "Remote XUL">
 <!ENTITY remoteXUL.longDesc "<p><ul><li>Please contact the website owners to inform them of this problem.</li></ul></p>">
+
+<!ENTITY inadequateSecurityError.title "Your connection is not secure">
+<!-- LOCALIZATION NOTE (inadequateSecurityError.longDesc) - Do not translate
+     "NS_ERROR_NET_INADEQUATE_SECURITY". -->
+<!ENTITY inadequateSecurityError.longDesc "<p><span class='hostname'></span> uses security technology that is outdated and vulnerable to attack. An attacker could easily reveal information which you thought to be safe. The website administrator will need to fix the server first before you can visit the site.</p><p>Error code: NS_ERROR_NET_INADEQUATE_SECURITY</p>">

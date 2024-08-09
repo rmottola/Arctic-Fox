@@ -89,7 +89,7 @@ MessageLoop* MessageLoop::current() {
 
 static mozilla::Atomic<int32_t> message_loop_id_seq(0);
 
-MessageLoop::MessageLoop(Type type)
+MessageLoop::MessageLoop(Type type, nsIThread* aThread)
     : type_(type),
       id_(++message_loop_id_seq),
       nestable_tasks_allowed_(true),
@@ -106,10 +106,12 @@ MessageLoop::MessageLoop(Type type)
   get_tls_ptr().Set(this);
 
   switch (type_) {
-  case TYPE_MOZILLA_UI:
-    pump_ = new mozilla::ipc::MessagePump();
+  case TYPE_MOZILLA_PARENT:
+    MOZ_RELEASE_ASSERT(!aThread);
+    pump_ = new mozilla::ipc::MessagePump(aThread);
     return;
   case TYPE_MOZILLA_CHILD:
+    MOZ_RELEASE_ASSERT(!aThread);
     pump_ = new mozilla::ipc::MessagePumpForChildProcess();
     // There is a MessageLoop Run call from XRE_InitChildProcess
     // and another one from MessagePumpForChildProcess. The one
@@ -119,11 +121,11 @@ MessageLoop::MessageLoop(Type type)
     run_depth_base_ = 2;
     return;
   case TYPE_MOZILLA_NONMAINTHREAD:
-    pump_ = new mozilla::ipc::MessagePumpForNonMainThreads();
+    pump_ = new mozilla::ipc::MessagePumpForNonMainThreads(aThread);
     return;
 #if defined(OS_WIN)
   case TYPE_MOZILLA_NONMAINUITHREAD:
-    pump_ = new mozilla::ipc::MessagePumpForNonMainUIThreads();
+    pump_ = new mozilla::ipc::MessagePumpForNonMainUIThreads(aThread);
     return;
 #endif
   default:

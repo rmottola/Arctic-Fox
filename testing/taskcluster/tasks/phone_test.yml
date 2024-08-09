@@ -3,7 +3,7 @@ task:
   created: '{{now}}'
   deadline: '{{#from_now}}24 hours{{/from_now}}'
   metadata:
-    source: http://todo.com/soon
+    source: '{{source}}'
     owner: mozilla-taskcluster-maintenance@mozilla.com
   tags:
     createdForUser: {{owner}}
@@ -14,14 +14,14 @@ task:
   scopes:
     - 'docker-worker:image:{{#docker_image}}tester-device{{/docker_image}}'
     - 'queue:create-task:aws-provisioner-v1/testdroid-device'
-    - 'docker-worker:cache:tc-vcs'
+    - 'docker-worker:cache:level-{{level}}-{{project}}-tc-vcs'
     - 'docker-worker:capability:device:phone'
 
   payload:
     image: '{{#docker_image}}tester-device{{/docker_image}}'
     maxRunTime: 3600
     cache:
-      tc-vcs: '/home/worker/.tc-vcs'
+      level-{{level}}-{{project}}-tc-vcs: '/home/worker/.tc-vcs'
     env:
       GAIA_HEAD_REPOSITORY: '{{{gaia_head_repository}}}'
       GAIA_BASE_REPOSITORY: '{{{gaia_base_repository}}}'

@@ -28,6 +28,7 @@ function add_ocsp_test(aHost, aExpectedResult, aOCSPResponseToServe) {
 do_get_profile();
 Services.prefs.setBoolPref("security.ssl.enable_ocsp_stapling", true);
 Services.prefs.setIntPref("security.OCSP.enabled", 1);
+Services.prefs.setIntPref("security.pki.sha1_enforcement_level", 3);
 var args = [["good", "default-ee", "unused"],
              ["expiredresponse", "default-ee", "unused"],
              ["oldvalidperiod", "default-ee", "unused"],
@@ -45,6 +46,14 @@ var oldValidityPeriodOCSPResponseGood = ocspResponses[2];
 var ocspResponseRevoked = ocspResponses[3];
 // Fresh signature, certificate is unknown.
 var ocspResponseUnknown = ocspResponses[4];
+
+// sometimes we expect a result without re-fetch
+var willNotRetry = 1;
+// but sometimes, since a bad response is in the cache, OCSP fetch will be
+// attempted for each validation - in practice, for these test certs, this
+// means 6 requests because various hash algorithm and key size combinations
+// are tried.
+var willRetry = 6;
 
 function run_test() {
   let ocspResponder = new HttpServer();

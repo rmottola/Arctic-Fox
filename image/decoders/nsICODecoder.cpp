@@ -99,7 +99,7 @@ nsICODecoder::GetFinalStateFromContainedDecoder()
   mInvalidRect.UnionRect(mInvalidRect, mContainedDecoder->TakeInvalidRect());
   mCurrentFrame = mContainedDecoder->GetCurrentFrameRef();
 
-  MOZ_ASSERT(HasError() || !mCurrentFrame || mCurrentFrame->IsImageComplete());
+  MOZ_ASSERT(HasError() || !mCurrentFrame || mCurrentFrame->IsFinished());
 }
 
 bool

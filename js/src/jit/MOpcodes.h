@@ -52,6 +52,7 @@ namespace jit {
     _(ReturnFromCtor)                                                       \
     _(BinarySharedStub)                                                     \
     _(UnarySharedStub)                                                      \
+    _(NullarySharedStub)                                                    \
     _(CheckOverRecursed)                                                    \
     _(DefVar)                                                               \
     _(DefLexical)                                                           \
@@ -146,8 +147,10 @@ namespace jit {
     _(LimitedTruncate)                                                      \
     _(RegExp)                                                               \
     _(RegExpMatcher)                                                        \
+    _(RegExpSearcher)                                                       \
     _(RegExpTester)                                                         \
-    _(RegExpReplace)                                                        \
+    _(RegExpPrototypeOptimizable)                                           \
+    _(RegExpInstanceOptimizable)                                            \
     _(StringReplace)                                                        \
     _(Lambda)                                                               \
     _(LambdaArrow)                                                          \
@@ -210,7 +213,6 @@ namespace jit {
     _(ConvertUnboxedObjectToNative)                                         \
     _(ArrayPopShift)                                                        \
     _(ArrayPush)                                                            \
-    _(ArrayConcat)                                                          \
     _(ArraySlice)                                                           \
     _(ArrayJoin)                                                            \
     _(LoadTypedArrayElementHole)                                            \
@@ -259,6 +261,7 @@ namespace jit {
     _(GetDOMProperty)                                                       \
     _(GetDOMMember)                                                         \
     _(SetDOMProperty)                                                       \
+    _(IsConstructor)                                                        \
     _(IsCallable)                                                           \
     _(IsObject)                                                             \
     _(HasClass)                                                             \
@@ -277,9 +280,9 @@ namespace jit {
     _(AsmJSPassStackArg)                                                    \
     _(AsmJSCall)                                                            \
     _(AsmSelect)                                                            \
+    _(AsmReinterpret)                                                       \
     _(NewDerivedTypedObject)                                                \
     _(RecompileCheck)                                                       \
-    _(MemoryBarrier)                                                        \
     _(AsmJSCompareExchangeHeap)                                             \
     _(AsmJSAtomicExchangeHeap)                                              \
     _(AsmJSAtomicBinopHeap)                                                 \

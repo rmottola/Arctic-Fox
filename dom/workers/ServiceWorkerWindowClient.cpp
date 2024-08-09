@@ -95,10 +95,7 @@ public:
     if (window) {
       nsCOMPtr<nsIDocument> doc = window->GetDocument();
       if (doc) {
-        nsContentUtils::DispatchChromeEvent(doc,
-                                            window->GetOuterWindow(),
-                                            NS_LITERAL_STRING("DOMServiceWorkerFocusClient"),
-                                            true, true);
+        nsContentUtils::DispatchFocusChromeEvent(window->GetOuterWindow());
         clientInfo.reset(new ServiceWorkerClientInfo(doc));
       }
     }
@@ -148,7 +145,7 @@ ServiceWorkerWindowClient::Focus(ErrorResult& aRv) const
     if (promiseProxy) {
       RefPtr<ClientFocusRunnable> r = new ClientFocusRunnable(mWindowId,
                                                                 promiseProxy);
-      MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(r)));
+      MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(r));
     } else {
       promise->MaybeReject(NS_ERROR_DOM_ABORT_ERR);
     }

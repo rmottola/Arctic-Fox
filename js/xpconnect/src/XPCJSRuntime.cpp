@@ -63,6 +63,10 @@
 #include "mozmemory.h"
 #endif
 
+#ifdef XP_WIN
+#include <windows.h>
+#endif
+
 using namespace mozilla;
 using namespace xpc;
 using namespace JS;
@@ -1109,7 +1113,6 @@ class Watchdog
 #include "ipc/Nuwa.h"
 #endif
 
-#define PREF_MAX_SCRIPT_RUN_TIME_CHILD "dom.max_child_script_run_time"
 #define PREF_MAX_SCRIPT_RUN_TIME_CONTENT "dom.max_script_run_time"
 #define PREF_MAX_SCRIPT_RUN_TIME_CHROME "dom.max_chrome_script_run_time"
 
@@ -1132,7 +1135,6 @@ class WatchdogManager : public nsIObserver
         mozilla::Preferences::AddStrongObserver(this, "dom.use_watchdog");
         mozilla::Preferences::AddStrongObserver(this, PREF_MAX_SCRIPT_RUN_TIME_CONTENT);
         mozilla::Preferences::AddStrongObserver(this, PREF_MAX_SCRIPT_RUN_TIME_CHROME);
-        mozilla::Preferences::AddStrongObserver(this, PREF_MAX_SCRIPT_RUN_TIME_CHILD);
     }
 
   protected:
@@ -1146,7 +1148,6 @@ class WatchdogManager : public nsIObserver
         mozilla::Preferences::RemoveObserver(this, "dom.use_watchdog");
         mozilla::Preferences::RemoveObserver(this, PREF_MAX_SCRIPT_RUN_TIME_CONTENT);
         mozilla::Preferences::RemoveObserver(this, PREF_MAX_SCRIPT_RUN_TIME_CHROME);
-        mozilla::Preferences::RemoveObserver(this, PREF_MAX_SCRIPT_RUN_TIME_CHILD);
     }
 
   public:
@@ -1224,10 +1225,7 @@ class WatchdogManager : public nsIObserver
             int32_t chromeTime = Preferences::GetInt(PREF_MAX_SCRIPT_RUN_TIME_CHROME, 20);
             if (chromeTime <= 0)
                 chromeTime = INT32_MAX;
-            int32_t childTime = Preferences::GetInt(PREF_MAX_SCRIPT_RUN_TIME_CHILD, 3);
-            if (childTime <= 0)
-                childTime = INT32_MAX;
-            mWatchdog->SetMinScriptRunTimeSeconds(std::min(std::min(contentTime, chromeTime), childTime));
+            mWatchdog->SetMinScriptRunTimeSeconds(std::min(contentTime, chromeTime));
         }
     }
 
@@ -1375,16 +1373,13 @@ XPCJSRuntime::InterruptCallback(JSContext* cx)
     if (!nsContentUtils::IsInitialized())
         return true;
 
-    bool contentProcess = XRE_IsContentProcess();
-
     // This is at least the second interrupt callback we've received since
     // returning to the event loop. See how long it's been, and what the limit
     // is.
     TimeDuration duration = TimeStamp::NowLoRes() - self->mSlowScriptCheckpoint;
     bool chrome = nsContentUtils::IsCallerChrome();
-    const char* prefName = contentProcess ? PREF_MAX_SCRIPT_RUN_TIME_CHILD
-                                 : chrome ? PREF_MAX_SCRIPT_RUN_TIME_CHROME
-                                          : PREF_MAX_SCRIPT_RUN_TIME_CONTENT;
+    const char* prefName = chrome ? PREF_MAX_SCRIPT_RUN_TIME_CHROME
+                                  : PREF_MAX_SCRIPT_RUN_TIME_CONTENT;
     int32_t limit = Preferences::GetInt(prefName, chrome ? 20 : 10);
 
     // If there's no limit, or we're within the limit, let it go.
@@ -1599,6 +1594,10 @@ ReloadPrefsCallback(const char* pref, void* data)
 
 XPCJSRuntime::~XPCJSRuntime()
 {
+    // Elsewhere we abort immediately if XPCJSRuntime initialization fails.
+    // Therefore the runtime must be non-null.
+    MOZ_ASSERT(MaybeRuntime());
+
     // This destructor runs before ~CycleCollectedJSRuntime, which does the
     // actual JS_DestroyRuntime() call. But destroying the runtime triggers
     // one final GC, which can call back into the runtime with various
@@ -2134,8 +2133,8 @@ ReportZoneStats(const JS::ZoneStats& zStats,
 
 static nsresult
 ReportClassStats(const ClassInfo& classInfo, const nsACString& path,
-                 nsIHandleReportCallback* cb, nsISupports* closure,
-                 size_t& gcTotal)
+                 const nsACString& shapesPath, nsIHandleReportCallback* cb,
+                 nsISupports* closure, size_t& gcTotal)
 {
     // We deliberately don't use ZCREPORT_BYTES, so that these per-class values
     // don't go into sundries.
@@ -2205,37 +2204,37 @@ ReportClassStats(const ClassInfo& classInfo, const nsACString& path,
     }
 
     if (classInfo.shapesGCHeapTree > 0) {
-        REPORT_GC_BYTES(path + NS_LITERAL_CSTRING("shapes/gc-heap/tree"),
+        REPORT_GC_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/gc-heap/tree"),
             classInfo.shapesGCHeapTree,
         "Shapes in a property tree.");
     }
 
     if (classInfo.shapesGCHeapDict > 0) {
-        REPORT_GC_BYTES(path + NS_LITERAL_CSTRING("shapes/gc-heap/dict"),
+        REPORT_GC_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/gc-heap/dict"),
             classInfo.shapesGCHeapDict,
         "Shapes in dictionary mode.");
     }
 
     if (classInfo.shapesGCHeapBase > 0) {
-        REPORT_GC_BYTES(path + NS_LITERAL_CSTRING("shapes/gc-heap/base"),
+        REPORT_GC_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/gc-heap/base"),
             classInfo.shapesGCHeapBase,
             "Base shapes, which collate data common to many shapes.");
     }
 
     if (classInfo.shapesMallocHeapTreeTables > 0) {
-        REPORT_BYTES(path + NS_LITERAL_CSTRING("shapes/malloc-heap/tree-tables"),
+        REPORT_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/malloc-heap/tree-tables"),
             KIND_HEAP, classInfo.shapesMallocHeapTreeTables,
             "Property tables of shapes in a property tree.");
     }
 
     if (classInfo.shapesMallocHeapDictTables > 0) {
-        REPORT_BYTES(path + NS_LITERAL_CSTRING("shapes/malloc-heap/dict-tables"),
+        REPORT_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/malloc-heap/dict-tables"),
             KIND_HEAP, classInfo.shapesMallocHeapDictTables,
             "Property tables of shapes in dictionary mode.");
     }
 
     if (classInfo.shapesMallocHeapTreeKids > 0) {
-        REPORT_BYTES(path + NS_LITERAL_CSTRING("shapes/malloc-heap/tree-kids"),
+        REPORT_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/malloc-heap/tree-kids"),
             KIND_HEAP, classInfo.shapesMallocHeapTreeKids,
             "Kid hashes of shapes in a property tree.");
     }
@@ -2283,8 +2282,12 @@ ReportCompartmentStats(const JS::CompartmentStats& cStats,
                     ? NS_LITERAL_CSTRING("classes/")
                     : NS_LITERAL_CSTRING("classes/class(<non-notable classes>)/");
 
-    rv = ReportClassStats(cStats.classInfo, nonNotablePath, cb, closure,
-                          gcTotal);
+    // XXX: shapes need special treatment until bug 1265271 is fixed.
+    nsCString shapesPath = cJSPathPrefix;
+    shapesPath += NS_LITERAL_CSTRING("classes/");
+
+    rv = ReportClassStats(cStats.classInfo, nonNotablePath, shapesPath, cb,
+                          closure, gcTotal);
     NS_ENSURE_SUCCESS(rv, rv);
 
     for (size_t i = 0; i < cStats.notableClasses.length(); i++) {
@@ -2294,7 +2297,8 @@ ReportCompartmentStats(const JS::CompartmentStats& cStats,
         nsCString classPath = cJSPathPrefix +
             nsPrintfCString("classes/class(%s)/", classInfo.className_);
 
-        rv = ReportClassStats(classInfo, classPath, cb, closure, gcTotal);
+        rv = ReportClassStats(classInfo, classPath, shapesPath, cb, closure,
+                              gcTotal);
         NS_ENSURE_SUCCESS(rv, rv);
     }
 
@@ -2732,7 +2736,7 @@ class OrphanReporter : public JS::ObjectPrivateVisitor
         // https://bugzilla.mozilla.org/show_bug.cgi?id=773533#c11 explains
         // that we have to skip XBL elements because they violate certain
         // assumptions.  Yuk.
-        if (node && !node->IsInDoc() &&
+        if (node && !node->IsInUncomposedDoc() &&
             !(node->IsElement() && node->AsElement()->IsInNamespace(kNameSpaceID_XBL)))
         {
             // This is an orphan node.  If we haven't already handled the
@@ -2740,8 +2744,12 @@ class OrphanReporter : public JS::ObjectPrivateVisitor
             // and then record its root so we don't measure it again.
             nsCOMPtr<nsINode> orphanTree = node->SubtreeRoot();
             if (!mAlreadyMeasuredOrphanTrees.Contains(orphanTree)) {
-                n += SizeOfTreeIncludingThis(orphanTree);
-                mAlreadyMeasuredOrphanTrees.PutEntry(orphanTree);
+                // If PutEntry() fails we don't measure this tree, which could
+                // lead to under-measurement. But that's better than the
+                // alternatives, which are over-measurement or an OOM abort.
+                if (mAlreadyMeasuredOrphanTrees.PutEntry(orphanTree, fallible)) {
+                    n += SizeOfTreeIncludingThis(orphanTree);
+                }
             }
         }
         return n;
@@ -3279,7 +3287,7 @@ ReadSourceFromFilename(JSContext* cx, const char* filename, char16_t** src, size
         return NS_ERROR_FILE_TOO_BIG;
 
     // Allocate an internal buf the size of the file.
-    auto buf = MakeUniqueFallible<unsigned char>(rawLen);
+    auto buf = MakeUniqueFallible<unsigned char[]>(rawLen);
     if (!buf)
         return NS_ERROR_OUT_OF_MEMORY;
 
@@ -3365,6 +3373,41 @@ XPCJSRuntime::XPCJSRuntime()
 {
 }
 
+#ifdef XP_WIN
+static size_t
+GetWindowsStackSize()
+{
+    // First, get the stack base. Because the stack grows down, this is the top
+    // of the stack.
+    const uint8_t* stackTop;
+#ifdef _WIN64
+    PNT_TIB64 pTib = reinterpret_cast<PNT_TIB64>(NtCurrentTeb());
+    stackTop = reinterpret_cast<const uint8_t*>(pTib->StackBase);
+#else
+    PNT_TIB pTib = reinterpret_cast<PNT_TIB>(NtCurrentTeb());
+    stackTop = reinterpret_cast<const uint8_t*>(pTib->StackBase);
+#endif
+
+    // Now determine the stack bottom. Note that we can't use tib->StackLimit,
+    // because that's the size of the committed area and we're also interested
+    // in the reserved pages below that.
+    MEMORY_BASIC_INFORMATION mbi;
+    if (!VirtualQuery(&mbi, &mbi, sizeof(mbi)))
+        MOZ_CRASH("VirtualQuery failed");
+
+    const uint8_t* stackBottom = reinterpret_cast<const uint8_t*>(mbi.AllocationBase);
+
+    // Do some sanity checks.
+    size_t stackSize = size_t(stackTop - stackBottom);
+    MOZ_RELEASE_ASSERT(stackSize >= 1 * 1024 * 1024);
+    MOZ_RELEASE_ASSERT(stackSize <= 32 * 1024 * 1024);
+
+    // Subtract 40 KB (Win32) or 80 KB (Win64) to account for things like
+    // the guard page and large PGO stack frames.
+    return stackSize - 10 * sizeof(uintptr_t) * 1024;
+}
+#endif
+
 nsresult
 XPCJSRuntime::Initialize()
 {
@@ -3447,9 +3490,9 @@ XPCJSRuntime::Initialize()
     const size_t kStackQuota =  2 * kDefaultStackQuota;
     const size_t kTrustedScriptBuffer = 450 * 1024;
 #elif defined(XP_WIN)
-    // 1MB is the default stack size on Windows, so use 900k.
-    // Windows PGO stack frames have unfortunately gotten pretty large lately. :-(
-    const size_t kStackQuota = 900 * 1024;
+    // 1MB is the default stack size on Windows. We use the /STACK linker flag
+    // to request a larger stack, so we determine the stack size at runtime.
+    const size_t kStackQuota = GetWindowsStackSize();
     const size_t kTrustedScriptBuffer = (sizeof(size_t) == 8) ? 180 * 1024   //win64
                                                               : 120 * 1024;  //win32
     // The following two configurations are linux-only. Given the numbers above,
@@ -3474,7 +3517,6 @@ XPCJSRuntime::Initialize()
                            kStackQuota - kSystemCodeBuffer,
                            kStackQuota - kSystemCodeBuffer - kTrustedScriptBuffer);
 
-    JS_SetErrorReporter(runtime, xpc::SystemErrorReporter);
     JS_SetDestroyCompartmentCallback(runtime, CompartmentDestroyedCallback);
     JS_SetSizeOfIncludingThisCompartmentCallback(runtime, CompartmentSizeOfIncludingThisCallback);
     JS_SetCompartmentNameCallback(runtime, CompartmentNameCallback);

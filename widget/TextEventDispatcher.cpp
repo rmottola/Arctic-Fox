@@ -152,8 +152,8 @@ TextEventDispatcher::GetState() const
 void
 TextEventDispatcher::InitEvent(WidgetGUIEvent& aEvent) const
 {
-  aEvent.time = PR_IntervalNow();
-  aEvent.refPoint = LayoutDeviceIntPoint(0, 0);
+  aEvent.mTime = PR_IntervalNow();
+  aEvent.mRefPoint = LayoutDeviceIntPoint(0, 0);
   aEvent.mFlags.mIsSynthesizedForTests = IsForTests();
   if (aEvent.mClass != eCompositionEventClass) {
     return;
@@ -399,7 +399,13 @@ TextEventDispatcher::DispatchKeyboardEventInternal(
                        void* aData,
                        uint32_t aIndexOfKeypress)
 {
-  MOZ_ASSERT(aMessage == eKeyDown || aMessage == eKeyUp ||
+  // Note that this method is also used for dispatching key events on a plugin
+  // because key events on a plugin should be dispatched same as normal key
+  // events.  Then, only some handlers which need to intercept key events
+  // before the focused plugin (e.g., reserved shortcut key handlers) can
+  // consume the events.
+  MOZ_ASSERT(WidgetKeyboardEvent::IsKeyDownOrKeyDownOnPlugin(aMessage) ||
+             WidgetKeyboardEvent::IsKeyUpOrKeyUpOnPlugin(aMessage) ||
              aMessage == eKeyPress, "Invalid aMessage value");
   nsresult rv = GetState();
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -412,7 +418,10 @@ TextEventDispatcher::DispatchKeyboardEventInternal(
   }
 
   // Basically, key events shouldn't be dispatched during composition.
-  if (IsComposing()) {
+  // Note that plugin process has different IME context.  Therefore, we don't
+  // need to check our composition state when the key event is fired on a
+  // plugin.
+  if (IsComposing() && !WidgetKeyboardEvent::IsKeyEventOnPlugin(aMessage)) {
     // However, if we need to behave like other browsers, we need the keydown
     // and keyup events.  Note that this behavior is also allowed by D3E spec.
     // FYI: keypress events must not be fired during composition.
@@ -432,36 +441,42 @@ TextEventDispatcher::DispatchKeyboardEventInternal(
     // If the key event should be dispatched as consumed event, marking it here.
     // This is useful to prevent double action.  E.g., when the key was already
     // handled by system, our chrome shouldn't handle it.
-    keyEvent.mFlags.mDefaultPrevented = true;
+    keyEvent.PreventDefaultBeforeDispatch();
   }
 
   // Corrects each member for the specific key event type.
-  if (aMessage == eKeyDown || aMessage == eKeyUp) {
+  if (keyEvent.mKeyNameIndex != KEY_NAME_INDEX_USE_STRING) {
     MOZ_ASSERT(!aIndexOfKeypress,
-      "aIndexOfKeypress must be 0 for either eKeyDown or eKeyUp");
-    // charCode of keydown and keyup should be 0.
-    keyEvent.charCode = 0;
-  } else if (keyEvent.mKeyNameIndex != KEY_NAME_INDEX_USE_STRING) {
-    MOZ_ASSERT(!aIndexOfKeypress,
-      "aIndexOfKeypress must be 0 for eKeyPress of non-printable key");
-    // If keypress event isn't caused by printable key, its charCode should
+      "aIndexOfKeypress must be 0 for non-printable key");
+    // If the keyboard event isn't caused by printable key, its charCode should
     // be 0.
-    keyEvent.charCode = 0;
+    keyEvent.SetCharCode(0);
   } else {
-    MOZ_RELEASE_ASSERT(
-      !aIndexOfKeypress || aIndexOfKeypress < keyEvent.mKeyValue.Length(),
-      "aIndexOfKeypress must be 0 - mKeyValue.Length() - 1");
-    keyEvent.keyCode = 0;
+    if (WidgetKeyboardEvent::IsKeyDownOrKeyDownOnPlugin(aMessage) ||
+        WidgetKeyboardEvent::IsKeyUpOrKeyUpOnPlugin(aMessage)) {
+      MOZ_RELEASE_ASSERT(!aIndexOfKeypress,
+        "aIndexOfKeypress must be 0 for either eKeyDown or eKeyUp");
+    } else {
+      MOZ_RELEASE_ASSERT(
+        !aIndexOfKeypress || aIndexOfKeypress < keyEvent.mKeyValue.Length(),
+        "aIndexOfKeypress must be 0 - mKeyValue.Length() - 1");
+    }
     wchar_t ch =
       keyEvent.mKeyValue.IsEmpty() ? 0 : keyEvent.mKeyValue[aIndexOfKeypress];
-    keyEvent.charCode = static_cast<uint32_t>(ch);
-    if (ch) {
-      keyEvent.mKeyValue.Assign(ch);
-    } else {
-      keyEvent.mKeyValue.Truncate();
+    keyEvent.SetCharCode(static_cast<uint32_t>(ch));
+    if (aMessage == eKeyPress) {
+      // keyCode of eKeyPress events of printable keys should be always 0.
+      keyEvent.keyCode = 0;
+      // eKeyPress events are dispatched for every character.
+      // So, each key value of eKeyPress events should be a character.
+      if (ch) {
+        keyEvent.mKeyValue.Assign(ch);
+      } else {
+        keyEvent.mKeyValue.Truncate();
+      }
     }
   }
-  if (aMessage == eKeyUp) {
+  if (WidgetKeyboardEvent::IsKeyUpOrKeyUpOnPlugin(aMessage)) {
     // mIsRepeat of keyup event must be false.
     keyEvent.mIsRepeat = false;
   }
@@ -480,9 +495,12 @@ TextEventDispatcher::DispatchKeyboardEventInternal(
   // TODO: Manage mUniqueId here.
 
   // Request the alternative char codes for the key event.
-  // XXX Currently, they are necessary only when the event is eKeyPress.
+  // eKeyDown also needs alternative char codes because nsXBLWindowKeyHandler
+  // needs to check if a following keypress event is reserved by chrome for
+  // stopping propagation of its preceding keydown event.
   keyEvent.alternativeCharCodes.Clear();
-  if (aMessage == eKeyPress &&
+  if ((WidgetKeyboardEvent::IsKeyDownOrKeyDownOnPlugin(aMessage) ||
+       aMessage == eKeyPress) &&
       (keyEvent.IsControl() || keyEvent.IsAlt() ||
        keyEvent.IsMeta() || keyEvent.IsOS())) {
     nsCOMPtr<TextEventDispatcherListener> listener =

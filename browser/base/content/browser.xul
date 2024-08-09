@@ -16,6 +16,7 @@
 <?xml-stylesheet href="chrome://browser/skin/controlcenter/panel.css" type="text/css"?>
 <?xml-stylesheet href="chrome://browser/skin/customizableui/panelUIOverlay.css" type="text/css"?>
 <?xml-stylesheet href="chrome://browser/skin/" type="text/css"?>
+<?xml-stylesheet href="chrome://browser/skin/browser-lightweightTheme.css" type="text/css"?>
 
 <?xul-overlay href="chrome://global/content/editMenuOverlay.xul"?>
 <?xul-overlay href="chrome://browser/content/baseMenuOverlay.xul"?>
@@ -50,6 +51,15 @@
         titlemodifier="&mainWindow.titlemodifier;"
         titlemodifier_normal="&mainWindow.titlemodifier;"
         titlemodifier_privatebrowsing="&mainWindow.titlemodifier; &mainWindow.titlePrivateBrowsingSuffix;"
+#endif
+#ifdef CAN_DRAW_IN_TITLEBAR
+#ifdef XP_WIN
+        chromemargin="0,2,2,2"
+#else
+# Remove, or MacOS looses title bar
+#        chromemargin="0,-1,-1,-1"
+#endif
+        tabsintitlebar="true"
 #endif
         titlemenuseparator="&mainWindow.titlemodifiermenuseparator;"
         lightweightthemes="true"
@@ -170,12 +180,6 @@
         <vbox>
           <label id="editBookmarkPanelTitle"/>
           <description id="editBookmarkPanelDescription"/>
-          <hbox>
-            <button id="editBookmarkPanelRemoveButton"
-                    class="editBookmarkPanelHeaderButton"
-                    oncommand="StarUI.removeBookmarkButtonCommand();"
-                    accesskey="&editBookmark.removeBookmark.accessKey;"/>
-          </hbox>
         </vbox>
       </row>
       <vbox id="editBookmarkPanelContent" flex="1" hidden="true"/>
@@ -186,15 +190,15 @@
                 label="&editBookmark.done.label;"
                 default="true"
                 oncommand="StarUI.panel.hidePopup();"/>
-        <button id="editBookmarkPanelDeleteButton"
+        <button id="editBookmarkPanelRemoveButton"
                 class="editBookmarkPanelBottomButton"
-                label="&editBookmark.cancel.label;"
-                oncommand="StarUI.cancelButtonOnCommand();"/>
+                oncommand="StarUI.removeBookmarkButtonCommand();"
+                accesskey="&editBookmark.removeBookmark.accessKey;"/>
 #else
-        <button id="editBookmarkPanelDeleteButton"
+        <button id="editBookmarkPanelRemoveButton"
                 class="editBookmarkPanelBottomButton"
-                label="&editBookmark.cancel.label;"
-                oncommand="StarUI.cancelButtonOnCommand();"/>
+                oncommand="StarUI.removeBookmarkButtonCommand();"
+                accesskey="&editBookmark.removeBookmark.accessKey;"/>
         <button id="editBookmarkPanelDoneButton"
                 class="editBookmarkPanelBottomButton"
                 label="&editBookmark.done.label;"
@@ -213,6 +217,7 @@
       <menuitem oncommand="gCustomizeMode.removeFromArea(document.popupNode)"
                 accesskey="&customizeMenu.removeFromToolbar.accesskey;"
                 label="&customizeMenu.removeFromToolbar.label;"
+                contexttype="toolbaritem"
                 class="customize-context-removeFromToolbar"/>
       <menuitem id="toolbar-context-reloadAllTabs"
                 class="toolbaritem-tabsmenu"
@@ -1078,30 +1083,6 @@
 
   <vbox id="browser-bottombox" layer="true">
     <notificationbox id="global-notificationbox"/>
-    <toolbar id="developer-toolbar"
-             class="devtools-toolbar"
-             hidden="true">
-#ifdef XP_MACOSX
-          <toolbarbutton id="developer-toolbar-closebutton"
-                         class="devtools-closebutton"
-                         oncommand="DeveloperToolbar.hide();"
-                         tooltiptext="&devToolbarCloseButton.tooltiptext;"/>
-#endif
-          <stack class="gclitoolbar-stack-node" flex="1">
-            <textbox class="gclitoolbar-input-node" rows="1"/>
-            <hbox class="gclitoolbar-complete-node"/>
-          </stack>
-          <toolbarbutton id="developer-toolbar-toolbox-button"
-                         class="developer-toolbar-button"
-                         observes="devtoolsMenuBroadcaster_DevToolbox"
-                         tooltiptext="&devToolbarToolsButton.tooltip;"/>
-#ifndef XP_MACOSX
-          <toolbarbutton id="developer-toolbar-closebutton"
-                         class="devtools-closebutton"
-                         oncommand="DeveloperToolbar.hide();"
-                         tooltiptext="&devToolbarCloseButton.tooltiptext;"/>
-#endif
-   </toolbar>
   </vbox>
 
 #ifndef XP_UNIX

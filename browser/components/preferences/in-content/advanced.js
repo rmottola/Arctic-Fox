@@ -44,7 +44,7 @@ var gAdvancedPane = {
     this.initSubmitCrashes();
 #endif
     this.initTelemetry();
-#ifdef MOZ_SERVICES_HEALTHREPORT
+#ifdef MOZ_TELEMETRY_REPORTING
     this.initSubmitHealthReport();
 #endif
     this.updateCacheSizeInputField();
@@ -55,7 +55,7 @@ var gAdvancedPane = {
                      gAdvancedPane.updateHardwareAcceleration);
     setEventListener("advancedPrefs", "select",
                      gAdvancedPane.tabSelectionChanged);
-#ifdef MOZ_SERVICES_HEALTHREPORT
+#ifdef MOZ_TELEMETRY_REPORTING
     setEventListener("submitHealthReportBox", "command",
                      gAdvancedPane.updateSubmitHealthReport);
 #endif
@@ -352,7 +352,7 @@ var gAdvancedPane = {
       ])
     };
 
-    actualSizeLabel.textContent = prefStrBundle.getString("actualDiskCacheSizeCalculated");
+    actualSizeLabel.value = prefStrBundle.getString("actualDiskCacheSizeCalculated");
 
     try {
       var cacheService =

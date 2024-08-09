@@ -9,6 +9,7 @@
 const { Ci, Cu } = require("chrome");
 const promise = require("promise");
 const EventEmitter = require("devtools/shared/event-emitter");
+const Services = require("Services");
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
@@ -396,6 +397,7 @@ TabTarget.prototype = {
         }
         this.activeTab = tabClient;
         this.threadActor = response.threadActor;
+
         attachConsole();
       });
     };
@@ -497,6 +499,10 @@ TabTarget.prototype = {
       this.emit("frame-update", aPacket);
     };
     this.client.addListener("frameUpdate", this._onFrameUpdate);
+
+    this._onSourceUpdated = (event, packet) => this.emit("source-updated", packet);
+    this.client.addListener("newSource", this._onSourceUpdated);
+    this.client.addListener("updatedSource", this._onSourceUpdated);
   },
 
   /**
@@ -507,6 +513,8 @@ TabTarget.prototype = {
     this.client.removeListener("tabNavigated", this._onTabNavigated);
     this.client.removeListener("tabDetached", this._onTabDetached);
     this.client.removeListener("frameUpdate", this._onFrameUpdate);
+    this.client.removeListener("newSource", this._onSourceUpdated);
+    this.client.removeListener("updatedSource", this._onSourceUpdated);
   },
 
   /**
@@ -601,6 +609,20 @@ TabTarget.prototype = {
   toString: function() {
     let id = this._tab ? this._tab : (this._form && this._form.actor);
     return `TabTarget:${id}`;
+  },
+
+  /**
+   * @see TabActor.prototype.onResolveLocation
+   */
+  resolveLocation(loc) {
+    let deferred = promise.defer();
+
+    this.client.request(Object.assign({
+      to: this._form.actor,
+      type: "resolveLocation",
+    }, loc), deferred.resolve);
+
+    return deferred.promise;
   },
 };
 

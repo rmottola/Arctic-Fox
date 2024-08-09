@@ -1,5 +1,6 @@
 Cu.import("resource://testing-common/httpd.js");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/NetUtil.jsm");
 
 var httpServer = null;
 // Need to randomize, because apparently no one clears our cache
@@ -98,7 +99,7 @@ function run_test()
                       Ci.nsICachingChannel.LOAD_ONLY_FROM_CACHE);
     var chanac = chan.QueryInterface(Ci.nsIApplicationCacheChannel);
     chanac.chooseApplicationCache = true;
-    chan.asyncOpen(new ChannelListener(finish_test), null);
+    chan.asyncOpen2(new ChannelListener(finish_test));
   }}
 
   var os = Cc["@mozilla.org/observer-service;1"].

@@ -91,7 +91,7 @@ FFmpegRuntimeLinker::CreateDecoderModule()
     case 55:
     case 56: module = FFmpegDecoderModule<55>::Create(&sLibAV); break;
     case 57: module = FFmpegDecoderModule<57>::Create(&sLibAV); break;
-    case 58: module = FFmpegDecoderModule<57>::Create(&sLibAV); break;
+    case 58: module = FFmpegDecoderModule<58>::Create(&sLibAV); break;
     default: module = nullptr;
   }
   return module.forget();

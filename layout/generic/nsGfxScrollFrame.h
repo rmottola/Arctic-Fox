@@ -49,6 +49,7 @@ public:
   typedef mozilla::CSSIntPoint CSSIntPoint;
   typedef mozilla::layout::ScrollbarActivity ScrollbarActivity;
   typedef mozilla::layers::FrameMetrics FrameMetrics;
+  typedef mozilla::layers::ScrollSnapInfo ScrollSnapInfo;
   typedef mozilla::layers::Layer Layer;
 
   class AsyncScroll;
@@ -57,7 +58,6 @@ public:
   ScrollFrameHelper(nsContainerFrame* aOuter, bool aIsRoot);
   ~ScrollFrameHelper();
 
-  bool IsScrollFrameWithSnapping() const;
   mozilla::ScrollbarStyles GetScrollbarStylesFromFrame() const;
 
   // If a child frame was added or removed on the scrollframe,
@@ -203,7 +203,6 @@ public:
   // Get the scroll range assuming the scrollport has size (aWidth, aHeight).
   nsRect GetScrollRange(nscoord aWidth, nscoord aHeight) const;
   nsSize GetScrollPositionClampingScrollPortSize() const;
-  void FlingSnap(const mozilla::CSSPoint& aDestination);
   void ScrollSnap(nsIScrollableFrame::ScrollMode aMode = nsIScrollableFrame::SMOOTH_MSD);
   void ScrollSnap(const nsPoint &aDestination,
                   nsIScrollableFrame::ScrollMode aMode = nsIScrollableFrame::SMOOTH_MSD);
@@ -390,11 +389,13 @@ public:
 
   bool UsesContainerScrolling() const;
 
+  ScrollSnapInfo GetScrollSnapInfo() const;
+
   bool DecideScrollableLayer(nsDisplayListBuilder* aBuilder,
                              nsRect* aDirtyRect,
                              bool aAllowCreateDisplayPort);
-  void NotifyImageVisibilityUpdate();
-  bool GetDisplayPortAtLastImageVisibilityUpdate(nsRect* aDisplayPort);
+  void NotifyApproximateFrameVisibilityUpdate();
+  bool GetDisplayPortAtLastApproximateFrameVisibilityUpdate(nsRect* aDisplayPort);
 
   bool AllowDisplayPortExpiration();
   void TriggerDisplayPortExpiration();
@@ -416,7 +417,7 @@ public:
     }
   }
   bool WantAsyncScroll() const;
-  Maybe<mozilla::layers::FrameMetrics> ComputeFrameMetrics(
+  Maybe<mozilla::layers::ScrollMetadata> ComputeScrollMetadata(
     Layer* aLayer, nsIFrame* aContainerReferenceFrame,
     const ContainerLayerParameters& aParameters,
     const mozilla::DisplayItemClip* aClip) const;
@@ -492,10 +493,10 @@ public:
   nsCOMPtr<nsITimer> mScrollActivityTimer;
   nsPoint mScrollPosForLayerPixelAlignment;
 
-  // The scroll position where we last updated image visibility.
-  nsPoint mLastUpdateImagesPos;
-  bool mHadDisplayPortAtLastImageUpdate;
-  nsRect mDisplayPortAtLastImageUpdate;
+  // The scroll position where we last updated frame visibility.
+  nsPoint mLastUpdateFramesPos;
+  bool mHadDisplayPortAtLastFrameUpdate;
+  nsRect mDisplayPortAtLastFrameUpdate;
 
   nsRect mPrevScrolledRect;
 
@@ -625,13 +626,13 @@ protected:
   AsyncScrollEventType mAsyncScrollEvent;
   bool HasPluginFrames();
 
-  static void EnsureImageVisPrefsCached();
-  static bool sImageVisPrefsCached;
-  // The number of scrollports wide/high to expand when looking for images.
+  static void EnsureFrameVisPrefsCached();
+  static bool sFrameVisPrefsCached;
+  // The number of scrollports wide/high to expand when tracking frame visibility.
   static uint32_t sHorzExpandScrollPort;
   static uint32_t sVertExpandScrollPort;
   // The fraction of the scrollport we allow to scroll by before we schedule
-  // an update of image visibility.
+  // an update of frame visibility.
   static int32_t sHorzScrollFraction;
   static int32_t sVertScrollFraction;
 };
@@ -698,8 +699,8 @@ public:
 
   virtual nscoord GetMinISize(nsRenderingContext *aRenderingContext) override;
   virtual nscoord GetPrefISize(nsRenderingContext *aRenderingContext) override;
-  virtual nsresult GetPadding(nsMargin& aPadding) override;
-  virtual bool IsCollapsed() override;
+  virtual nsresult GetXULPadding(nsMargin& aPadding) override;
+  virtual bool IsXULCollapsed() override;
   
   virtual void Reflow(nsPresContext*           aPresContext,
                       nsHTMLReflowMetrics&     aDesiredSize,
@@ -749,9 +750,6 @@ public:
   // nsIScrollableFrame
   virtual nsIFrame* GetScrolledFrame() const override {
     return mHelper.GetScrolledFrame();
-  }
-  virtual bool IsScrollFrameWithSnapping() const override {
-    return mHelper.IsScrollFrameWithSnapping();
   }
   virtual mozilla::ScrollbarStyles GetScrollbarStyles() const override {
     return mHelper.GetScrollbarStylesFromFrame();
@@ -838,9 +836,6 @@ public:
                         override {
     mHelper.ScrollBy(aDelta, aUnit, aMode, aOverflow, aOrigin, aMomentum, aSnap);
   }
-  virtual void FlingSnap(const mozilla::CSSPoint& aDestination) override {
-    mHelper.FlingSnap(aDestination);
-  }
   virtual void ScrollSnap() override {
     mHelper.ScrollSnap();
   }
@@ -905,12 +900,12 @@ public:
   virtual bool WantAsyncScroll() const override {
     return mHelper.WantAsyncScroll();
   }
-  virtual mozilla::Maybe<mozilla::layers::FrameMetrics> ComputeFrameMetrics(
+  virtual mozilla::Maybe<mozilla::layers::ScrollMetadata> ComputeScrollMetadata(
     Layer* aLayer, nsIFrame* aContainerReferenceFrame,
     const ContainerLayerParameters& aParameters,
     const mozilla::DisplayItemClip* aClip) const override
   {
-    return mHelper.ComputeFrameMetrics(aLayer, aContainerReferenceFrame, aParameters, aClip);
+    return mHelper.ComputeScrollMetadata(aLayer, aContainerReferenceFrame, aParameters, aClip);
   }
   virtual bool IsIgnoringViewportClipping() const override {
     return mHelper.IsIgnoringViewportClipping();
@@ -926,11 +921,11 @@ public:
                                      bool aAllowCreateDisplayPort) override {
     return mHelper.DecideScrollableLayer(aBuilder, aDirtyRect, aAllowCreateDisplayPort);
   }
-  virtual void NotifyImageVisibilityUpdate() override {
-    mHelper.NotifyImageVisibilityUpdate();
+  virtual void NotifyApproximateFrameVisibilityUpdate() override {
+    mHelper.NotifyApproximateFrameVisibilityUpdate();
   }
-  virtual bool GetDisplayPortAtLastImageVisibilityUpdate(nsRect* aDisplayPort) override {
-    return mHelper.GetDisplayPortAtLastImageVisibilityUpdate(aDisplayPort);
+  virtual bool GetDisplayPortAtLastApproximateFrameVisibilityUpdate(nsRect* aDisplayPort) override {
+    return mHelper.GetDisplayPortAtLastApproximateFrameVisibilityUpdate(aDisplayPort);
   }
   void TriggerDisplayPortExpiration() override {
     mHelper.TriggerDisplayPortExpiration();
@@ -1010,6 +1005,10 @@ public:
     mHelper.SetZoomableByAPZ(aZoomable);
   }
   
+  ScrollSnapInfo GetScrollSnapInfo() const override {
+    return mHelper.GetScrollSnapInfo();
+  }
+
 #ifdef DEBUG_FRAME_DUMP
   virtual nsresult GetFrameName(nsAString& aResult) const override;
 #endif
@@ -1125,20 +1124,20 @@ public:
   virtual void AppendAnonymousContentTo(nsTArray<nsIContent*>& aElements,
                                         uint32_t aFilter) override;
 
-  virtual nsSize GetMinSize(nsBoxLayoutState& aBoxLayoutState) override;
-  virtual nsSize GetPrefSize(nsBoxLayoutState& aBoxLayoutState) override;
-  virtual nsSize GetMaxSize(nsBoxLayoutState& aBoxLayoutState) override;
-  virtual nscoord GetBoxAscent(nsBoxLayoutState& aBoxLayoutState) override;
+  virtual nsSize GetXULMinSize(nsBoxLayoutState& aBoxLayoutState) override;
+  virtual nsSize GetXULPrefSize(nsBoxLayoutState& aBoxLayoutState) override;
+  virtual nsSize GetXULMaxSize(nsBoxLayoutState& aBoxLayoutState) override;
+  virtual nscoord GetXULBoxAscent(nsBoxLayoutState& aBoxLayoutState) override;
 
-  NS_IMETHOD DoLayout(nsBoxLayoutState& aBoxLayoutState) override;
-  virtual nsresult GetPadding(nsMargin& aPadding) override;
+  NS_IMETHOD DoXULLayout(nsBoxLayoutState& aBoxLayoutState) override;
+  virtual nsresult GetXULPadding(nsMargin& aPadding) override;
 
   virtual bool GetBorderRadii(const nsSize& aFrameSize, const nsSize& aBorderArea,
                               Sides aSkipSides, nscoord aRadii[8]) const override {
     return mHelper.GetBorderRadii(aFrameSize, aBorderArea, aSkipSides, aRadii);
   }
 
-  nsresult Layout(nsBoxLayoutState& aState);
+  nsresult XULLayout(nsBoxLayoutState& aState);
   void LayoutScrollArea(nsBoxLayoutState& aState, const nsPoint& aScrollPosition);
 
   static bool AddRemoveScrollbar(bool& aHasScrollbar, 
@@ -1164,9 +1163,6 @@ public:
   // nsIScrollableFrame
   virtual nsIFrame* GetScrolledFrame() const override {
     return mHelper.GetScrolledFrame();
-  }
-  virtual bool IsScrollFrameWithSnapping() const override {
-    return mHelper.IsScrollFrameWithSnapping();
   }
   virtual mozilla::ScrollbarStyles GetScrollbarStyles() const override {
     return mHelper.GetScrollbarStylesFromFrame();
@@ -1249,9 +1245,6 @@ public:
                         override {
     mHelper.ScrollBy(aDelta, aUnit, aMode, aOverflow, aOrigin, aMomentum, aSnap);
   }
-  virtual void FlingSnap(const mozilla::CSSPoint& aDestination) override {
-    mHelper.FlingSnap(aDestination);
-  }
   virtual void ScrollSnap() override {
     mHelper.ScrollSnap();
   }
@@ -1316,12 +1309,12 @@ public:
   virtual bool WantAsyncScroll() const override {
     return mHelper.WantAsyncScroll();
   }
-  virtual mozilla::Maybe<mozilla::layers::FrameMetrics> ComputeFrameMetrics(
+  virtual mozilla::Maybe<mozilla::layers::ScrollMetadata> ComputeScrollMetadata(
     Layer* aLayer, nsIFrame* aContainerReferenceFrame,
     const ContainerLayerParameters& aParameters,
     const mozilla::DisplayItemClip* aClip) const override
   {
-    return mHelper.ComputeFrameMetrics(aLayer, aContainerReferenceFrame, aParameters, aClip);
+    return mHelper.ComputeScrollMetadata(aLayer, aContainerReferenceFrame, aParameters, aClip);
   }
   virtual bool IsIgnoringViewportClipping() const override {
     return mHelper.IsIgnoringViewportClipping();
@@ -1419,14 +1412,18 @@ public:
                                      bool aAllowCreateDisplayPort) override {
     return mHelper.DecideScrollableLayer(aBuilder, aDirtyRect, aAllowCreateDisplayPort);
   }
-  virtual void NotifyImageVisibilityUpdate() override {
-    mHelper.NotifyImageVisibilityUpdate();
+  virtual void NotifyApproximateFrameVisibilityUpdate() override {
+    mHelper.NotifyApproximateFrameVisibilityUpdate();
   }
-  virtual bool GetDisplayPortAtLastImageVisibilityUpdate(nsRect* aDisplayPort) override {
-    return mHelper.GetDisplayPortAtLastImageVisibilityUpdate(aDisplayPort);
+  virtual bool GetDisplayPortAtLastApproximateFrameVisibilityUpdate(nsRect* aDisplayPort) override {
+    return mHelper.GetDisplayPortAtLastApproximateFrameVisibilityUpdate(aDisplayPort);
   }
   void TriggerDisplayPortExpiration() override {
     mHelper.TriggerDisplayPortExpiration();
+  }
+
+  ScrollSnapInfo GetScrollSnapInfo() const override {
+    return mHelper.GetScrollSnapInfo();
   }
 
 #ifdef DEBUG_FRAME_DUMP
@@ -1448,7 +1445,7 @@ protected:
     if (!mHelper.IsLTR()) {
       aRect.x = mHelper.mScrollPort.XMost() - aScrollPosition.x - aRect.width;
     }
-    mHelper.mScrolledFrame->SetBounds(aState, aRect, aRemoveOverflowAreas);
+    mHelper.mScrolledFrame->SetXULBounds(aState, aRect, aRemoveOverflowAreas);
   }
 
 private:

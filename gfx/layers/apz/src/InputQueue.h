@@ -10,8 +10,8 @@
 #include "DragTracker.h"
 #include "InputData.h"
 #include "mozilla/EventForwards.h"
+#include "mozilla/RefPtr.h"
 #include "mozilla/UniquePtr.h"
-#include "nsAutoPtr.h"
 #include "nsTArray.h"
 #include "TouchCounter.h"
 
@@ -175,7 +175,8 @@ private:
   bool MaybeHandleCurrentBlock(CancelableBlockState* block,
                                const InputData& aEvent);
 
-  void ScheduleMainThreadTimeout(const RefPtr<AsyncPanZoomController>& aTarget, uint64_t aInputBlockId);
+  void ScheduleMainThreadTimeout(const RefPtr<AsyncPanZoomController>& aTarget,
+                                 CancelableBlockState* aBlock);
   void MainThreadTimeout(const uint64_t& aInputBlockId);
   void ProcessInputBlocks();
   void UpdateActiveApzc(const RefPtr<AsyncPanZoomController>& aNewActive);

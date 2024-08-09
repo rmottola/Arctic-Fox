@@ -25,6 +25,7 @@
 #include "PluginDataResolver.h"
 
 #include "mozilla/unused.h"
+#include "mozilla/EventForwards.h"
 
 class gfxASurface;
 class gfxContext;
@@ -316,18 +317,6 @@ public:
         aOutput = mSrcAttribute;
     }
 
-    /**
-     * This function tells us whether this plugin instance would have been
-     * whitelisted for Shumway if Shumway had been enabled. This is being used
-     * for the purpose of gathering telemetry on Flash hangs that could
-     * potentially be avoided by using Shumway instead.
-     */
-    bool
-    IsWhitelistedForShumway() const
-    {
-        return mIsWhitelistedForShumway;
-    }
-
     virtual bool
     AnswerPluginFocusChange(const bool& gotFocus) override;
 
@@ -368,6 +357,14 @@ public:
     virtual bool
     RecvRequestCommitOrCancel(const bool& aCommitted) override;
 
+    // for reserved shortcut key handling with windowed plugin on Windows
+    nsresult HandledWindowedPluginKeyEvent(
+      const mozilla::NativeEventData& aKeyEventData,
+      bool aIsConsumed);
+    virtual bool
+    RecvOnWindowedPluginKeyEvent(
+      const mozilla::NativeEventData& aKeyEventData) override;
+
 private:
     // Create an appropriate platform surface for a background of size
     // |aSize|.  Return true if successful.
@@ -402,7 +399,6 @@ private:
     NPP mNPP;
     const NPNetscapeFuncs* mNPNIface;
     nsCString mSrcAttribute;
-    bool mIsWhitelistedForShumway;
     NPWindowType mWindowType;
     int16_t mDrawingModel;
     IntSize mWindowSize;

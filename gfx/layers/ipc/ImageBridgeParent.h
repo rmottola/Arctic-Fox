@@ -29,6 +29,7 @@ class Thread;
 namespace mozilla {
 namespace ipc {
 class Shmem;
+class GeckoChildProcessHost;
 } // namespace ipc
 
 namespace layers {
@@ -56,7 +57,7 @@ public:
   virtual void ActorDestroy(ActorDestroyReason aWhy) override;
 
   static PImageBridgeParent*
-  Create(Transport* aTransport, ProcessId aChildProcessId);
+  Create(Transport* aTransport, ProcessId aChildProcessId, ipc::GeckoChildProcessHost* aProcessHost);
 
   // CompositableParentManager
   virtual void SendFenceHandleIfPresent(PTextureParent* aTexture) override;
@@ -93,9 +94,7 @@ public:
   RecvChildAsyncMessages(InfallibleTArray<AsyncChildMessageData>&& aMessages) override;
 
   // Shutdown step 1
-  virtual bool RecvWillStop() override;
-  // Shutdown step 2
-  virtual bool RecvStop() override;
+  virtual bool RecvWillClose() override;
 
   MessageLoop* GetMessageLoop() const { return mMessageLoop; }
 
@@ -142,7 +141,7 @@ public:
 
   virtual bool UsesImageBridge() const override { return true; }
 
-  virtual bool IPCOpen() const override { return !mStopped; }
+  virtual bool IPCOpen() const override { return !mClosed; }
 
 protected:
   void OnChannelConnected(int32_t pid) override;
@@ -156,7 +155,9 @@ private:
   RefPtr<ImageBridgeParent> mSelfRef;
 
   bool mSetChildThreadPriority;
-  bool mStopped;
+  bool mClosed;
+
+  ipc::GeckoChildProcessHost* mSubprocess;
 
   /**
    * Map of all living ImageBridgeParent instances

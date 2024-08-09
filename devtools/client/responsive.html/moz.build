@@ -6,9 +6,11 @@
 
 DIRS += [
     'actions',
+    'audio',
     'components',
     'images',
     'reducers',
+    'utils',
 ]
 
 DevToolsModules(
@@ -17,8 +19,10 @@ DevToolsModules(
     'index.css',
     'manager.js',
     'reducers.js',
+    'responsive-ua.css',
     'store.js',
     'types.js',
 )
 
 XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']
+BROWSER_CHROME_MANIFESTS += ['test/browser/browser.ini']

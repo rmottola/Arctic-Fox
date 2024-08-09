@@ -4,19 +4,22 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "OmxDataDecoder.h"
 #include "GonkOmxPlatformLayer.h"
-#include "MediaInfo.h"
-#include "ImageContainer.h"
+
+#include <binder/MemoryDealer.h>
+#include <cutils/properties.h>
+#include <media/IOMX.h>
+#include <media/stagefright/MediaCodecList.h>
+#include <utils/List.h>
+
 #include "mozilla/Monitor.h"
 #include "mozilla/layers/TextureClient.h"
 #include "mozilla/layers/GrallocTextureClient.h"
 #include "mozilla/layers/ImageBridgeChild.h"
-#include <binder/MemoryDealer.h>
-#include <media/IOMX.h>
-#include <utils/List.h>
-#include <media/stagefright/MediaCodecList.h>
-#include <cutils/properties.h>
+
+#include "ImageContainer.h"
+#include "MediaInfo.h"
+#include "OmxDataDecoder.h"
 
 extern mozilla::LogModule* GetPDMLog();
 
@@ -32,11 +35,12 @@ extern mozilla::LogModule* GetPDMLog();
     return NS_ERROR_FAILURE;              \
   }                                       \
 
+// Android proprietary value.
+#define ANDROID_OMX_VIDEO_CodingVP8 (static_cast<OMX_VIDEO_CODINGTYPE>(9))
+
 using namespace android;
 
 namespace mozilla {
-
-extern void GetPortIndex(nsTArray<uint32_t>& aPortIndex);
 
 // In Gonk, the software component name has prefix "OMX.google". It needs to
 // have a way to use hardware codec first.
@@ -304,9 +308,7 @@ GonkBufferData::GetPlatformMediaData()
     return nullptr;
   }
 
-  VideoInfo info;
-  info.mDisplay = mGonkPlatformLayer->GetTrackInfo()->GetAsVideoInfo()->mDisplay;
-  info.mImage = mGonkPlatformLayer->GetTrackInfo()->GetAsVideoInfo()->mImage;
+  VideoInfo info(*mGonkPlatformLayer->GetTrackInfo()->GetAsVideoInfo());
   RefPtr<VideoData> data = VideoData::Create(info,
                                              mGonkPlatformLayer->GetImageContainer(),
                                              0,
@@ -315,7 +317,7 @@ GonkBufferData::GetPlatformMediaData()
                                              mTextureClientRecycleHandler->GetTextureClient(),
                                              false,
                                              0,
-                                             info.mImage);
+                                             info.ImageRect());
   LOG("%p, disp width %d, height %d, pic width %d, height %d, time %ld",
       this, info.mDisplay.width, info.mDisplay.height,
       info.mImage.width, info.mImage.height, mBuffer->nTimeStamp);
@@ -359,7 +361,7 @@ GonkOmxPlatformLayer::AllocateOmxBuffer(OMX_DIRTYPE aType,
   // Get port definition.
   OMX_PARAM_PORTDEFINITIONTYPE def;
   nsTArray<uint32_t> portindex;
-  GetPortIndex(portindex);
+  GetPortIndices(portindex);
   for (auto idx : portindex) {
     InitOmxParameter(&def);
     def.nPortIndex = idx;
@@ -572,14 +574,6 @@ GonkOmxPlatformLayer::SendCommand(OMX_COMMANDTYPE aCmd,
   return  (OMX_ERRORTYPE)mOmx->sendCommand(mNode, aCmd, aParam1);
 }
 
-template<class T> void
-GonkOmxPlatformLayer::InitOmxParameter(T* aParam)
-{
-  PodZero(aParam);
-  aParam->nSize = sizeof(T);
-  aParam->nVersion.s.nVersionMajor = 1;
-}
-
 bool
 GonkOmxPlatformLayer::LoadComponent(const ComponentInfo& aComponent)
 {
@@ -625,12 +619,16 @@ GonkOmxPlatformLayer::FindComponents(const nsACString& aMimeType,
     useHardwareCodecOnly = true;
   }
 
+  const char* mime = aMimeType.Data();
+  // Translate VP8 MIME type to Android format.
+  if (aMimeType.EqualsLiteral("video/webm; codecs=vp8")) {
+    mime = "video/x-vnd.on2.vp8";
+  }
+
   size_t start = 0;
   bool found = false;
   while (true) {
-    ssize_t index = codecs->findCodecByType(aMimeType.Data(),
-                                            false /* encoder */,
-                                            start);
+    ssize_t index = codecs->findCodecByType(mime, false /* encoder */, start);
     if (index < 0) {
       break;
     }
@@ -657,6 +655,15 @@ GonkOmxPlatformLayer::FindComponents(const nsACString& aMimeType,
   }
 
   return found;
+}
+
+OMX_VIDEO_CODINGTYPE
+GonkOmxPlatformLayer::CompressionFormat()
+{
+  MOZ_ASSERT(mInfo);
+
+  return mInfo->mMimeType.EqualsLiteral("video/webm; codecs=vp8") ?
+    ANDROID_OMX_VIDEO_CodingVP8 : OmxPlatformLayer::CompressionFormat();
 }
 
 } // mozilla

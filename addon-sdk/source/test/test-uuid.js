@@ -16,7 +16,7 @@ exports['test generate uuid'] = function(assert) {
 };
 
 exports['test parse uuid'] = function(assert) {
-  let firefoxUUID = '{ec8030f7-c20a-464f-9b0e-13a3a9e97384}';
+  let firefoxUUID = '{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}';
   let actual = uuid(firefoxUUID);
 
   assert.equal(actual.number, firefoxUUID, 'uuid parsed given string');

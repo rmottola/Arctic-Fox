@@ -31,7 +31,7 @@ ServoStyleSheet::IsApplicable() const
 bool
 ServoStyleSheet::HasRules() const
 {
-  MOZ_CRASH("stylo: not implemented");
+  return Servo_StyleSheetHasRules(RawSheet());
 }
 
 nsIDocument*

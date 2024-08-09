@@ -4,11 +4,16 @@
 
 "use strict";
 
+requestLongerTimeout(2);
+
 // Test that a page navigation resets the state of the global toggle button.
 
 add_task(function*() {
-  yield addTab(TEST_URL_ROOT + "doc_simple_animation.html");
+  yield addTab(URL_ROOT + "doc_simple_animation.html");
   let {inspector, panel} = yield openAnimationInspector();
+
+  info("Select the non-animated test node");
+  yield selectNodeAndWaitForAnimations(".still", inspector);
 
   ok(!panel.toggleAllButtonEl.classList.contains("paused"),
     "The toggle button is in its running state by default");

@@ -45,7 +45,6 @@ static const uint32_t ACCEPT_FOR_N_DAYS = 3;
 static const bool kDefaultPolicy = true;
 static const char kCookiesLifetimePolicy[] = "network.cookie.lifetimePolicy";
 static const char kCookiesLifetimeDays[] = "network.cookie.lifetime.days";
-static const char kCookiesAlwaysAcceptSession[] = "network.cookie.alwaysAcceptSessionCookies";
 
 static const char kCookiesPrefsMigrated[] = "network.cookie.prefsMigrated";
 // obsolete pref names for migration
@@ -76,7 +75,6 @@ nsCookiePermission::Init()
   if (prefBranch) {
     prefBranch->AddObserver(kCookiesLifetimePolicy, this, false);
     prefBranch->AddObserver(kCookiesLifetimeDays, this, false);
-    prefBranch->AddObserver(kCookiesAlwaysAcceptSession, this, false);
     PrefChanged(prefBranch, nullptr);
 
     // migration code for original cookie prefs
@@ -112,8 +110,7 @@ nsCookiePermission::PrefChanged(nsIPrefBranch *aPrefBranch,
 
   if (PREF_CHANGED(kCookiesLifetimePolicy) &&
       NS_SUCCEEDED(aPrefBranch->GetIntPref(kCookiesLifetimePolicy, &val))) {
-    if (val != static_cast<int32_t>(ACCEPT_SESSION) &&
-        val != static_cast<int32_t>(ACCEPT_FOR_N_DAYS)) {
+    if (val != static_cast<int32_t>(ACCEPT_SESSION) && val != static_cast<int32_t>(ACCEPT_FOR_N_DAYS)) {
       val = ACCEPT_NORMALLY;
     }
     mCookiesLifetimePolicy = val;
@@ -122,12 +119,7 @@ nsCookiePermission::PrefChanged(nsIPrefBranch *aPrefBranch,
   if (PREF_CHANGED(kCookiesLifetimeDays) &&
       NS_SUCCEEDED(aPrefBranch->GetIntPref(kCookiesLifetimeDays, &val)))
     // save cookie lifetime in seconds instead of days
-    mCookiesLifetimeSec = val * 24 * 60 * 60;
-
-  bool bval;
-  if (PREF_CHANGED(kCookiesAlwaysAcceptSession) &&
-      NS_SUCCEEDED(aPrefBranch->GetBoolPref(kCookiesAlwaysAcceptSession, &bval)))
-    mCookiesAlwaysAcceptSession = bval;
+    mCookiesLifetimeSec = (int64_t)val * 24 * 60 * 60;
 }
 
 NS_IMETHODIMP
@@ -235,23 +227,23 @@ nsCookiePermission::CanSetCookie(nsIURI     *aURI,
     break;
 
   default:
-    // The permission manager has nothing to say about this cookie
-    // so we apply the default prefs to it.
+    // the permission manager has nothing to say about this cookie -
+    // so, we apply the default prefs to it.
     NS_ASSERTION(perm == nsIPermissionManager::UNKNOWN_ACTION, "unknown permission");
 
-    // Now we need to figure out what type of accept policy we're dealing with.
-    // If we accept cookies normally, just bail and return.
+    // now we need to figure out what type of accept policy we're dealing with
+    // if we accept cookies normally, just bail and return
     if (mCookiesLifetimePolicy == ACCEPT_NORMALLY) {
       *aResult = true;
       return NS_OK;
     }
 
-    // Declare this here since it'll be used in all of the remaining cases.
+    // declare this here since it'll be used in all of the remaining cases
     int64_t currentTime = PR_Now() / PR_USEC_PER_SEC;
     int64_t delta = *aExpiry - currentTime;
 
-    // We are accepting the cookie, but if it's not a session cookie,
-    // we may have to limit its lifetime.
+    // We are accepting the cookie, but,
+    // if it's not a session cookie, we may have to limit its lifetime.
     if (!*aIsSession && delta > 0) {
       if (mCookiesLifetimePolicy == ACCEPT_SESSION) {
         // limit lifetime to session

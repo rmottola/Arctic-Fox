@@ -28,6 +28,7 @@ UNIFIED_SOURCES += [
     'FileSystemUtils.cpp',
     'GetDirectoryListingTask.cpp',
     'GetFileOrDirectoryTask.cpp',
+    'GetFilesTask.cpp',
     'OSFileSystem.cpp',
     'RemoveTask.cpp',
 ]
@@ -35,6 +36,7 @@ UNIFIED_SOURCES += [
 FINAL_LIBRARY = 'xul'
 
 IPDL_SOURCES += [
+    'PFileSystemParams.ipdlh',
     'PFileSystemRequest.ipdl',
 ]
 

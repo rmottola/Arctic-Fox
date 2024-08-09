@@ -173,7 +173,7 @@ this.PlacesBackups = {
     this._entries.sort((a, b) => {
       let aDate = this.getDateForFile(a);
       let bDate = this.getDateForFile(b);
-      return aDate < bDate ? 1 : aDate > bDate ? -1 : 0;
+      return bDate - aDate;
     });
     return this._entries;
   },
@@ -209,13 +209,15 @@ this.PlacesBackups = {
             this._backupFiles.push(filePath);
           }
         }
+
+        return undefined;
       }.bind(this));
       iterator.close();
 
       this._backupFiles.sort((a, b) => {
         let aDate = this.getDateForFile(a);
         let bDate = this.getDateForFile(b);
-        return aDate < bDate ? 1 : aDate > bDate ? -1 : 0;
+        return bDate - aDate;
       });
 
       return this._backupFiles;

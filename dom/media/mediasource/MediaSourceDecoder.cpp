@@ -61,7 +61,7 @@ MediaSourceDecoder::Load(nsIStreamListener**)
     return NS_ERROR_FAILURE;
   }
 
-  nsresult rv = GetStateMachine()->Init();
+  nsresult rv = GetStateMachine()->Init(this);
   NS_ENSURE_SUCCESS(rv, rv);
 
   SetStateMachineParameters();
@@ -116,6 +116,10 @@ MediaSourceDecoder::GetBuffered()
   MOZ_ASSERT(NS_IsMainThread());
 
   dom::SourceBufferList* sourceBuffers = mMediaSource->ActiveSourceBuffers();
+  if (!sourceBuffers) {
+    // Media source object is shutting down.
+    return TimeIntervals();
+  }
   media::TimeUnit highestEndTime;
   nsTArray<media::TimeIntervals> activeRanges;
   media::TimeIntervals buffered;
@@ -288,6 +292,11 @@ bool
 MediaSourceDecoder::CanPlayThrough()
 {
   MOZ_ASSERT(NS_IsMainThread());
+
+  if (NextFrameBufferedStatus() == MediaDecoderOwner::NEXT_FRAME_UNAVAILABLE) {
+    return false;
+  }
+
   if (IsNaN(mMediaSource->Duration())) {
     // Don't have any data yet.
     return false;

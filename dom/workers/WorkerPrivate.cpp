@@ -44,6 +44,7 @@
 #include "mozilla/Likely.h"
 #include "mozilla/LoadContext.h"
 #include "mozilla/dom/BindingUtils.h"
+#include "mozilla/dom/Console.h"
 #include "mozilla/dom/ErrorEvent.h"
 #include "mozilla/dom/ErrorEventBinding.h"
 #include "mozilla/dom/Exceptions.h"
@@ -101,13 +102,10 @@
 #include "SharedWorker.h"
 #include "WorkerDebuggerManager.h"
 #include "WorkerFeature.h"
+#include "WorkerNavigator.h"
 #include "WorkerRunnable.h"
 #include "WorkerScope.h"
 #include "WorkerThread.h"
-
-#ifdef XP_WIN
-#undef PostMessage
-#endif
 
 // JS_MaybeGC will run once every second during normal execution.
 #define PERIODIC_GC_TIMER_DELAY_SEC 1
@@ -215,11 +213,11 @@ SwapToISupportsArray(SmartPtr<T>& aSrc,
 // from the worker's EventTarget).
 class ExternalRunnableWrapper final : public WorkerRunnable
 {
-  nsCOMPtr<nsICancelableRunnable> mWrappedRunnable;
+  nsCOMPtr<nsIRunnable> mWrappedRunnable;
 
 public:
   ExternalRunnableWrapper(WorkerPrivate* aWorkerPrivate,
-                          nsICancelableRunnable* aWrappedRunnable)
+                          nsIRunnable* aWrappedRunnable)
   : WorkerRunnable(aWorkerPrivate, WorkerThreadUnchangedBusyCount),
     mWrappedRunnable(aWrappedRunnable)
   {
@@ -246,10 +244,14 @@ private:
     return true;
   }
 
-  NS_IMETHOD
+  nsresult
   Cancel() override
   {
-    nsresult rv = mWrappedRunnable->Cancel();
+    nsresult rv;
+    nsCOMPtr<nsICancelableRunnable> cancelable =
+      do_QueryInterface(mWrappedRunnable);
+    MOZ_ASSERT(cancelable); // We checked this earlier!
+    rv = cancelable->Cancel();
     nsresult rv2 = WorkerRunnable::Cancel();
     return NS_FAILED(rv) ? rv : rv2;
   }
@@ -404,7 +406,7 @@ private:
 
     mFinishedWorker->DisableDebugger();
 
-    runtime->UnregisterWorker(aCx, mFinishedWorker);
+    runtime->UnregisterWorker(mFinishedWorker);
 
     mFinishedWorker->ClearSelfRef();
     return true;
@@ -435,12 +437,9 @@ private:
     RuntimeService* runtime = RuntimeService::GetService();
     MOZ_ASSERT(runtime);
 
-    AutoSafeJSContext cx;
-    JSAutoRequest ar(cx);
-
     mFinishedWorker->DisableDebugger();
 
-    runtime->UnregisterWorker(cx, mFinishedWorker);
+    runtime->UnregisterWorker(mFinishedWorker);
 
     nsCOMPtr<nsILoadGroup> loadGroupToCancel;
     mFinishedWorker->ForgetOverridenLoadGroup(loadGroupToCancel);
@@ -629,7 +628,7 @@ private:
     return true;
   }
 
-  NS_IMETHOD Cancel() override
+  nsresult Cancel() override
   {
     // We need to run regardless.
     Run();
@@ -1350,7 +1349,7 @@ private:
     return true;
   }
 
-  NS_IMETHOD Cancel() override
+  nsresult Cancel() override
   {
     // We need to run regardless.
     Run();
@@ -1541,6 +1540,21 @@ private:
   bool mIsOffline;
 };
 
+class MemoryPressureRunnable : public WorkerControlRunnable
+{
+public:
+  explicit MemoryPressureRunnable(WorkerPrivate* aWorkerPrivate)
+    : WorkerControlRunnable(aWorkerPrivate, WorkerThreadUnchangedBusyCount)
+  {}
+
+  bool
+  WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
+  {
+    aWorkerPrivate->MemoryPressureInternal();
+    return true;
+  }
+};
+
 #ifdef DEBUG
 static bool
 StartsWithExplicit(nsACString& s)
@@ -1645,7 +1659,7 @@ private:
     return aWorkerPrivate->ConnectMessagePort(aCx, mPortIdentifier);
   }
 
-  NS_IMETHOD
+  nsresult
   Cancel() override
   {
     MessagePort::ForceClose(mPortIdentifier);
@@ -1697,7 +1711,7 @@ PRThreadFromThread(nsIThread* aThread)
   MOZ_ASSERT(aThread);
 
   PRThread* result;
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(aThread->GetPRThread(&result)));
+  MOZ_ALWAYS_SUCCEEDS(aThread->GetPRThread(&result));
   MOZ_ASSERT(result);
 
   return result;
@@ -2462,7 +2476,7 @@ WorkerPrivateParent<Derived>::MaybeWrapAsWorkerRunnable(already_AddRefed<nsIRunn
   }
 
   workerRunnable =
-    new ExternalRunnableWrapper(ParentAsWorkerPrivate(), cancelable);
+    new ExternalRunnableWrapper(ParentAsWorkerPrivate(), runnable);
   return workerRunnable.forget();
 }
 
@@ -3109,6 +3123,17 @@ WorkerPrivate::OfflineStatusChangeEventInternal(bool aIsOffline)
 }
 
 template <class Derived>
+void
+WorkerPrivateParent<Derived>::MemoryPressure(bool aDummy)
+{
+  AssertIsOnParentThread();
+
+  RefPtr<MemoryPressureRunnable> runnable =
+    new MemoryPressureRunnable(ParentAsWorkerPrivate());
+  NS_WARN_IF(!runnable->Dispatch());
+}
+
+template <class Derived>
 bool
 WorkerPrivateParent<Derived>::RegisterSharedWorker(SharedWorker* aSharedWorker,
                                                    MessagePort* aPort)
@@ -3458,8 +3483,8 @@ WorkerPrivateParent<Derived>::SetPrincipal(nsIPrincipal* aPrincipal,
   mLoadInfo.mPrincipalInfo = new PrincipalInfo();
   mLoadInfo.mPrivateBrowsing = nsContentUtils::IsInPrivateBrowsing(aLoadGroup);
 
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-    PrincipalToPrincipalInfo(aPrincipal, mLoadInfo.mPrincipalInfo)));
+  MOZ_ALWAYS_SUCCEEDS(
+    PrincipalToPrincipalInfo(aPrincipal, mLoadInfo.mPrincipalInfo));
 }
 
 template <class Derived>
@@ -4070,7 +4095,6 @@ WorkerPrivate::Constructor(JSContext* aCx,
   if (!parent) {
     runtimeService = RuntimeService::GetOrCreateService();
     if (!runtimeService) {
-      JS_ReportError(aCx, "Failed to create runtime service!");
       aRv.Throw(NS_ERROR_FAILURE);
       return nullptr;
     }
@@ -4085,7 +4109,7 @@ WorkerPrivate::Constructor(JSContext* aCx,
     new WorkerPrivate(parent, aScriptURL, aIsChromeWorker,
                       aWorkerType, aWorkerName, *aLoadInfo);
 
-  if (!runtimeService->RegisterWorker(aCx, worker)) {
+  if (!runtimeService->RegisterWorker(worker)) {
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return nullptr;
   }
@@ -4382,7 +4406,7 @@ WorkerPrivate::OverrideLoadInfoLoadGroup(WorkerLoadInfo& aLoadInfo)
 
   nsresult rv =
     loadGroup->SetNotificationCallbacks(aLoadInfo.mInterfaceRequestor);
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(rv));
+  MOZ_ALWAYS_SUCCEEDS(rv);
 
   aLoadInfo.mLoadGroup = loadGroup.forget();
 }
@@ -4407,7 +4431,6 @@ WorkerPrivate::DoRunLoop(JSContext* aCx)
   AutoJSAPI jsapi;
   jsapi.Init();
   MOZ_ASSERT(jsapi.cx() == aCx);
-  jsapi.TakeOwnershipOfErrorReporting();
 
   EnableMemoryReporter();
 
@@ -4506,6 +4529,9 @@ WorkerPrivate::DoRunLoop(JSContext* aCx)
       static_cast<nsIRunnable*>(runnable)->Run();
       runnable->Release();
 
+      // Flush the promise queue.
+      Promise::PerformWorkerDebuggerMicroTaskCheckpoint();
+
       if (debuggerRunnablesPending) {
         WorkerDebuggerGlobalScope* globalScope = DebuggerGlobalScope();
         MOZ_ASSERT(globalScope);
@@ -4573,7 +4599,7 @@ WorkerPrivate::MaybeDispatchLoadFailedRunnable()
     return;
   }
 
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(runnable.forget())));
+  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable.forget()));
 }
 
 void
@@ -4613,7 +4639,7 @@ WorkerPrivate::SetGCTimerMode(GCTimerMode aMode)
     return;
   }
 
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mGCTimer->Cancel()));
+  MOZ_ALWAYS_SUCCEEDS(mGCTimer->Cancel());
 
   mPeriodicGCTimerRunning = false;
   mIdleGCTimerRunning = false;
@@ -4644,10 +4670,10 @@ WorkerPrivate::SetGCTimerMode(GCTimerMode aMode)
     type = nsITimer::TYPE_ONE_SHOT;
   }
 
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mGCTimer->SetTarget(target)));
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
+  MOZ_ALWAYS_SUCCEEDS(mGCTimer->SetTarget(target));
+  MOZ_ALWAYS_SUCCEEDS(
     mGCTimer->InitWithNamedFuncCallback(DummyCallback, nullptr, delay, type,
-                                        "dom::workers::DummyCallback(2)")));
+                                        "dom::workers::DummyCallback(2)"));
 
   if (aMode == PeriodicTimer) {
     LOG(WorkerLog(), ("Worker %p scheduled periodic GC timer\n", this));
@@ -4667,7 +4693,7 @@ WorkerPrivate::ShutdownGCTimers()
   MOZ_ASSERT(mGCTimer);
 
   // Always make sure the timer is canceled.
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mGCTimer->Cancel()));
+  MOZ_ALWAYS_SUCCEEDS(mGCTimer->Cancel());
 
   LOG(WorkerLog(), ("Worker %p killed the GC timer\n", this));
 
@@ -5088,7 +5114,7 @@ WorkerPrivate::ModifyBusyCountFromWorker(bool aIncrease)
 }
 
 bool
-WorkerPrivate::AddChildWorker(JSContext* aCx, ParentType* aChildWorker)
+WorkerPrivate::AddChildWorker(ParentType* aChildWorker)
 {
   AssertIsOnWorkerThread();
 
@@ -5114,7 +5140,7 @@ WorkerPrivate::AddChildWorker(JSContext* aCx, ParentType* aChildWorker)
 }
 
 void
-WorkerPrivate::RemoveChildWorker(JSContext* aCx, ParentType* aChildWorker)
+WorkerPrivate::RemoveChildWorker(ParentType* aChildWorker)
 {
   AssertIsOnWorkerThread();
 
@@ -5178,7 +5204,7 @@ WorkerPrivate::NotifyFeatures(JSContext* aCx, Status aStatus)
   nsTObserverArray<WorkerFeature*>::ForwardIterator iter(mFeatures);
   while (iter.HasMore()) {
     WorkerFeature* feature = iter.GetNext();
-    if (!feature->Notify(aCx, aStatus)) {
+    if (!feature->Notify(aStatus)) {
       NS_WARNING("Failed to notify feature!");
     }
     MOZ_ASSERT(!JS_IsExceptionPending(aCx));
@@ -5246,8 +5272,7 @@ WorkerPrivate::CreateNewSyncLoop()
   MOZ_ASSERT(thread);
 
   nsCOMPtr<nsIEventTarget> realEventTarget;
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(thread->PushEventQueue(
-                                             getter_AddRefs(realEventTarget))));
+  MOZ_ALWAYS_SUCCEEDS(thread->PushEventQueue(getter_AddRefs(realEventTarget)));
 
   RefPtr<EventTarget> workerEventTarget =
     new EventTarget(this, realEventTarget);
@@ -5364,7 +5389,7 @@ WorkerPrivate::DestroySyncLoop(uint32_t aLoopIndex, nsIThreadInternal* aThread)
     mSyncLoopStack.RemoveElementAt(aLoopIndex);
   }
 
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(aThread->PopEventQueue(nestedEventTarget)));
+  MOZ_ALWAYS_SUCCEEDS(aThread->PopEventQueue(nestedEventTarget));
 
   if (!mSyncLoopStack.Length() && mPendingEventQueueClearing) {
     ClearMainEventQueue(WorkerRan);
@@ -5557,6 +5582,9 @@ WorkerPrivate::EnterDebuggerEventLoop()
       static_cast<nsIRunnable*>(runnable)->Run();
       runnable->Release();
 
+      // Flush the promise queue.
+      Promise::PerformWorkerDebuggerMicroTaskCheckpoint();
+
       // Now *might* be a good time to GC. Let the JS engine make the decision.
       if (JS::CurrentGlobalOrNull(cx)) {
         JS_MaybeGC(cx);
@@ -5675,7 +5703,7 @@ WorkerPrivate::NotifyInternal(JSContext* aCx, Status aStatus)
 
   // If the worker script never ran, or failed to compile, we don't need to do
   // anything else, except pretend that we ran the close handler.
-  if (!JS::CurrentGlobalOrNull(aCx)) {
+  if (!GlobalScope()) {
     mCloseHandlerStarted = true;
     mCloseHandlerFinished = true;
     return true;
@@ -5687,7 +5715,7 @@ WorkerPrivate::NotifyInternal(JSContext* aCx, Status aStatus)
     MOZ_ASSERT(!mCloseHandlerStarted && !mCloseHandlerFinished);
 
     RefPtr<CloseEventRunnable> closeRunnable = new CloseEventRunnable(this);
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToCurrentThread(closeRunnable)));
+    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToCurrentThread(closeRunnable));
   }
 
   if (aStatus == Closing) {
@@ -5750,8 +5778,7 @@ WorkerPrivate::ScheduleKillCloseEventRunnable()
     return false;
   }
 
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToCurrentThread(
-                                                      killCloseEventRunnable)));
+  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToCurrentThread(killCloseEventRunnable));
 
   return true;
 }
@@ -5844,7 +5871,8 @@ WorkerPrivate::SetTimeout(JSContext* aCx,
   // It's a script bug if setTimeout/setInterval are called from a close handler
   // so throw an exception.
   if (currentStatus == Closing) {
-    JS_ReportError(aCx, "Cannot schedule timeouts from the close handler!");
+    aRv.Throw(NS_ERROR_FAILURE);
+    return 0;
   }
 
   // If the worker is trying to call setTimeout/setInterval and the parent
@@ -5871,8 +5899,10 @@ WorkerPrivate::SetTimeout(JSContext* aCx,
     newInfo->mTimeoutString = aStringHandler;
   }
   else {
-    JS_ReportError(aCx, "Useless %s call (missing quotes around argument?)",
-                   aIsInterval ? "setInterval" : "setTimeout");
+    NS_NAMED_LITERAL_STRING(kSetInterval, "setInterval");
+    NS_NAMED_LITERAL_STRING(kSetTimeout, "setTimeout");
+    aRv.ThrowTypeError<MSG_USELESS_SETTIMEOUT>(aIsInterval ? kSetInterval
+                                                           : kSetTimeout);
     return 0;
   }
 
@@ -6051,7 +6081,7 @@ WorkerPrivate::RunExpiredTimeouts(JSContext* aCx)
 
     // Since we might be processing more timeouts, go ahead and flush
     // the promise queue now before we do that.
-    Promise::PerformMicroTaskCheckpoint();
+    Promise::PerformWorkerMicroTaskCheckpoint();
 
     NS_ASSERTION(mRunningExpiredTimeouts, "Someone changed this!");
   }
@@ -6273,6 +6303,26 @@ WorkerPrivate::CycleCollectInternal(bool aCollectChildren)
 }
 
 void
+WorkerPrivate::MemoryPressureInternal()
+{
+  AssertIsOnWorkerThread();
+
+  RefPtr<Console> console = mScope ? mScope->GetConsoleIfExists() : nullptr;
+  if (console) {
+    console->ClearStorage();
+  }
+
+  console = mDebuggerScope ? mDebuggerScope->GetConsoleIfExists() : nullptr;
+  if (console) {
+    console->ClearStorage();
+  }
+
+  for (uint32_t index = 0; index < mChildWorkers.Length(); index++) {
+    mChildWorkers[index]->MemoryPressure(false);
+  }
+}
+
+void
 WorkerPrivate::SetThread(WorkerThread* aThread)
 {
   if (aThread) {
@@ -6308,8 +6358,8 @@ WorkerPrivate::SetThread(WorkerThread* aThread)
 
       if (!mPreStartRunnables.IsEmpty()) {
         for (uint32_t index = 0; index < mPreStartRunnables.Length(); index++) {
-          MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-            mThread->DispatchAnyThread(friendKey, mPreStartRunnables[index].forget())));
+          MOZ_ALWAYS_SUCCEEDS(
+            mThread->DispatchAnyThread(friendKey, mPreStartRunnables[index].forget()));
         }
         mPreStartRunnables.Clear();
       }

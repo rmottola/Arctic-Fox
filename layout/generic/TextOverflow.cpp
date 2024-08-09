@@ -214,8 +214,8 @@ void
 nsDisplayTextOverflowMarker::Paint(nsDisplayListBuilder* aBuilder,
                                    nsRenderingContext*   aCtx)
 {
-  nscolor foregroundColor =
-    nsLayoutUtils::GetColor(mFrame, eCSSProperty_color);
+  nsCSSProperty colorProp = mFrame->StyleContext()->GetTextFillColorProp();
+  nscolor foregroundColor = nsLayoutUtils::GetColor(mFrame, colorProp);
 
   // Paint the text-shadows for the overflow marker
   nsLayoutUtils::PaintTextShadow(mFrame, aCtx, mRect, mVisibleRect,
@@ -721,10 +721,11 @@ TextOverflow::CanHaveTextOverflow(nsDisplayListBuilder* aBuilder,
                                   nsIFrame*             aBlockFrame)
 {
   // Nothing to do for text-overflow:clip or if 'overflow-x/y:visible' or if
-  // we're just building items for event processing or image visibility.
+  // we're just building items for event processing or frame visibility.
   if (HasClippedOverflow(aBlockFrame) ||
       IsInlineAxisOverflowVisible(aBlockFrame) ||
-      aBuilder->IsForEventDelivery() || aBuilder->IsForImageVisibility()) {
+      aBuilder->IsForEventDelivery() ||
+      aBuilder->IsForFrameVisibility()) {
     return false;
   }
 

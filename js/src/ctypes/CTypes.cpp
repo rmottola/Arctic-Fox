@@ -546,12 +546,15 @@ static const JSClass sCABIClass = {
 // Class representing ctypes.{C,Pointer,Array,Struct,Function}Type.prototype.
 // This exists to give said prototypes a class of "CType", and to provide
 // reserved slots for stashing various other prototype objects.
-static const JSClass sCTypeProtoClass = {
-  "CType",
-  JSCLASS_HAS_RESERVED_SLOTS(CTYPEPROTO_SLOTS),
+static const JSClassOps sCTypeProtoClassOps = {
   nullptr, nullptr, nullptr, nullptr,
   nullptr, nullptr, nullptr, nullptr,
   ConstructAbstract, nullptr, ConstructAbstract
+};
+static const JSClass sCTypeProtoClass = {
+  "CType",
+  JSCLASS_HAS_RESERVED_SLOTS(CTYPEPROTO_SLOTS),
+  &sCTypeProtoClassOps
 };
 
 // Class representing ctypes.CData.prototype and the 'prototype' properties
@@ -561,29 +564,38 @@ static const JSClass sCDataProtoClass = {
   0
 };
 
-static const JSClass sCTypeClass = {
-  "CType",
-  JSCLASS_HAS_RESERVED_SLOTS(CTYPE_SLOTS),
+static const JSClassOps sCTypeClassOps = {
   nullptr, nullptr, nullptr, nullptr,
   nullptr, nullptr, nullptr, CType::Finalize,
   CType::ConstructData, CType::HasInstance, CType::ConstructData,
   CType::Trace
 };
+static const JSClass sCTypeClass = {
+  "CType",
+  JSCLASS_HAS_RESERVED_SLOTS(CTYPE_SLOTS),
+  &sCTypeClassOps
+};
 
-static const JSClass sCDataClass = {
-  "CData",
-  JSCLASS_HAS_RESERVED_SLOTS(CDATA_SLOTS),
+static const JSClassOps sCDataClassOps = {
   nullptr, nullptr, ArrayType::Getter, ArrayType::Setter,
   nullptr, nullptr, nullptr, CData::Finalize,
   FunctionType::Call, nullptr, FunctionType::Call
 };
+static const JSClass sCDataClass = {
+  "CData",
+  JSCLASS_HAS_RESERVED_SLOTS(CDATA_SLOTS),
+  &sCDataClassOps
+};
 
-static const JSClass sCClosureClass = {
-  "CClosure",
-  JSCLASS_HAS_RESERVED_SLOTS(CCLOSURE_SLOTS),
+static const JSClassOps sCClosureClassOps = {
   nullptr, nullptr, nullptr, nullptr,
   nullptr, nullptr, nullptr, CClosure::Finalize,
   nullptr, nullptr, nullptr, CClosure::Trace
+};
+static const JSClass sCClosureClass = {
+  "CClosure",
+  JSCLASS_HAS_RESERVED_SLOTS(CCLOSURE_SLOTS),
+  &sCClosureClassOps
 };
 
 /*
@@ -600,11 +612,14 @@ static const JSClass sCDataFinalizerProtoClass = {
  * Instances of CDataFinalizer have both private data (with type
  * |CDataFinalizer::Private|) and slots (see |CDataFinalizerSlots|).
  */
+static const JSClassOps sCDataFinalizerClassOps = {
+  nullptr, nullptr, nullptr, nullptr,
+  nullptr, nullptr, nullptr, CDataFinalizer::Finalize
+};
 static const JSClass sCDataFinalizerClass = {
   "CDataFinalizer",
   JSCLASS_HAS_PRIVATE | JSCLASS_HAS_RESERVED_SLOTS(CDATAFINALIZER_SLOTS),
-  nullptr, nullptr, nullptr, nullptr,
-  nullptr, nullptr, nullptr, CDataFinalizer::Finalize
+  &sCDataFinalizerClassOps
 };
 
 
@@ -786,18 +801,21 @@ static const JSClass sUInt64ProtoClass = {
   0
 };
 
+static const JSClassOps sInt64ClassOps = {
+  nullptr, nullptr, nullptr, nullptr,
+  nullptr, nullptr, nullptr, Int64Base::Finalize
+};
+
 static const JSClass sInt64Class = {
   "Int64",
   JSCLASS_HAS_RESERVED_SLOTS(INT64_SLOTS),
-  nullptr, nullptr, nullptr, nullptr,
-  nullptr, nullptr, nullptr, Int64Base::Finalize
+  &sInt64ClassOps
 };
 
 static const JSClass sUInt64Class = {
   "UInt64",
   JSCLASS_HAS_RESERVED_SLOTS(INT64_SLOTS),
-  nullptr, nullptr, nullptr, nullptr,
-  nullptr, nullptr, nullptr, Int64Base::Finalize
+  &sInt64ClassOps
 };
 
 static const JSFunctionSpec sInt64StaticFunctions[] = {
@@ -2273,6 +2291,7 @@ InitTypeClasses(JSContext* cx, HandleObject ctypesObj)
   // Attach objects representing ABI constants.
   if (!DefineABIConstant(cx, ctypesObj, "default_abi", ABI_DEFAULT, ABIProto) ||
       !DefineABIConstant(cx, ctypesObj, "stdcall_abi", ABI_STDCALL, ABIProto) ||
+      !DefineABIConstant(cx, ctypesObj, "thiscall_abi", ABI_THISCALL, ABIProto) ||
       !DefineABIConstant(cx, ctypesObj, "winapi_abi", ABI_WINAPI, ABIProto))
     return false;
 
@@ -3917,6 +3936,8 @@ BuildTypeName(JSContext* cx, JSObject* typeObj_)
       ABICode abi = GetABICode(fninfo->mABI);
       if (abi == ABI_STDCALL)
         PrependString(result, "__stdcall");
+      else if (abi == ABI_THISCALL)
+        PrependString(result, "__thiscall");
       else if (abi == ABI_WINAPI)
         PrependString(result, "WINAPI");
 
@@ -4021,6 +4042,9 @@ BuildTypeSource(JSContext* cx,
       break;
     case ABI_STDCALL:
       AppendString(result, "ctypes.stdcall_abi, ");
+      break;
+    case ABI_THISCALL:
+      AppendString(result, "ctypes.thiscall_abi, ");
       break;
     case ABI_WINAPI:
       AppendString(result, "ctypes.winapi_abi, ");
@@ -5011,6 +5035,9 @@ ABI::ToSource(JSContext* cx, unsigned argc, Value* vp)
       break;
     case ABI_STDCALL:
       result = JS_NewStringCopyZ(cx, "ctypes.stdcall_abi");
+      break;
+    case ABI_THISCALL:
+      result = JS_NewStringCopyZ(cx, "ctypes.thiscall_abi");
       break;
     case ABI_WINAPI:
       result = JS_NewStringCopyZ(cx, "ctypes.winapi_abi");
@@ -6547,6 +6574,16 @@ GetABI(JSContext* cx, Value abiType, ffi_abi* result)
   case ABI_DEFAULT:
     *result = FFI_DEFAULT_ABI;
     return true;
+  case ABI_THISCALL:
+#if defined(_WIN64)
+    *result = FFI_WIN64;
+    return true;
+#elif defined(_WIN32)
+    *result = FFI_THISCALL;
+    return true;
+#else
+    break;
+#endif
   case ABI_STDCALL:
   case ABI_WINAPI:
 #if (defined(_WIN32) && !defined(_WIN64)) || defined(_OS2)
@@ -6692,6 +6729,7 @@ FunctionType::BuildSymbolName(JSString* name,
 
   switch (GetABICode(fninfo->mABI)) {
   case ABI_DEFAULT:
+  case ABI_THISCALL:
   case ABI_WINAPI:
     // For cdecl or WINAPI functions, no mangling is necessary.
     AppendString(result, name);

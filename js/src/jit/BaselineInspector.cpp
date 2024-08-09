@@ -573,7 +573,7 @@ BaselineInspector::getTemplateObjectForNative(jsbytecode* pc, Native native)
 }
 
 bool
-BaselineInspector::isOptimizableCallStringSplit(jsbytecode* pc, JSString** stringOut, JSString** stringArg,
+BaselineInspector::isOptimizableCallStringSplit(jsbytecode* pc, JSString** strOut, JSString** sepOut,
                                                 JSObject** objOut)
 {
     if (!hasBaselineScript())
@@ -589,8 +589,8 @@ BaselineInspector::isOptimizableCallStringSplit(jsbytecode* pc, JSString** strin
     if (stub->kind() != ICStub::Call_StringSplit)
         return false;
 
-    *stringOut = stub->toCall_StringSplit()->expectedThis();
-    *stringArg = stub->toCall_StringSplit()->expectedArg();
+    *strOut = stub->toCall_StringSplit()->expectedStr();
+    *sepOut = stub->toCall_StringSplit()->expectedSep();
     *objOut = stub->toCall_StringSplit()->templateObject();
     return true;
 }
@@ -805,8 +805,6 @@ BaselineInspector::expectedPropertyAccessInputType(jsbytecode* pc)
             // Either an object or magic arguments.
             return MIRType_Value;
 
-          case ICStub::GetProp_ArrayLength:
-          case ICStub::GetProp_UnboxedArrayLength:
           case ICStub::GetProp_Unboxed:
           case ICStub::GetProp_TypedObject:
           case ICStub::GetProp_CallScripted:
@@ -814,7 +812,6 @@ BaselineInspector::expectedPropertyAccessInputType(jsbytecode* pc)
           case ICStub::GetProp_CallDOMProxyNative:
           case ICStub::GetProp_CallDOMProxyWithGenerationNative:
           case ICStub::GetProp_DOMProxyShadowed:
-          case ICStub::GetProp_ModuleNamespace:
           case ICStub::GetElem_NativeSlotName:
           case ICStub::GetElem_NativeSlotSymbol:
           case ICStub::GetElem_NativePrototypeSlotName:

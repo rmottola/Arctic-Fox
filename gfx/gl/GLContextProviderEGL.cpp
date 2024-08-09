@@ -928,6 +928,10 @@ GLContextEGL::CreateEGLPBufferOffscreenContext(CreateContextFlags flags,
                                                const mozilla::gfx::IntSize& size,
                                                const SurfaceCaps& minCaps)
 {
+    bool forceEnableHardware = bool(flags & CreateContextFlags::FORCE_ENABLE_HARDWARE);
+    if (!sEGLLibrary.EnsureInitialized(forceEnableHardware))
+        return nullptr;
+
     SurfaceCaps configCaps;
     EGLConfig config = ChooseConfig(&sEGLLibrary, flags, minCaps, &configCaps);
     if (config == EGL_NO_CONFIG) {
@@ -935,8 +939,9 @@ GLContextEGL::CreateEGLPBufferOffscreenContext(CreateContextFlags flags,
         return nullptr;
     }
 
-    if (GLContext::ShouldSpew())
+    if (GLContext::ShouldSpew()) {
         sEGLLibrary.DumpEGLConfig(config);
+    }
 
     mozilla::gfx::IntSize pbSize(size);
     EGLSurface surface = GLContextEGL::CreatePBufferSurfaceTryingPowerOfTwo(config,
@@ -947,7 +952,6 @@ GLContextEGL::CreateEGLPBufferOffscreenContext(CreateContextFlags flags,
         return nullptr;
     }
 
-
     RefPtr<GLContextEGL> gl = GLContextEGL::CreateGLContext(flags, configCaps, nullptr, true,
                                                             config, surface);
     if (!gl) {
@@ -956,62 +960,12 @@ GLContextEGL::CreateEGLPBufferOffscreenContext(CreateContextFlags flags,
         return nullptr;
     }
 
-    if (!gl->Init()) {
-        NS_WARNING("Failed to initialize GLContext!");
-        // GLContextEGL::dtor will destroy |surface| for us.
-        return nullptr;
-    }
-
     return gl.forget();
-}
-
-/*static*/ already_AddRefed<GLContextEGL>
-GLContextEGL::CreateEGLPixmapOffscreenContext(const mozilla::gfx::IntSize& size)
-{
-    gfxASurface *thebesSurface = nullptr;
-    EGLNativePixmapType pixmap = 0;
-
-    if (!pixmap) {
-        return nullptr;
-    }
-
-    EGLSurface surface = 0;
-    EGLConfig config = 0;
-
-    if (!config) {
-        return nullptr;
-    }
-    MOZ_ASSERT(surface);
-
-    SurfaceCaps dummyCaps = SurfaceCaps::Any();
-    RefPtr<GLContextEGL> glContext =
-        GLContextEGL::CreateGLContext(CreateContextFlags::NONE, dummyCaps,
-                                      nullptr, true,
-                                      config, surface);
-    if (!glContext) {
-        NS_WARNING("Failed to create GLContext from XSurface");
-        sEGLLibrary.fDestroySurface(EGL_DISPLAY(), surface);
-        return nullptr;
-    }
-
-    if (!glContext->Init()) {
-        NS_WARNING("Failed to initialize GLContext!");
-        // GLContextEGL::dtor will destroy |surface| for us.
-        return nullptr;
-    }
-
-    glContext->HoldSurface(thebesSurface);
-
-    return glContext.forget();
 }
 
 /*static*/ already_AddRefed<GLContext>
 GLContextProviderEGL::CreateHeadless(CreateContextFlags flags)
 {
-    bool forceEnableHardware = bool(flags & CreateContextFlags::FORCE_ENABLE_HARDWARE);
-    if (!sEGLLibrary.EnsureInitialized(forceEnableHardware))
-        return nullptr;
-
     mozilla::gfx::IntSize dummySize = mozilla::gfx::IntSize(16, 16);
     SurfaceCaps dummyCaps = SurfaceCaps::Any();
     return GLContextEGL::CreateEGLPBufferOffscreenContext(flags, dummySize, dummyCaps);
@@ -1025,7 +979,7 @@ GLContextProviderEGL::CreateOffscreen(const mozilla::gfx::IntSize& size,
                                       CreateContextFlags flags)
 {
     bool forceEnableHardware = bool(flags & CreateContextFlags::FORCE_ENABLE_HARDWARE);
-    if (!sEGLLibrary.EnsureInitialized(forceEnableHardware))
+    if (!sEGLLibrary.EnsureInitialized(forceEnableHardware)) // Needed for IsANGLE().
         return nullptr;
 
     bool canOffscreenUseHeadless = true;

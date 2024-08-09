@@ -415,7 +415,7 @@ nsHttpResponseHead::ComputeCurrentAge(uint32_t now,
 // <or>
 //     freshnessLifetime = expires_value - date_value
 // <or>
-//     freshnessLifetime = (date_value - last_modified_value) * 0.10
+//     freshnessLifetime = min(one-week,(date_value - last_modified_value) * 0.10)
 // <or>
 //     freshnessLifetime = 0
 //
@@ -442,6 +442,20 @@ nsHttpResponseHead::ComputeFreshnessLifetime(uint32_t *result) const
         return NS_OK;
     }
 
+    // These responses can be cached indefinitely.
+    if ((mStatus == 300) || (mStatus == 410) || nsHttp::IsPermanentRedirect(mStatus)) {
+        LOG(("nsHttpResponseHead::ComputeFreshnessLifetime [this = %p] "
+             "Assign an infinite heuristic lifetime\n", this));
+        *result = uint32_t(-1);
+        return NS_OK;
+    }
+
+    if (mStatus >= 400) {
+        LOG(("nsHttpResponseHead::ComputeFreshnessLifetime [this = %p] "
+             "Do not calculate heuristic max-age for most responses >= 400\n", this));
+        return NS_OK;
+    }
+
     // Fallback on heuristic using last modified header...
     if (NS_SUCCEEDED(GetLastModifiedValue(&date2))) {
         LOG(("using last-modified to determine freshness-lifetime\n"));
@@ -449,17 +463,13 @@ nsHttpResponseHead::ComputeFreshnessLifetime(uint32_t *result) const
         if (date2 <= date) {
             // this only makes sense if last-modified is actually in the past
             *result = (date - date2) / 10;
+            const uint32_t kOneWeek = 60 * 60 * 24 * 7;
+            *result = std::min(kOneWeek, *result);
             return NS_OK;
         }
     }
 
-    // These responses can be cached indefinitely.
-    if ((mStatus == 300) || nsHttp::IsPermanentRedirect(mStatus)) {
-        *result = uint32_t(-1);
-        return NS_OK;
-    }
-
-    LOG(("nsHttpResponseHead::ComputeFreshnessLifetime [this = %x] "
+    LOG(("nsHttpResponseHead::ComputeFreshnessLifetime [this = %p] "
          "Insufficient information to compute a non-zero freshness "
          "lifetime!\n", this));
 
@@ -485,6 +495,8 @@ nsHttpResponseHead::MustValidate() const
     case 304:
     case 307:
     case 308:
+        // Gone forever
+    case 410:
         break;
         // Uncacheable redirects
     case 303:

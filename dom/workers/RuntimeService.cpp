@@ -555,6 +555,15 @@ LoadJSGCMemoryOptions(const char* aPrefName, void* /* aClosure */)
       continue;
     }
 
+    matchName.RebindLiteral(PREF_MEM_OPTIONS_PREFIX "gc_refresh_frame_slices_enabled");
+    if (memPrefName == matchName ||
+        (gRuntimeServiceDuringInit && index == 15)) {
+      bool prefValue = GetWorkerPref(matchName, false);
+      UpdateOtherJSGCMemoryOption(rts, JSGC_REFRESH_FRAME_SLICES_ENABLED,
+                                 prefValue ? 0 : 1);
+      continue;
+    }
+
 #ifdef DEBUG
     nsAutoCString message("Workers don't support the 'mem.");
     message.Append(memPrefName);
@@ -871,8 +880,10 @@ public:
 
   ~WorkerJSRuntime()
   {
-    JSRuntime* rt = Runtime();
-    MOZ_ASSERT(rt);
+    JSRuntime* rt = MaybeRuntime();
+    if (!rt) {
+      return;   // Initialize() must have failed
+    }
 
     delete static_cast<WorkerThreadRuntimePrivate*>(JS_GetRuntimePrivate(rt));
     JS_SetRuntimePrivate(rt, nullptr);
@@ -958,6 +969,34 @@ public:
     if (aRecursionDepth == 2) {
       CycleCollectedJSRuntime::AfterProcessTask(aRecursionDepth);
     }
+  }
+
+  virtual void DispatchToMicroTask(nsIRunnable* aRunnable) override
+  {
+    MOZ_ASSERT(!NS_IsMainThread());
+    MOZ_ASSERT(aRunnable);
+
+    std::queue<nsCOMPtr<nsIRunnable>>* microTaskQueue = nullptr;
+
+    JSContext* cx = GetCurrentThreadJSContext();
+    NS_ASSERTION(cx, "This should never be null!");
+
+    JS::Rooted<JSObject*> global(cx, JS::CurrentGlobalOrNull(cx));
+    NS_ASSERTION(global, "This should never be null!");
+
+    // On worker threads, if the current global is the worker global, we use the
+    // main promise micro task queue. Otherwise, the current global must be
+    // either the debugger global or a debugger sandbox, and we use the debugger
+    // promise micro task queue instead.
+    if (IsWorkerGlobal(global)) {
+      microTaskQueue = &mPromiseMicroTaskQueue;
+    } else {
+      MOZ_ASSERT(IsDebuggerGlobal(global) || IsDebuggerSandbox(global));
+
+      microTaskQueue = &mDebuggerPromiseMicroTaskQueue;
+    }
+
+    microTaskQueue->push(aRunnable);
   }
 
 private:
@@ -1359,7 +1398,7 @@ RuntimeService::GetService()
 }
 
 bool
-RuntimeService::RegisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
+RuntimeService::RegisterWorker(WorkerPrivate* aWorkerPrivate)
 {
   aWorkerPrivate->AssertIsOnParentThread();
 
@@ -1368,7 +1407,6 @@ RuntimeService::RegisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
     AssertIsOnMainThread();
 
     if (mShuttingDown) {
-      JS_ReportError(aCx, "Cannot create worker during shutdown!");
       return false;
     }
   }
@@ -1390,7 +1428,6 @@ RuntimeService::RegisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
     nsresult rv = scriptURI->GetSpec(sharedWorkerScriptSpec);
     if (NS_FAILED(rv)) {
       NS_WARNING("GetSpec failed?!");
-      xpc::Throw(aCx, rv);
       return false;
     }
 
@@ -1467,8 +1504,8 @@ RuntimeService::RegisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
 
   // From here on out we must call UnregisterWorker if something fails!
   if (parent) {
-    if (!parent->AddChildWorker(aCx, aWorkerPrivate)) {
-      UnregisterWorker(aCx, aWorkerPrivate);
+    if (!parent->AddChildWorker(aWorkerPrivate)) {
+      UnregisterWorker(aWorkerPrivate);
       return false;
     }
   }
@@ -1480,8 +1517,7 @@ RuntimeService::RegisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
                                              false /* aUsePrefOverriddenValue */)) ||
           NS_FAILED(Navigator::GetPlatform(mNavigatorProperties.mPlatform,
                                            false /* aUsePrefOverriddenValue */))) {
-        JS_ReportError(aCx, "Failed to load navigator strings!");
-        UnregisterWorker(aCx, aWorkerPrivate);
+        UnregisterWorker(aWorkerPrivate);
         return false;
       }
 
@@ -1510,7 +1546,7 @@ RuntimeService::RegisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
     }
   }
 
-  if (!queued && !ScheduleWorker(aCx, aWorkerPrivate)) {
+  if (!queued && !ScheduleWorker(aWorkerPrivate)) {
     return false;
   }
 
@@ -1543,7 +1579,7 @@ RuntimeService::RemoveSharedWorker(WorkerDomainInfo* aDomainInfo,
 }
 
 void
-RuntimeService::UnregisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
+RuntimeService::UnregisterWorker(WorkerPrivate* aWorkerPrivate)
 {
   aWorkerPrivate->AssertIsOnParentThread();
 
@@ -1624,7 +1660,7 @@ RuntimeService::UnregisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
   }
 
   if (parent) {
-    parent->RemoveChildWorker(aCx, aWorkerPrivate);
+    parent->RemoveChildWorker(aWorkerPrivate);
   }
   else if (aWorkerPrivate->IsSharedWorker()) {
     AssertIsOnMainThread();
@@ -1657,16 +1693,13 @@ RuntimeService::UnregisterWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
     }
   }
 
-  if (queuedWorker && !ScheduleWorker(aCx, queuedWorker)) {
-    UnregisterWorker(aCx, queuedWorker);
-    // There's nowhere sane to report the exception from ScheduleWorker, if any,
-    // here.
-    JS_ClearPendingException(aCx);
+  if (queuedWorker && !ScheduleWorker(queuedWorker)) {
+    UnregisterWorker(queuedWorker);
   }
 }
 
 bool
-RuntimeService::ScheduleWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
+RuntimeService::ScheduleWorker(WorkerPrivate* aWorkerPrivate)
 {
   if (!aWorkerPrivate->Start()) {
     // This is ok, means that we didn't need to make a thread for this worker.
@@ -1688,8 +1721,7 @@ RuntimeService::ScheduleWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
   if (!thread) {
     thread = WorkerThread::Create(friendKey);
     if (!thread) {
-      UnregisterWorker(aCx, aWorkerPrivate);
-      JS_ReportError(aCx, "Could not create new thread!");
+      UnregisterWorker(aWorkerPrivate);
       return false;
     }
   }
@@ -1702,11 +1734,12 @@ RuntimeService::ScheduleWorker(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
     NS_WARNING("Could not set the thread's priority!");
   }
 
+  JSRuntime* rt = CycleCollectedJSRuntime::Get()->Runtime();
   nsCOMPtr<nsIRunnable> runnable =
-    new WorkerThreadPrimaryRunnable(aWorkerPrivate, thread, JS_GetParentRuntime(aCx));
+    new WorkerThreadPrimaryRunnable(aWorkerPrivate, thread,
+                                    JS_GetParentRuntime(rt));
   if (NS_FAILED(thread->DispatchPrimaryRunnable(friendKey, runnable.forget()))) {
-    UnregisterWorker(aCx, aWorkerPrivate);
-    JS_ReportError(aCx, "Could not dispatch to thread!");
+    UnregisterWorker(aWorkerPrivate);
     return false;
   }
 
@@ -1755,11 +1788,11 @@ RuntimeService::ShutdownIdleThreads(nsITimer* aTimer, void* /* aClosure */)
     uint32_t delay(delta > TimeDuration(0) ? delta.ToMilliseconds() : 0);
 
     // Reschedule the timer.
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
+    MOZ_ALWAYS_SUCCEEDS(
       aTimer->InitWithFuncCallback(ShutdownIdleThreads,
                                    nullptr,
                                    delay,
-                                   nsITimer::TYPE_ONE_SHOT)));
+                                   nsITimer::TYPE_ONE_SHOT));
   }
 
   for (uint32_t index = 0; index < expiredThreads.Length(); index++) {
@@ -2364,13 +2397,13 @@ RuntimeService::NoteIdleThread(WorkerThread* aThread)
 
   // Too many idle threads, just shut this one down.
   if (shutdownThread) {
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(aThread->Shutdown()));
+    MOZ_ALWAYS_SUCCEEDS(aThread->Shutdown());
   } else if (scheduleTimer) {
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
+    MOZ_ALWAYS_SUCCEEDS(
       mIdleThreadTimer->InitWithFuncCallback(ShutdownIdleThreads,
                                              nullptr,
                                              IDLE_THREAD_TIMEOUT_SEC * 1000,
-                                             nsITimer::TYPE_ONE_SHOT)));
+                                             nsITimer::TYPE_ONE_SHOT));
   }
 }
 
@@ -2450,6 +2483,12 @@ RuntimeService::SendOfflineStatusChangeEventToAllWorkers(bool aIsOffline)
   BROADCAST_ALL_WORKERS(OfflineStatusChangeEvent, aIsOffline);
 }
 
+void
+RuntimeService::MemoryPressureAllWorkers()
+{
+  BROADCAST_ALL_WORKERS(MemoryPressure, /* dummy = */ false);
+}
+
 uint32_t
 RuntimeService::ClampedHardwareConcurrency() const
 {
@@ -2501,6 +2540,7 @@ RuntimeService::Observe(nsISupports* aSubject, const char* aTopic,
   if (!strcmp(aTopic, MEMORY_PRESSURE_OBSERVER_TOPIC)) {
     GarbageCollectAllWorkers(/* shrinking = */ true);
     CycleCollectAllWorkers();
+    MemoryPressureAllWorkers();
     return NS_OK;
   }
   if (!strcmp(aTopic, NS_IOSERVICE_OFFLINE_STATUS_TOPIC)) {
@@ -2701,8 +2741,8 @@ WorkerThreadPrimaryRunnable::Run()
 
   RefPtr<FinishedRunnable> finishedRunnable =
     new FinishedRunnable(mThread.forget());
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mainThread->Dispatch(finishedRunnable,
-                                                    NS_DISPATCH_NORMAL)));
+  MOZ_ALWAYS_SUCCEEDS(mainThread->Dispatch(finishedRunnable,
+                                           NS_DISPATCH_NORMAL));
 
   profiler_unregister_thread();
   return NS_OK;
@@ -2752,7 +2792,7 @@ WorkerThreadPrimaryRunnable::FinishedRunnable::Run()
     rts->NoteIdleThread(thread);
   }
   else if (thread->ShutdownRequired()) {
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(thread->Shutdown()));
+    MOZ_ALWAYS_SUCCEEDS(thread->Shutdown());
   }
 
   return NS_OK;

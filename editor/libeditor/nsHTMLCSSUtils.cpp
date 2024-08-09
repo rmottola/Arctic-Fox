@@ -509,8 +509,8 @@ nsHTMLCSSUtils::GetCSSInlinePropertyBase(nsINode* aNode, nsIAtom* aProperty,
     NS_ENSURE_STATE(cssDecl);
 
     // from these declarations, get the one we want and that one only
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-      cssDecl->GetPropertyValue(nsDependentAtomString(aProperty), aValue)));
+    MOZ_ALWAYS_SUCCEEDS(
+      cssDecl->GetPropertyValue(nsDependentAtomString(aProperty), aValue));
 
     return NS_OK;
   }
@@ -534,7 +534,7 @@ nsHTMLCSSUtils::GetComputedStyle(dom::Element* aElement)
 {
   MOZ_ASSERT(aElement);
 
-  nsIDocument* doc = aElement->GetCurrentDoc();
+  nsIDocument* doc = aElement->GetUncomposedDoc();
   NS_ENSURE_TRUE(doc, nullptr);
 
   nsIPresShell* presShell = doc->GetShell();
@@ -613,12 +613,19 @@ nsHTMLCSSUtils::GetDefaultLengthUnit(nsAString & aLengthUnit)
   }
 }
 
-// Unfortunately, CSSStyleDeclaration::GetPropertyCSSValue is not yet implemented...
-// We need then a way to determine the number part and the unit from aString, aString
-// being the result of a GetPropertyValue query...
+// Unfortunately, CSSStyleDeclaration::GetPropertyCSSValue is not yet
+// implemented... We need then a way to determine the number part and the unit
+// from aString, aString being the result of a GetPropertyValue query...
 void
-nsHTMLCSSUtils::ParseLength(const nsAString & aString, float * aValue, nsIAtom ** aUnit)
+nsHTMLCSSUtils::ParseLength(const nsAString& aString, float* aValue,
+                            nsIAtom** aUnit)
 {
+  if (aString.IsEmpty()) {
+    *aValue = 0;
+    *aUnit = NS_Atomize(aString).take();
+    return;
+  }
+
   nsAString::const_iterator iter;
   aString.BeginReading(iter);
 
@@ -654,7 +661,7 @@ nsHTMLCSSUtils::ParseLength(const nsAString & aString, float * aValue, nsIAtom *
     i++;
   }
   *aValue = value * sign;
-  *aUnit = NS_NewAtom(StringTail(aString, j-i)).take();
+  *aUnit = NS_Atomize(StringTail(aString, j-i)).take();
 }
 
 void

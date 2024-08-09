@@ -288,7 +288,7 @@ CodeGeneratorX64::visitShiftI64(LShiftI64* lir)
     const LAllocation* rhs = lir->getOperand(1);
 
     if (rhs->isConstant()) {
-        int32_t shift = ToInt32(rhs) & 0x3F;
+        int32_t shift = int32_t(ToInt64(rhs) & 0x3F);
         switch (lir->bitop()) {
           case JSOP_LSH:
             if (shift)
@@ -378,7 +378,7 @@ CodeGeneratorX64::visitMulI64(LMulI64* lir)
             if (constant > 0) {
                 // Use shift if constant is power of 2.
                 int32_t shift = mozilla::FloorLog2(constant);
-                if (int64_t(1 << shift) == constant) {
+                if (int64_t(1) << shift == constant) {
                     masm.shlq(Imm32(shift), lhs);
                     return;
                 }
@@ -490,6 +490,22 @@ CodeGeneratorX64::visitAsmSelectI64(LAsmSelectI64* lir)
 
     masm.test32(cond, cond);
     masm.cmovzq(falseExpr, out);
+}
+
+void
+CodeGeneratorX64::visitAsmReinterpretFromI64(LAsmReinterpretFromI64* lir)
+{
+    MOZ_ASSERT(lir->mir()->type() == MIRType_Double);
+    MOZ_ASSERT(lir->mir()->input()->type() == MIRType_Int64);
+    masm.vmovq(ToRegister(lir->input()), ToFloatRegister(lir->output()));
+}
+
+void
+CodeGeneratorX64::visitAsmReinterpretToI64(LAsmReinterpretToI64* lir)
+{
+    MOZ_ASSERT(lir->mir()->type() == MIRType_Int64);
+    MOZ_ASSERT(lir->mir()->input()->type() == MIRType_Double);
+    masm.vmovq(ToFloatRegister(lir->input()), ToRegister(lir->output()));
 }
 
 void

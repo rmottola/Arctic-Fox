@@ -26,6 +26,9 @@ my_GetErrorMessage(void* userRef, const unsigned errorNumber);
 void
 my_ErrorReporter(JSContext* cx, const char* message, JSErrorReport* report);
 
+bool
+GenerateInterfaceHelp(JSContext* cx, HandleObject obj, const char* name);
+
 JSString*
 FileAsString(JSContext* cx, const char* pathname);
 
@@ -45,6 +48,24 @@ class AutoCloseFile
         f_ = nullptr;
         return success;
     }
+};
+
+// Reference counted file.
+struct RCFile {
+    FILE* fp;
+    uint32_t numRefs;
+
+    RCFile() : fp(nullptr), numRefs(0) {}
+    explicit RCFile(FILE* fp) : fp(fp), numRefs(0) {}
+
+    void acquire() { numRefs++; }
+
+    // Starts out with a ref count of zero.
+    static RCFile* create(JSContext* cx, const char* filename, const char* mode);
+
+    void close();
+    bool isOpen() const { return fp; }
+    bool release();
 };
 
 } /* namespace shell */

@@ -84,7 +84,6 @@ DEFAULTS = dict(
         'extensions.checkCompatibility': False,
         'extensions.enabledScopes': 5,
         'extensions.update.notifyUser': False,
-        'xpinstall.signatures.required': False,
         'hangmonitor.timeout': 0,
         'network.proxy.http': 'localhost',
         'network.proxy.http_port': 80,
@@ -110,6 +109,7 @@ DEFAULTS = dict(
             'http://127.0.0.1/trackingprotection/tour',
         'browser.safebrowsing.enabled': False,
         'browser.safebrowsing.malware.enabled': False,
+        'browser.safebrowsing.blockedURIs.enabled': False,
         'browser.search.isUS': True,
         'browser.search.countryCode': 'US',
         'browser.selfsupport.url':

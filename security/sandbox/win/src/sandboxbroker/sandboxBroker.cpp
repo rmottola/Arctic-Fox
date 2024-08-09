@@ -5,6 +5,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "sandboxBroker.h"
+
+#include "base/win/windows_version.h"
 #include "sandbox/win/src/sandbox.h"
 #include "sandbox/win/src/sandbox_factory.h"
 #include "sandbox/win/src/security_level.h"
@@ -15,21 +17,30 @@ namespace mozilla
 
 sandbox::BrokerServices *SandboxBroker::sBrokerService = nullptr;
 
-SandboxBroker::SandboxBroker()
+/* static */
+bool
+SandboxBroker::Initialize()
 {
-  // XXX: This is not thread-safe! Two threads could simultaneously try
-  // to set `sBrokerService`
+  sBrokerService = sandbox::SandboxFactory::GetBrokerServices();
   if (!sBrokerService) {
-    sBrokerService = sandbox::SandboxFactory::GetBrokerServices();
-    if (sBrokerService) {
-      sandbox::ResultCode result = sBrokerService->Init();
-      if (result != sandbox::SBOX_ALL_OK) {
-        sBrokerService = nullptr;
-      }
-    }
+    return false;
   }
 
-  mPolicy = sBrokerService->CreatePolicy();
+  if (sBrokerService->Init() != sandbox::SBOX_ALL_OK) {
+    sBrokerService = nullptr;
+    return false;
+  }
+
+  return true;
+}
+
+SandboxBroker::SandboxBroker()
+{
+  if (sBrokerService) {
+    mPolicy = sBrokerService->CreatePolicy();
+  } else {
+    mPolicy = nullptr;
+  }
 }
 
 bool
@@ -50,6 +61,21 @@ SandboxBroker::LaunchApp(const wchar_t *aPath,
   if (aEnableLogging) {
     mozilla::sandboxing::ApplyLoggingPolicy(*mPolicy);
   }
+
+#if defined(DEBUG)
+  // Allow write access to TEMP directory in debug builds for logging purposes.
+  // The path from GetTempPathW can have a length up to MAX_PATH + 1, including
+  // the null, so we need MAX_PATH + 2, so we can add an * to the end.
+  wchar_t tempPath[MAX_PATH + 2];
+  uint32_t pathLen = ::GetTempPathW(MAX_PATH + 1, tempPath);
+  if (pathLen > 0) {
+    // GetTempPath path ends with \ and returns the length without the null.
+    tempPath[pathLen] = L'*';
+    tempPath[pathLen + 1] = L'\0';
+    mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
+                     sandbox::TargetPolicy::FILES_ALLOW_ANY, tempPath);
+  }
+#endif
 
   // Ceate the sandboxed process
   PROCESS_INFORMATION targetInfo = {0};
@@ -109,9 +135,7 @@ SandboxBroker::SetSecurityLevelForContentProcess(int32_t aSandboxLevel)
   } else {
     jobLevel = sandbox::JOB_NONE;
     accessTokenLevel = sandbox::USER_NON_ADMIN;
-    // INTEGRITY_LEVEL_LAST effectively means don't change from the integrity
-    // level of the broker process.
-    initialIntegrityLevel = sandbox::INTEGRITY_LEVEL_LAST;
+    initialIntegrityLevel = sandbox::INTEGRITY_LEVEL_MEDIUM;
     delayedIntegrityLevel = sandbox::INTEGRITY_LEVEL_MEDIUM;
   }
 
@@ -130,6 +154,25 @@ SandboxBroker::SetSecurityLevelForContentProcess(int32_t aSandboxLevel)
 
   if (aSandboxLevel > 2) {
     result = mPolicy->SetAlternateDesktop(true);
+    ret = ret && (sandbox::SBOX_ALL_OK == result);
+  }
+
+  if (aSandboxLevel >= 1) {
+    sandbox::MitigationFlags mitigations =
+      sandbox::MITIGATION_BOTTOM_UP_ASLR |
+      sandbox::MITIGATION_HEAP_TERMINATE |
+      sandbox::MITIGATION_SEHOP |
+      sandbox::MITIGATION_DEP_NO_ATL_THUNK |
+      sandbox::MITIGATION_DEP;
+
+    result = mPolicy->SetProcessMitigations(mitigations);
+    ret = ret && (sandbox::SBOX_ALL_OK == result);
+
+    mitigations =
+      sandbox::MITIGATION_STRICT_HANDLE_CHECKS |
+      sandbox::MITIGATION_DLL_SEARCH_ORDER;
+
+    result = mPolicy->SetDelayedProcessMitigations(mitigations);
     ret = ret && (sandbox::SBOX_ALL_OK == result);
   }
 
@@ -217,12 +260,6 @@ SandboxBroker::SetSecurityLevelForPluginProcess(int32_t aSandboxLevel)
   result = mPolicy->SetProcessMitigations(mitigations);
   ret = ret && (sandbox::SBOX_ALL_OK == result);
 
-  mitigations =
-    sandbox::MITIGATION_STRICT_HANDLE_CHECKS;
-
-  result = mPolicy->SetDelayedProcessMitigations(mitigations);
-  ret = ret && (sandbox::SBOX_ALL_OK == result);
-
   // Add the policy for the client side of a pipe. It is just a file
   // in the \pipe\ namespace. We restrict it to pipes that start with
   // "chrome." so the sandboxed process cannot connect to system services.
@@ -276,7 +313,7 @@ SandboxBroker::SetSecurityLevelForIPDLUnitTestProcess()
 }
 
 bool
-SandboxBroker::SetSecurityLevelForGMPlugin()
+SandboxBroker::SetSecurityLevelForGMPlugin(SandboxLevel aLevel)
 {
   if (!mPolicy) {
     return false;
@@ -284,9 +321,10 @@ SandboxBroker::SetSecurityLevelForGMPlugin()
 
   auto result = mPolicy->SetJobLevel(sandbox::JOB_LOCKDOWN, 0);
   bool ret = (sandbox::SBOX_ALL_OK == result);
-  result =
-    mPolicy->SetTokenLevel(sandbox::USER_RESTRICTED_SAME_ACCESS,
-                           sandbox::USER_LOCKDOWN);
+
+  auto level = (aLevel == Restricted) ?
+    sandbox::USER_RESTRICTED : sandbox::USER_LOCKDOWN;
+  result = mPolicy->SetTokenLevel(sandbox::USER_RESTRICTED_SAME_ACCESS, level);
   ret = ret && (sandbox::SBOX_ALL_OK == result);
 
   result = mPolicy->SetAlternateDesktop(true);
@@ -397,6 +435,10 @@ SandboxBroker::SetSecurityLevelForGMPlugin()
 bool
 SandboxBroker::AllowReadFile(wchar_t const *file)
 {
+  if (!mPolicy) {
+    return false;
+  }
+
   auto result =
     mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
                      sandbox::TargetPolicy::FILES_ALLOW_READONLY,
@@ -407,6 +449,10 @@ SandboxBroker::AllowReadFile(wchar_t const *file)
 bool
 SandboxBroker::AllowReadWriteFile(wchar_t const *file)
 {
+  if (!mPolicy) {
+    return false;
+  }
+
   auto result =
     mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
                      sandbox::TargetPolicy::FILES_ALLOW_ANY,
@@ -417,6 +463,10 @@ SandboxBroker::AllowReadWriteFile(wchar_t const *file)
 bool
 SandboxBroker::AllowDirectory(wchar_t const *dir)
 {
+  if (!mPolicy) {
+    return false;
+  }
+
   auto result =
     mPolicy->AddRule(sandbox::TargetPolicy::SUBSYS_FILES,
                      sandbox::TargetPolicy::FILES_ALLOW_DIR_ANY,
@@ -427,6 +477,10 @@ SandboxBroker::AllowDirectory(wchar_t const *dir)
 bool
 SandboxBroker::AddTargetPeer(HANDLE aPeerProcess)
 {
+  if (!sBrokerService) {
+    return false;
+  }
+
   sandbox::ResultCode result = sBrokerService->AddTargetPeer(aPeerProcess);
   return (sandbox::SBOX_ALL_OK == result);
 }

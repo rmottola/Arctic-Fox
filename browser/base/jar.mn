@@ -61,6 +61,7 @@ browser.jar:
 *       content/browser/browser.xul                   (content/browser.xul)
         content/browser/browser-addons.js             (content/browser-addons.js)
         content/browser/browser-ctrlTab.js            (content/browser-ctrlTab.js)
+        content/browser/browser-customization.js      (content/browser-customization.js)
         content/browser/browser-devedition.js         (content/browser-devedition.js)
         content/browser/browser-feeds.js              (content/browser-feeds.js)
 *       content/browser/browser-fullScreen.js         (content/browser-fullScreen.js)
@@ -75,6 +76,11 @@ browser.jar:
         content/browser/browser-sidebar.js            (content/browser-sidebar.js)
         content/browser/browser-syncui.js             (content/browser-syncui.js)
 *       content/browser/browser-tabPreviews.xml       (content/browser-tabPreviews.xml)
+#ifdef CAN_DRAW_IN_TITLEBAR
+*       content/browser/browser-tabsintitlebar.js       (content/browser-tabsintitlebar.js)
+#else
+        content/browser/browser-tabsintitlebar.js       (content/browser-tabsintitlebar-stub.js)
+#endif
         content/browser/browser-tabview.js            (content/browser-tabview.js)
         content/browser/browser-thumbnails.js         (content/browser-thumbnails.js)
         content/browser/tab-content.js                (content/tab-content.js)

@@ -42,15 +42,20 @@ public:
 class BasicCompositor : public Compositor
 {
 public:
-  explicit BasicCompositor(nsIWidget *aWidget);
+  explicit BasicCompositor(CompositorBridgeParent* aParent, nsIWidget *aWidget);
 
 protected:
   virtual ~BasicCompositor();
 
 public:
+
+  virtual BasicCompositor* AsBasicCompositor() override { return this; }
+
   virtual bool Initialize() override;
 
-  virtual void Destroy() override;
+  virtual void Destroy() override {}
+
+  virtual void DetachWidget() override;
 
   virtual TextureFactoryIdentifier GetTextureFactoryIdentifier() override;
 
@@ -64,7 +69,7 @@ public:
 
   virtual already_AddRefed<CompositingRenderTarget>
   CreateRenderTargetForWindow(const LayoutDeviceIntRect& aRect,
-                              SurfaceInitMode aInit,
+                              const LayoutDeviceIntRect& aClearRect,
                               BufferMode aBufferMode);
 
   virtual already_AddRefed<DataTextureSource>
@@ -97,7 +102,7 @@ public:
   virtual void BeginFrame(const nsIntRegion& aInvalidRegion,
                           const gfx::Rect *aClipRectIn,
                           const gfx::Rect& aRenderBounds,
-                          bool aOpaque,
+                          const nsIntRegion& aOpaqueRegion,
                           gfx::Rect *aClipRectOut = nullptr,
                           gfx::Rect *aRenderBoundsOut = nullptr) override;
   virtual void EndFrame() override;
@@ -141,6 +146,8 @@ private:
 
   uint32_t mMaxTextureSize;
 };
+
+BasicCompositor* AssertBasicCompositor(Compositor* aCompositor);
 
 } // namespace layers
 } // namespace mozilla

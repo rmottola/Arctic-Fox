@@ -7,7 +7,7 @@
 // Tests that links are shown in attributes when the values (or part of the
 // values) are URIs or pointers to IDs.
 
-const TEST_URL = TEST_URL_ROOT + "doc_markup_links.html";
+const TEST_URL = URL_ROOT + "doc_markup_links.html";
 
 const TEST_DATA = [{
   selector: "link",
@@ -19,7 +19,8 @@ const TEST_DATA = [{
   selector: "link[rel=icon]",
   attributes: [{
     attributeName: "href",
-    links: [{type: "uri", value: "/media/img/firefox/favicon-196.223e1bcaf067.png"}]
+    links: [{type: "uri",
+             value: "/media/img/firefox/favicon-196.223e1bcaf067.png"}]
   }]
 }, {
   selector: "form",
@@ -100,7 +101,7 @@ const TEST_DATA = [{
 }];
 
 add_task(function*() {
-  let {inspector} = yield addTab(TEST_URL).then(openInspector);
+  let {inspector} = yield openInspectorForURL(TEST_URL);
 
   for (let {selector, attributes} of TEST_DATA) {
     info("Testing attributes on node " + selector);
@@ -109,13 +110,16 @@ add_task(function*() {
 
     for (let {attributeName, links} of attributes) {
       info("Testing attribute " + attributeName);
-      let linkEls = editor.attrElements.get(attributeName).querySelectorAll(".link");
+      let linkEls = editor.attrElements.get(attributeName)
+                                       .querySelectorAll(".link");
 
       is(linkEls.length, links.length, "The right number of links were found");
 
-      for (let i = 0; i < links.length; i ++) {
-        is(linkEls[i].dataset.type, links[i].type, "Link " + i + " has the right type");
-        is(linkEls[i].textContent, links[i].value, "Link " + i + " has the right value");
+      for (let i = 0; i < links.length; i++) {
+        is(linkEls[i].dataset.type, links[i].type,
+           `Link ${i} has the right type`);
+        is(linkEls[i].textContent, links[i].value,
+           `Link ${i} has the right value`);
       }
     }
   }

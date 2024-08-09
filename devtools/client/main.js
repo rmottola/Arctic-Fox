@@ -4,20 +4,13 @@
 
 "use strict";
 
-const Services = require("Services");
-const { gDevTools } = require("devtools/client/framework/devtools");
+/**
+ * This module could have been devtools-browser.js.
+ * But we need this wrapper in order to define precisely what we are exporting
+ * out of client module loader (Loader.jsm): only Toolbox and TargetFactory.
+ */
 
-const { defaultTools, defaultThemes } = require("devtools/client/definitions");
-
-defaultTools.forEach(definition => gDevTools.registerTool(definition));
-defaultThemes.forEach(definition => gDevTools.registerTheme(definition));
-
-// Re-export for backwards compatibility, but we should probably the
-// definitions from require("devtools/client/definitions") in the future
-exports.defaultTools = require("devtools/client/definitions").defaultTools;
-exports.defaultThemes = require("devtools/client/definitions").defaultThemes;
-exports.Tools = require("devtools/client/definitions").Tools;
-
+// For compatiblity reasons, exposes these symbols on "devtools":
 Object.defineProperty(exports, "Toolbox", {
   get: () => require("devtools/client/framework/toolbox").Toolbox
 });
@@ -25,20 +18,5 @@ Object.defineProperty(exports, "TargetFactory", {
   get: () => require("devtools/client/framework/target").TargetFactory
 });
 
-const unloadObserver = {
-  observe: function(subject) {
-    if (subject.wrappedJSObject === require("@loader/unload")) {
-      Services.obs.removeObserver(unloadObserver, "sdk:loader:destroy");
-      for (let definition of gDevTools.getToolDefinitionArray()) {
-        gDevTools.unregisterTool(definition.id);
-      }
-      for (let definition of gDevTools.getThemeDefinitionArray()) {
-        gDevTools.unregisterTheme(definition.id);
-      }
-    }
-  }
-};
-Services.obs.addObserver(unloadObserver, "sdk:loader:destroy", false);
-
-const events = require("sdk/system/events");
-events.emit("devtools-loaded", {});
+// Load the main browser module
+require("devtools/client/framework/devtools-browser");

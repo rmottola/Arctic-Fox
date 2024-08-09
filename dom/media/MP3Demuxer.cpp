@@ -148,6 +148,15 @@ MP3TrackDemuxer::Init() {
   return mSamplesPerSecond && mChannels;
 }
 
+media::TimeUnit
+MP3TrackDemuxer::SeekPosition() const {
+  TimeUnit pos = Duration(mFrameIndex);
+  if (Duration() > TimeUnit()) {
+    pos = std::min(Duration(), pos);
+  }
+  return pos;
+}
+
 const FrameParser::Frame&
 MP3TrackDemuxer::LastFrame() const {
   return mParser.PrevFrame();
@@ -156,15 +165,6 @@ MP3TrackDemuxer::LastFrame() const {
 RefPtr<MediaRawData>
 MP3TrackDemuxer::DemuxSample() {
   return GetNextFrame(FindNextFrame());
-}
-
-media::TimeUnit
-MP3TrackDemuxer::SeekPosition() const {
-  TimeUnit pos = Duration(mFrameIndex);
-  if (Duration() > TimeUnit()) {
-    pos = std::min(Duration(), pos);
-  }
-  return pos;
 }
 
 const ID3Parser::ID3Header&
@@ -203,7 +203,7 @@ MP3TrackDemuxer::FastSeek(const TimeUnit& aTime) {
   if (!aTime.ToMicroseconds()) {
     // Quick seek to the beginning of the stream.
     mFrameIndex = 0;
-    } else if (vbr.IsTOCPresent() && Duration().ToMicroseconds() > 0) {
+  } else if (vbr.IsTOCPresent() && Duration().ToMicroseconds() > 0) {
     // Use TOC for more precise seeking.
     const float durationFrac = static_cast<float>(aTime.ToMicroseconds()) /
                                                   Duration().ToMicroseconds();
@@ -1064,7 +1064,7 @@ FrameParser::VBRHeader::ParseXing(ByteReader* aReader) {
     // Skip across the VBR header ID tag.
     aReader->ReadU32();
     mType = XING;
-    }
+  }
   uint32_t flags = 0;
   if (aReader->CanRead32()) {
     flags = aReader->ReadU32();

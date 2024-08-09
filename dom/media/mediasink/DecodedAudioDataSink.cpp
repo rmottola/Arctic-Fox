@@ -4,12 +4,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "nsPrintfCString.h"
 #include "MediaQueue.h"
 #include "DecodedAudioDataSink.h"
 #include "VideoUtils.h"
+#include "AudioConverter.h"
 
 #include "mozilla/CheckedInt.h"
 #include "mozilla/DebugOnly.h"
+#include "gfxPrefs.h"
 
 namespace mozilla {
 
@@ -37,7 +40,16 @@ DecodedAudioDataSink::DecodedAudioDataSink(MediaQueue<MediaData>& aAudioQueue,
   , mInfo(aInfo)
   , mChannel(aChannel)
   , mPlaying(true)
+  , mPlaybackComplete(false)
 {
+  bool resampling = gfxPrefs::AudioSinkResampling();
+  uint32_t resamplingRate = gfxPrefs::AudioSinkResampleRate();
+  mConverter =
+    MakeUnique<AudioConverter>(
+      AudioConfig(mInfo.mChannels, mInfo.mRate),
+      AudioConfig(mInfo.mChannels > 2 && gfxPrefs::AudioSinkForceStereo()
+                    ? 2 : mInfo.mChannels,
+                  resampling ? resamplingRate : mInfo.mRate));
 }
 
 DecodedAudioDataSink::~DecodedAudioDataSink()
@@ -118,7 +130,7 @@ DecodedAudioDataSink::SetPreservesPitch(bool aPreservesPitch)
 void
 DecodedAudioDataSink::SetPlaying(bool aPlaying)
 {
-  if (!mAudioStream || mPlaying == aPlaying) {
+  if (!mAudioStream || mPlaying == aPlaying || mPlaybackComplete) {
     return;
   }
   // pause/resume AudioStream as necessary.
@@ -134,7 +146,9 @@ nsresult
 DecodedAudioDataSink::InitializeAudioStream(const PlaybackParams& aParams)
 {
   mAudioStream = new AudioStream(*this);
-  nsresult rv = mAudioStream->Init(mInfo.mChannels, mInfo.mRate, mChannel);
+  nsresult rv = mAudioStream->Init(mConverter->OutputConfig().Channels(),
+                                   mConverter->OutputConfig().Rate(),
+                                   mChannel);
   if (NS_FAILED(rv)) {
     mAudioStream->Shutdown();
     mAudioStream = nullptr;
@@ -154,7 +168,8 @@ DecodedAudioDataSink::InitializeAudioStream(const PlaybackParams& aParams)
 int64_t
 DecodedAudioDataSink::GetEndTime() const
 {
-  CheckedInt64 playedUsecs = FramesToUsecs(mWritten, mInfo.mRate) + mStartTime;
+  CheckedInt64 playedUsecs =
+    FramesToUsecs(mWritten, mConverter->OutputConfig().Rate()) + mStartTime;
   if (!playedUsecs.isValid()) {
     NS_WARNING("Int overflow calculating audio end time");
     return -1;
@@ -202,19 +217,38 @@ DecodedAudioDataSink::PopFrames(uint32_t aFrames)
     UniquePtr<AudioDataValue[]> mData;
   };
 
-  if (!mCurrentData) {
+  while (!mCurrentData) {
     // No data in the queue. Return an empty chunk.
     if (AudioQueue().GetSize() == 0) {
       return MakeUnique<Chunk>();
+    }
+
+    AudioData* a = AudioQueue().PeekFront()->As<AudioData>();
+
+    // Ignore the element with 0 frames and try next.
+    if (a->mFrames == 0) {
+      RefPtr<MediaData> releaseMe = AudioQueue().PopFront();
+      continue;
+    }
+
+    // Ignore invalid samples.
+    if (a->mRate != mInfo.mRate || a->mChannels != mInfo.mChannels) {
+      NS_WARNING(nsPrintfCString(
+        "mismatched sample format, data=%p rate=%u channels=%u frames=%u",
+        a->mAudioData.get(), a->mRate, a->mChannels, a->mFrames).get());
+      RefPtr<MediaData> releaseMe = AudioQueue().PopFront();
+      continue;
     }
 
     // See if there's a gap in the audio. If there is, push silence into the
     // audio hardware, so we can play across the gap.
     // Calculate the timestamp of the next chunk of audio in numbers of
     // samples.
-    CheckedInt64 sampleTime = UsecsToFrames(AudioQueue().PeekFront()->mTime, mInfo.mRate);
+    CheckedInt64 sampleTime = UsecsToFrames(AudioQueue().PeekFront()->mTime,
+                                            mConverter->OutputConfig().Rate());
     // Calculate the number of frames that have been pushed onto the audio hardware.
-    CheckedInt64 playedFrames = UsecsToFrames(mStartTime, mInfo.mRate) +
+    CheckedInt64 playedFrames = UsecsToFrames(mStartTime,
+                                              mConverter->OutputConfig().Rate()) +
                                 static_cast<int64_t>(mWritten);
     CheckedInt64 missingFrames = sampleTime - playedFrames;
 
@@ -224,6 +258,9 @@ DecodedAudioDataSink::PopFrames(uint32_t aFrames)
       return MakeUnique<Chunk>();
     }
 
+    const uint32_t rate = mConverter->OutputConfig().Rate();
+    const uint32_t channels = mConverter->OutputConfig().Channels();
+
     if (missingFrames.value() > AUDIO_FUZZ_FRAMES) {
       // The next audio chunk begins some time after the end of the last chunk
       // we pushed to the audio hardware. We must push silence into the audio
@@ -232,13 +269,30 @@ DecodedAudioDataSink::PopFrames(uint32_t aFrames)
       missingFrames = std::min<int64_t>(UINT32_MAX, missingFrames.value());
       auto framesToPop = std::min<uint32_t>(missingFrames.value(), aFrames);
       mWritten += framesToPop;
-      return MakeUnique<SilentChunk>(framesToPop, mInfo.mChannels, mInfo.mRate);
+      return MakeUnique<SilentChunk>(framesToPop, channels, rate);
     }
 
-    mCurrentData = dont_AddRef(AudioQueue().PopFront().take()->As<AudioData>());
+    RefPtr<AudioData> data =
+      dont_AddRef(AudioQueue().PopFront().take()->As<AudioData>());
+    if (mConverter->InputConfig() != mConverter->OutputConfig()) {
+      AlignedAudioBuffer convertedData =
+        mConverter->Process(AudioSampleBuffer(Move(data->mAudioData))).Forget();
+      mCurrentData =
+        new AudioData(data->mOffset,
+                      data->mTime,
+                      data->mDuration,
+                      convertedData.Length() / channels,
+                      Move(convertedData),
+                      channels,
+                      rate);
+    } else {
+      mCurrentData = Move(data);
+    }
+
     mCursor = MakeUnique<AudioBufferCursor>(mCurrentData->mAudioData.get(),
                                             mCurrentData->mChannels,
                                             mCurrentData->mFrames);
+    MOZ_ASSERT(mCurrentData->mFrames > 0);
   }
 
   auto framesToPop = std::min(aFrames, mCursor->Available());
@@ -272,7 +326,8 @@ void
 DecodedAudioDataSink::Drained()
 {
   SINK_LOG("Drained");
-  mEndPromise.Resolve(true, __func__);
+  mPlaybackComplete = true;
+  mEndPromise.ResolveIfExists(true, __func__);
 }
 
 } // namespace media

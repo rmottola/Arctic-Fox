@@ -108,6 +108,7 @@ ClientLayerManager::ClientLayerManager(nsIWidget* aWidget)
   mMemoryPressureObserver = new MemoryPressureObserver(this);
 }
 
+
 ClientLayerManager::~ClientLayerManager()
 {
   if (mTransactionIdAllocator) {
@@ -126,6 +127,18 @@ ClientLayerManager::~ClientLayerManager()
   mRoot = nullptr;
 
   MOZ_COUNT_DTOR(ClientLayerManager);
+}
+
+void
+ClientLayerManager::Destroy()
+{
+  // It's important to call ClearCachedResource before Destroy because the
+  // former will early-return if the later has already run.
+  ClearCachedResources();
+  for (size_t i = 0; i < mTexturePools.Length(); i++) {
+    mTexturePools[i]->Destroy();
+  }
+  LayerManager::Destroy();
 }
 
 int32_t
@@ -406,11 +419,11 @@ ClientLayerManager::DidComposite(uint64_t aTransactionId,
   if (aTransactionId) {
     nsIWidgetListener *listener = mWidget->GetWidgetListener();
     if (listener) {
-      listener->DidCompositeWindow(aCompositeStart, aCompositeEnd);
+      listener->DidCompositeWindow(aTransactionId, aCompositeStart, aCompositeEnd);
     }
     listener = mWidget->GetAttachedWidgetListener();
     if (listener) {
-      listener->DidCompositeWindow(aCompositeStart, aCompositeEnd);
+      listener->DidCompositeWindow(aTransactionId, aCompositeStart, aCompositeEnd);
     }
     mTransactionIdAllocator->NotifyTransactionCompleted(aTransactionId);
   }
@@ -558,7 +571,7 @@ ClientLayerManager::FlushRendering()
 void
 ClientLayerManager::UpdateTextureFactoryIdentifier(const TextureFactoryIdentifier& aNewIdentifier)
 {
-  mForwarder->UpdateTextureFactoryIdentifier(aNewIdentifier);
+  mForwarder->IdentifyTextureHost(aNewIdentifier);
 }
 
 void
@@ -707,6 +720,8 @@ ClientLayerManager::SetIsFirstPaint()
 TextureClientPool*
 ClientLayerManager::GetTexturePool(SurfaceFormat aFormat, TextureFlags aFlags)
 {
+  MOZ_DIAGNOSTIC_ASSERT(!mDestroyed);
+
   for (size_t i = 0; i < mTexturePools.Length(); i++) {
     if (mTexturePools[i]->GetFormat() == aFormat &&
         mTexturePools[i]->GetFlags() == aFlags) {
@@ -747,6 +762,10 @@ ClientLayerManager::ClearCachedResources(Layer* aSubtree)
 void
 ClientLayerManager::HandleMemoryPressure()
 {
+  if (mRoot) {
+    HandleMemoryPressureLayer(mRoot);
+  }
+
   for (size_t i = 0; i < mTexturePools.Length(); i++) {
     mTexturePools[i]->ShrinkToMinimumSize();
   }
@@ -759,6 +778,16 @@ ClientLayerManager::ClearLayer(Layer* aLayer)
   for (Layer* child = aLayer->GetFirstChild(); child;
        child = child->GetNextSibling()) {
     ClearLayer(child);
+  }
+}
+
+void
+ClientLayerManager::HandleMemoryPressureLayer(Layer* aLayer)
+{
+  ClientLayer::ToClientLayer(aLayer)->HandleMemoryPressure();
+  for (Layer* child = aLayer->GetFirstChild(); child;
+       child = child->GetNextSibling()) {
+    HandleMemoryPressureLayer(child);
   }
 }
 

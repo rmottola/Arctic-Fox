@@ -581,7 +581,7 @@ class TransportAndDataEvent : public ChannelEvent
   void Run()
   {
     mChild->OnTransportAndData(mChannelStatus, mTransportStatus, mProgress,
-                               mProgressMax, mData, mOffset, mCount);
+                               mProgressMax, mOffset, mCount, mData);
   }
  private:
   HttpChannelChild* mChild;
@@ -599,9 +599,9 @@ HttpChannelChild::RecvOnTransportAndData(const nsresult& channelStatus,
                                          const nsresult& transportStatus,
                                          const uint64_t& progress,
                                          const uint64_t& progressMax,
-                                         const nsCString& data,
                                          const uint64_t& offset,
-                                         const uint32_t& count)
+                                         const uint32_t& count,
+                                         const nsCString& data)
 {
   LOG(("HttpChannelChild::RecvOnTransportAndData [this=%p]\n", this));
   MOZ_RELEASE_ASSERT(!mFlushedForDiversion,
@@ -656,9 +656,9 @@ HttpChannelChild::OnTransportAndData(const nsresult& channelStatus,
                                      const nsresult& transportStatus,
                                      const uint64_t progress,
                                      const uint64_t& progressMax,
-                                     const nsCString& data,
                                      const uint64_t& offset,
-                                     const uint32_t& count)
+                                     const uint32_t& count,
+                                     const nsCString& data)
 {
   LOG(("HttpChannelChild::OnTransportAndData [this=%p]\n", this));
 
@@ -942,7 +942,10 @@ HttpChannelChild::DoOnStopRequest(nsIRequest* aRequest, nsresult aChannelStatus,
     nsChannelClassifier::SetBlockedTrackingContent(this);
   }
 
+  MOZ_ASSERT(!mOnStopRequestCalled,
+             "We should not call OnStopRequest twice");
   mListener->OnStopRequest(aRequest, aContext, mStatus);
+  mOnStopRequestCalled = true;
 
   mListener = 0;
   mListenerContext = 0;
@@ -1089,14 +1092,21 @@ HttpChannelChild::FailedAsyncOpen(const nsresult& status)
 
   // We're already being called from IPDL, therefore already "async"
   HandleAsyncAbort();
+
+  if (mIPCOpen) {
+    PHttpChannelChild::Send__delete__(this);
+  }
+  // WARNING:  DO NOT RELY ON |THIS| EXISTING ANY MORE! 
+  // 
+  // NeckoChild::DeallocPHttpChannelChild() may have been called, which deletes 
+  // |this| if IPDL holds the last reference.
 }
 
 void
 HttpChannelChild::DoNotifyListenerCleanup()
 {
   LOG(("HttpChannelChild::DoNotifyListenerCleanup [this=%p]\n", this));
-  if (mIPCOpen)
-    PHttpChannelChild::Send__delete__(this);
+
   if (mInterceptListener) {
     mInterceptListener->Cleanup();
     mInterceptListener = nullptr;
@@ -1214,6 +1224,7 @@ HttpChannelChild::SetupRedirect(nsIURI* uri,
   nsCOMPtr<nsIHttpChannelChild> httpChannelChild = do_QueryInterface(newChannel);
   if (httpChannelChild) {
     bool shouldUpgrade = false;
+    auto channelChild = static_cast<HttpChannelChild*>(httpChannelChild.get());
     if (mShouldInterceptSubsequentRedirect) {
       // In the case where there was a synthesized response that caused a redirection,
       // we must force the new channel to intercept the request in the parent before a
@@ -1222,7 +1233,7 @@ HttpChannelChild::SetupRedirect(nsIURI* uri,
     } else if (mRedirectMode == nsIHttpChannelInternal::REDIRECT_MODE_MANUAL &&
                ((redirectFlags & (nsIChannelEventSink::REDIRECT_TEMPORARY |
                                   nsIChannelEventSink::REDIRECT_PERMANENT)) != 0) &&
-               ShouldInterceptURI(newChannel, uri, shouldUpgrade)) {
+               channelChild->ShouldInterceptURI(uri, shouldUpgrade)) {
       // In the case where the redirect mode is manual, we need to check whether
       // the post-redirect channel needs to be intercepted.  If that is the
       // case, force the new channel to intercept the request in the parent
@@ -1263,14 +1274,8 @@ HttpChannelChild::Redirect1Begin(const uint32_t& newChannelId,
   if (NS_SUCCEEDED(rv)) {
     if (mRedirectChannelChild) {
       mRedirectChannelChild->ConnectParent(newChannelId);
-      rv = gHttpHandler->AsyncOnChannelRedirect(this,
-                                                newChannel,
-                                                redirectFlags);
-    } else {
-      LOG(("  redirecting to a protocol that doesn't implement"
-           " nsIChildChannel"));
-      rv = NS_ERROR_FAILURE;
     }
+    rv = gHttpHandler->AsyncOnChannelRedirect(this, newChannel, redirectFlags);
   }
 
   if (NS_FAILED(rv))
@@ -1531,6 +1536,17 @@ HttpChannelChild::OnRedirectVerifyCallback(nsresult result)
   nsCOMPtr<nsIHttpChannel> newHttpChannel =
       do_QueryInterface(mRedirectChannelChild);
 
+  if (NS_SUCCEEDED(result) && !mRedirectChannelChild) {
+    // mRedirectChannelChild doesn't exist means we're redirecting to a protocol
+    // that doesn't implement nsIChildChannel. The redirect result should be set
+    // as failed by veto listeners and shouldn't enter this condition. As the
+    // last resort, we synthesize the error result as NS_ERROR_DOM_BAD_URI here
+    // to let nsHttpChannel::ContinueProcessResponse2 know it's redirecting to
+    // another protocol and throw an error.
+    LOG(("  redirecting to a protocol that doesn't implement nsIChildChannel"));
+    result = NS_ERROR_DOM_BAD_URI;
+  }
+
   if (newHttpChannel) {
     // Must not be called until after redirect observers called.
     newHttpChannel->SetOriginalURI(mOriginalURI);
@@ -1770,7 +1786,7 @@ HttpChannelChild::AsyncOpen(nsIStreamListener *listener, nsISupports *aContext)
                 mPostRedirectChannelShouldIntercept);
   bool shouldUpgrade = mPostRedirectChannelShouldUpgrade;
   if (mPostRedirectChannelShouldIntercept ||
-      ShouldInterceptURI(this, mURI, shouldUpgrade)) {
+      ShouldInterceptURI(mURI, shouldUpgrade)) {
     mResponseCouldBeSynthesized = true;
 
     nsCOMPtr<nsINetworkInterceptController> controller;
@@ -1907,7 +1923,6 @@ HttpChannelChild::ContinueAsyncOpen()
   openArgs.allowSpdy() = mAllowSpdy;
   openArgs.allowAltSvc() = mAllowAltSvc;
   openArgs.initialRwin() = mInitialRwin;
-  openArgs.allowStaleCacheContent() = mAllowStaleCacheContent;
 
   uint32_t cacheKey = 0;
   if (mCacheKey) {
@@ -1924,6 +1939,8 @@ HttpChannelChild::ContinueAsyncOpen()
   openArgs.cacheKey() = cacheKey;
 
   openArgs.blockAuthPrompt() = mBlockAuthPrompt;
+
+  openArgs.allowStaleCacheContent() = mAllowStaleCacheContent;
 
   openArgs.contentTypeHint() = mContentTypeHint;
 
@@ -2072,20 +2089,6 @@ HttpChannelChild::IsFromCache(bool *value)
 }
 
 NS_IMETHODIMP
-HttpChannelChild::SetAllowStaleCacheContent(bool aAllowStaleCacheContent)
-{
-  mAllowStaleCacheContent = aAllowStaleCacheContent;
-  return NS_OK;
-}
-NS_IMETHODIMP
-HttpChannelChild::GetAllowStaleCacheContent(bool *aAllowStaleCacheContent)
-{
-  NS_ENSURE_ARG(aAllowStaleCacheContent);
-  *aAllowStaleCacheContent = mAllowStaleCacheContent;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 HttpChannelChild::GetCacheKey(nsISupports **cacheKey)
 {
   NS_IF_ADDREF(*cacheKey = mCacheKey);
@@ -2097,6 +2100,20 @@ HttpChannelChild::SetCacheKey(nsISupports *cacheKey)
   ENSURE_CALLED_BEFORE_ASYNC_OPEN();
 
   mCacheKey = cacheKey;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+HttpChannelChild::SetAllowStaleCacheContent(bool aAllowStaleCacheContent)
+{
+  mAllowStaleCacheContent = aAllowStaleCacheContent;
+  return NS_OK;
+}
+NS_IMETHODIMP
+HttpChannelChild::GetAllowStaleCacheContent(bool *aAllowStaleCacheContent)
+{
+  NS_ENSURE_ARG(aAllowStaleCacheContent);
+  *aAllowStaleCacheContent = mAllowStaleCacheContent;
   return NS_OK;
 }
 
@@ -2476,6 +2493,8 @@ HttpChannelChild::GetDivertingToParent(bool* aDiverting)
 void
 HttpChannelChild::ResetInterception()
 {
+  NS_ENSURE_TRUE_VOID(gNeckoChild != nullptr);
+
   if (mInterceptListener) {
     mInterceptListener->Cleanup();
   }
@@ -2593,8 +2612,7 @@ HttpChannelChild::RecvIssueDeprecationWarning(const uint32_t& warning,
 }
 
 bool
-HttpChannelChild::ShouldInterceptURI(nsIChannel* aChannel,
-                                     nsIURI* aURI,
+HttpChannelChild::ShouldInterceptURI(nsIURI* aURI,
                                      bool& aShouldUpgrade)
 {
   bool isHttps = false;
@@ -2603,7 +2621,7 @@ HttpChannelChild::ShouldInterceptURI(nsIChannel* aChannel,
   nsCOMPtr<nsIPrincipal> resultPrincipal;
   if (!isHttps && mLoadInfo) {
       nsContentUtils::GetSecurityManager()->
-        GetChannelResultPrincipal(aChannel, getter_AddRefs(resultPrincipal));
+        GetChannelResultPrincipal(this, getter_AddRefs(resultPrincipal));
   }
   rv = NS_ShouldSecureUpgrade(aURI,
                               mLoadInfo,

@@ -198,6 +198,10 @@
 #include "nsIDocShellTreeOwner.h"
 #endif
 
+#ifdef MOZ_B2G
+#include "nsIHardwareKeyHandler.h"
+#endif
+
 #ifdef MOZ_TASK_TRACER
 #include "GeckoTaskTracer.h"
 using namespace mozilla::tasktracer;
@@ -746,6 +750,12 @@ PresShell::BeforeAfterKeyboardEventEnabled()
   return sBeforeAfterKeyboardEventEnabled;
 }
 
+/* static */ bool
+PresShell::IsTargetIframe(nsINode* aTarget)
+{
+  return aTarget && aTarget->IsHTMLElement(nsGkAtoms::iframe);
+}
+
 PresShell::PresShell()
   : mMouseLocation(NS_UNCONSTRAINEDSIZE, NS_UNCONSTRAINEDSIZE)
 {
@@ -869,9 +879,11 @@ PresShell::Init(nsIDocument* aDocument,
   mPresContext = aPresContext;
   aPresContext->SetShell(this);
 
-  // Now we can initialize the style set.
-  aStyleSet->Init(aPresContext);
+  // Now we can initialize the style set. Make sure to set the member before
+  // calling Init, since various subroutines need to find the style set off
+  // the PresContext during initialization.
   mStyleSet = aStyleSet;
+  mStyleSet->Init(aPresContext);
 
   // Notify our prescontext that it now has a compatibility mode.  Note that
   // this MUST happen after we set up our style set but before we create any
@@ -963,12 +975,9 @@ PresShell::Init(nsIDocument* aDocument,
   if (mPresContext->IsRootContentDocument()) {
     mZoomConstraintsClient = new ZoomConstraintsClient();
     mZoomConstraintsClient->Init(this, mDocument);
-#ifndef MOZ_WIDGET_ANDROID
-    // Fennec will need some work to use this code; see bug 1180267.
     if (gfxPrefs::MetaViewportEnabled() || gfxPrefs::APZAllowZooming()) {
       mMobileViewportManager = new MobileViewportManager(this, mDocument);
     }
-#endif
   }
 }
 
@@ -1174,9 +1183,10 @@ PresShell::Destroy()
 
   mSynthMouseMoveEvent.Revoke();
 
-  mUpdateImageVisibilityEvent.Revoke();
+  mUpdateApproximateFrameVisibilityEvent.Revoke();
+  mNotifyCompositorOfVisibleRegionsChangeEvent.Revoke();
 
-  ClearVisibleImagesList(nsIImageLoadingContent::ON_NONVISIBLE_REQUEST_DISCARD);
+  ClearVisibleFramesSets(Some(OnNonvisible::DISCARD_IMAGES));
 
   if (mCaret) {
     mCaret->Terminate();
@@ -1334,7 +1344,7 @@ nsIPresShell::SetAuthorStyleDisabled(bool aStyleDisabled)
 {
   if (aStyleDisabled != mStyleSet->GetAuthorStyleDisabled()) {
     mStyleSet->SetAuthorStyleDisabled(aStyleDisabled);
-    ReconstructStyleData();
+    RestyleForCSSRuleChanges();
 
     nsCOMPtr<nsIObserverService> observerService =
       mozilla::services::GetObserverService();
@@ -1443,7 +1453,7 @@ PresShell::AddUserSheet(nsISupports* aSheet)
 
   mStyleSet->EndUpdate();
 
-  ReconstructStyleData();
+  RestyleForCSSRuleChanges();
 }
 
 void
@@ -1459,7 +1469,7 @@ PresShell::AddAgentSheet(nsISupports* aSheet)
   }
 
   mStyleSet->AppendStyleSheet(SheetType::Agent, sheet);
-  ReconstructStyleData();
+  RestyleForCSSRuleChanges();
 }
 
 void
@@ -1482,7 +1492,7 @@ PresShell::AddAuthorSheet(nsISupports* aSheet)
     mStyleSet->AppendStyleSheet(SheetType::Doc, sheet);
   }
 
-  ReconstructStyleData();
+  RestyleForCSSRuleChanges();
 }
 
 void
@@ -1495,7 +1505,7 @@ PresShell::RemoveSheet(SheetType aType, nsISupports* aSheet)
   }
 
   mStyleSet->RemoveStyleSheet(aType, sheet);
-  ReconstructStyleData();
+  RestyleForCSSRuleChanges();
 }
 
 NS_IMETHODIMP
@@ -2389,7 +2399,7 @@ PresShell::EndUpdate(nsIDocument *aDocument, nsUpdateType aUpdateType)
   if (aUpdateType & UPDATE_STYLE) {
     mStyleSet->EndUpdate();
     if (mStylesHaveChanged || !mChangedScopeStyleRoots.IsEmpty())
-      ReconstructStyleData();
+      RestyleForCSSRuleChanges();
   }
 
   mFrameConstructor->EndUpdate();
@@ -2891,7 +2901,10 @@ PresShell::CreateReferenceRenderingContext()
   nsDeviceContext* devCtx = mPresContext->DeviceContext();
   RefPtr<gfxContext> rc;
   if (mPresContext->IsScreen()) {
-    rc = new gfxContext(gfxPlatform::GetPlatform()->ScreenReferenceDrawTarget());
+    rc = gfxContext::ForDrawTarget(gfxPlatform::GetPlatform()->ScreenReferenceDrawTarget());
+    if (!rc) {
+      return nullptr;
+    }
   } else {
     // We assume the devCtx has positive width and height for this call.
     // However, width and height, may be outside of the reasonable range
@@ -3626,7 +3639,7 @@ PresShell::DispatchSynthMouseMove(WidgetGUIEvent* aEvent,
   uint32_t hoverGenerationBefore =
     restyleManager->AsGecko()->GetHoverGeneration();
   nsEventStatus status;
-  nsView* targetView = nsView::GetViewFor(aEvent->widget);
+  nsView* targetView = nsView::GetViewFor(aEvent->mWidget);
   if (!targetView)
     return;
   targetView->GetViewManager()->DispatchEvent(aEvent, targetView, &status);
@@ -3780,7 +3793,7 @@ PresShell::UnsuppressAndInvalidate()
 
   if (!mHaveShutDown) {
     SynthesizeMouseMove(false);
-    ScheduleImageVisibilityUpdate();
+    ScheduleApproximateFrameVisibilityUpdateNow();
   }
 }
 
@@ -3946,6 +3959,23 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
    * SetNeedStyleFlush calls on the document.
    */
   mozFlushType flushType = aFlush.mFlushType;
+
+#ifdef MOZ_ENABLE_PROFILER_SPS
+  static const char flushTypeNames[][20] = {
+    "Content",
+    "ContentAndNotify",
+    "Style",
+    "InterruptibleLayout",
+    "Layout",
+    "Display"
+  };
+
+  // Make sure that we don't miss things added to mozFlushType!
+  MOZ_ASSERT(static_cast<uint32_t>(flushType) <= ArrayLength(flushTypeNames));
+
+  PROFILER_LABEL_PRINTF("PresShell", "Flush",
+    js::ProfileEntry::Category::GRAPHICS, "(Flush_%s)", flushTypeNames[flushType - 1]);
+#endif
 
 #ifdef ACCESSIBILITY
 #ifdef DEBUG
@@ -4400,7 +4430,7 @@ PresShell::ReconstructFrames(void)
 }
 
 void
-nsIPresShell::ReconstructStyleDataInternal()
+nsIPresShell::RestyleForCSSRuleChanges()
 {
   AutoTArray<RefPtr<mozilla::dom::Element>,1> scopeRoots;
   mChangedScopeStyleRoots.SwapElements(scopeRoots);
@@ -4448,12 +4478,6 @@ nsIPresShell::ReconstructStyleDataInternal()
                                        NS_STYLE_HINT_NONE);
     }
   }
-}
-
-void
-nsIPresShell::ReconstructStyleDataExternal()
-{
-  ReconstructStyleDataInternal();
 }
 
 void
@@ -4530,21 +4554,74 @@ PresShell::StyleRuleRemoved(StyleSheetHandle aStyleSheet)
 }
 
 nsIFrame*
-PresShell::GetRealPrimaryFrameFor(nsIContent* aContent) const
-{
-  if (aContent->GetComposedDoc() != GetDocument()) {
-    return nullptr;
-  }
-  nsIFrame *primaryFrame = aContent->GetPrimaryFrame();
-  if (!primaryFrame)
-    return nullptr;
-  return nsPlaceholderFrame::GetRealFrameFor(primaryFrame);
-}
-
-nsIFrame*
 PresShell::GetPlaceholderFrameFor(nsIFrame* aFrame) const
 {
   return mFrameConstructor->GetPlaceholderFrameFor(aFrame);
+}
+
+void
+PresShell::NotifyCompositorOfVisibleRegionsChange()
+{
+  mNotifyCompositorOfVisibleRegionsChangeEvent.Revoke();
+
+  if (!mVisibleRegions) {
+    return;
+  }
+
+  // Retrieve the layers ID and pres shell ID.
+  TabChild* tabChild = TabChild::GetFrom(this);
+  if (!tabChild) {
+    return;
+  }
+
+  const uint64_t layersId = tabChild->LayersId();
+  const uint32_t presShellId = GetPresShellId();
+
+  // Retrieve the CompositorBridgeChild.
+  LayerManager* layerManager = GetLayerManager();
+  if (!layerManager) {
+    return;
+  }
+
+  ClientLayerManager* clientLayerManager = layerManager->AsClientLayerManager();
+  if (!clientLayerManager) {
+    return;
+  }
+
+  CompositorBridgeChild* compositorChild = clientLayerManager->GetCompositorBridgeChild();
+  if (!compositorChild) {
+    return;
+  }
+
+  // Clear the old visible regions associated with this document.
+  compositorChild->SendClearVisibleRegions(layersId, presShellId);
+
+  // Send the new visible regions to the compositor.
+  for (auto iter = mVisibleRegions->mApproximate.ConstIter();
+      !iter.Done();
+      iter.Next()) {
+    const ViewID viewId = iter.Key();
+    const CSSIntRegion* region = iter.UserData();
+    MOZ_ASSERT(region);
+
+    const ScrollableLayerGuid guid(layersId, presShellId, viewId);
+
+    compositorChild->SendUpdateVisibleRegion(VisibilityCounter::MAY_BECOME_VISIBLE,
+                                             guid, *region);
+  }
+
+  for (auto iter = mVisibleRegions->mInDisplayPort.ConstIter();
+      !iter.Done();
+      iter.Next()) {
+    const ViewID viewId = iter.Key();
+    const CSSIntRegion* region = iter.UserData();
+    MOZ_ASSERT(region);
+
+    const ScrollableLayerGuid guid(layersId, presShellId, viewId);
+
+    compositorChild->SendUpdateVisibleRegion(VisibilityCounter::IN_DISPLAYPORT,
+                                             guid, *region);
+  }
 }
 
 nsresult
@@ -4658,6 +4735,9 @@ PresShell::RenderDocument(const nsRect& aRect, uint32_t aFlags,
   nsLayoutUtils::PaintFrame(&rc, rootFrame, nsRegion(aRect),
                             aBackgroundColor, flags);
 
+  // We don't call NotifyCompositorOfVisibleRegionsChange here because we're
+  // not painting to the window, and hence there should be no change.
+
   return NS_OK;
 }
 
@@ -4732,8 +4812,8 @@ PresShell::ClipListToRange(nsDisplayListBuilder *aBuilder,
       // Don't try to descend into subdocuments.
       // If this ever changes we'd need to add handling for subdocuments with
       // different zoom levels.
-      else if (content->GetCurrentDoc() ==
-                 aRange->GetStartParent()->GetCurrentDoc()) {
+      else if (content->GetUncomposedDoc() ==
+                 aRange->GetStartParent()->GetUncomposedDoc()) {
         // if the node is within the range, append it to the temporary list
         bool before, after;
         nsresult rv =
@@ -4780,7 +4860,6 @@ PresShell::CreateRangePaintInfo(nsIDOMRange* aRange,
                                 bool aForPrimarySelection)
 {
   nsRange* range = static_cast<nsRange*>(aRange);
-
   nsIFrame* ancestorFrame;
   nsIFrame* rootFrame = GetRootFrame();
 
@@ -4789,7 +4868,7 @@ PresShell::CreateRangePaintInfo(nsIDOMRange* aRange,
   // range.
   nsINode* startParent = range->GetStartParent();
   nsINode* endParent = range->GetEndParent();
-  nsIDocument* doc = startParent->GetCrossShadowCurrentDoc();
+  nsIDocument* doc = startParent->GetComposedDoc();
   if (startParent == doc || endParent == doc) {
     ancestorFrame = rootFrame;
   } else {
@@ -4811,12 +4890,12 @@ PresShell::CreateRangePaintInfo(nsIDOMRange* aRange,
       ancestorFrame = ancestorFrame->GetParent();
   }
 
-  if (!ancestorFrame)
+  if (!ancestorFrame) {
     return nullptr;
-
-  auto info = MakeUnique<RangePaintInfo>(range, ancestorFrame);
+  }
 
   // get a display list containing the range
+  auto info = MakeUnique<RangePaintInfo>(range, ancestorFrame);
   info->mBuilder.SetIncludeAllOutOfFlows();
   if (aForPrimarySelection) {
     info->mBuilder.SetSelectedFramesOnly();
@@ -4942,11 +5021,12 @@ PresShell::PaintRangePaintInfo(const nsTArray<UniquePtr<RangePaintInfo>>& aItems
    gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(
                                  IntSize(pixelArea.width, pixelArea.height),
                                  SurfaceFormat::B8G8R8A8);
-  if (!dt) {
+  if (!dt || !dt->IsValid()) {
     return nullptr;
   }
 
-  RefPtr<gfxContext> ctx = new gfxContext(dt);
+  RefPtr<gfxContext> ctx = gfxContext::ForDrawTarget(dt);
+  MOZ_ASSERT(ctx); // already checked the draw target above
 
   if (aRegion) {
     // Convert aRegion from CSS pixels to dev pixels
@@ -5020,7 +5100,7 @@ PresShell::RenderNode(nsIDOMNode* aNode,
 
   // nothing to draw if the node isn't in a document
   nsCOMPtr<nsINode> node = do_QueryInterface(aNode);
-  if (!node->IsInDoc())
+  if (!node->IsInUncomposedDoc())
     return nullptr;
 
   RefPtr<nsRange> range = new nsRange(node);
@@ -5495,7 +5575,7 @@ PresShell::ProcessSynthMouseMoveEvent(bool aFromScroll)
   // The appunits per devpixel ratio of |view|.
   int32_t viewAPD;
 
-  // refPoint will be mMouseLocation relative to the widget of |view|, the
+  // mRefPoint will be mMouseLocation relative to the widget of |view|, the
   // widget we will put in the event we dispatch, in viewAPD appunits
   nsPoint refpoint(0, 0);
 
@@ -5525,9 +5605,10 @@ PresShell::ProcessSynthMouseMoveEvent(bool aFromScroll)
   NS_ASSERTION(view->GetWidget(), "view should have a widget here");
   WidgetMouseEvent event(true, eMouseMove, view->GetWidget(),
                          WidgetMouseEvent::eSynthesized);
-  event.refPoint = LayoutDeviceIntPoint::FromAppUnitsToNearest(refpoint, viewAPD);
-  event.time = PR_IntervalNow();
-  // XXX set event.modifiers ?
+  event.mRefPoint =
+    LayoutDeviceIntPoint::FromAppUnitsToNearest(refpoint, viewAPD);
+  event.mTime = PR_IntervalNow();
+  // XXX set event.mModifiers ?
   // XXX mnakano I think that we should get the latest information from widget.
 
   nsCOMPtr<nsIPresShell> shell = pointVM->GetPresShell();
@@ -5547,17 +5628,14 @@ PresShell::ProcessSynthMouseMoveEvent(bool aFromScroll)
   }
 }
 
-static void
-AddFrameToVisibleRegions(nsIFrame* aFrame,
-                         nsViewManager* aViewManager,
-                         Maybe<VisibleRegions>& aVisibleRegions)
+void
+PresShell::AddFrameToVisibleRegions(nsIFrame* aFrame, VisibilityCounter aForCounter)
 {
-  if (!aVisibleRegions) {
+  if (!mVisibleRegions) {
     return;
   }
 
   MOZ_ASSERT(aFrame);
-  MOZ_ASSERT(aViewManager);
 
   // Retrieve the view ID for this frame (which we obtain from the enclosing
   // scrollable frame).
@@ -5592,227 +5670,173 @@ AddFrameToVisibleRegions(nsIFrame* aFrame,
     return;
   }
 
-  CSSIntRegion* regionForView = aVisibleRegions->LookupOrAdd(viewID);
+  VisibleRegions& regions = aForCounter == VisibilityCounter::MAY_BECOME_VISIBLE
+                          ? mVisibleRegions->mApproximate
+                          : mVisibleRegions->mInDisplayPort;
+  CSSIntRegion* regionForView = regions.LookupOrAdd(viewID);
   MOZ_ASSERT(regionForView);
 
   regionForView->OrWith(CSSPixel::FromAppUnitsRounded(frameRectInScrolledFrameSpace));
 }
 
 /* static */ void
-PresShell::MarkImagesInListVisible(const nsDisplayList& aList,
-                                   Maybe<VisibleRegions>& aVisibleRegions)
+PresShell::MarkFramesInListApproximatelyVisible(const nsDisplayList& aList)
 {
   for (nsDisplayItem* item = aList.GetBottom(); item; item = item->GetAbove()) {
     nsDisplayList* sublist = item->GetChildren();
     if (sublist) {
-      MarkImagesInListVisible(*sublist, aVisibleRegions);
+      MarkFramesInListApproximatelyVisible(*sublist);
       continue;
     }
-    nsIFrame* f = item->Frame();
-    // We could check the type of the display item, only a handful can hold an
-    // image loading content.
-    // dont bother nscomptr here, it is wasteful
-    nsCOMPtr<nsIImageLoadingContent> content(do_QueryInterface(f->GetContent()));
-    if (content) {
-      // use the presshell containing the image
-      PresShell* presShell = static_cast<PresShell*>(f->PresContext()->PresShell());
-      uint32_t count = presShell->mVisibleImages.Count();
-      presShell->mVisibleImages.PutEntry(content);
-      if (presShell->mVisibleImages.Count() > count) {
-        // content was added to mVisibleImages, so we need to increment its visible count
-        content->IncrementVisibleCount();
-      }
 
-      AddFrameToVisibleRegions(f, presShell->mViewManager, aVisibleRegions);
+    nsIFrame* frame = item->Frame();
+    MOZ_ASSERT(frame);
+
+    if (!frame->TrackingVisibility()) {
+      continue;
     }
-  }
-}
 
-void
-PresShell::ReportAnyBadState()
-{
-  if (!NS_IsMainThread()) {
-    gfxCriticalNote << "Got null image in image visibility: off-main-thread";
-  }
-  if (mIsZombie) {
-    gfxCriticalNote << "Got null image in image visibility: mIsZombie";
-  }
-  if (mIsDestroying) {
-    gfxCriticalNote << "Got null image in image visibility: mIsDestroying";
-  }
-  if (mIsReflowing) {
-    gfxCriticalNote << "Got null image in image visibility: mIsReflowing";
-  }
-  if (mPaintingIsFrozen) {
-    gfxCriticalNote << "Got null image in image visibility: mPaintingIsFrozen";
-  }
-  if (mForwardingContainer) {
-    gfxCriticalNote << "Got null image in image visibility: mForwardingContainer";
-  }
-  if (mIsNeverPainting) {
-    gfxCriticalNote << "Got null image in image visibility: mIsNeverPainting";
-  }
-  if (mIsDocumentGone) {
-    gfxCriticalNote << "Got null image in image visibility: mIsDocumentGone";
-  }
-  if (!nsContentUtils::IsSafeToRunScript()) {
-    gfxCriticalNote << "Got null image in image visibility: not safe to run script";
-  }
-}
-
-void
-PresShell::SetInImageVisibility(bool aState)
-{
-  mInImageVisibility = aState;
-}
-
-static void
-DecrementVisibleCount(nsTHashtable<nsRefPtrHashKey<nsIImageLoadingContent>>& aImages,
-                      uint32_t aNonvisibleAction, PresShell* aPresShell)
-{
-  for (auto iter = aImages.Iter(); !iter.Done(); iter.Next()) {
-    if (MOZ_UNLIKELY(!iter.Get()->GetKey())) {
-      // We are about to crash, annotate crash report with some info that might
-      // help debug the crash (bug 1251150)
-      aPresShell->ReportAnyBadState();
+    // Use the presshell containing the frame.
+    auto* presShell = static_cast<PresShell*>(frame->PresContext()->PresShell());
+    uint32_t count = presShell->mApproximatelyVisibleFrames.Count();
+    MOZ_ASSERT(!presShell->AssumeAllFramesVisible());
+    presShell->mApproximatelyVisibleFrames.PutEntry(frame);
+    if (presShell->mApproximatelyVisibleFrames.Count() > count) {
+      // The frame was added to mApproximatelyVisibleFrames, so increment its visible count.
+      frame->IncVisibilityCount(VisibilityCounter::MAY_BECOME_VISIBLE);
     }
-    aPresShell->SetInImageVisibility(true);
-    iter.Get()->GetKey()->DecrementVisibleCount(aNonvisibleAction);
-    aPresShell->SetInImageVisibility(false);
+
+    presShell->AddFrameToVisibleRegions(frame, VisibilityCounter::MAY_BECOME_VISIBLE);
   }
-}
-
-static void
-NotifyCompositorOfVisibleRegionsChange(PresShell* aPresShell,
-                                       const Maybe<VisibleRegions>& aRegions)
-{
-  if (!aRegions) {
-    return;
-  }
-
-  MOZ_ASSERT(aPresShell);
-
-  // Retrieve the layers ID and pres shell ID.
-  TabChild* tabChild = TabChild::GetFrom(aPresShell);
-  if (!tabChild) {
-    return;
-  }
-
-  const uint64_t layersId = tabChild->LayersId();
-  const uint32_t presShellId = aPresShell->GetPresShellId();
-
-  // Retrieve the CompositorBridgeChild.
-  LayerManager* layerManager = aPresShell->GetLayerManager();
-  if (!layerManager) {
-    return;
-  }
-
-  ClientLayerManager* clientLayerManager = layerManager->AsClientLayerManager();
-  if (!clientLayerManager) {
-    return;
-  }
-
-  CompositorBridgeChild* compositorChild = clientLayerManager->GetCompositorBridgeChild();
-  if (!compositorChild) {
-    return;
-  }
-
-  // Clear the old approximately visible regions associated with this document.
-  compositorChild->SendClearApproximatelyVisibleRegions(layersId, presShellId);
-
-  // Send the new approximately visible regions to the compositor.
-  for (auto iter = aRegions->ConstIter(); !iter.Done(); iter.Next()) {
-    const ViewID viewId = iter.Key();
-    const CSSIntRegion* region = iter.UserData();
-    MOZ_ASSERT(region);
-
-    const ScrollableLayerGuid guid(layersId, presShellId, viewId);
-
-    compositorChild->SendNotifyApproximatelyVisibleRegion(guid, *region);
-  }
-}
-
-void
-PresShell::RebuildImageVisibilityDisplayList(const nsDisplayList& aList)
-{
-  MOZ_ASSERT(!mImageVisibilityVisited, "already visited?");
-  mImageVisibilityVisited = true;
-  // Remove the entries of the mVisibleImages hashtable and put them in
-  // oldVisibleImages.
-  nsTHashtable< nsRefPtrHashKey<nsIImageLoadingContent> > oldVisibleImages;
-  mVisibleImages.SwapElements(oldVisibleImages);
-
-  // If we're visualizing visible regions, create a VisibleRegions object to
-  // store information about them. The functions we call will populate this
-  // object and send it to the compositor only if it's Some(), so we don't
-  // need to check the prefs everywhere.
-  Maybe<VisibleRegions> visibleRegions;
-  if (gfxPrefs::APZMinimap() && gfxPrefs::APZMinimapVisibilityEnabled()) {
-    visibleRegions.emplace();
-  }
-
-  MarkImagesInListVisible(aList, visibleRegions);
-
-  DecrementVisibleCount(oldVisibleImages,
-                        nsIImageLoadingContent::ON_NONVISIBLE_NO_ACTION, this);
-
-  NotifyCompositorOfVisibleRegionsChange(this, visibleRegions);
 }
 
 /* static */ void
-PresShell::ClearImageVisibilityVisited(nsView* aView, bool aClear)
+PresShell::DecVisibleCount(const VisibleFrames& aFrames,
+                           VisibilityCounter aCounter,
+                           Maybe<OnNonvisible> aNonvisibleAction /* = Nothing() */)
+{
+  for (auto iter = aFrames.ConstIter(); !iter.Done(); iter.Next()) {
+    nsIFrame* frame = iter.Get()->GetKey();
+    // Decrement the frame's visible count if we're still tracking its
+    // visibility. (We may not be, if the frame disabled visibility tracking
+    // after we added it to the visible frames list.)
+    if (frame->TrackingVisibility()) {
+      frame->DecVisibilityCount(aCounter, aNonvisibleAction);
+    }
+  }
+}
+
+void
+PresShell::InitVisibleRegionsIfVisualizationEnabled(VisibilityCounter aForCounter)
+{
+  // If we're visualizing visible regions, initialize a
+  // VisibleRegionsContainer to store them.  Visibility-related functions we
+  // call will only do the work of populating this object and sending it to
+  // the compositor if we've created it, so we don't need to check the prefs
+  // everywhere.
+  if (!gfxPrefs::APZMinimap() ||
+      !gfxPrefs::APZMinimapVisibilityEnabled()) {
+    mVisibleRegions = nullptr;
+    return;
+  }
+
+  if (mVisibleRegions) {
+    // Clear the regions we're about to update. We don't want to clear both,
+    // or the two visibility tracking methods will interfere with each other.
+    VisibleRegions& regions = aForCounter == VisibilityCounter::MAY_BECOME_VISIBLE
+                            ? mVisibleRegions->mApproximate
+                            : mVisibleRegions->mInDisplayPort;
+    regions.Clear();
+    return;
+  }
+
+  mVisibleRegions = MakeUnique<VisibleRegionsContainer>();
+}
+
+void
+PresShell::RebuildApproximateFrameVisibilityDisplayList(const nsDisplayList& aList)
+{
+  MOZ_ASSERT(!mApproximateFrameVisibilityVisited, "already visited?");
+  mApproximateFrameVisibilityVisited = true;
+
+  // Remove the entries of the mApproximatelyVisibleFrames hashtable and put
+  // them in oldApproxVisibleFrames.
+  VisibleFrames oldApproximatelyVisibleFrames;
+  mApproximatelyVisibleFrames.SwapElements(oldApproximatelyVisibleFrames);
+
+  InitVisibleRegionsIfVisualizationEnabled(VisibilityCounter::MAY_BECOME_VISIBLE);
+
+  MarkFramesInListApproximatelyVisible(aList);
+
+  DecVisibleCount(oldApproximatelyVisibleFrames,
+                  VisibilityCounter::MAY_BECOME_VISIBLE);
+
+  NotifyCompositorOfVisibleRegionsChange();
+}
+
+/* static */ void
+PresShell::ClearVisibleFramesForUnvisitedPresShells(nsView* aView, bool aClear)
 {
   nsViewManager* vm = aView->GetViewManager();
   if (aClear) {
     PresShell* presShell = static_cast<PresShell*>(vm->GetPresShell());
-    if (!presShell->mImageVisibilityVisited) {
-      presShell->ClearVisibleImagesList(
-        nsIImageLoadingContent::ON_NONVISIBLE_NO_ACTION);
+    if (!presShell->mApproximateFrameVisibilityVisited) {
+      presShell->ClearVisibleFramesSets();
     }
-    presShell->mImageVisibilityVisited = false;
+    presShell->mApproximateFrameVisibilityVisited = false;
   }
   for (nsView* v = aView->GetFirstChild(); v; v = v->GetNextSibling()) {
-    ClearImageVisibilityVisited(v, v->GetViewManager() != vm);
+    ClearVisibleFramesForUnvisitedPresShells(v, v->GetViewManager() != vm);
   }
 }
 
 void
-PresShell::ClearVisibleImagesList(uint32_t aNonvisibleAction)
+PresShell::ClearVisibleFramesSets(Maybe<OnNonvisible> aNonvisibleAction
+                                    /* = Nothing() */)
 {
-  if (mInImageVisibility) {
-    gfxCriticalNoteOnce << "ClearVisibleImagesList is re-entering on "
-                        << (NS_IsMainThread() ? "" : "non-") << "main thread";
+  DecVisibleCount(mApproximatelyVisibleFrames,
+                  VisibilityCounter::MAY_BECOME_VISIBLE,
+                  aNonvisibleAction);
+  mApproximatelyVisibleFrames.Clear();
+
+  DecVisibleCount(mInDisplayPortFrames,
+                  VisibilityCounter::IN_DISPLAYPORT,
+                  aNonvisibleAction);
+  mInDisplayPortFrames.Clear();
+
+  if (mVisibleRegions) {
+    mVisibleRegions->mApproximate.Clear();
+    mVisibleRegions->mInDisplayPort.Clear();
+    NotifyCompositorOfVisibleRegionsChange();
   }
-  DecrementVisibleCount(mVisibleImages, aNonvisibleAction, this);
-  mVisibleImages.Clear();
 }
 
 void
-PresShell::MarkImagesInSubtreeVisible(nsIFrame* aFrame,
-                                      const nsRect& aRect,
-                                      Maybe<VisibleRegions>& aVisibleRegions,
-                                      bool aRemoveOnly /* = false */)
+PresShell::MarkFramesInSubtreeApproximatelyVisible(nsIFrame* aFrame,
+                                                   const nsRect& aRect,
+                                                   bool aRemoveOnly /* = false */)
 {
   MOZ_ASSERT(aFrame->PresContext()->PresShell() == this, "wrong presshell");
 
-  nsCOMPtr<nsIImageLoadingContent> content(do_QueryInterface(aFrame->GetContent()));
-  if (content && aFrame->StyleVisibility()->IsVisible() &&
-      (!aRemoveOnly || content->GetVisibleCount() > 0)) {
-    uint32_t count = mVisibleImages.Count();
-    mVisibleImages.PutEntry(content);
-    if (mVisibleImages.Count() > count) {
-      // content was added to mVisibleImages, so we need to increment its visible count
-      content->IncrementVisibleCount();
+  if (aFrame->TrackingVisibility() &&
+      aFrame->StyleVisibility()->IsVisible() &&
+      (!aRemoveOnly || aFrame->IsVisibleOrMayBecomeVisibleSoon())) {
+    MOZ_ASSERT(!AssumeAllFramesVisible());
+    uint32_t count = mApproximatelyVisibleFrames.Count();
+    mApproximatelyVisibleFrames.PutEntry(aFrame);
+    if (mApproximatelyVisibleFrames.Count() > count) {
+      // The frame was added to mApproximatelyVisibleFrames, so increment its visible count.
+      aFrame->IncVisibilityCount(VisibilityCounter::MAY_BECOME_VISIBLE);
     }
 
-    AddFrameToVisibleRegions(aFrame, mViewManager, aVisibleRegions);
+    AddFrameToVisibleRegions(aFrame, VisibilityCounter::MAY_BECOME_VISIBLE);
   }
 
   nsSubDocumentFrame* subdocFrame = do_QueryFrame(aFrame);
   if (subdocFrame) {
     nsIPresShell* presShell = subdocFrame->GetSubdocumentPresShellForPainting(
       nsSubDocumentFrame::IGNORE_PAINT_SUPPRESSION);
-    if (presShell) {
+    if (presShell && !presShell->AssumeAllFramesVisible()) {
       nsRect rect = aRect;
       nsIFrame* root = presShell->GetRootFrame();
       if (root) {
@@ -5824,7 +5848,7 @@ PresShell::MarkImagesInSubtreeVisible(nsIFrame* aFrame,
         aFrame->PresContext()->AppUnitsPerDevPixel(),
         presShell->GetPresContext()->AppUnitsPerDevPixel());
 
-      presShell->RebuildImageVisibility(&rect);
+      presShell->RebuildApproximateFrameVisibility(&rect);
     }
     return;
   }
@@ -5833,7 +5857,7 @@ PresShell::MarkImagesInSubtreeVisible(nsIFrame* aFrame,
 
   nsIScrollableFrame* scrollFrame = do_QueryFrame(aFrame);
   if (scrollFrame) {
-    scrollFrame->NotifyImageVisibilityUpdate();
+    scrollFrame->NotifyApproximateFrameVisibilityUpdate();
     nsRect displayPort;
     bool usingDisplayport =
       nsLayoutUtils::GetDisplayPortForVisibilityTesting(
@@ -5848,7 +5872,7 @@ PresShell::MarkImagesInSubtreeVisible(nsIFrame* aFrame,
 
   bool preserves3DChildren = aFrame->Extend3DContext();
 
-  // we assume all images in popups are visible elsewhere, so we skip them here
+  // We assume all frames in popups are visible, so we skip them here.
   const nsIFrame::ChildListIDs skip(nsIFrame::kPopupList |
                                     nsIFrame::kSelectPopupList);
   for (nsIFrame::ChildListIterator childLists(aFrame);
@@ -5874,68 +5898,56 @@ PresShell::MarkImagesInSubtreeVisible(nsIFrame* aFrame,
           }
         }
       }
-      MarkImagesInSubtreeVisible(child, r, aVisibleRegions);
+      MarkFramesInSubtreeApproximatelyVisible(child, r);
     }
   }
 }
 
 void
-PresShell::RebuildImageVisibility(nsRect* aRect,
-                                  bool aRemoveOnly /* = false */)
+PresShell::RebuildApproximateFrameVisibility(nsRect* aRect,
+                                             bool aRemoveOnly /* = false */)
 {
-  MOZ_ASSERT(!mImageVisibilityVisited, "already visited?");
-  mImageVisibilityVisited = true;
+  MOZ_ASSERT(!mApproximateFrameVisibilityVisited, "already visited?");
+  mApproximateFrameVisibilityVisited = true;
 
   nsIFrame* rootFrame = GetRootFrame();
   if (!rootFrame) {
     return;
   }
 
-  if (mInImageVisibility) {
-    gfxCriticalNoteOnce << "RebuildImageVisibility is re-entering on "
-                        << (NS_IsMainThread() ? "" : "non-") << "main thread";
-  }
+  // Remove the entries of the mApproximatelyVisibleFrames hashtable and put
+  // them in oldApproximatelyVisibleFrames.
+  VisibleFrames oldApproximatelyVisibleFrames;
+  mApproximatelyVisibleFrames.SwapElements(oldApproximatelyVisibleFrames);
 
-  // Remove the entries of the mVisibleImages hashtable and put them in
-  // oldVisibleImages.
-  nsTHashtable< nsRefPtrHashKey<nsIImageLoadingContent> > oldVisibleImages;
-  mVisibleImages.SwapElements(oldVisibleImages);
-
-  // If we're visualizing visible regions, create a VisibleRegions object to
-  // store information about them. The functions we call will populate this
-  // object and send it to the compositor only if it's Some(), so we don't
-  // need to check the prefs everywhere.
-  Maybe<VisibleRegions> visibleRegions;
-  if (gfxPrefs::APZMinimap() && gfxPrefs::APZMinimapVisibilityEnabled()) {
-    visibleRegions.emplace();
-  }
+  InitVisibleRegionsIfVisualizationEnabled(VisibilityCounter::MAY_BECOME_VISIBLE);
 
   nsRect vis(nsPoint(0, 0), rootFrame->GetSize());
   if (aRect) {
     vis = *aRect;
   }
 
-  MarkImagesInSubtreeVisible(rootFrame, vis, visibleRegions, aRemoveOnly);
+  MarkFramesInSubtreeApproximatelyVisible(rootFrame, vis, aRemoveOnly);
 
-  DecrementVisibleCount(oldVisibleImages,
-                        nsIImageLoadingContent::ON_NONVISIBLE_NO_ACTION, this);
+  DecVisibleCount(oldApproximatelyVisibleFrames,
+                  VisibilityCounter::MAY_BECOME_VISIBLE);
 
-  NotifyCompositorOfVisibleRegionsChange(this, visibleRegions);
+  NotifyCompositorOfVisibleRegionsChange();
 }
 
 void
-PresShell::UpdateImageVisibility()
+PresShell::UpdateApproximateFrameVisibility()
 {
-  DoUpdateImageVisibility(/* aRemoveOnly = */ false);
+  DoUpdateApproximateFrameVisibility(/* aRemoveOnly = */ false);
 }
 
 void
-PresShell::DoUpdateImageVisibility(bool aRemoveOnly)
+PresShell::DoUpdateApproximateFrameVisibility(bool aRemoveOnly)
 {
   MOZ_ASSERT(!mPresContext || mPresContext->IsRootContentDocument(),
-    "updating image visibility on a non-root content document?");
+             "Updating approximate frame visibility on a non-root content document?");
 
-  mUpdateImageVisibilityEvent.Revoke();
+  mUpdateApproximateFrameVisibilityEvent.Revoke();
 
   if (mHaveShutDown || mIsDestroying) {
     return;
@@ -5944,27 +5956,27 @@ PresShell::DoUpdateImageVisibility(bool aRemoveOnly)
   // call update on that frame
   nsIFrame* rootFrame = GetRootFrame();
   if (!rootFrame) {
-    ClearVisibleImagesList(
-      nsIImageLoadingContent::ON_NONVISIBLE_REQUEST_DISCARD);
+    ClearVisibleFramesSets(Some(OnNonvisible::DISCARD_IMAGES));
     return;
   }
 
-  RebuildImageVisibility(/* aRect = */ nullptr, aRemoveOnly);
-  ClearImageVisibilityVisited(rootFrame->GetView(), true);
+  RebuildApproximateFrameVisibility(/* aRect = */ nullptr, aRemoveOnly);
+  ClearVisibleFramesForUnvisitedPresShells(rootFrame->GetView(), true);
 
-#ifdef DEBUG_IMAGE_VISIBILITY_DISPLAY_LIST
-  // This can be used to debug the frame walker by comparing beforeImageList and
-  // mVisibleImages in RebuildImageVisibilityDisplayList to see if they produce
-  // the same results (mVisibleImages holds the images the display list thinks
-  // are visible, beforeImageList holds the images the frame walker thinks are
-  // visible).
-  nsDisplayListBuilder builder(rootFrame, nsDisplayListBuilder::IMAGE_VISIBILITY, false);
+#ifdef DEBUG_FRAME_VISIBILITY_DISPLAY_LIST
+  // This can be used to debug the frame walker by comparing beforeFrameList
+  // and mApproximatelyVisibleFrames in RebuildFrameVisibilityDisplayList to see if
+  // they produce the same results (mApproximatelyVisibleFrames holds the frames the
+  // display list thinks are visible, beforeFrameList holds the frames the
+  // frame walker thinks are visible).
+  nsDisplayListBuilder builder(rootFrame, nsDisplayListBuilder::FRAME_VISIBILITY, false);
   nsRect updateRect(nsPoint(0, 0), rootFrame->GetSize());
   nsIFrame* rootScroll = GetRootScrollFrame();
   if (rootScroll) {
     nsIContent* content = rootScroll->GetContent();
     if (content) {
-      Unused << nsLayoutUtils::GetDisplayPort(content, &updateRect, RelativeTo::ScrollFrame);
+      Unused << nsLayoutUtils::GetDisplayPortForVisibilityTesting(content, &updateRect,
+        RelativeTo::ScrollFrame);
     }
 
     if (IgnoringViewportScrolling()) {
@@ -5977,48 +5989,86 @@ PresShell::DoUpdateImageVisibility(bool aRemoveOnly)
   rootFrame->BuildDisplayListForStackingContext(&builder, updateRect, &list);
   builder.LeavePresShell(rootFrame, updateRect);
 
-  RebuildImageVisibilityDisplayList(list);
+  RebuildApproximateFrameVisibilityDisplayList(list);
 
-  ClearImageVisibilityVisited(rootFrame->GetView(), true);
+  ClearVisibleFramesForUnvisitedPresShells(rootFrame->GetView(), true);
 
   list.DeleteAll();
 #endif
 }
 
 bool
-PresShell::AssumeAllImagesVisible()
+PresShell::AssumeAllFramesVisible()
 {
-  static bool sImageVisibilityEnabled = true;
-  static bool sImageVisibilityPrefCached = false;
+  static bool sFrameVisibilityEnabled = true;
+  static bool sFrameVisibilityPrefCached = false;
 
-  if (!sImageVisibilityPrefCached) {
-    Preferences::AddBoolVarCache(&sImageVisibilityEnabled,
-      "layout.imagevisibility.enabled", true);
-    sImageVisibilityPrefCached = true;
+  if (!sFrameVisibilityPrefCached) {
+    Preferences::AddBoolVarCache(&sFrameVisibilityEnabled,
+      "layout.framevisibility.enabled", true);
+    sFrameVisibilityPrefCached = true;
   }
 
-  if (!sImageVisibilityEnabled || !mPresContext || !mDocument) {
+  if (!sFrameVisibilityEnabled || !mPresContext || !mDocument) {
     return true;
   }
 
-  // We assume all images are visible in print, print preview, chrome, xul, and
+  // We assume all frames are visible in print, print preview, chrome, and
   // resource docs and don't keep track of them.
   if (mPresContext->Type() == nsPresContext::eContext_PrintPreview ||
       mPresContext->Type() == nsPresContext::eContext_Print ||
       mPresContext->IsChrome() ||
-      mDocument->IsResourceDoc() ||
-      mDocument->IsXULDocument()) {
+      mDocument->IsResourceDoc()) {
     return true;
+  }
+
+  // If we're assuming all frames are visible in the top level content
+  // document, we need to in subdocuments as well. Otherwise we can get in a
+  // situation where things like animations won't work in subdocuments because
+  // their frames appear not to be visible, since we won't schedule an image
+  // visibility update if the top level content document is assuming all
+  // frames are visible.
+  //
+  // Note that it's not safe to call IsRootContentDocument() if we're
+  // currently being destroyed, so we have to check that first.
+  if (!mHaveShutDown && !mIsDestroying &&
+      !mPresContext->IsRootContentDocument()) {
+    nsPresContext* presContext =
+      mPresContext->GetToplevelContentDocumentPresContext();
+    if (presContext && presContext->PresShell()->AssumeAllFramesVisible()) {
+      return true;
+    }
   }
 
   return false;
 }
 
 void
-PresShell::ScheduleImageVisibilityUpdate()
+PresShell::ScheduleApproximateFrameVisibilityUpdateSoon()
 {
-  if (AssumeAllImagesVisible())
+  if (AssumeAllFramesVisible()) {
     return;
+  }
+
+  if (!mPresContext) {
+    return;
+  }
+
+  nsRefreshDriver* refreshDriver = mPresContext->RefreshDriver();
+  if (!refreshDriver) {
+    return;
+  }
+
+  // Ask the refresh driver to update frame visibility soon.
+  refreshDriver->ScheduleFrameVisibilityUpdate();
+}
+
+void
+PresShell::ScheduleApproximateFrameVisibilityUpdateNow()
+{
+  if (AssumeAllFramesVisible()) {
+    return;
+  }
 
   if (!mPresContext->IsRootContentDocument()) {
     nsPresContext* presContext = mPresContext->GetToplevelContentDocumentPresContext();
@@ -6026,80 +6076,95 @@ PresShell::ScheduleImageVisibilityUpdate()
       return;
     MOZ_ASSERT(presContext->IsRootContentDocument(),
       "Didn't get a root prescontext from GetToplevelContentDocumentPresContext?");
-    presContext->PresShell()->ScheduleImageVisibilityUpdate();
+    presContext->PresShell()->ScheduleApproximateFrameVisibilityUpdateNow();
     return;
   }
 
-  if (mHaveShutDown || mIsDestroying)
+  if (mHaveShutDown || mIsDestroying) {
     return;
+  }
 
-  if (mUpdateImageVisibilityEvent.IsPending())
+  if (mUpdateApproximateFrameVisibilityEvent.IsPending()) {
     return;
+  }
 
   RefPtr<nsRunnableMethod<PresShell> > ev =
-    NS_NewRunnableMethod(this, &PresShell::UpdateImageVisibility);
+    NS_NewRunnableMethod(this, &PresShell::UpdateApproximateFrameVisibility);
   if (NS_SUCCEEDED(NS_DispatchToCurrentThread(ev))) {
-    mUpdateImageVisibilityEvent = ev;
+    mUpdateApproximateFrameVisibilityEvent = ev;
   }
 }
 
 void
-PresShell::EnsureImageInVisibleList(nsIImageLoadingContent* aImage)
+PresShell::MarkFrameVisibleInDisplayPort(nsIFrame* aFrame)
 {
-  if (AssumeAllImagesVisible()) {
-    aImage->IncrementVisibleCount();
+  if (!aFrame->TrackingVisibility()) {
+    return;
+  }
+
+  if (AssumeAllFramesVisible()) {
+    if (aFrame->GetVisibility() != Visibility::IN_DISPLAYPORT) {
+      aFrame->IncVisibilityCount(VisibilityCounter::IN_DISPLAYPORT);
+    }
     return;
   }
 
 #ifdef DEBUG
-  // if it has a frame make sure its in this presshell
-  nsCOMPtr<nsIContent> content = do_QueryInterface(aImage);
+  // Make sure it's in this pres shell.
+  nsCOMPtr<nsIContent> content = aFrame->GetContent();
   if (content) {
     PresShell* shell = static_cast<PresShell*>(content->OwnerDoc()->GetShell());
     MOZ_ASSERT(!shell || shell == this, "wrong shell");
   }
 #endif
 
-  if (mInImageVisibility) {
-    gfxCriticalNoteOnce << "EnsureImageInVisibleList is re-entering on "
-                        << (NS_IsMainThread() ? "" : "non-") << "main thread";
+  if (!mInDisplayPortFrames.Contains(aFrame)) {
+    MOZ_ASSERT(!AssumeAllFramesVisible());
+    mInDisplayPortFrames.PutEntry(aFrame);
+    aFrame->IncVisibilityCount(VisibilityCounter::IN_DISPLAYPORT);
   }
 
-  if (!mVisibleImages.Contains(aImage)) {
-    mVisibleImages.PutEntry(aImage);
-    aImage->IncrementVisibleCount();
+  AddFrameToVisibleRegions(aFrame, VisibilityCounter::IN_DISPLAYPORT);
+}
+
+static void
+RemoveFrameFromVisibleSet(nsIFrame* aFrame,
+                          VisibleFrames& aSet,
+                          VisibilityCounter aCounter)
+{
+  uint32_t count = aSet.Count();
+  aSet.RemoveEntry(aFrame);
+
+  if (aFrame->TrackingVisibility() && aSet.Count() < count) {
+    aFrame->DecVisibilityCount(aCounter);
   }
+
 }
 
 void
-PresShell::RemoveImageFromVisibleList(nsIImageLoadingContent* aImage)
+PresShell::MarkFrameNonvisible(nsIFrame* aFrame)
 {
 #ifdef DEBUG
-  // if it has a frame make sure its in this presshell
-  nsCOMPtr<nsIContent> content = do_QueryInterface(aImage);
+  // Make sure it's in this pres shell.
+  nsCOMPtr<nsIContent> content = aFrame->GetContent();
   if (content) {
     PresShell* shell = static_cast<PresShell*>(content->OwnerDoc()->GetShell());
     MOZ_ASSERT(!shell || shell == this, "wrong shell");
   }
 #endif
 
-  if (AssumeAllImagesVisible()) {
-    MOZ_ASSERT(mVisibleImages.Count() == 0, "shouldn't have any images in the table");
+  if (AssumeAllFramesVisible()) {
+    MOZ_ASSERT(mApproximatelyVisibleFrames.Count() == 0,
+               "Shouldn't have any frames in the approximate visibility set");
+    MOZ_ASSERT(mInDisplayPortFrames.Count() == 0,
+               "Shouldn't have any frames in the in-displayport visibility set");
     return;
   }
 
-  if (mInImageVisibility) {
-    gfxCriticalNoteOnce << "RemoveImageFromVisibleList is re-entering on "
-                        << (NS_IsMainThread() ? "" : "non-") << "main thread";
-  }
-
-  uint32_t count = mVisibleImages.Count();
-  mVisibleImages.RemoveEntry(aImage);
-  if (mVisibleImages.Count() < count) {
-    // aImage was in the hashtable, so we need to decrement its visible count
-    aImage->DecrementVisibleCount(
-      nsIImageLoadingContent::ON_NONVISIBLE_NO_ACTION);
-  }
+  RemoveFrameFromVisibleSet(aFrame, mApproximatelyVisibleFrames,
+                            VisibilityCounter::MAY_BECOME_VISIBLE);
+  RemoveFrameFromVisibleSet(aFrame, mInDisplayPortFrames,
+                            VisibilityCounter::IN_DISPLAYPORT);
 }
 
 class nsAutoNotifyDidPaint
@@ -6177,7 +6242,7 @@ PresShell::Paint(nsView*        aViewToPaint,
   NS_ASSERTION(!mIsDestroying, "painting a destroyed PresShell");
   NS_ASSERTION(aViewToPaint, "null view");
 
-  MOZ_ASSERT(!mImageVisibilityVisited, "should have been cleared");
+  MOZ_ASSERT(!mApproximateFrameVisibilityVisited, "Should have been cleared");
 
   if (!mIsActive || mIsZombie) {
     return;
@@ -6287,8 +6352,30 @@ PresShell::Paint(nsView*        aViewToPaint,
   }
 
   if (frame) {
+    // Remove the entries of the mInDisplayPortFrames hashtable and put them
+    // in oldInDisplayPortFrames.
+    VisibleFrames oldInDisplayPortFrames;
+    mInDisplayPortFrames.SwapElements(oldInDisplayPortFrames);
+
+    InitVisibleRegionsIfVisualizationEnabled(VisibilityCounter::IN_DISPLAYPORT);
+
     // We can paint directly into the widget using its layer manager.
     nsLayoutUtils::PaintFrame(nullptr, frame, aDirtyRegion, bgcolor, flags);
+
+    DecVisibleCount(oldInDisplayPortFrames, VisibilityCounter::IN_DISPLAYPORT);
+
+    if (mVisibleRegions &&
+        !mNotifyCompositorOfVisibleRegionsChangeEvent.IsPending()) {
+      // Asynchronously notify the compositor of the new visible regions,
+      // since this is happening during a paint and updating the visible
+      // regions triggers a recomposite.
+      RefPtr<nsRunnableMethod<PresShell>> event =
+        NS_NewRunnableMethod(this, &PresShell::NotifyCompositorOfVisibleRegionsChange);
+      if (NS_SUCCEEDED(NS_DispatchToMainThread(event))) {
+        mNotifyCompositorOfVisibleRegionsChangeEvent = event;
+      }
+    }
+
     return;
   }
 
@@ -6518,7 +6605,7 @@ nsIContent*
 PresShell::GetCurrentEventContent()
 {
   if (mCurrentEventContent &&
-      mCurrentEventContent->GetCrossShadowCurrentDoc() != mDocument) {
+      mCurrentEventContent->GetComposedDoc() != mDocument) {
     mCurrentEventContent = nullptr;
     mCurrentEventFrame = nullptr;
   }
@@ -6559,7 +6646,7 @@ PresShell::GetEventTargetContent(WidgetEvent* aEvent)
     nsIFrame* currentEventFrame = GetCurrentEventFrame();
     if (currentEventFrame) {
       currentEventFrame->GetContentForEvent(aEvent, getter_AddRefs(content));
-      NS_ASSERTION(!content || content->GetCrossShadowCurrentDoc() == mDocument,
+      NS_ASSERTION(!content || content->GetComposedDoc() == mDocument,
                    "handing out content from a different doc");
     }
   }
@@ -6591,7 +6678,7 @@ PresShell::PopCurrentEventInfo()
 
     // Don't use it if it has moved to a different document.
     if (mCurrentEventContent &&
-        mCurrentEventContent->GetCrossShadowCurrentDoc() != mDocument) {
+        mCurrentEventContent->GetComposedDoc() != mDocument) {
       mCurrentEventContent = nullptr;
       mCurrentEventFrame = nullptr;
     }
@@ -6707,7 +6794,7 @@ PresShell::RecordMouseLocation(WidgetGUIEvent* aEvent)
     if (!rootFrame) {
       nsView* rootView = mViewManager->GetRootView();
       mMouseLocation = nsLayoutUtils::TranslateWidgetToView(mPresContext,
-        aEvent->widget, aEvent->refPoint, rootView);
+        aEvent->mWidget, aEvent->mRefPoint, rootView);
       mMouseEventTargetGuid = InputAPZContext::GetTargetLayerGuid();
     } else {
       mMouseLocation =
@@ -6717,7 +6804,7 @@ PresShell::RecordMouseLocation(WidgetGUIEvent* aEvent)
 #ifdef DEBUG_MOUSE_LOCATION
     if (aEvent->mMessage == eMouseEnterIntoWidget) {
       printf("[ps=%p]got mouse enter for %p\n",
-             this, aEvent->widget);
+             this, aEvent->mWidget);
     }
     printf("[ps=%p]setting mouse location to (%d,%d)\n",
            this, mMouseLocation.x, mMouseLocation.y);
@@ -6735,7 +6822,7 @@ PresShell::RecordMouseLocation(WidgetGUIEvent* aEvent)
     mMouseEventTargetGuid = InputAPZContext::GetTargetLayerGuid();
 #ifdef DEBUG_MOUSE_LOCATION
     printf("[ps=%p]got mouse exit for %p\n",
-           this, aEvent->widget);
+           this, aEvent->mWidget);
     printf("[ps=%p]clearing mouse location\n",
            this);
 #endif
@@ -6837,23 +6924,24 @@ DispatchPointerFromMouseOrTouch(PresShell* aShell,
       return NS_OK;
     }
 
-    for (uint32_t i = 0; i < touchEvent->touches.Length(); ++i) {
-      mozilla::dom::Touch* touch = touchEvent->touches[i];
+    for (uint32_t i = 0; i < touchEvent->mTouches.Length(); ++i) {
+      mozilla::dom::Touch* touch = touchEvent->mTouches[i];
       if (!touch || !touch->convertToPointer) {
         continue;
       }
 
-      WidgetPointerEvent event(touchEvent->mFlags.mIsTrusted, pointerMessage, touchEvent->widget);
+      WidgetPointerEvent event(touchEvent->IsTrusted(), pointerMessage,
+                               touchEvent->mWidget);
       event.isPrimary = i == 0;
       event.pointerId = touch->Identifier();
-      event.refPoint = touch->mRefPoint;
-      event.modifiers = touchEvent->modifiers;
+      event.mRefPoint = touch->mRefPoint;
+      event.mModifiers = touchEvent->mModifiers;
       event.width = touch->RadiusX();
       event.height = touch->RadiusY();
       event.tiltX = touch->tiltX;
       event.tiltY = touch->tiltY;
-      event.time = touchEvent->time;
-      event.timeStamp = touchEvent->timeStamp;
+      event.mTime = touchEvent->mTime;
+      event.mTimeStamp = touchEvent->mTimeStamp;
       event.mFlags = touchEvent->mFlags;
       event.button = WidgetMouseEvent::eLeftButton;
       event.buttons = WidgetMouseEvent::eLeftButtonFlag;
@@ -6931,11 +7019,8 @@ CheckPermissionForBeforeAfterKeyboardEvent(Element* aElement)
 static void
 BuildTargetChainForBeforeAfterKeyboardEvent(nsINode* aTarget,
                                             nsTArray<nsCOMPtr<Element> >& aChain,
-                                            bool& aTargetIsIframe)
+                                            bool aTargetIsIframe)
 {
-  nsCOMPtr<nsIContent> content(do_QueryInterface(aTarget));
-  aTargetIsIframe = content && content->IsHTMLElement(nsGkAtoms::iframe);
-
   Element* frameElement;
   // If event target is not an iframe, skip the event target and get its
   // parent frame.
@@ -6978,12 +7063,12 @@ PresShell::DispatchBeforeKeyboardEventInternal(const nsTArray<nsCOMPtr<Element> 
     }
 
     aChainIndex = i;
-    InternalBeforeAfterKeyboardEvent beforeEvent(aEvent.mFlags.mIsTrusted,
-                                                 message, aEvent.widget);
+    InternalBeforeAfterKeyboardEvent beforeEvent(aEvent.IsTrusted(),
+                                                 message, aEvent.mWidget);
     beforeEvent.AssignBeforeAfterKeyEventData(aEvent, false);
     EventDispatcher::Dispatch(eventTarget, mPresContext, &beforeEvent);
 
-    if (beforeEvent.mFlags.mDefaultPrevented) {
+    if (beforeEvent.DefaultPrevented()) {
       aDefaultPrevented = true;
       return;
     }
@@ -7012,12 +7097,12 @@ PresShell::DispatchAfterKeyboardEventInternal(const nsTArray<nsCOMPtr<Element> >
       return;
     }
 
-    InternalBeforeAfterKeyboardEvent afterEvent(aEvent.mFlags.mIsTrusted,
-                                                message, aEvent.widget);
+    InternalBeforeAfterKeyboardEvent afterEvent(aEvent.IsTrusted(),
+                                                message, aEvent.mWidget);
     afterEvent.AssignBeforeAfterKeyEventData(aEvent, false);
     afterEvent.mEmbeddedCancelled.SetValue(embeddedCancelled);
     EventDispatcher::Dispatch(eventTarget, mPresContext, &afterEvent);
-    embeddedCancelled = afterEvent.mFlags.mDefaultPrevented;
+    embeddedCancelled = afterEvent.DefaultPrevented();
   }
 }
 
@@ -7035,7 +7120,7 @@ PresShell::DispatchAfterKeyboardEvent(nsINode* aTarget,
 
   // Build up a target chain. Each item in the chain will receive an after event.
   AutoTArray<nsCOMPtr<Element>, 5> chain;
-  bool targetIsIframe = false;
+  bool targetIsIframe = IsTargetIframe(aTarget);
   BuildTargetChainForBeforeAfterKeyboardEvent(aTarget, chain, targetIsIframe);
   DispatchAfterKeyboardEventInternal(chain, aEvent, aEmbeddedCancelled);
 }
@@ -7046,7 +7131,7 @@ PresShell::CanDispatchEvent(const WidgetGUIEvent* aEvent) const
   bool rv =
     mPresContext && !mHaveShutDown && nsContentUtils::IsSafeToRunScript();
   if (aEvent) {
-    rv &= (aEvent && aEvent->widget && !aEvent->widget->Destroyed());
+    rv &= (aEvent && aEvent->mWidget && !aEvent->mWidget->Destroyed());
   }
   return rv;
 }
@@ -7058,19 +7143,25 @@ PresShell::HandleKeyboardEvent(nsINode* aTarget,
                                nsEventStatus* aStatus,
                                EventDispatchingCallback* aEventCB)
 {
+  MOZ_ASSERT(aTarget);
+  
+  // return true if the event target is in its child process
+  bool targetIsIframe = IsTargetIframe(aTarget);
+
+  // Dispatch event directly if the event is a keypress event, a key event on
+  // plugin, or there is no need to fire beforeKey* and afterKey* events.
   if (aEvent.mMessage == eKeyPress ||
+      aEvent.IsKeyEventOnPlugin() ||
       !BeforeAfterKeyboardEventEnabled()) {
-    EventDispatcher::Dispatch(aTarget, mPresContext,
-                              &aEvent, nullptr, aStatus, aEventCB);
+    ForwardKeyToInputMethodAppOrDispatch(targetIsIframe, aTarget, aEvent,
+                                         aStatus, aEventCB);
     return;
   }
 
-  MOZ_ASSERT(aTarget);
   MOZ_ASSERT(aEvent.mMessage == eKeyDown || aEvent.mMessage == eKeyUp);
 
   // Build up a target chain. Each item in the chain will receive a before event.
   AutoTArray<nsCOMPtr<Element>, 5> chain;
-  bool targetIsIframe = false;
   BuildTargetChainForBeforeAfterKeyboardEvent(aTarget, chain, targetIsIframe);
 
   // Dispatch before events. If each item in the chain consumes the before
@@ -7089,7 +7180,7 @@ PresShell::HandleKeyboardEvent(nsINode* aTarget,
     *aStatus = nsEventStatus_eConsumeNoDefault;
     DispatchAfterKeyboardEventInternal(chain, aEvent, false, chainIndex);
     // No need to forward the event to child process.
-    aEvent.mFlags.mNoCrossProcessBoundaryForwarding = true;
+    aEvent.StopCrossProcessForwarding();
     return;
   }
 
@@ -7098,11 +7189,12 @@ PresShell::HandleKeyboardEvent(nsINode* aTarget,
     return;
   }
 
-  // Dispatch actual key event to event target.
-  EventDispatcher::Dispatch(aTarget, mPresContext,
-                            &aEvent, nullptr, aStatus, aEventCB);
+  if (ForwardKeyToInputMethodAppOrDispatch(targetIsIframe, aTarget, aEvent,
+                                           aStatus, aEventCB)) {
+    return;
+  }
 
-  if (aEvent.mFlags.mDefaultPrevented) {
+  if (aEvent.DefaultPrevented()) {
     // When embedder prevents the default action of actual key event, attribute
     // 'embeddedCancelled' of after event is false, i.e. |!targetIsIframe|.
     // On the contrary, if the defult action is prevented by embedded iframe,
@@ -7117,8 +7209,83 @@ PresShell::HandleKeyboardEvent(nsINode* aTarget,
   }
 
   // Dispatch after events to all items in the chain.
-  DispatchAfterKeyboardEventInternal(chain, aEvent,
-                                     aEvent.mFlags.mDefaultPrevented);
+  DispatchAfterKeyboardEventInternal(chain, aEvent, aEvent.DefaultPrevented());
+}
+
+#ifdef MOZ_B2G
+bool
+PresShell::ForwardKeyToInputMethodApp(nsINode* aTarget,
+                                      WidgetKeyboardEvent& aEvent,
+                                      nsEventStatus* aStatus)
+{
+  if (!XRE_IsParentProcess() || aEvent.mIsSynthesizedByTIP ||
+      aEvent.IsKeyEventOnPlugin()) {
+    return false;
+  }
+
+  if (!mHardwareKeyHandler) {
+    nsresult rv;
+    mHardwareKeyHandler =
+      do_GetService("@mozilla.org/HardwareKeyHandler;1", &rv);
+    if (!NS_SUCCEEDED(rv) || !mHardwareKeyHandler) {
+      return false;
+    }
+  }
+
+  if (mHardwareKeyHandler->ForwardKeyToInputMethodApp(aTarget,
+                                                      aEvent.AsKeyboardEvent(),
+                                                      aStatus)) {
+    // No need to dispatch the forwarded keyboard event to it's child process
+    aEvent.mFlags.mNoCrossProcessBoundaryForwarding = true;
+    return true;
+  }
+
+  return false;
+}
+#endif // MOZ_B2G
+
+bool
+PresShell::ForwardKeyToInputMethodAppOrDispatch(bool aIsTargetRemote,
+                                                nsINode* aTarget,
+                                                WidgetKeyboardEvent& aEvent,
+                                                nsEventStatus* aStatus,
+                                                EventDispatchingCallback* aEventCB)
+{
+#ifndef MOZ_B2G
+  // No need to forward to input-method-app if the platform isn't run on B2G.
+  EventDispatcher::Dispatch(aTarget, mPresContext,
+                            &aEvent, nullptr, aStatus, aEventCB);
+  return false;
+#else
+  // In-process case: the event target is in the current process
+  if (!aIsTargetRemote) {
+    if(ForwardKeyToInputMethodApp(aTarget, aEvent, aStatus)) {
+      return true;
+    }
+
+    // If the keyboard event isn't forwarded to the input-method-app,
+    // then it should be dispatched to its event target directly.
+    EventDispatcher::Dispatch(aTarget, mPresContext,
+                              &aEvent, nullptr, aStatus, aEventCB);
+
+    return false;
+  }
+
+  // OOP case: the event target is in its child process.
+  // Dispatch the keyboard event to the iframe that embeds the remote
+  // event target first.
+  EventDispatcher::Dispatch(aTarget, mPresContext,
+                            &aEvent, nullptr, aStatus, aEventCB);
+
+  // If the event is defaultPrevented, then there is no need to forward it
+  // to the input-method-app.
+  if (aEvent.mFlags.mDefaultPrevented) {
+    return false;
+  }
+
+  // Try forwarding to the input-method-app.
+  return ForwardKeyToInputMethodApp(aTarget, aEvent, aStatus);
+#endif // MOZ_B2G
 }
 
 nsresult
@@ -7214,9 +7381,11 @@ PresShell::HandleEvent(nsIFrame* aFrame,
     return NS_OK;
   }
 
-  nsIContent* capturingContent =
-    (aEvent->HasMouseEventMessage() ||
-     aEvent->mClass == eWheelEventClass ? GetCapturingContent() : nullptr);
+  nsIContent* capturingContent = ((aEvent->mClass == ePointerEventClass ||
+                                   aEvent->mClass == eWheelEventClass ||
+                                   aEvent->HasMouseEventMessage())
+                                 ? GetCapturingContent()
+                                 : nullptr);
 
   nsCOMPtr<nsIDocument> retargetEventDoc;
   if (!aDontRetargetEvents) {
@@ -7243,7 +7412,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
     } else if (capturingContent) {
       // if the mouse is being captured then retarget the mouse event at the
       // document that is being captured.
-      retargetEventDoc = capturingContent->GetCrossShadowCurrentDoc();
+      retargetEventDoc = capturingContent->GetComposedDoc();
 #ifdef ANDROID
     } else if ((aEvent->mClass == eTouchEventClass) ||
                (aEvent->mClass == eMouseEventClass) ||
@@ -7357,7 +7526,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
         if (!captureRetarget) {
           // A check was already done above to ensure that capturingContent is
           // in this presshell.
-          NS_ASSERTION(capturingContent->GetCrossShadowCurrentDoc() == GetDocument(),
+          NS_ASSERTION(capturingContent->GetComposedDoc() == GetDocument(),
                        "Unexpected document");
           nsIFrame* captureFrame = capturingContent->GetPrimaryFrame();
           if (captureFrame) {
@@ -7409,7 +7578,8 @@ PresShell::HandleEvent(nsIFrame* aFrame,
         // in the same document by taking the target of the events already in
         // the capture list
         nsCOMPtr<nsIContent> anyTarget;
-        if (TouchManager::gCaptureTouchList->Count() > 0 && touchEvent->touches.Length() > 1) {
+        if (TouchManager::gCaptureTouchList->Count() > 0 &&
+            touchEvent->mTouches.Length() > 1) {
           for (auto iter = TouchManager::gCaptureTouchList->Iter();
                !iter.Done();
                iter.Next()) {
@@ -7424,9 +7594,9 @@ PresShell::HandleEvent(nsIFrame* aFrame,
           }
         }
 
-        for (int32_t i = touchEvent->touches.Length(); i; ) {
+        for (int32_t i = touchEvent->mTouches.Length(); i; ) {
           --i;
-          dom::Touch* touch = touchEvent->touches[i];
+          dom::Touch* touch = touchEvent->mTouches[i];
 
           int32_t id = touch->Identifier();
           if (!TouchManager::gCaptureTouchList->Get(id, nullptr)) {
@@ -7460,10 +7630,10 @@ PresShell::HandleEvent(nsIFrame* aFrame,
 
               // if we couldn't find a target frame in the same document as
               // anyTarget, remove the touch from the capture touch list, as
-              // well as the event->touches array. touchmove events that aren't
+              // well as the event->mTouches array. touchmove events that aren't
               // in the captured touch list will be discarded
               if (!newTargetFrame) {
-                touchEvent->touches.RemoveElementAt(i);
+                touchEvent->mTouches.RemoveElementAt(i);
               } else {
                 target = newTargetFrame;
                 nsCOMPtr<nsIContent> targetContent;
@@ -7513,7 +7683,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
                                                         capturingContent))) {
       // A check was already done above to ensure that capturingContent is
       // in this presshell.
-      NS_ASSERTION(capturingContent->GetCrossShadowCurrentDoc() == GetDocument(),
+      NS_ASSERTION(capturingContent->GetComposedDoc() == GetDocument(),
                    "Unexpected document");
       nsIFrame* capturingFrame = capturingContent->GetPrimaryFrame();
       if (capturingFrame) {
@@ -7593,7 +7763,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
       case eTouchEnd: {
         // get the correct shell to dispatch to
         WidgetTouchEvent* touchEvent = aEvent->AsTouchEvent();
-        for (dom::Touch* touch : touchEvent->touches) {
+        for (dom::Touch* touch : touchEvent->mTouches) {
           if (!touch) {
             break;
           }
@@ -7636,19 +7806,19 @@ PresShell::HandleEvent(nsIFrame* aFrame,
     //
     // Note, currently for backwards compatibility we don't forward mouse events
     // to the active document when mouse is over some subdocument.
-    EventStateManager* activeESM =
-      EventStateManager::GetActiveEventStateManager();
-    if (activeESM && aEvent->HasMouseEventMessage() &&
-        activeESM != shell->GetPresContext()->EventStateManager() &&
-        static_cast<EventStateManager*>(activeESM)->GetPresContext()) {
-      nsIPresShell* activeShell =
-        static_cast<EventStateManager*>(activeESM)->GetPresContext()->
-          GetPresShell();
-      if (activeShell &&
-          nsContentUtils::ContentIsCrossDocDescendantOf(activeShell->GetDocument(),
-                                                        shell->GetDocument())) {
-        shell = static_cast<PresShell*>(activeShell);
-        frame = shell->GetRootFrame();
+    if (EventStateManager* activeESM = EventStateManager::GetActiveEventStateManager()) {
+      if (aEvent->mClass == ePointerEventClass || aEvent->HasMouseEventMessage()) {
+        if (activeESM != shell->GetPresContext()->EventStateManager()) {
+          if (nsPresContext* activeContext = activeESM->GetPresContext()) {
+            if (nsIPresShell* activeShell = activeContext->GetPresShell()) {
+              if (nsContentUtils::ContentIsCrossDocDescendantOf(activeShell->GetDocument(),
+                                                                shell->GetDocument())) {
+                shell = static_cast<PresShell*>(activeShell);
+                frame = shell->GetRootFrame();
+              }
+            }
+          }
+        }
       }
     }
 
@@ -7928,7 +8098,7 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent,
     bool isHandlingUserInput = false;
 
     // XXX How about IME events and input events for plugins?
-    if (aEvent->mFlags.mIsTrusted) {
+    if (aEvent->IsTrusted()) {
       switch (aEvent->mMessage) {
       case eKeyPress:
       case eKeyDown:
@@ -7943,7 +8113,13 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent,
             // DOM fullscreen mode. This prevents the browser ESC key
             // handler from stopping all loads in the document, which
             // would cause <video> loads to stop.
-            aEvent->mFlags.mDefaultPrevented = true;
+            // XXX We need to claim the Escape key event which will be
+            //     dispatched only into chrome is already consumed by
+            //     content because we need to prevent its default here
+            //     for some reasons (not sure) but we need to detect
+            //     if a chrome event handler will call PreventDefault()
+            //     again and check it later.
+            aEvent->PreventDefaultBeforeDispatch();
             aEvent->mFlags.mOnlyChromeDispatch = true;
 
             // The event listeners in chrome can prevent this ESC behavior by
@@ -7959,7 +8135,10 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent,
           nsCOMPtr<nsIDocument> pointerLockedDoc =
             do_QueryReferent(EventStateManager::sPointerLockedDoc);
           if (!mIsLastChromeOnlyEscapeKeyConsumed && pointerLockedDoc) {
-            aEvent->mFlags.mDefaultPrevented = true;
+            // XXX See above comment to understand the reason why this needs
+            //     to claim that the Escape key event is consumed by content
+            //     even though it will be dispatched only into chrome.
+            aEvent->PreventDefaultBeforeDispatch();
             aEvent->mFlags.mOnlyChromeDispatch = true;
             if (aEvent->mMessage == eKeyUp) {
               nsIDocument::UnlockPointer();
@@ -8019,7 +8198,7 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent,
     AutoHandlingUserInputStatePusher userInpStatePusher(isHandlingUserInput,
                                                         aEvent, mDocument);
 
-    if (aEvent->mFlags.mIsTrusted && aEvent->mMessage == eMouseMove) {
+    if (aEvent->IsTrusted() && aEvent->mMessage == eMouseMove) {
       nsIPresShell::AllowMouseCapture(
         EventStateManager::GetActiveEventStateManager() == manager);
     }
@@ -8029,7 +8208,7 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent,
 
     // FIXME. If the event was reused, we need to clear the old target,
     // bug 329430
-    aEvent->target = nullptr;
+    aEvent->mTarget = nullptr;
 
     // 1. Give event to event manager for pre event state changes and
     //    generation of synthetic events.
@@ -8100,6 +8279,14 @@ PresShell::HandleEventInternal(WidgetEvent* aEvent,
       break;
     }
   }
+
+  if (Telemetry::CanRecordBase() &&
+      !aEvent->mTimeStamp.IsNull() &&
+      aEvent->AsInputEvent()) {
+    double millis = (TimeStamp::Now() - aEvent->mTimeStamp).ToMilliseconds();
+    Telemetry::Accumulate(Telemetry::INPUT_EVENT_RESPONSE_MS, millis);
+  }
+
   return rv;
 }
 
@@ -8125,7 +8312,7 @@ nsIPresShell::DispatchGotOrLostPointerCaptureEvent(bool aIsGotCapture,
     bool dummy;
     // If the capturing element was removed from the DOM tree,
     // lostpointercapture event should be fired at the document.
-    if (!aIsGotCapture && !aCaptureTarget->IsInDoc()) {
+    if (!aIsGotCapture && !aCaptureTarget->IsInUncomposedDoc()) {
       aCaptureTarget->OwnerDoc()->DispatchEvent(event->InternalDOMEvent(), &dummy);
     } else {
       aCaptureTarget->DispatchEvent(event->InternalDOMEvent(), &dummy);
@@ -8189,7 +8376,7 @@ PresShell::DispatchTouchEventToDOM(WidgetEvent* aEvent,
   WidgetTouchEvent* touchEvent = aEvent->AsTouchEvent();
 
   // loop over all touches and dispatch events on any that have changed
-  for (dom::Touch* touch : touchEvent->touches) {
+  for (dom::Touch* touch : touchEvent->mTouches) {
     if (!touch || !touch->mChanged) {
       continue;
     }
@@ -8210,10 +8397,10 @@ PresShell::DispatchTouchEventToDOM(WidgetEvent* aEvent,
       content = capturingContent;
     }
     // copy the event
-    WidgetTouchEvent newEvent(touchEvent->mFlags.mIsTrusted,
-                              touchEvent->mMessage, touchEvent->widget);
+    WidgetTouchEvent newEvent(touchEvent->IsTrusted(),
+                              touchEvent->mMessage, touchEvent->mWidget);
     newEvent.AssignTouchEventData(*touchEvent, false);
-    newEvent.target = targetPtr;
+    newEvent.mTarget = targetPtr;
 
     RefPtr<PresShell> contentPresShell;
     if (doc == mDocument) {
@@ -8319,9 +8506,9 @@ PresShell::AdjustContextMenuKeyEvent(WidgetMouseEvent* aEvent)
         itemFrame = popupFrame;
 
       nsCOMPtr<nsIWidget> widget = popupFrame->GetNearestWidget();
-      aEvent->widget = widget;
+      aEvent->mWidget = widget;
       LayoutDeviceIntPoint widgetPoint = widget->WidgetToScreenOffset();
-      aEvent->refPoint = LayoutDeviceIntPoint::FromUnknownPoint(
+      aEvent->mRefPoint = LayoutDeviceIntPoint::FromUnknownPoint(
         itemFrame->GetScreenRect().BottomLeft()) - widgetPoint;
 
       mCurrentEventContent = itemFrame->GetContent();
@@ -8341,34 +8528,33 @@ PresShell::AdjustContextMenuKeyEvent(WidgetMouseEvent* aEvent)
   // and the coordinates returned by GetCurrentItemAndPositionForElement
   // are relative to the widget of the root of the root view manager.
   nsRootPresContext* rootPC = mPresContext->GetRootPresContext();
-  aEvent->refPoint.x = 0;
-  aEvent->refPoint.y = 0;
+  aEvent->mRefPoint = LayoutDeviceIntPoint(0, 0);
   if (rootPC) {
     rootPC->PresShell()->GetViewManager()->
-      GetRootWidget(getter_AddRefs(aEvent->widget));
+      GetRootWidget(getter_AddRefs(aEvent->mWidget));
 
-    if (aEvent->widget) {
+    if (aEvent->mWidget) {
       // default the refpoint to the topleft of our document
       nsPoint offset(0, 0);
       nsIFrame* rootFrame = mFrameConstructor->GetRootFrame();
       if (rootFrame) {
         nsView* view = rootFrame->GetClosestView(&offset);
-        offset += view->GetOffsetToWidget(aEvent->widget);
-        aEvent->refPoint =
+        offset += view->GetOffsetToWidget(aEvent->mWidget);
+        aEvent->mRefPoint =
           LayoutDeviceIntPoint::FromAppUnitsToNearest(offset, mPresContext->AppUnitsPerDevPixel());
       }
     }
   } else {
-    aEvent->widget = nullptr;
+    aEvent->mWidget = nullptr;
   }
 
   // see if we should use the caret position for the popup
   LayoutDeviceIntPoint caretPoint;
   // Beware! This may flush notifications via synchronous
   // ScrollSelectionIntoView.
-  if (PrepareToUseCaretPosition(aEvent->widget, caretPoint)) {
+  if (PrepareToUseCaretPosition(aEvent->mWidget, caretPoint)) {
     // caret position is good
-    aEvent->refPoint = caretPoint;
+    aEvent->mRefPoint = caretPoint;
     return true;
   }
 
@@ -8385,8 +8571,8 @@ PresShell::AdjustContextMenuKeyEvent(WidgetMouseEvent* aEvent)
     nsCOMPtr<nsIContent> currentPointElement;
     GetCurrentItemAndPositionForElement(currentFocus,
                                         getter_AddRefs(currentPointElement),
-                                        aEvent->refPoint,
-                                        aEvent->widget);
+                                        aEvent->mRefPoint,
+                                        aEvent->mWidget);
     if (currentPointElement) {
       mCurrentEventContent = currentPointElement;
       mCurrentEventFrame = nullptr;
@@ -8405,7 +8591,7 @@ PresShell::AdjustContextMenuKeyEvent(WidgetMouseEvent* aEvent)
 //    will also scroll the window as needed to make the caret visible.
 //
 //    The event widget should be the widget that generated the event, and
-//    whose coordinate system the resulting event's refPoint should be
+//    whose coordinate system the resulting event's mRefPoint should be
 //    relative to.  The returned point is in device pixels realtive to the
 //    widget passed in.
 bool
@@ -8822,7 +9008,8 @@ FreezeSubDocument(nsIDocument *aDocument, void *aData)
 void
 PresShell::Freeze()
 {
-  mUpdateImageVisibilityEvent.Revoke();
+  mUpdateApproximateFrameVisibilityEvent.Revoke();
+  mNotifyCompositorOfVisibleRegionsChangeEvent.Revoke();
 
   MaybeReleaseCapturingContent();
 
@@ -9526,40 +9713,52 @@ PresShell::Observe(nsISupports* aSubject,
   }
 #endif
 
-  if (!nsCRT::strcmp(aTopic, "agent-sheet-added") && mStyleSet) {
-    AddAgentSheet(aSubject);
+  if (!nsCRT::strcmp(aTopic, "agent-sheet-added")) {
+    if (mStyleSet) {
+      AddAgentSheet(aSubject);
+    }
     return NS_OK;
   }
 
-  if (!nsCRT::strcmp(aTopic, "user-sheet-added") && mStyleSet) {
-    AddUserSheet(aSubject);
+  if (!nsCRT::strcmp(aTopic, "user-sheet-added")) {
+    if (mStyleSet) {
+      AddUserSheet(aSubject);
+    }
     return NS_OK;
   }
 
-  if (!nsCRT::strcmp(aTopic, "author-sheet-added") && mStyleSet) {
-    AddAuthorSheet(aSubject);
+  if (!nsCRT::strcmp(aTopic, "author-sheet-added")) {
+    if (mStyleSet) {
+      AddAuthorSheet(aSubject);
+    }
     return NS_OK;
   }
 
-  if (!nsCRT::strcmp(aTopic, "agent-sheet-removed") && mStyleSet) {
-    RemoveSheet(SheetType::Agent, aSubject);
+  if (!nsCRT::strcmp(aTopic, "agent-sheet-removed")) {
+    if (mStyleSet) {
+      RemoveSheet(SheetType::Agent, aSubject);
+    }
     return NS_OK;
   }
 
-  if (!nsCRT::strcmp(aTopic, "user-sheet-removed") && mStyleSet) {
-    RemoveSheet(SheetType::User, aSubject);
+  if (!nsCRT::strcmp(aTopic, "user-sheet-removed")) {
+    if (mStyleSet) {
+      RemoveSheet(SheetType::User, aSubject);
+    }
     return NS_OK;
   }
 
-  if (!nsCRT::strcmp(aTopic, "author-sheet-removed") && mStyleSet) {
-    RemoveSheet(SheetType::Doc, aSubject);
+  if (!nsCRT::strcmp(aTopic, "author-sheet-removed")) {
+    if (mStyleSet) {
+      RemoveSheet(SheetType::Doc, aSubject);
+    }
     return NS_OK;
   }
 
-  if (!nsCRT::strcmp(aTopic, "memory-pressure") &&
-      !AssumeAllImagesVisible() &&
-      mPresContext->IsRootContentDocument()) {
-    DoUpdateImageVisibility(/* aRemoveOnly = */ true);
+  if (!nsCRT::strcmp(aTopic, "memory-pressure")) {
+    if (!AssumeAllFramesVisible() && mPresContext->IsRootContentDocument()) {
+      DoUpdateApproximateFrameVisibility(/* aRemoveOnly = */ true);
+    }
     return NS_OK;
   }
 
@@ -9643,10 +9842,10 @@ PresShell::DelayedInputEvent::~DelayedInputEvent()
 void
 PresShell::DelayedInputEvent::Dispatch()
 {
-  if (!mEvent || !mEvent->widget) {
+  if (!mEvent || !mEvent->mWidget) {
     return;
   }
-  nsCOMPtr<nsIWidget> widget = mEvent->widget;
+  nsCOMPtr<nsIWidget> widget = mEvent->mWidget;
   nsEventStatus status;
   widget->DispatchEvent(mEvent, status);
 }
@@ -9655,9 +9854,9 @@ PresShell::DelayedMouseEvent::DelayedMouseEvent(WidgetMouseEvent* aEvent) :
   DelayedInputEvent()
 {
   WidgetMouseEvent* mouseEvent =
-    new WidgetMouseEvent(aEvent->mFlags.mIsTrusted,
+    new WidgetMouseEvent(aEvent->IsTrusted(),
                          aEvent->mMessage,
-                         aEvent->widget,
+                         aEvent->mWidget,
                          aEvent->reason,
                          aEvent->context);
   mouseEvent->AssignMouseEventData(*aEvent, false);
@@ -9668,9 +9867,9 @@ PresShell::DelayedKeyEvent::DelayedKeyEvent(WidgetKeyboardEvent* aEvent) :
   DelayedInputEvent()
 {
   WidgetKeyboardEvent* keyEvent =
-    new WidgetKeyboardEvent(aEvent->mFlags.mIsTrusted,
+    new WidgetKeyboardEvent(aEvent->IsTrusted(),
                             aEvent->mMessage,
-                            aEvent->widget);
+                            aEvent->mWidget);
   keyEvent->AssignKeyEventData(*aEvent, false);
   keyEvent->mFlags.mIsSynthesizedForTests = aEvent->mFlags.mIsSynthesizedForTests;
   mEvent = keyEvent;
@@ -10833,16 +11032,10 @@ PresShell::UpdateImageLockingState()
   nsresult rv = mDocument->SetImageLockingState(locked);
 
   if (locked) {
-    if (mInImageVisibility) {
-      gfxCriticalNoteOnce << "UpdateImageLockingState is re-entering on "
-                          << (NS_IsMainThread() ? "" : "non-") << "main thread";
-    }
-
-    // Request decodes for visible images; we want to start decoding as
+    // Request decodes for visible image frames; we want to start decoding as
     // quickly as possible when we get foregrounded to minimize flashing.
-    for (auto iter = mVisibleImages.Iter(); !iter.Done(); iter.Next()) {
-      nsCOMPtr<nsIContent> content = do_QueryInterface(iter.Get()->GetKey());
-      nsImageFrame* imageFrame = do_QueryFrame(content->GetPrimaryFrame());
+    for (auto iter = mApproximatelyVisibleFrames.Iter(); !iter.Done(); iter.Next()) {
+      nsImageFrame* imageFrame = do_QueryFrame(iter.Get()->GetKey());
       if (imageFrame) {
         imageFrame->MaybeDecodeForPredictedSize();
       }
@@ -10877,7 +11070,12 @@ PresShell::AddSizeOfIncludingThis(MallocSizeOf aMallocSizeOf,
   if (mCaret) {
     *aPresShellSize += mCaret->SizeOfIncludingThis(aMallocSizeOf);
   }
-  *aPresShellSize += mVisibleImages.ShallowSizeOfExcludingThis(aMallocSizeOf);
+  *aPresShellSize += mApproximatelyVisibleFrames.ShallowSizeOfExcludingThis(aMallocSizeOf);
+  *aPresShellSize += mInDisplayPortFrames.ShallowSizeOfExcludingThis(aMallocSizeOf);
+  *aPresShellSize += mVisibleRegions
+                   ? mVisibleRegions->mApproximate.ShallowSizeOfIncludingThis(aMallocSizeOf) +
+                     mVisibleRegions->mInDisplayPort.ShallowSizeOfIncludingThis(aMallocSizeOf)
+                   : 0;
   *aPresShellSize += mFramesToDirty.ShallowSizeOfExcludingThis(aMallocSizeOf);
   *aPresShellSize += aArenaObjectsSize->mOther;
 

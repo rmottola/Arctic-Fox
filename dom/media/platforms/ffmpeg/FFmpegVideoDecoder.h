@@ -42,6 +42,7 @@ public:
   RefPtr<InitPromise> Init() override;
   nsresult Input(MediaRawData* aSample) override;
   void ProcessDrain() override;
+  void ProcessFlush() override;
   void InitCodecContext() override;
   const char* GetDescriptionName() const override
   {
@@ -70,8 +71,7 @@ private:
                                  AVFrame* aFrame);
 
   RefPtr<ImageContainer> mImageContainer;
-  nsIntSize mDisplay;
-  nsIntRect mImage;
+  VideoInfo mInfo;
 
   // Parser used for VP8 and VP9 decoding.
   AVCodecParserContext* mCodecParser;

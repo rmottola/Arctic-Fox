@@ -19,7 +19,7 @@ import time
 import uuid
 import copy
 import glob
-import logging
+import shlex
 from itertools import chain
 
 # import the power of mozharness ;)
@@ -30,11 +30,20 @@ from mozharness.base.config import BaseConfig, parse_config_file
 from mozharness.base.log import ERROR, OutputParser, FATAL
 from mozharness.base.script import PostScriptRun
 from mozharness.base.vcs.vcsbase import MercurialScript
-from mozharness.mozilla.buildbot import BuildbotMixin, TBPL_STATUS_DICT, \
-    TBPL_EXCEPTION, TBPL_RETRY, EXIT_STATUS_DICT, TBPL_WARNING, TBPL_SUCCESS, \
-    TBPL_WORST_LEVEL_TUPLE, TBPL_FAILURE
+from mozharness.mozilla.buildbot import (
+    BuildbotMixin,
+    EXIT_STATUS_DICT,
+    TBPL_STATUS_DICT,
+    TBPL_EXCEPTION,
+    TBPL_FAILURE,
+    TBPL_RETRY,
+    TBPL_WARNING,
+    TBPL_SUCCESS,
+    TBPL_WORST_LEVEL_TUPLE,
+)
 from mozharness.mozilla.purge import PurgeMixin
 from mozharness.mozilla.mock import MockMixin
+from mozharness.mozilla.secrets import SecretsMixin
 from mozharness.mozilla.signing import SigningMixin
 from mozharness.mozilla.mock import ERROR_MSGS as MOCK_ERROR_MSGS
 from mozharness.mozilla.testing.errors import TinderBoxPrintRe
@@ -79,6 +88,7 @@ TBPL_UPLOAD_ERRORS = [
     }
 ]
 
+
 class MakeUploadOutputParser(OutputParser):
     tbpl_error_list = TBPL_UPLOAD_ERRORS
     # let's create a switch case using name-spaces/dict
@@ -88,8 +98,6 @@ class MakeUploadOutputParser(OutputParser):
         ('symbolsUrl', "m.endswith('crashreporter-symbols.zip') or "
                        "m.endswith('crashreporter-symbols-full.zip')"),
         ('testsUrl', "m.endswith(('tests.tar.bz2', 'tests.zip'))"),
-        ('unsignedApkUrl', "m.endswith('apk') and "
-                           "'unsigned-unaligned' in m"),
         ('robocopApkUrl', "m.endswith('apk') and 'robocop' in m"),
         ('jsshellUrl', "'jsshell-' in m and m.endswith('.zip')"),
         ('partialMarUrl', "m.endswith('.mar') and '.partial.' in m"),
@@ -126,10 +134,15 @@ class MakeUploadOutputParser(OutputParser):
                     # For android builds, the package is also used as the mar file.
                     # Grab the first one, since that is the one in the
                     # nightly/YYYY/MM directory
-                    if self.use_package_as_marfile and 'completeMarUrl' not in self.matches:
-                        self.info("Using package as mar file: %s" % m)
-                        self.matches['completeMarUrl'] = m
-                        u, self.package_filename = os.path.split(m)
+                    if self.use_package_as_marfile:
+                        if 'tinderbox-builds' in m or 'nightly/latest-' in m:
+                            self.info("Skipping wrong packageUrl: %s" % m)
+                        else:
+                            if 'completeMarUrl' in self.matches:
+                                self.fatal("Found multiple package URLs. Please update buildbase.py")
+                            self.info("Using package as mar file: %s" % m)
+                            self.matches['completeMarUrl'] = m
+                            u, self.package_filename = os.path.split(m)
 
         if self.use_package_as_marfile and self.package_filename:
             # The checksum file is also dumped during 'make upload'. Look
@@ -156,6 +169,7 @@ class MakeUploadOutputParser(OutputParser):
         else:
             self.info(line)
 
+
 class CheckTestCompleteParser(OutputParser):
     tbpl_error_list = TBPL_UPLOAD_ERRORS
 
@@ -166,6 +180,7 @@ class CheckTestCompleteParser(OutputParser):
         self.fail_count = 0
         self.leaked = False
         self.harness_err_re = TinderBoxPrintRe['harness_error']['full_regex']
+        self.tbpl_status = TBPL_SUCCESS
 
     def parse_single_line(self, line):
         # Counts and flags.
@@ -183,17 +198,38 @@ class CheckTestCompleteParser(OutputParser):
                     self.leaked = None
                 else:
                     self.leaked = True
-            else:
-                self.fail_count += 1
+            self.fail_count += 1
             return self.warning(line)
         self.info(line)  # else
 
-    def evaluate_parser(self):
-        # Return the summary.
+    def evaluate_parser(self, return_code,  success_codes=None):
+        success_codes = success_codes or [0]
+
+        if self.num_errors:  # ran into a script error
+            self.tbpl_status = self.worst_level(TBPL_FAILURE, self.tbpl_status,
+                                                levels=TBPL_WORST_LEVEL_TUPLE)
+
+        if self.fail_count > 0:
+            self.tbpl_status = self.worst_level(TBPL_WARNING, self.tbpl_status,
+                                                levels=TBPL_WORST_LEVEL_TUPLE)
+
+        # Account for the possibility that no test summary was output.
+        if self.pass_count == 0 and self.fail_count == 0:
+            self.error('No tests run or test summary not found')
+            self.tbpl_status = self.worst_level(TBPL_WARNING, self.tbpl_status,
+                                                levels=TBPL_WORST_LEVEL_TUPLE)
+
+        if return_code not in success_codes:
+            self.tbpl_status = self.worst_level(TBPL_FAILURE, self.tbpl_status,
+                                                levels=TBPL_WORST_LEVEL_TUPLE)
+
+        # Print the summary.
         summary = tbox_print_summary(self.pass_count,
                                      self.fail_count,
                                      self.leaked)
         self.info("TinderboxPrint: check<br/>%s\n" % summary)
+
+        return self.tbpl_status
 
 
 class BuildingConfig(BaseConfig):
@@ -320,10 +356,11 @@ class BuildOptionParser(object):
         'source': 'builds/releng_sub_%s_configs/%s_source.py',
         'api-9': 'builds/releng_sub_%s_configs/%s_api_9.py',
         'api-11': 'builds/releng_sub_%s_configs/%s_api_11.py',
+        'api-15-frontend': 'builds/releng_sub_%s_configs/%s_api_15_frontend.py',
         'api-15': 'builds/releng_sub_%s_configs/%s_api_15.py',
-        'api-15-debug': 'builds/releng_sub_%s_configs/%s_api_15_debug.py',
         'api-9-debug': 'builds/releng_sub_%s_configs/%s_api_9_debug.py',
         'api-11-debug': 'builds/releng_sub_%s_configs/%s_api_11_debug.py',
+        'api-15-debug': 'builds/releng_sub_%s_configs/%s_api_15_debug.py',
         'x86': 'builds/releng_sub_%s_configs/%s_x86.py',
         'api-11-partner-sample1': 'builds/releng_sub_%s_configs/%s_api_11_partner_sample1.py',
         'api-15-partner-sample1': 'builds/releng_sub_%s_configs/%s_api_15_partner_sample1.py',
@@ -504,6 +541,14 @@ BUILD_BASE_CONFIG_OPTIONS = [
                 " %s for possibilites" % (
                     BuildOptionParser.branch_cfg_file,
                 )}],
+    [['--scm-level'], {
+        "action": "store",
+        "type": "int",
+        "dest": "scm_level",
+        "default": 1,
+        "help": "This sets the SCM level for the branch being built."
+                " See https://www.mozilla.org/en-US/about/"
+                "governance/policies/commit/access-policy/"}],
     [['--enable-pgo'], {
         "action": "store_true",
         "dest": "pgo_build",
@@ -537,7 +582,7 @@ def generate_build_UID():
 
 class BuildScript(BuildbotMixin, PurgeMixin, MockMixin, BalrogMixin,
                   SigningMixin, VirtualenvMixin, MercurialScript,
-                  InfluxRecordingMixin):
+                  InfluxRecordingMixin, SecretsMixin):
     def __init__(self, **kwargs):
         # objdir is referenced in _query_abs_dirs() so let's make sure we
         # have that attribute before calling BaseScript.__init__
@@ -682,11 +727,18 @@ or run without that action (ie: --no-{action})"
             app_ini_path = dirs['abs_app_ini_path']
         if (os.path.exists(print_conf_setting_path) and
                 os.path.exists(app_ini_path)):
+            python = self.query_exe('python2.7')
             cmd = [
-                'python', print_conf_setting_path, app_ini_path,
+                python, os.path.join(dirs['abs_src_dir'], 'mach'), 'python',
+                print_conf_setting_path, app_ini_path,
                 'App', prop
             ]
-            return self.get_output_from_command(cmd, cwd=dirs['base_work_dir'])
+            env = self.query_build_env()
+            # dirs['abs_obj_dir'] can be different from env['MOZ_OBJDIR'] on
+            # mac, and that confuses mach.
+            del env['MOZ_OBJDIR']
+            return self.get_output_from_command_m(cmd,
+                cwd=dirs['abs_obj_dir'], env=env)
         else:
             return None
 
@@ -726,6 +778,11 @@ or run without that action (ie: --no-{action})"
                 buildid = self.buildbot_config['properties']['buildid'].encode(
                     'ascii', 'replace'
                 )
+            else:
+                # for taskcluster, there are no buildbot properties, and we pass
+                # MOZ_BUILD_DATE into mozharness as an environment variable, only
+                # to have it pass the same value out with the same name.
+                buildid = os.environ.get('MOZ_BUILD_DATE')
 
         if not buildid:
             self.info("Creating buildid through current time")
@@ -1305,18 +1362,24 @@ or run without that action (ie: --no-{action})"
                                             dirs['abs_app_ini_path']),
                      level=error_level)
         self.info("Setting properties found in: %s" % dirs['abs_app_ini_path'])
+        python = self.query_exe('python2.7')
         base_cmd = [
-            'python', print_conf_setting_path, dirs['abs_app_ini_path'], 'App'
+            python, os.path.join(dirs['abs_src_dir'], 'mach'), 'python',
+            print_conf_setting_path, dirs['abs_app_ini_path'], 'App'
         ]
         properties_needed = [
             {'ini_name': 'SourceStamp', 'prop_name': 'sourcestamp'},
             {'ini_name': 'Version', 'prop_name': 'appVersion'},
             {'ini_name': 'Name', 'prop_name': 'appName'}
         ]
+        env = self.query_build_env()
+        # dirs['abs_obj_dir'] can be different from env['MOZ_OBJDIR'] on
+        # mac, and that confuses mach.
+        del env['MOZ_OBJDIR']
         for prop in properties_needed:
-            prop_val = self.get_output_from_command(
-                base_cmd + [prop['ini_name']], cwd=dirs['base_work_dir'],
-                halt_on_failure=halt_on_failure
+            prop_val = self.get_output_from_command_m(
+                base_cmd + [prop['ini_name']], cwd=dirs['abs_obj_dir'],
+                halt_on_failure=halt_on_failure, env=env
             )
             self.set_buildbot_property(prop['prop_name'],
                                        prop_val,
@@ -1495,8 +1558,6 @@ or run without that action (ie: --no-{action})"
             ('symbolsUrl', lambda m: m.endswith('crashreporter-symbols.zip') or
                            m.endswith('crashreporter-symbols-full.zip')),
             ('testsUrl', lambda m: m.endswith(('tests.tar.bz2', 'tests.zip'))),
-            ('unsignedApkUrl', lambda m: m.endswith('apk') and
-                               'unsigned-unaligned' in m),
             ('robocopApkUrl', lambda m: m.endswith('apk') and 'robocop' in m),
             ('jsshellUrl', lambda m: 'jsshell-' in m and m.endswith('.zip')),
             # Temporarily use "TC" in MarUrl parameters. We don't want to
@@ -1524,10 +1585,31 @@ or run without that action (ie: --no-{action})"
         dirs = self.query_abs_dirs()
         paths = [
             (packageName, os.path.join(dirs['abs_obj_dir'], 'dist', packageName)),
-            ('libxul.so', os.path.join(dirs['abs_obj_dir'], 'dist', 'bin', 'libxul.so')),
             ('omni.ja', os.path.join(dirs['abs_obj_dir'], 'dist', 'fennec', 'assets', 'omni.ja')),
             ('classes.dex', os.path.join(dirs['abs_obj_dir'], 'dist', 'fennec', 'classes.dex'))
         ]
+
+        # Find a stripped version of libxul if possible
+        def find_file(rootPath, fileName):
+            for root, dirs, files in os.walk(rootPath):
+                for file in files:
+                    if file == fileName:
+                        return (fileName, os.path.join(root, file))
+            return None
+
+        # Check in the firefox and fennec dist dirs
+        libxul = None
+        dist_root = os.path.join(dirs['abs_obj_dir'], 'dist')
+        for dist in ('firefox', 'fennec', 'b2g'):
+            libxul = find_file(os.path.join(dist_root, dist), 'libxul.so')
+            if libxul:
+                break
+
+        if libxul:
+            paths.append(libxul)
+        else:
+            paths.append( ('libxul.so', os.path.join(dirs['abs_obj_dir'], 'dist', 'bin', 'libxul.so')) )
+
         for (name, path) in paths:
             if os.path.exists(path):
                 self.info('TinderboxPrint: Size of %s<br/>%s bytes\n' % (name, self.query_filesize(path)))
@@ -1586,10 +1668,17 @@ or run without that action (ie: --no-{action})"
                                        'config',
                                        'printconfigsetting.py')
         abs_prev_ini_path = os.path.join(dirs['abs_obj_dir'], prev_ini_path)
-        previous_buildid = self.get_output_from_command(['python',
-                                                         print_conf_path,
-                                                         abs_prev_ini_path,
-                                                         'App', 'BuildID'])
+        python = self.query_exe('python2.7')
+        cmd = [
+            python, os.path.join(dirs['abs_src_dir'], 'mach'), 'python',
+            print_conf_path, abs_prev_ini_path, 'App', 'BuildID'
+        ]
+        env = self.query_build_env()
+        # dirs['abs_obj_dir'] can be different from env['MOZ_OBJDIR'] on
+        # mac, and that confuses mach.
+        del env['MOZ_OBJDIR']
+        previous_buildid = self.get_output_from_command_m(cmd,
+            cwd=dirs['abs_obj_dir'], env=env)
         if not previous_buildid:
             self.fatal("Could not determine previous_buildid. This property"
                        "requires the upload action creating a partial mar.")
@@ -1687,6 +1776,7 @@ or run without that action (ie: --no-{action})"
         if not self.query_is_nightly():
             self.info("Not a nightly build, skipping multi l10n.")
             return
+        self._initialize_taskcluster()
 
         self._checkout_compare_locales()
         dirs = self.query_abs_dirs()
@@ -1745,6 +1835,19 @@ or run without that action (ie: --no-{action})"
             self.set_buildbot_property(prop,
                                        parser.matches[prop],
                                        write_to_file=True)
+        upload_files_cmd = [
+            'make',
+            'echo-variable-UPLOAD_FILES',
+            'AB_CD=multi',
+        ]
+        output = self.get_output_from_command_m(
+            upload_files_cmd,
+            cwd=objdir,
+        )
+        files = shlex.split(output)
+        abs_files = [os.path.abspath(os.path.join(objdir, f)) for f in files]
+        self._taskcluster_upload(abs_files, self.routes_json['l10n'],
+                                 locale='multi')
 
     def postflight_build(self, console_output=True):
         """grabs properties from post build and calls ccache -s"""
@@ -1800,10 +1903,12 @@ or run without that action (ie: --no-{action})"
                                          cwd=dirs['abs_obj_dir'],
                                          env=env,
                                          output_parser=parser)
-        parser.evaluate_parser()
+        tbpl_status = parser.evaluate_parser(return_code)
+        return_code = EXIT_STATUS_DICT[tbpl_status]
+
         if return_code:
             self.return_code = self.worst_level(
-                EXIT_STATUS_DICT[TBPL_WARNING], self.return_code,
+                return_code,  self.return_code,
                 AUTOMATION_EXIT_CODES[::-1]
             )
             self.error("'make -k check' did not run successfully. Please check "

@@ -2,40 +2,33 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 /**
- * Test that we get a "Styles" marker with the correct meta.
+ * Test that we get "Styles" markers with correct meta.
  */
 
+const { PerformanceFront } = require("devtools/server/actors/performance");
+const MARKER_NAME = "Styles";
 
-function* spawnTest () {
-  let { target, front } = yield initBackend(SIMPLE_URL);
-  let markers = [];
+add_task(function*() {
+  let browser = yield addTab(MAIN_DOMAIN + "doc_perf.html");
+  let doc = browser.contentDocument;
 
-  front.on("timeline-data", handler);
-  let model = yield front.startRecording({ withTicks: true });
+  initDebuggerServer();
+  let client = new DebuggerClient(DebuggerServer.connectPipe());
+  let form = yield connectDebuggerClient(client);
+  let front = PerformanceFront(client, form);
+  yield front.connect();
+  let rec = yield front.startRecording({ withMarkers: true });
 
-  yield waitUntil(() => {
+  let markers = yield waitForMarkerType(front, MARKER_NAME, function (markers) {
     return markers.some(({restyleHint}) => restyleHint != void 0);
   });
 
-  front.off("timeline-data", handler);
-  yield front.stopRecording(model);
+  yield front.stopRecording(rec);
 
-  info(`Got ${markers.length} markers.`);
+  ok(markers.some(m => m.name === MARKER_NAME), `got some ${MARKER_NAME} markers`);
+  ok(markers.some(({restyleHint}) => restyleHint != void 0),
+    "Some markers have a restyleHint.");
 
-  ok(markers.every(({name}) => name === "Styles"), "All markers found are Styles markers");
-  ok(markers.length, "found some restyle markers");
-
-  ok(markers.some(({restyleHint}) => restyleHint != void 0), "some markers have a restyleHint property");
-
-  // Destroy the front before removing tab to ensure no
-  // lingering requests
-  yield front.destroy();
-  yield removeTab(target.tab);
-  finish();
-
-  function handler (_, name, m) {
-    if (name === "markers") {
-      markers = markers.concat(m.filter(marker => marker.name === "Styles"));
-    }
-  }
-}
+  yield closeDebuggerClient(client);
+  gBrowser.removeCurrentTab();
+});

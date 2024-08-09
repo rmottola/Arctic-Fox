@@ -119,7 +119,8 @@ public:
                     nsStyleContext* aParentContext,
                     TreeMatchContext& aTreeMatchContext);
     inline already_AddRefed<nsStyleContext>
-    ResolveStyleForNonElement(nsStyleContext* aParentContext);
+    ResolveStyleForNonElement(nsStyleContext* aParentContext,
+                              nsIAtom* aPseudoTag);
     inline already_AddRefed<nsStyleContext>
     ResolvePseudoElementStyle(dom::Element* aParentElement,
                               mozilla::CSSPseudoElementType aType,
@@ -157,6 +158,9 @@ public:
         mozilla::CSSPseudoElementType aPseudoType,
         dom::Element* aPseudoElement,
         EventStates aStateMask);
+
+    inline void RootStyleContextAdded();
+    inline void RootStyleContextRemoved();
 
   private:
     // Stores a pointer to an nsStyleSet or a ServoStyleSet.  The least

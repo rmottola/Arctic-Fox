@@ -5,10 +5,16 @@
 
 #include <algorithm>
 
+#include "PingPongRegion.h"
 #include "gtest/gtest.h"
+#include "gtest/MozGTestBench.h"
+#include "nsRect.h"
 #include "nsRegion.h"
+#include "RegionBuilder.h"
+#include "mozilla/gfx/TiledRegion.h"
 
 using namespace std;
+using namespace mozilla::gfx;
 
 class TestLargestRegion {
 public:
@@ -560,5 +566,191 @@ TEST(Gfx, RegionVisitEdges) {
 
     TestVisit(r);
   }
-
 }
+
+TEST(Gfx, PingPongRegion) {
+  nsRect rects[] = {
+    nsRect(4, 1, 61, 49),
+    nsRect(115, 1, 99, 49),
+    nsRect(115, 49, 99, 1),
+    nsRect(12, 50, 11, 5),
+    nsRect(25, 50, 28, 5),
+    nsRect(115, 50, 99, 5),
+    nsRect(115, 55, 99, 12),
+  };
+
+  // Test accumulations of various sizes to make sure
+  // the ping-pong behavior of PingPongRegion is working.
+  for (size_t size = 0; size < mozilla::ArrayLength(rects); size++) {
+    // bug 1130978.
+    nsRegion r;
+    PingPongRegion<nsRegion> ar;
+    for (size_t i = 0; i < size; i++) {
+      r.Or(r, rects[i]);
+      ar.OrWith(rects[i]);
+      EXPECT_TRUE(ar.Region().IsEqual(r));
+    }
+
+    for (size_t i = 0; i < size; i++) {
+      ar.SubOut(rects[i]);
+      r.SubOut(rects[i]);
+      EXPECT_TRUE(ar.Region().IsEqual(r));
+    }
+  }
+}
+
+// The TiledRegion tests use nsIntRect / IntRegion because nsRect doesn't have
+// InflateToMultiple which is required by TiledRegion.
+TEST(Gfx, TiledRegionNoSimplification2Rects) {
+  // Add two rectangles, both rectangles are completely inside
+  // different tiles.
+  nsIntRegion region;
+  region.OrWith(nsIntRect(50, 50, 50, 50));
+  region.OrWith(nsIntRect(300, 50, 50, 50));
+
+  TiledIntRegion tiledRegion;
+  tiledRegion.Add(nsIntRect(50, 50, 50, 50));
+  tiledRegion.Add(nsIntRect(300, 50, 50, 50));
+
+  // No simplification should have happened.
+  EXPECT_TRUE(region.IsEqual(tiledRegion.GetRegion()));
+}
+
+TEST(Gfx, TiledRegionNoSimplification1Region) {
+  // Add two rectangles, both rectangles are completely inside
+  // different tiles.
+  nsIntRegion region;
+  region.OrWith(nsIntRect(50, 50, 50, 50));
+  region.OrWith(nsIntRect(300, 50, 50, 50));
+
+  TiledIntRegion tiledRegion;
+  tiledRegion.Add(region);
+
+  // No simplification should have happened.
+  EXPECT_TRUE(region.IsEqual(tiledRegion.GetRegion()));
+}
+
+TEST(Gfx, TiledRegionWithSimplification3Rects) {
+  // Add three rectangles. The first two rectangles are completely inside
+  // different tiles, but the third rectangle intersects both tiles.
+  TiledIntRegion tiledRegion;
+  tiledRegion.Add(nsIntRect(50, 50, 50, 50));
+  tiledRegion.Add(nsIntRect(300, 50, 50, 50));
+  tiledRegion.Add(nsIntRect(250, 70, 10, 10));
+
+  // Both tiles should have simplified their rectangles, and those two
+  // rectangles are adjacent to each other, so they just build up one rect.
+  EXPECT_TRUE(tiledRegion.GetRegion().IsEqual(nsIntRect(50, 50, 300, 50)));
+}
+
+TEST(Gfx, TiledRegionWithSimplification1Region) {
+  // Add three rectangles. The first two rectangles are completely inside
+  // different tiles, but the third rectangle intersects both tiles.
+  nsIntRegion region;
+  region.OrWith(nsIntRect(50, 50, 50, 50));
+  region.OrWith(nsIntRect(300, 50, 50, 50));
+  region.OrWith(nsIntRect(250, 70, 10, 10));
+
+  TiledIntRegion tiledRegion;
+  tiledRegion.Add(region);
+
+  // Both tiles should have simplified their rectangles, and those two
+  // rectangles are adjacent to each other, so they just build up one rect.
+  EXPECT_TRUE(tiledRegion.GetRegion().IsEqual(nsIntRect(50, 50, 300, 50)));
+}
+
+TEST(Gfx, TiledRegionContains) {
+  // Add three rectangles. The first two rectangles are completely inside
+  // different tiles, but the third rectangle intersects both tiles.
+  TiledIntRegion tiledRegion;
+  tiledRegion.Add(nsIntRect(50, 50, 50, 50));
+  tiledRegion.Add(nsIntRect(300, 50, 50, 50));
+  tiledRegion.Add(nsIntRect(250, 70, 10, 10));
+
+  // Both tiles should have simplified their rectangles, and those two
+  // rectangles are adjacent to each other, so they just build up one rect.
+  EXPECT_TRUE(tiledRegion.Contains(nsIntRect(50, 50, 300, 50)));
+  EXPECT_TRUE(tiledRegion.Contains(nsIntRect(50, 50, 50, 50)));
+  EXPECT_FALSE(tiledRegion.Contains(nsIntRect(50, 50, 301, 50)));
+}
+
+TEST(Gfx, TiledRegionIntersects) {
+  // Add three rectangles. The first two rectangles are completely inside
+  // different tiles, but the third rectangle intersects both tiles.
+  TiledIntRegion tiledRegion;
+  tiledRegion.Add(nsIntRect(50, 50, 50, 50));
+  tiledRegion.Add(nsIntRect(300, 50, 50, 50));
+  tiledRegion.Add(nsIntRect(250, 70, 10, 10));
+
+  // Both tiles should have simplified their rectangles, and those two
+  // rectangles are adjacent to each other, so they just build up one rect.
+  EXPECT_TRUE(tiledRegion.Intersects(nsIntRect(50, 50, 300, 50)));
+  EXPECT_TRUE(tiledRegion.Intersects(nsIntRect(200, 10, 10, 50)));
+  EXPECT_TRUE(tiledRegion.Intersects(nsIntRect(50, 50, 301, 50)));
+  EXPECT_FALSE(tiledRegion.Intersects(nsIntRect(0, 0, 50, 500)));
+}
+
+MOZ_GTEST_BENCH(GfxBench, RegionOr, []{
+  const int size = 5000;
+
+  nsRegion r;
+  for (int i = 0; i < size; i++) {
+    r = r.Or(r, nsRect(i, i, i + 10, i + 10));
+  }
+
+  nsIntRegion rInt;
+  for (int i = 0; i < size; i++) {
+    rInt = rInt.Or(rInt, nsIntRect(i, i, i + 10, i + 10));
+  }
+});
+
+MOZ_GTEST_BENCH(GfxBench, RegionAnd, []{
+  const int size = 5000;
+  nsRegion r(nsRect(0, 0, size, size));
+  for (int i = 0; i < size; i++) {
+    nsRegion rMissingPixel(nsRect(0, 0, size, size));
+    rMissingPixel = rMissingPixel.Sub(rMissingPixel, nsRect(i, i, 1, 1));
+    r = r.And(r, rMissingPixel);
+  }
+});
+
+void BenchRegionBuilderOr() {
+  const int size = 5000;
+
+  RegionBuilder<nsRegion> r;
+  for (int i = 0; i < size; i++) {
+    r.Or(nsRect(i, i, i + 10, i + 10));
+  }
+  r.ToRegion();
+
+  RegionBuilder<nsIntRegion> rInt;
+  for (int i = 0; i < size; i++) {
+    rInt.Or(nsIntRect(i, i, i + 10, i + 10));
+  }
+  rInt.ToRegion();
+}
+
+MOZ_GTEST_BENCH(GfxBench, RegionBuilderOr, []{
+  BenchRegionBuilderOr();
+});
+
+void BenchPingPongRegionOr() {
+  const int size = 5000;
+
+  PingPongRegion<nsRegion> r;
+  for (int i = 0; i < size; i++) {
+    r.OrWith(nsRect(i, i, i + 10, i + 10));
+  }
+  r.Region();
+
+  PingPongRegion<nsIntRegion> rInt;
+  for (int i = 0; i < size; i++) {
+    rInt.OrWith(nsIntRect(i, i, i + 10, i + 10));
+  }
+  rInt.Region();
+}
+
+MOZ_GTEST_BENCH(GfxBench, PingPongRegionOr, []{
+  BenchPingPongRegionOr();
+});
+

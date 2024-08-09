@@ -5,6 +5,10 @@
 {
     # Everything below this is duplicated in the GN build. If you change
     # anything also change angle/BUILD.gn
+    'variables':
+    {
+        'angle_standalone%': 0,
+    },
     'targets':
     [
         {
@@ -33,14 +37,6 @@
                 ['angle_build_winrt==1',
                 {
                     'msvs_requires_importlibrary' : 'true',
-                    'msvs_settings':
-                    {
-                        'VCLinkerTool':
-                        {
-                            'EnableCOMDATFolding': '1',
-                            'OptimizeReferences': '1',
-                        }
-                    },
                 }],
             ],
         },

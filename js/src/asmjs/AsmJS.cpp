@@ -96,7 +96,6 @@ enum AsmJSAtomicsBuiltinFunction
     AsmJSAtomicsBuiltin_exchange,
     AsmJSAtomicsBuiltin_load,
     AsmJSAtomicsBuiltin_store,
-    AsmJSAtomicsBuiltin_fence,
     AsmJSAtomicsBuiltin_add,
     AsmJSAtomicsBuiltin_sub,
     AsmJSAtomicsBuiltin_and,
@@ -1735,7 +1734,6 @@ class MOZ_STACK_CLASS ModuleValidator
             !addStandardLibraryAtomicsName("exchange", AsmJSAtomicsBuiltin_exchange) ||
             !addStandardLibraryAtomicsName("load", AsmJSAtomicsBuiltin_load) ||
             !addStandardLibraryAtomicsName("store", AsmJSAtomicsBuiltin_store) ||
-            !addStandardLibraryAtomicsName("fence", AsmJSAtomicsBuiltin_fence) ||
             !addStandardLibraryAtomicsName("add", AsmJSAtomicsBuiltin_add) ||
             !addStandardLibraryAtomicsName("sub", AsmJSAtomicsBuiltin_sub) ||
             !addStandardLibraryAtomicsName("and", AsmJSAtomicsBuiltin_and) ||
@@ -4107,16 +4105,6 @@ CheckSharedArrayAtomicAccess(FunctionValidator& f, ParseNode* viewName, ParseNod
 }
 
 static bool
-CheckAtomicsFence(FunctionValidator& f, ParseNode* call, Type* type)
-{
-    if (CallArgListLength(call) != 0)
-        return f.fail(call, "Atomics.fence must be passed 0 arguments");
-
-    *type = Type::Void;
-    return f.encoder().writeExpr(Expr::AtomicsFence);
-}
-
-static bool
 WriteAtomicOperator(FunctionValidator& f, Expr opcode, size_t* viewTypeAt)
 {
     return f.encoder().writeExpr(opcode) &&
@@ -4309,8 +4297,6 @@ CheckAtomicsBuiltinCall(FunctionValidator& f, ParseNode* callNode, AsmJSAtomicsB
         return CheckAtomicsLoad(f, callNode, type);
       case AsmJSAtomicsBuiltin_store:
         return CheckAtomicsStore(f, callNode, type);
-      case AsmJSAtomicsBuiltin_fence:
-        return CheckAtomicsFence(f, callNode, type);
       case AsmJSAtomicsBuiltin_add:
         return CheckAtomicsBinop(f, callNode, type, AtomicFetchAddOp);
       case AsmJSAtomicsBuiltin_sub:
@@ -7371,7 +7357,6 @@ ValidateAtomicsBuiltinFunction(JSContext* cx, const AsmJSGlobal& global, HandleV
       case AsmJSAtomicsBuiltin_exchange: native = atomics_exchange; break;
       case AsmJSAtomicsBuiltin_load: native = atomics_load; break;
       case AsmJSAtomicsBuiltin_store: native = atomics_store; break;
-      case AsmJSAtomicsBuiltin_fence: native = atomics_fence; break;
       case AsmJSAtomicsBuiltin_add: native = atomics_add; break;
       case AsmJSAtomicsBuiltin_sub: native = atomics_sub; break;
       case AsmJSAtomicsBuiltin_and: native = atomics_and; break;
@@ -7434,6 +7419,8 @@ CheckBuffer(JSContext* cx, AsmJSModule& module, HandleValue bufferVal,
                         "valid length is 0x%x",
                         heapLength,
                         RoundUpToNextValidAsmJSHeapLength(heapLength)));
+        if (!msg)
+            return false;
         return LinkFail(cx, msg.get());
     }
 
@@ -7446,6 +7433,8 @@ CheckBuffer(JSContext* cx, AsmJSModule& module, HandleValue bufferVal,
                         "by const heap accesses).",
                         heapLength,
                         module.minHeapLength()));
+        if (!msg)
+            return false;
         return LinkFail(cx, msg.get());
     }
 
@@ -7596,7 +7585,7 @@ HandleDynamicLinkFailure(JSContext* cx, const CallArgs& args, AsmJSModule& modul
 
     // Call the function we just recompiled.
     args.setCallee(ObjectValue(*fun));
-    return Invoke(cx, args, args.isConstructing() ? CONSTRUCT : NO_CONSTRUCT);
+    return InternalCallOrConstruct(cx, args, args.isConstructing() ? CONSTRUCT : NO_CONSTRUCT);
 }
 
 static WasmModuleObject*
@@ -8146,6 +8135,8 @@ LookupAsmJSModuleInCache(ExclusiveContext* cx, AsmJSParser& parser, bool* loaded
     int64_t usecAfter = PRMJ_Now();
     int ms = (usecAfter - usecBefore) / PRMJ_USEC_PER_MSEC;
     *compilationTimeReport = UniqueChars(JS_smprintf("loaded from cache in %dms", ms));
+    if (!*compilationTimeReport)
+        return false;
     return true;
 }
 
@@ -8177,7 +8168,7 @@ EstablishPreconditions(ExclusiveContext* cx, AsmJSParser& parser)
 
     switch (parser.options().asmJSOption) {
       case AsmJSOption::Disabled:
-        return Warn(parser, JSMSG_USE_ASM_TYPE_FAIL, "Disabled by javascript.options.asmjs in about:config");
+        return Warn(parser, JSMSG_USE_ASM_TYPE_FAIL, "Disabled by 'asmjs' runtime option");
       case AsmJSOption::DisabledByDebugger:
         return Warn(parser, JSMSG_USE_ASM_TYPE_FAIL, "Disabled by debugger");
       case AsmJSOption::Enabled:

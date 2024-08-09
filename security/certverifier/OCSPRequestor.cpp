@@ -8,8 +8,8 @@
 
 #include <limits>
 
+#include "ScopedNSSTypes.h"
 #include "mozilla/Base64.h"
-#include "mozilla/Scoped.h"
 #include "nsIURLParser.h"
 #include "nsNSSCallbacks.h"
 #include "nsNetCID.h"
@@ -32,13 +32,13 @@ ReleaseHttpRequestSession(nsNSSHttpRequestSession* httpRequestSession)
   httpRequestSession->Release();
 }
 
-MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE(ScopedHTTPServerSession,
-                                          nsNSSHttpServerSession,
-                                          ReleaseHttpServerSession)
+MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueHTTPServerSession,
+                                      nsNSSHttpServerSession,
+                                      ReleaseHttpServerSession)
 
-MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE(ScopedHTTPRequestSession,
-                                          nsNSSHttpRequestSession,
-                                          ReleaseHttpRequestSession)
+MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueHTTPRequestSession,
+                                      nsNSSHttpRequestSession,
+                                      ReleaseHttpRequestSession)
 
 } // namespace mozilla
 
@@ -71,12 +71,16 @@ AppendEscapedBase64Item(const SECItem* encodedRequest, nsACString& path)
 }
 
 Result
-DoOCSPRequest(PLArenaPool* arena, const char* url,
+DoOCSPRequest(const UniquePLArenaPool& arena, const char* url,
               const SECItem* encodedRequest, PRIntervalTime timeout,
               bool useGET,
       /*out*/ SECItem*& encodedResponse)
 {
-  if (!arena || !url || !encodedRequest || !encodedRequest->data) {
+  MOZ_ASSERT(arena.get());
+  MOZ_ASSERT(url);
+  MOZ_ASSERT(encodedRequest);
+  MOZ_ASSERT(encodedRequest->data);
+  if (!arena.get() || !url || !encodedRequest || !encodedRequest->data) {
     return Result::FATAL_ERROR_INVALID_ARGS;
   }
   uint32_t urlLen = PL_strlen(url);
@@ -142,7 +146,7 @@ DoOCSPRequest(PLArenaPool* arena, const char* url,
   if (rv != Success) {
     return rv;
   }
-  ScopedHTTPServerSession serverSession(
+  UniqueHTTPServerSession serverSession(
     reinterpret_cast<nsNSSHttpServerSession*>(serverSessionPtr));
 
   nsAutoCString path;
@@ -173,7 +177,7 @@ DoOCSPRequest(PLArenaPool* arena, const char* url,
     return rv;
   }
 
-  ScopedHTTPRequestSession requestSession(
+  UniqueHTTPRequestSession requestSession(
     reinterpret_cast<nsNSSHttpRequestSession*>(requestSessionPtr));
 
   if (!useGET) {
@@ -200,7 +204,7 @@ DoOCSPRequest(PLArenaPool* arena, const char* url,
     return Result::ERROR_OCSP_SERVER_ERROR;
   }
 
-  encodedResponse = SECITEM_AllocItem(arena, nullptr, httpResponseDataLen);
+  encodedResponse = SECITEM_AllocItem(arena.get(), nullptr, httpResponseDataLen);
   if (!encodedResponse) {
     return Result::FATAL_ERROR_NO_MEMORY;
   }

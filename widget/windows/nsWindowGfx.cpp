@@ -24,6 +24,7 @@ using mozilla::plugins::PluginInstanceParent;
 #include "nsWindowGfx.h"
 #include "nsAppRunner.h"
 #include <windows.h>
+#include "gfxEnv.h"
 #include "gfxImageSurface.h"
 #include "gfxUtils.h"
 #include "gfxWindowsSurface.h"
@@ -313,7 +314,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
     debug_DumpPaintEvent(stdout,
                          this,
                          region,
-                         nsAutoCString("noname"),
+                         "noname",
                          (int32_t) mWnd);
 #endif // WIDGET_DEBUG_OUTPUT
 
@@ -381,7 +382,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
             gfxPlatform::GetPlatform()->CreateDrawTargetForSurface(targetSurface,
                                                                    IntSize(paintRect.right - paintRect.left,
                                                                    paintRect.bottom - paintRect.top));
-          if (!dt) {
+          if (!dt || !dt->IsValid()) {
             gfxWarning() << "nsWindow::OnPaint failed in CreateDrawTargetForSurface";
             return false;
           }
@@ -410,7 +411,8 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
 #endif
           }
 
-          RefPtr<gfxContext> thebesContext = new gfxContext(dt);
+          RefPtr<gfxContext> thebesContext = gfxContext::ForDrawTarget(dt);
+          MOZ_ASSERT(thebesContext); // already checked draw target above
 
           {
             AutoLayerManagerSetup
@@ -526,9 +528,11 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
         {
           result = listener->PaintWindow(
             this, LayoutDeviceIntRegion::FromUnknownRegion(region));
-          nsCOMPtr<nsIRunnable> event =
-            NS_NewRunnableMethod(this, &nsWindow::ForcePresent);
-          NS_DispatchToMainThread(event);
+          if (!gfxEnv::DisableForcePresent() && gfxWindowsPlatform::GetPlatform()->DwmCompositionEnabled()) {
+            nsCOMPtr<nsIRunnable> event =
+              NS_NewRunnableMethod(this, &nsWindow::ForcePresent);
+            NS_DispatchToMainThread(event);
+          }
         }
         break;
       default:

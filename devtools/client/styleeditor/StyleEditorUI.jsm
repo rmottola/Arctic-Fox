@@ -369,6 +369,7 @@ StyleEditorUI.prototype = {
       NetUtil.asyncFetch({
         uri: NetUtil.newURI(selectedFile),
         loadingNode: this._window.document,
+        securityFlags: Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_INHERITS,
         contentPolicyType: Ci.nsIContentPolicy.TYPE_OTHER
       }, (stream, status) => {
         if (!Components.isSuccessCode(status)) {
@@ -835,7 +836,8 @@ StyleEditorUI.prototype = {
     text(summary, ".stylesheet-linked-file", linkedCSSFile);
     text(summary, ".stylesheet-title", editor.styleSheet.title || "");
     text(summary, ".stylesheet-rule-count",
-      PluralForm.get(ruleCount, _("ruleCount.label")).replace("#1", ruleCount));
+      PluralForm.get(ruleCount,
+                     getString("ruleCount.label")).replace("#1", ruleCount));
   },
 
   /**
@@ -945,11 +947,11 @@ StyleEditorUI.prototype = {
    * @param  {object} options
    *         Object with width or/and height properties.
    */
-  _launchResponsiveMode: function(options = {}) {
+  _launchResponsiveMode: Task.async(function*(options = {}) {
     let tab = this._target.tab;
     let win = this._target.tab.ownerGlobal;
 
-    ResponsiveUIManager.runIfNeeded(win, tab);
+    yield ResponsiveUIManager.runIfNeeded(win, tab);
     if (options.width && options.height) {
       ResponsiveUIManager.getResponsiveUIForTab(tab).setSize(options.width,
                                                              options.height);
@@ -958,7 +960,7 @@ StyleEditorUI.prototype = {
     } else if (options.height) {
       ResponsiveUIManager.getResponsiveUIForTab(tab).setHeight(options.height);
     }
-  },
+  }),
 
   /**
    * Jump cursor to the editor for a stylesheet and line number for a rule.

@@ -128,6 +128,10 @@ class DataTextureSource;
 class CompositingRenderTarget;
 class CompositorBridgeParent;
 class LayerManagerComposite;
+class CompositorOGL;
+class CompositorD3D9;
+class CompositorD3D11;
+class BasicCompositor;
 
 enum SurfaceInitMode
 {
@@ -200,6 +204,7 @@ public:
 
   virtual bool Initialize() = 0;
   virtual void Destroy() = 0;
+  virtual void DetachWidget() {}
 
   /**
    * Return true if the effect type is supported.
@@ -371,7 +376,7 @@ public:
   virtual void BeginFrame(const nsIntRegion& aInvalidRegion,
                           const gfx::Rect* aClipRectIn,
                           const gfx::Rect& aRenderBounds,
-                          bool aOpaque,
+                          const nsIntRegion& aOpaqueRegion,
                           gfx::Rect* aClipRectOut = nullptr,
                           gfx::Rect* aRenderBoundsOut = nullptr) = 0;
 
@@ -423,6 +428,11 @@ public:
 #endif // MOZ_DUMP_PAINTING
 
   virtual LayersBackend GetBackendType() const = 0;
+
+  virtual CompositorOGL* AsCompositorOGL() { return nullptr; }
+  virtual CompositorD3D9* AsCompositorD3D9() { return nullptr; }
+  virtual CompositorD3D11* AsCompositorD3D11() { return nullptr; }
+  virtual BasicCompositor* AsBasicCompositor() { return nullptr; }
 
   /**
    * Each Compositor has a unique ID.
@@ -516,6 +526,11 @@ public:
   TimeStamp GetCompositeUntilTime() const {
     return mCompositeUntilTime;
   }
+
+  // A stale Compositor has no CompositorBridgeParent; it will not process
+  // frames and should not be used.
+  void SetInvalid();
+  bool IsValid() const;
 
 protected:
   void DrawDiagnosticsInternal(DiagnosticFlags aFlags,

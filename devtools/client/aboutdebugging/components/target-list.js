@@ -2,14 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* global React */
-
 "use strict";
 
+const { createClass, DOM: dom } =
+  require("devtools/client/shared/vendor/react");
 const Services = require("Services");
-
-const React = require("devtools/client/shared/vendor/react");
-const { Target } = require("./target");
 
 const Strings = Services.strings.createBundle(
   "chrome://devtools/locale/aboutdebugging.properties");
@@ -18,20 +15,20 @@ const LocaleCompare = (a, b) => {
   return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
 };
 
-exports.TargetList = React.createClass({
+module.exports = createClass({
   displayName: "TargetList",
 
   render() {
-    let { client, debugDisabled } = this.props;
+    let { client, debugDisabled, targetClass } = this.props;
     let targets = this.props.targets.sort(LocaleCompare).map(target => {
-      return React.createElement(Target, { client, target, debugDisabled });
+      return targetClass({ client, target, debugDisabled });
     });
-    return (
-      React.createElement("div", { id: this.props.id, className: "targets" },
-        React.createElement("h4", null, this.props.name),
-        targets.length > 0 ? targets :
-          React.createElement("p", null, Strings.GetStringFromName("nothing"))
-      )
+
+    return dom.div({ id: this.props.id, className: "targets" },
+      dom.h4(null, this.props.name),
+      targets.length > 0 ?
+        targets :
+        dom.p(null, Strings.GetStringFromName("nothing"))
     );
   },
 });

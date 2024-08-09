@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE HTML>
+<!DOCTYPE HTML>
 <html>
 <head>
   <title>Test MediaRecorder Record Timeslice</title>
@@ -25,75 +25,76 @@ function startTest(test, token) {
   element.src = test.name;
   element.test = test;
   element.stream = element.mozCaptureStream();
+  element.preload = "auto";
 
-  var mediaRecorder = new MediaRecorder(element.stream);
+  // Set up MediaRecorder once loadedmetadata fires and tracks are available.
+  element.onloadedmetadata = function() {
+    element.onloadedmetadata = null;
 
-  mediaRecorder.onerror = function () {
-    ok(false, 'Unexpected onerror callback fired');
-  };
+    var mediaRecorder = new MediaRecorder(element.stream);
 
-  mediaRecorder.onwarning = function () {
-    ok(false, 'Unexpected onwarning callback fired');
-  };
+    mediaRecorder.onerror = function () {
+      ok(false, 'Unexpected onerror callback fired');
+    };
 
-  mediaRecorder.onstop = function () {
-    ok(false, 'Unexpected onstop callback fired');
-  };
+    mediaRecorder.onwarning = function () {
+      ok(false, 'Unexpected onwarning callback fired');
+    };
 
-  var dataAvailableCount = 0;
-  var onDataAvailableFirst = false;
+    mediaRecorder.onstop = function () {
+      ok(false, 'Unexpected onstop callback fired');
+    };
 
-  // This handler fires every 250ms to generate a blob.
-  mediaRecorder.ondataavailable = function (evt) {
-    info('ondataavailable fired');
-    dataAvailableCount++;
+    var dataAvailableCount = 0;
+    var onDataAvailableFirst = false;
 
-    ok(evt instanceof BlobEvent,
-       'Events fired from ondataavailable should be BlobEvent');
-    is(evt.type, 'dataavailable',
-       'Event type should dataavailable');
-    ok(evt.data.size >= 0,
-       'Blob data size received is greater than or equal to zero');
+    // This handler fires every 250ms to generate a blob.
+    mediaRecorder.ondataavailable = function (evt) {
+      info('ondataavailable fired');
+      dataAvailableCount++;
 
-    is(evt.data.type, expectedMimeType,
-       'Blob data received should have type = ' + expectedMimeType);
-    is(mediaRecorder.mimeType, expectedMimeType,
-       'Mime type in ondataavailable = ' + mediaRecorder.mimeType);
+      ok(evt instanceof BlobEvent,
+         'Events fired from ondataavailable should be BlobEvent');
+      is(evt.type, 'dataavailable',
+         'Event type should dataavailable');
+      ok(evt.data.size >= 0,
+         'Blob data size received is greater than or equal to zero');
 
-    // We'll stop recording upon the 1st blob being received
-    if (dataAvailableCount === 1) {
-      mediaRecorder.onstop = function (evt) {
-        info('onstop fired');
+      is(evt.data.type, expectedMimeType,
+         'Blob data received should have type = ' + expectedMimeType);
+      is(mediaRecorder.mimeType, expectedMimeType,
+         'Mime type in ondataavailable = ' + mediaRecorder.mimeType);
 
-        if (!onDataAvailableFirst) {
-          ok(false, 'onstop unexpectedly fired before ondataavailable');
-        }
+      // We'll stop recording upon the 1st blob being received
+      if (dataAvailableCount === 1) {
+        mediaRecorder.onstop = function (evt) {
+          info('onstop fired');
 
-        manager.finished(token);
-      };
+          if (!onDataAvailableFirst) {
+            ok(false, 'onstop unexpectedly fired before ondataavailable');
+          }
+          element.pause();
+          manager.finished(token);
+        };
 
-      mediaRecorder.stop();
-      is(mediaRecorder.state, 'inactive',
-         'Media recorder is inactive after being stopped');
-      is(mediaRecorder.stream, element.stream,
-         'Media recorder stream = element stream post recording');
+        mediaRecorder.stop();
+        is(mediaRecorder.state, 'inactive',
+           'Media recorder is inactive after being stopped');
+        is(mediaRecorder.stream, element.stream,
+           'Media recorder stream = element stream post recording');
 
-    } else if (dataAvailableCount === 2) {
-      // Ensure we've received at least two ondataavailable events before onstop
-      onDataAvailableFirst = true;
-    }
-  };
+      } else if (dataAvailableCount === 2) {
+        // Ensure we've received at least two ondataavailable events before onstop
+        onDataAvailableFirst = true;
+      }
+    };
 
-  // Start recording once canplaythrough fires
-  element.oncanplaythrough = function() {
-    element.oncanplaythrough = null;
     mediaRecorder.start(250);
+    element.play();
     is(mediaRecorder.state, 'recording', 'Media recorder should be recording');
     is(mediaRecorder.stream, element.stream,
        'Media recorder stream = element stream at the start of recording');
   };
-
-  element.play();
 }
 
 manager.runTests(gMediaRecorderTests, startTest);

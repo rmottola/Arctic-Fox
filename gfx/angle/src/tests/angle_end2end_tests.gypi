@@ -23,10 +23,12 @@
             '<(angle_path)/src/tests/gl_tests/CopyTexImageTest.cpp',
             '<(angle_path)/src/tests/gl_tests/CubeMapTextureTest.cpp',
             '<(angle_path)/src/tests/gl_tests/DebugMarkerTest.cpp',
+            '<(angle_path)/src/tests/gl_tests/DebugTest.cpp',
             '<(angle_path)/src/tests/gl_tests/DepthStencilFormatsTest.cpp',
             '<(angle_path)/src/tests/gl_tests/DiscardFramebufferEXTTest.cpp',
             '<(angle_path)/src/tests/gl_tests/DrawBuffersTest.cpp',
             '<(angle_path)/src/tests/gl_tests/DrawElementsTest.cpp',
+            '<(angle_path)/src/tests/gl_tests/ETCTextureTest.cpp',
             '<(angle_path)/src/tests/gl_tests/FenceSyncTests.cpp',
             '<(angle_path)/src/tests/gl_tests/FramebufferFormatsTest.cpp',
             '<(angle_path)/src/tests/gl_tests/FramebufferRenderMipmapTest.cpp',
@@ -45,6 +47,7 @@
             '<(angle_path)/src/tests/gl_tests/PBOExtensionTest.cpp',
             '<(angle_path)/src/tests/gl_tests/PointSpritesTest.cpp',
             '<(angle_path)/src/tests/gl_tests/ProvokingVertexTest.cpp',
+            '<(angle_path)/src/tests/gl_tests/ObjectAllocationTest.cpp',
             '<(angle_path)/src/tests/gl_tests/OcclusionQueriesTest.cpp',
             '<(angle_path)/src/tests/gl_tests/ProgramBinaryTest.cpp',
             '<(angle_path)/src/tests/gl_tests/ReadPixelsTest.cpp',
@@ -52,8 +55,10 @@
             '<(angle_path)/src/tests/gl_tests/SimpleOperationTest.cpp',
             '<(angle_path)/src/tests/gl_tests/SixteenBppTextureTest.cpp',
             '<(angle_path)/src/tests/gl_tests/SRGBTextureTest.cpp',
+            '<(angle_path)/src/tests/gl_tests/StateChangeTest.cpp',
             '<(angle_path)/src/tests/gl_tests/SwizzleTest.cpp',
             '<(angle_path)/src/tests/gl_tests/TextureTest.cpp',
+            '<(angle_path)/src/tests/gl_tests/TimerQueriesTest.cpp',
             '<(angle_path)/src/tests/gl_tests/TransformFeedbackTest.cpp',
             '<(angle_path)/src/tests/gl_tests/UniformBufferTest.cpp',
             '<(angle_path)/src/tests/gl_tests/UniformTest.cpp',
@@ -77,9 +82,14 @@
             '<(angle_path)/src/tests/gl_tests/D3D11EmulatedIndexedBufferTest.cpp',
             '<(angle_path)/src/tests/gl_tests/D3D11FormatTablesTest.cpp',
             '<(angle_path)/src/tests/gl_tests/D3D11InputLayoutCacheTest.cpp',
-            '<(angle_path)/src/tests/gl_tests/QueryDisplayAttribTest.cpp',
+            '<(angle_path)/src/tests/egl_tests/EGLDeviceTest.cpp',
+            '<(angle_path)/src/tests/egl_tests/EGLPresentPathD3D11Test.cpp',
             # TODO(cwallez) for Linux, requires a portable implementation of threads
             '<(angle_path)/src/tests/egl_tests/EGLThreadTest.cpp',
+        ],
+        'angle_end2end_tests_x11_sources':
+        [
+            '<(angle_path)/src/tests/egl_tests/EGLX11VisualTest.cpp',
         ],
     },
     'dependencies':
@@ -106,6 +116,13 @@
             'sources':
             [
                 '<@(angle_end2end_tests_win_sources)',
+            ],
+        }],
+        ['use_x11==1',
+        {
+            'sources':
+            [
+                '<@(angle_end2end_tests_x11_sources)',
             ],
         }],
     ]

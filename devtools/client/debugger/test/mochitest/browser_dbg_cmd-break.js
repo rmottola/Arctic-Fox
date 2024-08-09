@@ -1,5 +1,7 @@
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 /* Any copyright is dedicated to the Public Domain.
-   http://creativecommons.org/publicdomain/zero/1.0/ */
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
 /**
  * Tests that the break commands works as they should.
@@ -147,7 +149,7 @@ function test() {
           args: {
             breakpoint: {
               status: 'INCOMPLETE',
-              message: 'Value required for \'breakpoint\'.'
+              message: 'Value required for \u2018breakpoint\u2019.'
             }
           }
         }

@@ -24,7 +24,6 @@
 #include "TextureClientPool.h"
 #include "nsDebug.h"                    // for NS_ASSERTION
 #include "nsISupportsImpl.h"            // for gfxContext::AddRef, etc
-#include "gfxReusableSharedImageSurfaceWrapper.h"
 #include "nsExpirationTracker.h"        // for nsExpirationTracker
 #include "nsMathUtils.h"               // for NS_lroundf
 #include "LayersLogging.h"
@@ -933,11 +932,12 @@ ClientMultiTiledLayerBuffer::PaintThebes(const nsIntRegion& aNewValidRegion,
             gfxPlatform::GetPlatform()->Optimal2DFormatForContent(
               GetContentType()));
 
-        if (!mSinglePaintDrawTarget) {
+        if (!mSinglePaintDrawTarget || !mSinglePaintDrawTarget->IsValid()) {
           return;
         }
 
-        ctxt = new gfxContext(mSinglePaintDrawTarget);
+        ctxt = gfxContext::ForDrawTarget(mSinglePaintDrawTarget);
+        MOZ_ASSERT(ctxt); // already checked draw target above
 
         mSinglePaintBufferOffset = nsIntPoint(bounds.x, bounds.y);
       }
@@ -1158,9 +1158,14 @@ void ClientMultiTiledLayerBuffer::Update(const nsIntRegion& newValidRegion,
       tileset.mTiles = &mMoz2DTiles[0];
       tileset.mTileCount = mMoz2DTiles.size();
       RefPtr<DrawTarget> drawTarget = gfx::Factory::CreateTiledDrawTarget(tileset);
+      if (!drawTarget || !drawTarget->IsValid()) {
+        gfxDevCrash(LogReason::InvalidContext) << "Invalid tiled draw target";
+        return;
+      }
       drawTarget->SetTransform(Matrix());
 
-      RefPtr<gfxContext> ctx = new gfxContext(drawTarget);
+      RefPtr<gfxContext> ctx = gfxContext::ForDrawTarget(drawTarget);
+      MOZ_ASSERT(ctx); // already checked the draw target above
       ctx->SetMatrix(
         ctx->CurrentMatrix().Scale(mResolution, mResolution).Translate(ThebesPoint(-mTilingOrigin)));
 

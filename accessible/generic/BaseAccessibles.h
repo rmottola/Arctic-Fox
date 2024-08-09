@@ -40,9 +40,6 @@ public:
 
 protected:
   virtual ~LeafAccessible() {}
-
-  // Accessible
-  virtual void CacheChildren() override;
 };
 
 /**

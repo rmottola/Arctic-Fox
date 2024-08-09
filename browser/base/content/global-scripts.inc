@@ -14,6 +14,7 @@
 
 <script type="application/javascript" src="chrome://browser/content/browser-addons.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-ctrlTab.js"/>
+<script type="application/javascript" src="chrome://browser/content/browser-customization.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-devedition.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-feeds.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-fullScreen.js"/>
@@ -27,6 +28,7 @@
 #endif
 <script type="application/javascript" src="chrome://browser/content/browser-sidebar.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-syncui.js"/>
+<script type="application/javascript" src="chrome://browser/content/browser-tabsintitlebar.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-tabview.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-thumbnails.js"/>
 

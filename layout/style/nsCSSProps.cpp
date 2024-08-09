@@ -890,13 +890,30 @@ const KTableEntry nsCSSProps::kImageLayerAttachmentKTable[] = {
 static_assert(NS_STYLE_IMAGELAYER_CLIP_BORDER == NS_STYLE_IMAGELAYER_ORIGIN_BORDER &&
               NS_STYLE_IMAGELAYER_CLIP_PADDING == NS_STYLE_IMAGELAYER_ORIGIN_PADDING &&
               NS_STYLE_IMAGELAYER_CLIP_CONTENT == NS_STYLE_IMAGELAYER_ORIGIN_CONTENT,
-              "bg-clip and bg-origin style constants must agree");
+              "Except background-clip:text, all {background,mask}-clip and "
+              "{background,mask}-origin style constants must agree");
+
 const KTableEntry nsCSSProps::kImageLayerOriginKTable[] = {
   { eCSSKeyword_border_box, NS_STYLE_IMAGELAYER_ORIGIN_BORDER },
   { eCSSKeyword_padding_box, NS_STYLE_IMAGELAYER_ORIGIN_PADDING },
   { eCSSKeyword_content_box, NS_STYLE_IMAGELAYER_ORIGIN_CONTENT },
   { eCSSKeyword_UNKNOWN, -1 }
 };
+
+KTableEntry nsCSSProps::kBackgroundClipKTable[] = {
+  { eCSSKeyword_border_box, NS_STYLE_IMAGELAYER_CLIP_BORDER },
+  { eCSSKeyword_padding_box, NS_STYLE_IMAGELAYER_CLIP_PADDING },
+  { eCSSKeyword_content_box, NS_STYLE_IMAGELAYER_CLIP_CONTENT },
+  // The next entry is controlled by the layout.css.background-clip-text.enabled
+  // pref.
+  { eCSSKeyword_text, NS_STYLE_IMAGELAYER_CLIP_TEXT },
+  { eCSSKeyword_UNKNOWN, -1 }
+};
+
+static_assert(MOZ_ARRAY_LENGTH(nsCSSProps::kImageLayerOriginKTable) ==
+              MOZ_ARRAY_LENGTH(nsCSSProps::kBackgroundClipKTable) - 1,
+              "background-clip has one extra value, which is text, compared"
+              "to {background,mask}-origin");
 
 // Note: Don't change this table unless you update
 // ParseImageLayerPosition!
@@ -1270,6 +1287,9 @@ KTableEntry nsCSSProps::kDisplayKTable[] = {
   // The next two entries are controlled by the layout.css.grid.enabled pref.
   { eCSSKeyword_grid,                NS_STYLE_DISPLAY_GRID },
   { eCSSKeyword_inline_grid,         NS_STYLE_DISPLAY_INLINE_GRID },
+  // The next two entries are controlled by the layout.css.prefixes.webkit pref.
+  { eCSSKeyword__webkit_box,         NS_STYLE_DISPLAY_WEBKIT_BOX },
+  { eCSSKeyword__webkit_inline_box,  NS_STYLE_DISPLAY_WEBKIT_INLINE_BOX },
   // The next entry is controlled by the layout.css.display-contents.enabled
   // pref.
   { eCSSKeyword_contents,            NS_STYLE_DISPLAY_CONTENTS },
@@ -2087,7 +2107,7 @@ const KTableEntry nsCSSProps::kTransitionTimingFunctionKTable[] = {
 const KTableEntry nsCSSProps::kUnicodeBidiKTable[] = {
   { eCSSKeyword_normal, NS_STYLE_UNICODE_BIDI_NORMAL },
   { eCSSKeyword_embed, NS_STYLE_UNICODE_BIDI_EMBED },
-  { eCSSKeyword_bidi_override, NS_STYLE_UNICODE_BIDI_OVERRIDE },
+  { eCSSKeyword_bidi_override, NS_STYLE_UNICODE_BIDI_BIDI_OVERRIDE },
   { eCSSKeyword__moz_isolate, NS_STYLE_UNICODE_BIDI_ISOLATE },
   { eCSSKeyword__moz_isolate_override, NS_STYLE_UNICODE_BIDI_ISOLATE_OVERRIDE },
   { eCSSKeyword__moz_plaintext, NS_STYLE_UNICODE_BIDI_PLAINTEXT },
@@ -2366,6 +2386,12 @@ const KTableEntry nsCSSProps::kTextRenderingKTable[] = {
 const KTableEntry nsCSSProps::kVectorEffectKTable[] = {
   { eCSSKeyword_none, NS_STYLE_VECTOR_EFFECT_NONE },
   { eCSSKeyword_non_scaling_stroke, NS_STYLE_VECTOR_EFFECT_NON_SCALING_STROKE },
+  { eCSSKeyword_UNKNOWN, -1 }
+};
+
+const KTableEntry nsCSSProps::kColorAdjustKTable[] = {
+  { eCSSKeyword_economy, NS_STYLE_COLOR_ADJUST_ECONOMY },
+  { eCSSKeyword_exact, NS_STYLE_COLOR_ADJUST_EXACT },
   { eCSSKeyword_UNKNOWN, -1 }
 };
 
@@ -2826,6 +2852,13 @@ static const nsCSSProperty gFlexFlowSubpropTable[] = {
   eCSSProperty_UNKNOWN
 };
 
+static const nsCSSProperty gGridTemplateSubpropTable[] = {
+  eCSSProperty_grid_template_areas,
+  eCSSProperty_grid_template_rows, 
+  eCSSProperty_grid_template_columns,
+  eCSSProperty_UNKNOWN
+};
+
 static const nsCSSProperty gGridSubpropTable[] = {
   eCSSProperty_grid_template_areas,
   eCSSProperty_grid_template_rows,
@@ -2889,6 +2922,12 @@ static const nsCSSProperty gTextDecorationSubpropTable[] = {
 static const nsCSSProperty gTextEmphasisSubpropTable[] = {
   eCSSProperty_text_emphasis_style,
   eCSSProperty_text_emphasis_color,
+  eCSSProperty_UNKNOWN
+};
+
+static const nsCSSProperty gWebkitTextStrokeSubpropTable[] = {
+  eCSSProperty__webkit_text_stroke_width,
+  eCSSProperty__webkit_text_stroke_color,
   eCSSProperty_UNKNOWN
 };
 
@@ -2985,19 +3024,12 @@ static const nsCSSProperty gSizeLogicalGroupTable[] = {
   eCSSProperty_UNKNOWN
 };
 
-static const nsCSSProperty gWebkitBoxOrientLogicalGroupTable[] = {
-  eCSSProperty_flex_direction,
-  eCSSProperty_UNKNOWN
-};
-
 const nsCSSProperty* const
 nsCSSProps::kLogicalGroupTable[eCSSPropertyLogicalGroup_COUNT] = {
 #define CSS_PROP_LOGICAL_GROUP_SHORTHAND(id_) g##id_##SubpropTable,
 #define CSS_PROP_LOGICAL_GROUP_AXIS(name_) g##name_##LogicalGroupTable,
 #define CSS_PROP_LOGICAL_GROUP_BOX(name_) g##name_##LogicalGroupTable,
-#define CSS_PROP_LOGICAL_GROUP_SINGLE(name_) g##name_##LogicalGroupTable,
 #include "nsCSSPropLogicalGroupList.h"
-#undef CSS_PROP_LOGICAL_GROUP_SINGLE
 #undef CSS_PROP_LOGICAL_GROUP_BOX
 #undef CSS_PROP_LOGICAL_GROUP_AXIS
 #undef CSS_PROP_LOGICAL_GROUP_SHORTHAND
@@ -3142,13 +3174,6 @@ enum ContentCheckCounter {
   ePropertyCount_for_Content
 };
 
-enum QuotesCheckCounter {
-  #define CSS_PROP_QUOTES ENUM_DATA_FOR_PROPERTY
-  #include "nsCSSPropList.h"
-  #undef CSS_PROP_QUOTES
-  ePropertyCount_for_Quotes
-};
-
 enum TextCheckCounter {
   #define CSS_PROP_TEXT ENUM_DATA_FOR_PROPERTY
   #include "nsCSSPropList.h"
@@ -3210,6 +3235,13 @@ enum VariablesCheckCounter {
   #include "nsCSSPropList.h"
   #undef CSS_PROP_VARIABLES
   ePropertyCount_for_Variables
+};
+
+enum EffectsCheckCounter {
+  #define CSS_PROP_EFFECTS ENUM_DATA_FOR_PROPERTY
+  #include "nsCSSPropList.h"
+  #undef CSS_PROP_EFFECTS
+  ePropertyCount_for_Effects
 };
 
 #undef ENUM_DATA_FOR_PROPERTY
@@ -3298,10 +3330,7 @@ nsCSSProps::gPropertyUseCounter[eCSSProperty_COUNT_no_shorthands] = {
                 "the CSS_PROPERTY_LOGICAL_BLOCK_AXIS flag");                \
   static_assert(!((flags_) & CSS_PROPERTY_LOGICAL_END_EDGE),                \
                 "only properties defined with CSS_PROP_LOGICAL can use "    \
-                "the CSS_PROPERTY_LOGICAL_END_EDGE flag");                  \
-  static_assert(!((flags_) & CSS_PROPERTY_LOGICAL_SINGLE_CUSTOM_VALMAPPING),\
-                "only properties defined with CSS_PROP_LOGICAL can use "    \
-                "the CSS_PROPERTY_LOGICAL_SINGLE_CUSTOM_VALMAPPING flag");
+                "the CSS_PROPERTY_LOGICAL_END_EDGE flag");
 #define CSS_PROP_LOGICAL(name_, id_, method_, flags_, pref_, parsevariant_, \
                          kwtable_, group_, stylestruct_,                    \
                          stylestructoffset_, animtype_)                     \
@@ -3314,21 +3343,7 @@ nsCSSProps::gPropertyUseCounter[eCSSProperty_COUNT_no_shorthands] = {
   static_assert(!(((flags_) & CSS_PROPERTY_LOGICAL_AXIS) &&                 \
                   ((flags_) & CSS_PROPERTY_LOGICAL_END_EDGE)),              \
                 "CSS_PROPERTY_LOGICAL_END_EDGE makes no sense when used "   \
-                "with CSS_PROPERTY_LOGICAL_AXIS");                          \
-  /* Make sure CSS_PROPERTY_LOGICAL_SINGLE_CUSTOM_VALMAPPING isn't used */  \
-  /* with other mutually-exclusive flags: */                                \
-  static_assert(!(((flags_) & CSS_PROPERTY_LOGICAL_AXIS) &&                 \
-                  ((flags_) & CSS_PROPERTY_LOGICAL_SINGLE_CUSTOM_VALMAPPING)),\
-                "CSS_PROPERTY_LOGICAL_SINGLE_CUSTOM_VALMAPPING makes no "   \
-                "sense when used with CSS_PROPERTY_LOGICAL_AXIS");          \
-  static_assert(!(((flags_) & CSS_PROPERTY_LOGICAL_BLOCK_AXIS) &&           \
-                  ((flags_) & CSS_PROPERTY_LOGICAL_SINGLE_CUSTOM_VALMAPPING)),\
-                "CSS_PROPERTY_LOGICAL_SINGLE_CUSTOM_VALMAPPING makes no "   \
-                "sense when used with CSS_PROPERTY_LOGICAL_BLOCK_AXIS");    \
-  static_assert(!(((flags_) & CSS_PROPERTY_LOGICAL_END_EDGE) &&             \
-                  ((flags_) & CSS_PROPERTY_LOGICAL_SINGLE_CUSTOM_VALMAPPING)),\
-                "CSS_PROPERTY_LOGICAL_SINGLE_CUSTOM_VALMAPPING makes no "   \
-                "sense when used with CSS_PROPERTY_LOGICAL_END_EDGE");
+                "with CSS_PROPERTY_LOGICAL_AXIS");
 #include "nsCSSPropList.h"
 #undef CSS_PROP_LOGICAL
 #undef CSS_PROP

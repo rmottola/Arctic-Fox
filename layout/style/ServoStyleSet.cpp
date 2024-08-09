@@ -7,13 +7,16 @@
 #include "mozilla/ServoStyleSet.h"
 
 #include "nsCSSAnonBoxes.h"
+#include "nsCSSPseudoElements.h"
+#include "nsStyleContext.h"
 #include "nsStyleSet.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
 
 ServoStyleSet::ServoStyleSet()
-  : mRawSet(Servo_InitStyleSet())
+  : mPresContext(nullptr)
+  , mRawSet(Servo_InitStyleSet())
   , mBatching(0)
 {
 }
@@ -21,6 +24,7 @@ ServoStyleSet::ServoStyleSet()
 void
 ServoStyleSet::Init(nsPresContext* aPresContext)
 {
+  mPresContext = aPresContext;
 }
 
 void
@@ -69,7 +73,18 @@ already_AddRefed<nsStyleContext>
 ServoStyleSet::ResolveStyleFor(Element* aElement,
                                nsStyleContext* aParentContext)
 {
-  MOZ_CRASH("stylo: not implemented");
+  RefPtr<ServoComputedValues> computedValues = dont_AddRef(Servo_GetComputedValues(aElement));
+  MOZ_ASSERT(computedValues);
+
+  // XXXbholley: nsStyleSet does visited handling here.
+
+  // XXXbholley: Figure out the correct thing to pass here. Does this fixup
+  // duplicate something that servo already does?
+  bool skipFixup = false;
+
+  return NS_NewStyleContext(aParentContext, mPresContext, nullptr,
+                            CSSPseudoElementType::NotPseudo,
+                            computedValues.forget(), skipFixup);
 }
 
 already_AddRefed<nsStyleContext>
@@ -81,7 +96,8 @@ ServoStyleSet::ResolveStyleFor(Element* aElement,
 }
 
 already_AddRefed<nsStyleContext>
-ServoStyleSet::ResolveStyleForNonElement(nsStyleContext* aParentContext)
+ServoStyleSet::ResolveStyleForNonElement(nsStyleContext* aParentContext,
+                                         nsIAtom* aPseudoTag)
 {
   MOZ_CRASH("stylo: not implemented");
 }
@@ -103,12 +119,20 @@ ServoStyleSet::ResolveAnonymousBoxStyle(nsIAtom* aPseudoTag,
 {
   MOZ_ASSERT(nsCSSAnonBoxes::IsAnonBox(aPseudoTag));
 
-  // FIXME(heycam): Do something with eSkipParentDisplayBasedStyleFixup,
-  // which is the only value of aFlags that can be passed in.
   MOZ_ASSERT(aFlags == 0 ||
              aFlags == nsStyleSet::eSkipParentDisplayBasedStyleFixup);
+  bool skipFixup = aFlags & nsStyleSet::eSkipParentDisplayBasedStyleFixup;
 
-  MOZ_CRASH("stylo: not implemented");
+  ServoComputedValues* parentStyle =
+    aParentContext ? aParentContext->StyleSource().AsServoComputedValues()
+                   : nullptr;
+  RefPtr<ServoComputedValues> computedValues =
+    dont_AddRef(Servo_GetComputedValuesForAnonymousBox(parentStyle, aPseudoTag));
+  MOZ_ASSERT(computedValues);
+
+  return NS_NewStyleContext(aParentContext, mPresContext, nullptr,
+                            CSSPseudoElementType::AnonBox,
+                            computedValues.forget(), skipFixup);
 }
 
 // manage the set of style sheets in the style set
@@ -122,6 +146,9 @@ ServoStyleSet::AppendStyleSheet(SheetType aType,
 
   mSheets[aType].RemoveElement(aSheet);
   mSheets[aType].AppendElement(aSheet);
+
+  // Maintain a mirrored list of sheets on the servo side.
+  Servo_AppendStyleSheet(aSheet->RawSheet(), mRawSet.get());
 
   return NS_OK;
 }
@@ -137,6 +164,9 @@ ServoStyleSet::PrependStyleSheet(SheetType aType,
   mSheets[aType].RemoveElement(aSheet);
   mSheets[aType].InsertElementAt(0, aSheet);
 
+  // Maintain a mirrored list of sheets on the servo side.
+  Servo_PrependStyleSheet(aSheet->RawSheet(), mRawSet.get());
+
   return NS_OK;
 }
 
@@ -144,7 +174,16 @@ nsresult
 ServoStyleSet::RemoveStyleSheet(SheetType aType,
                                 ServoStyleSheet* aSheet)
 {
-  MOZ_CRASH("stylo: not implemented");
+  MOZ_ASSERT(aSheet);
+  MOZ_ASSERT(aSheet->IsApplicable());
+  MOZ_ASSERT(nsStyleSet::IsCSSSheetType(aType));
+
+  mSheets[aType].RemoveElement(aSheet);
+
+  // Maintain a mirrored list of sheets on the servo side.
+  Servo_RemoveStyleSheet(aSheet->RawSheet(), mRawSet.get());
+
+  return NS_OK;
 }
 
 nsresult
@@ -187,7 +226,9 @@ nsresult
 ServoStyleSet::AddDocStyleSheet(ServoStyleSheet* aSheet,
                                 nsIDocument* aDocument)
 {
-  MOZ_CRASH("stylo: not implemented");
+  // XXXbholley: Implement this.
+  NS_ERROR("stylo: no support for adding doc stylesheets to ServoStyleSet");
+  return NS_OK;
 }
 
 already_AddRefed<nsStyleContext>

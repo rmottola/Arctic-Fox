@@ -468,6 +468,11 @@ EGLAPI EGLBoolean EGLAPIENTRY eglQuerySurfacePointerANGLE (EGLDisplay dpy, EGLSu
 #define EGL_ANGLE_surface_d3d_texture_2d_share_handle 1
 #endif /* EGL_ANGLE_surface_d3d_texture_2d_share_handle */
 
+#ifndef EGL_ANGLE_direct_composition
+#define EGL_ANGLE_direct_composition 1
+#define EGL_DIRECT_COMPOSITION_ANGLE 0x33A5
+#endif /* EGL_ANGLE_direct_composition */
+
 #ifndef EGL_ANGLE_platform_angle
 #define EGL_ANGLE_platform_angle 1
 #define EGL_PLATFORM_ANGLE_ANGLE          0x3202
@@ -498,6 +503,31 @@ EGLAPI EGLBoolean EGLAPIENTRY eglQuerySurfacePointerANGLE (EGLDisplay dpy, EGLSu
 #define EGL_ANGLE_window_fixed_size 1
 #define EGL_FIXED_SIZE_ANGLE              0x3201
 #endif /* EGL_ANGLE_window_fixed_size */
+
+#ifndef EGL_ANGLE_x11_visual
+#define EGL_ANGLE_x11_visual
+#define EGL_X11_VISUAL_ID_ANGLE 0x33A3
+#endif /* EGL_ANGLE_x11_visual */
+
+#ifndef EGL_ANGLE_flexible_surface_compatibility
+#define EGL_ANGLE_flexible_surface_compatibility 1
+#define EGL_FLEXIBLE_SURFACE_COMPATIBILITY_SUPPORTED_ANGLE 0x33A6
+#endif /* EGL_ANGLE_flexible_surface_compatibility */
+
+#ifndef EGL_ANGLE_surface_orientation
+#define EGL_ANGLE_surface_orientation
+#define EGL_OPTIMAL_SURFACE_ORIENTATION_ANGLE 0x33A7
+#define EGL_SURFACE_ORIENTATION_ANGLE 0x33A8
+#define EGL_SURFACE_ORIENTATION_INVERT_X_ANGLE 0x0001
+#define EGL_SURFACE_ORIENTATION_INVERT_Y_ANGLE 0x0002
+#endif /* EGL_ANGLE_surface_orientation */
+
+#ifndef EGL_ANGLE_experimental_present_path
+#define EGL_ANGLE_experimental_present_path
+#define EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE 0x33A4
+#define EGL_EXPERIMENTAL_PRESENT_PATH_FAST_ANGLE 0x33A9
+#define EGL_EXPERIMENTAL_PRESENT_PATH_COPY_ANGLE 0x33AA
+#endif /* EGL_ANGLE_experimental_present_path */
 
 #ifndef EGL_ARM_pixmap_multisample_discard
 #define EGL_ARM_pixmap_multisample_discard 1
@@ -538,6 +568,16 @@ EGLAPI EGLBoolean EGLAPIENTRY eglQueryDevicesEXT (EGLint max_devices, EGLDeviceE
 EGLAPI EGLBoolean EGLAPIENTRY eglQueryDisplayAttribEXT (EGLDisplay dpy, EGLint attribute, EGLAttrib *value);
 #endif
 #endif /* EGL_EXT_device_base */
+
+#ifndef EGL_ANGLE_device_creation
+#define EGL_ANGLE_device_creation 1
+typedef EGLDeviceEXT (EGLAPIENTRYP PFNEGLCREATEDEVICEANGLEPROC) (EGLint device_type, void *native_device, const EGLAttrib *attrib_list);
+typedef EGLBoolean (EGLAPIENTRYP PFNEGLRELEASEDEVICEANGLEPROC) (EGLDeviceEXT device);
+#ifdef EGL_EGLEXT_PROTOTYPES
+EGLAPI EGLDeviceEXT EGLAPIENTRY eglCreateDeviceANGLE (EGLint device_type, void *native_device, const EGLAttrib *attrib_list);
+EGLAPI EGLBoolean EGLAPIENTRY eglReleaseDeviceANGLE (EGLDeviceEXT device);
+#endif
+#endif /* EGL_ANGLE_device_creation */
 
 #ifndef EGL_EXT_device_drm
 #define EGL_EXT_device_drm 1

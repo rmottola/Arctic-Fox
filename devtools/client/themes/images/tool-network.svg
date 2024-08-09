@@ -1,9 +1,9 @@
 <!-- This Source Code Form is subject to the terms of the Mozilla Public
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
-<svg height="16" width="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="whitesmoke">
-    <path d="M28.2 10.6H4.6c-1 0-1.9-.8-1.9-1.9s.8-1.9 1.9-1.9h23.6c1 0 1.9.8 1.9 1.9s-.8 1.9-1.9 1.9z"/>
-    <path opacity="0.75" d="M35.4 18.1H16.7c-1 0-1.9-.8-1.9-1.9s.8-1.9 1.9-1.9h18.7c1 0 1.9.8 1.9 1.9s-.9 1.9-1.9 1.9z"/>
-    <path d="M21 25.6h-8.7c-1 0-1.9-.8-1.9-1.9s.8-1.9 1.9-1.9H21c1 0 1.9.8 1.9 1.9s-.9 1.9-1.9 1.9z"/>
-    <path opacity="0.75" d="M12.3 33.2H6.4c-1 0-1.9-.8-1.9-1.9 0-1 .8-1.9 1.9-1.9h5.9c1 0 1.9.8 1.9 1.9 0 1.1-.8 1.9-1.9 1.9z"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="whitesmoke">
+  <path opacity="0.5" d="M10.7 3.3c0-.2-.2-.4-.4-.4H2.8c-.2 0-.4.3-.4.5s.2.5.4.5h7.5c.2 0 .4-.3.4-.5"/>
+  <path d="M12.7 6.4c0-.2-.2-.4-.4-.4H4.8c-.2 0-.4.3-.4.5s.2.5.4.5h7.5c.2 0 .4-.3.4-.5"/>
+  <path opacity="0.5" d="M10.7 9.3c0-.2-.2-.4-.4-.4H3.8c-.2 0-.4.3-.4.5s.2.5.4.5h6.5c.2 0 .4-.3.4-.5"/>
+  <path d="M6.7 12.3c0-.2-.2-.4-.4-.4H2.8c-.2 0-.4.3-.4.5s.2.5.4.5h3.5c.2 0 .4-.3.4-.5"/>
 </svg>

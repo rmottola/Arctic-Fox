@@ -30,6 +30,12 @@ class nsIPrincipal;
 class nsScriptNameSpaceManager;
 class nsIMemoryReporterCallback;
 
+namespace mozilla {
+namespace dom {
+class Exception;
+}
+}
+
 typedef void (* xpcGCCallback)(JSGCStatus status);
 
 namespace xpc {
@@ -478,13 +484,6 @@ AddonWindowOrNull(JSObject* aObj);
 nsGlobalWindow*
 CurrentWindowOrNull(JSContext* cx);
 
-// Error reporter used when there is no associated DOM window on to which to
-// report errors and warnings.
-//
-// Note - This is temporarily implemented in nsJSEnvironment.cpp.
-void
-SystemErrorReporter(JSContext* cx, const char* message, JSErrorReport* rep);
-
 void
 SimulateActivityCallback(bool aActive);
 
@@ -515,6 +514,8 @@ class ErrorReport {
 
     void Init(JSErrorReport* aReport, const char* aFallbackMessage,
               bool aIsChrome, uint64_t aWindowID);
+    void Init(JSContext* aCx, mozilla::dom::Exception* aException,
+              bool aIsChrome, uint64_t aWindowID);
     // Log the error report to the console.  Which console will depend on the
     // window id it was initialized with.
     void LogToConsole();
@@ -532,6 +533,7 @@ class ErrorReport {
   public:
 
     nsCString mCategory;
+    nsString mErrorMsgName;
     nsString mErrorMsg;
     nsString mFileName;
     nsString mSourceLine;

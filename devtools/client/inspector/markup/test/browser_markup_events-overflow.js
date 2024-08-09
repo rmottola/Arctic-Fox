@@ -3,12 +3,14 @@
  http://creativecommons.org/publicdomain/zero/1.0/ */
 "use strict";
 
-const TEST_URL = TEST_URL_ROOT + "doc_markup_events-overflow.html";
+const TEST_URL = URL_ROOT + "doc_markup_events-overflow.html";
 const TEST_DATA = [
   {
     desc: "editor overflows container",
-    initialScrollTop: -1, // scroll to bottom
-    headerToClick: 49, // last header
+    // scroll to bottom
+    initialScrollTop: -1,
+    // last header
+    headerToClick: 49,
     alignBottom: true,
     alignTop: false,
   },
@@ -29,14 +31,15 @@ const TEST_DATA = [
 ];
 
 add_task(function*() {
-  let { inspector } = yield addTab(TEST_URL).then(openInspector);
+  let { inspector } = yield openInspectorForURL(TEST_URL);
 
   let markupContainer = yield getContainerForSelector("#events", inspector);
   let evHolder = markupContainer.elt.querySelector(".markupview-events");
   let tooltip = inspector.markup.tooltip;
 
   info("Clicking to open event tooltip.");
-  EventUtils.synthesizeMouseAtCenter(evHolder, {}, inspector.markup.doc.defaultView);
+  EventUtils.synthesizeMouseAtCenter(evHolder, {},
+    inspector.markup.doc.defaultView);
   yield tooltip.once("shown");
   info("EventTooltip visible.");
 
@@ -75,13 +78,11 @@ add_task(function*() {
 
       is(Math.round(headerRect.top), Math.round(containerRect.top),
         "Clicked header is aligned with the container top.");
-
     } else if (data.alignBottom) {
       let editorRect = header.nextElementSibling.getBoundingClientRect();
 
       is(Math.round(editorRect.bottom), Math.round(containerRect.bottom),
         "Clicked event handler code is aligned with the container bottom.");
-
     } else {
       is(container.scrollTop, data.initialScrollTop,
         "Container did not scroll, as expected.");

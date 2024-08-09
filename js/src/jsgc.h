@@ -155,7 +155,7 @@ CanBeFinalizedInBackground(AllocKind kind, const Class* clasp)
      * the alloc kind; kind may already be a background finalize kind.
      */
     return (!IsBackgroundFinalized(kind) &&
-            (!clasp->finalize || (clasp->flags & JSCLASS_BACKGROUND_FINALIZE)));
+            (!clasp->hasFinalize() || (clasp->flags & JSCLASS_BACKGROUND_FINALIZE)));
 }
 
 /* Capacity for slotsToThingKind */
@@ -918,6 +918,8 @@ class GCParallelTask
     // Amount of time this task took to execute.
     uint64_t duration_;
 
+    explicit GCParallelTask(const GCParallelTask&) = delete;
+
   protected:
     // A flag to signal a request for early completion of the off-thread task.
     mozilla::Atomic<bool> cancel_;
@@ -926,6 +928,11 @@ class GCParallelTask
 
   public:
     GCParallelTask() : state(NotStarted), duration_(0) {}
+    GCParallelTask(GCParallelTask&& other)
+      : state(other.state),
+        duration_(0),
+        cancel_(false)
+    {}
 
     // Derived classes must override this to ensure that join() gets called
     // before members get destructed.
@@ -1034,17 +1041,14 @@ class RelocationOverlay
     /* The low bit is set so this should never equal a normal pointer. */
     static const uintptr_t Relocated = uintptr_t(0xbad0bad1);
 
-    // Arrange the fields of the RelocationOverlay so that JSObject's group
-    // pointer is not overwritten during compacting.
-
-    /* A list entry to track all relocated things. */
-    RelocationOverlay* next_;
-
     /* Set to Relocated when moved. */
     uintptr_t magic_;
 
     /* The location |this| was moved to. */
     Cell* newLocation_;
+
+    /* A list entry to track all relocated things. */
+    RelocationOverlay* next_;
 
   public:
     static RelocationOverlay* fromCell(Cell* cell) {
@@ -1060,14 +1064,7 @@ class RelocationOverlay
         return newLocation_;
     }
 
-    void forwardTo(Cell* cell) {
-        MOZ_ASSERT(!isForwarded());
-        static_assert(offsetof(JSObject, group_) == offsetof(RelocationOverlay, next_),
-                      "next pointer and group should be at same location, "
-                      "so that group is not overwritten during compacting");
-        newLocation_ = cell;
-        magic_ = Relocated;
-    }
+    void forwardTo(Cell* cell);
 
     RelocationOverlay*& nextRef() {
         MOZ_ASSERT(isForwarded());
@@ -1107,7 +1104,10 @@ struct MightBeForwarded
                   "T must not be Cell or TenuredCell");
 
     static const bool value = mozilla::IsBaseOf<JSObject, T>::value ||
-                              mozilla::IsBaseOf<Shape, T>::value;
+                              mozilla::IsBaseOf<Shape, T>::value ||
+                              mozilla::IsBaseOf<JSString, T>::value ||
+                              mozilla::IsBaseOf<JSScript, T>::value ||
+                              mozilla::IsBaseOf<js::LazyScript, T>::value;
 };
 
 template <typename T>

@@ -96,7 +96,9 @@ EXPORTS += [
     'nsTextRunTransformations.h',
     'RubyUtils.h',
     'ScrollbarActivity.h',
-    'Selection.h',
+    'ScrollSnap.h',
+    'Visibility.h',
+    'VisibilityIPC.h',
 ]
 
 EXPORTS.mozilla += [
@@ -166,9 +168,9 @@ UNIFIED_SOURCES += [
     'nsViewportFrame.cpp',
     'RubyUtils.cpp',
     'ScrollbarActivity.cpp',
+    'ScrollSnap.cpp',
     'ScrollVelocityQueue.cpp',
     'StickyScrollContainer.cpp',
-    'SummaryFrame.cpp',
     'TextOverflow.cpp',
 ]
 

@@ -56,9 +56,13 @@ GetPropIRGenerator::tryAttachStub(Maybe<CacheIRWriter>& writer)
         RootedObject obj(cx_, &val_.toObject());
         ObjOperandId objId = writer->guardIsObject(valId);
 
+        if (!emitted_ && !tryAttachObjectLength(*writer, obj, objId))
+            return false;
         if (!emitted_ && !tryAttachNative(*writer, obj, objId))
             return false;
         if (!emitted_ && !tryAttachUnboxedExpando(*writer, obj, objId))
+            return false;
+        if (!emitted_ && !tryAttachModuleNamespace(*writer, obj, objId))
             return false;
     }
 
@@ -272,5 +276,79 @@ GetPropIRGenerator::tryAttachUnboxedExpando(CacheIRWriter& writer, HandleObject 
     emitted_ = true;
 
     EmitReadSlotResult(writer, obj, obj, shape, objId);
+    return true;
+}
+
+bool
+GetPropIRGenerator::tryAttachObjectLength(CacheIRWriter& writer, HandleObject obj, ObjOperandId objId)
+{
+    MOZ_ASSERT(!emitted_);
+
+    if (name_ != cx_->names().length)
+        return true;
+
+    if (obj->is<ArrayObject>()) {
+        // Make sure int32 is added to the TypeSet before we attach a stub, so
+        // the stub can return int32 values without monitoring the result.
+        if (obj->as<ArrayObject>().length() > INT32_MAX)
+            return true;
+
+        writer.guardClass(objId, GuardClassKind::Array);
+        writer.loadInt32ArrayLengthResult(objId);
+        emitted_ = true;
+        return true;
+    }
+
+    if (obj->is<UnboxedArrayObject>()) {
+        writer.guardClass(objId, GuardClassKind::UnboxedArray);
+        writer.loadUnboxedArrayLengthResult(objId);
+        emitted_ = true;
+        return true;
+    }
+
+    if (obj->is<ArgumentsObject>() && !obj->as<ArgumentsObject>().hasOverriddenLength()) {
+        if (obj->is<MappedArgumentsObject>()) {
+            writer.guardClass(objId, GuardClassKind::MappedArguments);
+        } else {
+            MOZ_ASSERT(obj->is<UnmappedArgumentsObject>());
+            writer.guardClass(objId, GuardClassKind::UnmappedArguments);
+        }
+        writer.loadArgumentsObjectLengthResult(objId);
+        emitted_ = true;
+        return true;
+    }
+
+    return true;
+}
+
+bool
+GetPropIRGenerator::tryAttachModuleNamespace(CacheIRWriter& writer, HandleObject obj,
+                                             ObjOperandId objId)
+{
+    MOZ_ASSERT(!emitted_);
+
+    if (!obj->is<ModuleNamespaceObject>())
+        return true;
+
+    Rooted<ModuleNamespaceObject*> ns(cx_, &obj->as<ModuleNamespaceObject>());
+    RootedModuleEnvironmentObject env(cx_);
+    RootedShape shape(cx_);
+    if (!ns->bindings().lookup(NameToId(name_), env.address(), shape.address()))
+        return true;
+
+    // Don't emit a stub until the target binding has been initialized.
+    if (env->getSlot(shape->slot()).isMagic(JS_UNINITIALIZED_LEXICAL))
+        return true;
+
+    if (IsIonEnabled(cx_))
+        EnsureTrackPropertyTypes(cx_, env, shape->propid());
+
+    emitted_ = true;
+
+    // Check for the specific namespace object.
+    writer.guardSpecificObject(objId, ns);
+
+    ObjOperandId envId = writer.loadObject(env);
+    EmitLoadSlotResult(writer, envId, env, shape);
     return true;
 }

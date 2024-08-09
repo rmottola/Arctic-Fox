@@ -10,6 +10,7 @@
 
 #include "mozilla/UniquePtr.h"
 #include "mozilla/WritingModes.h"
+#include "nsLineLayout.h"
 #include "nsPresContext.h"
 #include "nsStyleContext.h"
 
@@ -59,14 +60,14 @@ nsRubyTextContainerFrame::IsFrameOfType(uint32_t aFlags) const
   if (aFlags & eSupportsCSSTransforms) {
     return false;
   }
-  return nsRubyTextContainerFrameSuper::IsFrameOfType(aFlags);
+  return nsContainerFrame::IsFrameOfType(aFlags);
 }
 
 /* virtual */ void
 nsRubyTextContainerFrame::SetInitialChildList(ChildListID aListID,
                                               nsFrameList& aChildList)
 {
-  nsRubyTextContainerFrameSuper::SetInitialChildList(aListID, aChildList);
+  nsContainerFrame::SetInitialChildList(aListID, aChildList);
   if (aListID == kPrincipalList) {
     UpdateSpanFlag();
   }
@@ -76,7 +77,7 @@ nsRubyTextContainerFrame::SetInitialChildList(ChildListID aListID,
 nsRubyTextContainerFrame::AppendFrames(ChildListID aListID,
                                        nsFrameList& aFrameList)
 {
-  nsRubyTextContainerFrameSuper::AppendFrames(aListID, aFrameList);
+  nsContainerFrame::AppendFrames(aListID, aFrameList);
   UpdateSpanFlag();
 }
 
@@ -85,7 +86,7 @@ nsRubyTextContainerFrame::InsertFrames(ChildListID aListID,
                                        nsIFrame* aPrevFrame,
                                        nsFrameList& aFrameList)
 {
-  nsRubyTextContainerFrameSuper::InsertFrames(aListID, aPrevFrame, aFrameList);
+  nsContainerFrame::InsertFrames(aListID, aPrevFrame, aFrameList);
   UpdateSpanFlag();
 }
 
@@ -93,7 +94,7 @@ nsRubyTextContainerFrame::InsertFrames(ChildListID aListID,
 nsRubyTextContainerFrame::RemoveFrame(ChildListID aListID,
                                       nsIFrame* aOldFrame)
 {
-  nsRubyTextContainerFrameSuper::RemoveFrame(aListID, aOldFrame);
+  nsContainerFrame::RemoveFrame(aListID, aOldFrame);
   UpdateSpanFlag();
 }
 

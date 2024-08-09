@@ -17,6 +17,7 @@
 #include "skia/include/core/SkColorFilter.h"
 #include "skia/include/effects/SkBlurImageFilter.h"
 #include "skia/include/effects/SkLayerRasterizer.h"
+#include "Blur.h"
 #include "Logging.h"
 #include "Tools.h"
 #include "DataSurfaceHelpers.h"
@@ -97,6 +98,11 @@ static SkBitmap
 GetBitmapForSurface(SourceSurface* aSurface)
 {
   SkBitmap bitmap;
+
+  if (!aSurface) {
+    gfxDebug() << "Creating empty Skia bitmap from null SourceSurface";
+    return bitmap;
+  }
 
   if (aSurface->GetType() == SurfaceType::SKIA) {
     bitmap = static_cast<SourceSurfaceSkia*>(aSurface)->GetBitmap();
@@ -271,7 +277,9 @@ static inline Rect
 GetClipBounds(SkCanvas *aCanvas)
 {
   SkRect clipBounds;
-  aCanvas->getClipBounds(&clipBounds);
+  if (!aCanvas->getClipBounds(&clipBounds)) {
+    return Rect();
+  }
   return SkRectToRect(clipBounds);
 }
 
@@ -308,9 +316,8 @@ struct AutoPaintSetup {
       mPaint.setAntiAlias(false);
     }
 
-    Rect clipBounds = GetClipBounds(aCanvas);
     bool needsGroup = !IsOperatorBoundByMask(aOptions.mCompositionOp) &&
-                      (!aMaskBounds || !aMaskBounds->Contains(clipBounds));
+                      (!aMaskBounds || !aMaskBounds->Contains(GetClipBounds(aCanvas)));
 
     // TODO: We could skip the temporary for operator_source and just
     // clear the clip rect. The other operators would be harder
@@ -432,16 +439,37 @@ DrawTargetSkia::DrawSurfaceWithShadow(SourceSurface *aSurface,
   // to blur the image ourselves.
 
   SkPaint shadowPaint;
-  SkAutoTUnref<SkImageFilter> blurFilter(SkBlurImageFilter::Create(aSigma, aSigma));
-  SkAutoTUnref<SkColorFilter> colorFilter(
-    SkColorFilter::CreateModeFilter(ColorToSkColor(aColor, 1.0), SkXfermode::kSrcIn_Mode));
-
   shadowPaint.setXfermode(paint.getXfermode());
-  shadowPaint.setImageFilter(blurFilter.get());
-  shadowPaint.setColorFilter(colorFilter.get());
 
   IntPoint shadowDest = RoundedToInt(aDest + aOffset);
-  mCanvas->drawBitmap(bitmap, shadowDest.x, shadowDest.y, &shadowPaint);
+
+  SkBitmap blurMask;
+  if (!UsingSkiaGPU() &&
+      bitmap.extractAlpha(&blurMask)) {
+    // Prefer using our own box blur instead of Skia's when we're
+    // not using the GPU. It currently performs much better than
+    // SkBlurImageFilter or SkBlurMaskFilter on the CPU.
+    AlphaBoxBlur blur(Rect(0, 0, blurMask.width(), blurMask.height()),
+                      int32_t(blurMask.rowBytes()),
+                      aSigma, aSigma);
+    blurMask.lockPixels();
+    blur.Blur(reinterpret_cast<uint8_t*>(blurMask.getPixels()));
+    blurMask.unlockPixels();
+    blurMask.notifyPixelsChanged();
+
+    shadowPaint.setColor(ColorToSkColor(aColor, 1.0f));
+
+    mCanvas->drawBitmap(blurMask, shadowDest.x, shadowDest.y, &shadowPaint);
+  } else {
+    SkAutoTUnref<SkImageFilter> blurFilter(SkBlurImageFilter::Create(aSigma, aSigma));
+    SkAutoTUnref<SkColorFilter> colorFilter(
+      SkColorFilter::CreateModeFilter(ColorToSkColor(aColor, 1.0f), SkXfermode::kSrcIn_Mode));
+
+    shadowPaint.setImageFilter(blurFilter.get());
+    shadowPaint.setColorFilter(colorFilter.get());
+
+    mCanvas->drawBitmap(bitmap, shadowDest.x, shadowDest.y, &shadowPaint);
+  }
 
   // Composite the original image after the shadow
   IntPoint dest = RoundedToInt(aDest);
@@ -554,6 +582,8 @@ DrawTargetSkia::ShouldLCDRenderText(FontType aFontType, AntialiasMode aAntialias
   if (aAntialiasMode == AntialiasMode::DEFAULT) {
     switch (aFontType) {
       case FontType::MAC:
+      case FontType::GDI:
+      case FontType::DWRITE:
         return true;
       default:
         // TODO: Figure out what to do for the other platforms.
@@ -588,7 +618,6 @@ DrawTargetSkia::FillGlyphs(ScaledFont *aFont,
 
   bool shouldLCDRenderText = ShouldLCDRenderText(aFont->GetType(), aOptions.mAntialiasMode);
   paint.mPaint.setLCDRenderText(shouldLCDRenderText);
-  paint.mPaint.setSubpixelText(true);
 
   if (aRenderingOptions && aRenderingOptions->GetType() == FontType::CAIRO) {
     const GlyphRenderingOptionsCairo* cairoOptions =
@@ -603,11 +632,18 @@ DrawTargetSkia::FillGlyphs(ScaledFont *aFont,
     if (cairoOptions->GetAntialiasMode() == AntialiasMode::NONE) {
       paint.mPaint.setAntiAlias(false);
     }
-  } else if (aFont->GetType() == FontType::MAC && shouldLCDRenderText) {
-    // SkFontHost_mac only supports subpixel antialiasing when hinting is turned off.
-    paint.mPaint.setHinting(SkPaint::kNo_Hinting);
   } else {
-    paint.mPaint.setHinting(SkPaint::kNormal_Hinting);
+    // SkFontHost_cairo does not support subpixel text, so only enable it for other font hosts.
+    paint.mPaint.setSubpixelText(true);
+
+    if (aFont->GetType() == FontType::MAC) {
+      // SkFontHost_mac only supports subpixel antialiasing when hinting is turned off.
+      // For grayscale AA, we want to disable font smoothing as the only time we should
+      // use grayscale AA is with explicit -moz-osx-font-smoothing
+      paint.mPaint.setHinting(SkPaint::kNo_Hinting);
+    } else {
+      paint.mPaint.setHinting(SkPaint::kNormal_Hinting);
+    }
   }
 
   std::vector<uint16_t> indices;
@@ -659,7 +695,8 @@ DrawTargetSkia::MaskSurface(const Pattern &aSource,
     return;
   }
 
-  if (aOffset != Point(0, 0)) {
+  if (aOffset != Point(0, 0) &&
+      paint.mPaint.getShader()) {
     SkMatrix transform;
     transform.setTranslate(PointToSkPoint(-aOffset));
     SkShader* matrixShader = paint.mPaint.getShader()->newWithLocalMatrix(transform);
@@ -667,6 +704,102 @@ DrawTargetSkia::MaskSurface(const Pattern &aSource,
   }
 
   mCanvas->drawBitmap(bitmap, aOffset.x, aOffset.y, &paint.mPaint);
+}
+
+bool
+DrawTarget::Draw3DTransformedSurface(SourceSurface* aSurface, const Matrix4x4& aMatrix)
+{
+  // Composite the 3D transform with the DT's transform.
+  Matrix4x4 fullMat = aMatrix * Matrix4x4::From2D(mTransform);
+  if (fullMat.IsSingular()) {
+    return false;
+  }
+  // Transform the surface bounds and clip to this DT.
+  IntRect xformBounds =
+    RoundedOut(
+      fullMat.TransformAndClipBounds(Rect(Point(0, 0), Size(aSurface->GetSize())),
+                                     Rect(Point(0, 0), Size(GetSize()))));
+  if (xformBounds.IsEmpty()) {
+    return true;
+  }
+  // Offset the matrix by the transformed origin.
+  fullMat.PostTranslate(-xformBounds.x, -xformBounds.y, 0);
+
+  // Read in the source data.
+  SkBitmap srcBitmap = GetBitmapForSurface(aSurface);
+
+  // Set up an intermediate destination surface only the size of the transformed bounds.
+  // Try to pass through the source's format unmodified in both the BGRA and ARGB cases.
+  RefPtr<DataSourceSurface> dstSurf =
+    Factory::CreateDataSourceSurface(xformBounds.Size(),
+                                     srcBitmap.alphaType() == kPremul_SkAlphaType ?
+                                       aSurface->GetFormat() : SurfaceFormat::A8R8G8B8_UINT32,
+                                     true);
+  if (!dstSurf) {
+    return false;
+  }
+  SkAutoTUnref<SkCanvas> dstCanvas(
+    SkCanvas::NewRasterDirect(
+      SkImageInfo::Make(xformBounds.width, xformBounds.height,
+                        srcBitmap.alphaType() == kPremul_SkAlphaType ?
+                          srcBitmap.colorType() : kBGRA_8888_SkColorType,
+                        kPremul_SkAlphaType),
+      dstSurf->GetData(), dstSurf->Stride()));
+  if (!dstCanvas) {
+    return false;
+  }
+
+  // Do the transform.
+  SkPaint paint;
+  paint.setAntiAlias(true);
+  paint.setFilterQuality(kLow_SkFilterQuality);
+  paint.setXfermodeMode(SkXfermode::kSrc_Mode);
+
+  SkMatrix xform;
+  GfxMatrixToSkiaMatrix(fullMat, xform);
+  dstCanvas->setMatrix(xform);
+
+  dstCanvas->drawBitmap(srcBitmap, 0, 0, &paint);
+  dstCanvas->flush();
+
+  // Temporarily reset the DT's transform, since it has already been composed above.
+  Matrix origTransform = mTransform;
+  SetTransform(Matrix());
+
+  // Draw the transformed surface within the transformed bounds.
+  DrawSurface(dstSurf, Rect(xformBounds), Rect(Point(0, 0), Size(xformBounds.Size())));
+
+  SetTransform(origTransform);
+
+  return true;
+}
+
+bool
+DrawTargetSkia::Draw3DTransformedSurface(SourceSurface* aSurface, const Matrix4x4& aMatrix)
+{
+  if (aMatrix.IsSingular()) {
+    return false;
+  }
+
+  MarkChanged();
+
+  SkBitmap bitmap = GetBitmapForSurface(aSurface);
+
+  mCanvas->save();
+
+  SkPaint paint;
+  paint.setAntiAlias(true);
+  paint.setFilterQuality(kLow_SkFilterQuality);
+
+  SkMatrix xform;
+  GfxMatrixToSkiaMatrix(aMatrix, xform);
+  mCanvas->concat(xform);
+
+  mCanvas->drawBitmap(bitmap, 0, 0, &paint);
+
+  mCanvas->restore();
+
+  return true;
 }
 
 already_AddRefed<SourceSurface>
@@ -692,7 +825,8 @@ DrawTargetSkia::CreateSimilarDrawTarget(const IntSize &aSize, SurfaceFormat aFor
 #ifdef USE_SKIA_GPU
   if (UsingSkiaGPU()) {
     // Try to create a GPU draw target first if we're currently using the GPU.
-    if (target->InitWithGrContext(mGrContext.get(), aSize, aFormat)) {
+    // Mark the DT as cached so that shadow DTs, extracted subrects, and similar can be reused.
+    if (target->InitWithGrContext(mGrContext.get(), aSize, aFormat, true)) {
       return target.forget();
     }
     // Otherwise, just fall back to a software draw target.
@@ -726,17 +860,31 @@ DrawTargetSkia::OptimizeSourceSurface(SourceSurface *aSurface) const
       return surface.forget();
     }
 
+    SkBitmap bitmap = GetBitmapForSurface(aSurface);
+
     // Upload the SkBitmap to a GrTexture otherwise.
     SkAutoTUnref<GrTexture> texture(
-      GrRefCachedBitmapTexture(mGrContext.get(),
-                               GetBitmapForSurface(aSurface),
-                               GrTextureParams::ClampBilerp()));
+      GrRefCachedBitmapTexture(mGrContext.get(), bitmap, GrTextureParams::ClampBilerp()));
 
-    // Create a new SourceSurfaceSkia whose SkBitmap contains the GrTexture.
-    RefPtr<SourceSurfaceSkia> surface = new SourceSurfaceSkia();
-    if (surface->InitFromGrTexture(texture, aSurface->GetSize(), aSurface->GetFormat())) {
+    if (texture) {
+      // Create a new SourceSurfaceSkia whose SkBitmap contains the GrTexture.
+      RefPtr<SourceSurfaceSkia> surface = new SourceSurfaceSkia();
+      if (surface->InitFromGrTexture(texture, aSurface->GetSize(), aSurface->GetFormat())) {
+        return surface.forget();
+      }
+    }
+
+    // The data was too big to fit in a GrTexture.
+    if (aSurface->GetType() == SurfaceType::SKIA) {
+      // It is already a Skia source surface, so just reuse it as-is.
+      RefPtr<SourceSurface> surface(aSurface);
       return surface.forget();
     }
+
+    // Wrap it in a Skia source surface so that can do tiled uploads on-demand.
+    RefPtr<SourceSurfaceSkia> surface = new SourceSurfaceSkia();
+    surface->InitFromBitmap(bitmap);
+    return surface.forget();
   }
 #endif
 
@@ -842,10 +990,30 @@ DrawTargetSkia::Init(const IntSize &aSize, SurfaceFormat aFormat)
 }
 
 #ifdef USE_SKIA_GPU
+/** Indicating a DT should be cached means that space will be reserved in Skia's cache
+ * for the render target at creation time, with any unused resources exceeding the cache
+ * limits being purged. When the DT is freed, it will then be guaranteed to be kept around
+ * for subsequent allocations until it gets incidentally purged.
+ *
+ * If it is not marked as cached, no space will be purged to make room for the render
+ * target in the cache. When the DT is freed, If there is space within the resource limits
+ * it may be added to the cache, otherwise it will be freed immediately if the cache is
+ * already full.
+ *
+ * If you want to ensure that the resources will be kept around for reuse, it is better
+ * to mark them as cached. Such resources should be short-lived to ensure they don't
+ * permanently tie up cache resource limits. Long-lived resources should generally be
+ * left as uncached.
+ *
+ * In neither case will cache resource limits affect whether the resource allocation
+ * succeeds. The amount of in-use GPU resources is allowed to exceed the size of the cache.
+ * Thus, only hard GPU out-of-memory conditions will cause resource allocation to fail.
+ */
 bool
 DrawTargetSkia::InitWithGrContext(GrContext* aGrContext,
                                   const IntSize &aSize,
-                                  SurfaceFormat aFormat)
+                                  SurfaceFormat aFormat,
+                                  bool aCached)
 {
   MOZ_ASSERT(aGrContext, "null GrContext");
 
@@ -855,7 +1023,10 @@ DrawTargetSkia::InitWithGrContext(GrContext* aGrContext,
 
   // Create a GPU rendertarget/texture using the supplied GrContext.
   // NewRenderTarget also implicitly clears the underlying texture on creation.
-  SkAutoTUnref<SkSurface> gpuSurface(SkSurface::NewRenderTarget(aGrContext, SkSurface::kNo_Budgeted, MakeSkiaImageInfo(aSize, aFormat)));
+  SkAutoTUnref<SkSurface> gpuSurface(
+    SkSurface::NewRenderTarget(aGrContext,
+                               SkSurface::Budgeted(aCached),
+                               MakeSkiaImageInfo(aSize, aFormat)));
   if (!gpuSurface) {
     return false;
   }

@@ -543,19 +543,26 @@ XPCNativeScriptableSharedMap::GetNewOrUsed(uint32_t flags,
     NS_PRECONDITION(name,"bad param");
     NS_PRECONDITION(si,"bad param");
 
-    XPCNativeScriptableShared key(flags, name);
+    XPCNativeScriptableShared key(flags, name, /* populate = */ false);
     auto entry = static_cast<Entry*>(mTable->Add(&key, fallible));
     if (!entry)
         return false;
 
     XPCNativeScriptableShared* shared = entry->key;
 
+    // XXX: this XPCNativeScriptableShared is heap-allocated, which means the
+    // js::Class it contains is also heap-allocated. This causes problems for
+    // memory reporting. See the comment above the BaseShape case in
+    // StatsCellCallback() in js/src/vm/MemoryMetrics.cpp.
+    //
+    // When the code below is removed (bug 1265271) and there are no longer any
+    // heap-allocated js::Class instances, the disabled code in
+    // StatsCellCallback() should be reinstated.
+    //
     if (!shared) {
         entry->key = shared =
-            new XPCNativeScriptableShared(flags, key.TransferNameOwnership());
-        if (!shared)
-            return false;
-        shared->PopulateJSClass();
+            new XPCNativeScriptableShared(flags, key.TransferNameOwnership(),
+                                          /* populate = */ true);
     }
     si->SetScriptableShared(shared);
     return true;

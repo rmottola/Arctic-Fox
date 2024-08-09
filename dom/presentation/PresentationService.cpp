@@ -18,6 +18,7 @@
 #include "nsServiceManagerUtils.h"
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
+#include "PresentationLog.h"
 #include "PresentationService.h"
 
 using namespace mozilla;
@@ -47,6 +48,8 @@ private:
   nsString mId;
   nsString mOrigin;
 };
+
+LazyLogModule gPresentationLog("Presentation");
 
 } // namespace dom
 } // namespace mozilla
@@ -384,6 +387,8 @@ NS_IMETHODIMP
 PresentationService::StartSession(const nsAString& aUrl,
                                   const nsAString& aSessionId,
                                   const nsAString& aOrigin,
+                                  const nsAString& aDeviceId,
+                                  uint64_t aWindowId,
                                   nsIPresentationServiceCallback* aCallback)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -396,28 +401,77 @@ PresentationService::StartSession(const nsAString& aUrl,
     new PresentationControllingInfo(aUrl, aSessionId, aCallback);
   mSessionInfo.Put(aSessionId, info);
 
-  // Pop up a prompt and ask user to select a device.
-  nsCOMPtr<nsIPresentationDevicePrompt> prompt =
-    do_GetService(PRESENTATION_DEVICE_PROMPT_CONTRACTID);
-  if (NS_WARN_IF(!prompt)) {
-    return info->ReplyError(NS_ERROR_DOM_OPERATION_ERR);
+  // Only track the info when an actual window ID, which would never be 0, is
+  // provided (for an in-process sender page).
+  if (aWindowId != 0) {
+    mRespondingSessionIds.Put(aWindowId, new nsString(aSessionId));
+    mRespondingWindowIds.Put(aSessionId, aWindowId);
   }
+
   nsCOMPtr<nsIPresentationDeviceRequest> request =
     new PresentationDeviceRequest(aUrl, aSessionId, aOrigin);
-  nsresult rv = prompt->PromptDeviceSelection(request);
+
+  if (aDeviceId.IsVoid()) {
+    // Pop up a prompt and ask user to select a device.
+    nsCOMPtr<nsIPresentationDevicePrompt> prompt =
+      do_GetService(PRESENTATION_DEVICE_PROMPT_CONTRACTID);
+    if (NS_WARN_IF(!prompt)) {
+      return info->ReplyError(NS_ERROR_DOM_OPERATION_ERR);
+    }
+
+    nsresult rv = prompt->PromptDeviceSelection(request);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return info->ReplyError(NS_ERROR_DOM_OPERATION_ERR);
+    }
+
+    return NS_OK;
+  }
+
+  // Find the designated device from available device list.
+  nsCOMPtr<nsIPresentationDeviceManager> deviceManager =
+    do_GetService(PRESENTATION_DEVICE_MANAGER_CONTRACTID);
+  if (NS_WARN_IF(!deviceManager)) {
+    return info->ReplyError(NS_ERROR_DOM_OPERATION_ERR);
+  }
+
+  nsCOMPtr<nsIArray> devices;
+  nsresult rv = deviceManager->GetAvailableDevices(getter_AddRefs(devices));
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return info->ReplyError(NS_ERROR_DOM_OPERATION_ERR);
   }
 
-  return NS_OK;
+  nsCOMPtr<nsISimpleEnumerator> enumerator;
+  rv = devices->Enumerate(getter_AddRefs(enumerator));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return info->ReplyError(NS_ERROR_DOM_OPERATION_ERR);
+  }
+
+  NS_ConvertUTF16toUTF8 utf8DeviceId(aDeviceId);
+  bool hasMore;
+  while(NS_SUCCEEDED(enumerator->HasMoreElements(&hasMore)) && hasMore){
+    nsCOMPtr<nsISupports> isupports;
+    rv = enumerator->GetNext(getter_AddRefs(isupports));
+
+    nsCOMPtr<nsIPresentationDevice> device(do_QueryInterface(isupports));
+    MOZ_ASSERT(device);
+
+    nsAutoCString id;
+    if (NS_SUCCEEDED(device->GetId(id)) && id.Equals(utf8DeviceId)) {
+      request->Select(device);
+      return NS_OK;
+    }
+  }
+
+  // Reject if designated device is not available.
+  return info->ReplyError(NS_ERROR_DOM_NOT_FOUND_ERR);
 }
 
 NS_IMETHODIMP
 PresentationService::SendSessionMessage(const nsAString& aSessionId,
-                                        nsIInputStream* aStream)
+                                        const nsAString& aData)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  MOZ_ASSERT(aStream);
+  MOZ_ASSERT(!aData.IsEmpty());
   MOZ_ASSERT(!aSessionId.IsEmpty());
 
   RefPtr<PresentationSessionInfo> info = GetSessionInfo(aSessionId);
@@ -425,7 +479,7 @@ PresentationService::SendSessionMessage(const nsAString& aSessionId,
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  return info->Send(aStream);
+  return info->Send(aData);
 }
 
 NS_IMETHODIMP
@@ -568,7 +622,7 @@ PresentationService::NotifyReceiverReady(const nsAString& aSessionId,
   // Only track the responding info when an actual window ID, which would never
   // be 0, is provided (for an in-process receiver page).
   if (aWindowId != 0) {
-    mRespondingSessionIds.Put(aWindowId, new nsAutoString(aSessionId));
+    mRespondingSessionIds.Put(aWindowId, new nsString(aSessionId));
     mRespondingWindowIds.Put(aSessionId, aWindowId);
   }
 
@@ -583,12 +637,22 @@ PresentationService::UntrackSessionInfo(const nsAString& aSessionId)
 
   // Remove the in-process responding info if there's still any.
   uint64_t windowId = 0;
-  if(mRespondingWindowIds.Get(aSessionId, &windowId)) {
+  if (mRespondingWindowIds.Get(aSessionId, &windowId)) {
     mRespondingWindowIds.Remove(aSessionId);
     mRespondingSessionIds.Remove(windowId);
   }
 
   return NS_OK;
+}
+
+NS_IMETHODIMP
+PresentationService::GetWindowIdBySessionId(const nsAString& aSessionId,
+                                            uint64_t* aWindowId)
+{
+  if (mRespondingWindowIds.Get(aSessionId, aWindowId)) {
+    return NS_OK;
+  }
+  return NS_ERROR_NOT_AVAILABLE;
 }
 
 bool

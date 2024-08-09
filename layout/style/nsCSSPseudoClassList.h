@@ -123,7 +123,8 @@ CSS_PSEUDO_CLASS(mozWindowInactive, ":-moz-window-inactive", 0, "")
 CSS_PSEUDO_CLASS(mozTableBorderNonzero, ":-moz-table-border-nonzero", 0, "")
 
 // Matches HTML frame/iframe elements which are mozbrowser.
-CSS_PSEUDO_CLASS(mozBrowserFrame, ":-moz-browser-frame", 0, "")
+CSS_PSEUDO_CLASS(mozBrowserFrame, ":-moz-browser-frame",
+                 CSS_PSEUDO_CLASS_UA_SHEET_AND_CHROME, "")
 
 // Matches whatever the contextual reference elements are for the
 // matching operation.

@@ -145,6 +145,8 @@ DownmixAndInterleave(const nsTArray<const SrcT*>& aChannelData,
 struct AudioChunk {
   typedef mozilla::AudioSampleFormat SampleFormat;
 
+  AudioChunk() : mPrincipalHandle(PRINCIPAL_HANDLE_NONE) {}
+
   // Generic methods
   void SliceTo(StreamTime aStart, StreamTime aEnd)
   {
@@ -190,6 +192,7 @@ struct AudioChunk {
     mDuration = aDuration;
     mVolume = 1.0f;
     mBufferFormat = AUDIO_FORMAT_SILENCE;
+    mPrincipalHandle = PRINCIPAL_HANDLE_NONE;
   }
 
   size_t ChannelCount() const { return mChannelData.Length(); }
@@ -224,6 +227,8 @@ struct AudioChunk {
     return *reinterpret_cast<nsTArray<const T*>*>(&mChannelData);
   }
 
+  PrincipalHandle GetPrincipalHandle() const { return mPrincipalHandle; }
+
   StreamTime mDuration; // in frames within the buffer
   RefPtr<ThreadSharedObject> mBuffer; // the buffer object whose lifetime is managed; null means data is all zeroes
   nsTArray<const void*> mChannelData; // one pointer per channel; empty if and only if mBuffer is null
@@ -232,6 +237,9 @@ struct AudioChunk {
 #ifdef MOZILLA_INTERNAL_API
   mozilla::TimeStamp mTimeStamp;           // time at which this has been fetched from the MediaEngine
 #endif
+  // principalHandle for the data in this chunk.
+  // This can be compared to an nsIPrincipal* when back on main thread.
+  PrincipalHandle mPrincipalHandle;
 };
 
 /**
@@ -267,10 +275,7 @@ public:
       MOZ_ASSERT(channels == segmentChannelCount);
       output.SetLength(channels);
       bufferPtrs.SetLength(channels);
-#if !defined(MOZILLA_XPCOMRT_API)
-// FIXME Bug 1126414 - XPCOMRT does not support dom::WebAudioUtils::SpeexResamplerProcess
       uint32_t inFrames = c.mDuration;
-#endif // !defined(MOZILLA_XPCOMRT_API)
       // Round up to allocate; the last frame may not be used.
       NS_ASSERTION((UINT32_MAX - aInRate + 1) / c.mDuration >= aOutRate,
                    "Dropping samples");
@@ -279,14 +284,11 @@ public:
         T* out = output[i].AppendElements(outSize);
         uint32_t outFrames = outSize;
 
-#if !defined(MOZILLA_XPCOMRT_API)
-// FIXME Bug 1126414 - XPCOMRT does not support dom::WebAudioUtils::SpeexResamplerProcess
         const T* in = static_cast<const T*>(c.mChannelData[i]);
         dom::WebAudioUtils::SpeexResamplerProcess(aResampler, i,
                                                   in, &inFrames,
                                                   out, &outFrames);
         MOZ_ASSERT(inFrames == c.mDuration);
-#endif // !defined(MOZILLA_XPCOMRT_API)
 
         bufferPtrs[i] = out;
         output[i].SetLength(outFrames);
@@ -307,7 +309,7 @@ public:
 
   void AppendFrames(already_AddRefed<ThreadSharedObject> aBuffer,
                     const nsTArray<const float*>& aChannelData,
-                    int32_t aDuration)
+                    int32_t aDuration, const PrincipalHandle& aPrincipalHandle)
   {
     AudioChunk* chunk = AppendChunk(aDuration);
     chunk->mBuffer = aBuffer;
@@ -319,10 +321,11 @@ public:
 #ifdef MOZILLA_INTERNAL_API
     chunk->mTimeStamp = TimeStamp::Now();
 #endif
+    chunk->mPrincipalHandle = aPrincipalHandle;
   }
   void AppendFrames(already_AddRefed<ThreadSharedObject> aBuffer,
                     const nsTArray<const int16_t*>& aChannelData,
-                    int32_t aDuration)
+                    int32_t aDuration, const PrincipalHandle& aPrincipalHandle)
   {
     AudioChunk* chunk = AppendChunk(aDuration);
     chunk->mBuffer = aBuffer;
@@ -334,6 +337,7 @@ public:
 #ifdef MOZILLA_INTERNAL_API
     chunk->mTimeStamp = TimeStamp::Now();
 #endif
+    chunk->mPrincipalHandle = aPrincipalHandle;
   }
   // Consumes aChunk, and returns a pointer to the persistent copy of aChunk
   // in the segment.
@@ -347,6 +351,7 @@ public:
 #ifdef MOZILLA_INTERNAL_API
     chunk->mTimeStamp = TimeStamp::Now();
 #endif
+    chunk->mPrincipalHandle = aChunk->mPrincipalHandle;
     return chunk;
   }
   void ApplyVolume(float aVolume);

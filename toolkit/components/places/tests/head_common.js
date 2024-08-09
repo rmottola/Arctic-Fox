@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const CURRENT_SCHEMA_VERSION = 30;
+const CURRENT_SCHEMA_VERSION = 31;
 const FIRST_UPGRADABLE_SCHEMA_VERSION = 11;
 
 const NS_APP_USER_PROFILE_50_DIR = "ProfD";
@@ -534,9 +534,12 @@ function check_JSON_backup(aIsAutomaticBackup) {
  */
 function frecencyForUrl(aURI)
 {
-  let url = aURI instanceof Ci.nsIURI ? aURI.spec
-                                      : aURI instanceof URL ? aURI.href
-                                                            : aURI;
+  let url = aURI;
+  if (aURI instanceof Ci.nsIURI) {
+    url = aURI.spec;
+  } else if (aURI instanceof URL) {
+    url = aURI.href;
+  }
   let stmt = DBConn().createStatement(
     "SELECT frecency FROM moz_places WHERE url = ?1"
   );

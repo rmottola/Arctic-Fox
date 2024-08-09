@@ -6,13 +6,14 @@
 
 // Test whether ESCAPE keypress cancels dragging of an element.
 
-const TEST_URL = TEST_URL_ROOT + "doc_markup_dragdrop.html";
+const TEST_URL = URL_ROOT + "doc_markup_dragdrop.html";
 
 add_task(function*() {
-  let {inspector} = yield addTab(TEST_URL).then(openInspector);
+  let {inspector} = yield openInspectorForURL(TEST_URL);
   let {markup} = inspector;
 
   info("Get a test container");
+  yield selectNode("#test", inspector);
   let container = yield getContainerForSelector("#test", inspector);
 
   info("Simulate a drag/drop on this container");

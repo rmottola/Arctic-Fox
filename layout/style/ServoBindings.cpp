@@ -13,6 +13,8 @@
 #include "nsINode.h"
 #include "nsNameSpaceManager.h"
 #include "nsString.h"
+#include "nsStyleStruct.h"
+#include "StyleStructContext.h"
 
 #include "mozilla/EventStates.h"
 #include "mozilla/dom/Element.h"
@@ -23,7 +25,7 @@ Gecko_ChildrenCount(RawGeckoNode* aNode)
   return aNode->GetChildCount();
 }
 
-int
+bool
 Gecko_NodeIsElement(RawGeckoNode* aNode)
 {
   return aNode->IsElement();
@@ -101,36 +103,37 @@ Gecko_ElementState(RawGeckoElement* aElement)
          ((1 << (NS_EVENT_STATE_HIGHEST_SERVO_BIT + 1)) - 1);
 }
 
-int
+bool
 Gecko_IsHTMLElementInHTMLDocument(RawGeckoElement* aElement)
 {
   return aElement->IsHTMLElement() && aElement->OwnerDoc()->IsHTMLDocument();
 }
 
-int
+bool
 Gecko_IsLink(RawGeckoElement* aElement)
 {
   return nsCSSRuleProcessor::IsLink(aElement);
 }
 
-int Gecko_IsTextNode(RawGeckoNode* aNode)
+bool
+Gecko_IsTextNode(RawGeckoNode* aNode)
 {
   return aNode->NodeInfo()->NodeType() == nsIDOMNode::TEXT_NODE;
 }
 
-int
+bool
 Gecko_IsVisitedLink(RawGeckoElement* aElement)
 {
   return aElement->StyleState().HasState(NS_EVENT_STATE_VISITED);
 }
 
-int
+bool
 Gecko_IsUnvisitedLink(RawGeckoElement* aElement)
 {
   return aElement->StyleState().HasState(NS_EVENT_STATE_UNVISITED);
 }
 
-int
+bool
 Gecko_IsRootElement(RawGeckoElement* aElement)
 {
   return aElement->OwnerDoc()->GetRootElement() == aElement;
@@ -148,6 +151,31 @@ Gecko_SetNodeData(RawGeckoNode* aNode, ServoNodeData* aData)
   aNode->SetServoNodeData(aData);
 }
 
+#define STYLE_STRUCT(name, checkdata_cb)                                      \
+                                                                              \
+void                                                                          \
+Gecko_Construct_nsStyle##name(nsStyle##name* ptr)                             \
+{                                                                             \
+  new (ptr) nsStyle##name(StyleStructContext::ServoContext());                \
+}                                                                             \
+                                                                              \
+void                                                                          \
+Gecko_CopyConstruct_nsStyle##name(nsStyle##name* ptr,                         \
+                                  const nsStyle##name* other)                 \
+{                                                                             \
+  new (ptr) nsStyle##name(*other);                                            \
+}                                                                             \
+                                                                              \
+void                                                                          \
+Gecko_Destroy_nsStyle##name(nsStyle##name* ptr)                               \
+{                                                                             \
+  ptr->~nsStyle##name();                                                      \
+}
+
+#include "nsStyleStructList.h"
+
+#undef STYLE_STRUCT
+
 #ifndef MOZ_STYLO
 void
 Servo_DropNodeData(ServoNodeData* data)
@@ -164,9 +192,42 @@ Servo_StylesheetFromUTF8Bytes(const uint8_t* bytes, uint32_t length)
 }
 
 void
-Servo_ReleaseStylesheet(RawServoStyleSheet* sheet)
+Servo_AddRefStyleSheet(RawServoStyleSheet* sheet)
+{
+  MOZ_CRASH("stylo: shouldn't be calling Servo_AddRefStylesheet in a "
+            "non-MOZ_STYLO build");
+}
+
+void
+Servo_ReleaseStyleSheet(RawServoStyleSheet* sheet)
 {
   MOZ_CRASH("stylo: shouldn't be calling Servo_ReleaseStylesheet in a "
+            "non-MOZ_STYLO build");
+}
+
+void
+Servo_AppendStyleSheet(RawServoStyleSheet* sheet, RawServoStyleSet* set)
+{
+  MOZ_CRASH("stylo: shouldn't be calling Servo_AppendStyleSheet in a "
+            "non-MOZ_STYLO build");
+}
+
+void Servo_PrependStyleSheet(RawServoStyleSheet* sheet, RawServoStyleSet* set)
+{
+  MOZ_CRASH("stylo: shouldn't be calling Servo_PrependStyleSheet in a "
+            "non-MOZ_STYLO build");
+}
+
+void Servo_RemoveStyleSheet(RawServoStyleSheet* sheet, RawServoStyleSet* set)
+{
+  MOZ_CRASH("stylo: shouldn't be calling Servo_RemoveStyleSheet in a "
+            "non-MOZ_STYLO build");
+}
+
+bool
+Servo_StyleSheetHasRules(RawServoStyleSheet* sheet)
+{
+  MOZ_CRASH("stylo: shouldn't be calling Servo_StyleSheetHasRules in a "
             "non-MOZ_STYLO build");
 }
 
@@ -181,6 +242,35 @@ void
 Servo_DropStyleSet(RawServoStyleSet* set)
 {
   MOZ_CRASH("stylo: shouldn't be calling Servo_DropStyleSet in a "
+            "non-MOZ_STYLO build");
+}
+
+ServoComputedValues*
+Servo_GetComputedValues(RawGeckoElement* element)
+{
+  MOZ_CRASH("stylo: shouldn't be calling Servo_GetComputedValues in a "
+            "non-MOZ_STYLO build");
+}
+
+ServoComputedValues*
+Servo_GetComputedValuesForAnonymousBox(ServoComputedValues* parentStyleOrNull,
+                                       nsIAtom* pseudoTag)
+{
+  MOZ_CRASH("stylo: shouldn't be calling Servo_GetComputedValuesForAnonymousBox in a "
+            "non-MOZ_STYLO build");
+}
+
+void
+Servo_AddRefComputedValues(ServoComputedValues*)
+{
+  MOZ_CRASH("stylo: shouldn't be calling Servo_AddRefComputedValues in a "
+            "non-MOZ_STYLO build");
+}
+
+void
+Servo_ReleaseComputedValues(ServoComputedValues*)
+{
+  MOZ_CRASH("stylo: shouldn't be calling Servo_ReleaseComputedValues in a "
             "non-MOZ_STYLO build");
 }
 

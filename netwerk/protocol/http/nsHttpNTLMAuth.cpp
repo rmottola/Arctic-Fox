@@ -28,6 +28,8 @@
 #endif
 #include "mozilla/Attributes.h"
 #include "mozilla/CheckedInt.h"
+#include "nsNetUtil.h"
+#include "nsIChannel.h"
 
 namespace mozilla {
 namespace net {
@@ -186,6 +188,14 @@ static bool
 CanUseDefaultCredentials(nsIHttpAuthenticableChannel *channel,
                          bool isProxyAuth)
 {
+    // Prevent using default credentials for authentication when we are in the
+    // private browsing mode.  It would cause a privacy data leak.
+    nsCOMPtr<nsIChannel> bareChannel = do_QueryInterface(channel);
+    MOZ_ASSERT(bareChannel);
+    if (NS_UsePrivateBrowsing(bareChannel)) {
+        return false;
+    }
+
     nsCOMPtr<nsIPrefBranch> prefs = do_GetService(NS_PREFSERVICE_CONTRACTID);
     if (!prefs)
         return false;

@@ -21,6 +21,7 @@
 #include "nsStringStream.h"
 
 #include "mozilla/ErrorResult.h"
+#include "mozilla/dom/BodyUtil.h"
 #include "mozilla/dom/EncodingUtils.h"
 #include "mozilla/dom/Exceptions.h"
 #include "mozilla/dom/FetchDriver.h"
@@ -42,7 +43,6 @@
 #include "WorkerRunnable.h"
 #include "WorkerScope.h"
 #include "Workers.h"
-#include "FetchUtil.h"
 
 namespace mozilla {
 namespace dom {
@@ -154,6 +154,14 @@ FetchRequest(nsIGlobalObject* aGlobal, const RequestOrUSVString& aInput,
     return nullptr;
   }
 
+  // Double check that we have chrome privileges if the Request's content
+  // policy type has been overridden.  Note, we must do this before
+  // entering the global below.  Otherwise the IsCallerChrome() will
+  // always fail.
+  MOZ_ASSERT_IF(aInput.IsRequest() &&
+                aInput.GetAsRequest().IsContentPolicyTypeOverridden(),
+                nsContentUtils::IsCallerChrome());
+
   AutoJSAPI jsapi;
   jsapi.Init(aGlobal);
   JSContext* cx = jsapi.cx();
@@ -221,7 +229,7 @@ FetchRequest(nsIGlobalObject* aGlobal, const RequestOrUSVString& aInput,
     }
 
     RefPtr<MainThreadFetchRunnable> run = new MainThreadFetchRunnable(resolver, r);
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(run)));
+    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(run));
   }
 
   return p.forget();
@@ -443,7 +451,7 @@ ExtractFromURLSearchParams(const URLSearchParams& aParams,
   nsAutoString serialized;
   aParams.Stringify(serialized);
   aContentType = NS_LITERAL_CSTRING("application/x-www-form-urlencoded;charset=UTF-8");
-  return NS_NewStringInputStream(aStream, serialized);
+  return NS_NewCStringInputStream(aStream, NS_ConvertUTF16toUTF8(serialized));
 }
 } // namespace
 
@@ -740,7 +748,7 @@ public:
   ~FetchBodyFeature()
   { }
 
-  bool Notify(JSContext* aCx, workers::Status aStatus) override
+  bool Notify(workers::Status aStatus) override
   {
     MOZ_ASSERT(aStatus > workers::Running);
     if (!mWasNotified) {
@@ -1008,7 +1016,7 @@ FetchBody<Derived>::ContinueConsumeBody(nsresult aStatus, uint32_t aResultLength
   switch (mConsumeType) {
     case CONSUME_ARRAYBUFFER: {
       JS::Rooted<JSObject*> arrayBuffer(cx);
-      FetchUtil::ConsumeArrayBuffer(cx, &arrayBuffer, aResultLength, aResult,
+      BodyUtil::ConsumeArrayBuffer(cx, &arrayBuffer, aResultLength, aResult,
                                     error);
 
       if (!error.Failed()) {
@@ -1022,7 +1030,7 @@ FetchBody<Derived>::ContinueConsumeBody(nsresult aStatus, uint32_t aResultLength
       break;
     }
     case CONSUME_BLOB: {
-      RefPtr<dom::Blob> blob = FetchUtil::ConsumeBlob(
+      RefPtr<dom::Blob> blob = BodyUtil::ConsumeBlob(
         DerivedClass()->GetParentObject(), NS_ConvertUTF8toUTF16(mMimeType),
         aResultLength, aResult, error);
       if (!error.Failed()) {
@@ -1037,7 +1045,7 @@ FetchBody<Derived>::ContinueConsumeBody(nsresult aStatus, uint32_t aResultLength
       data.Adopt(reinterpret_cast<char*>(aResult), aResultLength);
       autoFree.Reset();
 
-      RefPtr<dom::FormData> fd = FetchUtil::ConsumeFormData(
+      RefPtr<dom::FormData> fd = BodyUtil::ConsumeFormData(
         DerivedClass()->GetParentObject(),
         mMimeType, data, error);
       if (!error.Failed()) {
@@ -1049,12 +1057,12 @@ FetchBody<Derived>::ContinueConsumeBody(nsresult aStatus, uint32_t aResultLength
       // fall through handles early exit.
     case CONSUME_JSON: {
       nsString decoded;
-      if (NS_SUCCEEDED(FetchUtil::ConsumeText(aResultLength, aResult, decoded))) {
+      if (NS_SUCCEEDED(BodyUtil::ConsumeText(aResultLength, aResult, decoded))) {
         if (mConsumeType == CONSUME_TEXT) {
           localPromise->MaybeResolve(decoded);
         } else {
           JS::Rooted<JS::Value> json(cx);
-          FetchUtil::ConsumeJson(cx, &json, decoded, error);
+          BodyUtil::ConsumeJson(cx, &json, decoded, error);
           if (!error.Failed()) {
             localPromise->MaybeResolve(cx, json);
           }

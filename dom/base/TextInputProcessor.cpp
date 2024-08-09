@@ -254,8 +254,9 @@ TextInputProcessor::IsValidEventTypeForComposition(
     return true;
   }
   if (aKeyboardEvent.mMessage == eUnidentifiedEvent &&
-      aKeyboardEvent.userType &&
-      nsDependentAtomString(aKeyboardEvent.userType).EqualsLiteral("on")) {
+      aKeyboardEvent.mSpecifiedEventType &&
+      nsDependentAtomString(
+        aKeyboardEvent.mSpecifiedEventType).EqualsLiteral("on")) {
     return true;
   }
   return false;
@@ -712,7 +713,8 @@ TextInputProcessor::WillDispatchKeyboardEvent(
                       uint32_t aIndexOfKeypress,
                       void* aData)
 {
-  // TextInputProcessor doesn't set alternative char code.
+  // TextInputProcessor doesn't set alternative char code nor modify charCode
+  // even when Ctrl key is pressed.
 }
 
 nsresult
@@ -764,6 +766,8 @@ TextInputProcessor::PrepareKeyboardEventToDispatch(
       WidgetKeyboardEvent::ComputeKeyCodeFromKeyNameIndex(
         aKeyboardEvent.mKeyNameIndex);
   }
+
+  aKeyboardEvent.mIsSynthesizedByTIP = (mForTests)? false : true;
 
   return NS_OK;
 }
@@ -825,7 +829,7 @@ TextInputProcessor::KeydownInternal(const WidgetKeyboardEvent& aKeyboardEvent,
   } else if (NS_WARN_IF(aKeyFlags & KEY_DONT_DISPATCH_MODIFIER_KEY_EVENT)) {
     return NS_ERROR_INVALID_ARG;
   }
-  keyEvent.modifiers = GetActiveModifiers();
+  keyEvent.mModifiers = GetActiveModifiers();
 
   RefPtr<TextEventDispatcher> kungfuDeathGrip(mDispatcher);
   rv = IsValidStateForComposition();
@@ -905,7 +909,7 @@ TextInputProcessor::KeyupInternal(const WidgetKeyboardEvent& aKeyboardEvent,
   } else if (NS_WARN_IF(aKeyFlags & KEY_DONT_DISPATCH_MODIFIER_KEY_EVENT)) {
     return NS_ERROR_INVALID_ARG;
   }
-  keyEvent.modifiers = GetActiveModifiers();
+  keyEvent.mModifiers = GetActiveModifiers();
 
   RefPtr<TextEventDispatcher> kungfuDeathGrip(mDispatcher);
   rv = IsValidStateForComposition();

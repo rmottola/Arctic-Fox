@@ -5,7 +5,6 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 include('build/moz.configure/init.configure')
-include('build/moz.configure/checks.configure')
 
 # Note:
 # - Gecko-specific options and rules should go in toolkit/moz.configure.
@@ -20,8 +19,10 @@ include('build/moz.configure/checks.configure')
 @depends(milestone)
 def e10s_testing_only(milestone):
     if not milestone.is_release:
-        set_config('E10S_TESTING_ONLY', '1')
-        set_define('E10S_TESTING_ONLY', '1')
+        return True
+
+set_config('E10S_TESTING_ONLY', e10s_testing_only)
+set_define('E10S_TESTING_ONLY', e10s_testing_only)
 
 
 option('--enable-artifact-builds', env='MOZ_ARTIFACT_BUILDS',
@@ -30,26 +31,46 @@ option('--enable-artifact-builds', env='MOZ_ARTIFACT_BUILDS',
 @depends('--enable-artifact-builds')
 def artifact_builds(value):
     if value:
-        imply_option('--disable-compile-environment')
-        set_config('MOZ_ARTIFACT_BUILDS', '1')
-    return bool(value)
+        return True
 
+set_config('MOZ_ARTIFACT_BUILDS', artifact_builds)
+
+@depends('--enable-artifact-builds')
+def imply_disable_compile_environment(value):
+    if value:
+        return False
+
+imply_option('--enable-compile-environment', imply_disable_compile_environment)
 
 option('--disable-compile-environment',
        help='Disable compiler/library checks')
 
 @depends('--disable-compile-environment')
-def compile_environment(value):
-    if value:
-        set_config('COMPILE_ENVIRONMENT', '1')
-        add_old_configure_assignment('COMPILE_ENVIRONMENT', '1')
-    return bool(value)
+def compile_environment(compile_env):
+    if compile_env:
+        return True
+
+set_config('COMPILE_ENVIRONMENT', compile_environment)
+add_old_configure_assignment('COMPILE_ENVIRONMENT', compile_environment)
+
+@depends('--disable-compile-environment', '--help')
+def toolchain_include(compile_env, help):
+    if compile_env:
+        return 'build/moz.configure/toolchain.configure'
+
+include(toolchain_include)
+
+@depends('--disable-compile-environment', '--help')
+def memory_include(compile_env, help):
+    if compile_env:
+        return 'build/moz.configure/memory.configure'
+
+include(memory_include)
 
 
 @depends('--help')
-@advanced
+@imports(_from='mozbuild.backend', _import='backends')
 def build_backends_choices(help):
-    from mozbuild.backend import backends
     return tuple(backends)
 
 
@@ -63,7 +84,9 @@ def build_backend(backends, artifact_builds):
     else:
         all_backends = ['RecursiveMake', 'FasterMake']
     all_backends.extend(backends)
-    set_config('BUILD_BACKENDS', unique_list(all_backends))
+    return unique_list(all_backends)
+
+set_config('BUILD_BACKENDS', build_backend)
 
 
 # Awk detection
@@ -73,7 +96,9 @@ awk = check_prog('AWK', ('gawk', 'mawk', 'nawk', 'awk'))
 # Until the AWK variable is not necessary in old-configure
 @depends(awk)
 def awk_for_old_configure(value):
-    add_old_configure_assignment('AWK', value)
+    return value
+
+add_old_configure_assignment('AWK', awk_for_old_configure)
 
 
 # Perl detection
@@ -83,30 +108,30 @@ perl = check_prog('PERL', ('perl5', 'perl'))
 # Until the PERL variable is not necessary in old-configure
 @depends(perl)
 def perl_for_old_configure(value):
-    add_old_configure_assignment('PERL', value)
+    return value
+
+add_old_configure_assignment('PERL', perl_for_old_configure)
 
 @template
 def perl_version_check(min_version):
     @depends(perl)
     @checking('for minimum required perl version >= %s' % min_version)
-    @advanced
+    @imports('subprocess')
     def get_perl_version(perl):
-        import subprocess
         try:
             return Version(subprocess.check_output([perl, '-e', 'print $]']))
         except subprocess.CalledProcessError as e:
-            error('Failed to get perl version: %s' % e.message)
+            die('Failed to get perl version: %s', e.message)
 
     @depends(get_perl_version)
     def check_perl_version(version):
         if version < min_version:
-            error('Perl %s or higher is required.' % min_version)
+            die('Perl %s or higher is required.', min_version)
 
     @depends(perl)
     @checking('for full perl installation')
-    @advanced
+    @imports('subprocess')
     def has_full_perl_installation(perl):
-        import subprocess
         ret = subprocess.call(
             [perl, '-e', 'use Config; exit(!-d $Config{archlib})'])
         return ret == 0
@@ -114,77 +139,35 @@ def perl_version_check(min_version):
     @depends(has_full_perl_installation)
     def require_full_perl_installation(has_full_perl_installation):
         if not has_full_perl_installation:
-            error('Cannot find Config.pm or $Config{archlib}. '
-                  'A full perl installation is required.')
+            die('Cannot find Config.pm or $Config{archlib}. '
+                'A full perl installation is required.')
 
 perl_version_check('5.006')
 
 
-# yasm detection
-# ==============================================================
-yasm = check_prog('YASM', ['yasm'], allow_missing=True)
-
-@depends(yasm)
-@checking('yasm version')
-@advanced
-def yasm_version(yasm):
-    if yasm:
-        import subprocess
-        try:
-            version = Version(subprocess.check_output(
-                [yasm, '--version']
-            ).splitlines()[0].split()[1])
-            # Until we move all the yasm consumers out of old-configure.
-            # bug 1257904
-            add_old_configure_assignment('_YASM_MAJOR_VERSION', version.major)
-            add_old_configure_assignment('_YASM_MINOR_VERSION', version.minor)
-            return version
-        except subprocess.CalledProcessError as e:
-            error('Failed to get yasm version: %s' % e.message)
-
-@depends(yasm, target)
-def yasm_asflags(yasm, target):
-    if yasm:
-        asflags = {
-            ('OSX', 'x86'): '-f macho32',
-            ('OSX', 'x86_64'): '-f macho64',
-            ('WINNT', 'x86'): '-f win32',
-            ('WINNT', 'x86_64'): '-f x64',
-        }.get((target.os, target.cpu), None)
-        if asflags is None:
-            # We're assuming every x86 platform we support that's
-            # not Windows or Mac is ELF.
-            if target.cpu == 'x86':
-                asflags = '-f elf32'
-            elif target.cpu == 'x86_64':
-                asflags = '-f elf64'
-        if asflags:
-            asflags += ' -rnasm -pnasm'
-            set_config('YASM_ASFLAGS', asflags)
-            set_config('HAVE_YASM', '1')
-            # Until the YASM variable is not necessary in old-configure.
-            add_old_configure_assignment('YASM', '1')
-        return asflags
-
 # Miscellaneous programs
 # ==============================================================
 check_prog('DOXYGEN', ('doxygen',), allow_missing=True)
-check_prog('TAR', ('gnutar', 'gtar', 'tar'))
-check_prog('UNZIP', ('unzip',))
 check_prog('XARGS', ('xargs',))
-check_prog('ZIP', ('zip',))
 
 @depends(target)
-def mac_programs(target):
+def extra_programs(target):
     if target.kernel == 'Darwin':
-        check_prog('DSYMUTIL', ('dsymutil', 'llvm-dsymutil'), allow_missing=True)
-        check_prog('GENISOIMAGE', ('genisoimage',), allow_missing=True)
-
-@depends(target)
-def linux_programs(target):
+        return namespace(
+            DSYMUTIL=('dsymutil', 'llvm-dsymutil'),
+            GENISOIMAGE=('genisoimage',),
+        )
     if target.os == 'GNU' and target.kernel == 'Linux':
-        check_prog('RPMBUILD', ('rpmbuild',), allow_missing=True)
+        return namespace(RPMBUILD=('rpmbuild',))
+
+check_prog('DSYMUTIL', delayed_getattr(extra_programs, 'DSYMUTIL'),
+           allow_missing=True)
+check_prog('GENISOIMAGE', delayed_getattr(extra_programs, 'GENISOIMAGE'),
+           allow_missing=True)
+check_prog('RPMBUILD', delayed_getattr(extra_programs, 'RPMBUILD'),
+           allow_missing=True)
 
 
 # Fallthrough to autoconf-based configure
 include('build/moz.configure/old.configure')
+# Please do not add anything after the include of old.configure.

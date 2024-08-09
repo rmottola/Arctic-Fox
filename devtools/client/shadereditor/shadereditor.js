@@ -17,8 +17,7 @@ const Services = require("Services");
 const EventEmitter = require("devtools/shared/event-emitter");
 const {Tooltip} = require("devtools/client/shared/widgets/Tooltip");
 const Editor = require("devtools/client/sourceeditor/editor");
-const Telemetry = require("devtools/client/shared/telemetry");
-const telemetry = new Telemetry();
+const {LocalizationHelper} = require("devtools/client/shared/l10n");
 
 // The panel's window global is an EventEmitter firing the following events:
 const EVENTS = {
@@ -87,7 +86,6 @@ var EventsHandler = {
    * Listen for events emitted by the current tab target.
    */
   initialize: function() {
-    telemetry.toolOpened("shadereditor");
     this._onHostChanged = this._onHostChanged.bind(this);
     this._onTabNavigated = this._onTabNavigated.bind(this);
     this._onProgramLinked = this._onProgramLinked.bind(this);
@@ -104,7 +102,6 @@ var EventsHandler = {
    * Remove events emitted by the current tab target.
    */
   destroy: function() {
-    telemetry.toolClosed("shadereditor");
     gToolbox.off("host-changed", this._onHostChanged);
     gTarget.off("will-navigate", this._onTabNavigated);
     gTarget.off("navigate", this._onTabNavigated);
@@ -622,7 +619,7 @@ var ShadersEditorsView = {
 /**
  * Localization convenience methods.
  */
-var L10N = new ViewHelpers.L10N(STRINGS_URI);
+var L10N = new LocalizationHelper(STRINGS_URI);
 
 /**
  * Convenient way of emitting events from the panel window.

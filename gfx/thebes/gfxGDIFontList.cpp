@@ -130,7 +130,7 @@ GDIFontEntry::GDIFontEntry(const nsAString& aFaceName,
       mFamilyHasItalicFace(aFamilyHasItalicFace),
       mCharset(), mUnicodeRanges()
 {
-    mUserFontData = aUserFontData;
+    mUserFontData.reset(aUserFontData);
     mStyle = aStyle;
     mWeight = aWeight;
     mStretch = aStretch;
@@ -325,7 +325,7 @@ GDIFontEntry::TestCharacterMap(uint32_t aCh)
         HFONT hfont = font->GetHFONT();
         HFONT oldFont = (HFONT)SelectObject(dc, hfont);
 
-        wchar_t str[1] = { aCh };
+        wchar_t str[1] = { (wchar_t)aCh };
         WORD glyph[1];
 
         bool hasGlyph = false;
@@ -895,23 +895,27 @@ gfxGDIFontList::MakePlatformFont(const nsAString& aFontName,
     return fe;
 }
 
-gfxFontFamily*
-gfxGDIFontList::FindFamily(const nsAString& aFamily, gfxFontStyle* aStyle,
-                           gfxFloat aDevToCssSize)
+bool
+gfxGDIFontList::FindAndAddFamilies(const nsAString& aFamily,
+                                   nsTArray<gfxFontFamily*>* aOutput,
+                                   gfxFontStyle* aStyle,
+                                   gfxFloat aDevToCssSize)
 {
     nsAutoString keyName(aFamily);
     BuildKeyNameFromFontName(keyName);
 
     gfxFontFamily *ff = mFontSubstitutes.GetWeak(keyName);
     if (ff) {
-        return ff;
+        aOutput->AppendElement(ff);
+        return true;
     }
 
     if (mNonExistingFonts.Contains(keyName)) {
-        return nullptr;
+        return false;
     }
 
-    return gfxPlatformFontList::FindFamily(aFamily);
+    return gfxPlatformFontList::FindAndAddFamilies(aFamily, aOutput, aStyle,
+                                                   aDevToCssSize);
 }
 
 gfxFontFamily*

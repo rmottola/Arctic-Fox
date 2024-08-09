@@ -91,6 +91,19 @@ public:
 
   virtual void ReplyRemoveTexture(const OpReplyRemoveTexture& aReply) override;
 
+  void AddPendingCompositorUpdate() {
+    mPendingCompositorUpdates++;
+  }
+  void SetPendingCompositorUpdates(uint32_t aCount) {
+    // Only called after construction.
+    MOZ_ASSERT(mPendingCompositorUpdates == 0);
+    mPendingCompositorUpdates = aCount;
+  }
+  void AcknowledgeCompositorUpdate() {
+    MOZ_ASSERT(mPendingCompositorUpdates > 0);
+    mPendingCompositorUpdates--;
+  }
+
 protected:
   virtual bool RecvSyncWithCompositor() override { return true; }
 
@@ -130,9 +143,6 @@ protected:
   virtual bool RecvGetAnimationTransform(PLayerParent* aParent,
                                          MaybeTransform* aTransform)
                                          override;
-  virtual bool RecvUpdateScrollOffset(const FrameMetrics::ViewID& aScrollId,
-                                      const uint32_t& aScrollGeneration,
-                                      const CSSPoint& aScrollOffset) override;
   virtual bool RecvSetAsyncScrollOffset(const FrameMetrics::ViewID& aId,
                                         const float& aX, const float& aY) override;
   virtual bool RecvSetAsyncZoom(const FrameMetrics::ViewID& aId,
@@ -190,6 +200,11 @@ private:
   uint64_t mId;
 
   uint64_t mPendingTransaction;
+
+  // Number of compositor updates we're waiting for the child to
+  // acknowledge.
+  uint32_t mPendingCompositorUpdates;
+
   // When the widget/frame/browser stuff in this process begins its
   // destruction process, we need to Disconnect() all the currently
   // live shadow layers, because some of them might be orphaned from

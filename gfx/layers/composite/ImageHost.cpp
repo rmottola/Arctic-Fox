@@ -330,9 +330,9 @@ ImageHost::Composite(LayerComposite* aLayer,
   }
 
   TimedImage* img = &mImages[imageIndex];
+  img->mTextureHost->SetCompositor(GetCompositor());
   SetCurrentTextureHost(img->mTextureHost);
   // Make sure the front buffer has a compositor
-  mCurrentTextureHost->SetCompositor(GetCompositor());
   if (mCurrentTextureSource) {
     mCurrentTextureSource->SetCompositor(GetCompositor());
   }
@@ -579,6 +579,27 @@ ImageHost::GetImageSize() const
     return IntSize(img->mPictureRect.width, img->mPictureRect.height);
   }
   return IntSize();
+}
+
+bool
+ImageHost::IsOpaque()
+{
+  const TimedImage* img = ChooseImage();
+  if (!img) {
+    return false;
+  }
+
+  if (img->mPictureRect.width == 0 ||
+      img->mPictureRect.height == 0 ||
+      !img->mTextureHost) {
+    return false;
+  }
+
+  gfx::SurfaceFormat format = img->mTextureHost->GetFormat();
+  if (gfx::IsOpaque(format)) {
+    return true;
+  }
+  return false;
 }
 
 already_AddRefed<TexturedEffect>

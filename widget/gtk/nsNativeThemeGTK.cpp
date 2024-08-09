@@ -23,6 +23,7 @@
 #include "nsIDOMHTMLInputElement.h"
 #include "nsRenderingContext.h"
 #include "nsGkAtoms.h"
+#include "nsAttrValueInlines.h"
 
 #include "mozilla/EventStates.h"
 #include "mozilla/Services.h"
@@ -176,6 +177,15 @@ nsNativeThemeGTK::GetTabMarginPixels(nsIFrame* aFrame)
                        aFrame->PresContext()->AppUnitsToDevPixels(-margin)));
 }
 
+static bool ShouldScrollbarButtonBeDisabled(int32_t aCurpos, int32_t aMaxpos,
+                                            uint8_t aWidgetType)
+{
+  return ((aCurpos == 0 && (aWidgetType == NS_THEME_SCROLLBAR_BUTTON_UP ||
+                            aWidgetType == NS_THEME_SCROLLBAR_BUTTON_LEFT))
+      || (aCurpos == aMaxpos && (aWidgetType == NS_THEME_SCROLLBAR_BUTTON_DOWN ||
+                                 aWidgetType == NS_THEME_SCROLLBAR_BUTTON_RIGHT)));
+}
+
 bool
 nsNativeThemeGTK::GetGtkWidgetAndState(uint8_t aWidgetType, nsIFrame* aFrame,
                                        GtkThemeWidgetType& aGtkWidgetType,
@@ -308,12 +318,9 @@ nsNativeThemeGTK::GetGtkWidgetAndState(uint8_t aWidgetType, nsIFrame* aFrame,
           // the beginning or the end, depending on the button type.
           int32_t curpos = CheckIntAttr(aFrame, nsGkAtoms::curpos, 0);
           int32_t maxpos = CheckIntAttr(aFrame, nsGkAtoms::maxpos, 100);
-          if ((curpos == 0 && (aWidgetType == NS_THEME_SCROLLBAR_BUTTON_UP ||
-                aWidgetType == NS_THEME_SCROLLBAR_BUTTON_LEFT)) ||
-              (curpos == maxpos &&
-               (aWidgetType == NS_THEME_SCROLLBAR_BUTTON_DOWN ||
-                aWidgetType == NS_THEME_SCROLLBAR_BUTTON_RIGHT)))
+          if (ShouldScrollbarButtonBeDisabled(curpos, maxpos, aWidgetType)) {
             aState->disabled = true;
+          }
 
           // In order to simulate native GTK scrollbar click behavior,
           // we set the active attribute on the element to true if it's
@@ -1561,8 +1568,9 @@ nsNativeThemeGTK::GetMinimumWidgetSize(nsPresContext* aPresContext,
   case NS_THEME_BUTTON_ARROW_NEXT:
   case NS_THEME_BUTTON_ARROW_PREVIOUS:
     {
-        moz_gtk_get_arrow_size(&aResult->width, &aResult->height);
-        *aIsOverridable = false;
+      moz_gtk_get_arrow_size(MOZ_GTK_TOOLBARBUTTON_ARROW,
+                             &aResult->width, &aResult->height);
+      *aIsOverridable = false;
     }
     break;
   case NS_THEME_CHECKBOX_CONTAINER:
@@ -1574,14 +1582,30 @@ nsNativeThemeGTK::GetMinimumWidgetSize(nsPresContext* aPresContext,
   case NS_THEME_TOOLBAR_BUTTON:
   case NS_THEME_TREEVIEW_HEADER_CELL:
     {
-      // Just include our border, and let the box code augment the size.
+      if (aWidgetType == NS_THEME_DROPDOWN) {
+        // Include the arrow size.
+        moz_gtk_get_arrow_size(MOZ_GTK_DROPDOWN,
+                               &aResult->width, &aResult->height);
+      }
+      // else the minimum size is missing consideration of container
+      // descendants; the value returned here will not be helpful, but the
+      // box model may consider border and padding with child minimum sizes.
+
       nsIntMargin border;
       nsNativeThemeGTK::GetWidgetBorder(aFrame->PresContext()->DeviceContext(),
                                         aFrame, aWidgetType, &border);
-      aResult->width = border.left + border.right;
-      aResult->height = border.top + border.bottom;
+      aResult->width += border.left + border.right;
+      aResult->height += border.top + border.bottom;
     }
     break;
+#if (MOZ_WIDGET_GTK == 3)
+  case NS_THEME_NUMBER_INPUT:
+  case NS_THEME_TEXTFIELD:
+    {
+      moz_gtk_get_entry_min_height(&aResult->height);
+    }
+    break;
+#endif
   case NS_THEME_TOOLBAR_SEPARATOR:
     {
       gint separator_width;
@@ -1627,7 +1651,8 @@ nsNativeThemeGTK::GetMinimumWidgetSize(nsPresContext* aPresContext,
 
 NS_IMETHODIMP
 nsNativeThemeGTK::WidgetStateChanged(nsIFrame* aFrame, uint8_t aWidgetType, 
-                                     nsIAtom* aAttribute, bool* aShouldRepaint)
+                                     nsIAtom* aAttribute, bool* aShouldRepaint,
+                                     const nsAttrValue* aOldValue)
 {
   // Some widget types just never change state.
   if (aWidgetType == NS_THEME_TOOLBOX ||
@@ -1662,7 +1687,25 @@ nsNativeThemeGTK::WidgetStateChanged(nsIFrame* aFrame, uint8_t aWidgetType,
        aWidgetType == NS_THEME_SCROLLBAR_BUTTON_RIGHT) &&
       (aAttribute == nsGkAtoms::curpos ||
        aAttribute == nsGkAtoms::maxpos)) {
-    *aShouldRepaint = true;
+    // If 'curpos' has changed and we are passed its old value, we can
+    // determine whether the button's enablement actually needs to change.
+    if (aAttribute == nsGkAtoms::curpos && aOldValue) {
+      int32_t curpos = CheckIntAttr(aFrame, nsGkAtoms::curpos, 0);
+      int32_t maxpos = CheckIntAttr(aFrame, nsGkAtoms::maxpos, 0);
+      nsAutoString str;
+      aOldValue->ToString(str);
+      nsresult err;
+      int32_t oldCurpos = str.ToInteger(&err);
+      if (str.IsEmpty() || NS_FAILED(err)) {
+        *aShouldRepaint = true;
+      } else {
+        bool disabledBefore = ShouldScrollbarButtonBeDisabled(oldCurpos, maxpos, aWidgetType);
+        bool disabledNow = ShouldScrollbarButtonBeDisabled(curpos, maxpos, aWidgetType);
+        *aShouldRepaint = (disabledBefore != disabledNow);
+      }
+    } else {
+      *aShouldRepaint = true;
+    }
     return NS_OK;
   }
 

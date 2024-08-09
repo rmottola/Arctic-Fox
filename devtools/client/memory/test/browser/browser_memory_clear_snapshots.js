@@ -5,6 +5,7 @@
  * Tests taking and then clearing snapshots.
  */
 
+ const { treeMapState } = require("devtools/client/memory/constants");
 const TEST_URL = "http://example.com/browser/devtools/client/memory/test/browser/doc_steady_allocation.html";
 
 this.test = makeMemoryTest(TEST_URL, function* ({ tab, panel }) {
@@ -16,9 +17,13 @@ this.test = makeMemoryTest(TEST_URL, function* ({ tab, panel }) {
   is(snapshotEls.length, 0, "No snapshots visible");
 
   info("Take two snapshots");
-  yield takeSnapshot(panel.panelWin);
-  yield takeSnapshot(panel.panelWin);
-  yield waitUntilSnapshotState(gStore, [states.SAVED_CENSUS, states.SAVED_CENSUS]);
+  takeSnapshot(panel.panelWin);
+  takeSnapshot(panel.panelWin);
+  yield waitUntilState(gStore, state =>
+    state.snapshots.length === 2 &&
+    state.snapshots[0].treeMap && state.snapshots[1].treeMap &&
+    state.snapshots[0].treeMap.state === treeMapState.SAVED &&
+    state.snapshots[1].treeMap.state === treeMapState.SAVED);
 
   snapshotEls = document.querySelectorAll("#memory-tool-container .list li");
   is(snapshotEls.length, 2, "Two snapshots visible");

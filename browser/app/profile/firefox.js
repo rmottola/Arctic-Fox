@@ -60,6 +60,12 @@ pref("services.kinto.changes.path", "/buckets/monitor/collections/changes/record
 pref("services.kinto.bucket", "blocklists");
 pref("services.kinto.onecrl.collection", "certificates");
 pref("services.kinto.onecrl.checked", 0);
+pref("services.kinto.addons.collection", "addons");
+pref("services.kinto.addons.checked", 0);
+pref("services.kinto.plugins.collection", "plugins");
+pref("services.kinto.plugins.checked", 0);
+pref("services.kinto.gfx.collection", "gfx");
+pref("services.kinto.gfx.checked", 0);
 
 // for now, let's keep kinto update out of the release channel
 #ifdef RELEASE_BUILD
@@ -73,6 +79,10 @@ pref("extensions.update.autoUpdateDefault", true);
 // Disable add-ons that are not installed by the user in all scopes by default.
 // See the SCOPE constants in AddonManager.jsm for values to use here.
 pref("extensions.autoDisableScopes", 15);
+
+// Add-on content security policies.
+pref("extensions.webextensions.base-content-security-policy", "script-src 'self' https://* moz-extension: blob: filesystem: 'unsafe-eval' 'unsafe-inline'; object-src 'self' https://* moz-extension: blob: filesystem:;");
+pref("extensions.webextensions.default-content-security-policy", "script-src 'self'; object-src 'self';");
 
 // Don't require signed add-ons by default
 pref("xpinstall.signatures.required", false);
@@ -1283,9 +1293,6 @@ pref("security.mixed_content.block_active_content", true);
 // ID (a UUID when set by gecko) that is used as a per profile suffix to a low
 // integrity temp directory.
 pref("security.sandbox.content.tempDirSuffix", "");
-
-// 2 = allow SHA-1 only before 2016-01-01
-pref("security.pki.sha1_enforcement_level", 2);
 
 // Required blocklist freshness for OneCRL OCSP bypass
 // (default is 1.25x extensions.blocklist.interval, or 30 hours)

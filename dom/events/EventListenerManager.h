@@ -328,7 +328,7 @@ public:
                    dom::EventTarget* aCurrentTarget,
                    nsEventStatus* aEventStatus)
   {
-    if (mListeners.IsEmpty() || aEvent->mFlags.mPropagationStopped) {
+    if (mListeners.IsEmpty() || aEvent->PropagationStopped()) {
       return;
     }
 
@@ -343,7 +343,7 @@ public:
     // Check if we already know that there is no event listener for the event.
     if (mNoListenerForEvent == aEvent->mMessage &&
         (mNoListenerForEvent != eUnidentifiedEvent ||
-         mNoListenerForEventAtom == aEvent->userType)) {
+         mNoListenerForEventAtom == aEvent->mSpecifiedEventType)) {
       return;
     }
     HandleEventInternal(aPresContext, aEvent, aDOMEvent, aCurrentTarget,

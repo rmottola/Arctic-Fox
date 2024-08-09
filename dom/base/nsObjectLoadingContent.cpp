@@ -1153,6 +1153,20 @@ nsObjectLoadingContent::OnStopRequest(nsIRequest *aRequest,
     if (thisNode && thisNode->IsInComposedDoc()) {
       thisNode->GetComposedDoc()->AddBlockedTrackingNode(thisNode);
     }
+  } else if (aStatusCode == NS_ERROR_BLOCKED_URI) {
+    // Logging is temporarily disabled until after experiment phase.
+    //
+    // nsAutoCString uri;
+    // mURI->GetSpec(uri);
+    // nsCOMPtr<nsIConsoleService> console(
+    //   do_GetService("@mozilla.org/consoleservice;1"));
+    // if (console) {
+    //   nsString message = NS_LITERAL_STRING("Blocking ") +
+    //     NS_ConvertASCIItoUTF16(uri) +
+    //     NS_LITERAL_STRING(" since it was found on an internal Firefox blocklist.");
+    //   console->LogStringMessage(message.get());
+    // }
+    Telemetry::Accumulate(Telemetry::PLUGIN_BLOCKED_FOR_STABILITY, 1);
   }
 
   NS_ENSURE_TRUE(nsContentUtils::LegacyIsCallerChromeOrNativeCode(), NS_ERROR_NOT_AVAILABLE);
@@ -1230,12 +1244,6 @@ nsObjectLoadingContent::GetParentApplication(mozIApplication** aApplication)
 
 NS_IMETHODIMP
 nsObjectLoadingContent::SetIsPrerendered()
-{
-  return NS_ERROR_NOT_IMPLEMENTED;
-}
-
-NS_IMETHODIMP
-nsObjectLoadingContent::SwapFrameLoaders(nsIFrameLoaderOwner* aOtherLoader)
 {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
@@ -1649,7 +1657,7 @@ nsObjectLoadingContent::CheckProcessPolicy(int16_t *aContentPolicy)
   NS_ASSERTION(thisContent, "Must be an instance of content");
 
   nsIDocument* doc = thisContent->OwnerDoc();
-  
+
   int32_t objectType;
   switch (mType) {
     case eType_Image:
@@ -2916,7 +2924,7 @@ nsObjectLoadingContent::PluginCrashed(nsIPluginTag* aPluginTag,
 
   // send nsPluginCrashedEvent
 
-  // Note that aPluginTag in invalidated after we're called, so copy 
+  // Note that aPluginTag in invalidated after we're called, so copy
   // out any data we need now.
   nsAutoCString pluginName;
   aPluginTag->GetName(pluginName);
@@ -3828,4 +3836,3 @@ nsObjectLoadingContent::SetupProtoChainRunner::Run()
 }
 
 NS_IMPL_ISUPPORTS(nsObjectLoadingContent::SetupProtoChainRunner, nsIRunnable)
-

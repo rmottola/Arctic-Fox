@@ -12,7 +12,6 @@ DevToolsModules(
     'json-panel.css',
     'main.css',
     'read-only-prop.svg',
-    'reps.css',
     'search-box.css',
     'search.svg',
     'tabs.css',

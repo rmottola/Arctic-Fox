@@ -18,8 +18,6 @@ const gIsLinux = AppConstants.platform == "linux";
 
 const Telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
 
-const Telemetry = Cc["@mozilla.org/base/telemetry;1"].getService(Ci.nsITelemetry);
-
 const MILLISECONDS_PER_MINUTE = 60 * 1000;
 const MILLISECONDS_PER_HOUR = 60 * MILLISECONDS_PER_MINUTE;
 const MILLISECONDS_PER_DAY = 24 * MILLISECONDS_PER_HOUR;
@@ -297,11 +295,6 @@ function fakeGeneratePingId(func) {
 function fakeCachedClientId(uuid) {
   let module = Cu.import("resource://gre/modules/TelemetryController.jsm");
   module.Policy.getCachedClientID = () => uuid;
-}
-
-function fakeIsUnifiedOptin(isOptin) {
-  let module = Cu.import("resource://gre/modules/TelemetryController.jsm");
-  module.Policy.isUnifiedOptin = () => isOptin;
 }
 
 // Return a date that is |offset| ms in the future from |date|.

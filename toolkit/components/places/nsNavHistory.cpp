@@ -566,8 +566,14 @@ public:
     if (navHistory) {
       nsCOMPtr<nsIURI> uri;
       (void)NS_NewURI(getter_AddRefs(uri), mSpec);
-      navHistory->NotifyFrecencyChanged(uri, mNewFrecency, mGUID, mHidden,
-                                        mLastVisitDate);
+      // We cannot assert since some automated tests are checking this path.
+      NS_WARN_IF_FALSE(uri, "Invalid URI in FrecencyNotification");
+      // Notify a frecency change only if we have a valid uri, otherwise
+      // the observer couldn't gather any useful data from the notification.
+      if (uri) {
+        navHistory->NotifyFrecencyChanged(uri, mNewFrecency, mGUID, mHidden,
+                                          mLastVisitDate);
+      }
     }
     return NS_OK;
   }
@@ -2449,6 +2455,13 @@ nsNavHistory::CleanupPlacesOnVisitsDelete(const nsCString& aPlaceIdsQueryString)
   );
   NS_ENSURE_SUCCESS(rv, rv);
 
+  // Hosts accumulated during the places delete are updated through a trigger
+  // (see nsPlacesTriggers.h).
+  rv = mDB->MainConn()->ExecuteSimpleSQL(
+    NS_LITERAL_CSTRING("DELETE FROM moz_updatehosts_temp")
+  );
+  NS_ENSURE_SUCCESS(rv, rv);
+
   // Invalidate frecencies of touched places, since they need recalculation.
   rv = invalidateFrecencies(aPlaceIdsQueryString);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -2482,6 +2495,8 @@ nsNavHistory::RemovePages(nsIURI **aURIs, uint32_t aLength)
   for (uint32_t i = 0; i < aLength; i++) {
     int64_t placeId;
     nsAutoCString guid;
+    if (!aURIs[i])
+      continue;
     rv = GetIdForPage(aURIs[i], &placeId, guid);
     NS_ENSURE_SUCCESS(rv, rv);
     if (placeId != 0) {

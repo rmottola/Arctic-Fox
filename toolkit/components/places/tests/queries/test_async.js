@@ -325,6 +325,7 @@ let DataHelper = {
         };
       default:
         do_throw("Unknown data type when populating DB: " + type);
+        return undefined;
       }
     });
   },

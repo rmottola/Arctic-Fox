@@ -56,7 +56,7 @@ PeerConnectionIdp.prototype = {
       }
       this._idp.stop();
     }
-    this._idp = new IdpSandbox(provider, protocol, this._win.document);
+    this._idp = new IdpSandbox(provider, protocol, this._win);
   },
 
   // start the IdP and do some error fixup
@@ -177,7 +177,7 @@ PeerConnectionIdp.prototype = {
         .getService(Components.interfaces.nsIIDNService);
     if (idnService.convertUTF8toACE(tail) !==
         idnService.convertUTF8toACE(provider)) {
-      error('name "' + identity.name +
+      error('name "' + name +
             '" doesn\'t match IdP: "' + this.provider + '"');
     }
   },

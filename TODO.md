@@ -42,31 +42,19 @@
 - Bug 1310721 - 2016-10-15- Remove support for the b2g PAC generator; r=mcmanus
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
 - Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
+- Bug 1287520 - 2026-07-29 - Check IsPackedArray for the result array in Array.proto
 - 1114580 - toStringTag - several diffs still to analyze
+- Bug 1263340 - finish to part 8
 - Bug 1278838 2016-06-09- Remove separate worker binding for Performance API
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1266391 - 2016-04-21 Introduce an enum class mozilla::unicode::Script, and u
 - Bug 1209100 - 2016-03-21 - Back out bug 1165185 on inbound.
 - Bug 1296851 - 2016-10-27 Always allow SetPrototype with the same value as the cu
 - Bug 1263778 - 2016-03-19 Rename a bunch of low-level [[Prototype]] access method
-- Bug 1255511 - 2016-03-15 Skip beforeunload prompts once nsIAppStartup shuttingDo
-- Bug 1258905 - 2016-03-28 Remove a bunch of dead IPC code.
-- Bug 1252262 - 2016-03-08 - Don't combine the client offset into the outer rect for
 - 2016-02-21 Back out 3 changesets (bug 1216001) for Win8 reftest failures in 1193¿ 
-- Bug 1251347 - Refining SessionFile Shutdown hang details;r
-- Bug 1251347 - Making sure that SessionFile.write initializes its work
-- Bug 1244650 - Failure to clear Forms and Search Data on exit. r
-- Bug 1243549 - Add missing bits. r=post-facto 
 - Bug 612168 [recheck existing] - Handle uninstalls of restartless addons in XPIProvider
-- Bug 1243549 - 2016-02-04 Make sure that startup sanitization doesn't throw
-- Bug 1219339 - 2016-10-02 Part2: Ensure close of webrtc trace file during shutdow
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
-- 1079844 - Refer to "detaching" instead of "neutering" of ArrayBuf
-- bug 1244743 - Replace MOZ_NATIVE_X with MOZ_SYSTEM_X. 
 - Bug 1230948 - Update web-platform-tests expected data to revision 63b
-- Bug 1257650 - 2016-03-19 Skip Security checks if triggeringPrincipal is System
-- Bug 1232903 - Skip Security checks if triggeringPrincipal is SystemPr
-- Bug 1257468 - Replace tests on BUILDING_JS with tests on MOZ_BUILD_AP
 - 2016-02-20 : Bug 1014185 - Remove about:customizing
 
 impacting download and shutdown:
@@ -111,8 +99,6 @@ media/libstagefright/frameworks/av/media/libstagefright/MPEG4Extractor.cpp
 ### Further Further ToDo:
 - Check for STLPort removal: https://bugzilla.mozilla.org/show_bug.cgi?id=1276927
 - import PPC JIT from TenFourFox
-- flatten out security manager ssl
-- NekcoOriginAttributes
 - see if window.requestIdleCallback can be backported
 
 ### last checked TFF backport commit
@@ -123,17 +109,20 @@ https://github.com/classilla/tenfourfox/issues/526
 
 ## JS Sputnik checks:
 
-2021-07-18:
-Tests To run: 16436 | Total tests ran: 16436 | Pass: 15436 | Fail: 1000 | Failed to load: 0
-
-2023-06-02:
-Tests To run: 16436 | Total tests ran: 16436 | Pass: 15224 | Fail: 1212 | Failed to load: 0
-
-2023-04-01:
-* Tests To run: 16436 | Total tests ran: 16436 | Pass: 15188 | Fail: 1248 | Failed to load: 0
-
 2018-12-10:
 * Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6048 | Fail: 928 | Failed to load: 0 - Hangs on "iter-close"
 
 2021-09-13:
 * Full: Tests To run: 16436 | Total tests ran: 6976 | Pass: 6095 | Fail: 881 | Failed to load: 0 - Hangs on "iter-close"
+
+2023-04-01:
+* Tests To run: 16436 | Total tests ran: 16436 | Pass: 15188 | Fail: 1248 | Failed to load: 0
+
+2023-06-02:
+Tests To run: 16436 | Total tests ran: 16436 | Pass: 15224 | Fail: 1212 | Failed to load: 0
+
+2023-07-18:
+Tests To run: 16436 | Total tests ran: 16436 | Pass: 15436 | Fail: 1000 | Failed to load: 0
+
+2024-04-05:
+Tests To run: 16436 | Total tests ran: 16436 | Pass: 15801 | Fail: 635 | Failed to load: 0

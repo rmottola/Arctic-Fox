@@ -1449,6 +1449,9 @@ GCRuntime::setParameter(JSGCParamKey key, uint32_t value, AutoLockGC& lock)
 bool
 GCSchedulingTunables::setParameter(JSGCParamKey key, uint32_t value, const AutoLockGC& lock)
 {
+    // Limit heap growth factor to one hundred times size of current heap.
+    const double MaxHeapGrowthFactor = 100;
+
     switch(key) {
       case JSGC_MAX_BYTES:
         gcMaxBytes_ = value;
@@ -1478,7 +1481,7 @@ GCSchedulingTunables::setParameter(JSGCParamKey key, uint32_t value, const AutoL
       }
       case JSGC_HIGH_FREQUENCY_HEAP_GROWTH_MAX: {
         double newGrowth = value / 100.0;
-        if (newGrowth <= 0.85)
+        if (newGrowth <= 0.85 || newGrowth > MaxHeapGrowthFactor)
             return false;
         highFrequencyHeapGrowthMax_ = newGrowth;
         MOZ_ASSERT(highFrequencyHeapGrowthMax_ / 0.85 > 1.0);
@@ -1486,7 +1489,7 @@ GCSchedulingTunables::setParameter(JSGCParamKey key, uint32_t value, const AutoL
       }
       case JSGC_HIGH_FREQUENCY_HEAP_GROWTH_MIN: {
         double newGrowth = value / 100.0;
-        if (newGrowth <= 0.85)
+        if (newGrowth <= 0.85 || newGrowth > MaxHeapGrowthFactor)
             return false;
         highFrequencyHeapGrowthMin_ = newGrowth;
         MOZ_ASSERT(highFrequencyHeapGrowthMin_ / 0.85 > 1.0);
@@ -1494,7 +1497,7 @@ GCSchedulingTunables::setParameter(JSGCParamKey key, uint32_t value, const AutoL
       }
       case JSGC_LOW_FREQUENCY_HEAP_GROWTH: {
         double newGrowth = value / 100.0;
-        if (newGrowth <= 0.9)
+        if (newGrowth <= 0.9 || newGrowth > MaxHeapGrowthFactor)
             return false;
         lowFrequencyHeapGrowth_ = newGrowth;
         MOZ_ASSERT(lowFrequencyHeapGrowth_ / 0.9 > 1.0);
@@ -1520,6 +1523,9 @@ GCSchedulingTunables::setParameter(JSGCParamKey key, uint32_t value, const AutoL
         if (minEmptyChunkCount_ > maxEmptyChunkCount_)
             minEmptyChunkCount_ = maxEmptyChunkCount_;
         MOZ_ASSERT(maxEmptyChunkCount_ >= minEmptyChunkCount_);
+        break;
+      case JSGC_REFRESH_FRAME_SLICES_ENABLED:
+        refreshFrameSlicesEnabled_ = value != 0;
         break;
       default:
         MOZ_CRASH("Unknown GC parameter.");
@@ -1582,6 +1588,8 @@ GCRuntime::getParameter(JSGCParamKey key, const AutoLockGC& lock)
         return tunables.maxEmptyChunkCount();
       case JSGC_COMPACTING_ENABLED:
         return compactingEnabled;
+      case JSGC_REFRESH_FRAME_SLICES_ENABLED:
+        return tunables.areRefreshFrameSlicesEnabled();
       default:
         MOZ_ASSERT(key == JSGC_NUMBER);
         return uint32_t(number);
@@ -2036,8 +2044,13 @@ static const AllocKind AllocKindsToRelocate[] = {
     AllocKind::OBJECT12_BACKGROUND,
     AllocKind::OBJECT16,
     AllocKind::OBJECT16_BACKGROUND,
+    AllocKind::SCRIPT,
+    AllocKind::LAZY_SCRIPT,
     AllocKind::SHAPE,
-    AllocKind::ACCESSOR_SHAPE
+    AllocKind::ACCESSOR_SHAPE,
+    AllocKind::FAT_INLINE_STRING,
+    AllocKind::STRING,
+    AllocKind::EXTERNAL_STRING
 };
 
 Arena*
@@ -2188,7 +2201,7 @@ RelocateCell(Zone* zone, TenuredCell* src, AllocKind thingKind, size_t thingSize
         }
 
         // Call object moved hook if present.
-        if (JSObjectMovedOp op = srcObj->getClass()->ext.objectMovedOp)
+        if (JSObjectMovedOp op = srcObj->getClass()->extObjectMovedOp())
             op(dstObj, srcObj);
 
         MOZ_ASSERT_IF(dstObj->isNative(),
@@ -2385,6 +2398,30 @@ MovingTracer::onShapeEdge(Shape** shapep)
 }
 
 void
+MovingTracer::onStringEdge(JSString** stringp)
+{
+    JSString* string = *stringp;
+    if (IsForwarded(string))
+        *stringp = Forwarded(string);
+}
+
+void
+MovingTracer::onScriptEdge(JSScript** scriptp)
+{
+    JSScript* script = *scriptp;
+    if (IsForwarded(script))
+        *scriptp = Forwarded(script);
+}
+
+void
+MovingTracer::onLazyScriptEdge(LazyScript** lazyp)
+{
+    LazyScript* lazy = *lazyp;
+    if (IsForwarded(lazy))
+        *lazyp = Forwarded(lazy);
+}
+
+void
 Zone::prepareForCompacting()
 {
     FreeOp* fop = runtimeFromMainThread()->defaultFreeOp();
@@ -2399,12 +2436,12 @@ GCRuntime::sweepTypesAfterCompacting(Zone* zone)
 
     AutoClearTypeInferenceStateOnOOM oom(zone);
 
-    for (ZoneCellIter i(zone, AllocKind::SCRIPT); !i.done(); i.next()) {
+    for (ZoneCellIterUnderGC i(zone, AllocKind::SCRIPT); !i.done(); i.next()) {
         JSScript* script = i.get<JSScript>();
         script->maybeSweepTypes(&oom);
     }
 
-    for (ZoneCellIter i(zone, AllocKind::OBJECT_GROUP); !i.done(); i.next()) {
+    for (ZoneCellIterUnderGC i(zone, AllocKind::OBJECT_GROUP); !i.done(); i.next()) {
         ObjectGroup* group = i.get<ObjectGroup>();
         group->maybeSweep(&oom);
     }
@@ -2420,11 +2457,11 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
     sweepTypesAfterCompacting(zone);
     zone->sweepBreakpoints(fop);
     zone->sweepWeakMaps();
+    for (auto* cache : zone->weakCaches_)
+        cache->sweep();
 
     for (CompartmentsInZoneIter c(zone); !c.done(); c.next()) {
         c->sweepInnerViews();
-        c->sweepBaseShapeTable();
-        c->sweepInitialShapeTable();
         c->objectGroups.sweep(fop);
         c->sweepRegExps();
         c->sweepSavedStacks();
@@ -2439,21 +2476,26 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
 }
 
 template <typename T>
-static void
-UpdateCellPointersTyped(MovingTracer* trc, Arena* arena, JS::TraceKind traceKind)
+static inline void
+UpdateCellPointers(MovingTracer* trc, T* cell)
 {
-    for (ArenaCellIterUnderGC i(arena); !i.done(); i.next()) {
-        T* cell = reinterpret_cast<T*>(i.getCell());
-        cell->fixupAfterMovingGC();
-        TraceChildren(trc, cell, traceKind);
-    }
+    cell->fixupAfterMovingGC();
+    cell->traceChildren(trc);
+}
+
+template <typename T>
+static void
+UpdateArenaPointersTyped(MovingTracer* trc, Arena* arena, JS::TraceKind traceKind)
+{
+    for (ArenaCellIterUnderGC i(arena); !i.done(); i.next())
+        UpdateCellPointers(trc, reinterpret_cast<T*>(i.getCell()));
 }
 
 /*
- * Update the interal pointers for all cells in an arena.
+ * Update the internal pointers for all cells in an arena.
  */
 static void
-UpdateCellPointers(MovingTracer* trc, Arena* arena)
+UpdateArenaPointers(MovingTracer* trc, Arena* arena)
 {
     AllocKind kind = arena->getAllocKind();
     JS::TraceKind traceKind = MapAllocToTraceKind(kind);
@@ -2473,31 +2515,34 @@ UpdateCellPointers(MovingTracer* trc, Arena* arena)
       case AllocKind::OBJECT12_BACKGROUND:
       case AllocKind::OBJECT16:
       case AllocKind::OBJECT16_BACKGROUND:
-        UpdateCellPointersTyped<JSObject>(trc, arena, traceKind);
+        UpdateArenaPointersTyped<JSObject>(trc, arena, traceKind);
         return;
       case AllocKind::SCRIPT:
-        UpdateCellPointersTyped<JSScript>(trc, arena, traceKind);
+        UpdateArenaPointersTyped<JSScript>(trc, arena, traceKind);
         return;
       case AllocKind::LAZY_SCRIPT:
-        UpdateCellPointersTyped<LazyScript>(trc, arena, traceKind);
+        UpdateArenaPointersTyped<LazyScript>(trc, arena, traceKind);
         return;
       case AllocKind::SHAPE:
-        UpdateCellPointersTyped<Shape>(trc, arena, traceKind);
+        UpdateArenaPointersTyped<Shape>(trc, arena, traceKind);
         return;
       case AllocKind::ACCESSOR_SHAPE:
-        UpdateCellPointersTyped<AccessorShape>(trc, arena, traceKind);
+        UpdateArenaPointersTyped<AccessorShape>(trc, arena, traceKind);
         return;
       case AllocKind::BASE_SHAPE:
-        UpdateCellPointersTyped<BaseShape>(trc, arena, traceKind);
+        UpdateArenaPointersTyped<BaseShape>(trc, arena, traceKind);
         return;
       case AllocKind::OBJECT_GROUP:
-        UpdateCellPointersTyped<ObjectGroup>(trc, arena, traceKind);
+        UpdateArenaPointersTyped<ObjectGroup>(trc, arena, traceKind);
+        return;
+      case AllocKind::STRING:
+        UpdateArenaPointersTyped<JSString>(trc, arena, traceKind);
         return;
       case AllocKind::JITCODE:
-        UpdateCellPointersTyped<jit::JitCode>(trc, arena, traceKind);
+        UpdateArenaPointersTyped<jit::JitCode>(trc, arena, traceKind);
         return;
       default:
-        MOZ_CRASH("Invalid alloc kind for UpdateCellPointers");
+        MOZ_CRASH("Invalid alloc kind for UpdateArenaPointers");
     }
 }
 
@@ -2539,9 +2584,10 @@ ArenasToUpdate::updateKind(AllocKind kind)
 {
     MOZ_ASSERT(IsValidAllocKind(kind));
 
-    // GC things that do not contain JSObject pointers don't need updating.
+    // GC things that do not contain pointers to cells we relocate don't need
+    // updating. Note that AllocKind::STRING is the only string kind which can
+    // be a rope and hence contain relocatable pointers.
     if (kind == AllocKind::FAT_INLINE_STRING ||
-        kind == AllocKind::STRING ||
         kind == AllocKind::EXTERNAL_STRING ||
         kind == AllocKind::SYMBOL)
     {
@@ -2615,7 +2661,7 @@ ArenasToUpdate::getArenasToUpdate(AutoLockHelperThreadState& lock, unsigned maxL
     return { begin, last->next };
 }
 
-struct UpdateCellPointersTask : public GCParallelTask
+struct UpdatePointersTask : public GCParallelTask
 {
     // Maximum number of arenas to update in one block.
 #ifdef DEBUG
@@ -2624,11 +2670,11 @@ struct UpdateCellPointersTask : public GCParallelTask
     static const unsigned MaxArenasToProcess = 256;
 #endif
 
-    UpdateCellPointersTask(JSRuntime* rt, ArenasToUpdate* source, AutoLockHelperThreadState& lock)
+    UpdatePointersTask(JSRuntime* rt, ArenasToUpdate* source, AutoLockHelperThreadState& lock)
       : rt_(rt), source_(source)
     {}
 
-    ~UpdateCellPointersTask() override { join(); }
+    ~UpdatePointersTask() override { join(); }
 
   private:
     JSRuntime* rt_;
@@ -2641,7 +2687,7 @@ struct UpdateCellPointersTask : public GCParallelTask
 };
 
 bool
-UpdateCellPointersTask::getArenasToUpdate()
+UpdatePointersTask::getArenasToUpdate()
 {
     AutoLockHelperThreadState lock;
     arenas_ = source_->getArenasToUpdate(lock, MaxArenasToProcess);
@@ -2649,15 +2695,15 @@ UpdateCellPointersTask::getArenasToUpdate()
 }
 
 void
-UpdateCellPointersTask::updateArenas()
+UpdatePointersTask::updateArenas()
 {
     MovingTracer trc(rt_);
     for (Arena* arena = arenas_.begin; arena != arenas_.end; arena = arena->next)
-        UpdateCellPointers(&trc, arena);
+        UpdateArenaPointers(&trc, arena);
 }
 
 /* virtual */ void
-UpdateCellPointersTask::run()
+UpdatePointersTask::run()
 {
     while (getArenasToUpdate())
         updateArenas();
@@ -2691,8 +2737,8 @@ GCRuntime::updateAllCellPointers(MovingTracer* trc, Zone* zone)
     ArenasToUpdate
         bgArenas(zone, bgTaskCount == 0 ? ArenasToUpdate::NONE : ArenasToUpdate::BACKGROUND);
 
-    Maybe<UpdateCellPointersTask> fgTask;
-    Maybe<UpdateCellPointersTask> bgTasks[MaxCellUpdateBackgroundTasks];
+    Maybe<UpdatePointersTask> fgTask;
+    Maybe<UpdatePointersTask> bgTasks[MaxCellUpdateBackgroundTasks];
 
     size_t tasksStarted = 0;
 
@@ -2718,6 +2764,14 @@ GCRuntime::updateAllCellPointers(MovingTracer* trc, Zone* zone)
     }
 }
 
+void
+GCRuntime::updateTypeDescrObjects(MovingTracer* trc, Zone* zone)
+{
+    zone->typeDescrObjects.sweep();
+    for (auto r = zone->typeDescrObjects.all(); !r.empty(); r.popFront())
+        UpdateCellPointers(trc, r.front().get());
+}
+
 /*
  * Update pointers to relocated cells by doing a full heap traversal and sweep.
  *
@@ -2737,6 +2791,11 @@ GCRuntime::updatePointersToRelocatedCells(Zone* zone)
     for (CompartmentsInZoneIter comp(zone); !comp.done(); comp.next())
         comp->fixupAfterMovingGC();
     JSCompartment::fixupCrossCompartmentWrappersAfterMovingGC(&trc);
+    rt->spsProfiler.fixupStringsMapAfterMovingGC();
+
+    // Update TypeDescrs before all other objects as typed objects access these
+    // objects when we trace them.
+    updateTypeDescrObjects(&trc, zone);
 
     // Iterate through all cells that can contain relocatable pointers to update
     // them. Since updating each cell is independent we try to parallelize this
@@ -2773,15 +2832,12 @@ GCRuntime::updatePointersToRelocatedCells(Zone* zone)
     // Type inference may put more blocks here to free.
     freeLifoAlloc.freeAll();
 
-    // Clear runtime caches that can contain cell pointers.
-    // TODO: Should possibly just call purgeRuntime() here.
-    rt->newObjectCache.purge();
-    rt->nativeIterCache.purge();
-
     // Call callbacks to get the rest of the system to fixup other untraced pointers.
     callWeakPointerZoneGroupCallbacks();
     for (CompartmentsInZoneIter comp(zone); !comp.done(); comp.next())
         callWeakPointerCompartmentCallbacks(comp);
+    if (rt->sweepZoneCallback)
+        rt->sweepZoneCallback(zone);
 }
 
 void
@@ -3916,15 +3972,11 @@ GCRuntime::checkForCompartmentMismatches()
     if (disableStrictProxyCheckingCount)
         return;
 
-    // ZoneCellIter could GC were this not called under GC.
-    MOZ_ASSERT(rt->isHeapBusy());
-    JS::AutoSuppressGCAnalysis noAnalysis;
-
     CompartmentCheckTracer trc(rt);
     for (ZonesIter zone(rt, SkipAtoms); !zone.done(); zone.next()) {
         trc.zone = zone;
         for (auto thingKind : AllAllocKinds()) {
-            for (ZoneCellIter i(zone, thingKind); !i.done(); i.next()) {
+            for (ZoneCellIterUnderGC i(zone, thingKind); !i.done(); i.next()) {
                 trc.src = i.getCell();
                 trc.srcKind = MapAllocToTraceKind(thingKind);
                 trc.compartment = DispatchTraceKindTyped(MaybeCompartmentFunctor(),
@@ -3944,7 +3996,7 @@ RelazifyFunctions(Zone* zone, AllocKind kind)
 
     JSRuntime* rt = zone->runtimeFromMainThread();
 
-    for (ZoneCellIter i(zone, kind); !i.done(); i.next()) {
+    for (ZoneCellIterUnderGC i(zone, kind); !i.done(); i.next()) {
         JSFunction* fun = &i.get<JSObject>()->as<JSFunction>();
         if (fun->hasScript())
             fun->maybeRelazify(rt);
@@ -4994,15 +5046,40 @@ class GCSweepTask : public GCParallelTask
         AutoSetThreadIsSweeping threadIsSweeping;
         GCParallelTask::runFromHelperThread();
     }
+    GCSweepTask(const GCSweepTask&) = delete;
+
   protected:
     JSRuntime* runtime;
+
   public:
     explicit GCSweepTask(JSRuntime* rt) : runtime(rt) {}
+    GCSweepTask(GCSweepTask&& other)
+      : GCParallelTask(mozilla::Forward<GCParallelTask>(other)),
+        runtime(other.runtime)
+    {}
+};
+
+// Causes the given WeakCache to be swept when run.
+class SweepWeakCacheTask : public GCSweepTask
+{
+    JS::WeakCache<void*>& cache;
+
+    SweepWeakCacheTask(const SweepWeakCacheTask&) = delete;
+
+  public:
+    SweepWeakCacheTask(JSRuntime* rt, JS::WeakCache<void*>& wc) : GCSweepTask(rt), cache(wc) {}
+    SweepWeakCacheTask(SweepWeakCacheTask&& other)
+      : GCSweepTask(mozilla::Forward<GCSweepTask>(other)), cache(other.cache)
+    {}
+
+    void run() override {
+        cache.sweep();
+    }
 };
 
 #define MAKE_GC_SWEEP_TASK(name)                                              \
     class name : public GCSweepTask {                                         \
-        virtual void run() override;                                          \
+        void run() override;                                                  \
       public:                                                                 \
         explicit name (JSRuntime* rt) : GCSweepTask(rt) {}                    \
     }
@@ -5034,20 +5111,6 @@ SweepCCWrappersTask::run()
 {
     for (GCCompartmentGroupIter c(runtime); !c.done(); c.next())
         c->sweepCrossCompartmentWrappers();
-}
-
-/* virtual */ void
-SweepBaseShapesTask::run()
-{
-    for (GCCompartmentGroupIter c(runtime); !c.done(); c.next())
-        c->sweepBaseShapeTable();
-}
-
-/* virtual */ void
-SweepInitialShapesTask::run()
-{
-    for (GCCompartmentGroupIter c(runtime); !c.done(); c.next())
-        c->sweepInitialShapeTable();
 }
 
 /* virtual */ void
@@ -5122,6 +5185,15 @@ GCRuntime::beginSweepingZoneGroup()
 
     validateIncrementalMarking();
 
+    FreeOp fop(rt);
+    SweepAtomsTask sweepAtomsTask(rt);
+    SweepInnerViewsTask sweepInnerViewsTask(rt);
+    SweepCCWrappersTask sweepCCWrappersTask(rt);
+    SweepObjectGroupsTask sweepObjectGroupsTask(rt);
+    SweepRegExpsTask sweepRegExpsTask(rt);
+    SweepMiscTask sweepMiscTask(rt);
+    mozilla::Vector<SweepWeakCacheTask> sweepCacheTasks;
+
     for (GCZoneGroupIter zone(rt); !zone.done(); zone.next()) {
         /* Clear all weakrefs that point to unmarked things. */
         for (auto edge : zone->gcWeakRefs) {
@@ -5131,21 +5203,16 @@ GCRuntime::beginSweepingZoneGroup()
         }
         zone->gcWeakRefs.clear();
 
-        /* No need to look up any more weakmap keys from this zone group. */
         AutoEnterOOMUnsafeRegion oomUnsafe;
+        for (JS::WeakCache<void*>* cache : zone->weakCaches_) {
+            if (!sweepCacheTasks.append(SweepWeakCacheTask(rt, *cache)))
+                oomUnsafe.crash("preparing weak cache sweeping task list");
+        }
+
+        /* No need to look up any more weakmap keys from this zone group. */
         if (!zone->gcWeakKeys.clear())
             oomUnsafe.crash("clearing weak keys in beginSweepingZoneGroup()");
     }
-
-    FreeOp fop(rt);
-    SweepAtomsTask sweepAtomsTask(rt);
-    SweepInnerViewsTask sweepInnerViewsTask(rt);
-    SweepCCWrappersTask sweepCCWrappersTask(rt);
-    SweepBaseShapesTask sweepBaseShapesTask(rt);
-    SweepInitialShapesTask sweepInitialShapesTask(rt);
-    SweepObjectGroupsTask sweepObjectGroupsTask(rt);
-    SweepRegExpsTask sweepRegExpsTask(rt);
-    SweepMiscTask sweepMiscTask(rt);
 
     {
         gcstats::AutoPhase ap(stats, gcstats::PHASE_FINALIZE_START);
@@ -5176,11 +5243,11 @@ GCRuntime::beginSweepingZoneGroup()
             AutoLockHelperThreadState helperLock;
             startTask(sweepInnerViewsTask, gcstats::PHASE_SWEEP_INNER_VIEWS);
             startTask(sweepCCWrappersTask, gcstats::PHASE_SWEEP_CC_WRAPPER);
-            startTask(sweepBaseShapesTask, gcstats::PHASE_SWEEP_BASE_SHAPE);
-            startTask(sweepInitialShapesTask, gcstats::PHASE_SWEEP_INITIAL_SHAPE);
             startTask(sweepObjectGroupsTask, gcstats::PHASE_SWEEP_TYPE_OBJECT);
             startTask(sweepRegExpsTask, gcstats::PHASE_SWEEP_REGEXP);
             startTask(sweepMiscTask, gcstats::PHASE_SWEEP_MISC);
+            for (auto& task : sweepCacheTasks)
+                startTask(task, gcstats::PHASE_SWEEP_MISC);
         }
 
         // The remainder of the of the tasks run in parallel on the main
@@ -5215,24 +5282,21 @@ GCRuntime::beginSweepingZoneGroup()
 
         {
             gcstats::AutoPhase apdc(stats, gcstats::PHASE_SWEEP_DISCARD_CODE);
-            for (GCZoneGroupIter zone(rt); !zone.done(); zone.next()) {
+            for (GCZoneGroupIter zone(rt); !zone.done(); zone.next())
                 zone->discardJitCode(&fop);
-            }
         }
 
         {
             gcstats::AutoPhase ap1(stats, gcstats::PHASE_SWEEP_TYPES);
             gcstats::AutoPhase ap2(stats, gcstats::PHASE_SWEEP_TYPES_BEGIN);
-            for (GCZoneGroupIter zone(rt); !zone.done(); zone.next()) {
+            for (GCZoneGroupIter zone(rt); !zone.done(); zone.next())
                 zone->beginSweepTypes(&fop, releaseObservedTypes && !zone->isPreservingCode());
-            }
         }
 
         {
             gcstats::AutoPhase ap(stats, gcstats::PHASE_SWEEP_BREAKPOINT);
-            for (GCZoneGroupIter zone(rt); !zone.done(); zone.next()) {
+            for (GCZoneGroupIter zone(rt); !zone.done(); zone.next())
                 zone->sweepBreakpoints(&fop);
-            }
         }
 
         {
@@ -5260,11 +5324,11 @@ GCRuntime::beginSweepingZoneGroup()
         AutoLockHelperThreadState helperLock;
         joinTask(sweepInnerViewsTask, gcstats::PHASE_SWEEP_INNER_VIEWS);
         joinTask(sweepCCWrappersTask, gcstats::PHASE_SWEEP_CC_WRAPPER);
-        joinTask(sweepBaseShapesTask, gcstats::PHASE_SWEEP_BASE_SHAPE);
-        joinTask(sweepInitialShapesTask, gcstats::PHASE_SWEEP_INITIAL_SHAPE);
         joinTask(sweepObjectGroupsTask, gcstats::PHASE_SWEEP_TYPE_OBJECT);
         joinTask(sweepRegExpsTask, gcstats::PHASE_SWEEP_REGEXP);
         joinTask(sweepMiscTask, gcstats::PHASE_SWEEP_MISC);
+        for (auto& task : sweepCacheTasks)
+            joinTask(task, gcstats::PHASE_SWEEP_MISC);
     }
 
     /*
@@ -5703,6 +5767,10 @@ GCRuntime::compactPhase(JS::gcreason::Reason reason, SliceBudget& sliceBudget)
         if (sliceBudget.isOverBudget())
             break;
     }
+
+    // Clear runtime caches that can contain cell pointers.
+    rt->newObjectCache.purge();
+    rt->nativeIterCache.purge();
 
 #ifdef DEBUG
     CheckHashTablesAfterMovingGC(rt);
@@ -6577,7 +6645,7 @@ GCRuntime::notifyDidPaint()
     }
 #endif
 
-    if (isIncrementalGCInProgress() && !interFrameGC) {
+    if (isIncrementalGCInProgress() && !interFrameGC && tunables.areRefreshFrameSlicesEnabled()) {
         JS::PrepareForIncrementalGC(rt);
         gcSlice(JS::gcreason::REFRESH_FRAME);
     }
@@ -7183,7 +7251,8 @@ JS_FRIEND_API(void)
 JS::AssertGCThingMustBeTenured(JSObject* obj)
 {
     MOZ_ASSERT(obj->isTenured() &&
-               (!IsNurseryAllocable(obj->asTenured().getAllocKind()) || obj->getClass()->finalize));
+               (!IsNurseryAllocable(obj->asTenured().getAllocKind()) ||
+                obj->getClass()->hasFinalize()));
 }
 
 JS_FRIEND_API(void)
@@ -7345,9 +7414,11 @@ js::gc::CheckHashTablesAfterMovingGC(JSRuntime* rt)
      * Check that internal hash tables no longer have any pointers to things
      * that have been moved.
      */
+    rt->spsProfiler.checkStringsMapAfterMovingGC();
     for (ZonesIter zone(rt, SkipAtoms); !zone.done(); zone.next()) {
         zone->checkUniqueIdTableAfterMovingGC();
-        for (ZoneCellIter i(zone, AllocKind::BASE_SHAPE); !i.done(); i.next()) {
+
+        for (ZoneCellIterUnderGC i(zone, AllocKind::BASE_SHAPE); !i.done(); i.next()) {
             BaseShape* baseShape = i.get<BaseShape>();
             if (baseShape->hasTable())
                 baseShape->table().checkAfterMovingGC();
@@ -7355,9 +7426,11 @@ js::gc::CheckHashTablesAfterMovingGC(JSRuntime* rt)
     }
     for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next()) {
         c->objectGroups.checkTablesAfterMovingGC();
+        c->dtoaCache.checkCacheAfterMovingGC();
         c->checkInitialShapesTableAfterMovingGC();
         c->checkWrapperMapAfterMovingGC();
         c->checkBaseShapeTableAfterMovingGC();
+        c->checkScriptMapsAfterMovingGC();
         if (c->debugScopes)
             c->debugScopes->checkHashTablesAfterMovingGC(rt);
     }

@@ -2,40 +2,28 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 /**
- * Test that we get a "Parse HTML" marker when a page sets innerHTML.
+ * Test that we get "Parse HTML" markers.
  */
 
-const TEST_URL = EXAMPLE_URL + "doc_innerHTML.html"
+const { PerformanceFront } = require("devtools/server/actors/performance");
+const MARKER_NAME = "Parse HTML";
 
-function* getMarkers(front) {
-  const { promise, resolve } = Promise.defer();
-  const handler = (_, name, markers) => {
-    if (name === "markers") {
-      resolve(markers);
-    }
-  };
-  front.on("timeline-data", handler);
+add_task(function*() {
+  let browser = yield addTab(MAIN_DOMAIN + "doc_innerHTML.html");
+  let doc = browser.contentDocument;
 
-  yield front.startRecording({ withMarkers: true, withTicks: true });
+  initDebuggerServer();
+  let client = new DebuggerClient(DebuggerServer.connectPipe());
+  let form = yield connectDebuggerClient(client);
+  let front = PerformanceFront(client, form);
+  yield front.connect();
+  let rec = yield front.startRecording({ withMarkers: true });
 
-  const markers = yield promise;
-  front.off("timeline-data", handler);
-  yield front.stopRecording();
+  let markers = yield waitForMarkerType(front, MARKER_NAME);
+  yield front.stopRecording(rec);
 
-  return markers;
-}
+  ok(markers.some(m => m.name === MARKER_NAME), `got some ${MARKER_NAME} markers`);
 
-function* spawnTest () {
-  let { target, front } = yield initBackend(TEST_URL);
-
-  const markers = yield getMarkers(front);
-  info("markers = " + JSON.stringify(markers, null, 2));
-  ok(markers.some(m => m.name === "Parse HTML" && m.stack != undefined),
-     "Should get some Parse HTML markers");
-
-  // Destroy the front before removing tab to ensure no
-  // lingering requests
-  yield front.destroy();
-  yield removeTab(target.tab);
-  finish();
-}
+  yield closeDebuggerClient(client);
+  gBrowser.removeCurrentTab();
+});

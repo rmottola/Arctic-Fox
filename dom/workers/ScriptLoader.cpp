@@ -194,7 +194,7 @@ ChannelFromScriptURL(nsIPrincipal* principal,
 
   if (nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(channel)) {
     rv = nsContentUtils::SetFetchReferrerURIWithPolicy(principal, parentDoc,
-                                                       httpChannel);
+                                                       httpChannel, mozilla::net::RP_Default);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -317,7 +317,8 @@ private:
   PostRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate, bool aRunResult)
           override;
 
-  NS_DECL_NSICANCELABLERUNNABLE
+  nsresult
+  Cancel() override;
 
   void
   ShutdownScriptLoader(JSContext* aCx,
@@ -707,7 +708,7 @@ private:
   }
 
   virtual bool
-  Notify(JSContext* aCx, Status aStatus) override
+  Notify(Status aStatus) override
   {
     mWorkerPrivate->AssertIsOnWorkerThread();
 
@@ -718,11 +719,7 @@ private:
         NS_NewRunnableMethod(this,
           &ScriptLoaderRunnable::CancelMainThreadWithBindingAborted);
       NS_ASSERTION(runnable, "This should never fail!");
-
-      if (NS_FAILED(NS_DispatchToMainThread(runnable))) {
-        JS_ReportError(aCx, "Failed to cancel script loader!");
-        return false;
-      }
+      MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable));
     }
 
     return true;
@@ -1415,7 +1412,7 @@ CacheCreator::ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue)
   JS::Rooted<JSObject*> obj(aCx, &aValue.toObject());
   Cache* cache = nullptr;
   nsresult rv = UNWRAP_OBJECT(Cache, obj, cache);
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(rv));
+  MOZ_ALWAYS_SUCCEEDS(rv);
 
   mCache = cache;
   MOZ_ASSERT(mCache);
@@ -1745,7 +1742,6 @@ ScriptExecutorRunnable::PreRun(WorkerPrivate* aWorkerPrivate)
 
   AutoJSAPI jsapi;
   jsapi.Init();
-  jsapi.TakeOwnershipOfErrorReporting();
 
   WorkerGlobalScope* globalScope =
     aWorkerPrivate->GetOrCreateGlobalScope(jsapi.cx());
@@ -1872,7 +1868,7 @@ ScriptExecutorRunnable::PostRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
   }
 }
 
-NS_IMETHODIMP
+nsresult
 ScriptExecutorRunnable::Cancel()
 {
   if (mLastIndex == mScriptLoader.mLoadInfos.Length() - 1) {
@@ -1943,7 +1939,7 @@ ScriptExecutorRunnable::LogExceptionToConsole(JSContext* aCx,
   MOZ_ASSERT(!mScriptLoader.mRv.Failed());
 
   js::ErrorReport report(aCx);
-  if (!report.init(aCx, exn)) {
+  if (!report.init(aCx, exn, js::ErrorReport::WithSideEffects)) {
     JS_ClearPendingException(aCx);
     return;
   }

@@ -1,7 +1,7 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-Cu.import("resource://services-common/moz-kinto-client.js");
+Cu.import("resource://services-common/kinto-offline-client.js");
 
 // set up what we need to make storage adapters
 const Kinto = loadKinto();
@@ -48,7 +48,7 @@ function test_collection_operations() {
     let adapter = do_get_kinto_adapter();
     yield adapter.open();
     let record = {id:"test-id", foo:"bar"};
-    yield adapter.create(record);
+    yield adapter.execute((transaction) => transaction.create(record));
     let newRecord = yield adapter.get("test-id");
     // ensure the record is the same as when it was added
     deepEqual(record, newRecord);
@@ -56,18 +56,16 @@ function test_collection_operations() {
   });
 
   // test removing records
-  add_task(function* test_kinto_create_new_get_existing() {
+  add_task(function* test_kinto_can_remove_some_records() {
     let adapter = do_get_kinto_adapter();
     yield adapter.open();
     // create a second record
     let record = {id:"test-id-2", foo:"baz"};
-    yield adapter.create(record);
+    yield adapter.execute((transaction) => transaction.create(record));
     let newRecord = yield adapter.get("test-id-2");
     deepEqual(record, newRecord);
     // delete the record
-    let id = yield adapter.delete(record.id);
-    // ensure the delete resolved with the record id
-    do_check_eq(record.id, id);
+    yield adapter.execute((transaction) => transaction.delete(record.id));
     newRecord = yield adapter.get(record.id);
     // ... and ensure it's no longer there
     do_check_eq(newRecord, undefined);
@@ -95,8 +93,8 @@ function test_collection_operations() {
     let originalRecord = {id:"test-id", foo:"bar"};
     let updatedRecord = {id:"test-id", foo:"baz"};
     yield adapter.clear();
-    yield adapter.create(originalRecord);
-    yield adapter.update(updatedRecord);
+    yield adapter.execute((transaction) => transaction.create(originalRecord));
+    yield adapter.execute((transaction) => transaction.update(updatedRecord));
     // ensure the record exists
     let newRecord = yield adapter.get("test-id");
     // ensure the record is the same as when it was added
@@ -111,9 +109,30 @@ function test_collection_operations() {
     let originalRecord = {id:"test-id-1", foo:"bar"};
     let records = yield adapter.list();
     do_check_eq(records.length, 1);
-    yield adapter.create(originalRecord);
+    yield adapter.execute((transaction) => transaction.create(originalRecord));
     records = yield adapter.list();
     do_check_eq(records.length, 2);
+    yield adapter.close();
+  });
+
+  // test aborting transaction
+  add_task(function* test_kinto_aborting_transaction() {
+    let adapter = do_get_kinto_adapter();
+    yield adapter.open();
+    yield adapter.clear();
+    let record = {id: 1, foo: "bar"};
+    let error = null;
+    try {
+      yield adapter.execute((transaction) => {
+        transaction.create(record);
+        throw new Error("unexpected");
+      });
+    } catch (e) {
+      error = e;
+    }
+    do_check_neq(error, null);
+    records = yield adapter.list();
+    do_check_eq(records.length, 0);
     yield adapter.close();
   });
 
@@ -138,6 +157,73 @@ function test_collection_operations() {
     // and should have saved correctly
     lastModified = yield adapter.getLastModified();
     do_check_eq(lastModified, intendedValue);
+    yield adapter.close();
+  });
+
+  // test loadDump(records)
+  add_task(function* test_kinto_import_records() {
+    let adapter = do_get_kinto_adapter();
+    yield adapter.open();
+    let record1 = {id: 1, foo: "bar"};
+    let record2 = {id: 2, foo: "baz"};
+    let impactedRecords = yield adapter.loadDump([
+      record1, record2
+    ]);
+    do_check_eq(impactedRecords.length, 2);
+    let newRecord1 = yield adapter.get("1");
+    // ensure the record is the same as when it was added
+    deepEqual(record1, newRecord1);
+    let newRecord2 = yield adapter.get("2");
+    // ensure the record is the same as when it was added
+    deepEqual(record2, newRecord2);
+    yield adapter.close();
+  });
+
+  add_task(function* test_kinto_import_records_should_override_existing() {
+    let adapter = do_get_kinto_adapter();
+    yield adapter.open();
+    yield adapter.clear();
+    records = yield adapter.list();
+    do_check_eq(records.length, 0);
+    let impactedRecords = yield adapter.loadDump([
+      {id: 1, foo: "bar"},
+      {id: 2, foo: "baz"},
+    ]);
+    do_check_eq(impactedRecords.length, 2);
+    yield adapter.loadDump([
+      {id: 1, foo: "baz"},
+      {id: 3, foo: "bab"},
+    ]);
+    records = yield adapter.list();
+    do_check_eq(records.length, 3);
+    let newRecord1 = yield adapter.get("1");
+    deepEqual(newRecord1.foo, "baz");
+    yield adapter.close();
+  });
+
+  add_task(function* test_import_updates_lastModified() {
+    let adapter = do_get_kinto_adapter();
+    yield adapter.open();
+    yield adapter.loadDump([
+      {id: 1, foo: "bar", last_modified: 1457896541},
+      {id: 2, foo: "baz", last_modified: 1458796542},
+    ]);
+    let lastModified = yield adapter.getLastModified();
+    do_check_eq(lastModified, 1458796542);
+    yield adapter.close();
+  });
+
+  add_task(function* test_import_preserves_older_lastModified() {
+    let adapter = do_get_kinto_adapter();
+    yield adapter.open();
+    yield adapter.saveLastModified(1458796543);
+
+    yield adapter.loadDump([
+      {id: 1, foo: "bar", last_modified: 1457896541},
+      {id: 2, foo: "baz", last_modified: 1458796542},
+    ]);
+    let lastModified = yield adapter.getLastModified();
+    do_check_eq(lastModified, 1458796543);
     yield adapter.close();
   });
 }

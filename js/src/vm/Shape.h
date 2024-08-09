@@ -217,18 +217,16 @@ class ShapeTable {
         return mallocSizeOf(this) + mallocSizeOf(entries_);
     }
 
-    /*
-     * NB: init and change are fallible but do not report OOM, so callers can
-     * cope or ignore. They do however use the context's calloc method in
-     * order to update the malloc counter on success.
-     */
+    // init() is fallible and reports OOM to the context.
     bool init(ExclusiveContext* cx, Shape* lastProp);
-    bool change(int log2Delta, ExclusiveContext* cx);
+
+    // change() is fallible but does not report OOM.
+    bool change(ExclusiveContext* cx, int log2Delta);
 
     template<MaybeAdding Adding>
     Entry& search(jsid id);
 
-    void fixupAfterMovingGC();
+    void trace(JSTracer* trc);
 #ifdef JSGC_HASH_TABLE_CHECKS
     void checkAfterMovingGC();
 #endif
@@ -454,8 +452,9 @@ class BaseShape : public gc::TenuredCell
     static const JS::TraceKind TraceKind = JS::TraceKind::BaseShape;
 
     void traceChildren(JSTracer* trc);
+    void traceChildrenSkipShapeTable(JSTracer* trc);
 
-    void fixupAfterMovingGC();
+    void fixupAfterMovingGC() {}
 
   private:
     static void staticAsserts() {
@@ -464,6 +463,8 @@ class BaseShape : public gc::TenuredCell
                       "Things inheriting from gc::Cell must have a size that's "
                       "a multiple of gc::CellSize");
     }
+
+    void traceShapeTable(JSTracer* trc);
 };
 
 class UnownedBaseShape : public BaseShape {};
@@ -540,6 +541,7 @@ class Shape : public gc::TenuredCell
     friend struct StackBaseShape;
     friend struct StackShape;
     friend struct JS::ubi::Concrete<Shape>;
+    friend class js::gc::RelocationOverlay;
 
   protected:
     HeapPtrBaseShape    base_;

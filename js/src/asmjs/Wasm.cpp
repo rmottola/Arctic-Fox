@@ -32,6 +32,7 @@
 #include "vm/Debugger-inl.h"
 
 using namespace js;
+using namespace js::jit;
 using namespace js::wasm;
 
 using mozilla::CheckedInt;
@@ -81,6 +82,16 @@ Unify(ExprType one, ExprType two)
     return ExprType::Void;
 }
 
+static bool
+IsI64Implemented()
+{
+#ifdef JS_CPU_X64
+        return true;
+#else
+        return false;
+#endif
+}
+
 class FunctionDecoder
 {
     JSContext* cx_;
@@ -108,11 +119,9 @@ class FunctionDecoder
         return Fail(cx_, d_, str);
     }
     bool checkI64Support() {
-#ifdef JS_CPU_X64
+        if (!IsI64Implemented())
+            return fail("i64 NYI on this platform");
         return true;
-#else
-        return fail("i64 NYI on this platform");
-#endif
     }
 
     MOZ_WARN_UNUSED_RESULT bool pushBlock() {
@@ -450,7 +459,7 @@ DecodeConversionOperator(FunctionDecoder& f, ValType to, ValType argType, ExprTy
 }
 
 static bool
-DecodeSelectOperator(FunctionDecoder& f, ExprType* type)
+DecodeSelect(FunctionDecoder& f, ExprType* type)
 {
     ExprType trueType;
     if (!DecodeExpr(f, &trueType))
@@ -463,9 +472,6 @@ DecodeSelectOperator(FunctionDecoder& f, ExprType* type)
     if (!DecodeExpr(f, &falseType))
         return false;
 
-    if (!CheckType(f, falseType, trueType))
-        return false;
-
     ExprType condType;
     if (!DecodeExpr(f, &condType))
         return false;
@@ -473,7 +479,7 @@ DecodeSelectOperator(FunctionDecoder& f, ExprType* type)
     if (!CheckType(f, condType, ValType::I32))
         return false;
 
-    *type = trueType;
+    *type = Unify(trueType, falseType);
     return true;
 }
 
@@ -562,15 +568,12 @@ DecodeBranch(FunctionDecoder& f, Expr expr, ExprType* type)
     if (!f.d().readVarU32(&relativeDepth))
         return f.fail("expected relative depth");
 
-    if (!f.branchWithType(relativeDepth, ExprType::Void))
-        return f.fail("branch depth exceeds current nesting level");
-
-    Expr value;
-    if (!f.d().readExpr(&value))
+    ExprType brType;
+    if (!DecodeExpr(f, &brType))
         return f.fail("expected branch value");
 
-    if (value != Expr::Nop)
-        return f.fail("NYI: branch values");
+    if (!f.branchWithType(relativeDepth, brType))
+        return f.fail("branch depth exceeds current nesting level");
 
     if (expr == Expr::BrIf) {
         ExprType actual;
@@ -672,7 +675,7 @@ DecodeExpr(FunctionDecoder& f, ExprType* type)
       case Expr::SetLocal:
         return DecodeSetLocal(f, type);
       case Expr::Select:
-        return DecodeSelectOperator(f, type);
+        return DecodeSelect(f, type);
       case Expr::Block:
         return DecodeBlock(f, /* isLoop */ false, type);
       case Expr::Loop:
@@ -805,9 +808,8 @@ DecodeExpr(FunctionDecoder& f, ExprType* type)
                DecodeConversionOperator(f, ValType::I32, ValType::I64, type);
       case Expr::I32TruncSF32:
       case Expr::I32TruncUF32:
-        return DecodeConversionOperator(f, ValType::I32, ValType::F32, type);
       case Expr::I32ReinterpretF32:
-        return f.fail("NYI: reinterpret");
+        return DecodeConversionOperator(f, ValType::I32, ValType::F32, type);
       case Expr::I32TruncSF64:
       case Expr::I32TruncUF64:
         return DecodeConversionOperator(f, ValType::I32, ValType::F64, type);
@@ -821,15 +823,13 @@ DecodeExpr(FunctionDecoder& f, ExprType* type)
                DecodeConversionOperator(f, ValType::I64, ValType::F32, type);
       case Expr::I64TruncSF64:
       case Expr::I64TruncUF64:
+      case Expr::I64ReinterpretF64:
         return f.checkI64Support() &&
                DecodeConversionOperator(f, ValType::I64, ValType::F64, type);
-      case Expr::I64ReinterpretF64:
-        return f.fail("NYI: i64");
       case Expr::F32ConvertSI32:
       case Expr::F32ConvertUI32:
-        return DecodeConversionOperator(f, ValType::F32, ValType::I32, type);
       case Expr::F32ReinterpretI32:
-        return f.fail("NYI: reinterpret");
+        return DecodeConversionOperator(f, ValType::F32, ValType::I32, type);
       case Expr::F32ConvertSI64:
       case Expr::F32ConvertUI64:
         return f.checkI64Support() &&
@@ -841,10 +841,9 @@ DecodeExpr(FunctionDecoder& f, ExprType* type)
         return DecodeConversionOperator(f, ValType::F64, ValType::I32, type);
       case Expr::F64ConvertSI64:
       case Expr::F64ConvertUI64:
+      case Expr::F64ReinterpretI64:
         return f.checkI64Support() &&
                DecodeConversionOperator(f, ValType::F64, ValType::I64, type);
-      case Expr::F64ReinterpretI64:
-        return f.fail("NYI: i64");
       case Expr::F64PromoteF32:
         return DecodeConversionOperator(f, ValType::F64, ValType::F32, type);
       case Expr::I32Load8S:
@@ -1083,14 +1082,16 @@ DecodeFunctionTable(JSContext* cx, Decoder& d, ModuleGeneratorData* init)
 static bool
 CheckTypeForJS(JSContext* cx, Decoder& d, const Sig& sig)
 {
+    bool allowI64 = IsI64Implemented() && JitOptions.wasmTestMode;
+
     for (ValType argType : sig.args()) {
-        if (argType == ValType::I64)
+        if (argType == ValType::I64 && !allowI64)
             return Fail(cx, d, "cannot import/export i64 argument");
         if (IsSimdType(argType))
             return Fail(cx, d, "cannot import/export SIMD argument");
     }
 
-    if (sig.ret() == ExprType::I64)
+    if (sig.ret() == ExprType::I64 && !allowI64)
         return Fail(cx, d, "cannot import/export i64 return type");
     if (IsSimdType(sig.ret()))
         return Fail(cx, d, "cannot import/export SIMD return type");

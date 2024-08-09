@@ -69,13 +69,6 @@ ChromeProcessController::PostDelayedTask(Task* aTask, int aDelayMs)
 }
 
 void
-ChromeProcessController::RequestFlingSnap(const FrameMetrics::ViewID& aScrollId,
-                                          const mozilla::CSSPoint& aDestination)
-{
-  APZCCallbackHelper::RequestFlingSnap(aScrollId, aDestination);
-}
-
-void
 ChromeProcessController::AcknowledgeScrollUpdate(const FrameMetrics::ViewID& aScrollId,
                                                  const uint32_t& aScrollGeneration)
 {
@@ -99,6 +92,9 @@ ChromeProcessController::Destroy()
 nsIPresShell*
 ChromeProcessController::GetPresShell() const
 {
+  if (!mWidget) {
+    return nullptr;
+  }
   if (nsView* view = nsView::GetViewFor(mWidget)) {
     return view->GetPresShell();
   }

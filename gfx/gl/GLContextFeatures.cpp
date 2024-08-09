@@ -548,6 +548,15 @@ static const FeatureInfo sFeatureInfoArr[] = {
         }
     },
     {
+        "seamless_cube_map_opt_in",
+        GLVersion::GL3_2,
+        GLESVersion::NONE,
+        GLContext::ARB_seamless_cube_map,
+        {
+            GLContext::Extensions_End
+        }
+    },
+    {
         // Do we have separate DRAW and READ framebuffer bind points?
         "split_framebuffer",
         GLVersion::GL3,
@@ -678,6 +687,15 @@ static const FeatureInfo sFeatureInfoArr[] = {
         {
             GLContext::ARB_texture_non_power_of_two,
             GLContext::OES_texture_npot,
+            GLContext::Extensions_End
+        }
+    },
+    {
+        "texture_rg",
+        GLVersion::GL3,
+        GLESVersion::ES3,
+        GLContext::ARB_texture_rg,
+        {
             GLContext::Extensions_End
         }
     },

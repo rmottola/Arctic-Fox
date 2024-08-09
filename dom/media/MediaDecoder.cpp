@@ -30,6 +30,10 @@
 #include "nsPrintfCString.h"
 #include "mozilla/Telemetry.h"
 
+#ifdef MOZ_ANDROID_OMX
+#include "AndroidBridge.h"
+#endif
+
 using namespace mozilla::dom;
 using namespace mozilla::layers;
 using namespace mozilla::media;
@@ -47,10 +51,14 @@ static const uint64_t ESTIMATED_DURATION_FUZZ_FACTOR_USECS = USECS_PER_S / 2;
 
 // avoid redefined macro in unified build
 #undef DECODER_LOG
+#undef DUMP_LOG
 
 LazyLogModule gMediaDecoderLog("MediaDecoder");
 #define DECODER_LOG(x, ...) \
   MOZ_LOG(gMediaDecoderLog, LogLevel::Debug, ("Decoder=%p " x, this, ##__VA_ARGS__))
+
+#define DUMP_LOG(x, ...) \
+  NS_DebugBreak(NS_DEBUG_WARNING, nsPrintfCString("Decoder=%p " x, this, ##__VA_ARGS__).get(), nullptr, nullptr, -1)
 
 static const char*
 ToPlayStateStr(MediaDecoder::PlayState aState)
@@ -552,6 +560,8 @@ MediaDecoder::MediaDecoder(MediaDecoderOwner* aOwner)
                       "MediaDecoder::mLogicallySeeking (Canonical)")
   , mSameOriginMedia(AbstractThread::MainThread(), false,
                      "MediaDecoder::mSameOriginMedia (Canonical)")
+  , mMediaPrincipalHandle(AbstractThread::MainThread(), PRINCIPAL_HANDLE_NONE,
+                          "MediaDecoder::mMediaPrincipalHandle (Canonical)")
   , mPlaybackBytesPerSecond(AbstractThread::MainThread(), 0.0,
                             "MediaDecoder::mPlaybackBytesPerSecond (Canonical)")
   , mPlaybackRateReliable(AbstractThread::MainThread(), true,
@@ -560,6 +570,8 @@ MediaDecoder::MediaDecoder(MediaDecoderOwner* aOwner)
                      "MediaDecoder::mDecoderPosition (Canonical)")
   , mMediaSeekable(AbstractThread::MainThread(), true,
                    "MediaDecoder::mMediaSeekable (Canonical)")
+  , mMediaSeekableOnlyInBufferedRanges(AbstractThread::MainThread(), false,
+                   "MediaDecoder::mMediaSeekableOnlyInBufferedRanges (Canonical)")
   , mTelemetryReported(false)
 {
   MOZ_COUNT_CTOR(MediaDecoder);
@@ -582,6 +594,9 @@ MediaDecoder::MediaDecoder(MediaDecoderOwner* aOwner)
   // readyState
   mWatchManager.Watch(mPlayState, &MediaDecoder::UpdateReadyState);
   mWatchManager.Watch(mNextFrameStatus, &MediaDecoder::UpdateReadyState);
+  // ReadyState computation depends on MediaDecoder::CanPlayThrough, which
+  // depends on the download rate.
+  mWatchManager.Watch(mBuffered, &MediaDecoder::UpdateReadyState);
 
   // mLogicalPosition
   mWatchManager.Watch(mCurrentPosition, &MediaDecoder::UpdateLogicalPosition);
@@ -725,7 +740,7 @@ MediaDecoder::InitializeStateMachine()
   MOZ_ASSERT(NS_IsMainThread());
   NS_ASSERTION(mDecoderStateMachine, "Cannot initialize null state machine!");
 
-  nsresult rv = mDecoderStateMachine->Init();
+  nsresult rv = mDecoderStateMachine->Init(this);
   NS_ENSURE_SUCCESS(rv, rv);
 
   // If some parameters got set before the state machine got created,
@@ -802,9 +817,7 @@ MediaDecoder::Seek(double aTime, SeekTarget::Type aSeekType)
   MOZ_ASSERT(!mIsDormant, "should be out of dormant by now");
   MOZ_ASSERT(aTime >= 0.0, "Cannot seek to a negative value.");
 
-  int64_t timeUsecs = 0;
-  nsresult rv = SecondsToUsecs(aTime, timeUsecs);
-  NS_ENSURE_SUCCESS(rv, rv);
+  int64_t timeUsecs = TimeUnit::FromSeconds(aTime).ToMicroseconds();
 
   mLogicalPosition = aTime;
   mWasEndedWhenEnteredDormant = false;
@@ -870,6 +883,7 @@ MediaDecoder::MetadataLoaded(nsAutoPtr<MediaInfo> aInfo,
               aInfo->HasAudio(), aInfo->HasVideo());
 
   SetMediaSeekable(aInfo->mMediaSeekable);
+  SetMediaSeekableOnlyInBufferedRanges(aInfo->mMediaSeekableOnlyInBufferedRanges);
   mInfo = aInfo.forget();
   ConstructMediaTracks();
 
@@ -1187,6 +1201,8 @@ MediaDecoder::NotifyPrincipalChanged()
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!mShuttingDown);
+  nsCOMPtr<nsIPrincipal> newPrincipal = GetCurrentPrincipal();
+  mMediaPrincipalHandle = MakePrincipalHandle(newPrincipal);
   mOwner->NotifyDecoderPrincipalChanged();
 }
 
@@ -1217,7 +1233,6 @@ MediaDecoder::OnSeekResolved(SeekResolveValue aVal)
     return;
 
   bool fireEnded = false;
-  bool seekWasAborted = false;
   {
     // An additional seek was requested while the current seek was
     // in operation.
@@ -1373,6 +1388,12 @@ MediaDecoder::SetMediaSeekable(bool aMediaSeekable) {
   mMediaSeekable = aMediaSeekable;
 }
 
+void
+MediaDecoder::SetMediaSeekableOnlyInBufferedRanges(bool aMediaSeekableOnlyInBufferedRanges){
+  MOZ_ASSERT(NS_IsMainThread());
+  mMediaSeekableOnlyInBufferedRanges = aMediaSeekableOnlyInBufferedRanges;
+}
+
 bool
 MediaDecoder::IsTransportSeekable()
 {
@@ -1388,14 +1409,23 @@ MediaDecoder::IsMediaSeekable()
   return mMediaSeekable;
 }
 
+bool
+MediaDecoder::IsMediaSeekableOnlyInBufferedRanges()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  return mMediaSeekableOnlyInBufferedRanges;
+}
+
 media::TimeIntervals
 MediaDecoder::GetSeekable()
 {
   MOZ_ASSERT(NS_IsMainThread());
   // We can seek in buffered range if the media is seekable. Also, we can seek
   // in unbuffered ranges if the transport level is seekable (local file or the
-  // server supports range requests, etc.)
-  if (!IsMediaSeekable()) {
+  // server supports range requests, etc.) or in cue-less WebMs
+  if (IsMediaSeekableOnlyInBufferedRanges()) {
+    return GetBuffered();
+  } else if (!IsMediaSeekable()) {
     return media::TimeIntervals();
   } else if (!IsTransportSeekable()) {
     return GetBuffered();
@@ -1561,10 +1591,6 @@ MediaDecoder::NotifyDataArrived() {
   }
 
   mDataArrivedEvent.Notify();
-
-  // ReadyState computation depends on MediaDecoder::CanPlayThrough, which
-  // depends on the download rate.
-  UpdateReadyState();
 }
 
 // Provide access to the state machine object
@@ -1695,9 +1721,11 @@ MediaDecoder::IsOmxEnabled()
 
 #ifdef MOZ_ANDROID_OMX
 bool
-MediaDecoder::IsAndroidMediaEnabled()
+MediaDecoder::IsAndroidMediaPluginEnabled()
 {
-  return Preferences::GetBool("media.plugins.enabled");
+  return AndroidBridge::Bridge() &&
+         AndroidBridge::Bridge()->GetAPIVersion() < 16 &&
+         Preferences::GetBool("media.plugins.enabled");
 }
 #endif
 
@@ -1846,6 +1874,23 @@ MediaDecoder::NextFrameBufferedStatus()
   return GetBuffered().Contains(interval)
     ? MediaDecoderOwner::NEXT_FRAME_AVAILABLE
     : MediaDecoderOwner::NEXT_FRAME_UNAVAILABLE;
+}
+
+void
+MediaDecoder::DumpDebugInfo()
+{
+  DUMP_LOG("metadata: channels=%u rate=%u hasAudio=%d hasVideo=%d, "
+           "state: mPlayState=%s mIsDormant=%d, mShuttingDown=%d",
+           mInfo->mAudio.mChannels, mInfo->mAudio.mRate, mInfo->HasAudio(), mInfo->HasVideo(),
+           PlayStateStr(), mIsDormant, mShuttingDown);
+
+  nsString str;
+  GetMozDebugReaderData(str);
+  DUMP_LOG("reader data:\n%s", NS_ConvertUTF16toUTF8(str).get());
+
+  if (!mShuttingDown && GetStateMachine()) {
+    GetStateMachine()->DumpDebugInfo();
+  }
 }
 
 void

@@ -10,20 +10,20 @@
 // positive delays.
 
 add_task(function*() {
-  yield addTab(TEST_URL_ROOT + "doc_simple_animation.html");
+  yield addTab(URL_ROOT + "doc_simple_animation.html");
   let {inspector, panel} = yield openAnimationInspector();
 
   info("Selecting a delayed animated node");
-  yield selectNode(".delayed", inspector);
+  yield selectNodeAndWaitForAnimations(".delayed", inspector);
   let timelineEl = panel.animationsTimelineComponent.rootWrapperEl;
   checkDelayAndName(timelineEl, true);
 
   info("Selecting a no-delay animated node");
-  yield selectNode(".animated", inspector);
+  yield selectNodeAndWaitForAnimations(".animated", inspector);
   checkDelayAndName(timelineEl, false);
 
   info("Selecting a negative-delay animated node");
-  yield selectNode(".negative-delay", inspector);
+  yield selectNodeAndWaitForAnimations(".negative-delay", inspector);
   checkDelayAndName(timelineEl, true);
 });
 
@@ -39,14 +39,15 @@ function checkDelayAndName(timelineEl, hasDelay) {
     let targetNode = timelineEl.querySelector(".target");
 
     // Check that the delay element does not cause the timeline to overflow.
-    let delayRect = delay.getBoundingClientRect();
-    let sidebarWidth = targetNode.getBoundingClientRect().width;
-    ok(delayRect.x >= sidebarWidth,
+    let delayLeft = Math.round(delay.getBoundingClientRect().x);
+    let sidebarWidth = Math.round(targetNode.getBoundingClientRect().width);
+    ok(delayLeft >= sidebarWidth,
        "The delay element isn't displayed over the sidebar");
 
     // Check that the delay is not displayed on top of the name.
-    let nameLeft = name.getBoundingClientRect().left;
-    ok(delayRect.right <= nameLeft,
+    let delayRight = Math.round(delay.getBoundingClientRect().right);
+    let nameLeft = Math.round(name.getBoundingClientRect().left);
+    ok(delayRight <= nameLeft,
        "The delay element does not span over the name element");
   }
 }

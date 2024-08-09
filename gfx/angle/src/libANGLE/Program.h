@@ -24,6 +24,7 @@
 
 #include "libANGLE/angletypes.h"
 #include "libANGLE/Constants.h"
+#include "libANGLE/Debug.h"
 #include "libANGLE/Error.h"
 #include "libANGLE/RefCountObject.h"
 
@@ -143,7 +144,7 @@ struct VariableLocation
     unsigned int index;
 };
 
-class Program : angle::NonCopyable
+class Program final : angle::NonCopyable, public LabeledObject
 {
   public:
     class Data final : angle::NonCopyable
@@ -151,6 +152,8 @@ class Program : angle::NonCopyable
       public:
         Data();
         ~Data();
+
+        const std::string &getLabel();
 
         const Shader *getAttachedVertexShader() const { return mAttachedVertexShader; }
         const Shader *getAttachedFragmentShader() const { return mAttachedFragmentShader; }
@@ -191,6 +194,8 @@ class Program : angle::NonCopyable
       private:
         friend class Program;
 
+        std::string mLabel;
+
         Shader *mAttachedFragmentShader;
         Shader *mAttachedVertexShader;
 
@@ -215,12 +220,17 @@ class Program : angle::NonCopyable
 
         // TODO(jmadill): use unordered/hash map when available
         std::map<int, VariableLocation> mOutputVariables;
+
+        bool mBinaryRetrieveableHint;
     };
 
     Program(rx::ImplFactory *factory, ResourceManager *manager, GLuint handle);
     ~Program();
 
     GLuint id() const { return mHandle; }
+
+    void setLabel(const std::string &label) override;
+    const std::string &getLabel() const override;
 
     rx::ProgramImpl *getImplementation() { return mProgram; }
     const rx::ProgramImpl *getImplementation() const { return mProgram; }
@@ -237,6 +247,8 @@ class Program : angle::NonCopyable
     Error loadBinary(GLenum binaryFormat, const void *binary, GLsizei length);
     Error saveBinary(GLenum *binaryFormat, void *binary, GLsizei bufSize, GLsizei *length) const;
     GLint getBinaryLength() const;
+    void setBinaryRetrievableHint(bool retrievable);
+    bool getBinaryRetrievableHint() const;
 
     int getInfoLogLength() const;
     void getInfoLog(GLsizei bufSize, GLsizei *length, char *infoLog) const;

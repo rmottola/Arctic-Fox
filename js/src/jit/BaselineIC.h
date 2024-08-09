@@ -190,98 +190,6 @@ class ICTypeUpdate_ObjectGroup : public ICStub
     };
 };
 
-class ICNewArray_Fallback : public ICFallbackStub
-{
-    friend class ICStubSpace;
-
-    HeapPtrObject templateObject_;
-
-    // The group used for objects created here is always available, even if the
-    // template object itself is not.
-    HeapPtrObjectGroup templateGroup_;
-
-    ICNewArray_Fallback(JitCode* stubCode, ObjectGroup* templateGroup)
-      : ICFallbackStub(ICStub::NewArray_Fallback, stubCode),
-        templateObject_(nullptr), templateGroup_(templateGroup)
-    {}
-
-  public:
-    class Compiler : public ICStubCompiler {
-        RootedObjectGroup templateGroup;
-        bool generateStubCode(MacroAssembler& masm);
-
-      public:
-        Compiler(JSContext* cx, ObjectGroup* templateGroup)
-          : ICStubCompiler(cx, ICStub::NewArray_Fallback, Engine::Baseline),
-            templateGroup(cx, templateGroup)
-        {}
-
-        ICStub* getStub(ICStubSpace* space) {
-            return newStub<ICNewArray_Fallback>(space, getStubCode(), templateGroup);
-        }
-    };
-
-    HeapPtrObject& templateObject() {
-        return templateObject_;
-    }
-
-    void setTemplateObject(JSObject* obj) {
-        MOZ_ASSERT(obj->group() == templateGroup());
-        templateObject_ = obj;
-    }
-
-    HeapPtrObjectGroup& templateGroup() {
-        return templateGroup_;
-    }
-
-    void setTemplateGroup(ObjectGroup* group) {
-        templateObject_ = nullptr;
-        templateGroup_ = group;
-    }
-};
-
-class ICNewObject_Fallback : public ICFallbackStub
-{
-    friend class ICStubSpace;
-
-    HeapPtrObject templateObject_;
-
-    explicit ICNewObject_Fallback(JitCode* stubCode)
-      : ICFallbackStub(ICStub::NewObject_Fallback, stubCode), templateObject_(nullptr)
-    {}
-
-  public:
-    class Compiler : public ICStubCompiler {
-        bool generateStubCode(MacroAssembler& masm);
-
-      public:
-        explicit Compiler(JSContext* cx)
-          : ICStubCompiler(cx, ICStub::NewObject_Fallback, Engine::Baseline)
-        {}
-
-        ICStub* getStub(ICStubSpace* space) {
-            return newStub<ICNewObject_Fallback>(space, getStubCode());
-        }
-    };
-
-    HeapPtrObject& templateObject() {
-        return templateObject_;
-    }
-
-    void setTemplateObject(JSObject* obj) {
-        templateObject_ = obj;
-    }
-};
-
-class ICNewObject_WithTemplate : public ICStub
-{
-    friend class ICStubSpace;
-
-    explicit ICNewObject_WithTemplate(JitCode* stubCode)
-      : ICStub(ICStub::NewObject_WithTemplate, stubCode)
-    {}
-};
-
 // ToBool
 //      JSOP_IFNE
 
@@ -1284,10 +1192,8 @@ class ICSetElem_DenseOrUnboxedArrayAddImpl : public ICSetElem_DenseOrUnboxedArra
 
   public:
     void traceShapes(JSTracer* trc) {
-        for (size_t i = 0; i < NumShapes; i++) {
-            if (shapes_[i])
-                TraceEdge(trc, &shapes_[i], "baseline-setelem-denseadd-stub-shape");
-        }
+        for (size_t i = 0; i < NumShapes; i++)
+            TraceNullableEdge(trc, &shapes_[i], "baseline-setelem-denseadd-stub-shape");
     }
     Shape* shape(size_t i) const {
         MOZ_ASSERT(i < NumShapes);
@@ -2961,36 +2867,36 @@ class ICCall_StringSplit : public ICMonitoredStub
 
   protected:
     uint32_t pcOffset_;
-    HeapPtrString expectedThis_;
-    HeapPtrString expectedArg_;
+    HeapPtrString expectedStr_;
+    HeapPtrString expectedSep_;
     HeapPtrObject templateObject_;
 
-    ICCall_StringSplit(JitCode* stubCode, ICStub* firstMonitorStub, uint32_t pcOffset, JSString* thisString,
-                       JSString* argString, JSObject* templateObject)
+    ICCall_StringSplit(JitCode* stubCode, ICStub* firstMonitorStub, uint32_t pcOffset, JSString* str,
+                       JSString* sep, JSObject* templateObject)
       : ICMonitoredStub(ICStub::Call_StringSplit, stubCode, firstMonitorStub),
-        pcOffset_(pcOffset), expectedThis_(thisString), expectedArg_(argString),
+        pcOffset_(pcOffset), expectedStr_(str), expectedSep_(sep),
         templateObject_(templateObject)
     { }
 
   public:
-    static size_t offsetOfExpectedThis() {
-        return offsetof(ICCall_StringSplit, expectedThis_);
+    static size_t offsetOfExpectedStr() {
+        return offsetof(ICCall_StringSplit, expectedStr_);
     }
 
-    static size_t offsetOfExpectedArg() {
-        return offsetof(ICCall_StringSplit, expectedArg_);
+    static size_t offsetOfExpectedSep() {
+        return offsetof(ICCall_StringSplit, expectedSep_);
     }
 
     static size_t offsetOfTemplateObject() {
         return offsetof(ICCall_StringSplit, templateObject_);
     }
 
-    HeapPtrString& expectedThis() {
-        return expectedThis_;
+    HeapPtrString& expectedStr() {
+        return expectedStr_;
     }
 
-    HeapPtrString& expectedArg() {
-        return expectedArg_;
+    HeapPtrString& expectedSep() {
+        return expectedSep_;
     }
 
     HeapPtrObject& templateObject() {
@@ -3001,8 +2907,8 @@ class ICCall_StringSplit : public ICMonitoredStub
       protected:
         ICStub* firstMonitorStub_;
         uint32_t pcOffset_;
-        RootedString expectedThis_;
-        RootedString expectedArg_;
+        RootedString expectedStr_;
+        RootedString expectedSep_;
         RootedObject templateObject_;
 
         bool generateStubCode(MacroAssembler& masm);
@@ -3013,19 +2919,19 @@ class ICCall_StringSplit : public ICMonitoredStub
         }
 
       public:
-        Compiler(JSContext* cx, ICStub* firstMonitorStub, uint32_t pcOffset, HandleString thisString,
-                 HandleString argString, HandleValue templateObject)
+        Compiler(JSContext* cx, ICStub* firstMonitorStub, uint32_t pcOffset, HandleString str,
+                 HandleString sep, HandleValue templateObject)
           : ICCallStubCompiler(cx, ICStub::Call_StringSplit),
             firstMonitorStub_(firstMonitorStub),
             pcOffset_(pcOffset),
-            expectedThis_(cx, thisString),
-            expectedArg_(cx, argString),
+            expectedStr_(cx, str),
+            expectedSep_(cx, sep),
             templateObject_(cx, &templateObject.toObject())
         { }
 
         ICStub* getStub(ICStubSpace* space) {
             return newStub<ICCall_StringSplit>(space, getStubCode(), firstMonitorStub_, pcOffset_,
-                                               expectedThis_, expectedArg_, templateObject_);
+                                               expectedStr_, expectedSep_, templateObject_);
         }
    };
 };

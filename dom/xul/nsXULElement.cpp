@@ -110,6 +110,7 @@
 
 #include "mozilla/dom/XULElementBinding.h"
 #include "mozilla/dom/BoxObject.h"
+#include "mozilla/dom/HTMLIFrameElement.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -436,7 +437,7 @@ already_AddRefed<nsINodeList>
 nsXULElement::GetElementsByAttribute(const nsAString& aAttribute,
                                      const nsAString& aValue)
 {
-    nsCOMPtr<nsIAtom> attrAtom(do_GetAtom(aAttribute));
+    nsCOMPtr<nsIAtom> attrAtom(NS_Atomize(aAttribute));
     void* attrValue = new nsString(aValue);
     RefPtr<nsContentList> list =
         new nsContentList(this,
@@ -467,7 +468,7 @@ nsXULElement::GetElementsByAttributeNS(const nsAString& aNamespaceURI,
                                        const nsAString& aValue,
                                        ErrorResult& rv)
 {
-    nsCOMPtr<nsIAtom> attrAtom(do_GetAtom(aAttribute));
+    nsCOMPtr<nsIAtom> attrAtom(NS_Atomize(aAttribute));
 
     int32_t nameSpaceId = kNameSpaceID_Wildcard;
     if (!aNamespaceURI.EqualsLiteral("*")) {
@@ -1049,14 +1050,14 @@ nsXULElement::BeforeSetAttr(int32_t aNamespaceID, nsIAtom* aName,
                             nsAttrValueOrString* aValue, bool aNotify)
 {
     if (aNamespaceID == kNameSpaceID_None && aName == nsGkAtoms::accesskey &&
-        IsInDoc()) {
+        IsInUncomposedDoc()) {
         nsAutoString oldValue;
         if (GetAttr(aNamespaceID, aName, oldValue)) {
             UnregisterAccessKey(oldValue);
         }
     } else if (aNamespaceID == kNameSpaceID_None &&
                (aName == nsGkAtoms::command || aName == nsGkAtoms::observes) &&
-               IsInDoc()) {
+               IsInUncomposedDoc()) {
 //         XXX sXBL/XBL2 issue! Owner or current document?
         nsAutoString oldValue;
         GetAttr(kNameSpaceID_None, nsGkAtoms::observes, oldValue);
@@ -1287,7 +1288,7 @@ nsXULElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
     }
     if (aVisitor.mEvent->mMessage == eXULCommand &&
         aVisitor.mEvent->mClass == eInputEventClass &&
-        aVisitor.mEvent->originalTarget == static_cast<nsIContent*>(this) &&
+        aVisitor.mEvent->mOriginalTarget == static_cast<nsIContent*>(this) &&
         !IsXULElement(nsGkAtoms::command)) {
         // Check that we really have an xul command event. That will be handled
         // in a special way.
@@ -1331,7 +1332,7 @@ nsXULElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
                 WidgetInputEvent* orig = aVisitor.mEvent->AsInputEvent();
                 nsContentUtils::DispatchXULCommand(
                   commandContent,
-                  aVisitor.mEvent->mFlags.mIsTrusted,
+                  aVisitor.mEvent->IsTrusted(),
                   aVisitor.mDOMEvent,
                   nullptr,
                   orig->IsControl(),
@@ -1570,7 +1571,7 @@ nsXULElement::LoadSrc()
                             nsGkAtoms::iframe)) {
         return NS_OK;
     }
-    if (!IsInDoc() ||
+    if (!IsInUncomposedDoc() ||
         !OwnerDoc()->GetRootElement() ||
         OwnerDoc()->GetRootElement()->
             NodeInfo()->Equals(nsGkAtoms::overlay, kNameSpaceID_XUL)) {
@@ -1635,41 +1636,51 @@ nsXULElement::SetIsPrerendered()
                  NS_LITERAL_STRING("true"), true);
 }
 
-nsresult
-nsXULElement::SwapFrameLoaders(nsIFrameLoaderOwner* aOtherOwner)
-{
-    nsCOMPtr<nsIContent> otherContent(do_QueryInterface(aOtherOwner));
-    NS_ENSURE_TRUE(otherContent, NS_ERROR_NOT_IMPLEMENTED);
-
-    nsXULElement* otherEl = FromContent(otherContent);
-    NS_ENSURE_TRUE(otherEl, NS_ERROR_NOT_IMPLEMENTED);
-
-    ErrorResult rv;
-    SwapFrameLoaders(*otherEl, rv);
-    return rv.StealNSResult();
-}
-
 void
-nsXULElement::SwapFrameLoaders(nsXULElement& aOtherElement, ErrorResult& rv)
+nsXULElement::SwapFrameLoaders(HTMLIFrameElement& aOtherLoaderOwner,
+                               ErrorResult& rv)
 {
-    if (&aOtherElement == this) {
-        // nothing to do
-        return;
-    }
-
     nsXULSlots *ourSlots = static_cast<nsXULSlots*>(GetExistingDOMSlots());
-    nsXULSlots *otherSlots =
-        static_cast<nsXULSlots*>(aOtherElement.GetExistingDOMSlots());
-    if (!ourSlots || !ourSlots->mFrameLoader ||
-        !otherSlots || !otherSlots->mFrameLoader) {
-        // Can't handle swapping when there is nothing to swap... yet.
+    if (!ourSlots) {
         rv.Throw(NS_ERROR_NOT_IMPLEMENTED);
         return;
     }
 
-    rv = ourSlots->mFrameLoader->SwapWithOtherLoader(otherSlots->mFrameLoader,
+    aOtherLoaderOwner.SwapFrameLoaders(ourSlots->mFrameLoader, rv);
+}
+
+void
+nsXULElement::SwapFrameLoaders(nsXULElement& aOtherLoaderOwner,
+                               ErrorResult& rv)
+{
+    if (&aOtherLoaderOwner == this) {
+        // nothing to do
+        return;
+    }
+
+    nsXULSlots *otherSlots =
+        static_cast<nsXULSlots*>(aOtherLoaderOwner.GetExistingDOMSlots());
+    if (!otherSlots) {
+        rv.Throw(NS_ERROR_NOT_IMPLEMENTED);
+        return;
+    }
+
+    SwapFrameLoaders(otherSlots->mFrameLoader, rv);
+}
+
+void
+nsXULElement::SwapFrameLoaders(RefPtr<nsFrameLoader>& aOtherLoader,
+                               mozilla::ErrorResult& rv)
+{
+    nsXULSlots *ourSlots = static_cast<nsXULSlots*>(GetExistingDOMSlots());
+    if (!ourSlots || !ourSlots->mFrameLoader || !aOtherLoader) {
+        rv.Throw(NS_ERROR_NOT_IMPLEMENTED);
+        return;
+    }
+
+    rv = ourSlots->mFrameLoader->SwapWithOtherLoader(aOtherLoader,
                                                      ourSlots->mFrameLoader,
-                                                     otherSlots->mFrameLoader);
+                                                     aOtherLoader);
 }
 
 NS_IMETHODIMP

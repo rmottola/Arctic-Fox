@@ -103,8 +103,10 @@ const TESTS = [ {
   lastUpdateTime  : 0
 } ];
 
-let gUTM;
-let gNextFunc;
+const DEBUG_TEST = false;
+
+var gUTM;
+var gNextFunc;
 
 XPCOMUtils.defineLazyServiceGetter(this, "gPref",
                                    "@mozilla.org/preferences-service;1",
@@ -218,35 +220,35 @@ function finished_test1thru7() {
 }
 
 function check_test1thru7() {
-  do_print("Testing: a category registered timer didn't fire due to an " +
-           "invalid default interval");
+  debugDump("Testing: a category registered timer didn't fire due to an " +
+            "invalid default interval");
   do_check_false(TESTS[0].notified);
 
-  do_print("Testing: a category registered timer didn't fire due to not " +
-           "implementing nsITimerCallback");
+  debugDump("Testing: a category registered timer didn't fire due to not " +
+            "implementing nsITimerCallback");
   do_check_false(TESTS[1].notified);
 
-  do_print("Testing: a category registered timer didn't fire due to the next " +
-           "update time being in the future");
+  debugDump("Testing: a category registered timer didn't fire due to the " +
+            "next update time being in the future");
   do_check_false(TESTS[2].notified);
 
-  do_print("Testing: a category registered timer didn't fire due to not " +
-           "having a notify method");
+  debugDump("Testing: a category registered timer didn't fire due to not " +
+            "having a notify method");
   do_check_false(TESTS[3].notified);
 
-  do_print("Testing: a category registered timer has fired");
+  debugDump("Testing: a category registered timer has fired");
   do_check_true(TESTS[4].notified);
 
-  do_print("Testing: a category registered timer fired that has an interval " +
-           "preference that overrides a default that wouldn't have fired yet");
+  debugDump("Testing: a category registered timer fired that has an interval " +
+            "preference that overrides a default that wouldn't have fired yet");
   do_check_true(TESTS[5].notified);
 
-  do_print("Testing: a category registered timer has fired due to the next " +
-           "update time being reset due to a future last update time");
+  debugDump("Testing: a category registered timer has fired due to the next " +
+            "update time being reset due to a future last update time");
   do_check_true(TESTS[6].notified);
 
-  do_print("Testing: two category registered timers last update time has " +
-           "user values");
+  debugDump("Testing: two category registered timers last update time has " +
+            "user values");
   do_check_true(gPref.prefHasUserValue(PREF_BRANCH_LAST_UPDATE_TIME +
                 TESTS[4].timerID));
   do_check_true(gPref.prefHasUserValue(PREF_BRANCH_LAST_UPDATE_TIME +
@@ -264,8 +266,8 @@ function check_test1thru7() {
     gCatMan.deleteCategoryEntry(CATEGORY_UPDATE_TIMER, entry, false);
     count++;
   }
-  do_print("Testing: no " + CATEGORY_UPDATE_TIMER + " categories are still " +
-           "registered");
+  debugDump("Testing: no " + CATEGORY_UPDATE_TIMER + " categories are still " +
+            "registered");
   do_check_eq(count, 0);
 
   do_execute_soon(run_test8);
@@ -287,7 +289,7 @@ function check_test8(aTestTimerCallback) {
     return;
   }
 
-  do_print("Testing: two registerTimer registered timers have fired");
+  debugDump("Testing: two registerTimer registered timers have fired");
   for (let i = 0; i < 2; i++) {
     do_check_true(TESTS[7 + i].notified);
   }
@@ -298,8 +300,8 @@ function check_test8(aTestTimerCallback) {
   do_check_true(Math.abs(TESTS[7].notifyTime - TESTS[8].notifyTime) >=
                 MAIN_TIMER_INTERVAL * 0.5);
 
-  do_print("Testing: two registerTimer registered timers last update time have " +
-           "been updated");
+  debugDump("Testing: two registerTimer registered timers last update time " +
+            "have been updated");
   for (let i = 0; i < 2; i++) {
     do_check_neq(gPref.getIntPref(PREF_BRANCH_LAST_UPDATE_TIME + TESTS[7 + i].timerID), 1);
   }
@@ -460,3 +462,49 @@ const gTest9Factory = {
     throw Cr.NS_ERROR_NO_AGGREGATION;
   }
 };
+
+/**
+ * Logs TEST-INFO messages.
+ *
+ * @param  aText
+ *         The text to log.
+ * @param  aCaller (optional)
+ *         An optional Components.stack.caller. If not specified
+ *         Components.stack.caller will be used.
+ */
+function logTestInfo(aText, aCaller) {
+  let caller = aCaller ? aCaller : Components.stack.caller;
+  let now = new Date;
+  let hh = now.getHours();
+  let mm = now.getMinutes();
+  let ss = now.getSeconds();
+  let ms = now.getMilliseconds();
+  let time = (hh < 10 ? "0" + hh : hh) + ":" +
+             (mm < 10 ? "0" + mm : mm) + ":" +
+             (ss < 10 ? "0" + ss : ss) + ":";
+  if (ms < 10) {
+    time += "00";
+  }
+  else if (ms < 100) {
+    time += "0";
+  }
+  time += ms;
+  let msg = time + " | TEST-INFO | " + caller.filename + " | [" + caller.name +
+            " : " + caller.lineNumber + "] " + aText;
+  do_print(msg);
+}
+
+/**
+ * Logs TEST-INFO messages when DEBUG_TEST evaluates to true.
+ *
+ * @param  aText
+ *         The text to log.
+ * @param  aCaller (optional)
+ *         An optional Components.stack.caller. If not specified
+ *         Components.stack.caller will be used.
+ */
+function debugDump(aText, aCaller) {
+  if (DEBUG_TEST) {
+    logTestInfo(aText, aCaller);
+  }
+}

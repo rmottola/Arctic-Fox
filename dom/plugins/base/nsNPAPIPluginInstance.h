@@ -28,6 +28,7 @@
 class PluginEventRunnable;
 #endif
 
+#include "mozilla/EventForwards.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/PluginLibrary.h"
 #include "mozilla/RefPtr.h"
@@ -126,6 +127,9 @@ public:
   nsresult GetScrollCaptureContainer(mozilla::layers::ImageContainer **aContainer);
   nsresult UpdateScrollState(bool aIsScrolling);
 #endif
+  nsresult HandledWindowedPluginKeyEvent(
+             const mozilla::NativeEventData& aKeyEventData,
+             bool aIsConsumed);
   nsPluginInstanceOwner* GetOwner();
   void SetOwner(nsPluginInstanceOwner *aOwner);
   void DidComposite();

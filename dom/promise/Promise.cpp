@@ -15,6 +15,8 @@
 
 #include "mozilla/dom/BindingUtils.h"
 #include "mozilla/dom/DOMError.h"
+#include "mozilla/dom/DOMException.h"
+#include "mozilla/dom/DOMExceptionBinding.h"
 #include "mozilla/dom/MediaStreamError.h"
 #include "mozilla/dom/PromiseBinding.h"
 #include "mozilla/dom/ScriptSettings.h"
@@ -79,10 +81,14 @@ protected:
   Run() override
   {
     NS_ASSERT_OWNINGTHREAD(PromiseReactionJob);
-    ThreadsafeAutoJSContext cx;
-    JS::Rooted<JSObject*> wrapper(cx, mPromise->GetWrapper());
-    MOZ_ASSERT(wrapper); // It was preserved!
-    JSAutoCompartment ac(cx, wrapper);
+
+    MOZ_ASSERT(mPromise->GetWrapper()); // It was preserved!
+
+    AutoJSAPI jsapi;
+    if (!jsapi.Init(mPromise->GetWrapper())) {
+      return NS_ERROR_FAILURE;
+    }
+    JSContext* cx = jsapi.cx();
 
     JS::Rooted<JS::Value> value(cx, mValue);
     if (!MaybeWrapValue(cx, &value)) {
@@ -92,16 +98,11 @@ protected:
     }
 
     JS::Rooted<JSObject*> asyncStack(cx, mPromise->mAllocationStack);
-    JS::Rooted<JSString*> asyncCause(cx, JS_NewStringCopyZ(cx, "Promise"));
-    if (!asyncCause) {
-      JS_ClearPendingException(cx);
-      return NS_ERROR_OUT_OF_MEMORY;
-    }
 
     {
       Maybe<JS::AutoSetAsyncStackForNewCalls> sas;
       if (asyncStack) {
-        sas.emplace(cx, asyncStack, asyncCause);
+        sas.emplace(cx, asyncStack, "Promise");
       }
       mCallback->Call(cx, value);
     }
@@ -205,12 +206,16 @@ protected:
   Run() override
   {
     NS_ASSERT_OWNINGTHREAD(PromiseResolveThenableJob);
-    ThreadsafeAutoJSContext cx;
-    JS::Rooted<JSObject*> wrapper(cx, mPromise->GetWrapper());
-    MOZ_ASSERT(wrapper); // It was preserved!
+
+    MOZ_ASSERT(mPromise->GetWrapper()); // It was preserved!
+
+    AutoJSAPI jsapi;
     // If we ever change which compartment we're working in here, make sure to
     // fix the fast-path for resolved-with-a-Promise in ResolveInternal.
-    JSAutoCompartment ac(cx, wrapper);
+    if (!jsapi.Init(mPromise->GetWrapper())) {
+      return NS_ERROR_FAILURE;
+    }
+    JSContext* cx = jsapi.cx();
 
     JS::Rooted<JSObject*> resolveFunc(cx,
       mPromise->CreateThenableFunction(cx, mPromise, PromiseCallback::Resolve));
@@ -775,7 +780,6 @@ Promise::AppendNativeHandler(PromiseNativeHandler* aRunnable)
     // happen anyway.
     return;
   }
-  jsapi.TakeOwnershipOfErrorReporting();
 
   JSContext* cx = jsapi.cx();
   JS::Rooted<JSObject*> handlerWrapper(cx);
@@ -915,7 +919,11 @@ Promise::MaybeRejectWithNull()
 bool
 Promise::PerformMicroTaskCheckpoint()
 {
+  MOZ_ASSERT(NS_IsMainThread(), "Wrong thread!");
+
   CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
+
+  // On the main thread, we always use the main promise micro task queue.
   std::queue<nsCOMPtr<nsIRunnable>>& microtaskQueue =
     runtime->GetPromiseMicroTaskQueue();
 
@@ -923,10 +931,7 @@ Promise::PerformMicroTaskCheckpoint()
     return false;
   }
 
-  Maybe<AutoSafeJSContext> cx;
-  if (NS_IsMainThread()) {
-    cx.emplace();
-  }
+  AutoSafeJSContext cx;
 
   do {
     nsCOMPtr<nsIRunnable> runnable = microtaskQueue.front();
@@ -938,13 +943,75 @@ Promise::PerformMicroTaskCheckpoint()
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return false;
     }
-    if (cx.isSome()) {
-      JS_CheckForInterrupt(cx.ref());
-    }
+    JS_CheckForInterrupt(cx);
     runtime->AfterProcessMicrotask();
   } while (!microtaskQueue.empty());
 
   return true;
+}
+
+void
+Promise::PerformWorkerMicroTaskCheckpoint()
+{
+  MOZ_ASSERT(!NS_IsMainThread(), "Wrong thread!");
+
+  CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
+
+  for (;;) {
+    // For a normal microtask checkpoint, we try to use the debugger microtask
+    // queue first. If the debugger queue is empty, we use the normal microtask
+    // queue instead.
+    std::queue<nsCOMPtr<nsIRunnable>>* microtaskQueue =
+      &runtime->GetDebuggerPromiseMicroTaskQueue();
+
+    if (microtaskQueue->empty()) {
+      microtaskQueue = &runtime->GetPromiseMicroTaskQueue();
+      if (microtaskQueue->empty()) {
+        break;
+      }
+    }
+
+    nsCOMPtr<nsIRunnable> runnable = microtaskQueue->front();
+    MOZ_ASSERT(runnable);
+
+    // This function can re-enter, so we remove the element before calling.
+    microtaskQueue->pop();
+    nsresult rv = runnable->Run();
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return;
+    }
+    runtime->AfterProcessMicrotask();
+  }
+}
+
+void
+Promise::PerformWorkerDebuggerMicroTaskCheckpoint()
+{
+  MOZ_ASSERT(!NS_IsMainThread(), "Wrong thread!");
+
+  CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
+
+  for (;;) {
+    // For a debugger microtask checkpoint, we always use the debugger microtask
+    // queue.
+    std::queue<nsCOMPtr<nsIRunnable>>* microtaskQueue =
+      &runtime->GetDebuggerPromiseMicroTaskQueue();
+
+    if (microtaskQueue->empty()) {
+      break;
+    }
+
+    nsCOMPtr<nsIRunnable> runnable = microtaskQueue->front();
+    MOZ_ASSERT(runnable);
+
+    // This function can re-enter, so we remove the element before calling.
+    microtaskQueue->pop();
+    nsresult rv = runnable->Run();
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return;
+    }
+    runtime->AfterProcessMicrotask();
+  }
 }
 
 #ifndef SPIDERMONKEY_PROMISE
@@ -1762,21 +1829,20 @@ public:
   {
     MOZ_ASSERT(mCountdown > 0);
 
-    ThreadsafeAutoSafeJSContext cx;
-    JSAutoCompartment ac(cx, mValues);
-    {
+    AutoJSAPI jsapi;
+    if (!jsapi.Init(mValues)) {
+      return;
+    }
+    JSContext* cx = jsapi.cx();
 
-      AutoDontReportUncaught silenceReporting(cx);
-      JS::Rooted<JS::Value> value(cx, aValue);
-      JS::Rooted<JSObject*> values(cx, mValues);
-      if (!JS_WrapValue(cx, &value) ||
-          !JS_DefineElement(cx, values, index, value, JSPROP_ENUMERATE)) {
-        MOZ_ASSERT(JS_IsExceptionPending(cx));
-        JS::Rooted<JS::Value> exn(cx);
-        JS_GetPendingException(cx, &exn);
-
-        mPromise->MaybeReject(cx, exn);
-      }
+    JS::Rooted<JS::Value> value(cx, aValue);
+    JS::Rooted<JSObject*> values(cx, mValues);
+    if (!JS_WrapValue(cx, &value) ||
+        !JS_DefineElement(cx, values, index, value, JSPROP_ENUMERATE)) {
+      MOZ_ASSERT(JS_IsExceptionPending(cx));
+      JS::Rooted<JS::Value> exn(cx);
+      jsapi.StealException(&exn);
+      mPromise->MaybeReject(cx, exn);
     }
 
     --mCountdown;
@@ -2409,18 +2475,6 @@ Promise::AppendCallbacks(PromiseCallback* aResolveCallback,
 }
 #endif // SPIDERMONKEY_PROMISE
 
-/* static */ void
-Promise::DispatchToMicroTask(nsIRunnable* aRunnable)
-{
-  MOZ_ASSERT(aRunnable);
-
-  CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
-  std::queue<nsCOMPtr<nsIRunnable>>& microtaskQueue =
-    runtime->GetPromiseMicroTaskQueue();
-
-  microtaskQueue.push(aRunnable);
-}
-
 #ifndef SPIDERMONKEY_PROMISE
 #if defined(DOM_PROMISE_DEPRECATED_REPORTING)
 void
@@ -2447,9 +2501,17 @@ Promise::MaybeReportRejected()
   }
 
   js::ErrorReport report(cx);
-  if (!report.init(cx, val)) {
-    JS_ClearPendingException(cx);
-    return;
+  RefPtr<Exception> exp;
+  bool isObject = val.isObject();
+  if (!isObject || NS_FAILED(UNWRAP_OBJECT(Exception, &val.toObject(), exp))) {
+    if (!isObject ||
+        NS_FAILED(UNWRAP_OBJECT(DOMException, &val.toObject(), exp))) {
+      if (!report.init(cx, val, js::ErrorReport::NoSideEffects)) {
+        NS_WARNING("Couldn't convert the unhandled rejected value to an exception.");
+        JS_ClearPendingException(cx);
+        return;
+      }
+    }
   }
 
   RefPtr<xpc::ErrorReport> xpcReport = new xpc::ErrorReport();
@@ -2457,7 +2519,12 @@ Promise::MaybeReportRejected()
   bool isChrome = isMainThread ? nsContentUtils::IsSystemPrincipal(nsContentUtils::ObjectPrincipal(obj))
                                : GetCurrentThreadWorkerPrivate()->IsChromeWorker();
   nsGlobalWindow* win = isMainThread ? xpc::WindowGlobalOrNull(obj) : nullptr;
-  xpcReport->Init(report.report(), report.message(), isChrome, win ? win->AsInner()->WindowID() : 0);
+  uint64_t windowID = win ? win->AsInner()->WindowID() : 0;
+  if (exp) {
+    xpcReport->Init(cx, exp, isChrome, windowID);
+  } else {
+    xpcReport->Init(report.report(), report.message(), isChrome, windowID);
+  }
 
   // Now post an event to do the real reporting async
   // Since Promises preserve their wrapper, it is essential to RefPtr<> the
@@ -2511,6 +2578,8 @@ void
 Promise::ResolveInternal(JSContext* aCx,
                          JS::Handle<JS::Value> aValue)
 {
+  CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
+
   mResolvePending = true;
 
   if (aValue.isObject()) {
@@ -2552,7 +2621,7 @@ Promise::ResolveInternal(JSContext* aCx,
         new PromiseInit(nullptr, thenObj, mozilla::dom::GetIncumbentGlobal());
       RefPtr<PromiseResolveThenableJob> task =
         new PromiseResolveThenableJob(this, valueObj, thenCallback);
-      DispatchToMicroTask(task);
+      runtime->DispatchToMicroTask(task);
       return;
     }
   }
@@ -2642,6 +2711,8 @@ Promise::MaybeSettle(JS::Handle<JS::Value> aValue,
 void
 Promise::TriggerPromiseReactions()
 {
+  CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
+
   nsTArray<RefPtr<PromiseCallback>> callbacks;
   callbacks.SwapElements(mState == Resolved ? mResolveCallbacks
                                             : mRejectCallbacks);
@@ -2651,7 +2722,7 @@ Promise::TriggerPromiseReactions()
   for (uint32_t i = 0; i < callbacks.Length(); ++i) {
     RefPtr<PromiseReactionJob> task =
       new PromiseReactionJob(this, callbacks[i], mResult);
-    DispatchToMicroTask(task);
+    runtime->DispatchToMicroTask(task);
   }
 }
 
@@ -2668,7 +2739,7 @@ Promise::RemoveFeature()
 }
 
 bool
-PromiseReportRejectFeature::Notify(JSContext* aCx, workers::Status aStatus)
+PromiseReportRejectFeature::Notify(workers::Status aStatus)
 {
   MOZ_ASSERT(aStatus > workers::Running);
   mPromise->MaybeReportRejectedOnce();
@@ -2931,7 +3002,7 @@ PromiseWorkerProxy::RejectedCallback(JSContext* aCx,
 }
 
 bool
-PromiseWorkerProxy::Notify(JSContext* aCx, Status aStatus)
+PromiseWorkerProxy::Notify(Status aStatus)
 {
   if (aStatus >= Canceling) {
     CleanUp();

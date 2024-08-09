@@ -1,15 +1,17 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
+"use strict";
 
 /**
  * Tests that we use the correct snapshot aggregate value
  * in `utils.getSnapshotTotals(snapshot)`
  */
 
-let { breakdowns, snapshotState: states } = require("devtools/client/memory/constants");
-let { getSnapshotTotals, breakdownEquals } = require("devtools/client/memory/utils");
-let { toggleInvertedAndRefresh } = require("devtools/client/memory/actions/inverted");
-let { takeSnapshotAndCensus } = require("devtools/client/memory/actions/snapshot");
+const { censusDisplays, snapshotState: states, viewState, censusState } = require("devtools/client/memory/constants");
+const { getSnapshotTotals } = require("devtools/client/memory/utils");
+const { takeSnapshotAndCensus } = require("devtools/client/memory/actions/snapshot");
+const { setCensusDisplayAndRefresh } = require("devtools/client/memory/actions/census-display");
+const { changeView } = require("devtools/client/memory/actions/view");
 
 function run_test() {
   run_next_test();
@@ -22,12 +24,15 @@ add_task(function *() {
   let store = Store();
   let { getState, dispatch } = store;
 
-  dispatch(takeSnapshotAndCensus(front, heapWorker));
-  yield waitUntilSnapshotState(store, [states.SAVED_CENSUS]);
+  dispatch(changeView(viewState.CENSUS));
 
-  ok(!getState().snapshots[0].census.inverted, "Snapshot is not inverted");
-  ok(isBreakdownType(getState().snapshots[0].census.report, "coarseType"),
-    "Snapshot using `coarseType` breakdown");
+  yield dispatch(setCensusDisplayAndRefresh(heapWorker,
+                                            censusDisplays.allocationStack));
+
+  dispatch(takeSnapshotAndCensus(front, heapWorker));
+  yield waitUntilCensusState(store, s => s.census, [censusState.SAVED]);
+
+  ok(!getState().snapshots[0].census.display.inverted, "Snapshot is not inverted");
 
   let census = getState().snapshots[0].census;
   let result = aggregate(census.report);
@@ -41,14 +46,18 @@ add_task(function *() {
   equal(totalBytes, result.bytes, "getSnapshotTotals reuslted in correct bytes");
   equal(totalCount, result.count, "getSnapshotTotals reuslted in correct count");
 
-  dispatch(toggleInvertedAndRefresh(heapWorker));
-  yield waitUntilSnapshotState(store, [states.SAVING_CENSUS]);
-  yield waitUntilSnapshotState(store, [states.SAVED_CENSUS]);
-  ok(getState().snapshots[0].census.inverted, "Snapshot is inverted");
+  dispatch(setCensusDisplayAndRefresh(heapWorker,
+                                      censusDisplays.invertedAllocationStack));
+
+  yield waitUntilCensusState(store, s => s.census, [censusState.SAVING]);
+  yield waitUntilCensusState(store, s => s.census, [censusState.SAVED]);
+  ok(getState().snapshots[0].census.display.inverted, "Snapshot is inverted");
 
   result = getSnapshotTotals(getState().snapshots[0].census);
-  equal(totalBytes, result.bytes, "getSnapshotTotals reuslted in correct bytes when inverted");
-  equal(totalCount, result.count, "getSnapshotTotals reuslted in correct count when inverted");
+  equal(totalBytes, result.bytes,
+        "getSnapshotTotals reuslted in correct bytes when inverted");
+  equal(totalCount, result.count,
+        "getSnapshotTotals reuslted in correct count when inverted");
 });
 
 function aggregate (report) {

@@ -26,5 +26,4 @@ DevToolsModules(
     'rulers.js',
     'screenshot.js',
     'security.js',
-    'tools.js',
 )

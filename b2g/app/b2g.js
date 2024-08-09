@@ -224,7 +224,6 @@ pref("dom.use_watchdog", false);
 // ensure that those calls don't accidentally trigger the dialog.
 pref("dom.max_script_run_time", 0);
 pref("dom.max_chrome_script_run_time", 0);
-pref("dom.max_child_script_run_time", 0);
 
 // plugins
 pref("plugin.disable", true);
@@ -296,7 +295,6 @@ pref("ui.dragThresholdY", 25);
 
 // Layers Acceleration.  We can only have nice things on gonk, because
 // they're not maintained anywhere else.
-pref("layers.offmainthreadcomposition.enabled", true);
 pref("layers.offmainthreadcomposition.async-animations", true);
 #ifndef MOZ_WIDGET_GONK
 pref("dom.ipc.tabs.disabled", true);
@@ -859,8 +857,8 @@ pref("memory.system_memory_reporter", true);
 // Don't dump memory reports on OOM, by default.
 pref("memory.dump_reports_on_oom", false);
 
-pref("layout.imagevisibility.numscrollportwidths", 1);
-pref("layout.imagevisibility.numscrollportheights", 1);
+pref("layout.framevisibility.numscrollportwidths", 1);
+pref("layout.framevisibility.numscrollportheights", 1);
 
 // Enable native identity (persona/browserid)
 pref("dom.identity.enabled", true);
@@ -1044,6 +1042,12 @@ pref("layout.accessiblecaret.enabled", true);
 #ifdef MOZ_WIDGET_GONK
 pref("layout.accessiblecaret.use_long_tap_injector", false);
 #endif
+
+// The active caret is disallow to be dragged across the other (inactive) caret.
+pref("layout.accessiblecaret.allow_dragging_across_other_caret", false);
+
+// Hide carets and text selection dialog during scrolling.
+pref("layout.accessiblecaret.always_show_when_scrolling", false);
 
 // Enable sync and mozId with Firefox Accounts.
 pref("services.sync.fxaccounts.enabled", true);

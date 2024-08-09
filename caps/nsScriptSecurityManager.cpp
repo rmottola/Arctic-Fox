@@ -304,7 +304,12 @@ nsScriptSecurityManager::AppStatusForPrincipal(nsIPrincipal *aPrin)
     // The app could contain a cross-origin iframe - make sure that the content
     // is actually same-origin with the app.
     MOZ_ASSERT(inIsolatedMozBrowser == false, "Checked this above");
-    PrincipalOriginAttributes attrs(appId, false);
+    nsAutoCString suffix;
+    PrincipalOriginAttributes attrs;
+    NS_ENSURE_TRUE(attrs.PopulateFromOrigin(NS_ConvertUTF16toUTF8(appOrigin), suffix),
+                   nsIPrincipal::APP_STATUS_NOT_INSTALLED);
+    attrs.mAppId = appId;
+    attrs.mInIsolatedMozBrowser = false;
     nsCOMPtr<nsIPrincipal> appPrin = BasePrincipal::CreateCodebasePrincipal(appURI, attrs);
     NS_ENSURE_TRUE(appPrin, nsIPrincipal::APP_STATUS_NOT_INSTALLED);
     return aPrin->Equals(appPrin) ? status
@@ -339,9 +344,19 @@ nsScriptSecurityManager::GetChannelResultPrincipal(nsIChannel* aChannel,
     aChannel->GetLoadInfo(getter_AddRefs(loadInfo));
     if (loadInfo) {
         if (loadInfo->GetLoadingSandboxed()) {
-            RefPtr<nsNullPrincipal> prin =
-              nsNullPrincipal::CreateWithInheritedAttributes(loadInfo->LoadingPrincipal());
-            NS_ENSURE_TRUE(prin, NS_ERROR_FAILURE);
+            RefPtr<nsNullPrincipal> prin;
+            if (loadInfo->LoadingPrincipal()) {
+              prin =
+                nsNullPrincipal::CreateWithInheritedAttributes(loadInfo->LoadingPrincipal());
+              NS_ENSURE_TRUE(prin, NS_ERROR_FAILURE);
+            } else {
+              NeckoOriginAttributes nAttrs;
+              loadInfo->GetOriginAttributes(&nAttrs);
+              PrincipalOriginAttributes pAttrs;
+              pAttrs.InheritFromNecko(nAttrs);
+              prin = nsNullPrincipal::Create(pAttrs);
+              NS_ENSURE_TRUE(prin, NS_ERROR_FAILURE);
+            }
             prin.forget(aPrincipal);
             return NS_OK;
         }

@@ -7,15 +7,16 @@
 // Test confirms that XUL attributes don't show up as empty
 // attributes after being deleted
 
-const TEST_URL = TEST_URL_ROOT + "doc_markup_xul.xul";
+const TEST_URL = URL_ROOT + "doc_markup_xul.xul";
 
 add_task(function*() {
-  let {inspector} = yield addTab(TEST_URL).then(openInspector);
+  let {inspector} = yield openInspectorForURL(TEST_URL);
 
   let panel = yield getNode("#test", inspector);
   let panelFront = yield getNodeFront("#test", inspector);
 
-  ok(panelFront.hasAttribute("id"), "panelFront has id attribute in the beginning");
+  ok(panelFront.hasAttribute("id"),
+     "panelFront has id attribute in the beginning");
 
   info("Removing panel's id attribute");
   panel.removeAttribute("id");
@@ -23,5 +24,6 @@ add_task(function*() {
   info("Waiting for markupmutation");
   yield inspector.once("markupmutation");
 
-  is(panelFront.hasAttribute("id"), false, "panelFront doesn't have id attribute anymore");
+  is(panelFront.hasAttribute("id"), false,
+     "panelFront doesn't have id attribute anymore");
 });

@@ -41,7 +41,7 @@ var platformVersion = exports.platformVersion = appInfo.platformVersion;
 // GUID.
 
 var ids = exports.ids = {
-  Firefox: "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}",
+  Firefox: "{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}",
   Mozilla: "{86c18b42-e466-45a9-ae7a-9b95ba6f5640}",
   SeaMonkey: "{92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}",
   Fennec: "{aa3c5121-dab2-40e2-81ca-7ea25febc110}",

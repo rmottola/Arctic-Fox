@@ -528,8 +528,6 @@ CycleCollectedJSRuntime::Initialize(JSRuntime* aParentRuntime,
   JS_SetDestroyZoneCallback(mJSRuntime, XPCStringConvert::FreeZoneCache);
   JS_SetSweepZoneCallback(mJSRuntime, XPCStringConvert::ClearZoneCache);
   JS::SetBuildIdOp(mJSRuntime, GetBuildId);
-  // XPCJSRuntime currently overrides this because we don't
-  // TakeOwnershipOfErrorReporting everwhere on the main thread yet.
   JS_SetErrorReporter(mJSRuntime, MozCrashErrorReporter);
 
   static js::DOMCallbacks DOMcallbacks = {
@@ -933,7 +931,10 @@ protected:
   NS_IMETHOD
   Run() override
   {
-    mCallback->Call("promise callback");
+    nsIGlobalObject* global = xpc::NativeGlobal(mCallback->CallbackPreserveColor());
+    if (global && !global->IsDying()) {
+      mCallback->Call("promise callback");
+    }
     return NS_OK;
   }
 
@@ -952,7 +953,7 @@ CycleCollectedJSRuntime::EnqueuePromiseJobCallback(JSContext* aCx,
   MOZ_ASSERT(Get() == self);
 
   nsCOMPtr<nsIRunnable> runnable = new PromiseJobRunnable(aCx, aJob);
-  self->GetPromiseMicroTaskQueue().push(runnable);
+  self->DispatchToMicroTask(runnable);
   return true;
 }
 
@@ -1137,6 +1138,13 @@ CycleCollectedJSRuntime::GetPromiseMicroTaskQueue()
   return mPromiseMicroTaskQueue;
 }
 
+std::queue<nsCOMPtr<nsIRunnable>>&
+CycleCollectedJSRuntime::GetDebuggerPromiseMicroTaskQueue()
+{
+  MOZ_ASSERT(mJSRuntime);
+  return mDebuggerPromiseMicroTaskQueue;
+}
+
 nsCycleCollectionParticipant*
 CycleCollectedJSRuntime::GCThingParticipant()
 {
@@ -1241,7 +1249,7 @@ CycleCollectedJSRuntime::JSObjectsTenured()
     if (!JS::ObjectIsTenured(wrapper)) {
       MOZ_ASSERT(!cache->PreservingWrapper());
       const JSClass* jsClass = js::GetObjectJSClass(wrapper);
-      jsClass->finalize(nullptr, wrapper);
+      jsClass->doFinalize(nullptr, wrapper);
     }
   }
 
@@ -1368,9 +1376,10 @@ CycleCollectedJSRuntime::AfterProcessTask(uint32_t aRecursionDepth)
   // Step 4.1: Execute microtasks.
   if (NS_IsMainThread()) {
     nsContentUtils::PerformMainThreadMicroTaskCheckpoint();
+    Promise::PerformMicroTaskCheckpoint();
+  } else {
+    Promise::PerformWorkerMicroTaskCheckpoint();
   }
-
-  Promise::PerformMicroTaskCheckpoint();
 
   // Step 4.2 Execute any events that were waiting for a stable state.
   ProcessStableStateQueue();
@@ -1647,6 +1656,15 @@ CycleCollectedJSRuntime::PrepareWaitingZonesForGC()
     }
     mZonesWaitingForGC.Clear();
   }
+}
+
+void
+CycleCollectedJSRuntime::DispatchToMicroTask(nsIRunnable* aRunnable)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(aRunnable);
+
+  mPromiseMicroTaskQueue.push(aRunnable);
 }
 
 void

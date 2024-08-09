@@ -2245,7 +2245,7 @@ Notification::WorkerGet(WorkerPrivate* aWorkerPrivate,
     new WorkerGetRunnable(proxy, aFilter.mTag, aScope);
   // Since this is called from script via
   // ServiceWorkerRegistration::GetNotifications, we can assert dispatch.
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(r)));
+  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(r));
   return p.forget();
 }
 
@@ -2472,7 +2472,7 @@ class CloseNotificationRunnable final
 };
 
 bool
-NotificationFeature::Notify(JSContext* aCx, Status aStatus)
+NotificationFeature::Notify(Status aStatus)
 {
   if (aStatus >= Canceling) {
     // CloseNotificationRunnable blocks the worker by pushing a sync event loop
@@ -2575,8 +2575,8 @@ public:
     // This is coming from a ServiceWorkerRegistrationWorkerThread.
     MOZ_ASSERT(registration);
 
-    if (!registration->mActiveWorker ||
-        registration->mActiveWorker->ID() != mWorkerPrivate->ServiceWorkerID()) {
+    if (!registration->GetActive() ||
+        registration->GetActive()->ID() != mWorkerPrivate->ServiceWorkerID()) {
       mRv = NS_ERROR_NOT_AVAILABLE;
     }
 

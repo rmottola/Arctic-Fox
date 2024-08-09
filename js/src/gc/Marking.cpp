@@ -410,6 +410,14 @@ js::TraceEdge(JSTracer* trc, WriteBarrieredBase<T>* thingp, const char* name)
 }
 
 template <typename T>
+void
+js::TraceNullableEdge(JSTracer* trc, WriteBarrieredBase<T>* thingp, const char* name)
+{
+    if (InternalBarrierMethods<T>::isMarkable(thingp->get()))
+        DispatchToTracer(trc, ConvertToBase(thingp->unsafeUnbarrieredForTracing()), name);
+}
+
+template <typename T>
 JS_PUBLIC_API(void)
 JS::TraceEdge(JSTracer* trc, JS::Heap<T>* thingp, const char* name)
 {
@@ -521,6 +529,7 @@ js::TraceRootRange(JSTracer* trc, size_t len, T* vec, const char* name)
 // Instantiate a copy of the Tracing templates for each derived type.
 #define INSTANTIATE_ALL_VALID_TRACE_FUNCTIONS(type) \
     template void js::TraceEdge<type>(JSTracer*, WriteBarrieredBase<type>*, const char*); \
+    template void js::TraceNullableEdge<type>(JSTracer*, WriteBarrieredBase<type>*, const char*); \
     template void js::TraceManuallyBarrieredEdge<type>(JSTracer*, type*, const char*); \
     template void js::TraceWeakEdge<type>(JSTracer*, WeakRef<type>*, const char*); \
     template void js::TraceRoot<type>(JSTracer*, type*, const char*); \
@@ -901,8 +910,8 @@ GCMarker::traverse(AccessorShape* thing) {
 } // namespace js
 
 template <typename S, typename T>
-void
-js::GCMarker::traverseEdge(S source, T* target)
+static void
+CheckTraversedEdge(S source, T* target)
 {
     // Atoms and Symbols do not have or mark their internal pointers, respectively.
     MOZ_ASSERT(!ThingIsPermanentAtomOrWellKnownSymbol(source));
@@ -918,7 +927,13 @@ js::GCMarker::traverseEdge(S source, T* target)
     // If we have access to a compartment pointer for both things, they must match.
     MOZ_ASSERT_IF(source->maybeCompartment() && target->maybeCompartment(),
                   source->maybeCompartment() == target->maybeCompartment());
+}
 
+template <typename S, typename T>
+void
+js::GCMarker::traverseEdge(S source, T* target)
+{
+    CheckTraversedEdge(source, target);
     traverse(target);
 }
 
@@ -1022,7 +1037,14 @@ js::GCMarker::eagerlyMarkChildren(Shape* shape)
 {
     MOZ_ASSERT(shape->isMarked(this->markColor()));
     do {
-        traverseEdge(shape, shape->base());
+        // Special case: if a base shape has a shape table then all its pointers
+        // must point to this shape or an anscestor.  Since these pointers will
+        // be traced by this loop they do not need to be traced here as well.
+        BaseShape* base = shape->base();
+        CheckTraversedEdge(shape, base);
+        if (mark(base))
+            base->traceChildrenSkipShapeTable(this);
+
         traverseEdge(shape, shape->propidRef().get());
 
         // When triggered between slices on belhalf of a barrier, these
@@ -1257,10 +1279,10 @@ CallTraceHook(Functor f, JSTracer* trc, JSObject* obj, CheckGeneration check, Ar
     MOZ_ASSERT(clasp);
     MOZ_ASSERT(obj->isNative() == clasp->isNative());
 
-    if (!clasp->trace)
+    if (!clasp->hasTrace())
         return &obj->as<NativeObject>();
 
-    if (clasp->trace == InlineTypedObject::obj_trace) {
+    if (clasp->isTrace(InlineTypedObject::obj_trace)) {
         Shape** pshape = obj->as<InlineTypedObject>().addressOfShapeFromGC();
         f(pshape, mozilla::Forward<Args>(args)...);
 
@@ -1290,7 +1312,7 @@ CallTraceHook(Functor f, JSTracer* trc, JSObject* obj, CheckGeneration check, Ar
         return nullptr;
     }
 
-    clasp->trace(trc, obj);
+    clasp->doTrace(trc, obj);
 
     if (!clasp->isNative())
         return nullptr;
@@ -2132,6 +2154,7 @@ JSObject*
 js::TenuringTracer::moveToTenured(JSObject* src)
 {
     MOZ_ASSERT(IsInsideNursery(src));
+    MOZ_ASSERT(!src->zone()->usedByExclusiveThread);
 
     AllocKind dstKind = src->allocKindForTenure(nursery());
     Zone* zone = src->zone();
@@ -2264,20 +2287,18 @@ js::TenuringTracer::moveObjectToTenured(JSObject* dst, JSObject* src, AllocKind 
         }
     }
 
-    if (src->getClass()->flags & JSCLASS_SKIP_NURSERY_FINALIZE) {
-        if (src->is<InlineTypedObject>()) {
-            InlineTypedObject::objectMovedDuringMinorGC(this, dst, src);
-        } else if (src->is<UnboxedArrayObject>()) {
-            tenuredSize += UnboxedArrayObject::objectMovedDuringMinorGC(this, dst, src, dstKind);
-        } else if (src->is<ArgumentsObject>()) {
-            tenuredSize += ArgumentsObject::objectMovedDuringMinorGC(this, dst, src);
-        } else if (JSObjectMovedOp op = dst->getClass()->ext.objectMovedOp) {
-            op(dst, src);
-        } else {
-            // Objects with JSCLASS_SKIP_NURSERY_FINALIZE need to be handled above
-            // to ensure any additional nursery buffers they hold are moved.
-            MOZ_CRASH("Unhandled JSCLASS_SKIP_NURSERY_FINALIZE Class");
-        }
+    if (src->is<InlineTypedObject>()) {
+        InlineTypedObject::objectMovedDuringMinorGC(this, dst, src);
+    } else if (src->is<UnboxedArrayObject>()) {
+        tenuredSize += UnboxedArrayObject::objectMovedDuringMinorGC(this, dst, src, dstKind);
+    } else if (src->is<ArgumentsObject>()) {
+        tenuredSize += ArgumentsObject::objectMovedDuringMinorGC(this, dst, src);
+    } else if (JSObjectMovedOp op = dst->getClass()->extObjectMovedOp()) {
+        op(dst, src);
+    } else if (src->getClass()->flags & JSCLASS_SKIP_NURSERY_FINALIZE) {
+        // Objects with JSCLASS_SKIP_NURSERY_FINALIZE need to be handled above
+        // to ensure any additional nursery buffers they hold are moved.
+        MOZ_CRASH("Unhandled JSCLASS_SKIP_NURSERY_FINALIZE Class");
     }
 
     return tenuredSize;

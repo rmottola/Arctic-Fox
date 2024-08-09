@@ -41,23 +41,6 @@ addTab = function(url) {
 }
 
 /**
- * Open the toolbox, with the inspector tool visible, and the rule-view
- * sidebar tab selected.
- *
- * @return a promise that resolves when the inspector is ready and the rule
- * view is visible and ready
- */
-function openRuleView() {
-  return openInspectorSidebarTab("ruleview").then(({toolbox, inspector}) => {
-    return {
-      toolbox,
-      inspector,
-      view: inspector.ruleview.view
-    };
-  });
-}
-
-/**
  * Simple DOM node accesor function that takes either a node or a string css
  * selector as argument and returns the corresponding node
  *
@@ -70,72 +53,6 @@ function getNode(nodeOrSelector) {
   return typeof nodeOrSelector === "string" ?
     content.document.querySelector(nodeOrSelector) :
     nodeOrSelector;
-}
-
-/**
- * Set the inspector's current selection to null so that no node is selected
- *
- * @param {InspectorPanel} inspector
- *        The instance of InspectorPanel currently loaded in the toolbox
- * @return a promise that resolves when the inspector is updated
- */
-function clearCurrentNodeSelection(inspector) {
-  info("Clearing the current selection");
-  let updated = inspector.once("inspector-updated");
-  inspector.selection.setNodeFront(null);
-  return updated;
-}
-
-/**
- * Wait for eventName on target to be delivered a number of times.
- *
- * @param {Object} target
- *        An observable object that either supports on/off or
- *        addEventListener/removeEventListener
- * @param {String} eventName
- * @param {Number} numTimes
- *        Number of deliveries to wait for.
- * @param {Boolean} useCapture
- *        Optional, for addEventListener/removeEventListener
- * @return A promise that resolves when the event has been handled
- */
-function waitForNEvents(target, eventName, numTimes, useCapture = false) {
-  info("Waiting for event: '" + eventName + "' on " + target + ".");
-
-  let deferred = promise.defer();
-  let count = 0;
-
-  for (let [add, remove] of [
-    ["addEventListener", "removeEventListener"],
-    ["addListener", "removeListener"],
-    ["on", "off"]
-  ]) {
-    if ((add in target) && (remove in target)) {
-      target[add](eventName, function onEvent(...aArgs) {
-        if (++count == numTimes) {
-          target[remove](eventName, onEvent, useCapture);
-          deferred.resolve.apply(deferred, aArgs);
-        }
-      }, useCapture);
-      break;
-    }
-  }
-
-  return deferred.promise;
-}
-
-/**
- * This shouldn't be used in the tests, but is useful when writing new tests or
- * debugging existing tests in order to introduce delays in the test steps
- *
- * @param {Number} ms
- *        The time to wait
- * @return A promise that resolves when the time is passed
- */
-function wait(ms) {
-  let def = promise.defer();
-  content.setTimeout(def.resolve, ms);
-  return def.promise;
 }
 
 /**
@@ -281,22 +198,6 @@ function assertHoverTooltipOn(tooltip, element) {
 }
 
 /**
- * Listen for a new tab to open and return a promise that resolves when one
- * does and completes the load event.
- *
- * @return a promise that resolves to the tab object
- */
-var waitForTab = Task.async(function*() {
-  info("Waiting for a tab to open");
-  yield once(gBrowser.tabContainer, "TabOpen");
-  let tab = gBrowser.selectedTab;
-  let browser = tab.linkedBrowser;
-  yield once(browser, "load", true);
-  info("The tab load completed");
-  return tab;
-});
-
-/**
  * Polls a given function waiting for it to return true.
  *
  * @param {Function} validatorFn
@@ -360,20 +261,6 @@ var getFontFamilyDataURL = Task.async(function*(font, nodeFront) {
   let dataURL = yield data.string();
   return dataURL;
 });
-
-/**
- * Simulate the key input for the given input in the window.
- *
- * @param {String} input
- *        The string value to input
- * @param {Window} win
- *        The window containing the panel
- */
-function synthesizeKeys(input, win) {
-  for (let key of input.split("")) {
-    EventUtils.synthesizeKey(key, {}, win);
-  }
-}
 
 /**
  * Get the DOMNode for a css rule in the rule-view that corresponds to the given
@@ -634,13 +521,12 @@ var setSearchFilter = Task.async(function*(view, searchValue) {
  *
  * @param {InspectorPanel} inspector
  *        The instance of InspectorPanel currently loaded in the toolbox
- * @return a promise that resolves after page reload and inspector
- * initialization
+ * @param {TestActor} testActor
+ *        The current instance of the TestActor
  */
-function reloadPage(inspector) {
+function* reloadPage(inspector, testActor) {
   let onNewRoot = inspector.once("new-root");
-  content.location.reload();
-  return onNewRoot.then(() => {
-    inspector.markup._waitForChildren();
-  });
+  yield testActor.eval("content.location.reload();");
+  yield onNewRoot;
+  yield inspector.markup._waitForChildren();
 }

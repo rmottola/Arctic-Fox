@@ -433,6 +433,25 @@ var TestActor = exports.TestActor = protocol.ActorClass({
   }),
 
   /**
+   * Get an attribute on a DOM Node.
+   * @param {String} selector The node selector
+   * @param {String} attribute The attribute name
+   * @return {String} value The attribute value
+   */
+  getAttribute: protocol.method(function (selector, attribute) {
+    let node = this._querySelector(selector);
+    return node.getAttribute(attribute);
+  }, {
+    request: {
+      selector: Arg(0, "string"),
+      property: Arg(1, "string")
+    },
+    response: {
+      value: RetVal("string")
+    }
+  }),
+
+  /**
    * Set an attribute on a DOM Node.
    * @param {String} selector The node selector
    * @param {String} attribute The attribute name
@@ -541,6 +560,47 @@ var TestActor = exports.TestActor = protocol.ActorClass({
       value: RetVal("json")
     }
   }),
+
+  /**
+   * Get information about a DOM element, identified by a selector.
+   * @param {String} selector The CSS selector to get the node (can be an array
+   * of selectors to get elements in an iframe).
+   * @return {Object} data Null if selector didn't match any node, otherwise:
+   * - {String} tagName.
+   * - {String} namespaceURI.
+   * - {Number} numChildren The number of children in the element.
+   * - {Array} attributes An array of {name, value, namespaceURI} objects.
+   * - {String} outerHTML.
+   * - {String} innerHTML.
+   * - {String} textContent.
+   */
+  getNodeInfo: protocol.method(function(selector) {
+    let node = this._querySelector(selector);
+    let info = null;
+
+    if (node) {
+      info = {
+        tagName: node.tagName,
+        namespaceURI: node.namespaceURI,
+        numChildren: node.children.length,
+        attributes: [...node.attributes].map(({name, value, namespaceURI}) => {
+          return {name, value, namespaceURI};
+        }),
+        outerHTML: node.outerHTML,
+        innerHTML: node.innerHTML,
+        textContent: node.textContent
+      };
+    }
+
+    return info;
+  }, {
+    request: {
+      selector: Arg(0, "string")
+    },
+    response: {
+      value: RetVal("json")
+    }
+  })
 });
 
 const TestActorFront = exports.TestActorFront = protocol.FrontClass(TestActor, {

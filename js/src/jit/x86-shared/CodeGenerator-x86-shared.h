@@ -116,6 +116,10 @@ class CodeGeneratorX86Shared : public CodeGeneratorShared
 
     NonAssertingLabel deoptLabel_;
 
+    Operand ToOperand(const LAllocation& a);
+    Operand ToOperand(const LAllocation* a);
+    Operand ToOperand(const LDefinition* def);
+
     MoveOperand toMoveOperand(LAllocation a) const;
 
     void bailoutIf(Assembler::Condition condition, LSnapshot* snapshot);
@@ -262,6 +266,7 @@ class CodeGeneratorX86Shared : public CodeGeneratorShared
     virtual void visitUDivOrModConstant(LUDivOrModConstant *ins);
     virtual void visitAsmJSPassStackArg(LAsmJSPassStackArg* ins);
     virtual void visitAsmSelect(LAsmSelect* ins);
+    virtual void visitAsmReinterpret(LAsmReinterpret* lir);
     virtual void visitMemoryBarrier(LMemoryBarrier* ins);
     virtual void visitAtomicTypedArrayElementBinop(LAtomicTypedArrayElementBinop* lir);
     virtual void visitAtomicTypedArrayElementBinopForEffect(LAtomicTypedArrayElementBinopForEffect* lir);

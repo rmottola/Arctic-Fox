@@ -20,7 +20,6 @@ task:
     - 'docker-worker:relengapi-proxy:tooltool.download.public'
 
   payload:
-    image: '{{#docker_image}}desktop-build{{/docker_image}}'
     cache:
       build-linux64-c6-workspace: '/home/worker/workspace'
       tooltool-cache: '/home/worker/tooltool-cache'

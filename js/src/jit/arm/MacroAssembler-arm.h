@@ -1315,8 +1315,12 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
 
     void cmp32(Register lhs, Imm32 rhs);
     void cmp32(Register lhs, Register rhs);
-    void cmp32(const Operand& lhs, Imm32 rhs);
-    void cmp32(const Operand& lhs, Register rhs);
+    void cmp32(const Address& lhs, Imm32 rhs) {
+        MOZ_CRASH("NYI");
+    }
+    void cmp32(const Address& lhs, Register rhs) {
+        MOZ_CRASH("NYI");
+    }
 
     void cmpPtr(Register lhs, Register rhs);
     void cmpPtr(Register lhs, ImmWord rhs);
@@ -1418,11 +1422,6 @@ class MacroAssemblerARMCompat : public MacroAssemblerARM
         ma_sub(r, Imm32(0x80000001), scratch);
         ma_cmn(scratch, Imm32(3));
         ma_b(handleNotAnInt, Above);
-    }
-
-    void memIntToValue(Address Source, Address Dest) {
-        load32(Source, lr);
-        storeValue(JSVAL_TYPE_INT32, lr, Dest);
     }
 
     void lea(Operand addr, Register dest) {

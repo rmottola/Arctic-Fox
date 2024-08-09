@@ -14,6 +14,7 @@
 #include <vector>
 #include <list>
 
+#include "base/buffer.h"
 #include "base/message_loop.h"
 #include "chrome/common/file_descriptor_set_posix.h"
 
@@ -87,10 +88,6 @@ class Channel::ChannelImpl : public MessageLoopForIO::Watcher {
   // to keep track of where we are.
   size_t message_send_bytes_written_;
 
-  // If the kTestingChannelID flag is specified, we use a FIFO instead of
-  // a socketpair().
-  bool uses_fifo_;
-
   int server_listen_pipe_;
   int pipe_;
   int client_pipe_;  // The client end of our socketpair().
@@ -131,7 +128,7 @@ class Channel::ChannelImpl : public MessageLoopForIO::Watcher {
 
   // Large messages that span multiple pipe buffers, get built-up using
   // this buffer.
-  std::string input_overflow_buf_;
+  Buffer input_overflow_buf_;
   std::vector<int> input_overflow_fds_;
 
   // In server-mode, we have to wait for the client to connect before we

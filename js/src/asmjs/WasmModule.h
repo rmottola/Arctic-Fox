@@ -600,7 +600,7 @@ class Module : public mozilla::LinkedListElement<Module>
     // directly into the JIT code. If the JIT code is released, the Module must
     // be notified so it can go back to the generic callImport.
 
-    bool callImport(JSContext* cx, uint32_t importIndex, unsigned argc, const Value* argv,
+    bool callImport(JSContext* cx, uint32_t importIndex, unsigned argc, const uint64_t* argv,
                     MutableHandleValue rval);
     void deoptimizeImportExit(uint32_t importIndex);
 
@@ -657,6 +657,8 @@ ExportedFunctionToIndex(JSFunction* fun);
 class WasmModuleObject : public NativeObject
 {
     static const unsigned MODULE_SLOT = 0;
+    static const ClassOps classOps_;
+
     bool hasModule() const;
     static void finalize(FreeOp* fop, JSObject* obj);
     static void trace(JSTracer* trc, JSObject* obj);

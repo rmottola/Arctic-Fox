@@ -94,9 +94,10 @@ StyleSetHandle::Ptr::ResolveStyleFor(dom::Element* aElement,
 }
 
 already_AddRefed<nsStyleContext>
-StyleSetHandle::Ptr::ResolveStyleForNonElement(nsStyleContext* aParentContext)
+StyleSetHandle::Ptr::ResolveStyleForNonElement(nsStyleContext* aParentContext,
+                                               nsIAtom* aPseudoTag)
 {
-  FORWARD(ResolveStyleForNonElement, (aParentContext));
+  FORWARD(ResolveStyleForNonElement, (aParentContext, aPseudoTag));
 }
 
 already_AddRefed<nsStyleContext>
@@ -232,6 +233,26 @@ StyleSetHandle::Ptr::HasStateDependentStyle(dom::Element* aElement,
 {
   FORWARD(HasStateDependentStyle, (aElement, aPseudoType, aPseudoElement,
                                    aStateMask));
+}
+
+void
+StyleSetHandle::Ptr::RootStyleContextAdded()
+{
+  if (IsGecko()) {
+    AsGecko()->RootStyleContextAdded();
+  } else {
+    // Not needed.
+  }
+}
+
+void
+StyleSetHandle::Ptr::RootStyleContextRemoved()
+{
+  if (IsGecko()) {
+    RootStyleContextAdded();
+  } else {
+    // Not needed.
+  }
 }
 
 } // namespace mozilla

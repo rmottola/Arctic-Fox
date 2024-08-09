@@ -66,14 +66,6 @@ public:
        given presShell. */
     static void InitializeRootDisplayport(nsIPresShell* aPresShell);
 
-    /* Tell layout to perform scroll snapping for the scrollable frame with the
-     * given scroll id. aDestination specifies the expected landing position of
-     * a current fling or scrolling animation that should be used to select
-     * the scroll snap point.
-     */
-    static void RequestFlingSnap(const FrameMetrics::ViewID& aScrollId,
-                                 const mozilla::CSSPoint& aDestination);
-
     /* Tell layout that we received the scroll offset update for the given view ID, so
        that it accepts future scroll offset updates from APZ. */
     static void AcknowledgeScrollUpdate(const FrameMetrics::ViewID& aScrollId,
@@ -172,6 +164,17 @@ public:
      * 1255054). */
     static void SuppressDisplayport(const bool& aEnabled,
                                     const nsCOMPtr<nsIPresShell>& aShell);
+
+    /* Whether or not displayport suppression should be turned on. Note that
+     * this only affects the return value of |IsDisplayportSuppressed()|, and
+     * doesn't change the value of the internal counter. As with
+     * SuppressDisplayport, this function should be passed a presShell to trigger
+     * a repaint if suppression is being turned off.
+     */
+    static void RespectDisplayPortSuppression(bool aEnabled,
+                                              const nsCOMPtr<nsIPresShell>& aShell);
+
+    /* Whether or not the displayport is currently suppressed. */
     static bool IsDisplayportSuppressed();
 
     static void

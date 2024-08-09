@@ -233,17 +233,18 @@ protected:
 };
 
 // This class is designed to be subclassed.
-class nsCancelableRunnable : public nsICancelableRunnable
+class CancelableRunnable : public nsRunnable,
+                             public nsICancelableRunnable
 {
 public:
-  NS_DECL_THREADSAFE_ISUPPORTS
-  NS_DECL_NSIRUNNABLE
-  NS_DECL_NSICANCELABLERUNNABLE
+  NS_DECL_ISUPPORTS_INHERITED
+  // nsICancelableRunnable
+  virtual nsresult Cancel() override;
 
-  nsCancelableRunnable() {}
+  CancelableRunnable() {}
 
 protected:
-  virtual ~nsCancelableRunnable() {}
+  virtual ~CancelableRunnable() {}
 };
 
 // An event that can be used to call a C++11 functions or function objects,
@@ -350,6 +351,7 @@ struct nsRunnableMethodTraits<R(NS_STDCALL C::*)(), Owning>
   typedef nsRunnableMethod<C, R, Owning> base_type;
 };
 #endif
+
 
 // IsParameterStorageClass<T>::value is true if T is a parameter-storage class
 // that will be recognized by NS_New[NonOwning]RunnableMethodWithArg[s] to

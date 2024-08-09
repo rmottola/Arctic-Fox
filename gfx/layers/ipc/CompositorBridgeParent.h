@@ -48,6 +48,10 @@ namespace gfx {
 class DrawTarget;
 } // namespace gfx
 
+namespace ipc {
+class GeckoChildProcessHost;
+} // namespace ipc
+
 namespace layers {
 
 class APZCTreeManager;
@@ -227,8 +231,7 @@ public:
 
   virtual bool RecvGetFrameUniformity(FrameUniformityData* aOutData) override;
   virtual bool RecvRequestOverfill() override;
-  virtual bool RecvWillStop() override;
-  virtual bool RecvStop() override;
+  virtual bool RecvWillClose() override;
   virtual bool RecvPause() override;
   virtual bool RecvResume() override;
   virtual bool RecvNotifyHidden(const uint64_t& id) override { return true; }
@@ -237,9 +240,13 @@ public:
   virtual bool RecvAdoptChild(const uint64_t& child) override;
   virtual bool RecvMakeSnapshot(const SurfaceDescriptor& aInSnapshot,
                                 const gfx::IntRect& aRect) override;
-  virtual bool RecvMakeWidgetSnapshot(const SurfaceDescriptor& aInSnapshot) override;
   virtual bool RecvFlushRendering() override;
   virtual bool RecvForcePresent() override;
+
+  virtual bool RecvAcknowledgeCompositorUpdate(const uint64_t& aLayersId) override {
+    MOZ_ASSERT_UNREACHABLE("This message is only sent cross-process");
+    return true;
+  }
 
   virtual bool RecvGetTileSize(int32_t* aWidth, int32_t* aHeight) override;
 
@@ -251,12 +258,16 @@ public:
   // @see CrossProcessCompositorBridgeParent::RecvRequestNotifyAfterRemotePaint
   virtual bool RecvRequestNotifyAfterRemotePaint() override { return true; };
 
-  virtual bool RecvClearApproximatelyVisibleRegions(const uint64_t& aLayersId,
-                                                    const uint32_t& aPresShellId) override;
-  void ClearApproximatelyVisibleRegions(const uint64_t& aLayersId,
-                                        const Maybe<uint32_t>& aPresShellId);
-  virtual bool RecvNotifyApproximatelyVisibleRegion(const ScrollableLayerGuid& aGuid,
-                                                    const CSSIntRegion& aRegion) override;
+  virtual bool RecvClearVisibleRegions(const uint64_t& aLayersId,
+                                       const uint32_t& aPresShellId) override;
+  void ClearVisibleRegions(const uint64_t& aLayersId,
+                           const Maybe<uint32_t>& aPresShellId);
+  virtual bool RecvUpdateVisibleRegion(const VisibilityCounter& aCounter,
+                                       const ScrollableLayerGuid& aGuid,
+                                       const CSSIntRegion& aRegion) override;
+  void UpdateVisibleRegion(const VisibilityCounter& aCounter,
+                           const ScrollableLayerGuid& aGuid,
+                           const CSSIntRegion& aRegion);
 
   virtual void ActorDestroy(ActorDestroyReason why) override;
 
@@ -305,7 +316,6 @@ public:
    * SetFirstPaintViewport on the next frame of composition.
    */
   void ForceIsFirstPaint();
-  void Destroy();
 
   static void SetShadowProperties(Layer* aLayer);
 
@@ -410,7 +420,7 @@ public:
    * directly to us.  Transport is to its thread context.
    */
   static PCompositorBridgeParent*
-  Create(Transport* aTransport, ProcessId aOtherProcess);
+  Create(Transport* aTransport, ProcessId aOtherProcess, mozilla::ipc::GeckoChildProcessHost* aProcessHost);
 
   struct LayerTreeState {
     LayerTreeState();
@@ -430,6 +440,10 @@ public:
     bool mUpdatedPluginDataAvailable;
     RefPtr<CompositorUpdateObserver> mLayerTreeReadyObserver;
     RefPtr<CompositorUpdateObserver> mLayerTreeClearedObserver;
+
+    // Number of times the compositor has been reset without having been
+    // acknowledged by the child.
+    uint32_t mPendingCompositorUpdates;
 
     PCompositorBridgeParent* CrossProcessPCompositorBridge() const;
   };
@@ -578,6 +592,10 @@ protected:
 
   RefPtr<CompositorThreadHolder> mCompositorThreadHolder;
   RefPtr<CompositorVsyncScheduler> mCompositorScheduler;
+  // This makes sure the compositorParent is not destroyed before receiving
+  // confirmation that the channel is closed.
+  // mSelfRef is cleared in DeferredDestroy which is scheduled by ActorDestroy.
+  RefPtr<CompositorBridgeParent> mSelfRef;
 
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
   // cached plugin data used to reduce the number of updates we request.
@@ -585,9 +603,6 @@ protected:
   nsIntPoint mPluginsLayerOffset;
   nsIntRegion mPluginsLayerVisibleRegion;
   nsTArray<PluginWindowData> mCachedPluginData;
-  // indicates if we are currently waiting on a plugin update confirmation.
-  // When this is true, composition is currently on hold.
-  bool mPluginUpdateResponsePending;
   // indicates if plugin window visibility and metric updates are currently
   // being defered due to a scroll operation.
   bool mDeferPluginWindows;

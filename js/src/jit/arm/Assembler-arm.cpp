@@ -638,6 +638,8 @@ Assembler::asmMergeWith(Assembler& other)
 {
     flush();
     other.flush();
+    if (other.oom())
+        return false;
     if (!AssemblerShared::asmMergeWith(size(), other))
         return false;
     return m_buffer.appendBuffer(other.m_buffer);
@@ -2783,9 +2785,6 @@ Assembler::bind(Label* label, BufferOffset boff)
         BufferOffset dest = boff.assigned() ? boff : nextOffset();
         BufferOffset b(label);
         do {
-            // Even a 0 offset may be invalid if we're out of memory.
-            if (oom())
-                return;
             BufferOffset next;
             more = nextLink(b, &next);
             Instruction branch = *editSrc(b);
@@ -2818,6 +2817,9 @@ Assembler::bindLater(Label* label, wasm::JumpTarget target)
 void
 Assembler::bind(RepatchLabel* label)
 {
+    // It does not seem to be useful to record this label for
+    // disassembly, as the value that is bound to the label is often
+    // effectively garbage and is replaced by something else later.
     BufferOffset dest = nextOffset();
     if (label->used() && !oom()) {
         // If the label has a use, then change this use to refer to the bound
@@ -2841,9 +2843,6 @@ Assembler::bind(RepatchLabel* label)
 void
 Assembler::retarget(Label* label, Label* target)
 {
-#ifdef JS_DISASM_ARM
-    spewLabel(label);
-#endif
 #ifdef JS_DISASM_ARM
     spewRetarget(label, target);
 #endif

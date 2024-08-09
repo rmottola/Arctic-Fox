@@ -6,6 +6,8 @@
 
 DevToolsModules(
     'browser.js',
+    'device-selector.js',
+    'global-toolbar.js',
     'resizable-viewport.js',
     'viewport-dimension.js',
     'viewport-toolbar.js',

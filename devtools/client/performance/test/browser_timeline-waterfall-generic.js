@@ -67,10 +67,11 @@ function* spawnTest() {
   ok($$(".waterfall-tree-item > .waterfall-marker > .waterfall-marker-bar").length,
     "Some marker color bars should have been created inside the waterfall.");
 
-  // Test the sidebar
+  // Test the sidebar.
 
   let detailsView = WaterfallView.details;
   let markersRoot = WaterfallView._markersRoot;
+  markersRoot.recalculateBounds(); // Make sure the bounds are up to date.
 
   let parentWidthBefore = $("#waterfall-view").getBoundingClientRect().width;
   let sidebarWidthBefore = $(".waterfall-sidebar").getBoundingClientRect().width;
@@ -81,10 +82,10 @@ function* spawnTest() {
   is(detailsWidthBefore, 0,
     "The details view width should be 0 when hidden.");
   is(markersRoot._waterfallWidth, parentWidthBefore - sidebarWidthBefore - WATERFALL_MARKER_SIDEBAR_SAFE_BOUNDS,
-    "The waterfall width is correct.")
+    "The waterfall width is correct (1).");
 
-  let receivedFocusEvent = markersRoot.once("focus");
-  let waterfallRerendered = once(WaterfallView, EVENTS.WATERFALL_RENDERED);
+  let receivedFocusEvent = once(markersRoot, "focus");
+  let waterfallRerendered = once(WaterfallView, EVENTS.UI_WATERFALL_RENDERED);
   WaterfallView._markersRoot.getChild(0).focus();
   yield receivedFocusEvent;
   yield waterfallRerendered;
@@ -102,8 +103,7 @@ function* spawnTest() {
   isnot(detailsWidthAfter, 0,
     "The details view width should not be 0 when visible.");
   is(markersRoot._waterfallWidth, parentWidthAfter - sidebarWidthAfter - detailsWidthAfter - WATERFALL_MARKER_SIDEBAR_SAFE_BOUNDS,
-    "The waterfall width is correct (2).")
+    "The waterfall width is correct (2).");
 
-  yield teardown(panel);
-  finish();
-}
+  yield teardownToolboxAndRemoveTab(panel);
+});

@@ -22,7 +22,7 @@ var { Loader } = Cu.import("resource://gre/modules/commonjs/toolkit/loader.js", 
 var promise = Cu.import("resource://gre/modules/Promise.jsm", {}).Promise;
 
 this.EXPORTED_SYMBOLS = ["DevToolsLoader", "devtools", "BuiltinProvider",
-                         "SrcdirProvider", "require", "loader"];
+                         "require", "loader"];
 
 /**
  * Providers are different strategies for loading the devtools.
@@ -31,7 +31,9 @@ this.EXPORTED_SYMBOLS = ["DevToolsLoader", "devtools", "BuiltinProvider",
 var loaderModules = {
   "Services": Object.create(Services),
   "toolkit/loader": Loader,
+  promise,
   PromiseDebugging,
+  ChromeUtils,
   ThreadSafeChromeUtils,
   HeapSnapshot,
 };
@@ -61,14 +63,28 @@ XPCOMUtils.defineLazyGetter(loaderModules, "xpcInspector", () => {
 XPCOMUtils.defineLazyGetter(loaderModules, "indexedDB", () => {
   // On xpcshell, we can't instantiate indexedDB without crashing
   try {
-    return Cu.Sandbox(this, {wantGlobalProperties:["indexedDB"]}).indexedDB;
+    let sandbox
+      = Cu.Sandbox(CC('@mozilla.org/systemprincipal;1', 'nsIPrincipal')(),
+                   {wantGlobalProperties: ["indexedDB"]});
+    return sandbox.indexedDB;
+
   } catch(e) {
     return {};
   }
 });
 
 XPCOMUtils.defineLazyGetter(loaderModules, "CSS", () => {
-  return Cu.Sandbox(this, {wantGlobalProperties: ["CSS"]}).CSS;
+  let sandbox
+    = Cu.Sandbox(CC('@mozilla.org/systemprincipal;1', 'nsIPrincipal')(),
+                 {wantGlobalProperties: ["CSS"]});
+  return sandbox.CSS;
+});
+
+XPCOMUtils.defineLazyGetter(loaderModules, "URL", () => {
+  let sandbox
+    = Cu.Sandbox(CC('@mozilla.org/systemprincipal;1', 'nsIPrincipal')(),
+                 {wantGlobalProperties: ["URL"]});
+  return sandbox.URL;
 });
 
 var sharedGlobalBlocklist = ["sdk/indexed-db"];
@@ -84,16 +100,12 @@ BuiltinProvider.prototype = {
       id: "fx-devtools",
       modules: loaderModules,
       paths: {
-        // When you add a line to this mapping, don't forget to make a
-        // corresponding addition to the SrcdirProvider mapping below as well.
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "": "resource://gre/modules/commonjs/",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "devtools": "resource://devtools",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "gcli": "resource://devtools/shared/gcli/source/lib/gcli",
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "promise": "resource://gre/modules/Promise-backend.js",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
         "acorn": "resource://devtools/acorn",
         // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
@@ -120,125 +132,6 @@ BuiltinProvider.prototype = {
   },
 };
 
-/**
- * Used when the tools should be loaded from a mozilla-central checkout.  In
- * addition to different paths, it needs to write chrome.manifest files to
- * override chrome urls from the builtin tools.
- */
-function SrcdirProvider() {}
-SrcdirProvider.prototype = {
-  fileURI: function(path) {
-    let file = new FileUtils.File(path);
-    return Services.io.newFileURI(file).spec;
-  },
-
-  load: function() {
-    let srcDir = Services.prefs.getComplexValue("devtools.loader.srcdir",
-                                                Ci.nsISupportsString);
-    srcDir = OS.Path.normalize(srcDir.data.trim());
-    let devtoolsDir = OS.Path.join(srcDir, "devtools");
-    let sharedDir = OS.Path.join(devtoolsDir, "shared");
-    let modulesDir = OS.Path.join(srcDir, "toolkit", "modules");
-    let devtoolsURI = this.fileURI(devtoolsDir);
-    let gcliURI = this.fileURI(OS.Path.join(sharedDir,
-                                            "gcli", "source", "lib", "gcli"));
-    let promiseURI = this.fileURI(OS.Path.join(modulesDir,
-                                               "Promise-backend.js"));
-    let acornURI = this.fileURI(OS.Path.join(sharedDir, "acorn"));
-    let acornWalkURI = OS.Path.join(acornURI, "walk.js");
-    let sourceMapURI = this.fileURI(OS.Path.join(sharedDir,
-                                                 "sourcemap", "source-map.js"));
-    this.loader = new Loader.Loader({
-      id: "fx-devtools",
-      modules: loaderModules,
-      paths: {
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "": "resource://gre/modules/commonjs/",
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "devtools": devtoolsURI,
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "gcli": gcliURI,
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "promise": promiseURI,
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "acorn": acornURI,
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "acorn/util/walk": acornWalkURI,
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-        "source-map": sourceMapURI,
-        // ⚠ DISCUSSION ON DEV-DEVELOPER-TOOLS REQUIRED BEFORE MODIFYING ⚠
-      },
-      globals: this.globals,
-      invisibleToDebugger: this.invisibleToDebugger,
-      sharedGlobal: true,
-      sharedGlobalBlocklist,
-    });
-
-    return this._writeManifest(srcDir).then(null, Cu.reportError);
-  },
-
-  unload: function(reason) {
-    Loader.unload(this.loader, reason);
-    delete this.loader;
-  },
-
-  _readFile: function(filename) {
-    let deferred = promise.defer();
-    let file = new FileUtils.File(filename);
-    NetUtil.asyncFetch({
-      uri: NetUtil.newURI(file),
-      loadUsingSystemPrincipal: true
-    }, (inputStream, status) => {
-        if (!Components.isSuccessCode(status)) {
-          deferred.reject(new Error("Couldn't load manifest: " + filename + "\n"));
-          return;
-        }
-        var data = NetUtil.readInputStreamToString(inputStream, inputStream.available());
-        deferred.resolve(data);
-      });
-
-    return deferred.promise;
-  },
-
-  _writeFile: function(filename, data) {
-    let promise = OS.File.writeAtomic(filename, data, {encoding: "utf-8"});
-    return promise.then(null, (ex) => new Error("Couldn't write manifest: " + ex + "\n"));
-  },
-
-  _writeManifest: function(srcDir) {
-    let clientDir = OS.Path.join(srcDir, "devtools", "client");
-    return this._readFile(OS.Path.join(clientDir, "jar.mn")).then((data) => {
-      // The file data is contained within inputStream.
-      // You can read it into a string with
-      let entries = [];
-      let lines = data.split(/\n/);
-      let preprocessed = /^\s*\*/;
-      let contentEntry = /^\s+content\/(\S+)\s+\((\S+)\)/;
-      for (let line of lines) {
-        if (preprocessed.test(line)) {
-          dump("Unable to override preprocessed file: " + line + "\n");
-          continue;
-        }
-        let match = contentEntry.exec(line);
-        if (match) {
-          let pathComponents = match[2].split("/");
-          pathComponents.unshift(clientDir);
-          let path = OS.Path.join.apply(OS.Path, pathComponents);
-          let uri = this.fileURI(path);
-          let chromeURI = "chrome://devtools/content/" + match[1];
-          let entry = "override " + chromeURI + "\t" + uri;
-          entries.push(entry);
-        }
-      }
-      return this._writeFile(OS.Path.join(clientDir, "chrome.manifest"),
-                             entries.join("\n"));
-    }).then(() => {
-      let clientDirFile = new FileUtils.File(clientDir);
-      Components.manager.addBootstrappedManifestLocation(clientDirFile);
-    });
-  }
-};
-
 var gNextLoaderID = 0;
 
 /**
@@ -260,7 +153,7 @@ this.DevToolsLoader = function DevToolsLoader() {
 DevToolsLoader.prototype = {
   get provider() {
     if (!this._provider) {
-      this._chooseProvider();
+      this._loadProvider();
     }
     return this._provider;
   },
@@ -282,7 +175,7 @@ DevToolsLoader.prototype = {
    */
   require: function() {
     if (!this._provider) {
-      this._chooseProvider();
+      this._loadProvider();
     }
     return this.require.apply(this, arguments);
   },
@@ -360,6 +253,9 @@ DevToolsLoader.prototype = {
     Object.getOwnPropertyNames(this._main).forEach(key => {
       XPCOMUtils.defineLazyGetter(this, key, () => this._main[key]);
     });
+
+    var events = this.require("sdk/system/events");
+    events.emit("devtools-loaded", {});
   },
 
   /**
@@ -371,8 +267,6 @@ DevToolsLoader.prototype = {
     }
 
     if (this._provider) {
-      var events = this.require("sdk/system/events");
-      events.emit("devtools-unloaded", {});
       delete this.require;
       this._provider.unload("newprovider");
     }
@@ -380,6 +274,7 @@ DevToolsLoader.prototype = {
 
     // Pass through internal loader settings specific to this loader instance
     this._provider.invisibleToDebugger = this.invisibleToDebugger;
+    // Changes here should be mirrored to devtools/.eslintrc.
     this._provider.globals = {
       isWorker: false,
       reportError: Cu.reportError,
@@ -418,21 +313,13 @@ DevToolsLoader.prototype = {
 
     this._provider.load();
     this.require = Loader.Require(this._provider.loader, { id: "devtools" });
-
-    if (this._mainid) {
-      this.main(this._mainid);
-    }
   },
 
   /**
    * Choose a default tools provider based on the preferences.
    */
-  _chooseProvider: function() {
-    if (Services.prefs.prefHasUserValue("devtools.loader.srcdir")) {
-      this.setProvider(new SrcdirProvider());
-    } else {
-      this.setProvider(new BuiltinProvider());
-    }
+  _loadProvider: function() {
+    this.setProvider(new BuiltinProvider());
   },
 
   /**
@@ -441,13 +328,13 @@ DevToolsLoader.prototype = {
   reload: function() {
     var events = this.require("sdk/system/events");
     events.emit("startupcache-invalidate", {});
-    events.emit("devtools-unloaded", {});
 
     this._provider.unload("reload");
     delete this._provider;
+    let mainid = this._mainid;
     delete this._mainid;
-    this._chooseProvider();
-    this.main("devtools/client/main");
+    this._loadProvider();
+    this.main(mainid);
   },
 
   /**

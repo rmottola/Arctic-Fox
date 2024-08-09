@@ -122,8 +122,7 @@ add_task(function* setUp() {
     },
   });
 
-  yield waitForPromise(subChangePromise, DEFAULT_TIMEOUT,
-    'Timed out waiting for subscription change event on startup');
+  yield subChangePromise;
 });
 
 add_task(function* test_site_visited() {
@@ -135,8 +134,7 @@ add_task(function* test_site_visited() {
   yield visitURI(quotaURI, Date.now());
   PushService.observe(null, 'idle-daily', '');
 
-  yield waitForPromise(subChangePromise, DEFAULT_TIMEOUT,
-    'Timed out waiting for subscription change event after visit');
+  yield subChangePromise;
 });
 
 add_task(function* test_perm_restored() {
@@ -148,6 +146,5 @@ add_task(function* test_perm_restored() {
   Services.perms.add(permURI, 'desktop-notification',
     Ci.nsIPermissionManager.ALLOW_ACTION);
 
-  yield waitForPromise(subChangePromise, DEFAULT_TIMEOUT,
-    'Timed out waiting for subscription change event after permission');
+  yield subChangePromise;
 });

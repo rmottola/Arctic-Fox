@@ -485,6 +485,14 @@ public:
   void HidePopupsInDocShell(nsIDocShellTreeItem* aDocShellToHide);
 
   /**
+   * Enable or disable the dynamic noautohide state of a panel.
+   *
+   * aPanel - the panel whose state is to change
+   * aShouldRollup - whether the panel is no longer noautohide
+   */
+  void EnableRollup(nsIContent* aPopup, bool aShouldRollup);
+
+  /**
    * Execute a menu command from the triggering event aEvent.
    *
    * aMenu - a menuitem to execute
@@ -778,6 +786,9 @@ protected:
   // the popup that is currently being opened, stored only during the
   // popupshowing event
   nsCOMPtr<nsIContent> mOpeningPopup;
+
+  // If true, all popups won't hide automatically on blur
+  static bool sDevtoolsDisableAutoHide;
 };
 
 #endif

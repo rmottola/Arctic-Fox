@@ -217,6 +217,8 @@ private:
 
   BluetoothGattManager();
 
+  nsresult Init();
+  void Uninit();
   void HandleShutdown();
 
   void RegisterClientNotification(BluetoothGattStatus aStatus,
