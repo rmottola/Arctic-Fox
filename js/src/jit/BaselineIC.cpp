@@ -2742,9 +2742,9 @@ void
 EmitUnboxedPreBarrierForBaseline(MacroAssembler &masm, T address, JSValueType type)
 {
     if (type == JSVAL_TYPE_OBJECT)
-        EmitPreBarrier(masm, address, MIRType_Object);
+        EmitPreBarrier(masm, address, MIRType::Object);
     else if (type == JSVAL_TYPE_STRING)
-        EmitPreBarrier(masm, address, MIRType_String);
+        EmitPreBarrier(masm, address, MIRType::String);
     else
         MOZ_ASSERT(!UnboxedTypeNeedsPreBarrier(type));
 }
@@ -2861,7 +2861,7 @@ ICSetElem_DenseOrUnboxedArray::Compiler::generateStubCode(MacroAssembler& masm)
 
         ValueOperand tmpVal = regs.takeAnyValue();
         masm.loadValue(valueAddr, tmpVal);
-        EmitPreBarrier(masm, element, MIRType_Value);
+        EmitPreBarrier(masm, element, MIRType::Value);
         masm.storeValue(tmpVal, element);
     } else {
         // Set element on an unboxed array.
@@ -4754,7 +4754,7 @@ ICSetProp_Native::Compiler::generateStubCode(MacroAssembler& masm)
 
     // Perform the store.
     masm.load32(Address(ICStubReg, ICSetProp_Native::offsetOfOffset()), scratch);
-    EmitPreBarrier(masm, BaseIndex(holderReg, scratch, TimesOne), MIRType_Value);
+    EmitPreBarrier(masm, BaseIndex(holderReg, scratch, TimesOne), MIRType::Value);
     masm.storeValue(R1, BaseIndex(holderReg, scratch, TimesOne));
     if (holderReg != objReg)
         regs.add(holderReg);
@@ -4872,7 +4872,7 @@ ICSetPropNativeAddCompiler::generateStubCode(MacroAssembler& masm)
 
         // Change the object's group.
         Address groupAddr(objReg, JSObject::offsetOfGroup());
-        EmitPreBarrier(masm, groupAddr, MIRType_ObjectGroup);
+        EmitPreBarrier(masm, groupAddr, MIRType::ObjectGroup);
         masm.storePtr(scratch, groupAddr);
 
         masm.bind(&noGroupChange);
@@ -4888,7 +4888,7 @@ ICSetPropNativeAddCompiler::generateStubCode(MacroAssembler& masm)
 
         // Write the expando object's new shape.
         Address shapeAddr(holderReg, JSObject::offsetOfShape());
-        EmitPreBarrier(masm, shapeAddr, MIRType_Shape);
+        EmitPreBarrier(masm, shapeAddr, MIRType::Shape);
         masm.loadPtr(Address(ICStubReg, ICSetProp_NativeAdd::offsetOfNewShape()), scratch);
         masm.storePtr(scratch, shapeAddr);
 
@@ -4897,7 +4897,7 @@ ICSetPropNativeAddCompiler::generateStubCode(MacroAssembler& masm)
     } else {
         // Write the object's new shape.
         Address shapeAddr(objReg, JSObject::offsetOfShape());
-        EmitPreBarrier(masm, shapeAddr, MIRType_Shape);
+        EmitPreBarrier(masm, shapeAddr, MIRType::Shape);
         masm.loadPtr(Address(ICStubReg, ICSetProp_NativeAdd::offsetOfNewShape()), scratch);
         masm.storePtr(scratch, shapeAddr);
 
@@ -5084,12 +5084,12 @@ ICSetProp_TypedObject::Compiler::generateStubCode(MacroAssembler& masm)
 
         switch (type) {
           case ReferenceTypeDescr::TYPE_ANY:
-            EmitPreBarrier(masm, dest, MIRType_Value);
+            EmitPreBarrier(masm, dest, MIRType::Value);
             masm.storeValue(R1, dest);
             break;
 
           case ReferenceTypeDescr::TYPE_OBJECT: {
-            EmitPreBarrier(masm, dest, MIRType_Object);
+            EmitPreBarrier(masm, dest, MIRType::Object);
             Label notObject;
             masm.branchTestObject(Assembler::NotEqual, R1, &notObject);
             Register rhsObject = masm.extractObject(R1, ExtractTemp0);
@@ -5102,7 +5102,7 @@ ICSetProp_TypedObject::Compiler::generateStubCode(MacroAssembler& masm)
           }
 
           case ReferenceTypeDescr::TYPE_STRING: {
-            EmitPreBarrier(masm, dest, MIRType_String);
+            EmitPreBarrier(masm, dest, MIRType::String);
             masm.branchTestString(Assembler::NotEqual, R1, &failure);
             Register rhsString = masm.extractString(R1, ExtractTemp0);
             masm.storePtr(rhsString, dest);
