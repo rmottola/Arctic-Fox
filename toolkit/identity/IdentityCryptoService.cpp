@@ -323,7 +323,7 @@ KeyGenRunnable::KeyGenRunnable(KeyType keyType,
 {
 }
 
-MOZ_WARN_UNUSED_RESULT nsresult
+MOZ_MUST_USE nsresult
 GenerateKeyPair(PK11SlotInfo * slot,
                 SECKEYPrivateKey ** privateKey,
                 SECKEYPublicKey ** publicKey,
@@ -349,7 +349,7 @@ GenerateKeyPair(PK11SlotInfo * slot,
 }
 
 
-MOZ_WARN_UNUSED_RESULT nsresult
+MOZ_MUST_USE nsresult
 GenerateRSAKeyPair(PK11SlotInfo * slot,
                    SECKEYPrivateKey ** privateKey,
                    SECKEYPublicKey ** publicKey)
@@ -363,7 +363,7 @@ GenerateRSAKeyPair(PK11SlotInfo * slot,
                          &rsaParams);
 }
 
-MOZ_WARN_UNUSED_RESULT nsresult
+MOZ_MUST_USE nsresult
 GenerateDSAKeyPair(PK11SlotInfo * slot,
                    SECKEYPrivateKey ** privateKey,
                    SECKEYPublicKey ** publicKey)
