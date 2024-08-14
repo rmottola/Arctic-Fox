@@ -1261,8 +1261,8 @@ RenderSignature(WasmRenderContext& c, const DeclaredSig& sig, bool varAssignment
 static bool
 RenderSignatures(WasmRenderContext& c)
 {
-    uint32_t sectionStart;
-    if (!c.d.startSection(SignaturesId, &sectionStart))
+    uint32_t sectionStart, sectionSize;
+    if (!c.d.startSection(SignaturesId, &sectionStart, &sectionSize))
         return RenderFail(c, "failed to start section");
     if (sectionStart == Decoder::NotStarted)
         return true;
@@ -1310,7 +1310,7 @@ RenderSignatures(WasmRenderContext& c)
             return false;
     }
 
-    if (!c.d.finishSection(sectionStart))
+    if (!c.d.finishSection(sectionStart, sectionSize))
         return RenderFail(c, "decls section byte size mismatch");
 
     return true;
@@ -1319,8 +1319,8 @@ RenderSignatures(WasmRenderContext& c)
 static bool
 RenderFunctionSignatures(WasmRenderContext& c)
 {
-    uint32_t sectionStart;
-    if (!c.d.startSection(FunctionSignaturesId, &sectionStart))
+    uint32_t sectionStart, sectionSize;
+    if (!c.d.startSection(FunctionSignaturesId, &sectionStart, &sectionSize))
         return RenderFail(c, "failed to start section");
     if (sectionStart == Decoder::NotStarted)
         return true;
@@ -1339,7 +1339,7 @@ RenderFunctionSignatures(WasmRenderContext& c)
         c.funcSigs[i] = sigIndex;
     }
 
-    if (!c.d.finishSection(sectionStart))
+    if (!c.d.finishSection(sectionStart, sectionSize))
         return RenderFail(c, "decls section byte size mismatch");
 
     return true;
@@ -1348,8 +1348,8 @@ RenderFunctionSignatures(WasmRenderContext& c)
 static bool
 RenderFunctionTable(WasmRenderContext& c)
 {
-    uint32_t sectionStart;
-    if (!c.d.startSection(FunctionTableId, &sectionStart))
+    uint32_t sectionStart, sectionSize;
+    if (!c.d.startSection(FunctionTableId, &sectionStart, &sectionSize))
         return RenderFail(c, "failed to start section");
     if (sectionStart == Decoder::NotStarted)
         return true;
@@ -1374,7 +1374,7 @@ RenderFunctionTable(WasmRenderContext& c)
     if (!c.buffer.append(")"))
         return false;
 
-    if (!c.d.finishSection(sectionStart))
+    if (!c.d.finishSection(sectionStart, sectionSize))
         return RenderFail(c, "table section byte size mismatch");
 
     return true;
@@ -1433,8 +1433,8 @@ RenderImport(WasmRenderContext& c, uint32_t importIndex)
 static bool
 RenderImportTable(WasmRenderContext& c)
 {
-    uint32_t sectionStart;
-    if (!c.d.startSection(ImportTableId, &sectionStart))
+    uint32_t sectionStart, sectionSize;
+    if (!c.d.startSection(ImportTableId, &sectionStart, &sectionSize))
         return RenderFail(c, "failed to start section");
     if (sectionStart == Decoder::NotStarted)
         return true;
@@ -1451,7 +1451,7 @@ RenderImportTable(WasmRenderContext& c)
             return false;
     }
 
-    if (!c.d.finishSection(sectionStart))
+    if (!c.d.finishSection(sectionStart, sectionSize))
         return RenderFail(c, "import section byte size mismatch");
 
     return true;
@@ -1463,8 +1463,8 @@ RenderMemory(WasmRenderContext& c, uint32_t* memInitial, uint32_t* memMax)
     *memInitial = 0;
     *memMax = 0;
 
-    uint32_t sectionStart;
-    if (!c.d.startSection(MemoryId, &sectionStart))
+    uint32_t sectionStart, sectionSize;
+    if (!c.d.startSection(MemoryId, &sectionStart, &sectionSize))
         return RenderFail(c, "failed to start section");
     if (sectionStart == Decoder::NotStarted)
         return true;
@@ -1483,7 +1483,7 @@ RenderMemory(WasmRenderContext& c, uint32_t* memInitial, uint32_t* memMax)
     if (!c.d.readFixedU8(&exported))
         return RenderFail(c, "expected exported byte");
 
-    if (!c.d.finishSection(sectionStart))
+    if (!c.d.finishSection(sectionStart, sectionSize))
         return RenderFail(c, "memory section byte size mismatch");
 
     if (exported && !c.buffer.append("(export \"memory\" memory)"))
@@ -1538,8 +1538,8 @@ RenderFunctionExport(WasmRenderContext& c)
 static bool
 RenderExportTable(WasmRenderContext& c)
 {
-    uint32_t sectionStart;
-    if (!c.d.startSection(ExportTableId, &sectionStart))
+    uint32_t sectionStart, sectionSize;
+    if (!c.d.startSection(ExportTableId, &sectionStart, &sectionSize))
         return RenderFail(c, "failed to start section");
     if (sectionStart == Decoder::NotStarted)
         return true;
@@ -1553,7 +1553,7 @@ RenderExportTable(WasmRenderContext& c)
             return false;
     }
 
-    if (!c.d.finishSection(sectionStart))
+    if (!c.d.finishSection(sectionStart, sectionSize))
         return RenderFail(c, "export section byte size mismatch");
 
     return true;
@@ -1622,8 +1622,8 @@ RenderFunctionBody(WasmRenderContext& c, uint32_t funcIndex, uint32_t paramsNum)
 static bool
 RenderFunctionBodies(WasmRenderContext& c)
 {
-    uint32_t sectionStart;
-    if (!c.d.startSection(FunctionBodiesId, &sectionStart))
+    uint32_t sectionStart, sectionSize;
+    if (!c.d.startSection(FunctionBodiesId, &sectionStart, &sectionSize))
         return RenderFail(c, "failed to start section");
 
     if (sectionStart == Decoder::NotStarted)
@@ -1664,7 +1664,7 @@ RenderFunctionBodies(WasmRenderContext& c)
             return false;
     }
 
-    if (!c.d.finishSection(sectionStart))
+    if (!c.d.finishSection(sectionStart, sectionSize))
         return RenderFail(c, "function section byte size mismatch");
 
    return true;
@@ -1689,7 +1689,8 @@ RenderDataSegments(WasmRenderContext& c, uint32_t memInitial, uint32_t memMax)
 
     c.indent++;
     uint32_t sectionStart;
-    if (!c.d.startSection(DataSegmentsId, &sectionStart))
+    uint32_t sectionSize;
+    if (!c.d.startSection(DataSegmentsId, &sectionStart, &sectionSize))
         return RenderFail(c, "failed to start section");
     if (sectionStart == Decoder::NotStarted) {
       if (!c.buffer.append(")\n"))
@@ -1731,7 +1732,7 @@ RenderDataSegments(WasmRenderContext& c, uint32_t memInitial, uint32_t memMax)
            return false;
     }
 
-    if (!c.d.finishSection(sectionStart))
+    if (!c.d.finishSection(sectionStart, sectionSize))
         return RenderFail(c, "data section byte size mismatch");
 
     c.indent--;
