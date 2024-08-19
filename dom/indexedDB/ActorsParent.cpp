@@ -5366,7 +5366,7 @@ private:
 };
 
 class ConnectionPool::ConnectionRunnable
-  : public nsRunnable
+  : public Runnable
 {
 protected:
   DatabaseInfo* mDatabaseInfo;
@@ -5518,7 +5518,7 @@ protected:
 };
 
 class ConnectionPool::FinishCallbackWrapper final
-  : public nsRunnable
+  : public Runnable
 {
   RefPtr<ConnectionPool> mConnectionPool;
   RefPtr<FinishCallback> mCallback;
@@ -5611,7 +5611,7 @@ public:
 };
 
 class ConnectionPool::ThreadRunnable final
-  : public nsRunnable
+  : public Runnable
 {
   // Only touched on the background thread.
   static uint32_t sNextSerialNumber;
@@ -5696,7 +5696,7 @@ private:
  ******************************************************************************/
 
 class DatabaseOperationBase
-  : public nsRunnable
+  : public Runnable
   , public mozIStorageProgressHandler
 {
   friend class UpgradeFileIdsFunction;
@@ -6085,7 +6085,7 @@ private:
 };
 
 class WaitForTransactionsHelper final
-  : public nsRunnable
+  : public Runnable
 {
   nsCOMPtr<nsIEventTarget> mOwningThread;
   const nsCString mDatabaseId;
@@ -8543,7 +8543,7 @@ private:
 };
 
 class GetFileReferencesHelper final
-  : public nsRunnable
+  : public Runnable
 {
   PersistenceType mPersistenceType;
   nsCString mOrigin;
@@ -8589,7 +8589,7 @@ private:
 };
 
 class FlushPendingFileDeletionsRunnable final
-  : public nsRunnable
+  : public Runnable
 {
 private:
   ~FlushPendingFileDeletionsRunnable()
@@ -8918,7 +8918,7 @@ private:
 };
 
 class Maintenance final
-  : public nsRunnable
+  : public Runnable
   , public OpenDirectoryListener
 {
   struct DirectoryInfo;
@@ -9146,7 +9146,7 @@ struct Maintenance::DirectoryInfo final
 };
 
 class DatabaseMaintenance final
-  : public nsRunnable
+  : public Runnable
 {
   // The minimum amount of time that has passed since the last vacuum before we
   // will attempt to analyze the database for fragmentation.
@@ -11937,7 +11937,7 @@ ConnectionPool::ScheduleTransaction(TransactionInfo* aTransactionInfo,
         // We need a thread right now so force all idle processing to stop by
         // posting a dummy runnable to each thread that might be doing idle
         // maintenance.
-        nsCOMPtr<nsIRunnable> runnable = new nsRunnable();
+        nsCOMPtr<nsIRunnable> runnable = new Runnable();
 
         for (uint32_t index = mDatabasesPerformingIdleMaintenance.Length();
              index > 0;
@@ -12575,7 +12575,7 @@ FinishCallbackWrapper::~FinishCallbackWrapper()
   MOZ_ASSERT(!mCallback);
 }
 
-NS_IMPL_ISUPPORTS_INHERITED0(ConnectionPool::FinishCallbackWrapper, nsRunnable)
+NS_IMPL_ISUPPORTS_INHERITED0(ConnectionPool::FinishCallbackWrapper, Runnable)
 
 nsresult
 ConnectionPool::
@@ -12635,7 +12635,7 @@ ThreadRunnable::~ThreadRunnable()
   MOZ_ASSERT(!mContinueRunning);
 }
 
-NS_IMPL_ISUPPORTS_INHERITED0(ConnectionPool::ThreadRunnable, nsRunnable)
+NS_IMPL_ISUPPORTS_INHERITED0(ConnectionPool::ThreadRunnable, Runnable)
 
 nsresult
 ConnectionPool::
@@ -13348,8 +13348,7 @@ WaitForTransactionsHelper::CallCallback()
   mState = State::Complete;
 }
 
-NS_IMPL_ISUPPORTS_INHERITED0(WaitForTransactionsHelper,
-                             nsRunnable)
+NS_IMPL_ISUPPORTS_INHERITED0(WaitForTransactionsHelper, Runnable)
 
 NS_IMETHODIMP
 WaitForTransactionsHelper::Run()
@@ -17760,7 +17759,7 @@ Maintenance::Finish()
   mState = State::Complete;
 }
 
-NS_IMPL_ISUPPORTS_INHERITED0(Maintenance, nsRunnable)
+NS_IMPL_ISUPPORTS_INHERITED0(Maintenance, Runnable)
 
 NS_IMETHODIMP
 Maintenance::Run()
@@ -19405,7 +19404,7 @@ DatabaseOperationBase::ObjectStoreHasIndexes(DatabaseConnection* aConnection,
 }
 
 NS_IMPL_ISUPPORTS_INHERITED(DatabaseOperationBase,
-                            nsRunnable,
+                            Runnable,
                             mozIStorageProgressHandler)
 
 NS_IMETHODIMP

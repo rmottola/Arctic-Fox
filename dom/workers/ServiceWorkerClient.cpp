@@ -83,7 +83,7 @@ ServiceWorkerClient::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProt
 namespace {
 
 class ServiceWorkerClientPostMessageRunnable final
-  : public nsRunnable
+  : public Runnable
   , public StructuredCloneHolder
 {
   uint64_t mWindowId;

@@ -1751,7 +1751,7 @@ nsEditor::RemoveEditorObserver(nsIEditorObserver *aObserver)
   return NS_OK;
 }
 
-class EditorInputEventDispatcher : public nsRunnable
+class EditorInputEventDispatcher : public Runnable
 {
 public:
   EditorInputEventDispatcher(nsEditor* aEditor,

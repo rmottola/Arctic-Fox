@@ -190,7 +190,7 @@ PopulateRegistrationData(nsIPrincipal* aPrincipal,
   return NS_OK;
 }
 
-class TeardownRunnable final : public nsRunnable
+class TeardownRunnable final : public Runnable
 {
 public:
   explicit TeardownRunnable(ServiceWorkerManagerChild* aActor)
@@ -405,7 +405,7 @@ GetRequiredScopeStringPrefix(nsIURI* aScriptURI, nsACString& aPrefix,
   return NS_OK;
 }
 
-class PropagateSoftUpdateRunnable final : public nsRunnable
+class PropagateSoftUpdateRunnable final : public Runnable
 {
 public:
   PropagateSoftUpdateRunnable(const PrincipalOriginAttributes& aOriginAttributes,
@@ -433,7 +433,7 @@ private:
   const nsString mScope;
 };
 
-class PropagateUnregisterRunnable final : public nsRunnable
+class PropagateUnregisterRunnable final : public Runnable
 {
 public:
   PropagateUnregisterRunnable(nsIPrincipal* aPrincipal,
@@ -470,7 +470,7 @@ private:
   const nsString mScope;
 };
 
-class RemoveRunnable final : public nsRunnable
+class RemoveRunnable final : public Runnable
 {
 public:
   explicit RemoveRunnable(const nsACString& aHost)
@@ -494,7 +494,7 @@ private:
   const nsCString mHost;
 };
 
-class PropagateRemoveRunnable final : public nsRunnable
+class PropagateRemoveRunnable final : public Runnable
 {
 public:
   explicit PropagateRemoveRunnable(const nsACString& aHost)
@@ -518,7 +518,7 @@ private:
   const nsCString mHost;
 };
 
-class PropagateRemoveAllRunnable final : public nsRunnable
+class PropagateRemoveAllRunnable final : public Runnable
 {
 public:
   PropagateRemoveAllRunnable()
@@ -732,7 +732,7 @@ ServiceWorkerManager::AppendPendingOperation(nsIRunnable* aRunnable)
 /*
  * Implements the async aspects of the getRegistrations algorithm.
  */
-class GetRegistrationsRunnable final : public nsRunnable
+class GetRegistrationsRunnable final : public Runnable
 {
   nsCOMPtr<nsPIDOMWindowInner> mWindow;
   RefPtr<Promise> mPromise;
@@ -847,7 +847,7 @@ ServiceWorkerManager::GetRegistrations(mozIDOMWindow* aWindow,
 /*
  * Implements the async aspects of the getRegistration algorithm.
  */
-class GetRegistrationRunnable final : public nsRunnable
+class GetRegistrationRunnable final : public Runnable
 {
   nsCOMPtr<nsPIDOMWindowInner> mWindow;
   RefPtr<Promise> mPromise;
@@ -949,7 +949,7 @@ ServiceWorkerManager::GetRegistration(mozIDOMWindow* aWindow,
   return NS_DispatchToCurrentThread(runnable);
 }
 
-class GetReadyPromiseRunnable final : public nsRunnable
+class GetReadyPromiseRunnable final : public Runnable
 {
   nsCOMPtr<nsPIDOMWindowInner> mWindow;
   RefPtr<Promise> mPromise;
@@ -2167,7 +2167,7 @@ ServiceWorkerManager::GetServiceWorkerForScope(nsPIDOMWindowInner* aWindow,
 
 namespace {
 
-class ContinueDispatchFetchEventRunnable : public nsRunnable
+class ContinueDispatchFetchEventRunnable : public Runnable
 {
   RefPtr<ServiceWorkerPrivate> mServiceWorkerPrivate;
   nsCOMPtr<nsIInterceptedChannel> mChannel;

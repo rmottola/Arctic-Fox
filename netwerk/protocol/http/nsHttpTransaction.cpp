@@ -917,7 +917,7 @@ nsHttpTransaction::SaveNetworkStats(bool enforce)
 
     // Create the event to save the network statistics.
     // the event is then dispatched to the main thread.
-    RefPtr<nsRunnable> event =
+    RefPtr<Runnable> event =
         new SaveNetworkStatsEvent(mAppId, mIsInIsolatedMozBrowser, mActiveNetworkInfo,
                                   mCountRecv, mCountSent, false);
     NS_DispatchToMainThread(event);
@@ -2129,7 +2129,7 @@ nsHttpTransaction::GetResponseEnd()
 // nsHttpTransaction deletion event
 //-----------------------------------------------------------------------------
 
-class DeleteHttpTransaction : public nsRunnable {
+class DeleteHttpTransaction : public Runnable {
 public:
     explicit DeleteHttpTransaction(nsHttpTransaction *trans)
         : mTrans(trans)

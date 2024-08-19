@@ -1807,7 +1807,7 @@ nsSSLIOLayerHelpers::addInsecureFallbackSite(const nsCString& hostname,
   Preferences::SetCString("security.tls.insecure_fallback_hosts", value);
 }
 
-class FallbackPrefRemover final : public nsRunnable
+class FallbackPrefRemover final : public Runnable
 {
 public:
   explicit FallbackPrefRemover(const nsACString& aHost)
@@ -1855,7 +1855,7 @@ nsSSLIOLayerHelpers::removeInsecureFallbackSite(const nsACString& hostname,
   if (!isPublic()) {
     return;
   }
-  RefPtr<nsRunnable> runnable = new FallbackPrefRemover(hostname);
+  RefPtr<Runnable> runnable = new FallbackPrefRemover(hostname);
   if (NS_IsMainThread()) {
     runnable->Run();
   } else {

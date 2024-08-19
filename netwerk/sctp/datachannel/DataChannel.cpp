@@ -2305,7 +2305,7 @@ DataChannelConnection::SendBinary(DataChannel *channel, const char *data,
   return SendMsgInternal(channel, data, len, ppid_final);
 }
 
-class ReadBlobRunnable : public nsRunnable {
+class ReadBlobRunnable : public Runnable {
 public:
   ReadBlobRunnable(DataChannelConnection* aConnection, uint16_t aStream,
     nsIInputStream* aBlob) :
@@ -2350,7 +2350,7 @@ DataChannelConnection::SendBlob(uint16_t stream, nsIInputStream *aBlob)
   return 0;
 }
 
-class DataChannelBlobSendRunnable : public nsRunnable
+class DataChannelBlobSendRunnable : public Runnable
 {
 public:
   DataChannelBlobSendRunnable(already_AddRefed<DataChannelConnection>& aConnection,

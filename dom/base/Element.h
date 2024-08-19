@@ -1350,7 +1350,7 @@ private:
   EventStates mState;
 };
 
-class RemoveFromBindingManagerRunnable : public nsRunnable
+class RemoveFromBindingManagerRunnable : public mozilla::Runnable
 {
 public:
   RemoveFromBindingManagerRunnable(nsBindingManager* aManager,

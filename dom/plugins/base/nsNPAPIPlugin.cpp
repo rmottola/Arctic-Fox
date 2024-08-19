@@ -617,7 +617,7 @@ namespace {
 
 static char *gNPPException;
 
-class nsPluginThreadRunnable : public nsRunnable,
+class nsPluginThreadRunnable : public Runnable,
                                public PRCList
 {
 public:
