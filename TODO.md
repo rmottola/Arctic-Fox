@@ -45,8 +45,6 @@
 - Bug 1278838 2016-06-09- Remove separate worker binding for Performance API
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1296851 - 2016-10-27 Always allow SetPrototype with the same value as the cu
-- Bug 1263778 - 2016-03-19 Rename a bunch of low-level [[Prototype]] access method
-- Bug 612168 [recheck existing] - Handle uninstalls of restartless addons in XPIProvider
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
 
 impacting download and shutdown:
