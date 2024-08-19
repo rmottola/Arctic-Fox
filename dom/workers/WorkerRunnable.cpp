@@ -500,7 +500,7 @@ StopSyncLoopRunnable::WorkerRun(JSContext* aCx,
   mSyncLoopTarget.swap(syncLoopTarget);
 
   if (!mResult) {
-    MaybeSetException(aCx);
+    MaybeSetException();
   }
 
   aWorkerPrivate->StopSyncLoop(syncLoopTarget, mResult);

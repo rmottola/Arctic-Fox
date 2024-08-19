@@ -222,7 +222,7 @@ private:
     { }
 
     virtual void
-    MaybeSetException(JSContext* aCx) override
+    MaybeSetException() override
     {
       mWorkerPrivate->AssertIsOnWorkerThread();
       MOZ_ASSERT(NS_FAILED(mErrorCode));
