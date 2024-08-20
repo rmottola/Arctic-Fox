@@ -649,6 +649,11 @@
                     command="Browser:ShowAllBookmarks"
                     key="manBookmarkKb"/>
           <menuseparator/>
+            <menuitem label="&recentBookmarks.label;"
+                      disabled="true"
+                      class="subviewbutton"/>
+            <vbox id="BMB_recentBookmarks"/>
+            <menuseparator/>
           <menuitem id="BMB_bookmarkThisPage"
 #ifndef XP_MACOSX
                     class="menuitem-iconic"
