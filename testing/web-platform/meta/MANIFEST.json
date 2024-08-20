@@ -11908,6 +11908,10 @@
         "url": "/XMLHttpRequest/send-send.htm"
       },
       {
+        "path": "XMLHttpRequest/send-send.worker.js",
+        "url": "/XMLHttpRequest/send-send.worker"
+      },
+      {
         "path": "XMLHttpRequest/send-sync-blocks-async.htm",
         "url": "/XMLHttpRequest/send-sync-blocks-async.htm"
       },
