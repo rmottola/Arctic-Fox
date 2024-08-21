@@ -10,7 +10,7 @@ AB_CD = en-US
 # Build a binary bootstrapping with XRE_main
 
 ifndef MOZ_WINCONSOLE
-ifdef MOZ_DEBUG
+ifneq (,$(MOZ_DEBUG)$(MOZ_ASAN))
 MOZ_WINCONSOLE = 1
 else
 MOZ_WINCONSOLE = 0
