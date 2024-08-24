@@ -2553,8 +2553,8 @@ nsHTMLEditor::CreateElementWithDefaults(const nsAString& aTagName)
   // the transaction system
 
   // New call to use instead to get proper HTML element, bug 39919
-  nsCOMPtr<Element> newElement =
-    CreateHTMLContent(nsCOMPtr<nsIAtom>(NS_Atomize(realTagName)));
+  nsCOMPtr<nsIAtom> realTagAtom = NS_Atomize(realTagName);
+  nsCOMPtr<Element> newElement = CreateHTMLContent(realTagAtom);
   if (!newElement) {
     return nullptr;
   }

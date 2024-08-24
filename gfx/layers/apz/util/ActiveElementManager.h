@@ -93,7 +93,7 @@ private:
   void SetActive(dom::Element* aTarget);
   void ResetActive();
   void ResetTouchBlockState();
-  void SetActiveTask(dom::Element* aTarget);
+  void SetActiveTask(const nsCOMPtr<dom::Element>& aTarget);
   void CancelTask();
 };
 
