@@ -169,7 +169,7 @@ CanCreateWMFDecoder()
 static bool
 IsH264DecoderBlacklisted()
 {
-#ifdef _WIN64
+#ifdef BLACKLIST_CRASHY_H264_DECODERS
   WCHAR systemPath[MAX_PATH + 1];
   if (!ConstructSystem32Path(L"msmpeg2vdec.dll", systemPath, MAX_PATH + 1)) {
     // Cannot build path -> Assume it's not the blacklisted DLL.
@@ -195,7 +195,7 @@ IsH264DecoderBlacklisted()
       return true;
     }
   }
-#endif // _WIN64
+#endif // BLACKLIST_CRASHY_H264_DECODERS
   return false;
 }
 
