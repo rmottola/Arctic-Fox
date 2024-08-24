@@ -793,8 +793,7 @@ ContentParent::JoinAllSubprocesses()
 
   bool done = false;
   Monitor monitor("mozilla.dom.ContentParent.JoinAllSubprocesses");
-  XRE_GetIOMessageLoop()->PostTask(FROM_HERE,
-                                   NewRunnableFunction(
+  XRE_GetIOMessageLoop()->PostTask(NewRunnableFunction(
                                      &ContentParent::JoinProcessesIOThread,
                                      &processes, &monitor, &done));
   {
@@ -2173,7 +2172,6 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
   for(uint32_t i = 0; i < childIDArray.Length(); i++) {
     ContentParent* cp = cpm->GetContentProcessById(childIDArray[i]);
     MessageLoop::current()->PostTask(
-      FROM_HERE,
       NewRunnableMethod(cp, &ContentParent::ShutDownProcess,
                         SEND_SHUTDOWN_MESSAGE));
   }
@@ -2257,7 +2255,6 @@ ContentParent::NotifyTabDestroyed(const TabId& aTabId,
     // In the case of normal shutdown, send a shutdown message to child to
     // allow it to perform shutdown tasks.
     MessageLoop::current()->PostTask(
-      FROM_HERE,
       NewRunnableMethod(this, &ContentParent::ShutDownProcess,
                         SEND_SHUTDOWN_MESSAGE));
   }
@@ -3622,7 +3619,6 @@ ContentParent::KillHard(const char* aReason)
 
   // EnsureProcessTerminated has responsibilty for closing otherProcessHandle.
   XRE_GetIOMessageLoop()->PostTask(
-    FROM_HERE,
     NewRunnableFunction(&ProcessWatcher::EnsureProcessTerminated,
                         otherProcessHandle, /*force=*/true));
 }

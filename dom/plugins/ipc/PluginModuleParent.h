@@ -607,7 +607,7 @@ private:
 
     DWORD mFlashProcess1;
     DWORD mFlashProcess2;
-    mozilla::plugins::FinishInjectorInitTask* mFinishInitTask;
+    RefPtr<mozilla::plugins::FinishInjectorInitTask> mFinishInitTask;
 #endif
 
     void OnProcessLaunched(const bool aSucceeded);
@@ -621,9 +621,10 @@ private:
             MOZ_ASSERT(aModule);
         }
 
-        void Run() override
+        NS_IMETHOD Run() override
         {
             mModule->OnProcessLaunched(mLaunchSucceeded);
+            return NS_OK;
         }
 
     private:
