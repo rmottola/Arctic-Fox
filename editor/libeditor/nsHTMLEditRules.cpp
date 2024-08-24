@@ -6375,7 +6375,8 @@ nsHTMLEditRules::SplitParagraph(nsIDOMNode *aPara,
   nsCOMPtr<nsIDOMNode> child =
     GetAsDOMNode(mHTMLEditor->GetLeftmostChild(rightParaNode, true));
   NS_ENSURE_STATE(mHTMLEditor);
-  if (mHTMLEditor->IsTextNode(child) || !mHTMLEditor ||
+  if (!mHTMLEditor ||
+      mHTMLEditor->IsTextNode(child) ||
       mHTMLEditor->IsContainer(child))
   {
     NS_ENSURE_STATE(mHTMLEditor);
@@ -7168,7 +7169,8 @@ nsHTMLEditRules::PinSelectionToNewBlock(Selection* aSelection)
     tmp = GetAsDOMNode(mHTMLEditor->GetLastEditableChild(*block));
     uint32_t endPoint;
     NS_ENSURE_STATE(mHTMLEditor);
-    if (mHTMLEditor->IsTextNode(tmp) || !mHTMLEditor ||
+    if (!mHTMLEditor ||
+        mHTMLEditor->IsTextNode(tmp) ||
         mHTMLEditor->IsContainer(tmp))
     {
       NS_ENSURE_STATE(mHTMLEditor);
@@ -7189,7 +7191,8 @@ nsHTMLEditRules::PinSelectionToNewBlock(Selection* aSelection)
     NS_ENSURE_STATE(mHTMLEditor);
     tmp = GetAsDOMNode(mHTMLEditor->GetFirstEditableChild(*block));
     int32_t offset;
-    if (!(mHTMLEditor->IsTextNode(tmp) || !mHTMLEditor ||
+    if (mHTMLEditor &&
+        !(mHTMLEditor->IsTextNode(tmp) ||
           mHTMLEditor->IsContainer(tmp)))
     {
       tmp = nsEditor::GetNodeLocation(tmp, &offset);
