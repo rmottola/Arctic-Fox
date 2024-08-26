@@ -355,9 +355,6 @@
 @RESPATH@/components/zipwriter.xpt
 
 ; JavaScript components
-@RESPATH@/components/RequestSync.manifest
-@RESPATH@/components/RequestSyncManager.js
-@RESPATH@/components/RequestSyncScheduler.js
 @RESPATH@/components/ChromeNotifications.js
 @RESPATH@/components/ChromeNotifications.manifest
 @RESPATH@/components/ConsoleAPI.manifest
@@ -922,10 +919,6 @@ bin/libfreebl_32int64_3.so
 
 @RESPATH@/components/FxAccountsUIGlue.js
 @RESPATH@/components/services_fxaccounts.xpt
-
-@RESPATH@/components/DataStore.manifest
-@RESPATH@/components/DataStoreImpl.js
-@RESPATH@/components/dom_datastore.xpt
 
 @RESPATH@/components/MobileIdentity.manifest
 @RESPATH@/components/MobileIdentity.js

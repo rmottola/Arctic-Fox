@@ -623,6 +623,9 @@ browser/chrome/devtools/skin/images/security-state-weak.svg
 browser/chrome/browser/skin/classic/browser/identity-secure.svg
 browser/chrome/browser/skin/classic/browser/identity-not-secure.svg
 
+browser/chrome/browser/defaults/permissions
+browser/defaults/permissions
+
 
 #Windows ArcticFox exceptions
 chrome/toolkit/skin/classic/mozapps/extensions/category-plugins.png

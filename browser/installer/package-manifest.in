@@ -527,10 +527,6 @@
 @RESPATH@/components/htmlMenuBuilder.js
 @RESPATH@/components/htmlMenuBuilder.manifest
 
-@RESPATH@/components/RequestSync.manifest
-@RESPATH@/components/RequestSyncManager.js
-@RESPATH@/components/RequestSyncScheduler.js
-
 @RESPATH@/components/PermissionSettings.js
 @RESPATH@/components/PermissionSettings.manifest
 @RESPATH@/components/ContactManager.js
@@ -814,10 +810,6 @@ bin/libfreebl_32int64_3.so
 @BINPATH@/updater@BIN_SUFFIX@
 #endif
 #endif
-
-@RESPATH@/components/DataStore.manifest
-@RESPATH@/components/DataStoreImpl.js
-@RESPATH@/components/dom_datastore.xpt
 
 @RESPATH@/components/dom_audiochannel.xpt
 

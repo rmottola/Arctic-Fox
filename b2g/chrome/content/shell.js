@@ -7,7 +7,6 @@
 window.performance.mark('gecko-shell-loadstart');
 
 Cu.import('resource://gre/modules/ContactService.jsm');
-Cu.import('resource://gre/modules/DataStoreChangeNotifier.jsm');
 Cu.import('resource://gre/modules/AlarmService.jsm');
 Cu.import('resource://gre/modules/ActivitiesService.jsm');
 Cu.import('resource://gre/modules/NotificationDB.jsm');
@@ -17,7 +16,6 @@ Cu.import('resource://gre/modules/UserAgentOverrides.jsm');
 Cu.import('resource://gre/modules/Keyboard.jsm');
 Cu.import('resource://gre/modules/ErrorPage.jsm');
 Cu.import('resource://gre/modules/AlertsHelper.jsm');
-Cu.import('resource://gre/modules/RequestSyncService.jsm');
 Cu.import('resource://gre/modules/SystemUpdateService.jsm');
 
 if (isGonk) {

@@ -5236,9 +5236,6 @@ pref("dom.forms.inputmode", true);
 // InputMethods for soft keyboards in B2G
 pref("dom.mozInputMethod.enabled", false);
 
-// DataStore is disabled by default
-pref("dom.datastore.enabled", false);
-
 // Telephony API
 #ifdef MOZ_B2G_RIL
 pref("dom.telephony.enabled", true);
@@ -5448,9 +5445,6 @@ pref("browser.addon-watch.interval", -1);
 pref("browser.addon-watch.ignore", "[\"mochikit@mozilla.org\",\"special-powers@mozilla.org\"]");
 // the percentage of time addons are allowed to use without being labeled slow
 pref("browser.addon-watch.percentage-limit", 5);
-
-// RequestSync API is disabled by default.
-pref("dom.requestSync.enabled", false);
 
 // Search service settings
 pref("browser.search.log", false);
