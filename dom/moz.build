@@ -56,7 +56,6 @@ DIRS += [
     'crypto',
     'phonenumberutils',
     'alarm',
-    'datastore',
     'devicestorage',
     'encoding',
     'events',

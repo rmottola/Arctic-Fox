@@ -164,11 +164,6 @@ public:
   Promise* GetBattery(ErrorResult& aRv);
   battery::BatteryManager* GetDeprecatedBattery(ErrorResult& aRv);
 
-  static already_AddRefed<Promise> GetDataStores(nsPIDOMWindowInner* aWindow,
-                                                 const nsAString& aName,
-                                                 const nsAString& aOwner,
-                                                 ErrorResult& aRv);
-
   static void AppName(nsAString& aAppName, bool aUsePrefOverriddenValue);
 
   static nsresult GetPlatform(nsAString& aPlatform,
@@ -185,10 +180,6 @@ public:
   // Clears the user agent cache by calling:
   // NavigatorBinding::ClearCachedUserAgentValue(this);
   void ClearUserAgentCache();
-
-  already_AddRefed<Promise> GetDataStores(const nsAString& aName,
-                                          const nsAString& aOwner,
-                                          ErrorResult& aRv);
 
   // Feature Detection API
   already_AddRefed<Promise> GetFeature(const nsAString& aName,
@@ -325,10 +316,6 @@ public:
 #endif // MOZ_NFC
   static bool HasUserMediaSupport(JSContext* /* unused */,
                                   JSObject* /* unused */);
-
-  static bool HasDataStoreSupport(nsIPrincipal* aPrincipal);
-
-  static bool HasDataStoreSupport(JSContext* cx, JSObject* aGlobal);
 
 #ifdef MOZ_B2G
   static bool HasMobileIdSupport(JSContext* aCx, JSObject* aGlobal);
