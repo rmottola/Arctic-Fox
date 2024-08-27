@@ -264,7 +264,10 @@ this.PushServiceWebSocket = {
   },
 
   validServerURI: function(serverURI) {
-    return serverURI.scheme == "ws" || serverURI.scheme == "wss";
+    if (serverURI.scheme == "ws") {
+      return !!prefs.get("testing.allowInsecureServerURL");
+    }
+    return serverURI.scheme == "wss";
   },
 
   get _UAID() {
