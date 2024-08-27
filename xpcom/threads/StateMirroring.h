@@ -234,6 +234,8 @@ private:
   };
 public:
 
+  // NB: Because mirror-initiated disconnection can race with canonical-
+  // initiated disconnection, a canonical should never be reinitialized.
   // Forward control operations to the Impl.
   void DisconnectAll() { return mImpl->DisconnectAll(); }
 
