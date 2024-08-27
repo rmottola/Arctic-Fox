@@ -1,0 +1,20 @@
+diff --git a/dom/system/gonk/GonkGPSGeolocationProvider.cpp b/dom/system/gonk/GonkGPSGeolocationProvider.cpp
+index 5ad23c67d6e7a..de068e0cd4f65 100644
+--- a/dom/system/gonk/GonkGPSGeolocationProvider.cpp
++++ b/dom/system/gonk/GonkGPSGeolocationProvider.cpp
+@@ -538,13 +538,13 @@ GonkGPSGeolocationProvider::RequestSettingValue(const char* aKey)
+   nsCOMPtr<nsISettingsServiceLock> lock;
+   nsresult rv = ss->CreateLock(nullptr, getter_AddRefs(lock));
+   if (NS_FAILED(rv)) {
+-    ERR("error while createLock setting '%s': %d\n", aKey, rv);
++    ERR("error while createLock setting '%s': %d\n", aKey, uint32_t(rv));
+     return;
+   }
+ 
+   rv = lock->Get(aKey, this);
+   if (NS_FAILED(rv)) {
+-    ERR("error while get setting '%s': %d\n", aKey, rv);
++    ERR("error while get setting '%s': %d\n", aKey, uint32_t(rv));
+     return;
+   }
+ }
