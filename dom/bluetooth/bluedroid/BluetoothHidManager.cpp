@@ -78,7 +78,7 @@ private:
 };
 
 class BluetoothHidManager::InitProfileResultHandlerRunnable final
-  : public nsRunnable
+  : public Runnable
 {
 public:
   InitProfileResultHandlerRunnable(BluetoothProfileResultHandler* aRes,
@@ -114,7 +114,7 @@ BluetoothHidManager::InitHidInterface(BluetoothProfileResultHandler* aRes)
 
   if (sBluetoothHidInterface) {
     BT_LOGR("Bluetooth HID interface is already initialized.");
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_OK);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch HID Init runnable");
@@ -127,7 +127,7 @@ BluetoothHidManager::InitHidInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!btInf)) {
     // If there's no backend interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch HID OnError runnable");
@@ -140,7 +140,7 @@ BluetoothHidManager::InitHidInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!setupInterface)) {
     // If there's no Setup interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch HID OnError runnable");
@@ -153,7 +153,7 @@ BluetoothHidManager::InitHidInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!hidinterface)) {
     // If there's no HID interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch HID OnError runnable");
@@ -230,7 +230,7 @@ private:
 };
 
 class BluetoothHidManager::DeinitProfileResultHandlerRunnable final
-  : public nsRunnable
+  : public Runnable
 {
 public:
   DeinitProfileResultHandlerRunnable(BluetoothProfileResultHandler* aRes,
@@ -266,7 +266,7 @@ BluetoothHidManager::DeinitHidInterface(BluetoothProfileResultHandler* aRes)
 
   if (!sBluetoothHidInterface) {
     BT_LOGR("Bluetooth Hid interface has not been initialized.");
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new DeinitProfileResultHandlerRunnable(aRes, NS_OK);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch HID Deinit runnable");
@@ -279,7 +279,7 @@ BluetoothHidManager::DeinitHidInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!btInf)) {
     // If there's no backend interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new DeinitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch HID OnError runnable");
@@ -292,7 +292,7 @@ BluetoothHidManager::DeinitHidInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!setupInterface)) {
     // If there's no Setup interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new DeinitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch HID OnError runnable");
