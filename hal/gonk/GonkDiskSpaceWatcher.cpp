@@ -310,7 +310,6 @@ StartDiskSpaceWatcher()
   gHalDiskSpaceWatcher = new GonkDiskSpaceWatcher();
 
   XRE_GetIOMessageLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(gHalDiskSpaceWatcher, &GonkDiskSpaceWatcher::DoStart));
 }
 
@@ -323,7 +322,6 @@ StopDiskSpaceWatcher()
   }
 
   XRE_GetIOMessageLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(gHalDiskSpaceWatcher, &GonkDiskSpaceWatcher::DoStop));
 }
 
