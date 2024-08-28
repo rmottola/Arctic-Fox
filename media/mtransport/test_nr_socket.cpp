@@ -259,6 +259,9 @@ void TestNrSocket::close() {
     timer_handle_ = 0;
   }
   internal_socket_->close();
+  for (RefPtr<PortMapping>& port_mapping : port_mappings_) {
+    port_mapping->external_socket_->close();
+  }
 }
 
 int TestNrSocket::listen(int backlog) {
