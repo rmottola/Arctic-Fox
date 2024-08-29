@@ -204,6 +204,28 @@ var TestActor = exports.TestActor = protocol.ActorClass({
   }),
 
   /**
+   * Wait for a specific event on a node matching the provided selector.
+   * @param {String} eventName The name of the event to listen to
+   * @param {String} selector Optional:  css selector of the node which should
+   *        trigger the event. If ommitted, target will be the content window
+   */
+  waitForEventOnNode: protocol.method(function (eventName, selector) {
+    return new Promise(resolve => {
+      let node = selector ? this._querySelector(selector) : this.content;
+      node.addEventListener(eventName, function onEvent() {
+        node.removeEventListener(eventName, onEvent);
+        resolve();
+      });
+    });
+  }, {
+    request: {
+      eventName: Arg(0, "string"),
+      selector: Arg(1, "nullable:string")
+    },
+    response: {}
+  }),
+
+  /**
    * Change the zoom level of the page.
    * Optionally subscribe to the box-model highlighter's update event and waiting
    * for it to refresh before responding.
@@ -466,6 +488,32 @@ var TestActor = exports.TestActor = protocol.ActorClass({
       property: Arg(1, "string"),
       value: Arg(2, "string")
     },
+    response: {}
+  }),
+
+  /**
+   * Remove an attribute from a DOM Node.
+   * @param {String} selector The node selector
+   * @param {String} attribute The attribute name
+   */
+  removeAttribute: protocol.method(function (selector, attribute) {
+    let node = this._querySelector(selector);
+    node.removeAttribute(attribute);
+  }, {
+    request: {
+      selector: Arg(0, "string"),
+      property: Arg(1, "string")
+    },
+    response: {}
+  }),
+
+  /**
+   * Reload the content window.
+   */
+  reload: protocol.method(function () {
+    this.content.location.reload();
+  }, {
+    request: {},
     response: {}
   }),
 
