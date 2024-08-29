@@ -457,6 +457,7 @@ function waitForAll(promises) {
     if (promises.length) {
       return waitForAll(promises);
     }
+    return undefined;
   });
 }
 

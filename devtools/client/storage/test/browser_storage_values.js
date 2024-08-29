@@ -135,7 +135,7 @@ const testCases = [
   ], true]
 ];
 
-add_task(function*() {
+add_task(function* () {
   yield openTabAndSetupStorage(MAIN_DOMAIN + "storage-complex-values.html");
 
   gUI.tree.expandAll();

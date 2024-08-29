@@ -183,7 +183,7 @@ var NetMonitorView = {
   /**
    * Destroys the UI for all the displayed panes.
    */
-  _destroyPanes: Task.async(function*() {
+  _destroyPanes: Task.async(function* () {
     dumpn("Destroying the NetMonitorView panes");
 
     Prefs.networkDetailsWidth = this._detailsPane.getAttribute("width");
@@ -280,7 +280,7 @@ var NetMonitorView = {
     let requestsView = this.RequestsMenu;
     let statisticsView = this.PerformanceStatistics;
 
-    Task.spawn(function*() {
+    Task.spawn(function* () {
       statisticsView.displayPlaceholderCharts();
       yield controller.triggerActivity(ACTIVITY_TYPE.RELOAD.WITH_CACHE_ENABLED);
 
@@ -647,6 +647,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     }
 
     this._flushRequestsTask.arm();
+    return undefined;
   },
 
   /**
@@ -690,7 +691,8 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    * @return array
    *        A promise that is resolved with the extracted form data.
    */
-  _getFormDataSections: Task.async(function*(headers, uploadHeaders, postData) {
+  _getFormDataSections: Task.async(function* (headers, uploadHeaders,
+                                              postData) {
     let formDataSections = [];
 
     let { headers: requestHeaders } = headers;
@@ -726,7 +728,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    * Copy the request form data parameters (or raw payload) from
    * the currently selected item.
    */
-  copyPostData: Task.async(function*() {
+  copyPostData: Task.async(function* () {
     let selected = this.selectedItem.attachment;
     let view = this;
 
@@ -766,7 +768,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
   copyAsCurl: function() {
     let selected = this.selectedItem.attachment;
 
-    Task.spawn(function*() {
+    Task.spawn(function* () {
       // Create a sanitized object for the Curl command generator.
       let data = {
         url: selected.url,
@@ -1288,7 +1290,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     }
 
     // Find the 'upgrade' header.
-    var upgradeHeader = requestHeaders.headers.find(header => {
+    let upgradeHeader = requestHeaders.headers.find(header => {
       return (header.name == "Upgrade");
     });
 
@@ -1491,6 +1493,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     }
 
     this._flushRequestsTask.arm();
+    return undefined;
   },
 
   /**
@@ -1585,7 +1588,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
             let currentItem = requestItem;
             let currentStore = { headers: [], headersSize: 0 };
 
-            Task.spawn(function*() {
+            Task.spawn(function* () {
               let postData = yield gNetwork.getString(val.postData.text);
               let payloadHeaders = CurlUtils.getHeadersFromMultipartText(
                 postData);
@@ -1779,7 +1782,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    * @return object
    *         A promise that is resolved once the information is displayed.
    */
-  updateMenuView: Task.async(function*(item, key, value) {
+  updateMenuView: Task.async(function* (item, key, value) {
     let target = item.target || item;
 
     switch (key) {
@@ -2246,6 +2249,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
         return anchor;
       });
     }
+    return undefined;
   },
 
   /**
@@ -2317,7 +2321,9 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
         .mimeType.includes("image/");
 
     let separators = $all(".request-menu-context-separator");
-    Array.forEach(separators, separator => separator.hidden = !selectedItem);
+    Array.forEach(separators, separator => {
+      separator.hidden = !selectedItem;
+    });
 
     let copyAsHar = $("#request-menu-context-copy-all-as-har");
     copyAsHar.hidden = !NetMonitorView.RequestsMenu.items.length;
@@ -2512,7 +2518,7 @@ SidebarView.prototype = {
    * @return object
    *        Returns a promise that resolves upon population of the subview.
    */
-  populate: Task.async(function*(data) {
+  populate: Task.async(function* (data) {
     let isCustom = data.isCustom;
     let view = isCustom ?
       NetMonitorView.CustomRequest :
@@ -2562,7 +2568,7 @@ CustomRequestView.prototype = {
    * @return object
    *        Returns a promise that resolves upon population the view.
    */
-  populate: Task.async(function*(data) {
+  populate: Task.async(function* (data) {
     $("#custom-url-value").value = data.url;
     $("#custom-method-value").value = data.method;
     this.updateCustomQuery(data.url);
@@ -2815,7 +2821,7 @@ NetworkDetailsView.prototype = {
       return;
     }
 
-    Task.spawn(function*() {
+    Task.spawn(function* () {
       viewState.updating[tab] = true;
       switch (tab) {
         // "Headers"
@@ -2954,7 +2960,7 @@ NetworkDetailsView.prototype = {
    * @return object
    *        A promise that resolves when request headers are set.
    */
-  _setRequestHeaders: Task.async(function*(headers, uploadHeaders) {
+  _setRequestHeaders: Task.async(function* (headers, uploadHeaders) {
     if (headers && headers.headers.length) {
       yield this._addHeaders(this._requestHeaders, headers);
     }
@@ -2971,7 +2977,7 @@ NetworkDetailsView.prototype = {
    * @return object
    *        A promise that resolves when response headers are set.
    */
-  _setResponseHeaders: Task.async(function*(response) {
+  _setResponseHeaders: Task.async(function* (response) {
     if (response && response.headers.length) {
       response.headers.sort((a, b) => a.name > b.name);
       yield this._addHeaders(this._responseHeaders, response);
@@ -2988,7 +2994,7 @@ NetworkDetailsView.prototype = {
    * @return object
    *        A promise that resolves when headers are added.
    */
-  _addHeaders: Task.async(function*(name, response) {
+  _addHeaders: Task.async(function* (name, response) {
     let kb = response.headersSize / 1024;
     let size = L10N.numberWithDecimals(kb, HEADERS_SIZE_DECIMALS);
     let text = L10N.getFormatStr("networkMenu.sizeKB", size);
@@ -3011,7 +3017,7 @@ NetworkDetailsView.prototype = {
    * @return object
    *        A promise that is resolved when the request cookies are set.
    */
-  _setRequestCookies: Task.async(function*(response) {
+  _setRequestCookies: Task.async(function* (response) {
     if (response && response.cookies.length) {
       response.cookies.sort((a, b) => a.name > b.name);
       yield this._addCookies(this._requestCookies, response);
@@ -3026,7 +3032,7 @@ NetworkDetailsView.prototype = {
    * @return object
    *        A promise that is resolved when the response cookies are set.
    */
-  _setResponseCookies: Task.async(function*(response) {
+  _setResponseCookies: Task.async(function* (response) {
     if (response && response.cookies.length) {
       yield this._addCookies(this._responseCookies, response);
     }
@@ -3042,7 +3048,7 @@ NetworkDetailsView.prototype = {
    * @return object
    *        Returns a promise that resolves upon the adding of cookies.
    */
-  _addCookies: Task.async(function*(name, response) {
+  _addCookies: Task.async(function* (name, response) {
     let cookiesScope = this._cookies.addScope(name);
     cookiesScope.expanded = true;
 
@@ -3096,7 +3102,7 @@ NetworkDetailsView.prototype = {
    * @return object
    *        A promise that is resolved when the request post params are set.
    */
-  _setRequestPostParams: Task.async(function*(headers, uploadHeaders,
+  _setRequestPostParams: Task.async(function* (headers, uploadHeaders,
     postData) {
     if (!headers || !uploadHeaders || !postData) {
       return;
@@ -3180,7 +3186,7 @@ NetworkDetailsView.prototype = {
    * @return object
    *         A promise that is resolved when the response body is set.
    */
-  _setResponseBody: Task.async(function*(url, response) {
+  _setResponseBody: Task.async(function* (url, response) {
     if (!response) {
       return;
     }
@@ -3375,7 +3381,7 @@ NetworkDetailsView.prototype = {
    * @return object
    *        A promise that is resolved when the html preview is rendered.
    */
-  _setHtmlPreview: Task.async(function*(response) {
+  _setHtmlPreview: Task.async(function* (response) {
     if (!response) {
       return promise.resolve();
     }
@@ -3388,6 +3394,7 @@ NetworkDetailsView.prototype = {
     iframe.contentDocument.documentElement.innerHTML = responseBody;
 
     window.emit(EVENTS.RESPONSE_HTML_PREVIEW_DISPLAYED);
+    return undefined;
   }),
 
   /**

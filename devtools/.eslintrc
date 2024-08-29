@@ -382,7 +382,7 @@
     // disallow labels that share a name with a variable
     "no-label-var": 0,
     // disallow use of labeled statements
-    "no-labels": 0,
+    "no-labels": 2,
     // disallow unnecessary nested blocks
     "no-lone-blocks": 0,
     // disallow creation of functions within loops

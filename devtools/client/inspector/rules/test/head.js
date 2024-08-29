@@ -32,7 +32,7 @@ registerCleanupFunction(() => {
  * script, so they can run on remote targets too.
  */
 var _addTab = addTab;
-addTab = function(url) {
+addTab = function (url) {
   return _addTab(url).then(tab => {
     info("Loading the helper frame script " + FRAME_SCRIPT_URL);
     let browser = tab.linkedBrowser;
@@ -155,7 +155,7 @@ function* waitForComputedStyleProperty(selector, pseudo, name, expected) {
  *
  * @return a promise that resolves to the inplace-editor element when ready
  */
-var focusEditableField = Task.async(function*(ruleView, editable, xOffset = 1,
+var focusEditableField = Task.async(function* (ruleView, editable, xOffset = 1,
     yOffset = 1, options = {}) {
   let onFocus = once(editable.parentNode, "focus", true);
   info("Clicking on editable field to turn to edit mode");
@@ -197,7 +197,7 @@ function assertHoverTooltipOn(tooltip, element) {
   }, () => {
     ok(false, "No tooltip is defined on hover of the given element");
   });
-};
+}
 
 /**
  * When a tooltip is closed, this ends up "commiting" the value changed within
@@ -227,7 +227,7 @@ function* hideTooltipAndWaitForRuleViewChanged(tooltip, view) {
  * @return a promise that resolves when the function returned true or rejects
  * if the timeout is reached
  */
-var waitForSuccess = Task.async(function*(validatorFn, desc = "untitled") {
+var waitForSuccess = Task.async(function* (validatorFn, desc = "untitled") {
   let i = 0;
   while (true) {
     info("Checking: " + desc);
@@ -271,7 +271,7 @@ function addStyle(doc, style) {
  *        The NodeActor that will used to retrieve the dataURL for the
  *        font family tooltip contents.
  */
-var getFontFamilyDataURL = Task.async(function*(font, nodeFront) {
+var getFontFamilyDataURL = Task.async(function* (font, nodeFront) {
   let fillStyle = (Services.prefs.getCharPref("devtools.theme") === "light") ?
       "black" : "white";
 
@@ -402,7 +402,7 @@ function getRuleViewSelectorHighlighterIcon(view, selectorText) {
  *          - {String} value The expected style value
  * The style will be checked like so: getComputedStyle(element)[name] === value
  */
-var simulateColorPickerChange = Task.async(function*(ruleView, colorPicker,
+var simulateColorPickerChange = Task.async(function* (ruleView, colorPicker,
     newRgba, expectedChange) {
   let onRuleViewChanged = ruleView.once("ruleview-changed");
   info("Getting the spectrum colorpicker object");
@@ -443,7 +443,7 @@ var simulateColorPickerChange = Task.async(function*(ruleView, colorPicker,
  *          - {String} value The expected style value
  * The style will be checked like so: getComputedStyle(element)[name] === value
  */
-var openColorPickerAndSelectColor = Task.async(function*(view, ruleIndex,
+var openColorPickerAndSelectColor = Task.async(function* (view, ruleIndex,
     propIndex, newRgba, expectedChange) {
   let ruleEditor = getRuleViewRuleEditor(view, ruleIndex);
   let propEditor = ruleEditor.rule.textProps[propIndex].editor;
@@ -481,7 +481,7 @@ var openColorPickerAndSelectColor = Task.async(function*(view, ruleIndex,
  *          - {String} value The expected style value
  * The style will be checked like so: getComputedStyle(element)[name] === value
  */
-var openCubicBezierAndChangeCoords = Task.async(function*(view, ruleIndex,
+var openCubicBezierAndChangeCoords = Task.async(function* (view, ruleIndex,
     propIndex, coords, expectedChange) {
   let ruleEditor = getRuleViewRuleEditor(view, ruleIndex);
   let propEditor = ruleEditor.rule.textProps[propIndex].editor;
@@ -577,9 +577,9 @@ function getRuleViewRuleEditor(view, childrenIndex, nodeIndex) {
  *        property to be blurred. Set to false if you don't want this.
  * @return {TextProperty} The instance of the TextProperty that was added
  */
-var addProperty = Task.async(function*(view, ruleIndex, name, value,
-                                       commitValueWith = "VK_RETURN",
-                                       blurNewProperty = true) {
+var addProperty = Task.async(function* (view, ruleIndex, name, value,
+                                        commitValueWith = "VK_RETURN",
+                                        blurNewProperty = true) {
   info("Adding new property " + name + ":" + value + " to rule " + ruleIndex);
 
   let ruleEditor = getRuleViewRuleEditor(view, ruleIndex);
@@ -635,8 +635,8 @@ var addProperty = Task.async(function*(view, ruleIndex, name, value,
  *        focused. This parameter is true by default, and that causes the new
  *        property to be blurred. Set to false if you don't want this.
  */
-var setProperty = Task.async(function*(view, textProp, value,
-                                       blurNewProperty = true) {
+var setProperty = Task.async(function* (view, textProp, value,
+                                        blurNewProperty = true) {
   yield focusEditableField(view, textProp.editor.valueSpan);
 
   let onPreview = view.once("ruleview-changed");
@@ -668,8 +668,8 @@ var setProperty = Task.async(function*(view, textProp, value,
  *        focused. This parameter is true by default, and that causes the new
  *        property to be blurred. Set to false if you don't want this.
  */
-var removeProperty = Task.async(function*(view, textProp,
-                                          blurNewProperty = true) {
+var removeProperty = Task.async(function* (view, textProp,
+                                           blurNewProperty = true) {
   yield focusEditableField(view, textProp.editor.nameSpan);
 
   let onModifications = view.once("ruleview-changed");
@@ -691,7 +691,7 @@ var removeProperty = Task.async(function*(view, textProp,
  * @param {TextProperty} textProp
  *        The instance of the TextProperty to be enabled/disabled
  */
-var togglePropStatus = Task.async(function*(view, textProp) {
+var togglePropStatus = Task.async(function* (view, textProp) {
   let onRuleViewRefreshed = view.once("ruleview-changed");
   textProp.editor.enable.click();
   yield onRuleViewRefreshed;
@@ -705,7 +705,7 @@ var togglePropStatus = Task.async(function*(view, textProp) {
  * @return a promise that resolves to the newly created editor when ready and
  * focused
  */
-var focusNewRuleViewProperty = Task.async(function*(ruleEditor) {
+var focusNewRuleViewProperty = Task.async(function* (ruleEditor) {
   info("Clicking on a close ruleEditor brace to start editing a new property");
   ruleEditor.closeBrace.scrollIntoView();
   let editor = yield focusEditableField(ruleEditor.ruleView,
@@ -730,7 +730,7 @@ var focusNewRuleViewProperty = Task.async(function*(ruleEditor) {
  * @return a promise that resolves when the new property name has been entered
  * and once the value field is focused
  */
-var createNewRuleViewProperty = Task.async(function*(ruleEditor, inputValue) {
+var createNewRuleViewProperty = Task.async(function* (ruleEditor, inputValue) {
   info("Creating a new property editor");
   let editor = yield focusNewRuleViewProperty(ruleEditor);
 
@@ -754,7 +754,7 @@ var createNewRuleViewProperty = Task.async(function*(ruleEditor, inputValue) {
  * @return a promise that resolves when the rule-view is filtered for the
  * search term
  */
-var setSearchFilter = Task.async(function*(view, searchValue) {
+var setSearchFilter = Task.async(function* (view, searchValue) {
   info("Setting filter text to \"" + searchValue + "\"");
   let win = view.styleWindow;
   let searchField = view.searchField;
