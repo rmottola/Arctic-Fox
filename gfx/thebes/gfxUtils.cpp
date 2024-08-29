@@ -1502,7 +1502,8 @@ public:
                              int32_t feature,
                              nsACString& failureId,
                              int32_t* status)
-      : WorkerMainThreadRunnable(workerPrivate)
+      : WorkerMainThreadRunnable(workerPrivate,
+                                 NS_LITERAL_CSTRING("GFX :: GetFeatureStatus"))
       , mGfxInfo(gfxInfo)
       , mFeature(feature)
       , mStatus(status)
