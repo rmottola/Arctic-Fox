@@ -19,6 +19,20 @@ var helpers = require("../helpers");
 
 module.exports = function(context) {
 
+  function importHead(path, node) {
+    try {
+      let stats = fs.statSync(path);
+      if (!stats.isFile()) {
+        return;
+      }
+    } catch (e) {
+      return;
+    }
+
+    let newGlobals = globals.getGlobalsForFile(path);
+    helpers.addGlobals(newGlobals, context.getScope());
+  }
+
   // ---------------------------------------------------------------------------
   // Public
   // ---------------------------------------------------------------------------
