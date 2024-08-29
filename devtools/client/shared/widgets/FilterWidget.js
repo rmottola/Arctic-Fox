@@ -71,7 +71,7 @@ const filterList = [
   },
   {
     "name": "hue-rotate",
-    "range": [0, 360],
+    "range": [0, Infinity],
     "type": "angle"
   },
   {
