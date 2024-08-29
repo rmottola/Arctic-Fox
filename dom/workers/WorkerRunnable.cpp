@@ -466,19 +466,20 @@ MainThreadWorkerSyncRunnable::PostDispatch(WorkerPrivate* aWorkerPrivate,
 {
 }
 
-StopSyncLoopRunnable::StopSyncLoopRunnable(
+MainThreadStopSyncLoopRunnable::MainThreadStopSyncLoopRunnable(
                                WorkerPrivate* aWorkerPrivate,
                                already_AddRefed<nsIEventTarget>&& aSyncLoopTarget,
                                bool aResult)
 : WorkerSyncRunnable(aWorkerPrivate, Move(aSyncLoopTarget)), mResult(aResult)
 {
+  AssertIsOnMainThread();
 #ifdef DEBUG
   mWorkerPrivate->AssertValidSyncLoop(mSyncLoopTarget);
 #endif
 }
 
 nsresult
-StopSyncLoopRunnable::Cancel()
+MainThreadStopSyncLoopRunnable::Cancel()
 {
   nsresult rv = Run();
   NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "Run() failed");
@@ -490,8 +491,8 @@ StopSyncLoopRunnable::Cancel()
 }
 
 bool
-StopSyncLoopRunnable::WorkerRun(JSContext* aCx,
-                                WorkerPrivate* aWorkerPrivate)
+MainThreadStopSyncLoopRunnable::WorkerRun(JSContext* aCx,
+                                          WorkerPrivate* aWorkerPrivate)
 {
   aWorkerPrivate->AssertIsOnWorkerThread();
   MOZ_ASSERT(mSyncLoopTarget);
@@ -508,11 +509,11 @@ StopSyncLoopRunnable::WorkerRun(JSContext* aCx,
 }
 
 bool
-StopSyncLoopRunnable::DispatchInternal()
+MainThreadStopSyncLoopRunnable::DispatchInternal()
 {
   MOZ_ASSERT(mSyncLoopTarget);
 
-  RefPtr<StopSyncLoopRunnable> runnable(this);
+  RefPtr<MainThreadStopSyncLoopRunnable> runnable(this);
   return NS_SUCCEEDED(mSyncLoopTarget->Dispatch(runnable.forget(), NS_DISPATCH_NORMAL));
 }
 
