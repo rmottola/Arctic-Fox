@@ -309,6 +309,7 @@ class OSXBootstrapper(BaseBootstrapper):
             ('git', 'git'),
             ('autoconf213', HOMEBREW_AUTOCONF213),
             ('gnu-tar', 'gnu-tar'),
+            ('watchman', 'watchman',)
         ]
         self._ensure_homebrew_packages(packages)
 
@@ -386,10 +387,13 @@ class OSXBootstrapper(BaseBootstrapper):
             self.run_as_root([self.port, '-v', 'install'] + missing)
 
     def ensure_macports_system_packages(self):
-        packages = ['python27',
-                    'mercurial',
-                    'autoconf213',
-                    'gnutar']
+        packages = [
+            'python27',
+            'mercurial',
+            'autoconf213',
+            'gnutar',
+            'watchman',
+        ]
 
         self._ensure_macports_packages(packages)
         self.run_as_root([self.port, 'select', '--set', 'python', 'python27'])
