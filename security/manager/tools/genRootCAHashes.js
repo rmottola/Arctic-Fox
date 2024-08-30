@@ -1,6 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+"use strict";
 
 // How to run this file:
 // 1. [obtain firefox source code]
@@ -8,12 +9,10 @@
 // 3. run `[path to]/run-mozilla.sh [path to]/xpcshell genRootCAHashes.js \
 //                                  [absolute path to]/RootHashes.inc'
 
-// <https://developer.mozilla.org/en/XPConnect/xpcshell/HOWTO>
-// <https://bugzilla.mozilla.org/show_bug.cgi?id=546628>
-const Cc = Components.classes;
-const Ci = Components.interfaces;
-const Cu = Components.utils;
-const Cr = Components.results;
+var Cc = Components.classes;
+var Ci = Components.interfaces;
+var Cu = Components.utils;
+var Cr = Components.results;
 
 const nsX509CertDB = "@mozilla.org/security/x509certdb;1";
 const CertDb = Components.classes[nsX509CertDB].getService(Ci.nsIX509CertDB);
