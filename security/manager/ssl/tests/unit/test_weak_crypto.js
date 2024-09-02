@@ -172,7 +172,7 @@ function run_test() {
 }
 
 // for sanity check
-add_task(function*() {
+add_task(function* () {
   let cert = yield getCert();
   ok(!!cert, "Got self-signed cert");
   let port = startServer(cert, false);
@@ -181,7 +181,7 @@ add_task(function*() {
   yield startClient(port, Cr.NS_OK, {isPrivate: true});
 });
 
-add_task(function*() {
+add_task(function* () {
   let cert = yield getCert();
   ok(!!cert, "Got self-signed cert");
   let port = startServer(cert, true);
@@ -249,7 +249,7 @@ add_task(function*() {
         "127.0.0.1");
 });
 
-add_task(function*() {
+add_task(function* () {
   let cert = yield getCert();
   ok(!!cert, "Got self-signed cert");
   let port = startServer(cert, false);
