@@ -1007,16 +1007,6 @@ pref("dom.ipc.plugins.enabled", true);
 
 pref("dom.ipc.shims.enabledWarnings", false);
 
-// Decode using Gecko Media Plugins in <video>, if a system decoder is not
-// availble and the preferred GMP is available.
-pref("media.gmp.decoder.enabled", true);
-
-// If decoding-via-GMP is turned on for <video>, use Adobe's GMP for decoding,
-// if it's available. Note: We won't fallback to another GMP if Adobe's is not
-// installed.
-pref("media.gmp.decoder.aac", 2);
-pref("media.gmp.decoder.h264", 2);
-
 // Start the browser in e10s mode
 pref("browser.tabs.remote.autostart", false);
 pref("browser.tabs.remote.desktopbehavior", true);
@@ -1368,6 +1358,18 @@ pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Linux; X11; r
 #else
 pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Windows NT 6.1; WOW64; rv:27.0) Gecko/20100101 Firefox/27.0");
 #endif
+
+
+// Decode using Gecko Media Plugins in <video>, if a system decoder is not
+// availble and the preferred GMP is available.
+pref("media.gmp.decoder.enabled", true);
+
+// If decoding-via-GMP is turned on for <video>, use Adobe's GMP for decoding,
+// if it's available. Note: We won't fallback to another GMP if Adobe's is not
+// installed.
+pref("media.gmp.decoder.aac", 2);
+pref("media.gmp.decoder.h264", 2);
+
 
 // ****************** s4e prefs ******************
 pref("status4evar.addonbar.borderStyle", false);
