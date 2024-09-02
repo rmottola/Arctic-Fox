@@ -1048,7 +1048,6 @@ void
 Console::Trace(JSContext* aCx)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mStatus == eInitialized);
 
   const Sequence<JS::Value> data;
   Method(aCx, MethodTrace, NS_LITERAL_STRING("trace"), data);
@@ -1066,7 +1065,6 @@ void
 Console::Time(JSContext* aCx, const JS::Handle<JS::Value> aTime)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mStatus == eInitialized);
 
   Sequence<JS::Value> data;
   SequenceRooter<JS::Value> rooter(aCx, &data);
@@ -1082,7 +1080,6 @@ void
 Console::TimeEnd(JSContext* aCx, const JS::Handle<JS::Value> aTime)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mStatus == eInitialized);
 
   Sequence<JS::Value> data;
   SequenceRooter<JS::Value> rooter(aCx, &data);
@@ -1098,7 +1095,6 @@ void
 Console::TimeStamp(JSContext* aCx, const JS::Handle<JS::Value> aData)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mStatus == eInitialized);
 
   Sequence<JS::Value> data;
   SequenceRooter<JS::Value> rooter(aCx, &data);
@@ -1114,8 +1110,6 @@ void
 Console::Profile(JSContext* aCx, const Sequence<JS::Value>& aData)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mStatus == eInitialized);
-
   ProfileMethod(aCx, NS_LITERAL_STRING("profile"), aData);
 }
 
@@ -1123,8 +1117,6 @@ void
 Console::ProfileEnd(JSContext* aCx, const Sequence<JS::Value>& aData)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mStatus == eInitialized);
-
   ProfileMethod(aCx, NS_LITERAL_STRING("profileEnd"), aData);
 }
 
@@ -1132,7 +1124,9 @@ void
 Console::ProfileMethod(JSContext* aCx, const nsAString& aAction,
                        const Sequence<JS::Value>& aData)
 {
-  MOZ_ASSERT(mStatus == eInitialized);
+  if (IsShuttingDown()) {
+    return;
+  }
 
   if (!NS_IsMainThread()) {
     // Here we are in a worker thread.
@@ -1190,7 +1184,6 @@ Console::Assert(JSContext* aCx, bool aCondition,
                 const Sequence<JS::Value>& aData)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mStatus == eInitialized);
 
   if (!aCondition) {
     Method(aCx, MethodAssert, NS_LITERAL_STRING("assert"), aData);
@@ -1203,7 +1196,6 @@ void
 Console::NoopMethod()
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mStatus == eInitialized);
 
   // Nothing to do.
 }
@@ -1277,7 +1269,9 @@ Console::Method(JSContext* aCx, MethodName aMethodName,
                 const Sequence<JS::Value>& aData)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT(mStatus == eInitialized);
+  if (IsShuttingDown()) {
+    return;
+  }
 
   RefPtr<ConsoleCallData> callData(new ConsoleCallData());
 
@@ -2408,6 +2402,13 @@ Console::AssertIsOnOwningThread() const
 {
   MOZ_ASSERT(mOwningThread);
   MOZ_ASSERT(PR_GetCurrentThread() == mOwningThread);
+}
+
+bool
+Console::IsShuttingDown() const
+{
+  MOZ_ASSERT(mStatus != eUnknown);
+  return mStatus == eShuttingDown;
 }
 
 } // namespace dom
