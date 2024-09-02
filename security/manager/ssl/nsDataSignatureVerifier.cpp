@@ -159,16 +159,16 @@ VerifyCMSDetachedSignatureIncludingCertificate(
     return NS_ERROR_CMS_VERIFY_NO_CONTENT_INFO;
   }
 
-  // We're expecting this to be a PKCS#7 signedData content info.
-  if (NSS_CMSContentInfo_GetContentTypeTag(cinfo)
-        != SEC_OID_PKCS7_SIGNED_DATA) {
-    return NS_ERROR_CMS_VERIFY_NO_CONTENT_INFO;
-  }
-
   // Set digest value.
   if (NSS_CMSSignedData_SetDigestValue(signedData, SEC_OID_SHA1,
                                        const_cast<SECItem*>(&detachedDigest))) {
     return NS_ERROR_CMS_VERIFY_BAD_DIGEST;
+  }
+
+  // We're expecting this to be a PKCS#7 signedData content info.
+  if (NSS_CMSContentInfo_GetContentTypeTag(cinfo)
+        != SEC_OID_PKCS7_SIGNED_DATA) {
+    return NS_ERROR_CMS_VERIFY_NO_CONTENT_INFO;
   }
 
   // Parse the certificates into CERTCertificate objects held in memory so
