@@ -35,6 +35,10 @@ using CrashReporter::GetIDFromMinidump;
 
 #include "mozilla/Telemetry.h"
 
+#ifdef XP_WIN
+#include "WMFDecoderModule.h"
+#endif
+
 #ifdef MOZ_WIDEVINE_EME
 #include "mozilla/dom/WidevineCDMManifestBinding.h"
 #include "widevine-adapter/WidevineAdapter.h"
