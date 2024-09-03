@@ -3082,17 +3082,6 @@ nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
   return result;
 }
 
-static inline bool
-IsTransformed(nsIFrame* aForFrame, nsIFrame* aTopFrame)
-{
-  for (nsIFrame* f = aForFrame; f != aTopFrame; f = f->GetParent()) {
-    if (f->IsTransformed()) {
-      return true;
-    }
-  }
-  return false;
-}
-
 nsRect
 nsCSSRendering::ComputeImageLayerPositioningArea(nsPresContext* aPresContext,
                                                  nsIFrame* aForFrame,
