@@ -4739,7 +4739,9 @@ PresShell::RenderDocument(const nsRect& aRect, uint32_t aFlags,
   }
 
   nsLayoutUtils::PaintFrame(&rc, rootFrame, nsRegion(aRect),
-                            aBackgroundColor, flags);
+                            aBackgroundColor,
+                            nsDisplayListBuilderMode::PAINTING,
+                            flags);
 
   // We don't call NotifyCompositorOfVisibleRegionsChange here because we're
   // not painting to the window, and hence there should be no change.
@@ -6366,7 +6368,8 @@ PresShell::Paint(nsView*        aViewToPaint,
     InitVisibleRegionsIfVisualizationEnabled(VisibilityCounter::IN_DISPLAYPORT);
 
     // We can paint directly into the widget using its layer manager.
-    nsLayoutUtils::PaintFrame(nullptr, frame, aDirtyRegion, bgcolor, flags);
+    nsLayoutUtils::PaintFrame(nullptr, frame, aDirtyRegion, bgcolor,
+                              nsDisplayListBuilderMode::PAINTING, flags);
 
     DecVisibleCount(oldInDisplayPortFrames, VisibilityCounter::IN_DISPLAYPORT);
 
