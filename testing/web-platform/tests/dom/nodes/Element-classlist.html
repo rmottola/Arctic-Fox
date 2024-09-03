@@ -377,8 +377,24 @@ test(function () {
     failed = e;
   }
   assert_equals(secondelem.classList,realList);
-  assert_false(failed,'an error was thrown');
-}, 'classList must be read-only');
+  assert_equals(secondelem.classList.length,2);
+  assert_equals(secondelem.classList[0],'foo');
+  assert_equals(secondelem.classList[1],'bar');
+}, 'classList must have [PutForwards=value]');
+test(function () {
+  var foo = document.createElement('div');
+  foo.className = 'a';
+  foo.classList.replace('token1', 'token2');
+
+  assert_equals(foo.className, 'a');
+
+  foo.classList.replace('a', 'b');
+  assert_equals(foo.className, 'b');
+
+  assert_throws('SYNTAX_ERR', function () { foo.classList.replace('t with space', '') });
+  assert_throws('INVALID_CHARACTER_ERR', function () { foo.classList.replace('t with space', 'foo') });
+  assert_throws('SYNTAX_ERR', function () { foo.classList.replace('', 'foo') });
+}, 'classList.replace should work');
     </script>
   </head>
   <body>
