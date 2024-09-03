@@ -7389,7 +7389,8 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
             size_t length;
             int32_t stride;
             mozilla::UniquePtr<char[]> surfaceData =
-              nsContentUtils::GetSurfaceData(dataSurface, &length, &stride);
+              nsContentUtils::GetSurfaceData(WrapNotNull(dataSurface), &length,
+                                             &stride);
 
             IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
             item->flavor() = flavorStr;
@@ -7493,8 +7494,9 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
 }
 
 mozilla::UniquePtr<char[]>
-nsContentUtils::GetSurfaceData(mozilla::gfx::DataSourceSurface* aSurface,
-                               size_t* aLength, int32_t* aStride)
+nsContentUtils::GetSurfaceData(
+  NotNull<mozilla::gfx::DataSourceSurface*> aSurface,
+  size_t* aLength, int32_t* aStride)
 {
   mozilla::gfx::DataSourceSurface::MappedSurface map;
   if (NS_WARN_IF(!aSurface->Map(mozilla::gfx::DataSourceSurface::MapType::READ, &map))) {
