@@ -68,12 +68,21 @@ ServoStyleSet::EndUpdate()
   return NS_OK;
 }
 
-// resolve a style context
 already_AddRefed<nsStyleContext>
 ServoStyleSet::ResolveStyleFor(Element* aElement,
                                nsStyleContext* aParentContext)
 {
-  RefPtr<ServoComputedValues> computedValues = dont_AddRef(Servo_GetComputedValues(aElement));
+  return GetContext(aElement, aParentContext, nullptr,
+                    CSSPseudoElementType::NotPseudo);
+}
+
+already_AddRefed<nsStyleContext>
+ServoStyleSet::GetContext(nsIContent* aContent,
+                          nsStyleContext* aParentContext,
+                          nsIAtom* aPseudoTag,
+                          CSSPseudoElementType aPseudoType)
+{
+  RefPtr<ServoComputedValues> computedValues = dont_AddRef(Servo_GetComputedValues(aContent));
   MOZ_ASSERT(computedValues);
 
   // XXXbholley: nsStyleSet does visited handling here.
@@ -82,8 +91,8 @@ ServoStyleSet::ResolveStyleFor(Element* aElement,
   // duplicate something that servo already does?
   bool skipFixup = false;
 
-  return NS_NewStyleContext(aParentContext, mPresContext, nullptr,
-                            CSSPseudoElementType::NotPseudo,
+  return NS_NewStyleContext(aParentContext, mPresContext, aPseudoTag,
+                            aPseudoType,
                             computedValues.forget(), skipFixup);
 }
 
@@ -99,7 +108,9 @@ already_AddRefed<nsStyleContext>
 ServoStyleSet::ResolveStyleForText(nsIContent* aTextNode,
                                    nsStyleContext* aParentContext)
 {
-  MOZ_CRASH("stylo: not implemented");
+  MOZ_ASSERT(aTextNode && aTextNode->IsNodeOfType(nsINode::eTEXT));
+  return GetContext(aTextNode, aParentContext, nsCSSAnonBoxes::mozText,
+                    CSSPseudoElementType::AnonBox);
 }
 
 already_AddRefed<nsStyleContext>
