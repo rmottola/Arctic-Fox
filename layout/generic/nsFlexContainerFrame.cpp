@@ -554,6 +554,9 @@ public:
     return mFlexShrink * mFlexBaseSize;
   }
 
+  const nsSize& IntrinsicRatio() const { return mIntrinsicRatio; }
+  bool HasIntrinsicRatio() const { return mIntrinsicRatio != nsSize(); }
+
   // Getters for margin:
   // ===================
   const nsMargin& GetMargin() const { return mMargin; }
@@ -745,6 +748,8 @@ protected:
   // Values that we already know in constructor: (and are hence mostly 'const')
   const float mFlexGrow;
   const float mFlexShrink;
+
+  const nsSize mIntrinsicRatio;
 
   const nsMargin mBorderPadding;
   nsMargin mMargin; // non-const because we need to resolve auto margins
@@ -1389,7 +1394,6 @@ MainSizeFromAspectRatio(nscoord aCrossSize,
 static nscoord
 PartiallyResolveAutoMinSize(const FlexItem& aFlexItem,
                             const nsHTMLReflowState& aItemReflowState,
-                            const nsSize& aIntrinsicRatio,
                             const FlexboxAxisTracker& aAxisTracker)
 {
   MOZ_ASSERT(aFlexItem.NeedsMinSizeAutoResolution(),
@@ -1426,7 +1430,7 @@ PartiallyResolveAutoMinSize(const FlexItem& aFlexItem,
   // * if the item has an intrinsic aspect ratio, the width (height) calculated
   //   from the aspect ratio and any definite size constraints in the opposite
   //   dimension.
-  if (aAxisTracker.GetCrossComponent(aIntrinsicRatio) != 0) {
+  if (aAxisTracker.GetCrossComponent(aFlexItem.IntrinsicRatio()) != 0) {
     // We have a usable aspect ratio. (not going to divide by 0)
     const bool useMinSizeIfCrossSizeIsIndefinite = true;
     nscoord crossSizeToUseWithRatio =
@@ -1435,7 +1439,7 @@ PartiallyResolveAutoMinSize(const FlexItem& aFlexItem,
                               aAxisTracker);
     nscoord minMainSizeFromRatio =
       MainSizeFromAspectRatio(crossSizeToUseWithRatio,
-                              aIntrinsicRatio, aAxisTracker);
+                              aFlexItem.IntrinsicRatio(), aAxisTracker);
     minMainSize = std::min(minMainSize, minMainSizeFromRatio);
   }
 
@@ -1449,7 +1453,6 @@ PartiallyResolveAutoMinSize(const FlexItem& aFlexItem,
 static bool
 ResolveAutoFlexBasisFromRatio(FlexItem& aFlexItem,
                               const nsHTMLReflowState& aItemReflowState,
-                              const nsSize& aIntrinsicRatio,
                               const FlexboxAxisTracker& aAxisTracker)
 {
   MOZ_ASSERT(NS_AUTOHEIGHT == aFlexItem.GetFlexBaseSize(),
@@ -1460,7 +1463,7 @@ ResolveAutoFlexBasisFromRatio(FlexItem& aFlexItem,
   //  - a definite cross size
   // then the flex base size is calculated from its inner cross size and the
   // flex item’s intrinsic aspect ratio.
-  if (aAxisTracker.GetCrossComponent(aIntrinsicRatio) != 0) {
+  if (aAxisTracker.GetCrossComponent(aFlexItem.IntrinsicRatio()) != 0) {
     // We have a usable aspect ratio. (not going to divide by 0)
     const bool useMinSizeIfCrossSizeIsIndefinite = false;
     nscoord crossSizeToUseWithRatio =
@@ -1471,7 +1474,7 @@ ResolveAutoFlexBasisFromRatio(FlexItem& aFlexItem,
       // We have a definite cross-size
       nscoord mainSizeFromRatio =
         MainSizeFromAspectRatio(crossSizeToUseWithRatio,
-                                aIntrinsicRatio, aAxisTracker);
+                                aFlexItem.IntrinsicRatio(), aAxisTracker);
       aFlexItem.SetFlexBaseSizeAndMainSize(mainSizeFromRatio);
       return true;
     }
@@ -1529,19 +1532,15 @@ nsFlexContainerFrame::
     }
   }
 
-  // We'll need the intrinsic ratio (if there is one), regardless of whether
-  // we're resolving min-[width|height]:auto or flex-basis:auto.
-  const nsSize ratio = aFlexItem.Frame()->GetIntrinsicRatio();
-
   nscoord resolvedMinSize; // (only set/used if isMainMinSizeAuto==true)
   bool minSizeNeedsToMeasureContent = false; // assume the best
   if (isMainMinSizeAuto) {
     // Resolve the min-size, except for considering the min-content size.
     // (We'll consider that later, if we need to.)
     resolvedMinSize = PartiallyResolveAutoMinSize(aFlexItem, aItemReflowState,
-                                                  ratio, aAxisTracker);
+                                                  aAxisTracker);
     if (resolvedMinSize > 0 &&
-        aAxisTracker.GetCrossComponent(ratio) == 0) {
+        aAxisTracker.GetCrossComponent(aFlexItem.IntrinsicRatio()) == 0) {
       // We don't have a usable aspect ratio, so we need to consider our
       // min-content size as another candidate min-size, which we'll have to
       // min() with the current resolvedMinSize.
@@ -1554,7 +1553,7 @@ nsFlexContainerFrame::
   bool flexBasisNeedsToMeasureContent = false; // assume the best
   if (isMainSizeAuto) {
     if (!ResolveAutoFlexBasisFromRatio(aFlexItem, aItemReflowState,
-                                       ratio, aAxisTracker)) {
+                                       aAxisTracker)) {
       flexBasisNeedsToMeasureContent = true;
     }
   }
@@ -1674,6 +1673,7 @@ FlexItem::FlexItem(nsHTMLReflowState& aFlexItemReflowState,
   : mFrame(aFlexItemReflowState.frame),
     mFlexGrow(aFlexGrow),
     mFlexShrink(aFlexShrink),
+    mIntrinsicRatio(mFrame->GetIntrinsicRatio()),
     mBorderPadding(aFlexItemReflowState.ComputedPhysicalBorderPadding()),
     mMargin(aFlexItemReflowState.ComputedPhysicalMargin()),
     mMainMinSize(aMainMinSize),
@@ -1766,6 +1766,7 @@ FlexItem::FlexItem(nsIFrame* aChildFrame, nscoord aCrossSize,
   : mFrame(aChildFrame),
     mFlexGrow(0.0f),
     mFlexShrink(0.0f),
+    mIntrinsicRatio(),
     // mBorderPadding uses default constructor,
     // mMargin uses default constructor,
     mFlexBaseSize(0),
