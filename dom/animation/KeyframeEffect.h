@@ -221,7 +221,7 @@ public:
   {
     Maybe<NonOwningAnimationTarget> result;
     if (mTarget) {
-      result.emplace(mTarget, mPseudoType);
+      result.emplace(*mTarget);
     }
     return result;
   }
@@ -365,11 +365,10 @@ protected:
   // owning Animation's timing.
   void UpdateTargetRegistration();
 
-  nsCOMPtr<Element> mTarget;
+  Maybe<OwningAnimationTarget> mTarget;
   RefPtr<Animation> mAnimation;
 
   RefPtr<AnimationEffectTimingReadOnly> mTiming;
-  CSSPseudoElementType mPseudoType;
 
   // The specified keyframes.
   nsTArray<Keyframe>          mFrames;
