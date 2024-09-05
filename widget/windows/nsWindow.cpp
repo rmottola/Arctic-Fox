@@ -137,6 +137,8 @@
 #include "mozilla/widget/WinNativeEventData.h"
 #include "nsThemeConstants.h"
 #include "nsBidiKeyboard.h"
+#include "nsThemeConstants.h"
+#include "gfxConfig.h"
 
 #include "nsIGfxInfo.h"
 #include "nsUXThemeConstants.h"
@@ -6870,7 +6872,7 @@ nsWindow::HasBogusPopupsDropShadowOnMultiMonitor() {
       gfxWindowsPlatform::GetPlatform()->IsDirect2DBackend() ? TRI_TRUE : TRI_FALSE;
     if (!sHasBogusPopupsDropShadowOnMultiMonitor) {
       // Otherwise check if Direct3D 9 may be used.
-      if (gfxPlatform::GetPlatform()->ShouldUseLayersAcceleration() &&
+      if (gfxConfig::IsEnabled(Feature::HW_COMPOSITING) &&
           !gfxPrefs::LayersPreferOpenGL())
       {
         nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
@@ -6880,7 +6882,7 @@ nsWindow::HasBogusPopupsDropShadowOnMultiMonitor() {
           if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_DIRECT3D_9_LAYERS,
                                                      discardFailureId, &status))) {
             if (status == nsIGfxInfo::FEATURE_STATUS_OK ||
-                gfxPrefs::LayersAccelerationForceEnabled())
+                gfxConfig::IsForcedOnByUser(Feature::HW_COMPOSITING))
             {
               sHasBogusPopupsDropShadowOnMultiMonitor = TRI_TRUE;
             }
