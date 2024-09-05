@@ -18985,6 +18985,10 @@
         "url": "/web-animations/animation/reverse.html"
       },
       {
+        "path": "web-animations/document/getAnimations.html",
+        "url": "/web-animations/document/getAnimations.html"
+      },
+      {
         "path": "web-animations/keyframe-effect/constructor.html",
         "url": "/web-animations/keyframe-effect/constructor.html"
       },
