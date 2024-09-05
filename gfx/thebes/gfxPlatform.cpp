@@ -175,8 +175,6 @@ static void ShutdownCMS();
 #include "mozilla/gfx/SourceSurfaceCairo.h"
 using namespace mozilla::gfx;
 
-void InitLayersAccelerationPrefs();
-
 /* Class to listen for pref changes so that chrome code can dynamically
    force sRGB as an output profile. See Bug #452125. */
 class SRGBOverrideObserver final : public nsIObserver,
@@ -658,6 +656,7 @@ gfxPlatform::Init()
 #else
     #error "No gfxPlatform implementation available"
 #endif
+    gPlatform->InitAcceleration();
 
 #ifdef USE_SKIA
     SkGraphics::Init();
@@ -667,7 +666,6 @@ gfxPlatform::Init()
     GLContext::StaticInit();
 #endif
 
-    InitLayersAccelerationPrefs();
     InitLayersIPC();
 
     gPlatform->PopulateScreenInfo();
@@ -2066,7 +2064,7 @@ static bool sPrefBrowserTabsRemoteAutostart = false;
 static bool sLayersAccelerationPrefsInitialized = false;
 
 void
-InitLayersAccelerationPrefs()
+gfxPlatform::InitAcceleration()
 {
   if (sLayersAccelerationPrefsInitialized) {
     return;
@@ -2232,7 +2230,7 @@ gfxPlatform::UsesOffMainThreadCompositing()
   static bool result = false;
 
   if (firstTime) {
-    InitLayersAccelerationPrefs();
+    MOZ_ASSERT(sLayersAccelerationPrefsInitialized);
     result =
       sPrefBrowserTabsRemoteAutostart ||
       !gfxPrefs::LayersOffMainThreadCompositionForceDisabled();

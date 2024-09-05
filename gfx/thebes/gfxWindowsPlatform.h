@@ -281,6 +281,7 @@ protected:
 
 private:
     void Init();
+    void InitAcceleration() override;
 
     void InitializeDevices();
     void InitializeD3D11();
