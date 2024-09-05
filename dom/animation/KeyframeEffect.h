@@ -192,8 +192,7 @@ class KeyframeEffectReadOnly : public AnimationEffectReadOnly
 {
 public:
   KeyframeEffectReadOnly(nsIDocument* aDocument,
-                         Element* aTarget,
-                         CSSPseudoElementType aPseudoType,
+                         const Maybe<OwningAnimationTarget>& aTarget,
                          const TimingParams& aTiming);
 
   NS_DECL_ISUPPORTS_INHERITED
@@ -339,8 +338,7 @@ public:
 
 protected:
   KeyframeEffectReadOnly(nsIDocument* aDocument,
-                         Element* aTarget,
-                         CSSPseudoElementType aPseudoType,
+                         const Maybe<OwningAnimationTarget>& aTarget,
                          AnimationEffectTimingReadOnly* aTiming);
 
   virtual ~KeyframeEffectReadOnly();
@@ -413,8 +411,7 @@ class KeyframeEffect : public KeyframeEffectReadOnly
 {
 public:
   KeyframeEffect(nsIDocument* aDocument,
-                 Element* aTarget,
-                 CSSPseudoElementType aPseudoType,
+                 const Maybe<OwningAnimationTarget>& aTarget,
                  const TimingParams& aTiming);
 
   JSObject* WrapObject(JSContext* aCx,
