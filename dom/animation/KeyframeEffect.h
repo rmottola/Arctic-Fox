@@ -433,6 +433,8 @@ public:
 
   void NotifySpecifiedTimingUpdated();
 
+  void SetTarget(const Nullable<ElementOrCSSPseudoElement>& aTarget);
+
 protected:
   ~KeyframeEffect() override;
 };
