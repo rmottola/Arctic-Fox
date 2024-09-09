@@ -12,6 +12,7 @@ TESTING_JS_MODULES += [
     'AppInfo.jsm',
     'Assert.jsm',
     'CoverageUtils.jsm',
+    'MockRegistrar.jsm',
     'StructuredLog.jsm',
     'TestUtils.jsm',
 ]
