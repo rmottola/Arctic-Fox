@@ -106,481 +106,640 @@
         "url": "/battery-status/battery-discharging-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.solid.destination-atop.png"
+        "path": "battery-status/battery-full-manual.html",
+        "url": "/battery-status/battery-full-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.solid.destination-in.png"
+        "path": "battery-status/battery-plugging-in-manual.html",
+        "url": "/battery-status/battery-plugging-in-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.solid.destination-out.png"
+        "path": "battery-status/battery-unplugging-manual.html",
+        "url": "/battery-status/battery-unplugging-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.solid.destination-over.png"
+        "path": "gamepad/events-manual.html",
+        "url": "/gamepad/events-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.solid.lighter.png"
+        "path": "gamepad/getgamepads-polling-manual.html",
+        "url": "/gamepad/getgamepads-polling-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.solid.source-atop.png"
+        "path": "gamepad/idlharness-manual.html",
+        "url": "/gamepad/idlharness-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.solid.source-in.png"
+        "path": "gamepad/timestamp-manual.html",
+        "url": "/gamepad/timestamp-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.solid.source-out.png"
+        "path": "geolocation-API/getCurrentPosition_permission-manual.html",
+        "url": "/geolocation-API/getCurrentPosition_permission-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.solid.source-over.png"
+        "path": "geolocation-API/getCurrentPosition_permission_allow-manual.html",
+        "url": "/geolocation-API/getCurrentPosition_permission_allow-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.solid.xor.png"
+        "path": "geolocation-API/getCurrentPosition_permission_deny-manual.html",
+        "url": "/geolocation-API/getCurrentPosition_permission_deny-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.transparent.copy.png"
+        "path": "geolocation-API/watchPosition_permission-manual.html",
+        "url": "/geolocation-API/watchPosition_permission-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.transparent.destination-atop.png"
+        "path": "html-longdesc/data-uri-image-data-uri-description-manual.html",
+        "url": "/html-longdesc/data-uri-image-data-uri-description-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.transparent.destination-in.png"
+        "path": "html-longdesc/data-uri-image-external-description-fragment-manual.html",
+        "url": "/html-longdesc/data-uri-image-external-description-fragment-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.transparent.destination-out.png"
+        "path": "html-longdesc/data-uri-image-external-description-manual.html",
+        "url": "/html-longdesc/data-uri-image-external-description-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.transparent.destination-over.png"
+        "path": "html-longdesc/data-uri-image-internal-description-manual.html",
+        "url": "/html-longdesc/data-uri-image-internal-description-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.transparent.lighter.png"
+        "path": "html-longdesc/empty-image-data-uri-description-manual.html",
+        "url": "/html-longdesc/empty-image-data-uri-description-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.transparent.source-atop.png"
+        "path": "html-longdesc/empty-image-external-description-fragment-manual.html",
+        "url": "/html-longdesc/empty-image-external-description-fragment-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.transparent.source-in.png"
+        "path": "html-longdesc/empty-image-external-description-manual.html",
+        "url": "/html-longdesc/empty-image-external-description-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.transparent.source-out.png"
+        "path": "html-longdesc/empty-image-internal-description-manual.html",
+        "url": "/html-longdesc/empty-image-internal-description-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.transparent.source-over.png"
+        "path": "html-longdesc/empty-longdesc-manual.html",
+        "url": "/html-longdesc/empty-longdesc-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.transparent.xor.png"
+        "path": "html-longdesc/external-image-data-uri-description-girt-by-spaces-manual.html",
+        "url": "/html-longdesc/external-image-data-uri-description-girt-by-spaces-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.fill.copy.png"
+        "path": "html-longdesc/external-image-data-uri-description-manual.html",
+        "url": "/html-longdesc/external-image-data-uri-description-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.fill.destination-atop.png"
+        "path": "html-longdesc/external-image-external-description-fragment-girt-by-spaces-manual.html",
+        "url": "/html-longdesc/external-image-external-description-fragment-girt-by-spaces-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.fill.destination-in.png"
+        "path": "html-longdesc/external-image-external-description-fragment-manual.html",
+        "url": "/html-longdesc/external-image-external-description-fragment-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.fill.source-in.png"
+        "path": "html-longdesc/external-image-external-description-girt-by-spaces-manual.html",
+        "url": "/html-longdesc/external-image-external-description-girt-by-spaces-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.fill.source-out.png"
+        "path": "html-longdesc/external-image-external-description-manual.html",
+        "url": "/html-longdesc/external-image-external-description-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.image.copy.png"
+        "path": "html-longdesc/external-image-internal-description-girt-by-spaces-manual.html",
+        "url": "/html-longdesc/external-image-internal-description-girt-by-spaces-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.image.destination-atop.png"
+        "path": "html-longdesc/external-image-internal-description-manual.html",
+        "url": "/html-longdesc/external-image-internal-description-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.image.destination-in.png"
+        "path": "html-longdesc/external-image-with-absolute-base-external-description-manual.html",
+        "url": "/html-longdesc/external-image-with-absolute-base-external-description-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.image.source-in.png"
+        "path": "html-longdesc/external-image-with-relative-base-external-description-manual.html",
+        "url": "/html-longdesc/external-image-with-relative-base-external-description-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.image.source-out.png"
+        "path": "html-longdesc/fail-fragment-pointer-manual.html",
+        "url": "/html-longdesc/fail-fragment-pointer-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.nocontext.copy.png"
+        "path": "html-longdesc/iframe-discoverability-manual.html",
+        "url": "/html-longdesc/iframe-discoverability-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.nocontext.destination-atop.png"
+        "path": "html-longdesc/invalid-longdesc-manual.html",
+        "url": "/html-longdesc/invalid-longdesc-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.nocontext.destination-in.png"
+        "path": "html-longdesc/reflected-changing-longdesc-manual.html",
+        "url": "/html-longdesc/reflected-changing-longdesc-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.nocontext.source-in.png"
+        "path": "html-media-capture/capture_audio-manual.html",
+        "url": "/html-media-capture/capture_audio-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.nocontext.source-out.png"
+        "path": "html-media-capture/capture_audio_cancel-manual.html",
+        "url": "/html-media-capture/capture_audio_cancel-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.pattern.copy.png"
+        "path": "html-media-capture/capture_image-manual.html",
+        "url": "/html-media-capture/capture_image-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.pattern.destination-atop.png"
+        "path": "html-media-capture/capture_image_cancel-manual.html",
+        "url": "/html-media-capture/capture_image_cancel-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.pattern.destination-in.png"
+        "path": "html-media-capture/capture_video-manual.html",
+        "url": "/html-media-capture/capture_video-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.pattern.source-in.png"
+        "path": "html-media-capture/capture_video_cancel-manual.html",
+        "url": "/html-media-capture/capture_video_cancel-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/2d.composite.uncovered.pattern.source-out.png"
+        "path": "html/browsers/history/the-history-interface/non-automated/traverse_the_history_unload_prompt_1-manual.html",
+        "url": "/html/browsers/history/the-history-interface/non-automated/traverse_the_history_unload_prompt_1-manual.html"
       },
       {
-        "url": "/2dcontext/compositing/canvas_compositing_globalcompositeoperation_001-ref.htm"
+        "path": "html/browsers/history/the-history-interface/non-automated/traverse_the_history_unload_prompt_2-manual.html",
+        "url": "/html/browsers/history/the-history-interface/non-automated/traverse_the_history_unload_prompt_2-manual.html"
       },
       {
-        "url": "/2dcontext/conformance-requirements/2d.coordinatespace.png"
+        "path": "html/browsers/history/the-location-interface/non-automated/manual_click_assign_during_load-manual.html",
+        "url": "/html/browsers/history/the-location-interface/non-automated/manual_click_assign_during_load-manual.html"
       },
       {
-        "url": "/2dcontext/drawing-rectangles-to-the-canvas/clear-100x50.png"
+        "path": "html/browsers/history/the-location-interface/non-automated/manual_click_location_replace_during_load-manual.html",
+        "url": "/html/browsers/history/the-location-interface/non-automated/manual_click_location_replace_during_load-manual.html"
       },
       {
-        "url": "/2dcontext/drawing-text-to-the-canvas/2d.text.draw.fill.basic.png"
+        "path": "html/browsers/history/the-location-interface/non-automated/manual_click_replace_during_load-manual.html",
+        "url": "/html/browsers/history/the-location-interface/non-automated/manual_click_replace_during_load-manual.html"
       },
       {
-        "url": "/2dcontext/drawing-text-to-the-canvas/2d.text.draw.fill.maxWidth.large.png"
+        "path": "html/browsers/history/the-location-interface/non-automated/manual_form_submit_assign_during_load-manual.html",
+        "url": "/html/browsers/history/the-location-interface/non-automated/manual_form_submit_assign_during_load-manual.html"
       },
       {
-        "url": "/2dcontext/drawing-text-to-the-canvas/2d.text.draw.fill.rtl.png"
+        "path": "html/browsers/history/the-location-interface/non-automated/reload_in_resize-manual.html",
+        "url": "/html/browsers/history/the-location-interface/non-automated/reload_in_resize-manual.html"
       },
       {
-        "url": "/2dcontext/drawing-text-to-the-canvas/2d.text.draw.stroke.basic.png"
+        "path": "html/browsers/offline/application-cache-api/api_status_checking-manual.html",
+        "url": "/html/browsers/offline/application-cache-api/api_status_checking-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.current.removed.png"
+        "path": "html/browsers/offline/application-cache-api/api_status_downloading-manual.html",
+        "url": "/html/browsers/offline/application-cache-api/api_status_downloading-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hex3.png"
+        "path": "html/browsers/offline/application-cache-api/api_status_obsolete-manual.html",
+        "url": "/html/browsers/offline/application-cache-api/api_status_obsolete-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hex6.png"
+        "path": "html/browsers/offline/application-cache-api/api_status_updateready-manual.html",
+        "url": "/html/browsers/offline/application-cache-api/api_status_updateready-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsl-1.png"
+        "path": "html/browsers/offline/application-cache-api/api_swapcache-manual.html",
+        "url": "/html/browsers/offline/application-cache-api/api_swapcache-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsl-2.png"
+        "path": "html/browsers/offline/browser-state/navigator_online_event-manual.html",
+        "url": "/html/browsers/offline/browser-state/navigator_online_event-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsl-3.png"
+        "path": "html/browsers/offline/introduction-4/event_downloading-manual.html",
+        "url": "/html/browsers/offline/introduction-4/event_downloading-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsl-4.png"
+        "path": "html/browsers/offline/introduction-4/event_error-manual.html",
+        "url": "/html/browsers/offline/introduction-4/event_error-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsl-5.png"
+        "path": "html/browsers/offline/introduction-4/event_obsolete-manual.html",
+        "url": "/html/browsers/offline/introduction-4/event_obsolete-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsl-6.png"
+        "path": "html/browsers/offline/introduction-4/event_updateready-manual.html",
+        "url": "/html/browsers/offline/introduction-4/event_updateready-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsl-clamp-1.png"
+        "path": "html/browsers/offline/introduction-4/event_updateready_swapcache-manual.html",
+        "url": "/html/browsers/offline/introduction-4/event_updateready_swapcache-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsl-clamp-2.png"
+        "path": "html/browsers/offline/manifest_main_empty-manual.html",
+        "url": "/html/browsers/offline/manifest_main_empty-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsl-clamp-3.png"
+        "path": "html/browsers/offline/manifest_notchanged_online-manual.html",
+        "url": "/html/browsers/offline/manifest_notchanged_online-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsl-clamp-4.png"
+        "path": "html/browsers/offline/manifest_section_empty-manual.html",
+        "url": "/html/browsers/offline/manifest_section_empty-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsla-1.png"
+        "path": "html/browsers/offline/manifest_section_many-manual.html",
+        "url": "/html/browsers/offline/manifest_section_many-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsla-2.png"
+        "path": "html/browsers/offline/section_network_offline-manual.html",
+        "url": "/html/browsers/offline/section_network_offline-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsla-clamp-1.png"
+        "path": "html/browsers/offline/section_network_online-manual.html",
+        "url": "/html/browsers/offline/section_network_online-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsla-clamp-2.png"
+        "path": "html/browsers/the-window-object/garbage-collection-and-browsing-contexts/non-automated/discard_iframe_history_1-manual.html",
+        "url": "/html/browsers/the-window-object/garbage-collection-and-browsing-contexts/non-automated/discard_iframe_history_1-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsla-clamp-3.png"
+        "path": "html/browsers/the-window-object/garbage-collection-and-browsing-contexts/non-automated/discard_iframe_history_2-manual.html",
+        "url": "/html/browsers/the-window-object/garbage-collection-and-browsing-contexts/non-automated/discard_iframe_history_2-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsla-clamp-4.png"
+        "path": "html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-locationbar-manual.html",
+        "url": "/html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-locationbar-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsla-clamp-5.png"
+        "path": "html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-menubar-manual.html",
+        "url": "/html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-menubar-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.hsla-clamp-6.png"
+        "path": "html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-personalbar-manual.html",
+        "url": "/html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-personalbar-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.html4.png"
+        "path": "html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-scrollbars-manual.html",
+        "url": "/html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-scrollbars-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgb-clamp-1.png"
+        "path": "html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-statusbar-manual.html",
+        "url": "/html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-statusbar-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgb-clamp-2.png"
+        "path": "html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-toolbar-manual.html",
+        "url": "/html/browsers/the-window-object/the-windowproxy-object/test-window-proxy-toolbar-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgb-clamp-3.png"
+        "path": "html/browsers/windows/noreferrer-cross-origin-manual.html",
+        "url": "/html/browsers/windows/noreferrer-cross-origin-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgb-clamp-4.png"
+        "path": "html/editing/dnd/datastore/015-manual.html",
+        "url": "/html/editing/dnd/datastore/015-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgb-clamp-5.png"
+        "path": "html/editing/dnd/events/events-cross-document-suite-manual.html",
+        "url": "/html/editing/dnd/events/events-cross-document-suite-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgb-eof.png"
+        "path": "html/editing/dnd/events/events-file-suite-manual.html",
+        "url": "/html/editing/dnd/events/events-file-suite-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgb-num.png"
+        "path": "html/editing/dnd/events/events-suite-manual.html",
+        "url": "/html/editing/dnd/events/events-suite-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgb-percent.png"
+        "path": "html/editing/dnd/synthetic/005-manual.html",
+        "url": "/html/editing/dnd/synthetic/005-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgba-clamp-1.png"
+        "path": "html/editing/dnd/synthetic/006-manual.html",
+        "url": "/html/editing/dnd/synthetic/006-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgba-clamp-2.png"
+        "path": "html/editing/dnd/target-origin/001-manual.html",
+        "url": "/html/editing/dnd/target-origin/001-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgba-eof.png"
+        "path": "html/editing/dnd/target-origin/002-manual.html",
+        "url": "/html/editing/dnd/target-origin/002-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgba-num-1.png"
+        "path": "html/editing/dnd/target-origin/003-manual.html",
+        "url": "/html/editing/dnd/target-origin/003-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgba-num-2.png"
+        "path": "html/editing/dnd/target-origin/004-manual.html",
+        "url": "/html/editing/dnd/target-origin/004-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgba-percent.png"
+        "path": "html/editing/dnd/target-origin/005-manual.html",
+        "url": "/html/editing/dnd/target-origin/005-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgba-solid-1.png"
+        "path": "html/editing/dnd/target-origin/006-manual.html",
+        "url": "/html/editing/dnd/target-origin/006-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgba-solid-2.png"
+        "path": "html/editing/dnd/target-origin/007-manual.html",
+        "url": "/html/editing/dnd/target-origin/007-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgba-solid-3.png"
+        "path": "html/editing/dnd/target-origin/008-manual.html",
+        "url": "/html/editing/dnd/target-origin/008-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.rgba-solid-4.png"
+        "path": "html/editing/dnd/target-origin/009-manual.html",
+        "url": "/html/editing/dnd/target-origin/009-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.svg-1.png"
+        "path": "html/editing/dnd/target-origin/010-manual.html",
+        "url": "/html/editing/dnd/target-origin/010-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.svg-2.png"
+        "path": "html/editing/dnd/target-origin/011-manual.html",
+        "url": "/html/editing/dnd/target-origin/011-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.transparent-1.png"
+        "path": "html/editing/dnd/target-origin/012-manual.html",
+        "url": "/html/editing/dnd/target-origin/012-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.fillStyle.parse.transparent-2.png"
+        "path": "html/editing/dnd/target-origin/013-manual.html",
+        "url": "/html/editing/dnd/target-origin/013-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.gradient.interpolate.alpha.png"
+        "path": "html/editing/dnd/target-origin/101-manual.html",
+        "url": "/html/editing/dnd/target-origin/101-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.gradient.interpolate.colour.png"
+        "path": "html/editing/dnd/target-origin/102-manual.html",
+        "url": "/html/editing/dnd/target-origin/102-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.gradient.interpolate.colouralpha.png"
+        "path": "html/editing/dnd/target-origin/103-manual.html",
+        "url": "/html/editing/dnd/target-origin/103-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.gradient.interpolate.multiple.png"
+        "path": "html/editing/dnd/target-origin/104-manual.html",
+        "url": "/html/editing/dnd/target-origin/104-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.gradient.interpolate.overlap.png"
+        "path": "html/editing/dnd/target-origin/105-manual.html",
+        "url": "/html/editing/dnd/target-origin/105-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.gradient.interpolate.vertical.png"
+        "path": "html/editing/dnd/target-origin/106-manual.html",
+        "url": "/html/editing/dnd/target-origin/106-manual.html"
       },
       {
-        "url": "/2dcontext/fill-and-stroke-styles/2d.gradient.object.current.png"
+        "path": "html/editing/dnd/target-origin/107-manual.html",
+        "url": "/html/editing/dnd/target-origin/107-manual.html"
       },
       {
-        "url": "/2dcontext/green-100x50.png"
+        "path": "html/editing/dnd/target-origin/108-manual.html",
+        "url": "/html/editing/dnd/target-origin/108-manual.html"
       },
       {
-        "url": "/2dcontext/line-styles/canvas_linestyles_linecap_001-ref.htm"
+        "path": "html/editing/dnd/target-origin/109-manual.html",
+        "url": "/html/editing/dnd/target-origin/109-manual.html"
       },
       {
-        "url": "/2dcontext/path-objects/2d.path.fill.overlap.png"
+        "path": "html/editing/dnd/target-origin/110-manual.html",
+        "url": "/html/editing/dnd/target-origin/110-manual.html"
       },
       {
-        "url": "/2dcontext/path-objects/2d.path.stroke.overlap.png"
+        "path": "html/editing/dnd/target-origin/111-manual.html",
+        "url": "/html/editing/dnd/target-origin/111-manual.html"
       },
       {
-        "url": "/2dcontext/pixel-manipulation/2d.imageData.put.alpha.png"
+        "path": "html/editing/dnd/target-origin/112-manual.html",
+        "url": "/html/editing/dnd/target-origin/112-manual.html"
       },
       {
-        "url": "/2dcontext/shadows/2d.shadow.alpha.2.png"
+        "path": "html/editing/dnd/target-origin/113-manual.html",
+        "url": "/html/editing/dnd/target-origin/113-manual.html"
       },
       {
-        "url": "/2dcontext/shadows/2d.shadow.alpha.3.png"
+        "path": "html/editing/dnd/target-origin/114-manual.html",
+        "url": "/html/editing/dnd/target-origin/114-manual.html"
       },
       {
-        "url": "/2dcontext/shadows/2d.shadow.alpha.4.png"
+        "path": "html/editing/dnd/target-origin/115-manual.html",
+        "url": "/html/editing/dnd/target-origin/115-manual.html"
       },
       {
-        "url": "/2dcontext/shadows/2d.shadow.alpha.5.png"
+        "path": "html/editing/dnd/target-origin/116-manual.html",
+        "url": "/html/editing/dnd/target-origin/116-manual.html"
       },
       {
-        "url": "/2dcontext/shadows/2d.shadow.blur.high.png"
+        "path": "html/editing/dnd/target-origin/117-manual.html",
+        "url": "/html/editing/dnd/target-origin/117-manual.html"
       },
       {
-        "url": "/2dcontext/shadows/2d.shadow.blur.low.png"
+        "path": "html/editing/dnd/target-origin/118-manual.html",
+        "url": "/html/editing/dnd/target-origin/118-manual.html"
       },
       {
-        "url": "/2dcontext/shadows/2d.shadow.canvas.alpha.png"
+        "path": "html/editing/dnd/target-origin/201-manual.html",
+        "url": "/html/editing/dnd/target-origin/201-manual.html"
       },
       {
-        "url": "/2dcontext/shadows/2d.shadow.gradient.alpha.png"
+        "path": "html/editing/dnd/the-dragevent-interface/dragevent-manual.html",
+        "url": "/html/editing/dnd/the-dragevent-interface/dragevent-manual.html"
       },
       {
-        "url": "/2dcontext/shadows/2d.shadow.image.alpha.png"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_data_item_file_type-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_data_item_file_type-manual.html"
       },
       {
-        "url": "/2dcontext/shadows/2d.shadow.pattern.alpha.png"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_data_item_kind_file-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_data_item_kind_file-manual.html"
       },
       {
-        "url": "/2dcontext/shadows/canvas_shadows_002-ref.htm"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_data_item_kind_string-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_data_item_kind_string-manual.html"
       },
       {
-        "url": "/2dcontext/the-canvas-state/canvas_state_restore_001-ref.htm"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_data_item_string_type-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_data_item_string_type-manual.html"
       },
       {
-        "url": "/2dcontext/tools/LICENSE.txt"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_inputbox_element-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_inputbox_element-manual.html"
       },
       {
-        "url": "/2dcontext/tools/gentest.py"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_inputbox_element_dbcs-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_inputbox_element_dbcs-manual.html"
       },
       {
-        "url": "/2dcontext/tools/name2dir.yaml"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_link_element-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_link_element-manual.html"
       },
       {
-        "url": "/2dcontext/tools/spec.yaml"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_case_insensitive_COpy-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_case_insensitive_COpy-manual.html"
       },
       {
-        "url": "/2dcontext/tools/specextract.py"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_case_insensitive_STRING-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_case_insensitive_STRING-manual.html"
       },
       {
-        "url": "/2dcontext/tools/templates.yaml"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_case_insensitive_String_-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_case_insensitive_String_-manual.html"
       },
       {
-        "url": "/2dcontext/tools/tests.yaml"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_case_insensitive_linK-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_case_insensitive_linK-manual.html"
       },
       {
-        "url": "/2dcontext/tools/tests2d.yaml"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_copy-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_copy-manual.html"
       },
       {
-        "url": "/2dcontext/tools/tests2dtext.yaml"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_foo-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_foo-manual.html"
       },
       {
-        "url": "/2dcontext/transformations/canvas_transformations_scale_001-ref.htm"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_link-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_link-manual.html"
       },
       {
-        "url": "/DOMEvents/tests/approved/support/ProcessingInstruction.DOMCharacterDataModified.xml"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_move-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_move-manual.html"
       },
       {
-        "url": "/DOMEvents/tests/submissions/Microsoft/ProcessingInstruction.DOMCharacterDataModified.xml"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_multiple_values_foo_bar_move-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_multiple_values_foo_bar_move-manual.html"
       },
       {
-        "url": "/DOMEvents/tests/submissions/Microsoft/converted/support/ProcessingInstruction.DOMCharacterDataModified.xml"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_multiple_values_foo_link-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_multiple_values_foo_link-manual.html"
       },
       {
-        "url": "/DOMEvents/tests/submissions/Microsoft/support/16kb.js"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_multiple_values_move_copy-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_multiple_values_move_copy-manual.html"
       },
       {
-        "url": "/DOMEvents/tests/submissions/Microsoft/support/InvalidBitMap.png"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_not_specified-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_not_specified-manual.html"
       },
       {
-        "url": "/DOMEvents/tests/submissions/Microsoft/support/iepreview.png"
+        "path": "html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_unordered_unique_space_separated-manual.html",
+        "url": "/html/editing/dnd/the-dropzone-attribute/dropzone_attribute_value_unordered_unique_space_separated-manual.html"
       },
       {
-        "url": "/DOMEvents/tests/submissions/Microsoft/support/navigate.js"
+        "path": "html/editing/focus/focus-01-manual.html",
+        "url": "/html/editing/focus/focus-01-manual.html"
       },
       {
-        "url": "/DOMEvents/tests/submissions/Microsoft/support/style01.css"
+        "path": "html/editing/focus/focus-02-manual.html",
+        "url": "/html/editing/focus/focus-02-manual.html"
       },
       {
-        "url": "/FileAPI/BlobURL/support/file_test1.js"
+        "path": "html/editing/focus/sequential-focus-navigation-and-the-tabindex-attribute/focus-tabindex-negative-manual.html",
+        "url": "/html/editing/focus/sequential-focus-navigation-and-the-tabindex-attribute/focus-tabindex-negative-manual.html"
       },
       {
-        "url": "/FileAPI/BlobURL/support/file_test2.txt"
+        "path": "html/editing/focus/sequential-focus-navigation-and-the-tabindex-attribute/focus-tabindex-order-manual.html",
+        "url": "/html/editing/focus/sequential-focus-navigation-and-the-tabindex-attribute/focus-tabindex-order-manual.html"
       },
       {
-        "url": "/FileAPI/FileReader/support/file_test1.txt"
+        "path": "html/editing/focus/sequential-focus-navigation-and-the-tabindex-attribute/focus-tabindex-positive-manual.html",
+        "url": "/html/editing/focus/sequential-focus-navigation-and-the-tabindex-attribute/focus-tabindex-positive-manual.html"
       },
       {
-        "url": "/FileAPI/filelist-section/support/upload.txt"
+        "path": "html/editing/focus/sequential-focus-navigation-and-the-tabindex-attribute/focus-tabindex-zero-manual.html",
+        "url": "/html/editing/focus/sequential-focus-navigation-and-the-tabindex-attribute/focus-tabindex-zero-manual.html"
       },
       {
-        "url": "/FileAPI/filelist-section/support/upload.zip"
+        "path": "html/obsolete/requirements-for-implementations/the-marquee-element-0/marquee-direction-down-manual.html",
+        "url": "/html/obsolete/requirements-for-implementations/the-marquee-element-0/marquee-direction-down-manual.html"
       },
       {
-        "url": "/FileAPI/reading-data-section/support/blue-100x100.png"
+        "path": "html/obsolete/requirements-for-implementations/the-marquee-element-0/marquee-direction-left-manual.html",
+        "url": "/html/obsolete/requirements-for-implementations/the-marquee-element-0/marquee-direction-left-manual.html"
       },
       {
-        "url": "/FileAPI/support/Blob.js"
+        "path": "html/obsolete/requirements-for-implementations/the-marquee-element-0/marquee-direction-right-manual.html",
+        "url": "/html/obsolete/requirements-for-implementations/the-marquee-element-0/marquee-direction-right-manual.html"
       },
       {
-        "url": "/FileAPI/support/upload.txt"
+        "path": "html/obsolete/requirements-for-implementations/the-marquee-element-0/marquee-direction-up-manual.html",
+        "url": "/html/obsolete/requirements-for-implementations/the-marquee-element-0/marquee-direction-up-manual.html"
       },
       {
-        "url": "/FileAPI/url/url_xmlhttprequest_img-ref.html"
+        "path": "html/semantics/embedded-content/media-elements/audio_controls_present-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/audio_controls_present-manual.html"
       },
       {
-        "url": "/IndexedDB/README.md"
+        "path": "html/semantics/embedded-content/media-elements/audio_loop_current_media_controller-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/audio_loop_current_media_controller-manual.html"
       },
       {
-        "url": "/IndexedDB/idbworker.js"
+        "path": "html/semantics/embedded-content/media-elements/audio_muted_overriding_volume-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/audio_muted_overriding_volume-manual.html"
       },
       {
-        "url": "/IndexedDB/interfaces.idl"
+        "path": "html/semantics/embedded-content/media-elements/audio_muted_present-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/audio_muted_present-manual.html"
       },
       {
-        "url": "/IndexedDB/support.js"
+        "path": "html/semantics/embedded-content/media-elements/audio_volume_loudest-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/audio_volume_loudest-manual.html"
       },
       {
-        "url": "/WebCryptoAPI/README.md"
+        "path": "html/semantics/embedded-content/media-elements/audio_volume_silent-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/audio_volume_silent-manual.html"
       },
       {
-        "url": "/WebIDL/ecmascript-binding/es-exceptions/constructor-object.js"
+        "path": "html/semantics/embedded-content/media-elements/loading-the-media-resource/stable-state-beforeunload-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/loading-the-media-resource/stable-state-beforeunload-manual.html"
       },
       {
-        "url": "/WebIDL/invalid/idl/enum.widl"
+        "path": "html/semantics/embedded-content/media-elements/loading-the-media-resource/stable-state-dialogs-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/loading-the-media-resource/stable-state-dialogs-manual.html"
       },
       {
-        "url": "/WebIDL/invalid/idl/module.widl"
+        "path": "html/semantics/embedded-content/media-elements/loading-the-media-resource/stable-state-print-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/loading-the-media-resource/stable-state-print-manual.html"
       },
       {
-        "url": "/WebIDL/invalid/idl/nonnullableany.widl"
+        "path": "html/semantics/embedded-content/media-elements/video_controls_present-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/video_controls_present-manual.html"
       },
       {
-        "url": "/WebIDL/invalid/idl/nonnullableobjects.widl"
+        "path": "html/semantics/embedded-content/media-elements/video_loop_current_media_controller-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/video_loop_current_media_controller-manual.html"
       },
       {
-        "url": "/WebIDL/invalid/idl/raises.widl"
+        "path": "html/semantics/embedded-content/media-elements/video_muted_overriding_volume-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/video_muted_overriding_volume-manual.html"
       },
       {
-        "url": "/WebIDL/invalid/idl/scopedname.widl"
+        "path": "html/semantics/embedded-content/media-elements/video_muted_present-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/video_muted_present-manual.html"
       },
       {
-        "url": "/WebIDL/invalid/idl/scopedname.widl~"
+        "path": "html/semantics/embedded-content/media-elements/video_volume_loudest-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/video_volume_loudest-manual.html"
       },
       {
-        "url": "/WebIDL/invalid/idl/sequenceAsAttribute.widl"
+        "path": "html/semantics/embedded-content/media-elements/video_volume_silent-manual.html",
+        "url": "/html/semantics/embedded-content/media-elements/video_volume_silent-manual.html"
       },
       {
-        "url": "/WebIDL/invalid/idl/special-omittable.widl"
+        "path": "html/semantics/embedded-content/the-canvas-element/2d.scaled-manual.html",
+        "url": "/html/semantics/embedded-content/the-canvas-element/2d.scaled-manual.html"
       },
       {
-        "url": "/WebIDL/invalid/idl/stringconstants.idl"
+        "path": "html/semantics/forms/attributes-common-to-form-controls/dirname-rtl-manual.html",
+        "url": "/html/semantics/forms/attributes-common-to-form-controls/dirname-rtl-manual.html"
       },
       {
         "url": "/WebIDL/readme.txt"
@@ -3817,178 +3976,577 @@
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-shadow-ref.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/type_selector_root-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-contained-dir_auto-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-contained-dir_auto-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-contained-dir_auto-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_animation_with_timestamp-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-contained-dir_auto-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-contained-dir_auto-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-contained-dir_auto-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_background_properties-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-contained-script-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-contained-script-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-contained-script-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_background_shorthand-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-contained-script-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-contained-script-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-contained-script-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_color-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-contained-style-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-contained-style-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-contained-style-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_font_properties-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-contained-style-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-contained-style-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-contained-style-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_font_shorthand-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-contained-textarea-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-contained-textarea-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-contained-textarea-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_namespace-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-contained-textarea-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-contained-textarea-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-contained-textarea-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_outline_properties-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-EN-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-EN-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-EN-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_outline_shorthand-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-EN-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-EN-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-EN-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_text-decoration_line-through-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_text-shadow-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-N-EN-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-N-EN-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-N-EN-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_timestamp_future-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-N-EN-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-N-EN-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-N-EN-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_timestamp_past-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-N-EN.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-N-EN-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-N-EN.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_transition_with_timestamp-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-N-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-N-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-N-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_normal_wrapped-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-N-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-N-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-N-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_nowrap-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_pre-line_wrapped-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-script-EN-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-script-EN-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-script-EN-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_pre-wrap_wrapped-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-script-EN-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-script-EN-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-script-EN-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_pre_wrapped-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-script-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-script-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-script-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_with_class-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-script-N-EN-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-script-N-EN-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-script-N-EN-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_with_class_object_specific_selector-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-script-N-EN-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-script-N-EN-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-script-N-EN-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_animation_with_timestamp-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-script-N-EN.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-script-N-EN-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-script-N-EN.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_background_properties-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-script-N-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-script-N-L-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-script-N-L.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_background_shorthand-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-script-N-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-script-N-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-script-N-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_color-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-input-script-R.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-input-script-R-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-input-script-R.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_font_properties-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-isolate.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-isolate-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-isolate.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_font_shorthand-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-pre-N-EN.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-pre-N-EN-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-pre-N-EN.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_namespace-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-pre-N-between-Rs.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-pre-N-between-Rs-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-pre-N-between-Rs.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_outline_properties-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-pre-mixed.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-pre-mixed-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-pre-mixed.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_outline_shorthand-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-textarea-N-EN.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-textarea-N-EN-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-textarea-N-EN.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_text-decoration_line-through-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-textarea-N-between-Rs.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-textarea-N-between-Rs-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-textarea-N-between-Rs.html"
       },
       {
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_text-shadow-ref.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_timestamp_future-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-textarea-script-N-EN.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-textarea-script-N-EN-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-textarea-script-N-EN.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_timestamp_past-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-textarea-script-N-between-Rs.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-textarea-script-N-between-Rs-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-textarea-script-N-between-Rs.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_transition_with_timestamp-ref.html"
+        "path": "html/dom/elements/global-attributes/dir_auto-textarea-script-mixed.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-textarea-script-mixed-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/dir_auto-textarea-script-mixed.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_voice_attribute-ref.html"
+        "path": "html/dom/elements/global-attributes/lang-xmllang-01.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/lang-xmllang-01-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/lang-xmllang-01.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_white-space_normal_wrapped-ref.html"
+        "path": "html/dom/elements/global-attributes/lang-xyzzy.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/lang-xyzzy-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/lang-xyzzy.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_white-space_nowrap-ref.html"
+        "path": "html/dom/elements/global-attributes/style-01.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/style-01-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/global-attributes/style-01.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_white-space_pre-line_wrapped-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-001a.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-001-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-001a.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_white-space_pre-wrap_wrapped-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-001b.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-001-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-001b.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_white-space_pre_wrapped-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-001c.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-001-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-001c.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_with_class-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-002a.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-002a-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-002a.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_with_class_object_specific_selector-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-002b.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-002b-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-002b.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/white-space_normal_wrapped-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-002c.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-002c-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-002c.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/white-space_nowrap_wrapped-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-003a.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-003-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-003a.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/white-space_pre-line_wrapped-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-003b.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-003-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-003b.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/white-space_pre-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-003c.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-003-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-003c.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/white-space_pre-wrap_wrapped-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-004a.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-004-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-004a.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/white-space_pre_wrapped-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-004b.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-004-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-004b.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/default_styles/bold_object_default_font-style-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-004c.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-004-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-004c.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/default_styles/inherit_as_default_value_inherits_values_from_media_element-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-005a.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-005-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-005a.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/default_styles/italic_object_default_font-style-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-005b.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-005-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-005b.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/default_styles/underline_object_default_font-style-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-005c.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-005-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-005c.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/size_50-ref.html"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-006a.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-006-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-006a.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/support/2_cues_overlapping_completely_move_up.vtt"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-006b.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-006-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-006b.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/support/2_cues_overlapping_partially_move_down.vtt"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-006c.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-006c-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-006c.html"
       },
       {
-        "url": "/webvtt/rendering/cues-with-video/processing-model/support/2_cues_overlapping_partially_move_up.vtt"
+        "path": "html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-007a.html",
+        "references": [
+          [
+            "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/reference/dir-isolation-007-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/html/dom/elements/requirements-relating-to-bidirectional-algorithm-formatting-characters/dir-isolation-007a.html"
       },
       {
         "url": "/webvtt/rendering/cues-with-video/processing-model/support/align_end.vtt"
@@ -6375,448 +6933,893 @@
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/text-shadow.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_normal_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_normal_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_normal_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_normal_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_nowrap_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_nowrap_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_nowrap_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_nowrap_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre-line_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre-line_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre-line_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre-line_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre-ref.html",
-        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre.html"
-      },
-      {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre-wrap_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre-wrap_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre-wrap_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre-wrap_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre-ref.html",
+            "=="
+          ]
+        ],
+        "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre.html"
+      },
+      {
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue/white-space_pre_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_box-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_box.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_box-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_box.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_shorthand_css_relative_url-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_shorthand_css_relative_url.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_shorthand_css_relative_url-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/background_shorthand_css_relative_url.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_animation_with_timestamp-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_animation_with_timestamp.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_animation_with_timestamp-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_animation_with_timestamp.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_background_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_background_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_background_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_background_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_background_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_background_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_background_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_background_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_color-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_color.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_color-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_color.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_font_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_font_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_font_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_font_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_font_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_font_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_font_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_font_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_namespace-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_namespace.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_namespace-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_namespace.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_outline_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_outline_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_outline_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_outline_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_outline_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_outline_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_outline_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_outline_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_text-decoration_line-through-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_text-decoration_line-through.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_text-decoration_line-through-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_text-decoration_line-through.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_text-shadow-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_text-shadow.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_text-shadow-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_text-shadow.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_timestamp_future-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_timestamp_future.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_timestamp_future-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_timestamp_future.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_timestamp_past-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_timestamp_past.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_timestamp_past-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_timestamp_past.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_transition_with_timestamp-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_transition_with_timestamp.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_transition_with_timestamp-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_transition_with_timestamp.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_normal_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_normal_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_normal_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_normal_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_nowrap-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_nowrap.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_nowrap-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_nowrap.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre-line_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre-line_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre-line_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre-line_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre-wrap_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre-wrap_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre-wrap_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre-wrap_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_white-space_pre_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_with_class-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_with_class.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_with_class-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_with_class.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_with_class_object_specific_selector-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_with_class_object_specific_selector.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_with_class_object_specific_selector-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/bold_object/bold_with_class_object_specific_selector.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_animation_with_timestamp-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_animation_with_timestamp.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_animation_with_timestamp-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_animation_with_timestamp.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_background_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_background_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_background_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_background_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_background_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_background_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_background_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_background_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_color-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_color.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_color-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_color.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_font_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_font_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_font_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_font_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_font_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_font_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_font_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_font_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_namespace-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_namespace.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_namespace-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_namespace.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_outline_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_outline_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_outline_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_outline_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_outline_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_outline_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_outline_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_outline_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_text-decoration_line-through-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_text-decoration_line-through.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_text-decoration_line-through-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_text-decoration_line-through.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_text-shadow-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_text-shadow.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_text-shadow-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_text-shadow.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_timestamp_future-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_timestamp_future.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_timestamp_future-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_timestamp_future.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_timestamp_past-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_timestamp_past.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_timestamp_past-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_timestamp_past.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_transition_with_timestamp-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_transition_with_timestamp.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_transition_with_timestamp-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_transition_with_timestamp.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_normal_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_normal_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_normal_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_normal_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_nowrap-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_nowrap.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_nowrap-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_nowrap.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre-line_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre-line_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre-line_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre-line_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre-wrap_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre-wrap_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre-wrap_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre-wrap_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_white-space_pre_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_with_class-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_with_class.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_with_class-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_with_class.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_with_class_object_specific_selector-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_with_class_object_specific_selector.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_with_class_object_specific_selector-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/class_object/class_with_class_object_specific_selector.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_hex-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_hex.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_hex-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_hex.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_hsla-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_hsla.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_hsla-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_hsla.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_rgba-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_rgba.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_rgba-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/color_rgba.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/cue_func_selector_single_colon-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/cue_func_selector_single_colon.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/cue_func_selector_single_colon-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/cue_func_selector_single_colon.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/font_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/font_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/font_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/font_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/font_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/font_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/font_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/font_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/id_color-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/id_color.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/id_color-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/id_color.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/inherit_values_from_media_element-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/inherit_values_from_media_element.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/inherit_values_from_media_element-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/inherit_values_from_media_element.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_animation_with_timestamp-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_animation_with_timestamp.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_animation_with_timestamp-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_animation_with_timestamp.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_background_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_background_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_background_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_background_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_background_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_background_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_background_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_background_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_color-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_color.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_color-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_color.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_font_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_font_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_font_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_font_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_font_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_font_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_font_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_font_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_namespace-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_namespace.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_namespace-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_namespace.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_outline_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_outline_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_outline_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_outline_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_outline_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_outline_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_outline_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_outline_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_text-decoration_line-through-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_text-decoration_line-through.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_text-decoration_line-through-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_text-decoration_line-through.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_text-shadow-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_text-shadow.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_text-shadow-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_text-shadow.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_timestamp_future-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_timestamp_future.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_timestamp_future-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_timestamp_future.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_timestamp_past-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_timestamp_past.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_timestamp_past-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_timestamp_past.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_transition_with_timestamp-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_transition_with_timestamp.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_transition_with_timestamp-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_transition_with_timestamp.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_normal_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_normal_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_normal_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_normal_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_nowrap-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_nowrap.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_nowrap-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_nowrap.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre-line_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre-line_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre-line_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre-line_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre-wrap_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre-wrap_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre-wrap_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre-wrap_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_white-space_pre_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_with_class-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_with_class.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_with_class-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_with_class.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_with_class_object_specific_selector-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_with_class_object_specific_selector.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_with_class_object_specific_selector-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/italic_object/italic_with_class_object_specific_selector.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/not_allowed_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/not_allowed_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/not_allowed_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/not_allowed_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/not_root_selector-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/not_root_selector.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/not_root_selector-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/not_root_selector.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/outline_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/outline_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/outline_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/outline_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/outline_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/outline_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/outline_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/outline_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/root_namespace-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/root_namespace.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/root_namespace-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/root_namespace.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/root_selector-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/root_selector.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/root_selector-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/root_selector.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-decoration_line-through-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-decoration_line-through.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-decoration_line-through-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-decoration_line-through.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-decoration_overline-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-decoration_overline.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-decoration_overline-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-decoration_overline.html"
       },
       {
@@ -6830,93 +7833,183 @@
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-decoration_underline.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-shadow-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-shadow.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-shadow-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/text-shadow.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/type_selector_root-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/type_selector_root.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/type_selector_root-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/type_selector_root.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_animation_with_timestamp-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_animation_with_timestamp.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_animation_with_timestamp-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_animation_with_timestamp.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_background_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_background_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_background_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_background_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_background_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_background_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_background_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_background_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_color-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_color.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_color-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_color.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_font_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_font_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_font_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_font_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_font_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_font_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_font_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_font_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_namespace-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_namespace.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_namespace-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_namespace.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_outline_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_outline_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_outline_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_outline_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_outline_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_outline_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_outline_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_outline_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_text-decoration_line-through-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_text-decoration_line-through.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_text-decoration_line-through-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_text-decoration_line-through.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_text-shadow-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_text-shadow.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_text-shadow-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_text-shadow.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_timestamp_future-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_timestamp_future.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_timestamp_future-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_timestamp_future.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_timestamp_past-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_timestamp_past.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_timestamp_past-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_timestamp_past.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_transition_with_timestamp-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_transition_with_timestamp.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_transition_with_timestamp-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_transition_with_timestamp.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_normal_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_normal_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_normal_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_normal_wrapped.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_nowrap-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_nowrap.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_nowrap-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/underline_object/underline_white-space_nowrap.html"
       },
       {
@@ -6965,53 +8058,103 @@
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_color.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_font_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_font_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_font_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_font_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_font_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_font_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_font_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_font_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_namespace-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_namespace.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_namespace-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_namespace.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_outline_properties-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_outline_properties.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_outline_properties-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_outline_properties.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_outline_shorthand-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_outline_shorthand.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_outline_shorthand-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_outline_shorthand.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_text-decoration_line-through-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_text-decoration_line-through.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_text-decoration_line-through-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_text-decoration_line-through.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_text-shadow-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_text-shadow.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_text-shadow-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_text-shadow.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_timestamp_future-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_timestamp_future.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_timestamp_future-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_timestamp_future.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_timestamp_past-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_timestamp_past.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_timestamp_past-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_timestamp_past.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_transition_with_timestamp-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_transition_with_timestamp.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_transition_with_timestamp-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/selectors/cue_function/voice_object/voice_transition_with_timestamp.html"
       },
       {
@@ -7215,8 +8358,13 @@
         "url": "/webvtt/rendering/cues-with-video/processing-model/too_many_cues.html"
       },
       {
-        "ref_type": "==",
-        "ref_url": "/webvtt/rendering/cues-with-video/processing-model/too_many_cues_wrapped-ref.html",
+        "path": "webvtt/rendering/cues-with-video/processing-model/too_many_cues_wrapped.html",
+        "references": [
+          [
+            "/webvtt/rendering/cues-with-video/processing-model/too_many_cues_wrapped-ref.html",
+            "=="
+          ]
+        ],
         "url": "/webvtt/rendering/cues-with-video/processing-model/too_many_cues_wrapped.html"
       }
     ],
@@ -21692,32 +22840,32 @@
       {
         "path": "html/syntax/parsing/html5lib_tests10.html",
         "timeout": "long",
-        "url": "/media-source/mediasource-redundant-seek.html"
+        "url": "/html/syntax/parsing/html5lib_tests10.html?run_type=write_single"
       },
       {
-        "path": "websockets/binary/002.html",
+        "path": "html/syntax/parsing/html5lib_tests11.html",
         "timeout": "long",
-        "url": "/websockets/binary/002.html"
+        "url": "/html/syntax/parsing/html5lib_tests11.html?run_type=uri"
       },
       {
-        "path": "websockets/binary/004.html",
+        "path": "html/syntax/parsing/html5lib_tests11.html",
         "timeout": "long",
-        "url": "/websockets/binary/004.html"
+        "url": "/html/syntax/parsing/html5lib_tests11.html?run_type=write"
       },
       {
-        "path": "websockets/constructor/013.html",
+        "path": "html/syntax/parsing/html5lib_tests11.html",
         "timeout": "long",
-        "url": "/websockets/constructor/013.html"
+        "url": "/html/syntax/parsing/html5lib_tests11.html?run_type=write_single"
       },
       {
-        "path": "websockets/cookies/005.html",
+        "path": "html/syntax/parsing/html5lib_tests12.html",
         "timeout": "long",
-        "url": "/websockets/cookies/005.html"
+        "url": "/html/syntax/parsing/html5lib_tests12.html?run_type=uri"
       },
       {
-        "path": "websockets/cookies/007.html",
+        "path": "html/syntax/parsing/html5lib_tests12.html",
         "timeout": "long",
-        "url": "/websockets/cookies/007.html"
+        "url": "/html/syntax/parsing/html5lib_tests12.html?run_type=write"
       },
       {
         "path": "html/syntax/parsing/html5lib_tests12.html",
@@ -22653,275 +23801,533 @@
             "=="
           ]
         ],
-        "service-workers/service-worker/fetch-event-respond-with-stops-propagation.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-event-respond-with-stops-propagation.https.html",
-            "url": "/service-workers/service-worker/fetch-event-respond-with-stops-propagation.https.html"
-          }
+        "url": "/2dcontext/compositing/canvas_compositing_globalcompositeoperation_001.htm"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_1.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_1.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_1_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-event.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-event.https.html",
-            "url": "/service-workers/service-worker/fetch-event.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_1.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_10.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_10.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_10_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-frame-resource.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-frame-resource.https.html",
-            "timeout": "long",
-            "url": "/service-workers/service-worker/fetch-frame-resource.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_10.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_11.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_11.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_11_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-header-visibility.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-header-visibility.https.html",
-            "url": "/service-workers/service-worker/fetch-header-visibility.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_11.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_12.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_12.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_12_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-mixed-content-to-inscope.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-mixed-content-to-inscope.https.html",
-            "timeout": "long",
-            "url": "/service-workers/service-worker/fetch-mixed-content-to-inscope.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_12.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_2.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_2.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_2_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-mixed-content-to-outscope.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-mixed-content-to-outscope.https.html",
-            "timeout": "long",
-            "url": "/service-workers/service-worker/fetch-mixed-content-to-outscope.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_2.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_3.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_3.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_3_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-request-css-base-url.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-request-css-base-url.https.html",
-            "url": "/service-workers/service-worker/fetch-request-css-base-url.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_3.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_4.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_4.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_4_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-request-css-images.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-request-css-images.https.html",
-            "url": "/service-workers/service-worker/fetch-request-css-images.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_4.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_5.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_5.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_5_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-request-fallback.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-request-fallback.https.html",
-            "url": "/service-workers/service-worker/fetch-request-fallback.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_5.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_6.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_6.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_6_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-request-no-freshness-headers.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-request-no-freshness-headers.https.html",
-            "url": "/service-workers/service-worker/fetch-request-no-freshness-headers.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_6.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_7.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_7.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_7_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-request-redirect.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-request-redirect.https.html",
-            "timeout": "long",
-            "url": "/service-workers/service-worker/fetch-request-redirect.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_7.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_8.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_8.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_8_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-request-resources.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-request-resources.https.html",
-            "url": "/service-workers/service-worker/fetch-request-resources.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_8.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_9.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_canvas_9.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_9_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-request-xhr.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-request-xhr.https.html",
-            "url": "/service-workers/service-worker/fetch-request-xhr.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_canvas_9.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_1.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_1.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_1_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-response-xhr.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-response-xhr.https.html",
-            "url": "/service-workers/service-worker/fetch-response-xhr.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_1.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_10.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_10.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_10_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/fetch-waits-for-activate.https.html": [
-          {
-            "path": "service-workers/service-worker/fetch-waits-for-activate.https.html",
-            "timeout": "long",
-            "url": "/service-workers/service-worker/fetch-waits-for-activate.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_10.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_11.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_11.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_11_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/getregistration.https.html": [
-          {
-            "path": "service-workers/service-worker/getregistration.https.html",
-            "url": "/service-workers/service-worker/getregistration.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_11.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_12.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_12.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_12_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/getregistrations.https.html": [
-          {
-            "path": "service-workers/service-worker/getregistrations.https.html",
-            "url": "/service-workers/service-worker/getregistrations.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_12.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_13.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_13.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_13_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/indexeddb.https.html": [
-          {
-            "path": "service-workers/service-worker/indexeddb.https.html",
-            "url": "/service-workers/service-worker/indexeddb.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_13.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_2.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_2.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_2_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/install-event-type.https.html": [
-          {
-            "path": "service-workers/service-worker/install-event-type.https.html",
-            "url": "/service-workers/service-worker/install-event-type.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_2.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_3.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_3.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_3_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/installing.https.html": [
-          {
-            "path": "service-workers/service-worker/installing.https.html",
-            "url": "/service-workers/service-worker/installing.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_3.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_4.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_4.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_4_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/interfaces.https.html": [
-          {
-            "path": "service-workers/service-worker/interfaces.https.html",
-            "url": "/service-workers/service-worker/interfaces.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_4.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_5.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_5.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_5_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/invalid-blobtype.https.html": [
-          {
-            "path": "service-workers/service-worker/invalid-blobtype.https.html",
-            "url": "/service-workers/service-worker/invalid-blobtype.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_5.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_6.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_6.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_6_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/invalid-header.https.html": [
-          {
-            "path": "service-workers/service-worker/invalid-header.https.html",
-            "url": "/service-workers/service-worker/invalid-header.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_6.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_7.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_7.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_7_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/multiple-register.https.html": [
-          {
-            "path": "service-workers/service-worker/multiple-register.https.html",
-            "url": "/service-workers/service-worker/multiple-register.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_7.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_8.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_8.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_8_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/multiple-update.https.html": [
-          {
-            "path": "service-workers/service-worker/multiple-update.https.html",
-            "url": "/service-workers/service-worker/multiple-update.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_8.html"
+      }
+    ],
+    "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_9.html": [
+      {
+        "path": "2dcontext/drawing-images-to-the-canvas/drawimage_html_image_9.html",
+        "references": [
+          [
+            "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_9_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/navigation-redirect.https.html": [
-          {
-            "path": "service-workers/service-worker/navigation-redirect.https.html",
-            "url": "/service-workers/service-worker/navigation-redirect.https.html"
-          }
+        "url": "/2dcontext/drawing-images-to-the-canvas/drawimage_html_image_9.html"
+      }
+    ],
+    "2dcontext/line-styles/canvas_linestyles_linecap_001.htm": [
+      {
+        "path": "2dcontext/line-styles/canvas_linestyles_linecap_001.htm",
+        "references": [
+          [
+            "/2dcontext/line-styles/canvas_linestyles_linecap_001-ref.htm",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/onactivate-script-error.https.html": [
-          {
-            "path": "service-workers/service-worker/onactivate-script-error.https.html",
-            "url": "/service-workers/service-worker/onactivate-script-error.https.html"
-          }
+        "url": "/2dcontext/line-styles/canvas_linestyles_linecap_001.htm"
+      }
+    ],
+    "2dcontext/line-styles/lineto_a.html": [
+      {
+        "path": "2dcontext/line-styles/lineto_a.html",
+        "references": [
+          [
+            "/2dcontext/line-styles/lineto_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/oninstall-script-error.https.html": [
-          {
-            "path": "service-workers/service-worker/oninstall-script-error.https.html",
-            "url": "/service-workers/service-worker/oninstall-script-error.https.html"
-          }
+        "url": "/2dcontext/line-styles/lineto_a.html"
+      }
+    ],
+    "2dcontext/shadows/canvas_shadows_002-ref.htm": [
+      {
+        "path": "2dcontext/shadows/canvas_shadows_002-ref.htm",
+        "references": [
+          [
+            "/2dcontext/shadows/canvas_shadows_002-ref.htm",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/performance-timeline.https.html": [
-          {
-            "path": "service-workers/service-worker/performance-timeline.https.html",
-            "url": "/service-workers/service-worker/performance-timeline.https.html"
-          }
+        "url": "/2dcontext/shadows/canvas_shadows_002-ref.htm"
+      }
+    ],
+    "2dcontext/shadows/canvas_shadows_002.htm": [
+      {
+        "path": "2dcontext/shadows/canvas_shadows_002.htm",
+        "references": [
+          [
+            "/2dcontext/shadows/canvas_shadows_002-ref.htm",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/postmessage-msgport-to-client.https.html": [
-          {
-            "path": "service-workers/service-worker/postmessage-msgport-to-client.https.html",
-            "url": "/service-workers/service-worker/postmessage-msgport-to-client.https.html"
-          }
+        "url": "/2dcontext/shadows/canvas_shadows_002.htm"
+      }
+    ],
+    "2dcontext/the-canvas-state/canvas_state_restore_001.htm": [
+      {
+        "path": "2dcontext/the-canvas-state/canvas_state_restore_001.htm",
+        "references": [
+          [
+            "/2dcontext/the-canvas-state/canvas_state_restore_001-ref.htm",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/postmessage-to-client.https.html": [
-          {
-            "path": "service-workers/service-worker/postmessage-to-client.https.html",
-            "url": "/service-workers/service-worker/postmessage-to-client.https.html"
-          }
+        "url": "/2dcontext/the-canvas-state/canvas_state_restore_001.htm"
+      }
+    ],
+    "2dcontext/transformations/canvas_transformations_reset_001.html": [
+      {
+        "path": "2dcontext/transformations/canvas_transformations_reset_001.html",
+        "references": [
+          [
+            "/2dcontext/transformations/canvas_transformations_reset_001-ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/postmessage.https.html": [
-          {
-            "path": "service-workers/service-worker/postmessage.https.html",
-            "url": "/service-workers/service-worker/postmessage.https.html"
-          }
+        "url": "/2dcontext/transformations/canvas_transformations_reset_001.html"
+      }
+    ],
+    "2dcontext/transformations/canvas_transformations_scale_001.htm": [
+      {
+        "path": "2dcontext/transformations/canvas_transformations_scale_001.htm",
+        "references": [
+          [
+            "/2dcontext/transformations/canvas_transformations_scale_001-ref.htm",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/ready.https.html": [
-          {
-            "path": "service-workers/service-worker/ready.https.html",
-            "url": "/service-workers/service-worker/ready.https.html"
-          }
+        "url": "/2dcontext/transformations/canvas_transformations_scale_001.htm"
+      }
+    ],
+    "2dcontext/transformations/transform_a.html": [
+      {
+        "path": "2dcontext/transformations/transform_a.html",
+        "references": [
+          [
+            "/2dcontext/transformations/transform_ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/referer.https.html": [
-          {
-            "path": "service-workers/service-worker/referer.https.html",
-            "url": "/service-workers/service-worker/referer.https.html"
-          }
+        "url": "/2dcontext/transformations/transform_a.html"
+      }
+    ],
+    "FileAPI/url/url_xmlhttprequest_img.html": [
+      {
+        "path": "FileAPI/url/url_xmlhttprequest_img.html",
+        "references": [
+          [
+            "/FileAPI/url/url_xmlhttprequest_img-ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/register-closed-window.https.html": [
-          {
-            "path": "service-workers/service-worker/register-closed-window.https.html",
-            "timeout": "long",
-            "url": "/service-workers/service-worker/register-closed-window.https.html"
-          }
+        "url": "/FileAPI/url/url_xmlhttprequest_img.html"
+      }
+    ],
+    "compat/webkit-text-fill-color-property-001a.html": [
+      {
+        "path": "compat/webkit-text-fill-color-property-001a.html",
+        "references": [
+          [
+            "/compat/webkit-text-fill-color-property-001-ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/register-default-scope.https.html": [
-          {
-            "path": "service-workers/service-worker/register-default-scope.https.html",
-            "url": "/service-workers/service-worker/register-default-scope.https.html"
-          }
+        "url": "/compat/webkit-text-fill-color-property-001a.html"
+      }
+    ],
+    "compat/webkit-text-fill-color-property-001b.html": [
+      {
+        "path": "compat/webkit-text-fill-color-property-001b.html",
+        "references": [
+          [
+            "/compat/webkit-text-fill-color-property-001-ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/register-same-scope-different-script-url.https.html": [
-          {
-            "path": "service-workers/service-worker/register-same-scope-different-script-url.https.html",
-            "url": "/service-workers/service-worker/register-same-scope-different-script-url.https.html"
-          }
+        "url": "/compat/webkit-text-fill-color-property-001b.html"
+      }
+    ],
+    "compat/webkit-text-fill-color-property-001c.html": [
+      {
+        "path": "compat/webkit-text-fill-color-property-001c.html",
+        "references": [
+          [
+            "/compat/webkit-text-fill-color-property-001-ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/register-wait-forever-in-install-worker.https.html": [
-          {
-            "path": "service-workers/service-worker/register-wait-forever-in-install-worker.https.html",
-            "url": "/service-workers/service-worker/register-wait-forever-in-install-worker.https.html"
-          }
+        "url": "/compat/webkit-text-fill-color-property-001c.html"
+      }
+    ],
+    "compat/webkit-text-fill-color-property-001d.html": [
+      {
+        "path": "compat/webkit-text-fill-color-property-001d.html",
+        "references": [
+          [
+            "/compat/webkit-text-fill-color-property-001-ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/registration-end-to-end.https.html": [
-          {
-            "path": "service-workers/service-worker/registration-end-to-end.https.html",
-            "url": "/service-workers/service-worker/registration-end-to-end.https.html"
-          }
+        "url": "/compat/webkit-text-fill-color-property-001d.html"
+      }
+    ],
+    "custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-custom-tag.html": [
+      {
+        "path": "custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-custom-tag.html",
+        "references": [
+          [
+            "/custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-custom-tag-ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/registration-events.https.html": [
-          {
-            "path": "service-workers/service-worker/registration-events.https.html",
-            "url": "/service-workers/service-worker/registration-events.https.html"
-          }
+        "url": "/custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-custom-tag.html"
+      }
+    ],
+    "custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-registered-custom-tag.html": [
+      {
+        "path": "custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-registered-custom-tag.html",
+        "references": [
+          [
+            "/custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-registered-custom-tag-ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/registration-iframe.https.html": [
-          {
-            "path": "service-workers/service-worker/registration-iframe.https.html",
-            "url": "/service-workers/service-worker/registration-iframe.https.html"
-          }
+        "url": "/custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-registered-custom-tag.html"
+      }
+    ],
+    "custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-registered-type-extension.html": [
+      {
+        "path": "custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-registered-type-extension.html",
+        "references": [
+          [
+            "/custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-registered-type-extension-ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/registration-service-worker-attributes.https.html": [
-          {
-            "path": "service-workers/service-worker/registration-service-worker-attributes.https.html",
-            "url": "/service-workers/service-worker/registration-service-worker-attributes.https.html"
-          }
+        "url": "/custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-registered-type-extension.html"
+      }
+    ],
+    "custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-type-extension.html": [
+      {
+        "path": "custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-type-extension.html",
+        "references": [
+          [
+            "/custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-type-extension-ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/registration.https.html": [
-          {
-            "path": "service-workers/service-worker/registration.https.html",
-            "url": "/service-workers/service-worker/registration.https.html"
-          }
+        "url": "/custom-elements/registering-custom-elements/unresolved-element-pseudoclass/unresolved-element-pseudoclass-css-test-type-extension.html"
+      }
+    ],
+    "html/dom/elements/global-attributes/dir_auto-EN-L-ref.html": [
+      {
+        "path": "html/dom/elements/global-attributes/dir_auto-EN-L-ref.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-EN-L-ref.html",
+            "=="
+          ]
         ],
-        "service-workers/service-worker/rejections.https.html": [
-          {
-            "path": "service-workers/service-worker/rejections.https.html",
-            "url": "/service-workers/service-worker/rejections.https.html"
-          }
+        "url": "/html/dom/elements/global-attributes/dir_auto-EN-L-ref.html"
+      }
+    ],
+    "html/dom/elements/global-attributes/dir_auto-EN-L.html": [
+      {
+        "path": "html/dom/elements/global-attributes/dir_auto-EN-L.html",
+        "references": [
+          [
+            "/html/dom/elements/global-attributes/dir_auto-EN-L-ref.html",
+            "=="
+          ]
         ],
         "url": "/html/dom/elements/global-attributes/dir_auto-EN-L.html"
       }
