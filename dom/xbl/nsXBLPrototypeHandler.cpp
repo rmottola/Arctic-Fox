@@ -453,6 +453,10 @@ nsXBLPrototypeHandler::DispatchXBLCommand(EventTarget* aTarget, nsIDOMEvent* aEv
   else
     controller = GetController(aTarget); // We're attached to the receiver possibly.
 
+  // We are the default action for this command.
+  // Stop any other default action from executing.
+  aEvent->PreventDefault();
+
   if (mEventName == nsGkAtoms::keypress &&
       mDetail == nsIDOMKeyEvent::DOM_VK_SPACE &&
       mMisc == 1) {
@@ -485,10 +489,6 @@ nsXBLPrototypeHandler::DispatchXBLCommand(EventTarget* aTarget, nsIDOMEvent* aEv
       }
     }
   }
-
-  // We are the default action for this command.
-  // Stop any other default action from executing.
-  aEvent->PreventDefault();
   
   if (controller)
     controller->DoCommand(command.get());
