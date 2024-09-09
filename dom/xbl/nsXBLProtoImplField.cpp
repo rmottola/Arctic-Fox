@@ -245,12 +245,7 @@ FieldGetterImpl(JSContext *cx, const JS::CallArgs& args)
     return true;
   }
 
-  JS::Rooted<JS::Value> v(cx);
-  if (!JS_GetPropertyById(cx, thisObj, id, &v)) {
-    return false;
-  }
-  args.rval().set(v);
-  return true;
+  return JS_GetPropertyById(cx, thisObj, id, args.rval());
 }
 
 static bool
