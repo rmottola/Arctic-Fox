@@ -218,7 +218,9 @@
                               key="key_gotoHistory"
                               observes="viewHistorySidebar"
                               label="&historyButton.label;"/>
-
+                    <menuitem id="menu_tabsSidebar"
+                              observes="viewTabsSidebar"
+                              label="&syncedTabs.sidebar.label;"/>
                   </menupopup>
                 </menu>
                 <menuseparator/>

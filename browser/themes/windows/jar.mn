@@ -15,6 +15,7 @@ browser.jar:
   skin/classic/browser/aboutSyncTabs.css
 #endif
   skin/classic/browser/aboutTabCrashed.css                     (../shared/aboutTabCrashed.css)
+* skin/classic/browser/syncedtabs/sidebar.css     (syncedtabs/sidebar.css)
   skin/classic/browser/actionicon-tab.png
   skin/classic/browser/appmenu-icons.png
   skin/classic/browser/appmenu-dropmarker.png

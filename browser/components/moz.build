@@ -22,6 +22,7 @@ DIRS += [
     'sessionstore',
     'shell',
     'selfsupport',
+    'syncedtabs',
     'statusbar',
 ]
 
