@@ -194,7 +194,7 @@ public:
                                      &format);
 
       if (NS_FAILED(res)) {
-        CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, CreateVideoFormat failed err = %d", __FUNCTION__, res);
+        CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, CreateVideoFormat failed err = %d", __FUNCTION__, (int)res);
         return NS_ERROR_FAILURE;
       }
 
@@ -202,7 +202,7 @@ public:
         mCoder = CreateEncoder(mime);
 
         if (NS_FAILED(res)) {
-          CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, CreateEncoderByType failed err = %d", __FUNCTION__, res);
+          CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, CreateEncoderByType failed err = %d", __FUNCTION__, (int)res);
           return NS_ERROR_FAILURE;
         }
 
@@ -215,13 +215,13 @@ public:
       } else {
         mCoder = CreateDecoder(mime);
         if (NS_FAILED(res)) {
-          CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, CreateDecoderByType failed err = %d", __FUNCTION__, res);
+          CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, CreateDecoderByType failed err = %d", __FUNCTION__, (int)res);
           return NS_ERROR_FAILURE;
         }
       }
       res = mCoder->Configure(format, nullptr, nullptr, flags);
       if (NS_FAILED(res)) {
-        CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, err = %d", __FUNCTION__, res);
+        CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, err = %d", __FUNCTION__, (int)res);
       }
     }
 
@@ -241,7 +241,7 @@ public:
     res = mCoder->Start();
     if (NS_FAILED(res)) {
       CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, mCoder->start() return err = %d",
-                  __FUNCTION__, res);
+                  __FUNCTION__, (int)res);
       return res;
     }
     isStarted = true;
@@ -360,7 +360,7 @@ public:
     res = BufferInfo::New(&bufferInfo);
     if (NS_FAILED(res)) {
       CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, BufferInfo::New return err = %d",
-                  __FUNCTION__, res);
+                  __FUNCTION__, (int)res);
       return res;
     }
     int32_t outputIndex = DequeueOutputBuffer(bufferInfo);
@@ -420,7 +420,7 @@ public:
 
     if (NS_FAILED(res)) {
       CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, mCoder->DequeueInputBuffer() return err = %d",
-                  __FUNCTION__, res);
+                  __FUNCTION__, (int)res);
       return -1;
     }
     return inputIndex;
@@ -432,7 +432,7 @@ public:
 
     if (NS_FAILED(res)) {
       CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, mCoder->QueueInputBuffer() return err = %d",
-                  __FUNCTION__, res);
+                  __FUNCTION__, (int)res);
     }
   }
 
@@ -444,7 +444,7 @@ public:
 
     if (NS_FAILED(res)) {
       CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, mCoder->DequeueOutputBuffer() return err = %d",
-                  __FUNCTION__, res);
+                  __FUNCTION__, (int)res);
       return -1;
     }
 
@@ -468,7 +468,7 @@ public:
     mInputBuffers = (jobjectArray) env->NewGlobalRef(inputBuffers.Get());
     if (NS_FAILED(res)) {
       CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, GetInputBuffers return err = %d",
-                  __FUNCTION__, res);
+                  __FUNCTION__, (int)res);
       return nullptr;
     }
 
@@ -488,7 +488,7 @@ public:
     mOutputBuffers = (jobjectArray) env->NewGlobalRef(outputBuffers.Get());
     if (NS_FAILED(res)) {
       CSFLogDebug(logTag, "WebrtcAndroidMediaCodec::%s, GetOutputBuffers return err = %d",
-                  __FUNCTION__, res);
+                  __FUNCTION__, (int)res);
       return nullptr;
     }
 
@@ -652,7 +652,7 @@ int32_t WebrtcMediaCodecVP8VideoEncoder::Encode(
 
     if (res != NS_OK) {
       CSFLogDebug(logTag,  "%s, encoder configure return err = %d",
-                  __FUNCTION__, res);
+                  __FUNCTION__, (int)res);
       return WEBRTC_VIDEO_CODEC_ERROR;
     }
 
@@ -660,7 +660,7 @@ int32_t WebrtcMediaCodecVP8VideoEncoder::Encode(
 
     if (NS_FAILED(res)) {
       mMediaCodecEncoder->isStarted = false;
-      CSFLogDebug(logTag,  "%s start encoder. err = %d", __FUNCTION__, res);
+      CSFLogDebug(logTag,  "%s start encoder. err = %d", __FUNCTION__, (int)res);
       return WEBRTC_VIDEO_CODEC_ERROR;
     }
 
@@ -731,7 +731,7 @@ int32_t WebrtcMediaCodecVP8VideoEncoder::Encode(
     res = BufferInfo::New(&bufferInfo);
     if (NS_FAILED(res)) {
       CSFLogDebug(logTag, "WebrtcMediaCodecVP8VideoEncoder::%s, BufferInfo::New return err = %d",
-                  __FUNCTION__, res);
+                  __FUNCTION__, (int)res);
       return -1;
     }
 
@@ -927,7 +927,7 @@ int32_t WebrtcMediaCodecVP8VideoDecoder::Decode(
 
     if (res != NS_OK) {
       CSFLogDebug(logTag,  "%s, decoder configure return err = %d",
-                  __FUNCTION__, res);
+                  __FUNCTION__, (int)res);
       return WEBRTC_VIDEO_CODEC_ERROR;
     }
 
@@ -935,7 +935,7 @@ int32_t WebrtcMediaCodecVP8VideoDecoder::Decode(
 
     if (NS_FAILED(res)) {
       mMediaCodecDecoder->isStarted = false;
-      CSFLogDebug(logTag,  "%s start decoder. err = %d", __FUNCTION__, res);
+      CSFLogDebug(logTag,  "%s start decoder. err = %d", __FUNCTION__, (int)res);
       return WEBRTC_VIDEO_CODEC_ERROR;
     }
 
