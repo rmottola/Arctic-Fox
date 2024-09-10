@@ -7,32 +7,33 @@
 #include "nsNSSCertificateDB.h"
 
 #include "AppTrustDomain.h"
+#include "CryptoTask.h"
+#include "NSSCertDBTrustDomain.h"
+#include "ScopedNSSTypes.h"
 #include "base64.h"
 #include "certdb.h"
-#include "CryptoTask.h"
+#include "mozilla/Logging.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/UniquePtr.h"
-#include "nsComponentManagerUtils.h"
 #include "nsCOMPtr.h"
+#include "nsComponentManagerUtils.h"
 #include "nsDataSignatureVerifier.h"
 #include "nsHashKeys.h"
+#include "nsIDirectoryEnumerator.h"
 #include "nsIFile.h"
 #include "nsIFileStreams.h"
 #include "nsIInputStream.h"
 #include "nsIStringEnumerator.h"
-#include "nsIDirectoryEnumerator.h"
 #include "nsIZipReader.h"
-#include "nsNetUtil.h"
 #include "nsNSSCertificate.h"
+#include "nsNetUtil.h"
 #include "nsProxyRelease.h"
-#include "nssb64.h"
-#include "NSSCertDBTrustDomain.h"
 #include "nsString.h"
 #include "nsTHashtable.h"
-#include "plstr.h"
-#include "mozilla/Logging.h"
+#include "nssb64.h"
 #include "pkix/pkix.h"
 #include "pkix/pkixnss.h"
+#include "plstr.h"
 #include "secmime.h"
 
 
@@ -650,6 +651,27 @@ VerifyCertificate(CERTCertificate* signerCert, void* voidContext, void* pinArg)
                       KeyPurposeId::id_kp_codeSigning,
                       CertPolicyId::anyPolicy,
                       nullptr/*stapledOCSPResponse*/);
+  if (rv == Result::ERROR_EXPIRED_CERTIFICATE) {
+    // For code-signing you normally need trusted 3rd-party timestamps to
+    // handle expiration properly. The signer could always mess with their
+    // system clock so you can't trust the certificate was un-expired when
+    // the signing took place. The choice is either to ignore expiration
+    // or to enforce expiration at time of use. The latter leads to the
+    // user-hostile result that perfectly good code stops working.
+    //
+    // Our package format doesn't support timestamps (nor do we have a
+    // trusted 3rd party timestamper), but since we sign all of our apps and
+    // add-ons ourselves we can trust ourselves not to mess with the clock
+    // on the signing systems. We also have a revocation mechanism if we
+    // need it. It's OK to ignore cert expiration under these conditions.
+    //
+    // This is an invalid approach if
+    //  * we issue certs to let others sign their own packages
+    //  * mozilla::pkix returns "expired" when there are "worse" problems
+    //    with the certificate or chain.
+    // (see bug 1267318)
+    rv = Success;
+  }
   if (rv != Success) {
     return mozilla::psm::GetXPCOMFromNSSError(MapResultToPRErrorCode(rv));
   }
@@ -662,11 +684,18 @@ VerifySignature(AppTrustedRoot trustedRoot, const SECItem& buffer,
                 const SECItem& detachedDigest,
                 /*out*/ ScopedCERTCertList& builtChain)
 {
+  // Currently, this function is only called within the CalculateResult() method
+  // of CryptoTasks. As such, NSS should not be shut down at this point and the
+  // CryptoTask implementation should already hold a nsNSSShutDownPreventionLock.
+  // We acquire a nsNSSShutDownPreventionLock here solely to prove we did to
+  // VerifyCMSDetachedSignatureIncludingCertificate().
+  nsNSSShutDownPreventionLock locker;
   VerifyCertificateContext context = { trustedRoot, builtChain };
   // XXX: missing pinArg
   return VerifyCMSDetachedSignatureIncludingCertificate(buffer, detachedDigest,
                                                         VerifyCertificate,
-                                                        &context, nullptr);
+                                                        &context, nullptr,
+                                                        locker);
 }
 
 NS_IMETHODIMP
@@ -877,10 +906,9 @@ VerifySignedManifest(AppTrustedRoot aTrustedRoot,
   }
 
   // Get base64 encoded string from manifest buffer digest
-  UniquePtr<char, void(&)(void*)>
+  UniquePORTString
     base64EncDigest(NSSBase64_EncodeItem(nullptr, nullptr, 0,
-                      const_cast<SECItem*>(&manifestCalculatedDigest.get())),
-                    PORT_Free);
+                      const_cast<SECItem*>(&manifestCalculatedDigest.get())));
   if (NS_WARN_IF(!base64EncDigest)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }

@@ -181,8 +181,8 @@ jit::EnterBaselineMethod(JSContext* cx, RunState& state)
     EnterJitData data(cx);
     data.jitcode = baseline->method()->raw();
 
-    AutoValueVector vals(cx);
-    if (!SetEnterJitData(cx, data, state, vals))
+    Rooted<GCVector<Value>> vals(cx, GCVector<Value>(cx));
+    if (!SetEnterJitData(cx, data, state, &vals))
         return JitExec_Error;
 
     JitExecStatus status = EnterBaseline(cx, data);
@@ -456,8 +456,7 @@ void
 BaselineScript::trace(JSTracer* trc)
 {
     TraceEdge(trc, &method_, "baseline-method");
-    if (templateScope_)
-        TraceEdge(trc, &templateScope_, "baseline-template-scope");
+    TraceNullableEdge(trc, &templateScope_, "baseline-template-scope");
 
     // Mark all IC stub codes hanging off the IC stub entries.
     for (size_t i = 0; i < numICEntries(); i++) {
@@ -577,59 +576,63 @@ BaselineScript::pcMappingReader(size_t indexEntry)
     return CompactBufferReader(dataStart, dataEnd);
 }
 
+struct ICEntries
+{
+    BaselineScript* const baseline_;
+
+    explicit ICEntries(BaselineScript* baseline) : baseline_(baseline) {}
+
+    ICEntry& operator[](size_t index) const {
+        return baseline_->icEntry(index);
+    }
+};
+
 ICEntry&
 BaselineScript::icEntryFromReturnOffset(CodeOffset returnOffset)
 {
-    size_t bottom = 0;
-    size_t top = numICEntries();
-    size_t mid = bottom + (top - bottom) / 2;
-    while (mid < top) {
-        ICEntry& midEntry = icEntry(mid);
-        if (midEntry.returnOffset().offset() < returnOffset.offset())
-            bottom = mid + 1;
-        else
-            top = mid;
-        mid = bottom + (top - bottom) / 2;
-    }
+    size_t loc;
+#ifdef DEBUG
+    bool found =
+#endif
+        BinarySearchIf(ICEntries(this), 0, numICEntries(),
+                       [&returnOffset](ICEntry& entry) {
+                           size_t roffset = returnOffset.offset();
+                           size_t entryRoffset = entry.returnOffset().offset();
+                           if (roffset < entryRoffset)
+                               return -1;
+                           if (entryRoffset < roffset)
+                               return 1;
+                           return 0;
+                       },
+                       &loc);
 
-    MOZ_ASSERT(mid < numICEntries());
-    MOZ_ASSERT(icEntry(mid).returnOffset().offset() == returnOffset.offset());
-
-    return icEntry(mid);
-}
-
-uint8_t*
-BaselineScript::returnAddressForIC(const ICEntry& ent)
-{
-    return method()->raw() + ent.returnOffset().offset();
+    MOZ_ASSERT(found);
+    MOZ_ASSERT(loc < numICEntries());
+    MOZ_ASSERT(icEntry(loc).returnOffset().offset() == returnOffset.offset());
+    return icEntry(loc);
 }
 
 static inline size_t
 ComputeBinarySearchMid(BaselineScript* baseline, uint32_t pcOffset)
 {
-    struct ICEntries
-    {
-        BaselineScript* const baseline_;
-
-        explicit ICEntries(BaselineScript* baseline) : baseline_(baseline) {}
-
-        ICEntry& operator[](size_t index) const {
-            return baseline_->icEntry(index);
-        }
-    };
-
     size_t loc;
     BinarySearchIf(ICEntries(baseline), 0, baseline->numICEntries(),
                    [pcOffset](ICEntry& entry) {
                        uint32_t entryOffset = entry.pcOffset();
                        if (pcOffset < entryOffset)
                            return -1;
-                       if (pcOffset > entryOffset)
+                       if (entryOffset < pcOffset)
                            return 1;
                        return 0;
                    },
                    &loc);
     return loc;
+}
+
+uint8_t*
+BaselineScript::returnAddressForIC(const ICEntry& ent)
+{
+    return method()->raw() + ent.returnOffset().offset();
 }
 
 ICEntry&

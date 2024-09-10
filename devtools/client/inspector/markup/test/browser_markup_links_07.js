@@ -7,10 +7,10 @@
 // Tests that a middle-click or meta/ctrl-click on links in attributes actually
 // do follows the link.
 
-const TEST_URL = TEST_URL_ROOT + "doc_markup_links.html";
+const TEST_URL = URL_ROOT + "doc_markup_links.html";
 
-add_task(function*() {
-  let {inspector} = yield addTab(TEST_URL).then(openInspector);
+add_task(function* () {
+  let {inspector} = yield openInspectorForURL(TEST_URL);
 
   info("Select a node with a URI attribute");
   yield selectNode("video", inspector);
@@ -21,11 +21,11 @@ add_task(function*() {
 
   info("Follow the link with middle-click and wait for the new tab to open");
   yield followLinkWaitForTab(linkEl, false,
-                             TEST_URL_ROOT + "doc_markup_tooltip.png");
+                             URL_ROOT + "doc_markup_tooltip.png");
 
   info("Follow the link with meta/ctrl-click and wait for the new tab to open");
   yield followLinkWaitForTab(linkEl, true,
-                             TEST_URL_ROOT + "doc_markup_tooltip.png");
+                             URL_ROOT + "doc_markup_tooltip.png");
 
   info("Select a node with a IDREF attribute");
   yield selectNode("label", inspector);
@@ -37,7 +37,8 @@ add_task(function*() {
   info("Follow link with middle-click, wait for new node to be selected.");
   yield followLinkWaitForNewNode(linkEl, false, inspector);
 
-  // We have to re-select the label as the link switched the currently selected node
+  // We have to re-select the label as the link switched the currently selected
+  // node.
   yield selectNode("label", inspector);
 
   info("Follow link with ctrl/meta-click, wait for new node to be selected.");

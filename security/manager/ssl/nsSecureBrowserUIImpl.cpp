@@ -106,6 +106,7 @@ nsSecureBrowserUIImpl::nsSecureBrowserUIImpl()
   , mIsViewSource(false)
   , mSubRequestsBrokenSecurity(0)
   , mSubRequestsNoSecurity(0)
+  , mCertUserOverridden(false)
   , mRestoreSubrequests(false)
   , mOnLocationChangeSeen(false)
 #ifdef DEBUG
@@ -229,6 +230,10 @@ nsSecureBrowserUIImpl::MapInternalToExternalState(uint32_t* aState, lockIconStat
   if (ev && (*aState & STATE_IS_SECURE))
     *aState |= nsIWebProgressListener::STATE_IDENTITY_EV_TOPLEVEL;
 
+  if (mCertUserOverridden && (*aState & STATE_IS_SECURE)) {
+    *aState |= nsIWebProgressListener::STATE_CERT_USER_OVERRIDDEN;
+  }
+
   nsCOMPtr<nsIDocShell> docShell = do_QueryReferent(mDocShell);
   if (!docShell)
     return NS_OK;
@@ -255,6 +260,9 @@ nsSecureBrowserUIImpl::MapInternalToExternalState(uint32_t* aState, lockIconStat
     *aState = STATE_IS_SECURE | STATE_SECURE_HIGH;
     if (ev) {
       *aState |= nsIWebProgressListener::STATE_IDENTITY_EV_TOPLEVEL;
+    }
+    if (mCertUserOverridden) {
+      *aState |= nsIWebProgressListener::STATE_CERT_USER_OVERRIDDEN;
     }
   }
   // * If so, the state should be broken or insecure; overriding the previous
@@ -701,109 +709,6 @@ nsSecureBrowserUIImpl::OnStateChange(nsIWebProgress* aWebProgress,
   }
 
 #if defined(DEBUG)
-  nsCString info2;
-  uint32_t testFlags = loadFlags;
-
-  if (testFlags & nsIChannel::LOAD_DOCUMENT_URI)
-  {
-    testFlags -= nsIChannel::LOAD_DOCUMENT_URI;
-    info2.AppendLiteral("LOAD_DOCUMENT_URI ");
-  }
-  if (testFlags & nsIChannel::LOAD_RETARGETED_DOCUMENT_URI)
-  {
-    testFlags -= nsIChannel::LOAD_RETARGETED_DOCUMENT_URI;
-    info2.AppendLiteral("LOAD_RETARGETED_DOCUMENT_URI ");
-  }
-  if (testFlags & nsIChannel::LOAD_REPLACE)
-  {
-    testFlags -= nsIChannel::LOAD_REPLACE;
-    info2.AppendLiteral("LOAD_REPLACE ");
-  }
-
-  const char *_status = NS_SUCCEEDED(aStatus) ? "1" : "0";
-
-  nsCString info;
-  uint32_t f = aProgressStateFlags;
-  if (f & nsIWebProgressListener::STATE_START)
-  {
-    f -= nsIWebProgressListener::STATE_START;
-    info.AppendLiteral("START ");
-  }
-  if (f & nsIWebProgressListener::STATE_REDIRECTING)
-  {
-    f -= nsIWebProgressListener::STATE_REDIRECTING;
-    info.AppendLiteral("REDIRECTING ");
-  }
-  if (f & nsIWebProgressListener::STATE_TRANSFERRING)
-  {
-    f -= nsIWebProgressListener::STATE_TRANSFERRING;
-    info.AppendLiteral("TRANSFERRING ");
-  }
-  if (f & nsIWebProgressListener::STATE_NEGOTIATING)
-  {
-    f -= nsIWebProgressListener::STATE_NEGOTIATING;
-    info.AppendLiteral("NEGOTIATING ");
-  }
-  if (f & nsIWebProgressListener::STATE_STOP)
-  {
-    f -= nsIWebProgressListener::STATE_STOP;
-    info.AppendLiteral("STOP ");
-  }
-  if (f & nsIWebProgressListener::STATE_IS_REQUEST)
-  {
-    f -= nsIWebProgressListener::STATE_IS_REQUEST;
-    info.AppendLiteral("IS_REQUEST ");
-  }
-  if (f & nsIWebProgressListener::STATE_IS_DOCUMENT)
-  {
-    f -= nsIWebProgressListener::STATE_IS_DOCUMENT;
-    info.AppendLiteral("IS_DOCUMENT ");
-  }
-  if (f & nsIWebProgressListener::STATE_IS_NETWORK)
-  {
-    f -= nsIWebProgressListener::STATE_IS_NETWORK;
-    info.AppendLiteral("IS_NETWORK ");
-  }
-  if (f & nsIWebProgressListener::STATE_IS_WINDOW)
-  {
-    f -= nsIWebProgressListener::STATE_IS_WINDOW;
-    info.AppendLiteral("IS_WINDOW ");
-  }
-  if (f & nsIWebProgressListener::STATE_IS_INSECURE)
-  {
-    f -= nsIWebProgressListener::STATE_IS_INSECURE;
-    info.AppendLiteral("IS_INSECURE ");
-  }
-  if (f & nsIWebProgressListener::STATE_IS_BROKEN)
-  {
-    f -= nsIWebProgressListener::STATE_IS_BROKEN;
-    info.AppendLiteral("IS_BROKEN ");
-  }
-  if (f & nsIWebProgressListener::STATE_IS_SECURE)
-  {
-    f -= nsIWebProgressListener::STATE_IS_SECURE;
-    info.AppendLiteral("IS_SECURE ");
-  }
-  if (f & nsIWebProgressListener::STATE_SECURE_HIGH)
-  {
-    f -= nsIWebProgressListener::STATE_SECURE_HIGH;
-    info.AppendLiteral("SECURE_HIGH ");
-  }
-  if (f & nsIWebProgressListener::STATE_RESTORING)
-  {
-    f -= nsIWebProgressListener::STATE_RESTORING;
-    info.AppendLiteral("STATE_RESTORING ");
-  }
-
-  if (f > 0)
-  {
-    info.AppendLiteral("f contains unknown flag!");
-  }
-
-  MOZ_LOG(gSecureDocLog, LogLevel::Debug,
-         ("SecureUI:%p: OnStateChange: %s %s -- %s\n", this, _status, 
-          info.get(), info2.get()));
-
   if (aProgressStateFlags & STATE_STOP
       &&
       channel)
@@ -1126,6 +1031,9 @@ nsSecureBrowserUIImpl::UpdateSecurityState(nsIRequest* aRequest,
   if (mNewToplevelSecurityState & STATE_IS_BROKEN) {
     newSecurityState = lis_broken_security;
   }
+
+  mCertUserOverridden =
+    mNewToplevelSecurityState & STATE_CERT_USER_OVERRIDDEN;
 
   MOZ_LOG(gSecureDocLog, LogLevel::Debug,
          ("SecureUI:%p: UpdateSecurityState:  old-new  %d - %d\n", this,

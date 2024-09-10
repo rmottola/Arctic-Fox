@@ -9,6 +9,7 @@
 #include "AsyncEventRunner.h"
 #include "DecoderTraits.h"
 #include "Benchmark.h"
+#include "DecoderDoctorDiagnostics.h"
 #include "MediaSourceUtils.h"
 #include "SourceBuffer.h"
 #include "SourceBufferList.h"
@@ -75,25 +76,26 @@ static const char* const gMediaSourceTypes[6] = {
 // 2. If H264 hardware acceleration is not available.
 // 3. The CPU is considered to be fast enough
 static bool
-IsWebMForced()
+IsWebMForced(DecoderDoctorDiagnostics* aDiagnostics)
 {
   bool mp4supported =
-    DecoderTraits::IsMP4TypeAndEnabled(NS_LITERAL_CSTRING("video/mp4"));
+    DecoderTraits::IsMP4TypeAndEnabled(NS_LITERAL_CSTRING("video/mp4"),
+                                       aDiagnostics);
   bool hwsupported = gfxPlatform::GetPlatform()->CanUseHardwareVideoDecoding();
   return !mp4supported || !hwsupported || VP9Benchmark::IsVP9DecodeFast();
 }
 
 static nsresult
-IsTypeSupported(const nsAString& aType)
+IsTypeSupported(const nsAString& aType, DecoderDoctorDiagnostics* aDiagnostics)
 {
   if (aType.IsEmpty()) {
-    return NS_ERROR_DOM_TYPE_ERR;
+    return NS_ERROR_DOM_INVALID_ACCESS_ERR;
   }
   nsContentTypeParser parser(aType);
   nsAutoString mimeType;
   nsresult rv = parser.GetType(mimeType);
   if (NS_FAILED(rv)) {
-    return NS_ERROR_DOM_INVALID_STATE_ERR;
+    return NS_ERROR_DOM_NOT_SUPPORTED_ERR;
   }
   NS_ConvertUTF16toUTF8 mimeTypeUTF8(mimeType);
 
@@ -102,27 +104,29 @@ IsTypeSupported(const nsAString& aType)
 
   for (uint32_t i = 0; gMediaSourceTypes[i]; ++i) {
     if (mimeType.EqualsASCII(gMediaSourceTypes[i])) {
-      if (DecoderTraits::IsMP4TypeAndEnabled(mimeTypeUTF8)) {
+      if (DecoderTraits::IsMP4TypeAndEnabled(mimeTypeUTF8, aDiagnostics)) {
         if (!Preferences::GetBool("media.mediasource.mp4.enabled", false)) {
           return NS_ERROR_DOM_NOT_SUPPORTED_ERR;
         }
         if (hasCodecs &&
             DecoderTraits::CanHandleCodecsType(mimeTypeUTF8.get(),
-                                               codecs) == CANPLAY_NO) {
-          return NS_ERROR_DOM_INVALID_STATE_ERR;
+                                               codecs,
+                                               aDiagnostics) == CANPLAY_NO) {
+          return NS_ERROR_DOM_NOT_SUPPORTED_ERR;
         }
         return NS_OK;
       } else if (DecoderTraits::IsWebMTypeAndEnabled(mimeTypeUTF8)) {
         if (!(Preferences::GetBool("media.mediasource.webm.enabled", false) ||
               (Preferences::GetBool("media.mediasource.webm.audio.enabled", true) &&
                DecoderTraits::IsWebMAudioType(mimeTypeUTF8)) ||
-              IsWebMForced())) {
+              IsWebMForced(aDiagnostics))) {
           return NS_ERROR_DOM_NOT_SUPPORTED_ERR;
         }
         if (hasCodecs &&
             DecoderTraits::CanHandleCodecsType(mimeTypeUTF8.get(),
-                                               codecs) == CANPLAY_NO) {
-          return NS_ERROR_DOM_INVALID_STATE_ERR;
+                                               codecs,
+                                               aDiagnostics) == CANPLAY_NO) {
+          return NS_ERROR_DOM_NOT_SUPPORTED_ERR;
         }
         return NS_OK;
       }
@@ -196,7 +200,7 @@ MediaSource::SetDuration(double aDuration, ErrorResult& aRv)
   MOZ_ASSERT(NS_IsMainThread());
   MSE_API("SetDuration(aDuration=%f, ErrorResult)", aDuration);
   if (aDuration < 0 || IsNaN(aDuration)) {
-    aRv.Throw(NS_ERROR_DOM_TYPE_ERR);
+    aRv.Throw(NS_ERROR_DOM_INVALID_ACCESS_ERR);
     return;
   }
   if (mReadyState != MediaSourceReadyState::Open ||
@@ -219,7 +223,12 @@ already_AddRefed<SourceBuffer>
 MediaSource::AddSourceBuffer(const nsAString& aType, ErrorResult& aRv)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  nsresult rv = mozilla::IsTypeSupported(aType);
+  DecoderDoctorDiagnostics diagnostics;
+  nsresult rv = mozilla::IsTypeSupported(aType, &diagnostics);
+  diagnostics.StoreFormatDiagnostics(GetOwner()
+                                     ? GetOwner()->GetExtantDoc()
+                                     : nullptr,
+                                     aType, NS_SUCCEEDED(rv), __func__);
   MSE_API("AddSourceBuffer(aType=%s)%s",
           NS_ConvertUTF16toUTF8(aType).get(),
           rv == NS_OK ? "" : " [not supported]");
@@ -330,15 +339,19 @@ MediaSource::EndOfStream(const Optional<MediaSourceEndOfStreamError>& aError, Er
     mDecoder->DecodeError();
     break;
   default:
-    aRv.Throw(NS_ERROR_DOM_TYPE_ERR);
+    aRv.Throw(NS_ERROR_DOM_INVALID_ACCESS_ERR);
   }
 }
 
 /* static */ bool
-MediaSource::IsTypeSupported(const GlobalObject&, const nsAString& aType)
+MediaSource::IsTypeSupported(const GlobalObject& aOwner, const nsAString& aType)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  nsresult rv = mozilla::IsTypeSupported(aType);
+  DecoderDoctorDiagnostics diagnostics;
+  nsresult rv = mozilla::IsTypeSupported(aType, &diagnostics);
+  nsCOMPtr<nsPIDOMWindowInner> window = do_QueryInterface(aOwner.GetAsSupports());
+  diagnostics.StoreFormatDiagnostics(window ? window->GetExtantDoc() : nullptr,
+                                     aType, NS_SUCCEEDED(rv), __func__);
 #define this nullptr
   MSE_API("IsTypeSupported(aType=%s)%s ",
           NS_ConvertUTF16toUTF8(aType).get(), rv == NS_OK ? "OK" : "[not supported]");
@@ -521,16 +534,6 @@ MediaSource::DurationChange(double aOldDuration, double aNewDuration)
     mSourceBuffers->RangeRemoval(aNewDuration, PositiveInfinity<double>());
   }
   // TODO: If partial audio frames/text cues exist, clamp duration based on mSourceBuffers.
-}
-
-void
-MediaSource::NotifyEvicted(double aStart, double aEnd)
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  MSE_DEBUG("NotifyEvicted(aStart=%f, aEnd=%f)", aStart, aEnd);
-  // Cycle through all SourceBuffers and tell them to evict data in
-  // the given range.
-  mSourceBuffers->Evict(aStart, aEnd);
 }
 
 void

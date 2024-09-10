@@ -39,7 +39,7 @@ using namespace mozilla;
 // Checking permissions needs to happen on the main thread, but the
 // binder callback is called on a special binder thread, so we use
 // this runnable for that.
-class GonkPermissionChecker : public nsRunnable {
+class GonkPermissionChecker : public Runnable {
   int32_t mPid;
   bool mCanUseCamera;
 
@@ -123,7 +123,7 @@ GonkPermissionService::checkPermission(const String16& permission, int32_t pid,
   String8 perm8(permission);
 
   // Some ril implementations need android.permission.MODIFY_AUDIO_SETTINGS
-  if ((uid == AID_RADIO || uid == AID_BLUETOOTH) &&
+  if ((uid == AID_SYSTEM || uid == AID_RADIO || uid == AID_BLUETOOTH) &&
       perm8 == "android.permission.MODIFY_AUDIO_SETTINGS") {
     return true;
   }

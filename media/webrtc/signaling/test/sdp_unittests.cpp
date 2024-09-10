@@ -271,7 +271,7 @@ class SdpTest : public ::testing::Test {
 
 static const std::string kVideoSdp =
   "v=0\r\n"
-  "o=- 137331303 2 IN IP4 127.0.0.1\r\n"
+  "o=- 4294967296 2 IN IP4 127.0.0.1\r\n"
   "s=SIP Call\r\n"
   "c=IN IP4 198.51.100.7\r\n"
   "t=0 0\r\n"
@@ -819,7 +819,7 @@ TEST_F(SdpTest, addFmtpMaxFsFr) {
 
 static const std::string kBrokenFmtp =
   "v=0\r\n"
-  "o=- 137331303 2 IN IP4 127.0.0.1\r\n"
+  "o=- 4294967296 2 IN IP4 127.0.0.1\r\n"
   "s=SIP Call\r\n"
   "t=0 0\r\n"
   "m=video 56436 RTP/SAVPF 120\r\n"
@@ -852,7 +852,7 @@ TEST_F(SdpTest, addIceLite) {
 TEST_F(SdpTest, parseIceLite) {
     std::string sdp =
         "v=0\r\n"
-        "o=- 137331303 2 IN IP4 127.0.0.1\r\n"
+        "o=- 4294967296 2 IN IP4 127.0.0.1\r\n"
         "s=SIP Call\r\n"
         "t=0 0\r\n"
         "a=ice-lite\r\n";
@@ -1012,7 +1012,7 @@ TEST_P(NewSdpTest, CheckOriginGetUsername) {
 
 TEST_P(NewSdpTest, CheckOriginGetSessionId) {
   ParseSdp(kVideoSdp);
-  ASSERT_EQ(137331303U, mSdp->GetOrigin().GetSessionId())
+  ASSERT_EQ(4294967296U, mSdp->GetOrigin().GetSessionId())
     << "Wrong session id in origin";
 }
 
@@ -1042,7 +1042,7 @@ TEST_P(NewSdpTest, CheckGetMissingBandwidth) {
 
 TEST_P(NewSdpTest, CheckGetBandwidth) {
   ParseSdp("v=0" CRLF
-           "o=- 137331303 2 IN IP4 127.0.0.1" CRLF
+           "o=- 4294967296 2 IN IP4 127.0.0.1" CRLF
            "s=SIP Call" CRLF
            "c=IN IP4 198.51.100.7" CRLF
            "b=CT:5000" CRLF
@@ -1110,7 +1110,7 @@ TEST_P(NewSdpTest, CheckMediaSectionGetMissingBandwidth) {
 
 TEST_P(NewSdpTest, CheckMediaSectionGetBandwidth) {
   ParseSdp("v=0\r\n"
-           "o=- 137331303 2 IN IP4 127.0.0.1\r\n"
+           "o=- 4294967296 2 IN IP4 127.0.0.1\r\n"
            "c=IN IP4 198.51.100.7\r\n"
            "t=0 0\r\n"
            "m=video 56436 RTP/SAVPF 120\r\n"
@@ -1120,6 +1120,12 @@ TEST_P(NewSdpTest, CheckMediaSectionGetBandwidth) {
     << "Wrong bandwidth in media section";
 }
 
+// Define a string that is 258 characters long. We use a long string here so
+// that we can test that we are able to parse and handle a string longer than
+// the default maximum length of 256 in sipcc.
+#define ID_A "1234567890abcdef"
+#define ID_B ID_A ID_A ID_A ID_A
+#define LONG_IDENTITY ID_B ID_B ID_B ID_B "xx"
 
 // SDP from a basic A/V apprtc call FFX/FFX
 const std::string kBasicAudioVideoOffer =
@@ -1135,7 +1141,7 @@ const std::string kBasicAudioVideoOffer =
 "a=msid-semantic:WMS stream streama" CRLF
 "a=msid-semantic:foo stream" CRLF
 "a=fingerprint:sha-256 DF:2E:AC:8A:FD:0A:8E:99:BF:5D:E8:3C:E7:FA:FB:08:3B:3C:54:1D:D7:D4:05:77:A0:72:9B:14:08:6D:0F:4C" CRLF
-"a=identity:blahblahblah foo;bar" CRLF
+"a=identity:" LONG_IDENTITY CRLF
 "a=group:BUNDLE first second" CRLF
 "a=group:BUNDLE third" CRLF
 "a=group:LS first third" CRLF
@@ -1143,6 +1149,7 @@ const std::string kBasicAudioVideoOffer =
 "c=IN IP4 0.0.0.0" CRLF
 "a=mid:first" CRLF
 "a=rtpmap:109 opus/48000/2" CRLF
+"a=fmtp:109 maxplaybackrate=32000;stereo=1" CRLF
 "a=ptime:20" CRLF
 "a=maxptime:20" CRLF
 "a=rtpmap:9 G722/8000" CRLF
@@ -1329,7 +1336,7 @@ TEST_P(NewSdpTest, CheckIdentity) {
   ASSERT_TRUE(mSdp->GetAttributeList().HasAttribute(
         SdpAttribute::kIdentityAttribute));
   auto identity = mSdp->GetAttributeList().GetIdentity();
-  ASSERT_EQ("blahblahblah", identity) << "Wrong identity assertion";
+  ASSERT_EQ(LONG_IDENTITY, identity) << "Wrong identity assertion";
 }
 
 TEST_P(NewSdpTest, CheckNumberOfMediaSections) {
@@ -1504,7 +1511,7 @@ const std::string kH264AudioVideoOffer =
 "a=rtpmap:0 PCMU/8000" CRLF
 "a=rtpmap:8 PCMA/8000" CRLF
 "a=rtpmap:101 telephone-event/8000" CRLF
-"a=fmtp:101 0-15" CRLF
+"a=fmtp:109 maxplaybackrate=32000;stereo=1" CRLF
 "a=ice-ufrag:00000000" CRLF
 "a=ice-pwd:0000000000000000000000000000000" CRLF
 "a=sendonly" CRLF
@@ -1559,8 +1566,13 @@ TEST_P(NewSdpTest, CheckFormatParameters) {
   auto audio_format_params =
       mSdp->GetMediaSection(0).GetAttributeList().GetFmtp().mFmtps;
   ASSERT_EQ(1U, audio_format_params.size());
-  ASSERT_EQ("101", audio_format_params[0].format);
-  ASSERT_EQ("0-15", audio_format_params[0].parameters_string);
+  ASSERT_EQ("109", audio_format_params[0].format);
+  ASSERT_TRUE(!!audio_format_params[0].parameters);
+  const SdpFmtpAttributeList::OpusParameters* opus_parameters =
+    static_cast<SdpFmtpAttributeList::OpusParameters*>(
+        audio_format_params[0].parameters.get());
+  ASSERT_EQ(32000U, opus_parameters->maxplaybackrate);
+  ASSERT_EQ(1U, opus_parameters->stereo);
 
   ASSERT_TRUE(mSdp->GetMediaSection(1).GetAttributeList().HasAttribute(
       SdpAttribute::kFmtpAttribute));

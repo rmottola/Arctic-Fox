@@ -185,6 +185,30 @@ class DebuggerWeakMap : private WeakMap<RelocatablePtr<UnbarrieredKey>, Relocata
 
 class LeaveDebuggeeNoExecute;
 
+// Suppresses all debuggee NX checks, i.e., allow all execution. Used to allow
+// certain whitelisted operations to execute code.
+//
+// WARNING
+// WARNING Do not use this unless you know what you are doing!
+// WARNING
+class AutoSuppressDebuggeeNoExecuteChecks
+{
+    EnterDebuggeeNoExecute** stack_;
+    EnterDebuggeeNoExecute* prev_;
+
+  public:
+    explicit AutoSuppressDebuggeeNoExecuteChecks(JSContext* cx) {
+        stack_ = &cx->runtime()->noExecuteDebuggerTop;
+        prev_ = *stack_;
+        *stack_ = nullptr;
+    }
+
+    ~AutoSuppressDebuggeeNoExecuteChecks() {
+        MOZ_ASSERT(!*stack_);
+        *stack_ = prev_;
+    }
+};
+
 /*
  * Env is the type of what ES5 calls "lexical environments" (runtime
  * activations of lexical scopes). This is currently just JSObject, and is
@@ -314,10 +338,8 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
         bool inNursery;
 
         void trace(JSTracer* trc) {
-            if (frame)
-                TraceEdge(trc, &frame, "Debugger::AllocationsLogEntry::frame");
-            if (ctorName)
-                TraceEdge(trc, &ctorName, "Debugger::AllocationsLogEntry::ctorName");
+            TraceNullableEdge(trc, &frame, "Debugger::AllocationsLogEntry::frame");
+            TraceNullableEdge(trc, &ctorName, "Debugger::AllocationsLogEntry::ctorName");
         }
     };
 
@@ -456,7 +478,6 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     uint32_t traceLoggerScriptedCallsLastDrainedSize;
     uint32_t traceLoggerScriptedCallsLastDrainedIteration;
 
-    class FrameRange;
     class ScriptQuery;
     class ObjectQuery;
 
@@ -538,7 +559,8 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static void finalize(FreeOp* fop, JSObject* obj);
     void markCrossCompartmentEdges(JSTracer* tracer);
 
-    static const Class jsclass;
+    static const ClassOps classOps_;
+    static const Class class_;
 
     static bool getHookImpl(JSContext* cx, CallArgs& args, Debugger& dbg, Hook which);
     static bool setHookImpl(JSContext* cx, CallArgs& args, Debugger& dbg, Hook which);
@@ -588,6 +610,7 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     static bool setupTraceLogger(JSContext* cx, unsigned argc, Value* vp);
     static bool drainTraceLogger(JSContext* cx, unsigned argc, Value* vp);
 #endif
+    static bool adoptDebuggeeValue(JSContext* cx, unsigned argc, Value* vp);
     static bool construct(JSContext* cx, unsigned argc, Value* vp);
     static const JSPropertySpec properties[];
     static const JSFunctionSpec methods[];
@@ -600,6 +623,18 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
                                                       IsObserving observing);
     static bool updateExecutionObservability(JSContext* cx, ExecutionObservableSet& obs,
                                              IsObserving observing);
+
+    template <typename FrameFn /* void (NativeObject*) */>
+    static void forEachDebuggerFrame(AbstractFramePtr frame, FrameFn fn);
+
+    /*
+     * Return a vector containing all Debugger.Frame instances referring to
+     * |frame|. |global| is |frame|'s global object; if nullptr or omitted, we
+     * compute it ourselves from |frame|.
+     */
+    using DebuggerFrameVector = GCVector<NativeObject*>;
+    static bool getDebuggerFrames(AbstractFramePtr frame,
+                                  MutableHandle<DebuggerFrameVector> frames);
 
   public:
     static bool ensureExecutionObservabilityOfOsrFrame(JSContext* cx, InterpreterFrame* frame);
@@ -655,10 +690,10 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
     JSTrapStatus fireNewGlobalObject(JSContext* cx, Handle<GlobalObject*> global, MutableHandleValue vp);
     JSTrapStatus firePromiseHook(JSContext* cx, Hook hook, HandleObject promise, MutableHandleValue vp);
 
-    JSObject* newVariantWrapper(JSContext* cx, Handle<DebuggerScriptReferent> referent) {
+    NativeObject* newVariantWrapper(JSContext* cx, Handle<DebuggerScriptReferent> referent) {
         return newDebuggerScript(cx, referent);
     }
-    JSObject* newVariantWrapper(JSContext* cx, Handle<DebuggerSourceReferent> referent) {
+    NativeObject* newVariantWrapper(JSContext* cx, Handle<DebuggerSourceReferent> referent) {
         return newDebuggerSource(cx, referent);
     }
 
@@ -680,13 +715,13 @@ class Debugger : private mozilla::LinkedListElement<Debugger>
      * Allocate and initialize a Debugger.Script instance whose referent is
      * |referent|.
      */
-    JSObject* newDebuggerScript(JSContext* cx, Handle<DebuggerScriptReferent> referent);
+    NativeObject* newDebuggerScript(JSContext* cx, Handle<DebuggerScriptReferent> referent);
 
     /*
      * Allocate and initialize a Debugger.Source instance whose referent is
      * |referent|.
      */
-    JSObject* newDebuggerSource(JSContext* cx, Handle<DebuggerSourceReferent> referent);
+    NativeObject* newDebuggerSource(JSContext* cx, Handle<DebuggerSourceReferent> referent);
 
     /*
      * Receive a "new script" event from the engine. A new script was compiled

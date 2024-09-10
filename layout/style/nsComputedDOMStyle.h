@@ -288,6 +288,8 @@ private:
   /* StyleImageLayer properties */
   already_AddRefed<CSSValue> DoGetImageLayerImage(const nsStyleImageLayers& aLayers);
   already_AddRefed<CSSValue> DoGetImageLayerPosition(const nsStyleImageLayers& aLayers);
+  already_AddRefed<CSSValue> DoGetImageLayerPositionX(const nsStyleImageLayers& aLayers);
+  already_AddRefed<CSSValue> DoGetImageLayerPositionY(const nsStyleImageLayers& aLayers);
   already_AddRefed<CSSValue> DoGetImageLayerRepeat(const nsStyleImageLayers& aLayers);
   already_AddRefed<CSSValue> DoGetImageLayerSize(const nsStyleImageLayers& aLayers);
 
@@ -296,6 +298,8 @@ private:
   already_AddRefed<CSSValue> DoGetBackgroundColor();
   already_AddRefed<CSSValue> DoGetBackgroundImage();
   already_AddRefed<CSSValue> DoGetBackgroundPosition();
+  already_AddRefed<CSSValue> DoGetBackgroundPositionX();
+  already_AddRefed<CSSValue> DoGetBackgroundPositionY();
   already_AddRefed<CSSValue> DoGetBackgroundRepeat();
   already_AddRefed<CSSValue> DoGetBackgroundClip();
   already_AddRefed<CSSValue> DoGetBackgroundBlendMode();
@@ -307,6 +311,8 @@ private:
 #ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
   already_AddRefed<CSSValue> DoGetMaskImage();
   already_AddRefed<CSSValue> DoGetMaskPosition();
+  already_AddRefed<CSSValue> DoGetMaskPositionX();
+  already_AddRefed<CSSValue> DoGetMaskPositionY();
   already_AddRefed<CSSValue> DoGetMaskRepeat();
   already_AddRefed<CSSValue> DoGetMaskClip();
   already_AddRefed<CSSValue> DoGetMaskOrigin();
@@ -425,8 +431,12 @@ private:
   already_AddRefed<CSSValue> DoGetHyphens();
   already_AddRefed<CSSValue> DoGetTabSize();
   already_AddRefed<CSSValue> DoGetTextSizeAdjust();
+  already_AddRefed<CSSValue> DoGetWebkitTextFillColor();
+  already_AddRefed<CSSValue> DoGetWebkitTextStrokeColor();
+  already_AddRefed<CSSValue> DoGetWebkitTextStrokeWidth();
 
   /* Visibility properties */
+  already_AddRefed<CSSValue> DoGetColorAdjust();
   already_AddRefed<CSSValue> DoGetOpacity();
   already_AddRefed<CSSValue> DoGetPointerEvents();
   already_AddRefed<CSSValue> DoGetVisibility();
@@ -719,4 +729,3 @@ NS_NewComputedDOMStyle(mozilla::dom::Element* aElement,
                          nsComputedDOMStyle::eAll);
 
 #endif /* nsComputedDOMStyle_h__ */
-

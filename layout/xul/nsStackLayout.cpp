@@ -59,14 +59,14 @@ nsStackLayout::nsStackLayout()
  */
 
 nsSize
-nsStackLayout::GetPrefSize(nsIFrame* aBox, nsBoxLayoutState& aState)
+nsStackLayout::GetXULPrefSize(nsIFrame* aBox, nsBoxLayoutState& aState)
 {
   nsSize prefSize (0, 0);
 
-  nsIFrame* child = nsBox::GetChildBox(aBox);
+  nsIFrame* child = nsBox::GetChildXULBox(aBox);
   while (child) {
     if (child->StyleXUL()->mStretchStack) {
-      nsSize pref = child->GetPrefSize(aState);
+      nsSize pref = child->GetXULPrefSize(aState);
 
       AddMargin(child, pref);
       nsMargin offset;
@@ -76,7 +76,7 @@ nsStackLayout::GetPrefSize(nsIFrame* aBox, nsBoxLayoutState& aState)
       AddLargestSize(prefSize, pref);
     }
 
-    child = nsBox::GetNextBox(child);
+    child = nsBox::GetNextXULBox(child);
   }
 
   AddBorderAndPadding(aBox, prefSize);
@@ -85,14 +85,14 @@ nsStackLayout::GetPrefSize(nsIFrame* aBox, nsBoxLayoutState& aState)
 }
 
 nsSize
-nsStackLayout::GetMinSize(nsIFrame* aBox, nsBoxLayoutState& aState)
+nsStackLayout::GetXULMinSize(nsIFrame* aBox, nsBoxLayoutState& aState)
 {
   nsSize minSize (0, 0);
 
-  nsIFrame* child = nsBox::GetChildBox(aBox);
+  nsIFrame* child = nsBox::GetChildXULBox(aBox);
   while (child) {
     if (child->StyleXUL()->mStretchStack) {
-      nsSize min = child->GetMinSize(aState);
+      nsSize min = child->GetXULMinSize(aState);
 
       AddMargin(child, min);
       nsMargin offset;
@@ -102,7 +102,7 @@ nsStackLayout::GetMinSize(nsIFrame* aBox, nsBoxLayoutState& aState)
       AddLargestSize(minSize, min);
     }
 
-    child = nsBox::GetNextBox(child);
+    child = nsBox::GetNextXULBox(child);
   }
 
   AddBorderAndPadding(aBox, minSize);
@@ -111,15 +111,15 @@ nsStackLayout::GetMinSize(nsIFrame* aBox, nsBoxLayoutState& aState)
 }
 
 nsSize
-nsStackLayout::GetMaxSize(nsIFrame* aBox, nsBoxLayoutState& aState)
+nsStackLayout::GetXULMaxSize(nsIFrame* aBox, nsBoxLayoutState& aState)
 {
   nsSize maxSize (NS_INTRINSICSIZE, NS_INTRINSICSIZE);
 
-  nsIFrame* child = nsBox::GetChildBox(aBox);
+  nsIFrame* child = nsBox::GetChildXULBox(aBox);
   while (child) {
     if (child->StyleXUL()->mStretchStack) {
-      nsSize min = child->GetMinSize(aState);
-      nsSize max = child->GetMaxSize(aState);
+      nsSize min = child->GetXULMinSize(aState);
+      nsSize max = child->GetXULMaxSize(aState);
 
       max = nsBox::BoundsCheckMinMax(min, max);
 
@@ -131,7 +131,7 @@ nsStackLayout::GetMaxSize(nsIFrame* aBox, nsBoxLayoutState& aState)
       AddSmallestSize(maxSize, max);
     }
 
-    child = nsBox::GetNextBox(child);
+    child = nsBox::GetNextXULBox(child);
   }
 
   AddBorderAndPadding(aBox, maxSize);
@@ -145,16 +145,16 @@ nsStackLayout::GetAscent(nsIFrame* aBox, nsBoxLayoutState& aState)
 {
   nscoord vAscent = 0;
 
-  nsIFrame* child = nsBox::GetChildBox(aBox);
+  nsIFrame* child = nsBox::GetChildXULBox(aBox);
   while (child) {  
-    nscoord ascent = child->GetBoxAscent(aState);
+    nscoord ascent = child->GetXULBoxAscent(aState);
     nsMargin margin;
-    child->GetMargin(margin);
+    child->GetXULMargin(margin);
     ascent += margin.top;
     if (ascent > vAscent)
       vAscent = ascent;
 
-    child = nsBox::GetNextBox(child);
+    child = nsBox::GetNextXULBox(child);
   }
 
   return vAscent;
@@ -169,7 +169,7 @@ nsStackLayout::GetOffset(nsIFrame* aChild, nsMargin& aOffset)
 
   // As an optimization, we cache the fact that we are not positioned to avoid
   // wasting time fetching attributes.
-  if (aChild->IsBoxFrame() &&
+  if (aChild->IsXULBoxFrame() &&
       (aChild->GetStateBits() & NS_STATE_STACK_NOT_POSITIONED))
     return 0;
 
@@ -241,7 +241,7 @@ nsStackLayout::GetOffset(nsIFrame* aChild, nsMargin& aOffset)
     }
   }
 
-  if (!offsetSpecified && aChild->IsBoxFrame()) {
+  if (!offsetSpecified && aChild->IsXULBoxFrame()) {
     // If no offset was specified at all, then we cache this fact to avoid requerying
     // CSS or the content model.
     aChild->AddStateBits(NS_STATE_STACK_NOT_POSITIONED);
@@ -252,21 +252,21 @@ nsStackLayout::GetOffset(nsIFrame* aChild, nsMargin& aOffset)
 
 
 NS_IMETHODIMP
-nsStackLayout::Layout(nsIFrame* aBox, nsBoxLayoutState& aState)
+nsStackLayout::XULLayout(nsIFrame* aBox, nsBoxLayoutState& aState)
 {
   nsRect clientRect;
-  aBox->GetClientRect(clientRect);
+  aBox->GetXULClientRect(clientRect);
 
   bool grow;
 
   do {
-    nsIFrame* child = nsBox::GetChildBox(aBox);
+    nsIFrame* child = nsBox::GetChildXULBox(aBox);
     grow = false;
 
     while (child) 
     {  
       nsMargin margin;
-      child->GetMargin(margin);
+      child->GetXULMargin(margin);
       nsRect childRect(clientRect);
       childRect.Deflate(margin);
 
@@ -283,7 +283,7 @@ nsStackLayout::Layout(nsIFrame* aBox, nsBoxLayoutState& aState)
       if (sizeChanged || NS_SUBTREE_DIRTY(child)) {
           // add in the child's margin
           nsMargin margin;
-          child->GetMargin(margin);
+          child->GetXULMargin(margin);
 
           // obtain our offset from the top left border of the stack's content box.
           nsMargin offset;
@@ -298,46 +298,48 @@ nsStackLayout::Layout(nsIFrame* aBox, nsBoxLayoutState& aState)
           //
           // Margins on the child are also included in the edge offsets
           if (offsetSpecified) {
+            nsSize min = child->GetXULMinSize(aState);
+            nsSize max = child->GetXULMaxSize(aState);
             if (offsetSpecified & SPECIFIED_LEFT) {
               childRect.x = clientRect.x + offset.left + margin.left;
               if (offsetSpecified & SPECIFIED_RIGHT) {
-                nsSize min = child->GetMinSize(aState);
-                nsSize max = child->GetMaxSize(aState);
                 nscoord width = clientRect.width - offset.LeftRight() - margin.LeftRight();
                 childRect.width = clamped(width, min.width, max.width);
               }
               else {
-                childRect.width = child->GetPrefSize(aState).width;
+                nscoord width = child->GetXULPrefSize(aState).width;
+                childRect.width = clamped(width, min.width, max.width);
               }
             }
             else if (offsetSpecified & SPECIFIED_RIGHT) {
-              childRect.width = child->GetPrefSize(aState).width;
+              nscoord width = child->GetXULPrefSize(aState).width;
+              childRect.width = clamped(width, min.width, max.width);
               childRect.x = clientRect.XMost() - offset.right - margin.right - childRect.width;
             }
 
             if (offsetSpecified & SPECIFIED_TOP) {
               childRect.y = clientRect.y + offset.top + margin.top;
               if (offsetSpecified & SPECIFIED_BOTTOM) {
-                nsSize min = child->GetMinSize(aState);
-                nsSize max = child->GetMaxSize(aState);
                 nscoord height = clientRect.height - offset.TopBottom() - margin.TopBottom();
                 childRect.height = clamped(height, min.height, max.height);
               }
               else {
-                childRect.height = child->GetPrefSize(aState).height;
+                nscoord height = child->GetXULPrefSize(aState).height;
+                childRect.height = clamped(height, min.height, max.height);
               }
             }
             else if (offsetSpecified & SPECIFIED_BOTTOM) {
-              childRect.height = child->GetPrefSize(aState).height;
+              nscoord height = child->GetXULPrefSize(aState).height;
+              childRect.height = clamped(height, min.height, max.height);
               childRect.y = clientRect.YMost() - offset.bottom - margin.bottom - childRect.height;
             }
           }
 
           // Now place the child.
-          child->SetBounds(aState, childRect);
+          child->SetXULBounds(aState, childRect);
 
           // Flow the child.
-          child->Layout(aState);
+          child->XULLayout(aState);
 
           // Get the child's new rect.
           childRect = child->GetRect();
@@ -357,7 +359,7 @@ nsStackLayout::Layout(nsIFrame* aBox, nsBoxLayoutState& aState)
           }
        }
 
-       child = nsBox::GetNextBox(child);
+       child = nsBox::GetNextXULBox(child);
      }
    } while (grow);
    
@@ -365,7 +367,7 @@ nsStackLayout::Layout(nsIFrame* aBox, nsBoxLayoutState& aState)
    // get bigger
    nsRect bounds(aBox->GetRect());
    nsMargin bp;
-   aBox->GetBorderAndPadding(bp);
+   aBox->GetXULBorderAndPadding(bp);
    clientRect.Inflate(bp);
 
    if (clientRect.width > bounds.width || clientRect.height > bounds.height)
@@ -375,7 +377,7 @@ nsStackLayout::Layout(nsIFrame* aBox, nsBoxLayoutState& aState)
      if (clientRect.height > bounds.height)
        bounds.height = clientRect.height;
 
-     aBox->SetBounds(aState, bounds);
+     aBox->SetXULBounds(aState, bounds);
    }
 
    return NS_OK;

@@ -14,8 +14,10 @@
 #include "mozilla/gfx/Rect.h"           // for RoundedIn
 #include "mozilla/gfx/ScaleFactor.h"    // for ScaleFactor
 #include "mozilla/gfx/Logging.h"        // for Log
+#include "mozilla/StaticPtr.h"          // for StaticAutoPtr
 #include "mozilla/TimeStamp.h"          // for TimeStamp
 #include "nsString.h"
+#include "nsStyleCoord.h"               // for nsStyleCoord
 
 namespace IPC {
 template <typename T> struct ParamTraits;
@@ -23,6 +25,15 @@ template <typename T> struct ParamTraits;
 
 namespace mozilla {
 namespace layers {
+
+/**
+ * Helper struct to hold a couple of fields that can be updated as part of
+ * an empty transaction.
+ */
+struct ScrollUpdateInfo {
+  uint32_t mScrollGeneration;
+  CSSPoint mScrollOffset;
+};
 
 /**
  * The viewport and displayport metrics for the painted frame at the
@@ -38,11 +49,19 @@ public:
   static const ViewID NULL_SCROLL_ID;   // This container layer does not scroll.
   static const ViewID START_SCROLL_ID = 2;  // This is the ID that scrolling subframes
                                         // will begin at.
-  static const FrameMetrics sNullMetrics;   // We often need an empty metrics
+
+  enum ScrollOffsetUpdateType : uint8_t {
+    eNone,          // The default; the scroll offset was not updated
+    eMainThread,    // The scroll offset was updated by the main thread.
+    ePending,       // The scroll offset was updated on the main thread, but not
+                    // painted, so the layer texture data is still at the old
+                    // offset.
+
+    eSentinel       // For IPC use only
+  };
 
   FrameMetrics()
     : mScrollId(NULL_SCROLL_ID)
-    , mScrollParentId(NULL_SCROLL_ID)
     , mPresShellResolution(1)
     , mCompositionBounds(0, 0, 0, 0)
     , mDisplayPort(0, 0, 0, 0)
@@ -59,21 +78,11 @@ public:
     , mPresShellId(-1)
     , mViewport(0, 0, 0, 0)
     , mExtraResolution()
-    , mBackgroundColor()
-    , mContentDescription()
-    , mLineScrollAmount(0, 0)
-    , mPageScrollAmount(0, 0)
-    , mClipRect()
-    , mMaskLayerIndex()
     , mPaintRequestTime()
+    , mScrollUpdateType(eNone)
     , mIsRootContent(false)
-    , mHasScrollgrab(false)
-    , mUpdateScrollOffset(false)
     , mDoSmoothScroll(false)
     , mUseDisplayPortMargins(false)
-    , mAllowVerticalScrollWithWheel(false)
-    , mIsLayersIdRoot(false)
-    , mUsesContainerScrolling(false)
     , mIsScrollInfoLayer(false)
   {
   }
@@ -84,7 +93,6 @@ public:
   {
     // Put mScrollId at the top since it's the most likely one to fail.
     return mScrollId == aOther.mScrollId &&
-           mScrollParentId == aOther.mScrollParentId &&
            mPresShellResolution == aOther.mPresShellResolution &&
            mCompositionBounds.IsEqualEdges(aOther.mCompositionBounds) &&
            mDisplayPort.IsEqualEdges(aOther.mDisplayPort) &&
@@ -101,35 +109,17 @@ public:
            mPresShellId == aOther.mPresShellId &&
            mViewport.IsEqualEdges(aOther.mViewport) &&
            mExtraResolution == aOther.mExtraResolution &&
-           mBackgroundColor == aOther.mBackgroundColor &&
-           // don't compare mContentDescription
-           mLineScrollAmount == aOther.mLineScrollAmount &&
-           mPageScrollAmount == aOther.mPageScrollAmount &&
-           mClipRect == aOther.mClipRect &&
-           mMaskLayerIndex == aOther.mMaskLayerIndex &&
            mPaintRequestTime == aOther.mPaintRequestTime &&
+           mScrollUpdateType == aOther.mScrollUpdateType &&
            mIsRootContent == aOther.mIsRootContent &&
-           mHasScrollgrab == aOther.mHasScrollgrab &&
-           mUpdateScrollOffset == aOther.mUpdateScrollOffset &&
            mDoSmoothScroll == aOther.mDoSmoothScroll &&
            mUseDisplayPortMargins == aOther.mUseDisplayPortMargins &&
-           mAllowVerticalScrollWithWheel == aOther.mAllowVerticalScrollWithWheel &&
-           mIsLayersIdRoot == aOther.mIsLayersIdRoot &&
-           mUsesContainerScrolling == aOther.mUsesContainerScrolling &&
            mIsScrollInfoLayer == aOther.mIsScrollInfoLayer;
   }
 
   bool operator!=(const FrameMetrics& aOther) const
   {
     return !operator==(aOther);
-  }
-
-  bool IsDefault() const
-  {
-    FrameMetrics def;
-
-    def.mPresShellId = mPresShellId;
-    return (def == *this);
   }
 
   bool IsScrollable() const
@@ -205,6 +195,15 @@ public:
     return size;
   }
 
+  CSSRect CalculateScrollRange() const
+  {
+    CSSSize scrollPortSize = CalculateCompositedSizeInCssPixels();
+    CSSRect scrollRange = mScrollableRect;
+    scrollRange.width = std::max(scrollRange.width - scrollPortSize.width, 0.0f);
+    scrollRange.height = std::max(scrollRange.height - scrollPortSize.height, 0.0f);
+    return scrollRange;
+  }
+
   void ScrollBy(const CSSPoint& aPoint)
   {
     mScrollOffset += aPoint;
@@ -234,20 +233,11 @@ public:
     mDoSmoothScroll = aOther.mDoSmoothScroll;
   }
 
-  void UpdateScrollInfo(uint32_t aScrollGeneration, const CSSPoint& aScrollOffset)
+  void UpdatePendingScrollInfo(const ScrollUpdateInfo& aInfo)
   {
-    mScrollOffset = aScrollOffset;
-    mScrollGeneration = aScrollGeneration;
-  }
-
-  // Make a copy of this FrameMetrics object which does not have any pointers
-  // to heap-allocated memory (i.e. is Plain Old Data, or 'POD'), and is
-  // therefore safe to be placed into shared memory.
-  FrameMetrics MakePODObject() const
-  {
-    FrameMetrics copy = *this;
-    copy.mContentDescription.Truncate();
-    return copy;
+    mScrollOffset = aInfo.mScrollOffset;
+    mScrollGeneration = aInfo.mScrollGeneration;
+    mScrollUpdateType = ePending;
   }
 
 public:
@@ -321,16 +311,6 @@ public:
     return mIsRootContent;
   }
 
-  void SetHasScrollgrab(bool aHasScrollgrab)
-  {
-    mHasScrollgrab = aHasScrollgrab;
-  }
-
-  bool GetHasScrollgrab() const
-  {
-    return mHasScrollgrab;
-  }
-
   void SetScrollOffset(const CSSPoint& aScrollOffset)
   {
     mScrollOffset = aScrollOffset;
@@ -363,7 +343,7 @@ public:
 
   void SetScrollOffsetUpdated(uint32_t aScrollGeneration)
   {
-    mUpdateScrollOffset = true;
+    mScrollUpdateType = eMainThread;
     mScrollGeneration = aScrollGeneration;
   }
 
@@ -373,9 +353,14 @@ public:
     mScrollGeneration = aScrollGeneration;
   }
 
+  ScrollOffsetUpdateType GetScrollUpdateType() const
+  {
+    return mScrollUpdateType;
+  }
+
   bool GetScrollOffsetUpdated() const
   {
-    return mUpdateScrollOffset;
+    return mScrollUpdateType != eNone;
   }
 
   bool GetDoSmoothScroll() const
@@ -396,16 +381,6 @@ public:
   void SetScrollId(ViewID scrollId)
   {
     mScrollId = scrollId;
-  }
-
-  ViewID GetScrollParentId() const
-  {
-    return mScrollParentId;
-  }
-
-  void SetScrollParentId(ViewID aParentId)
-  {
-    mScrollParentId = aParentId;
   }
 
   void SetRootCompositionSize(const CSSSize& aRootCompositionSize)
@@ -468,46 +443,6 @@ public:
     return mExtraResolution;
   }
 
-  const gfx::Color& GetBackgroundColor() const
-  {
-    return mBackgroundColor;
-  }
-
-  void SetBackgroundColor(const gfx::Color& aBackgroundColor)
-  {
-    mBackgroundColor = aBackgroundColor;
-  }
-
-  const nsCString& GetContentDescription() const
-  {
-    return mContentDescription;
-  }
-
-  void SetContentDescription(const nsCString& aContentDescription)
-  {
-    mContentDescription = aContentDescription;
-  }
-
-  const LayoutDeviceIntSize& GetLineScrollAmount() const
-  {
-    return mLineScrollAmount;
-  }
-
-  void SetLineScrollAmount(const LayoutDeviceIntSize& size)
-  {
-    mLineScrollAmount = size;
-  }
-
-  const LayoutDeviceIntSize& GetPageScrollAmount() const
-  {
-    return mPageScrollAmount;
-  }
-
-  void SetPageScrollAmount(const LayoutDeviceIntSize& size)
-  {
-    mPageScrollAmount = size;
-  }
-
   const CSSRect& GetScrollableRect() const
   {
     return mScrollableRect;
@@ -518,57 +453,11 @@ public:
     mScrollableRect = aScrollableRect;
   }
 
-  bool AllowVerticalScrollWithWheel() const
-  {
-    return mAllowVerticalScrollWithWheel;
-  }
-
-  void SetAllowVerticalScrollWithWheel(bool aValue)
-  {
-    mAllowVerticalScrollWithWheel = aValue;
-  }
-
-  void SetClipRect(const Maybe<ParentLayerIntRect>& aClipRect)
-  {
-    mClipRect = aClipRect;
-  }
-  const Maybe<ParentLayerIntRect>& GetClipRect() const
-  {
-    return mClipRect;
-  }
-  bool HasClipRect() const {
-    return mClipRect.isSome();
-  }
-  const ParentLayerIntRect& ClipRect() const {
-    return mClipRect.ref();
-  }
-
-  void SetMaskLayerIndex(const Maybe<size_t>& aIndex) {
-    mMaskLayerIndex = aIndex;
-  }
-  const Maybe<size_t>& GetMaskLayerIndex() const {
-    return mMaskLayerIndex;
-  }
-
   void SetPaintRequestTime(const TimeStamp& aTime) {
     mPaintRequestTime = aTime;
   }
   const TimeStamp& GetPaintRequestTime() const {
     return mPaintRequestTime;
-  }
-
-  void SetIsLayersIdRoot(bool aValue) {
-    mIsLayersIdRoot = aValue;
-  }
-  bool IsLayersIdRoot() const {
-    return mIsLayersIdRoot;
-  }
-
-  // Implemented out of line because the implementation needs gfxPrefs.h
-  // and we don't want to include that from FrameMetrics.h.
-  void SetUsesContainerScrolling(bool aValue);
-  bool UsesContainerScrolling() const {
-    return mUsesContainerScrolling;
   }
 
   void SetIsScrollInfoLayer(bool aIsScrollInfoLayer) {
@@ -581,9 +470,6 @@ public:
 private:
   // A unique ID assigned to each scrollable frame.
   ViewID mScrollId;
-
-  // The ViewID of the scrollable frame to which overscroll should be handed off.
-  ViewID mScrollParentId;
 
   // The pres-shell resolution that has been induced on the document containing
   // this scroll frame as a result of zooming this scroll frame (whether via
@@ -717,6 +603,245 @@ private:
   // that necessary to draw one Layer pixel per Screen pixel.
   ScreenToLayerScale2D mExtraResolution;
 
+  // The time at which the APZC last requested a repaint for this scrollframe.
+  TimeStamp mPaintRequestTime;
+
+  // Whether mScrollOffset was updated by something other than the APZ code, and
+  // if the APZC receiving this metrics should update its local copy.
+  ScrollOffsetUpdateType mScrollUpdateType;
+
+  // Whether or not this is the root scroll frame for the root content document.
+  bool mIsRootContent:1;
+
+  // When mDoSmoothScroll, the scroll offset should be animated to
+  // smoothly transition to mScrollOffset rather than be updated instantly.
+  bool mDoSmoothScroll:1;
+
+  // If this is true then we use the display port margins on this metrics,
+  // otherwise use the display port rect.
+  bool mUseDisplayPortMargins:1;
+
+  // Whether or not this frame has a "scroll info layer" to capture events.
+  bool mIsScrollInfoLayer:1;
+
+  // WARNING!!!!
+  //
+  // When adding a new field:
+  //
+  //  - First, consider whether the field can be added to ScrollMetadata
+  //    instead. If so, prefer that.
+  //
+  //  - Otherwise, the following places should be updated to include them
+  //    (as needed):
+  //      FrameMetrics::operator ==
+  //      AsyncPanZoomController::NotifyLayersUpdated
+  //      The ParamTraits specialization in GfxMessageUtils.h
+  //
+  // Please add new fields above this comment.
+
+  // Private helpers for IPC purposes
+  void SetDoSmoothScroll(bool aValue) {
+    mDoSmoothScroll = aValue;
+  }
+};
+
+struct ScrollSnapInfo {
+  ScrollSnapInfo()
+    : mScrollSnapTypeX(NS_STYLE_SCROLL_SNAP_TYPE_NONE)
+    , mScrollSnapTypeY(NS_STYLE_SCROLL_SNAP_TYPE_NONE)
+  {}
+
+  bool operator==(const ScrollSnapInfo& aOther) const
+  {
+    return mScrollSnapTypeX == aOther.mScrollSnapTypeX &&
+           mScrollSnapTypeY == aOther.mScrollSnapTypeY &&
+           mScrollSnapIntervalX == aOther.mScrollSnapIntervalX &&
+           mScrollSnapIntervalY == aOther.mScrollSnapIntervalY &&
+           mScrollSnapDestination == aOther.mScrollSnapDestination &&
+           mScrollSnapCoordinates == aOther.mScrollSnapCoordinates;
+  }
+
+  // The scroll frame's scroll-snap-type.
+  // One of NS_STYLE_SCROLL_SNAP_{NONE, MANDATORY, PROXIMITY}.
+  uint8_t mScrollSnapTypeX;
+  uint8_t mScrollSnapTypeY;
+
+  // The intervals derived from the scroll frame's scroll-snap-points.
+  Maybe<nscoord> mScrollSnapIntervalX;
+  Maybe<nscoord> mScrollSnapIntervalY;
+
+  // The scroll frame's scroll-snap-destination, in cooked form (to avoid
+  // shipping the raw nsStyleCoord::CalcValue over IPC).
+  nsPoint mScrollSnapDestination;
+
+  // The scroll-snap-coordinates of any descendant frames of the scroll frame,
+  // relative to the origin of the scrolled frame.
+  nsTArray<nsPoint> mScrollSnapCoordinates;
+};
+
+/**
+ * Metadata about a scroll frame that's stored in the layer tree for use by
+ * the compositor (including APZ). This includes the scroll frame's FrameMetrics,
+ * as well as other metadata. We don't put the other metadata into FrameMetrics
+ * to avoid FrameMetrics becoming too bloated (as a FrameMetrics is e.g. sent
+ * over IPC for every repaint request for every active scroll frame).
+ */
+struct ScrollMetadata {
+  friend struct IPC::ParamTraits<mozilla::layers::ScrollMetadata>;
+
+  typedef FrameMetrics::ViewID ViewID;
+public:
+  static StaticAutoPtr<const ScrollMetadata> sNullMetadata;   // We sometimes need an empty metadata
+
+  ScrollMetadata()
+    : mMetrics()
+    , mSnapInfo()
+    , mScrollParentId(FrameMetrics::NULL_SCROLL_ID)
+    , mBackgroundColor()
+    , mContentDescription()
+    , mLineScrollAmount(0, 0)
+    , mPageScrollAmount(0, 0)
+    , mMaskLayerIndex()
+    , mClipRect()
+    , mHasScrollgrab(false)
+    , mAllowVerticalScrollWithWheel(false)
+    , mIsLayersIdRoot(false)
+    , mUsesContainerScrolling(false)
+    , mForceDisableApz(false)
+  {}
+
+  bool operator==(const ScrollMetadata& aOther) const
+  {
+    return mMetrics == aOther.mMetrics &&
+           mSnapInfo == aOther.mSnapInfo &&
+           mScrollParentId == aOther.mScrollParentId &&
+           mBackgroundColor == aOther.mBackgroundColor &&
+           // don't compare mContentDescription
+           mLineScrollAmount == aOther.mLineScrollAmount &&
+           mPageScrollAmount == aOther.mPageScrollAmount &&
+           mMaskLayerIndex == aOther.mMaskLayerIndex &&
+           mClipRect == aOther.mClipRect &&
+           mHasScrollgrab == aOther.mHasScrollgrab &&
+           mAllowVerticalScrollWithWheel == aOther.mAllowVerticalScrollWithWheel &&
+           mIsLayersIdRoot == aOther.mIsLayersIdRoot &&
+           mUsesContainerScrolling == aOther.mUsesContainerScrolling &&
+           mForceDisableApz == aOther.mForceDisableApz;
+  }
+
+  bool operator!=(const ScrollMetadata& aOther) const
+  {
+    return !operator==(aOther);
+  }
+
+  bool IsDefault() const
+  {
+    ScrollMetadata def;
+
+    def.mMetrics.SetPresShellId(mMetrics.GetPresShellId());
+    return (def == *this);
+  }
+
+  FrameMetrics& GetMetrics() { return mMetrics; }
+  const FrameMetrics& GetMetrics() const { return mMetrics; }
+
+  void SetSnapInfo(ScrollSnapInfo&& aSnapInfo) {
+    mSnapInfo = Move(aSnapInfo);
+  }
+  const ScrollSnapInfo& GetSnapInfo() const { return mSnapInfo; }
+
+  ViewID GetScrollParentId() const {
+    return mScrollParentId;
+  }
+
+  void SetScrollParentId(ViewID aParentId) {
+    mScrollParentId = aParentId;
+  }
+  const gfx::Color& GetBackgroundColor() const {
+    return mBackgroundColor;
+  }
+  void SetBackgroundColor(const gfx::Color& aBackgroundColor) {
+    mBackgroundColor = aBackgroundColor;
+  }
+  const nsCString& GetContentDescription() const {
+    return mContentDescription;
+  }
+  void SetContentDescription(const nsCString& aContentDescription) {
+    mContentDescription = aContentDescription;
+  }
+  const LayoutDeviceIntSize& GetLineScrollAmount() const {
+    return mLineScrollAmount;
+  }
+  void SetLineScrollAmount(const LayoutDeviceIntSize& size) {
+    mLineScrollAmount = size;
+  }
+  const LayoutDeviceIntSize& GetPageScrollAmount() const {
+    return mPageScrollAmount;
+  }
+  void SetPageScrollAmount(const LayoutDeviceIntSize& size) {
+    mPageScrollAmount = size;
+  }
+  void SetMaskLayerIndex(const Maybe<size_t>& aIndex) {
+    mMaskLayerIndex = aIndex;
+  }
+  const Maybe<size_t>& GetMaskLayerIndex() const {
+    return mMaskLayerIndex;
+  }
+
+  void SetClipRect(const Maybe<ParentLayerIntRect>& aClipRect)
+  {
+    mClipRect = aClipRect;
+  }
+  const Maybe<ParentLayerIntRect>& GetClipRect() const
+  {
+    return mClipRect;
+  }
+  bool HasClipRect() const {
+    return mClipRect.isSome();
+  }
+  const ParentLayerIntRect& ClipRect() const {
+    return mClipRect.ref();
+  }
+
+  void SetHasScrollgrab(bool aHasScrollgrab) {
+    mHasScrollgrab = aHasScrollgrab;
+  }
+  bool GetHasScrollgrab() const {
+    return mHasScrollgrab;
+  }
+  bool AllowVerticalScrollWithWheel() const {
+    return mAllowVerticalScrollWithWheel;
+  }
+  void SetAllowVerticalScrollWithWheel(bool aValue) {
+    mAllowVerticalScrollWithWheel = aValue;
+  }
+  void SetIsLayersIdRoot(bool aValue) {
+    mIsLayersIdRoot = aValue;
+  }
+  bool IsLayersIdRoot() const {
+    return mIsLayersIdRoot;
+  }
+  // Implemented out of line because the implementation needs gfxPrefs.h
+  // and we don't want to include that from FrameMetrics.h.
+  void SetUsesContainerScrolling(bool aValue);
+  bool UsesContainerScrolling() const {
+    return mUsesContainerScrolling;
+  }
+  void SetForceDisableApz(bool aForceDisable) {
+    mForceDisableApz = aForceDisable;
+  }
+  bool IsApzForceDisabled() const {
+    return mForceDisableApz;
+  }
+
+private:
+  FrameMetrics mMetrics;
+
+  // Information used to determine where to snap to for a given scroll.
+  ScrollSnapInfo mSnapInfo;
+
+  // The ViewID of the scrollable frame to which overscroll should be handed off.
+  ViewID mScrollParentId;
+
   // The background color to use when overscrolling.
   gfx::Color mBackgroundColor;
 
@@ -731,34 +856,16 @@ private:
   // The value of GetPageScrollAmount(), for scroll frames.
   LayoutDeviceIntSize mPageScrollAmount;
 
-  // The clip rect to use when compositing a layer with this FrameMetrics.
-  Maybe<ParentLayerIntRect> mClipRect;
-
   // An extra clip mask layer to use when compositing a layer with this
   // FrameMetrics. This is an index into the MetricsMaskLayers array on
   // the Layer.
   Maybe<size_t> mMaskLayerIndex;
 
-  // The time at which the APZC last requested a repaint for this scrollframe.
-  TimeStamp mPaintRequestTime;
-
-  // Whether or not this is the root scroll frame for the root content document.
-  bool mIsRootContent:1;
+  // The clip rect to use when compositing a layer with this FrameMetrics.
+  Maybe<ParentLayerIntRect> mClipRect;
 
   // Whether or not this frame is for an element marked 'scrollgrab'.
   bool mHasScrollgrab:1;
-
-  // Whether mScrollOffset was updated by something other than the APZ code, and
-  // if the APZC receiving this metrics should update its local copy.
-  bool mUpdateScrollOffset:1;
-
-  // When mDoSmoothScroll, the scroll offset should be animated to
-  // smoothly transition to mScrollOffset rather than be updated instantly.
-  bool mDoSmoothScroll:1;
-
-  // If this is true then we use the display port margins on this metrics,
-  // otherwise use the display port rect.
-  bool mUseDisplayPortMargins:1;
 
   // Whether or not the frame can be vertically scrolled with a mouse wheel.
   bool mAllowVerticalScrollWithWheel:1;
@@ -771,27 +878,19 @@ private:
   // when containerful scrolling is eliminated.
   bool mUsesContainerScrolling:1;
 
-  // Whether or not this frame has a "scroll info layer" to capture events.
-  bool mIsScrollInfoLayer:1;
+  // Whether or not the compositor should actually do APZ-scrolling on this
+  // scrollframe.
+  bool mForceDisableApz:1;
 
   // WARNING!!!!
   //
-  // When adding new fields to FrameMetrics, the following places should be
+  // When adding new fields to ScrollMetadata, the following places should be
   // updated to include them (as needed):
-  //    FrameMetrics::operator ==
+  //    ScrollMetadata::operator ==
   //    AsyncPanZoomController::NotifyLayersUpdated
   //    The ParamTraits specialization in GfxMessageUtils.h
   //
   // Please add new fields above this comment.
-
-
-  // Private helpers for IPC purposes
-  void SetUpdateScrollOffset(bool aValue) {
-    mUpdateScrollOffset = aValue;
-  }
-  void SetDoSmoothScroll(bool aValue) {
-    mDoSmoothScroll = aValue;
-  }
 };
 
 /**

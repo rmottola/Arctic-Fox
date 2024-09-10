@@ -504,15 +504,15 @@ fun_resolve(JSContext* cx, HandleObject obj, HandleId id, bool* resolvedp)
                 // It's impossible to have an empty named class expression. We
                 // use empty as a sentinel when creating default class
                 // constructors.
-                MOZ_ASSERT(fun->atom() != cx->names().empty);
+                MOZ_ASSERT(fun->name() != cx->names().empty);
 
                 // Unnamed class expressions should not get a .name property
                 // at all.
-                if (fun->atom() == nullptr)
+                if (fun->name() == nullptr)
                     return true;
             }
 
-            v.setString(fun->atom() == nullptr ? cx->runtime()->emptyString : fun->atom());
+            v.setString(fun->name() == nullptr ? cx->runtime()->emptyString : fun->name());
         }
 
         if (!NativeDefineProperty(cx, fun, id, v, nullptr, nullptr,
@@ -566,7 +566,7 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleObject enclosingScope, Han
             return false;
         }
 
-        if (fun->atom() || fun->hasGuessedAtom())
+        if (fun->name() || fun->hasGuessedAtom())
             firstword |= HasAtom;
 
         if (fun->isStarGenerator())
@@ -786,8 +786,7 @@ JSFunction::trace(JSTracer* trc)
                    (HeapValue*)toExtended()->extendedSlots, "nativeReserved");
     }
 
-    if (atom_)
-        TraceEdge(trc, &atom_, "atom");
+    TraceNullableEdge(trc, &atom_, "atom");
 
     if (isInterpreted()) {
         // Functions can be be marked as interpreted despite having no script
@@ -921,9 +920,7 @@ CreateFunctionPrototype(JSContext* cx, JSProtoKey key)
     return functionProto;
 }
 
-const Class JSFunction::class_ = {
-    js_Function_str,
-    JSCLASS_HAS_CACHED_PROTO(JSProto_Function),
+static const ClassOps JSFunctionClassOps = {
     nullptr,                 /* addProperty */
     nullptr,                 /* delProperty */
     nullptr,                 /* getProperty */
@@ -936,14 +933,22 @@ const Class JSFunction::class_ = {
     fun_hasInstance,
     nullptr,                 /* construct   */
     fun_trace,
-    {
-        CreateFunctionConstructor,
-        CreateFunctionPrototype,
-        nullptr,
-        nullptr,
-        function_methods,
-        function_properties
-    }
+};
+
+static const ClassSpec JSFunctionClassSpec = {
+    CreateFunctionConstructor,
+    CreateFunctionPrototype,
+    nullptr,
+    nullptr,
+    function_methods,
+    function_properties
+};
+
+const Class JSFunction::class_ = {
+    js_Function_str,
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Function),
+    &JSFunctionClassOps,
+    &JSFunctionClassSpec
 };
 
 const Class* const js::FunctionClassPtr = &JSFunction::class_;
@@ -1057,8 +1062,8 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool lambdaParen)
         if (!(fun->isStarGenerator() ? out.append("function* ") : out.append("function ")))
             return nullptr;
     }
-    if (fun->atom()) {
-        if (!out.append(fun->atom()))
+    if (fun->name()) {
+        if (!out.append(fun->name()))
             return nullptr;
     }
 
@@ -1073,8 +1078,6 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool lambdaParen)
         if (!src)
             return nullptr;
 
-        bool exprBody = fun->isExprBody();
-
         // The source data for functions created by calling the Function
         // constructor is only the function's body.  This depends on the fact,
         // asserted below, that in Function("function f() {}"), the inner
@@ -1087,7 +1090,7 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool lambdaParen)
         // Functions created with the constructor can't be arrow functions or
         // expression closures.
         MOZ_ASSERT_IF(funCon, !fun->isArrow());
-        MOZ_ASSERT_IF(funCon, !exprBody);
+        MOZ_ASSERT_IF(funCon, !fun->isExprBody());
         MOZ_ASSERT_IF(!funCon && !fun->isArrow(),
                       src->length() > 0 && src->latin1OrTwoByteChar(0) == '(');
 
@@ -1179,7 +1182,7 @@ JSString*
 fun_toStringHelper(JSContext* cx, HandleObject obj, unsigned indent)
 {
     if (!obj->is<JSFunction>()) {
-        if (JSFunToStringOp op = obj->getOps()->funToString)
+        if (JSFunToStringOp op = obj->getOpsFunToString())
             return op(cx, obj, indent);
 
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
@@ -1245,22 +1248,35 @@ js::fun_call(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    HandleValue fval = args.thisv();
-    if (!IsCallable(fval)) {
+    HandleValue func = args.thisv();
+
+    // We don't need to do this -- Call would do it for us -- but the error
+    // message is *much* better if we do this here.  (Without this,
+    // JSDVG_SEARCH_STACK tries to decompile |func| as if it were |this| in
+    // the scripted caller's frame -- so for example
+    //
+    //   Function.prototype.call.call({});
+    //
+    // would identify |{}| as |this| as being the result of evaluating
+    // |Function.prototype.call| and would conclude, "Function.prototype.call
+    // is not a function".  Grotesque.)
+    if (!IsCallable(func)) {
         ReportIncompatibleMethod(cx, args, &JSFunction::class_);
         return false;
     }
 
-    args.setCallee(fval);
-    args.setThis(args.get(0));
+    size_t argCount = args.length();
+    if (argCount > 0)
+        argCount--; // strip off provided |this|
 
-    if (args.length() > 0) {
-        for (size_t i = 0; i < args.length() - 1; i++)
-            args[i].set(args[i + 1]);
-        args = CallArgsFromVp(args.length() - 1, vp);
-    }
+    InvokeArgs iargs(cx);
+    if (!iargs.init(argCount))
+        return false;
 
-    return Invoke(cx, args);
+    for (size_t i = 0; i < argCount; i++)
+        iargs[i].set(args[i + 1]);
+
+    return Call(cx, func, args.get(0), iargs, args.rval());
 }
 
 // ES5 15.3.4.3
@@ -1270,6 +1286,10 @@ js::fun_apply(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     // Step 1.
+    //
+    // Note that we must check callability here, not at actual call time,
+    // because extracting argument values from the provided arraylike might
+    // have side effects or throw an exception.
     HandleValue fval = args.thisv();
     if (!IsCallable(fval)) {
         ReportIncompatibleMethod(cx, args, &JSFunction::class_);
@@ -1292,9 +1312,6 @@ js::fun_apply(JSContext* cx, unsigned argc, Value* vp)
         MOZ_ASSERT(iter.numActualArgs() <= ARGS_LENGTH_MAX);
         if (!args2.init(iter.numActualArgs()))
             return false;
-
-        args2.setCallee(fval);
-        args2.setThis(args[0]);
 
         // Steps 7-8.
         iter.unaliasedForEachActual(cx, CopyTo(args2.array()));
@@ -1322,21 +1339,13 @@ js::fun_apply(JSContext* cx, unsigned argc, Value* vp)
         if (!args2.init(length))
             return false;
 
-        // Push fval, obj, and aobj's elements as args.
-        args2.setCallee(fval);
-        args2.setThis(args[0]);
-
         // Steps 7-8.
         if (!GetElements(cx, aobj, length, args2.array()))
             return false;
     }
 
     // Step 9.
-    if (!Invoke(cx, args2))
-        return false;
-
-    args.rval().set(args2.rval());
-    return true;
+    return Call(cx, fval, args[0], args2, args.rval());
 }
 
 bool
@@ -1452,11 +1461,6 @@ JSFunction::createScriptForLazilyInterpretedFunction(JSContext* cx, HandleFuncti
         // Trigger a pre barrier on the lazy script being overwritten.
         if (cx->zone()->needsIncrementalBarrier())
             LazyScript::writeBarrierPre(lazy);
-
-        // Suppress GC for now although we should be able to remove this by
-        // making 'lazy' a Rooted<LazyScript*> (which requires adding a
-        // THING_ROOT_LAZY_SCRIPT).
-        AutoSuppressGC suppressGC(cx);
 
         RootedScript script(cx, lazy->maybeScript());
 
@@ -2216,8 +2220,8 @@ js::DefineFunction(JSContext* cx, HandleObject obj, HandleId id, Native native,
         gop = nullptr;
         sop = nullptr;
     } else {
-        gop = obj->getClass()->getProperty;
-        sop = obj->getClass()->setProperty;
+        gop = obj->getClass()->getGetProperty();
+        sop = obj->getClass()->getSetProperty();
         MOZ_ASSERT(gop != JS_PropertyStub);
         MOZ_ASSERT(sop != JS_StrictPropertyStub);
     }

@@ -32,7 +32,6 @@ function* spawnTest() {
   is(framerate.hasSelection(), false,
     "The framerate overview shouldn't have a selection before recording.");
 
-  let markers = OverviewView.graphs.get("timeline");
   ok("selectionEnabled" in markers,
     "The selection should not be enabled for the markers overview (1).");
   is(markers.selectionEnabled, false,
@@ -40,7 +39,6 @@ function* spawnTest() {
   is(markers.hasSelection(), false,
     "The markers overview shouldn't have a selection before recording.");
 
-  let memory = OverviewView.graphs.get("memory");
   ok("selectionEnabled" in memory,
     "The selection should not be enabled for the memory overview (1).");
   is(memory.selectionEnabled, false,
@@ -79,13 +77,10 @@ function* spawnTest() {
 
   is(framerate.selectionEnabled, true,
     "The selection should now be enabled for the framerate overview.");
-
   is(markers.selectionEnabled, true,
     "The selection should now be enabled for the markers overview.");
-
   is(memory.selectionEnabled, true,
     "The selection should now be enabled for the memory overview.");
 
-  yield teardown(panel);
-  finish();
-}
+  yield teardownToolboxAndRemoveTab(panel);
+});

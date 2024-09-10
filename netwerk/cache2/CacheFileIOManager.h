@@ -234,6 +234,8 @@ public:
   NS_IMETHOD OnFileDoomed(CacheFileHandle *aHandle, nsresult aResult) = 0;
   NS_IMETHOD OnEOFSet(CacheFileHandle *aHandle, nsresult aResult) = 0;
   NS_IMETHOD OnFileRenamed(CacheFileHandle *aHandle, nsresult aResult) = 0;
+
+  virtual bool IsKilled() { return false; }
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(CacheFileIOListener, CACHEFILEIOLISTENER_IID)
@@ -382,7 +384,8 @@ private:
   nsresult DoomFileInternal(CacheFileHandle *aHandle,
                             PinningDoomRestriction aPinningStatusRestriction = NO_RESTRICTION);
   nsresult DoomFileByKeyInternal(const SHA1Sum::Hash *aHash);
-  nsresult ReleaseNSPRHandleInternal(CacheFileHandle *aHandle);
+  nsresult ReleaseNSPRHandleInternal(CacheFileHandle *aHandle,
+                                     bool aIgnoreShutdownLag = false);
   nsresult TruncateSeekSetEOFInternal(CacheFileHandle *aHandle,
                                       int64_t aTruncatePos, int64_t aEOFPos);
   nsresult RenameFileInternal(CacheFileHandle *aHandle,
@@ -429,11 +432,22 @@ private:
   // before we start an eviction loop.
   nsresult UpdateSmartCacheSize(int64_t aFreeSpace);
 
+  // May return true after shutdown only when time for flushing all data
+  // has already passed.
+  bool IsPastShutdownIOLag();
+
   // Memory reporting (private part)
   size_t SizeOfExcludingThisInternal(mozilla::MallocSizeOf mallocSizeOf) const;
 
   static CacheFileIOManager           *gInstance;
   TimeStamp                            mStartTime;
+  // Shutdown time stamp, accessed only on the I/O thread.  Used to bypass
+  // I/O after a certain time pass the shutdown has been demanded.
+  TimeStamp                            mShutdownDemandedTime;
+  // Set true on the main thread when cache shutdown is first demanded.
+  Atomic<bool, Relaxed>                mShutdownDemanded;
+  // Set true on the IO thread, CLOSE level as part of the internal shutdown
+  // procedure.
   bool                                 mShuttingDown;
   RefPtr<CacheIOThread>                mIOThread;
   nsCOMPtr<nsIFile>                    mCacheDirectory;

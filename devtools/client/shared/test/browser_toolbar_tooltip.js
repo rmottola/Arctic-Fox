@@ -26,7 +26,7 @@ add_task(function* showToolbar() {
   ok(!DeveloperToolbar.visible, "DeveloperToolbar is not visible in runTest");
 
   let showPromise = observeOnce(DeveloperToolbar.NOTIFICATIONS.SHOW);
-  document.getElementById("Tools:DevToolbar").doCommand();
+  document.getElementById("menu_devToolbar").doCommand();
   yield showPromise;
 });
 
@@ -63,17 +63,34 @@ add_task(function* testThemes() {
 
   Services.prefs.setCharPref(PREF_DEVTOOLS_THEME, "dark");
 
-  yield DeveloperToolbar.display.inputter.setInput("");
-  yield DeveloperToolbar.display.inputter.setInput("help help");
+  yield DeveloperToolbar.inputter.setInput("");
+  yield DeveloperToolbar.inputter.setInput("help help");
   is(tooltipPanel.document.documentElement.getAttribute("devtoolstheme"),
      "dark", "Tooltip panel has correct theme");
 
   Services.prefs.setCharPref(PREF_DEVTOOLS_THEME, "light");
 
-  yield DeveloperToolbar.display.inputter.setInput("");
-  yield DeveloperToolbar.display.inputter.setInput("help help");
+  yield DeveloperToolbar.inputter.setInput("");
+  yield DeveloperToolbar.inputter.setInput("help help");
   is(tooltipPanel.document.documentElement.getAttribute("devtoolstheme"),
      "light", "Tooltip panel has correct theme");
+});
+
+
+add_task(function* hideToolbar() {
+  info("Ending browser_toolbar_tooltip.js");
+  yield DeveloperToolbar.inputter.setInput('');
+
+  ok(DeveloperToolbar.visible, "DeveloperToolbar is visible in hideToolbar");
+
+  info("Hide toolbar");
+  let hidePromise = observeOnce(DeveloperToolbar.NOTIFICATIONS.HIDE);
+  document.getElementById("menu_devToolbar").doCommand();
+  yield hidePromise;
+
+  ok(!DeveloperToolbar.visible, "DeveloperToolbar is not visible in hideToolbar");
+
+  info("Done test");
 });
 
 function getLeftMargin() {

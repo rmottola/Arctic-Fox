@@ -58,10 +58,9 @@ PrincipalInfoToPrincipal(const PrincipalInfo& aPrincipalInfo,
     }
 
     case PrincipalInfo::TNullPrincipalInfo: {
-      principal = do_CreateInstance(NS_NULLPRINCIPAL_CONTRACTID, &rv);
-      if (NS_WARN_IF(NS_FAILED(rv))) {
-        return nullptr;
-      }
+      const NullPrincipalInfo& info =
+        aPrincipalInfo.get_NullPrincipalInfo();
+      principal = nsNullPrincipal::Create(info.attrs());
 
       return principal.forget();
     }
@@ -129,14 +128,14 @@ PrincipalToPrincipalInfo(nsIPrincipal* aPrincipal,
   MOZ_ASSERT(aPrincipal);
   MOZ_ASSERT(aPrincipalInfo);
 
-  bool isNullPointer;
-  nsresult rv = aPrincipal->GetIsNullPrincipal(&isNullPointer);
+  bool isNullPrin;
+  nsresult rv = aPrincipal->GetIsNullPrincipal(&isNullPrin);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
 
-  if (isNullPointer) {
-    *aPrincipalInfo = NullPrincipalInfo();
+  if (isNullPrin) {
+    *aPrincipalInfo = NullPrincipalInfo(BasePrincipal::Cast(aPrincipal)->OriginAttributesRef());
     return NS_OK;
   }
 
@@ -166,7 +165,7 @@ PrincipalToPrincipalInfo(nsIPrincipal* aPrincipal,
     PrincipalInfo info;
 
     nsTArray< nsCOMPtr<nsIPrincipal> >* whitelist;
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(expanded->GetWhiteList(&whitelist)));
+    MOZ_ALWAYS_SUCCEEDS(expanded->GetWhiteList(&whitelist));
 
     for (uint32_t i = 0; i < whitelist->Length(); i++) {
       rv = PrincipalToPrincipalInfo((*whitelist)[i], &info);
@@ -215,10 +214,14 @@ LoadInfoToLoadInfoArgs(nsILoadInfo *aLoadInfo,
   }
 
   nsresult rv = NS_OK;
-  PrincipalInfo requestingPrincipalInfo;
-  rv = PrincipalToPrincipalInfo(aLoadInfo->LoadingPrincipal(),
-                                &requestingPrincipalInfo);
-  NS_ENSURE_SUCCESS(rv, rv);
+  OptionalPrincipalInfo loadingPrincipalInfo = mozilla::void_t();
+  if (aLoadInfo->LoadingPrincipal()) {
+    PrincipalInfo loadingPrincipalInfoTemp;
+    rv = PrincipalToPrincipalInfo(aLoadInfo->LoadingPrincipal(),
+                                  &loadingPrincipalInfoTemp);
+    NS_ENSURE_SUCCESS(rv, rv);
+    loadingPrincipalInfo = loadingPrincipalInfoTemp;
+  }
 
   PrincipalInfo triggeringPrincipalInfo;
   rv = PrincipalToPrincipalInfo(aLoadInfo->TriggeringPrincipal(),
@@ -238,7 +241,7 @@ LoadInfoToLoadInfoArgs(nsILoadInfo *aLoadInfo,
 
   *aOptionalLoadInfoArgs =
     LoadInfoArgs(
-      requestingPrincipalInfo,
+      loadingPrincipalInfo,
       triggeringPrincipalInfo,
       aLoadInfo->GetSecurityFlags(),
       aLoadInfo->InternalContentPolicyType(),
@@ -275,8 +278,12 @@ LoadInfoArgsToLoadInfo(const OptionalLoadInfoArgs& aOptionalLoadInfoArgs,
     aOptionalLoadInfoArgs.get_LoadInfoArgs();
 
   nsresult rv = NS_OK;
-  nsCOMPtr<nsIPrincipal> requestingPrincipal =
-    PrincipalInfoToPrincipal(loadInfoArgs.requestingPrincipalInfo(), &rv);
+  nsCOMPtr<nsIPrincipal> loadingPrincipal;
+  if (loadInfoArgs.requestingPrincipalInfo().type() != OptionalPrincipalInfo::Tvoid_t) {
+    loadingPrincipal = PrincipalInfoToPrincipal(loadInfoArgs.requestingPrincipalInfo(), &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
   NS_ENSURE_SUCCESS(rv, rv);
   nsCOMPtr<nsIPrincipal> triggeringPrincipal =
     PrincipalInfoToPrincipal(loadInfoArgs.triggeringPrincipalInfo(), &rv);
@@ -299,7 +306,7 @@ LoadInfoArgsToLoadInfo(const OptionalLoadInfoArgs& aOptionalLoadInfoArgs,
   }
 
   nsCOMPtr<nsILoadInfo> loadInfo =
-    new mozilla::LoadInfo(requestingPrincipal,
+    new mozilla::LoadInfo(loadingPrincipal,
                           triggeringPrincipal,
                           loadInfoArgs.securityFlags(),
                           loadInfoArgs.contentPolicyType(),

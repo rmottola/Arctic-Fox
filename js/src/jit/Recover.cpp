@@ -337,7 +337,7 @@ MAdd::writeRecoverData(CompactBufferWriter& writer) const
 {
     MOZ_ASSERT(canRecoverOnBailout());
     writer.writeUnsigned(uint32_t(RInstruction::Recover_Add));
-    writer.writeByte(specialization_ == MIRType_Float32);
+    writer.writeByte(specialization_ == MIRType::Float32);
     return true;
 }
 
@@ -357,7 +357,7 @@ RAdd::recover(JSContext* cx, SnapshotIterator& iter) const
     if (!js::AddValues(cx, &lhs, &rhs, &result))
         return false;
 
-    // MIRType_Float32 is a specialization embedding the fact that the result is
+    // MIRType::Float32 is a specialization embedding the fact that the result is
     // rounded to a Float32.
     if (isFloatOperation_ && !RoundFloat32(cx, result, &result))
         return false;
@@ -371,7 +371,7 @@ MSub::writeRecoverData(CompactBufferWriter& writer) const
 {
     MOZ_ASSERT(canRecoverOnBailout());
     writer.writeUnsigned(uint32_t(RInstruction::Recover_Sub));
-    writer.writeByte(specialization_ == MIRType_Float32);
+    writer.writeByte(specialization_ == MIRType::Float32);
     return true;
 }
 
@@ -391,7 +391,7 @@ RSub::recover(JSContext* cx, SnapshotIterator& iter) const
     if (!js::SubValues(cx, &lhs, &rhs, &result))
         return false;
 
-    // MIRType_Float32 is a specialization embedding the fact that the result is
+    // MIRType::Float32 is a specialization embedding the fact that the result is
     // rounded to a Float32.
     if (isFloatOperation_ && !RoundFloat32(cx, result, &result))
         return false;
@@ -405,7 +405,7 @@ MMul::writeRecoverData(CompactBufferWriter& writer) const
 {
     MOZ_ASSERT(canRecoverOnBailout());
     writer.writeUnsigned(uint32_t(RInstruction::Recover_Mul));
-    writer.writeByte(specialization_ == MIRType_Float32);
+    writer.writeByte(specialization_ == MIRType::Float32);
     MOZ_ASSERT(Mode(uint8_t(mode_)) == mode_);
     writer.writeByte(uint8_t(mode_));
     return true;
@@ -428,7 +428,7 @@ RMul::recover(JSContext* cx, SnapshotIterator& iter) const
         if (!js::MulValues(cx, &lhs, &rhs, &result))
             return false;
 
-        // MIRType_Float32 is a specialization embedding the fact that the
+        // MIRType::Float32 is a specialization embedding the fact that the
         // result is rounded to a Float32.
         if (isFloatOperation_ && !RoundFloat32(cx, result, &result))
             return false;
@@ -447,7 +447,7 @@ MDiv::writeRecoverData(CompactBufferWriter& writer) const
 {
     MOZ_ASSERT(canRecoverOnBailout());
     writer.writeUnsigned(uint32_t(RInstruction::Recover_Div));
-    writer.writeByte(specialization_ == MIRType_Float32);
+    writer.writeByte(specialization_ == MIRType::Float32);
     return true;
 }
 
@@ -466,7 +466,7 @@ RDiv::recover(JSContext* cx, SnapshotIterator& iter) const
     if (!js::DivValues(cx, &lhs, &rhs, &result))
         return false;
 
-    // MIRType_Float32 is a specialization embedding the fact that the result is
+    // MIRType::Float32 is a specialization embedding the fact that the result is
     // rounded to a Float32.
     if (isFloatOperation_ && !RoundFloat32(cx, result, &result))
         return false;
@@ -830,7 +830,7 @@ MSqrt::writeRecoverData(CompactBufferWriter& writer) const
 {
     MOZ_ASSERT(canRecoverOnBailout());
     writer.writeUnsigned(uint32_t(RInstruction::Recover_Sqrt));
-    writer.writeByte(type() == MIRType_Float32);
+    writer.writeByte(type() == MIRType::Float32);
     return true;
 }
 
@@ -849,7 +849,7 @@ RSqrt::recover(JSContext* cx, SnapshotIterator& iter) const
     if (!math_sqrt_handle(cx, num, &result))
         return false;
 
-    // MIRType_Float32 is a specialization embedding the fact that the result is
+    // MIRType::Float32 is a specialization embedding the fact that the result is
     // rounded to a Float32.
     if (isFloatOperation_ && !RoundFloat32(cx, result, &result))
         return false;
@@ -987,7 +987,7 @@ RStringSplit::recover(JSContext* cx, SnapshotIterator& iter) const
     RootedObjectGroup group(cx, iter.read().toObject().group());
     RootedValue result(cx);
 
-    JSObject* res = str_split_string(cx, group, str, sep);
+    JSObject* res = str_split_string(cx, group, str, sep, INT32_MAX);
     if (!res)
         return false;
 
@@ -1013,13 +1013,40 @@ RRegExpMatcher::recover(JSContext* cx, SnapshotIterator& iter) const
     RootedObject regexp(cx, &iter.read().toObject());
     RootedString input(cx, iter.read().toString());
     int32_t lastIndex = iter.read().toInt32();
-    bool sticky = iter.read().toBoolean();
 
     RootedValue result(cx);
-    if (!RegExpMatcherRaw(cx, regexp, input, lastIndex, sticky, nullptr, &result))
+    if (!RegExpMatcherRaw(cx, regexp, input, lastIndex, nullptr, &result))
         return false;
 
     iter.storeInstructionResult(result);
+    return true;
+}
+
+bool
+MRegExpSearcher::writeRecoverData(CompactBufferWriter& writer) const
+{
+    MOZ_ASSERT(canRecoverOnBailout());
+    writer.writeUnsigned(uint32_t(RInstruction::Recover_RegExpSearcher));
+    return true;
+}
+
+RRegExpSearcher::RRegExpSearcher(CompactBufferReader& reader)
+{}
+
+bool
+RRegExpSearcher::recover(JSContext* cx, SnapshotIterator& iter) const
+{
+    RootedObject regexp(cx, &iter.read().toObject());
+    RootedString input(cx, iter.read().toString());
+    int32_t lastIndex = iter.read().toInt32();
+
+    int32_t result;
+    if (!RegExpSearcherRaw(cx, regexp, input, lastIndex, nullptr, &result))
+        return false;
+
+    RootedValue resultVal(cx);
+    resultVal.setInt32(result);
+    iter.storeInstructionResult(resultVal);
     return true;
 }
 
@@ -1040,41 +1067,14 @@ RRegExpTester::recover(JSContext* cx, SnapshotIterator& iter) const
     RootedString string(cx, iter.read().toString());
     RootedObject regexp(cx, &iter.read().toObject());
     int32_t lastIndex = iter.read().toInt32();
-    bool sticky = iter.read().toBoolean();
     int32_t endIndex;
 
-    if (!js::RegExpTesterRaw(cx, regexp, string, lastIndex, sticky, &endIndex))
+    if (!js::RegExpTesterRaw(cx, regexp, string, lastIndex, &endIndex))
         return false;
 
     RootedValue result(cx);
     result.setInt32(endIndex);
     iter.storeInstructionResult(result);
-    return true;
-}
-
-bool
-MRegExpReplace::writeRecoverData(CompactBufferWriter& writer) const
-{
-    MOZ_ASSERT(canRecoverOnBailout());
-    writer.writeUnsigned(uint32_t(RInstruction::Recover_RegExpReplace));
-    return true;
-}
-
-RRegExpReplace::RRegExpReplace(CompactBufferReader& reader)
-{ }
-
-bool
-RRegExpReplace::recover(JSContext* cx, SnapshotIterator& iter) const
-{
-    RootedString string(cx, iter.read().toString());
-    Rooted<RegExpObject*> regexp(cx, &iter.read().toObject().as<RegExpObject>());
-    RootedString repl(cx, iter.read().toString());
-
-    JSString* result = js::str_replace_regexp_raw(cx, string, regexp, repl);
-    if (!result)
-        return false;
-
-    iter.storeInstructionResult(StringValue(result));
     return true;
 }
 
@@ -1515,6 +1515,7 @@ RAssertRecoveredOnBailout::RAssertRecoveredOnBailout(CompactBufferReader& reader
 bool RAssertRecoveredOnBailout::recover(JSContext* cx, SnapshotIterator& iter) const
 {
     RootedValue result(cx);
+    iter.read(); // skip the unused operand.
     result.setUndefined();
     iter.storeInstructionResult(result);
     return true;

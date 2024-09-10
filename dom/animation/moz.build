@@ -21,11 +21,14 @@ EXPORTS.mozilla.dom += [
 EXPORTS.mozilla += [
     'AnimationComparator.h',
     'AnimationPerformanceWarning.h',
+    'AnimationTarget.h',
     'AnimationUtils.h',
     'AnimValuesStyleRule.h',
+    'ComputedTiming.h',
     'ComputedTimingFunction.h',
     'EffectCompositor.h',
     'EffectSet.h',
+    'KeyframeUtils.h',
     'PendingAnimationTracker.h',
     'PseudoElementHashEntry.h',
     'TimingParams.h',
@@ -46,6 +49,7 @@ UNIFIED_SOURCES += [
     'EffectCompositor.cpp',
     'EffectSet.cpp',
     'KeyframeEffect.cpp',
+    'KeyframeUtils.cpp',
     'PendingAnimationTracker.cpp',
     'TimingParams.cpp',
 ]

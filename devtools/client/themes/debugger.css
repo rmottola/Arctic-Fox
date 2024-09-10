@@ -29,6 +29,20 @@
   padding: 2px 0px;
 }
 
+.dbg-wasm-item .icon {
+  display: block;
+  background-image: url(chrome://devtools/skin/images/webconsole.svg);
+  background-repeat: no-repeat;
+  background-size: 72px 60px;
+  /* show warning icon */
+  background-position: -24px -24px;
+  width: 10px;
+  height: 10px;
+  position: absolute;
+  margin-inline-start: -15px;
+  margin-top: 3px;
+}
+
 .dbg-breakpoint-line {
   font-weight: 600;
 }
@@ -591,21 +605,11 @@
 }
 
 #instruments-pane-toggle {
-  list-style-image: url(images/debugger-collapse.png);
+  list-style-image: url(images/pane-collapse.svg);
 }
 
 #instruments-pane-toggle[pane-collapsed] {
-  list-style-image: url(images/debugger-expand.png);
-}
-
-@media (min-resolution: 1.1dppx) {
-  #instruments-pane-toggle {
-    list-style-image: url(images/debugger-collapse@2x.png);
-  }
-
-  #instruments-pane-toggle[pane-collapsed] {
-    list-style-image: url(images/debugger-expand@2x.png);
-  }
+  list-style-image: url(images/pane-expand.svg);
 }
 
 /* Horizontal vs. vertical layout */

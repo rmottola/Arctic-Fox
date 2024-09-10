@@ -21,8 +21,10 @@ namespace layers {
 class CompositorD3D9 : public Compositor
 {
 public:
-  CompositorD3D9(CompositorBridgeParent* aParent, nsIWidget *aWidget);
+  CompositorD3D9(CompositorBridgeParent* aParent, widget::CompositorWidgetProxy* aWidget);
   ~CompositorD3D9();
+
+  virtual CompositorD3D9* AsCompositorD3D9() override { return this; }
 
   virtual bool Initialize() override;
   virtual void Destroy() override {}
@@ -64,7 +66,7 @@ public:
   virtual void BeginFrame(const nsIntRegion& aInvalidRegion,
                           const gfx::Rect *aClipRectIn,
                           const gfx::Rect& aRenderBounds,
-                          bool aOpaque,
+                          const nsIntRegion& aOpaqueRegion,
                           gfx::Rect *aClipRectOut = nullptr,
                           gfx::Rect *aRenderBoundsOut = nullptr) override;
 
@@ -83,8 +85,6 @@ public:
   virtual LayersBackend GetBackendType() const override {
     return LayersBackend::LAYERS_D3D9;
   }
-
-  virtual nsIWidget* GetWidget() const override { return mWidget; }
 
   IDirect3DDevice9* device() const
   {
@@ -172,9 +172,6 @@ private:
 
   /* Swap chain associated with this compositor */
   RefPtr<SwapChainD3D9> mSwapChain;
-
-  /* Widget associated with this layer manager */
-  nsIWidget *mWidget;
 
   RefPtr<CompositingRenderTargetD3D9> mDefaultRT;
   RefPtr<CompositingRenderTargetD3D9> mCurrentRT;

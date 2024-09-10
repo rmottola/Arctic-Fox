@@ -1276,21 +1276,10 @@ MacroAssemblerMIPS64Compat::unboxInt32(const ValueOperand& operand, Register des
 }
 
 void
-MacroAssemblerMIPS64Compat::unboxInt32(const Operand& operand, Register dest)
+MacroAssemblerMIPS64Compat::unboxInt32(Register src, Register dest)
 {
-    switch(operand.getTag()) {
-    case Operand::REG:
-        ma_dsll(dest, operand.toReg(), Imm32(32));
-        ma_dsra(dest, dest, Imm32(32));
-        break;
-    case Operand::MEM:
-        unboxInt32(operand.toAddress(), dest);
-        break;
-    case Operand::FREG:
-    default:
-        MOZ_CRASH("unexpected operand kind");
-        break;
-    }
+    ma_dsll(dest, src, Imm32(32));
+    ma_dsra(dest, dest, Imm32(32));
 }
 
 void
@@ -1313,20 +1302,9 @@ MacroAssemblerMIPS64Compat::unboxBoolean(const ValueOperand& operand, Register d
 }
 
 void
-MacroAssemblerMIPS64Compat::unboxBoolean(const Operand& operand, Register dest)
+MacroAssemblerMIPS64Compat::unboxBoolean(Register src, Register dest)
 {
-    switch(operand.getTag()) {
-    case Operand::REG:
-        ma_dext(dest, operand.toReg(), Imm32(0), Imm32(32));
-        break;
-    case Operand::MEM:
-        unboxBoolean(operand.toAddress(), dest);
-        break;
-    case Operand::FREG:
-    default:
-        MOZ_CRASH("unexpected operand kind");
-        break;
-    }
+    ma_dext(dest, src, Imm32(0), Imm32(32));
 }
 
 void
@@ -1361,20 +1339,9 @@ MacroAssemblerMIPS64Compat::unboxString(const ValueOperand& operand, Register de
 }
 
 void
-MacroAssemblerMIPS64Compat::unboxString(const Operand& operand, Register dest)
+MacroAssemblerMIPS64Compat::unboxString(Register src, Register dest)
 {
-    switch(operand.getTag()) {
-    case Operand::REG:
-        ma_dext(dest, operand.toReg(), Imm32(0), Imm32(JSVAL_TAG_SHIFT));
-        break;
-    case Operand::MEM:
-        unboxNonDouble(operand.toAddress(), dest);
-        break;
-    case Operand::FREG:
-    default:
-        MOZ_CRASH("unexpected operand kind");
-        break;
-    }
+    ma_dext(dest, src, Imm32(0), Imm32(JSVAL_TAG_SHIFT));
 }
 
 void
@@ -1384,20 +1351,9 @@ MacroAssemblerMIPS64Compat::unboxString(const Address& src, Register dest)
 }
 
 void
-MacroAssemblerMIPS64Compat::unboxSymbol(const Operand& operand, Register dest)
+MacroAssemblerMIPS64Compat::unboxSymbol(Register src, Register dest)
 {
-    switch(operand.getTag()) {
-    case Operand::REG:
-        ma_dext(dest, operand.toReg(), Imm32(0), Imm32(JSVAL_TAG_SHIFT));
-        break;
-    case Operand::MEM:
-        unboxNonDouble(operand.toAddress(), dest);
-        break;
-    case Operand::FREG:
-    default:
-        MOZ_CRASH("unexpected operand kind");
-        break;
-    }
+    ma_dext(dest, src, Imm32(0), Imm32(JSVAL_TAG_SHIFT));
 }
 
 void
@@ -1413,20 +1369,9 @@ MacroAssemblerMIPS64Compat::unboxObject(const ValueOperand& src, Register dest)
 }
 
 void
-MacroAssemblerMIPS64Compat::unboxObject(const Operand& src, Register dest)
+MacroAssemblerMIPS64Compat::unboxObject(Register src, Register dest)
 {
-    switch(src.getTag()) {
-    case Operand::REG:
-        ma_dext(dest, src.toReg(), Imm32(0), Imm32(JSVAL_TAG_SHIFT));
-        break;
-    case Operand::MEM:
-        unboxNonDouble(src.toAddress(), dest);
-        break;
-    case Operand::FREG:
-    default:
-        MOZ_CRASH("unexpected operand kind");
-        break;
-    }
+    ma_dext(dest, src, Imm32(0), Imm32(JSVAL_TAG_SHIFT));
 }
 
 void
@@ -1585,17 +1530,17 @@ void
 MacroAssemblerMIPS64Compat::storeUnboxedValue(ConstantOrRegister value, MIRType valueType, const T& dest,
                                               MIRType slotType)
 {
-    if (valueType == MIRType_Double) {
+    if (valueType == MIRType::Double) {
         storeDouble(value.reg().typedReg().fpu(), dest);
         return;
     }
 
     // For known integers and booleans, we can just store the unboxed value if
     // the slot has the same type.
-    if ((valueType == MIRType_Int32 || valueType == MIRType_Boolean) && slotType == valueType) {
+    if ((valueType == MIRType::Int32 || valueType == MIRType::Boolean) && slotType == valueType) {
         if (value.constant()) {
             Value val = value.value();
-            if (valueType == MIRType_Int32)
+            if (valueType == MIRType::Int32)
                 store32(Imm32(val.toInt32()), dest);
             else
                 store32(Imm32(val.toBoolean() ? 1 : 0), dest);
@@ -2308,14 +2253,14 @@ void
 MacroAssembler::branchValueIsNurseryObject(Condition cond, const Address& address, Register temp,
                                            Label* label)
 {
-    branchValueIsNurseryObject(cond, address, temp, label);
+    branchValueIsNurseryObjectImpl(cond, address, temp, label);
 }
 
 void
 MacroAssembler::branchValueIsNurseryObject(Condition cond, ValueOperand value,
                                            Register temp, Label* label)
 {
-    branchValueIsNurseryObject(cond, value.valueReg(), temp, label);
+    branchValueIsNurseryObjectImpl(cond, value.valueReg(), temp, label);
 }
 
 template <typename T>

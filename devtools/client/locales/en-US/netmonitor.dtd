@@ -120,6 +120,10 @@
   -  in the network details footer for the "Flash" filtering button. -->
 <!ENTITY netmonitorUI.footer.filterFlash  "Flash">
 
+<!-- LOCALIZATION NOTE (netmonitorUI.footer.filterWS): This is the label displayed
+  -  in the network details footer for the "WS" filtering button. -->
+<!ENTITY netmonitorUI.footer.filterWS  "WS">
+
 <!-- LOCALIZATION NOTE (netmonitorUI.footer.filterOther): This is the label displayed
   -  in the network details footer for the "Other" filtering button. -->
 <!ENTITY netmonitorUI.footer.filterOther  "Other">
@@ -176,10 +180,6 @@
 <!-- LOCALIZATION NOTE (netmonitorUI.response.mime): This is the label displayed
   -  in the network details response tab identifying an image's mime. -->
 <!ENTITY netmonitorUI.response.mime       "MIME Type:">
-
-<!-- LOCALIZATION NOTE (netmonitorUI.response.encoding): This is the label displayed
-  -  in the network details response tab identifying an image's encoding. -->
-<!ENTITY netmonitorUI.response.encoding   "Encoding:">
 
 <!-- LOCALIZATION NOTE (netmonitorUI.timings.blocked): This is the label displayed
   -  in the network details timings tab identifying the amount of time spent

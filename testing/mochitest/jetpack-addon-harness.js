@@ -15,16 +15,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "Services",
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
   "resource://gre/modules/AddonManager.jsm");
 
-// Start the tests after the window has been displayed
-window.addEventListener("load", function testOnLoad() {
-  window.removeEventListener("load", testOnLoad);
-  window.addEventListener("MozAfterPaint", function testOnMozAfterPaint() {
-    window.removeEventListener("MozAfterPaint", testOnMozAfterPaint);
-    setTimeout(testInit, 0);
-  });
-});
+// How long to wait for an add-on to uninstall before aborting
+const MAX_UNINSTALL_TIME = 10000;
+setTimeout(testInit, 0);
 
-let sdkpath = null;
+var sdkpath = null;
 
 // Installs a single add-on returning a promise for when install is completed
 function installAddon(url) {
@@ -86,6 +81,10 @@ function uninstallAddon(oldAddon) {
         if (addon.id != oldAddon.id)
           return;
 
+        AddonManager.removeAddonListener(this);
+
+        dump("TEST-INFO | jetpack-addon-harness.js | Uninstalled test add-on " + addon.id + "\n");
+
         // Some add-ons do async work on uninstall, we must wait for that to
         // complete
         let timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
@@ -94,6 +93,11 @@ function uninstallAddon(oldAddon) {
     });
 
     oldAddon.uninstall();
+
+    // The uninstall should happen quickly, if not throw an exception
+    setTimeout(() => {
+      reject(new Error(`Addon ${oldAddon.id} failed to uninstall in a timely fashion.`));
+    }, MAX_UNINSTALL_TIME);
   });
 }
 
@@ -109,11 +113,16 @@ function waitForResults() {
 }
 
 // Runs tests for the add-on available at URL.
-let testAddon = Task.async(function*({ url, expected }) {
+var testAddon = Task.async(function*({ url }) {
+  dump("TEST-INFO | jetpack-addon-harness.js | Installing test add-on " + realPath(url) + "\n");
   let addon = yield installAddon(url);
+
   let results = yield waitForResults();
+
+  dump("TEST-INFO | jetpack-addon-harness.js | Uninstalling test add-on " + addon.id + "\n");
   yield uninstallAddon(addon);
 
+  dump("TEST-INFO | jetpack-addon-harness.js | Testing add-on " + realPath(url) + " is complete\n");
   return results;
 });
 
@@ -182,6 +191,8 @@ function testInit() {
         }
 
         if (config.closeWhenDone) {
+          dump("TEST-INFO | jetpack-addon-harness.js | Shutting down.\n");
+
           const appStartup = Cc['@mozilla.org/toolkit/app-startup;1'].
                              getService(Ci.nsIAppStartup);
           appStartup.quit(appStartup.eAttemptQuit);
@@ -193,6 +204,7 @@ function testInit() {
           return finish();
 
         let filename = fileNames.shift();
+        dump("TEST-INFO | jetpack-addon-harness.js | Starting test add-on " + realPath(filename.url) + "\n");
         testAddon(filename).then(results => {
           passed += results.passed;
           failed += results.failed;

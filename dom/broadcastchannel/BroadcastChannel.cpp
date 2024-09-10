@@ -73,7 +73,8 @@ public:
   InitializeRunnable(WorkerPrivate* aWorkerPrivate, nsACString& aOrigin,
                      PrincipalInfo& aPrincipalInfo, bool& aPrivateBrowsing,
                      ErrorResult& aRv)
-    : WorkerMainThreadRunnable(aWorkerPrivate)
+    : WorkerMainThreadRunnable(aWorkerPrivate,
+                               NS_LITERAL_CSTRING("BroadcastChannel :: Initialize"))
     , mWorkerPrivate(GetCurrentThreadWorkerPrivate())
     , mOrigin(aOrigin)
     , mPrincipalInfo(aPrincipalInfo)
@@ -142,7 +143,8 @@ private:
   ErrorResult& mRv;
 };
 
-class BCPostMessageRunnable final : public nsICancelableRunnable
+class BCPostMessageRunnable final : public nsIRunnable,
+                                    public nsICancelableRunnable
 {
 public:
   NS_DECL_ISUPPORTS
@@ -190,7 +192,7 @@ public:
     return NS_OK;
   }
 
-  NS_IMETHODIMP Cancel() override
+  nsresult Cancel() override
   {
     mActor = nullptr;
     return NS_OK;
@@ -205,7 +207,8 @@ private:
 
 NS_IMPL_ISUPPORTS(BCPostMessageRunnable, nsICancelableRunnable, nsIRunnable)
 
-class CloseRunnable final : public nsICancelableRunnable
+class CloseRunnable final : public nsIRunnable,
+                            public nsICancelableRunnable
 {
 public:
   NS_DECL_ISUPPORTS
@@ -222,7 +225,7 @@ public:
     return NS_OK;
   }
 
-  NS_IMETHODIMP Cancel() override
+  nsresult Cancel() override
   {
     mBC = nullptr;
     return NS_OK;
@@ -236,7 +239,8 @@ private:
 
 NS_IMPL_ISUPPORTS(CloseRunnable, nsICancelableRunnable, nsIRunnable)
 
-class TeardownRunnable final : public nsICancelableRunnable
+class TeardownRunnable final : public nsIRunnable,
+                               public nsICancelableRunnable
 {
 public:
   NS_DECL_ISUPPORTS
@@ -256,7 +260,7 @@ public:
     return NS_OK;
   }
 
-  NS_IMETHODIMP Cancel() override
+  nsresult Cancel() override
   {
     mActor = nullptr;
     return NS_OK;
@@ -281,7 +285,7 @@ public:
     MOZ_COUNT_CTOR(BroadcastChannelFeature);
   }
 
-  virtual bool Notify(JSContext* aCx, workers::Status aStatus) override
+  virtual bool Notify(workers::Status aStatus) override
   {
     if (aStatus >= Closing) {
       mChannel->Shutdown();

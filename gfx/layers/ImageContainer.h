@@ -56,7 +56,7 @@ public:
   /**
    * The XPCOM event that will do the actual release on the main thread.
    */
-  class SurfaceReleaser : public nsRunnable {
+  class SurfaceReleaser : public mozilla::Runnable {
   public:
     explicit SurfaceReleaser(RawRef aRef) : mRef(aRef) {}
     NS_IMETHOD Run() {
@@ -94,7 +94,7 @@ public:
   /**
    * The XPCOM event that will do the actual release on the creation thread.
    */
-  class SurfaceReleaser : public nsRunnable {
+  class SurfaceReleaser : public mozilla::Runnable {
   public:
     explicit SurfaceReleaser(RawRef aRef) : mRef(aRef) {}
     NS_IMETHOD Run() {
@@ -554,11 +554,17 @@ public:
    */
   static ProducerID AllocateProducerID();
 
+  /// ImageBridgeChild thread only.
+  static void AsyncDestroyActor(PImageContainerChild* aActor);
+
+  /// ImageBridgeChild thread only.
+  static void DeallocActor(PImageContainerChild* aActor);
+
 private:
   typedef mozilla::ReentrantMonitor ReentrantMonitor;
 
   // Private destructor, to discourage deletion outside of Release():
-  B2G_ACL_EXPORT ~ImageContainer();
+  ~ImageContainer();
 
   void SetCurrentImageInternal(const nsTArray<NonOwningImage>& aImages);
 
@@ -721,16 +727,16 @@ public:
    * This makes a copy of the data buffers, in order to support functioning
    * in all different layer managers.
    */
-  virtual bool SetData(const Data& aData) = 0;
+  virtual bool CopyData(const Data& aData) = 0;
 
   /**
    * This doesn't make a copy of the data buffers. Can be used when mBuffer is
-   * pre allocated with AllocateAndGetNewBuffer(size) and then SetDataNoCopy is
+   * pre allocated with AllocateAndGetNewBuffer(size) and then AdoptData is
    * called to only update the picture size, planes etc. fields in mData.
    * The GStreamer media backend uses this to decode into PlanarYCbCrImage(s)
    * directly.
    */
-  virtual bool SetDataNoCopy(const Data &aData);
+  virtual bool AdoptData(const Data &aData);
 
   /**
    * This allocates and returns a new buffer
@@ -787,16 +793,10 @@ class RecyclingPlanarYCbCrImage: public PlanarYCbCrImage {
 public:
   explicit RecyclingPlanarYCbCrImage(BufferRecycleBin *aRecycleBin) : mRecycleBin(aRecycleBin) {}
   virtual ~RecyclingPlanarYCbCrImage() override;
-  virtual bool SetData(const Data& aData) override;
+  virtual bool CopyData(const Data& aData) override;
   virtual uint8_t* AllocateAndGetNewBuffer(uint32_t aSize) override;
   virtual size_t SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const override;
 protected:
-  /**
-   * Make a copy of the YCbCr data into local storage.
-   *
-   * @param aData           Input image data.
-   */
-  bool CopyData(const Data& aData);
 
   /**
    * Return a buffer to store image data in.
@@ -825,7 +825,7 @@ public:
   virtual gfx::IntSize GetSize() override { return mSize; }
 
   SourceSurfaceImage(const gfx::IntSize& aSize, gfx::SourceSurface* aSourceSurface);
-  SourceSurfaceImage(gfx::SourceSurface* aSourceSurface);
+  explicit SourceSurfaceImage(gfx::SourceSurface* aSourceSurface);
   ~SourceSurfaceImage();
 
 private:

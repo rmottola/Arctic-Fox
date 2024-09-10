@@ -16,32 +16,78 @@ module.exports = createClass({
   displayName: "Viewport",
 
   propTypes: {
+    devices: PropTypes.shape(Types.devices).isRequired,
     location: Types.location.isRequired,
+    screenshot: PropTypes.shape(Types.screenshot).isRequired,
     viewport: PropTypes.shape(Types.viewport).isRequired,
+    onBrowserMounted: PropTypes.func.isRequired,
+    onChangeViewportDevice: PropTypes.func.isRequired,
+    onContentResize: PropTypes.func.isRequired,
     onResizeViewport: PropTypes.func.isRequired,
     onRotateViewport: PropTypes.func.isRequired,
   },
 
-  render() {
+  onChangeViewportDevice(device) {
     let {
-      location,
+      viewport,
+      onChangeViewportDevice,
+    } = this.props;
+
+    onChangeViewportDevice(viewport.id, device);
+  },
+
+  onResizeViewport(width, height) {
+    let {
       viewport,
       onResizeViewport,
+    } = this.props;
+
+    onResizeViewport(viewport.id, width, height);
+  },
+
+  onRotateViewport() {
+    let {
+      viewport,
       onRotateViewport,
     } = this.props;
+
+    onRotateViewport(viewport.id);
+  },
+
+  render() {
+    let {
+      devices,
+      location,
+      screenshot,
+      viewport,
+      onContentResize,
+      onBrowserMounted,
+    } = this.props;
+
+    let {
+      onChangeViewportDevice,
+      onRotateViewport,
+      onResizeViewport,
+    } = this;
 
     return dom.div(
       {
         className: "viewport",
       },
       ResizableViewport({
+        devices,
         location,
+        screenshot,
         viewport,
+        onBrowserMounted,
+        onChangeViewportDevice,
+        onContentResize,
         onResizeViewport,
         onRotateViewport,
       }),
       ViewportDimension({
         viewport,
+        onChangeViewportDevice,
         onResizeViewport,
       })
     );

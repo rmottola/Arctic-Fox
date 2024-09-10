@@ -15,6 +15,8 @@ import pprint
 import re
 from os import listdir
 from os.path import isfile, join
+import sh
+import redo
 
 sys.path.insert(1, os.path.dirname(os.path.dirname(sys.path[0])))
 from mozharness.base.log import FATAL
@@ -116,7 +118,6 @@ DEFAULT_EXCLUDES = [
     r"^.*json$",
     r"^.*/host.*$",
     r"^.*/mar-tools/.*$",
-    r"^.*gecko-unsigned-unaligned.apk$",
     r"^.*robocop.apk$",
     r"^.*contrib.*"
 ]
@@ -132,6 +133,7 @@ class BeetMover(BaseScript, VirtualenvMixin, object):
                 'create-virtualenv',
                 'activate-virtualenv',
                 'generate-candidates-manifest',
+                'refresh-antivirus',
                 'verify-bits',  # beets
                 'download-bits', # beets
                 'scan-bits',     # beets
@@ -230,6 +232,15 @@ class BeetMover(BaseScript, VirtualenvMixin, object):
         """
         # TODO
         self.log('skipping verification. unimplemented...')
+
+    def refresh_antivirus(self):
+       self.info("Refreshing clamav db...")
+       try:
+           redo.retry(lambda:
+                      sh.freshclam("--stdout", "--verbose", _timeout=300, _err_to_out=True))
+           self.info("Done.")
+       except sh.ErrorReturnCode:
+           self.warning("Freshclam failed, skipping DB update")
 
     def download_bits(self):
         """

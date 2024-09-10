@@ -35,7 +35,7 @@
 #include "nsIInputStream.h"
 #include "nsITransport.h"
 #include "nsIOService.h"
-#include "nsISchedulingContext.h"
+#include "nsIRequestContext.h"
 #include <algorithm>
 
 #ifdef MOZ_WIDGET_GONK
@@ -84,7 +84,6 @@ LogHeaders(const char *lineStart)
 nsHttpTransaction::nsHttpTransaction()
     : mLock("transaction lock")
     , mRequestSize(0)
-    , mConnection(nullptr)
     , mRequestHead(nullptr)
     , mResponseHead(nullptr)
     , mReader(nullptr)
@@ -918,7 +917,7 @@ nsHttpTransaction::SaveNetworkStats(bool enforce)
 
     // Create the event to save the network statistics.
     // the event is then dispatched to the main thread.
-    RefPtr<nsRunnable> event =
+    RefPtr<Runnable> event =
         new SaveNetworkStatsEvent(mAppId, mIsInIsolatedMozBrowser, mActiveNetworkInfo,
                                   mCountRecv, mCountSent, false);
     NS_DispatchToMainThread(event);
@@ -1929,10 +1928,10 @@ nsHttpTransaction::CancelPipeline(uint32_t reason)
 
 
 void
-nsHttpTransaction::SetSchedulingContext(nsISchedulingContext *aSchedulingContext)
+nsHttpTransaction::SetRequestContext(nsIRequestContext *aRequestContext)
 {
-    LOG(("nsHttpTransaction %p SetSchedulingContext %p\n", this, aSchedulingContext));
-    mSchedulingContext = aSchedulingContext;
+    LOG(("nsHttpTransaction %p SetRequestContext %p\n", this, aRequestContext));
+    mRequestContext = aRequestContext;
 }
 
 // Called when the transaction marked for blocking is associated with a connection
@@ -1947,32 +1946,32 @@ nsHttpTransaction::DispatchedAsBlocking()
 
     LOG(("nsHttpTransaction %p dispatched as blocking\n", this));
 
-    if (!mSchedulingContext)
+    if (!mRequestContext)
         return;
 
     LOG(("nsHttpTransaction adding blocking transaction %p from "
-         "scheduling context %p\n", this, mSchedulingContext.get()));
+         "request context %p\n", this, mRequestContext.get()));
 
-    mSchedulingContext->AddBlockingTransaction();
+    mRequestContext->AddBlockingTransaction();
     mDispatchedAsBlocking = true;
 }
 
 void
 nsHttpTransaction::RemoveDispatchedAsBlocking()
 {
-    if (!mSchedulingContext || !mDispatchedAsBlocking)
+    if (!mRequestContext || !mDispatchedAsBlocking)
         return;
 
     uint32_t blockers = 0;
-    nsresult rv = mSchedulingContext->RemoveBlockingTransaction(&blockers);
+    nsresult rv = mRequestContext->RemoveBlockingTransaction(&blockers);
 
     LOG(("nsHttpTransaction removing blocking transaction %p from "
-         "scheduling context %p. %d blockers remain.\n", this,
-         mSchedulingContext.get(), blockers));
+         "request context %p. %d blockers remain.\n", this,
+         mRequestContext.get(), blockers));
 
     if (NS_SUCCEEDED(rv) && !blockers) {
         LOG(("nsHttpTransaction %p triggering release of blocked channels "
-             " with scheduling context=%p\n", this, mSchedulingContext.get()));
+             " with request context=%p\n", this, mRequestContext.get()));
         gHttpHandler->ConnMgr()->ProcessPendingQ();
     }
 
@@ -1983,9 +1982,9 @@ void
 nsHttpTransaction::ReleaseBlockingTransaction()
 {
     RemoveDispatchedAsBlocking();
-    LOG(("nsHttpTransaction %p scheduling context set to null "
-         "in ReleaseBlockingTransaction() - was %p\n", this, mSchedulingContext.get()));
-    mSchedulingContext = nullptr;
+    LOG(("nsHttpTransaction %p request context set to null "
+         "in ReleaseBlockingTransaction() - was %p\n", this, mRequestContext.get()));
+    mRequestContext = nullptr;
 }
 
 void
@@ -2130,7 +2129,7 @@ nsHttpTransaction::GetResponseEnd()
 // nsHttpTransaction deletion event
 //-----------------------------------------------------------------------------
 
-class DeleteHttpTransaction : public nsRunnable {
+class DeleteHttpTransaction : public Runnable {
 public:
     explicit DeleteHttpTransaction(nsHttpTransaction *trans)
         : mTrans(trans)

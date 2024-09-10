@@ -17,14 +17,12 @@ const TEST_URI = `
   <span>This is a span</span>
 `;
 
-add_task(function*() {
+add_task(function* () {
   yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
   let {inspector, view} = yield openRuleView();
   yield selectNode("#testid", inspector);
 
-  let onRuleViewChanged = once(view, "ruleview-changed");
-  view.addRuleButton.click();
-  yield onRuleViewChanged;
+  yield addNewRule(inspector, view);
 
   info("Adding new properties to the new rule");
   yield testNewRule(view, "#testid", 1);

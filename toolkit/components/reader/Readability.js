@@ -1,3 +1,4 @@
+/*eslint-env es6:false*/
 /*
  * DO NOT MODIFY THIS FILE DIRECTLY!
  *
@@ -64,18 +65,23 @@ var Readability = function(uri, doc, options) {
   // Make an AJAX request for each page and append it to the document.
   this._curPageNum = 1;
 
+  var logEl;
+
   // Control whether log messages are sent to the console
   if (this._debug) {
-    function logEl(e) {
+    logEl = function(e) {
       var rv = e.nodeName + " ";
       if (e.nodeType == e.TEXT_NODE) {
         return rv + '("' + e.textContent + '")';
       }
       var classDesc = e.className && ("." + e.className.replace(/ /g, "."));
-      var elDesc = e.id ? "(#" + e.id + classDesc + ")" :
-                          (classDesc ? "(" + classDesc + ")" : "");
+      var elDesc = "";
+      if (e.id)
+        elDesc = "(#" + e.id + classDesc + ")";
+      else if (classDesc)
+        elDesc = "(" + classDesc + ")";
       return rv + elDesc;
-    }
+    };
     this.log = function () {
       if ("dump" in root) {
         var msg = Array.prototype.map.call(arguments, function(x) {
@@ -108,18 +114,21 @@ Readability.prototype = {
   // it quits and just show a link.
   DEFAULT_MAX_PAGES: 5,
 
+  // Element tags to score by default.
+  DEFAULT_TAGS_TO_SCORE: "section,h2,h3,h4,h5,h6,p,td,pre".toUpperCase().split(","),
+
   // All of the regular expressions in use within readability.
   // Defined up here so we don't instantiate them repeatedly in loops.
   REGEXPS: {
-    unlikelyCandidates: /banner|combx|comment|community|disqus|extra|foot|header|menu|remark|rss|share|shoutbox|sidebar|skyscraper|sponsor|ad-break|agegate|pagination|pager|popup/i,
+    unlikelyCandidates: /banner|combx|comment|community|disqus|extra|foot|header|menu|modal|related|remark|rss|share|shoutbox|sidebar|skyscraper|sponsor|ad-break|agegate|pagination|pager|popup/i,
     okMaybeItsACandidate: /and|article|body|column|main|shadow/i,
     positive: /article|body|content|entry|hentry|main|page|pagination|post|text|blog|story/i,
-    negative: /hidden|banner|combx|comment|com-|contact|foot|footer|footnote|masthead|media|meta|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget/i,
+    negative: /hidden|^hid$| hid$| hid |^hid |banner|combx|comment|com-|contact|foot|footer|footnote|masthead|media|meta|modal|outbrain|promo|related|scroll|share|shoutbox|sidebar|skyscraper|sponsor|shopping|tags|tool|widget/i,
     extraneous: /print|archive|comment|discuss|e[\-]?mail|share|reply|all|login|sign|single|utility/i,
     byline: /byline|author|dateline|writtenby/i,
     replaceFonts: /<(\/?)font[^>]*>/gi,
     normalize: /\s{2,}/g,
-    videos: /https?:\/\/(www\.)?(youtube|youtube-nocookie|player\.vimeo)\.com/i,
+    videos: /\/\/(www\.)?(dailymotion|youtube|youtube-nocookie|player\.vimeo)\.com/i,
     nextLink: /(next|weiter|continue|>([^\|]|$)|»([^\|]|$))/i,
     prevLink: /(prev|earl|old|new|<|«)/i,
     whitespace: /^\s*$/,
@@ -172,7 +181,33 @@ Readability.prototype = {
   },
 
   /**
-   * Converts each <a> and <img> uri in the given element to an absolute URI.
+   * Concat all nodelists passed as arguments.
+   *
+   * @return ...NodeList
+   * @return Array
+   */
+  _concatNodeLists: function() {
+    var slice = Array.prototype.slice;
+    var args = slice.call(arguments);
+    var nodeLists = args.map(function(list) {
+      return slice.call(list);
+    });
+    return Array.prototype.concat.apply([], nodeLists);
+  },
+
+  _getAllNodesWithTag: function(node, tagNames) {
+    if (node.querySelectorAll) {
+      return node.querySelectorAll(tagNames.join(','));
+    }
+    return [].concat.apply([], tagNames.map(function(tag) {
+      var collection = node.getElementsByTagName(tag);
+      return Array.isArray(collection) ? collection : Array.from(collection);
+    }));
+  },
+
+  /**
+   * Converts each <a> and <img> uri in the given element to an absolute URI,
+   * ignoring #ref URIs.
    *
    * @param Element
    * @return void
@@ -198,6 +233,10 @@ Readability.prototype = {
       // Dotslash relative URI.
       if (uri.indexOf("./") === 0)
         return pathBase + uri.slice(2);
+
+      // Ignore hash URIs:
+      if (uri[0] == "#")
+        return uri;
 
       // Standard relative URI; add entire path. pathBase already includes a
       // trailing "/".
@@ -252,10 +291,24 @@ Readability.prototype = {
       if (curTitle.split(' ').length < 3)
         curTitle = origTitle.replace(/[^\|\-]*[\|\-](.*)/gi,'$1');
     } else if (curTitle.indexOf(': ') !== -1) {
-      curTitle = origTitle.replace(/.*:(.*)/gi, '$1');
+      // Check if we have an heading containing this exact string, so we
+      // could assume it's the full title.
+      var headings = this._concatNodeLists(
+        doc.getElementsByTagName('h1'),
+        doc.getElementsByTagName('h2')
+      );
+      var match = this._someNode(headings, function(heading) {
+        return heading.textContent === curTitle;
+      });
 
-      if (curTitle.split(' ').length < 3)
-        curTitle = origTitle.replace(/[^:]*[:](.*)/gi,'$1');
+      // If we don't, let's extract the title out of the original title string.
+      if (!match) {
+        curTitle = origTitle.substring(origTitle.lastIndexOf(':') + 1);
+
+        // If the title is now too short, try the first colon instead:
+        if (curTitle.split(' ').length < 3)
+          curTitle = origTitle.substring(origTitle.indexOf(':') + 1);
+      }
     } else if (curTitle.length > 150 || curTitle.length < 15) {
       var hOnes = doc.getElementsByTagName('h1');
 
@@ -329,9 +382,9 @@ Readability.prototype = {
       // (which will be replaced with a <p> later).
       while ((next = this._nextElement(next)) && (next.tagName == "BR")) {
         replaced = true;
-        let sibling = next.nextSibling;
+        var brSibling = next.nextSibling;
         next.parentNode.removeChild(next);
-        next = sibling;
+        next = brSibling;
       }
 
       // If we removed a <br> chain, replace the remaining <br> with a <p>. Add
@@ -351,7 +404,7 @@ Readability.prototype = {
           }
 
           // Otherwise, make this node a child of the new <p>.
-          let sibling = next.nextSibling;
+          var sibling = next.nextSibling;
           p.appendChild(next);
           next = sibling;
         }
@@ -396,6 +449,7 @@ Readability.prototype = {
     this._clean(articleContent, "object");
     this._clean(articleContent, "embed");
     this._clean(articleContent, "h1");
+    this._clean(articleContent, "footer");
 
     // If there is only one h2, they are probably using it as a header
     // and not a subheader, so remove it since we already have a header.
@@ -556,6 +610,18 @@ Readability.prototype = {
     return false;
   },
 
+  _getNodeAncestors: function(node, maxDepth) {
+    maxDepth = maxDepth || 0;
+    var i = 0, ancestors = [];
+    while (node.parentNode) {
+      ancestors.push(node.parentNode)
+      if (maxDepth && ++i === maxDepth)
+        break;
+      node = node.parentNode;
+    }
+    return ancestors;
+  },
+
   /***
    * grabArticle - Using a variety of metrics (content score, classname, element types), find the content that is
    *         most likely to be the stuff a user wants to read. Then return it wrapped up in a div.
@@ -610,8 +676,9 @@ Readability.prototype = {
           }
         }
 
-        if (node.tagName === "P" || node.tagName === "TD" || node.tagName === "PRE")
+        if (this.DEFAULT_TAGS_TO_SCORE.indexOf(node.tagName) !== -1) {
           elementsToScore.push(node);
+        }
 
         // Turn all divs that don't have children block level elements into p's
         if (node.tagName === "DIV") {
@@ -650,30 +717,18 @@ Readability.prototype = {
       **/
       var candidates = [];
       this._forEachNode(elementsToScore, function(elementToScore) {
-        var parentNode = elementToScore.parentNode;
-        var grandParentNode = parentNode ? parentNode.parentNode : null;
-        var innerText = this._getInnerText(elementToScore);
-
-        if (!parentNode || typeof(parentNode.tagName) === 'undefined')
+        if (!elementToScore.parentNode || typeof(elementToScore.parentNode.tagName) === 'undefined')
           return;
 
         // If this paragraph is less than 25 characters, don't even count it.
+        var innerText = this._getInnerText(elementToScore);
         if (innerText.length < 25)
           return;
 
-        // Initialize readability data for the parent.
-        if (typeof parentNode.readability === 'undefined') {
-          this._initializeNode(parentNode);
-          candidates.push(parentNode);
-        }
-
-        // Initialize readability data for the grandparent.
-        if (grandParentNode &&
-          typeof(grandParentNode.readability) === 'undefined' &&
-          typeof(grandParentNode.tagName) !== 'undefined') {
-          this._initializeNode(grandParentNode);
-          candidates.push(grandParentNode);
-        }
+        // Exclude nodes with no ancestor.
+        var ancestors = this._getNodeAncestors(elementToScore, 3);
+        if (ancestors.length === 0)
+          return;
 
         var contentScore = 0;
 
@@ -686,11 +741,28 @@ Readability.prototype = {
         // For every 100 characters in this paragraph, add another point. Up to 3 points.
         contentScore += Math.min(Math.floor(innerText.length / 100), 3);
 
-        // Add the score to the parent. The grandparent gets half.
-        parentNode.readability.contentScore += contentScore;
+        // Initialize and score ancestors.
+        this._forEachNode(ancestors, function(ancestor, level) {
+          if (!ancestor.tagName)
+            return;
 
-        if (grandParentNode)
-          grandParentNode.readability.contentScore += contentScore / 2;
+          if (typeof(ancestor.readability) === 'undefined') {
+            this._initializeNode(ancestor);
+            candidates.push(ancestor);
+          }
+
+          // Node score divider:
+          // - parent:             1 (no division)
+          // - grandparent:        2
+          // - great grandparent+: ancestor level * 3
+          if (level === 0)
+            var scoreDivider = 1;
+          else if (level === 1)
+            scoreDivider = 2;
+          else
+            scoreDivider = level * 3;
+          ancestor.readability.contentScore += contentScore / scoreDivider;
+        });
       });
 
       // After we've calculated scores, loop through all of the possible
@@ -801,7 +873,8 @@ Readability.prototype = {
 
             if (nodeLength > 80 && linkDensity < 0.25) {
               append = true;
-            } else if (nodeLength < 80 && linkDensity === 0 && nodeContent.search(/\.( |$)/) !== -1) {
+            } else if (nodeLength < 80 && nodeLength > 0 && linkDensity === 0 &&
+                       nodeContent.search(/\.( |$)/) !== -1) {
               append = true;
             }
           }
@@ -817,10 +890,6 @@ Readability.prototype = {
 
             sibling = this._setNodeTag(sibling, "DIV");
           }
-
-          // To ensure a node does not interfere with readability styles,
-          // remove its classnames.
-          sibling.removeAttribute("class");
 
           articleContent.appendChild(sibling);
           // siblings is a reference to the children array, and
@@ -913,17 +982,17 @@ Readability.prototype = {
 
     // Match "description", or Twitter's "twitter:description" (Cards)
     // in name attribute.
-    var namePattern = /^\s*((twitter)\s*:\s*)?description\s*$/gi;
+    var namePattern = /^\s*((twitter)\s*:\s*)?(description|title)\s*$/gi;
 
-    // Match Facebook's og:description (Open Graph) in property attribute.
-    var propertyPattern = /^\s*og\s*:\s*description\s*$/gi;
+    // Match Facebook's Open Graph title & description properties.
+    var propertyPattern = /^\s*og\s*:\s*(description|title)\s*$/gi;
 
     // Find description tags.
     this._forEachNode(metaElements, function(element) {
       var elementName = element.getAttribute("name");
       var elementProperty = element.getAttribute("property");
 
-      if (elementName === "author") {
+      if ([elementName, elementProperty].indexOf("author") !== -1) {
         metadata.byline = element.getAttribute("content");
         return;
       }
@@ -954,6 +1023,14 @@ Readability.prototype = {
     } else if ("twitter:description" in values) {
       // Use twitter cards description.
       metadata.excerpt = values["twitter:description"];
+    }
+
+    if ("og:title" in values) {
+      // Use facebook open graph title.
+      metadata.title = values["og:title"];
+    } else if ("twitter:title" in values) {
+      // Use twitter cards title.
+      metadata.title = values["twitter:title"];
     }
 
     return metadata;
@@ -1082,7 +1159,7 @@ Readability.prototype = {
   _getLinkDensity: function(element) {
     var textLength = this._getInnerText(element).length;
     if (textLength === 0)
-      return undefined;
+      return 0;
 
     var linkLength = 0;
 
@@ -1559,6 +1636,7 @@ Readability.prototype = {
 
     var tagsList = e.getElementsByTagName(tag);
     var curTagsLength = tagsList.length;
+    var isList = tag === "ul" || tag === "ol";
 
     // Gather counts for other typical elements embedded within.
     // Traverse backwards so we can remove nodes at the same time
@@ -1594,13 +1672,13 @@ Readability.prototype = {
         var toRemove = false;
         if (img > p && !this._hasAncestorTag(tagsList[i], "figure")) {
           toRemove = true;
-        } else if (li > p && tag !== "ul" && tag !== "ol") {
+        } else if (!isList && li > p) {
           toRemove = true;
-        } else if ( input > Math.floor(p/3) ) {
+        } else if (input > Math.floor(p/3)) {
           toRemove = true;
-        } else if (contentLength < 25 && (img === 0 || img > 2) ) {
+        } else if (!isList && contentLength < 25 && (img === 0 || img > 2)) {
           toRemove = true;
-        } else if (weight < 25 && linkDensity > 0.2) {
+        } else if (!isList && weight < 25 && linkDensity > 0.2) {
           toRemove = true;
         } else if (weight >= 25 && linkDensity > 0.5) {
           toRemove = true;
@@ -1625,7 +1703,7 @@ Readability.prototype = {
     for (var headerIndex = 1; headerIndex < 3; headerIndex += 1) {
       var headers = e.getElementsByTagName('h' + headerIndex);
       for (var i = headers.length - 1; i >= 0; i -= 1) {
-        if (this._getClassWeight(headers[i]) < 0 || this._getLinkDensity(headers[i]) > 0.33)
+        if (this._getClassWeight(headers[i]) < 0)
           headers[i].parentNode.removeChild(headers[i]);
       }
     }
@@ -1648,32 +1726,42 @@ Readability.prototype = {
    *
    * @return boolean Whether or not we suspect parse() will suceeed at returning an article object.
    */
-  isProbablyReaderable: function() {
-    var nodes = this._doc.getElementsByTagName("p");
-    if (nodes.length < 5) {
-      return false;
-    }
+  isProbablyReaderable: function(helperIsVisible) {
+    var nodes = this._getAllNodesWithTag(this._doc, ["p", "pre"]);
 
-    var possibleParagraphs = 0;
-    for (var i = 0; i < nodes.length; i++) {
-      var node = nodes[i];
+    // FIXME we should have a fallback for helperIsVisible, but this is
+    // problematic because of jsdom's elem.style handling - see
+    // https://github.com/mozilla/readability/pull/186 for context.
+
+    var score = 0;
+    // This is a little cheeky, we use the accumulator 'score' to decide what to return from
+    // this callback:
+    return this._someNode(nodes, function(node) {
+      if (helperIsVisible && !helperIsVisible(node))
+        return false;
       var matchString = node.className + " " + node.id;
 
       if (this.REGEXPS.unlikelyCandidates.test(matchString) &&
           !this.REGEXPS.okMaybeItsACandidate.test(matchString)) {
-        continue;
+        return false;
       }
 
-      if (node.textContent.trim().length < 100) {
-        continue;
+      if (node.matches && node.matches("li p")) {
+        return false;
       }
 
-      possibleParagraphs++;
-      if (possibleParagraphs >= 5) {
+      var textContentLength = node.textContent.trim().length;
+      if (textContentLength < 140) {
+        return false;
+      }
+
+      score += Math.sqrt(textContentLength - 140);
+
+      if (score > 20) {
         return true;
       }
-    }
-    return false;
+      return false;
+    });
   },
 
   /**
@@ -1715,8 +1803,8 @@ Readability.prototype = {
 
     this._prepDocument();
 
-    var articleTitle = this._getArticleTitle();
     var metadata = this._getArticleMetadata();
+    var articleTitle = metadata.title || this._getArticleTitle();
 
     var articleContent = this._grabArticle();
     if (!articleContent)

@@ -28,6 +28,7 @@ namespace dom {
 class DocumentFragment;
 class DOMRect;
 class DOMRectList;
+class Selection;
 } // namespace dom
 } // namespace mozilla
 
@@ -346,7 +347,6 @@ protected:
   bool mIsPositioned : 1;
   bool mIsDetached : 1;
   bool mMaySpanAnonymousSubtrees : 1;
-  bool mInSelection : 1;
   bool mIsGenerated : 1;
   bool mStartOffsetWasIncremented : 1;
   bool mEndOffsetWasIncremented : 1;

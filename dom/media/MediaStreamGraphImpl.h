@@ -185,10 +185,6 @@ public:
    * This is called during application shutdown.
    */
   void ForceShutDown(ShutdownTicket* aShutdownTicket);
-  /**
-   * Shutdown() this MediaStreamGraph's threads and return when they've shut down.
-   */
-  void ShutdownThreads();
 
   /**
    * Called before the thread runs.
@@ -262,6 +258,21 @@ public:
    */
   void UpdateCurrentTimeForStreams(GraphTime aPrevCurrentTime);
   /**
+   * Process chunks for all streams and raise events for properties that have
+   * changed, such as principalId.
+   */
+  void ProcessChunkMetadata(GraphTime aPrevCurrentTime);
+  /**
+   * Process chunks for the given stream and interval, and raise events for
+   * properties that have changed, such as principalId.
+   */
+  template<typename C, typename Chunk>
+  void ProcessChunkMetadataForInterval(MediaStream* aStream,
+                                       TrackID aTrackID,
+                                       C& aSegment,
+                                       StreamTime aStart,
+                                       StreamTime aEnd);
+  /**
    * Process graph messages in mFrontMessageQueue.
    */
   void RunMessagesInQueue();
@@ -334,6 +345,12 @@ public:
                               const nsTArray<MediaStream*>& aStreamSet);
 
   /**
+   * Determine if we have any audio tracks, or are about to add any audiotracks.
+   * Also checks if we'll need the AEC running (i.e. microphone input tracks)
+   */
+  bool AudioTrackPresent(bool& aNeedsAEC);
+
+  /**
    * Sort mStreams so that every stream not in a cycle is after any streams
    * it depends on, and every stream in a cycle is marked as being in a cycle.
    * Also sets mIsConsumed on every stream.
@@ -386,12 +403,12 @@ public:
   void PlayVideo(MediaStream* aStream);
   /**
    * No more data will be forthcoming for aStream. The stream will end
-   * at the current buffer end point. The StreamBuffer's tracks must be
+   * at the current buffer end point. The StreamTracks's tracks must be
    * explicitly set to finished by the caller.
    */
-  void OpenAudioInputImpl(CubebUtils::AudioDeviceID aID,
+  void OpenAudioInputImpl(int aID,
                           AudioDataListener *aListener);
-  virtual nsresult OpenAudioInput(CubebUtils::AudioDeviceID aID,
+  virtual nsresult OpenAudioInput(int aID,
                                   AudioDataListener *aListener) override;
   void CloseAudioInputImpl(AudioDataListener *aListener);
   virtual void CloseAudioInput(AudioDataListener *aListener) override;
@@ -628,9 +645,9 @@ public:
    * and boolean to control if we want input/output
    */
   bool mInputWanted;
-  CubebUtils::AudioDeviceID mInputDeviceID;
+  int mInputDeviceID;
   bool mOutputWanted;
-  CubebUtils::AudioDeviceID mOutputDeviceID;
+  int mOutputDeviceID;
   // Maps AudioDataListeners to a usecount of streams using the listener
   // so we can know when it's no longer in use.
   nsDataHashtable<nsPtrHashKey<AudioDataListener>, uint32_t> mInputDeviceUsers;

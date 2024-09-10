@@ -35,12 +35,8 @@ namespace jit {
     _(Compare_Int32WithBoolean)                  \
                                                  \
     _(GetProp_Fallback)                          \
-    _(GetProp_ArrayLength)                       \
-    _(GetProp_UnboxedArrayLength)                \
     _(GetProp_Primitive)                         \
     _(GetProp_StringLength)                      \
-    _(GetProp_Unboxed)                           \
-    _(GetProp_TypedObject)                       \
     _(GetProp_CallScripted)                      \
     _(GetProp_CallNative)                        \
     _(GetProp_CallNativeGlobal)                  \
@@ -49,7 +45,6 @@ namespace jit {
     _(GetProp_DOMProxyShadowed)                  \
     _(GetProp_ArgumentsLength)                   \
     _(GetProp_ArgumentsCallee)                   \
-    _(GetProp_ModuleNamespace)                   \
     _(GetProp_Generic)                           \
                                                  \
     _(CacheIR_Monitored)                         \

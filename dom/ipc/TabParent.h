@@ -22,6 +22,7 @@
 #include "nsIAuthPromptProvider.h"
 #include "nsIBrowserDOMWindow.h"
 #include "nsIDOMEventListener.h"
+#include "nsIKeyEventInPluginCallback.h"
 #include "nsISecureBrowserUI.h"
 #include "nsITabParent.h"
 #include "nsIWebBrowserPersistable.h"
@@ -82,6 +83,7 @@ class TabParent final : public PBrowserParent
                       , public nsITabParent
                       , public nsIAuthPromptProvider
                       , public nsISecureBrowserUI
+                      , public nsIKeyEventInPluginCallback
                       , public nsSupportsWeakReference
                       , public TabContext
                       , public nsAPostRefreshObserver
@@ -167,10 +169,13 @@ public:
   RecvDispatchAfterKeyboardEvent(const WidgetKeyboardEvent& aEvent) override;
 
   virtual bool RecvBrowserFrameOpenWindow(PBrowserParent* aOpener,
+                                          PRenderFrameParent* aRenderFrame,
                                           const nsString& aURL,
                                           const nsString& aName,
                                           const nsString& aFeatures,
-                                          bool* aOutWindowOpened) override;
+                                          bool* aOutWindowOpened,
+                                          TextureFactoryIdentifier* aTextureFactoryIdentifier,
+                                          uint64_t* aLayersId) override;
 
   virtual bool
   RecvSyncMessage(const nsString& aMessage,
@@ -187,9 +192,9 @@ public:
                  nsTArray<ipc::StructuredCloneData>* aRetVal) override;
 
   virtual bool RecvAsyncMessage(const nsString& aMessage,
-                                const ClonedMessageData& aData,
                                 InfallibleTArray<CpowEntry>&& aCpows,
-                                const IPC::Principal& aPrincipal) override;
+                                const IPC::Principal& aPrincipal,
+                                const ClonedMessageData& aData) override;
 
   virtual bool
   RecvNotifyIMEFocus(const ContentCache& aContentCache,
@@ -252,6 +257,15 @@ public:
                                    const int32_t& aCause,
                                    const int32_t& aFocusChange) override;
 
+
+  // See nsIKeyEventInPluginCallback
+  virtual void HandledWindowedPluginKeyEvent(
+                 const NativeEventData& aKeyEventData,
+                 bool aIsConsumed) override;
+
+  virtual bool RecvOnWindowedPluginKeyEvent(
+                 const NativeEventData& aKeyEventData) override;
+
   virtual bool RecvRequestFocus(const bool& aCanRaise) override;
 
   virtual bool
@@ -278,7 +292,8 @@ public:
 
   virtual bool RecvShowTooltip(const uint32_t& aX,
                                const uint32_t& aY,
-                               const nsString& aTooltip) override;
+                               const nsString& aTooltip,
+                               const nsString& aDirection) override;
 
   virtual bool RecvHideTooltip() override;
 
@@ -393,13 +408,13 @@ public:
   virtual bool
   RecvSynthesizeNativeTouchPoint(const uint32_t& aPointerId,
                                  const TouchPointerState& aPointerState,
-                                 const ScreenIntPoint& aPointerScreenPoint,
+                                 const LayoutDeviceIntPoint& aPoint,
                                  const double& aPointerPressure,
                                  const uint32_t& aPointerOrientation,
                                  const uint64_t& aObserverId) override;
 
   virtual bool
-  RecvSynthesizeNativeTouchTap(const ScreenIntPoint& aPointerScreenPoint,
+  RecvSynthesizeNativeTouchTap(const LayoutDeviceIntPoint& aPoint,
                                const bool& aLongTap,
                                const uint64_t& aObserverId) override;
 
@@ -541,15 +556,13 @@ public:
 
   layout::RenderFrameParent* GetRenderFrame();
 
-  // Called by HttpChannelParent. The function may use a new process to
-  // reload the URI associated with the given channel.
-  void OnStartSignedPackageRequest(nsIChannel* aChannel,
-                                   const nsACString& aPackageId);
-
   void AudioChannelChangeNotification(nsPIDOMWindowOuter* aWindow,
                                       AudioChannel aAudioChannel,
                                       float aVolume,
                                       bool aMuted);
+  bool SetRenderFrame(PRenderFrameParent* aRFParent);
+  bool GetRenderFrameInfo(TextureFactoryIdentifier* aTextureFactoryIdentifier,
+                          uint64_t* aLayersId);
 
 protected:
   bool ReceiveMessage(const nsString& aMessage,
@@ -576,23 +589,17 @@ protected:
 
   virtual bool RecvRemotePaintIsReady() override;
 
-  virtual bool RecvGetRenderFrameInfo(PRenderFrameParent* aRenderFrame,
-                                      TextureFactoryIdentifier* aTextureFactoryIdentifier,
-                                      uint64_t* aLayersId) override;
-
   virtual bool RecvSetDimensions(const uint32_t& aFlags,
                                  const int32_t& aX, const int32_t& aY,
                                  const int32_t& aCx, const int32_t& aCy) override;
+
+  virtual bool RecvGetTabCount(uint32_t* aValue) override;
 
   virtual bool RecvAudioChannelActivityNotification(const uint32_t& aAudioChannel,
                                                     const bool& aActive) override;
 
   bool InitBrowserConfiguration(const nsCString& aURI,
                                 BrowserConfiguration& aConfiguration);
-
-  // Decide whether we have to use a new process to reload the URI associated
-  // with the given channel.
-  bool ShouldSwitchProcess(nsIChannel* aChannel, const nsACString& aSignedPkg);
 
   ContentCacheInParent mContentCache;
 

@@ -82,7 +82,7 @@ public:
   {
   }
 
-  NS_DECL_THREADSAFE_ISUPPORTS
+  NS_DECL_ISUPPORTS
 
   void FireScriptAvailable(nsresult aResult)
   {
@@ -179,14 +179,14 @@ public:
     insertBack(aElem);
   }
 
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   already_AddRefed<nsScriptLoadRequest> Steal(nsScriptLoadRequest* aElem)
   {
     aElem->removeFrom(*this);
     return dont_AddRef(aElem);
   }
 
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   already_AddRefed<nsScriptLoadRequest> StealFirst()
   {
     MOZ_ASSERT(!isEmpty());

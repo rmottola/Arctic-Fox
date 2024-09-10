@@ -12,7 +12,6 @@ import os
 import shutil
 import sys
 import warnings
-import which
 
 from mozbuild.base import (
     MachCommandBase,
@@ -29,30 +28,6 @@ import mozpack.path as mozpath
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-
-GAIA_PROFILE_NOT_FOUND = '''
-The mochitest command requires a non-debug gaia profile. Either
-pass in --profile, or set the GAIA_PROFILE environment variable.
-
-If you do not have a non-debug gaia profile, you can build one:
-    $ git clone https://github.com/mozilla-b2g/gaia
-    $ cd gaia
-    $ make
-
-The profile should be generated in a directory called 'profile'.
-'''.lstrip()
-
-GAIA_PROFILE_IS_DEBUG = '''
-The mochitest command requires a non-debug gaia profile. The
-specified profile, {}, is a debug profile.
-
-If you do not have a non-debug gaia profile, you can build one:
-    $ git clone https://github.com/mozilla-b2g/gaia
-    $ cd gaia
-    $ make
-
-The profile should be generated in a directory called 'profile'.
-'''.lstrip()
 
 ENG_BUILD_REQUIRED = '''
 The mochitest command requires an engineering build. It may be the case that
@@ -87,6 +62,15 @@ test path(s):
 Please check spelling and make sure there are mochitests living there.
 '''.lstrip()
 
+ROBOCOP_TESTS_NOT_FOUND = '''
+The robocop command could not find any tests under the following
+test path(s):
+
+{}
+
+Please check spelling and make sure the named tests exist.
+'''.lstrip()
+
 NOW_RUNNING = '''
 ######
 ### Now running mochitest-{}.
@@ -99,7 +83,7 @@ ALL_FLAVORS = {
     'mochitest': {
         'suite': 'plain',
         'aliases': ('plain', 'mochitest'),
-        'enabled_apps': ('firefox', 'b2g', 'android', 'mulet', 'b2g_desktop'),
+        'enabled_apps': ('firefox', 'b2g', 'android', 'mulet'),
     },
     'chrome': {
         'suite': 'chrome',
@@ -143,7 +127,7 @@ ALL_FLAVORS = {
     },
 }
 
-SUPPORTED_APPS = ['firefox', 'b2g', 'android', 'mulet', 'b2g_desktop']
+SUPPORTED_APPS = ['firefox', 'b2g', 'android', 'mulet']
 SUPPORTED_FLAVORS = list(chain.from_iterable([f['aliases'] for f in ALL_FLAVORS.values()]))
 CANONICAL_FLAVORS = sorted([f['aliases'][0] for f in ALL_FLAVORS.values()])
 
@@ -182,17 +166,7 @@ class MochitestRunner(MozbuildObject):
 
     def run_b2g_test(self, context, tests=None, suite='mochitest', **kwargs):
         """Runs a b2g mochitest."""
-        if kwargs.get('desktop'):
-            kwargs['profile'] = kwargs.get('profile') or os.environ.get('GAIA_PROFILE')
-            if not kwargs['profile'] or not os.path.isdir(kwargs['profile']):
-                print(GAIA_PROFILE_NOT_FOUND)
-                sys.exit(1)
-
-            if os.path.isfile(os.path.join(kwargs['profile'], 'extensions',
-                                           'httpd@gaiamobile.org')):
-                print(GAIA_PROFILE_IS_DEBUG.format(kwargs['profile']))
-                sys.exit(1)
-        elif context.target_out:
+        if context.target_out:
             host_webapps_dir = os.path.join(context.target_out, 'data', 'local', 'webapps')
             if not os.path.isdir(os.path.join(
                     host_webapps_dir, 'test-container.gaiamobile.org')):
@@ -223,10 +197,7 @@ class MochitestRunner(MozbuildObject):
             manifest.tests.extend(tests)
             options.manifestFile = manifest
 
-        if options.desktop:
-            return mochitest.run_desktop_mochitests(options)
-
-        return mochitest.run_remote_mochitests(options)
+        return mochitest.run_test_harness(options)
 
     def run_desktop_test(self, context, tests=None, suite=None, **kwargs):
         """Runs a mochitest.
@@ -321,6 +292,7 @@ class MochitestRunner(MozbuildObject):
 
 # parser
 
+
 def setup_argument_parser():
     build_obj = MozbuildObject.from_environment(cwd=here)
 
@@ -413,9 +385,6 @@ class MachCommands(MachCommandBase):
         from mozbuild.controller.building import BuildDriver
         self._ensure_state_subdir_exists('.')
 
-        driver = self._spawn(BuildDriver)
-        driver.install_tests(remove=False)
-
         test_paths = kwargs['test_paths']
         kwargs['test_paths'] = []
 
@@ -437,6 +406,9 @@ class MachCommands(MachCommandBase):
         tests = []
         if resolve_tests:
             tests = mochitest.resolve_tests(test_paths, test_objects, cwd=self._mach_context.cwd)
+
+        driver = self._spawn(BuildDriver)
+        driver.install_tests(tests)
 
         subsuite = kwargs.get('subsuite')
         if subsuite == 'default':
@@ -497,9 +469,11 @@ class MachCommands(MachCommandBase):
                 buildapp, '\n'.join(sorted(msg))))
             return 1
 
-        if buildapp in ('b2g', 'b2g_desktop'):
+        if buildapp in ('b2g',):
             run_mochitest = mochitest.run_b2g_test
         elif buildapp == 'android':
+            from mozrunner.devices.android_device import grant_runtime_permissions
+            grant_runtime_permissions(self, kwargs['app'])
             run_mochitest = mochitest.run_android_test
         else:
             run_mochitest = mochitest.run_desktop_test
@@ -537,8 +511,8 @@ class RobocopCommands(MachCommandBase):
              description='Run a Robocop test.',
              parser=setup_argument_parser)
     @CommandArgument('--serve', default=False, action='store_true',
-        help='Run no tests but start the mochi.test web server and launch '
-             'Fennec with a test profile.')
+                     help='Run no tests but start the mochi.test web server '
+                     'and launch Fennec with a test profile.')
     def run_robocop(self, serve=False, **kwargs):
         if serve:
             kwargs['autorun'] = False
@@ -555,16 +529,23 @@ class RobocopCommands(MachCommandBase):
         from mozbuild.controller.building import BuildDriver
         self._ensure_state_subdir_exists('.')
 
-        driver = self._spawn(BuildDriver)
-        driver.install_tests(remove=False)
-
         test_paths = kwargs['test_paths']
         kwargs['test_paths'] = []
 
         from mozbuild.testing import TestResolver
         resolver = self._spawn(TestResolver)
         tests = list(resolver.resolve_tests(paths=test_paths, cwd=self._mach_context.cwd,
-            flavor='instrumentation', subsuite='robocop'))
+                                            flavor='instrumentation', subsuite='robocop'))
+        driver = self._spawn(BuildDriver)
+        driver.install_tests(tests)
+
+        if len(tests) < 1:
+            print(ROBOCOP_TESTS_NOT_FOUND.format('\n'.join(
+                sorted(list(test_paths)))))
+            return 1
+
+        from mozrunner.devices.android_device import grant_runtime_permissions
+        grant_runtime_permissions(self, kwargs['app'])
 
         mochitest = self._spawn(MochitestRunner)
         return mochitest.run_robocop_test(self._mach_context, tests, 'robocop', **kwargs)

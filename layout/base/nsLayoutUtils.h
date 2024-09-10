@@ -9,6 +9,7 @@
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Maybe.h"
+#include "mozilla/TypedEnumBits.h"
 #include "nsBoundingMetrics.h"
 #include "nsChangeHint.h"
 #include "nsAutoPtr.h"
@@ -41,6 +42,7 @@ class nsIScrollableFrame;
 class nsIDOMEvent;
 class nsRegion;
 class nsDisplayListBuilder;
+enum class nsDisplayListBuilderMode : uint8_t;
 class nsDisplayItem;
 class nsFontMetrics;
 class nsFontFaceList;
@@ -143,6 +145,7 @@ class nsLayoutUtils
 
 public:
   typedef mozilla::layers::FrameMetrics FrameMetrics;
+  typedef mozilla::layers::ScrollMetadata ScrollMetadata;
   typedef FrameMetrics::ViewID ViewID;
   typedef mozilla::CSSPoint CSSPoint;
   typedef mozilla::CSSSize CSSSize;
@@ -253,6 +256,12 @@ public:
   static bool HasCriticalDisplayPort(nsIContent* aContent);
 
   /**
+   * If low-precision painting is turned on, delegates to GetCriticalDisplayPort.
+   * Otherwise, delegates to GetDisplayPort.
+   */
+  static bool GetHighResolutionDisplayPort(nsIContent* aContent, nsRect* aResult);
+
+  /**
    * Remove the displayport for the given element.
    */
   static void RemoveDisplayPort(nsIContent* aContent);
@@ -355,6 +364,15 @@ public:
    * This is aContent->GetPrimaryFrame() except for tableOuter frames.
    */
   static nsIFrame* GetStyleFrame(const nsIContent* aContent);
+
+  /**
+   * Gets the real primary frame associated with the content object.
+   *
+   * In the case of absolutely positioned elements and floated elements,
+   * the real primary frame is the frame that is out of the flow and not the
+   * placeholder frame.
+   */
+  static nsIFrame* GetRealPrimaryFrameFor(const nsIContent* aContent);
 
   /**
    * IsGeneratedContentFor returns true if aFrame is the outermost
@@ -1004,7 +1022,7 @@ public:
                                         const nscoord aRadii[8],
                                         const nsRect& aTestRect);
 
-  enum {
+  enum class PaintFrameFlags : uint32_t {
     PAINT_IN_TRANSFORM = 0x01,
     PAINT_SYNC_DECODE_IMAGES = 0x02,
     PAINT_WIDGET_LAYERS = 0x04,
@@ -1030,6 +1048,7 @@ public:
    * of aFrame.
    * @param aBackstop paint the dirty area with this color before drawing
    * the actual content; pass NS_RGBA(0,0,0,0) to draw no background.
+   * @param aBuilderMode Passed through to the display-list builder.
    * @param aFlags if PAINT_IN_TRANSFORM is set, then we assume
    * this is inside a transform or SVG foreignObject. If
    * PAINT_SYNC_DECODE_IMAGES is set, we force synchronous decode on all
@@ -1065,7 +1084,8 @@ public:
    */
   static nsresult PaintFrame(nsRenderingContext* aRenderingContext, nsIFrame* aFrame,
                              const nsRegion& aDirtyRegion, nscolor aBackstop,
-                             uint32_t aFlags = 0);
+                             nsDisplayListBuilderMode aBuilderMode,
+                             PaintFrameFlags aFlags = PaintFrameFlags(0));
 
   /**
    * Uses a binary search for find where the cursor falls in the line of text
@@ -1239,7 +1259,8 @@ public:
    * @param aSizeInflation number to multiply font size by
    */
   static already_AddRefed<nsFontMetrics> GetFontMetricsForStyleContext(
-      nsStyleContext* aStyleContext, float aSizeInflation = 1.0f);
+      nsStyleContext* aStyleContext, float aSizeInflation = 1.0f,
+      uint8_t aVariantWidth = NS_FONT_VARIANT_WIDTH_NORMAL);
 
   /**
    * Get the font metrics of emphasis marks corresponding to the given
@@ -2401,6 +2422,10 @@ public:
     return sSVGTransformBoxEnabled;
   }
 
+  static bool TextCombineUprightDigitsEnabled() {
+    return sTextCombineUprightDigitsEnabled;
+  }
+
   /**
    * See comment above "font.size.inflation.mappingIntercept" in
    * modules/libpref/src/init/all.js .
@@ -2548,14 +2573,6 @@ public:
     const nsIFrame* aAncestorFrame,
     nsRegion* aPreciseTargetDest,
     nsRegion* aImpreciseTargetDest);
-
-  /**
-   * Determine if aImageFrame (which is an nsImageFrame, nsImageControlFrame, or
-   * nsSVGImageFrame) is visible or close to being visible via scrolling and
-   * update the presshell with this knowledge.
-   */
-  static void
-  UpdateImageVisibilityForFrame(nsIFrame* aImageFrame);
 
   /**
    * Populate aOutSize with the size of the content viewer corresponding
@@ -2735,16 +2752,16 @@ public:
    */
   static bool CanScrollOriginClobberApz(nsIAtom* aScrollOrigin);
 
-  static FrameMetrics ComputeFrameMetrics(nsIFrame* aForFrame,
-                                          nsIFrame* aScrollFrame,
-                                          nsIContent* aContent,
-                                          const nsIFrame* aReferenceFrame,
-                                          Layer* aLayer,
-                                          ViewID aScrollParentId,
-                                          const nsRect& aViewport,
-                                          const mozilla::Maybe<nsRect>& aClipRect,
-                                          bool aIsRoot,
-                                          const ContainerLayerParameters& aContainerParameters);
+  static ScrollMetadata ComputeScrollMetadata(nsIFrame* aForFrame,
+                                              nsIFrame* aScrollFrame,
+                                              nsIContent* aContent,
+                                              const nsIFrame* aReferenceFrame,
+                                              Layer* aLayer,
+                                              ViewID aScrollParentId,
+                                              const nsRect& aViewport,
+                                              const mozilla::Maybe<nsRect>& aClipRect,
+                                              bool aIsRoot,
+                                              const ContainerLayerParameters& aContainerParameters);
 
   /**
    * If the given scroll frame needs an area excluded from its composition
@@ -2797,10 +2814,6 @@ public:
   static nsRect GetSelectionBoundingRect(mozilla::dom::Selection* aSel);
 
   /**
-   * Returns true if the given frame is a scrollframe and it has snap points.
-   */
-  static bool IsScrollFrameWithSnapping(nsIFrame* aFrame);
-  /**
    * Calculate the bounding rect of |aContent|, relative to the origin
    * of the scrolled content of |aRootScrollFrame|.
    * Where the element is contained inside a scrollable subframe, the
@@ -2814,6 +2827,13 @@ public:
    */
   static nsBlockFrame* GetFloatContainingBlock(nsIFrame* aFrame);
 
+  /**
+   * Walks up the frame tree from |aForFrame| up to |aTopFrame|, or to the
+   * root of the frame tree if |aTopFrame| is nullptr, and returns true if
+   * a transformed frame is encountered.
+   */
+  static bool IsTransformed(nsIFrame* aForFrame, nsIFrame* aTopFrame = nullptr);
+
 private:
   static uint32_t sFontSizeInflationEmPerLine;
   static uint32_t sFontSizeInflationMinTwips;
@@ -2826,6 +2846,7 @@ private:
   static bool sCSSVariablesEnabled;
   static bool sInterruptibleReflowEnabled;
   static bool sSVGTransformBoxEnabled;
+  static bool sTextCombineUprightDigitsEnabled;
 
   /**
    * Helper function for LogTestDataForPaint().
@@ -2837,6 +2858,8 @@ private:
 
   static bool IsAPZTestLoggingEnabled();
 };
+
+MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(nsLayoutUtils::PaintFrameFlags)
 
 template<typename PointType, typename RectType, typename CoordType>
 /* static */ bool
@@ -2953,7 +2976,7 @@ void StrokeLineWithSnapping(const nsPoint& aP1, const nsPoint& aP2,
   } // namespace layout
 } // namespace mozilla
 
-class nsSetAttrRunnable : public nsRunnable
+class nsSetAttrRunnable : public mozilla::Runnable
 {
 public:
   nsSetAttrRunnable(nsIContent* aContent, nsIAtom* aAttrName,
@@ -2968,7 +2991,7 @@ public:
   nsAutoString mValue;
 };
 
-class nsUnsetAttrRunnable : public nsRunnable
+class nsUnsetAttrRunnable : public mozilla::Runnable
 {
 public:
   nsUnsetAttrRunnable(nsIContent* aContent, nsIAtom* aAttrName);

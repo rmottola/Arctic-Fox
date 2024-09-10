@@ -194,8 +194,7 @@ PluginProcessParent::Delete()
       return;
   }
 
-  ioLoop->PostTask(FROM_HERE,
-                   NewRunnableMethod(this, &PluginProcessParent::Delete));
+  ioLoop->PostTask(NewRunnableMethod(this, &PluginProcessParent::Delete));
 }
 
 void
@@ -239,7 +238,7 @@ PluginProcessParent::OnChannelConnected(int32_t peer_pid)
     GeckoChildProcessHost::OnChannelConnected(peer_pid);
     if (mLaunchCompleteTask && !mRunCompleteTaskImmediately) {
         mLaunchCompleteTask->SetLaunchSucceeded();
-        mMainMsgLoop->PostTask(FROM_HERE, mTaskFactory.NewRunnableMethod(
+        mMainMsgLoop->PostTask(mTaskFactory.NewRunnableMethod(
                                    &PluginProcessParent::RunLaunchCompleteTask));
     }
 }
@@ -249,7 +248,7 @@ PluginProcessParent::OnChannelError()
 {
     GeckoChildProcessHost::OnChannelError();
     if (mLaunchCompleteTask && !mRunCompleteTaskImmediately) {
-        mMainMsgLoop->PostTask(FROM_HERE, mTaskFactory.NewRunnableMethod(
+        mMainMsgLoop->PostTask(mTaskFactory.NewRunnableMethod(
                                    &PluginProcessParent::RunLaunchCompleteTask));
     }
 }

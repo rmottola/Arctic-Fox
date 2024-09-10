@@ -17,12 +17,13 @@ struct StartSessionRequest
   nsString url;
   nsString sessionId;
   nsString origin;
+  nsString deviceId;
 };
 
 struct SendSessionMessageRequest
 {
   nsString sessionId;
-  InputStreamParams data;
+  nsString data;
 };
 
 struct CloseSessionRequest

@@ -52,7 +52,6 @@ public:
   void BeginUpdate();
   nsresult EndUpdate();
 
-  // resolve a style context
   already_AddRefed<nsStyleContext>
   ResolveStyleFor(dom::Element* aElement,
                   nsStyleContext* aParentContext);
@@ -63,7 +62,11 @@ public:
                   TreeMatchContext& aTreeMatchContext);
 
   already_AddRefed<nsStyleContext>
-  ResolveStyleForNonElement(nsStyleContext* aParentContext);
+  ResolveStyleForText(nsIContent* aTextNode,
+                      nsStyleContext* aParentContext);
+
+  already_AddRefed<nsStyleContext>
+  ResolveStyleForOtherNonElement(nsStyleContext* aParentContext);
 
   already_AddRefed<nsStyleContext>
   ResolvePseudoElementStyle(dom::Element* aParentElement,
@@ -114,6 +117,17 @@ public:
                                        EventStates aStateMask);
 
 private:
+  already_AddRefed<nsStyleContext> GetContext(already_AddRefed<ServoComputedValues>,
+                                              nsStyleContext* aParentContext,
+                                              nsIAtom* aPseudoTag,
+                                              CSSPseudoElementType aPseudoType);
+
+  already_AddRefed<nsStyleContext> GetContext(nsIContent* aContent,
+                                              nsStyleContext* aParentContext,
+                                              nsIAtom* aPseudoTag,
+                                              CSSPseudoElementType aPseudoType);
+
+  nsPresContext* mPresContext;
   UniquePtr<RawServoStyleSet> mRawSet;
   EnumeratedArray<SheetType, SheetType::Count,
                   nsTArray<RefPtr<ServoStyleSheet>>> mSheets;

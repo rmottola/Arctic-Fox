@@ -35,7 +35,8 @@ public:
                      layers::LayersBackend aLayersBackend,
                      layers::ImageContainer* aImageContainer,
                      FlushableTaskQueue* aVideoTaskQueue,
-                     MediaDataDecoderCallback* aCallback) override
+                     MediaDataDecoderCallback* aCallback,
+                     DecoderDoctorDiagnostics* aDiagnostics) override
   {
     RefPtr<MediaDataDecoder> decoder =
       new FFmpegVideoDecoder<V>(mLib, aVideoTaskQueue, aCallback, aConfig,
@@ -46,7 +47,8 @@ public:
   already_AddRefed<MediaDataDecoder>
   CreateAudioDecoder(const AudioInfo& aConfig,
                      FlushableTaskQueue* aAudioTaskQueue,
-                     MediaDataDecoderCallback* aCallback) override
+                     MediaDataDecoderCallback* aCallback,
+                     DecoderDoctorDiagnostics* aDiagnostics) override
   {
 #ifdef USING_MOZFFVPX
     return nullptr;
@@ -57,19 +59,23 @@ public:
 #endif
   }
 
-  bool SupportsMimeType(const nsACString& aMimeType) const override
+  bool SupportsMimeType(const nsACString& aMimeType,
+                        DecoderDoctorDiagnostics* aDiagnostics) const override
   {
+    AVCodecID videoCodec = FFmpegVideoDecoder<V>::GetCodecId(aMimeType);
 #ifdef USING_MOZFFVPX
-    AVCodecID audioCodec = AV_CODEC_ID_NONE;
+    if (videoCodec == AV_CODEC_ID_NONE) {
+        return false;
+    }
+    return !!FFmpegDataDecoder<V>::FindAVCodec(mLib, videoCodec);
 #else
     AVCodecID audioCodec = FFmpegAudioDecoder<V>::GetCodecId(aMimeType);
-#endif
-    AVCodecID videoCodec = FFmpegVideoDecoder<V>::GetCodecId(aMimeType);
     if (audioCodec == AV_CODEC_ID_NONE && videoCodec == AV_CODEC_ID_NONE) {
       return false;
     }
     AVCodecID codec = audioCodec != AV_CODEC_ID_NONE ? audioCodec : videoCodec;
     return !!FFmpegDataDecoder<V>::FindAVCodec(mLib, codec);
+#endif
   }
 
   ConversionRequired

@@ -2860,7 +2860,7 @@ SVGTextDrawPathCallbacks::PaintDecorationLine(Rect aPath, nscolor aColor)
 {
   mColor = aColor;
   AntialiasMode aaMode =
-    nsSVGUtils::ToAntialiasMode(mFrame->StyleSVG()->mTextRendering);
+    nsSVGUtils::ToAntialiasMode(mFrame->StyleText()->mTextRendering);
 
   gfx->Save();
   gfx->NewPath();
@@ -2897,7 +2897,7 @@ SVGTextDrawPathCallbacks::SetupContext()
   // XXX This is copied from nsSVGGlyphFrame::Render, but cairo doesn't actually
   // seem to do anything with the antialias mode.  So we can perhaps remove it,
   // or make SetAntialiasMode set cairo text antialiasing too.
-  switch (mFrame->StyleSVG()->mTextRendering) {
+  switch (mFrame->StyleText()->mTextRendering) {
   case NS_STYLE_TEXT_RENDERING_OPTIMIZESPEED:
     gfx->SetAntialiasMode(AntialiasMode::NONE);
     break;
@@ -3023,7 +3023,7 @@ SVGTextDrawPathCallbacks::StrokeGeometry()
                                           /*aContextPaint*/ nullptr);
         DrawOptions drawOptions;
         drawOptions.mAntialiasMode =
-          nsSVGUtils::ToAntialiasMode(mFrame->StyleSVG()->mTextRendering);
+          nsSVGUtils::ToAntialiasMode(mFrame->StyleText()->mTextRendering);
         gfx->GetDrawTarget()->Stroke(path, strokePattern, strokeOptions);
       }
     }
@@ -3209,7 +3209,7 @@ nsDisplaySVGText::Paint(nsDisplayListBuilder* aBuilder,
 
 NS_QUERYFRAME_HEAD(SVGTextFrame)
   NS_QUERYFRAME_ENTRY(SVGTextFrame)
-NS_QUERYFRAME_TAIL_INHERITING(SVGTextFrameBase)
+NS_QUERYFRAME_TAIL_INHERITING(nsSVGDisplayContainerFrame)
 
 // ---------------------------------------------------------------------
 // Implementation
@@ -3232,7 +3232,7 @@ SVGTextFrame::Init(nsIContent*       aContent,
 {
   NS_ASSERTION(aContent->IsSVGElement(nsGkAtoms::text), "Content is not an SVG text");
 
-  SVGTextFrameBase::Init(aContent, aParent, aPrevInFlow);
+  nsSVGDisplayContainerFrame::Init(aContent, aParent, aPrevInFlow);
   AddStateBits((aParent->GetStateBits() & NS_STATE_SVG_CLIPPATH_CHILD) |
                NS_FRAME_SVG_LAYOUT | NS_FRAME_IS_SVG_TEXT);
 
@@ -3248,6 +3248,10 @@ SVGTextFrame::BuildDisplayList(nsDisplayListBuilder* aBuilder,
     // We can sometimes be asked to paint before reflow happens and we
     // have updated mPositions, etc.  In this case, we just avoid
     // painting.
+    return;
+  }
+  if (!IsVisibleForPainting(aBuilder) &&
+      aBuilder->IsForPainting()) {
     return;
   }
   aLists.Content()->AppendNewToTop(
@@ -3732,10 +3736,10 @@ SVGTextFrame::PaintSVG(gfxContext& aContext,
 
     SVGTextContextPaint contextPaint;
     DrawMode drawMode =
-      SetupContextPaint(&aDrawTarget, aContext.CurrentMatrix(),
-                        frame, outerContextPaint, &contextPaint);
+      nsSVGUtils::SetupContextPaint(&aDrawTarget, aContext.CurrentMatrix(),
+                                    frame, outerContextPaint, &contextPaint);
 
-    if (int(drawMode) & int(DrawMode::GLYPH_STROKE)) {
+    if (drawMode & DrawMode::GLYPH_STROKE) {
       // This may change the gfxContext's transform (for non-scaling stroke),
       // in which case this needs to happen before we call SetMatrix() below.
       nsSVGUtils::SetupCairoStrokeGeometry(frame, &aContext, outerContextPaint);
@@ -3749,18 +3753,20 @@ SVGTextFrame::PaintSVG(gfxContext& aContext,
     aContext.SetMatrix(runTransform);
 
     if (drawMode != DrawMode(0)) {
-      LayoutDeviceRect frameRect = LayoutDevicePixel::
-        FromAppUnits(frame->GetVisualOverflowRect(), auPerDevPx);
       bool paintSVGGlyphs;
+      nsTextFrame::PaintTextParams params(rendCtx.ThebesContext());
+      params.framePt = gfxPoint();
+      params.dirtyRect = LayoutDevicePixel::
+        FromAppUnits(frame->GetVisualOverflowRect(), auPerDevPx);
+      params.contextPaint = &contextPaint;
       if (ShouldRenderAsPath(frame, paintSVGGlyphs)) {
         SVGTextDrawPathCallbacks callbacks(&rendCtx, frame,
                                            matrixForPaintServers,
                                            paintSVGGlyphs);
-        frame->PaintText(&rendCtx, nsPoint(), frameRect, item,
-                         &contextPaint, &callbacks);
+        params.callbacks = &callbacks;
+        frame->PaintText(params, item);
       } else {
-        frame->PaintText(&rendCtx, nsPoint(), frameRect, item,
-                         &contextPaint, nullptr);
+        frame->PaintText(params, item);
       }
     }
 
@@ -3920,7 +3926,7 @@ SVGTextFrame::ReflowSVG()
   // XXX nsSVGContainerFrame::ReflowSVG only looks at its nsISVGChildFrame
   // children, and calls ConsiderChildOverflow on them.  Does it matter
   // that ConsiderChildOverflow won't be called on our children?
-  SVGTextFrameBase::ReflowSVG();
+  nsSVGDisplayContainerFrame::ReflowSVG();
 }
 
 /**
@@ -4903,7 +4909,7 @@ SVGTextFrame::GetTextPathPathElement(nsIFrame* aTextPathFrame)
     nsCOMPtr<nsIURI> targetURI;
     nsCOMPtr<nsIURI> base = content->GetBaseURI();
     nsContentUtils::NewURIWithDocumentCharset(getter_AddRefs(targetURI), href,
-                                              content->GetCurrentDoc(), base);
+                                              content->GetUncomposedDoc(), base);
 
     property = nsSVGEffects::GetTextPathProperty(targetURI, aTextPathFrame,
                                                  nsSVGEffects::HrefProperty());
@@ -5420,7 +5426,7 @@ SVGTextFrame::UpdateFontSizeScaleFactor()
     if (!geometricPrecision) {
       // Unfortunately we can't treat text-rendering:geometricPrecision
       // separately for each text frame.
-      geometricPrecision = f->StyleSVG()->mTextRendering ==
+      geometricPrecision = f->StyleText()->mTextRendering ==
                              NS_STYLE_TEXT_RENDERING_GEOMETRICPRECISION;
     }
     nscoord size = f->StyleFont()->mFont.size;
@@ -5716,109 +5722,3 @@ SVGTextFrame::TransformFrameRectFromTextChild(const nsRect& aRect,
   return result - framePosition;
 }
 
-/**
- * Stores in |aTargetPaint| information on how to reconstruct the current
- * fill or stroke pattern. Will also set the paint opacity to transparent if
- * the paint is set to "none".
- * @param aOuterContextPaint pattern information from the outer text context
- * @param aTargetPaint where to store the current pattern information
- * @param aFillOrStroke member pointer to the paint we are setting up
- * @param aProperty the frame property descriptor of the fill or stroke paint
- *   server frame
- */
-static void
-SetupInheritablePaint(const DrawTarget* aDrawTarget,
-                      const gfxMatrix& aContextMatrix,
-                      nsIFrame* aFrame,
-                      float& aOpacity,
-                      gfxTextContextPaint* aOuterContextPaint,
-                      SVGTextContextPaint::Paint& aTargetPaint,
-                      nsStyleSVGPaint nsStyleSVG::*aFillOrStroke,
-                      nsSVGEffects::ObserverPropertyDescriptor aProperty)
-{
-  const nsStyleSVG *style = aFrame->StyleSVG();
-  nsSVGPaintServerFrame *ps =
-    nsSVGEffects::GetPaintServer(aFrame, &(style->*aFillOrStroke), aProperty);
-
-  if (ps) {
-    RefPtr<gfxPattern> pattern =
-      ps->GetPaintServerPattern(aFrame, aDrawTarget, aContextMatrix,
-                                aFillOrStroke, aOpacity);
-    if (pattern) {
-      aTargetPaint.SetPaintServer(aFrame, aContextMatrix, ps);
-      return;
-    }
-  }
-  if (aOuterContextPaint) {
-    RefPtr<gfxPattern> pattern;
-    switch ((style->*aFillOrStroke).mType) {
-    case eStyleSVGPaintType_ContextFill:
-      pattern = aOuterContextPaint->GetFillPattern(aDrawTarget, aOpacity,
-                                                   aContextMatrix);
-      break;
-    case eStyleSVGPaintType_ContextStroke:
-      pattern = aOuterContextPaint->GetStrokePattern(aDrawTarget, aOpacity,
-                                                     aContextMatrix);
-      break;
-    default:
-      ;
-    }
-    if (pattern) {
-      aTargetPaint.SetContextPaint(aOuterContextPaint, (style->*aFillOrStroke).mType);
-      return;
-    }
-  }
-  nscolor color =
-    nsSVGUtils::GetFallbackOrPaintColor(aFrame->StyleContext(), aFillOrStroke);
-  aTargetPaint.SetColor(color);
-}
-
-DrawMode
-SVGTextFrame::SetupContextPaint(const DrawTarget* aDrawTarget,
-                                const gfxMatrix& aContextMatrix,
-                                nsIFrame* aFrame,
-                                gfxTextContextPaint* aOuterContextPaint,
-                                SVGTextContextPaint* aThisContextPaint)
-{
-  DrawMode toDraw = DrawMode(0);
-
-  const nsStyleSVG *style = aFrame->StyleSVG();
-
-  // fill:
-  if (style->mFill.mType == eStyleSVGPaintType_None) {
-    aThisContextPaint->SetFillOpacity(0.0f);
-  } else {
-    float opacity = nsSVGUtils::GetOpacity(style->mFillOpacitySource,
-                                           style->mFillOpacity,
-                                           aOuterContextPaint);
-
-    SetupInheritablePaint(aDrawTarget, aContextMatrix, aFrame,
-                          opacity, aOuterContextPaint,
-                          aThisContextPaint->mFillPaint, &nsStyleSVG::mFill,
-                          nsSVGEffects::FillProperty());
-
-    aThisContextPaint->SetFillOpacity(opacity);
-
-    toDraw = DrawMode(int(toDraw) | int(DrawMode::GLYPH_FILL));
-  }
-
-  // stroke:
-  if (style->mStroke.mType == eStyleSVGPaintType_None) {
-    aThisContextPaint->SetStrokeOpacity(0.0f);
-  } else {
-    float opacity = nsSVGUtils::GetOpacity(style->mStrokeOpacitySource,
-                                           style->mStrokeOpacity,
-                                           aOuterContextPaint);
-
-    SetupInheritablePaint(aDrawTarget, aContextMatrix, aFrame,
-                          opacity, aOuterContextPaint,
-                          aThisContextPaint->mStrokePaint, &nsStyleSVG::mStroke,
-                          nsSVGEffects::StrokeProperty());
-
-    aThisContextPaint->SetStrokeOpacity(opacity);
-
-    toDraw = DrawMode(int(toDraw) | int(DrawMode::GLYPH_STROKE));
-  }
-
-  return toDraw;
-}

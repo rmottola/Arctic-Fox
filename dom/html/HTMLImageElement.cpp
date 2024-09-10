@@ -77,7 +77,7 @@ namespace dom {
 // Calls LoadSelectedImage on host element unless it has been superseded or
 // canceled -- this is the synchronous section of "update the image data".
 // https://html.spec.whatwg.org/multipage/embedded-content.html#update-the-image-data
-class ImageLoadTask : public nsRunnable
+class ImageLoadTask : public Runnable
 {
 public:
   ImageLoadTask(HTMLImageElement *aElement, bool aAlwaysLoad)
@@ -484,7 +484,7 @@ HTMLImageElement::IsHTMLFocusable(bool aWithMouse,
 {
   int32_t tabIndex = TabIndex();
 
-  if (IsInDoc()) {
+  if (IsInUncomposedDoc()) {
     nsAutoString usemap;
     GetUseMap(usemap);
     // XXXbz which document should this be using?  sXBL/XBL2 issue!  I

@@ -7,6 +7,7 @@
 #include "mozilla/DebugOnly.h"
 #include <stdint.h> // for intptr_t
 
+#include "mozilla/BasicEvents.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Telemetry.h"
 #include "PluginInstanceParent.h"
@@ -68,10 +69,6 @@ extern const wchar_t* kFlashFullscreenClass;
 #elif defined(XP_MACOSX)
 #include <ApplicationServices/ApplicationServices.h>
 #endif // defined(XP_MACOSX)
-
-// This is the pref used to determine whether to use Shumway on a Flash object
-// (when Shumway is enabled).
-static const char kShumwayWhitelistPref[] = "shumway.swf.whitelist";
 
 using namespace mozilla::plugins;
 using namespace mozilla::layers;
@@ -137,7 +134,6 @@ PluginInstanceParent::PluginInstanceParent(PluginModuleParent* parent,
     , mUseSurrogate(true)
     , mNPP(npp)
     , mNPNIface(npniface)
-    , mIsWhitelistedForShumway(false)
     , mWindowType(NPWindowTypeWindow)
     , mDrawingModel(kDefaultDrawingModel)
     , mLastRecordedDrawingModel(-1)
@@ -155,7 +151,6 @@ PluginInstanceParent::PluginInstanceParent(PluginModuleParent* parent,
     , mShColorSpace(nullptr)
 #endif
 #if defined(XP_WIN)
-    , mCaptureRefreshTask(nullptr)
     , mValidFirstCapture(false)
     , mIsScrolling(false)
 #endif
@@ -1229,7 +1224,8 @@ PluginInstanceParent::ScheduleScrollCapture(int aTimeout)
     CAPTURE_LOG("delayed scroll capture requested.");
     mCaptureRefreshTask =
         NewRunnableMethod(this, &PluginInstanceParent::ScheduledUpdateScrollCaptureCallback);
-    MessageLoop::current()->PostDelayedTask(FROM_HERE, mCaptureRefreshTask,
+    RefPtr<Runnable> addrefedTask = mCaptureRefreshTask;
+    MessageLoop::current()->PostDelayedTask(addrefedTask.forget(),
                                             kScrollCaptureDelayMs);
 }
 
@@ -1276,7 +1272,7 @@ PluginInstanceParent::UpdateScrollCapture(bool& aRequestNewCapture)
     RECT bounds = {0};
     ::GetWindowRect(mChildPluginHWND, &bounds);
     if ((bounds.left == bounds.right && bounds.top == bounds.bottom) ||
-        (!mWindowSize.width && !mWindowSize.height)) {
+        mWindowSize.IsEmpty()) {
         CAPTURE_LOG("empty bounds");
         // Lots of null window plugins in content, don't capture.
         return false;
@@ -1302,7 +1298,7 @@ PluginInstanceParent::UpdateScrollCapture(bool& aRequestNewCapture)
     bool isVisible = ::IsWindowVisible(mChildPluginHWND);
 
     CAPTURE_LOG("validcap=%d visible=%d region=%d clip=%d:%dx%dx%dx%d",
-                mValidFirstCapture, isVisible, rgnType, clipCorrect
+                mValidFirstCapture, isVisible, rgnType, clipCorrect,
                 clip.left, clip.top, clip.right, clip.bottom);
 
     // We have a good capture and can't update so keep using the existing
@@ -1331,6 +1327,11 @@ PluginInstanceParent::UpdateScrollCapture(bool& aRequestNewCapture)
     }
 
     IntSize targetSize = mScrollCapture->GetSize();
+
+    if (targetSize.IsEmpty()) {
+        return false;
+    }
+
     RefPtr<gfx::DrawTarget> dt =
         gfxPlatform::GetPlatform()->CreateDrawTargetForSurface(mScrollCapture,
                                                                targetSize);
@@ -2659,6 +2660,33 @@ PluginInstanceParent::RecvRequestCommitOrCancel(const bool& aCommitted)
         owner->RequestCommitOrCancel(aCommitted);
     }
 #endif
+    return true;
+}
+
+nsresult
+PluginInstanceParent::HandledWindowedPluginKeyEvent(
+                        const NativeEventData& aKeyEventData,
+                        bool aIsConsumed)
+{
+    if (NS_WARN_IF(!SendHandledWindowedPluginKeyEvent(aKeyEventData,
+                                                      aIsConsumed))) {
+        return NS_ERROR_FAILURE;
+    }
+    return NS_OK;
+}
+
+bool
+PluginInstanceParent::RecvOnWindowedPluginKeyEvent(
+                        const NativeEventData& aKeyEventData)
+{
+    nsPluginInstanceOwner* owner = GetOwner();
+    if (NS_WARN_IF(!owner)) {
+        // Notifies the plugin process of the key event being not consumed
+        // by us.
+        HandledWindowedPluginKeyEvent(aKeyEventData, false);
+        return true;
+    }
+    owner->OnWindowedPluginKeyEvent(aKeyEventData);
     return true;
 }
 

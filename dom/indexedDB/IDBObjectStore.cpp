@@ -197,7 +197,7 @@ struct MOZ_STACK_CLASS GetAddInfoClosure final
 };
 
 already_AddRefed<IDBRequest>
-GenerateRequest(IDBObjectStore* aObjectStore)
+GenerateRequest(JSContext* aCx, IDBObjectStore* aObjectStore)
 {
   MOZ_ASSERT(aObjectStore);
   aObjectStore->AssertIsOnOwningThread();
@@ -205,7 +205,7 @@ GenerateRequest(IDBObjectStore* aObjectStore)
   IDBTransaction* transaction = aObjectStore->Transaction();
 
   RefPtr<IDBRequest> request =
-    IDBRequest::Create(aObjectStore, transaction->Database(), transaction);
+    IDBRequest::Create(aCx, aObjectStore, transaction->Database(), transaction);
   MOZ_ASSERT(request);
 
   return request.forget();
@@ -1402,7 +1402,7 @@ IDBObjectStore::AddOrPut(JSContext* aCx,
     params = ObjectStoreAddParams(commonParams);
   }
 
-  RefPtr<IDBRequest> request = GenerateRequest(this);
+  RefPtr<IDBRequest> request = GenerateRequest(aCx, this);
   MOZ_ASSERT(request);
 
   if (!aFromCursor) {
@@ -1481,7 +1481,7 @@ IDBObjectStore::GetAllInternal(bool aKeysOnly,
     params = ObjectStoreGetAllParams(id, optionalKeyRange, limit);
   }
 
-  RefPtr<IDBRequest> request = GenerateRequest(this);
+  RefPtr<IDBRequest> request = GenerateRequest(aCx, this);
   MOZ_ASSERT(request);
 
   if (aKeysOnly) {
@@ -1518,7 +1518,7 @@ IDBObjectStore::GetAllInternal(bool aKeysOnly,
 }
 
 already_AddRefed<IDBRequest>
-IDBObjectStore::Clear(ErrorResult& aRv)
+IDBObjectStore::Clear(JSContext* aCx, ErrorResult& aRv)
 {
   AssertIsOnOwningThread();
 
@@ -1540,7 +1540,7 @@ IDBObjectStore::Clear(ErrorResult& aRv)
   ObjectStoreClearParams params;
   params.objectStoreId() = Id();
 
-  RefPtr<IDBRequest> request = GenerateRequest(this);
+  RefPtr<IDBRequest> request = GenerateRequest(aCx, this);
   MOZ_ASSERT(request);
 
   IDB_LOG_MARK("IndexedDB %s: Child  Transaction[%lld] Request[%llu]: "
@@ -1739,7 +1739,7 @@ IDBObjectStore::Get(JSContext* aCx,
   params.objectStoreId() = Id();
   keyRange->ToSerialized(params.keyRange());
 
-  RefPtr<IDBRequest> request = GenerateRequest(this);
+  RefPtr<IDBRequest> request = GenerateRequest(aCx, this);
   MOZ_ASSERT(request);
 
   IDB_LOG_MARK("IndexedDB %s: Child  Transaction[%lld] Request[%llu]: "
@@ -1797,7 +1797,7 @@ IDBObjectStore::DeleteInternal(JSContext* aCx,
   params.objectStoreId() = Id();
   keyRange->ToSerialized(params.keyRange());
 
-  RefPtr<IDBRequest> request = GenerateRequest(this);
+  RefPtr<IDBRequest> request = GenerateRequest(aCx, this);
   MOZ_ASSERT(request);
 
   if (!aFromCursor) {
@@ -2066,7 +2066,7 @@ IDBObjectStore::Count(JSContext* aCx,
     params.optionalKeyRange() = void_t();
   }
 
-  RefPtr<IDBRequest> request = GenerateRequest(this);
+  RefPtr<IDBRequest> request = GenerateRequest(aCx, this);
   MOZ_ASSERT(request);
 
   IDB_LOG_MARK("IndexedDB %s: Child  Transaction[%lld] Request[%llu]: "
@@ -2093,7 +2093,7 @@ IDBObjectStore::OpenCursorInternal(bool aKeysOnly,
                                    ErrorResult& aRv)
 {
   AssertIsOnOwningThread();
-  MOZ_ASSERT_IF(!aCx, aRange.isUndefined());
+  MOZ_ASSERT(aCx);
 
   if (mDeletedSpec) {
     aRv.Throw(NS_ERROR_DOM_INDEXEDDB_NOT_ALLOWED_ERR);
@@ -2143,7 +2143,7 @@ IDBObjectStore::OpenCursorInternal(bool aKeysOnly,
     params = Move(openParams);
   }
 
-  RefPtr<IDBRequest> request = GenerateRequest(this);
+  RefPtr<IDBRequest> request = GenerateRequest(aCx, this);
   MOZ_ASSERT(request);
 
   if (aKeysOnly) {

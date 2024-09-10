@@ -615,9 +615,8 @@ size_t
 AudioBufferSourceNode::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
 {
   size_t amount = AudioNode::SizeOfExcludingThis(aMallocSizeOf);
-  if (mBuffer) {
-    amount += mBuffer->SizeOfIncludingThis(aMallocSizeOf);
-  }
+
+  /* mBuffer can be shared and is accounted for separately. */
 
   amount += mPlaybackRate->SizeOfIncludingThis(aMallocSizeOf);
   amount += mDetune->SizeOfIncludingThis(aMallocSizeOf);
@@ -757,7 +756,7 @@ AudioBufferSourceNode::NotifyMainThreadStreamFinished()
 {
   MOZ_ASSERT(mStream->IsFinished());
 
-  class EndedEventDispatcher final : public nsRunnable
+  class EndedEventDispatcher final : public Runnable
   {
   public:
     explicit EndedEventDispatcher(AudioBufferSourceNode* aNode)

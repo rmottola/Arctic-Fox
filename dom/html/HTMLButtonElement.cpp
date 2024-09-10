@@ -253,7 +253,7 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
       // DOMActive event should be trusted since the activation is actually
       // occurred even if the cause is an untrusted click event.
       InternalUIEvent actEvent(true, eLegacyDOMActivate, mouseEvent);
-      actEvent.detail = 1;
+      actEvent.mDetail = 1;
 
       nsCOMPtr<nsIPresShell> shell = aVisitor.mPresContext->GetPresShell();
       if (shell) {
@@ -292,7 +292,7 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
                eKeyPress == aVisitor.mEvent->mMessage) ||
               (keyEvent->keyCode == NS_VK_SPACE &&
                eKeyUp == aVisitor.mEvent->mMessage)) {
-            DispatchSimulatedClick(this, aVisitor.mEvent->mFlags.mIsTrusted,
+            DispatchSimulatedClick(this, aVisitor.mEvent->IsTrusted(),
                                    aVisitor.mPresContext);
             aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
           }
@@ -303,7 +303,7 @@ HTMLButtonElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
         {
           WidgetMouseEvent* mouseEvent = aVisitor.mEvent->AsMouseEvent();
           if (mouseEvent->button == WidgetMouseEvent::eLeftButton) {
-            if (mouseEvent->mFlags.mIsTrusted) {
+            if (mouseEvent->IsTrusted()) {
               EventStateManager* esm =
                 aVisitor.mPresContext->EventStateManager();
               EventStateManager::SetActiveManager(

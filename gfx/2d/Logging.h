@@ -131,6 +131,14 @@ enum class LogReason : int {
   InvalidRect,
   CannotDraw3D, // 20
   IncompatibleBasicTexturedEffect,
+  InvalidFont,
+  PAllocTextureBackendMismatch,
+  GetFontFileDataFailed,
+  MessageChannelCloseFailure,
+  TextureAliveAfterShutdown,
+  InvalidContext,
+  InvalidCommandList,
+  AsyncTransactionTimeout,
   // End
   MustBeLessThanThis = 101,
 };

@@ -9,9 +9,9 @@
 #ifndef LIBANGLE_RENDERER_GL_GLX_WINDOWSURFACEGLX_H_
 #define LIBANGLE_RENDERER_GL_GLX_WINDOWSURFACEGLX_H_
 
-#include "libANGLE/renderer/gl/SurfaceGL.h"
 #include "libANGLE/renderer/gl/glx/DisplayGLX.h"
 #include "libANGLE/renderer/gl/glx/platform_glx.h"
+#include "libANGLE/renderer/gl/glx/SurfaceGLX.h"
 
 namespace rx
 {
@@ -19,7 +19,7 @@ namespace rx
 class DisplayGLX;
 class FunctionsGLX;
 
-class WindowSurfaceGLX : public SurfaceGL
+class WindowSurfaceGLX : public SurfaceGLX
 {
   public:
     WindowSurfaceGLX(const FunctionsGLX &glx,
@@ -37,7 +37,7 @@ class WindowSurfaceGLX : public SurfaceGL
     egl::Error swap() override;
     egl::Error postSubBuffer(EGLint x, EGLint y, EGLint width, EGLint height) override;
     egl::Error querySurfacePointerANGLE(EGLint attribute, void **value) override;
-    egl::Error bindTexImage(EGLint buffer) override;
+    egl::Error bindTexImage(gl::Texture *texture, EGLint buffer) override;
     egl::Error releaseTexImage(EGLint buffer) override;
     void setSwapInterval(EGLint interval) override;
 
@@ -46,6 +46,8 @@ class WindowSurfaceGLX : public SurfaceGL
 
     EGLint isPostSubBufferSupported() const override;
     EGLint getSwapBehavior() const override;
+
+    egl::Error checkForResize() override;
 
   private:
     bool getWindowDimensions(Window window, unsigned int *width, unsigned int *height) const;

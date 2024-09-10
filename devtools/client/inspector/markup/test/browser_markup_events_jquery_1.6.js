@@ -1,17 +1,18 @@
 /* vim: set ts=2 et sw=2 tw=80: */
 /* Any copyright is dedicated to the Public Domain.
  http://creativecommons.org/publicdomain/zero/1.0/ */
-
+/* import-globals-from helper_events_test_runner.js */
 "use strict";
 
 // Test that markup view event bubbles show the correct event info for jQuery
 // and jQuery Live events (jQuery version 1.6).
 
 const TEST_LIB = "lib_jquery_1.6_min.js";
-const TEST_URL = TEST_URL_ROOT + "doc_markup_events_jquery.html?" + TEST_LIB;
+const TEST_URL = URL_ROOT + "doc_markup_events_jquery.html?" + TEST_LIB;
 
 loadHelperScript("helper_events_test_runner.js");
 
+/*eslint-disable */
 const TEST_DATA = [
   {
     selector: "html",
@@ -79,7 +80,7 @@ const TEST_DATA = [
       },
       {
         type: "load",
-        filename: TEST_URL_ROOT + TEST_LIB + ":16",
+        filename: URL_ROOT + TEST_LIB + ":16",
         attributes: [
           "Bubbling",
           "DOM2"
@@ -120,7 +121,7 @@ const TEST_DATA = [
       },
       {
         type: "click",
-        filename: TEST_URL_ROOT + TEST_LIB + ":16",
+        filename: URL_ROOT + TEST_LIB + ":16",
         attributes: [
           "Bubbling",
           "DOM2"
@@ -141,7 +142,7 @@ const TEST_DATA = [
       },
       {
         type: "keydown",
-        filename: TEST_URL_ROOT + TEST_LIB + ":16",
+        filename: URL_ROOT + TEST_LIB + ":16",
         attributes: [
           "Bubbling",
           "DOM2"
@@ -168,7 +169,7 @@ const TEST_DATA = [
       },
       {
         type: "dblclick",
-        filename: TEST_URL_ROOT + TEST_LIB + ":16",
+        filename: URL_ROOT + TEST_LIB + ":16",
         attributes: [
           "jQuery",
           "Live"
@@ -223,7 +224,7 @@ const TEST_DATA = [
       },
       {
         type: "dragend",
-        filename: TEST_URL_ROOT + TEST_LIB + ":16",
+        filename: URL_ROOT + TEST_LIB + ":16",
         attributes: [
           "jQuery",
           "Live"
@@ -278,7 +279,7 @@ const TEST_DATA = [
       },
       {
         type: "dragleave",
-        filename: TEST_URL_ROOT + TEST_LIB + ":16",
+        filename: URL_ROOT + TEST_LIB + ":16",
         attributes: [
           "jQuery",
           "Live"
@@ -333,7 +334,7 @@ const TEST_DATA = [
       },
       {
         type: "dragstart",
-        filename: TEST_URL_ROOT + TEST_LIB + ":16",
+        filename: URL_ROOT + TEST_LIB + ":16",
         attributes: [
           "jQuery",
           "Live"
@@ -378,5 +379,8 @@ const TEST_DATA = [
     ]
   },
 ];
+/*eslint-enable */
 
-add_task(runEventPopupTests);
+add_task(function* () {
+  yield runEventPopupTests(TEST_URL, TEST_DATA);
+});

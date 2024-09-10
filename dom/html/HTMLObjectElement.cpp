@@ -122,7 +122,7 @@ static nsIWidget* GetWidget(Element* aElement)
 
 Element* HTMLObjectElement::sLastFocused = nullptr; // Weak
 
-class PluginFocusSetter : public nsRunnable
+class PluginFocusSetter : public Runnable
 {
 public:
   PluginFocusSetter(nsIWidget* aWidget, Element* aElement)
@@ -212,7 +212,7 @@ void
 HTMLObjectElement::HandleFocusBlurPlugin(Element* aElement,
                                          WidgetEvent* aEvent)
 {
-  if (!aEvent->mFlags.mIsTrusted) {
+  if (!aEvent->IsTrusted()) {
     return;
   }
   switch (aEvent->mMessage) {

@@ -170,6 +170,7 @@ TypeUtils::ToCacheRequest(CacheRequest& aOut, InternalRequest* aIn,
   }
 
   aIn->GetReferrer(aOut.referrer());
+  aOut.referrerPolicy() = aIn->ReferrerPolicy_();
 
   RefPtr<InternalHeaders> headers = aIn->Headers();
   MOZ_ASSERT(headers);
@@ -340,6 +341,7 @@ TypeUtils::ToInternalRequest(const CacheRequest& aIn)
   internalRequest->SetURL(url);
 
   internalRequest->SetReferrer(aIn.referrer());
+  internalRequest->SetReferrerPolicy(aIn.referrerPolicy());
   internalRequest->SetMode(aIn.mode());
   internalRequest->SetCredentialsMode(aIn.credentials());
   internalRequest->SetContentPolicyType(aIn.contentPolicyType());
@@ -417,7 +419,8 @@ TypeUtils::ProcessURL(nsACString& aUrl, bool* aSchemeValidOut,
   if (aSchemeValidOut) {
     nsAutoCString scheme(Substring(flatURL, schemePos, schemeLen));
     *aSchemeValidOut = scheme.LowerCaseEqualsLiteral("http") ||
-                       scheme.LowerCaseEqualsLiteral("https");
+                       scheme.LowerCaseEqualsLiteral("https") ||
+                       scheme.LowerCaseEqualsLiteral("app");
   }
 
   uint32_t queryPos;

@@ -22,7 +22,7 @@ PbufferSurfaceGLX::PbufferSurfaceGLX(RendererGL *renderer,
                                      const FunctionsGLX &glx,
                                      glx::Context context,
                                      glx::FBConfig fbConfig)
-    : SurfaceGL(renderer),
+    : SurfaceGLX(renderer),
       mWidth(width),
       mHeight(height),
       mLargest(largest),
@@ -97,7 +97,7 @@ egl::Error PbufferSurfaceGLX::querySurfacePointerANGLE(EGLint attribute, void **
     return egl::Error(EGL_SUCCESS);
 }
 
-egl::Error PbufferSurfaceGLX::bindTexImage(EGLint buffer)
+egl::Error PbufferSurfaceGLX::bindTexImage(gl::Texture *texture, EGLint buffer)
 {
     UNIMPLEMENTED();
     return egl::Error(EGL_SUCCESS);
@@ -134,4 +134,9 @@ EGLint PbufferSurfaceGLX::getSwapBehavior() const
     return EGL_BUFFER_PRESERVED;
 }
 
+egl::Error PbufferSurfaceGLX::checkForResize()
+{
+    // The size of pbuffers never change
+    return egl::Error(EGL_SUCCESS);
+}
 }

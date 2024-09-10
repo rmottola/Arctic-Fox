@@ -6,7 +6,6 @@
 <script src="/resources/testharness.js"></script>
 <script src="/resources/testharnessreport.js"></script>
 <script src="../testcommon.js"></script>
-<link rel="stylesheet" href="/resources/testharness.css">
 <body>
 <div id="log"></div>
 <div id="target"></div>
@@ -55,6 +54,20 @@ gTestArguments.forEach(function(args) {
                   "Animation.playState should be initially 'idle'");
   }, "Animation can be constructed " + args.description);
 });
+
+test(function(t) {
+  var effect = new KeyframeEffectReadOnly(null,
+                                          { left: ["10px", "20px"] },
+                                          { duration: 10000,
+                                            fill: "forwards" });
+  var anim = new Animation(effect, document.timeline);
+  anim.pause();
+  assert_equals(effect.getComputedTiming().progress, 0.0);
+  anim.currentTime += 5000;
+  assert_equals(effect.getComputedTiming().progress, 0.5);
+  anim.finish();
+  assert_equals(effect.getComputedTiming().progress, 1.0);
+}, "Animation constructed by an effect with null target runs normally");
 
 </script>
 </body>

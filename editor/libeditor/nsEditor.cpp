@@ -177,11 +177,13 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsEditor)
  NS_IMPL_CYCLE_COLLECTION_UNLINK(mDocStateListeners)
  NS_IMPL_CYCLE_COLLECTION_UNLINK(mEventTarget)
  NS_IMPL_CYCLE_COLLECTION_UNLINK(mEventListener)
+ NS_IMPL_CYCLE_COLLECTION_UNLINK(mSavedSel);
+ NS_IMPL_CYCLE_COLLECTION_UNLINK(mRangeUpdater);
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsEditor)
  nsIDocument* currentDoc =
-   tmp->mRootElement ? tmp->mRootElement->GetCurrentDoc() : nullptr;
+   tmp->mRootElement ? tmp->mRootElement->GetUncomposedDoc() : nullptr;
  if (currentDoc &&
      nsCCUncollectableMarker::InGeneration(cb, currentDoc->GetMarkedCCGeneration())) {
    return NS_SUCCESS_INTERRUPTED_TRAVERSE;
@@ -195,6 +197,8 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsEditor)
  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDocStateListeners)
  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mEventTarget)
  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mEventListener)
+ NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mSavedSel);
+ NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mRangeUpdater);
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsEditor)
@@ -420,7 +424,7 @@ nsEditor::GetDesiredSpellCheckState()
     // Some of the page content might be editable and some not, if spellcheck=
     // is explicitly set anywhere, so if there's anything editable on the page,
     // return true and let the spellchecker figure it out.
-    nsCOMPtr<nsIHTMLDocument> doc = do_QueryInterface(content->GetCurrentDoc());
+    nsCOMPtr<nsIHTMLDocument> doc = do_QueryInterface(content->GetUncomposedDoc());
     return doc && doc->IsEditingOn();
   }
 
@@ -1198,7 +1202,7 @@ nsEditor::SetAttribute(nsIDOMElement* aElement, const nsAString& aAttribute,
 {
   nsCOMPtr<Element> element = do_QueryInterface(aElement);
   NS_ENSURE_TRUE(element, NS_ERROR_NULL_POINTER);
-  nsCOMPtr<nsIAtom> attribute = do_GetAtom(aAttribute);
+  nsCOMPtr<nsIAtom> attribute = NS_Atomize(aAttribute);
 
   RefPtr<ChangeAttributeTxn> txn =
     CreateTxnForSetAttribute(*element, *attribute, aValue);
@@ -1231,7 +1235,7 @@ nsEditor::RemoveAttribute(nsIDOMElement* aElement, const nsAString& aAttribute)
 {
   nsCOMPtr<Element> element = do_QueryInterface(aElement);
   NS_ENSURE_TRUE(element, NS_ERROR_NULL_POINTER);
-  nsCOMPtr<nsIAtom> attribute = do_GetAtom(aAttribute);
+  nsCOMPtr<nsIAtom> attribute = NS_Atomize(aAttribute);
 
   RefPtr<ChangeAttributeTxn> txn =
     CreateTxnForRemoveAttribute(*element, *attribute);
@@ -1332,7 +1336,7 @@ nsEditor::CreateNode(const nsAString& aTag,
                      int32_t aPosition,
                      nsIDOMNode** aNewNode)
 {
-  nsCOMPtr<nsIAtom> tag = do_GetAtom(aTag);
+  nsCOMPtr<nsIAtom> tag = NS_Atomize(aTag);
   nsCOMPtr<nsINode> parent = do_QueryInterface(aParent);
   NS_ENSURE_STATE(parent);
   *aNewNode = GetAsDOMNode(CreateNode(tag, parent, aPosition).take());
@@ -1751,7 +1755,7 @@ nsEditor::RemoveEditorObserver(nsIEditorObserver *aObserver)
   return NS_OK;
 }
 
-class EditorInputEventDispatcher : public nsRunnable
+class EditorInputEventDispatcher : public Runnable
 {
 public:
   EditorInputEventDispatcher(nsEditor* aEditor,
@@ -1785,7 +1789,7 @@ public:
     // Even if the change is caused by untrusted event, we need to dispatch
     // trusted input event since it's a fact.
     InternalEditorInputEvent inputEvent(true, eEditorInput, widget);
-    inputEvent.time = static_cast<uint64_t>(PR_Now() / 1000);
+    inputEvent.mTime = static_cast<uint64_t>(PR_Now() / 1000);
     inputEvent.mIsComposing = mIsComposing;
     nsEventStatus status = nsEventStatus_eIgnore;
     nsresult rv =
@@ -2976,8 +2980,7 @@ nsEditor::GetNodeLocation(nsIDOMNode* aChild, int32_t* outOffset)
 
   nsCOMPtr<nsIDOMNode> parent;
 
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-    aChild->GetParentNode(getter_AddRefs(parent))));
+  MOZ_ALWAYS_SUCCEEDS(aChild->GetParentNode(getter_AddRefs(parent)));
   if (parent) {
     *outOffset = GetChildOffset(aChild, parent);
   }
@@ -3256,13 +3259,6 @@ nsEditor::GetLeftmostChild(nsINode *aCurrentNode,
 }
 
 bool
-nsEditor::IsBlockNode(nsIDOMNode* aNode)
-{
-  nsCOMPtr<nsINode> node = do_QueryInterface(aNode);
-  return IsBlockNode(node);
-}
-
-bool
 nsEditor::IsBlockNode(nsINode* aNode)
 {
   // stub to be overridden in nsHTMLEditor.
@@ -3355,13 +3351,6 @@ nsEditor::IsDescendantOfRoot(nsINode* inNode)
   NS_ENSURE_TRUE(root, false);
 
   return nsContentUtils::ContentIsDescendantOf(inNode, root);
-}
-
-bool
-nsEditor::IsDescendantOfEditorRoot(nsIDOMNode* aNode)
-{
-  nsCOMPtr<nsINode> node = do_QueryInterface(aNode);
-  return IsDescendantOfEditorRoot(node);
 }
 
 bool
@@ -3658,13 +3647,15 @@ nsEditor::GetChildAt(nsIDOMNode *aParent, int32_t aOffset)
 // assuming that aParentOrNode is the node itself if it's a text node, or
 // the node's parent otherwise.
 //
-nsCOMPtr<nsIDOMNode>
+nsIContent*
 nsEditor::GetNodeAtRangeOffsetPoint(nsIDOMNode* aParentOrNode, int32_t aOffset)
 {
-  if (IsTextNode(aParentOrNode)) {
-    return aParentOrNode;
+  nsCOMPtr<nsINode> parentOrNode = do_QueryInterface(aParentOrNode);
+  NS_ENSURE_TRUE(parentOrNode || !aParentOrNode, nullptr);
+  if (parentOrNode->GetAsText()) {
+    return parentOrNode->AsContent();
   }
-  return GetChildAt(aParentOrNode, aOffset);
+  return parentOrNode->GetChildAt(aOffset);
 }
 
 
@@ -3681,7 +3672,9 @@ nsEditor::GetStartNodeAndOffset(Selection* aSelection,
   nsCOMPtr<nsINode> startNode;
   nsresult rv = GetStartNodeAndOffset(aSelection, getter_AddRefs(startNode),
                                       outStartOffset);
-  NS_ENSURE_SUCCESS(rv, rv);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
 
   if (startNode) {
     NS_ADDREF(*outStartNode = startNode->AsDOMNode());
@@ -3702,7 +3695,9 @@ nsEditor::GetStartNodeAndOffset(Selection* aSelection, nsINode** aStartNode,
   *aStartNode = nullptr;
   *aStartOffset = 0;
 
-  NS_ENSURE_TRUE(aSelection->RangeCount(), NS_ERROR_FAILURE);
+  if (!aSelection->RangeCount()) {
+    return NS_ERROR_FAILURE;
+  }
 
   const nsRange* range = aSelection->GetRangeAt(0);
   NS_ENSURE_TRUE(range, NS_ERROR_FAILURE);
@@ -4150,8 +4145,7 @@ void
 nsEditor::DoAfterDoTransaction(nsITransaction *aTxn)
 {
   bool isTransientTransaction;
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-    aTxn->GetIsTransient(&isTransientTransaction)));
+  MOZ_ALWAYS_SUCCEEDS(aTxn->GetIsTransient(&isTransientTransaction));
 
   if (!isTransientTransaction)
   {
@@ -4165,8 +4159,7 @@ nsEditor::DoAfterDoTransaction(nsITransaction *aTxn)
       modCount = -modCount;
 
     // don't count transient transactions
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-      IncrementModificationCount(1)));
+    MOZ_ALWAYS_SUCCEEDS(IncrementModificationCount(1));
   }
 }
 
@@ -4175,16 +4168,14 @@ void
 nsEditor::DoAfterUndoTransaction()
 {
   // all undoable transactions are non-transient
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-    IncrementModificationCount(-1)));
+  MOZ_ALWAYS_SUCCEEDS(IncrementModificationCount(-1));
 }
 
 void
 nsEditor::DoAfterRedoTransaction()
 {
   // all redoable transactions are non-transient
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-    IncrementModificationCount(1)));
+  MOZ_ALWAYS_SUCCEEDS(IncrementModificationCount(1));
 }
 
 already_AddRefed<ChangeAttributeTxn>
@@ -5099,12 +5090,12 @@ nsEditor::IsAcceptableInputEvent(nsIDOMEvent* aEvent)
       break;
   }
   if (needsWidget &&
-      (!widgetGUIEvent || !widgetGUIEvent->widget)) {
+      (!widgetGUIEvent || !widgetGUIEvent->mWidget)) {
     return false;
   }
 
   // Accept all trusted events.
-  if (widgetEvent->mFlags.mIsTrusted) {
+  if (widgetEvent->IsTrusted()) {
     return true;
   }
 

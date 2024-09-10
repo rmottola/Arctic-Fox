@@ -286,17 +286,17 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
 
     template <typename T>
     void storeUnboxedValue(ConstantOrRegister value, MIRType valueType, const T& dest, MIRType slotType) {
-        if (valueType == MIRType_Double) {
+        if (valueType == MIRType::Double) {
             storeDouble(value.reg().typedReg().fpu(), dest);
             return;
         }
 
         // For known integers and booleans, we can just store the unboxed value if
         // the slot has the same type.
-        if ((valueType == MIRType_Int32 || valueType == MIRType_Boolean) && slotType == valueType) {
+        if ((valueType == MIRType::Int32 || valueType == MIRType::Boolean) && slotType == valueType) {
             if (value.constant()) {
                 Value val = value.value();
-                if (valueType == MIRType_Int32)
+                if (valueType == MIRType::Int32)
                     store32(Imm32(val.toInt32()), dest);
                 else
                     store32(Imm32(val.toBoolean() ? 1 : 0), dest);
@@ -1030,6 +1030,12 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
     }
     void cmp32(Register a, Register b) {
         Cmp(ARMRegister(a, 32), Operand(ARMRegister(b, 32)));
+    }
+    void cmp32(const Address& lhs, Imm32 rhs) {
+        cmp32(Operand(lhs.base, lhs.offset), rhs);
+    }
+    void cmp32(const Address& lhs, Register rhs) {
+        cmp32(Operand(lhs.base, lhs.offset), rhs);
     }
     void cmp32(const Operand& lhs, Imm32 rhs) {
         vixl::UseScratchRegisterScope temps(this);
@@ -1836,7 +1842,7 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
             MOZ_ASSERT(scratch64.asUnsized() != address.base);
             Ldr(scratch64, toMemOperand(address));
             int32OrDouble(scratch64.asUnsized(), ARMFPRegister(dest.fpu(), 64));
-        } else if (type == MIRType_Int32 || type == MIRType_Boolean) {
+        } else if (type == MIRType::Int32 || type == MIRType::Boolean) {
             load32(address, dest.gpr());
         } else {
             loadPtr(address, dest.gpr());
@@ -1852,7 +1858,7 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
             MOZ_ASSERT(scratch64.asUnsized() != address.index);
             doBaseIndex(scratch64, address, vixl::LDR_x);
             int32OrDouble(scratch64.asUnsized(), ARMFPRegister(dest.fpu(), 64));
-        }  else if (type == MIRType_Int32 || type == MIRType_Boolean) {
+        }  else if (type == MIRType::Int32 || type == MIRType::Boolean) {
             load32(address, dest.gpr());
         } else {
             loadPtr(address, dest.gpr());
@@ -1914,15 +1920,6 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
                                 uint8_t* globalData, unsigned globalDataOffset)
     {
         MOZ_CRASH("patchAsmJSGlobalAccess");
-    }
-
-    void memIntToValue(const Address& src, const Address& dest) {
-        vixl::UseScratchRegisterScope temps(this);
-        const Register scratch = temps.AcquireX().asUnsized();
-        MOZ_ASSERT(scratch != src.base);
-        MOZ_ASSERT(scratch != dest.base);
-        load32(src, scratch);
-        storeValue(JSVAL_TYPE_INT32, scratch, dest);
     }
 
     void profilerEnterFrame(Register framePtr, Register scratch) {

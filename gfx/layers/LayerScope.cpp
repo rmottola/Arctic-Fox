@@ -342,7 +342,7 @@ public:
     }
 private:
     friend class CreateServerSocketRunnable;
-    class CreateServerSocketRunnable : public nsRunnable
+    class CreateServerSocketRunnable : public Runnable
     {
     public:
         explicit CreateServerSocketRunnable(LayerScopeManager *aLayerScopeManager)
@@ -1023,7 +1023,7 @@ SenderHelper::SendLayer(LayerComposite* aLayer,
             Compositor* comp = compHost->GetCompositor();
             // Send EffectChain only for CompositorOGL
             if (LayersBackend::LAYERS_OPENGL == comp->GetBackendType()) {
-                CompositorOGL* compOGL = static_cast<CompositorOGL*>(comp);
+                CompositorOGL* compOGL = comp->AsCompositorOGL();
                 EffectChain effect;
                 // Generate primary effect (lock and gen)
                 AutoLockCompositableHost lock(compHost);

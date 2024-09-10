@@ -113,13 +113,11 @@ void
 SdpFmtpAttributeList::Serialize(std::ostream& os) const
 {
   for (auto i = mFmtps.begin(); i != mFmtps.end(); ++i) {
-    os << "a=" << mType << ":" << i->format << " ";
     if (i->parameters) {
+      os << "a=" << mType << ":" << i->format << " ";
       i->parameters->Serialize(os);
-    } else {
-      os << i->parameters_string;
+      os << CRLF;
     }
-    os << CRLF;
   }
 }
 
@@ -1127,11 +1125,8 @@ void
 SdpSctpmapAttributeList::Serialize(std::ostream& os) const
 {
   for (auto i = mSctpmaps.begin(); i != mSctpmaps.end(); ++i) {
-    os << "a=" << mType << ":" << i->pt << " " << i->name;
-    if (i->streams) {
-      os << " " << i->streams;
-    }
-    os << CRLF;
+    os << "a=" << mType << ":" << i->pt << " " << i->name << " " << i->streams
+      << CRLF;
   }
 }
 

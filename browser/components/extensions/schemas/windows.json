@@ -88,7 +88,6 @@
             "description": "The state of this browser window."
           },
           "alwaysOnTop": {
-            "unsupported": true,
             "type": "boolean",
             "description": "Whether the window is set to be always on top."
           },
@@ -335,13 +334,11 @@
                 "description": "Whether the new window should be an incognito window."
               },
               "type": {
-                "unsupported": true,
                 "$ref": "CreateType",
                 "optional": true,
                 "description": "Specifies what type of browser window to create. The 'panel' and 'detached_panel' types create a popup unless the '--enable-panels' flag is set."
               },
               "state": {
-                "unsupported": true,
                 "$ref": "WindowState",
                 "optional": true,
                 "description": "The initial state of the window. The 'minimized', 'maximized' and 'fullscreen' states cannot be combined with 'left', 'top', 'width' or 'height'."
@@ -380,26 +377,22 @@
             "name": "updateInfo",
             "properties": {
               "left": {
-                "unsupported": true,
                 "type": "integer",
                 "optional": true,
                 "description": "The offset from the left edge of the screen to move the window to in pixels. This value is ignored for panels."
               },
               "top": {
-                "unsupported": true,
                 "type": "integer",
                 "optional": true,
                 "description": "The offset from the top edge of the screen to move the window to in pixels. This value is ignored for panels."
               },
               "width": {
-                "unsupported": true,
                 "type": "integer",
                 "minimum": 0,
                 "optional": true,
                 "description": "The width to resize the window to in pixels. This value is ignored for panels."
               },
               "height": {
-                "unsupported": true,
                 "type": "integer",
                 "minimum": 0,
                 "optional": true,
@@ -411,13 +404,11 @@
                 "description": "If true, brings the window to the front. If false, brings the next window in the z-order to the front."
               },
               "drawAttention": {
-                "unsupported": true,
                 "type": "boolean",
                 "optional": true,
                 "description": "If true, causes the window to be displayed in a manner that draws the user's attention to the window, without changing the focused window. The effect lasts until the user changes focus to the window. This option has no effect if the window already has focus. Set to false to cancel a previous draw attention request."
               },
               "state": {
-                "unsupported": true,
                 "$ref": "WindowState",
                 "optional": true,
                 "description": "The new state of the window. The 'minimized', 'maximized' and 'fullscreen' states cannot be combined with 'left', 'top', 'width' or 'height'."

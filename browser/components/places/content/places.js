@@ -6,13 +6,16 @@
 Components.utils.import("resource://gre/modules/AppConstants.jsm");
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/TelemetryStopwatch.jsm");
-Components.utils.import("resource:///modules/MigrationUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "MigrationUtils",
+                                  "resource:///modules/MigrationUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "BookmarkJSONUtils",
                                   "resource://gre/modules/BookmarkJSONUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesBackups",
                                   "resource://gre/modules/PlacesBackups.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "DownloadUtils",
+                                  "resource://gre/modules/DownloadUtils.jsm");
 
 const RESTORE_FILEPICKER_FILTER_EXT = "*.json;*.jsonlz4";
 const HISTORY_LIBRARY_SEARCH_TELEMETRY = "PLACES_HISTORY_LIBRARY_SEARCH_TIME_MS";
@@ -139,7 +142,7 @@ var PlacesOrganizer = {
         aIID.equals(Components.interfaces.nsISupports))
       return this;
 
-    throw new Components.Exception("", Components.results.NS_NOINTERFACE);
+    throw Components.results.NS_NOINTERFACE;
   },
 
   handleEvent: function PO_handleEvent(aEvent) {
@@ -329,10 +332,13 @@ var PlacesOrganizer = {
   },
 
   openFlatContainer: function PO_openFlatContainerFlatContainer(aContainer) {
-    if (aContainer.itemId != -1)
+    if (aContainer.itemId != -1) {
+      PlacesUtils.asContainer(this._places.selectedNode).containerOpen = true;
       this._places.selectItems([aContainer.itemId], false);
-    else if (PlacesUtils.nodeIsQuery(aContainer))
+    }
+    else if (PlacesUtils.nodeIsQuery(aContainer)) {
       this._places.selectPlaceURI(aContainer.uri);
+    }
   },
 
   /**
@@ -1243,8 +1249,7 @@ var ViewMenu = {
 
     // Make sure we have a valid column.
     if (!colLookupTable.hasOwnProperty(columnId))
-      throw new Components.Exception("Invalid column",
-                                     Components.results.NS_ERROR_INVALID_ARG);
+      throw("Invalid column");
 
     // Use a default sort direction if none has been specified.  If aDirection
     // is invalid, result.sortingMode will be undefined, which has the effect
@@ -1310,8 +1315,7 @@ var ContentArea = {
   function CA_setContentViewForQueryString(aQueryString, aView, aOptions) {
     if (!aQueryString ||
         typeof aView != "object" && typeof aView != "function")
-      throw new Components.Exception("Invalid arguments",
-                                     Components.results.NS_ERROR_INVALID_ARG);
+      throw new Error("Invalid arguments");
 
     this._specialViews.set(aQueryString, { view: aView,
                                            options: aOptions || new Object() });

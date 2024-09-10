@@ -59,11 +59,11 @@ public:
   virtual bool IsForApp() const = 0;
   virtual bool IsForBrowser() const = 0;
 
-  MOZ_WARN_UNUSED_RESULT virtual PBlobParent*
+  MOZ_MUST_USE virtual PBlobParent*
   SendPBlobConstructor(PBlobParent* aActor,
                        const BlobConstructorParams& aParams) = 0;
 
-  MOZ_WARN_UNUSED_RESULT virtual PBrowserParent*
+  MOZ_MUST_USE virtual PBrowserParent*
   SendPBrowserConstructor(PBrowserParent* actor,
                           const TabId& aTabId,
                           const IPCTabContext& context,
@@ -110,9 +110,9 @@ protected: // IPDL methods
                               const IPC::Principal& aPrincipal,
                               nsTArray<ipc::StructuredCloneData>* aRetvals);
   virtual bool RecvAsyncMessage(const nsString& aMsg,
-                                const ClonedMessageData& aData,
                                 InfallibleTArray<jsipc::CpowEntry>&& aCpows,
-                                const IPC::Principal& aPrincipal);
+                                const IPC::Principal& aPrincipal,
+                                const ClonedMessageData& aData);
 
 protected: // members
   RefPtr<nsFrameMessageManager> mMessageManager;

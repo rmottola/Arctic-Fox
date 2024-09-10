@@ -224,7 +224,6 @@ pref("dom.use_watchdog", false);
 // ensure that those calls don't accidentally trigger the dialog.
 pref("dom.max_script_run_time", 0);
 pref("dom.max_chrome_script_run_time", 0);
-pref("dom.max_child_script_run_time", 0);
 
 // plugins
 pref("plugin.disable", true);
@@ -296,7 +295,6 @@ pref("ui.dragThresholdY", 25);
 
 // Layers Acceleration.  We can only have nice things on gonk, because
 // they're not maintained anywhere else.
-pref("layers.offmainthreadcomposition.enabled", true);
 pref("layers.offmainthreadcomposition.async-animations", true);
 #ifndef MOZ_WIDGET_GONK
 pref("dom.ipc.tabs.disabled", true);
@@ -859,8 +857,8 @@ pref("memory.system_memory_reporter", true);
 // Don't dump memory reports on OOM, by default.
 pref("memory.dump_reports_on_oom", false);
 
-pref("layout.imagevisibility.numscrollportwidths", 1);
-pref("layout.imagevisibility.numscrollportheights", 1);
+pref("layout.framevisibility.numscrollportwidths", 1);
+pref("layout.framevisibility.numscrollportheights", 1);
 
 // Enable native identity (persona/browserid)
 pref("dom.identity.enabled", true);
@@ -915,13 +913,6 @@ pref("network.sntp.pools", // Servers separated by ';'.
      "0.pool.ntp.org;1.pool.ntp.org;2.pool.ntp.org;3.pool.ntp.org");
 pref("network.sntp.port", 123);
 pref("network.sntp.timeout", 30); // In seconds.
-
-// Enable dataStore
-pref("dom.datastore.enabled", true);
-// When an entry is changed, use two timers to fire system messages in a more
-// moderate pattern.
-pref("dom.datastore.sysMsgOnChangeShortTimeoutSec", 10);
-pref("dom.datastore.sysMsgOnChangeLongTimeoutSec", 60);
 
 // DOM Inter-App Communication API.
 pref("dom.inter-app-communication-api.enabled", true);
@@ -1045,6 +1036,12 @@ pref("layout.accessiblecaret.enabled", true);
 pref("layout.accessiblecaret.use_long_tap_injector", false);
 #endif
 
+// The active caret is disallow to be dragged across the other (inactive) caret.
+pref("layout.accessiblecaret.allow_dragging_across_other_caret", false);
+
+// Hide carets and text selection dialog during scrolling.
+pref("layout.accessiblecaret.always_show_when_scrolling", false);
+
 // Enable sync and mozId with Firefox Accounts.
 pref("services.sync.fxaccounts.enabled", true);
 pref("identity.fxaccounts.enabled", true);
@@ -1083,9 +1080,6 @@ pref("dom.mozSettings.SettingsService.verbose.enabled", false);
 // IndexedDB transactions to be opened as readonly or keep everything as
 // readwrite.
 pref("dom.mozSettings.allowForceReadOnly", false);
-
-// RequestSync API is enabled by default on B2G.
-pref("dom.requestSync.enabled", true);
 
 // Comma separated list of activity names that can only be provided by
 // the system app in dev mode.

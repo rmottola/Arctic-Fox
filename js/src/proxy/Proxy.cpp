@@ -197,6 +197,16 @@ Proxy::setPrototype(JSContext* cx, HandleObject proxy, HandleObject proto, Objec
 }
 
 /* static */ bool
+Proxy::getPrototypeIfOrdinary(JSContext* cx, HandleObject proxy, bool* isOrdinary,
+                              MutableHandleObject proto)
+{
+    MOZ_ASSERT(proxy->hasLazyPrototype());
+    JS_CHECK_RECURSION(cx, return false);
+    return proxy->as<ProxyObject>().handler()->getPrototypeIfOrdinary(cx, proxy, isOrdinary,
+                                                                      proto);
+}
+
+/* static */ bool
 Proxy::setImmutablePrototype(JSContext* cx, HandleObject proxy, bool* succeeded)
 {
     JS_CHECK_RECURSION(cx, return false);
@@ -653,7 +663,7 @@ js::proxy_Finalize(FreeOp* fop, JSObject* obj)
 
     MOZ_ASSERT(obj->is<ProxyObject>());
     obj->as<ProxyObject>().handler()->finalize(fop, obj);
-    js_free(GetProxyDataLayout(obj)->values);
+    js_free(detail::GetProxyDataLayout(obj)->values);
 }
 
 void
@@ -715,6 +725,39 @@ js::proxy_FunToString(JSContext* cx, HandleObject proxy, unsigned indent)
 {
     return Proxy::fun_toString(cx, proxy, indent);
 }
+
+const ClassOps js::ProxyClassOps = {
+    nullptr,                 /* addProperty */
+    nullptr,                 /* delProperty */
+    nullptr,                 /* getProperty */
+    nullptr,                 /* setProperty */
+    nullptr,                 /* enumerate   */
+    nullptr,                 /* resolve     */
+    nullptr,                 /* mayResolve  */
+    js::proxy_Finalize,      /* finalize    */
+    nullptr,                 /* call        */
+    js::proxy_HasInstance,   /* hasInstance */
+    nullptr,                 /* construct   */
+    js::proxy_Trace,         /* trace       */
+};
+
+const ClassExtension js::ProxyClassExtension = PROXY_MAKE_EXT(
+    js::proxy_ObjectMoved
+);
+
+const ObjectOps js::ProxyObjectOps = {
+    js::proxy_LookupProperty,
+    js::proxy_DefineProperty,
+    js::proxy_HasProperty,
+    js::proxy_GetProperty,
+    js::proxy_SetProperty,
+    js::proxy_GetOwnPropertyDescriptor,
+    js::proxy_DeleteProperty,
+    js::proxy_Watch, js::proxy_Unwatch,
+    js::proxy_GetElements,
+    nullptr,  /* enumerate */
+    js::proxy_FunToString
+};
 
 const Class js::ProxyObject::proxyClass =
     PROXY_CLASS_DEF("Proxy", JSCLASS_HAS_CACHED_PROTO(JSProto_Proxy));

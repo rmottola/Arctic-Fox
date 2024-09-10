@@ -62,8 +62,8 @@ public:
                       const nsHTMLReflowState& aReflowState,
                       nsReflowStatus&          aStatus) override;
 
-  virtual nsSize GetMinSize(nsBoxLayoutState& aBoxLayoutState) override;
-  virtual bool IsCollapsed() override;
+  virtual nsSize GetXULMinSize(nsBoxLayoutState& aBoxLayoutState) override;
+  virtual bool IsXULCollapsed() override;
 
   virtual bool IsLeaf() const override;
   
@@ -205,7 +205,7 @@ protected:
   NS_DECLARE_FRAME_PROPERTY_WITHOUT_DTOR(TextControlInitializer,
                                          EditorInitializer)
 
-  class EditorInitializer : public nsRunnable {
+  class EditorInitializer : public mozilla::Runnable {
   public:
     explicit EditorInitializer(nsTextControlFrame* aFrame) :
       mFrame(aFrame) {}
@@ -224,7 +224,7 @@ protected:
   class ScrollOnFocusEvent;
   friend class ScrollOnFocusEvent;
 
-  class ScrollOnFocusEvent : public nsRunnable {
+  class ScrollOnFocusEvent : public mozilla::Runnable {
   public:
     explicit ScrollOnFocusEvent(nsTextControlFrame* aFrame) :
       mFrame(aFrame) {}

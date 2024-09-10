@@ -19,6 +19,9 @@ function run_test() {
   dump("using port " + serverPort + "\n");
 
   do_get_profile();
+  setPrefs({
+    'testing.allowInsecureServerURL': true,
+  });
   prefs = Cc["@mozilla.org/preferences-service;1"].getService(Ci.nsIPrefBranch);
 
   tlsProfile = prefs.getBoolPref("network.http.spdy.enforce-tls-profile");
@@ -27,6 +30,8 @@ function run_test() {
   var oldPref = prefs.getIntPref("network.http.speculative-parallel-limit");
   prefs.setIntPref("network.http.speculative-parallel-limit", 0);
   prefs.setBoolPref("network.http.spdy.enforce-tls-profile", false);
+  prefs.setBoolPref("dom.push.enabled", true);
+  prefs.setBoolPref("dom.push.connection.enabled", true);
 
   addCertOverride("localhost", serverPort,
                   Ci.nsICertOverrideService.ERROR_UNTRUSTED |
@@ -34,9 +39,6 @@ function run_test() {
                   Ci.nsICertOverrideService.ERROR_TIME);
 
   prefs.setIntPref("network.http.speculative-parallel-limit", oldPref);
-
-  servicePrefs.set('testing.notifyWorkers', false);
-  servicePrefs.set('testing.notifyAllObservers', true);
 
   run_next_test();
 }
@@ -49,6 +51,8 @@ add_task(function* test_pushNotifications() {
   // length 16.
   // /pushNotifications/subscription3 will send a message with rs equal 24 and
   // padding length 16.
+  // /pushNotifications/subscription4 will send a message with no rs and padding
+  // length 256.
 
   let db = PushServiceHttp2.newPushDB();
   do_register_cleanup(() => {
@@ -114,6 +118,30 @@ add_task(function* test_pushNotifications() {
       { appId: Ci.nsIScriptSecurityManager.NO_APP_ID, inIsolatedMozBrowser: false }),
     quota: Infinity,
     systemRecord: true,
+  }, {
+    subscriptionUri: serverURL + '/pushNotifications/subscription4',
+    pushEndpoint: serverURL + '/pushEndpoint4',
+    pushReceiptEndpoint: serverURL + '/pushReceiptEndpoint4',
+    scope: 'https://example.com/page/4',
+    p256dhPublicKey: ChromeUtils.base64URLDecode('BEcvDzkWCrUtjU_wygL98sbQCQrW1lY9irtgGnlCc4B0JJXLCHB9MTM73qD6GZYfL0YOvKo8XLOflh-J4dMGklU', {
+      padding: "reject",
+    }),
+    p256dhPrivateKey: {
+      crv: 'P-256',
+      d: 'fWi7tZaX0Pk6WnLrjQ3kiRq_g5XStL5pdH4pllNCqXw',
+      ext: true,
+      key_ops: ["deriveBits"],
+      kty: 'EC',
+      x: 'Ry8PORYKtS2NT_DKAv3yxtAJCtbWVj2Ku2AaeUJzgHQ',
+      y: 'JJXLCHB9MTM73qD6GZYfL0YOvKo8XLOflh-J4dMGklU'
+    },
+    authenticationSecret: ChromeUtils.base64URLDecode('cwDVC1iwAn8E37mkR3tMSg', {
+      padding: "reject",
+    }),
+    originAttributes: ChromeUtils.originAttributesToSuffix(
+      { appId: Ci.nsIScriptSecurityManager.NO_APP_ID, inIsolatedMozBrowser: false }),
+    quota: Infinity,
+    systemRecord: true,
   }];
 
   for (let record of records) {
@@ -141,7 +169,14 @@ add_task(function* test_pushNotifications() {
         equal(message.text(), "Some message", "decoded message is incorrect");
         return true;
       }
-    })
+    }),
+    promiseObserverNotification(PushServiceComponent.pushTopic, function(subject, data) {
+      var message = subject.QueryInterface(Ci.nsIPushMessage);
+      if (message && (data == "https://example.com/page/4")){
+        equal(message.text(), "Yet another message", "decoded message is incorrect");
+        return true;
+      }
+    }),
   ]);
 
   PushService.init({
@@ -149,8 +184,7 @@ add_task(function* test_pushNotifications() {
     db
   });
 
-  yield waitForPromise(notifyPromise, DEFAULT_TIMEOUT,
-    'Timed out waiting for notifications');
+  yield notifyPromise;
 });
 
 add_task(function* test_complete() {

@@ -22,6 +22,11 @@
 #include "mozilla/MemoryChecking.h"
 #include "mozilla/Snprintf.h"
 
+#ifdef __GNUC__
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wshadow"
+#endif
+
 #if defined(MOZ_VALGRIND)
 # include <valgrind/valgrind.h>
 #endif
@@ -34,6 +39,10 @@
 #include <ucontext.h>
 #include <unistd.h>
 #include <sys/syscall.h>
+#endif
+
+#ifdef __GNUC__
+# pragma GCC diagnostic pop // -Wshadow
 #endif
 
 #if defined(XP_LINUX) || defined(XP_MACOSX)

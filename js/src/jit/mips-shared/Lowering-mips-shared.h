@@ -70,6 +70,7 @@ class LIRGeneratorMIPSShared : public LIRGeneratorShared
     void lowerUMod(MMod* mod);
     void visitPowHalf(MPowHalf* ins);
     void visitAsmJSNeg(MAsmJSNeg* ins);
+    void visitAsmSelect(MAsmSelect* ins);
 
     LTableSwitch* newLTableSwitch(const LAllocation& in, const LDefinition& inputCopy,
                                   MTableSwitch* ins);
@@ -96,7 +97,7 @@ class LIRGeneratorMIPSShared : public LIRGeneratorShared
     void visitAtomicExchangeTypedArrayElement(MAtomicExchangeTypedArrayElement* ins);
     void visitAtomicTypedArrayElementBinop(MAtomicTypedArrayElementBinop* ins);
     void visitSubstr(MSubstr* ins);
-    void visitTruncateToInt64(MTruncateToInt64* ins);
+    void visitWasmTruncateToInt64(MWasmTruncateToInt64* ins);
     void visitInt64ToFloatingPoint(MInt64ToFloatingPoint* ins);
 };
 

@@ -90,6 +90,7 @@ class HangMonitorChild
   void NotifyPluginHangAsync(uint32_t aPluginId);
 
   void ClearHang();
+  void ClearHangAsync();
 
   virtual bool RecvTerminateScript() override;
   virtual bool RecvBeginStartingDebugger() override;
@@ -166,6 +167,11 @@ public:
     mBrowserDumpId = aId;
   }
 
+  void ClearHang() {
+    mHangData = HangData();
+    mBrowserDumpId.Truncate();
+  }
+
 private:
   ~HangMonitoredProcess() {}
 
@@ -186,6 +192,7 @@ public:
   void Open(Transport* aTransport, ProcessId aPid, MessageLoop* aIOLoop);
 
   virtual bool RecvHangEvidence(const HangData& aHangData) override;
+  virtual bool RecvClearHang() override;
 
   virtual void ActorDestroy(ActorDestroyReason aWhy) override;
 
@@ -258,7 +265,8 @@ HangMonitorChild::~HangMonitorChild()
 {
   // For some reason IPDL doesn't automatically delete the channel for a
   // bridged protocol (bug 1090570). So we have to do it ourselves.
-  XRE_GetIOMessageLoop()->PostTask(FROM_HERE, new DeleteTask<Transport>(GetTransport()));
+  RefPtr<DeleteTask<Transport>> task = new DeleteTask<Transport>(GetTransport());
+  XRE_GetIOMessageLoop()->PostTask(task.forget());
 
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(sInstance == this);
@@ -296,7 +304,6 @@ HangMonitorChild::ActorDestroy(ActorDestroyReason aWhy)
   // We use a task here to ensure that IPDL is finished with this
   // HangMonitorChild before it gets deleted on the main thread.
   MonitorLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(this, &HangMonitorChild::ShutdownOnThread));
 }
 
@@ -384,7 +391,6 @@ HangMonitorChild::NotifySlowScript(nsITabChild* aTabChild,
   nsAutoCString filename(aFileName);
 
   MonitorLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(this, &HangMonitorChild::NotifySlowScriptAsync,
                       id, filename, aLineNo));
   return SlowScriptAction::Continue;
@@ -415,7 +421,6 @@ HangMonitorChild::NotifyPluginHang(uint32_t aPluginId)
 
   // bounce to background thread
   MonitorLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(this,
                       &HangMonitorChild::NotifyPluginHangAsync,
                       aPluginId));
@@ -428,7 +433,8 @@ HangMonitorChild::NotifyPluginHangAsync(uint32_t aPluginId)
 
   // bounce back to parent on background thread
   if (mIPCOpen) {
-    Unused << SendHangEvidence(PluginHangData(aPluginId));
+    Unused << SendHangEvidence(PluginHangData(aPluginId,
+                                              base::GetCurrentProcId()));
   }
 }
 
@@ -438,11 +444,26 @@ HangMonitorChild::ClearHang()
   MOZ_ASSERT(NS_IsMainThread());
 
   if (mSentReport) {
+    // bounce to background thread
+    MonitorLoop()->PostTask(
+      NewRunnableMethod(this, &HangMonitorChild::ClearHangAsync));
+
     MonitorAutoLock lock(mMonitor);
     mSentReport = false;
     mTerminateScript = false;
     mStartDebugger = false;
     mFinishedStartingDebugger = false;
+  }
+}
+
+void
+HangMonitorChild::ClearHangAsync()
+{
+  MOZ_RELEASE_ASSERT(MessageLoop::current() == MonitorLoop());
+
+  // bounce back to parent on background thread
+  if (mIPCOpen) {
+    Unused << SendClearHang();
   }
 }
 
@@ -463,7 +484,8 @@ HangMonitorParent::~HangMonitorParent()
 {
   // For some reason IPDL doesn't automatically delete the channel for a
   // bridged protocol (bug 1090570). So we have to do it ourselves.
-  XRE_GetIOMessageLoop()->PostTask(FROM_HERE, new DeleteTask<Transport>(GetTransport()));
+  RefPtr<DeleteTask<Transport>> task = new DeleteTask<Transport>(GetTransport());
+  XRE_GetIOMessageLoop()->PostTask(task.forget());
 
 #ifdef MOZ_CRASHREPORTER
   MutexAutoLock lock(mBrowserCrashDumpHashLock);
@@ -490,7 +512,6 @@ HangMonitorParent::Shutdown()
   }
 
   MonitorLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(this, &HangMonitorParent::ShutdownOnThread));
 
   while (!mShutdownDone) {
@@ -532,7 +553,7 @@ HangMonitorParent::Open(Transport* aTransport, ProcessId aPid,
   MOZ_ASSERT(ok);
 }
 
-class HangObserverNotifier final : public nsRunnable
+class HangObserverNotifier final : public Runnable
 {
 public:
   HangObserverNotifier(HangMonitoredProcess* aProcess,
@@ -608,6 +629,51 @@ HangMonitorParent::RecvHangEvidence(const HangData& aHangData)
 
   nsCOMPtr<nsIRunnable> notifier =
     new HangObserverNotifier(mProcess, aHangData, crashId);
+  NS_DispatchToMainThread(notifier);
+
+  return true;
+}
+
+class ClearHangNotifier final : public Runnable
+{
+public:
+  explicit ClearHangNotifier(HangMonitoredProcess* aProcess)
+    : mProcess(aProcess)
+  {}
+
+  NS_IMETHOD
+  Run()
+  {
+    // chrome process, main thread
+    MOZ_RELEASE_ASSERT(NS_IsMainThread());
+    mProcess->ClearHang();
+
+    nsCOMPtr<nsIObserverService> observerService =
+      mozilla::services::GetObserverService();
+    observerService->NotifyObservers(mProcess, "clear-hang-report", nullptr);
+    return NS_OK;
+  }
+
+private:
+  RefPtr<HangMonitoredProcess> mProcess;
+};
+
+bool
+HangMonitorParent::RecvClearHang()
+{
+  // chrome process, background thread
+  MOZ_RELEASE_ASSERT(MessageLoop::current() == MonitorLoop());
+
+  if (!mReportHangs) {
+    return true;
+  }
+
+  mHangMonitor->InitiateCPOWTimeout();
+
+  MonitorAutoLock lock(mMonitor);
+
+  nsCOMPtr<nsIRunnable> notifier =
+    new ClearHangNotifier(mProcess);
   NS_DispatchToMainThread(notifier);
 
   return true;
@@ -767,7 +833,6 @@ HangMonitoredProcess::TerminateScript()
   }
 
   ProcessHangMonitor::Get()->MonitorLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(mActor, &HangMonitorParent::TerminateScript));
   return NS_OK;
 }
@@ -785,7 +850,6 @@ HangMonitoredProcess::BeginStartingDebugger()
   }
 
   ProcessHangMonitor::Get()->MonitorLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(mActor, &HangMonitorParent::BeginStartingDebugger));
   return NS_OK;
 }
@@ -803,7 +867,6 @@ HangMonitoredProcess::EndStartingDebugger()
   }
 
   ProcessHangMonitor::Get()->MonitorLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(mActor, &HangMonitorParent::EndStartingDebugger));
   return NS_OK;
 }
@@ -819,7 +882,8 @@ HangMonitoredProcess::TerminatePlugin()
   // generates a crash report that includes a browser report taken here
   // earlier, the content process, and any plugin process(es).
   uint32_t id = mHangData.get_PluginHangData().pluginId();
-  plugins::TerminatePlugin(id, NS_LITERAL_CSTRING("HangMonitor"),
+  base::ProcessId contentPid = mHangData.get_PluginHangData().contentProcessId();
+  plugins::TerminatePlugin(id, contentPid, NS_LITERAL_CSTRING("HangMonitor"),
                            mBrowserDumpId);
 
   if (mActor) {
@@ -982,7 +1046,6 @@ mozilla::CreateHangMonitorParent(ContentParent* aContentParent,
   parent->SetProcess(process);
 
   monitor->MonitorLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(parent, &HangMonitorParent::Open,
                       aTransport, aOtherPid, XRE_GetIOMessageLoop()));
 
@@ -999,7 +1062,6 @@ mozilla::CreateHangMonitorChild(mozilla::ipc::Transport* aTransport,
   HangMonitorChild* child = new HangMonitorChild(monitor);
 
   monitor->MonitorLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(child, &HangMonitorChild::Open,
                       aTransport, aOtherPid, XRE_GetIOMessageLoop()));
 

@@ -5,15 +5,16 @@
 "use strict";
 
 const { Ci, Cu } = require("chrome");
-const Services = require("Services");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const { assert, fetch } = DevToolsUtils;
 const EventEmitter = require("devtools/shared/event-emitter");
 const { OriginalLocation, GeneratedLocation } = require("devtools/server/actors/common");
 const { resolve } = require("promise");
+const { joinURI } = require("devtools/shared/path");
+const URL = require("URL");
 
-loader.lazyRequireGetter(this, "SourceActor", "devtools/server/actors/script", true);
-loader.lazyRequireGetter(this, "isEvalSource", "devtools/server/actors/script", true);
+loader.lazyRequireGetter(this, "SourceActor", "devtools/server/actors/source", true);
+loader.lazyRequireGetter(this, "isEvalSource", "devtools/server/actors/source", true);
 loader.lazyRequireGetter(this, "SourceMapConsumer", "source-map", true);
 loader.lazyRequireGetter(this, "SourceMapGenerator", "source-map", true);
 
@@ -246,6 +247,7 @@ TabSources.prototype = {
     }
 
     throw new Error('getSourceByURL: could not find source for ' + url);
+    return null;
   },
 
   /**
@@ -258,9 +260,9 @@ TabSources.prototype = {
    */
   _isMinifiedURL: function (aURL) {
     try {
-      let url = Services.io.newURI(aURL, null, null)
-                           .QueryInterface(Ci.nsIURL);
-      return MINIFIED_SOURCE_REGEXP.test(url.fileName);
+      let url = new URL(aURL);
+      let pathname = url.pathname;
+      return MINIFIED_SOURCE_REGEXP.test(pathname.slice(pathname.lastIndexOf("/") + 1));
     } catch (e) {
       // Not a valid URL so don't try to parse out the filename, just test the
       // whole thing with the minified source regexp.
@@ -299,18 +301,33 @@ TabSources.prototype = {
     let element = aSource.element ? aSource.element.unsafeDereference() : null;
     if (element && (element.tagName !== "SCRIPT" || !element.hasAttribute("src"))) {
       spec.isInlineSource = true;
+    } else if (aSource.introductionType === "wasm") {
+      // Wasm sources are not JavaScript. Give them their own content-type.
+      spec.contentType = "text/wasm";
     } else {
       if (url) {
-        try {
-          let urlInfo = Services.io.newURI(url, null, null).QueryInterface(Ci.nsIURL);
-          if (urlInfo.fileExtension === "js") {
-            spec.contentType = "text/javascript";
-          }
-        } catch(ex) {
-          // There are a few special URLs that we know are JavaScript:
-          // inline `javascript:` and code coming from the console
-          if (url.indexOf("javascript:") === 0 || url === 'debugger eval code') {
-            spec.contentType = "text/javascript";
+        // There are a few special URLs that we know are JavaScript:
+        // inline `javascript:` and code coming from the console
+        if (url.indexOf("javascript:") === 0 || url === 'debugger eval code') {
+          spec.contentType = "text/javascript";
+        } else {
+          try {
+            let pathname = new URL(url).pathname;
+            let filename = pathname.slice(pathname.lastIndexOf("/") + 1);
+            let index = filename.lastIndexOf(".");
+            let extension = index >= 0 ? filename.slice(index + 1) : "";
+            if (extension === "xml") {
+              // XUL inline scripts may not correctly have the
+              // `source.element` property, so do a blunt check here if
+              // it's an xml page.
+              spec.isInlineSource = true;
+            }
+            else if (extension === "js") {
+              spec.contentType = "text/javascript";
+            }
+          } catch (e) {
+            // This only needs to be here because URL is not yet exposed to
+            // workers.
           }
         }
       }
@@ -387,7 +404,7 @@ TabSources.prototype = {
 
     let sourceMapURL = aSource.sourceMapURL;
     if (aSource.url) {
-      sourceMapURL = this._normalize(sourceMapURL, aSource.url);
+      sourceMapURL = joinURI(aSource.url, sourceMapURL);
     }
     let result = this._fetchSourceMap(sourceMapURL, aSource.url);
 
@@ -461,13 +478,14 @@ TabSources.prototype = {
         ? aScriptURL
         : aAbsSourceMapURL);
     aSourceMap.sourceRoot = aSourceMap.sourceRoot
-      ? this._normalize(aSourceMap.sourceRoot, base)
+      ? joinURI(base, aSourceMap.sourceRoot)
       : base;
   },
 
   _dirname: function (aPath) {
-    return Services.io.newURI(
-      ".", null, Services.io.newURI(aPath, null, null)).spec;
+    let url = new URL(aPath);
+    let href = url.href;
+    return href.slice(0, href.lastIndexOf("/"));
   },
 
   /**
@@ -533,6 +551,7 @@ TabSources.prototype = {
     // Forcefully set the sourcemap cache. This will be used even if
     // sourcemaps are disabled.
     this._sourceMapCache[url] = resolve(aMap);
+    this.emit("updatedSource", this.getSourceActor(aSource));
   },
 
   /**
@@ -759,19 +778,6 @@ TabSources.prototype = {
    */
   disablePrettyPrint: function (aURL) {
     this.prettyPrintedSources.delete(aURL);
-  },
-
-  /**
-   * Normalize multiple relative paths towards the base paths on the right.
-   */
-  _normalize: function (...aURLs) {
-    assert(aURLs.length > 1, "Should have more than 1 URL");
-    let base = Services.io.newURI(aURLs.pop(), null, null);
-    let url;
-    while ((url = aURLs.pop())) {
-      base = Services.io.newURI(url, null, base);
-    }
-    return base.spec;
   },
 
   iter: function () {

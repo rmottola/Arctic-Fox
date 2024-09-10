@@ -7,6 +7,7 @@
 
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/Helpers.h"
+#include "nsChildView.h"
 #include "nsDeviceContext.h"
 #include "nsLayoutUtils.h"
 #include "nsObjCExceptions.h"
@@ -901,9 +902,9 @@ static void DrawCellWithSnapping(NSCell *cell,
 @end
 
 static void
-RenderWithCoreUILegacy(CGRect aRect, CGContextRef cgContext, NSDictionary* aOptions)
+RenderWithCoreUILegacy(CGRect aRect, CGContextRef cgContext, NSDictionary* aOptions, bool aSkipAreaCheck)
 {
-  if (aRect.size.width * aRect.size.height <= BITMAP_MAX_AREA) {
+  if (aSkipAreaCheck || (aRect.size.width * aRect.size.height <= BITMAP_MAX_AREA)) {
     CUIRendererRef renderer = [NSWindow respondsToSelector:@selector(coreUIRenderer)]
       ? [NSWindow coreUIRenderer] : nil;
     CUIDraw(renderer, aRect, cgContext, (CFDictionaryRef)aOptions, NULL);
@@ -946,7 +947,7 @@ RenderWithCoreUI(CGRect aRect, CGContextRef cgContext, NSDictionary* aOptions)
     [appearance _drawInRect:aRect context:cgContext options:aOptions];
   } else {
     // 10.9 and below
-    RenderWithCoreUILegacy(aRect, cgContext, aOptions);
+    RenderWithCoreUILegacy(aRect, cgContext, aOptions, false);
   }
 }
 
@@ -955,7 +956,7 @@ static float VerticalAlignFactor(nsIFrame *aFrame)
   if (!aFrame)
     return 0.5f; // default: center
 
-  const nsStyleCoord& va = aFrame->StyleTextReset()->mVerticalAlign;
+  const nsStyleCoord& va = aFrame->StyleDisplay()->mVerticalAlign;
   uint8_t intval = (va.GetUnit() == eStyleUnit_Enumerated)
                      ? va.GetIntValue()
                      : NS_STYLE_VERTICAL_ALIGN_MIDDLE;
@@ -2902,7 +2903,8 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
                   [NSNumber numberWithBool:YES], @"indiconly",
                   [NSNumber numberWithBool:YES], @"kCUIThumbProportionKey",
                   [NSNumber numberWithBool:YES], @"is.flipped",
-                  nil]);
+                  nil],
+                true);
       }
       break;
     case NS_THEME_SCROLLBAR_BUTTON_UP:
@@ -2941,6 +2943,7 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
               }
             }
           }
+
           const BOOL isOnTopOfDarkBackground = IsDarkBackground(aFrame);
           RenderWithCoreUILegacy(macRect, cgContext,
                   [NSDictionary dictionaryWithObjectsAndKeys:
@@ -2951,7 +2954,8 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
                     [NSNumber numberWithBool:YES], @"noindicator",
                     [NSNumber numberWithBool:YES], @"kCUIThumbProportionKey",
                     [NSNumber numberWithBool:YES], @"is.flipped",
-                    nil]);
+                    nil],
+                  true);
         }
       }
       break;
@@ -3584,7 +3588,8 @@ nsNativeThemeCocoa::GetMinimumWidgetSize(nsPresContext* aPresContext,
 
 NS_IMETHODIMP
 nsNativeThemeCocoa::WidgetStateChanged(nsIFrame* aFrame, uint8_t aWidgetType, 
-                                     nsIAtom* aAttribute, bool* aShouldRepaint)
+                                       nsIAtom* aAttribute, bool* aShouldRepaint,
+                                       const nsAttrValue* aOldValue)
 {
   // Some widget types just never change state.
   switch (aWidgetType) {

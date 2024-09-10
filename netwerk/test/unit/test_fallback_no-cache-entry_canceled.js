@@ -99,7 +99,7 @@ function run_test()
     chan.notificationCallbacks = new ChannelEventSink(ES_ABORT_REDIRECT);
     var chanac = chan.QueryInterface(Ci.nsIApplicationCacheChannel);
     chanac.chooseApplicationCache = true;
-    chan.asyncOpen(new ChannelListener(finish_test, null, CL_EXPECT_FAILURE), null);
+    chan.asyncOpen2(new ChannelListener(finish_test, null, CL_EXPECT_FAILURE));
   }}
 
   var os = Cc["@mozilla.org/observer-service;1"].

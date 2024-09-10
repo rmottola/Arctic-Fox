@@ -428,6 +428,7 @@ ESEDB.prototype = {
                                  systemTime.wSecond,
                                  systemTime.wMilliseconds));
     }
+    return undefined;
   },
 
   _getColumnInfo(tableName, columns) {

@@ -6,49 +6,28 @@
  * "nsCycleCollector::ForgetSkippable" markers when we force cycle collection.
  */
 
-const TEST_URL = EXAMPLE_URL + "doc_force_cc.html"
+const { PerformanceFront } = require("devtools/server/actors/performance");
 
-function waitForMarkerType(front, type) {
-  info("Waiting for marker of type = " + type);
-  const { promise, resolve } = Promise.defer();
-
-  const handler = (_, name, markers) => {
-    if (name !== "markers") {
-      return;
-    }
-
-    info("Got markers: " + JSON.stringify(markers, null, 2));
-
-    if (markers.some(m => m.name === type)) {
-      ok(true, "Found marker of type = " + type);
-      front.off("timeline-data", handler);
-      resolve();
-    }
-  };
-  front.on("timeline-data", handler);
-
-  return promise;
-}
-
-function* spawnTest () {
+add_task(function*() {
   // This test runs very slowly on linux32 debug EC2 instances.
   requestLongerTimeout(2);
 
-  let { target, front } = yield initBackend(TEST_URL);
+  let browser = yield addTab(MAIN_DOMAIN + "doc_force_cc.html");
+  let doc = browser.contentDocument;
 
-  yield front.startRecording({ withMarkers: true, withTicks: true });
+  initDebuggerServer();
+  let client = new DebuggerClient(DebuggerServer.connectPipe());
+  let form = yield connectDebuggerClient(client);
+  let front = PerformanceFront(client, form);
+  yield front.connect();
+  let rec = yield front.startRecording({ withMarkers: true });
 
-  yield Promise.all([
-    waitForMarkerType(front, "nsCycleCollector::Collect"),
-    waitForMarkerType(front, "nsCycleCollector::ForgetSkippable")
-  ]);
-  ok(true, "Got expected cycle collection events");
+  let markers = yield waitForMarkerType(front, ["nsCycleCollector::Collect", "nsCycleCollector::ForgetSkippable"])
+  yield front.stopRecording(rec);
 
-  yield front.stopRecording();
+  ok(markers.some(m => m.name === "nsCycleCollector::Collect"), "got some nsCycleCollector::Collect markers");
+  ok(markers.some(m => m.name === "nsCycleCollector::ForgetSkippable"), "got some nsCycleCollector::Collect markers");
 
-  // Destroy the front before removing tab to ensure no
-  // lingering requests
-  yield front.destroy();
-  yield removeTab(target.tab);
-  finish();
-}
+  yield closeDebuggerClient(client);
+  gBrowser.removeCurrentTab();
+});

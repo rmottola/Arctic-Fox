@@ -184,22 +184,24 @@ WindowNamedPropertiesHandler::ownPropNames(JSContext* aCx,
   nsGlobalWindow* outer = win->GetOuterWindowInternal();
   if (outer) {
     nsDOMWindowList* childWindows = outer->GetWindowList();
-    uint32_t length = childWindows->GetLength();
-    for (uint32_t i = 0; i < length; ++i) {
-      nsCOMPtr<nsIDocShellTreeItem> item =
-        childWindows->GetDocShellTreeItemAt(i);
-      // This is a bit silly, since we could presumably just do
-      // item->GetWindow().  But it's not obvious whether this does the same
-      // thing as GetChildWindow() with the item's name (due to the complexity
-      // of FindChildWithName).  Since GetChildWindow is what we use in
-      // getOwnPropDescriptor, let's try to be consistent.
-      nsString name;
-      item->GetName(name);
-      if (!names.Contains(name)) {
-        // Make sure we really would expose it from getOwnPropDescriptor.
-        nsCOMPtr<nsPIDOMWindowOuter> childWin = win->GetChildWindow(name);
-        if (childWin && ShouldExposeChildWindow(name, childWin)) {
-          names.AppendElement(name);
+    if (childWindows) {
+      uint32_t length = childWindows->GetLength();
+      for (uint32_t i = 0; i < length; ++i) {
+        nsCOMPtr<nsIDocShellTreeItem> item =
+          childWindows->GetDocShellTreeItemAt(i);
+        // This is a bit silly, since we could presumably just do
+        // item->GetWindow().  But it's not obvious whether this does the same
+        // thing as GetChildWindow() with the item's name (due to the complexity
+        // of FindChildWithName).  Since GetChildWindow is what we use in
+        // getOwnPropDescriptor, let's try to be consistent.
+        nsString name;
+        item->GetName(name);
+        if (!names.Contains(name)) {
+          // Make sure we really would expose it from getOwnPropDescriptor.
+          nsCOMPtr<nsPIDOMWindowOuter> childWin = win->GetChildWindow(name);
+          if (childWin && ShouldExposeChildWindow(name, childWin)) {
+            names.AppendElement(name);
+          }
         }
       }
     }
@@ -277,10 +279,10 @@ static const DOMIfaceAndProtoJSClass WindowNamedPropertiesClass = {
   PROXY_CLASS_DEF("WindowProperties",
                   JSCLASS_IS_DOMIFACEANDPROTOJSCLASS),
   eNamedPropertiesObject,
-  sWindowNamedPropertiesNativePropertyHooks,
-  "[object WindowProperties]",
   prototypes::id::_ID_Count,
   0,
+  sWindowNamedPropertiesNativePropertyHooks,
+  "[object WindowProperties]",
   EventTargetBinding::GetProtoObject
 };
 
@@ -292,13 +294,27 @@ WindowNamedPropertiesHandler::Create(JSContext* aCx,
   // Note: since the scope polluter proxy lives on the window's prototype
   // chain, it needs a singleton type to avoid polluting type information
   // for properties on the window.
-  JS::Rooted<JSObject*> gsp(aCx);
   js::ProxyOptions options;
   options.setSingleton(true);
   options.setClass(&WindowNamedPropertiesClass.mBase);
-  return js::NewProxyObject(aCx, WindowNamedPropertiesHandler::getInstance(),
-                            JS::NullHandleValue, aProto,
-                            options);
+
+  JS::Rooted<JSObject*> gsp(aCx);
+  gsp = js::NewProxyObject(aCx, WindowNamedPropertiesHandler::getInstance(),
+                           JS::NullHandleValue, aProto,
+                           options);
+  if (!gsp) {
+    return nullptr;
+  }
+
+  bool succeeded;
+  if (!JS_SetImmutablePrototype(aCx, gsp, &succeeded)) {
+    return nullptr;
+  }
+  MOZ_ASSERT(succeeded,
+             "errors making the [[Prototype]] of the named properties object "
+             "immutable should have been JSAPI failures, not !succeeded");
+
+  return gsp;
 }
 
 } // namespace dom

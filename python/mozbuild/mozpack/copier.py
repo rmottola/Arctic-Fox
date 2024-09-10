@@ -6,6 +6,7 @@ from __future__ import absolute_import
 
 import os
 import stat
+import sys
 
 from mozpack.errors import errors
 from mozpack.files import (
@@ -18,6 +19,7 @@ from collections import (
     Counter,
     OrderedDict,
 )
+import concurrent.futures as futures
 
 
 class FileRegistry(object):
@@ -285,11 +287,6 @@ class FileCopier(FileRegistry):
         # friends.
 
         required_dirs = set([destination])
-        dest_files = set()
-
-        for p, f in self:
-            dest_files.add(os.path.normpath(os.path.join(destination, p)))
-
         required_dirs |= set(os.path.normpath(os.path.join(destination, d))
             for d in self.required_directories())
 
@@ -377,11 +374,33 @@ class FileCopier(FileRegistry):
                     existing_files.add(os.path.normpath(os.path.join(root, f)))
 
         # Now we reconcile the state of the world against what we want.
+        dest_files = set()
 
         # Install files.
-        for p, f in self:
-            destfile = os.path.normpath(os.path.join(destination, p))
-            if f.copy(destfile, skip_if_older):
+        #
+        # Creating/appending new files on Windows/NTFS is slow. So we use a
+        # thread pool to speed it up significantly. The performance of this
+        # loop is so critical to common build operations on Linux that the
+        # overhead of the thread pool is worth avoiding, so we have 2 code
+        # paths. We also employ a low water mark to prevent thread pool
+        # creation if number of files is too small to benefit.
+        copy_results = []
+        if sys.platform == 'win32' and len(self) > 100:
+            with futures.ThreadPoolExecutor(4) as e:
+                fs = []
+                for p, f in self:
+                    destfile = os.path.normpath(os.path.join(destination, p))
+                    fs.append((destfile, e.submit(f.copy, destfile, skip_if_older)))
+
+            copy_results = [(destfile, f.result) for destfile, f in fs]
+        else:
+            for p, f in self:
+                destfile = os.path.normpath(os.path.join(destination, p))
+                copy_results.append((destfile, f.copy(destfile, skip_if_older)))
+
+        for destfile, copy_result in copy_results:
+            dest_files.add(destfile)
+            if copy_result:
                 result.updated_files.add(destfile)
             else:
                 result.existing_files.add(destfile)
@@ -412,20 +431,19 @@ class FileCopier(FileRegistry):
         # Then don't remove directories if we didn't remove unaccounted files
         # and one of those files exists.
         if not remove_unaccounted:
+            parents = set()
+            pathsep = os.path.sep
             for f in existing_files:
-                parent = f
-                previous = ''
-                parents = set()
+                path = f
                 while True:
-                    parent = os.path.dirname(parent)
-                    parents.add(parent)
-
-                    if previous == parent:
+                    # All the paths are normalized and relative by this point,
+                    # so os.path.dirname would only do extra work.
+                    dirname = path.rpartition(pathsep)[0]
+                    if dirname in parents:
                         break
-
-                    previous = parent
-
-                remove_dirs -= parents
+                    parents.add(dirname)
+                    path = dirname
+            remove_dirs -= parents
 
         # Remove empty directories that aren't required.
         for d in sorted(remove_dirs, key=len, reverse=True):
@@ -453,36 +471,6 @@ class FileCopier(FileRegistry):
         return result
 
 
-class FilePurger(FileCopier):
-    """A variation of FileCopier that is used to purge untracked files.
-
-    Callers create an instance then call .add() to register files/paths that
-    should exist. Once the canonical set of files that may exist is defined,
-    .purge() is called against a target directory. All files and empty
-    directories in the target directory that aren't in the registry will be
-    deleted.
-    """
-    class FakeFile(BaseFile):
-        def copy(self, dest, skip_if_older=True):
-            return True
-
-    def add(self, path):
-        """Record that a path should exist.
-
-        We currently do not track what kind of entity should be behind that
-        path. We presumably could add type tracking later and have purging
-        delete entities if there is a type mismatch.
-        """
-        return FileCopier.add(self, path, FilePurger.FakeFile())
-
-    def purge(self, dest):
-        """Deletes all files and empty directories not in the registry."""
-        return FileCopier.copy(self, dest)
-
-    def copy(self, *args, **kwargs):
-        raise Exception('copy() disabled on FilePurger. Use purge().')
-
-
 class Jarrer(FileRegistry, BaseFile):
     '''
     FileRegistry with the ability to copy and pack the registered files as a
@@ -496,7 +484,13 @@ class Jarrer(FileRegistry, BaseFile):
         self.compress = compress
         self.optimize = optimize
         self._preload = []
+        self._compress_options = {}  # Map path to compress boolean option.
         FileRegistry.__init__(self)
+
+    def add(self, path, content, compress=None):
+        FileRegistry.add(self, path, content)
+        if compress is not None:
+            self._compress_options[path] = compress
 
     def copy(self, dest, skip_if_older=True):
         '''
@@ -552,12 +546,14 @@ class Jarrer(FileRegistry, BaseFile):
         with JarWriter(fileobj=dest, compress=self.compress,
                        optimize=self.optimize) as jar:
             for path, file in self:
+                compress = self._compress_options.get(path, self.compress)
+
                 if path in old_contents:
-                    deflater = DeflaterDest(old_contents[path], self.compress)
+                    deflater = DeflaterDest(old_contents[path], compress)
                 else:
-                    deflater = DeflaterDest(compress=self.compress)
+                    deflater = DeflaterDest(compress=compress)
                 file.copy(deflater, skip_if_older)
-                jar.add(path, deflater.deflater, mode=file.mode)
+                jar.add(path, deflater.deflater, mode=file.mode, compress=compress)
             if self._preload:
                 jar.preload(self._preload)
 

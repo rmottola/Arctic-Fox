@@ -11,6 +11,7 @@
 #include "xpcprivate.h"
 #include "XPCWrapper.h"
 #include "nsIAppsService.h"
+#include "nsIInputStreamChannel.h"
 #include "nsILoadContext.h"
 #include "nsIServiceManager.h"
 #include "nsIScriptObjectPrincipal.h"
@@ -304,7 +305,12 @@ nsScriptSecurityManager::AppStatusForPrincipal(nsIPrincipal *aPrin)
     // The app could contain a cross-origin iframe - make sure that the content
     // is actually same-origin with the app.
     MOZ_ASSERT(inIsolatedMozBrowser == false, "Checked this above");
-    PrincipalOriginAttributes attrs(appId, false);
+    nsAutoCString suffix;
+    PrincipalOriginAttributes attrs;
+    NS_ENSURE_TRUE(attrs.PopulateFromOrigin(NS_ConvertUTF16toUTF8(appOrigin), suffix),
+                   nsIPrincipal::APP_STATUS_NOT_INSTALLED);
+    attrs.mAppId = appId;
+    attrs.mInIsolatedMozBrowser = false;
     nsCOMPtr<nsIPrincipal> appPrin = BasePrincipal::CreateCodebasePrincipal(appURI, attrs);
     NS_ENSURE_TRUE(appPrin, nsIPrincipal::APP_STATUS_NOT_INSTALLED);
     return aPrin->Equals(appPrin) ? status
@@ -324,6 +330,23 @@ NS_IMETHODIMP
 nsScriptSecurityManager::GetChannelResultPrincipal(nsIChannel* aChannel,
                                                    nsIPrincipal** aPrincipal)
 {
+  return GetChannelResultPrincipal(aChannel, aPrincipal,
+                                   /*aIgnoreSandboxing*/ false);
+}
+
+nsresult
+nsScriptSecurityManager::GetChannelResultPrincipalIfNotSandboxed(nsIChannel* aChannel,
+                                                                 nsIPrincipal** aPrincipal)
+{
+  return GetChannelResultPrincipal(aChannel, aPrincipal,
+                                   /*aIgnoreSandboxing*/ true);
+}
+
+nsresult
+nsScriptSecurityManager::GetChannelResultPrincipal(nsIChannel* aChannel,
+                                                   nsIPrincipal** aPrincipal,
+                                                   bool aIgnoreSandboxing)
+{
     NS_PRECONDITION(aChannel, "Must have channel!");
     nsCOMPtr<nsISupports> owner;
     aChannel->GetOwner(getter_AddRefs(owner));
@@ -338,15 +361,33 @@ nsScriptSecurityManager::GetChannelResultPrincipal(nsIChannel* aChannel,
     nsCOMPtr<nsILoadInfo> loadInfo;
     aChannel->GetLoadInfo(getter_AddRefs(loadInfo));
     if (loadInfo) {
-        if (loadInfo->GetLoadingSandboxed()) {
-            RefPtr<nsNullPrincipal> prin =
-              nsNullPrincipal::CreateWithInheritedAttributes(loadInfo->LoadingPrincipal());
-            NS_ENSURE_TRUE(prin, NS_ERROR_FAILURE);
+        if (!aIgnoreSandboxing && loadInfo->GetLoadingSandboxed()) {
+            RefPtr<nsNullPrincipal> prin;
+            if (loadInfo->LoadingPrincipal()) {
+              prin =
+                nsNullPrincipal::CreateWithInheritedAttributes(loadInfo->LoadingPrincipal());
+            } else {
+              NeckoOriginAttributes nAttrs;
+              loadInfo->GetOriginAttributes(&nAttrs);
+              PrincipalOriginAttributes pAttrs;
+              pAttrs.InheritFromNecko(nAttrs);
+              prin = nsNullPrincipal::Create(pAttrs);
+            }
             prin.forget(aPrincipal);
             return NS_OK;
         }
 
-        if (loadInfo->GetForceInheritPrincipal()) {
+        bool forceInterit = loadInfo->GetForceInheritPrincipal();
+        if (aIgnoreSandboxing && !forceInterit) {
+          // Check if SEC_FORCE_INHERIT_PRINCIPAL was dropped because of
+          // sandboxing:
+          if (loadInfo->GetLoadingSandboxed() &&
+              (loadInfo->GetSecurityFlags() &
+               nsILoadInfo::SEC_FORCE_INHERIT_PRINCIPAL_WAS_DROPPED)) {
+            forceInterit = true;
+          }
+        }
+        if (forceInterit) {
             NS_ADDREF(*aPrincipal = loadInfo->TriggeringPrincipal());
             return NS_OK;
         }
@@ -1169,7 +1210,6 @@ nsScriptSecurityManager::CreateNullPrincipal(JS::Handle<JS::Value> aOriginAttrib
       return NS_ERROR_INVALID_ARG;
   }
   nsCOMPtr<nsIPrincipal> prin = nsNullPrincipal::Create(attrs);
-  NS_ENSURE_TRUE(prin, NS_ERROR_FAILURE);
   prin.forget(aPrincipal);
   return NS_OK;
 }

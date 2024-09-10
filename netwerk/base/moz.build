@@ -72,7 +72,6 @@ XPIDL_SOURCES += [
     'nsINSSErrorsService.idl',
     'nsINullChannel.idl',
     'nsIPACGenerator.idl',
-    'nsIPackagedAppChannelListener.idl',
     'nsIPackagedAppService.idl',
     'nsIPackagedAppUtils.idl',
     'nsIPackagedAppVerifier.idl',
@@ -95,11 +94,11 @@ XPIDL_SOURCES += [
     'nsIRedirectChannelRegistrar.idl',
     'nsIRedirectResultListener.idl',
     'nsIRequest.idl',
+    'nsIRequestContext.idl',
     'nsIRequestObserver.idl',
     'nsIRequestObserverProxy.idl',
     'nsIResponseHeadProvider.idl',
     'nsIResumableChannel.idl',
-    'nsISchedulingContext.idl',
     'nsISecCheckWrapChannel.idl',
     'nsISecretDecoderRing.idl',
     'nsISecureBrowserUI.idl',
@@ -109,6 +108,7 @@ XPIDL_SOURCES += [
     'nsISerializationHelper.idl',
     'nsIServerSocket.idl',
     'nsISimpleStreamListener.idl',
+    'nsISocketFilter.idl',
     'nsISocketTransport.idl',
     'nsISocketTransportService.idl',
     'nsISpeculativeConnect.idl',
@@ -128,7 +128,6 @@ XPIDL_SOURCES += [
     'nsITraceableChannel.idl',
     'nsITransport.idl',
     'nsIUDPSocket.idl',
-    'nsIUDPSocketFilter.idl',
     'nsIUnicharStreamLoader.idl',
     'nsIUploadChannel.idl',
     'nsIUploadChannel2.idl',
@@ -156,7 +155,7 @@ EXPORTS += [
     'nsInputStreamPump.h',
     'nsMIMEInputStream.h',
     'nsNetUtil.h',
-    'nsNetUtil.inl',
+    'nsNetUtilInlines.h',
     'nsReadLine.h',
     'nsSerializationHelper.h',
     'nsSimpleNestedURI.h',
@@ -182,6 +181,7 @@ EXPORTS.mozilla.net += [
     'DashboardTypes.h',
     'MemoryDownloader.h',
     'OfflineObserver.h',
+    'Predictor.h',
     'ReferrerPolicy.h',
 ]
 
@@ -250,10 +250,11 @@ UNIFIED_SOURCES += [
     'nsURLHelper.cpp',
     'nsURLParsers.cpp',
     'OfflineObserver.cpp',
+    'PollableEvent.cpp',
     'Predictor.cpp',
     'ProxyAutoConfig.cpp',
     'RedirectChannelRegistrar.cpp',
-    'SchedulingContextService.cpp',
+    'RequestContextService.cpp',
     'SimpleBuffer.cpp',
     'StreamingProtocolService.cpp',
     'Tickler.cpp',
@@ -295,6 +296,7 @@ include('/ipc/chromium/chromium-config.mozbuild')
 FINAL_LIBRARY = 'xul'
 
 LOCAL_INCLUDES += [
+    '/docshell/base',
     '/dom/base',
     '/netwerk/protocol/http'
 ]

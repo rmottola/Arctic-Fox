@@ -1359,7 +1359,7 @@ void
 MacroAssemblerMIPSCompat::storeUnboxedValue(ConstantOrRegister value, MIRType valueType, const T& dest,
                                             MIRType slotType)
 {
-    if (valueType == MIRType_Double) {
+    if (valueType == MIRType::Double) {
         storeDouble(value.reg().typedReg().fpu(), dest);
         return;
     }
@@ -2150,7 +2150,7 @@ MacroAssembler::branchValueIsNurseryObject(Condition cond, const Address& addres
 
     Label done;
 
-    branchTestObject(Assembler::NotEqual, value, cond == Assembler::Equal ? &done : label);
+    branchTestObject(Assembler::NotEqual, address, cond == Assembler::Equal ? &done : label);
     loadPtr(address, temp);
     branchPtrInNurseryRange(cond, temp, InvalidReg, label);
 

@@ -17,6 +17,7 @@
 #include "mozilla/layers/Effects.h"
 #include "nsWindowsHelpers.h"
 #include "gfxPrefs.h"
+#include "gfxConfig.h"
 #include "gfxCrashReporterUtils.h"
 #include "gfxVR.h"
 #include "mozilla/gfx/StackArray.h"
@@ -158,9 +159,9 @@ private:
   bool mInitOkay;
 };
 
-CompositorD3D11::CompositorD3D11(nsIWidget* aWidget)
-  : mAttachments(nullptr)
-  , mWidget(aWidget)
+CompositorD3D11::CompositorD3D11(CompositorBridgeParent* aParent, widget::CompositorWidgetProxy* aWidget)
+  : Compositor(aWidget, aParent)
+  , mAttachments(nullptr)
   , mHwnd(nullptr)
   , mDisableSequenceForNextFrame(false)
   , mVerifyBuffersFailed(false)
@@ -195,17 +196,13 @@ CompositorD3D11::~CompositorD3D11()
 bool
 CompositorD3D11::Initialize()
 {
-  bool force = gfxPrefs::LayersAccelerationForceEnabled();
+  ScopedGfxFeatureReporter reporter("D3D11 Layers");
 
-  ScopedGfxFeatureReporter reporter("D3D11 Layers", force);
-
-  MOZ_ASSERT(gfxPlatform::CanUseDirect3D11());
+  MOZ_ASSERT(gfxConfig::IsEnabled(Feature::D3D11_COMPOSITING));
 
   HRESULT hr;
 
-  mDevice = gfxWindowsPlatform::GetPlatform()->GetD3D11Device();
-
-  if (!mDevice) {
+  if (!gfxWindowsPlatform::GetPlatform()->GetD3D11Device(&mDevice)) {
     return false;
   }
 
@@ -218,7 +215,7 @@ CompositorD3D11::Initialize()
 
   mFeatureLevel = mDevice->GetFeatureLevel();
 
-  mHwnd = (HWND)mWidget->GetNativeData(NS_NATIVE_WINDOW);
+  mHwnd = (HWND)mWidget->RealWidget()->GetNativeData(NS_NATIVE_WINDOW);
 
   memset(&mVSConstants, 0, sizeof(VertexShaderConstants));
 
@@ -495,10 +492,6 @@ CompositorD3D11::CreateRenderTarget(const gfx::IntRect& aRect,
   CD3D11_TEXTURE2D_DESC desc(DXGI_FORMAT_B8G8R8A8_UNORM, aRect.width, aRect.height, 1, 1,
                              D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET);
 
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in CreateRenderTarget";
-  }
-
   RefPtr<ID3D11Texture2D> texture;
   HRESULT hr = mDevice->CreateTexture2D(&desc, nullptr, getter_AddRefs(texture));
   if (FAILED(hr) || !texture) {
@@ -532,10 +525,6 @@ CompositorD3D11::CreateTexture(const gfx::IntRect& aRect,
                              aRect.width, aRect.height, 1, 1,
                              D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET);
 
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in CreateRenderTargetFromSource";
-  }
-
   RefPtr<ID3D11Texture2D> texture;
   HRESULT hr = mDevice->CreateTexture2D(&desc, nullptr, getter_AddRefs(texture));
 
@@ -549,27 +538,31 @@ CompositorD3D11::CreateTexture(const gfx::IntRect& aRect,
     const CompositingRenderTargetD3D11* sourceD3D11 =
       static_cast<const CompositingRenderTargetD3D11*>(aSource);
 
-    D3D11_BOX srcBox;
-    srcBox.left = aSourcePoint.x;
-    srcBox.top = aSourcePoint.y;
-    srcBox.front = 0;
-    srcBox.right = aSourcePoint.x + aRect.width;
-    srcBox.bottom = aSourcePoint.y + aRect.height;
-    srcBox.back = 1;
-
     const IntSize& srcSize = sourceD3D11->GetSize();
     MOZ_ASSERT(srcSize.width >= 0 && srcSize.height >= 0,
                "render targets should have nonnegative sizes");
-    if (srcBox.left < srcBox.right &&
-        srcBox.top < srcBox.bottom &&
-        srcBox.right <= static_cast<uint32_t>(srcSize.width) &&
-        srcBox.bottom <= static_cast<uint32_t>(srcSize.height)) {
+
+    IntRect srcRect(IntPoint(), srcSize);
+    IntRect copyRect(aSourcePoint, aRect.Size());
+    if (!srcRect.Contains(copyRect)) {
+      NS_WARNING("Could not copy the whole copy rect from the render target");
+    }
+
+    copyRect = copyRect.Intersect(srcRect);
+
+    if (!copyRect.IsEmpty()) {
+      D3D11_BOX copyBox;
+      copyBox.front = 0;
+      copyBox.back = 1;
+      copyBox.left = copyRect.x;
+      copyBox.top = copyRect.y;
+      copyBox.right = copyRect.XMost();
+      copyBox.bottom = copyRect.YMost();
+
       mContext->CopySubresourceRegion(texture, 0,
                                       0, 0, 0,
                                       sourceD3D11->GetD3D11Texture(), 0,
-                                      &srcBox);
-    } else {
-      NS_WARNING("Could not copy render target - source rect out of bounds");
+                                      &copyBox);
     }
   }
 
@@ -1124,14 +1117,10 @@ void
 CompositorD3D11::BeginFrame(const nsIntRegion& aInvalidRegion,
                             const Rect* aClipRectIn,
                             const Rect& aRenderBounds,
-                            bool aOpaque,
+                            const nsIntRegion& aOpaqueRegion,
                             Rect* aClipRectOut,
                             Rect* aRenderBoundsOut)
 {
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in BeginFrame";
-  }
-
   // Don't composite if we are minimised. Other than for the sake of efficency,
   // this is important because resizing our buffers when mimised will fail and
   // cause a crash when we're restored.
@@ -1297,6 +1286,19 @@ CompositorD3D11::PrepareViewport(const gfx::IntSize& aSize)
 }
 
 void
+CompositorD3D11::ForcePresent()
+{
+  LayoutDeviceIntSize size = mWidget->GetClientSize();
+
+  DXGI_SWAP_CHAIN_DESC desc;
+  mSwapChain->GetDesc(&desc);
+
+  if (desc.BufferDesc.Width == size.width && desc.BufferDesc.Height == size.height) {
+    mSwapChain->Present(0, 0);
+  }
+}
+
+void
 CompositorD3D11::PrepareViewport(const gfx::IntSize& aSize,
                                  const gfx::Matrix4x4& aProjection,
                                  float aZNear, float aZFar)
@@ -1317,10 +1319,7 @@ CompositorD3D11::PrepareViewport(const gfx::IntSize& aSize,
 void
 CompositorD3D11::EnsureSize()
 {
-  LayoutDeviceIntRect rect;
-  mWidget->GetClientBounds(rect);
-
-  mSize = rect.Size();
+  mSize = mWidget->GetClientSize();
 }
 
 bool
@@ -1398,10 +1397,6 @@ CompositorD3D11::VerifyBufferSize()
 bool
 CompositorD3D11::UpdateRenderTarget()
 {
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in UpdateRenderTarget";
-  }
-
   EnsureSize();
   if (!VerifyBufferSize()) {
     gfxCriticalNote << "Failed VerifyBufferSize in UpdateRenderTarget " << mSize;
@@ -1455,10 +1450,6 @@ DeviceAttachmentsD3D11::InitSyncObject()
                              D3D11_BIND_SHADER_RESOURCE |
                              D3D11_BIND_RENDER_TARGET);
   desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
-
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in InitSyncObject";
-  }
 
   RefPtr<ID3D11Texture2D> texture;
   HRESULT hr = mDevice->CreateTexture2D(&desc, nullptr, getter_AddRefs(texture));
@@ -1602,10 +1593,6 @@ CompositorD3D11::PaintToTarget()
 
   RefPtr<ID3D11Texture2D> readTexture;
 
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
-    gfxCriticalError() << "Out of sync D3D11 devices in PaintToTarget";
-  }
-
   hr = mDevice->CreateTexture2D(&softDesc, nullptr, getter_AddRefs(readTexture));
   if (FAILED(hr)) {
     gfxCriticalErrorOnce(gfxCriticalError::DefaultOptions(false)) << "Failed in PaintToTarget 2";
@@ -1655,7 +1642,8 @@ CompositorD3D11::HandleError(HRESULT hr, Severity aSeverity)
     MOZ_CRASH("GFX: Unrecoverable D3D11 error");
   }
 
-  if (mDevice != gfxWindowsPlatform::GetPlatform()->GetD3D11Device()) {
+  RefPtr<ID3D11Device> device;
+  if (!gfxWindowsPlatform::GetPlatform()->GetD3D11Device(&device) || device != mDevice) {
     gfxCriticalError() << "Out of sync D3D11 devices in HandleError, " << (int)mVerifyBuffersFailed;
   }
 

@@ -42,6 +42,7 @@
 #include "mozilla/ipc/FileDescriptorSetChild.h"
 #include "mozilla/ipc/FileDescriptorUtils.h"
 #include "mozilla/ipc/GeckoChildProcessHost.h"
+#include "mozilla/ipc/ProcessChild.h"
 #include "mozilla/ipc/TestShellChild.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "mozilla/layers/APZChild.h"
@@ -176,8 +177,6 @@
 #include "mozilla/dom/mobileconnection/MobileConnectionChild.h"
 #include "mozilla/dom/mobilemessage/SmsChild.h"
 #include "mozilla/dom/devicestorage/DeviceStorageRequestChild.h"
-#include "mozilla/dom/PFileSystemRequestChild.h"
-#include "mozilla/dom/FileSystemTaskBase.h"
 #include "mozilla/dom/bluetooth/PBluetoothChild.h"
 #include "mozilla/dom/PFMRadioChild.h"
 #include "mozilla/dom/PPresentationChild.h"
@@ -194,7 +193,6 @@
 #include "nsIPrincipal.h"
 #include "nsDeviceStorage.h"
 #include "DomainPolicy.h"
-#include "mozilla/dom/DataStoreService.h"
 #include "mozilla/dom/ipc/StructuredCloneData.h"
 #include "mozilla/dom/telephony/PTelephonyChild.h"
 #include "mozilla/dom/time/DateCacheCleaner.h"
@@ -852,11 +850,16 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
   nsTArray<FrameScriptInfo> frameScripts;
   nsCString urlToLoad;
 
+  PRenderFrameChild* renderFrame = newChild->SendPRenderFrameConstructor();
+  TextureFactoryIdentifier textureFactoryIdentifier;
+  uint64_t layersId = 0;
+
   if (aIframeMoz) {
     MOZ_ASSERT(aTabOpener);
-    newChild->SendBrowserFrameOpenWindow(aTabOpener, NS_ConvertUTF8toUTF16(url),
+    newChild->SendBrowserFrameOpenWindow(aTabOpener, renderFrame, NS_ConvertUTF8toUTF16(url),
                                          name, NS_ConvertUTF8toUTF16(features),
-                                         aWindowIsNew);
+                                         aWindowIsNew, &textureFactoryIdentifier,
+                                         &layersId);
   } else {
     nsAutoCString baseURIString;
     if (aTabOpener) {
@@ -874,12 +877,18 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
     auto* opener = nsPIDOMWindowOuter::From(aParent);
     nsIDocShell* openerShell;
     RefPtr<nsDocShell> openerDocShell;
+    float fullZoom = 1.0f;
     if (opener && (openerShell = opener->GetDocShell())) {
       openerDocShell = static_cast<nsDocShell*>(openerShell);
+      nsCOMPtr<nsIContentViewer> cv;
+      openerDocShell->GetContentViewer(getter_AddRefs(cv));
+      if (cv) {
+        cv->GetFullZoom(&fullZoom);
+      }
     }
 
     nsresult rv;
-    if (!SendCreateWindow(aTabOpener, newChild,
+    if (!SendCreateWindow(aTabOpener, newChild, renderFrame,
                           aChromeFlags, aCalledFromJS, aPositionSpecified,
                           aSizeSpecified, url,
                           name, features,
@@ -887,28 +896,29 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
                           openerDocShell
                             ? openerDocShell->GetOriginAttributes()
                             : DocShellOriginAttributes(),
+                          fullZoom,
                           &rv,
                           aWindowIsNew,
                           &frameScripts,
-                          &urlToLoad)) {
+                          &urlToLoad,
+                          &textureFactoryIdentifier,
+                          &layersId)) {
+      PRenderFrameChild::Send__delete__(renderFrame);
       return NS_ERROR_NOT_AVAILABLE;
     }
 
     if (NS_FAILED(rv)) {
+      PRenderFrameChild::Send__delete__(renderFrame);
+      PBrowserChild::Send__delete__(newChild);
       return rv;
     }
   }
   if (!*aWindowIsNew) {
+    PRenderFrameChild::Send__delete__(renderFrame);
     PBrowserChild::Send__delete__(newChild);
     return NS_ERROR_ABORT;
   }
 
-  TextureFactoryIdentifier textureFactoryIdentifier;
-  uint64_t layersId = 0;
-  PRenderFrameChild* renderFrame = newChild->SendPRenderFrameConstructor();
-  newChild->SendGetRenderFrameInfo(renderFrame,
-                                   &textureFactoryIdentifier,
-                                   &layersId);
   if (layersId == 0) { // if renderFrame is invalid.
     PRenderFrameChild::Send__delete__(renderFrame);
     renderFrame = nullptr;
@@ -1176,24 +1186,6 @@ NS_IMETHODIMP MemoryReportRequestChild::Run()
   return mgr->GetReportsForThisProcessExtended(cb, nullptr, mAnonymize,
                                                FileDescriptorToFILE(mDMDFile, "wb"),
                                                finished, nullptr);
-}
-
-bool
-ContentChild::RecvDataStoreNotify(const uint32_t& aAppId,
-                                  const nsString& aName,
-                                  const nsString& aManifestURL)
-{
-  RefPtr<DataStoreService> service = DataStoreService::GetOrCreate();
-  if (NS_WARN_IF(!service)) {
-    return false;
-  }
-
-  nsresult rv = service->EnableDataStore(aAppId, aName, aManifestURL);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
-    return false;
-  }
-
-  return true;
 }
 
 bool
@@ -1502,7 +1494,7 @@ ContentChild::RecvBidiKeyboardNotify(const bool& aIsLangRTL)
   return true;
 }
 
-static CancelableTask* sFirstIdleTask;
+static CancelableRunnable* sFirstIdleTask;
 
 static void FirstIdle(void)
 {
@@ -1583,8 +1575,9 @@ ContentChild::RecvPBrowserConstructor(PBrowserChild* aActor,
       hasRunOnce = true;
 
     MOZ_ASSERT(!sFirstIdleTask);
-    sFirstIdleTask = NewRunnableFunction(FirstIdle);
-    MessageLoop::current()->PostIdleTask(FROM_HERE, sFirstIdleTask);
+    RefPtr<CancelableRunnable> firstIdleTask = NewRunnableFunction(FirstIdle);
+    sFirstIdleTask = firstIdleTask;
+    MessageLoop::current()->PostIdleTask(firstIdleTask.forget());
 
     // Redo InitProcessAttributes() when the app or browser is really
     // launching so the attributes will be correct.
@@ -1813,24 +1806,6 @@ bool
 ContentChild::DeallocPDeviceStorageRequestChild(PDeviceStorageRequestChild* aDeviceStorage)
 {
   delete aDeviceStorage;
-  return true;
-}
-
-PFileSystemRequestChild*
-ContentChild::AllocPFileSystemRequestChild(const FileSystemParams& aParams)
-{
-  MOZ_CRASH("Should never get here!");
-  return nullptr;
-}
-
-bool
-ContentChild::DeallocPFileSystemRequestChild(PFileSystemRequestChild* aFileSystem)
-{
-  mozilla::dom::FileSystemTaskBase* child =
-    static_cast<mozilla::dom::FileSystemTaskBase*>(aFileSystem);
-  // The reference is increased in FileSystemTaskBase::Start of
-  // FileSystemTaskBase.cpp. We should decrease it after IPC.
-  NS_RELEASE(child);
   return true;
 }
 
@@ -2237,14 +2212,14 @@ ContentChild::ActorDestroy(ActorDestroyReason why)
 {
   if (AbnormalShutdown == why) {
     NS_WARNING("shutting down early because of crash!");
-    QuickExit();
+    ProcessChild::QuickExit();
   }
 
 #ifndef NS_FREE_PERMANENT_DATA
   // In release builds, there's no point in the content process
   // going through the full XPCOM shutdown path, because it doesn't
   // keep persistent state.
-  QuickExit();
+  ProcessChild::QuickExit();
 #else
   if (sFirstIdleTask) {
     sFirstIdleTask->Cancel();
@@ -2265,7 +2240,7 @@ ContentChild::ActorDestroy(ActorDestroyReason why)
   if (IsNuwaProcess()) {
     // The Nuwa cannot go through the full XPCOM shutdown path or deadlock
     // will result.
-    QuickExit();
+    ProcessChild::QuickExit();
   }
 #endif
 
@@ -2304,13 +2279,6 @@ ContentChild::ProcessingError(Result aCode, const char* aReason)
   }
 #endif
   NS_RUNTIMEABORT("Content child abort due to IPC error");
-}
-
-void
-ContentChild::QuickExit()
-{
-  NS_WARNING("content process _exit()ing");
-  _exit(0);
 }
 
 nsresult
@@ -2421,9 +2389,9 @@ ContentChild::RecvLoadProcessScript(const nsString& aURL)
 
 bool
 ContentChild::RecvAsyncMessage(const nsString& aMsg,
-                               const ClonedMessageData& aData,
                                InfallibleTArray<CpowEntry>&& aCpows,
-                               const IPC::Principal& aPrincipal)
+                               const IPC::Principal& aPrincipal,
+                               const ClonedMessageData& aData)
 {
   RefPtr<nsFrameMessageManager> cpm =
     nsFrameMessageManager::GetChildProcessManager();
@@ -2631,8 +2599,7 @@ ContentChild::RecvAppInit()
 #ifdef MOZ_NUWA_PROCESS
   if (IsNuwaProcess()) {
     ContentChild::GetSingleton()->RecvGarbageCollect();
-    MessageLoop::current()->PostTask(
-      FROM_HERE, NewRunnableFunction(OnFinishNuwaPreparation));
+    MessageLoop::current()->PostTask(NewRunnableFunction(OnFinishNuwaPreparation));
   }
 #endif
 
@@ -3228,6 +3195,9 @@ ContentChild::RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
           if (item.data().type() == IPCDataTransferData::TnsString) {
             const nsString& data = item.data().get_nsString();
             variant->SetAsAString(data);
+          } else if (item.data().type() == IPCDataTransferData::TnsCString) {
+            const nsCString& data = item.data().get_nsCString();
+            variant->SetAsACString(data);
           } else if (item.data().type() == IPCDataTransferData::TPBlobChild) {
             BlobChild* blob = static_cast<BlobChild*>(item.data().get_PBlobChild());
             RefPtr<BlobImpl> blobImpl = blob->GetBlobImpl();
@@ -3235,9 +3205,9 @@ ContentChild::RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
           } else {
             continue;
           }
-          dataTransfer->SetDataWithPrincipal(NS_ConvertUTF8toUTF16(item.flavor()),
-                                             variant, i,
-                                             nsContentUtils::GetSystemPrincipal());
+          dataTransfer->SetDataWithPrincipalFromOtherProcess(
+            NS_ConvertUTF8toUTF16(item.flavor()), variant, i,
+            nsContentUtils::GetSystemPrincipal());
         }
       }
       session->SetDataTransfer(dataTransfer);
@@ -3266,7 +3236,8 @@ ContentChild::RecvEndDragSession(const bool& aDoneDrag,
 
 bool
 ContentChild::RecvPush(const nsCString& aScope,
-                       const IPC::Principal& aPrincipal)
+                       const IPC::Principal& aPrincipal,
+                       const nsString& aMessageId)
 {
 #ifndef MOZ_SIMPLEPUSH
   nsCOMPtr<nsIPushNotifier> pushNotifierIface =
@@ -3276,7 +3247,12 @@ ContentChild::RecvPush(const nsCString& aScope,
   }
   PushNotifier* pushNotifier =
     static_cast<PushNotifier*>(pushNotifierIface.get());
-  nsresult rv = pushNotifier->NotifyPushWorkers(aScope, aPrincipal, Nothing());
+
+  nsresult rv = pushNotifier->NotifyPushObservers(aScope, Nothing());
+  Unused << NS_WARN_IF(NS_FAILED(rv));
+
+  rv = pushNotifier->NotifyPushWorkers(aScope, aPrincipal,
+                                       aMessageId, Nothing());
   Unused << NS_WARN_IF(NS_FAILED(rv));
 #endif
   return true;
@@ -3285,6 +3261,7 @@ ContentChild::RecvPush(const nsCString& aScope,
 bool
 ContentChild::RecvPushWithData(const nsCString& aScope,
                                const IPC::Principal& aPrincipal,
+                               const nsString& aMessageId,
                                InfallibleTArray<uint8_t>&& aData)
 {
 #ifndef MOZ_SIMPLEPUSH
@@ -3295,8 +3272,12 @@ ContentChild::RecvPushWithData(const nsCString& aScope,
   }
   PushNotifier* pushNotifier =
     static_cast<PushNotifier*>(pushNotifierIface.get());
-  nsresult rv = pushNotifier->NotifyPushWorkers(aScope, aPrincipal,
-                                                Some(aData));
+
+  nsresult rv = pushNotifier->NotifyPushObservers(aScope, Some(aData));
+  Unused << NS_WARN_IF(NS_FAILED(rv));
+
+  rv = pushNotifier->NotifyPushWorkers(aScope, aPrincipal,
+                                       aMessageId, Some(aData));
   Unused << NS_WARN_IF(NS_FAILED(rv));
 #endif
   return true;
@@ -3314,9 +3295,29 @@ ContentChild::RecvPushSubscriptionChange(const nsCString& aScope,
   }
   PushNotifier* pushNotifier =
     static_cast<PushNotifier*>(pushNotifierIface.get());
-  nsresult rv = pushNotifier->NotifySubscriptionChangeWorkers(aScope,
-                                                              aPrincipal);
+
+  nsresult rv = pushNotifier->NotifySubscriptionChangeObservers(aScope);
   Unused << NS_WARN_IF(NS_FAILED(rv));
+
+  rv = pushNotifier->NotifySubscriptionChangeWorkers(aScope, aPrincipal);
+  Unused << NS_WARN_IF(NS_FAILED(rv));
+#endif
+  return true;
+}
+
+bool
+ContentChild::RecvPushError(const nsCString& aScope, const nsString& aMessage,
+                            const uint32_t& aFlags)
+{
+#ifndef MOZ_SIMPLEPUSH
+  nsCOMPtr<nsIPushNotifier> pushNotifierIface =
+      do_GetService("@mozilla.org/push/Notifier;1");
+  if (NS_WARN_IF(!pushNotifierIface)) {
+      return true;
+  }
+  PushNotifier* pushNotifier =
+    static_cast<PushNotifier*>(pushNotifierIface.get());
+  pushNotifier->NotifyErrorWorkers(aScope, aMessage, aFlags);
 #endif
   return true;
 }

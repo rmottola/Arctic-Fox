@@ -5,7 +5,7 @@
 */
 
 /* globals XPCOMUtils, NewTabPrefsProvider, Services,
-  Locale, UpdateUtils, MODE_CHANNEL_MAP
+  Locale, UpdateUtils, NewTabRemoteResources
 */
 "use strict";
 
@@ -20,7 +20,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "NewTabPrefsProvider",
                                   "resource:///modules/NewTabPrefsProvider.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Locale",
                                   "resource://gre/modules/Locale.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "MODE_CHANNEL_MAP",
+XPCOMUtils.defineLazyModuleGetter(this, "NewTabRemoteResources",
                                   "resource:///modules/NewTabRemoteResources.jsm");
 
 const LOCAL_NEWTAB_URL = "chrome://browser/content/newtab/newTab.xhtml";
@@ -44,9 +44,10 @@ const PREF_SELECTED_LOCALE = "general.useragent.locale";
 // The preference that tells what remote mode is enabled.
 const PREF_REMOTE_MODE = "browser.newtabpage.remote.mode";
 
-const VALID_CHANNELS = new Set(["esr", "release", "beta", "aurora", "nightly"]);
+// The preference that tells which remote version is expected.
+const PREF_REMOTE_VERSION = "browser.newtabpage.remote.version";
 
-const REMOTE_NEWTAB_VERSION = "0";
+const VALID_CHANNELS = new Set(["esr", "release", "beta", "aurora", "nightly"]);
 
 function AboutNewTabService() {
   NewTabPrefsProvider.prefs.on(PREF_REMOTE_ENABLED, this._handleToggleEvent.bind(this));
@@ -145,11 +146,15 @@ AboutNewTabService.prototype = {
       NewTabPrefsProvider.prefs.on(
         PREF_REMOTE_MODE,
         this._updateRemoteMaybe);
+      NewTabPrefsProvider.prefs.on(
+        PREF_REMOTE_VERSION,
+        this._updateRemoteMaybe);
       this._remoteEnabled = true;
     } else {
       NewTabPrefsProvider.prefs.off(PREF_SELECTED_LOCALE, this._updateRemoteMaybe);
       NewTabPrefsProvider.prefs.off(PREF_MATCH_OS_LOCALE, this._updateRemoteMaybe);
       NewTabPrefsProvider.prefs.off(PREF_REMOTE_MODE, this._updateRemoteMaybe);
+      NewTabPrefsProvider.prefs.off(PREF_REMOTE_VERSION, this._updateRemoteMaybe);
       this._remoteEnabled = false;
     }
     if (!csTest) {
@@ -164,14 +169,14 @@ AboutNewTabService.prototype = {
   generateRemoteURL() {
     let releaseName = this.releaseFromUpdateChannel(UpdateUtils.UpdateChannel);
     let path = REMOTE_NEWTAB_PATH
-      .replace("%VERSION%", REMOTE_NEWTAB_VERSION)
+      .replace("%VERSION%", this.remoteVersion)
       .replace("%LOCALE%", Locale.getLocale())
       .replace("%CHANNEL%", releaseName);
     let mode = Services.prefs.getCharPref(PREF_REMOTE_MODE, "production");
-    if (!(mode in MODE_CHANNEL_MAP)) {
+    if (!(mode in NewTabRemoteResources.MODE_CHANNEL_MAP)) {
       mode = "production";
     }
-    return MODE_CHANNEL_MAP[mode].origin + path;
+    return NewTabRemoteResources.MODE_CHANNEL_MAP[mode].origin + path;
   },
 
   /*
@@ -224,7 +229,7 @@ AboutNewTabService.prototype = {
   },
 
   get remoteVersion() {
-    return REMOTE_NEWTAB_VERSION;
+    return Services.prefs.getCharPref(PREF_REMOTE_VERSION, "1");
   },
 
   get remoteReleaseName() {

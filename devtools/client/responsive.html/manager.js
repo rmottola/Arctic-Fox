@@ -4,8 +4,10 @@
 
 "use strict";
 
+const { Ci, Cr } = require("chrome");
 const promise = require("promise");
 const { Task } = require("resource://gre/modules/Task.jsm");
+const { XPCOMUtils } = require("resource://gre/modules/XPCOMUtils.jsm");
 const EventEmitter = require("devtools/shared/event-emitter");
 
 const TOOL_URL = "chrome://devtools/content/responsive.html/index.xhtml";
@@ -18,7 +20,7 @@ const TOOL_URL = "chrome://devtools/content/responsive.html/index.xhtml";
  * from devtools/client/responsivedesign/responsivedesign.jsm delegates to this
  * object when the pref "devtools.responsive.html.enabled" is true.
  */
-exports.ResponsiveUIManager = {
+const ResponsiveUIManager = exports.ResponsiveUIManager = {
   activeTabs: new Map(),
 
   /**
@@ -29,32 +31,54 @@ exports.ResponsiveUIManager = {
    * @param tab
    *        The browser tab.
    * @return Promise
-   *         Resolved when the toggling has completed.
+   *         Resolved when the toggling has completed.  If the UI has opened,
+   *         it is resolved to the ResponsiveUI instance for this tab.  If the
+   *         the UI has closed, there is no resolution value.
    */
   toggle(window, tab) {
-    if (this.isActiveForTab(tab)) {
-      this.activeTabs.get(tab).destroy();
-      this.activeTabs.delete(tab);
-    } else {
-      this.runIfNeeded(window, tab);
-    }
-    // TODO: Becomes a more interesting value in a later patch
-    return promise.resolve();
+    let action = this.isActiveForTab(tab) ? "close" : "open";
+    return this[action + "IfNeeded"](window, tab);
   },
 
   /**
-   * Launches the responsive UI.
+   * Opens the responsive UI, if not already open.
    *
    * @param window
    *        The main browser chrome window.
    * @param tab
    *        The browser tab.
+   * @return Promise
+   *         Resolved to the ResponsiveUI instance for this tab when opening is
+   *         complete.
    */
-  runIfNeeded(window, tab) {
+  openIfNeeded: Task.async(function* (window, tab) {
     if (!this.isActiveForTab(tab)) {
-      this.activeTabs.set(tab, new ResponsiveUI(window, tab));
+      let ui = new ResponsiveUI(window, tab);
+      this.activeTabs.set(tab, ui);
+      yield ui.inited;
+      this.emit("on", { tab });
     }
-  },
+    return this.getResponsiveUIForTab(tab);
+  }),
+
+  /**
+   * Closes the responsive UI, if not already closed.
+   *
+   * @param window
+   *        The main browser chrome window.
+   * @param tab
+   *        The browser tab.
+   * @return Promise
+   *         Resolved (with no value) when closing is complete.
+   */
+  closeIfNeeded: Task.async(function* (window, tab) {
+    if (this.isActiveForTab(tab)) {
+      yield this.activeTabs.get(tab).destroy();
+      this.activeTabs.delete(tab);
+      this.emit("off", { tab });
+    }
+    return promise.resolve();
+  }),
 
   /**
    * Returns true if responsive UI is active for a given tab.
@@ -92,33 +116,30 @@ exports.ResponsiveUIManager = {
    *        The GCLI command arguments.
    */
   handleGcliCommand: function(window, tab, command, args) {
+    let completed;
     switch (command) {
       case "resize to":
-        this.runIfNeeded(window, tab);
-        // TODO: Probably the wrong API
-        this.activeTabs.get(tab).setSize(args.width, args.height);
+        completed = this.openIfNeeded(window, tab);
+        this.activeTabs.get(tab).setViewportSize(args.width, args.height);
         break;
       case "resize on":
-        this.runIfNeeded(window, tab);
+        completed = this.openIfNeeded(window, tab);
         break;
       case "resize off":
-        if (this.isActiveForTab(tab)) {
-          this.activeTabs.get(tab).destroy();
-          this.activeTabs.delete(tab);
-        }
+        completed = this.closeIfNeeded(window, tab);
         break;
       case "resize toggle":
-        this.toggle(window, tab);
+        completed = this.toggle(window, tab);
         break;
       default:
     }
+    completed.catch(e => console.error(e));
   }
 };
 
 // GCLI commands in ../responsivedesign/resize-commands.js listen for events
 // from this object to know when the UI for a tab has opened or closed.
-EventEmitter.decorate(exports.ResponsiveUIManager);
-
+EventEmitter.decorate(ResponsiveUIManager);
 /**
  * ResponsiveUI manages the responsive design tool for a specific tab.  The
  * actual tool itself lives in a separate chrome:// document that is loaded into
@@ -126,9 +147,9 @@ EventEmitter.decorate(exports.ResponsiveUIManager);
  * integrate the tool into the surrounding browser UI as needed.
  */
 function ResponsiveUI(window, tab) {
-  this.window = window;
+  this.browserWindow = window;
   this.tab = tab;
-  this.init();
+  this.inited = this.init();
 }
 
 ResponsiveUI.prototype = {
@@ -136,12 +157,26 @@ ResponsiveUI.prototype = {
   /**
    * The main browser chrome window (that holds many tabs).
    */
-  window: null,
+  browserWindow: null,
 
   /**
    * The specific browser tab this responsive instance is for.
    */
   tab: null,
+
+  /**
+   * Promise resovled when the UI init has completed.
+   */
+  inited: null,
+
+  /**
+   * A window reference for the chrome:// document that displays the responsive
+   * design tool.  It is safe to reference this window directly even with e10s,
+   * as the tool UI is always loaded in the parent process.  The web content
+   * contained *within* the tool UI on the other hand is loaded in the child
+   * process.
+   */
+  toolWindow: null,
 
   /**
    * For the moment, we open the tool by:
@@ -156,23 +191,84 @@ ResponsiveUI.prototype = {
    * state.  Platform discussions are in progress to make this happen.  See
    * bug 1238160 about <iframe mozbrowser> for more details.
    */
-  init: Task.async(function*() {
+  init: Task.async(function* () {
     let tabBrowser = this.tab.linkedBrowser;
     let contentURI = tabBrowser.documentURI.spec;
     tabBrowser.loadURI(TOOL_URL);
     yield tabLoaded(this.tab);
-    let toolWindow = tabBrowser.contentWindow;
+    let toolWindow = this.toolWindow = tabBrowser.contentWindow;
+    toolWindow.addEventListener("message", this);
+    yield waitForMessage(toolWindow, "init");
     toolWindow.addInitialViewport(contentURI);
+    yield waitForMessage(toolWindow, "browser-mounted");
   }),
 
-  destroy() {
+  destroy: Task.async(function* () {
     let tabBrowser = this.tab.linkedBrowser;
-    tabBrowser.goBack();
-    this.window = null;
+    let browserWindow = this.browserWindow;
+    this.browserWindow = null;
     this.tab = null;
+    this.inited = null;
+    this.toolWindow = null;
+    let loaded = waitForDocLoadComplete(browserWindow.gBrowser);
+    tabBrowser.goBack();
+    yield loaded;
+  }),
+
+  handleEvent(event) {
+    let { tab, window } = this;
+    let toolWindow = tab.linkedBrowser.contentWindow;
+
+    if (event.origin !== "chrome://devtools") {
+      return;
+    }
+
+    switch (event.data.type) {
+      case "content-resize":
+        let { width, height } = event.data;
+        this.emit("content-resize", {
+          width,
+          height,
+        });
+        break;
+      case "exit":
+        toolWindow.removeEventListener(event.type, this);
+        ResponsiveUIManager.closeIfNeeded(window, tab);
+        break;
+    }
+  },
+
+  getViewportSize() {
+    return this.toolWindow.getViewportSize();
+  },
+
+  setViewportSize: Task.async(function* (width, height) {
+    yield this.inited;
+    this.toolWindow.setViewportSize(width, height);
+  }),
+
+  getViewportMessageManager() {
+    return this.toolWindow.getViewportMessageManager();
   },
 
 };
+
+EventEmitter.decorate(ResponsiveUI.prototype);
+
+function waitForMessage(win, type) {
+  let deferred = promise.defer();
+
+  let onMessage = event => {
+    if (event.data.type !== type) {
+      return;
+    }
+    win.removeEventListener("message", onMessage);
+    deferred.resolve();
+  };
+  win.addEventListener("message", onMessage);
+
+  return deferred.promise;
+}
 
 function tabLoaded(tab) {
   let deferred = promise.defer();
@@ -187,5 +283,29 @@ function tabLoaded(tab) {
   }
 
   tab.linkedBrowser.addEventListener("load", handle, true);
+  return deferred.promise;
+}
+
+/**
+ * Waits for the next load to complete in the current browser.
+ */
+function waitForDocLoadComplete(gBrowser) {
+  let deferred = promise.defer();
+  let progressListener = {
+    onStateChange: function(webProgress, req, flags, status) {
+      let docStop = Ci.nsIWebProgressListener.STATE_IS_NETWORK |
+                    Ci.nsIWebProgressListener.STATE_STOP;
+
+      // When a load needs to be retargetted to a new process it is cancelled
+      // with NS_BINDING_ABORTED so ignore that case
+      if ((flags & docStop) == docStop && status != Cr.NS_BINDING_ABORTED) {
+        gBrowser.removeProgressListener(progressListener);
+        deferred.resolve();
+      }
+    },
+    QueryInterface: XPCOMUtils.generateQI([Ci.nsIWebProgressListener,
+                                           Ci.nsISupportsWeakReference])
+  };
+  gBrowser.addProgressListener(progressListener);
   return deferred.promise;
 }

@@ -192,6 +192,7 @@ class NrIceProxyServer {
 class TestNat;
 
 class NrIceCtx {
+ friend class NrIceCtxHandler;
  public:
   enum ConnectionState { ICE_CTX_INIT,
                          ICE_CTX_CHECKING,
@@ -213,34 +214,31 @@ class NrIceCtx {
                 ICE_POLICY_ALL
   };
 
-  static void Init(bool allow_loopback = false,
-                   bool tcp_enabled = true,
-                   bool allow_link_local = false);
+  // initialize ICE globals, crypto, and logging
+  static void InitializeGlobals(bool allow_loopback = false,
+                                bool tcp_enabled = true,
+                                bool allow_link_local = false);
+  static std::string GetNewUfrag();
+  static std::string GetNewPwd();
 
-  // TODO(ekr@rtfm.com): Too many bools here. Bug 1193437.
-  static RefPtr<NrIceCtx> Create(const std::string& name,
-                                 bool offerer,
-                                 bool allow_loopback = false,
-                                 bool tcp_enabled = true,
-                                 bool allow_link_local = false,
-                                 bool hide_non_default = false,
-                                 Policy policy = ICE_POLICY_ALL);
+  bool Initialize(bool hide_non_default);
+  bool Initialize(bool hide_non_default,
+                  const std::string& ufrag,
+                  const std::string& pwd);
 
   int SetNat(const RefPtr<TestNat>& aNat);
 
   // Deinitialize all ICE global state. Used only for testing.
   static void internal_DeinitializeGlobal();
 
+  // Divide some timers to faster testing. Used only for testing.
+  void internal_SetTimerAccelarator(int divider);
 
   nr_ice_ctx *ctx() { return ctx_; }
   nr_ice_peer_ctx *peer() { return peer_; }
 
   // Testing only.
   void destroy_peer_ctx();
-
-  // Create a media stream
-  RefPtr<NrIceMediaStream> CreateStream(const std::string& name,
-                                        int components);
 
   void SetStream(size_t index, NrIceMediaStream* stream);
 
@@ -334,7 +332,7 @@ class NrIceCtx {
 
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(NrIceCtx)
 
- private:
+private:
   NrIceCtx(const std::string& name,
            bool offerer,
            Policy policy);

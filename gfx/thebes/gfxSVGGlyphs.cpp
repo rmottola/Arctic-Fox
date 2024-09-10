@@ -15,6 +15,7 @@
 #include "nsServiceManagerUtils.h"
 #include "nsIPresShell.h"
 #include "nsNetUtil.h"
+#include "nsNullPrincipal.h"
 #include "nsIInputStream.h"
 #include "nsStringStream.h"
 #include "nsStreamUtils.h"
@@ -209,23 +210,18 @@ gfxSVGGlyphsDocument::FindGlyphElements(Element *aElem)
  * If no such glyph exists, or in the case of an error return false
  * @param aContext The thebes aContext to draw to
  * @param aGlyphId The glyph id
- * @param aDrawMode Whether to fill or stroke or both (see |DrawMode|)
  * @return true iff rendering succeeded
  */
 bool
 gfxSVGGlyphs::RenderGlyph(gfxContext *aContext, uint32_t aGlyphId,
-                          DrawMode aDrawMode, gfxTextContextPaint *aContextPaint)
+                          gfxTextContextPaint *aContextPaint)
 {
-    if (aDrawMode == DrawMode::GLYPH_PATH) {
-        return false;
-    }
-
     gfxContextAutoSaveRestore aContextRestorer(aContext);
 
     Element *glyph = mGlyphIdMap.Get(aGlyphId);
     NS_ASSERTION(glyph, "No glyph element. Should check with HasSVGGlyph() first!");
 
-    return nsSVGUtils::PaintSVGGlyph(glyph, aContext, aDrawMode, aContextPaint);
+    return nsSVGUtils::PaintSVGGlyph(glyph, aContext, aContextPaint);
 }
 
 bool
@@ -347,9 +343,7 @@ gfxSVGGlyphsDocument::ParseDocument(const uint8_t *aBuffer, uint32_t aBufLen)
     rv = NS_NewURI(getter_AddRefs(uri), mSVGGlyphsDocumentURI);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsCOMPtr<nsIPrincipal> principal =
-      do_CreateInstance("@mozilla.org/nullprincipal;1", &rv);
-    NS_ENSURE_TRUE(principal, NS_ERROR_FAILURE);
+    nsCOMPtr<nsIPrincipal> principal = nsNullPrincipal::Create();
 
     nsCOMPtr<nsIDOMDocument> domDoc;
     rv = NS_NewDOMDocument(getter_AddRefs(domDoc),

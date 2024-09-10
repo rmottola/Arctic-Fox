@@ -10,7 +10,7 @@
  * nsWindow - Native window management and event handling.
  */
 
-#include "nsAutoPtr.h"
+#include "mozilla/RefPtr.h"
 #include "nsBaseWidget.h"
 #include "nsWindowBase.h"
 #include "nsdefs.h"
@@ -304,8 +304,6 @@ public:
   bool IsPopup();
   virtual bool ShouldUseOffMainThreadCompositing() override;
 
-  bool CaptureWidgetOnScreen(RefPtr<mozilla::gfx::DrawTarget> aDT) override;
-
   const IMEContext& DefaultIMC() const { return mDefaultIMC; }
 
   virtual void SetCandidateWindowForPlugin(
@@ -313,6 +311,9 @@ public:
                    aPosition) override;
   virtual void DefaultProcOfPluginEvent(
                  const mozilla::WidgetPluginEvent& aEvent) override;
+  virtual nsresult OnWindowedPluginKeyEvent(
+                     const mozilla::NativeEventData& aKeyEventData,
+                     nsIKeyEventInPluginCallback* aCallback) override;
 
 protected:
   virtual ~nsWindow();
@@ -475,6 +476,9 @@ private:
 protected:
 #endif // MOZ_XUL
 
+  HDC GetWindowSurface();
+  void FreeWindowSurface(HDC dc);
+
   static bool             IsAsyncResponseEvent(UINT aMsg, LRESULT& aResult);
   void                    IPCWindowProcHandler(UINT& msg, WPARAM& wParam, LPARAM& lParam);
 
@@ -490,7 +494,7 @@ protected:
   static void             ActivateOtherWindowHelper(HWND aWnd);
   void                    ClearCachedResources();
   nsIWidgetListener*      GetPaintListener();
-  static bool             IsRenderMode(gfxWindowsPlatform::RenderMode aMode);
+
   virtual bool            PreRender(LayerManagerComposite*) override;
   virtual void            PostRender(LayerManagerComposite*) override;
 

@@ -76,6 +76,7 @@ interface nsIPushService : nsISupports
   /** Observer topic names, exported for convenience. */
   readonly attribute DOMString pushTopic;
   readonly attribute DOMString subscriptionChangeTopic;
+  readonly attribute DOMString subscriptionLostTopic;
 
   /**
    * Creates a push subscription for the given |scope| URL and |principal|.
@@ -95,6 +96,16 @@ interface nsIPushService : nsISupports
    */
   void subscribe(in DOMString scope, in nsIPrincipal principal,
                  in nsIPushSubscriptionCallback callback);
+
+  /**
+   * Creates a restricted push subscription with the given public |key|. The
+   * application server must use the corresponding private key to authenticate
+   * message delivery requests, as described in draft-thomson-webpush-vapid.
+   */
+  void subscribeWithKey(in DOMString scope, in nsIPrincipal principal,
+                        in uint32_t keyLength,
+                        [const, array, size_is(keyLength)] in uint8_t key,
+                        in nsIPushSubscriptionCallback callback);
 
   /**
    * Removes a push subscription for the given |scope|.

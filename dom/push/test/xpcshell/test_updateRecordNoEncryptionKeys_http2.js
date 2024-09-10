@@ -29,6 +29,7 @@ function run_test() {
 
   do_get_profile();
   setPrefs({
+    'testing.allowInsecureServerURL': true,
     'http2.retryInterval': 1000,
     'http2.maxRetries': 2
   });
@@ -67,8 +68,7 @@ add_task(function* test1() {
     db
   });
 
-  yield waitForPromise(notifyPromise, DEFAULT_TIMEOUT,
-    'Timed out waiting for notifications');
+  yield notifyPromise;
 
   let aRecord = yield db.getByKeyID(serverURL + '/subscriptionNoKey');
   ok(aRecord, 'The record should still be there');

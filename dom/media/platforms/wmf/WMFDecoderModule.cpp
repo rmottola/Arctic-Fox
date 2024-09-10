@@ -17,6 +17,7 @@
 #include "nsComponentManagerUtils.h"
 #include "nsServiceManagerUtils.h"
 #include "nsIGfxInfo.h"
+#include "nsWindowsHelpers.h"
 #include "GfxDriverInfo.h"
 #include "gfxWindowsPlatform.h"
 #include "MediaInfo.h"
@@ -101,7 +102,8 @@ WMFDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
                                      layers::LayersBackend aLayersBackend,
                                      layers::ImageContainer* aImageContainer,
                                      FlushableTaskQueue* aVideoTaskQueue,
-                                     MediaDataDecoderCallback* aCallback)
+                                     MediaDataDecoderCallback* aCallback,
+                                     DecoderDoctorDiagnostics* aDiagnostics)
 {
   nsAutoPtr<WMFVideoMFTManager> manager(
     new WMFVideoMFTManager(aConfig,
@@ -122,7 +124,8 @@ WMFDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
 already_AddRefed<MediaDataDecoder>
 WMFDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
                                      FlushableTaskQueue* aAudioTaskQueue,
-                                     MediaDataDecoderCallback* aCallback)
+                                     MediaDataDecoderCallback* aCallback,
+                                     DecoderDoctorDiagnostics* aDiagnostics)
 {
   nsAutoPtr<WMFAudioMFTManager> manager(new WMFAudioMFTManager(aConfig));
 
@@ -163,9 +166,45 @@ CanCreateWMFDecoder()
   return result.value();
 }
 
+static bool
+IsH264DecoderBlacklisted()
+{
+#ifdef BLACKLIST_CRASHY_H264_DECODERS
+  WCHAR systemPath[MAX_PATH + 1];
+  if (!ConstructSystem32Path(L"msmpeg2vdec.dll", systemPath, MAX_PATH + 1)) {
+    // Cannot build path -> Assume it's not the blacklisted DLL.
+    return false;
+  }
+
+  DWORD zero;
+  DWORD infoSize = GetFileVersionInfoSizeW(systemPath, &zero);
+  if (infoSize == 0) {
+    // Can't get file info -> Assume we don't have the blacklisted DLL.
+    return false;
+  }
+  auto infoData = MakeUnique<unsigned char[]>(infoSize);
+  VS_FIXEDFILEINFO *vInfo;
+  UINT vInfoLen;
+  if (GetFileVersionInfoW(systemPath, 0, infoSize, infoData.get()) &&
+    VerQueryValueW(infoData.get(), L"\\", (LPVOID*)&vInfo, &vInfoLen))
+  {
+    if ((vInfo->dwFileVersionMS == ((12u << 16) | 0u))
+        && ((vInfo->dwFileVersionLS == ((9200u << 16) | 16426u))
+            || (vInfo->dwFileVersionLS == ((9200u << 16) | 17037u)))) {
+      // 12.0.9200.16426 & .17037 are blacklisted on Win64, see bug 1242343.
+      return true;
+    }
+  }
+#endif // BLACKLIST_CRASHY_H264_DECODERS
+  return false;
+}
+
 /* static */ bool
 WMFDecoderModule::HasH264()
 {
+  if (IsH264DecoderBlacklisted()) {
+    return false;
+  }
   return CanCreateWMFDecoder<CLSID_CMSH264DecoderMFT>();
 }
 
@@ -176,7 +215,8 @@ WMFDecoderModule::HasAAC()
 }
 
 bool
-WMFDecoderModule::SupportsMimeType(const nsACString& aMimeType) const
+WMFDecoderModule::SupportsMimeType(const nsACString& aMimeType,
+                                   DecoderDoctorDiagnostics* aDiagnostics) const
 {
   if ((aMimeType.EqualsLiteral("audio/mp4a-latm") ||
        aMimeType.EqualsLiteral("audio/mp4")) &&

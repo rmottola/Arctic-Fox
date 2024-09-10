@@ -17,8 +17,7 @@ const MAX_ENTRIES = 10;
 //    total items in the popup
 //  ]
 var testData = [
-  ["d", "direction", 0, 3],
-  ["VK_DOWN", "display", 1, 3],
+  ["d", "display", 1, 3],
   ["VK_DOWN", "dominant-baseline", 2, 3],
   ["VK_DOWN", "direction", 0, 3],
   ["VK_DOWN", "display", 1, 3],
@@ -26,28 +25,28 @@ var testData = [
   ["VK_UP", "dominant-baseline", 2, 3],
   ["VK_UP", "display", 1, 3],
   ["VK_BACK_SPACE", "d", -1, 0],
-  ["i", "direction", 0, 2],
+  ["i", "display", 1, 2],
   ["s", "display", -1, 0],
   ["VK_BACK_SPACE", "dis", -1, 0],
   ["VK_BACK_SPACE", "di", -1, 0],
   ["VK_BACK_SPACE", "d", -1, 0],
   ["VK_BACK_SPACE", "", -1, 0],
-  ["f", "fill", 0, MAX_ENTRIES],
-  ["i", "fill", 0, 4],
+  ["f", "filter", 3, MAX_ENTRIES],
+  ["i", "filter", 3, 4],
   ["VK_ESCAPE", null, -1, 0],
 ];
 
 const TEST_URI = "<h1 style='border: 1px solid red'>Header</h1>";
 
-add_task(function*() {
+add_task(function* () {
   yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
-  let {toolbox, inspector, view} = yield openRuleView();
+  let {toolbox, inspector, view, testActor} = yield openRuleView();
 
   info("Test autocompletion after 1st page load");
   yield runAutocompletionTest(toolbox, inspector, view);
 
   info("Test autocompletion after page navigation");
-  yield reloadPage(inspector);
+  yield reloadPage(inspector, testActor);
   yield runAutocompletionTest(toolbox, inspector, view);
 });
 
@@ -56,8 +55,8 @@ function* runAutocompletionTest(toolbox, inspector, view) {
   yield selectNode("h1", inspector);
 
   info("Focusing the css property editable field");
-  let brace = view.styleDocument.querySelector(".ruleview-ruleclose");
-  let editor = yield focusEditableField(view, brace);
+  let ruleEditor = getRuleViewRuleEditor(view, 0);
+  let editor = yield focusNewRuleViewProperty(ruleEditor);
 
   info("Starting to test for css property completion");
   for (let i = 0; i < testData.length; i++) {
@@ -83,7 +82,7 @@ function* testCompletion([key, completion, index, total], editor, view) {
   EventUtils.synthesizeKey(key, {}, view.styleWindow);
 
   yield onSuggest;
-  yield wait(1); // Equivalent of executeSoon
+  yield waitForTick();
 
   info("Checking the state");
   if (completion != null) {

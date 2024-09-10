@@ -13,7 +13,7 @@ namespace net {
 
 #define kMinBufSize        512
 
-class NotifyUpdateListenerEvent : public nsRunnable {
+class NotifyUpdateListenerEvent : public Runnable {
 public:
   NotifyUpdateListenerEvent(CacheFileChunkListener *aCallback,
                             CacheFileChunk *aChunk)
@@ -595,6 +595,12 @@ CacheFileChunk::OnFileRenamed(CacheFileHandle *aHandle, nsresult aResult)
 }
 
 bool
+CacheFileChunk::IsKilled()
+{
+  return mFile->IsKilled();
+}
+
+bool
 CacheFileChunk::IsReady() const
 {
   mFile->AssertOwnsLock();
@@ -657,7 +663,7 @@ CacheFileChunk::BufForReading() const
   return mBuf ? mBuf : mRWBuf;
 }
 
-MOZ_WARN_UNUSED_RESULT nsresult
+MOZ_MUST_USE nsresult
 CacheFileChunk::EnsureBufSize(uint32_t aBufSize)
 {
   mFile->AssertOwnsLock();

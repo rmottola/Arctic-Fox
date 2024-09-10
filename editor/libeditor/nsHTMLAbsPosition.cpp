@@ -83,17 +83,14 @@ nsHTMLEditor::AbsolutePositionSelection(bool aEnabled)
 NS_IMETHODIMP
 nsHTMLEditor::GetAbsolutelyPositionedSelectionContainer(nsIDOMElement **_retval)
 {
-  nsCOMPtr<nsIDOMElement> element;
-  nsresult res = GetSelectionContainer(getter_AddRefs(element));
-  NS_ENSURE_SUCCESS(res, res);
-
   nsAutoString positionStr;
-  nsCOMPtr<nsINode> node = do_QueryInterface(element);
+  nsCOMPtr<nsINode> node = GetSelectionContainer();
   nsCOMPtr<nsIDOMNode> resultNode;
 
   while (!resultNode && node && !node->IsHTMLElement(nsGkAtoms::html)) {
-    res = mHTMLCSSUtils->GetComputedProperty(*node, *nsGkAtoms::position,
-                                             positionStr);
+    nsresult res =
+      mHTMLCSSUtils->GetComputedProperty(*node, *nsGkAtoms::position,
+                                         positionStr);
     NS_ENSURE_SUCCESS(res, res);
     if (positionStr.EqualsLiteral("absolute"))
       resultNode = GetAsDOMNode(node);
@@ -102,9 +99,8 @@ nsHTMLEditor::GetAbsolutelyPositionedSelectionContainer(nsIDOMElement **_retval)
     }
   }
 
-  element = do_QueryInterface(resultNode );
-  *_retval = element;
-  NS_IF_ADDREF(*_retval);
+  nsCOMPtr<nsIDOMElement> element = do_QueryInterface(resultNode);
+  element.forget(_retval);
   return NS_OK;
 }
 
@@ -500,7 +496,7 @@ nsHTMLEditor::AbsolutelyPositionElement(nsIDOMElement* aElement,
 
     AddPositioningOffset(x, y);
     SnapToGrid(x, y);
-    SetElementPosition(aElement, x, y);
+    SetElementPosition(*element, x, y);
 
     // we may need to create a br if the positioned element is alone in its
     // container
@@ -579,11 +575,17 @@ nsHTMLEditor::SetElementPosition(nsIDOMElement *aElement, int32_t aX, int32_t aY
 {
   nsCOMPtr<Element> element = do_QueryInterface(aElement);
   NS_ENSURE_STATE(element);
-  nsAutoEditBatch batchIt(this);
 
-  mHTMLCSSUtils->SetCSSPropertyPixels(*element, *nsGkAtoms::left, aX);
-  mHTMLCSSUtils->SetCSSPropertyPixels(*element, *nsGkAtoms::top, aY);
+  SetElementPosition(*element, aX, aY);
   return NS_OK;
+}
+
+void
+nsHTMLEditor::SetElementPosition(dom::Element& aElement, int32_t aX, int32_t aY)
+{
+  nsAutoEditBatch batchIt(this);
+  mHTMLCSSUtils->SetCSSPropertyPixels(aElement, *nsGkAtoms::left, aX);
+  mHTMLCSSUtils->SetCSSPropertyPixels(aElement, *nsGkAtoms::top, aY);
 }
 
 // self-explanatory

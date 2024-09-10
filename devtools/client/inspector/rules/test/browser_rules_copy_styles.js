@@ -15,7 +15,7 @@ XPCOMUtils.defineLazyGetter(this, "osString", function() {
 
 const TEST_URI = URL_ROOT + "doc_copystyles.html";
 
-add_task(function*() {
+add_task(function* () {
   yield addTab(TEST_URI);
   let { inspector, view } = yield openRuleView();
   let contextmenu = view._contextmenu;
@@ -103,6 +103,7 @@ add_task(function*() {
                        "\tbackground-color: #00F;[\\r\\n]+" +
                        "\tfont-size: 12px;[\\r\\n]+" +
                        "\tborder-color: #00F !important;[\\r\\n]+" +
+                       "\t--var: \"\\*/\";[\\r\\n]+" +
                        "}",
       hidden: {
         copyLocation: true,
@@ -143,8 +144,8 @@ add_task(function*() {
       }
     },
     {
-      setup: function*() {
-        yield disableProperty(view);
+      setup: function* () {
+        yield disableProperty(view, 0);
       },
       desc: "Test Copy Rule with Disabled Property",
       node: ruleEditor.rule.textProps[2].editor.nameSpan,
@@ -154,6 +155,30 @@ add_task(function*() {
                        "\tbackground-color: #00F;[\\r\\n]+" +
                        "\tfont-size: 12px;[\\r\\n]+" +
                        "\tborder-color: #00F !important;[\\r\\n]+" +
+                       "\t--var: \"\\*/\";[\\r\\n]+" +
+                       "}",
+      hidden: {
+        copyLocation: true,
+        copyPropertyDeclaration: false,
+        copyPropertyName: false,
+        copyPropertyValue: true,
+        copySelector: true,
+        copyRule: false
+      }
+    },
+    {
+      setup: function* () {
+        yield disableProperty(view, 4);
+      },
+      desc: "Test Copy Rule with Disabled Property with Comment",
+      node: ruleEditor.rule.textProps[2].editor.nameSpan,
+      menuItem: contextmenu.menuitemCopyRule,
+      expectedPattern: "#testid {[\\r\\n]+" +
+                       "\t\/\\* color: #F00; \\*\/[\\r\\n]+" +
+                       "\tbackground-color: #00F;[\\r\\n]+" +
+                       "\tfont-size: 12px;[\\r\\n]+" +
+                       "\tborder-color: #00F !important;[\\r\\n]+" +
+                       "\t/\\* --var: \"\\*\\\\\/\"; \\*\/[\\r\\n]+" +
                        "}",
       hidden: {
         copyLocation: true,
@@ -234,20 +259,17 @@ function* checkCopyStyle(view, node, menuItem, expectedPattern, hidden) {
   try {
     yield waitForClipboard(() => menuItem.click(),
       () => checkClipboardData(expectedPattern));
-  } catch(e) {
+  } catch (e) {
     failedClipboard(expectedPattern);
   }
 
   view._contextmenu._menupopup.hidePopup();
 }
 
-function* disableProperty(view) {
+function* disableProperty(view, index) {
   let ruleEditor = getRuleViewRuleEditor(view, 1);
-  let propEditor = ruleEditor.rule.textProps[0].editor;
-
-  info("Disabling a property");
-  propEditor.enable.click();
-  yield ruleEditor.rule._applyingModifications;
+  let textProp = ruleEditor.rule.textProps[index];
+  yield togglePropStatus(view, textProp);
 }
 
 function checkClipboardData(expectedPattern) {

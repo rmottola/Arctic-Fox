@@ -42,7 +42,11 @@
 #endif
 
 #ifdef XP_WIN
+#include "mozilla/widget/AudioSession.h"
 #include <windows.h>
+#if defined(MOZ_SANDBOX)
+#include "SandboxBroker.h"
+#endif
 #endif
 
 // all this crap is needed to do the interactive shell stuff
@@ -96,6 +100,20 @@ private:
     nsCOMPtr<nsIFile> mPluginDir;
     nsCOMPtr<nsIFile> mAppFile;
 };
+
+#ifdef XP_WIN
+class MOZ_STACK_CLASS AutoAudioSession
+{
+public:
+    AutoAudioSession() {
+        widget::StartAudioSession();
+    }
+
+    ~AutoAudioSession() {
+        widget::StopAudioSession();
+    }
+};
+#endif
 
 static const char kXPConnectServiceContractID[] = "@mozilla.org/js/xpc/XPConnect;1";
 
@@ -546,13 +564,13 @@ Btoa(JSContext* cx, unsigned argc, Value* vp)
   return xpc::Base64Encode(cx, args[0], args.rval());
 }
 
-static PersistentRootedValue sScriptedInterruptCallback;
+static PersistentRootedValue *sScriptedInterruptCallback = nullptr;
 
 static bool
 XPCShellInterruptCallback(JSContext* cx)
 {
-    MOZ_ASSERT(sScriptedInterruptCallback.initialized());
-    RootedValue callback(cx, sScriptedInterruptCallback);
+    MOZ_ASSERT(sScriptedInterruptCallback->initialized());
+    RootedValue callback(cx, *sScriptedInterruptCallback);
 
     // If no interrupt callback was set by script, no-op.
     if (callback.isUndefined())
@@ -574,7 +592,7 @@ XPCShellInterruptCallback(JSContext* cx)
 static bool
 SetInterruptCallback(JSContext* cx, unsigned argc, Value* vp)
 {
-    MOZ_ASSERT(sScriptedInterruptCallback.initialized());
+    MOZ_ASSERT(sScriptedInterruptCallback->initialized());
 
     // Sanity-check args.
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
@@ -585,7 +603,7 @@ SetInterruptCallback(JSContext* cx, unsigned argc, Value* vp)
 
     // Allow callers to remove the interrupt callback by passing undefined.
     if (args[0].isUndefined()) {
-        sScriptedInterruptCallback = UndefinedValue();
+        *sScriptedInterruptCallback = UndefinedValue();
         return true;
     }
 
@@ -595,7 +613,7 @@ SetInterruptCallback(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    sScriptedInterruptCallback = args[0];
+    *sScriptedInterruptCallback = args[0];
 
     return true;
 }
@@ -776,10 +794,14 @@ env_resolve(JSContext* cx, HandleObject obj, HandleId id, bool* resolvedp)
     return true;
 }
 
-static const JSClass env_class = {
-    "environment", JSCLASS_HAS_PRIVATE,
+static const JSClassOps env_classOps = {
     nullptr, nullptr, nullptr, env_setProperty,
     env_enumerate, env_resolve
+};
+
+static const JSClass env_class = {
+    "environment", JSCLASS_HAS_PRIVATE,
+    &env_classOps
 };
 
 /***************************************************************************/
@@ -1419,7 +1441,8 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
         // Override the default XPConnect interrupt callback. We could store the
         // old one and restore it before shutting down, but there's not really a
         // reason to bother.
-        sScriptedInterruptCallback.init(rt, UndefinedValue());
+        sScriptedInterruptCallback = new PersistentRootedValue;
+        sScriptedInterruptCallback->init(rt, UndefinedValue());
         JS_SetInterruptCallback(rt, XPCShellInterruptCallback);
 
         AutoJSAPI jsapi;
@@ -1498,6 +1521,19 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
         gfxPrefs::GetSingleton();
         // Initialize e10s check on the main thread, if not already done
         BrowserTabsRemoteAutostart();
+#ifdef XP_WIN
+        // Plugin may require audio session if installed plugin can initialize
+        // asynchronized.
+        AutoAudioSession audioSession;
+
+#if defined(MOZ_SANDBOX)
+        // Required for sandboxed child processes.
+        if (!SandboxBroker::Initialize()) {
+          NS_WARNING("Failed to initialize broker services, sandboxed "
+                     "processes will fail to start.");
+        }
+#endif
+#endif
 
         {
             JS::Rooted<JSObject*> glob(cx, holder->GetJSObject());

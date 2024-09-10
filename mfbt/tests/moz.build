@@ -28,6 +28,7 @@ CppUnitTests([
     'TestMacroForEach',
     'TestMathAlgorithms',
     'TestMaybe',
+    'TestNotNull',
     'TestPair',
     'TestRefPtr',
     'TestRollingMean',

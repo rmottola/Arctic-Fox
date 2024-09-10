@@ -10,14 +10,23 @@
   */
 
 const EventEmitter = require("devtools/shared/event-emitter");
-const { Cu } = require("chrome");
-const { ViewHelpers } = Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm", {});
+const { Cu, Cc, Ci } = require("chrome");
+const { ViewHelpers } =
+      Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm",
+                {});
+
+const { LocalizationHelper } = require("devtools/client/shared/l10n");
 const STRINGS_URI = "chrome://devtools/locale/filterwidget.properties";
-const L10N = new ViewHelpers.L10N(STRINGS_URI);
+const L10N = new LocalizationHelper(STRINGS_URI);
+
 const {cssTokenizer} = require("devtools/client/shared/css-parsing-utils");
 
 loader.lazyGetter(this, "asyncStorage",
                   () => require("devtools/shared/async-storage"));
+
+loader.lazyGetter(this, "DOMUtils", () => {
+  return Cc["@mozilla.org/inspector/dom-utils;1"].getService(Ci.inIDOMUtils);
+});
 
 const DEFAULT_FILTER_TYPE = "length";
 const UNIT_MAPPING = {
@@ -62,7 +71,7 @@ const filterList = [
   },
   {
     "name": "hue-rotate",
-    "range": [0, 360],
+    "range": [0, Infinity],
     "type": "angle"
   },
   {
@@ -91,6 +100,9 @@ const filterList = [
     "type": "string"
   }
 ];
+
+// Valid values that shouldn't be parsed for filters.
+const SPECIAL_VALUES = new Set(["none", "unset", "initial", "inherit"]);
 
 /**
  * A CSS Filter editor widget used to add/remove/modify
@@ -307,8 +319,11 @@ CSSFilterEditorWidget.prototype = {
       let value = startValue + direction * multiplier;
 
       const [min, max] = this._definition(filter.name).range;
-      value = value < min ? min :
-              value > max ? max : value;
+      if (value < min) {
+        value = min;
+      } else if (value > max) {
+        value = max;
+      }
 
       input.value = fixFloat(value);
 
@@ -323,8 +338,8 @@ CSSFilterEditorWidget.prototype = {
       let {start, end, value} = num;
 
       let split = input.value.split("");
-      let computed = fixFloat(value + direction * multiplier),
-          dotIndex = computed.indexOf(".0");
+      let computed = fixFloat(value + direction * multiplier);
+      let dotIndex = computed.indexOf(".0");
       if (dotIndex > -1) {
         computed = computed.slice(0, -2);
 
@@ -343,10 +358,10 @@ CSSFilterEditorWidget.prototype = {
   },
 
   _input: function(e) {
-    let filterEl = e.target.closest(".filter"),
-        index = this._getFilterElementIndex(filterEl),
-        filter = this.filters[index],
-        def = this._definition(filter.name);
+    let filterEl = e.target.closest(".filter");
+    let index = this._getFilterElementIndex(filterEl);
+    let filter = this.filters[index];
+    let def = this._definition(filter.name);
 
     if (def.type !== "string") {
       e.target.value = fixFloat(e.target.value);
@@ -366,9 +381,9 @@ CSSFilterEditorWidget.prototype = {
       this.el.classList.add("dragging");
     // label-dragging
     } else if (e.target.classList.contains("devtools-draglabel")) {
-      let label = e.target,
-          input = filterEl.querySelector("input"),
-          index = this._getFilterElementIndex(filterEl);
+      let label = e.target;
+      let input = filterEl.querySelector("input");
+      let index = this._getFilterElementIndex(filterEl);
 
       this._dragging = {
         index, label, input,
@@ -386,19 +401,7 @@ CSSFilterEditorWidget.prototype = {
     }
 
     const key = select.value;
-    const def = this._definition(key);
-    // UNIT_MAPPING[string] is an empty string (falsy), so
-    // using || doesn't work here
-    const unitLabel = typeof UNIT_MAPPING[def.type] === "undefined" ?
-                             UNIT_MAPPING[DEFAULT_FILTER_TYPE] :
-                             UNIT_MAPPING[def.type];
-
-    // string-type filters have no default value but a placeholder instead
-    if (!unitLabel) {
-      this.add(key);
-    } else {
-      this.add(key, def.range[0] + unitLabel);
-    }
+    this.add(key, null);
 
     this.render();
   },
@@ -423,9 +426,9 @@ CSSFilterEditorWidget.prototype = {
   },
 
   _dragFilterElement: function(e) {
-    const rect = this.filtersList.getBoundingClientRect(),
-          top = e.pageY - LIST_PADDING,
-          bottom = e.pageY + LIST_PADDING;
+    const rect = this.filtersList.getBoundingClientRect();
+    let top = e.pageY - LIST_PADDING;
+    let bottom = e.pageY + LIST_PADDING;
     // don't allow dragging over top/bottom of list
     if (top < rect.top || bottom > rect.bottom) {
       return;
@@ -439,8 +442,11 @@ CSSFilterEditorWidget.prototype = {
     // change is the number of _steps_ taken from initial position
     // i.e. how many elements we have passed
     let change = delta / LIST_ITEM_HEIGHT;
-    change = change > 0 ? Math.floor(change) :
-             change < 0 ? Math.ceil(change) : change;
+    if (change > 0) {
+      change = Math.floor(change);
+    } else if (change < 0) {
+      change = Math.ceil(change);
+    }
 
     const children = this.filtersList.children;
     const index = [...children].indexOf(filterEl);
@@ -489,8 +495,11 @@ CSSFilterEditorWidget.prototype = {
 
     const filter = this.filters[dragging.index];
     const [min, max] = this._definition(filter.name).range;
-    value = value < min ? min :
-            value > max ? max : value;
+    if (value < min) {
+      value = min;
+    } else if (value > max) {
+      value = max;
+    }
 
     input.value = fixFloat(value);
 
@@ -551,10 +560,10 @@ CSSFilterEditorWidget.prototype = {
   _savePreset: function(e) {
     e.preventDefault();
 
-    let name = this.addPresetInput.value,
-        value = this.getCssValue();
+    let name = this.addPresetInput.value;
+    let value = this.getCssValue();
 
-    if (!name || !value || value === "none") {
+    if (!name || !value || SPECIAL_VALUES.has(value)) {
       this.emit("preset-save-error");
       return;
     }
@@ -593,9 +602,9 @@ CSSFilterEditorWidget.prototype = {
 
       let el = base.cloneNode(true);
 
-      let [name, value] = el.children,
-          label = name.children[1],
-          [input, unitPreview] = value.children;
+      let [name, value] = el.children;
+      let label = name.children[1];
+      let [input, unitPreview] = value.children;
 
       let min, max;
       if (def.range) {
@@ -615,11 +624,11 @@ CSSFilterEditorWidget.prototype = {
             input.max = max;
           }
           input.step = "0.1";
-        break;
+          break;
         case "string":
           input.type = "text";
           input.placeholder = def.placeholder;
-        break;
+          break;
       }
 
       // use photoshop-style label-dragging
@@ -637,7 +646,8 @@ CSSFilterEditorWidget.prototype = {
       this.filtersList.appendChild(el);
     }
 
-    let lastInput = this.filtersList.querySelector(`.filter:last-of-type input`);
+    let lastInput =
+        this.filtersList.querySelector(`.filter:last-of-type input`);
     if (lastInput) {
       lastInput.focus();
       // move cursor to end of input
@@ -685,6 +695,7 @@ CSSFilterEditorWidget.prototype = {
     *        filter's definition
     */
   _definition: function(name) {
+    name = name.toLowerCase();
     return filterList.find(a => a.name === name);
   },
 
@@ -701,21 +712,23 @@ CSSFilterEditorWidget.prototype = {
 
     this.filters = [];
 
-    if (cssValue === "none") {
+    if (SPECIAL_VALUES.has(cssValue)) {
+      this._specialValue = cssValue;
       this.emit("updated", this.getCssValue());
       this.render();
       return;
     }
 
-    // Apply filter to a temporary element
-    // and get the computed value to make parsing
-    // easier
-    let tmp = this.doc.createElement("i");
-    tmp.style.filter = cssValue;
-    const computedValue = this.win.getComputedStyle(tmp).filter;
+    for (let {name, value, quote} of tokenizeFilterValue(cssValue)) {
+      // If the specified value is invalid, replace it with the
+      // default.
+      if (name !== "url") {
+        if (!DOMUtils.cssPropertyIsValid("filter", name + "(" + value + ")")) {
+          value = null;
+        }
+      }
 
-    for (let {name, value} of tokenizeComputedFilter(computedValue)) {
-      this.add(name, value);
+      this.add(name, value, quote, true);
     }
 
     this.emit("updated", this.getCssValue());
@@ -729,13 +742,41 @@ CSSFilterEditorWidget.prototype = {
     *        filter name (e.g. blur)
     * @param {String} value
     *        value of the filter (e.g. 30px, 20%)
+    *        If this is |null|, then a default value may be supplied.
+    * @param {String} quote
+    *        For a url filter, the quoting style.  This can be a
+    *        single quote, a double quote, or empty.
     * @return {Number}
     *        The index of the new filter in the current list of filters
+    * @param {Boolean}
+    *        By default, adding a new filter emits an "updated" event, but if
+    *        you're calling add in a loop and wait to emit a single event after
+    *        the loop yourself, set this parameter to true.
     */
-  add: function(name, value = "") {
+  add: function(name, value, quote, noEvent) {
     const def = this._definition(name);
     if (!def) {
       return false;
+    }
+
+    if (value === null) {
+      // UNIT_MAPPING[string] is an empty string (falsy), so
+      // using || doesn't work here
+      const unitLabel = typeof UNIT_MAPPING[def.type] === "undefined" ?
+                               UNIT_MAPPING[DEFAULT_FILTER_TYPE] :
+                               UNIT_MAPPING[def.type];
+
+      // string-type filters have no default value but a placeholder instead
+      if (!unitLabel) {
+        value = "";
+      } else {
+        value = def.range[0] + unitLabel;
+      }
+
+      if (name === "url") {
+        // Default quote.
+        quote = "\"";
+      }
     }
 
     let unit = def.type === "string"
@@ -759,8 +800,10 @@ CSSFilterEditorWidget.prototype = {
       }
     }
 
-    const index = this.filters.push({value, unit, name: def.name}) - 1;
-    this.emit("updated", this.getCssValue());
+    const index = this.filters.push({value, unit, name, quote}) - 1;
+    if (!noEvent) {
+      this.emit("updated", this.getCssValue());
+    }
 
     return index;
   },
@@ -779,9 +822,22 @@ CSSFilterEditorWidget.prototype = {
       return null;
     }
 
-    const {value, unit} = filter;
+    // Just return the value+unit for non-url functions.
+    if (filter.name !== "url") {
+      return filter.value + filter.unit;
+    }
 
-    return value + unit;
+    // url values need to be quoted and escaped.
+    if (filter.quote === "'") {
+      return "'" + filter.value.replace(/\'/g, "\\'") + "'";
+    } else if (filter.quote === "\"") {
+      return "\"" + filter.value.replace(/\"/g, "\\\"") + "\"";
+    }
+
+    // Unquoted.  This approach might change the original input -- for
+    // example the original might be over-quoted.  But, this is
+    // correct and probably good enough.
+    return filter.value.replace(/[\\ \t()"']/g, "\\$&");
   },
 
   removeAt: function(index) {
@@ -803,7 +859,7 @@ CSSFilterEditorWidget.prototype = {
   getCssValue: function() {
     return this.filters.map((filter, i) => {
       return `${filter.name}(${this.getValueAt(i)})`;
-    }).join(" ") || "none";
+    }).join(" ") || this._specialValue || "none";
   },
 
   /**
@@ -875,23 +931,16 @@ function swapArrayIndices(array, a, b) {
 }
 
 /**
-  * Tokenizes CSS Filter value and returns an array of {name, value} pairs
-  *
-  * This is only a very simple tokenizer that only works its way through
-  * parenthesis in the string to detect function names and values.
-  * It assumes that the string actually is a well-formed filter value
-  * (e.g. "blur(2px) hue-rotate(100deg)").
-  *
-  * @param {String} css
-  *        CSS Filter value to be parsed
-  * @return {Array}
-  *        An array of {name, value} pairs
-  */
-function tokenizeComputedFilter(css) {
+ * Tokenizes a CSS Filter value and returns an array of {name, value} pairs.
+ *
+ * @param {String} css CSS Filter value to be parsed
+ * @return {Array} An array of {name, value} pairs
+ */
+function tokenizeFilterValue(css) {
   let filters = [];
   let depth = 0;
 
-  if (css === "none") {
+  if (SPECIAL_VALUES.has(css)) {
     return filters;
   }
 
@@ -907,7 +956,11 @@ function tokenizeComputedFilter(css) {
           state = "function";
           depth = 1;
         } else if (token.tokenType === "url" || token.tokenType === "bad_url") {
-          filters.push({name: "url", value: token.text});
+          // Extract the quoting style from the url.
+          let originalText = css.substring(token.startOffset, token.endOffset);
+          let [, quote] = /^url\([ \t\r\n\f]*(["']?)/i.exec(originalText);
+
+          filters.push({name: "url", value: token.text.trim(), quote: quote});
           // Leave state as "initial" because the URL token includes
           // the trailing close paren.
         }
@@ -917,7 +970,7 @@ function tokenizeComputedFilter(css) {
         if (token.tokenType === "symbol" && token.text === ")") {
           --depth;
           if (depth === 0) {
-            filters.push({name: name, value: contents});
+            filters.push({name: name, value: contents.trim()});
             state = "initial";
             break;
           }
@@ -954,8 +1007,8 @@ function getNeighbourNumber(string, index) {
     return null;
   }
 
-  let left = /-?[0-9.]*$/.exec(string.slice(0, index)),
-      right = /-?[0-9.]*/.exec(string.slice(index));
+  let left = /-?[0-9.]*$/.exec(string.slice(0, index));
+  let right = /-?[0-9.]*/.exec(string.slice(index));
 
   left = left ? left[0] : "";
   right = right ? right[0] : "";

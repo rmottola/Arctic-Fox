@@ -93,10 +93,6 @@
 #define IMAGE_GIF                           "image/gif"
 #define IMAGE_JPEG                          "image/jpeg"
 #define IMAGE_JPG                           "image/jpg"
-#ifdef MOZ_JXR
-#define IMAGE_JXR                           "image/jxr"
-#define IMAGE_MS_PHOTO                      "image/vnd.ms-photo"
-#endif
 #define IMAGE_PJPEG                         "image/pjpeg"
 #define IMAGE_PNG                           "image/png"
 #define IMAGE_X_PNG                         "image/x-png"
@@ -156,6 +152,7 @@
 
 #define VIDEO_MPEG                          "video/mpeg"
 #define VIDEO_MP4                           "video/mp4"
+#define VIDEO_QUICKTIME                     "video/quicktime"
 #define VIDEO_RAW                           "video/x-raw-yuv"
 #define VIDEO_OGG                           "video/ogg"
 #define VIDEO_WEBM                          "video/webm"

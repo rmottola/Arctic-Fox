@@ -83,9 +83,11 @@ CompositorOGL::BindBackdrop(ShaderProgramOGL* aProgram, GLuint aBackdrop, GLenum
   aProgram->SetBackdropTextureUnit(aTexUnit - LOCAL_GL_TEXTURE0);
 }
 
-CompositorOGL::CompositorOGL(nsIWidget *aWidget, int aSurfaceWidth,
-                             int aSurfaceHeight, bool aUseExternalSurfaceSize)
-  : mWidget(aWidget)
+CompositorOGL::CompositorOGL(CompositorBridgeParent* aParent,
+                             widget::CompositorWidgetProxy* aWidget,
+                             int aSurfaceWidth, int aSurfaceHeight,
+                             bool aUseExternalSurfaceSize)
+  : Compositor(aWidget, aParent)
   , mWidgetSize(-1, -1)
   , mSurfaceSize(aSurfaceWidth, aSurfaceHeight)
   , mHasBGRA(0)
@@ -110,7 +112,7 @@ CompositorOGL::CreateContext()
   RefPtr<GLContext> context;
 
   // Used by mock widget to create an offscreen context
-  void* widgetOpenGLContext = mWidget->GetNativeData(NS_NATIVE_OPENGL_CONTEXT);
+  void* widgetOpenGLContext = mWidget->RealWidget()->GetNativeData(NS_NATIVE_OPENGL_CONTEXT);
   if (widgetOpenGLContext) {
     GLContext* alreadyRefed = reinterpret_cast<GLContext*>(widgetOpenGLContext);
     return already_AddRefed<GLContext>(alreadyRefed);
@@ -119,7 +121,7 @@ CompositorOGL::CreateContext()
 #ifdef XP_WIN
   if (gfxEnv::LayersPreferEGL()) {
     printf_stderr("Trying GL layers...\n");
-    context = gl::GLContextProviderEGL::CreateForWindow(mWidget, false);
+    context = gl::GLContextProviderEGL::CreateForWindow(mWidget->RealWidget(), false);
   }
 #endif
 
@@ -134,7 +136,7 @@ CompositorOGL::CreateContext()
   }
 
   if (!context) {
-    context = gl::GLContextProvider::CreateForWindow(mWidget,
+    context = gl::GLContextProvider::CreateForWindow(mWidget->RealWidget(),
                 gfxPlatform::GetPlatform()->RequiresAcceleratedGLContextForCompositorOGL());
   }
 
@@ -223,9 +225,7 @@ CompositorOGL::CleanupResources()
 bool
 CompositorOGL::Initialize()
 {
-  bool force = gfxPrefs::LayersAccelerationForceEnabled();
-
-  ScopedGfxFeatureReporter reporter("GL Layers", force);
+  ScopedGfxFeatureReporter reporter("GL Layers");
 
   // Do not allow double initialization
   MOZ_ASSERT(mGLContext == nullptr, "Don't reinitialize CompositorOGL");
@@ -605,7 +605,7 @@ CompositorOGL::GetCurrentRenderTarget() const
 static GLenum
 GetFrameBufferInternalFormat(GLContext* gl,
                              GLuint aFrameBuffer,
-                             nsIWidget* aWidget)
+                             mozilla::widget::CompositorWidgetProxy* aWidget)
 {
   if (aFrameBuffer == 0) { // default framebuffer
     return aWidget->GetGLFrameBufferFormat();
@@ -629,7 +629,7 @@ void
 CompositorOGL::BeginFrame(const nsIntRegion& aInvalidRegion,
                           const Rect *aClipRectIn,
                           const Rect& aRenderBounds,
-                          bool aOpaque,
+                          const nsIntRegion& aOpaqueRegion,
                           Rect *aClipRectOut,
                           Rect *aRenderBoundsOut)
 {
@@ -1462,13 +1462,13 @@ CompositorOGL::EndFrame()
 
 #ifdef MOZ_DUMP_PAINTING
   if (gfxEnv::DumpCompositorTextures()) {
-    LayoutDeviceIntRect rect;
+    LayoutDeviceIntSize size;
     if (mUseExternalSurfaceSize) {
-      rect = LayoutDeviceIntRect(0, 0, mSurfaceSize.width, mSurfaceSize.height);
+      size = LayoutDeviceIntSize(mSurfaceSize.width, mSurfaceSize.height);
     } else {
-      mWidget->GetBounds(rect);
+      size = mWidget->GetClientSize();
     }
-    RefPtr<DrawTarget> target = gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(IntSize(rect.width, rect.height), SurfaceFormat::B8G8R8A8);
+    RefPtr<DrawTarget> target = gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(IntSize(size.width, size.height), SurfaceFormat::B8G8R8A8);
     if (target) {
       CopyToTarget(target, nsIntPoint(), Matrix());
       WriteSnapshotToDumpFile(this, target);
@@ -1600,7 +1600,7 @@ CompositorOGL::Resume()
     return false;
 
   // RenewSurface internally calls MakeCurrent.
-  return gl()->RenewSurface(GetWidget());
+  return gl()->RenewSurface(GetWidget()->RealWidget());
 #endif
   return true;
 }

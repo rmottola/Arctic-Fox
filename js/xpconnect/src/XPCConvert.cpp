@@ -693,7 +693,7 @@ XPCConvert::JSData2Native(void* d, HandleValue s,
                     *pErr = NS_ERROR_XPC_BAD_CONVERT_JS_NULL_REF;
                 return false;
             }
-            nsCOMPtr<nsIAtom> atom = NS_NewAtom(autoStr);
+            nsCOMPtr<nsIAtom> atom = NS_Atomize(autoStr);
             atom.forget((nsISupports**)d);
             return true;
         }
@@ -1083,10 +1083,7 @@ XPCConvert::JSValToXPCException(MutableHandleValue s,
         JSObject* unwrapped = js::CheckedUnwrap(obj, /* stopAtWindowProxy = */ false);
         if (!unwrapped)
             return NS_ERROR_XPC_SECURITY_MANAGER_VETO;
-        XPCWrappedNative* wrapper = IS_WN_REFLECTOR(unwrapped) ? XPCWrappedNative::Get(unwrapped)
-                                                               : nullptr;
-        if (wrapper) {
-            nsISupports* supports = wrapper->GetIdentityObject();
+        if (nsISupports* supports = UnwrapReflectorToISupports(unwrapped)) {
             nsCOMPtr<nsIException> iface = do_QueryInterface(supports);
             if (iface) {
                 // just pass through the exception (with extra ref and all)

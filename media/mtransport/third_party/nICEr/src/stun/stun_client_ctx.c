@@ -35,6 +35,7 @@ static char *RCSSTRING __UNUSED__="$Id: stun_client_ctx.c,v 1.2 2008/04/28 18:21
 
 #include <assert.h>
 #include <string.h>
+#include <math.h>
 
 #include <nr_api.h>
 #include "stun.h"
@@ -384,8 +385,12 @@ static int nr_stun_client_send_request(nr_stun_client_ctx *ctx)
 
     assert(ctx->my_addr.protocol==ctx->peer_addr.protocol);
 
-    if(r=nr_socket_sendto(ctx->sock, ctx->request->buffer, ctx->request->length, 0, &ctx->peer_addr))
-      ABORT(r);
+    if(r=nr_socket_sendto(ctx->sock, ctx->request->buffer, ctx->request->length, 0, &ctx->peer_addr)) {
+      if (r != R_WOULDBLOCK) {
+        ABORT(r);
+      }
+      r_log(NR_LOG_STUN,LOG_WARNING,"STUN-CLIENT(%s): nr_socket_sendto blocked, treating as dropped packet",ctx->label);
+    }
 
     ctx->request_ct++;
 

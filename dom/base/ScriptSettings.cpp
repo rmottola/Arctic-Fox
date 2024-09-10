@@ -52,7 +52,10 @@ public:
 
   static nsIGlobalObject* IncumbentGlobal() {
     ScriptSettingsStackEntry *entry = Top();
-    return entry ? entry->mGlobalObject : nullptr;
+    if (!entry) {
+      return nullptr;
+    }
+    return entry->mGlobalObject;
   }
 
   static ScriptSettingsStackEntry* EntryPoint() {
@@ -70,7 +73,10 @@ public:
 
   static nsIGlobalObject* EntryGlobal() {
     ScriptSettingsStackEntry *entry = EntryPoint();
-    return entry ? entry->mGlobalObject : nullptr;
+    if (!entry) {
+      return nullptr;
+    }
+    return entry->mGlobalObject;
   }
 
 };
@@ -552,11 +558,6 @@ WarningOnlyErrorReporter(JSContext* aCx, const char* aMessage, JSErrorReport* aR
 }
 
 void
-AutoJSAPI::TakeOwnershipOfErrorReporting()
-{
-}
-
-void
 AutoJSAPI::ReportException()
 {
   if (!HasException()) {
@@ -579,7 +580,8 @@ AutoJSAPI::ReportException()
   JSAutoCompartment ac(cx(), errorGlobal);
   JS::Rooted<JS::Value> exn(cx());
   js::ErrorReport jsReport(cx());
-  if (StealException(&exn) && jsReport.init(cx(), exn)) {
+  if (StealException(&exn) &&
+      jsReport.init(cx(), exn, js::ErrorReport::WithSideEffects)) {
     if (mIsMainThread) {
       RefPtr<xpc::ErrorReport> xpcReport = new xpc::ErrorReport();
 
@@ -660,8 +662,6 @@ AutoEntryScript::AutoEntryScript(nsIGlobalObject* aGlobalObject,
   if (aIsMainThread && gRunToCompletionListeners > 0) {
     mDocShellEntryMonitor.emplace(cx(), aReason);
   }
-
-  TakeOwnershipOfErrorReporting();
 }
 
 AutoEntryScript::AutoEntryScript(JSObject* aObject,
@@ -690,7 +690,7 @@ AutoEntryScript::DocshellEntryMonitor::DocshellEntryMonitor(JSContext* aCx,
 void
 AutoEntryScript::DocshellEntryMonitor::Entry(JSContext* aCx, JSFunction* aFunction,
                                              JSScript* aScript, JS::Handle<JS::Value> aAsyncStack,
-                                             JS::Handle<JSString*> aAsyncCause)
+                                             const char* aAsyncCause)
 {
   JS::Rooted<JSFunction*> rootedFunction(aCx);
   if (aFunction) {
@@ -735,13 +735,11 @@ AutoEntryScript::DocshellEntryMonitor::Entry(JSContext* aCx, JSFunction* aFuncti
     const char16_t* functionNameChars = functionName.isTwoByte() ?
       functionName.twoByteChars() : nullptr;
 
-    JS::Rooted<JS::Value> asyncCauseValue(aCx, aAsyncCause ? StringValue(aAsyncCause) :
-                                          JS::NullValue());
     docShellForJSRunToCompletion->NotifyJSRunToCompletionStart(mReason,
                                                                functionNameChars,
                                                                filename.BeginReading(),
                                                                lineNumber, aAsyncStack,
-                                                               asyncCauseValue);
+                                                               aAsyncCause);
   }
 }
 
@@ -850,28 +848,6 @@ AutoJSContext::operator JSContext*() const
   return mCx;
 }
 
-ThreadsafeAutoJSContext::ThreadsafeAutoJSContext(MOZ_GUARD_OBJECT_NOTIFIER_ONLY_PARAM_IN_IMPL)
-{
-  MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-
-  if (NS_IsMainThread()) {
-    mCx = nullptr;
-    mAutoJSContext.emplace();
-  } else {
-    mCx = mozilla::dom::workers::GetCurrentThreadJSContext();
-    mRequest.emplace(mCx);
-  }
-}
-
-ThreadsafeAutoJSContext::operator JSContext*() const
-{
-  if (mCx) {
-    return mCx;
-  } else {
-    return *mAutoJSContext;
-  }
-}
-
 AutoSafeJSContext::AutoSafeJSContext(MOZ_GUARD_OBJECT_NOTIFIER_ONLY_PARAM_IN_IMPL)
   : AutoJSAPI()
 {
@@ -884,28 +860,6 @@ AutoSafeJSContext::AutoSafeJSContext(MOZ_GUARD_OBJECT_NOTIFIER_ONLY_PARAM_IN_IMP
              "This is quite odd.  We should have crashed in the "
              "xpc::NativeGlobal() call if xpc::UnprivilegedJunkScope() "
              "returned null, and inited correctly otherwise!");
-}
-
-ThreadsafeAutoSafeJSContext::ThreadsafeAutoSafeJSContext(MOZ_GUARD_OBJECT_NOTIFIER_ONLY_PARAM_IN_IMPL)
-{
-  MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-
-  if (NS_IsMainThread()) {
-    mCx = nullptr;
-    mAutoSafeJSContext.emplace();
-  } else {
-    mCx = mozilla::dom::workers::GetCurrentThreadJSContext();
-    mRequest.emplace(mCx);
-  }
-}
-
-ThreadsafeAutoSafeJSContext::operator JSContext*() const
-{
-  if (mCx) {
-    return mCx;
-  } else {
-    return *mAutoSafeJSContext;
-  }
 }
 
 } // namespace mozilla

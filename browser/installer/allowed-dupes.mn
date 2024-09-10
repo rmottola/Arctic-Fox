@@ -374,8 +374,6 @@ browser/chrome/devtools/skin/images/animation-fast-track.svg
 browser/chrome/devtools/skin/themes/images/animation-fast-track.svg
 browser/chrome/devtools/skin/images/tool-network.svg
 browser/chrome/devtools/skin/themes/images/tool-network.svg
-browser/chrome/devtools/skin/floating-scrollbars.css
-browser/chrome/devtools/skin/themes/floating-scrollbars.css
 browser/chrome/devtools/skin/images/tool-debugger.svg
 browser/chrome/devtools/skin/themes/images/tool-debugger.svg
 browser/chrome/devtools/skin/images/tool-debugger-paused.svg
@@ -624,6 +622,9 @@ browser/chrome/browser/skin/classic/browser/identity-mixed-passive-loaded.svg
 browser/chrome/devtools/skin/images/security-state-weak.svg
 browser/chrome/browser/skin/classic/browser/identity-secure.svg
 browser/chrome/browser/skin/classic/browser/identity-not-secure.svg
+
+browser/chrome/browser/defaults/permissions
+browser/defaults/permissions
 
 
 #Windows ArcticFox exceptions

@@ -74,7 +74,12 @@ DirectProxyHandler::call(JSContext* cx, HandleObject proxy, const CallArgs& args
 {
     assertEnteredPolicy(cx, proxy, JSID_VOID, CALL);
     RootedValue target(cx, proxy->as<ProxyObject>().private_());
-    return Invoke(cx, args.thisv(), target, args.length(), args.array(), args.rval());
+
+    InvokeArgs iargs(cx);
+    if (!FillArgumentsFromArraylike(cx, iargs, args))
+        return false;
+
+    return js::Call(cx, target, args.thisv(), iargs, args.rval());
 }
 
 bool
@@ -135,6 +140,14 @@ DirectProxyHandler::setPrototype(JSContext* cx, HandleObject proxy, HandleObject
 {
     RootedObject target(cx, proxy->as<ProxyObject>().target());
     return SetPrototype(cx, target, proto, result);
+}
+
+bool
+DirectProxyHandler::getPrototypeIfOrdinary(JSContext* cx, HandleObject proxy,
+                                           bool* isOrdinary, MutableHandleObject protop) const
+{
+    RootedObject target(cx, proxy->as<ProxyObject>().target());
+    return GetPrototypeIfOrdinary(cx, target, isOrdinary, protop);
 }
 
 bool

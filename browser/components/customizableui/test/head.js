@@ -8,7 +8,8 @@
 var tmp = {};
 Cu.import("resource://gre/modules/Promise.jsm", tmp);
 Cu.import("resource:///modules/CustomizableUI.jsm", tmp);
-var {Promise, CustomizableUI} = tmp;
+Cu.import("resource://gre/modules/AppConstants.jsm", tmp);
+var {Promise, CustomizableUI, AppConstants} = tmp;
 
 var ChromeUtils = {};
 Services.scriptloader.loadSubScript("chrome://mochikit/content/tests/SimpleTest/ChromeUtils.js", ChromeUtils);

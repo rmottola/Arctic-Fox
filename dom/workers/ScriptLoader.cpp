@@ -9,6 +9,7 @@
 #include "nsIChannel.h"
 #include "nsIContentPolicy.h"
 #include "nsIContentSecurityPolicy.h"
+#include "nsIDocShell.h"
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIInputStreamPump.h"
@@ -194,7 +195,7 @@ ChannelFromScriptURL(nsIPrincipal* principal,
 
   if (nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(channel)) {
     rv = nsContentUtils::SetFetchReferrerURIWithPolicy(principal, parentDoc,
-                                                       httpChannel);
+                                                       httpChannel, mozilla::net::RP_Default);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -317,7 +318,8 @@ private:
   PostRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate, bool aRunResult)
           override;
 
-  NS_DECL_NSICANCELABLERUNNABLE
+  nsresult
+  Cancel() override;
 
   void
   ShutdownScriptLoader(JSContext* aCx,
@@ -707,7 +709,7 @@ private:
   }
 
   virtual bool
-  Notify(JSContext* aCx, Status aStatus) override
+  Notify(Status aStatus) override
   {
     mWorkerPrivate->AssertIsOnWorkerThread();
 
@@ -718,11 +720,7 @@ private:
         NS_NewRunnableMethod(this,
           &ScriptLoaderRunnable::CancelMainThreadWithBindingAborted);
       NS_ASSERTION(runnable, "This should never fail!");
-
-      if (NS_FAILED(NS_DispatchToMainThread(runnable))) {
-        JS_ReportError(aCx, "Failed to cancel script loader!");
-        return false;
-      }
+      MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable));
     }
 
     return true;
@@ -892,6 +890,28 @@ private:
     nsresult& rv = loadInfo.mLoadResult;
 
     nsLoadFlags loadFlags = nsIRequest::LOAD_NORMAL;
+
+    // Get the top-level worker.
+    WorkerPrivate* topWorkerPrivate = mWorkerPrivate;
+    WorkerPrivate* parent = topWorkerPrivate->GetParent();
+    while (parent) {
+      topWorkerPrivate = parent;
+      parent = topWorkerPrivate->GetParent();
+    }
+
+    // If the top-level worker is a dedicated worker and has a window, and the
+    // window has a docshell, the caching behavior of this worker should match
+    // that of that docshell.
+    if (topWorkerPrivate->IsDedicatedWorker()) {
+      nsCOMPtr<nsPIDOMWindowInner> window = topWorkerPrivate->GetWindow();
+      if (window) {
+        nsCOMPtr<nsIDocShell> docShell = do_GetInterface(window);
+        if (docShell) {
+          nsresult rv = docShell->GetDefaultLoadFlags(&loadFlags);
+          NS_ENSURE_SUCCESS(rv, rv);
+        }
+      }
+    }
 
     // If we are loading a script for a ServiceWorker then we must not
     // try to intercept it.  If the interception matches the current
@@ -1415,7 +1435,7 @@ CacheCreator::ResolvedCallback(JSContext* aCx, JS::Handle<JS::Value> aValue)
   JS::Rooted<JSObject*> obj(aCx, &aValue.toObject());
   Cache* cache = nullptr;
   nsresult rv = UNWRAP_OBJECT(Cache, obj, cache);
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(rv));
+  MOZ_ALWAYS_SUCCEEDS(rv);
 
   mCache = cache;
   MOZ_ASSERT(mCache);
@@ -1616,15 +1636,17 @@ CacheScriptLoader::OnStreamComplete(nsIStreamLoader* aLoader, nsISupports* aCont
                                     const uint8_t* aString)
 {
   AssertIsOnMainThread();
-  MOZ_ASSERT(mLoadInfo.mCacheStatus == ScriptLoadInfo::ReadingFromCache);
 
   mPump = nullptr;
 
   if (NS_FAILED(aStatus)) {
+    MOZ_ASSERT(mLoadInfo.mCacheStatus == ScriptLoadInfo::ReadingFromCache ||
+               mLoadInfo.mCacheStatus == ScriptLoadInfo::Cancel);
     Fail(aStatus);
     return NS_OK;
   }
 
+  MOZ_ASSERT(mLoadInfo.mCacheStatus == ScriptLoadInfo::ReadingFromCache);
   mLoadInfo.mCacheStatus = ScriptLoadInfo::Cached;
 
   MOZ_ASSERT(mPrincipalInfo);
@@ -1633,43 +1655,42 @@ CacheScriptLoader::OnStreamComplete(nsIStreamLoader* aLoader, nsISupports* aCont
   return NS_OK;
 }
 
-class ChannelGetterRunnable final : public nsRunnable
+class ChannelGetterRunnable final : public WorkerMainThreadRunnable
 {
-  WorkerPrivate* mParentWorker;
-  nsCOMPtr<nsIEventTarget> mSyncLoopTarget;
   const nsAString& mScriptURL;
   nsIChannel** mChannel;
   nsresult mResult;
 
 public:
   ChannelGetterRunnable(WorkerPrivate* aParentWorker,
-                        nsIEventTarget* aSyncLoopTarget,
                         const nsAString& aScriptURL,
                         nsIChannel** aChannel)
-  : mParentWorker(aParentWorker), mSyncLoopTarget(aSyncLoopTarget),
-    mScriptURL(aScriptURL), mChannel(aChannel), mResult(NS_ERROR_FAILURE)
+    : WorkerMainThreadRunnable(aParentWorker,
+                               NS_LITERAL_CSTRING("ScriptLoader :: ChannelGetter"))
+    , mScriptURL(aScriptURL)
+    , mChannel(aChannel)
+    , mResult(NS_ERROR_FAILURE)
   {
-    MOZ_ASSERT(mParentWorker);
+    MOZ_ASSERT(aParentWorker);
     aParentWorker->AssertIsOnWorkerThread();
-    MOZ_ASSERT(aSyncLoopTarget);
   }
 
-  NS_IMETHOD
-  Run() override
+  virtual bool
+  MainThreadRun() override
   {
     AssertIsOnMainThread();
 
-    nsIPrincipal* principal = mParentWorker->GetPrincipal();
+    nsIPrincipal* principal = mWorkerPrivate->GetPrincipal();
     MOZ_ASSERT(principal);
 
     // Figure out our base URI.
-    nsCOMPtr<nsIURI> baseURI = mParentWorker->GetBaseURI();
+    nsCOMPtr<nsIURI> baseURI = mWorkerPrivate->GetBaseURI();
     MOZ_ASSERT(baseURI);
 
     // May be null.
-    nsCOMPtr<nsIDocument> parentDoc = mParentWorker->GetDocument();
+    nsCOMPtr<nsIDocument> parentDoc = mWorkerPrivate->GetDocument();
 
-    nsCOMPtr<nsILoadGroup> loadGroup = mParentWorker->GetLoadGroup();
+    nsCOMPtr<nsILoadGroup> loadGroup = mWorkerPrivate->GetLoadGroup();
 
     nsCOMPtr<nsIChannel> channel;
     mResult =
@@ -1683,14 +1704,7 @@ public:
       channel.forget(mChannel);
     }
 
-    RefPtr<MainThreadStopSyncLoopRunnable> runnable =
-      new MainThreadStopSyncLoopRunnable(mParentWorker,
-                                         mSyncLoopTarget.forget(), true);
-    if (!runnable->Dispatch()) {
-      NS_ERROR("This should never fail!");
-    }
-
-    return NS_OK;
+    return true;
   }
 
   nsresult
@@ -1745,7 +1759,6 @@ ScriptExecutorRunnable::PreRun(WorkerPrivate* aWorkerPrivate)
 
   AutoJSAPI jsapi;
   jsapi.Init();
-  jsapi.TakeOwnershipOfErrorReporting();
 
   WorkerGlobalScope* globalScope =
     aWorkerPrivate->GetOrCreateGlobalScope(jsapi.cx());
@@ -1872,7 +1885,7 @@ ScriptExecutorRunnable::PostRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
   }
 }
 
-NS_IMETHODIMP
+nsresult
 ScriptExecutorRunnable::Cancel()
 {
   if (mLastIndex == mScriptLoader.mLoadInfos.Length() - 1) {
@@ -1902,9 +1915,8 @@ ScriptExecutorRunnable::ShutdownScriptLoader(JSContext* aCx,
     // 1) mScriptLoader.mRv.Failed().  In that case we just want to leave it
     //    as-is, except if it has a JS exception and we need to mute JS
     //    exceptions.  In that case, we log the exception without firing any
-    //    events and then replace it on the ErrorResult with a generic
-    //    NS_ERROR_FAILURE for lack of anything better.  XXXbz: This should
-    //    throw a NetworkError per spec updates.  See bug 1249673.
+    //    events and then replace it on the ErrorResult with a NetworkError,
+    //    per spec.
     //
     // 2) mScriptLoader.mRv succeeded.  As far as I can tell, this can only
     //    happen when loading the main worker script and
@@ -1914,7 +1926,7 @@ ScriptExecutorRunnable::ShutdownScriptLoader(JSContext* aCx,
     if (mScriptLoader.mRv.Failed()) {
       if (aMutedError && mScriptLoader.mRv.IsJSException()) {
         LogExceptionToConsole(aCx, aWorkerPrivate);
-        mScriptLoader.mRv.Throw(NS_ERROR_FAILURE);
+        mScriptLoader.mRv.Throw(NS_ERROR_DOM_NETWORK_ERR);
       }
     } else {
       mScriptLoader.mRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
@@ -1943,7 +1955,7 @@ ScriptExecutorRunnable::LogExceptionToConsole(JSContext* aCx,
   MOZ_ASSERT(!mScriptLoader.mRv.Failed());
 
   js::ErrorReport report(aCx);
-  if (!report.init(aCx, exn)) {
+  if (!report.init(aCx, exn, js::ErrorReport::WithSideEffects)) {
     JS_ClearPendingException(aCx);
     return;
   }
@@ -2025,19 +2037,14 @@ ChannelFromScriptURLWorkerThread(JSContext* aCx,
 {
   aParent->AssertIsOnWorkerThread();
 
-  AutoSyncLoopHolder syncLoop(aParent);
-
   RefPtr<ChannelGetterRunnable> getter =
-    new ChannelGetterRunnable(aParent, syncLoop.EventTarget(), aScriptURL,
-                              aChannel);
+    new ChannelGetterRunnable(aParent, aScriptURL, aChannel);
 
-  if (NS_FAILED(NS_DispatchToMainThread(getter))) {
+  ErrorResult rv;
+  getter->Dispatch(rv);
+  if (rv.Failed()) {
     NS_ERROR("Failed to dispatch!");
-    return NS_ERROR_FAILURE;
-  }
-
-  if (!syncLoop.Run()) {
-    return NS_ERROR_FAILURE;
+    return rv.StealNSResult();
   }
 
   return getter->GetResult();

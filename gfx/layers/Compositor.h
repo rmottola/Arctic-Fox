@@ -21,6 +21,7 @@
 #include "nsRegion.h"
 #include <vector>
 #include "mozilla/WidgetUtils.h"
+#include "CompositorWidgetProxy.h"
 
 /**
  * Different elements of a web pages are rendered into separate "layers" before
@@ -128,6 +129,10 @@ class DataTextureSource;
 class CompositingRenderTarget;
 class CompositorBridgeParent;
 class LayerManagerComposite;
+class CompositorOGL;
+class CompositorD3D9;
+class CompositorD3D11;
+class BasicCompositor;
 
 enum SurfaceInitMode
 {
@@ -185,11 +190,13 @@ protected:
 public:
   NS_INLINE_DECL_REFCOUNTING(Compositor)
 
-  explicit Compositor(CompositorBridgeParent* aParent = nullptr)
+  explicit Compositor(widget::CompositorWidgetProxy* aWidget,
+                      CompositorBridgeParent* aParent = nullptr)
     : mCompositorID(0)
     , mDiagnosticTypes(DiagnosticTypes::NO_DIAGNOSTIC)
     , mParent(aParent)
     , mScreenRotation(ROTATION_0)
+    , mWidget(aWidget)
   {
   }
 
@@ -200,6 +207,8 @@ public:
 
   virtual bool Initialize() = 0;
   virtual void Destroy() = 0;
+
+  virtual void DetachWidget() { mWidget = nullptr; }
 
   /**
    * Return true if the effect type is supported.
@@ -371,7 +380,7 @@ public:
   virtual void BeginFrame(const nsIntRegion& aInvalidRegion,
                           const gfx::Rect* aClipRectIn,
                           const gfx::Rect& aRenderBounds,
-                          bool aOpaque,
+                          const nsIntRegion& aOpaqueRegion,
                           gfx::Rect* aClipRectOut = nullptr,
                           gfx::Rect* aRenderBoundsOut = nullptr) = 0;
 
@@ -424,6 +433,11 @@ public:
 
   virtual LayersBackend GetBackendType() const = 0;
 
+  virtual CompositorOGL* AsCompositorOGL() { return nullptr; }
+  virtual CompositorD3D9* AsCompositorD3D9() { return nullptr; }
+  virtual CompositorD3D11* AsCompositorD3D11() { return nullptr; }
+  virtual BasicCompositor* AsBasicCompositor() { return nullptr; }
+
   /**
    * Each Compositor has a unique ID.
    * This ID is used to keep references to each Compositor in a map accessed
@@ -462,9 +476,7 @@ public:
 
   virtual void ForcePresent() { }
 
-  // XXX I expect we will want to move mWidget into this class and implement
-  // these methods properly.
-  virtual nsIWidget* GetWidget() const { return nullptr; }
+  widget::CompositorWidgetProxy* GetWidget() const { return mWidget; }
 
   virtual bool HasImageHostOverlays() { return false; }
 
@@ -517,6 +529,11 @@ public:
     return mCompositeUntilTime;
   }
 
+  // A stale Compositor has no CompositorBridgeParent; it will not process
+  // frames and should not be used.
+  void SetInvalid();
+  bool IsValid() const;
+
 protected:
   void DrawDiagnosticsInternal(DiagnosticFlags aFlags,
                                const gfx::Rect& aVisibleRect,
@@ -568,6 +585,8 @@ protected:
 
   RefPtr<gfx::DrawTarget> mTarget;
   gfx::IntRect mTargetBounds;
+
+  widget::CompositorWidgetProxy* mWidget;
 
 #if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
   FenceHandle mReleaseFenceHandle;

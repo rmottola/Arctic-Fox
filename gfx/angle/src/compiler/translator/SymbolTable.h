@@ -197,12 +197,16 @@ struct TParameter
 class TFunction : public TSymbol
 {
   public:
-    TFunction(const TString *name, const TType *retType, TOperator tOp = EOpNull, const char *ext = "")
+    TFunction(const TString *name,
+              const TType *retType,
+              TOperator tOp   = EOpNull,
+              const char *ext = "")
         : TSymbol(name),
           returnType(retType),
           mangledName(nullptr),
           op(tOp),
-          defined(false)
+          defined(false),
+          mHasPrototypeDeclaration(false)
     {
         relateToExtension(ext);
     }
@@ -242,14 +246,10 @@ class TFunction : public TSymbol
         return op;
     }
 
-    void setDefined()
-    {
-        defined = true;
-    }
-    bool isDefined()
-    {
-        return defined;
-    }
+    void setDefined() { defined = true; }
+    bool isDefined() { return defined; }
+    void setHasPrototypeDeclaration() { mHasPrototypeDeclaration = true; }
+    bool hasPrototypeDeclaration() const { return mHasPrototypeDeclaration; }
 
     size_t getParamCount() const
     {
@@ -269,6 +269,7 @@ class TFunction : public TSymbol
     mutable const TString *mangledName;
     TOperator op;
     bool defined;
+    bool mHasPrototypeDeclaration;
 };
 
 // Interface block name sub-symbol
@@ -435,6 +436,8 @@ class TSymbolTable : angle::NonCopyable
     {
         if (!SupportsPrecision(type.type))
             return false;
+        if (type.type == EbtUInt)
+            return false;  // ESSL 3.00.4 section 4.5.4
         if (type.isAggregate())
             return false; // Not allowed to set for aggregate types
         int indexOfLastElement = static_cast<int>(precisionStack.size()) - 1;

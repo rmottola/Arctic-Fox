@@ -21,6 +21,7 @@
 #include "AccessCheck.h"
 
 #include "mozilla/dom/BindingUtils.h"
+#include "mozilla/dom/DOMException.h"
 #include "mozilla/dom/Exceptions.h"
 #include "mozilla/dom/Promise.h"
 
@@ -30,6 +31,8 @@
 #include "nsIObjectInputStream.h"
 #include "nsIObjectOutputStream.h"
 #include "nsScriptSecurityManager.h"
+
+#include "jsfriendapi.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -178,7 +181,6 @@ xpc::ErrorReport::Init(JSErrorReport* aReport, const char* aFallbackMessage,
     mWindowID = aWindowID;
 
     ErrorReportToMessageString(aReport, mErrorMsg);
-
     if (mErrorMsg.IsEmpty() && aFallbackMessage) {
         mErrorMsg.AssignWithConversion(aFallbackMessage);
     }
@@ -190,11 +192,38 @@ xpc::ErrorReport::Init(JSErrorReport* aReport, const char* aFallbackMessage,
     }
 
     mSourceLine.Assign(aReport->linebuf(), aReport->linebufLength());
+    const JSErrorFormatString* efs = js::GetErrorMessage(nullptr, aReport->errorNumber);
+
+    if (efs == nullptr) {
+        mErrorMsgName.AssignASCII("");
+    } else {
+        mErrorMsgName.AssignASCII(efs->name);
+    }
 
     mLineNumber = aReport->lineno;
     mColumn = aReport->column;
     mFlags = aReport->flags;
     mIsMuted = aReport->isMuted;
+}
+
+void
+xpc::ErrorReport::Init(JSContext* aCx, mozilla::dom::Exception* aException,
+                       bool aIsChrome, uint64_t aWindowID)
+{
+    mCategory = aIsChrome ? NS_LITERAL_CSTRING("chrome javascript")
+                          : NS_LITERAL_CSTRING("content javascript");
+    mWindowID = aWindowID;
+
+    aException->GetErrorMessage(mErrorMsg);
+
+    aException->GetFilename(aCx, mFileName);
+    if (mFileName.IsEmpty()) {
+      mFileName.SetIsVoid(true);
+    }
+    aException->GetLineNumber(aCx, &mLineNumber);
+    aException->GetColumnNumber(&mColumn);
+
+    mFlags = JSREPORT_EXCEPTION;
 }
 
 static LazyLogModule gJSDiagnostics("JSDiagnostics");
@@ -248,6 +277,7 @@ xpc::ErrorReport::LogToConsoleWithStack(JS::HandleObject aStack)
     } else {
       errorObject = new nsScriptError();
     }
+    errorObject->SetErrorMessageName(mErrorMsgName);
     NS_ENSURE_TRUE_VOID(consoleService && errorObject);
 
     nsresult rv = errorObject->InitWithWindowID(mErrorMsg, mFileName, mSourceLine,
@@ -376,7 +406,7 @@ CreateGlobalObject(JSContext* cx, const JSClass* clasp, nsIPrincipal* principal,
     // Verify that the right trace hook is called. Note that this doesn't
     // work right for wrapped globals, since the tracing situation there is
     // more complicated. Manual inspection shows that they do the right thing.
-    if (!((const js::Class*)clasp)->ext.isWrappedNative)
+    if (!((const js::Class*)clasp)->isWrappedNative())
     {
         VerifyTraceProtoAndIfaceCacheCalledTracer trc(JS_GetRuntime(cx));
         TraceChildren(&trc, GCCellPtr(global.get()));

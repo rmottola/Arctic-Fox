@@ -289,11 +289,14 @@ nsTableFrame::RegisterPositionedTablePart(nsIFrame* aFrame)
 nsTableFrame::UnregisterPositionedTablePart(nsIFrame* aFrame,
                                             nsIFrame* aDestructRoot)
 {
-  // Retrieve the table frame, and ensure that we hit aDestructRoot on the way.
-  // If we don't, that means that the table frame will be destroyed, so we don't
-  // need to bother with unregistering this frame.
-  nsTableFrame* tableFrame = GetTableFramePassingThrough(aDestructRoot, aFrame);
-  if (!tableFrame) {
+  // Retrieve the table frame, and check if we hit aDestructRoot on the way.
+  bool didPassThrough;
+  nsTableFrame* tableFrame = GetTableFramePassingThrough(aDestructRoot, aFrame,
+      &didPassThrough);
+  if (!didPassThrough && !tableFrame->GetPrevContinuation()) {
+    // The table frame will be destroyed, and it's the first im flow (and thus
+    // owning the PositionedTablePartArray), so we don't need to do
+    // anything.
     return;
   }
   tableFrame = static_cast<nsTableFrame*>(tableFrame->FirstContinuation());
@@ -1092,7 +1095,7 @@ nsDisplayTableItem::UpdateForFrameBackground(nsIFrame* aFrame)
   nsStyleContext *bgSC;
   if (!nsCSSRendering::FindBackground(aFrame, &bgSC))
     return;
-  if (!bgSC->StyleBackground()->HasFixedBackground())
+  if (!bgSC->StyleBackground()->HasFixedBackground(aFrame))
     return;
 
   mPartHasFixedBackground = true;
@@ -1239,7 +1242,7 @@ nsTableFrame::DisplayGenericTablePart(nsDisplayListBuilder* aBuilder,
     }
 
     // Paint the outset box-shadows for the table frames
-    bool hasBoxShadow = aFrame->StyleBorder()->mBoxShadow != nullptr;
+    bool hasBoxShadow = aFrame->StyleEffects()->mBoxShadow != nullptr;
     if (hasBoxShadow) {
       lists->BorderBackground()->AppendNewToTop(
         new (aBuilder) nsDisplayBoxShadowOuter(aBuilder, aFrame));
@@ -1250,6 +1253,7 @@ nsTableFrame::DisplayGenericTablePart(nsDisplayListBuilder* aBuilder,
     // XXX how to handle collapsed borders?
     if (aBuilder->IsForEventDelivery()) {
       nsDisplayBackgroundImage::AppendBackgroundItemsToTop(aBuilder, aFrame,
+                                                           aFrame->GetRectRelativeToSelf(),
                                                            lists->BorderBackground());
     }
 
@@ -3829,19 +3833,20 @@ nsTableFrame::GetTableFrame(nsIFrame* aFrame)
 
 nsTableFrame*
 nsTableFrame::GetTableFramePassingThrough(nsIFrame* aMustPassThrough,
-                                          nsIFrame* aFrame)
+                                          nsIFrame* aFrame,
+                                          bool* aDidPassThrough)
 {
   MOZ_ASSERT(aMustPassThrough == aFrame ||
              nsLayoutUtils::IsProperAncestorFrame(aMustPassThrough, aFrame),
              "aMustPassThrough should be an ancestor");
 
-  // Retrieve the table frame, and ensure that we hit aMustPassThrough on the
-  // way.  If we don't, just return null.
-  bool hitPassThroughFrame = false;
+  // Retrieve the table frame, and check if we hit aMustPassThrough on the
+  // way.
+  *aDidPassThrough = false;
   nsTableFrame* tableFrame = nullptr;
   for (nsIFrame* ancestor = aFrame; ancestor; ancestor = ancestor->GetParent()) {
     if (ancestor == aMustPassThrough) {
-      hitPassThroughFrame = true;
+      *aDidPassThrough = true;
     }
     if (nsGkAtoms::tableFrame == ancestor->GetType()) {
       tableFrame = static_cast<nsTableFrame*>(ancestor);
@@ -3850,7 +3855,7 @@ nsTableFrame::GetTableFramePassingThrough(nsIFrame* aMustPassThrough,
   }
 
   MOZ_ASSERT(tableFrame, "Should have a table frame here");
-  return hitPassThroughFrame ? tableFrame : nullptr;
+  return tableFrame;
 }
 
 bool
@@ -4793,7 +4798,7 @@ GetPaintStyleInfo(const nsIFrame* aFrame,
   }
 }
 
-class nsDelayedCalcBCBorders : public nsRunnable {
+class nsDelayedCalcBCBorders : public Runnable {
 public:
   explicit nsDelayedCalcBCBorders(nsIFrame* aFrame) :
     mFrame(aFrame) {}

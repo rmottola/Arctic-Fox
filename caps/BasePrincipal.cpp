@@ -516,6 +516,13 @@ BasePrincipal::GetAppId(uint32_t* aAppId)
 }
 
 NS_IMETHODIMP
+BasePrincipal::GetAddonId(nsAString& aAddonId)
+{
+  aAddonId.Assign(mOriginAttributes.mAddonId);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 BasePrincipal::GetUserContextId(uint32_t* aUserContextId)
 {
   *aUserContextId = UserContextId();
@@ -546,7 +553,7 @@ BasePrincipal::CreateCodebasePrincipal(nsIURI* aURI, const PrincipalOriginAttrib
                                     &inheritsPrincipal);
   nsCOMPtr<nsIPrincipal> principal;
   if (NS_FAILED(rv) || inheritsPrincipal) {
-    return nsNullPrincipal::Create();
+    return nsNullPrincipal::Create(aAttrs);
   }
 
   // Check whether the URI knows what its principal is supposed to be.
@@ -555,7 +562,7 @@ BasePrincipal::CreateCodebasePrincipal(nsIURI* aURI, const PrincipalOriginAttrib
     nsCOMPtr<nsIPrincipal> principal;
     uriPrinc->GetPrincipal(getter_AddRefs(principal));
     if (!principal) {
-      return nsNullPrincipal::Create();
+      return nsNullPrincipal::Create(aAttrs);
     }
     RefPtr<BasePrincipal> concrete = Cast(principal);
     return concrete.forget();

@@ -42,7 +42,7 @@ namespace mozilla {
 namespace dom {
 
 NS_IMPL_ISUPPORTS(FetchDriver,
-                  nsIStreamListener, nsIInterfaceRequestor,
+                  nsIStreamListener, nsIChannelEventSink, nsIInterfaceRequestor,
                   nsIThreadRetargetableStreamListener)
 
 FetchDriver::FetchDriver(InternalRequest* aRequest, nsIPrincipal* aPrincipal,
@@ -131,6 +131,15 @@ FetchDriver::HttpFetch()
        !mRequest->Headers()->HasOnlySimpleHeaders())) {
     MOZ_ASSERT(false, "The API should have caught this");
     return NS_ERROR_DOM_BAD_URI;
+  }
+
+  // non-GET requests aren't allowed for blob.
+  if (IsBlobURI(uri)) {
+    nsAutoCString method;
+    mRequest->GetMethod(method);
+    if (!method.EqualsLiteral("GET")) {
+      return NS_ERROR_DOM_NETWORK_ERR;
+    }
   }
 
   // Step 2 deals with letting ServiceWorkers intercept requests. This is
@@ -225,11 +234,16 @@ FetchDriver::HttpFetch()
 
   mLoadGroup = nullptr;
 
-  // FIXME(nsm): Bug 1120715.
-  // Step 3.4 "If request's cache mode is default and request's header list
-  // contains a header named `If-Modified-Since`, `If-None-Match`,
-  // `If-Unmodified-Since`, `If-Match`, or `If-Range`, set request's cache mode
-  // to no-store."
+  // Insert ourselves into the notification callbacks chain so we can set
+  // headers on redirects.
+#ifdef DEBUG
+  {
+    nsCOMPtr<nsIInterfaceRequestor> notificationCallbacks;
+    chan->GetNotificationCallbacks(getter_AddRefs(notificationCallbacks));
+    MOZ_ASSERT(!notificationCallbacks);
+  }
+#endif
+  chan->SetNotificationCallbacks(this);
 
   // Step 3.5 begins "HTTP network or cache fetch".
   // HTTP network or cache fetch
@@ -244,33 +258,41 @@ FetchDriver::HttpFetch()
     NS_ENSURE_SUCCESS(rv, rv);
 
     // Set the same headers.
-    AutoTArray<InternalHeaders::Entry, 5> headers;
-    mRequest->Headers()->GetEntries(headers);
-    bool hasAccept = false;
-    for (uint32_t i = 0; i < headers.Length(); ++i) {
-      if (!hasAccept && headers[i].mName.EqualsLiteral("accept")) {
-        hasAccept = true;
-      }
-      if (headers[i].mValue.IsEmpty()) {
-        httpChan->SetEmptyRequestHeader(headers[i].mName);
-      } else {
-        httpChan->SetRequestHeader(headers[i].mName, headers[i].mValue, false /* merge */);
-      }
-    }
-
-    if (!hasAccept) {
-      httpChan->SetRequestHeader(NS_LITERAL_CSTRING("accept"),
-                                 NS_LITERAL_CSTRING("*/*"),
-                                 false /* merge */);
-    }
+    SetRequestHeaders(httpChan);
 
     // Step 2. Set the referrer.
     nsAutoString referrer;
     mRequest->GetReferrer(referrer);
+    ReferrerPolicy referrerPolicy = mRequest->ReferrerPolicy_();
+    net::ReferrerPolicy net_referrerPolicy = net::RP_Unset;
+    switch (referrerPolicy) {
+    case ReferrerPolicy::_empty:
+      net_referrerPolicy = net::RP_Default;
+      break;
+    case ReferrerPolicy::No_referrer:
+      net_referrerPolicy = net::RP_No_Referrer;
+      break;
+    case ReferrerPolicy::No_referrer_when_downgrade:
+      net_referrerPolicy = net::RP_No_Referrer_When_Downgrade;
+      break;
+    case ReferrerPolicy::Origin:
+      net_referrerPolicy = net::RP_Origin;
+      break;
+    case ReferrerPolicy::Origin_when_cross_origin:
+      net_referrerPolicy = net::RP_Origin_When_Crossorigin;
+      break;
+    case ReferrerPolicy::Unsafe_url:
+      net_referrerPolicy = net::RP_Unsafe_URL;
+      break;
+    default:
+      MOZ_ASSERT_UNREACHABLE("Invalid ReferrerPolicy enum value?");
+      break;
+    }
     if (referrer.EqualsLiteral(kFETCH_CLIENT_REFERRER_STR)) {
       rv = nsContentUtils::SetFetchReferrerURIWithPolicy(mPrincipal,
                                                          mDocument,
-                                                         httpChan);
+                                                         httpChan,
+                                                         net_referrerPolicy);
       NS_ENSURE_SUCCESS(rv, rv);
     } else if (referrer.IsEmpty()) {
       rv = httpChan->SetReferrerWithPolicy(nullptr, net::RP_No_Referrer);
@@ -279,32 +301,20 @@ FetchDriver::HttpFetch()
       // From "Determine request's Referrer" step 3
       // "If request's referrer is a URL, let referrerSource be request's
       // referrer."
-      //
-      // XXXnsm - We never actually hit this from a fetch() call since both
-      // fetch and Request() create a new internal request whose referrer is
-      // always set to about:client. Should we just crash here instead until
-      // someone tries to use FetchDriver for non-fetch() APIs?
       nsCOMPtr<nsIURI> referrerURI;
       rv = NS_NewURI(getter_AddRefs(referrerURI), referrer, nullptr, nullptr);
       NS_ENSURE_SUCCESS(rv, rv);
 
+      uint32_t documentReferrerPolicy = mDocument ? mDocument->GetReferrerPolicy() :
+                                                    net::RP_Default;
       rv =
         httpChan->SetReferrerWithPolicy(referrerURI,
-                                        mDocument ? mDocument->GetReferrerPolicy() :
-                                                    net::RP_Default);
+                                        referrerPolicy == ReferrerPolicy::_empty ?
+                                          documentReferrerPolicy :
+                                          net_referrerPolicy);
       NS_ENSURE_SUCCESS(rv, rv);
     }
 
-    // Step 3 "If HTTPRequest's force Origin header flag is set..."
-    if (mRequest->ForceOriginHeader()) {
-      nsAutoString origin;
-      rv = nsContentUtils::GetUTFOrigin(mPrincipal, origin);
-      NS_ENSURE_SUCCESS(rv, rv);
-
-      httpChan->SetRequestHeader(NS_LITERAL_CSTRING("origin"),
-                                 NS_ConvertUTF16toUTF8(origin),
-                                 false /* merge */);
-    }
     // Bug 1120722 - Authorization will be handled later.
     // Auth may require prompting, we don't support it yet.
     // The next patch in this same bug prevents this from aborting the request.
@@ -316,11 +326,11 @@ FetchDriver::HttpFetch()
     // dom/workers/ServiceWorkerManager.cpp
     internalChan->SetCorsMode(static_cast<uint32_t>(mRequest->Mode()));
     internalChan->SetRedirectMode(static_cast<uint32_t>(mRequest->GetRedirectMode()));
+    mRequest->MaybeSkipCacheIfPerformingRevalidation();
+    internalChan->SetFetchCacheMode(static_cast<uint32_t>(mRequest->GetCacheMode()));
   }
 
   // Step 5. Proxy authentication will be handled by Necko.
-  // FIXME(nsm): Bug 1120715.
-  // Step 7-10. "If request's cache mode is neither no-store nor reload..."
 
   // Continue setting up 'HTTPRequest'. Content-Type and body data.
   nsCOMPtr<nsIUploadChannel2> uploadChan = do_QueryInterface(chan);
@@ -406,7 +416,7 @@ FetchDriver::BeginAndGetFilteredResponse(InternalResponse* aResponse,
   return filteredResponse.forget();
 }
 
-nsresult
+void
 FetchDriver::FailWithNetworkError()
 {
   workers::AssertIsOnMainThread();
@@ -419,7 +429,6 @@ FetchDriver::FailWithNetworkError()
     mObserver->OnResponseEnd();
     mObserver = nullptr;
   }
-  return NS_OK;
 }
 
 namespace {
@@ -466,7 +475,7 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
 
   nsresult rv;
   aRequest->GetStatus(&rv);
-  if (NS_WARN_IF(NS_FAILED(rv))) {
+  if (NS_FAILED(rv)) {
     FailWithNetworkError();
     return rv;
   }
@@ -670,6 +679,21 @@ FetchDriver::OnStopRequest(nsIRequest* aRequest,
 }
 
 NS_IMETHODIMP
+FetchDriver::AsyncOnChannelRedirect(nsIChannel* aOldChannel,
+                                    nsIChannel* aNewChannel,
+                                    uint32_t aFlags,
+                                    nsIAsyncVerifyRedirectCallback *aCallback)
+{
+  nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(aNewChannel);
+  if (httpChannel) {
+    SetRequestHeaders(httpChannel);
+  }
+
+  aCallback->OnRedirectVerifyCallback(NS_OK);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 FetchDriver::CheckListenerChain()
 {
   return NS_OK;
@@ -678,6 +702,11 @@ FetchDriver::CheckListenerChain()
 NS_IMETHODIMP
 FetchDriver::GetInterface(const nsIID& aIID, void **aResult)
 {
+  if (aIID.Equals(NS_GET_IID(nsIChannelEventSink))) {
+    *aResult = static_cast<nsIChannelEventSink*>(this);
+    NS_ADDREF_THIS();
+    return NS_OK;
+  }
   if (aIID.Equals(NS_GET_IID(nsIStreamListener))) {
     *aResult = static_cast<nsIStreamListener*>(this);
     NS_ADDREF_THIS();
@@ -698,6 +727,41 @@ FetchDriver::SetDocument(nsIDocument* aDocument)
   // Cannot set document after Fetch() has been called.
   MOZ_ASSERT(!mFetchCalled);
   mDocument = aDocument;
+}
+
+void
+FetchDriver::SetRequestHeaders(nsIHttpChannel* aChannel) const
+{
+  MOZ_ASSERT(aChannel);
+
+  AutoTArray<InternalHeaders::Entry, 5> headers;
+  mRequest->Headers()->GetEntries(headers);
+  bool hasAccept = false;
+  for (uint32_t i = 0; i < headers.Length(); ++i) {
+    if (!hasAccept && headers[i].mName.EqualsLiteral("accept")) {
+      hasAccept = true;
+    }
+    if (headers[i].mValue.IsEmpty()) {
+      aChannel->SetEmptyRequestHeader(headers[i].mName);
+    } else {
+      aChannel->SetRequestHeader(headers[i].mName, headers[i].mValue, false /* merge */);
+    }
+  }
+
+  if (!hasAccept) {
+    aChannel->SetRequestHeader(NS_LITERAL_CSTRING("accept"),
+                               NS_LITERAL_CSTRING("*/*"),
+                               false /* merge */);
+  }
+
+  if (mRequest->ForceOriginHeader()) {
+    nsAutoString origin;
+    if (NS_SUCCEEDED(nsContentUtils::GetUTFOrigin(mPrincipal, origin))) {
+      aChannel->SetRequestHeader(NS_LITERAL_CSTRING("origin"),
+                                 NS_ConvertUTF16toUTF8(origin),
+                                 false /* merge */);
+    }
+  }
 }
 
 } // namespace dom

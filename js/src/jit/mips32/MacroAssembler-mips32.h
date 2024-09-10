@@ -9,7 +9,6 @@
 
 #include "jsopcode.h"
 
-#include "jit/AtomicOp.h"
 #include "jit/IonCaches.h"
 #include "jit/JitFrames.h"
 #include "jit/mips-shared/MacroAssembler-mips-shared.h"
@@ -991,11 +990,6 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
   public:
     CodeOffset labelForPatch() {
         return CodeOffset(nextOffset().getOffset());
-    }
-
-    void memIntToValue(Address Source, Address Dest) {
-        load32(Source, ScratchRegister);
-        storeValue(JSVAL_TYPE_INT32, ScratchRegister, Dest);
     }
 
     void lea(Operand addr, Register dest) {

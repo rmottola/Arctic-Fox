@@ -550,7 +550,7 @@ load 914891.html
 load 915475.xhtml
 load 927558.html
 load 943509-1.html
-asserts(3-8) load 944909-1.html
+asserts(2-8) load 944909-1.html
 load 946167-1.html
 load 947158.html
 load 949932.html
@@ -611,3 +611,4 @@ load details-display-none-summary-3.html
 load 1304441.html
 pref(dom.details_element.enabled,true) load summary-position-out-of-flow.html
 asserts(4) load 1225005.html # bug 682647 and bug 448083
+load 1233191.html

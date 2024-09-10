@@ -702,7 +702,7 @@ nsSiteSecurityService::ProcessPKPHeader(nsIURI* aSourceURI,
   rv = aSSLStatus->GetServerCert(getter_AddRefs(cert));
   NS_ENSURE_SUCCESS(rv, rv);
   NS_ENSURE_TRUE(cert, NS_ERROR_FAILURE);
-  ScopedCERTCertificate nssCert(cert->GetCert());
+  UniqueCERTCertificate nssCert(cert->GetCert());
   NS_ENSURE_TRUE(nssCert, NS_ERROR_FAILURE);
 
   mozilla::pkix::Time now(mozilla::pkix::Now());
@@ -913,7 +913,7 @@ int STSPreloadCompare(const void *key, const void *entry)
 {
   const char *keyStr = (const char *)key;
   const nsSTSPreload *preloadEntry = (const nsSTSPreload *)entry;
-  return strcmp(keyStr, preloadEntry->mHost);
+  return strcmp(keyStr, &kSTSHostTable[preloadEntry->mHostIndex]);
 }
 
 // Returns the preload list entry for the given host, if it exists.

@@ -5,22 +5,25 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "nsNSSCallbacks.h"
-#include "pkix/pkixtypes.h"
+
 #include "mozilla/Telemetry.h"
 #include "mozilla/TimeStamp.h"
-#include "nsNSSComponent.h"
-#include "nsNSSIOLayer.h"
-#include "nsIWebProgressListener.h"
-#include "nsProtectedAuthThread.h"
+#include "nsContentUtils.h"
+#include "nsICertOverrideService.h"
+#include "nsIHttpChannelInternal.h"
+#include "nsIPrompt.h"
+#include "nsISupportsPriority.h"
 #include "nsITokenDialogs.h"
 #include "nsIUploadChannel.h"
-#include "nsIPrompt.h"
-#include "nsProxyRelease.h"
-#include "PSMRunnable.h"
-#include "nsContentUtils.h"
-#include "nsIHttpChannelInternal.h"
-#include "nsISupportsPriority.h"
+#include "nsIWebProgressListener.h"
 #include "nsNetUtil.h"
+#include "nsNSSComponent.h"
+#include "nsNSSIOLayer.h"
+#include "nsProtectedAuthThread.h"
+#include "nsProxyRelease.h"
+#include "pkix/pkixtypes.h"
+#include "PSMRunnable.h"
+#include "ScopedNSSTypes.h"
 #include "SharedSSLState.h"
 #include "ssl.h"
 #include "sslproto.h"
@@ -45,7 +48,7 @@ const uint32_t KEA_NOT_SUPPORTED = 1;
 
 } // namespace
 
-class nsHTTPDownloadEvent : public nsRunnable {
+class nsHTTPDownloadEvent : public Runnable {
 public:
   nsHTTPDownloadEvent();
   ~nsHTTPDownloadEvent();
@@ -172,7 +175,7 @@ nsHTTPDownloadEvent::Run()
   return NS_OK;
 }
 
-struct nsCancelHTTPDownloadEvent : nsRunnable {
+struct nsCancelHTTPDownloadEvent : Runnable {
   RefPtr<nsHTTPListener> mListener;
 
   NS_IMETHOD Run() {
@@ -671,9 +674,9 @@ ShowProtectedAuthPrompt(PK11SlotInfo* slot, nsIInterfaceRequestor *ir)
   char* protAuthRetVal = nullptr;
 
   // Get protected auth dialogs
-  nsITokenDialogs* dialogs = 0;
-  nsresult nsrv = getNSSDialogs((void**)&dialogs, 
-                                NS_GET_IID(nsITokenDialogs), 
+  nsCOMPtr<nsITokenDialogs> dialogs;
+  nsresult nsrv = getNSSDialogs(getter_AddRefs(dialogs),
+                                NS_GET_IID(nsITokenDialogs),
                                 NS_TOKENDIALOGS_CONTRACTID);
   if (NS_SUCCEEDED(nsrv))
   {
@@ -707,15 +710,12 @@ ShowProtectedAuthPrompt(PK11SlotInfo* slot, nsIInterfaceRequestor *ir)
               default:
                   protAuthRetVal = nullptr;
                   break;
-              
           }
         }
       }
 
       NS_RELEASE(protectedAuthRunnable);
     }
-
-    NS_RELEASE(dialogs);
   }
 
   return protAuthRetVal;
@@ -833,11 +833,6 @@ PreliminaryHandshakeDone(PRFileDesc* fd)
   if (!infoObject)
     return;
 
-  if (infoObject->IsPreliminaryHandshakeDone())
-    return;
-
-  infoObject->SetPreliminaryHandshakeDone();
-
   SSLChannelInfo channelInfo;
   if (SSL_GetChannelInfo(fd, &channelInfo, sizeof(channelInfo)) == SECSuccess) {
     infoObject->SetSSLVersionUsed(channelInfo.protocolVersion);
@@ -862,6 +857,11 @@ PreliminaryHandshakeDone(PRFileDesc* fd)
     }
   }
 
+  // Don't update NPN details on renegotiation.
+  if (infoObject->IsPreliminaryHandshakeDone()) {
+    return;
+  }
+
   // Get the NPN value.
   SSLNextProtoState state;
   unsigned char npnbuf[256];
@@ -880,6 +880,8 @@ PreliminaryHandshakeDone(PRFileDesc* fd)
   else {
     infoObject->SetNegotiatedNPN(nullptr, 0);
   }
+
+  infoObject->SetPreliminaryHandshakeDone();
 }
 
 SECStatus
@@ -1209,6 +1211,17 @@ void HandshakeCallback(PRFileDesc* fd, void* client_data) {
   bool renegotiationUnsafe = !siteSupportsSafeRenego &&
                              ioLayerHelpers.treatUnsafeNegotiationAsBroken();
 
+
+  /* Set the SSL Status information */
+  RefPtr<nsSSLStatus> status(infoObject->SSLStatus());
+  if (!status) {
+    status = new nsSSLStatus();
+    infoObject->SetSSLStatus(status);
+  }
+
+  RememberCertErrorsTable::GetInstance().LookupCertErrorBits(infoObject,
+                                                             status);
+
   uint32_t state;
   if (usesWeakCipher || renegotiationUnsafe) {
     state = nsIWebProgressListener::STATE_IS_BROKEN;
@@ -1226,6 +1239,39 @@ void HandshakeCallback(PRFileDesc* fd, void* client_data) {
                                                 infoObject->GetPort());
     }
   }
+
+  if (status->HasServerCert()) {
+    MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
+           ("HandshakeCallback KEEPING existing cert\n"));
+  } else {
+    UniqueCERTCertificate serverCert(SSL_PeerCertificate(fd));
+    RefPtr<nsNSSCertificate> nssc(nsNSSCertificate::Create(serverCert.get()));
+    MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
+           ("HandshakeCallback using NEW cert %p\n", nssc.get()));
+    status->SetServerCert(nssc, nsNSSCertificate::ev_status_unknown);
+  }
+
+  nsCOMPtr<nsICertOverrideService> overrideService =
+      do_GetService(NS_CERTOVERRIDE_CONTRACTID);
+
+  if (overrideService) {
+    bool haveOverride;
+    uint32_t overrideBits = 0; // Unused.
+    bool isTemporaryOverride; // Unused.
+    const nsACString& hostString(infoObject->GetHostName());
+    const int32_t port(infoObject->GetPort());
+    nsCOMPtr<nsIX509Cert> cert;
+    status->GetServerCert(getter_AddRefs(cert));
+    nsresult nsrv = overrideService->HasMatchingOverride(hostString, port,
+                                                         cert,
+                                                         &overrideBits,
+                                                         &isTemporaryOverride,
+                                                         &haveOverride);
+    if (NS_SUCCEEDED(nsrv) && haveOverride) {
+      state |= nsIWebProgressListener::STATE_CERT_USER_OVERRIDDEN;
+    }
+  }
+
   infoObject->SetSecurityState(state);
 
   // XXX Bug 883674: We shouldn't be formatting messages here in PSM; instead,
@@ -1242,27 +1288,6 @@ void HandshakeCallback(PRFileDesc* fd, void* client_data) {
     msg.AppendLiteral(" : server does not support RFC 5746, see CVE-2009-3555");
 
     nsContentUtils::LogSimpleConsoleError(msg, "SSL");
-  }
-
-  /* Set the SSL Status information */
-  RefPtr<nsSSLStatus> status(infoObject->SSLStatus());
-  if (!status) {
-    status = new nsSSLStatus();
-    infoObject->SetSSLStatus(status);
-  }
-
-  RememberCertErrorsTable::GetInstance().LookupCertErrorBits(infoObject,
-                                                             status);
-
-  if (status->HasServerCert()) {
-    MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
-           ("HandshakeCallback KEEPING existing cert\n"));
-  } else {
-    ScopedCERTCertificate serverCert(SSL_PeerCertificate(fd));
-    RefPtr<nsNSSCertificate> nssc(nsNSSCertificate::Create(serverCert.get()));
-    MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
-           ("HandshakeCallback using NEW cert %p\n", nssc.get()));
-    status->SetServerCert(nssc, nsNSSCertificate::ev_status_unknown);
   }
 
   infoObject->NoteTimeUntilReady();

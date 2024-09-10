@@ -269,7 +269,8 @@ public:
                                              const gfx::IntSize& aSize,
                                              const Maybe<IntRect>& aCropRect,
                                              layers::Image** aImage)
-  : WorkerMainThreadRunnable(GetCurrentThreadWorkerPrivate())
+  : WorkerMainThreadRunnable(GetCurrentThreadWorkerPrivate(),
+                               NS_LITERAL_CSTRING("ImageBitmap :: Create Image from Raw Data"))
   , mImage(aImage)
   , mBuffer(aBuffer)
   , mBufferLength(aBufferLength)
@@ -627,7 +628,7 @@ ImageBitmap::CreateInternal(nsIGlobalObject* aGlobal, HTMLVideoElement& aVideoEl
   }
 
   // Check security.
-  nsCOMPtr<nsIPrincipal> principal = aVideoEl.GetCurrentPrincipal();
+  nsCOMPtr<nsIPrincipal> principal = aVideoEl.GetCurrentVideoPrincipal();
   bool CORSUsed = aVideoEl.GetCORSMode() != CORS_NONE;
   if (!CheckSecurityForHTMLElements(false, CORSUsed, principal)) {
     aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
@@ -851,7 +852,7 @@ private:
   RefPtr<ImageBitmap> mImageBitmap;
 };
 
-class FulfillImageBitmapPromiseTask final : public nsRunnable,
+class FulfillImageBitmapPromiseTask final : public Runnable,
                                             public FulfillImageBitmapPromise
 {
 public:
@@ -1041,7 +1042,7 @@ protected:
   Maybe<IntRect> mCropRect;
 };
 
-class CreateImageBitmapFromBlobTask final : public nsRunnable,
+class CreateImageBitmapFromBlobTask final : public Runnable,
                                             public CreateImageBitmapFromBlob
 {
 public:
@@ -1086,7 +1087,8 @@ class CreateImageBitmapFromBlobWorkerTask final : public WorkerSameThreadRunnabl
                                    Blob& aBlob,
                                    Maybe<IntRect>& aCropRect,
                                    layers::Image** aImage)
-    : WorkerMainThreadRunnable(aWorkerPrivate)
+    : WorkerMainThreadRunnable(aWorkerPrivate,
+                               NS_LITERAL_CSTRING("ImageBitmap :: Create Image from Blob"))
     , mBlob(aBlob)
     , mCropRect(aCropRect)
     , mImage(aImage)

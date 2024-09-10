@@ -562,7 +562,8 @@ class Build(MachCommandBase):
         status = self._run_make(srcdir=True, filename='client.mk',
             target='configure', line_handler=on_line, log=False,
             print_directory=False, allow_parallel=False, ensure_exit_code=False,
-            append_env={b'CONFIGURE_ARGS': options.encode('utf-8')})
+            append_env={b'CONFIGURE_ARGS': options.encode('utf-8'),
+                        b'NO_BUILDSTATUS_MESSAGES': b'1',})
 
         if not status:
             print('Configure complete!')
@@ -908,7 +909,10 @@ class GTestCommands(MachCommandBase):
         # https://code.google.com/p/googletest/wiki/AdvancedGuide#Running_Test_Programs:_Advanced_Options
         gtest_env = {b'GTEST_FILTER': gtest_filter}
 
-        xre_path = os.path.join(self.topobjdir, "dist", "bin")
+        # Note: we must normalize the path here so that gtest on Windows sees
+        # a MOZ_GMP_PATH which has only Windows dir seperators, because
+        # nsILocalFile cannot open the paths with non-Windows dir seperators.
+        xre_path = os.path.join(os.path.normpath(self.topobjdir), "dist", "bin")
         gtest_env["MOZ_XRE_DIR"] = xre_path
         gtest_env["MOZ_GMP_PATH"] = os.pathsep.join(
             os.path.join(xre_path, p, "1.0")
@@ -1121,12 +1125,12 @@ class RunProgram(MachCommandBase):
         help='Enable DMD. The following arguments have no effect without this.')
     @CommandArgument('--mode', choices=['live', 'dark-matter', 'cumulative', 'scan'], group='DMD',
          help='Profiling mode. The default is \'dark-matter\'.')
-    @CommandArgument('--sample-below', default=None, type=str, group='DMD',
-        help='Sample blocks smaller than this. Use 1 for no sampling. The default is 4093.')
+    @CommandArgument('--stacks', choices=['partial', 'full'], group='DMD',
+        help='Allocation stack trace coverage. The default is \'partial\'.')
     @CommandArgument('--show-dump-stats', action='store_true', group='DMD',
         help='Show stats when doing dumps.')
     def run(self, params, remote, background, noprofile, debug, debugger,
-        debugparams, slowscript, dmd, mode, sample_below, show_dump_stats):
+        debugparams, slowscript, dmd, mode, stacks, show_dump_stats):
 
         if conditions.is_android(self):
             # Running Firefox for Android is completely different
@@ -1173,6 +1177,9 @@ class RunProgram(MachCommandBase):
         extra_env = {'MOZ_CRASHREPORTER_DISABLE': '1'}
 
         if debug or debugger or debugparams:
+            if 'INSIDE_EMACS' in os.environ:
+                self.log_manager.terminal_handler.setLevel(logging.WARNING)
+
             import mozdebug
             if not debugger:
                 # No debugger name was provided. Look for the default ones on
@@ -1207,8 +1214,8 @@ class RunProgram(MachCommandBase):
 
             if mode:
                 dmd_params.append('--mode=' + mode)
-            if sample_below:
-                dmd_params.append('--sample-below=' + sample_below)
+            if stacks:
+                dmd_params.append('--stacks=' + stacks)
             if show_dump_stats:
                 dmd_params.append('--show-dump-stats=yes')
 

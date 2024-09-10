@@ -259,6 +259,11 @@ nsresult nsJSThunk::EvaluateScript(nsIChannel *aChannel,
         return NS_ERROR_DOM_RETVAL_UNDEFINED;
     }
 
+    // Fail if someone tries to execute in a global with system principal.
+    if (nsContentUtils::IsSystemPrincipal(objectPrincipal)) {
+        return NS_ERROR_DOM_SECURITY_ERR;
+    }
+
     JS::Rooted<JS::Value> v (cx, JS::UndefinedValue());
     // Finally, we have everything needed to evaluate the expression.
     JS::CompileOptions options(cx);
@@ -413,7 +418,6 @@ nsresult nsJSChannel::Init(nsIURI *aURI)
     nsCOMPtr<nsIChannel> channel;
 
     nsCOMPtr<nsIPrincipal> nullPrincipal = nsNullPrincipal::Create();
-    NS_ENSURE_TRUE(nullPrincipal, NS_ERROR_FAILURE);
 
     // If the resultant script evaluation actually does return a value, we
     // treat it as html.
@@ -1222,6 +1226,7 @@ nsJSProtocolHandler::NewChannel2(nsIURI* uri,
                                  nsIChannel** result)
 {
     nsresult rv;
+
     NS_ENSURE_ARG_POINTER(uri);
 
     RefPtr<nsJSChannel> channel = new nsJSChannel();
@@ -1237,7 +1242,6 @@ nsJSProtocolHandler::NewChannel2(nsIURI* uri,
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (NS_SUCCEEDED(rv)) {
-        *result = channel;
         channel.forget(result);
     }
     return rv;

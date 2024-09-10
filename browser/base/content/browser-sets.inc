@@ -104,6 +104,7 @@
     <command id="Tools:Addons" oncommand="BrowserOpenAddonsMgr();"/>
     <command id="Tools:Permissions" oncommand="BrowserOpenPermissionsMgr();"/>
     <command id="Tools:ErrorConsole" oncommand="toJavaScriptConsole()" disabled="true" hidden="true"/>
+    <command id="Tools:ServiceWorkers" oncommand="gDevToolsBrowser.openAboutDebugging(gBrowser, 'workers')"/>
     <command id="Tools:DevToolsConnect" oncommand="gDevToolsBrowser.openConnectScreen(gBrowser)" disabled="true" hidden="true"/>
     <command id="Tools:Sanitize"
      oncommand="Cc['@mozilla.org/browser/browserglue;1'].getService(Ci.nsIBrowserGlue).sanitize(window);"/>
@@ -119,7 +120,7 @@
 
   <commandset id="placesCommands">
     <command id="Browser:ShowAllBookmarks"
-             oncommand="PlacesCommandHook.showPlacesOrganizer('AllBookmarks');"/>
+             oncommand="PlacesCommandHook.showPlacesOrganizer('UnfiledBookmarks');"/>
     <command id="Browser:ShowAllHistory"
              oncommand="PlacesCommandHook.showPlacesOrganizer('History');"/>
   </commandset>
@@ -172,6 +173,10 @@
     <broadcaster id="sync-setup-state"/>
     <broadcaster id="sync-syncnow-state"/>
     <broadcaster id="sync-reauth-state" hidden="true"/>
+    <broadcaster id="viewTabsSidebar" autoCheck="false" sidebartitle="&syncedTabs.sidebar.label;"
+                 type="checkbox" group="sidebar"
+                 sidebarurl="chrome://browser/content/syncedtabs/sidebar.xhtml"
+                 oncommand="SidebarUI.toggle('viewTabsSidebar');"/>
 #endif
     <broadcaster id="workOfflineMenuitemState"/>
 
@@ -206,7 +211,7 @@
                  command="Tools:Scratchpad"
                  key="key_scratchpad"/>
     <broadcaster id="devtoolsMenuBroadcaster_ResponsiveUI"
-                 label="&responsiveDesignTool.label;"
+                 label="&responsiveDesignMode.label;"
                  type="checkbox" autocheck="false"
                  command="Tools:ResponsiveUI"
                  key="key_responsiveUI"/>
@@ -226,6 +231,9 @@
     <broadcaster id="devtoolsMenuBroadcaster_GetMoreTools"
                  label="&getMoreDevtoolsCmd.label;"
                  oncommand="openUILinkIn(gPrefService.getCharPref('browser.getdevtools.url'), 'tab');"/>
+    <broadcaster id="devtoolsMenuBroadcaster_ServiceWorkers"
+                 label="&devtoolsServiceWorkers.label;"
+                 command="Tools:ServiceWorkers"/>
     <broadcaster id="devtoolsMenuBroadcaster_connect"
                  label="&devtoolsConnect.label;"
                  command="Tools:DevToolsConnect"/>
@@ -280,7 +288,7 @@
     <key id="key_browserToolbox" key="&browserToolboxCmd.commandkey;" command="Tools:BrowserToolbox" modifiers="accel,alt,shift"/>
     <key id="key_devToolbar" keycode="&devToolbar.keycode;" modifiers="shift"
          keytext="&devToolbar.keytext;" command="Tools:DevToolbarFocus"/>
-    <key id="key_responsiveUI" key="&responsiveDesignTool.commandkey;" command="Tools:ResponsiveUI"
+    <key id="key_responsiveUI" key="&responsiveDesignMode.commandkey;" command="Tools:ResponsiveUI"
 #ifdef XP_MACOSX
         modifiers="accel,alt"
 #else

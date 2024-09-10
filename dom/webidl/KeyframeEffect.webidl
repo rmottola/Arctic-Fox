@@ -46,14 +46,22 @@ interface KeyframeEffectReadOnly : AnimationEffectReadOnly {
 };
 
 // Non-standard extensions
-dictionary AnimationPropertyState {
-  DOMString property;
-  boolean runningOnCompositor;
-  DOMString? warning;
+dictionary AnimationPropertyValueDetails {
+  required double             offset;
+  required DOMString          value;
+           DOMString          easing;
+  required CompositeOperation composite;
+};
+
+dictionary AnimationPropertyDetails {
+  required DOMString                               property;
+  required boolean                                 runningOnCompositor;
+           DOMString                               warning;
+  required sequence<AnimationPropertyValueDetails> values;
 };
 
 partial interface KeyframeEffectReadOnly {
-  [ChromeOnly] sequence<AnimationPropertyState> getPropertyState();
+  [ChromeOnly, Throws] sequence<AnimationPropertyDetails> getProperties();
 };
 
 [Func="nsDocument::IsWebAnimationsEnabled",
@@ -61,14 +69,13 @@ partial interface KeyframeEffectReadOnly {
               object? frames,
               optional (unrestricted double or KeyframeEffectOptions) options)]
 interface KeyframeEffect : KeyframeEffectReadOnly {
-  // Bug 1067769 - Allow setting KeyframeEffect.target
-  // inherit attribute Animatable?                 target;
+  inherit attribute (Element or CSSPseudoElement)? target;
   // Bug 1216843 - implement animation composition
   // inherit attribute IterationCompositeOperation iterationComposite;
   // Bug 1216844 - implement additive animation
   // inherit attribute CompositeOperation          composite;
   // Bug 1244590 - implement spacing modes
   // inherit attribute DOMString                   spacing;
-  // Bug 1244591 - implement setFrames
-  // void setFrames (object? frames);
+  [Throws]
+  void setFrames (object? frames);
 };

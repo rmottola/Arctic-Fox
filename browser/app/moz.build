@@ -21,10 +21,9 @@ SOURCES += [
 
 FINAL_TARGET_FILES += ['blocklist.xml']
 FINAL_TARGET_FILES.defaults.profile += ['profile/prefs.js']
+FINAL_TARGET_FILES.defaults += ['permissions']
 
 DEFINES['APP_VERSION'] = CONFIG['MOZ_APP_VERSION']
-
-DEFINES['XPCOM_GLUE'] = True
 
 LOCAL_INCLUDES += [
     '!/build',
@@ -36,8 +35,10 @@ LOCAL_INCLUDES += [
 DELAYLOAD_DLLS += [
     'mozglue.dll',
 ]
-USE_STATIC_LIBS = True
 
+USE_LIBS += [
+    'mozglue',
+]
 
 if CONFIG['_MSC_VER']:
     # Always enter a Windows program through wmain, whether or not we're
@@ -59,16 +60,6 @@ if CONFIG['OS_ARCH'] == 'WINNT':
 if CONFIG['OS_ARCH'] == 'WINNT' and not CONFIG['GNU_CC']:
     LDFLAGS += ['/HEAP:0x40000']
 
-if CONFIG['OS_ARCH'] == 'WINNT':
-    USE_LIBS += [
-        'mozglue',
-        'xpcomglue_staticruntime',
-    ]
-else:
-    USE_LIBS += [
-        'xpcomglue',
-    ]
-
 DISABLE_STL_WRAPPING = True
 
 if CONFIG['MOZ_LINKER']:
@@ -77,7 +68,9 @@ if CONFIG['MOZ_LINKER']:
 if CONFIG['HAVE_CLOCK_MONOTONIC']:
     OS_LIBS += CONFIG['REALTIME_LIBS']
 
-JAR_MANIFESTS += ['jar.mn']
-
 if CONFIG['GNU_CXX']:
     CXXFLAGS += ['-Wshadow']
+
+for icon in ('firefox', 'document', 'newwindow', 'newtab', 'pbmode'):
+    DEFINES[icon.upper() + '_ICO'] = '"%s/dist/branding/%s.ico"' % (
+        TOPOBJDIR, icon)

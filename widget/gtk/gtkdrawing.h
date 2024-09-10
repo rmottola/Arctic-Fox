@@ -18,9 +18,11 @@
 #include <gdk/gdk.h>
 #include <gtk/gtk.h>
 
+#if (MOZ_WIDGET_GTK == 2)
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
+#endif
 
 /*** type definitions ***/
 typedef struct {
@@ -387,12 +389,21 @@ gint moz_gtk_get_tab_scroll_arrow_size(gint* width, gint* height);
 
 /**
  * Get the desired size of an arrow in a button
- * width:   [OUT] the desired width
- * height:  [OUT] the desired height
  *
- * returns:    MOZ_GTK_SUCCESS if there was no error, an error code otherwise
+ * widgetType: [IN]  the widget for which to get the arrow size
+ * width:      [OUT] the desired width
+ * height:     [OUT] the desired height
  */
-gint moz_gtk_get_arrow_size(gint* width, gint* height);
+void
+moz_gtk_get_arrow_size(GtkThemeWidgetType widgetType,
+                       gint* width, gint* height);
+
+/**
+ * Get the minimum height of a entry widget
+ * size:    [OUT] the minimum height
+ *
+ */
+void moz_gtk_get_entry_min_height(gint* height);
 
 /**
  * Get the desired size of a toolbar separator
@@ -464,8 +475,10 @@ gboolean moz_gtk_images_in_buttons(void);
  */
 gboolean moz_gtk_has_scrollbar_buttons(void);
 
+#if (MOZ_WIDGET_GTK == 2)
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
+#endif
 
 #endif

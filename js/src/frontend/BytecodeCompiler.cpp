@@ -346,11 +346,15 @@ BytecodeCompiler::prepareAndEmitTree(ParseNode** ppn)
 {
     if (!FoldConstants(cx, ppn, parser.ptr()) ||
         !NameFunctions(cx, *ppn) ||
-        !emitter->updateLocalsToFrameSlots() ||
-        !emitter->emitTree(*ppn))
+        !emitter->updateLocalsToFrameSlots())
     {
         return false;
     }
+
+    emitter->setFunctionBodyEndPos((*ppn)->pn_pos);
+
+    if (!emitter->emitTree(*ppn))
+        return false;
 
     return true;
 }
@@ -760,13 +764,15 @@ frontend::CompileScript(ExclusiveContext* cx, LifoAlloc* alloc, HandleObject sco
 
 ModuleObject*
 frontend::CompileModule(ExclusiveContext* cx, const ReadOnlyCompileOptions& optionsInput,
-                        SourceBufferHolder& srcBuf, LifoAlloc* alloc)
+                        SourceBufferHolder& srcBuf, LifoAlloc* alloc,
+                        ScriptSourceObject** sourceObjectOut /* = nullptr */)
 {
     MOZ_ASSERT(srcBuf.get());
     MOZ_ASSERT(cx->isJSContext() == (alloc == nullptr));
 
     if (!alloc)
         alloc = &cx->asJSContext()->tempLifoAlloc();
+    MOZ_ASSERT_IF(sourceObjectOut, *sourceObjectOut == nullptr);
 
     CompileOptions options(cx, optionsInput);
     options.maybeMakeStrictMode(true); // ES6 10.2.1 Module code is always strict mode code.
@@ -783,6 +789,10 @@ frontend::CompileModule(ExclusiveContext* cx, const ReadOnlyCompileOptions& opti
     // module is compiled off main thread.
     if (cx->isJSContext() && !ModuleObject::FreezeArrayProperties(cx->asJSContext(), module))
         return nullptr;
+
+    // See the comment about sourceObjectOut above.
+    if (sourceObjectOut)
+        *sourceObjectOut = compiler.sourceObjectPtr();
 
     return module;
 }
@@ -840,7 +850,7 @@ frontend::CompileLazyFunction(JSContext* cx, Handle<LazyScript*> lazy, const cha
     MOZ_ASSERT(!options.forEval);
     BytecodeEmitter bce(/* parent = */ nullptr, &parser, pn->pn_funbox, script, lazy,
                         /* insideEval = */ false, /* evalCaller = */ nullptr,
-                        /* insideNonGlobalEval = */ false, options.lineno,
+                        /* insideNonGlobalEval = */ false, pn->pn_pos,
                         BytecodeEmitter::LazyFunction);
     if (!bce.init())
         return false;

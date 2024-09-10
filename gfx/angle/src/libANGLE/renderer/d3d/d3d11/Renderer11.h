@@ -18,6 +18,7 @@
 #include "libANGLE/renderer/d3d/RenderTargetD3D.h"
 #include "libANGLE/renderer/d3d/d3d11/DebugAnnotator11.h"
 #include "libANGLE/renderer/d3d/d3d11/InputLayoutCache.h"
+#include "libANGLE/renderer/d3d/d3d11/renderer11_utils.h"
 #include "libANGLE/renderer/d3d/d3d11/RenderStateCache.h"
 #include "libANGLE/renderer/d3d/d3d11/StateManager11.h"
 
@@ -111,7 +112,13 @@ class Renderer11 : public RendererD3D
     gl::Error flush() override;
     gl::Error finish() override;
 
-    virtual SwapChainD3D *createSwapChain(NativeWindow nativeWindow, HANDLE shareHandle, GLenum backBufferFormat, GLenum depthBufferFormat);
+    SwapChainD3D *createSwapChain(NativeWindow nativeWindow,
+                                  HANDLE shareHandle,
+                                  GLenum backBufferFormat,
+                                  GLenum depthBufferFormat,
+                                  EGLint orientation) override;
+
+    CompilerImpl *createCompiler() override;
 
     virtual gl::Error generateSwizzle(gl::Texture *texture);
     virtual gl::Error setSamplerState(gl::SamplerType type, int index, gl::Texture *texture, const gl::SamplerState &sampler);
@@ -121,41 +128,32 @@ class Renderer11 : public RendererD3D
                                 const std::vector<GLint> &vertexUniformBuffers,
                                 const std::vector<GLint> &fragmentUniformBuffers) override;
 
-    virtual gl::Error setRasterizerState(const gl::RasterizerState &rasterState);
-    gl::Error setBlendState(const gl::Framebuffer *framebuffer,
-                            const gl::BlendState &blendState,
-                            const gl::ColorF &blendColor,
-                            unsigned int sampleMask) override;
-
-    virtual gl::Error setDepthStencilState(const gl::DepthStencilState &depthStencilState, int stencilRef,
-                                           int stencilBackRef, bool frontFaceCCW);
-
-    virtual void setScissorRectangle(const gl::Rectangle &scissor, bool enabled);
-    virtual void setViewport(const gl::Rectangle &viewport, float zNear, float zFar, GLenum drawMode, GLenum frontFace,
-                             bool ignoreViewport);
+    gl::Error updateState(const gl::Data &data, GLenum drawMode) override;
 
     virtual bool applyPrimitiveType(GLenum mode, GLsizei count, bool usesPointSize);
     gl::Error applyRenderTarget(const gl::Framebuffer *frameBuffer) override;
     gl::Error applyUniforms(const ProgramD3D &programD3D,
                             GLenum drawMode,
                             const std::vector<D3DUniform *> &uniformArray) override;
-    virtual gl::Error applyVertexBuffer(const gl::State &state, GLenum mode, GLint first, GLsizei count, GLsizei instances, SourceIndexData *sourceIndexInfo);
+    virtual gl::Error applyVertexBuffer(const gl::State &state,
+                                        GLenum mode,
+                                        GLint first,
+                                        GLsizei count,
+                                        GLsizei instances,
+                                        TranslatedIndexData *indexInfo);
     gl::Error applyIndexBuffer(const gl::Data &data,
                                const GLvoid *indices,
                                GLsizei count,
                                GLenum mode,
                                GLenum type,
-                               TranslatedIndexData *indexInfo,
-                               SourceIndexData *sourceIndexInfo) override;
+                               TranslatedIndexData *indexInfo) override;
     void applyTransformFeedbackBuffers(const gl::State &state) override;
-
-    virtual void markAllStateDirty();
 
     // lost device
     bool testDeviceLost() override;
     bool testDeviceResettable() override;
 
-    VendorID getVendorId() const override;
+    VendorID getVendorId() const;
     SIZE_T getMaxResourceSize() const;
     std::string getRendererDescription() const override;
     DeviceIdentifier getAdapterIdentifier() const override;
@@ -259,18 +257,24 @@ class Renderer11 : public RendererD3D
     virtual gl::Error fastCopyBufferToTexture(const gl::PixelUnpackState &unpack, unsigned int offset, RenderTargetD3D *destRenderTarget,
                                               GLenum destinationFormat, GLenum sourcePixelsType, const gl::Box &destArea);
 
+    void markAllStateDirty();
     void unapplyRenderTargets();
     void setOneTimeRenderTarget(ID3D11RenderTargetView *renderTargetView);
-    gl::Error packPixels(ID3D11Texture2D *readTexture, const PackPixelsParams &params, uint8_t *pixelsOut);
+    gl::Error packPixels(const TextureHelper11 &textureHelper,
+                         const PackPixelsParams &params,
+                         uint8_t *pixelsOut);
 
     bool getLUID(LUID *adapterLuid) const override;
     VertexConversionType getVertexConversionType(gl::VertexFormatType vertexFormatType) const override;
     GLenum getVertexComponentType(gl::VertexFormatType vertexFormatType) const override;
 
-    gl::Error readTextureData(ID3D11Texture2D *texture, unsigned int subResource, const gl::Rectangle &area, GLenum format,
-                              GLenum type, GLuint outputPitch, const gl::PixelPackState &pack, uint8_t *pixels);
-
-    void setShaderResource(gl::SamplerType shaderType, UINT resourceSlot, ID3D11ShaderResourceView *srv);
+    gl::Error readFromAttachment(const gl::FramebufferAttachment &srcAttachment,
+                                 const gl::Rectangle &sourceArea,
+                                 GLenum format,
+                                 GLenum type,
+                                 GLuint outputPitch,
+                                 const gl::PixelPackState &pack,
+                                 uint8_t *pixels);
 
     gl::Error blitRenderbufferRect(const gl::Rectangle &readRect, const gl::Rectangle &drawRect, RenderTargetD3D *readRenderTarget,
                                    RenderTargetD3D *drawRenderTarget, GLenum filter, const gl::Rectangle *scissor,
@@ -281,16 +285,17 @@ class Renderer11 : public RendererD3D
 
     RendererClass getRendererClass() const override { return RENDERER_D3D11; }
     InputLayoutCache *getInputLayoutCache() { return &mInputLayoutCache; }
+    StateManager11 *getStateManager() { return &mStateManager; }
 
     void onSwap();
     void onBufferDelete(const Buffer11 *deleted);
+
+    egl::Error getEGLDevice(DeviceImpl **device) override;
 
   protected:
     void createAnnotator() override;
     gl::Error clearTextures(gl::SamplerType samplerType, size_t rangeStart, size_t rangeEnd) override;
     gl::Error applyShadersImpl(const gl::Data &data, GLenum drawMode) override;
-
-    egl::Error initializeEGLDevice(DeviceD3D **outDevice) override;
 
     void syncState(const gl::State &state, const gl::State::DirtyBits &bitmask) override;
 
@@ -327,7 +332,6 @@ class Renderer11 : public RendererD3D
                               int instances);
 
     ID3D11Texture2D *resolveMultisampledTexture(ID3D11Texture2D *source, unsigned int subresource);
-    void unsetConflictingSRVs(gl::SamplerType shaderType, uintptr_t resource, const gl::ImageIndex &index);
 
     void populateRenderer11DeviceCaps();
 
@@ -335,31 +339,26 @@ class Renderer11 : public RendererD3D
 
     HMODULE mD3d11Module;
     HMODULE mDxgiModule;
+    HMODULE mDCompModule;
     std::vector<D3D_FEATURE_LEVEL> mAvailableFeatureLevels;
-    D3D_DRIVER_TYPE mDriverType;
+    D3D_DRIVER_TYPE mRequestedDriverType;
+    bool mCreatedWithDeviceEXT;
+    DeviceD3D *mEGLDevice;
 
     HLSLCompiler mCompiler;
 
+    egl::Error initializeD3DDevice();
     void initializeDevice();
     void releaseDeviceResources();
     void release();
+
+    d3d11::ANGLED3D11DeviceType getDeviceType() const;
 
     RenderStateCache mStateCache;
 
     // current render target states
     uintptr_t mAppliedRTVs[gl::IMPLEMENTATION_MAX_DRAW_BUFFERS];
     uintptr_t mAppliedDSV;
-    bool mDepthStencilInitialized;
-    bool mRenderTargetDescInitialized;
-    unsigned int mCurStencilSize;
-
-    struct RenderTargetDesc
-    {
-        size_t width;
-        size_t height;
-        DXGI_FORMAT format;
-    };
-    RenderTargetDesc mRenderTargetDesc;
 
     // Currently applied sampler states
     std::vector<bool> mForceSetVertexSamplerStates;
@@ -368,71 +367,7 @@ class Renderer11 : public RendererD3D
     std::vector<bool> mForceSetPixelSamplerStates;
     std::vector<gl::SamplerState> mCurPixelSamplerStates;
 
-    // Currently applied textures
-    struct SRVRecord
-    {
-        uintptr_t srv;
-        uintptr_t resource;
-        D3D11_SHADER_RESOURCE_VIEW_DESC desc;
-    };
-
-    // A cache of current SRVs that also tracks the highest 'used' (non-NULL) SRV
-    // We might want to investigate a more robust approach that is also fast when there's
-    // a large gap between used SRVs (e.g. if SRV 0 and 7 are non-NULL, this approach will
-    // waste time on SRVs 1-6.)
-    class SRVCache : angle::NonCopyable
-    {
-      public:
-        SRVCache()
-            : mHighestUsedSRV(0)
-        {
-        }
-
-        void initialize(size_t size)
-        {
-            mCurrentSRVs.resize(size);
-        }
-
-        size_t size() const { return mCurrentSRVs.size(); }
-        size_t highestUsed() const { return mHighestUsedSRV; }
-
-        const SRVRecord &operator[](size_t index) const { return mCurrentSRVs[index]; }
-        void clear();
-        void update(size_t resourceIndex, ID3D11ShaderResourceView *srv);
-
-      private:
-        std::vector<SRVRecord> mCurrentSRVs;
-        size_t mHighestUsedSRV;
-    };
-
-    SRVCache mCurVertexSRVs;
-    SRVCache mCurPixelSRVs;
-
-    // A block of NULL pointers, cached so we don't re-allocate every draw call
-    std::vector<ID3D11ShaderResourceView*> mNullSRVs;
-
     StateManager11 mStateManager;
-
-    // Currently applied rasterizer state
-    bool mForceSetRasterState;
-    gl::RasterizerState mCurRasterState;
-
-    // Currently applied depth stencil state
-    bool mForceSetDepthStencilState;
-    gl::DepthStencilState mCurDepthStencilState;
-    int mCurStencilRef;
-    int mCurStencilBackRef;
-
-    // Currently applied scissor rectangle
-    bool mForceSetScissor;
-    bool mScissorEnabled;
-    gl::Rectangle mCurScissor;
-
-    // Currently applied viewport
-    bool mForceSetViewport;
-    gl::Rectangle mCurViewport;
-    float mCurNear;
-    float mCurFar;
 
     // Currently applied primitive topology
     D3D11_PRIMITIVE_TOPOLOGY mCurrentPrimitiveTopology;
@@ -459,16 +394,14 @@ class Renderer11 : public RendererD3D
     uintptr_t mAppliedGeometryShader;
     uintptr_t mAppliedPixelShader;
 
-    dx_VertexConstants mVertexConstants;
-    dx_VertexConstants mAppliedVertexConstants;
+    dx_VertexConstants11 mAppliedVertexConstants;
     ID3D11Buffer *mDriverConstantBufferVS;
     ID3D11Buffer *mCurrentVertexConstantBuffer;
     unsigned int mCurrentConstantBufferVS[gl::IMPLEMENTATION_MAX_VERTEX_SHADER_UNIFORM_BUFFERS];
     GLintptr mCurrentConstantBufferVSOffset[gl::IMPLEMENTATION_MAX_VERTEX_SHADER_UNIFORM_BUFFERS];
     GLsizeiptr mCurrentConstantBufferVSSize[gl::IMPLEMENTATION_MAX_VERTEX_SHADER_UNIFORM_BUFFERS];
 
-    dx_PixelConstants mPixelConstants;
-    dx_PixelConstants mAppliedPixelConstants;
+    dx_PixelConstants11 mAppliedPixelConstants;
     ID3D11Buffer *mDriverConstantBufferPS;
     ID3D11Buffer *mCurrentPixelConstantBuffer;
     unsigned int mCurrentConstantBufferPS[gl::IMPLEMENTATION_MAX_FRAGMENT_SHADER_UNIFORM_BUFFERS];
@@ -514,6 +447,8 @@ class Renderer11 : public RendererD3D
     ID3D11Debug *mDebug;
 
     std::vector<GLuint> mScratchIndexDataBuffer;
+
+    mutable Optional<bool> mSupportsShareHandles;
 };
 
 }

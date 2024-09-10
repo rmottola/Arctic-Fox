@@ -25,6 +25,7 @@
 #include "nsIDOMHTMLTextAreaElement.h"
 #include "nsIDOMHTMLInputElement.h"
 #include "nsFocusManager.h"
+#include "nsIFormControl.h"
 #include "nsIDOMEventListener.h"
 #include "nsPIDOMWindow.h"
 #include "nsPIWindowRoot.h"
@@ -226,7 +227,7 @@ nsXBLPrototypeHandler::ExecuteHandler(EventTarget* aTarget,
 
   // Look for a compiled handler on the element. 
   // Should be compiled and bound with "on" in front of the name.
-  nsCOMPtr<nsIAtom> onEventAtom = do_GetAtom(NS_LITERAL_STRING("onxbl") +
+  nsCOMPtr<nsIAtom> onEventAtom = NS_Atomize(NS_LITERAL_STRING("onxbl") +
                                              nsDependentAtomString(mEventName));
 
   // Compile the handler and bind it to the element.
@@ -273,7 +274,6 @@ nsXBLPrototypeHandler::ExecuteHandler(EventTarget* aTarget,
   if (NS_WARN_IF(!jsapi.Init(boundGlobal))) {
     return NS_OK;
   }
-  jsapi.TakeOwnershipOfErrorReporting();
   JSContext* cx = jsapi.cx();
   JS::Rooted<JSObject*> handler(cx);
 
@@ -453,6 +453,10 @@ nsXBLPrototypeHandler::DispatchXBLCommand(EventTarget* aTarget, nsIDOMEvent* aEv
   else
     controller = GetController(aTarget); // We're attached to the receiver possibly.
 
+  // We are the default action for this command.
+  // Stop any other default action from executing.
+  aEvent->PreventDefault();
+
   if (mEventName == nsGkAtoms::keypress &&
       mDetail == nsIDOMKeyEvent::DOM_VK_SPACE &&
       mMisc == 1) {
@@ -472,40 +476,19 @@ nsXBLPrototypeHandler::DispatchXBLCommand(EventTarget* aTarget, nsIDOMEvent* aEv
         nsFocusManager::GetFocusedDescendant(windowToCheck, true, getter_AddRefs(focusedWindow));
     }
 
-    bool isLink = false;
-    nsIContent *content = focusedContent;
+    // If the focus is in an editable region, don't scroll.
+    if (focusedContent && focusedContent->IsEditable()) {
+      return NS_OK;
+    }
 
-    // if the focused element is a link then we do want space to 
-    // scroll down. The focused element may be an element in a link,
-    // we need to check the parent node too. Only do this check if an
-    // element is focused and has a parent.
-    if (focusedContent && focusedContent->GetParent()) {
-      while (content) {
-        if (content->IsHTMLElement(nsGkAtoms::a)) {
-          isLink = true;
-          break;
-        }
-
-        if (content->HasAttr(kNameSpaceID_XLink, nsGkAtoms::type)) {
-          isLink = content->AttrValueIs(kNameSpaceID_XLink, nsGkAtoms::type,
-                                        nsGkAtoms::simple, eCaseMatters);
-
-          if (isLink) {
-            break;
-          }
-        }
-
-        content = content->GetParent();
-      }
-
-      if (!isLink)
+    // If the focus is in a form control, don't scroll.
+    for (nsIContent* c = focusedContent; c; c = c->GetParent()) {
+      nsCOMPtr<nsIFormControl> formControl = do_QueryInterface(c);
+      if (formControl) {
         return NS_OK;
+      }
     }
   }
-
-  // We are the default action for this command.
-  // Stop any other default action from executing.
-  aEvent->PreventDefault();
   
   if (controller)
     controller->DoCommand(command.get());
@@ -649,8 +632,8 @@ nsXBLPrototypeHandler::MouseEventMatched(nsIDOMMouseEvent* aMouseEvent)
 
 struct keyCodeData {
   const char* str;
-  size_t strlength;
-  uint32_t keycode;
+  uint16_t strlength;
+  uint16_t keycode;
 };
 
 // All of these must be uppercase, since the function below does
@@ -783,7 +766,7 @@ nsXBLPrototypeHandler::ConstructPrototype(nsIContent* aKeyElement,
       return;
   }
 
-  mEventName = do_GetAtom(event);
+  mEventName = NS_Atomize(event);
 
   if (aPhase) {
     const nsDependentString phase(aPhase);
@@ -977,7 +960,7 @@ nsXBLPrototypeHandler::Read(nsIObjectInputStream* aStream)
   nsAutoString name;
   rv = aStream->ReadString(name);
   NS_ENSURE_SUCCESS(rv, rv);
-  mEventName = do_GetAtom(name);
+  mEventName = NS_Atomize(name);
 
   rv = aStream->Read32(&mLineNumber);
   NS_ENSURE_SUCCESS(rv, rv);

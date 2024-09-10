@@ -138,7 +138,7 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     profilerSampleBufferLapCount_(1),
     wasmActivationStack_(nullptr),
     asyncStackForNewActivations(this),
-    asyncCauseForNewActivations(this),
+    asyncCauseForNewActivations(nullptr),
     asyncCallIsExplicit(false),
     entryMonitor(nullptr),
     noExecuteDebuggerTop(nullptr),
@@ -151,6 +151,8 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     handlingSegFault(false),
     handlingJitInterrupt_(false),
     interruptCallback(nullptr),
+    enqueuePromiseJobCallback(nullptr),
+    enqueuePromiseJobCallbackData(nullptr),
 #ifdef DEBUG
     exclusiveAccessOwner(nullptr),
     mainThreadHasExclusiveAccess(false),
@@ -204,7 +206,7 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     canUseSignalHandlers_(false),
     defaultFreeOp_(thisFromCtor()),
     debuggerMutations(0),
-    securityCallbacks(const_cast<JSSecurityCallbacks*>(&NullSecurityCallbacks)),
+    securityCallbacks(&NullSecurityCallbacks),
     DOMcallbacks(nullptr),
     destroyPrincipals(nullptr),
     readPrincipals(nullptr),
@@ -650,7 +652,7 @@ JSRuntime::requestInterrupt(InterruptMode mode)
         // collection among others), take additional steps to
         // interrupt corner cases where the above fields are not
         // regularly polled.  Wake both ilooping JIT code and
-        // futexWait.
+        // Atomics.wait().
         fx.lock();
         if (fx.isWaiting())
             fx.wake(FutexRuntime::WakeForJSInterrupt);
@@ -710,9 +712,7 @@ JSRuntime::getDefaultLocale()
     if (defaultLocale)
         return defaultLocale;
 
-    char* locale;
-    char* lang;
-    char* p;
+    const char* locale;
 #ifdef HAVE_SETLOCALE
     locale = setlocale(LC_ALL, nullptr);
 #else
@@ -720,10 +720,13 @@ JSRuntime::getDefaultLocale()
 #endif
     // convert to a well-formed BCP 47 language tag
     if (!locale || !strcmp(locale, "C"))
-        locale = const_cast<char*>("und");
-    lang = JS_strdup(this, locale);
+        locale = "und";
+
+    char* lang = JS_strdup(this, locale);
     if (!lang)
         return nullptr;
+
+    char* p;
     if ((p = strchr(lang, '.')))
         *p = '\0';
     while ((p = strchr(lang, '_')))
@@ -758,6 +761,16 @@ FreeOp::~FreeOp()
 
     if (!jitPoisonRanges.empty())
         jit::ExecutableAllocator::poisonCode(runtime(), jitPoisonRanges);
+}
+
+bool
+JSRuntime::enqueuePromiseJob(JSContext* cx, HandleFunction job)
+{
+    MOZ_ASSERT(cx->runtime()->enqueuePromiseJobCallback,
+               "Must set a callback using JS_SetEnqeueuPromiseJobCallback before using Promises");
+
+    void* data = cx->runtime()->enqueuePromiseJobCallbackData;
+    return cx->runtime()->enqueuePromiseJobCallback(cx, job, data);
 }
 
 void

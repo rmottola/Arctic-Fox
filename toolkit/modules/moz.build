@@ -11,6 +11,7 @@ MOCHITEST_CHROME_MANIFESTS += ['tests/chrome/chrome.ini']
 
 TESTING_JS_MODULES += [
     'tests/PromiseTestUtils.jsm',
+    'tests/xpcshell/TestIntegration.jsm',
 ]
 
 SPHINX_TREES['toolkit_modules'] = 'docs'
@@ -41,6 +42,7 @@ EXTRA_JS_MODULES += [
     'Http.jsm',
     'InlineSpellChecker.jsm',
     'InlineSpellCheckerContent.jsm',
+    'Integration.jsm',
     'LoadContextInfo.jsm',
     'Locale.jsm',
     'Log.jsm',
@@ -123,7 +125,8 @@ for var in ('ANDROID_PACKAGE_NAME',
 for var in ('MOZ_TOOLKIT_SEARCH',
             'MOZ_REQUIRE_SIGNING',
             'MOZ_SYSTEM_NSS',
-            'MOZ_UPDATER'):
+            'MOZ_UPDATER',
+            'MOZ_SWITCHBOARD'):
     if CONFIG[var]:
         DEFINES[var] = True
 

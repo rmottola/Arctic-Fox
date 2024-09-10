@@ -57,8 +57,6 @@ public:
     already_AddRefed<mozilla::gfx::ScaledFont>
       GetScaledFontForFont(mozilla::gfx::DrawTarget* aTarget, gfxFont *aFont) override;
 
-    nsresult GetStandardFamilyName(const nsAString& aFontName, nsAString& aFamilyName) override;
-
     gfxFontGroup*
     CreateFontGroup(const mozilla::FontFamilyList& aFontFamilyList,
                     const gfxFontStyle *aStyle,
@@ -66,29 +64,12 @@ public:
                     gfxUserFontSet *aUserFontSet,
                     gfxFloat aDevToCssSize) override;
 
-    virtual gfxFontEntry* LookupLocalFont(const nsAString& aFontName,
-                                          uint16_t aWeight,
-                                          int16_t aStretch,
-                                          uint8_t aStyle) override;
-
     virtual gfxPlatformFontList* CreatePlatformFontList() override;
-
-    virtual gfxFontEntry* MakePlatformFont(const nsAString& aFontName,
-                                           uint16_t aWeight,
-                                           int16_t aStretch,
-                                           uint8_t aStyle,
-                                           const uint8_t* aFontData,
-                                           uint32_t aLength) override;
 
     bool IsFontFormatSupported(nsIURI *aFontURI, uint32_t aFormatFlags) override;
 
-    nsresult GetFontList(nsIAtom *aLangGroup,
-                         const nsACString& aGenericFamily,
-                         nsTArray<nsString>& aListOfFonts) override;
-    nsresult UpdateFontList() override;
-
     virtual void GetCommonFallbackFonts(uint32_t aCh, uint32_t aNextCh,
-                                        int32_t aRunScript,
+                                        Script aRunScript,
                                         nsTArray<const char*>& aFontList) override;
 
     // lookup the system font for a particular system font type and set
@@ -104,6 +85,11 @@ public:
     }
 
     virtual bool SupportsApzWheelInput() const override {
+      return true;
+    }
+
+    bool RespectsFontStyleSmoothing() const override {
+      // gfxMacFont respects the font smoothing hint.
       return true;
     }
 

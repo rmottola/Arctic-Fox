@@ -38,7 +38,7 @@ IsCacheableNonGlobalScope(JSObject* obj)
     bool cacheable =
         obj->is<CallObject>() || obj->is<ClonedBlockObject>() || obj->is<DeclEnvObject>();
 
-    MOZ_ASSERT_IF(cacheable, !obj->getOps()->lookupProperty);
+    MOZ_ASSERT_IF(cacheable, !obj->getOpsLookupProperty());
     return cacheable;
 }
 
@@ -757,7 +757,7 @@ AbstractFramePtr::initArgsObj(ArgumentsObject& argsobj) const
 }
 
 inline bool
-AbstractFramePtr::copyRawFrameSlots(AutoValueVector* vec) const
+AbstractFramePtr::copyRawFrameSlots(MutableHandle<GCVector<Value>> vec) const
 {
     if (isInterpreterFrame())
         return asInterpreterFrame()->copyRawFrameSlots(vec);
@@ -873,7 +873,7 @@ Activation::Activation(JSContext* cx, Kind kind)
     hideScriptedCallerCount_(0),
     frameCache_(cx),
     asyncStack_(cx, cx->runtime_->asyncStackForNewActivations),
-    asyncCause_(cx, cx->runtime_->asyncCauseForNewActivations),
+    asyncCause_(cx->runtime_->asyncCauseForNewActivations),
     asyncCallIsExplicit_(cx->runtime_->asyncCallIsExplicit),
     kind_(kind)
 {

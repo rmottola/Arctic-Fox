@@ -8,6 +8,7 @@
 
 #include "jsgc.h"
 
+#include "gc/Policy.h"
 #include "jit/BaselineJIT.h"
 #include "jit/Ion.h"
 #include "jit/JitCompartment.h"
@@ -25,11 +26,12 @@ Zone * const Zone::NotOnList = reinterpret_cast<Zone*>(1);
 JS::Zone::Zone(JSRuntime* rt)
   : JS::shadow::Zone(rt, &rt->gc.marker),
     debuggers(nullptr),
-    suppressObjectMetadataCallback(false),
+    suppressAllocationMetadataBuilder(false),
     arenas(rt),
     types(this),
     compartments(),
     gcGrayRoots(),
+    typeDescrObjects(this, SystemAllocPolicy()),
     gcMallocBytes(0),
     gcMallocGCTriggered(false),
     usage(&rt->gc.usage),
@@ -56,6 +58,8 @@ JS::Zone::Zone(JSRuntime* rt)
 
 Zone::~Zone()
 {
+    MOZ_ASSERT_IF(typeDescrObjects.initialized(), typeDescrObjects.empty());
+
     JSRuntime* rt = runtimeFromMainThread();
     if (this == rt->gc.systemZone)
         rt->gc.systemZone = nullptr;
@@ -67,7 +71,10 @@ Zone::~Zone()
 bool Zone::init(bool isSystemArg)
 {
     isSystem = isSystemArg;
-    return uniqueIds_.init() && gcZoneGroupEdges.init() && gcWeakKeys.init();
+    return uniqueIds_.init() &&
+           gcZoneGroupEdges.init() &&
+           gcWeakKeys.init() &&
+           typeDescrObjects.init();
 }
 
 void
@@ -146,7 +153,7 @@ Zone::sweepBreakpoints(FreeOp* fop)
      */
 
     MOZ_ASSERT(isGCSweepingOrCompacting());
-    for (ZoneCellIter i(this, AllocKind::SCRIPT); !i.done(); i.next()) {
+    for (ZoneCellIterUnderGC i(this, AllocKind::SCRIPT); !i.done(); i.next()) {
         JSScript* script = i.get<JSScript>();
         if (!script->hasAnyBreakpointsOrStepMode())
             continue;
@@ -422,4 +429,10 @@ ZoneList::clear()
 {
     while (!isEmpty())
         removeFront();
+}
+
+JS_PUBLIC_API(void)
+JS::shadow::RegisterWeakCache(JS::Zone* zone, WeakCache<void*>* cachep)
+{
+    zone->registerWeakCache(cachep);
 }

@@ -36,7 +36,7 @@
  * don't assert dispatch success for any of the notifications, and assume that
  * any canonical or mirror owned by a thread for whom dispatch fails will soon
  * be disconnected by its holder anyway.
- * 
+ *
  * Given that semantics may change and comments tend to go out of date, we
  * deliberately don't provide usage examples here. Grep around to find them.
  */
@@ -115,6 +115,7 @@ public:
     mImpl = new Impl(aThread, aInitialValue, aName);
   }
 
+
   ~Canonical() {}
 
 private:
@@ -186,12 +187,12 @@ private:
       }
       mValue = aNewValue;
 
-      // We wait until things have stabilized before sending state updates so that
+      // We wait until things have stablized before sending state updates so that
       // we can avoid sending multiple updates, and possibly avoid sending any
       // updates at all if the value ends up where it started.
       if (!alreadyNotifying) {
         nsCOMPtr<nsIRunnable> r = NS_NewRunnableMethod(this, &Impl::DoNotify);
-        AbstractThread::GetCurrent()->TailDispatcher().AddDirectTask(r.forget());
+        AbstractThread::DispatchDirectTask(r.forget());
       }
     }
 
@@ -233,6 +234,8 @@ private:
   };
 public:
 
+  // NB: Because mirror-initiated disconnection can race with canonical-
+  // initiated disconnection, a canonical should never be reinitialized.
   // Forward control operations to the Impl.
   void DisconnectAll() { return mImpl->DisconnectAll(); }
 

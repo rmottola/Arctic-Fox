@@ -346,8 +346,7 @@ SessionRecorder.prototype = Object.freeze({
       this._log.debug("Recording last sessions as #" + count + ".");
       this._prefs.set("previous." + count, JSON.stringify(obj));
     } catch (ex) {
-      this._log.warn("Exception when migrating last session: " +
-                     CommonUtils.exceptionStr(ex));
+      this._log.warn("Exception when migrating last session", ex);
     } finally {
       this._log.debug("Resetting prefs from last session.");
       for (let pref of this._CURRENT_PREFS) {

@@ -351,7 +351,7 @@ private:
 
 NS_IMPL_ISUPPORTS(GMPShutdownObserver, nsIRunnable, nsIObserver)
 
-class NotifyObserversTask : public nsRunnable {
+class NotifyObserversTask : public Runnable {
 public:
   explicit NotifyObserversTask(const char* aTopic)
     : mTopic(aTopic)
@@ -541,8 +541,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
 
     EXPECT_TRUE(IsGMPStorageIsEmpty());
 
-    const nsString origin1 = NS_LITERAL_STRING("example1.com");
-    const nsString origin2 = NS_LITERAL_STRING("example2.org");
+    const nsString origin1 = NS_LITERAL_STRING("http://example1.com");
+    const nsString origin2 = NS_LITERAL_STRING("http://example2.org");
 
     nsCString PBnodeId1 = GetNodeId(origin1, origin2, true);
     nsCString PBnodeId2 = GetNodeId(origin1, origin2, true);
@@ -578,8 +578,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
 
     // Once we clear storage, the node ids generated for the same origin-pair
     // should be different.
-    const nsString origin1 = NS_LITERAL_STRING("example1.com");
-    const nsString origin2 = NS_LITERAL_STRING("example2.org");
+    const nsString origin1 = NS_LITERAL_STRING("http://example1.com");
+    const nsString origin2 = NS_LITERAL_STRING("http://example2.org");
     nsCString nodeId3 = GetNodeId(origin1, origin2, false);
     EXPECT_TRUE(!aNodeId1.Equals(nodeId3));
 
@@ -621,7 +621,7 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
     updates.AppendElement(aUpdate);
     CreateDecryptor(aOrigin, aTopLevelOrigin, aInPBMode, Move(updates));
   }
-  class Updates : public nsRunnable
+  class Updates : public Runnable
   {
   public:
     Updates(GMPStorageTest* aRunner, nsTArray<nsCString>&& aUpdates)
@@ -683,8 +683,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
     Expect(NS_LITERAL_CSTRING("test-storage complete"),
            NS_NewRunnableMethod(this, &GMPStorageTest::SetFinished));
 
-    CreateDecryptor(NS_LITERAL_STRING("example1.com"),
-                    NS_LITERAL_STRING("example2.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example1.com"),
+                    NS_LITERAL_STRING("http://example2.com"),
                     false,
                     NS_LITERAL_CSTRING("test-storage"));
   }
@@ -704,8 +704,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
         this, &GMPStorageTest::TestForgetThisSite_AnotherSite);
     Expect(NS_LITERAL_CSTRING("test-storage complete"), r);
 
-    CreateDecryptor(NS_LITERAL_STRING("example1.com"),
-                    NS_LITERAL_STRING("example2.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example1.com"),
+                    NS_LITERAL_STRING("http://example2.com"),
                     false,
                     NS_LITERAL_CSTRING("test-storage"));
   }
@@ -718,8 +718,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
         this, &GMPStorageTest::TestForgetThisSite_CollectSiteInfo);
     Expect(NS_LITERAL_CSTRING("test-storage complete"), r);
 
-    CreateDecryptor(NS_LITERAL_STRING("example3.com"),
-                    NS_LITERAL_STRING("example4.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example3.com"),
+                    NS_LITERAL_STRING("http://example4.com"),
                     false,
                     NS_LITERAL_CSTRING("test-storage"));
   }
@@ -747,7 +747,7 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
 
   void TestForgetThisSite_CollectSiteInfo() {
     nsAutoPtr<NodeInfo> siteInfo(
-        new NodeInfo(NS_LITERAL_CSTRING("example1.com")));
+        new NodeInfo(NS_LITERAL_CSTRING("http://example1.com")));
     // Collect nodeIds that are expected to remain for later comparison.
     EnumerateGMPStorageDir(NS_LITERAL_CSTRING("id"), NodeIdCollector(siteInfo));
     // Invoke "Forget this site" on the main thread.
@@ -837,8 +837,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
         this, &GMPStorageTest::TestClearRecentHistory1_Clear);
     Expect(NS_LITERAL_CSTRING("test-storage complete"), r);
 
-    CreateDecryptor(NS_LITERAL_STRING("example1.com"),
-                    NS_LITERAL_STRING("example2.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example1.com"),
+                    NS_LITERAL_STRING("http://example2.com"),
                     false,
                     NS_LITERAL_CSTRING("test-storage"));
 }
@@ -859,8 +859,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
         this, &GMPStorageTest::TestClearRecentHistory2_Clear);
     Expect(NS_LITERAL_CSTRING("test-storage complete"), r);
 
-    CreateDecryptor(NS_LITERAL_STRING("example1.com"),
-                    NS_LITERAL_STRING("example2.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example1.com"),
+                    NS_LITERAL_STRING("http://example2.com"),
                     false,
                     NS_LITERAL_CSTRING("test-storage"));
   }
@@ -881,8 +881,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
         this, &GMPStorageTest::TestClearRecentHistory3_Clear);
     Expect(NS_LITERAL_CSTRING("test-storage complete"), r);
 
-    CreateDecryptor(NS_LITERAL_STRING("example1.com"),
-                    NS_LITERAL_STRING("example2.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example1.com"),
+                    NS_LITERAL_STRING("http://example2.com"),
                     false,
                     NS_LITERAL_CSTRING("test-storage"));
   }
@@ -995,8 +995,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
 
     // Open decryptor on one, origin, write a record, and test that that
     // record can't be read on another origin.
-    CreateDecryptor(NS_LITERAL_STRING("example3.com"),
-                    NS_LITERAL_STRING("example4.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example3.com"),
+                    NS_LITERAL_STRING("http://example4.com"),
                     false,
                     update);
   }
@@ -1009,8 +1009,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
     Expect(NS_LITERAL_CSTRING("retrieve crossOriginTestRecordId succeeded (length 0 bytes)"),
            NS_NewRunnableMethod(this, &GMPStorageTest::SetFinished));
 
-    CreateDecryptor(NS_LITERAL_STRING("example5.com"),
-                    NS_LITERAL_STRING("example6.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example5.com"),
+                    NS_LITERAL_STRING("http://example6.com"),
                     false,
                     NS_LITERAL_CSTRING("retrieve crossOriginTestRecordId"));
   }
@@ -1026,8 +1026,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
     // open another, and test that record can be read, close decryptor,
     // then send pb-last-context-closed notification, then open decryptor
     // and check that it can't read that data; it should have been purged.
-    CreateDecryptor(NS_LITERAL_STRING("pb1.com"),
-                    NS_LITERAL_STRING("pb2.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://pb1.com"),
+                    NS_LITERAL_STRING("http://pb2.com"),
                     true,
                     NS_LITERAL_CSTRING("store pbdata test-pb-data"));
   }
@@ -1039,8 +1039,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
            NS_NewRunnableMethod(this,
               &GMPStorageTest::TestPBStorage_RecordRetrievedContinuation));
 
-    CreateDecryptor(NS_LITERAL_STRING("pb1.com"),
-                    NS_LITERAL_STRING("pb2.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://pb1.com"),
+                    NS_LITERAL_STRING("http://pb2.com"),
                     true,
                     NS_LITERAL_CSTRING("retrieve pbdata"));
   }
@@ -1053,8 +1053,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
            NS_NewRunnableMethod(this,
               &GMPStorageTest::SetFinished));
 
-    CreateDecryptor(NS_LITERAL_STRING("pb1.com"),
-                    NS_LITERAL_STRING("pb2.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://pb1.com"),
+                    NS_LITERAL_STRING("http://pb2.com"),
                     true,
                     NS_LITERAL_CSTRING("retrieve pbdata"));
   }
@@ -1084,20 +1084,20 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
   void TestAsyncShutdownTimeout() {
     // Create decryptors that timeout in their async shutdown.
     // If the gtest hangs on shutdown, test fails!
-    CreateAsyncShutdownTimeoutGMP(NS_LITERAL_STRING("example7.com"),
-                                  NS_LITERAL_STRING("example8.com"),
+    CreateAsyncShutdownTimeoutGMP(NS_LITERAL_STRING("http://example7.com"),
+                                  NS_LITERAL_STRING("http://example8.com"),
                                   &GMPStorageTest::TestAsyncShutdownTimeout2);
   };
 
   void TestAsyncShutdownTimeout2() {
-    CreateAsyncShutdownTimeoutGMP(NS_LITERAL_STRING("example9.com"),
-                                  NS_LITERAL_STRING("example10.com"),
+    CreateAsyncShutdownTimeoutGMP(NS_LITERAL_STRING("http://example9.com"),
+                                  NS_LITERAL_STRING("http://example10.com"),
                                   &GMPStorageTest::TestAsyncShutdownTimeout3);
   };
 
   void TestAsyncShutdownTimeout3() {
-    CreateAsyncShutdownTimeoutGMP(NS_LITERAL_STRING("example11.com"),
-                                  NS_LITERAL_STRING("example12.com"),
+    CreateAsyncShutdownTimeoutGMP(NS_LITERAL_STRING("http://example11.com"),
+                                  NS_LITERAL_STRING("http://example12.com"),
                                   &GMPStorageTest::SetFinished);
   };
 
@@ -1120,8 +1120,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
 
     // Test that a GMP can write to storage during shutdown, and retrieve
     // that written data in a subsequent session.
-    CreateDecryptor(NS_LITERAL_STRING("example13.com"),
-                    NS_LITERAL_STRING("example14.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example13.com"),
+                    NS_LITERAL_STRING("http://example14.com"),
                     false,
                     update);
   }
@@ -1139,8 +1139,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
     Expect(response,
            NS_NewRunnableMethod(this, &GMPStorageTest::SetFinished));
 
-    CreateDecryptor(NS_LITERAL_STRING("example13.com"),
-                    NS_LITERAL_STRING("example14.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example13.com"),
+                    NS_LITERAL_STRING("http://example14.com"),
                     false,
                     NS_LITERAL_CSTRING("retrieve-shutdown-token"));
   }
@@ -1152,8 +1152,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
     Expect(NS_LITERAL_CSTRING("OP tests completed"),
            NS_NewRunnableMethod(this, &GMPStorageTest::SetFinished));
 
-    CreateDecryptor(NS_LITERAL_STRING("example15.com"),
-                    NS_LITERAL_STRING("example16.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example15.com"),
+                    NS_LITERAL_STRING("http://example16.com"),
                     false,
                     NS_LITERAL_CSTRING("test-op-apis"));
   }
@@ -1163,8 +1163,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
     Expect(NS_LITERAL_CSTRING("retrieved plugin-voucher: gmp-fake placeholder voucher"),
            NS_NewRunnableMethod(this, &GMPStorageTest::SetFinished));
 
-    CreateDecryptor(NS_LITERAL_STRING("example17.com"),
-                    NS_LITERAL_STRING("example18.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://example17.com"),
+                    NS_LITERAL_STRING("http://example18.com"),
                     false,
                     NS_LITERAL_CSTRING("retrieve-plugin-voucher"));
   }
@@ -1213,8 +1213,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
       Expect(response, continuation);
     }
 
-    CreateDecryptor(NS_LITERAL_STRING("foo.com"),
-                    NS_LITERAL_STRING("bar.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://foo.com"),
+                    NS_LITERAL_STRING("http://bar.com"),
                     aPrivateBrowsing,
                     Move(updates));
   }
@@ -1266,8 +1266,8 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
     update.Append(longRecordName);
     update.AppendLiteral(" ");
     update.Append(data);
-    CreateDecryptor(NS_LITERAL_STRING("fuz.com"),
-                    NS_LITERAL_STRING("baz.com"),
+    CreateDecryptor(NS_LITERAL_STRING("http://fuz.com"),
+                    NS_LITERAL_STRING("http://baz.com"),
                     false,
                     update);
   }
@@ -1465,6 +1465,11 @@ TEST(GeckoMediaPlugins, GMPPluginVoucher) {
 
 #if defined(XP_WIN)
 TEST(GeckoMediaPlugins, GMPOutputProtection) {
+  // Output Protection is not available pre-Vista.
+  if (!IsVistaOrLater()) {
+    return;
+  }
+
   RefPtr<GMPStorageTest> runner = new GMPStorageTest();
   runner->DoTest(&GMPStorageTest::TestOutputProtection);
 }

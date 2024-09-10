@@ -891,7 +891,7 @@ class LNewArray : public LInstructionHelper<1, 0, 1>
     }
 
     const char* extraName() const {
-        return mir()->shouldUseVM() ? "VMCall" : nullptr;
+        return mir()->templateObject() ? "VMCall" : nullptr;
     }
 
     const LDefinition* temp() {
@@ -953,7 +953,7 @@ class LNewObject : public LInstructionHelper<1, 0, 1>
     }
 
     const char* extraName() const {
-        return mir()->shouldUseVM() ? "VMCall" : nullptr;
+        return mir()->templateObject() ? "VMCall" : nullptr;
     }
 
     const LDefinition* temp() {
@@ -1254,6 +1254,73 @@ class LAsmThrowUnreachable : public LInstructionHelper<0, 0, 0>
 
     LAsmThrowUnreachable()
     { }
+};
+
+template<size_t Defs, size_t Ops>
+class LAsmReinterpretBase : public LInstructionHelper<Defs, Ops, 0>
+{
+    typedef LInstructionHelper<Defs, Ops, 0> Base;
+
+  public:
+    const LAllocation* input() {
+        return Base::getOperand(0);
+    }
+    MAsmReinterpret* mir() const {
+        return Base::mir_->toAsmReinterpret();
+    }
+};
+
+class LAsmReinterpret : public LAsmReinterpretBase<1, 1>
+{
+  public:
+    LIR_HEADER(AsmReinterpret);
+    explicit LAsmReinterpret(const LAllocation& input) {
+        setOperand(0, input);
+    }
+};
+
+class LAsmReinterpretFromI64 : public LAsmReinterpretBase<1, INT64_PIECES>
+{
+  public:
+    LIR_HEADER(AsmReinterpretFromI64);
+    explicit LAsmReinterpretFromI64(const LInt64Allocation& input) {
+        setInt64Operand(0, input);
+    }
+};
+
+class LAsmReinterpretToI64 : public LAsmReinterpretBase<INT64_PIECES, 1>
+{
+  public:
+    LIR_HEADER(AsmReinterpretToI64);
+    explicit LAsmReinterpretToI64(const LAllocation& input) {
+        setOperand(0, input);
+    }
+};
+
+namespace details {
+    template<size_t Defs, size_t Ops>
+    class RotateBase : public LInstructionHelper<Defs, Ops, 0>
+    {
+        typedef LInstructionHelper<Defs, Ops, 0> Base;
+      public:
+        MRotate* mir() {
+            return Base::mir_->toRotate();
+        }
+        const LAllocation* input() { return Base::getOperand(0); }
+        const LAllocation* count() { return Base::getOperand(1); }
+    };
+} // details
+
+class LRotate : public details::RotateBase<1, 2>
+{
+  public:
+    LIR_HEADER(Rotate);
+};
+
+class LRotate64 : public details::RotateBase<INT64_PIECES, INT64_PIECES + 1>
+{
+  public:
+    LIR_HEADER(Rotate64);
 };
 
 class LInterruptCheck : public LInstructionHelper<0, 0, 0>
@@ -3972,6 +4039,20 @@ class LTruncateFToInt32 : public LInstructionHelper<1, 1, 1>
     }
 };
 
+class LWasmTruncateToInt32 : public LInstructionHelper<1, 1, 0>
+{
+  public:
+    LIR_HEADER(WasmTruncateToInt32)
+
+    explicit LWasmTruncateToInt32(const LAllocation& in) {
+        setOperand(0, in);
+    }
+
+    MWasmTruncateToInt32* mir() const {
+        return mir_->toWasmTruncateToInt32();
+    }
+};
+
 class LWrapInt64ToInt32 : public LInstructionHelper<1, INT64_PIECES, 0>
 {
   public:
@@ -4269,18 +4350,17 @@ class LRegExp : public LCallInstructionHelper<1, 0, 0>
     }
 };
 
-class LRegExpMatcher : public LCallInstructionHelper<BOX_PIECES, 4, 0>
+class LRegExpMatcher : public LCallInstructionHelper<BOX_PIECES, 3, 0>
 {
   public:
     LIR_HEADER(RegExpMatcher)
 
     LRegExpMatcher(const LAllocation& regexp, const LAllocation& string,
-                   const LAllocation& lastIndex, const LAllocation& sticky)
+                   const LAllocation& lastIndex)
     {
         setOperand(0, regexp);
         setOperand(1, string);
         setOperand(2, lastIndex);
-        setOperand(3, sticky);
     }
 
     const LAllocation* regexp() {
@@ -4291,9 +4371,6 @@ class LRegExpMatcher : public LCallInstructionHelper<BOX_PIECES, 4, 0>
     }
     const LAllocation* lastIndex() {
         return getOperand(2);
-    }
-    const LAllocation* sticky() {
-        return getOperand(3);
     }
 
     const MRegExpMatcher* mir() const {
@@ -4301,18 +4378,17 @@ class LRegExpMatcher : public LCallInstructionHelper<BOX_PIECES, 4, 0>
     }
 };
 
-class LRegExpTester : public LCallInstructionHelper<1, 4, 0>
+class LRegExpSearcher : public LCallInstructionHelper<1, 3, 0>
 {
   public:
-    LIR_HEADER(RegExpTester)
+    LIR_HEADER(RegExpSearcher)
 
-    LRegExpTester(const LAllocation& regexp, const LAllocation& string,
-                  const LAllocation& lastIndex, const LAllocation& sticky)
+    LRegExpSearcher(const LAllocation& regexp, const LAllocation& string,
+                    const LAllocation& lastIndex)
     {
         setOperand(0, regexp);
         setOperand(1, string);
         setOperand(2, lastIndex);
-        setOperand(3, sticky);
     }
 
     const LAllocation* regexp() {
@@ -4324,8 +4400,33 @@ class LRegExpTester : public LCallInstructionHelper<1, 4, 0>
     const LAllocation* lastIndex() {
         return getOperand(2);
     }
-    const LAllocation* sticky() {
-        return getOperand(3);
+
+    const MRegExpSearcher* mir() const {
+        return mir_->toRegExpSearcher();
+    }
+};
+
+class LRegExpTester : public LCallInstructionHelper<1, 3, 0>
+{
+  public:
+    LIR_HEADER(RegExpTester)
+
+    LRegExpTester(const LAllocation& regexp, const LAllocation& string,
+                  const LAllocation& lastIndex)
+    {
+        setOperand(0, regexp);
+        setOperand(1, string);
+        setOperand(2, lastIndex);
+    }
+
+    const LAllocation* regexp() {
+        return getOperand(0);
+    }
+    const LAllocation* string() {
+        return getOperand(1);
+    }
+    const LAllocation* lastIndex() {
+        return getOperand(2);
     }
 
     const MRegExpTester* mir() const {
@@ -4333,16 +4434,92 @@ class LRegExpTester : public LCallInstructionHelper<1, 4, 0>
     }
 };
 
-
-class LStrReplace : public LCallInstructionHelper<1, 3, 0>
+class LRegExpPrototypeOptimizable : public LInstructionHelper<1, 1, 1>
 {
   public:
-    LStrReplace(const LAllocation& string, const LAllocation& pattern,
+    LIR_HEADER(RegExpPrototypeOptimizable);
+    explicit LRegExpPrototypeOptimizable(const LAllocation& object, const LDefinition& temp) {
+        setOperand(0, object);
+        setTemp(0, temp);
+    }
+
+    const LAllocation* object() {
+        return getOperand(0);
+    }
+    const LDefinition* temp() {
+        return getTemp(0);
+    }
+    MRegExpPrototypeOptimizable* mir() const {
+        return mir_->toRegExpPrototypeOptimizable();
+    }
+};
+
+class LRegExpInstanceOptimizable : public LInstructionHelper<1, 2, 1>
+{
+  public:
+    LIR_HEADER(RegExpInstanceOptimizable);
+    explicit LRegExpInstanceOptimizable(const LAllocation& object, const LAllocation& proto,
+                                        const LDefinition& temp) {
+        setOperand(0, object);
+        setOperand(1, proto);
+        setTemp(0, temp);
+    }
+
+    const LAllocation* object() {
+        return getOperand(0);
+    }
+    const LAllocation* proto() {
+        return getOperand(1);
+    }
+    const LDefinition* temp() {
+        return getTemp(0);
+    }
+    MRegExpInstanceOptimizable* mir() const {
+        return mir_->toRegExpInstanceOptimizable();
+    }
+};
+
+class LGetFirstDollarIndex : public LInstructionHelper<1, 1, 3>
+{
+  public:
+    LIR_HEADER(GetFirstDollarIndex);
+    explicit LGetFirstDollarIndex(const LAllocation& str, const LDefinition& temp0,
+                                  const LDefinition& temp1, const LDefinition& temp2) {
+        setOperand(0, str);
+        setTemp(0, temp0);
+        setTemp(1, temp1);
+        setTemp(2, temp2);
+    }
+
+    const LAllocation* str() {
+        return getOperand(0);
+    }
+    const LDefinition* temp0() {
+        return getTemp(0);
+    }
+    const LDefinition* temp1() {
+        return getTemp(1);
+    }
+    const LDefinition* temp2() {
+        return getTemp(2);
+    }
+};
+
+class LStringReplace: public LCallInstructionHelper<1, 3, 0>
+{
+  public:
+    LIR_HEADER(StringReplace);
+
+    LStringReplace(const LAllocation& string, const LAllocation& pattern,
                    const LAllocation& replacement)
     {
         setOperand(0, string);
         setOperand(1, pattern);
         setOperand(2, replacement);
+    }
+
+    const MStringReplace* mir() const {
+        return mir_->toStringReplace();
     }
 
     const LAllocation* string() {
@@ -4353,38 +4530,6 @@ class LStrReplace : public LCallInstructionHelper<1, 3, 0>
     }
     const LAllocation* replacement() {
         return getOperand(2);
-    }
-};
-
-class LRegExpReplace: public LStrReplace
-{
-  public:
-    LIR_HEADER(RegExpReplace);
-
-    LRegExpReplace(const LAllocation& string, const LAllocation& pattern,
-                   const LAllocation& replacement)
-      : LStrReplace(string, pattern, replacement)
-    {
-    }
-
-    const MRegExpReplace* mir() const {
-        return mir_->toRegExpReplace();
-    }
-};
-
-class LStringReplace: public LStrReplace
-{
-  public:
-    LIR_HEADER(StringReplace);
-
-    LStringReplace(const LAllocation& string, const LAllocation& pattern,
-                   const LAllocation& replacement)
-      : LStrReplace(string, pattern, replacement)
-    {
-    }
-
-    const MStringReplace* mir() const {
-        return mir_->toStringReplace();
     }
 };
 
@@ -4420,6 +4565,16 @@ class LUnarySharedStub : public LCallInstructionHelper<BOX_PIECES, BOX_PIECES, 0
     }
 
     static const size_t Input = 0;
+};
+
+class LNullarySharedStub : public LCallInstructionHelper<BOX_PIECES, 0, 0>
+{
+  public:
+    LIR_HEADER(NullarySharedStub)
+
+    const MNullarySharedStub* mir() const {
+        return mir_->toNullarySharedStub();
+    }
 };
 
 class LLambdaForSingleton : public LCallInstructionHelper<1, 1, 0>
@@ -5407,35 +5562,6 @@ class LArrayPushT : public LInstructionHelper<1, 2, 1>
     }
     const LDefinition* temp() {
         return getTemp(0);
-    }
-};
-
-class LArrayConcat : public LCallInstructionHelper<1, 2, 2>
-{
-  public:
-    LIR_HEADER(ArrayConcat)
-
-    LArrayConcat(const LAllocation& lhs, const LAllocation& rhs,
-                 const LDefinition& temp1, const LDefinition& temp2) {
-        setOperand(0, lhs);
-        setOperand(1, rhs);
-        setTemp(0, temp1);
-        setTemp(1, temp2);
-    }
-    const MArrayConcat* mir() const {
-        return mir_->toArrayConcat();
-    }
-    const LAllocation* lhs() {
-        return getOperand(0);
-    }
-    const LAllocation* rhs() {
-        return getOperand(1);
-    }
-    const LDefinition* temp1() {
-        return getTemp(0);
-    }
-    const LDefinition* temp2() {
-        return getTemp(1);
     }
 };
 
@@ -7203,6 +7329,22 @@ class LIsCallable : public LInstructionHelper<1, 1, 0>
     }
 };
 
+class LIsConstructor : public LInstructionHelper<1, 1, 0>
+{
+  public:
+    LIR_HEADER(IsConstructor);
+    explicit LIsConstructor(const LAllocation& object) {
+        setOperand(0, object);
+    }
+
+    const LAllocation* object() {
+        return getOperand(0);
+    }
+    MIsConstructor* mir() const {
+        return mir_->toIsConstructor();
+    }
+};
+
 class LIsObject : public LInstructionHelper<1, BOX_PIECES, 0>
 {
   public:
@@ -7921,10 +8063,6 @@ class LMemoryBarrier : public LInstructionHelper<0, 0, 0>
 
     MemoryBarrierBits type() const {
         return type_;
-    }
-
-    const MMemoryBarrier* mir() const {
-        return mir_->toMemoryBarrier();
     }
 };
 

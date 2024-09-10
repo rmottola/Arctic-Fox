@@ -13,6 +13,7 @@
 #include "gc/Tracer.h"
 
 #include "jsobjinlines.h"
+#include "jsscriptinlines.h"
 
 using namespace js;
 using namespace js::frontend;
@@ -356,6 +357,15 @@ ModuleNamespaceObject::ProxyHandler::setPrototype(JSContext* cx, HandleObject pr
 }
 
 bool
+ModuleNamespaceObject::ProxyHandler::getPrototypeIfOrdinary(JSContext* cx, HandleObject proxy,
+                                                            bool* isOrdinary,
+                                                            MutableHandleObject protop) const
+{
+    *isOrdinary = false;
+    return true;
+}
+
+bool
 ModuleNamespaceObject::ProxyHandler::setImmutablePrototype(JSContext* cx, HandleObject proxy,
                                                            bool* succeeded) const
 {
@@ -529,11 +539,8 @@ void FunctionDeclaration::trace(JSTracer* trc)
 ///////////////////////////////////////////////////////////////////////////
 // ModuleObject
 
-/* static */ const Class
-ModuleObject::class_ = {
-    "Module",
-    JSCLASS_HAS_RESERVED_SLOTS(ModuleObject::SlotCount) |
-    JSCLASS_IS_ANONYMOUS,
+/* static */ const ClassOps
+ModuleObject::classOps_ = {
     nullptr,        /* addProperty */
     nullptr,        /* delProperty */
     nullptr,        /* getProperty */
@@ -546,6 +553,14 @@ ModuleObject::class_ = {
     nullptr,        /* hasInstance */
     nullptr,        /* construct   */
     ModuleObject::trace
+};
+
+/* static */ const Class
+ModuleObject::class_ = {
+    "Module",
+    JSCLASS_HAS_RESERVED_SLOTS(ModuleObject::SlotCount) |
+    JSCLASS_IS_ANONYMOUS,
+    &ModuleObject::classOps_
 };
 
 #define DEFINE_ARRAY_SLOT_ACCESSOR(cls, name, slot)                           \
@@ -1102,7 +1117,7 @@ ModuleBuilder::processExport(frontend::ParseNode* pn)
 
       case PNK_FUNCTION: {
           RootedFunction func(cx_, kid->pn_funbox->function());
-          RootedAtom localName(cx_, func->atom());
+          RootedAtom localName(cx_, func->name());
           RootedAtom exportName(cx_, isDefault ? cx_->names().default_ : localName.get());
           if (!appendExportEntry(exportName, localName))
               return false;

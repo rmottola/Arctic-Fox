@@ -255,7 +255,7 @@ private:
   class ScrollSelectionIntoViewEvent;
   friend class ScrollSelectionIntoViewEvent;
 
-  class ScrollSelectionIntoViewEvent : public nsRunnable {
+  class ScrollSelectionIntoViewEvent : public Runnable {
   public:
     NS_DECL_NSIRUNNABLE
     ScrollSelectionIntoViewEvent(Selection* aSelection,
@@ -367,7 +367,7 @@ public:
   }
 };
 
-class MOZ_STACK_CLASS AutoHideSelectionChanges final
+class MOZ_RAII AutoHideSelectionChanges final
 {
 private:
   RefPtr<Selection> mSelection;

@@ -160,6 +160,7 @@ var Service = {
     this.uuidMap.set(uuid, extension);
     this.aps.setAddonLoadURICallback(extension.id, this.checkAddonMayLoad.bind(this, extension));
     this.aps.setAddonLocalizeCallback(extension.id, extension.localize.bind(extension));
+    this.aps.setAddonCSP(extension.id, extension.manifest.content_security_policy);
   },
 
   // Called when an extension is unloaded.
@@ -168,6 +169,7 @@ var Service = {
     this.uuidMap.delete(uuid);
     this.aps.setAddonLoadURICallback(extension.id, null);
     this.aps.setAddonLocalizeCallback(extension.id, null);
+    this.aps.setAddonCSP(extension.id, null);
 
     let handler = Services.io.getProtocolHandler("moz-extension");
     handler.QueryInterface(Ci.nsISubstitutingProtocolHandler);
@@ -180,15 +182,15 @@ var Service = {
   extensionURILoadableByAnyone(uri) {
     let uuid = uri.host;
     let extension = this.uuidMap.get(uuid);
-    if (!extension) {
+    if (!extension || !extension.webAccessibleResources) {
       return false;
     }
 
-    let path = uri.path;
+    let path = uri.QueryInterface(Ci.nsIURL).filePath;
     if (path.length > 0 && path[0] == "/") {
       path = path.substr(1);
     }
-    return extension.webAccessibleResources.has(path);
+    return extension.webAccessibleResources.matches(path);
   },
 
   // Checks whether a given extension can load this URI (typically via
@@ -232,7 +234,7 @@ function getAPILevelForWindow(window, addonId) {
 
   // Non WebExtension URLs and WebExtension URLs from a different extension
   // has no access to APIs.
-  if (!addonId && getAddonIdForWindow(window) != addonId) {
+  if (!addonId || getAddonIdForWindow(window) != addonId) {
     return NO_PRIVILEGES;
   }
 

@@ -9,6 +9,8 @@ DIRS += [
 ]
 
 DevToolsModules(
+    'categories.js',
+    'constants.js',
     'global.js',
     'io.js',
     'markers.js',

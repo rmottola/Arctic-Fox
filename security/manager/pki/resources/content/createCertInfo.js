@@ -4,6 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 /* import-globals-from pippki.js */
+"use strict";
 
 var keygenThread;
 
@@ -19,7 +20,7 @@ function onLoad()
   window.setCursor("wait");
 
   var obs = {
-    observe : function keygenListenerObserve(subject, topic, data) {
+    observe: function keygenListenerObserve(subject, topic, data) {
       if (topic == "keygen-finished") {
         window.close();
       }

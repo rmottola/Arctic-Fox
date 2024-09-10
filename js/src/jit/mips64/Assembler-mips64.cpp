@@ -23,8 +23,8 @@ ABIArg
 ABIArgGenerator::next(MIRType type)
 {
     switch (type) {
-      case MIRType_Int32:
-      case MIRType_Pointer: {
+      case MIRType::Int32:
+      case MIRType::Pointer: {
         Register destReg;
         if (GetIntArgReg(usedArgSlots_, &destReg))
             current_ = ABIArg(destReg);
@@ -33,13 +33,13 @@ ABIArgGenerator::next(MIRType type)
         usedArgSlots_++;
         break;
       }
-      case MIRType_Float32:
-      case MIRType_Double: {
+      case MIRType::Float32:
+      case MIRType::Double: {
         FloatRegister destFReg;
         FloatRegister::ContentType contentType;
         if (!usedArgSlots_)
             firstArgFloat = true;
-        contentType = (type == MIRType_Double) ?
+        contentType = (type == MIRType::Double) ?
             FloatRegisters::Double : FloatRegisters::Single;
         if (GetFloatArgReg(usedArgSlots_, &destFReg))
             current_ = ABIArg(FloatRegister(destFReg.id(), contentType));
@@ -269,14 +269,10 @@ Assembler::bind(InstImm* inst, uintptr_t branch, uintptr_t target)
     }
 
     if (BOffImm16::IsInRange(offset)) {
-#ifdef _MIPS_ARCH_LOONGSON3A
         // Don't skip trailing nops can imporve performance
         // on Loongson3 platform.
-        bool skipNops = false;
-#else
-        bool skipNops = (inst[0].encode() != inst_bgezal.encode() &&
-                         inst[0].encode() != inst_beq.encode());
-#endif
+        bool skipNops = !isLoongson() && (inst[0].encode() != inst_bgezal.encode() &&
+                                          inst[0].encode() != inst_beq.encode());
 
         inst[0].setBOffImm16(BOffImm16(offset));
         inst[1].makeNop();

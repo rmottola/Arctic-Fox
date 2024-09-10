@@ -4,23 +4,36 @@
 
 "use strict";
 
+/**
+ * This is the main module loaded in Firefox desktop that handles browser
+ * windows and coordinates devtools around each window.
+ *
+ * This module is loaded lazily by devtools-clhandler.js, once the first
+ * browser window is ready (i.e. fired browser-delayed-startup-finished event)
+ **/
+
 const {Cc, Ci, Cu} = require("chrome");
 const Services = require("Services");
 const promise = require("promise");
-const {gDevTools} = require("./devtools");
+const Telemetry = require("devtools/client/shared/telemetry");
+const { gDevTools } = require("./devtools");
+const { when: unload } = require("sdk/system/unload");
 
 // Load target and toolbox lazily as they need gDevTools to be fully initialized
 loader.lazyRequireGetter(this, "TargetFactory", "devtools/client/framework/target", true);
 loader.lazyRequireGetter(this, "Toolbox", "devtools/client/framework/toolbox", true);
 loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
 loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", true);
+loader.lazyRequireGetter(this, "BrowserMenus", "devtools/client/framework/browser-menus");
 
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "CustomizableUI",
-                                  "resource:///modules/CustomizableUI.jsm");
+loader.lazyImporter(this, "CustomizableUI", "resource:///modules/CustomizableUI.jsm");
 
 const bundle = Services.strings.createBundle("chrome://devtools/locale/toolbox.properties");
+
+const TABS_OPEN_PEAK_HISTOGRAM = "DEVTOOLS_TABS_OPEN_PEAK_LINEAR";
+const TABS_OPEN_AVG_HISTOGRAM = "DEVTOOLS_TABS_OPEN_AVERAGE_LINEAR";
+const TABS_PINNED_PEAK_HISTOGRAM = "DEVTOOLS_TABS_PINNED_PEAK_LINEAR";
+const TABS_PINNED_AVG_HISTOGRAM = "DEVTOOLS_TABS_PINNED_AVERAGE_LINEAR";
 
 /**
  * gDevToolsBrowser exposes functions to connect the gDevTools instance with a
@@ -32,6 +45,8 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
    * as the window is closed
    */
   _trackedBrowserWindows: new Set(),
+
+  _telemetry: new Telemetry(),
 
   _tabStats: {
     peakOpen: 0,
@@ -116,10 +131,17 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
   },
 
   observe: function(subject, topic, prefName) {
-    if (prefName.endsWith("enabled")) {
-      for (let win of this._trackedBrowserWindows) {
-        this.updateCommandAvailability(win);
-      }
+    switch (topic) {
+      case "browser-delayed-startup-finished":
+        this._registerBrowserWindow(subject);
+        break;
+      case "nsPref:changed":
+        if (prefName.endsWith("enabled")) {
+          for (let win of this._trackedBrowserWindows) {
+            this.updateCommandAvailability(win);
+          }
+        }
+        break;
     }
   },
 
@@ -175,6 +197,15 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
         gDevTools.emit("select-tool-command", toolId);
       });
     }
+  },
+
+  /**
+   * Open a tab on "about:debugging", optionally pre-select a given tab.
+   */
+   // Used by browser-sets.inc, command
+  openAboutDebugging: function(gBrowser, hash) {
+    let url = "about:debugging" + (hash ? "#" + hash : "");
+    gBrowser.selectedTab = gBrowser.addTab(url);
   },
 
   /**
@@ -331,17 +362,19 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
    * @param {XULDocument} doc
    *        The document to which menuitems and handlers are to be added
    */
-  // Used by browser.js
-  registerBrowserWindow: function DT_registerBrowserWindow(win) {
+  _registerBrowserWindow: function(win) {
+    BrowserMenus.addMenus(win.document);
+
+    // Inject lazily DeveloperToolbar on the chrome window
+    loader.lazyGetter(win, "DeveloperToolbar", function() {
+      let { DeveloperToolbar } = require("devtools/client/shared/developer-toolbar");
+      return new DeveloperToolbar(win);
+    });
+
     this.updateCommandAvailability(win);
     this.ensurePrefObserver();
     gDevToolsBrowser._trackedBrowserWindows.add(win);
-    gDevToolsBrowser._addAllToolsToMenu(win.document);
-
-    if (this._isFirebugInstalled()) {
-      let broadcaster = win.document.getElementById("devtoolsMenuBroadcaster_DevToolbox");
-      broadcaster.removeAttribute("key");
-    }
+    win.addEventListener("unload", this);
 
     let tabContainer = win.gBrowser.tabContainer;
     tabContainer.addEventListener("TabSelect", this, false);
@@ -349,29 +382,6 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
     tabContainer.addEventListener("TabClose", this, false);
     tabContainer.addEventListener("TabPinned", this, false);
     tabContainer.addEventListener("TabUnpinned", this, false);
-  },
-
-  /**
-   * Add a <key> to <keyset id="devtoolsKeyset">.
-   * Appending a <key> element is not always enough. The <keyset> needs
-   * to be detached and reattached to make sure the <key> is taken into
-   * account (see bug 832984).
-   *
-   * @param {XULDocument} doc
-   *        The document to which keys are to be added
-   * @param {XULElement} or {DocumentFragment} keys
-   *        Keys to add
-   */
-  attachKeybindingsToBrowser: function DT_attachKeybindingsToBrowser(doc, keys) {
-    let devtoolsKeyset = doc.getElementById("devtoolsKeyset");
-
-    if (!devtoolsKeyset) {
-      devtoolsKeyset = doc.createElement("keyset");
-      devtoolsKeyset.setAttribute("id", "devtoolsKeyset");
-    }
-    devtoolsKeyset.appendChild(keys);
-    let mainKeyset = doc.getElementById("mainKeyset");
-    mainKeyset.parentNode.insertBefore(devtoolsKeyset, mainKeyset);
   },
 
   /**
@@ -467,16 +477,6 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
   },
 
   /**
-   * Detect the presence of a Firebug.
-   *
-   * @return promise
-   */
-  _isFirebugInstalled: function DT_isFirebugInstalled() {
-    let bootstrappedAddons = Services.prefs.getCharPref("extensions.bootstrappedAddons");
-    return bootstrappedAddons.indexOf("firebug@software.joehewitt.com") != -1;
-  },
-
-  /**
    * Add the menuitem for a tool to all open browser windows.
    *
    * @param {object} toolDefinition
@@ -511,168 +511,12 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
     }
 
     for (let win of gDevToolsBrowser._trackedBrowserWindows) {
-      let doc = win.document;
-      let elements = gDevToolsBrowser._createToolMenuElements(toolDefinition, doc);
-
-      doc.getElementById("mainCommandSet").appendChild(elements.cmd);
-
-      if (elements.key) {
-        this.attachKeybindingsToBrowser(doc, elements.key);
-      }
-
-      doc.getElementById("mainBroadcasterSet").appendChild(elements.bc);
-
-      let amp = doc.getElementById("appmenu_webDeveloper_popup");
-      if (amp) {
-        let ref;
-
-        if (prevDef != null) {
-          let menuitem = doc.getElementById("appmenuitem_" + prevDef.id);
-          ref = menuitem && menuitem.nextSibling ? menuitem.nextSibling : null;
-        } else {
-          ref = doc.getElementById("appmenu_devtools_separator");
-        }
-
-        if (ref) {
-          amp.insertBefore(elements.appmenuitem, ref);
-        }
-      }
-
-      let ref;
-
-      if (prevDef) {
-        let menuitem = doc.getElementById("menuitem_" + prevDef.id);
-        ref = menuitem && menuitem.nextSibling ? menuitem.nextSibling : null;
-      } else {
-        ref = doc.getElementById("menu_devtools_separator");
-      }
-
-      if (ref) {
-        ref.parentNode.insertBefore(elements.menuitem, ref);
-      }
+      BrowserMenus.insertToolMenuElements(win.document, toolDefinition, prevDef);
     }
 
     if (toolDefinition.id === "jsdebugger") {
       gDevToolsBrowser.setSlowScriptDebugHandler();
     }
-  },
-
-  /**
-   * Add all tools to the developer tools menu of a window.
-   *
-   * @param {XULDocument} doc
-   *        The document to which the tool items are to be added.
-   */
-  _addAllToolsToMenu: function DT_addAllToolsToMenu(doc) {
-    let fragCommands = doc.createDocumentFragment();
-    let fragKeys = doc.createDocumentFragment();
-    let fragBroadcasters = doc.createDocumentFragment();
-    let fragAppMenuItems = doc.createDocumentFragment();
-    let fragMenuItems = doc.createDocumentFragment();
-
-    for (let toolDefinition of gDevTools.getToolDefinitionArray()) {
-      if (!toolDefinition.inMenu) {
-        continue;
-      }
-
-      let elements = gDevToolsBrowser._createToolMenuElements(toolDefinition, doc);
-
-      if (!elements) {
-        return;
-      }
-
-      fragCommands.appendChild(elements.cmd);
-      if (elements.key) {
-        fragKeys.appendChild(elements.key);
-      }
-      fragBroadcasters.appendChild(elements.bc);
-      fragAppMenuItems.appendChild(elements.appmenuitem);
-      fragMenuItems.appendChild(elements.menuitem);
-    }
-
-    let mcs = doc.getElementById("mainCommandSet");
-    mcs.appendChild(fragCommands);
-
-    this.attachKeybindingsToBrowser(doc, fragKeys);
-
-    let mbs = doc.getElementById("mainBroadcasterSet");
-    mbs.appendChild(fragBroadcasters);
-
-    let amps = doc.getElementById("appmenu_devtools_separator");
-    if (amps) {
-      amps.parentNode.insertBefore(fragAppMenuItems, amps);
-    }
-
-    let mps = doc.getElementById("menu_devtools_separator");
-    if (mps) {
-      mps.parentNode.insertBefore(fragMenuItems, mps);
-    }
-  },
-
-  /**
-   * Add a menu entry for a tool definition
-   *
-   * @param {string} toolDefinition
-   *        Tool definition of the tool to add a menu entry.
-   * @param {XULDocument} doc
-   *        The document to which the tool menu item is to be added.
-   */
-  _createToolMenuElements: function DT_createToolMenuElements(toolDefinition, doc) {
-    let id = toolDefinition.id;
-
-    // Prevent multiple entries for the same tool.
-    if (doc.getElementById("Tools:" + id)) {
-      return;
-    }
-
-    let cmd = doc.createElement("command");
-    cmd.id = "Tools:" + id;
-    cmd.setAttribute("oncommand",
-        'gDevToolsBrowser.selectToolCommand(gBrowser, "' + id + '");');
-
-    let key = null;
-    if (toolDefinition.key) {
-      key = doc.createElement("key");
-      key.id = "key_" + id;
-
-      if (toolDefinition.key.startsWith("VK_")) {
-        key.setAttribute("keycode", toolDefinition.key);
-      } else {
-        key.setAttribute("key", toolDefinition.key);
-      }
-
-      key.setAttribute("command", cmd.id);
-      key.setAttribute("modifiers", toolDefinition.modifiers);
-    }
-
-    let bc = doc.createElement("broadcaster");
-    bc.id = "devtoolsMenuBroadcaster_" + id;
-    bc.setAttribute("label", toolDefinition.menuLabel || toolDefinition.label);
-    bc.setAttribute("command", cmd.id);
-
-    if (key) {
-      bc.setAttribute("key", "key_" + id);
-    }
-
-    let appmenuitem = doc.createElement("menuitem");
-    appmenuitem.id = "appmenuitem_" + id;
-    appmenuitem.setAttribute("observes", "devtoolsMenuBroadcaster_" + id);
-
-    let menuitem = doc.createElement("menuitem");
-    menuitem.id = "menuitem_" + id;
-    menuitem.setAttribute("observes", "devtoolsMenuBroadcaster_" + id);
-
-    if (toolDefinition.accesskey) {
-      menuitem.setAttribute("accesskey", toolDefinition.accesskey);
-    }
-
-    return {
-      cmd: cmd,
-      key: key,
-      bc: bc,
-      appmenuitem: appmenuitem,
-      menuitem: menuitem
-    };
   },
 
   hasToolboxOpened: function(win) {
@@ -711,46 +555,11 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
    */
   _removeToolFromWindows: function DT_removeToolFromWindows(toolId) {
     for (let win of gDevToolsBrowser._trackedBrowserWindows) {
-      gDevToolsBrowser._removeToolFromMenu(toolId, win.document);
+      BrowserMenus.removeToolFromMenu(toolId, win.document);
     }
 
     if (toolId === "jsdebugger") {
       gDevToolsBrowser.unsetSlowScriptDebugHandler();
-    }
-  },
-
-  /**
-   * Remove a tool's menuitem from a window
-   *
-   * @param {string} toolId
-   *        Id of the tool to add a menu entry for
-   * @param {XULDocument} doc
-   *        The document to which the tool menu item is to be removed from
-   */
-  _removeToolFromMenu: function DT_removeToolFromMenu(toolId, doc) {
-    let command = doc.getElementById("Tools:" + toolId);
-    if (command) {
-      command.parentNode.removeChild(command);
-    }
-
-    let key = doc.getElementById("key_" + toolId);
-    if (key) {
-      key.parentNode.removeChild(key);
-    }
-
-    let bc = doc.getElementById("devtoolsMenuBroadcaster_" + toolId);
-    if (bc) {
-      bc.parentNode.removeChild(bc);
-    }
-
-    let appmenuitem = doc.getElementById("appmenuitem_" + toolId);
-    if (appmenuitem) {
-      appmenuitem.parentNode.removeChild(appmenuitem);
-    }
-
-    let menuitem = doc.getElementById("menuitem_" + toolId);
-    if (menuitem) {
-      menuitem.parentNode.removeChild(menuitem);
     }
   },
 
@@ -761,14 +570,24 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
    * @param  {XULWindow} win
    *         The window containing the menu entry
    */
-  forgetBrowserWindow: function DT_forgetBrowserWindow(win) {
+  _forgetBrowserWindow: function(win) {
+    if (!gDevToolsBrowser._trackedBrowserWindows.has(win)) {
+      return;
+    }
     gDevToolsBrowser._trackedBrowserWindows.delete(win);
+    win.removeEventListener("unload", this);
 
     // Destroy toolboxes for closed window
     for (let [target, toolbox] of gDevTools._toolboxes) {
       if (toolbox.frame && toolbox.frame.ownerDocument.defaultView == win) {
         toolbox.destroy();
       }
+    }
+
+    // Destroy the Developer toolbar if it has been accessed
+    let desc = Object.getOwnPropertyDescriptor(win, "DeveloperToolbar");
+    if (desc && !desc.get) {
+      win.DeveloperToolbar.destroy();
     }
 
     let tabContainer = win.gBrowser.tabContainer;
@@ -804,7 +623,29 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
       break;
       case "TabSelect":
         gDevToolsBrowser._updateMenuCheckbox();
+      break;
+      case "unload":
+        // top-level browser window unload
+        gDevToolsBrowser._forgetBrowserWindow(event.target.defaultView);
+      break;
     }
+  },
+
+  _pingTelemetry: function() {
+    let mean = function(arr) {
+      if (arr.length === 0) {
+        return 0;
+      }
+
+      let total = arr.reduce((a, b) => a + b);
+      return Math.ceil(total / arr.length);
+    };
+
+    let tabStats = gDevToolsBrowser._tabStats;
+    this._telemetry.log(TABS_OPEN_PEAK_HISTOGRAM, tabStats.peakOpen);
+    this._telemetry.log(TABS_OPEN_AVG_HISTOGRAM, mean(tabStats.histOpen));
+    this._telemetry.log(TABS_PINNED_PEAK_HISTOGRAM, tabStats.peakPinned);
+    this._telemetry.log(TABS_PINNED_AVG_HISTOGRAM, mean(tabStats.histPinned));
   },
 
   /**
@@ -812,10 +653,22 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
    */
   destroy: function() {
     Services.prefs.removeObserver("devtools.", gDevToolsBrowser);
+    Services.obs.removeObserver(gDevToolsBrowser, "browser-delayed-startup-finished");
     Services.obs.removeObserver(gDevToolsBrowser.destroy, "quit-application");
+
+    gDevToolsBrowser._pingTelemetry();
+    gDevToolsBrowser._telemetry = null;
+
+    for (let win of gDevToolsBrowser._trackedBrowserWindows) {
+      gDevToolsBrowser._forgetBrowserWindow(win);
+    }
   },
 }
 
+// Handle all already registered tools,
+gDevTools.getToolDefinitionArray()
+         .forEach(def => gDevToolsBrowser._addToolToWindows(def));
+// and the new ones.
 gDevTools.on("tool-registered", function(ev, toolId) {
   let toolDefinition = gDevTools._tools.get(toolId);
   gDevToolsBrowser._addToolToWindows(toolDefinition);
@@ -832,9 +685,19 @@ gDevTools.on("toolbox-ready", gDevToolsBrowser._updateMenuCheckbox);
 gDevTools.on("toolbox-destroyed", gDevToolsBrowser._updateMenuCheckbox);
 
 Services.obs.addObserver(gDevToolsBrowser.destroy, "quit-application", false);
+Services.obs.addObserver(gDevToolsBrowser, "browser-delayed-startup-finished", false);
 
-// Load the browser devtools main module as the loader's main module.
-// This is done precisely here as main.js ends up dispatching the
-// tool-registered events we are listening in this module.
-loader.main("devtools/client/main");
+// Fake end of browser window load event for all already opened windows
+// that is already fully loaded.
+let enumerator = Services.wm.getEnumerator("navigator:browser");
+while (enumerator.hasMoreElements()) {
+  let win = enumerator.getNext();
+  if (win.gBrowserInit && win.gBrowserInit.delayedStartupFinished) {
+    gDevToolsBrowser._registerBrowserWindow(win);
+  }
+}
 
+// Watch for module loader unload. Fires when the tools are reloaded.
+unload(function () {
+  gDevToolsBrowser.destroy();
+});

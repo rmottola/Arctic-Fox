@@ -130,9 +130,9 @@ var WebProgressListener = {
       json.documentURI = content.document.documentURIObject.spec;
       json.charset = content.document.characterSet;
       json.mayEnableCharacterEncodingMenu = docShell.mayEnableCharacterEncodingMenu;
+      json.inLoadURI = WebNavigation.inLoadURI;
     }
 
-    json.inLoadURI = WebNavigation.inLoadURI;
     this._send("Content:StateChange", json, objects);
   },
 
@@ -171,6 +171,7 @@ var WebProgressListener = {
       json.mayEnableCharacterEncodingMenu = docShell.mayEnableCharacterEncodingMenu;
       json.principal = content.document.nodePrincipal;
       json.synthetic = content.document.mozSyntheticDocument;
+      json.inLoadURI = WebNavigation.inLoadURI;
 
       if (AppConstants.MOZ_CRASHREPORTER && CrashReporter.enabled) {
         let uri = aLocationURI.clone();
@@ -512,11 +513,6 @@ addMessageListener("Browser:Thumbnail:CheckState", function (aMessage) {
   });
 });
 
-addMessageListener("UpdateCharacterSet", function (aMessage) {
-  docShell.charset = aMessage.data.value;
-  docShell.gatherCharsetMenuTelemetry();
-});
-
 // The AddonsChild needs to be rooted so that it stays alive as long as
 // the tab.
 var AddonsChild = RemoteAddonsChild.init(this);
@@ -637,10 +633,10 @@ addMessageListener("PermitUnload", msg => {
 var outerWindowID = content.QueryInterface(Ci.nsIInterfaceRequestor)
                            .getInterface(Ci.nsIDOMWindowUtils)
                            .outerWindowID;
-var initData = sendSyncMessage("Browser:Init", {outerWindowID: outerWindowID});
-if (initData.length) {
-  docShell.useGlobalHistory = initData[0].useGlobalHistory;
-  if (initData[0].initPopup) {
-    setTimeout(() => AutoCompletePopup.init(), 0);
+sendAsyncMessage("Browser:Init", {outerWindowID: outerWindowID});
+addMessageListener("Browser:InitReceived", function onInitReceived(msg) {
+  removeMessageListener("Browser:InitReceived", onInitReceived);
+  if (msg.data.initPopup) {
+    AutoCompletePopup.init();
   }
-}
+});

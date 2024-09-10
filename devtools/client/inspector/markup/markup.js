@@ -28,6 +28,7 @@ const {editableField, InplaceEditor} =
       require("devtools/client/shared/inplace-editor");
 const {HTMLEditor} = require("devtools/client/inspector/markup/html-editor");
 const promise = require("promise");
+const Services = require("Services");
 const {Tooltip} = require("devtools/client/shared/widgets/Tooltip");
 const EventEmitter = require("devtools/shared/event-emitter");
 const Heritage = require("sdk/core/heritage");
@@ -208,6 +209,8 @@ MarkupView.prototype = {
       }
     }
     this._showContainerAsHovered(container.node);
+
+    this.emit("node-hover");
   },
 
   /**
@@ -340,6 +343,8 @@ MarkupView.prototype = {
       this.getContainer(this._hoveredNode).hovered = false;
     }
     this._hoveredNode = null;
+
+    this.emit("leave");
   },
 
   /**
@@ -463,6 +468,8 @@ MarkupView.prototype = {
       // and decision to show or not the tooltip
       return container.isImagePreviewTarget(target, this.tooltip);
     }
+
+    return undefined;
   },
 
   /**
@@ -529,6 +536,7 @@ MarkupView.prototype = {
 
       // Make sure the new selection receives focus so the keyboard can be used.
       this.maybeFocusNewSelection();
+      return undefined;
     }).catch(e => {
       if (!this._destroyer) {
         console.error(e);
@@ -604,17 +612,19 @@ MarkupView.prototype = {
       return;
     }
 
+    // Ignore keystrokes with modifiers to allow native shortcuts (such as save:
+    // accel + S) to bubble up.
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+      return;
+    }
+
     switch (event.keyCode) {
       case Ci.nsIDOMKeyEvent.DOM_VK_H:
-        if (event.metaKey || event.shiftKey) {
-          handled = false;
+        let node = this._selectedContainer.node;
+        if (node.hidden) {
+          this.walker.unhideNode(node);
         } else {
-          let node = this._selectedContainer.node;
-          if (node.hidden) {
-            this.walker.unhideNode(node);
-          } else {
-            this.walker.hideNode(node);
-          }
+          this.walker.hideNode(node);
         }
         break;
       case Ci.nsIDOMKeyEvent.DOM_VK_DELETE:
@@ -700,6 +710,7 @@ MarkupView.prototype = {
           this.cancelDragging();
           break;
         }
+        // falls through
       }
       default:
         handled = false;
@@ -1948,7 +1959,7 @@ MarkupContainer.prototype = {
    * Check if element is draggable.
    */
   isDraggable: function() {
-    let tagName = this.node.tagName.toLowerCase();
+    let tagName = this.node.tagName && this.node.tagName.toLowerCase();
 
     return !this.node.isPseudoElement &&
            !this.node.isAnonymous &&
@@ -2002,7 +2013,7 @@ MarkupContainer.prototype = {
   /**
    * On mouse up, stop dragging.
    */
-  _onMouseUp: Task.async(function*() {
+  _onMouseUp: Task.async(function* () {
     this._isPreDragging = false;
 
     if (this.isDragging) {
@@ -2291,6 +2302,7 @@ MarkupElementContainer.prototype = Heritage.extend(MarkupContainer.prototype, {
       });
       return true;
     }
+    return undefined;
   },
 
   /**
@@ -2320,7 +2332,7 @@ MarkupElementContainer.prototype = Heritage.extend(MarkupContainer.prototype, {
       Services.prefs.getIntPref("devtools.inspector.imagePreviewTooltipSize");
 
     // Fetch the preview from the server.
-    this.tooltipDataPromise = Task.spawn(function*() {
+    this.tooltipDataPromise = Task.spawn(function* () {
       let preview = yield this.node.getImageData(maxDim);
       let data = yield preview.data.string();
 
@@ -2511,6 +2523,11 @@ function TextEditor(container, node, template) {
     stopOnReturn: true,
     trigger: "dblclick",
     multiline: true,
+    maxWidth: () => {
+      let elementRect = this.value.getBoundingClientRect();
+      let containerRect = this.container.elt.getBoundingClientRect();
+      return containerRect.right - elementRect.left - 2;
+    },
     trimOutput: false,
     done: (val, commit) => {
       if (!commit) {
@@ -3153,9 +3170,7 @@ function parseAttributeValues(attr, doc) {
     }
   }
 
-  // Attributes return from DOMParser in reverse order from how they are
-  // entered.
-  return attributes.reverse();
+  return attributes;
 }
 
 /**

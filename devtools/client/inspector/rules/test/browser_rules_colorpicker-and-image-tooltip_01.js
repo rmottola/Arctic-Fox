@@ -17,7 +17,7 @@ const TEST_URI = `
   Testing the color picker tooltip!
 `;
 
-add_task(function*() {
+add_task(function* () {
   yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
   let {view} = yield openRuleView();
   let value = getRuleViewProperty(view, "body", "background").valueSpan;
@@ -39,15 +39,17 @@ function* testImageTooltipAfterColorChange(swatch, url, ruleView) {
   swatch.click();
   yield onShown;
   yield simulateColorPickerChange(ruleView, picker, [0, 0, 0, 1], {
-    element: content.document.body,
-    name: "backgroundImage",
+    selector: "body",
+    name: "background-image",
     value: 'url("chrome://global/skin/icons/warning-64.png"), linear-gradient(rgb(0, 0, 0), rgb(255, 0, 102) 400px)'
   });
 
   let spectrum = yield picker.spectrum;
   let onHidden = picker.tooltip.once("hidden");
+  let onModifications = ruleView.once("ruleview-changed");
   EventUtils.sendKey("RETURN", spectrum.element.ownerDocument.defaultView);
   yield onHidden;
+  yield onModifications;
 
   info("Verify again that the image preview tooltip works");
   // After a color change, the property is re-populated, we need to get the new

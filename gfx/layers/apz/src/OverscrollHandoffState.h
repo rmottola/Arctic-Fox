@@ -8,49 +8,19 @@
 #define mozilla_layers_OverscrollHandoffChain_h
 
 #include <vector>
-#include "nsAutoPtr.h"
+#include "mozilla/RefPtr.h"   // for RefPtr
 #include "nsISupportsImpl.h"  // for NS_INLINE_DECL_THREADSAFE_REFCOUNTING
 #include "APZUtils.h"         // for CancelAnimationFlags
 #include "Layers.h"           // for Layer::ScrollDirection
 #include "Units.h"            // for ScreenPoint
 
 namespace mozilla {
+
+class InputData;
+
 namespace layers {
 
 class AsyncPanZoomController;
-
-/**
- * A variant of NS_INLINE_DECL_THREADSAFE_REFCOUNTING which makes the refcount
- * variable |mutable|, and the AddRef and Release methods |const|, to allow
- * using an |RefPtr<const T>|, and thereby enforcing better const-correctness.
- * This is currently here because OverscrollHandoffChain is the only thing
- * currently using it. As a follow-up, we can move this to xpcom/glue, write
- * a corresponding version for non-threadsafe refcounting, and perhaps
- * transition other clients of NS_INLINE_DECL_[THREADSAFE_]REFCOUNTING to the
- * mutable versions.
- */
-#define NS_INLINE_DECL_THREADSAFE_MUTABLE_REFCOUNTING(_class)                 \
-public:                                                                       \
-  NS_METHOD_(MozExternalRefCountType) AddRef(void) const {                    \
-    MOZ_ASSERT_TYPE_OK_FOR_REFCOUNTING(_class)                                \
-    MOZ_ASSERT(int32_t(mRefCnt) >= 0, "illegal refcnt");                      \
-    nsrefcnt count = ++mRefCnt;                                               \
-    NS_LOG_ADDREF(const_cast<_class*>(this), count, #_class, sizeof(*this));  \
-    return (nsrefcnt) count;                                                  \
-  }                                                                           \
-  NS_METHOD_(MozExternalRefCountType) Release(void) const {                   \
-    MOZ_ASSERT(int32_t(mRefCnt) > 0, "dup release");                          \
-    nsrefcnt count = --mRefCnt;                                               \
-    NS_LOG_RELEASE(const_cast<_class*>(this), count, #_class);                \
-    if (count == 0) {                                                         \
-      delete (this);                                                          \
-      return 0;                                                               \
-    }                                                                         \
-    return count;                                                             \
-  }                                                                           \
-protected:                                                                    \
-  mutable ::mozilla::ThreadSafeAutoRefCnt mRefCnt;                            \
-public:
 
 /**
  * This class represents the chain of APZCs along which overscroll is handed off.
@@ -70,7 +40,7 @@ public:
   // Mutable so that we can pass around the class by
   // RefPtr<const OverscrollHandoffChain> and thus enforce that, once built,
   // the chain is not modified.
-  NS_INLINE_DECL_THREADSAFE_MUTABLE_REFCOUNTING(OverscrollHandoffChain)
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(OverscrollHandoffChain)
 
   /*
    * Methods for building the handoff chain.

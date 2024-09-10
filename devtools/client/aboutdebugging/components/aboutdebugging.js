@@ -3,31 +3,39 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /* eslint-env browser */
+/* globals AddonsTab, WorkersTab */
 
 "use strict";
 
+const { createFactory, createClass, DOM: dom } =
+  require("devtools/client/shared/vendor/react");
 const Services = require("Services");
 
-const React = require("devtools/client/shared/vendor/react");
-const { TabMenu } = require("./tab-menu");
+const TabMenu = createFactory(require("./tab-menu"));
 
-loader.lazyRequireGetter(this, "AddonsTab", "./components/addons-tab", true);
-loader.lazyRequireGetter(this, "WorkersTab", "./components/workers-tab", true);
+loader.lazyGetter(this, "AddonsTab",
+  () => createFactory(require("./addons-tab")));
+loader.lazyGetter(this, "WorkersTab",
+  () => createFactory(require("./workers-tab")));
 
 const Strings = Services.strings.createBundle(
   "chrome://devtools/locale/aboutdebugging.properties");
 
-const tabs = [
-  { id: "addons", name: Strings.GetStringFromName("addons"),
-    icon: "chrome://devtools/skin/images/debugging-addons.svg",
-    component: AddonsTab },
-  { id: "workers", name: Strings.GetStringFromName("workers"),
-    icon: "chrome://devtools/skin/images/debugging-workers.svg",
-    component: WorkersTab },
-];
+const tabs = [{
+  id: "addons",
+  name: Strings.GetStringFromName("addons"),
+  icon: "chrome://devtools/skin/images/debugging-addons.svg",
+  component: AddonsTab
+}, {
+  id: "workers",
+  name: Strings.GetStringFromName("workers"),
+  icon: "chrome://devtools/skin/images/debugging-workers.svg",
+  component: WorkersTab
+}];
+
 const defaultTabId = "addons";
 
-exports.AboutDebuggingApp = React.createClass({
+module.exports = createClass({
   displayName: "AboutDebuggingApp",
 
   getInitialState() {
@@ -55,12 +63,12 @@ exports.AboutDebuggingApp = React.createClass({
 
     let selectedTab = tabs.find(t => t.id == selectedTabId);
 
-    return React.createElement(
-      "div", { className: "app"},
-        React.createElement(TabMenu, { tabs, selectedTabId, selectTab }),
-        React.createElement("div", { className: "main-content" },
-          React.createElement(selectedTab.component, { client }))
-        );
+    return dom.div({ className: "app" },
+      TabMenu({ tabs, selectedTabId, selectTab }),
+      dom.div({ className: "main-content" },
+        selectedTab.component({ client })
+      )
+    );
   },
 
   onHashChange() {

@@ -695,14 +695,10 @@ nsCORSListenerProxy::AsyncOnChannelRedirect(nsIChannel *aOldChannel,
       if (NS_SUCCEEDED(rv)) {
         bool equal;
         rv = oldChannelPrincipal->Equals(newChannelPrincipal, &equal);
-        if (NS_SUCCEEDED(rv)) {
-          if (!equal) {
-            // Spec says to set our source origin to a unique origin.
-            mOriginHeaderPrincipal = nsNullPrincipal::Create();
-            if (!mOriginHeaderPrincipal) {
-              rv = NS_ERROR_OUT_OF_MEMORY;
-            }
-          }
+        if (NS_SUCCEEDED(rv) && !equal) {
+          // Spec says to set our source origin to a unique origin.
+          mOriginHeaderPrincipal =
+            nsNullPrincipal::CreateWithInheritedAttributes(oldChannelPrincipal);
         }
       }
 
@@ -1345,6 +1341,10 @@ nsCORSListenerProxy::StartCORSPreflight(nsIChannel* aRequestChannel,
              "how did we end up here?");
 
   nsCOMPtr<nsIPrincipal> principal = originalLoadInfo->LoadingPrincipal();
+  MOZ_ASSERT(principal &&
+             originalLoadInfo->GetExternalContentPolicyType() !=
+               nsIContentPolicy::TYPE_DOCUMENT,
+             "Should not do CORS loads for top-level loads, so a loadingPrincipal should always exist.");
   bool withCredentials = originalLoadInfo->GetCookiePolicy() ==
     nsILoadInfo::SEC_COOKIES_INCLUDE;
 

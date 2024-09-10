@@ -220,20 +220,9 @@ WifiGeoCoordsObject.prototype = {
   QueryInterface:  XPCOMUtils.generateQI([Ci.nsIDOMGeoPositionCoords])
 };
 
-function WifiGeoPositionObject(lat, lng, acc, cc, tz, zip, city, rc, region, country, isp, org, as) {
+function WifiGeoPositionObject(lat, lng, acc) {
   this.coords = new WifiGeoCoordsObject(lat, lng, acc, 0, 0);
   this.address = null;
-  this.countrycode = cc;
-  this.timezone = tz;
-  this.zipcode = zip;
-  this.postalcode = zip;
-  this.city = city;
-  this.regioncode = rc;
-  this.region = region;
-  this.country = country;
-  this.isp = isp;
-  this.org = org;
-  this.as = as;
   this.timestamp = Date.now();
 }
 
@@ -394,8 +383,9 @@ WifiGeoPositionProvider.prototype = {
       let result = ap.ssid.indexOf(mask, ap.ssid.length - mask.length);
       if (result != -1) {
         LOG("Filtering out " + ap.ssid + " " + result);
+        return false;
       }
-      return result;
+      return true;
     };
 
     function sort(a, b) {
@@ -455,7 +445,7 @@ WifiGeoPositionProvider.prototype = {
               break;
             // CDMA cases to be handled in bug 1010282
           };
-          result.push({ radio: radioTechFamily,
+          result.push({ radioType: radioTechFamily,
                       mobileCountryCode: voice.network.mcc,
                       mobileNetworkCode: voice.network.mnc,
                       locationAreaCode: cell.gsmLocationAreaCode,
@@ -506,43 +496,38 @@ WifiGeoPositionProvider.prototype = {
     this.notifyListener("locationUpdatePending");
 
     try {
-      xhr.open("GET", url, true);
+      xhr.open("POST", url, true);
     } catch (e) {
       this.notifyListener("notifyError",
                           [POSITION_UNAVAILABLE]);
       return;
     }
+    xhr.setRequestHeader("Content-Type", "application/json; charset=UTF-8");
     xhr.responseType = "json";
     xhr.mozBackgroundRequest = true;
     xhr.channel.loadFlags = Ci.nsIChannel.LOAD_ANONYMOUS;
-    
+    xhr.timeout = Services.prefs.getIntPref("geo.wifi.xhr.timeout");
+    xhr.ontimeout = (function() {
+      LOG("Location request XHR timed out.")
+      this.notifyListener("notifyError",
+                          [POSITION_UNAVAILABLE]);
+    }).bind(this);
     xhr.onerror = (function() {
       this.notifyListener("notifyError",
                           [POSITION_UNAVAILABLE]);
     }).bind(this);
-    
     xhr.onload = (function() {
       LOG("server returned status: " + xhr.status + " --> " +  JSON.stringify(xhr.response));
       if ((xhr.channel instanceof Ci.nsIHttpChannel && xhr.status != 200) ||
-          !xhr.response || !xhr.response.status || xhr.response.status == 'fail') {
+          !xhr.response || !xhr.response.location) {
         this.notifyListener("notifyError",
                             [POSITION_UNAVAILABLE]);
         return;
       }
 
-      let newLocation = new WifiGeoPositionObject(xhr.response.lat,
-                                                  xhr.response.lon,
-                                                  null, //accuracy not provided
-                                                  xhr.response.countryCode,
-                                                  xhr.response.timezone,
-                                                  xhr.response.zip,
-                                                  xhr.response.city,
-                                                  xhr.response.region,
-                                                  xhr.response.regionName,
-                                                  xhr.response.country,
-                                                  xhr.response.isp,
-                                                  xhr.response.org,
-                                                  xhr.response.as);
+      let newLocation = new WifiGeoPositionObject(xhr.response.location.lat,
+                                                  xhr.response.location.lng,
+                                                  xhr.response.accuracy);
 
       this.notifyListener("update", [newLocation]);
       gCachedRequest = new CachedRequest(newLocation, data.cellTowers, data.wifiAccessPoints);

@@ -2,7 +2,7 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-let DEVTOOLS_CHROME_ENABLED = "devtools.chrome.enabled";
+var DEVTOOLS_CHROME_ENABLED = "devtools.chrome.enabled";
 
 function test()
 {
@@ -12,8 +12,6 @@ function test()
   gBrowser.selectedTab = gBrowser.addTab();
   gBrowser.selectedBrowser.addEventListener("load", function onLoad() {
     gBrowser.selectedBrowser.removeEventListener("load", onLoad, true);
-
-    ok(window.Scratchpad, "Scratchpad variable exists");
 
     openScratchpad(runTests);
   }, true);

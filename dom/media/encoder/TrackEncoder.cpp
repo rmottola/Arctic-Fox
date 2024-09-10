@@ -249,11 +249,30 @@ VideoTrackEncoder::AppendVideoSegment(const VideoSegment& aSegment)
   VideoSegment::ChunkIterator iter(const_cast<VideoSegment&>(aSegment));
   while (!iter.IsEnded()) {
     VideoChunk chunk = *iter;
-    RefPtr<layers::Image> image = chunk.mFrame.GetImage();
-    mRawSegment.AppendFrame(image.forget(),
-                            chunk.GetDuration(),
-                            chunk.mFrame.GetIntrinsicSize(),
-                            chunk.mFrame.GetForceBlack());
+    mTotalFrameDuration += chunk.GetDuration();
+    mLastFrameDuration += chunk.GetDuration();
+    // Send only the unique video frames for encoding.
+    // Or if we got the same video chunks more than 1 seconds,
+    // force to send into encoder.
+    if ((mLastFrame != chunk.mFrame) ||
+        (mLastFrameDuration >= mTrackRate)) {
+      RefPtr<layers::Image> image = chunk.mFrame.GetImage();
+      // Because we may get chunks with a null image (due to input blocking),
+      // accumulate duration and give it to the next frame that arrives.
+      // Canonically incorrect - the duration should go to the previous frame
+      // - but that would require delaying until the next frame arrives.
+      // Best would be to do like OMXEncoder and pass an effective timestamp
+      // in with each frame.
+      if (image) {
+        mRawSegment.AppendFrame(image.forget(),
+                                mLastFrameDuration,
+                                chunk.mFrame.GetIntrinsicSize(),
+                                PRINCIPAL_HANDLE_NONE,
+                                chunk.mFrame.GetForceBlack());
+        mLastFrameDuration = 0;
+      }
+    }
+    mLastFrame.TakeFrom(&chunk.mFrame);
     iter.Next();
   }
 

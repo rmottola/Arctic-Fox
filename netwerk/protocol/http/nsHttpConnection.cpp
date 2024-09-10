@@ -1452,7 +1452,7 @@ nsHttpConnection::ResumeRecv()
 }
 
 
-class HttpConnectionForceIO : public nsRunnable
+class HttpConnectionForceIO : public Runnable
 {
 public:
   HttpConnectionForceIO(nsHttpConnection *aConn, bool doRecv)

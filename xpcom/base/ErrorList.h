@@ -118,9 +118,17 @@
   /* 4:  NS_ERROR_MODULE_WIDGET */
   /* ======================================================================= */
 #define MODULE  NS_ERROR_MODULE_WIDGET
-  /* Used by nsIWidget::NotifyIME(). Returned when the notification is handled
-   * and the notified event is consumed by IME. */
+  /* Used by:
+   *   - nsIWidget::NotifyIME()
+   *   - nsIWidget::OnWindowedPluginKeyEvent()
+   * Returned when the notification or the event is handled and it's consumed
+   * by somebody. */
   ERROR(NS_SUCCESS_EVENT_CONSUMED,                        SUCCESS(1)),
+  /* Used by:
+   *   - nsIWidget::OnWindowedPluginKeyEvent()
+   * Returned when the event is handled correctly but the result will be
+   * notified asynchronously. */
+  ERROR(NS_SUCCESS_EVENT_HANDLED_ASYNCHRONOUSLY,          SUCCESS(2)),
 #undef MODULE
 
 
@@ -217,6 +225,8 @@
   ERROR(NS_ERROR_PROXY_CONNECTION_REFUSED,  FAILURE(72)),
   /* A transfer was only partially done when it completed. */
   ERROR(NS_ERROR_NET_PARTIAL_TRANSFER,      FAILURE(76)),
+  /* HTTP/2 detected invalid TLS configuration */
+  ERROR(NS_ERROR_NET_INADEQUATE_SECURITY,   FAILURE(82)),
 
   /* XXX really need to better rationalize these error codes.  are consumers of
    * necko really expected to know how to discern the meaning of these?? */
@@ -719,6 +729,7 @@
   ERROR(NS_ERROR_TRACKING_URI,          FAILURE(34)),
   ERROR(NS_ERROR_UNWANTED_URI,          FAILURE(35)),
   ERROR(NS_ERROR_FORBIDDEN_URI,         FAILURE(36)),
+  ERROR(NS_ERROR_BLOCKED_URI,           FAILURE(37)),
   /* Used when "Save Link As..." doesn't see the headers quickly enough to
    * choose a filename.  See nsContextMenu.js. */
   ERROR(NS_ERROR_SAVE_LINK_AS_TIMEOUT,  FAILURE(32)),
@@ -944,8 +955,8 @@
   /* ======================================================================= */
 #define MODULE NS_ERROR_MODULE_DOM_ANIM
   ERROR(NS_ERROR_DOM_ANIM_MISSING_PROPS_ERR,              FAILURE(1)),
-  ERROR(NS_ERROR_DOM_ANIM_NO_TARGET_ERR,                  FAILURE(2)),
-  ERROR(NS_ERROR_DOM_ANIM_TARGET_NOT_IN_DOC_ERR,          FAILURE(3)),
+  ERROR(NS_ERROR_DOM_ANIM_NO_TIMELINE_ERR,                FAILURE(2)),
+  ERROR(NS_ERROR_DOM_ANIM_NO_EFFECT_ERR,                  FAILURE(3)),
 #undef MODULE
 
   /* ======================================================================= */
@@ -953,9 +964,11 @@
   /* ======================================================================= */
 #define MODULE NS_ERROR_MODULE_DOM_PUSH
   ERROR(NS_ERROR_DOM_PUSH_INVALID_REGISTRATION_ERR, FAILURE(1)),
-  ERROR(NS_ERROR_DOM_PUSH_DENIED_ERR, FAILURE(2)),
-  ERROR(NS_ERROR_DOM_PUSH_ABORT_ERR, FAILURE(3)),
-  ERROR(NS_ERROR_DOM_PUSH_SERVICE_UNREACHABLE, FAILURE(4)),
+  ERROR(NS_ERROR_DOM_PUSH_DENIED_ERR,               FAILURE(2)),
+  ERROR(NS_ERROR_DOM_PUSH_ABORT_ERR,                FAILURE(3)),
+  ERROR(NS_ERROR_DOM_PUSH_SERVICE_UNREACHABLE,      FAILURE(4)),
+  ERROR(NS_ERROR_DOM_PUSH_INVALID_KEY_ERR,          FAILURE(5)),
+  ERROR(NS_ERROR_DOM_PUSH_MISMATCHED_KEY_ERR,       FAILURE(6)),
 #undef MODULE
 
   /* ======================================================================= */

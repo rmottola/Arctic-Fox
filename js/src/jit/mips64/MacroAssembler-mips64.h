@@ -9,7 +9,6 @@
 
 #include "jsopcode.h"
 
-#include "jit/AtomicOp.h"
 #include "jit/IonCaches.h"
 #include "jit/JitFrames.h"
 #include "jit/mips-shared/MacroAssembler-mips-shared.h"
@@ -342,23 +341,24 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
     void unboxNonDouble(const Address& src, Register dest);
     void unboxNonDouble(const BaseIndex& src, Register dest);
     void unboxInt32(const ValueOperand& operand, Register dest);
-    void unboxInt32(const Operand& operand, Register dest);
+    void unboxInt32(Register src, Register dest);
     void unboxInt32(const Address& src, Register dest);
     void unboxInt32(const BaseIndex& src, Register dest);
     void unboxBoolean(const ValueOperand& operand, Register dest);
-    void unboxBoolean(const Operand& operand, Register dest);
+    void unboxBoolean(Register src, Register dest);
     void unboxBoolean(const Address& src, Register dest);
     void unboxBoolean(const BaseIndex& src, Register dest);
     void unboxDouble(const ValueOperand& operand, FloatRegister dest);
+    void unboxDouble(Register src, Register dest);
     void unboxDouble(const Address& src, FloatRegister dest);
     void unboxString(const ValueOperand& operand, Register dest);
-    void unboxString(const Operand& operand, Register dest);
+    void unboxString(Register src, Register dest);
     void unboxString(const Address& src, Register dest);
     void unboxSymbol(const ValueOperand& src, Register dest);
-    void unboxSymbol(const Operand& src, Register dest);
+    void unboxSymbol(Register src, Register dest);
     void unboxSymbol(const Address& src, Register dest);
     void unboxObject(const ValueOperand& src, Register dest);
-    void unboxObject(const Operand& src, Register dest);
+    void unboxObject(Register src, Register dest);
     void unboxObject(const Address& src, Register dest);
     void unboxObject(const BaseIndex& src, Register dest) { unboxNonDouble(src, dest); }
     void unboxValue(const ValueOperand& src, AnyRegister dest);
@@ -426,9 +426,9 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
     void loadUnboxedValue(const T& address, MIRType type, AnyRegister dest) {
         if (dest.isFloat())
             loadInt32OrDouble(address, dest.fpu());
-        else if (type == MIRType_Int32)
+        else if (type == MIRType::Int32)
             unboxInt32(address, dest.gpr());
-        else if (type == MIRType_Boolean)
+        else if (type == MIRType::Boolean)
             unboxBoolean(address, dest.gpr());
         else
             unboxNonDouble(address, dest.gpr());
@@ -1000,11 +1000,6 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
   public:
     CodeOffset labelForPatch() {
         return CodeOffset(nextOffset().getOffset());
-    }
-
-    void memIntToValue(Address Source, Address Dest) {
-        load32(Source, ScratchRegister);
-        storeValue(JSVAL_TYPE_INT32, ScratchRegister, Dest);
     }
 
     void lea(Operand addr, Register dest) {

@@ -162,6 +162,19 @@ class VirtualenvManager(object):
             return self.virtualenv_root
         return self.build(python)
 
+    def _log_process_output(self, *args, **kwargs):
+        if hasattr(self.log_handle, 'fileno'):
+            return subprocess.call(*args, stdout=self.log_handle,
+                                   stderr=subprocess.STDOUT, **kwargs)
+
+        proc = subprocess.Popen(*args, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, **kwargs)
+
+        for line in proc.stdout:
+            self.log_handle.write(line)
+
+        return proc.wait()
+
     def create(self, python=sys.executable):
         """Create a new, empty virtualenv.
 
@@ -173,10 +186,14 @@ class VirtualenvManager(object):
         env.pop('PYTHONDONTWRITEBYTECODE', None)
 
         args = [python, self.virtualenv_script_path,
+            # Without this, virtualenv.py may attempt to contact the outside
+            # world and search for or download a newer version of pip,
+            # setuptools, or wheel. This is bad for security, reproducibility,
+            # and speed.
+            '--no-download',
             self.virtualenv_root]
 
-        result = subprocess.call(args, stdout=self.log_handle,
-            stderr=subprocess.STDOUT, env=env)
+        result = self._log_process_output(args, env=env)
 
         if result:
             raise Exception(
@@ -424,8 +441,7 @@ class VirtualenvManager(object):
         args = [self.python_path, __file__, 'populate', self.topsrcdir,
             self.topobjdir, self.virtualenv_root, self.manifest_path]
 
-        result = subprocess.call(args, stdout=self.log_handle,
-            stderr=subprocess.STDOUT, cwd=self.topsrcdir)
+        result = self._log_process_output(args, cwd=self.topsrcdir)
 
         if result != 0:
             raise Exception('Error populating virtualenv.')

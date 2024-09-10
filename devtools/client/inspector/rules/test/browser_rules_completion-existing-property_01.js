@@ -18,7 +18,7 @@ const MAX_ENTRIES = 10;
 //  ]
 var testData = [
   ["VK_RIGHT", "font", -1, 0],
-  ["-", "font-family", 0, MAX_ENTRIES],
+  ["-", "font-size", 4, MAX_ENTRIES],
   ["f", "font-family", 0, 2],
   ["VK_BACK_SPACE", "font-f", -1, 0],
   ["VK_BACK_SPACE", "font-", -1, 0],
@@ -27,8 +27,7 @@ var testData = [
   ["VK_BACK_SPACE", "fo", -1, 0],
   ["VK_BACK_SPACE", "f", -1, 0],
   ["VK_BACK_SPACE", "", -1, 0],
-  ["d", "direction", 0, 3],
-  ["VK_DOWN", "display", 1, 3],
+  ["d", "display", 1, 3],
   ["VK_DOWN", "dominant-baseline", 2, 3],
   ["VK_DOWN", "direction", 0, 3],
   ["VK_DOWN", "display", 1, 3],
@@ -36,7 +35,7 @@ var testData = [
   ["VK_UP", "dominant-baseline", 2, 3],
   ["VK_UP", "display", 1, 3],
   ["VK_BACK_SPACE", "d", -1, 0],
-  ["i", "direction", 0, 2],
+  ["i", "display", 1, 2],
   ["s", "display", -1, 0],
   ["VK_BACK_SPACE", "dis", -1, 0],
   ["VK_BACK_SPACE", "di", -1, 0],
@@ -46,25 +45,25 @@ var testData = [
   ["VK_END", "", -1, 0],
   ["VK_PAGE_UP", "", -1, 0],
   ["VK_PAGE_DOWN", "", -1, 0],
-  ["f", "fill", 0, MAX_ENTRIES],
-  ["i", "fill", 0, 4],
-  ["VK_LEFT", "fill", -1, 0],
-  ["VK_LEFT", "fill", -1, 0],
-  ["i", "fiill", -1, 0],
+  ["f", "filter", 3, MAX_ENTRIES],
+  ["i", "filter", 3, 4],
+  ["VK_LEFT", "filter", -1, 0],
+  ["VK_LEFT", "filter", -1, 0],
+  ["i", "fiilter", -1, 0],
   ["VK_ESCAPE", null, -1, 0],
 ];
 
 const TEST_URI = "<h1 style='font: 24px serif'>Header</h1>";
 
-add_task(function*() {
+add_task(function* () {
   yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
-  let {toolbox, inspector, view} = yield openRuleView();
+  let {toolbox, inspector, view, testActor} = yield openRuleView();
 
   info("Test autocompletion after 1st page load");
   yield runAutocompletionTest(toolbox, inspector, view);
 
   info("Test autocompletion after page navigation");
-  yield reloadPage(inspector);
+  yield reloadPage(inspector, testActor);
   yield runAutocompletionTest(toolbox, inspector, view);
 });
 
@@ -78,17 +77,22 @@ function* runAutocompletionTest(toolbox, inspector, view) {
   let editor = yield focusEditableField(view, propertyName);
 
   info("Starting to test for css property completion");
+  let previousPopupSize = 0;
   for (let i = 0; i < testData.length; i++) {
-    yield testCompletion(testData[i], editor, view);
+    let expectPopupHiddenEvent = previousPopupSize > 0 && testData[3] === 0;
+    yield testCompletion(testData[i], expectPopupHiddenEvent, editor, view);
+    previousPopupSize = testData[3];
   }
 }
 
-function* testCompletion([key, completion, index, total], editor, view) {
+function* testCompletion([key, completion, index, total],
+                         expectPopupHiddenEvent, editor, view) {
   info("Pressing key " + key);
   info("Expecting " + completion + ", " + index + ", " + total);
 
+  // Listening for the right event that will tell us when the key has been
+  // entered and processed.
   let onSuggest;
-
   if (/(left|right|back_space|escape|home|end|page_up|page_down)/ig.test(key)) {
     info("Adding event listener for " +
       "left|right|back_space|escape|home|end|page_up|page_down keys");
@@ -98,11 +102,16 @@ function* testCompletion([key, completion, index, total], editor, view) {
     onSuggest = editor.once("after-suggest");
   }
 
+  // Also listening for popup hiding if needed.
+  let onMaybePopupHidden = expectPopupHiddenEvent
+                           ? once(editor.popup._panel, "hidden")
+                           : null;
+
   info("Synthesizing key " + key);
   EventUtils.synthesizeKey(key, {}, view.styleWindow);
 
   yield onSuggest;
-  yield wait(1); // Equivalent of executeSoon
+  yield onMaybePopupHidden;
 
   info("Checking the state");
   if (completion != null) {

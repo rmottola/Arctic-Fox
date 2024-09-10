@@ -47,8 +47,8 @@ ABIArg
 ABIArgGenerator::softNext(MIRType type)
 {
     switch (type) {
-      case MIRType_Int32:
-      case MIRType_Pointer:
+      case MIRType::Int32:
+      case MIRType::Pointer:
         if (intRegIndex_ == NumIntArgRegs) {
             current_ = ABIArg(stackOffset_);
             stackOffset_ += sizeof(uint32_t);
@@ -57,7 +57,7 @@ ABIArgGenerator::softNext(MIRType type)
         current_ = ABIArg(Register::FromCode(intRegIndex_));
         intRegIndex_++;
         break;
-      case MIRType_Float32:
+      case MIRType::Float32:
         if (intRegIndex_ == NumIntArgRegs) {
             current_ = ABIArg(stackOffset_);
             stackOffset_ += sizeof(uint32_t);
@@ -66,7 +66,7 @@ ABIArgGenerator::softNext(MIRType type)
         current_ = ABIArg(Register::FromCode(intRegIndex_));
         intRegIndex_++;
         break;
-      case MIRType_Double:
+      case MIRType::Double:
         // Make sure to use an even register index. Increase to next even number
         // when odd.
         intRegIndex_ = (intRegIndex_ + 1) & ~1;
@@ -92,8 +92,8 @@ ABIArg
 ABIArgGenerator::hardNext(MIRType type)
 {
     switch (type) {
-      case MIRType_Int32:
-      case MIRType_Pointer:
+      case MIRType::Int32:
+      case MIRType::Pointer:
         if (intRegIndex_ == NumIntArgRegs) {
             current_ = ABIArg(stackOffset_);
             stackOffset_ += sizeof(uint32_t);
@@ -102,7 +102,7 @@ ABIArgGenerator::hardNext(MIRType type)
         current_ = ABIArg(Register::FromCode(intRegIndex_));
         intRegIndex_++;
         break;
-      case MIRType_Float32:
+      case MIRType::Float32:
         if (floatRegIndex_ == NumFloatArgRegs) {
             static const int align = sizeof(double) - 1;
             stackOffset_ = (stackOffset_ + align) & ~align;
@@ -113,7 +113,7 @@ ABIArgGenerator::hardNext(MIRType type)
         current_ = ABIArg(VFPRegister(floatRegIndex_, VFPRegister::Single));
         floatRegIndex_++;
         break;
-      case MIRType_Double:
+      case MIRType::Double:
         // Double register are composed of 2 float registers, thus we have to
         // skip any float register which cannot be used in a pair of float
         // registers in which a double value can be stored.
@@ -638,6 +638,8 @@ Assembler::asmMergeWith(Assembler& other)
 {
     flush();
     other.flush();
+    if (other.oom())
+        return false;
     if (!AssemblerShared::asmMergeWith(size(), other))
         return false;
     return m_buffer.appendBuffer(other.m_buffer);
@@ -2783,9 +2785,6 @@ Assembler::bind(Label* label, BufferOffset boff)
         BufferOffset dest = boff.assigned() ? boff : nextOffset();
         BufferOffset b(label);
         do {
-            // Even a 0 offset may be invalid if we're out of memory.
-            if (oom())
-                return;
             BufferOffset next;
             more = nextLink(b, &next);
             Instruction branch = *editSrc(b);
@@ -2818,6 +2817,9 @@ Assembler::bindLater(Label* label, wasm::JumpTarget target)
 void
 Assembler::bind(RepatchLabel* label)
 {
+    // It does not seem to be useful to record this label for
+    // disassembly, as the value that is bound to the label is often
+    // effectively garbage and is replaced by something else later.
     BufferOffset dest = nextOffset();
     if (label->used() && !oom()) {
         // If the label has a use, then change this use to refer to the bound
@@ -2841,9 +2843,6 @@ Assembler::bind(RepatchLabel* label)
 void
 Assembler::retarget(Label* label, Label* target)
 {
-#ifdef JS_DISASM_ARM
-    spewLabel(label);
-#endif
 #ifdef JS_DISASM_ARM
     spewRetarget(label, target);
 #endif

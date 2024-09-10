@@ -130,7 +130,7 @@ HttpChannelParent::Init(const HttpChannelCreationArgs& aArgs)
                        a.appCacheClientID(), a.allowSpdy(), a.allowAltSvc(), a.fds(),
                        a.loadInfo(), a.synthesizedResponseHead(),
                        a.synthesizedSecurityInfoSerialization(),
-                       a.cacheKey(), a.schedulingContextID(), a.preflightArgs(),
+                       a.cacheKey(), a.requestContextID(), a.preflightArgs(),
                        a.initialRwin(), a.blockAuthPrompt(),
                        a.suspendAfterSynthesizeResponse(),
                        a.allowStaleCacheContent(), a.contentTypeHint());
@@ -157,7 +157,6 @@ NS_INTERFACE_MAP_BEGIN(HttpChannelParent)
   NS_INTERFACE_MAP_ENTRY(nsIProgressEventSink)
   NS_INTERFACE_MAP_ENTRY(nsIRequestObserver)
   NS_INTERFACE_MAP_ENTRY(nsIStreamListener)
-  NS_INTERFACE_MAP_ENTRY(nsIPackagedAppChannelListener)
   NS_INTERFACE_MAP_ENTRY(nsIParentChannel)
   NS_INTERFACE_MAP_ENTRY(nsIAuthPromptProvider)
   NS_INTERFACE_MAP_ENTRY(nsIParentRedirectingChannel)
@@ -259,7 +258,7 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
                                  const OptionalHttpResponseHead& aSynthesizedResponseHead,
                                  const nsCString&           aSecurityInfoSerialization,
                                  const uint32_t&            aCacheKey,
-                                 const nsCString&           aSchedulingContextID,
+                                 const nsCString&           aRequestContextID,
                                  const OptionalCorsPreflightArgs& aCorsPreflightArgs,
                                  const uint32_t&            aInitialRwin,
                                  const bool&                aBlockAuthPrompt,
@@ -479,9 +478,9 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
     }
   }
 
-  nsID schedulingContextID;
-  schedulingContextID.Parse(aSchedulingContextID.BeginReading());
-  mChannel->SetSchedulingContextID(schedulingContextID);
+  nsID requestContextID;
+  requestContextID.Parse(aRequestContextID.BeginReading());
+  mChannel->SetRequestContextID(requestContextID);
 
   mSuspendAfterSynthesizeResponse = aSuspendAfterSynthesizeResponse;
 
@@ -985,19 +984,6 @@ HttpChannelParent::RecvRemoveCorsPreflightCacheEntry(const URIParams& uri,
 }
 
 //-----------------------------------------------------------------------------
-// HttpChannelParent::nsIPackagedAppChannelListener
-//-----------------------------------------------------------------------------
-
-NS_IMETHODIMP
-HttpChannelParent::OnStartSignedPackageRequest(const nsACString& aPackageId)
-{
-  if (mTabParent) {
-    mTabParent->OnStartSignedPackageRequest(mChannel, aPackageId);
-  }
-  return NS_OK;
-}
-
-//-----------------------------------------------------------------------------
 // HttpChannelParent::nsIRequestObserver
 //-----------------------------------------------------------------------------
 
@@ -1140,23 +1126,39 @@ HttpChannelParent::OnDataAvailable(nsIRequest *aRequest,
   MOZ_RELEASE_ASSERT(!mDivertingFromChild,
     "Cannot call OnDataAvailable if diverting is set!");
 
-  nsCString data;
-  nsresult rv = NS_ReadInputStreamToString(aInputStream, data, aCount);
-  if (NS_FAILED(rv))
-    return rv;
-
   nsresult channelStatus = NS_OK;
   mChannel->GetStatus(&channelStatus);
 
-  // OnDataAvailable is always preceded by OnStatus/OnProgress calls that set
-  // mStoredStatus/mStoredProgress(Max) to appropriate values, unless
-  // LOAD_BACKGROUND set.  In that case, they'll have garbage values, but
-  // child doesn't use them.
-  if (mIPCClosed || !SendOnTransportAndData(channelStatus, mStoredStatus,
-                                            mStoredProgress, mStoredProgressMax,
-                                            data, aOffset, aCount)) {
-    return NS_ERROR_UNEXPECTED;
+  static uint32_t const kCopyChunkSize = 128 * 1024;
+  uint32_t toRead = std::min<uint32_t>(aCount, kCopyChunkSize);
+
+  nsCString data;
+  if (!data.SetCapacity(toRead, fallible)) {
+    LOG(("  out of memory!"));
+    return NS_ERROR_OUT_OF_MEMORY;
   }
+
+  while (aCount) {
+    nsresult rv = NS_ReadInputStreamToString(aInputStream, data, toRead);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+
+    // OnDataAvailable is always preceded by OnStatus/OnProgress calls that set
+    // mStoredStatus/mStoredProgress(Max) to appropriate values, unless
+    // LOAD_BACKGROUND set.  In that case, they'll have garbage values, but
+    // child doesn't use them.
+    if (mIPCClosed || !SendOnTransportAndData(channelStatus, mStoredStatus,
+                                              mStoredProgress, mStoredProgressMax,
+                                              aOffset, toRead, data)) {
+      return NS_ERROR_UNEXPECTED;
+    }
+
+    aOffset += toRead;
+    aCount -= toRead;
+    toRead = std::min<uint32_t>(aCount, kCopyChunkSize);
+  }
+
   return NS_OK;
 }
 
@@ -1493,7 +1495,7 @@ HttpChannelParent::StartDiversion()
   }
 }
 
-class HTTPFailDiversionEvent : public nsRunnable
+class HTTPFailDiversionEvent : public Runnable
 {
 public:
   HTTPFailDiversionEvent(HttpChannelParent *aChannelParent,

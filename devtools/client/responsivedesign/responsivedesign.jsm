@@ -7,18 +7,24 @@
 const Ci = Components.interfaces;
 const Cu = Components.utils;
 
-var { loader, require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+var {loader, require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 var Telemetry = require("devtools/client/shared/telemetry");
-var { showDoorhanger } = require("devtools/client/shared/doorhanger");
-var { TouchEventSimulator } = require("devtools/shared/touch/simulator");
-var { Task } = require("resource://gre/modules/Task.jsm");
+var {showDoorhanger} = require("devtools/client/shared/doorhanger");
+var {TouchEventSimulator} = require("devtools/shared/touch/simulator");
+var {Task} = require("resource://gre/modules/Task.jsm");
 var promise = require("promise");
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 var Services = require("Services");
 var EventEmitter = require("devtools/shared/event-emitter");
-var { ViewHelpers } = require("devtools/client/shared/widgets/ViewHelpers.jsm");
+var {ViewHelpers} = require("devtools/client/shared/widgets/ViewHelpers.jsm");
+var { LocalizationHelper } = require("devtools/client/shared/l10n");
+
 loader.lazyImporter(this, "SystemAppProxy",
                     "resource://gre/modules/SystemAppProxy.jsm");
+loader.lazyRequireGetter(this, "DebuggerClient",
+                         "devtools/shared/client/main", true);
+loader.lazyRequireGetter(this, "DebuggerServer",
+                         "devtools/server/main", true);
 
 this.EXPORTED_SYMBOLS = ["ResponsiveUIManager"];
 
@@ -33,7 +39,7 @@ const ROUND_RATIO = 10;
 
 const INPUT_PARSER = /(\d+)[^\d]+(\d+)/;
 
-const SHARED_L10N = new ViewHelpers.L10N("chrome://devtools/locale/shared.properties");
+const SHARED_L10N = new LocalizationHelper("chrome://devtools/locale/shared.properties");
 
 function debug(msg) {
   // dump(`RDM UI: ${msg}\n`);
@@ -63,12 +69,18 @@ var Manager = {
    *
    * @param aWindow the main window.
    * @param aTab the tab targeted.
+   * @returns {ResponsiveUI} the instance of ResponsiveUI for the current tab.
    */
-  runIfNeeded: function(aWindow, aTab) {
+  runIfNeeded: Task.async(function*(aWindow, aTab) {
+    let ui;
     if (!this.isActiveForTab(aTab)) {
-      new ResponsiveUI(aWindow, aTab);
+      ui = new ResponsiveUI(aWindow, aTab);
+      yield ui.inited;
+    } else {
+      ui = this.getResponsiveUIForTab(aTab);
     }
-  },
+    return ui;
+  }),
 
   /**
    * Returns true if responsive view is active for the provided tab.
@@ -97,9 +109,7 @@ var Manager = {
   handleGcliCommand: Task.async(function*(aWindow, aTab, aCommand, aArgs) {
     switch (aCommand) {
       case "resize to":
-        this.runIfNeeded(aWindow, aTab);
-        let ui = ActiveTabs.get(aTab);
-        yield ui.inited;
+        let ui = yield this.runIfNeeded(aWindow, aTab);
         ui.setSize(aArgs.width, aArgs.height);
         break;
       case "resize on":
@@ -171,6 +181,7 @@ function ResponsiveUI(aWindow, aTab)
   this.bound_startResizing = this.startResizing.bind(this);
   this.bound_stopResizing = this.stopResizing.bind(this);
   this.bound_onDrag = this.onDrag.bind(this);
+  this.bound_changeUA = this.changeUA.bind(this);
   this.bound_onContentResize = this.onContentResize.bind(this);
 
   this.mm.addMessageListener("ResponsiveMode:OnContentResize",
@@ -197,7 +208,6 @@ ResponsiveUI.prototype = {
 
   init: Task.async(function*() {
     debug("INIT BEGINS");
-
     let ready = this.waitForMessage("ResponsiveMode:ChildScriptReady");
     this.mm.loadFrameScript("resource://devtools/client/responsivedesign/responsivedesign-child.js", true);
     yield ready;
@@ -237,6 +247,9 @@ ResponsiveUI.prototype = {
     this.touchEnableBefore = false;
     this.touchEventSimulator = new TouchEventSimulator(this.browser);
 
+    yield this.connectToServer();
+    this.userAgentInput.hidden = false;
+
     // Hook to display promotional Developer Edition doorhanger.
     // Only displayed once.
     showDoorhanger({
@@ -248,6 +261,21 @@ ResponsiveUI.prototype = {
     // Notify that responsive mode is on.
     this._telemetry.toolOpened("responsive");
     ResponsiveUIManager.emit("on", { tab: this.tab });
+  }),
+
+  connectToServer: Task.async(function*() {
+    if (!DebuggerServer.initialized) {
+      DebuggerServer.init();
+      DebuggerServer.addBrowserActors();
+    }
+    this.client = new DebuggerClient(DebuggerServer.connectPipe());
+    yield this.client.connect();
+    let {tab} = yield this.client.getTab();
+    let [response, tabClient] = yield this.client.attachTab(tab.actor);
+    this.tabClient = tabClient;
+    if (!tabClient) {
+      Cu.reportError("Responsive Mode: failed to attach tab");
+    }
   }),
 
   loadPresets: function() {
@@ -355,7 +383,14 @@ ResponsiveUI.prototype = {
     if (this.touchEventSimulator) {
       this.touchEventSimulator.stop();
     }
+
+    yield new Promise((resolve, reject) => {
+      this.client.close(resolve);
+      this.client = this.tabClient = null;
+    });
+
     this._telemetry.toolClosed("responsive");
+
     let stopped = this.waitForMessage("ResponsiveMode:Stop:Done");
     this.tab.linkedBrowser.messageManager.sendAsyncMessage("ResponsiveMode:Stop");
     yield stopped;
@@ -425,7 +460,7 @@ ResponsiveUI.prototype = {
    *    <menulist class="devtools-responsiveui-menulist"/> // presets
    *    <toolbarbutton tabindex="0" class="devtools-responsiveui-toolbarbutton" tooltiptext="rotate"/> // rotate
    *    <toolbarbutton tabindex="0" class="devtools-responsiveui-toolbarbutton" tooltiptext="screenshot"/> // screenshot
-   *    <toolbarbutton tabindex="0" class="devtools-responsiveui-toolbarbutton" tooltiptext="Leave Responsive Design View"/> // close
+   *    <toolbarbutton tabindex="0" class="devtools-responsiveui-toolbarbutton" tooltiptext="Leave Responsive Design Mode"/> // close
    *  </toolbar>
    *  <stack class="browserStack"> From tabbrowser.xml
    *    <browser/>
@@ -490,7 +525,7 @@ ResponsiveUI.prototype = {
     this.closebutton = this.chromeDoc.createElement("toolbarbutton");
     this.closebutton.setAttribute("tabindex", "0");
     this.closebutton.className = "devtools-responsiveui-toolbarbutton devtools-responsiveui-close";
-    this.closebutton.setAttribute("tooltiptext", this.strings.GetStringFromName("responsiveUI.close"));
+    this.closebutton.setAttribute("tooltiptext", this.strings.GetStringFromName("responsiveUI.close1"));
     this.closebutton.addEventListener("command", this.bound_close, true);
 
     this.toolbar.appendChild(this.closebutton);
@@ -505,6 +540,14 @@ ResponsiveUI.prototype = {
     this.toolbar.appendChild(this.touchbutton);
 
     this.toolbar.appendChild(this.screenshotbutton);
+
+    this.userAgentInput = this.chromeDoc.createElement("textbox");
+    this.userAgentInput.className = "devtools-responsiveui-textinput";
+    this.userAgentInput.setAttribute("placeholder",
+      this.strings.GetStringFromName("responsiveUI.userAgentPlaceholder"));
+    this.userAgentInput.addEventListener("blur", this.bound_changeUA, true);
+    this.userAgentInput.hidden = true;
+    this.toolbar.appendChild(this.userAgentInput);
 
     // Resizers
     let resizerTooltip = this.strings.GetStringFromName("responsiveUI.resizerTooltip");
@@ -719,7 +762,7 @@ ResponsiveUI.prototype = {
     let h = this.customPreset.height;
     let newName = {};
 
-    let title = this.strings.GetStringFromName("responsiveUI.customNamePromptTitle");
+    let title = this.strings.GetStringFromName("responsiveUI.customNamePromptTitle1");
     let message = this.strings.formatStringFromName("responsiveUI.customNamePromptMsg", [w, h], 2);
     let promptOk = Services.prompt.prompt(null, title, message, newName, null, {});
 
@@ -900,6 +943,39 @@ ResponsiveUI.prototype = {
        }
      }
    }),
+
+  waitForReload() {
+    let navigatedDeferred = promise.defer();
+    let onNavigated = (_, { state }) => {
+      if (state != "stop") {
+        return;
+      }
+      this.client.removeListener("tabNavigated", onNavigated);
+      navigatedDeferred.resolve();
+    };
+    this.client.addListener("tabNavigated", onNavigated);
+    return navigatedDeferred.promise;
+  },
+
+  /**
+   * Change the user agent string
+   */
+  changeUA: Task.async(function*() {
+    let value = this.userAgentInput.value;
+    if (value) {
+      this.userAgentInput.setAttribute("attention", "true");
+    } else {
+      this.userAgentInput.removeAttribute("attention");
+    }
+
+    // Changing the UA triggers an automatic reload.  Ensure we wait for this to
+    // complete before emitting the changed event, so that tests wait for the
+    // reload.
+    let reloaded = this.waitForReload();
+    yield this.tabClient.reconfigure({customUserAgent: value});
+    yield reloaded;
+    ResponsiveUIManager.emit("userAgentChanged", { tab: this.tab });
+  }),
 
   /**
    * Get the current width and height.

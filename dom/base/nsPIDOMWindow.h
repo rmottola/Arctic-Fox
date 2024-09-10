@@ -655,6 +655,7 @@ protected:
   // "active".  Only used on outer windows.
   bool                   mIsBackground;
 
+  bool                   mMediaSuspended;
   bool                   mAudioMuted;
   float                  mAudioVolume;
 
@@ -861,21 +862,17 @@ public:
   }
 
   // Audio API
+  bool GetMediaSuspended() const;
+  void SetMediaSuspended(bool aSuspended);
+
   bool GetAudioMuted() const;
   void SetAudioMuted(bool aMuted);
 
   float GetAudioVolume() const;
   nsresult SetAudioVolume(float aVolume);
 
-  void SetServiceWorkersTestingEnabled(bool aEnabled)
-  {
-    mServiceWorkersTestingEnabled = aEnabled;
-  }
-
-  bool GetServiceWorkersTestingEnabled()
-  {
-    return mServiceWorkersTestingEnabled;
-  }
+  void SetServiceWorkersTestingEnabled(bool aEnabled);
+  bool GetServiceWorkersTestingEnabled();
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(nsPIDOMWindowOuter, NS_PIDOMWINDOWOUTER_IID)

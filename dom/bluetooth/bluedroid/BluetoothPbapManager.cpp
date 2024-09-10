@@ -93,6 +93,8 @@ BluetoothPbapManager::HandleShutdown()
 
   sInShutdown = true;
   Disconnect(nullptr);
+  Uninit();
+
   sPbapManager = nullptr;
 }
 
@@ -104,27 +106,19 @@ BluetoothPbapManager::BluetoothPbapManager() : mPhonebookSizeRequired(false)
 }
 
 BluetoothPbapManager::~BluetoothPbapManager()
-{
-  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
-  if (NS_WARN_IF(!obs)) {
-    return;
-  }
+{ }
 
-  NS_WARN_IF(NS_FAILED(
-    obs->RemoveObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID)));
-}
-
-bool
+nsresult
 BluetoothPbapManager::Init()
 {
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
   if (NS_WARN_IF(!obs)) {
-    return false;
+    return NS_ERROR_NOT_AVAILABLE;
   }
 
-  if (NS_WARN_IF(NS_FAILED(
-        obs->AddObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, false)))) {
-    return false;
+  auto rv = obs->AddObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, false);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
   }
 
   /**
@@ -136,7 +130,46 @@ BluetoothPbapManager::Init()
    * absence of read events when device boots up.
    */
 
-  return true;
+  return NS_OK;
+}
+
+void
+BluetoothPbapManager::Uninit()
+{
+  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+  if (NS_WARN_IF(!obs)) {
+    return;
+  }
+
+  NS_WARN_IF(NS_FAILED(
+    obs->RemoveObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID)));
+}
+
+// static
+void
+BluetoothPbapManager::InitPbapInterface(BluetoothProfileResultHandler* aRes)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (aRes) {
+    aRes->Init();
+  }
+}
+
+// static
+void
+BluetoothPbapManager::DeinitPbapInterface(BluetoothProfileResultHandler* aRes)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (sPbapManager) {
+    sPbapManager->Uninit();
+    sPbapManager = nullptr;
+  }
+
+  if (aRes) {
+    aRes->Deinit();
+  }
 }
 
 //static
@@ -156,8 +189,8 @@ BluetoothPbapManager::Get()
   }
 
   // Create a new instance, register, and return
-  BluetoothPbapManager *manager = new BluetoothPbapManager();
-  if (NS_WARN_IF(!manager->Init())) {
+  RefPtr<BluetoothPbapManager> manager = new BluetoothPbapManager();
+  if (NS_WARN_IF(NS_FAILED(manager->Init()))) {
     return nullptr;
   }
 

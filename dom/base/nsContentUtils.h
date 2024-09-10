@@ -32,6 +32,7 @@
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/net/ReferrerPolicy.h"
 #include "mozilla/Logging.h"
+#include "mozilla/NotNull.h"
 #include "nsIContentPolicy.h"
 
 #if defined(XP_WIN)
@@ -169,15 +170,6 @@ struct EventNameMapping
   int32_t  mType;
   mozilla::EventMessage mMessage;
   mozilla::EventClassID mEventClassID;
-};
-
-struct nsShortcutCandidate {
-  nsShortcutCandidate(uint32_t aCharCode, bool aIgnoreShift) :
-    mCharCode(aCharCode), mIgnoreShift(aIgnoreShift)
-  {
-  }
-  uint32_t mCharCode;
-  bool     mIgnoreShift;
 };
 
 typedef void (*CallOnRemoteChildFunction) (mozilla::dom::TabParent* aTabParent,
@@ -688,6 +680,8 @@ public:
    * keep a mutable version around should pass in a clone.
    *
    * @param aURI uri of the image to be loaded
+   * @param aContext element of document where the result of this request
+   *                 will be used.
    * @param aLoadingDocument the document we belong to
    * @param aLoadingPrincipal the principal doing the load
    * @param aReferrer the referrer URI
@@ -700,6 +694,7 @@ public:
    * @return the imgIRequest for the image load
    */
   static nsresult LoadImage(nsIURI* aURI,
+                            nsINode* aContext,
                             nsIDocument* aLoadingDocument,
                             nsIPrincipal* aLoadingPrincipal,
                             nsIURI* aReferrer,
@@ -834,7 +829,15 @@ public:
    *   @param [aColumnNumber=0] (Optional) Column number within resource
               containing error.
               If aURI is null, then aDocument->GetDocumentURI() is used.
+   *   @param [aLocationMode] (Optional) Specifies the behavior if
+              error location information is omitted.
    */
+  enum MissingErrorLocationMode {
+    // Don't show location information in the error console.
+    eOMIT_LOCATION,
+    // Get location information from the currently executing script.
+    eUSE_CALLING_LOCATION
+  };
   static nsresult ReportToConsoleNonLocalized(const nsAString& aErrorText,
                                               uint32_t aErrorFlags,
                                               const nsACString& aCategory,
@@ -843,7 +846,9 @@ public:
                                               const nsAFlatString& aSourceLine
                                                 = EmptyString(),
                                               uint32_t aLineNumber = 0,
-                                              uint32_t aColumnNumber = 0);
+                                              uint32_t aColumnNumber = 0,
+                                              MissingErrorLocationMode aLocationMode
+                                                = eUSE_CALLING_LOCATION);
 
   /**
    * Report a localized error message to the error console.
@@ -917,6 +922,7 @@ public:
    */
   static nsresult GenerateUUIDInPlace(nsID& aUUID);
 
+  static bool PrefetchEnabled(nsIDocShell* aDocShell);
 
   /**
    * Fill (with the parameters given) the localized string named |aKey| in
@@ -1123,6 +1129,13 @@ public:
                                       bool aCancelable,
                                       bool *aDefaultAction = nullptr);
 
+  /**
+   * Helper function for dispatching a "DOMServiceWorkerFocusClient" event to
+   * the chrome event handler of the given DOM Window. This has the effect
+   * of focusing the corresponding tab and bringing the browser window
+   * to the foreground.
+   */
+  static nsresult DispatchFocusChromeEvent(nsPIDOMWindowOuter* aWindow);
 
   /**
    * This method creates and dispatches a trusted event.
@@ -1380,7 +1393,7 @@ public:
    * @param aResult the result. Out param.
    * @return false on out of memory errors, true otherwise.
    */
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   static bool GetNodeTextContent(nsINode* aNode, bool aDeep,
                                  nsAString& aResult, const mozilla::fallible_t&);
 
@@ -1511,27 +1524,6 @@ public:
   static const nsDependentString GetLocalizedEllipsis();
 
   /**
-   * Get the candidates for accelkeys for aDOMKeyEvent.
-   *
-   * @param aDOMKeyEvent [in] the key event for accelkey handling.
-   * @param aCandidates [out] the candidate shortcut key combination list.
-   *                          the first item is most preferred.
-   */
-  static void GetAccelKeyCandidates(nsIDOMKeyEvent* aDOMKeyEvent,
-                                    nsTArray<nsShortcutCandidate>& aCandidates);
-
-  /**
-   * Get the candidates for accesskeys for aNativeKeyEvent.
-   *
-   * @param aNativeKeyEvent [in] the key event for accesskey handling.
-   * @param aCandidates [out] the candidate access key list.
-   *                          the first item is most preferred.
-   */
-  static void GetAccessKeyCandidates(
-                mozilla::WidgetKeyboardEvent* aNativeKeyEvent,
-                nsTArray<uint32_t>& aCandidates);
-
-  /**
    * Hide any XUL popups associated with aDocument, including any documents
    * displayed in child frames. Does nothing if aDocument is null.
    */
@@ -1562,14 +1554,6 @@ public:
    * Return true if aURI is a local file URI (i.e. file://).
    */
   static bool URIIsLocalFile(nsIURI *aURI);
-
-  /**
-   * Given a URI, return set beforeHash to the part before the '#', and
-   * afterHash to the remainder of the URI, including the '#'.
-   */
-  static nsresult SplitURIAtHash(nsIURI *aURI,
-                                 nsACString &aBeforeHash,
-                                 nsACString &aAfterHash);
 
   /**
    * Get the application manifest URI for this document.  The manifest URI
@@ -1772,16 +1756,6 @@ public:
                                      bool aShift = false,
                                      bool aMeta = false);
 
-  /**
-   * Gets the nsIDocument given the script context. Will return nullptr on failure.
-   *
-   * @param aScriptContext the script context to get the document for; can be null
-   *
-   * @return the document associated with the script context
-   */
-  static nsIDocument*
-  GetDocumentFromScriptContext(nsIScriptContext* aScriptContext);
-
   static bool CheckMayLoad(nsIPrincipal* aPrincipal, nsIChannel* aChannel, bool aAllowIfInheritsPrincipal);
 
   /**
@@ -1791,7 +1765,7 @@ public:
    */
   static bool CanAccessNativeAnon();
 
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   static nsresult WrapNative(JSContext *cx, nsISupports *native,
                              const nsIID* aIID, JS::MutableHandle<JS::Value> vp,
                              bool aAllowWrapping = true)
@@ -1800,7 +1774,7 @@ public:
   }
 
   // Same as the WrapNative above, but use this one if aIID is nsISupports' IID.
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   static nsresult WrapNative(JSContext *cx, nsISupports *native,
                              JS::MutableHandle<JS::Value> vp,
                              bool aAllowWrapping = true)
@@ -1808,7 +1782,7 @@ public:
     return WrapNative(cx, native, nullptr, nullptr, vp, aAllowWrapping);
   }
 
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   static nsresult WrapNative(JSContext *cx, nsISupports *native,
                              nsWrapperCache *cache,
                              JS::MutableHandle<JS::Value> vp,
@@ -1841,7 +1815,7 @@ public:
    * @param aString the string to convert the newlines inside [in/out]
    */
   static void PlatformToDOMLineBreaks(nsString &aString);
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   static bool PlatformToDOMLineBreaks(nsString &aString,
                                       const mozilla::fallible_t&);
 
@@ -2452,8 +2426,9 @@ public:
    * Get the pixel data from the given source surface and return it as a buffer.
    * The length and stride will be assigned from the surface.
    */
-  static mozilla::UniquePtr<char[]> GetSurfaceData(mozilla::gfx::DataSourceSurface* aSurface,
-                                                   size_t* aLength, int32_t* aStride);
+  static mozilla::UniquePtr<char[]> GetSurfaceData(
+    mozilla::NotNull<mozilla::gfx::DataSourceSurface*> aSurface,
+    size_t* aLength, int32_t* aStride);
 
   // Helpers shared by the implementations of nsContentUtils methods and
   // nsIDOMWindowUtils methods.
@@ -2522,7 +2497,8 @@ public:
    */
   static nsresult SetFetchReferrerURIWithPolicy(nsIPrincipal* aPrincipal,
                                                 nsIDocument* aDoc,
-                                                nsIHttpChannel* aChannel);
+                                                nsIHttpChannel* aChannel,
+                                                mozilla::net::ReferrerPolicy aReferrerPolicy);
 
   static bool PushEnabled(JSContext* aCx, JSObject* aObj);
 

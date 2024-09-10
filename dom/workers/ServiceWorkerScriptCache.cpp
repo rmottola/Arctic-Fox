@@ -537,7 +537,8 @@ private:
 
     ErrorResult result;
     nsCOMPtr<nsIInputStream> body;
-    result = NS_NewStringInputStream(getter_AddRefs(body), mCN->Buffer());
+    result = NS_NewCStringInputStream(getter_AddRefs(body),
+                                      NS_ConvertUTF16toUTF8(mCN->Buffer()));
     if (NS_WARN_IF(result.Failed())) {
       MOZ_ASSERT(!result.IsErrorWithMessage());
       Fail(result.StealNSResult());
@@ -1012,7 +1013,9 @@ GenerateCacheName(nsAString& aName)
 
   char chars[NSID_LENGTH];
   id.ToProvidedString(chars);
-  aName.AssignASCII(chars, NSID_LENGTH);
+
+  // NSID_LENGTH counts the null terminator.
+  aName.AssignASCII(chars, NSID_LENGTH - 1);
 
   return NS_OK;
 }

@@ -55,7 +55,7 @@ NS_IMPL_CYCLE_COLLECTION_UNROOT_NATIVE(WebAudioDecodeJob, Release)
 
 using namespace dom;
 
-class ReportResultTask final : public nsRunnable
+class ReportResultTask final : public Runnable
 {
 public:
   ReportResultTask(WebAudioDecodeJob& aDecodeJob,
@@ -94,7 +94,7 @@ enum class PhaseEnum : int
   Done
 };
 
-class MediaDecodeTask final : public nsRunnable
+class MediaDecodeTask final : public Runnable
 {
 public:
   MediaDecodeTask(const char* aContentType, uint8_t* aBuffer,
@@ -145,7 +145,6 @@ private:
     MOZ_ASSERT(NS_IsMainThread());
     // MediaDecoderReader expects that BufferDecoder is alive.
     // Destruct MediaDecoderReader first.
-    mDecoderReader->BreakCycles();
     mDecoderReader = nullptr;
     mBufferDecoder = nullptr;
     JS_free(nullptr, mBuffer);
@@ -470,18 +469,12 @@ WebAudioDecodeJob::AllocateBuffer()
   MOZ_ASSERT(!mOutput);
   MOZ_ASSERT(NS_IsMainThread());
 
-  AutoJSAPI jsapi;
-  if (NS_WARN_IF(!jsapi.Init(mContext->GetOwner()))) {
-    return false;
-  }
-  JSContext* cx = jsapi.cx();
-
   // Now create the AudioBuffer
   ErrorResult rv;
   uint32_t channelCount = mBuffer->GetChannels();
   mOutput = AudioBuffer::Create(mContext, channelCount,
                                 mWriteIndex, mContext->SampleRate(),
-                                mBuffer.forget(), cx, rv);
+                                mBuffer.forget(), rv);
   return !rv.Failed();
 }
 

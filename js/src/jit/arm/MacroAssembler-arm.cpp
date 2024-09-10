@@ -1092,6 +1092,8 @@ MacroAssemblerARM::ma_ldrd(EDtrAddr addr, Register rt, DebugOnly<Register> rt2,
 {
     MOZ_ASSERT((rt.code() & 1) == 0);
     MOZ_ASSERT(rt2.value.code() == rt.code() + 1);
+    MOZ_ASSERT(addr.maybeOffsetRegister() != rt); // Undefined behavior if rm == rt/rt2.
+    MOZ_ASSERT(addr.maybeOffsetRegister() != rt2);
     as_extdtr(IsLoad, 64, true, mode, rt, addr, cc);
 }
 
@@ -2363,19 +2365,6 @@ MacroAssemblerARMCompat::cmp32(Register lhs, Imm32 rhs)
 }
 
 void
-MacroAssemblerARMCompat::cmp32(const Operand& lhs, Register rhs)
-{
-    ma_cmp(lhs.toReg(), rhs);
-}
-
-void
-MacroAssemblerARMCompat::cmp32(const Operand& lhs, Imm32 rhs)
-{
-    MOZ_ASSERT(lhs.toReg() != ScratchRegister);
-    ma_cmp(lhs.toReg(), rhs);
-}
-
-void
 MacroAssemblerARMCompat::cmp32(Register lhs, Register rhs)
 {
     ma_cmp(lhs, rhs);
@@ -2454,7 +2443,6 @@ void
 MacroAssemblerARMCompat::setStackArg(Register reg, uint32_t arg)
 {
     ma_dataTransferN(IsStore, 32, true, sp, Imm32(arg * sizeof(intptr_t)), reg);
-
 }
 
 void
@@ -3084,7 +3072,7 @@ void
 MacroAssemblerARMCompat::storeUnboxedValue(ConstantOrRegister value, MIRType valueType,
                                            const T& dest, MIRType slotType)
 {
-    if (valueType == MIRType_Double) {
+    if (valueType == MIRType::Double) {
         storeDouble(value.reg().typedReg().fpu(), dest);
         return;
     }
@@ -3170,7 +3158,15 @@ MacroAssemblerARMCompat::loadValue(const BaseIndex& addr, ValueOperand val)
         Register tmpIdx;
         if (addr.offset == 0) {
             if (addr.scale == TimesOne) {
-                tmpIdx = addr.index;
+                // If the offset register is the same as one of the destination
+                // registers, LDRD's behavior is undefined. Use the scratch
+                // register to avoid this.
+                if (val.aliases(addr.index)) {
+                    ma_mov(addr.index, scratch);
+                    tmpIdx = scratch;
+                } else {
+                    tmpIdx = addr.index;
+                }
             } else {
                 ma_lsl(Imm32(addr.scale), addr.index, scratch);
                 tmpIdx = scratch;
@@ -4579,6 +4575,15 @@ MacroAssemblerARMCompat::asMasm() const
 
 //{{{ check_macroassembler_style
 // ===============================================================
+// MacroAssembler high-level usage.
+
+void
+MacroAssembler::flush()
+{
+    Assembler::flush();
+}
+
+// ===============================================================
 // Stack manipulation functions.
 
 void
@@ -5061,12 +5066,6 @@ MacroAssembler::branchTestValue(Condition cond, const ValueOperand& lhs,
         ma_cmp(lhs.payloadReg(), Imm32(jv.s.payload.i32));
     ma_cmp(lhs.typeReg(), Imm32(jv.s.tag), Equal);
     ma_b(label, cond);
-}
-
-void
-MacroAssembler::flush()
-{
-    Assembler::flush();
 }
 
 //}}} check_macroassembler_style

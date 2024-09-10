@@ -172,7 +172,7 @@ private:
 };
 
 class BluetoothAvrcpManager::InitProfileResultHandlerRunnable final
-  : public nsRunnable
+  : public Runnable
 {
 public:
   InitProfileResultHandlerRunnable(BluetoothProfileResultHandler* aRes,
@@ -211,7 +211,7 @@ BluetoothAvrcpManager::InitAvrcpInterface(BluetoothProfileResultHandler* aRes)
 
   if (sBtAvrcpInterface) {
     BT_LOGR("Bluetooth AVRCP interface is already initalized.");
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_OK);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch AVRCP Init runnable");
@@ -224,7 +224,7 @@ BluetoothAvrcpManager::InitAvrcpInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!btInf)) {
     // If there's no Bluetooth interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch AVRCP OnError runnable");
@@ -237,7 +237,7 @@ BluetoothAvrcpManager::InitAvrcpInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!setupInterface)) {
     // If there's no Setup interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch AVRCP OnError runnable");
@@ -250,7 +250,7 @@ BluetoothAvrcpManager::InitAvrcpInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!avrcpInterface)) {
     // If there's no AVRCP interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch AVRCP OnError runnable");
@@ -268,6 +268,10 @@ BluetoothAvrcpManager::InitAvrcpInterface(BluetoothProfileResultHandler* aRes)
 }
 
 BluetoothAvrcpManager::~BluetoothAvrcpManager()
+{ }
+
+void
+BluetoothAvrcpManager::Uninit()
 {
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
   NS_ENSURE_TRUE_VOID(obs);
@@ -294,9 +298,9 @@ BluetoothAvrcpManager::Get()
   // If we're in shutdown, don't create a new instance
   NS_ENSURE_FALSE(sInShutdown, nullptr);
 
-  // Create a new instance, register, and return
-  BluetoothAvrcpManager* manager = new BluetoothAvrcpManager();
-  sBluetoothAvrcpManager = manager;
+  // Create a new instance and return
+  sBluetoothAvrcpManager = new BluetoothAvrcpManager();
+
   return sBluetoothAvrcpManager;
 }
 
@@ -318,6 +322,9 @@ public:
     sBtAvrcpInterface->SetNotificationHandler(nullptr);
     sBtAvrcpInterface = nullptr;
 
+    sBluetoothAvrcpManager->Uninit();
+    sBluetoothAvrcpManager = nullptr;
+
     if (mRes) {
       mRes->OnError(NS_ERROR_FAILURE);
     }
@@ -330,6 +337,9 @@ public:
     sBtAvrcpInterface->SetNotificationHandler(nullptr);
     sBtAvrcpInterface = nullptr;
 
+    sBluetoothAvrcpManager->Uninit();
+    sBluetoothAvrcpManager = nullptr;
+
     if (mRes) {
       mRes->Deinit();
     }
@@ -340,7 +350,7 @@ private:
 };
 
 class BluetoothAvrcpManager::DeinitProfileResultHandlerRunnable final
-  : public nsRunnable
+  : public Runnable
 {
 public:
   DeinitProfileResultHandlerRunnable(BluetoothProfileResultHandler* aRes,
@@ -376,7 +386,7 @@ BluetoothAvrcpManager::DeinitAvrcpInterface(BluetoothProfileResultHandler* aRes)
 
   if (!sBtAvrcpInterface) {
     BT_LOGR("Bluetooth AVRCP interface has not been initalized.");
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new DeinitProfileResultHandlerRunnable(aRes, NS_OK);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch AVRCP Deinit runnable");
@@ -389,7 +399,7 @@ BluetoothAvrcpManager::DeinitAvrcpInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!btInf)) {
     // If there's no backend interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new DeinitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch AVRCP OnError runnable");
@@ -402,7 +412,7 @@ BluetoothAvrcpManager::DeinitAvrcpInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!setupInterface)) {
     // If there's no Setup interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new DeinitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch AVRCP OnError runnable");
@@ -424,7 +434,7 @@ BluetoothAvrcpManager::HandleShutdown()
   sBluetoothAvrcpManager = nullptr;
 }
 
-class BluetoothAvrcpManager::ConnectRunnable final : public nsRunnable
+class BluetoothAvrcpManager::ConnectRunnable final : public Runnable
 {
 public:
   ConnectRunnable(BluetoothAvrcpManager* aManager)
@@ -457,7 +467,7 @@ BluetoothAvrcpManager::Connect(const BluetoothAddress& aDeviceAddress,
   NS_DispatchToMainThread(new ConnectRunnable(this));
 }
 
-class BluetoothAvrcpManager::DisconnectRunnable final : public nsRunnable
+class BluetoothAvrcpManager::DisconnectRunnable final : public Runnable
 {
 public:
   DisconnectRunnable(BluetoothAvrcpManager* aManager)

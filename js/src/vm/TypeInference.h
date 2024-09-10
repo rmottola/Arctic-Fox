@@ -145,8 +145,7 @@ enum : uint32_t {
     /* Whether any objects have been iterated over. */
     OBJECT_FLAG_ITERATED              = 0x00080000,
 
-    /* For a global object, whether flags were set on the RegExpStatics. */
-    OBJECT_FLAG_REGEXP_FLAGS_SET      = 0x00100000,
+    /* 0x00100000 is not used. */
 
     /*
      * For the function on a run-once script, whether the function has actually
@@ -663,6 +662,12 @@ class TemporaryTypeSet : public TypeSet
         this->objectSet = objectSet;
     }
 
+    TemporaryTypeSet(LifoAlloc* alloc, jit::MIRType type)
+      : TemporaryTypeSet(alloc, PrimitiveType(ValueTypeFromMIRType(type)))
+    {
+        MOZ_ASSERT(type != jit::MIRType::Value);
+    }
+
     /*
      * Constraints for JIT compilation.
      *
@@ -675,7 +680,7 @@ class TemporaryTypeSet : public TypeSet
     /* Get any type tag which all values in this set must have. */
     jit::MIRType getKnownMIRType();
 
-    bool isMagicArguments() { return getKnownMIRType() == jit::MIRType_MagicOptimizedArguments; }
+    bool isMagicArguments() { return getKnownMIRType() == jit::MIRType::MagicOptimizedArguments; }
 
     /* Whether this value may be an object. */
     bool maybeObject() { return unknownObject() || baseObjectCount() > 0; }

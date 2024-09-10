@@ -56,8 +56,10 @@
 #include "nsIOService.h"
 
 #include "mozilla/net/NeckoChild.h"
+#include "mozilla/net/NeckoParent.h"
 #include "mozilla/ipc/URIUtils.h"
 #include "mozilla/Telemetry.h"
+#include "mozilla/unused.h"
 
 #if defined(XP_UNIX)
 #include <sys/utsname.h>
@@ -330,8 +332,8 @@ nsHttpHandler::Init()
     rv = InitConnectionMgr();
     if (NS_FAILED(rv)) return rv;
 
-    mSchedulingContextService =
-        do_GetService("@mozilla.org/network/scheduling-context-service;1");
+    mRequestContextService =
+        do_GetService("@mozilla.org/network/request-context-service;1");
 
 #if defined(ANDROID) || defined(MOZ_MULET)
     mProductSub.AssignLiteral(MOZILLA_UAVERSION);
@@ -2224,6 +2226,9 @@ nsHttpHandler::SpeculativeConnectInternal(nsIURI *aURI,
         obsService->NotifyObservers(nullptr,
                                     "speculative-connect-request",
                                     NS_ConvertUTF8toUTF16(spec).get());
+        if (!IsNeckoChild() && gNeckoParent) {
+            Unused << gNeckoParent->SendSpeculativeConnectRequest(spec);
+        }
     }
 
     nsISiteSecurityService* sss = gHttpHandler->GetSSService();

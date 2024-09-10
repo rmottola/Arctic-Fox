@@ -19,7 +19,10 @@
     macro(apply, apply, "apply") \
     macro(arguments, arguments, "arguments") \
     macro(as, as, "as") \
+    macro(ArrayBufferSpecies, ArrayBufferSpecies, "ArrayBufferSpecies") \
     macro(ArrayIteratorNext, ArrayIteratorNext, "ArrayIteratorNext") \
+    macro(ArraySpecies, ArraySpecies, "ArraySpecies") \
+    macro(ArraySpeciesCreate, ArraySpeciesCreate, "ArraySpeciesCreate") \
     macro(ArrayType, ArrayType, "ArrayType") \
     macro(ArrayValues, ArrayValues, "ArrayValues") \
     macro(ArrayValuesAt, ArrayValuesAt, "ArrayValuesAt") \
@@ -58,6 +61,7 @@
     macro(ConvertAndCopyTo, ConvertAndCopyTo, "ConvertAndCopyTo") \
     macro(copyWithin, copyWithin, "copyWithin") \
     macro(count, count, "count") \
+    macro(CreateResolvingFunctions, CreateResolvingFunctions, "CreateResolvingFunctions") \
     macro(currency, currency, "currency") \
     macro(currencyDisplay, currencyDisplay, "currencyDisplay") \
     macro(DateTimeFormat, DateTimeFormat, "DateTimeFormat") \
@@ -92,6 +96,7 @@
     macro(era, era, "era") \
     macro(escape, escape, "escape") \
     macro(eval, eval, "eval") \
+    macro(exec, exec, "exec") \
     macro(false, false_, "false") \
     macro(fieldOffsets, fieldOffsets, "fieldOffsets") \
     macro(fieldTypes, fieldTypes, "fieldTypes") \
@@ -111,13 +116,18 @@
     macro(formatToParts, formatToParts, "formatToParts") \
     macro(frame, frame, "frame") \
     macro(from, from, "from") \
+    macro(futexOK, futexOK, "ok") \
+    macro(futexNotEqual, futexNotEqual, "not-equal") \
+    macro(futexTimedOut, futexTimedOut, "timed-out") \
     macro(gcCycleNumber, gcCycleNumber, "gcCycleNumber") \
     macro(GeneratorFunction, GeneratorFunction, "GeneratorFunction") \
     macro(get, get, "get") \
+    macro(getPrefix, getPrefix, "get ") \
     macro(getInternals, getInternals, "getInternals") \
     macro(getOwnPropertyDescriptor, getOwnPropertyDescriptor, "getOwnPropertyDescriptor") \
     macro(getOwnPropertyNames, getOwnPropertyNames, "getOwnPropertyNames") \
     macro(getPropertyDescriptor, getPropertyDescriptor, "getPropertyDescriptor") \
+    macro(getPrototypeOf, getPrototypeOf, "getPrototypeOf") \
     macro(global, global, "global") \
     macro(Handle, Handle, "Handle") \
     macro(has, has, "has") \
@@ -207,6 +217,11 @@
     macro(parseInt, parseInt, "parseInt") \
     macro(pattern, pattern, "pattern") \
     macro(preventExtensions, preventExtensions, "preventExtensions") \
+    macro(promise, promise, "promise") \
+    macro(state, state, "state") \
+    macro(pending, pending, "pending") \
+    macro(fulfilled, fulfilled, "fulfilled") \
+    macro(rejected, rejected, "rejected") \
     macro(propertyIsEnumerable, propertyIsEnumerable, "propertyIsEnumerable") \
     macro(proto, proto, "__proto__") \
     macro(prototype, prototype, "prototype") \
@@ -223,9 +238,12 @@
     macro(sensitivity, sensitivity, "sensitivity") \
     macro(separator, separator, "separator") \
     macro(set, set, "set") \
+    macro(setPrefix, setPrefix, "set ") \
+    macro(setPrototypeOf, setPrototypeOf, "setPrototypeOf") \
     macro(shape, shape, "shape") \
     macro(size, size, "size") \
     macro(source, source, "source") \
+    macro(SpeciesConstructor, SpeciesConstructor, "SpeciesConstructor") \
     macro(stack, stack, "stack") \
     macro(star, star, "*") \
     macro(starDefaultStar, starDefaultStar, "*default*") \
@@ -293,22 +311,6 @@
     macro(boolean, boolean, "boolean") \
     macro(null, null, "null") \
     macro(symbol, symbol, "symbol") \
-    /* Well-known atom names must be continuous and ordered, matching \
-     * enum JS::SymbolCode in jsapi.h. */ \
-    macro(iterator, iterator, "iterator") \
-    macro(match, match, "match") \
-    macro(species, species, "species") \
-    macro(toPrimitive, toPrimitive, "toPrimitive") \
-    macro(unscopables, unscopables, "unscopables") \
-    /* Same goes for the descriptions of the well-known symbols. */ \
-    macro(Symbol_create, Symbol_create, "Symbol.create") \
-    macro(Symbol_hasInstance, Symbol_hasInstance, "Symbol.hasInstance") \
-    macro(Symbol_isConcatSpreadable, Symbol_isConcatSpreadable, "Symbol.isConcatSpreadable") \
-    macro(Symbol_iterator, Symbol_iterator, "Symbol.iterator") \
-    macro(Symbol_match,    Symbol_match,    "Symbol.match") \
-    macro(Symbol_species,  Symbol_species,  "Symbol.species") \
-    macro(Symbol_toPrimitive, Symbol_toPrimitive, "Symbol.toPrimitive") \
-    macro(Symbol_unscopables, Symbol_unscopables, "Symbol.unscopables") \
     /* Function names for properties named by symbols. */ \
     macro(Symbol_iterator_fun, Symbol_iterator_fun, "[Symbol.iterator]") \
 

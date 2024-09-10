@@ -94,6 +94,7 @@ NeckoParent::NeckoParent()
 
 NeckoParent::~NeckoParent()
 {
+  gNeckoParent = nullptr;
   if (mObserver) {
     mObserver->RemoveObserver();
   }
@@ -1006,21 +1007,32 @@ NeckoParent::OfflineNotification(nsISupports *aSubject)
 
   }
 
+  // XPCShells don't have any TabParents
+  // Just send the ipdl message to the child process.
+  if (!UsingNeckoIPCSecurity()) {
+    bool offline = false;
+    gIOService->IsAppOffline(targetAppId, &offline);
+    if (!SendAppOfflineStatus(targetAppId, offline)) {
+      printf_stderr("NeckoParent: "
+                    "SendAppOfflineStatus failed for targetAppId: %u\n", targetAppId);
+    }
+  }
+
   return NS_OK;
 }
 
 bool
-NeckoParent::RecvRemoveSchedulingContext(const nsCString& scid)
+NeckoParent::RecvRemoveRequestContext(const nsCString& rcid)
 {
-  nsCOMPtr<nsISchedulingContextService> scsvc =
-    do_GetService("@mozilla.org/network/scheduling-context-service;1");
-  if (!scsvc) {
+  nsCOMPtr<nsIRequestContextService> rcsvc =
+    do_GetService("@mozilla.org/network/request-context-service;1");
+  if (!rcsvc) {
     return true;
   }
 
   nsID id;
-  id.Parse(scid.BeginReading());
-  scsvc->RemoveSchedulingContext(id);
+  id.Parse(rcid.BeginReading());
+  rcsvc->RemoveRequestContext(id);
 
   return true;
 }

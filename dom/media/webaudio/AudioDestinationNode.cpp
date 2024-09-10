@@ -113,7 +113,7 @@ public:
   }
 
 
-  class OnCompleteTask final : public nsRunnable
+  class OnCompleteTask final : public Runnable
   {
   public:
     OnCompleteTask(AudioContext* aAudioContext, AudioBuffer* aRenderedBuffer)
@@ -143,17 +143,11 @@ public:
     // which is strongly referenced by the runnable that called
     // AudioDestinationNode::FireOfflineCompletionEvent.
 
-    AutoJSAPI jsapi;
-    if (NS_WARN_IF(!jsapi.Init(aNode->GetOwner()))) {
-      return;
-    }
-    JSContext* cx = jsapi.cx();
-
     // Create the input buffer
     ErrorResult rv;
     RefPtr<AudioBuffer> renderedBuffer =
       AudioBuffer::Create(context, mNumberOfChannels, mLength, mSampleRate,
-                          mBuffer.forget(), cx, rv);
+                          mBuffer.forget(), rv);
     if (rv.Failed()) {
       return;
     }
@@ -195,7 +189,7 @@ private:
   bool mBufferAllocated;
 };
 
-class InputMutedRunnable final : public nsRunnable
+class InputMutedRunnable final : public Runnable
 {
 public:
   InputMutedRunnable(AudioNodeStream* aStream,

@@ -9,7 +9,7 @@
 
 Services.prefs.setIntPref("devtools.markup.pagesize", 5);
 
-const TEST_URL = TEST_URL_ROOT + "doc_markup_pagesize_01.html";
+const TEST_URL = URL_ROOT + "doc_markup_pagesize_01.html";
 const TEST_DATA = [{
   desc: "Select the last item",
   selector: "#z",
@@ -37,8 +37,8 @@ const TEST_DATA = [{
   expected: "*more*uvwxy*more*"
 }];
 
-add_task(function*() {
-  let {inspector} = yield addTab(TEST_URL).then(openInspector);
+add_task(function* () {
+  let {inspector} = yield openInspectorForURL(TEST_URL);
 
   info("Start iterating through the test data");
   for (let step of TEST_DATA) {

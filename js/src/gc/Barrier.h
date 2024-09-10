@@ -261,7 +261,7 @@ struct InternalBarrierMethods<T*>
     static void readBarrier(T* v) { T::readBarrier(v); }
 };
 
-template <typename S> struct PreBarrierFunctor : VoidDefaultAdaptor<S> {
+template <typename S> struct PreBarrierFunctor : public VoidDefaultAdaptor<S> {
     template <typename T> void operator()(T* t);
 };
 
@@ -379,7 +379,7 @@ template <class T>
 class PreBarriered : public WriteBarrieredBase<T>
 {
   public:
-    PreBarriered() : WriteBarrieredBase<T>(GCPolicy<T>::initial()) {}
+    PreBarriered() : WriteBarrieredBase<T>(JS::GCPolicy<T>::initial()) {}
     /*
      * Allow implicit construction for use in generic contexts, such as DebuggerWeakMap::markKeys.
      */
@@ -424,12 +424,12 @@ template <class T>
 class HeapPtr : public WriteBarrieredBase<T>
 {
   public:
-    HeapPtr() : WriteBarrieredBase<T>(GCPolicy<T>::initial()) {}
+    HeapPtr() : WriteBarrieredBase<T>(JS::GCPolicy<T>::initial()) {}
     explicit HeapPtr(T v) : WriteBarrieredBase<T>(v) {
-        this->post(GCPolicy<T>::initial(), v);
+        this->post(JS::GCPolicy<T>::initial(), v);
     }
     explicit HeapPtr(const HeapPtr<T>& v) : WriteBarrieredBase<T>(v) {
-        this->post(GCPolicy<T>::initial(), v);
+        this->post(JS::GCPolicy<T>::initial(), v);
     }
 #ifdef DEBUG
     ~HeapPtr() {
@@ -441,7 +441,7 @@ class HeapPtr : public WriteBarrieredBase<T>
 
     void init(T v) {
         this->value = v;
-        this->post(GCPolicy<T>::initial(), v);
+        this->post(JS::GCPolicy<T>::initial(), v);
     }
 
     DECLARE_POINTER_ASSIGN_OPS(HeapPtr, T);
@@ -470,21 +470,35 @@ class HeapPtr : public WriteBarrieredBase<T>
 };
 
 /*
- * A pre- and post-barriered heap pointer, for use inside the JS engine.
+ * A pre- and post-barriered heap pointer, for use inside the JS engine. These
+ * heap pointers can be stored in C++ containers like GCVector and GCHashMap.
  *
- * Unlike HeapPtr<T>, it can be used in memory that is not managed by the GC,
- * i.e. in C++ containers.  It is, however, somewhat slower, so should only be
- * used in contexts where this ability is necessary.
+ * The GC sometimes keeps pointers to pointers to GC things --- for example, to
+ * track references into the nursery. However, C++ containers like GCVector and
+ * GCHashMap usually reserve the right to relocate their elements any time
+ * they're modified, invalidating all pointers to the elements. RelocatablePtr
+ * has a move constructor which knows how to keep the GC up to date if it is
+ * moved to a new location.
+ *
+ * However, because of this additional communication with the GC, RelocatablePtr
+ * is somewhat slower, so it should only be used in contexts where this ability
+ * is necessary.
+ *
+ * Obviously, JSObjects, JSStrings, and the like get tenured and compacted, so
+ * whatever pointers they contain get relocated, in the sense used here.
+ * However, since the GC itself is moving those values, it takes care of its
+ * internal pointers to those pointers itself. RelocatablePtr is only necessary
+ * when the relocation would otherwise occur without the GC's knowledge.
  */
 template <class T>
 class RelocatablePtr : public WriteBarrieredBase<T>
 {
   public:
-    RelocatablePtr() : WriteBarrieredBase<T>(GCPolicy<T>::initial()) {}
+    RelocatablePtr() : WriteBarrieredBase<T>(JS::GCPolicy<T>::initial()) {}
 
     // Implicitly adding barriers is a reasonable default.
     MOZ_IMPLICIT RelocatablePtr(const T& v) : WriteBarrieredBase<T>(v) {
-        this->post(GCPolicy<T>::initial(), this->value);
+        this->post(JS::GCPolicy<T>::initial(), this->value);
     }
 
     /*
@@ -494,17 +508,17 @@ class RelocatablePtr : public WriteBarrieredBase<T>
      * simply omit the rvalue variant.
      */
     MOZ_IMPLICIT RelocatablePtr(const RelocatablePtr<T>& v) : WriteBarrieredBase<T>(v) {
-        this->post(GCPolicy<T>::initial(), this->value);
+        this->post(JS::GCPolicy<T>::initial(), this->value);
     }
 
     ~RelocatablePtr() {
         this->pre();
-        this->post(this->value, GCPolicy<T>::initial());
+        this->post(this->value, JS::GCPolicy<T>::initial());
     }
 
     void init(T v) {
         this->value = v;
-        this->post(GCPolicy<T>::initial(), this->value);
+        this->post(JS::GCPolicy<T>::initial(), this->value);
     }
 
     DECLARE_POINTER_ASSIGN_OPS(RelocatablePtr, T);
@@ -559,16 +573,16 @@ template <typename T>
 class ReadBarriered : public ReadBarrieredBase<T>
 {
   public:
-    ReadBarriered() : ReadBarrieredBase<T>(GCPolicy<T>::initial()) {}
+    ReadBarriered() : ReadBarrieredBase<T>(JS::GCPolicy<T>::initial()) {}
 
     // It is okay to add barriers implicitly.
     MOZ_IMPLICIT ReadBarriered(const T& v) : ReadBarrieredBase<T>(v) {
-        this->post(GCPolicy<T>::initial(), v);
+        this->post(JS::GCPolicy<T>::initial(), v);
     }
 
     // Copy is creating a new edge, so we must read barrier the source edge.
     explicit ReadBarriered(const ReadBarriered& v) : ReadBarrieredBase<T>(v) {
-        this->post(GCPolicy<T>::initial(), v.get());
+        this->post(JS::GCPolicy<T>::initial(), v.get());
     }
 
     // Move retains the lifetime status of the source edge, so does not fire
@@ -576,11 +590,11 @@ class ReadBarriered : public ReadBarrieredBase<T>
     ReadBarriered(ReadBarriered&& v)
       : ReadBarrieredBase<T>(mozilla::Forward<ReadBarriered<T>>(v))
     {
-        this->post(GCPolicy<T>::initial(), v.value);
+        this->post(JS::GCPolicy<T>::initial(), v.value);
     }
 
     ~ReadBarriered() {
-        this->post(this->value, GCPolicy<T>::initial());
+        this->post(this->value, JS::GCPolicy<T>::initial());
     }
 
     ReadBarriered& operator=(const ReadBarriered& v) {
@@ -592,7 +606,7 @@ class ReadBarriered : public ReadBarrieredBase<T>
 
     const T get() const {
         if (!InternalBarrierMethods<T>::isMarkable(this->value))
-            return GCPolicy<T>::initial();
+            return JS::GCPolicy<T>::initial();
         this->read();
         return this->value;
     }

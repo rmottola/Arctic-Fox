@@ -200,7 +200,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(NotificationStorageCallback)
   NS_INTERFACE_MAP_ENTRY(nsISupports)
 NS_INTERFACE_MAP_END
 
-class NotificationGetRunnable final : public nsRunnable
+class NotificationGetRunnable final : public Runnable
 {
   const nsString mOrigin;
   const nsString mTag;
@@ -289,7 +289,8 @@ class GetPermissionRunnable final : public WorkerMainThreadRunnable
 
 public:
   explicit GetPermissionRunnable(WorkerPrivate* aWorker)
-    : WorkerMainThreadRunnable(aWorker)
+    : WorkerMainThreadRunnable(aWorker,
+                               NS_LITERAL_CSTRING("Notification :: Get Permission"))
     , mPermission(NotificationPermission::Denied)
   { }
 
@@ -310,7 +311,7 @@ public:
   }
 };
 
-class FocusWindowRunnable final : public nsRunnable
+class FocusWindowRunnable final : public Runnable
 {
   nsMainThreadPtrHandle<nsPIDOMWindowInner> mWindow;
 public:
@@ -520,7 +521,7 @@ public:
   }
 };
 
-class NotificationTask : public nsRunnable
+class NotificationTask : public Runnable
 {
 public:
   enum NotificationAction {
@@ -2165,7 +2166,7 @@ private:
 
 NS_IMPL_ISUPPORTS(WorkerGetCallback, nsINotificationStorageCallback)
 
-class WorkerGetRunnable final : public nsRunnable
+class WorkerGetRunnable final : public Runnable
 {
   RefPtr<PromiseWorkerProxy> mPromiseProxy;
   const nsString mTag;
@@ -2245,7 +2246,7 @@ Notification::WorkerGet(WorkerPrivate* aWorkerPrivate,
     new WorkerGetRunnable(proxy, aFilter.mTag, aScope);
   // Since this is called from script via
   // ServiceWorkerRegistration::GetNotifications, we can assert dispatch.
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(r)));
+  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(r));
   return p.forget();
 }
 
@@ -2446,7 +2447,8 @@ class CloseNotificationRunnable final
 
   public:
   explicit CloseNotificationRunnable(Notification* aNotification)
-    : WorkerMainThreadRunnable(aNotification->mWorkerPrivate)
+    : WorkerMainThreadRunnable(aNotification->mWorkerPrivate,
+                               NS_LITERAL_CSTRING("Notification :: Close Notification"))
     , mNotification(aNotification)
     , mHadObserver(false)
   {}
@@ -2472,7 +2474,7 @@ class CloseNotificationRunnable final
 };
 
 bool
-NotificationFeature::Notify(JSContext* aCx, Status aStatus)
+NotificationFeature::Notify(Status aStatus)
 {
   if (aStatus >= Canceling) {
     // CloseNotificationRunnable blocks the worker by pushing a sync event loop
@@ -2553,7 +2555,8 @@ class CheckLoadRunnable final : public WorkerMainThreadRunnable
 
 public:
   explicit CheckLoadRunnable(WorkerPrivate* aWorker, const nsACString& aScope)
-    : WorkerMainThreadRunnable(aWorker)
+    : WorkerMainThreadRunnable(aWorker,
+                               NS_LITERAL_CSTRING("Notification :: Check Load"))
     , mRv(NS_ERROR_DOM_SECURITY_ERR)
     , mScope(aScope)
   { }
@@ -2575,8 +2578,8 @@ public:
     // This is coming from a ServiceWorkerRegistrationWorkerThread.
     MOZ_ASSERT(registration);
 
-    if (!registration->mActiveWorker ||
-        registration->mActiveWorker->ID() != mWorkerPrivate->ServiceWorkerID()) {
+    if (!registration->GetActive() ||
+        registration->GetActive()->ID() != mWorkerPrivate->ServiceWorkerID()) {
       mRv = NS_ERROR_NOT_AVAILABLE;
     }
 

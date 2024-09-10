@@ -4,7 +4,6 @@
 
 from mozpack.copier import (
     FileCopier,
-    FilePurger,
     FileRegistry,
     FileRegistrySubtree,
     Jarrer,
@@ -466,38 +465,6 @@ class TestFileCopier(TestWithTmpDir):
                          {self.tmppath('dest/foo/bar')})
 
 
-class TestFilePurger(TestWithTmpDir):
-    def test_file_purger(self):
-        existing = os.path.join(self.tmpdir, 'existing')
-        extra = os.path.join(self.tmpdir, 'extra')
-        empty_dir = os.path.join(self.tmpdir, 'dir')
-
-        with open(existing, 'a'):
-            pass
-
-        with open(extra, 'a'):
-            pass
-
-        os.mkdir(empty_dir)
-        with open(os.path.join(empty_dir, 'foo'), 'a'):
-            pass
-
-        self.assertTrue(os.path.exists(existing))
-        self.assertTrue(os.path.exists(extra))
-
-        purger = FilePurger()
-        purger.add('existing')
-        result = purger.purge(self.tmpdir)
-        self.assertEqual(result.removed_files, set(self.tmppath(p) for p in
-            ('extra', 'dir/foo')))
-        self.assertEqual(result.removed_files_count, 2)
-        self.assertEqual(result.removed_directories_count, 1)
-
-        self.assertTrue(os.path.exists(existing))
-        self.assertFalse(os.path.exists(extra))
-        self.assertFalse(os.path.exists(empty_dir))
-
-
 class TestJarrer(unittest.TestCase):
     def check_jar(self, dest, copier):
         jar = JarReader(fileobj=dest)
@@ -541,6 +508,22 @@ class TestJarrer(unittest.TestCase):
         self.assertEqual([f.filename for f in jar], preloaded +
                          [p for p in copier.paths() if not p in preloaded])
         self.assertEqual(jar.last_preloaded, preloaded[-1])
+
+
+    def test_jarrer_compress(self):
+        copier = Jarrer()
+        copier.add('foo/bar', GeneratedFile('ffffff'))
+        copier.add('foo/qux', GeneratedFile('ffffff'), compress=False)
+
+        dest = MockDest()
+        copier.copy(dest)
+        self.check_jar(dest, copier)
+
+        dest.seek(0)
+        jar = JarReader(fileobj=dest)
+        self.assertTrue(jar['foo/bar'].compressed)
+        self.assertFalse(jar['foo/qux'].compressed)
+
 
 if __name__ == '__main__':
     mozunit.main()

@@ -219,38 +219,43 @@ extern nsIThread* NS_GetCurrentThread();
 
 #ifndef XPCOM_GLUE_AVOID_NSPR
 
+namespace mozilla {
+
 // This class is designed to be subclassed.
-class nsRunnable : public nsIRunnable
+class Runnable : public nsIRunnable
 {
 public:
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIRUNNABLE
 
-  nsRunnable() {}
+  Runnable() {}
 
 protected:
-  virtual ~nsRunnable() {}
+  virtual ~Runnable() {}
 };
 
 // This class is designed to be subclassed.
-class nsCancelableRunnable : public nsICancelableRunnable
+class CancelableRunnable : public Runnable,
+                           public nsICancelableRunnable
 {
 public:
-  NS_DECL_THREADSAFE_ISUPPORTS
-  NS_DECL_NSIRUNNABLE
-  NS_DECL_NSICANCELABLERUNNABLE
+  NS_DECL_ISUPPORTS_INHERITED
+  // nsICancelableRunnable
+  virtual nsresult Cancel() override;
 
-  nsCancelableRunnable() {}
+  CancelableRunnable() {}
 
 protected:
-  virtual ~nsCancelableRunnable() {}
+  virtual ~CancelableRunnable() {}
 };
+
+} // namespace mozilla
 
 // An event that can be used to call a C++11 functions or function objects,
 // including lambdas. The function must have no required arguments, and must
 // return void.
 template<typename Function>
-class nsRunnableFunction : public nsRunnable
+class nsRunnableFunction : public mozilla::Runnable
 {
 public:
   explicit nsRunnableFunction(const Function& aFunction)
@@ -279,7 +284,7 @@ nsRunnableFunction<Function>* NS_NewRunnableFunction(const Function& aFunction)
 template<class ClassType,
          typename ReturnType = void,
          bool Owning = true>
-class nsRunnableMethod : public nsRunnable
+class nsRunnableMethod : public mozilla::Runnable
 {
 public:
   virtual void Revoke() = 0;
@@ -350,6 +355,7 @@ struct nsRunnableMethodTraits<R(NS_STDCALL C::*)(), Owning>
   typedef nsRunnableMethod<C, R, Owning> base_type;
 };
 #endif
+
 
 // IsParameterStorageClass<T>::value is true if T is a parameter-storage class
 // that will be recognized by NS_New[NonOwning]RunnableMethodWithArg[s] to
@@ -778,7 +784,7 @@ NS_NewNonOwningRunnableMethodWithArgs(PtrType&& aPtr, Method aMethod,
 //
 //   class R;
 //
-//   class E : public nsRunnable {
+//   class E : public mozilla::Runnable {
 //   public:
 //     void Revoke() {
 //       mResource = nullptr;

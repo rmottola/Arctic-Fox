@@ -7,7 +7,6 @@
 window.performance.mark('gecko-shell-loadstart');
 
 Cu.import('resource://gre/modules/ContactService.jsm');
-Cu.import('resource://gre/modules/DataStoreChangeNotifier.jsm');
 Cu.import('resource://gre/modules/AlarmService.jsm');
 Cu.import('resource://gre/modules/ActivitiesService.jsm');
 Cu.import('resource://gre/modules/NotificationDB.jsm');
@@ -17,7 +16,6 @@ Cu.import('resource://gre/modules/UserAgentOverrides.jsm');
 Cu.import('resource://gre/modules/Keyboard.jsm');
 Cu.import('resource://gre/modules/ErrorPage.jsm');
 Cu.import('resource://gre/modules/AlertsHelper.jsm');
-Cu.import('resource://gre/modules/RequestSyncService.jsm');
 Cu.import('resource://gre/modules/SystemUpdateService.jsm');
 
 if (isGonk) {
@@ -1139,22 +1137,50 @@ window.addEventListener('ContentStart', function update_onContentStart() {
 
   updatePrompt.wrappedJSObject.handleContentStart(shell);
 });
+/* The "GPSChipOn" is to indicate that GPS engine is turned ON by the modem.
+   During this GPS engine is turned ON by the modem, we make the location tracking icon visible to user.
+   Once GPS engine is turned OFF, the location icon will disappear.
+   If GPS engine is not turned ON by the modem or GPS location service is triggered,
+   we let GPS service take over the control of showing the location tracking icon.
+   The regular sequence of the geolocation-device-events is: starting-> GPSStarting-> shutdown-> GPSShutdown
+*/
+
 
 (function geolocationStatusTracker() {
   let gGeolocationActive = false;
+  let GPSChipOn = false;
 
   Services.obs.addObserver(function(aSubject, aTopic, aData) {
     let oldState = gGeolocationActive;
-    if (aData == "starting") {
-      gGeolocationActive = true;
-    } else if (aData == "shutdown") {
-      gGeolocationActive = false;
+    let promptWarning = false;
+    switch (aData) {
+      case "GPSStarting":
+        if (!gGeolocationActive) {
+          gGeolocationActive = true;
+          GPSChipOn = true;
+          promptWarning = true;
+        }
+        break;
+      case "GPSShutdown":
+        if (GPSChipOn) {
+          gGeolocationActive = false;
+          GPSChipOn = false;
+        }
+        break;
+      case "starting":
+        gGeolocationActive = true;
+        GPSChipOn = false;
+        break;
+      case "shutdown":
+        gGeolocationActive = false;
+        break;
     }
 
     if (gGeolocationActive != oldState) {
       shell.sendChromeEvent({
         type: 'geolocation-status',
-        active: gGeolocationActive
+        active: gGeolocationActive,
+        prompt: promptWarning
       });
     }
 }, "geolocation-device-events", false);

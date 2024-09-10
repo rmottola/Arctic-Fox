@@ -17,6 +17,7 @@
 #include "webrtc/modules/desktop_capture/desktop_frame_win.h"
 #include "webrtc/modules/desktop_capture/win/window_capture_utils.h"
 #include "webrtc/system_wrappers/interface/logging.h"
+#include <VersionHelpers.h>
 
 namespace webrtc {
 
@@ -49,6 +50,14 @@ BOOL CALLBACK WindowsEnumerationHandler(HWND hwnd, LPARAM param) {
   if (wcscmp(class_name, L"Progman") == 0 || wcscmp(class_name, L"Button") == 0)
     return TRUE;
 
+  // Win8 introduced "Modern Apps" whose associated window is
+  // non-shareable. We want to filter them out.
+  if (IsWindows8OrGreater() &&
+      (wcscmp(class_name, L"ApplicationFrameWindow") == 0 ||
+       wcscmp(class_name, L"Windows.UI.Core.CoreWindow") == 0)) {
+    return TRUE;
+  }
+
   WindowCapturer::Window window;
   window.id = reinterpret_cast<WindowCapturer::WindowId>(hwnd);
 
@@ -61,6 +70,12 @@ BOOL CALLBACK WindowsEnumerationHandler(HWND hwnd, LPARAM param) {
   // Skip windows when we failed to convert the title or it is empty.
   if (window.title.empty())
     return TRUE;
+  // Skip windows of zero visible area, except IconicWindows
+  RECT bounds;
+  if(GetClientRect(hwnd,&bounds) && !IsIconic(hwnd)
+    && IsRectEmpty(&bounds)){
+    return TRUE;
+  }
 
   list->push_back(window);
 

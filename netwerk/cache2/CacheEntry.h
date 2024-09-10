@@ -60,6 +60,9 @@ public:
   void AsyncOpen(nsICacheEntryOpenCallback* aCallback, uint32_t aFlags);
 
   CacheEntryHandle* NewHandle();
+  // For a new and recreated entry w/o a callback, we need to wrap it
+  // with a handle to detect writing consumer is gone.
+  CacheEntryHandle* NewWriteHandle();
 
 public:
   uint32_t GetMetadataMemoryConsumption();
@@ -178,7 +181,7 @@ private:
 
   // Since OnCacheEntryAvailable must be invoked on the main thread
   // we need a runnable for it...
-  class AvailableCallbackRunnable : public nsRunnable
+  class AvailableCallbackRunnable : public Runnable
   {
   public:
     AvailableCallbackRunnable(CacheEntry* aEntry,
@@ -200,7 +203,7 @@ private:
 
   // Since OnCacheEntryDoomed must be invoked on the main thread
   // we need a runnable for it...
-  class DoomCallbackRunnable : public nsRunnable
+  class DoomCallbackRunnable : public Runnable
   {
   public:
     DoomCallbackRunnable(CacheEntry* aEntry, nsresult aRv)
@@ -240,9 +243,6 @@ private:
 
   nsresult OpenOutputStreamInternal(int64_t offset, nsIOutputStream * *_retval);
 
-  // When this entry is new and recreated w/o a callback, we need to wrap it
-  // with a handle to detect writing consumer is gone.
-  CacheEntryHandle* NewWriteHandle();
   void OnHandleClosed(CacheEntryHandle const* aHandle);
 
 private:
@@ -266,6 +266,9 @@ private:
 
   // Called only from DoomAlreadyRemoved()
   void DoomFile();
+  // When this entry is doomed the first time, this method removes
+  // any force-valid timing info for this entry.
+  void RemoveForcedValidity();
 
   already_AddRefed<CacheEntryHandle> ReopenTruncated(bool aMemoryOnly,
                                                      nsICacheEntryOpenCallback* aCallback);
@@ -390,7 +393,7 @@ private:
 };
 
 
-class CacheOutputCloseListener final : public nsRunnable
+class CacheOutputCloseListener final : public Runnable
 {
 public:
   void OnOutputClosed();

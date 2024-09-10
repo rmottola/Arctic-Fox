@@ -409,8 +409,6 @@ public:
 		  double aW, double aH,
                   const nsAString& aBgColor, uint32_t aFlags,
                   mozilla::ErrorResult& aError);
-  void DrawWidgetAsOnScreen(nsGlobalWindow& aWindow,
-			    mozilla::ErrorResult& aError);
   void AsyncDrawXULElement(nsXULElement& aElem, double aX, double aY, double aW,
                            double aH, const nsAString& aBgColor, uint32_t aFlags,
                            mozilla::ErrorResult& aError);
@@ -445,7 +443,8 @@ public:
     return nullptr;
   }
   NS_IMETHOD SetDimensions(int32_t aWidth, int32_t aHeight) override;
-  NS_IMETHOD InitializeWithSurface(nsIDocShell* aShell, gfxASurface* aSurface, int32_t aWidth, int32_t aHeight) override;
+  NS_IMETHOD InitializeWithDrawTarget(nsIDocShell* aShell,
+                                      gfx::DrawTarget* aTarget) override;
 
   NS_IMETHOD GetInputStream(const char* aMimeType,
                             const char16_t* aEncoderOptions,

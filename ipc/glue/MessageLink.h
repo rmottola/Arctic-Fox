@@ -62,6 +62,7 @@ class MessageListener
   public:
     MOZ_DECLARE_WEAKREFERENCE_TYPENAME(MessageListener)
     typedef IPC::Message Message;
+    typedef IPC::MessageInfo MessageInfo;
 
     virtual ~MessageListener() { }
 
@@ -120,8 +121,8 @@ class MessageListener
     virtual void OnExitedCall() {
         NS_RUNTIMEABORT("default impl shouldn't be invoked");
     }
-    virtual RacyInterruptPolicy MediateInterruptRace(const Message& parent,
-                                                     const Message& child)
+    virtual RacyInterruptPolicy MediateInterruptRace(const MessageInfo& parent,
+                                                     const MessageInfo& child)
     {
         return RIPChildWins;
     }
@@ -204,7 +205,7 @@ class ProcessLink
     // These methods acquire the monitor and forward to the
     // similarly named methods in AsyncChannel below
     // (OnMessageReceivedFromLink(), etc)
-    virtual void OnMessageReceived(const Message& msg) override;
+    virtual void OnMessageReceived(Message&& msg) override;
     virtual void OnChannelConnected(int32_t peer_pid) override;
     virtual void OnChannelError() override;
 

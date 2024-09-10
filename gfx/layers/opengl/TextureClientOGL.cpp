@@ -51,6 +51,17 @@ EGLImageTextureData::CreateTextureClient(EGLImageImage* aImage, gfx::IntSize aSi
   );
 }
 
+void
+EGLImageTextureData::FillInfo(TextureData::Info& aInfo) const
+{
+  aInfo.size = mSize;
+  aInfo.format = gfx::SurfaceFormat::UNKNOWN;
+  aInfo.hasIntermediateBuffer = false;
+  aInfo.hasSynchronization = false;
+  aInfo.supportsMoz2D = false;
+  aInfo.canExposeMappedData = false;
+}
+
 bool
 EGLImageTextureData::Serialize(SurfaceDescriptor& aOutDescriptor)
 {
@@ -81,9 +92,6 @@ AndroidSurfaceTextureData::CreateTextureClient(AndroidSurfaceTexture* aSurfTex,
     return nullptr;
   }
 
-  // XXX - This is quite sad and slow.
-  aFlags |= TextureFlags::DEALLOCATE_CLIENT;
-
   if (aOriginPos == gl::OriginPos::BottomLeft) {
     aFlags |= TextureFlags::ORIGIN_BOTTOM_LEFT;
   }
@@ -102,6 +110,17 @@ AndroidSurfaceTextureData::AndroidSurfaceTextureData(AndroidSurfaceTexture* aSur
 
 AndroidSurfaceTextureData::~AndroidSurfaceTextureData()
 {}
+
+void
+AndroidSurfaceTextureData::FillInfo(TextureData::Info& aInfo) const
+{
+  aInfo.size = mSize;
+  aInfo.format = gfx::SurfaceFormat::UNKNOWN;
+  aInfo.hasIntermediateBuffer = false;
+  aInfo.hasSynchronization = false;
+  aInfo.supportsMoz2D = false;
+  aInfo.canExposeMappedData = false;
+}
 
 bool
 AndroidSurfaceTextureData::Serialize(SurfaceDescriptor& aOutDescriptor)

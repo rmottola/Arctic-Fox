@@ -329,6 +329,7 @@ PlacesViewBase.prototype = {
     let type = aPlacesNode.type;
     if (type == Ci.nsINavHistoryResultNode.RESULT_TYPE_SEPARATOR) {
       element = document.createElement("menuseparator");
+      element.setAttribute("class", "small-separator");
     }
     else {
       let itemId = aPlacesNode.itemId;
@@ -996,6 +997,10 @@ PlacesToolbar.prototype = {
     this._removeEventListeners(this._rootElt, ["overflow", "underflow"], true);
     this._removeEventListeners(window, ["resize", "unload"], false);
     this._removeEventListeners(gBrowser.tabContainer, ["TabOpen", "TabClose"], false);
+
+    if (this._chevron._placesView) {
+      this._chevron._placesView.uninit();
+    }
 
     PlacesViewBase.prototype.uninit.apply(this, arguments);
   },

@@ -33,6 +33,7 @@
 #include "nsRegion.h"                   // for nsIntRegion
 #include "nscore.h"                     // for nsAString, etc
 #include "LayerTreeInvalidation.h"
+#include "Visibility.h"
 
 class gfxContext;
 
@@ -219,10 +220,17 @@ public:
     mInvalidRegion.Or(mInvalidRegion, aRegion);
   }
 
-  void ClearApproximatelyVisibleRegions(uint64_t aLayersId,
-                                        const Maybe<uint32_t>& aPresShellId)
+  void ClearVisibleRegions(uint64_t aLayersId,
+                           const Maybe<uint32_t>& aPresShellId)
   {
-    for (auto iter = mVisibleRegions.Iter(); !iter.Done(); iter.Next()) {
+    for (auto iter = mApproximatelyVisibleRegions.Iter(); !iter.Done(); iter.Next()) {
+      if (iter.Key().mLayersId == aLayersId &&
+          (!aPresShellId || iter.Key().mPresShellId == *aPresShellId)) {
+        iter.Remove();
+      }
+    }
+
+    for (auto iter = mInDisplayPortVisibleRegions.Iter(); !iter.Done(); iter.Next()) {
       if (iter.Key().mLayersId == aLayersId &&
           (!aPresShellId || iter.Key().mPresShellId == *aPresShellId)) {
         iter.Remove();
@@ -230,18 +238,35 @@ public:
     }
   }
 
-  void UpdateApproximatelyVisibleRegion(const ScrollableLayerGuid& aGuid,
-                                        const CSSIntRegion& aRegion)
+  void UpdateVisibleRegion(VisibilityCounter aCounter,
+                           const ScrollableLayerGuid& aGuid,
+                           const CSSIntRegion& aRegion)
   {
-    CSSIntRegion* regionForScrollFrame = mVisibleRegions.LookupOrAdd(aGuid);
+    VisibleRegions& regions = aCounter == VisibilityCounter::MAY_BECOME_VISIBLE
+                            ? mApproximatelyVisibleRegions
+                            : mInDisplayPortVisibleRegions;
+
+    CSSIntRegion* regionForScrollFrame = regions.LookupOrAdd(aGuid);
     MOZ_ASSERT(regionForScrollFrame);
 
     *regionForScrollFrame = aRegion;
   }
 
-  CSSIntRegion* GetApproximatelyVisibleRegion(const ScrollableLayerGuid& aGuid)
+  CSSIntRegion* GetVisibleRegion(VisibilityCounter aCounter,
+                                 const ScrollableLayerGuid& aGuid)
   {
-    return mVisibleRegions.Get(aGuid);
+    static CSSIntRegion emptyRegion;
+
+    VisibleRegions& regions = aCounter == VisibilityCounter::MAY_BECOME_VISIBLE
+                            ? mApproximatelyVisibleRegions
+                            : mInDisplayPortVisibleRegions;
+
+    CSSIntRegion* region = regions.Get(aGuid);
+    if (!region) {
+      region = &emptyRegion;
+    }
+
+    return region;
   }
 
   Compositor* GetCompositor() const
@@ -339,7 +364,7 @@ private:
   /**
    * Render the current layer tree to the active target.
    */
-  void Render(const nsIntRegion& aInvalidRegion);
+  void Render(const nsIntRegion& aInvalidRegion, const nsIntRegion& aOpaqueRegion);
 #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
   void RenderToPresentationSurface();
 #endif
@@ -382,7 +407,8 @@ private:
 
   typedef nsClassHashtable<nsGenericHashKey<ScrollableLayerGuid>,
                            CSSIntRegion> VisibleRegions;
-  VisibleRegions mVisibleRegions;
+  VisibleRegions mApproximatelyVisibleRegions;
+  VisibleRegions mInDisplayPortVisibleRegions;
 
   UniquePtr<FPSState> mFPS;
 
@@ -491,7 +517,7 @@ public:
     mShadowClipRect = aRect;
   }
 
-  void SetShadowTransform(const gfx::Matrix4x4& aMatrix)
+  void SetShadowBaseTransform(const gfx::Matrix4x4& aMatrix)
   {
     mShadowTransform = aMatrix;
   }
@@ -527,7 +553,7 @@ public:
    * While progressive drawing is in progress this region will be
    * a subset of the shadow visible region.
    */
-  nsIntRegion GetFullyRenderedRegion();
+  virtual nsIntRegion GetFullyRenderedRegion();
 
 protected:
   gfx::Matrix4x4 mShadowTransform;

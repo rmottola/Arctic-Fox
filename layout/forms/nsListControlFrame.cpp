@@ -141,6 +141,14 @@ nsListControlFrame::DestroyFrom(nsIFrame* aDestructRoot)
   mContent->RemoveSystemEventListener(NS_LITERAL_STRING("mousemove"),
                                       mEventListener, false);
 
+  if (XRE_IsContentProcess() &&
+      Preferences::GetBool("browser.tabs.remote.desktopbehavior", false)) {
+    nsContentUtils::AddScriptRunner(
+      new AsyncEventDispatcher(mContent,
+                               NS_LITERAL_STRING("mozhidedropdown"), true,
+                               true));
+  }
+
   nsFormControlFrame::RegUnRegAccessKey(static_cast<nsIFrame*>(this), false);
   nsHTMLScrollFrame::DestroyFrom(aDestructRoot);
 }
@@ -269,8 +277,10 @@ GetMaxOptionBSize(nsIFrame* aContainer, WritingMode aWM)
     nscoord optionBSize;
     if (nsCOMPtr<nsIDOMHTMLOptGroupElement>
         (do_QueryInterface(option->GetContent()))) {
-      // an optgroup
-      optionBSize = GetMaxOptionBSize(option, aWM);
+      // An optgroup; drill through any scroll frame and recurse.  |frame| might
+      // be null here though if |option| is an anonymous leaf frame of some sort.
+      auto frame = option->GetContentInsertionFrame();
+      optionBSize = frame ? GetMaxOptionBSize(frame, aWM) : 0;
     } else {
       // an option
       optionBSize = option->BSize(aWM);
@@ -585,6 +595,9 @@ nsListControlFrame::ReflowAsDropdown(nsPresContext*           aPresContext,
           newBSize = visibleBSize;  // use the exact block size
         } else {
           newBSize = mNumDisplayRows * blockSizeOfARow; // approximate
+          // The approximation here might actually be too big (bug 1208978);
+          // don't let it exceed the actual block-size of the list.
+          newBSize = std::min(newBSize, visibleBSize);
         }
       } else {
         rows = availableBSize / blockSizeOfARow;
@@ -1745,40 +1758,6 @@ nsListControlFrame::GetIndexFromDOMEvent(nsIDOMEvent* aMouseEvent,
     return NS_OK;
   }
 
-  int32_t numOptions = GetNumberOfOptions();
-  if (numOptions < 1)
-    return NS_ERROR_FAILURE;
-
-  nsPoint pt = nsLayoutUtils::GetDOMEventCoordinatesRelativeTo(aMouseEvent, this);
-
-  // If the event coordinate is above the first option frame, then target the
-  // first option frame
-  RefPtr<dom::HTMLOptionElement> firstOption = GetOption(0);
-  NS_ASSERTION(firstOption, "Can't find first option that's supposed to be there");
-  nsIFrame* optionFrame = firstOption->GetPrimaryFrame();
-  if (optionFrame) {
-    nsPoint ptInOptionFrame = pt - optionFrame->GetOffsetTo(this);
-    if (ptInOptionFrame.y < 0 && ptInOptionFrame.x >= 0 &&
-        ptInOptionFrame.x < optionFrame->GetSize().width) {
-      aCurIndex = 0;
-      return NS_OK;
-    }
-  }
-
-  RefPtr<dom::HTMLOptionElement> lastOption = GetOption(numOptions - 1);
-  // If the event coordinate is below the last option frame, then target the
-  // last option frame
-  NS_ASSERTION(lastOption, "Can't find last option that's supposed to be there");
-  optionFrame = lastOption->GetPrimaryFrame();
-  if (optionFrame) {
-    nsPoint ptInOptionFrame = pt - optionFrame->GetOffsetTo(this);
-    if (ptInOptionFrame.y >= optionFrame->GetSize().height && ptInOptionFrame.x >= 0 &&
-        ptInOptionFrame.x < optionFrame->GetSize().width) {
-      aCurIndex = numOptions - 1;
-      return NS_OK;
-    }
-  }
-
   return NS_ERROR_FAILURE;
 }
 
@@ -2280,7 +2259,7 @@ nsListControlFrame::KeyPress(nsIDOMEvent* aKeyEvent)
   // XXX Not I18N compliant
 
   // Don't do incremental search if the key event has already consumed.
-  if (keyEvent->mFlags.mDefaultPrevented) {
+  if (keyEvent->DefaultPrevented()) {
     return NS_OK;
   }
 
@@ -2332,7 +2311,7 @@ nsListControlFrame::KeyPress(nsIDOMEvent* aKeyEvent)
   // string we will use to find options and start searching at the current
   // keystroke.  Otherwise, Truncate the string if it's been a long time
   // since our last keypress.
-  if (keyEvent->time - gLastKeyTime > INCREMENTAL_SEARCH_KEYPRESS_TIME) {
+  if (keyEvent->mTime - gLastKeyTime > INCREMENTAL_SEARCH_KEYPRESS_TIME) {
     // If this is ' ' and we are at the beginning of the string, treat it as
     // "select this option" (bug 191543)
     if (keyEvent->charCode == ' ') {
@@ -2347,7 +2326,7 @@ nsListControlFrame::KeyPress(nsIDOMEvent* aKeyEvent)
     GetIncrementalString().Truncate();
   }
 
-  gLastKeyTime = keyEvent->time;
+  gLastKeyTime = keyEvent->mTime;
 
   // Append this keystroke to the search string. 
   char16_t uniChar = ToLowerCase(static_cast<char16_t>(keyEvent->charCode));
@@ -2489,11 +2468,8 @@ nsListEventListener::HandleEvent(nsIDOMEvent* aEvent)
     return mFrame->nsListControlFrame::MouseDown(aEvent);
   }
   if (eventType.EqualsLiteral("mouseup")) {
-    bool defaultPrevented = false;
-    aEvent->GetDefaultPrevented(&defaultPrevented);
-    if (defaultPrevented) {
-      return NS_OK;
-    }
+    // Don't try to honor defaultPrevented here - it's not web compatible.
+    // (bug 1194733)
     return mFrame->nsListControlFrame::MouseUp(aEvent);
   }
   if (eventType.EqualsLiteral("mousemove")) {

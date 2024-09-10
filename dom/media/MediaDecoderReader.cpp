@@ -106,7 +106,6 @@ MediaDecoderReader::InitializationTask()
 MediaDecoderReader::~MediaDecoderReader()
 {
   MOZ_ASSERT(mShutdown);
-  ResetDecode();
   MOZ_COUNT_DTOR(MediaDecoderReader);
 }
 
@@ -148,11 +147,11 @@ nsresult MediaDecoderReader::ResetDecode()
   return NS_OK;
 }
 
-RefPtr<MediaDecoderReader::VideoDataPromise>
+RefPtr<MediaDecoderReader::MediaDataPromise>
 MediaDecoderReader::DecodeToFirstVideoData()
 {
   MOZ_ASSERT(OnTaskQueue());
-  typedef MediaDecoderReader::VideoDataPromise PromiseType;
+  typedef MediaDecoderReader::MediaDataPromise PromiseType;
   RefPtr<PromiseType::Private> p = new PromiseType::Private(__func__);
   RefPtr<MediaDecoderReader> self = this;
   InvokeUntil([self] () -> bool {
@@ -225,7 +224,7 @@ MediaDecoderReader::AsyncReadMetadata()
   return MetadataPromise::CreateAndResolve(metadata, __func__);
 }
 
-class ReRequestVideoWithSkipTask : public nsRunnable
+class ReRequestVideoWithSkipTask : public Runnable
 {
 public:
   ReRequestVideoWithSkipTask(MediaDecoderReader* aReader,
@@ -252,7 +251,7 @@ private:
   const int64_t mTimeThreshold;
 };
 
-class ReRequestAudioTask : public nsRunnable
+class ReRequestAudioTask : public Runnable
 {
 public:
   explicit ReRequestAudioTask(MediaDecoderReader* aReader)
@@ -276,11 +275,11 @@ private:
   RefPtr<MediaDecoderReader> mReader;
 };
 
-RefPtr<MediaDecoderReader::VideoDataPromise>
+RefPtr<MediaDecoderReader::MediaDataPromise>
 MediaDecoderReader::RequestVideoData(bool aSkipToNextKeyframe,
                                      int64_t aTimeThreshold)
 {
-  RefPtr<VideoDataPromise> p = mBaseVideoPromise.Ensure(__func__);
+  RefPtr<MediaDataPromise> p = mBaseVideoPromise.Ensure(__func__);
   bool skip = aSkipToNextKeyframe;
   while (VideoQueue().GetSize() == 0 &&
          !VideoQueue().IsFinished()) {
@@ -312,10 +311,10 @@ MediaDecoderReader::RequestVideoData(bool aSkipToNextKeyframe,
   return p;
 }
 
-RefPtr<MediaDecoderReader::AudioDataPromise>
+RefPtr<MediaDecoderReader::MediaDataPromise>
 MediaDecoderReader::RequestAudioData()
 {
-  RefPtr<AudioDataPromise> p = mBaseAudioPromise.Ensure(__func__);
+  RefPtr<MediaDataPromise> p = mBaseAudioPromise.Ensure(__func__);
   while (AudioQueue().GetSize() == 0 &&
          !AudioQueue().IsFinished()) {
     if (!DecodeAudioData()) {
@@ -347,14 +346,6 @@ MediaDecoderReader::RequestAudioData()
   }
 
   return p;
-}
-
-void
-MediaDecoderReader::BreakCycles()
-{
-  // Nothing left to do here these days. We keep this method around so that, if
-  // we need it, we don't have to make all of the subclass implementations call
-  // the superclass method again.
 }
 
 RefPtr<ShutdownPromise>

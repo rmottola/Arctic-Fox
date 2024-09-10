@@ -528,7 +528,10 @@ nsresult OggReader::DecodeVorbis(ogg_packet* aPacket) {
   ogg_int64_t endFrame = aPacket->granulepos;
   while ((frames = vorbis_synthesis_pcmout(&mVorbisState->mDsp, &pcm)) > 0) {
     mVorbisState->ValidateVorbisPacketSamples(aPacket, frames);
-    auto buffer = MakeUnique<AudioDataValue[]>(frames * channels);
+    AlignedAudioBuffer buffer(frames * channels);
+    if (!buffer) {
+      return NS_ERROR_OUT_OF_MEMORY;
+    }
     for (uint32_t j = 0; j < channels; ++j) {
       VorbisPCMValue* channel = pcm[j];
       for (uint32_t i = 0; i < uint32_t(frames); ++i) {
@@ -577,7 +580,10 @@ nsresult OggReader::DecodeOpus(ogg_packet* aPacket) {
   if (frames < 120 || frames > 5760)
     return NS_ERROR_FAILURE;
   uint32_t channels = mOpusState->mChannels;
-  auto buffer = MakeUnique<AudioDataValue[]>(frames * channels);
+  AlignedAudioBuffer buffer(frames * channels);
+  if (!buffer) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
 
   // Decode to the appropriate sample type.
 #ifdef MOZ_SAMPLE_TYPE_FLOAT32
@@ -617,7 +623,10 @@ nsresult OggReader::DecodeOpus(ogg_packet* aPacket) {
     }
     int32_t keepFrames = frames - skipFrames;
     int samples = keepFrames * channels;
-    auto trimBuffer = MakeUnique<AudioDataValue[]>(samples);
+    AlignedAudioBuffer trimBuffer(samples);
+    if (!trimBuffer) {
+      return NS_ERROR_OUT_OF_MEMORY;
+    }
     for (int i = 0; i < samples; i++)
       trimBuffer[i] = buffer[skipFrames*channels + i];
 
@@ -1349,7 +1358,7 @@ nsresult OggReader::SeekInBufferedRange(int64_t aTarget,
     } while (!eof &&
              mVideoQueue.GetSize() == 0);
 
-    VideoData* video = mVideoQueue.PeekFront();
+    RefPtr<VideoData> video = mVideoQueue.PeekFront();
     if (video && !video->mKeyframe) {
       // First decoded frame isn't a keyframe, seek back to previous keyframe,
       // otherwise we'll get visual artifacts.
@@ -1481,7 +1490,7 @@ nsresult OggReader::SeekInternal(int64_t aTarget, int64_t aEndTime)
     // First, we must check to see if there's already a keyframe in the frames
     // that we may have already decoded, and discard frames up to the
     // keyframe.
-    VideoData* v;
+    RefPtr<VideoData> v;
     while ((v = mVideoQueue.PeekFront()) && !v->mKeyframe) {
       RefPtr<VideoData> releaseMe = mVideoQueue.PopFront();
     }
@@ -1950,7 +1959,7 @@ media::TimeIntervals OggReader::GetBuffered()
 #endif
 }
 
-VideoData* OggReader::FindStartTime(int64_t& aOutStartTime)
+void OggReader::FindStartTime(int64_t& aOutStartTime)
 {
   MOZ_ASSERT(OnTaskQueue());
 
@@ -1958,17 +1967,16 @@ VideoData* OggReader::FindStartTime(int64_t& aOutStartTime)
   // the duration.
   int64_t videoStartTime = INT64_MAX;
   int64_t audioStartTime = INT64_MAX;
-  VideoData* videoData = nullptr;
 
   if (HasVideo()) {
-    videoData = SyncDecodeToFirstVideoData();
+    RefPtr<VideoData> videoData = SyncDecodeToFirstVideoData();
     if (videoData) {
       videoStartTime = videoData->mTime;
       LOG(LogLevel::Debug, ("OggReader::FindStartTime() video=%lld", videoStartTime));
     }
   }
   if (HasAudio()) {
-    AudioData* audioData = SyncDecodeToFirstAudioData();
+    RefPtr<AudioData> audioData = SyncDecodeToFirstAudioData();
     if (audioData) {
       audioStartTime = audioData->mTime;
       LOG(LogLevel::Debug, ("OggReader::FindStartTime() audio=%lld", audioStartTime));
@@ -1979,11 +1987,9 @@ VideoData* OggReader::FindStartTime(int64_t& aOutStartTime)
   if (startTime != INT64_MAX) {
     aOutStartTime = startTime;
   }
-
-  return videoData;
 }
 
-AudioData* OggReader::SyncDecodeToFirstAudioData()
+RefPtr<AudioData> OggReader::SyncDecodeToFirstAudioData()
 {
   bool eof = false;
   while (!eof && AudioQueue().GetSize() == 0) {
@@ -1995,11 +2001,10 @@ AudioData* OggReader::SyncDecodeToFirstAudioData()
   if (eof) {
     AudioQueue().Finish();
   }
-  AudioData* d = nullptr;
-  return (d = AudioQueue().PeekFront()) ? d : nullptr;
+  return AudioQueue().PeekFront();
 }
 
-VideoData* OggReader::SyncDecodeToFirstVideoData()
+RefPtr<VideoData> OggReader::SyncDecodeToFirstVideoData()
 {
   bool eof = false;
   while (!eof && VideoQueue().GetSize() == 0) {
@@ -2012,8 +2017,7 @@ VideoData* OggReader::SyncDecodeToFirstVideoData()
   if (eof) {
     VideoQueue().Finish();
   }
-  VideoData* d = nullptr;
-  return (d = VideoQueue().PeekFront()) ? d : nullptr;
+  return VideoQueue().PeekFront();
 }
 
 OggCodecStore::OggCodecStore()

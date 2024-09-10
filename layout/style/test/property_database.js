@@ -665,7 +665,7 @@ if (IsCSSPropertyPrefEnabled("layout.css.prefixes.webkit")) {
     "-webkit-gradient(linear, 1 2, 3 4, color-stop(0, rgb(1,2,3)))",
     "-webkit-gradient(linear, 1 2, 3 4, color-stop(0, #00ff00))",
     "-webkit-gradient(linear, 1 2, 3 4, color-stop(0, #00f))",
-    "-webkit-gradient(linear, 1 2, 3 4, color-stop(0, hsla(240, 30%, 50%, 0.9)))",
+    "-webkit-gradient(linear, 1 2, 3 4, color-stop(0, hsla(240, 30%, 50%, 0.8)))",
     "-webkit-gradient(linear, 1 2, 3 4, color-stop(0, rgba(255, 230, 10, 0.5)))",
 
     // linear w/ multiple color stops:
@@ -1367,6 +1367,14 @@ var gCSSProperties = {
     type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
     alias_for: "box-sizing",
     subproperties: [ "box-sizing" ],
+  },
+  "color-adjust": {
+    domProp: "colorAdjust",
+    inherited: true,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: [ "economy" ],
+    other_values: [ "exact" ],
+    invalid_values: []
   },
   "-moz-columns": {
     domProp: "MozColumns",
@@ -2221,6 +2229,10 @@ var gCSSProperties = {
       /* error inside functions */
       "-moz-image-rect(url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAKElEQVR42u3NQQ0AAAgEoNP+nTWFDzcoQE1udQQCgUAgEAgEAsGTYAGjxAE/G/Q2tQAAAABJRU5ErkJggg==), rubbish, 50%, 30%, 0) transparent",
       "-moz-element(#a rubbish) black",
+      "text",
+      "text border-box",
+      "content-box text text",
+      "padding-box text url(404.png) text",
     ]
   },
   "background-attachment": {
@@ -4319,7 +4331,7 @@ var gCSSProperties = {
     initial_values: [ "auto", "normal" ],
     other_values: [ "start", "end", "flex-start", "flex-end", "self-start",
                     "self-end", "center", "left", "right", "baseline",
-                    "last-baseline", "stretch", "left true", "true right",
+                    "last-baseline", "stretch", "left unsafe", "unsafe right",
                     "safe right", "center safe" ],
     invalid_values: [ "space-between", "abc", "30px", "none",
                       "legacy left", "right legacy" ]
@@ -4861,25 +4873,6 @@ function logical_box_prop_get_computed(cs, property)
     throw "Unexpected property";
   }
   return cs.getPropertyValue(property);
-}
-
-// Helper to get computed style of "-webkit-box-orient" from "flex-direction"
-// and the "writing-mode".
-function webkit_orient_get_computed(cs, property)
-{
-  var writingMode = cs.getPropertyValue("writing-mode") || "horizontal-tb";
-
-  var mapping; // map from flex-direction values to -webkit-box-orient values.
-  if (writingMode == "horizontal-tb") {
-    // Horizontal writing-mode
-    mapping = { "row" : "horizontal", "column" : "vertical"};
-  } else {
-    // Vertical writing-mode
-    mapping = { "row" : "vertical",   "column" : "horizontal"};
-  }
-
-  var flexDirection = cs.getPropertyValue("flex-direction");
-  return mapping[flexDirection];
 }
 
 // Get the computed value for a property.  For shorthands, return the
@@ -5433,11 +5426,15 @@ if (IsCSSPropertyPrefEnabled("layout.css.text-combine-upright.enabled")) {
     inherited: true,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "none" ],
-    other_values: [ "all", "digits", "digits 2", "digits 3", "digits 4", "digits     3" ],
+    other_values: [ "all" ],
     invalid_values: [ "auto", "all 2", "none all", "digits -3", "digits 0",
                       "digits 12", "none 3", "digits 3.1415", "digits3", "digits 1",
                       "digits 3 all", "digits foo", "digits all", "digits 3.0" ]
   };
+  if (IsCSSPropertyPrefEnabled("layout.css.text-combine-upright-digits.enabled")) {
+    gCSSProperties["text-combine-upright"].other_values.push(
+      "digits", "digits 2", "digits 3", "digits 4", "digits     3");
+  }
 }
 
 if (IsCSSPropertyPrefEnabled("layout.css.masking.enabled")) {
@@ -6135,6 +6132,59 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
     ]
   };
 
+  gCSSProperties["grid-template"] = {
+    domProp: "gridTemplate",
+    inherited: false,
+    type: CSS_TYPE_TRUE_SHORTHAND,
+    subproperties: [
+      "grid-template-areas",
+      "grid-template-rows",
+      "grid-template-columns",
+    ],
+    initial_values: [
+      "none",
+      "none / none",
+    ],
+    other_values: [
+      // <'grid-template-rows'> / <'grid-template-columns'>
+      "40px / 100px",
+      "[foo] 40px [bar] / [baz] 100px [fizz]",
+      " none/100px",
+      "40px/none",
+      // [ <track-list> / ]? [ <line-names>? <string> <track-size>? <line-names>? ]+
+      "'fizz'",
+      "[bar] 'fizz'",
+      "'fizz' / [foo] 40px",
+      "[bar] 'fizz' / [foo] 40px",
+      "'fizz' 100px / [foo] 40px",
+      "[bar] 'fizz' 100px / [foo] 40px",
+      "[bar] 'fizz' 100px [buzz] / [foo] 40px",
+      "[bar] 'fizz' 100px [buzz] \n [a] '.' 200px [b] / [foo] 40px",
+    ],
+    invalid_values: [
+      "[foo] [bar] 40px / 100px",
+      "[fizz] [buzz] 100px / 40px",
+      "[fizz] [buzz] 'foo' / 40px",
+      "'foo' / none"
+    ]
+  };
+  if (isGridTemplateSubgridValueEnabled) {
+    gCSSProperties["grid-template"].other_values.push(
+      "subgrid",
+      "subgrid/40px 20px",
+      "subgrid [foo] [] [bar baz] / 40px 20px",
+      "40px 20px/subgrid",
+      "40px 20px/subgrid  [foo] [] repeat(3, [a] [b]) [bar baz]",
+      "subgrid/subgrid",
+      "subgrid [foo] [] [bar baz]/subgrid [foo] [] [bar baz]"
+    );
+    gCSSProperties["grid-template"].invalid_values.push(
+      "subgrid []",
+      "subgrid [] / 'fizz'",
+      "subgrid / 'fizz'"
+    );
+  }
+
   gCSSProperties["grid"] = {
     domProp: "grid",
     inherited: false,
@@ -6158,21 +6208,8 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
       "column dense auto",
       "dense row minmax(min-content, 2fr)",
       "row 40px / 100px",
-      // <'grid-template-rows'> / <'grid-template-columns'>
-      "40px / 100px",
-      "[foo] 40px [bar] / [baz] 100px [fizz]",
-      " none/100px",
-      "40px/none",
-      // [ <track-list> / ]? [ <line-names>? <string> <track-size>? <line-names>? ]+
-      "'fizz'",
-      "[bar] 'fizz'",
-      "'fizz' / [foo] 40px",
-      "[bar] 'fizz' / [foo] 40px",
-      "'fizz' 100px / [foo] 40px",
-      "[bar] 'fizz' 100px / [foo] 40px",
-      "[bar] 'fizz' 100px [buzz] / [foo] 40px",
-      "[bar] 'fizz' 100px [buzz] \n [a] '.' 200px [b] / [foo] 40px",
     ].concat(
+      gCSSProperties["grid-template"].other_values,
       gCSSProperties["grid-auto-flow"].other_values
     ),
     invalid_values: [
@@ -6180,31 +6217,12 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
       "row -20px",
       "row 200ms",
       "row 40px 100px",
-      "[foo] [bar] 40px / 100px",
-      "[fizz] [buzz] 100px / 40px",
-      "[fizz] [buzz] 'foo' / 40px",
-      "'foo' / none"
     ].concat(
+      gCSSProperties["grid-template"].invalid_values,
       gCSSProperties["grid-auto-flow"].invalid_values
         .filter((v) => v != 'none')
     )
   };
-  if (isGridTemplateSubgridValueEnabled) {
-    gCSSProperties["grid"].other_values.push(
-      "subgrid",
-      "subgrid/40px 20px",
-      "subgrid [foo] [] [bar baz] / 40px 20px",
-      "40px 20px/subgrid",
-      "40px 20px/subgrid  [foo] [] repeat(3, [a] [b]) [bar baz]",
-      "subgrid/subgrid",
-      "subgrid [foo] [] [bar baz]/subgrid [foo] [] [bar baz]"
-    );
-    gCSSProperties["grid"].invalid_values.push(
-      "subgrid []",
-      "subgrid [] / 'fizz'",
-      "subgrid / 'fizz'"
-    );
-  }
 
   var gridLineOtherValues = [
     "foo",
@@ -6550,17 +6568,6 @@ if (IsCSSPropertyPrefEnabled("layout.css.background-blend-mode.enabled")) {
     other_values: [ "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn",
       "hard-light", "soft-light", "difference", "exclusion", "hue", "saturation", "color", "luminosity" ],
     invalid_values: ["none", "10px", "multiply multiply"]
-  };
-}
-
-if (SpecialPowers.getBoolPref("layout.css.will-change.enabled")) {
-  gCSSProperties["will-change"] = {
-    domProp: "willChange",
-    inherited: false,
-    type: CSS_TYPE_LONGHAND,
-    initial_values: [ "auto" ],
-    other_values: [ "scroll-position", "contents", "transform", "opacity", "scroll-position, transform", "transform, opacity", "contents, transform", "property-that-doesnt-exist-yet" ],
-    invalid_values: [ "none", "all", "default", "auto, scroll-position", "scroll-position, auto", "transform scroll-position", ",", "trailing,", "will-change", "transform, will-change" ]
   };
 }
 
@@ -7024,6 +7031,42 @@ if (IsCSSPropertyPrefEnabled("layout.css.prefixes.webkit")) {
     alias_for: "filter",
     subproperties: [ "filter" ],
   };
+  gCSSProperties["-webkit-text-fill-color"] = {
+    domProp: "webkitTextFillColor",
+    inherited: true,
+    type: CSS_TYPE_LONGHAND,
+    prerequisites: { "color": "black" },
+    initial_values: [ "currentColor", "black", "#000", "#000000", "rgb(0,0,0)" ],
+    other_values: [ "red", "rgba(255,255,255,0.5)", "transparent" ],
+    invalid_values: [ "#0", "#00", "#0000", "#00000", "#0000000", "#00000000", "#000000000", "000000", "ff00ff", "rgb(255,xxx,255)" ]
+  };
+  gCSSProperties["-webkit-text-stroke"] = {
+    domProp: "webkitTextStroke",
+    inherited: true,
+    type: CSS_TYPE_TRUE_SHORTHAND,
+    prerequisites: { "color": "black" },
+    subproperties: [ "-webkit-text-stroke-width", "-webkit-text-stroke-color" ],
+    initial_values: [ "0 currentColor", "currentColor 0px", "0", "currentColor", "0px black" ],
+    other_values: [ "thin black", "#f00 medium", "thick rgba(0,0,255,0.5)", "calc(4px - 8px) green", "2px", "green 0", "currentColor 4em", "currentColor calc(5px - 1px)" ],
+    invalid_values: [ "-3px black", "calc(50%+ 2px) #000", "30% #f00" ]
+  };
+  gCSSProperties["-webkit-text-stroke-color"] = {
+    domProp: "webkitTextStrokeColor",
+    inherited: true,
+    type: CSS_TYPE_LONGHAND,
+    prerequisites: { "color": "black" },
+    initial_values: [ "currentColor", "black", "#000", "#000000", "rgb(0,0,0)" ],
+    other_values: [ "red", "rgba(255,255,255,0.5)", "transparent" ],
+    invalid_values: [ "#0", "#00", "#0000", "#00000", "#0000000", "#00000000", "#000000000", "000000", "ff00ff", "rgb(255,xxx,255)" ]
+  };
+  gCSSProperties["-webkit-text-stroke-width"] = {
+    domProp: "webkitTextStrokeWidth",
+    inherited: true,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: [ "0", "0px", "0em", "0ex", "calc(0pt)", "calc(4px - 8px)" ],
+    other_values: [ "thin", "medium", "thick", "17px", "0.2em", "calc(3*25px + 5em)", "calc(5px - 1px)" ],
+    invalid_values: [ "5%", "1px calc(nonsense)", "1px red", "-0.1px", "-3px", "30%" ]
+  },
   gCSSProperties["-webkit-text-size-adjust"] = {
     domProp: "webkitTextSizeAdjust",
     inherited: true,
@@ -7143,13 +7186,6 @@ if (IsCSSPropertyPrefEnabled("layout.css.prefixes.webkit")) {
     alias_for: "border-bottom-right-radius",
     subproperties: [ "border-bottom-right-radius" ],
   };
-  gCSSProperties["-webkit-appearance"] = {
-    domProp: "webkitAppearance",
-    inherited: false,
-    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-    alias_for: "-moz-appearance",
-    subproperties: [ "-moz-appearance" ],
-  };
   gCSSProperties["-webkit-background-clip"] = {
     domProp: "webkitBackgroundClip",
     inherited: false,
@@ -7196,44 +7232,43 @@ if (IsCSSPropertyPrefEnabled("layout.css.prefixes.webkit")) {
     domProp: "webkitBoxFlex",
     inherited: false,
     type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-    alias_for: "flex-grow",
-    subproperties: [ "flex-grow" ],
+    alias_for: "-moz-box-flex",
+    subproperties: [ "-moz-box-flex" ],
   };
   gCSSProperties["-webkit-box-ordinal-group"] = {
     domProp: "webkitBoxOrdinalGroup",
     inherited: false,
     type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-    alias_for: "order",
-    subproperties: [ "order" ],
+    alias_for: "-moz-box-ordinal-group",
+    subproperties: [ "-moz-box-ordinal-group" ],
   };
-  /* This one is not an alias - it's implemented as a logical property: */
   gCSSProperties["-webkit-box-orient"] = {
     domProp: "webkitBoxOrient",
     inherited: false,
-    type: CSS_TYPE_LONGHAND,
-    logical: true,
-    get_computed: webkit_orient_get_computed,
-    initial_values: [ "horizontal" ],
-    other_values: [ "vertical" ],
-    invalid_values: [
-      "0", "0px", "auto",
-      /* Flex-direction values: */
-      "row", "column", "row-reverse", "column-reverse",
-    ],
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "-moz-box-orient",
+    subproperties: [ "-moz-box-orient" ],
+  };
+  gCSSProperties["-webkit-box-direction"] = {
+    domProp: "webkitBoxDirection",
+    inherited: false,
+    type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
+    alias_for: "-moz-box-direction",
+    subproperties: [ "-moz-box-direction" ],
   };
   gCSSProperties["-webkit-box-align"] = {
     domProp: "webkitBoxAlign",
     inherited: false,
     type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-    alias_for: "align-items",
-    subproperties: [ "align-items" ],
+    alias_for: "-moz-box-align",
+    subproperties: [ "-moz-box-align" ],
   };
   gCSSProperties["-webkit-box-pack"] = {
     domProp: "webkitBoxPack",
     inherited: false,
     type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
-    alias_for: "justify-content",
-    subproperties: [ "justify-content" ],
+    alias_for: "-moz-box-pack",
+    subproperties: [ "-moz-box-pack" ],
   };
   gCSSProperties["-webkit-user-select"] = {
     domProp: "webkitUserSelect",
@@ -7391,6 +7426,30 @@ if (IsCSSPropertyPrefEnabled("layout.css.text-emphasis.enabled")) {
     invalid_values: [ "rubbish", "dot rubbish", "rubbish dot", "open rubbish", "rubbish open", "open filled", "dot circle",
                       "open '#'", "'#' filled", "dot '#'", "'#' circle", "1", "1 open", "open 1" ]
   };
+}
+
+if (IsCSSPropertyPrefEnabled("layout.css.background-clip-text.enabled")) {
+  gCSSProperties["background-clip"].other_values.push(
+    "text",
+    "content-box, text",
+    "text, border-box",
+    "text, text"
+  );
+  gCSSProperties["background"].other_values.push(
+    "url(404.png) green padding-box text",
+    "content-box text url(404.png) blue"
+  );
+} else {
+  gCSSProperties["background-clip"].invalid_values.push(
+    "text",
+    "content-box, text",
+    "text, border-box",
+    "text, text"
+  );
+  gCSSProperties["background"].invalid_values.push(
+    "url(404.png) green padding-box text",
+    "content-box text url(404.png) blue"
+  );
 }
 
 // Copy aliased properties' fields from their alias targets.

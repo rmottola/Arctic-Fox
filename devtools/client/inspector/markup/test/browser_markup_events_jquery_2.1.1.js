@@ -1,17 +1,18 @@
 /* vim: set ts=2 et sw=2 tw=80: */
 /* Any copyright is dedicated to the Public Domain.
  http://creativecommons.org/publicdomain/zero/1.0/ */
-
+/* import-globals-from helper_events_test_runner.js */
 "use strict";
 
 // Test that markup view event bubbles show the correct event info for jQuery
 // and jQuery Live events (jQuery version 2.1.1).
 
 const TEST_LIB = "lib_jquery_2.1.1_min.js";
-const TEST_URL = TEST_URL_ROOT + "doc_markup_events_jquery.html?" + TEST_LIB;
+const TEST_URL = URL_ROOT + "doc_markup_events_jquery.html?" + TEST_LIB;
 
 loadHelperScript("helper_events_test_runner.js");
 
+/*eslint-disable */
 const TEST_DATA = [
   {
     selector: "html",
@@ -104,7 +105,7 @@ const TEST_DATA = [
       },
       {
         type: "click",
-        filename: TEST_URL_ROOT + TEST_LIB + ":3",
+        filename: URL_ROOT + TEST_LIB + ":3",
         attributes: [
           "Bubbling",
           "DOM2"
@@ -125,7 +126,7 @@ const TEST_DATA = [
       },
       {
         type: "keydown",
-        filename: TEST_URL_ROOT + TEST_LIB + ":3",
+        filename: URL_ROOT + TEST_LIB + ":3",
         attributes: [
           "Bubbling",
           "DOM2"
@@ -186,5 +187,8 @@ const TEST_DATA = [
     ]
   },
 ];
+/*eslint-enable */
 
-add_task(runEventPopupTests);
+add_task(function* () {
+  yield runEventPopupTests(TEST_URL, TEST_DATA);
+});

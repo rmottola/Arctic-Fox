@@ -74,9 +74,10 @@ SwapScaleWidthHeightForRotation(IntSize& aSize, VideoInfo::Rotation aDegrees)
   }
 }
 
-nsVideoFrame::nsVideoFrame(nsStyleContext* aContext) :
-  nsContainerFrame(aContext)
+nsVideoFrame::nsVideoFrame(nsStyleContext* aContext)
+  : nsContainerFrame(aContext)
 {
+  EnableVisibilityTracking();
 }
 
 nsVideoFrame::~nsVideoFrame()
@@ -265,7 +266,7 @@ nsVideoFrame::BuildLayer(nsDisplayListBuilder* aBuilder,
   return result.forget();
 }
 
-class DispatchResizeToControls : public nsRunnable
+class DispatchResizeToControls : public Runnable
 {
 public:
   explicit DispatchResizeToControls(nsIContent* aContent)
@@ -347,7 +348,7 @@ nsVideoFrame::Reflow(nsPresContext*           aPresContext,
                                        aReflowState.ComputedWidth(),
                                        aReflowState.ComputedHeight()));
       if (child->GetSize() != size) {
-        RefPtr<nsRunnable> event = new DispatchResizeToControls(child->GetContent());
+        RefPtr<Runnable> event = new DispatchResizeToControls(child->GetContent());
         nsContentUtils::AddScriptRunner(event);
       }
     } else if (child->GetContent() == mCaptionDiv) {
@@ -609,7 +610,7 @@ nsVideoFrame::GetVideoIntrinsicSize(nsRenderingContext *aRenderingContext)
 
     // Ask the controls frame what its preferred height is
     nsBoxLayoutState boxState(PresContext(), aRenderingContext, 0);
-    nscoord prefHeight = mFrames.LastChild()->GetPrefSize(boxState).height;
+    nscoord prefHeight = mFrames.LastChild()->GetXULPrefSize(boxState).height;
     return nsSize(nsPresContext::CSSPixelsToAppUnits(size.width), prefHeight);
   }
 
@@ -657,6 +658,21 @@ nsVideoFrame::AttributeChanged(int32_t aNameSpaceID,
   return nsContainerFrame::AttributeChanged(aNameSpaceID,
                                             aAttribute,
                                             aModType);
+}
+
+void
+nsVideoFrame::OnVisibilityChange(Visibility aNewVisibility,
+                                 Maybe<OnNonvisible> aNonvisibleAction)
+{
+  nsCOMPtr<nsIImageLoadingContent> imageLoader = do_QueryInterface(mPosterImage);
+  if (!imageLoader) {
+    nsContainerFrame::OnVisibilityChange(aNewVisibility, aNonvisibleAction);
+    return;
+  }
+
+  imageLoader->OnVisibilityChange(aNewVisibility, aNonvisibleAction);
+
+  nsContainerFrame::OnVisibilityChange(aNewVisibility, aNonvisibleAction);
 }
 
 bool nsVideoFrame::HasVideoElement() {

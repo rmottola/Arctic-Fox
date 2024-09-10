@@ -21,7 +21,7 @@ class ServiceWorkerInfo;
 class ServiceWorkerRegistrationInfo;
 class KeepAliveToken;
 
-class LifeCycleEventCallback : public nsRunnable
+class LifeCycleEventCallback : public Runnable
 {
 public:
   // Called on the worker thread.
@@ -85,7 +85,8 @@ public:
                      nsIRunnable* aLoadFailure);
 
   nsresult
-  SendPushEvent(const Maybe<nsTArray<uint8_t>>& aData,
+  SendPushEvent(const nsAString& aMessageId,
+                const Maybe<nsTArray<uint8_t>>& aData,
                 ServiceWorkerRegistrationInfo* aRegistration);
 
   nsresult

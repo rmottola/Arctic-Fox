@@ -65,77 +65,80 @@ static const JSFunctionSpec exception_methods[] = {
     JS_FS_END
 };
 
-#define IMPLEMENT_ERROR_SUBCLASS_EXTRA_FLAGS(name, extraClassSpecFlags)  \
+static const ClassOps ErrorObjectClassOps = {
+    nullptr,                 /* addProperty */
+    nullptr,                 /* delProperty */
+    nullptr,                 /* getProperty */
+    nullptr,                 /* setProperty */
+    nullptr,                 /* enumerate */
+    nullptr,                 /* resolve */
+    nullptr,                 /* mayResolve */
+    exn_finalize,
+    nullptr,                 /* call        */
+    nullptr,                 /* hasInstance */
+    nullptr,                 /* construct   */
+    nullptr,                 /* trace       */
+};
+
+#define IMPLEMENT_ERROR_CLASS(name, classSpecPtr) \
     { \
         js_Error_str, /* yes, really */ \
         JSCLASS_HAS_CACHED_PROTO(JSProto_##name) | \
         JSCLASS_HAS_RESERVED_SLOTS(ErrorObject::RESERVED_SLOTS), \
-        nullptr,                 /* addProperty */ \
-        nullptr,                 /* delProperty */ \
-        nullptr,                 /* getProperty */ \
-        nullptr,                 /* setProperty */ \
-        nullptr,                 /* enumerate */ \
-        nullptr,                 /* resolve */ \
-        nullptr,                 /* mayResolve */ \
-        exn_finalize, \
-        nullptr,                 /* call        */ \
-        nullptr,                 /* hasInstance */ \
-        nullptr,                 /* construct   */ \
-        nullptr,                 /* trace       */ \
-        { \
-            ErrorObject::createConstructor, \
-            ErrorObject::createProto, \
-            nullptr, \
-            nullptr, \
-            exception_methods, \
-            exception_properties, \
-            nullptr, \
-            JSProto_Error | extraClassSpecFlags \
-        } \
+        &ErrorObjectClassOps, \
+        classSpecPtr \
     }
 
-#define IMPLEMENT_ERROR_SUBCLASS(name) \
-    IMPLEMENT_ERROR_SUBCLASS_EXTRA_FLAGS(name, 0)
+const ClassSpec
+ErrorObject::errorClassSpec_ = {
+    ErrorObject::createConstructor,
+    ErrorObject::createProto,
+    nullptr,
+    nullptr,
+    exception_methods,
+    exception_properties,
+    nullptr,
+    0
+};
+
+const ClassSpec
+ErrorObject::subErrorClassSpec_ = {
+    ErrorObject::createConstructor,
+    ErrorObject::createProto,
+    nullptr,
+    nullptr,
+    exception_methods,
+    exception_properties,
+    nullptr,
+    JSProto_Error
+};
+
+const ClassSpec
+ErrorObject::debuggeeWouldRunClassSpec_ = {
+    ErrorObject::createConstructor,
+    ErrorObject::createProto,
+    nullptr,
+    nullptr,
+    exception_methods,
+    exception_properties,
+    nullptr,
+    JSProto_Error | ClassSpec::DontDefineConstructor
+};
 
 const Class
 ErrorObject::classes[JSEXN_LIMIT] = {
-    {
-        js_Error_str,
-        JSCLASS_HAS_CACHED_PROTO(JSProto_Error) |
-        JSCLASS_HAS_RESERVED_SLOTS(ErrorObject::RESERVED_SLOTS),
-        nullptr,                 /* addProperty */
-        nullptr,                 /* delProperty */
-        nullptr,                 /* getProperty */
-        nullptr,                 /* setProperty */
-        nullptr,                 /* enumerate */
-        nullptr,                 /* resolve */
-        nullptr,                 /* mayResolve */
-        exn_finalize,
-        nullptr,                 /* call        */
-        nullptr,                 /* hasInstance */
-        nullptr,                 /* construct   */
-        nullptr,                 /* trace       */
-        {
-            ErrorObject::createConstructor,
-            ErrorObject::createProto,
-            nullptr,
-            nullptr,
-            exception_methods,
-            exception_properties,
-            nullptr
-        }
-    },
-    IMPLEMENT_ERROR_SUBCLASS(InternalError),
-    IMPLEMENT_ERROR_SUBCLASS(EvalError),
-    IMPLEMENT_ERROR_SUBCLASS(RangeError),
-    IMPLEMENT_ERROR_SUBCLASS(ReferenceError),
-    IMPLEMENT_ERROR_SUBCLASS(SyntaxError),
-    IMPLEMENT_ERROR_SUBCLASS(TypeError),
-    IMPLEMENT_ERROR_SUBCLASS(URIError),
+    IMPLEMENT_ERROR_CLASS(Error,          &ErrorObject::errorClassSpec_),
+    IMPLEMENT_ERROR_CLASS(InternalError,  &ErrorObject::subErrorClassSpec_),
+    IMPLEMENT_ERROR_CLASS(EvalError,      &ErrorObject::subErrorClassSpec_),
+    IMPLEMENT_ERROR_CLASS(RangeError,     &ErrorObject::subErrorClassSpec_),
+    IMPLEMENT_ERROR_CLASS(ReferenceError, &ErrorObject::subErrorClassSpec_),
+    IMPLEMENT_ERROR_CLASS(SyntaxError,    &ErrorObject::subErrorClassSpec_),
+    IMPLEMENT_ERROR_CLASS(TypeError,      &ErrorObject::subErrorClassSpec_),
+    IMPLEMENT_ERROR_CLASS(URIError,       &ErrorObject::subErrorClassSpec_),
 
     // DebuggeeWouldRun is a subclass of Error but is accessible via the
     // Debugger constructor, not the global.
-    IMPLEMENT_ERROR_SUBCLASS_EXTRA_FLAGS(DebuggeeWouldRun, ClassSpec::DontDefineConstructor),
+    IMPLEMENT_ERROR_CLASS(DebuggeeWouldRun, &ErrorObject::debuggeeWouldRunClassSpec_)
 };
 
 JSErrorReport*
@@ -302,7 +305,13 @@ js::ErrorFromException(JSContext* cx, HandleObject objArg)
     if (!obj->is<ErrorObject>())
         return nullptr;
 
-    return obj->as<ErrorObject>().getOrCreateErrorReport(cx);
+    JSErrorReport* report = obj->as<ErrorObject>().getOrCreateErrorReport(cx);
+    if (!report) {
+        MOZ_ASSERT(cx->isThrowingOutOfMemory());
+        cx->recoverFromOutOfMemory();
+    }
+
+    return report;
 }
 
 JS_PUBLIC_API(JSObject*)
@@ -664,7 +673,7 @@ js::ReportUncaughtException(JSContext* cx)
     cx->clearPendingException();
 
     ErrorReport err(cx);
-    if (!err.init(cx, exn)) {
+    if (!err.init(cx, exn, js::ErrorReport::WithSideEffects)) {
         cx->clearPendingException();
         return false;
     }
@@ -768,15 +777,23 @@ ErrorReport::ReportAddonExceptionToTelementry(JSContext* cx)
 }
 
 bool
-ErrorReport::init(JSContext* cx, HandleValue exn)
+ErrorReport::init(JSContext* cx, HandleValue exn,
+                  SniffingBehavior sniffingBehavior)
 {
     MOZ_ASSERT(!cx->isExceptionPending());
+    MOZ_ASSERT(!reportp);
 
     if (exn.isObject()) {
         // Because ToString below could error and an exception object could become
         // unrooted, we must root our exception object, if any.
         exnObject = &exn.toObject();
         reportp = ErrorFromException(cx, exnObject);
+
+        if (!reportp && sniffingBehavior == NoSideEffects) {
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
+                                 JSMSG_ERR_DURING_THROW);
+            return false;
+        }
 
         // Let's see if the exception is from add-on code, if so, it should be reported
         // to telementry.
@@ -1017,49 +1034,49 @@ JS::CreateError(JSContext* cx, JSExnType type, HandleObject stack, HandleString 
 const char*
 js::ValueToSourceForError(JSContext* cx, HandleValue val, JSAutoByteString& bytes)
 {
-    if (val.isUndefined()) {
+    if (val.isUndefined())
         return "undefined";
-    }
-    if (val.isNull()) {
+
+    if (val.isNull())
         return "null";
-    }
+
+    AutoClearPendingException acpe(cx);
 
     RootedString str(cx, JS_ValueToSource(cx, val));
-    if (!str) {
-        JS_ClearPendingException(cx);
+    if (!str)
         return "<<error converting value to string>>";
-    }
 
     StringBuffer sb(cx);
     if (val.isObject()) {
         RootedObject valObj(cx, val.toObjectOrNull());
         ESClassValue cls;
-        if (!GetBuiltinClass(cx, valObj, &cls)) {
-            JS_ClearPendingException(cx);
+        if (!GetBuiltinClass(cx, valObj, &cls))
             return "<<error determining class of value>>";
-        }
-        if (cls == ESClass_Array) {
-            sb.append("the array ");
-        } else if (cls == ESClass_ArrayBuffer) {
-            sb.append("the array buffer ");
-        } else if (JS_IsArrayBufferViewObject(valObj)) {
-            sb.append("the typed array ");
-        } else {
-            sb.append("the object ");
-        }
+        const char* s;
+        if (cls == ESClass_Array)
+            s = "the array ";
+        else if (cls == ESClass_ArrayBuffer)
+            s = "the array buffer ";
+        else if (JS_IsArrayBufferViewObject(valObj))
+            s = "the typed array ";
+        else
+            s = "the object ";
+        if (!sb.append(s, strlen(s)))
+            return "<<error converting value to string>>";
     } else if (val.isNumber()) {
-        sb.append("the number ");
+        if (!sb.append("the number "))
+            return "<<error converting value to string>>";
     } else if (val.isString()) {
-        sb.append("the string ");
+        if (!sb.append("the string "))
+            return "<<error converting value to string>>";
     } else {
         MOZ_ASSERT(val.isBoolean() || val.isSymbol());
         return bytes.encodeLatin1(cx, str);
     }
-    sb.append(str);
-    str = sb.finishString();
-    if (!str) {
-        JS_ClearPendingException(cx);
+    if (!sb.append(str))
         return "<<error converting value to string>>";
-    }
+    str = sb.finishString();
+    if (!str)
+        return "<<error converting value to string>>";
     return bytes.encodeLatin1(cx, str);
 }

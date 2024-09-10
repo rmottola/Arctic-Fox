@@ -31,32 +31,39 @@ ServoStyleSheet::IsApplicable() const
 bool
 ServoStyleSheet::HasRules() const
 {
-  MOZ_CRASH("stylo: not implemented");
+  return Servo_StyleSheetHasRules(RawSheet());
 }
 
 nsIDocument*
 ServoStyleSheet::GetOwningDocument() const
 {
-  NS_ERROR("stylo: GetOwningDocument not implemented, returning null");
-
-  return nullptr;
+  return mDocument;
 }
 
 void
 ServoStyleSheet::SetOwningDocument(nsIDocument* aDocument)
 {
-  MOZ_CRASH("stylo: not implemented");
+  // XXXheycam: Traverse to child ServoStyleSheets to set this, like
+  // CSSStyleSheet::SetOwningDocument does.
+
+  mDocument = aDocument;
 }
 
 StyleSheetHandle
 ServoStyleSheet::GetParentSheet() const
 {
+  // XXXheycam: When we implement support for child sheets, we'll have
+  // to fix SetOwningDocument to propagate the owning document down
+  // to the children.
   MOZ_CRASH("stylo: not implemented");
 }
 
 void
 ServoStyleSheet::AppendStyleSheet(StyleSheetHandle aSheet)
 {
+  // XXXheycam: When we implement support for child sheets, we'll have
+  // to fix SetOwningDocument to propagate the owning document down
+  // to the children.
   MOZ_CRASH("stylo: not implemented");
 }
 
@@ -72,7 +79,7 @@ ServoStyleSheet::ParseSheet(const nsAString& aInput,
 
   NS_ConvertUTF16toUTF8 input(aInput);
   mSheet = already_AddRefed<RawServoStyleSheet>(Servo_StylesheetFromUTF8Bytes(
-      reinterpret_cast<const uint8_t*>(input.get()), input.Length()));
+      reinterpret_cast<const uint8_t*>(input.get()), input.Length(), aParsingMode));
 }
 
 void

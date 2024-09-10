@@ -189,6 +189,7 @@
     _(Float32ToInt32)               \
     _(TruncateDToInt32)             \
     _(TruncateFToInt32)             \
+    _(WasmTruncateToInt32)          \
     _(WrapInt64ToInt32)             \
     _(ExtendInt32ToInt64)           \
     _(BooleanToString)              \
@@ -207,12 +208,16 @@
     _(OsrArgumentsObject)           \
     _(RegExp)                       \
     _(RegExpMatcher)                \
+    _(RegExpSearcher)               \
     _(RegExpTester)                 \
-    _(RegExpReplace)                \
+    _(RegExpPrototypeOptimizable)   \
+    _(RegExpInstanceOptimizable)    \
+    _(GetFirstDollarIndex)          \
     _(StringReplace)                \
     _(Substr)                       \
     _(BinarySharedStub)             \
     _(UnarySharedStub)              \
+    _(NullarySharedStub)            \
     _(Lambda)                       \
     _(LambdaArrow)                  \
     _(LambdaForSingleton)           \
@@ -265,7 +270,6 @@
     _(ArrayPopShiftT)               \
     _(ArrayPushV)                   \
     _(ArrayPushT)                   \
-    _(ArrayConcat)                  \
     _(ArraySlice)                   \
     _(ArrayJoin)                    \
     _(StoreElementHoleV)            \
@@ -346,12 +350,18 @@
     _(InterruptCheck)               \
     _(AsmJSInterruptCheck)          \
     _(AsmThrowUnreachable)          \
+    _(AsmReinterpret)               \
+    _(AsmReinterpretToI64)          \
+    _(AsmReinterpretFromI64)        \
+    _(Rotate)                       \
+    _(Rotate64)                     \
     _(GetDOMProperty)               \
     _(GetDOMMemberV)                \
     _(GetDOMMemberT)                \
     _(SetDOMProperty)               \
     _(CallDOMNative)                \
     _(IsCallable)                   \
+    _(IsConstructor)                \
     _(IsObject)                     \
     _(IsObjectAndBranch)            \
     _(HasClass)                     \

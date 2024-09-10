@@ -17,9 +17,7 @@ const EventEmitter = require("devtools/shared/event-emitter");
 const { CallWatcherFront } = require("devtools/server/actors/call-watcher");
 const { CanvasFront } = require("devtools/server/actors/canvas");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
-
-const Telemetry = require("devtools/client/shared/telemetry");
-const telemetry = new Telemetry();
+const { LocalizationHelper } = require("devtools/client/shared/l10n");
 
 const CANVAS_ACTOR_RECORDING_ATTEMPT = DevToolsUtils.testing ? 500 : 5000;
 
@@ -132,7 +130,6 @@ var EventsHandler = {
    * Listen for events emitted by the current tab target.
    */
   initialize: function() {
-    telemetry.toolOpened("canvasdebugger");
     this._onTabNavigated = this._onTabNavigated.bind(this);
     gTarget.on("will-navigate", this._onTabNavigated);
     gTarget.on("navigate", this._onTabNavigated);
@@ -142,7 +139,6 @@ var EventsHandler = {
    * Remove events emitted by the current tab target.
    */
   destroy: function() {
-    telemetry.toolClosed("canvasdebugger");
     gTarget.off("will-navigate", this._onTabNavigated);
     gTarget.off("navigate", this._onTabNavigated);
   },
@@ -180,8 +176,8 @@ var EventsHandler = {
 /**
  * Localization convenience methods.
  */
-var L10N = new ViewHelpers.L10N(STRINGS_URI);
-var SHARED_L10N = new ViewHelpers.L10N(SHARED_STRINGS_URI);
+var L10N = new LocalizationHelper(STRINGS_URI);
+var SHARED_L10N = new LocalizationHelper(SHARED_STRINGS_URI);
 
 /**
  * Convenient way of emitting events from the panel window.

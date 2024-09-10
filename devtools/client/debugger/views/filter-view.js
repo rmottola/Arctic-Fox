@@ -1,3 +1,5 @@
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -443,9 +445,11 @@ FilterView.prototype = {
       this._searchbox.value = aOperator + this.DebuggerView.editor.getSelection();
       return;
     }
-    if (SEARCH_AUTOFILL.indexOf(aOperator) != -1) {
+
+    let content = this.DebuggerView.editor.getText();
+    if (content.length < this.DebuggerView.LARGE_FILE_SIZE &&
+        SEARCH_AUTOFILL.indexOf(aOperator) != -1) {
       let cursor = this.DebuggerView.editor.getCursor();
-      let content = this.DebuggerView.editor.getText();
       let location = this.DebuggerView.Sources.selectedItem.attachment.source.url;
       let source = this.Parser.get(content, location);
       let identifier = source.getIdentifierAt({ line: cursor.line+1, column: cursor.ch });

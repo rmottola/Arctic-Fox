@@ -44,7 +44,7 @@ namespace layers {
  * being leaf nodes. Layer C is in the middle and has n+1 FrameMetrics, labelled
  * FM0...FMn. FM0 is the FrameMetrics you get by calling c->GetFrameMetrics(0)
  * and FMn is the FrameMetrics you can obtain by calling
- * c->GetFrameMetrics(c->GetFrameMetricsCount() - 1). This layer tree is
+ * c->GetFrameMetrics(c->GetScrollMetadataCount() - 1). This layer tree is
  * conceptually equivalent to this one below:
  *
  *                    +---+
@@ -113,8 +113,8 @@ namespace layers {
  * the wrapped layer as a void* for printf purposes.
  *
  * The implementation may look like it special-cases mIndex == 0 and/or
- * GetFrameMetricsCount() == 0. This is an artifact of the fact that both
- * mIndex and GetFrameMetricsCount() are uint32_t and GetFrameMetricsCount()
+ * GetScrollMetadataCount() == 0. This is an artifact of the fact that both
+ * mIndex and GetScrollMetadataCount() are uint32_t and GetScrollMetadataCount()
  * can return 0 but mIndex cannot store -1. This seems better than the
  * alternative of making mIndex a int32_t that can store -1, but then having
  * to cast to uint32_t all over the place.
@@ -142,7 +142,7 @@ public:
 
     switch (aStart) {
       case StartAt::TOP:
-        mIndex = mLayer->GetFrameMetricsCount();
+        mIndex = mLayer->GetScrollMetadataCount();
         if (mIndex > 0) {
           mIndex--;
         }
@@ -161,7 +161,7 @@ public:
     , mIndex(aMetricsIndex)
   {
     MOZ_ASSERT(mLayer);
-    MOZ_ASSERT(mIndex == 0 || mIndex < mLayer->GetFrameMetricsCount());
+    MOZ_ASSERT(mIndex == 0 || mIndex < mLayer->GetScrollMetadataCount());
   }
 
   bool IsValid() const
@@ -240,21 +240,26 @@ public:
     return LayerMetricsWrapper(nullptr);
   }
 
-  const FrameMetrics& Metrics() const
+  const ScrollMetadata& Metadata() const
   {
     MOZ_ASSERT(IsValid());
 
-    if (mIndex >= mLayer->GetFrameMetricsCount()) {
-      return FrameMetrics::sNullMetrics;
+    if (mIndex >= mLayer->GetScrollMetadataCount()) {
+      return *ScrollMetadata::sNullMetadata;
     }
-    return mLayer->GetFrameMetrics(mIndex);
+    return mLayer->GetScrollMetadata(mIndex);
+  }
+
+  const FrameMetrics& Metrics() const
+  {
+    return Metadata().GetMetrics();
   }
 
   AsyncPanZoomController* GetApzc() const
   {
     MOZ_ASSERT(IsValid());
 
-    if (mIndex >= mLayer->GetFrameMetricsCount()) {
+    if (mIndex >= mLayer->GetScrollMetadataCount()) {
       return nullptr;
     }
     return mLayer->GetAsyncPanZoomController(mIndex);
@@ -264,12 +269,12 @@ public:
   {
     MOZ_ASSERT(IsValid());
 
-    if (mLayer->GetFrameMetricsCount() == 0) {
+    if (mLayer->GetScrollMetadataCount() == 0) {
       MOZ_ASSERT(mIndex == 0);
       MOZ_ASSERT(aApzc == nullptr);
       return;
     }
-    MOZ_ASSERT(mIndex < mLayer->GetFrameMetricsCount());
+    MOZ_ASSERT(mIndex < mLayer->GetScrollMetadataCount());
     mLayer->SetAsyncPanZoomController(mIndex, aApzc);
   }
 
@@ -361,17 +366,22 @@ public:
     return region;
   }
 
-  const Maybe<ParentLayerIntRect>& GetClipRect() const
+  Maybe<ParentLayerIntRect> GetClipRect() const
   {
     MOZ_ASSERT(IsValid());
 
-    static const Maybe<ParentLayerIntRect> sNoClipRect = Nothing();
+    Maybe<ParentLayerIntRect> result;
 
+    // The layer can have a clip rect, which is considered to apply
+    // only to the bottommost LayerMetrics.
     if (AtBottomLayer()) {
-      return mLayer->GetClipRect();
+      result = mLayer->GetClipRect();
     }
 
-    return sNoClipRect;
+    // The scroll metadata can have a clip rect as well.
+    result = IntersectMaybeRects(result, Metadata().GetClipRect());
+
+    return result;
   }
 
   float GetPresShellResolution() const
@@ -418,6 +428,12 @@ public:
     }
   }
 
+  bool IsScrollbarContainer() const
+  {
+    MOZ_ASSERT(IsValid());
+    return mLayer->IsScrollbarContainer();
+  }
+
   // Expose an opaque pointer to the layer. Mostly used for printf
   // purposes. This is not intended to be a general-purpose accessor
   // for the underlying layer.
@@ -441,30 +457,30 @@ public:
 
   static const FrameMetrics& TopmostScrollableMetrics(Layer* aLayer)
   {
-    for (uint32_t i = aLayer->GetFrameMetricsCount(); i > 0; i--) {
+    for (uint32_t i = aLayer->GetScrollMetadataCount(); i > 0; i--) {
       if (aLayer->GetFrameMetrics(i - 1).IsScrollable()) {
         return aLayer->GetFrameMetrics(i - 1);
       }
     }
-    return FrameMetrics::sNullMetrics;
+    return ScrollMetadata::sNullMetadata->GetMetrics();
   }
 
   static const FrameMetrics& BottommostScrollableMetrics(Layer* aLayer)
   {
-    for (uint32_t i = 0; i < aLayer->GetFrameMetricsCount(); i++) {
+    for (uint32_t i = 0; i < aLayer->GetScrollMetadataCount(); i++) {
       if (aLayer->GetFrameMetrics(i).IsScrollable()) {
         return aLayer->GetFrameMetrics(i);
       }
     }
-    return FrameMetrics::sNullMetrics;
+    return ScrollMetadata::sNullMetadata->GetMetrics();
   }
 
   static const FrameMetrics& BottommostMetrics(Layer* aLayer)
   {
-    if (aLayer->GetFrameMetricsCount() > 0) {
+    if (aLayer->GetScrollMetadataCount() > 0) {
       return aLayer->GetFrameMetrics(0);
     }
-    return FrameMetrics::sNullMetrics;
+    return ScrollMetadata::sNullMetadata->GetMetrics();
   }
 
 private:
@@ -475,7 +491,7 @@ private:
 
   bool AtTopLayer() const
   {
-    return mLayer->GetFrameMetricsCount() == 0 || mIndex == mLayer->GetFrameMetricsCount() - 1;
+    return mLayer->GetScrollMetadataCount() == 0 || mIndex == mLayer->GetScrollMetadataCount() - 1;
   }
 
 private:

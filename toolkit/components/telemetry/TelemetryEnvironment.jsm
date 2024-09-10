@@ -35,6 +35,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "ProfileAge",
                                   "resource://gre/modules/ProfileAge.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
                                   "resource://gre/modules/UpdateUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "WindowsRegistry",
+                                  "resource://gre/modules/WindowsRegistry.jsm");
 
 const CHANGE_THROTTLE_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -116,6 +118,7 @@ const DEFAULT_ENVIRONMENT_PREFS = new Map([
   ["browser.search.suggest.enabled", {what: RECORD_PREF_VALUE}],
   ["browser.startup.homepage", {what: RECORD_PREF_STATE}],
   ["browser.startup.page", {what: RECORD_PREF_VALUE}],
+  ["browser.tabs.animate", {what: RECORD_PREF_VALUE}],
   ["browser.urlbar.suggest.searches", {what: RECORD_PREF_VALUE}],
   ["browser.urlbar.unifiedcomplete", {what: RECORD_PREF_VALUE}],
   ["browser.urlbar.userMadeSearchSuggestionsChoice", {what: RECORD_PREF_VALUE}],
@@ -125,6 +128,7 @@ const DEFAULT_ENVIRONMENT_PREFS = new Map([
   ["dom.ipc.plugins.asyncInit.enabled", {what: RECORD_PREF_VALUE}],
   ["dom.ipc.plugins.enabled", {what: RECORD_PREF_VALUE}],
   ["dom.ipc.processCount", {what: RECORD_PREF_VALUE, requiresRestart: true}],
+  ["dom.max_script_run_time", {what: RECORD_PREF_VALUE}],
   ["experiments.manifest.uri", {what: RECORD_PREF_VALUE}],
   ["extensions.autoDisableScopes", {what: RECORD_PREF_VALUE}],
   ["extensions.enabledScopes", {what: RECORD_PREF_VALUE}],
@@ -146,7 +150,7 @@ const DEFAULT_ENVIRONMENT_PREFS = new Map([
   ["layers.componentalpha.enabled", {what: RECORD_PREF_VALUE}],
   ["layers.d3d11.disable-warp", {what: RECORD_PREF_VALUE}],
   ["layers.d3d11.force-warp", {what: RECORD_PREF_VALUE}],
-  ["layers.offmainthreadcomposition.enabled", {what: RECORD_PREF_VALUE}],
+  ["layers.offmainthreadcomposition.force-disabled", {what: RECORD_PREF_VALUE}],
   ["layers.prefer-d3d9", {what: RECORD_PREF_VALUE}],
   ["layers.prefer-opengl", {what: RECORD_PREF_VALUE}],
   ["layout.css.devPixelsPerPx", {what: RECORD_PREF_VALUE}],
@@ -176,6 +180,7 @@ const PREF_PARTNER_ID = "mozilla.partner.id";
 const PREF_UPDATE_ENABLED = "app.update.enabled";
 const PREF_UPDATE_AUTODOWNLOAD = "app.update.auto";
 const PREF_SEARCH_COHORT = "browser.search.cohort";
+const PREF_E10S_COHORT = "e10s.rollout.cohort";
 
 const EXPERIMENTS_CHANGED_TOPIC = "experiments-changed";
 const SEARCH_ENGINE_MODIFIED_TOPIC = "browser-search-engine-modified";
@@ -264,7 +269,7 @@ function getGfxField(aPropertyName, aDefault) {
   try {
     // Accessing the field may throw if |aPropertyName| does not exist.
     let gfxProp = gfxInfo[aPropertyName];
-    if (gfxProp !== "") {
+    if (gfxProp !== undefined && gfxProp !== "") {
       return gfxProp;
     }
   } catch (e) {}
@@ -314,16 +319,17 @@ function getGfxAdapter(aSuffix = "") {
 }
 
 /**
- * Gets the service pack information on Windows platforms. This was copied from
- * nsUpdateService.js.
+ * Gets the service pack and build information on Windows platforms. The initial version
+ * was copied from nsUpdateService.js.
  *
- * @return An object containing the service pack major and minor versions.
+ * @return An object containing the service pack major and minor versions, along with the
+ *         build number.
  */
-function getServicePack() {
-  const UNKNOWN_SERVICE_PACK = {major: null, minor: null};
+function getWindowsVersionInfo() {
+  const UNKNOWN_VERSION_INFO = {servicePackMajor: null, servicePackMinor: null, buildNumber: null};
 
   if (AppConstants.platform !== "win") {
-    return UNKNOWN_SERVICE_PACK;
+    return UNKNOWN_VERSION_INFO;
   }
 
   const BYTE = ctypes.uint8_t;
@@ -364,11 +370,12 @@ function getServicePack() {
     }
 
     return {
-      major: winVer.wServicePackMajor,
-      minor: winVer.wServicePackMinor,
+      servicePackMajor: winVer.wServicePackMajor,
+      servicePackMinor: winVer.wServicePackMinor,
+      buildNumber: winVer.dwBuildNumber,
     };
   } catch (e) {
-    return UNKNOWN_SERVICE_PACK;
+    return UNKNOWN_VERSION_INFO;
   } finally {
     kernel32.close();
   }
@@ -505,7 +512,8 @@ EnvironmentAddonBuilder.prototype = {
     };
 
     let result = {
-      changed: !ObjectUtils.deepEqual(addons, this._environment._currentEnvironment.addons),
+      changed: !this._environment._currentEnvironment.addons ||
+               !ObjectUtils.deepEqual(addons, this._environment._currentEnvironment.addons),
     };
 
     if (result.changed) {
@@ -1110,6 +1118,7 @@ EnvironmentCache.prototype = {
     this._currentEnvironment.settings = {
       blocklistEnabled: Preferences.get(PREF_BLOCKLIST_ENABLED, true),
       e10sEnabled: Services.appinfo.browserTabsRemoteAutostart,
+      e10sCohort: Preferences.get(PREF_E10S_COHORT, "unknown"),
       telemetryEnabled: Utils.isTelemetryEnabled,
       locale: getBrowserLocale(),
       update: {
@@ -1238,9 +1247,23 @@ EnvironmentCache.prototype = {
     if (["gonk", "android"].includes(AppConstants.platform)) {
       data.kernelVersion = getSysinfoProperty("kernel_version", null);
     } else if (AppConstants.platform === "win") {
-      let servicePack = getServicePack();
-      data.servicePackMajor = servicePack.major;
-      data.servicePackMinor = servicePack.minor;
+      // The path to the "UBR" key, queried to get additional version details on Windows.
+      const WINDOWS_UBR_KEY_PATH = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
+
+      let versionInfo = getWindowsVersionInfo();
+      data.servicePackMajor = versionInfo.servicePackMajor;
+      data.servicePackMinor = versionInfo.servicePackMinor;
+      // We only need the build number and UBR if we're at or above Windows 10.
+      if (typeof(data.version) === 'string' &&
+          Services.vc.compare(data.version, "10") >= 0) {
+        data.windowsBuildNumber = versionInfo.buildNumber;
+        // Query the UBR key and only add it to the environment if it's available.
+        // |readRegKey| doesn't throw, but rather returns 'undefined' on error.
+        let ubr = WindowsRegistry.readRegKey(Ci.nsIWindowsRegKey.ROOT_KEY_LOCAL_MACHINE,
+                                             WINDOWS_UBR_KEY_PATH, "UBR",
+                                             Ci.nsIWindowsRegKey.WOW64_64);
+        data.windowsUBR = (ubr !== undefined) ? ubr : null;
+      }
       data.installYear = getSysinfoProperty("installYear", null);
     }
 
@@ -1314,7 +1337,7 @@ EnvironmentCache.prototype = {
     this._log.trace("_getGFXData - Two display adapters detected.");
 
     gfxData.adapters.push(getGfxAdapter("2"));
-    gfxData.adapters[1].GPUActive = getGfxField("isGPU2Active ", null);
+    gfxData.adapters[1].GPUActive = getGfxField("isGPU2Active", null);
 
     return gfxData;
   },

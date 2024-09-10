@@ -33,7 +33,10 @@ const NORMAL_FONT_SIZE = 12;
 const SCRATCHPAD_L10N = "chrome://devtools/locale/scratchpad.properties";
 const DEVTOOLS_CHROME_ENABLED = "devtools.chrome.enabled";
 const PREF_RECENT_FILES_MAX = "devtools.scratchpad.recentFilesMax";
+const SHOW_LINE_NUMBERS = "devtools.scratchpad.lineNumbers";
+const WRAP_TEXT = "devtools.scratchpad.wrapText";
 const SHOW_TRAILING_SPACE = "devtools.scratchpad.showTrailingSpace";
+const EDITOR_FONT_SIZE = "devtools.scratchpad.editorFontSize";
 const ENABLE_AUTOCOMPLETION = "devtools.scratchpad.enableAutocompletion";
 const TAB_SIZE = "devtools.editor.tabsize";
 const FALLBACK_CHARSET_LIST = "intl.fallbackCharsetList.ISO-8859-1";
@@ -42,7 +45,6 @@ const VARIABLES_VIEW_URL = "chrome://devtools/content/shared/widgets/VariablesVi
 
 const {require, loader} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 
-const Telemetry = require("devtools/client/shared/telemetry");
 const Editor    = require("devtools/client/sourceeditor/editor");
 const TargetFactory = require("devtools/client/framework/target").TargetFactory;
 const EventEmitter = require("devtools/shared/event-emitter");
@@ -78,6 +80,7 @@ loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
 loader.lazyRequireGetter(this, "DebuggerClient", "devtools/shared/client/main", true);
 loader.lazyRequireGetter(this, "EnvironmentClient", "devtools/shared/client/main", true);
 loader.lazyRequireGetter(this, "ObjectClient", "devtools/shared/client/main", true);
+loader.lazyRequireGetter(this, "HUDService", "devtools/client/webconsole/hudservice");
 
 XPCOMUtils.defineLazyGetter(this, "REMOTE_TIMEOUT", () =>
   Services.prefs.getIntPref("devtools.debugger.remote-timeout"));
@@ -87,11 +90,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "ShortcutUtils",
 
 XPCOMUtils.defineLazyModuleGetter(this, "Reflect",
   "resource://gre/modules/reflect.jsm");
-
-// Because we have no constructor / destructor where we can log metrics we need
-// to do so here.
-var telemetry = new Telemetry();
-telemetry.toolOpened("scratchpad");
 
 var WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
 
@@ -228,13 +226,13 @@ var Scratchpad = {
         Scratchpad.sidebar.hide();
       },
       "sp-cmd-line-numbers": () => {
-        Scratchpad.toggleEditorOption('lineNumbers');
+        Scratchpad.toggleEditorOption('lineNumbers', SHOW_LINE_NUMBERS);
       },
       "sp-cmd-wrap-text": () => {
-        Scratchpad.toggleEditorOption('lineWrapping');
+        Scratchpad.toggleEditorOption('lineWrapping', WRAP_TEXT);
       },
       "sp-cmd-highlight-trailing-space": () => {
-        Scratchpad.toggleEditorOption('showTrailingSpace');
+        Scratchpad.toggleEditorOption('showTrailingSpace', SHOW_TRAILING_SPACE);
       },
       "sp-cmd-larger-font": () => {
         Scratchpad.increaseFontSize();
@@ -252,6 +250,39 @@ var Scratchpad = {
       if (elem) {
         elem.addEventListener("command", commands[command]);
       }
+    }
+  },
+
+  /**
+   * Check or uncheck view menu items according to stored preferences.
+   */
+  _updateViewMenuItems: function SP_updateViewMenuItems() {
+    this._updateViewMenuItem(SHOW_LINE_NUMBERS, "sp-menu-line-numbers");
+    this._updateViewMenuItem(WRAP_TEXT, "sp-menu-word-wrap");
+    this._updateViewMenuItem(SHOW_TRAILING_SPACE, "sp-menu-highlight-trailing-space");
+    this._updateViewFontMenuItem(MINIMUM_FONT_SIZE, "sp-cmd-smaller-font");
+    this._updateViewFontMenuItem(MAXIMUM_FONT_SIZE, "sp-cmd-larger-font");
+  },
+
+  /**
+   * Check or uncheck view menu item according to stored preferences.
+   */
+  _updateViewMenuItem: function SP_updateViewMenuItem(preferenceName, menuId) {
+    let checked = Services.prefs.getBoolPref(preferenceName);
+    if (checked) {
+        document.getElementById(menuId).setAttribute('checked', true);
+    } else {
+        document.getElementById(menuId).removeAttribute('checked');
+    }
+  },
+
+  /**
+   * Disable view menu item if the stored font size is equals to the given one.
+   */
+  _updateViewFontMenuItem: function SP_updateViewFontMenuItem(fontSize, commandId) {
+    let prefFontSize = Services.prefs.getIntPref(EDITOR_FONT_SIZE);
+    if (prefFontSize === fontSize) {
+      document.getElementById(commandId).setAttribute('disabled', true);
     }
   },
 
@@ -1126,6 +1157,7 @@ var Scratchpad = {
     let channel = NetUtil.newChannel({
       uri: NetUtil.newURI(aFile),
       loadingNode: window.document,
+      securityFlags: Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_INHERITS,
       contentPolicyType: Ci.nsIContentPolicy.TYPE_OTHER});
     channel.contentType = "application/javascript";
 
@@ -1555,7 +1587,7 @@ var Scratchpad = {
    */
   openErrorConsole: function SP_openErrorConsole()
   {
-    this.browserWindow.HUDService.toggleBrowserConsole();
+    HUDService.toggleBrowserConsole();
   },
 
   /**
@@ -1682,16 +1714,19 @@ var Scratchpad = {
     let config = {
       mode: Editor.modes.js,
       value: initialText,
-      lineNumbers: true,
+      lineNumbers: Services.prefs.getBoolPref(SHOW_LINE_NUMBERS),
       contextMenu: "scratchpad-text-popup",
       showTrailingSpace: Services.prefs.getBoolPref(SHOW_TRAILING_SPACE),
       autocomplete: Services.prefs.getBoolPref(ENABLE_AUTOCOMPLETION),
+      lineWrapping: Services.prefs.getBoolPref(WRAP_TEXT),
     };
 
     this.editor = new Editor(config);
     let editorElement = document.querySelector("#scratchpad-editor");
     this.editor.appendTo(editorElement).then(() => {
       var lines = initialText.split("\n");
+
+      this.editor.setFontSize(Services.prefs.getIntPref(EDITOR_FONT_SIZE));
 
       this.editor.on("change", this._onChanged);
       // Keep a reference to the bound version for use in onUnload.
@@ -1718,6 +1753,7 @@ var Scratchpad = {
       CloseObserver.init();
     }).then(null, (err) => console.error(err));
     this._setupCommandListeners();
+    this._updateViewMenuItems();
     this._setupPopupShowingListeners();
   },
 
@@ -1898,10 +1934,11 @@ var Scratchpad = {
   /**
    * Toggle a editor's boolean option.
    */
-  toggleEditorOption: function SP_toggleEditorOption(optionName)
+  toggleEditorOption: function SP_toggleEditorOption(optionName, optionPreference)
   {
     let newOptionValue = !this.editor.getOption(optionName);
     this.editor.setOption(optionName, newOptionValue);
+    Services.prefs.setBoolPref(optionPreference, newOptionValue);
   },
 
   /**
@@ -1912,7 +1949,15 @@ var Scratchpad = {
     let size = this.editor.getFontSize();
 
     if (size < MAXIMUM_FONT_SIZE) {
-      this.editor.setFontSize(size + 1);
+      let newFontSize = size + 1;
+      this.editor.setFontSize(newFontSize);
+      Services.prefs.setIntPref(EDITOR_FONT_SIZE, newFontSize);
+
+      if (newFontSize === MAXIMUM_FONT_SIZE) {
+        document.getElementById("sp-cmd-larger-font").setAttribute('disabled', true);
+      }
+
+      document.getElementById("sp-cmd-smaller-font").removeAttribute('disabled');
     }
   },
 
@@ -1924,8 +1969,16 @@ var Scratchpad = {
     let size = this.editor.getFontSize();
 
     if (size > MINIMUM_FONT_SIZE) {
-      this.editor.setFontSize(size - 1);
+      let newFontSize = size - 1;
+      this.editor.setFontSize(newFontSize);
+      Services.prefs.setIntPref(EDITOR_FONT_SIZE, newFontSize);
+
+      if (newFontSize === MINIMUM_FONT_SIZE) {
+        document.getElementById("sp-cmd-smaller-font").setAttribute('disabled', true);
+      }
     }
+
+    document.getElementById("sp-cmd-larger-font").removeAttribute('disabled');
   },
 
   /**
@@ -1934,6 +1987,10 @@ var Scratchpad = {
   normalFontSize: function SP_normalFontSize()
   {
     this.editor.setFontSize(NORMAL_FONT_SIZE);
+    Services.prefs.setIntPref(EDITOR_FONT_SIZE, NORMAL_FONT_SIZE);
+
+    document.getElementById("sp-cmd-larger-font").removeAttribute('disabled');
+    document.getElementById("sp-cmd-smaller-font").removeAttribute('disabled');
   },
 
   _observers: [],

@@ -90,7 +90,6 @@ function InspectorPanel(iframeWindow, toolbox) {
   this.onNewSelection = this.onNewSelection.bind(this);
   this.onBeforeNewSelection = this.onBeforeNewSelection.bind(this);
   this.onDetached = this.onDetached.bind(this);
-  this.onToolboxHostChanged = this.onToolboxHostChanged.bind(this);
   this.onPaneToggleButtonClicked = this.onPaneToggleButtonClicked.bind(this);
   this._onMarkupFrameLoad = this._onMarkupFrameLoad.bind(this);
 
@@ -166,8 +165,6 @@ InspectorPanel.prototype = {
     this.selection.on("detached-front", this.onDetached);
 
     this.breadcrumbs = new HTMLBreadcrumbs(this);
-
-    this._toolbox.on("host-changed", this.onToolboxHostChanged);
 
     if (this.target.isLocalTab) {
       // Show a warning when the debugger is paused.
@@ -386,7 +383,6 @@ InspectorPanel.prototype = {
     this._paneToggleButton = this.panelDoc.getElementById("inspector-pane-toggle");
     this._paneToggleButton.addEventListener("mousedown",
       this.onPaneToggleButtonClicked);
-    this.updatePaneToggleButton();
   },
 
   /**
@@ -504,7 +500,7 @@ InspectorPanel.prototype = {
 
     if (!this._updateProgress) {
       // Start an update in progress.
-      var self = this;
+      let self = this;
       this._updateProgress = {
         node: this.selection.nodeFront,
         outstanding: new Set(),
@@ -512,7 +508,9 @@ InspectorPanel.prototype = {
           if (this !== self._updateProgress) {
             return;
           }
-          if (this.node !== self.selection.nodeFront) {
+          // Cancel update if there is no `selection` anymore.
+          // It can happen if the inspector panel is already destroyed.
+          if (!self.selection || (this.node !== self.selection.nodeFront)) {
             self.cancelUpdate();
             return;
           }
@@ -582,7 +580,6 @@ InspectorPanel.prototype = {
     this.target.off("thread-paused", this.updateDebuggerPausedWarning);
     this.target.off("thread-resumed", this.updateDebuggerPausedWarning);
     this._toolbox.off("select", this.updateDebuggerPausedWarning);
-    this._toolbox.off("host-changed", this.onToolboxHostChanged);
 
     if (this.ruleview) {
       this.ruleview.destroy();
@@ -680,6 +677,9 @@ InspectorPanel.prototype = {
                              !this.selection.isPseudoElementNode();
     let isEditableElement = isSelectionElement &&
                             !this.selection.isAnonymousNode();
+    let isDuplicatableElement = isSelectionElement &&
+                                !this.selection.isAnonymousNode() &&
+                                !this.selection.isRoot();
     let isScreenshotable = isSelectionElement &&
                            this.canGetUniqueSelector &&
                            this.selection.nodeFront.isTreeDisplayed;
@@ -709,6 +709,7 @@ InspectorPanel.prototype = {
     // "Copy outer HTML", "Scroll Into View" & "Screenshot Node" as appropriate
     let unique = this.panelDoc.getElementById("node-menu-copyuniqueselector");
     let screenshot = this.panelDoc.getElementById("node-menu-screenshotnode");
+    let duplicateNode = this.panelDoc.getElementById("node-menu-duplicatenode");
     let copyInnerHTML = this.panelDoc.getElementById("node-menu-copyinner");
     let copyOuterHTML = this.panelDoc.getElementById("node-menu-copyouter");
     let scrollIntoView = this.panelDoc.getElementById("node-menu-scrollnodeintoview");
@@ -725,9 +726,19 @@ InspectorPanel.prototype = {
       expandAll.removeAttribute("disabled");
     }
 
+    this._target.actorHasMethod("domwalker", "duplicateNode").then(value => {
+      duplicateNode.hidden = !value;
+    });
     this._target.actorHasMethod("domnode", "scrollIntoView").then(value => {
       scrollIntoView.hidden = !value;
     });
+
+    if (isDuplicatableElement) {
+      duplicateNode.removeAttribute("disabled");
+    }
+    else {
+      duplicateNode.setAttribute("disabled", "true");
+    }
 
     if (isSelectionElement) {
       unique.removeAttribute("disabled");
@@ -966,13 +977,6 @@ InspectorPanel.prototype = {
   },
 
   /**
-   * When the type of toolbox host changes.
-   */
-  onToolboxHostChanged: function() {
-    this.updatePaneToggleButton();
-  },
-
-  /**
    * When the pane toggle button is clicked, toggle the pane, change the button
    * state and tooltip.
    */
@@ -981,10 +985,16 @@ InspectorPanel.prototype = {
     let button = this._paneToggleButton;
     let isVisible = !button.hasAttribute("pane-collapsed");
 
-    // Make sure the sidebar has a width attribute before collapsing because
-    // ViewHelpers needs it.
-    if (isVisible && !sidePane.hasAttribute("width")) {
-      sidePane.setAttribute("width", sidePane.getBoundingClientRect().width);
+    // Make sure the sidebar has width and height attributes before collapsing
+    // because ViewHelpers needs it.
+    if (isVisible) {
+      let rect = sidePane.getBoundingClientRect();
+      if (!sidePane.hasAttribute("width")) {
+        sidePane.setAttribute("width", rect.width);
+      }
+      // always refresh the height attribute before collapsing, it could have
+      // been modified by resizing the container.
+      sidePane.setAttribute("height", rect.height);
     }
 
     ViewHelpers.togglePane({
@@ -1000,14 +1010,6 @@ InspectorPanel.prototype = {
       button.removeAttribute("pane-collapsed");
       button.setAttribute("tooltiptext", strings.GetStringFromName("inspector.collapsePane"));
     }
-  },
-
-  /**
-   * Update the pane toggle button visibility depending on the toolbox host type.
-   */
-  updatePaneToggleButton: function() {
-    this._paneToggleButton.setAttribute("hidden",
-      this._toolbox.hostType === HostType.SIDE);
   },
 
   /**
@@ -1237,6 +1239,20 @@ InspectorPanel.prototype = {
     }
 
     this.selection.nodeFront.scrollIntoView();
+  },
+
+  /**
+   * Duplicate the selected node
+   */
+  duplicateNode: function() {
+    let selection = this.selection;
+    if (!selection.isElementNode() ||
+        selection.isRoot() ||
+        selection.isAnonymousNode() ||
+        selection.isPseudoElementNode()) {
+      return;
+    }
+    this.walker.duplicateNode(selection.nodeFront).catch(e => console.error(e));
   },
 
   /**

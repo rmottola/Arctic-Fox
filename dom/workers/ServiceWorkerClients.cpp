@@ -60,7 +60,7 @@ ServiceWorkerClients::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenPro
 
 namespace {
 
-class GetRunnable final : public nsRunnable
+class GetRunnable final : public Runnable
 {
   class ResolvePromiseWorkerRunnable final : public WorkerRunnable
   {
@@ -142,7 +142,7 @@ public:
   }
 };
 
-class MatchAllRunnable final : public nsRunnable
+class MatchAllRunnable final : public Runnable
 {
   class ResolvePromiseWorkerRunnable final : public WorkerRunnable
   {
@@ -256,7 +256,7 @@ public:
   }
 };
 
-class ClaimRunnable final : public nsRunnable
+class ClaimRunnable final : public Runnable
 {
   RefPtr<PromiseWorkerProxy> mPromiseProxy;
   nsCString mScope;
@@ -469,7 +469,7 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(WebProgressListener)
   NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
 NS_INTERFACE_MAP_END
 
-class OpenWindowRunnable final : public nsRunnable
+class OpenWindowRunnable final : public Runnable
 {
   RefPtr<PromiseWorkerProxy> mPromiseProxy;
   nsString mUrl;
@@ -502,6 +502,11 @@ public:
     nsresult rv = OpenWindow(getter_AddRefs(window));
     if (NS_SUCCEEDED(rv)) {
       MOZ_ASSERT(window);
+
+      rv = nsContentUtils::DispatchFocusChromeEvent(window);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        return rv;
+      }
 
       WorkerPrivate* workerPrivate = mPromiseProxy->GetWorkerPrivate();
       MOZ_ASSERT(workerPrivate);
@@ -601,7 +606,7 @@ private:
                            spec.get(),
                            nullptr,
                            nullptr,
-                           false, false, true, nullptr, nullptr, nullptr,
+                           false, false, true, nullptr, nullptr, nullptr, 1.0f, 0,
                            getter_AddRefs(newWindow));
       nsCOMPtr<nsPIDOMWindowOuter> pwindow = nsPIDOMWindowOuter::From(newWindow);
       pwindow.forget(aWindow);
@@ -670,7 +675,7 @@ ServiceWorkerClients::Get(const nsAString& aClientId, ErrorResult& aRv)
 
   RefPtr<GetRunnable> r =
     new GetRunnable(promiseProxy, aClientId);
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(r)));
+  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(r));
   return promise.forget();
 }
 
@@ -706,7 +711,7 @@ ServiceWorkerClients::MatchAll(const ClientQueryOptions& aOptions,
     new MatchAllRunnable(promiseProxy,
                          NS_ConvertUTF16toUTF8(scope),
                          aOptions.mIncludeUncontrolled);
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(r)));
+  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(r));
   return promise.forget();
 }
 
@@ -747,7 +752,7 @@ ServiceWorkerClients::OpenWindow(const nsAString& aUrl,
 
   RefPtr<OpenWindowRunnable> r = new OpenWindowRunnable(promiseProxy,
                                                           aUrl, scope);
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(r)));
+  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(r));
 
   return promise.forget();
 }
@@ -776,6 +781,6 @@ ServiceWorkerClients::Claim(ErrorResult& aRv)
   RefPtr<ClaimRunnable> runnable =
     new ClaimRunnable(promiseProxy, NS_ConvertUTF16toUTF8(scope));
 
-  MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(runnable)));
+  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable));
   return promise.forget();
 }

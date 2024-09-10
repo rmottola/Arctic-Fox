@@ -81,7 +81,7 @@ internalIntlRegExps.currencyDigitsRE = null;
 function getUnicodeLocaleExtensionSequenceRE() {
     return internalIntlRegExps.unicodeLocaleExtensionSequenceRE ||
            (internalIntlRegExps.unicodeLocaleExtensionSequenceRE =
-            regexp_construct_no_statics("-u(?:-[a-z0-9]{2,8})+"));
+            regexp_construct("-u(?:-[a-z0-9]{2,8})+"));
 }
 
 
@@ -106,7 +106,7 @@ function removeUnicodeExtensions(locale) {
     var extensions;
     var unicodeLocaleExtensionSequenceRE = getUnicodeLocaleExtensionSequenceRE();
     while ((extensions = regexp_exec_no_statics(unicodeLocaleExtensionSequenceRE, left)) !== null) {
-        left = callFunction(std_String_replace, left, extensions[0], "");
+        left = callFunction(String_replace, left, extensions[0], "");
         unicodeLocaleExtensionSequenceRE.lastIndex = 0;
     }
 
@@ -215,8 +215,7 @@ function getLanguageTagRE() {
     var languageTag = "^(?:" + langtag + "|" + privateuse + "|" + grandfathered + ")$";
 
     // Language tags are case insensitive (RFC 5646 section 2.1.1).
-    return (internalIntlRegExps.languageTagRE =
-            regexp_construct_no_statics(languageTag, "i"));
+    return (internalIntlRegExps.languageTagRE = regexp_construct(languageTag, "i"));
 }
 
 
@@ -262,8 +261,7 @@ function getDuplicateVariantRE() {
     // regular expression to address this.  (Note that there's no worry about
     // case transformation accepting invalid characters here: users have
     // already verified the string is alphanumeric Latin plus "-".)
-    return (internalIntlRegExps.duplicateVariantRE =
-            regexp_construct_no_statics(duplicateVariant, "i"));
+    return (internalIntlRegExps.duplicateVariantRE = regexp_construct(duplicateVariant, "i"));
 }
 
 
@@ -308,8 +306,7 @@ function getDuplicateSingletonRE() {
     // expression to address this.  (Note that there's no worry about case
     // transformation accepting invalid characters here: users have already
     // verified the string is alphanumeric Latin plus "-".)
-    return (internalIntlRegExps.duplicateSingletonRE =
-            regexp_construct_no_statics(duplicateSingleton, "i"));
+    return (internalIntlRegExps.duplicateSingletonRE = regexp_construct(duplicateSingleton, "i"));
 }
 
 
@@ -381,7 +378,7 @@ function CanonicalizeLanguageTag(locale) {
     if (callFunction(std_Object_hasOwnProperty, langTagMappings, locale))
         return langTagMappings[locale];
 
-    var subtags = callFunction(std_String_split, locale, "-");
+    var subtags = StringSplitString(ToString(locale), "-");
     var i = 0;
 
     // Handle the standard part: All subtags before the first singleton or "x".
@@ -614,8 +611,7 @@ function DefaultLocale() {
  */
 function getIsWellFormedCurrencyCodeRE() {
     return internalIntlRegExps.isWellFormedCurrencyCodeRE ||
-           (internalIntlRegExps.isWellFormedCurrencyCodeRE =
-            regexp_construct_no_statics("[^A-Z]"));
+           (internalIntlRegExps.isWellFormedCurrencyCodeRE = regexp_construct("[^A-Z]"));
 }
 function IsWellFormedCurrencyCode(currency) {
     var c = ToString(currency);
@@ -841,7 +837,7 @@ function ResolveLocale(availableLocales, requestedLocales, options, relevantExte
         extensionIndex = r.extensionIndex;
 
         // Steps 5.d-e.
-        extensionSubtags = callFunction(std_String_split, extension, "-");
+        extensionSubtags = StringSplitString(ToString(extension), "-");
         extensionSubtagsLength = extensionSubtags.length;
     }
 
@@ -1941,8 +1937,7 @@ var currencyDigits = {
  */
 function getCurrencyDigitsRE() {
     return internalIntlRegExps.currencyDigitsRE ||
-           (internalIntlRegExps.currencyDigitsRE =
-            regexp_construct_no_statics("^[A-Z]{3}$"));
+           (internalIntlRegExps.currencyDigitsRE = regexp_construct("^[A-Z]{3}$"));
 }
 function CurrencyDigits(currency) {
     assert(typeof currency === "string", "CurrencyDigits");
@@ -2889,4 +2884,18 @@ function resolveICUPattern(pattern, result) {
                 _DefineDataProperty(result, "hour12", false);
         }
     }
+}
+
+function Intl_getCanonicalLocales(locales) {
+  let codes = CanonicalizeLocaleList(locales);
+  let result = [];
+
+  let len = codes.length;
+  let k = 0;
+
+  while (k < len) {
+    _DefineDataProperty(result, k, codes[k]);
+    k++;
+  }
+  return result;
 }

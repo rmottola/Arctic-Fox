@@ -16,69 +16,22 @@
 var fs = require("fs");
 var path = require("path");
 var helpers = require("../helpers");
-var importRx = /^(?:Services\.scriptloader\.|loader)?loadSubScript\((.+)[",]/;
+var globals = require("../globals");
 
 module.exports = function(context) {
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
 
-  function checkFile(fileArray) {
-    var filePath = fileArray.pop();
-
-    while (filePath) {
-      var headText;
-
-      try {
-        headText = fs.readFileSync(filePath, "utf8");
-      } catch (e) {
-        // Couldn't find file, continue.
-        filePath = fileArray.pop();
-        continue;
+  function importHead(path, node) {
+    try {
+      let stats = fs.statSync(path);
+      if (!stats.isFile()) {
+        return;
       }
-
-      var ast = helpers.getAST(headText);
-      var globalVars = helpers.getGlobals(ast);
-
-      for (var i = 0; i < globalVars.length; i++) {
-        var varName = globalVars[i];
-        helpers.addVarToScope(varName, context);
-      }
-
-      for (var index in ast.body) {
-        var node = ast.body[index];
-        var source = helpers.getTextForNode(node, headText);
-        var name = helpers.getVarNameFromImportSource(source);
-
-        if (name) {
-          helpers.addVarToScope(name, context);
-          continue;
-        }
-
-        // Scripts loaded using loadSubScript or loadHelperScript
-        var matches = source.match(importRx);
-
-        if (!matches) {
-          matches = source.match(/^loadHelperScript\((.+)[",]/);
-        }
-
-        if (matches) {
-          var cwd = process.cwd();
-
-          filePath = matches[1];
-          filePath = filePath.replace("chrome://mochitests/content/browser",
-                                      cwd + "/../../../..");
-          filePath = filePath.replace(/testdir\s*\+\s*["']/gi, cwd + "/");
-          filePath = filePath.replace(/test_dir\s*\+\s*["']/gi, cwd);
-          filePath = filePath.replace(/["']/gi, "");
-          filePath = path.normalize(filePath);
-
-          fileArray.push(filePath);
-        }
-      }
-
-      filePath = fileArray.pop();
+    } catch (e) {
+      return;
     }
+
+    let newGlobals = globals.getGlobalsForFile(path);
+    helpers.addGlobals(newGlobals, context.getScope());
   }
 
   // ---------------------------------------------------------------------------
@@ -86,17 +39,20 @@ module.exports = function(context) {
   // ---------------------------------------------------------------------------
 
   return {
-    Program: function() {
-      if (!helpers.getIsBrowserMochitest(this)) {
+    Program: function(node) {
+      if (!helpers.getIsTest(this)) {
         return;
       }
 
-      var testPath = this.getFilename();
-      var testFilename = path.basename(testPath);
-      var fullTestPath = path.resolve(testFilename);
-      var fullHeadjsPath = path.resolve("head.js");
+      var currentFilePath = helpers.getAbsoluteFilePath(context);
+      var dirName = path.dirname(currentFilePath);
+      var fullHeadjsPath = path.resolve(dirName, "head.js");
+      if (!fs.existsSync(fullHeadjsPath)) {
+        return;
+      }
 
-      checkFile([fullTestPath, fullHeadjsPath]);
+      let newGlobals = globals.getGlobalsForFile(fullHeadjsPath);
+      helpers.addGlobals(newGlobals, context.getScope());
     }
   };
 };

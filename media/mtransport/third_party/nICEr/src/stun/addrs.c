@@ -75,11 +75,14 @@ static char *RCSSTRING __UNUSED__="$Id: addrs.c,v 1.2 2008/04/28 18:21:30 ekr Ex
 
 #include "stun.h"
 #include "addrs.h"
+#include "nr_crypto.h"
+#include "util.h"
 
 #if defined(WIN32)
 
 #define WIN32_MAX_NUM_INTERFACES  20
 
+#define NR_MD5_HASH_LENGTH 16
 
 #define _NR_MAX_KEY_LENGTH 256
 #define _NR_MAX_NAME_LENGTH 512
@@ -149,7 +152,8 @@ stun_get_win32_addrs(nr_local_addr addrs[], int maxaddrs, int *count)
     int r,_status;
     PIP_ADAPTER_ADDRESSES AdapterAddresses = NULL, tmpAddress = NULL;
     ULONG buflen;
-    char munged_ifname[IFNAMSIZ];
+    char bin_hashed_ifname[NR_MD5_HASH_LENGTH];
+    char hex_hashed_ifname[MAXIFNAME];
     int n = 0;
 
     *count = 0;
@@ -184,28 +188,20 @@ stun_get_win32_addrs(nr_local_addr addrs[], int maxaddrs, int *count)
     /* Loop through the adapters */
 
     for (tmpAddress = AdapterAddresses; tmpAddress != NULL; tmpAddress = tmpAddress->Next) {
-      char *c;
 
       if (tmpAddress->OperStatus != IfOperStatusUp)
         continue;
 
-      snprintf(munged_ifname, IFNAMSIZ, "%S%c", tmpAddress->FriendlyName, 0);
-      munged_ifname[IFNAMSIZ-1] = '\0';
-
-      /* replace spaces with underscores */
-      c = strchr(munged_ifname, ' ');
-      while (c != NULL) {
-        *c = '_';
-         c = strchr(munged_ifname, ' ');
-      }
-      c = strchr(munged_ifname, '.');
-      while (c != NULL) {
-        *c = '+';
-         c = strchr(munged_ifname, '+');
-      }
-
       if ((tmpAddress->IfIndex != 0) || (tmpAddress->Ipv6IfIndex != 0)) {
         IP_ADAPTER_UNICAST_ADDRESS *u = 0;
+
+        if(r=nr_crypto_md5((UCHAR *)tmpAddress->FriendlyName,
+                           wcslen(tmpAddress->FriendlyName) * sizeof(wchar_t),
+                           bin_hashed_ifname))
+          ABORT(r);
+        if(r=nr_bin2hex(bin_hashed_ifname, sizeof(bin_hashed_ifname),
+          hex_hashed_ifname))
+          ABORT(r);
 
         for (u = tmpAddress->FirstUnicastAddress; u != 0; u = u->Next) {
           SOCKET_ADDRESS *sa_addr = &u->Address;
@@ -216,14 +212,25 @@ stun_get_win32_addrs(nr_local_addr addrs[], int maxaddrs, int *count)
                 ABORT(r);
           }
           else {
-            r_log(NR_LOG_STUN, LOG_DEBUG, "Unrecognized sa_family for adapteraddress %s",munged_ifname);
+            r_log(NR_LOG_STUN, LOG_DEBUG, "Unrecognized sa_family for address on adapter %lu", tmpAddress->IfIndex);
             continue;
           }
 
-          strlcpy(addrs[n].addr.ifname, munged_ifname, sizeof(addrs[n].addr.ifname));
-          /* TODO: (Bug 895793) Getting interface properties for Windows */
-          addrs[n].interface.type = NR_INTERFACE_TYPE_UNKNOWN;
+          strlcpy(addrs[n].addr.ifname, hex_hashed_ifname, sizeof(addrs[n].addr.ifname));
+          if (tmpAddress->IfType == IF_TYPE_ETHERNET_CSMACD) {
+            addrs[n].interface.type = NR_INTERFACE_TYPE_WIRED;
+          } else if (tmpAddress->IfType == IF_TYPE_IEEE80211) {
+            /* Note: this only works for >= Win Vista */
+            addrs[n].interface.type = NR_INTERFACE_TYPE_WIFI;
+          } else {
+            addrs[n].interface.type = NR_INTERFACE_TYPE_UNKNOWN;
+          }
+#if (_WIN32_WINNT >= 0x0600)
+          /* Note: only >= Vista provide link speed information */
+          addrs[n].interface.estimated_speed = tmpAddress->TransmitLinkSpeed / 1000;
+#else
           addrs[n].interface.estimated_speed = 0;
+#endif
           if (++n >= maxaddrs)
             goto done;
         }
@@ -261,62 +268,67 @@ stun_getifaddrs(nr_local_addr addrs[], int maxaddrs, int *count)
   if_addr = if_addrs_head;
 
   while (if_addr && *count < maxaddrs) {
-    switch (if_addr->ifa_addr->sa_family) {
-      case AF_INET:
-      case AF_INET6:
-        if (r=nr_sockaddr_to_transport_addr(if_addr->ifa_addr, IPPROTO_UDP, 0, &(addrs[*count].addr))) {
-          r_log(NR_LOG_STUN, LOG_ERR, "nr_sockaddr_to_transport_addr error r = %d", r);
-        } else {
+    /* This can be null */
+    if (if_addr->ifa_addr) {
+      switch (if_addr->ifa_addr->sa_family) {
+        case AF_INET:
+        case AF_INET6:
+          if (r=nr_sockaddr_to_transport_addr(if_addr->ifa_addr, IPPROTO_UDP, 0, &(addrs[*count].addr))) {
+            r_log(NR_LOG_STUN, LOG_ERR, "nr_sockaddr_to_transport_addr error r = %d", r);
+          } else {
 #if defined(LINUX) && !defined(ANDROID)
-          struct ethtool_cmd ecmd;
-          struct ifreq ifr;
-          struct iwreq wrq;
-          int e;
-          int s = socket(AF_INET, SOCK_DGRAM, 0);
+            struct ethtool_cmd ecmd;
+            struct ifreq ifr;
+            struct iwreq wrq;
+            int e;
+            int s = socket(AF_INET, SOCK_DGRAM, 0);
 
-          strncpy(ifr.ifr_name, if_addr->ifa_name, sizeof(ifr.ifr_name));
-          /* TODO (Bug 896851): interface property for Android */
-          /* Getting ethtool for ethernet information. */
-          ecmd.cmd = ETHTOOL_GSET;
-          /* In/out param */
-          ifr.ifr_data = (void*)&ecmd;
+            strncpy(ifr.ifr_name, if_addr->ifa_name, sizeof(ifr.ifr_name));
+            /* TODO (Bug 896851): interface property for Android */
+            /* Getting ethtool for ethernet information. */
+            ecmd.cmd = ETHTOOL_GSET;
+            /* In/out param */
+            ifr.ifr_data = (void*)&ecmd;
 
-          e = ioctl(s, SIOCETHTOOL, &ifr);
-          if (e == 0)
-          {
-             /* For wireless network, we won't get ethtool, it's a wired
-              * connection */
-             addrs[*count].interface.type = NR_INTERFACE_TYPE_WIRED;
+            e = ioctl(s, SIOCETHTOOL, &ifr);
+            if (e == 0)
+            {
+               /* For wireless network, we won't get ethtool, it's a wired
+                * connection */
+               addrs[*count].interface.type = NR_INTERFACE_TYPE_WIRED;
 #ifdef DONT_HAVE_ETHTOOL_SPEED_HI
-             addrs[*count].interface.estimated_speed = ecmd.speed;
+               addrs[*count].interface.estimated_speed = ecmd.speed;
 #else
-             addrs[*count].interface.estimated_speed = ((ecmd.speed_hi << 16) | ecmd.speed) * 1000;
+               addrs[*count].interface.estimated_speed = ((ecmd.speed_hi << 16) | ecmd.speed) * 1000;
 #endif
-          }
+            }
 
-          strncpy(wrq.ifr_name, if_addr->ifa_name, sizeof(wrq.ifr_name));
-          e = ioctl(s, SIOCGIWRATE, &wrq);
-          if (e == 0)
-          {
-             addrs[*count].interface.type = NR_INTERFACE_TYPE_WIFI;
-             addrs[*count].interface.estimated_speed = wrq.u.bitrate.value / 1000;
-          }
+            strncpy(wrq.ifr_name, if_addr->ifa_name, sizeof(wrq.ifr_name));
+            e = ioctl(s, SIOCGIWRATE, &wrq);
+            if (e == 0)
+            {
+               addrs[*count].interface.type = NR_INTERFACE_TYPE_WIFI;
+               addrs[*count].interface.estimated_speed = wrq.u.bitrate.value / 1000;
+            }
 
-          if (if_addr->ifa_flags & IFF_POINTOPOINT)
-          {
-             addrs[*count].interface.type = NR_INTERFACE_TYPE_UNKNOWN | NR_INTERFACE_TYPE_VPN;
-             /* TODO (Bug 896913): find backend network type of this VPN */
-          }
+            close(s);
+
+            if (if_addr->ifa_flags & IFF_POINTOPOINT)
+            {
+               addrs[*count].interface.type = NR_INTERFACE_TYPE_UNKNOWN | NR_INTERFACE_TYPE_VPN;
+               /* TODO (Bug 896913): find backend network type of this VPN */
+            }
 #else
-          addrs[*count].interface.type = NR_INTERFACE_TYPE_UNKNOWN;
-          addrs[*count].interface.estimated_speed = 0;
+            addrs[*count].interface.type = NR_INTERFACE_TYPE_UNKNOWN;
+            addrs[*count].interface.estimated_speed = 0;
 #endif
-          strlcpy(addrs[*count].addr.ifname, if_addr->ifa_name, sizeof(addrs[*count].addr.ifname));
-          ++(*count);
-        }
-        break;
-      default:
-        ;
+            strlcpy(addrs[*count].addr.ifname, if_addr->ifa_name, sizeof(addrs[*count].addr.ifname));
+            ++(*count);
+          }
+          break;
+        default:
+          ;
+      }
     }
 
     if_addr = if_addr->ifa_next;

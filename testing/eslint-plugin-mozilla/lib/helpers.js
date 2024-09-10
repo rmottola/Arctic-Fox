@@ -8,16 +8,29 @@
 
 var escope = require("escope");
 var espree = require("espree");
+var estraverse = require("estraverse");
+var path = require("path");
+var fs = require("fs");
 
-var regexes = [
-  /^(?:Cu|Components\.utils)\.import\(".*\/(.*?)\.jsm?"\);?$/,
-  /^loader\.lazyImporter\(\w+, "(\w+)"/,
-  /^loader\.lazyRequireGetter\(\w+, "(\w+)"/,
-  /^loader\.lazyServiceGetter\(\w+, "(\w+)"/,
-  /^XPCOMUtils\.defineLazyModuleGetter\(\w+, "(\w+)"/,
-  /^loader\.lazyGetter\(\w+, "(\w+)"/,
-  /^XPCOMUtils\.defineLazyGetter\(\w+, "(\w+)"/,
-  /^XPCOMUtils\.defineLazyServiceGetter\(\w+, "(\w+)"/
+var definitions = [
+  /^loader\.lazyGetter\(this, "(\w+)"/,
+  /^loader\.lazyImporter\(this, "(\w+)"/,
+  /^loader\.lazyServiceGetter\(this, "(\w+)"/,
+  /^loader\.lazyRequireGetter\(this, "(\w+)"/,
+  /^XPCOMUtils\.defineLazyGetter\(this, "(\w+)"/,
+  /^XPCOMUtils\.defineLazyModuleGetter\(this, "(\w+)"/,
+  /^XPCOMUtils\.defineLazyServiceGetter\(this, "(\w+)"/,
+  /^XPCOMUtils\.defineConstant\(this, "(\w+)"/,
+  /^DevToolsUtils\.defineLazyModuleGetter\(this, "(\w+)"/,
+  /^DevToolsUtils\.defineLazyGetter\(this, "(\w+)"/,
+  /^Object\.defineProperty\(this, "(\w+)"/,
+  /^Reflect\.defineProperty\(this, "(\w+)"/,
+  /^this\.__defineGetter__\("(\w+)"/,
+  /^this\.(\w+) =/
+];
+
+var imports = [
+  /^(?:Cu|Components\.utils)\.import\(".*\/(.*?)\.jsm?"(?:, this)?\)/,
 ];
 
 module.exports = {
@@ -40,77 +53,149 @@ module.exports = {
   },
 
   /**
-   * Gets the source text of an AST node.
+   * A simplistic conversion of some AST nodes to a standard string form.
    *
-   * @param  {ASTNode} node
-   *         The AST node representing the source text.
-   * @param  {ASTContext} context
-   *         The current context.
+   * @param  {Object} node
+   *         The AST node to convert.
    *
    * @return {String}
-   *         The source text representing the AST node.
+   *         The JS source for the node.
    */
-  getSource: function(node, context) {
-    return context.getSource(node).replace(/[\r\n]+\s*/g, " ")
-                                  .replace(/\s*=\s*/g, " = ")
-                                  .replace(/\s+\./g, ".")
-                                  .replace(/,\s+/g, ", ")
-                                  .replace(/;\n(\d+)/g, ";$1")
-                                  .replace(/\s+/g, " ");
-  },
-
-  /**
-   * Gets the variable name from an import source
-   * e.g. Cu.import("path/to/someName") will return "someName."
-   *
-   * Some valid input strings:
-   *  - Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
-   *  - loader.lazyImporter(this, "name1");
-   *  - loader.lazyRequireGetter(this, "name2"
-   *  - loader.lazyServiceGetter(this, "name3"
-   *  - XPCOMUtils.defineLazyModuleGetter(this, "setNamedTimeout", ...)
-   *  - loader.lazyGetter(this, "toolboxStrings"
-   *  - XPCOMUtils.defineLazyGetter(this, "clipboardHelper"
-   *
-   * @param  {String} source
-   *         The source representing an import statement.
-   *
-   * @return {String}
-   *         The variable name imported.
-   */
-  getVarNameFromImportSource: function(source) {
-    for (var i = 0; i < regexes.length; i++) {
-      var regex = regexes[i];
-      var matches = source.match(regex);
-
-      if (matches) {
-        var name = matches[1];
-
-        return name;
-      }
+  getASTSource: function(node) {
+    switch (node.type) {
+      case "MemberExpression":
+        if (node.computed)
+          throw new Error("getASTSource unsupported computed MemberExpression");
+        return this.getASTSource(node.object) + "." + this.getASTSource(node.property);
+      case "ThisExpression":
+        return "this";
+      case "Identifier":
+        return node.name;
+      case "Literal":
+        return JSON.stringify(node.value);
+      case "CallExpression":
+        var args = node.arguments.map(a => this.getASTSource(a)).join(", ");
+        return this.getASTSource(node.callee) + "(" + args + ")";
+      case "ObjectExpression":
+        return "{}";
+      case "ExpressionStatement":
+        return this.getASTSource(node.expression) + ";";
+      case "FunctionExpression":
+        return "function() {}";
+      case "ArrowFunctionExpression":
+        return "() => {}";
+      case "AssignmentExpression":
+        return this.getASTSource(node.left) + " = " + this.getASTSource(node.right);
+      default:
+        throw new Error("getASTSource unsupported node type: " + node.type);
     }
   },
 
   /**
-   * Get an array of globals from an AST.
+   * This walks an AST in a manner similar to ESLint passing node and comment
+   * events to the listener. The listener is expected to be a simple function
+   * which accepts node type, node and parents arguments.
    *
    * @param  {Object} ast
-   *         The AST for which the globals are to be returned.
-   *
-   * @return {Array}
-   *         An array of variable names.
+   *         The AST to walk.
+   * @param  {Function} listener
+   *         A callback function to call for the nodes. Passed three arguments,
+   *         event type, node and an array of parent nodes for the current node.
    */
-  getGlobals: function(ast) {
-    var scopeManager = escope.analyze(ast);
-    var globalScope = scopeManager.acquire(ast);
-    var result = [];
+  walkAST(ast, listener) {
+    let parents = [];
 
-    for (var variable in globalScope.variables) {
-      var name = globalScope.variables[variable].name;
-      result.push(name);
+    let seenComments = new Set();
+    function sendCommentEvents(comments) {
+      if (!comments) {
+        return;
+      }
+
+      for (let comment of comments) {
+        if (seenComments.has(comment)) {
+          return;
+        }
+        seenComments.add(comment);
+
+        listener(comment.type + "Comment", comment, parents);
+      }
     }
 
-    return result;
+    estraverse.traverse(ast, {
+      enter(node, parent) {
+        // Comments are held in node.comments for empty programs
+        let leadingComments = node.leadingComments;
+        if (node.type === "Program" && node.body.length == 0) {
+          leadingComments = node.comments;
+        }
+
+        sendCommentEvents(leadingComments);
+        listener(node.type, node, parents);
+        sendCommentEvents(node.trailingComments);
+
+        parents.push(node);
+      },
+
+      leave(node, parent) {
+        // TODO send comment exit events
+        listener(node.type + ":exit", node, parents);
+
+        if (parents.length == 0) {
+          throw new Error("Left more nodes than entered.");
+        }
+        parents.pop();
+      }
+    });
+    if (parents.length) {
+      throw new Error("Entered more nodes than left.");
+    }
+  },
+
+  /**
+   * Attempts to convert an ExpressionStatement to a likely global variable
+   * definition.
+   *
+   * @param  {Object} node
+   *         The AST node to convert.
+   * @param  {boolean} isGlobal
+   *         True if the current node is in the global scope
+   *
+   * @return {String or null}
+   *         The variable name defined.
+   */
+  convertExpressionToGlobal: function(node, isGlobal) {
+    try {
+      var source = this.getASTSource(node);
+    }
+    catch (e) {
+      return null;
+    }
+
+    for (var reg of definitions) {
+      var match = source.match(reg);
+      if (match) {
+        // Must be in the global scope
+        if (!isGlobal) {
+          return null;
+        }
+
+        return match[1];
+      }
+    }
+
+    for (reg of imports) {
+      var match = source.match(reg);
+      if (match) {
+        // The two argument form is only acceptable in the global scope
+        if (node.expression.arguments.length > 1 && !isGlobal) {
+          return null;
+        }
+
+        return match[1];
+      }
+    }
+
+    return null;
   },
 
   /**
@@ -118,39 +203,44 @@ module.exports = {
    * HACK: This relies on eslint internals so it could break at any time.
    *
    * @param {String} name
-   *        The variable name to add to the current scope.
-   * @param {ASTContext} context
-   *        The current context.
+   *        The variable name to add to the scope.
+   * @param {ASTScope} scope
+   *        The scope to add to.
+   * @param {boolean} writable
+   *        Whether the global can be overwritten.
    */
-  addVarToScope: function(name, context) {
-    var scope = context.getScope();
+  addVarToScope: function(name, scope, writable) {
+    // If the variable is already defined then skip it
+    if (scope.set && scope.set.has(name)) {
+      return;
+    }
+
+    writable = writable === undefined ? true : writable;
     var variables = scope.variables;
     var variable = new escope.Variable(name, scope);
 
     variable.eslintExplicitGlobal = false;
-    variable.writeable = true;
+    variable.writeable = writable;
     variables.push(variable);
+
+    // Since eslint 1.10.3, scope variables are now duplicated in the scope.set
+    // map, so we need to store them there too if it exists.
+    // See https://groups.google.com/forum/#!msg/eslint/Y4_oHMWwP-o/5S57U8jXd8kJ
+    if (scope.set) {
+      scope.set.set(name, variable);
+    }
   },
 
   /**
-   * Get the single line text represented by a particular AST node.
+   * Adds a set of globals to a scope.
    *
-   * @param  {ASTNode} node
-   *         The AST node representing the source text.
-   * @param  {String} text
-   *         The text representing the AST node.
-   *
-   * @return {String}
-   *         A single line version of the string represented by node.
+   * @param {Array} globalVars
+   *        An array of global variable names.
+   * @param {ASTScope} scope
+   *        The scope.
    */
-  getTextForNode: function(node, text) {
-    var source = text.substr(node.range[0], node.range[1] - node.range[0]);
-
-    return source.replace(/[\r\n]+\s*/g, "")
-                 .replace(/\s*=\s*/g, " = ")
-                 .replace(/\s+\./g, ".")
-                 .replace(/,\s+/g, ", ")
-                 .replace(/;\n(\d+)/g, ";$1");
+  addGlobals: function(globalVars, scope) {
+    globalVars.forEach(v => this.addVarToScope(v.name, scope, v.writable));
   },
 
   /**
@@ -162,6 +252,8 @@ module.exports = {
    */
   getPermissiveConfig: function() {
     return {
+      comment: true,
+      attachComment: true,
       range: true,
       loc: true,
       tolerant: true,
@@ -195,21 +287,20 @@ module.exports = {
   /**
    * Check whether the context is the global scope.
    *
-   * @param {ASTContext} context
-   *        The current context.
+   * @param {Array} ancestors
+   *        The parents of the current node.
    *
    * @return {Boolean}
    *         True or false
    */
-  getIsGlobalScope: function(context) {
-    var ancestors = context.getAncestors();
-    var parent = ancestors.pop();
-
-    if (parent.type == "ExpressionStatement") {
-      parent = ancestors.pop();
+  getIsGlobalScope: function(ancestors) {
+    for (let parent of ancestors) {
+      if (parent.type == "FunctionExpression" ||
+          parent.type == "FunctionDeclaration") {
+        return false;
+      }
     }
-
-    return parent.type == "Program";
+    return true;
   },
 
   /**
@@ -217,15 +308,31 @@ module.exports = {
    *
    * @param  {RuleContext} scope
    *         You should pass this from within a rule
-   *         e.g. helpers.getIsBrowserMochitest(this)
+   *         e.g. helpers.getIsHeadFile(this)
    *
    * @return {Boolean}
    *         True or false
    */
   getIsHeadFile: function(scope) {
-    var pathAndFilename = scope.getFilename();
+    var pathAndFilename = this.cleanUpPath(scope.getFilename());
 
     return /.*[\\/]head(_.+)?\.js$/.test(pathAndFilename);
+  },
+
+  /**
+   * Check whether we might be in an xpcshell test.
+   *
+   * @param  {RuleContext} scope
+   *         You should pass this from within a rule
+   *         e.g. helpers.getIsXpcshellTest(this)
+   *
+   * @return {Boolean}
+   *         True or false
+   */
+  getIsXpcshellTest: function(scope) {
+    var pathAndFilename = this.cleanUpPath(scope.getFilename());
+
+    return /.*[\\/]test_.+\.js$/.test(pathAndFilename);
   },
 
   /**
@@ -239,8 +346,86 @@ module.exports = {
    *         True or false
    */
   getIsBrowserMochitest: function(scope) {
-    var pathAndFilename = scope.getFilename();
+    var pathAndFilename = this.cleanUpPath(scope.getFilename());
 
     return /.*[\\/]browser_.+\.js$/.test(pathAndFilename);
+  },
+
+  /**
+   * Check whether we are in a test of some kind.
+   *
+   * @param  {RuleContext} scope
+   *         You should pass this from within a rule
+   *         e.g. helpers.getIsTest(this)
+   *
+   * @return {Boolean}
+   *         True or false
+   */
+  getIsTest: function(scope) {
+    if (this.getIsXpcshellTest(scope)) {
+      return true;
+    }
+
+    return this.getIsBrowserMochitest(scope);
+  },
+
+  /**
+   * Gets the root directory of the repository by walking up directories until
+   * a .eslintignore file is found.
+   * @param {ASTContext} context
+   *        The current context.
+   *
+   * @return {String} The absolute path of the repository directory
+   */
+  getRootDir: function(context) {
+    var fileName = this.getAbsoluteFilePath(context);
+    var dirName = path.dirname(fileName);
+
+    while (dirName && !fs.existsSync(path.join(dirName, ".eslintignore"))) {
+      dirName = path.dirname(dirName);
+    }
+
+    if (!dirName) {
+      throw new Error("Unable to find root of repository");
+    }
+
+    return dirName;
+  },
+
+  /**
+   * ESLint may be executed from various places: from mach, at the root of the
+   * repository, or from a directory in the repository when, for instance,
+   * executed by a text editor's plugin.
+   * The value returned by context.getFileName() varies because of this.
+   * This helper function makes sure to return an absolute file path for the
+   * current context, by looking at process.cwd().
+   * @param {Context} context
+   * @return {String} The absolute path
+   */
+  getAbsoluteFilePath: function(context) {
+    var fileName = this.cleanUpPath(context.getFilename());
+    var cwd = process.cwd();
+
+    if (path.isAbsolute(fileName)) {
+      // Case 2: executed from the repo's root with mach:
+      //   fileName: /path/to/mozilla/repo/a/b/c/d.js
+      //   cwd: /path/to/mozilla/repo
+      return fileName;
+    } else {
+      // Case 1: executed form in a nested directory, e.g. from a text editor:
+      //   fileName: a/b/c/d.js
+      //   cwd: /path/to/mozilla/repo/a/b/c
+      var dirName = path.dirname(fileName);
+      return cwd.slice(0, cwd.length - dirName.length) + fileName;
+    }
+  },
+
+  /**
+   * When ESLint is run from SublimeText, paths retrieved from
+   * context.getFileName contain leading and trailing double-quote characters.
+   * These characters need to be removed.
+   */
+  cleanUpPath: function(path) {
+    return path.replace(/^"/, "").replace(/"$/, "");
   }
 };

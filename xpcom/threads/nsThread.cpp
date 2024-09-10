@@ -190,7 +190,7 @@ NS_IMPL_CI_INTERFACE_GETTER(nsThread, nsIThread, nsIThreadInternal,
 
 //-----------------------------------------------------------------------------
 
-class nsThreadStartupEvent : public nsRunnable
+class nsThreadStartupEvent : public Runnable
 {
 public:
   nsThreadStartupEvent()
@@ -254,21 +254,19 @@ struct nsThreadShutdownContext
 // to call PR_JoinThread. It implements nsICancelableRunnable so that it can
 // run on a DOM Worker thread (where all events must implement
 // nsICancelableRunnable.)
-class nsThreadShutdownAckEvent : public nsRunnable,
-                                 public nsICancelableRunnable
+class nsThreadShutdownAckEvent : public CancelableRunnable
 {
 public:
   explicit nsThreadShutdownAckEvent(nsThreadShutdownContext* aCtx)
     : mShutdownContext(aCtx)
   {
   }
-  NS_DECL_ISUPPORTS_INHERITED
   NS_IMETHOD Run() override
   {
     mShutdownContext->terminatingThread->ShutdownComplete(mShutdownContext);
     return NS_OK;
   }
-  NS_IMETHOD Cancel() override
+  nsresult Cancel() override
   {
     return Run();
   }
@@ -278,11 +276,8 @@ private:
   nsThreadShutdownContext* mShutdownContext;
 };
 
-NS_IMPL_ISUPPORTS_INHERITED(nsThreadShutdownAckEvent, nsRunnable,
-                            nsICancelableRunnable)
-
 // This event is responsible for setting mShutdownContext
-class nsThreadShutdownEvent : public nsRunnable
+class nsThreadShutdownEvent : public Runnable
 {
 public:
   nsThreadShutdownEvent(nsThread* aThr, nsThreadShutdownContext* aCtx)
@@ -390,7 +385,7 @@ nsThread::ThreadFunc(void* aArg)
   {
     // Scope for MessageLoop.
     nsAutoPtr<MessageLoop> loop(
-      new MessageLoop(MessageLoop::TYPE_MOZILLA_NONMAINTHREAD));
+      new MessageLoop(MessageLoop::TYPE_MOZILLA_NONMAINTHREAD, self));
 
     // Now, process incoming events...
     loop->Run();
@@ -709,7 +704,7 @@ nsThreadShutdownContext*
 nsThread::ShutdownInternal(bool aSync)
 {
   MOZ_ASSERT(mThread);
-
+  MOZ_ASSERT(mThread != PR_GetCurrentThread());
   if (NS_WARN_IF(mThread == PR_GetCurrentThread())) {
     return nullptr;
   }

@@ -56,6 +56,7 @@ T overrideDefault(const char* param, T dflt) {
     }
     return dflt;
 }
+
 #define SET_DEFAULT(var, dflt) var = overrideDefault("JIT_OPTION_" #var, dflt)
 DefaultJitOptions::DefaultJitOptions()
 {
@@ -85,6 +86,9 @@ DefaultJitOptions::DefaultJitOptions()
 
     // Toggles whether Edge Case Analysis is gobally disabled.
     SET_DEFAULT(disableEdgeCaseAnalysis, false);
+
+    // Toggles whether to use flow sensitive Alias Analysis.
+    SET_DEFAULT(disableFlowAA, true);
 
     // Toggle whether global value numbering is globally disabled.
     SET_DEFAULT(disableGvn, false);
@@ -188,6 +192,9 @@ DefaultJitOptions::DefaultJitOptions()
 
     // Toggles whether unboxed plain objects can be created by the VM.
     SET_DEFAULT(disableUnboxedObjects, false);
+
+    // Test whether wasm int64 / double NaN bits testing is enabled.
+    SET_DEFAULT(wasmTestMode, false);
 }
 
 bool

@@ -93,9 +93,6 @@ public:
   IMPL_EVENT_HANDLER(error)
   void Close();
 
-  // Determine if preferences allow EventSource
-  static bool PrefEnabled(JSContext* aCx = nullptr, JSObject* aGlobal = nullptr);
-
   virtual void DisconnectFromOwner() override;
 
 protected:
@@ -107,9 +104,8 @@ protected:
 
   nsresult GetBaseURI(nsIURI **aBaseURI);
 
-  net::ReferrerPolicy GetReferrerPolicy();
-
-  nsresult SetupHttpChannel();
+  void SetupHttpChannel();
+  nsresult SetupReferrerPolicy();
   nsresult InitChannelAndRequestEventSource();
   nsresult ResetConnection();
   nsresult DispatchFailConnection();

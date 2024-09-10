@@ -12,6 +12,10 @@ ID
 .DS_Store*
 *.pdb
 
+# Emacs
+\#*\#
+.\#*
+
 # Vim swap files.
 .*.sw[a-z]
 .sw[a-z]

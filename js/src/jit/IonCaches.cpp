@@ -383,6 +383,12 @@ IonCache::updateBaseAddress(JitCode* code, MacroAssembler& masm)
     rejoinLabel_.repoint(code, &masm);
 }
 
+void IonCache::trace(JSTracer* trc)
+{
+    if (script_)
+        TraceManuallyBarrieredEdge(trc, &script_, "IonCache::script_");
+}
+
 static void*
 GetReturnAddressToIonCode(JSContext* cx)
 {
@@ -484,7 +490,7 @@ IsCacheableNoProperty(JSObject* obj, JSObject* holder, Shape* shape, jsbytecode*
 
     // Just because we didn't find the property on the object doesn't mean it
     // won't magically appear through various engine hacks.
-    if (obj->getClass()->getProperty)
+    if (obj->getClass()->getGetProperty())
         return false;
 
     // Don't generate missing property ICs if we skipped a non-native object, as
@@ -534,6 +540,9 @@ IsOptimizableArgumentsObjectForGetElem(JSObject* obj, Value idval)
     ArgumentsObject& argsObj = obj->as<ArgumentsObject>();
 
     if (argsObj.isAnyElementDeleted())
+        return false;
+
+    if (argsObj.hasOverriddenElement())
         return false;
 
     if (!idval.isInt32())
@@ -700,10 +709,10 @@ CheckDOMProxyExpandoDoesNotShadow(JSContext* cx, MacroAssembler& masm, JSObject*
         ExpandoAndGeneration* expandoAndGeneration = (ExpandoAndGeneration*)expandoVal.toPrivate();
         masm.movePtr(ImmPtr(expandoAndGeneration), tempVal.scratchReg());
 
-        masm.branch32(Assembler::NotEqual,
+        masm.branch64(Assembler::NotEqual,
                       Address(tempVal.scratchReg(),
                               ExpandoAndGeneration::offsetOfGeneration()),
-                      Imm32(expandoAndGeneration->generation),
+                      Imm64(expandoAndGeneration->generation),
                       &failDOMProxyCheck);
 
         expandoVal = expandoAndGeneration->expando;
@@ -773,7 +782,7 @@ GenerateReadSlot(JSContext* cx, IonScript* ion, MacroAssembler& masm,
     {
         if (output.hasValue()) {
             scratchReg = output.valueReg().scratchReg();
-        } else if (output.type() == MIRType_Double) {
+        } else if (output.type() == MIRType::Double) {
             scratchReg = object;
             masm.push(scratchReg);
             restoreScratch = true;
@@ -924,7 +933,7 @@ EmitGetterCall(JSContext* cx, MacroAssembler& masm,
 
         // Construct vp array:
         // Push object value for |this|
-        masm.Push(TypedOrValueRegister(MIRType_Object, AnyRegister(object)));
+        masm.Push(TypedOrValueRegister(MIRType::Object, AnyRegister(object)));
         // Push callee/outparam.
         masm.Push(ObjectValue(*target));
 
@@ -1040,7 +1049,7 @@ EmitGetterCall(JSContext* cx, MacroAssembler& masm,
 
         for (size_t i = 0; i < target->nargs(); i++)
             masm.Push(UndefinedValue());
-        masm.Push(TypedOrValueRegister(MIRType_Object, AnyRegister(object)));
+        masm.Push(TypedOrValueRegister(MIRType::Object, AnyRegister(object)));
 
         masm.movePtr(ImmGCPtr(target), scratchReg);
 
@@ -1151,7 +1160,7 @@ GenerateArrayLength(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher&
     if (output.hasValue()) {
         outReg = output.valueReg().scratchReg();
     } else {
-        MOZ_ASSERT(output.type() == MIRType_Int32);
+        MOZ_ASSERT(output.type() == MIRType::Int32);
         outReg = output.typedReg().gpr();
     }
 
@@ -1184,7 +1193,7 @@ GenerateUnboxedArrayLength(JSContext* cx, MacroAssembler& masm, IonCache::StubAt
     if (output.hasValue()) {
         outReg = output.valueReg().scratchReg();
     } else {
-        MOZ_ASSERT(output.type() == MIRType_Int32);
+        MOZ_ASSERT(output.type() == MIRType::Int32);
         outReg = output.typedReg().gpr();
     }
     MOZ_ASSERT(object != outReg);
@@ -1219,7 +1228,7 @@ GenerateTypedArrayLength(JSContext* cx, MacroAssembler& masm, IonCache::StubAtta
     if (output.hasValue()) {
         tmpReg = output.valueReg().scratchReg();
     } else {
-        MOZ_ASSERT(output.type() == MIRType_Int32);
+        MOZ_ASSERT(output.type() == MIRType::Int32);
         tmpReg = output.typedReg().gpr();
     }
     MOZ_ASSERT(object != tmpReg);
@@ -1249,7 +1258,7 @@ IsCacheableArrayLength(JSContext* cx, HandleObject obj, TypedOrValueRegister out
     if (!obj->is<ArrayObject>())
         return false;
 
-    if (output.type() != MIRType_Value && output.type() != MIRType_Int32) {
+    if (output.type() != MIRType::Value && output.type() != MIRType::Int32) {
         // The stub assumes that we always output Int32, so make sure our output
         // is equipped to handle that.
         return false;
@@ -1356,12 +1365,12 @@ EmitIdGuard(MacroAssembler& masm, jsid id, TypedOrValueRegister idReg, Register 
 {
     MOZ_ASSERT(JSID_IS_STRING(id) || JSID_IS_SYMBOL(id));
 
-    MOZ_ASSERT(idReg.type() == MIRType_String ||
-               idReg.type() == MIRType_Symbol ||
-               idReg.type() == MIRType_Value);
+    MOZ_ASSERT(idReg.type() == MIRType::String ||
+               idReg.type() == MIRType::Symbol ||
+               idReg.type() == MIRType::Value);
 
     Register payloadReg;
-    if (idReg.type() == MIRType_Value) {
+    if (idReg.type() == MIRType::Value) {
         ValueOperand val = idReg.valueReg();
         if (JSID_IS_SYMBOL(id)) {
             masm.branchTestSymbol(Assembler::NotEqual, val, failures);
@@ -1631,7 +1640,7 @@ GetPropertyIC::tryAttachTypedArrayLength(JSContext* cx, HandleScript outerScript
     if (hasTypedArrayLengthStub(obj))
         return true;
 
-    if (output().type() != MIRType_Value && output().type() != MIRType_Int32) {
+    if (output().type() != MIRType::Value && output().type() != MIRType::Int32) {
         // The next execution should cause an invalidation because the type
         // does not fit.
         return true;
@@ -1984,7 +1993,7 @@ GetPropertyIC::tryAttachArgumentsLength(JSContext* cx, HandleScript outerScript,
         return true;
 
     MIRType outputType = output().type();
-    if (!(outputType == MIRType_Value || outputType == MIRType_Int32))
+    if (!(outputType == MIRType::Value || outputType == MIRType::Int32))
         return true;
 
     if (hasArgumentsLengthStub(obj->is<MappedArgumentsObject>()))
@@ -2004,7 +2013,7 @@ GetPropertyIC::tryAttachArgumentsLength(JSContext* cx, HandleScript outerScript,
     if (output().hasValue()) {
         tmpReg = output().valueReg().scratchReg();
     } else {
-        MOZ_ASSERT(output().type() == MIRType_Int32);
+        MOZ_ASSERT(output().type() == MIRType::Int32);
         tmpReg = output().typedReg().gpr();
     }
     MOZ_ASSERT(object() != tmpReg);
@@ -2067,7 +2076,7 @@ GenerateReadModuleNamespace(JSContext* cx, IonScript* ion, MacroAssembler& masm,
 
     if (output.hasValue()) {
         scratchReg = output.valueReg().scratchReg();
-    } else if (output.type() == MIRType_Double) {
+    } else if (output.type() == MIRType::Double) {
         masm.push(object);
         scratchReg = object;
         restoreScratch = true;
@@ -2381,7 +2390,7 @@ GenerateSetSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
         Address addr(object, NativeObject::getFixedSlotOffset(shape->slot()));
 
         if (cx->zone()->needsIncrementalBarrier())
-            masm.callPreBarrier(addr, MIRType_Value);
+            masm.callPreBarrier(addr, MIRType::Value);
 
         masm.storeConstantOrRegister(value, addr);
     } else {
@@ -2390,7 +2399,7 @@ GenerateSetSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
         Address addr(tempReg, obj->as<NativeObject>().dynamicSlotIndex(shape->slot()) * sizeof(Value));
 
         if (cx->zone()->needsIncrementalBarrier())
-            masm.callPreBarrier(addr, MIRType_Value);
+            masm.callPreBarrier(addr, MIRType::Value);
 
         masm.storeConstantOrRegister(value, addr);
     }
@@ -2749,7 +2758,7 @@ GenerateCallSetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
 
         // Build vp and move the base into argVpReg.
         masm.Push(value);
-        masm.Push(TypedOrValueRegister(MIRType_Object, AnyRegister(object)));
+        masm.Push(TypedOrValueRegister(MIRType::Object, AnyRegister(object)));
         masm.Push(ObjectValue(*target));
         masm.moveStackPtrTo(argVpReg);
 
@@ -2877,7 +2886,7 @@ GenerateCallSetter(JSContext* cx, IonScript* ion, MacroAssembler& masm,
         for (size_t i = 1; i < target->nargs(); i++)
             masm.Push(UndefinedValue());
         masm.Push(value);
-        masm.Push(TypedOrValueRegister(MIRType_Object, AnyRegister(object)));
+        masm.Push(TypedOrValueRegister(MIRType::Object, AnyRegister(object)));
 
         masm.movePtr(ImmGCPtr(target), tempReg);
 
@@ -3110,7 +3119,7 @@ GenerateAddSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
     // Write the object or expando object's new shape.
     Address shapeAddr(object, JSObject::offsetOfShape());
     if (cx->zone()->needsIncrementalBarrier())
-        masm.callPreBarrier(shapeAddr, MIRType_Shape);
+        masm.callPreBarrier(shapeAddr, MIRType::Shape);
     masm.storePtr(ImmGCPtr(newShape), shapeAddr);
 
     if (oldGroup != obj->group()) {
@@ -3129,7 +3138,7 @@ GenerateAddSlot(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& att
 
         Address groupAddr(object, JSObject::offsetOfGroup());
         if (cx->zone()->needsIncrementalBarrier())
-            masm.callPreBarrier(groupAddr, MIRType_ObjectGroup);
+            masm.callPreBarrier(groupAddr, MIRType::ObjectGroup);
         masm.storePtr(ImmGCPtr(obj->group()), groupAddr);
 
         masm.bind(&noTypeChange);
@@ -3203,7 +3212,7 @@ CanInlineSetPropTypeCheck(JSObject* obj, jsid id, ConstantOrRegister val, bool* 
                 // TIs handling of objects is complicated enough to warrant a runtime
                 // check, as we can't statically handle the case where the typeset
                 // contains the specific object, but doesn't have ANYOBJECT set.
-                if (reg.hasTyped() && reg.type() != MIRType_Object) {
+                if (reg.hasTyped() && reg.type() != MIRType::Object) {
                     JSValueType valType = ValueTypeFromMIRType(reg.type());
                     if (!propTypes->hasType(TypeSet::PrimitiveType(valType)))
                         return false;
@@ -3294,7 +3303,7 @@ IsPropertyAddInlineable(JSContext* cx, NativeObject* obj, HandleId id, ConstantO
         return false;
 
     // Likewise for an addProperty hook, since we'll need to invoke it.
-    if (obj->getClass()->addProperty)
+    if (obj->getClass()->getAddProperty())
         return false;
 
     if (!obj->nonProxyIsExtensible() || !shape->writable())
@@ -3374,9 +3383,9 @@ GenerateSetUnboxed(JSContext* cx, MacroAssembler& masm, IonCache::StubAttacher& 
 
     if (cx->zone()->needsIncrementalBarrier()) {
         if (unboxedType == JSVAL_TYPE_OBJECT)
-            masm.callPreBarrier(address, MIRType_Object);
+            masm.callPreBarrier(address, MIRType::Object);
         else if (unboxedType == JSVAL_TYPE_STRING)
-            masm.callPreBarrier(address, MIRType_String);
+            masm.callPreBarrier(address, MIRType::String);
         else
             MOZ_ASSERT(!UnboxedTypeNeedsPreBarrier(unboxedType));
     }
@@ -3931,7 +3940,7 @@ GenerateDenseElementHole(JSContext* cx, MacroAssembler& masm, IonCache::StubAtta
         indexReg = scratchReg;
         masm.unboxInt32(val, indexReg);
     } else {
-        MOZ_ASSERT(index.type() == MIRType_Int32);
+        MOZ_ASSERT(index.type() == MIRType::Int32);
         indexReg = index.typedReg().gpr();
     }
 
@@ -4203,7 +4212,7 @@ GetPropertyIC::tryAttachArgumentsElement(JSContext* cx, HandleScript outerScript
         return true;
 
     TypedOrValueRegister index = id().reg();
-    if (index.type() != MIRType_Value && index.type() != MIRType_Int32)
+    if (index.type() != MIRType::Value && index.type() != MIRType::Int32)
         return true;
 
     MOZ_ASSERT(output().hasValue());
@@ -4219,9 +4228,12 @@ GetPropertyIC::tryAttachArgumentsElement(JSContext* cx, HandleScript outerScript
 
     masm.branchTestObjClass(Assembler::NotEqual, object(), tmpReg, obj->getClass(), &failures);
 
-    // Get initial ArgsObj length value, test if length has been overridden.
+    // Get initial ArgsObj length value, test if length or any element have
+    // been overridden.
     masm.unboxInt32(Address(object(), ArgumentsObject::getInitialLengthSlotOffset()), tmpReg);
-    masm.branchTest32(Assembler::NonZero, tmpReg, Imm32(ArgumentsObject::LENGTH_OVERRIDDEN_BIT),
+    masm.branchTest32(Assembler::NonZero, tmpReg,
+                      Imm32(ArgumentsObject::LENGTH_OVERRIDDEN_BIT |
+                            ArgumentsObject::ELEMENT_OVERRIDDEN_BIT),
                       &failures);
     masm.rshiftPtr(Imm32(ArgumentsObject::PACKED_BITS_COUNT), tmpReg);
 
@@ -4238,7 +4250,7 @@ GetPropertyIC::tryAttachArgumentsElement(JSContext* cx, HandleScript outerScript
         masm.unboxInt32(val, indexReg);
         masm.branch32(Assembler::AboveOrEqual, indexReg, tmpReg, &failureRestoreIndex);
     } else {
-        MOZ_ASSERT(index.type() == MIRType_Int32);
+        MOZ_ASSERT(index.type() == MIRType::Int32);
         indexReg = index.typedReg().gpr();
         masm.branch32(Assembler::AboveOrEqual, indexReg, tmpReg, &failures);
     }
@@ -4373,7 +4385,7 @@ StoreDenseElement(MacroAssembler& masm, ConstantOrRegister value, Register eleme
     }
 
     TypedOrValueRegister reg = value.reg();
-    if (reg.hasTyped() && reg.type() != MIRType_Int32) {
+    if (reg.hasTyped() && reg.type() != MIRType::Int32) {
         masm.storeTypedOrValue(reg, target);
         return;
     }
@@ -4392,7 +4404,7 @@ StoreDenseElement(MacroAssembler& masm, ConstantOrRegister value, Register eleme
         masm.int32ValueToDouble(reg.valueReg(), ScratchDoubleReg);
         masm.storeDouble(ScratchDoubleReg, target);
     } else {
-        MOZ_ASSERT(reg.type() == MIRType_Int32);
+        MOZ_ASSERT(reg.type() == MIRType::Int32);
         masm.convertInt32ToDouble(reg.typedReg().gpr(), ScratchDoubleReg);
         masm.storeDouble(ScratchDoubleReg, target);
     }
@@ -4488,7 +4500,7 @@ GenerateSetDenseElement(JSContext* cx, MacroAssembler& masm, IonCache::StubAttac
         }
 
         if (cx->zone()->needsIncrementalBarrier())
-            masm.callPreBarrier(target, MIRType_Value);
+            masm.callPreBarrier(target, MIRType::Value);
 
         // Store the value.
         if (guardHoles)
@@ -5050,4 +5062,3 @@ NameIC::update(JSContext* cx, HandleScript outerScript, size_t cacheIndex, Handl
 
     return true;
 }
-

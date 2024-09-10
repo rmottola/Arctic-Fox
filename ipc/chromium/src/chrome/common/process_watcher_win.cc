@@ -7,7 +7,6 @@
 #include "base/message_loop.h"
 #include "base/object_watcher.h"
 #include "base/sys_info.h"
-#include "chrome/common/env_vars.h"
 #include "chrome/common/result_codes.h"
 
 // Maximum amount of time (in milliseconds) to wait for the process to exit.
@@ -15,7 +14,8 @@ static const int kWaitInterval = 2000;
 
 namespace {
 
-class TimerExpiredTask : public Task, public base::ObjectWatcher::Delegate {
+class TimerExpiredTask : public mozilla::Runnable,
+                         public base::ObjectWatcher::Delegate {
  public:
   explicit TimerExpiredTask(base::ProcessHandle process) : process_(process) {
     watcher_.StartWatching(process_, this);
@@ -30,9 +30,10 @@ class TimerExpiredTask : public Task, public base::ObjectWatcher::Delegate {
 
   // Task ---------------------------------------------------------------------
 
-  virtual void Run() {
+  NS_IMETHOD Run() override {
     if (process_)
       KillProcess();
+    return NS_OK;
   }
 
   // MessageLoop::Watcher -----------------------------------------------------
@@ -48,15 +49,6 @@ class TimerExpiredTask : public Task, public base::ObjectWatcher::Delegate {
 
  private:
   void KillProcess() {
-    if (base::SysInfo::HasEnvVar(env_vars::kHeadless)) {
-     // If running the distributed tests, give the renderer a little time
-     // to figure out that the channel is shutdown and unwind.
-     if (WaitForSingleObject(process_, kWaitInterval) == WAIT_OBJECT_0) {
-       OnObjectSignaled(process_);
-       return;
-     }
-    }
-
     // OK, time to get frisky.  We don't actually care when the process
     // terminates.  We just care that it eventually terminates, and that's what
     // TerminateProcess should do for us. Don't check for the result code since
@@ -95,7 +87,8 @@ void ProcessWatcher::EnsureProcessTerminated(base::ProcessHandle process
     return;
   }
 
-  MessageLoop::current()->PostDelayedTask(FROM_HERE,
-                                          new TimerExpiredTask(process),
+  RefPtr<mozilla::Runnable> task = new TimerExpiredTask(process);
+
+  MessageLoop::current()->PostDelayedTask(task.forget(),
                                           kWaitInterval);
 }

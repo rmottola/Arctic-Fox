@@ -31,7 +31,7 @@ class MockSurfaceImpl : public rx::SurfaceImpl
     MOCK_METHOD0(swap, egl::Error());
     MOCK_METHOD4(postSubBuffer, egl::Error(EGLint, EGLint, EGLint, EGLint));
     MOCK_METHOD2(querySurfacePointerANGLE, egl::Error(EGLint, void**));
-    MOCK_METHOD1(bindTexImage, egl::Error(EGLint));
+    MOCK_METHOD2(bindTexImage, egl::Error(gl::Texture*, EGLint));
     MOCK_METHOD1(releaseTexImage, egl::Error(EGLint));
     MOCK_METHOD1(setSwapInterval, void(EGLint));
     MOCK_CONST_METHOD0(getWidth, EGLint());
@@ -50,10 +50,6 @@ TEST(SurfaceTest, DestructionDeletesImpl)
     MockSurfaceImpl *impl = new MockSurfaceImpl;
     EXPECT_CALL(*impl, getSwapBehavior());
     EXPECT_CALL(*impl, createDefaultFramebuffer(testing::_)).WillOnce(testing::Return(framebuffer));
-
-    EXPECT_CALL(*framebuffer, setDrawBuffers(1, testing::_));
-    EXPECT_CALL(*framebuffer, setReadBuffer(GL_BACK));
-    EXPECT_CALL(*framebuffer, onUpdateColorAttachment(0));
 
     egl::Config config;
     egl::Surface *surface = new egl::Surface(impl, EGL_WINDOW_BIT, &config, egl::AttributeMap());

@@ -20,11 +20,7 @@ const TEST_URI = `
   Testing the color picker tooltip!
 `;
 
-const PAGE_CONTENT = [
-
-].join("\n");
-
-add_task(function*() {
+add_task(function* () {
   yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
   let {view} = yield openRuleView();
   yield testColorChangeIsntRevertedWhenOtherTooltipIsShown(view);
@@ -41,14 +37,17 @@ function* testColorChangeIsntRevertedWhenOtherTooltipIsShown(ruleView) {
   yield onShown;
 
   yield simulateColorPickerChange(ruleView, picker, [0, 0, 0, 1], {
-    element: content.document.body,
-    name: "backgroundColor",
+    selector: "body",
+    name: "background-color",
     value: "rgb(0, 0, 0)"
   });
+
   let spectrum = yield picker.spectrum;
+  let onModifications = ruleView.once("ruleview-changed");
   let onHidden = picker.tooltip.once("hidden");
   EventUtils.sendKey("RETURN", spectrum.element.ownerDocument.defaultView);
   yield onHidden;
+  yield onModifications;
 
   info("Open the image preview tooltip");
   let value = getRuleViewProperty(ruleView, "body", "background").valueSpan;

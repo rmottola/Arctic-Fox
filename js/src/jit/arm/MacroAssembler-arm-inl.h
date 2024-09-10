@@ -420,6 +420,38 @@ MacroAssembler::rshift64(Imm32 imm, Register64 dest)
 }
 
 // ===============================================================
+// Rotate functions
+void
+MacroAssembler::rotateLeft(Imm32 count, Register input, Register dest)
+{
+    if (count.value)
+        ma_rol(count, input, dest);
+    else
+        ma_mov(input, dest);
+}
+
+void
+MacroAssembler::rotateLeft(Register count, Register input, Register dest)
+{
+    ma_rol(count, input, dest);
+}
+
+void
+MacroAssembler::rotateRight(Imm32 count, Register input, Register dest)
+{
+    if (count.value)
+        ma_ror(count, input, dest);
+    else
+        ma_mov(input, dest);
+}
+
+void
+MacroAssembler::rotateRight(Register count, Register input, Register dest)
+{
+    ma_ror(count, input, dest);
+}
+
+// ===============================================================
 // Branch functions
 
 void
@@ -481,38 +513,38 @@ MacroAssembler::branch32(Condition cond, const BaseIndex& lhs, Imm32 rhs, Label*
     branch32(cond, scratch2, rhs, label);
 }
 
-
-void
-MacroAssembler::branch32(Condition cond, const Operand& lhs, Register rhs, Label* label)
-{
-    if (lhs.getTag() == Operand::OP2) {
-        branch32(cond, lhs.toReg(), rhs, label);
-    } else {
-        ScratchRegisterScope scratch(*this);
-        ma_ldr(lhs.toAddress(), scratch);
-        branch32(cond, scratch, rhs, label);
-    }
-}
-
-void
-MacroAssembler::branch32(Condition cond, const Operand& lhs, Imm32 rhs, Label* label)
-{
-    if (lhs.getTag() == Operand::OP2) {
-        branch32(cond, lhs.toReg(), rhs, label);
-    } else {
-        // branch32 will use ScratchRegister.
-        AutoRegisterScope scratch(*this, secondScratchReg_);
-        ma_ldr(lhs.toAddress(), scratch);
-        branch32(cond, scratch, rhs, label);
-    }
-}
-
 void
 MacroAssembler::branch32(Condition cond, wasm::SymbolicAddress lhs, Imm32 rhs, Label* label)
 {
     ScratchRegisterScope scratch(*this);
     loadPtr(lhs, scratch);
     branch32(cond, scratch, rhs, label);
+}
+
+void
+MacroAssembler::branch64(Condition cond, const Address& lhs, Imm64 val, Label* label)
+{
+    MOZ_ASSERT(cond == Assembler::NotEqual,
+               "other condition codes not supported");
+
+    branch32(cond, lhs, val.firstHalf(), label);
+    branch32(cond, Address(lhs.base, lhs.offset + sizeof(uint32_t)), val.secondHalf(), label);
+}
+
+void
+MacroAssembler::branch64(Condition cond, const Address& lhs, const Address& rhs, Register scratch,
+                         Label* label)
+{
+    MOZ_ASSERT(cond == Assembler::NotEqual,
+               "other condition codes not supported");
+    MOZ_ASSERT(lhs.base != scratch);
+    MOZ_ASSERT(rhs.base != scratch);
+
+    load32(rhs, scratch);
+    branch32(cond, lhs, scratch, label);
+
+    load32(Address(rhs.base, rhs.offset + sizeof(uint32_t)), scratch);
+    branch32(cond, Address(lhs.base, lhs.offset + sizeof(uint32_t)), scratch, label);
 }
 
 void
@@ -682,7 +714,7 @@ MacroAssembler::branchDouble(DoubleCondition cond, FloatRegister lhs, FloatRegis
     ma_b(label, ConditionFromDoubleCondition(cond));
 }
 
-// There are two options for implementing emitTruncateDouble:
+// There are two options for implementing branchTruncateDouble:
 //
 // 1. Convert the floating point value to an integer, if it did not fit, then it
 // was clamped to INT_MIN/INT_MAX, and we can test it. NOTE: if the value

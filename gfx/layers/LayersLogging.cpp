@@ -145,6 +145,22 @@ AppendToString(std::stringstream& aStream, const EventRegions& e,
 }
 
 void
+AppendToString(std::stringstream& aStream, const ScrollMetadata& m,
+               const char* pfx, const char* sfx)
+{
+  aStream << pfx;
+  AppendToString(aStream, m.GetMetrics(), "{ [metrics=");
+  AppendToString(aStream, m.GetBackgroundColor(), "] [color=");
+  if (m.GetScrollParentId() != FrameMetrics::NULL_SCROLL_ID) {
+    AppendToString(aStream, m.GetScrollParentId(), "] [scrollParent=");
+  }
+  if (m.HasClipRect()) {
+    AppendToString(aStream, m.ClipRect(), "] [clip=");
+  }
+  aStream << "] }" << sfx;
+}
+
+void
 AppendToString(std::stringstream& aStream, const FrameMetrics& m,
                const char* pfx, const char* sfx, bool detailed)
 {
@@ -157,17 +173,10 @@ AppendToString(std::stringstream& aStream, const FrameMetrics& m,
   }
   AppendToString(aStream, m.GetDisplayPort(), "] [dp=");
   AppendToString(aStream, m.GetCriticalDisplayPort(), "] [cdp=");
-  AppendToString(aStream, m.GetBackgroundColor(), "] [color=");
   if (!detailed) {
     AppendToString(aStream, m.GetScrollId(), "] [scrollId=");
-    if (m.GetScrollParentId() != FrameMetrics::NULL_SCROLL_ID) {
-      AppendToString(aStream, m.GetScrollParentId(), "] [scrollParent=");
-    }
     if (m.IsRootContent()) {
       aStream << "] [rcd";
-    }
-    if (m.HasClipRect()) {
-      AppendToString(aStream, m.ClipRect(), "] [clip=");
     }
     AppendToString(aStream, m.GetZoom(), "] [z=", "] }");
   } else {
@@ -182,9 +191,8 @@ AppendToString(std::stringstream& aStream, const FrameMetrics& m,
     AppendToString(aStream, m.GetZoom(), " z=");
     AppendToString(aStream, m.GetExtraResolution(), " er=");
     aStream << nsPrintfCString(")] [u=(%d %d %lu)",
-            m.GetScrollOffsetUpdated(), m.GetDoSmoothScroll(),
+            m.GetScrollUpdateType(), m.GetDoSmoothScroll(),
             m.GetScrollGeneration()).get();
-    AppendToString(aStream, m.GetScrollParentId(), "] [p=");
     aStream << nsPrintfCString("] [i=(%ld %lld %d)] }",
             m.GetPresShellId(), m.GetScrollId(), m.IsRootContent()).get();
   }

@@ -1,3 +1,9 @@
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 "use strict";
 
 const {
@@ -30,13 +36,15 @@ const TIMELINE_BACKGROUND_RESIZE_DEBOUNCE_TIMER = 50;
  * new time and state of the timeline.
  *
  * @param {InspectorPanel} inspector.
+ * @param {Object} serverTraits The list of server-side capabilities.
  */
-function AnimationsTimeline(inspector) {
+function AnimationsTimeline(inspector, serverTraits) {
   this.animations = [];
   this.targetNodes = [];
   this.timeBlocks = [];
   this.details = [];
   this.inspector = inspector;
+  this.serverTraits = serverTraits;
 
   this.onAnimationStateChanged = this.onAnimationStateChanged.bind(this);
   this.onScrubberMouseDown = this.onScrubberMouseDown.bind(this);
@@ -81,7 +89,8 @@ AnimationsTimeline.prototype = {
         "class": "scrubber-handle"
       }
     });
-    this.scrubberHandleEl.addEventListener("mousedown", this.onScrubberMouseDown);
+    this.scrubberHandleEl.addEventListener("mousedown",
+      this.onScrubberMouseDown);
 
     this.timeHeaderEl = createNode({
       parent: this.rootWrapperEl,
@@ -89,7 +98,8 @@ AnimationsTimeline.prototype = {
         "class": "time-header track-container"
       }
     });
-    this.timeHeaderEl.addEventListener("mousedown", this.onScrubberMouseDown);
+    this.timeHeaderEl.addEventListener("mousedown",
+      this.onScrubberMouseDown);
 
     this.animationsEl = createNode({
       parent: this.rootWrapperEl,
@@ -99,14 +109,16 @@ AnimationsTimeline.prototype = {
       }
     });
 
-    this.win.addEventListener("resize", this.onWindowResize);
+    this.win.addEventListener("resize",
+      this.onWindowResize);
   },
 
   destroy: function() {
     this.stopAnimatingScrubber();
     this.unrender();
 
-    this.win.removeEventListener("resize", this.onWindowResize);
+    this.win.removeEventListener("resize",
+      this.onWindowResize);
     this.timeHeaderEl.removeEventListener("mousedown",
       this.onScrubberMouseDown);
     this.scrubberHandleEl.removeEventListener("mousedown",
@@ -122,6 +134,7 @@ AnimationsTimeline.prototype = {
     this.scrubberHandleEl = null;
     this.win = null;
     this.inspector = null;
+    this.serverTraits = null;
   },
 
   /**
@@ -144,6 +157,7 @@ AnimationsTimeline.prototype = {
     for (let animation of this.animations) {
       animation.off("changed", this.onAnimationStateChanged);
     }
+    this.stopAnimatingScrubber();
     TimeScale.reset();
     this.destroySubComponents("targetNodes");
     this.destroySubComponents("timeBlocks");
@@ -155,6 +169,11 @@ AnimationsTimeline.prototype = {
   },
 
   onWindowResize: function() {
+    // Don't do anything if the root element has a width of 0
+    if (this.rootWrapperEl.offsetWidth === 0) {
+      return;
+    }
+
     if (this.windowResizeTimer) {
       this.win.clearTimeout(this.windowResizeTimer);
     }
@@ -277,9 +296,9 @@ AnimationsTimeline.prototype = {
         parent: this.animationsEl,
         nodeType: "li",
         attributes: {
-          "class": "animation" + (animation.state.isRunningOnCompositor
-                                  ? " fast-track"
-                                  : "")
+          "class": "animation " +
+                   animation.state.type +
+                   (animation.state.isRunningOnCompositor ? " fast-track" : "")
         }
       });
 
@@ -293,7 +312,7 @@ AnimationsTimeline.prototype = {
         }
       });
 
-      let details = new AnimationDetails();
+      let details = new AnimationDetails(this.serverTraits);
       details.init(detailsEl);
       details.on("frame-selected", this.onFrameSelected);
       this.details.push(details);
@@ -357,16 +376,19 @@ AnimationsTimeline.prototype = {
   },
 
   startAnimatingScrubber: function(time) {
-    let x = TimeScale.startTimeToDistance(time);
-    this.scrubberEl.style.left = x + "%";
-
-    // Only stop the scrubber if it's out of bounds or all animations have been
-    // paused, but not if at least an animation is infinite.
     let isOutOfBounds = time < TimeScale.minStartTime ||
                         time > TimeScale.maxEndTime;
     let isAllPaused = !this.isAtLeastOneAnimationPlaying();
     let hasInfinite = this.hasInfiniteAnimations();
 
+    let x = TimeScale.startTimeToDistance(time);
+    if (x > 100 && !hasInfinite) {
+      x = 100;
+    }
+    this.scrubberEl.style.left = x + "%";
+
+    // Only stop the scrubber if it's out of bounds or all animations have been
+    // paused, but not if at least an animation is infinite.
     if (isAllPaused || (isOutOfBounds && !hasInfinite)) {
       this.stopAnimatingScrubber();
       this.emit("timeline-data-changed", {
@@ -410,15 +432,21 @@ AnimationsTimeline.prototype = {
 
   drawHeaderAndBackground: function() {
     let width = this.timeHeaderEl.offsetWidth;
-    let scale = width / (TimeScale.maxEndTime - TimeScale.minStartTime);
+    let animationDuration = TimeScale.maxEndTime - TimeScale.minStartTime;
+    let minTimeInterval = TIME_GRADUATION_MIN_SPACING *
+                          animationDuration / width;
+    let intervalLength = findOptimalTimeInterval(minTimeInterval);
+    let intervalWidth = intervalLength * width / animationDuration;
+
     drawGraphElementBackground(this.win.document, "time-graduations",
-                               width, scale);
+                               width, intervalWidth);
 
     // And the time graduation header.
     this.timeHeaderEl.innerHTML = "";
-    let interval = findOptimalTimeInterval(scale, TIME_GRADUATION_MIN_SPACING);
-    for (let i = 0; i < width; i += interval) {
-      let pos = 100 * i / width;
+
+    for (let i = 0; i <= width / intervalWidth; i++) {
+      let pos = 100 * i * intervalWidth / width;
+
       createNode({
         parent: this.timeHeaderEl,
         nodeType: "span",

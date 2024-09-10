@@ -276,10 +276,7 @@ nsXPCWrappedJSClass::CallQueryInterfaceOnJSObject(JSContext* cx,
                 }
             }
 
-            // Don't report if reporting was disabled by someone else.
-            if (!ContextOptionsRef(cx).dontReportUncaught() &&
-                !ContextOptionsRef(cx).autoJSAPIOwnsErrorReporting())
-                JS_ReportPendingException(cx);
+            MOZ_ASSERT(ContextOptionsRef(cx).autoJSAPIOwnsErrorReporting());
         } else if (!success) {
             NS_WARNING("QI hook ran OOMed - this is probably a bug!");
         }
@@ -1431,9 +1428,7 @@ FinalizeStub(JSFreeOp* fop, JSObject* obj)
 {
 }
 
-static const JSClass XPCOutParamClass = {
-    "XPCOutParam",
-    0,
+static const JSClassOps XPCOutParamClassOps = {
     nullptr,   /* addProperty */
     nullptr,   /* delProperty */
     nullptr,   /* getProperty */
@@ -1446,6 +1441,12 @@ static const JSClass XPCOutParamClass = {
     nullptr,   /* hasInstance */
     nullptr,   /* construct */
     nullptr    /* trace */
+};
+
+static const JSClass XPCOutParamClass = {
+    "XPCOutParam",
+    0,
+    &XPCOutParamClassOps
 };
 
 bool

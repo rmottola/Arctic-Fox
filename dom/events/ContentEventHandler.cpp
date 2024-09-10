@@ -183,9 +183,9 @@ ContentEventHandler::InitCommon()
   NS_ENSURE_TRUE(endNode, NS_ERROR_FAILURE);
 
   // See bug 537041 comment 5, the range could have removed node.
-  NS_ENSURE_TRUE(startNode->GetCurrentDoc() == mPresShell->GetDocument(),
+  NS_ENSURE_TRUE(startNode->GetUncomposedDoc() == mPresShell->GetDocument(),
                  NS_ERROR_NOT_AVAILABLE);
-  NS_ASSERTION(startNode->GetCurrentDoc() == endNode->GetCurrentDoc(),
+  NS_ASSERTION(startNode->GetUncomposedDoc() == endNode->GetUncomposedDoc(),
                "mFirstSelectedRange crosses the document boundary");
 
   mRootContent = startNode->GetSelectionRootContent(mPresShell);
@@ -1122,6 +1122,15 @@ ContentEventHandler::OnQuerySelectedText(WidgetQueryContentEvent* aEvent)
     return rv;
   }
 
+  nsINode* const startNode = mFirstSelectedRange->GetStartParent();
+  nsINode* const endNode = mFirstSelectedRange->GetEndParent();
+
+  // Make sure the selection is within the root content range.
+  if (!nsContentUtils::ContentIsDescendantOf(startNode, mRootContent) ||
+      !nsContentUtils::ContentIsDescendantOf(endNode, mRootContent)) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
   NS_ASSERTION(aEvent->mReply.mString.IsEmpty(),
                "The reply string must be empty");
 
@@ -1525,9 +1534,9 @@ ContentEventHandler::OnQueryCharacterAtPoint(WidgetQueryContentEvent* aEvent)
 
   // The root frame's widget might be different, e.g., the event was fired on
   // a popup but the rootFrame is the document root.
-  if (rootWidget != aEvent->widget) {
-    NS_PRECONDITION(aEvent->widget, "The event must have the widget");
-    nsView* view = nsView::GetViewFor(aEvent->widget);
+  if (rootWidget != aEvent->mWidget) {
+    NS_PRECONDITION(aEvent->mWidget, "The event must have the widget");
+    nsView* view = nsView::GetViewFor(aEvent->mWidget);
     NS_ENSURE_TRUE(view, NS_ERROR_FAILURE);
     rootFrame = view->GetFrame();
     NS_ENSURE_TRUE(rootFrame, NS_ERROR_FAILURE);
@@ -1538,9 +1547,9 @@ ContentEventHandler::OnQueryCharacterAtPoint(WidgetQueryContentEvent* aEvent)
   WidgetQueryContentEvent eventOnRoot(true, eQueryCharacterAtPoint,
                                       rootWidget);
   eventOnRoot.mUseNativeLineBreak = aEvent->mUseNativeLineBreak;
-  eventOnRoot.refPoint = aEvent->refPoint;
-  if (rootWidget != aEvent->widget) {
-    eventOnRoot.refPoint += aEvent->widget->WidgetToScreenOffset() -
+  eventOnRoot.mRefPoint = aEvent->mRefPoint;
+  if (rootWidget != aEvent->mWidget) {
+    eventOnRoot.mRefPoint += aEvent->mWidget->WidgetToScreenOffset() -
       rootWidget->WidgetToScreenOffset();
   }
   nsPoint ptInRoot =
@@ -1602,7 +1611,7 @@ ContentEventHandler::OnQueryCharacterAtPoint(WidgetQueryContentEvent* aEvent)
     return rv;
   }
 
-  WidgetQueryContentEvent textRect(true, eQueryTextRect, aEvent->widget);
+  WidgetQueryContentEvent textRect(true, eQueryTextRect, aEvent->mWidget);
   textRect.InitForQueryTextRect(offset, 1, aEvent->mUseNativeLineBreak);
   rv = OnQueryTextRect(&textRect);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -1628,14 +1637,15 @@ ContentEventHandler::OnQueryDOMWidgetHittest(WidgetQueryContentEvent* aEvent)
   aEvent->mSucceeded = false;
   aEvent->mReply.mWidgetIsHit = false;
 
-  NS_ENSURE_TRUE(aEvent->widget, NS_ERROR_FAILURE);
+  NS_ENSURE_TRUE(aEvent->mWidget, NS_ERROR_FAILURE);
 
   nsIDocument* doc = mPresShell->GetDocument();
   NS_ENSURE_TRUE(doc, NS_ERROR_FAILURE);
   nsIFrame* docFrame = mPresShell->GetRootFrame();
   NS_ENSURE_TRUE(docFrame, NS_ERROR_FAILURE);
 
-  LayoutDeviceIntPoint eventLoc = aEvent->refPoint + aEvent->widget->WidgetToScreenOffset();
+  LayoutDeviceIntPoint eventLoc =
+    aEvent->mRefPoint + aEvent->mWidget->WidgetToScreenOffset();
   nsIntRect docFrameRect = docFrame->GetScreenRect(); // Returns CSS pixels
   CSSIntPoint eventLocCSS(
     mPresContext->DevPixelsToIntCSSPixels(eventLoc.x) - docFrameRect.x,
@@ -1652,7 +1662,7 @@ ContentEventHandler::OnQueryDOMWidgetHittest(WidgetQueryContentEvent* aEvent)
     } else if (targetFrame) {
       targetWidget = targetFrame->GetNearestWidget();
     }
-    if (aEvent->widget == targetWidget) {
+    if (aEvent->mWidget == targetWidget) {
       aEvent->mReply.mWidgetIsHit = true;
     }
   }
@@ -1900,16 +1910,24 @@ ContentEventHandler::ConvertToRootRelativeOffset(nsIFrame* aFrame,
 {
   NS_ASSERTION(aFrame, "aFrame must not be null");
 
-  nsPresContext* rootPresContext = aFrame->PresContext()->GetRootPresContext();
-  if (NS_WARN_IF(!rootPresContext)) {
+  nsPresContext* thisPC = aFrame->PresContext();
+  nsPresContext* rootPC = thisPC->GetRootPresContext();
+  if (NS_WARN_IF(!rootPC)) {
     return NS_ERROR_FAILURE;
   }
-  nsIFrame* rootFrame = rootPresContext->PresShell()->GetRootFrame();
+  nsIFrame* rootFrame = rootPC->PresShell()->GetRootFrame();
   if (NS_WARN_IF(!rootFrame)) {
     return NS_ERROR_FAILURE;
   }
 
   aRect = nsLayoutUtils::TransformFrameRectToAncestor(aFrame, aRect, rootFrame);
+
+  // TransformFrameRectToAncestor returned the rect in the ancestor's appUnits,
+  // but we want it in aFrame's units (in case of different full-zoom factors),
+  // so convert back.
+  aRect = aRect.ScaleToOtherAppUnitsRoundOut(rootPC->AppUnitsPerDevPixel(),
+                                             thisPC->AppUnitsPerDevPixel());
+
   return NS_OK;
 }
 

@@ -10,7 +10,15 @@
 <pre id="test">
 <script class="testbody" type="text/javascript">
 
+
 function startTest() {
+  // also do general checks on mimetype support for audio-only
+  ok(MediaRecorder.isTypeSupported("audio/ogg"), 'Should support audio/ogg');
+  ok(MediaRecorder.isTypeSupported('audio/ogg; codecs="opus"'), 'Should support audio/ogg+opus');
+  ok(!MediaRecorder.isTypeSupported('audio/ogg; codecs="foobar"'), 'Should not support audio/ogg + unknown_codec');
+  ok(!MediaRecorder.isTypeSupported("video/webm"), 'Should not support video/webm');
+  ok(!MediaRecorder.isTypeSupported("video/mp4"), 'Should not support video/mp4');
+
   navigator.mozGetUserMedia({audio: false, video: true, fake: true},
     function(stream) {
 
@@ -26,6 +34,13 @@ function startTest() {
 
       mediaRecorder.onerror = function (e) {
         callbackStep++;
+        if (callbackStep == 1) {
+          try {
+            mediaRecorder.pause();
+          } catch(e) {
+            ok(false, 'Should not get exception in pause call.');
+          }
+        }
         ok(callbackStep < 3, 'onerror callback fired as expected.');
         is(e.name, 'GenericError', 'Error name should be GenericError.');
         is(mediaRecorder.mimeType, '', 'mimetype should be empty');
@@ -60,12 +75,6 @@ function startTest() {
       } catch(e) {
         ok(false, 'Should not get exception in start call.');
       }
-
-      try {
-        mediaRecorder.pause();
-      } catch(e) {
-        ok(false, 'Should not get exception in pause call.');
-      }
     },
     function(err) {
       ok(false, 'Unexpected error fired with: ' + err);
@@ -81,7 +90,8 @@ SimpleTest.waitForExplicitFinish();
 SpecialPowers.pushPrefEnv(
   {
     "set": [
-      ["media.encoder.webm.enabled", false]
+      ["media.encoder.webm.enabled", false],
+      ["media.encoder.omx.enabled", false]
     ]
   }, startTest);
 

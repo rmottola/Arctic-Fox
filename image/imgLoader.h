@@ -253,18 +253,18 @@ public:
 
   nsresult Init();
 
-  static imgLoader* Create()
+  static already_AddRefed<imgLoader>
+  Create()
   {
       // Unfortunately, we rely on XPCOM module init happening
       // before imgLoader creation. For now, it's easier
       // to just call CallCreateInstance() which will init
       // the image module instead of calling new imgLoader
       // directly.
-      imgILoader* loader;
-      CallCreateInstance("@mozilla.org/image/loader;1", &loader);
+      nsCOMPtr<imgILoader> loader = do_CreateInstance("@mozilla.org/image/loader;1");
       // There's only one imgLoader implementation so we
       // can safely cast to it.
-      return static_cast<imgLoader*>(loader);
+      return loader.forget().downcast<imgLoader>();
   }
 
   static already_AddRefed<imgLoader>
@@ -277,7 +277,8 @@ public:
                      nsIPrincipal* aLoadingPrincipal,
                      nsILoadGroup* aLoadGroup,
                      imgINotificationObserver* aObserver,
-                     nsISupports* aCX,
+                     nsINode* aContext,
+                     nsIDocument* aLoadingDocument,
                      nsLoadFlags aLoadFlags,
                      nsISupports* aCacheKey,
                      nsContentPolicyType aContentPolicyType,
@@ -414,12 +415,6 @@ private: // methods
   void CacheEntriesChanged(bool aForChrome, int32_t aSizeDiff = 0);
   void CheckCacheLimits(imgCacheTable& cache, imgCacheQueue& queue);
 
-#ifdef MOZ_JXR
-  void UpdateJXRAcceptHeader(bool enabled);
-  static void FindMIMETypeInAcceptHeader(const char* mimeType, char* start,
-      char* end, char** subStart, char** subEnd);
-#endif
-
 private: // data
   friend class imgCacheEntry;
   friend class imgMemoryReporter;
@@ -448,10 +443,6 @@ private: // data
 
   mozilla::UniquePtr<imgCacheExpirationTracker> mCacheTracker;
   bool mRespectPrivacy;
-
-#ifdef MOZ_JXR
-  nsCString mLastJxrMimeType;
-#endif
 };
 
 

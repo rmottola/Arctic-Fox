@@ -656,6 +656,11 @@ nsUrlClassifierDBServiceWorker::CacheCompletions(CacheResultArray *results)
   // Ownership is transferred in to us
   nsAutoPtr<CacheResultArray> resultsPtr(results);
 
+  if (mLastResults == *resultsPtr) {
+    LOG(("Skipping completions that have just been cached already."));
+    return NS_OK;
+  }
+
   nsAutoPtr<ProtocolParser> pParse(new ProtocolParser());
   nsTArray<TableUpdate*> updates;
 
@@ -698,6 +703,7 @@ nsUrlClassifierDBServiceWorker::CacheCompletions(CacheResultArray *results)
    }
 
   mClassifier->ApplyUpdates(&updates);
+  mLastResults = *resultsPtr;
   return NS_OK;
 }
 
@@ -753,6 +759,15 @@ nsUrlClassifierDBServiceWorker::SetLastUpdateTime(const nsACString &table,
 
   return NS_OK;
 }
+
+NS_IMETHODIMP
+nsUrlClassifierDBServiceWorker::ClearLastResults()
+{
+  MOZ_ASSERT(!NS_IsMainThread(), "Must be on the background thread");
+  mLastResults.Clear();
+  return NS_OK;
+}
+
 
 // -------------------------------------------------------------------------
 // nsUrlClassifierLookupCallback
@@ -863,6 +878,8 @@ nsUrlClassifierLookupCallback::LookupComplete(nsTArray<LookupResult>* results)
     }
   }
 
+  LOG(("nsUrlClassifierLookupCallback::LookupComplete [%p] "
+       "%u pending completions", this, mPendingCompletions));
   if (mPendingCompletions == 0) {
     // All results were complete, we're ready!
     HandleResults();
@@ -933,8 +950,14 @@ nsUrlClassifierLookupCallback::HandleResults()
 {
   if (!mResults) {
     // No results, this URI is clean.
+    LOG(("nsUrlClassifierLookupCallback::HandleResults [%p, no results]", this));
     return mCallback->HandleEvent(NS_LITERAL_CSTRING(""));
   }
+  MOZ_ASSERT(mPendingCompletions == 0, "HandleResults() should never be "
+             "called while there are pending completions");
+
+  LOG(("nsUrlClassifierLookupCallback::HandleResults [%p, %u results]",
+       this, mResults->Length()));
 
   nsTArray<nsCString> tables;
   // Build a stringified list of result tables.
@@ -952,7 +975,8 @@ nsUrlClassifierLookupCallback::HandleResults()
       continue;
     }
 
-    LOG(("Confirmed result from table %s", result.mTableName.get()));
+    LOG(("Confirmed result %X from table %s",
+         result.hash.prefix.ToUint32(), result.mTableName.get()));
 
     if (tables.IndexOf(result.mTableName) == nsTArray<nsCString>::NoIndex) {
       tables.AppendElement(result.mTableName);
@@ -1442,7 +1466,7 @@ nsUrlClassifierDBService::SetHashCompleter(const nsACString &tableName,
   } else {
     mCompleters.Remove(tableName);
   }
-
+  ClearLastResults();
   return NS_OK;
 }
 
@@ -1453,6 +1477,14 @@ nsUrlClassifierDBService::SetLastUpdateTime(const nsACString &tableName,
   NS_ENSURE_TRUE(gDbBackgroundThread, NS_ERROR_NOT_INITIALIZED);
 
   return mWorkerProxy->SetLastUpdateTime(tableName, lastUpdateTime);
+}
+
+NS_IMETHODIMP
+nsUrlClassifierDBService::ClearLastResults()
+{
+  NS_ENSURE_TRUE(gDbBackgroundThread, NS_ERROR_NOT_INITIALIZED);
+
+  return mWorkerProxy->ClearLastResults();
 }
 
 NS_IMETHODIMP

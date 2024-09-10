@@ -70,14 +70,21 @@ class Surface final : public gl::FramebufferAttachmentObject
     EGLint isFixedSize() const;
 
     // FramebufferAttachmentObject implementation
-    GLsizei getAttachmentWidth(const gl::FramebufferAttachment::Target &/*target*/) const override { return getWidth(); }
-    GLsizei getAttachmentHeight(const gl::FramebufferAttachment::Target &/*target*/) const override { return getHeight(); }
+    gl::Extents getAttachmentSize(const gl::FramebufferAttachment::Target &target) const override;
     GLenum getAttachmentInternalFormat(const gl::FramebufferAttachment::Target &target) const override;
     GLsizei getAttachmentSamples(const gl::FramebufferAttachment::Target &target) const override;
 
     void onAttach() override {}
     void onDetach() override {}
     GLuint getId() const override;
+
+    bool flexibleSurfaceCompatibilityRequested() const
+    {
+        return mFlexibleSurfaceCompatibilityRequested;
+    }
+    EGLint getOrientation() const { return mOrientation; }
+
+    bool directComposition() const { return mDirectComposition; }
 
   private:
     virtual ~Surface();
@@ -99,10 +106,13 @@ class Surface final : public gl::FramebufferAttachmentObject
     const egl::Config *mConfig;
 
     bool mPostSubBufferRequested;
+    bool mFlexibleSurfaceCompatibilityRequested;
 
     bool mFixedSize;
     size_t mFixedWidth;
     size_t mFixedHeight;
+
+    bool mDirectComposition;
 
     EGLenum mTextureFormat;
     EGLenum mTextureTarget;
@@ -110,6 +120,8 @@ class Surface final : public gl::FramebufferAttachmentObject
     EGLint mPixelAspectRatio;      // Display aspect ratio
     EGLenum mRenderBuffer;         // Render buffer
     EGLenum mSwapBehavior;         // Buffer swap behavior
+
+    EGLint mOrientation;
 
     BindingPointer<gl::Texture> mTexture;
 };

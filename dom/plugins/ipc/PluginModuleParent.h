@@ -136,6 +136,8 @@ public:
         return mPluginName + mPluginVersion;
     }
 
+    void AccumulateModuleInitBlockedTime();
+
     virtual nsresult GetRunID(uint32_t* aRunID) override;
     virtual void SetHasLocalInstance() override {
         mHadLocalInstance = true;
@@ -145,7 +147,8 @@ public:
 
 protected:
     virtual mozilla::ipc::RacyInterruptPolicy
-    MediateInterruptRace(const Message& parent, const Message& child) override
+    MediateInterruptRace(const MessageInfo& parent,
+                         const MessageInfo& child) override
     {
         return MediateRace(parent, child);
     }
@@ -263,6 +266,11 @@ protected:
     virtual nsresult GetScrollCaptureContainer(NPP aInstance, mozilla::layers::ImageContainer** aContainer) override;
     virtual nsresult UpdateScrollState(NPP aInstance, bool aIsScrolling);
 #endif
+
+    virtual nsresult HandledWindowedPluginKeyEvent(
+                       NPP aInstance,
+                       const mozilla::NativeEventData& aNativeKeyData,
+                       bool aIsConsumed) override;
 
 #if defined(XP_UNIX) && !defined(XP_MACOSX) && !defined(MOZ_WIDGET_GONK)
     virtual nsresult NP_Initialize(NPNetscapeFuncs* bFuncs, NPPluginFuncs* pFuncs, NPError* error) override;
@@ -418,6 +426,8 @@ class PluginModuleChromeParent
      *
      * @param aMsgLoop the main message pump associated with the module
      *   protocol.
+     * @param aContentPid PID of the e10s content process from which a hang was
+     *   reported. May be kInvalidProcessId if not applicable.
      * @param aMonitorDescription a string describing the hang monitor that
      *   is making this call. This string is added to the crash reporter
      *   annotations for the plugin process.
@@ -427,6 +437,7 @@ class PluginModuleChromeParent
      *   dump will be taken at the time of this call.
      */
     void TerminateChildProcess(MessageLoop* aMsgLoop,
+                               base::ProcessId aContentPid,
                                const nsCString& aMonitorDescription,
                                const nsAString& aBrowserDumpId);
 
@@ -547,7 +558,7 @@ private:
         kHangUIDontShow = (1u << 3)
     };
     Atomic<uint32_t> mHangAnnotationFlags;
-    mozilla::Mutex mHangAnnotatorMutex;
+    mozilla::Mutex mProtocolCallStackMutex;
     InfallibleTArray<mozilla::ipc::IProtocol*> mProtocolCallStack;
 #ifdef XP_WIN
     InfallibleTArray<float> mPluginCpuUsageOnHang;
@@ -597,7 +608,7 @@ private:
 
     DWORD mFlashProcess1;
     DWORD mFlashProcess2;
-    mozilla::plugins::FinishInjectorInitTask* mFinishInitTask;
+    RefPtr<mozilla::plugins::FinishInjectorInitTask> mFinishInitTask;
 #endif
 
     void OnProcessLaunched(const bool aSucceeded);
@@ -611,9 +622,10 @@ private:
             MOZ_ASSERT(aModule);
         }
 
-        void Run() override
+        NS_IMETHOD Run() override
         {
             mModule->OnProcessLaunched(mLaunchSucceeded);
+            return NS_OK;
         }
 
     private:
@@ -625,6 +637,10 @@ private:
     bool                mInitOnAsyncConnect;
     nsresult            mAsyncInitRv;
     NPError             mAsyncInitError;
+    // mContentParent is to be used ONLY during the IPC dance that occurs
+    // when ContentParent::RecvLoadPlugin is called under async plugin init!
+    // In other contexts it is *unsafe*, as there might be multiple content
+    // processes in existence!
     dom::ContentParent* mContentParent;
     nsCOMPtr<nsIObserver> mOfflineObserver;
 #ifdef MOZ_ENABLE_PROFILER_SPS

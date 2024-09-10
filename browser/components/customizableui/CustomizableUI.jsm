@@ -2127,7 +2127,8 @@ var CustomizableUIInternal = {
 
   dispatchToolboxEvent: function(aEventType, aDetails={}, aWindow=null) {
     if (aWindow) {
-      return this._dispatchToolboxEventToWindow(aEventType, aDetails, aWindow);
+      this._dispatchToolboxEventToWindow(aEventType, aDetails, aWindow);
+      return;
     }
     for (let [win, ] of gBuildWindows) {
       this._dispatchToolboxEventToWindow(aEventType, aDetails, win);
@@ -2411,6 +2412,7 @@ var CustomizableUIInternal = {
                                                         aArgs);
       } catch (e) {
         Cu.reportError(e);
+        return undefined;
       }
     };
   },
@@ -3905,7 +3907,7 @@ function XULWidgetGroupWrapper(aWidgetId) {
   });
 
   this.__defineGetter__("instances", function() {
-    return Array.from(gBuildWindows, ([win,]) => this.forWindow(win));
+    return Array.from(gBuildWindows, (wins) => this.forWindow(wins[0]));
   });
 
   Object.freeze(this);

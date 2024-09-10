@@ -20,21 +20,27 @@
 // These constants are duplicated in `PushComponents.js`.
 #define OBSERVER_TOPIC_PUSH "push-message"
 #define OBSERVER_TOPIC_SUBSCRIPTION_CHANGE "push-subscription-change"
+#define OBSERVER_TOPIC_SUBSCRIPTION_LOST "push-subscription-lost"
 
 namespace mozilla {
 namespace dom {
+
+class ContentParent;
+class ContentChild;
 
 /**
  * `PushNotifier` implements the `nsIPushNotifier` interface. This service
  * forwards incoming push messages to service workers running in the content
  * process, and emits XPCOM observer notifications for system subscriptions.
  *
- * The XPCOM service can only be used from the main process. Callers running
- * in the content process should use
- * `ServiceWorkerManager::SendPush{SubscriptionChange}Event` directly.
+ * This service exists solely to support `PushService.jsm`. Other callers
+ * should use `ServiceWorkerManager` directly.
  */
 class PushNotifier final : public nsIPushNotifier
 {
+  friend class ContentParent;
+  friend class ContentChild;
+
 public:
   PushNotifier();
 
@@ -42,22 +48,27 @@ public:
   NS_DECL_CYCLE_COLLECTION_CLASS_AMBIGUOUS(PushNotifier, nsIPushNotifier)
   NS_DECL_NSIPUSHNOTIFIER
 
-  nsresult NotifyPush(const nsACString& aScope, nsIPrincipal* aPrincipal,
-                      Maybe<nsTArray<uint8_t>> aData);
-  nsresult NotifyPushWorkers(const nsACString& aScope,
-                             nsIPrincipal* aPrincipal,
-                             Maybe<nsTArray<uint8_t>> aData);
-  nsresult NotifySubscriptionChangeWorkers(const nsACString& aScope,
-                                           nsIPrincipal* aPrincipal);
-
-protected:
+private:
   virtual ~PushNotifier();
 
-private:
+  nsresult NotifyPush(const nsACString& aScope, nsIPrincipal* aPrincipal,
+                      const nsAString& aMessageId,
+                      const Maybe<nsTArray<uint8_t>>& aData);
+  nsresult NotifyPushWorkers(const nsACString& aScope,
+                             nsIPrincipal* aPrincipal,
+                             const nsAString& aMessageId,
+                             const Maybe<nsTArray<uint8_t>>& aData);
+  nsresult NotifySubscriptionChangeWorkers(const nsACString& aScope,
+                                           nsIPrincipal* aPrincipal);
+  void NotifyErrorWorkers(const nsACString& aScope, const nsAString& aMessage,
+                          uint32_t aFlags);
   nsresult NotifyPushObservers(const nsACString& aScope,
-                               Maybe<nsTArray<uint8_t>> aData);
+                               const Maybe<nsTArray<uint8_t>>& aData);
   nsresult NotifySubscriptionChangeObservers(const nsACString& aScope);
-  bool ShouldNotifyObservers(nsIPrincipal* aPrincipal);
+  nsresult NotifySubscriptionLostObservers(const nsACString& aScope,
+                                           uint16_t aReason);
+  nsresult DoNotifyObservers(nsISupports *aSubject, const char *aTopic,
+                             const nsACString& aScope);
   bool ShouldNotifyWorkers(nsIPrincipal* aPrincipal);
 };
 

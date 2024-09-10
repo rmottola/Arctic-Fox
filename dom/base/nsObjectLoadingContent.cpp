@@ -86,6 +86,7 @@
 #include "mozilla/EventStates.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/dom/HTMLObjectElementBinding.h"
+#include "mozilla/dom/HTMLSharedObjectElement.h"
 
 #ifdef XP_WIN
 // Thanks so much, Microsoft! :(
@@ -140,7 +141,7 @@ InActiveDocument(nsIContent *aContent)
 /// Runnables and helper classes
 ///
 
-class nsAsyncInstantiateEvent : public nsRunnable {
+class nsAsyncInstantiateEvent : public Runnable {
 public:
   explicit nsAsyncInstantiateEvent(nsObjectLoadingContent* aContent)
   : mContent(aContent) {}
@@ -173,7 +174,7 @@ nsAsyncInstantiateEvent::Run()
 // (outside an active document) or stopped (in a document but unrendered). This
 // is used to allow scripts to move a plugin around the document hierarchy
 // without re-instantiating it.
-class CheckPluginStopEvent : public nsRunnable {
+class CheckPluginStopEvent : public Runnable {
 public:
   explicit CheckPluginStopEvent(nsObjectLoadingContent* aContent)
   : mContent(aContent) {}
@@ -248,7 +249,7 @@ CheckPluginStopEvent::Run()
 /**
  * Helper task for firing simple events
  */
-class nsSimplePluginEvent : public nsRunnable {
+class nsSimplePluginEvent : public Runnable {
 public:
   nsSimplePluginEvent(nsIContent* aTarget, const nsAString &aEvent)
     : mTarget(aTarget)
@@ -301,7 +302,7 @@ nsSimplePluginEvent::Run()
 /**
  * A task for firing PluginCrashed DOM Events.
  */
-class nsPluginCrashedEvent : public nsRunnable {
+class nsPluginCrashedEvent : public Runnable {
 public:
   nsCOMPtr<nsIContent> mContent;
   nsString mPluginDumpID;
@@ -360,7 +361,7 @@ nsPluginCrashedEvent::Run()
   return NS_OK;
 }
 
-class nsStopPluginRunnable : public nsRunnable, public nsITimerCallback
+class nsStopPluginRunnable : public Runnable, public nsITimerCallback
 {
 public:
   NS_DECL_ISUPPORTS_INHERITED
@@ -374,7 +375,7 @@ public:
     NS_ASSERTION(aContent, "need a nsObjectLoadingContent");
   }
 
-  // nsRunnable
+  // Runnable
   NS_IMETHOD Run() override;
 
   // nsITimerCallback
@@ -389,7 +390,7 @@ private:
   nsCOMPtr<nsIObjectLoadingContent> mContent;
 };
 
-NS_IMPL_ISUPPORTS_INHERITED(nsStopPluginRunnable, nsRunnable, nsITimerCallback)
+NS_IMPL_ISUPPORTS_INHERITED(nsStopPluginRunnable, Runnable, nsITimerCallback)
 
 NS_IMETHODIMP
 nsStopPluginRunnable::Notify(nsITimer *aTimer)
@@ -1153,6 +1154,20 @@ nsObjectLoadingContent::OnStopRequest(nsIRequest *aRequest,
     if (thisNode && thisNode->IsInComposedDoc()) {
       thisNode->GetComposedDoc()->AddBlockedTrackingNode(thisNode);
     }
+  } else if (aStatusCode == NS_ERROR_BLOCKED_URI) {
+    // Logging is temporarily disabled until after experiment phase.
+    //
+    // nsAutoCString uri;
+    // mURI->GetSpec(uri);
+    // nsCOMPtr<nsIConsoleService> console(
+    //   do_GetService("@mozilla.org/consoleservice;1"));
+    // if (console) {
+    //   nsString message = NS_LITERAL_STRING("Blocking ") +
+    //     NS_ConvertASCIItoUTF16(uri) +
+    //     NS_LITERAL_STRING(" since it was found on an internal Firefox blocklist.");
+    //   console->LogStringMessage(message.get());
+    // }
+    Telemetry::Accumulate(Telemetry::PLUGIN_BLOCKED_FOR_STABILITY, 1);
   }
 
   NS_ENSURE_TRUE(nsContentUtils::LegacyIsCallerChromeOrNativeCode(), NS_ERROR_NOT_AVAILABLE);
@@ -1230,12 +1245,6 @@ nsObjectLoadingContent::GetParentApplication(mozIApplication** aApplication)
 
 NS_IMETHODIMP
 nsObjectLoadingContent::SetIsPrerendered()
-{
-  return NS_ERROR_NOT_IMPLEMENTED;
-}
-
-NS_IMETHODIMP
-nsObjectLoadingContent::SwapFrameLoaders(nsIFrameLoaderOwner* aOtherLoader)
 {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
@@ -1649,7 +1658,7 @@ nsObjectLoadingContent::CheckProcessPolicy(int16_t *aContentPolicy)
   NS_ASSERTION(thisContent, "Must be an instance of content");
 
   nsIDocument* doc = thisContent->OwnerDoc();
-  
+
   int32_t objectType;
   switch (mType) {
     case eType_Image:
@@ -2916,7 +2925,7 @@ nsObjectLoadingContent::PluginCrashed(nsIPluginTag* aPluginTag,
 
   // send nsPluginCrashedEvent
 
-  // Note that aPluginTag in invalidated after we're called, so copy 
+  // Note that aPluginTag in invalidated after we're called, so copy
   // out any data we need now.
   nsAutoCString pluginName;
   aPluginTag->GetName(pluginName);
@@ -3082,24 +3091,35 @@ nsObjectLoadingContent::LoadFallback(FallbackType aType, bool aNotify) {
     aType = eFallbackAlternate;
   }
 
+  // We'll set this to null no matter what now, doing it here means we'll load
+  // child embeds as we find them in the upcoming loop.
+  mType = eType_Null;
+
+  // Do a breadth-first traverse of node tree with the current element as root,
+  // looking for the first embed we can find.
+  nsTArray<nsINodeList*> childNodes;
   if ((thisContent->IsHTMLElement(nsGkAtoms::object) ||
        thisContent->IsHTMLElement(nsGkAtoms::applet)) &&
       (aType == eFallbackUnsupported ||
        aType == eFallbackDisabled ||
        aType == eFallbackBlocklisted))
   {
-    // Show alternate content instead, if it exists
-    for (nsIContent* child = thisContent->GetFirstChild();
-         child; child = child->GetNextSibling()) {
-      if (!child->IsHTMLElement(nsGkAtoms::param) &&
+    for (nsIContent* child = thisContent->GetFirstChild(); child;
+         child = child->GetNextNode(thisContent)) {
+      if (aType != eFallbackAlternate &&
+          !child->IsHTMLElement(nsGkAtoms::param) &&
           nsStyleUtil::IsSignificantChild(child, true, false)) {
         aType = eFallbackAlternate;
-        break;
+      }
+      if (child->IsHTMLElement(nsGkAtoms::embed)) {
+        HTMLSharedObjectElement* object = static_cast<HTMLSharedObjectElement*>(child);
+        if (object) {
+          object->StartObjectLoad(true, true);
+        }
       }
     }
   }
 
-  mType = eType_Null;
   mFallbackType = aType;
 
   // Notify
@@ -3828,4 +3848,3 @@ nsObjectLoadingContent::SetupProtoChainRunner::Run()
 }
 
 NS_IMPL_ISUPPORTS(nsObjectLoadingContent::SetupProtoChainRunner, nsIRunnable)
-

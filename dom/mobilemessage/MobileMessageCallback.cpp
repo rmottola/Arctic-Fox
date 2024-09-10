@@ -261,8 +261,14 @@ MobileMessageCallback::NotifyMessageDeleted(bool *aDeleted, uint32_t aSize)
   JSContext* cx = jsapi.cx();
 
   JS::Rooted<JSObject*> deleteArrayObj(cx, JS_NewArrayObject(cx, aSize));
+  if (!deleteArrayObj) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
   for (uint32_t i = 0; i < aSize; i++) {
-    JS_DefineElement(cx, deleteArrayObj, i, aDeleted[i], JSPROP_ENUMERATE);
+    if (!JS_DefineElement(cx, deleteArrayObj, i, aDeleted[i],
+                          JSPROP_ENUMERATE)) {
+      return NS_ERROR_UNEXPECTED;
+    }
   }
 
   JS::Rooted<JS::Value> deleteArrayVal(cx, JS::ObjectValue(*deleteArrayObj));

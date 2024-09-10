@@ -123,7 +123,8 @@ CSS_PSEUDO_CLASS(mozWindowInactive, ":-moz-window-inactive", 0, "")
 CSS_PSEUDO_CLASS(mozTableBorderNonzero, ":-moz-table-border-nonzero", 0, "")
 
 // Matches HTML frame/iframe elements which are mozbrowser.
-CSS_PSEUDO_CLASS(mozBrowserFrame, ":-moz-browser-frame", 0, "")
+CSS_PSEUDO_CLASS(mozBrowserFrame, ":-moz-browser-frame",
+                 CSS_PSEUDO_CLASS_UA_SHEET_AND_CHROME, "")
 
 // Matches whatever the contextual reference elements are for the
 // matching operation.
@@ -131,7 +132,7 @@ CSS_PSEUDO_CLASS(scope, ":scope", 0, "layout.css.scope-pseudo.enabled")
 
 // :not needs to come at the end of the non-bit pseudo-class list, since
 // it doesn't actually get directly matched on in SelectorMatches.
-CSS_PSEUDO_CLASS(notPseudo, ":not", 0, "")
+CSS_PSEUDO_CLASS(negation, ":not", 0, "")
 
 // :dir(ltr) and :dir(rtl) match elements whose resolved
 // directionality in the markup language is ltr or rtl respectively.

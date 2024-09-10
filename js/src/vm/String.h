@@ -316,6 +316,8 @@ class JSString : public js::gc::TenuredCell
     /* Avoid lame compile errors in JSRope::flatten */
     friend class JSRope;
 
+    friend class js::gc::RelocationOverlay;
+
   protected:
     template <typename CharT>
     MOZ_ALWAYS_INLINE
@@ -471,6 +473,8 @@ class JSString : public js::gc::TenuredCell
     /* Only called by the GC for strings with the AllocKind::STRING kind. */
 
     inline void finalize(js::FreeOp* fop);
+
+    void fixupAfterMovingGC() {}
 
     /* Gets the number of bytes that the chars take on the heap. */
 
@@ -1136,7 +1140,7 @@ NameToId(PropertyName* name)
     return NON_INTEGER_ATOM_TO_JSID(name);
 }
 
-using PropertyNameVector = js::GCVector<PropertyName*>;
+using PropertyNameVector = JS::GCVector<PropertyName*>;
 
 template <typename CharT>
 void

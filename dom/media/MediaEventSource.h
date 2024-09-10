@@ -9,6 +9,7 @@
 
 #include "mozilla/AbstractThread.h"
 #include "mozilla/Atomics.h"
+#include "mozilla/IndexSequence.h"
 #include "mozilla/Mutex.h"
 #include "mozilla/Tuple.h"
 #include "mozilla/TypeTraits.h"
@@ -132,7 +133,7 @@ class ListenerHelper {
   // NS_NewRunnableFunction will result in 2 copies of the event data.
   // One is captured by the lambda and the other is the copy of the lambda.
   template <typename... Ts>
-  class R : public nsRunnable {
+  class R : public Runnable {
   public:
     template <typename... Us>
     R(RevocableToken* aToken, const Function& aFunction, Us&&... aEvents)

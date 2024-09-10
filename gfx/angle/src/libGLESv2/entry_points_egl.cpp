@@ -41,7 +41,7 @@ EGLDisplay EGLAPIENTRY GetDisplay(EGLNativeDisplayType display_id)
 {
     EVENT("(EGLNativeDisplayType display_id = 0x%0.8p)", display_id);
 
-    return Display::getDisplay(display_id, AttributeMap());
+    return Display::GetDisplayFromAttribs(reinterpret_cast<void *>(display_id), AttributeMap());
 }
 
 EGLBoolean EGLAPIENTRY Initialize(EGLDisplay dpy, EGLint *major, EGLint *minor)
@@ -426,6 +426,37 @@ EGLBoolean EGLAPIENTRY QuerySurface(EGLDisplay dpy, EGLSurface surface, EGLint a
         }
         *value = eglSurface->isFixedSize();
         break;
+      case EGL_FLEXIBLE_SURFACE_COMPATIBILITY_SUPPORTED_ANGLE:
+          if (!display->getExtensions().flexibleSurfaceCompatibility)
+          {
+              SetGlobalError(
+                  Error(EGL_BAD_ATTRIBUTE,
+                        "EGL_FLEXIBLE_SURFACE_COMPATIBILITY_SUPPORTED_ANGLE cannot be used without "
+                        "EGL_ANGLE_flexible_surface_compatibility support."));
+              return EGL_FALSE;
+          }
+          *value = eglSurface->flexibleSurfaceCompatibilityRequested();
+          break;
+      case EGL_SURFACE_ORIENTATION_ANGLE:
+          if (!display->getExtensions().surfaceOrientation)
+          {
+              SetGlobalError(Error(EGL_BAD_ATTRIBUTE,
+                                   "EGL_SURFACE_ORIENTATION_ANGLE cannot be queried without "
+                                   "EGL_ANGLE_surface_orientation support."));
+              return EGL_FALSE;
+          }
+          *value = eglSurface->getOrientation();
+          break;
+      case EGL_DIRECT_COMPOSITION_ANGLE:
+          if (!display->getExtensions().directComposition)
+          {
+              SetGlobalError(Error(EGL_BAD_ATTRIBUTE,
+                                   "EGL_DIRECT_COMPOSITION_ANGLE cannot be used without "
+                                   "EGL_ANGLE_direct_composition support."));
+              return EGL_FALSE;
+          }
+          *value = eglSurface->directComposition();
+          break;
       default:
         SetGlobalError(Error(EGL_BAD_ATTRIBUTE));
         return EGL_FALSE;
@@ -589,7 +620,9 @@ EGLBoolean EGLAPIENTRY MakeCurrent(EGLDisplay dpy, EGLSurface draw, EGLSurface r
 
     if (readSurface)
     {
-        Error readCompatError = ValidateCompatibleConfigs(readSurface->getConfig(), context->getConfig(), readSurface->getType());
+        Error readCompatError =
+            ValidateCompatibleConfigs(display, readSurface->getConfig(), readSurface,
+                                      context->getConfig(), readSurface->getType());
         if (readCompatError.isError())
         {
             SetGlobalError(readCompatError);
@@ -603,7 +636,9 @@ EGLBoolean EGLAPIENTRY MakeCurrent(EGLDisplay dpy, EGLSurface draw, EGLSurface r
 
         if (drawSurface)
         {
-            Error drawCompatError = ValidateCompatibleConfigs(drawSurface->getConfig(), context->getConfig(), drawSurface->getType());
+            Error drawCompatError =
+                ValidateCompatibleConfigs(display, drawSurface->getConfig(), drawSurface,
+                                          context->getConfig(), drawSurface->getType());
             if (drawCompatError.isError())
             {
                 SetGlobalError(drawCompatError);
@@ -710,20 +745,56 @@ EGLBoolean EGLAPIENTRY WaitGL(void)
 {
     EVENT("()");
 
-    UNIMPLEMENTED();   // FIXME
+    Display *display = GetGlobalDisplay();
+
+    Error error = ValidateDisplay(display);
+    if (error.isError())
+    {
+        SetGlobalError(error);
+        return EGL_FALSE;
+    }
+
+    // eglWaitGL like calling eglWaitClient with the OpenGL ES API bound. Since we only implement
+    // OpenGL ES we can do the call directly.
+    error = display->waitClient();
+    if (error.isError())
+    {
+        SetGlobalError(error);
+        return EGL_FALSE;
+    }
 
     SetGlobalError(Error(EGL_SUCCESS));
-    return 0;
+    return EGL_TRUE;
 }
 
 EGLBoolean EGLAPIENTRY WaitNative(EGLint engine)
 {
     EVENT("(EGLint engine = %d)", engine);
 
-    UNIMPLEMENTED();   // FIXME
+    Display *display = GetGlobalDisplay();
+
+    Error error = ValidateDisplay(display);
+    if (error.isError())
+    {
+        SetGlobalError(error);
+        return EGL_FALSE;
+    }
+
+    if (engine != EGL_CORE_NATIVE_ENGINE)
+    {
+        SetGlobalError(
+            Error(EGL_BAD_PARAMETER, "the 'engine' parameter has an unrecognized value"));
+    }
+
+    error = display->waitNative(engine, GetGlobalDrawSurface(), GetGlobalReadSurface());
+    if (error.isError())
+    {
+        SetGlobalError(error);
+        return EGL_FALSE;
+    }
 
     SetGlobalError(Error(EGL_SUCCESS));
-    return 0;
+    return EGL_TRUE;
 }
 
 EGLBoolean EGLAPIENTRY SwapBuffers(EGLDisplay dpy, EGLSurface surface)
@@ -1028,10 +1099,24 @@ EGLBoolean EGLAPIENTRY WaitClient(void)
 {
     EVENT("()");
 
-    UNIMPLEMENTED();   // FIXME
+    Display *display = GetGlobalDisplay();
+
+    Error error = ValidateDisplay(display);
+    if (error.isError())
+    {
+        SetGlobalError(error);
+        return EGL_FALSE;
+    }
+
+    error = display->waitClient();
+    if (error.isError())
+    {
+        SetGlobalError(error);
+        return EGL_FALSE;
+    }
 
     SetGlobalError(Error(EGL_SUCCESS));
-    return 0;
+    return EGL_TRUE;
 }
 
 // EGL 1.4
@@ -1361,6 +1446,19 @@ __eglMustCastToProperFunctionPointerType EGLAPIENTRY GetProcAddress(const char *
         INSERT_PROC_ADDRESS(gl, GenVertexArraysOES);
         INSERT_PROC_ADDRESS(gl, IsVertexArrayOES);
 
+        // GL_KHR_debug
+        INSERT_PROC_ADDRESS(gl, DebugMessageControlKHR);
+        INSERT_PROC_ADDRESS(gl, DebugMessageInsertKHR);
+        INSERT_PROC_ADDRESS(gl, DebugMessageCallbackKHR);
+        INSERT_PROC_ADDRESS(gl, GetDebugMessageLogKHR);
+        INSERT_PROC_ADDRESS(gl, PushDebugGroupKHR);
+        INSERT_PROC_ADDRESS(gl, PopDebugGroupKHR);
+        INSERT_PROC_ADDRESS(gl, ObjectLabelKHR);
+        INSERT_PROC_ADDRESS(gl, GetObjectLabelKHR);
+        INSERT_PROC_ADDRESS(gl, ObjectPtrLabelKHR);
+        INSERT_PROC_ADDRESS(gl, GetObjectPtrLabelKHR);
+        INSERT_PROC_ADDRESS(gl, GetPointervKHR);
+
         // GLES3 core
         INSERT_PROC_ADDRESS(gl, ReadBuffer);
         INSERT_PROC_ADDRESS(gl, DrawRangeElements);
@@ -1539,6 +1637,10 @@ __eglMustCastToProperFunctionPointerType EGLAPIENTRY GetProcAddress(const char *
         // EGL_KHR_image_base/EGL_KHR_image
         INSERT_PROC_ADDRESS(egl, CreateImageKHR);
         INSERT_PROC_ADDRESS(egl, DestroyImageKHR);
+
+        // EGL_EXT_device_creation
+        INSERT_PROC_ADDRESS(egl, CreateDeviceANGLE);
+        INSERT_PROC_ADDRESS(egl, ReleaseDeviceANGLE);
 
 #undef INSERT_PROC_ADDRESS
         return map;

@@ -19,7 +19,8 @@
 @APPNAME@/Contents/Info.plist
 @APPNAME@/Contents/PkgInfo
 @APPNAME@/Contents/Plug-Ins/
-@RESPATH@
+@RESPATH@/@MOZ_APP_NAME@.icns
+@RESPATH@/@LPROJ_ROOT@.lproj/*
 #endif
 
 [@AB_CD@]
@@ -42,9 +43,7 @@
 #endif
 
 [xpcom]
-#ifndef XP_MACOSX
 @RESPATH@/dependentlibs.list
-#endif
 #ifndef MOZ_STATIC_JS
 @BINPATH@/@DLL_PREFIX@mozjs@DLL_SUFFIX@
 #endif
@@ -77,29 +76,10 @@
 #endif
 #endif
 #ifndef MOZ_SYSTEM_ICU
-#ifdef MOZ_SHARED_ICU
-#ifdef XP_WIN
-@BINPATH@/icudt@MOZ_ICU_DBG_SUFFIX@@MOZ_ICU_VERSION@.dll
-@BINPATH@/icuin@MOZ_ICU_DBG_SUFFIX@@MOZ_ICU_VERSION@.dll
-@BINPATH@/icuuc@MOZ_ICU_DBG_SUFFIX@@MOZ_ICU_VERSION@.dll
-#elif defined(XP_MACOSX)
-@BINPATH@/libicudata.@MOZ_ICU_VERSION@.dylib
-@BINPATH@/libicui18n.@MOZ_ICU_VERSION@.dylib
-@BINPATH@/libicuuc.@MOZ_ICU_VERSION@.dylib
-#elif defined(XP_UNIX)
-@BINPATH@/libicudata.so.@MOZ_ICU_VERSION@
-@BINPATH@/libicui18n.so.@MOZ_ICU_VERSION@
-@BINPATH@/libicuuc.so.@MOZ_ICU_VERSION@
-#endif
-#endif
+@RESPATH@/@ICU_DATA_FILE@
 #endif
 #ifdef MOZ_SHARED_MOZGLUE
 @BINPATH@/@DLL_PREFIX@mozglue@DLL_SUFFIX@
-#endif
-#ifdef MOZ_REPLACE_MALLOC
-#ifndef MOZ_JEMALLOC4
-@BINPATH@/@DLL_PREFIX@replace_jemalloc@DLL_SUFFIX@
-#endif
 #endif
 #ifdef ANDROID
 @RESPATH@/AndroidManifest.xml
@@ -137,7 +117,7 @@
 #endif
 #endif
 #ifdef MOZ_WEBSPEECH_MODELS
-@BINPATH@/models/
+@RESPATH@/models/
 #endif
 
 ; [Components]
@@ -149,35 +129,34 @@
 #endif
 @RESPATH@/components/accessibility.xpt
 #endif
-@BINPATH@/components/appshell.xpt
-@BINPATH@/components/appstartup.xpt
-@BINPATH@/components/autocomplete.xpt
-@BINPATH@/components/autoconfig.xpt
-@BINPATH@/components/browsercompsbase.xpt
-@BINPATH@/components/browser-element.xpt
-@BINPATH@/components/browser-feeds.xpt
-@BINPATH@/components/caps.xpt
-@BINPATH@/components/chardet.xpt
-@BINPATH@/components/chrome.xpt
-@BINPATH@/components/commandhandler.xpt
-@BINPATH@/components/commandlines.xpt
-@BINPATH@/components/compartments.xpt
-@BINPATH@/components/composer.xpt
-@BINPATH@/components/content_events.xpt
-@BINPATH@/components/content_html.xpt
-@BINPATH@/components/content_xslt.xpt
-@BINPATH@/components/cookie.xpt
-@BINPATH@/components/devtools_security.xpt
-@BINPATH@/components/directory.xpt
-@BINPATH@/components/diskspacewatcher.xpt
-@BINPATH@/components/docshell.xpt
-@BINPATH@/components/dom.xpt
-@BINPATH@/components/dom_activities.xpt
-@BINPATH@/components/dom_apps.xpt
-@BINPATH@/components/dom_newapps.xpt
-@BINPATH@/components/dom_audiochannel.xpt
-@BINPATH@/components/dom_base.xpt
-@BINPATH@/components/dom_system.xpt
+@RESPATH@/components/appshell.xpt
+@RESPATH@/components/appstartup.xpt
+@RESPATH@/components/autocomplete.xpt
+@RESPATH@/components/autoconfig.xpt
+@RESPATH@/components/browsercompsbase.xpt
+@RESPATH@/components/browser-element.xpt
+@RESPATH@/components/browser-feeds.xpt
+@RESPATH@/components/caps.xpt
+@RESPATH@/components/chardet.xpt
+@RESPATH@/components/chrome.xpt
+@RESPATH@/components/commandhandler.xpt
+@RESPATH@/components/commandlines.xpt
+@RESPATH@/components/compartments.xpt
+@RESPATH@/components/composer.xpt
+@RESPATH@/components/content_events.xpt
+@RESPATH@/components/content_html.xpt
+@RESPATH@/components/content_xslt.xpt
+@RESPATH@/components/cookie.xpt
+@RESPATH@/components/directory.xpt
+@RESPATH@/components/diskspacewatcher.xpt
+@RESPATH@/components/docshell.xpt
+@RESPATH@/components/dom.xpt
+@RESPATH@/components/dom_activities.xpt
+@RESPATH@/components/dom_apps.xpt
+@RESPATH@/components/dom_newapps.xpt
+@RESPATH@/components/dom_audiochannel.xpt
+@RESPATH@/components/dom_base.xpt
+@RESPATH@/components/dom_system.xpt
 #ifdef MOZ_WIDGET_GONK
 @RESPATH@/components/dom_wifi.xpt
 @RESPATH@/components/dom_system_gonk.xpt
@@ -190,7 +169,7 @@
 @RESPATH@/components/dom_bluetooth.xpt
 #endif
 #ifdef MOZ_B2G_CAMERA
-@BINPATH@/components/dom_camera.xpt
+@RESPATH@/components/dom_camera.xpt
 #endif
 @RESPATH@/components/dom_canvas.xpt
 @RESPATH@/components/dom_contacts.xpt
@@ -375,9 +354,6 @@
 @RESPATH@/components/zipwriter.xpt
 
 ; JavaScript components
-@RESPATH@/components/RequestSync.manifest
-@RESPATH@/components/RequestSyncManager.js
-@RESPATH@/components/RequestSyncScheduler.js
 @RESPATH@/components/ChromeNotifications.js
 @RESPATH@/components/ChromeNotifications.manifest
 @RESPATH@/components/ConsoleAPI.manifest
@@ -420,6 +396,8 @@
 @RESPATH@/components/nsLoginInfo.js
 @RESPATH@/components/nsLoginManager.js
 @RESPATH@/components/nsLoginManagerPrompter.js
+@RESPATH@/components/TooltipTextProvider.js
+@RESPATH@/components/TooltipTextProvider.manifest
 @RESPATH@/components/NetworkGeolocationProvider.manifest
 @RESPATH@/components/NetworkGeolocationProvider.js
 @RESPATH@/components/TVSimulatorService.js
@@ -446,6 +424,8 @@
 @RESPATH@/components/PresentationDeviceInfoManager.js
 @RESPATH@/components/BuiltinProviders.manifest
 @RESPATH@/components/TCPPresentationServer.js
+@RESPATH@/components/PresentationDataChannelSessionTransport.js
+@RESPATH@/components/PresentationDataChannelSessionTransport.manifest
 
 #ifdef MOZ_SECUREELEMENT
 @RESPATH@/components/ACEService.js
@@ -485,8 +465,8 @@
 
 ; Camera
 #ifdef MOZ_B2G_CAMERA
-@BINPATH@/components/CameraTestHardware.js
-@BINPATH@/components/CameraTestHardware.manifest
+@RESPATH@/components/CameraTestHardware.js
+@RESPATH@/components/CameraTestHardware.manifest
 #endif // MOZ_B2G_CAMERA
 
 ; Tethering
@@ -689,6 +669,9 @@
 ; InputMethod API
 @RESPATH@/components/MozKeyboard.js
 @RESPATH@/components/InputMethod.manifest
+#ifdef MOZ_B2G
+@RESPATH@/components/inputmethod.xpt
+#endif
 
 @RESPATH@/components/EngineeringMode.manifest
 @RESPATH@/components/EngineeringModeAPI.js
@@ -804,18 +787,6 @@
 @RESPATH@/res/table-remove-row-active.gif
 @RESPATH@/res/table-remove-row-hover.gif
 @RESPATH@/res/table-remove-row.gif
-@RESPATH@/res/accessiblecaret.png
-@RESPATH@/res/accessiblecaret@1.5x.png
-@RESPATH@/res/accessiblecaret@2.25x.png
-@RESPATH@/res/accessiblecaret@2x.png
-@RESPATH@/res/accessiblecaret_tilt_left.png
-@RESPATH@/res/accessiblecaret_tilt_left@1.5x.png
-@RESPATH@/res/accessiblecaret_tilt_left@2.25x.png
-@RESPATH@/res/accessiblecaret_tilt_left@2x.png
-@RESPATH@/res/accessiblecaret_tilt_right.png
-@RESPATH@/res/accessiblecaret_tilt_right@1.5x.png
-@RESPATH@/res/accessiblecaret_tilt_right@2.25x.png
-@RESPATH@/res/accessiblecaret_tilt_right@2x.png
 @RESPATH@/res/grabber.gif
 #ifdef XP_MACOSX
 @RESPATH@/res/cursors/*
@@ -947,10 +918,6 @@ bin/libfreebl_32int64_3.so
 
 @RESPATH@/components/FxAccountsUIGlue.js
 @RESPATH@/components/services_fxaccounts.xpt
-
-@RESPATH@/components/DataStore.manifest
-@RESPATH@/components/DataStoreImpl.js
-@RESPATH@/components/dom_datastore.xpt
 
 @RESPATH@/components/MobileIdentity.manifest
 @RESPATH@/components/MobileIdentity.js

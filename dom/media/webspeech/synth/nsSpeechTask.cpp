@@ -325,7 +325,8 @@ nsSpeechTask::SendAudioImpl(RefPtr<mozilla::SharedBuffer>& aSamples, uint32_t aD
   AudioSegment segment;
   AutoTArray<const int16_t*, 1> channelData;
   channelData.AppendElement(static_cast<int16_t*>(aSamples->Data()));
-  segment.AppendFrames(aSamples.forget(), channelData, aDataLen);
+  segment.AppendFrames(aSamples.forget(), channelData, aDataLen,
+                       PRINCIPAL_HANDLE_NONE);
   mStream->AppendToTrack(1, &segment);
   mStream->AdvanceKnownTracksTime(STREAM_TIME_MAX);
 }
@@ -498,9 +499,15 @@ nsSpeechTask::DispatchResumeImpl(float aElapsedTime, uint32_t aCharIndex)
 NS_IMETHODIMP
 nsSpeechTask::DispatchError(float aElapsedTime, uint32_t aCharIndex)
 {
+  LOG(LogLevel::Debug, ("nsSpeechTask::DispatchError"));
+
   if (!mIndirectAudio) {
     NS_WARNING("Can't call DispatchError() from a direct audio speech service");
     return NS_ERROR_FAILURE;
+  }
+
+  if (!mPreCanceled) {
+    nsSynthVoiceRegistry::GetInstance()->SpeakNext();
   }
 
   return DispatchErrorImpl(aElapsedTime, aCharIndex);
@@ -512,6 +519,10 @@ nsSpeechTask::DispatchErrorImpl(float aElapsedTime, uint32_t aCharIndex)
   MOZ_ASSERT(mUtterance);
   if(NS_WARN_IF(mUtterance->mState == SpeechSynthesisUtterance::STATE_ENDED)) {
     return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  if (mSpeechSynthesis) {
+    mSpeechSynthesis->OnEnd(this);
   }
 
   mUtterance->mState = SpeechSynthesisUtterance::STATE_ENDED;

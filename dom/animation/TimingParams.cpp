@@ -6,6 +6,13 @@
 
 #include "mozilla/TimingParams.h"
 
+#include "mozilla/AnimationUtils.h"
+#include "mozilla/dom/AnimatableBinding.h"
+#include "mozilla/dom/KeyframeEffectBinding.h"
+#include "nsCSSParser.h" // For nsCSSParser
+#include "nsIDocument.h"
+#include "nsRuleNode.h"
+
 namespace mozilla {
 
 template <class OptionsType>
@@ -32,10 +39,9 @@ GetTimingProperties(
 
 template <class OptionsType>
 static TimingParams
-TimingParamsFromOptionsUnion(
-  const OptionsType& aOptions,
-  const Nullable<dom::ElementOrCSSPseudoElement>& aTarget,
-  ErrorResult& aRv)
+TimingParamsFromOptionsUnion(const OptionsType& aOptions,
+                             nsIDocument* aDocument,
+                             ErrorResult& aRv)
 {
   TimingParams result;
   if (aOptions.IsUnrestrictedDouble()) {
@@ -47,21 +53,6 @@ TimingParamsFromOptionsUnion(
       aRv.Throw(NS_ERROR_DOM_TYPE_ERR);
     }
   } else {
-    // If aTarget is a pseudo element, we pass its parent element because
-    // TimingParams only needs its owner doc to parse easing and both pseudo
-    // element and its parent element should have the same owner doc.
-    // Bug 1246320: Avoid passing the element for parsing the timing function
-    RefPtr<dom::Element> targetElement;
-    if (!aTarget.IsNull()) {
-      const dom::ElementOrCSSPseudoElement& target = aTarget.Value();
-      MOZ_ASSERT(target.IsElement() || target.IsCSSPseudoElement(),
-                 "Uninitialized target");
-      if (target.IsElement()) {
-        targetElement = &target.GetAsElement();
-      } else {
-        targetElement = target.GetAsCSSPseudoElement().ParentElement();
-      }
-    }
     const dom::AnimationEffectTimingProperties& timing =
       GetTimingProperties(aOptions);
 
@@ -74,6 +65,15 @@ TimingParamsFromOptionsUnion(
     if (aRv.Failed()) {
       return result;
     }
+    TimingParams::ValidateIterations(timing.mIterations, aRv);
+    if (aRv.Failed()) {
+      return result;
+    }
+    Maybe<ComputedTimingFunction> easing =
+      TimingParams::ParseEasing(timing.mEasing, aDocument, aRv);
+    if (aRv.Failed()) {
+      return result;
+    }
 
     result.mDuration = duration;
     result.mDelay = TimeDuration::FromMilliseconds(timing.mDelay);
@@ -82,8 +82,7 @@ TimingParamsFromOptionsUnion(
     result.mIterationStart = timing.mIterationStart;
     result.mDirection = timing.mDirection;
     result.mFill = timing.mFill;
-    result.mFunction =
-      AnimationUtils::ParseEasing(targetElement, timing.mEasing);
+    result.mFunction = easing;
   }
   return result;
 }
@@ -91,19 +90,79 @@ TimingParamsFromOptionsUnion(
 /* static */ TimingParams
 TimingParams::FromOptionsUnion(
   const dom::UnrestrictedDoubleOrKeyframeEffectOptions& aOptions,
-  const Nullable<dom::ElementOrCSSPseudoElement>& aTarget,
+  nsIDocument* aDocument,
   ErrorResult& aRv)
 {
-  return TimingParamsFromOptionsUnion(aOptions, aTarget, aRv);
+  return TimingParamsFromOptionsUnion(aOptions, aDocument, aRv);
 }
 
 /* static */ TimingParams
 TimingParams::FromOptionsUnion(
   const dom::UnrestrictedDoubleOrKeyframeAnimationOptions& aOptions,
-  const Nullable<dom::ElementOrCSSPseudoElement>& aTarget,
+  nsIDocument* aDocument,
   ErrorResult& aRv)
 {
-  return TimingParamsFromOptionsUnion(aOptions, aTarget, aRv);
+  return TimingParamsFromOptionsUnion(aOptions, aDocument, aRv);
+}
+
+/* static */ Maybe<ComputedTimingFunction>
+TimingParams::ParseEasing(const nsAString& aEasing,
+                          nsIDocument* aDocument,
+                          ErrorResult& aRv)
+{
+  MOZ_ASSERT(aDocument);
+
+  nsCSSValue value;
+  nsCSSParser parser;
+  parser.ParseLonghandProperty(eCSSProperty_animation_timing_function,
+                               aEasing,
+                               aDocument->GetDocumentURI(),
+                               aDocument->GetDocumentURI(),
+                               aDocument->NodePrincipal(),
+                               value);
+
+  switch (value.GetUnit()) {
+    case eCSSUnit_List: {
+      const nsCSSValueList* list = value.GetListValue();
+      if (list->mNext) {
+        // don't support a list of timing functions
+        break;
+      }
+      switch (list->mValue.GetUnit()) {
+        case eCSSUnit_Enumerated:
+          // Return Nothing() if "linear" is passed in.
+          if (list->mValue.GetIntValue() ==
+              NS_STYLE_TRANSITION_TIMING_FUNCTION_LINEAR) {
+            return Nothing();
+          }
+          MOZ_FALLTHROUGH;
+        case eCSSUnit_Cubic_Bezier:
+        case eCSSUnit_Steps: {
+          nsTimingFunction timingFunction;
+          nsRuleNode::ComputeTimingFunction(list->mValue, timingFunction);
+          ComputedTimingFunction computedTimingFunction;
+          computedTimingFunction.Init(timingFunction);
+          return Some(computedTimingFunction);
+        }
+        default:
+          MOZ_ASSERT_UNREACHABLE("unexpected animation-timing-function list "
+                                 "item unit");
+        break;
+      }
+      break;
+    }
+    case eCSSUnit_Inherit:
+    case eCSSUnit_Initial:
+    case eCSSUnit_Unset:
+    case eCSSUnit_TokenStream:
+    case eCSSUnit_Null:
+      break;
+    default:
+      MOZ_ASSERT_UNREACHABLE("unexpected animation-timing-function unit");
+      break;
+  }
+  aRv.ThrowTypeError<dom::MSG_INVALID_EASING_ERROR>(aEasing);
+  return Nothing();
 }
 
 bool

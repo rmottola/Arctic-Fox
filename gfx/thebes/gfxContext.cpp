@@ -72,7 +72,9 @@ gfxContext::gfxContext(DrawTarget *aTarget, const Point& aDeviceOffset)
   , mTransformChanged(false)
   , mDT(aTarget)
 {
-  MOZ_ASSERT(aTarget, "Don't create a gfxContext without a DrawTarget");
+  if (!aTarget) {
+    gfxCriticalError() << "Don't create a gfxContext without a DrawTarget";
+  }
 
   MOZ_COUNT_CTOR(gfxContext);
 
@@ -83,10 +85,23 @@ gfxContext::gfxContext(DrawTarget *aTarget, const Point& aDeviceOffset)
 }
 
 /* static */ already_AddRefed<gfxContext>
-gfxContext::ContextForDrawTarget(DrawTarget* aTarget)
+gfxContext::ForDrawTarget(DrawTarget* aTarget,
+                          const mozilla::gfx::Point& aDeviceOffset)
 {
   if (!aTarget || !aTarget->IsValid()) {
-    gfxWarning() << "Invalid target in gfxContext::ContextForDrawTarget";
+    gfxCriticalNote << "Invalid target in gfxContext::ForDrawTarget " << hexa(aTarget);
+    return nullptr;
+  }
+
+  RefPtr<gfxContext> result = new gfxContext(aTarget, aDeviceOffset);
+  return result.forget();
+}
+
+/* static */ already_AddRefed<gfxContext>
+gfxContext::ForDrawTargetWithTransform(DrawTarget* aTarget)
+{
+  if (!aTarget || !aTarget->IsValid()) {
+    gfxCriticalNote << "Invalid target in gfxContext::ForDrawTargetWithTransform " << hexa(aTarget);
     return nullptr;
   }
 
@@ -105,24 +120,6 @@ gfxContext::~gfxContext()
   }
   mDT->Flush();
   MOZ_COUNT_DTOR(gfxContext);
-}
-
-already_AddRefed<gfxASurface>
-gfxContext::CurrentSurface()
-{
-  if (mDT->GetBackendType() == BackendType::CAIRO) {
-    cairo_t* ctx = static_cast<cairo_t*>
-      (mDT->GetNativeSurface(NativeSurfaceType::CAIRO_CONTEXT));
-    if (ctx) {
-      cairo_surface_t* s = cairo_get_group_target(ctx);
-      if (s) {
-        return gfxASurface::Wrap(s);
-      }
-    }
-  }
-
-  // An Azure context doesn't have a surface backing it.
-  return nullptr;
 }
 
 void
@@ -1066,6 +1063,9 @@ gfxContext::EnsurePathBuilder()
     Matrix toNewUS = mPathTransform * invTransform;
 
     RefPtr<Path> path = mPathBuilder->Finish();
+    if (!path) {
+      gfxCriticalError() << "gfxContext::EnsurePathBuilder failed in PathBuilder::Finish";
+    }
     mPathBuilder = path->TransformedCopyToBuilder(toNewUS);
   }
 

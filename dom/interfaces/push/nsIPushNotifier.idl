@@ -1,22 +1,46 @@
+/* -*- Mode: IDL; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 #include "nsISupports.idl"
 
 interface nsIPrincipal;
 
 /**
  * Fires service worker events for push messages sent to content subscriptions,
- * and XPCOM observer notifications for system subscriptions. This service
- * can only be used from the parent process.
+ * and XPCOM observer notifications for system subscriptions.
  */
-[scriptable, uuid(b00dfdeb-14e5-425b-adc7-b531442e3216)]
+[scriptable, builtinclass, uuid(b00dfdeb-14e5-425b-adc7-b531442e3216)]
 interface nsIPushNotifier : nsISupports
 {
-  void notifyPush(in ACString scope, in nsIPrincipal principal);
+  void notifyPush(in ACString scope, in nsIPrincipal principal,
+                  in DOMString messageId);
 
   void notifyPushWithData(in ACString scope, in nsIPrincipal principal,
+                          in DOMString messageId,
                           [optional] in uint32_t dataLen,
                           [array, size_is(dataLen)] in uint8_t data);
 
   void notifySubscriptionChange(in ACString scope, in nsIPrincipal principal);
+
+  /**
+   * Fires a `push-subscription-lost` observer notification. Chrome code can
+   * listen for this notification to see when the Push service removes or
+   * expires a subscription for the |scope|.
+   *
+   * This is useful for Dev Tools and debugging add-ons that need to be
+   * notified when a subscription changes state. Other chrome callers should
+   * listen for `push-subscription-change` and resubscribe instead.
+   *
+   * |reason| is an `nsIPushErrorReporter` unsubscribe reason. The reason is
+   * wrapped in an `nsISupportsPRUint16` and passed as the subject.
+   */
+  void notifySubscriptionLost(in ACString scope, in nsIPrincipal principal,
+                              [optional] in uint16_t reason);
+
+  void notifyError(in ACString scope, in nsIPrincipal principal,
+                   in DOMString message, in uint32_t flags);
 };
 
 /**
@@ -26,7 +50,7 @@ interface nsIPushNotifier : nsISupports
  *
  * This interface resembles the `PushMessageData` WebIDL interface.
  */
-[scriptable, uuid(136dc8fd-8c56-4176-9170-eaa86b6ba99e)]
+[scriptable, builtinclass, uuid(136dc8fd-8c56-4176-9170-eaa86b6ba99e)]
 interface nsIPushMessage : nsISupports
 {
   /** Extracts the data as a UTF-8 text string. */

@@ -78,7 +78,7 @@ function triggerInfoBar(expectedTimeoutMs) {
   showInfobarCallback();
 }
 
-let checkInfobarButton = Task.async(function* (aNotification) {
+var checkInfobarButton = Task.async(function* (aNotification) {
   // Check that the button on the data choices infobar does the right thing.
   let buttons = aNotification.getElementsByTagName("button");
   Assert.equal(buttons.length, 1, "There is 1 button in the data reporting notification.");

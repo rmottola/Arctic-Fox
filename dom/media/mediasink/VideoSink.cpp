@@ -4,6 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "MediaQueue.h"
 #include "VideoSink.h"
 
 namespace mozilla {
@@ -24,7 +25,6 @@ VideoSink::VideoSink(AbstractThread* aThread,
                      MediaSink* aAudioSink,
                      MediaQueue<MediaData>& aVideoQueue,
                      VideoFrameContainer* aContainer,
-                     bool aRealTime,
                      FrameStatistics& aFrameStats,
                      uint32_t aVQueueSentToCompositerSize)
   : mOwnerThread(aThread)
@@ -32,10 +32,8 @@ VideoSink::VideoSink(AbstractThread* aThread,
   , mVideoQueue(aVideoQueue)
   , mContainer(aContainer)
   , mProducerID(ImageContainer::AllocateProducerID())
-  , mRealTime(aRealTime)
   , mFrameStats(aFrameStats)
   , mVideoFrameEndTime(-1)
-  , mOldDroppedCount(0)
   , mHasVideo(false)
   , mUpdateScheduler(aThread)
   , mVideoQueueSendToCompositorSize(aVQueueSentToCompositerSize)
@@ -365,10 +363,6 @@ VideoSink::RenderVideoFrames(int32_t aMaxFrames,
                 frame->mTime, frame->mFrameID, VideoQueue().GetSize());
   }
   mContainer->SetCurrentFrames(frames[0]->As<VideoData>()->mDisplay, images);
-
-  uint32_t dropped = mContainer->GetDroppedImageCount();
-  mFrameStats.NotifyDecodedFrames(0, 0, dropped - mOldDroppedCount);
-  mOldDroppedCount = dropped;
 }
 
 void
@@ -389,8 +383,8 @@ VideoSink::UpdateRenderedVideoFrames()
     RefPtr<MediaData> currentFrame = VideoQueue().PopFront();
     int32_t framesRemoved = 0;
     while (VideoQueue().GetSize() > 0) {
-      MediaData* nextFrame = VideoQueue().PeekFront();
-      if (!mRealTime && nextFrame->mTime > clockTime) {
+      RefPtr<MediaData> nextFrame = VideoQueue().PeekFront();
+      if (nextFrame->mTime > clockTime) {
         remainingTime = nextFrame->mTime - clockTime;
         break;
       }

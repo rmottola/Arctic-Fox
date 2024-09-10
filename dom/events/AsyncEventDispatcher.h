@@ -24,8 +24,8 @@ namespace mozilla {
  * want to ensure that the event handler doesn't mutate the DOM at
  * the wrong time, in order to avoid resulting instability.
  */
- 
-class AsyncEventDispatcher : public nsCancelableRunnable
+
+class AsyncEventDispatcher : public CancelableRunnable
 {
 public:
   /**
@@ -60,7 +60,7 @@ public:
   AsyncEventDispatcher(dom::EventTarget* aTarget, WidgetEvent& aEvent);
 
   NS_IMETHOD Run() override;
-  NS_IMETHOD Cancel() override;
+  nsresult Cancel() override;
   nsresult PostDOMEvent();
   void RunDOMEventWhenSafe();
 
@@ -95,7 +95,7 @@ public:
       mBlockedDoc->BlockOnload();
     }
   }
-  
+
   ~LoadBlockingAsyncEventDispatcher();
 
 private:

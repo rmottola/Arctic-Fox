@@ -48,12 +48,14 @@ const TEST_DATA = [{
   key: "back_space",
   focusedSelector: "#second"
 }, {
-  setup: function*(inspector) {
+  setup: function* (inspector, testActor) {
     // Removing the siblings of #first in order to test with an only child.
     let mutated = inspector.once("markupmutation");
-    for (let node of content.document.querySelectorAll("#second, #third")) {
-      node.remove();
-    }
+    yield testActor.eval(`
+      for (let node of content.document.querySelectorAll("#second, #third")) {
+        node.remove();
+      }
+    `);
     yield mutated;
   },
   selector: "#first",
@@ -65,12 +67,12 @@ const TEST_DATA = [{
   focusedSelector: "#parent"
 }];
 
-add_task(function*() {
-  let {inspector} = yield addTab(TEST_URL).then(openInspector);
+add_task(function* () {
+  let {inspector, testActor} = yield openInspectorForURL(TEST_URL);
 
   for (let {setup, selector, key, focusedSelector} of TEST_DATA) {
     if (setup) {
-      yield setup(inspector);
+      yield setup(inspector, testActor);
     }
 
     yield checkDeleteAndSelection(inspector, key, selector, focusedSelector);

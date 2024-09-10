@@ -139,6 +139,7 @@ config = {
                 "--xre-path=%(abs_res_dir)s",
                 "--cwd=%(gtest_dir)s",
                 "--symbols-path=%(symbols_path)s",
+                "--utility-path=tests/bin",
                 "%(binary_path)s",
             ],
             "run_filename": "rungtests.py",
@@ -187,11 +188,6 @@ config = {
             "options": ["--suite=reftest",
                         "--setpref=gfx.direct2d.disabled=true",
                         "--setpref=layers.acceleration.disabled=true"],
-            "tests": ["tests/reftest/tests/layout/reftests/reftest.list"]
-        },
-        "reftest-omtc": {
-            "options": ["--suite=reftest",
-                        "--setpref=layers.offmainthreadcomposition.enabled=true"],
             "tests": ["tests/reftest/tests/layout/reftests/reftest.list"]
         },
         "crashtest-ipc": {

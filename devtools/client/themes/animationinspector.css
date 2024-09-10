@@ -27,6 +27,26 @@
   --time-graduation-border-color: rgba(128, 136, 144, .5);
 }
 
+.animation {
+  --timeline-border-color: var(--theme-body-color);
+  --timeline-background-color: var(--theme-splitter-color);
+}
+
+.animation.cssanimation {
+  --timeline-border-color: var(--theme-highlight-lightorange);
+  --timeline-background-color: var(--theme-contrast-background);
+}
+
+.animation.csstransition {
+  --timeline-border-color: var(--theme-highlight-bluegrey);
+  --timeline-background-color: var(--theme-highlight-blue);
+}
+
+.animation.scriptanimation {
+  --timeline-border-color: var(--theme-highlight-green);
+  --timeline-background-color: var(--theme-graphs-green);
+}
+
 html {
   height: 100%;
 }
@@ -68,11 +88,6 @@ body {
   display: flex;
 }
 
-#global-toolbar .label,
-#timeline-toolbar .label {
-  padding: 1px 4px;
-}
-
 /* The main animations container */
 
 #players {
@@ -102,18 +117,35 @@ body {
 
 /* Element picker, toggle-all buttons, timeline pause button, ... */
 
-#global-toolbar .devtools-button,
-#timeline-toolbar .devtools-button {
-  border-width: 0 0 0 1px;
+#global-toolbar > *,
+#timeline-toolbar > * {
   min-height: var(--toolbar-height);
+  border-color: var(--theme-splitter-color);
+  border-width: 0 0 0 1px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
+#global-toolbar .label,
+#timeline-toolbar .label {
+  padding: 0 5px;
+  border-style: solid;
+}
+
+#global-toolbar .devtools-button,
 #timeline-toolbar .devtools-button {
+  margin: 0;
+  padding: 0;
+}
+
+#timeline-toolbar .devtools-button,
+#timeline-toolbar .label {
   border-width: 0 1px 0 0;
 }
 
 #element-picker::before {
-  background-image: url("chrome://devtools/skin/images/command-pick.png");
+  background-image: url("chrome://devtools/skin/images/command-pick.svg");
 }
 
 .pause-button::before {
@@ -129,10 +161,6 @@ body {
 }
 
 @media (min-resolution: 1.1dppx) {
-  #element-picker::before {
-    background-image: url("chrome://devtools/skin/images/command-pick@2x.png");
-  }
-
   .pause-button::before {
     background-image: url("images/debugger-pause@2x.png");
   }
@@ -146,11 +174,26 @@ body {
   }
 }
 
-#timeline-rate select {
+#timeline-rate select.devtools-button {
   -moz-appearance: none;
   text-align: center;
-  color: inherit;
   font-family: inherit;
+  color: var(--theme-body-color);
+  font-size: 1em;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("chrome://devtools/skin/images/dropmarker.svg");
+  background-repeat: no-repeat;
+  background-position: calc(100% - 4px) center;
+  padding-right: 1em;
+}
+
+#timeline-rate {
+  position: relative;
+  width: 4.5em;
 }
 
 /* Animation timeline component */
@@ -158,6 +201,7 @@ body {
 .animation-timeline {
   height: 100%;
   overflow: hidden;
+  position: relative;
   /* The timeline gets its background-image from a canvas element created in
      /devtools/client/animationinspector/utils.js drawGraphElementBackground
      thanks to document.mozSetImageElement("time-graduations", canvas)
@@ -185,7 +229,7 @@ body {
 }
 
 .animation-timeline .scrubber-wrapper {
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
   height: 100%;
 }
@@ -279,39 +323,26 @@ body {
 /* Animation iterations */
 
 .animation-timeline .animation .iterations {
-  position: relative;
+  position: absolute;
   height: 100%;
   box-sizing: border-box;
-
-  --timelime-border-color: var(--theme-body-color);
-  --timeline-background-color: var(--theme-splitter-color);
 
   /* Iterations of the animation are displayed with a repeating linear-gradient
      which size is dynamically changed from JS. The gradient only draws 1px
      borders between each iteration. These borders must have the same color as
      the border of this element */
   background-image:
-    linear-gradient(to right,
-                    var(--timelime-border-color) 0,
-                    var(--timelime-border-color) 1px,
+    linear-gradient(to left,
+                    var(--timeline-border-color) 0,
+                    var(--timeline-border-color) 1px,
                     transparent 1px,
                     transparent 2px);
-  background-repeat: repeat-x;
-  background-position: -1px 0;
-  border: 1px solid var(--timelime-border-color);
+  border: 1px solid var(--timeline-border-color);
+  /* Border-right is already handled by the gradient */
+  border-width: 1px 0 1px 1px;
 
   /* The background color is set independently */
   background-color: var(--timeline-background-color);
-}
-
-.animation-timeline .animation .cssanimation {
-  --timelime-border-color: var(--theme-highlight-lightorange);
-  --timeline-background-color: var(--theme-contrast-background);
-}
-
-.animation-timeline .animation .csstransition {
-  --timelime-border-color: var(--theme-highlight-bluegrey);
-  --timeline-background-color: var(--theme-highlight-blue);
 }
 
 .animation-timeline .animation .iterations.infinite {
@@ -337,42 +368,74 @@ body {
 }
 
 .animation-timeline .animation .name {
+  position: absolute;
   color: var(--theme-selection-color);
   height: 100%;
-  width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 150%;
+  display: flex;
+  align-items: center;
   padding: 0 2px;
+  box-sizing: border-box;
+  --fast-track-icon-width: 12px;
+  z-index: 1;
 }
 
-.animation-timeline .fast-track .name {
+.animation-timeline .animation .name div {
+  /* Flex items don't support text-overflow, so a child div is used */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.animation-timeline .fast-track .name div {
+  width: calc(100% - var(--fast-track-icon-width));
+}
+
+.animation-timeline .fast-track .name::after {
   /* Animations running on the compositor have the fast-track background image*/
+  content: "";
+  display: block;
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: var(--fast-track-icon-width);
+  z-index: 1;
+
   background-image: url("images/animation-fast-track.svg");
   background-repeat: no-repeat;
-  background-position: calc(100% - 5px) center;
+  background-position: center;
+}
+
+.animation-timeline .animation .delay,
+.animation-timeline .animation .end-delay {
+  position: absolute;
+  height: 100%;
+  border: 1px solid var(--timeline-border-color);
+  box-sizing: border-box;
 }
 
 .animation-timeline .animation .delay {
-  position: absolute;
-  top: 0;
-  /* Make sure the delay covers up the animation border */
-  transform: translate(-1px, -1px);
-  box-sizing: border-box;
-  height: calc(100% + 2px);
-
-  border: 1px solid var(--timelime-border-color);
   border-width: 1px 0 1px 1px;
   background-image: repeating-linear-gradient(45deg,
                                               transparent,
                                               transparent 1px,
                                               var(--theme-selection-color) 1px,
                                               var(--theme-selection-color) 4px);
-  background-color: var(--timelime-border-color);
+  background-color: var(--timeline-border-color);
 }
 
-.animation-timeline .animation .delay.negative {
+.animation-timeline .animation .end-delay {
+  border-width: 1px 1px 1px 0;
+  background-image: repeating-linear-gradient(
+                      -45deg,
+                      transparent,
+                      transparent 3px,
+                      var(--timeline-border-color) 3px,
+                      var(--timeline-border-color) 4px);
+}
+
+.animation-timeline .animation .delay.negative,
+.animation-timeline .animation .end-delay.negative {
   /* Negative delays are displayed on top of the animation, so they need a
      right border. Whereas normal delays are displayed just before the
      animation, so there's already the animation's left border that serves as
@@ -484,6 +547,10 @@ body {
 
 .keyframes.csstransition {
   background-color: var(--theme-highlight-blue);
+}
+
+.keyframes.scriptanimation {
+  background-color: var(--theme-graphs-green);
 }
 
 .keyframes .frame {

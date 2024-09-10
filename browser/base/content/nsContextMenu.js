@@ -11,10 +11,6 @@ Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
 
 
-XPCOMUtils.defineLazyModuleGetter(this, "CustomizableUI",
-  "resource:///modules/CustomizableUI.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "Pocket",
-  "resource:///modules/Pocket.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
   "resource://gre/modules/LoginHelper.jsm");
 
@@ -224,27 +220,6 @@ nsContextMenu.prototype = {
                      SimpleServiceDiscovery.services.length > 0 &&
                      CastingApps.getServicesForVideo(this.target).length > 0;
     this.setItemAttr("context-castvideo", "disabled", !shouldShowCast);
-
-    this.initPocketItems();
-  },
-
-  initPocketItems: function CM_initPocketItems() {
-    var showSaveCurrentPageToPocket = !(this.onTextInput || this.onLink ||
-                                        this.isContentSelected || this.onImage ||
-                                        this.onCanvas || this.onVideo || this.onAudio);
-    let targetURI = (this.onSaveableLink || this.onPlainTextLink) ? this.linkURI : this.browser.currentURI;
-    /*
-    let canPocket = CustomizableUI.getPlacementOfWidget("pocket-button") &&
-                    window.pktApi && window.pktApi.isUserLoggedIn();
-    canPocket = canPocket && (targetURI.schemeIs("http") || targetURI.schemeIs("https") ||
-                              (targetURI.schemeIs("about") && ReaderMode.getOriginalUrl(targetURI.spec)));
-    canPocket = canPocket && window.gBrowser && this.browser.getTabBrowser() == window.gBrowser;
-
-    this.showItem("context-pocket", canPocket && showSaveCurrentPageToPocket);
-    let showSaveLinkToPocket = canPocket && !showSaveCurrentPageToPocket &&
-                               (this.onSaveableLink || this.onPlainTextLink);
-    this.showItem("context-savelinktopocket", showSaveLinkToPocket);
-    */
   },
 
   initViewItems: function CM_initViewItems() {
@@ -555,12 +530,18 @@ nsContextMenu.prototype = {
     LoginHelper.openPasswordManager(window, gContextMenuContentData.documentURIObject.host);
   },
 
-  inspectNode: function CM_inspectNode() {
+  inspectNode: function() {
     let {devtools} = Cu.import("resource://devtools/shared/Loader.jsm", {});
     let gBrowser = this.browser.ownerDocument.defaultView.gBrowser;
-    let tt = devtools.TargetFactory.forTab(gBrowser.selectedTab);
-    return gDevTools.showToolbox(tt, "inspector").then(function(toolbox) {
+    let target = devtools.TargetFactory.forTab(gBrowser.selectedTab);
+
+    return gDevTools.showToolbox(target, "inspector").then(toolbox => {
       let inspector = toolbox.getCurrentPanel();
+
+      // new-node-front tells us when the node has been selected, whether the
+      // browser is remote or not.
+      let onNewNode = inspector.selection.once("new-node-front");
+
       if (this.isRemote) {
         this.browser.messageManager.sendAsyncMessage("debug:inspect", {}, {node: this.target});
         inspector.walker.findInspectingNode().then(nodeFront => {
@@ -569,7 +550,13 @@ nsContextMenu.prototype = {
       } else {
         inspector.selection.setNode(this.target, "browser-context-menu");
       }
-    }.bind(this));
+
+      return onNewNode.then(() => {
+        // Now that the node has been selected, wait until the inspector is
+        // fully updated.
+        return inspector.once("inspector-updated");
+      });
+    });
   },
 
   // Set various context menu attributes based on the state of the world.
@@ -954,12 +941,12 @@ nsContextMenu.prototype = {
     urlSecurityCheck(this.linkURL, this.principal);
     let referrerURI = gContextMenuContentData.documentURIObject;
 
-    // if the mixedContentChannel is present and the referring URI passes
+    // if its parent allows mixed content and the referring URI passes
     // a same origin check with the target URI, we can preserve the users
     // decision of disabling MCB on a page for it's child tabs.
     let persistAllowMixedContentInChildTab = false;
 
-    if (this.browser.docShell && this.browser.docShell.mixedContentChannel) {
+    if (gContextMenuContentData.parentAllowsMixedContent) {
       const sm = Services.scriptSecurityManager;
       try {
         let targetURI = this.linkURI;
@@ -1690,14 +1677,6 @@ nsContextMenu.prototype = {
 
   sendPage: function CM_sendPage() {
     MailIntegration.sendLinkForWindow(this.browser.contentWindow);  
-  },
-
-  saveLinkToPocket: function CM_saveLinkToPocket() {
-    Pocket.savePage(this.browser, this.linkURL);
-  },
-
-  savePageToPocket: function CM_saveToPocket() {
-    Pocket.savePage(this.browser, this.browser.currentURI.spec, this.browser.contentTitle);
   },
 
   printFrame: function CM_printFrame() {

@@ -211,8 +211,8 @@ enum class WasmAstExprKind
     SetLocal,
     Store,
     TernaryOperator,
-    Trap,
     UnaryOperator,
+    Unreachable
 };
 
 class WasmAstExpr : public WasmAstNode
@@ -241,10 +241,10 @@ struct WasmAstNop : WasmAstExpr
     {}
 };
 
-struct WasmAstTrap : WasmAstExpr
+struct WasmAstUnreachable : WasmAstExpr
 {
-    WasmAstTrap()
-      : WasmAstExpr(WasmAstExprKind::Trap)
+    WasmAstUnreachable()
+      : WasmAstExpr(WasmAstExprKind::Unreachable)
     {}
 };
 
@@ -305,8 +305,8 @@ class WasmAstBlock : public WasmAstExpr
 
   public:
     static const WasmAstExprKind Kind = WasmAstExprKind::Block;
-    explicit WasmAstBlock(Expr expr, WasmName breakName, WasmName continueName,
-                          WasmAstExprVector&& exprs)
+    explicit WasmAstBlock(Expr expr, WasmName breakName,
+                          WasmName continueName, WasmAstExprVector&& exprs)
       : WasmAstExpr(Kind),
         expr_(expr),
         breakName_(breakName),
@@ -325,18 +325,22 @@ class WasmAstBranch : public WasmAstExpr
     Expr expr_;
     WasmAstExpr* cond_;
     WasmRef target_;
+    WasmAstExpr* value_;
 
   public:
     static const WasmAstExprKind Kind = WasmAstExprKind::Branch;
-    explicit WasmAstBranch(Expr expr, WasmAstExpr* cond, WasmRef target)
+    explicit WasmAstBranch(Expr expr, WasmAstExpr* cond, WasmRef target, WasmAstExpr* value)
       : WasmAstExpr(Kind),
         expr_(expr),
         cond_(cond),
-        target_(target)
+        target_(target),
+        value_(value)
     {}
+
     Expr expr() const { return expr_; }
     WasmRef& target() { return target_; }
     WasmAstExpr& cond() const { MOZ_ASSERT(cond_); return *cond_; }
+    WasmAstExpr* maybeValue() const { return value_; }
 };
 
 class WasmAstCall : public WasmAstExpr
@@ -467,18 +471,22 @@ class WasmAstBranchTable : public WasmAstExpr
     WasmAstExpr& index_;
     WasmRef default_;
     WasmRefVector table_;
+    WasmAstExpr* value_;
 
   public:
     static const WasmAstExprKind Kind = WasmAstExprKind::BranchTable;
-    explicit WasmAstBranchTable(WasmAstExpr& index, WasmRef def, WasmRefVector&& table)
+    explicit WasmAstBranchTable(WasmAstExpr& index, WasmRef def, WasmRefVector&& table,
+                                WasmAstExpr* maybeValue)
       : WasmAstExpr(Kind),
         index_(index),
         default_(def),
-        table_(Move(table))
+        table_(Move(table)),
+        value_(maybeValue)
     {}
     WasmAstExpr& index() const { return index_; }
     WasmRef& def() { return default_; }
     WasmRefVector& table() { return table_; }
+    WasmAstExpr* maybeValue() { return value_; }
 };
 
 class WasmAstFunc : public WasmAstNode
@@ -633,7 +641,9 @@ class WasmAstModule : public WasmAstNode
             return true;
         }
         *sigIndex = sigs_.length();
-        return sigs_.append(new (lifo_) WasmAstSig(WasmName(), Move(sig))) &&
+        auto* lifoSig = new (lifo_) WasmAstSig(WasmName(), Move(sig));
+        return lifoSig &&
+               sigs_.append(lifoSig) &&
                sigMap_.add(p, sigs_.back(), *sigIndex);
     }
     bool append(WasmAstSig* sig) {
@@ -827,9 +837,9 @@ class WasmToken
         Table,
         TernaryOpcode,
         Text,
-        Trap,
         Type,
         UnaryOpcode,
+        Unreachable,
         ValueType
     };
   private:
@@ -998,7 +1008,7 @@ IsWasmLetter(char16_t c)
 static bool
 IsNameAfterDollar(char16_t c)
 {
-    return IsWasmLetter(c) || IsWasmDigit(c) || c == '_' || c == '$' || c == '-';
+    return IsWasmLetter(c) || IsWasmDigit(c) || c == '_' || c == '$' || c == '-' || c == '.';
 }
 
 static bool
@@ -1166,6 +1176,7 @@ class WasmTokenStream
     WasmToken nan(const char16_t* begin);
     WasmToken literal(const char16_t* begin);
     WasmToken next();
+    void skipSpaces();
 
   public:
     WasmTokenStream(const char16_t* text, UniqueChars* error)
@@ -1344,15 +1355,48 @@ WasmTokenStream::literal(const char16_t* begin)
     return WasmToken(u.value(), begin, cur_);
 }
 
+void
+WasmTokenStream::skipSpaces()
+{
+    while (cur_ != end_) {
+        char16_t ch = *cur_;
+        if (ch == ';' && consume(MOZ_UTF16(";;"))) {
+            // Skipping single line comment.
+            while (cur_ != end_ && !IsWasmNewLine(*cur_))
+                cur_++;
+        } else if (ch == '(' && consume(MOZ_UTF16("(;"))) {
+            // Skipping multi-line and possibly nested comments.
+            size_t level = 1;
+            while (cur_ != end_) {
+                char16_t ch = *cur_;
+                if (ch == '(' && consume(MOZ_UTF16("(;"))) {
+                    level++;
+                } else if (ch == ';' && consume(MOZ_UTF16(";)"))) {
+                    if (--level == 0)
+                        break;
+                } else {
+                    cur_++;
+                    if (IsWasmNewLine(ch)) {
+                        lineStart_ = cur_;
+                        line_++;
+                    }
+                }
+            }
+        } else if (IsWasmSpace(ch)) {
+            cur_++;
+            if (IsWasmNewLine(ch)) {
+                lineStart_ = cur_;
+                line_++;
+            }
+        } else
+            break; // non-whitespace found
+    }
+}
+
 WasmToken
 WasmTokenStream::next()
 {
-    while (cur_ != end_ && IsWasmSpace(*cur_)) {
-        if (IsWasmNewLine(*cur_++)) {
-            lineStart_ = cur_;
-            line_++;
-        }
-    }
+    skipSpaces();
 
     if (cur_ == end_)
         return WasmToken(WasmToken::EndOfFile, cur_, cur_);
@@ -1619,6 +1663,11 @@ WasmTokenStream::next()
               case 'p':
                 if (consume(MOZ_UTF16("promote/f32")))
                     return WasmToken(WasmToken::ConversionOpcode, Expr::F64PromoteF32,
+                                     begin, cur_);
+                break;
+              case 'r':
+                if (consume(MOZ_UTF16("reinterpret/i64")))
+                    return WasmToken(WasmToken::UnaryOpcode, Expr::F64ReinterpretI64,
                                      begin, cur_);
                 break;
               case 's':
@@ -1987,8 +2036,11 @@ WasmTokenStream::next()
             return WasmToken(WasmToken::Table, begin, cur_);
         if (consume(MOZ_UTF16("type")))
             return WasmToken(WasmToken::Type, begin, cur_);
-        if (consume(MOZ_UTF16("trap")))
-            return WasmToken(WasmToken::Trap, begin, cur_);
+        break;
+
+      case 'u':
+        if (consume(MOZ_UTF16("unreachable")))
+            return WasmToken(WasmToken::Unreachable, begin, cur_);
         break;
 
       default:
@@ -2078,14 +2130,30 @@ ParseBranch(WasmParseContext& c, Expr expr)
     if (!c.ts.matchRef(&target, c.error))
         return nullptr;
 
-    WasmAstExpr* cond = nullptr;
-    if (expr == Expr::BrIf) {
-        cond = ParseExpr(c);
-        if (!cond)
+    WasmAstExpr* value = nullptr;
+    if (c.ts.getIf(WasmToken::OpenParen)) {
+        value = ParseExprInsideParens(c);
+        if (!value)
+            return nullptr;
+        if (!c.ts.match(WasmToken::CloseParen, c.error))
             return nullptr;
     }
 
-    return new(c.lifo) WasmAstBranch(expr, cond, target);
+    WasmAstExpr* cond = nullptr;
+    if (expr == Expr::BrIf) {
+        if (c.ts.getIf(WasmToken::OpenParen)) {
+            cond = ParseExprInsideParens(c);
+            if (!cond)
+                return nullptr;
+            if (!c.ts.match(WasmToken::CloseParen, c.error))
+                return nullptr;
+        } else {
+            cond = value;
+            value = nullptr;
+        }
+    }
+
+    return new(c.lifo) WasmAstBranch(expr, cond, target, value);
 }
 
 static bool
@@ -2433,7 +2501,7 @@ ParseConst(WasmParseContext& c, WasmToken constToken)
           case WasmToken::SignedInteger:
             return new(c.lifo) WasmAstConst(Val(uint64_t(val.sint())));
           case WasmToken::NegativeZero:
-            return new(c.lifo) WasmAstConst(Val(uint32_t(0)));
+            return new(c.lifo) WasmAstConst(Val(uint64_t(0)));
           default:
             break;
         }
@@ -2736,7 +2804,17 @@ ParseBranchTable(WasmParseContext& c, WasmToken brTable)
     if (!index)
         return nullptr;
 
-    return new(c.lifo) WasmAstBranchTable(*index, def, Move(table));
+    WasmAstExpr* value = nullptr;
+    if (c.ts.getIf(WasmToken::OpenParen)) {
+        value = index;
+        index = ParseExprInsideParens(c);
+        if (!index)
+            return nullptr;
+        if (!c.ts.match(WasmToken::CloseParen, c.error))
+            return nullptr;
+    }
+
+    return new(c.lifo) WasmAstBranchTable(*index, def, Move(table), value);
 }
 
 static WasmAstExpr*
@@ -2747,8 +2825,8 @@ ParseExprInsideParens(WasmParseContext& c)
     switch (token.kind()) {
       case WasmToken::Nop:
         return new(c.lifo) WasmAstNop;
-      case WasmToken::Trap:
-        return new(c.lifo) WasmAstTrap;
+      case WasmToken::Unreachable:
+        return new(c.lifo) WasmAstUnreachable;
       case WasmToken::BinaryOpcode:
         return ParseBinaryOperator(c, token.expr());
       case WasmToken::Block:
@@ -3307,6 +3385,9 @@ ResolveBranch(Resolver& r, WasmAstBranch& br)
     if (!r.resolveBranchTarget(br.target()))
         return false;
 
+    if (br.maybeValue() && !ResolveExpr(r, *br.maybeValue()))
+        return false;
+
     if (br.expr() == Expr::BrIf) {
         if (!ResolveExpr(r, br.cond()))
             return false;
@@ -3414,9 +3495,18 @@ ResolveConversionOperator(Resolver& r, WasmAstConversionOperator& b)
 static bool
 ResolveIfElse(Resolver& r, WasmAstIf& i)
 {
-    return ResolveExpr(r, i.cond()) &&
-           ResolveExpr(r, i.thenBranch()) &&
-           (!i.hasElse() || ResolveExpr(r, i.elseBranch()));
+    if (!ResolveExpr(r, i.cond()))
+        return false;
+    if (!r.pushTarget(WasmName()))
+        return false;
+    if (!ResolveExpr(r, i.thenBranch()))
+        return false;
+    if (i.hasElse()) {
+        if (!ResolveExpr(r, i.elseBranch()))
+            return false;
+    }
+    r.popTarget(WasmName());
+    return true;
 }
 
 static bool
@@ -3463,7 +3553,7 @@ ResolveExpr(Resolver& r, WasmAstExpr& expr)
 {
     switch (expr.kind()) {
       case WasmAstExprKind::Nop:
-      case WasmAstExprKind::Trap:
+      case WasmAstExprKind::Unreachable:
         return true;
       case WasmAstExprKind::BinaryOperator:
         return ResolveBinaryOperator(r, expr.as<WasmAstBinaryOperator>());
@@ -3587,13 +3677,14 @@ EncodeBlock(Encoder& e, WasmAstBlock& b)
         return false;
 
     size_t numExprs = b.exprs().length();
-    if (!e.writeVarU32(numExprs))
-        return false;
 
     for (size_t i = 0; i < numExprs; i++) {
         if (!EncodeExpr(e, *b.exprs()[i]))
             return false;
     }
+
+    if (!e.writeExpr(Expr::End))
+        return false;
 
     return true;
 }
@@ -3603,19 +3694,26 @@ EncodeBranch(Encoder& e, WasmAstBranch& br)
 {
     MOZ_ASSERT(br.expr() == Expr::Br || br.expr() == Expr::BrIf);
 
-    if (!e.writeExpr(br.expr()))
-        return false;
-
-    if (!e.writeVarU32(br.target().index()))
-        return false;
-
-    if (!e.writeExpr(Expr::Nop))
-        return false;
+    uint32_t arity = 0;
+    if (br.maybeValue()) {
+        arity = 1;
+        if (!EncodeExpr(e, *br.maybeValue()))
+            return false;
+    }
 
     if (br.expr() == Expr::BrIf) {
         if (!EncodeExpr(e, br.cond()))
             return false;
     }
+
+    if (!e.writeExpr(br.expr()))
+        return false;
+
+    if (!e.writeVarU32(arity))
+        return false;
+
+    if (!e.writeVarU32(br.target().index()))
+        return false;
 
     return true;
 }
@@ -3634,13 +3732,16 @@ EncodeArgs(Encoder& e, const WasmAstExprVector& args)
 static bool
 EncodeCall(Encoder& e, WasmAstCall& c)
 {
+    if (!EncodeArgs(e, c.args()))
+        return false;
+
     if (!e.writeExpr(c.expr()))
         return false;
 
-    if (!e.writeVarU32(c.func().index()))
+    if (!e.writeVarU32(c.args().length()))
         return false;
 
-    if (!EncodeArgs(e, c.args()))
+    if (!e.writeVarU32(c.func().index()))
         return false;
 
     return true;
@@ -3649,16 +3750,19 @@ EncodeCall(Encoder& e, WasmAstCall& c)
 static bool
 EncodeCallIndirect(Encoder& e, WasmAstCallIndirect& c)
 {
-    if (!e.writeExpr(Expr::CallIndirect))
-        return false;
-
-    if (!e.writeVarU32(c.sig().index()))
-        return false;
-
     if (!EncodeExpr(e, *c.index()))
         return false;
 
     if (!EncodeArgs(e, c.args()))
+        return false;
+
+    if (!e.writeExpr(Expr::CallIndirect))
+        return false;
+
+    if (!e.writeVarU32(c.args().length()))
+        return false;
+
+    if (!e.writeVarU32(c.sig().index()))
         return false;
 
     return true;
@@ -3696,93 +3800,128 @@ EncodeGetLocal(Encoder& e, WasmAstGetLocal& gl)
 static bool
 EncodeSetLocal(Encoder& e, WasmAstSetLocal& sl)
 {
-    return e.writeExpr(Expr::SetLocal) &&
-           e.writeVarU32(sl.local().index()) &&
-           EncodeExpr(e, sl.value());
+    return EncodeExpr(e, sl.value()) &&
+           e.writeExpr(Expr::SetLocal) &&
+           e.writeVarU32(sl.local().index());
 }
 
 static bool
 EncodeUnaryOperator(Encoder& e, WasmAstUnaryOperator& b)
 {
-    return e.writeExpr(b.expr()) &&
-           EncodeExpr(e, *b.op());
+    return EncodeExpr(e, *b.op()) &&
+           e.writeExpr(b.expr());
 }
 
 static bool
 EncodeBinaryOperator(Encoder& e, WasmAstBinaryOperator& b)
 {
-    return e.writeExpr(b.expr()) &&
-           EncodeExpr(e, *b.lhs()) &&
-           EncodeExpr(e, *b.rhs());
+    return EncodeExpr(e, *b.lhs()) &&
+           EncodeExpr(e, *b.rhs()) &&
+           e.writeExpr(b.expr());
 }
 
 static bool
 EncodeTernaryOperator(Encoder& e, WasmAstTernaryOperator& b)
 {
-    return e.writeExpr(b.expr()) &&
-           EncodeExpr(e, *b.op0()) &&
+    return EncodeExpr(e, *b.op0()) &&
            EncodeExpr(e, *b.op1()) &&
-           EncodeExpr(e, *b.op2());
+           EncodeExpr(e, *b.op2()) &&
+           e.writeExpr(b.expr());
 }
 
 static bool
 EncodeComparisonOperator(Encoder& e, WasmAstComparisonOperator& b)
 {
-    return e.writeExpr(b.expr()) &&
-           EncodeExpr(e, *b.lhs()) &&
-           EncodeExpr(e, *b.rhs());
+    return EncodeExpr(e, *b.lhs()) &&
+           EncodeExpr(e, *b.rhs()) &&
+           e.writeExpr(b.expr());
 }
 
 static bool
 EncodeConversionOperator(Encoder& e, WasmAstConversionOperator& b)
 {
-    return e.writeExpr(b.expr()) &&
-           EncodeExpr(e, *b.op());
+    return EncodeExpr(e, *b.op()) &&
+           e.writeExpr(b.expr());
 }
 
 static bool
 EmitIf(Encoder& e, WasmAstIf& i)
 {
-    return e.writeExpr(i.hasElse() ? Expr::IfElse : Expr::If) &&
-           EncodeExpr(e, i.cond()) &&
+    return EncodeExpr(e, i.cond()) &&
+           e.writeExpr(Expr::If) &&
            EncodeExpr(e, i.thenBranch()) &&
-           (!i.hasElse() || EncodeExpr(e, i.elseBranch()));
+           (!i.hasElse() ||
+            (e.writeExpr(Expr::Else) &&
+             EncodeExpr(e, i.elseBranch()))) &&
+           e.writeExpr(Expr::End);
 }
 
 static bool
 EncodeLoadStoreAddress(Encoder &e, const WasmAstLoadStoreAddress &address)
 {
+    return EncodeExpr(e, address.base());
+}
+
+static bool
+EncodeLoadStoreFlags(Encoder &e, const WasmAstLoadStoreAddress &address)
+{
     return e.writeVarU32(address.flags()) &&
-           e.writeVarU32(address.offset()) &&
-           EncodeExpr(e, address.base());
+           e.writeVarU32(address.offset());
 }
 
 static bool
 EncodeLoad(Encoder& e, WasmAstLoad& l)
 {
-    return e.writeExpr(l.expr()) &&
-           EncodeLoadStoreAddress(e, l.address());
+    return EncodeLoadStoreAddress(e, l.address()) &&
+           e.writeExpr(l.expr()) &&
+           EncodeLoadStoreFlags(e, l.address());
 }
 
 static bool
 EncodeStore(Encoder& e, WasmAstStore& s)
 {
-    return e.writeExpr(s.expr()) &&
-           EncodeLoadStoreAddress(e, s.address()) &&
-           EncodeExpr(e, s.value());
+    return EncodeLoadStoreAddress(e, s.address()) &&
+           EncodeExpr(e, s.value()) &&
+           e.writeExpr(s.expr()) &&
+           EncodeLoadStoreFlags(e, s.address());
 }
 
 static bool
 EncodeReturn(Encoder& e, WasmAstReturn& r)
 {
-    return e.writeExpr(Expr::Return) &&
-           (!r.maybeExpr() || EncodeExpr(e, *r.maybeExpr()));
+    uint32_t arity = 0;
+    if (r.maybeExpr()) {
+        arity = 1;
+        if (!EncodeExpr(e, *r.maybeExpr()))
+           return false;
+    }
+
+    if (!e.writeExpr(Expr::Return))
+        return false;
+
+    if (!e.writeVarU32(arity))
+        return false;
+
+    return true;
 }
 
 static bool
 EncodeBranchTable(Encoder& e, WasmAstBranchTable& bt)
 {
+    uint32_t arity = 0;
+    if (bt.maybeValue()) {
+        arity = 1;
+        if (!EncodeExpr(e, *bt.maybeValue()))
+            return false;
+    }
+
+    if (!EncodeExpr(e, bt.index()))
+        return false;
+
     if (!e.writeExpr(Expr::BrTable))
+        return false;
+
+    if (!e.writeVarU32(arity))
         return false;
 
     if (!e.writeVarU32(bt.table().length()))
@@ -3796,7 +3935,7 @@ EncodeBranchTable(Encoder& e, WasmAstBranchTable& bt)
     if (!e.writeFixedU32(bt.def().index()))
         return false;
 
-    return EncodeExpr(e, bt.index());
+    return true;
 }
 
 static bool
@@ -3805,7 +3944,7 @@ EncodeExpr(Encoder& e, WasmAstExpr& expr)
     switch (expr.kind()) {
       case WasmAstExprKind::Nop:
         return e.writeExpr(Expr::Nop);
-      case WasmAstExprKind::Trap:
+      case WasmAstExprKind::Unreachable:
         return e.writeExpr(Expr::Unreachable);
       case WasmAstExprKind::BinaryOperator:
         return EncodeBinaryOperator(e, expr.as<WasmAstBinaryOperator>());
@@ -3849,27 +3988,35 @@ EncodeExpr(Encoder& e, WasmAstExpr& expr)
 // wasm AST binary serialization
 
 static bool
-EncodeSignatures(Encoder& e, WasmAstModule& module)
+EncodeTypeSection(Encoder& e, WasmAstModule& module)
 {
     if (module.sigs().empty())
         return true;
 
     size_t offset;
-    if (!e.startSection(SignaturesId, &offset))
+    if (!e.startSection(TypeSectionId, &offset))
         return false;
 
     if (!e.writeVarU32(module.sigs().length()))
         return false;
 
     for (WasmAstSig* sig : module.sigs()) {
-        if (!e.writeVarU32(sig->args().length()))
+        if (!e.writeVarU32(uint32_t(TypeConstructor::Function)))
             return false;
 
-        if (!e.writeExprType(sig->ret()))
+        if (!e.writeVarU32(sig->args().length()))
             return false;
 
         for (ValType t : sig->args()) {
             if (!e.writeValType(t))
+                return false;
+        }
+
+        if (!e.writeVarU32(!IsVoid(sig->ret())))
+            return false;
+
+        if (!IsVoid(sig->ret())) {
+            if (!e.writeValType(NonVoidToValType(sig->ret())))
                 return false;
         }
     }
@@ -3879,13 +4026,13 @@ EncodeSignatures(Encoder& e, WasmAstModule& module)
 }
 
 static bool
-EncodeFunctionSignatures(Encoder& e, WasmAstModule& module)
+EncodeFunctionSection(Encoder& e, WasmAstModule& module)
 {
     if (module.funcs().empty())
         return true;
 
     size_t offset;
-    if (!e.startSection(FunctionSignaturesId, &offset))
+    if (!e.startSection(FunctionSectionId, &offset))
         return false;
 
     if (!e.writeVarU32(module.funcs().length()))
@@ -3924,13 +4071,13 @@ EncodeImport(Encoder& e, WasmAstImport& imp)
 }
 
 static bool
-EncodeImportTable(Encoder& e, WasmAstModule& module)
+EncodeImportSection(Encoder& e, WasmAstModule& module)
 {
     if (module.imports().empty())
         return true;
 
     size_t offset;
-    if (!e.startSection(ImportTableId, &offset))
+    if (!e.startSection(ImportSectionId, &offset))
         return false;
 
     if (!e.writeVarU32(module.imports().length()))
@@ -3946,13 +4093,13 @@ EncodeImportTable(Encoder& e, WasmAstModule& module)
 }
 
 static bool
-EncodeMemory(Encoder& e, WasmAstModule& module)
+EncodeMemorySection(Encoder& e, WasmAstModule& module)
 {
     if (!module.maybeMemory())
         return true;
 
     size_t offset;
-    if (!e.startSection(MemoryId, &offset))
+    if (!e.startSection(MemorySectionId, &offset))
         return false;
 
     WasmAstMemory& memory = *module.maybeMemory();
@@ -3992,7 +4139,7 @@ EncodeFunctionExport(Encoder& e, WasmAstExport& exp)
 }
 
 static bool
-EncodeExportTable(Encoder& e, WasmAstModule& module)
+EncodeExportSection(Encoder& e, WasmAstModule& module)
 {
     uint32_t numFuncExports = 0;
     for (WasmAstExport* exp : module.exports()) {
@@ -4004,7 +4151,7 @@ EncodeExportTable(Encoder& e, WasmAstModule& module)
         return true;
 
     size_t offset;
-    if (!e.startSection(ExportTableId, &offset))
+    if (!e.startSection(ExportSectionId, &offset))
         return false;
 
     if (!e.writeVarU32(numFuncExports))
@@ -4026,13 +4173,13 @@ EncodeExportTable(Encoder& e, WasmAstModule& module)
 }
 
 static bool
-EncodeFunctionTable(Encoder& e, WasmAstModule& module)
+EncodeTableSection(Encoder& e, WasmAstModule& module)
 {
     if (!module.maybeTable())
         return true;
 
     size_t offset;
-    if (!e.startSection(FunctionTableId, &offset))
+    if (!e.startSection(TableSectionId, &offset))
         return false;
 
     if (!e.writeVarU32(module.maybeTable()->elems().length()))
@@ -4072,13 +4219,13 @@ EncodeFunctionBody(Encoder& e, WasmAstFunc& func)
 }
 
 static bool
-EncodeFunctionBodies(Encoder& e, WasmAstModule& module)
+EncodeCodeSection(Encoder& e, WasmAstModule& module)
 {
     if (module.funcs().empty())
         return true;
 
     size_t offset;
-    if (!e.startSection(FunctionBodiesId, &offset))
+    if (!e.startSection(CodeSectionId, &offset))
         return false;
 
     if (!e.writeVarU32(module.funcs().length()))
@@ -4120,7 +4267,7 @@ EncodeDataSegment(Encoder& e, WasmAstSegment& segment)
 }
 
 static bool
-EncodeDataSegments(Encoder& e, WasmAstModule& module)
+EncodeDataSection(Encoder& e, WasmAstModule& module)
 {
     if (!module.maybeMemory() || module.maybeMemory()->segments().empty())
         return true;
@@ -4128,7 +4275,7 @@ EncodeDataSegments(Encoder& e, WasmAstModule& module)
     const WasmAstSegmentVector& segments = module.maybeMemory()->segments();
 
     size_t offset;
-    if (!e.startSection(DataSegmentsId, &offset))
+    if (!e.startSection(DataSectionId, &offset))
         return false;
 
     if (!e.writeVarU32(segments.length()))
@@ -4154,28 +4301,28 @@ EncodeModule(WasmAstModule& module, Bytes* bytes)
     if (!e.writeFixedU32(EncodingVersion))
         return false;
 
-    if (!EncodeSignatures(e, module))
+    if (!EncodeTypeSection(e, module))
         return false;
 
-    if (!EncodeImportTable(e, module))
+    if (!EncodeImportSection(e, module))
         return false;
 
-    if (!EncodeFunctionSignatures(e, module))
+    if (!EncodeFunctionSection(e, module))
         return false;
 
-    if (!EncodeFunctionTable(e, module))
+    if (!EncodeTableSection(e, module))
         return false;
 
-    if (!EncodeMemory(e, module))
+    if (!EncodeMemorySection(e, module))
         return false;
 
-    if (!EncodeExportTable(e, module))
+    if (!EncodeExportSection(e, module))
         return false;
 
-    if (!EncodeFunctionBodies(e, module))
+    if (!EncodeCodeSection(e, module))
         return false;
 
-    if (!EncodeDataSegments(e, module))
+    if (!EncodeDataSection(e, module))
         return false;
 
     return true;

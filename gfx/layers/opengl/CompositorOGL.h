@@ -193,13 +193,17 @@ class CompositorOGL final : public Compositor
 
   std::map<ShaderConfigOGL, ShaderProgramOGL*> mPrograms;
 public:
-  explicit CompositorOGL(nsIWidget *aWidget, int aSurfaceWidth = -1, int aSurfaceHeight = -1,
+  explicit CompositorOGL(CompositorBridgeParent* aParent,
+                         widget::CompositorWidgetProxy* aWidget,
+                         int aSurfaceWidth = -1, int aSurfaceHeight = -1,
                          bool aUseExternalSurfaceSize = false);
 
 protected:
   virtual ~CompositorOGL();
 
 public:
+  virtual CompositorOGL* AsCompositorOGL() override { return this; }
+
   virtual already_AddRefed<DataTextureSource>
   CreateDataTextureSource(TextureFlags aFlags = TextureFlags::NO_FLAGS) override;
 
@@ -274,8 +278,6 @@ public:
   virtual void Pause() override;
   virtual bool Resume() override;
 
-  virtual nsIWidget* GetWidget() const override { return mWidget; }
-
   virtual bool HasImageHostOverlays() override
   {
 #if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 21
@@ -348,7 +350,6 @@ private:
   void PrepareViewport(CompositingRenderTargetOGL *aRenderTarget);
 
   /** Widget associated with this compositor */
-  nsIWidget *mWidget;
   LayoutDeviceIntSize mWidgetSize;
   RefPtr<GLContext> mGLContext;
   UniquePtr<GLBlitTextureImageHelper> mBlitTextureImageHelper;
@@ -401,7 +402,7 @@ private:
   virtual void BeginFrame(const nsIntRegion& aInvalidRegion,
                           const gfx::Rect *aClipRectIn,
                           const gfx::Rect& aRenderBounds,
-                          bool aOpaque,
+                          const nsIntRegion& aOpaqueRegion,
                           gfx::Rect *aClipRectOut = nullptr,
                           gfx::Rect *aRenderBoundsOut = nullptr) override;
 

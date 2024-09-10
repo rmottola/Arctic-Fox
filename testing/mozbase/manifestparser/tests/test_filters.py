@@ -8,6 +8,7 @@ from manifestparser.filters import (
     subsuite,
     tags,
     skip_if,
+    run_if,
     fail_if,
     enabled,
     filterlist,
@@ -101,7 +102,7 @@ class BuiltinFilters(unittest.TestCase):
         {"name": "test4", "disabled": "some reason"},
         {"name": "test5", "subsuite": "baz"},
         {"name": "test6", "subsuite": "baz,foo == 'bar'"},
-        {"name": "test7", "tags": "foo, bar"},
+        {"name": "test7", "tags": "foo bar"},
     )
 
     def test_skip_if(self):
@@ -113,19 +114,28 @@ class BuiltinFilters(unittest.TestCase):
         tests = list(skip_if(tests, {'foo': 'bar'}))
         self.assertNotIn(self.tests[1], tests)
 
+    def test_run_if(self):
+        tests = deepcopy(self.tests)
+        tests = list(run_if(tests, {}))
+        self.assertNotIn(self.tests[2], tests)
+
+        tests = deepcopy(self.tests)
+        tests = list(run_if(tests, {'foo': 'bar'}))
+        self.assertEquals(len(tests), len(self.tests))
+
     def test_fail_if(self):
         tests = deepcopy(self.tests)
         tests = list(fail_if(tests, {}))
-        self.assertNotIn('expected', tests[2])
+        self.assertNotIn('expected', tests[3])
 
         tests = deepcopy(self.tests)
         tests = list(fail_if(tests, {'foo': 'bar'}))
-        self.assertEquals(tests[2]['expected'], 'fail')
+        self.assertEquals(tests[3]['expected'], 'fail')
 
     def test_enabled(self):
         tests = deepcopy(self.tests)
         tests = list(enabled(tests, {}))
-        self.assertNotIn(self.tests[3], tests)
+        self.assertNotIn(self.tests[4], tests)
 
     def test_subsuite(self):
         sub1 = subsuite()

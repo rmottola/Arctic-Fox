@@ -22,7 +22,7 @@
 #include "nsContentUtils.h"
 #include "mozilla/Attributes.h"
 
-class nsReflowFrameRunnable : public nsRunnable
+class nsReflowFrameRunnable : public mozilla::Runnable
 {
 public:
   nsReflowFrameRunnable(nsIFrame* aFrame,
@@ -104,7 +104,7 @@ public:
 };
 
 NS_IMETHODIMP
-nsProgressMeterFrame::DoLayout(nsBoxLayoutState& aState)
+nsProgressMeterFrame::DoXULLayout(nsBoxLayoutState& aState)
 {
   if (mNeedsReflowCallback) {
     nsIReflowCallback* cb = new nsAsyncProgressMeterInit(this);
@@ -113,7 +113,7 @@ nsProgressMeterFrame::DoLayout(nsBoxLayoutState& aState)
     }
     mNeedsReflowCallback = false;
   }
-  return nsBoxFrame::DoLayout(aState);
+  return nsBoxFrame::DoXULLayout(aState);
 }
 
 nsresult

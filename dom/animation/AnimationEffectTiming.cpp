@@ -9,6 +9,7 @@
 #include "mozilla/dom/AnimatableBinding.h"
 #include "mozilla/dom/AnimationEffectTimingBinding.h"
 #include "mozilla/TimingParams.h"
+#include "nsAString.h"
 
 namespace mozilla {
 namespace dom {
@@ -28,6 +29,18 @@ PostSpecifiedTimingUpdated(KeyframeEffect* aEffect)
 }
 
 void
+AnimationEffectTiming::SetDelay(double aDelay)
+{
+  TimeDuration delay = TimeDuration::FromMilliseconds(aDelay);
+  if (mTiming.mDelay == delay) {
+    return;
+  }
+  mTiming.mDelay = delay;
+
+  PostSpecifiedTimingUpdated(mEffect);
+}
+
+void
 AnimationEffectTiming::SetEndDelay(double aEndDelay)
 {
   TimeDuration endDelay = TimeDuration::FromMilliseconds(aEndDelay);
@@ -35,6 +48,17 @@ AnimationEffectTiming::SetEndDelay(double aEndDelay)
     return;
   }
   mTiming.mEndDelay = endDelay;
+
+  PostSpecifiedTimingUpdated(mEffect);
+}
+
+void
+AnimationEffectTiming::SetFill(const FillMode& aFill)
+{
+  if (mTiming.mFill == aFill) {
+    return;
+  }
+  mTiming.mFill = aFill;
 
   PostSpecifiedTimingUpdated(mEffect);
 }
@@ -58,6 +82,23 @@ AnimationEffectTiming::SetIterationStart(double aIterationStart,
 }
 
 void
+AnimationEffectTiming::SetIterations(double aIterations, ErrorResult& aRv)
+{
+  if (mTiming.mIterations == aIterations) {
+    return;
+  }
+
+  TimingParams::ValidateIterations(aIterations, aRv);
+  if (aRv.Failed()) {
+    return;
+  }
+
+  mTiming.mIterations = aIterations;
+
+  PostSpecifiedTimingUpdated(mEffect);
+}
+
+void
 AnimationEffectTiming::SetDuration(const UnrestrictedDoubleOrString& aDuration,
                                    ErrorResult& aRv)
 {
@@ -72,6 +113,40 @@ AnimationEffectTiming::SetDuration(const UnrestrictedDoubleOrString& aDuration,
   }
 
   mTiming.mDuration = newDuration;
+
+  PostSpecifiedTimingUpdated(mEffect);
+}
+
+void
+AnimationEffectTiming::SetDirection(const PlaybackDirection& aDirection)
+{
+  if (mTiming.mDirection == aDirection) {
+    return;
+  }
+
+  mTiming.mDirection = aDirection;
+
+  PostSpecifiedTimingUpdated(mEffect);
+}
+
+void
+AnimationEffectTiming::SetEasing(JSContext* aCx,
+                                 const nsAString& aEasing,
+                                 ErrorResult& aRv)
+{
+  Maybe<ComputedTimingFunction> newFunction =
+    TimingParams::ParseEasing(aEasing,
+                              AnimationUtils::GetCurrentRealmDocument(aCx),
+                              aRv);
+  if (aRv.Failed()) {
+    return;
+  }
+
+  if (mTiming.mFunction == newFunction) {
+    return;
+  }
+
+  mTiming.mFunction = newFunction;
 
   PostSpecifiedTimingUpdated(mEffect);
 }

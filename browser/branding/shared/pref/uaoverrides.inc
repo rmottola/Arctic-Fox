@@ -26,7 +26,7 @@ pref("@GUAO_PREF@.addons.palemoon.org", "Mozilla/5.0 (@OS_SLICE@ rv:@MOZILLA_UAV
 
 
 // Required for google to play nice with Arctic Fox
-pref("@GUAO_PREF@.accounts.google.com","Mozilla/5.0 (@OS_SLICE@ rv:42.1) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/43.0 @PM_SLICE@");
+pref("@GUAO_PREF@.accounts.google.com","Mozilla/5.0 (@OS_SLICE@ rv:45.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/45.0 @PM_SLICE@");
 pref("@GUAO_PREF@.google.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @PM_SLICE@");
 pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @PM_SLICE@");
 pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @PM_SLICE@");
@@ -37,12 +37,6 @@ pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (iPad; CPU OS 10_2_1 like Mac OS X) 
 // Trick these sites in to thinking we are using IE11
 pref("@GUAO_PREF@.dropbox.com","Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko");
 pref("@GUAO_PREF@.players.brightcove.net","Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko");
-
-#ifdef XP_UNIX
-// Google Fonts forces unicode ranges unless it is being told the browser is Firefox 43 or below.
-// They do NOT test for unicode-ranges CSS support.
-pref("@GUAO_PREF@.fonts.googleapis.com","Mozilla/5.0 (@OS_SLICE@ rv:43.0) Gecko/20010101 Firefox/43.0");
-#endif
 
 // UA-Sniffing domains below have indicated no interest in supporting Arctic Fox (BOO!)
 pref("@GUAO_PREF@.bing.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");

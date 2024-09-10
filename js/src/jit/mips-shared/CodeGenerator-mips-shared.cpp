@@ -6,6 +6,7 @@
 
 #include "jit/mips-shared/CodeGenerator-mips-shared.h"
 
+#include "mozilla/DebugOnly.h"
 #include "mozilla/MathAlgorithms.h"
 
 #include "jscntxt.h"
@@ -29,28 +30,11 @@
 using namespace js;
 using namespace js::jit;
 
+using mozilla::DebugOnly;
 using mozilla::FloorLog2;
 using mozilla::NegativeInfinity;
 using JS::GenericNaN;
 using JS::ToInt32;
-
-// inline
-Address
-CodeGeneratorMIPSShared::ToAddress(const LAllocation& a)
-{
-    MOZ_ASSERT(a.isMemory());
-    int32_t offset = ToStackOffset(&a);
-
-    return Address(StackPointer, offset);
-}
-
-// inline
-Address
-CodeGeneratorMIPSShared::ToAddress(const LAllocation* a)
-{
-    return ToAddress(*a);
-}
-
 
 // shared
 CodeGeneratorMIPSShared::CodeGeneratorMIPSShared(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masm)
@@ -919,6 +903,42 @@ CodeGeneratorMIPSShared::visitClzI(LClzI* ins)
 }
 
 void
+CodeGeneratorMIPSShared::visitCtzI(LCtzI* ins)
+{
+    Register input = ToRegister(ins->input());
+    Register output = ToRegister(ins->output());
+
+    masm.ma_ctz(output, input);
+}
+
+void
+CodeGeneratorMIPSShared::visitPopcntI(LPopcntI* ins)
+{
+    Register input = ToRegister(ins->input());
+    Register output = ToRegister(ins->output());
+
+    // Equivalent to GCC output of mozilla::CountPopulation32()
+    Register tmp = ToRegister(ins->temp());
+
+    masm.ma_move(output, input);
+    masm.ma_sra(tmp, input, Imm32(1));
+    masm.ma_and(tmp, Imm32(0x55555555));
+    masm.ma_subu(output, tmp);
+    masm.ma_sra(tmp, output, Imm32(2));
+    masm.ma_and(output, Imm32(0x33333333));
+    masm.ma_and(tmp, Imm32(0x33333333));
+    masm.ma_addu(output, tmp);
+    masm.ma_srl(tmp, output, Imm32(4));
+    masm.ma_addu(output, tmp);
+    masm.ma_and(output, Imm32(0xF0F0F0F));
+    masm.ma_sll(tmp, output, Imm32(8));
+    masm.ma_addu(output, tmp);
+    masm.ma_sll(tmp, output, Imm32(16));
+    masm.ma_addu(output, tmp);
+    masm.ma_sra(output, output, Imm32(24));
+}
+
+void
 CodeGeneratorMIPSShared::visitPowHalfD(LPowHalfD* ins)
 {
     FloatRegister input = ToFloatRegister(ins->input());
@@ -959,22 +979,22 @@ CodeGeneratorMIPSShared::toMoveOperand(LAllocation a) const
 void
 CodeGeneratorMIPSShared::visitMathD(LMathD* math)
 {
-    const LAllocation* src1 = math->getOperand(0);
-    const LAllocation* src2 = math->getOperand(1);
-    const LDefinition* output = math->getDef(0);
+    FloatRegister src1 = ToFloatRegister(math->getOperand(0));
+    FloatRegister src2 = ToFloatRegister(math->getOperand(1));
+    FloatRegister output = ToFloatRegister(math->getDef(0));
 
     switch (math->jsop()) {
       case JSOP_ADD:
-        masm.as_addd(ToFloatRegister(output), ToFloatRegister(src1), ToFloatRegister(src2));
+        masm.as_addd(output, src1, src2);
         break;
       case JSOP_SUB:
-        masm.as_subd(ToFloatRegister(output), ToFloatRegister(src1), ToFloatRegister(src2));
+        masm.as_subd(output, src1, src2);
         break;
       case JSOP_MUL:
-        masm.as_muld(ToFloatRegister(output), ToFloatRegister(src1), ToFloatRegister(src2));
+        masm.as_muld(output, src1, src2);
         break;
       case JSOP_DIV:
-        masm.as_divd(ToFloatRegister(output), ToFloatRegister(src1), ToFloatRegister(src2));
+        masm.as_divd(output, src1, src2);
         break;
       default:
         MOZ_CRASH("unexpected opcode");
@@ -984,22 +1004,22 @@ CodeGeneratorMIPSShared::visitMathD(LMathD* math)
 void
 CodeGeneratorMIPSShared::visitMathF(LMathF* math)
 {
-    const LAllocation* src1 = math->getOperand(0);
-    const LAllocation* src2 = math->getOperand(1);
-    const LDefinition* output = math->getDef(0);
+    FloatRegister src1 = ToFloatRegister(math->getOperand(0));
+    FloatRegister src2 = ToFloatRegister(math->getOperand(1));
+    FloatRegister output = ToFloatRegister(math->getDef(0));
 
     switch (math->jsop()) {
       case JSOP_ADD:
-        masm.as_adds(ToFloatRegister(output), ToFloatRegister(src1), ToFloatRegister(src2));
+        masm.as_adds(output, src1, src2);
         break;
       case JSOP_SUB:
-        masm.as_subs(ToFloatRegister(output), ToFloatRegister(src1), ToFloatRegister(src2));
+        masm.as_subs(output, src1, src2);
         break;
       case JSOP_MUL:
-        masm.as_muls(ToFloatRegister(output), ToFloatRegister(src1), ToFloatRegister(src2));
+        masm.as_muls(output, src1, src2);
         break;
       case JSOP_DIV:
-        masm.as_divs(ToFloatRegister(output), ToFloatRegister(src1), ToFloatRegister(src2));
+        masm.as_divs(output, src1, src2);
         break;
       default:
         MOZ_CRASH("unexpected opcode");
@@ -1445,17 +1465,8 @@ CodeGeneratorMIPSShared::visitNotD(LNotD* ins)
     FloatRegister in = ToFloatRegister(ins->input());
     Register dest = ToRegister(ins->output());
 
-    Label falsey, done;
     masm.loadConstantDouble(0.0, ScratchDoubleReg);
-    masm.ma_bc1d(in, ScratchDoubleReg, &falsey, Assembler::DoubleEqualOrUnordered, ShortJump);
-
-    masm.move32(Imm32(0), dest);
-    masm.ma_b(&done, ShortJump);
-
-    masm.bind(&falsey);
-    masm.move32(Imm32(1), dest);
-
-    masm.bind(&done);
+    masm.ma_cmp_set_double(dest, in, ScratchDoubleReg, Assembler::DoubleEqualOrUnordered);
 }
 
 void
@@ -1466,17 +1477,8 @@ CodeGeneratorMIPSShared::visitNotF(LNotF* ins)
     FloatRegister in = ToFloatRegister(ins->input());
     Register dest = ToRegister(ins->output());
 
-    Label falsey, done;
     masm.loadConstantFloat32(0.0f, ScratchFloat32Reg);
-    masm.ma_bc1s(in, ScratchFloat32Reg, &falsey, Assembler::DoubleEqualOrUnordered, ShortJump);
-
-    masm.move32(Imm32(0), dest);
-    masm.ma_b(&done, ShortJump);
-
-    masm.bind(&falsey);
-    masm.move32(Imm32(1), dest);
-
-    masm.bind(&done);
+    masm.ma_cmp_set_float32(dest, in, ScratchFloat32Reg, Assembler::DoubleEqualOrUnordered);
 }
 
 void
@@ -1701,11 +1703,12 @@ CodeGeneratorMIPSShared::visitAsmJSStoreHeap(LAsmJSStoreHeap* ins)
         MOZ_ASSERT(ptrImm >= 0);
 
         if (isFloat) {
-            if (size == 32) {
-                masm.storeFloat32(ToFloatRegister(value), Address(HeapReg, ptrImm));
-            } else {
-                masm.storeDouble(ToFloatRegister(value), Address(HeapReg, ptrImm));
-            }
+            FloatRegister freg = ToFloatRegister(value);
+            Address addr(HeapReg, ptrImm);
+            if (size == 32)
+                masm.storeFloat32(freg, addr);
+            else
+                masm.storeDouble(freg, addr);
         }  else {
             masm.ma_store(ToRegister(value), Address(HeapReg, ptrImm),
                           static_cast<LoadStoreSize>(size), isSigned ? SignExtend : ZeroExtend);
@@ -1719,10 +1722,12 @@ CodeGeneratorMIPSShared::visitAsmJSStoreHeap(LAsmJSStoreHeap* ins)
 
     if (!mir->needsBoundsCheck()) {
         if (isFloat) {
-            if (size == 32) {
-                masm.storeFloat32(ToFloatRegister(value), BaseIndex(HeapReg, ptrReg, TimesOne));
-            } else
-                masm.storeDouble(ToFloatRegister(value), BaseIndex(HeapReg, ptrReg, TimesOne));
+            FloatRegister freg = ToFloatRegister(value);
+            BaseIndex bi(HeapReg, ptrReg, TimesOne);
+            if (size == 32)
+                masm.storeFloat32(freg, bi);
+            else
+                masm.storeDouble(freg, bi);
         } else {
             masm.ma_store(ToRegister(value), BaseIndex(HeapReg, ptrReg, TimesOne),
                           static_cast<LoadStoreSize>(size), isSigned ? SignExtend : ZeroExtend);
@@ -1905,6 +1910,72 @@ CodeGeneratorMIPSShared::visitAsmJSPassStackArg(LAsmJSPassStackArg* ins)
 }
 
 void
+CodeGeneratorMIPSShared::visitAsmSelect(LAsmSelect* ins)
+{
+    MIRType mirType = ins->mir()->type();
+
+    Register cond = ToRegister(ins->condExpr());
+    const LAllocation* falseExpr = ins->falseExpr();
+
+    if (mirType == MIRType::Int32) {
+        Register out = ToRegister(ins->output());
+        MOZ_ASSERT(ToRegister(ins->trueExpr()) == out, "true expr input is reused for output");
+        masm.as_movz(out, ToRegister(falseExpr), cond);
+        return;
+    }
+
+    FloatRegister out = ToFloatRegister(ins->output());
+    MOZ_ASSERT(ToFloatRegister(ins->trueExpr()) == out, "true expr input is reused for output");
+
+    if (falseExpr->isFloatReg()) {
+        if (mirType == MIRType::Float32)
+            masm.as_movz(Assembler::SingleFloat, out, ToFloatRegister(falseExpr), cond);
+        else if (mirType == MIRType::Double)
+            masm.as_movz(Assembler::DoubleFloat, out, ToFloatRegister(falseExpr), cond);
+        else
+            MOZ_CRASH("unhandled type in visitAsmSelect!");
+    } else {
+        Label done;
+        masm.ma_b(cond, cond, &done, Assembler::NonZero, ShortJump);
+
+        if (mirType == MIRType::Float32)
+            masm.loadFloat32(ToAddress(falseExpr), out);
+        else if (mirType == MIRType::Double)
+            masm.loadDouble(ToAddress(falseExpr), out);
+        else
+            MOZ_CRASH("unhandled type in visitAsmSelect!");
+
+        masm.bind(&done);
+    }
+}
+
+void
+CodeGeneratorMIPSShared::visitAsmReinterpret(LAsmReinterpret* lir)
+{
+    MOZ_ASSERT(gen->compilingAsmJS());
+    MAsmReinterpret* ins = lir->mir();
+
+    MIRType to = ins->type();
+    DebugOnly<MIRType> from = ins->input()->type();
+
+    switch (to) {
+      case MIRType::Int32:
+        MOZ_ASSERT(from == MIRType::Float32);
+        masm.as_mfc1(ToRegister(lir->output()), ToFloatRegister(lir->input()));
+        break;
+      case MIRType::Float32:
+        MOZ_ASSERT(from == MIRType::Int32);
+        masm.as_mtc1(ToRegister(lir->input()), ToFloatRegister(lir->output()));
+        break;
+      case MIRType::Double:
+      case MIRType::Int64:
+        MOZ_CRASH("not handled by this LIR opcode");
+      default:
+        MOZ_CRASH("unexpected AsmReinterpret");
+    }
+}
+
+void
 CodeGeneratorMIPSShared::visitUDivOrMod(LUDivOrMod* ins)
 {
     Register lhs = ToRegister(ins->lhs());
@@ -1960,9 +2031,9 @@ CodeGeneratorMIPSShared::visitAsmJSLoadGlobalVar(LAsmJSLoadGlobalVar* ins)
 {
     const MAsmJSLoadGlobalVar* mir = ins->mir();
     unsigned addr = mir->globalDataOffset() - AsmJSGlobalRegBias;
-    if (mir->type() == MIRType_Int32)
+    if (mir->type() == MIRType::Int32)
         masm.load32(Address(GlobalReg, addr), ToRegister(ins->output()));
-    else if (mir->type() == MIRType_Float32)
+    else if (mir->type() == MIRType::Float32)
         masm.loadFloat32(Address(GlobalReg, addr), ToFloatRegister(ins->output()));
     else
         masm.loadDouble(Address(GlobalReg, addr), ToFloatRegister(ins->output()));
@@ -1975,9 +2046,9 @@ CodeGeneratorMIPSShared::visitAsmJSStoreGlobalVar(LAsmJSStoreGlobalVar* ins)
 
     MOZ_ASSERT(IsNumberType(mir->value()->type()));
     unsigned addr = mir->globalDataOffset() - AsmJSGlobalRegBias;
-    if (mir->value()->type() == MIRType_Int32)
+    if (mir->value()->type() == MIRType::Int32)
         masm.store32(ToRegister(ins->value()), Address(GlobalReg, addr));
-    else if (mir->value()->type() == MIRType_Float32)
+    else if (mir->value()->type() == MIRType::Float32)
         masm.storeFloat32(ToFloatRegister(ins->value()), Address(GlobalReg, addr));
     else
         masm.storeDouble(ToFloatRegister(ins->value()), Address(GlobalReg, addr));

@@ -3,9 +3,11 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 const { Cu } = require("chrome");
-Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
+
+const { LocalizationHelper } = require("devtools/client/shared/l10n");
 const STRINGS_URI = "chrome://devtools/locale/jit-optimizations.properties";
-const L10N = new ViewHelpers.L10N(STRINGS_URI);
+const L10N = new LocalizationHelper(STRINGS_URI);
+
 const { PluralForm } = require("resource://gre/modules/PluralForm.jsm");
 const { DOM: dom, PropTypes, createClass, createFactory } = require("devtools/client/shared/vendor/react");
 const {
@@ -14,7 +16,8 @@ const {
 const Frame = createFactory(require("devtools/client/shared/components/frame"));
 const OPTIMIZATION_FAILURE = L10N.getStr("jit.optimizationFailure");
 const JIT_SAMPLES = L10N.getStr("jit.samples");
-const JIT_EMPTY_TEXT = L10N.getStr("jit.empty");
+const JIT_TYPES = L10N.getStr("jit.types");
+const JIT_ATTEMPTS = L10N.getStr("jit.attempts");
 const PROPNAME_MAX_LENGTH = 4;
 // If TREE_ROW_HEIGHT changes, be sure to change `var(--jit-tree-row-height)`
 // in `devtools/client/themes/jit-optimizations.css`
@@ -100,13 +103,13 @@ const JITOptimizationsItem = module.exports = createClass({
 
   _renderAttempts({ item: attempts }) {
     return dom.span({ className: "optimization-attempts" },
-      `Attempts (${attempts.length})`
+      `${JIT_ATTEMPTS} (${attempts.length})`
     );
   },
 
   _renderTypes({ item: types }) {
     return dom.span({ className: "optimization-types" },
-      `Types (${types.length})`
+      `${JIT_TYPES} (${types.length})`
     );
   },
 

@@ -38,15 +38,22 @@
 #include "nsISupportsImpl.h"
 #include "ThreadSafeRefcountingWithMainThreadDestruction.h"
 #include "mozilla/VsyncDispatcher.h"
+#include "CompositorWidgetProxy.h"
 
-class CancelableTask;
 class MessageLoop;
 class nsIWidget;
 
 namespace mozilla {
+
+class CancelableRunnable;
+
 namespace gfx {
 class DrawTarget;
 } // namespace gfx
+
+namespace ipc {
+class GeckoChildProcessHost;
+} // namespace ipc
 
 namespace layers {
 
@@ -122,7 +129,7 @@ public:
   void SetNeedsComposite();
   void OnForceComposeToTarget();
 
-  void ScheduleTask(CancelableTask*, int);
+  void ScheduleTask(already_AddRefed<CancelableRunnable>, int);
   void ResumeComposition();
   void ComposeToTarget(gfx::DrawTarget* aTarget, const gfx::IntRect* aRect = nullptr);
   void PostCompositeTask(TimeStamp aCompositeTimestamp);
@@ -189,16 +196,16 @@ private:
   RefPtr<CompositorVsyncScheduler::Observer> mVsyncObserver;
 
   mozilla::Monitor mCurrentCompositeTaskMonitor;
-  CancelableTask* mCurrentCompositeTask;
+  RefPtr<CancelableRunnable> mCurrentCompositeTask;
 
   mozilla::Monitor mSetNeedsCompositeMonitor;
-  CancelableTask* mSetNeedsCompositeTask;
+  RefPtr<CancelableRunnable> mSetNeedsCompositeTask;
 
 #ifdef MOZ_WIDGET_GONK
 #if ANDROID_VERSION >= 19
   bool mDisplayEnabled;
   mozilla::Monitor mSetDisplayMonitor;
-  CancelableTask* mSetDisplayTask;
+  RefPtr<CancelableRunnable> mSetDisplayTask;
 #endif
 #endif
 };
@@ -221,14 +228,15 @@ class CompositorBridgeParent final : public PCompositorBridgeParent,
   friend class CompositorVsyncScheduler;
 
 public:
-  explicit CompositorBridgeParent(nsIWidget* aWidget,
-                            bool aUseExternalSurfaceSize = false,
-                            int aSurfaceWidth = -1, int aSurfaceHeight = -1);
+  explicit CompositorBridgeParent(widget::CompositorWidgetProxy* aWidget,
+                                  CSSToLayoutDeviceScale aScale,
+                                  bool aUseAPZ,
+                                  bool aUseExternalSurfaceSize = false,
+                                  int aSurfaceWidth = -1, int aSurfaceHeight = -1);
 
   virtual bool RecvGetFrameUniformity(FrameUniformityData* aOutData) override;
   virtual bool RecvRequestOverfill() override;
-  virtual bool RecvWillStop() override;
-  virtual bool RecvStop() override;
+  virtual bool RecvWillClose() override;
   virtual bool RecvPause() override;
   virtual bool RecvResume() override;
   virtual bool RecvNotifyHidden(const uint64_t& id) override { return true; }
@@ -237,9 +245,13 @@ public:
   virtual bool RecvAdoptChild(const uint64_t& child) override;
   virtual bool RecvMakeSnapshot(const SurfaceDescriptor& aInSnapshot,
                                 const gfx::IntRect& aRect) override;
-  virtual bool RecvMakeWidgetSnapshot(const SurfaceDescriptor& aInSnapshot) override;
   virtual bool RecvFlushRendering() override;
   virtual bool RecvForcePresent() override;
+
+  virtual bool RecvAcknowledgeCompositorUpdate(const uint64_t& aLayersId) override {
+    MOZ_ASSERT_UNREACHABLE("This message is only sent cross-process");
+    return true;
+  }
 
   virtual bool RecvGetTileSize(int32_t* aWidth, int32_t* aHeight) override;
 
@@ -251,12 +263,16 @@ public:
   // @see CrossProcessCompositorBridgeParent::RecvRequestNotifyAfterRemotePaint
   virtual bool RecvRequestNotifyAfterRemotePaint() override { return true; };
 
-  virtual bool RecvClearApproximatelyVisibleRegions(const uint64_t& aLayersId,
-                                                    const uint32_t& aPresShellId) override;
-  void ClearApproximatelyVisibleRegions(const uint64_t& aLayersId,
-                                        const Maybe<uint32_t>& aPresShellId);
-  virtual bool RecvNotifyApproximatelyVisibleRegion(const ScrollableLayerGuid& aGuid,
-                                                    const CSSIntRegion& aRegion) override;
+  virtual bool RecvClearVisibleRegions(const uint64_t& aLayersId,
+                                       const uint32_t& aPresShellId) override;
+  void ClearVisibleRegions(const uint64_t& aLayersId,
+                           const Maybe<uint32_t>& aPresShellId);
+  virtual bool RecvUpdateVisibleRegion(const VisibilityCounter& aCounter,
+                                       const ScrollableLayerGuid& aGuid,
+                                       const CSSIntRegion& aRegion) override;
+  void UpdateVisibleRegion(const VisibilityCounter& aCounter,
+                           const ScrollableLayerGuid& aGuid,
+                           const CSSIntRegion& aRegion);
 
   virtual void ActorDestroy(ActorDestroyReason why) override;
 
@@ -305,7 +321,6 @@ public:
    * SetFirstPaintViewport on the next frame of composition.
    */
   void ForceIsFirstPaint();
-  void Destroy();
 
   static void SetShadowProperties(Layer* aLayer);
 
@@ -410,7 +425,7 @@ public:
    * directly to us.  Transport is to its thread context.
    */
   static PCompositorBridgeParent*
-  Create(Transport* aTransport, ProcessId aOtherProcess);
+  Create(Transport* aTransport, ProcessId aOtherProcess, mozilla::ipc::GeckoChildProcessHost* aProcessHost);
 
   struct LayerTreeState {
     LayerTreeState();
@@ -430,6 +445,10 @@ public:
     bool mUpdatedPluginDataAvailable;
     RefPtr<CompositorUpdateObserver> mLayerTreeReadyObserver;
     RefPtr<CompositorUpdateObserver> mLayerTreeClearedObserver;
+
+    // Number of times the compositor has been reset without having been
+    // acknowledged by the child.
+    uint32_t mPendingCompositorUpdates;
 
     PCompositorBridgeParent* CrossProcessPCompositorBridge() const;
   };
@@ -480,7 +499,7 @@ public:
    */
   static bool IsInCompositorThread();
 
-  nsIWidget* GetWidget() { return mWidget; }
+  widget::CompositorWidgetProxy* GetWidgetProxy() { return mWidgetProxy; }
 
   void ForceComposeToTarget(gfx::DrawTarget* aTarget, const gfx::IntRect* aRect = nullptr);
 
@@ -510,7 +529,7 @@ protected:
                                  TextureFactoryIdentifier* aTextureFactoryIdentifier,
                                  bool* aSuccess) override;
   virtual bool DeallocPLayerTransactionParent(PLayerTransactionParent* aLayers) override;
-  virtual void ScheduleTask(CancelableTask*, int);
+  virtual void ScheduleTask(already_AddRefed<CancelableRunnable>, int);
   void CompositeToTarget(gfx::DrawTarget* aTarget, const gfx::IntRect* aRect = nullptr);
 
   void SetEGLSurfaceSize(int width, int height);
@@ -553,7 +572,7 @@ protected:
   RefPtr<LayerManagerComposite> mLayerManager;
   RefPtr<Compositor> mCompositor;
   RefPtr<AsyncCompositionManager> mCompositionManager;
-  nsIWidget* mWidget;
+  widget::CompositorWidgetProxy* mWidgetProxy;
   TimeStamp mTestTime;
   bool mIsTesting;
 
@@ -572,12 +591,16 @@ protected:
   const uint64_t mRootLayerTreeID;
 
   bool mOverrideComposeReadiness;
-  CancelableTask* mForceCompositionTask;
+  RefPtr<CancelableRunnable> mForceCompositionTask;
 
   RefPtr<APZCTreeManager> mApzcTreeManager;
 
   RefPtr<CompositorThreadHolder> mCompositorThreadHolder;
   RefPtr<CompositorVsyncScheduler> mCompositorScheduler;
+  // This makes sure the compositorParent is not destroyed before receiving
+  // confirmation that the channel is closed.
+  // mSelfRef is cleared in DeferredDestroy which is scheduled by ActorDestroy.
+  RefPtr<CompositorBridgeParent> mSelfRef;
 
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
   // cached plugin data used to reduce the number of updates we request.
@@ -585,9 +608,6 @@ protected:
   nsIntPoint mPluginsLayerOffset;
   nsIntRegion mPluginsLayerVisibleRegion;
   nsTArray<PluginWindowData> mCachedPluginData;
-  // indicates if we are currently waiting on a plugin update confirmation.
-  // When this is true, composition is currently on hold.
-  bool mPluginUpdateResponsePending;
   // indicates if plugin window visibility and metric updates are currently
   // being defered due to a scroll operation.
   bool mDeferPluginWindows;

@@ -2,7 +2,7 @@ $inherits:
   from: 'tasks/builds/b2g_dolphin_base.yml'
 task:
   scopes:
-    - 'docker-worker:cache:build-dolphin-512-eng'
+    - 'docker-worker:cache:level-{{level}}-{{project}}-build-dolphin-512-eng'
   metadata:
     name: '[TC] B2G Dolphin 512 Eng'
 

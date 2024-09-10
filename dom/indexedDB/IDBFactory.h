@@ -91,11 +91,6 @@ public:
                         IDBFactory** aFactory);
 
   static nsresult
-  CreateForDatastore(JSContext* aCx,
-                    JS::Handle<JSObject*> aOwningObject,
-                    IDBFactory** aFactory);
-
-  static nsresult
   CreateForWorker(JSContext* aCx,
                   JS::Handle<JSObject*> aOwningObject,
                   const PrincipalInfo& aPrincipalInfo,
@@ -164,17 +159,20 @@ public:
   IsChrome() const;
 
   already_AddRefed<IDBOpenDBRequest>
-  Open(const nsAString& aName,
+  Open(JSContext* aCx,
+       const nsAString& aName,
        uint64_t aVersion,
        ErrorResult& aRv);
 
   already_AddRefed<IDBOpenDBRequest>
-  Open(const nsAString& aName,
+  Open(JSContext* aCx,
+       const nsAString& aName,
        const IDBOpenDBOptions& aOptions,
        ErrorResult& aRv);
 
   already_AddRefed<IDBOpenDBRequest>
-  DeleteDatabase(const nsAString& aName,
+  DeleteDatabase(JSContext* aCx,
+                 const nsAString& aName,
                  const IDBOpenDBOptions& aOptions,
                  ErrorResult& aRv);
 
@@ -185,19 +183,22 @@ public:
       ErrorResult& aRv);
 
   already_AddRefed<IDBOpenDBRequest>
-  OpenForPrincipal(nsIPrincipal* aPrincipal,
+  OpenForPrincipal(JSContext* aCx,
+                   nsIPrincipal* aPrincipal,
                    const nsAString& aName,
                    uint64_t aVersion,
                    ErrorResult& aRv);
 
   already_AddRefed<IDBOpenDBRequest>
-  OpenForPrincipal(nsIPrincipal* aPrincipal,
+  OpenForPrincipal(JSContext* aCx,
+                   nsIPrincipal* aPrincipal,
                    const nsAString& aName,
                    const IDBOpenDBOptions& aOptions,
                    ErrorResult& aRv);
 
   already_AddRefed<IDBOpenDBRequest>
-  DeleteForPrincipal(nsIPrincipal* aPrincipal,
+  DeleteForPrincipal(JSContext* aCx,
+                     nsIPrincipal* aPrincipal,
                      const nsAString& aName,
                      const IDBOpenDBOptions& aOptions,
                      ErrorResult& aRv);
@@ -231,7 +232,8 @@ private:
                            nsIPrincipal** aPrincipal);
 
   already_AddRefed<IDBOpenDBRequest>
-  OpenInternal(nsIPrincipal* aPrincipal,
+  OpenInternal(JSContext* aCx,
+               nsIPrincipal* aPrincipal,
                const nsAString& aName,
                const Optional<uint64_t>& aVersion,
                const Optional<StorageType>& aStorageType,

@@ -389,9 +389,39 @@ BluetoothGattManager::Get()
   NS_ENSURE_FALSE(mInShutdown, nullptr);
 
   // Create a new instance, register, and return
-  BluetoothGattManager* manager = new BluetoothGattManager();
+  RefPtr<BluetoothGattManager> manager = new BluetoothGattManager();
+  NS_ENSURE_SUCCESS(manager->Init(), nullptr);
+
   sBluetoothGattManager = manager;
+
   return sBluetoothGattManager;
+}
+
+nsresult
+BluetoothGattManager::Init()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+  NS_ENSURE_TRUE(obs, NS_ERROR_NOT_AVAILABLE);
+
+  auto rv = obs->AddObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID, false);
+  if (NS_FAILED(rv)) {
+    BT_WARNING("Failed to add observers!");
+    return rv;
+  }
+
+  return NS_OK;
+}
+
+void
+BluetoothGattManager::Uninit()
+{
+  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+  NS_ENSURE_TRUE_VOID(obs);
+  if (NS_FAILED(obs->RemoveObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID))) {
+    BT_WARNING("Failed to remove shutdown observer!");
+  }
 }
 
 class BluetoothGattManager::RegisterModuleResultHandler final
@@ -435,7 +465,7 @@ private:
 };
 
 class BluetoothGattManager::InitProfileResultHandlerRunnable final
-  : public nsRunnable
+  : public Runnable
 {
 public:
   InitProfileResultHandlerRunnable(BluetoothProfileResultHandler* aRes,
@@ -471,7 +501,7 @@ BluetoothGattManager::InitGattInterface(BluetoothProfileResultHandler* aRes)
 
   if (sBluetoothGattInterface) {
     BT_LOGR("Bluetooth GATT interface is already initalized.");
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_OK);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch GATT Init runnable");
@@ -484,7 +514,7 @@ BluetoothGattManager::InitGattInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!btInf)) {
     // If there's no Bluetooth interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch GATT OnError runnable");
@@ -497,7 +527,7 @@ BluetoothGattManager::InitGattInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!setupInterface)) {
     // If there's no Setup interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch GATT OnError runnable");
@@ -510,7 +540,7 @@ BluetoothGattManager::InitGattInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!gattInterface)) {
     // If there's no GATT interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new InitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch GATT OnError runnable");
@@ -552,6 +582,11 @@ public:
 
     sBluetoothGattInterface->SetNotificationHandler(nullptr);
     sBluetoothGattInterface = nullptr;
+    sClients = nullptr;
+    sServers = nullptr;
+
+    sBluetoothGattManager->Uninit();
+    sBluetoothGattManager = nullptr;
 
     if (mRes) {
       mRes->OnError(NS_ERROR_FAILURE);
@@ -567,6 +602,9 @@ public:
     sClients = nullptr;
     sServers = nullptr;
 
+    sBluetoothGattManager->Uninit();
+    sBluetoothGattManager = nullptr;
+
     if (mRes) {
       mRes->Deinit();
     }
@@ -577,7 +615,7 @@ private:
 };
 
 class BluetoothGattManager::DeinitProfileResultHandlerRunnable final
-  : public nsRunnable
+  : public Runnable
 {
 public:
   DeinitProfileResultHandlerRunnable(BluetoothProfileResultHandler* aRes,
@@ -613,7 +651,7 @@ BluetoothGattManager::DeinitGattInterface(BluetoothProfileResultHandler* aRes)
 
   if (!sBluetoothGattInterface) {
     BT_LOGR("Bluetooth GATT interface has not been initalized.");
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new DeinitProfileResultHandlerRunnable(aRes, NS_OK);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch GATT Deinit runnable");
@@ -626,7 +664,7 @@ BluetoothGattManager::DeinitGattInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!btInf)) {
     // If there's no backend interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new DeinitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch GATT OnError runnable");
@@ -639,7 +677,7 @@ BluetoothGattManager::DeinitGattInterface(BluetoothProfileResultHandler* aRes)
   if (NS_WARN_IF(!setupInterface)) {
     // If there's no Setup interface, we dispatch a runnable
     // that calls the profile result handler.
-    RefPtr<nsRunnable> r =
+    RefPtr<Runnable> r =
       new DeinitProfileResultHandlerRunnable(aRes, NS_ERROR_FAILURE);
     if (NS_FAILED(NS_DispatchToMainThread(r))) {
       BT_LOGR("Failed to dispatch GATT OnError runnable");
@@ -4073,13 +4111,7 @@ BluetoothGattManager::BluetoothGattManager()
 { }
 
 BluetoothGattManager::~BluetoothGattManager()
-{
-  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
-  NS_ENSURE_TRUE_VOID(obs);
-  if (NS_FAILED(obs->RemoveObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID))) {
-    BT_WARNING("Failed to remove shutdown observer!");
-  }
-}
+{ }
 
 NS_IMETHODIMP
 BluetoothGattManager::Observe(nsISupports* aSubject,

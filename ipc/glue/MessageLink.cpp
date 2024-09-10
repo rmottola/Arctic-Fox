@@ -132,14 +132,12 @@ ProcessLink::Open(mozilla::ipc::Transport* aTransport, MessageLoop *aIOLoop, Sid
             // we start polling our pipe and processing outgoing
             // messages.
             mIOLoop->PostTask(
-                FROM_HERE,
                 NewRunnableMethod(this, &ProcessLink::OnChannelOpened));
         } else {
             // Transport::Connect() has already been called.  Take
             // over the channel from the previous listener and process
             // any queued messages.
             mIOLoop->PostTask(
-                FROM_HERE,
                 NewRunnableMethod(this, &ProcessLink::OnTakeConnectedChannel));
         }
 
@@ -168,7 +166,6 @@ ProcessLink::EchoMessage(Message *msg)
     mChan->mMonitor->AssertCurrentThreadOwns();
 
     mIOLoop->PostTask(
-        FROM_HERE,
         NewRunnableMethod(this, &ProcessLink::OnEchoMessage, msg));
     // OnEchoMessage takes ownership of |msg|
 }
@@ -216,7 +213,6 @@ ProcessLink::SendMessage(Message *msg)
 #endif
 
     mIOLoop->PostTask(
-        FROM_HERE,
         NewRunnableMethod(mTransport, &Transport::Send, msg));
 }
 
@@ -226,8 +222,7 @@ ProcessLink::SendClose()
     mChan->AssertWorkerThread();
     mChan->mMonitor->AssertCurrentThreadOwns();
 
-    mIOLoop->PostTask(
-        FROM_HERE, NewRunnableMethod(this, &ProcessLink::OnCloseChannel));
+    mIOLoop->PostTask(NewRunnableMethod(this, &ProcessLink::OnCloseChannel));
 }
 
 ThreadLink::ThreadLink(MessageChannel *aChan, MessageChannel *aTargetChan)
@@ -271,7 +266,7 @@ ThreadLink::EchoMessage(Message *msg)
     mChan->AssertWorkerThread();
     mChan->mMonitor->AssertCurrentThreadOwns();
 
-    mChan->OnMessageReceivedFromLink(*msg);
+    mChan->OnMessageReceivedFromLink(Move(*msg));
     delete msg;
 }
 
@@ -282,7 +277,7 @@ ThreadLink::SendMessage(Message *msg)
     mChan->mMonitor->AssertCurrentThreadOwns();
 
     if (mTargetChan)
-        mTargetChan->OnMessageReceivedFromLink(*msg);
+        mTargetChan->OnMessageReceivedFromLink(Move(*msg));
     delete msg;
 }
 
@@ -322,19 +317,19 @@ ThreadLink::Unsound_NumQueuedMessages() const
 //
 
 void
-ProcessLink::OnMessageReceived(const Message& msg)
+ProcessLink::OnMessageReceived(Message&& msg)
 {
     AssertIOThread();
     NS_ASSERTION(mChan->mChannelState != ChannelError, "Shouldn't get here!");
     MonitorAutoLock lock(*mChan->mMonitor);
-    mChan->OnMessageReceivedFromLink(msg);
+    mChan->OnMessageReceivedFromLink(Move(msg));
 }
 
 void
 ProcessLink::OnEchoMessage(Message* msg)
 {
     AssertIOThread();
-    OnMessageReceived(*msg);
+    OnMessageReceived(Move(*msg));
     delete msg;
 }
 
@@ -381,7 +376,7 @@ ProcessLink::OnTakeConnectedChannel()
 
     // Dispatch whatever messages the previous listener had queued up.
     while (!pending.empty()) {
-        OnMessageReceived(pending.front());
+        OnMessageReceived(Move(pending.front()));
         pending.pop();
     }
 }

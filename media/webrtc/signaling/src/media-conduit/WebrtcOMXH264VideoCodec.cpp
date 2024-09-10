@@ -128,7 +128,7 @@ ShutdownThread(nsCOMPtr<nsIThread>& aThread)
 // TODO: Bug 997110 - Revisit queue/drain logic. Current design assumes that
 //       encoder only generate one output buffer per input frame and won't work
 //       if encoder drops frames or generates multiple output per input.
-class OMXOutputDrain : public nsRunnable
+class OMXOutputDrain : public Runnable
 {
 public:
   void Start() {
@@ -529,7 +529,7 @@ public:
 
     gfx::IntSize picSize(buffer->GetSize());
     nsAutoPtr<layers::GrallocImage> grallocImage(new layers::GrallocImage());
-    grallocImage->SetData(buffer, picSize);
+    grallocImage->AdoptData(buffer, picSize);
 
     // Get timestamp of the frame about to render.
     int64_t timestamp = -1;
@@ -841,7 +841,7 @@ WebrtcOMXH264VideoEncoder::WebrtcOMXH264VideoEncoder()
 int32_t
 WebrtcOMXH264VideoEncoder::InitEncode(const webrtc::VideoCodec* aCodecSettings,
                                       int32_t aNumOfCores,
-                                      uint32_t aMaxPayloadSize)
+                                      size_t aMaxPayloadSize)
 {
   CODEC_LOGD("WebrtcOMXH264VideoEncoder:%p init", this);
 
@@ -1004,8 +1004,8 @@ WebrtcOMXH264VideoEncoder::Encode(const webrtc::I420VideoFrame& aInputImage,
   yuvData.mPicSize = yuvData.mYSize;
   yuvData.mStereoMode = StereoMode::MONO;
   layers::RecyclingPlanarYCbCrImage img(nullptr);
-  // SetDataNoCopy() doesn't need AllocateAndGetNewBuffer(); OMXVideoEncoder is ok with this
-  img.SetDataNoCopy(yuvData);
+  // AdoptData() doesn't need AllocateAndGetNewBuffer(); OMXVideoEncoder is ok with this
+  img.AdoptData(yuvData);
 
   CODEC_LOGD("Encode frame: %dx%d, timestamp %u (%lld), renderTimeMs %" PRIu64,
              aInputImage.width(), aInputImage.height(),

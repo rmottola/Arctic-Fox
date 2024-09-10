@@ -129,13 +129,11 @@ static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegD2 = t0;
 static MOZ_CONSTEXPR_VAR Register RegExpMatcherRegExpReg = CallTempReg0;
 static MOZ_CONSTEXPR_VAR Register RegExpMatcherStringReg = CallTempReg1;
 static MOZ_CONSTEXPR_VAR Register RegExpMatcherLastIndexReg = CallTempReg2;
-static MOZ_CONSTEXPR_VAR Register RegExpMatcherStickyReg = CallTempReg3;
 
 // Registerd used in RegExpTester instruction (do not use ReturnReg).
 static MOZ_CONSTEXPR_VAR Register RegExpTesterRegExpReg = CallTempReg0;
 static MOZ_CONSTEXPR_VAR Register RegExpTesterStringReg = CallTempReg1;
 static MOZ_CONSTEXPR_VAR Register RegExpTesterLastIndexReg = CallTempReg2;
-static MOZ_CONSTEXPR_VAR Register RegExpTesterStickyReg = CallTempReg3;
 
 static MOZ_CONSTEXPR_VAR uint32_t CodeAlignment = 4;
 
@@ -427,6 +425,10 @@ enum FunctionField {
     ff_ceil_w_fmt  = 14,
     ff_floor_w_fmt = 15,
 
+    ff_movf_fmt    = 17,
+    ff_movz_fmt    = 18,
+    ff_movn_fmt    = 19,
+
     ff_cvt_s_fmt   = 32,
     ff_cvt_d_fmt   = 33,
     ff_cvt_w_fmt   = 36,
@@ -635,6 +637,18 @@ class Operand
         return Register::FromCode(reg);
     }
 };
+
+inline Imm32
+Imm64::firstHalf() const
+{
+    return low();
+}
+
+inline Imm32
+Imm64::secondHalf() const
+{
+    return hi();
+}
 
 void
 PatchJump(CodeLocationJump& jump_, CodeLocationLabel label,
@@ -1051,6 +1065,14 @@ class AssemblerMIPSShared : public AssemblerShared
                          FPConditionBit fcc = FCC0);
     BufferOffset as_cule(FloatFormat fmt, FloatRegister fs, FloatRegister ft,
                          FPConditionBit fcc = FCC0);
+
+    // FP conditional move.
+    BufferOffset as_movt(FloatFormat fmt, FloatRegister fd, FloatRegister fs,
+                         FPConditionBit fcc = FCC0);
+    BufferOffset as_movf(FloatFormat fmt, FloatRegister fd, FloatRegister fs,
+                         FPConditionBit fcc = FCC0);
+    BufferOffset as_movz(FloatFormat fmt, FloatRegister fd, FloatRegister fs, Register rt);
+    BufferOffset as_movn(FloatFormat fmt, FloatRegister fd, FloatRegister fs, Register rt);
 
     // label operations
     void bind(Label* label, BufferOffset boff = BufferOffset());

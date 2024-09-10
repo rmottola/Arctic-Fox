@@ -70,10 +70,12 @@ class Message : public Pickle {
           MessageCompression compression = COMPRESSION_NONE,
           const char* const name="???");
 
-  // Initializes a message from a const block of data.  The data is not copied;
-  // instead the data is merely referenced by this message.  Only const methods
-  // should be used on the message when initialized this way.
-  Message(const char* data, int data_len);
+  // Initializes a message from a const block of data. If ownership == BORROWS,
+  // the data is not copied; instead the data is merely referenced by this
+  // message. Only const methods should be used on the message when initialized
+  // this way. If ownership == OWNS, then again no copying takes place. However,
+  // the buffer is writable and will be freed when the message is destroyed.
+  Message(const char* data, int data_len, Ownership ownership = BORROWS);
 
   Message(const Message& other);
   Message(Message&& other);
@@ -242,6 +244,12 @@ class Message : public Pickle {
     return Pickle::FindNext(sizeof(Header), range_start, range_end);
   }
 
+  // If the given range contains at least header_size bytes, return the length
+  // of the message including the header.
+  static uint32_t GetLength(const char* range_start, const char* range_end) {
+    return Pickle::GetLength(sizeof(Header), range_start, range_end);
+  }
+
 #if defined(OS_POSIX)
   // On POSIX, a message supports reading / writing FileDescriptor objects.
   // This is used to pass a file descriptor to the peer of an IPC channel.
@@ -348,6 +356,21 @@ class Message : public Pickle {
 
   const char* name_;
 
+};
+
+class MessageInfo {
+public:
+    typedef uint32_t msgid_t;
+
+    explicit MessageInfo(const Message& aMsg)
+        : mSeqno(aMsg.seqno()), mType(aMsg.type()) {}
+
+    int32_t seqno() const { return mSeqno; }
+    msgid_t type() const { return mType; }
+
+private:
+    int32_t mSeqno;
+    msgid_t mType;
 };
 
 //------------------------------------------------------------------------------

@@ -33,7 +33,6 @@ public:
             MediaSink* aAudioSink,
             MediaQueue<MediaData>& aVideoQueue,
             VideoFrameContainer* aContainer,
-            bool aRealTime,
             FrameStatistics& aFrameStats,
             uint32_t aVQueueSentToCompositerSize);
 
@@ -116,9 +115,6 @@ private:
   // FrameIDs. A unique and immutable value per VideoSink.
   const ProducerID mProducerID;
 
-  // True if we are decoding a real-time stream.
-  const bool mRealTime;
-
   // Used to notify MediaDecoder's frame statistics
   FrameStatistics& mFrameStats;
 
@@ -129,8 +125,6 @@ private:
   // The presentation end time of the last video frame which has been displayed
   // in microseconds.
   int64_t mVideoFrameEndTime;
-
-  uint32_t mOldDroppedCount;
 
   // Event listeners for VideoQueue
   MediaEventListener mPushListener;

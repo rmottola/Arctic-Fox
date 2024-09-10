@@ -15,7 +15,7 @@ const TEST_URI = `
   </style>
 `;
 
-add_task(function*() {
+add_task(function* () {
   yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
   let {view} = yield openRuleView();
 
@@ -39,9 +39,10 @@ function* testPressingEnterCommitsChanges(swatch, ruleView) {
   widget.coordinates = [0.1, 2, 0.9, -1];
   let expected = "cubic-bezier(0.1, 2, 0.9, -1)";
 
-  yield waitForSuccess(() => {
-    return content.getComputedStyle(content.document.body)
-      .transitionTimingFunction === expected;
+  yield waitForSuccess(function* () {
+    let func = yield getComputedStyleProperty("body", null,
+                                              "transition-timing-function");
+    return func === expected;
   }, "Waiting for the change to be previewed on the element");
 
   ok(getRuleViewProperty(ruleView, "body", "transition").valueSpan.textContent
@@ -49,13 +50,17 @@ function* testPressingEnterCommitsChanges(swatch, ruleView) {
     "The text of the timing-function was updated");
 
   info("Sending RETURN key within the tooltip document");
-  let onHidden = bezierTooltip.tooltip.once("hidden");
+  // Pressing RETURN ends up doing 2 rule-view updates, one for the preview and
+  // one for the commit when the tooltip closes.
+  let onRuleViewChanged = waitForNEvents(ruleView, "ruleview-changed", 2);
   EventUtils.sendKey("RETURN", widget.parent.ownerDocument.defaultView);
-  yield onHidden;
+  yield onRuleViewChanged;
 
-  is(content.getComputedStyle(content.document.body).transitionTimingFunction,
-    expected, "The element's timing-function was kept after RETURN");
-  ok(getRuleViewProperty(ruleView, "body", "transition").valueSpan.textContent
-    .indexOf("cubic-bezier(") !== -1,
-    "The text of the timing-function was kept after RETURN");
+  let style = yield getComputedStyleProperty("body", null,
+                                             "transition-timing-function");
+  is(style, expected, "The element's timing-function was kept after RETURN");
+
+  let ruleViewStyle = getRuleViewProperty(ruleView, "body", "transition")
+                      .valueSpan.textContent.indexOf("cubic-bezier(") !== -1;
+  ok(ruleViewStyle, "The text of the timing-function was kept after RETURN");
 }

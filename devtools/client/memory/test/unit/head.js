@@ -23,7 +23,15 @@ var HeapSnapshotFileUtils = require("devtools/shared/heapsnapshot/HeapSnapshotFi
 var HeapAnalysesClient = require("devtools/shared/heapsnapshot/HeapAnalysesClient");
 var { addDebuggerToGlobal } = require("resource://gre/modules/jsdebugger.jsm");
 var Store = require("devtools/client/memory/store");
+var { L10N } = require("devtools/client/memory/utils");
 var SYSTEM_PRINCIPAL = Cc["@mozilla.org/systemprincipal;1"].createInstance(Ci.nsIPrincipal);
+
+var EXPECTED_DTU_ASSERT_FAILURE_COUNT = 0;
+
+do_register_cleanup(function() {
+  equal(DevToolsUtils.assertionFailureCount, EXPECTED_DTU_ASSERT_FAILURE_COUNT,
+        "Should have had the expected number of DevToolsUtils.assert() failures.");
+});
 
 function dumpn(msg) {
   dump(`MEMORY-TEST: ${msg}\n`);
@@ -72,22 +80,40 @@ function waitUntilSnapshotState (store, expected) {
   return waitUntilState(store, predicate);
 }
 
-function isBreakdownType (report, type) {
-  // Little sanity check, all reports should have at least a children array.
-  if (!report || !Array.isArray(report.children)) {
-    return false;
+function findReportLeafIndex(node, name = null) {
+  if (node.reportLeafIndex && (!name || node.name === name)) {
+    return node.reportLeafIndex;
   }
-  switch (type) {
-    case "coarseType":
-      return report.children.find(c => c.name === "objects");
-    case "objectClass":
-      return report.children.find(c => c.name === "Function");
-    case "internalType":
-      return report.children.find(c => c.name === "js::BaseShape") &&
-             !report.children.find(c => c.name === "objects");
-    default:
-      throw new Error(`isBreakdownType does not yet support ${type}`);
+
+  if (node.children) {
+    for (let child of node.children) {
+      const found = findReportLeafIndex(child);
+      if (found) {
+        return found;
+      }
+    }
   }
+
+  return null;
+}
+
+function waitUntilCensusState (store, getCensus, expected) {
+  let predicate = () => {
+    let snapshots = store.getState().snapshots;
+
+    do_print('Current census state:' +
+             snapshots.map(x => getCensus(x) ? getCensus(x).state : null ));
+
+    return snapshots.length === expected.length &&
+           expected.every((state, i) => {
+             let census = getCensus(snapshots[i]);
+             return (state === "*") ||
+                    (!census && !state) ||
+                    (census && census.state === state);
+           });
+  };
+  do_print(`Waiting for snapshots' censuses to be of state: ${expected}`);
+  return waitUntilState(store, predicate);
 }
 
 function *createTempFile () {

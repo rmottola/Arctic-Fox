@@ -4,8 +4,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#define CERT_AddTempCertToPerm __CERT_AddTempCertToPerm
-
 #include "ScopedNSSTypes.h"
 #include "TestHarness.h"
 #include "cert.h"
@@ -130,7 +128,7 @@ AddCertificate(char* pem, char* nickname)
     return false;
   }
 
-  mozilla::ScopedCERTCertificate cert(
+  mozilla::UniqueCERTCertificate cert(
     CERT_NewTempCertificate(CERT_GetDefaultCertDB(), sCertDER, nickname, false,
                             true));
   if (!cert) {
@@ -142,7 +140,7 @@ AddCertificate(char* pem, char* nickname)
   trust.sslFlags = 0;
   trust.emailFlags = 0;
   trust.objectSigningFlags = 0;
-  if (CERT_AddTempCertToPerm(cert, nickname, &trust) != SECSuccess) {
+  if (CERT_AddTempCertToPerm(cert.get(), nickname, &trust) != SECSuccess) {
     fail("CERT_AddTempCertToPerm failed");
     return false;
   }

@@ -6,22 +6,22 @@
 
 // Test that the layout-view continues to work after the page is reloaded
 
-add_task(function*() {
+add_task(function* () {
   yield addTab(URL_ROOT + "doc_layout_iframe1.html");
-  let {toolbox, inspector, view} = yield openLayoutView();
+  let {inspector, view, testActor} = yield openLayoutView();
 
   info("Test that the layout-view works on the first page");
-  yield assertLayoutView(inspector, view);
+  yield assertLayoutView(inspector, view, testActor);
 
   info("Reload the page");
-  content.location.reload();
+  yield testActor.reload();
   yield inspector.once("markuploaded");
 
   info("Test that the layout-view works on the reloaded page");
-  yield assertLayoutView(inspector, view);
+  yield assertLayoutView(inspector, view, testActor);
 });
 
-function* assertLayoutView(inspector, view) {
+function* assertLayoutView(inspector, view, testActor) {
   info("Selecting the test node");
   yield selectNode("p", inspector);
 
@@ -31,7 +31,7 @@ function* assertLayoutView(inspector, view) {
 
   info("Listening for layout-view changes and modifying the padding");
   let onUpdated = waitForUpdate(inspector);
-  getNode("p").style.padding = "20px";
+  yield setStyle(testActor, "p", "padding", "20px");
   yield onUpdated;
   ok(true, "Layout-view got updated");
 

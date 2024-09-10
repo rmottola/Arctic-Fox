@@ -48,6 +48,12 @@ nsMenuBarListener::~nsMenuBarListener()
 }
 
 void
+nsMenuBarListener::OnDestroyMenuBarFrame()
+{
+  mMenuBarFrame = nullptr;
+}
+
+void
 nsMenuBarListener::InitializeStatics()
 {
   Preferences::AddBoolVarCache(&mAccessKeyFocuses,
@@ -140,15 +146,30 @@ nsMenuBarListener::KeyUp(nsIDOMEvent* aKeyEvent)
     {
       // The access key was down and is now up, and no other
       // keys were pressed in between.
+      bool toggleMenuActiveState = true;
       if (!mMenuBarFrame->IsActive()) {
-        mMenuBarFrame->SetActiveByKeyboard();
+        // First, close all existing popups because other popups shouldn't
+        // handle key events when menubar is active and IME should be
+        // disabled.
+        nsXULPopupManager* pm = nsXULPopupManager::GetInstance();
+        if (pm) {
+          pm->Rollup(0, false, nullptr, nullptr);
+        }
+        // If menubar active state is changed or the menubar is destroyed
+        // during closing the popups, we should do nothing anymore.
+        toggleMenuActiveState = !Destroyed() && !mMenuBarFrame->IsActive();
       }
-      ToggleMenuActiveState();
+      if (toggleMenuActiveState) {
+        if (!mMenuBarFrame->IsActive()) {
+          mMenuBarFrame->SetActiveByKeyboard();
+        }
+        ToggleMenuActiveState();
+      }
     }
     mAccessKeyDown = false;
     mAccessKeyDownCanceled = false;
 
-    bool active = mMenuBarFrame->IsActive();
+    bool active = !Destroyed() && mMenuBarFrame->IsActive();
     if (active) {
       aKeyEvent->StopPropagation();
       aKeyEvent->PreventDefault();
@@ -201,7 +222,7 @@ nsMenuBarListener::KeyPress(nsIDOMEvent* aKeyEvent)
           aKeyEvent->WidgetEventPtr()->AsKeyboardEvent();
         if (nativeKeyEvent) {
           AutoTArray<uint32_t, 10> keys;
-          nsContentUtils::GetAccessKeyCandidates(nativeKeyEvent, keys);
+          nativeKeyEvent->GetAccessKeyCandidates(keys);
           hasAccessKeyCandidates = !keys.IsEmpty();
         }
       }
@@ -279,7 +300,7 @@ nsMenuBarListener::GetModifiersForAccessKey(nsIDOMKeyEvent* aKeyEvent)
   static const Modifiers kPossibleModifiersForAccessKey =
     (MODIFIER_SHIFT | MODIFIER_CONTROL | MODIFIER_ALT | MODIFIER_META |
      MODIFIER_OS);
-  return (inputEvent->modifiers & kPossibleModifiersForAccessKey);
+  return (inputEvent->mModifiers & kPossibleModifiersForAccessKey);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -387,6 +408,11 @@ nsMenuBarListener::MouseDown(nsIDOMEvent* aMouseEvent)
 nsresult
 nsMenuBarListener::HandleEvent(nsIDOMEvent* aEvent)
 {
+  // If the menu bar is collapsed, don't do anything.
+  if (!mMenuBarFrame->StyleVisibility()->IsVisible()) {
+    return NS_OK;
+  }
+
   nsAutoString eventType;
   aEvent->GetType(eventType);
   

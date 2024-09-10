@@ -128,9 +128,10 @@ public:
                                    const uint8_t* aFontData,
                                    uint32_t aLength) override;
 
-    gfxFontFamily* FindFamily(const nsAString& aFamily,
-                              gfxFontStyle* aStyle = nullptr,
-                              gfxFloat aDevToCssSize = 1.0) override;
+    bool FindAndAddFamilies(const nsAString& aFamily,
+                            nsTArray<gfxFontFamily*>* aOutput,
+                            gfxFontStyle* aStyle = nullptr,
+                            gfxFloat aDevToCssSize = 1.0) override;
 
     // lookup the system font for a particular system font type and set
     // the name and style characteristics
@@ -175,7 +176,7 @@ private:
 
     // search fonts system-wide for a given character, null otherwise
     gfxFontEntry* GlobalFontFallback(const uint32_t aCh,
-                                     int32_t aRunScript,
+                                     Script aRunScript,
                                      const gfxFontStyle* aMatchStyle,
                                      uint32_t& aCmapCount,
                                      gfxFontFamily** aMatchedFamily) override;

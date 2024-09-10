@@ -7,7 +7,7 @@
 // Tests that the contextual menu shows the right items when clicking on a link
 // in an attribute.
 
-const TEST_URL = TEST_URL_ROOT + "doc_markup_links.html";
+const TEST_URL = URL_ROOT + "doc_markup_links.html";
 const STRINGS = Services.strings
   .createBundle("chrome://devtools/locale/inspector.properties");
 const TOOLBOX_STRINGS = Services.strings
@@ -28,16 +28,20 @@ const TEST_DATA = [{
   popupNodeSelector: ".link",
   isLinkFollowItemVisible: true,
   isLinkCopyItemVisible: true,
-  linkFollowItemLabel: TOOLBOX_STRINGS.GetStringFromName("toolbox.viewCssSourceInStyleEditor.label"),
-  linkCopyItemLabel: STRINGS.GetStringFromName("inspector.menu.copyUrlToClipboard.label")
+  linkFollowItemLabel: TOOLBOX_STRINGS.GetStringFromName(
+    "toolbox.viewCssSourceInStyleEditor.label"),
+  linkCopyItemLabel: STRINGS.GetStringFromName(
+    "inspector.menu.copyUrlToClipboard.label")
 }, {
   selector: "link[rel=icon]",
   attributeName: "href",
   popupNodeSelector: ".link",
   isLinkFollowItemVisible: true,
   isLinkCopyItemVisible: true,
-  linkFollowItemLabel: STRINGS.GetStringFromName("inspector.menu.openUrlInNewTab.label"),
-  linkCopyItemLabel: STRINGS.GetStringFromName("inspector.menu.copyUrlToClipboard.label")
+  linkFollowItemLabel: STRINGS.GetStringFromName(
+    "inspector.menu.openUrlInNewTab.label"),
+  linkCopyItemLabel: STRINGS.GetStringFromName(
+    "inspector.menu.copyUrlToClipboard.label")
 }, {
   selector: "link",
   attributeName: "rel",
@@ -58,8 +62,10 @@ const TEST_DATA = [{
   popupNodeSelector: ".link",
   isLinkFollowItemVisible: true,
   isLinkCopyItemVisible: true,
-  linkFollowItemLabel: TOOLBOX_STRINGS.GetStringFromName("toolbox.viewJsSourceInDebugger.label"),
-  linkCopyItemLabel: STRINGS.GetStringFromName("inspector.menu.copyUrlToClipboard.label")
+  linkFollowItemLabel: TOOLBOX_STRINGS.GetStringFromName(
+    "toolbox.viewJsSourceInDebugger.label"),
+  linkCopyItemLabel: STRINGS.GetStringFromName(
+    "inspector.menu.copyUrlToClipboard.label")
 }, {
   selector: "p[for]",
   attributeName: "for",
@@ -68,8 +74,8 @@ const TEST_DATA = [{
   isLinkCopyItemVisible: false
 }];
 
-add_task(function*() {
-  let {inspector} = yield addTab(TEST_URL).then(openInspector);
+add_task(function* () {
+  let {inspector} = yield openInspectorForURL(TEST_URL);
 
   let linkFollow = inspector.panelDoc.getElementById("node-menu-link-follow");
   let linkCopy = inspector.panelDoc.getElementById("node-menu-link-copy");

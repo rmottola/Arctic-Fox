@@ -4,13 +4,16 @@
 
 "use strict";
 
-const {Cc, Ci, Cu} = require("chrome");
+const {Cc, Ci} = require("chrome");
 const promise = require("promise");
 const protocol = require("devtools/server/protocol");
 const {Arg, Option, method, RetVal, types} = protocol;
 const events = require("sdk/event/core");
 const {Class} = require("sdk/core/heritage");
 const {LongStringActor} = require("devtools/server/actors/string");
+const {
+  getDefinedGeometryProperties
+} = require("devtools/server/actors/highlighters/geometry-editor");
 
 // This will also add the "stylesheet" actor type for protocol.js to recognize
 const {UPDATE_PRESERVING_RULES, UPDATE_GENERAL} =
@@ -565,14 +568,15 @@ var PageStyleActor = protocol.ActorClass({
    *   `matchedSelectors`: Include an array of specific selectors that
    *     caused this rule to match its node.
    */
-  getApplied: method(Task.async(function*(node, options) {
+  getApplied: method(Task.async(function* (node, options) {
     if (!node) {
       return {entries: [], rules: [], sheets: []};
     }
 
     this.cssLogic.highlight(node.rawNode);
     let entries = [];
-    entries = entries.concat(this._getAllElementRules(node, undefined, options));
+    entries = entries.concat(this._getAllElementRules(node, undefined,
+                                                      options));
 
     let result = this.getAppliedProps(node, entries, options);
     for (let rule of result.rules) {
@@ -596,6 +600,24 @@ var PageStyleActor = protocol.ActorClass({
     });
   },
 
+  isPositionEditable: method(Task.async(function* (node) {
+    if (!node || node.rawNode.nodeType !== node.rawNode.ELEMENT_NODE) {
+      return false;
+    }
+
+    let props = getDefinedGeometryProperties(node.rawNode);
+
+    // Elements with only `width` and `height` are currently not considered
+    // editable.
+    return props.has("top") ||
+           props.has("right") ||
+           props.has("left") ||
+           props.has("bottom");
+  }), {
+    request: { node: Arg(0, "domnode")},
+    response: { value: RetVal("boolean") }
+  }),
+
   /**
    * Helper function for getApplied, gets all the rules from a given
    * element. See getApplied for documentation on parameters.
@@ -611,7 +633,8 @@ var PageStyleActor = protocol.ActorClass({
    *                - pseudoElement String
    */
   _getAllElementRules: function(node, inherited, options) {
-    let {bindingElement, pseudo} = CssLogic.getBindingElementAndPseudo(node.rawNode);
+    let {bindingElement, pseudo} =
+        CssLogic.getBindingElementAndPseudo(node.rawNode);
     let rules = [];
 
     if (!bindingElement || !bindingElement.style) {
@@ -644,21 +667,24 @@ var PageStyleActor = protocol.ActorClass({
     // Add normal rules.  Typically this is passing in the node passed into the
     // function, unless if that node was ::before/::after.  In which case,
     // it will pass in the parentNode along with "::before"/"::after".
-    this._getElementRules(bindingElement, pseudo, inherited, options).forEach(rule => {
-      // The only case when there would be a pseudo here is ::before/::after,
-      // and in this case we want to tell the view that it belongs to the
-      // element (which is a _moz_generated_content native anonymous element).
-      rule.pseudoElement = null;
-      rules.push(rule);
-    });
+    this._getElementRules(bindingElement, pseudo, inherited, options)
+        .forEach(oneRule => {
+          // The only case when there would be a pseudo here is
+          // ::before/::after, and in this case we want to tell the
+          // view that it belongs to the element (which is a
+          // _moz_generated_content native anonymous element).
+          oneRule.pseudoElement = null;
+          rules.push(oneRule);
+        });
 
     // Now any pseudos (except for ::before / ::after, which was handled as
     // a 'normal rule' above.
     if (showElementStyles) {
-      for (let pseudo of PSEUDO_ELEMENTS_TO_READ) {
-        this._getElementRules(bindingElement, pseudo, inherited, options).forEach(rule => {
-          rules.push(rule);
-        });
+      for (let readPseudo of PSEUDO_ELEMENTS_TO_READ) {
+        this._getElementRules(bindingElement, readPseudo, inherited, options)
+            .forEach(oneRule => {
+              rules.push(oneRule);
+            });
       }
     }
 
@@ -741,7 +767,8 @@ var PageStyleActor = protocol.ActorClass({
     if (options.inherited) {
       let parent = this.walker.parentNode(node);
       while (parent && parent.rawNode.nodeType != Ci.nsIDOMNode.DOCUMENT_NODE) {
-        entries = entries.concat(this._getAllElementRules(parent, parent, options));
+        entries = entries.concat(this._getAllElementRules(parent, parent,
+                                                          options));
         parent = this.walker.parentNode(parent);
       }
     }
@@ -756,10 +783,12 @@ var PageStyleActor = protocol.ActorClass({
         let selectors = CssLogic.getSelectors(domRule);
         let element = entry.inherited ? entry.inherited.rawNode : node.rawNode;
 
-        let {bindingElement, pseudo} = CssLogic.getBindingElementAndPseudo(element);
+        let {bindingElement, pseudo} =
+            CssLogic.getBindingElementAndPseudo(element);
         entry.matchedSelectors = [];
         for (let i = 0; i < selectors.length; i++) {
-          if (DOMUtils.selectorMatchesElement(bindingElement, domRule, i, pseudo)) {
+          if (DOMUtils.selectorMatchesElement(bindingElement, domRule, i,
+                                              pseudo)) {
             entry.matchedSelectors.push(selectors[i]);
           }
         }
@@ -961,7 +990,7 @@ var PageStyleActor = protocol.ActorClass({
    *        CSSOM.
    * @returns {StyleRuleActor} the new rule
    */
-  addNewRule: method(Task.async(function*(node, pseudoClasses,
+  addNewRule: method(Task.async(function* (node, pseudoClasses,
                                           editAuthored = false) {
     let style = this.styleElement;
     let sheet = style.sheet;
@@ -1006,9 +1035,9 @@ var PageStyleActor = protocol.ActorClass({
 exports.PageStyleActor = PageStyleActor;
 
 /**
- * Front object for the PageStyleActor
+ * PageStyleFront, the front object for the PageStyleActor
  */
-var PageStyleFront = protocol.FrontClass(PageStyleActor, {
+protocol.FrontClass(PageStyleActor, {
   initialize: function(conn, form, ctx, detail) {
     protocol.Front.prototype.initialize.call(this, conn, form, ctx, detail);
     this.inspector = this.parent();
@@ -1042,7 +1071,7 @@ var PageStyleFront = protocol.FrontClass(PageStyleActor, {
     impl: "_getMatchedSelectors"
   }),
 
-  getApplied: protocol.custom(Task.async(function*(node, options={}) {
+  getApplied: protocol.custom(Task.async(function* (node, options = {}) {
     // If the getApplied method doesn't recreate the style cache itself, this
     // means a call to cssLogic.highlight is required before trying to access
     // the applied rules. Issue a request to getLayout if this is the case.
@@ -1127,7 +1156,7 @@ var StyleRuleActor = protocol.ActorClass({
     return this.pageStyle.conn;
   },
 
-  destroy: function () {
+  destroy: function() {
     if (!this.rawStyle) {
       return;
     }
@@ -1176,7 +1205,7 @@ var StyleRuleActor = protocol.ActorClass({
   },
 
   toString: function() {
-    return "[StyleRuleActor for " + this.rawRule + "]"
+    return "[StyleRuleActor for " + this.rawRule + "]";
   },
 
   form: function(detail) {
@@ -1200,7 +1229,8 @@ var StyleRuleActor = protocol.ActorClass({
     };
 
     if (this.rawRule.parentRule) {
-      form.parentRule = this.pageStyle._styleRef(this.rawRule.parentRule).actorID;
+      form.parentRule =
+        this.pageStyle._styleRef(this.rawRule.parentRule).actorID;
 
       // CSS rules that we call media rules are STYLE_RULES that are children
       // of MEDIA_RULEs. We need to check the parentRule to check if a rule is
@@ -1214,7 +1244,8 @@ var StyleRuleActor = protocol.ActorClass({
       }
     }
     if (this._parentSheet) {
-      form.parentStyleSheet = this.pageStyle._sheetRef(this._parentSheet).actorID;
+      form.parentStyleSheet =
+        this.pageStyle._sheetRef(this._parentSheet).actorID;
     }
 
     // One tricky thing here is that other methods in this actor must
@@ -1394,7 +1425,7 @@ var StyleRuleActor = protocol.ActorClass({
    * @param {String} newText the new text of the rule
    * @returns the rule with updated properties
    */
-  setRuleText: method(Task.async(function*(newText) {
+  setRuleText: method(Task.async(function* (newText) {
     if (!this.canSetRuleText ||
         (this.type !== Ci.nsIDOMCSSRule.STYLE_RULE &&
          this.type !== Ci.nsIDOMCSSRule.KEYFRAME_RULE)) {
@@ -1485,7 +1516,7 @@ var StyleRuleActor = protocol.ActorClass({
    * @returns {CSSRule}
    *        The new CSS rule added
    */
-  _addNewSelector: Task.async(function*(value, editAuthored) {
+  _addNewSelector: Task.async(function* (value, editAuthored) {
     let rule = this.rawRule;
     let parentStyleSheet = this._parentSheet;
 
@@ -1520,7 +1551,7 @@ var StyleRuleActor = protocol.ActorClass({
             parentStyleSheet.insertRule(value + " " + ruleText, i);
             parentStyleSheet.deleteRule(i + 1);
             break;
-          } catch(e) {
+          } catch (e) {
             // The selector could be invalid, or the rule could fail to insert.
             return null;
           }
@@ -1544,14 +1575,14 @@ var StyleRuleActor = protocol.ActorClass({
    *        Returns a boolean if the selector in the stylesheet was modified,
    *        and false otherwise
    */
-  modifySelector: method(Task.async(function*(value) {
+  modifySelector: method(Task.async(function* (value) {
     if (this.type === ELEMENT_STYLE) {
       return false;
     }
 
     let document = this.getDocument(this._parentSheet);
     // Extract the selector, and pseudo elements and classes
-    let [selector, pseudoProp] = value.split(/(:{1,2}.+$)/);
+    let [selector] = value.split(/(:{1,2}.+$)/);
     let selectorElement;
 
     try {
@@ -1626,7 +1657,7 @@ var StyleRuleActor = protocol.ActorClass({
       let isMatching = false;
       try {
         isMatching = node.rawNode.matches(value);
-      } catch(e) {
+      } catch (e) {
         // This fails when value is an invalid selector.
       }
 
@@ -1643,9 +1674,9 @@ var StyleRuleActor = protocol.ActorClass({
 });
 
 /**
- * Front for the StyleRule actor.
+ * StyleRuleFront, the front for the StyleRule actor.
  */
-var StyleRuleFront = protocol.FrontClass(StyleRuleActor, {
+protocol.FrontClass(StyleRuleActor, {
   initialize: function(client, form, ctx, detail) {
     protocol.Front.prototype.initialize.call(this, client, form, ctx, detail);
   },
@@ -1802,7 +1833,7 @@ var StyleRuleFront = protocol.FrontClass(StyleRuleActor, {
       });
   },
 
-  modifySelector: protocol.custom(Task.async(function*(node, value) {
+  modifySelector: protocol.custom(Task.async(function* (node, value) {
     let response;
     if (this.supportsModifySelectorUnmatched) {
       // If the debugee supports adding unmatched rules (post FF41)
@@ -1911,9 +1942,13 @@ var RuleModificationList = Class({
    *                       generally for setting properties
    *                       on an element's style.
    * @param {String} name current name of the property
+   *
+   * This parameter is also passed, but as it is not used in this
+   * implementation, it is omitted.  It is documented here as this
+   * code also defined the interface implemented by @see RuleRewriter.
    * @param {String} newName new name of the property
    */
-  renameProperty: function(index, name, newName) {
+  renameProperty: function(index, name) {
     this.removeProperty(index, name);
   },
 
@@ -1941,6 +1976,11 @@ var RuleModificationList = Class({
    * Create a new property.  This implementation does nothing, because
    * |setRuleText| is not available.
    *
+   * These parameter are passed, but as they are not used in this
+   * implementation, they are omitted.  They are documented here as
+   * this code also defined the interface implemented by @see
+   * RuleRewriter.
+   *
    * @param {Number} index index of the property in the rule.
    *                       This can be -1 in the case where
    *                       the rule does not support setRuleText;
@@ -1951,7 +1991,7 @@ var RuleModificationList = Class({
    * @param {String} priority priority of the new property; either
    *                          the empty string or "important"
    */
-  createProperty: function(index, name, value, priority) {
+  createProperty: function() {
     // Nothing.
   },
 });

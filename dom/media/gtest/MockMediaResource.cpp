@@ -10,10 +10,10 @@
 namespace mozilla
 {
 
-MockMediaResource::MockMediaResource(const char* aFileName)
+MockMediaResource::MockMediaResource(const char* aFileName, const nsACString& aContentType)
   : mFileHandle(nullptr)
   , mFileName(aFileName)
-  , mContentType(NS_LITERAL_CSTRING("video/mp4"))
+  , mContentType(aContentType)
 {
 }
 
@@ -64,7 +64,6 @@ MockMediaResource::GetLength()
   if (mFileHandle == nullptr) {
     return -1;
   }
-
   fseek(mFileHandle, 0, SEEK_END);
   return ftell(mFileHandle);
 }

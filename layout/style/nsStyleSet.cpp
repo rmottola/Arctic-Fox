@@ -187,11 +187,16 @@ nsStyleSet::nsStyleSet()
   : mRuleTree(nullptr),
     mBatching(0),
     mInShutdown(false),
+    mInGC(false),
     mAuthorStyleDisabled(false),
     mInReconstruct(false),
     mInitFontFeatureValuesLookup(true),
     mNeedsRestyleAfterEnsureUniqueInner(false),
     mDirty(0),
+    mRootStyleContextCount(0),
+#ifdef DEBUG
+    mOldRootNode(nullptr),
+#endif
     mUnusedRuleNodeCount(0)
 {
 }
@@ -246,9 +251,6 @@ nsStyleSet::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const
   }
   n += mScopedDocSheetRuleProcessors.ShallowSizeOfExcludingThis(aMallocSizeOf);
 
-  n += mRoots.ShallowSizeOfExcludingThis(aMallocSizeOf);
-  n += mOldRuleTrees.ShallowSizeOfExcludingThis(aMallocSizeOf);
-
   return n;
 }
 
@@ -277,26 +279,21 @@ nsStyleSet::BeginReconstruct()
 {
   NS_ASSERTION(!mInReconstruct, "Unmatched begin/end?");
   NS_ASSERTION(mRuleTree, "Reconstructing before first construction?");
+  mInReconstruct = true;
 
   // Clear any ArenaRefPtr-managed style contexts, as we don't want them
   // held on to after the rule tree has been reconstructed.
   PresContext()->PresShell()->ClearArenaRefPtrs(eArenaObjectID_nsStyleContext);
 
-  // Create a new rule tree root
-  nsRuleNode* newTree = nsRuleNode::CreateRootNode(mRuleTree->PresContext());
+#ifdef DEBUG
+  MOZ_ASSERT(!mOldRootNode);
+  mOldRootNode = mRuleTree;
+#endif
 
-  // Save the old rule tree so we can destroy it later
-  if (!mOldRuleTrees.AppendElement(mRuleTree)) {
-    newTree->Destroy();
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
-
-  // We need to keep mRoots so that the rule tree GC will only free the
-  // rule trees that really aren't referenced anymore (which should be
-  // all of them, if there are no bugs in reresolution code).
-
-  mInReconstruct = true;
-  mRuleTree = newTree;
+  // Create a new rule tree root, dropping the reference to our old rule tree.
+  // After reconstruction, we will re-enable GC, and allow everything to be
+  // collected.
+  mRuleTree = nsRuleNode::CreateRootNode(mRuleTree->PresContext());
 
   return NS_OK;
 }
@@ -306,22 +303,6 @@ nsStyleSet::EndReconstruct()
 {
   NS_ASSERTION(mInReconstruct, "Unmatched begin/end?");
   mInReconstruct = false;
-#ifdef DEBUG
-  for (int32_t i = mRoots.Length() - 1; i >= 0; --i) {
-    // Since nsStyleContext's mParent and mRuleNode are immutable, and
-    // style contexts own their parents, and nsStyleContext asserts in
-    // its constructor that the style context and its parent are in the
-    // same rule tree, we don't need to check any of the children of
-    // mRoots; we only need to check the rule nodes of mRoots
-    // themselves.
-
-    NS_ASSERTION(mRoots[i]->RuleNode()->RuleTree() == mRuleTree,
-                 "style context has old rule node");
-  }
-#endif
-  // This *should* destroy the only element of mOldRuleTrees, but in
-  // case of some bugs (which would trigger the above assertions), it
-  // won't.
   GCRuleTrees();
 }
 
@@ -529,7 +510,7 @@ nsStyleSet::GatherRuleProcessors(SheetType aType)
         sheetsForScope.AppendElements(sheets.Elements() + start, end - start);
         nsCSSRuleProcessor* oldRP = oldScopedRuleProcessorHash.Get(scope);
         mScopedDocSheetRuleProcessors.AppendElement
-          (new nsCSSRuleProcessor(sheetsForScope, aType, scope, oldRP));
+          (new nsCSSRuleProcessor(Move(sheetsForScope), aType, scope, oldRP));
 
         start = end;
       } while (start < count);
@@ -727,40 +708,8 @@ nsStyleSet::AddDocStyleSheet(CSSStyleSheet* aSheet, nsIDocument* aDocument)
   nsTArray<RefPtr<CSSStyleSheet>>& sheets = mSheets[type];
 
   bool present = sheets.RemoveElement(aSheet);
-  nsStyleSheetService *sheetService = nsStyleSheetService::GetInstance();
 
-  // lowest index first
-  int32_t newDocIndex = aDocument->GetIndexOfStyleSheet(aSheet);
-
-  int32_t count = sheets.Length();
-  int32_t index;
-  for (index = 0; index < count; index++) {
-    CSSStyleSheet* sheet = sheets[index];
-    int32_t sheetDocIndex = aDocument->GetIndexOfStyleSheet(sheet);
-    if (sheetDocIndex > newDocIndex)
-      break;
-
-    // If the sheet is not owned by the document it can be an author
-    // sheet registered at nsStyleSheetService or an additional author
-    // sheet on the document, which means the new 
-    // doc sheet should end up before it.
-    if (sheetDocIndex < 0) {
-      if (sheetService) {
-        auto& authorSheets = *sheetService->AuthorStyleSheets();
-        StyleSheetHandle handle = sheet;
-        if (authorSheets.IndexOf(handle) != authorSheets.NoIndex) {
-          break;
-        }
-      }
-      MOZ_ASSERT(!aDocument->GetFirstAdditionalAuthorSheet() ||
-                 aDocument->GetFirstAdditionalAuthorSheet()->IsGecko(),
-                 "why do we have a ServoStyleSheet for an nsStyleSet?");
-      if (sheet == aDocument->GetFirstAdditionalAuthorSheet()->GetAsGecko()) {
-        break;
-      }
-    }
-  }
-
+  size_t index = aDocument->FindDocStyleSheetInsertionPoint(sheets, aSheet);
   sheets.InsertElementAt(index, aSheet);
 
   if (!present) {
@@ -998,6 +947,8 @@ nsStyleSet::GetContext(nsStyleContext* aParentContext,
       // Update CSS animations in case the animation-name has just changed.
       PresContext()->AnimationManager()->UpdateAnimations(result,
                                                           aElementForAnimation);
+      PresContext()->EffectCompositor()->UpdateEffectProperties(
+        result, aElementForAnimation, result->GetPseudoType());
 
       animRule = PresContext()->EffectCompositor()->
                    GetAnimationRule(aElementForAnimation,
@@ -1035,7 +986,7 @@ nsStyleSet::GetContext(nsStyleContext* aParentContext,
       aElementForAnimation->IsHTMLElement(nsGkAtoms::body) &&
       aPseudoType == CSSPseudoElementType::NotPseudo &&
       PresContext()->CompatibilityMode() == eCompatibility_NavQuirks) {
-    nsIDocument* doc = aElementForAnimation->GetCurrentDoc();
+    nsIDocument* doc = aElementForAnimation->GetUncomposedDoc();
     if (doc && doc->GetBodyElement() == aElementForAnimation) {
       // Update the prescontext's body color
       PresContext()->SetBodyTextColor(result->StyleColor()->mColor);
@@ -1798,12 +1749,21 @@ nsStyleSet::ResolveStyleWithoutAnimation(dom::Element* aTarget,
 }
 
 already_AddRefed<nsStyleContext>
-nsStyleSet::ResolveStyleForNonElement(nsStyleContext* aParentContext)
+nsStyleSet::ResolveStyleForText(nsIContent* aTextNode,
+                                nsStyleContext* aParentContext)
+{
+  MOZ_ASSERT(aTextNode && aTextNode->IsNodeOfType(nsINode::eTEXT));
+  return GetContext(aParentContext, mRuleTree, nullptr,
+                    nsCSSAnonBoxes::mozText,
+                    CSSPseudoElementType::AnonBox, nullptr, eNoFlags);
+}
+
+already_AddRefed<nsStyleContext>
+nsStyleSet::ResolveStyleForOtherNonElement(nsStyleContext* aParentContext)
 {
   return GetContext(aParentContext, mRuleTree, nullptr,
-                    nsCSSAnonBoxes::mozNonElement,
-                    CSSPseudoElementType::AnonBox, nullptr,
-                    eNoFlags);
+                    nsCSSAnonBoxes::mozOtherNonElement,
+                    CSSPseudoElementType::AnonBox, nullptr, eNoFlags);
 }
 
 void
@@ -2197,87 +2157,42 @@ void
 nsStyleSet::BeginShutdown()
 {
   mInShutdown = 1;
-  mRoots.Clear(); // no longer valid, since we won't keep it up to date
 }
 
 void
 nsStyleSet::Shutdown()
 {
-  mRuleTree->Destroy();
   mRuleTree = nullptr;
-
-  // We can have old rule trees either because:
-  //   (1) we failed the assertions in EndReconstruct, or
-  //   (2) we're shutting down within a reconstruct (see bug 462392)
-  for (uint32_t i = mOldRuleTrees.Length(); i > 0; ) {
-    --i;
-    mOldRuleTrees[i]->Destroy();
-  }
-  mOldRuleTrees.Clear();
+  GCRuleTrees();
+  MOZ_ASSERT(mUnusedRuleNodeList.isEmpty());
+  MOZ_ASSERT(mUnusedRuleNodeCount == 0);
 }
 
-static const uint32_t kGCInterval = 300;
-
-// Notification that a style context with a null parent has been created.
-void
-nsStyleSet::AddStyleContextRoot(nsStyleContext* aStyleContext)
-{
-  // aStyleContext has not been fully initialized, but its parent and
-  // rule node are correct.
-  MOZ_ASSERT(!aStyleContext->GetParent());
-  mRoots.AppendElement(aStyleContext);
-}
-
-void
-nsStyleSet::NotifyStyleContextDestroyed(nsStyleContext* aStyleContext)
-{
-  if (mInShutdown)
-    return;
-
-  // Remove style contexts from mRoots even if mOldRuleTree is non-null.  This
-  // could be a style context from the new ruletree!
-  if (!aStyleContext->GetParent()) {
-    mRoots.RemoveElement(aStyleContext);
-  }
-
-  if (mInReconstruct)
-    return;
-
-  if (mUnusedRuleNodeCount >= kGCInterval) {
-    GCRuleTrees();
-  }
-}
 
 void
 nsStyleSet::GCRuleTrees()
 {
-  mUnusedRuleNodeCount = 0;
+  MOZ_ASSERT(!mInReconstruct);
+  MOZ_ASSERT(!mInGC);
+  mInGC = true;
 
-  // Mark the style context tree by marking all style contexts which
-  // have no parent, which will mark all descendants.  This will reach
-  // style contexts in the undisplayed map and "additional style
-  // contexts" since they are descendants of the roots.
-  for (int32_t i = mRoots.Length() - 1; i >= 0; --i) {
-    mRoots[i]->Mark();
-  }
-
-  // Sweep the rule tree.
+  while (!mUnusedRuleNodeList.isEmpty()) {
+    nsRuleNode* node = mUnusedRuleNodeList.popFirst();
 #ifdef DEBUG
-  bool deleted =
-#endif
-    mRuleTree->Sweep();
-  NS_ASSERTION(!deleted, "Root node must not be gc'd");
-
-  // Sweep the old rule trees.
-  for (uint32_t i = mOldRuleTrees.Length(); i > 0; ) {
-    --i;
-    if (mOldRuleTrees[i]->Sweep()) {
-      // It was deleted, as it should be.
-      mOldRuleTrees.RemoveElementAt(i);
-    } else {
-      NS_NOTREACHED("old rule tree still referenced");
+    if (node == mOldRootNode) {
+      // Flag that we've GCed the old root, if any.
+      mOldRootNode = nullptr;
     }
+#endif
+    node->Destroy();
   }
+
+#ifdef DEBUG
+  NS_ASSERTION(!mOldRootNode, "Should have GCed old root node");
+  mOldRootNode = nullptr;
+#endif
+  mUnusedRuleNodeCount = 0;
+  mInGC = false;
 }
 
 already_AddRefed<nsStyleContext>

@@ -10,7 +10,7 @@
 const {Cc, Ci, Cu} = require("chrome");
 const promise = require("promise");
 const Services = require("Services");
-const {Tools} = require("devtools/client/main");
+const {Tools} = require("devtools/client/definitions");
 const {setTimeout, clearTimeout} =
       Cu.import("resource://gre/modules/Timer.jsm", {});
 const {CssLogic} = require("devtools/shared/inspector/css-logic");
@@ -120,8 +120,12 @@ function createDummyDocument() {
   });
   let docShell = getDocShell(frame);
   let eventTarget = docShell.chromeEventHandler;
-  docShell.createAboutBlankContentViewer(Cc["@mozilla.org/nullprincipal;1"]
-                                         .createInstance(Ci.nsIPrincipal));
+  let ssm = Services.scriptSecurityManager;
+
+  // We probably need to call InheritFromDocShellToDoc to get the correct origin
+  // attributes, but right now we can't call it from JS.
+  let nullPrincipal = ssm.createNullPrincipal(docShell.getOriginAttributes());
+  docShell.createAboutBlankContentViewer(nullPrincipal);
   let window = docShell.contentViewer.DOMDocument.defaultView;
   window.location = "data:text/html,<html></html>";
   let deferred = promise.defer();
@@ -261,7 +265,7 @@ CssRuleView.prototype = {
    *
    * @return {Promise} Resolves to the instance of the highlighter.
    */
-  getSelectorHighlighter: Task.async(function*() {
+  getSelectorHighlighter: Task.async(function* () {
     let utils = this.inspector.toolbox.highlighterUtils;
     if (!utils.supportsCustomHighlighters()) {
       return null;
@@ -319,7 +323,7 @@ CssRuleView.prototype = {
     }, Cu.reportError);
   },
 
-  highlightSelector: Task.async(function*(selector) {
+  highlightSelector: Task.async(function* (selector) {
     let node = this.inspector.selection.nodeFront;
 
     let highlighter = yield this.getSelectorHighlighter();
@@ -334,7 +338,7 @@ CssRuleView.prototype = {
     });
   }),
 
-  unhighlightSelector: Task.async(function*() {
+  unhighlightSelector: Task.async(function* () {
     let highlighter = yield this.getSelectorHighlighter();
     if (!highlighter) {
       return;
@@ -462,7 +466,8 @@ CssRuleView.prototype = {
     try {
       let text = "";
 
-      if (target && target.nodeName === "input") {
+      let nodeName = target && target.nodeName;
+      if (nodeName === "input" || nodeName == "textarea") {
         let start = Math.min(target.selectionStart, target.selectionEnd);
         let end = Math.max(target.selectionStart, target.selectionEnd);
         let count = end - start;
@@ -873,6 +878,7 @@ CssRuleView.prototype = {
       if (this._elementStyle === elementStyle) {
         return this._populate();
       }
+      return undefined;
     }).then(() => {
       if (this._elementStyle === elementStyle) {
         if (!refresh) {
@@ -957,16 +963,17 @@ CssRuleView.prototype = {
     let elementStyle = this._elementStyle;
     return this._elementStyle.populate().then(() => {
       if (this._elementStyle !== elementStyle || this.isDestroyed) {
-        return;
+        return null;
       }
 
       this._clearRules();
-      this._createEditors();
-
+      let onEditorsReady = this._createEditors();
       this.refreshPseudoClassPanel();
 
       // Notify anyone that cares that we refreshed.
-      this.emit("ruleview-refreshed");
+      return onEditorsReady.then(() => {
+        this.emit("ruleview-refreshed");
+      }, e => console.error(e));
     }).then(null, promiseWarn);
   },
 
@@ -1146,9 +1153,10 @@ CssRuleView.prototype = {
     let container = null;
 
     if (!this._elementStyle.rules) {
-      return;
+      return promise.resolve();
     }
 
+    let editorReadyPromises = [];
     for (let rule of this._elementStyle.rules) {
       if (rule.domRule.system) {
         continue;
@@ -1157,6 +1165,7 @@ CssRuleView.prototype = {
       // Initialize rule editor
       if (!rule.editor) {
         rule.editor = new RuleEditor(this, rule);
+        editorReadyPromises.push(rule.editor.once("source-link-updated"));
       }
 
       // Filter the rules and highlight any matches if there is a search input
@@ -1210,6 +1219,8 @@ CssRuleView.prototype = {
     } else {
       this.searchField.classList.remove("devtools-style-searchbox-no-match");
     }
+
+    return promise.all(editorReadyPromises);
   },
 
   /**
@@ -1495,11 +1506,15 @@ CssRuleView.prototype = {
    * Handle the keypress event in the rule view.
    */
   _onKeypress: function(event) {
+    if (!event.target.closest("#sidebar-panel-ruleview")) {
+      return;
+    }
+
     let isOSX = Services.appinfo.OS === "Darwin";
 
     if (((isOSX && event.metaKey && !event.ctrlKey && !event.altKey) ||
         (!isOSX && event.ctrlKey && !event.metaKey && !event.altKey)) &&
-        event.code === "KeyF") {
+        event.key === "f") {
       this.searchField.focus();
       event.preventDefault();
     }
@@ -1688,8 +1703,8 @@ RuleViewTool.prototype = {
       let target = this.inspector.target;
       if (Tools.styleEditor.isTargetSupported(target)) {
         gDevTools.showToolbox(target, "styleeditor").then(function(toolbox) {
-          let sheet = source || href;
-          toolbox.getCurrentPanel().selectStyleSheet(sheet, line, column);
+          let url = source || href;
+          toolbox.getCurrentPanel().selectStyleSheet(url, line, column);
         });
       }
       return;

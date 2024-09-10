@@ -104,9 +104,7 @@ namespace {
 
 } /* anonymous namespace */
 
-const Class MapIteratorObject::class_ = {
-    "Map Iterator",
-    JSCLASS_HAS_RESERVED_SLOTS(MapIteratorObject::SlotCount),
+static const ClassOps MapIteratorObjectClassOps = {
     nullptr, /* addProperty */
     nullptr, /* delProperty */
     nullptr, /* getProperty */
@@ -115,6 +113,12 @@ const Class MapIteratorObject::class_ = {
     nullptr, /* resolve */
     nullptr, /* mayResolve */
     MapIteratorObject::finalize
+};
+
+const Class MapIteratorObject::class_ = {
+    "Map Iterator",
+    JSCLASS_HAS_RESERVED_SLOTS(MapIteratorObject::SlotCount),
+    &MapIteratorObjectClassOps
 };
 
 const JSFunctionSpec MapIteratorObject::methods[] = {
@@ -196,18 +200,6 @@ MapIteratorObject::next(JSContext* cx, Handle<MapIteratorObject*> mapIterator,
     MOZ_ASSERT(resultPairObj->getDenseInitializedLength() == 2);
     MOZ_ASSERT(resultPairObj->getDenseCapacity() >= 2);
 
-#ifdef DEBUG
-    // The array elements should be null, so that inlined
-    // _GetNextMapEntryForIterator doesn't have to perform pre-barrier.
-    RootedValue val(cx);
-    if (!GetElement(cx, resultPairObj, resultPairObj, 0, &val))
-        return false;
-    MOZ_ASSERT(val.isNull());
-    if (!GetElement(cx, resultPairObj, resultPairObj, 1, &val))
-        return false;
-    MOZ_ASSERT(val.isNull());
-#endif
-
     ValueMap::Range* range = MapIteratorObjectRange(mapIterator);
     if (!range || range->empty()) {
         js_delete(range);
@@ -259,10 +251,7 @@ MapIteratorObject::createResultPair(JSContext* cx)
 
 /*** Map *****************************************************************************************/
 
-const Class MapObject::class_ = {
-    "Map",
-    JSCLASS_HAS_PRIVATE |
-    JSCLASS_HAS_CACHED_PROTO(JSProto_Map),
+const ClassOps MapObject::classOps_ = {
     nullptr, // addProperty
     nullptr, // delProperty
     nullptr, // getProperty
@@ -275,6 +264,13 @@ const Class MapObject::class_ = {
     nullptr, // hasInstance
     nullptr, // construct
     mark
+};
+
+const Class MapObject::class_ = {
+    "Map",
+    JSCLASS_HAS_PRIVATE |
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Map),
+    &MapObject::classOps_
 };
 
 const JSPropertySpec MapObject::properties[] = {
@@ -414,15 +410,15 @@ WriteBarrierPost(JSRuntime* rt, ValueSet* set, const Value& key)
 
 bool
 MapObject::getKeysAndValuesInterleaved(JSContext* cx, HandleObject obj,
-                                       JS::AutoValueVector* entries)
+                                       JS::MutableHandle<GCVector<JS::Value>> entries)
 {
     ValueMap* map = obj->as<MapObject>().getData();
     if (!map)
         return false;
 
     for (ValueMap::Range r = map->all(); !r.empty(); r.popFront()) {
-        if (!entries->append(r.front().key.get()) ||
-            !entries->append(r.front().value))
+        if (!entries.append(r.front().key.get()) ||
+            !entries.append(r.front().value))
         {
             return false;
         }
@@ -502,14 +498,16 @@ MapObject::construct(JSContext* cx, unsigned argc, Value* vp)
 
         bool isOriginalAdder = IsNativeFunction(adderVal, MapObject::set);
         RootedValue mapVal(cx, ObjectValue(*obj));
-        FastInvokeGuard fig(cx, adderVal);
+        FastCallGuard fig(cx, adderVal);
         InvokeArgs& args2 = fig.args();
 
         ForOfIterator iter(cx);
         if (!iter.init(args[0]))
             return false;
+
         RootedValue pairVal(cx);
         RootedObject pairObj(cx);
+        RootedValue dummy(cx);
         Rooted<HashableValue> hkey(cx);
         ValueMap* map = obj->getData();
         while (true) {
@@ -550,12 +548,10 @@ MapObject::construct(JSContext* cx, unsigned argc, Value* vp)
                 if (!args2.init(2))
                     return false;
 
-                args2.setCallee(adderVal);
-                args2.setThis(mapVal);
                 args2[0].set(key);
                 args2[1].set(val);
 
-                if (!fig.invoke(cx))
+                if (!fig.call(cx, adderVal, mapVal, &dummy))
                     return false;
             }
         }
@@ -870,9 +866,7 @@ class SetIteratorObject : public NativeObject
 
 } /* anonymous namespace */
 
-const Class SetIteratorObject::class_ = {
-    "Set Iterator",
-    JSCLASS_HAS_RESERVED_SLOTS(SetIteratorObject::SlotCount),
+static const ClassOps SetIteratorObjectClassOps = {
     nullptr, /* addProperty */
     nullptr, /* delProperty */
     nullptr, /* getProperty */
@@ -881,6 +875,12 @@ const Class SetIteratorObject::class_ = {
     nullptr, /* resolve */
     nullptr, /* mayResolve */
     SetIteratorObject::finalize
+};
+
+const Class SetIteratorObject::class_ = {
+    "Set Iterator",
+    JSCLASS_HAS_RESERVED_SLOTS(SetIteratorObject::SlotCount),
+    &SetIteratorObjectClassOps
 };
 
 const JSFunctionSpec SetIteratorObject::methods[] = {
@@ -1006,10 +1006,7 @@ SetIteratorObject::next(JSContext* cx, unsigned argc, Value* vp)
 
 /*** Set *****************************************************************************************/
 
-const Class SetObject::class_ = {
-    "Set",
-    JSCLASS_HAS_PRIVATE |
-    JSCLASS_HAS_CACHED_PROTO(JSProto_Set),
+const ClassOps SetObject::classOps_ = {
     nullptr, // addProperty
     nullptr, // delProperty
     nullptr, // getProperty
@@ -1022,6 +1019,13 @@ const Class SetObject::class_ = {
     nullptr, // hasInstance
     nullptr, // construct
     mark
+};
+
+const Class SetObject::class_ = {
+    "Set",
+    JSCLASS_HAS_PRIVATE |
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Set),
+    &SetObject::classOps_
 };
 
 const JSPropertySpec SetObject::properties[] = {
@@ -1071,14 +1075,14 @@ SetObject::initClass(JSContext* cx, JSObject* obj)
 
 
 bool
-SetObject::keys(JSContext* cx, HandleObject obj, JS::AutoValueVector* keys)
+SetObject::keys(JSContext* cx, HandleObject obj, JS::MutableHandle<GCVector<JS::Value>> keys)
 {
     ValueSet* set = obj->as<SetObject>().getData();
     if (!set)
         return false;
 
     for (ValueSet::Range r = set->all(); !r.empty(); r.popFront()) {
-        if (!keys->append(r.front().get()))
+        if (!keys.append(r.front().get()))
             return false;
     }
 
@@ -1166,7 +1170,7 @@ SetObject::construct(JSContext* cx, unsigned argc, Value* vp)
 
         bool isOriginalAdder = IsNativeFunction(adderVal, SetObject::add);
         RootedValue setVal(cx, ObjectValue(*obj));
-        FastInvokeGuard fig(cx, adderVal);
+        FastCallGuard fig(cx, adderVal);
         InvokeArgs& args2 = fig.args();
 
         RootedValue keyVal(cx);
@@ -1174,6 +1178,7 @@ SetObject::construct(JSContext* cx, unsigned argc, Value* vp)
         if (!iter.init(args[0]))
             return false;
         Rooted<HashableValue> key(cx);
+        RootedValue dummy(cx);
         ValueSet* set = obj->getData();
         while (true) {
             bool done;
@@ -1194,11 +1199,9 @@ SetObject::construct(JSContext* cx, unsigned argc, Value* vp)
                 if (!args2.init(1))
                     return false;
 
-                args2.setCallee(adderVal);
-                args2.setThis(setVal);
                 args2[0].set(keyVal);
 
-                if (!fig.invoke(cx))
+                if (!fig.call(cx, adderVal, setVal, &dummy))
                     return false;
             }
         }
@@ -1459,23 +1462,18 @@ js::InitSelfHostingCollectionIteratorFunctions(JSContext* cx, HandleObject obj)
 
 /*** JS static utility functions *********************************************/
 
-static
-bool
+static bool
 forEach(const char* funcName, JSContext *cx, HandleObject obj, HandleValue callbackFn, HandleValue thisArg)
 {
     CHECK_REQUEST(cx);
+
     RootedId forEachId(cx, NameToId(cx->names().forEach));
     RootedFunction forEachFunc(cx, JS::GetSelfHostedFunction(cx, funcName, forEachId, 2));
     if (!forEachFunc)
         return false;
-    InvokeArgs args(cx);
-    if (!args.init(2))
-        return false;
-    args.setCallee(JS::ObjectValue(*forEachFunc));
-    args.setThis(JS::ObjectValue(*obj));
-    args[0].set(callbackFn);
-    args[1].set(thisArg);
-    return Invoke(cx, args);
+
+    RootedValue fval(cx, ObjectValue(*forEachFunc));
+    return Call(cx, fval, obj, callbackFn, thisArg, &fval);
 }
 
 // Handles Clear/Size for public jsapi map/set access

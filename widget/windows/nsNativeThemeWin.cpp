@@ -1556,7 +1556,7 @@ AssumeThemePartAndStateAreTransparent(int32_t aPart, int32_t aState)
 static inline double
 GetThemeDpiScaleFactor(nsIFrame* aFrame)
 {
-  if (WinUtils::IsPerMonitorDPIAware() && GetSystemMetrics(SM_CMONITORS) > 1) {
+  if (WinUtils::IsPerMonitorDPIAware()) {
     nsIWidget* rootWidget = aFrame->PresContext()->GetRootWidget();
     if (rootWidget) {
       double systemScale = WinUtils::SystemScaleFactor();
@@ -2155,7 +2155,6 @@ nsNativeThemeWin::GetWidgetPadding(nsDeviceContext* aContext,
     if (aWidgetType == NS_THEME_WINDOW_TITLEBAR_MAXIMIZED)
       aResult->top = GetSystemMetrics(SM_CXFRAME)
                    + GetSystemMetrics(SM_CXPADDEDBORDER);
-    ScaleForFrameDPI(aResult, aFrame);
     return ok;
   }
 
@@ -2476,7 +2475,6 @@ nsNativeThemeWin::GetMinimumWidgetSize(nsPresContext* aPresContext, nsIFrame* aF
       }
       AddPaddingRect(aResult, CAPTIONBUTTON_RESTORE);
       *aIsOverridable = false;
-      ScaleForFrameDPI(aResult, aFrame);
       return rv;
 
     case NS_THEME_WINDOW_BUTTON_MINIMIZE:
@@ -2488,7 +2486,6 @@ nsNativeThemeWin::GetMinimumWidgetSize(nsPresContext* aPresContext, nsIFrame* aF
       }
       AddPaddingRect(aResult, CAPTIONBUTTON_MINIMIZE);
       *aIsOverridable = false;
-      ScaleForFrameDPI(aResult, aFrame);
       return rv;
 
     case NS_THEME_WINDOW_BUTTON_CLOSE:
@@ -2500,7 +2497,6 @@ nsNativeThemeWin::GetMinimumWidgetSize(nsPresContext* aPresContext, nsIFrame* aF
       }
       AddPaddingRect(aResult, CAPTIONBUTTON_CLOSE);
       *aIsOverridable = false;
-      ScaleForFrameDPI(aResult, aFrame);
       return rv;
 
     case NS_THEME_WINDOW_TITLEBAR:
@@ -2509,7 +2505,6 @@ nsNativeThemeWin::GetMinimumWidgetSize(nsPresContext* aPresContext, nsIFrame* aF
       aResult->height += GetSystemMetrics(SM_CYFRAME);
       aResult->height += GetSystemMetrics(SM_CXPADDEDBORDER);
       *aIsOverridable = false;
-      ScaleForFrameDPI(aResult, aFrame);
       return rv;
 
     case NS_THEME_WINDOW_BUTTON_BOX:
@@ -2524,7 +2519,6 @@ nsNativeThemeWin::GetMinimumWidgetSize(nsPresContext* aPresContext, nsIFrame* aF
           aResult->height -= 2;
         }
         *aIsOverridable = false;
-        ScaleForFrameDPI(aResult, aFrame);
         return rv;
       }
       break;
@@ -2535,7 +2529,6 @@ nsNativeThemeWin::GetMinimumWidgetSize(nsPresContext* aPresContext, nsIFrame* aF
       aResult->width = GetSystemMetrics(SM_CXFRAME);
       aResult->height = GetSystemMetrics(SM_CYFRAME);
       *aIsOverridable = false;
-      ScaleForFrameDPI(aResult, aFrame);
       return rv;
   }
 
@@ -2584,7 +2577,8 @@ nsNativeThemeWin::GetMinimumWidgetSize(nsPresContext* aPresContext, nsIFrame* aF
 
 NS_IMETHODIMP
 nsNativeThemeWin::WidgetStateChanged(nsIFrame* aFrame, uint8_t aWidgetType, 
-                                     nsIAtom* aAttribute, bool* aShouldRepaint)
+                                     nsIAtom* aAttribute, bool* aShouldRepaint,
+                                     const nsAttrValue* aOldValue)
 {
   // Some widget types just never change state.
   if (aWidgetType == NS_THEME_TOOLBOX ||

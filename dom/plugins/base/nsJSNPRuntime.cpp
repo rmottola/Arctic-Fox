@@ -59,7 +59,7 @@ struct JSObjWrapperHasher
   }
 };
 
-namespace js {
+namespace JS {
 template <>
 struct GCPolicy<nsJSObjWrapper*> {
     static void trace(JSTracer* trc, nsJSObjWrapper** wrapper, const char* name) {
@@ -68,7 +68,7 @@ struct GCPolicy<nsJSObjWrapper*> {
         (*wrapper)->trace(trc);
     }
 };
-} // namespace js
+} // namespace JS
 
 class NPObjWrapperHashEntry : public PLDHashEntryHdr
 {
@@ -85,7 +85,7 @@ public:
 // when a plugin is torn down in case there's a leak in the plugin (we
 // don't want to leak the world just because a plugin leaks an
 // NPObject).
-typedef js::GCHashMap<nsJSObjWrapperKey,
+typedef JS::GCHashMap<nsJSObjWrapperKey,
                       nsJSObjWrapper*,
                       JSObjWrapperHasher,
                       js::SystemAllocPolicy> JSObjWrapperTable;
@@ -144,7 +144,6 @@ public:
     : mAes(aes)
     , mIsDestroyPending(aWrapper->mDestroyPending)
   {
-    MOZ_ASSERT(aes.OwnsErrorReporting());
   }
 
   ~AutoJSExceptionSuppressor()
@@ -220,42 +219,48 @@ CreateNPObjectMember(NPP npp, JSContext *cx,
                      JS::Handle<jsid> id,  NPVariant* getPropertyResult,
                      JS::MutableHandle<JS::Value> vp);
 
-const static js::Class sNPObjectJSWrapperClass =
-  {
-    NPRUNTIME_JSCLASS_NAME,
-    JSCLASS_HAS_PRIVATE,
+const static js::ClassOps sNPObjectJSWrapperClassOps = {
     NPObjWrapper_AddProperty,
     NPObjWrapper_DelProperty,
     NPObjWrapper_GetProperty,
     NPObjWrapper_SetProperty,
     nullptr,
     NPObjWrapper_Resolve,
-    nullptr,                                                /* mayResolve */
+    nullptr,                    /* mayResolve */
     NPObjWrapper_Finalize,
     NPObjWrapper_Call,
-    nullptr,                                                /* hasInstance */
+    nullptr,                    /* hasInstance */
     NPObjWrapper_Construct,
-    nullptr,                                                /* trace */
+    nullptr,                    /* trace */
+};
+
+const static js::ClassExtension sNPObjectJSWrapperClassExtension = {
+    nullptr,                    /* weakmapKeyDelegateOp */
+    NPObjWrapper_ObjectMoved
+};
+
+const static js::ObjectOps sNPObjectJSWrapperObjectOps = {
+    nullptr, // lookupProperty
+    nullptr, // defineProperty
+    nullptr, // hasProperty
+    nullptr, // getProperty
+    nullptr, // setProperty
+    nullptr, // getOwnPropertyDescriptor
+    nullptr, // deleteProperty
+    nullptr, nullptr, // watch/unwatch
+    nullptr, // getElements
+    NPObjWrapper_Enumerate,
+    nullptr,
+};
+
+const static js::Class sNPObjectJSWrapperClass = {
+    NPRUNTIME_JSCLASS_NAME,
+    JSCLASS_HAS_PRIVATE,
+    &sNPObjectJSWrapperClassOps,
     JS_NULL_CLASS_SPEC,
-    {
-      false,                                                /* isWrappedNative */
-      nullptr,                                              /* weakmapKeyDelegateOp */
-      NPObjWrapper_ObjectMoved
-    },
-    {
-        nullptr, // lookupProperty
-        nullptr, // defineProperty
-        nullptr, // hasProperty
-        nullptr, // getProperty
-        nullptr, // setProperty
-        nullptr, // getOwnPropertyDescriptor
-        nullptr, // deleteProperty
-        nullptr, nullptr, // watch/unwatch
-        nullptr, // getElements
-        NPObjWrapper_Enumerate,
-        nullptr,
-    }
-  };
+    &sNPObjectJSWrapperClassExtension,
+    &sNPObjectJSWrapperObjectOps
+};
 
 typedef struct NPObjectMemberPrivate {
     JS::Heap<JSObject *> npobjWrapper;
@@ -280,14 +285,17 @@ NPObjectMember_Trace(JSTracer *trc, JSObject *obj);
 static bool
 NPObjectMember_toPrimitive(JSContext *cx, unsigned argc, JS::Value *vp);
 
-static const JSClass sNPObjectMemberClass =
-  {
-    "NPObject Ambiguous Member class", JSCLASS_HAS_PRIVATE,
-    nullptr, nullptr, NPObjectMember_GetProperty, nullptr,
-    nullptr, nullptr, nullptr,
-    NPObjectMember_Finalize, NPObjectMember_Call,
-    nullptr, nullptr, NPObjectMember_Trace
-  };
+static const JSClassOps sNPObjectMemberClassOps = {
+  nullptr, nullptr, NPObjectMember_GetProperty, nullptr,
+  nullptr, nullptr, nullptr,
+  NPObjectMember_Finalize, NPObjectMember_Call,
+  nullptr, nullptr, NPObjectMember_Trace
+};
+
+static const JSClass sNPObjectMemberClass = {
+  "NPObject Ambiguous Member class", JSCLASS_HAS_PRIVATE,
+  &sNPObjectMemberClassOps
+};
 
 static void
 OnWrapperDestroyed();

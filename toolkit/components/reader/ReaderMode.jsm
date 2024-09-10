@@ -355,6 +355,7 @@ this.ReaderMode = {
       if (!exists) {
         return OS.File.makeDir(dir);
       }
+      return undefined;
     });
   }
 };

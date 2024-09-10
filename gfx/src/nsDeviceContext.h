@@ -11,7 +11,7 @@
 #include "gfxTypes.h"                   // for gfxFloat
 #include "gfxFont.h"                    // for gfxFont::Orientation
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT_HELPER2
-#include "nsAutoPtr.h"                  // for nsRefPtr
+#include "mozilla/RefPtr.h"             // for RefPtr
 #include "nsCOMPtr.h"                   // for nsCOMPtr
 #include "nsCoord.h"                    // for nscoord
 #include "nsError.h"                    // for nsresult
@@ -219,12 +219,18 @@ public:
     nsresult EndPage();
 
     /**
-     * Check to see if the DPI has changed
+     * Check to see if the DPI has changed, or impose a new DPI scale value.
+     * @param  aScale - If non-null, the default (unzoomed) CSS to device pixel
+     *                  scale factor will be returned here; and if it is > 0.0
+     *                  on input, the given value will be used instead of
+     *                  getting it from the widget (if any). This is used to
+     *                  allow subdocument contexts to inherit the resolution
+     *                  setting of their parent.
      * @return whether there was actually a change in the DPI (whether
      *         AppUnitsPerDevPixel() or AppUnitsPerPhysicalInch()
      *         changed)
      */
-    bool CheckDPIChange();
+    bool CheckDPIChange(double* aScale = nullptr);
 
     /**
      * Set the full zoom factor: all lengths are multiplied by this factor
@@ -249,7 +255,7 @@ private:
     // Private destructor, to discourage deletion outside of Release():
     ~nsDeviceContext();
 
-    void SetDPI();
+    void SetDPI(double* aScale = nullptr);
     void ComputeClientRectUsingScreen(nsRect *outRect);
     void ComputeFullAreaUsingScreen(nsRect *outRect);
     void FindScreen(nsIScreen **outScreen);

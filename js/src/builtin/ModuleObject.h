@@ -165,6 +165,8 @@ class ModuleNamespaceObject : public ProxyObject
                           MutableHandleObject protop) const override;
         bool setPrototype(JSContext* cx, HandleObject proxy, HandleObject proto,
                           ObjectOpResult& result) const override;
+        bool getPrototypeIfOrdinary(JSContext* cx, HandleObject proxy, bool* isOrdinary,
+                                    MutableHandleObject protop) const override;
         bool setImmutablePrototype(JSContext* cx, HandleObject proxy,
                                    bool* succeeded) const override;
 
@@ -264,6 +266,8 @@ class ModuleObject : public NativeObject
                                                   HandleObject exports);
 
   private:
+    static const ClassOps classOps_;
+
     static void trace(JSTracer* trc, JSObject* obj);
     static void finalize(js::FreeOp* fop, JSObject* obj);
 

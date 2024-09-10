@@ -212,7 +212,7 @@ struct OSXVoice
   bool mIsDefault;
 };
 
-class RegisterVoicesRunnable final : public nsRunnable
+class RegisterVoicesRunnable final : public Runnable
 {
 public:
   RegisterVoicesRunnable(OSXSpeechSynthesizerService* aSpeechService,
@@ -254,10 +254,13 @@ RegisterVoicesRunnable::Run()
       registry->SetDefaultVoice(voice.mUri, true);
     }
   }
+
+  registry->NotifyVoicesChanged();
+
   return NS_OK;
 }
 
-class EnumVoicesRunnable final : public nsRunnable
+class EnumVoicesRunnable final : public Runnable
 {
 public:
   explicit EnumVoicesRunnable(OSXSpeechSynthesizerService* aSpeechService)

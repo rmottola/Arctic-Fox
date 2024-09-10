@@ -42,6 +42,7 @@
 #ifdef XP_WIN
 #include <windows.h>
 #include <shlobj.h>
+#include "mozilla/WindowsVersion.h"
 #endif
 #ifdef XP_MACOSX
 #include "nsILocalFileMac.h"
@@ -643,6 +644,20 @@ GetContentProcessTempBaseDirKey()
 nsresult
 nsXREDirProvider::LoadContentProcessTempDir()
 {
+#if defined(XP_WIN)
+  const bool isSandboxDisabled = !mozilla::IsVistaOrLater() ||
+    (Preferences::GetInt("security.sandbox.content.level") < 1);
+#elif defined(XP_MACOSX)
+  const bool isSandboxDisabled =
+    Preferences::GetInt("security.sandbox.content.level") < 1;
+#endif
+
+  if (isSandboxDisabled) {
+    // Just use the normal temp directory if sandboxing is turned off
+    return NS_GetSpecialDirectory(NS_OS_TEMP_DIR,
+                                  getter_AddRefs(mContentTempDir));
+  }
+
   nsCOMPtr<nsIFile> localFile;
 
   nsresult rv = NS_GetSpecialDirectory(GetContentProcessTempBaseDirKey(),
@@ -702,15 +717,24 @@ nsXREDirProvider::LoadExtensionBundleDirectories()
                                NS_EXTENSION_LOCATION);
       LoadExtensionDirectories(parser, "ThemeDirs", mThemeDirectories,
                                NS_SKIN_LOCATION);
-#if MOZ_BUILD_APP == browser
+/* non-Firefox applications that use overrides in their default theme should
+ * define AC_DEFINE(MOZ_SEPARATE_MANIFEST_FOR_THEME_OVERRIDES) in their
+ * configure.in */
+#if defined(MOZ_BUILD_APP_IS_BROWSER) || defined(MOZ_SEPARATE_MANIFEST_FOR_THEME_OVERRIDES)
     } else {
       // In safe mode, still load the default theme directory:
       nsCOMPtr<nsIFile> themeManifest;
       mXULAppDir->Clone(getter_AddRefs(themeManifest));
       themeManifest->AppendNative(NS_LITERAL_CSTRING("extensions"));
-      themeManifest->AppendNative(NS_LITERAL_CSTRING("{972ce4c6-7e08-4474-a285-3208198ce6fd}"));
-      themeManifest->AppendNative(NS_LITERAL_CSTRING("chrome.manifest"));
-      XRE_AddManifestLocation(NS_SKIN_LOCATION, themeManifest);
+      themeManifest->AppendNative(NS_LITERAL_CSTRING("{972ce4c6-7e08-4474-a285-3208198ce6fd}.xpi"));
+      bool exists = false;
+      if (NS_SUCCEEDED(themeManifest->Exists(&exists)) && exists) {
+        XRE_AddJarManifestLocation(NS_SKIN_LOCATION, themeManifest);
+      } else {
+        themeManifest->SetNativeLeafName(NS_LITERAL_CSTRING("{972ce4c6-7e08-4474-a285-3208198ce6fd}"));
+        themeManifest->AppendNative(NS_LITERAL_CSTRING("chrome.manifest"));
+        XRE_AddManifestLocation(NS_SKIN_LOCATION, themeManifest);
+      }
 #endif
     }
   }

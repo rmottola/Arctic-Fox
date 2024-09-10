@@ -20,7 +20,7 @@
  */
 
 // http://www.whatwg.org/specs/web-apps/current-work/#the-navigator-object
-[HeaderFile="Navigator.h", NeedResolve]
+[HeaderFile="Navigator.h"]
 interface Navigator {
   // objects implementing this interface also implement the interfaces given below
 };
@@ -43,7 +43,7 @@ interface NavigatorID {
   readonly attribute DOMString appVersion;
   [Constant, Cached]
   readonly attribute DOMString platform;
-  [Pure, Cached, Throws=Workers]
+  [Pure, Cached, Throws]
   readonly attribute DOMString userAgent;
   [Constant, Cached]
   readonly attribute DOMString product; // constant "Gecko"
@@ -138,16 +138,6 @@ partial interface Navigator {
   [Throws, Pref="dom.battery.enabled", BinaryName="deprecatedBattery"]
   readonly attribute BatteryManager? battery;
 };
-
-// https://wiki.mozilla.org/WebAPI/DataStore
-[NoInterfaceObject,
- Exposed=(Window,Worker)]
-interface NavigatorDataStore {
-    [NewObject, Func="Navigator::HasDataStoreSupport"]
-    Promise<sequence<DataStore>> getDataStores(DOMString name,
-                                               optional DOMString? owner = null);
-};
-Navigator implements NavigatorDataStore;
 
 // http://www.w3.org/TR/vibration/#vibration-interface
 partial interface Navigator {
@@ -384,7 +374,6 @@ partial interface Navigator {
 };
 #endif // MOZ_AUDIO_CHANNEL_MANAGER
 
-#ifdef MOZ_MEDIA_NAVIGATOR
 callback NavigatorUserMediaSuccessCallback = void (MediaStream stream);
 callback NavigatorUserMediaErrorCallback = void (MediaStreamError error);
 
@@ -418,7 +407,6 @@ partial interface Navigator {
                               // now that devices are enumerated earlier.
                               optional DOMString callID = "");
 };
-#endif // MOZ_MEDIA_NAVIGATOR
 
 // Service Workers/Navigation Controllers
 partial interface Navigator {

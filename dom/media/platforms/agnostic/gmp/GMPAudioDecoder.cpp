@@ -37,7 +37,11 @@ AudioCallbackAdapter::Decoded(const nsTArray<int16_t>& aPCM, uint64_t aTimeStamp
 
   size_t numFrames = aPCM.Length() / aChannels;
   MOZ_ASSERT((aPCM.Length() % aChannels) == 0);
-  auto audioData = MakeUnique<AudioDataValue[]>(aPCM.Length());
+  AlignedAudioBuffer audioData(aPCM.Length());
+  if (!audioData) {
+    mCallback->Error();
+    return;
+  }
 
   for (size_t i = 0; i < aPCM.Length(); ++i) {
     audioData[i] = AudioSampleToFloat(aPCM[i]);
@@ -52,7 +56,6 @@ AudioCallbackAdapter::Decoded(const nsTArray<int16_t>& aPCM, uint64_t aTimeStamp
       return;
     }
     mAudioFrameOffset = timestamp.value();
-    MOZ_ASSERT(mAudioFrameOffset >= 0);
     mMustRecaptureAudioPosition = false;
   }
 
@@ -137,27 +140,24 @@ GMPAudioDecoder::InitTags(nsTArray<nsCString>& aTags)
 nsCString
 GMPAudioDecoder::GetNodeId()
 {
-  return NS_LITERAL_CSTRING("");
-}
-
-void
-GMPAudioDecoder::GetGMPAPI(GMPInitDoneRunnable* aInitDone)
-{
-  MOZ_ASSERT(IsOnGMPThread());
-
-  nsTArray<nsCString> tags;
-  InitTags(tags);
-  UniquePtr<GetGMPAudioDecoderCallback> callback(
-    new GMPInitDoneCallback(this, aInitDone));
-  if (NS_FAILED(mMPS->GetGMPAudioDecoder(&tags, GetNodeId(), Move(callback)))) {
-    aInitDone->Dispatch();
-  }
+  return SHARED_GMP_DECODING_NODE_ID;
 }
 
 void
 GMPAudioDecoder::GMPInitDone(GMPAudioDecoderProxy* aGMP)
 {
-  MOZ_ASSERT(aGMP);
+  MOZ_ASSERT(IsOnGMPThread());
+
+  if (!aGMP) {
+    mInitPromise.RejectIfExists(MediaDataDecoder::DecoderFailureReason::INIT_ERROR, __func__);
+    return;
+  }
+  if (mInitPromise.IsEmpty()) {
+    // GMP must have been shutdown while we were waiting for Init operation
+    // to complete.
+    aGMP->Close();
+    return;
+  }
   nsTArray<uint8_t> codecSpecific;
   codecSpecific.AppendElements(mConfig.mCodecSpecificConfig->Elements(),
                                mConfig.mCodecSpecificConfig->Length());
@@ -168,9 +168,14 @@ GMPAudioDecoder::GMPInitDone(GMPAudioDecoderProxy* aGMP)
                                  mConfig.mRate,
                                  codecSpecific,
                                  mAdapter);
-  if (NS_SUCCEEDED(rv)) {
-    mGMP = aGMP;
+  if (NS_FAILED(rv)) {
+    aGMP->Close();
+    mInitPromise.Reject(MediaDataDecoder::DecoderFailureReason::INIT_ERROR, __func__);
+    return;
   }
+
+  mGMP = aGMP;
+  mInitPromise.Resolve(TrackInfo::kAudioTrack, __func__);
 }
 
 RefPtr<MediaDataDecoder::InitPromise>
@@ -181,21 +186,16 @@ GMPAudioDecoder::Init()
   mMPS = do_GetService("@mozilla.org/gecko-media-plugin-service;1");
   MOZ_ASSERT(mMPS);
 
-  nsCOMPtr<nsIThread> gmpThread = NS_GetCurrentThread();
+  RefPtr<InitPromise> promise(mInitPromise.Ensure(__func__));
 
-  RefPtr<GMPInitDoneRunnable> initDone(new GMPInitDoneRunnable());
-  gmpThread->Dispatch(
-    NS_NewRunnableMethodWithArg<GMPInitDoneRunnable*>(this,
-                                                      &GMPAudioDecoder::GetGMPAPI,
-                                                      initDone),
-    NS_DISPATCH_NORMAL);
-
-  while (!initDone->IsDone()) {
-    NS_ProcessNextEvent(gmpThread, true);
+  nsTArray<nsCString> tags;
+  InitTags(tags);
+  UniquePtr<GetGMPAudioDecoderCallback> callback(new GMPInitDoneCallback(this));
+  if (NS_FAILED(mMPS->GetGMPAudioDecoder(&tags, GetNodeId(), Move(callback)))) {
+    mInitPromise.Reject(MediaDataDecoder::DecoderFailureReason::INIT_ERROR, __func__);
   }
 
-  return mGMP ? InitPromise::CreateAndResolve(TrackInfo::kAudioTrack, __func__)
-              : InitPromise::CreateAndReject(MediaDataDecoder::DecoderFailureReason::INIT_ERROR, __func__);
+  return promise;
 }
 
 nsresult
@@ -249,9 +249,11 @@ GMPAudioDecoder::Drain()
 nsresult
 GMPAudioDecoder::Shutdown()
 {
+  mInitPromise.RejectIfExists(MediaDataDecoder::DecoderFailureReason::CANCELED, __func__);
   if (!mGMP) {
     return NS_ERROR_FAILURE;
   }
+  // Note this unblocks flush and drain operations waiting for callbacks.
   mGMP->Close();
   mGMP = nullptr;
 

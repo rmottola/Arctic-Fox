@@ -192,6 +192,29 @@ MacroAssembler::negateDouble(FloatRegister reg)
 }
 
 // ===============================================================
+// Rotation functions
+void
+MacroAssembler::rotateLeft(Imm32 count, Register input, Register dest)
+{
+    MOZ_CRASH("NYI");
+}
+void
+MacroAssembler::rotateLeft(Register count, Register input, Register dest)
+{
+    MOZ_CRASH("NYI");
+}
+void
+MacroAssembler::rotateRight(Imm32 count, Register input, Register dest)
+{
+    MOZ_CRASH("NYI");
+}
+void
+MacroAssembler::rotateRight(Register count, Register input, Register dest)
+{
+    MOZ_CRASH("NYI");
+}
+
+// ===============================================================
 // Branch functions
 
 void
@@ -240,24 +263,6 @@ MacroAssembler::branch32(Condition cond, const BaseIndex& lhs, Imm32 rhs, Label*
 {
     load32(lhs, SecondScratchReg);
     ma_b(SecondScratchReg, rhs, label, cond);
-}
-
-void
-MacroAssembler::branch32(Condition cond, const Operand& lhs, Register rhs, Label* label)
-{
-    if (lhs.getTag() == Operand::REG)
-        ma_b(lhs.toReg(), rhs, label, cond);
-    else
-        branch32(cond, lhs.toAddress(), rhs, label);
-}
-
-void
-MacroAssembler::branch32(Condition cond, const Operand& lhs, Imm32 rhs, Label* label)
-{
-    if (lhs.getTag() == Operand::REG)
-        ma_b(lhs.toReg(), rhs, label, cond);
-    else
-        branch32(cond, lhs.toAddress(), rhs, label);
 }
 
 void

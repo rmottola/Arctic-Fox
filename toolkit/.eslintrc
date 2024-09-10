@@ -44,7 +44,7 @@
     // "key-spacing": [2, { "beforeColon": false, "afterColon": true, "mode": "minimum" }],
 
     // Unix linebreaks
-    // "linebreak-style": [2, "unix"],
+    "linebreak-style": [2, "unix"],
 
     // Always require parenthesis for new calls
     // "new-parens": 2,
@@ -92,13 +92,13 @@
     "no-invalid-regexp": 2,
 
     // No odd whitespace characters
-    // "no-irregular-whitespace": 2,
+    "no-irregular-whitespace": 2,
 
     // No single if block inside an else block
     // "no-lonely-if": 2,
 
     // No mixing spaces and tabs in indent
-    // "no-mixed-spaces-and-tabs": [2, "smart-tabs"],
+    "no-mixed-spaces-and-tabs": [2, "smart-tabs"],
 
     // No unnecessary spacing
     // "no-multi-spaces": [2, { exceptions: { "AssignmentExpression": true, "VariableDeclarator": true, "ArrayExpression": true, "ObjectExpression": true } }],
@@ -110,7 +110,7 @@
     "no-negated-in-lhs": 2,
 
     // Nested ternary statements are confusing
-    // "no-nested-ternary": 2,
+    "no-nested-ternary": 2,
 
     // Use {} instead of new Object()
     // "no-new-object": 2,

@@ -20,6 +20,9 @@
 
     "browser": false,
 
+    // Browser window globals.
+    "PanelUI": false,
+
     // Test harness globals
     "add_task": false,
     "BrowserTestUtils": false,

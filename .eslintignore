@@ -74,7 +74,6 @@ browser/components/shell/**
 browser/components/tabview/**
 browser/components/translation/**
 browser/components/uitour/**
-browser/experiments/**
 browser/extensions/pdfjs/**
 browser/extensions/shumway/**
 browser/fuel/**
@@ -85,7 +84,6 @@ browser/extensions/loop/**
 
 # devtools/ exclusions
 devtools/*.js
-devtools/client/animationinspector/**
 devtools/client/canvasdebugger/**
 devtools/client/commandline/**
 devtools/client/debugger/**
@@ -95,15 +93,14 @@ devtools/client/framework/**
 # included in the ignore list.
 devtools/client/inspector/computed/**
 devtools/client/inspector/fonts/**
-devtools/client/inspector/layout/**
 devtools/client/inspector/markup/test/**
-devtools/client/inspector/rules/**
 devtools/client/inspector/shared/test/**
 devtools/client/inspector/test/**
 devtools/client/inspector/*.js
 devtools/client/jsonview/**
 devtools/client/memory/**
-devtools/client/netmonitor/**
+devtools/client/netmonitor/test/**
+devtools/client/netmonitor/har/test/**
 devtools/client/performance/**
 devtools/client/projecteditor/**
 devtools/client/promisedebugger/**
@@ -113,12 +110,29 @@ devtools/client/shadereditor/**
 devtools/client/shared/**
 devtools/client/sourceeditor/**
 devtools/client/storage/**
-devtools/client/tilt/**
 devtools/client/webaudioeditor/**
 devtools/client/webconsole/**
 devtools/client/webide/**
 devtools/server/**
-devtools/shared/**
+devtools/shared/*.js
+devtools/shared/*.jsm
+devtools/shared/apps/**
+devtools/shared/client/**
+devtools/shared/discovery/**
+devtools/shared/gcli/**
+devtools/shared/heapsnapshot/**
+devtools/shared/inspector/**
+devtools/shared/layout/**
+devtools/shared/locales/**
+devtools/shared/performance/**
+devtools/shared/qrcode/**
+devtools/shared/security/**
+devtools/shared/shims/**
+devtools/shared/tests/**
+devtools/shared/touch/**
+devtools/shared/transport/**
+devtools/shared/webconsole/test/**
+devtools/shared/worker/**
 
 # Ignore devtools pre-processed files
 devtools/client/framework/toolbox-process-window.js
@@ -140,7 +154,7 @@ devtools/client/webaudioeditor/lib/dagre-d3.js
 devtools/client/sourceeditor/codemirror/*.js
 devtools/client/sourceeditor/codemirror/**/*.js
 devtools/client/sourceeditor/test/codemirror/*
-devtools/client/markupview/test/lib_*
+devtools/client/inspector/markup/test/lib_*
 
 # mobile/android/ exclusions
 mobile/android/chrome/content

@@ -9,7 +9,6 @@
 #include "gfxFont.h"
 #include "gfxFontFamilyList.h"
 #include "nsRefPtrHashtable.h"
-#include "nsAutoPtr.h"
 #include "nsCOMPtr.h"
 #include "nsIURI.h"
 #include "nsIPrincipal.h"
@@ -261,6 +260,10 @@ public:
     virtual nsresult CheckFontLoad(const gfxFontFaceSrc* aFontFaceSrc,
                                    nsIPrincipal** aPrincipal,
                                    bool* aBypassCache) = 0;
+
+    // check whether content policies allow the given URI to load.
+    virtual bool IsFontLoadAllowed(nsIURI* aFontLocation,
+                                   nsIPrincipal* aPrincipal) = 0;
 
     // initialize the process that loads external font data, which upon
     // completion will call FontDataDownloadComplete method

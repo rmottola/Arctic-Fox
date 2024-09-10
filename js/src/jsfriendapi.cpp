@@ -19,6 +19,7 @@
 #include "jsweakmap.h"
 #include "jswrapper.h"
 
+#include "builtin/Promise.h"
 #include "builtin/TestingFunctions.h"
 #include "js/Proxy.h"
 #include "proxy/DeadObjectProxy.h"
@@ -138,8 +139,14 @@ JS_NewObjectWithUniqueType(JSContext* cx, const JSClass* clasp, HandleObject pro
 JS_FRIEND_API(JSObject*)
 JS_NewObjectWithoutMetadata(JSContext* cx, const JSClass* clasp, JS::Handle<JSObject*> proto)
 {
-    AutoSuppressObjectMetadataCallback suppressMetadata(cx);
+    AutoSuppressAllocationMetadataBuilder suppressMetadata(cx);
     return JS_NewObjectWithGivenProto(cx, clasp, proto);
+}
+
+JS_FRIEND_API(bool)
+JS_GetIsSecureContext(JSCompartment* compartment)
+{
+    return compartment->creationOptions().secureContext();
 }
 
 JS_FRIEND_API(JSPrincipals*)
@@ -286,6 +293,8 @@ js::GetBuiltinClass(JSContext* cx, HandleObject obj, ESClassValue* classValue)
         *classValue = ESClass_Set;
     else if (obj->is<MapObject>())
         *classValue = ESClass_Map;
+    else if (obj->is<PromiseObject>())
+        *classValue = ESClass_Promise;
     else
         *classValue = ESClass_Other;
 
@@ -578,13 +587,6 @@ js::ZoneGlobalsAreAllGray(JS::Zone* zone)
     return true;
 }
 
-JS_FRIEND_API(JS::TraceKind)
-js::GCThingTraceKind(void* thing)
-{
-    MOZ_ASSERT(thing);
-    return static_cast<js::gc::Cell*>(thing)->getTraceKind();
-}
-
 JS_FRIEND_API(void)
 js::VisitGrayWrapperTargets(Zone* zone, GCThingCallback callback, void* closure)
 {
@@ -600,7 +602,7 @@ js::VisitGrayWrapperTargets(Zone* zone, GCThingCallback callback, void* closure)
 JS_FRIEND_API(JSObject*)
 js::GetWeakmapKeyDelegate(JSObject* key)
 {
-    if (JSWeakmapKeyDelegateOp op = key->getClass()->ext.weakmapKeyDelegateOp)
+    if (JSWeakmapKeyDelegateOp op = key->getClass()->extWeakmapKeyDelegateOp())
         return op(key);
     return nullptr;
 }
@@ -1231,13 +1233,13 @@ js::AutoCTypesActivityCallback::AutoCTypesActivityCallback(JSContext* cx,
 }
 
 JS_FRIEND_API(void)
-js::SetObjectMetadataCallback(JSContext* cx, ObjectMetadataCallback callback)
+js::SetAllocationMetadataBuilder(JSContext* cx, const AllocationMetadataBuilder *callback)
 {
-    cx->compartment()->setObjectMetadataCallback(callback);
+    cx->compartment()->setAllocationMetadataBuilder(callback);
 }
 
 JS_FRIEND_API(JSObject*)
-js::GetObjectMetadata(JSObject* obj)
+js::GetAllocationMetadata(JSObject* obj)
 {
     ObjectWeakMap* map = obj->compartment()->objectMetadataTable;
     if (map)
@@ -1269,35 +1271,9 @@ js::ReportErrorWithId(JSContext* cx, const char* msg, HandleId id)
 #ifdef DEBUG
 bool
 js::HasObjectMovedOp(JSObject* obj) {
-    return !!GetObjectClass(obj)->ext.objectMovedOp;
+    return !!GetObjectClass(obj)->extObjectMovedOp();
 }
 #endif
-
-JS_FRIEND_API(void)
-JS_StoreObjectPostBarrierCallback(JSContext* cx,
-                                  void (*callback)(JSTracer* trc, JSObject* key, void* data),
-                                  JSObject* key, void* data)
-{
-    JSRuntime* rt = cx->runtime();
-    if (IsInsideNursery(key))
-        rt->gc.storeBuffer.putCallback(callback, key, data);
-}
-
-extern JS_FRIEND_API(void)
-JS_StoreStringPostBarrierCallback(JSContext* cx,
-                                  void (*callback)(JSTracer* trc, JSString* key, void* data),
-                                  JSString* key, void* data)
-{
-    JSRuntime* rt = cx->runtime();
-    if (IsInsideNursery(key))
-        rt->gc.storeBuffer.putCallback(callback, key, data);
-}
-
-extern JS_FRIEND_API(void)
-JS_ClearAllPostBarrierCallbacks(JSRuntime* rt)
-{
-    rt->gc.clearPostBarrierCallbacks();
-}
 
 JS_FRIEND_API(bool)
 js::ForwardToNative(JSContext* cx, JSNative native, const CallArgs& args)

@@ -6,20 +6,20 @@
 
 #include <algorithm>
 
+#include "ScopedNSSTypes.h"
+#include "mozilla/Snprintf.h"
 #include "mozilla/UniquePtr.h"
-#include "nsComponentManagerUtils.h"
 #include "nsCOMPtr.h"
+#include "nsComponentManagerUtils.h"
 #include "nsDateTimeFormatCID.h"
 #include "nsIDateTimeFormat.h"
 #include "nsNSSASN1Object.h"
-#include "nsNSSCertificate.h"
 #include "nsNSSCertTrust.h"
 #include "nsNSSCertValidity.h"
+#include "nsNSSCertificate.h"
 #include "nsNSSComponent.h"
 #include "nsServiceManagerUtils.h"
 #include "prerror.h"
-#include "prprf.h"
-#include "ScopedNSSTypes.h"
 #include "secder.h"
 
 using namespace mozilla;
@@ -83,53 +83,47 @@ GetIntValue(SECItem *versionItem,
 }
 
 static nsresult
-ProcessVersion(SECItem         *versionItem,
-               nsINSSComponent *nssComponent,
-               nsIASN1PrintableItem **retItem)
+ProcessVersion(SECItem* versionItem, nsINSSComponent* nssComponent,
+               nsIASN1PrintableItem** retItem)
 {
-  nsresult rv;
   nsAutoString text;
-  nsCOMPtr<nsIASN1PrintableItem> printableItem = new nsNSSASN1PrintableItem();
- 
   nssComponent->GetPIPNSSBundleString("CertDumpVersion", text);
-  rv = printableItem->SetDisplayName(text);
-  if (NS_FAILED(rv))
+  nsCOMPtr<nsIASN1PrintableItem> printableItem = new nsNSSASN1PrintableItem();
+  nsresult rv = printableItem->SetDisplayName(text);
+  if (NS_FAILED(rv)) {
     return rv;
+  }
 
   // Now to figure out what version this certificate is.
-  unsigned long version;
-
+  unsigned int version;
   if (versionItem->data) {
-    rv = GetIntValue(versionItem, &version);
-    if (NS_FAILED(rv))
-      return rv;
+    // Filter out totally bogus version values/encodings.
+    if (versionItem->len != 1) {
+      return NS_ERROR_FAILURE;
+    }
+    version = *reinterpret_cast<const uint8_t*>(versionItem->data);
   } else {
-    // If there is no version present in the cert, then rfc2459
-    // says we default to v1 (0)
+    // If there is no version present in the cert, then RFC 5280 says we
+    // default to v1 (0).
     version = 0;
   }
 
-  switch (version){
-  case 0:
-    rv = nssComponent->GetPIPNSSBundleString("CertDumpVersion1", text);
-    break;
-  case 1:
-    rv = nssComponent->GetPIPNSSBundleString("CertDumpVersion2", text);
-    break;
-  case 2:
-    rv = nssComponent->GetPIPNSSBundleString("CertDumpVersion3", text);
-    break;
-  default:
-    NS_ERROR("Bad value for cert version");
-    rv = NS_ERROR_FAILURE;
-  }
-    
-  if (NS_FAILED(rv))
+  // A value of n actually corresponds to version n + 1
+  nsAutoString versionString;
+  versionString.AppendInt(version + 1);
+  const char16_t* params[1] = { versionString.get() };
+  rv = nssComponent->PIPBundleFormatStringFromName("CertDumpVersionValue",
+                                                   params,
+                                                   MOZ_ARRAY_LENGTH(params),
+                                                   text);
+  if (NS_FAILED(rv)) {
     return rv;
+  }
 
   rv = printableItem->SetDisplayValue(text);
-  if (NS_FAILED(rv))
+  if (NS_FAILED(rv)) {
     return rv;
+  }
 
   printableItem.forget(retItem);
   return NS_OK;
@@ -210,12 +204,12 @@ GetDefaultOIDFormat(SECItem *oid,
         unsigned long one = std::min(val/40, 2UL); // never > 2
         unsigned long two = val - (one * 40);
 
-        written = PR_snprintf(&buf[len], sizeof(buf)-len, "%lu%c%lu", 
-			      one, separator, two);
+        written = snprintf(&buf[len], sizeof(buf) - len, "%lu%c%lu",
+                           one, separator, two);
       }
       else {
-        written = PR_snprintf(&buf[len], sizeof(buf)-len, "%c%lu", 
-			      separator, val);
+        written = snprintf(&buf[len], sizeof(buf) - len, "%c%lu",
+                           separator, val);
       }
     }
     else {
@@ -223,13 +217,12 @@ GetDefaultOIDFormat(SECItem *oid,
       nssComponent->GetPIPNSSBundleString("CertUnknown", 
                                           unknownText);
       if (first) {
-        written = PR_snprintf(&buf[len], sizeof(buf)-len, "%s",
-                              NS_ConvertUTF16toUTF8(unknownText).get());
+        written = snprintf(&buf[len], sizeof(buf) - len, "%s",
+                           NS_ConvertUTF16toUTF8(unknownText).get());
       }
       else {
-        written = PR_snprintf(&buf[len], sizeof(buf)-len, "%c%s",
-                              separator, 
-                              NS_ConvertUTF16toUTF8(unknownText).get());
+        written = snprintf(&buf[len], sizeof(buf) - len, "%c%s",
+                           separator, NS_ConvertUTF16toUTF8(unknownText).get());
       }
 
       if (++invalidCount > 3) {
@@ -642,7 +635,7 @@ ProcessRawBytes(nsINSSComponent *nssComponent, SECItem *data,
   uint32_t i;
   char buffer[5];
   for (i=0; i<data->len; i++) {
-    PR_snprintf(buffer, 5, "%02x ", data->data[i]);
+    snprintf_literal(buffer, "%02x ", data->data[i]);
     AppendASCIItoUTF16(buffer, text);
     if ((i+1)%16 == 0) {
       text.AppendLiteral(SEPARATOR);
@@ -979,10 +972,10 @@ ProcessGeneralName(const UniquePLArenaPool& arena, CERTGeneralName* current,
 	    && guid.len == 16) {
 	  char buf[40];
 	  unsigned char *d = guid.data;
-	  PR_snprintf(buf, sizeof(buf), 
-		      "{%.2x%.2x%.2x%.2x-%.2x%.2x-%.2x%.2x-%.2x%.2x-%.2x%.2x%.2x%.2x%.2x%.2x}",
-		      d[3], d[2], d[1], d[0], d[5], d[4], d[7], d[6],
-		      d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]);
+          snprintf_literal(buf,
+            "{%.2x%.2x%.2x%.2x-%.2x%.2x-%.2x%.2x-%.2x%.2x-%.2x%.2x%.2x%.2x%.2x%.2x}",
+            d[3], d[2], d[1], d[0], d[5], d[4], d[7], d[6],
+            d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]);
 	  value.AssignASCII(buf);
 	} else {
 	  ProcessRawBytes(nssComponent, &current->name.OthName.name, value);
@@ -1207,7 +1200,7 @@ ProcessUserNotice(SECItem* derNotice, nsAString& text,
       unsigned long number;
       char buffer[60];
       if (SEC_ASN1DecodeInteger(*itemList, &number) == SECSuccess) {
-        PR_snprintf(buffer, sizeof(buffer), "#%d", number);
+        snprintf_literal(buffer, "#%d", number);
         if (itemList != notice->noticeReference.noticeNumbers)
           text.AppendLiteral(", ");
         AppendASCIItoUTF16(buffer, text);
@@ -1497,7 +1490,7 @@ ProcessMSCAVersion(SECItem  *extData,
     return ProcessRawBytes(nssComponent, extData, text);
 
   /* Apparently, the encoding is <minor><major>, with 16 bits each */
-  PR_snprintf(buf, sizeof(buf), "%d.%d", version & 0xFFFF, version>>16);
+  snprintf_literal(buf, "%d.%d", version & 0xFFFF, version >> 16);
   text.AppendASCII(buf);
   return NS_OK;
 }
@@ -1638,11 +1631,9 @@ static nsresult
 ProcessTime(PRTime dispTime, const char16_t* displayName,
             nsIASN1Sequence* parentSequence)
 {
-  nsresult rv;
-  nsCOMPtr<nsIDateTimeFormat> dateFormatter =
-     do_CreateInstance(NS_DATETIMEFORMAT_CONTRACTID, &rv);
-  if (NS_FAILED(rv)) {
-    return rv;
+  nsCOMPtr<nsIDateTimeFormat> dateFormatter = nsIDateTimeFormat::Create();
+  if (!dateFormatter) {
+    return NS_ERROR_FAILURE;
   }
 
   nsString text;
@@ -2114,10 +2105,9 @@ GetCertFingerprintByOidTag(CERTCertificate* nsscert,
                                  nsscert->derCert.len);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  char *tmpstr = CERT_Hexify(const_cast<SECItem*>(&digest.get()), 1);
+  UniquePORTString tmpstr(CERT_Hexify(const_cast<SECItem*>(&digest.get()), 1));
   NS_ENSURE_TRUE(tmpstr, NS_ERROR_OUT_OF_MEMORY);
 
-  fp.Assign(tmpstr);
-  PORT_Free(tmpstr);
+  fp.Assign(tmpstr.get());
   return NS_OK;
 }

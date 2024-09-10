@@ -109,6 +109,11 @@ void nsMenuChainItem::Detach(nsMenuChainItem** aRoot)
   }
 }
 
+bool nsXULPopupManager::sDevtoolsDisableAutoHide = false;
+
+const char* kPrefDevtoolsDisableAutoHide =
+  "ui.popup.disable_autohide";
+
 NS_IMPL_ISUPPORTS(nsXULPopupManager,
                   nsIDOMEventListener,
                   nsITimerCallback,
@@ -127,6 +132,8 @@ nsXULPopupManager::nsXULPopupManager() :
   if (obs) {
     obs->AddObserver(this, "xpcom-shutdown", false);
   }
+  Preferences::AddBoolVarCache(&sDevtoolsDisableAutoHide,
+                               kPrefDevtoolsDisableAutoHide, false);
 }
 
 nsXULPopupManager::~nsXULPopupManager() 
@@ -183,6 +190,15 @@ bool
 nsXULPopupManager::Rollup(uint32_t aCount, bool aFlush,
                           const nsIntPoint* pos, nsIContent** aLastRolledUp)
 {
+  // We can disable the autohide behavior via a pref to ease debugging.
+  if (nsXULPopupManager::sDevtoolsDisableAutoHide) {
+    // Required on linux to allow events to work on other targets.
+    if (mWidget) {
+      mWidget->CaptureRollupEvents(nullptr, false);
+    }
+    return false;
+  }
+
   bool consume = false;
 
   nsMenuChainItem* item = GetTopVisibleMenu();
@@ -411,7 +427,7 @@ nsXULPopupManager::AdjustPopupsOnWindowChange(nsPIDOMWindowOuter* aWindow)
     if (frame->GetAutoPosition()) {
       nsIContent* popup = frame->GetContent();
       if (popup) {
-        nsIDocument* document = popup->GetCurrentDoc();
+        nsIDocument* document = popup->GetUncomposedDoc();
         if (document) {
           if (nsPIDOMWindowOuter* window = document->GetWindow()) {
             window = window->GetPrivateRoot();
@@ -527,7 +543,7 @@ nsMenuPopupFrame*
 nsXULPopupManager::GetPopupFrameForContent(nsIContent* aContent, bool aShouldFlush)
 {
   if (aShouldFlush) {
-    nsIDocument *document = aContent->GetCurrentDoc();
+    nsIDocument *document = aContent->GetUncomposedDoc();
     if (document) {
       nsCOMPtr<nsIPresShell> presShell = document->GetShell();
       if (presShell)
@@ -585,9 +601,9 @@ nsXULPopupManager::InitTriggerEvent(nsIDOMEvent* aEvent, nsIContent* aPopup,
     if (event) {
       WidgetInputEvent* inputEvent = event->AsInputEvent();
       if (inputEvent) {
-        mCachedModifiers = inputEvent->modifiers;
+        mCachedModifiers = inputEvent->mModifiers;
       }
-      nsIDocument* doc = aPopup->GetCurrentDoc();
+      nsIDocument* doc = aPopup->GetUncomposedDoc();
       if (doc) {
         nsIPresShell* presShell = doc->GetShell();
         nsPresContext* presContext;
@@ -601,7 +617,7 @@ nsXULPopupManager::InitTriggerEvent(nsIDOMEvent* aEvent, nsIContent* aPopup,
           if ((event->mClass == eMouseEventClass || 
                event->mClass == eMouseScrollEventClass ||
                event->mClass == eWheelEventClass) &&
-               !event->AsGUIEvent()->widget) {
+               !event->AsGUIEvent()->mWidget) {
             // no widget, so just use the client point if available
             nsCOMPtr<nsIDOMMouseEvent> mouseEvent = do_QueryInterface(aEvent);
             nsIntPoint clientPt;
@@ -1220,6 +1236,41 @@ nsXULPopupManager::HidePopupsInList(const nsTArray<nsMenuPopupFrame *> &aFrames)
   SetCaptureState(nullptr);
 }
 
+void
+nsXULPopupManager::EnableRollup(nsIContent* aPopup, bool aShouldRollup)
+{
+#ifndef MOZ_GTK
+  if (aShouldRollup) {
+    nsMenuChainItem* item = mNoHidePanels;
+    while (item) {
+      if (item->Content() == aPopup) {
+        item->Detach(&mNoHidePanels);
+        nsIContent* oldmenu = nullptr;
+        if (mPopups)
+          oldmenu = mPopups->Content();
+        item->SetParent(mPopups);
+        mPopups = item;
+        SetCaptureState(oldmenu);
+        return;
+      }
+      item = item->GetParent();
+    }
+  } else {
+    nsMenuChainItem* item = mPopups;
+    while (item) {
+      if (item->Content() == aPopup) {
+        item->Detach(&mPopups);
+        item->SetParent(mNoHidePanels);
+        mNoHidePanels = item;
+        SetCaptureState(nullptr);
+        return;
+      }
+      item = item->GetParent();
+    }
+  }
+#endif
+}
+
 bool
 nsXULPopupManager::IsChildOfDocShell(nsIDocument* aDoc, nsIDocShellTreeItem* aExpected)
 {
@@ -1364,14 +1415,14 @@ nsXULPopupManager::FirePopupShowingEvent(nsIContent* aPopup,
     presShell->GetPresContext()->GetRootPresContext();
   if (rootPresContext) {
     rootPresContext->PresShell()->GetViewManager()->
-      GetRootWidget(getter_AddRefs(event.widget));
+      GetRootWidget(getter_AddRefs(event.mWidget));
   }
   else {
-    event.widget = nullptr;
+    event.mWidget = nullptr;
   }
 
-  event.refPoint = mCachedMousePoint;
-  event.modifiers = mCachedModifiers;
+  event.mRefPoint = mCachedMousePoint;
+  event.mModifiers = mCachedModifiers;
   EventDispatcher::Dispatch(popup, presContext, &event, nullptr, &status);
 
   mCachedMousePoint = LayoutDeviceIntPoint(0, 0);
@@ -1388,7 +1439,7 @@ nsXULPopupManager::FirePopupShowingEvent(nsIContent* aPopup,
                            nsGkAtoms::_true, eCaseMatters)) {
     nsIFocusManager* fm = nsFocusManager::GetFocusManager();
     if (fm) {
-      nsIDocument* doc = popup->GetCurrentDoc();
+      nsIDocument* doc = popup->GetUncomposedDoc();
 
       // Only remove the focus if the currently focused item is ouside the
       // popup. It isn't a big deal if the current focus is in a child popup
@@ -1446,7 +1497,7 @@ nsXULPopupManager::FirePopupHidingEvent(nsIContent* aPopup,
                            nsGkAtoms::_true, eCaseMatters)) {
     nsIFocusManager* fm = nsFocusManager::GetFocusManager();
     if (fm) {
-      nsIDocument* doc = aPopup->GetCurrentDoc();
+      nsIDocument* doc = aPopup->GetUncomposedDoc();
 
       // Remove the focus from the focused node only if it is inside the popup.
       nsCOMPtr<nsIDOMElement> currentFocusElement;
@@ -1614,7 +1665,7 @@ nsXULPopupManager::GetLastTriggerNode(nsIDocument* aDocument, bool aIsTooltip)
   // if mOpeningPopup is set, it means that a popupshowing event is being
   // fired. In this case, just use the cached node, as the popup is not yet in
   // the list of open popups.
-  if (mOpeningPopup && mOpeningPopup->GetCurrentDoc() == aDocument &&
+  if (mOpeningPopup && mOpeningPopup->GetUncomposedDoc() == aDocument &&
       aIsTooltip == mOpeningPopup->IsXULElement(nsGkAtoms::tooltip)) {
     node = do_QueryInterface(nsMenuPopupFrame::GetTriggerContent(GetPopupFrameForContent(mOpeningPopup, false)));
   }
@@ -1623,7 +1674,7 @@ nsXULPopupManager::GetLastTriggerNode(nsIDocument* aDocument, bool aIsTooltip)
     while (item) {
       // look for a popup of the same type and document.
       if ((item->PopupType() == ePopupTypeTooltip) == aIsTooltip &&
-          item->Content()->GetCurrentDoc() == aDocument) {
+          item->Content()->GetUncomposedDoc() == aDocument) {
         node = do_QueryInterface(nsMenuPopupFrame::GetTriggerContent(item->Frame()));
         if (node)
           break;
@@ -1872,7 +1923,7 @@ nsXULPopupManager::UpdateMenuItems(nsIContent* aPopup)
   // Walk all of the menu's children, checking to see if any of them has a
   // command attribute. If so, then several attributes must potentially be updated.
 
-  nsCOMPtr<nsIDocument> document = aPopup->GetCurrentDoc();
+  nsCOMPtr<nsIDocument> document = aPopup->GetUncomposedDoc();
   if (!document) {
     return;
   }
@@ -2610,7 +2661,7 @@ nsXULPopupHidingEvent::Run()
 {
   nsXULPopupManager* pm = nsXULPopupManager::GetInstance();
 
-  nsIDocument *document = mPopup->GetCurrentDoc();
+  nsIDocument *document = mPopup->GetUncomposedDoc();
   if (pm && document) {
     nsIPresShell* presShell = document->GetShell();
     if (presShell) {

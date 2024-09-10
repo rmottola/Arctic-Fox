@@ -10,7 +10,6 @@
 #include "ClientLayerManager.h"         // for ClientLayerManager
 #include "base/message_loop.h"          // for MessageLoop
 #include "base/task.h"                  // for NewRunnableMethod, etc
-#include "base/tracked.h"               // for FROM_HERE
 #include "mozilla/layers/LayerTransactionChild.h"
 #include "mozilla/layers/PLayerTransactionChild.h"
 #include "mozilla/mozalloc.h"           // for operator new, etc
@@ -34,7 +33,7 @@ using mozilla::Unused;
 namespace mozilla {
 namespace layers {
 
-/*static*/ CompositorBridgeChild* CompositorBridgeChild::sCompositor;
+static StaticRefPtr<CompositorBridgeChild> sCompositorBridge;
 
 Atomic<int32_t> CompositableForwarder::sSerialCounter(0);
 
@@ -46,20 +45,28 @@ CompositorBridgeChild::CompositorBridgeChild(ClientLayerManager *aLayerManager)
 
 CompositorBridgeChild::~CompositorBridgeChild()
 {
-  XRE_GetIOMessageLoop()->PostTask(FROM_HERE,
-                                   new DeleteTask<Transport>(GetTransport()));
+  RefPtr<DeleteTask<Transport>> task = new DeleteTask<Transport>(GetTransport());
+  XRE_GetIOMessageLoop()->PostTask(task.forget());
 
   if (mCanSend) {
     gfxCriticalError() << "CompositorBridgeChild was not deinitialized";
   }
 }
 
+bool
+CompositorBridgeChild::IsSameProcess() const
+{
+  return OtherPid() == base::GetCurrentProcId();
+}
+
 static void DeferredDestroyCompositor(RefPtr<CompositorBridgeParent> aCompositorBridgeParent,
                                       RefPtr<CompositorBridgeChild> aCompositorBridgeChild)
 {
-    // Bug 848949 needs to be fixed before
-    // we can close the channel properly
-    //aCompositorBridgeChild->Close();
+  aCompositorBridgeChild->Close();
+
+  if (sCompositorBridge == aCompositorBridgeChild) {
+    sCompositorBridge = nullptr;
+  }
 }
 
 void
@@ -72,23 +79,10 @@ CompositorBridgeChild::Destroy()
     return;
   }
 
-  mCanSend = false;
-
   // Destroying the layer manager may cause all sorts of things to happen, so
   // let's make sure there is still a reference to keep this alive whatever
   // happens.
   RefPtr<CompositorBridgeChild> selfRef = this;
-
-  SendWillStop();
-  // The call just made to SendWillStop can result in IPC from the
-  // CompositorBridgeParent to the CompositorBridgeChild (e.g. caused by the destruction
-  // of shared memory). We need to ensure this gets processed by the
-  // CompositorBridgeChild before it gets destroyed. It suffices to ensure that
-  // events already in the MessageLoop get processed before the
-  // CompositorBridgeChild is destroyed, so we add a task to the MessageLoop to
-  // handle compositor desctruction.
-
-  // From now on the only message we can send is Stop.
 
   if (mLayerManager) {
     mLayerManager->Destroy();
@@ -103,12 +97,33 @@ CompositorBridgeChild::Destroy()
     layers->Destroy();
   }
 
-  SendStop();
+  SendWillClose();
+  mCanSend = false;
 
-  // The DeferredDestroyCompositor task takes ownership of compositorParent and
-  // will release them when it runs.
-  MessageLoop::current()->PostTask(FROM_HERE,
+
+  // The call just made to SendWillClose can result in IPC from the
+  // CompositorBridgeParent to the CompositorBridgeChild (e.g. caused by the destruction
+  // of shared memory). We need to ensure this gets processed by the
+  // CompositorBridgeChild before it gets destroyed. It suffices to ensure that
+  // events already in the MessageLoop get processed before the
+  // CompositorBridgeChild is destroyed, so we add a task to the MessageLoop to
+  // handle compositor desctruction.
+
+  // From now on we can't send any message message.
+  MessageLoop::current()->PostTask(
              NewRunnableFunction(DeferredDestroyCompositor, mCompositorBridgeParent, selfRef));
+}
+
+// static
+void
+CompositorBridgeChild::ShutDown()
+{
+  if (sCompositorBridge) {
+    sCompositorBridge->Destroy();
+    do {
+      NS_ProcessNextEvent(nullptr, true);
+    } while (sCompositorBridge);
+  }
 }
 
 bool
@@ -127,7 +142,7 @@ CompositorBridgeChild::LookupCompositorFrameMetrics(const FrameMetrics::ViewID a
 CompositorBridgeChild::Create(Transport* aTransport, ProcessId aOtherPid)
 {
   // There's only one compositor per child process.
-  MOZ_ASSERT(!sCompositor);
+  MOZ_ASSERT(!sCompositorBridge);
 
   RefPtr<CompositorBridgeChild> child(new CompositorBridgeChild(nullptr));
   if (!child->Open(aTransport, aOtherPid, XRE_GetIOMessageLoop(), ipc::ChildSide)) {
@@ -137,16 +152,15 @@ CompositorBridgeChild::Create(Transport* aTransport, ProcessId aOtherPid)
 
   child->mCanSend = true;
 
-  // We release this ref in ActorDestroy().
-  sCompositor = child.forget().take();
+  // We release this ref in DeferredDestroyCompositor.
+  sCompositorBridge = child;
 
   int32_t width;
   int32_t height;
-  sCompositor->SendGetTileSize(&width, &height);
+  sCompositorBridge->SendGetTileSize(&width, &height);
   gfxPlatform::GetPlatform()->SetTileSize(width, height);
 
-  // We release this ref in ActorDestroy().
-  return sCompositor;
+  return sCompositorBridge;
 }
 
 bool
@@ -166,7 +180,14 @@ CompositorBridgeChild::Get()
 {
   // This is only expected to be used in child processes.
   MOZ_ASSERT(!XRE_IsParentProcess());
-  return sCompositor;
+  return sCompositorBridge;
+}
+
+// static
+bool
+CompositorBridgeChild::ChildProcessHasCompositorBridge()
+{
+  return sCompositorBridge != nullptr;
 }
 
 PLayerTransactionChild*
@@ -212,7 +233,7 @@ CompositorBridgeChild::RecvInvalidateLayers(const uint64_t& aLayersId)
 
 bool
 CompositorBridgeChild::RecvCompositorUpdated(const uint64_t& aLayersId,
-                                      const TextureFactoryIdentifier& aNewIdentifier)
+                                             const TextureFactoryIdentifier& aNewIdentifier)
 {
   if (mLayerManager) {
     // This case is handled directly by nsBaseWidget.
@@ -221,6 +242,7 @@ CompositorBridgeChild::RecvCompositorUpdated(const uint64_t& aLayersId,
     if (dom::TabChild* child = dom::TabChild::GetFrom(aLayersId)) {
       child->CompositorUpdated(aNewIdentifier);
     }
+    SendAcknowledgeCompositorUpdate(aLayersId);
   }
   return true;
 }
@@ -297,14 +319,8 @@ CompositorBridgeChild::RecvUpdatePluginConfigurations(const LayoutDeviceIntPoint
       LayoutDeviceIntRect visibleBounds;
       // If the plugin is visible update it's geometry.
       if (isVisible) {
-        // bounds (content origin) - don't pass true to Resize, it triggers a
-        // sync paint update to the plugin process on Windows, which happens
-        // prior to clipping information being applied.
+        // Set bounds (content origin)
         bounds = aPlugins[pluginsIdx].bounds();
-        rv = widget->Resize(aContentOffset.x + bounds.x,
-                            aContentOffset.y + bounds.y,
-                            bounds.width, bounds.height, false);
-        NS_ASSERTION(NS_SUCCEEDED(rv), "widget call failure");
         nsTArray<LayoutDeviceIntRect> rectsOut;
         // This call may change the value of isVisible
         CalculatePluginClip(bounds, aPlugins[pluginsIdx].clip(),
@@ -313,6 +329,14 @@ CompositorBridgeChild::RecvUpdatePluginConfigurations(const LayoutDeviceIntPoint
                             rectsOut, visibleBounds, isVisible);
         // content clipping region (widget origin)
         rv = widget->SetWindowClipRegion(rectsOut, false);
+        NS_ASSERTION(NS_SUCCEEDED(rv), "widget call failure");
+        // This will trigger a browser window paint event for areas uncovered
+        // by a child window move, and will call invalidate on the plugin
+        // parent window which the browser owns. The latter gets picked up in
+        // our OnPaint handler and forwarded over to the plugin process async.
+        rv = widget->Resize(aContentOffset.x + bounds.x,
+                            aContentOffset.y + bounds.y,
+                            bounds.width, bounds.height, true);
         NS_ASSERTION(NS_SUCCEEDED(rv), "widget call failure");
       }
 
@@ -416,8 +440,6 @@ CompositorBridgeChild::RecvClearCachedResources(const uint64_t& aId)
 void
 CompositorBridgeChild::ActorDestroy(ActorDestroyReason aWhy)
 {
-  MOZ_ASSERT(sCompositor == this);
-
   if (aWhy == AbnormalShutdown) {
 #ifdef MOZ_B2G
   // Due to poor lifetime management of gralloc (and possibly shmems) we will
@@ -430,12 +452,8 @@ CompositorBridgeChild::ActorDestroy(ActorDestroyReason aWhy)
     // If the parent side runs into a problem then the actor will be destroyed.
     // There is nothing we can do in the child side, here sets mCanSend as false.
     mCanSend = false;
-    gfxCriticalNote << "Receive IPC close with reason=" << aWhy;
+    gfxCriticalNote << "Receive IPC close with reason=AbnormalShutdown";
   }
-
-  MessageLoop::current()->PostTask(
-    FROM_HERE,
-    NewRunnableMethod(this, &CompositorBridgeChild::Release));
 }
 
 bool
@@ -570,9 +588,13 @@ CompositorBridgeChild::CancelNotifyAfterRemotePaint(TabChild* aTabChild)
 }
 
 bool
-CompositorBridgeChild::SendWillStop()
+CompositorBridgeChild::SendWillClose()
 {
-  return PCompositorBridgeChild::SendWillStop();
+  MOZ_ASSERT(mCanSend);
+  if (!mCanSend) {
+    return true;
+  }
+  return PCompositorBridgeChild::SendWillClose();
 }
 
 bool
@@ -706,28 +728,27 @@ CompositorBridgeChild::SendRequestNotifyAfterRemotePaint()
 }
 
 bool
-CompositorBridgeChild::SendClearApproximatelyVisibleRegions(uint64_t aLayersId,
-                                                            uint32_t aPresShellId)
+CompositorBridgeChild::SendClearVisibleRegions(uint64_t aLayersId,
+                                               uint32_t aPresShellId)
 {
   MOZ_ASSERT(mCanSend);
   if (!mCanSend) {
     return true;
   }
-  return PCompositorBridgeChild::SendClearApproximatelyVisibleRegions(aLayersId,
-                                                                aPresShellId);
+  return PCompositorBridgeChild::SendClearVisibleRegions(aLayersId, aPresShellId);
 }
 
 bool
-CompositorBridgeChild::SendNotifyApproximatelyVisibleRegion(const ScrollableLayerGuid& aGuid,
-                                                            const CSSIntRegion& aRegion)
+CompositorBridgeChild::SendUpdateVisibleRegion(VisibilityCounter aCounter,
+                                               const ScrollableLayerGuid& aGuid,
+                                               const CSSIntRegion& aRegion)
 {
   MOZ_ASSERT(mCanSend);
   if (!mCanSend) {
     return true;
   }
-  return PCompositorBridgeChild::SendNotifyApproximatelyVisibleRegion(aGuid, aRegion);
+  return PCompositorBridgeChild::SendUpdateVisibleRegion(aCounter, aGuid, aRegion);
 }
-
 
 } // namespace layers
 } // namespace mozilla

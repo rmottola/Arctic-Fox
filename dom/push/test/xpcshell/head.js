@@ -22,8 +22,6 @@ XPCOMUtils.defineLazyServiceGetter(this, 'PushServiceComponent',
 const serviceExports = Cu.import('resource://gre/modules/PushService.jsm', {});
 const servicePrefs = new Preferences('dom.push.');
 
-const DEFAULT_TIMEOUT = 5000;
-
 const WEBSOCKET_CLOSE_GOING_AWAY = 1001;
 
 var isParent = Cc['@mozilla.org/xre/runtime;1']
@@ -118,31 +116,6 @@ function promiseObserverNotification(topic, matchFunc) {
 }
 
 /**
- * Waits for a promise to settle. Returns a rejected promise if the promise
- * is not resolved or rejected within the given delay.
- *
- * @param {Promise} promise The pending promise.
- * @param {Number} delay The time to wait before rejecting the promise.
- * @param {String} [message] The rejection message if the promise times out.
- * @returns {Promise} A promise that settles with the value of the pending
- *  promise, or rejects if the pending promise times out.
- */
-function waitForPromise(promise, delay, message = 'Timed out waiting on promise') {
-  let timeoutDefer = Promise.defer();
-  let id = setTimeout(() => timeoutDefer.reject(new Error(message)), delay);
-  return Promise.race([
-    promise.then(value => {
-      clearTimeout(id);
-      return value;
-    }, error => {
-      clearTimeout(id);
-      throw error;
-    }),
-    timeoutDefer.promise
-  ]);
-}
-
-/**
  * Wraps an object in a proxy that traps property gets and returns stubs. If
  * the stub is a function, the original value will be passed as the first
  * argument. If the original value is a function, the proxy returns a wrapper
@@ -210,7 +183,6 @@ function setPrefs(prefs = {}) {
     maxQuotaPerSubscription: 16,
     quotaUpdateDelay: 3000,
     'testing.notifyWorkers': false,
-    'testing.notifyAllObservers': true,
   }, prefs);
   for (let pref in defaultPrefs) {
     servicePrefs.set(pref, defaultPrefs[pref]);
@@ -501,6 +473,15 @@ var setUpServiceInParent = Task.async(function* (service, db) {
           }));
         },
         onRegister(request) {
+          if (request.key) {
+            let appServerKey = new Uint8Array(
+              ChromeUtils.base64URLDecode(request.key, {
+                padding: "require",
+              })
+            );
+            equal(appServerKey.length, 65, 'Wrong app server key length');
+            equal(appServerKey[0], 4, 'Wrong app server key format');
+          }
           this.serverSendMsg(JSON.stringify({
             messageType: 'register',
             uaid: userAgentID,

@@ -41,7 +41,7 @@ static char* GetResource(Decoder *aDecoder)
   return static_cast<char*>(aDecoder->mResource);
 }
 
-class GetIntPrefEvent : public nsRunnable {
+class GetIntPrefEvent : public Runnable {
 public:
   GetIntPrefEvent(const char* aPref, int32_t* aResult)
     : mPref(aPref), mResult(aResult) {}
@@ -111,7 +111,8 @@ static bool IsOmxSupported()
     nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
     if (gfxInfo) {
       int32_t status;
-      if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_STAGEFRIGHT, &status))) {
+      nsCString discardFailure;
+      if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(nsIGfxInfo::FEATURE_STAGEFRIGHT, discardFailure, &status))) {
         if (status != nsIGfxInfo::FEATURE_STATUS_OK) {
           NS_WARNING("XXX stagefright blacklisted\n");
           return false;

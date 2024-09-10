@@ -67,9 +67,6 @@ GetSriLog()
   return gSriPRLog;
 }
 
-// The nsScriptLoadRequest is passed as the context to necko, and thus
-// it needs to be threadsafe. Necko won't do anything with this
-// context, but it will AddRef and Release it on other threads.
 NS_IMPL_ISUPPORTS0(nsScriptLoadRequest)
 
 nsScriptLoadRequestList::~nsScriptLoadRequestList()
@@ -376,7 +373,7 @@ nsScriptLoader::PreloadURIComparator::Equals(const PreloadInfo &aPi,
          same;
 }
 
-class nsScriptRequestProcessor : public nsRunnable
+class nsScriptRequestProcessor : public Runnable
 {
 private:
   RefPtr<nsScriptLoader> mLoader;
@@ -731,7 +728,7 @@ nsScriptLoader::ProcessScriptElement(nsIScriptElement *aElement)
 
 namespace {
 
-class NotifyOffThreadScriptLoadCompletedRunnable : public nsRunnable
+class NotifyOffThreadScriptLoadCompletedRunnable : public Runnable
 {
   RefPtr<nsScriptLoadRequest> mRequest;
   RefPtr<nsScriptLoader> mLoader;
@@ -832,7 +829,6 @@ nsScriptLoader::AttemptAsyncScriptCompile(nsScriptLoadRequest* aRequest)
   if (!jsapi.Init(globalObject)) {
     return NS_ERROR_FAILURE;
   }
-  jsapi.TakeOwnershipOfErrorReporting();
 
   JSContext* cx = jsapi.cx();
   JS::Rooted<JSObject*> global(cx, globalObject->GetGlobalJSObject());
@@ -1574,7 +1570,7 @@ nsScriptLoader::PrepareLoadedRequest(nsScriptLoadRequest* aRequest,
 
   if (!aString.empty()) {
     aRequest->mScriptTextLength = aString.length();
-    aRequest->mScriptTextBuf = aString.extractRawBuffer();
+    aRequest->mScriptTextBuf = aString.extractOrCopyRawBuffer();
   }
 
   // This assertion could fire errorously if we ran out of memory when

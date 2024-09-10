@@ -13,6 +13,7 @@ Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
 var {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 var Services = require("Services");
 var promise = require("promise");
+var {LocalizationHelper} = require("devtools/client/shared/l10n");
 
 Object.defineProperty(this, "WebConsoleUtils", {
   get: function() {
@@ -33,10 +34,12 @@ const MAX_LONG_STRING_LENGTH = 200000;
 const MAX_PROPERTY_ITEMS = 2000;
 const DBG_STRINGS_URI = "chrome://devtools/locale/debugger.properties";
 
-const ELLIPSIS = Services.prefs.getComplexValue("intl.ellipsis", Ci.nsIPrefLocalizedString).data
-
 this.EXPORTED_SYMBOLS = ["VariablesViewController", "StackFrameUtils"];
 
+/**
+ * Localization convenience methods.
+ */
+var L10N = new LocalizationHelper(DBG_STRINGS_URI);
 
 /**
  * Controller for a VariablesView that handles interfacing with the debugger
@@ -195,7 +198,7 @@ VariablesViewController.prototype = {
       // Query the name of the first and last items for this slice
       let deferred = promise.defer();
       aIterator.names([start, start + count - 1], ({ names }) => {
-        let label = "[" + names[0] + ELLIPSIS + names[1] + "]";
+        let label = "[" + names[0] + L10N.ellipsis + names[1] + "]";
         let item = aTarget.addItem(label);
         item.showArrow();
         this.addExpander(item, sliceGrip);
@@ -675,12 +678,12 @@ VariablesViewController.prototype = {
    *
    * This function will empty the variables view.
    *
-   * @param object aOptions
+   * @param object options
    *        Options for the contents of the view:
    *        - objectActor: the grip of the new ObjectActor to show.
    *        - rawObject: the raw object to show.
    *        - label: the label for the inspected object.
-   * @param object aConfiguration
+   * @param object configuration
    *        Additional options for the controller:
    *        - overrideValueEvalMacro: @see _setEvaluationMacros
    *        - getterOrSetterEvalMacro: @see _setEvaluationMacros
@@ -689,24 +692,28 @@ VariablesViewController.prototype = {
    *         - variable: the created Variable.
    *         - expanded: the Promise that resolves when the variable expands.
    */
-  setSingleVariable: function(aOptions, aConfiguration = {}) {
-    this._setEvaluationMacros(aConfiguration);
+  setSingleVariable: function(options, configuration = {}) {
+    this._setEvaluationMacros(configuration);
     this.view.empty();
 
-    let scope = this.view.addScope(aOptions.label);
+    let scope = this.view.addScope(options.label);
     scope.expanded = true; // Expand the scope by default.
-    scope.locked = true; // Prevent collpasing the scope.
+    scope.locked = true; // Prevent collapsing the scope.
 
     let variable = scope.addItem("", { enumerable: true });
     let populated;
 
-    if (aOptions.objectActor) {
+    if (options.objectActor) {
       // Save objectActor for properties filtering
-      this.objectActor = aOptions.objectActor;
-      populated = this.populate(variable, aOptions.objectActor);
-      variable.expand();
-    } else if (aOptions.rawObject) {
-      variable.populate(aOptions.rawObject, { expanded: true });
+      this.objectActor = options.objectActor;
+      if (VariablesView.isPrimitive({ value: this.objectActor })) {
+        populated = promise.resolve();
+      } else {
+        populated = this.populate(variable, options.objectActor);
+        variable.expand();
+      }
+    } else if (options.rawObject) {
+      variable.populate(options.rawObject, { expanded: true });
       populated = promise.resolve();
     }
 
@@ -787,8 +794,3 @@ var StackFrameUtils = this.StackFrameUtils = {
     return label;
   }
 };
-
-/**
- * Localization convenience methods.
- */
-var L10N = new ViewHelpers.L10N(DBG_STRINGS_URI);

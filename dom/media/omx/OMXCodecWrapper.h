@@ -14,9 +14,8 @@
 
 #include "AudioSegment.h"
 #include "GonkNativeWindow.h"
-#include "GonkNativeWindowClient.h"
 #include "mozilla/media/MediaSystemResourceClient.h"
-#include "RefPtr.h"
+#include "mozilla/RefPtr.h"
 
 #include <speex/speex_resampler.h>
 

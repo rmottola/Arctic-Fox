@@ -83,7 +83,7 @@ private:
   bool mOuterTransaction;
 };
 
-class RestoreSelectionState : public nsRunnable {
+class RestoreSelectionState : public Runnable {
 public:
   RestoreSelectionState(nsTextEditorState *aState, nsTextControlFrame *aFrame)
     : mFrame(aFrame),
@@ -902,7 +902,7 @@ nsTextInputListener::HandleEvent(nsIDOMEvent* aEvent)
     mTxtCtrlElement->IsTextArea() ?
       nsIWidget::NativeKeyBindingsForMultiLineEditor :
       nsIWidget::NativeKeyBindingsForSingleLineEditor;
-  nsIWidget* widget = keyEvent->widget;
+  nsIWidget* widget = keyEvent->mWidget;
   // If the event is created by chrome script, the widget is nullptr.
   if (!widget) {
     widget = mFrame->GetNearestWidget();
@@ -1087,7 +1087,7 @@ nsTextEditorState::GetSelectionController() const
 }
 
 // Helper class, used below in BindToFrame().
-class PrepareEditorEvent : public nsRunnable {
+class PrepareEditorEvent : public Runnable {
 public:
   PrepareEditorEvent(nsTextEditorState &aState,
                      nsIContent *aOwnerContent,

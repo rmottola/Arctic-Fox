@@ -665,7 +665,10 @@ JsepSessionImpl::CreateOffer(const JsepOfferOptions& options,
   SetupBundle(sdp.get());
 
   if (mCurrentLocalDescription) {
-    rv = CopyPreviousTransportParams(*GetAnswer(), *sdp, sdp.get());
+    rv = CopyPreviousTransportParams(*GetAnswer(),
+                                     *mCurrentLocalDescription,
+                                     *sdp,
+                                     sdp.get());
     NS_ENSURE_SUCCESS(rv,rv);
   }
 
@@ -803,7 +806,11 @@ JsepSessionImpl::CreateAnswer(const JsepAnswerOptions& options,
   }
 
   if (mCurrentLocalDescription) {
-    rv = CopyPreviousTransportParams(*GetAnswer(), *sdp, sdp.get());
+    // per discussion with bwc, 3rd parm here should be offer, not *sdp. (mjf)
+    rv = CopyPreviousTransportParams(*GetAnswer(),
+                                     *mCurrentRemoteDescription,
+                                     offer,
+                                     sdp.get());
     NS_ENSURE_SUCCESS(rv,rv);
   }
 
@@ -1208,6 +1215,28 @@ JsepSessionImpl::SetRemoteDescription(JsepSdpType type, const std::string& sdp)
   bool iceLite =
       parsed->GetAttributeList().HasAttribute(SdpAttribute::kIceLiteAttribute);
 
+  // check for mismatch ufrag/pwd indicating ice restart
+  // can't just check the first one because it might be disabled
+  bool iceRestarting = false;
+  if (mCurrentRemoteDescription.get()) {
+    for (size_t i = 0;
+         !iceRestarting &&
+           i < mCurrentRemoteDescription->GetMediaSectionCount();
+         ++i) {
+
+      const SdpMediaSection& newMsection = parsed->GetMediaSection(i);
+      const SdpMediaSection& oldMsection =
+        mCurrentRemoteDescription->GetMediaSection(i);
+
+      if (mSdpHelper.MsectionIsDisabled(newMsection) ||
+          mSdpHelper.MsectionIsDisabled(oldMsection)) {
+        continue;
+      }
+
+      iceRestarting = mSdpHelper.IceCredentialsDiffer(newMsection, oldMsection);
+    }
+  }
+
   std::vector<std::string> iceOptions;
   if (parsed->GetAttributeList().HasAttribute(
           SdpAttribute::kIceOptionsAttribute)) {
@@ -1229,6 +1258,7 @@ JsepSessionImpl::SetRemoteDescription(JsepSdpType type, const std::string& sdp)
   if (NS_SUCCEEDED(rv)) {
     mRemoteIsIceLite = iceLite;
     mIceOptions = iceOptions;
+    mRemoteIceIsRestarting = iceRestarting;
   }
 
   return rv;
@@ -1520,12 +1550,18 @@ JsepSessionImpl::AddTransportAttributes(SdpMediaSection* msection,
 
 nsresult
 JsepSessionImpl::CopyPreviousTransportParams(const Sdp& oldAnswer,
+                                             const Sdp& offerersPreviousSdp,
                                              const Sdp& newOffer,
                                              Sdp* newLocal)
 {
   for (size_t i = 0; i < oldAnswer.GetMediaSectionCount(); ++i) {
     if (!mSdpHelper.MsectionIsDisabled(newLocal->GetMediaSection(i)) &&
-        mSdpHelper.AreOldTransportParamsValid(oldAnswer, newOffer, i)) {
+        mSdpHelper.AreOldTransportParamsValid(oldAnswer,
+                                              offerersPreviousSdp,
+                                              newOffer,
+                                              i) &&
+        !mRemoteIceIsRestarting
+       ) {
       // If newLocal is an offer, this will be the number of components we used
       // last time, and if it is an answer, this will be the number of
       // components we've decided we're using now.
@@ -1841,28 +1877,37 @@ JsepSessionImpl::ValidateRemoteDescription(const Sdp& description)
   rv = mSdpHelper.GetBundledMids(description, &newBundledMids);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  // check for partial ice restart, which is not supported
+  Maybe<bool> iceCredsDiffer;
   for (size_t i = 0;
        i < mCurrentRemoteDescription->GetMediaSectionCount();
        ++i) {
-    if (mSdpHelper.MsectionIsDisabled(description.GetMediaSection(i)) ||
-        mSdpHelper.MsectionIsDisabled(mCurrentRemoteDescription->GetMediaSection(i))) {
+
+    const SdpMediaSection& newMsection = description.GetMediaSection(i);
+    const SdpMediaSection& oldMsection =
+      mCurrentRemoteDescription->GetMediaSection(i);
+
+    if (mSdpHelper.MsectionIsDisabled(newMsection) ||
+        mSdpHelper.MsectionIsDisabled(oldMsection)) {
       continue;
     }
 
-    const SdpAttributeList& newAttrs(
-        description.GetMediaSection(i).GetAttributeList());
-    const SdpAttributeList& oldAttrs(
-        mCurrentRemoteDescription->GetMediaSection(i).GetAttributeList());
+    if (oldMsection.GetMediaType() != newMsection.GetMediaType()) {
+      JSEP_SET_ERROR("Remote description changes the media type of m-line "
+                     << i);
+      return NS_ERROR_INVALID_ARG;
+    }
 
-    if ((newAttrs.GetIceUfrag() != oldAttrs.GetIceUfrag()) ||
-        (newAttrs.GetIcePwd() != oldAttrs.GetIcePwd())) {
-      JSEP_SET_ERROR("ICE restart is unsupported at this time "
+    bool differ = mSdpHelper.IceCredentialsDiffer(newMsection, oldMsection);
+    // Detect whether all the creds are the same or all are different
+    if (!iceCredsDiffer.isSome()) {
+      // for the first msection capture whether creds are different or same
+      iceCredsDiffer = mozilla::Some(differ);
+    } else if (iceCredsDiffer.isSome() && *iceCredsDiffer != differ) {
+      // subsequent msections must match the first sections
+      JSEP_SET_ERROR("Partial ICE restart is unsupported at this time "
                      "(new remote description changes either the ice-ufrag "
-                     "or ice-pwd)" <<
-                     "ice-ufrag (old): " << oldAttrs.GetIceUfrag() <<
-                     "ice-ufrag (new): " << newAttrs.GetIceUfrag() <<
-                     "ice-pwd (old): " << oldAttrs.GetIcePwd() <<
-                     "ice-pwd (new): " << newAttrs.GetIcePwd());
+                     "or ice-pwd on fewer than all msections)");
       return NS_ERROR_INVALID_ARG;
     }
   }
@@ -2037,13 +2082,27 @@ void
 JsepSessionImpl::SetupDefaultCodecs()
 {
   // Supported audio codecs.
+  // Per jmspeex on IRC:
+  // For 32KHz sampling, 28 is ok, 32 is good, 40 should be really good
+  // quality.  Note that 1-2Kbps will be wasted on a stereo Opus channel
+  // with mono input compared to configuring it for mono.
+  // If we reduce bitrate enough Opus will low-pass us; 16000 will kill a
+  // 9KHz tone.  This should be adaptive when we're at the low-end of video
+  // bandwidth (say <100Kbps), and if we're audio-only, down to 8 or
+  // 12Kbps.
   mSupportedCodecs.values.push_back(new JsepAudioCodecDescription(
       "109",
       "opus",
       48000,
       2,
       960,
-      16000));
+#ifdef WEBRTC_GONK
+      // TODO Move this elsewhere to be adaptive to rate - Bug 1207925
+      16000 // B2G uses lower capture sampling rate
+#else
+      40000
+#endif
+      ));
 
   mSupportedCodecs.values.push_back(new JsepAudioCodecDescription(
       "9",
@@ -2074,16 +2133,7 @@ JsepSessionImpl::SetupDefaultCodecs()
                                     ));
 
   // Supported video codecs.
-  JsepVideoCodecDescription* vp8 = new JsepVideoCodecDescription(
-      "120",
-      "VP8",
-      90000
-      );
-  // Defaults for mandatory params
-  vp8->mConstraints.maxFs = 12288; // Enough for 2048x1536
-  vp8->mConstraints.maxFps = 60;
-  mSupportedCodecs.values.push_back(vp8);
-
+  // Note: order here implies priority for building offers!
   JsepVideoCodecDescription* vp9 = new JsepVideoCodecDescription(
       "121",
       "VP9",
@@ -2093,6 +2143,16 @@ JsepSessionImpl::SetupDefaultCodecs()
   vp9->mConstraints.maxFs = 12288; // Enough for 2048x1536
   vp9->mConstraints.maxFps = 60;
   mSupportedCodecs.values.push_back(vp9);
+
+  JsepVideoCodecDescription* vp8 = new JsepVideoCodecDescription(
+      "120",
+      "VP8",
+      90000
+      );
+  // Defaults for mandatory params
+  vp8->mConstraints.maxFs = 12288; // Enough for 2048x1536
+  vp8->mConstraints.maxFps = 60;
+  mSupportedCodecs.values.push_back(vp8);
 
   JsepVideoCodecDescription* h264_1 = new JsepVideoCodecDescription(
       "126",
@@ -2384,4 +2444,5 @@ JsepSessionImpl::AllLocalTracksAreAssigned() const
 
   return true;
 }
+
 } // namespace mozilla

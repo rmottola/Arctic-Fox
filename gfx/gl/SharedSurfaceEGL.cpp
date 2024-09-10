@@ -88,9 +88,12 @@ SharedSurface_EGLImage::~SharedSurface_EGLImage()
 {
     mEGL->fDestroyImage(Display(), mImage);
 
-    mGL->MakeCurrent();
-    mGL->fDeleteTextures(1, &mProdTex);
-    mProdTex = 0;
+    if (mSync) {
+        // We can't call this unless we have the ext, but we will always have
+        // the ext if we have something to destroy.
+        mEGL->fDestroySync(Display(), mSync);
+        mSync = 0;
+    }
 
     if (mConsTex) {
         MOZ_ASSERT(mGarbageBin);
@@ -98,12 +101,11 @@ SharedSurface_EGLImage::~SharedSurface_EGLImage()
         mConsTex = 0;
     }
 
-    if (mSync) {
-        // We can't call this unless we have the ext, but we will always have
-        // the ext if we have something to destroy.
-        mEGL->fDestroySync(Display(), mSync);
-        mSync = 0;
-    }
+    if (!mGL->MakeCurrent())
+        return;
+
+    mGL->fDeleteTextures(1, &mProdTex);
+    mProdTex = 0;
 }
 
 layers::TextureFlags
@@ -138,6 +140,15 @@ SharedSurface_EGLImage::ProducerReleaseImpl()
 
     MOZ_ASSERT(!mSync);
     mGL->fFinish();
+}
+
+void
+SharedSurface_EGLImage::ProducerReadAcquireImpl()
+{
+    // Wait on the fence, because presumably we're going to want to read this surface
+    if (mSync) {
+        mEGL->fClientWaitSync(Display(), mSync, 0, LOCAL_EGL_FOREVER);
+    }
 }
 
 EGLDisplay

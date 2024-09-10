@@ -9,12 +9,14 @@ var Ci = SpecialPowers.Ci;
 
 // Specifies whether we are using fake streams to run this automation
 var FAKE_ENABLED = true;
+var TEST_AUDIO_FREQ = 1000;
 try {
   var audioDevice = SpecialPowers.getCharPref('media.audio_loopback_dev');
   var videoDevice = SpecialPowers.getCharPref('media.video_loopback_dev');
   dump('TEST DEVICES: Using media devices:\n');
   dump('audio: ' + audioDevice + '\nvideo: ' + videoDevice + '\n');
   FAKE_ENABLED = false;
+  TEST_AUDIO_FREQ = 440;
 } catch (e) {
   dump('TEST DEVICES: No test devices found (in media.{audio,video}_loopback_dev, using fake streams.\n');
   FAKE_ENABLED = true;
@@ -76,6 +78,17 @@ AudioStreamAnalyser.prototype = {
       requestAnimationFrame(render);
     }
     requestAnimationFrame(render);
+  },
+
+  /**
+   * Disconnects the input stream from our internal analyser node.
+   * Call this to reduce main thread processing, mostly necessary on slow
+   * devices.
+   */
+  disconnect: function() {
+    this.disableDebugCanvas();
+    this.sourceNodes.forEach(n => n.disconnect());
+    this.sourceNodes = [];
   },
 
   /**
@@ -275,9 +288,12 @@ function run_test(is_initiator) {
 function runTestWhenReady(testFunc) {
   setupEnvironment();
   return testConfigured.then(options => testFunc(options))
-    .catch(e => ok(false, 'Error executing test: ' + e +
+    .catch(e => {
+      ok(false, 'Error executing test: ' + e +
         ((typeof e.stack === 'string') ?
-        (' ' + e.stack.split('\n').join(' ... ')) : '')));
+        (' ' + e.stack.split('\n').join(' ... ')) : ''));
+      SimpleTest.finish();
+    });
 }
 
 
@@ -317,6 +333,34 @@ function checkMediaStreamTracks(constraints, mediaStream) {
     mediaStream.getAudioTracks());
   checkMediaStreamTracksByType(constraints, 'video',
     mediaStream.getVideoTracks());
+}
+
+function checkMediaStreamCloneAgainstOriginal(clone, original) {
+  isnot(clone.id.length, 0, "Stream clone should have an id string");
+  isnot(clone, original,
+        "Stream clone should be different from the original");
+  isnot(clone.id, original.id,
+        "Stream clone's id should be different from the original's");
+  is(clone.getAudioTracks().length, original.getAudioTracks().length,
+     "All audio tracks should get cloned");
+  is(clone.getVideoTracks().length, original.getVideoTracks().length,
+     "All video tracks should get cloned");
+  original.getTracks()
+          .forEach(t => ok(!clone.getTracks().includes(t),
+                           "The clone's tracks should be originals"));
+}
+
+function checkMediaStreamTrackCloneAgainstOriginal(clone, original) {
+  isnot(clone.id.length, 0,
+        "Track clone should have an id string");
+  isnot(clone, original,
+        "Track clone should be different from the original");
+  isnot(clone.id, original.id,
+        "Track clone's id should be different from the original's");
+  is(clone.kind, original.kind,
+     "Track clone's kind should be same as the original's");
+  is(clone.enabled, original.enabled,
+     "Track clone's kind should be same as the original's");
 }
 
 /*** Utility methods */

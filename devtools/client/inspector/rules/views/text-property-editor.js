@@ -118,14 +118,14 @@ TextPropertyEditor.prototype = {
     // Create a span that will hold the property and semicolon.
     // Use this span to create a slightly larger click target
     // for the value.
-    let propertyContainer = createChild(this.container, "span", {
+    this.valueContainer = createChild(this.container, "span", {
       class: "ruleview-propertyvaluecontainer"
     });
 
     // Property value, editable when focused.  Changes to the
     // property value are applied as they are typed, and reverted
     // if the user presses escape.
-    this.valueSpan = createChild(propertyContainer, "span", {
+    this.valueSpan = createChild(this.valueContainer, "span", {
       class: "ruleview-propertyvalue theme-fg-color1",
       tabindex: this.ruleEditor.isEditable ? "0" : "-1",
     });
@@ -149,7 +149,7 @@ TextPropertyEditor.prototype = {
                        value: parsedValue,
                        priority: this.prop.priority };
 
-    appendText(propertyContainer, ";");
+    appendText(this.valueContainer, ";");
 
     this.warning = createChild(this.container, "div", {
       class: "ruleview-warning",
@@ -183,7 +183,9 @@ TextPropertyEditor.prototype = {
       this.nameContainer.addEventListener("click", (event) => {
         // Clicks within the name shouldn't propagate any further.
         event.stopPropagation();
-        if (event.target === propertyContainer) {
+
+        // Forward clicks on nameContainer to the editable nameSpan
+        if (event.target === this.nameContainer) {
           this.nameSpan.click();
         }
       }, false);
@@ -202,11 +204,12 @@ TextPropertyEditor.prototype = {
       this.nameContainer.addEventListener("paste",
         blurOnMultipleProperties, false);
 
-      propertyContainer.addEventListener("click", (event) => {
+      this.valueContainer.addEventListener("click", (event) => {
         // Clicks within the value shouldn't propagate any further.
         event.stopPropagation();
 
-        if (event.target === propertyContainer) {
+        // Forward clicks on valueContainer to the editable valueSpan
+        if (event.target === this.valueContainer) {
           this.valueSpan.click();
         }
       }, false);
@@ -230,7 +233,9 @@ TextPropertyEditor.prototype = {
         advanceChars: advanceValidate,
         contentType: InplaceEditor.CONTENT_TYPES.CSS_VALUE,
         property: this.prop,
-        popup: this.popup
+        popup: this.popup,
+        multiline: true,
+        maxWidth: () => this.container.getBoundingClientRect().width
       });
     }
   },
@@ -246,6 +251,7 @@ TextPropertyEditor.prototype = {
     if (domRule) {
       return domRule.href || domRule.nodeHref;
     }
+    return undefined;
   },
 
   /**
@@ -299,7 +305,8 @@ TextPropertyEditor.prototype = {
     this.warning.hidden = this.editing || this.isValid();
     this.filterProperty.hidden = this.editing ||
                                  !this.isValid() ||
-                                 !this.prop.overridden;
+                                 !this.prop.overridden ||
+                                 this.ruleEditor.rule.isUnmatched;
 
     if (!this.editing &&
         (this.prop.overridden || !this.prop.enabled ||
@@ -333,6 +340,7 @@ TextPropertyEditor.prototype = {
     const colorSwatchClass = "ruleview-colorswatch";
     const bezierSwatchClass = "ruleview-bezierswatch";
     const filterSwatchClass = "ruleview-filterswatch";
+    const angleSwatchClass = "ruleview-angleswatch";
 
     let outputParser = this.ruleView._outputParser;
     let parserOptions = {
@@ -342,6 +350,8 @@ TextPropertyEditor.prototype = {
       bezierClass: "ruleview-bezier",
       filterSwatchClass: sharedSwatchClass + filterSwatchClass,
       filterClass: "ruleview-filter",
+      angleSwatchClass: sharedSwatchClass + angleSwatchClass,
+      angleClass: "ruleview-angle",
       defaultColorType: !propDirty,
       urlClass: "theme-link",
       baseURI: this.sheetURI
@@ -363,6 +373,7 @@ TextPropertyEditor.prototype = {
           onCommit: this._onSwatchCommit,
           onRevert: this._onSwatchRevert
         });
+        span.on("unit-change", this._onSwatchCommit);
       }
     }
 
@@ -394,6 +405,14 @@ TextPropertyEditor.prototype = {
           onCommit: this._onSwatchCommit,
           onRevert: this._onSwatchRevert
         }, outputParser, parserOptions);
+      }
+    }
+
+    this.angleSwatchSpans =
+      this.valueSpan.querySelectorAll("." + angleSwatchClass);
+    if (this.ruleEditor.isEditable) {
+      for (let angleSpan of this.angleSwatchSpans) {
+        angleSpan.on("unit-change", this._onSwatchCommit);
       }
     }
 
@@ -604,6 +623,13 @@ TextPropertyEditor.prototype = {
     if (this._colorSwatchSpans && this._colorSwatchSpans.length) {
       for (let span of this._colorSwatchSpans) {
         this.ruleView.tooltips.colorPicker.removeSwatch(span);
+        span.off("unit-change", this._onSwatchCommit);
+      }
+    }
+
+    if (this.angleSwatchSpans && this.angleSwatchSpans.length) {
+      for (let span of this.angleSwatchSpans) {
+        span.off("unit-change", this._onSwatchCommit);
       }
     }
 

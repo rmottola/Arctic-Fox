@@ -91,6 +91,7 @@ EXPORTS += [
     'nsPresState.h',
     'nsRefreshDriver.h',
     'nsStyleChangeList.h',
+    'nsStyleSheetService.h',
     'ScrollbarStyles.h',
     'StackArena.h',
     'Units.h',
@@ -109,6 +110,7 @@ EXPORTS.mozilla += [
     'RestyleManagerHandle.h',
     'RestyleManagerHandleInlines.h',
     'ServoRestyleManager.h',
+    'StaticPresData.h',
 ]
 
 UNIFIED_SOURCES += [
@@ -154,6 +156,7 @@ UNIFIED_SOURCES += [
     'ScrollbarStyles.cpp',
     'ServoRestyleManager.cpp',
     'StackArena.cpp',
+    'StaticPresData.cpp',
     'TouchManager.cpp',
     'ZoomConstraintsClient.cpp',
 ]
@@ -187,6 +190,11 @@ LOCAL_INCLUDES += [
     '/dom/xbl',
     '/view',
 ]
+
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'android':
+    LOCAL_INCLUDES += [
+        '/widget/android',
+    ]
 
 FINAL_LIBRARY = 'xul'
 

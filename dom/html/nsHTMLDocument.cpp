@@ -1107,7 +1107,7 @@ nsHTMLDocument::MatchLinks(nsIContent *aContent, int32_t aNamespaceID,
   nsIDocument* doc = aContent->GetUncomposedDoc();
 
   if (doc) {
-    NS_ASSERTION(aContent->IsInDoc(),
+    NS_ASSERTION(aContent->IsInUncomposedDoc(),
                  "This method should never be called on content nodes that "
                  "are not in a document!");
 #ifdef DEBUG
@@ -1152,7 +1152,7 @@ bool
 nsHTMLDocument::MatchAnchors(nsIContent *aContent, int32_t aNamespaceID,
                              nsIAtom* aAtom, void* aData)
 {
-  NS_ASSERTION(aContent->IsInDoc(),
+  NS_ASSERTION(aContent->IsInUncomposedDoc(),
                "This method should never be called on content nodes that "
                "are not in a document!");
 #ifdef DEBUG
@@ -2048,7 +2048,7 @@ static void* CreateTokens(nsINode* aRootNode, const nsString* types)
       ++iter;
     } while (iter != end && !nsContentUtils::IsHTMLWhitespace(*iter));
 
-    tokens->AppendElement(do_GetAtom(Substring(start, iter)));
+    tokens->AppendElement(NS_Atomize(Substring(start, iter)));
 
     // skip whitespace
     while (iter != end && nsContentUtils::IsHTMLWhitespace(*iter)) {
@@ -2541,7 +2541,7 @@ nsHTMLDocument::EndUpdate(nsUpdateType aUpdateType)
 
 
 // Helper class, used below in ChangeContentEditableCount().
-class DeferredContentEditableCountChangeEvent : public nsRunnable
+class DeferredContentEditableCountChangeEvent : public Runnable
 {
 public:
   DeferredContentEditableCountChangeEvent(nsHTMLDocument *aDoc,
@@ -2673,7 +2673,7 @@ nsHTMLDocument::TearingDownEditor(nsIEditor *aEditor)
 
     presShell->SetAgentStyleSheets(agentSheets);
 
-    presShell->ReconstructStyleData();
+    presShell->RestyleForCSSRuleChanges();
   }
 }
 
@@ -2837,7 +2837,7 @@ nsHTMLDocument::EditingStateChanged()
     rv = presShell->SetAgentStyleSheets(agentSheets);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    presShell->ReconstructStyleData();
+    presShell->RestyleForCSSRuleChanges();
 
     // Adjust focused element with new style but blur event shouldn't be fired
     // until mEditingState is modified with newState.

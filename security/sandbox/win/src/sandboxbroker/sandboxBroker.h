@@ -27,6 +27,9 @@ class SANDBOX_EXPORT SandboxBroker
 {
 public:
   SandboxBroker();
+
+  static bool Initialize();
+
   bool LaunchApp(const wchar_t *aPath,
                  const wchar_t *aArguments,
                  const bool aEnableLogging,
@@ -39,7 +42,11 @@ public:
 #endif
   bool SetSecurityLevelForPluginProcess(int32_t aSandboxLevel);
   bool SetSecurityLevelForIPDLUnitTestProcess();
-  bool SetSecurityLevelForGMPlugin();
+  enum SandboxLevel {
+    LockDown,
+    Restricted
+  };
+  bool SetSecurityLevelForGMPlugin(SandboxLevel aLevel);
 
   // File system permissions
   bool AllowReadFile(wchar_t const *file);

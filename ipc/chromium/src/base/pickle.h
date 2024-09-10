@@ -32,6 +32,11 @@
 //
 class Pickle {
  public:
+  enum Ownership {
+    BORROWS,
+    OWNS,
+  };
+
   ~Pickle();
 
   // Initialize a Pickle object using the default header size.
@@ -42,11 +47,13 @@ class Pickle {
   // will be rounded up to ensure that the header size is 32bit-aligned.
   explicit Pickle(int header_size);
 
-  // Initializes a Pickle from a const block of data.  The data is not copied;
-  // instead the data is merely referenced by this Pickle.  Only const methods
-  // should be used on the Pickle when initialized this way.  The header
-  // padding size is deduced from the data length.
-  Pickle(const char* data, int data_len);
+  // Initializes a Pickle from a const block of data. If ownership == BORROWS,
+  // the data is not copied; instead the data is merely referenced by this
+  // Pickle. Only const methods should be used on the Pickle when initialized
+  // this way. The header padding size is deduced from the data length.  If
+  // ownership == OWNS, then again no copying takes place. However, the buffer
+  // is writable and will be freed when this Pickle is destroyed.
+  Pickle(const char* data, int data_len, Ownership ownership = BORROWS);
 
   // Initializes a Pickle as a deep copy of another Pickle.
   Pickle(const Pickle& other);
@@ -62,6 +69,11 @@ class Pickle {
   int size() const { return static_cast<int>(header_size_ +
                                              header_->payload_size); }
 
+  // Return the full size of the memory allocated for this Pickle's data.
+  uint32_t capacity() const {
+    return capacity_;
+  }
+
   // Returns the data for this Pickle.
   const void* data() const { return header_; }
 
@@ -69,31 +81,30 @@ class Pickle {
   // the Pickle, initialize *iter to NULL.  If successful, these methods return
   // true.  Otherwise, false is returned to indicate that the result could not
   // be extracted.
-  MOZ_WARN_UNUSED_RESULT bool ReadBool(void** iter, bool* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadInt16(void** iter, int16_t* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadUInt16(void** iter, uint16_t* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadShort(void** iter, short* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadInt(void** iter, int* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadLong(void** iter, long* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadULong(void** iter, unsigned long* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadSize(void** iter, size_t* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadInt32(void** iter, int32_t* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadUInt32(void** iter, uint32_t* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadInt64(void** iter, int64_t* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadUInt64(void** iter, uint64_t* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadDouble(void** iter, double* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadIntPtr(void** iter, intptr_t* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadUnsignedChar(void** iter, unsigned char* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadString(void** iter, std::string* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadWString(void** iter, std::wstring* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadString16(void** iter, string16* result) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadData(void** iter, const char** data, int* length) const;
-  MOZ_WARN_UNUSED_RESULT bool ReadBytes(void** iter, const char** data, int length,
+  MOZ_MUST_USE bool ReadBool(void** iter, bool* result) const;
+  MOZ_MUST_USE bool ReadInt16(void** iter, int16_t* result) const;
+  MOZ_MUST_USE bool ReadUInt16(void** iter, uint16_t* result) const;
+  MOZ_MUST_USE bool ReadShort(void** iter, short* result) const;
+  MOZ_MUST_USE bool ReadInt(void** iter, int* result) const;
+  MOZ_MUST_USE bool ReadLong(void** iter, long* result) const;
+  MOZ_MUST_USE bool ReadULong(void** iter, unsigned long* result) const;
+  MOZ_MUST_USE bool ReadSize(void** iter, size_t* result) const;
+  MOZ_MUST_USE bool ReadInt32(void** iter, int32_t* result) const;
+  MOZ_MUST_USE bool ReadUInt32(void** iter, uint32_t* result) const;
+  MOZ_MUST_USE bool ReadInt64(void** iter, int64_t* result) const;
+  MOZ_MUST_USE bool ReadUInt64(void** iter, uint64_t* result) const;
+  MOZ_MUST_USE bool ReadDouble(void** iter, double* result) const;
+  MOZ_MUST_USE bool ReadIntPtr(void** iter, intptr_t* result) const;
+  MOZ_MUST_USE bool ReadUnsignedChar(void** iter, unsigned char* result) const;
+  MOZ_MUST_USE bool ReadString(void** iter, std::string* result) const;
+  MOZ_MUST_USE bool ReadWString(void** iter, std::wstring* result) const;
+  MOZ_MUST_USE bool ReadData(void** iter, const char** data, int* length) const;
+  MOZ_MUST_USE bool ReadBytes(void** iter, const char** data, int length,
 					uint32_t alignment = sizeof(memberAlignmentType)) const;
 
   // Safer version of ReadInt() checks for the result not being negative.
   // Use it for reading the object sizes.
-  MOZ_WARN_UNUSED_RESULT bool ReadLength(void** iter, int* result) const;
+  MOZ_MUST_USE bool ReadLength(void** iter, int* result) const;
 
   // Methods for adding to the payload of the Pickle.  These values are
   // appended to the end of the Pickle's payload.  When reading values from a
@@ -151,7 +162,6 @@ class Pickle {
   }
   bool WriteString(const std::string& value);
   bool WriteWString(const std::wstring& value);
-  bool WriteString16(const string16& value);
   bool WriteData(const char* data, int length);
   bool WriteBytes(const void* data, int data_len,
                   uint32_t alignment = sizeof(memberAlignmentType));
@@ -234,10 +244,6 @@ class Pickle {
     return header_ ? payload() + payload_size() : nullptr;
   }
 
-  uint32_t capacity() const {
-    return capacity_;
-  }
-
   // Resizes the buffer for use when writing the specified amount of data. The
   // location that the data should be written at is returned, or NULL if there
   // was an error. Call EndWrite with the returned offset and the given length
@@ -253,7 +259,7 @@ class Pickle {
   // the header: new_capacity = sizeof(Header) + desired_payload_capacity.
   // A realloc() failure will cause a Resize failure... and caller should check
   // the return result for true (i.e., successful resizing).
-  bool Resize(uint32_t new_capacity);
+  void Resize(uint32_t new_capacity);
 
   // Round 'bytes' up to the next multiple of 'alignment'.  'alignment' must be
   // a power of 2.
@@ -281,6 +287,12 @@ class Pickle {
   static const char* FindNext(uint32_t header_size,
                               const char* range_start,
                               const char* range_end);
+
+  // If the given range contains at least header_size bytes, return the length
+  // of the pickled data including the header.
+  static uint32_t GetLength(uint32_t header_size,
+                            const char* range_start,
+                            const char* range_end);
 
   // The allocation granularity of the payload.
   static const int kPayloadUnit;

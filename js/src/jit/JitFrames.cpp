@@ -1682,7 +1682,7 @@ SnapshotIterator::fromStack(int32_t offset) const
 static Value
 FromObjectPayload(uintptr_t payload)
 {
-    // Note: Both MIRType_Object and MIRType_ObjectOrNull are encoded in
+    // Note: Both MIRType::Object and MIRType::ObjectOrNull are encoded in
     // snapshots using JSVAL_TYPE_OBJECT.
     return ObjectOrNullValue(reinterpret_cast<JSObject*>(payload));
 }
@@ -1901,8 +1901,11 @@ SnapshotIterator::maybeRead(const RValueAllocation& a, MaybeReadFallback& fallba
         return allocationValue(a);
 
     if (fallback.canRecoverResults()) {
+        // Code paths which are calling maybeRead are not always capable of
+        // returning an error code, as these code paths used to be infallible.
+        AutoEnterOOMUnsafeRegion oomUnsafe;
         if (!initInstructionResults(fallback))
-            MOZ_CRASH("Unable to recover allocations.");
+            oomUnsafe.crash("js::jit::SnapshotIterator::maybeRead");
 
         if (allocationReadable(a))
             return allocationValue(a);
@@ -2921,13 +2924,27 @@ JitProfilingFrameIterator::tryInitWithTable(JitcodeGlobalTable* table, void* pc,
 }
 
 void
-JitProfilingFrameIterator::fixBaselineDebugModeOSRReturnAddress()
+JitProfilingFrameIterator::fixBaselineReturnAddress()
 {
     MOZ_ASSERT(type_ == JitFrame_BaselineJS);
     BaselineFrame* bl = (BaselineFrame*)(fp_ - BaselineFrame::FramePointerOffset -
                                          BaselineFrame::Size());
-    if (BaselineDebugModeOSRInfo* info = bl->getDebugModeOSRInfo())
+
+    // Debug mode OSR for Baseline uses a "continuation fixer" and stashes the
+    // actual return address in an auxiliary structure.
+    if (BaselineDebugModeOSRInfo* info = bl->getDebugModeOSRInfo()) {
         returnAddressToFp_ = info->resumeAddr;
+        return;
+    }
+
+    // Resuming a generator via .throw() pushes a bogus return address onto
+    // the stack. We have the actual jsbytecode* stashed on the frame itself;
+    // translate that into the Baseline code address.
+    if (jsbytecode* override = bl->maybeOverridePc()) {
+        JSScript* script = bl->script();
+        returnAddressToFp_ = script->baselineScript()->nativeCodeForPC(script, override);
+        return;
+    }
 }
 
 void
@@ -2982,7 +2999,7 @@ JitProfilingFrameIterator::moveToNextFrame(CommonFrameLayout* frame)
         returnAddressToFp_ = frame->returnAddress();
         fp_ = GetPreviousRawFrame<uint8_t*>(frame);
         type_ = JitFrame_BaselineJS;
-        fixBaselineDebugModeOSRReturnAddress();
+        fixBaselineReturnAddress();
         return;
     }
 

@@ -28,9 +28,9 @@ addMessageListener("devtools:test:reload", function ({ data }) {
   content.location.reload(data.forceget);
 });
 
-addMessageListener("devtools:test:console", function ({ data }) {
-  let method = data.shift();
-  content.console[method].apply(content.console, data);
+addMessageListener("devtools:test:console", function ({ data: { method, args, id } }) {
+  content.console[method].apply(content.console, args)
+  sendAsyncMessage("devtools:test:console:response", { id });
 });
 
 /**
@@ -115,8 +115,7 @@ addMessageListener("devtools:test:profiler", function ({ data: { method, args, i
 });
 
 
-// To eval in content, look at `evalInDebuggee` in the head.js of canvasdebugger
-// for an example.
+// To eval in content, look at `evalInDebuggee` in the shared-head.js.
 addMessageListener("devtools:test:eval", function ({ data }) {
   sendAsyncMessage("devtools:test:eval:response", {
     value: content.eval(data.script),
@@ -146,42 +145,6 @@ addMessageListener("devtools:test:setStyle", function(msg) {
   node.style[propertyName] = propertyValue;
 
   sendAsyncMessage("devtools:test:setStyle");
-});
-
-/**
- * Get information about a DOM element, identified by a selector.
- * @param {Object} data
- * - {String} selector The CSS selector to get the node (can be a "super"
- *   selector).
- * @return {Object} data Null if selector didn't match any node, otherwise:
- * - {String} tagName.
- * - {String} namespaceURI.
- * - {Number} numChildren The number of children in the element.
- * - {Array} attributes An array of {name, value, namespaceURI} objects.
- * - {String} outerHTML.
- * - {String} innerHTML.
- * - {String} textContent.
- */
-addMessageListener("devtools:test:getDomElementInfo", function(msg) {
-  let {selector} = msg.data;
-  let node = superQuerySelector(selector);
-
-  let info = null;
-  if (node) {
-    info = {
-      tagName: node.tagName,
-      namespaceURI: node.namespaceURI,
-      numChildren: node.children.length,
-      attributes: [...node.attributes].map(({name, value, namespaceURI}) => {
-        return {name, value, namespaceURI};
-      }),
-      outerHTML: node.outerHTML,
-      innerHTML: node.innerHTML,
-      textContent: node.textContent
-    };
-  }
-
-  sendAsyncMessage("devtools:test:getDomElementInfo", info);
 });
 
 /**

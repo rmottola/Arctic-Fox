@@ -61,7 +61,7 @@ HttpRequestSucceeded(nsIStreamLoader *loader)
 // nsPACManCallback::OnQueryComplete on the Main thread when its completion is
 // discovered on the pac thread
 
-class ExecuteCallback final : public nsRunnable
+class ExecuteCallback final : public Runnable
 {
 public:
   ExecuteCallback(nsPACManCallback *aCallback,
@@ -101,7 +101,7 @@ private:
 // acts as a proxy to do that, as the PACMan is reference counted
 // and might be destroyed on either thread
 
-class ShutdownThread final : public nsRunnable
+class ShutdownThread final : public Runnable
 {
 public:
   explicit ShutdownThread(nsIThread *thread)
@@ -122,7 +122,7 @@ private:
 
 // Dispatch this to wait until the PAC thread shuts down.
 
-class WaitForThreadShutdown final : public nsRunnable
+class WaitForThreadShutdown final : public Runnable
 {
 public:
   explicit WaitForThreadShutdown(nsPACMan *aPACMan)
@@ -150,7 +150,7 @@ private:
 // the javascript PAC file has been installed (perhaps unsuccessfully)
 // and that there is no reason to queue executions anymore
 
-class PACLoadComplete final : public nsRunnable
+class PACLoadComplete final : public Runnable
 {
 public:
   explicit PACLoadComplete(nsPACMan *aPACMan)
@@ -176,7 +176,7 @@ private:
 // thread onto the PAC thread. There are 3 options: process the queue,
 // cancel the queue, and setup the javascript context with a new PAC file
 
-class ExecutePACThreadAction final : public nsRunnable
+class ExecutePACThreadAction final : public Runnable
 {
 public:
   // by default we just process the queue
@@ -361,8 +361,11 @@ nsPACMan::AsyncGetProxyForURI(nsIURI *uri, uint32_t appId,
 
   // Maybe Reload PAC
   if (!mPACURISpec.IsEmpty() && !mScheduledReload.IsNull() &&
-      TimeStamp::Now() > mScheduledReload)
+      TimeStamp::Now() > mScheduledReload) {
+    LOG(("nsPACMan::AsyncGetProxyForURI reload as scheduled\n"));
+
     LoadPACFromURI(EmptyCString());
+  }
 
   RefPtr<PendingPACQuery> query =
     new PendingPACQuery(this, uri, appId, isInIsolatedMozBrowser, callback,
@@ -404,6 +407,7 @@ nsPACMan::LoadPACFromURI(const nsCString &spec)
       do_CreateInstance(NS_STREAMLOADER_CONTRACTID);
   NS_ENSURE_STATE(loader);
 
+  LOG(("nsPACMan::LoadPACFromURI %s\n", spec.get()));
   // Since we might get called from nsProtocolProxyService::Init, we need to
   // post an event back to the main thread before we try to use the IO service.
   //
@@ -506,6 +510,9 @@ nsPACMan::OnLoadFailure()
 
   mScheduledReload = TimeStamp::Now() + TimeDuration::FromSeconds(interval);
 
+  LOG(("OnLoadFailure: retry in %d seconds (%d fails)\n",
+       interval, mLoadFailureCount));
+
   // while we wait for the retry queued members should try direct
   // even if that means fast failure.
   PostCancelPendingQ(NS_ERROR_NOT_AVAILABLE);
@@ -603,6 +610,7 @@ nsPACMan::ProcessPending()
       !PACURI.IsEmpty() &&
       !PACURI.Equals(mPACURISpec)) {
     query->UseAlternatePACFile(PACURI);
+    LOG(("Use PAC from system settings: %s\n", PACURI.get()));
     completed = true;
   }
 
@@ -613,6 +621,7 @@ nsPACMan::ProcessPending()
                    GetProxyForURI(query->mSpec, query->mScheme,
                                   query->mHost, query->mPort,
                                   pacString))) {
+    LOG(("Use proxy from system settings: %s\n", pacString.get()));
     query->Complete(NS_OK, pacString);
     completed = true;
   }
@@ -623,6 +632,7 @@ nsPACMan::ProcessPending()
                                           query->mAppId, query->mAppOrigin,
                                           query->mIsInIsolatedMozBrowser,
                                           pacString);
+    LOG(("Use proxy from PAC: %s\n", pacString.get()));
     query->Complete(status, pacString);
   }
 
@@ -646,9 +656,12 @@ nsPACMan::OnStreamComplete(nsIStreamLoader *loader,
     // than once before the initial call completed.  In this case, status
     // should be NS_ERROR_ABORT, and if so, then we know that we can and
     // should delay any processing.
+    LOG(("OnStreamComplete: called more than once\n"));
     if (status == NS_ERROR_ABORT)
       return NS_OK;
   }
+
+  LOG(("OnStreamComplete: entry\n"));
 
   if (NS_SUCCEEDED(status) && HttpRequestSucceeded(loader)) {
     // Get the URI spec used to load this PAC script.
@@ -681,12 +694,15 @@ nsPACMan::OnStreamComplete(nsIStreamLoader *loader,
     if (mPACThread)
       mPACThread->Dispatch(pending, nsIEventTarget::DISPATCH_NORMAL);
 
+    LOG(("OnStreamComplete: process the PAC contents\n"));
+
     // Even if the PAC file could not be parsed, we did succeed in loading the
     // data for it.
     mLoadFailureCount = 0;
   } else {
     // We were unable to load the PAC file (presumably because of a network
     // failure).  Try again a little later.
+    LOG(("OnStreamComplete: unable to load PAC, retry later\n"));
     OnLoadFailure();
   }
 

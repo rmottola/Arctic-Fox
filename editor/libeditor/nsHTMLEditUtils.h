@@ -14,10 +14,6 @@ class nsINode;
 class nsHTMLEditUtils
 {
 public:
-  // from nsTextEditRules:
-  static bool IsBig(nsIDOMNode *aNode);
-  static bool IsSmall(nsIDOMNode *aNode);
-
   // from nsHTMLEditRules:
   static bool IsInlineStyle(nsINode* aNode);
   static bool IsInlineStyle(nsIDOMNode *aNode);
@@ -39,7 +35,7 @@ public:
   static bool IsTableElementButNotTable(nsIDOMNode *aNode);
   static bool IsTableCell(nsINode* node);
   static bool IsTableCell(nsIDOMNode *aNode);
-  static bool IsTableCellOrCaption(nsIDOMNode *aNode);
+  static bool IsTableCellOrCaption(nsINode& aNode);
   static bool IsList(nsINode* aNode);
   static bool IsList(nsIDOMNode *aNode);
   static bool IsOrderedList(nsIDOMNode *aNode);

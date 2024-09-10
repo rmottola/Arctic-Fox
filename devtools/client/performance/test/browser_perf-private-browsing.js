@@ -44,7 +44,13 @@ function* testNormalWindow() {
 }
 
 function* testPrivateWindow() {
-  let { panel } = yield createPanelInWindow({ private: true });
+  let { panel } = yield createPanelInNewWindow({
+    private: true,
+    // The add-on SDK can't seem to be able to listen to "ready" or "close"
+    // events for private tabs. Don't really absolutely need to though.
+    dontWaitForTabReady: true
+  });
+
   let { PerformanceView } = panel.panelWin;
 
   is(PerformanceView.getState(), "unavailable",
@@ -59,14 +65,14 @@ function* testRecordingFailingInWindow(index) {
     ok(false, "Recording should not start while a private window is present.");
   };
 
-  PerformanceController.on(EVENTS.RECORDING_STARTED, onRecordingStarted);
+  PerformanceController.on(EVENTS.RECORDING_STATE_CHANGE, onRecordingStarted);
 
-  let whenFailed = once(PerformanceController, EVENTS.NEW_RECORDING_FAILED);
+  let whenFailed = once(PerformanceController, EVENTS.BACKEND_FAILED_AFTER_RECORDING_START);
   PerformanceController.startRecording();
   yield whenFailed;
   ok(true, "Recording has failed.");
 
-  PerformanceController.off(EVENTS.RECORDING_STARTED, onRecordingStarted);
+  PerformanceController.off(EVENTS.RECORDING_STATE_CHANGE, onRecordingStarted);
 }
 
 function* testRecordingSucceedingInWindow(index) {
@@ -77,17 +83,20 @@ function* testRecordingSucceedingInWindow(index) {
     ok(false, "Recording should start while now private windows are present.");
   };
 
-  PerformanceController.on(EVENTS.NEW_RECORDING_FAILED, onRecordingFailed);
+  PerformanceController.on(EVENTS.BACKEND_FAILED_AFTER_RECORDING_START, onRecordingFailed);
 
   yield startRecording(panel);
   yield stopRecording(panel);
   ok(true, "Recording has succeeded.");
 
-  PerformanceController.off(EVENTS.RECORDING_STARTED, onRecordingFailed);
+  PerformanceController.off(EVENTS.BACKEND_FAILED_AFTER_RECORDING_START, onRecordingFailed);
 }
 
-function* teardownPerfInWindow(index) {
+function* teardownPerfInWindow(index, options) {
   let { panel, win } = gPanelWinTuples[index];
-  yield teardown(panel, win);
-  win.close();
+  yield teardownToolboxAndRemoveTab(panel, options);
+
+  if (options.shouldCloseWindow) {
+    win.close();
+  }
 }

@@ -42,6 +42,7 @@ PRLogModuleInfo* gWin32ClipboardLog = nullptr;
 
 // oddly, this isn't in the MSVC headers anywhere.
 UINT nsClipboard::CF_HTML = ::RegisterClipboardFormatW(L"HTML Format");
+UINT nsClipboard::CF_CUSTOMTYPES = ::RegisterClipboardFormatW(L"application/x-moz-custom-clipdata");
 
 
 //-------------------------------------------------------------------------
@@ -88,7 +89,7 @@ nsClipboard::Observe(nsISupports *aSubject, const char *aTopic,
 }
 
 //-------------------------------------------------------------------------
-UINT nsClipboard::GetFormat(const char* aMimeStr)
+UINT nsClipboard::GetFormat(const char* aMimeStr, bool aMapHTMLMime)
 {
   UINT format;
 
@@ -105,8 +106,10 @@ UINT nsClipboard::GetFormat(const char* aMimeStr)
            strcmp(aMimeStr, kFilePromiseMime) == 0)
     format = CF_HDROP;
   else if (strcmp(aMimeStr, kNativeHTMLMime) == 0 ||
-           strcmp(aMimeStr, kHTMLMime) == 0)
+           aMapHTMLMime && strcmp(aMimeStr, kHTMLMime) == 0)
     format = CF_HTML;
+  else if (strcmp(aMimeStr, kCustomTypesMime) == 0)
+    format = CF_CUSTOMTYPES;
   else
     format = ::RegisterClipboardFormatW(NS_ConvertASCIItoUTF16(aMimeStr).get());
 
@@ -168,7 +171,9 @@ nsresult nsClipboard::SetupNativeDataObject(nsITransferable * aTransferable, IDa
     if ( currentFlavor ) {
       nsXPIDLCString flavorStr;
       currentFlavor->ToString(getter_Copies(flavorStr));
-      UINT format = GetFormat(flavorStr);
+      // When putting data onto the clipboard, we want to maintain kHTMLMime
+      // ("text/html") and not map it to CF_HTML here since this will be done below.
+      UINT format = GetFormat(flavorStr, false);
 
       // Now tell the native IDataObject about both our mime type and 
       // the native data format
@@ -520,6 +525,9 @@ nsresult nsClipboard::GetNativeDataOffClipboard(IDataObject * aDataObject, UINT 
                     // do that in FindPlatformHTML(). For now, return the allocLen. This
                     // case is mostly to ensure we don't try to call strlen on the buffer.
                     *aLen = allocLen;
+                  } else if (fe.cfFormat == CF_CUSTOMTYPES) {
+                    // Binary data
+                    *aLen = allocLen;
                   } else if (fe.cfFormat == preferredDropEffect) {
                     // As per the MSDN doc entitled: "Shell Clipboard Formats"
                     // CFSTR_PREFERREDDROPEFFECT should return a DWORD
@@ -666,16 +674,19 @@ nsresult nsClipboard::GetDataFromDataObject(IDataObject     * aDataObject,
           NS_IF_RELEASE(imageStream);
         }
         else {
-          // we probably have some form of text. The DOM only wants LF, so convert from Win32 line 
-          // endings to DOM line endings.
-          int32_t signedLen = static_cast<int32_t>(dataLen);
-          nsLinebreakHelpers::ConvertPlatformToDOMLinebreaks ( flavorStr, &data, &signedLen );
-          dataLen = signedLen;
+          // Treat custom types as a string of bytes.
+          if (strcmp(flavorStr, kCustomTypesMime) != 0) {
+            // we probably have some form of text. The DOM only wants LF, so convert from Win32 line 
+            // endings to DOM line endings.
+            int32_t signedLen = static_cast<int32_t>(dataLen);
+            nsLinebreakHelpers::ConvertPlatformToDOMLinebreaks ( flavorStr, &data, &signedLen );
+            dataLen = signedLen;
 
-          if (strcmp(flavorStr, kRTFMime) == 0) {
-            // RTF on Windows is known to sometimes deliver an extra null byte.
-            if (dataLen > 0 && static_cast<char*>(data)[dataLen - 1] == '\0')
-              dataLen--;
+            if (strcmp(flavorStr, kRTFMime) == 0) {
+              // RTF on Windows is known to sometimes deliver an extra null byte.
+              if (dataLen > 0 && static_cast<char*>(data)[dataLen - 1] == '\0')
+                dataLen--;
+            }
           }
 
           nsPrimitiveHelpers::CreatePrimitiveForData ( flavorStr, data, dataLen, getter_AddRefs(genericDataWrapper) );

@@ -27,15 +27,6 @@
 using namespace mozilla;
 
 ///////////////////////////////////////////////////////////////////////////
-//                  
-bool 
-nsHTMLEditUtils::IsBig(nsIDOMNode* aNode)
-{
-  return nsEditor::NodeIsType(aNode, nsGkAtoms::big);
-}
-
-
-///////////////////////////////////////////////////////////////////////////
 // IsInlineStyle true if node is an inline style
 //
 bool
@@ -105,15 +96,6 @@ nsHTMLEditUtils::IsNodeThatCanOutdent(nsIDOMNode* aNode)
       || (nodeAtom == nsGkAtoms::dt)
       || (nodeAtom == nsGkAtoms::blockquote);
 }
-
-///////////////////////////////////////////////////////////////////////////
-//                  
-bool 
-nsHTMLEditUtils::IsSmall(nsIDOMNode* aNode)
-{
-  return nsEditor::NodeIsType(aNode, nsGkAtoms::small);
-}
-
 
 /********************************************************
  *  helper methods from nsHTMLEditRules
@@ -277,16 +259,13 @@ nsHTMLEditUtils::IsTableCell(nsINode* aNode)
 
 
 ///////////////////////////////////////////////////////////////////////////
-// IsTableCell: true if node an html td or th
+// IsTableCellOrCaption: true if node an html td or th or caption
 //
 bool
-nsHTMLEditUtils::IsTableCellOrCaption(nsIDOMNode* aNode)
+nsHTMLEditUtils::IsTableCellOrCaption(nsINode& aNode)
 {
-  NS_PRECONDITION(aNode, "null parent passed to nsHTMLEditUtils::IsTableCell");
-  nsCOMPtr<nsIAtom> nodeAtom = nsEditor::GetTag(aNode);
-  return (nodeAtom == nsGkAtoms::td)
-      || (nodeAtom == nsGkAtoms::th)
-      || (nodeAtom == nsGkAtoms::caption);
+  return aNode.IsAnyOfHTMLElements(nsGkAtoms::td, nsGkAtoms::th,
+                                   nsGkAtoms::caption);
 }
 
 
@@ -683,7 +662,6 @@ static const nsElementInfo kElements[eHTMLTag_userdefined] = {
   ELEM(dt, true, true, GROUP_DL_CONTENT, GROUP_INLINE_ELEMENT),
   ELEM(em, true, true, GROUP_PHRASE, GROUP_INLINE_ELEMENT),
   ELEM(embed, false, false, GROUP_NONE, GROUP_NONE),
-  ELEM(extapp, true, true, GROUP_NONE, GROUP_NONE),
   ELEM(fieldset, true, true, GROUP_BLOCK, GROUP_FLOW_ELEMENT),
   ELEM(figcaption, true, false, GROUP_FIGCAPTION, GROUP_FLOW_ELEMENT),
   ELEM(figure, true, true, GROUP_BLOCK,

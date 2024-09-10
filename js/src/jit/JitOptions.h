@@ -51,6 +51,7 @@ struct DefaultJitOptions
     bool disableEaa;
     bool disableEagerSimdUnbox;
     bool disableEdgeCaseAnalysis;
+    bool disableFlowAA;
     bool disableGvn;
     bool disableInlining;
     bool disableLicm;
@@ -66,6 +67,7 @@ struct DefaultJitOptions
     bool forceInlineCaches;
     bool limitScriptSize;
     bool osr;
+    bool wasmTestMode;
     uint32_t baselineWarmUpThreshold;
     uint32_t exceptionBailoutThreshold;
     uint32_t frequentBailoutThreshold;

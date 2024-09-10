@@ -29,6 +29,8 @@ struct CubebDestroyPolicy
 
 class AudioStream;
 class FrameHistory;
+class AudioConfig;
+class AudioConverter;
 
 class AudioClock
 {
@@ -284,6 +286,11 @@ public:
   // Returns true when the audio stream is paused.
   bool IsPaused();
 
+  static uint32_t GetPreferredRate()
+  {
+    CubebUtils::InitPreferredSampleRate();
+    return CubebUtils::PreferredSampleRate();
+  }
   uint32_t GetRate() { return mOutRate; }
   uint32_t GetChannels() { return mChannels; }
   uint32_t GetOutChannels() { return mOutChannels; }
@@ -326,8 +333,9 @@ private:
 
   nsresult EnsureTimeStretcherInitializedUnlocked();
 
-  // Return true if downmixing succeeds otherwise false.
-  bool Downmix(Chunk* aChunk);
+  // Return true if audio frames are valid (correct sampling rate and valid
+  // channel count) otherwise false.
+  bool IsValidAudioFormat(Chunk* aChunk);
 
   void GetUnprocessed(AudioBufferWriter& aWriter);
   void GetTimeStretched(AudioBufferWriter& aWriter);
@@ -343,9 +351,6 @@ private:
   uint32_t mOutRate;
   uint32_t mChannels;
   uint32_t mOutChannels;
-#if defined(__ANDROID__)
-  dom::AudioChannel mAudioChannel;
-#endif
   AudioClock mAudioClock;
   soundtouch::SoundTouch* mTimeStretcher;
 
@@ -370,8 +375,6 @@ private:
 
   StreamState mState;
   bool mIsFirst;
-  // Get this value from the preferece, if true, we would downmix the stereo.
-  bool mIsMonoAudioEnabled;
 
   DataSource& mDataSource;
 };

@@ -267,14 +267,7 @@ public:
 
   bool CxPusherIsStackTop() const { return mCxPusher->IsStackTop(); }
 
-  // We're moving towards a world where the AutoJSAPI always handles
-  // exceptions that bubble up from the JS engine. In order to make this
-  // process incremental, we allow consumers to opt-in to the new behavior
-  // while keeping the old behavior as the default.
-  void TakeOwnershipOfErrorReporting();
-  bool OwnsErrorReporting() { return true; }
-  // If HasException, report it.  Otherwise, a no-op.  This must be
-  // called only if OwnsErrorReporting().
+  // If HasException, report it.  Otherwise, a no-op.
   void ReportException();
 
   bool HasException() const {
@@ -363,16 +356,21 @@ private:
   public:
     DocshellEntryMonitor(JSContext* aCx, const char* aReason);
 
+    // Please note that |aAsyncCause| here is owned by the caller, and its
+    // lifetime must outlive the lifetime of the DocshellEntryMonitor object.
+    // In practice, |aAsyncCause| is identical to |aReason| passed into
+    // the AutoEntryScript constructor, so the lifetime requirements are
+    // trivially satisfied by |aReason| being a statically allocated string.
     void Entry(JSContext* aCx, JSFunction* aFunction,
                JS::Handle<JS::Value> aAsyncStack,
-               JS::Handle<JSString*> aAsyncCause) override
+               const char* aAsyncCause) override
     {
       Entry(aCx, aFunction, nullptr, aAsyncStack, aAsyncCause);
     }
 
     void Entry(JSContext* aCx, JSScript* aScript,
                JS::Handle<JS::Value> aAsyncStack,
-               JS::Handle<JSString*> aAsyncCause) override
+               const char* aAsyncCause) override
     {
       Entry(aCx, nullptr, aScript, aAsyncStack, aAsyncCause);
     }
@@ -382,7 +380,7 @@ private:
   private:
     void Entry(JSContext* aCx, JSFunction* aFunction, JSScript* aScript,
                JS::Handle<JS::Value> aAsyncStack,
-               JS::Handle<JSString*> aAsyncCause);
+               const char* aAsyncCause);
 
     const char* mReason;
   };
@@ -444,22 +442,6 @@ protected:
 };
 
 /**
- * Use ThreadsafeAutoJSContext when you want an AutoJSContext but might be
- * running on a worker thread.
- */
-class MOZ_RAII ThreadsafeAutoJSContext {
-public:
-  explicit ThreadsafeAutoJSContext(MOZ_GUARD_OBJECT_NOTIFIER_ONLY_PARAM);
-  operator JSContext*() const;
-
-private:
-  JSContext* mCx; // Used on workers.  Null means mainthread.
-  Maybe<JSAutoRequest> mRequest; // Used on workers.
-  Maybe<AutoJSContext> mAutoJSContext; // Used on main thread.
-  MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
-
-/**
  * AutoSafeJSContext is similar to AutoJSContext but will only return the safe
  * JS context. That means it will never call nsContentUtils::GetCurrentJSContext().
  *
@@ -476,22 +458,6 @@ public:
 private:
   MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 };
-
-/**
- * Like AutoSafeJSContext but can be used safely on worker threads.
- */
-class MOZ_RAII ThreadsafeAutoSafeJSContext {
-public:
-  explicit ThreadsafeAutoSafeJSContext(MOZ_GUARD_OBJECT_NOTIFIER_ONLY_PARAM);
-  operator JSContext*() const;
-
-private:
-  JSContext* mCx; // Used on workers.  Null means mainthread.
-  Maybe<JSAutoRequest> mRequest; // Used on workers.
-  Maybe<AutoSafeJSContext> mAutoSafeJSContext; // Used on main thread.
-  MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
-
 
 } // namespace mozilla
 

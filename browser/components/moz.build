@@ -7,7 +7,6 @@
 DIRS += [
     'about',
     'contextualidentity',
-    'certerror',
     'customizableui',
     'dirprovider',
     'downloads',
@@ -23,6 +22,7 @@ DIRS += [
     'sessionstore',
     'shell',
     'selfsupport',
+    'syncedtabs',
     'statusbar',
 ]
 
@@ -47,6 +47,15 @@ EXTRA_COMPONENTS += [
 EXTRA_JS_MODULES += [
     'distribution.js',
 ]
+
+BROWSER_CHROME_MANIFESTS += [
+    'tests/browser/browser.ini'
+]
+
+XPCSHELL_TESTS_MANIFESTS += [
+    'tests/unit/xpcshell.ini'
+]
+
 
 with Files('controlcenter/**'):
     BUG_COMPONENT = ('Firefox', 'General')

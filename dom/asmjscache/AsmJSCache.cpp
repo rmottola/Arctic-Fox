@@ -238,7 +238,7 @@ EvictEntries(nsIFile* aDirectory, const nsACString& aGroup,
 // FileDescriptorHolder owns a file descriptor and its memory mapping.
 // FileDescriptorHolder is derived by two runnable classes (that is,
 // (Parent|Child)Runnable.
-class FileDescriptorHolder : public nsRunnable
+class FileDescriptorHolder : public Runnable
 {
 public:
   FileDescriptorHolder()
@@ -464,8 +464,7 @@ private:
                mState != eFinished);
 
     mState = eFailing;
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(mOwningThread->Dispatch(this,
-                                                         NS_DISPATCH_NORMAL)));
+    MOZ_ALWAYS_SUCCEEDS(mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL));
   }
 
   void
@@ -916,8 +915,7 @@ ParentRunnable::Run()
       }
 
       mState = eWaitingToFinishInit;
-      MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-        mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL)));
+      MOZ_ALWAYS_SUCCEEDS(mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL));
 
       return NS_OK;
     }
@@ -959,15 +957,13 @@ ParentRunnable::Run()
       rv = ReadMetadata();
       if (NS_FAILED(rv)) {
         mState = eFailedToReadMetadata;
-        MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-          mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL)));
+        MOZ_ALWAYS_SUCCEEDS(mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL));
         return NS_OK;
       }
 
       if (mOpenMode == eOpenForRead) {
         mState = eSendingMetadataForRead;
-        MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-          mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL)));
+        MOZ_ALWAYS_SUCCEEDS(mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL));
 
         return NS_OK;
       }
@@ -979,8 +975,7 @@ ParentRunnable::Run()
       }
 
       mState = eSendingCacheFile;
-      MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-        mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL)));
+      MOZ_ALWAYS_SUCCEEDS(mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL));
       return NS_OK;
     }
 
@@ -1022,8 +1017,7 @@ ParentRunnable::Run()
       }
 
       mState = eSendingCacheFile;
-      MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-        mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL)));
+      MOZ_ALWAYS_SUCCEEDS(mOwningThread->Dispatch(this, NS_DISPATCH_NORMAL));
       return NS_OK;
     }
 

@@ -16,7 +16,7 @@ USING_WORKERS_NAMESPACE
 
 namespace {
 
-class RegisterDebuggerMainThreadRunnable final : public nsRunnable
+class RegisterDebuggerMainThreadRunnable final : public mozilla::Runnable
 {
   WorkerPrivate* mWorkerPrivate;
   bool mNotifyListeners;
@@ -43,7 +43,7 @@ private:
   }
 };
 
-class UnregisterDebuggerMainThreadRunnable final : public nsRunnable
+class UnregisterDebuggerMainThreadRunnable final : public mozilla::Runnable
 {
   WorkerPrivate* mWorkerPrivate;
 
@@ -273,8 +273,7 @@ WorkerDebuggerManager::RegisterDebugger(WorkerPrivate* aWorkerPrivate)
 
     nsCOMPtr<nsIRunnable> runnable =
       new RegisterDebuggerMainThreadRunnable(aWorkerPrivate, hasListeners);
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-      NS_DispatchToMainThread(runnable, NS_DISPATCH_NORMAL)));
+    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable, NS_DISPATCH_NORMAL));
 
     if (hasListeners) {
       aWorkerPrivate->WaitForIsDebuggerRegistered(true);
@@ -292,8 +291,7 @@ WorkerDebuggerManager::UnregisterDebugger(WorkerPrivate* aWorkerPrivate)
   } else {
     nsCOMPtr<nsIRunnable> runnable =
       new UnregisterDebuggerMainThreadRunnable(aWorkerPrivate);
-    MOZ_ALWAYS_TRUE(NS_SUCCEEDED(
-      NS_DispatchToMainThread(runnable, NS_DISPATCH_NORMAL)));
+    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable, NS_DISPATCH_NORMAL));
 
     aWorkerPrivate->WaitForIsDebuggerRegistered(false);
   }

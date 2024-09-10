@@ -37,6 +37,7 @@
 #include "mozilla/dom/Element.h"
 #include "nsRuleWalker.h"
 #include "nsRuleProcessorData.h"
+#include "nsCSSPseudoClasses.h"
 #include "nsCSSRuleProcessor.h"
 #include "mozilla/dom/CSSLexer.h"
 #include "mozilla/dom/InspectorUtilsBinding.h"
@@ -230,7 +231,7 @@ inDOMUtils::GetCSSStyleRules(nsIDOMElement *aElement,
 
   nsCOMPtr<nsIAtom> pseudoElt;
   if (!aPseudo.IsEmpty()) {
-    pseudoElt = do_GetAtom(aPseudo);
+    pseudoElt = NS_Atomize(aPseudo);
   }
 
   nsRuleNode* ruleNode = nullptr;
@@ -245,8 +246,10 @@ inDOMUtils::GetCSSStyleRules(nsIDOMElement *aElement,
   }
 
   nsCOMPtr<nsISupportsArray> rules;
-  NS_NewISupportsArray(getter_AddRefs(rules));
-  if (!rules) return NS_ERROR_OUT_OF_MEMORY;
+  nsresult rv = NS_NewISupportsArray(getter_AddRefs(rules));
+  if (NS_FAILED(rv)) {
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
 
   for ( ; !ruleNode->IsRoot(); ruleNode = ruleNode->GetParent()) {
     RefPtr<Declaration> decl = do_QueryObject(ruleNode->GetRule());
@@ -455,7 +458,7 @@ inDOMUtils::SelectorMatchesElement(nsIDOMElement* aElement,
   if (!aPseudo.IsEmpty()) {
     // We need to make sure that the requested pseudo element type
     // matches the selector pseudo element type before proceeding.
-    nsCOMPtr<nsIAtom> pseudoElt = do_GetAtom(aPseudo);
+    nsCOMPtr<nsIAtom> pseudoElt = NS_Atomize(aPseudo);
     if (sel->mSelectors->PseudoType() !=
         nsCSSPseudoElements::GetPseudoType(pseudoElt)) {
       *aMatches = false;
@@ -755,6 +758,7 @@ PropertySupportsVariant(nsCSSProperty aPropertyID, uint32_t aVariant)
     uint32_t supported;
     switch (aPropertyID) {
       case eCSSProperty_border_image_slice:
+      case eCSSProperty_grid_template:
       case eCSSProperty_grid:
         supported = VARIANT_PN;
         break;
@@ -773,9 +777,13 @@ PropertySupportsVariant(nsCSSProperty aPropertyID, uint32_t aVariant)
       case eCSSProperty_border_bottom_left_radius:
       case eCSSProperty_border_bottom_right_radius:
       case eCSSProperty_background_position:
+      case eCSSProperty_background_position_x:
+      case eCSSProperty_background_position_y:
       case eCSSProperty_background_size:
 #ifdef MOZ_ENABLE_MASK_AS_SHORTHAND
       case eCSSProperty_mask_position:
+      case eCSSProperty_mask_position_x:
+      case eCSSProperty_mask_position_y:
       case eCSSProperty_mask_size:
 #endif
       case eCSSProperty_grid_auto_columns:
@@ -1095,21 +1103,36 @@ inDOMUtils::GetBindingURLs(nsIDOMElement *aElement, nsIArray **_retval)
 
 NS_IMETHODIMP
 inDOMUtils::SetContentState(nsIDOMElement* aElement,
-                            EventStates::InternalType aState)
+                            EventStates::InternalType aState,
+                            bool* aRetVal)
 {
   NS_ENSURE_ARG_POINTER(aElement);
 
   RefPtr<EventStateManager> esm =
     inLayoutUtils::GetEventStateManagerFor(aElement);
-  if (esm) {
-    nsCOMPtr<nsIContent> content;
-    content = do_QueryInterface(aElement);
+  NS_ENSURE_TRUE(esm, NS_ERROR_INVALID_ARG);
 
-    // XXX Invalid cast of bool to nsresult (bug 778108)
-    return (nsresult)esm->SetContentState(content, EventStates(aState));
-  }
+  nsCOMPtr<nsIContent> content;
+  content = do_QueryInterface(aElement);
+  NS_ENSURE_TRUE(content, NS_ERROR_INVALID_ARG);
 
-  return NS_ERROR_FAILURE;
+  *aRetVal = esm->SetContentState(content, EventStates(aState));
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+inDOMUtils::RemoveContentState(nsIDOMElement* aElement,
+                               EventStates::InternalType aState,
+                               bool* aRetVal)
+{
+  NS_ENSURE_ARG_POINTER(aElement);
+
+  RefPtr<EventStateManager> esm =
+    inLayoutUtils::GetEventStateManagerFor(aElement);
+  NS_ENSURE_TRUE(esm, NS_ERROR_INVALID_ARG);
+
+  *aRetVal = esm->SetContentState(nullptr, EventStates(aState));
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -1184,20 +1207,21 @@ GetStatesForPseudoClass(const nsAString& aStatePseudo)
     EventStates()
   };
   static_assert(MOZ_ARRAY_LENGTH(sPseudoClassStates) ==
-                nsCSSPseudoClasses::ePseudoClass_NotPseudoClass + 1,
+                static_cast<size_t>(CSSPseudoClassType::MAX),
                 "Length of PseudoClassStates array is incorrect");
 
-  nsCOMPtr<nsIAtom> atom = do_GetAtom(aStatePseudo);
+  nsCOMPtr<nsIAtom> atom = NS_Atomize(aStatePseudo);
 
   // Ignore :moz-any-link so we don't give the element simultaneous
   // visited and unvisited style state
   if (nsCSSPseudoClasses::GetPseudoType(atom) ==
-      nsCSSPseudoClasses::ePseudoClass_mozAnyLink) {
+      CSSPseudoClassType::mozAnyLink) {
     return EventStates();
   }
   // Our array above is long enough that indexing into it with
-  // NotPseudoClass is ok.
-  return sPseudoClassStates[nsCSSPseudoClasses::GetPseudoType(atom)];
+  // NotPseudo is ok.
+  CSSPseudoClassType type = nsCSSPseudoClasses::GetPseudoType(atom);
+  return sPseudoClassStates[static_cast<CSSPseudoClassTypeBase>(type)];
 }
 
 NS_IMETHODIMP

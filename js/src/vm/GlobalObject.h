@@ -135,7 +135,6 @@ class GlobalObject : public NativeObject
 
     enum WarnOnceFlag : int32_t {
         WARN_WATCH_DEPRECATED                   = 1 << 0,
-        WARN_STRING_CONTAINS_DEPRECATED         = 1 << 1,
     };
 
     // Emit the specified warning if the given slot in |obj|'s global isn't
@@ -242,6 +241,12 @@ class GlobalObject : public NativeObject
     }
 
   private:
+    static bool defineConstructorPropertiesAndLinkPrototype(JSContext* cx,
+                                                            Handle<GlobalObject*> global,
+                                                            JSProtoKey key, const Class* clasp,
+                                                            HandleId id, HandleObject ctor,
+                                                            HandleObject proto);
+
     bool arrayClassInitialized() const {
         return classIsInitialized(JSProto_Array);
     }
@@ -388,6 +393,12 @@ class GlobalObject : public NativeObject
         if (!ensureConstructor(cx, global, JSProto_Symbol))
             return nullptr;
         return &global->getPrototype(JSProto_Symbol).toObject().as<NativeObject>();
+    }
+
+    static NativeObject* getOrCreatePromisePrototype(JSContext* cx, Handle<GlobalObject*> global) {
+        if (!ensureConstructor(cx, global, JSProto_Promise))
+            return nullptr;
+        return &global->getPrototype(JSProto_Promise).toObject().as<NativeObject>();
     }
 
     static NativeObject* getOrCreateRegExpPrototype(JSContext* cx, Handle<GlobalObject*> global) {
@@ -590,6 +601,13 @@ class GlobalObject : public NativeObject
         return &self->getPrototype(JSProto_DataView).toObject();
     }
 
+    static JSFunction*
+    getOrCreatePromiseConstructor(JSContext* cx, Handle<GlobalObject*> global) {
+        if (!ensureConstructor(cx, global, JSProto_Promise))
+            return nullptr;
+        return &global->getConstructor(JSProto_Promise).toObject().as<JSFunction>();
+    }
+
     static NativeObject* getIntrinsicsHolder(JSContext* cx, Handle<GlobalObject*> global);
 
     bool maybeExistingIntrinsicValue(PropertyName* name, Value* vp) {
@@ -696,12 +714,6 @@ class GlobalObject : public NativeObject
         // debuggers like Firebug (bug 934669).
         //return warnOnceAbout(cx, obj, WARN_WATCH_DEPRECATED, JSMSG_OBJECT_WATCH_DEPRECATED);
         return true;
-    }
-
-    // Warn about use of the deprecated String.prototype.contains method
-    static bool warnOnceAboutStringContains(JSContext* cx, HandleObject strContains) {
-        return warnOnceAbout(cx, strContains, WARN_STRING_CONTAINS_DEPRECATED,
-                             JSMSG_DEPRECATED_STRING_CONTAINS);
     }
 
     static bool getOrCreateEval(JSContext* cx, Handle<GlobalObject*> global,

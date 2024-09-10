@@ -114,7 +114,9 @@ VPXDecoder::DoDecodeFrame(MediaRawData* aSample)
   vpx_image_t      *img;
 
   while ((img = vpx_codec_get_frame(&mVPX, &iter))) {
-    NS_ASSERTION(img->fmt == VPX_IMG_FMT_I420, "WebM image format not I420");
+    NS_ASSERTION(img->fmt == VPX_IMG_FMT_I420 ||
+                 img->fmt == VPX_IMG_FMT_I444,
+                 "WebM image format not I420 or I444");
 
     // Chroma shifts are rounded down as per the decoding examples in the SDK
     VideoData::YCbCrBuffer b;
@@ -126,27 +128,39 @@ VPXDecoder::DoDecodeFrame(MediaRawData* aSample)
 
     b.mPlanes[1].mData = img->planes[1];
     b.mPlanes[1].mStride = img->stride[1];
-    b.mPlanes[1].mHeight = (img->d_h + 1) >> img->y_chroma_shift;
-    b.mPlanes[1].mWidth = (img->d_w + 1) >> img->x_chroma_shift;
     b.mPlanes[1].mOffset = b.mPlanes[1].mSkip = 0;
 
     b.mPlanes[2].mData = img->planes[2];
     b.mPlanes[2].mStride = img->stride[2];
-    b.mPlanes[2].mHeight = (img->d_h + 1) >> img->y_chroma_shift;
-    b.mPlanes[2].mWidth = (img->d_w + 1) >> img->x_chroma_shift;
     b.mPlanes[2].mOffset = b.mPlanes[2].mSkip = 0;
 
-    VideoInfo info;
-    info.mDisplay = mInfo.mDisplay;
-    RefPtr<VideoData> v = VideoData::Create(info,
-                                              mImageContainer,
-                                              aSample->mOffset,
-                                              aSample->mTime,
-                                              aSample->mDuration,
-                                              b,
-                                              aSample->mKeyframe,
-                                              aSample->mTimecode,
-                                              mInfo.mImage);
+    if (img->fmt == VPX_IMG_FMT_I420) {
+      b.mPlanes[1].mHeight = (img->d_h + 1) >> img->y_chroma_shift;
+      b.mPlanes[1].mWidth = (img->d_w + 1) >> img->x_chroma_shift;
+
+      b.mPlanes[2].mHeight = (img->d_h + 1) >> img->y_chroma_shift;
+      b.mPlanes[2].mWidth = (img->d_w + 1) >> img->x_chroma_shift;
+    } else if (img->fmt == VPX_IMG_FMT_I444) {
+      b.mPlanes[1].mHeight = img->d_h;
+      b.mPlanes[1].mWidth = img->d_w;
+
+      b.mPlanes[2].mHeight = img->d_h;
+      b.mPlanes[2].mWidth = img->d_w;
+    } else {
+      LOG("VPX Unknown image format");
+      return -1;
+    }
+
+    RefPtr<VideoData> v = VideoData::Create(mInfo,
+                                            mImageContainer,
+                                            aSample->mOffset,
+                                            aSample->mTime,
+                                            aSample->mDuration,
+                                            b,
+                                            aSample->mKeyframe,
+                                            aSample->mTimecode,
+                                            mInfo.ScaledImageRect(img->d_w,
+                                                                  img->d_h));
 
     if (!v) {
       LOG("Image allocation error source %ldx%ld display %ldx%ld picture %ldx%ld",
@@ -199,10 +213,12 @@ VPXDecoder::Drain()
 
 /* static */
 bool
-VPXDecoder::IsVPX(const nsACString& aMimeType)
+VPXDecoder::IsVPX(const nsACString& aMimeType, uint8_t aCodecMask)
 {
-  return aMimeType.EqualsLiteral("video/webm; codecs=vp8") ||
-    aMimeType.EqualsLiteral("video/webm; codecs=vp9");
+  return ((aCodecMask & VPXDecoder::VP8) &&
+          aMimeType.EqualsLiteral("video/webm; codecs=vp8")) ||
+         ((aCodecMask & VPXDecoder::VP9) &&
+          aMimeType.EqualsLiteral("video/webm; codecs=vp9"));
 }
 
 } // namespace mozilla

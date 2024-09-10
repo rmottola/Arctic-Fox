@@ -313,9 +313,9 @@ KeyEventDispatcher::DispatchKeyEventInternal(EventMessage aEventMessage)
         event.mKeyValue = mDOMPrintableKeyValue;
     }
     event.mCodeNameIndex = mDOMCodeNameIndex;
-    event.modifiers = getDOMModifiers(mData.metaState);
+    event.mModifiers = getDOMModifiers(mData.metaState);
     event.location = mDOMKeyLocation;
-    event.time = mData.timeMs;
+    event.mTime = mData.timeMs;
     return nsWindow::DispatchKeyInput(event);
 }
 
@@ -354,7 +354,7 @@ KeyEventDispatcher::DispatchKeyUpEvent()
     DispatchKeyEventInternal(eKeyUp);
 }
 
-class SwitchEventRunnable : public nsRunnable {
+class SwitchEventRunnable : public mozilla::Runnable {
 public:
     SwitchEventRunnable(hal::SwitchEvent& aEvent) : mEvent(aEvent)
     {}

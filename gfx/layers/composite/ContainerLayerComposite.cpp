@@ -62,7 +62,7 @@ LayerHasCheckerboardingAPZC(Layer* aLayer, Color* aOutColor)
     }
     if (i.GetApzc() && i.GetApzc()->IsCurrentlyCheckerboarding()) {
       if (aOutColor) {
-        *aOutColor = i.Metrics().GetBackgroundColor();
+        *aOutColor = i.Metadata().GetBackgroundColor();
       }
       return true;
     }
@@ -141,8 +141,7 @@ template<class ContainerT> void
 ContainerRenderVR(ContainerT* aContainer,
                   LayerManagerComposite* aManager,
                   const gfx::IntRect& aClipRect,
-                  RefPtr<gfx::VRHMDInfo> aHMD,
-                  int32_t aInputFrameID)
+                  RefPtr<gfx::VRHMDInfo> aHMD)
 {
   int32_t inputFrameID = -1;
 
@@ -273,11 +272,29 @@ ContainerRenderVR(ContainerT* aContainer,
                                                  surfaceRect.width, surfaceRect.height));
       layerToRender->RenderLayer(surfaceRect);
 
-      CompositableHost *ch = layerToRender->GetCompositableHost();
-      if (ch) {
-        int32_t compositableInputFrameID = ch->GetLastInputFrameID();
-        if (compositableInputFrameID != -1) {
-          inputFrameID = compositableInputFrameID;
+      // Search all children recursively until we find the canvas with
+      // an inputFrameID
+      std::stack<LayerComposite*> searchLayers;
+      searchLayers.push(layerToRender);
+      while (!searchLayers.empty() && inputFrameID == -1) {
+        LayerComposite* searchLayer = searchLayers.top();
+        searchLayers.pop();
+        if (searchLayer) {
+          searchLayers.push(searchLayer->GetFirstChildComposite());
+          Layer* sibling = searchLayer->GetLayer();
+          if (sibling) {
+            sibling = sibling->GetNextSibling();
+          }
+          if (sibling) {
+            searchLayers.push(sibling->AsLayerComposite());
+          }
+          CompositableHost *ch = searchLayer->GetCompositableHost();
+          if (ch) {
+            int32_t compositableInputFrameID = ch->GetLastInputFrameID();
+            if (compositableInputFrameID != -1) {
+              inputFrameID = compositableInputFrameID;
+            }
+          }
         }
       }
 
@@ -343,7 +360,8 @@ ContainerRenderVR(ContainerT* aContainer,
 static bool
 NeedToDrawCheckerboardingForLayer(Layer* aLayer, Color* aOutCheckerboardingColor)
 {
-  return (aLayer->GetContentFlags() & Layer::CONTENT_OPAQUE) &&
+  return (aLayer->Manager()->AsyncPanZoomEnabled() &&
+         aLayer->GetContentFlags() & Layer::CONTENT_OPAQUE) &&
          aLayer->IsOpaqueForVisibility() &&
          LayerHasCheckerboardingAPZC(aLayer, aOutCheckerboardingColor);
 }
@@ -455,13 +473,29 @@ ContainerPrepare(ContainerT* aContainer,
   }
 }
 
+template <typename RectPainter> void
+DrawRegion(CSSIntRegion* aRegion,
+           gfx::Color aColor,
+           const RectPainter& aRectPainter)
+{
+  MOZ_ASSERT(aRegion);
+
+  // Iterate through and draw the rects in the region using the provided lambda.
+  for (CSSIntRegion::RectIterator iterator = aRegion->RectIter();
+       !iterator.Done();
+       iterator.Next())
+  {
+    aRectPainter(iterator.Get(), aColor);
+  }
+}
+
 template<class ContainerT> void
 RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
                    const RenderTargetIntRect& aClipRect, Layer* aLayer)
 {
   Compositor* compositor = aManager->GetCompositor();
 
-  if (aLayer->GetFrameMetricsCount() < 1) {
+  if (aLayer->GetScrollMetadataCount() < 1) {
     return;
   }
 
@@ -470,10 +504,7 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
     return;
   }
 
-  AsyncTransform asyncTransformWithoutOverscroll;
-  ParentLayerPoint scrollOffset;
-  controller->SampleContentTransformForFrame(&asyncTransformWithoutOverscroll,
-                                           scrollOffset);
+  ParentLayerPoint scrollOffset = controller->GetCurrentAsyncScrollOffset(AsyncPanZoomController::RESPECT_FORCE_DISABLE);
 
   // Options
   const int verticalPadding = 10;
@@ -482,9 +513,11 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
   gfx::Color tileActiveColor(1, 1, 1, 0.4f);
   gfx::Color tileBorderColor(0, 0, 0, 0.1f);
   gfx::Color pageBorderColor(0, 0, 0);
+  gfx::Color criticalDisplayPortColor(1.f, 1.f, 0);
   gfx::Color displayPortColor(0, 1.f, 0);
   gfx::Color viewPortColor(0, 0, 1.f, 0.3f);
-  gfx::Color visibilityColor(1.f, 0, 0);
+  gfx::Color approxVisibilityColor(1.f, 0, 0);
+  gfx::Color inDisplayPortVisibilityColor(1.f, 1.f, 0);
 
   // Rects
   const FrameMetrics& fm = aLayer->GetFrameMetrics(0);
@@ -492,6 +525,10 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
   LayerRect scrollRect = fm.GetScrollableRect() * fm.LayersPixelsPerCSSPixel();
   LayerRect viewRect = ParentLayerRect(scrollOffset, compositionBounds.Size()) / LayerToParentLayerScale(1);
   LayerRect dp = (fm.GetDisplayPort() + fm.GetScrollOffset()) * fm.LayersPixelsPerCSSPixel();
+  Maybe<LayerRect> cdp;
+  if (!fm.GetCriticalDisplayPort().IsEmpty()) {
+    cdp = Some((fm.GetCriticalDisplayPort() + fm.GetScrollOffset()) * fm.LayersPixelsPerCSSPixel());
+  }
 
   // Don't render trivial minimap. They can show up from textboxes and other tiny frames.
   if (viewRect.width < 64 && viewRect.height < 64) {
@@ -503,41 +540,32 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
   float scaleFactor;
   float scaleFactorX;
   float scaleFactorY;
-  scaleFactorX = 100.f / scrollRect.width;
-  scaleFactorY = ((viewRect.height) - 2 * verticalPadding) / scrollRect.height;
+  Rect dest = Rect(aClipRect.ToUnknownRect());
+  if (aLayer->GetEffectiveClipRect()) {
+    dest = Rect(aLayer->GetEffectiveClipRect().value().ToUnknownRect());
+  } else {
+    dest = aContainer->GetEffectiveTransform().Inverse().TransformBounds(dest);
+  }
+  dest = dest.Intersect(compositionBounds.ToUnknownRect());
+  scaleFactorX = std::min(100.f, dest.width - (2 * horizontalPadding)) / scrollRect.width;
+  scaleFactorY = (dest.height - (2 * verticalPadding)) / scrollRect.height;
   scaleFactor = std::min(scaleFactorX, scaleFactorY);
+  if (scaleFactor <= 0) {
+    return;
+  }
 
   Matrix4x4 transform = Matrix4x4::Scaling(scaleFactor, scaleFactor, 1);
-  transform.PostTranslate(horizontalPadding + compositionBounds.x, verticalPadding + compositionBounds.y, 0);
+  transform.PostTranslate(horizontalPadding + dest.x, verticalPadding + dest.y, 0);
 
-  Rect clipRect = aContainer->GetEffectiveTransform().TransformBounds(
-                    transform.TransformBounds(scrollRect.ToUnknownRect()));
+  Rect transformedScrollRect = transform.TransformBounds(scrollRect.ToUnknownRect());
+
+  Rect clipRect = aContainer->GetEffectiveTransform().TransformBounds(transformedScrollRect);
   clipRect.width++;
   clipRect.height++;
 
-  Rect r;
-  r = transform.TransformBounds(scrollRect.ToUnknownRect());
-  compositor->FillRect(r, backgroundColor, clipRect, aContainer->GetEffectiveTransform());
-
-  /* Disabled because on long pages SlowDrawRect becomes a bottleneck.
-  int tileW = gfxPrefs::LayersTileWidth();
-  int tileH = gfxPrefs::LayersTileHeight();
-
-  for (int x = scrollRect.x; x < scrollRect.XMost(); x += tileW) {
-    for (int y = scrollRect.y; y < scrollRect.YMost(); y += tileH) {
-      LayerRect tileRect = LayerRect(x - x % tileW, y - y % tileH, tileW, tileH);
-      r = transform.TransformBounds(tileRect.ToUnknownRect());
-      if (tileRect.Intersects(dp)) {
-        compositor->FillRect(r, tileActiveColor, clipRect, aContainer->GetEffectiveTransform());
-      }
-      compositor->SlowDrawRect(r, tileBorderColor, clipRect, aContainer->GetEffectiveTransform());
-    }
-  }
-  */
-
   // Render the scrollable area.
-  r = transform.TransformBounds(scrollRect.ToUnknownRect());
-  compositor->SlowDrawRect(r, pageBorderColor, clipRect, aContainer->GetEffectiveTransform());
+  compositor->FillRect(transformedScrollRect, backgroundColor, clipRect, aContainer->GetEffectiveTransform());
+  compositor->SlowDrawRect(transformedScrollRect, pageBorderColor, clipRect, aContainer->GetEffectiveTransform());
 
   // If enabled, render information about visibility.
   if (gfxPrefs::APZMinimapVisibilityEnabled()) {
@@ -548,30 +576,33 @@ RenderMinimap(ContainerT* aContainer, LayerManagerComposite* aManager,
 
     ScrollableLayerGuid guid = controller->GetGuid();
 
-    // Get the approximately visible region.
-    static CSSIntRegion emptyRegion;
-    CSSIntRegion* visibleRegion = aManager->GetApproximatelyVisibleRegion(guid);
-    if (!visibleRegion) {
-      visibleRegion = &emptyRegion;
-    }
-
-    // Iterate through and draw the rects in the region.
-    for (CSSIntRegion::RectIterator iterator = visibleRegion->RectIter();
-         !iterator.Done();
-         iterator.Next())
-    {
-      CSSIntRect rect = iterator.Get();
-      LayerRect scaledRect = rect * fm.LayersPixelsPerCSSPixel();
+    auto rectPainter = [&](const CSSIntRect& aRect, const gfx::Color& aColor) {
+      LayerRect scaledRect = aRect * fm.LayersPixelsPerCSSPixel();
       Rect r = transform.TransformBounds(scaledRect.ToUnknownRect());
-      compositor->FillRect(r, visibilityColor, clipRect, aContainer->GetEffectiveTransform());
-    }
+      compositor->FillRect(r, aColor, clipRect, aContainer->GetEffectiveTransform());
+    };
+
+    // Draw the approximately visible region.
+    CSSIntRegion* approxVisibleRegion =
+      aManager->GetVisibleRegion(VisibilityCounter::MAY_BECOME_VISIBLE, guid);
+    DrawRegion(approxVisibleRegion, approxVisibilityColor, rectPainter);
+
+    // Draw the in-displayport visible region.
+    CSSIntRegion* inDisplayPortVisibleRegion =
+      aManager->GetVisibleRegion(VisibilityCounter::IN_DISPLAYPORT, guid);
+    DrawRegion(inDisplayPortVisibleRegion, inDisplayPortVisibilityColor, rectPainter);
   }
 
   // Render the displayport.
-  r = transform.TransformBounds(dp.ToUnknownRect());
+  Rect r = transform.TransformBounds(dp.ToUnknownRect());
   compositor->FillRect(r, tileActiveColor, clipRect, aContainer->GetEffectiveTransform());
-  r = transform.TransformBounds(dp.ToUnknownRect());
   compositor->SlowDrawRect(r, displayPortColor, clipRect, aContainer->GetEffectiveTransform());
+
+  // Render the critical displayport if there is one
+  if (cdp) {
+    r = transform.TransformBounds(cdp->ToUnknownRect());
+    compositor->SlowDrawRect(r, criticalDisplayPortColor, clipRect, aContainer->GetEffectiveTransform());
+  }
 
   // Render the viewport.
   r = transform.TransformBounds(viewRect.ToUnknownRect());
@@ -647,7 +678,7 @@ RenderLayers(ContainerT* aContainer,
     // frames higher up, so loop from the top down, and accumulate an async
     // transform as we go along.
     Matrix4x4 asyncTransform;
-    for (uint32_t i = layer->GetFrameMetricsCount(); i > 0; --i) {
+    for (uint32_t i = layer->GetScrollMetadataCount(); i > 0; --i) {
       if (layer->GetFrameMetrics(i - 1).IsScrollable()) {
         // Since the composition bounds are in the parent layer's coordinates,
         // use the parent's effective transform rather than the layer's own.
@@ -657,8 +688,9 @@ RenderLayers(ContainerT* aContainer,
                                                    gfx::Rect(aClipRect.ToUnknownRect()),
                                                    asyncTransform * aContainer->GetEffectiveTransform());
         if (AsyncPanZoomController* apzc = layer->GetAsyncPanZoomController(i - 1)) {
-          asyncTransform = apzc->GetCurrentAsyncTransformWithOverscroll().ToUnknownMatrix()
-                         * asyncTransform;
+          asyncTransform =
+              apzc->GetCurrentAsyncTransformWithOverscroll(AsyncPanZoomController::RESPECT_FORCE_DISABLE).ToUnknownMatrix()
+            * asyncTransform;
         }
       }
     }
@@ -750,7 +782,7 @@ ContainerRender(ContainerT* aContainer,
 
   RefPtr<gfx::VRHMDInfo> hmdInfo = gfx::VRManager::Get()->GetDevice(aContainer->GetVRDeviceID());
   if (hmdInfo && hmdInfo->GetConfiguration().IsValid()) {
-    ContainerRenderVR(aContainer, aManager, aClipRect, hmdInfo, aContainer->GetInputFrameID());
+    ContainerRenderVR(aContainer, aManager, aClipRect, hmdInfo);
     aContainer->mPrepared = nullptr;
     return;
   }
@@ -807,7 +839,7 @@ ContainerRender(ContainerT* aContainer,
     for (LayerMetricsWrapper i(aContainer); i; i = i.GetFirstChild()) {
       if (AsyncPanZoomController* apzc = i.GetApzc()) {
         if (!apzc->GetAsyncTransformAppliedToContent()
-            && !AsyncTransformComponentMatrix(apzc->GetCurrentAsyncTransform()).IsIdentity()) {
+            && !AsyncTransformComponentMatrix(apzc->GetCurrentAsyncTransform(AsyncPanZoomController::NORMAL)).IsIdentity()) {
           aManager->UnusedApzTransformWarning();
           break;
         }

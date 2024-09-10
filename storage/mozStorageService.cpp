@@ -680,7 +680,7 @@ Service::OpenSpecialDatabase(const char *aStorageKey,
 
 namespace {
 
-class AsyncInitDatabase final : public nsRunnable
+class AsyncInitDatabase final : public Runnable
 {
 public:
   AsyncInitDatabase(Connection* aConnection,
@@ -707,7 +707,7 @@ public:
           &Connection::AsyncClose,
           nullptr);
       MOZ_ASSERT(closeRunnable);
-      MOZ_ALWAYS_TRUE(NS_SUCCEEDED(NS_DispatchToMainThread(closeRunnable)));
+      MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(closeRunnable));
 
       return DispatchResult(rv, nullptr);
     }

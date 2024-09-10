@@ -9,6 +9,7 @@
 #include "PluginHangUIParent.h"
 
 #include "mozilla/Telemetry.h"
+#include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/plugins/PluginModuleParent.h"
 
 #include "nsContentUtils.h"
@@ -32,7 +33,7 @@ using std::string;
 using std::vector;
 
 namespace {
-class nsPluginHangUITelemetry : public nsRunnable
+class nsPluginHangUITelemetry : public mozilla::Runnable
 {
 public:
   nsPluginHangUITelemetry(int aResponseCode, int aDontAskCode,
@@ -354,6 +355,7 @@ PluginHangUIParent::RecvUserResponse(const unsigned int& aResponse)
   if (aResponse & HANGUI_USER_RESPONSE_STOP) {
     // User clicked Stop
     mModule->TerminateChildProcess(mMainThreadMessageLoop,
+                                   mozilla::ipc::kInvalidProcessId,
                                    NS_LITERAL_CSTRING("ModalHangUI"),
                                    EmptyString());
     responseCode = 1;

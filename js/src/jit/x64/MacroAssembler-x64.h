@@ -882,7 +882,7 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
     void loadUnboxedValue(const T& src, MIRType type, AnyRegister dest) {
         if (dest.isFloat())
             loadInt32OrDouble(src, dest.fpu());
-        else if (type == MIRType_Int32 || type == MIRType_Boolean)
+        else if (type == MIRType::Int32 || type == MIRType::Boolean)
             movl(Operand(src), dest.gpr());
         else
             unboxNonDouble(Operand(src), dest.gpr());
@@ -941,11 +941,6 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
         MOZ_ASSERT(nextInsn <= globalData);
         uint8_t* target = globalData + globalDataOffset;
         ((int32_t*)nextInsn)[-1] = target - nextInsn;
-    }
-    void memIntToValue(Address Source, Address Dest) {
-        ScratchRegisterScope scratch(asMasm());
-        load32(Source, scratch);
-        storeValue(JSVAL_TYPE_INT32, scratch, Dest);
     }
 
     // Instrumentation for entering and leaving the profiler.

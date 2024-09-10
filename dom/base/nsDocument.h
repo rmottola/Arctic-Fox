@@ -735,7 +735,7 @@ public:
    */
   virtual void SetContentType(const nsAString& aContentType) override;
 
-  virtual nsresult SetBaseURI(nsIURI* aURI) override;
+  virtual void SetBaseURI(nsIURI* aURI) override;
 
   /**
    * Get/Set the base target of a link in a document.
@@ -786,6 +786,7 @@ public:
 
   virtual already_AddRefed<mozilla::dom::UndoManager> GetUndoManager() override;
 
+  static bool IsElementAnimateEnabled(JSContext* aCx, JSObject* aObject);
   static bool IsWebAnimationsEnabled(JSContext* aCx, JSObject* aObject);
   virtual mozilla::dom::DocumentTimeline* Timeline() override;
   virtual void GetAnimations(

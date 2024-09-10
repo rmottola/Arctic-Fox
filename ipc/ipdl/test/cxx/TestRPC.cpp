@@ -14,6 +14,8 @@ namespace _ipdltest {
 // parent
 
 TestRPCParent::TestRPCParent()
+ : reentered_(false),
+   resolved_first_cpow_(false)
 {
   MOZ_COUNT_CTOR(TestRPCParent);
 }
@@ -59,46 +61,25 @@ TestRPCParent::RecvTest1_InnerEvent(uint32_t* aResult)
 bool
 TestRPCParent::RecvTest2_Start()
 {
-  if (!SendTest2_Msg1())
-    fail("SendTest2_Msg1");
+  // Send a CPOW. During this time, we must NOT process the RPC message, as
+  // we could start receiving CPOW replies out-of-order.
+  if (!SendTest2_FirstUrgent())
+    fail("SendTest2_FirstUrgent");
 
+  MOZ_ASSERT(!reentered_);
+  resolved_first_cpow_ = true;
   return true;
 }
 
 bool
-TestRPCParent::RecvTest2_Msg2()
+TestRPCParent::RecvTest2_OutOfOrder()
 {
-  if (!SendTest2_Msg3())
-    fail("SendTest2_Msg3");
+  // Send a CPOW. If this RPC call was initiated while waiting for the first
+  // CPOW to resolve, replies will be processed out of order, and we'll crash.
+  if (!SendTest2_SecondUrgent())
+    fail("SendTest2_SecondUrgent");
 
-  return true;
-}
-
-bool
-TestRPCParent::RecvTest2_FirstUrgent()
-{
-  return true;
-}
-
-bool
-TestRPCParent::RecvTest2_SecondUrgent()
-{
-  return true;
-}
-
-bool
-TestRPCParent::RecvTest3_Start(uint32_t* aResult)
-{
-  if (!SendTest3_WakeUp(aResult))
-    fail("SendTest3_WakeUp");
-
-  return true;
-}
-
-bool
-TestRPCParent::RecvTest3_InnerEvent(uint32_t* aResult)
-{
-  *aResult = 200;
+  reentered_ = true;
   return true;
 }
 
@@ -107,8 +88,6 @@ TestRPCParent::RecvTest3_InnerEvent(uint32_t* aResult)
 
 
 TestRPCChild::TestRPCChild()
- : reentered_(false),
-   resolved_first_cpow_(false)
 {
     MOZ_COUNT_CTOR(TestRPCChild);
 }
@@ -130,14 +109,8 @@ TestRPCChild::RecvStart()
   if (!SendTest2_Start())
     fail("SendTest2_Start");
 
-  if (!SendTest2_Msg2())
-    fail("SendTest2_Msg2");
-
-  result = 0;
-  if (!SendTest3_Start(&result))
-    fail("SendTest3_Start");
-  if (result != 200)
-    fail("Wrong result (expected 200)");
+  if (!SendTest2_OutOfOrder())
+    fail("SendTest2_OutOfOrder");
 
   Close();
   return true;
@@ -163,38 +136,15 @@ TestRPCChild::RecvTest1_NoReenter(uint32_t* aResult)
   return true;
 }
 
-bool TestRPCChild::RecvTest2_Msg1()
+bool
+TestRPCChild::RecvTest2_FirstUrgent()
 {
-  MOZ_ASSERT(resolved_first_cpow_);
-
-  // Send a CPOW. If this RPC call was initiated while waiting for the first
-  // CPOW to resolve, replies will be processed out of order, and we'll crash.
-  if (!SendTest2_SecondUrgent())
-    fail("SendTest2_SecondUrgent");
-
-  reentered_ = true;
   return true;
 }
 
 bool
-TestRPCChild::RecvTest2_Msg3()
+TestRPCChild::RecvTest2_SecondUrgent()
 {
-  // Send a CPOW. During this time, we must NOT process the RPC message, as
-  // we could start receiving CPOW replies out-of-order.
-  if (!SendTest2_FirstUrgent())
-    fail("SendTest2_FirstUrgent");
-
-  MOZ_ASSERT(!reentered_);
-  resolved_first_cpow_ = true;
-  return true;
-}
-
-bool
-TestRPCChild::RecvTest3_WakeUp(uint32_t* aResult)
-{
-  if (!SendTest3_InnerEvent(aResult))
-    fail("SendTest3_InnerEvent");
-
   return true;
 }
 

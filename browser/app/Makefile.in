@@ -7,20 +7,10 @@ dist_dest   = $(DIST)/$(MOZ_MACBUNDLE_NAME)
 # hardcode en-US for the moment
 AB_CD = en-US
 
-DEFINES += \
-  -DAB_CD=$(AB_CD) \
-  -DAPP_VERSION="$(MOZ_APP_VERSION)" \
-  -DFIREFOX_ICO=\"$(DIST)/branding/firefox.ico\" \
-  -DDOCUMENT_ICO=\"$(DIST)/branding/document.ico\" \
-  -DNEWWINDOW_ICO=\"$(DIST)/branding/newwindow.ico\" \
-  -DNEWTAB_ICO=\"$(DIST)/branding/newtab.ico\" \
-  -DPBMODE_ICO=\"$(DIST)/branding/pbmode.ico\" \
-  $(NULL)
-
 # Build a binary bootstrapping with XRE_main
 
 ifndef MOZ_WINCONSOLE
-ifdef MOZ_DEBUG
+ifneq (,$(MOZ_DEBUG)$(MOZ_ASAN))
 MOZ_WINCONSOLE = 1
 else
 MOZ_WINCONSOLE = 0

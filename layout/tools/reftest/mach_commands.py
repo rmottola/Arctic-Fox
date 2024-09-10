@@ -230,7 +230,7 @@ class ReftestRunner(MozbuildObject):
             kwargs["tests"] = [os.path.join(*default_manifest[kwargs["suite"]])]
 
         kwargs["extraProfileFiles"].append(
-            os.path.join(self.topobjdir, "dist", "bin", "res", "fonts"))
+            os.path.join(self.topsrcdir, "mobile", "android", "fonts"))
 
         if not kwargs["httpdPath"]:
             kwargs["httpdPath"] = os.path.join(self.tests_dir, "modules")
@@ -243,6 +243,9 @@ class ReftestRunner(MozbuildObject):
         kwargs["dm_trans"] = "adb"
         kwargs["ignoreWindowSize"] = True
         kwargs["printDeviceInfo"] = False
+
+        from mozrunner.devices.android_device import grant_runtime_permissions
+        grant_runtime_permissions(self, kwargs['app'])
 
         # A symlink and some path manipulations are required so that test
         # manifests can be found both locally and remotely (via a url)

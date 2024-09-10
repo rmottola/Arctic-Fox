@@ -85,11 +85,11 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "CacheStorage",
 // IMPORTANT: Do not change this list without review from a DOM peer!
+    "CustomEvent",
+// IMPORTANT: Do not change this list without review from a DOM peer!
     "DedicatedWorkerGlobalScope",
 // IMPORTANT: Do not change this list without review from a DOM peer!
-    { name: "DataStore", b2g: true },
-// IMPORTANT: Do not change this list without review from a DOM peer!
-    { name: "DataStoreCursor", b2g: true },
+    "Directory",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "DOMCursor",
 // IMPORTANT: Do not change this list without review from a DOM peer!

@@ -105,6 +105,10 @@
 
 /* Sidebar & recording items */
 
+#recordings-list {
+  border-inline-end: 1px solid var(--theme-splitter-color);
+}
+
 .recording-item {
   padding: 4px;
 }
@@ -137,7 +141,7 @@
 
 .notice-container {
   font-size: 120%;
-  background-color: var(--theme-toolbar-background);
+  background-color: var(--theme-body-background);
   color: var(--theme-body-color);
   padding-bottom: 20vh;
 }

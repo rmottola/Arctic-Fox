@@ -10,6 +10,8 @@
 #define gc_Policy_h
 
 #include "mozilla/TypeTraits.h"
+#include "gc/Barrier.h"
+#include "gc/Marking.h"
 #include "js/GCPolicyAPI.h"
 
 // Forward declare the types we're defining policies for. This file is
@@ -17,6 +19,7 @@
 // will be available when we do template expansion, allowing for use of
 // static members in the underlying types. We cannot, however, use
 // static_assert to verify relations between types.
+class JSLinearString;
 namespace js {
 class AccessorShape;
 class ArgumentsObject;
@@ -131,33 +134,38 @@ struct InternalGCPointerPolicy {
         TraceManuallyBarrieredEdge(trc, vp, name);
     }
 };
+
+} // namespace js
+
+namespace JS {
+
 #define DEFINE_INTERNAL_GC_POLICY(type) \
-    template <> struct GCPolicy<type> : public InternalGCPointerPolicy<type> {};
+    template <> struct GCPolicy<type> : public js::InternalGCPointerPolicy<type> {};
 FOR_EACH_INTERNAL_GC_POINTER_TYPE(DEFINE_INTERNAL_GC_POLICY)
 #undef DEFINE_INTERNAL_GC_POLICY
 
 template <typename T>
-struct GCPolicy<RelocatablePtr<T>>
+struct GCPolicy<js::RelocatablePtr<T>>
 {
-    static void trace(JSTracer* trc, RelocatablePtr<T>* thingp, const char* name) {
-        TraceEdge(trc, thingp, name);
+    static void trace(JSTracer* trc, js::RelocatablePtr<T>* thingp, const char* name) {
+        js::TraceEdge(trc, thingp, name);
     }
-    static bool needsSweep(RelocatablePtr<T>* thingp) {
-        return gc::IsAboutToBeFinalized(thingp);
+    static bool needsSweep(js::RelocatablePtr<T>* thingp) {
+        return js::gc::IsAboutToBeFinalized(thingp);
     }
 };
 
 template <typename T>
-struct GCPolicy<ReadBarriered<T>>
+struct GCPolicy<js::ReadBarriered<T>>
 {
-    static void trace(JSTracer* trc, ReadBarriered<T>* thingp, const char* name) {
-        TraceEdge(trc, thingp, name);
+    static void trace(JSTracer* trc, js::ReadBarriered<T>* thingp, const char* name) {
+        js::TraceEdge(trc, thingp, name);
     }
-    static bool needsSweep(ReadBarriered<T>* thingp) {
-        return gc::IsAboutToBeFinalized(thingp);
+    static bool needsSweep(js::ReadBarriered<T>* thingp) {
+        return js::gc::IsAboutToBeFinalized(thingp);
     }
 };
 
-} // namespace js
+} // namespace JS
 
 #endif // gc_Policy_h

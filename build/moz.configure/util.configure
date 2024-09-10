@@ -4,84 +4,44 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-@template
-@advanced
-def warn(*args):
-    'Print a warning.'
-    import sys
-    print(*args, file=sys.stderr)
-    sys.stderr.flush()
-
-
-@template
-@advanced
-def error(*args):
+@imports('sys')
+def die(*args):
     'Print an error and terminate configure.'
-    import sys
-    print(*args, file=sys.stderr)
-    sys.stderr.flush()
+    log.error(*args)
     sys.exit(1)
 
 
-@template
-@advanced
+@imports(_from='mozbuild.configure', _import='ConfigureError')
 def configure_error(message):
     '''Raise a programming error and terminate configure.
     Primarily for use in moz.configure templates to sanity check
     their inputs from moz.configure usage.'''
-    from mozbuild.configure import ConfigureError
     raise ConfigureError(message)
 
 
-@template
-@advanced
+@imports('os')
 def is_absolute_or_relative(path):
-    import os
     if os.altsep and os.altsep in path:
         return True
     return os.sep in path
 
 
-@template
-@advanced
+@imports(_import='mozpack.path', _as='mozpath')
 def normsep(path):
-    import mozpack.path as mozpath
     return mozpath.normsep(path)
 
 
-@template
-@advanced
+@imports(_from='which', _import='which')
+@imports(_from='which', _import='WhichError')
 def find_program(file):
     if is_absolute_or_relative(file):
         return os.path.abspath(file) if os.path.isfile(file) else None
-    from which import which, WhichError
     try:
         return normsep(which(file))
     except WhichError:
         return None
 
 
-@depends('--help')
-def _defines(help):
-    ret = {}
-    set_config('DEFINES', ret)
-    return ret
-
-
-@template
-def set_define(name, value):
-    @depends(_defines)
-    @advanced
-    def _add_define(defines):
-        from mozbuild.configure import ConfigureError
-        if name in defines:
-            raise ConfigureError("'%s' is already defined" % name)
-        defines[name] = value
-
-del _defines
-
-
-@template
 def unique_list(l):
     result = []
     for i in l:
@@ -89,11 +49,9 @@ def unique_list(l):
             result.append(i)
     return result
 
-@template
-@advanced
+@imports(_from='mozbuild.configure.util', _import='Version', _as='_Version')
 def Version(v):
     'A version number that can be compared usefully.'
-    from mozbuild.configure.util import Version as _Version
     return _Version(v)
 
 # Denotes a deprecated option. Combines option() and @depends:
@@ -121,8 +79,39 @@ def deprecated_option(*args, **kwargs):
 
 
 # from mozbuild.util import ReadOnlyNamespace as namespace
-@template
-@advanced
+@imports(_from='mozbuild.util', _import='ReadOnlyNamespace')
 def namespace(**kwargs):
-    from mozbuild.util import ReadOnlyNamespace
     return ReadOnlyNamespace(**kwargs)
+
+
+# Some @depends function return namespaces, and one could want to use one
+# specific attribute from such a namespace as a "value" given to functions
+# such as `set_config`. But those functions do not take immediate values.
+# The `delayed_getattr` function allows access to attributes from the result
+# of a @depends function in a non-immediate manner.
+#   @depends('--option')
+#   def option(value)
+#       return namespace(foo=value)
+#   set_config('FOO', delayed_getattr(option, 'foo')
+@template
+def delayed_getattr(func, key):
+    @depends(func)
+    def result(value):
+        # The @depends function we're being passed may have returned
+        # None, or an object that simply doesn't have the wanted key.
+        # In that case, just return None.
+        return getattr(value, key, None)
+    return result
+
+
+# Like @depends, but the decorated function is only called if one of the
+# arguments it would be called with has a positive value (bool(value) is True)
+@template
+def depends_if(*args):
+    def decorator(func):
+        @depends(*args)
+        def wrapper(*args):
+            if any(arg for arg in args):
+                return func(*args)
+        return wrapper
+    return decorator
