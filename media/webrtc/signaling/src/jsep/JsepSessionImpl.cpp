@@ -2444,4 +2444,5 @@ JsepSessionImpl::AllLocalTracksAreAssigned() const
 
   return true;
 }
+
 } // namespace mozilla
