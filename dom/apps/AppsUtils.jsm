@@ -220,7 +220,7 @@ this.AppsUtils = {
         deferred.resolve(file);
       }
     });
-    aRequestChannel.asyncOpen(listener, null);
+    aRequestChannel.asyncOpen2(listener);
 
     return deferred.promise;
   },
