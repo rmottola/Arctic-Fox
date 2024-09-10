@@ -742,19 +742,24 @@
         "url": "/html/semantics/forms/attributes-common-to-form-controls/dirname-rtl-manual.html"
       },
       {
-        "url": "/WebIDL/readme.txt"
+        "path": "html/semantics/forms/constraints/tooLong-input-email-delete-manual.html",
+        "url": "/html/semantics/forms/constraints/tooLong-input-email-delete-manual.html"
       },
       {
-        "url": "/WebIDL/testable_assertions.txt"
+        "path": "html/semantics/forms/constraints/tooLong-input-password-delete-manual.html",
+        "url": "/html/semantics/forms/constraints/tooLong-input-password-delete-manual.html"
       },
       {
-        "url": "/WebIDL/valid/idl/allowany.widl"
+        "path": "html/semantics/forms/constraints/tooLong-input-search-delete-manual.html",
+        "url": "/html/semantics/forms/constraints/tooLong-input-search-delete-manual.html"
       },
       {
-        "url": "/WebIDL/valid/idl/array.widl"
+        "path": "html/semantics/forms/constraints/tooLong-input-tel-delete-manual.html",
+        "url": "/html/semantics/forms/constraints/tooLong-input-tel-delete-manual.html"
       },
       {
-        "url": "/WebIDL/valid/idl/attributes.widl"
+        "path": "html/semantics/forms/constraints/tooLong-input-text-delete-manual.html",
+        "url": "/html/semantics/forms/constraints/tooLong-input-text-delete-manual.html"
       },
       {
         "url": "/WebIDL/valid/idl/callback.widl"
@@ -23347,20 +23352,24 @@
         "url": "/service-workers/service-worker/update-after-oneday.https.html"
       },
       {
-        "path": "service-workers/service-worker/update.https.html",
-        "url": "/service-workers/service-worker/update.https.html"
+        "path": "websockets/constructor/013.html",
+        "timeout": "long",
+        "url": "/websockets/constructor/013.html"
       },
       {
-        "path": "service-workers/service-worker/waiting.https.html",
-        "url": "/service-workers/service-worker/waiting.https.html"
+        "path": "websockets/constructor/014.html",
+        "timeout": "long",
+        "url": "/websockets/constructor/014.html"
       },
       {
-        "path": "service-workers/service-worker/websocket.https.html",
-        "url": "/service-workers/service-worker/websocket.https.html"
+        "path": "websockets/cookies/005.html",
+        "timeout": "long",
+        "url": "/websockets/cookies/005.html"
       },
       {
-        "path": "service-workers/service-worker/worker-interception.https.html",
-        "url": "/service-workers/service-worker/worker-interception.https.html"
+        "path": "websockets/cookies/007.html",
+        "timeout": "long",
+        "url": "/websockets/cookies/007.html"
       },
       {
         "path": "websockets/extended-payload-length.html",
