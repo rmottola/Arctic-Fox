@@ -1125,11 +1125,8 @@ void
 SdpSctpmapAttributeList::Serialize(std::ostream& os) const
 {
   for (auto i = mSctpmaps.begin(); i != mSctpmaps.end(); ++i) {
-    os << "a=" << mType << ":" << i->pt << " " << i->name;
-    if (i->streams) {
-      os << " " << i->streams;
-    }
-    os << CRLF;
+    os << "a=" << mType << ":" << i->pt << " " << i->name << " " << i->streams
+      << CRLF;
   }
 }
 
