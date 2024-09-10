@@ -12,6 +12,7 @@
 #include "ssl.h"
 
 #include "mozilla/RefPtr.h"
+#include "mozilla/Tuple.h"
 
 #define GTEST_HAS_RTTI 0
 #include "gtest/gtest.h"
@@ -620,10 +621,9 @@ protected:
           session.AddLocalIceCandidate(kAEqualsCandidate + candidate.str(),
                                        level, &mid, &skipped);
           if (!skipped) {
-            // TODO (bug 1095793): Need to add mid to mCandidatesToTrickle
             mCandidatesToTrickle.push_back(
-                std::pair<uint16_t, std::string>(
-                  level, kAEqualsCandidate + candidate.str()));
+                Tuple<Level, Mid, Candidate>(
+                  level, mid, kAEqualsCandidate + candidate.str()));
             candidates.push_back(candidate.str());
           }
         }
@@ -665,10 +665,12 @@ protected:
 
       void Trickle(JsepSession& session)
       {
-        for (const auto& levelAndCandidate : mCandidatesToTrickle) {
-          session.AddRemoteIceCandidate(levelAndCandidate.second,
-                                        "",
-                                        levelAndCandidate.first);
+        for (const auto& levelMidAndCandidate : mCandidatesToTrickle) {
+          Level level;
+          Mid mid;
+          Candidate candidate;
+          Tie(level, mid, candidate) = levelMidAndCandidate;
+          session.AddRemoteIceCandidate(candidate, mid, level);
         }
         mCandidatesToTrickle.clear();
       }
@@ -779,6 +781,7 @@ protected:
 
     private:
       typedef size_t Level;
+      typedef std::string Mid;
       typedef std::string Candidate;
       typedef std::string Address;
       typedef uint16_t Port;
@@ -790,8 +793,8 @@ protected:
       std::map<Level,
                std::map<ComponentType,
                         std::vector<Candidate>>> mCandidates;
-      // Level/candidate pairs that need to be trickled
-      std::vector<std::pair<Level, Candidate>> mCandidatesToTrickle;
+      // Level/mid/candidate tuples that need to be trickled
+      std::vector<Tuple<Level, Mid, Candidate>> mCandidatesToTrickle;
   };
 
   // For streaming parse errors
