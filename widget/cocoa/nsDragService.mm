@@ -492,6 +492,7 @@ nsDragService::GetData(nsITransferable* aTransferable, uint32_t aItemIndex)
       break;
     }
     else if (flavorStr.EqualsLiteral(kCustomTypesMime)) {
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
       NSString* availableType = [item availableTypeFromArray:[NSArray arrayWithObject:kCustomTypesPboardType]];
       if (!availableType || !IsValidType(availableType, false)) {
           continue;
@@ -514,6 +515,7 @@ nsDragService::GetData(nsITransferable* aTransferable, uint32_t aItemIndex)
 
       aTransferable->SetTransferData(flavorStr, genericDataWrapper, sizeof(nsIInputStream*));
       free(clipboardDataPtr);
+#endif
       break;
     }
 
