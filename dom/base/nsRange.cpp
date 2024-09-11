@@ -2533,6 +2533,12 @@ nsRange::InsertNode(nsINode& aNode, ErrorResult& aRv)
       return;
     }
 
+    referenceParentNode->EnsurePreInsertionValidity(aNode, tStartContainer,
+                                                    aRv);
+    if (aRv.Failed()) {
+      return;
+    }
+
     nsCOMPtr<nsIDOMText> secondPart;
     aRv = startTextNode->SplitText(tStartOffset, getter_AddRefs(secondPart));
     if (aRv.Failed()) {
@@ -2550,6 +2556,11 @@ nsRange::InsertNode(nsINode& aNode, ErrorResult& aRv)
     nsCOMPtr<nsIDOMNode> q;
     aRv = tChildList->Item(tStartOffset, getter_AddRefs(q));
     referenceNode = do_QueryInterface(q);
+    if (aRv.Failed()) {
+      return;
+    }
+
+    tStartContainer->EnsurePreInsertionValidity(aNode, referenceNode, aRv);
     if (aRv.Failed()) {
       return;
     }
