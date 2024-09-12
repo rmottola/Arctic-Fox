@@ -238,6 +238,9 @@ public:
     return NS_OK;
   }
 
+protected:
+  ~ReadAirplaneModeSettingTask() {}
+
 private:
   RefPtr<FMRadioReplyRunnable> mPendingRequest;
 };
