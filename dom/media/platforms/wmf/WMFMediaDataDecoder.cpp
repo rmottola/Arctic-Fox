@@ -220,7 +220,7 @@ WMFMediaDataDecoder::Drain()
   MOZ_DIAGNOSTIC_ASSERT(!mIsShutDown);
 
   nsCOMPtr<nsIRunnable> runnable =
-  NS_NewRunnableMethod(this, &WMFMediaDataDecoder::ProcessDrain);
+    NS_NewRunnableMethod(this, &WMFMediaDataDecoder::ProcessDrain);
   mTaskQueue->Dispatch(runnable.forget());
   return NS_OK;
 }
