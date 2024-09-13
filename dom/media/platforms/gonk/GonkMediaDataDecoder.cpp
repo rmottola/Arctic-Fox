@@ -92,16 +92,15 @@ GonkDecoderManager::ProcessQueuedSamples()
   status_t rv;
   while (mQueuedSamples.Length()) {
     RefPtr<MediaRawData> data = mQueuedSamples.ElementAt(0);
-    {
-      rv = mDecoder->Input(reinterpret_cast<const uint8_t*>(data->Data()),
-                           data->Size(),
-                           data->mTime,
-                           0,
-                           INPUT_TIMEOUT_US);
-    }
+    rv = mDecoder->Input(reinterpret_cast<const uint8_t*>(data->Data()),
+                         data->Size(),
+                         data->mTime,
+                         0,
+                         INPUT_TIMEOUT_US);
     if (rv == OK) {
       mQueuedSamples.RemoveElementAt(0);
-      mWaitOutput.AppendElement(data->mOffset);
+      mWaitOutput.AppendElement(WaitOutputInfo(data->mOffset, data->mTime,
+                                               /* eos */ data->Data() == nullptr));
     } else if (rv == -EAGAIN || rv == -ETIMEDOUT) {
       // In most cases, EAGAIN or ETIMEOUT are safe because OMX can't fill
       // buffer on time.
@@ -289,25 +288,22 @@ GonkDecoderManager::ProcessToDo(bool aEndOfStream)
     return;
   }
 
-  nsresult rv = NS_OK;
   while (mWaitOutput.Length() > 0) {
     RefPtr<MediaData> output;
-    int64_t offset = mWaitOutput.ElementAt(0);
-    rv = Output(offset, output);
+    WaitOutputInfo wait = mWaitOutput.ElementAt(0);
+    nsresult rv = Output(wait.mOffset, output);
     if (rv == NS_OK) {
-      mWaitOutput.RemoveElementAt(0);
       mDecodeCallback->Output(output);
+      UpdateWaitingList(output->mTime);
     } else if (rv == NS_ERROR_ABORT) {
       // EOS
       MOZ_ASSERT(mQueuedSamples.IsEmpty());
-      mWaitOutput.RemoveElementAt(0);
-      // Sometimes the decoder attaches EOS flag to the final output buffer
-      // instead of emits EOS by itself, hence the 2nd condition.
-      MOZ_ASSERT(mWaitOutput.IsEmpty() ||
-                 (mWaitOutput.Length() == 1 && output.get()));
       if (output) {
         mDecodeCallback->Output(output);
+        UpdateWaitingList(output->mTime);
       }
+      MOZ_ASSERT(mWaitOutput.Length() == 1);
+      mWaitOutput.RemoveElementAt(0);
       mDecodeCallback->DrainComplete();
       return;
     } else if (rv == NS_ERROR_NOT_AVAILABLE) {
