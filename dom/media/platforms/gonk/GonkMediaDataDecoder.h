@@ -195,7 +195,6 @@ public:
   }
 
 private:
-  RefPtr<FlushableTaskQueue> mTaskQueue;
 
   android::sp<GonkDecoderManager> mManager;
 };
