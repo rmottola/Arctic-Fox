@@ -266,8 +266,7 @@ void MediaOmxReader::HandleResourceAllocated()
 
   if (mLastParserDuration >= 0) {
     // Prefer the parser duration if we have it.
-    ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-    mDecoder->SetMediaDuration(mLastParserDuration);
+    mInfo.mMetadataDuration = Some(TimeUnit::FromMicroseconds(mLastParserDuration));
   } else {
     // MP3 parser failed to find a duration.
     // Set the total duration (the max of the audio and video track).

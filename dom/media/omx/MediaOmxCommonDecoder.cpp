@@ -107,7 +107,6 @@ MediaOmxCommonDecoder::FirstFrameLoaded(nsAutoPtr<MediaInfo> aInfo,
     DisableStateMachineAudioOffloading();
     return;
   }
-
   PauseStateMachine();
   if (mLogicallySeeking) {
     SeekTarget target = SeekTarget(mLogicalPosition,
