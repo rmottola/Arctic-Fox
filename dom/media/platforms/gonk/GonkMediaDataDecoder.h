@@ -75,7 +75,7 @@ protected:
   int32_t ProcessQueuedSamples();
 
   void ProcessInput(bool aEndOfStream);
-  void ProcessFlush();
+  virtual void ProcessFlush();
   void ProcessToDo(bool aEndOfStream);
 
   RefPtr<MediaByteBuffer> mCodecSpecificData;
