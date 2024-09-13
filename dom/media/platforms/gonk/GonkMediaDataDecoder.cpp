@@ -120,6 +120,11 @@ GonkDecoderManager::Flush()
     GMDD_LOG("Decoder is not initialized");
     return NS_ERROR_UNEXPECTED;
   }
+
+  if (!mInitPromise.IsEmpty()) {
+    return NS_OK;
+  }
+
   {
     MutexAutoLock lock(mMutex);
     mQueuedSamples.Clear();
@@ -141,7 +146,7 @@ nsresult
 GonkDecoderManager::Input(MediaRawData* aSample)
 {
   ReentrantMonitorAutoEnter mon(mMonitor);
-  nsRefPtr<MediaRawData> sample;
+  RefPtr<MediaRawData> sample;
 
   if (!aSample) {
     // It means EOS with empty sample.
@@ -157,7 +162,7 @@ GonkDecoderManager::Input(MediaRawData* aSample)
 
   status_t rv;
   while (mQueueSample.Length()) {
-    nsRefPtr<MediaRawData> data = mQueueSample.ElementAt(0);
+    RefPtr<MediaRawData> data = mQueueSample.ElementAt(0);
     {
       ReentrantMonitorAutoExit mon_exit(mMonitor);
       rv = SendSampleToOMX(data);
@@ -286,7 +291,7 @@ GonkDecoderManager::ProcessToDo(bool aEndOfStream)
 
   nsresult rv = NS_OK;
   while (mWaitOutput.Length() > 0) {
-    nsRefPtr<MediaData> output;
+    RefPtr<MediaData> output;
     int64_t offset = mWaitOutput.ElementAt(0);
     rv = Output(offset, output);
     if (rv == NS_OK) {
