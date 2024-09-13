@@ -27,12 +27,6 @@ using namespace android;
 
 namespace mozilla {
 
-GonkDecoderManager::GonkDecoderManager(MediaTaskQueue* aTaskQueue)
-  : mMonitor("GonkDecoderManager")
-  , mTaskQueue(aTaskQueue)
-{
-}
-
 bool
 GonkDecoderManager::InitLoopers(MediaData::Type aType)
 {
@@ -136,56 +130,6 @@ GonkDecoderManager::Flush()
   while (mIsFlushing) {
     lock.Wait();
   }
-  return NS_OK;
-}
-
-nsresult
-GonkDecoderManager::Input(MediaRawData* aSample)
-{
-  ReentrantMonitorAutoEnter mon(mMonitor);
-  RefPtr<MediaRawData> sample;
-
-  if (!aSample) {
-    // It means EOS with empty sample.
-    sample = new MediaRawData();
-  } else {
-    sample = aSample;
-    if (!PerformFormatSpecificProcess(sample)) {
-      return NS_ERROR_FAILURE;
-    }
-  }
-
-  mQueueSample.AppendElement(sample);
-
-  status_t rv;
-  while (mQueueSample.Length()) {
-    RefPtr<MediaRawData> data = mQueueSample.ElementAt(0);
-    {
-      ReentrantMonitorAutoExit mon_exit(mMonitor);
-      rv = SendSampleToOMX(data);
-    }
-    if (rv == OK) {
-      mQueueSample.RemoveElementAt(0);
-    } else if (rv == -EAGAIN || rv == -ETIMEDOUT) {
-      // In most cases, EAGAIN or ETIMEOUT are safe because OMX can't fill
-      // buffer on time.
-      return NS_OK;
-    } else {
-      return NS_ERROR_UNEXPECTED;
-    }
-  }
-
-  return NS_OK;
-}
-
-nsresult
-GonkMediaDataDecoder::Init()
-{
-  sp<MediaCodecProxy> decoder;
-  decoder = mManager->Init(mCallback);
-  mDecoder = decoder;
-  mDrainComplete = false;
-
   return NS_OK;
 }
 
