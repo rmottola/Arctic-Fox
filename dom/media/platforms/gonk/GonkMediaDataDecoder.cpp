@@ -129,8 +129,6 @@ GonkDecoderManager::Flush()
     mQueuedSamples.Clear();
   }
 
-  mLastTime = 0;
-
   MonitorAutoLock lock(mFlushMonitor);
   mIsFlushing = true;
   sp<AMessage> flush = new AMessage(kNotifyProcessFlush, id());

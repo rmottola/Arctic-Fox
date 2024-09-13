@@ -49,6 +49,11 @@ public:
 
   nsresult Shutdown() override;
 
+  const char* GetDescriptionName() const override
+  {
+    return "gonk video decoder";
+  }
+
   static void RecycleCallback(TextureClient* aClient, void* aClosure);
 
 protected:
@@ -60,11 +65,6 @@ protected:
   {
     mNeedsCopyBuffer = true;
     GonkDecoderManager::ProcessFlush();
-  }
-
-  const char* GetDescriptionName() const override
-  {
-    return "gonk video decoder";
   }
 
 private:
