@@ -40,7 +40,7 @@ function debug(s) {
   dump("-*- SettingsRequestManager: " + s + "\n");
 }
 
-let inParent = Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULRuntime)
+var inParent = Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULRuntime)
                   .processType == Ci.nsIXULRuntime.PROCESS_TYPE_DEFAULT;
 
 const kXpcomShutdownObserverTopic      = "xpcom-shutdown";
@@ -58,8 +58,12 @@ const kAllSettingsWritePermission      = "settings" + kSettingsWriteSuffix;
 // will be allowed depends on the exact permissions the app has.
 const kSomeSettingsReadPermission      = "settings-api" + kSettingsReadSuffix;
 const kSomeSettingsWritePermission     = "settings-api" + kSettingsWriteSuffix;
+
 // Time, in seconds, to consider the API is starting to jam
-const kSoftLockupDelta                 = 30;
+var kSoftLockupDelta = 30;
+try {
+  kSoftLockupDelta = Services.prefs.getIntPref("dom.mozSettings.softLockupDelta");
+} catch (ex) { }
 
 XPCOMUtils.defineLazyServiceGetter(this, "mrm",
                                    "@mozilla.org/memory-reporter-manager;1",
