@@ -564,7 +564,7 @@ MediaCodecDataDecoder::QueueSample(const MediaRawData* aSample)
     return res;
   }
 
-  mDurations.push(TimeUnit::FromMicroseconds(aSample->mDuration));
+  mDurations.push_back(TimeUnit::FromMicroseconds(aSample->mDuration));
   return NS_OK;
 }
 
@@ -609,7 +609,7 @@ MediaCodecDataDecoder::GetOutputDuration()
 {
   MOZ_ASSERT(!mDurations.empty(), "Should have had a duration queued");
   const TimeUnit duration = mDurations.front();
-  mDurations.pop();
+  mDurations.pop_front();
   return duration;
 }
 
@@ -662,7 +662,7 @@ MediaCodecDataDecoder::DecoderLoop()
       if (NS_SUCCEEDED(res)) {
         // We've fed this into the decoder, so remove it from the queue.
         MonitorAutoLock lock(mMonitor);
-        mQueue.pop();
+        mQueue.pop_front();
         isOutputDone = false;
       }
     }
