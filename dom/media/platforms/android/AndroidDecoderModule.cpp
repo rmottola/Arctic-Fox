@@ -769,12 +769,8 @@ MediaCodecDataDecoder::ClearQueue()
 {
   mMonitor.AssertCurrentThreadOwns();
 
-  while (!mQueue.empty()) {
-    mQueue.pop();
-  }
-  while (!mDurations.empty()) {
-    mDurations.pop();
-  }
+  mQueue.clear();
+  mDurations.clear();
 }
 
 nsresult
@@ -838,15 +834,20 @@ MediaCodecDataDecoder::Shutdown()
   State(kStopping);
   lock.Notify();
 
-  while (State() == kStopping) {
+  while (mThread && State() != kShutdown) {
     lock.Wait();
   }
 
-  mThread->Shutdown();
-  mThread = nullptr;
+  if (mThread) {
+    mThread->Shutdown();
+    mThread = nullptr;
+  }
 
-  mDecoder->Stop();
-  mDecoder->Release();
+  if (mDecoder) {
+    mDecoder->Stop();
+    mDecoder->Release();
+    mDecoder = nullptr;
+  }
 
   return NS_OK;
 }
