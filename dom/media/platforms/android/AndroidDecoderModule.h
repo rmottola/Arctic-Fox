@@ -101,7 +101,7 @@ protected:
 
   nsresult GetInputBuffer(JNIEnv* env, int index, jni::Object::LocalRef* buffer);
   bool WaitForInput();
-  MediaRawData* PeekNextSample();
+  already_AddRefed<MediaRawData> PeekNextSample();
   nsresult QueueSample(const MediaRawData* aSample);
   nsresult QueueEOS();
   void HandleEOS(int32_t aOutputStatus);
