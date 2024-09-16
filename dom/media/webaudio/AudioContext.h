@@ -314,6 +314,7 @@ public:
   IMPL_EVENT_HANDLER(mozinterruptend)
 
 private:
+  void DisconnectFromWindow();
   void RemoveFromDecodeQueue(WebAudioDecodeJob* aDecodeJob);
   void ShutdownDecoder();
 
