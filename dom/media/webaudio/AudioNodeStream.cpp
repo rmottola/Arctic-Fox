@@ -454,8 +454,10 @@ AudioNodeStream::ObtainInputBlock(AudioBlock& aTmpChunk,
   }
 
   aTmpChunk.AllocateChannels(outputChannelCount);
-  // The static storage here should be 1KB, so it's fine
-  AutoTArray<float, GUESS_AUDIO_CHANNELS*WEBAUDIO_BLOCK_SIZE> downmixBuffer;
+  // TODO: See Bug 1261168. Ideally we would use an aligned version of
+  // AutoTArray (of size GUESS_AUDIO_CHANNELS*WEBAUDIO_BLOCK_SIZE) here.
+  AlignedTArray<float, 16> downmixBuffer;
+  downmixBuffer.SetLength(GUESS_AUDIO_CHANNELS*WEBAUDIO_BLOCK_SIZE);
 
   for (uint32_t i = 0; i < inputChunkCount; ++i) {
     AccumulateInputChunk(i, *inputChunks[i], &aTmpChunk, &downmixBuffer);
@@ -466,7 +468,7 @@ void
 AudioNodeStream::AccumulateInputChunk(uint32_t aInputIndex,
                                       const AudioBlock& aChunk,
                                       AudioBlock* aBlock,
-                                      nsTArray<float>* aDownmixBuffer)
+                                      AlignedTArray<float, 16>* aDownmixBuffer)
 {
   AutoTArray<const float*,GUESS_AUDIO_CHANNELS> channels;
   UpMixDownMixChunk(&aChunk, aBlock->ChannelCount(), channels, *aDownmixBuffer);
@@ -492,7 +494,7 @@ void
 AudioNodeStream::UpMixDownMixChunk(const AudioBlock* aChunk,
                                    uint32_t aOutputChannelCount,
                                    nsTArray<const float*>& aOutputChannels,
-                                   nsTArray<float>& aDownmixBuffer)
+                                   AlignedTArray<float, 16>& aDownmixBuffer)
 {
   for (uint32_t i = 0; i < aChunk->ChannelCount(); i++) {
     aOutputChannels.AppendElement(static_cast<const float*>(aChunk->mChannelData[i]));
