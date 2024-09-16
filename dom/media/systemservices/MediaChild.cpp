@@ -111,5 +111,5 @@ DeallocPMediaChild(media::PMediaChild *aActor)
   return true;
 }
 
-}
-}
+} // namespace media
+} // namespace mozilla
