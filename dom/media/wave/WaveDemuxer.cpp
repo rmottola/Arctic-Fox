@@ -652,6 +652,7 @@ RIFFParser::RIFFHeader::RIFFHeader()
 void
 RIFFParser::RIFFHeader::Reset()
 {
+  memset(mRaw, 0, sizeof(mRaw));
   mPos = 0;
 }
 
@@ -730,6 +731,7 @@ HeaderParser::ChunkHeader::ChunkHeader()
 void
 HeaderParser::ChunkHeader::Reset()
 {
+  memset(mRaw, 0, sizeof(mRaw));
   mPos = 0;
 }
 
@@ -804,6 +806,7 @@ FormatParser::FormatChunk::FormatChunk()
 void
 FormatParser::FormatChunk::Reset()
 {
+  memset(mRaw, 0, sizeof(mRaw));
   mPos = 0;
 }
 
