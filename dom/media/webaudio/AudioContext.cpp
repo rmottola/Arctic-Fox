@@ -126,15 +126,11 @@ AudioContext::AudioContext(nsPIDOMWindowInner* aWindow,
 nsresult
 AudioContext::Init()
 {
-  // We skip calling SetIsOnlyNodeForContext and the creation of the
-  // audioChannelAgent during mDestination's constructor, because we can only
-  // call them after mDestination has been set up.
   if (!mIsOffline) {
     nsresult rv = mDestination->CreateAudioChannelAgent();
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
-    mDestination->SetIsOnlyNodeForContext(true);
   }
 
   return NS_OK;
@@ -675,8 +671,7 @@ double
 AudioContext::CurrentTime() const
 {
   MediaStream* stream = Destination()->Stream();
-  return stream->StreamTimeToSeconds(stream->GetCurrentTime() +
-                                     Destination()->ExtraCurrentTime());
+  return stream->StreamTimeToSeconds(stream->GetCurrentTime());
 }
 
 void
@@ -986,13 +981,6 @@ AudioContext::RegisterNode(AudioNode* aNode)
 {
   MOZ_ASSERT(!mAllNodes.Contains(aNode));
   mAllNodes.PutEntry(aNode);
-  // mDestinationNode may be null when we're destroying nodes unlinked by CC.
-  // Skipping unnecessary calls after shutdown avoids RunInStableState events
-  // getting stuck in CycleCollectedJSRuntime during final cycle collection
-  // (bug 1200514).
-  if (mDestination && !mIsShutDown) {
-    mDestination->SetIsOnlyNodeForContext(mAllNodes.Count() == 1);
-  }
 }
 
 void
@@ -1000,10 +988,6 @@ AudioContext::UnregisterNode(AudioNode* aNode)
 {
   MOZ_ASSERT(mAllNodes.Contains(aNode));
   mAllNodes.RemoveEntry(aNode);
-  // mDestinationNode may be null when we're destroying nodes unlinked by CC
-  if (mDestination) {
-    mDestination->SetIsOnlyNodeForContext(mAllNodes.Count() == 1);
-  }
 }
 
 JSObject*
