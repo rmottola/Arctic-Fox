@@ -268,6 +268,7 @@ public:
   // OfflineAudioContext methods
   already_AddRefed<Promise> StartRendering(ErrorResult& aRv);
   IMPL_EVENT_HANDLER(complete)
+  unsigned long Length();
 
   bool IsOffline() const { return mIsOffline; }
 
