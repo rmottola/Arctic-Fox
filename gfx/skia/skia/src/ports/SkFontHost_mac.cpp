@@ -903,8 +903,9 @@ CGRGBPixel* Offscreen::getCG(const SkScalerContext_Mac& context, const SkGlyph& 
     // skip rows based on the glyph's height
     image += (fSize.fHeight - glyph.fHeight) * fSize.fWidth;
 
-    // erase to black
-    sk_memset_rect32(image, 0, glyph.fWidth, glyph.fHeight, rowBytes);
+    // Erase to white (or transparent black if it's a color glyph, to not composite against white).
+    uint32_t bgColor = (SkMask::kARGB32_Format != glyph.fMaskFormat) ? 0xFFFFFFFF : 0x00000000;
+    sk_memset_rect32(image, bgColor, glyph.fWidth, glyph.fHeight, rowBytes);
 
     float subX = 0;
     float subY = 0;
@@ -1286,7 +1287,7 @@ void SkScalerContext_Mac::generateImage(const SkGlyph& glyph) {
                 int b = (addr[x] >>  0) & 0xFF;
                 addr[x] = (table[r] << 16) | (table[g] << 8) | table[b];
             }
-            addr = SkTAddByteOffset(addr, cgRowBytes);
+            addr = SkTAddOffset<CGRGBPixel>(addr, cgRowBytes);
         }
     }
 
