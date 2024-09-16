@@ -334,7 +334,13 @@ protected:
   }
 };
 
-static WakeLockObserversManager sWakeLockObservers;
+static WakeLockObserversManager&
+WakeLockObservers()
+{
+  static WakeLockObserversManager sWakeLockObservers;
+  AssertMainThread();
+  return sWakeLockObservers;
+}
 
 class ScreenConfigurationObserversManager : public CachingObserversManager<ScreenConfiguration>
 {
@@ -661,14 +667,14 @@ void
 RegisterWakeLockObserver(WakeLockObserver* aObserver)
 {
   AssertMainThread();
-  sWakeLockObservers.AddObserver(aObserver);
+  WakeLockObservers().AddObserver(aObserver);
 }
 
 void
 UnregisterWakeLockObserver(WakeLockObserver* aObserver)
 {
   AssertMainThread();
-  sWakeLockObservers.RemoveObserver(aObserver);
+  WakeLockObservers().RemoveObserver(aObserver);
 }
 
 void
@@ -699,7 +705,7 @@ void
 NotifyWakeLockChange(const WakeLockInformation& aInfo)
 {
   AssertMainThread();
-  sWakeLockObservers.BroadcastInformation(aInfo);
+  WakeLockObservers().BroadcastInformation(aInfo);
 }
 
 void
