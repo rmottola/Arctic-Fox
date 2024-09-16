@@ -62,12 +62,14 @@ public:
    */
   void AllocateChannels(uint32_t aChannelCount);
 
+  /**
+   * ChannelFloatsForWrite() should only be used when the buffers have been
+   * created with AllocateChannels().
+   */
   float* ChannelFloatsForWrite(size_t aChannel)
   {
     MOZ_ASSERT(mBufferFormat == AUDIO_FORMAT_FLOAT32);
-#if DEBUG
-    AssertNoLastingShares();
-#endif
+    MOZ_ASSERT(CanWrite());
     return static_cast<float*>(const_cast<void*>(mChannelData[aChannel]));
   }
 
@@ -111,7 +113,7 @@ public:
 
 private:
   void ClearDownstreamMark();
-  void AssertNoLastingShares();
+  bool CanWrite();
 
   // mBufferIsDownstreamRef is set only when mBuffer references an
   // AudioBlockBuffer created in a different AudioBlock.  That can happen when
