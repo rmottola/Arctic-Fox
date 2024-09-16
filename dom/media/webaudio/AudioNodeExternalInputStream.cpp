@@ -122,8 +122,12 @@ static void ConvertSegmentToAudioBlock(AudioSegment* aSegment,
         CopyChunkToBlock<float>(*ci, aBlock, duration);
         break;
       }
-      case AUDIO_FORMAT_SILENCE:
+      case AUDIO_FORMAT_SILENCE: {
+        // The actual type of the sample does not matter here, but we still need
+        // to send some audio to the graph.
+        CopyChunkToBlock<float>(*ci, aBlock, duration);
         break;
+      }
     }
     duration += ci->GetDuration();
   }
