@@ -160,3 +160,6 @@ pref(canvas.customfocusring.enabled,true) skip-if(B2G) skip-if(Android&&AndroidV
 skip-if(winWidget&&layersGPUAccelerated&&d2d) == capturestream.html wrapper.html?green.png
 
 fuzzy-if(Android,3,40) == 1177726-text-stroke-bounds.html 1177726-text-stroke-bounds-ref.html
+
+# Canvas Filter Reftests
+include filters/reftest.list
