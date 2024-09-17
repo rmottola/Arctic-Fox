@@ -36,7 +36,6 @@ enum class DecoderType
   ICO,
   ICON,
   WEBP,
-  JXR,
   UNKNOWN
 };
 
