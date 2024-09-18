@@ -697,8 +697,12 @@
 @RESPATH@/components/nsUrlClassifierHashCompleter.js
 @RESPATH@/components/nsUrlClassifierListManager.js
 @RESPATH@/components/nsUrlClassifierLib.js
-@RESPATH@/components/PrivateBrowsingTrackingProtectionWhitelist.js
 @RESPATH@/components/url-classifier.xpt
+
+; Private Browsing
+@RESPATH@/components/privatebrowsing.xpt
+@RESPATH@/components/PrivateBrowsing.manifest
+@RESPATH@/components/PrivateBrowsingTrackingProtectionWhitelist.js
 
 ; Security Reports
 @RESPATH@/components/SecurityReporter.manifest

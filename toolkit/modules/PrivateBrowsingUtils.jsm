@@ -10,7 +10,7 @@ const kAutoStartPref = "browser.privatebrowsing.autostart";
 
 // This will be set to true when the PB mode is autostarted from the command
 // line for the current session.
-let gTemporaryAutoStartMode = false;
+var gTemporaryAutoStartMode = false;
 
 const Cc = Components.classes;
 const Ci = Components.interfaces;
@@ -52,13 +52,13 @@ this.PrivateBrowsingUtils = {
   },
 
   addToTrackingAllowlist(aURI) {
-    let pbmtpWhitelist = Cc["@mozilla.org/url-classifier/pbm-tp-whitelist;1"]
+    let pbmtpWhitelist = Cc["@mozilla.org/pbm-tp-whitelist;1"]
                            .getService(Ci.nsIPrivateBrowsingTrackingProtectionWhitelist);
     pbmtpWhitelist.addToAllowList(aURI);
   },
 
   removeFromTrackingAllowlist(aURI) {
-    let pbmtpWhitelist = Cc["@mozilla.org/url-classifier/pbm-tp-whitelist;1"]
+    let pbmtpWhitelist = Cc["@mozilla.org/pbm-tp-whitelist;1"]
                            .getService(Ci.nsIPrivateBrowsingTrackingProtectionWhitelist);
     pbmtpWhitelist.removeFromAllowList(aURI);
   },
