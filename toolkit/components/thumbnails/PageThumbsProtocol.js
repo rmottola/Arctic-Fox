@@ -92,7 +92,7 @@ Protocol.prototype = {
   },
 
   newChannel: function Proto_newChannel(aURI) {
-    return newChannel2(aURI, null);
+    return this.newChannel2(aURI, null);
   },
 
   /**
