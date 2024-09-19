@@ -398,7 +398,7 @@ Http2Stream::ParseHttpRequestHeaders(const char *buf,
         this, avail, mUpstreamState));
 
   mFlatHttpRequestHeaders.Append(buf, avail);
-  const nsHttpRequestHead *head = mTransaction->RequestHead();
+  nsHttpRequestHead *head = mTransaction->RequestHead();
 
   // We can use the simple double crlf because firefox is the
   // only client we are parsing
@@ -425,9 +425,11 @@ Http2Stream::ParseHttpRequestHeaders(const char *buf,
   nsAutoCString hashkey;
   head->GetHeader(nsHttp::Host, authorityHeader);
 
+  nsAutoCString requestURI;
+  head->RequestURI(requestURI);
   CreatePushHashKey(nsDependentCString(head->IsHTTPS() ? "https" : "http"),
                     authorityHeader, mSession->Serial(),
-                    head->RequestURI(),
+                    requestURI,
                     mOrigin, hashkey);
 
   // check the push cache for GET
@@ -497,9 +499,11 @@ Http2Stream::GenerateOpen()
 
   mOpenGenerated = 1;
 
-  const nsHttpRequestHead *head = mTransaction->RequestHead();
+  nsHttpRequestHead *head = mTransaction->RequestHead();
+  nsAutoCString requestURI;
+  head->RequestURI(requestURI);
   LOG3(("Http2Stream %p Stream ID 0x%X [session=%p] for URI %s\n",
-        this, mStreamID, mSession, nsCString(head->RequestURI()).get()));
+        this, mStreamID, mSession, requestURI.get()));
 
   if (mStreamID >= 0x80000000) {
     // streamID must fit in 31 bits. Evading This is theoretically possible
@@ -539,9 +543,13 @@ Http2Stream::GenerateOpen()
     authorityHeader.AppendInt(ci->OriginPort());
   }
 
+  nsAutoCString method;
+  nsAutoCString path;
+  head->Method(method);
+  head->Path(path);
   mSession->Compressor()->EncodeHeaderBlock(mFlatHttpRequestHeaders,
-                                            head->Method(),
-                                            head->Path(),
+                                            method,
+                                            path,
                                             authorityHeader,
                                             scheme,
                                             head->IsConnect(),
@@ -607,7 +615,7 @@ Http2Stream::GenerateOpen()
   LOG3(("Http2Stream %p Generating %d bytes of HEADERS for stream 0x%X with "
         "priority weight %u dep 0x%X frames %u uri=%s\n",
         this, mTxInlineFrameUsed, mStreamID, mPriorityWeight,
-        mPriorityDependency, numFrames, nsCString(head->RequestURI()).get()));
+        mPriorityDependency, numFrames, requestURI.get()));
 
   uint32_t outputOffset = 0;
   uint32_t compressedDataOffset = 0;
@@ -653,7 +661,7 @@ Http2Stream::GenerateOpen()
   // The size of the input headers is approximate
   uint32_t ratio =
     compressedData.Length() * 100 /
-    (11 + head->RequestURI().Length() +
+    (11 + requestURI.Length() +
      mFlatHttpRequestHeaders.Length());
 
   mFlatHttpRequestHeaders.Truncate();
