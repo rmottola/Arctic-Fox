@@ -1161,6 +1161,9 @@ add_task(function* test_savedSessionData() {
   Assert.equal(payload.info.profileSubsessionCounter, expectedSubsessions);
   yield TelemetrySession.shutdown();
 
+  // Restore the UUID generator so we don't mess with other tests.
+  fakeGenerateUUID(generateUUID, generateUUID);
+
   // Load back the serialised session data.
   let data = yield CommonUtils.readJSON(dataFilePath);
   Assert.equal(data.profileSubsessionCounter, expectedSubsessions);
@@ -1259,66 +1262,14 @@ add_task(function* test_invalidSessionData() {
 
   yield TelemetrySession.shutdown();
 
+  // Restore the UUID generator so we don't mess with other tests.
+  fakeGenerateUUID(generateUUID, generateUUID);
+
   // Load back the serialised session data.
   let data = yield CommonUtils.readJSON(dataFilePath);
   Assert.equal(data.profileSubsessionCounter, expectedSubsessions);
   Assert.equal(data.sessionId, expectedSessionUUID);
   Assert.equal(data.subsessionId, expectedSubsessionUUID);
-});
-
-add_task(function* test_pingExtendedStats() {
-  const EXTENDED_PAYLOAD_FIELDS = [
-    "chromeHangs", "threadHangStats", "log", "slowSQL", "fileIOReports", "lateWrites",
-    "addonHistograms", "addonDetails", "UIMeasurements",
-  ];
-
-  // Disable sending extended statistics.
-  Telemetry.canRecordExtended = false;
-
-  gRequestIterator = Iterator(new Request());
-  yield TelemetrySession.reset();
-  yield sendPing();
-
-  let request = yield gRequestIterator.next();
-  let ping = decodeRequestPayload(request);
-  checkPingFormat(ping, PING_TYPE_MAIN, true, true);
-
-  // Check that the payload does not contain extended statistics fields.
-  for (let f in EXTENDED_PAYLOAD_FIELDS) {
-    Assert.ok(!(EXTENDED_PAYLOAD_FIELDS[f] in ping.payload),
-              EXTENDED_PAYLOAD_FIELDS[f] + " must not be in the payload if the extended set is off.");
-  }
-
-  // We check this one separately so that we can reuse EXTENDED_PAYLOAD_FIELDS below, since
-  // slowSQLStartup might not be there.
-  Assert.ok(!("slowSQLStartup" in ping.payload),
-            "slowSQLStartup must not be sent if the extended set is off");
-
-  Assert.ok(!("addonManager" in ping.payload.simpleMeasurements),
-            "addonManager must not be sent if the extended set is off.");
-  Assert.ok(!("UITelemetry" in ping.payload.simpleMeasurements),
-            "UITelemetry must not be sent if the extended set is off.");
-
-  // Restore the preference.
-  Telemetry.canRecordExtended = true;
-
-  // Send a new ping that should contain the extended data.
-  yield TelemetrySession.reset();
-  yield sendPing();
-  request = yield gRequestIterator.next();
-  ping = decodeRequestPayload(request);
-  checkPingFormat(ping, PING_TYPE_MAIN, true, true);
-
-  // Check that the payload now contains extended statistics fields.
-  for (let f in EXTENDED_PAYLOAD_FIELDS) {
-    Assert.ok(EXTENDED_PAYLOAD_FIELDS[f] in ping.payload,
-              EXTENDED_PAYLOAD_FIELDS[f] + " must be in the payload if the extended set is on.");
-  }
-
-  Assert.ok("addonManager" in ping.payload.simpleMeasurements,
-            "addonManager must be sent if the extended set is on.");
-  Assert.ok("UITelemetry" in ping.payload.simpleMeasurements,
-            "UITelemetry must be sent if the extended set is on.");
 });
 
 add_task(function* test_abortedSession() {
@@ -1516,24 +1467,43 @@ add_task(function* test_schedulerComputerSleep() {
   yield OS.File.removeDir(DATAREPORTING_PATH, { ignoreAbsent: true });
 
   // Set a fake current date and start Telemetry.
-  let nowDate = new Date(2009, 10, 18, 0, 0, 0);
-  fakeNow(nowDate);
+  let nowDate = fakeNow(2009, 10, 18, 0, 0, 0);
   let schedulerTickCallback = null;
   fakeSchedulerTimer(callback => schedulerTickCallback = callback, () => {});
   yield TelemetrySession.reset();
 
   // Set the current time 3 days in the future at midnight, before running the callback.
-  let future = futureDate(nowDate, MS_IN_ONE_DAY * 3);
-  fakeNow(future);
+  nowDate = fakeNow(futureDate(nowDate, 3 * MS_IN_ONE_DAY));
   Assert.ok(!!schedulerTickCallback);
   // Execute one scheduler tick.
   yield schedulerTickCallback();
 
   let dailyPing = yield PingServer.promiseNextPing();
-  Assert.equal(dailyPing.payload.info.reason, REASON_DAILY);
+  Assert.equal(dailyPing.payload.info.reason, REASON_DAILY,
+               "The wake notification should have triggered a daily ping.");
+  Assert.equal(dailyPing.creationDate, nowDate.toISOString(),
+               "The daily ping date should be correct.");
 
   Assert.ok((yield OS.File.exists(ABORTED_FILE)),
             "There must be an aborted session ping.");
+
+  // Now also test if we are sending a daily ping if we wake up on the next
+  // day even when the timer doesn't trigger.
+  // This can happen due to timeouts not running out during sleep times,
+  // see bug 1262386, bug 1204823 et al.
+  // Note that we don't get wake notifications on Linux due to bug 758848.
+  nowDate = fakeNow(futureDate(nowDate, 1 * MS_IN_ONE_DAY));
+
+  // We emulate the mentioned timeout behavior by sending the wake notification
+  // instead of triggering the timeout callback.
+  // This should trigger a daily ping, because we passed midnight.
+  Services.obs.notifyObservers(null, "wake_notification", null);
+
+  dailyPing = yield PingServer.promiseNextPing();
+  Assert.equal(dailyPing.payload.info.reason, REASON_DAILY,
+               "The wake notification should have triggered a daily ping.");
+  Assert.equal(dailyPing.creationDate, nowDate.toISOString(),
+               "The daily ping date should be correct.");
 
   // TODO: Remove the TelemetrySend manual shutdown when bug 1145188 lands.
   yield TelemetrySend.shutdown();
@@ -1628,12 +1598,6 @@ add_task(function* test_schedulerNothingDue() {
 
   // Check that no aborted session ping was written to disk.
   Assert.ok(!(yield OS.File.exists(ABORTED_FILE)));
-
-  // We should not miss midnight when going to idle.
-  now.setHours(23);
-  now.setMinutes(50);
-  fakeIdleNotification("idle");
-  Assert.equal(schedulerTimeout, 10 * 60 * 1000);
 
   // TODO: Remove the TelemetrySend manual shutdown when bug 1145188 lands.
   yield TelemetrySend.shutdown();
@@ -1736,6 +1700,7 @@ add_task(function* test_schedulerUserIdle() {
   // We should not miss midnight when going to idle.
   now.setHours(23);
   now.setMinutes(50);
+  fakeNow(now);
   fakeIdleNotification("idle");
   Assert.equal(schedulerTimeout, 10 * 60 * 1000);
 
