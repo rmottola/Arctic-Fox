@@ -322,6 +322,17 @@ function getSnapshot(histogramId) {
   return Telemetry.getHistogramById(histogramId).snapshot();
 }
 
+// Generates a random string of at least a specific length.
+function generateRandomString(length) {
+  let string = "";
+
+  while (string.length < length) {
+    string += Math.random().toString(36);
+  }
+
+  return string.substring(0, length);
+}
+
 if (runningInParent) {
   // Set logging preferences for all the tests.
   Services.prefs.setCharPref("toolkit.telemetry.log.level", "Trace");
