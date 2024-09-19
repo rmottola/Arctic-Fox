@@ -872,6 +872,35 @@ private:
   CanvasRenderingContext2D *mContext;
 };
 
+class CanvasFilterChainObserver : public nsSVGFilterChainObserver
+{
+public:
+  CanvasFilterChainObserver(nsTArray<nsStyleFilter>& aFilters,
+                            Element* aCanvasElement,
+                            CanvasRenderingContext2D* aContext)
+    : nsSVGFilterChainObserver(aFilters, aCanvasElement)
+    , mContext(aContext)
+  {
+  }
+
+  virtual void DoUpdate() override
+  {
+    if (!mContext) {
+      MOZ_CRASH("This should never be called without a context");
+    }
+    // Refresh the cached FilterDescription in mContext->CurrentState().filter.
+    // If this filter is not at the top of the state stack, we'll refresh the
+    // wrong filter, but that's ok, because we'll refresh the right filter
+    // when we pop the state stack in CanvasRenderingContext2D::Restore().
+    mContext->UpdateFilter();
+  }
+
+  void DetachFromContext() { mContext = nullptr; }
+
+private:
+  CanvasRenderingContext2D *mContext;
+};
+
 NS_IMPL_CYCLE_COLLECTING_ADDREF(CanvasRenderingContext2D)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(CanvasRenderingContext2D)
 
@@ -887,6 +916,12 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(CanvasRenderingContext2D)
     ImplCycleCollectionUnlink(tmp->mStyleStack[i].patternStyles[Style::FILL]);
     ImplCycleCollectionUnlink(tmp->mStyleStack[i].gradientStyles[Style::STROKE]);
     ImplCycleCollectionUnlink(tmp->mStyleStack[i].gradientStyles[Style::FILL]);
+    CanvasFilterChainObserver *filterChainObserver =
+      static_cast<CanvasFilterChainObserver*>(tmp->mStyleStack[i].filterChainObserver.get());
+    if (filterChainObserver) {
+      filterChainObserver->DetachFromContext();
+    }
+    ImplCycleCollectionUnlink(tmp->mStyleStack[i].filterChainObserver);
   }
   for (size_t x = 0 ; x < tmp->mHitRegionsOptions.Length(); x++) {
     RegionInfo& info = tmp->mHitRegionsOptions[x];
@@ -904,6 +939,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(CanvasRenderingContext2D)
     ImplCycleCollectionTraverse(cb, tmp->mStyleStack[i].patternStyles[Style::FILL], "Fill CanvasPattern");
     ImplCycleCollectionTraverse(cb, tmp->mStyleStack[i].gradientStyles[Style::STROKE], "Stroke CanvasGradient");
     ImplCycleCollectionTraverse(cb, tmp->mStyleStack[i].gradientStyles[Style::FILL], "Fill CanvasGradient");
+    ImplCycleCollectionTraverse(cb, tmp->mStyleStack[i].filterChainObserver, "Filter Chain Observer");
   }
   for (size_t x = 0 ; x < tmp->mHitRegionsOptions.Length(); x++) {
     RegionInfo& info = tmp->mHitRegionsOptions[x];
@@ -2424,30 +2460,6 @@ CanvasRenderingContext2D::ParseFilter(const nsAString& aString,
   aFilterChain = sc->StyleEffects()->mFilters;
   return true;
 }
-
-class CanvasFilterChainObserver : public nsSVGFilterChainObserver
-{
-public:
-  CanvasFilterChainObserver(nsTArray<nsStyleFilter>& aFilters,
-                            Element* aCanvasElement,
-                            CanvasRenderingContext2D* aContext)
-    : nsSVGFilterChainObserver(aFilters, aCanvasElement)
-    , mContext(aContext)
-  {
-  }
-
-  virtual void DoUpdate() override
-  {
-    // Refresh the cached FilterDescription in mContext->CurrentState().filter.
-    // If this filter is not at the top of the state stack, we'll refresh the
-    // wrong filter, but that's ok, because we'll refresh the right filter
-    // when we pop the state stack in CanvasRenderingContext2D::Restore().
-    mContext->UpdateFilter();
-  }
-
-private:
-  CanvasRenderingContext2D *mContext;
-};
 
 void
 CanvasRenderingContext2D::SetFilter(const nsAString& aFilter, ErrorResult& aError)
