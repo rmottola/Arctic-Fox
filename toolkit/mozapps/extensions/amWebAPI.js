@@ -102,9 +102,9 @@ function AddonInstall(window, properties) {
  * to make sure of that. It also automatically wraps objects when necessary.
  */
 function WebAPITask(generator) {
-  let task = Task.async(generator);
-
   return function(...args) {
+    let task = Task.async(generator.bind(this));
+
     let win = this.window;
 
     let wrapForContent = (obj) => {
