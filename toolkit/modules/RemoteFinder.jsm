@@ -166,6 +166,9 @@ RemoteFinder.prototype = {
   keyPress: function (aEvent) {
     this._browser.messageManager.sendAsyncMessage("Finder:KeyPress",
                                                   { keyCode: aEvent.keyCode,
+                                                    ctrlKey: aEvent.ctrlKey,
+                                                    metaKey: aEvent.metaKey,
+                                                    altKey: aEvent.altKey,
                                                     shiftKey: aEvent.shiftKey });
   },
 
