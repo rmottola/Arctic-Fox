@@ -227,7 +227,7 @@ ApplyBorderToStyle(const nsMathMLmtdFrame* aFrame,
 }
 
 static nsMargin
-ComputeBorderOverflow(nsMathMLmtdFrame* aFrame, nsStyleBorder aStyleBorder)
+ComputeBorderOverflow(nsMathMLmtdFrame* aFrame, const nsStyleBorder& aStyleBorder)
 {
   nsMargin overflow;
   int32_t rowIndex;
