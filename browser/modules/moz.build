@@ -30,6 +30,7 @@ EXTRA_JS_MODULES += [
     'offlineAppCache.jsm',
     'openLocationLastURL.jsm',
     'PageMenu.jsm',
+    'PanelFrame.jsm',
     'PluginContent.jsm',
     'ProcessHangMonitor.jsm',
     'ReaderParent.jsm',
