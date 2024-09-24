@@ -3698,7 +3698,7 @@ CacheFileIOManager::CheckAndCreateDir(nsIFile *aFile, const char *aDir,
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (!isEmpty) {
-      // Don't check the result, if this fails, that's OK.  We do this
+      // Don't check the result, if this fails, it's OK.  We do this
       // only for the doomed directory that doesn't need to be deleted
       // for the cost of completely disabling the whole browser.
       TrashDirectory(file);
