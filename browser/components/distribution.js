@@ -348,7 +348,7 @@ DistributionCustomizer.prototype = {
         try {
           let value = this._ini.getString("Preferences-" + this._locale, key);
           if (value) {
-            Preferences.set(key, parseValue(value));
+            defaults.set(key, parseValue(value));
           }
           usedPreferences.push(key);
         } catch (e) { /* ignore bad prefs and move on */ }
@@ -363,7 +363,7 @@ DistributionCustomizer.prototype = {
         try {
           let value = this._ini.getString("Preferences-" + this._language, key);
           if (value) {
-            Preferences.set(key, parseValue(value));
+            defaults.set(key, parseValue(value));
           }
           usedPreferences.push(key);
         } catch (e) { /* ignore bad prefs and move on */ }
@@ -380,7 +380,7 @@ DistributionCustomizer.prototype = {
           if (value) {
             value = value.replace(/%LOCALE%/g, this._locale);
             value = value.replace(/%LANGUAGE%/g, this._language);
-            Preferences.set(key, parseValue(value));
+            defaults.set(key, parseValue(value));
           }
         } catch (e) { /* ignore bad prefs and move on */ }
       }
