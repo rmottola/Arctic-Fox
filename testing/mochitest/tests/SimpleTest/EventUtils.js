@@ -58,6 +58,13 @@ function getElement(id) {
 
 this.$ = this.getElement;
 
+function computeButton(aEvent) {
+  if (typeof aEvent.button != 'undefined') {
+    return aEvent.button;
+  }
+  return aEvent.type == 'contextmenu' ? 2 : 0;
+}
+
 function sendMouseEvent(aEvent, aTarget, aWindow) {
   if (['click', 'contextmenu', 'dblclick', 'mousedown', 'mouseup', 'mouseover', 'mouseout'].indexOf(aEvent.type) == -1) {
     throw new Error("sendMouseEvent doesn't know about event type '" + aEvent.type + "'");
@@ -89,7 +96,7 @@ function sendMouseEvent(aEvent, aTarget, aWindow) {
   var altKeyArg        = aEvent.altKey        || false;
   var shiftKeyArg      = aEvent.shiftKey      || false;
   var metaKeyArg       = aEvent.metaKey       || false;
-  var buttonArg        = aEvent.button        || (aEvent.type == 'contextmenu' ? 2 : 0);
+  var buttonArg        = computeButton(aEvent);
   var relatedTargetArg = aEvent.relatedTarget || null;
 
   event.initMouseEvent(typeArg, canBubbleArg, cancelableArg, viewArg, detailArg,
@@ -130,7 +137,7 @@ function sendDragEvent(aEvent, aTarget, aWindow=window) {
   var altKeyArg        = aEvent.altKey        || false;
   var shiftKeyArg      = aEvent.shiftKey      || false;
   var metaKeyArg       = aEvent.metaKey       || false;
-  var buttonArg        = aEvent.button        || 0;
+  var buttonArg        = computeButton(aEvent);
   var relatedTargetArg = aEvent.relatedTarget || null;
   var dataTransfer     = aEvent.dataTransfer  || null;
 
@@ -313,7 +320,7 @@ function synthesizeMouseAtPoint(left, top, aEvent, aWindow)
   var defaultPrevented = false;
 
   if (utils) {
-    var button = aEvent.button || 0;
+    var button = computeButton(aEvent);
     var clickCount = aEvent.clickCount || 1;
     var modifiers = _parseModifiers(aEvent);
     var pressure = ("pressure" in aEvent) ? aEvent.pressure : 0;
@@ -361,7 +368,7 @@ function synthesizePointerAtPoint(left, top, aEvent, aWindow)
   var defaultPrevented = false;
 
   if (utils) {
-    var button = aEvent.button || 0;
+    var button = computeButton(aEvent);
     var clickCount = aEvent.clickCount || 1;
     var modifiers = _parseModifiers(aEvent);
     var pressure = ("pressure" in aEvent) ? aEvent.pressure : 0;
