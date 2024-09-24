@@ -1714,6 +1714,7 @@ var BookmarkingUI = {
     // Handle special case when the button is in the panel.
     let isBookmarked = this._itemIds.length > 0;
 
+/* FIXME
     if (this._currentAreaType == CustomizableUI.TYPE_MENU_PANEL) {
       this._showSubview();
       return;
@@ -1724,6 +1725,7 @@ var BookmarkingUI = {
       // Close the overflow panel because the Edit Bookmark panel will appear.
       widget.node.removeAttribute("closemenu");
     }
+*/
 
     // Ignore clicks on the star if we are updating its state.
     if (!this._pendingStmt) {
