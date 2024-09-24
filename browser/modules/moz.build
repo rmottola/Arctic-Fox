@@ -18,6 +18,7 @@ EXTRA_JS_MODULES += [
     'ContentClick.jsm',
     'ContentCrashHandlers.jsm',
     'ContentLinkHandler.jsm',
+    'ContentObservers.jsm',
     'ContentSearch.jsm',
     'ContentWebRTC.jsm',
     'DirectoryLinksProvider.jsm',
