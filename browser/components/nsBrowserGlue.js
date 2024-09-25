@@ -85,6 +85,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "OS",
 XPCOMUtils.defineLazyModuleGetter(this, "RemotePrompt",
                                   "resource:///modules/RemotePrompt.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "ContentPrefServiceParent",
+                                  "resource://gre/modules/ContentPrefServiceParent.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "Feeds",
                                   "resource:///modules/Feeds.jsm");
 
@@ -730,6 +733,7 @@ BrowserGlue.prototype = {
       RemotePrompt.init();
     }
     Feeds.init();
+    ContentPrefServiceParent.init();
 
     LoginManagerParent.init();
     ReaderParent.init();
@@ -956,13 +960,6 @@ BrowserGlue.prototype = {
     // With older versions of the extension installed, this load will fail
     // passively.
     Services.ppmm.loadProcessScript("resource://pdf.js/pdfjschildbootstrap.js", true);
-
-    if (AppConstants.NIGHTLY_BUILD) {
-      // Registering Shumway bootstrap script the child processes.
-      Services.ppmm.loadProcessScript("chrome://shumway/content/bootstrap-content.js", true);
-      // Initializing Shumway (shall be run after child script registration).
-      ShumwayUtils.init();
-    }
 
     if (AppConstants.platform == "win") {
       // For Windows 7, initialize the jump list module.
