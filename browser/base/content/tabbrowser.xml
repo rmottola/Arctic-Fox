@@ -1591,7 +1591,7 @@
             // Unhook our progress listener.
             let tab = this.getTabForBrowser(aBrowser);
             let filter = this._tabFilters.get(tab);
-	    let listener = this._tabListeners.get(tab);
+            let listener = this._tabListeners.get(tab);
             aBrowser.webProgress.removeProgressListener(filter);
             filter.removeProgressListener(listener);
 
@@ -1831,6 +1831,7 @@
             var notificationbox = document.createElementNS(NS_XUL,
                                                            "notificationbox");
             notificationbox.setAttribute("flex", "1");
+            notificationbox.setAttribute("notificationside", "top");
             notificationbox.appendChild(browserSidebarContainer);
 
             // Prevent the superfluous initial load of a blank document
