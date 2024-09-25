@@ -71,6 +71,9 @@ function test() {
   testVal("http://localhost/ foo bar baz");
   testVal("http://localhost.localdomain/ foo bar baz", "localhost.localdomain/ foo bar baz");
 
+  testVal("http://localhost");
+  testVal("http://someotherhostwithnodots");
+
   Services.prefs.setBoolPref(prefname, false);
 
   testVal("http://mozilla.org/");
