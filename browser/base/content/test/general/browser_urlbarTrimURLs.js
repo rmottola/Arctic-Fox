@@ -71,7 +71,16 @@ function test() {
   testVal("http://localhost/ foo bar baz");
   testVal("http://localhost.localdomain/ foo bar baz", "localhost.localdomain/ foo bar baz");
 
+  // Behaviour for hosts with no dots depends on the whitelist:
+  let fixupWhitelistPref = "browser.fixup.domainwhitelist.localhost";
+  Services.prefs.setBoolPref(fixupWhitelistPref, false);
   testVal("http://localhost");
+  Services.prefs.setBoolPref(fixupWhitelistPref, true);
+  testVal("http://localhost", "localhost");
+  Services.prefs.clearUserPref(fixupWhitelistPref);
+
+  testVal("http:// invalid url");
+
   testVal("http://someotherhostwithnodots");
 
   Services.prefs.setBoolPref(prefname, false);
