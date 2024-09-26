@@ -93,6 +93,11 @@ function getUserSample() {
 
 function setCohort(cohortName) {
   Preferences.set(PREF_COHORT_NAME, cohortName);
+  try {
+    if (Ci.nsICrashReporter) {
+      Services.appinfo.QueryInterface(Ci.nsICrashReporter).annotateCrashReport("E10SCohort", cohortName);
+    }
+  } catch (e) {}
 }
 
 function optedIn() {
@@ -108,4 +113,3 @@ function optedOut() {
          (Preferences.isSet(PREF_TOGGLE_E10S) &&
           Preferences.get(PREF_TOGGLE_E10S) == false);
 }
-
