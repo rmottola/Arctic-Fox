@@ -1,6 +1,7 @@
 import os
 
 config = {
+    # note: overridden by MOZHARNESS_ACTIONS in TaskCluster tasks
     'default_actions': [
         'clobber',
         'clone-tools',
@@ -29,9 +30,9 @@ config = {
 
     #########################################################################
     ###### 64 bit specific ######
-    'base_name': 'Linux_x86-64_%(branch)s_Static_Analysis',
+    'base_name': 'Linux_x86-64_%(branch)s_Artifact_build',
     'platform': 'linux64',
-    'stage_platform': 'linux64-st-an',
+    'stage_platform': 'linux64',
     'publish_nightly_en_US_routes': False,
     'env': {
         'MOZBUILD_STATE_PATH': os.path.join(os.getcwd(), '.mozbuild'),
@@ -80,8 +81,8 @@ config = {
         'gstreamer-plugins-base-devel', 'freetype-2.3.11-6.el6_1.8.x86_64',
         'freetype-devel-2.3.11-6.el6_1.8.x86_64'
     ],
-    'src_mozconfig': 'browser/config/mozconfigs/linux64/opt-static-analysis-clang',
-    'tooltool_manifest_src': 'browser/config/tooltool-manifests/linux64/\
-clang.manifest.centos6',
+    'src_mozconfig': 'browser/config/mozconfigs/linux64/artifact',
+    'tooltool_manifest_src': "browser/config/tooltool-manifests/linux64/\
+releng.manifest",
     #######################
 }

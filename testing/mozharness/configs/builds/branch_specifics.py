@@ -34,7 +34,6 @@ config = {
         "repo_path": 'mozilla-central',
         "update_channel": "nightly",
         "graph_server_branch_name": "Firefox",
-        'use_branch_in_symbols_extra_buildid': False,
         'stage_server': 'upload.ffxbld.productdelivery.prod.mozaws.net',
     },
     'mozilla-release': {
@@ -43,7 +42,6 @@ config = {
         # nightlies for mozilla-release
         'update_channel': 'release',
         'branch_uses_per_checkin_strategy': True,
-        'use_branch_in_symbols_extra_buildid': False,
         'stage_server': 'upload.ffxbld.productdelivery.prod.mozaws.net',
     },
     'mozilla-beta': {
@@ -52,19 +50,16 @@ config = {
         # nightlies for mozilla-beta
         'update_channel': 'beta',
         'branch_uses_per_checkin_strategy': True,
-        'use_branch_in_symbols_extra_buildid': False,
         'stage_server': 'upload.ffxbld.productdelivery.prod.mozaws.net',
     },
     'mozilla-aurora': {
         'repo_path': 'releases/mozilla-aurora',
         'update_channel': 'aurora',
         'branch_uses_per_checkin_strategy': True,
-        'use_branch_in_symbols_extra_buildid': False,
         'stage_server': 'upload.ffxbld.productdelivery.prod.mozaws.net',
     },
     'mozilla-b2g32_v2_0': {
         'repo_path': 'releases/mozilla-b2g32_v2_0',
-        'use_branch_in_symbols_extra_buildid': False,
         'update_channel': 'nightly-b2g32',
         'graph_server_branch_name': 'Mozilla-B2g32-v2.0',
     },
@@ -76,7 +71,6 @@ config = {
         'to_tinderbox_dated': False,
         'include_post_upload_builddir': True,
         'release_to_try_builds': True,
-        'use_branch_in_symbols_extra_buildid': False,
         'stage_server': 'upload.trybld.productdelivery.prod.mozaws.net',
         'stage_username': 'trybld',
         'stage_ssh_key': 'trybld_dsa',
