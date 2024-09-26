@@ -626,6 +626,23 @@ browser/chrome/browser/skin/classic/browser/identity-not-secure.svg
 browser/chrome/browser/defaults/permissions
 browser/defaults/permissions
 
+browser/features/firefox@getpocket.com/chrome/skin/linux/pocket.css
+browser/features/loop@mozilla.org/chrome/content/shared/img/sharing-active.svg
+browser/features/loop@mozilla.org/chrome/content/shared/img/sharing-hover.svg
+browser/features/loop@mozilla.org/chrome/content/shared/img/sharing-pending.svg
+browser/features/loop@mozilla.org/chrome/content/shared/img/sharing.svg
+browser/features/loop@mozilla.org/chrome/content/shared/img/cam_audio.svg
+browser/features/loop@mozilla.org/chrome/content/shared/img/media-group.svg
+browser/features/loop@mozilla.org/chrome/skin/linux/menuPanel.png
+browser/features/loop@mozilla.org/chrome/skin/windows/menuPanel.png
+browser/features/loop@mozilla.org/chrome/skin/linux/menuPanel@2x.png
+browser/features/loop@mozilla.org/chrome/skin/windows/menuPanel@2x.png
+browser/features/loop@mozilla.org/chrome/skin/linux/toolbar-inverted.png
+browser/features/loop@mozilla.org/chrome/skin/windows/toolbar-inverted.png
+browser/features/loop@mozilla.org/chrome/content/locale-fallback/en-US/loop.properties
+browser/features/loop@mozilla.org/chrome/skin/linux/toolbar-inverted@2x.png
+browser/features/loop@mozilla.org/chrome/skin/windows/toolbar-inverted@2x.png
+
 
 #Windows ArcticFox exceptions
 chrome/toolkit/skin/classic/mozapps/extensions/category-plugins.png
