@@ -12,7 +12,6 @@ DIRS += [
     'downloads',
     'extensions',
     'feeds',
-    'fuel',
     'migration',
     'newtab',
     'places',

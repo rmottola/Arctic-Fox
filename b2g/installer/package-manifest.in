@@ -233,7 +233,6 @@
 @RESPATH@/components/filepicker.xpt
 #endif
 @RESPATH@/components/find.xpt
-@RESPATH@/components/fuel.xpt
 @RESPATH@/components/gfx.xpt
 @RESPATH@/components/hal.xpt
 @RESPATH@/components/html5.xpt
