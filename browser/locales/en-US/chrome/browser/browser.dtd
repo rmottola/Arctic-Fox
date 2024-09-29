@@ -179,7 +179,25 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY printButton.label            "Print">
 <!ENTITY printButton.tooltip          "Print this page">
 
-<!ENTITY urlbar.webNotsNotificationAnchor2.label        "Change whether the site can receive notifications">
+<!ENTITY urlbar.viewSiteInfo.label                      "View site information">
+<!-- LOCALIZATION NOTE: all of the following urlbar NotificationAnchor.label strings are
+     used to provide accessible labels to users of assistive technology like screenreaders.
+     It is not possible to see them visually in the UI. -->
+<!ENTITY urlbar.defaultNotificationAnchor.label         "View a notification">
+<!ENTITY urlbar.geolocationNotificationAnchor.label     "View the location request">
+<!ENTITY urlbar.addonsNotificationAnchor.label          "View the add-on install message">
+<!ENTITY urlbar.indexedDBNotificationAnchor.label       "View the app-offline storage message">
+<!ENTITY urlbar.loginFillNotificationAnchor.label       "Manage your login information">
+<!ENTITY urlbar.passwordNotificationAnchor.label        "Check if you want to save your password">
+<!ENTITY urlbar.pluginsNotificationAnchor.label         "Manage plugin usage on this page">
+<!ENTITY urlbar.webNotsNotificationAnchor3.label        "Change whether you can receive notifications from the site">
+
+<!ENTITY urlbar.webRTCShareDevicesNotificationAnchor.label      "Manage sharing your camera and/or microphone with the site">
+<!ENTITY urlbar.webRTCSharingDevicesNotificationAnchor.label    "You are sharing your camera and/or microphone with the site">
+<!ENTITY urlbar.webRTCShareMicrophoneNotificationAnchor.label   "Manage sharing your microphone with the site">
+<!ENTITY urlbar.webRTCSharingMicrophoneNotificationAnchor.label "You are sharing your microphone with the site">
+<!ENTITY urlbar.webRTCShareScreenNotificationAnchor.label       "Manage sharing your windows or screen with the site">
+<!ENTITY urlbar.webRTCSharingScreenNotificationAnchor.label     "You are sharing a window or your screen with the site">
 
 <!ENTITY backForwardItem.title        "Back/Forward">
 <!ENTITY locationItem.title           "Location">
