@@ -98,9 +98,7 @@ RestyleManager::RestyleManager(nsPresContext* aPresContext)
   , mPendingRestyles(ELEMENT_HAS_PENDING_RESTYLE |
                      ELEMENT_IS_POTENTIAL_RESTYLE_ROOT |
                      ELEMENT_IS_CONDITIONAL_RESTYLE_ANCESTOR)
-#ifdef DEBUG
   , mIsProcessingRestyles(false)
-#endif
 #ifdef RESTYLE_LOGGING
   , mLoggingDepth(0)
 #endif
@@ -1744,9 +1742,7 @@ RestyleManager::ProcessPendingRestyles()
   // Process non-animation restyles...
   MOZ_ASSERT(!mIsProcessingRestyles,
              "Nesting calls to ProcessPendingRestyles?");
-#ifdef DEBUG
   mIsProcessingRestyles = true;
-#endif
 
   // Before we process any restyles, we need to ensure that style
   // resulting from any animations is up-to-date, so that if any style
@@ -1755,7 +1751,7 @@ RestyleManager::ProcessPendingRestyles()
   bool haveNonAnimation =
     mHavePendingNonAnimationRestyles || mDoRebuildAllStyleData;
   if (haveNonAnimation) {
-    IncrementAnimationGeneration();
+    ++mAnimationGeneration;
     UpdateOnlyAnimationStyles();
   } else {
     // If we don't have non-animation style updates, then we have queued
@@ -1788,9 +1784,7 @@ RestyleManager::ProcessPendingRestyles()
     mPresContext->TransitionManager()->SetInAnimationOnlyStyleUpdate(false);
   }
 
-#ifdef DEBUG
   mIsProcessingRestyles = false;
-#endif
 
   NS_ASSERTION(haveNonAnimation || !mHavePendingNonAnimationRestyles,
                "should not have added restyles");
