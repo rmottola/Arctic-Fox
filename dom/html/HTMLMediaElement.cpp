@@ -3243,11 +3243,13 @@ public:
     const VideoSegment& video = static_cast<const VideoSegment&>(aQueuedMedia);
     for (VideoSegment::ConstChunkIterator c(video); !c.IsEnded(); c.Next()) {
       if (c->mFrame.GetIntrinsicSize() != gfx::IntSize(0,0)) {
+        mInitialSizeFound = true;
         nsCOMPtr<nsIRunnable> event =
           NS_NewRunnableMethodWithArgs<gfx::IntSize>(
               this, &StreamSizeListener::ReceivedSize,
               c->mFrame.GetIntrinsicSize());
         aGraph->DispatchToMainThreadAfterStreamStateUpdate(event.forget());
+        return;
       }
     }
   }
