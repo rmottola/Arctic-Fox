@@ -30,6 +30,10 @@ pref("@GUAO_PREF@.google.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @
 pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @PM_SLICE@");
 pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @PM_SLICE@");
 
+// Google fonts serves physically different fonts to later Firefox versions that render incorrectly unless on Gecko
+pref("@GUAO_PREF@.fonts.googleapis.com", "Mozilla/5.0 (%OS_SLICE% rv:52.0) Gecko/20100101 Firefox/52.0 @PM_SLICE@"");
+pref("@GUAO_PREF@.fonts-api.wp.com", "Mozilla/5.0 (%OS_SLICE% rv:52.0) Gecko/20100101 Firefox/52.0 @PM_SLICE@"");
+
 // Switch to mobile youtube to bypass CPU/JS hungry slow as molasses new polyfill interface
 pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (iPad; CPU OS 10_2_1 like Mac OS X) AppleWebKit/602.4.6 (KHTML, like Gecko) Version/10.0 Mobile/14D27 Safari/602.1");
 
