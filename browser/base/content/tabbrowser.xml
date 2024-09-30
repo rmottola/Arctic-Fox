@@ -6421,8 +6421,13 @@
         <parameter name="aUserContextId"/>
         <body>
         <![CDATA[
-          this.linkedBrowser.setAttribute("usercontextid", aUserContextId);
-          this.setAttribute("usercontextid", aUserContextId);
+          if (aUserContextId) {
+            this.linkedBrowser.setAttribute("usercontextid", aUserContextId);
+            this.setAttribute("usercontextid", aUserContextId);
+          } else {
+            this.linkedBrowser.removeAttribute("usercontextid");
+            this.removeAttribute("usercontextid");
+          }
         ]]>
         </body>
       </method>
