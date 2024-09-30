@@ -23,6 +23,7 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/Timer.jsm");
 Cu.import("resource://testing-common/TestUtils.jsm");
+Cu.import("resource://testing-common/ContentTask.jsm");
 
 Cc["@mozilla.org/globalmessagemanager;1"]
   .getService(Ci.nsIMessageListenerManager)
@@ -32,7 +33,14 @@ Cc["@mozilla.org/globalmessagemanager;1"]
 XPCOMUtils.defineLazyModuleGetter(this, "E10SUtils",
   "resource:///modules/E10SUtils.jsm");
 
+// For now, we'll allow tests to use CPOWs in this module for
+// some cases.
+Cu.permitCPOWsInScope(this);
+
 var gSendCharCount = 0;
+var gSynthesizeKeyCount = 0;
+var gSynthesizeCompositionCount = 0;
+var gSynthesizeCompositionChangeCount = 0;
 
 this.BrowserTestUtils = {
   /**
@@ -312,6 +320,8 @@ this.BrowserTestUtils = {
    *        The element that should receive the event.
    * @param {string} eventName
    *        Name of the event to listen to.
+   * @param {bool} capture [optional]
+   *        True to use a capturing listener.
    * @param {function} checkFn [optional]
    *        Called with the Event object as argument, should return true if the
    *        event is the expected one, or false if it should be ignored and
@@ -325,23 +335,108 @@ this.BrowserTestUtils = {
    * @returns {Promise}
    * @resolves The Event object.
    */
-  waitForEvent(subject, eventName, checkFn) {
+  waitForEvent(subject, eventName, capture, checkFn) {
     return new Promise((resolve, reject) => {
       subject.addEventListener(eventName, function listener(event) {
         try {
           if (checkFn && !checkFn(event)) {
             return;
           }
-          subject.removeEventListener(eventName, listener);
+          subject.removeEventListener(eventName, listener, capture);
           resolve(event);
         } catch (ex) {
           try {
-            subject.removeEventListener(eventName, listener);
+            subject.removeEventListener(eventName, listener, capture);
           } catch (ex2) {
             // Maybe the provided object does not support removeEventListener.
           }
           reject(ex);
         }
+      }, capture);
+    });
+  },
+
+  /**
+   * Like waitForEvent, but adds the event listener to the message manager
+   * global for browser.
+   *
+   * @param {string} eventName
+   *        Name of the event to listen to.
+   * @param {bool} capture [optional]
+   *        Whether to use a capturing listener.
+   * @param {function} checkFn [optional]
+   *        Called with the Event object as argument, should return true if the
+   *        event is the expected one, or false if it should be ignored and
+   *        listening should continue. If not specified, the first event with
+   *        the specified name resolves the returned promise.
+   * @param {bool} wantsUntrusted [optional]
+   *        Whether to accept untrusted events
+   *
+   * @note Because this function is intended for testing, any error in checkFn
+   *       will cause the returned promise to be rejected instead of waiting for
+   *       the next event, since this is probably a bug in the test.
+   *
+   * @returns {Promise}
+   */
+  waitForContentEvent(browser, eventName, capture = false, checkFn, wantsUntrusted = false) {
+    let parameters = {
+      eventName,
+      capture,
+      checkFnSource: checkFn ? checkFn.toSource() : null,
+      wantsUntrusted,
+    };
+    return ContentTask.spawn(browser, parameters,
+        function({ eventName, capture, checkFnSource, wantsUntrusted }) {
+          let checkFn;
+          if (checkFnSource) {
+            checkFn = eval(`(() => (${checkFnSource}))()`);
+          }
+          return new Promise((resolve, reject) => {
+            addEventListener(eventName, function listener(event) {
+              let completion = resolve;
+              try {
+                if (checkFn && !checkFn(event)) {
+                  return;
+                }
+              } catch (e) {
+                completion = () => reject(e);
+              }
+              removeEventListener(eventName, listener, capture);
+              completion();
+            }, capture, wantsUntrusted);
+          });
+        });
+  },
+
+  /**
+   * Like browserLoaded, but waits for an error page to appear.
+   * This explicitly deals with cases where the browser is not currently remote and a
+   * remoteness switch will occur before the error page is loaded, which is tricky
+   * because error pages don't fire 'regular' load events that we can rely on.
+   *
+   * @param {xul:browser} browser
+   *        A xul:browser.
+   *
+   * @return {Promise}
+   * @resolves When an error page has been loaded in the browser.
+   */
+  waitForErrorPage(browser) {
+    let waitForLoad = () =>
+      this.waitForContentEvent(browser, "AboutNetErrorLoad", false, null, true);
+
+    let win = browser.ownerDocument.defaultView;
+    let tab = win.gBrowser.getTabForBrowser(browser);
+    if (!tab || browser.isRemoteBrowser || !win.gMultiProcessBrowser) {
+      return waitForLoad();
+    }
+
+    // We're going to switch remoteness when loading an error page. We need to be
+    // quite careful in order to make sure we're adding the listener in time to
+    // get this event:
+    return new Promise((resolve, reject) => {
+      tab.addEventListener("TabRemotenessChange", function onTRC() {
+        tab.removeEventListener("TabRemotenessChange", onTRC);
+        waitForLoad().then(resolve, reject);
       });
     });
   },
@@ -612,7 +707,7 @@ this.BrowserTestUtils = {
 
   /**
    * Version of EventUtils' `sendChar` function; it will synthesize a keypress
-   * event in a child process and returns a Promise that will result when the
+   * event in a child process and returns a Promise that will resolve when the
    * event was fired. Instead of a Window, a Browser object is required to be
    * passed to this function.
    *
@@ -634,7 +729,7 @@ this.BrowserTestUtils = {
           return;
 
         mm.removeMessageListener("Test:SendCharDone", charMsg);
-        resolve(message.data.sendCharResult);
+        resolve(message.data.result);
       });
 
       mm.sendAsyncMessage("Test:SendChar", {
@@ -642,5 +737,145 @@ this.BrowserTestUtils = {
         seq: seq
       });
     });
-  }
+  },
+
+  /**
+   * Version of EventUtils' `synthesizeKey` function; it will synthesize a key
+   * event in a child process and returns a Promise that will resolve when the
+   * event was fired. Instead of a Window, a Browser object is required to be
+   * passed to this function.
+   *
+   * @param {String} key
+   *        See the documentation available for EventUtils#synthesizeKey.
+   * @param {Object} event
+   *        See the documentation available for EventUtils#synthesizeKey.
+   * @param {Browser} browser
+   *        Browser element, must not be null.
+   *
+   * @returns {Promise}
+   */
+  synthesizeKey(key, event, browser) {
+    return new Promise(resolve => {
+      let seq = ++gSynthesizeKeyCount;
+      let mm = browser.messageManager;
+
+      mm.addMessageListener("Test:SynthesizeKeyDone", function keyMsg(message) {
+        if (message.data.seq != seq)
+          return;
+
+        mm.removeMessageListener("Test:SynthesizeKeyDone", keyMsg);
+        resolve();
+      });
+
+      mm.sendAsyncMessage("Test:SynthesizeKey", { key, event, seq });
+    });
+  },
+
+  /**
+   * Version of EventUtils' `synthesizeComposition` function; it will synthesize
+   * a composition event in a child process and returns a Promise that will
+   * resolve when the event was fired. Instead of a Window, a Browser object is
+   * required to be passed to this function.
+   *
+   * @param {Object} event
+   *        See the documentation available for EventUtils#synthesizeComposition.
+   * @param {Browser} browser
+   *        Browser element, must not be null.
+   *
+   * @returns {Promise}
+   * @resolves False if the composition event could not be synthesized.
+   */
+  synthesizeComposition(event, browser) {
+    return new Promise(resolve => {
+      let seq = ++gSynthesizeCompositionCount;
+      let mm = browser.messageManager;
+
+      mm.addMessageListener("Test:SynthesizeCompositionDone", function compMsg(message) {
+        if (message.data.seq != seq)
+          return;
+
+        mm.removeMessageListener("Test:SynthesizeCompositionDone", compMsg);
+        resolve(message.data.result);
+      });
+
+      mm.sendAsyncMessage("Test:SynthesizeComposition", { event, seq });
+    });
+  },
+
+  /**
+   * Version of EventUtils' `synthesizeCompositionChange` function; it will
+   * synthesize a compositionchange event in a child process and returns a
+   * Promise that will resolve when the event was fired. Instead of a Window, a
+   * Browser object is required to be passed to this function.
+   *
+   * @param {Object} event
+   *        See the documentation available for EventUtils#synthesizeCompositionChange.
+   * @param {Browser} browser
+   *        Browser element, must not be null.
+   *
+   * @returns {Promise}
+   */
+  synthesizeCompositionChange(event, browser) {
+    return new Promise(resolve => {
+      let seq = ++gSynthesizeCompositionChangeCount;
+      let mm = browser.messageManager;
+
+      mm.addMessageListener("Test:SynthesizeCompositionChangeDone", function compMsg(message) {
+        if (message.data.seq != seq)
+          return;
+
+        mm.removeMessageListener("Test:SynthesizeCompositionChangeDone", compMsg);
+        resolve();
+      });
+
+      mm.sendAsyncMessage("Test:SynthesizeCompositionChange", { event, seq });
+    });
+  },
+
+  /**
+   * Will poll a condition function until it returns true.
+   *
+   * @param condition
+   *        A condition function that must return true or false. If the
+   *        condition ever throws, this is also treated as a false.
+   * @param interval
+   *        The time interval to poll the condition function. Defaults
+   *        to 100ms.
+   * @param attempts
+   *        The number of times to poll before giving up and rejecting
+   *        if the condition has not yet returned true. Defaults to 50
+   *        (~5 seconds for 100ms intervals)
+   * @return Promise
+   *        Resolves when condition is true.
+   *        Rejects if timeout is exceeded or condition ever throws.
+   */
+  waitForCondition(condition, msg, interval=100, maxTries=50) {
+    return new Promise((resolve, reject) => {
+      let tries = 0;
+      let intervalID = setInterval(() => {
+        if (tries >= maxTries) {
+          clearInterval(intervalID);
+          msg += ` - timed out after ${maxTries} tries.`;
+          reject(msg);
+          return;
+        }
+
+        let conditionPassed = false;
+        try {
+          conditionPassed = condition();
+        } catch(e) {
+          msg += ` - threw exception: ${e}`;
+          clearInterval(intervalID);
+          reject(msg);
+          return;
+        }
+
+        if (conditionPassed) {
+          clearInterval(intervalID);
+          resolve();
+        }
+        tries++;
+      }, interval);
+    });
+  },
 };

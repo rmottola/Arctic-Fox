@@ -16,4 +16,7 @@ RUN apt-get -q update \
     wget \
     && apt-get clean
 
-RUN freshclam --verbose
+COPY requirements.txt /tmp/
+RUN pip install -r /tmp/requirements.txt
+# Freshclam may be flaky, retry if it fails
+RUN for i in 1 2 3 4 5; do freshclam --verbose && break || sleep 15; done

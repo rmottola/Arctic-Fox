@@ -723,13 +723,15 @@ StripURIForReporting(nsIURI* aURI,
   // 1) If the origin of uri is a globally unique identifier (for example,
   // aURI has a scheme of data, blob, or filesystem), then return the
   // ASCII serialization of uri’s scheme.
-  bool isHttp =
-    (NS_SUCCEEDED(aURI->SchemeIs("http", &isHttp)) && isHttp) ||
-    (NS_SUCCEEDED(aURI->SchemeIs("https", &isHttp)) && isHttp);
-  if (!isHttp) {
+  bool isHttpOrFtp =
+    (NS_SUCCEEDED(aURI->SchemeIs("http", &isHttpOrFtp)) && isHttpOrFtp) ||
+    (NS_SUCCEEDED(aURI->SchemeIs("https", &isHttpOrFtp)) && isHttpOrFtp) ||
+    (NS_SUCCEEDED(aURI->SchemeIs("ftp", &isHttpOrFtp)) && isHttpOrFtp);
+
+  if (!isHttpOrFtp) {
     // not strictly spec compliant, but what we really care about is
-    // http/https. If it's not http/https, then treat aURI as if
-    // it's a globally unique identifier and just return the scheme.
+    // http/https and also ftp. If it's not http/https or ftp, then treat aURI
+    // as if it's a globally unique identifier and just return the scheme.
     aURI->GetScheme(outStrippedURI);
     return;
   }
@@ -962,7 +964,7 @@ nsCSPContext::SendReports(nsISupports* aBlockedContentSource,
       continue;
     }
 
-    rv = uploadChannel->SetUploadStream(sis, NS_LITERAL_CSTRING("application/json"), -1);
+    rv = uploadChannel->SetUploadStream(sis, NS_LITERAL_CSTRING("application/csp-report"), -1);
     NS_ENSURE_SUCCESS(rv, rv);
 
     // if this is an HTTP channel, set the request method to post
@@ -994,7 +996,7 @@ nsCSPContext::SendReports(nsISupports* aBlockedContentSource,
 /**
  * Dispatched from the main thread to send reports for one CSP violation.
  */
-class CSPReportSenderRunnable final : public nsRunnable
+class CSPReportSenderRunnable final : public Runnable
 {
   public:
     CSPReportSenderRunnable(nsISupports* aBlockedContentSource,

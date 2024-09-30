@@ -197,6 +197,10 @@ GonkAudioDecoderManager::Output(int64_t aStreamOffset,
       }
 
       // Update AudioInfo
+      AudioConfig::ChannelLayout layout(codec_channel_count);
+      if (!layout.IsValid()) {
+        return NS_ERROR_FAILURE;
+      }
       mAudioChannels = codec_channel_count;
       mAudioRate = codec_sample_rate;
 
@@ -244,13 +248,22 @@ GonkAudioDecoderManager::Output(int64_t aStreamOffset,
   return NS_ERROR_NOT_AVAILABLE;
 }
 
-nsresult
-GonkAudioDecoderManager::Flush()
+void
+GonkAudioDecoderManager::ProcessFlush()
 {
   GADM_LOG("FLUSH<<<");
   mAudioQueue.Reset();
   GADM_LOG(">>>FLUSH");
-  return GonkDecoderManager::Flush();
+  GonkDecoderManager::ProcessFlush();
+}
+
+void
+GonkAudioDecoderManager::ResetEOS()
+{
+  GADM_LOG("ResetEOS(<<<");
+  mAudioQueue.Reset();
+  GADM_LOG(">>>ResetEOS(");
+  GonkDecoderManager::ResetEOS();
 }
 
 } // namespace mozilla

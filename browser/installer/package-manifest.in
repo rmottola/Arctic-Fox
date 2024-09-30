@@ -170,7 +170,6 @@
 #endif
 @RESPATH@/components/content_xslt.xpt
 @RESPATH@/components/cookie.xpt
-@RESPATH@/browser/components/devtools_security.xpt
 @RESPATH@/components/directory.xpt
 @RESPATH@/components/docshell.xpt
 @RESPATH@/components/dom.xpt
@@ -240,7 +239,6 @@
 @RESPATH@/components/filepicker.xpt
 #endif
 @RESPATH@/components/find.xpt
-@RESPATH@/browser/components/fuel.xpt
 @RESPATH@/components/gfx.xpt
 @RESPATH@/components/html5.xpt
 @RESPATH@/components/htmlparser.xpt
@@ -367,14 +365,18 @@
 @RESPATH@/browser/components/BrowserFeeds.manifest
 @RESPATH@/browser/components/FeedConverter.js
 @RESPATH@/browser/components/FeedWriter.js
-@RESPATH@/browser/components/fuelApplication.manifest
-@RESPATH@/browser/components/fuelApplication.js
 @RESPATH@/browser/components/WebContentConverter.js
 @RESPATH@/browser/components/BrowserComponents.manifest
 @RESPATH@/browser/components/nsBrowserContentHandler.js
 @RESPATH@/browser/components/nsBrowserGlue.js
 @RESPATH@/browser/components/nsSetDefaultBrowser.manifest
 @RESPATH@/browser/components/nsSetDefaultBrowser.js
+@RESPATH@/browser/components/devtools-startup.manifest
+@RESPATH@/browser/components/devtools-startup.js
+@RESPATH@/browser/components/webideCli.js
+@RESPATH@/browser/components/webideComponents.manifest
+@RESPATH@/browser/components/Experiments.manifest
+@RESPATH@/browser/components/ExperimentsService.js
 @RESPATH@/browser/components/browser-newtab.xpt
 @RESPATH@/browser/components/aboutNewTabService.js
 @RESPATH@/browser/components/NewTabComponents.manifest
@@ -527,10 +529,6 @@
 @RESPATH@/components/htmlMenuBuilder.js
 @RESPATH@/components/htmlMenuBuilder.manifest
 
-@RESPATH@/components/RequestSync.manifest
-@RESPATH@/components/RequestSyncManager.js
-@RESPATH@/components/RequestSyncScheduler.js
-
 @RESPATH@/components/PermissionSettings.js
 @RESPATH@/components/PermissionSettings.manifest
 @RESPATH@/components/ContactManager.js
@@ -652,6 +650,9 @@
 @BINPATH@/@MOZ_D3DCOMPILER_VISTA_DLL@
 #endif
 
+#ifdef MOZ_D3DCOMPILER_XP_DLL
+@BINPATH@/@MOZ_D3DCOMPILER_XP_DLL@
+#endif
 #endif # MOZ_ANGLE_RENDERER
 
 ; [Browser Chrome Files]
@@ -672,6 +673,12 @@
 @RESPATH@/browser/chrome/icons/default/default32.png
 @RESPATH@/browser/chrome/icons/default/default48.png
 #endif
+@RESPATH@/browser/features/*
+
+; [Webide Files]
+@RESPATH@/browser/chrome/webide@JAREXT@
+@RESPATH@/browser/chrome/webide.manifest
+@RESPATH@/browser/@PREF_DIR@/webide-prefs.js
 
 ; DevTools
 @RESPATH@/browser/chrome/devtools@JAREXT@
@@ -697,6 +704,7 @@
 @RESPATH@/greprefs.js
 @RESPATH@/defaults/autoconfig/prefcalls.js
 @RESPATH@/browser/defaults/profile/prefs.js
+@RESPATH@/browser/defaults/permissions
 
 ; Warning: changing the path to channel-prefs.js can cause bugs (Bug 756325)
 ; Technically this is an app pref file, but we are keeping it in the original
@@ -813,10 +821,6 @@ bin/libfreebl_32int64_3.so
 @BINPATH@/updater@BIN_SUFFIX@
 #endif
 #endif
-
-@RESPATH@/components/DataStore.manifest
-@RESPATH@/components/DataStoreImpl.js
-@RESPATH@/components/dom_datastore.xpt
 
 @RESPATH@/components/dom_audiochannel.xpt
 

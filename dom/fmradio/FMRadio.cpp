@@ -27,7 +27,6 @@
 // If the pref is true, the antanna will be always available.
 #define DOM_FM_ANTENNA_INTERNAL_PREF "dom.fmradio.antenna.internal"
 
-using namespace mozilla::hal;
 using mozilla::Preferences;
 
 BEGIN_FMRADIO_NAMESPACE
@@ -59,8 +58,6 @@ public:
     mFMRadio = do_GetWeakReference(static_cast<nsIDOMEventTarget*>(aFMRadio));
     mType = aType;
   }
-
-  ~FMRadioRequest() { }
 
   NS_IMETHODIMP
   Run()
@@ -97,6 +94,9 @@ public:
     return NS_OK;
   }
 
+protected:
+  ~FMRadioRequest() { }
+
 private:
   FMRadioRequestArgs::Type mType;
   nsWeakPtr mFMRadio;
@@ -105,7 +105,7 @@ private:
 NS_IMPL_ISUPPORTS_INHERITED0(FMRadioRequest, DOMRequest)
 
 FMRadio::FMRadio()
-  : mHeadphoneState(SWITCH_STATE_OFF)
+  : mHeadphoneState(hal::SWITCH_STATE_OFF)
   , mRdsGroupMask(0)
   , mAudioChannelAgentEnabled(false)
   , mHasInternalAntenna(false)
@@ -130,8 +130,8 @@ FMRadio::Init(nsPIDOMWindowInner *aWindow)
   if (mHasInternalAntenna) {
     LOG("We have an internal antenna.");
   } else {
-    mHeadphoneState = GetCurrentSwitchState(SWITCH_HEADPHONES);
-    RegisterSwitchObserver(SWITCH_HEADPHONES, this);
+    mHeadphoneState = hal::GetCurrentSwitchState(hal::SWITCH_HEADPHONES);
+    hal::RegisterSwitchObserver(hal::SWITCH_HEADPHONES, this);
   }
 
   nsCOMPtr<nsIAudioChannelAgent> audioChannelAgent =
@@ -154,7 +154,7 @@ FMRadio::Shutdown()
   IFMRadioService::Singleton()->RemoveObserver(this);
 
   if (!mHasInternalAntenna) {
-    UnregisterSwitchObserver(SWITCH_HEADPHONES, this);
+    hal::UnregisterSwitchObserver(hal::SWITCH_HEADPHONES, this);
   }
 
   mIsShutdown = true;
@@ -167,7 +167,7 @@ FMRadio::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 }
 
 void
-FMRadio::Notify(const SwitchEvent& aEvent)
+FMRadio::Notify(const hal::SwitchEvent& aEvent)
 {
   MOZ_ASSERT(!mHasInternalAntenna);
 
@@ -240,8 +240,8 @@ FMRadio::RdsEnabled()
 bool
 FMRadio::AntennaAvailable() const
 {
-  return mHasInternalAntenna ? true : (mHeadphoneState != SWITCH_STATE_OFF) &&
-    (mHeadphoneState != SWITCH_STATE_UNKNOWN);
+  return mHasInternalAntenna ? true : (mHeadphoneState != hal::SWITCH_STATE_OFF) &&
+    (mHeadphoneState != hal::SWITCH_STATE_UNKNOWN);
 }
 
 Nullable<double>
@@ -388,7 +388,7 @@ FMRadio::SeekUp()
   }
 
   RefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
-  IFMRadioService::Singleton()->Seek(FM_RADIO_SEEK_DIRECTION_UP, r);
+  IFMRadioService::Singleton()->Seek(hal::FM_RADIO_SEEK_DIRECTION_UP, r);
 
   return r.forget();
 }
@@ -402,7 +402,7 @@ FMRadio::SeekDown()
   }
 
   RefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
-  IFMRadioService::Singleton()->Seek(FM_RADIO_SEEK_DIRECTION_DOWN, r);
+  IFMRadioService::Singleton()->Seek(hal::FM_RADIO_SEEK_DIRECTION_DOWN, r);
 
   return r.forget();
 }

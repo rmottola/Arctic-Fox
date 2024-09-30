@@ -38,7 +38,6 @@ static const char16_t DOT          = '.';
 static const char16_t UNDERLINE    = '_';
 static const char16_t TILDE        = '~';
 static const char16_t WILDCARD     = '*';
-static const char16_t WHITESPACE   = ' ';
 static const char16_t SINGLEQUOTE  = '\'';
 static const char16_t OPEN_CURL    = '{';
 static const char16_t CLOSE_CURL   = '}';
@@ -78,7 +77,7 @@ nsCSPTokenizer::generateNextToken()
 {
   skipWhiteSpaceAndSemicolon();
   while (!atEnd() &&
-         *mCurChar != WHITESPACE &&
+         !nsContentUtils::IsHTMLWhitespace(*mCurChar) &&
          *mCurChar != SEMICOLON) {
     mCurToken.Append(*mCurChar++);
   }
@@ -578,7 +577,8 @@ nsCSPParser::keywordSource()
   }
 
   if (CSP_IsKeyword(mCurToken, CSP_UNSAFE_INLINE)) {
-      nsCOMPtr<nsIDocument> doc = do_QueryReferent(mCSPContext->GetLoadingContext());
+      nsWeakPtr ctx = mCSPContext->GetLoadingContext();
+      nsCOMPtr<nsIDocument> doc = do_QueryReferent(ctx);
       if (doc) {
         doc->SetHasUnsafeInlineCSP(true);
       }
@@ -597,7 +597,8 @@ nsCSPParser::keywordSource()
   }
 
   if (CSP_IsKeyword(mCurToken, CSP_UNSAFE_EVAL)) {
-    nsCOMPtr<nsIDocument> doc = do_QueryReferent(mCSPContext->GetLoadingContext());
+    nsWeakPtr ctx = mCSPContext->GetLoadingContext();
+    nsCOMPtr<nsIDocument> doc = do_QueryReferent(ctx);
     if (doc) {
       doc->SetHasUnsafeEvalCSP(true);
     }
@@ -1119,15 +1120,16 @@ nsCSPParser::directive()
     srcs.AppendElement(keyword);
   }
 
-  // if a hash or nonce is specified within script-src, then
-  // unsafe-inline should be ignored, see:
+  // Ignore unsafe-inline within script-src or style-src if nonce
+  // or hash is specified, see:
   // http://www.w3.org/TR/CSP2/#directive-script-src
-  if (cspDir->equals(nsIContentSecurityPolicy::SCRIPT_SRC_DIRECTIVE) &&
+  if ((cspDir->equals(nsIContentSecurityPolicy::SCRIPT_SRC_DIRECTIVE) ||
+       cspDir->equals(nsIContentSecurityPolicy::STYLE_SRC_DIRECTIVE)) &&
       mHasHashOrNonce && mUnsafeInlineKeywordSrc) {
     mUnsafeInlineKeywordSrc->invalidate();
     // log to the console that unsafe-inline will be ignored
     const char16_t* params[] = { MOZ_UTF16("'unsafe-inline'") };
-    logWarningErrorToConsole(nsIScriptError::warningFlag, "ignoringSrcWithinScriptSrc",
+    logWarningErrorToConsole(nsIScriptError::warningFlag, "ignoringSrcWithinScriptStyleSrc",
                              params, ArrayLength(params));
   }
 

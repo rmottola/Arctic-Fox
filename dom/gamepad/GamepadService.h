@@ -39,6 +39,7 @@ class GamepadService : public nsIObserver
   static bool IsAPIEnabled();
 
   void BeginShutdown();
+  void StopMonitoring();
 
   // Indicate that |aWindow| wants to receive gamepad events.
   void AddListener(nsGlobalWindow* aWindow);
@@ -132,6 +133,7 @@ class GamepadService : public nsIObserver
   nsCOMPtr<nsITimer> mTimer;
 };
 
-}  // namespace dom
-}  // namespace mozilla
+} // namespace dom
+} // namespace mozilla
+
 #endif // mozilla_dom_GamepadService_h_

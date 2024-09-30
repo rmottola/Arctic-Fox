@@ -1360,7 +1360,7 @@ void nsIDocument::SelectorCache::CacheList(const nsAString& aSelector,
   AddObject(key);
 }
 
-class nsIDocument::SelectorCacheKeyDeleter final : public nsRunnable
+class nsIDocument::SelectorCacheKeyDeleter final : public Runnable
 {
 public:
   explicit SelectorCacheKeyDeleter(SelectorCacheKey* aToDelete)
@@ -3574,11 +3574,11 @@ nsIDocument::GetBaseURI(bool aTryUseXHRDocBaseURI) const
   return uri.forget();
 }
 
-nsresult
+void
 nsDocument::SetBaseURI(nsIURI* aURI)
 {
   if (!aURI && !mDocumentBaseURI) {
-    return NS_OK;
+    return;
   }
 
   // Don't do anything if the URI wasn't actually changed.
@@ -3586,25 +3586,7 @@ nsDocument::SetBaseURI(nsIURI* aURI)
     bool equalBases = false;
     mDocumentBaseURI->Equals(aURI, &equalBases);
     if (equalBases) {
-      return NS_OK;
-    }
-  }
-
-  // Check if CSP allows this base-uri
-  nsCOMPtr<nsIContentSecurityPolicy> csp;
-  nsresult rv = NodePrincipal()->GetCsp(getter_AddRefs(csp));
-  NS_ENSURE_SUCCESS(rv, rv);
-  if (csp && aURI) {
-    bool permitsBaseURI = false;
-
-    // base-uri is only enforced if explicitly defined in the
-    // policy - do *not* consult default-src, see:
-    // http://www.w3.org/TR/CSP2/#directive-default-src
-    rv = csp->Permits(aURI, nsIContentSecurityPolicy::BASE_URI_DIRECTIVE,
-                      true, &permitsBaseURI);
-    NS_ENSURE_SUCCESS(rv, rv);
-    if (!permitsBaseURI) {
-      return NS_OK;
+      return;
     }
   }
 
@@ -3614,8 +3596,6 @@ nsDocument::SetBaseURI(nsIURI* aURI)
     mDocumentBaseURI = nullptr;
   }
   RefreshLinkHrefs();
-
-  return NS_OK;
 }
 
 void
@@ -9121,7 +9101,7 @@ nsDocument::UnblockOnload(bool aFireSync)
   }
 }
 
-class nsUnblockOnloadEvent : public nsRunnable {
+class nsUnblockOnloadEvent : public Runnable {
 public:
   explicit nsUnblockOnloadEvent(nsDocument* aDoc) : mDoc(aDoc) {}
   NS_IMETHOD Run() {
@@ -9995,7 +9975,7 @@ nsDocument::LoadChromeSheetSync(nsIURI* uri, bool isAgentSheet,
   return CSSLoader()->LoadSheetSync(uri, mode, isAgentSheet, aSheet);
 }
 
-class nsDelayedEventDispatcher : public nsRunnable
+class nsDelayedEventDispatcher : public Runnable
 {
 public:
   explicit nsDelayedEventDispatcher(nsTArray<nsCOMPtr<nsIDocument>>& aDocuments)
@@ -11184,7 +11164,7 @@ AskWindowToExitFullscreen(nsIDocument* aDoc)
   }
 }
 
-class nsCallExitFullscreen : public nsRunnable
+class nsCallExitFullscreen : public Runnable
 {
 public:
   explicit nsCallExitFullscreen(nsIDocument* aDoc)
@@ -11258,7 +11238,7 @@ ResetFullScreen(nsIDocument* aDocument, void* aData)
 // Since nsIDocument::ExitFullscreenInDocTree() could be called from
 // Element::UnbindFromTree() where it is not safe to synchronously run
 // script. This runnable is the script part of that function.
-class ExitFullscreenScriptRunnable : public nsRunnable
+class ExitFullscreenScriptRunnable : public Runnable
 {
 public:
   explicit ExitFullscreenScriptRunnable(nsCOMArray<nsIDocument>&& aDocuments)
@@ -11452,7 +11432,7 @@ nsDocument::RestorePreviousFullScreenState()
   }
 }
 
-class nsCallRequestFullScreen : public nsRunnable
+class nsCallRequestFullScreen : public Runnable
 {
 public:
   explicit nsCallRequestFullScreen(UniquePtr<FullscreenRequest>&& aRequest)
@@ -11699,8 +11679,8 @@ GetFullscreenError(nsIDocument* aDoc, bool aCallerIsChrome)
   if (nsContentUtils::IsFullScreenApiEnabled() && aCallerIsChrome) {
     // Chrome code can always use the full-screen API, provided it's not
     // explicitly disabled. Note IsCallerChrome() returns true when running
-    // in an nsRunnable, so don't use GetMozFullScreenEnabled() from an
-    // nsRunnable!
+    // in a Runnable, so don't use GetMozFullScreenEnabled() from a
+    // Runnable!
     return nullptr;
   }
 
@@ -12225,7 +12205,7 @@ static const uint8_t kPointerLockRequestLimit = 2;
 class nsPointerLockPermissionRequest;
 mozilla::StaticRefPtr<nsPointerLockPermissionRequest> gPendingPointerLockRequest;
 
-class nsPointerLockPermissionRequest : public nsRunnable,
+class nsPointerLockPermissionRequest : public Runnable,
                                        public nsIContentPermissionRequest
 {
 public:
@@ -12300,7 +12280,7 @@ protected:
 };
 
 NS_IMPL_ISUPPORTS_INHERITED(nsPointerLockPermissionRequest,
-                            nsRunnable,
+                            Runnable,
                             nsIContentPermissionRequest)
 
 NS_IMETHODIMP

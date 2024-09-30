@@ -324,7 +324,11 @@ nsEditorEventListener::GetFocusedRootContent()
   nsIDocument* composedDoc = focusedContent->GetComposedDoc();
   NS_ENSURE_TRUE(composedDoc, nullptr);
 
-  return composedDoc->HasFlag(NODE_IS_EDITABLE) ? nullptr : focusedContent;
+  if (composedDoc->HasFlag(NODE_IS_EDITABLE)) {
+    return nullptr;
+  }
+
+  return focusedContent;
 }
 
 bool
@@ -1073,6 +1077,11 @@ nsEditorEventListener::Focus(nsIDOMEvent* aEvent)
 
   // Spell check a textarea the first time that it is focused.
   SpellCheckIfNeeded();
+  if (!mEditor) {
+    // In e10s, this can cause us to flush notifications, which can destroy
+    // the node we're about to focus.
+    return NS_OK;
+  }
 
   nsCOMPtr<nsIDOMEventTarget> target;
   aEvent->GetTarget(getter_AddRefs(target));

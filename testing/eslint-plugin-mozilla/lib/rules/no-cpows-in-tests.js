@@ -22,12 +22,18 @@ var cpows = [
   /^window\.content/
 ];
 
+var isInContentTask = false;
+
 module.exports = function(context) {
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 
   function showError(node, identifier) {
+    if (isInContentTask) {
+      return;
+    }
+
     context.report({
       node: node,
       message: identifier +
@@ -35,11 +41,32 @@ module.exports = function(context) {
     });
   }
 
+  function isContentTask(node) {
+    return node &&
+           node.type === "MemberExpression" &&
+           node.property.type === "Identifier" &&
+           node.property.name === "spawn" &&
+           node.object.type === "Identifier" &&
+           node.object.name === "ContentTask";
+  }
+
   // ---------------------------------------------------------------------------
   // Public
   // ---------------------------------------------------------------------------
 
   return {
+    CallExpression: function(node) {
+      if (isContentTask(node.callee)) {
+        isInContentTask = true;
+      }
+    },
+
+    "CallExpression:exit": function(node) {
+      if (isContentTask(node.callee)) {
+        isInContentTask = false;
+      }
+    },
+
     MemberExpression: function(node) {
       if (!helpers.getIsBrowserMochitest(this)) {
         return;
@@ -47,14 +74,16 @@ module.exports = function(context) {
 
       var expression = context.getSource(node);
 
-      cpows.some(function(cpow) {
+      // Only report a single CPOW error per node -- so if checking
+      // |cpows| reports one, don't report another below.
+      var someCpowFound = cpows.some(function(cpow) {
         if (cpow.test(expression)) {
           showError(node, expression);
           return true;
         }
         return false;
       });
-      if (helpers.getIsGlobalScope(context)) {
+      if (!someCpowFound && helpers.getIsGlobalScope(context.getAncestors())) {
         if (/^content\./.test(expression)) {
           showError(node, expression);
           return;
@@ -75,7 +104,6 @@ module.exports = function(context) {
             node.parent.object.name != "content") {
           return;
         }
-
         showError(node, expression);
         return;
       }

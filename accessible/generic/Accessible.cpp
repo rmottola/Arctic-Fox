@@ -94,8 +94,7 @@ using namespace mozilla::a11y;
 ////////////////////////////////////////////////////////////////////////////////
 // Accessible: nsISupports and cycle collection
 
-NS_IMPL_CYCLE_COLLECTION(Accessible,
-                         mContent, mParent, mChildren)
+NS_IMPL_CYCLE_COLLECTION(Accessible, mContent)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(Accessible)
   if (aIID.Equals(NS_GET_IID(Accessible)))
@@ -885,6 +884,15 @@ Accessible::HandleAccEvent(AccEvent* aEvent)
                                       event->IsFromUserInput());
           break;
                                                      }
+        case nsIAccessibleEvent::EVENT_SELECTION:
+        case nsIAccessibleEvent::EVENT_SELECTION_ADD:
+        case nsIAccessibleEvent::EVENT_SELECTION_REMOVE: {
+          AccSelChangeEvent* selEvent = downcast_accEvent(aEvent);
+          uint64_t widgetID = selEvent->Widget()->IsDoc() ? 0 :
+            reinterpret_cast<uintptr_t>(selEvent->Widget());
+          ipcDoc->SendSelectionEvent(id, widgetID, aEvent->GetEventType());
+          break;
+                                                         }
         default:
                                                          ipcDoc->SendEvent(id, aEvent->GetEventType());
       }
@@ -1760,7 +1768,7 @@ Accessible::GetNativeInterface(void** aNativeAccessible)
 void
 Accessible::DoCommand(nsIContent *aContent, uint32_t aActionIndex)
 {
-  class Runnable final : public nsRunnable
+  class Runnable final : public mozilla::Runnable
   {
   public:
     Runnable(Accessible* aAcc, nsIContent* aContent, uint32_t aIdx) :
@@ -1970,7 +1978,7 @@ Accessible::BindToParent(Accessible* aParent, uint32_t aIndexInParent)
 #ifdef A11Y_LOG
   if (mParent) {
     logging::TreeInfo("BindToParent: stealing accessible", 0,
-                      "old parent", mParent.get(),
+                      "old parent", mParent,
                       "new parent", aParent,
                       "child", this, nullptr);
   }

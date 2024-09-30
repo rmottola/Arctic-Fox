@@ -15,6 +15,9 @@ browser.jar:
   skin/classic/browser/aboutSyncTabs.css
 #endif
   skin/classic/browser/aboutTabCrashed.css                   (../shared/aboutTabCrashed.css)
+* skin/classic/browser/syncedtabs/sidebar.css          (syncedtabs/sidebar.css)
+  skin/classic/browser/syncedtabs/arrow-open.svg       (syncedtabs/arrow-open.svg)
+  skin/classic/browser/syncedtabs/arrow-closed.svg     (syncedtabs/arrow-closed.svg)
   skin/classic/browser/actionicon-tab.png
   skin/classic/browser/appmenu-icons.png
   skin/classic/browser/appmenu-dropmarker.png
@@ -80,16 +83,17 @@ browser.jar:
   skin/classic/browser/webRTC-sharingScreen-menubar.png
   skin/classic/browser/webRTC-sharingScreen-menubar@2x.png
 * skin/classic/browser/controlcenter/panel.css        (controlcenter/panel.css)
+  skin/classic/browser/customizableui/thumburger-inverted.png  (customizableui/thumburger-inverted.png)
+  skin/classic/browser/customizableui/thumburger-inverted@2x.png  (customizableui/thumburger-inverted@2x.png)
+  skin/classic/browser/customizableui/thumburger.png  (customizableui/thumburger.png)
+  skin/classic/browser/customizableui/thumburger@2x.png  (customizableui/thumburger@2x.png)
+* skin/classic/browser/customizableui/panelUIOverlay.css    (customizableui/panelUIOverlay.css)
   skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
   skin/classic/browser/downloads/buttons.png                   (downloads/buttons.png)
   skin/classic/browser/downloads/contentAreaDownloadsView.css  (downloads/contentAreaDownloadsView.css)
   skin/classic/browser/downloads/download-glow.png             (downloads/download-glow.png)
   skin/classic/browser/downloads/download-notification-finish.png (downloads/download-notification-finish.png)
   skin/classic/browser/downloads/download-notification-start.png (downloads/download-notification-start.png)
-  skin/classic/browser/customizableui/thumburger-inverted.png  (customizableui/thumburger-inverted.png)
-  skin/classic/browser/customizableui/thumburger-inverted@2x.png  (customizableui/thumburger-inverted@2x.png)
-  skin/classic/browser/customizableui/thumburger.png  (customizableui/thumburger.png)
-  skin/classic/browser/customizableui/thumburger@2x.png  (customizableui/thumburger@2x.png)
   skin/classic/browser/downloads/download-summary.png       (downloads/download-summary.png)
   skin/classic/browser/downloads/downloads.css              (downloads/downloads.css)
   skin/classic/browser/feeds/feedIcon.png                   (feeds/feedIcon.png)

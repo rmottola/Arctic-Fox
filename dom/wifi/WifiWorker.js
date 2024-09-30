@@ -416,7 +416,7 @@ var WifiManager = (function() {
     let currentNetwork = Object.create(null);
     currentNetwork.netId = manager.connectionInfo.id;
 
-    manager.getNetworkConfiguration(currentNetwork, function (){
+    manager.getNetworkConfiguration(currentNetwork, function () {
       curNetworkKey = getNetworkKey(currentNetwork);
 
       // Add additional information to static ip configuration
@@ -435,15 +435,19 @@ var WifiManager = (function() {
       // If the ssid of current connection is the same as configured ssid
       // It means we need update current connection to use static IP address.
       if (setNetworkKey == curNetworkKey) {
-        // Use configureInterface directly doesn't work, the network iterface
+        // Use configureInterface directly doesn't work, the network interface
         // and routing table is changed but still cannot connect to network
         // so the workaround here is disable interface the enable again to
         // trigger network reconnect with static ip.
         gNetworkService.disableInterface(manager.ifname, function (ok) {
           gNetworkService.enableInterface(manager.ifname, function (ok) {
+            callback(ok);
           });
         });
+        return;
       }
+
+      callback(true);
     });
   }
 
@@ -864,6 +868,16 @@ var WifiManager = (function() {
     }
     if (eventData.indexOf("CTRL-EVENT-EAP") === 0) {
       return handleWpaEapEvents(event);
+    }
+    if (eventData.indexOf("CTRL-EVENT-ASSOC-REJECT") === 0) {
+      debug("CTRL-EVENT-ASSOC-REJECT: network error");
+      notify("passwordmaybeincorrect");
+      if (manager.authenticationFailuresCount > MAX_RETRIES_ON_AUTHENTICATION_FAILURE) {
+        manager.authenticationFailuresCount = 0;
+        debug("CTRL-EVENT-ASSOC-REJECT: disconnect network");
+        notify("disconnected", {connectionInfo: manager.connectionInfo});
+      }
+      return true;
     }
     if (eventData.indexOf("WPS-TIMEOUT") === 0) {
       notifyStateChange({ state: "WPS_TIMEOUT", BSSID: null, id: -1 });
@@ -1418,6 +1432,14 @@ var WifiManager = (function() {
                               ? wifiCommand.getConnectionInfoICS
                               : wifiCommand.getConnectionInfoGB;
 
+  manager.ensureSupplicantDetached = aCallback => {
+    if (!manager.enabled) {
+      aCallback();
+      return;
+    }
+    wifiCommand.closeSupplicantConnection(aCallback);
+  };
+
   manager.isHandShakeState = function(state) {
     switch (state) {
       case "AUTHENTICATING":
@@ -1764,7 +1786,7 @@ function isWepHexKey(s) {
 }
 
 
-let WifiNetworkInterface = {
+var WifiNetworkInterface = {
 
   QueryInterface: XPCOMUtils.generateQI([Ci.nsINetworkInterface]),
 
@@ -1831,8 +1853,8 @@ function WifiScanResult() {}
 
 // TODO Make the difference between a DOM-based network object and our
 // networks objects much clearer.
-let netToDOM;
-let netFromDOM;
+var netToDOM;
+var netFromDOM;
 
 function WifiWorker() {
   var self = this;
@@ -2184,7 +2206,10 @@ function WifiWorker() {
             ssid: quote(WifiManager.connectionInfo.ssid),
             mode: MODE_ESS,
             frequency: 0};
-        self._fireEvent("onconnecting", { network: netToDOM(self.currentNetwork) });
+        WifiManager.getNetworkConfiguration(self.currentNetwork, function (){
+          // Notify again because we get complete network information.
+          self._fireEvent("onconnecting", { network: netToDOM(self.currentNetwork) });
+        });
         break;
       case "ASSOCIATED":
         // set to full power mode when ready to do 4 way handsharke.
@@ -2620,7 +2645,9 @@ WifiWorker.prototype = {
 
         // Only fire the event if the link speed changed or the signal
         // strength changed by more than 10%.
-        function tensPlace(percent) ((percent / 10) | 0)
+        function tensPlace(percent) {
+          return (percent / 10) | 0;
+        }
 
         if (last && last.linkSpeed === info.linkSpeed &&
             last.ipAddress === info.ipAddress &&
@@ -3499,7 +3526,7 @@ WifiWorker.prototype = {
   },
 
   setStaticIpMode: function(msg) {
-    const message = "WifiManager:setStaticMode:Return";
+    const message = "WifiManager:setStaticIpMode:Return";
     let self = this;
     let network = msg.data.network;
     let info = msg.data.info;
@@ -3802,10 +3829,14 @@ WifiWorker.prototype = {
       break;
 
     case "xpcom-shutdown":
-      let wifiService = Cc["@mozilla.org/wifi/service;1"].getService(Ci.nsIWifiProxyService);
-      wifiService.shutdown();
-      let wifiCertService = Cc["@mozilla.org/wifi/certservice;1"].getService(Ci.nsIWifiCertService);
-      wifiCertService.shutdown();
+      // Ensure the supplicant is detached from B2G to avoid XPCOM shutdown
+      // blocks forever.
+      WifiManager.ensureSupplicantDetached(() => {
+        let wifiService = Cc["@mozilla.org/wifi/service;1"].getService(Ci.nsIWifiProxyService);
+        wifiService.shutdown();
+        let wifiCertService = Cc["@mozilla.org/wifi/certservice;1"].getService(Ci.nsIWifiCertService);
+        wifiCertService.shutdown();
+      });
       break;
     }
   },
@@ -3883,7 +3914,7 @@ WifiWorker.prototype = {
 
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory([WifiWorker]);
 
-let debug;
+var debug;
 function updateDebug() {
   if (DEBUG) {
     debug = function (s) {

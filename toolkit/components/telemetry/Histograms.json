@@ -535,6 +535,20 @@
     "kind": "boolean",
     "description": "Geolocation on OS X is either MLS or CoreLocation"
   },
+  "GEOLOCATION_GETCURRENTPOSITION_VISIBLE": {
+    "alert_emails": ["michelangelo@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "boolean",
+    "bug_numbers": [1255198],
+    "description": "This metric is recorded every time a navigator.geolocation.getCurrentPosition() request gets allowed/fulfilled. A false value is recorded if the owner is not visible according to document.isVisible."
+  },
+  "GEOLOCATION_WATCHPOSITION_VISIBLE": {
+    "alert_emails": ["michelangelo@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "boolean",
+    "bug_numbers": [1255198],
+    "description": "This metric is recorded every time a navigator.geolocation.watchPosition() request gets allowed/fulfilled. A false value is recorded if the owner is not visible according to document.isVisible."
+  },
   "JS_DEPRECATED_LANGUAGE_EXTENSIONS_IN_CONTENT": {
     "alert_emails": ["jdemooij@mozilla.com"],
     "expires_in_version": "never",
@@ -1355,6 +1369,15 @@
     "kind": "enumerated",
     "n_values": 3,
     "description": "Stats about what kind of resource requested http authentication. (0=top-level doc, 1=same origin subresources 2=cross-origin subresources)"
+  },
+  "HTTP_AUTH_TYPE_STATS": {
+    "alert_emails": ["rbarnes@mozilla.com"],
+    "bug_numbers": [1266571],
+    "expires_in_version": "52",
+    "kind": "enumerated",
+    "n_values": 8,
+    "releaseChannelCollection": "opt-out",
+    "description": "Recorded once for each HTTP 401 response. The value records the type of authentication and the TLS-enabled status. (0=basic/clear, 1=basic/tls, 2=digest/clear, 3=digest/tls, 4=ntlm/clear, 5=ntlm/tls, 6=negotiate/clear, 7=negotiate/tls)"
   },
   "SSL_HANDSHAKE_VERSION": {
     "expires_in_version": "never",
@@ -3284,6 +3307,14 @@
     "n_buckets": 10,
     "description": "Time spent in nsDiskCacheStreamIO::Close() on the main thread (ms)"
   },
+  "NETWORK_ID": {
+    "alert_emails": ["necko@mozilla.com"],
+    "bug_numbers": [1240932],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 6,
+    "description": "Network identification (0=None, 1=New, 2=Same)"
+  },
   "IDLE_NOTIFY_BACK_MS": {
     "expires_in_version": "40",
     "kind": "exponential",
@@ -3426,6 +3457,15 @@
     "n_buckets": 20,
     "releaseChannelCollection": "opt-out",
     "description": "PLACES: Number of unique pages"
+  },
+  "PLACES_MOST_RECENT_EXPIRED_VISIT_DAYS": {
+    "alert_emails": ["mbonardo@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "linear",
+    "low": 30,
+    "high": 730,
+    "n_buckets": 12,
+    "description": "PLACES: the most recent expired visit in days"
   },
   "PLACES_BOOKMARKS_COUNT": {
     "expires_in_version": "never",
@@ -10273,6 +10313,16 @@
     "keyed": true,
     "description": "Measures the size of IPC messages by message name"
   },
+  "IPC_REPLY_SIZE": {
+    "alert_emails": ["wmccloskey@mozilla.com"],
+    "bug_numbers": [1264820],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": 8000000,
+    "n_buckets": 50,
+    "keyed": true,
+    "description": "Measures the size of IPC messages by message name"
+  },
   "MESSAGE_MANAGER_MESSAGE_SIZE": {
     "alert_emails": ["wmccloskey@mozilla.com"],
     "bug_numbers": [1260908],
@@ -10289,5 +10339,15 @@
     "expires_in_version": "55",
     "kind": "boolean",
     "description": "Result of call to SandboxBroker::Initialize"
+  },
+  "SYNC_WORKER_OPERATION": {
+    "alert_emails": ["amarchesini@mozilla.com", "khuey@mozilla.com" ],
+    "bug_numbers": [1267904],
+    "expires_in_version": "never",
+    "kind": "exponential",
+    "high": 5000,
+    "n_buckets": 20,
+    "keyed": true,
+    "description": "Tracking how long a Worker thread is blocked when a sync operation is executed on the main-thread."
   }
 }

@@ -318,7 +318,10 @@ LayoutView.prototype = {
     let editor = new InplaceEditor({
       element: element,
       initial: initialValue,
-
+      contentType: InplaceEditor.CONTENT_TYPES.CSS_VALUE,
+      property: {
+        name: dimension.property
+      },
       start: self => {
         self.elt.parentNode.classList.add("layout-editing");
       },
@@ -601,6 +604,7 @@ LayoutView.prototype = {
       this.elementRules = styleEntries.map(e => e.rule);
 
       this.inspector.emit("layoutview-updated");
+      return undefined;
     }).bind(this)).catch(console.error);
 
     this._lastRequest = lastRequest;

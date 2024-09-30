@@ -5,6 +5,7 @@
 "use strict";
 
 Components.utils.import("resource://gre/modules/Services.jsm");
+Components.utils.import("resource://gre/modules/NetUtil.jsm");
 
 if (typeof(Ci) == 'undefined') {
   var Ci = Components.interfaces;
@@ -186,15 +187,12 @@ SpecialPowersObserverAPI.prototype = {
     // to evaluate http:// urls...
     var scriptableStream = Cc["@mozilla.org/scriptableinputstream;1"]
                              .getService(Ci.nsIScriptableInputStream);
-    var channel = Services.io.newChannel2(aUrl,
-                                          null,
-                                          null,
-                                          null,      // aLoadingNode
-                                          Services.scriptSecurityManager.getSystemPrincipal(),
-                                          null,      // aTriggeringPrincipal
-                                          Ci.nsILoadInfo.SEC_NORMAL,
-                                          Ci.nsIContentPolicy.TYPE_OTHER);
-    var input = channel.open();
+
+    var channel = NetUtil.newChannel({
+      uri: aUrl,
+      loadUsingSystemPrincipal: true
+    });
+    var input = channel.open2();
     scriptableStream.init(input);
 
     var str;
@@ -422,10 +420,20 @@ SpecialPowersObserverAPI.prototype = {
       }
 
       case "SPLoadChromeScript": {
-        let url = aMessage.json.url;
         let id = aMessage.json.id;
+        let jsScript;
+        let scriptName;
 
-        let jsScript = this._readUrlAsString(url);
+        if (aMessage.json.url) {
+          jsScript = this._readUrlAsString(aMessage.json.url);
+          scriptName = aMessage.json.url;
+        } else if (aMessage.json.function) {
+          jsScript = aMessage.json.function.body;
+          scriptName = aMessage.json.function.name
+            || "<loadChromeScript anonymous function>";
+        } else {
+          throw new SpecialPowersError("SPLoadChromeScript: Invalid script");
+        }
 
         // Setup a chrome sandbox that has access to sendAsyncMessage
         // and addMessageListener in order to communicate with
@@ -449,8 +457,8 @@ SpecialPowersObserverAPI.prototype = {
         let reporter = function (err, message, stack) {
           // Pipe assertions back to parent process
           mm.sendAsyncMessage("SPChromeScriptAssert",
-                              { id: id, url: url, err: err, message: message,
-                                stack: stack });
+                              { id, name: scriptName, err, message,
+                                stack });
         };
         Object.defineProperty(sb, "assert", {
           get: function () {
@@ -467,10 +475,10 @@ SpecialPowersObserverAPI.prototype = {
 
         // Evaluate the chrome script
         try {
-          Components.utils.evalInSandbox(jsScript, sb, "1.8", url, 1);
+          Components.utils.evalInSandbox(jsScript, sb, "1.8", scriptName, 1);
         } catch(e) {
           throw new SpecialPowersError(
-            "Error while executing chrome script '" + url + "':\n" +
+            "Error while executing chrome script '" + scriptName + "':\n" +
             e + "\n" +
             e.fileName + ":" + e.lineNumber);
         }
@@ -481,10 +489,9 @@ SpecialPowersObserverAPI.prototype = {
         let id = aMessage.json.id;
         let name = aMessage.json.name;
         let message = aMessage.json.message;
-        this._chromeScriptListeners
-            .filter(o => (o.name == name && o.id == id))
-            .forEach(o => o.listener(message));
-        return undefined;	// See comment at the beginning of this function.
+        return this._chromeScriptListeners
+                   .filter(o => (o.name == name && o.id == id))
+                   .map(o => o.listener(message));
       }
 
       case "SPImportInMainProcess": {

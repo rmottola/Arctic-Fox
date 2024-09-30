@@ -66,12 +66,10 @@
 #include "ActiveLayerTracker.h"
 #include "CounterStyleManager.h"
 #include "FrameLayerBuilder.h"
-#include "mozilla/dom/RequestSyncWifiService.h"
 #include "AnimationCommon.h"
 #include "LayerAnimationInfo.h"
 
 #include "AudioChannelService.h"
-#include "mozilla/dom/DataStoreService.h"
 #include "mozilla/dom/PromiseDebugging.h"
 #include "mozilla/dom/WebCryptoThreadPool.h"
 
@@ -304,10 +302,6 @@ nsLayoutStatics::Initialize()
 
   ServiceWorkerRegistrar::Initialize();
 
-#ifdef MOZ_B2G
-  RequestSyncWifiService::Init();
-#endif
-
 #ifdef DEBUG
   nsStyleContext::Initialize();
   mozilla::LayerAnimationInfo::Initialize();
@@ -428,8 +422,6 @@ nsLayoutStatics::Shutdown()
 
   nsHyphenationManager::Shutdown();
   nsDOMMutationObserver::Shutdown();
-
-  DataStoreService::Shutdown();
 
   ContentParent::ShutDown();
 

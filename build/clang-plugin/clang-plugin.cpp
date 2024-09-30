@@ -337,7 +337,7 @@ static CustomTypeAnnotation HeapClass =
 static CustomTypeAnnotation NonTemporaryClass =
     CustomTypeAnnotation("moz_non_temporary_class", "non-temporary");
 static CustomTypeAnnotation MustUse =
-    CustomTypeAnnotation("moz_must_use", "must-use");
+    CustomTypeAnnotation("moz_must_use_type", "must-use");
 
 class MemMoveAnnotation final : public CustomTypeAnnotation {
 public:

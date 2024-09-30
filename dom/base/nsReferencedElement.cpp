@@ -47,7 +47,7 @@ nsReferencedElement::Reset(nsIContent* aFromContent, nsIURI* aURI,
     return;
 
   // Get the current document
-  nsIDocument *doc = aFromContent->GetComposedDoc();
+  nsIDocument *doc = aFromContent->OwnerDoc();
   if (!doc)
     return;
 
@@ -124,7 +124,7 @@ void
 nsReferencedElement::ResetWithID(nsIContent* aFromContent, const nsString& aID,
                                  bool aWatch)
 {
-  nsIDocument *doc = aFromContent->GetComposedDoc();
+  nsIDocument *doc = aFromContent->OwnerDoc();
   if (!doc)
     return;
 
@@ -215,7 +215,7 @@ nsReferencedElement::Observe(Element* aOldElement,
 }
 
 NS_IMPL_ISUPPORTS_INHERITED0(nsReferencedElement::ChangeNotification,
-                             nsRunnable)
+                             mozilla::Runnable)
 
 NS_IMPL_ISUPPORTS(nsReferencedElement::DocumentLoadNotification,
                   nsIObserver)

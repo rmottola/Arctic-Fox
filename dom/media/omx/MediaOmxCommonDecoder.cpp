@@ -107,7 +107,6 @@ MediaOmxCommonDecoder::FirstFrameLoaded(nsAutoPtr<MediaInfo> aInfo,
     DisableStateMachineAudioOffloading();
     return;
   }
-
   PauseStateMachine();
   if (mLogicallySeeking) {
     SeekTarget target = SeekTarget(mLogicalPosition,
@@ -128,13 +127,7 @@ MediaOmxCommonDecoder::PauseStateMachine()
   MOZ_ASSERT(NS_IsMainThread());
   DECODER_LOG(LogLevel::Debug, ("%s", __PRETTY_FUNCTION__));
 
-  if (mShuttingDown) {
-    return;
-  }
-
-  if (!GetStateMachine()) {
-    return;
-  }
+  MOZ_ASSERT(GetStateMachine());
   // enter dormant state
   GetStateMachine()->DispatchSetDormant(true);
 }
@@ -232,7 +225,7 @@ MediaOmxCommonDecoder::ChangeState(PlayState aState)
 }
 
 void
-MediaOmxCommonDecoder::CallSeek(SeekTarget aTarget)
+MediaOmxCommonDecoder::CallSeek(const SeekTarget& aTarget)
 {
   if (!mAudioOffloadPlayer) {
     MediaDecoder::CallSeek(aTarget);

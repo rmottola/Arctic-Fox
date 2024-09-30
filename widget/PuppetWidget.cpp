@@ -983,10 +983,14 @@ PuppetWidget::SetCursor(imgIContainer* aCursor,
 
   RefPtr<mozilla::gfx::DataSourceSurface> dataSurface =
     surface->GetDataSurface();
+  if (!dataSurface) {
+    return NS_ERROR_FAILURE;
+  }
+
   size_t length;
   int32_t stride;
   mozilla::UniquePtr<char[]> surfaceData =
-    nsContentUtils::GetSurfaceData(dataSurface, &length, &stride);
+    nsContentUtils::GetSurfaceData(WrapNotNull(dataSurface), &length, &stride);
 
   nsDependentCString cursorData(surfaceData.get(), length);
   mozilla::gfx::IntSize size = dataSurface->GetSize();

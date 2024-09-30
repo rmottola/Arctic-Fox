@@ -254,7 +254,7 @@ APZCTreeManager::PrintAPZCInfo(const LayerMetricsWrapper& aLayer,
                << "\tsr=" << metrics.GetScrollableRect()
                << (aLayer.IsScrollInfoLayer() ? "\tscrollinfo" : "")
                << (apzc->HasScrollgrab() ? "\tscrollgrab" : "") << "\t"
-               << metrics.GetContentDescription().get();
+               << aLayer.Metadata().GetContentDescription().get();
 }
 
 void
@@ -780,6 +780,16 @@ APZCTreeManager::ReceiveInputEvent(InputData& aEvent,
       if (!panInput.mHandledByAPZ) {
         return result;
       }
+
+      // If/when we enable support for pan inputs off-main-thread, we'll need
+      // to duplicate this EventStateManager code or something. See the other
+      // call to GetUserPrefsForWheelEvent in this file for why these fields
+      // are stored separately.
+      MOZ_ASSERT(NS_IsMainThread());
+      WidgetWheelEvent wheelEvent = panInput.ToWidgetWheelEvent(nullptr);
+      EventStateManager::GetUserPrefsForWheelEvent(&wheelEvent,
+        &panInput.mUserDeltaMultiplierX,
+        &panInput.mUserDeltaMultiplierY);
 
       RefPtr<AsyncPanZoomController> apzc = GetTargetAPZC(panInput.mPanStartPoint,
                                                             &hitResult);

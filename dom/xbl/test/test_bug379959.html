@@ -31,7 +31,6 @@ var seenCrossOrign = false;
 
 function receiveMessage(e) {
   is(e.origin, "http://mochi.test:8888", "wrong sender!");
-  messages++;
 
   if (e.data.test === "dataIsAllowed") {
     is(e.data.result, 1, "data-url load should have succeeded");
@@ -56,8 +55,6 @@ function receiveMessage(e) {
 }
 
 window.addEventListener("message", receiveMessage, false);
-
-var iframe = document.getElementById('f');
 
 function runTest() {
   // make sure data: is allowed

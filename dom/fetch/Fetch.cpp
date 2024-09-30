@@ -106,7 +106,7 @@ private:
   ~MainThreadFetchResolver();
 };
 
-class MainThreadFetchRunnable : public nsRunnable
+class MainThreadFetchRunnable : public Runnable
 {
   RefPtr<WorkerFetchResolver> mResolver;
   RefPtr<InternalRequest> mRequest;
@@ -696,7 +696,7 @@ NS_INTERFACE_MAP_BEGIN(ConsumeBodyDoneObserver<Derived>)
 NS_INTERFACE_MAP_END
 
 template <class Derived>
-class BeginConsumeBodyRunnable final : public nsRunnable
+class BeginConsumeBodyRunnable final : public Runnable
 {
   FetchBody<Derived>* mFetchBody;
 public:
@@ -718,7 +718,8 @@ class CancelPumpRunnable final : public WorkerMainThreadRunnable
   FetchBody<Derived>* mBody;
 public:
   explicit CancelPumpRunnable(FetchBody<Derived>* aBody)
-    : WorkerMainThreadRunnable(aBody->mWorkerPrivate)
+    : WorkerMainThreadRunnable(aBody->mWorkerPrivate,
+                               NS_LITERAL_CSTRING("Fetch :: Cancel Pump"))
     , mBody(aBody)
   { }
 

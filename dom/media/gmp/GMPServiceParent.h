@@ -59,6 +59,9 @@ public:
   RefPtr<GenericPromise> EnsureInitialized();
   RefPtr<GenericPromise> AsyncAddPluginDirectory(const nsAString& aDirectory);
 
+  // GMP thread access only
+  bool IsShuttingDown();
+
 private:
   friend class GMPServiceParent;
 
@@ -118,7 +121,7 @@ private:
   nsresult EnsurePluginsOnDiskScanned();
   nsresult InitStorage();
 
-  class PathRunnable : public nsRunnable
+  class PathRunnable : public Runnable
   {
   public:
     enum EOperation {
@@ -221,7 +224,8 @@ public:
                    nsTArray<ProcessId>&& aAlreadyBridgedTo,
                    base::ProcessId* aID,
                    nsCString* aDisplayName,
-                   uint32_t* aPluginId) override;
+                   uint32_t* aPluginId,
+                   nsresult* aRv) override;
   bool RecvGetGMPNodeId(const nsString& aOrigin,
                         const nsString& aTopLevelOrigin,
                         const nsString& aGMPName,

@@ -3,6 +3,7 @@
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+"use strict";
 
 /*
  * These are helper functions to be included
@@ -72,32 +73,50 @@ function alertPromptService(title, message)
   ps.alert(window, title, message);
 }
 
+const DEFAULT_CERT_EXTENSION = "crt";
+
+/**
+ * Generates a filename for a cert suitable to set as the |defaultString|
+ * attribute on an nsIFilePicker.
+ *
+ * @param {nsIX509Cert} cert
+ *        The cert to generate a filename for.
+ * @returns {String}
+ *          Generated filename.
+ */
+function certToFilename(cert) {
+  let filename = cert.commonName;
+  if (!filename) {
+    filename = cert.windowTitle;
+  }
+
+  // Remove unneeded and/or unsafe characters.
+  filename = filename.replace(/\s/g, "")
+                     .replace(/\./g, "")
+                     .replace(/\\/g, "")
+                     .replace(/\//g, "");
+
+  // nsIFilePicker.defaultExtension is more of a suggestion to some
+  // implementations, so we include the extension in the file name as well. This
+  // is what the documentation for nsIFilePicker.defaultString says we should do
+  // anyways.
+  return `${filename}.${DEFAULT_CERT_EXTENSION}`;
+}
+
 function exportToFile(parent, cert)
 {
   var bundle = document.getElementById("pippki_bundle");
-  if (!cert)
+  if (!cert) {
     return;
+  }
 
   var nsIFilePicker = Components.interfaces.nsIFilePicker;
   var fp = Components.classes["@mozilla.org/filepicker;1"].
            createInstance(nsIFilePicker);
   fp.init(parent, bundle.getString("SaveCertAs"),
           nsIFilePicker.modeSave);
-
-  var filename = cert.commonName;
-  if (!filename)
-    filename = cert.windowTitle;
-  // Remove undesired characters and whitespace from the default filename
-  fp.defaultString = filename.replace(/\s/g, "")
-                             .replace(/\./g, "")
-                             .replace(/\\/g, "")
-                             .replace(/\//g, "")
-                             + ".crt";
-  // nsIFilePicker.defaultExtension is more of a suggestion to some filepicker
-  // implementations, so we include the extension in the file name as well. This
-  // is what the documentation for nsIFilePicker.defaultString says we should do
-  // anyway.
-  fp.defaultExtension = "crt";
+  fp.defaultString = certToFilename(cert);
+  fp.defaultExtension = DEFAULT_CERT_EXTENSION;
   fp.appendFilter(bundle.getString("CertFormatBase64"), "*.crt; *.pem");
   fp.appendFilter(bundle.getString("CertFormatBase64Chain"), "*.crt; *.pem");
   fp.appendFilter(bundle.getString("CertFormatDER"), "*.der");
@@ -105,8 +124,9 @@ function exportToFile(parent, cert)
   fp.appendFilter(bundle.getString("CertFormatPKCS7Chain"), "*.p7c");
   fp.appendFilters(nsIFilePicker.filterAll);
   var res = fp.show();
-  if (res != nsIFilePicker.returnOK && res != nsIFilePicker.returnReplace)
+  if (res != nsIFilePicker.returnOK && res != nsIFilePicker.returnReplace) {
     return;
+  }
 
   var content = '';
   switch (fp.filterIndex) {

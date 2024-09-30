@@ -685,6 +685,13 @@ GeckoMediaPluginServiceParent::NotifySyncShutdownComplete()
   mWaitingForPluginsSyncShutdown = false;
 }
 
+bool
+GeckoMediaPluginServiceParent::IsShuttingDown()
+{
+  MOZ_ASSERT(NS_GetCurrentThread() == mGMPThread);
+  return mShuttingDownOnGMPThread;
+}
+
 void
 GeckoMediaPluginServiceParent::UnloadPlugins()
 {
@@ -782,7 +789,7 @@ GeckoMediaPluginServiceParent::LoadFromEnvironment()
   return GenericPromise::All(thread, promises);
 }
 
-class NotifyObserversTask final : public nsRunnable {
+class NotifyObserversTask final : public mozilla::Runnable {
 public:
   explicit NotifyObserversTask(const char* aTopic, nsString aData = EmptyString())
     : mTopic(aTopic)
@@ -878,11 +885,6 @@ GeckoMediaPluginServiceParent::RemoveAndDeletePluginDirectory(
                      aDefer));
 }
 
-class DummyRunnable : public nsRunnable {
-public:
-  NS_IMETHOD Run() { return NS_OK; }
-};
-
 NS_IMETHODIMP
 GeckoMediaPluginServiceParent::GetPluginVersionForAPI(const nsACString& aAPI,
                                                       nsTArray<nsCString>* aTags,
@@ -933,7 +935,7 @@ GeckoMediaPluginServiceParent::EnsurePluginsOnDiskScanned()
     // cause an event to be dispatched to which scans for plugins. We
     // dispatch a sync event to the GMP thread here in order to wait until
     // after the GMP thread has scanned any paths in MOZ_GMP_PATH.
-    nsresult rv = GMPDispatch(new DummyRunnable(), NS_DISPATCH_SYNC);
+    nsresult rv = GMPDispatch(new mozilla::Runnable(), NS_DISPATCH_SYNC);
     NS_ENSURE_SUCCESS(rv, rv);
     MOZ_ASSERT(mScannedPluginOnDisk, "Should have scanned MOZ_GMP_PATH by now");
   }
@@ -1779,8 +1781,8 @@ GeckoMediaPluginServiceParent::ClearStorage()
 
 GMPServiceParent::~GMPServiceParent()
 {
-  XRE_GetIOMessageLoop()->PostTask(FROM_HERE,
-                                   new DeleteTask<Transport>(GetTransport()));
+  RefPtr<DeleteTask<Transport>> task = new DeleteTask<Transport>(GetTransport());
+  XRE_GetIOMessageLoop()->PostTask(task.forget());
 }
 
 bool
@@ -1790,8 +1792,15 @@ GMPServiceParent::RecvLoadGMP(const nsCString& aNodeId,
                               nsTArray<ProcessId>&& aAlreadyBridgedTo,
                               ProcessId* aId,
                               nsCString* aDisplayName,
-                              uint32_t* aPluginId)
+                              uint32_t* aPluginId,
+                              nsresult* aRv)
 {
+  *aRv = NS_OK;
+  if (mService->IsShuttingDown()) {
+    *aRv = NS_ERROR_ILLEGAL_DURING_SHUTDOWN;
+    return true;
+  }
+
   RefPtr<GMPParent> gmp = mService->SelectPluginForAPI(aNodeId, aAPI, aTags);
 
   nsCString api = aTags[0];
@@ -1833,7 +1842,7 @@ GMPServiceParent::RecvGetGMPPluginVersionForAPI(const nsCString& aAPI,
                                                       *aVersion));
 }
 
-class DeleteGMPServiceParent : public nsRunnable
+class DeleteGMPServiceParent : public mozilla::Runnable
 {
 public:
   explicit DeleteGMPServiceParent(GMPServiceParent* aToDelete)
@@ -1856,7 +1865,7 @@ GMPServiceParent::ActorDestroy(ActorDestroyReason aWhy)
   NS_DispatchToCurrentThread(new DeleteGMPServiceParent(this));
 }
 
-class OpenPGMPServiceParent : public nsRunnable
+class OpenPGMPServiceParent : public mozilla::Runnable
 {
 public:
   OpenPGMPServiceParent(GMPServiceParent* aGMPServiceParent,

@@ -1217,7 +1217,9 @@ nsRange::SetStart(nsIDOMNode* aParent, int32_t aOffset)
 nsRange::SetStart(nsINode* aParent, int32_t aOffset)
 {
   nsINode* newRoot = IsValidBoundary(aParent);
-  NS_ENSURE_TRUE(newRoot, NS_ERROR_DOM_INVALID_NODE_TYPE_ERR);
+  if (!newRoot) {
+    return NS_ERROR_DOM_INVALID_NODE_TYPE_ERR;
+  }
 
   if (aOffset < 0 || uint32_t(aOffset) > aParent->Length()) {
     return NS_ERROR_DOM_INDEX_SIZE_ERR;
@@ -1319,7 +1321,9 @@ nsRange::SetEnd(nsIDOMNode* aParent, int32_t aOffset)
 nsRange::SetEnd(nsINode* aParent, int32_t aOffset)
 {
   nsINode* newRoot = IsValidBoundary(aParent);
-  NS_ENSURE_TRUE(newRoot, NS_ERROR_DOM_INVALID_NODE_TYPE_ERR);
+  if (!newRoot) {
+    return NS_ERROR_DOM_INVALID_NODE_TYPE_ERR;
+  }
 
   if (aOffset < 0 || uint32_t(aOffset) > aParent->Length()) {
     return NS_ERROR_DOM_INDEX_SIZE_ERR;
@@ -2533,6 +2537,12 @@ nsRange::InsertNode(nsINode& aNode, ErrorResult& aRv)
       return;
     }
 
+    referenceParentNode->EnsurePreInsertionValidity(aNode, tStartContainer,
+                                                    aRv);
+    if (aRv.Failed()) {
+      return;
+    }
+
     nsCOMPtr<nsIDOMText> secondPart;
     aRv = startTextNode->SplitText(tStartOffset, getter_AddRefs(secondPart));
     if (aRv.Failed()) {
@@ -2550,6 +2560,11 @@ nsRange::InsertNode(nsINode& aNode, ErrorResult& aRv)
     nsCOMPtr<nsIDOMNode> q;
     aRv = tChildList->Item(tStartOffset, getter_AddRefs(q));
     referenceNode = do_QueryInterface(q);
+    if (aRv.Failed()) {
+      return;
+    }
+
+    tStartContainer->EnsurePreInsertionValidity(aNode, referenceNode, aRv);
     if (aRv.Failed()) {
       return;
     }

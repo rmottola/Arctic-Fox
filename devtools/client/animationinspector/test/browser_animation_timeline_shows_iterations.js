@@ -7,7 +7,7 @@
 // Check that the timeline is displays as many iteration elements as there are
 // iterations in an animation.
 
-add_task(function*() {
+add_task(function* () {
   yield addTab(URL_ROOT + "doc_simple_animation.html");
   let {inspector, panel} = yield openAnimationInspector();
 

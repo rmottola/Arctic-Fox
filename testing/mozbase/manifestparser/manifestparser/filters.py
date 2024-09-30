@@ -32,6 +32,18 @@ def skip_if(tests, values):
         yield test
 
 
+def run_if(tests, values):
+    """
+    Sets disabled on all tests containing the `run-if` tag and whose condition
+    is False. This filter is added by default.
+    """
+    tag = 'run-if'
+    for test in tests:
+        if tag in test and not parse(test[tag], **values):
+            test.setdefault('disabled', '{}: {}'.format(tag, test[tag]))
+        yield test
+
+
 def fail_if(tests, values):
     """
     Sets expected to 'fail' on all tests containing the `fail-if` tag and whose
@@ -171,12 +183,12 @@ class chunk_by_slice(InstanceFilter):
             # chunk will contain an equal number of enabled tests.
             if self.this_chunk == 1:
                 start = 0
-            else:
+            elif start < len(chunk_tests):
                 start = tests.index(chunk_tests[start])
 
             if self.this_chunk == self.total_chunks:
                 end = len(tests)
-            else:
+            elif end < len(chunk_tests):
                 end = tests.index(chunk_tests[end])
         return (t for t in tests[start:end])
 
@@ -300,6 +312,13 @@ class tags(InstanceFilter):
     InstanceFilter's __eq__ method, so multiple instances can be added.
     Multiple tag filters is equivalent to joining tags with the AND operator.
 
+    To define a tag in a manifest, add a `tags` attribute to a test or DEFAULT
+    section. Tests can have multiple tags, in which case they should be
+    whitespace delimited. For example:
+
+    [test_foobar.html]
+    tags = foo bar
+
     :param tags: A tag or list of tags to filter tests on
     """
     unique = False
@@ -315,7 +334,7 @@ class tags(InstanceFilter):
             if 'tags' not in test:
                 continue
 
-            test_tags = [t.strip() for t in test['tags'].split(',')]
+            test_tags = [t.strip() for t in test['tags'].split()]
             if any(t in self.tags for t in test_tags):
                 yield test
 
@@ -352,11 +371,12 @@ class pathprefix(InstanceFilter):
 
 DEFAULT_FILTERS = (
     skip_if,
+    run_if,
     fail_if,
 )
 """
-By default :func:`~.active_tests` will run the :func:`~.skip_if`
-and :func:`~.fail_if` filters.
+By default :func:`~.active_tests` will run the :func:`~.skip_if`,
+:func:`~.run_if` and :func:`~.fail_if` filters.
 """
 
 

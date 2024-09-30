@@ -6,17 +6,17 @@
 #define AndroidDecoderModule_h_
 
 #include "PlatformDecoderModule.h"
-#include "AndroidSurfaceTexture.h"
 
 #include "MediaCodec.h"
+#include "SurfaceTexture.h"
 #include "TimeUnits.h"
 #include "mozilla/Monitor.h"
 
-#include <queue>
+#include <deque>
 
 namespace mozilla {
 
-typedef std::queue<RefPtr<MediaRawData>> SampleQueue;
+typedef std::deque<RefPtr<MediaRawData>> SampleQueue;
 
 class AndroidDecoderModule : public PlatformDecoderModule {
 public:
@@ -101,7 +101,7 @@ protected:
 
   nsresult GetInputBuffer(JNIEnv* env, int index, jni::Object::LocalRef* buffer);
   bool WaitForInput();
-  MediaRawData* PeekNextSample();
+  already_AddRefed<MediaRawData> PeekNextSample();
   nsresult QueueSample(const MediaRawData* aSample);
   nsresult QueueEOS();
   void HandleEOS(int32_t aOutputStatus);
@@ -110,7 +110,8 @@ protected:
                          widget::sdk::MediaFormat::Param aFormat,
                          int32_t aStatus);
   ModuleState State() const;
-  void State(ModuleState aState);
+  // Sets decoder state and returns whether the new state has become effective.
+  bool State(ModuleState aState);
   void DecoderLoop();
 
   virtual void ClearQueue();
@@ -136,7 +137,7 @@ protected:
 
   SampleQueue mQueue;
   // Durations are stored in microseconds.
-  std::queue<media::TimeUnit> mDurations;
+  std::deque<media::TimeUnit> mDurations;
 };
 
 } // namespace mozilla

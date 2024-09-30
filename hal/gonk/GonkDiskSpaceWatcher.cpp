@@ -7,17 +7,16 @@
 #include <sys/vfs.h>
 #include <fcntl.h>
 #include <errno.h>
+#include "base/message_loop.h"
+#include "DiskSpaceWatcher.h"
+#include "fanotify.h"
 #include "nsIObserverService.h"
 #include "nsIDiskSpaceWatcher.h"
-#include "mozilla/ModuleUtils.h"
-#include "nsAutoPtr.h"
 #include "nsThreadUtils.h"
-#include "base/message_loop.h"
+#include "nsXULAppAPI.h"
+#include "mozilla/ModuleUtils.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
-#include "nsXULAppAPI.h"
-#include "fanotify.h"
-#include "DiskSpaceWatcher.h"
 
 using namespace mozilla;
 
@@ -120,7 +119,7 @@ static GonkDiskSpaceWatcher* gHalDiskSpaceWatcher = nullptr;
 static const char kWatchedPath[] = "/data";
 
 // Helper class to dispatch calls to xpcom on the main thread.
-class DiskSpaceNotifier : public nsRunnable
+class DiskSpaceNotifier : public Runnable
 {
 public:
   DiskSpaceNotifier(const bool aIsDiskFull, const uint64_t aFreeSpace) :
@@ -140,7 +139,7 @@ private:
 };
 
 // Helper runnable to delete the watcher on the main thread.
-class DiskSpaceCleaner : public nsRunnable
+class DiskSpaceCleaner : public Runnable
 {
 public:
   NS_IMETHOD Run()
@@ -177,15 +176,17 @@ GonkDiskSpaceWatcher::DoStart()
   NS_ASSERTION(XRE_GetIOMessageLoop() == MessageLoopForIO::current(),
                "Not on the correct message loop");
 
-  mFd = fanotify_init(FAN_CLASS_NOTIF, FAN_CLOEXEC);
+  mFd = fanotify_init(FAN_CLASS_NOTIF, FAN_CLOEXEC | O_LARGEFILE);
   if (mFd == -1) {
     if (errno == ENOSYS) {
-      NS_WARNING("Warning: No fanotify support in this device's kernel.\n");
+      // Don't change these printf_stderr since we need these logs even
+      // in opt builds.
+      printf_stderr("Warning: No fanotify support in this device's kernel.\n");
 #if ANDROID_VERSION >= 19
       MOZ_CRASH("Fanotify support must be enabled in the kernel.");
 #endif
     } else {
-      NS_WARNING("Error calling fanotify_init()");
+      printf_stderr("Error calling fanotify_init()");
     }
     return;
   }
@@ -310,7 +311,6 @@ StartDiskSpaceWatcher()
   gHalDiskSpaceWatcher = new GonkDiskSpaceWatcher();
 
   XRE_GetIOMessageLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(gHalDiskSpaceWatcher, &GonkDiskSpaceWatcher::DoStart));
 }
 
@@ -323,7 +323,6 @@ StopDiskSpaceWatcher()
   }
 
   XRE_GetIOMessageLoop()->PostTask(
-    FROM_HERE,
     NewRunnableMethod(gHalDiskSpaceWatcher, &GonkDiskSpaceWatcher::DoStop));
 }
 

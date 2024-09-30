@@ -250,8 +250,6 @@ chrome/toolkit/content/global/devtools/theme-switching.js
 browser/chrome/devtools/modules/devtools/client/shared/frame-script-utils.js
 chrome/toolkit/content/global/devtools/frame-script-utils.js
 chrome/toolkit/skin/classic/global/inContentUI/background-texture.png
-browser/modules/promise.js
-modules/commonjs/sdk/core/promise.js
 chrome/toolkit/skin/classic/mozapps/extensions/category-themes.png
 chrome/toolkit/skin/classic/mozapps/extensions/themeGeneric.png
 browser/chrome/browser/skin/classic/browser/feeds/audioFeedIcon.png
@@ -622,6 +620,26 @@ browser/chrome/browser/skin/classic/browser/identity-mixed-passive-loaded.svg
 browser/chrome/devtools/skin/images/security-state-weak.svg
 browser/chrome/browser/skin/classic/browser/identity-secure.svg
 browser/chrome/browser/skin/classic/browser/identity-not-secure.svg
+
+browser/chrome/browser/defaults/permissions
+browser/defaults/permissions
+
+browser/features/firefox@getpocket.com/chrome/skin/linux/pocket.css
+browser/features/loop@mozilla.org/chrome/content/shared/img/sharing-active.svg
+browser/features/loop@mozilla.org/chrome/content/shared/img/sharing-hover.svg
+browser/features/loop@mozilla.org/chrome/content/shared/img/sharing-pending.svg
+browser/features/loop@mozilla.org/chrome/content/shared/img/sharing.svg
+browser/features/loop@mozilla.org/chrome/content/shared/img/cam_audio.svg
+browser/features/loop@mozilla.org/chrome/content/shared/img/media-group.svg
+browser/features/loop@mozilla.org/chrome/skin/linux/menuPanel.png
+browser/features/loop@mozilla.org/chrome/skin/windows/menuPanel.png
+browser/features/loop@mozilla.org/chrome/skin/linux/menuPanel@2x.png
+browser/features/loop@mozilla.org/chrome/skin/windows/menuPanel@2x.png
+browser/features/loop@mozilla.org/chrome/skin/linux/toolbar-inverted.png
+browser/features/loop@mozilla.org/chrome/skin/windows/toolbar-inverted.png
+browser/features/loop@mozilla.org/chrome/content/locale-fallback/en-US/loop.properties
+browser/features/loop@mozilla.org/chrome/skin/linux/toolbar-inverted@2x.png
+browser/features/loop@mozilla.org/chrome/skin/windows/toolbar-inverted@2x.png
 
 
 #Windows ArcticFox exceptions

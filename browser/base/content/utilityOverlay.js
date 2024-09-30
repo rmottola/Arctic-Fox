@@ -23,7 +23,7 @@ this.__defineGetter__("BROWSER_NEW_TAB_URL", () => {
       !aboutNewTabService.overridden) {
     return "about:privatebrowsing";
   }
-  return "about:newtab";
+  return aboutNewTabService.newTabURL;
 });
 
 var TAB_DROP_TYPE = "application/x-moz-tabbrowser-tab";
@@ -686,8 +686,27 @@ function openPrefsHelp() {
 function trimURL(aURL) {
   // This function must not modify the given URL such that calling
   // nsIURIFixup::createFixupURI with the result will produce a different URI.
-  return aURL /* remove single trailing slash for http/https/ftp URLs */
-             .replace(/^((?:http|https|ftp):\/\/[^/]+)\/$/, "$1")
-              /* remove http:// unless the host starts with "ftp\d*\." or contains "@" */
-             .replace(/^http:\/\/((?!ftp\d*\.)[^\/@]+(?:\/|$))/, "$1");
+
+  // remove single trailing slash for http/https/ftp URLs
+  let url = aURL.replace(/^((?:http|https|ftp):\/\/[^/]+)\/$/, "$1");
+
+  // remove http://
+  if (!url.startsWith("http://")) {
+    return url;
+  }
+  let urlWithoutProtocol = url.substring(7);
+
+  let flags = Services.uriFixup.FIXUP_FLAG_ALLOW_KEYWORD_LOOKUP |
+              Services.uriFixup.FIXUP_FLAG_FIX_SCHEME_TYPOS;
+  let fixedUpURL, expectedURLSpec;
+  try {
+    fixedUpURL = Services.uriFixup.createFixupURI(urlWithoutProtocol, flags);
+    expectedURLSpec = makeURI(aURL).spec;
+  } catch (ex) {
+    return url;
+  }
+  if (fixedUpURL.spec == expectedURLSpec) {
+    return urlWithoutProtocol;
+  }
+  return url;
 }

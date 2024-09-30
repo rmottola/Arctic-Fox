@@ -91,7 +91,7 @@ function doFinalChecks(editor) {
 /* Helpers */
 function* getSizing() {
   let browser = gBrowser.selectedBrowser;
-  let sizing = yield ContentTask.spawn(browser, {}, function*() {
+  let sizing = yield ContentTask.spawn(browser, {}, function* () {
     return {
       width: content.innerWidth,
       height: content.innerHeight

@@ -9,18 +9,17 @@ MARIONETTE_CONTEXT = "chrome";
 
 Cu.import("resource://gre/modules/Promise.jsm");
 
-let MMS = {};
+var MMS = {};
 Cu.import("resource://gre/modules/MmsPduHelper.jsm", MMS);
 
-let gMobileMessageDatabaseService =
+var gMobileMessageDatabaseService =
   Cc["@mozilla.org/mobilemessage/gonkmobilemessagedatabaseservice;1"]
     .getService(Ci.nsIGonkMobileMessageDatabaseService);
 
-let gUuidGenerator =
-  Cc["@mozilla.org/uuid-generator;1"]
-    .getService(Ci.nsIUUIDGenerator);
+var gUuidGenerator =
+  Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
 
-let gMmsService = Cc["@mozilla.org/mms/gonkmmsservice;1"]
+var gMmsService = Cc["@mozilla.org/mms/gonkmmsservice;1"]
                        .getService(Ci.nsIMmsService);
 
 function saveMmsNotification() {

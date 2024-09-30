@@ -9,16 +9,13 @@
 
 const TESTCASE_URI = URL_ROOT + "doc_keyframeLineNumbers.html";
 
-add_task(function*() {
+add_task(function* () {
   yield addTab(TESTCASE_URI);
   let { inspector, view } = yield openRuleView();
   yield selectNode("#outer", inspector);
 
-  // Insert a new property, which will affect the line numbers.
-  let elementRuleEditor = getRuleViewRuleEditor(view, 1);
-  let onRuleViewChanged = view.once("ruleview-changed");
-  yield createNewRuleViewProperty(elementRuleEditor, "font-size: 72px");
-  yield onRuleViewChanged;
+  info("Insert a new property, which will affect the line numbers");
+  yield addProperty(view, 1, "font-size", "72px");
 
   yield selectNode("#inner", inspector);
 

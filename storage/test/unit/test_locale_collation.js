@@ -254,7 +254,7 @@ function setup()
 ///////////////////////////////////////////////////////////////////////////////
 //// Test Runs
 
-let gTests = [
+var gTests = [
   {
     desc: "Case and accent sensitive UTF-8",
     run:   () => runUtf8Test("locale_case_accent_sensitive")

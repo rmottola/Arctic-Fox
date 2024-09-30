@@ -102,7 +102,7 @@ BluetoothOppManager::Observe(nsISupports* aSubject,
   return NS_ERROR_UNEXPECTED;
 }
 
-class BluetoothOppManager::SendSocketDataTask final : public nsRunnable
+class BluetoothOppManager::SendSocketDataTask final : public Runnable
 {
 public:
   SendSocketDataTask(UniquePtr<uint8_t[]> aStream, uint32_t aSize)
@@ -126,7 +126,7 @@ private:
   uint32_t mSize;
 };
 
-class BluetoothOppManager::ReadFileTask final : public nsRunnable
+class BluetoothOppManager::ReadFileTask final : public Runnable
 {
 public:
   ReadFileTask(nsIInputStream* aInputStream,
@@ -172,7 +172,7 @@ private:
   uint32_t mAvailablePacketSize;
 };
 
-class BluetoothOppManager::CloseSocketTask final : public Task
+class BluetoothOppManager::CloseSocketTask final : public Runnable
 {
 public:
   CloseSocketTask(BluetoothSocket* aSocket) : mSocket(aSocket)
@@ -180,10 +180,11 @@ public:
     MOZ_ASSERT(aSocket);
   }
 
-  void Run() override
+  NS_IMETHOD Run() override
   {
     MOZ_ASSERT(NS_IsMainThread());
     mSocket->Close();
+    return NS_OK;
   }
 
 private:
@@ -248,6 +249,24 @@ BluetoothOppManager::Init()
 void
 BluetoothOppManager::Uninit()
 {
+  if (mServerSocket) {
+    mServerSocket->SetObserver(nullptr);
+
+    if (mServerSocket->GetConnectionStatus() != SOCKET_DISCONNECTED) {
+      mServerSocket->Close();
+    }
+    mServerSocket = nullptr;
+  }
+
+  if (mSocket) {
+    mSocket->SetObserver(nullptr);
+
+    if (mSocket->GetConnectionStatus() != SOCKET_DISCONNECTED) {
+      mSocket->Close();
+    }
+    mSocket = nullptr;
+  }
+
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
   NS_ENSURE_TRUE_VOID(obs);
 
@@ -316,10 +335,11 @@ BluetoothOppManager::ConnectInternal(const BluetoothAddress& aDeviceAddress)
   MOZ_ASSERT(NS_IsMainThread());
 
   // Stop listening because currently we only support one connection at a time.
-  if (mServerSocket) {
+  if (mServerSocket &&
+      mServerSocket->GetConnectionStatus() != SOCKET_DISCONNECTED) {
     mServerSocket->Close();
-    mServerSocket = nullptr;
   }
+  mServerSocket = nullptr;
 
   mIsServer = false;
 
@@ -393,10 +413,11 @@ BluetoothOppManager::Listen()
    * BT stops; otherwise no more read events would be received even if
    * BT restarts.
    */
-  if (mServerSocket) {
+  if (mServerSocket &&
+      mServerSocket->GetConnectionStatus() != SOCKET_DISCONNECTED) {
     mServerSocket->Close();
-    mServerSocket = nullptr;
   }
+  mServerSocket = nullptr;
 
   mServerSocket = new BluetoothSocket(this);
 
@@ -1138,8 +1159,8 @@ BluetoothOppManager::ClientDataHandler(UnixSocketBuffer* aMessage)
     // Disconnect request, so we make a delay here. If the socket hasn't been
     // disconnected, we will close it.
     if (mSocket) {
-      MessageLoop::current()->
-        PostDelayedTask(FROM_HERE, new CloseSocketTask(mSocket), 1000);
+      MessageLoop::current()->PostDelayedTask(
+        MakeAndAddRef<CloseSocketTask>(mSocket), 1000);
     }
   } else if (mLastCommand == ObexRequestCode::Connect) {
     MOZ_ASSERT(!mFileName.IsEmpty());
@@ -1563,7 +1584,16 @@ BluetoothOppManager::OnSocketConnectError(BluetoothSocket* aSocket)
 {
   BT_LOGR("[%s]", (mIsServer)? "server" : "client");
 
+  if (mServerSocket &&
+      mServerSocket->GetConnectionStatus() != SOCKET_DISCONNECTED) {
+    mServerSocket->Close();
+  }
   mServerSocket = nullptr;
+
+  if (mSocket &&
+      mSocket->GetConnectionStatus() != SOCKET_DISCONNECTED) {
+    mSocket->Close();
+  }
   mSocket = nullptr;
 
   if (!mIsServer) {
@@ -1613,7 +1643,8 @@ BluetoothOppManager::OnSocketDisconnect(BluetoothSocket* aSocket)
   mDeviceAddress.Clear();
   mSuccessFlag = false;
 
-  mSocket = nullptr;
+  mSocket = nullptr; // should already be closed
+
   // Listen as a server if there's no more batch to process
   if (!ProcessNextBatch()) {
     Listen();
@@ -1677,6 +1708,8 @@ BluetoothOppManager::OnGetServiceChannel(
       OnSocketConnectError(mSocket);
       return;
     }
+
+    return; // We update the service records before we connect.
   }
 
   mSocket->Connect(aDeviceAddress, aServiceUuid,

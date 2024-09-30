@@ -97,9 +97,6 @@ pref("browser.getdevtools.url","https://addons.palemoon.org/extensions/web-devel
 // Feedback URL
 pref("browser.feedback.url", "https://forums.macrumors.com/threads/arctic-fox-web-browser-for-10-6-64bit.2133051/");
 
-// Help button in slow startup dialog
-pref("browser.slowstartup.help.url", "http://www.palemoon.org/support/slowstartup.shtml");
-
 // Whether to escape to a content-less page if a user presses "Get me out of here"
 // on a network error page (e.g. cert error)
 pref("browser.escape_to_blank", false);
@@ -1007,16 +1004,6 @@ pref("dom.ipc.plugins.enabled", true);
 
 pref("dom.ipc.shims.enabledWarnings", false);
 
-// Decode using Gecko Media Plugins in <video>, if a system decoder is not
-// availble and the preferred GMP is available.
-pref("media.gmp.decoder.enabled", true);
-
-// If decoding-via-GMP is turned on for <video>, use Adobe's GMP for decoding,
-// if it's available. Note: We won't fallback to another GMP if Adobe's is not
-// installed.
-pref("media.gmp.decoder.aac", 2);
-pref("media.gmp.decoder.h264", 2);
-
 // Start the browser in e10s mode
 pref("browser.tabs.remote.autostart", false);
 pref("browser.tabs.remote.desktopbehavior", true);
@@ -1245,6 +1232,9 @@ pref("browser.newtabpage.directory.ping", "https://tiles.services.mozilla.com/v3
 // activates the remote-hosted newtab page
 pref("browser.newtabpage.remote", false);
 
+// remote newtab version targeted
+pref("browser.newtabpage.remote.version", "1");
+
 // Toggles endpoints allowed for remote newtab communications
 pref("browser.newtabpage.remote.mode", "production");
 
@@ -1369,6 +1359,18 @@ pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Linux; X11; r
 pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Windows NT 6.1; WOW64; rv:27.0) Gecko/20100101 Firefox/27.0");
 #endif
 
+
+// Decode using Gecko Media Plugins in <video>, if a system decoder is not
+// availble and the preferred GMP is available.
+pref("media.gmp.decoder.enabled", true);
+
+// If decoding-via-GMP is turned on for <video>, use Adobe's GMP for decoding,
+// if it's available. Note: We won't fallback to another GMP if Adobe's is not
+// installed.
+pref("media.gmp.decoder.aac", 2);
+pref("media.gmp.decoder.h264", 2);
+
+
 // ****************** s4e prefs ******************
 pref("status4evar.addonbar.borderStyle", false);
 pref("status4evar.addonbar.closeButton", false);
@@ -1461,6 +1463,10 @@ pref("dom.ipc.reportProcessHangs", false);
 #else
 pref("dom.ipc.reportProcessHangs", true);
 #endif
+
+// On desktop, we want the URLs to be included here for ease of debugging,
+// and because (normally) these errors are not persisted anywhere.
+pref("reader.errors.includeURLs", true);
 
 pref("view_source.tab", true);
 

@@ -12,7 +12,6 @@ DIRS += [
     'downloads',
     'extensions',
     'feeds',
-    'fuel',
     'migration',
     'newtab',
     'places',
@@ -22,6 +21,7 @@ DIRS += [
     'sessionstore',
     'shell',
     'selfsupport',
+    'syncedtabs',
     'statusbar',
 ]
 

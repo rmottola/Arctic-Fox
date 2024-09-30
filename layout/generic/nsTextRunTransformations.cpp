@@ -322,7 +322,7 @@ nsCaseTransformTextRunFactory::TransformString(
       forceNonFullWidth = charStyle->mForceNonFullWidth;
 
       nsIAtom* newLang = charStyle->mExplicitLanguage
-                         ? charStyle->mLanguage : nullptr;
+                         ? charStyle->mLanguage.get() : nullptr;
       if (lang != newLang) {
         lang = newLang;
         languageSpecificCasing = GetCasingFor(lang);

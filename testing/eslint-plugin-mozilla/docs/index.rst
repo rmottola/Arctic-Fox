@@ -25,6 +25,13 @@ avoids ESLint telling us that the function is never called.
 ``no-cpows-in-tests`` This rule checks if the file is a browser mochitest and,
 if so, checks for possible CPOW usage.
 
+``reject-importGlobalProperties`` This rule rejects calls to
+"Cu.importGlobalProperties".  Use of this function is undesirable in
+some parts of the tree.
+
+``this-top-level-scope``  This rule treats top-level assignments like
+``this.mumble = value`` as declaring a global.
+
 Note: These are string matches so we will miss situations where the parent
 object is assigned to another variable e.g.::
 
@@ -68,4 +75,6 @@ Example configuration::
    mark-test-function-used
    no-aArgs
    no-cpows-in-tests
+   reject-importGlobalProperties
+   this-top-level-scope
    var-only-at-top-level

@@ -370,6 +370,18 @@
     <tooltip id="dynamic-shortcut-tooltip"
              onpopupshowing="UpdateDynamicShortcutTooltipText(this);"/>
 
+    <menupopup id="SyncedTabsSidebarContext">
+      <menuitem label="&syncedTabs.context.openTab.label;"
+                accesskey="&syncedTabs.context.openTab.accesskey;"
+                id="syncedTabsOpenSelected"/>
+      <menuitem label="&syncedTabs.context.bookmarkSingleTab.label;"
+                accesskey="&syncedTabs.context.bookmarkSingleTab.accesskey;"
+                id="syncedTabsBookmarkSelected"/>
+      <menuseparator/>
+      <menuitem label="&syncedTabs.context.refreshList.label;"
+                accesskey="&syncedTabs.context.refreshList.accesskey;"
+                id="syncedTabsRefresh"/>
+    </menupopup>
   </popupset>
 
 #ifdef CAN_DRAW_IN_TITLEBAR
@@ -649,6 +661,11 @@
                     command="Browser:ShowAllBookmarks"
                     key="manBookmarkKb"/>
           <menuseparator/>
+            <menuitem label="&recentBookmarks.label;"
+                      disabled="true"
+                      class="subviewbutton"/>
+            <vbox id="BMB_recentBookmarks"/>
+            <menuseparator/>
           <menuitem id="BMB_bookmarkThisPage"
 #ifndef XP_MACOSX
                     class="menuitem-iconic"
@@ -763,6 +780,17 @@
           <!-- History menu items -->
         </menupopup>
       </toolbarbutton>
+
+      <toolbaritem id="PanelUI-button"
+                   hidden="true"
+                   class="chromeclass-toolbar-additional"
+                   removable="false">
+        <toolbarbutton id="PanelUI-menu-button"
+                       class="toolbarbutton-1 badged-button"
+                       consumeanchor="PanelUI-button"
+                       label="&brandShortName;"
+                       tooltiptext="&appmenu.tooltip;"/>
+      </toolbaritem>
 
       <hbox id="window-controls" hidden="true" pack="end">
         <toolbarbutton id="minimize-button"

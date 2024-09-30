@@ -59,8 +59,6 @@ DEFINES['GL_APICALL'] = ""
 DEFINES['GL_GLEXT_PROTOTYPES'] = ""
 DEFINES['EGLAPI'] = ""
 
-ALLOW_COMPILER_WARNINGS = True
-
 
 
 LOCAL_INCLUDES += [ '../../include', '../../src', '../../src/third_party/khronos' ]

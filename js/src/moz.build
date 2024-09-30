@@ -156,6 +156,7 @@ UNIFIED_SOURCES += [
     'asmjs/AsmJS.cpp',
     'asmjs/Wasm.cpp',
     'asmjs/WasmBinary.cpp',
+    'asmjs/WasmBinaryIterator.cpp',
     'asmjs/WasmBinaryToText.cpp',
     'asmjs/WasmFrameIterator.cpp',
     'asmjs/WasmGenerator.cpp',
@@ -211,6 +212,7 @@ UNIFIED_SOURCES += [
     'irregexp/RegExpParser.cpp',
     'irregexp/RegExpStack.cpp',
     'jit/AliasAnalysis.cpp',
+    'jit/AliasAnalysisShared.cpp',
     'jit/AlignmentMaskAnalysis.cpp',
     'jit/BacktrackingAllocator.cpp',
     'jit/Bailouts.cpp',
@@ -234,6 +236,7 @@ UNIFIED_SOURCES += [
     'jit/EdgeCaseAnalysis.cpp',
     'jit/EffectiveAddressAnalysis.cpp',
     'jit/ExecutableAllocator.cpp',
+    'jit/FlowAliasAnalysis.cpp',
     'jit/InstructionReordering.cpp',
     'jit/Ion.cpp',
     'jit/IonAnalysis.cpp',
@@ -246,6 +249,7 @@ UNIFIED_SOURCES += [
     'jit/JitSpewer.cpp',
     'jit/JSONSpewer.cpp',
     'jit/LICM.cpp',
+    'jit/Linker.cpp',
     'jit/LIR.cpp',
     'jit/LoopUnroller.cpp',
     'jit/Lowering.cpp',
@@ -554,6 +558,7 @@ elif CONFIG['JS_CODEGEN_MIPS32'] or CONFIG['JS_CODEGEN_MIPS64']:
 if CONFIG['OS_ARCH'] == 'WINNT':
     SOURCES += [
         'jit/ExecutableAllocatorWin.cpp',
+        'threading/windows/ConditionVariable.cpp',
         'threading/windows/Mutex.cpp',
     ]
     # _CRT_RAND_S must be #defined before #including stdlib.h to get rand_s()
@@ -561,6 +566,7 @@ if CONFIG['OS_ARCH'] == 'WINNT':
 else:
     SOURCES += [
         'jit/ExecutableAllocatorPosix.cpp',
+        'threading/posix/ConditionVariable.cpp',
         'threading/posix/Mutex.cpp',
     ]
 
@@ -709,6 +715,8 @@ if CONFIG['OS_ARCH'] == 'SunOS':
         'nsl',
         'socket',
     ]
+
+OS_LIBS += CONFIG['REALTIME_LIBS']
 
 CFLAGS += CONFIG['MOZ_ICU_CFLAGS']
 CXXFLAGS += CONFIG['MOZ_ICU_CFLAGS']

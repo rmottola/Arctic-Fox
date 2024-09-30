@@ -1858,8 +1858,6 @@ pref("network.websocket.delay-failed-reconnects", true);
 // </ws>
 
 // Server-Sent Events
-
-pref("dom.server-events.enabled", true);
 // Equal to the DEFAULT_RECONNECTION_TIME_VALUE value in nsEventSource.cpp
 pref("dom.server-events.default-reconnection-time", 5000); // in milliseconds
 
@@ -4824,6 +4822,7 @@ pref("gfx.direct2d.force-enabled", false);
 
 pref("layers.prefer-opengl", false);
 pref("layers.prefer-d3d9", false);
+pref("layers.allow-d3d9-fallback", true);
 pref("layers.d3d11.force-warp", false);
 pref("layers.d3d11.disable-warp", false);
 
@@ -4841,6 +4840,9 @@ pref("layers.compositor-lru-size", 0);
 
 // Enable/Disable the geolocation API for content
 pref("geo.enabled", true);
+
+// Timeout for outbound network geolocation provider XHR
+pref("geo.wifi.xhr.timeout", 60000);
 
 // Enable/Disable the orientation API for content
 pref("device.sensors.enabled", true);
@@ -4979,22 +4981,6 @@ pref("dom.push.pingInterval", 1800000); // 30 minutes
 
 // How long before we timeout
 pref("dom.push.requestTimeout", 10000);
-pref("dom.push.pingInterval.default", 180000);// 3 min
-pref("dom.push.pingInterval.mobile", 180000); // 3 min
-pref("dom.push.pingInterval.wifi", 180000);  // 3 min
-
-// Adaptive ping
-pref("dom.push.adaptive.enabled", false);
-pref("dom.push.adaptive.lastGoodPingInterval", 180000);// 3 min
-pref("dom.push.adaptive.lastGoodPingInterval.mobile", 180000);// 3 min
-pref("dom.push.adaptive.lastGoodPingInterval.wifi", 180000);// 3 min
-// Valid gap between the biggest good ping and the bad ping
-pref("dom.push.adaptive.gap", 60000); // 1 minute
-// We limit the ping to this maximum value
-pref("dom.push.adaptive.upperLimit", 1740000); // 29 min
-
-// enable udp wakeup support
-pref("dom.push.udp.wakeupEnabled", false);
 
 // WebPush prefs:
 pref("dom.push.http2.reset_retry_count_after_ms", 60000);
@@ -5236,9 +5222,6 @@ pref("dom.forms.inputmode", true);
 // InputMethods for soft keyboards in B2G
 pref("dom.mozInputMethod.enabled", false);
 
-// DataStore is disabled by default
-pref("dom.datastore.enabled", false);
-
 // Telephony API
 #ifdef MOZ_B2G_RIL
 pref("dom.telephony.enabled", true);
@@ -5449,9 +5432,6 @@ pref("browser.addon-watch.ignore", "[\"mochikit@mozilla.org\",\"special-powers@m
 // the percentage of time addons are allowed to use without being labeled slow
 pref("browser.addon-watch.percentage-limit", 5);
 
-// RequestSync API is disabled by default.
-pref("dom.requestSync.enabled", false);
-
 // Search service settings
 pref("browser.search.log", false);
 pref("browser.search.update", true);
@@ -5518,6 +5498,10 @@ pref("reader.parse-node-limit", 3000);
 // Force-enables reader mode parsing, even on low-memory platforms, where it
 // is disabled by default.
 pref("reader.parse-on-load.force-enabled", false);
+
+// Whether we include full URLs in browser console errors. This is disabled
+// by default because some platforms will persist these, leading to privacy issues.
+pref("reader.errors.includeURLs", false);
 
 // The default relative font size in reader mode (1-9)
 pref("reader.font_size", 5);

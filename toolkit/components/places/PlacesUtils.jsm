@@ -583,11 +583,11 @@ this.PlacesUtils = {
       if (PlacesUtils.nodeIsFolder(node) &&
           node.type != Ci.nsINavHistoryResultNode.RESULT_TYPE_FOLDER_SHORTCUT &&
           asQuery(node).queryOptions.excludeItems) {
-        let node = PlacesUtils.getFolderContents(node.itemId, false, true).root;
+        let folderRoot = PlacesUtils.getFolderContents(node.itemId, false, true).root;
         try {
-          return gatherDataFunc(node);
+          return gatherDataFunc(folderRoot);
         } finally {
-          node.containerOpen = false;
+          folderRoot.containerOpen = false;
         }
       }
       // If we didn't create our own query, do not alter the node's state.
@@ -1387,19 +1387,28 @@ this.PlacesUtils = {
   },
 
   /**
-   * Gets the shared Sqlite.jsm readonly connection to the Places database.
-   * This is intended to be used mostly internally, and by other Places modules.
-   * Outside the Places component, it should be used only as a last resort.
+   * Gets a shared Sqlite.jsm readonly connection to the Places database,
+   * usable only for SELECT queries.
+   *
+   * This is intended to be used mostly internally, components outside of
+   * Places should, when possible, use API calls and file bugs to get proper
+   * APIs, where they are missing.
    * Keep in mind the Places DB schema is by no means frozen or even stable.
    * Your custom queries can - and will - break overtime.
+   *
+   * Example:
+   * let db = yield PlacesUtils.promiseDBConnection();
+   * let rows = yield db.executeCached(sql, params);
    */
   promiseDBConnection: () => gAsyncDBConnPromised,
 
   /**
-   * Perform a read/write operation on the Places database.
+   * Performs a read/write operation on the Places database through a Sqlite.jsm
+   * wrapped connection to the Places database.
    *
-   * Gets a Sqlite.jsm wrapped connection to the Places database.
-   * This is intended to be used mostly internally, and by other Places modules.
+   * This is intended to be used only by Places itself, always use APIs if you
+   * need to modify the Places database. Use promiseDBConnection if you need to
+   * SELECT from the database and there's no covering API.
    * Keep in mind the Places DB schema is by no means frozen or even stable.
    * Your custom queries can - and will - break overtime.
    *
@@ -1733,7 +1742,7 @@ this.PlacesUtils = {
    *  - guid (string): the item's GUID (same as aItemGuid for the top item).
    *  - [deprecated] id (number): the item's id. This is only if
    *    aOptions.includeItemIds is set.
-   *  - type (number):  the item's type.  @see PlacesUtils.TYPE_X_*
+   *  - type (string):  the item's type.  @see PlacesUtils.TYPE_X_*
    *  - title (string): the item's title. If it has no title, this property
    *    isn't set.
    *  - dateAdded (number, microseconds from the epoch): the date-added value of
@@ -1742,6 +1751,7 @@ this.PlacesUtils = {
    *    value of the item.
    *  - annos (see getAnnotationsForItem): the item's annotations.  This is not
    *    set if there are no annotations set for the item).
+   *  - index: the item's index under it's parent.
    *
    * The root object (i.e. the one for aItemGuid) also has the following
    * properties set:
@@ -2045,83 +2055,67 @@ XPCOMUtils.defineLazyGetter(this, "bundle", function() {
          createBundle(PLACES_STRING_BUNDLE_URI);
 });
 
-// A promise resolved once the Sqlite.jsm connections
-// can be closed.
-var promiseCanCloseConnection = function() {
-  let TOPIC = "places-will-close-connection";
-  return new Promise(resolve => {
-    let observer = function() {
-      Services.obs.removeObserver(observer, TOPIC);
-      resolve();
-    }
-    Services.obs.addObserver(observer, TOPIC, false)
-  });
-};
+/**
+ * Setup internal databases for closing properly during shutdown.
+ *
+ * 1. Places initiates shutdown.
+ * 2. Before places can move to the step where it closes the low-level connection,
+ *   we need to make sure that we have closed `conn`.
+ * 3. Before we can close `conn`, we need to make sure that all external clients
+ *   have stopped using `conn`.
+ * 4. Before we can close Sqlite, we need to close `conn`.
+ */
+function setupDbForShutdown(conn, name) {
+  try {
+    let state = "0. Not started.";
+    let promiseClosed = new Promise(resolve => {
+      // The service initiates shutdown.
+      // Before it can safely close its connection, we need to make sure
+      // that we have closed the high-level connection.
+      AsyncShutdown.placesClosingInternalConnection.addBlocker(`${name} closing as part of Places shutdown`,
+        Task.async(function*() {
+          state = "1. Service has initiated shutdown";
+
+          // At this stage, all external clients have finished using the
+          // database. We just need to close the high-level connection.
+          yield conn.close();
+          state = "2. Closed Sqlite.jsm connection.";
+
+          resolve();
+        }),
+        () => state
+      );
+    });
+
+    // Make sure that Sqlite.jsm doesn't close until we are done
+    // with the high-level connection.
+    Sqlite.shutdown.addBlocker(`${name} must be closed before Sqlite.jsm`,
+      () => promiseClosed,
+      () => state
+    );
+  } catch(ex) {
+    // It's too late to block shutdown, just close the connection.
+    conn.close();
+    throw ex;
+  }
+}
 
 XPCOMUtils.defineLazyGetter(this, "gAsyncDBConnPromised",
-  () => new Promise((resolve) => {
-    Sqlite.cloneStorageConnection({
-      connection: PlacesUtils.history.DBConnection,
-      readOnly:   true
-    }).then(conn => {
-      try {
-        let state = "0. not started";
-
-        let promiseReady = promiseCanCloseConnection();
-        let promiseShutdownComplete = Task.async(function*() {
-          // Don't close the connection as long as it might be used.
-          state = "1. waiting for `places-will-close-connection`";
-          yield promiseReady;
-
-          // But close the connection before Sqlite shutdown.
-          state = "2. closing the connection";
-          yield conn.close();
-
-          state = "3. done";
-        })();
-        Sqlite.shutdown.addBlocker("PlacesUtils read-only connection closing",
-          promiseShutdownComplete,
-          () => state);
-      } catch(ex) {
-        // It's too late to block shutdown, just close the connection.
-        conn.close();
-        throw ex;
-      }
-      resolve(conn);
-    });
+  () => Sqlite.cloneStorageConnection({
+    connection: PlacesUtils.history.DBConnection,
+    readOnly:   true
+  }).then(conn => {
+      setupDbForShutdown(conn, "PlacesUtils read-only connection");
+      return conn;
   })
 );
 
 XPCOMUtils.defineLazyGetter(this, "gAsyncDBWrapperPromised",
-  () => new Promise((resolve) => {
-    Sqlite.wrapStorageConnection({
+  () => Sqlite.wrapStorageConnection({
       connection: PlacesUtils.history.DBConnection,
-    }).then(conn => {
-      try {
-        let state = "0. not started";
-
-        let promiseReady = promiseCanCloseConnection();
-        let promiseShutdownComplete = Task.async(function*() {
-          // Don't close the connection as long as it might be used.
-          state = "1. waiting for `places-will-close-connection`";
-          yield promiseReady;
-
-          // But close the connection before Sqlite shutdown.
-          state = "2. closing the connection";
-          yield conn.close();
-
-          state = "3. done";
-        })();
-        Sqlite.shutdown.addBlocker("PlacesUtils wrapped connection closing",
-          promiseShutdownComplete,
-          () => state);
-      } catch(ex) {
-        // It's too late to block shutdown, just close the connection.
-        conn.close();
-        throw ex;
-      }
-      resolve(conn);
-    });
+  }).then(conn => {
+    setupDbForShutdown(conn, "PlacesUtils wrapped connection");
+    return conn;
   })
 );
 

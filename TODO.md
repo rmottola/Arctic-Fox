@@ -34,7 +34,6 @@
 - 1297276 - Rename mfbt/unused.h to mfbt/Unused.h for consistency
 - 1276938 - Optimize string usage in setAttribute when dealing with
 - 1263778 - Rename a bunch of low-level [[Prototype]] access methods to make their interactions with statically-known and dynamically-computed [[Prototype]]s clearer : Too much work for now
-- 1244098 - fold jspo_in, would improve performance, but we are missing testNotDefinedProperty and for that we need shouldAbortOnPreliminaryGroups() and that needs preliminaryObjects in the ObjectGroup
 - 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - Bug 1310721 - 2016-10-15- Remove support for the b2g PAC generator; r=mcmanus
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
@@ -45,8 +44,6 @@
 - Bug 1278838 2016-06-09- Remove separate worker binding for Performance API
 - Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1296851 - 2016-10-27 Always allow SetPrototype with the same value as the cu
-- Bug 1263778 - 2016-03-19 Rename a bunch of low-level [[Prototype]] access method
-- Bug 612168 [recheck existing] - Handle uninstalls of restartless addons in XPIProvider
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
 
 impacting download and shutdown:
@@ -55,9 +52,6 @@ Bug 875648 - Use Downloads.jsm functions to get download directories
 
 # Mac Specific
 Bug 1180725 - use AVFoundation for camera capture on OSX. r=jib
-
-# Win specific Check with Roy Tam:
-- bug 1139012 - telemetry for MLS vs win8 geolocation response.
 
 
 ## Enhancing JS

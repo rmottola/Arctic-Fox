@@ -17,7 +17,7 @@ Cu.import("resource://gre/modules/TelemetryController.jsm", this);
 Cu.import("resource://gre/modules/TelemetrySend.jsm", this);
 Cu.import("resource://gre/modules/Task.jsm", this);
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-let {OS: {File, Path, Constants}} = Cu.import("resource://gre/modules/osfile.jsm", {});
+var {OS: {File, Path, Constants}} = Cu.import("resource://gre/modules/osfile.jsm", {});
 
 // We increment TelemetryStorage's MAX_PING_FILE_AGE and
 // OVERDUE_PING_FILE_AGE by 1 minute so that our test pings exceed
@@ -33,8 +33,10 @@ const RECENT_PINGS = 4;
 
 const TOTAL_EXPECTED_PINGS = OVERDUE_PINGS + RECENT_PINGS + OLD_FORMAT_PINGS;
 
-let gCreatedPings = 0;
-let gSeenPings = 0;
+const PREF_FHR_UPLOAD = "datareporting.healthreport.uploadEnabled";
+
+var gCreatedPings = 0;
+var gSeenPings = 0;
 
 /**
  * Creates some Telemetry pings for the and saves them to disk. Each ping gets a
@@ -48,13 +50,13 @@ let gSeenPings = 0;
  * @returns Promise
  * @resolve an Array with the created pings ids.
  */
-let createSavedPings = Task.async(function* (aPingInfos) {
+var createSavedPings = Task.async(function* (aPingInfos) {
   let pingIds = [];
   let now = Date.now();
 
   for (let type in aPingInfos) {
     let num = aPingInfos[type].num;
-    let age = now - aPingInfos[type].age;
+    let age = now - (aPingInfos[type].age || 0);
     for (let i = 0; i < num; ++i) {
       let pingId = yield TelemetryController.addPendingPing("test-ping", {}, { overwrite: true });
       if (aPingInfos[type].age) {
@@ -77,7 +79,7 @@ let createSavedPings = Task.async(function* (aPingInfos) {
  * @param aPingIds an Array of ping ids to delete.
  * @returns Promise
  */
-let clearPings = Task.async(function* (aPingIds) {
+var clearPings = Task.async(function* (aPingIds) {
   for (let pingId of aPingIds) {
     yield TelemetryStorage.removePendingPing(pingId);
   }
@@ -118,7 +120,7 @@ function assertReceivedPings(aExpectedNum) {
  * @param aPingIds an Array of pings ids to check.
  * @returns Promise
  */
-let assertNotSaved = Task.async(function* (aPingIds) {
+var assertNotSaved = Task.async(function* (aPingIds) {
   let saved = 0;
   for (let id of aPingIds) {
     let filePath = getSavePathForPingId(id);
@@ -145,7 +147,7 @@ function pingHandler(aRequest) {
 /**
  * Clear out all pending pings.
  */
-let clearPendingPings = Task.async(function*() {
+var clearPendingPings = Task.async(function*() {
   const pending = yield TelemetryStorage.loadPendingPingList();
   for (let p of pending) {
     yield TelemetryStorage.removePendingPing(p.id);
@@ -156,6 +158,7 @@ function run_test() {
   PingServer.start();
   PingServer.registerPingHandler(pingHandler);
   do_get_profile();
+  loadAddonManager("xpcshell@tests.mozilla.org", "XPCShell", "1", "1.9.2");
 
   Services.prefs.setBoolPref(PREF_TELEMETRY_ENABLED, true);
   Services.prefs.setCharPref(TelemetryController.Constants.PREF_SERVER,
@@ -168,6 +171,9 @@ function run_test() {
  * |TelemetryController.testSaveDirectoryToFile| could fail.
  */
 add_task(function* setupEnvironment() {
+  // The following tests assume this pref to be true by default.
+  Services.prefs.setBoolPref(PREF_FHR_UPLOAD, true);
+
   yield TelemetryController.setup();
 
   let directory = TelemetryStorage.pingDirectoryPath;
@@ -389,7 +395,6 @@ add_task(function* test_overdue_old_format() {
 
 add_task(function* test_pendingPingsQuota() {
   const PING_TYPE = "foo";
-  const PREF_FHR_UPLOAD = "datareporting.healthreport.uploadEnabled";
 
   // Disable upload so pings don't get sent and removed from the pending pings directory.
   Services.prefs.setBoolPref(PREF_FHR_UPLOAD, false);
@@ -500,6 +505,48 @@ add_task(function* test_pendingPingsQuota() {
   yield TelemetryController.reset();
   yield TelemetryStorage.testPendingQuotaTaskPromise();
   yield checkPendingPings();
+
+  const OVERSIZED_PING_ID = "9b21ec8f-f762-4d28-a2c1-44e1c4694f24";
+  // Create a pending oversized ping.
+  const OVERSIZED_PING = {
+    id: OVERSIZED_PING_ID,
+    type: PING_TYPE,
+    creationDate: (new Date()).toISOString(),
+    // Generate a 2MB string to use as the ping payload.
+    payload: generateRandomString(2 * 1024 * 1024),
+  };
+  yield TelemetryStorage.savePendingPing(OVERSIZED_PING);
+
+  // Reset the histograms.
+  Telemetry.getHistogramById("TELEMETRY_PING_SIZE_EXCEEDED_PENDING").clear();
+  Telemetry.getHistogramById("TELEMETRY_DISCARDED_PENDING_PINGS_SIZE_MB").clear();
+
+  // Try to manually load the oversized ping.
+  yield Assert.rejects(TelemetryStorage.loadPendingPing(OVERSIZED_PING_ID),
+                       "The oversized ping should have been pruned.");
+  Assert.ok(!(yield OS.File.exists(getSavePathForPingId(OVERSIZED_PING_ID))),
+            "The ping should not be on the disk anymore.");
+
+  // Make sure we're correctly updating the related histograms.
+  h = Telemetry.getHistogramById("TELEMETRY_PING_SIZE_EXCEEDED_PENDING").snapshot();
+  Assert.equal(h.sum, 1, "Telemetry must report 1 oversized ping in the pending pings directory.");
+  h = Telemetry.getHistogramById("TELEMETRY_DISCARDED_PENDING_PINGS_SIZE_MB").snapshot();
+  Assert.equal(h.counts[2], 1, "Telemetry must report a 2MB, oversized, ping.");
+
+  // Save the ping again to check if it gets pruned when scanning the pings directory.
+  yield TelemetryStorage.savePendingPing(OVERSIZED_PING);
+  expectedPrunedPings.push(OVERSIZED_PING_ID);
+
+  // Scan the pending pings directory.
+  yield TelemetryController.reset();
+  yield TelemetryStorage.testPendingQuotaTaskPromise();
+  yield checkPendingPings();
+
+  // Make sure we're correctly updating the related histograms.
+  h = Telemetry.getHistogramById("TELEMETRY_PING_SIZE_EXCEEDED_PENDING").snapshot();
+  Assert.equal(h.sum, 2, "Telemetry must report 1 oversized ping in the pending pings directory.");
+  h = Telemetry.getHistogramById("TELEMETRY_DISCARDED_PENDING_PINGS_SIZE_MB").snapshot();
+  Assert.equal(h.counts[2], 2, "Telemetry must report two 2MB, oversized, pings.");
 
   Services.prefs.setBoolPref(PREF_FHR_UPLOAD, true);
 });

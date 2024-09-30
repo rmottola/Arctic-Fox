@@ -206,7 +206,7 @@ static const double THRESHOLD_LOW_PLAYBACKRATE_AUDIO = 0.5;
 // receive events. If we neglect to remove the self-reference then the element
 // just lives longer than it needs to.
 
-class nsMediaEvent : public nsRunnable
+class nsMediaEvent : public Runnable
 {
 public:
 
@@ -1899,7 +1899,7 @@ public:
                                            MediaStreamTrackSource)
 
   explicit CaptureStreamTrackSource(HTMLMediaElement* aElement)
-    : MediaStreamTrackSource(nsCOMPtr<nsIPrincipal>(aElement->GetCurrentPrincipal()),
+    : MediaStreamTrackSource(nsCOMPtr<nsIPrincipal>(aElement->GetCurrentPrincipal()).get(),
                              true,
                              nsString())
     , mElement(aElement)
@@ -2026,7 +2026,7 @@ HTMLMediaElement::CaptureStreamInternal(bool aFinishWhenEnded,
 
   OutputMediaStream* out = mOutputStreams.AppendElement();
   MediaStreamTrackSourceGetter* getter = new CaptureStreamTrackSourceGetter(this);
-  out->mStream = DOMMediaStream::CreateTrackUnionStream(window, aGraph, getter);
+  out->mStream = DOMMediaStream::CreateTrackUnionStreamAsInput(window, aGraph, getter);
   out->mFinishWhenEnded = aFinishWhenEnded;
 
   mAudioCaptured = true;

@@ -401,8 +401,7 @@ static CompositionOp
 OptimalFillOp()
 {
 #ifdef XP_WIN
-    if (gfxWindowsPlatform::GetPlatform()->GetRenderMode() ==
-        gfxWindowsPlatform::RENDER_DIRECT2D) {
+    if (gfxWindowsPlatform::GetPlatform()->IsDirect2DBackend()) {
         // D2D -really- hates operator source.
         return CompositionOp::OP_OVER;
     }
@@ -1502,7 +1501,8 @@ public:
                              int32_t feature,
                              nsACString& failureId,
                              int32_t* status)
-      : WorkerMainThreadRunnable(workerPrivate)
+      : WorkerMainThreadRunnable(workerPrivate,
+                                 NS_LITERAL_CSTRING("GFX :: GetFeatureStatus"))
       , mGfxInfo(gfxInfo)
       , mFeature(feature)
       , mStatus(status)

@@ -120,8 +120,12 @@ function createDummyDocument() {
   });
   let docShell = getDocShell(frame);
   let eventTarget = docShell.chromeEventHandler;
-  docShell.createAboutBlankContentViewer(Cc["@mozilla.org/nullprincipal;1"]
-                                         .createInstance(Ci.nsIPrincipal));
+  let ssm = Services.scriptSecurityManager;
+
+  // We probably need to call InheritFromDocShellToDoc to get the correct origin
+  // attributes, but right now we can't call it from JS.
+  let nullPrincipal = ssm.createNullPrincipal(docShell.getOriginAttributes());
+  docShell.createAboutBlankContentViewer(nullPrincipal);
   let window = docShell.contentViewer.DOMDocument.defaultView;
   window.location = "data:text/html,<html></html>";
   let deferred = promise.defer();
@@ -261,7 +265,7 @@ CssRuleView.prototype = {
    *
    * @return {Promise} Resolves to the instance of the highlighter.
    */
-  getSelectorHighlighter: Task.async(function*() {
+  getSelectorHighlighter: Task.async(function* () {
     let utils = this.inspector.toolbox.highlighterUtils;
     if (!utils.supportsCustomHighlighters()) {
       return null;
@@ -319,7 +323,7 @@ CssRuleView.prototype = {
     }, Cu.reportError);
   },
 
-  highlightSelector: Task.async(function*(selector) {
+  highlightSelector: Task.async(function* (selector) {
     let node = this.inspector.selection.nodeFront;
 
     let highlighter = yield this.getSelectorHighlighter();
@@ -334,7 +338,7 @@ CssRuleView.prototype = {
     });
   }),
 
-  unhighlightSelector: Task.async(function*() {
+  unhighlightSelector: Task.async(function* () {
     let highlighter = yield this.getSelectorHighlighter();
     if (!highlighter) {
       return;
@@ -462,7 +466,8 @@ CssRuleView.prototype = {
     try {
       let text = "";
 
-      if (target && target.nodeName === "input") {
+      let nodeName = target && target.nodeName;
+      if (nodeName === "input" || nodeName == "textarea") {
         let start = Math.min(target.selectionStart, target.selectionEnd);
         let end = Math.max(target.selectionStart, target.selectionEnd);
         let count = end - start;
@@ -873,6 +878,7 @@ CssRuleView.prototype = {
       if (this._elementStyle === elementStyle) {
         return this._populate();
       }
+      return undefined;
     }).then(() => {
       if (this._elementStyle === elementStyle) {
         if (!refresh) {
@@ -957,7 +963,7 @@ CssRuleView.prototype = {
     let elementStyle = this._elementStyle;
     return this._elementStyle.populate().then(() => {
       if (this._elementStyle !== elementStyle || this.isDestroyed) {
-        return;
+        return null;
       }
 
       this._clearRules();
@@ -1697,8 +1703,8 @@ RuleViewTool.prototype = {
       let target = this.inspector.target;
       if (Tools.styleEditor.isTargetSupported(target)) {
         gDevTools.showToolbox(target, "styleeditor").then(function(toolbox) {
-          let sheet = source || href;
-          toolbox.getCurrentPanel().selectStyleSheet(sheet, line, column);
+          let url = source || href;
+          toolbox.getCurrentPanel().selectStyleSheet(url, line, column);
         });
       }
       return;

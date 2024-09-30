@@ -694,6 +694,17 @@ GLScreenBuffer::IsReadFramebufferDefault() const
     return SharedSurf()->mAttachType == AttachmentType::Screen;
 }
 
+uint32_t
+GLScreenBuffer::DepthBits() const
+{
+    const GLFormats& formats = mFactory->mFormats;
+
+    if (formats.depth == LOCAL_GL_DEPTH_COMPONENT16)
+        return 16;
+
+    return 24;
+}
+
 ////////////////////////////////////////////////////////////////////////
 // Utils
 
@@ -843,7 +854,7 @@ DrawBuffer::Create(GLContext* const gl,
 
 DrawBuffer::~DrawBuffer()
 {
-    if(!mGL->MakeCurrent())
+    if (!mGL->MakeCurrent())
         return;
 
     GLuint fb = mFB;
@@ -921,7 +932,7 @@ ReadBuffer::Create(GLContext* gl,
 
 ReadBuffer::~ReadBuffer()
 {
-    if(!mGL->MakeCurrent())
+    if (!mGL->MakeCurrent())
         return;
 
     GLuint fb = mFB;

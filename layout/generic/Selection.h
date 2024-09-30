@@ -255,7 +255,7 @@ private:
   class ScrollSelectionIntoViewEvent;
   friend class ScrollSelectionIntoViewEvent;
 
-  class ScrollSelectionIntoViewEvent : public nsRunnable {
+  class ScrollSelectionIntoViewEvent : public Runnable {
   public:
     NS_DECL_NSIRUNNABLE
     ScrollSelectionIntoViewEvent(Selection* aSelection,

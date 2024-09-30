@@ -8,6 +8,39 @@
 
 BEGIN_WORKERS_NAMESPACE
 
+namespace {
+
+class ContinueActivateRunnable final : public LifeCycleEventCallback
+{
+  nsMainThreadPtrHandle<ServiceWorkerRegistrationInfo> mRegistration;
+  bool mSuccess;
+
+public:
+  explicit ContinueActivateRunnable(const nsMainThreadPtrHandle<ServiceWorkerRegistrationInfo>& aRegistration)
+    : mRegistration(aRegistration)
+    , mSuccess(false)
+  {
+    AssertIsOnMainThread();
+  }
+
+  void
+  SetResult(bool aResult) override
+  {
+    mSuccess = aResult;
+  }
+
+  NS_IMETHOD
+  Run() override
+  {
+    AssertIsOnMainThread();
+    mRegistration->FinishActivate(mSuccess);
+    mRegistration = nullptr;
+    return NS_OK;
+  }
+};
+
+} // anonymous namespace
+
 void
 ServiceWorkerRegistrationInfo::Clear()
 {
@@ -260,8 +293,7 @@ ServiceWorkerRegistrationInfo::IsLastUpdateCheckTimeOverOneDay() const
   const uint64_t kSecondsPerDay = 86400;
   const uint64_t now = PR_IntervalNow() / PR_MSEC_PER_SEC;
 
-  if ((mLastUpdateCheckTime != 0) &&
-      (now - mLastUpdateCheckTime > kSecondsPerDay)) {
+  if ((now - mLastUpdateCheckTime) > kSecondsPerDay) {
     return true;
   }
   return false;

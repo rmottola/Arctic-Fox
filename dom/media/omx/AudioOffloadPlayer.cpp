@@ -346,7 +346,7 @@ status_t AudioOffloadPlayer::DoSeek()
   CHECK(mAudioSink.get());
 
   AUDIO_OFFLOAD_LOG(LogLevel::Debug,
-                    "DoSeek ( %lld )", mSeekTarget.GetTime().ToMicroseconds());
+                    ("DoSeek ( %lld )", mSeekTarget.GetTime().ToMicroseconds()));
 
   mReachedEOS = false;
   mPositionTimeMediaUs = -1;
@@ -502,7 +502,6 @@ size_t AudioOffloadPlayer::FillBuffer(void* aData, size_t aSize)
   while (sizeRemaining > 0) {
     MediaSource::ReadOptions options;
     bool refreshSeekTime = false;
-
     {
       android::Mutex::Autolock autoLock(mLock);
 
@@ -519,7 +518,6 @@ size_t AudioOffloadPlayer::FillBuffer(void* aData, size_t aSize)
     }
 
     if (!mInputBuffer) {
-
       status_t err;
       err = mSource->read(&mInputBuffer, &options);
 
@@ -573,7 +571,7 @@ size_t AudioOffloadPlayer::FillBuffer(void* aData, size_t aSize)
         AUDIO_OFFLOAD_LOG(LogLevel::Debug, ("seek is updated during unlocking mLock"));
       }
 
-        if (refreshSeekTime) {
+      if (refreshSeekTime) {
         NotifyPositionChanged();
 
         // need to adjust the mStartPosUs for offload decoding since parser

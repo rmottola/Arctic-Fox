@@ -41,7 +41,6 @@ export MOZ_AUTOMATION_UPLOAD=0
 
 export MOZ_CRASHREPORTER_NO_REPORT=1
 export MOZ_OBJDIR=obj-firefox
-export MOZ_SYMBOLS_EXTRA_BUILDID=linux64
 export POST_SYMBOL_UPLOAD_CMD=/usr/local/bin/post-symbol-upload.py
 export TINDERBOX_OUTPUT=1
 

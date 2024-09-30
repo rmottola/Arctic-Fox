@@ -1297,6 +1297,32 @@ class LAsmReinterpretToI64 : public LAsmReinterpretBase<INT64_PIECES, 1>
     }
 };
 
+namespace details {
+    template<size_t Defs, size_t Ops>
+    class RotateBase : public LInstructionHelper<Defs, Ops, 0>
+    {
+        typedef LInstructionHelper<Defs, Ops, 0> Base;
+      public:
+        MRotate* mir() {
+            return Base::mir_->toRotate();
+        }
+        const LAllocation* input() { return Base::getOperand(0); }
+        const LAllocation* count() { return Base::getOperand(1); }
+    };
+} // details
+
+class LRotate : public details::RotateBase<1, 2>
+{
+  public:
+    LIR_HEADER(Rotate);
+};
+
+class LRotate64 : public details::RotateBase<INT64_PIECES, INT64_PIECES + 1>
+{
+  public:
+    LIR_HEADER(Rotate64);
+};
+
 class LInterruptCheck : public LInstructionHelper<0, 0, 0>
 {
     Label* oolEntry_;
@@ -4013,6 +4039,20 @@ class LTruncateFToInt32 : public LInstructionHelper<1, 1, 1>
     }
 };
 
+class LWasmTruncateToInt32 : public LInstructionHelper<1, 1, 0>
+{
+  public:
+    LIR_HEADER(WasmTruncateToInt32)
+
+    explicit LWasmTruncateToInt32(const LAllocation& in) {
+        setOperand(0, in);
+    }
+
+    MWasmTruncateToInt32* mir() const {
+        return mir_->toWasmTruncateToInt32();
+    }
+};
+
 class LWrapInt64ToInt32 : public LInstructionHelper<1, INT64_PIECES, 0>
 {
   public:
@@ -4436,6 +4476,32 @@ class LRegExpInstanceOptimizable : public LInstructionHelper<1, 2, 1>
     }
     MRegExpInstanceOptimizable* mir() const {
         return mir_->toRegExpInstanceOptimizable();
+    }
+};
+
+class LGetFirstDollarIndex : public LInstructionHelper<1, 1, 3>
+{
+  public:
+    LIR_HEADER(GetFirstDollarIndex);
+    explicit LGetFirstDollarIndex(const LAllocation& str, const LDefinition& temp0,
+                                  const LDefinition& temp1, const LDefinition& temp2) {
+        setOperand(0, str);
+        setTemp(0, temp0);
+        setTemp(1, temp1);
+        setTemp(2, temp2);
+    }
+
+    const LAllocation* str() {
+        return getOperand(0);
+    }
+    const LDefinition* temp0() {
+        return getTemp(0);
+    }
+    const LDefinition* temp1() {
+        return getTemp(1);
+    }
+    const LDefinition* temp2() {
+        return getTemp(2);
     }
 };
 

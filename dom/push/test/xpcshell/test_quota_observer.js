@@ -57,13 +57,11 @@ add_task(function* test_expiration_history_observer() {
     quota: 0,
   });
 
-  yield addVisit({
+  yield PlacesTestUtils.addVisits({
     uri: 'https://example.com/infrequent',
     title: 'Infrequently-visited page',
-    visits: [{
-      visitDate: (Date.now() - 14 * 24 * 60 * 60 * 1000) * 1000,
-      transitionType: Ci.nsINavHistoryService.TRANSITION_LINK,
-    }],
+    visitDate: (Date.now() - 14 * 24 * 60 * 60 * 1000) * 1000,
+    transition: Ci.nsINavHistoryService.TRANSITION_LINK
   });
 
   let unregisterDone;
@@ -73,7 +71,6 @@ add_task(function* test_expiration_history_observer() {
 
   PushService.init({
     serverURI: 'wss://push.example.org/',
-    networkInfo: new MockDesktopNetworkInfo(),
     db,
     makeWebSocket(uri) {
       return new MockWebSocket(uri, {
@@ -126,13 +123,11 @@ add_task(function* test_expiration_history_observer() {
   });
 
   // Now visit the site...
-  yield addVisit({
+  yield PlacesTestUtils.addVisits({
     uri: 'https://example.com/another-page',
     title: 'Infrequently-visited page',
-    visits: [{
-      visitDate: Date.now() * 1000,
-      transitionType: Ci.nsINavHistoryService.TRANSITION_LINK,
-    }],
+    visitDate: Date.now() * 1000,
+    transition: Ci.nsINavHistoryService.TRANSITION_LINK
   });
   Services.obs.notifyObservers(null, 'idle-daily', '');
 

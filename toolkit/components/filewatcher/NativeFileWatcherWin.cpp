@@ -27,7 +27,7 @@ namespace {
 /**
  * An event used to notify the main thread when an error happens.
  */
-class WatchedErrorEvent final : public nsRunnable
+class WatchedErrorEvent final : public Runnable
 {
 public:
   /**
@@ -65,7 +65,7 @@ public:
 /**
  * An event used to notify the main thread when an operation is successful.
  */
-class WatchedSuccessEvent final : public nsRunnable
+class WatchedSuccessEvent final : public Runnable
 {
 public:
   /**
@@ -103,7 +103,7 @@ public:
  * An event used to notify the main thread of a change in a watched
  * resource.
  */
-class WatchedChangeEvent final : public nsRunnable
+class WatchedChangeEvent final : public Runnable
 {
 public:
   /**
@@ -132,16 +132,8 @@ private:
   nsString mChangedResource;
 };
 
-static PRLogModuleInfo* GetFileWatcherContextLog()
-{
-  static PRLogModuleInfo *gNativeWatcherPRLog;
-  if (!gNativeWatcherPRLog) {
-    gNativeWatcherPRLog = PR_NewLogModule("NativeFileWatcherService");
-  }
-  return gNativeWatcherPRLog;
-}
-
-#define FILEWATCHERLOG(...) MOZ_LOG(GetFileWatcherContextLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
+static mozilla::LazyLogModule gNativeWatcherPRLog("NativeFileWatcherService");
+#define FILEWATCHERLOG(...) MOZ_LOG(gNativeWatcherPRLog, mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 // The number of notifications to store within WatchedResourceDescriptor:mNotificationBuffer.
 // If the buffer overflows, its contents are discarded and a change callback is dispatched
@@ -232,7 +224,7 @@ struct PathRunnablesParametersWrapper {
  * This runnable is dispatched to the main thread in order to safely
  * shutdown the worker thread.
  */
-class NativeWatcherIOShutdownTask : public nsRunnable
+class NativeWatcherIOShutdownTask : public Runnable
 {
 public:
   NativeWatcherIOShutdownTask()
@@ -263,7 +255,7 @@ private:
  * by issuing a NS_DispatchToCurrentThread(this) before exiting. This is done to allow
  * the execution of other runnables enqueued within the thread task queue.
  */
-class NativeFileWatcherIOTask : public nsRunnable
+class NativeFileWatcherIOTask : public Runnable
 {
 public:
   NativeFileWatcherIOTask(HANDLE aIOCompletionPort)

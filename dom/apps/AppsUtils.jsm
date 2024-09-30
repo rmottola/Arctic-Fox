@@ -220,7 +220,7 @@ this.AppsUtils = {
         deferred.resolve(file);
       }
     });
-    aRequestChannel.asyncOpen(listener, null);
+    aRequestChannel.asyncOpen2(listener);
 
     return deferred.promise;
   },
@@ -368,15 +368,6 @@ this.AppsUtils = {
     isCoreApp = app.basePath == this.getCoreAppsBasePath();
 #endif
     debug(app.basePath + " isCoreApp: " + isCoreApp);
-
-    // Before bug 910473, this is a temporary workaround to get correct path
-    // from child process in mochitest.
-    let prefName = "dom.mozApps.auto_confirm_install";
-    if (Services.prefs.prefHasUserValue(prefName) &&
-        Services.prefs.getBoolPref(prefName)) {
-      return { "path": app.basePath + "/" + app.id,
-               "isCoreApp": isCoreApp };
-    }
 
     return { "path": app.basePath + "/" + app.id,
              "isCoreApp": isCoreApp };
@@ -848,7 +839,7 @@ ManifestHelper.prototype = {
   _localeProp: function(aProp) {
     if (this._localeRoot[aProp] != undefined)
       return this._localeRoot[aProp];
-    return this._manifest[aProp];
+    return (aProp in this._manifest) ? this._manifest[aProp] : undefined;
   },
 
   get name() {

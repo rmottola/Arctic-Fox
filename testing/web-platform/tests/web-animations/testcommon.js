@@ -8,29 +8,21 @@ policies and contribution forms [3].
 [3] http://www.w3.org/2004/10/27-testcases
  */
 
-"use strict";
+'use strict';
 
-var ANIMATION_END_TIME = 1000;
-var ANIMATION_TOP_DEFAULT = 300;
-var ANIMATION_TOP_0 = 10;
-var ANIMATION_TOP_0_5 = 100;
-var ANIMATION_TOP_1 = 200;
+var MS_PER_SEC = 1000;
 
-var KEYFRAMES = [ {
-  top : ANIMATION_TOP_0 + 'px',
-  offset : 0
-}, {
-  top : ANIMATION_TOP_0_5 + 'px',
-  offset : 1 / 2
-}, {
-  top : ANIMATION_TOP_1 + 'px',
-  offset : 1
-} ];
+// The recommended minimum precision to use for time values[1].
+//
+// [1] https://w3c.github.io/web-animations/#precision-of-time-values
+var TIME_PRECISION = 0.0005; // ms
 
-// creates new animation for given target
-function newAnimation(animationTarget) {
-  animationTarget.style.top = ANIMATION_TOP_DEFAULT + 'px';
-  return new Animation(animationTarget, KEYFRAMES, ANIMATION_END_TIME);
+// Allow implementations to substitute an alternative method for comparing
+// times based on their precision requirements.
+if (!window.assert_times_equal) {
+  window.assert_times_equal = function(actual, expected, description) {
+    assert_approx_equals(actual, expected, TIME_PRECISION, description);
+  }
 }
 
 // creates div element, appends it to the document body and
@@ -89,11 +81,6 @@ function createPseudo(test, type) {
   assert_equals(anim.effect.target.type, '::' + type);
   anim.cancel();
   return anim.effect.target;
-}
-
-// Returns the type name of given object
-function type(object) {
-  return Object.prototype.toString.call(object).slice(8, -1);
 }
 
 // Convert px unit value to a Number

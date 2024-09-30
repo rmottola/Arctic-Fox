@@ -2188,21 +2188,17 @@ nsTreeBodyFrame::GetImage(int32_t aRowIndex, nsTreeColumn* aCol, bool aUseContex
 
       // XXXbz what's the origin principal for this stuff that comes from our
       // view?  I guess we should assume that it's the node's principal...
-      if (nsContentUtils::CanLoadImage(srcURI, mContent, doc,
-                                       mContent->NodePrincipal())) {
-        nsresult rv = nsContentUtils::LoadImage(srcURI,
-                                                mContent,
-                                                doc,
-                                                mContent->NodePrincipal(),
-                                                doc->GetDocumentURI(),
-                                                doc->GetReferrerPolicy(),
-                                                imgNotificationObserver,
-                                                nsIRequest::LOAD_NORMAL,
-                                                EmptyString(),
-                                                getter_AddRefs(imageRequest));
-        NS_ENSURE_SUCCESS(rv, rv);
-                                  
-      }
+      nsresult rv = nsContentUtils::LoadImage(srcURI,
+                                              mContent,
+                                              doc,
+                                              mContent->NodePrincipal(),
+                                              doc->GetDocumentURI(),
+                                              doc->GetReferrerPolicy(),
+                                              imgNotificationObserver,
+                                              nsIRequest::LOAD_NORMAL,
+                                              EmptyString(),
+                                              getter_AddRefs(imageRequest));
+      NS_ENSURE_SUCCESS(rv, rv);
     }
     listener->UnsuppressInvalidation();
 
@@ -4840,7 +4836,7 @@ nsTreeBodyFrame::FireInvalidateEvent(int32_t aStartRowIdx, int32_t aEndRowIdx,
 }
 #endif
 
-class nsOverflowChecker : public nsRunnable
+class nsOverflowChecker : public Runnable
 {
 public:
   explicit nsOverflowChecker(nsTreeBodyFrame* aFrame) : mFrame(aFrame) {}

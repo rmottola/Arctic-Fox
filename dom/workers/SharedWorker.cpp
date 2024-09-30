@@ -137,7 +137,6 @@ SharedWorker::Close()
 
   if (mMessagePort) {
     mMessagePort->Close();
-    mMessagePort = nullptr;
   }
 }
 

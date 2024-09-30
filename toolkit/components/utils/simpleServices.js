@@ -24,33 +24,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
 XPCOMUtils.defineLazyModuleGetter(this, "Services",
                                   "resource://gre/modules/Services.jsm");
 
-function RemoteTagServiceService()
-{
-}
-
-RemoteTagServiceService.prototype = {
-  classID: Components.ID("{dfd07380-6083-11e4-9803-0800200c9a66}"),
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIRemoteTagService, Ci.nsISupportsWeakReference]),
-
-  /**
-   * CPOWs can have user data attached to them. This data originates
-   * in the local process from this function, getRemoteObjectTag. It's
-   * sent along with the CPOW to the remote process, where it can be
-   * fetched with Components.utils.getCrossProcessWrapperTag.
-   */
-  getRemoteObjectTag: function(target) {
-    if (target instanceof Ci.nsIDocShellTreeItem) {
-      return "ContentDocShellTreeItem";
-    }
-
-    if (target instanceof Ci.nsIDOMDocument) {
-      return "ContentDocument";
-    }
-
-    return "generic";
-  }
-};
-
 function AddonPolicyService()
 {
   this.wrappedJSObject = this;
@@ -286,5 +259,5 @@ AddonLocalizationConverter.prototype = {
   },
 };
 
-this.NSGetFactory = XPCOMUtils.generateNSGetFactory([RemoteTagServiceService, AddonPolicyService,
+this.NSGetFactory = XPCOMUtils.generateNSGetFactory([AddonPolicyService,
                                                      AddonLocalizationConverter]);

@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "AudioDestinationNode.h"
+#include "AlignmentUtils.h"
 #include "AudioContext.h"
 #include "mozilla/dom/AudioDestinationNodeBinding.h"
 #include "mozilla/dom/ScriptSettings.h"
@@ -55,18 +56,26 @@ public:
     // will not go anywhere.
     *aOutput = aInput;
 
-    // The output buffer is allocated lazily, on the rendering thread.
-    if (!mBufferAllocated) {
+    // The output buffer is allocated lazily, on the rendering thread, when
+    // non-null input is received.
+    if (!mBufferAllocated && !aInput.IsNull()) {
       // These allocations might fail if content provides a huge number of
       // channels or size, but it's OK since we'll deal with the failure
       // gracefully.
       mBuffer = ThreadSharedFloatArrayBufferList::
         Create(mNumberOfChannels, mLength, fallible);
+      if (mBuffer && mWriteIndex) {
+        // Zero leading for any null chunks that were skipped.
+        for (uint32_t i = 0; i < mNumberOfChannels; ++i) {
+          float* channelData = mBuffer->GetDataForWrite(i);
+          PodZero(channelData, mWriteIndex);
+        }
+      }
 
       mBufferAllocated = true;
     }
 
-    // Handle the case of allocation failure in the input buffer
+    // Skip copying if there is no buffer.
     uint32_t outputChannelCount = mBuffer ? mNumberOfChannels : 0;
 
     // Record our input buffer
@@ -79,7 +88,7 @@ public:
         PodZero(outputData, duration);
       } else {
         const float* inputBuffer = static_cast<const float*>(aInput.mChannelData[i]);
-        if (duration == WEBAUDIO_BLOCK_SIZE) {
+        if (duration == WEBAUDIO_BLOCK_SIZE && IS_ALIGNED16(inputBuffer)) {
           // Use the optimized version of the copy with scale operation
           AudioBlockCopyChannelWithScale(inputBuffer, aInput.mVolume,
                                          outputData);
@@ -113,7 +122,7 @@ public:
   }
 
 
-  class OnCompleteTask final : public nsRunnable
+  class OnCompleteTask final : public Runnable
   {
   public:
     OnCompleteTask(AudioContext* aAudioContext, AudioBuffer* aRenderedBuffer)
@@ -189,7 +198,7 @@ private:
   bool mBufferAllocated;
 };
 
-class InputMutedRunnable final : public nsRunnable
+class InputMutedRunnable final : public Runnable
 {
 public:
   InputMutedRunnable(AudioNodeStream* aStream,
@@ -323,8 +332,6 @@ AudioDestinationNode::AudioDestinationNode(AudioContext* aContext,
   , mAudioChannel(AudioChannel::Normal)
   , mIsOffline(aIsOffline)
   , mAudioChannelAgentPlaying(false)
-  , mExtraCurrentTimeSinceLastStartedBlocking(0)
-  , mExtraCurrentTimeUpdatedSinceLastStableState(false)
   , mCaptured(false)
 {
   MediaStreamGraph* graph = aIsOffline ?
@@ -638,74 +645,6 @@ AudioDestinationNode::CreateAudioChannelAgent()
   }
 
   return NS_OK;
-}
-
-void
-AudioDestinationNode::NotifyStableState()
-{
-  mExtraCurrentTimeUpdatedSinceLastStableState = false;
-}
-
-void
-AudioDestinationNode::ScheduleStableStateNotification()
-{
-  nsCOMPtr<nsIRunnable> event =
-    NS_NewRunnableMethod(this, &AudioDestinationNode::NotifyStableState);
-  // Dispatch will fail if this is called on AudioNode destruction during
-  // shutdown, in which case failure can be ignored.
-  nsContentUtils::RunInStableState(event.forget());
-}
-
-StreamTime
-AudioDestinationNode::ExtraCurrentTime()
-{
-  if (!mStartedBlockingDueToBeingOnlyNode.IsNull() &&
-      !mExtraCurrentTimeUpdatedSinceLastStableState) {
-    mExtraCurrentTimeUpdatedSinceLastStableState = true;
-    // Round to nearest processing block.
-    double seconds =
-      (TimeStamp::Now() - mStartedBlockingDueToBeingOnlyNode).ToSeconds();
-    mExtraCurrentTimeSinceLastStartedBlocking = WEBAUDIO_BLOCK_SIZE *
-      StreamTime(seconds * Context()->SampleRate() / WEBAUDIO_BLOCK_SIZE + 0.5);
-    ScheduleStableStateNotification();
-  }
-  return mExtraCurrentTimeSinceLastStartedBlocking;
-}
-
-void
-AudioDestinationNode::SetIsOnlyNodeForContext(bool aIsOnlyNode)
-{
-  if (!mStartedBlockingDueToBeingOnlyNode.IsNull() == aIsOnlyNode) {
-    // Nothing changed.
-    return;
-  }
-
-  if (!mStream) {
-    // DestroyMediaStream has been called, presumably during CC Unlink().
-    return;
-  }
-
-  if (mIsOffline) {
-    // Don't block the destination stream for offline AudioContexts, since
-    // we expect the zero data produced when there are no other nodes to
-    // show up in its result buffer. Also, we would get confused by adding
-    // ExtraCurrentTime before StartRendering has even been called.
-    return;
-  }
-
-  if (aIsOnlyNode) {
-    mStream->Suspend();
-    mStartedBlockingDueToBeingOnlyNode = TimeStamp::Now();
-    // Don't do an update of mExtraCurrentTimeSinceLastStartedBlocking until the next stable state.
-    mExtraCurrentTimeUpdatedSinceLastStableState = true;
-    ScheduleStableStateNotification();
-  } else {
-    // Force update of mExtraCurrentTimeSinceLastStartedBlocking if necessary
-    ExtraCurrentTime();
-    mStream->AdvanceAndResume(mExtraCurrentTimeSinceLastStartedBlocking);
-    mExtraCurrentTimeSinceLastStartedBlocking = 0;
-    mStartedBlockingDueToBeingOnlyNode = TimeStamp();
-  }
 }
 
 void

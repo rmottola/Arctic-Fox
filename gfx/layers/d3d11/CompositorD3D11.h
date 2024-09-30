@@ -42,14 +42,13 @@ struct DeviceAttachmentsD3D11;
 class CompositorD3D11 : public Compositor
 {
 public:
-  CompositorD3D11(CompositorBridgeParent* aParent, nsIWidget* aWidget);
+  CompositorD3D11(CompositorBridgeParent* aParent, widget::CompositorWidgetProxy* aWidget);
   ~CompositorD3D11();
 
   virtual CompositorD3D11* AsCompositorD3D11() override { return this; }
 
   virtual bool Initialize() override;
   virtual void Destroy() override {}
-  virtual void DetachWidget() override { mWidget = nullptr; }
 
   virtual TextureFactoryIdentifier
     GetTextureFactoryIdentifier() override;
@@ -147,9 +146,7 @@ public:
     return LayersBackend::LAYERS_D3D11;
   }
 
-  virtual void ForcePresent() { mSwapChain->Present(0, 0); }
-
-  virtual nsIWidget* GetWidget() const override { return mWidget; }
+  virtual void ForcePresent();
 
   ID3D11Device* GetDevice() { return mDevice; }
 
@@ -190,8 +187,6 @@ private:
   RefPtr<CompositingRenderTargetD3D11> mCurrentRT;
 
   DeviceAttachmentsD3D11* mAttachments;
-
-  nsIWidget* mWidget;
 
   LayoutDeviceIntSize mSize;
 

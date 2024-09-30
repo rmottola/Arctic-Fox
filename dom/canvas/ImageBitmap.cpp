@@ -269,7 +269,8 @@ public:
                                              const gfx::IntSize& aSize,
                                              const Maybe<IntRect>& aCropRect,
                                              layers::Image** aImage)
-  : WorkerMainThreadRunnable(GetCurrentThreadWorkerPrivate())
+  : WorkerMainThreadRunnable(GetCurrentThreadWorkerPrivate(),
+                               NS_LITERAL_CSTRING("ImageBitmap :: Create Image from Raw Data"))
   , mImage(aImage)
   , mBuffer(aBuffer)
   , mBufferLength(aBufferLength)
@@ -389,11 +390,13 @@ HasRasterImage(HTMLImageElement& aImageEl)
   return false;
 }
 
-ImageBitmap::ImageBitmap(nsIGlobalObject* aGlobal, layers::Image* aData)
+ImageBitmap::ImageBitmap(nsIGlobalObject* aGlobal, layers::Image* aData,
+                         bool aIsPremultipliedAlpha /* = true */)
   : mParent(aGlobal)
   , mData(aData)
   , mSurface(nullptr)
   , mPictureRect(0, 0, aData->GetSize().width, aData->GetSize().height)
+  , mIsPremultipliedAlpha(aIsPremultipliedAlpha)
 {
   MOZ_ASSERT(aData, "aData is null in ImageBitmap constructor.");
 }
@@ -433,10 +436,10 @@ ImageBitmap::PrepareForDrawTarget(gfx::DrawTarget* aTarget)
 
   if (!mSurface) {
     mSurface = mData->GetAsSourceSurface();
-  }
 
-  if (!mSurface) {
-    return nullptr;
+    if (!mSurface) {
+      return nullptr;
+    }
   }
 
   RefPtr<DrawTarget> target = aTarget;
@@ -469,31 +472,90 @@ ImageBitmap::PrepareForDrawTarget(gfx::DrawTarget* aTarget)
       return surface.forget();
     }
 
-    // We need to fall back to generic copying and cropping for the Windows8.1,
-    // D2D1 backend.
-    // In the Windows8.1 D2D1 backend, it might trigger "partial upload" from a
-    // non-SourceSurfaceD2D1 surface to a D2D1Image in the following
-    // CopySurface() step. However, the "partial upload" only supports uploading
-    // a rectangle starts from the upper-left point, which means it cannot
-    // upload an arbitrary part of the source surface and this causes problems
-    // if the mPictureRect is not starts from the upper-left point.
-    if (target->GetBackendType() == BackendType::DIRECT2D1_1 &&
-        mSurface->GetType() != SurfaceType::D2D1_1_IMAGE) {
-      RefPtr<DataSourceSurface> dataSurface = mSurface->GetDataSurface();
-      if (NS_WARN_IF(!dataSurface)) {
-        mSurface = nullptr;
-        RefPtr<gfx::SourceSurface> surface(mSurface);
-        return surface.forget();
-      }
-
-      mSurface = CropAndCopyDataSourceSurface(dataSurface, mPictureRect);
-    } else {
-      target->CopySurface(mSurface, surfPortion, dest);
-      mSurface = target->Snapshot();
-    }
+    target->CopySurface(mSurface, surfPortion, dest);
+    mSurface = target->Snapshot();
 
     // Make mCropRect match new surface we've cropped to
     mPictureRect.MoveTo(0, 0);
+  }
+
+  // Pre-multiply alpha here.
+  // Apply pre-multiply alpha only if mIsPremultipliedAlpha is false.
+  if (!mIsPremultipliedAlpha) {
+    MOZ_ASSERT(mSurface->GetFormat() == SurfaceFormat::R8G8B8A8 ||
+               mSurface->GetFormat() == SurfaceFormat::B8G8R8A8 ||
+               mSurface->GetFormat() == SurfaceFormat::A8R8G8B8);
+
+    RefPtr<DataSourceSurface> dstSurface = mSurface->GetDataSurface();
+    MOZ_ASSERT(dstSurface);
+
+    RefPtr<DataSourceSurface> srcSurface;
+    DataSourceSurface::MappedSurface srcMap;
+    DataSourceSurface::MappedSurface dstMap;
+
+    if (!dstSurface->Map(DataSourceSurface::MapType::READ_WRITE, &dstMap)) {
+      srcSurface = dstSurface;
+      if (!srcSurface->Map(DataSourceSurface::READ, &srcMap)) {
+        gfxCriticalError() << "Failed to map source surface for premultiplying alpha.";
+        return nullptr;
+      }
+
+      dstSurface = Factory::CreateDataSourceSurface(srcSurface->GetSize(), srcSurface->GetFormat());
+
+      if (!dstSurface || !dstSurface->Map(DataSourceSurface::MapType::WRITE, &dstMap)) {
+        gfxCriticalError() << "Failed to map destination surface for premultiplying alpha.";
+        srcSurface->Unmap();
+        return nullptr;
+      }
+    }
+
+    uint8_t rIndex = 0;
+    uint8_t gIndex = 0;
+    uint8_t bIndex = 0;
+    uint8_t aIndex = 0;
+
+    if (mSurface->GetFormat() == SurfaceFormat::R8G8B8A8) {
+      rIndex = 0;
+      gIndex = 1;
+      bIndex = 2;
+      aIndex = 3;
+    } else if (mSurface->GetFormat() == SurfaceFormat::B8G8R8A8) {
+      rIndex = 2;
+      gIndex = 1;
+      bIndex = 0;
+      aIndex = 3;
+    } else if (mSurface->GetFormat() == SurfaceFormat::A8R8G8B8) {
+      rIndex = 1;
+      gIndex = 2;
+      bIndex = 3;
+      aIndex = 0;
+    }
+
+    for (int i = 0; i < dstSurface->GetSize().height; ++i) {
+      uint8_t* bufferPtr = dstMap.mData + dstMap.mStride * i;
+      uint8_t* srcBufferPtr = srcSurface ? srcMap.mData + srcMap.mStride * i : bufferPtr;
+      for (int i = 0; i < dstSurface->GetSize().width; ++i) {
+        uint8_t r = *(srcBufferPtr+rIndex);
+        uint8_t g = *(srcBufferPtr+gIndex);
+        uint8_t b = *(srcBufferPtr+bIndex);
+        uint8_t a = *(srcBufferPtr+aIndex);
+
+        *(bufferPtr+rIndex) = gfxUtils::sPremultiplyTable[a * 256 + r];
+        *(bufferPtr+gIndex) = gfxUtils::sPremultiplyTable[a * 256 + g];
+        *(bufferPtr+bIndex) = gfxUtils::sPremultiplyTable[a * 256 + b];
+        *(bufferPtr+aIndex) = a;
+
+        bufferPtr += 4;
+        srcBufferPtr += 4;
+      }
+    }
+
+    dstSurface->Unmap();
+    if (srcSurface) {
+      srcSurface->Unmap();
+    }
+
+    mSurface = dstSurface;
   }
 
   // Replace our surface with one optimized for the target we're about to draw
@@ -518,6 +580,7 @@ ImageBitmap::ToCloneData()
 {
   ImageBitmapCloneData* result = new ImageBitmapCloneData();
   result->mPictureRect = mPictureRect;
+  result->mIsPremultipliedAlpha = mIsPremultipliedAlpha;
   RefPtr<SourceSurface> surface = mData->GetAsSourceSurface();
   result->mSurface = surface->GetDataSurface();
   MOZ_ASSERT(result->mSurface);
@@ -532,7 +595,8 @@ ImageBitmap::CreateFromCloneData(nsIGlobalObject* aGlobal,
   RefPtr<layers::Image> data =
     CreateImageFromSurface(aData->mSurface);
 
-  RefPtr<ImageBitmap> ret = new ImageBitmap(aGlobal, data);
+  RefPtr<ImageBitmap> ret = new ImageBitmap(aGlobal, data,
+                                            aData->mIsPremultipliedAlpha);
   ErrorResult rv;
   ret->SetPictureRect(aData->mPictureRect, rv);
   return ret.forget();
@@ -763,7 +827,8 @@ ImageBitmap::CreateInternal(nsIGlobalObject* aGlobal, ImageData& aImageData,
   }
 
   // Create an ImageBimtap.
-  RefPtr<ImageBitmap> ret = new ImageBitmap(aGlobal, data);
+  // ImageData's underlying data is not alpha-premultiplied.
+  RefPtr<ImageBitmap> ret = new ImageBitmap(aGlobal, data, false);
 
   // The cropping information has been handled in the CreateImageFromRawData()
   // function.
@@ -821,7 +886,7 @@ ImageBitmap::CreateInternal(nsIGlobalObject* aGlobal, ImageBitmap& aImageBitmap,
   }
 
   RefPtr<layers::Image> data = aImageBitmap.mData;
-  RefPtr<ImageBitmap> ret = new ImageBitmap(aGlobal, data);
+  RefPtr<ImageBitmap> ret = new ImageBitmap(aGlobal, data, aImageBitmap.mIsPremultipliedAlpha);
 
   // Set the picture rectangle.
   if (ret && aCropRect.isSome()) {
@@ -851,7 +916,7 @@ private:
   RefPtr<ImageBitmap> mImageBitmap;
 };
 
-class FulfillImageBitmapPromiseTask final : public nsRunnable,
+class FulfillImageBitmapPromiseTask final : public Runnable,
                                             public FulfillImageBitmapPromise
 {
 public:
@@ -1041,7 +1106,7 @@ protected:
   Maybe<IntRect> mCropRect;
 };
 
-class CreateImageBitmapFromBlobTask final : public nsRunnable,
+class CreateImageBitmapFromBlobTask final : public Runnable,
                                             public CreateImageBitmapFromBlob
 {
 public:
@@ -1086,7 +1151,8 @@ class CreateImageBitmapFromBlobWorkerTask final : public WorkerSameThreadRunnabl
                                    Blob& aBlob,
                                    Maybe<IntRect>& aCropRect,
                                    layers::Image** aImage)
-    : WorkerMainThreadRunnable(aWorkerPrivate)
+    : WorkerMainThreadRunnable(aWorkerPrivate,
+                               NS_LITERAL_CSTRING("ImageBitmap :: Create Image from Blob"))
     , mBlob(aBlob)
     , mCropRect(aCropRect)
     , mImage(aImage)
@@ -1239,9 +1305,12 @@ ImageBitmap::ReadStructuredClone(JSContext* aCx,
   uint32_t picRectY_;
   uint32_t picRectWidth_;
   uint32_t picRectHeight_;
+  uint32_t isPremultipliedAlpha_;
+  uint32_t dummy_;
 
   if (!JS_ReadUint32Pair(aReader, &picRectX_, &picRectY_) ||
-      !JS_ReadUint32Pair(aReader, &picRectWidth_, &picRectHeight_)) {
+      !JS_ReadUint32Pair(aReader, &picRectWidth_, &picRectHeight_) ||
+      !JS_ReadUint32Pair(aReader, &isPremultipliedAlpha_, &dummy_)) {
     return nullptr;
   }
 
@@ -1263,7 +1332,7 @@ ImageBitmap::ReadStructuredClone(JSContext* aCx,
   {
     RefPtr<layers::Image> img = CreateImageFromSurface(aClonedSurfaces[aIndex]);
     RefPtr<ImageBitmap> imageBitmap =
-      new ImageBitmap(aParent, img);
+      new ImageBitmap(aParent, img, isPremultipliedAlpha_);
 
     ErrorResult error;
     imageBitmap->SetPictureRect(IntRect(picRectX, picRectY,
@@ -1293,13 +1362,15 @@ ImageBitmap::WriteStructuredClone(JSStructuredCloneWriter* aWriter,
   const uint32_t picRectY = BitwiseCast<uint32_t>(aImageBitmap->mPictureRect.y);
   const uint32_t picRectWidth = BitwiseCast<uint32_t>(aImageBitmap->mPictureRect.width);
   const uint32_t picRectHeight = BitwiseCast<uint32_t>(aImageBitmap->mPictureRect.height);
+  const uint32_t isPremultipliedAlpha = aImageBitmap->mIsPremultipliedAlpha ? 1 : 0;
 
   // Indexing the cloned surfaces and send the index to the receiver.
   uint32_t index = aClonedSurfaces.Length();
 
   if (NS_WARN_IF(!JS_WriteUint32Pair(aWriter, SCTAG_DOM_IMAGEBITMAP, index)) ||
       NS_WARN_IF(!JS_WriteUint32Pair(aWriter, picRectX, picRectY)) ||
-      NS_WARN_IF(!JS_WriteUint32Pair(aWriter, picRectWidth, picRectHeight))) {
+      NS_WARN_IF(!JS_WriteUint32Pair(aWriter, picRectWidth, picRectHeight)) ||
+      NS_WARN_IF(!JS_WriteUint32Pair(aWriter, isPremultipliedAlpha, 0))) {
     return false;
   }
 

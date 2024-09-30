@@ -19,7 +19,8 @@
 @APPNAME@/Contents/Info.plist
 @APPNAME@/Contents/PkgInfo
 @APPNAME@/Contents/Plug-Ins/
-@RESPATH@
+@RESPATH@/@MOZ_APP_NAME@.icns
+@RESPATH@/@LPROJ_ROOT@.lproj/*
 #endif
 
 [@AB_CD@]
@@ -42,9 +43,7 @@
 #endif
 
 [xpcom]
-#ifndef XP_MACOSX
 @RESPATH@/dependentlibs.list
-#endif
 #ifndef MOZ_STATIC_JS
 @BINPATH@/@DLL_PREFIX@mozjs@DLL_SUFFIX@
 #endif
@@ -118,7 +117,7 @@
 #endif
 #endif
 #ifdef MOZ_WEBSPEECH_MODELS
-@BINPATH@/models/
+@RESPATH@/models/
 #endif
 
 ; [Components]
@@ -130,35 +129,34 @@
 #endif
 @RESPATH@/components/accessibility.xpt
 #endif
-@BINPATH@/components/appshell.xpt
-@BINPATH@/components/appstartup.xpt
-@BINPATH@/components/autocomplete.xpt
-@BINPATH@/components/autoconfig.xpt
-@BINPATH@/components/browsercompsbase.xpt
-@BINPATH@/components/browser-element.xpt
-@BINPATH@/components/browser-feeds.xpt
-@BINPATH@/components/caps.xpt
-@BINPATH@/components/chardet.xpt
-@BINPATH@/components/chrome.xpt
-@BINPATH@/components/commandhandler.xpt
-@BINPATH@/components/commandlines.xpt
-@BINPATH@/components/compartments.xpt
-@BINPATH@/components/composer.xpt
-@BINPATH@/components/content_events.xpt
-@BINPATH@/components/content_html.xpt
-@BINPATH@/components/content_xslt.xpt
-@BINPATH@/components/cookie.xpt
-@BINPATH@/components/devtools_security.xpt
-@BINPATH@/components/directory.xpt
-@BINPATH@/components/diskspacewatcher.xpt
-@BINPATH@/components/docshell.xpt
-@BINPATH@/components/dom.xpt
-@BINPATH@/components/dom_activities.xpt
-@BINPATH@/components/dom_apps.xpt
-@BINPATH@/components/dom_newapps.xpt
-@BINPATH@/components/dom_audiochannel.xpt
-@BINPATH@/components/dom_base.xpt
-@BINPATH@/components/dom_system.xpt
+@RESPATH@/components/appshell.xpt
+@RESPATH@/components/appstartup.xpt
+@RESPATH@/components/autocomplete.xpt
+@RESPATH@/components/autoconfig.xpt
+@RESPATH@/components/browsercompsbase.xpt
+@RESPATH@/components/browser-element.xpt
+@RESPATH@/components/browser-feeds.xpt
+@RESPATH@/components/caps.xpt
+@RESPATH@/components/chardet.xpt
+@RESPATH@/components/chrome.xpt
+@RESPATH@/components/commandhandler.xpt
+@RESPATH@/components/commandlines.xpt
+@RESPATH@/components/compartments.xpt
+@RESPATH@/components/composer.xpt
+@RESPATH@/components/content_events.xpt
+@RESPATH@/components/content_html.xpt
+@RESPATH@/components/content_xslt.xpt
+@RESPATH@/components/cookie.xpt
+@RESPATH@/components/directory.xpt
+@RESPATH@/components/diskspacewatcher.xpt
+@RESPATH@/components/docshell.xpt
+@RESPATH@/components/dom.xpt
+@RESPATH@/components/dom_activities.xpt
+@RESPATH@/components/dom_apps.xpt
+@RESPATH@/components/dom_newapps.xpt
+@RESPATH@/components/dom_audiochannel.xpt
+@RESPATH@/components/dom_base.xpt
+@RESPATH@/components/dom_system.xpt
 #ifdef MOZ_WIDGET_GONK
 @RESPATH@/components/dom_wifi.xpt
 @RESPATH@/components/dom_system_gonk.xpt
@@ -171,7 +169,7 @@
 @RESPATH@/components/dom_bluetooth.xpt
 #endif
 #ifdef MOZ_B2G_CAMERA
-@BINPATH@/components/dom_camera.xpt
+@RESPATH@/components/dom_camera.xpt
 #endif
 @RESPATH@/components/dom_canvas.xpt
 @RESPATH@/components/dom_contacts.xpt
@@ -235,7 +233,6 @@
 @RESPATH@/components/filepicker.xpt
 #endif
 @RESPATH@/components/find.xpt
-@RESPATH@/components/fuel.xpt
 @RESPATH@/components/gfx.xpt
 @RESPATH@/components/hal.xpt
 @RESPATH@/components/html5.xpt
@@ -356,9 +353,6 @@
 @RESPATH@/components/zipwriter.xpt
 
 ; JavaScript components
-@RESPATH@/components/RequestSync.manifest
-@RESPATH@/components/RequestSyncManager.js
-@RESPATH@/components/RequestSyncScheduler.js
 @RESPATH@/components/ChromeNotifications.js
 @RESPATH@/components/ChromeNotifications.manifest
 @RESPATH@/components/ConsoleAPI.manifest
@@ -470,8 +464,8 @@
 
 ; Camera
 #ifdef MOZ_B2G_CAMERA
-@BINPATH@/components/CameraTestHardware.js
-@BINPATH@/components/CameraTestHardware.manifest
+@RESPATH@/components/CameraTestHardware.js
+@RESPATH@/components/CameraTestHardware.manifest
 #endif // MOZ_B2G_CAMERA
 
 ; Tethering
@@ -702,8 +696,12 @@
 @RESPATH@/components/nsUrlClassifierHashCompleter.js
 @RESPATH@/components/nsUrlClassifierListManager.js
 @RESPATH@/components/nsUrlClassifierLib.js
-@RESPATH@/components/PrivateBrowsingTrackingProtectionWhitelist.js
 @RESPATH@/components/url-classifier.xpt
+
+; Private Browsing
+@RESPATH@/components/privatebrowsing.xpt
+@RESPATH@/components/PrivateBrowsing.manifest
+@RESPATH@/components/PrivateBrowsingTrackingProtectionWhitelist.js
 
 ; Security Reports
 @RESPATH@/components/SecurityReporter.manifest
@@ -923,10 +921,6 @@ bin/libfreebl_32int64_3.so
 
 @RESPATH@/components/FxAccountsUIGlue.js
 @RESPATH@/components/services_fxaccounts.xpt
-
-@RESPATH@/components/DataStore.manifest
-@RESPATH@/components/DataStoreImpl.js
-@RESPATH@/components/dom_datastore.xpt
 
 @RESPATH@/components/MobileIdentity.manifest
 @RESPATH@/components/MobileIdentity.js

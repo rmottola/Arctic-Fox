@@ -12,6 +12,7 @@
 
 // Local Includes
 #include "Navigator.h"
+#include "nsContentSecurityManager.h"
 #include "nsScreen.h"
 #include "nsHistory.h"
 #include "nsPerformance.h"
@@ -685,6 +686,12 @@ public:
   virtual bool delete_(JSContext *cx, JS::Handle<JSObject*> proxy,
                        JS::Handle<jsid> id,
                        JS::ObjectOpResult &result) const override;
+
+  virtual bool getPrototypeIfOrdinary(JSContext* cx,
+                                      JS::Handle<JSObject*> proxy,
+                                      bool* isOrdinary,
+                                      JS::MutableHandle<JSObject*> protop) const override;
+
   virtual bool enumerate(JSContext *cx, JS::Handle<JSObject*> proxy,
                          JS::MutableHandle<JSObject*> vp) const override;
   virtual bool preventExtensions(JSContext* cx,
@@ -909,6 +916,27 @@ nsOuterWindowProxy::delete_(JSContext *cx, JS::Handle<JSObject*> proxy,
   }
 
   return js::Wrapper::delete_(cx, proxy, id, result);
+}
+
+bool
+nsOuterWindowProxy::getPrototypeIfOrdinary(JSContext* cx,
+                                           JS::Handle<JSObject*> proxy,
+                                           bool* isOrdinary,
+                                           JS::MutableHandle<JSObject*> protop) const
+{
+  // Window's [[GetPrototypeOf]] trap isn't the ordinary definition:
+  //
+  //   https://html.spec.whatwg.org/multipage/browsers.html#windowproxy-getprototypeof
+  //
+  // We nonetheless can implement it here using a non-"lazy" [[Prototype]],
+  // because wrapper-class handlers (particularly, XOW in FilteringWrapper.cpp)
+  // supply all the non-ordinary behavior.
+  //
+  // But from a spec point of view, it's the exact same object in both cases --
+  // only the observer's changed.  So both cases *must* report non-ordinary,
+  // even if non-"lazy" [[Prototype]] usually means ordinary.
+  *isOrdinary = false;
+  return true;
 }
 
 bool
@@ -1155,6 +1183,7 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mInClose(false),
     mHavePendingClose(false),
     mHadOriginalOpener(false),
+    mOriginalOpenerWasSecureContext(false),
     mIsPopupSpam(false),
     mBlockScriptedClosingFlag(false),
     mWasOffline(false),
@@ -2063,7 +2092,10 @@ nsIScriptContext *
 nsGlobalWindow::GetScriptContext()
 {
   nsGlobalWindow* outer = GetOuterWindowInternal();
-  return outer ? outer->mContext : nullptr;
+  if (!outer) {
+    return nullptr;
+  }
+  return outer->mContext;
 }
 
 JSObject *
@@ -2321,6 +2353,165 @@ InitializeLegacyNetscapeObject(JSContext* aCx, JS::Handle<JSObject*> aGlobal)
 }
 
 /**
+ * Returns true if the "HTTPS state" of the document should be "modern". See:
+ *
+ * https://html.spec.whatwg.org/#concept-document-https-state
+ * https://fetch.spec.whatwg.org/#concept-response-https-state
+ *
+ * Note: this function only relates to figuring out HTTPS state, which is an
+ * input to the Secure Context algorithm.  We are not actually implementing any
+ * part of the Secure Context algorithm itself here.
+ *
+ * This is a bit of a hack.  Ideally we'd propagate HTTPS state through
+ * nsIChannel as described in the Fetch and HTML specs, but making channels
+ * know about whether they should inherit HTTPS state, propagating information
+ * about who the channel's "client" is, exposing GetHttpsState API on channels
+ * and modifying the various cache implementations to store and retrieve HTTPS
+ * state involves a huge amount of code (see bug 1220687).  We avoid that for
+ * now using this function.
+ *
+ * This function takes advantage of the observation that we can return true if
+ * nsIContentSecurityManager::IsOriginPotentiallyTrustworthy returns true for
+ * the document's origin (e.g. the origin has a scheme of 'https' or host
+ * 'localhost' etc.).  Since we generally propagate a creator document's origin
+ * onto data:, blob:, etc. documents, this works for them too.
+ *
+ * The scenario where this observation breaks down is sandboxing without the
+ * 'allow-same-origin' flag, since in this case a document is given a unique
+ * origin (IsOriginPotentiallyTrustworthy would return false).  We handle that
+ * by using the origin that the document would have had had it not been
+ * sandboxed.
+ *
+ * DEFICIENCIES: Note that this function uses nsIScriptSecurityManager's
+ * getChannelResultPrincipalIfNotSandboxed, and that method's ignoring of
+ * sandboxing is limited to the immediate sandbox.  In the case that aDocument
+ * should inherit its origin (e.g. data: URI) but its parent has ended up
+ * with a unique origin due to sandboxing further up the parent chain we may
+ * end up returning false when we would ideally return true (since we will
+ * examine the parent's origin for 'https' and not finding it.)  This means
+ * that we may restrict the privileges of some pages unnecessarily in this
+ * edge case.
+ */
+static bool HttpsStateIsModern(nsIDocument* aDocument)
+{
+  nsCOMPtr<nsIPrincipal> principal = aDocument->NodePrincipal();
+
+  // If aDocument is sandboxed, try and get the principal that it would have
+  // been given had it not been sandboxed:
+  if (principal->GetIsNullPrincipal() &&
+      (aDocument->GetSandboxFlags() & SANDBOXED_ORIGIN)) {
+    nsIChannel* channel = aDocument->GetChannel();
+    if (channel) {
+      nsCOMPtr<nsIScriptSecurityManager> ssm =
+        nsContentUtils::GetSecurityManager();
+      nsresult rv =
+        ssm->GetChannelResultPrincipalIfNotSandboxed(channel,
+                                                     getter_AddRefs(principal));
+      if (NS_FAILED(rv)) {
+        return false;
+      }
+    }
+  }
+
+  if (principal->GetIsNullPrincipal()) {
+    return false;
+  }
+
+  MOZ_ASSERT(principal->GetIsCodebasePrincipal());
+
+  nsCOMPtr<nsIContentSecurityManager> csm =
+    do_GetService(NS_CONTENTSECURITYMANAGER_CONTRACTID);
+  NS_WARN_IF(!csm);
+  if (csm) {
+    bool isTrustworthyOrigin = false;
+    csm->IsOriginPotentiallyTrustworthy(principal, &isTrustworthyOrigin);
+    if (isTrustworthyOrigin) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool
+nsGlobalWindow::ComputeIsSecureContext(nsIDocument* aDocument)
+{
+  MOZ_ASSERT(IsOuterWindow());
+
+  nsCOMPtr<nsIPrincipal> principal = aDocument->NodePrincipal();
+  if (nsContentUtils::IsSystemPrincipal(principal)) {
+    return true;
+  }
+
+  // Implement https://w3c.github.io/webappsec-secure-contexts/#settings-object
+
+  bool hadNonSecureContextCreator = false;
+
+  nsPIDOMWindowOuter* parentOuterWin = GetScriptableParent();
+  MOZ_ASSERT(parentOuterWin, "How can we get here? No docShell somehow?");
+  if (nsGlobalWindow::Cast(parentOuterWin) != this) {
+    // There may be a small chance that parentOuterWin has navigated in
+    // the time that it took us to start loading this sub-document.  If that
+    // were the case then parentOuterWin->GetCurrentInnerWindow() wouldn't
+    // return the window for the document that is embedding us.  For this
+    // reason we only use the GetScriptableParent call above to check that we
+    // have a same-type parent, but actually get the inner window via the
+    // document that we know is embedding us.
+    nsIDocument* creatorDoc = aDocument->GetParentDocument();
+    if (!creatorDoc) {
+      return false; // we must be tearing down
+    }
+    nsGlobalWindow* parentWin =
+      nsGlobalWindow::Cast(creatorDoc->GetInnerWindow());
+    if (!parentWin) {
+      return false; // we must be tearing down
+    }
+    MOZ_ASSERT(parentWin ==
+               nsGlobalWindow::Cast(parentOuterWin->GetCurrentInnerWindow()),
+               "Creator window mismatch while setting Secure Context state");
+    hadNonSecureContextCreator = !parentWin->IsSecureContext();
+  } else if (mHadOriginalOpener) {
+    hadNonSecureContextCreator = !mOriginalOpenerWasSecureContext;
+  }
+
+  if (hadNonSecureContextCreator) {
+    return false;
+  }
+
+  if (HttpsStateIsModern(aDocument)) {
+    return true;
+  }
+
+  if (principal->GetIsNullPrincipal()) {
+    nsCOMPtr<nsIURI> uri = aDocument->GetOriginalURI();
+    // IsOriginPotentiallyTrustworthy doesn't care about origin attributes so
+    // it doesn't actually matter what we use here, but reusing the document
+    // principal's attributes is convenient.
+    const PrincipalOriginAttributes& attrs =
+      BasePrincipal::Cast(principal)->OriginAttributesRef();
+    // CreateCodebasePrincipal correctly gets a useful principal for blob: and
+    // other URI_INHERITS_SECURITY_CONTEXT URIs.
+    principal = BasePrincipal::CreateCodebasePrincipal(uri, attrs);
+    if (NS_WARN_IF(!principal)) {
+      return false;
+    }
+  }
+
+  nsCOMPtr<nsIContentSecurityManager> csm =
+    do_GetService(NS_CONTENTSECURITYMANAGER_CONTRACTID);
+  NS_WARN_IF(!csm);
+  if (csm) {
+    bool isTrustworthyOrigin = false;
+    csm->IsOriginPotentiallyTrustworthy(principal, &isTrustworthyOrigin);
+    if (isTrustworthyOrigin) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Create a new global object that will be used for an inner window.
  * Return the native global and an nsISupports 'holder' that can be used
  * to manage the lifetime of it.
@@ -2330,7 +2521,8 @@ CreateNativeGlobalForInner(JSContext* aCx,
                            nsGlobalWindow* aNewInner,
                            nsIURI* aURI,
                            nsIPrincipal* aPrincipal,
-                           JS::MutableHandle<JSObject*> aGlobal)
+                           JS::MutableHandle<JSObject*> aGlobal,
+                           bool aIsSecureContext)
 {
   MOZ_ASSERT(aCx);
   MOZ_ASSERT(aNewInner);
@@ -2359,6 +2551,8 @@ CreateNativeGlobalForInner(JSContext* aCx,
   if (top && top->GetGlobalJSObject()) {
     options.creationOptions().setSameZoneAs(top->GetGlobalJSObject());
   }
+
+  options.creationOptions().setSecureContext(aIsSecureContext);
 
   xpc::InitGlobalObjectOptions(options, aPrincipal);
 
@@ -2588,7 +2782,8 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
       rv = CreateNativeGlobalForInner(cx, newInnerWindow,
                                       aDocument->GetDocumentURI(),
                                       aDocument->NodePrincipal(),
-                                      &newInnerGlobal);
+                                      &newInnerGlobal,
+                                      ComputeIsSecureContext(aDocument));
       NS_ASSERTION(NS_SUCCEEDED(rv) && newInnerGlobal &&
                    newInnerWindow->GetWrapperPreserveColor() == newInnerGlobal,
                    "Failed to get script global");
@@ -3030,7 +3225,11 @@ nsGlobalWindow::SetOpenerWindow(nsPIDOMWindowOuter* aOpener,
   NS_ASSERTION(mOpener || !aOpener, "Opener must support weak references!");
 
   if (aOriginalOpener) {
+    MOZ_ASSERT(!mHadOriginalOpener,
+               "Probably too late to call ComputeIsSecureContext again");
     mHadOriginalOpener = true;
+    mOriginalOpenerWasSecureContext =
+      nsGlobalWindow::Cast(aOpener->GetCurrentInnerWindow())->IsSecureContext();
   }
 
 #ifdef DEBUG
@@ -3363,6 +3562,7 @@ nsGlobalWindow::PostHandleEvent(EventChainPostVisitor& aVisitor)
       nsEventStatus status = nsEventStatus_eIgnore;
       WidgetEvent event(aVisitor.mEvent->IsTrusted(), eLoad);
       event.mFlags.mBubbles = false;
+      event.mFlags.mCancelable = false;
 
       // Most of the time we could get a pres context to pass in here,
       // but not always (i.e. if this window is not shown there won't
@@ -3674,8 +3874,8 @@ nsPIDOMWindowInner::CreatePerformanceObjectIfNeeded()
     // If we are dealing with an iframe, we will need the parent's performance
     // object (so we can add the iframe as a resource of that page).
     nsPerformance* parentPerformance = nullptr;
-    nsCOMPtr<nsPIDOMWindowOuter> parentWindow = GetScriptableParent();
-    if (GetOuterWindow() != parentWindow) {
+    nsCOMPtr<nsPIDOMWindowOuter> parentWindow = GetScriptableParentOrNull();
+    if (parentWindow) {
       nsPIDOMWindowInner* parentInnerWindow = nullptr;
       if (parentWindow) {
         parentInnerWindow = parentWindow->GetCurrentInnerWindow();
@@ -3892,6 +4092,19 @@ nsGlobalWindow::GetScriptableParent()
 
   nsCOMPtr<nsPIDOMWindowOuter> parent = GetParentOuter();
   return parent.get();
+}
+
+/**
+ * Behavies identically to GetScriptableParent extept that it returns null
+ * if GetScriptableParent would return this window.
+ */
+nsPIDOMWindowOuter*
+nsGlobalWindow::GetScriptableParentOrNull()
+{
+  FORWARD_TO_OUTER(GetScriptableParentOrNull, (), nullptr);
+
+  nsPIDOMWindowOuter* parent = GetScriptableParent();
+  return (Cast(parent) == this) ? nullptr : parent;
 }
 
 /**
@@ -5928,7 +6141,7 @@ GetFullscreenTransitionDuration(bool aEnterFullscreen,
   }
 }
 
-class FullscreenTransitionTask : public nsRunnable
+class FullscreenTransitionTask : public Runnable
 {
 public:
   FullscreenTransitionTask(const FullscreenTransitionDuration& aDuration,
@@ -5954,6 +6167,27 @@ private:
     MOZ_COUNT_DTOR(FullscreenTransitionTask);
   }
 
+  /**
+   * The flow of fullscreen transition:
+   *
+   *         parent process         |         child process
+   * ----------------------------------------------------------------
+   *
+   *                                    | request/exit fullscreen
+   *                              <-----|
+   *         BeforeToggle stage |
+   *                            |
+   *  ToggleFullscreen stage *1 |----->
+   *                                    | HandleFullscreenRequests
+   *                                    |
+   *                              <-----| MozAfterPaint event
+   *       AfterToggle stage *2 |
+   *                            |
+   *                  End stage |
+   *
+   * Note we also start a timer at *1 so that if we don't get MozAfterPaint
+   * from the child process in time, we continue going to *2.
+   */
   enum Stage {
     // BeforeToggle stage happens before we enter or leave fullscreen
     // state. In this stage, the task triggers the pre-toggle fullscreen
@@ -5965,7 +6199,9 @@ private:
     // AfterToggle stage happens after we toggle the fullscreen state.
     // In this stage, the task triggers the post-toggle fullscreen
     // transition on the widget.
-    eAfterToggle
+    eAfterToggle,
+    // End stage is triggered after the final transition finishes.
+    eEnd
   };
 
   class Observer final : public nsIObserver
@@ -6011,10 +6247,12 @@ FullscreenTransitionTask::Run()
     return NS_OK;
   }
   if (stage == eBeforeToggle) {
+    PROFILER_MARKER("Fullscreen transition start");
     mWidget->PerformFullscreenTransition(nsIWidget::eBeforeFullscreenToggle,
                                          mDuration.mFadeIn, mTransitionData,
                                          this);
   } else if (stage == eToggleFullscreen) {
+    PROFILER_MARKER("Fullscreen toggle start");
     if (MOZ_UNLIKELY(mWindow->mFullScreen != mFullscreen)) {
       // This could happen in theory if several fullscreen requests in
       // different direction happen continuously in a short time. We
@@ -6054,6 +6292,8 @@ FullscreenTransitionTask::Run()
     mWidget->PerformFullscreenTransition(nsIWidget::eAfterFullscreenToggle,
                                          mDuration.mFadeOut, mTransitionData,
                                          this);
+  } else if (stage == eEnd) {
+    PROFILER_MARKER("Fullscreen transition end");
   }
   return NS_OK;
 }
@@ -6074,6 +6314,7 @@ FullscreenTransitionTask::Observer::Observe(nsISupports* aSubject,
       // The paint notification arrives first. Cancel the timer.
       mTask->mTimer->Cancel();
       shouldContinue = true;
+      PROFILER_MARKER("Fullscreen toggle end");
     }
   } else {
 #ifdef DEBUG
@@ -6084,6 +6325,7 @@ FullscreenTransitionTask::Observer::Observe(nsISupports* aSubject,
                "Should only trigger this with the timer the task created");
 #endif
     shouldContinue = true;
+    PROFILER_MARKER("Fullscreen toggle timeout");
   }
   if (shouldContinue) {
     nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
@@ -6216,13 +6458,6 @@ nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
     }
   }
 
-  // If we didn't setup the widget, we may need to manually set this
-  // flag, or the assertion in FinishFullscreenChange is violated.
-  if (nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell()) {
-    if (!presShell->IsInFullscreenChange()) {
-      presShell->SetIsInFullscreenChange(true);
-    }
-  }
   FinishFullscreenChange(aFullScreen);
   return NS_OK;
 }
@@ -6236,8 +6471,18 @@ nsGlobalWindow::SetWidgetFullscreen(FullscreenReason aReason, bool aIsFullscreen
   MOZ_ASSERT(!AsOuter()->GetFrameElementInternal(), "Content window should not call this");
   MOZ_ASSERT(XRE_GetProcessType() == GeckoProcessType_Default);
 
-  if (nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell()) {
-    presShell->SetIsInFullscreenChange(true);
+  if (!NS_WARN_IF(!IsChromeWindow())) {
+    auto chromeWin = static_cast<nsGlobalChromeWindow*>(this);
+    if (!NS_WARN_IF(chromeWin->mFullscreenPresShell)) {
+      if (nsIPresShell* shell = mDocShell->GetPresShell()) {
+        if (nsRefreshDriver* rd = shell->GetRefreshDriver()) {
+          chromeWin->mFullscreenPresShell = do_GetWeakReference(shell);
+          MOZ_ASSERT(chromeWin->mFullscreenPresShell);
+          rd->SetIsResizeSuppressed();
+          rd->Freeze();
+        }
+      }
+    }
   }
   nsresult rv = aReason == FullscreenReason::ForFullscreenMode ?
     // If we enter fullscreen for fullscreen mode, we want
@@ -6279,9 +6524,15 @@ nsGlobalWindow::FinishFullscreenChange(bool aIsFullscreen)
   // respond visually if we are kicked into full screen mode
   DispatchCustomEvent(NS_LITERAL_STRING("fullscreen"));
 
-  if (nsCOMPtr<nsIPresShell> presShell = mDocShell->GetPresShell()) {
-    MOZ_ASSERT(presShell->IsInFullscreenChange());
-    presShell->SetIsInFullscreenChange(false);
+  if (!NS_WARN_IF(!IsChromeWindow())) {
+    auto chromeWin = static_cast<nsGlobalChromeWindow*>(this);
+    if (nsCOMPtr<nsIPresShell> shell =
+        do_QueryReferent(chromeWin->mFullscreenPresShell)) {
+      if (nsRefreshDriver* rd = shell->GetRefreshDriver()) {
+        rd->Thaw();
+      }
+      chromeWin->mFullscreenPresShell = nullptr;
+    }
   }
 
   if (!mWakeLock && mFullScreen) {
@@ -7052,7 +7303,7 @@ nsGlobalWindow::PrintOuter(ErrorResult& aError)
   if (NS_SUCCEEDED(GetInterface(NS_GET_IID(nsIWebBrowserPrint),
                                 getter_AddRefs(webBrowserPrint)))) {
     nsAutoSyncOperation sync(GetCurrentInnerWindowInternal() ?
-                               GetCurrentInnerWindowInternal()->mDoc :
+                               GetCurrentInnerWindowInternal()->mDoc.get() :
                                nullptr);
 
     nsCOMPtr<nsIPrintSettingsService> printSettingsService =
@@ -8166,7 +8417,7 @@ nsGlobalWindow::PostMessageMoz(JSContext* aCx, JS::Handle<JS::Value> aMessage,
   PostMessageMoz(aCx, aMessage, aTargetOrigin, transferArray, aError);
 }
 
-class nsCloseEvent : public nsRunnable {
+class nsCloseEvent : public Runnable {
 
   RefPtr<nsGlobalWindow> mWindow;
   bool mIndirect;
@@ -8547,7 +8798,7 @@ nsGlobalWindow::RunPendingTimeoutsRecursive(nsGlobalWindow *aTopWindow,
   }
 }
 
-class nsPendingTimeoutRunner : public nsRunnable
+class nsPendingTimeoutRunner : public Runnable
 {
 public:
   explicit nsPendingTimeoutRunner(nsGlobalWindow* aWindow)
@@ -8647,7 +8898,7 @@ struct BrowserCompartmentMatcher : public js::CompartmentFilter {
 };
 
 
-class WindowDestroyedEvent : public nsRunnable
+class WindowDestroyedEvent : public Runnable
 {
 public:
   WindowDestroyedEvent(nsIDOMWindow* aWindow, uint64_t aID,
@@ -9081,7 +9332,7 @@ nsGlobalWindow::ShowModalDialog(JSContext* aCx, const nsAString& aUrl,
   }
 }
 
-class ChildCommandDispatcher : public nsRunnable
+class ChildCommandDispatcher : public Runnable
 {
 public:
   ChildCommandDispatcher(nsGlobalWindow* aWindow,
@@ -9111,7 +9362,7 @@ private:
   nsString                             mAction;
 };
 
-class CommandDispatcher : public nsRunnable
+class CommandDispatcher : public Runnable
 {
 public:
   CommandDispatcher(nsIDOMXULCommandDispatcher* aDispatcher,
@@ -9377,7 +9628,7 @@ nsGlobalWindow::AddEventListener(const nsAString& aType,
 void
 nsGlobalWindow::AddEventListener(const nsAString& aType,
                                  EventListener* aListener,
-                                 bool aUseCapture,
+                                 const AddEventListenerOptionsOrBoolean& aOptions,
                                  const Nullable<bool>& aWantsUntrusted,
                                  ErrorResult& aRv)
 {
@@ -9399,7 +9650,8 @@ nsGlobalWindow::AddEventListener(const nsAString& aType,
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return;
   }
-  manager->AddEventListener(aType, aListener, aUseCapture, wantsUntrusted);
+
+  manager->AddEventListener(aType, aListener, aOptions, wantsUntrusted);
 }
 
 NS_IMETHODIMP
@@ -9911,7 +10163,7 @@ nsGlobalWindow::PageHidden()
   mNeedsFocus = true;
 }
 
-class HashchangeCallback : public nsRunnable
+class HashchangeCallback : public Runnable
 {
 public:
   HashchangeCallback(const nsAString &aOldURL,
@@ -10523,7 +10775,7 @@ nsGlobalWindow::FireOfflineStatusEventIfChanged()
   nsContentUtils::DispatchTrustedEvent(mDoc, eventTarget, name, true, false);
 }
 
-class NotifyIdleObserverRunnable : public nsRunnable
+class NotifyIdleObserverRunnable : public Runnable
 {
 public:
   NotifyIdleObserverRunnable(nsIIdleObserver* aIdleObserver,
@@ -13888,6 +14140,14 @@ nsGlobalWindow::GetConsole(ErrorResult& aRv)
   }
 
   return mConsole;
+}
+
+bool
+nsGlobalWindow::IsSecureContext() const
+{
+  MOZ_RELEASE_ASSERT(IsInnerWindow());
+
+  return JS_GetIsSecureContext(js::GetObjectCompartment(GetWrapperPreserveColor()));
 }
 
 already_AddRefed<External>

@@ -499,7 +499,7 @@ nsXHTMLContentSerializer::CheckElementStart(nsIContent * aContent,
   if (aContent->IsHTMLElement(nsGkAtoms::br) &&
       (mFlags & nsIDocumentEncoder::OutputNoFormattingInPre) &&
       PreLevel() > 0) {
-    AppendNewLineToString(aStr);
+    aResult = AppendNewLineToString(aStr) ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
     return false;
   }
 
@@ -511,7 +511,7 @@ nsXHTMLContentSerializer::CheckElementStart(nsIContent * aContent,
 }
 
 bool
-nsXHTMLContentSerializer::CheckElementEnd(Element* aElement,
+nsXHTMLContentSerializer::CheckElementEnd(mozilla::dom::Element* aElement,
                                           bool& aForceFormat,
                                           nsAString& aStr)
 {

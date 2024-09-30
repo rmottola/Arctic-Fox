@@ -83,7 +83,7 @@ private:
   bool mOuterTransaction;
 };
 
-class RestoreSelectionState : public nsRunnable {
+class RestoreSelectionState : public Runnable {
 public:
   RestoreSelectionState(nsTextEditorState *aState, nsTextControlFrame *aFrame)
     : mFrame(aFrame),
@@ -1087,7 +1087,7 @@ nsTextEditorState::GetSelectionController() const
 }
 
 // Helper class, used below in BindToFrame().
-class PrepareEditorEvent : public nsRunnable {
+class PrepareEditorEvent : public Runnable {
 public:
   PrepareEditorEvent(nsTextEditorState &aState,
                      nsIContent *aOwnerContent,
@@ -1915,7 +1915,7 @@ nsTextEditorState::GetValue(nsAString& aValue, bool aIgnoreWrap) const
     if (!mTextCtrlElement->ValueChanged() || !mValue) {
       mTextCtrlElement->GetDefaultValueFromContent(aValue);
     } else {
-      aValue = NS_ConvertUTF8toUTF16(*mValue);
+      aValue = *mValue;
     }
   }
 }
@@ -2136,7 +2136,7 @@ nsTextEditorState::SetValue(const nsAString& aValue, uint32_t aFlags)
     }
   } else {
     if (!mValue) {
-      mValue = new nsCString;
+      mValue.emplace();
     }
     nsString value;
     if (!value.Assign(newValue, fallible)) {
@@ -2145,7 +2145,7 @@ nsTextEditorState::SetValue(const nsAString& aValue, uint32_t aFlags)
     if (!nsContentUtils::PlatformToDOMLineBreaks(value, fallible)) {
       return false;
     }
-    if (!CopyUTF16toUTF8(value, *mValue, fallible)) {
+    if (!mValue->Assign(value, fallible)) {
       return false;
     }
 

@@ -38,12 +38,12 @@ use SampleEntry;
 
 /// Map Error to int32 return codes.
 const MP4PARSE_OK: i32 = 0;
-const MP4PARSE_ERROR_BADARG: i32 = -1;
-const MP4PARSE_ERROR_INVALID: i32 = -2;
-const MP4PARSE_ERROR_UNSUPPORTED: i32 = -3;
-const MP4PARSE_ERROR_EOF: i32 = -4;
-const MP4PARSE_ASSERT: i32 = -5;
-const MP4PARSE_ERROR_IO: i32 = -6;
+const MP4PARSE_ERROR_BADARG: i32 = 1;
+const MP4PARSE_ERROR_INVALID: i32 = 2;
+const MP4PARSE_ERROR_UNSUPPORTED: i32 = 3;
+const MP4PARSE_ERROR_EOF: i32 = 4;
+const MP4PARSE_ASSERT: i32 = 5;
+const MP4PARSE_ERROR_IO: i32 = 6;
 
 /// Map TrackType to uint32 constants.
 const TRACK_TYPE_H264: u32 = 0;
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn mp4parse_read(context: *mut MediaContext, buffer: *cons
     // result in an Ok(..) otherwise, meaning we could see
     // Ok(Err(Error::..)) here. So map thread failures back
     // to an mp4parse::Error before converting to a C return value.
-    match task.join().or(Err(Error::AssertCaught)) {
+    match task.join().unwrap_or(Err(Error::AssertCaught)) {
         Ok(_) => MP4PARSE_OK,
         Err(Error::InvalidData) => MP4PARSE_ERROR_INVALID,
         Err(Error::Unsupported) => MP4PARSE_ERROR_UNSUPPORTED,

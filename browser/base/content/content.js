@@ -153,7 +153,7 @@ var handleContentContextMenu = function (event) {
   if (Services.prefs.getBoolPref("network.http.enablePerElementReferrer")) {
     let referrerAttrValue = Services.netUtils.parseAttributePolicyString(event.target.
                             getAttribute("referrerpolicy"));
-    if (referrerAttrValue !== Ci.nsIHttpChannel.REFERRER_POLICY_DEFAULT) {
+    if (referrerAttrValue !== Ci.nsIHttpChannel.REFERRER_POLICY_UNSET) {
       referrerPolicy = referrerAttrValue;
     }
   }
@@ -452,7 +452,7 @@ var ClickEventHandler = {
         node) {
       let referrerAttrValue = Services.netUtils.parseAttributePolicyString(node.
                               getAttribute("referrerpolicy"));
-      if (referrerAttrValue !== Ci.nsIHttpChannel.REFERRER_POLICY_DEFAULT) {
+      if (referrerAttrValue !== Ci.nsIHttpChannel.REFERRER_POLICY_UNSET) {
         referrerPolicy = referrerAttrValue;
       }
     }

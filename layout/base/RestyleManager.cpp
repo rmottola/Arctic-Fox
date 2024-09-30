@@ -98,9 +98,7 @@ RestyleManager::RestyleManager(nsPresContext* aPresContext)
   , mPendingRestyles(ELEMENT_HAS_PENDING_RESTYLE |
                      ELEMENT_IS_POTENTIAL_RESTYLE_ROOT |
                      ELEMENT_IS_CONDITIONAL_RESTYLE_ANCESTOR)
-#ifdef DEBUG
   , mIsProcessingRestyles(false)
-#endif
 #ifdef RESTYLE_LOGGING
   , mLoggingDepth(0)
 #endif
@@ -869,6 +867,19 @@ RestyleManager::ProcessRestyledFrames(nsStyleChangeList& aChangeList)
         // invalidation, so change UpdateOpacityLayer to RepaintFrame.
         hint &= ~nsChangeHint_UpdateOpacityLayer;
         hint |= nsChangeHint_RepaintFrame;
+      }
+
+      if (hint & nsChangeHint_UpdateBackgroundPosition) {
+        // For most frame types, DLBI can detect background position changes,
+        // so we only need to schedule a paint.
+        hint |= nsChangeHint_SchedulePaint;
+        if (frame->IsFrameOfType(nsIFrame::eTablePart) ||
+            frame->IsFrameOfType(nsIFrame::eMathML)) {
+          // Table parts and MathML frames don't build display items for their
+          // backgrounds, so DLBI can't detect background-position changes for
+          // these frames. Repaint the whole frame.
+          hint |= nsChangeHint_RepaintFrame;
+        }
       }
 
       if (hint & (nsChangeHint_RepaintFrame | nsChangeHint_SyncFrameView |
@@ -1731,9 +1742,7 @@ RestyleManager::ProcessPendingRestyles()
   // Process non-animation restyles...
   MOZ_ASSERT(!mIsProcessingRestyles,
              "Nesting calls to ProcessPendingRestyles?");
-#ifdef DEBUG
   mIsProcessingRestyles = true;
-#endif
 
   // Before we process any restyles, we need to ensure that style
   // resulting from any animations is up-to-date, so that if any style
@@ -1742,7 +1751,7 @@ RestyleManager::ProcessPendingRestyles()
   bool haveNonAnimation =
     mHavePendingNonAnimationRestyles || mDoRebuildAllStyleData;
   if (haveNonAnimation) {
-    IncrementAnimationGeneration();
+    ++mAnimationGeneration;
     UpdateOnlyAnimationStyles();
   } else {
     // If we don't have non-animation style updates, then we have queued
@@ -1775,9 +1784,7 @@ RestyleManager::ProcessPendingRestyles()
     mPresContext->TransitionManager()->SetInAnimationOnlyStyleUpdate(false);
   }
 
-#ifdef DEBUG
   mIsProcessingRestyles = false;
-#endif
 
   NS_ASSERTION(haveNonAnimation || !mHavePendingNonAnimationRestyles,
                "should not have added restyles");
@@ -3923,10 +3930,12 @@ ElementRestyler::RestyleSelf(nsIFrame* aSelf,
     // continuation.
     LOG_RESTYLE("using previous continuation's context");
     newContext = prevContinuationContext;
+  } else if (pseudoTag == nsCSSAnonBoxes::mozText) {
+    MOZ_ASSERT(aSelf->GetType() == nsGkAtoms::textFrame);
+    newContext =
+      styleSet->ResolveStyleForText(aSelf->GetContent(), parentContext);
   } else if (nsCSSAnonBoxes::IsNonElement(pseudoTag)) {
-    NS_ASSERTION(aSelf->GetContent(),
-                 "non pseudo-element frame without content node");
-    newContext = styleSet->ResolveStyleForNonElement(parentContext, pseudoTag);
+    newContext = styleSet->ResolveStyleForOtherNonElement(parentContext);
   }
   else {
     Element* element = ElementForStyleContext(mParentContent, aSelf, pseudoType);

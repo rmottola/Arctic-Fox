@@ -6,7 +6,7 @@
 
 // Test that the layout-view continues to work after the page is reloaded
 
-add_task(function*() {
+add_task(function* () {
   yield addTab(URL_ROOT + "doc_layout_iframe1.html");
   let {inspector, view, testActor} = yield openLayoutView();
 
@@ -14,7 +14,7 @@ add_task(function*() {
   yield assertLayoutView(inspector, view, testActor);
 
   info("Reload the page");
-  yield testActor.eval("content.location.reload();");
+  yield testActor.reload();
   yield inspector.once("markuploaded");
 
   info("Test that the layout-view works on the reloaded page");

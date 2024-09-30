@@ -42,6 +42,22 @@ function setPermissions(action) {
   });
 }
 
+function revokePermissions(action) {
+  return Promise.all(PERMISSIONS.map(x =>
+    navigator.permissions.revoke({ name: x.name }).then(
+      result => is(result.state, "prompt", `correct state for '${x.name}'`),
+      error => ok(false, `revoke should not have rejected for '${x.name}'`))
+  ));
+}
+
+function revokeUnsupportedPermissions() {
+  return Promise.all(UNSUPPORTED_PERMISSIONS.map(name =>
+    navigator.permissions.revoke({ name: name }).then(
+      result => ok(false, `revoke should not have resolved for '${name}'`),
+      error => is(error.name, 'TypeError', `revoke should have thrown TypeError for '${name}'`))
+  ));
+}
+
 function checkPermissions(state) {
   return Promise.all(PERMISSIONS.map(x => {
     return navigator.permissions.query({ name: x.name }).then(
@@ -52,7 +68,7 @@ function checkPermissions(state) {
 
 function checkUnsupportedPermissions() {
   return Promise.all(UNSUPPORTED_PERMISSIONS.map(name => {
-    return navigator.permissions.query({ name }).then(
+    return navigator.permissions.query({ name: name }).then(
       result => ok(false, `query should not have resolved for '${name}'`),
       error => {
         is(error.name, 'TypeError',
@@ -61,10 +77,10 @@ function checkUnsupportedPermissions() {
   }));
 }
 
-function checkUserVisiblePushPermission() {
-  return navigator.permissions.query({ name: 'push', userVisible: true }).then(
-    result => ok(false, `query should not have resolved for userVisible push`),
-    error => ok(true, `query should have rejected for userVisible push`));
+function checkUserVisibleOnlyPushPermission() {
+  return navigator.permissions.query({ name: 'push', userVisibleOnly: true }).then(
+    result => ok(false, `query should not have resolved for userVisibleOnly push`),
+    error => ok(true, `query should have rejected for userVisibleOnly push`));
 }
 
 function promiseStateChanged(name, state) {
@@ -102,9 +118,14 @@ function testInvalidQuery() {
     error => ok(true, 'invalid query should have rejected'));
 }
 
+function testInvalidRevoke() {
+  navigator.permissions.revoke({ name: 'invalid' }).then(
+    result => ok(false, 'invalid revoke should not have resolved'),
+    error => ok(true, 'invalid revoke should have rejected'));
+}
+
 function runTests() {
   checkUnsupportedPermissions()
-    .then(checkUserVisiblePushPermission)
     .then(() => setPermissions(UNKNOWN_ACTION))
     .then(() => checkPermissions('prompt'))
     .then(() => setPermissions(PROMPT_ACTION))
@@ -115,6 +136,10 @@ function runTests() {
     .then(() => checkPermissions('denied'))
     .then(testStatusOnChange)
     .then(testInvalidQuery)
+    .then(revokeUnsupportedPermissions)
+    .then(revokePermissions)
+    .then(() => checkPermissions('prompt'))
+    .then(testInvalidRevoke)
     .then(SimpleTest.finish)
     .catch ((e) => {
       ok(false, 'Unexpected error ' + e);

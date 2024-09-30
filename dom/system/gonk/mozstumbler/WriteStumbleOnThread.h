@@ -33,7 +33,7 @@
  This thread is guarded so that only one instance is active (see the
  mozilla::Atomics used for this).
  */
-class WriteStumbleOnThread : public nsRunnable
+class WriteStumbleOnThread : public mozilla::Runnable
 {
 public:
   explicit WriteStumbleOnThread(const nsCString& aDesc)

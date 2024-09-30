@@ -23,11 +23,13 @@ const Strings = Services.strings.createBundle(
 
 const tabs = [{
   id: "addons",
+  panelId: "tab-addons",
   name: Strings.GetStringFromName("addons"),
   icon: "chrome://devtools/skin/images/debugging-addons.svg",
   component: AddonsTab
 }, {
   id: "workers",
+  panelId: "tab-workers",
   name: Strings.GetStringFromName("workers"),
   icon: "chrome://devtools/skin/images/debugging-workers.svg",
   component: WorkersTab
@@ -56,23 +58,10 @@ module.exports = createClass({
     this.props.telemetry.destroy();
   },
 
-  render() {
-    let { client } = this.props;
-    let { selectedTabId } = this.state;
-    let selectTab = this.selectTab;
-
-    let selectedTab = tabs.find(t => t.id == selectedTabId);
-
-    return dom.div({ className: "app" },
-      TabMenu({ tabs, selectedTabId, selectTab }),
-      dom.div({ className: "main-content" },
-        selectedTab.component({ client })
-      )
-    );
-  },
-
   onHashChange() {
-    let tabId = window.location.hash.substr(1);
+    let hash = window.location.hash;
+    // Default to defaultTabId if no hash is provided.
+    let tabId = hash ? hash.substr(1) : defaultTabId;
 
     let isValid = tabs.some(t => t.id == tabId);
     if (isValid) {
@@ -86,5 +75,20 @@ module.exports = createClass({
 
   selectTab(tabId) {
     window.location.hash = "#" + tabId;
+  },
+
+  render() {
+    let { client } = this.props;
+    let { selectedTabId } = this.state;
+    let selectTab = this.selectTab;
+
+    let selectedTab = tabs.find(t => t.id == selectedTabId);
+
+    return dom.div({ className: "app" },
+      TabMenu({ tabs, selectedTabId, selectTab }),
+      dom.div({ className: "main-content" },
+        selectedTab.component({ client, id: selectedTab.panelId })
+      )
+    );
   }
 });

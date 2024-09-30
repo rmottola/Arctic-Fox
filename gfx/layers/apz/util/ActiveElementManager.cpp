@@ -94,10 +94,10 @@ ActiveElementManager::TriggerElementActivation()
                     // bug properly should make this unnecessary.
     MOZ_ASSERT(mSetActiveTask == nullptr);
 
-    mSetActiveTask = NewRunnableMethod(
+    RefPtr<CancelableRunnable> task = NewRunnableMethod(
         this, &ActiveElementManager::SetActiveTask, mTarget);
-    MessageLoop::current()->PostDelayedTask(
-        FROM_HERE, mSetActiveTask, sActivationDelayMs);
+    mSetActiveTask = task;
+    MessageLoop::current()->PostDelayedTask(task.forget(), sActivationDelayMs);
     AEM_LOG("Scheduling mSetActiveTask %p\n", mSetActiveTask);
   }
 }
@@ -209,7 +209,7 @@ ActiveElementManager::ResetTouchBlockState()
 }
 
 void
-ActiveElementManager::SetActiveTask(dom::Element* aTarget)
+ActiveElementManager::SetActiveTask(const nsCOMPtr<dom::Element>& aTarget)
 {
   AEM_LOG("mSetActiveTask %p running\n", mSetActiveTask);
 

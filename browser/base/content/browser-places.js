@@ -1080,7 +1080,7 @@ var PlacesToolbarHelper = {
 
     // CustomizableUI.addListener is idempotent, so we can safely
     // call this multiple times.
-//FIXME    CustomizableUI.addListener(this);
+    CustomizableUI.addListener(this);
 
     // If the bookmarks toolbar item is:
     // - not in a toolbar, or;
@@ -1297,8 +1297,7 @@ var BookmarkingUI = {
    */
   _currentAreaType: null,
   _shouldUpdateStarState: function() {
-//    return this._currentAreaType == CustomizableUI.TYPE_TOOLBAR;
-    return;
+    return this._currentAreaType == CustomizableUI.TYPE_TOOLBAR;
   },
 
   /**

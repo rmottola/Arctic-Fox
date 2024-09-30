@@ -694,7 +694,6 @@ MessageChannel::Open(MessageChannel *aTargetChan, MessageLoop *aTargetLoop, Side
     MonitorAutoLock lock(*mMonitor);
     mChannelState = ChannelOpening;
     aTargetLoop->PostTask(
-        FROM_HERE,
         NewRunnableMethod(aTargetChan, &MessageChannel::OnOpenAsSlave, this, oppSide));
 
     while (ChannelOpening == mChannelState)
@@ -759,7 +758,7 @@ MessageChannel::Send(Message* aMsg)
 {
     if (aMsg->capacity() >= kMinTelemetryMessageSize) {
         Telemetry::Accumulate(Telemetry::IPC_MESSAGE_SIZE,
-                              nsCString(aMsg->name()), aMsg->capacity());
+                              nsDependentCString(aMsg->name()), aMsg->capacity());
     }
 
     CxxStackFrame frame(*this, OUT_MESSAGE, aMsg);
@@ -983,7 +982,8 @@ MessageChannel::OnMessageReceivedFromLink(Message&& aMsg)
         if (!compress) {
             // If we compressed away the previous message, we'll re-use
             // its pending task.
-            mWorkerLoop->PostTask(FROM_HERE, new DequeueTask(mDequeueOneTask));
+            RefPtr<DequeueTask> task = new DequeueTask(mDequeueOneTask);
+            mWorkerLoop->PostTask(task.forget());
         }
     }
 }
@@ -1059,7 +1059,7 @@ MessageChannel::Send(Message* aMsg, Message* aReply)
 {
     if (aMsg->capacity() >= kMinTelemetryMessageSize) {
         Telemetry::Accumulate(Telemetry::IPC_MESSAGE_SIZE,
-                              nsCString(aMsg->name()), aMsg->capacity());
+                              nsDependentCString(aMsg->name()), aMsg->capacity());
     }
 
     nsAutoPtr<Message> msg(aMsg);
@@ -1158,6 +1158,9 @@ MessageChannel::Send(Message* aMsg, Message* aReply)
 
     IPC_LOG("Send seqno=%d, xid=%d", seqno, transaction);
 
+    // msg will be destroyed soon, but name() is not owned by msg.
+    const char* msgName = msg->name();
+
     mLink->SendMessage(msg.forget());
 
     while (true) {
@@ -1244,6 +1247,10 @@ MessageChannel::Send(Message* aMsg, Message* aReply)
     MOZ_RELEASE_ASSERT(reply->is_sync());
 
     *aReply = Move(*reply);
+    if (aReply->capacity() >= kMinTelemetryMessageSize) {
+        Telemetry::Accumulate(Telemetry::IPC_REPLY_SIZE,
+                              nsDependentCString(msgName), aReply->capacity());
+    }
     return true;
 }
 
@@ -1278,7 +1285,7 @@ MessageChannel::Call(Message* aMsg, Message* aReply)
     msg->set_seqno(NextSeqno());
     msg->set_interrupt_remote_stack_depth_guess(mRemoteStackDepthGuess);
     msg->set_interrupt_local_stack_depth(1 + InterruptStackDepth());
-    mInterruptStack.push(*msg);
+    mInterruptStack.push(MessageInfo(*msg));
     mLink->SendMessage(msg.forget());
 
     while (true) {
@@ -1363,7 +1370,7 @@ MessageChannel::Call(Message* aMsg, Message* aReply)
             // If this is not a reply the call we've initiated, add it to our
             // out-of-turn replies and keep polling for events.
             {
-                const Message &outcall = mInterruptStack.top();
+                const MessageInfo &outcall = mInterruptStack.top();
 
                 // Note, In the parent, sequence numbers increase from 0, and
                 // in the child, they decrease from 0.
@@ -1665,9 +1672,11 @@ MessageChannel::DispatchInterruptMessage(const Message& aMsg, size_t stackDepth)
         // processing of the other side's in-call.
         bool defer;
         const char* winner;
-        const Message& parentMsg = (mSide == ChildSide) ? aMsg : mInterruptStack.top();
-        const Message& childMsg = (mSide == ChildSide) ? mInterruptStack.top() : aMsg;
-        switch (mListener->MediateInterruptRace(parentMsg, childMsg))
+        const MessageInfo parentMsgInfo =
+          (mSide == ChildSide) ? MessageInfo(aMsg) : mInterruptStack.top();
+        const MessageInfo childMsgInfo =
+          (mSide == ChildSide) ? mInterruptStack.top() : MessageInfo(aMsg);
+        switch (mListener->MediateInterruptRace(parentMsgInfo, childMsgInfo))
         {
           case RIPChildWins:
             winner = "child";
@@ -1799,14 +1808,16 @@ MessageChannel::EnqueuePendingMessages()
     MaybeUndeferIncall();
 
     for (size_t i = 0; i < mDeferred.size(); ++i) {
-        mWorkerLoop->PostTask(FROM_HERE, new DequeueTask(mDequeueOneTask));
+        RefPtr<DequeueTask> task = new DequeueTask(mDequeueOneTask);
+        mWorkerLoop->PostTask(task.forget());
     }
 
     // XXX performance tuning knob: could process all or k pending
     // messages here, rather than enqueuing for later processing
 
     for (size_t i = 0; i < mPending.size(); ++i) {
-        mWorkerLoop->PostTask(FROM_HERE, new DequeueTask(mDequeueOneTask));
+        RefPtr<DequeueTask> task = new DequeueTask(mDequeueOneTask);
+        mWorkerLoop->PostTask(task.forget());
     }
 }
 
@@ -1914,7 +1925,8 @@ MessageChannel::OnChannelConnected(int32_t peer_id)
     MOZ_RELEASE_ASSERT(!mPeerPidSet);
     mPeerPidSet = true;
     mPeerPid = peer_id;
-    mWorkerLoop->PostTask(FROM_HERE, new DequeueTask(mOnChannelConnectedTask));
+    RefPtr<DequeueTask> task = new DequeueTask(mOnChannelConnectedTask);
+    mWorkerLoop->PostTask(task.forget());
 }
 
 void
@@ -2083,8 +2095,9 @@ MessageChannel::OnNotifyMaybeChannelError()
     if (IsOnCxxStack()) {
         mChannelErrorTask =
             NewRunnableMethod(this, &MessageChannel::OnNotifyMaybeChannelError);
+        RefPtr<Runnable> task = mChannelErrorTask;
         // 10 ms delay is completely arbitrary
-        mWorkerLoop->PostDelayedTask(FROM_HERE, mChannelErrorTask, 10);
+        mWorkerLoop->PostDelayedTask(task.forget(), 10);
         return;
     }
 
@@ -2102,7 +2115,8 @@ MessageChannel::PostErrorNotifyTask()
     // This must be the last code that runs on this thread!
     mChannelErrorTask =
         NewRunnableMethod(this, &MessageChannel::OnNotifyMaybeChannelError);
-    mWorkerLoop->PostTask(FROM_HERE, mChannelErrorTask);
+    RefPtr<Runnable> task = mChannelErrorTask;
+    mWorkerLoop->PostTask(task.forget());
 }
 
 // Special async message.
@@ -2297,7 +2311,8 @@ MessageChannel::EndTimeout()
         // OnMaybeDequeueOne. But during the timeout, that function will skip
         // some messages. Now they're ready to be processed, so we enqueue more
         // tasks.
-        mWorkerLoop->PostTask(FROM_HERE, new DequeueTask(mDequeueOneTask));
+        RefPtr<DequeueTask> task = new DequeueTask(mDequeueOneTask);
+        mWorkerLoop->PostTask(task.forget());
     }
 }
 

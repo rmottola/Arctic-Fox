@@ -41,12 +41,17 @@ xpcAccessible::GetNextSibling(nsIAccessible** aNextSibling)
   if (IntlGeneric().IsNull())
     return NS_ERROR_FAILURE;
 
-  if (!Intl())
-    return NS_ERROR_FAILURE;
+  if (IntlGeneric().IsAccessible()) {
+    nsresult rv = NS_OK;
+    NS_IF_ADDREF(*aNextSibling = ToXPC(Intl()->GetSiblingAtOffset(1, &rv)));
+    return rv;
+  }
 
-  nsresult rv = NS_OK;
-  NS_IF_ADDREF(*aNextSibling = ToXPC(Intl()->GetSiblingAtOffset(1, &rv)));
-  return rv;
+  ProxyAccessible* proxy = IntlGeneric().AsProxy();
+  NS_ENSURE_STATE(proxy);
+
+  NS_IF_ADDREF(*aNextSibling = ToXPC(proxy->NextSibling()));
+  return *aNextSibling ? NS_OK : NS_ERROR_FAILURE;
 }
 
 NS_IMETHODIMP
@@ -57,12 +62,17 @@ xpcAccessible::GetPreviousSibling(nsIAccessible** aPreviousSibling)
   if (IntlGeneric().IsNull())
     return NS_ERROR_FAILURE;
 
-  if (!Intl())
-    return NS_ERROR_FAILURE;
+  if (IntlGeneric().IsAccessible()) {
+    nsresult rv = NS_OK;
+    NS_IF_ADDREF(*aPreviousSibling = ToXPC(Intl()->GetSiblingAtOffset(-1, &rv)));
+    return rv;
+  }
 
-  nsresult rv = NS_OK;
-  NS_IF_ADDREF(*aPreviousSibling = ToXPC(Intl()->GetSiblingAtOffset(-1, &rv)));
-  return rv;
+  ProxyAccessible* proxy = IntlGeneric().AsProxy();
+  NS_ENSURE_STATE(proxy);
+
+  NS_IF_ADDREF(*aPreviousSibling = ToXPC(proxy->PrevSibling()));
+  return *aPreviousSibling ? NS_OK : NS_ERROR_FAILURE;
 }
 
 NS_IMETHODIMP
@@ -157,10 +167,12 @@ xpcAccessible::GetIndexInParent(int32_t* aIndexInParent)
   if (IntlGeneric().IsNull())
     return NS_ERROR_FAILURE;
 
-  if (!Intl())
-    return NS_ERROR_FAILURE;
+  if (IntlGeneric().IsAccessible()) {
+    *aIndexInParent = Intl()->IndexInParent();
+  } else if (IntlGeneric().IsProxy()) {
+    *aIndexInParent = IntlGeneric().AsProxy()->IndexInParent();
+  }
 
-  *aIndexInParent = Intl()->IndexInParent();
   return *aIndexInParent != -1 ? NS_OK : NS_ERROR_FAILURE;
 }
 
@@ -239,10 +251,13 @@ xpcAccessible::GetState(uint32_t* aState, uint32_t* aExtraState)
 {
   NS_ENSURE_ARG_POINTER(aState);
 
-  if (!Intl())
+  if (IntlGeneric().IsNull())
     nsAccUtils::To32States(states::DEFUNCT, aState, aExtraState);
-  else
+  else if (Intl())
     nsAccUtils::To32States(Intl()->State(), aState, aExtraState);
+  else
+    nsAccUtils::To32States(IntlGeneric().AsProxy()->State(), aState,
+                           aExtraState);
 
   return NS_OK;
 }
@@ -252,11 +267,16 @@ xpcAccessible::GetName(nsAString& aName)
 {
   aName.Truncate();
 
-  if (!Intl())
+  if (IntlGeneric().IsNull())
     return NS_ERROR_FAILURE;
 
   nsAutoString name;
-  Intl()->Name(name);
+  if (ProxyAccessible* proxy = IntlGeneric().AsProxy()) {
+    proxy->Name(name);
+  } else {
+    Intl()->Name(name);
+  }
+
   aName.Assign(name);
 
   return NS_OK;
@@ -265,11 +285,16 @@ xpcAccessible::GetName(nsAString& aName)
 NS_IMETHODIMP
 xpcAccessible::GetDescription(nsAString& aDescription)
 {
-  if (!Intl())
+  if (IntlGeneric().IsNull())
     return NS_ERROR_FAILURE;
 
   nsAutoString desc;
-  Intl()->Description(desc);
+  if (ProxyAccessible* proxy = IntlGeneric().AsProxy()) {
+    proxy->Description(desc);
+  } else {
+    Intl()->Description(desc);
+  }
+
   aDescription.Assign(desc);
 
   return NS_OK;
@@ -278,21 +303,33 @@ xpcAccessible::GetDescription(nsAString& aDescription)
 NS_IMETHODIMP
 xpcAccessible::GetLanguage(nsAString& aLanguage)
 {
-  if (!Intl())
+  if (IntlGeneric().IsNull())
     return NS_ERROR_FAILURE;
 
-  Intl()->Language(aLanguage);
+  nsAutoString lang;
+  if (ProxyAccessible* proxy = IntlGeneric().AsProxy()) {
+    proxy->Language(lang);
+  } else {
+    Intl()->Language(lang);
+  }
+
+  aLanguage.Assign(lang);
   return NS_OK;
 }
 
 NS_IMETHODIMP
 xpcAccessible::GetValue(nsAString& aValue)
 {
-  if (!Intl())
+  if (IntlGeneric().IsNull())
     return NS_ERROR_FAILURE;
 
   nsAutoString value;
-  Intl()->Value(value);
+  if (ProxyAccessible* proxy = IntlGeneric().AsProxy()) {
+    proxy->Value(value);
+  } else {
+    Intl()->Value(value);
+  }
+
   aValue.Assign(value);
 
   return NS_OK;
@@ -379,10 +416,16 @@ xpcAccessible::GetBounds(int32_t* aX, int32_t* aY,
   NS_ENSURE_ARG_POINTER(aHeight);
   *aHeight = 0;
 
-  if (!Intl())
+  if (IntlGeneric().IsNull())
     return NS_ERROR_FAILURE;
 
-  nsIntRect rect = Intl()->Bounds();
+  nsIntRect rect;
+  if (Accessible* acc = IntlGeneric().AsAccessible()) {
+    rect = acc->Bounds();
+  } else {
+    rect = IntlGeneric().AsProxy()->Bounds();
+  }
+
   *aX = rect.x;
   *aY = rect.y;
   *aWidth = rect.width;

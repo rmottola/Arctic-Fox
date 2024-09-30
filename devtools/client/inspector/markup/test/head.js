@@ -20,7 +20,9 @@ SimpleTest.requestCompleteLog();
 
 // Set the testing flag on DevToolsUtils and reset it when the test ends
 DevToolsUtils.testing = true;
-registerCleanupFunction(() => DevToolsUtils.testing = false);
+registerCleanupFunction(() => {
+  DevToolsUtils.testing = false;
+});
 
 // Clear preferences that may be set during the course of tests.
 registerCleanupFunction(() => {
@@ -52,73 +54,11 @@ function loadHelperScript(filePath) {
  * @return a promise that resolves when the inspector has emitted the event
  * new-root
  */
-function reloadPage(inspector) {
+function reloadPage(inspector, testActor) {
   info("Reloading the page");
   let newRoot = inspector.once("new-root");
-  content.location.reload();
+  testActor.reload();
   return newRoot;
-}
-
-/**
- * Reload the current tab location.
- * @param {TestActorFront} testActor An instance of the current TestActorFront
- * instantiated when the test started.
- */
-function reloadTab(testActor) {
-  return testActor.eval("location.reload()");
-}
-
-/**
- * Simple DOM node accesor function that takes either a node or a string css
- * selector as argument and returns the corresponding node
- * @param {String|DOMNode} nodeOrSelector
- * @return {DOMNode|CPOW} Note that in e10s mode a CPOW object is returned which
- * doesn't implement *all* of the DOMNode's properties
- */
-function getNode(nodeOrSelector) {
-  info("Getting the node for '" + nodeOrSelector + "'");
-  return typeof nodeOrSelector === "string" ?
-    content.document.querySelector(nodeOrSelector) :
-    nodeOrSelector;
-}
-
-/**
- * Get information about a DOM element, identified by its selector.
- * @param {String} selector.
- * @return {Promise} a promise that resolves to the element's information.
- */
-function getNodeInfo(selector, testActor) {
-  return testActor.getNodeInfo(selector);
-}
-
-/**
- * Set the value of an attribute of a DOM element, identified by its selector.
- * @param {String} selector.
- * @param {String} attributeName.
- * @param {String} attributeValue.
- * @param {TestActorFront} testActor The current TestActorFront instance.
- * @return {Promise} resolves when done.
- */
-function setNodeAttribute(selector, attributeName, attributeValue, testActor) {
-  return testActor.setAttribute(selector, attributeName, attributeValue);
-}
-
-/**
- * Highlight a node and set the inspector's current selection to the node or
- * the first match of the given css selector.
- * @param {String|DOMNode} nodeOrSelector
- * @param {InspectorPanel} inspector
- *        The instance of InspectorPanel currently loaded in the toolbox
- * @return a promise that resolves when the inspector is updated with the new
- * node
- */
-function selectAndHighlightNode(nodeOrSelector, inspector) {
-  info("Highlighting and selecting the node " + nodeOrSelector);
-
-  let node = getNode(nodeOrSelector);
-  let updated = inspector.toolbox.once("highlighter-ready");
-  inspector.selection.setNode(node, "test-highlight");
-  return updated;
 }
 
 /**
@@ -141,7 +81,7 @@ function getContainerForNodeFront(nodeFront, {markup}) {
  * loaded in the toolbox
  * @return {MarkupContainer}
  */
-var getContainerForSelector = Task.async(function*(selector, inspector) {
+var getContainerForSelector = Task.async(function* (selector, inspector) {
   info("Getting the markup-container for node " + selector);
   let nodeFront = yield getNodeFront(selector, inspector);
   let container = getContainerForNodeFront(nodeFront, inspector);
@@ -174,7 +114,7 @@ function waitForChildrenUpdated({markup}) {
  * loaded in the toolbox
  * @return {Promise} Resolves when the node has been selected.
  */
-var clickContainer = Task.async(function*(selector, inspector) {
+var clickContainer = Task.async(function* (selector, inspector) {
   info("Clicking on the markup-container for node " + selector);
 
   let nodeFront = yield getNodeFront(selector, inspector);
@@ -217,7 +157,7 @@ function setEditableFieldValue(field, value, inspector) {
  * loaded in the toolbox
  * @return a promise that resolves when the node has mutated
  */
-var addNewAttributes = Task.async(function*(selector, text, inspector) {
+var addNewAttributes = Task.async(function* (selector, text, inspector) {
   info(`Entering text "${text}" in new attribute field for node ${selector}`);
 
   let container = yield getContainerForSelector(selector, inspector);
@@ -240,8 +180,8 @@ var addNewAttributes = Task.async(function*(selector, text, inspector) {
  * Note that node.getAttribute() returns attribute values provided by the HTML
  * parser. The parser only provides unescaped entities so &amp; will return &.
  */
-var assertAttributes = Task.async(function*(selector, expected, testActor) {
-  let {attributes: actual} = yield getNodeInfo(selector, testActor);
+var assertAttributes = Task.async(function* (selector, expected, testActor) {
+  let {attributes: actual} = yield testActor.getNodeInfo(selector);
 
   is(actual.length, Object.keys(expected).length,
     "The node " + selector + " has the expected number of attributes.");
@@ -325,7 +265,7 @@ function searchUsingSelectorSearch(selector, inspector) {
  */
 function wait(ms) {
   let def = promise.defer();
-  content.setTimeout(def.resolve, ms);
+  setTimeout(def.resolve, ms);
   return def.promise;
 }
 
@@ -339,7 +279,7 @@ function wait(ms) {
  *         the menu items are disabled once the menu has been checked.
  */
 var isEditingMenuDisabled = Task.async(
-function*(nodeFront, inspector, assert = true) {
+function* (nodeFront, inspector, assert = true) {
   let doc = inspector.panelDoc;
   let deleteMenuItem = doc.getElementById("node-menu-delete");
   let editHTMLMenuItem = doc.getElementById("node-menu-edithtml");
@@ -377,7 +317,7 @@ function*(nodeFront, inspector, assert = true) {
  *         the menu items are enabled once the menu has been checked.
  */
 var isEditingMenuEnabled = Task.async(
-function*(nodeFront, inspector, assert = true) {
+function* (nodeFront, inspector, assert = true) {
   let doc = inspector.panelDoc;
   let deleteMenuItem = doc.getElementById("node-menu-delete");
   let editHTMLMenuItem = doc.getElementById("node-menu-edithtml");
@@ -410,7 +350,7 @@ function*(nodeFront, inspector, assert = true) {
  * @param {DOMNode} menu A menu that implements hidePopup/openPopup
  * @return a promise that resolves once the menu is opened.
  */
-var reopenMenu = Task.async(function*(menu) {
+var reopenMenu = Task.async(function* (menu) {
   // First close it is if it is already opened.
   if (menu.state == "closing" || menu.state == "open") {
     let popuphidden = once(menu, "popuphidden", true);
@@ -484,7 +424,7 @@ function checkFocusedAttribute(attrName, editMode) {
  *         A promise that resolves with an array of attribute names
  *         (e.g. ["id", "class", "href"])
  */
-var getAttributesFromEditor = Task.async(function*(selector, inspector) {
+var getAttributesFromEditor = Task.async(function* (selector, inspector) {
   let nodeList = (yield getContainerForSelector(selector, inspector))
     .tagLine.querySelectorAll("[data-attr]");
 
@@ -502,6 +442,7 @@ function* waitForMultipleChildrenUpdates(inspector) {
     yield waitForChildrenUpdated(inspector);
     return yield waitForMultipleChildrenUpdates(inspector);
   }
+  return undefined;
 }
 
 /**

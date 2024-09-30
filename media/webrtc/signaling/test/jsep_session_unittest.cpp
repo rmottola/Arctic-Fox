@@ -12,6 +12,7 @@
 #include "ssl.h"
 
 #include "mozilla/RefPtr.h"
+#include "mozilla/Tuple.h"
 
 #define GTEST_HAS_RTTI 0
 #include "gtest/gtest.h"
@@ -620,10 +621,9 @@ protected:
           session.AddLocalIceCandidate(kAEqualsCandidate + candidate.str(),
                                        level, &mid, &skipped);
           if (!skipped) {
-            // TODO (bug 1095793): Need to add mid to mCandidatesToTrickle
             mCandidatesToTrickle.push_back(
-                std::pair<uint16_t, std::string>(
-                  level, kAEqualsCandidate + candidate.str()));
+                Tuple<Level, Mid, Candidate>(
+                  level, mid, kAEqualsCandidate + candidate.str()));
             candidates.push_back(candidate.str());
           }
         }
@@ -665,10 +665,12 @@ protected:
 
       void Trickle(JsepSession& session)
       {
-        for (const auto& levelAndCandidate : mCandidatesToTrickle) {
-          session.AddRemoteIceCandidate(levelAndCandidate.second,
-                                        "",
-                                        levelAndCandidate.first);
+        for (const auto& levelMidAndCandidate : mCandidatesToTrickle) {
+          Level level;
+          Mid mid;
+          Candidate candidate;
+          Tie(level, mid, candidate) = levelMidAndCandidate;
+          session.AddRemoteIceCandidate(candidate, mid, level);
         }
         mCandidatesToTrickle.clear();
       }
@@ -779,6 +781,7 @@ protected:
 
     private:
       typedef size_t Level;
+      typedef std::string Mid;
       typedef std::string Candidate;
       typedef std::string Address;
       typedef uint16_t Port;
@@ -790,8 +793,8 @@ protected:
       std::map<Level,
                std::map<ComponentType,
                         std::vector<Candidate>>> mCandidates;
-      // Level/candidate pairs that need to be trickled
-      std::vector<std::pair<Level, Candidate>> mCandidatesToTrickle;
+      // Level/mid/candidate tuples that need to be trickled
+      std::vector<Tuple<Level, Mid, Candidate>> mCandidatesToTrickle;
   };
 
   // For streaming parse errors
@@ -860,6 +863,43 @@ protected:
   }
 
   void
+  ValidateDisabledMSection(const SdpMediaSection* msection)
+  {
+    ASSERT_EQ(1U, msection->GetFormats().size());
+    // Maybe validate that no attributes are present except rtpmap and
+    // inactive? How?
+    ASSERT_EQ(SdpDirectionAttribute::kInactive,
+              msection->GetDirectionAttribute().mValue);
+    if (msection->GetMediaType() == SdpMediaSection::kAudio) {
+      ASSERT_EQ("0", msection->GetFormats()[0]);
+      const SdpRtpmapAttributeList::Rtpmap* rtpmap(msection->FindRtpmap("0"));
+      ASSERT_TRUE(rtpmap);
+      ASSERT_EQ("0", rtpmap->pt);
+      ASSERT_EQ("PCMU", rtpmap->name);
+    } else if (msection->GetMediaType() == SdpMediaSection::kVideo) {
+      ASSERT_EQ("120", msection->GetFormats()[0]);
+      const SdpRtpmapAttributeList::Rtpmap* rtpmap(msection->FindRtpmap("120"));
+      ASSERT_TRUE(rtpmap);
+      ASSERT_EQ("120", rtpmap->pt);
+      ASSERT_EQ("VP8", rtpmap->name);
+    } else if (msection->GetMediaType() == SdpMediaSection::kApplication) {
+      ASSERT_EQ("5000", msection->GetFormats()[0]);
+      const SdpSctpmapAttributeList::Sctpmap* sctpmap(msection->FindSctpmap("5000"));
+      ASSERT_TRUE(sctpmap);
+      ASSERT_EQ("5000", sctpmap->pt);
+      ASSERT_EQ("rejected", sctpmap->name);
+      ASSERT_EQ(0U, sctpmap->streams);
+    } else {
+      // Not that we would have any test which tests this...
+      ASSERT_EQ("19", msection->GetFormats()[0]);
+      const SdpRtpmapAttributeList::Rtpmap* rtpmap(msection->FindRtpmap("19"));
+      ASSERT_TRUE(rtpmap);
+      ASSERT_EQ("19", rtpmap->pt);
+      ASSERT_EQ("reserved", rtpmap->name);
+    }
+  }
+
+  void
   DumpTrack(const JsepTrack& track)
   {
     const JsepTrackNegotiatedDetails* details = track.GetNegotiatedDetails();
@@ -925,10 +965,7 @@ private:
       }
 
       if (msection.GetPort() == 0) {
-        ASSERT_EQ(SdpDirectionAttribute::kInactive,
-                  msection.GetDirectionAttribute().mValue);
-        // Maybe validate that no attributes are present except rtpmap and
-        // inactive?
+        ValidateDisabledMSection(&msection);
         continue;
       }
       const SdpAttributeList& attrs = msection.GetAttributeList();

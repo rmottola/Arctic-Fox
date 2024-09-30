@@ -1543,11 +1543,11 @@ class ReservedRooted : public ReservedRootedBase<T>
     }
 
     explicit ReservedRooted(Rooted<T>* root) : savedRoot(root) {
-        *root = js::GCPolicy<T>::initial();
+        *root = JS::GCPolicy<T>::initial();
     }
 
     ~ReservedRooted() {
-        *savedRoot = js::GCPolicy<T>::initial();
+        *savedRoot = JS::GCPolicy<T>::initial();
     }
 
     void set(const T& p) const { *savedRoot = p; }
@@ -4257,7 +4257,7 @@ js::DefFunOperation(JSContext* cx, HandleScript script, HandleObject scopeChain,
         parent = parent->enclosingScope();
 
     /* ES5 10.5 (NB: with subsequent errata). */
-    RootedPropertyName name(cx, fun->atom()->asPropertyName());
+    RootedPropertyName name(cx, fun->name()->asPropertyName());
 
     RootedShape shape(cx);
     RootedObject pobj(cx);
@@ -4969,8 +4969,8 @@ js::ThrowUninitializedThis(JSContext* cx, AbstractFramePtr frame)
     if (fun->isDerivedClassConstructor()) {
         const char* name = "anonymous";
         JSAutoByteString str;
-        if (fun->atom()) {
-            if (!AtomToPrintableString(cx, fun->atom(), &str))
+        if (fun->name()) {
+            if (!AtomToPrintableString(cx, fun->name(), &str))
                 return false;
             name = str.ptr();
         }

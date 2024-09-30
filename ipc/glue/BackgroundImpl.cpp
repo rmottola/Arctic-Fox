@@ -448,8 +448,10 @@ private:
   // This class is reference counted.
   ~ChildImpl()
   {
-    XRE_GetIOMessageLoop()->PostTask(FROM_HERE,
-                                     new DeleteTask<Transport>(GetTransport()));
+    RefPtr<DeleteTask<Transport>> task =
+      new DeleteTask<Transport>(GetTransport());
+    XRE_GetIOMessageLoop()->PostTask(task.forget());
+
     AssertActorDestroyed();
   }
 
@@ -495,8 +497,7 @@ private:
   }
 };
 
-class ParentImpl::RequestMessageLoopRunnable final :
-  public nsRunnable
+class ParentImpl::RequestMessageLoopRunnable final : public Runnable
 {
   nsCOMPtr<nsIThread> mTargetThread;
   MessageLoop* mMessageLoop;
@@ -510,8 +511,6 @@ public:
     MOZ_ASSERT(aTargetThread);
   }
 
-  NS_DECL_ISUPPORTS_INHERITED
-
 private:
   ~RequestMessageLoopRunnable()
   { }
@@ -519,7 +518,7 @@ private:
   NS_DECL_NSIRUNNABLE
 };
 
-class ParentImpl::ShutdownBackgroundThreadRunnable final : public nsRunnable
+class ParentImpl::ShutdownBackgroundThreadRunnable final : public Runnable
 {
 public:
   ShutdownBackgroundThreadRunnable()
@@ -528,8 +527,6 @@ public:
     AssertIsOnMainThread();
   }
 
-  NS_DECL_ISUPPORTS_INHERITED
-
 private:
   ~ShutdownBackgroundThreadRunnable()
   { }
@@ -537,7 +534,7 @@ private:
   NS_DECL_NSIRUNNABLE
 };
 
-class ParentImpl::ForceCloseBackgroundActorsRunnable final : public nsRunnable
+class ParentImpl::ForceCloseBackgroundActorsRunnable final : public Runnable
 {
   nsTArray<ParentImpl*>* mActorArray;
 
@@ -550,8 +547,6 @@ public:
     MOZ_ASSERT(aActorArray);
   }
 
-  NS_DECL_ISUPPORTS_INHERITED
-
 private:
   ~ForceCloseBackgroundActorsRunnable()
   { }
@@ -559,7 +554,7 @@ private:
   NS_DECL_NSIRUNNABLE
 };
 
-class ParentImpl::CreateCallbackRunnable final : public nsRunnable
+class ParentImpl::CreateCallbackRunnable final : public Runnable
 {
   RefPtr<CreateCallback> mCallback;
 
@@ -572,8 +567,6 @@ public:
     MOZ_ASSERT(aCallback);
   }
 
-  NS_DECL_ISUPPORTS_INHERITED
-
 private:
   ~CreateCallbackRunnable()
   { }
@@ -581,7 +574,7 @@ private:
   NS_DECL_NSIRUNNABLE
 };
 
-class ParentImpl::ConnectActorRunnable final : public nsRunnable
+class ParentImpl::ConnectActorRunnable final : public Runnable
 {
   RefPtr<ParentImpl> mActor;
   Transport* mTransport;
@@ -602,8 +595,6 @@ public:
     MOZ_ASSERT(aTransport);
     MOZ_ASSERT(aLiveActorArray);
   }
-
-  NS_DECL_ISUPPORTS_INHERITED
 
 private:
   ~ConnectActorRunnable()
@@ -652,7 +643,7 @@ private:
   }
 };
 
-class ChildImpl::CreateActorRunnable final : public nsRunnable
+class ChildImpl::CreateActorRunnable final : public Runnable
 {
   nsCOMPtr<nsIEventTarget> mEventTarget;
 
@@ -662,8 +653,6 @@ public:
   {
     MOZ_ASSERT(mEventTarget);
   }
-
-  NS_DECL_ISUPPORTS_INHERITED
 
 private:
   ~CreateActorRunnable()
@@ -716,15 +705,13 @@ protected:
   nsresult Cancel() override;
 };
 
-class ChildImpl::FailedCreateCallbackRunnable final : public nsRunnable
+class ChildImpl::FailedCreateCallbackRunnable final : public Runnable
 {
 public:
   FailedCreateCallbackRunnable()
   {
     // May be created on any thread!
   }
-
-  NS_DECL_ISUPPORTS_INHERITED
 
 protected:
   virtual ~FailedCreateCallbackRunnable()
@@ -733,7 +720,7 @@ protected:
   NS_DECL_NSIRUNNABLE
 };
 
-class ChildImpl::OpenChildProcessActorRunnable final : public nsRunnable
+class ChildImpl::OpenChildProcessActorRunnable final : public Runnable
 {
   RefPtr<ChildImpl> mActor;
   nsAutoPtr<Transport> mTransport;
@@ -751,8 +738,6 @@ public:
     MOZ_ASSERT(aTransport);
   }
 
-  NS_DECL_ISUPPORTS_INHERITED
-
 private:
   ~OpenChildProcessActorRunnable()
   {
@@ -765,7 +750,7 @@ private:
   NS_DECL_NSIRUNNABLE
 };
 
-class ChildImpl::OpenMainProcessActorRunnable final : public nsRunnable
+class ChildImpl::OpenMainProcessActorRunnable final : public Runnable
 {
   RefPtr<ChildImpl> mActor;
   RefPtr<ParentImpl> mParentActor;
@@ -782,8 +767,6 @@ public:
     MOZ_ASSERT(mParentActor);
     MOZ_ASSERT(aParentMessageLoop);
   }
-
-  NS_DECL_ISUPPORTS_INHERITED
 
 private:
   ~OpenMainProcessActorRunnable()
@@ -1306,8 +1289,8 @@ ParentImpl::MainThreadActorDestroy()
   MOZ_ASSERT_IF(!mIsOtherProcessActor, !mTransport);
 
   if (mTransport) {
-    XRE_GetIOMessageLoop()->PostTask(FROM_HERE,
-                                     new DeleteTask<Transport>(mTransport));
+    RefPtr<DeleteTask<Transport>> task = new DeleteTask<Transport>(mTransport);
+    XRE_GetIOMessageLoop()->PostTask(task.forget());
     mTransport = nullptr;
   }
 
@@ -1410,9 +1393,6 @@ ParentImpl::ShutdownObserver::Observe(nsISupports* aSubject,
   return NS_OK;
 }
 
-NS_IMPL_ISUPPORTS_INHERITED0(ParentImpl::RequestMessageLoopRunnable,
-                             nsRunnable)
-
 NS_IMETHODIMP
 ParentImpl::RequestMessageLoopRunnable::Run()
 {
@@ -1479,9 +1459,6 @@ ParentImpl::RequestMessageLoopRunnable::Run()
   return NS_OK;
 }
 
-NS_IMPL_ISUPPORTS_INHERITED0(ParentImpl::ShutdownBackgroundThreadRunnable,
-                             nsRunnable)
-
 NS_IMETHODIMP
 ParentImpl::ShutdownBackgroundThreadRunnable::Run()
 {
@@ -1496,9 +1473,6 @@ ParentImpl::ShutdownBackgroundThreadRunnable::Run()
 
   return NS_OK;
 }
-
-NS_IMPL_ISUPPORTS_INHERITED0(ParentImpl::ForceCloseBackgroundActorsRunnable,
-                             nsRunnable)
 
 NS_IMETHODIMP
 ParentImpl::ForceCloseBackgroundActorsRunnable::Run()
@@ -1528,8 +1502,6 @@ ParentImpl::ForceCloseBackgroundActorsRunnable::Run()
   return NS_OK;
 }
 
-NS_IMPL_ISUPPORTS_INHERITED0(ParentImpl::CreateCallbackRunnable, nsRunnable)
-
 NS_IMETHODIMP
 ParentImpl::CreateCallbackRunnable::Run()
 {
@@ -1547,8 +1519,6 @@ ParentImpl::CreateCallbackRunnable::Run()
 
   return NS_OK;
 }
-
-NS_IMPL_ISUPPORTS_INHERITED0(ParentImpl::ConnectActorRunnable, nsRunnable)
 
 NS_IMETHODIMP
 ParentImpl::ConnectActorRunnable::Run()
@@ -1847,9 +1817,6 @@ ChildImpl::AlreadyCreatedCallbackRunnable::Cancel()
   return NS_OK;
 }
 
-NS_IMPL_ISUPPORTS_INHERITED0(ChildImpl::FailedCreateCallbackRunnable,
-                             nsRunnable);
-
 NS_IMETHODIMP
 ChildImpl::FailedCreateCallbackRunnable::Run()
 {
@@ -1864,9 +1831,6 @@ ChildImpl::FailedCreateCallbackRunnable::Run()
 
   return NS_OK;
 }
-
-NS_IMPL_ISUPPORTS_INHERITED0(ChildImpl::OpenChildProcessActorRunnable,
-                             nsRunnable);
 
 NS_IMETHODIMP
 ChildImpl::OpenChildProcessActorRunnable::Run()
@@ -1917,9 +1881,6 @@ ChildImpl::OpenChildProcessActorRunnable::Run()
 
   return NS_OK;
 }
-
-NS_IMPL_ISUPPORTS_INHERITED0(ChildImpl::OpenMainProcessActorRunnable,
-                             nsRunnable);
 
 NS_IMETHODIMP
 ChildImpl::OpenMainProcessActorRunnable::Run()
@@ -1983,8 +1944,6 @@ ChildImpl::OpenMainProcessActorRunnable::Run()
 
   return NS_OK;
 }
-
-NS_IMPL_ISUPPORTS_INHERITED0(ChildImpl::CreateActorRunnable, nsRunnable)
 
 NS_IMETHODIMP
 ChildImpl::CreateActorRunnable::Run()

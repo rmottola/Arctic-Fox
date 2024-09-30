@@ -23,7 +23,7 @@
  */
 function runAddAttributesTests(tests, nodeOrSelector, inspector, testActor) {
   info("Running " + tests.length + " add-attributes tests");
-  return Task.spawn(function*() {
+  return Task.spawn(function* () {
     info("Selecting the test node");
     yield selectNode("div", inspector);
 
@@ -58,7 +58,6 @@ function* runAddAttributesTest(test, selector, inspector, testActor) {
   if (test.setUp) {
     test.setUp(inspector);
   }
-  let element = getNode(selector);
 
   info("Starting add-attribute test: " + test.desc);
   yield addNewAttributes(selector, test.text, inspector);
@@ -68,7 +67,7 @@ function* runAddAttributesTest(test, selector, inspector, testActor) {
 
   if (test.validate) {
     let container = yield getContainerForSelector(selector, inspector);
-    test.validate(element, container, inspector);
+    test.validate(container, inspector);
   }
 
   info("Undo the change");
@@ -97,7 +96,7 @@ function* runAddAttributesTest(test, selector, inspector, testActor) {
  */
 function runEditAttributesTests(tests, inspector, testActor) {
   info("Running " + tests.length + " edit-attributes tests");
-  return Task.spawn(function*() {
+  return Task.spawn(function* () {
     info("Expanding all nodes in the markup-view");
     yield inspector.markup.expandAll();
 

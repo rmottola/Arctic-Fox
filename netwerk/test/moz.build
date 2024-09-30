@@ -18,7 +18,6 @@ GeckoSimplePrograms([
     'PropertiesTest',
     'ReadNTLM',
     'TestBlockingSocket',
-    'TestCallbacks',
     'TestDNS',
     'TestIncrementalDownload',
     'TestOpen',
@@ -36,7 +35,6 @@ GeckoSimplePrograms([
 #    TestIDN',
 #    TestIOThreads',
 #    TestSocketTransport',
-#    TestStreamChannel',
 #    TestStreamPump',
 #    TestStreamTransport',
 #    TestUDPSocketProvider',
@@ -54,6 +52,11 @@ RESOURCE_FILES += [
 ]
 
 USE_LIBS += ['static:js']
+
+if CONFIG['ENABLE_INTL_API'] and CONFIG['MOZ_ICU_DATA_ARCHIVE']:
+    # The ICU libraries linked into libmozjs will not include the ICU data,
+    # so link it directly.
+    USE_LIBS += ['icudata']
 
 CXXFLAGS += CONFIG['TK_CFLAGS']
 

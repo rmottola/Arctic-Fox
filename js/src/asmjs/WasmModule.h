@@ -501,7 +501,7 @@ class Module : public mozilla::LinkedListElement<Module>
     void specializeToHeap(ArrayBufferObjectMaybeShared* heap);
     void despecializeFromHeap(ArrayBufferObjectMaybeShared* heap);
     bool sendCodeRangesToProfiler(JSContext* cx);
-    MOZ_WARN_UNUSED_RESULT bool setProfilingEnabled(JSContext* cx, bool enabled);
+    MOZ_MUST_USE bool setProfilingEnabled(JSContext* cx, bool enabled);
     ImportExit& importToExit(const Import& import);
 
     friend class js::WasmActivation;
@@ -552,6 +552,7 @@ class Module : public mozilla::LinkedListElement<Module>
     const AsmJSModule& asAsmJS() const { MOZ_ASSERT(isAsmJS()); return *(const AsmJSModule*)this; }
     virtual bool mutedErrors() const;
     virtual const char16_t* displayURL() const;
+    virtual ScriptSource* maybeScriptSource() const { return nullptr; }
 
     // The range [0, functionBytes) is a subrange of [0, codeBytes) that
     // contains only function body code, not the stub code. This distinction is

@@ -476,6 +476,9 @@ private:
 protected:
 #endif // MOZ_XUL
 
+  HDC GetWindowSurface();
+  void FreeWindowSurface(HDC dc);
+
   static bool             IsAsyncResponseEvent(UINT aMsg, LRESULT& aResult);
   void                    IPCWindowProcHandler(UINT& msg, WPARAM& wParam, LPARAM& lParam);
 
@@ -491,7 +494,7 @@ protected:
   static void             ActivateOtherWindowHelper(HWND aWnd);
   void                    ClearCachedResources();
   nsIWidgetListener*      GetPaintListener();
-  static bool             IsRenderMode(gfxWindowsPlatform::RenderMode aMode);
+
   virtual bool            PreRender(LayerManagerComposite*) override;
   virtual void            PostRender(LayerManagerComposite*) override;
 

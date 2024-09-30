@@ -3,7 +3,7 @@
 
 "use strict";
 
-const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 var bsp = Cu.import("resource://gre/modules/CrashManager.jsm", this);
 Cu.import("resource://gre/modules/Promise.jsm", this);
@@ -96,7 +96,7 @@ add_task(function* test_submitted_dumps() {
   entries = yield m.submittedDumps();
   Assert.equal(entries.length, COUNT + 1, "hr- in filename detected.");
 
-  let gotIDs = new Set([e.id for (e of entries)]);
+  let gotIDs = new Set(entries.map(e => e.id));
   Assert.ok(gotIDs.has(hrID));
 });
 

@@ -133,6 +133,7 @@ XPCOMUtils.defineLazyGetter(this, "ALL_BUILTIN_ITEMS", function() {
     "BMB_unsortedBookmarksPopup",
     "BMB_bookmarksToolbarPopup",
     "search-go-button",
+    "soundplaying-icon",
   ]
   return DEFAULT_ITEMS.concat(PALETTE_ITEMS)
                       .concat(SPECIAL_CASES);
@@ -535,7 +536,7 @@ this.BrowserUITelemetry = {
     let paletteItems =
       CustomizableUI.getUnusedWidgets(aWindow.gNavToolbox.palette);
     let defaultRemoved = [];
-    for (item of paletteItems) {
+    for (let item of paletteItems) {
       if (DEFAULT_ITEMS.indexOf(item.id) != -1) {
         defaultRemoved.push(item.id);
       }
@@ -609,6 +610,10 @@ this.BrowserUITelemetry = {
 
   countPanicEvent: function(timeId) {
     this._countEvent(["forget-button", timeId]);
+  },
+
+  countTabMutingEvent: function(action, reason) {
+    this._countEvent(["tab-audio-control", action, reason || "no reason given"]);
   },
 
   _logAwesomeBarSearchResult: function (url) {

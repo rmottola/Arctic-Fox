@@ -14,8 +14,6 @@ function synthTestQueue(aTestArgs, aEndFunc) {
       is(e.target, utterances.shift(), "Target matches utterances");
       ok(!speechSynthesis.speaking, "speechSynthesis is not speaking.");
 
-      isnot(e.eventType, 'error', "Error in utterance");
-
       if (utterances.length) {
         ok(speechSynthesis.pending, "other utterances queued");
       } else {
@@ -38,10 +36,12 @@ function synthTestQueue(aTestArgs, aEndFunc) {
     u.addEventListener('end', onend_handler);
     u.addEventListener('error', onend_handler);
 
-    u.addEventListener(
-      'error', function onerror_handler(e) {
-        ok(false, "Error in speech utterance '" + e.target.text + "'");
-      });
+    u.addEventListener('error',
+      (function (expectedError) {
+        return function onerror_handler(e) {
+          ok(expectedError, "Error in speech utterance '" + e.target.text + "'");
+        };
+      })(aTestArgs[i][1] ? aTestArgs[i][1].err : false));
 
     utterances.push(u);
     win.speechSynthesis.speak(u);
@@ -58,7 +58,28 @@ function loadFrame(frameId) {
       frame.contentWindow.document.title = frameId;
       resolve(frame);
     });
-    frame1.src = 'data:text/html,' + encodeURI('<html><head></head><body></body></html>');
+    frame.src = 'data:text/html,' + encodeURI('<html><head></head><body></body></html>');
+  });
+}
+
+function waitForVoices(win) {
+  return new Promise(resolve => {
+    function resolver() {
+      if (win.speechSynthesis.getVoices().length) {
+        win.speechSynthesis.removeEventListener('voiceschanged', resolver);
+        resolve();
+      }
+    }
+
+    win.speechSynthesis.addEventListener('voiceschanged', resolver);
+    resolver();
+  });
+}
+
+function loadSpeechTest(fileName, prefs, frameId="testFrame") {
+  loadFrame(frameId).then(frame => {
+    waitForVoices(frame.contentWindow).then(
+      () => document.getElementById("testFrame").src = fileName);
   });
 }
 

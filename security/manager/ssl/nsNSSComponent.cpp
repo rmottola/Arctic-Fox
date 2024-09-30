@@ -4,8 +4,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#define CERT_AddTempCertToPerm __CERT_AddTempCertToPerm
-
 #include "nsNSSComponent.h"
 
 #include "ExtendedValidation.h"
@@ -1389,6 +1387,7 @@ void nsNSSComponent::setValidationOptions(bool isInitialSetting,
                            static_cast<int32_t>(BRNameMatchingPolicy::Mode::DoNotEnforce)));
   switch (nameMatchingMode) {
     case BRNameMatchingPolicy::Mode::Enforce:
+    case BRNameMatchingPolicy::Mode::EnforceAfter23August2015:
     case BRNameMatchingPolicy::Mode::EnforceAfter23August2016:
     case BRNameMatchingPolicy::Mode::DoNotEnforce:
       break;
@@ -2124,28 +2123,33 @@ nsresult
 setPassword(PK11SlotInfo* slot, nsIInterfaceRequestor* ctx,
             nsNSSShutDownPreventionLock& /*proofOfLock*/)
 {
-  nsresult rv = NS_OK;
+  MOZ_ASSERT(slot);
+  MOZ_ASSERT(ctx);
+  NS_ENSURE_ARG_POINTER(slot);
+  NS_ENSURE_ARG_POINTER(ctx);
 
   if (PK11_NeedUserInit(slot)) {
-    nsITokenPasswordDialogs* dialogs;
+    nsCOMPtr<nsITokenPasswordDialogs> dialogs;
+    nsresult rv = getNSSDialogs(getter_AddRefs(dialogs),
+                                NS_GET_IID(nsITokenPasswordDialogs),
+                                NS_TOKENPASSWORDSDIALOG_CONTRACTID);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+
     bool canceled;
     NS_ConvertUTF8toUTF16 tokenName(PK11_GetTokenName(slot));
-
-    rv = getNSSDialogs((void**)&dialogs,
-                       NS_GET_IID(nsITokenPasswordDialogs),
-                       NS_TOKENPASSWORDSDIALOG_CONTRACTID);
-
-    if (NS_FAILED(rv)) goto loser;
-
     rv = dialogs->SetPassword(ctx, tokenName.get(), &canceled);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
 
-    NS_RELEASE(dialogs);
-    if (NS_FAILED(rv)) goto loser;
-
-    if (canceled) { rv = NS_ERROR_NOT_AVAILABLE; goto loser; }
+    if (canceled) {
+      return NS_ERROR_NOT_AVAILABLE;
+    }
   }
- loser:
-  return rv;
+
+  return NS_OK;
 }
 
 namespace mozilla {
@@ -2193,6 +2197,13 @@ InitializeCipherSuite()
   SEC_PKCS12EnableCipher(PKCS12_DES_EDE3_168, 1);
   SEC_PKCS12SetPreferredCipher(PKCS12_DES_EDE3_168, 1);
   PORT_SetUCS2_ASCIIConversionFunction(pip_ucs2_ascii_conversion_fn);
+
+  // PSM enforces a minimum RSA key size of 1024 bits, which is overridable.
+  // NSS has its own minimum, which is not overridable (the default is 1023
+  // bits). This sets the NSS minimum to 512 bits so users can still connect to
+  // devices like wifi routers with woefully small keys (they would have to add
+  // an override to do so, but they already do for such devices).
+  NSS_OptionSet(NSS_RSA_MIN_KEY_SIZE, 512);
 
   // Observe preference change around cipher suite setting.
   return CipherSuiteChangeObserver::StartObserve();

@@ -380,9 +380,12 @@ nsDOMWindowUtils::SetDisplayPortForElement(float aXPx, float aYPx,
         LayerManager* manager = widget->GetLayerManager(&isRetainingManager);
         if (isRetainingManager) {
           manager->BeginTransaction();
-          nsLayoutUtils::PaintFrame(nullptr, rootFrame, nsRegion(), NS_RGB(255, 255, 255),
-                                    nsLayoutUtils::PAINT_WIDGET_LAYERS |
-                                    nsLayoutUtils::PAINT_EXISTING_TRANSACTION);
+          using PaintFrameFlags = nsLayoutUtils::PaintFrameFlags;
+          nsLayoutUtils::PaintFrame(nullptr, rootFrame, nsRegion(),
+                                    NS_RGB(255, 255, 255),
+                                    nsDisplayListBuilderMode::PAINTING,
+                                    PaintFrameFlags::PAINT_WIDGET_LAYERS |
+                                    PaintFrameFlags::PAINT_EXISTING_TRANSACTION);
         }
       }
     }
@@ -3063,37 +3066,25 @@ nsDOMWindowUtils::RemoteFrameFullscreenReverted()
   return NS_OK;
 }
 
-class MOZ_STACK_CLASS FullscreenChangePrepare
+static void
+PrepareForFullscreenChange(nsIPresShell* aPresShell, const nsSize& aSize,
+                           nsSize* aOldSize = nullptr)
 {
-public:
-  FullscreenChangePrepare(nsIPresShell* aPresShell,
-                          const nsSize& aSize, nsSize* aOldSize = nullptr)
-    : mPresShell(aPresShell)
-  {
-    if (mPresShell) {
-      mPresShell->SetIsInFullscreenChange(true);
-    }
-    if (aSize.IsEmpty()) {
-      return;
-    }
-    if (nsViewManager* viewManager = mPresShell->GetViewManager()) {
+  if (!aPresShell) {
+    return;
+  }
+  if (nsRefreshDriver* rd = aPresShell->GetRefreshDriver()) {
+    rd->SetIsResizeSuppressed();
+  }
+  if (!aSize.IsEmpty()) {
+    if (nsViewManager* viewManager = aPresShell->GetViewManager()) {
       if (aOldSize) {
         viewManager->GetWindowDimensions(&aOldSize->width, &aOldSize->height);
       }
       viewManager->SetWindowDimensions(aSize.width, aSize.height);
     }
   }
-
-  ~FullscreenChangePrepare()
-  {
-    if (mPresShell) {
-      mPresShell->SetIsInFullscreenChange(false);
-    }
-  }
-
-private:
-  nsCOMPtr<nsIPresShell> mPresShell;
-};
+}
 
 class OldWindowSize : public LinkedListElement<OldWindowSize>
 {
@@ -3154,6 +3145,7 @@ LinkedList<OldWindowSize> OldWindowSize::sList;
 NS_IMETHODIMP
 nsDOMWindowUtils::HandleFullscreenRequests(bool* aRetVal)
 {
+  PROFILER_MARKER("Enter fullscreen");
   nsCOMPtr<nsIDocument> doc = GetDocument();
   NS_ENSURE_STATE(doc);
 
@@ -3166,7 +3158,7 @@ nsDOMWindowUtils::HandleFullscreenRequests(bool* aRetVal)
     presContext->DeviceContext()->GetRect(screenRect);
   }
   nsSize oldSize;
-  FullscreenChangePrepare prepare(GetPresShell(), screenRect.Size(), &oldSize);
+  PrepareForFullscreenChange(GetPresShell(), screenRect.Size(), &oldSize);
   OldWindowSize::Set(doc->GetWindow(), oldSize);
 
   *aRetVal = nsIDocument::HandlePendingFullscreenRequests(doc);
@@ -3176,6 +3168,7 @@ nsDOMWindowUtils::HandleFullscreenRequests(bool* aRetVal)
 nsresult
 nsDOMWindowUtils::ExitFullscreen()
 {
+  PROFILER_MARKER("Exit fullscreen");
   nsCOMPtr<nsIDocument> doc = GetDocument();
   NS_ENSURE_STATE(doc);
 
@@ -3190,7 +3183,7 @@ nsDOMWindowUtils::ExitFullscreen()
   // set the window dimensions in advance. Since the resize message
   // comes after the fullscreen change call, doing so could avoid an
   // extra resize reflow after this point.
-  FullscreenChangePrepare prepare(GetPresShell(), oldSize);
+  PrepareForFullscreenChange(GetPresShell(), oldSize);
   nsIDocument::ExitFullscreenInDocTree(doc);
   return NS_OK;
 }

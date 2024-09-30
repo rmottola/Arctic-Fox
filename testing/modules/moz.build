@@ -12,6 +12,8 @@ TESTING_JS_MODULES += [
     'AppInfo.jsm',
     'Assert.jsm',
     'CoverageUtils.jsm',
+    'MockRegistrar.jsm',
+    'sinon-1.16.1.js',
     'StructuredLog.jsm',
     'TestUtils.jsm',
 ]

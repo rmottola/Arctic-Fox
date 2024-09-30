@@ -48,6 +48,8 @@ const TEST_DATA = [
     numUserRules: 1,
     numUARules: 0
   },
+  // Note that some tests below assume that the "a" selector is the
+  // last test in TEST_DATA.
   {
     selector: "a",
     numUserRules: 3,
@@ -55,7 +57,7 @@ const TEST_DATA = [
   }
 ];
 
-add_task(function*() {
+add_task(function* () {
   requestLongerTimeout(2);
 
   info("Starting the test with the pref set to true before toolbox is opened");
@@ -108,15 +110,20 @@ function* userAgentStylesVisible(inspector, view) {
     ok(uaRules.length > data.numUARules, "Has UA rules");
   }
 
-  ok(userRules.some(rule=> rule.matchedSelectors.length === 1),
+  ok(userRules.some(rule => rule.matchedSelectors.length === 1),
     "There is an inline style for element in user styles");
 
-  ok(uaRules.some(rule=> rule.matchedSelectors.indexOf(":-moz-any-link")),
-    "There is a rule for :-moz-any-link");
-  ok(uaRules.some(rule=> rule.matchedSelectors.indexOf("*|*:link")),
-    "There is a rule for *|*:link");
-  ok(uaRules.some(rule=> rule.matchedSelectors.length === 1),
-    "Inline styles for ua styles");
+  // These tests rely on the "a" selector being the last test in
+  // TEST_DATA.
+  ok(uaRules.some(rule => {
+    return rule.matchedSelectors.indexOf(":-moz-any-link") !== -1;
+  }), "There is a rule for :-moz-any-link");
+  ok(uaRules.some(rule => {
+    return rule.matchedSelectors.indexOf("*|*:link") !== -1;
+  }), "There is a rule for *|*:link");
+  ok(uaRules.some(rule => {
+    return rule.matchedSelectors.length === 1;
+  }), "Inline styles for ua styles");
 }
 
 function* userAgentStylesNotVisible(inspector, view) {
@@ -140,11 +147,13 @@ function* compareAppliedStylesWithUI(inspector, view, filter) {
   info("Making sure that UI is consistent with pageStyle.getApplied");
 
   let entries = yield inspector.pageStyle.getApplied(
-    inspector.selection.nodeFront, {
-    inherited: true,
-    matchedSelectors: true,
-    filter: filter
-  });
+    inspector.selection.nodeFront,
+    {
+      inherited: true,
+      matchedSelectors: true,
+      filter: filter
+    }
+  );
 
   // We may see multiple entries that map to a given rule; filter the
   // duplicates here to match what the UI does.

@@ -1190,7 +1190,7 @@ GetParen(JSLinearString* matched, JS::Value capture, JSSubString* out)
 template <typename CharT>
 static bool
 InterpretDollar(JSLinearString* matched, JSLinearString* string, size_t position, size_t tailPos,
-                AutoValueVector& captures, JSLinearString* replacement,
+                MutableHandle<GCVector<Value>> captures, JSLinearString* replacement,
                 const CharT* replacementBegin, const CharT* currentDollar,
                 const CharT* replacementEnd,
                 JSSubString* out, size_t* skip)
@@ -1265,7 +1265,7 @@ InterpretDollar(JSLinearString* matched, JSLinearString* string, size_t position
 template <typename CharT>
 static bool
 FindReplaceLengthString(JSContext* cx, HandleLinearString matched, HandleLinearString string,
-                        size_t position, size_t tailPos, AutoValueVector& captures,
+                        size_t position, size_t tailPos, MutableHandle<GCVector<Value>> captures,
                         HandleLinearString replacement, size_t firstDollarIndex, size_t* sizep)
 {
     CheckedInt<uint32_t> replen = replacement->length();
@@ -1304,7 +1304,7 @@ FindReplaceLengthString(JSContext* cx, HandleLinearString matched, HandleLinearS
 
 static bool
 FindReplaceLength(JSContext* cx, HandleLinearString matched, HandleLinearString string,
-                  size_t position, size_t tailPos, AutoValueVector& captures,
+                  size_t position, size_t tailPos, MutableHandle<GCVector<Value>> captures,
                   HandleLinearString replacement, size_t firstDollarIndex, size_t* sizep)
 {
     return replacement->hasLatin1Chars()
@@ -1322,7 +1322,7 @@ FindReplaceLength(JSContext* cx, HandleLinearString matched, HandleLinearString 
 template <typename CharT>
 static void
 DoReplace(HandleLinearString matched, HandleLinearString string,
-          size_t position, size_t tailPos, AutoValueVector& captures,
+          size_t position, size_t tailPos, MutableHandle<GCVector<Value>> captures,
           HandleLinearString replacement, size_t firstDollarIndex, StringBuffer &sb)
 {
     JS::AutoCheckCannotGC nogc;
@@ -1378,7 +1378,7 @@ js::RegExpGetSubstitution(JSContext* cx, HandleLinearString matched, HandleLinea
     if (!GetLengthProperty(cx, capturesObj, &nCaptures))
         return false;
 
-    AutoValueVector captures(cx);
+    Rooted<GCVector<Value>> captures(cx, GCVector<Value>(cx));
     if (!captures.reserve(nCaptures))
         return false;
 
@@ -1414,7 +1414,7 @@ js::RegExpGetSubstitution(JSContext* cx, HandleLinearString matched, HandleLinea
 
     // Step 11.
     size_t reserveLength;
-    if (!FindReplaceLength(cx, matched, string, position, tailPos, captures, replacement,
+    if (!FindReplaceLength(cx, matched, string, position, tailPos, &captures, replacement,
                            firstDollarIndex, &reserveLength))
     {
         return false;
@@ -1430,10 +1430,10 @@ js::RegExpGetSubstitution(JSContext* cx, HandleLinearString matched, HandleLinea
         return false;
 
     if (replacement->hasLatin1Chars()) {
-        DoReplace<Latin1Char>(matched, string, position, tailPos, captures,
+        DoReplace<Latin1Char>(matched, string, position, tailPos, &captures,
                               replacement, firstDollarIndex, result);
     } else {
-        DoReplace<char16_t>(matched, string, position, tailPos, captures,
+        DoReplace<char16_t>(matched, string, position, tailPos, &captures,
                             replacement, firstDollarIndex, result);
     }
 
@@ -1443,6 +1443,58 @@ js::RegExpGetSubstitution(JSContext* cx, HandleLinearString matched, HandleLinea
         return false;
 
     rval.setString(resultString);
+    return true;
+}
+
+bool
+js::GetFirstDollarIndex(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 1);
+    RootedString str(cx, args[0].toString());
+
+    int32_t index = -1;
+    if (!GetFirstDollarIndexRaw(cx, str, &index))
+        return false;
+
+    args.rval().setInt32(index);
+    return true;
+}
+
+template <typename TextChar>
+static MOZ_ALWAYS_INLINE int
+GetFirstDollarIndexImpl(const TextChar* text, uint32_t textLen)
+{
+    const TextChar* end = text + textLen;
+    for (const TextChar* c = text; c != end; ++c) {
+        if (*c == '$')
+            return c - text;
+    }
+    return -1;
+}
+
+int32_t
+js::GetFirstDollarIndexRawFlat(JSLinearString* text)
+{
+    uint32_t len = text->length();
+    // Should be handled in different path.
+    MOZ_ASSERT(len != 0);
+
+    JS::AutoCheckCannotGC nogc;
+    if (text->hasLatin1Chars())
+        return GetFirstDollarIndexImpl(text->latin1Chars(nogc), len);
+
+    return  GetFirstDollarIndexImpl(text->twoByteChars(nogc), len);
+}
+
+bool
+js::GetFirstDollarIndexRaw(JSContext* cx, HandleString str, int32_t* index)
+{
+    JSLinearString* text = str->ensureLinear(cx);
+    if (!text)
+        return false;
+
+    *index = GetFirstDollarIndexRawFlat(text);
     return true;
 }
 

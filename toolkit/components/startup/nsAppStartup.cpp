@@ -97,7 +97,7 @@ using namespace mozilla;
 
 uint32_t gRestartMode = 0;
 
-class nsAppExitEvent : public nsRunnable {
+class nsAppExitEvent : public mozilla::Runnable {
 private:
   RefPtr<nsAppStartup> mService;
 

@@ -32,6 +32,7 @@
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/net/ReferrerPolicy.h"
 #include "mozilla/Logging.h"
+#include "mozilla/NotNull.h"
 #include "nsIContentPolicy.h"
 
 #if defined(XP_WIN)
@@ -1392,7 +1393,7 @@ public:
    * @param aResult the result. Out param.
    * @return false on out of memory errors, true otherwise.
    */
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   static bool GetNodeTextContent(nsINode* aNode, bool aDeep,
                                  nsAString& aResult, const mozilla::fallible_t&);
 
@@ -1764,7 +1765,7 @@ public:
    */
   static bool CanAccessNativeAnon();
 
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   static nsresult WrapNative(JSContext *cx, nsISupports *native,
                              const nsIID* aIID, JS::MutableHandle<JS::Value> vp,
                              bool aAllowWrapping = true)
@@ -1773,7 +1774,7 @@ public:
   }
 
   // Same as the WrapNative above, but use this one if aIID is nsISupports' IID.
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   static nsresult WrapNative(JSContext *cx, nsISupports *native,
                              JS::MutableHandle<JS::Value> vp,
                              bool aAllowWrapping = true)
@@ -1781,7 +1782,7 @@ public:
     return WrapNative(cx, native, nullptr, nullptr, vp, aAllowWrapping);
   }
 
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   static nsresult WrapNative(JSContext *cx, nsISupports *native,
                              nsWrapperCache *cache,
                              JS::MutableHandle<JS::Value> vp,
@@ -1814,7 +1815,7 @@ public:
    * @param aString the string to convert the newlines inside [in/out]
    */
   static void PlatformToDOMLineBreaks(nsString &aString);
-  MOZ_WARN_UNUSED_RESULT
+  MOZ_MUST_USE
   static bool PlatformToDOMLineBreaks(nsString &aString,
                                       const mozilla::fallible_t&);
 
@@ -2425,8 +2426,9 @@ public:
    * Get the pixel data from the given source surface and return it as a buffer.
    * The length and stride will be assigned from the surface.
    */
-  static mozilla::UniquePtr<char[]> GetSurfaceData(mozilla::gfx::DataSourceSurface* aSurface,
-                                                   size_t* aLength, int32_t* aStride);
+  static mozilla::UniquePtr<char[]> GetSurfaceData(
+    mozilla::NotNull<mozilla::gfx::DataSourceSurface*> aSurface,
+    size_t* aLength, int32_t* aStride);
 
   // Helpers shared by the implementations of nsContentUtils methods and
   // nsIDOMWindowUtils methods.

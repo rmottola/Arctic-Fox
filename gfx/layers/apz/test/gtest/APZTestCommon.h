@@ -41,8 +41,6 @@ using ::testing::AtMost;
 using ::testing::MockFunction;
 using ::testing::InSequence;
 
-class Task;
-
 template<class T>
 class ScopedGfxPref {
 public:
@@ -68,6 +66,11 @@ private:
     &(gfxPrefs::Set##prefBase), \
     prefValue)
 
+static TimeStamp GetStartupTime() {
+  static TimeStamp sStartupTime = TimeStamp::Now();
+  return sStartupTime;
+}
+
 class MockContentController : public GeckoContentController {
 public:
   MOCK_METHOD1(RequestContentRepaint, void(const FrameMetrics&));
@@ -76,7 +79,10 @@ public:
   MOCK_METHOD3(HandleDoubleTap, void(const CSSPoint&, Modifiers, const ScrollableLayerGuid&));
   MOCK_METHOD3(HandleSingleTap, void(const CSSPoint&, Modifiers, const ScrollableLayerGuid&));
   MOCK_METHOD4(HandleLongTap, void(const CSSPoint&, Modifiers, const ScrollableLayerGuid&, uint64_t));
-  MOCK_METHOD2(PostDelayedTask, void(Task* aTask, int aDelayMs));
+  // Can't use the macros with already_AddRefed :(
+  void PostDelayedTask(already_AddRefed<Runnable> aTask, int aDelayMs) {
+    RefPtr<Runnable> task = aTask;
+  }
   MOCK_METHOD3(NotifyAPZStateChange, void(const ScrollableLayerGuid& aGuid, APZStateChange aChange, int aArg));
   MOCK_METHOD0(NotifyFlushComplete, void());
 };
@@ -84,7 +90,7 @@ public:
 class MockContentControllerDelayed : public MockContentController {
 public:
   MockContentControllerDelayed()
-    : mTime(TimeStamp::Now())
+    : mTime(GetStartupTime())
   {
   }
 
@@ -104,7 +110,8 @@ public:
     mTime = target;
   }
 
-  void PostDelayedTask(Task* aTask, int aDelayMs) {
+  void PostDelayedTask(already_AddRefed<Runnable> aTask, int aDelayMs) {
+    RefPtr<Runnable> task = aTask;
     TimeStamp runAtTime = mTime + TimeDuration::FromMilliseconds(aDelayMs);
     int insIndex = mTaskQueue.Length();
     while (insIndex > 0) {
@@ -113,7 +120,7 @@ public:
       }
       insIndex--;
     }
-    mTaskQueue.InsertElementAt(insIndex, std::make_pair(aTask, runAtTime));
+    mTaskQueue.InsertElementAt(insIndex, std::make_pair(task, runAtTime));
   }
 
   // Run all the tasks in the queue, returning the number of tasks
@@ -122,7 +129,7 @@ public:
   // in the queue after this function is called. Only when the return
   // value is 0 is the queue guaranteed to be empty.
   int RunThroughDelayedTasks() {
-    nsTArray<std::pair<Task*, TimeStamp>> runQueue;
+    nsTArray<std::pair<RefPtr<Runnable>, TimeStamp>> runQueue;
     runQueue.SwapElements(mTaskQueue);
     int numTasks = runQueue.Length();
     for (int i = 0; i < numTasks; i++) {
@@ -131,25 +138,25 @@ public:
 
       // Deleting the task is important in order to release the reference to
       // the callee object.
-      delete runQueue[i].first;
+      runQueue[i].first = nullptr;
     }
     return numTasks;
   }
 
 private:
   void RunNextDelayedTask() {
-    std::pair<Task*, TimeStamp> next = mTaskQueue[0];
+    std::pair<RefPtr<Runnable>, TimeStamp> next = mTaskQueue[0];
     mTaskQueue.RemoveElementAt(0);
     mTime = next.second;
     next.first->Run();
     // Deleting the task is important in order to release the reference to
     // the callee object.
-    delete next.first;
+    next.first = nullptr;
   }
 
   // The following array is sorted by timestamp (tasks are inserted in order by
   // timestamp).
-  nsTArray<std::pair<Task*, TimeStamp>> mTaskQueue;
+  nsTArray<std::pair<RefPtr<Runnable>, TimeStamp>> mTaskQueue;
   TimeStamp mTime;
 };
 
@@ -219,6 +226,11 @@ public:
     return mFrameMetrics;
   }
 
+  ScrollMetadata& GetScrollMetadata() {
+    ReentrantMonitorAutoEnter lock(mMonitor);
+    return mScrollMetadata;
+  }
+
   const FrameMetrics& GetFrameMetrics() const {
     ReentrantMonitorAutoEnter lock(mMonitor);
     return mFrameMetrics;
@@ -258,11 +270,6 @@ public:
     mWaitForMainThread = true;
   }
 
-  static TimeStamp GetStartupTime() {
-    static TimeStamp sStartupTime = TimeStamp::Now();
-    return sStartupTime;
-  }
-
 private:
   bool mWaitForMainThread;
   MockContentControllerDelayed* mcc;
@@ -293,7 +300,7 @@ TestFrameMetrics()
 uint32_t
 MillisecondsSinceStartup(TimeStamp aTime)
 {
-  return (aTime - TestAsyncPanZoomController::GetStartupTime()).ToMilliseconds();
+  return (aTime - GetStartupTime()).ToMilliseconds();
 }
 
 #endif // mozilla_layers_APZTestCommon_h

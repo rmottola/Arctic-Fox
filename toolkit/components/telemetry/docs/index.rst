@@ -19,4 +19,7 @@ Client-side, this consists of:
    common-ping
    environment
    main-ping
+   core-ping
+   deletion-ping
+   uitour-ping
    preferences

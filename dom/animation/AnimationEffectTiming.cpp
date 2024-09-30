@@ -55,7 +55,12 @@ AnimationEffectTiming::SetEndDelay(double aEndDelay)
 void
 AnimationEffectTiming::SetFill(const FillMode& aFill)
 {
-  // TODO: Bug 1244637 - implement AnimationEffectTiming fill
+  if (mTiming.mFill == aFill) {
+    return;
+  }
+  mTiming.mFill = aFill;
+
+  PostSpecifiedTimingUpdated(mEffect);
 }
 
 void
@@ -115,7 +120,13 @@ AnimationEffectTiming::SetDuration(const UnrestrictedDoubleOrString& aDuration,
 void
 AnimationEffectTiming::SetDirection(const PlaybackDirection& aDirection)
 {
-  // TODO: Bug 1244642 - implement AnimationEffectTiming direction
+  if (mTiming.mDirection == aDirection) {
+    return;
+  }
+
+  mTiming.mDirection = aDirection;
+
+  PostSpecifiedTimingUpdated(mEffect);
 }
 
 void

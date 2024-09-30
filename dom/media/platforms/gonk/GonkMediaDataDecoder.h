@@ -40,8 +40,8 @@ public:
   // Shutdown decoder and rejects the init promise.
   virtual nsresult Shutdown();
 
-  // True if sample is queued.
-  bool HasQueuedSample();
+  // How many samples are waiting for processing.
+  size_t NumQueuedSamples();
 
   // Set callback for decoder events, such as requesting more input,
   // returning output, or reporting error.
@@ -53,7 +53,7 @@ public:
 protected:
   GonkDecoderManager()
     : mMutex("GonkDecoderManager")
-    , mLastTime(0)
+    , mLastTime(INT64_MIN)
     , mFlushMonitor("GonkDecoderManager::Flush")
     , mIsFlushing(false)
     , mDecodeCallback(nullptr)
@@ -75,8 +75,9 @@ protected:
   int32_t ProcessQueuedSamples();
 
   void ProcessInput(bool aEndOfStream);
-  void ProcessFlush();
+  virtual void ProcessFlush();
   void ProcessToDo(bool aEndOfStream);
+  virtual void ResetEOS();
 
   RefPtr<MediaByteBuffer> mCodecSpecificData;
 
@@ -122,8 +123,19 @@ protected:
   // forbidden by mDecoder.
   android::sp<android::AMessage> mToDo;
 
-  // Stores the offset of every output that needs to be read from mDecoder.
-  nsTArray<int64_t> mWaitOutput;
+  // Stores sample info for output buffer processing later.
+  struct WaitOutputInfo {
+    WaitOutputInfo(int64_t aOffset, int64_t aTimestamp, bool aEOS)
+      : mOffset(aOffset)
+      , mTimestamp(aTimestamp)
+      , mEOS(aEOS)
+    {}
+    const int64_t mOffset;
+    const int64_t mTimestamp;
+    const bool mEOS;
+  };
+
+  nsTArray<WaitOutputInfo> mWaitOutput;
 
   MediaDataDecoderCallback* mDecodeCallback; // Reports decoder output or error.
 
@@ -195,7 +207,6 @@ public:
   }
 
 private:
-  RefPtr<FlushableTaskQueue> mTaskQueue;
 
   android::sp<GonkDecoderManager> mManager;
 };

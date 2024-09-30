@@ -128,7 +128,7 @@ ShutdownThread(nsCOMPtr<nsIThread>& aThread)
 // TODO: Bug 997110 - Revisit queue/drain logic. Current design assumes that
 //       encoder only generate one output buffer per input frame and won't work
 //       if encoder drops frames or generates multiple output per input.
-class OMXOutputDrain : public nsRunnable
+class OMXOutputDrain : public Runnable
 {
 public:
   void Start() {
@@ -841,7 +841,7 @@ WebrtcOMXH264VideoEncoder::WebrtcOMXH264VideoEncoder()
 int32_t
 WebrtcOMXH264VideoEncoder::InitEncode(const webrtc::VideoCodec* aCodecSettings,
                                       int32_t aNumOfCores,
-                                      uint32_t aMaxPayloadSize)
+                                      size_t aMaxPayloadSize)
 {
   CODEC_LOGD("WebrtcOMXH264VideoEncoder:%p init", this);
 

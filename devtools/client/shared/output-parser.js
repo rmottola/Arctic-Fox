@@ -7,12 +7,12 @@
 "use strict";
 
 const {Cc, Ci, Cu} = require("chrome");
+const {angleUtils} = require("devtools/shared/css-angle");
 const {colorUtils} = require("devtools/shared/css-color");
 const Services = require("Services");
+const EventEmitter = require("devtools/shared/event-emitter");
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
-
-const MAX_ITERATIONS = 100;
 
 const BEZIER_KEYWORDS = ["linear", "ease-in-out", "ease-in", "ease-out",
                          "ease"];
@@ -27,6 +27,21 @@ const COLOR_TAKING_FUNCTIONS = ["linear-gradient",
                                 "repeating-radial-gradient",
                                 "-moz-repeating-radial-gradient",
                                 "drop-shadow"];
+
+// Functions that accept an angle argument.
+const ANGLE_TAKING_FUNCTIONS = ["linear-gradient",
+                                "-moz-linear-gradient",
+                                "repeating-linear-gradient",
+                                "-moz-repeating-linear-gradient",
+                                "rotate",
+                                "rotateX",
+                                "rotateY",
+                                "rotateZ",
+                                "rotate3d",
+                                "skew",
+                                "skewX",
+                                "skewY",
+                                "hue-rotate"];
 
 loader.lazyGetter(this, "DOMUtils", function() {
   return Cc["@mozilla.org/inspector/dom-utils;1"].getService(Ci.inIDOMUtils);
@@ -52,7 +67,9 @@ function OutputParser(document) {
   this.parsed = [];
   this.doc = document;
   this.colorSwatches = new WeakMap();
-  this._onSwatchMouseDown = this._onSwatchMouseDown.bind(this);
+  this.angleSwatches = new WeakMap();
+  this._onColorSwatchMouseDown = this._onColorSwatchMouseDown.bind(this);
+  this._onAngleSwatchMouseDown = this._onAngleSwatchMouseDown.bind(this);
 }
 
 exports.OutputParser = OutputParser;
@@ -71,7 +88,7 @@ OutputParser.prototype = {
    * @return {DocumentFragment}
    *         A document fragment containing color swatches etc.
    */
-  parseCssProperty: function(name, value, options={}) {
+  parseCssProperty: function(name, value, options = {}) {
     options = this._mergeOptions(options);
 
     options.expectCubicBezier =
@@ -81,7 +98,10 @@ OutputParser.prototype = {
       safeCssPropertySupportsType(name, DOMUtils.TYPE_COLOR) ||
       safeCssPropertySupportsType(name, DOMUtils.TYPE_GRADIENT);
 
-    if (this._cssPropertySupportsValue(name, value)) {
+    // The filter property is special in that we want to show the
+    // swatch even if the value is invalid, because this way the user
+    // can easily use the editor to fix it.
+    if (options.expectFilter || this._cssPropertySupportsValue(name, value)) {
       return this._parse(value, options);
     }
     this._appendTextNode(value);
@@ -141,12 +161,11 @@ OutputParser.prototype = {
    * @return {DocumentFragment}
    *         A document fragment.
    */
-  _parse: function(text, options={}) {
+  _parse: function(text, options = {}) {
     text = text.trim();
     this.parsed.length = 0;
 
     let tokenStream = DOMUtils.getCSSLexer(text);
-    let i = 0;
     let parenDepth = 0;
     let outerMostFunctionTakesColor = false;
 
@@ -154,6 +173,10 @@ OutputParser.prototype = {
       return options.supportsColor ||
         (options.expectFilter && parenDepth === 1 &&
          outerMostFunctionTakesColor);
+    };
+
+    let angleOK = function(angle) {
+      return /^-?\d+\.?\d*(deg|rad|grad|turn)$/gi.test(angle);
     };
 
     while (true) {
@@ -165,27 +188,19 @@ OutputParser.prototype = {
         continue;
       }
 
-      // Prevent this loop from slowing down the browser with too
-      // many nodes being appended into output. In practice it is very unlikely
-      // that this will ever happen.
-      i++;
-      if (i > MAX_ITERATIONS) {
-        this._appendTextNode(text.substring(token.startOffset,
-                                            token.endOffset));
-        continue;
-      }
-
       switch (token.tokenType) {
         case "function": {
-          if (COLOR_TAKING_FUNCTIONS.indexOf(token.text) >= 0) {
-            // The function can accept a color argument, and we know
-            // it isn't special in some other way.  So, we let it
-            // through to the ordinary parsing loop so that colors
+          if (COLOR_TAKING_FUNCTIONS.includes(token.text) ||
+              ANGLE_TAKING_FUNCTIONS.includes(token.text)) {
+            // The function can accept a color or an angle argument, and we know
+            // it isn't special in some other way. So, we let it
+            // through to the ordinary parsing loop so that the value
             // can be handled in a single place.
             this._appendTextNode(text.substring(token.startOffset,
                                                 token.endOffset));
             if (parenDepth === 0) {
-              outerMostFunctionTakesColor = true;
+              outerMostFunctionTakesColor = COLOR_TAKING_FUNCTIONS.includes(
+                token.text);
             }
             ++parenDepth;
           } else {
@@ -209,6 +224,8 @@ OutputParser.prototype = {
             this._appendCubicBezier(token.text, options);
           } else if (colorOK() && DOMUtils.isValidCSSColor(token.text)) {
             this._appendColor(token.text, options);
+          } else if (angleOK(token.text)) {
+            this._appendAngle(token.text, options);
           } else {
             this._appendTextNode(text.substring(token.startOffset,
                                                 token.endOffset));
@@ -225,7 +242,14 @@ OutputParser.prototype = {
           }
           break;
         }
-
+        case "dimension":
+          let value = text.substring(token.startOffset, token.endOffset);
+          if (angleOK(value)) {
+            this._appendAngle(value, options);
+          } else {
+            this._appendTextNode(value);
+          }
+          break;
         case "url":
         case "bad_url":
           this._appendURL(text.substring(token.startOffset, token.endOffset),
@@ -235,13 +259,16 @@ OutputParser.prototype = {
         case "symbol":
           if (token.text === "(") {
             ++parenDepth;
-          } else if (token.token === ")") {
+          } else if (token.text === ")") {
             --parenDepth;
+            if (parenDepth === 0) {
+              outerMostFunctionTakesColor = false;
+            }
           }
           // falls through
         default:
-          this._appendTextNode(text.substring(token.startOffset,
-                                              token.endOffset));
+          this._appendTextNode(
+            text.substring(token.startOffset, token.endOffset));
           break;
       }
     }
@@ -266,7 +293,7 @@ OutputParser.prototype = {
    */
   _appendCubicBezier: function(bezier, options) {
     let container = this._createNode("span", {
-       "data-bezier": bezier
+      "data-bezier": bezier
     });
 
     if (options.bezierSwatchClass) {
@@ -279,6 +306,49 @@ OutputParser.prototype = {
     let value = this._createNode("span", {
       class: options.bezierClass
     }, bezier);
+
+    container.appendChild(value);
+    this.parsed.push(container);
+  },
+
+  /**
+   * Append a angle value to the output
+   *
+   * @param {String} angle
+   *        angle to append
+   * @param {Object} options
+   *        Options object. For valid options and default values see
+   *        _mergeOptions()
+   */
+  _appendAngle: function(angle, options) {
+    let angleObj = new angleUtils.CssAngle(angle);
+    let container = this._createNode("span", {
+      "data-angle": angle
+    });
+
+    if (options.angleSwatchClass) {
+      let swatch = this._createNode("span", {
+        class: options.angleSwatchClass
+      });
+      this.angleSwatches.set(swatch, angleObj);
+      swatch.addEventListener("mousedown", this._onAngleSwatchMouseDown, false);
+
+      // Add click listener to stop event propagation when shift key is pressed
+      // in order to prevent the value input to be focused.
+      // Bug 711942 will add a tooltip to edit angle values and we should
+      // be able to move this listener to Tooltip.js when it'll be implemented.
+      swatch.addEventListener("click", function(event) {
+        if (event.shiftKey) {
+          event.stopPropagation();
+        }
+      }, false);
+      EventEmitter.decorate(swatch);
+      container.appendChild(swatch);
+    }
+
+    let value = this._createNode("span", {
+      class: options.angleClass
+    }, angle);
 
     container.appendChild(value);
     this.parsed.push(container);
@@ -329,7 +399,8 @@ OutputParser.prototype = {
           style: "background-color:" + color
         });
         this.colorSwatches.set(swatch, colorObj);
-        swatch.addEventListener("mousedown", this._onSwatchMouseDown, false);
+        swatch.addEventListener("mousedown", this._onColorSwatchMouseDown, false);
+        EventEmitter.decorate(swatch);
         container.appendChild(swatch);
       }
 
@@ -383,7 +454,7 @@ OutputParser.prototype = {
     return container;
   },
 
-  _onSwatchMouseDown: function(event) {
+  _onColorSwatchMouseDown: function(event) {
     // Prevent text selection in the case of shift-click or double-click.
     event.preventDefault();
 
@@ -396,6 +467,23 @@ OutputParser.prototype = {
     let val = color.nextColorUnit();
 
     swatch.nextElementSibling.textContent = val;
+    swatch.emit("unit-change", val);
+  },
+
+  _onAngleSwatchMouseDown: function(event) {
+    // Prevent text selection in the case of shift-click or double-click.
+    event.preventDefault();
+
+    if (!event.shiftKey) {
+      return;
+    }
+
+    let swatch = event.target;
+    let angle = this.angleSwatches.get(swatch);
+    let val = angle.nextAngleUnit();
+
+    swatch.nextElementSibling.textContent = val;
+    swatch.emit("unit-change", val);
   },
 
   /**
@@ -555,6 +643,9 @@ OutputParser.prototype = {
    *           - bezierSwatchClass: ""  // The class to use for bezier swatches.
    *           - bezierClass: ""        // The class to use for the bezier value
    *                                    // that follows the swatch.
+   *           - angleSwatchClass: ""   // The class to use for angle swatches.
+   *           - angleClass: ""         // The class to use for the angle value
+   *                                    // that follows the swatch.
    *           - supportsColor: false   // Does the CSS property support colors?
    *           - urlClass: ""           // The class to be used for url() links.
    *           - baseURI: ""            // A string or nsIURI used to resolve
@@ -574,6 +665,8 @@ OutputParser.prototype = {
       colorClass: "",
       bezierSwatchClass: "",
       bezierClass: "",
+      angleSwatchClass: "",
+      angleClass: "",
       supportsColor: false,
       urlClass: "",
       baseURI: "",
