@@ -781,6 +781,17 @@
         </menupopup>
       </toolbarbutton>
 
+      <toolbaritem id="PanelUI-button"
+                   hidden="true"
+                   class="chromeclass-toolbar-additional"
+                   removable="false">
+        <toolbarbutton id="PanelUI-menu-button"
+                       class="toolbarbutton-1 badged-button"
+                       consumeanchor="PanelUI-button"
+                       label="&brandShortName;"
+                       tooltiptext="&appmenu.tooltip;"/>
+      </toolbaritem>
+
       <hbox id="window-controls" hidden="true" pack="end">
         <toolbarbutton id="minimize-button"
                        tooltiptext="&fullScreenMinimize.tooltip;"
