@@ -43,7 +43,7 @@ pref("@GUAO_PREF@.players.brightcove.net","Mozilla/5.0 (Windows NT 6.1; Trident/
 
 // UA-Sniffing domains below have indicated no interest in supporting Arctic Fox (BOO!)
 pref("@GUAO_PREF@.bing.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) @GK_SLICE@ Firefox/48.0");
-pref("@GUAO_PREF@.github.com","Mozilla/5.0 (@OS_SLICE@ rv:45.1) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/45.1 @AF_SLICE@");
+pref("@GUAO_PREF@.github.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @AF_SLICE@");
 
 // yahoo is nasty too
 pref("@GUAO_PREF@.yahoo.com","Mozilla/5.0 (@OS_SLICE@ rv:52.0) @GK_SLICE@ @GRE_VERSION_SLICE@ Firefox/52.0");
