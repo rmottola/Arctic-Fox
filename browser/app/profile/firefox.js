@@ -1464,6 +1464,10 @@ pref("dom.ipc.reportProcessHangs", false);
 pref("dom.ipc.reportProcessHangs", true);
 #endif
 
+// On desktop, we want the URLs to be included here for ease of debugging,
+// and because (normally) these errors are not persisted anywhere.
+pref("reader.errors.includeURLs", true);
+
 pref("view_source.tab", true);
 
 pref("dom.serviceWorkers.enabled", true);
