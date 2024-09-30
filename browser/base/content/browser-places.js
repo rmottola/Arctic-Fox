@@ -1080,7 +1080,7 @@ var PlacesToolbarHelper = {
 
     // CustomizableUI.addListener is idempotent, so we can safely
     // call this multiple times.
-//FIXME    CustomizableUI.addListener(this);
+    CustomizableUI.addListener(this);
 
     // If the bookmarks toolbar item is:
     // - not in a toolbar, or;
@@ -1297,8 +1297,7 @@ var BookmarkingUI = {
    */
   _currentAreaType: null,
   _shouldUpdateStarState: function() {
-//    return this._currentAreaType == CustomizableUI.TYPE_TOOLBAR;
-    return;
+    return this._currentAreaType == CustomizableUI.TYPE_TOOLBAR;
   },
 
   /**
@@ -1714,7 +1713,6 @@ var BookmarkingUI = {
     // Handle special case when the button is in the panel.
     let isBookmarked = this._itemIds.length > 0;
 
-/* FIXME
     if (this._currentAreaType == CustomizableUI.TYPE_MENU_PANEL) {
       this._showSubview();
       return;
@@ -1725,7 +1723,6 @@ var BookmarkingUI = {
       // Close the overflow panel because the Edit Bookmark panel will appear.
       widget.node.removeAttribute("closemenu");
     }
-*/
 
     // Ignore clicks on the star if we are updating its state.
     if (!this._pendingStmt) {
