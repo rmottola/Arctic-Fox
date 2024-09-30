@@ -1170,7 +1170,7 @@
 
               this.mCurrentTab.lastAccessed = Infinity;
               this.mCurrentTab.removeAttribute("unread");
-              this.selectedTab.lastAccessed = Date.now();
+              oldTab.lastAccessed = Date.now();
 
               let oldFindBar = oldTab._findBar;
               if (oldFindBar &&
@@ -6347,7 +6347,6 @@
       <field name="_overPlayingIcon">false</field>
       <field name="mCorrespondingMenuitem">null</field>
       <field name="closing">false</field>
-      <field name="lastAccessed">0</field>
 
       <method name="_mouseenter">
         <body><![CDATA[
