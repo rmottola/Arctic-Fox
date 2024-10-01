@@ -1609,6 +1609,7 @@ public:
    *                   has not yet been AddRefed.
    * @return false on out of memory, true otherwise.
    */
+  static bool AddScriptRunner(already_AddRefed<nsIRunnable> aRunnable);
   static bool AddScriptRunner(nsIRunnable* aRunnable);
 
   /**

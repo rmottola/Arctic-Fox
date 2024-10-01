@@ -1910,7 +1910,7 @@ PresShell::ResizeReflowIgnoreOverride(nscoord aWidth, nscoord aHeight)
       }
     } else {
       RefPtr<nsRunnableMethod<PresShell> > resizeEvent =
-        NS_NewRunnableMethod(this, &PresShell::FireResizeEvent);
+        NewRunnableMethod(this, &PresShell::FireResizeEvent);
       if (NS_SUCCEEDED(NS_DispatchToCurrentThread(resizeEvent))) {
         mResizeEvent = resizeEvent;
         mDocument->SetNeedStyleFlush();
@@ -6092,7 +6092,7 @@ PresShell::ScheduleApproximateFrameVisibilityUpdateNow()
   }
 
   RefPtr<nsRunnableMethod<PresShell> > ev =
-    NS_NewRunnableMethod(this, &PresShell::UpdateApproximateFrameVisibility);
+    NewRunnableMethod(this, &PresShell::UpdateApproximateFrameVisibility);
   if (NS_SUCCEEDED(NS_DispatchToCurrentThread(ev))) {
     mUpdateApproximateFrameVisibilityEvent = ev;
   }
@@ -6375,7 +6375,7 @@ PresShell::Paint(nsView*        aViewToPaint,
       // since this is happening during a paint and updating the visible
       // regions triggers a recomposite.
       RefPtr<nsRunnableMethod<PresShell>> event =
-        NS_NewRunnableMethod(this, &PresShell::NotifyCompositorOfVisibleRegionsChange);
+        NewRunnableMethod(this, &PresShell::NotifyCompositorOfVisibleRegionsChange);
       if (NS_SUCCEEDED(NS_DispatchToMainThread(event))) {
         mNotifyCompositorOfVisibleRegionsChangeEvent = event;
       }

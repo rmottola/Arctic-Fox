@@ -1588,7 +1588,7 @@ nsPresContext::ThemeChanged()
     sThemeChanged = true;
 
     nsCOMPtr<nsIRunnable> ev =
-      NS_NewRunnableMethod(this, &nsPresContext::ThemeChangedInternal);
+      NewRunnableMethod(this, &nsPresContext::ThemeChangedInternal);
     if (NS_SUCCEEDED(NS_DispatchToCurrentThread(ev))) {
       mPendingThemeChanged = true;
     }
@@ -1647,7 +1647,7 @@ nsPresContext::SysColorChanged()
   if (!mPendingSysColorChanged) {
     sLookAndFeelChanged = true;
     nsCOMPtr<nsIRunnable> ev =
-      NS_NewRunnableMethod(this, &nsPresContext::SysColorChangedInternal);
+      NewRunnableMethod(this, &nsPresContext::SysColorChangedInternal);
     if (NS_SUCCEEDED(NS_DispatchToCurrentThread(ev))) {
       mPendingSysColorChanged = true;
     }
@@ -1682,7 +1682,7 @@ nsPresContext::UIResolutionChanged()
 {
   if (!mPendingUIResolutionChanged) {
     nsCOMPtr<nsIRunnable> ev =
-      NS_NewRunnableMethod(this, &nsPresContext::UIResolutionChangedInternal);
+      NewRunnableMethod(this, &nsPresContext::UIResolutionChangedInternal);
     if (NS_SUCCEEDED(NS_DispatchToCurrentThread(ev))) {
       mPendingUIResolutionChanged = true;
     }
@@ -1933,7 +1933,7 @@ nsPresContext::PostMediaFeatureValuesChangedEvent()
   // need to track whether it's been added).
   if (!mPendingMediaFeatureValuesChanged) {
     nsCOMPtr<nsIRunnable> ev =
-      NS_NewRunnableMethod(this, &nsPresContext::HandleMediaFeatureValuesChangedEvent);
+      NewRunnableMethod(this, &nsPresContext::HandleMediaFeatureValuesChangedEvent);
     if (NS_SUCCEEDED(NS_DispatchToCurrentThread(ev))) {
       mPendingMediaFeatureValuesChanged = true;
       mDocument->SetNeedStyleFlush();
@@ -2125,7 +2125,7 @@ nsPresContext::RebuildCounterStyles()
   mDocument->SetNeedStyleFlush();
   if (!mPostedFlushCounterStyles) {
     nsCOMPtr<nsIRunnable> ev =
-      NS_NewRunnableMethod(this, &nsPresContext::HandleRebuildCounterStyles);
+      NewRunnableMethod(this, &nsPresContext::HandleRebuildCounterStyles);
     if (NS_SUCCEEDED(NS_DispatchToCurrentThread(ev))) {
       mPostedFlushCounterStyles = true;
     }

@@ -2473,9 +2473,7 @@ nsWindow::OnSizeAllocate(GtkAllocation *aAllocation)
     // GtkWindow callers of gtk_widget_size_allocate expect the signal
     // handlers to return sometime in the near future.
     mNeedsDispatchResized = true;
-    nsCOMPtr<nsIRunnable> r =
-        NS_NewRunnableMethod(this, &nsWindow::MaybeDispatchResized);
-    NS_DispatchToCurrentThread(r.forget());
+    NS_DispatchToCurrentThread(NewRunnableMethod(this, &nsWindow::MaybeDispatchResized));
 }
 
 void
@@ -4632,7 +4630,7 @@ nsWindow::GrabPointer(guint32 aTime)
         // popups don't rollup while potentially adjusting the grab for
         // this popup.
         nsCOMPtr<nsIRunnable> event =
-            NS_NewRunnableMethod(this, &nsWindow::CheckForRollupDuringGrab);
+            NewRunnableMethod(this, &nsWindow::CheckForRollupDuringGrab);
         NS_DispatchToCurrentThread(event.forget());
     }
 }

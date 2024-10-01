@@ -1697,8 +1697,9 @@ nsMemoryReporterManager::GetReportsExtended(
                                                      aDMDDumpIdent);
 
   if (aMinimize) {
-    rv = MinimizeMemoryUsage(NS_NewRunnableMethod(
-      this, &nsMemoryReporterManager::StartGettingReports));
+    nsCOMPtr<nsIRunnable> callback =
+      NewRunnableMethod(this, &nsMemoryReporterManager::StartGettingReports);
+    rv = MinimizeMemoryUsage(callback);
   } else {
     rv = StartGettingReports();
   }
