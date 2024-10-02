@@ -1540,12 +1540,6 @@ HTMLFormElement::NamedGetter(const nsAString& aName, bool &aFound)
   return nullptr;
 }
 
-bool
-HTMLFormElement::NameIsEnumerable(const nsAString& aName)
-{
-  return true;
-}
-
 void
 HTMLFormElement::GetSupportedNames(unsigned, nsTArray<nsString >& aRetval)
 {
