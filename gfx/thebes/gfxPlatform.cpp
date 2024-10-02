@@ -23,6 +23,7 @@
 #include "gfxEnv.h"
 #include "gfxTextRun.h"
 #include "gfxConfig.h"
+#include "MediaPrefs.h"
 
 #ifdef XP_WIN
 #include <process.h>
@@ -588,6 +589,7 @@ gfxPlatform::Init()
 
     // Initialize the preferences by creating the singleton.
     gfxPrefs::GetSingleton();
+    MediaPrefs::GetSingleton();
 
     auto fwd = new CrashStatsLogForwarder("GraphicsCriticalError");
     fwd->SetCircularBufferSize(gfxPrefs::GfxLoggingCrashLength());
