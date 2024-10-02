@@ -1003,8 +1003,6 @@ MediaFormatReader::InternalSeek(TrackType aTrack, const InternalSeekTarget& aTar
       TrackTypeToStr(aTrack), aTarget.mTime.ToSeconds());
 
   auto& decoder = GetDecoderData(aTrack);
-  decoder.mTimeThreshold = Some(aTarget);
-  RefPtr<MediaFormatReader> self = this;
   decoder.ResetDemuxer();
   decoder.mTimeThreshold = Some(aTarget);
   RefPtr<MediaFormatReader> self = this;
