@@ -1147,11 +1147,6 @@ static bool IsAutoplayEnabled()
   return Preferences::GetBool("media.autoplay.enabled");
 }
 
-static bool IsScriptedAutoplayEnabled()
-{
-  return Preferences::GetBool("media.autoplay.allowscripted");
-}
-
 static bool UseAudioChannelAPI()
 {
   return Preferences::GetBool("media.useAudioChannelAPI");
@@ -2395,7 +2390,6 @@ HTMLMediaElement::PlayInternal(bool aCallerIsChrome)
   // media.autoplay.enabled=false
   if (!mHasUserInteraction
       && !IsAutoplayEnabled()
-      && !IsScriptedAutoplayEnabled()
       && !EventStateManager::IsHandlingUserInput()
       && !aCallerIsChrome) {
     LOG(LogLevel::Debug, ("%p Blocked attempt to autoplay media.", this));
