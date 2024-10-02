@@ -236,7 +236,7 @@ namespace {
 struct VerifyCertificateContext
 {
   nsCOMPtr<nsIX509Cert> signingCert;
-  ScopedCERTCertList builtChain;
+  UniqueCERTCertList builtChain;
 };
 
 static nsresult
