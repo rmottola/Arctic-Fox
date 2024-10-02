@@ -95,7 +95,7 @@ nsresult AndroidMediaReader::ReadMetadata(MediaInfo* aInfo,
 RefPtr<ShutdownPromise>
 AndroidMediaReader::Shutdown()
 {
-  ResetDecode();
+  ResetDecode(AUDIO_VIDEO);
   if (mPlugin) {
     GetAndroidMediaPluginHost()->DestroyDecoder(mPlugin);
     mPlugin = nullptr;
@@ -105,14 +105,14 @@ AndroidMediaReader::Shutdown()
 }
 
 // Resets all state related to decoding, emptying all buffers etc.
-nsresult AndroidMediaReader::ResetDecode()
+nsresult AndroidMediaReader::ResetDecode(TargetQueues aQueues)
 {
   if (mLastVideoFrame) {
     mLastVideoFrame = nullptr;
   }
   mSeekRequest.DisconnectIfExists();
   mSeekPromise.RejectIfExists(NS_OK, __func__);
-  return MediaDecoderReader::ResetDecode();
+  return MediaDecoderReader::ResetDecode(aQueues);
 }
 
 bool AndroidMediaReader::DecodeVideoFrame(bool &aKeyframeSkip,
