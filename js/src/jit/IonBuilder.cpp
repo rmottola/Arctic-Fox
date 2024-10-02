@@ -6275,7 +6275,7 @@ IonBuilder::createThisScriptedSingleton(JSFunction* target, MDefinition* callee)
         return nullptr;
     if (!templateObject->is<PlainObject>() && !templateObject->is<UnboxedPlainObject>())
         return nullptr;
-    if (templateObject->getProto() != proto)
+    if (templateObject->staticPrototype() != proto)
         return nullptr;
 
     TypeSet::ObjectKey* templateObjectKey = TypeSet::ObjectKey::get(templateObject->group());
@@ -6322,7 +6322,7 @@ IonBuilder::createThisScriptedBaseline(MDefinition* callee)
         return nullptr;
 
     JSObject* proto = checkNurseryObject(&protov.toObject());
-    if (proto != templateObject->getProto())
+    if (proto != templateObject->staticPrototype())
         return nullptr;
 
     TypeSet::ObjectKey* templateObjectKey = TypeSet::ObjectKey::get(templateObject->group());
@@ -8110,7 +8110,7 @@ IonBuilder::testSingletonProperty(JSObject* obj, jsid id)
         if (ObjectHasExtraOwnProperty(compartment, objKey, id))
             return nullptr;
 
-        obj = checkNurseryObject(obj->getProto());
+        obj = checkNurseryObject(obj->staticPrototype());
     }
 
     return nullptr;
