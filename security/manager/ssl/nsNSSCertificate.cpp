@@ -1639,7 +1639,7 @@ nsNSSCertList::DupCertList(const UniqueCERTCertList& certList,
   return newList;
 }
 
-void*
+CERTCertList*
 nsNSSCertList::GetRawCertList()
 {
   // This function should only be called after acquiring a
