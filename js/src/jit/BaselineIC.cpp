@@ -7772,12 +7772,14 @@ TryAttachInstanceOfStub(JSContext* cx, BaselineFrame* frame, ICInstanceOf_Fallba
     // clobber it.
     if (!js::FunctionHasDefaultHasInstance(fun, cx->wellKnownSymbols()))
         return true;
+
     // Refuse to optimize any function whose [[Prototype]] isn't
     // Function.prototype.
-    if (fun->hasLazyPrototype() || fun->hasUncacheableProto())
+    if (!fun->hasStaticPrototype() || fun->hasUncacheableProto())
         return true;
+
     Value funProto = cx->global()->getPrototype(JSProto_Function);
-    if (funProto.isObject() && fun->getProto() != &funProto.toObject())
+    if (funProto.isObject() && fun->staticPrototype() != &funProto.toObject())
         return true;
 
     Shape* shape = fun->lookupPure(cx->names().prototype);
