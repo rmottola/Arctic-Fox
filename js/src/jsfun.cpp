@@ -693,7 +693,6 @@ js::fun_symbolHasInstance(JSContext* cx, unsigned argc, Value* vp)
 /*
  * ES6 (4-25-16) 7.3.19 OrdinaryHasInstance
  */
-
 bool
 js::OrdinaryHasInstance(JSContext* cx, HandleObject objArg, MutableHandleValue v, bool* bp)
 {
@@ -1162,20 +1161,6 @@ js::FunctionToString(JSContext* cx, HandleFunction fun, bool lambdaParen)
         }
     }
     return out.finishString();
-}
-
-bool
-js::FunctionHasDefaultHasInstance(JSFunction* fun, const WellKnownSymbols& symbols)
-{
-    jsid id = SYMBOL_TO_JSID(symbols.hasInstance);
-    Shape* shape = fun->lookupPure(id);
-    if (shape) {
-        if (!shape->hasSlot() || !shape->hasDefaultGetter())
-            return false;
-        const Value hasInstance = fun->as<NativeObject>().getSlot(shape->slot());
-        return IsNativeFunction(hasInstance, js::fun_symbolHasInstance);
-    }
-    return true;
 }
 
 JSString*
