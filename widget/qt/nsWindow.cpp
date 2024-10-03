@@ -950,7 +950,7 @@ InitMouseEvent(WidgetMouseEvent& aMouseEvent, QMouseEvent* aEvent,
                                    aEvent->modifiers() & Qt::AltModifier,
                                    aEvent->modifiers() & Qt::ShiftModifier,
                                    aEvent->modifiers() & Qt::MetaModifier);
-    aMouseEvent.clickCount = aClickCount;
+    aMouseEvent.mClickCount = aClickCount;
 
     switch (aEvent->button()) {
     case Qt::LeftButton:
@@ -1976,7 +1976,7 @@ nsWindow::ProcessMotionEvent()
                                  mMoveEvent.modifiers & Qt::AltModifier,
                                  mMoveEvent.modifiers & Qt::ShiftModifier,
                                  mMoveEvent.modifiers & Qt::MetaModifier);
-        event.clickCount      = 0;
+        event.mClickCount = 0;
 
         DispatchEvent(&event);
         mMoveEvent.needDispatch = false;

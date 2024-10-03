@@ -4551,7 +4551,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
     // blocked.
     clickCount--;
   }
-  geckoEvent.clickCount = clickCount;
+  geckoEvent.mClickCount = clickCount;
 
   if (modifierFlags & NSControlKeyMask)
     geckoEvent.button = WidgetMouseEvent::eRightButton;
@@ -4750,7 +4750,7 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
   geckoEvent.button = WidgetMouseEvent::eRightButton;
-  geckoEvent.clickCount = [theEvent clickCount];
+  geckoEvent.mClickCount = [theEvent clickCount];
 
   mGeckoChild->DispatchInputEvent(&geckoEvent);
   if (!mGeckoChild)
@@ -4773,7 +4773,7 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
   geckoEvent.button = WidgetMouseEvent::eRightButton;
-  geckoEvent.clickCount = [theEvent clickCount];
+  geckoEvent.mClickCount = [theEvent clickCount];
 
   nsAutoRetainCocoaObject kungFuDeathGrip(self);
   mGeckoChild->DispatchInputEvent(&geckoEvent);
@@ -4813,7 +4813,7 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
   geckoEvent.button = WidgetMouseEvent::eMiddleButton;
-  geckoEvent.clickCount = [theEvent clickCount];
+  geckoEvent.mClickCount = [theEvent clickCount];
 
   mGeckoChild->DispatchInputEvent(&geckoEvent);
 

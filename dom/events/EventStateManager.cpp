@@ -605,16 +605,16 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     switch (mouseEvent->button) {
     case WidgetMouseEvent::eLeftButton:
       BeginTrackingDragGesture(aPresContext, mouseEvent, aTargetFrame);
-      mLClickCount = mouseEvent->clickCount;
+      mLClickCount = mouseEvent->mClickCount;
       SetClickCount(mouseEvent, aStatus);
       sNormalLMouseEventInProcess = true;
       break;
     case WidgetMouseEvent::eMiddleButton:
-      mMClickCount = mouseEvent->clickCount;
+      mMClickCount = mouseEvent->mClickCount;
       SetClickCount(mouseEvent, aStatus);
       break;
     case WidgetMouseEvent::eRightButton:
-      mRClickCount = mouseEvent->clickCount;
+      mRClickCount = mouseEvent->mClickCount;
       SetClickCount(mouseEvent, aStatus);
       break;
     }
@@ -1529,7 +1529,7 @@ EventStateManager::FireContextClick()
       // init the event while mCurrentTarget is still good
       WidgetMouseEvent event(true, eContextMenu, targetWidget,
                              WidgetMouseEvent::eReal);
-      event.clickCount = 1;
+      event.mClickCount = 1;
       FillInEventFromGestureDown(&event);
         
       // stop selection tracking, we're in control now
@@ -4569,10 +4569,10 @@ EventStateManager::SetClickCount(WidgetMouseEvent* aEvent,
       if (mLastLeftMouseDownContent == mouseContent ||
           mLastLeftMouseDownContentParent == mouseContent ||
           mLastLeftMouseDownContent == mouseContentParent) {
-        aEvent->clickCount = mLClickCount;
+        aEvent->mClickCount = mLClickCount;
         mLClickCount = 0;
       } else {
-        aEvent->clickCount = 0;
+        aEvent->mClickCount = 0;
       }
       mLastLeftMouseDownContent = nullptr;
       mLastLeftMouseDownContentParent = nullptr;
@@ -4587,10 +4587,10 @@ EventStateManager::SetClickCount(WidgetMouseEvent* aEvent,
       if (mLastMiddleMouseDownContent == mouseContent ||
           mLastMiddleMouseDownContentParent == mouseContent ||
           mLastMiddleMouseDownContent == mouseContentParent) {
-        aEvent->clickCount = mMClickCount;
+        aEvent->mClickCount = mMClickCount;
         mMClickCount = 0;
       } else {
-        aEvent->clickCount = 0;
+        aEvent->mClickCount = 0;
       }
       mLastMiddleMouseDownContent = nullptr;
       mLastMiddleMouseDownContentParent = nullptr;
@@ -4605,10 +4605,10 @@ EventStateManager::SetClickCount(WidgetMouseEvent* aEvent,
       if (mLastRightMouseDownContent == mouseContent ||
           mLastRightMouseDownContentParent == mouseContent ||
           mLastRightMouseDownContent == mouseContentParent) {
-        aEvent->clickCount = mRClickCount;
+        aEvent->mClickCount = mRClickCount;
         mRClickCount = 0;
       } else {
-        aEvent->clickCount = 0;
+        aEvent->mClickCount = 0;
       }
       mLastRightMouseDownContent = nullptr;
       mLastRightMouseDownContentParent = nullptr;
@@ -4632,7 +4632,7 @@ EventStateManager::InitAndDispatchClickEvent(WidgetMouseEvent* aEvent,
                          aEvent->mWidget, WidgetMouseEvent::eReal);
 
   event.mRefPoint = aEvent->mRefPoint;
-  event.clickCount = aEvent->clickCount;
+  event.mClickCount = aEvent->mClickCount;
   event.mModifiers = aEvent->mModifiers;
   event.buttons = aEvent->buttons;
   event.mTime = aEvent->mTime;
@@ -4653,7 +4653,7 @@ EventStateManager::CheckForAndDispatchClick(WidgetMouseEvent* aEvent,
 
   //If mouse is still over same element, clickcount will be > 1.
   //If it has moved it will be zero, so no click.
-  if (0 != aEvent->clickCount) {
+  if (aEvent->mClickCount) {
     //Check that the window isn't disabled before firing a click
     //(see bug 366544).
     if (aEvent->mWidget && !aEvent->mWidget->IsEnabled()) {
@@ -4687,7 +4687,7 @@ EventStateManager::CheckForAndDispatchClick(WidgetMouseEvent* aEvent,
                                       presShell, mouseContent, currentTarget,
                                       notDispatchToContents);
 
-      if (NS_SUCCEEDED(ret) && aEvent->clickCount == 2 &&
+      if (NS_SUCCEEDED(ret) && aEvent->mClickCount == 2 &&
           mouseContent && mouseContent->IsInComposedDoc()) {
         // fire double click
         ret = InitAndDispatchClickEvent(aEvent, aStatus, eMouseDoubleClick,

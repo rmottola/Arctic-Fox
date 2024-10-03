@@ -3299,7 +3299,7 @@ nsFrameSelection::SetDelayedCaretData(WidgetMouseEvent* aMouseEvent)
   if (aMouseEvent) {
     mDelayedMouseEventValid = true;
     mDelayedMouseEventIsShift = aMouseEvent->IsShift();
-    mDelayedMouseEventClickCount = aMouseEvent->clickCount;
+    mDelayedMouseEventClickCount = aMouseEvent->mClickCount;
   } else {
     mDelayedMouseEventValid = false;
   }
