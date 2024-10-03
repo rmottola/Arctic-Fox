@@ -1269,7 +1269,7 @@ NativeKey::InitKeyEvent(WidgetKeyboardEvent& aKeyEvent,
   }
   aKeyEvent.mCodeNameIndex = mCodeNameIndex;
   MOZ_ASSERT(mCodeNameIndex != CODE_NAME_INDEX_USE_STRING);
-  aKeyEvent.location = GetKeyLocation();
+  aKeyEvent.mLocation = GetKeyLocation();
   aModKeyState.InitInputEvent(aKeyEvent);
 
   NPEvent pluginEvent;
