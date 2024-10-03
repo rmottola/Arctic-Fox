@@ -1595,10 +1595,11 @@ nsPresContext::ThemeChanged()
   }
 }
 
-static void
+static bool
 NotifyThemeChanged(TabParent* aTabParent, void* aArg)
 {
   aTabParent->ThemeChanged();
+  return false;
 }
 
 void
@@ -1951,11 +1952,12 @@ nsPresContext::HandleMediaFeatureValuesChangedEvent()
   }
 }
 
-static void
+static bool
 NotifyTabSizeModeChanged(TabParent* aTab, void* aArg)
 {
   nsSizeMode* sizeMode = static_cast<nsSizeMode*>(aArg);
   aTab->SizeModeChanged(*sizeMode);
+  return false;
 }
 
 void
