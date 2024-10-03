@@ -3823,9 +3823,7 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
             getchannel.addstmt(StmtReturn(p.channelVar()))
 
         cloneprotocol.addstmts([
-            _fatalError('Clone() for ' +
-                        p.name +
-                        ' has not yet been implemented'),
+            _fatalError('Clone() has not yet been implemented'),
             StmtReturn(ExprLiteral.NULL)
         ])
 
