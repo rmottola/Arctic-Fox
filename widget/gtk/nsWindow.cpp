@@ -2547,7 +2547,7 @@ nsWindow::OnLeaveNotifyEvent(GdkEventCrossing *aEvent)
     event.mRefPoint = GdkEventCoordsToDevicePixels(aEvent->x, aEvent->y);
     event.AssignEventTime(GetWidgetEventTime(aEvent->time));
 
-    event.exit = is_top_level_mouse_exit(mGdkWindow, aEvent)
+    event.mExitFrom = is_top_level_mouse_exit(mGdkWindow, aEvent)
         ? WidgetMouseEvent::eTopLevel : WidgetMouseEvent::eChild;
 
     LOG(("OnLeaveNotify: %p\n", (void *)this));
