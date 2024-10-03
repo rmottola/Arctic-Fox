@@ -13,6 +13,9 @@
 #include "mozilla/WindowsVersion.h"
 
 #include "nsAlgorithm.h"
+#ifdef MOZ_CRASHREPORTER
+#include "nsExceptionHandler.h"
+#endif
 #include "nsGkAtoms.h"
 #include "nsIDOMKeyEvent.h"
 #include "nsIIdleServiceInternal.h"
@@ -1091,7 +1094,9 @@ NativeKey::GetScanCodeWithExtendedFlag() const
   // MapVirtualKeyEx() has been improved for supporting extended keys since
   // Vista.  When we call it for mapping a scancode of an extended key and
   // a virtual keycode, we need to add 0xE000 to the scancode.
-  if (!mIsExtended) {
+  // On Win XP and Win Server 2003, this doesn't support. On them, we have
+  // no way to get virtual keycodes from scancode of extended keys.
+  if (!mIsExtended || !IsVistaOrLater()) {
     return mScanCode;
   }
   return (0xE000 | mScanCode);
@@ -1167,7 +1172,12 @@ bool
 NativeKey::CanComputeVirtualKeyCodeFromScanCode() const
 {
   // Vista or later supports ScanCodeEx.
-  return true;
+  if (IsVistaOrLater()) {
+    return true;
+  }
+  // Otherwise, MapVirtualKeyEx() can compute virtual keycode only with
+  // non-extended key.
+  return !mIsExtended;
 }
 
 uint8_t
@@ -1193,7 +1203,8 @@ NativeKey::ComputeScanCodeExFromVirtualKeyCode(UINT aVirtualKeyCode) const
 {
   return static_cast<uint16_t>(
            ::MapVirtualKeyEx(aVirtualKeyCode,
-                             MAPVK_VK_TO_VSC_EX,
+                             IsVistaOrLater() ? MAPVK_VK_TO_VSC_EX :
+                                                MAPVK_VK_TO_VSC,
                              mKeyboardLayout));
 }
 
@@ -1850,6 +1861,61 @@ NativeKey::NeedsToHandleWithoutFollowingCharMessages() const
   return mIsPrintableKey;
 }
 
+#ifdef MOZ_CRASHREPORTER
+
+static nsCString
+GetResultOfInSendMessageEx()
+{
+  DWORD ret = ::InSendMessageEx(nullptr);
+  if (!ret) {
+    return NS_LITERAL_CSTRING("ISMEX_NOSEND");
+  }
+  nsAutoCString result;
+  if (ret & ISMEX_CALLBACK) {
+    result = "ISMEX_CALLBACK";
+  }
+  if (ret & ISMEX_NOTIFY) {
+    if (!result.IsEmpty()) {
+      result += " | ";
+    }
+    result += "ISMEX_NOTIFY";
+  }
+  if (ret & ISMEX_REPLIED) {
+    if (!result.IsEmpty()) {
+      result += " | ";
+    }
+    result += "ISMEX_REPLIED";
+  }
+  if (ret & ISMEX_SEND) {
+    if (!result.IsEmpty()) {
+      result += " | ";
+    }
+    result += "ISMEX_SEND";
+  }
+  return result;
+}
+
+static const char*
+GetMessageName(UINT aMessage)
+{
+  switch (aMessage) {
+    case WM_KEYDOWN:     return "WM_KEYDOWN";
+    case WM_SYSKEYDOWN:  return "WM_SYSKEYDOWN";
+    case WM_KEYUP:       return "WM_KEYUP";
+    case WM_SYSKEYUP:    return "WM_SYSKEYUP";
+    case WM_CHAR:        return "WM_CHAR";
+    case WM_DEADCHAR:    return "WM_DEADCHAR";
+    case WM_SYSCHAR:     return "WM_SYSCHAR";
+    case WM_SYSDEADCHAR: return "WM_SYSDEADCHAR";
+    case WM_UNICHAR:     return "WM_UNICHAR";
+    case WM_QUIT:        return "WM_QUIT";
+    case WM_NULL:        return "WM_NULL";
+    default:             return "Unknown";
+  }
+}
+
+#endif // #ifdef MOZ_CRASHREPORTER
+
 bool
 NativeKey::MayBeSameCharMessage(const MSG& aCharMsg1,
                                 const MSG& aCharMsg2) const
@@ -1945,6 +2011,45 @@ NativeKey::GetFollowingCharMessage(MSG& aCharMsg, bool aRemove) const
     }
 
     if (doCrash) {
+#ifdef MOZ_CRASHREPORTER
+      nsPrintfCString info("\nPeekMessage() failed to remove char message! "
+                           "\nHandling message: %s (0x%08X), wParam: 0x%08X, "
+                           "lParam: 0x%08X, hwnd=0x%p, InSendMessageEx()=%s, \n"
+                           "Found message: %s (0x%08X), wParam: 0x%08X, "
+                           "lParam: 0x%08X, hwnd=0x%p, "
+                           "\nWM_NULL has been removed: %d, "
+                           "\nNext key message in all windows: %s (0x%08X), "
+                           "wParam: 0x%08X, lParam: 0x%08X, hwnd=0x%p, "
+                           "time=%d, ",
+                           GetMessageName(mMsg.message),
+                           mMsg.message, mMsg.wParam, mMsg.lParam,
+                           nextKeyMsg.hwnd,
+                           GetResultOfInSendMessageEx().get(),
+                           GetMessageName(nextKeyMsg.message),
+                           nextKeyMsg.message, nextKeyMsg.wParam,
+                           nextKeyMsg.lParam, nextKeyMsg.hwnd, i,
+                           GetMessageName(nextKeyMsgInAllWindows.message),
+                           nextKeyMsgInAllWindows.message,
+                           nextKeyMsgInAllWindows.wParam,
+                           nextKeyMsgInAllWindows.lParam,
+                           nextKeyMsgInAllWindows.hwnd,
+                           nextKeyMsgInAllWindows.time);
+      CrashReporter::AppendAppNotesToCrashReport(info);
+      MSG nextMsg;
+      if (WinUtils::PeekMessage(&nextMsg, 0, 0, 0,
+                                PM_NOREMOVE | PM_NOYIELD)) {
+        nsPrintfCString info("\nNext message in all windows: %s (0x%08X), "
+                             "wParam: 0x%08X, lParam: 0x%08X, hwnd=0x%p, "
+                             "time=%d",
+                             GetMessageName(nextMsg.message),
+                             nextMsg.message, nextMsg.wParam, nextMsg.lParam,
+                             nextMsg.hwnd, nextMsg.time);
+        CrashReporter::AppendAppNotesToCrashReport(info);
+      } else {
+        CrashReporter::AppendAppNotesToCrashReport(
+          NS_LITERAL_CSTRING("\nThere is no message in any window"));
+      }
+#endif // #ifdef MOZ_CRASHREPORTER
       MOZ_CRASH("We lost the following char message");
     }
 
@@ -1964,12 +2069,79 @@ NativeKey::GetFollowingCharMessage(MSG& aCharMsg, bool aRemove) const
     //       in lParam may be changed from 0 to something.  The changed value
     //       is different from the scan code of handling keydown message.
     if (!MayBeSameCharMessage(removedMsg, nextKeyMsg)) {
+#ifdef MOZ_CRASHREPORTER
+      nsPrintfCString info("\nPeekMessage() removed unexpcted char message! "
+                           "\nHandling message: %s (0x%08X), wParam: 0x%08X, "
+                           "lParam: 0x%08X, hwnd=0x%p, InSendMessageEx()=%s, "
+                           "\nFound message: %s (0x%08X), wParam: 0x%08X, "
+                           "lParam: 0x%08X, hwnd=0x%p, "
+                           "\nRemoved message: %s (0x%08X), wParam: 0x%08X, "
+                           "lParam: 0x%08X, hwnd=0x%p, ",
+                           GetMessageName(mMsg.message),
+                           mMsg.message, mMsg.wParam, mMsg.lParam, mMsg.hwnd,
+                           GetResultOfInSendMessageEx().get(),
+                           GetMessageName(nextKeyMsg.message),
+                           nextKeyMsg.message, nextKeyMsg.wParam,
+                           nextKeyMsg.lParam, nextKeyMsg.hwnd,
+                           GetMessageName(removedMsg.message),
+                           removedMsg.message, removedMsg.wParam,
+                           removedMsg.lParam, removedMsg.hwnd);
+      CrashReporter::AppendAppNotesToCrashReport(info);
+      // What's the next key message?
+      MSG nextKeyMsgAfter;
+      if (WinUtils::PeekMessage(&nextKeyMsgAfter, mMsg.hwnd,
+                                WM_KEYFIRST, WM_KEYLAST,
+                                PM_NOREMOVE | PM_NOYIELD)) {
+        nsPrintfCString info("\nNext key message after unexpected char message "
+                             "removed: %s (0x%08X), wParam: 0x%08X, "
+                             "lParam: 0x%08X, hwnd=0x%p, ",
+                             GetMessageName(nextKeyMsgAfter.message),
+                             nextKeyMsgAfter.message, nextKeyMsgAfter.wParam,
+                             nextKeyMsgAfter.lParam, nextKeyMsgAfter.hwnd);
+        CrashReporter::AppendAppNotesToCrashReport(info);
+      } else {
+        CrashReporter::AppendAppNotesToCrashReport(
+          NS_LITERAL_CSTRING("\nThere is no key message after unexpected char "
+                             "message removed, "));
+      }
+      // Another window has a key message?
+      MSG nextKeyMsgInAllWindows;
+      if (WinUtils::PeekMessage(&nextKeyMsgInAllWindows, 0,
+                                WM_KEYFIRST, WM_KEYLAST,
+                                PM_NOREMOVE | PM_NOYIELD)) {
+        nsPrintfCString info("\nNext key message in all windows: %s (0x%08X), "
+                             "wParam: 0x%08X, lParam: 0x%08X, hwnd=0x%p.",
+                             GetMessageName(nextKeyMsgInAllWindows.message),
+                             nextKeyMsgInAllWindows.message,
+                             nextKeyMsgInAllWindows.wParam,
+                             nextKeyMsgInAllWindows.lParam,
+                             nextKeyMsgInAllWindows.hwnd);
+        CrashReporter::AppendAppNotesToCrashReport(info);
+      } else {
+        CrashReporter::AppendAppNotesToCrashReport(
+          NS_LITERAL_CSTRING("\nThere is no key message in any windows."));
+      }
+#endif // #ifdef MOZ_CRASHREPORTER
       MOZ_CRASH("PeekMessage() removed unexpected message");
     }
 
     aCharMsg = removedMsg;
     return true;
   }
+#ifdef MOZ_CRASHREPORTER
+  nsPrintfCString info("\nWe lost following char message! "
+                       "\nHandling message: %s (0x%08X), wParam: 0x%08X, "
+                       "lParam: 0x%08X, InSendMessageEx()=%s, \n"
+                       "Found message: %s (0x%08X), wParam: 0x%08X, "
+                       "lParam: 0x%08X, removed a lot of WM_NULL",
+                       GetMessageName(mMsg.message),
+                       mMsg.message, mMsg.wParam, mMsg.lParam,
+                       GetResultOfInSendMessageEx().get(),
+                       GetMessageName(nextKeyMsg.message),
+                       nextKeyMsg.message, nextKeyMsg.wParam,
+                       nextKeyMsg.lParam);
+  CrashReporter::AppendAppNotesToCrashReport(info);
+#endif // #ifdef MOZ_CRASHREPORTER
   MOZ_CRASH("We lost the following char message");
   return false;
 }
@@ -2424,6 +2596,17 @@ KeyboardLayout::InitNativeKey(NativeKey& aNativeKey,
 
     int32_t activeDeadKeyIndex = GetKeyIndex(mActiveDeadKey);
     if (activeDeadKeyIndex < 0 || activeDeadKeyIndex >= NS_NUM_OF_KEYS) {
+#if defined(DEBUG) || defined(MOZ_CRASHREPORTER)
+      nsPrintfCString warning("The virtual key index (%d) of mActiveDeadKey "
+                              "(0x%02X) is not a printable key (virtualKey="
+                              "0x%02X)",
+                              activeDeadKeyIndex, mActiveDeadKey, virtualKey);
+      NS_WARNING(warning.get());
+#ifdef MOZ_CRASHREPORTER
+      CrashReporter::AppendAppNotesToCrashReport(
+                       NS_LITERAL_CSTRING("\n") + warning);
+#endif // #ifdef MOZ_CRASHREPORTER
+#endif // #if defined(DEBUG) || defined(MOZ_CRASHREPORTER)
       MOZ_CRASH("Trying to reference out of range of mVirtualKeys");
     }
     UniCharsAndModifiers prevDeadChars =
@@ -2583,7 +2766,8 @@ KeyboardLayout::LoadLayout(HKL aLayout)
 
   if (MOZ_LOG_TEST(sKeyboardLayoutLogger, LogLevel::Debug)) {
     static const UINT kExtendedScanCode[] = { 0x0000, 0xE000 };
-    static const UINT kMapType = MAPVK_VSC_TO_VK_EX;
+    static const UINT kMapType =
+      IsVistaOrLater() ? MAPVK_VSC_TO_VK_EX : MAPVK_VSC_TO_VK;
     MOZ_LOG(sKeyboardLayoutLogger, LogLevel::Debug,
            ("Logging virtual keycode values for scancode (0x%p)...",
             mKeyboardLayout));
@@ -2594,6 +2778,11 @@ KeyboardLayout::LoadLayout(HKL aLayout)
           ::MapVirtualKeyEx(scanCode, kMapType, mKeyboardLayout);
         MOZ_LOG(sKeyboardLayoutLogger, LogLevel::Debug,
                ("0x%04X, %s", scanCode, kVirtualKeyName[virtualKeyCode]));
+      }
+      // XP and Server 2003 don't support 0xE0 prefix of the scancode.
+      // Therefore, we don't need to continue on them.
+      if (!IsVistaOrLater()) {
+        break;
       }
     }
   }
