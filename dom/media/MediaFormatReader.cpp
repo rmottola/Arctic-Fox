@@ -651,7 +651,6 @@ MediaFormatReader::NotifyNewOutput(TrackType aTrack, MediaData* aSample)
   }
   decoder.mOutput.AppendElement(aSample);
   decoder.mNumSamplesOutput++;
-  decoder.mNumSamplesOutputTotal++;
   ScheduleUpdate(aTrack);
 }
 
@@ -1119,12 +1118,21 @@ MediaFormatReader::Update(TrackType aTrack)
            target.Time().ToSeconds(),
            output->mKeyframe);
       decoder.mOutput.RemoveElementAt(0);
+      decoder.mSizeOfQueue -= 1;
     }
   }
 
   if (decoder.HasPromise()) {
     needOutput = true;
     if (decoder.mOutput.Length()) {
+      RefPtr<MediaData> output = decoder.mOutput[0];
+      decoder.mOutput.RemoveElementAt(0);
+      decoder.mSizeOfQueue -= 1;
+      decoder.mLastSampleTime =
+        Some(TimeInterval(TimeUnit::FromMicroseconds(output->mTime),
+                          TimeUnit::FromMicroseconds(output->GetEndTime())));
+      decoder.mNumSamplesOutputTotal++;
+      ReturnOutput(output, aTrack);
       // We have a decoded sample ready to be returned.
       if (aTrack == TrackType::kVideoTrack) {
         uint64_t delta =
@@ -1135,13 +1143,6 @@ MediaFormatReader::Update(TrackType aTrack)
         mVideo.mIsHardwareAccelerated =
           mVideo.mDecoder && mVideo.mDecoder->IsHardwareAccelerated(error);
       }
-      RefPtr<MediaData> output = decoder.mOutput[0];
-      decoder.mOutput.RemoveElementAt(0);
-      decoder.mSizeOfQueue -= 1;
-      decoder.mLastSampleTime =
-        Some(TimeInterval(TimeUnit::FromMicroseconds(output->mTime),
-                          TimeUnit::FromMicroseconds(output->GetEndTime())));
-      ReturnOutput(output, aTrack);
     } else if (decoder.mError) {
       LOG("Rejecting %s promise: DECODE_ERROR", TrackTypeToStr(aTrack));
       decoder.RejectPromise(DECODE_ERROR, __func__);
