@@ -540,6 +540,9 @@ MediaFormatReader::OnDemuxFailed(TrackType aTrack, DemuxerFailureReason aFailure
   decoder.mDemuxRequest.Complete();
   switch (aFailure) {
     case DemuxerFailureReason::END_OF_STREAM:
+      if (!decoder.mWaitingForData) {
+        decoder.mNeedDraining = true;
+      }
       NotifyEndOfStream(aTrack);
       break;
     case DemuxerFailureReason::DEMUXER_ERROR:
@@ -551,7 +554,7 @@ MediaFormatReader::OnDemuxFailed(TrackType aTrack, DemuxerFailureReason aFailure
       }
       NotifyWaitingForData(aTrack);
       break;
-    case DemuxerFailureReason::CANCELED:
+    case DemuxerFailureReason::CANCELED: MOZ_FALLTHROUGH;
     case DemuxerFailureReason::SHUTDOWN:
       if (decoder.HasPromise()) {
         decoder.RejectPromise(CANCELED, __func__);
@@ -707,7 +710,6 @@ MediaFormatReader::NotifyEndOfStream(TrackType aTrack)
   MOZ_ASSERT(OnTaskQueue());
   auto& decoder = GetDecoderData(aTrack);
   decoder.mDemuxEOS = true;
-  decoder.mNeedDraining = true;
   ScheduleUpdate(aTrack);
 }
 
@@ -1024,7 +1026,7 @@ MediaFormatReader::InternalSeek(TrackType aTrack, const InternalSeekTarget& aTar
                           decoder.mTimeThreshold.reset();
                           self->NotifyEndOfStream(aTrack);
                           break;
-                        case DemuxerFailureReason::CANCELED:
+                        case DemuxerFailureReason::CANCELED: MOZ_FALLTHROUGH;
                         case DemuxerFailureReason::SHUTDOWN:
                           decoder.mTimeThreshold.reset();
                           break;
@@ -1444,16 +1446,13 @@ MediaFormatReader::OnVideoSkipFailed(MediaTrackDemuxer::SkipFailureHolder aFailu
 
   MOZ_ASSERT(mVideo.HasPromise());
   switch (aFailure.mFailure) {
-    case DemuxerFailureReason::END_OF_STREAM:
-      VideoSkipReset(aFailure.mSkipped);
-      NotifyEndOfStream(TrackType::kVideoTrack);
-      break;
+    case DemuxerFailureReason::END_OF_STREAM: MOZ_FALLTHROUGH;
     case DemuxerFailureReason::WAITING_FOR_DATA:
       // We can't complete the skip operation, will just service a video frame
       // normally.
       NotifyDecodingRequested(TrackInfo::kVideoTrack);
       break;
-    case DemuxerFailureReason::CANCELED:
+    case DemuxerFailureReason::CANCELED: MOZ_FALLTHROUGH;
     case DemuxerFailureReason::SHUTDOWN:
       if (mVideo.HasPromise()) {
         mVideo.RejectPromise(CANCELED, __func__);
