@@ -16,8 +16,6 @@
 #include "base/lock.h"
 #include "base/message_pump.h"
 #include "base/observer_list.h"
-#include "base/task.h"
-#include "base/timer.h"
 
 #if defined(OS_WIN)
 // We need this to declare base::MessagePumpWin::Dispatcher, which we should
@@ -28,6 +26,7 @@
 #endif
 
 #include "nsAutoPtr.h"
+#include "nsThreadUtils.h"
 
 class nsIThread;
 

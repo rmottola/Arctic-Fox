@@ -14,6 +14,7 @@
 
 #include "base/buffer.h"
 #include "base/message_loop.h"
+#include "base/task.h"
 #include "nsISupportsImpl.h"
 
 namespace IPC {
