@@ -89,7 +89,7 @@ PDMFactory::~PDMFactory()
 
 already_AddRefed<MediaDataDecoder>
 PDMFactory::CreateDecoder(const TrackInfo& aConfig,
-                          FlushableTaskQueue* aTaskQueue,
+                          TaskQueue* aTaskQueue,
                           MediaDataDecoderCallback* aCallback,
                           DecoderDoctorDiagnostics* aDiagnostics,
                           layers::LayersBackend aLayersBackend,
@@ -144,7 +144,7 @@ PDMFactory::CreateDecoder(const TrackInfo& aConfig,
 already_AddRefed<MediaDataDecoder>
 PDMFactory::CreateDecoderWithPDM(PlatformDecoderModule* aPDM,
                                  const TrackInfo& aConfig,
-                                 FlushableTaskQueue* aTaskQueue,
+                                 TaskQueue* aTaskQueue,
                                  MediaDataDecoderCallback* aCallback,
                                  DecoderDoctorDiagnostics* aDiagnostics,
                                  layers::LayersBackend aLayersBackend,

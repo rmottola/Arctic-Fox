@@ -79,7 +79,7 @@ already_AddRefed<MediaDataDecoder>
 WMFDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
                                      layers::LayersBackend aLayersBackend,
                                      layers::ImageContainer* aImageContainer,
-                                     FlushableTaskQueue* aVideoTaskQueue,
+                                     TaskQueue* aTaskQueue,
                                      MediaDataDecoderCallback* aCallback,
                                      DecoderDoctorDiagnostics* aDiagnostics)
 {
@@ -94,14 +94,14 @@ WMFDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
   }
 
   RefPtr<MediaDataDecoder> decoder =
-    new WMFMediaDataDecoder(manager.forget(), aVideoTaskQueue, aCallback);
+    new WMFMediaDataDecoder(manager.forget(), aTaskQueue, aCallback);
 
   return decoder.forget();
 }
 
 already_AddRefed<MediaDataDecoder>
 WMFDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
-                                     FlushableTaskQueue* aAudioTaskQueue,
+                                     TaskQueue* aTaskQueue,
                                      MediaDataDecoderCallback* aCallback,
                                      DecoderDoctorDiagnostics* aDiagnostics)
 {
@@ -112,7 +112,7 @@ WMFDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
   }
 
   RefPtr<MediaDataDecoder> decoder =
-    new WMFMediaDataDecoder(manager.forget(), aAudioTaskQueue, aCallback);
+    new WMFMediaDataDecoder(manager.forget(), aTaskQueue, aCallback);
   return decoder.forget();
 }
 

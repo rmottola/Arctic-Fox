@@ -48,7 +48,7 @@ already_AddRefed<MediaDataDecoder>
 GMPDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
                                      layers::LayersBackend aLayersBackend,
                                      layers::ImageContainer* aImageContainer,
-                                     FlushableTaskQueue* aVideoTaskQueue,
+                                     TaskQueue* aTaskQueue,
                                      MediaDataDecoderCallback* aCallback,
                                      DecoderDoctorDiagnostics* aDiagnostics)
 {
@@ -67,14 +67,14 @@ GMPDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
   wrapper->SetProxyTarget(new GMPVideoDecoder(aConfig,
                                               aLayersBackend,
                                               aImageContainer,
-                                              aVideoTaskQueue,
+                                              aTaskQueue,
                                               wrapper->Callback()));
   return wrapper.forget();
 }
 
 already_AddRefed<MediaDataDecoder>
 GMPDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
-                                     FlushableTaskQueue* aAudioTaskQueue,
+                                     TaskQueue* aTaskQueue,
                                      MediaDataDecoderCallback* aCallback,
                                      DecoderDoctorDiagnostics* aDiagnostics)
 {
@@ -91,7 +91,7 @@ GMPDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
 
   RefPtr<MediaDataDecoderProxy> wrapper = CreateDecoderWrapper(aCallback);
   wrapper->SetProxyTarget(new GMPAudioDecoder(aConfig,
-                                              aAudioTaskQueue,
+                                              aTaskQueue,
                                               wrapper->Callback()));
   return wrapper.forget();
 }
