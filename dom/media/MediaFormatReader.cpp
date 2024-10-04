@@ -652,7 +652,6 @@ MediaFormatReader::NotifyNewOutput(TrackType aTrack, MediaData* aSample)
   decoder.mOutput.AppendElement(aSample);
   decoder.mNumSamplesOutput++;
   decoder.mNumSamplesOutputTotal++;
-  decoder.mNumSamplesOutputTotalSinceTelemetry++;
   ScheduleUpdate(aTrack);
 }
 
