@@ -18,7 +18,7 @@
 namespace mozilla {
 
 WMFMediaDataDecoder::WMFMediaDataDecoder(MFTManager* aMFTManager,
-                                         FlushableTaskQueue* aTaskQueue,
+                                         TaskQueue* aTaskQueue,
                                          MediaDataDecoderCallback* aCallback)
   : mTaskQueue(aTaskQueue)
   , mCallback(aCallback)
