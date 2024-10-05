@@ -174,9 +174,9 @@ MediaFormatReader::Init()
   InitLayersBackendType();
 
   mAudio.mTaskQueue =
-    new FlushableTaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
+    new TaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
   mVideo.mTaskQueue =
-    new FlushableTaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
+    new TaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
 
   return NS_OK;
 }

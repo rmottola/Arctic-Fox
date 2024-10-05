@@ -220,7 +220,7 @@ static const uint8_t sTestH264ExtraData[] = {
 static already_AddRefed<MediaDataDecoder>
 CreateTestH264Decoder(layers::LayersBackend aBackend,
                       VideoInfo& aConfig,
-                      FlushableTaskQueue* aTaskQueue)
+                      TaskQueue* aTaskQueue)
 {
   aConfig.mMimeType = "video/avc";
   aConfig.mId = 1;
@@ -253,8 +253,8 @@ MP4Decoder::IsVideoAccelerated(layers::LayersBackend aBackend, nsIGlobalObject* 
     return nullptr;
   }
 
-  RefPtr<FlushableTaskQueue> taskQueue =
-    new FlushableTaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
+  RefPtr<TaskQueue> taskQueue =
+    new TaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
   VideoInfo config;
   RefPtr<MediaDataDecoder> decoder(CreateTestH264Decoder(aBackend, config, taskQueue));
   if (!decoder) {
