@@ -1976,13 +1976,6 @@ public:
   }
 
   // Implement MediaStreamListener
-  void NotifyQueuedTrackChanges(MediaStreamGraph* graph, TrackID tid,
-                                StreamTime offset,
-                                uint32_t events,
-                                const MediaSegment& queued_media,
-                                MediaStream* input_stream,
-                                TrackID input_tid) override {}
-
   void NotifyPull(MediaStreamGraph* graph, StreamTime desired_time) override
   {
     MOZ_ASSERT(source_);
@@ -2138,14 +2131,7 @@ public:
 #endif
   }
 
-
   // Implement MediaStreamListener
-  void NotifyQueuedTrackChanges(MediaStreamGraph* graph, TrackID tid,
-                                StreamTime offset,
-                                uint32_t events,
-                                const MediaSegment& queued_media,
-                                MediaStream* input_stream,
-                                TrackID input_tid) override {}
   void NotifyPull(MediaStreamGraph* graph, StreamTime desired_time) override
   {
     ReentrantMonitorAutoEnter enter(monitor_);
