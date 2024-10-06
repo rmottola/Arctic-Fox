@@ -1530,6 +1530,9 @@ protected:
   Dispatch(already_AddRefed<nsIRunnable>&& aRunnable, uint32_t aFlags) override;
 
   NS_IMETHOD
+  DelayedDispatch(already_AddRefed<nsIRunnable>&&, uint32_t) override;
+
+  NS_IMETHOD
   IsOnCurrentThread(bool* aIsOnCurrentThread) override;
 };
 
