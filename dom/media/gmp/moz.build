@@ -76,6 +76,9 @@ if CONFIG['OS_TARGET'] == 'Android':
     SOURCES += [
       'GMPLoader.cpp',
     ]
+    USE_LIBS += [
+        'rlz',
+    ]
 
 UNIFIED_SOURCES += [
     'GMPAudioDecoderChild.cpp',
@@ -112,10 +115,9 @@ UNIFIED_SOURCES += [
     'GMPVideoPlaneImpl.cpp',
 ]
 
-if CONFIG['OS_TARGET'] in ('WINNT', 'Darwin'):
-  DIRS += [
-      'rlz',
-  ]
+DIRS += [
+    'rlz',
+]
 
 IPDL_SOURCES += [
   'GMPTypes.ipdlh',
