@@ -122,7 +122,7 @@ public:
   {
   }
 
-  bool checkSimulatedOOM() const
+  MOZ_MUST_USE bool checkSimulatedOOM() const
   {
     return true;
   }
