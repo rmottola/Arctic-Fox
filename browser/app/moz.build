@@ -42,6 +42,17 @@ if CONFIG['OS_ARCH'] == 'WINNT':
     RCINCLUDE = 'splash.rc'
     DEFINES['MOZ_PHOENIX'] = True
 
+if CONFIG['MOZ_SANDBOX'] and CONFIG['OS_ARCH'] == 'WINNT':
+    # For sandbox includes and the include dependencies those have
+    LOCAL_INCLUDES += [
+        '/security/sandbox/chromium',
+        '/security/sandbox/chromium-shim',
+    ]
+
+    USE_LIBS += [
+        'sandbox_s',
+    ]
+
 # Control the default heap size.
 # This is the heap returned by GetProcessHeap().
 # As we use the CRT heap, the default size is too large and wastes VM.
