@@ -239,6 +239,7 @@ using namespace js;
 using namespace js::gc;
 
 using mozilla::ArrayLength;
+using mozilla::Get;
 using mozilla::Maybe;
 using mozilla::Swap;
 
@@ -4005,13 +4006,23 @@ class CompartmentCheckTracer : public JS::CallbackTracer
     JSCompartment* compartment;
 };
 
+namespace {
+struct IsDestComparatorFunctor {
+    JS::GCCellPtr dst_;
+    IsDestComparatorFunctor(JS::GCCellPtr dst) : dst_(dst) {}
+
+    using ReturnType = bool;
+    template <typename T> bool operator()(T* t) { return (*t) == dst_.asCell(); }
+};
+} // namespace (anonymous)
+
 static bool
-InCrossCompartmentMap(JSObject* src, Cell* dst, JS::TraceKind dstKind)
+InCrossCompartmentMap(JSObject* src, JS::GCCellPtr dst)
 {
     JSCompartment* srccomp = src->compartment();
 
-    if (dstKind == JS::TraceKind::Object) {
-        Value key = ObjectValue(*static_cast<JSObject*>(dst));
+    if (dst.is<JSObject>()) {
+        Value key = ObjectValue(dst.as<JSObject>());
         if (WrapperMap::Ptr p = srccomp->lookupWrapper(key)) {
             if (*p->value().unsafeGet() == ObjectValue(*src))
                 return true;
@@ -4023,8 +4034,11 @@ InCrossCompartmentMap(JSObject* src, Cell* dst, JS::TraceKind dstKind)
      * know the right hashtable key, so we have to iterate.
      */
     for (JSCompartment::WrapperEnum e(srccomp); !e.empty(); e.popFront()) {
-        if (e.front().key().wrapped == dst && ToMarkable(e.front().value()) == src)
+        if (e.front().mutableKey().applyToWrapped(IsDestComparatorFunctor(dst)) &&
+            ToMarkable(e.front().value()) == src)
+        {
             return true;
+        }
     }
 
     return false;
@@ -4037,14 +4051,13 @@ struct MaybeCompartmentFunctor {
 void
 CompartmentCheckTracer::onChild(const JS::GCCellPtr& thing)
 {
-    TenuredCell* tenured = TenuredCell::fromPointer(thing.asCell());
-
     JSCompartment* comp = DispatchTyped(MaybeCompartmentFunctor(), thing);
     if (comp && compartment) {
         MOZ_ASSERT(comp == compartment || runtime()->isAtomsCompartment(comp) ||
                    (srcKind == JS::TraceKind::Object &&
-                    InCrossCompartmentMap(static_cast<JSObject*>(src), tenured, thing.kind())));
+                    InCrossCompartmentMap(static_cast<JSObject*>(src), thing)));
     } else {
+        TenuredCell* tenured = TenuredCell::fromPointer(thing.asCell());
         MOZ_ASSERT(tenured->zone() == zone || tenured->zone()->isAtomsZone());
     }
 }
@@ -4279,24 +4292,9 @@ GCRuntime::markCompartments()
     /* Set the maybeAlive flag based on cross-compartment edges. */
     for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next()) {
         for (JSCompartment::WrapperEnum e(c); !e.empty(); e.popFront()) {
-            const CrossCompartmentKey& key = e.front().key();
-            JSCompartment* dest;
-            switch (key.kind) {
-              case CrossCompartmentKey::ObjectWrapper:
-              case CrossCompartmentKey::DebuggerObject:
-              case CrossCompartmentKey::DebuggerSource:
-              case CrossCompartmentKey::DebuggerEnvironment:
-              case CrossCompartmentKey::DebuggerWasmScript:
-              case CrossCompartmentKey::DebuggerWasmSource:
-                dest = static_cast<JSObject*>(key.wrapped)->compartment();
-                break;
-              case CrossCompartmentKey::DebuggerScript:
-                dest = static_cast<JSScript*>(key.wrapped)->compartment();
-                break;
-              default:
-                dest = nullptr;
-                break;
-            }
+            if (e.front().key().is<JSString*>())
+                continue;
+            JSCompartment* dest = e.front().mutableKey().compartment();
             if (dest)
                 dest->maybeAlive = true;
         }
@@ -4307,6 +4305,7 @@ GCRuntime::markCompartments()
      * during MarkRuntime.
      */
 
+    /* Propogate maybeAlive to scheduleForDestruction. */
     for (GCCompartmentsIter c(rt); !c.done(); c.next()) {
         if (!c->maybeAlive && !rt->isAtomsCompartment(c))
             c->scheduledForDestruction = true;
@@ -4688,7 +4687,7 @@ DropStringWrappers(JSRuntime* rt)
      */
     for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next()) {
         for (JSCompartment::WrapperEnum e(c); !e.empty(); e.popFront()) {
-            if (e.front().key().kind == CrossCompartmentKey::StringWrapper)
+            if (e.front().key().is<JSString*>())
                 e.removeFront();
         }
     }
@@ -4708,41 +4707,46 @@ DropStringWrappers(JSRuntime* rt)
  *
  * Tarjan's algorithm is used to calculate the components.
  */
+namespace {
+struct AddOutgoingEdgeFunctor {
+    bool needsEdge_;
+    ComponentFinder<JS::Zone>& finder_;
+
+    AddOutgoingEdgeFunctor(bool needsEdge, ComponentFinder<JS::Zone>& finder)
+      : needsEdge_(needsEdge), finder_(finder)
+    {}
+
+    using ReturnType = void;
+    template <typename T>
+    ReturnType operator()(T tp) {
+        TenuredCell& other = (*tp)->asTenured();
+
+        /*
+         * Add edge to wrapped object compartment if wrapped object is not
+         * marked black to indicate that wrapper compartment not be swept
+         * after wrapped compartment.
+         */
+        if (needsEdge_) {
+            JS::Zone* zone = other.zone();
+            if (zone->isGCMarking())
+                finder_.addEdgeTo(zone);
+        }
+    }
+};
+} // namespace (anonymous)
 
 void
 JSCompartment::findOutgoingEdges(ComponentFinder<JS::Zone>& finder)
 {
     for (js::WrapperMap::Enum e(crossCompartmentWrappers); !e.empty(); e.popFront()) {
-        CrossCompartmentKey::Kind kind = e.front().key().kind;
-        MOZ_ASSERT(kind != CrossCompartmentKey::StringWrapper);
-        TenuredCell& other = e.front().key().wrapped->asTenured();
-        if (kind == CrossCompartmentKey::ObjectWrapper) {
-            /*
-             * Add edge to wrapped object compartment if wrapped object is not
-             * marked black to indicate that wrapper compartment not be swept
-             * after wrapped compartment.
-             */
-            if (!other.isMarked(BLACK) || other.isMarked(GRAY)) {
-                JS::Zone* w = other.zone();
-                if (w->isGCMarking())
-                    finder.addEdgeTo(w);
-            }
-        } else {
-            MOZ_ASSERT(kind == CrossCompartmentKey::DebuggerScript ||
-                       kind == CrossCompartmentKey::DebuggerSource ||
-                       kind == CrossCompartmentKey::DebuggerObject ||
-                       kind == CrossCompartmentKey::DebuggerEnvironment ||
-                       kind == CrossCompartmentKey::DebuggerWasmScript ||
-                       kind == CrossCompartmentKey::DebuggerWasmSource);
-            /*
-             * Add edge for debugger object wrappers, to ensure (in conjuction
-             * with call to Debugger::findCompartmentEdges below) that debugger
-             * and debuggee objects are always swept in the same group.
-             */
-            JS::Zone* w = other.zone();
-            if (w->isGCMarking())
-                finder.addEdgeTo(w);
+        CrossCompartmentKey& key = e.front().mutableKey();
+        MOZ_ASSERT(!key.is<JSString*>());
+        bool needsEdge = true;
+        if (key.is<JSObject*>()) {
+            TenuredCell& other = key.as<JSObject*>()->asTenured();
+            needsEdge = !other.isMarked(BLACK) || other.isMarked(GRAY);
         }
+        key.applyToWrapped(AddOutgoingEdgeFunctor(needsEdge, finder));
     }
 }
 
@@ -4902,6 +4906,20 @@ AssertNotOnGrayList(JSObject* obj)
                   GetProxyExtra(obj, ProxyObject::grayLinkExtraSlot(obj)).isUndefined());
 }
 #endif
+
+static void
+AssertNoWrappersInGrayList(JSRuntime* rt)
+{
+#ifdef DEBUG
+    for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next()) {
+        MOZ_ASSERT(!c->gcIncomingGrayPointers);
+        for (JSCompartment::WrapperEnum e(c); !e.empty(); e.popFront()) {
+            if (!e.front().key().is<JSString*>())
+                AssertNotOnGrayList(&e.front().value().unbarrieredGet().toObject());
+        }
+    }
+#endif
+}
 
 static JSObject*
 CrossCompartmentPointerReferent(JSObject* obj)
@@ -5508,16 +5526,7 @@ GCRuntime::beginSweepPhase(bool destroyingRuntime)
 
     releaseObservedTypes = shouldReleaseObservedTypes();
 
-#ifdef DEBUG
-    for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next()) {
-        MOZ_ASSERT(!c->gcIncomingGrayPointers);
-        for (JSCompartment::WrapperEnum e(c); !e.empty(); e.popFront()) {
-            if (e.front().key().kind != CrossCompartmentKey::StringWrapper)
-                AssertNotOnGrayList(&e.front().value().unbarrieredGet().toObject());
-        }
-    }
-#endif
-
+    AssertNoWrappersInGrayList(rt);
     DropStringWrappers(rt);
 
     findZoneGroups();
@@ -5797,16 +5806,9 @@ GCRuntime::endSweepPhase(bool destroyingRuntime)
                           !zone->arenas.arenaListsToSweep[i]);
         }
     }
-
-    for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next()) {
-        MOZ_ASSERT(!c->gcIncomingGrayPointers);
-
-        for (JSCompartment::WrapperEnum e(c); !e.empty(); e.popFront()) {
-            if (e.front().key().kind != CrossCompartmentKey::StringWrapper)
-                AssertNotOnGrayList(&e.front().value().unbarrieredGet().toObject());
-        }
-    }
 #endif
+
+    AssertNoWrappersInGrayList(rt);
 }
 
 void
