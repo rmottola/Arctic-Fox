@@ -53,6 +53,7 @@ extern bool
 CurrentThreadIsIonCompiling();
 #endif
 
+// The return value indicates if anything was unmarked.
 extern bool
 UnmarkGrayCellRecursively(gc::Cell* cell, JS::TraceKind kind);
 
@@ -267,6 +268,7 @@ class TenuredCell : public Cell
 
     // Mark bit management.
     MOZ_ALWAYS_INLINE bool isMarked(uint32_t color = BLACK) const;
+    // The return value indicates if the cell went from unmarked to marked.
     MOZ_ALWAYS_INLINE bool markIfUnmarked(uint32_t color = BLACK) const;
     MOZ_ALWAYS_INLINE void unmark(uint32_t color) const;
     MOZ_ALWAYS_INLINE void copyMarkBitsFrom(const TenuredCell* src);
@@ -849,6 +851,7 @@ struct ChunkBitmap
         return *word & mask;
     }
 
+    // The return value indicates if the cell went from unmarked to marked.
     MOZ_ALWAYS_INLINE bool markIfUnmarked(const Cell* cell, uint32_t color) {
         uintptr_t* word, mask;
         getMarkWordAndMask(cell, BLACK, &word, &mask);
@@ -967,7 +970,7 @@ struct Chunk
     void releaseArena(JSRuntime* rt, Arena* arena, const AutoLockGC& lock);
     void recycleArena(Arena* arena, SortedArenaList& dest, size_t thingsPerArena);
 
-    bool decommitOneFreeArena(JSRuntime* rt, AutoLockGC& lock);
+    MOZ_MUST_USE bool decommitOneFreeArena(JSRuntime* rt, AutoLockGC& lock);
     void decommitAllArenasWithoutUnlocking(const AutoLockGC& lock);
 
     static Chunk* allocate(JSRuntime* rt);
