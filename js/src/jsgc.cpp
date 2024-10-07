@@ -6738,6 +6738,8 @@ GCRuntime::onOutOfMallocMemory(const AutoLockGC& lock)
 void
 GCRuntime::minorGCImpl(JS::gcreason::Reason reason, Nursery::ObjectGroupList* pretenureGroups)
 {
+    MOZ_ASSERT(!rt->isHeapBusy());
+
     if (rt->mainThread.suppressGC)
         return;
 
@@ -6771,7 +6773,7 @@ void
 GCRuntime::disableGenerationalGC()
 {
     if (isGenerationalGCEnabled()) {
-        minorGC(JS::gcreason::API);
+        evictNursery(JS::gcreason::API);
         nursery.disable();
         storeBuffer.disable();
     }
