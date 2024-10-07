@@ -641,6 +641,9 @@ enum class Trap
     IntegerOverflow,
     // Trying to coerce NaN to an integer.
     InvalidConversionToInteger,
+    // Integer division by zero.
+    IntegerDivideByZero,
+
     // (asm.js only) SIMD float to int conversion failed because the input
     // wasn't in bounds.
     ImpreciseSimdConversion,
@@ -659,6 +662,7 @@ enum class JumpTarget
     Unreachable = unsigned(Trap::Unreachable),
     IntegerOverflow = unsigned(Trap::IntegerOverflow),
     InvalidConversionToInteger = unsigned(Trap::InvalidConversionToInteger),
+    IntegerDivideByZero = unsigned(Trap::IntegerDivideByZero),
     ImpreciseSimdConversion = unsigned(Trap::ImpreciseSimdConversion),
     // Non-traps
     StackOverflow,

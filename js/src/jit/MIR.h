@@ -6875,6 +6875,7 @@ class MDiv : public MBinaryArithInstruction
     bool canBeDivideByZero_;
     bool canBeNegativeDividend_;
     bool unsigned_;
+    bool trapOnError_;
 
     MDiv(MDefinition* left, MDefinition* right, MIRType type)
       : MBinaryArithInstruction(left, right),
@@ -6882,7 +6883,8 @@ class MDiv : public MBinaryArithInstruction
         canBeNegativeOverflow_(true),
         canBeDivideByZero_(true),
         canBeNegativeDividend_(true),
-        unsigned_(false)
+        unsigned_(false),
+        trapOnError_(false)
     {
         if (type != MIRType::Value)
             specialization_ = type;
@@ -6898,10 +6900,11 @@ class MDiv : public MBinaryArithInstruction
         return new(alloc) MDiv(left, right, type);
     }
     static MDiv* NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right,
-                          MIRType type, bool unsignd)
+                          MIRType type, bool unsignd, bool trapOnError = false)
     {
         MDiv* div = new(alloc) MDiv(left, right, type);
         div->unsigned_ = unsignd;
+        div->trapOnError_ = trapOnError;
         if (type == MIRType::Int32)
             div->setTruncateKind(Truncate);
         return div;
@@ -6965,6 +6968,10 @@ class MDiv : public MBinaryArithInstruction
         return isTruncated() || isTruncatedIndirectly();
     }
 
+    bool trapOnError() const {
+        return trapOnError_;
+    }
+
     bool isFloat32Commutative() const override { return true; }
 
     void computeRange(TempAllocator& alloc) override;
@@ -6980,8 +6987,11 @@ class MDiv : public MBinaryArithInstruction
     }
 
     bool congruentTo(const MDefinition* ins) const override {
-        return MBinaryArithInstruction::congruentTo(ins) &&
-               unsigned_ == ins->toDiv()->isUnsigned();
+        if (!MBinaryArithInstruction::congruentTo(ins))
+            return false;
+        const MDiv* other = ins->toDiv();
+        MOZ_ASSERT(other->trapOnError() == trapOnError_);
+        return unsigned_ == other->isUnsigned();
     }
 
     ALLOW_CLONE(MDiv)
@@ -6993,13 +7003,15 @@ class MMod : public MBinaryArithInstruction
     bool canBeNegativeDividend_;
     bool canBePowerOfTwoDivisor_;
     bool canBeDivideByZero_;
+    bool trapOnError_;
 
     MMod(MDefinition* left, MDefinition* right, MIRType type)
       : MBinaryArithInstruction(left, right),
         unsigned_(false),
         canBeNegativeDividend_(true),
         canBePowerOfTwoDivisor_(true),
-        canBeDivideByZero_(true)
+        canBeDivideByZero_(true),
+        trapOnError_(false)
     {
         if (type != MIRType::Value)
             specialization_ = type;
@@ -7012,10 +7024,11 @@ class MMod : public MBinaryArithInstruction
         return new(alloc) MMod(left, right, MIRType::Value);
     }
     static MMod* NewAsmJS(TempAllocator& alloc, MDefinition* left, MDefinition* right,
-                          MIRType type, bool unsignd)
+                          MIRType type, bool unsignd, bool trapOnError = false)
     {
         MMod* mod = new(alloc) MMod(left, right, type);
         mod->unsigned_ = unsignd;
+        mod->trapOnError_ = trapOnError;
         if (type == MIRType::Int32)
             mod->setTruncateKind(Truncate);
         return mod;
@@ -7047,6 +7060,10 @@ class MMod : public MBinaryArithInstruction
 
     bool isUnsigned() const {
         return unsigned_;
+    }
+
+    bool trapOnError() const {
+        return trapOnError_;
     }
 
     bool writeRecoverData(CompactBufferWriter& writer) const override;
