@@ -1609,10 +1609,8 @@ GlobalHelperThreadState::compressionInProgress(SourceCompressionTask* task)
 bool
 SourceCompressionTask::complete()
 {
-    if (!active()) {
-        MOZ_ASSERT(!compressed);
+    if (!active())
         return true;
-    }
 
     {
         AutoLockHelperThreadState lock;
@@ -1622,11 +1620,7 @@ SourceCompressionTask::complete()
 
     if (result == Success) {
         MOZ_ASSERT(compressed);
-        mozilla::UniquePtr<char[], JS::FreePolicy> compressedSource(
-            reinterpret_cast<char*>(compressed));
-        compressed = nullptr;
-
-        if (!ss->setCompressedSource(cx, mozilla::Move(compressedSource), compressedBytes,
+        if (!ss->setCompressedSource(cx, mozilla::Move(compressed), compressedBytes,
                                      ss->length()))
         {
             ss = nullptr;
@@ -1634,14 +1628,11 @@ SourceCompressionTask::complete()
             return false;
         }
     } else {
-        js_free(compressed);
-
         if (result == OOM)
             ReportOutOfMemory(cx);
     }
 
     ss = nullptr;
-    compressed = nullptr;
     MOZ_ASSERT(!active());
 
     return result != OOM;

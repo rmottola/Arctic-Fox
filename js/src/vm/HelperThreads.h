@@ -571,7 +571,7 @@ struct SourceCompressionTask
         Aborted,
         Success
     } result;
-    void* compressed;
+    mozilla::UniquePtr<char[], JS::FreePolicy> compressed;
     size_t compressedBytes;
     HashNumber compressedHash;
 
