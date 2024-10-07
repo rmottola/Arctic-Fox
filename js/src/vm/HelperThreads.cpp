@@ -1619,14 +1619,8 @@ SourceCompressionTask::complete()
     }
 
     if (result == Success) {
-        MOZ_ASSERT(compressed);
-        if (!ss->setCompressedSource(cx, mozilla::Move(compressed), compressedBytes,
-                                     ss->length()))
-        {
-            ss = nullptr;
-            MOZ_ASSERT(!active());
-            return false;
-        }
+        MOZ_ASSERT(resultString);
+        ss->setCompressedSource(mozilla::Move(*resultString), ss->length());
     } else {
         if (result == OOM)
             ReportOutOfMemory(cx);
