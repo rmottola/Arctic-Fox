@@ -573,12 +573,16 @@ struct SourceCompressionTask
     } result;
     mozilla::UniquePtr<char[], JS::FreePolicy> compressed;
     size_t compressedBytes;
-    HashNumber compressedHash;
 
   public:
     explicit SourceCompressionTask(ExclusiveContext* cx)
-      : helperThread(nullptr), cx(cx), ss(nullptr), abort_(false),
-        result(OOM), compressed(nullptr), compressedBytes(0), compressedHash(0)
+      : helperThread(nullptr)
+      , cx(cx)
+      , ss(nullptr)
+      , abort_(false)
+      , result(OOM)
+      , compressed(nullptr)
+      , compressedBytes(0)
     {}
 
     ~SourceCompressionTask()
