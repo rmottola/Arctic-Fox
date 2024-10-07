@@ -3011,7 +3011,8 @@ Parser<FullParseHandler>::functionArgsAndBody(InHandling inHandling, ParseNode* 
         return true;
     } while (false);
 
-    blockScopes.resize(oldBlockScopesLength);
+    if (!blockScopes.resize(oldBlockScopesLength))
+        return false;
 
     // Continue doing a full parse for this inner function.
     ParseContext<FullParseHandler> funpc(this, pc, pn, funbox, newDirectives);
