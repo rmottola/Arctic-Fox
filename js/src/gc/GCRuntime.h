@@ -811,8 +811,6 @@ class GCRuntime
     bool isFullGc() const { return isFull; }
     bool isCompactingGc() const { return isCompacting; }
 
-    bool shouldCleanUpEverything() { return cleanUpEverything; }
-
     bool areGrayBitsValid() const { return grayBitsValid; }
     void setGrayBitsInvalid() { grayBitsValid = false; }
 
