@@ -96,6 +96,7 @@ MOZ_MUST_USE mozilla::Maybe<SharedImmutableString>
 SharedImmutableStringsCache::getOrCreate(OwnedChars&& chars, size_t length)
 {
     OwnedChars owned(mozilla::Move(chars));
+    MOZ_ASSERT(owned);
     return getOrCreate(owned.get(), length, [&]() { return mozilla::Move(owned); });
 }
 
@@ -109,6 +110,7 @@ MOZ_MUST_USE mozilla::Maybe<SharedImmutableTwoByteString>
 SharedImmutableStringsCache::getOrCreate(OwnedTwoByteChars&& chars, size_t length)
 {
     OwnedTwoByteChars owned(mozilla::Move(chars));
+    MOZ_ASSERT(owned);
     return getOrCreate(owned.get(), length, [&]() { return mozilla::Move(owned); });
 }
 
