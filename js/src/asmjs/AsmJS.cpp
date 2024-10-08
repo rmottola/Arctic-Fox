@@ -1769,7 +1769,7 @@ class MOZ_STACK_CLASS ModuleValidator
             !genData->sigs.resize(MaxSigs) ||
             !genData->funcSigs.resize(MaxFuncs) ||
             !genData->imports.resize(MaxImports) ||
-            !genData->sigToTable.resize(MaxSigs))
+            !genData->asmJSSigToTable.resize(MaxTables))
         {
             return false;
         }
