@@ -95,7 +95,6 @@ FrameIterator::settle()
         break;
       case CodeRange::ImportJitExit:
       case CodeRange::ImportInterpExit:
-      case CodeRange::ErrorExit:
       case CodeRange::Inline:
       case CodeRange::CallThunk:
         MOZ_CRASH("Should not encounter an exit during iteration");
@@ -469,7 +468,6 @@ ProfilingFrameIterator::initFromFP(const WasmActivation& activation)
         break;
       case CodeRange::ImportJitExit:
       case CodeRange::ImportInterpExit:
-      case CodeRange::ErrorExit:
       case CodeRange::Inline:
       case CodeRange::CallThunk:
         MOZ_CRASH("Unexpected CodeRange kind");
@@ -524,8 +522,7 @@ ProfilingFrameIterator::ProfilingFrameIterator(const WasmActivation& activation,
       case CodeRange::Function:
       case CodeRange::CallThunk:
       case CodeRange::ImportJitExit:
-      case CodeRange::ImportInterpExit:
-      case CodeRange::ErrorExit: {
+      case CodeRange::ImportInterpExit: {
         // When the pc is inside the prologue/epilogue, the innermost
         // call's AsmJSFrame is not complete and thus fp points to the the
         // second-to-innermost call's AsmJSFrame. Since fp can only tell you
@@ -639,7 +636,6 @@ ProfilingFrameIterator::operator++()
       case CodeRange::Function:
       case CodeRange::ImportJitExit:
       case CodeRange::ImportInterpExit:
-      case CodeRange::ErrorExit:
       case CodeRange::Inline:
       case CodeRange::CallThunk:
         stackAddress_ = callerFP_;
@@ -685,7 +681,6 @@ ProfilingFrameIterator::label() const
       case CodeRange::Entry:            return "entry trampoline (in asm.js)";
       case CodeRange::ImportJitExit:    return importJitDescription;
       case CodeRange::ImportInterpExit: return importInterpDescription;
-      case CodeRange::ErrorExit:        return errorDescription;
       case CodeRange::Inline:           return "inline stub (in asm.js)";
       case CodeRange::CallThunk:        return "call thunk (in asm.js)";
     }
