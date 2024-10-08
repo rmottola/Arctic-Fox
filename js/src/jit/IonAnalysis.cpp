@@ -2712,9 +2712,13 @@ IsResumableMIRType(MIRType type)
       case MIRType::MagicOptimizedOut:
       case MIRType::MagicUninitializedLexical:
       case MIRType::Value:
-      case MIRType::Float32x4:
       case MIRType::Int32x4:
+      case MIRType::Int16x8:
+      case MIRType::Int8x16:
+      case MIRType::Float32x4:
       case MIRType::Bool32x4:
+      case MIRType::Bool16x8:
+      case MIRType::Bool8x16:
         return true;
 
       case MIRType::MagicHole:
