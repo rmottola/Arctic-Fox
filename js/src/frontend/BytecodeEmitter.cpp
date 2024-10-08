@@ -9277,7 +9277,7 @@ CGObjectList::finish(ObjectArray* array)
     MOZ_ASSERT(length <= INDEX_LIMIT);
     MOZ_ASSERT(length == array->length);
 
-    js::HeapPtrObject* cursor = array->vector + array->length;
+    js::GCPtrObject* cursor = array->vector + array->length;
     ObjectBox* objbox = lastbox;
     do {
         --cursor;

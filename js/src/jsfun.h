@@ -144,7 +144,7 @@ class JSFunction : public js::NativeObject
         } i;
         void*           nativeOrScript;
     } u;
-    js::HeapPtrAtom  atom_;       /* name for diagnostics and decompiling */
+    js::GCPtrAtom atom_;      /* name for diagnostics and decompiling */
 
   public:
 
@@ -345,12 +345,12 @@ class JSFunction : public js::NativeObject
 
     void setEnvironment(JSObject* obj) {
         MOZ_ASSERT(isInterpreted() && !isBeingParsed());
-        *reinterpret_cast<js::HeapPtrObject*>(&u.i.env_) = obj;
+        *reinterpret_cast<js::GCPtrObject*>(&u.i.env_) = obj;
     }
 
     void initEnvironment(JSObject* obj) {
         MOZ_ASSERT(isInterpreted() && !isBeingParsed());
-        reinterpret_cast<js::HeapPtrObject*>(&u.i.env_)->init(obj);
+        reinterpret_cast<js::GCPtrObject*>(&u.i.env_)->init(obj);
     }
 
     void unsetEnvironment() {
@@ -570,9 +570,9 @@ class JSFunction : public js::NativeObject
     size_t getBoundFunctionArgumentCount() const;
 
   private:
-    js::HeapPtrScript& mutableScript() {
+    js::GCPtrScript& mutableScript() {
         MOZ_ASSERT(hasScript());
-        return *(js::HeapPtrScript*)&u.i.s.script_;
+        return *(js::GCPtrScript*)&u.i.s.script_;
     }
 
     inline js::FunctionExtended* toExtended();
@@ -723,7 +723,7 @@ class FunctionExtended : public JSFunction
 
     static inline size_t offsetOfExtendedSlot(unsigned which) {
         MOZ_ASSERT(which < NUM_EXTENDED_SLOTS);
-        return offsetof(FunctionExtended, extendedSlots) + which * sizeof(HeapValue);
+        return offsetof(FunctionExtended, extendedSlots) + which * sizeof(GCPtrValue);
     }
     static inline size_t offsetOfArrowNewTargetSlot() {
         return offsetOfExtendedSlot(ARROW_NEWTARGET_SLOT);
@@ -733,7 +733,7 @@ class FunctionExtended : public JSFunction
     friend class JSFunction;
 
     /* Reserved slots available for storage by particular native functions. */
-    HeapValue extendedSlots[NUM_EXTENDED_SLOTS];
+    GCPtrValue extendedSlots[NUM_EXTENDED_SLOTS];
 };
 
 extern bool
