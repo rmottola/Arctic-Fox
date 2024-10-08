@@ -6210,23 +6210,24 @@ class MClz
 {
     bool operandIsNeverZero_;
 
-    explicit MClz(MDefinition* num)
+    explicit MClz(MDefinition* num, MIRType type)
       : MUnaryInstruction(num),
         operandIsNeverZero_(false)
     {
+        MOZ_ASSERT(IsIntType(type));
         MOZ_ASSERT(IsNumberType(num->type()));
-        specialization_ = MIRType::Int32;
-        setResultType(MIRType::Int32);
+        specialization_ = type;
+        setResultType(type);
         setMovable();
     }
 
   public:
     INSTRUCTION_HEADER(Clz)
     static MClz* New(TempAllocator& alloc, MDefinition* num) {
-        return new(alloc) MClz(num);
+        return new(alloc) MClz(num, MIRType::Int32);
     }
     static MClz* NewAsmJS(TempAllocator& alloc, MDefinition* num) {
-        return new(alloc) MClz(num);
+        return new(alloc) MClz(num, num->type());
     }
     MDefinition* num() const {
         return getOperand(0);
@@ -6254,23 +6255,24 @@ class MCtz
 {
     bool operandIsNeverZero_;
 
-    explicit MCtz(MDefinition* num)
+    explicit MCtz(MDefinition* num, MIRType type)
       : MUnaryInstruction(num),
         operandIsNeverZero_(false)
     {
+        MOZ_ASSERT(IsIntType(type));
         MOZ_ASSERT(IsNumberType(num->type()));
-        specialization_ = MIRType::Int32;
-        setResultType(MIRType::Int32);
+        specialization_ = type;
+        setResultType(type);
         setMovable();
     }
 
   public:
     INSTRUCTION_HEADER(Ctz)
     static MCtz* New(TempAllocator& alloc, MDefinition* num) {
-        return new(alloc) MCtz(num);
+        return new(alloc) MCtz(num, MIRType::Int32);
     }
     static MCtz* NewAsmJS(TempAllocator& alloc, MDefinition* num) {
-        return new(alloc) MCtz(num);
+        return new(alloc) MCtz(num, num->type());
     }
     MDefinition* num() const {
         return getOperand(0);
@@ -6296,22 +6298,23 @@ class MPopcnt
   : public MUnaryInstruction
   , public BitwisePolicy::Data
 {
-    explicit MPopcnt(MDefinition* num)
+    explicit MPopcnt(MDefinition* num, MIRType type)
       : MUnaryInstruction(num)
     {
         MOZ_ASSERT(IsNumberType(num->type()));
-        specialization_ = MIRType::Int32;
-        setResultType(MIRType::Int32);
+        MOZ_ASSERT(IsIntType(type));
+        specialization_ = type;
+        setResultType(type);
         setMovable();
     }
 
   public:
     INSTRUCTION_HEADER(Popcnt)
     static MPopcnt* New(TempAllocator& alloc, MDefinition* num) {
-        return new(alloc) MPopcnt(num);
+        return new(alloc) MPopcnt(num, MIRType::Int32);
     }
     static MPopcnt* NewAsmJS(TempAllocator& alloc, MDefinition* num) {
-        return new(alloc) MPopcnt(num);
+        return new(alloc) MPopcnt(num, num->type());
     }
     MDefinition* num() const {
         return getOperand(0);

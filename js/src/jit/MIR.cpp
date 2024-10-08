@@ -5269,10 +5269,17 @@ MDefinition*
 MClz::foldsTo(TempAllocator& alloc)
 {
     if (num()->isConstant()) {
-        int32_t n = num()->toConstant()->toInt32();
+        MConstant* c = num()->toConstant();
+        if (type() == MIRType::Int32) {
+            int32_t n = c->toInt32();
+            if (n == 0)
+                return MConstant::New(alloc, Int32Value(32));
+            return MConstant::New(alloc, Int32Value(mozilla::CountLeadingZeroes32(n)));
+        }
+        int64_t n = c->toInt64();
         if (n == 0)
-            return MConstant::New(alloc, Int32Value(32));
-        return MConstant::New(alloc, Int32Value(mozilla::CountLeadingZeroes32(n)));
+            return MConstant::NewInt64(alloc, int64_t(64));
+        return MConstant::NewInt64(alloc, int64_t(mozilla::CountLeadingZeroes64(n)));
     }
 
     return this;
@@ -5282,10 +5289,17 @@ MDefinition*
 MCtz::foldsTo(TempAllocator& alloc)
 {
     if (num()->isConstant()) {
-        int32_t n = num()->toConstant()->toInt32();
+        MConstant* c = num()->toConstant();
+        if (type() == MIRType::Int32) {
+            int32_t n = num()->toConstant()->toInt32();
+            if (n == 0)
+                return MConstant::New(alloc, Int32Value(32));
+            return MConstant::New(alloc, Int32Value(mozilla::CountTrailingZeroes32(n)));
+        }
+        int64_t n = c->toInt64();
         if (n == 0)
-            return MConstant::New(alloc, Int32Value(32));
-        return MConstant::New(alloc, Int32Value(mozilla::CountTrailingZeroes32(n)));
+            return MConstant::NewInt64(alloc, int64_t(64));
+        return MConstant::NewInt64(alloc, int64_t(mozilla::CountTrailingZeroes64(n)));
     }
 
     return this;
@@ -5295,8 +5309,13 @@ MDefinition*
 MPopcnt::foldsTo(TempAllocator& alloc)
 {
     if (num()->isConstant()) {
-        int32_t n = num()->toConstant()->toInt32();
-        return MConstant::New(alloc, Int32Value(mozilla::CountPopulation32(n)));
+        MConstant* c = num()->toConstant();
+        if (type() == MIRType::Int32) {
+            int32_t n = num()->toConstant()->toInt32();
+            return MConstant::New(alloc, Int32Value(mozilla::CountPopulation32(n)));
+        }
+        int64_t n = c->toInt64();
+        return MConstant::NewInt64(alloc, int64_t(mozilla::CountPopulation64(n)));
     }
 
     return this;

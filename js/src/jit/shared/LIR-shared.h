@@ -3299,7 +3299,7 @@ class LAbsF : public LInstructionHelper<1, 1, 0>
     }
 };
 
-// Count leading zeroes
+// Count leading zeroes on an int32.
 class LClzI : public LInstructionHelper<1, 1, 0>
 {
   public:
@@ -3313,7 +3313,21 @@ class LClzI : public LInstructionHelper<1, 1, 0>
     }
 };
 
-// Count trailing zeroes
+// Count leading zeroes on an int64.
+class LClzI64 : public LInstructionHelper<INT64_PIECES, INT64_PIECES, 0>
+{
+  public:
+    LIR_HEADER(ClzI64)
+    explicit LClzI64(const LInt64Allocation& num) {
+        setInt64Operand(0, num);
+    }
+
+    MClz* mir() const {
+        return mir_->toClz();
+    }
+};
+
+// Count trailing zeroes on an int32.
 class LCtzI : public LInstructionHelper<1, 1, 0>
 {
   public:
@@ -3327,7 +3341,21 @@ class LCtzI : public LInstructionHelper<1, 1, 0>
     }
 };
 
-// Count population
+// Count trailing zeroes on an int64.
+class LCtzI64 : public LInstructionHelper<INT64_PIECES, INT64_PIECES, 0>
+{
+  public:
+    LIR_HEADER(CtzI64)
+    explicit LCtzI64(const LInt64Allocation& num) {
+        setInt64Operand(0, num);
+    }
+
+    MCtz* mir() const {
+        return mir_->toCtz();
+    }
+};
+
+// Count population on an int32.
 class LPopcntI : public LInstructionHelper<1, 1, 1>
 {
   public:
@@ -3343,6 +3371,21 @@ class LPopcntI : public LInstructionHelper<1, 1, 1>
 
     const LDefinition* temp() {
         return getTemp(0);
+    }
+};
+
+// Count population on an int64.
+class LPopcntI64 : public LInstructionHelper<INT64_PIECES, INT64_PIECES, 1>
+{
+  public:
+    LIR_HEADER(PopcntI64)
+    explicit LPopcntI64(const LInt64Allocation& num, const LInt64Definition& temp) {
+        setInt64Operand(0, num);
+        setInt64Temp(0, temp);
+    }
+
+    MPopcnt* mir() const {
+        return mir_->toPopcnt();
     }
 };
 
