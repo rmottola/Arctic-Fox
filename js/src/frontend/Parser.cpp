@@ -704,7 +704,7 @@ Parser<ParseHandler>::Parser(ExclusiveContext* cx, LifoAlloc* alloc,
 {
     {
         AutoLockForExclusiveAccess lock(cx);
-        cx->perThreadData->addActiveCompilation();
+        cx->perThreadData->addActiveCompilation(lock);
     }
 
     // The Mozilla specific JSOPTION_EXTRA_WARNINGS option adds extra warnings
@@ -745,7 +745,7 @@ Parser<ParseHandler>::~Parser()
 
     {
         AutoLockForExclusiveAccess lock(context);
-        context->perThreadData->removeActiveCompilation();
+        context->perThreadData->removeActiveCompilation(lock);
     }
 }
 

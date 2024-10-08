@@ -2466,13 +2466,13 @@ typedef HashSet<SharedScriptData*,
                 SystemAllocPolicy> ScriptDataTable;
 
 extern void
-UnmarkScriptData(JSRuntime* rt);
+UnmarkScriptData(JSRuntime* rt, AutoLockForExclusiveAccess& lock);
 
 extern void
-SweepScriptData(JSRuntime* rt);
+SweepScriptData(JSRuntime* rt, AutoLockForExclusiveAccess& lock);
 
 extern void
-FreeScriptData(JSRuntime* rt);
+FreeScriptData(JSRuntime* rt, AutoLockForExclusiveAccess& lock);
 
 struct ScriptAndCounts
 {

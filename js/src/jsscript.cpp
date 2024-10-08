@@ -2538,12 +2538,12 @@ SaveSharedScriptData(ExclusiveContext* cx, Handle<JSScript*> script, SharedScrip
 
     ScriptBytecodeHasher::Lookup l(ssd);
 
-    ScriptDataTable::AddPtr p = cx->scriptDataTable().lookupForAdd(l);
+    ScriptDataTable::AddPtr p = cx->scriptDataTable(lock).lookupForAdd(l);
     if (p) {
         js_free(ssd);
         ssd = *p;
     } else {
-        if (!cx->scriptDataTable().add(p, ssd)) {
+        if (!cx->scriptDataTable(lock).add(p, ssd)) {
             script->setCode(nullptr);
             script->atoms = nullptr;
             js_free(ssd);
@@ -2582,10 +2582,10 @@ MarkScriptData(JSRuntime* rt, const jsbytecode* bytecode)
 }
 
 void
-js::UnmarkScriptData(JSRuntime* rt)
+js::UnmarkScriptData(JSRuntime* rt, AutoLockForExclusiveAccess& lock)
 {
     MOZ_ASSERT(rt->gc.isFullGc());
-    ScriptDataTable& table = rt->scriptDataTable();
+    ScriptDataTable& table = rt->scriptDataTable(lock);
     for (ScriptDataTable::Enum e(table); !e.empty(); e.popFront()) {
         SharedScriptData* entry = e.front();
         entry->marked = false;
@@ -2593,10 +2593,10 @@ js::UnmarkScriptData(JSRuntime* rt)
 }
 
 void
-js::SweepScriptData(JSRuntime* rt)
+js::SweepScriptData(JSRuntime* rt, AutoLockForExclusiveAccess& lock)
 {
     MOZ_ASSERT(rt->gc.isFullGc());
-    ScriptDataTable& table = rt->scriptDataTable();
+    ScriptDataTable& table = rt->scriptDataTable(lock);
 
     if (rt->keepAtoms())
         return;
@@ -2611,9 +2611,9 @@ js::SweepScriptData(JSRuntime* rt)
 }
 
 void
-js::FreeScriptData(JSRuntime* rt)
+js::FreeScriptData(JSRuntime* rt, AutoLockForExclusiveAccess& lock)
 {
-    ScriptDataTable& table = rt->scriptDataTable();
+    ScriptDataTable& table = rt->scriptDataTable(lock);
     if (!table.initialized())
         return;
 

@@ -2716,10 +2716,9 @@ GCRuntime::updateAllCellPointers(MovingTracer* trc, Zone* zone)
  * part of the traversal.
  */
 void
-GCRuntime::updatePointersToRelocatedCells(Zone* zone)
+GCRuntime::updatePointersToRelocatedCells(Zone* zone, AutoLockForExclusiveAccess& lock)
 {
     MOZ_ASSERT(zone->isGCCompacting());
-    MOZ_ASSERT(rt->currentThreadHasExclusiveAccess());
 
     gcstats::AutoPhase ap(stats, gcstats::PHASE_COMPACT_UPDATE);
     MovingTracer trc(rt);
@@ -2737,7 +2736,7 @@ GCRuntime::updatePointersToRelocatedCells(Zone* zone)
 
     // Mark roots to update them.
     {
-        markRuntime(&trc, MarkRuntime);
+        markRuntime(&trc, MarkRuntime, lock);
 
         gcstats::AutoPhase ap(stats, gcstats::PHASE_MARK_ROOTS);
         Debugger::markAll(&trc);
@@ -3855,7 +3854,7 @@ ArenaLists::checkEmptyArenaList(AllocKind kind)
 }
 
 void
-GCRuntime::purgeRuntime()
+GCRuntime::purgeRuntime(AutoLockForExclusiveAccess& lock)
 {
     for (GCCompartmentsIter comp(rt); !comp.done(); comp.next())
         comp->purge();
@@ -3871,7 +3870,7 @@ GCRuntime::purgeRuntime()
     rt->evalCache.clear();
 
     if (!rt->hasActiveCompilations())
-        rt->parseMapPool().purgeAll();
+        rt->parseMapPool(lock).purgeAll();
 
     if (auto cache = rt->maybeThisRuntimeSharedImmutableStrings())
         cache->purge();
@@ -4006,7 +4005,7 @@ RelazifyFunctions(Zone* zone, AllocKind kind)
 }
 
 bool
-GCRuntime::beginMarkPhase(JS::gcreason::Reason reason)
+GCRuntime::beginMarkPhase(JS::gcreason::Reason reason, AutoLockForExclusiveAccess& lock)
 {
     int64_t currentTime = PRMJ_Now();
 
@@ -4065,7 +4064,7 @@ GCRuntime::beginMarkPhase(JS::gcreason::Reason reason)
      * cancel the incremental GC. See IsIncrementalGCSafe.
      */
     if (isFull && !rt->keepAtoms()) {
-        Zone* atomsZone = rt->atomsCompartment()->zone();
+        Zone* atomsZone = rt->atomsCompartment(lock)->zone();
         if (atomsZone->isGCScheduled()) {
             MOZ_ASSERT(!atomsZone->isCollecting());
             atomsZone->setGCState(Zone::Mark);
@@ -4125,7 +4124,7 @@ GCRuntime::beginMarkPhase(JS::gcreason::Reason reason)
      */
     {
         gcstats::AutoPhase ap(stats, gcstats::PHASE_PURGE);
-        purgeRuntime();
+        purgeRuntime(lock);
     }
 
     /*
@@ -4147,10 +4146,10 @@ GCRuntime::beginMarkPhase(JS::gcreason::Reason reason)
         }
 
         if (isFull)
-            UnmarkScriptData(rt);
+            UnmarkScriptData(rt, lock);
     }
 
-    markRuntime(gcmarker, MarkRuntime);
+    markRuntime(gcmarker, MarkRuntime, lock);
 
     gcstats::AutoPhase ap2(stats, gcstats::PHASE_MARK_ROOTS);
 
@@ -4323,7 +4322,7 @@ class js::gc::MarkingValidator
   public:
     explicit MarkingValidator(GCRuntime* gc);
     ~MarkingValidator();
-    void nonIncrementalMark();
+    void nonIncrementalMark(AutoLockForExclusiveAccess& lock);
     void validate();
 
   private:
@@ -4349,7 +4348,7 @@ js::gc::MarkingValidator::~MarkingValidator()
 }
 
 void
-js::gc::MarkingValidator::nonIncrementalMark()
+js::gc::MarkingValidator::nonIncrementalMark(AutoLockForExclusiveAccess& lock)
 {
     /*
      * Perform a non-incremental mark for all collecting zones and record
@@ -4435,7 +4434,7 @@ js::gc::MarkingValidator::nonIncrementalMark()
                 chunk->bitmap.clear();
         }
 
-        gc->markRuntime(gcmarker, GCRuntime::MarkRuntime);
+        gc->markRuntime(gcmarker, GCRuntime::MarkRuntime, lock);
 
         gc->incrementalState = MARK;
         auto unlimited = SliceBudget::unlimited();
@@ -4554,14 +4553,14 @@ js::gc::MarkingValidator::validate()
 #endif // JS_GC_ZEAL
 
 void
-GCRuntime::computeNonIncrementalMarkingForValidation()
+GCRuntime::computeNonIncrementalMarkingForValidation(AutoLockForExclusiveAccess& lock)
 {
 #ifdef JS_GC_ZEAL
     MOZ_ASSERT(!markingValidator);
     if (isIncremental && hasZealMode(ZealMode::IncrementalMarkingValidator))
         markingValidator = js_new<MarkingValidator>(this);
     if (markingValidator)
-        markingValidator->nonIncrementalMark();
+        markingValidator->nonIncrementalMark(lock);
 #endif
 }
 
@@ -4616,9 +4615,9 @@ DropStringWrappers(JSRuntime* rt)
 namespace {
 struct AddOutgoingEdgeFunctor {
     bool needsEdge_;
-    ComponentFinder<JS::Zone>& finder_;
+    ZoneComponentFinder& finder_;
 
-    AddOutgoingEdgeFunctor(bool needsEdge, ComponentFinder<JS::Zone>& finder)
+    AddOutgoingEdgeFunctor(bool needsEdge, ZoneComponentFinder& finder)
       : needsEdge_(needsEdge), finder_(finder)
     {}
 
@@ -4642,7 +4641,7 @@ struct AddOutgoingEdgeFunctor {
 } // namespace (anonymous)
 
 void
-JSCompartment::findOutgoingEdges(ComponentFinder<JS::Zone>& finder)
+JSCompartment::findOutgoingEdges(ZoneComponentFinder& finder)
 {
     for (js::WrapperMap::Enum e(crossCompartmentWrappers); !e.empty(); e.popFront()) {
         CrossCompartmentKey& key = e.front().mutableKey();
@@ -4657,15 +4656,16 @@ JSCompartment::findOutgoingEdges(ComponentFinder<JS::Zone>& finder)
 }
 
 void
-Zone::findOutgoingEdges(ComponentFinder<JS::Zone>& finder)
+Zone::findOutgoingEdges(ZoneComponentFinder& finder)
 {
     /*
      * Any compartment may have a pointer to an atom in the atoms
      * compartment, and these aren't in the cross compartment map.
      */
     JSRuntime* rt = runtimeFromMainThread();
-    if (rt->atomsCompartment()->zone()->isGCMarking())
-        finder.addEdgeTo(rt->atomsCompartment()->zone());
+    Zone* atomsZone = rt->atomsCompartment(finder.lock)->zone();
+    if (atomsZone->isGCMarking())
+        finder.addEdgeTo(atomsZone);
 
     for (CompartmentsInZoneIter comp(this); !comp.done(); comp.next())
         comp->findOutgoingEdges(finder);
@@ -4700,9 +4700,9 @@ GCRuntime::findZoneEdgesForWeakMaps()
 }
 
 void
-GCRuntime::findZoneGroups()
+GCRuntime::findZoneGroups(AutoLockForExclusiveAccess& lock)
 {
-    ComponentFinder<Zone> finder(rt->mainThread.nativeStackLimit[StackForSystemCode]);
+    ZoneComponentFinder finder(rt->mainThread.nativeStackLimit[StackForSystemCode], lock);
     if (!isIncremental || !findZoneEdgesForWeakMaps())
         finder.useOneComponent();
 
@@ -4744,7 +4744,7 @@ GCRuntime::getNextZoneGroup()
     }
 
     if (!isIncremental)
-        ComponentFinder<Zone>::mergeGroups(currentZoneGroup);
+        ZoneComponentFinder::mergeGroups(currentZoneGroup);
 
     if (abortSweepAfterCurrentGroup) {
         MOZ_ASSERT(!isIncremental);
@@ -5163,7 +5163,7 @@ GCRuntime::joinTask(GCParallelTask& task, gcstats::Phase phase)
 }
 
 void
-GCRuntime::beginSweepingZoneGroup()
+GCRuntime::beginSweepingZoneGroup(AutoLockForExclusiveAccess& lock)
 {
     /*
      * Begin sweeping the group of zones in gcCurrentZoneGroup,
@@ -5315,7 +5315,7 @@ GCRuntime::beginSweepingZoneGroup()
 
     if (sweepingAtoms) {
         gcstats::AutoPhase ap(stats, gcstats::PHASE_SWEEP_SYMBOL_REGISTRY);
-        rt->symbolRegistry().sweep();
+        rt->symbolRegistry(lock).sweep();
     }
 
     // Rejoin our off-main-thread tasks.
@@ -5407,7 +5407,7 @@ GCRuntime::endSweepingZoneGroup()
 }
 
 void
-GCRuntime::beginSweepPhase(bool destroyingRuntime)
+GCRuntime::beginSweepPhase(bool destroyingRuntime, AutoLockForExclusiveAccess& lock)
 {
     /*
      * Sweep phase.
@@ -5423,7 +5423,7 @@ GCRuntime::beginSweepPhase(bool destroyingRuntime)
 
     releaseHeldRelocatedArenas();
 
-    computeNonIncrementalMarkingForValidation();
+    computeNonIncrementalMarkingForValidation(lock);
 
     gcstats::AutoPhase ap(stats, gcstats::PHASE_SWEEP);
 
@@ -5435,9 +5435,9 @@ GCRuntime::beginSweepPhase(bool destroyingRuntime)
     AssertNoWrappersInGrayList(rt);
     DropStringWrappers(rt);
 
-    findZoneGroups();
+    findZoneGroups(lock);
     endMarkingZoneGroup();
-    beginSweepingZoneGroup();
+    beginSweepingZoneGroup(lock);
 }
 
 bool
@@ -5512,7 +5512,7 @@ SweepArenaList(Arena** arenasToSweep, SliceBudget& sliceBudget, Args... args)
 }
 
 GCRuntime::IncrementalProgress
-GCRuntime::sweepPhase(SliceBudget& sliceBudget)
+GCRuntime::sweepPhase(SliceBudget& sliceBudget, AutoLockForExclusiveAccess& lock)
 {
     AutoSetThreadIsSweeping threadIsSweeping;
 
@@ -5616,12 +5616,12 @@ GCRuntime::sweepPhase(SliceBudget& sliceBudget)
             return Finished;
 
         endMarkingZoneGroup();
-        beginSweepingZoneGroup();
+        beginSweepingZoneGroup(lock);
     }
 }
 
 void
-GCRuntime::endSweepPhase(bool destroyingRuntime)
+GCRuntime::endSweepPhase(bool destroyingRuntime, AutoLockForExclusiveAccess& lock)
 {
     AutoSetThreadIsSweeping threadIsSweeping;
 
@@ -5666,7 +5666,7 @@ GCRuntime::endSweepPhase(bool destroyingRuntime)
          * script's filename. See bug 323267.
          */
         if (isFull)
-            SweepScriptData(rt);
+            SweepScriptData(rt, lock);
 
         /* Clear out any small pools that we're hanging on to. */
         if (jit::JitRuntime* jitRuntime = rt->jitRuntime()) {
@@ -5735,7 +5735,8 @@ GCRuntime::beginCompactPhase()
 }
 
 GCRuntime::IncrementalProgress
-GCRuntime::compactPhase(JS::gcreason::Reason reason, SliceBudget& sliceBudget)
+GCRuntime::compactPhase(JS::gcreason::Reason reason, SliceBudget& sliceBudget,
+                        AutoLockForExclusiveAccess& lock)
 {
     MOZ_ASSERT(rt->gc.nursery.isEmpty());
     assertBackgroundSweepingFinished();
@@ -5749,7 +5750,7 @@ GCRuntime::compactPhase(JS::gcreason::Reason reason, SliceBudget& sliceBudget)
         Arena* relocatedArenas = nullptr;
         if (relocateArenas(zone, reason, relocatedArenas, sliceBudget)) {
             zone->setGCState(Zone::Compact);
-            updatePointersToRelocatedCells(zone);
+            updatePointersToRelocatedCells(zone, lock);
             zone->setGCState(Zone::Finished);
         }
         if (ShouldProtectRelocatedArenas(reason))
@@ -5770,7 +5771,7 @@ GCRuntime::compactPhase(JS::gcreason::Reason reason, SliceBudget& sliceBudget)
 #endif
 #ifdef JS_GC_ZEAL
     if (rt->hasZealMode(ZealMode::CheckHeapOnMovingGC))
-        CheckHeapAfterMovingGC(rt);
+        CheckHeapAfterMovingGC(rt, lock);
 #endif
 
     return zonesToMaybeCompact.isEmpty() ? Finished : NotFinished;
@@ -5884,7 +5885,7 @@ AutoTraceSession::~AutoTraceSession()
 }
 
 void
-GCRuntime::resetIncrementalGC(const char* reason)
+GCRuntime::resetIncrementalGC(const char* reason, AutoLockForExclusiveAccess& lock)
 {
     switch (incrementalState) {
       case NO_INCREMENTAL:
@@ -5928,7 +5929,7 @@ GCRuntime::resetIncrementalGC(const char* reason)
         isCompacting = false;
 
         auto unlimited = SliceBudget::unlimited();
-        incrementalCollectSlice(unlimited, JS::gcreason::RESET);
+        incrementalCollectSlice(unlimited, JS::gcreason::RESET, lock);
 
         isCompacting = wasCompacting;
 
@@ -5949,7 +5950,7 @@ GCRuntime::resetIncrementalGC(const char* reason)
         isCompacting = false;
 
         auto unlimited = SliceBudget::unlimited();
-        incrementalCollectSlice(unlimited, JS::gcreason::RESET);
+        incrementalCollectSlice(unlimited, JS::gcreason::RESET, lock);
 
         isCompacting = wasCompacting;
 
@@ -5964,7 +5965,7 @@ GCRuntime::resetIncrementalGC(const char* reason)
         zonesToMaybeCompact.clear();
 
         auto unlimited = SliceBudget::unlimited();
-        incrementalCollectSlice(unlimited, JS::gcreason::RESET);
+        incrementalCollectSlice(unlimited, JS::gcreason::RESET, lock);
 
         isCompacting = wasCompacting;
         break;
@@ -6068,10 +6069,9 @@ ShouldCleanUpEverything(JS::gcreason::Reason reason, JSGCInvocationKind gckind)
 }
 
 void
-GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason reason)
+GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason reason,
+                                   AutoLockForExclusiveAccess& lock)
 {
-    MOZ_ASSERT(rt->currentThreadHasExclusiveAccess());
-
     AutoGCSlice slice(rt);
 
     bool destroyingRuntime = (reason == JS::gcreason::DESTROY_RUNTIME);
@@ -6115,7 +6115,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         MOZ_FALLTHROUGH;
 
       case MARK_ROOTS:
-        if (!beginMarkPhase(reason)) {
+        if (!beginMarkPhase(reason, lock)) {
             incrementalState = NO_INCREMENTAL;
             return;
         }
@@ -6163,7 +6163,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
          * This runs to completion, but we don't continue if the budget is
          * now exhasted.
          */
-        beginSweepPhase(destroyingRuntime);
+        beginSweepPhase(destroyingRuntime, lock);
         if (budget.isOverBudget())
             break;
 
@@ -6179,10 +6179,10 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
       case SWEEP:
         AutoGCRooter::traceAllWrappers(&marker);
 
-        if (sweepPhase(budget) == NotFinished)
+        if (sweepPhase(budget, lock) == NotFinished)
             break;
 
-        endSweepPhase(destroyingRuntime);
+        endSweepPhase(destroyingRuntime, lock);
 
         incrementalState = FINALIZE;
 
@@ -6227,7 +6227,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
             if (!startedCompacting)
                 beginCompactPhase();
 
-            if (compactPhase(reason, budget) == NotFinished)
+            if (compactPhase(reason, budget, lock) == NotFinished)
                 break;
 
             endCompactPhase(reason);
@@ -6258,18 +6258,18 @@ gc::IsIncrementalGCSafe(JSRuntime* rt)
 }
 
 void
-GCRuntime::budgetIncrementalGC(SliceBudget& budget)
+GCRuntime::budgetIncrementalGC(SliceBudget& budget, AutoLockForExclusiveAccess& lock)
 {
     IncrementalSafety safe = IsIncrementalGCSafe(rt);
     if (!safe) {
-        resetIncrementalGC(safe.reason());
+        resetIncrementalGC(safe.reason(), lock);
         budget.makeUnlimited();
         stats.nonincremental(safe.reason());
         return;
     }
 
     if (mode != JSGC_MODE_INCREMENTAL) {
-        resetIncrementalGC("GC mode change");
+        resetIncrementalGC("GC mode change", lock);
         budget.makeUnlimited();
         stats.nonincremental("GC mode");
         return;
@@ -6297,7 +6297,7 @@ GCRuntime::budgetIncrementalGC(SliceBudget& budget)
     }
 
     if (reset)
-        resetIncrementalGC("zone change");
+        resetIncrementalGC("zone change", lock);
 }
 
 namespace {
@@ -6388,12 +6388,12 @@ GCRuntime::gcCycle(bool nonincrementalByAPI, SliceBudget& budget, JS::gcreason::
         // the caller expects this GC to collect certain objects, and we need
         // to make sure to collect everything possible.
         if (reason != JS::gcreason::ALLOC_TRIGGER)
-            resetIncrementalGC("requested");
+            resetIncrementalGC("requested", session.lock);
 
         stats.nonincremental("requested");
         budget.makeUnlimited();
     } else {
-        budgetIncrementalGC(budget);
+        budgetIncrementalGC(budget, session.lock);
     }
 
     /* The GC was reset, so we need a do-over. */
@@ -6402,7 +6402,7 @@ GCRuntime::gcCycle(bool nonincrementalByAPI, SliceBudget& budget, JS::gcreason::
 
     TraceMajorGCStart();
 
-    incrementalCollectSlice(budget, reason);
+    incrementalCollectSlice(budget, reason, session.lock);
 
 #ifndef JS_MORE_DETERMINISTIC
     nextFullGCTime = PRMJ_Now() + GC_IDLE_FULL_SPAN;
@@ -6623,7 +6623,7 @@ GCRuntime::abortGC()
     AutoTraceSession session(rt, JS::HeapState::MajorCollecting);
 
     number++;
-    resetIncrementalGC("abort");
+    resetIncrementalGC("abort", session.lock);
 }
 
 void
@@ -6827,7 +6827,7 @@ void js::gc::FinishGC(JSRuntime* rt)
 AutoPrepareForTracing::AutoPrepareForTracing(JSRuntime* rt, ZoneSelector selector)
 {
     js::gc::FinishGC(rt);
-    session.emplace(rt);
+    session_.emplace(rt);
 }
 
 JSCompartment*
