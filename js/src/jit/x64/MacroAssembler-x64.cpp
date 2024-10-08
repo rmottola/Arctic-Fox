@@ -395,7 +395,8 @@ MacroAssembler::callWithABINoProfiler(Register fun, MoveOp::Type result)
     if (IsIntArgReg(fun)) {
         // Callee register may be clobbered for an argument. Move the callee to
         // r10, a volatile, non-argument register.
-        moveResolver_.addMove(MoveOperand(fun), MoveOperand(r10), MoveOp::GENERAL);
+        propagateOOM(moveResolver_.addMove(MoveOperand(fun), MoveOperand(r10),
+                                           MoveOp::GENERAL));
         fun = r10;
     }
 
@@ -414,7 +415,8 @@ MacroAssembler::callWithABINoProfiler(const Address& fun, MoveOp::Type result)
     if (IsIntArgReg(safeFun.base)) {
         // Callee register may be clobbered for an argument. Move the callee to
         // r10, a volatile, non-argument register.
-        moveResolver_.addMove(MoveOperand(fun.base), MoveOperand(r10), MoveOp::GENERAL);
+        propagateOOM(moveResolver_.addMove(MoveOperand(fun.base), MoveOperand(r10),
+                                           MoveOp::GENERAL));
         safeFun.base = r10;
     }
 
