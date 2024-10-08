@@ -1405,7 +1405,7 @@ void
 MSimdInsertElement::printOpcode(GenericPrinter& out) const
 {
     MDefinition::printOpcode(out);
-    out.printf(" (%s)", MSimdInsertElement::LaneName(lane()));
+    out.printf(" (lane %u)", lane());
 }
 
 void
