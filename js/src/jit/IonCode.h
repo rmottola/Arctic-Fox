@@ -611,7 +611,8 @@ struct IonBlockCounts
 
   public:
 
-    bool init(uint32_t id, uint32_t offset, char* description, uint32_t numSuccessors) {
+    MOZ_MUST_USE bool init(uint32_t id, uint32_t offset, char* description,
+                           uint32_t numSuccessors) {
         id_ = id;
         offset_ = offset;
         description_ = description;
@@ -710,7 +711,7 @@ struct IonScriptCounts
         }
     }
 
-    bool init(size_t numBlocks) {
+    MOZ_MUST_USE bool init(size_t numBlocks) {
         blocks_ = js_pod_calloc<IonBlockCounts>(numBlocks);
         if (!blocks_)
             return false;
