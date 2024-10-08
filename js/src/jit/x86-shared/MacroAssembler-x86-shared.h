@@ -1232,7 +1232,7 @@ class MacroAssemblerX86Shared : public Assembler
             return true;
         }
         if (v == minusOne) {
-            vpcmpeqw(dest, dest, dest);
+            vpcmpeqw(Operand(dest), dest, dest);
             return true;
         }
         return false;
