@@ -242,7 +242,7 @@ wasm::GenerateEntry(MacroAssembler& masm, unsigned target, const Sig& sig, bool 
 
     // Call into the real function.
     masm.assertStackAlignment(AsmJSStackAlignment);
-    masm.call(CallSiteDesc(CallSiteDesc::Relative), AsmJSInternalCallee(target));
+    masm.call(CallSiteDesc(CallSiteDesc::Relative), target);
 
     // Recover the stack pointer value before dynamic alignment.
     masm.loadWasmActivation(scratch);
