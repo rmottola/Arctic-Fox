@@ -1033,7 +1033,7 @@ struct JSRuntime : public JS::shadow::Runtime,
         return interpreterStack_;
     }
 
-    bool enqueuePromiseJob(JSContext* cx, js::HandleFunction job);
+    bool enqueuePromiseJob(JSContext* cx, js::HandleFunction job, js::HandleObject promise);
 
     //-------------------------------------------------------------------------
     // Self-hosting support
