@@ -37,7 +37,6 @@
 #include "jswin.h"
 #include "jswrapper.h"
 
-#include "asmjs/WasmModule.h"
 #include "builtin/Eval.h"
 #include "builtin/Object.h"
 #include "builtin/SymbolObject.h"
@@ -3776,9 +3775,6 @@ JSObject::addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::ClassIn
         ArrayBufferObject::addSizeOfExcludingThis(this, mallocSizeOf, info);
     } else if (is<SharedArrayBufferObject>()) {
         SharedArrayBufferObject::addSizeOfExcludingThis(this, mallocSizeOf, info);
-    } else if (is<WasmModuleObject>()) {
-        as<WasmModuleObject>().addSizeOfMisc(mallocSizeOf, &info->objectsNonHeapCodeAsmJS,
-                                             &info->objectsMallocHeapMisc);
 #ifdef JS_HAS_CTYPES
     } else {
         // This must be the last case.
