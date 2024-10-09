@@ -1119,6 +1119,7 @@ class JS_PUBLIC_API(RuntimeOptions) {
         ion_(true),
         asmJS_(true),
         wasm_(false),
+        wasmAlwaysBaseline_(false),
         throwOnAsmJSValidationFailure_(false),
         nativeRegExp_(true),
         unboxedArrays_(false),
@@ -1173,6 +1174,16 @@ class JS_PUBLIC_API(RuntimeOptions) {
     }
     RuntimeOptions& toggleWasm() {
         wasm_ = !wasm_;
+        return *this;
+    }
+
+    bool wasmAlwaysBaseline() const { return wasmAlwaysBaseline_; }
+    RuntimeOptions& setWasmAlwaysBaseline(bool flag) {
+        wasmAlwaysBaseline_ = flag;
+        return *this;
+    }
+    RuntimeOptions& toggleWasmAlwaysBaseline() {
+        wasmAlwaysBaseline_ = !wasmAlwaysBaseline_;
         return *this;
     }
 
@@ -1257,6 +1268,7 @@ class JS_PUBLIC_API(RuntimeOptions) {
     bool ion_ : 1;
     bool asmJS_ : 1;
     bool wasm_ : 1;
+    bool wasmAlwaysBaseline_ : 1;
     bool throwOnAsmJSValidationFailure_ : 1;
     bool nativeRegExp_ : 1;
     bool unboxedArrays_ : 1;
