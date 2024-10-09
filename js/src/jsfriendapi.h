@@ -1501,6 +1501,8 @@ enum Type {
     MaxTypedArrayViewType,
 
     Float32x4,
+    Int8x16,
+    Int16x8,
     Int32x4
 };
 
@@ -1521,6 +1523,8 @@ byteSize(Type atype)
         return 4;
       case Float64:
         return 8;
+      case Int8x16:
+      case Int16x8:
       case Int32x4:
       case Float32x4:
         return 16;
@@ -1535,6 +1539,8 @@ isSignedIntType(Type atype) {
       case Int8:
       case Int16:
       case Int32:
+      case Int8x16:
+      case Int16x8:
       case Int32x4:
         return true;
       case Uint8:
@@ -1563,6 +1569,8 @@ isSimdType(Type atype) {
       case Float32:
       case Float64:
         return false;
+      case Int8x16:
+      case Int16x8:
       case Int32x4:
       case Float32x4:
         return true;
@@ -1575,6 +1583,10 @@ isSimdType(Type atype) {
 static inline size_t
 scalarByteSize(Type atype) {
     switch (atype) {
+      case Int8x16:
+        return 1;
+      case Int16x8:
+        return 2;
       case Int32x4:
       case Float32x4:
         return 4;
