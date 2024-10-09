@@ -2486,6 +2486,8 @@ IonBuilder::finishLoop(CFGState& state, MBasicBlock* successor)
 IonBuilder::ControlStatus
 IonBuilder::restartLoop(const CFGState& state)
 {
+    AutoTraceLog logCompile(traceLogger(), TraceLogger_IonBuilderRestartLoop);
+
     spew("New types at loop header, restarting loop body");
 
     if (JitOptions.limitScriptSize) {

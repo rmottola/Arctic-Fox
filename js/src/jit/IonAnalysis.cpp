@@ -3918,6 +3918,11 @@ jit::AnalyzeNewScriptDefiniteProperties(JSContext* cx, JSFunction* fun,
     if (script->length() > MAX_SCRIPT_SIZE)
         return true;
 
+    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
+    TraceLoggerEvent event(logger, TraceLogger_AnnotateScripts, script);
+    AutoTraceLog logScript(logger, event);
+    AutoTraceLog logCompile(logger, TraceLogger_IonAnalysis);
+
     Vector<PropertyName*> accessedProperties(cx);
 
     LifoAlloc alloc(TempAllocator::PreferredLifoChunkSize);
@@ -4157,6 +4162,11 @@ jit::AnalyzeArgumentsUsage(JSContext* cx, JSScript* scriptArg)
 
     if (!script->ensureHasTypes(cx))
         return false;
+
+    TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
+    TraceLoggerEvent event(logger, TraceLogger_AnnotateScripts, script);
+    AutoTraceLog logScript(logger, event);
+    AutoTraceLog logCompile(logger, TraceLogger_IonAnalysis);
 
     LifoAlloc alloc(TempAllocator::PreferredLifoChunkSize);
     TempAllocator temp(&alloc);
