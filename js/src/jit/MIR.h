@@ -9375,7 +9375,7 @@ class MNot
 // (unsigned comparisons may be used).
 class MBoundsCheck
   : public MBinaryInstruction,
-    public NoTypePolicy::Data
+    public MixPolicy<IntPolicy<0>, IntPolicy<1>>::Data
 {
     // Range over which to perform the bounds check, may be modified by GVN.
     int32_t minimum_;
@@ -9446,7 +9446,7 @@ class MBoundsCheck
 // Bailout if index < minimum.
 class MBoundsCheckLower
   : public MUnaryInstruction,
-    public NoTypePolicy::Data
+    public IntPolicy<0>::Data
 {
     int32_t minimum_;
     bool fallible_;

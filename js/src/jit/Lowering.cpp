@@ -2934,8 +2934,12 @@ LIRGenerator::visitNot(MNot* ins)
 void
 LIRGenerator::visitBoundsCheck(MBoundsCheck* ins)
 {
-     if (!ins->fallible())
-         return;
+    MOZ_ASSERT(ins->index()->type() == MIRType::Int32);
+    MOZ_ASSERT(ins->length()->type() == MIRType::Int32);
+    MOZ_ASSERT(ins->type() == MIRType::Int32);
+
+    if (!ins->fallible())
+        return;
 
     LInstruction* check;
     if (ins->minimum() || ins->maximum()) {
@@ -2953,6 +2957,8 @@ LIRGenerator::visitBoundsCheck(MBoundsCheck* ins)
 void
 LIRGenerator::visitBoundsCheckLower(MBoundsCheckLower* ins)
 {
+    MOZ_ASSERT(ins->index()->type() == MIRType::Int32);
+
     if (!ins->fallible())
         return;
 
