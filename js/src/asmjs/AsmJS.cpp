@@ -3397,6 +3397,26 @@ IsSimdValidOperationType(SimdType type, SimdOperation op)
 {
 #define CASE(op) case SimdOperation::Fn_##op:
     switch(type) {
+      case SimdType::Int8x16:
+        switch (op) {
+          case SimdOperation::Constructor:
+          case SimdOperation::Fn_fromUint8x16Bits:
+          case SimdOperation::Fn_fromUint16x8Bits:
+          case SimdOperation::Fn_fromUint32x4Bits:
+          FORALL_INT8X16_ASMJS_OP(CASE) return true;
+          default: return false;
+        }
+        break;
+      case SimdType::Int16x8:
+        switch (op) {
+          case SimdOperation::Constructor:
+          case SimdOperation::Fn_fromUint8x16Bits:
+          case SimdOperation::Fn_fromUint16x8Bits:
+          case SimdOperation::Fn_fromUint32x4Bits:
+          FORALL_INT16X8_ASMJS_OP(CASE) return true;
+          default: return false;
+        }
+        break;
       case SimdType::Int32x4:
         switch (op) {
           case SimdOperation::Constructor:
@@ -3404,6 +3424,26 @@ IsSimdValidOperationType(SimdType type, SimdOperation op)
           case SimdOperation::Fn_fromUint16x8Bits:
           case SimdOperation::Fn_fromUint32x4Bits:
           FORALL_INT32X4_ASMJS_OP(CASE) return true;
+          default: return false;
+        }
+        break;
+      case SimdType::Uint8x16:
+        switch (op) {
+          case SimdOperation::Constructor:
+          case SimdOperation::Fn_fromInt8x16Bits:
+          case SimdOperation::Fn_fromUint16x8Bits:
+          case SimdOperation::Fn_fromUint32x4Bits:
+          FORALL_INT8X16_ASMJS_OP(CASE) return true;
+          default: return false;
+        }
+        break;
+      case SimdType::Uint16x8:
+        switch (op) {
+          case SimdOperation::Constructor:
+          case SimdOperation::Fn_fromUint8x16Bits:
+          case SimdOperation::Fn_fromInt16x8Bits:
+          case SimdOperation::Fn_fromUint32x4Bits:
+          FORALL_INT16X8_ASMJS_OP(CASE) return true;
           default: return false;
         }
         break;
@@ -3427,6 +3467,8 @@ IsSimdValidOperationType(SimdType type, SimdOperation op)
           default: return false;
         }
         break;
+      case SimdType::Bool8x16:
+      case SimdType::Bool16x8:
       case SimdType::Bool32x4:
         switch (op) {
           case SimdOperation::Constructor:
