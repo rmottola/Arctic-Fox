@@ -6579,8 +6579,7 @@ CheckIf(FunctionValidator& f, ParseNode* ifStmt)
 
         if (elseStmt->isKind(PNK_IF)) {
             ifStmt = elseStmt;
-            ++numIfEnd;
-            if (numIfEnd == 0)
+            if (numIfEnd++ == UINT32_MAX)
                 return false;
             goto recurse;
         }
