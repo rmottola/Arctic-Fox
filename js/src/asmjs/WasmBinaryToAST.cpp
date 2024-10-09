@@ -1248,7 +1248,7 @@ AstDecodeMemorySection(AstDecodeContext& c)
     if (!c.d.readVarU32(&initialSizePages))
         return AstDecodeFail(c, "expected initial memory size");
 
-    CheckedInt<int32_t> initialSize = initialSizePages;
+    CheckedInt<uint32_t> initialSize = initialSizePages;
     initialSize *= PageSize;
     if (!initialSize.isValid())
         return AstDecodeFail(c, "initial memory size too big");
@@ -1257,10 +1257,10 @@ AstDecodeMemorySection(AstDecodeContext& c)
     if (!c.d.readVarU32(&maxSizePages))
         return AstDecodeFail(c, "expected initial memory size");
 
-    CheckedInt<int32_t> maxSize = maxSizePages;
+    CheckedInt<uint32_t> maxSize = maxSizePages;
     maxSize *= PageSize;
     if (!maxSize.isValid())
-        return AstDecodeFail(c, "initial memory size too big");
+        return AstDecodeFail(c, "maximum memory size too big");
 
     uint8_t exported;
     if (!c.d.readFixedU8(&exported))
