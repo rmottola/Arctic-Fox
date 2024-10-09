@@ -1650,10 +1650,8 @@ Debugger::slowPathOnNewScript(JSContext* cx, HandleScript script)
             return JSTRAP_CONTINUE;
         });
 
-    if (status == JSTRAP_ERROR) {
-        ReportOutOfMemory(cx);
+    if (status == JSTRAP_ERROR)
         return;
-    }
 
     MOZ_ASSERT(status == JSTRAP_CONTINUE);
 }
@@ -1672,10 +1670,8 @@ Debugger::slowPathOnNewWasmInstance(JSContext* cx, Handle<WasmInstanceObject*> w
             return JSTRAP_CONTINUE;
         });
 
-    if (status == JSTRAP_ERROR) {
-        ReportOutOfMemory(cx);
+    if (status == JSTRAP_ERROR)
         return;
-    }
 
     MOZ_ASSERT(status == JSTRAP_CONTINUE);
 }
@@ -3836,7 +3832,7 @@ class MOZ_STACK_CLASS Debugger::ScriptQuery
         source(cx, AsVariant(static_cast<ScriptSourceObject*>(nullptr))),
         innermostForCompartment(cx->runtime()),
         vector(cx, ScriptVector(cx)),
-        instanceObjectVector(cx, WasmInstanceObjectVector(cx))
+        wasmInstanceVector(cx, WasmInstanceObjectVector(cx))
     {}
 
     /*
@@ -4027,8 +4023,11 @@ class MOZ_STACK_CLASS Debugger::ScriptQuery
         // TODOshu: Until such time that wasm modules are real ES6 modules,
         // unconditionally consider all wasm toplevel instance scripts.
         for (WeakGlobalObjectSet::Range r = debugger->allDebuggees(); !r.empty(); r.popFront()) {
-            for (wasm::Instance* instance : r.front()->compartment()->wasmInstanceWeakList)
-                consider(instance);
+            auto& wasmInstances = r.front()->compartment()->wasmInstances;
+            if (!wasmInstances.initialized())
+                continue;
+            for (auto i = wasmInstances.all(); !i.empty(); i.popFront())
+                consider(i.front());
         }
 
         return true;
@@ -4039,7 +4038,7 @@ class MOZ_STACK_CLASS Debugger::ScriptQuery
     }
 
     Handle<WasmInstanceObjectVector> foundWasmInstances() const {
-        return instanceObjectVector;
+        return wasmInstanceVector;
     }
 
   private:
@@ -4105,7 +4104,7 @@ class MOZ_STACK_CLASS Debugger::ScriptQuery
     /*
      * Like above, but for wasm modules.
      */
-    Rooted<WasmInstanceObjectVector> instanceObjectVector;
+    Rooted<WasmInstanceObjectVector> wasmInstanceVector;
 
     /* Indicates whether OOM has occurred while matching. */
     bool oom;
@@ -4262,21 +4261,17 @@ class MOZ_STACK_CLASS Debugger::ScriptQuery
     }
 
     /*
-     * If |wasmInstance| matches this query, append it to |instanceObjectVector|.
+     * If |instanceObject| matches this query, append it to |wasmInstanceVector|.
      * Set |oom| if an out of memory condition occurred.
      */
-    void consider(wasm::Instance* wasmInstance) {
+    void consider(WasmInstanceObject* instanceObject) {
         if (oom)
             return;
 
-        WasmInstanceObject* instanceObject = &wasmInstance->object();
         if (hasSource && source != AsVariant(instanceObject))
             return;
 
-        // See Instance::readBarrier comment.
-        wasmInstance->readBarrier();
-
-        if (!instanceObjectVector.append(instanceObject))
+        if (!wasmInstanceVector.append(instanceObject))
             oom = true;
     }
 };
