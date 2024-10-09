@@ -244,11 +244,12 @@ AstDecodeCall(AstDecodeContext& c)
     if (!AstDecodeCallReturn(c, *sig))
         return false;
 
+    uint32_t argsLength = args.length();
     AstCall* call = new(c.lifo) AstCall(Expr::Call, funcRef, Move(args));
     if (!call)
         return false;
 
-    c.iter().setResult(AstDecodeStackItem(call, args.length()));
+    c.iter().setResult(AstDecodeStackItem(call, argsLength));
     return true;
 }
 
@@ -280,11 +281,12 @@ AstDecodeCallIndirect(AstDecodeContext& c)
     if (!AstDecodeCallReturn(c, *sig))
         return false;
 
+    uint32_t argsLength = args.length();
     AstCallIndirect* call = new(c.lifo) AstCallIndirect(sigRef, index.expr, Move(args));
     if (!call)
         return false;
 
-    c.iter().setResult(AstDecodeStackItem(call, 1 + args.length()));
+    c.iter().setResult(AstDecodeStackItem(call, 1 + argsLength));
     return true;
 }
 
@@ -312,11 +314,12 @@ AstDecodeCallImport(AstDecodeContext& c)
     if (!AstDecodeCallReturn(c, *sig))
         return false;
 
+    uint32_t argsLength = args.length();
     AstCall* call = new(c.lifo) AstCall(Expr::CallImport, funcRef, Move(args));
     if (!call)
         return false;
 
-    c.iter().setResult(AstDecodeStackItem(call, args.length()));
+    c.iter().setResult(AstDecodeStackItem(call, argsLength));
     return true;
 }
 
