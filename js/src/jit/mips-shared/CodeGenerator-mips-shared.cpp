@@ -1671,7 +1671,7 @@ CodeGeneratorMIPSShared::visitAsmJSLoadHeap(LAsmJSLoadHeap* ins)
     masm.bind(&done);
 
     memoryBarrier(mir->barrierAfter());
-    masm.append(wasm::HeapAccess(bo.getOffset()));
+    masm.append(wasm::BoundsCheck(bo.getOffset()));
 }
 
 void
@@ -1759,7 +1759,7 @@ CodeGeneratorMIPSShared::visitAsmJSStoreHeap(LAsmJSStoreHeap* ins)
     masm.bind(&done);
 
     memoryBarrier(mir->barrierAfter());
-    masm.append(wasm::HeapAccess(bo.getOffset()));
+    masm.append(wasm::BoundsCheck(bo.getOffset()));
 }
 
 void
@@ -1789,7 +1789,7 @@ CodeGeneratorMIPSShared::visitAsmJSCompareExchangeHeap(LAsmJSCompareExchangeHeap
                                         valueTemp, offsetTemp, maskTemp,
                                         ToAnyRegister(ins->output()));
     if (mir->needsBoundsCheck())
-        masm.append(wasm::HeapAccess(maybeCmpOffset));
+        masm.append(wasm::BoundsCheck(maybeCmpOffset));
 }
 
 void
@@ -1816,7 +1816,7 @@ CodeGeneratorMIPSShared::visitAsmJSAtomicExchangeHeap(LAsmJSAtomicExchangeHeap* 
                                        srcAddr, value, InvalidReg, valueTemp,
                                        offsetTemp, maskTemp, ToAnyRegister(ins->output()));
     if (mir->needsBoundsCheck())
-        masm.append(wasm::HeapAccess(maybeCmpOffset));
+        masm.append(wasm::BoundsCheck(maybeCmpOffset));
 }
 
 void
@@ -1854,7 +1854,7 @@ CodeGeneratorMIPSShared::visitAsmJSAtomicBinopHeap(LAsmJSAtomicBinopHeap* ins)
                                    valueTemp, offsetTemp, maskTemp,
                                    ToAnyRegister(ins->output()));
     if (mir->needsBoundsCheck())
-        masm.append(wasm::HeapAccess(maybeCmpOffset));
+        masm.append(wasm::BoundsCheck(maybeCmpOffset));
 }
 
 void
@@ -1890,7 +1890,7 @@ CodeGeneratorMIPSShared::visitAsmJSAtomicBinopHeapForEffect(LAsmJSAtomicBinopHea
                                    valueTemp, offsetTemp, maskTemp);
 
     if (mir->needsBoundsCheck())
-        masm.append(wasm::HeapAccess(maybeCmpOffset));
+        masm.append(wasm::BoundsCheck(maybeCmpOffset));
 }
 
 void
