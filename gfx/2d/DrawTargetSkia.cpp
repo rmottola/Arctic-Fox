@@ -265,7 +265,7 @@ SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, Float aAlpha = 1.0)
 
       sk_sp<SkShader> shader = SkShader::MakeBitmapShader(bitmap, xTileMode, yTileMode, &mat);
       aPaint.setShader(shader);
-      if (pat.mFilter == Filter::POINT) {
+      if (pat.mSamplingFilter == SamplingFilter::POINT) {
         aPaint.setFilterQuality(kNone_SkFilterQuality);
       }
       break;
@@ -380,7 +380,7 @@ DrawTargetSkia::DrawSurface(SourceSurface *aSurface,
   SkBitmap bitmap = GetBitmapForSurface(aSurface);
 
   AutoPaintSetup paint(mCanvas.get(), aOptions, &aDest);
-  if (aSurfOptions.mFilter == Filter::POINT) {
+  if (aSurfOptions.mSamplingFilter == SamplingFilter::POINT) {
     paint.mPaint.setFilterQuality(kNone_SkFilterQuality);
   }
 
