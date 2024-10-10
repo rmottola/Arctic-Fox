@@ -50,7 +50,7 @@ Compositor::ShouldDrawDiagnostics(DiagnosticFlags aFlags)
 void
 Compositor::DrawDiagnostics(DiagnosticFlags aFlags,
                             const nsIntRegion& aVisibleRegion,
-                            const gfx::Rect& aClipRect,
+                            const gfx::IntRect& aClipRect,
                             const gfx::Matrix4x4& aTransform,
                             uint32_t aFlashCounter)
 {
@@ -73,7 +73,7 @@ Compositor::DrawDiagnostics(DiagnosticFlags aFlags,
 void
 Compositor::DrawDiagnostics(DiagnosticFlags aFlags,
                             const gfx::Rect& aVisibleRect,
-                            const gfx::Rect& aClipRect,
+                            const gfx::IntRect& aClipRect,
                             const gfx::Matrix4x4& aTransform,
                             uint32_t aFlashCounter)
 {
@@ -88,7 +88,7 @@ Compositor::DrawDiagnostics(DiagnosticFlags aFlags,
 void
 Compositor::DrawDiagnosticsInternal(DiagnosticFlags aFlags,
                                     const gfx::Rect& aVisibleRect,
-                                    const gfx::Rect& aClipRect,
+                                    const gfx::IntRect& aClipRect,
                                     const gfx::Matrix4x4& aTransform,
                                     uint32_t aFlashCounter)
 {
@@ -146,7 +146,7 @@ Compositor::DrawDiagnosticsInternal(DiagnosticFlags aFlags,
 
 void
 Compositor::SlowDrawRect(const gfx::Rect& aRect, const gfx::Color& aColor,
-                     const gfx::Rect& aClipRect,
+                     const gfx::IntRect& aClipRect,
                      const gfx::Matrix4x4& aTransform, int aStrokeWidth)
 {
   // TODO This should draw a rect using a single draw call but since
@@ -179,7 +179,7 @@ Compositor::SlowDrawRect(const gfx::Rect& aRect, const gfx::Color& aColor,
 
 void
 Compositor::FillRect(const gfx::Rect& aRect, const gfx::Color& aColor,
-                     const gfx::Rect& aClipRect,
+                     const gfx::IntRect& aClipRect,
                      const gfx::Matrix4x4& aTransform)
 {
   float opacity = 1.0f;
@@ -357,7 +357,7 @@ DecomposeIntoNoRepeatRects(const gfx::Rect& aRect,
 
 gfx::IntRect
 Compositor::ComputeBackdropCopyRect(const gfx::Rect& aRect,
-                                    const gfx::Rect& aClipRect,
+                                    const gfx::IntRect& aClipRect,
                                     const gfx::Matrix4x4& aTransform,
                                     gfx::Matrix4x4* aOutTransform,
                                     gfx::Rect* aOutLayerQuad)
@@ -366,7 +366,7 @@ Compositor::ComputeBackdropCopyRect(const gfx::Rect& aRect,
   gfx::IntPoint rtOffset = GetCurrentRenderTarget()->GetOrigin();
   gfx::IntSize rtSize = GetCurrentRenderTarget()->GetSize();
 
-  gfx::Rect renderBounds(0, 0, rtSize.width, rtSize.height);
+  gfx::IntRect renderBounds(0, 0, rtSize.width, rtSize.height);
   renderBounds.IntersectRect(renderBounds, aClipRect);
   renderBounds.MoveBy(rtOffset);
 
