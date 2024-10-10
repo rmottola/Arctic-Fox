@@ -985,17 +985,19 @@ static struct {
 } cache[16];
 static int n_cached;
 
-#else /* !PIXMAN_HAS_ATOMIC_OPS */
+#else  /* !PIXMAN_HAS_ATOMIC_OPS */
 static pixman_image_t *
 _pixman_transparent_image (void)
 {
     return _pixman_image_for_solid (&_cairo_pattern_clear);
 }
+
 static pixman_image_t *
 _pixman_black_image (void)
 {
     return _pixman_image_for_solid (&_cairo_pattern_black);
 }
+
 static pixman_image_t *
 _pixman_white_image (void)
 {
@@ -1054,7 +1056,6 @@ _pixman_image_for_solid (const cairo_solid_pattern_t *pattern)
 	    return _pixman_white_image ();
 	}
     }
-
 
     CAIRO_MUTEX_LOCK (_cairo_image_solid_cache_mutex);
     for (i = 0; i < n_cached; i++) {
