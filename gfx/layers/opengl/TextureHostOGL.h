@@ -349,7 +349,7 @@ public:
 
   virtual const char* Name() const override { return "SurfaceTextureSource"; }
 
-  virtual TextureSourceOGL* AsSourceOGL() { return this; }
+  virtual TextureSourceOGL* AsSourceOGL() override { return this; }
 
   virtual void BindTexture(GLenum activetex, gfx::Filter aFilter) override;
 
@@ -361,7 +361,7 @@ public:
 
   virtual gfx::Matrix4x4 GetTextureTransform() override;
 
-  virtual GLenum GetTextureTarget() const { return mTextureTarget; }
+  virtual GLenum GetTextureTarget() const override { return mTextureTarget; }
 
   virtual GLenum GetWrapMode() const override { return mWrapMode; }
 
