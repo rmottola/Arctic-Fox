@@ -108,8 +108,7 @@ private:
           PrefAddVarCache(&mValue,aPreference, mValue);
           break;
         default:
-          MOZ_CRASH();
-          break;
+          MOZ_CRASH("Incomplete switch");
       }
     }
     void Set(UpdatePolicy aUpdate, const char* aPref, T aValue)
@@ -124,8 +123,7 @@ private:
           mValue = PrefGet(aPref, mValue);
           break;
         default:
-          MOZ_CRASH();
-          break;
+          MOZ_CRASH("Incomplete switch");
       }
     }
     T mValue;
