@@ -1469,6 +1469,8 @@ CompositorOGL::EndFrame()
 
   MOZ_ASSERT(mCurrentRenderTarget == mWindowRenderTarget, "Rendering target not properly restored");
 
+  Compositor::EndFrame();
+
 #ifdef MOZ_DUMP_PAINTING
   if (gfxEnv::DumpCompositorTextures()) {
     LayoutDeviceIntSize size;
