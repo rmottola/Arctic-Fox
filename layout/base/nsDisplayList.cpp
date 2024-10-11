@@ -3185,7 +3185,7 @@ void
 nsDisplayImageContainer::ConfigureLayer(ImageLayer* aLayer,
                                         const ContainerLayerParameters& aParameters)
 {
-  aLayer->SetFilter(nsLayoutUtils::GetGraphicsFilterForFrame(mFrame));
+  aLayer->SetSamplingFilter(nsLayoutUtils::GetSamplingFilterForFrame(mFrame));
 
   nsCOMPtr<imgIContainer> image = GetImage();
   MOZ_ASSERT(image);

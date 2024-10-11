@@ -5198,7 +5198,7 @@ nsImageRenderer::Draw(nsPresContext*       aPresContext,
     return DrawResult::SUCCESS;
   }
 
-  Filter filter = nsLayoutUtils::GetGraphicsFilterForFrame(mForFrame);
+  SamplingFilter samplingFilter = nsLayoutUtils::GetSamplingFilterForFrame(mForFrame);
   DrawResult result = DrawResult::SUCCESS;
   RefPtr<gfxContext> ctx = aRenderingContext.ThebesContext();
   IntRect tmpDTRect;
@@ -5222,7 +5222,8 @@ nsImageRenderer::Draw(nsPresContext*       aPresContext,
       result =
         nsLayoutUtils::DrawBackgroundImage(*ctx,
                                            aPresContext,
-                                           mImageContainer, imageSize, filter,
+                                           mImageContainer, imageSize,
+                                           samplingFilter,
                                            aDest, aFill, aRepeatSize,
                                            aAnchor, aDirtyRect,
                                            ConvertImageRendererToDrawFlags(mFlags),
@@ -5249,7 +5250,7 @@ nsImageRenderer::Draw(nsPresContext*       aPresContext,
       result =
         nsLayoutUtils::DrawImage(*ctx,
                                  aPresContext, image,
-                                 filter, aDest, aFill, aAnchor, aDirtyRect,
+                                 samplingFilter, aDest, aFill, aAnchor, aDirtyRect,
                                  ConvertImageRendererToDrawFlags(mFlags));
       break;
     }
@@ -5275,7 +5276,7 @@ nsImageRenderer::Draw(nsPresContext*       aPresContext,
     DrawTarget* dt = aRenderingContext.ThebesContext()->GetDrawTarget();
     dt->DrawSurface(surf, Rect(tmpDTRect.x, tmpDTRect.y, tmpDTRect.width, tmpDTRect.height),
                     Rect(0, 0, tmpDTRect.width, tmpDTRect.height),
-                    DrawSurfaceOptions(Filter::POINT),
+                    DrawSurfaceOptions(SamplingFilter::POINT),
                     DrawOptions(1.0f, aRenderingContext.ThebesContext()->CurrentOp()));
   }
 
@@ -5472,13 +5473,13 @@ nsImageRenderer::DrawBorderImageComponent(nsPresContext*       aPresContext,
     MOZ_ASSERT_IF(aSVGViewportSize,
                   subImage->GetType() == imgIContainer::TYPE_VECTOR);
 
-    Filter filter = nsLayoutUtils::GetGraphicsFilterForFrame(mForFrame);
+    SamplingFilter samplingFilter = nsLayoutUtils::GetSamplingFilterForFrame(mForFrame);
 
     if (!RequiresScaling(aFill, aHFill, aVFill, aUnitSize)) {
       return nsLayoutUtils::DrawSingleImage(*aRenderingContext.ThebesContext(),
                                             aPresContext,
                                             subImage,
-                                            filter,
+                                            samplingFilter,
                                             aFill, aDirtyRect,
                                             nullptr,
                                             drawFlags);
@@ -5488,7 +5489,7 @@ nsImageRenderer::DrawBorderImageComponent(nsPresContext*       aPresContext,
     return nsLayoutUtils::DrawImage(*aRenderingContext.ThebesContext(),
                                     aPresContext,
                                     subImage,
-                                    filter,
+                                    samplingFilter,
                                     tile, aFill, tile.TopLeft(), aDirtyRect,
                                     drawFlags);
   }
