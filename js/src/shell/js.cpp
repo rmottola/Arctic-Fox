@@ -506,17 +506,14 @@ EnvironmentPreparer::invoke(HandleObject scope, Closure& closure)
     MOZ_ASSERT(!JS_IsExceptionPending(cx));
 
     AutoCompartment ac(cx, scope);
+    AutoReportException are(cx);
     if (!closure(cx))
-        JS_ReportPendingException(cx);
-
-    MOZ_ASSERT(!JS_IsExceptionPending(cx));
+        return;
 }
 
-static void
+static MOZ_MUST_USE bool
 RunFile(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
 {
-    ShellRuntime* sr = GetShellRuntime(cx);
-
     SkipUTF8BOM(file);
 
     // To support the UNIX #! shell hack, gobble the first line if it starts
@@ -541,22 +538,23 @@ RunFile(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
                .setIsRunOnce(true)
                .setNoScriptRval(true);
 
-        (void) JS::Compile(cx, options, file, &script);
+        if (!JS::Compile(cx, options, file, &script))
+            return false;
+        MOZ_ASSERT(script);
     }
 
     #ifdef DEBUG
         if (dumpEntrainedVariables)
             AnalyzeEntrainedVariables(cx, script);
     #endif
-    if (script && !compileOnly) {
-        if (!JS_ExecuteScript(cx, script)) {
-            if (!sr->quitting && sr->exitCode != EXITCODE_TIMEOUT)
-                sr->exitCode = EXITCODE_RUNTIME_ERROR;
-        }
+    if (!compileOnly) {
+        if (!JS_ExecuteScript(cx, script))
+            return false;
         int64_t t2 = PRMJ_Now() - t1;
         if (printTiming)
             printf("runtime = %.3f ms\n", double(t2) / PRMJ_USEC_PER_MSEC);
     }
+    return true;
 }
 
 static bool
@@ -622,12 +620,10 @@ GetImportMethod(JSContext* cx, HandleObject loader, MutableHandleFunction result
     return true;
 }
 
-static void
+static MOZ_MUST_USE bool
 RunModule(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
 {
-    // Exectute a module by calling |Reflect.Loader.import(filename)|.
-
-    ShellRuntime* sr = GetShellRuntime(cx);
+    // Execute a module by calling |Reflect.Loader.import(filename)|.
 
     RootedObject loaderObj(cx);
     MOZ_ALWAYS_TRUE(GetLoaderObject(cx, &loaderObj));
@@ -640,10 +636,7 @@ RunModule(JSContext* cx, const char* filename, FILE* file, bool compileOnly)
     args[1].setUndefined();
 
     RootedValue value(cx);
-    if (!JS_CallFunction(cx, loaderObj, importFun, args, &value)) {
-        sr->exitCode = EXITCODE_RUNTIME_ERROR;
-        return;
-    }
+    return JS_CallFunction(cx, loaderObj, importFun, args, &value);
 }
 
 #ifdef SPIDERMONKEY_PROMISE
@@ -673,8 +666,10 @@ DrainJobQueue(JSContext* cx)
     for (size_t i = 0; i < sr->jobQueue.length(); i++) {
         job = sr->jobQueue[i];
         AutoCompartment ac(cx, job);
-        if (!JS::Call(cx, UndefinedHandleValue, job, args, &rval))
-            JS_ReportPendingException(cx);
+        {
+            AutoReportException are(cx);
+            JS::Call(cx, UndefinedHandleValue, job, args, &rval);
+        }
         sr->jobQueue[i].set(nullptr);
     }
     sr->jobQueue.clear();
@@ -770,7 +765,7 @@ EvalAndPrint(JSContext* cx, const char* bytes, size_t length,
     return true;
 }
 
-static void
+static MOZ_MUST_USE bool
 ReadEvalPrintLoop(JSContext* cx, FILE* in, bool compileOnly)
 {
     ShellRuntime* sr = GetShellRuntime(cx);
@@ -797,14 +792,14 @@ ReadEvalPrintLoop(JSContext* cx, FILE* in, bool compileOnly)
             if (!line) {
                 if (errno) {
                     JS_ReportError(cx, strerror(errno));
-                    return;
+                    return false;
                 }
                 hitEOF = true;
                 break;
             }
 
             if (!buffer.append(line, strlen(line)) || !buffer.append('\n'))
-                return;
+                return false;
 
             lineno++;
             if (!ScheduleWatchdog(cx->runtime(), sr->timeoutInterval)) {
@@ -816,10 +811,12 @@ ReadEvalPrintLoop(JSContext* cx, FILE* in, bool compileOnly)
         if (hitEOF && buffer.empty())
             break;
 
-        if (!EvalAndPrint(cx, buffer.begin(), buffer.length(), startline, compileOnly)) {
-            // Catch the error, report it, and keep going.
-            JS_ReportPendingException(cx);
+        {
+            // Report exceptions but keep going.
+            AutoReportException are(cx);
+            (void) EvalAndPrint(cx, buffer.begin(), buffer.length(), startline, compileOnly);
         }
+
         // If a let or const fail to initialize they will remain in an unusable
         // without further intervention. This call cleans up the global scope,
         // setting uninitialized lexicals to undefined so that they may still
@@ -838,6 +835,8 @@ ReadEvalPrintLoop(JSContext* cx, FILE* in, bool compileOnly)
 
     if (gOutFile->isOpen())
         fprintf(gOutFile->fp, "\n");
+
+    return true;
 }
 
 enum FileKind
@@ -846,7 +845,7 @@ enum FileKind
     FileModule
 };
 
-static void
+static MOZ_MUST_USE bool
 Process(JSContext* cx, const char* filename, bool forceTTY, FileKind kind = FileScript)
 {
     FILE* file;
@@ -857,22 +856,27 @@ Process(JSContext* cx, const char* filename, bool forceTTY, FileKind kind = File
         if (!file) {
             JS_ReportErrorNumber(cx, my_GetErrorMessage, nullptr,
                                  JSSMSG_CANT_OPEN, filename, strerror(errno));
-            return;
+            return false;
         }
     }
     AutoCloseFile autoClose(file);
 
     if (!forceTTY && !isatty(fileno(file))) {
         // It's not interactive - just execute it.
-        if (kind == FileScript)
-            RunFile(cx, filename, file, compileOnly);
-        else
-            RunModule(cx, filename, file, compileOnly);
+        if (kind == FileScript) {
+            if (!RunFile(cx, filename, file, compileOnly))
+                return false;
+        } else {
+            if (!RunModule(cx, filename, file, compileOnly))
+                return false;
+        }
     } else {
         // It's an interactive filehandle; drop into read-eval-print loop.
         MOZ_ASSERT(kind == FileScript);
-        ReadEvalPrintLoop(cx, file, compileOnly);
+        if (!ReadEvalPrintLoop(cx, file, compileOnly))
+            return false;
     }
+    return true;
 }
 
 static bool
@@ -1233,7 +1237,6 @@ class AutoNewContext
         newcx = NewContext(JS_GetRuntime(cx));
         if (!newcx)
             return false;
-        JS::ContextOptionsRef(newcx).setDontReportUncaught(true);
 
         newRequest.emplace(newcx);
         newCompartment.emplace(newcx, JS::CurrentGlobalOrNull(cx));
@@ -2980,7 +2983,7 @@ WorkerMain(void* arg)
     sr->isWorker = true;
     JS_SetRuntimePrivate(rt, sr.get());
     JS_SetFutexCanWait(rt);
-    JS_SetErrorReporter(rt, my_ErrorReporter);
+    JS_SetErrorReporter(rt, WarningReporter);
     JS_InitDestroyPrincipalsCallback(rt, ShellPrincipals::destroy);
     SetWorkerRuntimeOptions(rt);
 
@@ -3015,6 +3018,7 @@ WorkerMain(void* arg)
         options.setFileAndLine("<string>", 1)
                .setIsRunOnce(true);
 
+        AutoReportException are(cx);
         RootedScript script(cx);
         if (!JS::Compile(cx, options, input->chars, input->length, &script))
             break;
@@ -3110,6 +3114,7 @@ EvalInWorker(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
+    args.rval().setUndefined();
     return true;
 }
 
@@ -5965,13 +5970,55 @@ PrintStackTrace(JSContext* cx, HandleValue exn)
     return true;
 }
 
+js::shell::AutoReportException::~AutoReportException()
+{
+    if (!JS_IsExceptionPending(cx))
+        return;
+
+    // Get exception object before printing and clearing exception.
+    RootedValue exn(cx);
+    (void) JS_GetPendingException(cx, &exn);
+
+    JS_ClearPendingException(cx);
+
+    ShellRuntime* sr = GetShellRuntime(cx);
+    js::ErrorReport report(cx);
+    if (!report.init(cx, exn, js::ErrorReport::WithSideEffects)) {
+        fprintf(stderr, "out of memory initializing ErrorReport\n");
+        JS_ClearPendingException(cx);
+        return;
+    }
+
+    MOZ_ASSERT(!JSREPORT_IS_WARNING(report.report()->flags));
+
+    FILE* fp = ErrorFilePointer();
+    PrintError(cx, fp, report.message(), report.report(), reportWarnings);
+
+    {
+        JS::AutoSaveExceptionState savedExc(cx);
+        if (!PrintStackTrace(cx, exn))
+            fputs("(Unable to print stack trace)\n", fp);
+        savedExc.restore();
+    }
+
+    if (report.report()->errorNumber == JSMSG_OUT_OF_MEMORY)
+        sr->exitCode = EXITCODE_OUT_OF_MEMORY;
+    else
+        sr->exitCode = EXITCODE_RUNTIME_ERROR;
+
+    JS_ClearPendingException(cx);
+}
+
 void
-js::shell::my_ErrorReporter(JSContext* cx, const char* message, JSErrorReport* report)
+js::shell::WarningReporter(JSContext* cx, const char* message, JSErrorReport* report)
 {
     ShellRuntime* sr = GetShellRuntime(cx);
     FILE* fp = ErrorFilePointer();
 
-    if (report && JSREPORT_IS_WARNING(report->flags) && sr->lastWarningEnabled) {
+    MOZ_ASSERT(report);
+    MOZ_ASSERT(JSREPORT_IS_WARNING(report->flags));
+
+    if (sr->lastWarningEnabled) {
         JS::AutoSaveExceptionState savedExc(cx);
         if (!CreateLastWarningObject(cx, report)) {
             fputs("Unhandled error happened while creating last warning object.\n", fp);
@@ -5980,25 +6027,8 @@ js::shell::my_ErrorReporter(JSContext* cx, const char* message, JSErrorReport* r
         savedExc.restore();
     }
 
-    // Get exception object before printing and clearing exception.
-    RootedValue exn(cx);
-    if (JS_IsExceptionPending(cx))
-        (void) JS_GetPendingException(cx, &exn);
-
-    (void) PrintError(cx, fp, message, report, reportWarnings);
-    if (!exn.isUndefined()) {
-        JS::AutoSaveExceptionState savedExc(cx);
-        if (!PrintStackTrace(cx, exn))
-            fputs("(Unable to print stack trace)\n", fp);
-        savedExc.restore();
-    }
-
-    if (!JSREPORT_IS_WARNING(report->flags)) {
-        if (report->errorNumber == JSMSG_OUT_OF_MEMORY)
-            sr->exitCode = EXITCODE_OUT_OF_MEMORY;
-        else
-            sr->exitCode = EXITCODE_RUNTIME_ERROR;
-    }
+    // Print the warning.
+    PrintError(cx, fp, message, report, reportWarnings);
 }
 
 static bool
@@ -6507,6 +6537,9 @@ NewContext(JSRuntime* rt)
     if (!cx)
         return nullptr;
 
+    JS::ContextOptionsRef(cx).setDontReportUncaught(true);
+    JS::ContextOptionsRef(cx).setAutoJSAPIOwnsErrorReporting(true);
+
     JSShellContextData* data = NewContextData();
     if (!data) {
         DestroyContext(cx, false);
@@ -6620,6 +6653,8 @@ NewGlobalObject(JSContext* cx, JS::CompartmentOptions& options,
 static bool
 BindScriptArgs(JSContext* cx, OptionParser* op)
 {
+    AutoReportException are(cx);
+
     MultiStringRange msr = op->getMultiStringArg("scriptArgs");
     RootedObject scriptArgs(cx);
     scriptArgs = JS_NewArrayObject(cx, 0);
@@ -6663,7 +6698,7 @@ OptionFailure(const char* option, const char* str)
     return false;
 }
 
-static int
+static MOZ_MUST_USE bool
 ProcessArgs(JSContext* cx, OptionParser* op)
 {
     ShellRuntime* sr = GetShellRuntime(cx);
@@ -6673,7 +6708,7 @@ ProcessArgs(JSContext* cx, OptionParser* op)
 
     /* |scriptArgs| gets bound on the global before any code is run. */
     if (!BindScriptArgs(cx, op))
-        return EXIT_FAILURE;
+        return false;
 
     MultiStringRange filePaths = op->getMultiStringOption('f');
     MultiStringRange codeChunks = op->getMultiStringOption('e');
@@ -6684,15 +6719,14 @@ ProcessArgs(JSContext* cx, OptionParser* op)
         modulePaths.empty() &&
         !op->getStringArg("script"))
     {
-        Process(cx, nullptr, true); /* Interactive. */
-        return sr->exitCode;
+        return Process(cx, nullptr, true); /* Interactive. */
     }
 
     if (const char* path = op->getStringOption("module-load-path"))
         moduleLoadPath = path;
 
     if (!modulePaths.empty() && !InitModuleLoader(cx))
-        return EXIT_FAILURE;
+        return false;
 
     while (!filePaths.empty() || !codeChunks.empty() || !modulePaths.empty()) {
         size_t fpArgno = filePaths.empty() ? SIZE_MAX : filePaths.argno();
@@ -6701,9 +6735,8 @@ ProcessArgs(JSContext* cx, OptionParser* op)
 
         if (fpArgno < ccArgno && fpArgno < mpArgno) {
             char* path = filePaths.front();
-            Process(cx, path, false, FileScript);
-            if (sr->exitCode)
-                return sr->exitCode;
+            if (!Process(cx, path, false, FileScript))
+                return false;
             filePaths.popFront();
         } else if (ccArgno < fpArgno && ccArgno < mpArgno) {
             const char* code = codeChunks.front();
@@ -6711,36 +6744,36 @@ ProcessArgs(JSContext* cx, OptionParser* op)
             JS::CompileOptions opts(cx);
             opts.setFileAndLine("-e", 1);
             if (!JS::Evaluate(cx, opts, code, strlen(code), &rval))
-                return sr->exitCode ? sr->exitCode : EXITCODE_RUNTIME_ERROR;
+                return false;
             codeChunks.popFront();
             if (sr->quitting)
                 break;
         } else {
             MOZ_ASSERT(mpArgno < fpArgno && mpArgno < ccArgno);
             char* path = modulePaths.front();
-            Process(cx, path, false, FileModule);
-            if (sr->exitCode)
-                return sr->exitCode;
+            if (!Process(cx, path, false, FileModule))
+                return false;
             modulePaths.popFront();
         }
     }
 
     if (sr->quitting)
-        return sr->exitCode ? sr->exitCode : EXIT_SUCCESS;
+        return false;
 
     /* The |script| argument is processed after all options. */
     if (const char* path = op->getStringArg("script")) {
-        Process(cx, path, false);
-        if (sr->exitCode)
-            return sr->exitCode;
+        if (!Process(cx, path, false))
+            return false;
     }
 
     DrainJobQueue(cx);
 
-    if (op->getBoolOption('i'))
-        Process(cx, nullptr, true);
+    if (op->getBoolOption('i')) {
+        if (!Process(cx, nullptr, true))
+            return false;
+    }
 
-    return sr->exitCode ? sr->exitCode : EXIT_SUCCESS;
+    return true;
 }
 
 static bool
@@ -7074,7 +7107,16 @@ Shell(JSContext* cx, OptionParser* op, char** envp)
 
     JSAutoCompartment ac(cx, glob);
 
-    int result = ProcessArgs(cx, op);
+    ShellRuntime* sr = GetShellRuntime(cx);
+    int result = EXIT_SUCCESS;
+    {
+        AutoReportException are(cx);
+        if (!ProcessArgs(cx, op) && !sr->quitting)
+            result = EXITCODE_RUNTIME_ERROR;
+    }
+
+    if (sr->exitCode)
+        result = sr->exitCode;
 
     if (enableDisassemblyDumps)
         js::DumpCompartmentPCCounts(cx);
@@ -7407,7 +7449,7 @@ main(int argc, char** argv, char** envp)
     JS_SetRuntimePrivate(rt, sr.get());
     // Waiting is allowed on the shell's main thread, for now.
     JS_SetFutexCanWait(rt);
-    JS_SetErrorReporter(rt, my_ErrorReporter);
+    JS_SetErrorReporter(rt, WarningReporter);
     if (!SetRuntimeOptions(rt, op))
         return 1;
 
