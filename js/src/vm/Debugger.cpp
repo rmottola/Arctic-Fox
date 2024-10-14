@@ -1609,7 +1609,7 @@ Debugger::fireDebuggerStatement(JSContext* cx, MutableHandleValue vp)
     Maybe<AutoCompartment> ac;
     ac.emplace(cx, object);
 
-    ScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
+    ScriptFrameIter iter(cx);
     RootedValue scriptFrame(cx);
     if (!getScriptFrame(cx, iter, &scriptFrame))
         return handleUncaughtException(ac, false);
@@ -1638,7 +1638,7 @@ Debugger::fireExceptionUnwind(JSContext* cx, MutableHandleValue vp)
     RootedValue scriptFrame(cx);
     RootedValue wrappedExc(cx, exc);
 
-    ScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
+    ScriptFrameIter iter(cx);
     if (!getScriptFrame(cx, iter, &scriptFrame) || !wrapDebuggeeValue(cx, &wrappedExc))
         return handleUncaughtException(ac, false);
 
@@ -1806,7 +1806,7 @@ Debugger::slowPathOnNewWasmInstance(JSContext* cx, Handle<WasmInstanceObject*> w
 /* static */ JSTrapStatus
 Debugger::onTrap(JSContext* cx, MutableHandleValue vp)
 {
-    ScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
+    ScriptFrameIter iter(cx);
     RootedScript script(cx, iter.script());
     MOZ_ASSERT(script->isDebuggee());
     Rooted<GlobalObject*> scriptGlobal(cx, &script->global());
@@ -1870,7 +1870,7 @@ Debugger::onTrap(JSContext* cx, MutableHandleValue vp)
 /* static */ JSTrapStatus
 Debugger::onSingleStep(JSContext* cx, MutableHandleValue vp)
 {
-    ScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
+    ScriptFrameIter iter(cx);
 
     /*
      * We may be stepping over a JSOP_EXCEPTION, that pushes the context's
@@ -2333,8 +2333,7 @@ Debugger::updateExecutionObservabilityOfFrames(JSContext* cx, const ExecutionObs
     }
 
     AbstractFramePtr oldestEnabledFrame;
-    for (ScriptFrameIter iter(cx, ScriptFrameIter::ALL_CONTEXTS,
-                              ScriptFrameIter::GO_THROUGH_SAVED);
+    for (ScriptFrameIter iter(cx, ScriptFrameIter::ALL_CONTEXTS);
          !iter.done();
          ++iter)
     {
@@ -2640,8 +2639,7 @@ Debugger::updateObservesCoverageOnDebuggees(JSContext* cx, IsObserving observing
     // If any frame on the stack belongs to the debuggee, then we cannot update
     // the ScriptCounts, because this would imply to invalidate a Debugger.Frame
     // to recompile it with/without ScriptCount support.
-    for (ScriptFrameIter iter(cx, ScriptFrameIter::ALL_CONTEXTS,
-                              ScriptFrameIter::GO_THROUGH_SAVED);
+    for (ScriptFrameIter iter(cx, ScriptFrameIter::ALL_CONTEXTS);
          !iter.done();
          ++iter)
     {
@@ -3615,7 +3613,7 @@ Debugger::getNewestFrame(JSContext* cx, unsigned argc, Value* vp)
             if (i.isIon() && !i.ensureHasRematerializedFrame(cx))
                 return false;
             AbstractFramePtr frame = i.abstractFramePtr();
-            ScriptFrameIter iter(i.activation()->cx(), ScriptFrameIter::GO_THROUGH_SAVED);
+            ScriptFrameIter iter(i.activation()->cx());
             while (!iter.hasUsableAbstractFramePtr() || iter.abstractFramePtr() != frame)
                 ++iter;
             return dbg->getScriptFrame(cx, iter, args.rval());
@@ -6091,7 +6089,7 @@ Debugger::removeFromFrameMapsAndClearBreakpointsIn(JSContext* cx, AbstractFrameP
 /* static */ bool
 Debugger::handleBaselineOsr(JSContext* cx, InterpreterFrame* from, jit::BaselineFrame* to)
 {
-    ScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
+    ScriptFrameIter iter(cx);
     MOZ_ASSERT(iter.abstractFramePtr() == to);
     return replaceFrameGuts(cx, from, to, iter);
 }
@@ -6107,7 +6105,7 @@ Debugger::handleIonBailout(JSContext* cx, jit::RematerializedFrame* from, jit::B
     // across any inlined frames younger than |to|, the baseline frame
     // reconstructed during bailout from the Ion frame corresponding to
     // |from|.
-    ScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
+    ScriptFrameIter iter(cx);
     while (iter.abstractFramePtr() != to)
         ++iter;
     return replaceFrameGuts(cx, from, to, iter);
@@ -7066,7 +7064,6 @@ CheckThisFrame(JSContext* cx, const CallArgs& args, const char* fnname, bool che
             maybeIter.emplace(*(ScriptFrameIter::Data*)(f.raw()));             \
         } else {                                                               \
             maybeIter.emplace(cx, ScriptFrameIter::ALL_CONTEXTS,               \
-                              ScriptFrameIter::GO_THROUGH_SAVED,               \
                               ScriptFrameIter::IGNORE_DEBUGGER_EVAL_PREV_LINK); \
             ScriptFrameIter& iter = *maybeIter;                                \
             while (!iter.hasUsableAbstractFramePtr() || iter.abstractFramePtr() != f) \
