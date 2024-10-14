@@ -2824,7 +2824,7 @@ private:
 
     // We make these private so that stack manipulation can only happen
     // through one of the above friends.
-    JSContext* Pop();
+    void Pop();
     void Push(JSContext* cx);
 
     AutoTArray<JSContext*, 16> mStack;
