@@ -295,7 +295,7 @@ public:
   nsCycleCollectionParticipant* ZoneParticipant();
 
   nsresult TraverseRoots(nsCycleCollectionNoteRootCallback& aCb);
-  bool UsefulToMergeZones() const;
+  virtual bool UsefulToMergeZones() const;
   void FixWeakMappingGrayBits() const;
   bool AreGCGrayBitsValid() const;
   void GarbageCollect(uint32_t aReason) const;
