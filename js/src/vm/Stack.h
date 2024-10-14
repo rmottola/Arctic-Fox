@@ -1777,7 +1777,7 @@ class FrameIter
         Data(const Data& other);
     };
 
-    MOZ_IMPLICIT FrameIter(JSContext* cx, SavedOption = STOP_AT_SAVED);
+    FrameIter(JSContext* cx, SavedOption);
     FrameIter(JSContext* cx, ContextOption, SavedOption,
               DebuggerEvalOption = FOLLOW_DEBUGGER_EVAL_PREV_LINK);
     FrameIter(JSContext* cx, ContextOption, SavedOption, DebuggerEvalOption, JSPrincipals*);
@@ -1918,7 +1918,7 @@ class ScriptFrameIter : public FrameIter
     }
 
   public:
-    explicit ScriptFrameIter(JSContext* cx, SavedOption savedOption = STOP_AT_SAVED)
+    ScriptFrameIter(JSContext* cx, SavedOption savedOption)
       : FrameIter(cx, savedOption)
     {
         settle();
@@ -1970,8 +1970,7 @@ class NonBuiltinFrameIter : public FrameIter
     void settle();
 
   public:
-    explicit NonBuiltinFrameIter(JSContext* cx,
-                                 FrameIter::SavedOption opt = FrameIter::STOP_AT_SAVED)
+    NonBuiltinFrameIter(JSContext* cx, FrameIter::SavedOption opt)
       : FrameIter(cx, opt)
     {
         settle();
@@ -2022,8 +2021,7 @@ class NonBuiltinScriptFrameIter : public ScriptFrameIter
 
   public:
     explicit NonBuiltinScriptFrameIter(JSContext* cx,
-                                       ScriptFrameIter::SavedOption opt =
-                                       ScriptFrameIter::STOP_AT_SAVED)
+                                       ScriptFrameIter::SavedOption opt)
       : ScriptFrameIter(cx, opt)
     {
         settle();

@@ -6436,7 +6436,7 @@ DescribeScriptedCaller(JSContext* cx, AutoFilename* filename, unsigned* lineno,
     if (column)
         *column = 0;
 
-    NonBuiltinFrameIter i(cx);
+    NonBuiltinFrameIter i(cx, FrameIter::STOP_AT_SAVED);
     if (i.done())
         return false;
 
@@ -6516,7 +6516,7 @@ GetScriptedCallerGlobal(JSContext* cx)
         if (!activation)
             return nullptr;
     } else {
-        NonBuiltinFrameIter i(cx);
+        NonBuiltinFrameIter i(cx, FrameIter::STOP_AT_SAVED);
         if (i.done())
             return nullptr;
         activation = i.activation();

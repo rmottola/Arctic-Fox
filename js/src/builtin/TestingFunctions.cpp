@@ -1750,7 +1750,7 @@ ShellAllocationMetadataBuilder::build(JSContext* cx, HandleObject,
     int stackIndex = 0;
     RootedId id(cx);
     RootedValue callee(cx);
-    for (NonBuiltinScriptFrameIter iter(cx); !iter.done(); ++iter) {
+    for (NonBuiltinScriptFrameIter iter(cx, FrameIter::STOP_AT_SAVED); !iter.done(); ++iter) {
         if (iter.isFunctionFrame() && iter.compartment() == cx->compartment()) {
             id = INT_TO_JSID(stackIndex);
             RootedObject callee(cx, iter.callee(cx));
@@ -1844,7 +1844,7 @@ testingFunc_inIon(JSContext* cx, unsigned argc, Value* vp)
         return true;
     }
 
-    ScriptFrameIter iter(cx);
+    ScriptFrameIter iter(cx, FrameIter::STOP_AT_SAVED);
     if (iter.isIon()) {
         // Reset the counter of the IonScript's script.
         jit::JitFrameIterator jitIter(cx);
