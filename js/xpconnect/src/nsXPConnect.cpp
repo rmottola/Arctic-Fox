@@ -1004,10 +1004,10 @@ nsXPConnect::GetSafeJSContext()
 
 namespace xpc {
 
-bool
+void
 PushNullJSContext()
 {
-    return XPCJSRuntime::Get()->GetJSContextStack()->Push(nullptr);
+    XPCJSRuntime::Get()->GetJSContextStack()->Push(nullptr);
 }
 
 void
