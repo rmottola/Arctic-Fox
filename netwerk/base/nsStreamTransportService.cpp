@@ -511,7 +511,7 @@ nsStreamTransportService::DispatchFromScript(nsIRunnable *task, uint32_t flags)
 }
 
 NS_IMETHODIMP
-nsStreamTransportService::Dispatch(already_AddRefed<nsIRunnable>&& task, uint32_t flags)
+nsStreamTransportService::Dispatch(already_AddRefed<nsIRunnable> task, uint32_t flags)
 {
     nsCOMPtr<nsIRunnable> event(task); // so it gets released on failure paths
     nsCOMPtr<nsIThreadPool> pool;
@@ -527,7 +527,7 @@ nsStreamTransportService::Dispatch(already_AddRefed<nsIRunnable>&& task, uint32_
 }
 
 NS_IMETHODIMP
-nsStreamTransportService::DelayedDispatch(already_AddRefed<nsIRunnable>&&, uint32_t)
+nsStreamTransportService::DelayedDispatch(already_AddRefed<nsIRunnable>, uint32_t)
 {
     return NS_ERROR_NOT_IMPLEMENTED;
 }
