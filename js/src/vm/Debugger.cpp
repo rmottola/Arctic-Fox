@@ -1609,7 +1609,7 @@ Debugger::fireDebuggerStatement(JSContext* cx, MutableHandleValue vp)
     Maybe<AutoCompartment> ac;
     ac.emplace(cx, object);
 
-    ScriptFrameIter iter(cx, FrameIter::STOP_AT_SAVED);
+    ScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
     RootedValue scriptFrame(cx);
     if (!getScriptFrame(cx, iter, &scriptFrame))
         return handleUncaughtException(ac, false);
@@ -1638,7 +1638,7 @@ Debugger::fireExceptionUnwind(JSContext* cx, MutableHandleValue vp)
     RootedValue scriptFrame(cx);
     RootedValue wrappedExc(cx, exc);
 
-    ScriptFrameIter iter(cx, FrameIter::STOP_AT_SAVED);
+    ScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
     if (!getScriptFrame(cx, iter, &scriptFrame) || !wrapDebuggeeValue(cx, &wrappedExc))
         return handleUncaughtException(ac, false);
 
@@ -1806,7 +1806,7 @@ Debugger::slowPathOnNewWasmInstance(JSContext* cx, Handle<WasmInstanceObject*> w
 /* static */ JSTrapStatus
 Debugger::onTrap(JSContext* cx, MutableHandleValue vp)
 {
-    ScriptFrameIter iter(cx, FrameIter::STOP_AT_SAVED);
+    ScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
     RootedScript script(cx, iter.script());
     MOZ_ASSERT(script->isDebuggee());
     Rooted<GlobalObject*> scriptGlobal(cx, &script->global());
@@ -1870,7 +1870,7 @@ Debugger::onTrap(JSContext* cx, MutableHandleValue vp)
 /* static */ JSTrapStatus
 Debugger::onSingleStep(JSContext* cx, MutableHandleValue vp)
 {
-    ScriptFrameIter iter(cx, FrameIter::STOP_AT_SAVED);
+    ScriptFrameIter iter(cx, FrameIter::GO_THROUGH_SAVED);
 
     /*
      * We may be stepping over a JSOP_EXCEPTION, that pushes the context's
