@@ -2816,7 +2816,6 @@ public:
 
     JSContext* InitSafeJSContext();
     JSContext* GetSafeJSContext();
-    bool HasJSContext(JSContext* cx);
 
 private:
     friend class mozilla::dom::danger::AutoCxPusher;
