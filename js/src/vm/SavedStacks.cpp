@@ -1081,7 +1081,7 @@ SavedStacks::saveCurrentStack(JSContext* cx, MutableHandleSavedFrame frame, unsi
     }
 
     AutoSPSEntry psuedoFrame(cx->runtime(), "js::SavedStacks::saveCurrentStack");
-    FrameIter iter(cx, FrameIter::ALL_CONTEXTS);
+    FrameIter iter(cx);
     return insertFrames(cx, iter, frame, maxFrameCount);
 }
 

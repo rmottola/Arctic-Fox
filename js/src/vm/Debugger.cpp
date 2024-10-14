@@ -2333,7 +2333,7 @@ Debugger::updateExecutionObservabilityOfFrames(JSContext* cx, const ExecutionObs
     }
 
     AbstractFramePtr oldestEnabledFrame;
-    for (ScriptFrameIter iter(cx, ScriptFrameIter::ALL_CONTEXTS);
+    for (ScriptFrameIter iter(cx);
          !iter.done();
          ++iter)
     {
@@ -2639,7 +2639,7 @@ Debugger::updateObservesCoverageOnDebuggees(JSContext* cx, IsObserving observing
     // If any frame on the stack belongs to the debuggee, then we cannot update
     // the ScriptCounts, because this would imply to invalidate a Debugger.Frame
     // to recompile it with/without ScriptCount support.
-    for (ScriptFrameIter iter(cx, ScriptFrameIter::ALL_CONTEXTS);
+    for (ScriptFrameIter iter(cx);
          !iter.done();
          ++iter)
     {
@@ -7063,8 +7063,7 @@ CheckThisFrame(JSContext* cx, const CallArgs& args, const char* fnname, bool che
         if (f.isScriptFrameIterData()) {                                       \
             maybeIter.emplace(*(ScriptFrameIter::Data*)(f.raw()));             \
         } else {                                                               \
-            maybeIter.emplace(cx, ScriptFrameIter::ALL_CONTEXTS,               \
-                              ScriptFrameIter::IGNORE_DEBUGGER_EVAL_PREV_LINK); \
+            maybeIter.emplace(cx, ScriptFrameIter::IGNORE_DEBUGGER_EVAL_PREV_LINK); \
             ScriptFrameIter& iter = *maybeIter;                                \
             while (!iter.hasUsableAbstractFramePtr() || iter.abstractFramePtr() != f) \
                 ++iter;                                                        \
