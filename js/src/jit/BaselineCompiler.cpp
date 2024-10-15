@@ -828,17 +828,6 @@ BaselineCompiler::emitDebugTrap()
     return appendICEntry(ICEntry::Kind_DebugTrap, masm.currentOffset());
 }
 
-void
-BaselineCompiler::emitCoverage(jsbytecode* pc)
-{
-    PCCounts* counts = script->maybeGetPCCounts(pc);
-    if (!counts)
-        return;
-
-    uint64_t* counterAddr = &counts->numExec();
-    masm.inc64(AbsoluteAddress(counterAddr));
-}
-
 #ifdef JS_TRACE_LOGGING
 bool
 BaselineCompiler::emitTraceLoggerEnter()
@@ -936,7 +925,6 @@ BaselineCompiler::emitBody()
     bool lastOpUnreachable = false;
     uint32_t emittedOps = 0;
     mozilla::DebugOnly<jsbytecode*> prevpc = pc;
-    bool compileCoverage = script->hasScriptCounts();
 
     while (true) {
         JSOp op = JSOp(*pc);
@@ -990,10 +978,6 @@ BaselineCompiler::emitBody()
         // Emit traps for breakpoints and step mode.
         if (compileDebugInstrumentation_ && !emitDebugTrap())
             return Method_Error;
-
-        // Emit code coverage code, to fill the same data as the interpreter.
-        if (compileCoverage)
-            emitCoverage(pc);
 
         switch (op) {
           default:
@@ -4340,5 +4324,10 @@ BaselineCompiler::emit_JSOP_DEBUGCHECKSELFHOSTED()
 bool
 BaselineCompiler::emit_JSOP_JUMPTARGET()
 {
+    if (!script->hasScriptCounts())
+        return true;
+    PCCounts* counts = script->maybeGetPCCounts(pc);
+    uint64_t* counterAddr = &counts->numExec();
+    masm.inc64(AbsoluteAddress(counterAddr));
     return true;
 }
