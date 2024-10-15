@@ -700,12 +700,6 @@ JS::RuntimeOptionsRef(JSContext* cx)
     return cx->runtime()->options();
 }
 
-JS_PUBLIC_API(JS::ContextOptions&)
-JS::ContextOptionsRef(JSContext* cx)
-{
-    return cx->options();
-}
-
 JS_PUBLIC_API(const char*)
 JS_GetImplementationVersion(void)
 {
@@ -2837,29 +2831,6 @@ JS::IsConstructor(JSObject* obj)
     return obj->isConstructor();
 }
 
-struct AutoLastFrameCheck
-{
-    explicit AutoLastFrameCheck(JSContext* cx
-                                MOZ_GUARD_OBJECT_NOTIFIER_PARAM)
-      : cx(cx)
-    {
-        MOZ_ASSERT(cx);
-        MOZ_GUARD_OBJECT_NOTIFIER_INIT;
-    }
-
-    ~AutoLastFrameCheck() {
-        if (cx->isExceptionPending() &&
-            !JS_IsRunning(cx) &&
-            (!cx->options().dontReportUncaught() && !cx->options().autoJSAPIOwnsErrorReporting())) {
-            ReportUncaughtException(cx);
-        }
-    }
-
-  private:
-    JSContext* cx;
-    MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
-};
-
 JS_PUBLIC_API(bool)
 JS_CallFunctionValue(JSContext* cx, HandleObject obj, HandleValue fval, const HandleValueArray& args,
                      MutableHandleValue rval)
@@ -2868,7 +2839,6 @@ JS_CallFunctionValue(JSContext* cx, HandleObject obj, HandleValue fval, const Ha
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, fval, args);
-    AutoLastFrameCheck lfc(cx);
 
     InvokeArgs iargs(cx);
     if (!FillArgumentsFromArraylike(cx, iargs, args))
@@ -2886,7 +2856,6 @@ JS_CallFunction(JSContext* cx, HandleObject obj, HandleFunction fun, const Handl
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, fun, args);
-    AutoLastFrameCheck lfc(cx);
 
     InvokeArgs iargs(cx);
     if (!FillArgumentsFromArraylike(cx, iargs, args))
@@ -2905,7 +2874,6 @@ JS_CallFunctionName(JSContext* cx, HandleObject obj, const char* name, const Han
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, args);
-    AutoLastFrameCheck lfc(cx);
 
     JSAtom* atom = Atomize(cx, name, strlen(name));
     if (!atom)
@@ -2931,7 +2899,6 @@ JS::Call(JSContext* cx, HandleValue thisv, HandleValue fval, const JS::HandleVal
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, thisv, fval, args);
-    AutoLastFrameCheck lfc(cx);
 
     InvokeArgs iargs(cx);
     if (!FillArgumentsFromArraylike(cx, iargs, args))
@@ -2947,7 +2914,6 @@ JS::Construct(JSContext* cx, HandleValue fval, HandleObject newTarget, const JS:
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, fval, newTarget, args);
-    AutoLastFrameCheck lfc(cx);
 
     if (!IsConstructor(fval)) {
         ReportValueError(cx, JSMSG_NOT_CONSTRUCTOR, JSDVG_IGNORE_STACK, fval, nullptr);
@@ -2974,7 +2940,6 @@ JS::Construct(JSContext* cx, HandleValue fval, const JS::HandleValueArray& args,
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, fval, args);
-    AutoLastFrameCheck lfc(cx);
 
     if (!IsConstructor(fval)) {
         ReportValueError(cx, JSMSG_NOT_CONSTRUCTOR, JSDVG_IGNORE_STACK, fval, nullptr);
@@ -4006,7 +3971,6 @@ Compile(JSContext* cx, const ReadOnlyCompileOptions& options, SyntacticScopeOpti
     MOZ_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
-    AutoLastFrameCheck lfc(cx);
 
     Rooted<StaticScope*> staticScope(cx, &cx->global()->lexicalScope().staticBlock());
     if (scopeOption == HasNonSyntacticScope) {
@@ -4175,17 +4139,7 @@ JS_PUBLIC_API(JSScript*)
 JS::FinishOffThreadScript(JSContext* maybecx, JSRuntime* rt, void* token)
 {
     MOZ_ASSERT(CurrentThreadCanAccessRuntime(rt));
-
-    if (maybecx) {
-        RootedScript script(maybecx);
-        {
-            AutoLastFrameCheck lfc(maybecx);
-            script = HelperThreadState().finishScriptParseTask(maybecx, rt, token);
-        }
-        return script;
-    } else {
-        return HelperThreadState().finishScriptParseTask(maybecx, rt, token);
-    }
+    return HelperThreadState().finishScriptParseTask(maybecx, rt, token);
 }
 
 JS_PUBLIC_API(bool)
@@ -4201,17 +4155,7 @@ JS_PUBLIC_API(JSObject*)
 JS::FinishOffThreadModule(JSContext* maybecx, JSRuntime* rt, void* token)
 {
     MOZ_ASSERT(CurrentThreadCanAccessRuntime(rt));
-
-    if (maybecx) {
-        RootedObject module(maybecx);
-        {
-            AutoLastFrameCheck lfc(maybecx);
-            module = HelperThreadState().finishModuleParseTask(maybecx, rt, token);
-        }
-        return module;
-    } else {
-        return HelperThreadState().finishModuleParseTask(maybecx, rt, token);
-    }
+    return HelperThreadState().finishModuleParseTask(maybecx, rt, token);
 }
 
 JS_PUBLIC_API(bool)
@@ -4323,7 +4267,6 @@ CompileFunction(JSContext* cx, const ReadOnlyCompileOptions& optionsArg,
     assertSameCompartment(cx, enclosingDynamicScope);
     assertSameCompartment(cx, enclosingStaticScope);
     RootedAtom funAtom(cx);
-    AutoLastFrameCheck lfc(cx);
 
     if (name) {
         funAtom = Atomize(cx, name, strlen(name));
@@ -4435,7 +4378,6 @@ ExecuteScript(JSContext* cx, HandleObject scope, HandleScript script, Value* rva
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, scope, script);
     MOZ_ASSERT_IF(!IsGlobalLexicalScope(scope), script->hasNonSyntacticScope());
-    AutoLastFrameCheck lfc(cx);
     return Execute(cx, script, *scope, rval);
 }
 
@@ -4514,8 +4456,6 @@ Evaluate(JSContext* cx, HandleObject scope, Handle<StaticScope*> staticScope,
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, scope);
-
-    AutoLastFrameCheck lfc(cx);
 
     MOZ_ASSERT_IF(!IsGlobalLexicalScope(scope), HasNonSyntacticStaticScopeChain(staticScope));
 
@@ -4668,8 +4608,6 @@ JS::CompileModule(JSContext* cx, const ReadOnlyCompileOptions& options,
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
 
-    AutoLastFrameCheck lfc(cx);
-
     module.set(frontend::CompileModule(cx, options, srcBuf));
     return !!module;
 }
@@ -4722,8 +4660,8 @@ JS::GetModuleScript(JSContext* cx, JS::HandleObject moduleArg)
     return moduleArg->as<ModuleObject>().script();
 }
 
-static JSObject*
-JS_NewHelper(JSContext* cx, HandleObject ctor, const JS::HandleValueArray& inputArgs)
+JS_PUBLIC_API(JSObject*)
+JS_New(JSContext* cx, HandleObject ctor, const JS::HandleValueArray& inputArgs)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
@@ -4743,17 +4681,6 @@ JS_NewHelper(JSContext* cx, HandleObject ctor, const JS::HandleValueArray& input
     if (!js::Construct(cx, ctorVal, args, ctorVal, &obj))
         return nullptr;
 
-    return obj;
-}
-
-JS_PUBLIC_API(JSObject*)
-JS_New(JSContext* cx, HandleObject ctor, const JS::HandleValueArray& inputArgs)
-{
-    RootedObject obj(cx);
-    {
-        AutoLastFrameCheck lfc(cx);
-        obj = JS_NewHelper(cx, ctor, inputArgs);
-    }
     return obj;
 }
 
