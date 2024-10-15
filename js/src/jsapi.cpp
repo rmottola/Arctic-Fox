@@ -1470,18 +1470,6 @@ JS_SetGCParameter(JSRuntime* rt, JSGCParamKey key, uint32_t value)
     MOZ_ALWAYS_TRUE(rt->gc.setParameter(key, value, lock));
 }
 
-JS_PUBLIC_API(void)
-JS_SetGGCMode(JSRuntime* rt, bool enabled)
-{
-  // Control GGC
-  if (enabled && !rt->gc.isGenerationalGCEnabled()) {
-    rt->gc.enableGenerationalGC();
-  } else if (!enabled && rt->gc.isGenerationalGCEnabled()) {
-    rt->gc.disableGenerationalGC();
-  }
-}
-
-
 JS_PUBLIC_API(uint32_t)
 JS_GetGCParameter(JSRuntime* rt, JSGCParamKey key)
 {
