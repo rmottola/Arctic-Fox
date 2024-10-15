@@ -2305,13 +2305,6 @@ mozilla::dom::StartupJSEnvironment()
 }
 
 static void
-ReportAllJSExceptionsPrefChangedCallback(const char* aPrefName, void* aClosure)
-{
-  bool reportAll = Preferences::GetBool(aPrefName, false);
-  nsContentUtils::XPConnect()->SetReportAllJSExceptions(reportAll);
-}
-
-static void
 SetMemoryHighWaterMarkPrefChangedCallback(const char* aPrefName, void* aClosure)
 {
   int32_t highwatermark = Preferences::GetInt(aPrefName, 128);
@@ -2466,9 +2459,6 @@ nsJSContext::EnsureStatics()
   JS::SetAsmJSCacheOps(sRuntime, &asmJSCacheOps);
 
   // Set these global xpconnect options...
-  Preferences::RegisterCallbackAndCall(ReportAllJSExceptionsPrefChangedCallback,
-                                       "dom.report_all_js_exceptions");
-
   Preferences::RegisterCallbackAndCall(SetMemoryHighWaterMarkPrefChangedCallback,
                                        "javascript.options.mem.high_water_mark");
 
