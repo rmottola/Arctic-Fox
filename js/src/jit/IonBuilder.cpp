@@ -1641,6 +1641,7 @@ IonBuilder::inspectOpcode(JSOp op)
 
     switch (op) {
       case JSOP_NOP:
+      case JSOP_NOP_DESTRUCTURING:
       case JSOP_LINENO:
       case JSOP_LOOPENTRY:
         return true;
