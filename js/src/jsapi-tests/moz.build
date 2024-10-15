@@ -29,6 +29,7 @@ UNIFIED_SOURCES += [
     'testEnclosingFunction.cpp',
     'testErrorCopying.cpp',
     'testException.cpp',
+    'testExternalArrayBuffer.cpp',
     'testExternalStrings.cpp',
     'testFindSCCs.cpp',
     'testForceLexicalInitialization.cpp',
