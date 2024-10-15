@@ -1261,12 +1261,16 @@ BaselineCompiler::emit_JSOP_POS()
 bool
 BaselineCompiler::emit_JSOP_LOOPHEAD()
 {
+    if (!emit_JSOP_JUMPTARGET())
+        return false;
     return emitInterruptCheck();
 }
 
 bool
 BaselineCompiler::emit_JSOP_LOOPENTRY()
 {
+    if (!emit_JSOP_JUMPTARGET())
+        return false;
     frame.syncStack(0);
     return emitWarmUpCounterIncrement(LoopEntryCanIonOsr(pc));
 }
@@ -3346,6 +3350,9 @@ BaselineCompiler::emit_JSOP_THROWING()
 bool
 BaselineCompiler::emit_JSOP_TRY()
 {
+    if (!emit_JSOP_JUMPTARGET())
+        return false;
+
     // Ionmonkey can't inline function with JSOP_TRY.
     script->setUninlineable();
     return true;
@@ -3777,6 +3784,8 @@ BaselineCompiler::emit_JSOP_ISNOITER()
 bool
 BaselineCompiler::emit_JSOP_ENDITER()
 {
+    if (!emit_JSOP_JUMPTARGET())
+        return false;
     frame.popRegsAndSync(1);
 
     ICIteratorClose_Fallback::Compiler compiler(cx);
@@ -4326,4 +4335,10 @@ BaselineCompiler::emit_JSOP_DEBUGCHECKSELFHOSTED()
 #endif
     return true;
 
+}
+
+bool
+BaselineCompiler::emit_JSOP_JUMPTARGET()
+{
+    return true;
 }
