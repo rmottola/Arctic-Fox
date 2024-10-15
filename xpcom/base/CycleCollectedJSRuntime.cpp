@@ -533,7 +533,6 @@ CycleCollectedJSRuntime::Initialize(JSRuntime* aParentRuntime,
   JS::SetOutOfMemoryCallback(mJSRuntime, OutOfMemoryCallback, this);
   JS::SetLargeAllocationFailureCallback(mJSRuntime,
                                         LargeAllocationFailureCallback, this);
-  JS_SetContextCallback(mJSRuntime, ContextCallback, this);
   JS_SetDestroyZoneCallback(mJSRuntime, XPCStringConvert::FreeZoneCache);
   JS_SetSweepZoneCallback(mJSRuntime, XPCStringConvert::ClearZoneCache);
   JS::SetBuildIdOp(mJSRuntime, GetBuildId);
@@ -913,18 +912,6 @@ CycleCollectedJSRuntime::LargeAllocationFailureCallback(void* aData)
   CycleCollectedJSRuntime* self = static_cast<CycleCollectedJSRuntime*>(aData);
 
   self->OnLargeAllocationFailure();
-}
-
-/* static */ bool
-CycleCollectedJSRuntime::ContextCallback(JSContext* aContext,
-                                         unsigned aOperation,
-                                         void* aData)
-{
-  CycleCollectedJSRuntime* self = static_cast<CycleCollectedJSRuntime*>(aData);
-
-  MOZ_ASSERT(JS_GetRuntime(aContext) == self->Runtime());
-
-  return self->CustomContextCallback(aContext, aOperation);
 }
 
 class PromiseJobRunnable final : public Runnable
