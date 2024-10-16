@@ -7469,7 +7469,7 @@ PresShell::HandleEvent(nsIFrame* aFrame,
 
   if (aEvent->IsUsingCoordinates()) {
     ReleasePointerCaptureCaller releasePointerCaptureCaller;
-    if (nsLayoutUtils::AreAsyncAnimationsEnabled() && mDocument) {
+    if (mDocument) {
       if (aEvent->mClass == eTouchEventClass) {
         nsIDocument::UnlockPointer();
       }
