@@ -8,6 +8,7 @@
 #define mozilla_dom_KeyframeEffect_h
 
 #include "nsAutoPtr.h"
+#include "nsChangeHint.h"
 #include "nsCSSProperty.h"
 #include "nsCSSValue.h"
 #include "nsCycleCollectionParticipant.h"
@@ -116,6 +117,8 @@ struct AnimationPropertySegment
   float mFromKey, mToKey;
   StyleAnimationValue mFromValue, mToValue;
   Maybe<ComputedTimingFunction> mTimingFunction;
+
+  nsChangeHint mChangeHint;
 
   bool operator==(const AnimationPropertySegment& aOther) const {
     return mFromKey == aOther.mFromKey &&
