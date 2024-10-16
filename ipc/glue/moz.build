@@ -29,6 +29,8 @@ EXPORTS.mozilla.ipc += [
     'ProcessChild.h',
     'ProtocolUtils.h',
     'ScopedXREEmbed.h',
+    'SendStream.h',
+    'SendStreamAlloc.h',
     'SharedMemory.h',
     'SharedMemoryBasic.h',
     'Shmem.h',
@@ -125,6 +127,8 @@ UNIFIED_SOURCES += [
     'ProcessChild.cpp',
     'ProtocolUtils.cpp',
     'ScopedXREEmbed.cpp',
+    'SendStreamChild.cpp',
+    'SendStreamParent.cpp',
     'SharedMemory.cpp',
     'Shmem.cpp',
     'StringUtil.cpp',
@@ -164,6 +168,7 @@ IPDL_SOURCES = [
     'PFileDescriptorSet.ipdl',
     'PProcLoader.ipdl',
     'ProtocolTypes.ipdlh',
+    'PSendStream.ipdl',
     'URIParams.ipdlh',
 ]
 
