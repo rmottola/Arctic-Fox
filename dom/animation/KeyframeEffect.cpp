@@ -1081,6 +1081,12 @@ KeyframeEffectReadOnly::CanThrottle() const
     return true;
   }
 
+  // We can throttle the animation if the animation is paint only and
+  // the target frame is out of view.
+  if (CanIgnoreIfNotVisible() && frame->IsScrolledOutOfView()) {
+    return true;
+  }
+
   // First we need to check layer generation and transform overflow
   // prior to the property.mIsRunningOnCompositor check because we should
   // occasionally unthrottle these animations even if the animations are
