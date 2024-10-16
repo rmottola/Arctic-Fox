@@ -10346,5 +10346,13 @@
     "n_buckets": 20,
     "keyed": true,
     "description": "Tracking how long a Worker thread is blocked when a sync operation is executed on the main-thread."
+  },
+  "XHR_IN_WORKER": {
+    "alert_emails": ["amarchesini@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "count",
+    "bug_numbers": [1280229],
+    "description": "Number of the use of XHR in workers.",
+    "releaseChannelCollection": "opt-out"
   }
 }
