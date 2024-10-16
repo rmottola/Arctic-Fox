@@ -1365,6 +1365,10 @@ KeyframeEffectReadOnly::CalculateCumulativeChangeHint()
 bool
 KeyframeEffectReadOnly::CanIgnoreIfNotVisible() const
 {
+  if (!AnimationUtils::IsOffscreenThrottlingEnabled()) {
+    return false;
+  }
+
   // FIXME: For further sophisticated optimization we need to check
   // change hint on the segment corresponding to computedTiming.progress.
   return NS_IsHintSubset(
