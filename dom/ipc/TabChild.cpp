@@ -842,6 +842,11 @@ TabChild::Init()
     do_QueryInterface(window->GetChromeEventHandler());
   docShell->SetChromeEventHandler(chromeHandler);
 
+  // Set prerender flag if necessary.
+  if (mIsPrerendered) {
+    docShell->SetIsPrerendered();
+  }
+
   nsContentUtils::SetScrollbarsVisibility(window->GetDocShell(),
     !!(mChromeFlags & nsIWebBrowserChrome::CHROME_SCROLLBARS));
 
@@ -2484,6 +2489,8 @@ TabChild::RecvSetUpdateHitRegion(const bool& aEnabled)
 bool
 TabChild::RecvSetDocShellIsActive(const bool& aIsActive, const bool& aIsHidden)
 {
+    // docshell is consider prerendered only if not active yet
+    mIsPrerendered &= !aIsActive;
     nsCOMPtr<nsIDocShell> docShell = do_GetInterface(WebNavigation());
     if (docShell) {
       if (aIsHidden) {

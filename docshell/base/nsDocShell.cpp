@@ -3306,11 +3306,12 @@ nsDocShell::SetDocLoaderParent(nsDocLoader* aParent)
     }
     SetAllowContentRetargeting(mAllowContentRetargeting &&
       parentAsDocShell->GetAllowContentRetargetingOnChildren());
-    if (NS_SUCCEEDED(parentAsDocShell->GetIsActive(&value))) {
-      SetIsActive(value);
-    }
     if (parentAsDocShell->GetIsPrerendered()) {
-      SetIsPrerendered(true);
+      SetIsPrerendered();
+    }
+    if (NS_SUCCEEDED(parentAsDocShell->GetIsActive(&value))) {
+      // a prerendered docshell is not active yet
+      SetIsActive(value && !mIsPrerendered);
     }
     if (NS_SUCCEEDED(parentAsDocShell->GetCustomUserAgent(customUserAgent)) &&
         !customUserAgent.IsEmpty()) {
@@ -6096,6 +6097,9 @@ nsDocShell::SetIsActiveInternal(bool aIsActive, bool aIsHidden)
   // Keep track ourselves.
   mIsActive = aIsActive;
 
+  // Clear prerender flag if necessary.
+  mIsPrerendered &= !aIsActive;
+
   // Tell the PresShell about it.
   nsCOMPtr<nsIPresShell> pshell = GetPresShell();
   if (pshell) {
@@ -6161,11 +6165,12 @@ nsDocShell::GetIsActive(bool* aIsActive)
 }
 
 NS_IMETHODIMP
-nsDocShell::SetIsPrerendered(bool aPrerendered)
+nsDocShell::SetIsPrerendered()
 {
-  MOZ_ASSERT(!aPrerendered || !mIsPrerendered,
-             "SetIsPrerendered(true) called on already prerendered docshell");
-  mIsPrerendered = aPrerendered;
+  MOZ_ASSERT(!mIsPrerendered,
+             "SetIsPrerendered() called on already prerendered docshell");
+  SetIsActive(false);
+  mIsPrerendered = true;
   return NS_OK;
 }
 
