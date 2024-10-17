@@ -825,7 +825,7 @@ var SessionStoreInternal = {
           if (tabData.userTypedValue && !tabData.userTypedClear) {
             browser.userTypedValue = tabData.userTypedValue;
             if (data.didStartLoad) {
-              browser.userTypedClear++;
+              browser.urlbarChangeTracker.startedLoad();
             }
             win.URLBarSetURI();
           }
