@@ -1724,8 +1724,12 @@ EventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
         KillClickHoldTimer();
       }
 
-      nsCOMPtr<nsISupports> container = aPresContext->GetContainerWeak();
-      nsCOMPtr<nsPIDOMWindowOuter> window = do_GetInterface(container);
+      nsCOMPtr<nsIDocShell> docshell = aPresContext->GetDocShell();
+      if (!docshell) {
+        return;
+      }
+
+      nsCOMPtr<nsPIDOMWindowOuter> window = docshell->GetWindow();
       if (!window)
         return;
 

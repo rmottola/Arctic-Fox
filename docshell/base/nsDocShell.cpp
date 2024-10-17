@@ -2963,7 +2963,7 @@ nsDocShell::GetSessionStorageForPrincipal(nsIPrincipal* aPrincipal,
     return NS_ERROR_UNEXPECTED;
   }
 
-  nsCOMPtr<nsPIDOMWindowOuter> domWin = do_GetInterface(GetAsSupports(this));
+  nsCOMPtr<nsPIDOMWindowOuter> domWin = GetWindow();
 
   if (aCreate) {
     return manager->CreateStorage(domWin->GetCurrentInnerWindow(), aPrincipal,
