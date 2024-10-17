@@ -1267,6 +1267,7 @@ NS_GetOriginAttributes(nsIChannel *aChannel,
     DocShellOriginAttributes doa;
     loadContext->GetOriginAttributes(doa);
     aAttributes.InheritFromDocShellToNecko(doa);
+    aAttributes.SyncAttributesWithPrivateBrowsing(NS_UsePrivateBrowsing(aChannel));
     return true;
 }
 

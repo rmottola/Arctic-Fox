@@ -160,6 +160,7 @@ NeckoParent::GetValidatedAppInfo(const SerializedLoadContext& aSerialized,
     aAttrs.mInIsolatedMozBrowser = inBrowserElement;
     aAttrs.mSignedPkg = aSerialized.mOriginAttributes.mSignedPkg;
     aAttrs.mUserContextId = aSerialized.mOriginAttributes.mUserContextId;
+    aAttrs.mPrivateBrowsingId = aSerialized.mOriginAttributes.mPrivateBrowsingId;
 
     return nullptr;
   }
@@ -196,6 +197,7 @@ NeckoParent::CreateChannelLoadContext(const PBrowserOrId& aBrowser,
   // if !UsingNeckoIPCSecurity(), we may not have a LoadContext to set. This is
   // the common case for most xpcshell tests.
   if (aSerialized.IsNotNull()) {
+    attrs.SyncAttributesWithPrivateBrowsing(aSerialized.mUsePrivateBrowsing);
     switch (aBrowser.type()) {
       case PBrowserOrId::TPBrowserParent:
       {
@@ -912,6 +914,7 @@ NeckoParent::RecvPredPredict(const ipc::OptionalURIParams& aTargetURI,
   DocShellOriginAttributes attrs(NECKO_UNKNOWN_APP_ID, false);
   nsCOMPtr<nsILoadContext> loadContext;
   if (aLoadContext.IsNotNull()) {
+    attrs.SyncAttributesWithPrivateBrowsing(aLoadContext.mUsePrivateBrowsing);
     loadContext = new LoadContext(aLoadContext, nestedFrameId, attrs);
   }
 
@@ -944,6 +947,7 @@ NeckoParent::RecvPredLearn(const ipc::URIParams& aTargetURI,
   DocShellOriginAttributes attrs(NECKO_UNKNOWN_APP_ID, false);
   nsCOMPtr<nsILoadContext> loadContext;
   if (aLoadContext.IsNotNull()) {
+    attrs.SyncAttributesWithPrivateBrowsing(aLoadContext.mUsePrivateBrowsing);
     loadContext = new LoadContext(aLoadContext, nestedFrameId, attrs);
   }
 
