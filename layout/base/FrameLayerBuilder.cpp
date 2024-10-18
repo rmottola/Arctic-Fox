@@ -2095,6 +2095,11 @@ ContainerState::GetLayerCreationHint(AnimatedGeometryRoot* aAnimatedGeometryRoot
   // Check whether the layer will be scrollable. This is used as a hint to
   // influence whether tiled layers are used or not.
 
+  // Check creation hint inherited from our parent.
+  if (mParameters.mLayerCreationHint == LayerManager::SCROLLABLE) {
+    return LayerManager::SCROLLABLE;
+  }
+
   // Check whether there's any active scroll frame on the animated geometry
   // root chain.
   for (AnimatedGeometryRoot* agr = aAnimatedGeometryRoot;
@@ -3956,6 +3961,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
 
       ContainerLayerParameters params = mParameters;
       params.mBackgroundColor = uniformColor;
+      params.mLayerCreationHint = GetLayerCreationHint(animatedGeometryRoot);
       params.mScrollClip = agrScrollClip;
       params.mScrollClipForPerspectiveChild = nullptr;
 
