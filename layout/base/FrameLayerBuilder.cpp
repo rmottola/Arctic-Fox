@@ -3954,9 +3954,10 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
                                              &itemVisibleRect, uniformColorPtr);
       }
 
-      mParameters.mBackgroundColor = uniformColor;
-      mParameters.mScrollClip = agrScrollClip;
-      mParameters.mScrollClipForPerspectiveChild = nullptr;
+      ContainerLayerParameters params = mParameters;
+      params.mBackgroundColor = uniformColor;
+      params.mScrollClip = agrScrollClip;
+      params.mScrollClipForPerspectiveChild = nullptr;
 
       if (itemType == nsDisplayItem::TYPE_PERSPECTIVE) {
         // Perspective items have a single child item, an nsDisplayTransform.
@@ -3969,7 +3970,7 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
         // perspective frame, so it won't be the scroll clip for the scrolled
         // frame in the case that we care about, and we'll forward that scroll
         // clip to our child.
-        mParameters.mScrollClipForPerspectiveChild = itemScrollClip;
+        params.mScrollClipForPerspectiveChild = itemScrollClip;
       }
 
       // Just use its layer.
@@ -3977,8 +3978,8 @@ ContainerState::ProcessDisplayItems(nsDisplayList* aList)
       // currently don't know. If BuildContainerLayerFor gets called by
       // item->BuildLayer, this will be set to a proper rect.
       nsIntRect layerContentsVisibleRect(0, 0, -1, -1);
-      mParameters.mLayerContentsVisibleRect = &layerContentsVisibleRect;
-      RefPtr<Layer> ownLayer = item->BuildLayer(mBuilder, mManager, mParameters);
+      params.mLayerContentsVisibleRect = &layerContentsVisibleRect;
+      RefPtr<Layer> ownLayer = item->BuildLayer(mBuilder, mManager, params);
       if (!ownLayer) {
         continue;
       }
