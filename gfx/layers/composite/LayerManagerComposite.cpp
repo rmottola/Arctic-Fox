@@ -1571,7 +1571,7 @@ LayerComposite::GetFullyRenderedRegion() {
   }
 }
 
-const Matrix4x4
+Matrix4x4
 LayerComposite::GetShadowTransform() {
   Matrix4x4 transform = mShadowTransform;
   Layer* layer = GetLayer();

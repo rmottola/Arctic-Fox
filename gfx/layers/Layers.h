@@ -1321,7 +1321,7 @@ public:
   const Layer* GetPrevSibling() const { return mPrevSibling; }
   virtual Layer* GetFirstChild() const { return nullptr; }
   virtual Layer* GetLastChild() const { return nullptr; }
-  const gfx::Matrix4x4 GetTransform() const;
+  gfx::Matrix4x4 GetTransform() const;
   // Same as GetTransform(), but returns the transform as a strongly-typed
   // matrix. Eventually this will replace GetTransform().
   const CSSTransformMatrix GetTransformTyped() const;
@@ -1400,7 +1400,7 @@ public:
    * for shadow layers, GetShadowBaseTransform(), in either case with the
    * pre- and post-scales applied.
    */
-  const gfx::Matrix4x4 GetLocalTransform();
+  gfx::Matrix4x4 GetLocalTransform();
 
   /**
    * Same as GetLocalTransform(), but returns a strongly-typed matrix.
