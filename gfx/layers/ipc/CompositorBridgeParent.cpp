@@ -1048,15 +1048,18 @@ CompositorBridgeParent::ScheduleTask(already_AddRefed<CancelableRunnable> task, 
 void
 CompositorBridgeParent::NotifyShadowTreeTransaction(uint64_t aId, bool aIsFirstPaint,
     bool aScheduleComposite, uint32_t aPaintSequenceNumber,
-    bool aIsRepeatTransaction)
+    bool aIsRepeatTransaction, bool aHitTestUpdate)
 {
   if (mApzcTreeManager &&
       !aIsRepeatTransaction &&
       mLayerManager &&
       mLayerManager->GetRoot()) {
     AutoResolveRefLayers resolve(mCompositionManager);
-    mApzcTreeManager->UpdateHitTestingTree(this, mLayerManager->GetRoot(),
-        aIsFirstPaint, aId, aPaintSequenceNumber);
+
+    if (aHitTestUpdate) {
+      mApzcTreeManager->UpdateHitTestingTree(this, mLayerManager->GetRoot(),
+          aIsFirstPaint, aId, aPaintSequenceNumber);
+    }
 
     mLayerManager->NotifyShadowTreeTransaction();
   }
@@ -1294,7 +1297,8 @@ CompositorBridgeParent::ShadowLayersUpdated(LayerTransactionParent* aLayerTree,
                                             bool aScheduleComposite,
                                             uint32_t aPaintSequenceNumber,
                                             bool aIsRepeatTransaction,
-                                            int32_t aPaintSyncId)
+                                            int32_t aPaintSyncId,
+                                            bool aHitTestUpdate)
 {
   ScheduleRotationOnCompositorThread(aTargetConfig, aIsFirstPaint);
 
@@ -1309,8 +1313,9 @@ CompositorBridgeParent::ShadowLayersUpdated(LayerTransactionParent* aLayerTree,
   Layer* root = aLayerTree->GetRoot();
   mLayerManager->SetRoot(root);
 
-  if (mApzcTreeManager && !aIsRepeatTransaction) {
+  if (mApzcTreeManager && !aIsRepeatTransaction && aHitTestUpdate) {
     AutoResolveRefLayers resolve(mCompositionManager);
+
     mApzcTreeManager->UpdateHitTestingTree(this, root, aIsFirstPaint,
         mRootLayerTreeID, aPaintSequenceNumber);
   }
@@ -1928,7 +1933,8 @@ public:
                                    bool aScheduleComposite,
                                    uint32_t aPaintSequenceNumber,
                                    bool aIsRepeatTransaction,
-                                   int32_t /*aPaintSyncId: unused*/) override;
+                                   int32_t /*aPaintSyncId: unused*/,
+                                   bool aHitTestUpdate) override;
   virtual void ForceComposite(LayerTransactionParent* aLayerTree) override;
   virtual void NotifyClearCachedResources(LayerTransactionParent* aLayerTree) override;
   virtual bool SetTestSampleTime(LayerTransactionParent* aLayerTree,
@@ -2346,7 +2352,8 @@ CrossProcessCompositorBridgeParent::ShadowLayersUpdated(
   bool aScheduleComposite,
   uint32_t aPaintSequenceNumber,
   bool aIsRepeatTransaction,
-  int32_t /*aPaintSyncId: unused*/)
+  int32_t /*aPaintSyncId: unused*/,
+  bool aHitTestUpdate)
 {
   uint64_t id = aLayerTree->GetId();
 
@@ -2371,7 +2378,7 @@ CrossProcessCompositorBridgeParent::ShadowLayersUpdated(
   state->mUpdatedPluginDataAvailable = true;
 
   state->mParent->NotifyShadowTreeTransaction(id, aIsFirstPaint, aScheduleComposite,
-      aPaintSequenceNumber, aIsRepeatTransaction);
+      aPaintSequenceNumber, aIsRepeatTransaction, aHitTestUpdate);
 
   // Send the 'remote paint ready' message to the content thread if it has already asked.
   if(mNotifyAfterRemotePaint)  {

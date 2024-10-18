@@ -264,6 +264,9 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
     layer_manager()->BeginTransaction();
   }
 
+  // not all edits require an update to the hit testing tree
+  bool updateHitTestingTree = false;
+
   for (EditArray::index_type i = 0; i < cset.Length(); ++i) {
     const Edit& edit = cset[i];
 
@@ -275,6 +278,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       RefPtr<PaintedLayerComposite> layer =
         layer_manager()->CreatePaintedLayerComposite();
       AsLayerComposite(edit.get_OpCreatePaintedLayer())->Bind(layer);
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TOpCreateContainerLayer: {
@@ -282,6 +287,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
 
       RefPtr<ContainerLayer> layer = layer_manager()->CreateContainerLayerComposite();
       AsLayerComposite(edit.get_OpCreateContainerLayer())->Bind(layer);
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TOpCreateImageLayer: {
@@ -290,6 +297,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       RefPtr<ImageLayerComposite> layer =
         layer_manager()->CreateImageLayerComposite();
       AsLayerComposite(edit.get_OpCreateImageLayer())->Bind(layer);
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TOpCreateColorLayer: {
@@ -297,6 +306,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
 
       RefPtr<ColorLayerComposite> layer = layer_manager()->CreateColorLayerComposite();
       AsLayerComposite(edit.get_OpCreateColorLayer())->Bind(layer);
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TOpCreateCanvasLayer: {
@@ -305,6 +316,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       RefPtr<CanvasLayerComposite> layer =
         layer_manager()->CreateCanvasLayerComposite();
       AsLayerComposite(edit.get_OpCreateCanvasLayer())->Bind(layer);
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TOpCreateRefLayer: {
@@ -313,6 +326,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       RefPtr<RefLayerComposite> layer =
         layer_manager()->CreateRefLayerComposite();
       AsLayerComposite(edit.get_OpCreateRefLayer())->Bind(layer);
+
+      updateHitTestingTree = true;
       break;
     }
 
@@ -468,6 +483,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       default:
         NS_RUNTIMEABORT("not reached");
       }
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TOpSetDiagnosticTypes: {
@@ -492,6 +509,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
         return false;
       }
       mRoot = newRoot;
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TOpInsertAfter: {
@@ -508,6 +527,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       {
         return false;
       }
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TOpPrependChild: {
@@ -524,6 +545,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       {
         return false;
       }
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TOpRemoveChild: {
@@ -540,6 +563,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       {
         return false;
       }
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TOpRepositionChild: {
@@ -556,6 +581,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       {
         return false;
       }
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TOpRaiseToTopChild: {
@@ -572,6 +599,8 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
       {
         return false;
       }
+
+      updateHitTestingTree = true;
       break;
     }
     case Edit::TCompositableOperation: {
@@ -622,7 +651,7 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
   mShadowLayersManager->ShadowLayersUpdated(this, aTransactionId, targetConfig,
                                             aPlugins, isFirstPaint, scheduleComposite,
                                             paintSequenceNumber, isRepeatTransaction,
-                                            aPaintSyncId);
+                                            aPaintSyncId, updateHitTestingTree);
 
   {
     AutoResolveRefLayers resolve(mShadowLayersManager->GetCompositionManager(this));
