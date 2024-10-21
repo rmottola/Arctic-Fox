@@ -719,6 +719,7 @@ private:
   RecvGetXPCOMProcessAttributes(bool* aIsOffline,
                                 bool* aIsConnected,
                                 bool* aIsLangRTL,
+                                bool* aHaveBidiKeyboards,
                                 InfallibleTArray<nsString>* dictionaries,
                                 ClipboardCapabilities* clipboardCaps,
                                 DomainPolicyClone* domainPolicy,
