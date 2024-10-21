@@ -435,6 +435,8 @@ private:
 
     void SetLoadGroupUserAgentOverride();
 
+    void SetDoNotTrack();
+
 private:
     nsCOMPtr<nsICancelable>           mProxyRequest;
 
