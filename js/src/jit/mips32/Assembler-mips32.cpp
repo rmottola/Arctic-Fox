@@ -88,6 +88,13 @@ js::jit::RD(FloatRegister r)
 }
 
 uint32_t
+js::jit::RZ(FloatRegister r)
+{
+    MOZ_ASSERT(r.id() < FloatRegisters::RegisterIdLimit);
+    return r.id() << RZShift;
+}
+
+uint32_t
 js::jit::SA(FloatRegister r)
 {
     MOZ_ASSERT(r.id() < FloatRegisters::RegisterIdLimit);
