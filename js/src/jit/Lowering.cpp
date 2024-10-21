@@ -4571,8 +4571,10 @@ SpewResumePoint(MBasicBlock* block, MInstruction* ins, MResumePoint* resumePoint
 bool
 LIRGenerator::visitInstruction(MInstruction* ins)
 {
-    if (ins->isRecoveredOnBailout())
+    if (ins->isRecoveredOnBailout()) {
+        MOZ_ASSERT(!JitOptions.disableRecoverIns);
         return true;
+    }
 
     if (!gen->ensureBallast())
         return false;

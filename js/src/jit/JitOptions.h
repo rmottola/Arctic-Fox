@@ -59,6 +59,7 @@ struct DefaultJitOptions
     bool disablePgo;
     bool disableInstructionReordering;
     bool disableRangeAnalysis;
+    bool disableRecoverIns;
     bool disableScalarReplacement;
     bool disableSharedStubs;
     bool disableSincos;
