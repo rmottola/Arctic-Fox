@@ -7801,9 +7801,7 @@ nsRuleNode::ComputeListData(void* aStartStruct,
     case eCSSUnit_Unset:
     case eCSSUnit_Inherit: {
       conditions.SetUncacheable();
-      nsString type;
-      parentList->GetListStyleType(type);
-      list->SetListStyleType(type, parentList->GetCounterStyle());
+      list->SetCounterStyle(parentList->GetCounterStyle());
       break;
     }
     case eCSSUnit_Initial:
@@ -7818,8 +7816,7 @@ nsRuleNode::ComputeListData(void* aStartStruct,
     case eCSSUnit_String: {
       nsString str;
       typeValue->GetStringValue(str);
-      list->SetListStyleType(NS_LITERAL_STRING(""),
-                             new AnonymousCounterStyle(str));
+      list->SetCounterStyle(new AnonymousCounterStyle(str));
       break;
     }
     case eCSSUnit_Enumerated: {
@@ -7849,9 +7846,7 @@ nsRuleNode::ComputeListData(void* aStartStruct,
       break;
     }
     case eCSSUnit_Symbols:
-      list->SetListStyleType(
-        NS_LITERAL_STRING(""),
-        new AnonymousCounterStyle(typeValue->GetArrayValue()));
+      list->SetCounterStyle(new AnonymousCounterStyle(typeValue->GetArrayValue()));
       break;
     case eCSSUnit_Null:
       break;
