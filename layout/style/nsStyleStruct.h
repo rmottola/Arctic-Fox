@@ -1477,6 +1477,9 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleList
   }
   void SetCounterStyle(mozilla::CounterStyle* aStyle)
   {
+    // NB: This function is called off-main-thread during parallel restyle, but
+    // only with builtin styles that use dummy refcounting.
+    MOZ_ASSERT(NS_IsMainThread() || aStyle->IsDependentStyle());
     mCounterStyle = aStyle;
   }
   void SetListStyleType(const nsSubstring& aType,
