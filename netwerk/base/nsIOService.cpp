@@ -60,9 +60,8 @@
 #include "nsINetworkInterface.h"
 #endif
 
-using namespace mozilla;
-using mozilla::net::IsNeckoChild;
-using mozilla::net::CaptivePortalService;
+namespace mozilla {
+namespace net {
 
 #define PORT_PREF_PREFIX           "network.security.ports."
 #define PORT_PREF(x)               PORT_PREF_PREFIX x
@@ -82,9 +81,9 @@ using mozilla::net::CaptivePortalService;
 nsIOService* gIOService = nullptr;
 static bool gHasWarnedUploadChannel2;
 
-static mozilla::LazyLogModule gIOServiceLog("nsIOService");
+static LazyLogModule gIOServiceLog("nsIOService");
 #undef LOG
-#define LOG(args)     MOZ_LOG(gIOServiceLog, mozilla::LogLevel::Debug, args)
+#define LOG(args)     MOZ_LOG(gIOServiceLog, LogLevel::Debug, args)
 
 // A general port blacklist.  Connections to these ports will not be allowed
 // unless the protocol overrides.
@@ -239,8 +238,7 @@ nsIOService::Init()
     }
     
     // Register for profile change notifications
-    nsCOMPtr<nsIObserverService> observerService =
-        mozilla::services::GetObserverService();
+    nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
     if (observerService) {
         observerService->AddObserver(this, kProfileChangeNetTeardownTopic, true);
         observerService->AddObserver(this, kProfileChangeNetRestoreTopic, true);
@@ -395,7 +393,7 @@ nsIOService::RecheckCaptivePortalIfLocalRedirect(nsIChannel* newChan)
         return NS_OK;
     }
 
-    mozilla::net::NetAddr netAddr;
+    NetAddr netAddr;
     PRNetAddrToNetAddr(&prAddr, &netAddr);
     if (IsIPAddrLocal(&netAddr)) {
         // Redirects to local IP addresses are probably captive portals
@@ -868,11 +866,11 @@ nsIOService::NewChannelFromURIWithProxyFlags2(nsIURI* aURI,
     if (aLoadingNode || aLoadingPrincipal ||
         aContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT) {
       nsCOMPtr<nsINode> loadingNode(do_QueryInterface(aLoadingNode));
-      loadInfo = new mozilla::LoadInfo(aLoadingPrincipal,
-                                       aTriggeringPrincipal,
-                                       loadingNode,
-                                       aSecurityFlags,
-                                       aContentPolicyType);
+      loadInfo = new LoadInfo(aLoadingPrincipal,
+                              aTriggeringPrincipal,
+                              loadingNode,
+                              aSecurityFlags,
+                              aContentPolicyType);
     }
     NS_ASSERTION(loadInfo, "Please pass security info when creating a channel");
     return NewChannelFromURIWithProxyFlagsInternal(aURI,
@@ -1036,8 +1034,7 @@ nsIOService::SetOffline(bool offline)
 
     mSettingOffline = true;
 
-    nsCOMPtr<nsIObserverService> observerService =
-        mozilla::services::GetObserverService();
+    nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
 
     NS_ASSERTION(observerService, "The observer service should not be null");
 
@@ -1150,8 +1147,7 @@ nsIOService::SetConnectivityInternal(bool aConnectivity)
     // we have statistic about network change event even if we are offline.
     mLastConnectivityChange = PR_IntervalNow();
 
-    nsCOMPtr<nsIObserverService> observerService =
-        mozilla::services::GetObserverService();
+    nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
     if (!observerService) {
         return NS_OK;
     }
@@ -1415,8 +1411,7 @@ private:
 NS_IMETHODIMP
 nsIOService::NotifyWakeup()
 {
-    nsCOMPtr<nsIObserverService> observerService =
-        mozilla::services::GetObserverService();
+    nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
 
     NS_ASSERTION(observerService, "The observer service should not be null");
 
@@ -1778,7 +1773,7 @@ nsIOService::ParseAttributePolicyString(const nsAString& policyString,
                                                 uint32_t *outPolicyEnum)
 {
   NS_ENSURE_ARG(outPolicyEnum);
-  *outPolicyEnum = (uint32_t)mozilla::net::AttributeReferrerPolicyFromString(policyString);
+  *outPolicyEnum = (uint32_t)AttributeReferrerPolicyFromString(policyString);
   return NS_OK;
 }
 
@@ -1923,8 +1918,7 @@ nsIOService::NotifyAppOfflineStatus(uint32_t appId, int32_t state)
     MOZ_RELEASE_ASSERT(NS_IsMainThread(),
             "Should be called on the main thread");
 
-    nsCOMPtr<nsIObserverService> observerService =
-        mozilla::services::GetObserverService();
+    nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
     MOZ_ASSERT(observerService, "The observer service should not be null");
 
     if (observerService) {
@@ -2080,3 +2074,6 @@ nsIOService::IsAppOffline(uint32_t aAppId, bool* aResult)
 
     return NS_OK;
 }
+
+} // namespace net
+} // namespace mozilla
