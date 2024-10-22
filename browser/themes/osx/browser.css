@@ -1613,6 +1613,13 @@ richlistitem[type~="action"][actiontype="switchtab"][selected="true"] > .ac-url-
         linear-gradient(-moz-dialog, -moz-dialog);
 }
 
+/* ----- SIDEBAR ELEMENTS ----- */
+
+#sidebar-box {
+  -moz-appearance: -moz-mac-source-list;
+  box-shadow: inset -2px 0 0 hsla(0,0%,100%,.2);
+}
+
 .tabbrowser-tab:-moz-lwtheme {
     color: inherit;
     /* 0.99 opacity rquired to force an active layer, see bug #1028369 */
@@ -1621,6 +1628,23 @@ richlistitem[type~="action"][actiontype="switchtab"][selected="true"] > .ac-url-
 
 .tabbrowser-tab:-moz-lwtheme:not([selected="true"]) {
     opacity: 0.9;
+}
+
+@media (-moz-mac-yosemite-theme) {
+  #sidebar-box {
+    box-shadow: none;
+  }
+
+  sidebarheader {
+    text-shadow: none;
+    font-weight: 500;
+  }
+
+  .sidebar-title,
+  #sidebar-title {
+    color: #636363;
+    font-weight: 500;
+  }
 }
 
 /* Remove highlight fuzz on dark themes */
