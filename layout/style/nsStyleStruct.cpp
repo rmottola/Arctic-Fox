@@ -1312,7 +1312,7 @@ nsChangeHint nsStyleSVGReset::CalcDifference(const nsStyleSVGReset& aOther) cons
     hint |= nsChangeHint_RepaintFrame;
   }
 
-  hint |= mMask.CalcDifference(aOther.mMask);
+  hint |= mMask.CalcDifference(aOther.mMask, nsChangeHint_RepaintFrame);
 
   return hint;
 }
@@ -2319,7 +2319,8 @@ nsStyleImageLayers::nsStyleImageLayers(const nsStyleImageLayers &aSource)
 }
 
 nsChangeHint
-nsStyleImageLayers::CalcDifference(const nsStyleImageLayers& aOther) const
+nsStyleImageLayers::CalcDifference(const nsStyleImageLayers& aOther,
+                                   nsChangeHint aPositionChangeHint) const
 {
   nsChangeHint hint = nsChangeHint(0);
 
@@ -2333,7 +2334,8 @@ nsStyleImageLayers::CalcDifference(const nsStyleImageLayers& aOther) const
   NS_FOR_VISIBLE_IMAGE_LAYERS_BACK_TO_FRONT(i, moreLayers) {
     if (i < lessLayers.mImageCount) {
       nsChangeHint layerDifference =
-        moreLayers.mLayers[i].CalcDifference(lessLayers.mLayers[i]);
+        moreLayers.mLayers[i].CalcDifference(lessLayers.mLayers[i],
+                                             aPositionChangeHint);
       hint |= layerDifference;
       if (layerDifference &&
           ((moreLayers.mLayers[i].mImage.GetType() == eStyleImageType_Element) ||
@@ -2577,7 +2579,8 @@ nsStyleImageLayers::Layer::operator==(const Layer& aOther) const
 }
 
 nsChangeHint
-nsStyleImageLayers::Layer::CalcDifference(const nsStyleImageLayers::Layer& aOther) const
+nsStyleImageLayers::Layer::CalcDifference(const nsStyleImageLayers::Layer& aOther,
+                                          nsChangeHint aPositionChangeHint) const
 {
   nsChangeHint hint = nsChangeHint(0);
   if (!EqualURIs(mSourceURI, aOther.mSourceURI)) {
@@ -2599,7 +2602,7 @@ nsStyleImageLayers::Layer::CalcDifference(const nsStyleImageLayers::Layer& aOthe
   }
 
   if (mPosition != aOther.mPosition) {
-    hint |= nsChangeHint_UpdateBackgroundPosition;
+    hint |= aPositionChangeHint;
   }
 
   return hint;
@@ -2646,7 +2649,8 @@ nsChangeHint nsStyleBackground::CalcDifference(const nsStyleBackground& aOther) 
     hint |= nsChangeHint_RepaintFrame;
   }
 
-  hint |= mImage.CalcDifference(aOther.mImage);
+  hint |= mImage.CalcDifference(aOther.mImage,
+                                nsChangeHint_UpdateBackgroundPosition);
 
   return hint;
 }
