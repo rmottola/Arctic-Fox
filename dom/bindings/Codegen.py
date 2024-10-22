@@ -13691,7 +13691,9 @@ class CGNativeMember(ClassMethod):
     def __init__(self, descriptorProvider, member, name, signature, extendedAttrs,
                  breakAfter=True, passJSBitsAsNeeded=True, visibility="public",
                  typedArraysAreStructs=True, variadicIsSequence=False,
-                 resultNotAddRefed=False):
+                 resultNotAddRefed=False,
+                 virtual=False,
+                 override=False):
         """
         If typedArraysAreStructs is false, typed arrays will be passed as
         JS::Handle<JSObject*>.  If it's true they will be passed as one of the
@@ -13719,7 +13721,9 @@ class CGNativeMember(ClassMethod):
                                     not signature[0].isVoid()),
                              breakAfterReturnDecl=" ",
                              breakAfterSelf=breakAfterSelf,
-                             visibility=visibility)
+                             visibility=visibility,
+                             virtual=virtual,
+                             override=override)
 
     def getReturnType(self, type, isMember):
         return self.getRetvalInfo(type, isMember)[0]
@@ -14483,12 +14487,15 @@ class CGJSImplMember(CGNativeMember):
     """
     def __init__(self, descriptorProvider, member, name, signature,
                  extendedAttrs, breakAfter=True, passJSBitsAsNeeded=True,
-                 visibility="public", variadicIsSequence=False):
+                 visibility="public", variadicIsSequence=False,
+                 virtual=False, override=False):
         CGNativeMember.__init__(self, descriptorProvider, member, name,
                                 signature, extendedAttrs, breakAfter=breakAfter,
                                 passJSBitsAsNeeded=passJSBitsAsNeeded,
                                 visibility=visibility,
-                                variadicIsSequence=variadicIsSequence)
+                                variadicIsSequence=variadicIsSequence,
+                                virtual=virtual,
+                                override=override)
         self.body = self.getImpl()
 
     def getArgs(self, returnType, argList):
@@ -14503,6 +14510,13 @@ class CGJSImplMethod(CGJSImplMember):
     interface.
     """
     def __init__(self, descriptor, method, signature, isConstructor, breakAfter=True):
+        virtual = False
+        override = False
+        if (method.identifier.name == "eventListenerWasAdded" or
+            method.identifier.name == "eventListenerWasRemoved"):
+            virtual = True
+            override = True
+
         self.signature = signature
         self.descriptor = descriptor
         self.isConstructor = isConstructor
@@ -14513,7 +14527,9 @@ class CGJSImplMethod(CGJSImplMember):
                                 descriptor.getExtendedAttributes(method),
                                 breakAfter=breakAfter,
                                 variadicIsSequence=True,
-                                passJSBitsAsNeeded=False)
+                                passJSBitsAsNeeded=False,
+                                virtual=virtual,
+                                override=override)
 
     def getArgs(self, returnType, argList):
         if self.isConstructor:
