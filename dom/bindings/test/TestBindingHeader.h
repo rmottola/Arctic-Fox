@@ -1408,6 +1408,9 @@ public:
 class TestRenamedNamespace {
 };
 
+class TestProtoObjectHackedNamespace {
+};
+
 } // namespace dom
 } // namespace mozilla
 
