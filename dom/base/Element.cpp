@@ -3789,7 +3789,7 @@ Element::FontSizeInflation()
 net::ReferrerPolicy
 Element::GetReferrerPolicyAsEnum()
 {
-  if (Preferences::GetBool("network.http.enablePerElementReferrer", false) &&
+  if (Preferences::GetBool("network.http.enablePerElementReferrer", true) &&
       IsHTMLElement()) {
     const nsAttrValue* referrerValue = GetParsedAttr(nsGkAtoms::referrerpolicy);
     if (referrerValue && referrerValue->Type() == nsAttrValue::eEnum) {
