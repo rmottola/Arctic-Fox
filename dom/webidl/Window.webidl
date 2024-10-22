@@ -413,12 +413,6 @@ partial interface Window {
 };
 #endif
 
-// ConsoleAPI
-partial interface Window {
-  [Replaceable, GetterThrows]
-  readonly attribute Console console;
-};
-
 // https://w3c.github.io/webappsec-secure-contexts/#monkey-patching-global-object
 partial interface Window {
   readonly attribute boolean isSecureContext;
