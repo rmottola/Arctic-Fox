@@ -44,6 +44,11 @@ using mozilla::gfx::SourceSurface;
 using mozilla::image::ImageRegion;
 using std::ceil;
 
+#if !defined(MAC_OS_X_VERSION_10_7) || MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_7
+// When building with a pre-10.7 SDK, NSEventPhase is not defined.
+NSString *const NSVerticalGlyphFormAttributeName = @"NSVerticalGlyphFormAttributeName";
+#endif
+
 static float
 MenuBarScreenHeight()
 {
