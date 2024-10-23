@@ -3926,12 +3926,12 @@ nsComputedDOMStyle::DoGetWordBreak()
 }
 
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::DoGetWordWrap()
+nsComputedDOMStyle::DoGetOverflowWrap()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(StyleText()->mWordWrap,
-                                   nsCSSProps::kWordWrapKTable));
+    nsCSSProps::ValueToKeywordEnum(StyleText()->mOverflowWrap,
+                                   nsCSSProps::kOverflowWrapKTable));
   return val.forget();
 }
 
