@@ -3564,7 +3564,7 @@ AreShadowArraysEqual(nsCSSShadowArray* lhs,
 //
 
 nsStyleText::nsStyleText(StyleStructContext aContext)
-  : mTextAlign(NS_STYLE_TEXT_ALIGN_DEFAULT)
+  : mTextAlign(NS_STYLE_TEXT_ALIGN_START)
   , mTextAlignLast(NS_STYLE_TEXT_ALIGN_AUTO)
   , mTextAlignTrue(false)
   , mTextAlignLastTrue(false)
