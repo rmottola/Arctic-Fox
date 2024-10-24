@@ -650,7 +650,7 @@ CSSAnimationBuilder::Build(nsPresContext* aPresContext,
   animation->SetOwningElement(
     OwningElementRef(*mTarget, mStyleContext->GetPseudoType()));
 
-  animation->SetTimeline(mTimeline);
+  animation->SetTimelineNoUpdate(mTimeline);
   animation->SetEffect(effect);
 
   if (isStylePaused) {
