@@ -165,6 +165,10 @@ Animation::SetTimelineNoUpdate(AnimationTimeline* aTimeline)
     return;
   }
 
+  if (mTimeline) {
+    mTimeline->RemoveAnimation(this);
+  }
+
   mTimeline = aTimeline;
   if (!mStartTime.IsNull()) {
     mHoldTime.SetNull();
