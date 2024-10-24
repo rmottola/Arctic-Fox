@@ -1395,7 +1395,7 @@ class nsStyleQuoteValues
 {
 public:
   typedef nsTArray<std::pair<nsString, nsString>> QuotePairArray;
-  NS_INLINE_DECL_REFCOUNTING(nsStyleQuoteValues);
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(nsStyleQuoteValues);
   QuotePairArray mQuotePairs;
 
 private:
