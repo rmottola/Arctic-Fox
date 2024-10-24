@@ -852,7 +852,7 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleMargin
   {
     MOZ_ASSERT(mMargin.ConvertsToLength());
     NS_FOR_CSS_SIDES(side) {
-      aMargin.Side(side) = mMargin.Get(side).ToLength();
+      aMargin.Side(side) = mMargin.ToLength(side);
     }
   }
 };
@@ -909,7 +909,7 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStylePadding
     MOZ_ASSERT(mPadding.ConvertsToLength());
     NS_FOR_CSS_SIDES(side) {
       // Clamp negative calc() to 0.
-      aPadding.Side(side) = std::max(mPadding.Get(side).ToLength(), 0);
+      aPadding.Side(side) = std::max(mPadding.ToLength(side), 0);
     }
   }
 };
