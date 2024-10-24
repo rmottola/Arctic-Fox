@@ -350,7 +350,7 @@ Animation::GetFinished(ErrorResult& aRv)
 void
 Animation::Cancel()
 {
-  DoCancel();
+  CancelNoUpdate();
   PostUpdate();
 }
 
@@ -413,14 +413,14 @@ Animation::Finish(ErrorResult& aRv)
 void
 Animation::Play(ErrorResult& aRv, LimitBehavior aLimitBehavior)
 {
-  DoPlay(aRv, aLimitBehavior);
+  PlayNoUpdate(aRv, aLimitBehavior);
   PostUpdate();
 }
 
 void
 Animation::Pause(ErrorResult& aRv)
 {
-  DoPause(aRv);
+  PauseNoUpdate(aRv);
   PostUpdate();
 }
 
@@ -654,7 +654,7 @@ Animation::SilentlySetPlaybackRate(double aPlaybackRate)
 
 // https://w3c.github.io/web-animations/#cancel-an-animation
 void
-Animation::DoCancel()
+Animation::CancelNoUpdate()
 {
   if (mPendingState != PendingState::NotPending) {
     CancelPendingTasks();
@@ -837,7 +837,7 @@ Animation::NotifyEffectTimingUpdated()
 
 // https://w3c.github.io/web-animations/#play-an-animation
 void
-Animation::DoPlay(ErrorResult& aRv, LimitBehavior aLimitBehavior)
+Animation::PlayNoUpdate(ErrorResult& aRv, LimitBehavior aLimitBehavior)
 {
   AutoMutationBatchForAnimation mb(*this);
 
@@ -917,7 +917,7 @@ Animation::DoPlay(ErrorResult& aRv, LimitBehavior aLimitBehavior)
 
 // https://w3c.github.io/web-animations/#pause-an-animation
 void
-Animation::DoPause(ErrorResult& aRv)
+Animation::PauseNoUpdate(ErrorResult& aRv)
 {
   if (IsPausedOrPausing()) {
     return;
@@ -1160,8 +1160,8 @@ Animation::IsPossiblyOrphanedPendingAnimation() const
   //   when we have been painted.
   // * When we started playing we couldn't find a PendingAnimationTracker to
   //   register with (perhaps the effect had no document) so we simply
-  //   set mPendingState in DoPlay and relied on this method to catch us on the
-  //   next tick.
+  //   set mPendingState in PlayNoUpdate and relied on this method to catch us
+  //   on the next tick.
 
   // If we're not pending we're ok.
   if (mPendingState == PendingState::NotPending) {
