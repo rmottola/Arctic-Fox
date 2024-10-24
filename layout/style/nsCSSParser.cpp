@@ -6618,7 +6618,8 @@ CSSParserImpl::ParseColor(nsCSSValue& aValue)
     case eCSSToken_ID:
     case eCSSToken_Hash:
       // #xxyyzz
-      if (NS_HexToRGB(tk->mIdent, &rgba)) {
+      // FIXME
+      if (NS_HexToRGBA(tk->mIdent, nsHexColorType::NoAlpha, &rgba)) {
         MOZ_ASSERT(tk->mIdent.Length() == 3 || tk->mIdent.Length() == 6,
                    "unexpected hex color length");
         nsCSSUnit unit = tk->mIdent.Length() == 3 ?
@@ -6772,7 +6773,8 @@ CSSParserImpl::ParseColor(nsCSSValue& aValue)
         // not handled by this switch.  Ignore them.
         break;
     }
-    if (NS_HexToRGB(str, &rgba)) {
+    // FIXME
+    if (NS_HexToRGBA(str, nsHexColorType::NoAlpha, &rgba)) {
       aValue.SetIntegerColorValue(rgba, eCSSUnit_HexColor);
       return CSSParseResult::Ok;
     }
