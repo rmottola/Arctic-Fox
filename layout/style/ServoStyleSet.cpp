@@ -375,3 +375,9 @@ ServoStyleSet::HasStateDependentStyle(dom::Element* aElement,
 {
   MOZ_CRASH("stylo: not implemented");
 }
+
+void
+ServoStyleSet::RestyleSubtree(nsINode* aNode)
+{
+  Servo_RestyleSubtree(aNode, mRawSet.get());
+}
