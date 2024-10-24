@@ -612,3 +612,5 @@ load 1304441.html
 pref(dom.details_element.enabled,true) load summary-position-out-of-flow.html
 asserts(4) load 1225005.html # bug 682647 and bug 448083
 load 1233191.html
+asserts(2) load 1272983-1.html # bug 586628
+asserts(2) load 1272983-2.html # bug 586628
