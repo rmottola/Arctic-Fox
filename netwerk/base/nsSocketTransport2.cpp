@@ -36,6 +36,7 @@
 #include <algorithm>
 
 #include "nsPrintfCString.h"
+#include "xpcpublic.h"
 
 #if defined(XP_WIN)
 #include "mozilla/WindowsVersion.h"
@@ -1211,16 +1212,6 @@ nsSocketTransport::InitiateSocket()
 {
     SOCKET_LOG(("nsSocketTransport::InitiateSocket [this=%p]\n", this));
 
-    static int crashOnNonLocalConnections = -1;
-    if (crashOnNonLocalConnections == -1) {
-        const char *s = getenv("MOZ_DISABLE_NONLOCAL_CONNECTIONS");
-        if (s) {
-            crashOnNonLocalConnections = !!strncmp(s, "0", 1);
-        } else {
-            crashOnNonLocalConnections = 0;
-        }
-    }
-
     nsresult rv;
     bool isLocal;
     IsLocal(&isLocal);
@@ -1242,7 +1233,7 @@ nsSocketTransport::InitiateSocket()
 #endif
 
         if (NS_SUCCEEDED(mCondition) &&
-            crashOnNonLocalConnections &&
+            xpc::AreNonLocalConnectionsDisabled() &&
             !(IsIPAddrAny(&mNetAddr) || IsIPAddrLocal(&mNetAddr))) {
             nsAutoCString ipaddr;
             RefPtr<nsNetAddr> netaddr = new nsNetAddr(&mNetAddr);
