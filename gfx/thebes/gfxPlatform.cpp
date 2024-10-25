@@ -593,6 +593,8 @@ gfxPlatform::Init()
     gfxPrefs::GetSingleton();
     MediaPrefs::GetSingleton();
 
+    gfxConfig::Init();
+
     GPUProcessManager::Initialize();
 
     auto fwd = new CrashStatsLogForwarder("GraphicsCriticalError");
@@ -853,6 +855,8 @@ gfxPlatform::Shutdown()
 
     gfxPrefs::DestroySingleton();
     gfxFont::DestroySingletons();
+
+    gfxConfig::Shutdown();
 
     delete gPlatform;
     gPlatform = nullptr;
@@ -2127,9 +2131,11 @@ gfxPlatform::InitCompositorAccelerationPrefs()
                          "Acceleration blocked by platform"))
   {
     if (gfxPrefs::LayersAccelerationDisabledDoNotUseDirectly()) {
-      feature.UserDisable("Disabled by pref");
+      feature.UserDisable("Disabled by pref",
+                          NS_LITERAL_CSTRING("FEATURE_FAILURE_COMP_PREF"));
     } else if (acceleratedEnv && *acceleratedEnv == '0') {
-      feature.UserDisable("Disabled by envvar");
+      feature.UserDisable("Disabled by envvar",
+                          NS_LITERAL_CSTRING("FEATURE_FAILURE_COMP_ENV"));
     }
   } else {
     if (acceleratedEnv && *acceleratedEnv == '1') {
@@ -2144,7 +2150,8 @@ gfxPlatform::InitCompositorAccelerationPrefs()
 
   // Safe mode trumps everything.
   if (InSafeMode()) {
-    feature.ForceDisable(FeatureStatus::Blocked, "Acceleration blocked by safe-mode");
+    feature.ForceDisable(FeatureStatus::Blocked, "Acceleration blocked by safe-mode",
+                         NS_LITERAL_CSTRING("FEATURE_FAILURE_COMP_SAFEMODE"));
   }
 }
 
