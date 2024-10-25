@@ -478,6 +478,8 @@ public:
 
   void FastSeek(double aTime, ErrorResult& aRv);
 
+  void SeekToNextFrame(ErrorResult& aRv);
+
   double Duration() const;
 
   bool HasAudio() const

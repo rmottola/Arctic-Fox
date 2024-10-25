@@ -1449,6 +1449,12 @@ HTMLMediaElement::FastSeek(double aTime, ErrorResult& aRv)
 }
 
 void
+HTMLMediaElement::SeekToNextFrame(ErrorResult& aRv)
+{
+  Seek(CurrentTime(), SeekTarget::NextFrame, aRv);
+}
+
+void
 HTMLMediaElement::SetCurrentTime(double aCurrentTime, ErrorResult& aRv)
 {
   Seek(aCurrentTime, SeekTarget::Accurate, aRv);
