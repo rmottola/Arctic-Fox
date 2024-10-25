@@ -203,7 +203,7 @@ var snapshotFormatters = {
     // @where    The name in "graphics-<name>-tbody", of the element to append to.
     // @trs      Array of row elements.
     function addRows(where, trs) {
-      $.append($('graphics-' + where + '-tbody'), trs);
+      $.append($("graphics-" + where + "-tbody"), trs);
     }
 
     // Build and append a row.
@@ -349,7 +349,7 @@ var snapshotFormatters = {
       }
       addRow(id, "active", strings.GetStringFromName(active));
       addRows(id, trs);
-    };
+    }
     showGpu("gpu-1", "");
     showGpu("gpu-2", "2");
 
