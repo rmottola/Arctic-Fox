@@ -5607,3 +5607,11 @@ pref("dom.mozBrowserFramesEnabled", false);
 
 // Is support for 'color-adjust' CSS property enabled?
 pref("layout.css.color-adjust.enabled", true);
+
+// Once bug 1276272 is resolved, we will trun this preference to default ON in
+// non-release channels.
+#ifdef RELEASE_BUILD
+pref("media.seekToNextFrame.enabled", false);
+#else
+pref("media.seekToNextFrame.enabled", true);
+#endif
