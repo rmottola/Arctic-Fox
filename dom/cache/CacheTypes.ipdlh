@@ -77,7 +77,7 @@ union CacheRequestOrVoid
 struct CacheResponse
 {
   ResponseType type;
-  nsCString url;
+  nsCString[] urlList;
   uint32_t status;
   nsCString statusText;
   HeadersEntry[] headers;
