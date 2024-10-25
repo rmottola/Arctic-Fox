@@ -12,7 +12,6 @@
 
 #include "nsWhitespaceTokenizer.h"
 #include "nsXULAppAPI.h"
-#include "nsAutoPtr.h"
 #include "nsString.h"
 #include "nsThreadUtils.h"
 #include "mozilla/RefPtr.h"

@@ -28,6 +28,8 @@
 #include "mozilla/TypeTraits.h"
 #endif
 
+#include "nsAutoPtr.h"
+
 using namespace IPC;
 
 using base::GetCurrentProcId;
