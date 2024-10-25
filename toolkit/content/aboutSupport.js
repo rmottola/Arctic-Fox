@@ -667,6 +667,10 @@ Serializer.prototype = {
     this._currentLine += text;
   },
 
+  _isHiddenSubHeading: function (th) {
+    return th.parentNode.parentNode.style.display == "none";
+  },
+
   _serializeTable: function (table) {
     // Collect the table's column headings if in fact there are any.  First
     // check thead.  If there's no thead, check the first tr.
@@ -679,12 +683,10 @@ Serializer.prototype = {
       // If there's a contiguous run of th's in the children starting from the
       // rightmost child, then consider them to be column headings.
       for (let i = tableHeadingCols.length - 1; i >= 0; i--) {
-        if (tableHeadingCols[i].localName != "th")
+        let col = tableHeadingCols[i];
+        if (col.localName != "th" || col.classList.contains("title-column"))
           break;
-        colHeadings[i] = this._nodeText(
-            tableHeadingCols[i],
-            (tableHeadingCols[i].classList &&
-             tableHeadingCols[i].classList.contains("endline"))).trim();
+        colHeadings[i] = this._nodeText(col).trim();
       }
     }
     let hasColHeadings = Object.keys(colHeadings).length > 0;
@@ -711,10 +713,7 @@ Serializer.prototype = {
           let text = "";
           if (colHeadings[j])
             text += colHeadings[j] + ": ";
-          text += this._nodeText(
-              children[j],
-              (children[j].classList &&
-               children[j].classList.contains("endline"))).trim();
+          text += this._nodeText(children[j]).trim();
           this._appendText(text);
           this._startNewLine();
         }
@@ -730,14 +729,13 @@ Serializer.prototype = {
       if (this._ignoreElement(trs[i]))
         continue;
       let children = trs[i].querySelectorAll("th,td");
-      let rowHeading = this._nodeText(
-          children[0],
-          (children[0].classList &&
-           children[0].classList.contains("endline"))).trim();
-      this._appendText(rowHeading + ": " + this._nodeText(
-          children[1],
-          (children[1].classList &&
-           children[1].classList.contains("endline"))).trim());
+      let rowHeading = this._nodeText(children[0]).trim();
+      if (children[0].classList.contains("title-column")) {
+        if (!this._isHiddenSubHeading(children[0]))
+          this._appendText(rowHeading);
+      } else {
+        this._appendText(rowHeading + ": " + this._nodeText(children[1]).trim());
+      }
       this._startNewLine();
     }
     this._startNewLine();
