@@ -342,6 +342,35 @@ private:
   using WorkerRunnable::Cancel;
 };
 
+// A convenience class for WorkerRunnables that originate on the main
+// thread.
+class MainThreadWorkerRunnable : public WorkerRunnable
+{
+protected:
+  explicit MainThreadWorkerRunnable(WorkerPrivate* aWorkerPrivate)
+  : WorkerRunnable(aWorkerPrivate, WorkerThreadUnchangedBusyCount)
+  {
+    AssertIsOnMainThread();
+  }
+
+  virtual ~MainThreadWorkerRunnable()
+  {}
+
+  virtual bool
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override
+  {
+    AssertIsOnMainThread();
+    return true;
+  }
+
+  virtual void
+  PostDispatch(WorkerPrivate* aWorkerPrivate,
+               bool aDispatchResult) override
+  {
+    AssertIsOnMainThread();
+  }
+};
+
 // A convenience class for WorkerControlRunnables that originate on the main
 // thread.
 class MainThreadWorkerControlRunnable : public WorkerControlRunnable
@@ -362,7 +391,10 @@ protected:
   }
 
   virtual void
-  PostDispatch(WorkerPrivate* aWorkerPrivate, bool aDispatchResult) override;
+  PostDispatch(WorkerPrivate* aWorkerPrivate, bool aDispatchResult) override
+  {
+    AssertIsOnMainThread();
+  }
 };
 
 // A WorkerRunnable that should be dispatched from the worker to itself for
