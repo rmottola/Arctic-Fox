@@ -925,6 +925,7 @@ protected:
                      lineCap(mozilla::gfx::CapStyle::BUTT),
                      lineJoin(mozilla::gfx::JoinStyle::MITER_OR_BEVEL),
                      filterString(MOZ_UTF16("none")),
+                     updateFilterOnWriteOnly(false),
                      imageSmoothingEnabled(true),
                      fontExplicitLanguage(false)
     { }
@@ -957,6 +958,7 @@ protected:
           filterChainObserver(aOther.filterChainObserver),
           filter(aOther.filter),
           filterAdditionalImages(aOther.filterAdditionalImages),
+          updateFilterOnWriteOnly(aOther.updateFilterOnWriteOnly),
           imageSmoothingEnabled(aOther.imageSmoothingEnabled),
           fontExplicitLanguage(aOther.fontExplicitLanguage)
     { }
@@ -1034,6 +1036,7 @@ protected:
     RefPtr<nsSVGFilterChainObserver> filterChainObserver;
     mozilla::gfx::FilterDescription filter;
     nsTArray<RefPtr<mozilla::gfx::SourceSurface>> filterAdditionalImages;
+    bool updateFilterOnWriteOnly;
 
     bool imageSmoothingEnabled;
     bool fontExplicitLanguage;
