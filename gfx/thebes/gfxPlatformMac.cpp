@@ -451,9 +451,6 @@ public:
     ~OSXDisplay()
     {
       MOZ_ASSERT(NS_IsMainThread());
-      mTimer->Cancel();
-      mTimer = nullptr;
-      DisableVsync();
     }
 
     static void RetryEnableVsync(nsITimer* aTimer, void* aOsxDisplay)
@@ -547,6 +544,14 @@ public:
     virtual TimeDuration GetVsyncRate() override
     {
       return mVsyncRate;
+    }
+
+    virtual void Shutdown() override
+    {
+      MOZ_ASSERT(NS_IsMainThread());
+      mTimer->Cancel();
+      mTimer = nullptr;
+      DisableVsync();
     }
 
     // The vsync timestamps given by the CVDisplayLinkCallback are
