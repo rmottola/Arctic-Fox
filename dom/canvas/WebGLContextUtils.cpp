@@ -830,7 +830,7 @@ InfoFrom(WebGLTexImageFunc func, WebGLTexDimensions dims)
         case WebGLTexImageFunc::CompTexImage:    return "compressedTexImage2D";
         case WebGLTexImageFunc::CompTexSubImage: return "compressedTexSubImage2D";
         default:
-            MOZ_CRASH();
+            MOZ_CRASH("GFX: invalid 2D TexDimensions");
         }
     case WebGLTexDimensions::Tex3D:
         switch (func) {
@@ -839,10 +839,10 @@ InfoFrom(WebGLTexImageFunc func, WebGLTexDimensions dims)
         case WebGLTexImageFunc::CopyTexSubImage: return "copyTexSubImage3D";
         case WebGLTexImageFunc::CompTexSubImage: return "compressedTexSubImage3D";
         default:
-            MOZ_CRASH();
+            MOZ_CRASH("GFX: invalid 3D TexDimensions");
         }
     default:
-        MOZ_CRASH();
+        MOZ_CRASH("GFX: invalid TexDimensions");
     }
 }
 
