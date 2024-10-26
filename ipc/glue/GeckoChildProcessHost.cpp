@@ -1052,6 +1052,8 @@ GeckoChildProcessHost::PerformAsyncLaunchInternal(std::vector<std::string>& aExt
         shouldSandboxCurrentProcess = true;
       }
       break;
+    case GeckoProcessType_GPU:
+      break;
     case GeckoProcessType_Default:
     default:
       MOZ_CRASH("Bad process type in GeckoChildProcessHost");
