@@ -233,6 +233,10 @@ public:
 
 protected:
   virtual ~Runnable() {}
+private:
+  Runnable(const Runnable&) = delete;
+  Runnable& operator=(const Runnable&) = delete;
+  Runnable& operator=(const Runnable&&) = delete;
 };
 
 // This class is designed to be subclassed.
@@ -248,6 +252,10 @@ public:
 
 protected:
   virtual ~CancelableRunnable() {}
+private:
+  CancelableRunnable(const CancelableRunnable&) = delete;
+  CancelableRunnable& operator=(const CancelableRunnable&) = delete;
+  CancelableRunnable& operator=(const CancelableRunnable&&) = delete;
 };
 
 } // namespace mozilla
