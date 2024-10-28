@@ -4,15 +4,18 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+with Files('*'):
+    BUG_COMPONENT = ('Core', 'Web Audio')
+
 DIRS += ['blink']
 
 TEST_DIRS += ['compiledtest']
 
 MOCHITEST_MANIFESTS += [
+    'test/blink/mochitest.ini',
     'test/mochitest.ini',
 ]
 
-MOCHITEST_CHROME_MANIFESTS += ['test/chrome.ini']
 
 TEST_HARNESS_FILES.testing.mochitest.tests.dom.media.webaudio.test.blink += [
     'test/blink/audio-testing.js',
