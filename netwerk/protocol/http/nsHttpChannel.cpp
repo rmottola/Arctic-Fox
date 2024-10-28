@@ -1648,7 +1648,8 @@ ProcessXCTO(nsHttpResponseHead* aResponseHead, nsILoadInfo* aLoadInfo)
     }
 
     // 2) Query the content type from the channel
-    nsAFlatCString contentType = aResponseHead->ContentType();
+    nsAutoCString contentType;
+    aResponseHead->ContentType(contentType);
 
     // 3) Compare the expected MIME type with the actual type
     if (aLoadInfo->InternalContentPolicyType() == nsIContentPolicy::TYPE_STYLESHEET) {
