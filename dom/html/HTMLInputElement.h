@@ -1293,7 +1293,6 @@ protected:
 #endif
 
   RefPtr<FileList>  mFileList;
-  RefPtr<Promise> mFilesAndDirectoriesPromise;
 
   nsString mStaticDocFileList;
   

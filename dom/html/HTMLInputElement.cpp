@@ -1043,7 +1043,6 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLInputElement,
   }
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFilesOrDirectories)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFileList)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFilesAndDirectoriesPromise)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLInputElement,
@@ -1052,7 +1051,6 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLInputElement,
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mControllers)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFilesOrDirectories)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFileList)
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mFilesAndDirectoriesPromise)
   if (tmp->IsSingleLineTextControl(false)) {
     tmp->mInputData.mState->Unlink();
   }
@@ -2703,9 +2701,6 @@ HTMLInputElement::UpdateFileList()
       }
     }
   }
-
-  // Make sure we (lazily) create a new Promise for GetFilesAndDirectories:
-  mFilesAndDirectoriesPromise = nullptr;
 }
 
 nsresult
@@ -5037,10 +5032,6 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
     return nullptr;
   }
 
-  if (mFilesAndDirectoriesPromise) {
-    return RefPtr<Promise>(mFilesAndDirectoriesPromise).forget();
-  }
-
   nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
   MOZ_ASSERT(global);
   if (!global) {
@@ -5081,12 +5072,6 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
   }
 
   p->MaybeResolve(filesAndDirsSeq);
-
-  // Cache the Promise so that repeat getFilesAndDirectories() calls return
-  // the same Promise and array of File and Directory objects until the user
-  // picks different files/directories:
-  mFilesAndDirectoriesPromise = p;
-
   return p.forget();
 }
 
