@@ -21,6 +21,7 @@ class GetDirectoryListingTaskChild final : public FileSystemTaskChildBase
 public:
   static already_AddRefed<GetDirectoryListingTaskChild>
   Create(FileSystemBase* aFileSystem,
+         Directory* aDirectory,
          nsIFile* aTargetPath,
          const nsAString& aFilters,
          ErrorResult& aRv);
@@ -37,6 +38,7 @@ public:
 private:
   // If aDirectoryOnly is set, we should ensure that the target is a directory.
   GetDirectoryListingTaskChild(FileSystemBase* aFileSystem,
+                               Directory* aDirectory,
                                nsIFile* aTargetPath,
                                const nsAString& aFilters);
 
@@ -52,6 +54,7 @@ private:
   HandlerCallback() override;
 
   RefPtr<Promise> mPromise;
+  RefPtr<Directory> mDirectory;
   nsCOMPtr<nsIFile> mTargetPath;
   nsString mFilters;
 
