@@ -208,6 +208,9 @@ partial interface HTMLInputElement {
 
   [Throws, Pref="dom.input.dirpicker"]
   void chooseDirectory();
+
+  [Pref="dom.webkitBlink.dirPicker.enabled", BinaryName="WebkitDirectoryAttr", SetterThrows]
+  attribute boolean webkitdirectory;
 };
 
 [NoInterfaceObject]
