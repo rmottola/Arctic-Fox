@@ -388,6 +388,11 @@ public:
     return CheckFormValidity(nullptr);
   }
 
+  bool ReportValidity()
+  {
+    return CheckValidFormSubmission();
+  }
+
   Element*
   IndexedGetter(uint32_t aIndex, bool &aFound);
 
