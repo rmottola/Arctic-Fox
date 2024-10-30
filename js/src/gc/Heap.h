@@ -686,6 +686,10 @@ class Arena
     static void staticAsserts();
 
     void unmarkAll();
+
+    static size_t offsetOfBufferedCells() {
+        return offsetof(Arena, bufferedCells);
+    }
 };
 
 static_assert(ArenaZoneOffset == offsetof(Arena, zone),
