@@ -1473,18 +1473,24 @@ MCeil::computeRange(TempAllocator& alloc)
 void
 MClz::computeRange(TempAllocator& alloc)
 {
+    if (type() != MIRType::Int32)
+        return;
     setRange(Range::NewUInt32Range(alloc, 0, 32));
 }
 
 void
 MCtz::computeRange(TempAllocator& alloc)
 {
+    if (type() != MIRType::Int32)
+        return;
     setRange(Range::NewUInt32Range(alloc, 0, 32));
 }
 
 void
 MPopcnt::computeRange(TempAllocator& alloc)
 {
+    if (type() != MIRType::Int32)
+        return;
     setRange(Range::NewUInt32Range(alloc, 0, 32));
 }
 
@@ -2355,6 +2361,8 @@ RangeAnalysis::addRangeAssertions()
                 continue;
 
             Range r(ins);
+
+            MOZ_ASSERT_IF(ins->type() == MIRType::Int64, r.isUnknown());
 
             // Don't insert assertions if there's nothing interesting to assert.
             if (r.isUnknown() || (ins->type() == MIRType::Int32 && r.isUnknownInt32()))
