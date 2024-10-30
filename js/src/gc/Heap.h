@@ -268,6 +268,8 @@ struct Cell
 
 #ifdef DEBUG
     inline bool isAligned() const;
+    void dump(FILE* fp) const;
+    void dump() const;
 #endif
 
   protected:
