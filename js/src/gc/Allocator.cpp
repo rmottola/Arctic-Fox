@@ -19,6 +19,7 @@
 
 #include "gc/Heap-inl.h"
 
+using namespace js;
 using namespace gc;
 
 template <typename T, AllowGC allowGC /* = CanGC */>
