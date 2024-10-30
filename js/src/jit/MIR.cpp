@@ -5991,6 +5991,9 @@ PropertyTypeIncludes(TempAllocator& alloc, HeapTypeSetKey property,
             types = types->clone(alloc.lifoAlloc());
         else
             types = alloc.lifoAlloc()->new_<TemporaryTypeSet>();
+        if (!types) {
+            return false;
+        }
         types->addType(newType, alloc.lifoAlloc());
     }
 
