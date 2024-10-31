@@ -36,6 +36,7 @@
 typedef uint16_t nsMediaNetworkState;
 typedef uint16_t nsMediaReadyState;
 typedef uint32_t SuspendTypes;
+typedef uint32_t AudibleChangedReasons;
 
 namespace mozilla {
 class DecoderDoctorDiagnostics;
@@ -451,7 +452,7 @@ public:
   virtual void SetAudibleState(bool aAudible) final override;
 
   // Notify agent when the MediaElement changes its audible state.
-  void NotifyAudioPlaybackChanged();
+  void NotifyAudioPlaybackChanged(AudibleChangedReasons aReason);
 
   // XPCOM GetPreload() is OK
   void SetPreload(const nsAString& aValue, ErrorResult& aRv)
@@ -1180,6 +1181,8 @@ protected:
 
   bool IsAllowedToPlay();
 
+  bool IsAudible() const;
+
   class nsAsyncEventRunner;
   using nsGenericHTMLElement::DispatchEvent;
   // For nsAsyncEventRunner.
@@ -1609,8 +1612,11 @@ private:
   // be seeked even before the media is loaded.
   double mDefaultPlaybackStartPosition;
 
-  // True if the audio track is producing audible sound.
+  // True if the audio track is not silent.
   bool mIsAudioTrackAudible;
+
+  // True if media element is audible for users.
+  bool mAudible;
 };
 
 } // namespace dom
