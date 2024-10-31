@@ -5615,6 +5615,13 @@ pref("dom.mozBrowserFramesEnabled", false);
 // Is support for 'color-adjust' CSS property enabled?
 pref("layout.css.color-adjust.enabled", true);
 
+// Disable Node.rootNode in release builds.
+#ifdef RELEASE_BUILD
+pref("dom.node.rootNode.enabled", false);
+#else
+pref("dom.node.rootNode.enabled", true);
+#endif
+
 // Once bug 1276272 is resolved, we will trun this preference to default ON in
 // non-release channels.
 #ifdef RELEASE_BUILD
