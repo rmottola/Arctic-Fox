@@ -1110,7 +1110,7 @@ protected:
     return isPaused;
   }
 
-  void ReportMSETelemetry();
+  void ReportTelemetry();
 
   // Check the permissions for audiochannel.
   bool CheckAudioChannelPermissions(const nsAString& aType);
