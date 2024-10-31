@@ -782,6 +782,10 @@ void HTMLMediaElement::AbortExistingLoads()
   AddRemoveSelfReference();
 
   mIsRunningSelectResource = false;
+
+  if (mTextTrackManager) {
+    mTextTrackManager->NotifyReset();
+  }
 }
 
 void HTMLMediaElement::NoSupportedMediaSourceError()
