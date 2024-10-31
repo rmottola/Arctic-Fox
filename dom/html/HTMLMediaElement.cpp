@@ -1929,6 +1929,14 @@ public:
     mElement->AddDecoderPrincipalChangeObserver(this);
   }
 
+  void Destroy() override
+  {
+    MOZ_ASSERT(mElement);
+    DebugOnly<bool> res = mElement->RemoveDecoderPrincipalChangeObserver(this);
+    NS_ASSERTION(res, "Removing decoder principal changed observer failed. "
+                      "Had it already been removed?");
+  }
+
   MediaSourceEnum GetMediaSource() const override
   {
     return MediaSourceEnum::Other;
@@ -1965,11 +1973,6 @@ public:
 protected:
   virtual ~CaptureStreamTrackSource()
   {
-    if (mElement) {
-      DebugOnly<bool> res = mElement->RemoveDecoderPrincipalChangeObserver(this);
-      NS_ASSERTION(res, "Removing decoder principal changed observer failed. "
-                        "Had it already been removed?");
-    }
   }
 
   RefPtr<HTMLMediaElement> mElement;
