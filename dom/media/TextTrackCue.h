@@ -214,19 +214,15 @@ public:
     mPosition = aPosition;
   }
 
-  AlignSetting PositionAlign() const
+  PositionAlignSetting PositionAlign() const
   {
     return mPositionAlign;
   }
 
-  void SetPositionAlign(AlignSetting aPositionAlign, ErrorResult& aRv)
+  void SetPositionAlign(PositionAlignSetting aPositionAlign, ErrorResult& aRv)
   {
-    if (mPositionAlign == aPositionAlign)
+    if (mPositionAlign == aPositionAlign) {
       return;
-
-    if (aPositionAlign == AlignSetting::Left ||
-        aPositionAlign == AlignSetting::Right) {
-      return aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
     }
 
     mReset = true;
@@ -307,6 +303,8 @@ public:
     return mReset;
   }
 
+  PositionAlignSetting ComputedPositionAlign();
+
   // Helper functions for implementation.
   bool
   operator==(const TextTrackCue& rhs) const
@@ -366,7 +364,7 @@ private:
   RefPtr<HTMLTrackElement> mTrackElement;
   nsString mId;
   int32_t mPosition;
-  AlignSetting mPositionAlign;
+  PositionAlignSetting mPositionAlign;
   int32_t mSize;
   bool mPauseOnExit;
   bool mSnapToLines;
