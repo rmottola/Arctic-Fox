@@ -262,7 +262,6 @@ ifneq (,$(TAR))
 source-package:
 	SRCDIR=$(srcdir) \
 	DIST=$(DIST) \
-	MAKE=$(MAKE) \
 	MKDIR=$(MKDIR) \
 	TAR=$(TAR) \
 	MOZJS_MAJOR_VERSION=$(MOZJS_MAJOR_VERSION) \
