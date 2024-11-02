@@ -243,6 +243,18 @@ class TypedArrayObjectTemplate : public TypedArrayObject
         {
             return false;
         }
+        return true;
+    }
+
+    static bool
+    getOrCreateCreateArrayFromBufferFunction(JSContext* cx, MutableHandleValue fval)
+    {
+        RootedValue cache(cx, cx->global()->createArrayFromBuffer<NativeType>());
+        if (cache.isObject()) {
+            MOZ_ASSERT(cache.toObject().is<JSFunction>());
+            fval.set(cache);
+            return true;
+        }
 
         RootedFunction fun(cx);
         fun = NewNativeFunction(cx, ArrayBufferObject::createTypedArrayFromBuffer<NativeType>,
@@ -251,6 +263,8 @@ class TypedArrayObjectTemplate : public TypedArrayObject
             return false;
 
         cx->global()->setCreateArrayFromBuffer<NativeType>(fun);
+
+        fval.setObject(*fun);
         return true;
     }
 
@@ -571,7 +585,10 @@ class TypedArrayObjectTemplate : public TypedArrayObject
                 args[1].setInt32(lengthInt);
                 args[2].setObject(*protoRoot);
 
-                RootedValue fval(cx, cx->global()->createArrayFromBuffer<NativeType>());
+                RootedValue fval(cx);
+                if (!getOrCreateCreateArrayFromBufferFunction(cx, &fval))
+                    return nullptr;
+
                 RootedValue thisv(cx, ObjectValue(*bufobj));
                 RootedValue rval(cx);
                 if (!js::Call(cx, fval, thisv, args, &rval))
