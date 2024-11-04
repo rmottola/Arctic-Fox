@@ -150,3 +150,6 @@ LOCAL_INCLUDES += [
     '/xpcom/build',
     '/xpcom/threads',
 ]
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']

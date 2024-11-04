@@ -247,3 +247,6 @@ if CONFIG['MOZ_X11']:
     CXXFLAGS += CONFIG['XCFLAGS']
 
 FINAL_LIBRARY = 'xul'
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']

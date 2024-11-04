@@ -135,3 +135,5 @@ LOCAL_INCLUDES += [
     '..'
 ]
 
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']
