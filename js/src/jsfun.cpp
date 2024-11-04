@@ -756,41 +756,6 @@ js::OrdinaryHasInstance(JSContext* cx, HandleObject objArg, MutableHandleValue v
     return true;
 }
 
-/*
- * [[HasInstance]] internal method for Function objects: fetch the .prototype
- * property of its 'this' parameter, and walks the prototype chain of v (only
- * if v is an object) returning true if .prototype is found.
- */
-static bool
-fun_hasInstance(JSContext* cx, HandleObject objArg, MutableHandleValue v, bool* bp)
-{
-    RootedObject obj(cx, objArg);
-
-    while (obj->is<JSFunction>() && obj->isBoundFunction())
-        obj = obj->as<JSFunction>().getBoundFunctionTarget();
-
-    RootedValue pval(cx);
-    if (!GetProperty(cx, obj, obj, cx->names().prototype, &pval))
-        return false;
-
-    if (pval.isPrimitive()) {
-        /*
-         * Throw a runtime error if instanceof is called on a function that
-         * has a non-object as its .prototype value.
-         */
-        RootedValue val(cx, ObjectValue(*obj));
-        ReportValueError(cx, JSMSG_BAD_PROTOTYPE, -1, val, nullptr);
-        return false;
-    }
-
-    RootedObject pobj(cx, &pval.toObject());
-    bool isDelegate;
-    if (!IsDelegate(cx, pobj, v, &isDelegate))
-        return false;
-    *bp = isDelegate;
-    return true;
-}
-
 inline void
 JSFunction::trace(JSTracer* trc)
 {
@@ -942,7 +907,7 @@ static const ClassOps JSFunctionClassOps = {
     fun_mayResolve,
     nullptr,                 /* finalize    */
     nullptr,                 /* call        */
-    fun_hasInstance,
+    nullptr,
     nullptr,                 /* construct   */
     fun_trace,
 };
@@ -1845,7 +1810,8 @@ const JSFunctionSpec js::function_methods[] = {
     JS_FN(js_apply_str,      fun_apply,      2,0),
     JS_FN(js_call_str,       fun_call,       1,0),
     JS_FN("isGenerator",     fun_isGenerator,0,0),
-    JS_SELF_HOSTED_FN("bind", "FunctionBind", 2,JSFUN_HAS_REST),
+    JS_SELF_HOSTED_FN("bind", "FunctionBind", 2, JSFUN_HAS_REST),
+    JS_SYM_FN(hasInstance, fun_symbolHasInstance, 1, JSPROP_READONLY | JSPROP_PERMANENT),
     JS_FS_END
 };
 
