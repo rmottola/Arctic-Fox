@@ -2216,7 +2216,6 @@ GCRuntime::sweepZoneAfterCompacting(Zone* zone)
         c->sweepRegExps();
         c->sweepSavedStacks();
         c->sweepGlobalObject(fop);
-        c->sweepObjectPendingMetadata();
         c->sweepSelfHostingScriptSource();
         c->sweepDebugScopes();
         c->sweepJitCompartment(fop);
@@ -5039,7 +5038,6 @@ GCRuntime::beginSweepingZoneGroup(AutoLockForExclusiveAccess& lock)
 
             for (GCCompartmentGroupIter c(rt); !c.done(); c.next()) {
                 c->sweepGlobalObject(&fop);
-                c->sweepObjectPendingMetadata();
                 c->sweepDebugScopes();
                 c->sweepJitCompartment(&fop);
                 c->sweepTemplateObjects();
