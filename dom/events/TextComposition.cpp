@@ -455,7 +455,7 @@ TextComposition::NotityUpdateComposition(
     return;
   }
 
-  NotifyIME(NOTIFY_IME_OF_COMPOSITION_UPDATE);
+  NotifyIME(NOTIFY_IME_OF_COMPOSITION_EVENT_HANDLED);
 }
 
 void

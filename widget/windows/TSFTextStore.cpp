@@ -1659,9 +1659,9 @@ TSFTextStore::FlushPendingActions()
           }
         }
 
-        // eCompositionStart always causes NOTIFY_IME_OF_COMPOSITION_UPDATE.
-        // Therefore, we should wait to clear the locked content until it's
-        // notified.
+        // eCompositionStart always causes
+        // NOTIFY_IME_OF_COMPOSITION_EVENT_HANDLED.  Therefore, we should
+        // wait to clear the locked content until it's notified.
         mDeferClearingLockedContent = true;
 
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
@@ -1690,9 +1690,9 @@ TSFTextStore::FlushPendingActions()
                 action.mRanges ? action.mRanges->Length() : 0));
 
         // eCompositionChange causes a DOM text event, the IME will be notified
-        // of NOTIFY_IME_OF_COMPOSITION_UPDATE.  In this case, we should not
-        // clear the locked content until we notify the IME of the composition
-        // update.
+        // of NOTIFY_IME_OF_COMPOSITION_EVENT_HANDLED.  In this case, we
+        // should not clear the locked content until we notify the IME of the
+        // composition update.
         mDeferClearingLockedContent = true;
 
         rv = mDispatcher->SetPendingComposition(action.mData,
@@ -1726,8 +1726,8 @@ TSFTextStore::FlushPendingActions()
                 this, NS_ConvertUTF16toUTF8(action.mData).get()));
 
         // Dispatching eCompositionCommit causes a DOM text event, then,
-        // the IME will be notified of NOTIFY_IME_OF_COMPOSITION_UPDATE.  In
-        // this case, we should not clear the locked content until we notify
+        // the IME will be notified of NOTIFY_IME_OF_COMPOSITION_EVENT_HANDLED.
+        // In this case, we should not clear the locked content until we notify
         // the IME of the composition update.
         mDeferClearingLockedContent = true;
 
