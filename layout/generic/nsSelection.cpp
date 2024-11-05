@@ -530,8 +530,7 @@ struct MOZ_RAII AutoPrepareFocusRange
 
 nsFrameSelection::nsFrameSelection()
 {
-  int32_t i;
-  for (i = 0;i<nsISelectionController::NUM_SELECTIONTYPES;i++){
+  for (size_t i = 0; i < kPresentSelectionTypeCount; i++){
     mDomSelections[i] = new Selection(this);
     mDomSelections[i]->SetType(GetSelectionTypeFromIndex(i));
   }
@@ -580,8 +579,7 @@ nsFrameSelection::~nsFrameSelection()
 NS_IMPL_CYCLE_COLLECTION_CLASS(nsFrameSelection)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsFrameSelection)
-  int32_t i;
-  for (i = 0; i < nsISelectionController::NUM_SELECTIONTYPES; ++i) {
+  for (size_t i = 0; i < kPresentSelectionTypeCount; ++i) {
     tmp->mDomSelections[i] = nullptr;
   }
 
@@ -603,8 +601,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsFrameSelection)
                                               GetMarkedCCGeneration())) {
     return NS_SUCCESS_INTERRUPTED_TRAVERSE;
   }
-  int32_t i;
-  for (i = 0; i < nsISelectionController::NUM_SELECTIONTYPES; ++i) {
+  for (size_t i = 0; i < kPresentSelectionTypeCount; ++i) {
     NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mDomSelections[i])
   }
 
@@ -1886,7 +1883,7 @@ nsFrameSelection::LookUpSelection(nsIContent *aContent,
 
   SelectionDetails* details = nullptr;
 
-  for (int32_t j = 0; j < nsISelectionController::NUM_SELECTIONTYPES; j++) {
+  for (size_t j = 0; j < kPresentSelectionTypeCount; j++) {
     if (mDomSelections[j]) {
       mDomSelections[j]->LookUpSelection(aContent, aContentOffset,
                                          aContentLength, &details,
@@ -3427,7 +3424,7 @@ nsFrameSelection::DisconnectFromPresShell()
   }
 
   StopAutoScrollTimer();
-  for (int32_t i = 0; i < nsISelectionController::NUM_SELECTIONTYPES; i++) {
+  for (size_t i = 0; i < kPresentSelectionTypeCount; i++) {
     mDomSelections[i]->Clear(nullptr);
   }
   mShell = nullptr;
