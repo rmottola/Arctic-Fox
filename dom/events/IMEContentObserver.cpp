@@ -177,6 +177,7 @@ IMEContentObserver::IMEContentObserver()
   , mNeedsToNotifyIMEOfTextChange(false)
   , mNeedsToNotifyIMEOfSelectionChange(false)
   , mNeedsToNotifyIMEOfPositionChange(false)
+  , mNeedsToNotifyIMEOfCompositionEventHandled(false)
   , mIsHandlingQueryContentEvent(false)
 {
 #ifdef DEBUG
@@ -560,10 +561,29 @@ IMEContentObserver::MaybeReinitialize(nsIWidget* aWidget,
 
 bool
 IMEContentObserver::IsManaging(nsPresContext* aPresContext,
-                               nsIContent* aContent)
+                               nsIContent* aContent) const
 {
   return GetState() == eState_Observing &&
          IsObservingContent(aPresContext, aContent);
+}
+
+bool
+IMEContentObserver::IsManaging(const TextComposition* aComposition) const
+{
+  if (GetState() != eState_Observing) {
+    return false;
+  }
+  nsPresContext* presContext = aComposition->GetPresContext();
+  if (NS_WARN_IF(!presContext)) {
+    return false;
+  }
+  if (presContext != GetPresContext()) {
+    return false; // observing different document
+  }
+  nsINode* targetNode = aComposition->GetEventTargetNode();
+  nsIContent* targetContent =
+    targetNode && targetNode->IsContent() ? targetNode->AsContent() : nullptr;
+  return IsObservingContent(presContext, targetContent);
 }
 
 IMEContentObserver::State
@@ -1218,6 +1238,17 @@ IMEContentObserver::MaybeNotifyIMEOfPositionChange()
   FlushMergeableNotifications();
 }
 
+void
+IMEContentObserver::MaybeNotifyCompositionEventHandled()
+{
+  MOZ_LOG(sIMECOLog, LogLevel::Debug,
+    ("IMECO: 0x%p IMEContentObserver::MaybeNotifyCompositionEventHandled()",
+     this));
+
+  PostCompositionEventHandledNotification();
+  FlushMergeableNotifications();
+}
+
 bool
 IMEContentObserver::UpdateSelectionCache()
 {
@@ -1262,6 +1293,16 @@ IMEContentObserver::PostPositionChangeNotification()
     ("IMECO: 0x%p IMEContentObserver::PostPositionChangeNotification()", this));
 
   mNeedsToNotifyIMEOfPositionChange = true;
+}
+
+void
+IMEContentObserver::PostCompositionEventHandledNotification()
+{
+  MOZ_LOG(sIMECOLog, LogLevel::Debug,
+    ("IMECO: 0x%p IMEContentObserver::"
+     "PostCompositionEventHandledNotification()", this));
+
+  mNeedsToNotifyIMEOfCompositionEventHandled = true;
 }
 
 bool
@@ -1391,6 +1432,9 @@ IMEContentObserver::AChangeEvent::CanNotifyIME(
   if (NS_WARN_IF(!mIMEContentObserver)) {
     return false;
   }
+  if (aChangeEventType == eChangeEventType_CompositionEventHandled) {
+    return mIMEContentObserver->mWidget != nullptr;
+  }
   State state = mIMEContentObserver->GetState();
   // If it's not initialized, we should do nothing.
   if (state == eState_NotObserving) {
@@ -1433,6 +1477,8 @@ IMEContentObserver::AChangeEvent::IsSafeToNotifyIME(
     if (NS_WARN_IF(state != eState_Initializing && state != eState_Observing)) {
       return false;
     }
+  } else if (aChangeEventType == eChangeEventType_CompositionEventHandled) {
+    // It doesn't need to check the observing status.
   } else if (state != eState_Observing) {
     return false;
   }
@@ -1515,6 +1561,18 @@ IMEContentObserver::IMENotificationSender::Run()
     if (mIMEContentObserver->mNeedsToNotifyIMEOfPositionChange) {
       mIMEContentObserver->mNeedsToNotifyIMEOfPositionChange = false;
       SendPositionChange();
+    }
+  }
+
+  // Composition event handled notification should be sent after all the
+  // other notifications because this notifies widget of finishing all pending
+  // events are handled completely.
+  if (!mIMEContentObserver->mNeedsToNotifyIMEOfTextChange &&
+      !mIMEContentObserver->mNeedsToNotifyIMEOfSelectionChange &&
+      !mIMEContentObserver->mNeedsToNotifyIMEOfPositionChange) {
+    if (mIMEContentObserver->mNeedsToNotifyIMEOfCompositionEventHandled) {
+      mIMEContentObserver->mNeedsToNotifyIMEOfCompositionEventHandled = false;
+      SendCompositionEventHandled();
     }
   }
 
@@ -1742,6 +1800,46 @@ IMEContentObserver::IMENotificationSender::SendPositionChange()
   MOZ_LOG(sIMECOLog, LogLevel::Debug,
     ("IMECO: 0x%p IMEContentObserver::IMENotificationSender::"
      "SendPositionChange(), sent NOTIFY_IME_OF_POSITION_CHANGE", this));
+}
+
+void
+IMEContentObserver::IMENotificationSender::SendCompositionEventHandled()
+{
+  if (!CanNotifyIME(eChangeEventType_CompositionEventHandled)) {
+    MOZ_LOG(sIMECOLog, LogLevel::Debug,
+      ("IMECO: 0x%p IMEContentObserver::IMENotificationSender::"
+       "SendCompositionEventHandled(), FAILED, due to impossible to notify "
+       "IME of composition event handled", this));
+    return;
+  }
+
+  if (!IsSafeToNotifyIME(eChangeEventType_CompositionEventHandled)) {
+    MOZ_LOG(sIMECOLog, LogLevel::Debug,
+      ("IMECO: 0x%p   IMEContentObserver::IMENotificationSender::"
+       "SendCompositionEventHandled(), retrying to send "
+       "NOTIFY_IME_OF_POSITION_CHANGE...", this));
+    mIMEContentObserver->PostCompositionEventHandledNotification();
+    return;
+  }
+
+  MOZ_LOG(sIMECOLog, LogLevel::Info,
+    ("IMECO: 0x%p IMEContentObserver::IMENotificationSender::"
+     "SendCompositionEventHandled(), sending "
+     "NOTIFY_IME_OF_COMPOSITION_EVENT_HANDLED...", this));
+
+  MOZ_RELEASE_ASSERT(mIMEContentObserver->mSendingNotification ==
+                       NOTIFY_IME_OF_NOTHING);
+  mIMEContentObserver->mSendingNotification =
+                         NOTIFY_IME_OF_COMPOSITION_EVENT_HANDLED;
+  IMEStateManager::NotifyIME(
+                     IMENotification(NOTIFY_IME_OF_COMPOSITION_EVENT_HANDLED),
+                     mIMEContentObserver->mWidget);
+  mIMEContentObserver->mSendingNotification = NOTIFY_IME_OF_NOTHING;
+
+  MOZ_LOG(sIMECOLog, LogLevel::Debug,
+    ("IMECO: 0x%p IMEContentObserver::IMENotificationSender::"
+     "SendCompositionEventHandled(), sent "
+     "NOTIFY_IME_OF_COMPOSITION_EVENT_HANDLED", this));
 }
 
 } // namespace mozilla
