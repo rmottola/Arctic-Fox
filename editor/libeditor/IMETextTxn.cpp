@@ -145,8 +145,8 @@ IMETextTxn::GetTxnDescription(nsAString& aString)
 }
 
 /* ============ private methods ================== */
-static SelectionType
-ToSelectionType(TextRangeType aTextRangeType)
+static RawSelectionType
+ToRawSelectionType(TextRangeType aTextRangeType)
 {
   switch (aTextRangeType) {
     case TextRangeType::eRawClause:
@@ -185,7 +185,7 @@ IMETextTxn::SetIMESelection(nsEditor& aEditor,
   NS_ENSURE_SUCCESS(rv, rv);
 
   // First, remove all selections of IME composition.
-  static const SelectionType kIMESelections[] = {
+  static const RawSelectionType kIMESelections[] = {
     nsISelectionController::SELECTION_IME_RAWINPUT,
     nsISelectionController::SELECTION_IME_SELECTEDRAWTEXT,
     nsISelectionController::SELECTION_IME_CONVERTEDTEXT,
@@ -270,7 +270,7 @@ IMETextTxn::SetIMESelection(nsEditor& aEditor,
 
     // Set the range of the clause to selection.
     nsCOMPtr<nsISelection> selectionOfIME;
-    rv = selCon->GetSelection(ToSelectionType(textRange.mRangeType),
+    rv = selCon->GetSelection(ToRawSelectionType(textRange.mRangeType),
                               getter_AddRefs(selectionOfIME));
     if (NS_FAILED(rv)) {
       NS_WARNING("Failed to get IME selection");

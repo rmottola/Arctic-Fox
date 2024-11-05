@@ -32,6 +32,7 @@
 #include "nsHashKeys.h"
 #include "nsISupports.h"
 #include "nsIContent.h"
+#include "nsISelectionController.h"
 #include "nsQueryFrame.h"
 #include "nsCoord.h"
 #include "nsColor.h"
@@ -99,8 +100,6 @@ class DocAccessible;
 #endif
 struct nsArenaMemoryStats;
 class nsITimer;
-
-typedef short SelectionType;
 
 namespace mozilla {
 class EventStates;
@@ -842,7 +841,8 @@ public:
     */
   int16_t GetSelectionFlags() const { return mSelectionFlags; }
 
-  virtual mozilla::dom::Selection* GetCurrentSelection(SelectionType aType) = 0;
+  virtual mozilla::dom::Selection*
+    GetCurrentSelection(mozilla::RawSelectionType aType) = 0;
 
   /**
     * Interface to dispatch events via the presshell
