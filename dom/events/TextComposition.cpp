@@ -507,6 +507,12 @@ TextComposition::OnCompositionEventDispatched(
 }
 
 void
+TextComposition::OnStartOffsetUpdatedInChild(uint32_t aStartOffset)
+{
+  mCompositionStartOffset = aStartOffset;
+}
+
+void
 TextComposition::MaybeNotifyIMEOfCompositionEventHandled(
                    const WidgetCompositionEvent* aCompositionEvent)
 {
