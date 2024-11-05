@@ -2591,7 +2591,7 @@ nsDocumentViewer::GetDocumentSelection()
     return nullptr;
   }
 
-  return mPresShell->GetCurrentSelection(nsISelectionController::SELECTION_NORMAL);
+  return mPresShell->GetCurrentSelection(SelectionType::SELECTION_NORMAL);
 }
 
 /* ========================================================================================

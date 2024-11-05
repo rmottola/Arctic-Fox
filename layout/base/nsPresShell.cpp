@@ -1536,7 +1536,7 @@ PresShell::GetSelection(RawSelectionType aRawSelectionType,
   if (!aSelection || !mSelection)
     return NS_ERROR_NULL_POINTER;
 
-  *aSelection = mSelection->GetSelection(aRawSelectionType);
+  *aSelection = mSelection->GetSelection(ToSelectionType(aRawSelectionType));
 
   if (!(*aSelection))
     return NS_ERROR_INVALID_ARG;
@@ -1547,12 +1547,12 @@ PresShell::GetSelection(RawSelectionType aRawSelectionType,
 }
 
 Selection*
-PresShell::GetCurrentSelection(RawSelectionType aRawSelectionType)
+PresShell::GetCurrentSelection(SelectionType aSelectionType)
 {
   if (!mSelection)
     return nullptr;
 
-  return mSelection->GetSelection(aRawSelectionType);
+  return mSelection->GetSelection(aSelectionType);
 }
 
 NS_IMETHODIMP
@@ -1563,8 +1563,8 @@ PresShell::ScrollSelectionIntoView(RawSelectionType aRawSelectionType,
   if (!mSelection)
     return NS_ERROR_NULL_POINTER;
 
-  return mSelection->ScrollSelectionIntoView(aRawSelectionType, aRegion,
-                                             aFlags);
+  return mSelection->ScrollSelectionIntoView(ToSelectionType(aRawSelectionType),
+                                             aRegion, aFlags);
 }
 
 NS_IMETHODIMP
@@ -1573,7 +1573,7 @@ PresShell::RepaintSelection(RawSelectionType aRawSelectionType)
   if (!mSelection)
     return NS_ERROR_NULL_POINTER;
 
-  return mSelection->RepaintSelection(aRawSelectionType);
+  return mSelection->RepaintSelection(ToSelectionType(aRawSelectionType));
 }
 
 // Make shell be a document observer
@@ -2725,8 +2725,8 @@ nsIPresShell::GetFrameToScrollAsScrollable(
     focusedContent = do_QueryInterface(focusedElement);
   }
   if (!focusedContent && mSelection) {
-    nsISelection* domSelection = mSelection->
-      GetSelection(nsISelectionController::SELECTION_NORMAL);
+    nsISelection* domSelection =
+      mSelection->GetSelection(SelectionType::SELECTION_NORMAL);
     if (domSelection) {
       nsCOMPtr<nsIDOMNode> focusedNode;
       domSelection->GetFocusNode(getter_AddRefs(focusedNode));
@@ -3062,8 +3062,8 @@ PresShell::GoToAnchor(const nsAString& aAnchorName, bool aScroll,
     NS_ASSERTION(node, "No nsIDOMNode for descendant of anchor");
     jumpToRange->SelectNodeContents(node);
     // Select the anchor
-    nsISelection* sel = mSelection->
-      GetSelection(nsISelectionController::SELECTION_NORMAL);
+    nsISelection* sel =
+      mSelection->GetSelection(SelectionType::SELECTION_NORMAL);
     if (sel) {
       sel->RemoveAllRanges();
       sel->AddRange(jumpToRange);
