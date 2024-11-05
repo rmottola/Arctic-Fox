@@ -5567,11 +5567,10 @@ nsDisplayTransform::GetResultingTransformMatrix(const FrameTransformProperties& 
                                                 const nsPoint& aOrigin,
                                                 float aAppUnitsPerPixel,
                                                 uint32_t aFlags,
-                                                const nsRect* aBoundsOverride,
-                                                nsIFrame** aOutAncestor)
+                                                const nsRect* aBoundsOverride)
 {
   return GetResultingTransformMatrixInternal(aProperties, aOrigin, aAppUnitsPerPixel,
-                                             aFlags, aBoundsOverride, aOutAncestor);
+                                             aFlags, aBoundsOverride);
 }
 
 Matrix4x4
@@ -5579,15 +5578,14 @@ nsDisplayTransform::GetResultingTransformMatrix(const nsIFrame* aFrame,
                                                 const nsPoint& aOrigin,
                                                 float aAppUnitsPerPixel,
                                                 uint32_t aFlags,
-                                                const nsRect* aBoundsOverride,
-                                                nsIFrame** aOutAncestor)
+                                                const nsRect* aBoundsOverride)
 {
   FrameTransformProperties props(aFrame,
                                  aAppUnitsPerPixel,
                                  aBoundsOverride);
 
   return GetResultingTransformMatrixInternal(props, aOrigin, aAppUnitsPerPixel,
-                                             aFlags, aBoundsOverride, aOutAncestor);
+                                             aFlags, aBoundsOverride);
 }
 
 Matrix4x4
@@ -5595,17 +5593,12 @@ nsDisplayTransform::GetResultingTransformMatrixInternal(const FrameTransformProp
                                                         const nsPoint& aOrigin,
                                                         float aAppUnitsPerPixel,
                                                         uint32_t aFlags,
-                                                        const nsRect* aBoundsOverride,
-                                                        nsIFrame** aOutAncestor)
+                                                        const nsRect* aBoundsOverride)
 {
   const nsIFrame *frame = aProperties.mFrame;
   NS_ASSERTION(frame || !(aFlags & INCLUDE_PERSPECTIVE), "Must have a frame to compute perspective!");
   MOZ_ASSERT((aFlags & (OFFSET_BY_ORIGIN|BASIS_AT_ORIGIN)) != (OFFSET_BY_ORIGIN|BASIS_AT_ORIGIN),
              "Can't specify offset by origin as well as basis at origin!");
-
-  if (aOutAncestor) {
-    *aOutAncestor = nsLayoutUtils::GetCrossDocParentFrame(frame);
-  }
 
   // Get the underlying transform matrix:
 
@@ -5731,7 +5724,7 @@ nsDisplayTransform::GetResultingTransformMatrixInternal(const FrameTransformProp
       GetResultingTransformMatrixInternal(props,
                                           aOrigin - frame->GetPosition(),
                                           aAppUnitsPerPixel, flags,
-                                          nullptr, aOutAncestor);
+                                          nullptr);
     result = result * parent;
   }
 
