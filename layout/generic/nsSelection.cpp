@@ -126,7 +126,7 @@ ToChar(SelectionType aSelectionType)
       return "SelectionType::eIMERawClause";
     case SelectionType::eIMESelectedRawClause:
       return "SelectionType::eIMESelectedRawClause";
-    case SelectionType::SELECTION_IME_CONVERTEDTEXT:
+    case SelectionType::eIMEConvertedClause:
       return "SelectionType::eIMEConvertedClause";
     case SelectionType::SELECTION_IME_SELECTEDCONVERTEDTEXT:
       return "SelectionType::eIMESelectedClause";
@@ -152,7 +152,7 @@ IsValidSelectionType(RawSelectionType aRawSelectionType)
     case SelectionType::eSpellCheck:
     case SelectionType::eIMERawClause:
     case SelectionType::eIMESelectedRawClause:
-    case SelectionType::SELECTION_IME_CONVERTEDTEXT:
+    case SelectionType::eIMEConvertedClause:
     case SelectionType::SELECTION_IME_SELECTEDCONVERTEDTEXT:
     case SelectionType::SELECTION_ACCESSIBILITY:
     case SelectionType::SELECTION_FIND:
@@ -360,7 +360,7 @@ GetIndexFromSelectionType(SelectionType aSelectionType)
       return 2;
     case SelectionType::eIMESelectedRawClause:
       return 3;
-    case SelectionType::SELECTION_IME_CONVERTEDTEXT:
+    case SelectionType::eIMEConvertedClause:
       return 4;
     case SelectionType::SELECTION_IME_SELECTEDCONVERTEDTEXT:
       return 5;
@@ -386,7 +386,7 @@ GetSelectionTypeFromIndex(int8_t aIndex)
     SelectionType::eSpellCheck,
     SelectionType::eIMERawClause,
     SelectionType::eIMESelectedRawClause,
-    SelectionType::SELECTION_IME_CONVERTEDTEXT,
+    SelectionType::eIMEConvertedClause,
     SelectionType::SELECTION_IME_SELECTEDCONVERTEDTEXT,
     SelectionType::SELECTION_ACCESSIBILITY,
     SelectionType::SELECTION_FIND,
