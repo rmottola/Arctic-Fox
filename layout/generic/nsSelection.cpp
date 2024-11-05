@@ -136,7 +136,7 @@ ToChar(SelectionType aSelectionType)
       return "SelectionType::eFind";
     case SelectionType::eURLSecondary:
       return "SelectionType::eURLSecondary";
-    case SelectionType::SELECTION_URLSTRIKEOUT:
+    case SelectionType::eURLStrikeout:
       return "SelectionType::eURLStrikeout";
     default:
       return "Invalid SelectionType";
@@ -157,7 +157,7 @@ IsValidSelectionType(RawSelectionType aRawSelectionType)
     case SelectionType::eAccessibility:
     case SelectionType::eFind:
     case SelectionType::eURLSecondary:
-    case SelectionType::SELECTION_URLSTRIKEOUT:
+    case SelectionType::eURLStrikeout:
       return true;
     default:
       return false;
@@ -370,7 +370,7 @@ GetIndexFromSelectionType(SelectionType aSelectionType)
       return 7;
     case SelectionType::eURLSecondary:
       return 8;
-    case SelectionType::SELECTION_URLSTRIKEOUT:
+    case SelectionType::eURLStrikeout:
       return 9;
     default:
       return -1;
@@ -391,7 +391,7 @@ GetSelectionTypeFromIndex(int8_t aIndex)
     SelectionType::eAccessibility,
     SelectionType::eFind,
     SelectionType::eURLSecondary,
-    SelectionType::SELECTION_URLSTRIKEOUT
+    SelectionType::eURLStrikeout
   };
   if (NS_WARN_IF(aIndex < 0) ||
       NS_WARN_IF(static_cast<size_t>(aIndex) >= ArrayLength(kSelectionTypes))) {
