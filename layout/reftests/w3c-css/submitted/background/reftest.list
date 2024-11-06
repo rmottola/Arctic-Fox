@@ -1,2 +1,7 @@
+# background-repeat round/space test cases
 == background-repeat-space-9.html background-repeat-space-9-ref.html
 == background-repeat-space-10.html background-repeat-space-10-ref.html
+
+#border-image test cases
+== border-image-repeat-round-1.html border-image-repeat-round-1-ref.html
+== border-image-repeat-round-2.html border-image-repeat-round-2-ref.html
