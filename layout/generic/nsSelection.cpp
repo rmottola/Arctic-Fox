@@ -6594,14 +6594,11 @@ NS_INTERFACE_MAP_END
 NS_IMPL_CYCLE_COLLECTING_ADDREF(SelectionChangeListener)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(SelectionChangeListener)
 
-
 NS_IMETHODIMP
 SelectionChangeListener::NotifySelectionChanged(nsIDOMDocument* aDoc,
                                                 nsISelection* aSel, int16_t aReason)
 {
-  // This cast is valid as nsISelection is a builtinclass which is only
-  // implemented by Selection.
-  RefPtr<Selection> sel = static_cast<Selection*>(aSel);
+  RefPtr<Selection> sel = aSel->AsSelection();
 
   nsIDocument* doc = sel->GetParentObject();
   if (!(doc && nsContentUtils::IsSystemPrincipal(doc->NodePrincipal())) &&
