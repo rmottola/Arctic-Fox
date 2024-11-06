@@ -1244,7 +1244,7 @@ gfxPlatform::PopulateScreenInfo()
 bool
 gfxPlatform::SupportsAzureContentForDrawTarget(DrawTarget* aTarget)
 {
-  if (!aTarget) {
+  if (!aTarget || !aTarget->IsValid()) {
     return false;
   }
 
