@@ -3264,7 +3264,6 @@ ComputeRoundedSize(nscoord aCurrentSize, nscoord aPositioningSize)
   return nscoord(NS_lround(float(aPositioningSize) / repeatCount));
 }
 
-
 // Apply the CSS image sizing algorithm as it applies to background images.
 // See http://www.w3.org/TR/css3-background/#the-background-size .
 // aIntrinsicSize is the size that the background image 'would like to be'.
@@ -3276,7 +3275,7 @@ ComputeDrawnSizeForBackground(const CSSSizeOrRatio& aIntrinsicSize,
                               uint8_t aXRepeat, uint8_t aYRepeat)
 {
   nsSize imageSize;
-  
+
   // Size is dictated by cover or contain rules.
   if (aLayerSize.mWidthType == nsStyleImageLayers::Size::eContain ||
       aLayerSize.mWidthType == nsStyleImageLayers::Size::eCover) {
@@ -3355,7 +3354,7 @@ static nscoord
 ComputeSpacedRepeatSize(nscoord aImageDimension,
                         nscoord aAvailableSpace,
                         bool& aRepeat) {
-  float ratio = aAvailableSpace / aImageDimension;
+  float ratio = static_cast<float>(aAvailableSpace) / aImageDimension;
 
   if (ratio < 2.0f) { // If you can't repeat at least twice, then don't repeat.
     aRepeat = false;
@@ -3542,7 +3541,6 @@ nsCSSRendering::PrepareImageLayer(nsPresContext* aPresContext,
 
   imageTopLeft += bgPositioningArea.TopLeft();
   state.mAnchor += bgPositioningArea.TopLeft();
-
   state.mDestArea = nsRect(imageTopLeft + aBorderArea.TopLeft(), imageSize);
   state.mFillArea = state.mDestArea;
 
