@@ -699,7 +699,7 @@ nsBaseDragService::DrawDragForImage(nsIImageLoadingContent* aImageLoader,
     if (!dt || !dt->IsValid())
       return NS_ERROR_FAILURE;
 
-    RefPtr<gfxContext> ctx = gfxContext::ForDrawTarget(dt);
+    RefPtr<gfxContext> ctx = gfxContext::CreateOrNull(dt);
     if (!ctx)
       return NS_ERROR_FAILURE;
 
