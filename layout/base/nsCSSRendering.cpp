@@ -5432,7 +5432,7 @@ ComputeTile(const nsRect&        aFill,
     break;
   case NS_STYLE_BORDER_IMAGE_REPEAT_ROUND:
     tile.x = aFill.x;
-    tile.width = aFill.width / ceil(gfxFloat(aFill.width)/aUnitSize.width);
+    tile.width = ComputeRoundedSize(aUnitSize.width, aFill.width);
     break;
   default:
     NS_NOTREACHED("unrecognized border-image fill style");
@@ -5449,7 +5449,7 @@ ComputeTile(const nsRect&        aFill,
     break;
   case NS_STYLE_BORDER_IMAGE_REPEAT_ROUND:
     tile.y = aFill.y;
-    tile.height = aFill.height/ceil(gfxFloat(aFill.height)/aUnitSize.height);
+    tile.height = ComputeRoundedSize(aUnitSize.height, aFill.height);
     break;
   default:
     NS_NOTREACHED("unrecognized border-image fill style");
