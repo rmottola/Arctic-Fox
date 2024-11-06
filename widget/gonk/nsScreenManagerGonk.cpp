@@ -900,9 +900,9 @@ nsScreenManagerGonk::VsyncControl(bool aEnabled)
 {
     if (!NS_IsMainThread()) {
         NS_DispatchToMainThread(
-            NS_NewRunnableMethodWithArgs<bool>(this,
-                                               &nsScreenManagerGonk::VsyncControl,
-                                               aEnabled));
+            NewRunnableMethod<bool>(this,
+                                    &nsScreenManagerGonk::VsyncControl,
+                                    aEnabled));
         return;
     }
 

@@ -28,6 +28,7 @@
 #include "nsXULAppAPI.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/Services.h"
+#include "base/task.h"
 
 #undef VOLUME_MANAGER_LOG_TAG
 #define VOLUME_MANAGER_LOG_TAG  "nsVolumeService"
