@@ -421,7 +421,7 @@ public:
 
   virtual gfx::IntSize GetSize() const override { return mSize; }
 
-  virtual const char* Name() { return "SurfaceTextureHost"; }
+  virtual const char* Name() override { return "SurfaceTextureHost"; }
 
 protected:
   RefPtr<gl::AndroidSurfaceTexture> mSurfTex;
