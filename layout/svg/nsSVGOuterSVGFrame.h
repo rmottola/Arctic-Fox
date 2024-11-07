@@ -63,7 +63,7 @@ public:
                          const nsHTMLReflowState*  aReflowState,
                          nsDidReflowStatus aStatus) override;
 
-  virtual bool UpdateOverflow() override;
+  virtual void UnionChildOverflow(nsOverflowAreas& aOverflowAreas) override;
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
                                 const nsRect&           aDirtyRect,
