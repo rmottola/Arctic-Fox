@@ -2403,13 +2403,12 @@ nsDisplayBackgroundImage::nsDisplayBackgroundImage(nsDisplayListBuilder* aBuilde
 
   nsPresContext* presContext = mFrame->PresContext();
   uint32_t flags = aBuilder->GetBackgroundPaintFlags();
-  nsRect borderArea = nsRect(ToReferenceFrame(), mFrame->GetSize());
   const nsStyleImageLayers::Layer &layer = mBackgroundStyle->mImage.mLayers[mLayer];
 
   bool isTransformedFixed;
   nsBackgroundLayerState state =
     nsCSSRendering::PrepareImageLayer(presContext, mFrame, flags,
-                                      borderArea, borderArea, layer,
+                                      mBackgroundRect, mBackgroundRect, layer,
                                       &isTransformedFixed);
   mShouldTreatAsFixed = ComputeShouldTreatAsFixed(isTransformedFixed);
 
