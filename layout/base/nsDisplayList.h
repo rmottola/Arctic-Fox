@@ -1551,11 +1551,11 @@ public:
     return nsRegion();
   }
   /**
-   * If this returns true, then aColor is set to the uniform color
-   * @return true if the item is guaranteed to paint every pixel in its
+   * @return Some(nscolor) if the item is guaranteed to paint every pixel in its
    * bounds with the same (possibly translucent) color
    */
-  virtual bool IsUniform(nsDisplayListBuilder* aBuilder, nscolor* aColor) { return false; }
+  virtual mozilla::Maybe<nscolor> IsUniform(nsDisplayListBuilder* aBuilder)
+  { return mozilla::Nothing(); }
   /**
    * @return true if the contents of this item are rendered fixed relative
    * to the nearest viewport.
@@ -2613,10 +2613,9 @@ public:
     return result;
   }
 
-  virtual bool IsUniform(nsDisplayListBuilder* aBuilder, nscolor* aColor) override
+  virtual mozilla::Maybe<nscolor> IsUniform(nsDisplayListBuilder* aBuilder) override
   {
-    *aColor = mColor;
-    return true;
+    return mozilla::Some(mColor);
   }
 
 protected:
@@ -2693,7 +2692,7 @@ public:
                                  nsRegion* aVisibleRegion) override;
   virtual nsRegion GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
                                    bool* aSnap) override;
-  virtual bool IsUniform(nsDisplayListBuilder* aBuilder, nscolor* aColor) override;
+  virtual mozilla::Maybe<nscolor> IsUniform(nsDisplayListBuilder* aBuilder) override;
   /**
    * GetBounds() returns the background painting area.
    */
@@ -2789,7 +2788,7 @@ public:
                        HitTestState* aState, nsTArray<nsIFrame*> *aOutFrames) override;
   virtual nsRegion GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
                                    bool* aSnap) override;
-  virtual bool IsUniform(nsDisplayListBuilder* aBuilder, nscolor* aColor) override;
+  virtual mozilla::Maybe<nscolor> IsUniform(nsDisplayListBuilder* aBuilder) override;
   virtual bool ProvidesFontSmoothingBackgroundColor(nscolor* aColor) override;
 
   /**
@@ -2853,7 +2852,7 @@ public:
 
   virtual nsRegion GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
                                    bool* aSnap) override;
-  virtual bool IsUniform(nsDisplayListBuilder* aBuilder, nscolor* aColor) override;
+  virtual mozilla::Maybe<nscolor> IsUniform(nsDisplayListBuilder* aBuilder) override;
   virtual void HitTest(nsDisplayListBuilder* aBuilder, const nsRect& aRect,
                        HitTestState* aState, nsTArray<nsIFrame*> *aOutFrames) override;
 
@@ -2914,10 +2913,9 @@ public:
     return GetBounds(aBuilder, aSnap);
   }
 
-  virtual bool IsUniform(nsDisplayListBuilder* aBuilder, nscolor* aColor) override
+  virtual mozilla::Maybe<nscolor> IsUniform(nsDisplayListBuilder* aBuilder) override
   {
-    *aColor = NS_RGBA(0, 0, 0, 0);
-    return true;
+    return mozilla::Some(NS_RGBA(0, 0, 0, 0));
   }
 
   virtual bool ClearsBackground() override
@@ -3225,7 +3223,7 @@ public:
   virtual nsRect GetBounds(nsDisplayListBuilder* aBuilder, bool* aSnap) override;
   virtual nsRegion GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
                                    bool* aSnap) override;
-  virtual bool IsUniform(nsDisplayListBuilder* aBuilder, nscolor* aColor) override;
+  virtual mozilla::Maybe<nscolor> IsUniform(nsDisplayListBuilder* aBuilder) override;
   virtual void Paint(nsDisplayListBuilder* aBuilder, nsRenderingContext* aCtx) override;
   virtual bool ComputeVisibility(nsDisplayListBuilder* aBuilder,
                                  nsRegion* aVisibleRegion) override;
@@ -3928,7 +3926,7 @@ public:
   virtual nsRect GetBounds(nsDisplayListBuilder *aBuilder, bool* aSnap) override;
   virtual nsRegion GetOpaqueRegion(nsDisplayListBuilder *aBuilder,
                                    bool* aSnap) override;
-  virtual bool IsUniform(nsDisplayListBuilder *aBuilder, nscolor* aColor) override;
+  virtual mozilla::Maybe<nscolor> IsUniform(nsDisplayListBuilder *aBuilder) override;
   virtual LayerState GetLayerState(nsDisplayListBuilder* aBuilder,
                                    LayerManager* aManager,
                                    const ContainerLayerParameters& aParameters) override;
@@ -4241,9 +4239,9 @@ public:
     return mList.GetOpaqueRegion(aBuilder, aSnap);
   }
 
-  virtual bool IsUniform(nsDisplayListBuilder* aBuilder, nscolor* aColor) override
+  virtual mozilla::Maybe<nscolor> IsUniform(nsDisplayListBuilder* aBuilder) override
   {
-    return mList.IsUniform(aBuilder, aColor);
+    return mList.IsUniform(aBuilder);
   }
 
   virtual LayerState GetLayerState(nsDisplayListBuilder* aBuilder,
