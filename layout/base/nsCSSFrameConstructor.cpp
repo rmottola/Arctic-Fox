@@ -5413,7 +5413,6 @@ nsCSSFrameConstructor::FindSVGData(Element* aElement,
         return &sTSpanData;
       }
     } else if (aTag == nsGkAtoms::tspan ||
-               aTag == nsGkAtoms::altGlyph ||
                aTag == nsGkAtoms::a) {
       return &sTSpanData;
     }
@@ -5426,7 +5425,6 @@ nsCSSFrameConstructor::FindSVGData(Element* aElement,
                                  nsCSSAnonBoxes::mozSVGText);
     return &sTextData;
   } else if (aTag == nsGkAtoms::tspan ||
-             aTag == nsGkAtoms::altGlyph ||
              aTag == nsGkAtoms::textPath) {
     return &sSuppressData;
   }
