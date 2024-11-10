@@ -2826,13 +2826,6 @@
     "n_values": 4,
     "description": "Count the number of 0) successful connections to an ipv4 address, 1) failed connection an ipv4 address, 2) successful connection to an ipv6 address and 3) failed connections to an ipv6 address."
   },
-  "NETWORK_SESSION_AT_256FD": {
-    "expires_in_version": "49",
-    "kind": "boolean",
-    "description": "session exceeded old 256 limit",
-    "bug_numbers": [1260218],
-    "alert_emails": ["necko@mozilla.com"]
-  },
   "NETWORK_SESSION_AT_900FD": {
     "expires_in_version": "never",
     "kind": "boolean",
