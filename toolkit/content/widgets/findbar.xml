@@ -1261,6 +1261,13 @@
         ]]></body>
       </method>
 
+      <method name="onHighlightFinished">
+        <parameter name="result"/>
+        <body><![CDATA[
+          // Noop.
+        ]]></body>
+      </method>
+
       <method name="onCurrentSelection">
         <parameter name="aSelectionString" />
         <parameter name="aIsInitialSelection" />
