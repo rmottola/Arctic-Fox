@@ -41,6 +41,10 @@ findbar[noanim] {
   margin: 0 8px;
 }
 
+.findbar-find-next > .toolbarbutton-icon {
+ -moz-appearance: button-arrow-next;
+}
+
 /* find-previous button */
 
 .findbar-find-previous > .toolbarbutton-icon {
