@@ -329,12 +329,6 @@
             case "accessibility.typeaheadfind.casesensitive":
               this._self._setCaseSensitivity(prefsvc.getIntPref(aPrefName));
               break;
-            case "accessibility.typeaheadfind.highlightallbydefault":
-              this._self._typeAheadHighlightAllByDefault = prefsvc.getBoolPref(aPrefName);
-              break;
-            case "accessibility.typeaheadfind.highlightallremember":
-              this._self._typeAheadHighlightAllRemember = prefsvc.getBoolPref(aPrefName);
-              break;
           }
         }
       })]]></field>
@@ -369,10 +363,6 @@
                             this._observer, false);
         prefsvc.addObserver("accessibility.typeaheadfind.casesensitive",
                             this._observer, false);
-        prefsvc.addObserver("accessibility.typeaheadfind.highlightallbydefault",
-                            this._observer, false);
-        prefsvc.addObserver("accessibility.typeaheadfind.highlightallremember",
-                            this._observer, false);
 
         this._findAsYouType =
           prefsvc.getBoolPref("accessibility.typeaheadfind");
@@ -380,10 +370,6 @@
           prefsvc.getBoolPref("accessibility.typeaheadfind.linksonly");
         this._typeAheadCaseSensitive =
           prefsvc.getIntPref("accessibility.typeaheadfind.casesensitive");
-        this._typeAheadHighlightAllByDefault =
-          prefsvc.getBoolPref("accessibility.typeaheadfind.highlightallbydefault");
-        this._typeAheadHighlightAllRemember =
-          prefsvc.getBoolPref("accessibility.typeaheadfind.highlightallremember");
 
         // Convenience
         this.nsITypeAheadFind = Components.interfaces.nsITypeAheadFind;
@@ -422,23 +408,9 @@
                                  this._observer);
           prefsvc.removeObserver("accessibility.typeaheadfind.casesensitive",
                                  this._observer);
-          prefsvc.removeObserver("accessibility.typeaheadfind.highlightallbydefault",
-                                 this._observer);
-          prefsvc.removeObserver("accessibility.typeaheadfind.highlightallremember",
-                                 this._observer);
 
           // Clear all timers that might still be running.
           this._cancelTimers();
-          
-          // If the "highlight all" option state should be remembered,
-          // then the preference to highlight all by default gets
-          // overwritten with the current state, just before destroying
-          // which usually happens while closing a browser window
-          if (this._typeAheadHighlightAllRemember) {
-            let pref = "accessibility.typeaheadfind.highlightallbydefault";
-            let state = this.getElement("highlight").checked;
-            prefsvc.setBoolPref(pref, state);
-          }
         ]]></body>
       </method>
 
@@ -675,17 +647,6 @@
 
           this._cancelTimers();
           this.toggleHighlight(false);
-          
-          // If the "highlight all" option state should be remembered,
-          // then the preference to highlight all by default gets
-          // overwritten with the current state, just before closing
-          if (this._typeAheadHighlightAllRemember) {
-            let prefsvc = Components.classes["@mozilla.org/preferences-service;1"]
-                         .getService(Components.interfaces.nsIPrefBranch);
-            let pref = "accessibility.typeaheadfind.highlightallbydefault";
-            let state = this.getElement("highlight").checked;
-            prefsvc.setBoolPref(pref, state);
-          }
 
           this._findFailedString = null;
         ]]></body>
@@ -891,11 +852,6 @@
           }
           this.getElement("find-next").hidden =
             this.getElement("find-previous").hidden = showMinimalUI;
-          this._updateCaseSensitivity();
-          
-          this.getElement("highlight").checked = this._typeAheadHighlightAllByDefault;
-          if (this._typeAheadHighlightAllByDefault)
-            this.toggleHighlight(true);
 
           if (showMinimalUI)
             this._findField.classList.add("minimal");
