@@ -23,10 +23,22 @@ findbar[hidden] {
   transition-delay: 0s, 0s, 150ms;
 }
 
-/* find-next button */
+findbar[noanim] {
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
 
-.findbar-find-next > .toolbarbutton-icon {
-  -moz-appearance: button-arrow-next;
+.findbar-container {
+  padding-inline-start: 8px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.findbar-closebutton {
+  -moz-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0 8px;
 }
 
 /* find-previous button */
