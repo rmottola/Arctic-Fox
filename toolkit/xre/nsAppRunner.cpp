@@ -4719,6 +4719,7 @@ enum {
   kE10sDisabledForAddons = 7,
   kE10sForceDisabled = 8,
   kE10sDisabledForXPAcceleration = 9,
+  kE10sDisabledForOperatingSystem = 10,
 };
 
 #if defined(XP_WIN) || defined(XP_MACOSX)
@@ -4791,6 +4792,22 @@ MultiprocessBlockPolicy() {
   }
 #endif // XP_WIN || XP_MACOSX
 
+  if (disabledForA11y) {
+    gMultiprocessBlockPolicy = kE10sDisabledForAccessibility;
+    return gMultiprocessBlockPolicy;
+  }
+
+  /**
+   * Avoids enabling e10s for Windows XP users on the release channel.
+   */
+#if defined(XP_WIN)
+  if (Preferences::GetDefaultCString("app.update.channel").EqualsLiteral("release") &&
+      !IsVistaOrLater()) {
+    gMultiprocessBlockPolicy = kE10sDisabledForOperatingSystem;
+    return gMultiprocessBlockPolicy;
+  }
+#endif
+
 #if defined(XP_WIN)
   /**
    * We block on Windows XP if layers acceleration is requested. This is due to
@@ -4804,11 +4821,6 @@ MultiprocessBlockPolicy() {
     return gMultiprocessBlockPolicy;
   }
 #endif // XP_WIN
-
-  if (disabledForA11y) {
-    gMultiprocessBlockPolicy = kE10sDisabledForAccessibility;
-    return gMultiprocessBlockPolicy;
-  }
 
   /**
    * Avoids enabling e10s for certain locales that require bidi selection,
@@ -4839,7 +4851,6 @@ MultiprocessBlockPolicy() {
     gMultiprocessBlockPolicy = kE10sDisabledForBidi;
     return gMultiprocessBlockPolicy;
   }
-
 
   /*
    * None of the blocking policies matched, so e10s is allowed to run.
