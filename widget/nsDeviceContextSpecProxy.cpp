@@ -87,7 +87,7 @@ nsDeviceContextSpecProxy::MakePrintTarget()
     return nullptr;
   }
 
-  // The type of PrintTarget that we return here doesn't really matter since
+  // The type of PrintTarget that we return here shouldn't really matter since
   // our implementation of GetDrawEventRecorder returns an object, which means
   // the DrawTarget returned by the PrintTarget will be a DrawTargetRecording.
   // The recording will be serialized and sent over to the parent process where
@@ -96,6 +96,9 @@ nsDeviceContextSpecProxy::MakePrintTarget()
   // nsIDeviceContextSpecProxy is created for the platform that we are running
   // on.  It is that DrawTarget that the recording will be replayed on to
   // print.
+  // XXX(jwatt): The above isn't quite true.  We do want to use a
+  // PrintTargetRecording here, but we can't until bug 1280324 is figured out
+  // and fixed otherwise we will cause bug 1280181 to happen again.
   RefPtr<PrintTarget> target = PrintTargetThebes::CreateOrNull(surface);
 
   return target.forget();
