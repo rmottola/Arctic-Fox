@@ -361,7 +361,6 @@ void nsNotifyAddrListener::OnNetlinkMessage(int aNetlinkSocket)
 
     if (networkChange) {
         checkLink();
-        calculateNetworkId();
     }
 }
 
@@ -424,6 +423,7 @@ nsNotifyAddrListener::Run()
             double period = (TimeStamp::Now() - mChangeTime).ToMilliseconds();
             if (period >= kNetworkChangeCoalescingPeriod) {
                 SendEvent(NS_NETWORK_LINK_DATA_CHANGED);
+                calculateNetworkId();
                 mCoalescingActive = false;
                 pollWait = -1; // restore to default
             } else {
