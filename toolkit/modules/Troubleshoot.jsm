@@ -482,6 +482,7 @@ var dataProviders = {
     }
 
     data.featureLog = gfxInfo.getFeatureLog();
+    data.crashGuards = gfxInfo.getActiveCrashGuards();
 
     completed();
   },
