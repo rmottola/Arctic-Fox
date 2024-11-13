@@ -560,6 +560,7 @@ CubicBezierPresetWidget.prototype = {
 
     let categoryDisplayLabel = this._normalizeCategoryLabel(categoryLabel);
     category.textContent = categoryDisplayLabel;
+    category.setAttribute("title", categoryDisplayLabel);
 
     return category;
   },
@@ -607,6 +608,7 @@ CubicBezierPresetWidget.prototype = {
     let presetDisplayLabel = this._normalizePresetLabel(categoryLabel, presetLabel);
     presetLabelElem.textContent = presetDisplayLabel;
     preset.appendChild(presetLabelElem);
+    preset.setAttribute("title", presetDisplayLabel);
 
     return preset;
   },
