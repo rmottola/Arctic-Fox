@@ -114,12 +114,25 @@ function testForErrors(filepath, key, str) {
   testForError(filepath, key, str, /\.\.\./, "ellipsis", "Strings with an ellipsis should use the Unicode \u2026 character instead of three periods.");
 }
 
+function* getAllTheFiles(extension) {
+  let appDirGreD = Services.dirsvc.get("GreD", Ci.nsIFile);
+  let appDirXCurProcD = Services.dirsvc.get("XCurProcD", Ci.nsIFile);
+  if (appDirGreD.contains(appDirXCurProcD)) {
+    return yield generateURIsFromDirTree(appDirGreD, [extension]);
+  }
+  if (appDirXCurProcD.contains(appDirGreD)) {
+    return yield generateURIsFromDirTree(appDirXCurProcD, [extension]);
+  }
+  let urisGreD = yield generateURIsFromDirTree(appDirGreD, [extension]);
+  let urisXCurProcD = yield generateURIsFromDirTree(appDirXCurProcD, [extension]);
+  return Array.from(new Set(urisGreD.concat(appDirXCurProcD)));
+}
+
 add_task(function* checkAllTheProperties() {
-  let appDir = Services.dirsvc.get("XCurProcD", Ci.nsIFile);
   // This asynchronously produces a list of URLs (sadly, mostly sync on our
   // test infrastructure because it runs against jarfiles there, and
   // our zipreader APIs are all sync)
-  let uris = yield generateURIsFromDirTree(appDir, [".properties"]);
+  let uris = yield getAllTheFiles(".properties");
   ok(uris.length, `Found ${uris.length} .properties files to scan for misused characters`);
 
   for (let uri of uris) {
@@ -131,19 +144,35 @@ add_task(function* checkAllTheProperties() {
   }
 });
 
-add_task(function* checkAllTheDTDs() {
-  let appDir = Services.dirsvc.get("XCurProcD", Ci.nsIFile);
-  let uris = yield generateURIsFromDirTree(appDir, [".dtd"]);
-  ok(uris.length, `Found ${uris.length} .dtd files to scan for misused characters`);
-
-  for (let uri of uris) {
-    let rawContents = yield fetchFile(uri.spec);
-    let entities = rawContents.match(/ENTITY\s+([\w\.]*)\s+["'](.*)["']/g);
-    for (let entity of entities) {
-      let [, key, str] = entity.match(/ENTITY\s+([\w\.]*)\s+["'](.*)["']/);
-      testForErrors(uri.spec, key, str);
-    }
+var checkDTD = Task.async(function* (aURISpec) {
+  let rawContents = yield fetchFile(aURISpec);
+  // The regular expression below is adapted from:
+  // https://hg.mozilla.org/mozilla-central/file/68c0b7d6f16ce5bb023e08050102b5f2fe4aacd8/python/compare-locales/compare_locales/parser.py#l233
+  let entities = rawContents.match(/<!ENTITY\s+([\w\.]*)\s+("[^"]*"|'[^']*')\s*>/g);
+  if (!entities) {
+    // Some files, such as requestAutocomplete.dtd, have no entities defined.
+    return;
   }
+  for (let entity of entities) {
+    let [, key, str] = entity.match(/<!ENTITY\s+([\w\.]*)\s+("[^"]*"|'[^']*')\s*>/);
+    // The matched string includes the enclosing quotation marks,
+    // we need to slice them off.
+    str = str.slice(1, -1);
+    testForErrors(aURISpec, key, str);
+  }
+});
+
+add_task(function* checkAllTheDTDs() {
+  let uris = yield getAllTheFiles(".dtd");
+  ok(uris.length, `Found ${uris.length} .dtd files to scan for misused characters`);
+  for (let uri of uris) {
+    yield checkDTD(uri.spec);
+  }
+
+  // This support DTD file supplies a string with a newline to make sure
+  // the regex in checkDTD works correctly for that case.
+  let dtdLocation = gTestPath.replace(/\/[^\/]*$/i, "/bug1262648_string_with_newlines.dtd");
+  yield checkDTD(dtdLocation);
 });
 
 add_task(function* ensureWhiteListIsEmpty() {

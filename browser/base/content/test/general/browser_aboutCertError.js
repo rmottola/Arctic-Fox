@@ -224,7 +224,7 @@ add_task(function* checkAdvancedDetailsForHSTS() {
   });
   is(message.divDisplay, "block", "Debug information is visible");
   ok(message.text.includes(badStsUri.spec), "Correct URL found");
-  ok(message.text.includes("requested domain name does not match the server's certificate"),
+  ok(message.text.includes("requested domain name does not match the server\u2019s certificate"),
      "Correct error message found");
   ok(message.text.includes("HTTP Strict Transport Security: false"),
      "Correct HSTS value found");
