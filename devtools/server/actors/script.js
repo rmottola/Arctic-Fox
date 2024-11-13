@@ -624,7 +624,7 @@ const ThreadActor = ActorClass({
     this._state = "attached";
     this._debuggerSourcesSeen = new Set();
 
-    update(this._options, aRequest.options || {});
+    Object.assign(this._options, aRequest.options || {});
     this.sources.setOptions(this._options);
     this.sources.on("newSource", this.onSourceEvent);
     this.sources.on("updatedSource", this.onSourceEvent);
@@ -687,7 +687,7 @@ const ThreadActor = ActorClass({
       this.dbg.allowUnobservedAsmJS = !options.observeAsmJS;
     }
 
-    update(this._options, options);
+    Object.assign(this._options, options);
 
     // Update the global source store
     this.sources.setOptions(options);
@@ -2155,9 +2155,9 @@ function PauseScopedObjectActor(obj, hooks) {
 
 PauseScopedObjectActor.prototype = Object.create(PauseScopedActor.prototype);
 
-update(PauseScopedObjectActor.prototype, ObjectActor.prototype);
+Object.assign(PauseScopedObjectActor.prototype, ObjectActor.prototype);
 
-update(PauseScopedObjectActor.prototype, {
+Object.assign(PauseScopedObjectActor.prototype, {
   constructor: PauseScopedObjectActor,
   actorPrefix: "pausedobj",
 
@@ -2206,7 +2206,7 @@ update(PauseScopedObjectActor.prototype, {
   }),
 });
 
-update(PauseScopedObjectActor.prototype.requestTypes, {
+Object.assign(PauseScopedObjectActor.prototype.requestTypes, {
   "threadGrip": PauseScopedObjectActor.prototype.onThreadGrip,
 });
 
@@ -2280,7 +2280,7 @@ function ChromeDebuggerActor(aConnection, aParent)
 
 ChromeDebuggerActor.prototype = Object.create(ThreadActor.prototype);
 
-update(ChromeDebuggerActor.prototype, {
+Object.assign(ChromeDebuggerActor.prototype, {
   constructor: ChromeDebuggerActor,
 
   // A constant prefix that will be used to form the actor ID by the server.
@@ -2308,7 +2308,7 @@ function AddonThreadActor(aConnect, aParent) {
 
 AddonThreadActor.prototype = Object.create(ThreadActor.prototype);
 
-update(AddonThreadActor.prototype, {
+Object.assign(AddonThreadActor.prototype, {
   constructor: AddonThreadActor,
 
   // A constant prefix that will be used to form the actor ID by the server.
