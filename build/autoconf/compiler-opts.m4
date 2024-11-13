@@ -396,6 +396,7 @@ AC_DEFUN([MOZ_SET_WARNINGS_CFLAGS],
     # -Wclass-varargs - catches objects passed by value to variadic functions.
     # -Wloop-analysis - catches issues around loops
     # -Wnon-literal-null-conversion - catches expressions used as a null pointer constant
+    # -Wstring-conversion - catches string literals used in boolean expressions
     # -Wthread-safety - catches inconsistent use of mutexes
     #
     # XXX: at the time of writing, the version of clang used on the OS X test
@@ -412,6 +413,7 @@ AC_DEFUN([MOZ_SET_WARNINGS_CFLAGS],
         MOZ_C_SUPPORTS_WARNING(-Werror=, non-literal-null-conversion, ac_c_has_non_literal_null_conversion)
     fi
 
+    MOZ_C_SUPPORTS_WARNING(-W, string-conversion, ac_c_has_wstring_conversion)
     MOZ_C_SUPPORTS_WARNING(-W, thread-safety, ac_c_has_wthread_safety)
 
     # Turn off some non-useful warnings that -Wall turns on.
@@ -462,6 +464,7 @@ AC_DEFUN([MOZ_SET_WARNINGS_CXXFLAGS],
     # -Wimplicit-fallthrough - catches unintentional switch case fallthroughs
     # -Wloop-analysis - catches issues around loops
     # -Wnon-literal-null-conversion - catches expressions used as a null pointer constant
+    # -Wstring-conversion - catches string literals used in boolean expressions
     # -Wthread-safety - catches inconsistent use of mutexes
     #
     # XXX: at the time of writing, the version of clang used on the OS X test
@@ -483,6 +486,7 @@ AC_DEFUN([MOZ_SET_WARNINGS_CXXFLAGS],
         MOZ_CXX_SUPPORTS_WARNING(-Werror=, non-literal-null-conversion, ac_cxx_has_non_literal_null_conversion)
     fi
 
+    MOZ_CXX_SUPPORTS_WARNING(-W, string-conversion, ac_cxx_has_wstring_conversion)
     MOZ_CXX_SUPPORTS_WARNING(-W, thread-safety, ac_cxx_has_wthread_safety)
 
     # Turn off some non-useful warnings that -Wall turns on.
