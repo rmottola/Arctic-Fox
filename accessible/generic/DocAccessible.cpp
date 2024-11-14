@@ -1600,6 +1600,10 @@ DocAccessible::UpdateAccessibleOnAttrChange(dom::Element* aElement,
     // the document has loaded. In this case we just update the role map entry.
     if (mContent == aElement) {
       SetRoleMapEntry(aria::GetRoleMap(aElement));
+      if (mIPCDoc) {
+        mIPCDoc->SendRoleChangedEvent(Role());
+      }
+
       return true;
     }
 
@@ -1633,6 +1637,22 @@ DocAccessible::UpdateAccessibleOnAttrChange(dom::Element* aElement,
   }
 
   return false;
+}
+
+void
+DocAccessible::UpdateRootElIfNeeded()
+{
+  dom::Element* rootEl = mDocumentNode->GetBodyElement();
+  if (!rootEl) {
+    rootEl = mDocumentNode->GetRootElement();
+  }
+  if (rootEl != mContent) {
+    mContent = rootEl;
+    SetRoleMapEntry(aria::GetRoleMap(rootEl));
+    if (mIPCDoc) {
+      mIPCDoc->SendRoleChangedEvent(Role());
+    }
+  }
 }
 
 /**
