@@ -2342,8 +2342,24 @@ GeckoDriver.prototype.switchToShadowRoot = function(cmd, resp) {
 };
 
 /** Add a cookie to the document. */
-GeckoDriver.prototype.addCookie = function(cmd, resp) {
-  yield this.listener.addCookie({cookie: cmd.parameters.cookie});
+GeckoDriver.prototype.addCookie = function*(cmd, resp) {
+  let cb = msg => {
+    this.mm.removeMessageListener("Marionette:addCookie", cb);
+    let cookie = msg.json;
+    Services.cookies.add(
+        cookie.domain,
+        cookie.path,
+        cookie.name,
+        cookie.value,
+        cookie.secure,
+        cookie.httpOnly,
+        cookie.session,
+        cookie.expiry,
+        {}); // originAttributes
+    return true;
+  };
+  this.mm.addMessageListener("Marionette:addCookie", cb);
+  yield this.listener.addCookie(cmd.parameters.cookie);
 };
 
 /**
@@ -2900,7 +2916,7 @@ GeckoDriver.prototype.receiveMessage = function(message) {
       let isForCurrentPath = path => currentPath.indexOf(path) != -1;
       let results = [];
 
-      let en = cookieManager.getCookiesFromHost(host);
+      let en = cookieManager.getCookiesFromHost(host, {});
       while (en.hasMoreElements()) {
         let cookie = en.getNext().QueryInterface(Ci.nsICookie2);
         // take the hostname and progressively shorten
