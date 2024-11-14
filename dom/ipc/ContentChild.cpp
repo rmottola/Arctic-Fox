@@ -60,7 +60,6 @@
 #include "mozilla/media/MediaChild.h"
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/WebBrowserPersistDocumentChild.h"
-#include "imgLoader.h"
 
 #if defined(MOZ_CONTENT_SANDBOX)
 #if defined(XP_WIN)
@@ -2224,16 +2223,6 @@ ContentChild::RecvRegisterChromeItem(const ChromeRegistryItem& item)
       return false;
   }
 
-  return true;
-}
-
-bool
-ContentChild::RecvClearImageCache(const bool& privateLoader, const bool& chrome)
-{
-  imgLoader* loader = privateLoader ? imgLoader::PrivateBrowsingLoader() :
-                                      imgLoader::NormalLoader();
-
-  loader->ClearCache(chrome);
   return true;
 }
 
