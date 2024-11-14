@@ -480,7 +480,7 @@ RootActor.prototype = {
   },
 
   onProtocolDescription: function () {
-    return require("devtools/server/protocol").dumpProtocolSpec();
+    return require("devtools/shared/protocol").dumpProtocolSpec();
   },
 
   /* Support for DebuggerServer.addGlobalActor. */
