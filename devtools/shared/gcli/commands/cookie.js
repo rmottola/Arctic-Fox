@@ -18,10 +18,6 @@
  * a local Firefox desktop tab (not in webide or the browser toolbox), we can
  * make the commands run on the client.
  * This way, they'll always run in the parent process.
- *
- * Note that the commands also need access to the content (see
- * context.environment.document) which means that as long as they run on the
- * client, they'll be using CPOWs (when e10s is enabled).
  */
 
 const { Ci, Cc } = require("chrome");
@@ -35,6 +31,8 @@ XPCOMUtils.defineLazyGetter(this, "cookieMgr", function() {
 /**
  * Check host value and remove port part as it is not used
  * for storing cookies.
+ *
+ * Parameter will usually be `new URL(context.environment.target.url).host`
  */
 function sanitizeHost(host) {
   if (host == null || host == "") {
@@ -93,7 +91,8 @@ exports.items = [
         throw new Error("The cookie gcli commands only work in a local tab, " +
                         "see bug 1221488");
       }
-      let host = sanitizeHost(context.environment.document.location.host);
+      let host = new URL(context.environment.target.url).host;
+      host = sanitizeHost(host);
       let enm = cookieMgr.getCookiesFromHost(host);
 
       let cookies = [];
@@ -135,7 +134,8 @@ exports.items = [
         throw new Error("The cookie gcli commands only work in a local tab, " +
                         "see bug 1221488");
       }
-      let host = sanitizeHost(context.environment.document.location.host);
+      let host = new URL(context.environment.target.url).host;
+      host = sanitizeHost(host);
       let enm = cookieMgr.getCookiesFromHost(host);
 
       while (enm.hasMoreElements()) {
@@ -278,7 +278,8 @@ exports.items = [
         throw new Error("The cookie gcli commands only work in a local tab, " +
                         "see bug 1221488");
       }
-      let host = sanitizeHost(context.environment.document.location.host);
+      let host = new URL(context.environment.target.url).host;
+      host = sanitizeHost(host);
       let time = Date.parse(args.expires) / 1000;
 
       cookieMgr.add(args.domain ? "." + args.domain : host,
