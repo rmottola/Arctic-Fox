@@ -1303,15 +1303,15 @@ static const CipherPref sCipherPrefs[] = {
  { "security.ssl3.ecdhe_rsa_aes_256_gcm_sha384",
    TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, true },
 
- { "security.ssl3.ecdhe_rsa_aes_256_sha",
-   TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, true },
- { "security.ssl3.ecdhe_ecdsa_aes_256_sha",
-   TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, true },
-
  { "security.ssl3.ecdhe_rsa_aes_128_sha",
    TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, true },
  { "security.ssl3.ecdhe_ecdsa_aes_128_sha",
    TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, true },
+
+ { "security.ssl3.ecdhe_rsa_aes_256_sha",
+   TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, true },
+ { "security.ssl3.ecdhe_ecdsa_aes_256_sha",
+   TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, true },
 
  { "security.ssl3.dhe_rsa_aes_256_sha",
    TLS_DHE_RSA_WITH_AES_256_CBC_SHA, true },
@@ -1346,18 +1346,6 @@ static const CipherPref sCipherPrefs[] = {
 
  // All the rest are disabled by default
  // As per RFC
- { "security.ssl3.ecdhe_rsa_rc4_128_sha",
-   TLS_ECDHE_RSA_WITH_RC4_128_SHA, false, true }, // RC4
- { "security.ssl3.ecdhe_ecdsa_rc4_128_sha",
-   TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, false, true }, // RC4
- { "security.ssl3.rsa_rc4_128_sha",
-   TLS_RSA_WITH_RC4_128_SHA, false, true }, // RC4
- { "security.ssl3.rsa_rc4_128_md5",
-   TLS_RSA_WITH_RC4_128_MD5, false, true }, // RC4, HMAC-MD5
- {"security.ssl3.ecdh_ecdsa_rc4_128_sha", 
-   TLS_ECDH_ECDSA_WITH_RC4_128_SHA, false, true }, // RC4
- {"security.ssl3.ecdh_rsa_rc4_128_sha", 
-   TLS_ECDH_RSA_WITH_RC4_128_SHA, false, true }, // RC4
  // Expensive/deprecated
  {"security.ssl3.rsa_fips_des_ede3_sha", SSL_RSA_FIPS_WITH_3DES_EDE_CBC_SHA, false, true },
  {"security.ssl3.dhe_dss_camellia_256_sha", TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA, false, false },

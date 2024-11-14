@@ -41,8 +41,6 @@ pref("security.ssl3.rsa_camellia_256_sha", true);
 
 // Cipher suites disabled by default                   //Reason:
 pref("security.ssl3.ecdhe_rsa_des_ede3_sha", false);   //3DES
-pref("security.ssl3.ecdhe_rsa_rc4_128_sha", false);    //RC4
-pref("security.ssl3.ecdhe_ecdsa_rc4_128_sha", false);  //RC4
 pref("security.ssl3.rsa_fips_des_ede3_sha", false);    //FIPS,3DES
 pref("security.ssl3.dhe_rsa_des_ede3_sha", false);     //3DES
 pref("security.ssl3.dhe_dss_camellia_256_sha", false); //DHE+DSS
@@ -61,8 +59,6 @@ pref("security.ssl3.ecdh_rsa_des_ede3_sha", false);    //Non-ephemeral,3DES
 pref("security.ssl3.ecdh_rsa_rc4_128_sha", false);     //Non-ephemeral,RC4
 pref("security.ssl3.rsa_seed_sha", false);             //In disuse
 pref("security.ssl3.rsa_des_ede3_sha", false);         //3DES
-pref("security.ssl3.rsa_rc4_128_sha", false);          //RC4
-pref("security.ssl3.rsa_rc4_128_md5", false);          //RC4,MD5
 
 pref("security.default_personal_cert",   "Ask Every Time");
 pref("security.remember_cert_checkbox_default_setting", true);
