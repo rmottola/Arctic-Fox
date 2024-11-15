@@ -2044,6 +2044,31 @@ SpecialPowersAPI.prototype = {
     });
   },
 
+  _pu: null,
+
+  get ParserUtils() {
+    if (this._pu != null)
+      return this._pu;
+
+    let pu = Cc["@mozilla.org/parserutils;1"].getService(Ci.nsIParserUtils);
+    // We need to create and return our own wrapper.
+    this._pu = {
+      sanitize: function(src, flags) {
+        return pu.sanitize(src, flags);
+      },
+      convertToPlainText: function(src, flags, wrapCol) {
+        return pu.convertToPlainText(src, flags, wrapCol);
+      },
+      parseFragment: function(fragment, flags, isXML, baseURL, element) {
+        let baseURI = baseURL ? NetUtil.newURI(baseURL) : null;
+        return pu.parseFragment(unwrapIfWrapped(fragment),
+                                flags, isXML, baseURI,
+                                unwrapIfWrapped(element));
+      },
+    };
+    return this._pu;
+  },
+
   createDOMWalker: function(node, showAnonymousContent) {
     node = unwrapIfWrapped(node);
     let walker = Cc["@mozilla.org/inspector/deep-tree-walker;1"].
@@ -2065,6 +2090,7 @@ SpecialPowersAPI.prototype = {
     unwrapIfWrapped(mo).observe(unwrapIfWrapped(node),
                                 {nativeAnonymousChildList, subtree});
   },
+
 };
 
 this.SpecialPowersAPI = SpecialPowersAPI;
