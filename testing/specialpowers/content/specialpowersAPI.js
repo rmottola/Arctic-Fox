@@ -1908,10 +1908,6 @@ SpecialPowersAPI.prototype = {
     this._sendSyncMessage('SPObserverService', msg);
   },
 
-  createDOMFile: function(path, options) {
-    return new File(path, options);
-  },
-
   removeAllServiceWorkerData: function() {
     this.notifyObserversInParentProcess(null, "browser:purge-session-history", "");
   },
