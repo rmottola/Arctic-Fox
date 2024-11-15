@@ -2034,6 +2034,10 @@ SpecialPowersAPI.prototype = {
       channel.asyncOpen2(listener);
     });
   },
+
+  allowMedia: function(window, enable) {
+    this._getDocShell(window).allowMedia = enable;
+  },
 };
 
 this.SpecialPowersAPI = SpecialPowersAPI;
