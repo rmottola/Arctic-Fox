@@ -7198,6 +7198,7 @@ protected:
   nsTArray<MaybeBlockedDatabaseInfo> mMaybeBlockedDatabases;
 
   const CommonFactoryRequestParams mCommonParams;
+  nsCString mSuffix;
   nsCString mGroup;
   nsCString mOrigin;
   nsCString mDatabaseId;
@@ -17648,6 +17649,10 @@ Maintenance::DirectoryWork()
   QuotaManager* quotaManager = QuotaManager::Get();
   MOZ_ASSERT(quotaManager);
 
+  if (NS_WARN_IF(NS_FAILED(quotaManager->EnsureStorageIsInitialized()))) {
+    return NS_ERROR_FAILURE;
+  }
+
   nsCOMPtr<nsIFile> storageDir = GetFileForPath(quotaManager->GetStoragePath());
   MOZ_ASSERT(storageDir);
 
@@ -17813,13 +17818,15 @@ Maintenance::DirectoryWork()
           MOZ_ASSERT(origin.IsEmpty());
 
           int64_t dummyTimeStamp;
+          nsCString dummySuffix;
           bool dummyIsApp;
           if (NS_WARN_IF(NS_FAILED(
-                QuotaManager::GetDirectoryMetadata(originDir,
-                                                   &dummyTimeStamp,
-                                                   group,
-                                                   origin,
-                                                   &dummyIsApp)))) {
+                quotaManager->GetDirectoryMetadata2(originDir,
+                                                    &dummyTimeStamp,
+                                                    dummySuffix,
+                                                    group,
+                                                    origin,
+                                                    &dummyIsApp)))) {
             // Not much we can do here...
             continue;
           }
@@ -20168,7 +20175,7 @@ FactoryOp::CheckPermission(ContentParent* aContentParent,
     }
 
     if (State::Initial == mState) {
-      QuotaManager::GetInfoForChrome(&mGroup, &mOrigin, &mIsApp);
+      QuotaManager::GetInfoForChrome(&mSuffix, &mGroup, &mOrigin, &mIsApp);
 
       MOZ_ASSERT(!QuotaManager::IsFirstPromptRequired(persistenceType, mOrigin,
                                                       mIsApp));
@@ -20190,10 +20197,15 @@ FactoryOp::CheckPermission(ContentParent* aContentParent,
     return rv;
   }
 
+  nsCString suffix;
   nsCString group;
   nsCString origin;
   bool isApp;
-  rv = QuotaManager::GetInfoFromPrincipal(principal, &group, &origin, &isApp);
+  rv = QuotaManager::GetInfoFromPrincipal(principal,
+                                          &suffix,
+                                          &group,
+                                          &origin,
+                                          &isApp);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
   }
@@ -20235,6 +20247,7 @@ FactoryOp::CheckPermission(ContentParent* aContentParent,
 
   if (permission != PermissionRequestBase::kPermissionDenied &&
       State::Initial == mState) {
+    mSuffix = suffix;
     mGroup = group;
     mOrigin = origin;
     mIsApp = isApp;
@@ -20709,6 +20722,7 @@ OpenDatabaseOp::DoDatabaseWork()
 
   nsresult rv =
     quotaManager->EnsureOriginIsInitialized(persistenceType,
+                                            mSuffix,
                                             mGroup,
                                             mOrigin,
                                             mIsApp,
