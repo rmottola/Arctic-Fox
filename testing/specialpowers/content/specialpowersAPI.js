@@ -1998,6 +1998,15 @@ SpecialPowersAPI.prototype = {
     this.notifyObserversInParentProcess(null, "extension-invalidate-storage-cache", "");
   },
 
+  allowMedia: function(window, enable) {
+    this._getDocShell(window).allowMedia = enable;
+  },
+
+  createChromeCache: function(name, url) {
+    let principal = this._getPrincipalFromArg(url);
+    return wrapIfUnwrapped(new content.window.CacheStorage(name, principal));
+  },
+
   loadChannelAndReturnStatus: function(url, loadUsingSystemPrincipal) {
     const BinaryInputStream =
         Components.Constructor("@mozilla.org/binaryinputstream;1",
@@ -2033,15 +2042,6 @@ SpecialPowersAPI.prototype = {
       channel.documentURI = uri;
       channel.asyncOpen2(listener);
     });
-  },
-
-  allowMedia: function(window, enable) {
-    this._getDocShell(window).allowMedia = enable;
-  },
-
-  createChromeCache: function(name, url) {
-    let principal = this._getPrincipalFromArg(url);
-    return wrapIfUnwrapped(new content.window.CacheStorage(name, principal));
   },
 };
 
