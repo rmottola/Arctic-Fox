@@ -629,15 +629,6 @@ ConvertToNSArray(nsTArray<ProxyAccessible*>& aArray)
 
   }
 
-#ifdef DEBUG_hakan
-  // make sure we're not returning any ignored accessibles.
-  NSEnumerator *e = [mChildren objectEnumerator];
-  mozAccessible *m = nil;
-  while ((m = [e nextObject])) {
-    NSAssert1(![m accessibilityIsIgnored], @"we should never return an ignored accessible! (%@)", m);
-  }
-#endif
-
   return mChildren;
 
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
@@ -1078,7 +1069,6 @@ struct RoleDescrComparator
 #ifdef DEBUG_hakan
   NSLog (@"%@ received focus!", self);
 #endif
-  NSAssert1(![self accessibilityIsIgnored], @"trying to set focus to ignored element! (%@)", self);
   NSAccessibilityPostNotification(GetObjectOrRepresentedView(self),
                                   NSAccessibilityFocusedUIElementChangedNotification);
 
@@ -1159,7 +1149,6 @@ struct RoleDescrComparator
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  NSAssert(![self accessibilityIsIgnored], @"can't sanity check children of an ignored accessible!");
   NSEnumerator *iter = [children objectEnumerator];
   mozAccessible *curObj = nil;
 
@@ -1212,8 +1201,7 @@ struct RoleDescrComparator
   if (!children)
     return;
 
-  if (![self accessibilityIsIgnored])
-    [self sanityCheckChildren];
+  [self sanityCheckChildren];
 
   NSEnumerator *iter = [children objectEnumerator];
   mozAccessible *object = nil;
