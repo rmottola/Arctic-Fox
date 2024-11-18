@@ -2,12 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-let {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
+var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
-let uuidGen = Cc["@mozilla.org/uuid-generator;1"]
+var uuidGen = Cc["@mozilla.org/uuid-generator;1"]
                 .getService(Ci.nsIUUIDGenerator);
 
-let loader = Cc["@mozilla.org/moz/jssubscript-loader;1"]
+var loader = Cc["@mozilla.org/moz/jssubscript-loader;1"]
                .getService(Ci.mozIJSSubScriptLoader);
 
 loader.loadSubScript("chrome://marionette/content/simpletest.js");
@@ -27,59 +27,59 @@ loader.loadSubScript("chrome://marionette/content/ChromeUtils.js", utils);
 loader.loadSubScript("chrome://marionette/content/atoms.js", utils);
 loader.loadSubScript("chrome://marionette/content/sendkeys.js", utils);
 
-let marionetteLogObj = new MarionetteLogObj();
+var marionetteLogObj = new MarionetteLogObj();
 
-let isB2G = false;
+var isB2G = false;
 
-let marionetteTestName;
-let winUtil = content.QueryInterface(Ci.nsIInterfaceRequestor)
+var marionetteTestName;
+var winUtil = content.QueryInterface(Ci.nsIInterfaceRequestor)
     .getInterface(Ci.nsIDOMWindowUtils);
-let listenerId = null; // unique ID of this listener
-let curContainer = { frame: content, shadowRoot: null };
-let isRemoteBrowser = () => curContainer.frame.contentWindow !== null;
-let previousContainer = null;
-let elementManager = new ElementManager([]);
-let accessibility = new Accessibility();
-let actions = new ActionChain(utils, checkForInterrupted);
-let importedScripts = null;
+var listenerId = null; // unique ID of this listener
+var curContainer = { frame: content, shadowRoot: null };
+var isRemoteBrowser = () => curContainer.frame.contentWindow !== null;
+var previousContainer = null;
+var elementManager = new ElementManager([]);
+var accessibility = new Accessibility();
+var actions = new ActionChain(utils, checkForInterrupted);
+var importedScripts = null;
 
 // Contains the last file input element that was the target of
 // sendKeysToElement.
-let fileInputElement;
+var fileInputElement;
 
 // A dict of sandboxes used this session
-let sandboxes = {};
+var sandboxes = {};
 // The name of the current sandbox
-let sandboxName = 'default';
+var sandboxName = 'default';
 
 // the unload handler
-let onunload;
+var onunload;
 
 // Flag to indicate whether an async script is currently running or not.
-let asyncTestRunning = false;
-let asyncTestCommandId;
-let asyncTestTimeoutId;
+var asyncTestRunning = false;
+var asyncTestCommandId;
+var asyncTestTimeoutId;
 
-let inactivityTimeoutId = null;
-let heartbeatCallback = function () {}; // Called by the simpletest methods.
+var inactivityTimeoutId = null;
+var heartbeatCallback = function () {}; // Called by the simpletest methods.
 
-let originalOnError;
+var originalOnError;
 //timer for doc changes
-let checkTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
+var checkTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
 //timer for readystate
-let readyStateTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
+var readyStateTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
 // timer for navigation commands.
-let navTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
-let onDOMContentLoaded;
+var navTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
+var onDOMContentLoaded;
 // Send move events about this often
-let EVENT_INTERVAL = 30; // milliseconds
+var EVENT_INTERVAL = 30; // milliseconds
 // last touch for each fingerId
-let multiLast = {};
+var multiLast = {};
 
 Cu.import("resource://gre/modules/Log.jsm");
-let logger = Log.repository.getLogger("Marionette");
+var logger = Log.repository.getLogger("Marionette");
 logger.info("loaded listener.js");
-let modalHandler = function() {
+var modalHandler = function() {
   // This gets called on the system app only since it receives the mozbrowserprompt event
   sendSyncMessage("Marionette:switchedToFrame", { frameValue: null, storePrevious: true });
   let isLocal = sendSyncMessage("MarionetteFrame:handleModal", {})[0].value;
@@ -193,25 +193,27 @@ function removeMessageListenerId(messageName, handler) {
   removeMessageListener(messageName + listenerId, handler);
 }
 
-let getTitleFn = dispatch(getTitle);
-let getPageSourceFn = dispatch(getPageSource);
-let getActiveElementFn = dispatch(getActiveElement);
-let clickElementFn = dispatch(clickElement);
-let goBackFn = dispatch(goBack);
-let getElementAttributeFn = dispatch(getElementAttribute);
-let getElementTextFn = dispatch(getElementText);
-let getElementTagNameFn = dispatch(getElementTagName);
-let getElementRectFn = dispatch(getElementRect);
-let isElementEnabledFn = dispatch(isElementEnabled);
-let getCurrentUrlFn = dispatch(getCurrentUrl);
-let findElementContentFn = dispatch(findElementContent);
-let findElementsContentFn = dispatch(findElementsContent);
-let isElementSelectedFn = dispatch(isElementSelected);
-let clearElementFn = dispatch(clearElement);
-let isElementDisplayedFn = dispatch(isElementDisplayed);
-let getElementValueOfCssPropertyFn = dispatch(getElementValueOfCssProperty);
-let switchToShadowRootFn = dispatch(switchToShadowRoot);
-let getCookiesFn = dispatch(getCookies);
+var getTitleFn = dispatch(getTitle);
+var getPageSourceFn = dispatch(getPageSource);
+var getActiveElementFn = dispatch(getActiveElement);
+var clickElementFn = dispatch(clickElement);
+var goBackFn = dispatch(goBack);
+var getElementAttributeFn = dispatch(getElementAttribute);
+var getElementTextFn = dispatch(getElementText);
+var getElementTagNameFn = dispatch(getElementTagName);
+var getElementRectFn = dispatch(getElementRect);
+var isElementEnabledFn = dispatch(isElementEnabled);
+var getCurrentUrlFn = dispatch(getCurrentUrl);
+var findElementContentFn = dispatch(findElementContent);
+var findElementsContentFn = dispatch(findElementsContent);
+var isElementSelectedFn = dispatch(isElementSelected);
+var clearElementFn = dispatch(clearElement);
+var isElementDisplayedFn = dispatch(isElementDisplayed);
+var getElementValueOfCssPropertyFn = dispatch(getElementValueOfCssProperty);
+var switchToShadowRootFn = dispatch(switchToShadowRoot);
+var getCookiesFn = dispatch(getCookies);
+var singleTapFn = dispatch(singleTap);
+var takeScreenshotFn = dispatch(takeScreenshot);
 
 /**
  * Start all message listeners
@@ -256,7 +258,7 @@ function startListeners() {
   addMessageListenerId("Marionette:importScript", importScript);
   addMessageListenerId("Marionette:getAppCacheStatus", getAppCacheStatus);
   addMessageListenerId("Marionette:setTestName", setTestName);
-  addMessageListenerId("Marionette:takeScreenshot", takeScreenshot);
+  addMessageListenerId("Marionette:takeScreenshot", takeScreenshotFn);
   addMessageListenerId("Marionette:addCookie", addCookie);
   addMessageListenerId("Marionette:getCookies", getCookiesFn);
   addMessageListenerId("Marionette:deleteAllCookies", deleteAllCookies);
@@ -360,7 +362,7 @@ function deleteSession(msg) {
   removeMessageListenerId("Marionette:importScript", importScript);
   removeMessageListenerId("Marionette:getAppCacheStatus", getAppCacheStatus);
   removeMessageListenerId("Marionette:setTestName", setTestName);
-  removeMessageListenerId("Marionette:takeScreenshot", takeScreenshot);
+  removeMessageListenerId("Marionette:takeScreenshot", takeScreenshotFn);
   removeMessageListenerId("Marionette:addCookie", addCookie);
   removeMessageListenerId("Marionette:getCookies", getCookiesFn);
   removeMessageListenerId("Marionette:deleteAllCookies", deleteAllCookies);
@@ -1990,44 +1992,35 @@ function importScript(msg) {
  * <code>msg.json.highlights</code>, a red box will be painted around
  * them to highlight their position.
  */
-function takeScreenshot(msg) {
+function takeScreenshot(id, highlights, full) {
   let node = null;
-  if (msg.json.id) {
-    try {
-      node = elementManager.getKnownElement(msg.json.id, curContainer)
-    }
-    catch (e) {
-      sendResponse(e.message, e.code, e.stack, msg.json.command_id);
-      return;
-    }
-  }
-  else {
+  if (id) {
+    node = elementManager.getKnownElement(id, curContainer)
+  } else {
     node = curContainer.frame;
   }
-  let highlights = msg.json.highlights;
 
-  var document = curContainer.frame.document;
-  var rect, win, width, height, left, top;
+  let document = curContainer.frame.document;
+  let rect, win, width, height, left, top;
+
   // node can be either a window or an arbitrary DOM node
   if (node == curContainer.frame) {
     // node is a window
     win = node;
-    if (msg.json.full) {
+    if (full) {
       // the full window
       width = document.body.scrollWidth;
       height = document.body.scrollHeight;
       top = 0;
       left = 0;
-    }
-    else {
+    } else {
       // only the viewport
       width = document.documentElement.clientWidth;
       height = document.documentElement.clientHeight;
       left = curContainer.frame.pageXOffset;
       top = curContainer.frame.pageYOffset;
     }
-  }
-  else {
+  } else {
     // node is an arbitrary DOM node
     win = node.ownerDocument.defaultView;
     rect = node.getBoundingClientRect();
@@ -2037,15 +2030,16 @@ function takeScreenshot(msg) {
     left = rect.left;
   }
 
-  var canvas = document.createElementNS("http://www.w3.org/1999/xhtml",
-                                        "canvas");
+  let canvas = document.createElementNS(
+      "http://www.w3.org/1999/xhtml", "canvas");
   canvas.width = width;
   canvas.height = height;
-  var ctx = canvas.getContext("2d");
-  // Draws the DOM contents of the window to the canvas
+  let ctx = canvas.getContext("2d");
+
+  // draws the DOM contents of the window to the canvas
   ctx.drawWindow(win, left, top, width, height, "rgb(255,255,255)");
 
-  // This section is for drawing a red rectangle around each element
+  // this section is for drawing a red rectangle around each element
   // passed in via the highlights array
   if (highlights) {
     ctx.lineWidth = "2";
@@ -2053,25 +2047,26 @@ function takeScreenshot(msg) {
     ctx.save();
 
     for (var i = 0; i < highlights.length; ++i) {
-      var elem = elementManager.getKnownElement(highlights[i], curContainer);
+      let elem = elementManager.getKnownElement(highlights[i], curContainer);
       rect = elem.getBoundingClientRect();
 
-      var offsetY = -top;
-      var offsetX = -left;
+      let offsetY = -top;
+      let offsetX = -left;
 
-      // Draw the rectangle
-      ctx.strokeRect(rect.left + offsetX,
-                     rect.top + offsetY,
-                     rect.width,
-                     rect.height);
+      // draw the rectangle
+      ctx.strokeRect(
+          rect.left + offsetX,
+          rect.top + offsetY,
+          rect.width,
+          rect.height);
     }
   }
 
-  // Return the Base64 encoded string back to the client so that it
-  // can save the file to disk if it is required
-  var dataUrl = canvas.toDataURL("image/png", "");
-  var data = dataUrl.substring(dataUrl.indexOf(",") + 1);
-  sendResponse({value: data}, msg.json.command_id);
+  // return the Base64 encoded string back to the client
+  // so that it can save the file to disk if it is required
+  let dataUrl = canvas.toDataURL("image/png", "");
+  let encoded = dataUrl.substring(dataUrl.indexOf(",") + 1);
+  return encoded;
 }
 
 // Call register self when we get loaded
