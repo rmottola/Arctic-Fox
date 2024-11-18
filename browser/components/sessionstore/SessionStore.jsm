@@ -135,7 +135,6 @@ Cu.import("resource://gre/modules/Services.jsm", this);
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
 Cu.import("resource://gre/modules/TelemetryTimestamps.jsm", this);
 Cu.import("resource://gre/modules/TelemetryStopwatch.jsm", this);
-Cu.import("resource://gre/modules/debug.js", this);
 Cu.import("resource://gre/modules/osfile.jsm", this);
 Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm", this);
 Cu.import("resource://gre/modules/Promise.jsm", this);
@@ -448,10 +447,7 @@ var SessionStoreInternal = {
 
   // number of tabs currently restoring
   _tabsRestoringCount: 0,
-  
-  // whether restored tabs load cached versions or force a reload
-  _cacheBehavior: 0,
-  
+
   // When starting Firefox with a single private window, this is the place
   // where we keep the session we actually wanted to restore in case the user
   // decides to later open a non-private window as well.
