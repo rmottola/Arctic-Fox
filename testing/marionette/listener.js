@@ -211,6 +211,7 @@ let clearElementFn = dispatch(clearElement);
 let isElementDisplayedFn = dispatch(isElementDisplayed);
 let getElementValueOfCssPropertyFn = dispatch(getElementValueOfCssProperty);
 let switchToShadowRootFn = dispatch(switchToShadowRoot);
+let getCookiesFn = dispatch(getCookies);
 
 /**
  * Start all message listeners
@@ -257,7 +258,7 @@ function startListeners() {
   addMessageListenerId("Marionette:setTestName", setTestName);
   addMessageListenerId("Marionette:takeScreenshot", takeScreenshot);
   addMessageListenerId("Marionette:addCookie", addCookie);
-  addMessageListenerId("Marionette:getCookies", getCookies);
+  addMessageListenerId("Marionette:getCookies", getCookiesFn);
   addMessageListenerId("Marionette:deleteAllCookies", deleteAllCookies);
   addMessageListenerId("Marionette:deleteCookie", deleteCookie);
 }
@@ -361,7 +362,7 @@ function deleteSession(msg) {
   removeMessageListenerId("Marionette:setTestName", setTestName);
   removeMessageListenerId("Marionette:takeScreenshot", takeScreenshot);
   removeMessageListenerId("Marionette:addCookie", addCookie);
-  removeMessageListenerId("Marionette:getCookies", getCookies);
+  removeMessageListenerId("Marionette:getCookies", getCookiesFn);
   removeMessageListenerId("Marionette:deleteAllCookies", deleteAllCookies);
   removeMessageListenerId("Marionette:deleteCookie", deleteCookie);
   if (isB2G) {
@@ -1846,17 +1847,20 @@ function addCookie(msg) {
 /**
  * Get all cookies for the current domain.
  */
-function getCookies(msg) {
-  var toReturn = [];
-  var cookies = getVisibleCookies(curContainer.frame.location);
+function getCookies() {
+  let rv = [];
+  let cookies = getVisibleCookies(curContainer.frame.location);
+
   for (let cookie of cookies) {
-    var expires = cookie.expires;
-    if (expires == 0) {  // Session cookie, don't return an expiry.
+    let expires = cookie.expires;
+    // session cookie, don't return an expiry
+    if (expires == 0) {
       expires = null;
-    } else if (expires == 1) { // Date before epoch time, cap to epoch.
+    // date before epoch time, cap to epoch
+    } else if (expires == 1) {
       expires = 0;
     }
-    toReturn.push({
+    rv.push({
       'name': cookie.name,
       'value': cookie.value,
       'path': cookie.path,
@@ -1866,7 +1870,8 @@ function getCookies(msg) {
       'expiry': expires
     });
   }
-  sendResponse({value: toReturn}, msg.json.command_id);
+
+  return rv;
 }
 
 /**
