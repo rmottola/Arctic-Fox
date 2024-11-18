@@ -4,6 +4,8 @@
 
 "use strict";
 
+requestLongerTimeout(3);
+
 add_task(function* () {
   for (let i = 0; i < 3; ++i) {
     let tab = gBrowser.addTab("http://example.com/", { userContextId: i });
