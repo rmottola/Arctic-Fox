@@ -64,9 +64,9 @@ MOZ_APP_ID={8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}
 # This should usually be the same as the value MAR_CHANNEL_ID.
 # If more than one ID is needed, then you should use a comma separated list
 # of values.
-ACCEPTED_MAR_CHANNEL_IDS=palemoon-release
+ACCEPTED_MAR_CHANNEL_IDS=arcticfox-release
 # The MAR_CHANNEL_ID must not contain the following 3 characters: ",\t "
-MAR_CHANNEL_ID=palemoon-release
+MAR_CHANNEL_ID=arcticfox-release
 MOZ_PROFILE_MIGRATOR=1
 MOZ_EXTENSION_MANAGER=1
 MOZ_APP_STATIC_INI=1
