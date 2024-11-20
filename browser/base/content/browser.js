@@ -1092,7 +1092,6 @@ var gBrowserInit = {
     CombinedStopReload.init();
     TabsOnTop.init();
     gPrivateBrowsingUI.init();
-    TabsInTitlebar.init();
     retrieveToolbarIconsizesFromTheme();
 
 #ifdef XP_WIN
@@ -5465,12 +5464,15 @@ var TabletModeUpdater = {
   },
 
   update(isInTabletMode) {
+    let wasInTabletMode = document.documentElement.hasAttribute("tabletmode");
     if (isInTabletMode) {
       document.documentElement.setAttribute("tabletmode", "true");
     } else {
       document.documentElement.removeAttribute("tabletmode");
     }
-    TabsInTitlebar.updateAppearance(true);
+    if (wasInTabletMode != isInTabletMode) {
+      TabsInTitlebar.updateAppearance(true);
+    }
   },
 };
 
