@@ -43,7 +43,7 @@ loader.lazyGetter(this, "toolboxStrings", () => {
       }
       return bundle.formatStringFromName(name, args, args.length);
     } catch (ex) {
-      Services.console.logStringMessage("Error reading '" + name + "'");
+      console.log("Error reading '" + name + "'");
       return null;
     }
   };
