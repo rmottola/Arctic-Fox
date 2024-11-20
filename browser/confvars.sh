@@ -8,6 +8,12 @@ MOZ_APP_VENDOR=org.multix
 MOZ_UPDATER=1
 MOZ_PHOENIX=1
 
+if test "$MOZ_WIDGET_TOOLKIT" = "windows" -o \
+        "$MOZ_WIDGET_TOOLKIT" = "gtk2" -o \
+        "$MOZ_WIDGET_TOOLKIT" = "gtk3"; then
+  MOZ_BUNDLED_FONTS=1
+fi
+
 if test "$OS_ARCH" = "WINNT"; then
   MOZ_MAINTENANCE_SERVICE=1
   if ! test "$HAVE_64BIT_BUILD"; then
