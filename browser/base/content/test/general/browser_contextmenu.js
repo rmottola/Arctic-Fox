@@ -108,6 +108,7 @@ add_task(function* test_video_ok() {
      "context-media-playbackrate", null,
          ["context-media-playbackrate-050x", true,
           "context-media-playbackrate-100x", true,
+          "context-media-playbackrate-125x", true,
           "context-media-playbackrate-150x", true,
           "context-media-playbackrate-200x", true], null,
      "context-media-hidecontrols", true,
@@ -133,6 +134,7 @@ add_task(function* test_audio_in_video() {
      "context-media-playbackrate", null,
          ["context-media-playbackrate-050x", true,
           "context-media-playbackrate-100x", true,
+          "context-media-playbackrate-125x", true,
           "context-media-playbackrate-150x", true,
           "context-media-playbackrate-200x", true], null,
      "context-media-showcontrols", true,
@@ -152,6 +154,7 @@ add_task(function* test_video_bad() {
      "context-media-playbackrate", null,
          ["context-media-playbackrate-050x", false,
           "context-media-playbackrate-100x", false,
+          "context-media-playbackrate-125x", false,
           "context-media-playbackrate-150x", false,
           "context-media-playbackrate-200x", false], null,
      "context-media-hidecontrols", false,
@@ -177,6 +180,7 @@ add_task(function* test_video_bad2() {
      "context-media-playbackrate", null,
          ["context-media-playbackrate-050x", false,
           "context-media-playbackrate-100x", false,
+          "context-media-playbackrate-125x", false,
           "context-media-playbackrate-150x", false,
           "context-media-playbackrate-200x", false], null,
      "context-media-hidecontrols", false,
@@ -235,6 +239,7 @@ add_task(function* test_video_in_iframe() {
      "context-media-playbackrate", null,
          ["context-media-playbackrate-050x", true,
           "context-media-playbackrate-100x", true,
+          "context-media-playbackrate-125x", true,
           "context-media-playbackrate-150x", true,
           "context-media-playbackrate-200x", true], null,
      "context-media-hidecontrols", true,
@@ -272,6 +277,7 @@ add_task(function* test_audio_in_iframe() {
      "context-media-playbackrate", null,
          ["context-media-playbackrate-050x", true,
           "context-media-playbackrate-100x", true,
+          "context-media-playbackrate-125x", true,
           "context-media-playbackrate-150x", true,
           "context-media-playbackrate-200x", true], null,
      "---",                        null,
@@ -463,7 +469,7 @@ add_task(function* test_copylinkcommand() {
       yield ContentTask.spawn(gBrowser.selectedBrowser, null, function*() {
         let doc = content.document;
         let input = doc.getElementById("test-input");
-        is(input.value, "http://mozilla.com/", "paste for command cmd_paste");
+        Assert.equal(input.value, "http://mozilla.com/", "paste for command cmd_paste");
       });
     }
   });
@@ -511,7 +517,7 @@ add_task(function* test_pagemenu() {
       item.doCommand();
       yield ContentTask.spawn(gBrowser.selectedBrowser, null, function*() {
         let pagemenu = content.document.getElementById("test-pagemenu");
-        ok(!pagemenu.hasAttribute("hopeless"), "attribute got removed");
+        Assert.ok(!pagemenu.hasAttribute("hopeless"), "attribute got removed");
       });
     }
   });
@@ -839,7 +845,7 @@ function* selectText(selector) {
     win.getSelection().removeAllRanges();
     let div = doc.createRange();
     let element = doc.querySelector(selector);
-    ok(element, "Found element to select text from");
+    Assert.ok(element, "Found element to select text from");
     div.setStartBefore(element);
     div.setEndAfter(element);
     win.getSelection().addRange(div);
