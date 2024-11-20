@@ -50,7 +50,7 @@
 @RESPATH@/browser/defaults/profile/localstore.rdf
 @RESPATH@/browser/defaults/profile/mimeTypes.rdf
 @RESPATH@/dictionaries/*
-#if defined(XP_WIN)
+#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
 @RESPATH@/fonts/*
 #endif
 @RESPATH@/hyphenation/*
