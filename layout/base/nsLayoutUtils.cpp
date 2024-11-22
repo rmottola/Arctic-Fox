@@ -6965,7 +6965,7 @@ nsLayoutUtils::DrawBackgroundImage(gfxContext&         aContext,
       nsRect dest(i, j, aDest.width, aDest.height);
       DrawResult result = DrawImageInternal(aContext, aPresContext, aImage, aSamplingFilter,
                                             dest, dest, aAnchor, aDirty, &svgContext,
-                                            aImageFlags, aExtendMode);
+                                            aImageFlags, ExtendMode::CLAMP);
       if (result != DrawResult::SUCCESS) {
         return result;
       }
