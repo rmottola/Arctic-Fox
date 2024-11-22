@@ -6681,7 +6681,6 @@ ComputeSnappedImageDrawingParameters(gfxContext*     aCtx,
                                        region, svgViewportSize);
 }
 
-
 static DrawResult
 DrawImageInternal(gfxContext&            aContext,
                   nsPresContext*         aPresContext,
@@ -7394,13 +7393,15 @@ nsLayoutUtils::SurfaceFromElement(nsIImageLoadingContent* aElement,
 
   nsCOMPtr<nsIPrincipal> principal;
   rv = imgRequest->GetImagePrincipal(getter_AddRefs(principal));
-  if (NS_FAILED(rv))
+  if (NS_FAILED(rv)) {
     return result;
+  }
 
   nsCOMPtr<imgIContainer> imgContainer;
   rv = imgRequest->GetImage(getter_AddRefs(imgContainer));
-  if (NS_FAILED(rv))
+  if (NS_FAILED(rv)) {
     return result;
+  }
 
   uint32_t noRasterize = aSurfaceFlags & SFE_NO_RASTERIZING_VECTORS;
 
@@ -7465,7 +7466,6 @@ nsLayoutUtils::SurfaceFromElement(nsIImageLoadingContent* aElement,
   // no images, including SVG images, can load content from another domain.
   result.mIsWriteOnly = false;
   result.mImageRequest = imgRequest.forget();
-
   return result;
 }
 
