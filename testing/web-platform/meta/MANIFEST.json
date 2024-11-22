@@ -23517,6 +23517,18 @@
         ]
       },
       "testharness": {
+        "XMLHttpRequest/xmlhttprequest-sync-block-defer-scripts.html": [
+          {
+            "path": "XMLHttpRequest/xmlhttprequest-sync-block-defer-scripts.html",
+            "url": "/XMLHttpRequest/xmlhttprequest-sync-block-defer-scripts.html"
+          }
+        ],
+        "XMLHttpRequest/xmlhttprequest-sync-block-scripts.html": [
+          {
+            "path": "XMLHttpRequest/xmlhttprequest-sync-block-scripts.html",
+            "url": "/XMLHttpRequest/xmlhttprequest-sync-block-scripts.html"
+          }
+        ],
         "DOM-parsing/createContextualFragment.html": [
           {
             "path": "DOM-parsing/createContextualFragment.html",

@@ -9700,6 +9700,9 @@ nsDocument::SuppressEventHandling(nsIDocument::SuppressionType aWhat,
     mAnimationsPaused += aIncrease;
   } else {
     mEventsSuppressed += aIncrease;
+    for (uint32_t i = 0; i < aIncrease; ++i) {
+      ScriptLoader()->AddExecuteBlocker();
+    }
   }
 
   SuppressArgs args = { aWhat, aIncrease };
@@ -10028,6 +10031,7 @@ GetAndUnsuppressSubDocuments(nsIDocument* aDocument,
   if (args->mWhat != nsIDocument::eAnimationsOnly &&
       aDocument->EventHandlingSuppressed() > 0) {
     static_cast<nsDocument*>(aDocument)->DecreaseEventSuppression();
+    aDocument->ScriptLoader()->RemoveExecuteBlocker();
   } else if (args->mWhat == nsIDocument::eAnimationsOnly &&
              aDocument->AnimationsPaused()) {
     static_cast<nsDocument*>(aDocument)->ResumeAnimations();
