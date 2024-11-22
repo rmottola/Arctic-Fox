@@ -434,6 +434,7 @@ NS_IMPL_CYCLE_COLLECTING_RELEASE(nsScriptLoader)
 nsScriptLoader::nsScriptLoader(nsIDocument *aDocument)
   : mDocument(aDocument),
     mParserBlockingBlockerCount(0),
+    mBlockerCount(0),
     mNumberOfProcessors(0),
     mEnabled(true),
     mDeferEnabled(false),
@@ -2060,7 +2061,7 @@ nsScriptLoader::ProcessPendingRequests()
     ProcessRequest(request);
   }
 
-  while (mEnabled && !mLoadedAsyncRequests.isEmpty()) {
+  while (ReadyToExecuteScripts() && !mLoadedAsyncRequests.isEmpty()) {
     request = mLoadedAsyncRequests.StealFirst();
     if (request->IsModuleRequest()) {
       ProcessRequest(request);
@@ -2069,7 +2070,8 @@ nsScriptLoader::ProcessPendingRequests()
     }
   }
 
-  while (mEnabled && !mNonAsyncExternalScriptInsertedRequests.isEmpty() &&
+  while (ReadyToExecuteScripts() &&
+         !mNonAsyncExternalScriptInsertedRequests.isEmpty() &&
          mNonAsyncExternalScriptInsertedRequests.getFirst()->IsReadyToRun()) {
     // Violate the HTML5 spec and execute these in the insertion order in
     // order to make LABjs and the "order" plug-in for RequireJS work with
@@ -2080,7 +2082,9 @@ nsScriptLoader::ProcessPendingRequests()
   }
 
   if (mDocumentParsingDone && mXSLTRequests.isEmpty()) {
-    while (!mDeferRequests.isEmpty() && mDeferRequests.getFirst()->IsReadyToRun()) {
+    while (ReadyToExecuteScripts() &&
+           !mDeferRequests.isEmpty() &&
+           mDeferRequests.getFirst()->IsReadyToRun()) {
       request = mDeferRequests.StealFirst();
       ProcessRequest(request);
     }
