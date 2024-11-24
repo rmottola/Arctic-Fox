@@ -883,7 +883,7 @@ WebConsoleActor.prototype =
                                 error.unsafeDereference();
         errorMessage = unsafeDereference && unsafeDereference.toString
           ? unsafeDereference.toString()
-          : "" + error;
+          : String(error);
       }
     }
 
