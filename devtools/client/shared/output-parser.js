@@ -209,7 +209,7 @@ OutputParser.prototype = {
 
             if (options.expectCubicBezier && token.text === "cubic-bezier") {
               this._appendCubicBezier(functionText, options);
-            } else if (colorOK() && DOMUtils.isValidCSSColor(functionText)) {
+            } else if (colorOK() && colorUtils.isValidCSSColor(functionText)) {
               this._appendColor(functionText, options);
             } else {
               this._appendTextNode(functionText);
@@ -222,7 +222,7 @@ OutputParser.prototype = {
           if (options.expectCubicBezier &&
               BEZIER_KEYWORDS.indexOf(token.text) >= 0) {
             this._appendCubicBezier(token.text, options);
-          } else if (colorOK() && DOMUtils.isValidCSSColor(token.text)) {
+          } else if (colorOK() && colorUtils.isValidCSSColor(token.text)) {
             this._appendColor(token.text, options);
           } else if (angleOK(token.text)) {
             this._appendAngle(token.text, options);
@@ -235,7 +235,7 @@ OutputParser.prototype = {
         case "id":
         case "hash": {
           let original = text.substring(token.startOffset, token.endOffset);
-          if (colorOK() && DOMUtils.isValidCSSColor(original)) {
+          if (colorOK() && colorUtils.isValidCSSColor(original)) {
             this._appendColor(original, options);
           } else {
             this._appendTextNode(original);
