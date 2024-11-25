@@ -40,6 +40,8 @@ var AboutReader = function(mm, win, articlePromise) {
 
   this._docRef = Cu.getWeakReference(doc);
   this._winRef = Cu.getWeakReference(win);
+  this._innerWindowId = win.QueryInterface(Ci.nsIInterfaceRequestor)
+    .getInterface(Ci.nsIDOMWindowUtils).currentInnerWindowID;
 
   this._article = null;
 
@@ -59,9 +61,11 @@ var AboutReader = function(mm, win, articlePromise) {
 
   doc.addEventListener("click", this, false);
 
-  win.addEventListener("unload", this, false);
+  win.addEventListener("pagehide", this, false);
   win.addEventListener("scroll", this, false);
   win.addEventListener("resize", this, false);
+
+  Services.obs.addObserver(this, "inner-window-destroyed", false);
 
   doc.addEventListener("visibilitychange", this, false);
 
@@ -253,7 +257,7 @@ AboutReader.prototype = {
         this._handleVisibilityChange();
         break;
 
-      case "unload":
+      case "pagehide":
         // Close the Banners Font-dropdown, cleanup Android BackPressListener.
         this._closeDropdowns();
 
@@ -263,6 +267,19 @@ AboutReader.prototype = {
         this._windowUnloaded = true;
         break;
     }
+  },
+
+  observe: function(subject, topic, data) {
+    if (subject.QueryInterface(Ci.nsISupportsPRUint64).data != this._innerWindowId) {
+      return;
+    }
+
+    Services.obs.removeObserver(this, "inner-window-destroyed", false);
+
+    this._mm.removeMessageListener("Reader:CloseDropdown", this);
+    this._mm.removeMessageListener("Reader:AddButton", this);
+    this._mm.removeMessageListener("Reader:RemoveButton", this);
+    this._windowUnloaded = true;
   },
 
   _onReaderClose: function() {
