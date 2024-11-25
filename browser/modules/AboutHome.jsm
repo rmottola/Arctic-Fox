@@ -169,15 +169,15 @@ var AboutHome = {
 
       if (AboutHomeUtils.showKnowYourRights) {
         // Set pref to indicate we've shown the notification.
-//        let currentVersion = Services.prefs.getIntPref("browser.rights.version");
- //       Services.prefs.setBoolPref("browser.rights." + currentVersion + ".shown", true);
+        let currentVersion = Services.prefs.getIntPref("browser.rights.version");
+        Services.prefs.setBoolPref("browser.rights." + currentVersion + ".shown", true);
       }
 
       if (target && target.messageManager) {
-//        target.messageManager.sendAsyncMessage("AboutHome:Update", data);
+        target.messageManager.sendAsyncMessage("AboutHome:Update", data);
       } else {
-//        let mm = Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageListenerManager);
- //       mm.broadcastAsyncMessage("AboutHome:Update", data);
+        let mm = Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageListenerManager);
+        mm.broadcastAsyncMessage("AboutHome:Update", data);
       }
     }).then(null, function onError(x) {
       Cu.reportError("Error in AboutHome.sendAboutHomeData: " + x);
