@@ -1338,6 +1338,10 @@ Search.prototype = {
       this._maybeRestyleSearchMatch(match);
     }
 
+    if (this._addingHeuristicFirstMatch) {
+      match.style += " heuristic";
+    }
+
     match.icon = match.icon || PlacesUtils.favicons.defaultFavicon.spec;
     match.finalCompleteValue = match.finalCompleteValue || "";
 
@@ -1620,7 +1624,7 @@ Search.prototype = {
     if (!Prefs.autofill)
       return false;
 
-    if (!this._searchTokens.length == 1)
+    if (this._searchTokens.length != 1)
       return false;
 
     // autoFill can only cope with history or bookmarks entries.
