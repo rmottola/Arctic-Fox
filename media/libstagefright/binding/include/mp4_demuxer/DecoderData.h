@@ -11,8 +11,8 @@
 #include "mozilla/Vector.h"
 #include "mozilla/RefPtr.h"
 #include "nsString.h"
-#include "nsString.h"
 #include "nsTArray.h"
+#include "nsString.h"
 
 namespace stagefright
 {
