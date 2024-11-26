@@ -2744,7 +2744,6 @@ VPX_ARM_ASM=
 LIBJPEG_TURBO_AS=
 LIBJPEG_TURBO_ASFLAGS=
 MOZ_PERMISSIONS=1
-MOZ_PLACES=1
 MOZ_SOCIAL=1
 MOZ_PREF_EXTENSIONS=1
 MOZ_REFLOW_PERF=
@@ -3511,17 +3510,6 @@ fi
 AC_SUBST(MOZ_SYNTH_SPEECHD)
 
 dnl ========================================================
-dnl = Enable Android History instead of Places
-dnl ========================================================
-if test -n "$MOZ_ANDROID_HISTORY"; then
-    if test -z "$MOZ_PLACES"; then
-        AC_DEFINE(MOZ_ANDROID_HISTORY)
-    else
-        AC_MSG_ERROR([Cannot use MOZ_ANDROID_HISTORY alongside MOZ_PLACES.])
-    fi
-fi
-
-dnl ========================================================
 dnl = Disable WebSMS backend
 dnl ========================================================
 MOZ_ARG_DISABLE_BOOL(websms-backend,
@@ -3532,13 +3520,6 @@ MOZ_ARG_DISABLE_BOOL(websms-backend,
 
 if test -n "$MOZ_WEBSMS_BACKEND"; then
     AC_DEFINE(MOZ_WEBSMS_BACKEND)
-fi
-
-dnl ========================================================
-dnl = Include Reading List service on Android
-dnl ========================================================
-if test -n "$MOZ_ANDROID_READING_LIST_SERVICE"; then
-    AC_DEFINE(MOZ_ANDROID_READING_LIST_SERVICE)
 fi
 
 dnl =========================================================
@@ -6546,11 +6527,6 @@ if test "$BUILD_CTYPES"; then
     AC_DEFINE(BUILD_CTYPES)
 fi
 
-dnl Build Places if required
-if test "$MOZ_PLACES"; then
-  AC_DEFINE(MOZ_PLACES)
-fi
-
 dnl Build SocialAPI if required
 if test "$MOZ_SOCIAL"; then
   AC_DEFINE(MOZ_SOCIAL)
@@ -6623,7 +6599,6 @@ AC_SUBST(MOZ_DEBUG_LDFLAGS)
 AC_SUBST(WARNINGS_AS_ERRORS)
 AC_SUBST_SET(MOZ_EXTENSIONS)
 AC_SUBST(LIBICONV)
-AC_SUBST(MOZ_PLACES)
 AC_SUBST(MOZ_SOCIAL)
 AC_SUBST(MOZ_TOOLKIT_SEARCH)
 AC_SUBST(MOZ_FEEDS)
