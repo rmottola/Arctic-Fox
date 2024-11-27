@@ -67,7 +67,7 @@ browser.jar:
 *       content/browser/browser-fullScreen.js         (content/browser-fullScreen.js)
         content/browser/browser-fullZoom.js           (content/browser-fullZoom.js)
 *       content/browser/browser-gestureSupport.js     (content/browser-gestureSupport.js)
-*       content/browser/browser-places.js             (content/browser-places.js)
+        content/browser/browser-places.js             (content/browser-places.js)
         content/browser/browser-plugins.js            (content/browser-plugins.js)
         content/browser/browser-refreshblocker.js     (content/browser-refreshblocker.js)
 #ifdef MOZ_SAFE_BROWSING
@@ -99,7 +99,6 @@ browser.jar:
         content/browser/pageinfo/feeds.xml            (content/pageinfo/feeds.xml)
         content/browser/pageinfo/permissions.js       (content/pageinfo/permissions.js)
         content/browser/pageinfo/security.js          (content/pageinfo/security.js)
-#ifdef MOZ_SERVICES_SYNC
         content/browser/sync/aboutSyncTabs.xul        (content/sync/aboutSyncTabs.xul)
         content/browser/sync/aboutSyncTabs.js         (content/sync/aboutSyncTabs.js)
         content/browser/sync/aboutSyncTabs.css        (content/sync/aboutSyncTabs.css)
@@ -113,7 +112,6 @@ browser.jar:
         content/browser/sync/key.xhtml                (content/sync/key.xhtml)
         content/browser/sync/notification.xml         (content/sync/notification.xml)
         content/browser/sync/utils.js                 (content/sync/utils.js)
-#endif
         content/browser/openLocation.js               (content/openLocation.js)
         content/browser/openLocation.xul              (content/openLocation.xul)
         content/browser/safeMode.css                  (content/safeMode.css)

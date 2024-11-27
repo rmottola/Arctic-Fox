@@ -749,13 +749,11 @@
                     key="key_sanitize"
                     command="Tools:Sanitize"/>
           <menuseparator id="HMB_sanitizeSeparator"/>
-#ifdef MOZ_SERVICES_SYNC
           <menuitem id="HMB_sync-tabs-menuitem"
                     class="syncTabsMenuItem"
                     label="&syncTabsMenu2.label;"
                     oncommand="BrowserOpenSyncTabs();"
                     disabled="true"/>
-#endif
           <menuitem id="HMB_historyRestoreLastSession"
                     label="&historyRestoreLastSession.label;"
                     command="Browser:RestoreLastSession"/>

@@ -504,10 +504,8 @@
 @RESPATH@/browser/components/SelfSupportService.manifest
 @RESPATH@/browser/components/SelfSupportService.js
 #endif
-#ifdef MOZ_SERVICES_SYNC
 @RESPATH@/components/SyncComponents.manifest
 @RESPATH@/components/Weave.js
-#endif
 @RESPATH@/components/CaptivePortalDetectComponents.manifest
 @RESPATH@/components/captivedetect.js
 @RESPATH@/components/servicesComponents.manifest
@@ -715,9 +713,7 @@
 #ifdef MOZ_SERVICES_NOTIFICATIONS
 @RESPATH@/defaults/pref/services-notifications.js
 #endif
-#ifdef MOZ_SERVICES_SYNC
 @RESPATH@/defaults/pref/services-sync.js
-#endif
 
 ; [Layout Engine Resources]
 ; Style Sheets, Graphics and other Resources used by the layout engine.

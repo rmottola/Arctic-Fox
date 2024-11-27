@@ -11,9 +11,7 @@ browser.jar:
   skin/classic/browser/aboutCertError_sectionCollapsed.png
   skin/classic/browser/aboutCertError_sectionCollapsed-rtl.png
   skin/classic/browser/aboutCertError_sectionExpanded.png
-#ifdef MOZ_SERVICES_SYNC
   skin/classic/browser/aboutSyncTabs.css
-#endif
   skin/classic/browser/aboutTabCrashed.css                   (../shared/aboutTabCrashed.css)
 * skin/classic/browser/syncedtabs/sidebar.css          (syncedtabs/sidebar.css)
   skin/classic/browser/syncedtabs/arrow-open.svg       (syncedtabs/arrow-open.svg)
@@ -134,9 +132,7 @@ browser.jar:
   skin/classic/browser/preferences/application.png          (preferences/application.png)
   skin/classic/browser/preferences/mail.png                 (preferences/mail.png)
   skin/classic/browser/preferences/Options.png              (preferences/Options.png)
-#ifdef MOZ_SERVICES_SYNC
   skin/classic/browser/preferences/Options-sync.png         (preferences/Options-sync.png)
-#endif
   skin/classic/browser/preferences/saveFile.png             (preferences/saveFile.png)
 * skin/classic/browser/preferences/preferences.css          (preferences/preferences.css)
   skin/classic/browser/preferences/applications.css         (preferences/applications.css)
@@ -159,7 +155,6 @@ browser.jar:
   skin/classic/browser/tabbrowser/tab-arrow-left-inverted.png  (tabbrowser/tab-arrow-left-inverted.png)
   skin/classic/browser/tabbrowser/tab-overflow-border.png      (tabbrowser/tab-overflow-border.png)
   skin/classic/browser/tabbrowser/tabDragIndicator.png         (tabbrowser/tabDragIndicator.png)
-#ifdef MOZ_SERVICES_SYNC
   skin/classic/browser/sync-throbber.png
   skin/classic/browser/sync-16.png
   skin/classic/browser/sync-32.png
@@ -171,7 +166,6 @@ browser.jar:
   skin/classic/browser/syncSetup.css
   skin/classic/browser/syncCommon.css
   skin/classic/browser/syncQuota.css
-#endif
   skin/classic/browser/yosemite/thumburger.png              (customizableui/thumburger-yosemite.png)
   skin/classic/browser/yosemite/thumburger@2x.png           (customizableui/thumburger-yosemite@2x.png)
 
