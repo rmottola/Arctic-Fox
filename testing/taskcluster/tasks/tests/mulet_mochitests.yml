@@ -39,11 +39,6 @@ task:
       - --mochitest-suite=plain-chunked
       - --total-chunk={{total_chunks}}
       - --this-chunk={{chunk}}
-    artifacts:
-      'public/build':
-        type: directory
-        path: '/home/worker/artifacts/'
-        expires: '{{#from_now}}1 year{{/from_now}}'
 
   extra:
     treeherderEnv:
