@@ -3,7 +3,7 @@ $inherits:
   from: 'tasks/tests/b2g_unittest_base.yml'
 task:
   metadata:
-    name: '[TC] Mulet Mochitests ({{chunk}})'
+    name: '[TC] Mulet Mochitests ( {{chunk}} )'
     description: Mulet Mochitest run {{chunk}}
   payload:
     command:
@@ -26,9 +26,12 @@ task:
         expires: '{{#from_now}}1 year{{/from_now}}'
 
   extra:
+    treeherderEnv:
+      - production
+      - staging
     chunks:
       total: 5
     treeherder:
-      groupSymbol: tc-M
+      groupSymbol: M
       groupName: Mulet mochitests
       symbol: {{chunk}}
