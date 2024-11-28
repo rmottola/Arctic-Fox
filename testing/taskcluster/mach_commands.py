@@ -335,6 +335,12 @@ class Graph(object):
         if vcs_info:
             pushdate = time.strftime('%Y%m%d%H%M%S', time.gmtime(vcs_info.pushdate))
 
+            sys.stderr.write('%d commits influencing task scheduling:\n' %
+                             len(vcs_info.changesets))
+            for c in vcs_info.changesets:
+                sys.stderr.write('%s %s\n' % (
+                    c['node'][0:12], c['desc'].splitlines()[0]))
+
                 changed_files |= set(c['files'])
 
         # Template parameters used when expanding the graph
