@@ -257,6 +257,14 @@ function waitForServiceWorkerRegistered(tab) {
       done();
     });
   });
+
+  // Ensure that the UI removes the addon from the list
+  yield addonListMutation;
+  let names = [...addonList.querySelectorAll(".target-name")];
+  names = names.map(element => element.textContent);
+  ok(!names.includes(addonName),
+    "After uninstall, the addon name disappears from the list of addons: "
+    + names);
 }
 
 /**
