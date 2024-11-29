@@ -953,19 +953,13 @@ LoginManagerPrompter.prototype = {
           this._getLocalizedString("notifyBarRememberPasswordButtonText");
     var rememberButtonAccessKey =
           this._getLocalizedString("notifyBarRememberPasswordButtonAccessKey");
+    var usernamePlaceholder =
+          this._getLocalizedString("noUsernamePlaceholder");
 
     var displayHost = this._getShortDisplayHost(aLogin.hostname);
-    var notificationText;
-    if (aLogin.username) {
-      var displayUser = this._sanitizeUsername(aLogin.username);
-      notificationText  = this._getLocalizedString(
-                                  "rememberPasswordMsg",
-                                  [displayUser, displayHost]);
-    } else {
-      notificationText  = this._getLocalizedString(
+    var notificationText = this._getLocalizedString(
                                   "rememberPasswordMsgNoUsername",
                                   [displayHost]);
-    }
 
     // The callbacks in |buttons| have a closure to access the variables
     // in scope here; set one to |this._pwmgr| so we can get back to pwmgr
@@ -1134,21 +1128,18 @@ LoginManagerPrompter.prototype = {
    *        A notification box or a popup notification.
    */
   _showChangeLoginNotification : function (aNotifyObj, aOldLogin, aNewPassword) {
-    var notificationText;
-    if (aOldLogin.username) {
-      var displayUser = this._sanitizeUsername(aOldLogin.username);
-      notificationText  = this._getLocalizedString(
-                                    "updatePasswordMsg",
-                                    [displayUser]);
-    } else {
-      notificationText  = this._getLocalizedString(
-                                    "updatePasswordMsgNoUser");
-    }
-
     var changeButtonText =
           this._getLocalizedString("notifyBarUpdateButtonText");
     var changeButtonAccessKey =
           this._getLocalizedString("notifyBarUpdateButtonAccessKey");
+    var usernamePlaceholder =
+          this._getLocalizedString("noUsernamePlaceholder");
+
+    // We reuse the existing message, even if it expects a username, until we
+    // switch to the final terminology in bug 1144856.
+    var displayHost = this._getShortDisplayHost(aOldLogin.hostname);
+    var notificationText = this._getLocalizedString("updatePasswordMsg",
+                                                    [displayHost]);
 
     // The callbacks in |buttons| have a closure to access the variables
     // in scope here; set one to |this._pwmgr| so we can get back to pwmgr
