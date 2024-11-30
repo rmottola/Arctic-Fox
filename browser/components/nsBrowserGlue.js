@@ -2122,7 +2122,7 @@ BrowserGlue.prototype = {
                            "hidden");
     }
 
-    if (currentVersion < 37) {
+    if (currentUIVersion < 37) {
       Services.prefs.clearUserPref("browser.sessionstore.restore_on_demand");
     }
 
