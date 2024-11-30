@@ -1,0 +1,1478 @@
+diff --git a/modules/libpref/init/all.js b/modules/libpref/init/all.js
+index a1c6e18b12c04..5d71caf4698d1 100644
+--- a/modules/libpref/init/all.js
++++ b/modules/libpref/init/all.js
+@@ -4248,6 +4248,7 @@ pref("signon.storeWhenAutocompleteOff",     true);
+ pref("signon.ui.experimental",              false);
+ pref("signon.debug",                        false);
+ pref("signon.recipes.path",                 "chrome://passwordmgr/content/recipes.json");
++pref("signon.schemeUpgrades",               false);
+ 
+ // Satchel (Form Manager) prefs
+ pref("browser.formfill.debug",            false);
+diff --git a/toolkit/components/passwordmgr/LoginHelper.jsm b/toolkit/components/passwordmgr/LoginHelper.jsm
+index de5336b1067cd..81cad6c074467 100644
+--- a/toolkit/components/passwordmgr/LoginHelper.jsm
++++ b/toolkit/components/passwordmgr/LoginHelper.jsm
+@@ -34,9 +34,10 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+  */
+ this.LoginHelper = {
+   /**
+-   * Warning: this only updates if a logger was created.
++   * Warning: these only update if a logger was created.
+    */
+   debug: Services.prefs.getBoolPref("signon.debug"),
++  schemeUpgrades: Services.prefs.getBoolPref("signon.schemeUpgrades"),
+ 
+   createLogger(aLogPrefix) {
+     let getMaxLogLevel = () => {
+@@ -54,6 +55,7 @@ this.LoginHelper = {
+     // Watch for pref changes and update this.debug and the maxLogLevel for created loggers
+     Services.prefs.addObserver("signon.", () => {
+       this.debug = Services.prefs.getBoolPref("signon.debug");
++      this.schemeUpgrades = Services.prefs.getBoolPref("signon.schemeUpgrades");
+       logger.maxLogLevel = getMaxLogLevel();
+     }, false);
+ 
+@@ -333,38 +335,131 @@ this.LoginHelper = {
+   },
+ 
+   /**
+-   * Removes duplicates from a list of logins.
++   * Removes duplicates from a list of logins while preserving the sort order.
+    *
+    * @param {nsILoginInfo[]} logins
+    *        A list of logins we want to deduplicate.
+-   *
+-   * @param {string[] = ["username", "password"]} uniqueKeys
++   * @param {string[]} [uniqueKeys = ["username", "password"]]
+    *        A list of login attributes to use as unique keys for the deduplication.
++   * @param {string[]} [resolveBy = ["timeLastUsed"]]
++   *        Ordered array of keyword strings used to decide which of the
++   *        duplicates should be used. "scheme" would prefer the login that has
++   *        a scheme matching `preferredOrigin`'s if there are two logins with
++   *        the same `uniqueKeys`. The default preference to distinguish two
++   *        logins is `timeLastUsed`. If there is no preference between two
++   *        logins, the first one found wins.
++   * @param {string} [preferredOrigin = undefined]
++   *        String representing the origin to use for preferring one login over
++   *        another when they are dupes. This is used with "scheme" for
++   *        `resolveBy` so the scheme from this origin will be preferred.
+    *
+    * @returns {nsILoginInfo[]} list of unique logins.
+    */
+-  dedupeLogins(logins, uniqueKeys = ["username", "password"]) {
++  dedupeLogins(logins, uniqueKeys = ["username", "password"],
++               resolveBy = ["timeLastUsed"],
++               preferredOrigin = undefined) {
+     const KEY_DELIMITER = ":";
+ 
++    if (!preferredOrigin && resolveBy.includes("scheme")) {
++      throw new Error("dedupeLogins: `preferredOrigin` is required in order to "+
++                      "prefer schemes which match it.");
++    }
++
++    let preferredOriginScheme;
++    if (preferredOrigin) {
++      try {
++        preferredOriginScheme = Services.io.newURI(preferredOrigin, null, null).scheme;
++      } catch (ex) {
++        // Handle strings that aren't valid URIs e.g. chrome://FirefoxAccounts
++      }
++    }
++
++    if (!preferredOriginScheme && resolveBy.includes("scheme")) {
++      throw new Error("dedupeLogins: Deduping with a scheme preference but couldn't " +
++                      "get the preferred origin scheme.");
++    }
++
++    // We use a Map to easily lookup logins by their unique keys.
++    let loginsByKeys = new Map();
++
+     // Generate a unique key string from a login.
+     function getKey(login, uniqueKeys) {
+       return uniqueKeys.reduce((prev, key) => prev + KEY_DELIMITER + login[key], "");
+     }
+ 
+-    // We use a Map to easily lookup logins by their unique keys.
+-    let loginsByKeys = new Map();
++    /**
++     * @return {bool} whether `login` is preferred over its duplicate (considering `uniqueKeys`)
++     *                `existingLogin`.
++     *
++     * `resolveBy` is a sorted array so we can return true the first time `login` is preferred
++     * over the existingLogin.
++     */
++    function isLoginPreferred(existingLogin, login) {
++      if (!resolveBy || resolveBy.length == 0) {
++        // If there is no preference, prefer the existing login.
++        return false;
++      }
++
++      for (let preference of resolveBy) {
++        switch (preference) {
++          case "scheme": {
++            if (!preferredOriginScheme) {
++              break;
++            }
++
++            try {
++              // Only `hostname` is currently considered
++              let existingLoginURI = Services.io.newURI(existingLogin.hostname, null, null);
++              let loginURI = Services.io.newURI(login.hostname, null, null);
++              // If the schemes of the two logins are the same or neither match the
++              // preferredOriginScheme then we have no preference and look at the next resolveBy.
++              if (loginURI.scheme == existingLoginURI.scheme ||
++                  (loginURI.scheme != preferredOriginScheme &&
++                   existingLoginURI.scheme != preferredOriginScheme)) {
++                break;
++              }
++
++              return loginURI.scheme == preferredOriginScheme;
++            } catch (ex) {
++              // Some URLs aren't valid nsIURI (e.g. chrome://FirefoxAccounts)
++              log.debug("dedupeLogins/shouldReplaceExisting: Error comparing schemes:",
++                        existingLogin.hostname, login.hostname,
++                        "preferredOrigin:", preferredOrigin, ex);
++            }
++            break;
++          }
++          case "timeLastUsed":
++          case "timePasswordChanged": {
++            // If we find a more recent login for the same key, replace the existing one.
++            let loginDate = login.QueryInterface(Ci.nsILoginMetaInfo)[preference];
++            let storedLoginDate = existingLogin.QueryInterface(Ci.nsILoginMetaInfo)[preference];
++            if (loginDate == storedLoginDate) {
++              break;
++            }
++
++            return loginDate > storedLoginDate;
++          }
++          default: {
++            throw new Error("dedupeLogins: Invalid resolveBy preference: " + preference);
++          }
++        }
++      }
++
++      return false;
++    }
++
+     for (let login of logins) {
+       let key = getKey(login, uniqueKeys);
+-      // If we find a more recently used login for the same key, replace the existing one.
++
+       if (loginsByKeys.has(key)) {
+-        let loginDate = login.QueryInterface(Ci.nsILoginMetaInfo).timeLastUsed;
+-        let storedLoginDate = loginsByKeys.get(key).QueryInterface(Ci.nsILoginMetaInfo).timeLastUsed;
+-        if (loginDate < storedLoginDate) {
++        if (!isLoginPreferred(loginsByKeys.get(key), login)) {
++          // If there is no preference for the new login, use the existing one.
+           continue;
+         }
+       }
+       loginsByKeys.set(key, login);
+     }
++
+     // Return the map values in the form of an array.
+     return [...loginsByKeys.values()];
+   },
+@@ -491,14 +586,12 @@ this.LoginHelper = {
+    */
+   loginToVanillaObject(login) {
+     let obj = {};
+-    for (let i in login) {
++    for (let i in login.QueryInterface(Ci.nsILoginMetaInfo)) {
+       if (typeof login[i] !== 'function') {
+         obj[i] = login[i];
+       }
+     }
+ 
+-    login.QueryInterface(Ci.nsILoginMetaInfo);
+-    obj.guid = login.guid;
+     return obj;
+   },
+ 
+@@ -506,15 +599,17 @@ this.LoginHelper = {
+    * Convert an object received from IPC into an nsILoginInfo (with guid).
+    */
+   vanillaObjectToLogin(login) {
+-    var formLogin = Cc["@mozilla.org/login-manager/loginInfo;1"].
+-                  createInstance(Ci.nsILoginInfo);
++    let formLogin = Cc["@mozilla.org/login-manager/loginInfo;1"].
++                    createInstance(Ci.nsILoginInfo);
+     formLogin.init(login.hostname, login.formSubmitURL,
+                    login.httpRealm, login.username,
+                    login.password, login.usernameField,
+                    login.passwordField);
+ 
+     formLogin.QueryInterface(Ci.nsILoginMetaInfo);
+-    formLogin.guid = login.guid;
++    for (let prop of ["guid", "timeCreated", "timeLastUsed", "timePasswordChanged", "timesUsed"]) {
++      formLogin[prop] = login[prop];
++    }
+     return formLogin;
+   },
+ 
+@@ -552,3 +647,8 @@ this.LoginHelper = {
+     }
+   }
+ };
++
++XPCOMUtils.defineLazyGetter(this, "log", () => {
++  let logger = LoginHelper.createLogger("LoginHelper");
++  return logger;
++});
+diff --git a/toolkit/components/passwordmgr/LoginManagerContent.jsm b/toolkit/components/passwordmgr/LoginManagerContent.jsm
+index 3518d262288b7..2376006f0b368 100644
+--- a/toolkit/components/passwordmgr/LoginManagerContent.jsm
++++ b/toolkit/components/passwordmgr/LoginManagerContent.jsm
+@@ -229,6 +229,9 @@ var LoginManagerContent = {
+     let win = doc.defaultView;
+ 
+     let formOrigin = LoginUtils._getPasswordOrigin(doc.documentURI);
++    if (!formOrigin) {
++      return Promise.reject("_getLoginDataFromParent: A form origin is required");
++    }
+     let actionOrigin = LoginUtils._getActionOrigin(form);
+ 
+     let messageManager = messageManagerFromWindow(win);
+diff --git a/toolkit/components/passwordmgr/LoginManagerContextMenu.jsm b/toolkit/components/passwordmgr/LoginManagerContextMenu.jsm
+index 725ba56b11b23..b258a27dce058 100644
+--- a/toolkit/components/passwordmgr/LoginManagerContextMenu.jsm
++++ b/toolkit/components/passwordmgr/LoginManagerContextMenu.jsm
+@@ -10,6 +10,8 @@ const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
+ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ Cu.import("resource://gre/modules/Services.jsm");
+ 
++XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
++                                  "resource://gre/modules/LoginHelper.jsm");
+ XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
+                                   "resource://gre/modules/LoginManagerParent.jsm");
+ 
+@@ -93,7 +95,16 @@ var LoginManagerContextMenu = {
+    * @returns {nsILoginInfo[]} a login list
+    */
+   _findLogins(documentURI) {
+-    let logins = Services.logins.findLogins({}, documentURI.prePath, "", "");
++    let searchParams = {
++      hostname: documentURI.prePath,
++      schemeUpgrades: LoginHelper.schemeUpgrades,
++    };
++    let logins = LoginHelper.searchLoginsWithObject(searchParams);
++    let resolveBy = [
++      "scheme",
++      "timePasswordChanged",
++    ];
++    logins = LoginHelper.dedupeLogins(logins, ["username", "password"], resolveBy, documentURI.prePath);
+ 
+     // Sort logins in alphabetical order and by date.
+     logins.sort((loginA, loginB) => {
+diff --git a/toolkit/components/passwordmgr/LoginManagerParent.jsm b/toolkit/components/passwordmgr/LoginManagerParent.jsm
+index 44e347480cd8d..6a5729e576dc3 100644
+--- a/toolkit/components/passwordmgr/LoginManagerParent.jsm
++++ b/toolkit/components/passwordmgr/LoginManagerParent.jsm
+@@ -57,7 +57,6 @@ var LoginManagerParent = {
+       });
+       return this._recipeManager.initializationPromise;
+     });
+-
+   },
+ 
+   receiveMessage: function (msg) {
+@@ -207,7 +206,17 @@ var LoginManagerParent = {
+       return;
+     }
+ 
+-    var logins = Services.logins.findLogins({}, formOrigin, actionOrigin, null);
++    let logins = LoginHelper.searchLoginsWithObject({
++      formSubmitURL: actionOrigin,
++      hostname: formOrigin,
++      schemeUpgrades: LoginHelper.schemeUpgrades,
++    });
++    let resolveBy = [
++      "scheme",
++      "timePasswordChanged",
++    ];
++    logins = LoginHelper.dedupeLogins(logins, ["username"], resolveBy, formOrigin);
++    log("sendLoginDataToChild:", logins.length, "deduped logins");
+     // Convert the array of nsILoginInfo to vanilla JS objects since nsILoginInfo
+     // doesn't support structured cloning.
+     var jsLogins = LoginHelper.loginsToVanillaObjects(logins);
+@@ -238,7 +247,16 @@ var LoginManagerParent = {
+       log("Creating new autocomplete search result.");
+ 
+       // Grab the logins from the database.
+-      logins = Services.logins.findLogins({}, formOrigin, actionOrigin, null);
++      logins = LoginHelper.searchLoginsWithObject({
++        formSubmitURL: actionOrigin,
++        hostname: formOrigin,
++        schemeUpgrades: LoginHelper.schemeUpgrades,
++      });
++      let resolveBy = [
++        "scheme",
++        "timePasswordChanged",
++      ];
++      logins = LoginHelper.dedupeLogins(logins, ["username"], resolveBy, formOrigin);
+     }
+ 
+     let matchingLogins = logins.filter(function(fullMatch) {
+@@ -310,7 +328,11 @@ var LoginManagerParent = {
+                    (usernameField ? usernameField.name  : ""),
+                    newPasswordField.name);
+ 
+-    let logins = Services.logins.findLogins({}, hostname, formSubmitURL, null);
++    let logins = LoginHelper.searchLoginsWithObject({
++      formSubmitURL,
++      hostname,
++      schemeUpgrades: LoginHelper.schemeUpgrades,
++    });
+ 
+     // If we didn't find a username field, but seem to be changing a
+     // password, allow the user to select from a list of applicable
+@@ -463,6 +485,7 @@ var LoginManagerParent = {
+     }
+     state.anchorDeferredTask.arm();
+   },
++
+   updateLoginAnchor: Task.async(function* (browser) {
+     // Copy the state to use for this execution of the task. These will not
+     // change during this execution of the asynchronous function, but in case a
+@@ -473,7 +496,11 @@ var LoginManagerParent = {
+ 
+     // Check if there are form logins for the site, ignoring formSubmitURL.
+     let hasLogins = loginFormOrigin &&
+-                    Services.logins.countLogins(loginFormOrigin, "", null) > 0;
++                    LoginHelper.searchLoginsWithObject({
++                      formSubmitURL: "",
++                      hostname: loginFormOrigin,
++                      schemeUpgrades: LoginHelper.schemeUpgrades,
++                    }).length > 0;
+ 
+     // Once this preference is removed, this version of the fill doorhanger
+     // should be enabled for Desktop only, and not for Android or B2G.
+diff --git a/toolkit/components/passwordmgr/nsLoginManagerPrompter.js b/toolkit/components/passwordmgr/nsLoginManagerPrompter.js
+index 8fc50fe66ffff..3245c0405afec 100644
+--- a/toolkit/components/passwordmgr/nsLoginManagerPrompter.js
++++ b/toolkit/components/passwordmgr/nsLoginManagerPrompter.js
+@@ -536,7 +536,7 @@ LoginManagerPrompter.prototype = {
+ 
+       // Looks for existing logins to prefill the prompt with.
+       var foundLogins = this._pwmgr.findLogins({},
+-                                  hostname, null, httpRealm);
++                                               hostname, null, httpRealm);
+       this.log("found " + foundLogins.length + " matching logins.");
+ 
+       // XXX Can't select from multiple accounts yet. (bug 227632)
+@@ -721,6 +721,7 @@ LoginManagerPrompter.prototype = {
+    *
+    */
+   promptToSavePassword : function (aLogin) {
++    this.log("promptToSavePassword");
+     var notifyObj = this._getPopupNote() || this._getNotifyBox();
+     if (notifyObj)
+       this._showSaveLoginNotification(notifyObj, aLogin);
+@@ -1175,6 +1176,7 @@ LoginManagerPrompter.prototype = {
+    *                       The new login from the page form.
+    */
+   promptToChangePassword(aOldLogin, aNewLogin) {
++    this.log("promptToChangePassword");
+     let notifyObj = this._getPopupNote() || this._getNotifyBox();
+ 
+     if (notifyObj) {
+@@ -1302,6 +1304,7 @@ LoginManagerPrompter.prototype = {
+    * Note; XPCOM stupidity: |count| is just |logins.length|.
+    */
+   promptToChangePasswordWithUsernames : function (logins, count, aNewLogin) {
++    this.log("promptToChangePasswordWithUsernames with count:", count);
+     const buttonFlags = Ci.nsIPrompt.STD_YES_NO_BUTTONS;
+ 
+     var usernames = logins.map(l => l.username);
+diff --git a/toolkit/components/passwordmgr/test/browser/browser_context_menu.js b/toolkit/components/passwordmgr/test/browser/browser_context_menu.js
+index 6d6b564df3236..dc67560b71964 100644
+--- a/toolkit/components/passwordmgr/test/browser/browser_context_menu.js
++++ b/toolkit/components/passwordmgr/test/browser/browser_context_menu.js
+@@ -16,7 +16,7 @@ add_task(function* test_initialize() {
+   Services.prefs.setBoolPref("signon.autofillForms", false);
+   registerCleanupFunction(() => {
+     Services.prefs.clearUserPref("signon.autofillForms");
+-    Services.logins.removeAllLogins();
++    Services.prefs.clearUserPref("signon.schemeUpgrades");
+   });
+   for (let login of loginList()) {
+     Services.logins.addLogin(login);
+@@ -27,7 +27,8 @@ add_task(function* test_initialize() {
+  * Check if the context menu is populated with the right
+  * menuitems for the target password input field.
+  */
+-add_task(function* test_context_menu_populate_password() {
++add_task(function* test_context_menu_populate_password_noSchemeUpgrades() {
++  Services.prefs.setBoolPref("signon.schemeUpgrades", false);
+   yield BrowserTestUtils.withNewTab({
+     gBrowser,
+     url: TEST_HOSTNAME + MULTIPLE_FORMS_PAGE_PATH,
+@@ -38,18 +39,65 @@ add_task(function* test_context_menu_populate_password() {
+ 
+     // Check the content of the password manager popup
+     let popupMenu = document.getElementById("fill-login-popup");
+-    checkMenu(popupMenu);
++    checkMenu(popupMenu, 2);
+ 
+     let contextMenu = document.getElementById("contentAreaContextMenu");
+     contextMenu.hidePopup();
+   });
+ });
+ 
++/**
++ * Check if the context menu is populated with the right
++ * menuitems for the target password input field.
++ */
++add_task(function* test_context_menu_populate_password_schemeUpgrades() {
++  Services.prefs.setBoolPref("signon.schemeUpgrades", true);
++  yield BrowserTestUtils.withNewTab({
++    gBrowser,
++    url: TEST_HOSTNAME + MULTIPLE_FORMS_PAGE_PATH,
++  }, function* (browser) {
++    let passwordInput = browser.contentWindow.document.getElementById("test-password-1");
++
++    yield openPasswordContextMenu(browser, passwordInput);
++
++    // Check the content of the password manager popup
++    let popupMenu = document.getElementById("fill-login-popup");
++    checkMenu(popupMenu, 3);
++
++    let contextMenu = document.getElementById("contentAreaContextMenu");
++    contextMenu.hidePopup();
++  });
++});
++
++/**
++ * Check if the context menu is populated with the right menuitems
++ * for the target username field with a password field present.
++ */
++add_task(function* test_context_menu_populate_username_with_password_noSchemeUpgrades() {
++  Services.prefs.setBoolPref("signon.schemeUpgrades", false);
++  yield BrowserTestUtils.withNewTab({
++    gBrowser,
++    url: TEST_HOSTNAME + "/browser/toolkit/components/" +
++         "passwordmgr/test/browser/multiple_forms.html",
++  }, function* (browser) {
++    let passwordInput = browser.contentWindow.document.getElementById("test-username-2");
++
++    yield openPasswordContextMenu(browser, passwordInput);
++
++    // Check the content of the password manager popup
++    let popupMenu = document.getElementById("fill-login-popup");
++    checkMenu(popupMenu, 2);
++
++    let contextMenu = document.getElementById("contentAreaContextMenu");
++    contextMenu.hidePopup();
++  });
++});
+ /**
+  * Check if the context menu is populated with the right menuitems
+  * for the target username field with a password field present.
+  */
+-add_task(function* test_context_menu_populate_username_with_password() {
++add_task(function* test_context_menu_populate_username_with_password_schemeUpgrades() {
++  Services.prefs.setBoolPref("signon.schemeUpgrades", true);
+   yield BrowserTestUtils.withNewTab({
+     gBrowser,
+     url: TEST_HOSTNAME + "/browser/toolkit/components/" +
+@@ -61,7 +109,7 @@ add_task(function* test_context_menu_populate_username_with_password() {
+ 
+     // Check the content of the password manager popup
+     let popupMenu = document.getElementById("fill-login-popup");
+-    checkMenu(popupMenu);
++    checkMenu(popupMenu, 3);
+ 
+     let contextMenu = document.getElementById("contentAreaContextMenu");
+     contextMenu.hidePopup();
+@@ -73,6 +121,7 @@ add_task(function* test_context_menu_populate_username_with_password() {
+  * login menuitem is clicked.
+  */
+ add_task(function* test_context_menu_password_fill() {
++  Services.prefs.setBoolPref("signon.schemeUpgrades", true);
+   yield BrowserTestUtils.withNewTab({
+     gBrowser,
+     url: TEST_HOSTNAME + MULTIPLE_FORMS_PAGE_PATH,
+@@ -111,7 +160,8 @@ add_task(function* test_context_menu_password_fill() {
+         // The only field affected by the password fill
+         // should be the target password field itself.
+         let unchangedFields = form.querySelectorAll('input:not(#' + passwordField.id + ')');
+-        yield assertContextMenuFill(form, null, passwordField, unchangedFields);
++        yield assertContextMenuFill(form, null, passwordField, unchangedFields, 1);
++        Assert.equal(passwordField.value, "password1", "Check upgraded login was actually used");
+         contextMenu.hidePopup();
+       }
+     }
+@@ -123,6 +173,7 @@ add_task(function* test_context_menu_password_fill() {
+  * username context menu login menuitem is clicked.
+  */
+ add_task(function* test_context_menu_username_login_fill() {
++  Services.prefs.setBoolPref("signon.schemeUpgrades", true);
+   yield BrowserTestUtils.withNewTab({
+     gBrowser,
+     url: TEST_HOSTNAME + MULTIPLE_FORMS_PAGE_PATH,
+@@ -168,7 +219,10 @@ add_task(function* test_context_menu_username_login_fill() {
+         }
+         // We shouldn't change any field that's not the target username field or the first password field
+         let unchangedFields = form.querySelectorAll('input:not(#' + usernameField.id + '):not(#' + passwordField.id + ')');
+-        yield assertContextMenuFill(form, usernameField, passwordField, unchangedFields);
++        yield assertContextMenuFill(form, usernameField, passwordField, unchangedFields, 1);
++        if (!passwordField.hasAttribute("expectedFail")) {
++          Assert.equal(passwordField.value, "password1", "Check upgraded login was actually used");
++        }
+         contextMenu.hidePopup();
+       }
+     }
+@@ -179,6 +233,7 @@ add_task(function* test_context_menu_username_login_fill() {
+  * Check if the password field is correctly filled when it's in an iframe.
+  */
+ add_task(function* test_context_menu_iframe_fill() {
++  Services.prefs.setBoolPref("signon.schemeUpgrades", true);
+   yield BrowserTestUtils.withNewTab({
+     gBrowser,
+     url: TEST_HOSTNAME + MULTIPLE_FORMS_PAGE_PATH,
+@@ -262,7 +317,7 @@ function* openPasswordContextMenu(browser, passwordInput, assertCallback = null)
+ /**
+  * Verify that only the expected form fields are filled.
+  */
+-function* assertContextMenuFill(form, usernameField, passwordField, unchangedFields){
++function* assertContextMenuFill(form, usernameField, passwordField, unchangedFields, loginIndex){
+   let popupMenu = document.getElementById("fill-login-popup");
+ 
+   // Store the value of fields that should remain unchanged.
+@@ -272,14 +327,14 @@ function* assertContextMenuFill(form, usernameField, passwordField, unchangedFie
+     }
+   }
+ 
+-  // Execute the default command of the first login menuitem found at the context menu.
+-  let firstLoginItem = popupMenu.getElementsByClassName("context-login-item")[0];
+-  firstLoginItem.doCommand();
++  // Execute the default command of the specified login menuitem found in the context menu.
++  let loginItem = popupMenu.getElementsByClassName("context-login-item")[loginIndex];
++  loginItem.doCommand();
+ 
+   yield BrowserTestUtils.waitForEvent(form, "input", "Username input value changed");
+ 
+   // Find the used login by it's username (Use only unique usernames in this test).
+-  let login = getLoginFromUsername(firstLoginItem.label);
++  let login = getLoginFromUsername(loginItem.label);
+ 
+   // If we have an username field, check if it's correctly filled
+   if (usernameField && usernameField.getAttribute("expectedFail") == null) {
+@@ -306,12 +361,19 @@ function* assertContextMenuFill(form, usernameField, passwordField, unchangedFie
+ 
+ /**
+  * Check if every login that matches the page hostname are available at the context menu.
++ * @param {Element} contextMenu
++ * @param {Number} expectedCount - Number of logins expected in the context menu. Used to ensure
++*                                  we continue testing something useful.
+  */
+-function checkMenu(contextMenu) {
+-  let logins = loginList().filter(login => login.hostname == TEST_HOSTNAME);
++function checkMenu(contextMenu, expectedCount) {
++  let logins = loginList().filter(login => {
++    return LoginHelper.isOriginMatching(login.hostname, TEST_HOSTNAME, {
++      schemeUpgrades: Services.prefs.getBoolPref("signon.schemeUpgrades"),
++    });
++  });
+   // Make an array of menuitems for easier comparison.
+   let menuitems = [...contextMenu.getElementsByClassName("context-login-item")];
+-  Assert.equal(menuitems.length, logins.length, "Same amount of menu items and expected logins.");
++  Assert.equal(menuitems.length, expectedCount, "Expected number of menu items");
+   Assert.ok(logins.every(l => menuitems.some(m => l.username == m.label)), "Every login have an item at the menu.");
+ }
+ 
+@@ -328,7 +390,8 @@ function getLoginFromUsername(username) {
+  * List of logins used for the test.
+  *
+  * We should only use unique usernames in this test,
+- * because we need to search logins by username.
++ * because we need to search logins by username. There is one duplicate u+p combo
++ * in order to test de-duping in the menu.
+  */
+ function loginList() {
+   return [
+@@ -338,6 +401,13 @@ function loginList() {
+       username: "username",
+       password: "password",
+     }),
++    // Same as above but HTTP in order to test de-duping.
++    LoginTestUtils.testData.formLogin({
++      hostname: "http://example.com",
++      formSubmitURL: "http://example.com",
++      username: "username",
++      password: "password",
++    }),
+     LoginTestUtils.testData.formLogin({
+       hostname: "http://example.com",
+       formSubmitURL: "http://example.com",
+@@ -351,8 +421,8 @@ function loginList() {
+       password: "password2",
+     }),
+     LoginTestUtils.testData.formLogin({
+-      hostname: "https://example.org",
+-      formSubmitURL: "https://example.org",
++      hostname: "http://example.org",
++      formSubmitURL: "http://example.org",
+       username: "username-cross-origin",
+       password: "password-cross-origin",
+     }),
+diff --git a/toolkit/components/passwordmgr/test/mochitest/mochitest.ini b/toolkit/components/passwordmgr/test/mochitest/mochitest.ini
+index feb1b1b3e1303..be62cd20a7dc8 100644
+--- a/toolkit/components/passwordmgr/test/mochitest/mochitest.ini
++++ b/toolkit/components/passwordmgr/test/mochitest/mochitest.ini
+@@ -1,15 +1,19 @@
+ [DEFAULT]
+ skip-if = buildapp == 'mulet' || buildapp == 'b2g'
+ support-files =
++  ../../../prompts/test/chromeScript.js
++  ../../../prompts/test/prompt_common.js
+   ../../../satchel/test/parent_utils.js
+   ../../../satchel/test/satchel_common.js
+   ../authenticate.sjs
+-  ../pwmgr_common.js
++  ../browser/form_basic.html
++  ../browser/form_cross_origin_secure_action.html
+   ../notification_common.js
++  ../pwmgr_common.js
+   auth2/authenticate.sjs
+-  ../../../prompts/test/prompt_common.js
+-  ../../../prompts/test/chromeScript.js
+ 
++[test_autocomplete_https_upgrade.html]
++[test_autofill_https_upgrade.html]
+ [test_autofill_password-only.html]
+ [test_basic_form.html]
+ [test_basic_form_0pw.html]
+diff --git a/toolkit/components/passwordmgr/test/mochitest/test_autocomplete_https_upgrade.html b/toolkit/components/passwordmgr/test/mochitest/test_autocomplete_https_upgrade.html
+new file mode 100644
+index 0000000000000..7d57253225f53
+--- /dev/null
++++ b/toolkit/components/passwordmgr/test/mochitest/test_autocomplete_https_upgrade.html
+@@ -0,0 +1,218 @@
++<!DOCTYPE HTML>
++<html>
++<head>
++  <meta charset="utf-8">
++  <title>Test autocomplete on an HTTPS page using upgraded HTTP logins</title>
++  <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
++  <script type="text/javascript" src="/tests/SimpleTest/EventUtils.js"></script>
++  <script type="text/javascript" src="/tests/SimpleTest/SpawnTask.js"></script>
++  <script type="text/javascript" src="satchel_common.js"></script>
++  <script type="text/javascript" src="pwmgr_common.js"></script>
++  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
++</head>
++<body>
++<script>
++const chromeScript = runChecksAfterCommonInit(false);
++
++runInParent(function addLogins() {
++  const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
++  Cu.import("resource://gre/modules/Services.jsm");
++
++  // Create some logins just for this form, since we'll be deleting them.
++  let nsLoginInfo = Components.Constructor("@mozilla.org/login-manager/loginInfo;1",
++                                           Ci.nsILoginInfo, "init");
++
++  // We have two actual HTTPS to avoid autofill before the schemeUpgrades pref flips to true.
++  let login0 = new nsLoginInfo("https://example.org", "https://example.org", null,
++                               "name", "pass", "uname", "pword");
++
++  let login1 = new nsLoginInfo("https://example.org", "https://example.org", null,
++                               "name1", "pass1", "uname", "pword");
++
++  // Same as above but HTTP instead of HTTPS (to test de-duping)
++  let login2 = new nsLoginInfo("http://example.org", "http://example.org", null,
++                               "name1", "passHTTP", "uname", "pword");
++
++  // Different HTTP login to upgrade with secure formSubmitURL
++  let login3 = new nsLoginInfo("http://example.org", "https://example.org", null,
++                               "name2", "passHTTPtoHTTPS", "uname", "pword");
++
++  try {
++    Services.logins.addLogin(login0);
++    Services.logins.addLogin(login1);
++    Services.logins.addLogin(login2);
++    Services.logins.addLogin(login3);
++  } catch (e) {
++    assert.ok(false, "addLogin threw: " + e);
++  }
++});
++</script>
++<p id="display"></p>
++
++<!-- we presumably can't hide the content for this test. -->
++<div id="content">
++  <iframe src="https://example.org/tests/toolkit/components/passwordmgr/test/mochitest/form_basic.html"></iframe>
++</div>
++
++<pre id="test">
++<script class="testbody" type="text/javascript">
++const shiftModifier = SpecialPowers.Ci.nsIDOMEvent.SHIFT_MASK;
++
++let iframe = SpecialPowers.wrap(document.getElementsByTagName("iframe")[0]);
++let iframeDoc;
++let uname;
++let pword;
++
++// Restore the form to the default state.
++function restoreForm() {
++  pword.focus();
++  uname.value = "";
++  pword.value = "";
++  uname.focus();
++}
++
++// Check for expected username/password in form.
++function checkACForm(expectedUsername, expectedPassword) {
++  let formID = uname.parentNode.id;
++  is(uname.value, expectedUsername, "Checking " + formID + " username");
++  is(pword.value, expectedPassword, "Checking " + formID + " password");
++}
++
++add_task(function* setup() {
++  yield SpecialPowers.pushPrefEnv({"set": [["signon.schemeUpgrades", true]]});
++
++  yield new Promise(resolve => {
++    iframe.addEventListener("load", function onLoad() {
++      iframe.removeEventListener("load", onLoad);
++      resolve();
++    });
++  });
++
++  iframeDoc = iframe.contentDocument;
++  uname = iframeDoc.getElementById("form-basic-username");
++  pword = iframeDoc.getElementById("form-basic-password");
++});
++
++add_task(function* test_empty_first_entry() {
++  // Make sure initial form is empty.
++  checkACForm("", "");
++  // Trigger autocomplete popup
++  restoreForm();
++  let popupState = yield getPopupState();
++  is(popupState.open, false, "Check popup is initially closed");
++  let shownPromise = promiseACShown();
++  doKey("down");
++  let results = yield shownPromise;
++  popupState = yield getPopupState();
++  is(popupState.selectedIndex, -1, "Check no entries are selected");
++  checkArrayValues(results, ["name", "name1", "name2"], "initial");
++
++  // Check first entry
++  let index0Promise = notifySelectedIndex(0);
++  doKey("down");
++  yield index0Promise;
++  checkACForm("", ""); // value shouldn't update
++  doKey("return"); // not "enter"!
++  yield promiseFormsProcessed();
++  checkACForm("name", "pass");
++});
++
++add_task(function* test_empty_second_entry() {
++  restoreForm();
++  let shownPromise = promiseACShown();
++  doKey("down"); // open
++  yield shownPromise;
++  doKey("down"); // first
++  doKey("down"); // second
++  doKey("return"); // not "enter"!
++  yield promiseFormsProcessed();
++  checkACForm("name1", "pass1");
++});
++
++add_task(function* test_search() {
++  restoreForm();
++  let shownPromise = promiseACShown();
++  // We need to blur for the autocomplete controller to notice the forced value below.
++  uname.blur();
++  uname.value = "name";
++  uname.focus();
++  sendChar("1");
++  doKey("down"); // open
++  let results = yield shownPromise;
++  checkArrayValues(results, ["name1"], "check result deduping for 'name1'");
++  doKey("down"); // first
++  doKey("return"); // not "enter"!
++  yield promiseFormsProcessed();
++  checkACForm("name1", "pass1");
++
++  let popupState = yield getPopupState();
++  is(popupState.open, false, "Check popup is now closed");
++});
++
++add_task(function* test_delete_first_entry() {
++  restoreForm();
++  uname.focus();
++  let shownPromise = promiseACShown();
++  doKey("down");
++  yield shownPromise;
++
++  let index0Promise = notifySelectedIndex(0);
++  doKey("down");
++  yield index0Promise;
++
++  let deletionPromise = promiseStorageChanged(["removeLogin"]);
++  // On OS X, shift-backspace and shift-delete work, just delete does not.
++  // On Win/Linux, shift-backspace does not work, delete and shift-delete do.
++  doKey("delete", shiftModifier);
++  yield deletionPromise;
++  checkACForm("", "");
++
++  let results = yield notifyMenuChanged(2, "name1");
++
++  checkArrayValues(results, ["name1", "name2"], "two should remain after deleting the first");
++  let popupState = yield getPopupState();
++  is(popupState.open, true, "Check popup stays open after deleting");
++  doKey("escape");
++  popupState = yield getPopupState();
++  is(popupState.open, false, "Check popup closed upon ESC");
++});
++
++add_task(function* test_delete_duplicate_entry() {
++  restoreForm();
++  uname.focus();
++  let shownPromise = promiseACShown();
++  doKey("down");
++  yield shownPromise;
++
++  let index0Promise = notifySelectedIndex(0);
++  doKey("down");
++  yield index0Promise;
++
++  let deletionPromise = promiseStorageChanged(["removeLogin"]);
++  // On OS X, shift-backspace and shift-delete work, just delete does not.
++  // On Win/Linux, shift-backspace does not work, delete and shift-delete do.
++  doKey("delete", shiftModifier);
++  yield deletionPromise;
++  checkACForm("", "");
++
++  is(LoginManager.countLogins("http://example.org", "http://example.org", null), 1,
++     "Check that the HTTP login remains");
++  is(LoginManager.countLogins("https://example.org", "https://example.org", null), 0,
++     "Check that the HTTPS login was deleted");
++
++  // Two menu items should remain as the HTTPS login should have been deleted but
++  // the HTTP would remain.
++  let results = yield notifyMenuChanged(1, "name2");
++
++  checkArrayValues(results, ["name2"], "one should remain after deleting the HTTPS name1");
++  let popupState = yield getPopupState();
++  is(popupState.open, true, "Check popup stays open after deleting");
++  doKey("escape");
++  popupState = yield getPopupState();
++  is(popupState.open, false, "Check popup closed upon ESC");
++});
++
++</script>
++</pre>
++</body>
++</html>
+diff --git a/toolkit/components/passwordmgr/test/mochitest/test_autofill_https_upgrade.html b/toolkit/components/passwordmgr/test/mochitest/test_autofill_https_upgrade.html
+new file mode 100644
+index 0000000000000..91be1366e7b64
+--- /dev/null
++++ b/toolkit/components/passwordmgr/test/mochitest/test_autofill_https_upgrade.html
+@@ -0,0 +1,117 @@
++<!DOCTYPE HTML>
++<html>
++<head>
++  <meta charset="utf-8">
++  <title>Test autocomplete on an HTTPS page using upgraded HTTP logins</title>
++  <script type="text/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
++  <script type="text/javascript" src="/tests/SimpleTest/EventUtils.js"></script>
++  <script type="text/javascript" src="/tests/SimpleTest/SpawnTask.js"></script>
++  <script type="text/javascript" src="satchel_common.js"></script>
++  <script type="text/javascript" src="pwmgr_common.js"></script>
++  <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css" />
++</head>
++<body>
++<script>
++const MISSING_ACTION_PATH = TESTS_DIR + "mochitest/form_basic.html";
++const CROSS_ORIGIN_SECURE_PATH = TESTS_DIR + "mochitest/form_cross_origin_secure_action.html";
++
++const chromeScript = runChecksAfterCommonInit(false);
++
++let nsLoginInfo = SpecialPowers.wrap(SpecialPowers.Components).Constructor("@mozilla.org/login-manager/loginInfo;1",
++SpecialPowers.Ci.nsILoginInfo,
++"init");
++</script>
++<p id="display"></p>
++
++<!-- we presumably can't hide the content for this test. -->
++<div id="content">
++  <iframe></iframe>
++</div>
++
++<pre id="test">
++<script class="testbody" type="text/javascript">
++let iframe = SpecialPowers.wrap(document.getElementsByTagName("iframe")[0]);
++
++// Check for expected username/password in form.
++function checkACForm(expectedUsername, expectedPassword) {
++  let iframeDoc = iframe.contentDocument;
++  let uname = iframeDoc.getElementById("form-basic-username");
++  let pword = iframeDoc.getElementById("form-basic-password");
++  let formID = uname.parentNode.id;
++  is(uname.value, expectedUsername, "Checking " + formID + " username");
++  is(pword.value, expectedPassword, "Checking " + formID + " password");
++}
++function* prepareLoginsAndProcessForm(url, logins = []) {
++  LoginManager.removeAllLogins();
++
++  let dates = Date.now();
++  for (let login of logins) {
++    SpecialPowers.do_QueryInterface(login, SpecialPowers.Ci.nsILoginMetaInfo);
++    // Force all dates to be the same so they don't affect things like deduping.
++    login.timeCreated = login.timePasswordChanged = login.timeLastUsed = dates;
++    LoginManager.addLogin(login);
++  }
++
++  iframe.src = url;
++  yield promiseFormsProcessed();
++}
++
++add_task(function* setup() {
++  yield SpecialPowers.pushPrefEnv({"set": [["signon.schemeUpgrades", true]]});
++})
++
++add_task(function* test_simpleNoDupesNoAction() {
++  yield prepareLoginsAndProcessForm("https://example.com" + MISSING_ACTION_PATH, [
++    new nsLoginInfo("http://example.com", "http://example.com", null,
++                    "name2", "pass2", "uname", "pword"),
++  ]);
++
++  checkACForm("name2", "pass2");
++});
++
++add_task(function* test_simpleNoDupesUpgradeOriginAndAction() {
++  yield prepareLoginsAndProcessForm("https://example.com" + CROSS_ORIGIN_SECURE_PATH, [
++    new nsLoginInfo("http://example.com", "http://another.domain", null,
++                    "name2", "pass2", "uname", "pword"),
++  ]);
++
++  checkACForm("name2", "pass2");
++});
++
++add_task(function* test_simpleNoDupesUpgradeOriginOnly() {
++  yield prepareLoginsAndProcessForm("https://example.com" + CROSS_ORIGIN_SECURE_PATH, [
++    new nsLoginInfo("http://example.com", "https://another.domain", null,
++                    "name2", "pass2", "uname", "pword"),
++  ]);
++
++  checkACForm("name2", "pass2");
++});
++
++add_task(function* test_simpleNoDupesUpgradeActionOnly() {
++  yield prepareLoginsAndProcessForm("https://example.com" + CROSS_ORIGIN_SECURE_PATH, [
++    new nsLoginInfo("https://example.com", "http://another.domain", null,
++                    "name2", "pass2", "uname", "pword"),
++  ]);
++
++  checkACForm("name2", "pass2");
++});
++
++add_task(function* test_dedupe() {
++  yield prepareLoginsAndProcessForm("https://example.com" + MISSING_ACTION_PATH, [
++    new nsLoginInfo("https://example.com", "https://example.com", null,
++                    "name1", "passHTTPStoHTTPS", "uname", "pword"),
++    new nsLoginInfo("http://example.com", "http://example.com", null,
++                    "name1", "passHTTPtoHTTP", "uname", "pword"),
++    new nsLoginInfo("http://example.com", "https://example.com", null,
++                    "name1", "passHTTPtoHTTPS", "uname", "pword"),
++    new nsLoginInfo("https://example.com", "http://example.com", null,
++                    "name1", "passHTTPStoHTTP", "uname", "pword"),
++  ]);
++
++  checkACForm("name1", "passHTTPStoHTTPS");
++});
++
++</script>
++</pre>
++</body>
++</html>
+diff --git a/toolkit/components/passwordmgr/test/mochitest/test_basic_form_2pw_2.html b/toolkit/components/passwordmgr/test/mochitest/test_basic_form_2pw_2.html
+index d4d54a3420769..cc2282973bc2e 100644
+--- a/toolkit/components/passwordmgr/test/mochitest/test_basic_form_2pw_2.html
++++ b/toolkit/components/passwordmgr/test/mochitest/test_basic_form_2pw_2.html
+@@ -56,7 +56,7 @@
+   if (formNum == 999) {
+     is(numSubmittedForms, 999, "Ensuring all forms submitted for testing.");
+ 
+-    var numEndingLogins = countLogins();
++    var numEndingLogins = LoginManager.countLogins("", "", "");
+ 
+     ok(numEndingLogins > 0, "counting logins at end");
+     is(numStartingLogins, numEndingLogins + 222, "counting logins at end");
+diff --git a/toolkit/components/passwordmgr/test/mochitest/test_basic_form_autocomplete.html b/toolkit/components/passwordmgr/test/mochitest/test_basic_form_autocomplete.html
+index a1e8144cfc401..8ddba3d87d58c 100644
+--- a/toolkit/components/passwordmgr/test/mochitest/test_basic_form_autocomplete.html
++++ b/toolkit/components/passwordmgr/test/mochitest/test_basic_form_autocomplete.html
+@@ -219,7 +219,6 @@
+   checkACForm("", "");
+   let popupState = yield getPopupState();
+   is(popupState.open, false, "Check popup is initially closed");
+-  is(popupState.selectedIndex, -1, "Check no entries are selected");
+ });
+ 
+ add_task(function* test_form1_first_entry() {
+@@ -229,6 +228,10 @@
+   let shownPromise = promiseACShown();
+   doKey("down"); // open
+   yield shownPromise;
++
++  let popupState = yield getPopupState();
++  is(popupState.selectedIndex, -1, "Check no entries are selected upon opening");
++
+   doKey("down"); // first
+   checkACForm("", ""); // value shouldn't update just by selecting
+   doKey("return"); // not "enter"!
+@@ -428,7 +431,7 @@
+   // Delete the first entry (of 4), "tempuser1"
+   doKey("down");
+   var numLogins;
+-  numLogins = countLogins(chromeScript, "http://mochi.test:8888", "http://autocomplete:8888", null);
++  numLogins = LoginManager.countLogins("http://mochi.test:8888", "http://autocomplete:8888", null);
+   is(numLogins, 5, "Correct number of logins before deleting one");
+ 
+   var deletionPromise = promiseStorageChanged(["removeLogin"]);
+@@ -438,7 +441,7 @@
+   yield deletionPromise;
+ 
+   checkACForm("", "");
+-  numLogins = countLogins(chromeScript, "http://mochi.test:8888", "http://autocomplete:8888", null);
++  numLogins = LoginManager.countLogins("http://mochi.test:8888", "http://autocomplete:8888", null);
+   is(numLogins, 4, "Correct number of logins after deleting one");
+   notifyMenuChanged(4);
+   doKey("return");
+@@ -470,7 +473,7 @@
+   doKey("down");
+   doKey("delete", shiftModifier);
+   checkACForm("", "");
+-  numLogins = countLogins(chromeScript, "http://mochi.test:8888", "http://autocomplete:8888", null);
++  numLogins = LoginManager.countLogins("http://mochi.test:8888", "http://autocomplete:8888", null);
+   is(numLogins, 3, "Correct number of logins after deleting one");
+   doKey("return");
+   yield promiseFormsProcessed();
+@@ -502,7 +505,7 @@
+   doKey("down");
+   doKey("delete", shiftModifier);
+   checkACForm("", "");
+-  numLogins = countLogins(chromeScript, "http://mochi.test:8888", "http://autocomplete:8888", null);
++  numLogins = LoginManager.countLogins("http://mochi.test:8888", "http://autocomplete:8888", null);
+   is(numLogins, 2, "Correct number of logins after deleting one");
+   doKey("return");
+   yield promiseFormsProcessed();
+@@ -534,7 +537,7 @@
+   doKey("delete", shiftModifier);
+   //doKey("return");
+   checkACForm("", "");
+-  numLogins = countLogins(chromeScript, "http://mochi.test:8888", "http://autocomplete:8888", null);
++  numLogins = LoginManager.countLogins("http://mochi.test:8888", "http://autocomplete:8888", null);
+   is(numLogins, 1, "Correct number of logins after deleting one");
+ 
+   // remove the login that's not shown in the list.
+diff --git a/toolkit/components/passwordmgr/test/pwmgr_common.js b/toolkit/components/passwordmgr/test/pwmgr_common.js
+index cf1d701787ede..9a2466b519b17 100644
+--- a/toolkit/components/passwordmgr/test/pwmgr_common.js
++++ b/toolkit/components/passwordmgr/test/pwmgr_common.js
+@@ -1,3 +1,5 @@
++const TESTS_DIR = "/tests/toolkit/components/passwordmgr/test/";
++
+ /**
+  * Returns the element with the specified |name| attribute.
+  */
+@@ -275,7 +277,7 @@ function promiseFormsProcessed(expectedCount = 1) {
+       processedCount++;
+       if (processedCount == expectedCount) {
+         SpecialPowers.removeObserver(onProcessedForm, "passwordmgr-processed-form");
+-        resolve(subject, data);
++        resolve(SpecialPowers.Cu.waiveXrays(subject), data);
+       }
+     }
+     SpecialPowers.addObserver(onProcessedForm, "passwordmgr-processed-form", false);
+@@ -318,10 +320,6 @@ function promiseStorageChanged(expectedChangeTypes) {
+   });
+ }
+ 
+-function countLogins(chromeScript, formOrigin, submitOrigin, httpRealm) {
+-  return chromeScript.sendSyncMessage("countLogins", {formOrigin, submitOrigin, httpRealm})[0][0];
+-}
+-
+ /**
+  * Run a function synchronously in the parent process and destroy it in the test cleanup function.
+  * @param {Function|String} aFunctionOrURL - either a function that will be stringified and run
+@@ -361,6 +359,7 @@ if (this.addMessageListener) {
+   // Ignore ok/is in commonInit since they aren't defined in a chrome script.
+   ok = is = () => {}; // eslint-disable-line no-native-reassign
+ 
++  Cu.import("resource://gre/modules/LoginHelper.jsm");
+   Cu.import("resource://gre/modules/Services.jsm");
+   Cu.import("resource://gre/modules/Task.jsm");
+ 
+@@ -391,8 +390,17 @@ if (this.addMessageListener) {
+     sendAsyncMessage("recipesReset");
+   }));
+ 
+-  addMessageListener("countLogins", ({formOrigin, submitOrigin, httpRealm}) => {
+-    return Services.logins.countLogins(formOrigin, submitOrigin, httpRealm);
++  addMessageListener("proxyLoginManager", msg => {
++    // Recreate nsILoginInfo objects from vanilla JS objects.
++    let recreatedArgs = msg.args.map((arg, index) => {
++      if (msg.loginInfoIndices.includes(index)) {
++        return LoginHelper.vanillaObjectToLogin(arg);
++      }
++
++      return arg;
++    });
++
++    return Services.logins[msg.methodName](...recreatedArgs);
+   });
+ 
+   var globalMM = Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageListenerManager);
+@@ -422,4 +430,33 @@ if (this.addMessageListener) {
+       }
+     });
+   });
++
++
++  let { LoginHelper } = SpecialPowers.Cu.import("resource://gre/modules/LoginHelper.jsm", {});
++  /**
++   * Proxy for Services.logins (nsILoginManager).
++   * Only supports arguments which support structured clone plus {nsILoginInfo}
++   * Assumes properties are methods.
++   */
++  this.LoginManager = new Proxy({}, {
++    get(target, prop, receiver) {
++      return (...args) => {
++        let loginInfoIndices = [];
++        let cloneableArgs = args.map((val, index) => {
++          if (SpecialPowers.call_Instanceof(val, SpecialPowers.Ci.nsILoginInfo)) {
++            loginInfoIndices.push(index);
++            return LoginHelper.loginToVanillaObject(val);
++          }
++
++          return val;
++        });
++
++        return chromeScript.sendSyncMessage("proxyLoginManager", {
++          args: cloneableArgs,
++          loginInfoIndices,
++          methodName: prop,
++        })[0][0];
++      };
++    },
++  });
+ }
+diff --git a/toolkit/components/passwordmgr/test/unit/test_dedupeLogins.js b/toolkit/components/passwordmgr/test/unit/test_dedupeLogins.js
+new file mode 100644
+index 0000000000000..fc97826fb0629
+--- /dev/null
++++ b/toolkit/components/passwordmgr/test/unit/test_dedupeLogins.js
+@@ -0,0 +1,292 @@
++/*
++ * Test LoginHelper.dedupeLogins
++ */
++
++"use strict";
++
++Cu.import("resource://gre/modules/LoginHelper.jsm");
++
++const DOMAIN1_HTTP_TO_HTTP_U1_P1 = TestData.formLogin({
++  timePasswordChanged: 3000,
++  timeLastUsed: 2000,
++});
++const DOMAIN1_HTTP_TO_HTTP_U1_P2 = TestData.formLogin({
++  password: "password two",
++});
++const DOMAIN1_HTTP_TO_HTTP_U2_P2 = TestData.formLogin({
++  password: "password two",
++  username: "username two",
++});
++const DOMAIN1_HTTPS_TO_HTTPS_U1_P1 = TestData.formLogin({
++  formSubmitURL: "http://www.example.com",
++  hostname: "https://www3.example.com",
++  timePasswordChanged: 4000,
++  timeLastUsed: 1000,
++});
++const DOMAIN1_HTTPS_TO_EMPTY_U1_P1 = TestData.formLogin({
++  formSubmitURL: "",
++  hostname: "https://www3.example.com",
++});
++const DOMAIN1_HTTPS_TO_EMPTYU_P1 = TestData.formLogin({
++  hostname: "https://www3.example.com",
++  username: "",
++});
++const DOMAIN1_HTTP_AUTH = TestData.authLogin({
++  hostname: "http://www3.example.com",
++});
++const DOMAIN1_HTTPS_AUTH = TestData.authLogin({
++  hostname: "https://www3.example.com",
++});
++
++
++add_task(function test_dedupeLogins() {
++  // [description, expectedOutput, dedupe arg. 0, dedupe arg 1, ...]
++  let testcases = [
++    [
++      "exact dupes",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      undefined,
++      [], // force no resolveBy logic to test behavior of preferring the first..
++    ],
++    [
++      "default uniqueKeys is un + pw",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P2],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P2],
++      undefined,
++      [],
++    ],
++    [
++      "same usernames, different passwords, dedupe username only",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P2],
++      ["username"],
++      [],
++    ],
++    [
++      "same un+pw, different scheme",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      undefined,
++      [],
++    ],
++    [
++      "same un+pw, different scheme, reverse order",
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      undefined,
++      [],
++    ],
++    [
++      "same un+pw, different scheme, include hostname",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      ["hostname", "username", "password"],
++      [],
++    ],
++    [
++      "empty username is not deduped with non-empty",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTPS_TO_EMPTYU_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTPS_TO_EMPTYU_P1],
++      undefined,
++      [],
++    ],
++    [
++      "empty username is deduped with same passwords",
++      [DOMAIN1_HTTPS_TO_EMPTYU_P1],
++      [DOMAIN1_HTTPS_TO_EMPTYU_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      ["password"],
++      [],
++    ],
++    [
++      "mix of form and HTTP auth",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTP_AUTH],
++      undefined,
++      [],
++    ],
++  ];
++
++  for (let tc of testcases) {
++    let description = tc.shift();
++    let expected = tc.shift();
++    let actual = LoginHelper.dedupeLogins(...tc);
++    Assert.strictEqual(actual.length, expected.length, `Check: ${description}`);
++    for (let [i, login] of expected.entries()) {
++      Assert.strictEqual(actual[i], login, `Check index ${i}`);
++    }
++  }
++});
++
++
++add_task(function* test_dedupeLogins_resolveBy() {
++  Assert.ok(DOMAIN1_HTTP_TO_HTTP_U1_P1.timeLastUsed > DOMAIN1_HTTPS_TO_HTTPS_U1_P1.timeLastUsed,
++            "Sanity check timeLastUsed difference");
++  Assert.ok(DOMAIN1_HTTP_TO_HTTP_U1_P1.timePasswordChanged < DOMAIN1_HTTPS_TO_HTTPS_U1_P1.timePasswordChanged,
++            "Sanity check timePasswordChanged difference");
++
++  let testcases = [
++    [
++      "default resolveBy is timeLastUsed",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++    ],
++    [
++      "default resolveBy is timeLastUsed, reversed input",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++    ],
++    [
++      "resolveBy timeLastUsed + timePasswordChanged",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      undefined,
++      ["timeLastUsed", "timePasswordChanged"],
++    ],
++    [
++      "resolveBy timeLastUsed + timePasswordChanged, reversed input",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      undefined,
++      ["timeLastUsed", "timePasswordChanged"],
++    ],
++    [
++      "resolveBy timePasswordChanged",
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      undefined,
++      ["timePasswordChanged"],
++    ],
++    [
++      "resolveBy timePasswordChanged, reversed",
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      undefined,
++      ["timePasswordChanged"],
++    ],
++    [
++      "resolveBy timePasswordChanged + timeLastUsed",
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      undefined,
++      ["timePasswordChanged", "timeLastUsed"],
++    ],
++    [
++      "resolveBy timePasswordChanged + timeLastUsed, reversed",
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      undefined,
++      ["timePasswordChanged", "timeLastUsed"],
++    ],
++    [
++      "resolveBy scheme + timePasswordChanged, prefer HTTP",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      undefined,
++      ["scheme", "timePasswordChanged"],
++      DOMAIN1_HTTP_TO_HTTP_U1_P1.hostname,
++    ],
++    [
++      "resolveBy scheme + timePasswordChanged, prefer HTTP, reversed input",
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      undefined,
++      ["scheme", "timePasswordChanged"],
++      DOMAIN1_HTTP_TO_HTTP_U1_P1.hostname,
++    ],
++    [
++      "resolveBy scheme + timePasswordChanged, prefer HTTPS",
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      undefined,
++      ["scheme", "timePasswordChanged"],
++      DOMAIN1_HTTPS_TO_HTTPS_U1_P1.hostname,
++    ],
++    [
++      "resolveBy scheme + timePasswordChanged, prefer HTTPS, reversed input",
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      [DOMAIN1_HTTP_TO_HTTP_U1_P1, DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      undefined,
++      ["scheme", "timePasswordChanged"],
++      DOMAIN1_HTTPS_TO_HTTPS_U1_P1.hostname,
++    ],
++    [
++      "resolveBy scheme HTTP auth",
++      [DOMAIN1_HTTPS_AUTH],
++      [DOMAIN1_HTTP_AUTH, DOMAIN1_HTTPS_AUTH],
++      undefined,
++      ["scheme"],
++      DOMAIN1_HTTPS_AUTH.hostname,
++    ],
++    [
++      "resolveBy scheme HTTP auth, reversed input",
++      [DOMAIN1_HTTPS_AUTH],
++      [DOMAIN1_HTTPS_AUTH, DOMAIN1_HTTP_AUTH],
++      undefined,
++      ["scheme"],
++      DOMAIN1_HTTPS_AUTH.hostname,
++    ],
++    [
++      "resolveBy scheme, empty form submit URL",
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1],
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTPS_TO_EMPTY_U1_P1],
++      undefined,
++      ["scheme"],
++      DOMAIN1_HTTPS_TO_HTTPS_U1_P1.hostname,
++    ],
++  ];
++
++  for (let tc of testcases) {
++    let description = tc.shift();
++    let expected = tc.shift();
++    let actual = LoginHelper.dedupeLogins(...tc);
++    Assert.strictEqual(actual.length, expected.length, `Check: ${description}`);
++    for (let [i, login] of expected.entries()) {
++      Assert.strictEqual(actual[i], login, `Check index ${i}`);
++    }
++  }
++
++});
++
++add_task(function* test_dedupeLogins_preferredOriginMissing() {
++  let testcases = [
++    [
++      "resolveBy scheme + timePasswordChanged, missing preferredOrigin",
++      /preferredOrigin/,
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      undefined,
++      ["scheme", "timePasswordChanged"],
++    ],
++    [
++      "resolveBy timePasswordChanged + scheme, missing preferredOrigin",
++      /preferredOrigin/,
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      undefined,
++      ["timePasswordChanged", "scheme"],
++    ],
++    [
++      "resolveBy scheme + timePasswordChanged, empty preferredOrigin",
++      /preferredOrigin/,
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      undefined,
++      ["scheme", "timePasswordChanged"],
++      "",
++    ],
++    [
++      "resolveBy scheme + timePasswordChanged, invalid preferredOrigin",
++      /preferred origin/,
++      [DOMAIN1_HTTPS_TO_HTTPS_U1_P1, DOMAIN1_HTTP_TO_HTTP_U1_P1],
++      undefined,
++      ["scheme", "timePasswordChanged"],
++      "example.com",
++    ],
++  ];
++
++  for (let tc of testcases) {
++    let description = tc.shift();
++    let expectedException = tc.shift();
++    Assert.throws(() => {
++      LoginHelper.dedupeLogins(...tc);
++    }, expectedException, `Check: ${description}`);
++  }
++});
+diff --git a/toolkit/components/passwordmgr/test/unit/xpcshell.ini b/toolkit/components/passwordmgr/test/unit/xpcshell.ini
+index deeab2075938f..48c3e80a31ebe 100644
+--- a/toolkit/components/passwordmgr/test/unit/xpcshell.ini
++++ b/toolkit/components/passwordmgr/test/unit/xpcshell.ini
+@@ -21,6 +21,7 @@ skip-if = true || os != "android" # Bug 1171687: Needs fixing on Android
+ skip-if = os == "android" # The context menu isn't used on Android.
+ # LoginManagerContextMenu is only included for MOZ_BUILD_APP == 'browser'.
+ run-if = buildapp == "browser"
++[test_dedupeLogins.js]
+ [test_disabled_hosts.js]
+ [test_getFormFields.js]
+ [test_getPasswordFields.js]
