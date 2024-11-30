@@ -431,8 +431,7 @@
            iconsize="large">
     <!-- Menu -->
     <toolbar type="menubar" id="toolbar-menubar" class="chromeclass-menubar" customizable="true"
-             defaultset="menubar-items"
-             mode="icons" iconsize="small" defaulticonsize="small"
+             defaultset="menubar-items"             mode="icons" iconsize="small" defaulticonsize="small"
              lockiconsize="true"
 #ifdef MENUBAR_CAN_AUTOHIDE
              toolbarname="&menubarCmd.label;"
@@ -817,7 +816,6 @@
              lockiconsize="true"
              class="chromeclass-directories"
              context="toolbar-context-menu"
-             defaultset="personal-bookmarks"
              toolbarname="&personalbarCmd.label;" accesskey="&personalbarCmd.accesskey;"
              collapsed="false"
              customizable="true">
@@ -877,8 +875,6 @@
              context="toolbar-context-menu"
 #ifdef APPMENU_ON_TABBAR
              defaultset="appmenu-toolbar-button,tabbrowser-tabs,new-tab-button,alltabs-button,tabs-closebutton"
-#else
-             defaultset="tabbrowser-tabs,new-tab-button,alltabs-button,tabs-closebutton"
 #endif
              collapsed="true">
 
