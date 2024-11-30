@@ -67,9 +67,8 @@
 
     <popupnotification id="password-notification" hidden="true">
       <popupnotificationcontent orient="vertical">
-        <textbox id="password-notification-username" disabled="true"/>
-        <textbox id="password-notification-password" type="password"
-                 disabled="true"/>
+        <textbox id="password-notification-username"/>
+        <textbox id="password-notification-password" type="password"/>
       </popupnotificationcontent>
     </popupnotification>
 
