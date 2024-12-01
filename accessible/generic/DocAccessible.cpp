@@ -426,6 +426,11 @@ DocAccessible::Shutdown()
     logging::DocDestroy("document shutdown", mDocumentNode, this);
 #endif
 
+  // Mark the document as shutdown before AT is notified about the document
+  // removal from its container (valid for root documents on ATK and due to
+  // some reason for MSAA, refer to bug 757392 for details).
+  mStateFlags |= eIsDefunct;
+
   if (mNotificationController) {
     mNotificationController->Shutdown();
     mNotificationController = nullptr;
@@ -433,10 +438,6 @@ DocAccessible::Shutdown()
 
   RemoveEventListeners();
 
-  // Mark the document as shutdown before AT is notified about the document
-  // removal from its container (valid for root documents on ATK and due to
-  // some reason for MSAA, refer to bug 757392 for details).
-  mStateFlags |= eIsDefunct;
   nsCOMPtr<nsIDocument> kungFuDeathGripDoc = mDocumentNode;
   mDocumentNode = nullptr;
 
