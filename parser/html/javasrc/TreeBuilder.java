@@ -2184,9 +2184,9 @@ public abstract class TreeBuilder<T> implements TokenHandler,
                                         break;
                                     } else if (eltPos == 0 || (node.isSpecial()
                                             && (node.ns != "http://www.w3.org/1999/xhtml"
-                                                || (node.name != "p"
-                                                        && node.name != "address"
-                                                        && node.name != "div")))) {
+                                                    || (node.name != "p"
+                                                            && node.name != "address"
+                                                            && node.name != "div")))) {
                                         break;
                                     }
                                     eltPos--;
@@ -4750,7 +4750,7 @@ public abstract class TreeBuilder<T> implements TokenHandler,
             int furthestBlockPos = formattingEltStackPos + 1;
             while (furthestBlockPos <= currentPtr) {
                 StackNode<T> node = stack[furthestBlockPos]; // weak ref
-                assert furthestBlockPos > 0: "How is formattingEltStackPos + 1 not > 0?"
+                assert furthestBlockPos > 0: "How is formattingEltStackPos + 1 not > 0?";
                 if (node.isSpecial()) {
                     break;
                 }
