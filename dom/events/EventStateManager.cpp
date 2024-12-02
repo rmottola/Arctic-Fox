@@ -1536,7 +1536,8 @@ EventStateManager::FireContextClick()
       }
       else if (mGestureDownContent->IsAnyOfHTMLElements(nsGkAtoms::applet,
                                                         nsGkAtoms::embed,
-                                                        nsGkAtoms::object)) {
+                                                        nsGkAtoms::object,
+                                                        nsGkAtoms::label)) {
         allowedToDispatch = false;
       }
     }
