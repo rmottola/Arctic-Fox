@@ -25,8 +25,7 @@ tasks:
         source: {{{source}}}
         name: "[tc] Initial decision task for try"
         description: |
-          This is the single most important task as it decides how all other tasks
-          get built.
+          Create the task-graph for a try push
 
       workerType: "gecko-decision"
       provisionerId: "aws-provisioner-v1"
