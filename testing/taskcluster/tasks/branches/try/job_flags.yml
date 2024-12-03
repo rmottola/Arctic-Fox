@@ -114,6 +114,13 @@ builds:
   linux64:
     platforms:
       - Linux64
+    extra-builds:
+      - sm-plain
+      - sm-arm-sim
+      - sm-compacting
+      - sm-generational
+      - sm-rootanalysis
+      - sm-warnaserr
     types:
       opt:
         task: tasks/builds/opt_linux64_clobber.yml
