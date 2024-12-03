@@ -250,31 +250,6 @@ def decorate_task_treeherder_routes(task, project, revision, pushlog_id):
                                         pushlog_id)
         task['routes'].append(route)
 
-class BuildTaskValidationException(Exception):
-    pass
-
-def validate_build_task(task):
-    '''The build tasks have some required fields in extra this function ensures
-    they are there. '''
-    if 'task' not in task:
-        raise BuildTaskValidationException('must have task field')
-
-    task_def = task['task']
-
-    if 'extra' not in task_def:
-        raise BuildTaskValidationException('build task must have task.extra props')
-
-    if 'locations' not in task_def['extra']:
-        raise BuildTaskValidationException('task.extra.locations missing')
-
-    locations = task_def['extra']['locations']
-
-    if 'build' not in locations:
-        raise BuildTaskValidationException('task.extra.locations.build missing')
-
-    if 'tests' not in locations and 'test_packages' not in locations:
-        raise BuildTaskValidationException('task.extra.locations.tests or '
-                                           'task.extra.locations.tests_packages missing')
 
 def decorate_task_json_routes(task, json_routes, parameters):
     """Decorate the given task with routes.json routes.
@@ -289,6 +264,32 @@ def decorate_task_json_routes(task, json_routes, parameters):
 
     task['routes'] = routes
 
+
+class BuildTaskValidationException(Exception):
+    pass
+
+
+def validate_build_task(task):
+    '''The build tasks have some required fields in extra this function ensures
+    they are there. '''
+    if 'task' not in task:
+        raise BuildTaskValidationException('must have task field')
+
+    task_def = task['task']
+
+    if 'extra' not in task_def:
+        raise BuildTaskValidationException('build task must have task.extra props')
+
+    if 'locations' in task_def['extra']:
+
+        locations = task_def['extra']['locations']
+
+        if 'build' not in locations:
+            raise BuildTaskValidationException('task.extra.locations.build missing')
+
+        if 'tests' not in locations and 'test_packages' not in locations:
+            raise BuildTaskValidationException('task.extra.locations.tests or '
+                                               'task.extra.locations.tests_packages missing')
 
 
 class LegacyKind(base.Kind):
