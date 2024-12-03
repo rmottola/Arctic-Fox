@@ -1,4 +1,5 @@
 # This task is the base for most tests in gecko.
+docker-image: tester
 task:
   created: '{{now}}'
   deadline: '{{#from_now}}24 hours{{/from_now}}'
