@@ -6,9 +6,10 @@
 
 import unittest
 import mozunit
-from taskcluster_graph.commit_parser import (
+from taskgraph.util.legacy_commit_parser import (
     parse_commit,
-    normalize_test_list
+    normalize_test_list,
+    parse_test_opts
 )
 
 class TestCommitParser(unittest.TestCase):
@@ -386,9 +387,11 @@ class TestCommitParser(unittest.TestCase):
                         'allowed_build_tasks': {
                             'task/linux': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/win32': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             }
                         }
                     },
@@ -396,9 +399,11 @@ class TestCommitParser(unittest.TestCase):
                         'allowed_build_tasks': {
                             'task/linux-debug': {
                                 'task': 'task/mochitest',
+                                'unittest_try_name': 'mochitest',
                             },
                             'task/win32': {
                                 'task': 'task/mochitest',
+                                'unittest_try_name': 'mochitest',
                             }
                         }
                     }
@@ -472,9 +477,11 @@ class TestCommitParser(unittest.TestCase):
                         'allowed_build_tasks': {
                             'task/linux-debug': {
                                 'task': 'task/mochitest',
+                                'unittest_try_name': 'mochitest',
                             },
                             'task/win32': {
                                 'task': 'task/mochitest',
+                                'unittest_try_name': 'mochitest',
                             }
                         }
                     }
@@ -529,7 +536,8 @@ class TestCommitParser(unittest.TestCase):
                             'task/linux': {
                                 'task': 'task/mochitest',
                                 'chunks': 5,
-                                'only_chunks': set([1, 2])
+                                'only_chunks': set([1, 2]),
+                                'unittest_try_name': 'mochitest',
                             },
                         }
                     }
@@ -603,15 +611,19 @@ class TestCommitParser(unittest.TestCase):
                         'allowed_build_tasks': {
                             'task/linux': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux-debug': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux64': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux64-debug': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             }
                         }
                     }
@@ -625,15 +637,19 @@ class TestCommitParser(unittest.TestCase):
                         'allowed_build_tasks': {
                             'task/linux': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux-debug': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux64': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux64-debug': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             }
                         }
                     }
@@ -647,15 +663,19 @@ class TestCommitParser(unittest.TestCase):
                         'allowed_build_tasks': {
                             'task/linux': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux-debug': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux64': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux64-debug': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             }
                         }
                     }
@@ -669,15 +689,19 @@ class TestCommitParser(unittest.TestCase):
                         'allowed_build_tasks': {
                             'task/linux': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux-debug': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux64': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             },
                             'task/linux64-debug': {
                                 'task': 'task/web-platform-tests',
+                                'unittest_try_name': 'web-platform-tests',
                             }
                         }
                     }
