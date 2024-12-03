@@ -1178,7 +1178,7 @@ toolbar#nav-bar {
                  isinstance(v, (basestring, numbers.Number)))
         d['testRoot'] = self.testRoot
         if options.jscov_dir_prefix:
-            d['jscovDirPrefix'] = options.jscov_dir_prefix;
+            d['jscovDirPrefix'] = options.jscov_dir_prefix
         if not options.keep_open:
             d['closeWhenDone'] = '1'
         content = json.dumps(d)
