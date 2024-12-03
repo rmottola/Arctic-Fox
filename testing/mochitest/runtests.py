@@ -2116,6 +2116,8 @@ class MochitestDesktop(MochitestBase):
             flavor = 'devtools-chrome'
         elif flavor == 'mochitest':
             flavor = 'plain'
+            if options.subsuite:
+                flavor = options.subsuite
 
         base = 'mochitest'
         if options.e10s:
