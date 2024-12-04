@@ -5826,6 +5826,7 @@ ContentParent::StartProfiler(nsIProfilerStartParams* aParams)
 
 bool
 ContentParent::RecvNotifyPushObservers(const nsCString& aScope,
+                                       const IPC::Principal& aPrincipal,
                                        const nsString& aMessageId)
 {
 #ifndef MOZ_SIMPLEPUSH
@@ -5835,7 +5836,8 @@ ContentParent::RecvNotifyPushObservers(const nsCString& aScope,
       return true;
   }
 
-  nsresult rv = pushNotifier->NotifyPushObservers(aScope, Nothing());
+  nsresult rv = pushNotifier->NotifyPushObservers(aScope, aPrincipal,
+                                                  Nothing());
   Unused << NS_WARN_IF(NS_FAILED(rv));
 #endif
   return true;
@@ -5843,6 +5845,7 @@ ContentParent::RecvNotifyPushObservers(const nsCString& aScope,
 
 bool
 ContentParent::RecvNotifyPushObserversWithData(const nsCString& aScope,
+                                               const IPC::Principal& aPrincipal,
                                                const nsString& aMessageId,
                                                InfallibleTArray<uint8_t>&& aData)
 {
@@ -5853,14 +5856,16 @@ ContentParent::RecvNotifyPushObserversWithData(const nsCString& aScope,
       return true;
   }
 
-  nsresult rv = pushNotifier->NotifyPushObservers(aScope, Some(aData));
+  nsresult rv = pushNotifier->NotifyPushObservers(aScope, aPrincipal,
+                                                  Some(aData));
   Unused << NS_WARN_IF(NS_FAILED(rv));
 #endif
   return true;
 }
 
 bool
-ContentParent::RecvNotifyPushSubscriptionChangeObservers(const nsCString& aScope)
+ContentParent::RecvNotifyPushSubscriptionChangeObservers(const nsCString& aScope,
+                                                         const IPC::Principal& aPrincipal)
 {
 #ifndef MOZ_SIMPLEPUSH
   nsCOMPtr<nsIPushNotifier> pushNotifier =
@@ -5869,7 +5874,8 @@ ContentParent::RecvNotifyPushSubscriptionChangeObservers(const nsCString& aScope
       return true;
   }
 
-  nsresult rv = pushNotifier->NotifySubscriptionChangeObservers(aScope);
+  nsresult rv = pushNotifier->NotifySubscriptionChangeObservers(aScope,
+                                                                aPrincipal);
   Unused << NS_WARN_IF(NS_FAILED(rv));
 #endif
   return true;
