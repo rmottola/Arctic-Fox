@@ -10354,6 +10354,14 @@
     "keyed": true,
     "description": "Tracking how long a Worker thread is blocked when a sync operation is executed on the main-thread."
   },
+  "ABOUTCRASHES_OPENED_COUNT": {
+    "alert_emails": ["bgirard@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "count",
+    "bug_numbers": [1276714, 1276716],
+    "description": "Number of times about:crashes has been opened.",
+    "releaseChannelCollection": "opt-out"
+  },
   "XHR_IN_WORKER": {
     "alert_emails": ["amarchesini@mozilla.com"],
     "expires_in_version": "never",
