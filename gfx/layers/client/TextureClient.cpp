@@ -1024,7 +1024,8 @@ TextureClient::CreateForYCbCrWithBufferSize(ClientIPCAllocator* aAllocator,
 }
 
 TextureClient::TextureClient(TextureData* aData, TextureFlags aFlags, ClientIPCAllocator* aAllocator)
-: mAllocator(aAllocator)
+: AtomicRefCountedWithFinalize("TextureClient")
+, mAllocator(aAllocator)
 , mActor(nullptr)
 , mData(aData)
 , mFlags(aFlags)
