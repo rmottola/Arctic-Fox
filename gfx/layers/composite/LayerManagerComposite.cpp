@@ -1166,8 +1166,7 @@ LayerManagerComposite::RenderToPresentationSurface()
 
   mCompositor->EndFrame();
 #ifdef MOZ_WIDGET_GONK
-  mCompositor->SetDispAcquireFence(mRoot,
-                                   mirrorScreenWidget); // Call after EndFrame()
+  mCompositor->SetDispAcquireFence(mRoot); // Call after EndFrame()
 
   RefPtr<Composer2D> composer2D;
   composer2D = mCompositor->GetWidget()->GetComposer2D();
