@@ -2509,7 +2509,7 @@ ContentPermissionPrompt.prototype = {
     let types = aRequest.types.QueryInterface(Ci.nsIArray);
     if (types.length != 1) {
       aRequest.cancel();
-      return;
+      return undefined;
     }
 
     if (!aOptions)
