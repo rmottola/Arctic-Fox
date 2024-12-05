@@ -543,6 +543,7 @@ RecyclingPlanarYCbCrImage::CopyData(const Data& aData)
             mData.mCbCrSize, mData.mCbCrStride, mData.mCrSkip);
 
   mSize = aData.mPicSize;
+  mOrigin = gfx::IntPoint(aData.mPicX, aData.mPicY);
   return true;
 }
 
@@ -559,6 +560,7 @@ PlanarYCbCrImage::AdoptData(const Data &aData)
 {
   mData = aData;
   mSize = aData.mPicSize;
+  mOrigin = gfx::IntPoint(aData.mPicX, aData.mPicY);
   return true;
 }
 
