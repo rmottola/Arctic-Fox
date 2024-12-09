@@ -202,6 +202,10 @@ static DllBlockInfo sWindowsDllBlocklist[] = {
   // ESET, bug 1229252
   { "eoppmonitor.dll", ALL_VERSIONS },
 
+  // SS2OSD, bug 1262348
+  { "ss2osd.dll", ALL_VERSIONS },
+  { "ss2devprops.dll", ALL_VERSIONS },
+
   // F-Secure DeepGuard, causes stack overflow crashes
   { "fshook64.dll", ALL_VERSIONS },
 
