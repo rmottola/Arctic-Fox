@@ -197,6 +197,9 @@ static DllBlockInfo sWindowsDllBlocklist[] = {
   { "grabdll.dll", MAKE_VERSION(2, 6, 1, 0) },
   { "grabkernel.dll", MAKE_VERSION(1, 0, 0, 1) },
 
+  // ESET, bug 1229252
+  { "eoppmonitor.dll", ALL_VERSIONS },
+
   // F-Secure DeepGuard, causes stack overflow crashes
   { "fshook64.dll", ALL_VERSIONS },
 
