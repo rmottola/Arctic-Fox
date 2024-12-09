@@ -297,6 +297,7 @@ public:
     {
         nsCacheServiceAutoLock autoLock(LOCK_TELEM(NSBLOCKONCACHETHREADEVENT_RUN));
         CACHE_LOG_DEBUG(("nsBlockOnCacheThreadEvent [%p]\n", this));
+        nsCacheService::gService->mNotified = true;
         nsCacheService::gService->mCondVar.Notify();
         return NS_OK;
     }
@@ -853,9 +854,12 @@ nsCacheService::SyncWithCacheIOThread()
     }
 
     // wait until notified, then return
-    rv = gService->mCondVar.Wait();
+    gService->mNotified = false;
+    while (!gService->mNotified) {
+      gService->mCondVar.Wait();
+    }
 
-    return rv;
+    return NS_OK;
 }
 
 
@@ -1074,6 +1078,7 @@ nsCacheService::nsCacheService()
     : mObserver(nullptr),
       mLock("nsCacheService.mLock"),
       mCondVar(mLock, "nsCacheService.mCondVar"),
+      mNotified(false),
       mTimeStampLock("nsCacheService.mTimeStampLock"),
       mInitialized(false),
       mClearingEntries(false),
