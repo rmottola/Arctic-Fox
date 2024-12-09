@@ -136,7 +136,7 @@ DrawTargetSkia::DrawTargetSkia()
   : mSnapshot(nullptr)
 #ifdef MOZ_WIDGET_COCOA
   , mCG(nullptr)
-  , mColorSpace(CGColorSpaceCreateDeviceRGB())
+  , mColorSpace(nullptr)
   , mCanvasData(nullptr)
   , mCGSize(0, 0)
 #endif
@@ -147,9 +147,13 @@ DrawTargetSkia::~DrawTargetSkia()
 {
 #ifdef MOZ_WIDGET_COCOA
   if (mCG) {
-    CGColorSpaceRelease(mColorSpace);
     CGContextRelease(mCG);
     mCG = nullptr;
+  }
+
+  if (mColorSpace) {
+    CGColorSpaceRelease(mColorSpace);
+    mColorSpace = nullptr;
   }
 #endif
 }
@@ -844,6 +848,10 @@ DrawTargetSkia::BorrowCGContext(const DrawOptions &aOptions)
     return mCG;
   }
 
+  if (!mColorSpace) {
+    mColorSpace = CGColorSpaceCreateDeviceRGB();
+  }
+
   if (mCG) {
     // Release the old CG context since it's no longer valid.
     CGContextRelease(mCG);
@@ -923,6 +931,7 @@ DrawTargetSkia::FillGlyphsWithCG(ScaledFont *aFont,
   Vector<CGGlyph,32> glyphs;
   Vector<CGPoint,32> positions;
   if (!SetupCGGlyphs(cgContext, aBuffer, glyphs, positions)) {
+    ReturnCGContext(cgContext);
     return false;
   }
 
@@ -1009,9 +1018,13 @@ DrawTargetSkia::FillGlyphs(ScaledFont *aFont,
 #endif
 
   ScaledFontBase* skiaFont = static_cast<ScaledFontBase*>(aFont);
+  SkTypeface* typeface = skiaFont->GetSkTypeface();
+  if (!typeface) {
+    return;
+  }
 
   AutoPaintSetup paint(mCanvas.get(), aOptions, aPattern);
-  paint.mPaint.setTypeface(skiaFont->GetSkTypeface());
+  paint.mPaint.setTypeface(typeface);
   paint.mPaint.setTextSize(SkFloatToScalar(skiaFont->mSize));
   paint.mPaint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
 
@@ -1032,26 +1045,39 @@ DrawTargetSkia::FillGlyphs(ScaledFont *aFont,
       paint.mPaint.setAntiAlias(false);
     }
   } else {
-    // SkFontHost_cairo does not support subpixel text, so only enable it for other font hosts.
+    // SkFontHost_cairo does not support subpixel text positioning,
+    // so only enable it for other font hosts.
     paint.mPaint.setSubpixelText(true);
 
     if (aFont->GetType() == FontType::MAC &&
-       (shouldLCDRenderText || aOptions.mAntialiasMode == AntialiasMode::GRAY)) {
-      // SkFontHost_mac only enables CG Font Smoothing if hinting is disabled.
-      // CG Font Smoothing normally enables subpixel AA in CG, but Skia supports
-      // font smoothing with grayscale AA.
-      // SkFontHost_mac only supports subpixel antialiasing when hinting is turned off.
-      // We can get grayscale AA if we have -moz-osx-font-smoothing: grayscale
-      // explicitly enabled or for transparent surfaces.
-      // If we have AA grayscale explicit through the draw options,
-      // then we want to disable font smoothing.
-      // If we have a transparent surface, shouldLCDRenderText will be false. But unless
-      // grayscale font smoothing is explicitly requested, we still want Skia to use
-      // CG Font smoothing.
+       aOptions.mAntialiasMode == AntialiasMode::GRAY) {
+      // Normally, Skia enables LCD FontSmoothing which creates thicker fonts
+      // and also enables subpixel AA. CoreGraphics without font smoothing
+      // explicitly creates thinner fonts and grayscale AA.
+      // CoreGraphics doesn't support a configuration that produces thicker
+      // fonts with grayscale AA as LCD Font Smoothing enables or disables both.
+      // However, Skia supports it by enabling font smoothing (producing subpixel AA)
+      // and converts it to grayscale AA. Since Skia doesn't support subpixel AA on
+      // transparent backgrounds, we still want font smoothing for the thicker fonts,
+      // even if it is grayscale AA.
+      //
+      // With explicit Grayscale AA (from -moz-osx-font-smoothing:grayscale),
+      // we want to have grayscale AA with no smoothing at all. This means
+      // disabling the LCD font smoothing behaviour.
+      // To accomplish this we have to explicitly disable hinting,
+      // and disable LCDRenderText.
       paint.mPaint.setHinting(SkPaint::kNo_Hinting);
     } else {
       paint.mPaint.setHinting(SkPaint::kNormal_Hinting);
     }
+  }
+
+  if (!shouldLCDRenderText && aFont->GetType() == FontType::GDI) {
+    // If we have non LCD GDI text, Cairo currently always uses cleartype fonts and
+    // converts them to grayscale. Force Skia to do the same, otherwise we use
+    // GDI fonts with the ANTIALIASED_QUALITY which is generally bolder than
+    // Cleartype fonts.
+    paint.mPaint.setFlags(paint.mPaint.getFlags() | SkPaint::kGenA8FromLCD_Flag);
   }
 
   std::vector<uint16_t> indices;
