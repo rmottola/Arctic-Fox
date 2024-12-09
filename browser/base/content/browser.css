@@ -824,3 +824,7 @@ menuitems are really transparent against white background.
 .popup-notification-invalid-input[focused] {
   box-shadow: 0 0 2px 2px rgba(255,0,0,0.4);
 }
+
+#login-fill-doorhanger:not([inDetailView]) > #login-fill-clickcapturer {
+  pointer-events: none;
+}

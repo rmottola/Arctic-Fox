@@ -492,7 +492,9 @@ var LoginManagerParent = {
       yield fillDoorhanger.promiseHidden;
       fillDoorhanger.loginFormPresent = loginFormPresent;
       fillDoorhanger.loginFormOrigin = loginFormOrigin;
-      fillDoorhanger.filterString = loginFormOrigin;
+      fillDoorhanger.filterString = hasLogins ? loginFormOrigin : "";
+      fillDoorhanger.detailLogin = null;
+      fillDoorhanger.autoDetailLogin = true;
       return;
     }
     if (showLoginAnchor) {
@@ -500,7 +502,8 @@ var LoginManagerParent = {
         browser,
         loginFormPresent,
         loginFormOrigin,
-        filterString: loginFormOrigin,
+        filterString: hasLogins ? loginFormOrigin : "",
+        autoDetailLogin: true,
       });
     }
   }),
