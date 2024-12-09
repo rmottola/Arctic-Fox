@@ -1,8 +1,3 @@
-/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
-/* Any copyright is dedicated to the Public Domain.
- * http://creativecommons.org/publicdomain/zero/1.0/ */
-
 /**
  * Provides infrastructure for automated login components tests.
  */
@@ -12,7 +7,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //// Globals
 
-const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
+let { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -37,13 +32,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "LoginTestUtils",
                                   "resource://testing-common/LoginTestUtils.jsm");
 LoginTestUtils.Assert = Assert;
 const TestData = LoginTestUtils.testData;
-
-// Import LoginTestUtils.jsm as LoginTest.
-XPCOMUtils.defineLazyModuleGetter(this, "LoginTest",
-                                  "resource://testing-common/LoginTestUtils.jsm",
-                                  "LoginTestUtils");
-LoginTest.Assert = Assert;
-const TestData = LoginTest.testData;
+const newPropertyBag = LoginHelper.newPropertyBag;
 
 /**
  * All the tests are implemented with add_task, this starts them automatically.
@@ -172,7 +161,7 @@ const MockDocument = {
 
 //// Initialization functions common to all tests
 
-add_task(function test_common_initialize()
+add_task(function* test_common_initialize()
 {
   // Before initializing the service for the first time, we should copy the key
   // file required to decrypt the logins contained in the SQLite databases used
