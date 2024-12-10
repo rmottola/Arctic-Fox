@@ -6117,7 +6117,7 @@
             bgLoad = !bgLoad;
 
           let tab = this._getDragTargetTab(event, true);
-          if (!tab || dropEffect == "copy") {
+          if (!tab) {
             // We're adding a new tab.
             let userContextId = this.selectedItem.getAttribute("usercontextid");
             let newIndex = this._getDropIndex(event, true);
