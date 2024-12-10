@@ -828,3 +828,9 @@ menuitems are really transparent against white background.
 #login-fill-doorhanger:not([inDetailView]) > #login-fill-clickcapturer {
   pointer-events: none;
 }
+
+.dragfeedback-tab {
+  -moz-appearance: none;
+  opacity: 0.65;
+  -moz-window-shadow: none;
+}
