@@ -40,7 +40,6 @@ var gPluginHandler = {
     }
   },
 
-
   receiveMessage: function (msg) {
     switch (msg.name) {
       case "PluginContent:ShowClickToPlayNotification":
@@ -589,6 +588,7 @@ var gPluginHandler = {
                      "cannot be read.");
       return;
     }
+
     let runID = propertyBag.getPropertyAsUint32("runID");
     let uglyPluginName = propertyBag.getPropertyAsAString("pluginName");
     let pluginName = BrowserUtils.makeNicePluginName(uglyPluginName);
@@ -675,7 +675,6 @@ var gPluginHandler = {
     let crashurl = formatURL("app.support.baseURL", true);
     crashurl += "plugin-crashed-notificationbar";
     link.href = crashurl;
-
     let description = notification.ownerDocument.getAnonymousElementByAttribute(notification, "anonid", "messageText");
     description.appendChild(link);
   },

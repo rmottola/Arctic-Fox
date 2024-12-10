@@ -1299,11 +1299,6 @@ var gBrowserInit = {
     // Ensure login manager is up and running.
     Services.logins;
 
-#ifdef MOZ_CRASHREPORTER
-    if (gMultiProcessBrowser)
-      TabCrashReporter.init();
-#endif
-
     // Initialize the full zoom setting.
     // We do this before the session restore service gets initialized so we can
     // apply full zoom settings to tabs restored by the session restore service.
