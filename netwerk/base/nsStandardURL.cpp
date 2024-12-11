@@ -608,9 +608,10 @@ nsStandardURL::BuildNormalizedSpec(const char *spec)
         }
     }
 
-    // In case we must use encoded strings, we have to make a copy of every
-    // segment because they are pointing to the |spec| while we are changing
-    // their value.
+    // We must take a copy of every single segment because they are pointing to
+    // the |spec| while we are changing their value, in case we must use
+    // encoded strings.
+    URLSegment username(mUsername);
     URLSegment password(mPassword);
     URLSegment host(mHost);
     URLSegment path(mPath);
