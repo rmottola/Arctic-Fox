@@ -1266,6 +1266,8 @@
                 this._adjustFocusAfterTabSwitch(this.mCurrentTab);
             }
 
+            updateUserContextUIIndicator();
+
             this.tabContainer._setPositionalAttributes();
 
             if (!gMultiProcessBrowser) {
@@ -4409,6 +4411,12 @@
               let tab = this.getTabForBrowser(browser);
               if (tab && data.userContextId) {
                 tab.setUserContextId(data.userContextId);
+              }
+
+	      // We don't want to update the container icon and identifier if
+	      // this is not the selected browser.
+              if (browser == gBrowser.selectedBrowser) {
+                updateUserContextUIIndicator();
               }
 
               break;
