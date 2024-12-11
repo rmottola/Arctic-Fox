@@ -21,7 +21,6 @@
 #include "nsNetCID.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/ipc/URIUtils.h"
-#include "mozilla/CheckedInt.h"
 #include <algorithm>
 #include "mozilla/dom/EncodingUtils.h"
 #include "nsContentUtils.h"
@@ -644,7 +643,7 @@ nsStandardURL::BuildNormalizedSpec(const char *spec)
 
     // append authority
     if (mUsername.mLen > 0) {
-        i = AppendSegmentToBuf(buf, i, spec, mUsername, mUsername,
+        i = AppendSegmentToBuf(buf, i, spec, username, mUsername,
                                &encUsername, useEncUsername, &diff);
         ShiftFromPassword(diff);
         if (password.mLen >= 0) {
