@@ -597,6 +597,10 @@
                                onclick="ReaderParent.handleReaderButtonEvent(event);"
                                onkeypress="ReaderParent.handleReaderButtonEvent(event);"/>
           </hbox>
+              <hbox id="userContext-icons" hidden="true">
+                <label id="userContext-label"/>
+                <image id="userContext-indicator"/>
+              </hbox>
           <toolbarbutton id="urlbar-go-button"
                          class="chromeclass-toolbar-additional"
                          onclick="gURLBar.handleCommand(event);"
