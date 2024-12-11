@@ -1308,11 +1308,6 @@ nsStandardURL::SetSpec(const nsACString &input)
         return NS_ERROR_MALFORMED_URI;
     }
 
-    // NUL characters aren't allowed in the filtered URI.
-    if (filteredURI.Contains('\0')) {
-        return NS_ERROR_MALFORMED_URI;
-    }
-
     // Make a backup of the curent URL
     nsStandardURL prevURL(false,false);
     prevURL.CopyMembers(this, eHonorRef);
@@ -2526,7 +2521,7 @@ nsStandardURL::SetFilePath(const nsACString &input)
         int32_t dirLen, baseLen, extLen;
         nsresult rv;
 
-        rv = mParser->ParseFilePath(filepath, -1,
+        rv = mParser->ParseFilePath(filepath, flat.Length(),
                                     &dirPos, &dirLen,
                                     &basePos, &baseLen,
                                     &extPos, &extLen);
@@ -2615,7 +2610,7 @@ nsStandardURL::SetQuery(const nsACString &input)
         return NS_OK;
     }
 
-    int32_t queryLen = strlen(query);
+    int32_t queryLen = flat.Length();
     if (query[0] == '?') {
         query++;
         queryLen--;
@@ -2665,10 +2660,6 @@ nsStandardURL::SetRef(const nsACString &input)
 
     LOG(("nsStandardURL::SetRef [ref=%s]\n", ref));
 
-    if (input.Contains('\0')) {
-        return NS_ERROR_MALFORMED_URI;
-    }
-
     if (mPath.mLen < 0)
         return SetPath(flat);
 
@@ -2695,7 +2686,7 @@ nsStandardURL::SetRef(const nsACString &input)
         ref++;
         refLen--;
     }
-    
+
     if (mRef.mLen < 0) {
         mSpec.Append('#');
         ++mPath.mLen;  // Include the # in the path.
@@ -2766,7 +2757,7 @@ nsStandardURL::SetFileName(const nsACString &input)
         URLSegment basename, extension;
 
         // let the parser locate the basename and extension
-        rv = mParser->ParseFileName(filename, -1,
+        rv = mParser->ParseFileName(filename, flat.Length(),
                                     &basename.mPos, &basename.mLen,
                                     &extension.mPos, &extension.mLen);
         if (NS_FAILED(rv)) return rv;
