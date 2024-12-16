@@ -1116,7 +1116,7 @@ nsDisplayTableItem::ComputeInvalidationRegion(nsDisplayListBuilder* aBuilder,
     static_cast<const nsDisplayTableItemGeometry*>(aGeometry);
 
   bool invalidateForAttachmentFixed = false;
-  if (mPartHasFixedBackground) {
+  if (mDrawsBackground && mPartHasFixedBackground) {
     nsPoint frameOffsetToViewport = mFrame->GetOffsetTo(
         mFrame->PresContext()->PresShell()->GetRootFrame());
     invalidateForAttachmentFixed =
@@ -1136,8 +1136,9 @@ nsDisplayTableItem::ComputeInvalidationRegion(nsDisplayListBuilder* aBuilder,
 class nsDisplayTableBorderBackground : public nsDisplayTableItem {
 public:
   nsDisplayTableBorderBackground(nsDisplayListBuilder* aBuilder,
-                                 nsTableFrame* aFrame) :
-    nsDisplayTableItem(aBuilder, aFrame) {
+                                 nsTableFrame* aFrame,
+                                 bool aDrawsBackground) :
+    nsDisplayTableItem(aBuilder, aFrame, aDrawsBackground) {
     MOZ_COUNT_CTOR(nsDisplayTableBorderBackground);
   }
 #ifdef NS_BUILD_REFCNT_LOGGING
@@ -1320,8 +1321,8 @@ nsTableFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
 
   nsDisplayTableItem* item = nullptr;
   if (IsVisibleInSelection(aBuilder)) {
+    nsMargin deflate = GetDeflationForBackground(PresContext());
     if (StyleVisibility()->IsVisible()) {
-      nsMargin deflate = GetDeflationForBackground(PresContext());
       // If 'deflate' is (0,0,0,0) then we can paint the table background
       // in its own display item, so do that to take advantage of
       // opacity and visibility optimizations
@@ -1338,7 +1339,8 @@ nsTableFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
     if (aBuilder->IsForEventDelivery() ||
         AnyTablePartHasBorderOrBackground(this, GetNextSibling()) ||
         AnyTablePartHasBorderOrBackground(mColGroups.FirstChild(), nullptr)) {
-      item = new (aBuilder) nsDisplayTableBorderBackground(aBuilder, this);
+      item = new (aBuilder) nsDisplayTableBorderBackground(aBuilder, this,
+          deflate != nsMargin(0, 0, 0, 0));
       aLists.BorderBackground()->AppendNewToTop(item);
     }
   }
