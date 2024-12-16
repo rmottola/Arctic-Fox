@@ -171,8 +171,8 @@ BEGIN_TEST(testChromeBuffer)
         JS::RootedFunction fun(cx, JS_NewFunction(cx, CallTrusted, 0, 0, "callTrusted"));
         JS::RootedObject callTrusted(cx, JS_GetFunctionObject(fun));
 
-        const char *paramName = "f";
-        const char *bytes = "try {                                      "
+        const char* paramName = "f";
+        const char* bytes = "try {                                      "
                             "  return untrusted(trusted);               "
                             "} catch (e) {                              "
                             "  return f();                              "
