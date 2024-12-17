@@ -2838,6 +2838,9 @@ HTMLMediaElement::ReportTelemetry()
     }
   }
 
+  Telemetry::Accumulate(Telemetry::VIDEO_UNLOAD_STATE, state);
+  LOG(LogLevel::Debug, ("%p VIDEO_UNLOAD_STATE = %d", this, state));
+
   if (HTMLVideoElement* vid = HTMLVideoElement::FromContentOrNull(this)) {
     RefPtr<VideoPlaybackQuality> quality = vid->GetVideoPlaybackQuality();
     uint64_t totalFrames = quality->TotalVideoFrames();
@@ -2850,9 +2853,6 @@ HTMLMediaElement::ReportTelemetry()
                             percentage);
     }
   }
-
-  Telemetry::Accumulate(Telemetry::VIDEO_MSE_UNLOAD_STATE, state);
-  LOG(LogLevel::Debug, ("%p VIDEO_MSE_UNLOAD_STATE = %d", this, state));
 
   Telemetry::Accumulate(Telemetry::VIDEO_PLAY_TIME_MS, SECONDS_TO_MS(mPlayTime.Total()));
   LOG(LogLevel::Debug, ("%p VIDEO_PLAY_TIME_MS = %f", this, mPlayTime.Total()));
