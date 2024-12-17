@@ -8072,10 +8072,16 @@ TabModalPromptBox.prototype = {
     const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
     let newPrompt = document.createElementNS(XUL_NS, "tabmodalprompt");
     let browser = this.browser;
-    browser.parentNode.appendChild(newPrompt);
+    browser.parentNode.insertBefore(newPrompt, browser.nextSibling);
     browser.setAttribute("tabmodalPromptShowing", true);
 
     newPrompt.clientTop; // style flush to assure binding is attached
+
+    let prompts = this.listPrompts();
+    if (prompts.length > 1) {
+      // Let's hide ourself behind the current prompt.
+      newPrompt.hidden = true;
+    }
 
     let principalToAllowFocusFor = this._allowTabFocusByPromptPrincipal;
     delete this._allowTabFocusByPromptPrincipal;
@@ -8111,6 +8117,7 @@ TabModalPromptBox.prototype = {
     let prompts = this.listPrompts();
     if (prompts.length) {
       let prompt = prompts[prompts.length - 1];
+      prompt.hidden = false;
       prompt.Dialog.setDefaultFocus();
     } else {
       browser.removeAttribute("tabmodalPromptShowing");
