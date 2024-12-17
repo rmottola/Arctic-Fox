@@ -2588,6 +2588,14 @@
     "n_buckets": 50,
     "description": "How many speculative connections are made needlessly"
   },
+  "TAP_TO_LOAD_IMAGE_SIZE": {
+    "expires_in_version": "50",
+    "kind": "exponential",
+    "high": 32768,
+    "n_buckets": 50,
+    "description": "The size of the image being shown, when using tap-to-load images. (kilobytes)",
+    "bug_numbers": [1208167]
+  },
   "STS_POLL_AND_EVENTS_CYCLE": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -2892,13 +2900,6 @@
     "high": 5000,
     "n_buckets": 20,
     "description": "Time spent loading plugin DLL and obtaining metadata (ms)"
-  },
-  "PLUGIN_STARTUP_MS": {
-    "expires_in_version": "never",
-    "kind": "exponential",
-    "high": 5000,
-    "n_buckets": 20,
-    "description": "Time spent starting up plugins (ms)"
   },
   "PLUGIN_SHUTDOWN_MS": {
     "expires_in_version": "never",
@@ -3624,6 +3625,16 @@
     "n_buckets": 10,
     "cpp_guard": "ANDROID",
     "description": "Number of reading list items stored in the browser DB *** No longer needed (bug 1156565). Delete histogram and accumulation code! ***"
+  },
+  "FENNEC_READER_VIEW_CACHE_SIZE": {
+    "expires_in_version": "60",
+    "alert_emails": ["mobile-frontend@mozilla.com"],
+    "kind": "exponential",
+    "low": 32,
+    "high": 51200,
+    "n_buckets": 20,
+    "description": "Total disk space used by items in the reader view cache (KB)",
+    "bug_numbers": [1246159]
   },
   "PLACES_SORTED_BOOKMARKS_PERC": {
     "expires_in_version": "never",
@@ -5370,6 +5381,15 @@
     "description": "Time for a URL bar DB search to return (ms)",
     "cpp_guard": "ANDROID"
   },
+  "FENNEC_RESTRICTED_PROFILE_RESTRICTIONS": {
+    "expires_in_version": "50",
+    "kind": "enumerated",
+    "n_values": 30,
+    "description": "Whether various restrictions are set, keyed by restiction name",
+    "keyed": true,
+    "bug_numbers": [1218942],
+    "alert_emails": ["mobile-frontend@mozilla.com"]
+  },
   "FENNEC_STARTUP_TIME_GECKOREADY": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -5395,6 +5415,13 @@
     "high": 20000,
     "n_buckets": 20,
     "description": "Time for the home screen Top Sites query to return with no filter set (ms)",
+    "cpp_guard": "ANDROID"
+  },
+  "FENNEC_HOMEPANELS_CUSTOM": {
+    "expires_in_version": "54",
+    "kind": "boolean",
+    "bug_numbers": [1245368],
+    "description": "Whether the user has customized their homepanels",
     "cpp_guard": "ANDROID"
   },
   "FENNEC_WAS_KILLED": {
@@ -5558,6 +5585,12 @@
     "expires_in_version": "never",
     "kind": "flag",
     "description": "Whether enablePrivilege has ever been called during the current session"
+  },
+  "SUBJECT_PRINCIPAL_ACCESSED_WITHOUT_SCRIPT_ON_STACK": {
+    "expires_in_version": "46",
+    "alert_emails": ["bholley@mozilla.com"],
+    "kind": "flag",
+    "description": "Whether the subject principal was accessed without script on the stack during the current session"
   },
   "TOUCH_ENABLED_DEVICE": {
     "expires_in_version": "never",
@@ -6317,6 +6350,20 @@
     "kind": "count",
     "description": "How many times the audio MFT decoder returns success but output nothing.",
     "bug_numbers": [1176071]
+  },
+  "VIDEO_CAN_CREATE_AAC_DECODER": {
+    "alert_emails": ["cpearce@mozilla.com"],
+    "expires_in_version": "50",
+    "kind": "boolean",
+    "description": "Whether at startup we report we can playback MP4 (AAC) audio. This is single value is recorded at every startup.",
+    "releaseChannelCollection": "opt-out"
+  },
+  "VIDEO_CAN_CREATE_H264_DECODER": {
+    "alert_emails": ["cpearce@mozilla.com"],
+    "expires_in_version": "50",
+    "kind": "boolean",
+    "description": "Whether at startup we report we can playback MP4 (H.264) video. This is single value is recorded at every startup.",
+    "releaseChannelCollection": "opt-out"
   },
   "VIDEO_CANPLAYTYPE_H264_CONSTRAINT_SET_FLAG": {
     "expires_in_version": "50",
