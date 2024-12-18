@@ -29,6 +29,12 @@ const TEL_CAPTURE_DONE_TIMEOUT = 1;
 const TEL_CAPTURE_DONE_CRASHED = 4;
 const TEL_CAPTURE_DONE_BAD_URI = 5;
 
+// These are looked up on the global as properties below.
+XPCOMUtils.defineConstant(this, "TEL_CAPTURE_DONE_OK", TEL_CAPTURE_DONE_OK);
+XPCOMUtils.defineConstant(this, "TEL_CAPTURE_DONE_TIMEOUT", TEL_CAPTURE_DONE_TIMEOUT);
+XPCOMUtils.defineConstant(this, "TEL_CAPTURE_DONE_CRASHED", TEL_CAPTURE_DONE_CRASHED);
+XPCOMUtils.defineConstant(this, "TEL_CAPTURE_DONE_BAD_URI", TEL_CAPTURE_DONE_BAD_URI);
+
 const global = this;
 
 const BackgroundPageThumbs = {
@@ -82,7 +88,7 @@ const BackgroundPageThumbs = {
    * @param url      The URL to capture.
    * @param options  An optional object that configures the capture.  See
    *                 capture() for description.
-   * @return {Promise} Promise;
+   * @return {Promise} A Promise that resolves when this task completes
    */
   captureIfMissing: Task.async(function* (url, options={}) {
     // The fileExistsForURL call is an optimization, potentially but unlikely
@@ -95,10 +101,31 @@ const BackgroundPageThumbs = {
       }
       return url;
     }
+    let thumbPromise = new Promise((resolve, reject) => {
+      function observe(subject, topic, data) { // jshint ignore:line
+        if (data === url) {
+          switch(topic) {
+            case "page-thumbnail:create":
+              resolve();
+              break;
+            case "page-thumbnail:error":
+              reject(new Error("page-thumbnail:error"));
+              break;
+          }
+          Services.obs.removeObserver(observe, "page-thumbnail:create");
+          Services.obs.removeObserver(observe, "page-thumbnail:error");
+        }
+      }
+      Services.obs.addObserver(observe, "page-thumbnail:create", false);
+      Services.obs.addObserver(observe, "page-thumbnail:error", false);
+    });
     try{
       this.capture(url, options);
+      yield thumbPromise;
     } catch (err) {
-      options.onDone(url);
+      if (options.onDone) {
+        options.onDone(url);
+      }
       throw err;
     }
     return url;
@@ -243,6 +270,9 @@ const BackgroundPageThumbs = {
       throw new Error("The capture should be at the head of the queue.");
     this._captureQueue.shift();
     this._capturesByURL.delete(capture.url);
+    if (capture.doneReason != TEL_CAPTURE_DONE_OK) {
+      Services.obs.notifyObservers(null, "page-thumbnail:error", capture.url);
+    }
 
     // Start the destroy-browser timer *before* processing the capture queue.
     let timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
@@ -272,6 +302,7 @@ function Capture(url, captureCallback, options) {
   this.id = Capture.nextID++;
   this.creationDate = new Date();
   this.doneCallbacks = [];
+  this.doneReason;
   if (options.onDone)
     this.doneCallbacks.push(options.onDone);
 }
@@ -358,9 +389,11 @@ Capture.prototype = {
     // removes the didCapture message listener.
     let { captureCallback, doneCallbacks, options } = this;
     this.destroy();
+    this.doneReason = reason;
 
-    if (typeof(reason) != "number")
+    if (typeof(reason) != "number") {
       throw new Error("A done reason must be given.");
+    }
     tel("CAPTURE_DONE_REASON_2", reason);
     if (data && data.telemetry) {
       // Telemetry is currently disabled in the content process (bug 680508).
