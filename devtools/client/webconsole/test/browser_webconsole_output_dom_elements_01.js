@@ -1,7 +1,7 @@
-/*
- * Any copyright is dedicated to the Public Domain.
- * http://creativecommons.org/publicdomain/zero/1.0/
- */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
+/* Any copyright is dedicated to the Public Domain.
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
 // Whitelisting this test.
 // As part of bug 1077403, the leaking uncaught rejections should be fixed.
@@ -9,7 +9,8 @@
 "use strict";
 
 thisTestLeaksUncaughtRejectionsAndShouldBeFixed(null);
-thisTestLeaksUncaughtRejectionsAndShouldBeFixed("TypeError: this.toolbox is null");
+thisTestLeaksUncaughtRejectionsAndShouldBeFixed(
+  "TypeError: this.toolbox is null");
 
 // Test the webconsole output for various types of DOM Nodes.
 
@@ -55,9 +56,9 @@ var inputTests = [
 
   {
     input: "testNodeList()",
-    output: "NodeList [ <html>, <head>, <meta>, <title>, " +
-            "<body#body-id.body-class>, <p>, <p#lots-of-attributes>, <iframe>, " +
-            "<div.some.classname.here.with.more.classnames.here>, <script> ]",
+    output: "NodeList [ <p>, <p#lots-of-attributes>, <iframe>, " +
+            "<div.some.classname.here.with.more.classnames.here>, " +
+            "<svg>, <clipPath>, <rect>, <script> ]",
     printOutput: "[object NodeList]",
     inspectable: true,
     noClick: true,
@@ -67,6 +68,16 @@ var inputTests = [
   {
     input: "testNodeInIframe()",
     output: "<p>",
+    printOutput: "[object HTMLParagraphElement]",
+    inspectable: true,
+    noClick: true,
+    inspectorIcon: true
+  },
+
+  {
+    input: "testLotsOfAttributes()",
+    output: '<p id="lots-of-attributes" a="" b="" c="" d="" e="" f="" g="" ' +
+            'h="" i="" j="" k="" l="" m="" n="">',
     printOutput: "[object HTMLParagraphElement]",
     inspectable: true,
     noClick: true,
@@ -99,20 +110,11 @@ var inputTests = [
     noClick: true,
     inspectorIcon: false
   },
-
-  {
-    input: "testLotsOfAttributes()",
-    output: '<p id="lots-of-attributes" a="" b="" c="" d="" e="" f="" g="" h="" i="" j="" k="" l="" m="" n="">',
-    printOutput: "[object HTMLParagraphElement]",
-    inspectable: true,
-    noClick: true,
-    inspectorIcon: true
-  }
 ];
 
 function test() {
   requestLongerTimeout(2);
-  Task.spawn(function*() {
+  Task.spawn(function* () {
     let {tab} = yield loadTab(TEST_URI);
     let hud = yield openConsole(tab);
     yield checkOutputForInputs(hud, inputTests);
