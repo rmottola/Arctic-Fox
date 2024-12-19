@@ -3348,6 +3348,10 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onPageError: function(type, packet) {
     if (this.webConsoleFrame && packet.from == this._consoleActor) {
+      if (this.webConsoleFrame.SUPER_FRONTEND_EXPERIMENT) {
+        this.webConsoleFrame.newConsoleOutput.dispatchMessageAdd(packet);
+        return;
+      }
       this.webConsoleFrame.handlePageError(packet.pageError);
     }
   },
