@@ -1642,6 +1642,15 @@ WebConsoleFrame.prototype = {
 
     this._updateNetMessage(actorId);
 
+    if (this.window.NetRequest) {
+      this.window.NetRequest.onNetworkEvent({
+        client: this.webConsoleClient,
+        response: networkInfo,
+        node: messageNode,
+        update: false
+      });
+    }
+
     return messageNode;
   },
 
@@ -1845,6 +1854,15 @@ WebConsoleFrame.prototype = {
    */
   handleNetworkEventUpdate: function(networkInfo, packet) {
     if (networkInfo.node && this._updateNetMessage(packet.from)) {
+      if (this.window.NetRequest) {
+        this.window.NetRequest.onNetworkEvent({
+          client: this.webConsoleClient,
+          response: packet,
+          node: networkInfo.node,
+          update: true
+        });
+      }
+
       this.emit("new-messages", new Set([{
         update: true,
         node: networkInfo.node,
