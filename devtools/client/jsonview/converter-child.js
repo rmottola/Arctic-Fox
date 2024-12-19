@@ -215,7 +215,7 @@ var Converter = Class({
       '</body></html>';
   },
 
-  toErrorPage: function(error, data, uri) {
+  toErrorPage: function (error, data, uri) {
     // Escape unicode nulls
     data = data.replace("\u0000", "\uFFFD");
 

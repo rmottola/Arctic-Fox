@@ -57,7 +57,7 @@ DomPanel.prototype = {
 
   // Initialization
 
-  initialize: function() {
+  initialize: function () {
     this.panelWin.addEventListener("devtools/content/message",
       this.onContentMessage, true);
 
@@ -137,7 +137,7 @@ DomPanel.prototype = {
 
   // Helpers
 
-  postContentMessage: function(type, args) {
+  postContentMessage: function (type, args) {
     let data = {
       type: type,
       args: args,
@@ -152,7 +152,7 @@ DomPanel.prototype = {
     this.panelWin.dispatchEvent(event);
   },
 
-  onContentMessage: function(event) {
+  onContentMessage: function (event) {
     let data = event.data;
     let method = data.type;
     if (typeof this[method] == "function") {
