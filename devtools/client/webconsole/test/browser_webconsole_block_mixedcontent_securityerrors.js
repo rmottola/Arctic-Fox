@@ -95,7 +95,7 @@ function mixedContentOverrideTest2(hud, browser) {
         objects: true,
       },
     ],
-  }).then(msgs => deferred.resolve(msgs), Cu.reportError);
+  }).then(msgs => deferred.resolve(msgs), e => console.error(e));
 
   return deferred.promise;
 }

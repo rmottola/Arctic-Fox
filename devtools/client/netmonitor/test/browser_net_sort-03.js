@@ -191,6 +191,6 @@ function test() {
       return promise.resolve(null);
     }
 
-    performRequestsInContent(requests).then(null, Cu.reportError);
+    performRequestsInContent(requests).then(null, e => console.error(e));
   });
 }
