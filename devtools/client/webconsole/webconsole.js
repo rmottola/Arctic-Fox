@@ -197,6 +197,7 @@ const MIN_FONT_SIZE = 10;
 const PREF_CONNECTION_TIMEOUT = "devtools.debugger.remote-timeout";
 const PREF_PERSISTLOG = "devtools.webconsole.persistlog";
 const PREF_MESSAGE_TIMESTAMP = "devtools.webconsole.timestampMessages";
+const PREF_NEW_FRONTEND_ENABLED = "devtools.webconsole.new-frontend-enabled";
 
 /**
  * A WebConsoleFrame instance is an interactive console initialized *per target*
@@ -507,7 +508,8 @@ WebConsoleFrame.prototype = {
   _initUI: function() {
     this.document = this.window.document;
     this.rootElement = this.document.documentElement;
-    this.SUPER_FRONTEND_EXPERIMENT = !this.owner._browserConsole && !!this.window.NewConsoleOutput;
+    this.NEW_CONSOLE_OUTPUT_ENABLED = !this.owner._browserConsole &&
+      Services.prefs.getBoolPref(PREF_NEW_FRONTEND_ENABLED);
 
     this._initDefaultFilterPrefs();
 
@@ -568,7 +570,7 @@ WebConsoleFrame.prototype = {
     this.jsterm = new JSTerm(this);
     this.jsterm.init();
 
-    if (this.SUPER_FRONTEND_EXPERIMENT) {
+    if (this.NEW_CONSOLE_OUTPUT_ENABLED) {
       // @TODO Remove this once JSTerm is handled with React/Redux.
       this.window.jsterm = this.jsterm;
       console.log("Entering experimental mode for console frontend");
@@ -3348,7 +3350,7 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onPageError: function(type, packet) {
     if (this.webConsoleFrame && packet.from == this._consoleActor) {
-      if (this.webConsoleFrame.SUPER_FRONTEND_EXPERIMENT) {
+      if (this.webConsoleFrame.NEW_CONSOLE_OUTPUT_ENABLED) {
         this.webConsoleFrame.newConsoleOutput.dispatchMessageAdd(packet);
         return;
       }
@@ -3384,7 +3386,7 @@ WebConsoleConnectionProxy.prototype = {
    */
   _onConsoleAPICall: function(type, packet) {
     if (this.webConsoleFrame && packet.from == this._consoleActor) {
-      if (this.webConsoleFrame.SUPER_FRONTEND_EXPERIMENT) {
+      if (this.webConsoleFrame.NEW_CONSOLE_OUTPUT_ENABLED) {
         this.webConsoleFrame.newConsoleOutput.dispatchMessageAdd(packet);
       } else {
         this.webConsoleFrame.handleConsoleAPICall(packet.message);
