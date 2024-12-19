@@ -191,6 +191,6 @@ function test() {
       return promise.resolve(null);
     }
 
-    aDebuggee.performRequests();
+    performRequestsInContent(requests).then(null, Cu.reportError);
   });
 }
