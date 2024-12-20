@@ -4,6 +4,10 @@
 
 "use strict";
 
+const { LocalizationHelper } = require("devtools/client/shared/l10n");
+const STRINGS_URI = "chrome://global/locale/layout_errors.properties";
+const L10N = new LocalizationHelper(STRINGS_URI);
+
 // Test that when an animation is selected, its list of animated properties is
 // displayed below it.
 
@@ -41,6 +45,9 @@ add_task(function* () {
   ok(hasExpectedProperties(propertiesList),
      "The list of properties panel contains the right properties");
 
+  ok(hasExpectedWarnings(propertiesList),
+     "The list of properties panel contains the right warnings");
+
   info("Click to unselect the animation");
   yield clickOnAnimation(panel, 0, true);
 
@@ -64,4 +71,15 @@ function hasExpectedProperties(containerEl) {
   }
 
   return true;
+}
+
+function hasExpectedWarnings(containerEl) {
+  let warnings = [...containerEl.querySelectorAll(".warning")];
+  for (let warning of warnings) {
+    if (warning.getAttribute("title") ==
+         L10N.getStr("AnimationWarningTransformWithGeometricProperties")) {
+      return true;
+    }
+  }
+  return false;
 }
