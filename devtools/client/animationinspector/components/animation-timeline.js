@@ -272,6 +272,21 @@ AnimationsTimeline.prototype = {
     });
   },
 
+  getCompositorStatusClassName: function (state) {
+    let className = state.isRunningOnCompositor
+                    ? " fast-track"
+                    : "";
+
+    if (state.isRunningOnCompositor && state.propertyState) {
+      className +=
+        state.propertyState.some(propState => !propState.runningOnCompositor)
+        ? " some-properties"
+        : " all-properties";
+    }
+
+    return className;
+  },
+
   render: function (animations, documentCurrentTime) {
     this.unrender();
 
@@ -289,7 +304,6 @@ AnimationsTimeline.prototype = {
 
     for (let animation of this.animations) {
       animation.on("changed", this.onAnimationStateChanged);
-
       // Each line contains the target animated node and the animation time
       // block.
       let animationEl = createNode({
@@ -298,7 +312,7 @@ AnimationsTimeline.prototype = {
         attributes: {
           "class": "animation " +
                    animation.state.type +
-                   (animation.state.isRunningOnCompositor ? " fast-track" : "")
+                   this.getCompositorStatusClassName(animation.state)
         }
       });
 
@@ -308,7 +322,7 @@ AnimationsTimeline.prototype = {
         parent: this.animationsEl,
         nodeType: "li",
         attributes: {
-          "class": "animated-properties"
+          "class": "animated-properties " + animation.state.type
         }
       });
 
