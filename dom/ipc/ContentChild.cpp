@@ -456,7 +456,7 @@ ConsoleListener::Observe(nsIConsoleMessage* aMessage)
 
   nsCOMPtr<nsIScriptError> scriptError = do_QueryInterface(aMessage);
   if (scriptError) {
-    nsString msg, sourceName, sourceLine;
+    nsAutoString msg, sourceName, sourceLine;
     nsXPIDLCString category;
     uint32_t lineNum, colNum, flags;
 
