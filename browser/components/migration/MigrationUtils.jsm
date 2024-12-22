@@ -567,6 +567,7 @@ this.MigrationUtils = Object.freeze({
    *        - {nsIBrowserProfileMigrator} actual migrator object
    *        - {Boolean} whether this is a startup migration
    *        - {Boolean} whether to skip the 'source' page
+   *        - {String} an identifier for the profile to use when migrating
    *        NB: If you add new consumers, please add a migration entry point
    *        constant below, and specify at least the first element of the array
    *        (the migration entry point for purposes of telemetry).
@@ -649,11 +650,13 @@ this.MigrationUtils = Object.freeze({
    *        migrator for it, or with the first option selected as a fallback
    *        (The first option is hardcoded to be the most common browser for
    *         the OS we run on.  See migration.xul).
+   * @param [optional] aProfileToMigrate
+   *        If set, the migration wizard will import from the profile indicated.
    * @throws if aMigratorKey is invalid or if it points to a non-existent
    *         source.
    */
   startupMigration:
-  function MU_startupMigrator(aProfileStartup, aMigratorKey) {
+  function MU_startupMigrator(aProfileStartup, aMigratorKey, aProfileToMigrate) {
     if (!aProfileStartup) {
       throw new Error("a profile-startup instance is required for startup-migration");
     }
@@ -703,7 +706,8 @@ this.MigrationUtils = Object.freeze({
       migratorKey,
       migrator,
       aProfileStartup,
-      skipSourcePage
+      skipSourcePage,
+      aProfileToMigrate,
     ];
     this.showMigrationWizard(null, params);
   },
