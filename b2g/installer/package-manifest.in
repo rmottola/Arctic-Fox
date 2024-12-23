@@ -625,11 +625,6 @@
 @RESPATH@/components/PushServiceLauncher.js
 #endif
 
-@RESPATH@/components/InterAppComm.manifest
-@RESPATH@/components/InterAppCommService.js
-@RESPATH@/components/InterAppConnection.js
-@RESPATH@/components/InterAppMessagePort.js
-
 @BINPATH@/components/nsDOMIdentity.js
 @BINPATH@/components/nsIDService.js
 @BINPATH@/components/Identity.manifest
@@ -889,7 +884,6 @@ bin/libfreebl_32int64_3.so
 @RESPATH@/components/FilePicker.js
 @RESPATH@/components/HelperAppDialog.js
 @RESPATH@/components/DownloadsUI.js
-@RESPATH@/components/InterAppCommUIGlue.js
 @RESPATH@/components/SystemMessageGlue.js
 @RESPATH@/components/B2GAppMigrator.js
 @RESPATH@/components/B2GPresentationDevicePrompt.js
