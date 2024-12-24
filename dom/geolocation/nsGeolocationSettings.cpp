@@ -259,6 +259,7 @@ nsGeolocationSettings::HandleGeolocationPerOriginSettingsChange(const JS::Value&
     // if it is an app that is always precise, skip it
     nsAutoJSString origin;
     if (!origin.init(cx, id)) {
+      JS_ClearPendingException(cx); // catch and ignore any exceptions
       continue;
     }
     if (mAlwaysPreciseApps.Contains(origin)) {
@@ -267,7 +268,8 @@ nsGeolocationSettings::HandleGeolocationPerOriginSettingsChange(const JS::Value&
 
     // get the app setting object
     JS::RootedValue propertyValue(cx);
-    if (!JS_GetPropertyById(cx, obj, id, &propertyValue) || !propertyValue.isObject()) {
+    if (!JS_GetPropertyById(cx, obj, id, &propertyValue)) {
+      JS_ClearPendingException(cx); // catch and ignore any exceptions
       continue;
     }
     JS::RootedObject settingObj(cx, &propertyValue.toObject());
@@ -279,6 +281,8 @@ nsGeolocationSettings::HandleGeolocationPerOriginSettingsChange(const JS::Value&
     JS::RootedValue fm(cx);
     if (JS_GetProperty(cx, settingObj, "type", &fm)) {
       settings->HandleTypeChange(fm);
+    } else {
+      JS_ClearPendingException(cx); // catch and ignore any exceptions
     }
 
 #ifdef MOZ_APPROX_LOCATION
@@ -286,6 +290,8 @@ nsGeolocationSettings::HandleGeolocationPerOriginSettingsChange(const JS::Value&
     JS::RootedValue distance(cx);
     if (JS_GetProperty(cx, settingObj, "distance", &distance)) {
       settings->HandleApproxDistanceChange(distance);
+    } else {
+      JS_ClearPendingException(cx); // catch and ignore any exceptions
     }
 #endif
 
@@ -293,6 +299,8 @@ nsGeolocationSettings::HandleGeolocationPerOriginSettingsChange(const JS::Value&
     JS::RootedValue coords(cx);
     if (JS_GetProperty(cx, settingObj, "coords", &coords)) {
       settings->HandleFixedCoordsChange(coords);
+    } else {
+      JS_ClearPendingException(cx); // catch and ignore any exceptions
     }
 
     // add the per-app setting object to the hashtable
@@ -335,11 +343,13 @@ nsGeolocationSettings::HandleGeolocationAlwaysPreciseChange(const JS::Value& aVa
     JS::RootedValue value(cx);
 
     if (!JS_GetElement(cx, obj, i, &value) || !value.isString()) {
+      JS_ClearPendingException(cx); // catch and ignore any exceptions
       continue;
     }
 
     nsAutoJSString origin;
     if (!origin.init(cx, value)) {
+      JS_ClearPendingException(cx); // catch and ignore any exceptions
       continue;
     }
 
