@@ -814,7 +814,7 @@ toolbar[mode=full] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 }
 
 #stop-button {
-    -moz-image-region: rect(0, 54px, 18px, 36px);
+    -moz-image-region: rect(0, 108px, 18px, 90px);
 }
 
 #reload-button {
