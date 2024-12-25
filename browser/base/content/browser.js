@@ -1157,10 +1157,6 @@ var gBrowserInit = {
       ZoomManager.setZoomForBrowser(browser, 1);
     }, false, true);
 
-    gBrowser.addEventListener("InsecureLoginFormsStateChange", function() {
-      gIdentityHandler.refreshForInsecureLoginForms();
-    });
-
     let uriToLoad = this._getUriToLoad();
     if (uriToLoad && uriToLoad != "about:blank") {
       if (uriToLoad instanceof Ci.nsISupportsArray) {
@@ -6996,6 +6992,20 @@ var gIdentityHandler = {
     PopupNotifications.show(gBrowser.selectedBrowser, "bad-content",
                             "", "bad-content-blocked-notification-icon",
                             null, null, options);
+  },
+
+  /**
+   * This is called asynchronously when requested by the Logins module, after
+   * the insecure login forms state for the page has been updated.
+   */
+  refreshForInsecureLoginForms() {
+    // Check this._uri because we don't want to refresh the user interface if
+    // this is called before the first page load in the window for any reason.
+    if (!this._uri) {
+      Cu.reportError("Unexpected early call to refreshForInsecureLoginForms.");
+      return;
+    }
+    this.refreshIdentityBlock();
   },
 
   /**
