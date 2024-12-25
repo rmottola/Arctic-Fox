@@ -200,10 +200,8 @@ this.TabCrashHandler = {
       this.prefs.setCharPref("email", "");
     }
 
-    if (CrashSubmit.submit(dumpID, { recordSubmission: true })) {
-      this.childMap.set(childID, null); // Avoid resubmission.
-      this.removeSubmitCheckboxesForSameCrash(childID);
-    }
+    this.childMap.set(childID, null); // Avoid resubmission.
+    this.removeSubmitCheckboxesForSameCrash(childID);
   },
 
   removeSubmitCheckboxesForSameCrash: function(childID) {
