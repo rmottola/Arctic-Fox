@@ -72,7 +72,7 @@ this.TabCrashHandler = {
         if (!browser)
           return;
 
-        this.browserMap.set(browser, aSubject.childID);
+        this.browserMap.set(browser.permanentKey, aSubject.childID);
         break;
     }
   },
@@ -203,8 +203,8 @@ this.TabCrashHandler = {
         if (!doc.documentURI.startsWith("about:tabcrashed"))
           continue;
 
-        if (this.browserMap.get(browser) == childID) {
-          this.browserMap.delete(browser);
+        if (this.browserMap.get(browser.permanentKey) == childID) {
+          this.browserMap.delete(browser.permanentKey);
           let ports = this.pageListener.portsForBrowser(browser);
           if (ports.length) {
             // For about:tabcrashed, we don't expect subframes. We can
@@ -213,28 +213,6 @@ this.TabCrashHandler = {
           }
         }
       }
-    }
-  },
-
-  onAboutTabCrashedLoad: function (aBrowser) {
-    if (!this.childMap)
-      return;
-
-    let dumpID = this.childMap.get(this.browserMap.get(aBrowser));
-    if (!dumpID)
-      return;
-
-    let doc = aBrowser.contentDocument;
-    doc.documentElement.classList.add("crashDumpAvailable");
-    let sendReport = this.prefs.getBoolPref("sendReport");
-    doc.getElementById("sendReport").checked = sendReport;
-    let includeURL = this.prefs.getBoolPref("includeURL");
-    doc.getElementById("includeURL").checked = includeURL;
-    let emailMe = this.prefs.getBoolPref("emailMe");
-    doc.getElementById("emailMe").checked = emailMe;
-    if (emailMe) {
-      let email = this.prefs.getCharPref("email", "");
-      doc.getElementById("email").value = email;
     }
   },
 
@@ -320,6 +298,7 @@ this.TabCrashHandler = {
     if (!this.childMap) {
       return null;
     }
+
     return this.childMap.get(this.browserMap.get(browser.permanentKey));
   },
 }
