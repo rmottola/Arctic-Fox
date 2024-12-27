@@ -1011,8 +1011,7 @@ nsComboboxControlFrame::RedisplayText(int32_t aIndex)
 
     RefPtr<RedisplayTextEvent> event = new RedisplayTextEvent(this);
     mRedisplayTextEvent = event;
-    if (!nsContentUtils::AddScriptRunner(event))
-      mRedisplayTextEvent.Forget();
+    nsContentUtils::AddScriptRunner(event);
   }
   return rv;
 }
