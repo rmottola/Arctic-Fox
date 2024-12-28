@@ -36,10 +36,6 @@ public:
 #ifdef MOZILLA_INTERNAL_API
     nsrefcnt AddRef(void);
     nsrefcnt Release(void);
-
-    // These functions exist so that browsercomps can refcount a gfxASurface
-    virtual nsrefcnt AddRefExternal(void);
-    virtual nsrefcnt ReleaseExternal(void);
 #else
     virtual nsrefcnt AddRef(void);
     virtual nsrefcnt Release(void);
@@ -100,13 +96,6 @@ public:
     virtual already_AddRefed<gfxImageSurface> GetAsImageSurface();
 
     /**
-     * Returns a read-only ARGB32 image surface for this surface. If this is an
-     * optimized surface this may require a copy.
-     * Returns null on error.
-     */
-    virtual already_AddRefed<gfxImageSurface> GetAsReadableARGB32ImageSurface();
-
-    /**
      * Creates a new ARGB32 image surface with the same contents as this surface.
      * Returns null on error.
      */
@@ -120,9 +109,6 @@ public:
     static int32_t FormatStrideForWidth(gfxImageFormat format, int32_t width);
 
     static gfxContentType ContentFromFormat(gfxImageFormat format);
-
-    void SetSubpixelAntialiasingEnabled(bool aEnabled);
-    bool GetSubpixelAntialiasingEnabled();
 
     /**
      * Record number of bytes for given surface type.  Use positive bytes
@@ -167,12 +153,6 @@ public:
         return GetEmptyOpaqueRect();
     }
 
-    /**
-     * Mark the surface as being allowed/not allowed to be used as a source.
-     */
-    void SetAllowUseAsSource(bool aAllow) { mAllowUseAsSource = aAllow; }
-    bool GetAllowUseAsSource() { return mAllowUseAsSource; }
-
     static uint8_t BytesPerPixel(gfxImageFormat aImageFormat);
 
 protected:
@@ -203,7 +183,6 @@ private:
 
 protected:
     bool mSurfaceValid;
-    bool mAllowUseAsSource;
 };
 
 /**
