@@ -511,6 +511,7 @@ static const FeatureInfo sFeatureInfoArr[] = {
         GLContext::Extension_None,
         {
             GLContext::ARB_texture_float,
+            GLContext::EXT_color_buffer_float,
             GLContext::EXT_color_buffer_half_float,
             GLContext::Extensions_End
         }
@@ -563,6 +564,17 @@ static const FeatureInfo sFeatureInfoArr[] = {
         GLESVersion::NONE,
         GLContext::ARB_seamless_cube_map,
         {
+            GLContext::Extensions_End
+        }
+    },
+    {
+        "shader_texture_lod",
+        GLVersion::NONE,
+        GLESVersion::NONE,
+        GLContext::Extension_None,
+        {
+            GLContext::ARB_shader_texture_lod,
+            GLContext::EXT_shader_texture_lod,
             GLContext::Extensions_End
         }
     },

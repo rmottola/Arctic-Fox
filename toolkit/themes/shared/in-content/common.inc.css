@@ -360,13 +360,11 @@ xul|button[type="menu"] > xul|menupopup xul|menuseparator {
 
 /* textboxes */
 
+html|input[type="text"],
+html|textarea,
 *|textbox {
   -moz-appearance: none;
-  height: 30px;
   color: #333;
-  line-height: 20px;
-  padding-right: 10px;
-  padding-left: 10px;
   border: 1px solid #c1c1c1;
   -moz-border-top-colors: none !important;
   -moz-border-right-colors: none !important;
@@ -374,6 +372,19 @@ xul|button[type="menu"] > xul|menupopup xul|menuseparator {
   -moz-border-left-colors: none !important;
   border-radius: 2px;
   background-color: #fff;
+}
+
+xul|textbox {
+  min-height: 30px;
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+html|input[type="text"],
+html|textarea {
+  font-family: inherit;
+  font-size: inherit;
+  padding: 5px 10px;
 }
 
 html|textbox:focus,

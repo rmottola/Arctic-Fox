@@ -120,8 +120,6 @@ WebGLContext::IsExtensionSupported(WebGLExtensionID ext) const
     // OES_
     case WebGLExtensionID::OES_texture_float_linear:
         return gl->IsSupported(gl::GLFeature::texture_float_linear);
-    case WebGLExtensionID::OES_texture_half_float_linear:
-        return gl->IsSupported(gl::GLFeature::texture_half_float_linear);
 
     // WEBGL_
     case WebGLExtensionID::WEBGL_color_buffer_float:
@@ -176,7 +174,7 @@ WebGLContext::IsExtensionSupported(WebGLExtensionID ext) const
         case WebGLExtensionID::EXT_frag_depth:
             return WebGLExtensionFragDepth::IsSupported(this);
         case WebGLExtensionID::EXT_shader_texture_lod:
-            return gl->IsExtensionSupported(gl::GLContext::EXT_shader_texture_lod);
+            return gl->IsSupported(gl::GLFeature::shader_texture_lod);
         case WebGLExtensionID::EXT_sRGB:
             return WebGLExtensionSRGB::IsSupported(this);
 
@@ -189,6 +187,8 @@ WebGLContext::IsExtensionSupported(WebGLExtensionID ext) const
             return WebGLExtensionTextureFloat::IsSupported(this);
         case WebGLExtensionID::OES_texture_half_float:
             return WebGLExtensionTextureHalfFloat::IsSupported(this);
+        case WebGLExtensionID::OES_texture_half_float_linear:
+            return gl->IsSupported(gl::GLFeature::texture_half_float_linear);
 
         case WebGLExtensionID::OES_vertex_array_object:
             return true;

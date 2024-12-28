@@ -594,8 +594,8 @@ nsComboboxControlFrame::GetAvailableDropdownSpace(WritingMode aWM,
                                containerSize);
     mLastDropDownAfterScreenBCoord = thisScreenRect.BEnd(aWM) +
                                      aTranslation->B(aWM);
-    mLastDropDownBeforeScreenBCoord = thisScreenRect.BEnd(aWM) +
-                                     aTranslation->B(aWM);
+    mLastDropDownBeforeScreenBCoord = thisScreenRect.BStart(aWM) +
+                                      aTranslation->B(aWM);
   }
 
   nscoord minBCoord;
@@ -1011,8 +1011,7 @@ nsComboboxControlFrame::RedisplayText(int32_t aIndex)
 
     RefPtr<RedisplayTextEvent> event = new RedisplayTextEvent(this);
     mRedisplayTextEvent = event;
-    if (!nsContentUtils::AddScriptRunner(event))
-      mRedisplayTextEvent.Forget();
+    nsContentUtils::AddScriptRunner(event);
   }
   return rv;
 }
