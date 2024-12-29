@@ -60,8 +60,6 @@ public:
     void SetDeviceOffset(const gfxPoint& offset);
     gfxPoint GetDeviceOffset() const;
 
-    virtual bool GetRotateForLandscape() { return false; }
-
     void Flush() const;
     void MarkDirty();
     void MarkDirty(const gfxRect& r);
