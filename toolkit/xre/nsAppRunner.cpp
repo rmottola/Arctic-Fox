@@ -2892,21 +2892,6 @@ static void MakeOrSetMinidumpPath(nsIFile* profD)
 const nsXREAppData* gAppData = nullptr;
 
 #ifdef MOZ_WIDGET_GTK
-#include "prlink.h"
-typedef void (*_g_set_application_name_fn)(const gchar *application_name);
-typedef void (*_gtk_window_set_auto_startup_notification_fn)(gboolean setting);
-
-static PRFuncPtr FindFunction(const char* aName)
-{
-  PRLibrary *lib = nullptr;
-  PRFuncPtr result = PR_FindFunctionSymbolAndLibrary(aName, &lib);
-  // Since the library was already loaded, we can safely unload it here.
-  if (lib) {
-    PR_UnloadLibrary(lib);
-  }
-  return result;
-}
-
 static void MOZ_gdk_display_close(GdkDisplay *display)
 {
 #if CLEANUP_MEMORY
@@ -3518,6 +3503,12 @@ XREMain::XRE_mainInit(bool* aExitFlag)
     gSafeMode = true;
 #endif
 
+#ifdef MOZ_CRASHREPORTER
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("SafeMode"),
+                                       gSafeMode ? NS_LITERAL_CSTRING("1") :
+                                                   NS_LITERAL_CSTRING("0"));
+#endif
+
   // Handle --no-remote and --new-instance command line arguments. Setup
   // the environment to better accommodate other components and various
   // restart scenarios.
@@ -3867,17 +3858,8 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
   }
 #endif
 #if defined(MOZ_WIDGET_GTK)
-  // g_set_application_name () is only defined in glib2.2 and higher.
-  _g_set_application_name_fn _g_set_application_name =
-    (_g_set_application_name_fn)FindFunction("g_set_application_name");
-  if (_g_set_application_name) {
-    _g_set_application_name(mAppData->name);
-  }
-  _gtk_window_set_auto_startup_notification_fn _gtk_window_set_auto_startup_notification =
-    (_gtk_window_set_auto_startup_notification_fn)FindFunction("gtk_window_set_auto_startup_notification");
-  if (_gtk_window_set_auto_startup_notification) {
-    _gtk_window_set_auto_startup_notification(false);
-  }
+  g_set_application_name(mAppData->name);
+  gtk_window_set_auto_startup_notification(false);
 
 #if (MOZ_WIDGET_GTK == 2)
   gtk_widget_set_default_colormap(gdk_rgb_get_colormap());
