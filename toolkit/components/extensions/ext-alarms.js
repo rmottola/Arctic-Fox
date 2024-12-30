@@ -90,7 +90,7 @@ extensions.on("shutdown", (type, extension) => {
 });
 /* eslint-enable mozilla/balanced-listeners */
 
-extensions.registerAPI((extension, context) => {
+extensions.registerPrivilegedAPI("alarms", (extension, context) => {
   return {
     alarms: {
       create: function(...args) {
