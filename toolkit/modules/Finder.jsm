@@ -240,7 +240,16 @@ Finder.prototype = {
       return "";
 
     // Process our text to get rid of unwanted characters.
-    return selText.trim().replace(/\s+/g, " ").substr(0, kSelectionMaxLen);
+    selText = selText.trim().replace(/\s+/g, " ");
+    let truncLength = kSelectionMaxLen;
+    if (selText.length > truncLength) {
+      let truncChar = selText.charAt(truncLength).charCodeAt(0);
+      if (truncChar >= 0xDC00 && truncChar <= 0xDFFF)
+        truncLength++;
+      selText = selText.substr(0, truncLength);
+    }
+
+    return selText;
   },
 
   enableSelection: function() {
@@ -554,6 +563,10 @@ Finder.prototype = {
           }
         }
       }
+    }
+
+    if (!selection.rangeCount || selection.isCollapsed) {
+      return null;
     }
 
     let utils = topWin.QueryInterface(Ci.nsIInterfaceRequestor)

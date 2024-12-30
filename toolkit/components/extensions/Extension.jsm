@@ -77,12 +77,14 @@ ExtensionManagement.registerScript("chrome://extensions/content/ext-test.js");
 
 const BASE_SCHEMA = "chrome://extensions/content/schemas/manifest.json";
 
+ExtensionManagement.registerSchema("chrome://extensions/content/schemas/alarms.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/cookies.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/downloads.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/extension.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/extension_types.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/i18n.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/idle.json");
+ExtensionManagement.registerSchema("chrome://extensions/content/schemas/notifications.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/runtime.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/storage.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/test.json");
