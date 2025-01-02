@@ -5308,7 +5308,16 @@ pref("dom.mapped_arraybuffer.enabled", false);
 pref("urlclassifier.malwareTable", "goog-malware-shavar,goog-unwanted-shavar,test-malware-simple,test-unwanted-simple");
 pref("urlclassifier.phishTable", "goog-phish-shavar,test-phish-simple");
 pref("urlclassifier.downloadBlockTable", "");
+
+#ifdef XP_WIN
+ // Only download the whitelist on Windows, since the whitelist is
+ // only useful for suppressing remote lookups for signed binaries which we can
+ // only verify on Windows (Bug 974579). Other platforms always do remote lookups.
+pref("urlclassifier.downloadAllowTable", "goog-downloadwhite-digest256");
+#else
 pref("urlclassifier.downloadAllowTable", "");
+#endif
+
 pref("urlclassifier.disallow_completions", "test-malware-simple,test-phish-simple,test-unwanted-simple,test-track-simple,test-trackwhite-simple,test-forbid-simple,goog-downloadwhite-digest256,mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256,test-block-simple,mozplugin-block-digest256,mozplugin2-block-digest256");
 
 // The table and update/gethash URLs for Safebrowsing phishing and malware
