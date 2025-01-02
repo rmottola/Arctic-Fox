@@ -75,6 +75,74 @@ var snapshotFormatters = {
     $("safemode-box").textContent = data.safeMode;
   },
 
+  crashes: function crashes(data) {
+    if (!AppConstants.MOZ_CRASHREPORTER)
+      return;
+
+    let strings = stringBundle();
+    let daysRange = Troubleshoot.kMaxCrashAge / (24 * 60 * 60 * 1000);
+    $("crashes-title").textContent =
+      PluralForm.get(daysRange, strings.GetStringFromName("crashesTitle"))
+                .replace("#1", daysRange);
+    let reportURL;
+    try {
+      reportURL = Services.prefs.getCharPref("breakpad.reportURL");
+      // Ignore any non http/https urls
+      if (!/^https?:/i.test(reportURL))
+        reportURL = null;
+    }
+    catch (e) { }
+    if (!reportURL) {
+      $("crashes-noConfig").style.display = "block";
+      $("crashes-noConfig").classList.remove("no-copy");
+      return;
+    }
+    else {
+      $("crashes-allReports").style.display = "block";
+      $("crashes-allReports").classList.remove("no-copy");
+    }
+
+    if (data.pending > 0) {
+      $("crashes-allReportsWithPending").textContent =
+        PluralForm.get(data.pending, strings.GetStringFromName("pendingReports"))
+                  .replace("#1", data.pending);
+    }
+
+    let dateNow = new Date();
+    $.append($("crashes-tbody"), data.submitted.map(function (crash) {
+      let date = new Date(crash.date);
+      let timePassed = dateNow - date;
+      let formattedDate;
+      if (timePassed >= 24 * 60 * 60 * 1000)
+      {
+        let daysPassed = Math.round(timePassed / (24 * 60 * 60 * 1000));
+        let daysPassedString = strings.GetStringFromName("crashesTimeDays");
+        formattedDate = PluralForm.get(daysPassed, daysPassedString)
+                                  .replace("#1", daysPassed);
+      }
+      else if (timePassed >= 60 * 60 * 1000)
+      {
+        let hoursPassed = Math.round(timePassed / (60 * 60 * 1000));
+        let hoursPassedString = strings.GetStringFromName("crashesTimeHours");
+        formattedDate = PluralForm.get(hoursPassed, hoursPassedString)
+                                  .replace("#1", hoursPassed);
+      }
+      else
+      {
+        let minutesPassed = Math.max(Math.round(timePassed / (60 * 1000)), 1);
+        let minutesPassedString = strings.GetStringFromName("crashesTimeMinutes");
+        formattedDate = PluralForm.get(minutesPassed, minutesPassedString)
+                                  .replace("#1", minutesPassed);
+      }
+      return $.new("tr", [
+        $.new("td", [
+          $.new("a", crash.id, null, {href : reportURL + crash.id})
+        ]),
+        $.new("td", formattedDate)
+      ]);
+    }));
+  },
+
   extensions: function extensions(data) {
     $.append($("extensions-tbody"), data.map(function (extension) {
       return $.new("tr", [
@@ -298,6 +366,7 @@ var snapshotFormatters = {
     delete data.windowLayerManagerType;
     delete data.numTotalWindows;
     delete data.numAcceleratedWindows;
+    delete data.numAcceleratedWindowsMessage;
 
     addRow("features", "asyncPanZoom",
            apzInfo.length
@@ -318,14 +387,14 @@ var snapshotFormatters = {
 
     // Adapter tbodies.
     let adapterKeys = [
-      ["adapterDescription"],
-      ["adapterVendorID"],
-      ["adapterDeviceID"],
-      ["driverVersion"],
-      ["driverDate"],
-      ["adapterDrivers"],
-      ["adapterSubsysID"],
-      ["adapterRAM"],
+      ["adapterDescription", "gpuDescription"],
+      ["adapterVendorID", "gpuVendorID"],
+      ["adapterDeviceID", "gpuDeviceID"],
+      ["driverVersion", "gpuDriverVersion"],
+      ["driverDate", "gpuDriverDate"],
+      ["adapterDrivers", "gpuDrivers"],
+      ["adapterSubsysID", "gpuSubsysID"],
+      ["adapterRAM", "gpuRAM"],
     ];
 
     function showGpu(id, suffix) {
@@ -334,8 +403,8 @@ var snapshotFormatters = {
       }
 
       let trs = [];
-      for (let key of adapterKeys) {
-        let value = get(key);
+      for (let [prop, key] of adapterKeys) {
+        let value = get(prop);
         if (value === undefined || value === "")
           continue;
         trs.push(buildRow(key, value));
@@ -350,16 +419,16 @@ var snapshotFormatters = {
       if ("isGPU2Active" in data && ((suffix == "2") != data.isGPU2Active)) {
         active = "no";
       }
-      addRow(id, "active", strings.GetStringFromName(active));
+      addRow(id, "gpuActive", strings.GetStringFromName(active));
       addRows(id, trs);
     }
     showGpu("gpu-1", "");
     showGpu("gpu-2", "2");
 
     // Remove adapter keys.
-    for (let key of adapterKeys) {
-      delete data[key];
-      delete data[key + "2"];
+    for (let [prop, key] of adapterKeys) {
+      delete data[prop];
+      delete data[prop + "2"];
     }
     delete data.isGPU2Active;
 
@@ -448,7 +517,11 @@ var snapshotFormatters = {
     // Now that we're done, grab any remaining keys in data and drop them into
     // the diagnostics section.
     for (let key in data) {
-      addRow("diagnostics", key, data[key]);
+      let value = data[key];
+      if (Array.isArray(value)) {
+        value = localizedMsg(value);
+      }
+      addRow("diagnostics", key, value);
     }
   },
 
