@@ -75,6 +75,74 @@ var snapshotFormatters = {
     $("safemode-box").textContent = data.safeMode;
   },
 
+  crashes: function crashes(data) {
+    if (!AppConstants.MOZ_CRASHREPORTER)
+      return;
+
+    let strings = stringBundle();
+    let daysRange = Troubleshoot.kMaxCrashAge / (24 * 60 * 60 * 1000);
+    $("crashes-title").textContent =
+      PluralForm.get(daysRange, strings.GetStringFromName("crashesTitle"))
+                .replace("#1", daysRange);
+    let reportURL;
+    try {
+      reportURL = Services.prefs.getCharPref("breakpad.reportURL");
+      // Ignore any non http/https urls
+      if (!/^https?:/i.test(reportURL))
+        reportURL = null;
+    }
+    catch (e) { }
+    if (!reportURL) {
+      $("crashes-noConfig").style.display = "block";
+      $("crashes-noConfig").classList.remove("no-copy");
+      return;
+    }
+    else {
+      $("crashes-allReports").style.display = "block";
+      $("crashes-allReports").classList.remove("no-copy");
+    }
+
+    if (data.pending > 0) {
+      $("crashes-allReportsWithPending").textContent =
+        PluralForm.get(data.pending, strings.GetStringFromName("pendingReports"))
+                  .replace("#1", data.pending);
+    }
+
+    let dateNow = new Date();
+    $.append($("crashes-tbody"), data.submitted.map(function (crash) {
+      let date = new Date(crash.date);
+      let timePassed = dateNow - date;
+      let formattedDate;
+      if (timePassed >= 24 * 60 * 60 * 1000)
+      {
+        let daysPassed = Math.round(timePassed / (24 * 60 * 60 * 1000));
+        let daysPassedString = strings.GetStringFromName("crashesTimeDays");
+        formattedDate = PluralForm.get(daysPassed, daysPassedString)
+                                  .replace("#1", daysPassed);
+      }
+      else if (timePassed >= 60 * 60 * 1000)
+      {
+        let hoursPassed = Math.round(timePassed / (60 * 60 * 1000));
+        let hoursPassedString = strings.GetStringFromName("crashesTimeHours");
+        formattedDate = PluralForm.get(hoursPassed, hoursPassedString)
+                                  .replace("#1", hoursPassed);
+      }
+      else
+      {
+        let minutesPassed = Math.max(Math.round(timePassed / (60 * 1000)), 1);
+        let minutesPassedString = strings.GetStringFromName("crashesTimeMinutes");
+        formattedDate = PluralForm.get(minutesPassed, minutesPassedString)
+                                  .replace("#1", minutesPassed);
+      }
+      return $.new("tr", [
+        $.new("td", [
+          $.new("a", crash.id, null, {href : reportURL + crash.id})
+        ]),
+        $.new("td", formattedDate)
+      ]);
+    }));
+  },
+
   extensions: function extensions(data) {
     $.append($("extensions-tbody"), data.map(function (extension) {
       return $.new("tr", [
