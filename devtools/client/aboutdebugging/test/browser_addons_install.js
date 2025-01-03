@@ -7,30 +7,21 @@ const ADDON_NAME = "test-devtools";
 
 add_task(function* () {
   let { tab, document } = yield openAboutDebugging("addons");
+  yield waitForInitialAddonList(document);
 
-  yield installAddon(document, "addons/unpacked/install.rdf", "test-devtools");
+  // Install this add-on, and verify that it appears in the about:debugging UI
+  yield installAddon(document, "addons/unpacked/install.rdf", ADDON_NAME,
+                     "test-devtools");
 
-  // Check that the addon appears in the UI
-  let names = [...document.querySelectorAll("#addons .target-name")];
-  names = names.map(element => element.textContent);
-  ok(names.includes(ADDON_NAME),
-    "The addon name appears in the list of addons: " + names);
-
-  // Now uninstall this addon
-  yield uninstallAddon(ADDON_ID);
-
-  // Ensure that the UI removes the addon from the list
-  names = [...document.querySelectorAll("#addons .target-name")];
-  names = names.map(element => element.textContent);
-  ok(!names.includes(ADDON_NAME),
-    "After uninstall, the addon name disappears from the list of addons: "
-    + names);
+  // Install the add-on, and verify that it disappears in the about:debugging UI
+  yield uninstallAddon(document, ADDON_ID, ADDON_NAME);
 
   yield closeAboutDebugging(tab);
 });
 
 add_task(function* () {
   let { tab, document } = yield openAboutDebugging("addons");
+  yield waitForInitialAddonList(document);
 
   // Start an observer that looks for the install error before
   // actually doing the install

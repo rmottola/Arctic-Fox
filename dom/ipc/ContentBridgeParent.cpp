@@ -9,6 +9,7 @@
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "nsXULAppAPI.h"
 #include "nsIObserverService.h"
+#include "base/task.h"
 
 using namespace mozilla::ipc;
 using namespace mozilla::jsipc;
@@ -37,8 +38,7 @@ ContentBridgeParent::ActorDestroy(ActorDestroyReason aWhy)
   if (os) {
     os->RemoveObserver(this, "content-child-shutdown");
   }
-  MessageLoop::current()->PostTask(
-    NewRunnableMethod(this, &ContentBridgeParent::DeferredDestroy));
+  MessageLoop::current()->PostTask(NewRunnableMethod(this, &ContentBridgeParent::DeferredDestroy));
 }
 
 /*static*/ ContentBridgeParent*
@@ -168,8 +168,7 @@ ContentBridgeParent::NotifyTabDestroyed()
 {
   int32_t numLiveTabs = ManagedPBrowserParent().Count();
   if (numLiveTabs == 1) {
-    MessageLoop::current()->PostTask(
-      NewRunnableMethod(this, &ContentBridgeParent::Close));
+    MessageLoop::current()->PostTask(NewRunnableMethod(this, &ContentBridgeParent::Close));
   }
 }
 

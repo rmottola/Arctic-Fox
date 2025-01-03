@@ -6,7 +6,9 @@
 #if !defined(MediaDecoderReader_h_)
 #define MediaDecoderReader_h_
 
+#include "mozilla/EnumSet.h"
 #include "mozilla/MozPromise.h"
+#include "nsAutoPtr.h"
 
 #include "AbstractMediaDecoder.h"
 #include "MediaInfo.h"
@@ -73,6 +75,8 @@ public:
     CANCELED
   };
 
+  using TrackSet = EnumSet<TrackInfo::TrackType>;
+
   using MetadataPromise =
     MozPromise<RefPtr<MetadataHolder>, ReadMetadataFailureReason, IsExclusive>;
   using MediaDataPromise =
@@ -125,7 +129,11 @@ public:
   // The first samples of every stream produced after a ResetDecode() call
   // *must* be marked as "discontinuities". If it's not, seeking work won't
   // properly!
-  virtual nsresult ResetDecode();
+  //
+  // aParam is a set of TrackInfo::TrackType enums specifying which
+  // queues need to be reset, defaulting to both audio and video tracks.
+  virtual nsresult ResetDecode(TrackSet aTracks = TrackSet(TrackInfo::kAudioTrack,
+                                                           TrackInfo::kVideoTrack));
 
   // Requests one audio sample from the reader.
   //
@@ -394,6 +402,8 @@ private:
 
   // Recomputes mBuffered.
   virtual void UpdateBuffered();
+
+  virtual void VisibilityChanged();
 
   virtual void NotifyDataArrivedInternal() {}
 

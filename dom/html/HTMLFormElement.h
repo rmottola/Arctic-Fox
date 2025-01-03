@@ -9,6 +9,7 @@
 
 #include "mozilla/AsyncEventDispatcher.h"
 #include "mozilla/Attributes.h"
+#include "nsAutoPtr.h"
 #include "nsCOMPtr.h"
 #include "nsIForm.h"
 #include "nsIFormControl.h"
@@ -387,15 +388,18 @@ public:
     return CheckFormValidity(nullptr);
   }
 
+  bool ReportValidity()
+  {
+    return CheckValidFormSubmission();
+  }
+
   Element*
   IndexedGetter(uint32_t aIndex, bool &aFound);
 
   already_AddRefed<nsISupports>
   NamedGetter(const nsAString& aName, bool &aFound);
 
-  bool NameIsEnumerable(const nsAString& aName);
-
-  void GetSupportedNames(unsigned, nsTArray<nsString >& aRetval);
+  void GetSupportedNames(nsTArray<nsString>& aRetval);
 
   static int32_t
   CompareFormControlPosition(Element* aElement1, Element* aElement2,

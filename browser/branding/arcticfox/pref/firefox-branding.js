@@ -3,7 +3,10 @@
 #include ../../shared/pref/preferences.inc
 #include ../../shared/pref/uaoverrides.inc
 
-pref("startup.homepage_override_url","");
+pref("startup.homepage_override_url", "");
+pref("startup.homepage_welcome_url", "https://www.mozilla.org/%LOCALE%/firefox/%VERSION%/firstrun/");
+pref("startup.homepage_welcome_url.additional", "");
+
 pref("app.releaseNotesURL", "https://github.com/rmottola/Arctic-Fox/releases");
 
 // Disable Firefox compatmode by default.

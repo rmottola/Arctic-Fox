@@ -85,8 +85,7 @@ MediaDecoderReader::MediaDecoderReader(AbstractMediaDecoder* aDecoder)
   }
 
   // Dispatch initialization that needs to happen on that task queue.
-  nsCOMPtr<nsIRunnable> r = NS_NewRunnableMethod(this, &MediaDecoderReader::InitializationTask);
-  mTaskQueue->Dispatch(r.forget());
+  mTaskQueue->Dispatch(NewRunnableMethod(this, &MediaDecoderReader::InitializationTask));
 }
 
 void
@@ -133,16 +132,19 @@ size_t MediaDecoderReader::SizeOfAudioQueueInFrames()
   return mAudioQueue.GetSize();
 }
 
-nsresult MediaDecoderReader::ResetDecode()
+nsresult MediaDecoderReader::ResetDecode(TrackSet aTracks)
 {
-  VideoQueue().Reset();
-  AudioQueue().Reset();
+  if (aTracks.contains(TrackInfo::kVideoTrack)) {
+    VideoQueue().Reset();
+    mVideoDiscontinuity = true;
+    mBaseVideoPromise.RejectIfExists(CANCELED, __func__);
+  }
 
-  mAudioDiscontinuity = true;
-  mVideoDiscontinuity = true;
-
-  mBaseAudioPromise.RejectIfExists(CANCELED, __func__);
-  mBaseVideoPromise.RejectIfExists(CANCELED, __func__);
+  if (aTracks.contains(TrackInfo::kAudioTrack)) {
+    AudioQueue().Reset();
+    mAudioDiscontinuity = true;
+    mBaseAudioPromise.RejectIfExists(CANCELED, __func__);
+  }
 
   return NS_OK;
 }
@@ -183,6 +185,10 @@ MediaDecoderReader::UpdateBuffered()
   NS_ENSURE_TRUE_VOID(!mShutdown);
   mBuffered = GetBuffered();
 }
+
+void
+MediaDecoderReader::VisibilityChanged()
+{}
 
 media::TimeIntervals
 MediaDecoderReader::GetBuffered()

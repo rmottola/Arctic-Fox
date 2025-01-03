@@ -7,6 +7,9 @@
 #include "base/message_loop.h"          // for MessageLoop
 #include "mozilla/layers/CompositorBridgeParent.h"  // for CompositorBridgeParent
 #include "mozilla/layers/Effects.h"     // for Effect, EffectChain, etc
+#include "mozilla/layers/TextureClient.h"
+#include "mozilla/layers/TextureHost.h"
+#include "mozilla/layers/CompositorThread.h"
 #include "mozilla/mozalloc.h"           // for operator delete, etc
 #include "gfx2DGlue.h"
 #include "nsAppRunner.h"
@@ -22,11 +25,65 @@ namespace mozilla {
 
 namespace layers {
 
+Compositor::Compositor(widget::CompositorWidgetProxy* aWidget,
+                      CompositorBridgeParent* aParent)
+  : mCompositorID(0)
+  , mDiagnosticTypes(DiagnosticTypes::NO_DIAGNOSTIC)
+  , mParent(aParent)
+  , mPixelsPerFrame(0)
+  , mPixelsFilled(0)
+  , mScreenRotation(ROTATION_0)
+  , mWidget(aWidget)
+  , mIsDestroyed(false)
+{
+}
+
+Compositor::~Compositor()
+{
+  for (auto& lock : mUnlockAfterComposition) {
+    lock->ReadUnlock();
+  }
+  mUnlockAfterComposition.Clear();
+}
+
+void
+Compositor::Destroy()
+{
+  FlushPendingNotifyNotUsed();
+  mIsDestroyed = true;
+}
+
+void
+Compositor::EndFrame()
+{
+  for (auto& lock : mUnlockAfterComposition) {
+    lock->ReadUnlock();
+  }
+  mUnlockAfterComposition.Clear();
+}
+
+void
+Compositor::NotifyNotUsedAfterComposition(TextureHost* aTextureHost)
+{
+  MOZ_ASSERT(!mIsDestroyed);
+
+  mNotifyNotUsedAfterComposition.AppendElement(aTextureHost);
+}
+
+void
+Compositor::FlushPendingNotifyNotUsed()
+{
+  for (auto& textureHost : mNotifyNotUsedAfterComposition) {
+    textureHost->CallNotifyNotUsed();
+  }
+  mNotifyNotUsedAfterComposition.Clear();
+}
+
 /* static */ void
 Compositor::AssertOnCompositorThread()
 {
-  MOZ_ASSERT(!CompositorBridgeParent::CompositorLoop() ||
-             CompositorBridgeParent::CompositorLoop() == MessageLoop::current(),
+  MOZ_ASSERT(!CompositorThreadHolder::Loop() ||
+             CompositorThreadHolder::Loop() == MessageLoop::current(),
              "Can only call this from the compositor thread!");
 }
 
@@ -49,7 +106,7 @@ Compositor::ShouldDrawDiagnostics(DiagnosticFlags aFlags)
 void
 Compositor::DrawDiagnostics(DiagnosticFlags aFlags,
                             const nsIntRegion& aVisibleRegion,
-                            const gfx::Rect& aClipRect,
+                            const gfx::IntRect& aClipRect,
                             const gfx::Matrix4x4& aTransform,
                             uint32_t aFlashCounter)
 {
@@ -72,7 +129,7 @@ Compositor::DrawDiagnostics(DiagnosticFlags aFlags,
 void
 Compositor::DrawDiagnostics(DiagnosticFlags aFlags,
                             const gfx::Rect& aVisibleRect,
-                            const gfx::Rect& aClipRect,
+                            const gfx::IntRect& aClipRect,
                             const gfx::Matrix4x4& aTransform,
                             uint32_t aFlashCounter)
 {
@@ -87,7 +144,7 @@ Compositor::DrawDiagnostics(DiagnosticFlags aFlags,
 void
 Compositor::DrawDiagnosticsInternal(DiagnosticFlags aFlags,
                                     const gfx::Rect& aVisibleRect,
-                                    const gfx::Rect& aClipRect,
+                                    const gfx::IntRect& aClipRect,
                                     const gfx::Matrix4x4& aTransform,
                                     uint32_t aFlashCounter)
 {
@@ -145,7 +202,7 @@ Compositor::DrawDiagnosticsInternal(DiagnosticFlags aFlags,
 
 void
 Compositor::SlowDrawRect(const gfx::Rect& aRect, const gfx::Color& aColor,
-                     const gfx::Rect& aClipRect,
+                     const gfx::IntRect& aClipRect,
                      const gfx::Matrix4x4& aTransform, int aStrokeWidth)
 {
   // TODO This should draw a rect using a single draw call but since
@@ -178,7 +235,7 @@ Compositor::SlowDrawRect(const gfx::Rect& aRect, const gfx::Color& aColor,
 
 void
 Compositor::FillRect(const gfx::Rect& aRect, const gfx::Color& aColor,
-                     const gfx::Rect& aClipRect,
+                     const gfx::IntRect& aClipRect,
                      const gfx::Matrix4x4& aTransform)
 {
   float opacity = 1.0f;
@@ -356,7 +413,7 @@ DecomposeIntoNoRepeatRects(const gfx::Rect& aRect,
 
 gfx::IntRect
 Compositor::ComputeBackdropCopyRect(const gfx::Rect& aRect,
-                                    const gfx::Rect& aClipRect,
+                                    const gfx::IntRect& aClipRect,
                                     const gfx::Matrix4x4& aTransform,
                                     gfx::Matrix4x4* aOutTransform,
                                     gfx::Rect* aOutLayerQuad)
@@ -365,7 +422,7 @@ Compositor::ComputeBackdropCopyRect(const gfx::Rect& aRect,
   gfx::IntPoint rtOffset = GetCurrentRenderTarget()->GetOrigin();
   gfx::IntSize rtSize = GetCurrentRenderTarget()->GetSize();
 
-  gfx::Rect renderBounds(0, 0, rtSize.width, rtSize.height);
+  gfx::IntRect renderBounds(0, 0, rtSize.width, rtSize.height);
   renderBounds.IntersectRect(renderBounds, aClipRect);
   renderBounds.MoveBy(rtOffset);
 
@@ -412,7 +469,7 @@ Compositor::IsValid() const
 
 #if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
 void
-Compositor::SetDispAcquireFence(Layer* aLayer, nsIWidget* aWidget)
+Compositor::SetDispAcquireFence(Layer* aLayer)
 {
   // OpenGL does not provide ReleaseFence for rendering.
   // Instead use DispAcquireFence as layer buffer's ReleaseFence
@@ -420,11 +477,10 @@ Compositor::SetDispAcquireFence(Layer* aLayer, nsIWidget* aWidget)
   // DispAcquireFence is DisplaySurface's AcquireFence.
   // AcquireFence will be signaled when a buffer's content is available.
   // See Bug 974152.
-
-  if (!aLayer || !aWidget) {
+  if (!aLayer || !mWidget) {
     return;
   }
-  nsWindow* window = static_cast<nsWindow*>(aWidget);
+  nsWindow* window = static_cast<nsWindow*>(mWidget->RealWidget());
   RefPtr<FenceHandle::FdObj> fence = new FenceHandle::FdObj(
       window->GetScreen()->GetPrevDispAcquireFd());
   mReleaseFenceHandle.Merge(FenceHandle(fence));
@@ -443,7 +499,7 @@ Compositor::GetReleaseFence()
 
 #else
 void
-Compositor::SetDispAcquireFence(Layer* aLayer, nsIWidget* aWidget)
+Compositor::SetDispAcquireFence(Layer* aLayer)
 {
 }
 

@@ -276,29 +276,28 @@ Factory::CheckSurfaceSize(const IntSize &sz,
     return false;
   }
 
-  // make sure the surface area doesn't overflow a int32_t
-  CheckedInt<int32_t> tmp = sz.width;
-  tmp *= sz.height;
-  if (!tmp.isValid()) {
-    gfxDebug() << "Surface size too large (would overflow)!";
+#if defined(XP_MACOSX)
+  // CoreGraphics is limited to images < 32K in *height*,
+  // so clamp all surfaces on the Mac to that height
+  if (sz.height > SHRT_MAX) {
+    gfxDebug() << "Surface size too large (exceeds CoreGraphics limit)!";
     return false;
   }
+#endif
 
   // assuming 4 bytes per pixel, make sure the allocation size
   // doesn't overflow a int32_t either
   CheckedInt<int32_t> stride = sz.width;
   stride *= 4;
-
-  // When aligning the stride to 16 bytes, it can grow by up to 15 bytes.
-  stride += 16 - 1;
-
+  if (stride.isValid()) {
+    stride = GetAlignedStride<16>(stride.value());
+  }
   if (!stride.isValid()) {
     gfxDebug() << "Surface size too large (stride overflows int32_t)!";
     return false;
   }
 
-  CheckedInt<int32_t> numBytes = GetAlignedStride<16>(sz.width * 4);
-  numBytes *= sz.height;
+  CheckedInt<int32_t> numBytes = stride * sz.height;
   if (!numBytes.isValid()) {
     gfxDebug() << "Surface size too large (allocation size would overflow int32_t)!";
     return false;
@@ -367,7 +366,6 @@ Factory::CreateDrawTarget(BackendType aBackend, const IntSize &aSize, SurfaceFor
     }
 #endif
   default:
-    gfxDebug() << "Invalid draw target type specified.";
     return nullptr;
   }
 
@@ -813,18 +811,25 @@ Factory::CreateCGGlyphRenderingOptions(const Color &aFontSmoothingBackgroundColo
 #endif
 
 already_AddRefed<DataSourceSurface>
-Factory::CreateWrappingDataSourceSurface(uint8_t *aData, int32_t aStride,
+Factory::CreateWrappingDataSourceSurface(uint8_t *aData,
+                                         int32_t aStride,
                                          const IntSize &aSize,
-                                         SurfaceFormat aFormat)
+                                         SurfaceFormat aFormat,
+                                         SourceSurfaceDeallocator aDeallocator /* = nullptr */,
+                                         void* aClosure /* = nullptr */)
 {
   if (aSize.width <= 0 || aSize.height <= 0) {
     return nullptr;
   }
+  if (!aDeallocator && aClosure) {
+    return nullptr;
+  }
+
   MOZ_ASSERT(aData);
 
   RefPtr<SourceSurfaceRawData> newSurf = new SourceSurfaceRawData();
+  newSurf->InitWrappingData(aData, aSize, aStride, aFormat, aDeallocator, aClosure);
 
-  newSurf->InitWrappingData(aData, aSize, aStride, aFormat, false);
   return newSurf.forget();
 }
 

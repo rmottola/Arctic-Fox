@@ -11,8 +11,8 @@
 #include "mozilla/Vector.h"
 #include "mozilla/RefPtr.h"
 #include "nsString.h"
-#include "nsString.h"
 #include "nsTArray.h"
+#include "nsString.h"
 
 namespace stagefright
 {
@@ -75,7 +75,6 @@ public:
   virtual bool IsValid() const override;
 };
 
-typedef int64_t Microseconds;
 }
 
 #endif

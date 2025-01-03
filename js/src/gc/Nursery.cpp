@@ -380,9 +380,7 @@ js::TenuringTracer::TenuringTracer(JSRuntime* rt, Nursery* nursery)
 void
 js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList* pretenureGroups)
 {
-    if (rt->mainThread.suppressGC)
-        return;
-
+    MOZ_ASSERT(!rt->mainThread.suppressGC);
     JS_AbortIfWrongThread(rt);
 
     StoreBuffer& sb = rt->gc.storeBuffer;
@@ -442,7 +440,7 @@ js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList
     TIME_END(traceGenericEntries);
 
     TIME_START(markRuntime);
-    rt->gc.markRuntime(&mover);
+    rt->gc.markRuntime(&mover, GCRuntime::TraceRuntime, session.lock);
     TIME_END(markRuntime);
 
     TIME_START(markDebugger);

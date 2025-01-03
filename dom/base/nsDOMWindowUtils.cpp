@@ -497,6 +497,19 @@ nsDOMWindowUtils::SetResolutionAndScaleTo(float aResolution)
 }
 
 NS_IMETHODIMP
+nsDOMWindowUtils::SetRestoreResolution(float aResolution)
+{
+  nsIPresShell* presShell = GetPresShell();
+  if (!presShell) {
+    return NS_ERROR_FAILURE;
+  }
+
+  presShell->SetRestoreResolution(aResolution);
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 nsDOMWindowUtils::GetResolution(float* aResolution)
 {
   nsIPresShell* presShell = GetPresShell();
@@ -683,7 +696,7 @@ nsDOMWindowUtils::SendPointerEventCommon(const nsAString& aType,
   event.tiltX = aTiltX;
   event.tiltY = aTiltY;
   event.isPrimary = (nsIDOMMouseEvent::MOZ_SOURCE_MOUSE == aInputSourceArg) ? true : aIsPrimary;
-  event.clickCount = aClickCount;
+  event.mClickCount = aClickCount;
   event.mTime = PR_IntervalNow();
   event.mFlags.mIsSynthesizedForTests = aOptionalArgCount >= 10 ? aIsSynthesized : true;
 
@@ -694,7 +707,7 @@ nsDOMWindowUtils::SendPointerEventCommon(const nsAString& aType,
 
   event.mRefPoint =
     nsContentUtils::ToWidgetPoint(CSSPoint(aX, aY), offset, presContext);
-  event.ignoreRootScrollFrame = aIgnoreRootScrollFrame;
+  event.mIgnoreRootScrollFrame = aIgnoreRootScrollFrame;
 
   nsEventStatus status;
   if (aToWindow) {
@@ -1008,7 +1021,7 @@ nsDOMWindowUtils::SendNativeKeyEvent(int32_t aNativeKeyboardLayout,
   if (!widget)
     return NS_ERROR_FAILURE;
 
-  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs
+  NS_DispatchToMainThread(NewRunnableMethod
     <int32_t, int32_t, uint32_t, nsString, nsString, nsIObserver*>
     (widget, &nsIWidget::SynthesizeNativeKeyEvent, aNativeKeyboardLayout,
     aNativeKeyCode, aModifiers, aCharacters, aUnmodifiedCharacters, aObserver));
@@ -1028,7 +1041,7 @@ nsDOMWindowUtils::SendNativeMouseEvent(int32_t aScreenX,
   if (!widget)
     return NS_ERROR_FAILURE;
 
-  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs
+  NS_DispatchToMainThread(NewRunnableMethod
     <LayoutDeviceIntPoint, int32_t, int32_t, nsIObserver*>
     (widget, &nsIWidget::SynthesizeNativeMouseEvent,
     LayoutDeviceIntPoint(aScreenX, aScreenY), aNativeMessage, aModifierFlags,
@@ -1047,7 +1060,7 @@ nsDOMWindowUtils::SendNativeMouseMove(int32_t aScreenX,
   if (!widget)
     return NS_ERROR_FAILURE;
 
-  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs
+  NS_DispatchToMainThread(NewRunnableMethod
     <LayoutDeviceIntPoint, nsIObserver*>
     (widget, &nsIWidget::SynthesizeNativeMouseMove,
     LayoutDeviceIntPoint(aScreenX, aScreenY), aObserver));
@@ -1072,7 +1085,7 @@ nsDOMWindowUtils::SendNativeMouseScrollEvent(int32_t aScreenX,
     return NS_ERROR_FAILURE;
   }
 
-  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs
+  NS_DispatchToMainThread(NewRunnableMethod
     <mozilla::LayoutDeviceIntPoint, uint32_t, double, double, double, uint32_t, uint32_t, nsIObserver*>
     (widget, &nsIWidget::SynthesizeNativeMouseScrollEvent,
     LayoutDeviceIntPoint(aScreenX, aScreenY), aNativeMessage, aDeltaX, aDeltaY,
@@ -1098,7 +1111,7 @@ nsDOMWindowUtils::SendNativeTouchPoint(uint32_t aPointerId,
     return NS_ERROR_INVALID_ARG;
   }
 
-  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs
+  NS_DispatchToMainThread(NewRunnableMethod
     <uint32_t, nsIWidget::TouchPointerState, LayoutDeviceIntPoint, double, uint32_t, nsIObserver*>
     (widget, &nsIWidget::SynthesizeNativeTouchPoint, aPointerId,
     (nsIWidget::TouchPointerState)aTouchState,
@@ -1118,7 +1131,7 @@ nsDOMWindowUtils::SendNativeTouchTap(int32_t aScreenX,
     return NS_ERROR_FAILURE;
   }
 
-  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs
+  NS_DispatchToMainThread(NewRunnableMethod
     <LayoutDeviceIntPoint, bool, nsIObserver*>
     (widget, &nsIWidget::SynthesizeNativeTouchTap,
     LayoutDeviceIntPoint(aScreenX, aScreenY), aLongTap, aObserver));
@@ -1133,7 +1146,7 @@ nsDOMWindowUtils::ClearNativeTouchSequence(nsIObserver* aObserver)
     return NS_ERROR_FAILURE;
   }
 
-  NS_DispatchToMainThread(NS_NewRunnableMethodWithArgs<nsIObserver*>
+  NS_DispatchToMainThread(NewRunnableMethod<nsIObserver*>
     (widget, &nsIWidget::ClearNativeTouchSequence, aObserver));
   return NS_OK;
 }
@@ -1859,6 +1872,56 @@ nsDOMWindowUtils::SendQueryContentEvent(uint32_t aType,
       return NS_ERROR_INVALID_ARG;
   }
 
+  SelectionType selectionType = SelectionType::eNormal;
+  static const uint32_t kSelectionFlags =
+    QUERY_CONTENT_FLAG_SELECTION_SPELLCHECK |
+    QUERY_CONTENT_FLAG_SELECTION_IME_RAWINPUT |
+    QUERY_CONTENT_FLAG_SELECTION_IME_SELECTEDRAWTEXT |
+    QUERY_CONTENT_FLAG_SELECTION_IME_CONVERTEDTEXT |
+    QUERY_CONTENT_FLAG_SELECTION_IME_SELECTEDCONVERTEDTEXT |
+    QUERY_CONTENT_FLAG_SELECTION_ACCESSIBILITY |
+    QUERY_CONTENT_FLAG_SELECTION_FIND |
+    QUERY_CONTENT_FLAG_SELECTION_URLSECONDARY |
+    QUERY_CONTENT_FLAG_SELECTION_URLSTRIKEOUT;
+  switch (aAdditionalFlags & kSelectionFlags) {
+    case QUERY_CONTENT_FLAG_SELECTION_SPELLCHECK:
+      selectionType = SelectionType::eSpellCheck;
+      break;
+    case QUERY_CONTENT_FLAG_SELECTION_IME_RAWINPUT:
+      selectionType = SelectionType::eIMERawClause;
+      break;
+    case QUERY_CONTENT_FLAG_SELECTION_IME_SELECTEDRAWTEXT:
+      selectionType = SelectionType::eIMESelectedRawClause;
+      break;
+    case QUERY_CONTENT_FLAG_SELECTION_IME_CONVERTEDTEXT:
+      selectionType = SelectionType::eIMEConvertedClause;
+      break;
+    case QUERY_CONTENT_FLAG_SELECTION_IME_SELECTEDCONVERTEDTEXT:
+      selectionType = SelectionType::eIMESelectedClause;
+      break;
+    case QUERY_CONTENT_FLAG_SELECTION_ACCESSIBILITY:
+      selectionType = SelectionType::eAccessibility;
+      break;
+    case QUERY_CONTENT_FLAG_SELECTION_FIND:
+      selectionType = SelectionType::eFind;
+      break;
+    case QUERY_CONTENT_FLAG_SELECTION_URLSECONDARY:
+      selectionType = SelectionType::eURLSecondary;
+      break;
+    case QUERY_CONTENT_FLAG_SELECTION_URLSTRIKEOUT:
+      selectionType = SelectionType::eURLStrikeout;
+      break;
+    case 0:
+      break;
+    default:
+      return NS_ERROR_INVALID_ARG;
+  }
+
+  if (selectionType != SelectionType::eNormal &&
+      message != eQuerySelectedText) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
   nsCOMPtr<nsIWidget> targetWidget = widget;
   LayoutDeviceIntPoint pt(aX, aY);
 
@@ -1902,6 +1965,9 @@ nsDOMWindowUtils::SendQueryContentEvent(uint32_t aType,
       break;
     case eQueryTextRect:
       queryEvent.InitForQueryTextRect(aOffset, aLength, useNativeLineBreak);
+      break;
+    case eQuerySelectedText:
+      queryEvent.InitForQuerySelectedText(selectionType, useNativeLineBreak);
       break;
     default:
       queryEvent.mUseNativeLineBreak = useNativeLineBreak;
@@ -2503,7 +2569,7 @@ nsDOMWindowUtils::ComputeAnimationDistance(nsIDOMElement* aElement,
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsCSSProperty property =
-    nsCSSProps::LookupProperty(aProperty, nsCSSProps::eIgnoreEnabledState);
+    nsCSSProps::LookupProperty(aProperty, CSSEnabledState::eIgnoreEnabledState);
   if (property != eCSSProperty_UNKNOWN && nsCSSProps::IsShorthand(property)) {
     property = eCSSProperty_UNKNOWN;
   }
@@ -2894,7 +2960,8 @@ nsDOMWindowUtils::GetFileReferences(const nsAString& aDatabaseName, int64_t aId,
 
   nsCString origin;
   nsresult rv =
-    quota::QuotaManager::GetInfoFromWindow(window, nullptr, &origin, nullptr);
+    quota::QuotaManager::GetInfoFromWindow(window, nullptr, nullptr, &origin,
+                                           nullptr);
   NS_ENSURE_SUCCESS(rv, rv);
 
   IDBOpenDBOptions options;
@@ -3667,22 +3734,22 @@ nsDOMWindowUtils::PostRestyleSelfEvent(nsIDOMElement* aElement)
 }
 
 NS_IMETHODIMP
-nsDOMWindowUtils::GetMediaSuspended(bool* aSuspended)
+nsDOMWindowUtils::GetMediaSuspend(uint32_t* aSuspend)
 {
   nsCOMPtr<nsPIDOMWindowOuter> window = do_QueryReferent(mWindow);
   NS_ENSURE_STATE(window);
 
-  *aSuspended = window->GetMediaSuspended();
+  *aSuspend = window->GetMediaSuspend();
   return NS_OK;
 }
 
 NS_IMETHODIMP
-nsDOMWindowUtils::SetMediaSuspended(bool aSuspended)
+nsDOMWindowUtils::SetMediaSuspend(uint32_t aSuspend)
 {
   nsCOMPtr<nsPIDOMWindowOuter> window = do_QueryReferent(mWindow);
   NS_ENSURE_STATE(window);
 
-  window->SetMediaSuspended(aSuspended);
+  window->SetMediaSuspend(aSuspend);
   return NS_OK;
 }
 
@@ -3779,6 +3846,18 @@ nsDOMWindowUtils::AskPermission(nsIContentPermissionRequest* aRequest)
 {
   nsCOMPtr<nsPIDOMWindowOuter> window = do_QueryReferent(mWindow);
   return nsContentPermissionUtils::AskPermission(aRequest, window->GetCurrentInnerWindow());
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::GetElementsRestyled(uint64_t* aResult)
+{
+  nsPresContext* presContext = GetPresContext();
+  if (!presContext) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+
+  *aResult = presContext->ElementsRestyledCount();
+  return NS_OK;
 }
 
 NS_IMETHODIMP

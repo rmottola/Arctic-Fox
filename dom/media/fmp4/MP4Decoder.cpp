@@ -32,18 +32,10 @@
 
 namespace mozilla {
 
-#if defined(MOZ_GONK_MEDIACODEC) || defined(XP_WIN) || defined(MOZ_APPLEMEDIA) || defined(MOZ_FFMPEG)
-#define MP4_READER_DORMANT_HEURISTIC
-#else
-#undef MP4_READER_DORMANT_HEURISTIC
-#endif
-
 MP4Decoder::MP4Decoder(MediaDecoderOwner* aOwner)
   : MediaDecoder(aOwner)
 {
-#if defined(MP4_READER_DORMANT_HEURISTIC)
   mDormantSupported = Preferences::GetBool("media.decoder.heuristic.dormant.enabled", false);
-#endif
 }
 
 MediaDecoderStateMachine* MP4Decoder::CreateStateMachine()
@@ -153,7 +145,6 @@ MP4Decoder::CanHandleMediaType(const nsACString& aMIMETypeExcludingCodecs,
   }
 
   // Verify that we have a PDM that supports the whitelisted types.
-  PDMFactory::Init();
   RefPtr<PDMFactory> platform = new PDMFactory();
   for (const nsCString& codecMime : codecMimes) {
     if (!platform->SupportsMimeType(codecMime, aDiagnostics)) {
@@ -221,7 +212,7 @@ static const uint8_t sTestH264ExtraData[] = {
 static already_AddRefed<MediaDataDecoder>
 CreateTestH264Decoder(layers::LayersBackend aBackend,
                       VideoInfo& aConfig,
-                      FlushableTaskQueue* aTaskQueue)
+                      TaskQueue* aTaskQueue)
 {
   aConfig.mMimeType = "video/avc";
   aConfig.mId = 1;
@@ -231,8 +222,6 @@ CreateTestH264Decoder(layers::LayersBackend aBackend,
   aConfig.mExtraData = new MediaByteBuffer();
   aConfig.mExtraData->AppendElements(sTestH264ExtraData,
                                      MOZ_ARRAY_LENGTH(sTestH264ExtraData));
-
-  PDMFactory::Init();
 
   RefPtr<PDMFactory> platform = new PDMFactory();
   RefPtr<MediaDataDecoder> decoder(
@@ -256,8 +245,8 @@ MP4Decoder::IsVideoAccelerated(layers::LayersBackend aBackend, nsIGlobalObject* 
     return nullptr;
   }
 
-  RefPtr<FlushableTaskQueue> taskQueue =
-    new FlushableTaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
+  RefPtr<TaskQueue> taskQueue =
+    new TaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
   VideoInfo config;
   RefPtr<MediaDataDecoder> decoder(CreateTestH264Decoder(aBackend, config, taskQueue));
   if (!decoder) {

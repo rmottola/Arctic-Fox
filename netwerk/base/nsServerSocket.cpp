@@ -13,13 +13,12 @@
 #include "prio.h"
 #include "nsThreadUtils.h"
 #include "mozilla/Attributes.h"
-#include "mozilla/Endian.h"
+#include "mozilla/EndianUtils.h"
 #include "mozilla/net/DNS.h"
 #include "nsServiceManagerUtils.h"
 #include "nsIFile.h"
 
-using namespace mozilla;
-using namespace mozilla::net;
+namespace mozilla { namespace net {
 
 static NS_DEFINE_CID(kSocketTransportServiceCID, NS_SOCKETTRANSPORTSERVICE_CID);
 
@@ -30,10 +29,7 @@ typedef void (nsServerSocket:: *nsServerSocketFunc)(void);
 static nsresult
 PostEvent(nsServerSocket *s, nsServerSocketFunc func)
 {
-  nsCOMPtr<nsIRunnable> ev = NS_NewRunnableMethod(s, func);
-  if (!ev)
-    return NS_ERROR_OUT_OF_MEMORY;
-
+  nsCOMPtr<nsIRunnable> ev = NewRunnableMethod(s, func);
   if (!gSocketTransportService)
     return NS_ERROR_FAILURE;
 
@@ -129,7 +125,7 @@ nsServerSocket::TryAttach()
   if (!gSocketTransportService->CanAttachSocket())
   {
     nsCOMPtr<nsIRunnable> event =
-      NS_NewRunnableMethod(this, &nsServerSocket::OnMsgAttach);
+      NewRunnableMethod(this, &nsServerSocket::OnMsgAttach);
     if (!event)
       return NS_ERROR_OUT_OF_MEMORY;
 
@@ -559,3 +555,6 @@ nsServerSocket::GetAddress(PRNetAddr *aResult)
   memcpy(aResult, &mAddr, sizeof(mAddr));
   return NS_OK;
 }
+
+} // namespace net
+} // namespace mozilla

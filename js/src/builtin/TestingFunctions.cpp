@@ -21,6 +21,7 @@
 
 #include "asmjs/AsmJS.h"
 #include "asmjs/Wasm.h"
+#include "asmjs/WasmBinaryToExperimentalText.h"
 #include "asmjs/WasmBinaryToText.h"
 #include "asmjs/WasmTextToBinary.h"
 #include "builtin/Promise.h"
@@ -580,13 +581,30 @@ WasmBinaryToText(JSContext* cx, unsigned argc, Value* vp)
         bytes = copy.begin();
     }
 
+    bool experimental = false;
+    if (args.length() > 1) {
+        JSString* opt = JS::ToString(cx, args[1]);
+        if (!opt)
+            return false;
+        bool match;
+        if (!JS_StringEqualsAscii(cx, opt, "experimental", &match))
+            return false;
+        experimental = match;
+    }
+
     StringBuffer buffer(cx);
-    if (!wasm::BinaryToText(cx, bytes, length, buffer)) {
-        if (!cx->isExceptionPending()) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_WASM_DECODE_FAIL,
-                                 "print error");
+    if (experimental) {
+        if (!wasm::BinaryToExperimentalText(cx, bytes, length, buffer, wasm::ExperimentalTextFormatting())) {
+            if (!cx->isExceptionPending())
+                JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_WASM_FAIL, "print error");
+            return false;
         }
-        return false;
+    } else {
+        if (!wasm::BinaryToText(cx, bytes, length, buffer)) {
+            if (!cx->isExceptionPending())
+                JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_WASM_FAIL, "print error");
+            return false;
+        }
     }
 
     JSString* result = buffer.finishString();
@@ -702,7 +720,7 @@ GCZeal(JSContext* cx, unsigned argc, Value* vp)
             return false;
     }
 
-    JS_SetGCZeal(cx, (uint8_t)zeal, frequency);
+    JS_SetGCZeal(cx->runtime(), (uint8_t)zeal, frequency);
     args.rval().setUndefined();
     return true;
 }
@@ -1285,7 +1303,7 @@ OOMTest(JSContext* cx, unsigned argc, Value* vp)
         threadEnd = threadOption + 1;
     }
 
-    JS_SetGCZeal(cx, 0, JS_DEFAULT_ZEAL_FREQ);
+    JS_SetGCZeal(cx->runtime(), 0, JS_DEFAULT_ZEAL_FREQ);
 
     for (unsigned thread = threadStart; thread < threadEnd; thread++) {
         if (verbose)
@@ -1785,6 +1803,23 @@ testingFunc_bailout(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
+testingFunc_bailAfter(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    if (args.length() != 1 || !args[0].isInt32() || args[0].toInt32() < 0) {
+        JS_ReportError(cx, "Argument must be a positive number that fits an int32");
+        return false;
+    }
+
+#ifdef DEBUG
+    cx->runtime()->setIonBailAfter(args[0].toInt32());
+#endif
+
+    args.rval().setUndefined();
+    return true;
+}
+
+static bool
 testingFunc_inJit(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -1909,6 +1944,8 @@ SetJitCompilerOption(JSContext* cx, unsigned argc, Value* vp)
     }
 
     JSFlatString* strArg = JS_FlattenString(cx, args[0].toString());
+    if (!strArg)
+        return false;
 
 #define JIT_COMPILER_MATCH(key, string)                 \
     else if (JS_FlatStringEqualsAscii(strArg, string))  \
@@ -2625,11 +2662,16 @@ FindPath(JSContext* cx, unsigned argc, Value* vp)
 
         heaptools::FindPathHandler handler(cx, start, target, &nodes, edges);
         heaptools::FindPathHandler::Traversal traversal(cx->runtime(), handler, autoCannotGC);
-        if (!traversal.init() || !traversal.addStart(start))
+        if (!traversal.init() || !traversal.addStart(start)) {
+            ReportOutOfMemory(cx);
             return false;
+        }
 
-        if (!traversal.traverse())
+        if (!traversal.traverse()) {
+            if (!cx->isExceptionPending())
+                ReportOutOfMemory(cx);
             return false;
+        }
 
         if (!handler.foundPath) {
             // We didn't find any paths from the start to the target.
@@ -3312,6 +3354,11 @@ SetGCCallback(JSContext* cx, unsigned argc, Value* vp)
 
     if (strcmp(action.ptr(), "minorGC") == 0) {
         auto info = js_new<gcCallback::MinorGC>();
+        if (!info) {
+            ReportOutOfMemory(cx);
+            return false;
+        }
+
         info->phases = phases;
         info->active = true;
         JS_SetGCCallback(cx->runtime(), gcCallback::minorGC, info);
@@ -3329,6 +3376,11 @@ SetGCCallback(JSContext* cx, unsigned argc, Value* vp)
         }
 
         auto info = js_new<gcCallback::MajorGC>();
+        if (!info) {
+            ReportOutOfMemory(cx);
+            return false;
+        }
+
         info->phases = phases;
         info->depth = depth;
         JS_SetGCCallback(cx->runtime(), gcCallback::majorGC, info);
@@ -3495,15 +3547,6 @@ GetModuleEnvironmentValue(JSContext* cx, unsigned argc, Value* vp)
         return false;
 
     return GetProperty(cx, env, env, id, args.rval());
-}
-
-static bool
-EnableMatchFlagArgument(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    cx->runtime()->options().setMatchFlagArgument(true);
-    args.rval().setUndefined();
-    return true;
 }
 
 static const JSFunctionSpecWithHelp TestingFunctions[] = {
@@ -3809,6 +3852,12 @@ gc::ZealModeHelpText),
 "bailout()",
 "  Force a bailout out of ionmonkey (if running in ionmonkey)."),
 
+    JS_FN_HELP("bailAfter", testingFunc_bailAfter, 1, 0,
+"bailAfter(number)",
+"  Start a counter to bail once after passing the given amount of possible bailout positions in\n"
+"  ionmonkey.\n"),
+
+
     JS_FN_HELP("inJit", testingFunc_inJit, 0, 0,
 "inJit()",
 "  Returns true when called within (jit-)compiled code. When jit compilation is disabled this\n"
@@ -4022,11 +4071,6 @@ gc::ZealModeHelpText),
     JS_FN_HELP("getModuleEnvironmentValue", GetModuleEnvironmentValue, 2, 0,
 "getModuleEnvironmentValue(module, name)",
 "  Get the value of a bound name in a module environment.\n"),
-
-    JS_FN_HELP("enableMatchFlagArgument", EnableMatchFlagArgument, 0, 0,
-"enableMatchFlagArgument()",
-"  Enables the deprecated, non-standard flag argument of\n"
-"  String.prototype.{match,search,replace}.\n"),
 
     JS_FS_HELP_END
 };

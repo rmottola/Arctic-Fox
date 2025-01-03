@@ -30,7 +30,6 @@
 #include "nsIWeakReferenceUtils.h"
 #include "nsIWorkerDebugger.h"
 #include "nsIXPConnect.h"
-#include "nsPerformance.h"
 #include "nsPIDOMWindow.h"
 
 #include <algorithm>
@@ -56,9 +55,11 @@
 #include "mozilla/dom/MessagePort.h"
 #include "mozilla/dom/MessagePortBinding.h"
 #include "mozilla/dom/MessagePortList.h"
+#include "mozilla/dom/Performance.h"
 #include "mozilla/dom/PMessagePort.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/PromiseDebugging.h"
+#include "mozilla/dom/SimpleGlobalObject.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/dom/StructuredCloneHolder.h"
 #include "mozilla/dom/TabChild.h"
@@ -655,6 +656,10 @@ class MessageEventRunnable final : public WorkerRunnable
   // This is only used for messages dispatched to a service worker.
   UniquePtr<ServiceWorkerClientInfo> mEventSource;
 
+  // This is only used to hold service workers alive while dispatching the
+  // message event.
+  nsMainThreadPtrHandle<nsISupports> mKeepAliveToken;
+
 public:
   MessageEventRunnable(WorkerPrivate* aWorkerPrivate,
                        TargetAndBusyBehavior aBehavior)
@@ -665,9 +670,11 @@ public:
   }
 
   void
-  SetMessageSource(UniquePtr<ServiceWorkerClientInfo>&& aSource)
+  SetServiceWorkerData(UniquePtr<ServiceWorkerClientInfo>&& aSource,
+                       const nsMainThreadPtrHandle<nsISupports>& aKeepAliveToken)
   {
     mEventSource = Move(aSource);
+    mKeepAliveToken = aKeepAliveToken;
   }
 
   bool
@@ -1058,6 +1065,11 @@ public:
 
       // Now fire an event at the global object, but don't do that if the error
       // code is too much recursion and this is the same script threw the error.
+      // XXXbz the interaction of this with worker errors seems kinda broken.
+      // An overrecursion in the debugger or debugger sandbox will get turned
+      // into an error event on our parent worker!
+      // https://bugzilla.mozilla.org/show_bug.cgi?id=1271441 tracks making this
+      // better.
       if (aFireAtScope && (aTarget || aErrorNumber != JSMSG_OVER_RECURSED)) {
         JS::Rooted<JSObject*> global(aCx, JS::CurrentGlobalOrNull(aCx));
         NS_ASSERTION(global, "This should never be null!");
@@ -1074,10 +1086,19 @@ public:
             UNWRAP_OBJECT(WorkerDebuggerGlobalScope, global, globalScope);
 
             MOZ_ASSERT_IF(globalScope, globalScope->GetWrapperPreserveColor() == global);
-            MOZ_ASSERT_IF(!globalScope, IsDebuggerSandbox(global));
+            if (globalScope || IsDebuggerSandbox(global)) {
+              aWorkerPrivate->ReportErrorToDebugger(aFilename, aLineNumber,
+                                                    aMessage);
+              return;
+            }
 
-            aWorkerPrivate->ReportErrorToDebugger(aFilename, aLineNumber,
-                                                  aMessage);
+            MOZ_ASSERT(SimpleGlobalObject::SimpleGlobalType(global) ==
+                         SimpleGlobalObject::GlobalType::BindingDetail);
+            // XXXbz We should really log this to console, but unwinding out of
+            // this stuff without ending up firing any events is ... hard.  Just
+            // return for now.
+            // https://bugzilla.mozilla.org/show_bug.cgi?id=1271441 tracks
+            // making this better.
             return;
           }
 
@@ -1799,7 +1820,7 @@ TimerThreadEventTarget::DispatchFromScript(nsIRunnable* aRunnable, uint32_t aFla
 }
 
 NS_IMETHODIMP
-TimerThreadEventTarget::Dispatch(already_AddRefed<nsIRunnable>&& aRunnable, uint32_t aFlags)
+TimerThreadEventTarget::Dispatch(already_AddRefed<nsIRunnable> aRunnable, uint32_t aFlags)
 {
   // This should only happen on the timer thread.
   MOZ_ASSERT(!NS_IsMainThread());
@@ -1818,6 +1839,12 @@ TimerThreadEventTarget::Dispatch(already_AddRefed<nsIRunnable>&& aRunnable, uint
   mWorkerRunnable->Dispatch();
 
   return NS_OK;
+}
+
+NS_IMETHODIMP
+TimerThreadEventTarget::DelayedDispatch(already_AddRefed<nsIRunnable>, uint32_t)
+{
+  return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 NS_IMETHODIMP
@@ -2367,7 +2394,7 @@ WorkerPrivateParent<Derived>::WrapObject(JSContext* aCx, JS::Handle<JSObject*> a
 
 template <class Derived>
 nsresult
-WorkerPrivateParent<Derived>::DispatchPrivate(already_AddRefed<WorkerRunnable>&& aRunnable,
+WorkerPrivateParent<Derived>::DispatchPrivate(already_AddRefed<WorkerRunnable> aRunnable,
                                               nsIEventTarget* aSyncLoopTarget)
 {
   // May be called on any thread!
@@ -2445,7 +2472,7 @@ WorkerPrivateParent<Derived>::DisableDebugger()
 template <class Derived>
 nsresult
 WorkerPrivateParent<Derived>::DispatchControlRunnable(
-  already_AddRefed<WorkerControlRunnable>&& aWorkerControlRunnable)
+  already_AddRefed<WorkerControlRunnable> aWorkerControlRunnable)
 {
   // May be called on any thread!
   RefPtr<WorkerControlRunnable> runnable(aWorkerControlRunnable);
@@ -2483,7 +2510,7 @@ WorkerPrivateParent<Derived>::DispatchControlRunnable(
 template <class Derived>
 nsresult
 WorkerPrivateParent<Derived>::DispatchDebuggerRunnable(
-  already_AddRefed<WorkerRunnable>&& aDebuggerRunnable)
+  already_AddRefed<WorkerRunnable> aDebuggerRunnable)
 {
   // May be called on any thread!
 
@@ -2513,7 +2540,7 @@ WorkerPrivateParent<Derived>::DispatchDebuggerRunnable(
 
 template <class Derived>
 already_AddRefed<WorkerRunnable>
-WorkerPrivateParent<Derived>::MaybeWrapAsWorkerRunnable(already_AddRefed<nsIRunnable>&& aRunnable)
+WorkerPrivateParent<Derived>::MaybeWrapAsWorkerRunnable(already_AddRefed<nsIRunnable> aRunnable)
 {
   // May be called on any thread!
 
@@ -2920,6 +2947,7 @@ WorkerPrivateParent<Derived>::PostMessageInternal(
                                             JS::Handle<JS::Value> aMessage,
                                             const Optional<Sequence<JS::Value>>& aTransferable,
                                             UniquePtr<ServiceWorkerClientInfo>&& aClientInfo,
+                                            const nsMainThreadPtrHandle<nsISupports>& aKeepAliveToken,
                                             ErrorResult& aRv)
 {
   AssertIsOnParentThread();
@@ -2981,7 +3009,7 @@ WorkerPrivateParent<Derived>::PostMessageInternal(
     return;
   }
 
-  runnable->SetMessageSource(Move(aClientInfo));
+  runnable->SetServiceWorkerData(Move(aClientInfo), aKeepAliveToken);
 
   if (!runnable->Dispatch()) {
     aRv.Throw(NS_ERROR_FAILURE);
@@ -2995,7 +3023,7 @@ WorkerPrivateParent<Derived>::PostMessage(
                              const Optional<Sequence<JS::Value>>& aTransferable,
                              ErrorResult& aRv)
 {
-  PostMessageInternal(aCx, aMessage, aTransferable, nullptr, aRv);
+  PostMessageInternal(aCx, aMessage, aTransferable, nullptr, nullptr, aRv);
 }
 
 template <class Derived>
@@ -3004,10 +3032,12 @@ WorkerPrivateParent<Derived>::PostMessageToServiceWorker(
                              JSContext* aCx, JS::Handle<JS::Value> aMessage,
                              const Optional<Sequence<JS::Value>>& aTransferable,
                              UniquePtr<ServiceWorkerClientInfo>&& aClientInfo,
+                             const nsMainThreadPtrHandle<nsISupports>& aKeepAliveToken,
                              ErrorResult& aRv)
 {
   AssertIsOnMainThread();
-  PostMessageInternal(aCx, aMessage, aTransferable, Move(aClientInfo), aRv);
+  PostMessageInternal(aCx, aMessage, aTransferable, Move(aClientInfo),
+                      aKeepAliveToken, aRv);
 }
 
 template <class Derived>
@@ -3541,23 +3571,6 @@ WorkerPrivateParent<Derived>::SetPrincipal(nsIPrincipal* aPrincipal,
 
   MOZ_ALWAYS_SUCCEEDS(
     PrincipalToPrincipalInfo(aPrincipal, mLoadInfo.mPrincipalInfo));
-}
-
-template <class Derived>
-JSContext*
-WorkerPrivateParent<Derived>::ParentJSContext() const
-{
-  AssertIsOnParentThread();
-
-  if (mParent) {
-    return mParent->GetJSContext();
-  }
-
-  AssertIsOnMainThread();
-
-  return mLoadInfo.mScriptContext ?
-         mLoadInfo.mScriptContext->GetNativeContext() :
-         nsContentUtils::GetSafeJSContext();
 }
 
 template <class Derived>
@@ -5870,7 +5883,7 @@ WorkerPrivate::ReportError(JSContext* aCx, const char* aFallbackMessage,
     columnNumber = aReport->tokenOffset();
     flags = aReport->flags;
     errorNumber = aReport->errorNumber;
-    MOZ_ASSERT(aReport->exnType >= JSEXN_NONE && aReport->exnType < JSEXN_LIMIT);
+    MOZ_ASSERT(aReport->exnType >= JSEXN_FIRST && aReport->exnType < JSEXN_LIMIT);
     exnType = JSExnType(aReport->exnType);
   }
   else {
@@ -6309,7 +6322,7 @@ WorkerPrivate::UpdateGCZealInternal(JSContext* aCx, uint8_t aGCZeal,
 {
   AssertIsOnWorkerThread();
 
-  JS_SetGCZeal(aCx, aGCZeal, aFrequency);
+  JS_SetGCZeal(JS_GetRuntime(aCx), aGCZeal, aFrequency);
 
   for (uint32_t index = 0; index < mChildWorkers.Length(); index++) {
     mChildWorkers[index]->UpdateGCZeal(aGCZeal, aFrequency);
@@ -6680,7 +6693,7 @@ EventTarget::DispatchFromScript(nsIRunnable* aRunnable, uint32_t aFlags)
 template <class Derived>
 NS_IMETHODIMP
 WorkerPrivateParent<Derived>::
-EventTarget::Dispatch(already_AddRefed<nsIRunnable>&& aRunnable, uint32_t aFlags)
+EventTarget::Dispatch(already_AddRefed<nsIRunnable> aRunnable, uint32_t aFlags)
 {
   // May be called on any thread!
   nsCOMPtr<nsIRunnable> event(aRunnable);
@@ -6711,6 +6724,14 @@ EventTarget::Dispatch(already_AddRefed<nsIRunnable>&& aRunnable, uint32_t aFlags
   }
 
   return NS_OK;
+}
+
+template <class Derived>
+NS_IMETHODIMP
+WorkerPrivateParent<Derived>::
+EventTarget::DelayedDispatch(already_AddRefed<nsIRunnable>, uint32_t)
+{
+  return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 template <class Derived>

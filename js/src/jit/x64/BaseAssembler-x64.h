@@ -125,6 +125,25 @@ class BaseAssemblerX64 : public BaseAssembler
         m_formatter.oneByteOp64(OP_XOR_GvEv, addr, dst);
     }
 
+    void bsrq_rr(RegisterID src, RegisterID dst)
+    {
+        spew("bsrq       %s, %s", GPReg64Name(src), GPReg64Name(dst));
+        m_formatter.twoByteOp64(OP2_BSR_GvEv, src, dst);
+    }
+
+    void bsfq_rr(RegisterID src, RegisterID dst)
+    {
+        spew("bsfq       %s, %s", GPReg64Name(src), GPReg64Name(dst));
+        m_formatter.twoByteOp64(OP2_BSF_GvEv, src, dst);
+    }
+
+    void popcntq_rr(RegisterID src, RegisterID dst)
+    {
+        spew("popcntq    %s, %s", GPReg64Name(src), GPReg64Name(dst));
+        m_formatter.legacySSEPrefix(VEX_SS);
+        m_formatter.twoByteOp64(OP2_POPCNT_GvEv, src, dst);
+    }
+
     void andq_ir(int32_t imm, RegisterID dst)
     {
         spew("andq       $0x%" PRIx64 ", %s", int64_t(imm), GPReg64Name(dst));
@@ -472,17 +491,17 @@ class BaseAssemblerX64 : public BaseAssembler
     void cmovzq_rr(RegisterID src, RegisterID dst)
     {
         spew("cmovz     %s, %s", GPReg16Name(src), GPReg32Name(dst));
-        m_formatter.twoByteOp64(OP2_CMOVZ_GvqpEvqp, src, dst);
+        m_formatter.twoByteOp64(OP2_CMOVZ_GvEv, src, dst);
     }
     void cmovzq_mr(int32_t offset, RegisterID base, RegisterID dst)
     {
         spew("cmovz     " MEM_ob ", %s", ADDR_ob(offset, base), GPReg32Name(dst));
-        m_formatter.twoByteOp64(OP2_CMOVZ_GvqpEvqp, offset, base, dst);
+        m_formatter.twoByteOp64(OP2_CMOVZ_GvEv, offset, base, dst);
     }
     void cmovzq_mr(int32_t offset, RegisterID base, RegisterID index, int scale, RegisterID dst)
     {
         spew("cmovz     " MEM_obs ", %s", ADDR_obs(offset, base, index, scale), GPReg32Name(dst));
-        m_formatter.twoByteOp64(OP2_CMOVZ_GvqpEvqp, offset, base, index, scale, dst);
+        m_formatter.twoByteOp64(OP2_CMOVZ_GvEv, offset, base, index, scale, dst);
     }
 
     void xchgq_rr(RegisterID src, RegisterID dst)
@@ -675,6 +694,15 @@ class BaseAssemblerX64 : public BaseAssembler
         m_formatter.oneByteRipOp64(OP_MOV_GvEv, 0, dst);
         JmpSrc label(m_formatter.size());
         spew("movq       " MEM_o32r ", %s", ADDR_o32r(label.offset()), GPRegName(dst));
+        return label;
+    }
+
+    MOZ_MUST_USE JmpSrc
+    movq_rrip(RegisterID src)
+    {
+        m_formatter.oneByteRipOp64(OP_MOV_EvGv, 0, (RegisterID)src);
+        JmpSrc label(m_formatter.size());
+        spew("movq       %s, " MEM_o32r "", GPRegName(src), ADDR_o32r(label.offset()));
         return label;
     }
 

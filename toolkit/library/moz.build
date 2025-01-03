@@ -18,6 +18,7 @@ def Libxul(name):
     DELAYLOAD_DLLS += [
         'comdlg32.dll',
         'dbghelp.dll',
+        'netapi32.dll',
         'PowrProf.dll',
         'psapi.dll',
         'rasapi32.dll',
@@ -101,11 +102,6 @@ DIRS += ['gtest']
 USE_LIBS += [
     'js',
 ]
-
-if CONFIG['MOZ_SANDBOX'] and CONFIG['OS_ARCH'] == 'WINNT':
-    USE_LIBS += [
-        'sandboxbroker',
-    ]
 
 USE_LIBS += [
     'gkmedias',
@@ -344,6 +340,7 @@ if CONFIG['OS_ARCH'] == 'WINNT':
         'comdlg32',
         'imm32',
         'msimg32',
+        'netapi32',
         'shlwapi',
         'psapi',
         'ws2_32',

@@ -8,7 +8,6 @@
 #define nsIConstraintValidition_h___
 
 #include "nsISupports.h"
-#include "nsAutoPtr.h"
 #include "nsString.h"
 
 class nsIDOMValidityState;
@@ -73,6 +72,7 @@ public:
   }
   mozilla::dom::ValidityState* Validity();
   bool CheckValidity();
+  bool ReportValidity();
 
 protected:
 

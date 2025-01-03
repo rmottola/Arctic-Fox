@@ -23,6 +23,8 @@ user_pref("browser.shell.checkDefaultBrowser", false);
 user_pref("shell.checkDefaultClient", false);
 user_pref("browser.warnOnQuit", false);
 user_pref("accessibility.typeaheadfind.autostart", false);
+user_pref("findbar.highlightAll", false);
+user_pref("findbar.modalHighlight", false);
 user_pref("javascript.options.showInConsole", true);
 user_pref("devtools.browsertoolbox.panel", "jsdebugger");
 user_pref("devtools.errorconsole.enabled", true);
@@ -109,8 +111,8 @@ user_pref("extensions.getAddons.get.url", "http://%(server)s/extensions-dummy/re
 user_pref("extensions.getAddons.getWithPerformance.url", "http://%(server)s/extensions-dummy/repositoryGetWithPerformanceURL");
 user_pref("extensions.getAddons.search.browseURL", "http://%(server)s/extensions-dummy/repositoryBrowseURL");
 user_pref("extensions.getAddons.search.url", "http://%(server)s/extensions-dummy/repositorySearchURL");
-// Ensure kinto updates don't hit the network
-user_pref("services.kinto.base", "http://%(server)s/dummy-kinto/v1");
+// Ensure blocklist updates don't hit the network
+user_pref("services.settings.server", "http://%(server)s/dummy-kinto/v1");
 // Make sure that opening the plugins check page won't hit the network
 user_pref("plugins.update.url", "http://%(server)s/plugins-dummy/updateCheckURL");
 // Make sure SNTP requests don't hit the network
@@ -302,8 +304,6 @@ user_pref("media.eme.enabled", true);
 user_pref("media.decoder.heuristic.dormant.timeout", 0);
 #endif
 
-// Don't prompt about e10s
-user_pref("browser.displayedE10SPrompt.1", 5);
 // Don't use auto-enabled e10s
 user_pref("browser.tabs.remote.autostart.1", false);
 user_pref("browser.tabs.remote.autostart.2", false);

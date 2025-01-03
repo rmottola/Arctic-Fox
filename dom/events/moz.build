@@ -151,3 +151,6 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
 if CONFIG['MOZ_X11']:
     CFLAGS += CONFIG['XCFLAGS']
     CXXFLAGS += CONFIG['XCFLAGS']
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']

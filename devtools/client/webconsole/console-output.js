@@ -1,5 +1,5 @@
 /* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
-/* vim: set ft= javascript ts=2 et sw=2 tw=80: */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -1335,8 +1335,10 @@ Messages.Extended.prototype = Heritage.extend(Messages.Simple.prototype,
  *        The evaluation response packet received from the server.
  * @param string [errorMessage]
  *        Optional error message to display.
+ * @param string [errorDocLink]
+ * Optional error doc URL to link to.
  */
-Messages.JavaScriptEvalOutput = function(evalResponse, errorMessage)
+Messages.JavaScriptEvalOutput = function(evalResponse, errorMessage, errorDocLink)
 {
   let severity = "log", msg, quoteStrings = true;
 
@@ -1344,7 +1346,7 @@ Messages.JavaScriptEvalOutput = function(evalResponse, errorMessage)
   // be useful to extensions customizing the console output.
   this.response = evalResponse;
 
-  if (errorMessage) {
+  if (typeof(errorMessage) !== "undefined") {
     severity = "error";
     msg = errorMessage;
     quoteStrings = false;
@@ -1359,7 +1361,13 @@ Messages.JavaScriptEvalOutput = function(evalResponse, errorMessage)
     severity: severity,
     quoteStrings: quoteStrings,
   };
-  Messages.Extended.call(this, [msg], options);
+
+  let messages = [msg];
+  if (errorDocLink) {
+    messages.push(errorDocLink);
+  }
+
+  Messages.Extended.call(this, messages, options);
 };
 
 Messages.JavaScriptEvalOutput.prototype = Messages.Extended.prototype;
@@ -3208,7 +3216,7 @@ Widgets.ObjectRenderers.add({
     // the message is destroyed.
     this.message.widgets.add(this);
 
-    this.linkToInspector().then(null, Cu.reportError);
+    this.linkToInspector().then(null, e => console.error(e));
   },
 
   /**
@@ -3298,7 +3306,7 @@ Widgets.ObjectRenderers.add({
   {
     return this.linkToInspector().then(() => {
       return this.toolbox.highlighterUtils.unhighlight();
-    }).then(null, Cu.reportError);
+    }).then(null, e => console.error(e));
   },
 
   /**
@@ -3491,7 +3499,7 @@ Widgets.LongString.prototype = Heritage.extend(Widgets.BaseWidget.prototype,
   _onSubstring: function(response)
   {
     if (response.error) {
-      Cu.reportError("LongString substring failure: " + response.error);
+      console.error("LongString substring failure: " + response.error);
       return;
     }
 

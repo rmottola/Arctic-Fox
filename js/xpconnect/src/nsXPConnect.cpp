@@ -43,7 +43,6 @@ NS_IMPL_ISUPPORTS(nsXPConnect, nsIXPConnect)
 
 nsXPConnect* nsXPConnect::gSelf = nullptr;
 bool         nsXPConnect::gOnceAliveNowDead = false;
-uint32_t     nsXPConnect::gReportAllJSExceptions = 0;
 
 // Global cache of the default script security manager (QI'd to
 // nsIScriptSecurityManager) and the system principal.
@@ -67,10 +66,6 @@ nsXPConnect::nsXPConnect()
     if (!mRuntime) {
         NS_RUNTIMEABORT("Couldn't create XPCJSRuntime.");
     }
-
-    char* reportableEnv = PR_GetEnv("MOZ_REPORT_ALL_JS_EXCEPTIONS");
-    if (reportableEnv && *reportableEnv)
-        gReportAllJSExceptions = 1;
 }
 
 nsXPConnect::~nsXPConnect()
@@ -278,7 +273,7 @@ xpc::ErrorReport::LogToConsoleWithStack(JS::HandleObject aStack)
       errorObject = new nsScriptError();
     }
     errorObject->SetErrorMessageName(mErrorMsgName);
-    NS_ENSURE_TRUE_VOID(consoleService && errorObject);
+    NS_ENSURE_TRUE_VOID(consoleService);
 
     nsresult rv = errorObject->InitWithWindowID(mErrorMsg, mFileName, mSourceLine,
                                                 mLineNumber, mColumn, mFlags,
@@ -346,11 +341,10 @@ xpc_MarkInCCGeneration(nsISupports* aVariant, uint32_t aGeneration)
 void
 xpc_TryUnmarkWrappedGrayObject(nsISupports* aWrappedJS)
 {
-    nsCOMPtr<nsIXPConnectWrappedJS> wjs = do_QueryInterface(aWrappedJS);
-    if (wjs) {
-        // Unmarks gray JSObject.
-        static_cast<nsXPCWrappedJS*>(wjs.get())->GetJSObject();
-    }
+    nsCOMPtr<nsIXPConnectWrappedJSUnmarkGray> wjsug =
+      do_QueryInterface(aWrappedJS);
+    MOZ_ASSERT(!wjsug, "One should never be able to QI to "
+                       "nsIXPConnectWrappedJSUnmarkGray successfully!");
 }
 
 /***************************************************************************/
@@ -402,19 +396,22 @@ CreateGlobalObject(JSContext* cx, const JSClass* clasp, nsIPrincipal* principal,
     // of |global|.
     (void) new XPCWrappedNativeScope(cx, global);
 
+    if (clasp->flags & JSCLASS_DOM_GLOBAL) {
 #ifdef DEBUG
-    // Verify that the right trace hook is called. Note that this doesn't
-    // work right for wrapped globals, since the tracing situation there is
-    // more complicated. Manual inspection shows that they do the right thing.
-    if (!((const js::Class*)clasp)->isWrappedNative())
-    {
-        VerifyTraceProtoAndIfaceCacheCalledTracer trc(JS_GetRuntime(cx));
-        TraceChildren(&trc, GCCellPtr(global.get()));
-        MOZ_ASSERT(trc.ok, "Trace hook on global needs to call TraceXPCGlobal for XPConnect compartments.");
-    }
+        // Verify that the right trace hook is called. Note that this doesn't
+        // work right for wrapped globals, since the tracing situation there is
+        // more complicated. Manual inspection shows that they do the right
+        // thing.  Also note that we only check this for JSCLASS_DOM_GLOBAL
+        // classes because xpc::TraceXPCGlobal won't call
+        // TraceProtoAndIfaceCache unless that flag is set.
+        if (!((const js::Class*)clasp)->isWrappedNative())
+        {
+            VerifyTraceProtoAndIfaceCacheCalledTracer trc(JS_GetRuntime(cx));
+            TraceChildren(&trc, GCCellPtr(global.get()));
+            MOZ_ASSERT(trc.ok, "Trace hook on global needs to call TraceXPCGlobal for XPConnect compartments.");
+        }
 #endif
 
-    if (clasp->flags & JSCLASS_DOM_GLOBAL) {
         const char* className = clasp->name;
         AllocateProtoAndIfaceCache(global,
                                    (strcmp(className, "Window") == 0 ||
@@ -433,9 +430,12 @@ InitGlobalObjectOptions(JS::CompartmentOptions& aOptions,
     bool shouldDiscardSystemSource = ShouldDiscardSystemSource();
     bool extraWarningsForSystemJS = ExtraWarningsForSystemJS();
 
-    bool isSystem = false;
-    if (shouldDiscardSystemSource || extraWarningsForSystemJS)
-        isSystem = nsContentUtils::IsSystemPrincipal(aPrincipal);
+    bool isSystem = nsContentUtils::IsSystemPrincipal(aPrincipal);
+
+    if (isSystem) {
+        // Make sure [SecureContext] APIs are visible:
+        aOptions.creationOptions().setSecureContext(true);
+    }
 
     short status = aPrincipal->GetAppStatus();
 
@@ -978,16 +978,6 @@ nsXPConnect::JSToVariant(JSContext* ctx, HandleValue value, nsIVariant** _retval
     return NS_OK;
 }
 
-NS_IMETHODIMP
-nsXPConnect::SetReportAllJSExceptions(bool newval)
-{
-    // Ignore if the environment variable was set.
-    if (gReportAllJSExceptions != 1)
-        gReportAllJSExceptions = newval ? 2 : 0;
-
-    return NS_OK;
-}
-
 /* virtual */
 JSContext*
 nsXPConnect::GetCurrentJSContext()
@@ -1004,10 +994,10 @@ nsXPConnect::GetSafeJSContext()
 
 namespace xpc {
 
-bool
+void
 PushNullJSContext()
 {
-    return XPCJSRuntime::Get()->GetJSContextStack()->Push(nullptr);
+    XPCJSRuntime::Get()->GetJSContextStack()->Push(nullptr);
 }
 
 void

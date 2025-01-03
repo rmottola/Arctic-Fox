@@ -229,6 +229,33 @@
       </table>
 
       <!-- - - - - - - - - - - - - - - - - - - - - -->
+#ifdef MOZ_CRASHREPORTER
+
+      <h2 class="major-section" id="crashes-title">
+        &aboutSupport.crashes.title;
+      </h2>
+
+      <table id="crashes-table">
+        <thead>
+          <tr>
+            <th>
+              &aboutSupport.crashes.id;
+            </th>
+            <th>
+              &aboutSupport.crashes.sendDate;
+            </th>
+          </tr>
+        </thead>
+        <tbody id="crashes-tbody">
+        </tbody>
+      </table>
+      <p id="crashes-allReports" class="hidden no-copy">
+        <a href="about:crashes" id="crashes-allReportsWithPending" class="block">&aboutSupport.crashes.allReports;</a>
+      </p>
+      <p id="crashes-noConfig" class="hidden no-copy">&aboutSupport.crashes.noConfig;</p>
+
+#endif
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
 
       <h2 class="major-section">
         &aboutSupport.extensionsTitle;
@@ -293,6 +320,30 @@
           <tr>
             <th colspan="2" class="title-column">
               &aboutSupport.graphicsDiagnosticsTitle;
+            </th>
+          </tr>
+        </tbody>
+
+        <tbody id="graphics-decisions-tbody">
+          <tr>
+            <th colspan="2" class="title-column">
+              &aboutSupport.graphicsDecisionLogTitle;
+            </th>
+          </tr>
+        </tbody>
+
+        <tbody id="graphics-crashguards-tbody">
+          <tr>
+            <th colspan="2" class="title-column">
+              &aboutSupport.graphicsCrashGuardsTitle;
+            </th>
+          </tr>
+        </tbody>
+
+        <tbody id="graphics-workarounds-tbody">
+          <tr>
+            <th colspan="2" class="title-column">
+              &aboutSupport.graphicsWorkaroundsTitle;
             </th>
           </tr>
         </tbody>

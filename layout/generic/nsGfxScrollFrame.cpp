@@ -28,7 +28,6 @@
 #include "nsIDOMHTMLTextAreaElement.h"
 #include "nsNodeInfoManager.h"
 #include "nsContentCreatorFunctions.h"
-#include "nsAutoPtr.h"
 #include "nsPresState.h"
 #include "nsIHTMLDocument.h"
 #include "nsContentUtils.h"
@@ -522,7 +521,7 @@ nsHTMLScrollFrame::ReflowScrolledFrame(ScrollReflowState* aState,
   kidReflowState.SetComputedBSize(computedBSize);
   kidReflowState.ComputedMinBSize() = computedMinBSize;
   kidReflowState.ComputedMaxBSize() = computedMaxBSize;
-  if (aState->mReflowState.IsBResize()) {
+  if (aState->mReflowState.IsBResizeForWM(kidReflowState.GetWritingMode())) {
     kidReflowState.SetBResize(true);
   }
 
@@ -3424,6 +3423,7 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
         MaxZIndexInListOfItemsContainedInFrame(positionedDescendants, mOuter);
       if (zindex >= 0) {
         destinationList = positionedDescendants;
+        inactiveRegionItem->SetOverrideZIndex(zindex);
       } else {
         destinationList = scrolledContent.Outlines();
       }
@@ -5174,7 +5174,7 @@ ScrollFrameHelper::ReflowCallbackCanceled()
 }
 
 bool
-ScrollFrameHelper::UpdateOverflow()
+ScrollFrameHelper::ComputeCustomOverflow(nsOverflowAreas& aOverflowAreas)
 {
   nsIScrollableFrame* sf = do_QueryFrame(mOuter);
   ScrollbarStyles ss = sf->GetScrollbarStyles();
@@ -5214,7 +5214,7 @@ ScrollFrameHelper::UpdateOverflow()
     return false;  // reflowing will update overflow
   }
   PostOverflowEvent();
-  return mOuter->nsContainerFrame::UpdateOverflow();
+  return mOuter->nsContainerFrame::ComputeCustomOverflow(aOverflowAreas);
 }
 
 void

@@ -5,6 +5,7 @@
 #include "CompositorWidgetProxy.h"
 #include "GLConsts.h"
 #include "nsBaseWidget.h"
+#include "VsyncDispatcher.h"
 
 namespace mozilla {
 namespace widget {
@@ -26,9 +27,9 @@ CompositorWidgetProxy::CleanupRemoteDrawing()
 }
 
 already_AddRefed<gfx::DrawTarget>
-CompositorWidgetProxy::CreateBackBufferDrawTarget(gfx::DrawTarget* aScreenTarget,
-                                                  const LayoutDeviceIntRect& aRect,
-                                                  const LayoutDeviceIntRect& aClearRect)
+CompositorWidgetProxy::GetBackBufferDrawTarget(gfx::DrawTarget* aScreenTarget,
+                                               const LayoutDeviceIntRect& aRect,
+                                               const LayoutDeviceIntRect& aClearRect)
 {
   MOZ_ASSERT(aScreenTarget);
   gfx::SurfaceFormat format = gfx::SurfaceFormat::B8G8R8A8;
@@ -55,6 +56,13 @@ CompositorWidgetProxy::CreateBackBufferDrawTarget(gfx::DrawTarget* aScreenTarget
   return target.forget();
 }
 
+already_AddRefed<gfx::SourceSurface>
+CompositorWidgetProxy::EndBackBufferDrawing()
+{
+  RefPtr<gfx::SourceSurface> surface = mLastBackBuffer ? mLastBackBuffer->Snapshot() : nullptr;
+  return surface.forget();
+}
+
 uint32_t
 CompositorWidgetProxy::GetGLFrameBufferFormat()
 {
@@ -69,18 +77,12 @@ CompositorWidgetProxyWrapper::CompositorWidgetProxyWrapper(nsBaseWidget* aWidget
 bool
 CompositorWidgetProxyWrapper::PreRender(layers::LayerManagerComposite* aManager)
 {
-  if (!mWidget) {
-    return false;
-  }
   return mWidget->PreRender(aManager);
 }
 
 void
 CompositorWidgetProxyWrapper::PostRender(layers::LayerManagerComposite* aManager)
 {
-  if (!mWidget) {
-    return;
-  }
   mWidget->PostRender(aManager);
 }
 
@@ -88,9 +90,6 @@ void
 CompositorWidgetProxyWrapper::DrawWindowUnderlay(layers::LayerManagerComposite* aManager,
                                                  LayoutDeviceIntRect aRect)
 {
-  if (!mWidget) {
-    return;
-  }
   mWidget->DrawWindowUnderlay(aManager, aRect);
 }
 
@@ -98,18 +97,12 @@ void
 CompositorWidgetProxyWrapper::DrawWindowOverlay(layers::LayerManagerComposite* aManager,
                                                 LayoutDeviceIntRect aRect)
 {
-  if (!mWidget) {
-    return;
-  }
   mWidget->DrawWindowOverlay(aManager, aRect);
 }
 
 already_AddRefed<gfx::DrawTarget>
 CompositorWidgetProxyWrapper::StartRemoteDrawing()
 {
-  if (!mWidget) {
-    return nullptr;
-  }
   return mWidget->StartRemoteDrawing();
 }
 
@@ -117,18 +110,12 @@ already_AddRefed<gfx::DrawTarget>
 CompositorWidgetProxyWrapper::StartRemoteDrawingInRegion(LayoutDeviceIntRegion& aInvalidRegion,
                                                          layers::BufferMode* aBufferMode)
 {
-  if (!mWidget) {
-    return nullptr;
-  }
   return mWidget->StartRemoteDrawingInRegion(aInvalidRegion, aBufferMode);
 }
 
 void
 CompositorWidgetProxyWrapper::EndRemoteDrawing()
 {
-  if (!mWidget) {
-    return;
-  }
   mWidget->EndRemoteDrawing();
 }
 
@@ -136,70 +123,62 @@ void
 CompositorWidgetProxyWrapper::EndRemoteDrawingInRegion(gfx::DrawTarget* aDrawTarget,
                                                        LayoutDeviceIntRegion& aInvalidRegion)
 {
-  if (!mWidget) {
-    return;
-  }
   mWidget->EndRemoteDrawingInRegion(aDrawTarget, aInvalidRegion);
 }
 
 void
 CompositorWidgetProxyWrapper::CleanupRemoteDrawing()
 {
-  if (mWidget) {
-    mWidget->CleanupRemoteDrawing();
-  }
-  CompositorWidgetProxy::CleanupRemoteDrawing();
+  mWidget->CleanupRemoteDrawing();
 }
 
 void
 CompositorWidgetProxyWrapper::CleanupWindowEffects()
 {
-  if (!mWidget) {
-    return;
-  }
   mWidget->CleanupWindowEffects();
 }
 
 bool
 CompositorWidgetProxyWrapper::InitCompositor(layers::Compositor* aCompositor)
 {
-  if (!mWidget) {
-    return false;
-  }
   return mWidget->InitCompositor(aCompositor);
 }
 
 LayoutDeviceIntSize
 CompositorWidgetProxyWrapper::GetClientSize()
 {
-  if (!mWidget) {
-    return LayoutDeviceIntSize();
-  }
   return mWidget->GetClientSize();
 }
 
 uint32_t
 CompositorWidgetProxyWrapper::GetGLFrameBufferFormat()
 {
-  if (!mWidget) {
-    return CompositorWidgetProxy::GetGLFrameBufferFormat();
-  }
   return mWidget->GetGLFrameBufferFormat();
 }
 
 layers::Composer2D*
 CompositorWidgetProxyWrapper::GetComposer2D()
 {
-  if (!mWidget) {
-    return nullptr;
-  }
   return mWidget->GetComposer2D();
+}
+
+uintptr_t
+CompositorWidgetProxyWrapper::GetWidgetKey()
+{
+  return reinterpret_cast<uintptr_t>(mWidget);
 }
 
 nsIWidget*
 CompositorWidgetProxyWrapper::RealWidget()
 {
   return mWidget;
+}
+
+already_AddRefed<CompositorVsyncDispatcher>
+CompositorWidgetProxyWrapper::GetCompositorVsyncDispatcher()
+{
+  RefPtr<CompositorVsyncDispatcher> cvd = mWidget->GetCompositorVsyncDispatcher();
+  return cvd.forget();
 }
 
 } // namespace widget

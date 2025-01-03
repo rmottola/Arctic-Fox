@@ -203,6 +203,30 @@ function waitForInitialAddonList(document) {
 }
 
 /**
+ * Returns a promise that will resolve when the add-on list has been updated.
+ *
+ * @param {Node} document
+ * @return {Promise}
+ */
+function waitForInitialAddonList(document) {
+  const addonListContainer = document.querySelector("#addons .targets");
+  let addonCount = addonListContainer.querySelectorAll(".target");
+  addonCount = addonCount ? [...addonCount].length : -1;
+  info("Waiting for add-ons to load. Current add-on count: " + addonCount);
+
+  // This relies on the network speed of the actor responding to the
+  // listAddons() request and also the speed of openAboutDebugging().
+  let result;
+  if (addonCount > 0) {
+    info("Actually, the add-ons have already loaded");
+    result = Promise.resolve();
+  } else {
+    result = waitForMutation(addonListContainer, { childList: true });
+  }
+  return result;
+}
+
+/**
  * Returns a promise that will resolve after receiving a mutation matching the
  * provided mutation options on the provided target.
  * @param {Node} target
@@ -257,6 +281,14 @@ function waitForServiceWorkerRegistered(tab) {
       done();
     });
   });
+
+  // Ensure that the UI removes the addon from the list
+  yield addonListMutation;
+  let names = [...addonList.querySelectorAll(".target-name")];
+  names = names.map(element => element.textContent);
+  ok(!names.includes(addonName),
+    "After uninstall, the addon name disappears from the list of addons: "
+    + names);
 }
 
 /**

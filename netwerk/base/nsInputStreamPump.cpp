@@ -22,7 +22,7 @@
 static NS_DEFINE_CID(kStreamTransportServiceCID, NS_STREAMTRANSPORTSERVICE_CID);
 
 //
-// NSPR_LOG_MODULES=nsStreamPump:5
+// MOZ_LOG=nsStreamPump:5
 //
 static mozilla::LazyLogModule gStreamPumpLog("nsStreamPump");
 #undef LOG
@@ -679,7 +679,7 @@ nsInputStreamPump::OnStateStop()
         MOZ_ASSERT(NS_IsMainThread(),
                    "OnStateStop should only be called on the main thread.");
         nsresult rv = NS_DispatchToMainThread(
-            NS_NewRunnableMethod(this, &nsInputStreamPump::CallOnStateStop));
+            NewRunnableMethod(this, &nsInputStreamPump::CallOnStateStop));
         NS_ENSURE_SUCCESS(rv, STATE_IDLE);
         return STATE_IDLE;
     }

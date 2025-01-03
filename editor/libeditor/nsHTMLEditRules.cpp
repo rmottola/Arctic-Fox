@@ -15,6 +15,7 @@
 #include "mozilla/dom/Element.h"
 #include "mozilla/OwningNonNull.h"
 #include "mozilla/mozalloc.h"
+#include "nsAutoPtr.h"
 #include "nsAString.h"
 #include "nsAlgorithm.h"
 #include "nsCRT.h"
@@ -53,6 +54,11 @@
 #include "nsUnicharUtils.h"
 #include "nsWSRunObject.h"
 #include <algorithm>
+
+// Workaround for windows headers
+#ifdef SetProp
+#undef SetProp
+#endif
 
 class nsISupports;
 class nsRulesInfo;
@@ -8157,7 +8163,10 @@ nsHTMLEditRules::WillDeleteSelection(nsISelection* aSelection)
   if (!mListenerEnabled) {
     return NS_OK;
   }
-  RefPtr<Selection> selection = static_cast<Selection*>(aSelection);
+  if (NS_WARN_IF(!aSelection)) {
+    return NS_ERROR_INVALID_ARG;
+  }
+  RefPtr<Selection> selection = aSelection->AsSelection();
   // get the (collapsed) selection location
   nsCOMPtr<nsIDOMNode> selNode;
   int32_t selOffset;
@@ -8731,7 +8740,7 @@ nsHTMLEditRules::WillRelativeChangeZIndex(Selection* aSelection,
 NS_IMETHODIMP
 nsHTMLEditRules::DocumentModified()
 {
-  nsContentUtils::AddScriptRunner(NS_NewRunnableMethod(this, &nsHTMLEditRules::DocumentModifiedWorker));
+  nsContentUtils::AddScriptRunner(NewRunnableMethod(this, &nsHTMLEditRules::DocumentModifiedWorker));
   return NS_OK;
 }
 

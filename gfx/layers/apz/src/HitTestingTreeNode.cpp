@@ -29,6 +29,7 @@ HitTestingTreeNode::HitTestingTreeNode(AsyncPanZoomController* aApzc,
   , mScrollDir(Layer::NONE)
   , mScrollSize(0)
   , mIsScrollbarContainer(false)
+  , mFixedPosTarget(FrameMetrics::NULL_SCROLL_ID)
   , mOverride(EventRegionsOverride::NoOverride)
 {
 if (mIsPrimaryApzcHolder) {
@@ -127,6 +128,18 @@ HitTestingTreeNode::IsScrollbarNode() const
 }
 
 void
+HitTestingTreeNode::SetFixedPosData(FrameMetrics::ViewID aFixedPosTarget)
+{
+  mFixedPosTarget = aFixedPosTarget;
+}
+
+FrameMetrics::ViewID
+HitTestingTreeNode::GetFixedPosTarget() const
+{
+  return mFixedPosTarget;
+}
+
+void
 HitTestingTreeNode::SetPrevSibling(HitTestingTreeNode* aSibling)
 {
   mPrevSibling = aSibling;
@@ -188,19 +201,6 @@ AsyncPanZoomController*
 HitTestingTreeNode::GetNearestContainingApzc() const
 {
   for (const HitTestingTreeNode* n = this; n; n = n->GetParent()) {
-    if (n->GetApzc()) {
-      return n->GetApzc();
-    }
-  }
-  return nullptr;
-}
-
-AsyncPanZoomController*
-HitTestingTreeNode::GetNearestContainingApzcWithSameLayersId() const
-{
-  for (const HitTestingTreeNode* n = this;
-       n && n->mLayersId == mLayersId;
-       n = n->GetParent()) {
     if (n->GetApzc()) {
       return n->GetApzc();
     }
@@ -278,6 +278,17 @@ HitTestingTreeNode::HitTest(const ParentLayerPoint& aPoint) const
   {
     return HitTestResult::HitDispatchToContentRegion;
   }
+  if (gfxPrefs::TouchActionEnabled()) {
+    if (mEventRegions.mNoActionRegion.Contains(point.x, point.y)) {
+      return HitTestResult::HitLayerTouchActionNone;
+    }
+    if (mEventRegions.mHorizontalPanRegion.Contains(point.x, point.y)) {
+      return HitTestResult::HitLayerTouchActionPanX;
+    }
+    if (mEventRegions.mVerticalPanRegion.Contains(point.x, point.y)) {
+      return HitTestResult::HitLayerTouchActionPanY;
+    }
+  }
   return HitTestResult::HitLayer;
 }
 
@@ -293,11 +304,12 @@ HitTestingTreeNode::Dump(const char* aPrefix) const
   if (mPrevSibling) {
     mPrevSibling->Dump(aPrefix);
   }
-  printf_stderr("%sHitTestingTreeNode (%p) APZC (%p) g=(%s) %s%sr=(%s) t=(%s) c=(%s)\n",
+  printf_stderr("%sHitTestingTreeNode (%p) APZC (%p) g=(%s) %s%s%sr=(%s) t=(%s) c=(%s)\n",
     aPrefix, this, mApzc.get(),
     mApzc ? Stringify(mApzc->GetGuid()).c_str() : nsPrintfCString("l=%" PRIu64, mLayersId).get(),
     (mOverride & EventRegionsOverride::ForceDispatchToContent) ? "fdtc " : "",
     (mOverride & EventRegionsOverride::ForceEmptyHitRegion) ? "fehr " : "",
+    (mFixedPosTarget != FrameMetrics::NULL_SCROLL_ID) ? nsPrintfCString("fixed=%" PRIu64 " ", mFixedPosTarget).get() : "",
     Stringify(mEventRegions).c_str(), Stringify(mTransform).c_str(),
     mClipRegion ? Stringify(mClipRegion.ref()).c_str() : "none");
   if (mLastChild) {

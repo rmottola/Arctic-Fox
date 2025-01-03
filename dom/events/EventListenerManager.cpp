@@ -264,7 +264,7 @@ EventListenerManager::AddEventListenerInternal(
     listener = &mListeners.ElementAt(i);
     // mListener == aListenerHolder is the last one, since it can be a bit slow.
     if (listener->mListenerIsHandler == aHandler &&
-        listener->mFlags == aFlags &&
+        listener->mFlags.EqualsForAddition(aFlags) &&
         EVENT_TYPE_EQUALS(listener, aEventMessage, aTypeAtom, aTypeString,
                           aAllEvents) &&
         listener->mListener == aListenerHolder) {
@@ -285,6 +285,8 @@ EventListenerManager::AddEventListenerInternal(
   listener->mListenerIsHandler = aHandler;
   listener->mHandlerIsString = false;
   listener->mAllEvents = aAllEvents;
+  listener->mIsChrome = mIsMainThreadELM &&
+    nsContentUtils::LegacyIsCallerChromeOrNativeCode();
 
   // Detect the type of event listener.
   nsCOMPtr<nsIXPConnectWrappedJS> wjs;
@@ -615,7 +617,7 @@ EventListenerManager::RemoveEventListenerInternal(
                           aAllEvents)) {
       ++typeCount;
       if (listener->mListener == aListenerHolder &&
-          listener->mFlags.EqualsIgnoringTrustness(aFlags)) {
+          listener->mFlags.EqualsForRemoval(aFlags)) {
         RefPtr<EventListenerManager> kungFuDeathGrip(this);
         mListeners.RemoveElementAt(i);
         --count;
@@ -678,6 +680,15 @@ EventListenerManager::ListenerCanHandle(const Listener* aListener,
       return aListener->mTypeAtom == aEvent->mSpecifiedEventType;
     }
     return aListener->mTypeString.Equals(aEvent->mSpecifiedEventTypeString);
+  }
+  if (!nsContentUtils::IsUnprefixedFullscreenApiEnabled() &&
+      aEvent->IsTrusted() && (aEventMessage == eFullscreenChange ||
+                              aEventMessage == eFullscreenError)) {
+    // If unprefixed Fullscreen API is not enabled, don't dispatch it
+    // to the content.
+    if (!aEvent->mFlags.mInSystemGroup && !aListener->mIsChrome) {
+      return false;
+    }
   }
   MOZ_ASSERT(mIsMainThreadELM);
   return aListener->mEventMessage == aEventMessage;
@@ -1268,9 +1279,11 @@ EventListenerManager::HandleEventInternal(nsPresContext* aPresContext,
               }
             }
 
+            aEvent->mFlags.mInPassiveListener = listener->mFlags.mPassive;
             if (NS_FAILED(HandleEventSubType(listener, *aDOMEvent, aCurrentTarget))) {
-              aEvent->mFlags.mExceptionHasBeenRisen = true;
+              aEvent->mFlags.mExceptionWasRaised = true;
             }
+            aEvent->mFlags.mInPassiveListener = false;
 
             if (needsEndEventMarker) {
               timelines->AddMarkerForDocShell(
@@ -1320,6 +1333,19 @@ EventListenerManager::Disconnect()
   RemoveAllListeners();
 }
 
+static EventListenerFlags
+GetEventListenerFlagsFromOptions(const EventListenerOptions& aOptions)
+{
+  EventListenerFlags flags;
+  flags.mCapture = aOptions.mCapture;
+  if (aOptions.mMozSystemGroup) {
+    JSContext* cx = nsContentUtils::GetCurrentJSContext();
+    MOZ_ASSERT(cx, "Not being called from JS?");
+    flags.mInSystemGroup = IsChromeOrXBL(cx, nullptr);
+  }
+  return flags;
+}
+
 void
 EventListenerManager::AddEventListener(
                         const nsAString& aType,
@@ -1341,9 +1367,13 @@ EventListenerManager::AddEventListener(
                         bool aWantsUntrusted)
 {
   EventListenerFlags flags;
-  flags.mCapture =
-    aOptions.IsBoolean() ? aOptions.GetAsBoolean()
-                         : aOptions.GetAsAddEventListenerOptions().mCapture;
+  if (aOptions.IsBoolean()) {
+    flags.mCapture = aOptions.GetAsBoolean();
+  } else {
+    const auto& options = aOptions.GetAsAddEventListenerOptions();
+    flags = GetEventListenerFlagsFromOptions(options);
+    flags.mPassive = options.mPassive;
+  }
   flags.mAllowUntrustedEvents = aWantsUntrusted;
   return AddEventListenerByType(aListenerHolder, aType, flags);
 }
@@ -1366,9 +1396,12 @@ EventListenerManager::RemoveEventListener(
                         const dom::EventListenerOptionsOrBoolean& aOptions)
 {
   EventListenerFlags flags;
-  flags.mCapture =
-    aOptions.IsBoolean() ? aOptions.GetAsBoolean()
-                         : aOptions.GetAsEventListenerOptions().mCapture;
+  if (aOptions.IsBoolean()) {
+    flags.mCapture = aOptions.GetAsBoolean();
+  } else {
+    const auto& options = aOptions.GetAsEventListenerOptions();
+    flags = GetEventListenerFlagsFromOptions(options);
+  }
   RemoveEventListenerByType(aListenerHolder, aType, flags);
 }
 
@@ -1510,7 +1543,7 @@ EventListenerManager::GetListenerInfo(nsCOMArray<nsIEventListenerInfo>* aList)
                             listener.mFlags.mCapture,
                             listener.mFlags.mAllowUntrustedEvents,
                             listener.mFlags.mInSystemGroup);
-    aList->AppendObject(info);
+    aList->AppendElement(info.forget());
   }
   return NS_OK;
 }

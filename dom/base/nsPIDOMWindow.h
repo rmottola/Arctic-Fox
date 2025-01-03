@@ -11,7 +11,6 @@
 #include "mozIDOMWindow.h"
 
 #include "nsCOMPtr.h"
-#include "nsAutoPtr.h"
 #include "nsTArray.h"
 #include "mozilla/dom/EventTarget.h"
 #include "js/TypeDecls.h"
@@ -32,18 +31,20 @@ class nsIDocument;
 class nsIIdleObserver;
 class nsIScriptTimeoutHandler;
 class nsIURI;
-class nsPerformance;
 class nsPIDOMWindowInner;
 class nsPIDOMWindowOuter;
 class nsPIWindowRoot;
 class nsXBLPrototypeHandler;
 struct nsTimeout;
 
+typedef uint32_t SuspendTypes;
+
 namespace mozilla {
 namespace dom {
 class AudioContext;
 class Element;
-class ServiceWorkerRegistrationMainThread;
+class Performance;
+class ServiceWorkerRegistration;
 } // namespace dom
 namespace gfx {
 class VRDeviceProxy;
@@ -66,7 +67,8 @@ enum UIStateChangeType
 {
   UIStateChangeType_NoChange,
   UIStateChangeType_Set,
-  UIStateChangeType_Clear
+  UIStateChangeType_Clear,
+  UIStateChangeType_Invalid // used for serialization only
 };
 
 enum class FullscreenReason
@@ -410,12 +412,6 @@ public:
                                      UIStateChangeType aShowFocusRings) = 0;
 
   /**
-   * Get the keyboard indicator state for accelerators and focus rings.
-   */
-  virtual void GetKeyboardIndicators(bool* aShowAccelerators,
-                                     bool* aShowFocusRings) = 0;
-
-  /**
    * Indicates that the page in the window has been hidden. This is used to
    * reset the focus state.
    */
@@ -620,10 +616,10 @@ protected:
   nsIDocShell* MOZ_NON_OWNING_REF mDocShell;  // Weak Reference
 
   // mPerformance is only used on inner windows.
-  RefPtr<nsPerformance>       mPerformance;
+  RefPtr<mozilla::dom::Performance> mPerformance;
 
   typedef nsRefPtrHashtable<nsStringHashKey,
-                            mozilla::dom::ServiceWorkerRegistrationMainThread>
+                            mozilla::dom::ServiceWorkerRegistration>
           ServiceWorkerRegistrationTable;
   ServiceWorkerRegistrationTable mServiceWorkerRegistrationTable;
 
@@ -661,7 +657,19 @@ protected:
   // "active".  Only used on outer windows.
   bool                   mIsBackground;
 
-  bool                   mMediaSuspended;
+  /**
+   * The suspended types can be "disposable" or "permanent". This varable only
+   * stores the value about permanent suspend.
+   * - disposable
+   * To pause all playing media in that window, but doesn't affect the media
+   * which starts after that.
+   *
+   * - permanent
+   * To pause all media in that window, and also affect the media which starts
+   * after that.
+   */
+  SuspendTypes       mMediaSuspend;
+
   bool                   mAudioMuted;
   float                  mAudioVolume;
 
@@ -734,11 +742,11 @@ public:
   bool GetAudioCaptured() const;
   nsresult SetAudioCapture(bool aCapture);
 
-  already_AddRefed<mozilla::dom::ServiceWorkerRegistrationMainThread>
+  already_AddRefed<mozilla::dom::ServiceWorkerRegistration>
     GetServiceWorkerRegistration(const nsAString& aScope);
   void InvalidateServiceWorkerRegistration(const nsAString& aScope);
 
-  nsPerformance* GetPerformance();
+  mozilla::dom::Performance* GetPerformance();
 
   bool HasMutationListeners(uint32_t aMutationEventType) const
   {
@@ -817,7 +825,9 @@ NS_DEFINE_STATIC_IID_ACCESSOR(nsPIDOMWindowInner, NS_PIDOMWINDOWINNER_IID)
 class nsPIDOMWindowOuter : public nsPIDOMWindow<mozIDOMWindowProxy>
 {
 protected:
-  void RefreshMediaElements();
+  void RefreshMediaElementsVolume();
+  void RefreshMediaElementsSuspend(SuspendTypes aSuspend);
+  bool IsDisposableSuspend(SuspendTypes aSuspend) const;
 
 public:
   NS_DECLARE_STATIC_IID_ACCESSOR(NS_PIDOMWINDOWOUTER_IID)
@@ -868,8 +878,8 @@ public:
   }
 
   // Audio API
-  bool GetMediaSuspended() const;
-  void SetMediaSuspended(bool aSuspended);
+  SuspendTypes GetMediaSuspend() const;
+  void SetMediaSuspend(SuspendTypes aSuspend);
 
   bool GetAudioMuted() const;
   void SetAudioMuted(bool aMuted);

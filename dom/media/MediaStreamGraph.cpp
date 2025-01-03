@@ -181,16 +181,62 @@ MediaStreamGraphImpl::ExtractPendingInput(SourceMediaStream* aStream,
       }
     }
     finished = aStream->mUpdateFinished;
-    bool notifiedTrackCreated = false;
+    bool shouldNotifyTrackCreated = false;
     for (int32_t i = aStream->mUpdateTracks.Length() - 1; i >= 0; --i) {
       SourceMediaStream::TrackData* data = &aStream->mUpdateTracks[i];
       aStream->ApplyTrackDisabling(data->mID, data->mData);
+      // Dealing with NotifyQueuedTrackChanges and NotifyQueuedAudioData part.
+
+      // The logic is different from the manipulating of aStream->mTracks part.
+      // So it is not combined with the manipulating of aStream->mTracks part.
       StreamTime offset = (data->mCommands & SourceMediaStream::TRACK_CREATE)
           ? data->mStart : aStream->mTracks.FindTrack(data->mID)->GetSegment()->GetDuration();
-      for (MediaStreamListener* l : aStream->mListeners) {
-        l->NotifyQueuedTrackChanges(this, data->mID,
-                                    offset, data->mCommands, *data->mData);
+
+      // Audio case.
+      if (data->mData->GetType() == MediaSegment::AUDIO) {
+        if (data->mCommands) {
+          MOZ_ASSERT(!(data->mCommands & SourceMediaStream::TRACK_UNUSED));
+          for (MediaStreamListener* l : aStream->mListeners) {
+            if (data->mCommands & SourceMediaStream::TRACK_END) {
+              l->NotifyQueuedAudioData(this, data->mID,
+                                       offset, *(static_cast<AudioSegment*>(data->mData.get())));
+            }
+            l->NotifyQueuedTrackChanges(this, data->mID,
+                                        offset, data->mCommands, *data->mData);
+            if (data->mCommands & SourceMediaStream::TRACK_CREATE) {
+              l->NotifyQueuedAudioData(this, data->mID,
+                                       offset, *(static_cast<AudioSegment*>(data->mData.get())));
+            }
+          }
+        } else {
+          for (MediaStreamListener* l : aStream->mListeners) {
+              l->NotifyQueuedAudioData(this, data->mID,
+                                       offset, *(static_cast<AudioSegment*>(data->mData.get())));
+          }
+        }
       }
+
+      // Video case.
+      if (data->mData->GetType() == MediaSegment::VIDEO) {
+        if (data->mCommands) {
+          MOZ_ASSERT(!(data->mCommands & SourceMediaStream::TRACK_UNUSED));
+          for (MediaStreamListener* l : aStream->mListeners) {
+            l->NotifyQueuedTrackChanges(this, data->mID,
+                                        offset, data->mCommands, *data->mData);
+          }
+        } else {
+          // Fixme: This part will be removed in the bug 1201363. It will be
+          // removed in changeset "Do not copy video segment to StreamTracks in
+          // TrackUnionStream."
+
+          // Dealing with video and not TRACK_CREATE and TRACK_END case.
+          for (MediaStreamListener* l : aStream->mListeners) {
+            l->NotifyQueuedTrackChanges(this, data->mID,
+                                        offset, data->mCommands, *data->mData);
+          }
+        }
+      }
+
       for (TrackBound<MediaStreamTrackListener>& b : aStream->mTrackListeners) {
         if (b.mTrackID != data->mID) {
           continue;
@@ -212,7 +258,7 @@ MediaStreamGraphImpl::ExtractPendingInput(SourceMediaStream* aStream,
         // data->mData with an empty clone.
         data->mData = segment->CreateEmptyClone();
         data->mCommands &= ~SourceMediaStream::TRACK_CREATE;
-        notifiedTrackCreated = true;
+        shouldNotifyTrackCreated = true;
       } else if (data->mData->GetDuration() > 0) {
         MediaSegment* dest = aStream->mTracks.FindTrack(data->mID)->GetSegment();
         STREAM_LOG(LogLevel::Verbose, ("SourceMediaStream %p track %d, advancing end from %lld to %lld",
@@ -227,7 +273,7 @@ MediaStreamGraphImpl::ExtractPendingInput(SourceMediaStream* aStream,
         aStream->mUpdateTracks.RemoveElementAt(i);
       }
     }
-    if (notifiedTrackCreated) {
+    if (shouldNotifyTrackCreated) {
       for (MediaStreamListener* l : aStream->mListeners) {
         l->NotifyFinishedTrackCreation(this);
       }

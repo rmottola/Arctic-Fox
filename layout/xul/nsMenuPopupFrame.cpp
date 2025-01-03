@@ -847,6 +847,11 @@ nsMenuPopupFrame::ShowPopup(bool aIsContextMenu)
     mPopupState = ePopupOpening;
     mIsOpenChanged = true;
 
+    // Clear mouse capture when a context menu is opened.
+    if (aIsContextMenu) {
+      nsIPresShell::SetCapturingContent(nullptr, 0);
+    }
+
     nsMenuFrame* menuFrame = do_QueryFrame(GetParent());
     if (menuFrame) {
       nsWeakFrame weakFrame(this);
@@ -947,10 +952,10 @@ nsMenuPopupFrame::HidePopup(bool aDeselectMenu, nsPopupState aNewState)
   }
 }
 
-void
-nsMenuPopupFrame::GetLayoutFlags(uint32_t& aFlags)
+uint32_t
+nsMenuPopupFrame::GetXULLayoutFlags()
 {
-  aFlags = NS_FRAME_NO_SIZE_VIEW | NS_FRAME_NO_MOVE_VIEW | NS_FRAME_NO_VISIBILITY;
+  return NS_FRAME_NO_SIZE_VIEW | NS_FRAME_NO_MOVE_VIEW | NS_FRAME_NO_VISIBILITY;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1577,6 +1582,17 @@ nsMenuPopupFrame::GetConstraintRect(const LayoutDeviceIntRect& aAnchorRect,
   if (mInContentShell) {
     // for content shells, clip to the client area rather than the screen area
     screenRectPixels.IntersectRect(screenRectPixels, aRootScreenRect);
+  }
+  else if (!mOverrideConstraintRect.IsEmpty()) {
+    LayoutDeviceIntRect overrideConstrainRect =
+      LayoutDeviceIntRect::FromAppUnitsToNearest(mOverrideConstraintRect,
+                                                 PresContext()->AppUnitsPerDevPixel());
+    // This is currently only used for <select> elements where we want to constrain
+    // vertically to the screen but not horizontally, so do the intersection and then
+    // reset the horizontal values.
+    screenRectPixels.IntersectRect(screenRectPixels, overrideConstrainRect);
+    screenRectPixels.x = overrideConstrainRect.x;
+    screenRectPixels.width = overrideConstrainRect.width;
   }
 
   return screenRectPixels;

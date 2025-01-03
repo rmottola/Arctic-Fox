@@ -132,7 +132,7 @@ nsSVGClipPathFrame::GetClipMask(gfxContext& aReferenceContext,
 
   // Paint this clipPath's contents into maskDT:
   {
-    RefPtr<gfxContext> ctx = gfxContext::ForDrawTarget(maskDT);
+    RefPtr<gfxContext> ctx = gfxContext::CreateOrNull(maskDT);
     if (!ctx) {
       gfxCriticalError() << "SVGClipPath context problem " << gfx::hexa(maskDT);
       return nullptr;
@@ -380,25 +380,27 @@ nsSVGClipPathFrame::IsValid()
   for (nsIFrame* kid = mFrames.FirstChild(); kid;
        kid = kid->GetNextSibling()) {
 
-    nsIAtom *type = kid->GetType();
+    nsIAtom* kidType = kid->GetType();
 
-    if (type == nsGkAtoms::svgUseFrame) {
+    if (kidType == nsGkAtoms::svgUseFrame) {
       for (nsIFrame* grandKid : kid->PrincipalChildList()) {
 
-        nsIAtom *type = grandKid->GetType();
+        nsIAtom* grandKidType = grandKid->GetType();
 
-        if (type != nsGkAtoms::svgPathGeometryFrame &&
-            type != nsGkAtoms::svgTextFrame) {
+        if (grandKidType != nsGkAtoms::svgPathGeometryFrame &&
+            grandKidType != nsGkAtoms::svgTextFrame) {
           return false;
         }
       }
       continue;
     }
-    if (type != nsGkAtoms::svgPathGeometryFrame &&
-        type != nsGkAtoms::svgTextFrame) {
+
+    if (kidType != nsGkAtoms::svgPathGeometryFrame &&
+        kidType != nsGkAtoms::svgTextFrame) {
       return false;
     }
   }
+
   return true;
 }
 

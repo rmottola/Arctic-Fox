@@ -215,12 +215,10 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
 
   ClientLayerManager *clientLayerManager = GetLayerManager()->AsClientLayerManager();
 
-  if (clientLayerManager && mCompositorBridgeParent &&
-      !mBounds.IsEqualEdges(mLastPaintBounds))
-  {
+  if (clientLayerManager && !mBounds.IsEqualEdges(mLastPaintBounds)) {
     // Do an early async composite so that we at least have something on the
     // screen in the right place, even if the content is out of date.
-    mCompositorBridgeParent->ScheduleRenderOnCompositorThread();
+    clientLayerManager->Composite();
   }
   mLastPaintBounds = mBounds;
 
@@ -238,7 +236,8 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
     ::BeginPaint(mWnd, &ps);
     ::EndPaint(mWnd, &ps);
 
-    aDC = mMemoryDC;
+    // We're guaranteed to have a widget proxy since we called GetLayerManager().
+    aDC = GetCompositorWidgetProxy()->GetTransparentDC();
   }
 #endif
 
@@ -266,12 +265,14 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
 #endif
   nsIntRegion region = GetRegionToPaint(forceRepaint, ps, hDC);
 
-  if (clientLayerManager && mCompositorBridgeParent) {
+  if (clientLayerManager) {
     // We need to paint to the screen even if nothing changed, since if we
     // don't have a compositing window manager, our pixels could be stale.
     clientLayerManager->SetNeedsComposite(true);
     clientLayerManager->SendInvalidRegion(region);
   }
+
+  RefPtr<nsWindow> strongThis(this);
 
   nsIWidgetListener* listener = GetPaintListener();
   if (listener) {
@@ -283,8 +284,8 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
     return false;
   }
 
-  if (clientLayerManager && mCompositorBridgeParent && clientLayerManager->NeedsComposite()) {
-    mCompositorBridgeParent->ScheduleRenderOnCompositorThread();
+  if (clientLayerManager && clientLayerManager->NeedsComposite()) {
+    clientLayerManager->Composite();
     clientLayerManager->SetNeedsComposite(false);
   }
 
@@ -310,10 +311,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
 #if defined(MOZ_XUL)
           // don't support transparency for non-GDI rendering, for now
           if (eTransparencyTransparent == mTransparencyMode) {
-            if (mTransparentSurface == nullptr) {
-              SetupTranslucentWindowMemoryBitmap(mTransparencyMode);
-            }
-            targetSurface = mTransparentSurface;
+            targetSurface = GetCompositorWidgetProxy()->EnsureTransparentSurface();
           }
 #endif
 
@@ -363,7 +361,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
           doubleBuffering = mozilla::layers::BufferMode::BUFFERED;
 #endif
 
-          RefPtr<gfxContext> thebesContext = gfxContext::ForDrawTarget(dt);
+          RefPtr<gfxContext> thebesContext = gfxContext::CreateOrNull(dt);
           MOZ_ASSERT(thebesContext); // already checked draw target above
 
           {
@@ -378,7 +376,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
             // Data from offscreen drawing surface was copied to memory bitmap of transparent
             // bitmap. Now it can be read from memory bitmap to apply alpha channel and after
             // that displayed on the screen.
-            UpdateTranslucentWindow();
+            GetCompositorWidgetProxy()->RedrawTransparentWindow();
           }
 #endif
         }
@@ -389,7 +387,7 @@ bool nsWindow::OnPaint(HDC aDC, uint32_t aNestingLevel)
             this, LayoutDeviceIntRegion::FromUnknownRegion(region));
           if (!gfxEnv::DisableForcePresent() && gfxWindowsPlatform::GetPlatform()->DwmCompositionEnabled()) {
             nsCOMPtr<nsIRunnable> event =
-              NS_NewRunnableMethod(this, &nsWindow::ForcePresent);
+              NewRunnableMethod(this, &nsWindow::ForcePresent);
             NS_DispatchToMainThread(event);
           }
         }

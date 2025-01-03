@@ -189,7 +189,7 @@ void nsViewManager::DoSetWindowDimensions(nscoord aWidth, nscoord aHeight)
     // Don't resize the widget. It is already being set elsewhere.
     mRootView->SetDimensions(newDim, true, false);
     if (mPresShell)
-      mPresShell->ResizeReflow(aWidth, aHeight);
+      mPresShell->ResizeReflow(aWidth, aHeight, oldDim.width, oldDim.height);
   }
 }
 
@@ -210,10 +210,10 @@ nsViewManager::ShouldDelayResize() const
 }
 
 void
-nsViewManager::SetWindowDimensions(nscoord aWidth, nscoord aHeight)
+nsViewManager::SetWindowDimensions(nscoord aWidth, nscoord aHeight, bool aDelayResize)
 {
   if (mRootView) {
-    if (!ShouldDelayResize()) {
+    if (!ShouldDelayResize() && !aDelayResize) {
       if (mDelayedResize != nsSize(NSCOORD_NONE, NSCOORD_NONE) &&
           mDelayedResize != nsSize(aWidth, aHeight)) {
         // We have a delayed resize; that now obsolete size may already have
@@ -708,15 +708,16 @@ void nsViewManager::InvalidateViews(nsView *aView)
 
 void nsViewManager::WillPaintWindow(nsIWidget* aWidget)
 {
-  if (aWidget) {
-    nsView* view = nsView::GetViewFor(aWidget);
-    LayerManager *manager = aWidget->GetLayerManager();
+  RefPtr<nsIWidget> widget(aWidget);
+  if (widget) {
+    nsView* view = nsView::GetViewFor(widget);
+    LayerManager* manager = widget->GetLayerManager();
     if (view &&
         (view->ForcedRepaint() || !manager->NeedsWidgetInvalidation())) {
       ProcessPendingUpdates();
       // Re-get the view pointer here since the ProcessPendingUpdates might have
       // destroyed it during CallWillPaintOnObservers.
-      view = nsView::GetViewFor(aWidget);
+      view = nsView::GetViewFor(widget);
       if (view) {
         view->SetForcedRepaint(false);
       }
@@ -767,7 +768,7 @@ nsViewManager::DispatchEvent(WidgetGUIEvent *aEvent,
   WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
   if ((mouseEvent &&
        // Ignore mouse events that we synthesize.
-       mouseEvent->reason == WidgetMouseEvent::eReal &&
+       mouseEvent->mReason == WidgetMouseEvent::eReal &&
        // Ignore mouse exit and enter (we'll get moves if the user
        // is really moving the mouse) since we get them when we
        // create and destroy widgets.

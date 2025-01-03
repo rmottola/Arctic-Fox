@@ -12,7 +12,6 @@
 #include "VPXDecoder.h"
 
 #include "nsThreadUtils.h"
-#include "nsAutoPtr.h"
 #include "nsPromiseFlatString.h"
 #include "nsIGfxInfo.h"
 
@@ -269,7 +268,7 @@ AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType,
       aMimeType.EqualsLiteral("audio/wave; codecs=7") ||
       aMimeType.EqualsLiteral("audio/wave; codecs=65534")) {
     return false;
-  }  
+  }
 
   if ((VPXDecoder::IsVPX(aMimeType, VPXDecoder::VP8) &&
        !GetFeatureStatus(nsIGfxInfo::FEATURE_VP8_HW_DECODE)) ||
@@ -285,7 +284,7 @@ AndroidDecoderModule::SupportsMimeType(const nsACString& aMimeType,
 already_AddRefed<MediaDataDecoder>
 AndroidDecoderModule::CreateVideoDecoder(
     const VideoInfo& aConfig, layers::LayersBackend aLayersBackend,
-    layers::ImageContainer* aImageContainer, FlushableTaskQueue* aVideoTaskQueue,
+    layers::ImageContainer* aImageContainer, TaskQueue* aTaskQueue,
     MediaDataDecoderCallback* aCallback,
     DecoderDoctorDiagnostics* aDiagnostics)
 {
@@ -305,7 +304,7 @@ AndroidDecoderModule::CreateVideoDecoder(
 
 already_AddRefed<MediaDataDecoder>
 AndroidDecoderModule::CreateAudioDecoder(
-    const AudioInfo& aConfig, FlushableTaskQueue* aAudioTaskQueue,
+    const AudioInfo& aConfig, TaskQueue* aTaskQueue,
     MediaDataDecoderCallback* aCallback,
     DecoderDoctorDiagnostics* aDiagnostics)
 {
@@ -378,7 +377,7 @@ MediaCodecDataDecoder::InitDecoder(Surface::Param aSurface)
 {
   mDecoder = CreateDecoder(mMimeType);
   if (!mDecoder) {
-    INVOKE_CALLBACK(Error);
+    INVOKE_CALLBACK(Error, MediaDataDecoderError::FATAL_ERROR);
     return NS_ERROR_FAILURE;
   }
 
@@ -389,9 +388,8 @@ MediaCodecDataDecoder::InitDecoder(Surface::Param aSurface)
   NS_ENSURE_SUCCESS(rv = ResetInputBuffers(), rv);
   NS_ENSURE_SUCCESS(rv = ResetOutputBuffers(), rv);
 
-  rv = NS_NewNamedThread(
-      "MC Decoder", getter_AddRefs(mThread),
-      NS_NewRunnableMethod(this, &MediaCodecDataDecoder::DecoderLoop));
+  nsCOMPtr<nsIRunnable> r = NewRunnableMethod(this, &MediaCodecDataDecoder::DecoderLoop);
+  rv = NS_NewNamedThread("MC Decoder", getter_AddRefs(mThread), r);
 
   return rv;
 }
@@ -406,7 +404,7 @@ static const int64_t kDecoderTimeout = 10000;
       INVOKE_CALLBACK(DrainComplete); \
       State(kDecoding); \
     } \
-    INVOKE_CALLBACK(Error); \
+    INVOKE_CALLBACK(Error, MediaDataDecoderError::FATAL_ERROR); \
     break; \
   }
 
@@ -637,7 +635,7 @@ MediaCodecDataDecoder::DecoderLoop()
       BREAK_ON_DECODER_ERROR();
     } else if (outputStatus < 0) {
       NS_WARNING("Unknown error from decoder!");
-      INVOKE_CALLBACK(Error);
+      INVOKE_CALLBACK(Error, MediaDataDecoderError::DECODE_ERROR);
       // Don't break here just in case it's recoverable. If it's not, other
       // stuff will fail later and we'll bail out.
     } else {

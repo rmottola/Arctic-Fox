@@ -449,11 +449,12 @@ CreateSamplingRestrictedDrawable(gfxDrawable* aDrawable,
       return nullptr;
     }
 
-    RefPtr<gfxContext> tmpCtx = gfxContext::ForDrawTarget(target);
+    RefPtr<gfxContext> tmpCtx = gfxContext::CreateOrNull(target);
     MOZ_ASSERT(tmpCtx); // already checked the target above
 
     tmpCtx->SetOp(OptimalFillOp());
-    aDrawable->Draw(tmpCtx, needed - needed.TopLeft(), ExtendMode::REPEAT, Filter::LINEAR,
+    aDrawable->Draw(tmpCtx, needed - needed.TopLeft(), ExtendMode::REPEAT,
+                    SamplingFilter::LINEAR,
                     1.0, gfxMatrix::Translation(needed.TopLeft()));
     RefPtr<SourceSurface> surface = target->Snapshot();
 
@@ -464,9 +465,9 @@ CreateSamplingRestrictedDrawable(gfxDrawable* aDrawable,
 
 /* These heuristics are based on Source/WebCore/platform/graphics/skia/ImageSkia.cpp:computeResamplingMode() */
 #ifdef MOZ_GFX_OPTIMIZE_MOBILE
-static Filter ReduceResamplingFilter(Filter aFilter,
-                                     int aImgWidth, int aImgHeight,
-                                     float aSourceWidth, float aSourceHeight)
+static SamplingFilter ReduceResamplingFilter(SamplingFilter aSamplingFilter,
+                                             int aImgWidth, int aImgHeight,
+                                             float aSourceWidth, float aSourceHeight)
 {
     // Images smaller than this in either direction are considered "small" and
     // are not resampled ever (see below).
@@ -481,7 +482,7 @@ static Filter ReduceResamplingFilter(Filter aFilter,
         || aImgHeight <= kSmallImageSizeThreshold) {
         // Never resample small images. These are often used for borders and
         // rules (think 1x1 images used to make lines).
-        return Filter::POINT;
+        return SamplingFilter::POINT;
     }
 
     if (aImgHeight * kLargeStretch <= aSourceHeight || aImgWidth * kLargeStretch <= aSourceWidth) {
@@ -492,11 +493,11 @@ static Filter ReduceResamplingFilter(Filter aFilter,
         // (which might be large) and then is stretching it to fill some part
         // of the page.
         if (fabs(aSourceWidth - aImgWidth)/aImgWidth < 0.5 || fabs(aSourceHeight - aImgHeight)/aImgHeight < 0.5)
-            return Filter::POINT;
+            return SamplingFilter::POINT;
 
         // The image is growing a lot and in more than one direction. Resampling
         // is slow and doesn't give us very much when growing a lot.
-        return aFilter;
+        return aSamplingFilter;
     }
 
     /* Some notes on other heuristics:
@@ -517,15 +518,15 @@ static Filter ReduceResamplingFilter(Filter aFilter,
        It currently looks unused in WebKit but it's something to watch out for.
     */
 
-    return aFilter;
+    return aSamplingFilter;
 }
 #else
-static Filter ReduceResamplingFilter(Filter aFilter,
-                                     int aImgWidth, int aImgHeight,
-                                     int aSourceWidth, int aSourceHeight)
+static SamplingFilter ReduceResamplingFilter(SamplingFilter aSamplingFilter,
+                                             int aImgWidth, int aImgHeight,
+                                             int aSourceWidth, int aSourceHeight)
 {
     // Just pass the filter through unchanged
-    return aFilter;
+    return aSamplingFilter;
 }
 #endif
 
@@ -549,9 +550,10 @@ PrescaleAndTileDrawable(gfxDrawable* aDrawable,
                         gfxContext* aContext,
                         const ImageRegion& aRegion,
                         Rect aImageRect,
-                        const Filter& aFilter,
+                        const SamplingFilter aSamplingFilter,
                         const SurfaceFormat aFormat,
-                        gfxFloat aOpacity)
+                        gfxFloat aOpacity,
+                        ExtendMode aExtendMode)
 {
   gfxSize scaleFactor = aContext->CurrentMatrix().ScaleFactors(true);
   gfxMatrix scaleMatrix = gfxMatrix::Scaling(scaleFactor.width, scaleFactor.height);
@@ -597,12 +599,12 @@ PrescaleAndTileDrawable(gfxDrawable* aDrawable,
     return false;
   }
 
-  RefPtr<gfxContext> tmpCtx = gfxContext::ForDrawTarget(scaledDT);
+  RefPtr<gfxContext> tmpCtx = gfxContext::CreateOrNull(scaledDT);
   MOZ_ASSERT(tmpCtx); // already checked the target above
 
   scaledDT->SetTransform(ToMatrix(scaleMatrix));
   gfxRect gfxImageRect(aImageRect.x, aImageRect.y, aImageRect.width, aImageRect.height);
-  aDrawable->Draw(tmpCtx, gfxImageRect, ExtendMode::REPEAT, aFilter, 1.0, gfxMatrix());
+  aDrawable->Draw(tmpCtx, gfxImageRect, aExtendMode, aSamplingFilter, 1.0, gfxMatrix());
 
   RefPtr<SourceSurface> scaledImage = scaledDT->Snapshot();
 
@@ -618,8 +620,8 @@ PrescaleAndTileDrawable(gfxDrawable* aDrawable,
     DrawOptions drawOptions(aOpacity, aContext->CurrentOp(),
                             aContext->CurrentAntialiasMode());
 
-    SurfacePattern scaledImagePattern(scaledImage, ExtendMode::REPEAT,
-                                      Matrix(), aFilter);
+    SurfacePattern scaledImagePattern(scaledImage, aExtendMode,
+                                      Matrix(), aSamplingFilter);
     destDrawTarget->FillRect(scaledNeededRect, scaledImagePattern, drawOptions);
   }
   return true;
@@ -632,7 +634,7 @@ gfxUtils::DrawPixelSnapped(gfxContext*         aContext,
                            const gfxSize&      aImageSize,
                            const ImageRegion&  aRegion,
                            const SurfaceFormat aFormat,
-                           Filter              aFilter,
+                           SamplingFilter      aSamplingFilter,
                            uint32_t            aImageFlags,
                            gfxFloat            aOpacity)
 {
@@ -645,9 +647,10 @@ gfxUtils::DrawPixelSnapped(gfxContext*         aContext,
 
     RefPtr<gfxDrawable> drawable = aDrawable;
 
-    aFilter = ReduceResamplingFilter(aFilter,
-                                     imageRect.Width(), imageRect.Height(),
-                                     region.Width(), region.Height());
+    aSamplingFilter =
+      ReduceResamplingFilter(aSamplingFilter,
+                             imageRect.Width(), imageRect.Height(),
+                             region.Width(), region.Height());
 
     // OK now, the hard part left is to account for the subimage sampling
     // restriction. If all the transforms involved are just integer
@@ -662,14 +665,15 @@ gfxUtils::DrawPixelSnapped(gfxContext*         aContext,
                                                aContext->CurrentAntialiasMode(),
                                                aRegion.Rect(),
                                                aRegion.Restriction(),
-                                               extendMode, aFilter, aOpacity)) {
+                                               extendMode, aSamplingFilter,
+                                               aOpacity)) {
               return;
             }
 
 #ifdef MOZ_WIDGET_COCOA
             if (PrescaleAndTileDrawable(aDrawable, aContext, aRegion,
-                                        ToRect(imageRect), aFilter,
-                                        aFormat, aOpacity)) {
+                                        ToRect(imageRect), aSamplingFilter,
+                                        aFormat, aOpacity, extendMode)) {
               return;
             }
 #endif
@@ -693,7 +697,8 @@ gfxUtils::DrawPixelSnapped(gfxContext*         aContext,
         }
     }
 
-    drawable->Draw(aContext, aRegion.Rect(), extendMode, aFilter, aOpacity, gfxMatrix());
+    drawable->Draw(aContext, aRegion.Rect(), extendMode, aSamplingFilter,
+                   aOpacity, gfxMatrix());
 }
 
 /* static */ int
@@ -1347,7 +1352,7 @@ gfxUtils::WriteAsPNG(nsIPresShell* aShell, const char* aFile)
                                      SurfaceFormat::B8G8R8A8);
   NS_ENSURE_TRUE(dt && dt->IsValid(), /*void*/);
 
-  RefPtr<gfxContext> context = gfxContext::ForDrawTarget(dt);
+  RefPtr<gfxContext> context = gfxContext::CreateOrNull(dt);
   MOZ_ASSERT(context); // already checked the draw target above
   aShell->RenderDocument(r, 0, NS_RGB(255, 255, 0), context);
   WriteAsPNG(dt.get(), aFile);

@@ -612,7 +612,7 @@ VariablesViewController.prototype = {
         break;
       default:
         let error = "Unknown Debugger.Environment type: " + aSource.type;
-        Cu.reportError(error);
+        console.error(error);
         deferred.reject(error);
     }
 

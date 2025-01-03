@@ -640,11 +640,11 @@ nsEditor::DeleteSelection(EDirection aAction, EStripWrappers aStripWrappers)
 NS_IMETHODIMP
 nsEditor::GetSelection(nsISelection** aSelection)
 {
-  return GetSelection(nsISelectionController::SELECTION_NORMAL, aSelection);
+  return GetSelection(SelectionType::eNormal, aSelection);
 }
 
 nsresult
-nsEditor::GetSelection(int16_t aSelectionType, nsISelection** aSelection)
+nsEditor::GetSelection(SelectionType aSelectionType, nsISelection** aSelection)
 {
   NS_ENSURE_TRUE(aSelection, NS_ERROR_NULL_POINTER);
   *aSelection = nullptr;
@@ -653,19 +653,19 @@ nsEditor::GetSelection(int16_t aSelectionType, nsISelection** aSelection)
   if (!selcon) {
     return NS_ERROR_NOT_INITIALIZED;
   }
-  return selcon->GetSelection(aSelectionType, aSelection);  // does an addref
+  return selcon->GetSelection(ToRawSelectionType(aSelectionType), aSelection);
 }
 
 Selection*
-nsEditor::GetSelection(int16_t aSelectionType)
+nsEditor::GetSelection(SelectionType aSelectionType)
 {
   nsCOMPtr<nsISelection> sel;
   nsresult res = GetSelection(aSelectionType, getter_AddRefs(sel));
-  if (NS_FAILED(res)) {
+  if (NS_WARN_IF(NS_FAILED(res)) || NS_WARN_IF(!sel)) {
     return nullptr;
   }
 
-  return static_cast<Selection*>(sel.get());
+  return sel->AsSelection();
 }
 
 NS_IMETHODIMP
@@ -2427,7 +2427,7 @@ nsEditor::InsertTextIntoTextNodeImpl(const nsAString& aStringToInsert,
     for (uint32_t i = 0; i < (ranges ? ranges->Length() : 0); ++i) {
       const TextRange& textRange = ranges->ElementAt(i);
       if (!textRange.Length() ||
-          textRange.mRangeType != NS_TEXTRANGE_RAWINPUT) {
+          textRange.mRangeType != TextRangeType::eRawClause) {
         continue;
       }
       if (!mPhonetic) {
@@ -2674,11 +2674,11 @@ nsEditor::SplitNodeImpl(nsIContent& aExistingRightNode,
 {
   // Remember all selection points.
   AutoTArray<SavedRange, 10> savedRanges;
-  for (size_t i = 0; i < nsISelectionController::NUM_SELECTIONTYPES - 1; ++i) {
-    SelectionType type(1 << i);
+  for (size_t i = 0; i < kPresentSelectionTypeCount; ++i) {
+    SelectionType selectionType(ToSelectionType(1 << i));
     SavedRange range;
-    range.mSelection = GetSelection(type);
-    if (type == nsISelectionController::SELECTION_NORMAL) {
+    range.mSelection = GetSelection(selectionType);
+    if (selectionType == SelectionType::eNormal) {
       NS_ENSURE_TRUE(range.mSelection, NS_ERROR_NULL_POINTER);
     } else if (!range.mSelection) {
       // For non-normal selections, skip over the non-existing ones.
@@ -2761,8 +2761,7 @@ nsEditor::SplitNodeImpl(nsIContent& aExistingRightNode,
     }
 
     if (shouldSetSelection &&
-        range.mSelection->Type() ==
-          nsISelectionController::SELECTION_NORMAL) {
+        range.mSelection->Type() == SelectionType::eNormal) {
       // If the editor should adjust the selection, don't bother restoring
       // the ranges for the normal selection here.
       continue;
@@ -2822,11 +2821,11 @@ nsEditor::JoinNodesImpl(nsINode* aNodeToKeep,
 
   // Remember all selection points.
   AutoTArray<SavedRange, 10> savedRanges;
-  for (size_t i = 0; i < nsISelectionController::NUM_SELECTIONTYPES - 1; ++i) {
-    SelectionType type(1 << i);
+  for (size_t i = 0; i < kPresentSelectionTypeCount; ++i) {
+    SelectionType selectionType(ToSelectionType(1 << i));
     SavedRange range;
-    range.mSelection = GetSelection(type);
-    if (type == nsISelectionController::SELECTION_NORMAL) {
+    range.mSelection = GetSelection(selectionType);
+    if (selectionType == SelectionType::eNormal) {
       NS_ENSURE_TRUE(range.mSelection, NS_ERROR_NULL_POINTER);
     } else if (!range.mSelection) {
       // For non-normal selections, skip over the non-existing ones.
@@ -2915,8 +2914,7 @@ nsEditor::JoinNodesImpl(nsINode* aNodeToKeep,
     }
 
     if (shouldSetSelection &&
-        range.mSelection->Type() ==
-          nsISelectionController::SELECTION_NORMAL) {
+        range.mSelection->Type() == SelectionType::eNormal) {
       // If the editor should adjust the selection, don't bother restoring
       // the ranges for the normal selection here.
       continue;
@@ -4622,21 +4620,21 @@ nsEditor::HandleKeyPressEvent(nsIDOMKeyEvent* aKeyEvent)
   if (IsReadonly() || IsDisabled()) {
     // consume backspace for disabled and readonly textfields, to prevent
     // back in history, which could be confusing to users
-    if (nativeKeyEvent->keyCode == nsIDOMKeyEvent::DOM_VK_BACK_SPACE) {
+    if (nativeKeyEvent->mKeyCode == NS_VK_BACK) {
       aKeyEvent->AsEvent()->PreventDefault();
     }
     return NS_OK;
   }
 
-  switch (nativeKeyEvent->keyCode) {
-    case nsIDOMKeyEvent::DOM_VK_META:
-    case nsIDOMKeyEvent::DOM_VK_WIN:
-    case nsIDOMKeyEvent::DOM_VK_SHIFT:
-    case nsIDOMKeyEvent::DOM_VK_CONTROL:
-    case nsIDOMKeyEvent::DOM_VK_ALT:
+  switch (nativeKeyEvent->mKeyCode) {
+    case NS_VK_META:
+    case NS_VK_WIN:
+    case NS_VK_SHIFT:
+    case NS_VK_CONTROL:
+    case NS_VK_ALT:
       aKeyEvent->AsEvent()->PreventDefault(); // consumed
       return NS_OK;
-    case nsIDOMKeyEvent::DOM_VK_BACK_SPACE:
+    case NS_VK_BACK:
       if (nativeKeyEvent->IsControl() || nativeKeyEvent->IsAlt() ||
           nativeKeyEvent->IsMeta() || nativeKeyEvent->IsOS()) {
         return NS_OK;
@@ -4644,7 +4642,7 @@ nsEditor::HandleKeyPressEvent(nsIDOMKeyEvent* aKeyEvent)
       DeleteSelection(nsIEditor::ePrevious, nsIEditor::eStrip);
       aKeyEvent->AsEvent()->PreventDefault(); // consumed
       return NS_OK;
-    case nsIDOMKeyEvent::DOM_VK_DELETE:
+    case NS_VK_DELETE:
       // on certain platforms (such as windows) the shift key
       // modifies what delete does (cmd_cut in this case).
       // bailing here to allow the keybindings to do the cut.
@@ -5154,10 +5152,10 @@ nsEditor::GetIMESelectionStartOffsetIn(nsINode* aTextNode)
 
   int32_t minOffset = INT32_MAX;
   static const SelectionType kIMESelectionTypes[] = {
-    nsISelectionController::SELECTION_IME_RAWINPUT,
-    nsISelectionController::SELECTION_IME_SELECTEDRAWTEXT,
-    nsISelectionController::SELECTION_IME_CONVERTEDTEXT,
-    nsISelectionController::SELECTION_IME_SELECTEDCONVERTEDTEXT
+    SelectionType::eIMERawClause,
+    SelectionType::eIMESelectedRawClause,
+    SelectionType::eIMEConvertedClause,
+    SelectionType::eIMESelectedClause
   };
   for (auto selectionType : kIMESelectionTypes) {
     RefPtr<Selection> selection = GetSelection(selectionType);

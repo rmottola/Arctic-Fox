@@ -118,6 +118,10 @@ public:
     return mTextTrackSource;
   }
 
+  void SetCuesInactive();
+
+  void NotifyCueUpdated(TextTrackCue *aCue);
+
 private:
   ~TextTrack();
 

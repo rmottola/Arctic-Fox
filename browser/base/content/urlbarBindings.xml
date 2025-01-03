@@ -156,6 +156,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           if (action) {
             switch (action.type) {
               case "switchtab": // Fall through.
+              case "remotetab": // Fall through.
               case "visiturl": {
                 returnValue = action.params.url;
                 break;
@@ -164,6 +165,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                 returnValue = action.params.input;
                 break;
               }
+            }
+          } else {
+            let originalUrl = ReaderMode.getOriginalUrl(aValue);
+            if (originalUrl) {
+              returnValue = originalUrl;
             }
           }
 
@@ -363,6 +369,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           {
             this.value = url;
             gBrowser.userTypedValue = url;
+            if (gInitialPages.includes(url)) {
+              gBrowser.selectedBrowser.initialPageLoadedFromURLBar = url;
+            }
             try {
               addToUrlbarHistory(url);
             } catch (ex) {

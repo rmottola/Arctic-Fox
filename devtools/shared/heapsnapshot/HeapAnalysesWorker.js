@@ -33,6 +33,24 @@ workerHelper.createTask(self, "readHeapSnapshot", ({ snapshotFilePath }) => {
 });
 
 /**
+ * @see HeapAnalysesClient.prototype.deleteHeapSnapshot
+ */
+workerHelper.createTask(self, "deleteHeapSnapshot", ({ snapshotFilePath }) => {
+  let snapshot = snapshots[snapshotFilePath];
+  if (!snapshot) {
+    throw new Error(`No known heap snapshot for '${snapshotFilePath}'`);
+  }
+
+  snapshots[snapshotFilePath] = undefined;
+
+  let dominatorTreeId = dominatorTreeSnapshots.indexOf(snapshot);
+  if (dominatorTreeId != -1) {
+    dominatorTreeSnapshots[dominatorTreeId] = undefined;
+    dominatorTrees[dominatorTreeId] = undefined;
+  }
+});
+
+/**
  * @see HeapAnalysesClient.prototype.takeCensus
  */
 workerHelper.createTask(self, "takeCensus", ({ snapshotFilePath, censusOptions, requestOptions }) => {
@@ -137,7 +155,8 @@ workerHelper.createTask(self, "getDominatorTree", request => {
     dominatorTreeId,
     breakdown,
     maxDepth,
-    maxSiblings
+    maxSiblings,
+    maxRetainingPaths,
   } = request;
 
   if (!(0 <= dominatorTreeId && dominatorTreeId < dominatorTrees.length)) {
@@ -148,11 +167,29 @@ workerHelper.createTask(self, "getDominatorTree", request => {
   const dominatorTree = dominatorTrees[dominatorTreeId];
   const snapshot = dominatorTreeSnapshots[dominatorTreeId];
 
-  return DominatorTreeNode.partialTraversal(dominatorTree,
-                                            snapshot,
-                                            breakdown,
-                                            maxDepth,
-                                            maxSiblings);
+  const tree = DominatorTreeNode.partialTraversal(dominatorTree,
+                                                  snapshot,
+                                                  breakdown,
+                                                  maxDepth,
+                                                  maxSiblings);
+
+  const nodes = [];
+  (function getNodes(node) {
+    nodes.push(node);
+    if (node.children) {
+      for (let i = 0, length = node.children.length; i < length; i++) {
+        getNodes(node.children[i]);
+      }
+    }
+  }(tree));
+
+  DominatorTreeNode.attachShortestPaths(snapshot,
+                                        breakdown,
+                                        dominatorTree.root,
+                                        nodes,
+                                        maxRetainingPaths);
+
+  return tree;
 });
 
 /**
@@ -164,7 +201,8 @@ workerHelper.createTask(self, "getImmediatelyDominated", request => {
     nodeId,
     breakdown,
     startIndex,
-    maxCount
+    maxCount,
+    maxRetainingPaths,
   } = request;
 
   if (!(0 <= dominatorTreeId && dominatorTreeId < dominatorTrees.length)) {
@@ -198,7 +236,21 @@ workerHelper.createTask(self, "getImmediatelyDominated", request => {
       return node;
     });
 
+  const path = [];
+  let id = nodeId;
+  do {
+    path.push(id);
+    id = dominatorTree.getImmediateDominator(id);
+  } while (id !== null);
+  path.reverse();
+
   const moreChildrenAvailable = childIds.length > end;
 
-  return { nodes, moreChildrenAvailable };
+  DominatorTreeNode.attachShortestPaths(snapshot,
+                                        breakdown,
+                                        dominatorTree.root,
+                                        nodes,
+                                        maxRetainingPaths);
+
+  return { nodes, moreChildrenAvailable, path };
 });

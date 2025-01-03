@@ -229,8 +229,8 @@ public:
                     const nsAString *aInsertString = nullptr);
 
   /**
-   * WillDispatchKeyboardEvent() computes aKeyEvent.alternativeCharCodes and
-   * recompute aKeyEvent.charCode if it's necessary.
+   * WillDispatchKeyboardEvent() computes aKeyEvent.mAlternativeCharCodes and
+   * recompute aKeyEvent.mCharCode if it's necessary.
    *
    * @param aNativeKeyEvent       A native key event for which you want to
    *                              dispatch a Gecko key event.
@@ -972,8 +972,8 @@ private:
    * @param aSelectedRange        Current selected range (or caret position).
    * @return                      NS_TEXTRANGE_*.
    */
-  uint32_t ConvertToTextRangeType(uint32_t aUnderlineStyle,
-                                  NSRange& aSelectedRange);
+  TextRangeType ConvertToTextRangeType(uint32_t aUnderlineStyle,
+                                       NSRange& aSelectedRange);
 
   /**
    * GetRangeCount() computes the range count of aAttrString.

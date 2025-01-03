@@ -5,6 +5,7 @@
 var Cc = Components.classes;
 var Ci = Components.interfaces;
 var Cu = Components.utils;
+var Cr = Components.results;
 
 Cu.import("resource://gre/modules/AppConstants.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -237,6 +238,7 @@ var WebNavigation =  {
     addMessageListener("WebNavigation:GoForward", this);
     addMessageListener("WebNavigation:GotoIndex", this);
     addMessageListener("WebNavigation:LoadURI", this);
+    addMessageListener("WebNavigation:SetOriginAttributes", this);
     addMessageListener("WebNavigation:Reload", this);
     addMessageListener("WebNavigation:Stop", this);
   },
@@ -268,6 +270,9 @@ var WebNavigation =  {
                      message.data.postData, message.data.headers,
                      message.data.baseURI);
         break;
+      case "WebNavigation:SetOriginAttributes":
+        this.setOriginAttributes(message.data.originAttributes);
+        break;
       case "WebNavigation:Reload":
         this.reload(message.data.flags);
         break;
@@ -277,19 +282,30 @@ var WebNavigation =  {
     }
   },
 
+  _wrapURIChangeCall(fn) {
+    this._inLoadURI = true;
+    try {
+      fn();
+    } finally {
+      this._inLoadURI = false;
+      WebProgressListener.sendLoadCallResult();
+    }
+  },
+
   goBack: function() {
     if (this.webNavigation.canGoBack) {
-      this.webNavigation.goBack();
+      this._wrapURIChangeCall(() => this.webNavigation.goBack());
     }
   },
 
   goForward: function() {
-    if (this.webNavigation.canGoForward)
-      this.webNavigation.goForward();
+    if (this.webNavigation.canGoForward) {
+      this._wrapURIChangeCall(() => this.webNavigation.goForward());
+    }
   },
 
   gotoIndex: function(index) {
-    this.webNavigation.gotoIndex(index);
+    this._wrapURIChangeCall(() => this.webNavigation.gotoIndex(index));
   },
 
   loadURI: function(uri, flags, referrer, referrerPolicy, postData, headers, baseURI) {
@@ -312,13 +328,15 @@ var WebNavigation =  {
       headers = makeInputStream(headers);
     if (baseURI)
       baseURI = Services.io.newURI(baseURI, null, null);
-    this._inLoadURI = true;
-    try {
-      this.webNavigation.loadURIWithOptions(uri, flags, referrer, referrerPolicy,
-                                            postData, headers, baseURI);
-    } finally {
-      this._inLoadURI = false;
-      WebProgressListener.sendLoadCallResult();
+    this._wrapURIChangeCall(() => {
+      return this.webNavigation.loadURIWithOptions(uri, flags, referrer, referrerPolicy,
+                                                   postData, headers, baseURI);
+    });
+  },
+
+  setOriginAttributes: function(originAttributes) {
+    if (originAttributes) {
+      this.webNavigation.setOriginAttributesBeforeLoading(originAttributes);
     }
   },
 
@@ -352,6 +370,7 @@ var SecurityUI = {
 var ControllerCommands = {
   init: function () {
     addMessageListener("ControllerCommands:Do", this);
+    addMessageListener("ControllerCommands:DoWithParams", this);
   },
 
   receiveMessage: function(message) {
@@ -359,6 +378,23 @@ var ControllerCommands = {
       case "ControllerCommands:Do":
         if (docShell.isCommandEnabled(message.data))
           docShell.doCommand(message.data);
+        break;
+
+      case "ControllerCommands:DoWithParams":
+        var data = message.data;
+        if (docShell.isCommandEnabled(data.cmd)) {
+          var params = Cc["@mozilla.org/embedcomp/command-params;1"].
+                       createInstance(Ci.nsICommandParams);
+          for (var name in data.params) {
+            var value = data.params[name];
+            if (value.type == "long") {
+              params.setLongValue(name, parseInt(value.value));
+            } else {
+              throw Cr.NS_ERROR_NOT_IMPLEMENTED;
+            }
+          }
+          docShell.doCommandWithParams(data.cmd, params);
+        }
         break;
     }
   }
@@ -459,13 +495,13 @@ addMessageListener("TextZoom", function (aMessage) {
 
 addEventListener("FullZoomChange", function () {
   if (ZoomManager.refreshFullZoom()) {
-    sendAsyncMessage("FullZoomChange", { value:  ZoomManager.fullZoom});
+    sendAsyncMessage("FullZoomChange", { value: ZoomManager.fullZoom });
   }
 }, false);
 
 addEventListener("TextZoomChange", function (aEvent) {
   if (ZoomManager.refreshTextZoom()) {
-    sendAsyncMessage("TextZoomChange", { value:  ZoomManager.textZoom});
+    sendAsyncMessage("TextZoomChange", { value: ZoomManager.textZoom });
   }
 }, false);
 

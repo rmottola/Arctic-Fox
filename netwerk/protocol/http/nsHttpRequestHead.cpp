@@ -21,7 +21,8 @@ nsHttpRequestHead::nsHttpRequestHead()
     , mVersion(NS_HTTP_VERSION_1_1)
     , mParsedMethod(kMethod_Get)
     , mHTTPS(false)
-    , mLock("nsHttpRequestHead.mLock")
+    , mReentrantMonitor("nsHttpRequestHead.mReentrantMonitor")
+    , mInVisitHeaders(false)
 {
     MOZ_COUNT_CTOR(nsHttpRequestHead);
 }
@@ -36,41 +37,43 @@ nsHttpRequestHead::~nsHttpRequestHead()
 const nsHttpHeaderArray &
 nsHttpRequestHead::Headers() const
 {
-  mLock.AssertCurrentThreadOwns();
-  return mHeaders;
+    nsHttpRequestHead &curr = const_cast<nsHttpRequestHead&>(*this);
+    curr.mReentrantMonitor.AssertCurrentThreadIn();
+    return mHeaders;
 }
 
 void
 nsHttpRequestHead::SetHeaders(const nsHttpHeaderArray& aHeaders)
 {
-  mHeaders = aHeaders;
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    mHeaders = aHeaders;
 }
 
 void
 nsHttpRequestHead::SetVersion(nsHttpVersion version)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     mVersion = version;
 }
 
 void
 nsHttpRequestHead::SetRequestURI(const nsCSubstring &s)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     mRequestURI = s;
 }
 
 void
 nsHttpRequestHead::SetPath(const nsCSubstring &s)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     mPath = s;
 }
 
 uint32_t
 nsHttpRequestHead::HeaderCount()
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     return mHeaders.Count();
 }
 
@@ -78,49 +81,52 @@ nsresult
 nsHttpRequestHead::VisitHeaders(nsIHttpHeaderVisitor *visitor,
                                 nsHttpHeaderArray::VisitorFilter filter /* = nsHttpHeaderArray::eFilterAll*/)
 {
-    MutexAutoLock lock(mLock);
-    return mHeaders.VisitHeaders(visitor, filter);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    mInVisitHeaders = true;
+    nsresult rv = mHeaders.VisitHeaders(visitor, filter);
+    mInVisitHeaders = false;
+    return rv;
 }
 
 void
 nsHttpRequestHead::Method(nsACString &aMethod)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     aMethod = mMethod;
 }
 
 nsHttpVersion
 nsHttpRequestHead::Version()
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     return mVersion;
 }
 
 void
 nsHttpRequestHead::RequestURI(nsACString &aRequestURI)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     aRequestURI = mRequestURI;
 }
 
 void
 nsHttpRequestHead::Path(nsACString &aPath)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     aPath = mPath.IsEmpty() ? mRequestURI : mPath;
 }
 
 void
 nsHttpRequestHead::SetHTTPS(bool val)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter monk(mReentrantMonitor);
     mHTTPS = val;
 }
 
 void
 nsHttpRequestHead::Origin(nsACString &aOrigin)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     aOrigin = mOrigin;
 }
 
@@ -128,58 +134,86 @@ nsresult
 nsHttpRequestHead::SetHeader(nsHttpAtom h, const nsACString &v,
                              bool m /*= false*/)
 {
-    MutexAutoLock lock(mLock);
-    return mHeaders.SetHeader(h, v, m);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+
+    if (mInVisitHeaders) {
+        return NS_ERROR_FAILURE;
+    }
+
+    return mHeaders.SetHeader(h, v, m,
+                              nsHttpHeaderArray::eVarietyRequestOverride);
 }
 
 nsresult
 nsHttpRequestHead::SetHeader(nsHttpAtom h, const nsACString &v, bool m,
                              nsHttpHeaderArray::HeaderVariety variety)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+
+    if (mInVisitHeaders) {
+        return NS_ERROR_FAILURE;
+    }
+
     return mHeaders.SetHeader(h, v, m, variety);
 }
 
 nsresult
 nsHttpRequestHead::SetEmptyHeader(nsHttpAtom h)
 {
-    MutexAutoLock lock(mLock);
-    return mHeaders.SetEmptyHeader(h);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+
+    if (mInVisitHeaders) {
+        return NS_ERROR_FAILURE;
+    }
+
+    return mHeaders.SetEmptyHeader(h,
+                                   nsHttpHeaderArray::eVarietyRequestOverride);
 }
 
 nsresult
 nsHttpRequestHead::GetHeader(nsHttpAtom h, nsACString &v)
 {
     v.Truncate();
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     return mHeaders.GetHeader(h, v);
 }
 
-void
+nsresult
 nsHttpRequestHead::ClearHeader(nsHttpAtom h)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+
+    if (mInVisitHeaders) {
+        return NS_ERROR_FAILURE;
+    }
+
     mHeaders.ClearHeader(h);
+    return NS_OK;
 }
 
 void
 nsHttpRequestHead::ClearHeaders()
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+
+    if (mInVisitHeaders) {
+        return;
+    }
+
     mHeaders.Clear();
 }
 
 bool
 nsHttpRequestHead::HasHeader(nsHttpAtom h)
 {
-  MutexAutoLock lock(mLock);
-  return mHeaders.HasHeader(h);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    return mHeaders.HasHeader(h);
 }
 
 bool
 nsHttpRequestHead::HasHeaderValue(nsHttpAtom h, const char *v)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     return mHeaders.HasHeaderValue(h, v);
 }
 
@@ -187,9 +221,15 @@ nsresult
 nsHttpRequestHead::SetHeaderOnce(nsHttpAtom h, const char *v,
                                  bool merge /*= false */)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+
+    if (mInVisitHeaders) {
+        return NS_ERROR_FAILURE;
+    }
+
     if (!merge || !mHeaders.HasHeaderValue(h, v)) {
-        return mHeaders.SetHeader(h, nsDependentCString(v), merge);
+        return mHeaders.SetHeader(h, nsDependentCString(v), merge,
+                                  nsHttpHeaderArray::eVarietyRequestOverride);
     }
     return NS_OK;
 }
@@ -197,35 +237,52 @@ nsHttpRequestHead::SetHeaderOnce(nsHttpAtom h, const char *v,
 nsHttpRequestHead::ParsedMethodType
 nsHttpRequestHead::ParsedMethod()
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     return mParsedMethod;
 }
 
 bool
 nsHttpRequestHead::EqualsMethod(ParsedMethodType aType)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     return mParsedMethod == aType;
 }
 
 void
 nsHttpRequestHead::ParseHeaderSet(char *buffer)
 {
-    MutexAutoLock lock(mLock);
-    mHeaders.ParseHeaderSet(buffer);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+    nsHttpAtom hdr;
+    char *val;
+    while (buffer) {
+        char *eof = strchr(buffer, '\r');
+        if (!eof) {
+            break;
+        }
+        *eof = '\0';
+        if (NS_SUCCEEDED(nsHttpHeaderArray::ParseHeaderLine(buffer,
+                                                            &hdr,
+                                                            &val))) {
+            mHeaders.SetHeaderFromNet(hdr, nsDependentCString(val), false);
+        }
+        buffer = eof + 1;
+        if (*buffer == '\n') {
+            buffer++;
+        }
+    }
 }
 
 bool
 nsHttpRequestHead::IsHTTPS()
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     return mHTTPS;
 }
 
 void
 nsHttpRequestHead::SetMethod(const nsACString &method)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     mParsedMethod = kMethod_Custom;
     mMethod = method;
     if (!strcmp(mMethod.get(), "GET")) {
@@ -249,7 +306,7 @@ void
 nsHttpRequestHead::SetOrigin(const nsACString &scheme, const nsACString &host,
                              int32_t port)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     mOrigin.Assign(scheme);
     mOrigin.Append(NS_LITERAL_CSTRING("://"));
     mOrigin.Append(host);
@@ -262,7 +319,7 @@ nsHttpRequestHead::SetOrigin(const nsACString &scheme, const nsACString &host,
 bool
 nsHttpRequestHead::IsSafeMethod()
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     // This code will need to be extended for new safe methods, otherwise
     // they'll default to "not safe".
     if ((mParsedMethod == kMethod_Get) || (mParsedMethod == kMethod_Head) ||
@@ -283,7 +340,7 @@ nsHttpRequestHead::IsSafeMethod()
 void
 nsHttpRequestHead::Flatten(nsACString &buf, bool pruneProxyHeaders)
 {
-    MutexAutoLock lock(mLock);
+    ReentrantMonitorAutoEnter mon(mReentrantMonitor);
     // note: the first append is intentional.
 
     buf.Append(mMethod);
@@ -304,7 +361,7 @@ nsHttpRequestHead::Flatten(nsACString &buf, bool pruneProxyHeaders)
 
     buf.AppendLiteral("\r\n");
 
-    mHeaders.Flatten(buf, pruneProxyHeaders);
+    mHeaders.Flatten(buf, pruneProxyHeaders, false);
 }
 
 } // namespace net

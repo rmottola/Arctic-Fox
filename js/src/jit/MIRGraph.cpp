@@ -34,7 +34,7 @@ MIRGenerator::MIRGenerator(CompileCompartment* compartment, const JitCompileOpti
     wasmMaxStackArgBytes_(0),
     performsCall_(false),
     usesSimd_(false),
-    usesSimdCached_(false),
+    cachedUsesSimd_(false),
     modifiesFrameArguments_(false),
     instrumentedProfiling_(false),
     instrumentedProfilingIsCached_(false),
@@ -50,10 +50,10 @@ MIRGenerator::MIRGenerator(CompileCompartment* compartment, const JitCompileOpti
 bool
 MIRGenerator::usesSimd()
 {
-    if (usesSimdCached_)
+    if (cachedUsesSimd_)
         return usesSimd_;
 
-    usesSimdCached_ = true;
+    cachedUsesSimd_ = true;
     for (ReversePostorderIterator block = graph_->rpoBegin(),
                                   end   = graph_->rpoEnd();
          block != end;
@@ -558,7 +558,9 @@ MBasicBlock::inherit(TempAllocator& alloc, BytecodeAnalysis* analysis, MBasicBlo
         if (kind_ == PENDING_LOOP_HEADER) {
             size_t i = 0;
             for (i = 0; i < info().firstStackSlot(); i++) {
-                MPhi* phi = MPhi::New(alloc);
+                MPhi* phi = MPhi::New(alloc.fallible());
+                if (!phi)
+                    return false;
                 phi->addInlineInput(pred->getSlot(i));
                 addPhi(phi);
                 setSlot(i, phi);
@@ -578,7 +580,9 @@ MBasicBlock::inherit(TempAllocator& alloc, BytecodeAnalysis* analysis, MBasicBlo
             }
 
             for (; i < stackDepth(); i++) {
-                MPhi* phi = MPhi::New(alloc);
+                MPhi* phi = MPhi::New(alloc.fallible());
+                if (!phi)
+                    return false;
                 phi->addInlineInput(pred->getSlot(i));
                 addPhi(phi);
                 setSlot(i, phi);
@@ -1193,9 +1197,11 @@ MBasicBlock::addPredecessorPopN(TempAllocator& alloc, MBasicBlock* pred, uint32_
                 // Otherwise, create a new phi node.
                 MPhi* phi;
                 if (mine->type() == other->type())
-                    phi = MPhi::New(alloc, mine->type());
+                    phi = MPhi::New(alloc.fallible(), mine->type());
                 else
-                    phi = MPhi::New(alloc);
+                    phi = MPhi::New(alloc.fallible());
+                if (!phi)
+                    return false;
                 addPhi(phi);
 
                 // Prime the phi for each predecessor, so input(x) comes from

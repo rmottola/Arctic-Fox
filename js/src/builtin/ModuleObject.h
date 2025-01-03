@@ -118,8 +118,8 @@ class IndirectBindingMap
     struct Binding
     {
         Binding(ModuleEnvironmentObject* environment, Shape* shape);
-        RelocatablePtr<ModuleEnvironmentObject*> environment;
-        RelocatablePtrShape shape;
+        HeapPtr<ModuleEnvironmentObject*> environment;
+        HeapPtr<Shape*> shape;
     };
 
     typedef HashMap<jsid, Binding, DefaultHasher<jsid>, ZoneAllocPolicy> Map;
@@ -194,8 +194,8 @@ struct FunctionDeclaration
     FunctionDeclaration(HandleAtom name, HandleFunction fun);
     void trace(JSTracer* trc);
 
-    RelocatablePtrAtom name;
-    RelocatablePtrFunction fun;
+    HeapPtr<JSAtom*> name;
+    HeapPtr<JSFunction*> fun;
 };
 
 using FunctionDeclarationVector = GCVector<FunctionDeclaration, 0, ZoneAllocPolicy>;
@@ -211,6 +211,7 @@ class ModuleObject : public NativeObject
         EnvironmentSlot,
         NamespaceSlot,
         EvaluatedSlot,
+        HostDefinedSlot,
         RequestedModulesSlot,
         ImportEntriesSlot,
         LocalExportEntriesSlot,
@@ -245,6 +246,7 @@ class ModuleObject : public NativeObject
     ModuleEnvironmentObject* environment() const;
     ModuleNamespaceObject* namespace_();
     bool evaluated() const;
+    Value hostDefinedField() const;
     ArrayObject& requestedModules() const;
     ArrayObject& importEntries() const;
     ArrayObject& localExportEntries() const;
@@ -254,14 +256,27 @@ class ModuleObject : public NativeObject
     JSObject* namespaceExports();
     IndirectBindingMap* namespaceBindings();
 
+    static bool DeclarationInstantiation(JSContext* cx, HandleModuleObject self);
+    static bool Evaluation(JSContext* cx, HandleModuleObject self);
+
+    void setHostDefinedField(JS::Value value);
+
+    // For intrinsic_CreateModuleEnvironment.
     void createEnvironment();
 
+    // For BytecodeEmitter.
     bool noteFunctionDeclaration(ExclusiveContext* cx, HandleAtom name, HandleFunction fun);
+
+    // For intrinsic_InstantiateModuleFunctionDeclarations.
     static bool instantiateFunctionDeclarations(JSContext* cx, HandleModuleObject self);
 
+    // For intrinsic_SetModuleEvaluated.
     void setEvaluated();
+
+    // For intrinsic_EvaluateModule.
     static bool evaluate(JSContext* cx, HandleModuleObject self, MutableHandleValue rval);
 
+    // For intrinsic_NewModuleNamespace.
     static ModuleNamespaceObject* createNamespace(JSContext* cx, HandleModuleObject self,
                                                   HandleObject exports);
 
@@ -325,8 +340,6 @@ class MOZ_STACK_CLASS ModuleBuilder
     template <typename T>
     ArrayObject* createArray(const GCVector<T>& vector);
 };
-
-bool InitModuleClasses(JSContext* cx, HandleObject obj);
 
 } // namespace js
 

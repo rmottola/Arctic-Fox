@@ -125,12 +125,28 @@ treechildren.autocomplete-treebody::-moz-tree-cell-text(selected) {
 }
 
 .ac-site-icon {
-  width: 16px; 
+  width: 16px;
   height: 16px;
-  margin-bottom: -1px;
-  -moz-margin-start: 7px;
-  -moz-margin-end: 5px;
+  max-width: 16px;
+  max-height: 16px;
+  -moz-margin-start: 0;
+  -moz-margin-end: 11px;
+  list-style-image: url("chrome://mozapps/skin/places/defaultFavicon.png");
 }
+
+.ac-site-icon[selected] {
+  list-style-image: url("chrome://mozapps/skin/places/defaultFavicon-inverted.png");
+}
+
+@media (min-resolution: 2dppx) {
+  .ac-site-icon {
+    list-style-image: url("chrome://mozapps/skin/places/defaultFavicon@2x.png");
+  }
+  .ac-site-icon[selected] {
+    list-style-image: url("chrome://mozapps/skin/places/defaultFavicon-inverted@2x.png");
+  }
+}
+
 
 .ac-type-icon {
   width: 16px;

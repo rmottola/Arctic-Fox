@@ -58,6 +58,18 @@ NullHttpChannel::Init(nsIURI *aURI,
 //-----------------------------------------------------------------------------
 
 NS_IMETHODIMP
+NullHttpChannel::GetChannelId(nsACString& aChannelId)
+{
+    return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+NS_IMETHODIMP
+NullHttpChannel::SetChannelId(const nsACString& aChannelId)
+{
+    return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+NS_IMETHODIMP
 NullHttpChannel::GetTransferSize(uint64_t *aTransferSize)
 {
     return NS_ERROR_NOT_IMPLEMENTED;
@@ -207,6 +219,19 @@ NS_IMETHODIMP
 NullHttpChannel::VisitResponseHeaders(nsIHttpHeaderVisitor *aVisitor)
 {
   return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+NS_IMETHODIMP
+NullHttpChannel::GetOriginalResponseHeader(const nsACString & header,
+                                            nsIHttpHeaderVisitor *aVisitor)
+{
+    return NS_ERROR_NOT_IMPLEMENTED;
+}
+
+NS_IMETHODIMP
+NullHttpChannel::VisitOriginalResponseHeaders(nsIHttpHeaderVisitor *aVisitor)
+{
+    return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 NS_IMETHODIMP

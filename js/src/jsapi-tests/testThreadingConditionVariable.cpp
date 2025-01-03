@@ -8,45 +8,35 @@
 #include "jsapi-tests/tests.h"
 #include "threading/ConditionVariable.h"
 #include "threading/Mutex.h"
+#include "threading/Thread.h"
 
 struct TestState {
     js::Mutex mutex;
     js::ConditionVariable condition;
     bool flag;
-    PRThread* testThread;
+    js::Thread testThread;
 
     explicit TestState(bool createThread = true)
-      : flag(false), testThread(nullptr)
+      : flag(false)
     {
-        if (createThread) {
-            testThread = PR_CreateThread(PR_USER_THREAD,
-                                         setFlag,
-                                         (void *)this,
-                                         PR_PRIORITY_NORMAL,
-                                         PR_GLOBAL_THREAD,
-                                         PR_JOINABLE_THREAD,
-                                         0);
-            MOZ_RELEASE_ASSERT(testThread);
-        }
+        if (createThread)
+            MOZ_RELEASE_ASSERT(testThread.init(setFlag, this));
     }
 
-    static void setFlag(void* arg) {
-        auto& state = *static_cast<TestState*>(arg);
-        js::UniqueLock<js::Mutex> lock(state.mutex);
-        state.flag = true;
-        state.condition.notify_one();
+    static void setFlag(TestState* state) {
+        js::UniqueLock<js::Mutex> lock(state->mutex);
+        state->flag = true;
+        state->condition.notify_one();
     }
 
     void join() {
-        MOZ_RELEASE_ASSERT(testThread != nullptr);
-        PR_JoinThread(testThread);
-        testThread = nullptr;
+        testThread.join();
     }
 };
 
 BEGIN_TEST(testThreadingConditionVariable)
 {
-    auto state = MakeUnique<TestState>();
+    auto state = mozilla::MakeUnique<TestState>();
     {
         js::UniqueLock<js::Mutex> lock(state->mutex);
         while (!state->flag)
@@ -62,7 +52,7 @@ END_TEST(testThreadingConditionVariable)
 
 BEGIN_TEST(testThreadingConditionVariablePredicate)
 {
-    auto state = MakeUnique<TestState>();
+    auto state = mozilla::MakeUnique<TestState>();
     {
         js::UniqueLock<js::Mutex> lock(state->mutex);
         state->condition.wait(lock, [&state]() {return state->flag;});
@@ -77,7 +67,7 @@ END_TEST(testThreadingConditionVariablePredicate)
 
 BEGIN_TEST(testThreadingConditionVariableUntilOkay)
 {
-    auto state = MakeUnique<TestState>();
+    auto state = mozilla::MakeUnique<TestState>();
     {
         js::UniqueLock<js::Mutex> lock(state->mutex);
         while (!state->flag) {
@@ -96,7 +86,7 @@ END_TEST(testThreadingConditionVariableUntilOkay)
 
 BEGIN_TEST(testThreadingConditionVariableUntilTimeout)
 {
-    auto state = MakeUnique<TestState>(false);
+    auto state = mozilla::MakeUnique<TestState>(false);
     {
         js::UniqueLock<js::Mutex> lock(state->mutex);
         while (!state->flag) {
@@ -122,7 +112,7 @@ END_TEST(testThreadingConditionVariableUntilTimeout)
 
 BEGIN_TEST(testThreadingConditionVariableUntilOkayPredicate)
 {
-    auto state = MakeUnique<TestState>();
+    auto state = mozilla::MakeUnique<TestState>();
     {
         js::UniqueLock<js::Mutex> lock(state->mutex);
         auto to = mozilla::TimeStamp::Now() + mozilla::TimeDuration::FromSeconds(600);
@@ -139,7 +129,7 @@ END_TEST(testThreadingConditionVariableUntilOkayPredicate)
 
 BEGIN_TEST(testThreadingConditionVariableUntilTimeoutPredicate)
 {
-    auto state = MakeUnique<TestState>(false);
+    auto state = mozilla::MakeUnique<TestState>(false);
     {
         js::UniqueLock<js::Mutex> lock(state->mutex);
         auto to = mozilla::TimeStamp::Now() + mozilla::TimeDuration::FromMilliseconds(10);
@@ -154,7 +144,7 @@ END_TEST(testThreadingConditionVariableUntilTimeoutPredicate)
 
 BEGIN_TEST(testThreadingConditionVariableForOkay)
 {
-    auto state = MakeUnique<TestState>();
+    auto state = mozilla::MakeUnique<TestState>();
     {
         js::UniqueLock<js::Mutex> lock(state->mutex);
         while (!state->flag) {
@@ -173,7 +163,7 @@ END_TEST(testThreadingConditionVariableForOkay)
 
 BEGIN_TEST(testThreadingConditionVariableForTimeout)
 {
-    auto state = MakeUnique<TestState>(false);
+    auto state = mozilla::MakeUnique<TestState>(false);
     {
         js::UniqueLock<js::Mutex> lock(state->mutex);
         while (!state->flag) {
@@ -199,7 +189,7 @@ END_TEST(testThreadingConditionVariableForTimeout)
 
 BEGIN_TEST(testThreadingConditionVariableForOkayPredicate)
 {
-    auto state = MakeUnique<TestState>();
+    auto state = mozilla::MakeUnique<TestState>();
     {
         js::UniqueLock<js::Mutex> lock(state->mutex);
         auto duration = mozilla::TimeDuration::FromSeconds(600);
@@ -216,7 +206,7 @@ END_TEST(testThreadingConditionVariableForOkayPredicate)
 
 BEGIN_TEST(testThreadingConditionVariableForTimeoutPredicate)
 {
-    auto state = MakeUnique<TestState>(false);
+    auto state = mozilla::MakeUnique<TestState>(false);
     {
         js::UniqueLock<js::Mutex> lock(state->mutex);
         auto duration = mozilla::TimeDuration::FromMilliseconds(10);

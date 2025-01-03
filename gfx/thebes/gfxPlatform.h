@@ -95,8 +95,6 @@ enum eGfxLog {
 // when searching through pref langs, max number of pref langs
 const uint32_t kMaxLenPrefLangList = 32;
 
-extern bool gANGLESupportsD3D11;
-
 #define UNINITIALIZED_VALUE  (-1)
 
 inline const char*
@@ -138,7 +136,8 @@ enum class DeviceResetReason
 
 enum class ForcedDeviceResetReason
 {
-  OPENSHAREDHANDLE = 0
+  OPENSHAREDHANDLE = 0,
+  COMPOSITOR_UPDATED,
 };
 
 class gfxPlatform {
@@ -449,9 +448,7 @@ public:
 
     static bool OffMainThreadCompositingEnabled();
 
-    static bool CanUseDirect3D9();
     virtual bool CanUseHardwareVideoDecoding();
-    static bool CanUseDirect3D11ANGLE();
 
     // Returns a prioritized list of all available compositor backends.
     void GetCompositorBackends(bool useAcceleration, nsTArray<mozilla::layers::LayersBackend>& aBackends);
@@ -525,6 +522,12 @@ public:
      * for measuring text etc as if they will be rendered to the screen
      */
     gfxASurface* ScreenReferenceSurface() { return mScreenReferenceSurface; }
+
+    /**
+     * Returns a 1x1 DrawTarget that can be used for measuring text etc. as
+     * it would measure if rendered on-screen.  Guaranteed to return a
+     * non-null and valid DrawTarget.
+     */
     mozilla::gfx::DrawTarget* ScreenReferenceDrawTarget() { return mScreenReferenceDrawTarget; }
 
     virtual mozilla::gfx::SurfaceFormat Optimal2DFormatForContent(gfxContentType aContent);
@@ -636,6 +639,8 @@ public:
     mozilla::layers::LayersBackend GetCompositorBackend() const {
       return mCompositorBackend;
     }
+
+    virtual void CompositorUpdated() {}
 
     // Return information on how child processes should initialize graphics
     // devices. Currently this is only used on Windows.

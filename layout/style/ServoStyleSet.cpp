@@ -128,7 +128,14 @@ ServoStyleSet::ResolveStyleForText(nsIContent* aTextNode,
 already_AddRefed<nsStyleContext>
 ServoStyleSet::ResolveStyleForOtherNonElement(nsStyleContext* aParentContext)
 {
-  MOZ_CRASH("stylo: not implemented");
+  RefPtr<ServoComputedValues> computedValues =
+    Servo_InheritComputedValues(
+      aParentContext->StyleSource().AsServoComputedValues());
+  MOZ_ASSERT(computedValues);
+
+  return GetContext(computedValues.forget(), aParentContext,
+                    nsCSSAnonBoxes::mozOtherNonElement,
+                    CSSPseudoElementType::AnonBox);
 }
 
 already_AddRefed<nsStyleContext>
@@ -137,8 +144,9 @@ ServoStyleSet::ResolvePseudoElementStyle(Element* aParentElement,
                                          nsStyleContext* aParentContext,
                                          Element* aPseudoElement)
 {
-  MOZ_ASSERT(!aPseudoElement,
-             "stylo: We don't support CSS_PSEUDO_ELEMENT_SUPPORTS_USER_ACTION_STATE yet");
+  if (aPseudoElement) {
+    NS_ERROR("stylo: We don't support CSS_PSEUDO_ELEMENT_SUPPORTS_USER_ACTION_STATE yet");
+  }
   MOZ_ASSERT(aParentContext);
   MOZ_ASSERT(aType < CSSPseudoElementType::Count);
   nsIAtom* pseudoTag = nsCSSPseudoElements::GetPseudoAtom(aType);
@@ -172,7 +180,7 @@ ServoStyleSet::ResolveAnonymousBoxStyle(nsIAtom* aPseudoTag,
                                                        mRawSet.get()));
   MOZ_ASSERT(computedValues);
 
-  return NS_NewStyleContext(aParentContext, mPresContext, nullptr,
+  return NS_NewStyleContext(aParentContext, mPresContext, aPseudoTag,
                             CSSPseudoElementType::AnonBox,
                             computedValues.forget(), skipFixup);
 }
@@ -348,8 +356,9 @@ ServoStyleSet::ProbePseudoElementStyle(Element* aParentElement,
                                        TreeMatchContext& aTreeMatchContext,
                                        Element* aPseudoElement)
 {
-  MOZ_ASSERT(!aPseudoElement,
-             "stylo: We don't support CSS_PSEUDO_ELEMENT_SUPPORTS_USER_ACTION_STATE yet");
+  if (aPseudoElement) {
+    NS_ERROR("stylo: We don't support CSS_PSEUDO_ELEMENT_SUPPORTS_USER_ACTION_STATE yet");
+  }
   return ProbePseudoElementStyle(aParentElement, aType, aParentContext);
 }
 
@@ -367,4 +376,10 @@ ServoStyleSet::HasStateDependentStyle(dom::Element* aElement,
                                      EventStates aStateMask)
 {
   MOZ_CRASH("stylo: not implemented");
+}
+
+void
+ServoStyleSet::RestyleSubtree(nsINode* aNode)
+{
+  Servo_RestyleSubtree(aNode, mRawSet.get());
 }

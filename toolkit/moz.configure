@@ -340,7 +340,7 @@ add_old_configure_assignment('MOZ_FMP4', fmp4)
 
 # EME Support
 # ==============================================================
-option('--enable-eme', nargs='*', choices=('adobe',),
+option('--enable-eme', nargs='*', choices=('adobe','widevine',),
        help='Enable support for Encrypted Media Extensions')
 
 @depends('--enable-eme', fmp4)
@@ -378,9 +378,13 @@ def packager_format(value):
 
 set_config('MOZ_PACKAGER_FORMAT', packager_format)
 
-@depends(host)
-def jar_maker_format(host):
-    return 'flat' if host.os == 'WINNT' else 'symlink'
+@depends(host, build_project)
+def jar_maker_format(host, build_project):
+    # Multilocales for mobile/android use the same mergedirs for all locales,
+    # so we can't use symlinks for those builds.
+    if host.os == 'WINNT' or build_project == 'mobile/android':
+        return 'flat'
+    return 'symlink'
 
 set_config('MOZ_JAR_MAKER_FILE_FORMAT', jar_maker_format)
 
@@ -398,6 +402,34 @@ def omnijar_name(toolkit):
     return 'assets/omni.ja' if toolkit == 'android' else 'omni.ja'
 
 set_config('OMNIJAR_NAME', omnijar_name)
+
+project_flag('MOZ_PLACES',
+             help='Build Places if required',
+             set_as_define=True)
+
+project_flag('MOZ_SOCIAL',
+             help='Build SocialAPI if required',
+             default=True)
+
+project_flag('MOZ_SERVICES_HEALTHREPORT',
+             help='Build Firefox Health Reporter Service',
+             set_for_old_configure=True,
+             set_as_define=True)
+
+project_flag('MOZ_SERVICES_SYNC',
+             help='Build Sync Services if required')
+
+project_flag('MOZ_SERVICES_CLOUDSYNC',
+             help='Build Services/CloudSync if required')
+
+project_flag('MOZ_ANDROID_HISTORY',
+             help='Enable Android History instead of Places',
+             set_as_define=True)
+
+@depends('MOZ_PLACES', 'MOZ_ANDROID_HISTORY')
+def check_places_and_android_history(places, android_history):
+    if places and android_history:
+        die('Cannot use MOZ_ANDROID_HISTORY alongside MOZ_PLACES.')
 
 # Miscellaneous programs
 # ==============================================================

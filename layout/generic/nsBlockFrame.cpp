@@ -994,11 +994,11 @@ CalculateContainingBlockSizeForAbsolutes(WritingMode aWM,
     // the correct padding area with the legend taken into account.
     const nsHTMLReflowState* aLastRS = &aReflowState;
     const nsHTMLReflowState* lastButOneRS = &aReflowState;
-    while (aLastRS->parentReflowState &&
-           aLastRS->parentReflowState->frame->GetContent() == frame->GetContent() &&
-           aLastRS->parentReflowState->frame->GetType() != nsGkAtoms::fieldSetFrame) {
+    while (aLastRS->mParentReflowState &&
+           aLastRS->mParentReflowState->frame->GetContent() == frame->GetContent() &&
+           aLastRS->mParentReflowState->frame->GetType() != nsGkAtoms::fieldSetFrame) {
       lastButOneRS = aLastRS;
-      aLastRS = aLastRS->parentReflowState;
+      aLastRS = aLastRS->mParentReflowState;
     }
     if (aLastRS != &aReflowState) {
       // Scrollbars need to be specifically excluded, if present, because they are outside the
@@ -1575,7 +1575,7 @@ nsBlockFrame::ComputeFinalSize(const nsHTMLReflowState& aReflowState,
 
   if (NS_UNCONSTRAINEDSIZE != aReflowState.ComputedBSize()
       && (GetParent()->GetType() != nsGkAtoms::columnSetFrame ||
-          aReflowState.parentReflowState->AvailableBSize() == NS_UNCONSTRAINEDSIZE)) {
+          aReflowState.mParentReflowState->AvailableBSize() == NS_UNCONSTRAINEDSIZE)) {
     ComputeFinalBSize(aReflowState, &aState.mReflowStatus,
                       aState.mBCoord + nonCarriedOutBDirMargin,
                       borderPadding, finalSize, aState.mConsumedBSize);
@@ -1623,13 +1623,29 @@ nsBlockFrame::ComputeFinalSize(const nsHTMLReflowState& aReflowState,
     }
   }
 
-  if (IS_TRUE_OVERFLOW_CONTAINER(this) &&
-      NS_FRAME_IS_NOT_COMPLETE(aState.mReflowStatus)) {
-    // Overflow containers can only be overflow complete.
-    // Note that auto height overflow containers have no normal children
-    NS_ASSERTION(finalSize.BSize(wm) == 0,
-                 "overflow containers must be zero-block-size");
-    NS_FRAME_SET_OVERFLOW_INCOMPLETE(aState.mReflowStatus);
+  if (IS_TRUE_OVERFLOW_CONTAINER(this)) {
+    if (NS_FRAME_IS_NOT_COMPLETE(aState.mReflowStatus)) {
+      // Overflow containers can only be overflow complete.
+      // Note that auto height overflow containers have no normal children
+      NS_ASSERTION(finalSize.BSize(wm) == 0,
+                   "overflow containers must be zero-block-size");
+      NS_FRAME_SET_OVERFLOW_INCOMPLETE(aState.mReflowStatus);
+    }
+  } else if (aReflowState.AvailableBSize() != NS_UNCONSTRAINEDSIZE &&
+             !NS_INLINE_IS_BREAK_BEFORE(aState.mReflowStatus) &&
+             NS_FRAME_IS_COMPLETE(aState.mReflowStatus)) {
+    // Currently only used for grid items, but could be used in other contexts.
+    // The FragStretchBSizeProperty is our expected non-fragmented block-size
+    // we should stretch to (for align-self:stretch etc).  In some fragmentation
+    // cases though, the last fragment (this frame since we're complete), needs
+    // to have extra size applied because earlier fragments consumed too much of
+    // our computed size due to overflowing their containing block.  (E.g. this
+    // ensures we fill the last row when a multi-row grid item is fragmented).
+    bool found;
+    nscoord bSize = Properties().Get(FragStretchBSizeProperty(), &found);
+    if (found) {
+      finalSize.BSize(wm) = std::max(bSize, finalSize.BSize(wm));
+    }
   }
 
   // Screen out negative block sizes --- can happen due to integer overflows :-(
@@ -1729,12 +1745,9 @@ nsBlockFrame::ComputeOverflowAreas(const nsRect&         aBounds,
   aOverflowAreas = areas;
 }
 
-bool
-nsBlockFrame::UpdateOverflow()
+void
+nsBlockFrame::UnionChildOverflow(nsOverflowAreas& aOverflowAreas)
 {
-  nsRect rect(nsPoint(0, 0), GetSize());
-  nsOverflowAreas overflowAreas(rect, rect);
-
   // We need to update the overflow areas of lines manually, as they
   // get cached and re-used otherwise. Lines aren't exposed as normal
   // frame children, so calling UnionChildOverflow alone will end up
@@ -1759,27 +1772,30 @@ nsBlockFrame::UpdateOverflow()
     }
 
     line->SetOverflowAreas(lineAreas);
-    overflowAreas.UnionWith(lineAreas);
+    aOverflowAreas.UnionWith(lineAreas);
   }
-
-  // Line cursor invariants depend on the overflow areas of the lines, so
-  // we must clear the line cursor since those areas may have changed.
-  ClearLineCursor();
 
   // Union with child frames, skipping the principal and float lists
   // since we already handled those using the line boxes.
-  nsLayoutUtils::UnionChildOverflow(this, overflowAreas,
+  nsLayoutUtils::UnionChildOverflow(this, aOverflowAreas,
                                     kPrincipalList | kFloatList);
+}
 
+bool
+nsBlockFrame::ComputeCustomOverflow(nsOverflowAreas& aOverflowAreas)
+{
   bool found;
   nscoord blockEndEdgeOfChildren =
     Properties().Get(BlockEndEdgeOfChildrenProperty(), &found);
   if (found) {
     ConsiderBlockEndEdgeOfChildren(GetWritingMode(),
-                                   blockEndEdgeOfChildren, overflowAreas);
+                                   blockEndEdgeOfChildren, aOverflowAreas);
   }
 
-  return FinishAndStoreOverflow(overflowAreas, GetSize());
+  // Line cursor invariants depend on the overflow areas of the lines, so
+  // we must clear the line cursor since those areas may have changed.
+  ClearLineCursor();
+  return nsContainerFrame::ComputeCustomOverflow(aOverflowAreas);
 }
 
 void
@@ -1846,7 +1862,7 @@ IsAlignedLeft(uint8_t aAlignment,
 {
   return aFrame->IsSVGText() ||
          NS_STYLE_TEXT_ALIGN_LEFT == aAlignment ||
-         (((NS_STYLE_TEXT_ALIGN_DEFAULT == aAlignment &&
+         (((NS_STYLE_TEXT_ALIGN_START == aAlignment &&
            NS_STYLE_DIRECTION_LTR == aDirection) ||
           (NS_STYLE_TEXT_ALIGN_END == aAlignment &&
            NS_STYLE_DIRECTION_RTL == aDirection)) &&
@@ -1962,8 +1978,8 @@ nsBlockFrame::PropagateFloatDamage(nsBlockReflowState& aState,
                                    nscoord aDeltaBCoord)
 {
   nsFloatManager *floatManager = aState.mReflowState.mFloatManager;
-  NS_ASSERTION((aState.mReflowState.parentReflowState &&
-                aState.mReflowState.parentReflowState->mFloatManager == floatManager) ||
+  NS_ASSERTION((aState.mReflowState.mParentReflowState &&
+                aState.mReflowState.mParentReflowState->mFloatManager == floatManager) ||
                 aState.mReflowState.mBlockDelta == 0, "Bad block delta passed in");
 
   // Check to see if there are any floats; if there aren't, there can't

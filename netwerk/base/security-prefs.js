@@ -41,8 +41,6 @@ pref("security.ssl3.rsa_camellia_256_sha", true);
 
 // Cipher suites disabled by default                   //Reason:
 pref("security.ssl3.ecdhe_rsa_des_ede3_sha", false);   //3DES
-pref("security.ssl3.ecdhe_rsa_rc4_128_sha", false);    //RC4
-pref("security.ssl3.ecdhe_ecdsa_rc4_128_sha", false);  //RC4
 pref("security.ssl3.rsa_fips_des_ede3_sha", false);    //FIPS,3DES
 pref("security.ssl3.dhe_rsa_des_ede3_sha", false);     //3DES
 pref("security.ssl3.dhe_dss_camellia_256_sha", false); //DHE+DSS
@@ -61,8 +59,6 @@ pref("security.ssl3.ecdh_rsa_des_ede3_sha", false);    //Non-ephemeral,3DES
 pref("security.ssl3.ecdh_rsa_rc4_128_sha", false);     //Non-ephemeral,RC4
 pref("security.ssl3.rsa_seed_sha", false);             //In disuse
 pref("security.ssl3.rsa_des_ede3_sha", false);         //3DES
-pref("security.ssl3.rsa_rc4_128_sha", false);          //RC4
-pref("security.ssl3.rsa_rc4_128_md5", false);          //RC4,MD5
 
 pref("security.default_personal_cert",   "Ask Every Time");
 pref("security.remember_cert_checkbox_default_setting", true);
@@ -93,6 +89,18 @@ pref("security.pki.sha1_enforcement_level", 3);
 pref("security.pki.name_matching_mode", 1);
 #else
 pref("security.pki.name_matching_mode", 2);
+#endif
+
+// security.pki.netscape_step_up_policy controls how the platform handles the
+// id-Netscape-stepUp OID in extended key usage extensions of CA certificates.
+// 0: id-Netscape-stepUp is always considered equivalent to id-kp-serverAuth
+// 1: it is considered equivalent when the notBefore is before 23 August 2016
+// 2: similarly, but for 23 August 2015
+// 3: it is never considered equivalent
+#ifdef RELEASE_BUILD
+pref("security.pki.netscape_step_up_policy", 1);
+#else
+pref("security.pki.netscape_step_up_policy", 2);
 #endif
 
 pref("security.webauth.u2f", false);

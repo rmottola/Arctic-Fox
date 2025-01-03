@@ -249,6 +249,7 @@ int32_t nsXPLookAndFeel::sCachedColorBits[COLOR_CACHE_SIZE] = {0};
 bool nsXPLookAndFeel::sInitialized = false;
 bool nsXPLookAndFeel::sUseNativeColors = true;
 bool nsXPLookAndFeel::sUseStandinsForNativeColors = false;
+bool nsXPLookAndFeel::sFindbarModalHighlight = false;
 
 nsLookAndFeel* nsXPLookAndFeel::sInstance = nullptr;
 bool nsXPLookAndFeel::sShutdown = false;
@@ -335,7 +336,8 @@ nsXPLookAndFeel::ColorPrefChanged (unsigned int index, const char *prefName)
   if (!colorStr.IsEmpty()) {
     nscolor thecolor;
     if (colorStr[0] == char16_t('#')) {
-      if (NS_HexToRGB(nsDependentString(colorStr, 1), &thecolor)) {
+      if (NS_HexToRGBA(nsDependentString(colorStr, 1),
+                       nsHexColorType::NoAlpha, &thecolor)) {
         int32_t id = NS_PTR_TO_INT32(index);
         CACHE_COLOR(id, thecolor);
       }
@@ -389,7 +391,7 @@ nsXPLookAndFeel::InitColorFromPref(int32_t i)
   if (colorStr[0] == char16_t('#')) {
     nsAutoString hexString;
     colorStr.Right(hexString, colorStr.Length() - 1);
-    if (NS_HexToRGB(hexString, &thecolor)) {
+    if (NS_HexToRGBA(hexString, nsHexColorType::NoAlpha, &thecolor)) {
       CACHE_COLOR(i, thecolor);
     }
   } else if (NS_ColorNameToRGB(colorStr, &thecolor)) {
@@ -466,6 +468,9 @@ nsXPLookAndFeel::Init()
   Preferences::AddBoolVarCache(&sUseStandinsForNativeColors,
                                "ui.use_standins_for_native_colors",
                                sUseStandinsForNativeColors);
+  Preferences::AddBoolVarCache(&sFindbarModalHighlight,
+                               "findbar.modalHighlight",
+                               sFindbarModalHighlight);
 
   if (XRE_IsContentProcess()) {
     mozilla::dom::ContentChild* cc =
@@ -774,6 +779,11 @@ nsXPLookAndFeel::GetColorImpl(ColorID aID, bool aUseStandinsForNativeColors,
   }
 
   if (aID == eColorID_TextSelectBackgroundAttention) {
+    if (sFindbarModalHighlight) {
+      aResult = NS_RGBA(0, 0, 0, 0);
+      return NS_OK;
+    }
+
     // This makes the selection stand out when typeaheadfind is on
     // Used with nsISelectionController::SELECTION_ATTENTION
     aResult = NS_RGB(0x38, 0xd8, 0x78);

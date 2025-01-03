@@ -22,6 +22,7 @@
 #include "gfxVR.h"
 #include "mozilla/gfx/StackArray.h"
 #include "mozilla/Services.h"
+#include "mozilla/widget/WinCompositorWidgetProxy.h"
 
 #include "mozilla/EnumeratedArray.h"
 #include "mozilla/Telemetry.h"
@@ -215,7 +216,7 @@ CompositorD3D11::Initialize()
 
   mFeatureLevel = mDevice->GetFeatureLevel();
 
-  mHwnd = (HWND)mWidget->RealWidget()->GetNativeData(NS_NATIVE_WINDOW);
+  mHwnd = mWidget->AsWindowsProxy()->GetHwnd();
 
   memset(&mVSConstants, 0, sizeof(VertexShaderConstants));
 
@@ -695,7 +696,7 @@ CompositorD3D11::ClearRect(const gfx::Rect& aRect)
 
 void
 CompositorD3D11::DrawVRDistortion(const gfx::Rect& aRect,
-                                  const gfx::Rect& aClipRect,
+                                  const gfx::IntRect& aClipRect,
                                   const EffectChain& aEffectChain,
                                   gfx::Float aOpacity,
                                   const gfx::Matrix4x4& aTransform)
@@ -871,7 +872,7 @@ EffectToBlendLayerType(Effect* aEffect)
 
 void
 CompositorD3D11::DrawQuad(const gfx::Rect& aRect,
-                          const gfx::Rect& aClipRect,
+                          const gfx::IntRect& aClipRect,
                           const EffectChain& aEffectChain,
                           gfx::Float aOpacity,
                           const gfx::Matrix4x4& aTransform,
@@ -1013,14 +1014,14 @@ CompositorD3D11::DrawQuad(const gfx::Rect& aRect,
         restoreBlendMode = true;
       }
 
-      SetSamplerForFilter(texturedEffect->mFilter);
+      SetSamplerForSamplingFilter(texturedEffect->mSamplingFilter);
     }
     break;
   case EffectTypes::YCBCR: {
       EffectYCbCr* ycbcrEffect =
         static_cast<EffectYCbCr*>(aEffectChain.mPrimaryEffect.get());
 
-      SetSamplerForFilter(Filter::LINEAR);
+      SetSamplerForSamplingFilter(SamplingFilter::LINEAR);
 
       pTexCoordRect = &ycbcrEffect->mTextureCoords;
 
@@ -1063,7 +1064,7 @@ CompositorD3D11::DrawQuad(const gfx::Rect& aRect,
         return;
       }
 
-      SetSamplerForFilter(effectComponentAlpha->mFilter);
+      SetSamplerForSamplingFilter(effectComponentAlpha->mSamplingFilter);
 
       pTexCoordRect = &effectComponentAlpha->mTextureCoords;
 
@@ -1115,18 +1116,18 @@ CompositorD3D11::DrawQuad(const gfx::Rect& aRect,
 
 void
 CompositorD3D11::BeginFrame(const nsIntRegion& aInvalidRegion,
-                            const Rect* aClipRectIn,
-                            const Rect& aRenderBounds,
+                            const IntRect* aClipRectIn,
+                            const IntRect& aRenderBounds,
                             const nsIntRegion& aOpaqueRegion,
-                            Rect* aClipRectOut,
-                            Rect* aRenderBoundsOut)
+                            IntRect* aClipRectOut,
+                            IntRect* aRenderBoundsOut)
 {
   // Don't composite if we are minimised. Other than for the sake of efficency,
   // this is important because resizing our buffers when mimised will fail and
   // cause a crash when we're restored.
   NS_ASSERTION(mHwnd, "Couldn't find an HWND when initialising?");
   if (::IsIconic(mHwnd) || mDevice->GetDeviceRemovedReason() != S_OK) {
-    *aRenderBoundsOut = Rect();
+    *aRenderBoundsOut = IntRect();
     return;
   }
 
@@ -1135,16 +1136,9 @@ CompositorD3D11::BeginFrame(const nsIntRegion& aInvalidRegion,
   // Failed to create a render target or the view.
   if (!UpdateRenderTarget() || !mDefaultRT || !mDefaultRT->mRTView ||
       mSize.width <= 0 || mSize.height <= 0) {
-    *aRenderBoundsOut = Rect();
+    *aRenderBoundsOut = IntRect();
     return;
   }
-
-  mContext->IASetInputLayout(mAttachments->mInputLayout);
-
-  ID3D11Buffer* buffer = mAttachments->mVertexBuffer;
-  UINT size = sizeof(Vertex);
-  UINT offset = 0;
-  mContext->IASetVertexBuffers(0, 1, &buffer, &size, &offset);
 
   IntRect intRect = IntRect(IntPoint(0, 0), mSize.ToUnknownSize());
   // Sometimes the invalid region is larger than we want to draw.
@@ -1157,28 +1151,42 @@ CompositorD3D11::BeginFrame(const nsIntRegion& aInvalidRegion,
   }
 
   IntRect invalidRect = invalidRegionSafe.GetBounds();
+
+  IntRect clipRect = invalidRect;
+  if (aClipRectIn) {
+    clipRect.IntersectRect(clipRect, IntRect(aClipRectIn->x, aClipRectIn->y, aClipRectIn->width, aClipRectIn->height));
+  }
+
+  if (clipRect.IsEmpty()) {
+    *aRenderBoundsOut = IntRect();
+    return;
+  }
+
+  mContext->IASetInputLayout(mAttachments->mInputLayout);
+
+  ID3D11Buffer* buffer = mAttachments->mVertexBuffer;
+  UINT size = sizeof(Vertex);
+  UINT offset = 0;
+  mContext->IASetVertexBuffers(0, 1, &buffer, &size, &offset);
+
   mInvalidRect = IntRect(invalidRect.x, invalidRect.y, invalidRect.width, invalidRect.height);
   mInvalidRegion = invalidRegionSafe;
 
   if (aClipRectOut) {
-    *aClipRectOut = Rect(0, 0, mSize.width, mSize.height);
+    *aClipRectOut = IntRect(0, 0, mSize.width, mSize.height);
   }
   if (aRenderBoundsOut) {
-    *aRenderBoundsOut = Rect(0, 0, mSize.width, mSize.height);
+    *aRenderBoundsOut = IntRect(0, 0, mSize.width, mSize.height);
   }
 
-  if (aClipRectIn) {
-    invalidRect.IntersectRect(invalidRect, IntRect(aClipRectIn->x, aClipRectIn->y, aClipRectIn->width, aClipRectIn->height));
-  }
-
-  mCurrentClip = IntRect(invalidRect.x, invalidRect.y, invalidRect.width, invalidRect.height);
+  mCurrentClip = IntRect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
 
   mContext->RSSetState(mAttachments->mRasterizerState);
 
   SetRenderTarget(mDefaultRT);
 
   // ClearRect will set the correct blend state for us.
-  ClearRect(Rect(invalidRect.x, invalidRect.y, invalidRect.width, invalidRect.height));
+  ClearRect(Rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height));
 
   if (mAttachments->mSyncTexture) {
     RefPtr<IDXGIKeyedMutex> mutex;
@@ -1187,7 +1195,17 @@ CompositorD3D11::BeginFrame(const nsIntRegion& aInvalidRegion,
     MOZ_ASSERT(mutex);
     HRESULT hr = mutex->AcquireSync(0, 10000);
     if (hr == WAIT_TIMEOUT) {
-      MOZ_CRASH("GFX: D3D11 timeout");
+      hr = mDevice->GetDeviceRemovedReason();
+      if (hr == S_OK) {
+        // There is no driver-removed event. Crash with this timeout.
+        MOZ_CRASH("GFX: D3D11 normal status timeout");
+      }
+
+      // Since the timeout is related to the driver-removed, clear the
+      // render-bounding size to skip this frame.
+      gfxCriticalNote << "GFX: D3D11 timeout with device-removed:" << gfx::hexa(hr);
+      *aRenderBoundsOut = IntRect();
+      return;
     }
 
     mutex->ReleaseSync(0);
@@ -1197,6 +1215,8 @@ CompositorD3D11::BeginFrame(const nsIntRegion& aInvalidRegion,
 void
 CompositorD3D11::EndFrame()
 {
+  Compositor::EndFrame();
+
   if (!mDefaultRT) {
     return;
   }
@@ -1205,6 +1225,13 @@ CompositorD3D11::EndFrame()
   EnsureSize();
   if (mSize.width <= 0 || mSize.height <= 0) {
     return;
+  }
+
+  RefPtr<ID3D11Query> query;
+  CD3D11_QUERY_DESC  desc(D3D11_QUERY_EVENT);
+  mDevice->CreateQuery(&desc, getter_AddRefs(query));
+  if (query) {
+    mContext->End(query);
   }
 
   UINT presentInterval = 0;
@@ -1266,6 +1293,23 @@ CompositorD3D11::EndFrame()
       PaintToTarget();
     }
   }
+
+  // Block until the previous frame's work has been completed.
+  if (mQuery) {
+    TimeStamp start = TimeStamp::Now();
+    BOOL result;
+    while (mContext->GetData(mQuery, &result, sizeof(BOOL), 0) != S_OK) {
+      if (mDevice->GetDeviceRemovedReason() != S_OK) {
+        break;
+      }
+      if ((TimeStamp::Now() - start) > TimeDuration::FromSeconds(2)) {
+        break;
+      }
+      Sleep(0);
+    }
+  }
+  // Store the query for this frame so we can flush it next time.
+  mQuery = query;
 
   mCurrentRT = nullptr;
 }
@@ -1553,14 +1597,14 @@ CompositorD3D11::UpdateConstantBuffers()
 }
 
 void
-CompositorD3D11::SetSamplerForFilter(Filter aFilter)
+CompositorD3D11::SetSamplerForSamplingFilter(SamplingFilter aSamplingFilter)
 {
   ID3D11SamplerState *sampler;
-  switch (aFilter) {
-    case Filter::POINT:
+  switch (aSamplingFilter) {
+    case SamplingFilter::POINT:
     sampler = mAttachments->mPointSamplerState;
     break;
-  case Filter::LINEAR:
+  case SamplingFilter::LINEAR:
   default:
     sampler = mAttachments->mLinearSamplerState;
     break;

@@ -104,21 +104,21 @@ public:
   virtual void BeginTransaction() override;
   virtual void BeginTransactionWithTarget(gfxContext* aTarget) override
   {
-    MOZ_CRASH("Use BeginTransactionWithDrawTarget");
+    MOZ_CRASH("GFX: Use BeginTransactionWithDrawTarget");
   }
   void BeginTransactionWithDrawTarget(gfx::DrawTarget* aTarget,
                                       const gfx::IntRect& aRect);
 
   virtual bool EndEmptyTransaction(EndTransactionFlags aFlags = END_DEFAULT) override
   {
-    MOZ_CRASH("Use EndTransaction(aTimeStamp)");
+    MOZ_CRASH("GFX: Use EndTransaction(aTimeStamp)");
     return false;
   }
   virtual void EndTransaction(DrawPaintedLayerCallback aCallback,
                               void* aCallbackData,
                               EndTransactionFlags aFlags = END_DEFAULT) override
   {
-    MOZ_CRASH("Use EndTransaction(aTimeStamp)");
+    MOZ_CRASH("GFX: Use EndTransaction(aTimeStamp)");
   }
   void EndTransaction(const TimeStamp& aTimeStamp,
                       EndTransactionFlags aFlags = END_DEFAULT);
@@ -131,7 +131,7 @@ public:
 
   virtual int32_t GetMaxTextureSize() const override
   {
-    MOZ_CRASH("Call on compositor, not LayerManagerComposite");
+    MOZ_CRASH("GFX: Call on compositor, not LayerManagerComposite");
   }
 
   virtual void ClearCachedResources(Layer* aSubtree = nullptr) override;
@@ -150,11 +150,11 @@ public:
 
   virtual LayersBackend GetBackendType() override
   {
-    MOZ_CRASH("Shouldn't be called for composited layer manager");
+    MOZ_CRASH("GFX: Shouldn't be called for composited layer manager");
   }
   virtual void GetBackendName(nsAString& name) override
   {
-    MOZ_CRASH("Shouldn't be called for composited layer manager");
+    MOZ_CRASH("GFX: Shouldn't be called for composited layer manager");
   }
 
   virtual bool AreComponentAlphaLayersEnabled() override;
@@ -377,7 +377,7 @@ private:
   /**
    * Render debug overlays such as the FPS/FrameCounter above the frame.
    */
-  void RenderDebugOverlay(const gfx::Rect& aBounds);
+  void RenderDebugOverlay(const gfx::IntRect& aBounds);
 
 
   RefPtr<CompositingRenderTarget> PushGroupForLayerEffects();
@@ -541,7 +541,7 @@ public:
   const Maybe<ParentLayerIntRect>& GetShadowClipRect() { return mShadowClipRect; }
   const LayerIntRegion& GetShadowVisibleRegion() { return mShadowVisibleRegion; }
   const gfx::Matrix4x4& GetShadowBaseTransform() { return mShadowTransform; }
-  const gfx::Matrix4x4 GetShadowTransform();
+  gfx::Matrix4x4 GetShadowTransform();
   bool GetShadowTransformSetByAnimation() { return mShadowTransformSetByAnimation; }
   bool HasLayerBeenComposited() { return mLayerComposited; }
   gfx::IntRect GetClearRect() { return mClearRect; }
@@ -614,7 +614,7 @@ RenderWithAllMasks(Layer* aLayer, Compositor* aCompositor,
     LayerManagerComposite::AutoAddMaskEffect
       autoMaskEffect(firstMask, effectChain);
     aLayer->AsLayerComposite()->AddBlendModeEffect(effectChain);
-    aRenderCallback(effectChain, gfx::Rect(aClipRect));
+    aRenderCallback(effectChain, aClipRect);
     return;
   }
 
@@ -652,13 +652,13 @@ RenderWithAllMasks(Layer* aLayer, Compositor* aCompositor,
     EffectChain firstEffectChain(aLayer);
     LayerManagerComposite::AutoAddMaskEffect
       firstMaskEffect(firstMask, firstEffectChain);
-    aRenderCallback(firstEffectChain, gfx::Rect(aClipRect - surfaceRect.TopLeft()));
+    aRenderCallback(firstEffectChain, aClipRect - surfaceRect.TopLeft());
     // firstTarget now contains the transformed source with the first mask and
     // opacity already applied.
   }
 
   // Apply the intermediate masks.
-  gfx::Rect intermediateClip(surfaceRect - surfaceRect.TopLeft());
+  gfx::IntRect intermediateClip(surfaceRect - surfaceRect.TopLeft());
   RefPtr<CompositingRenderTarget> previousTarget = firstTarget;
   for (size_t i = nextAncestorMaskLayer; i < ancestorMaskLayerCount - 1; i++) {
     Layer* intermediateMask = aLayer->GetAncestorMaskLayerAt(i);
@@ -692,7 +692,7 @@ RenderWithAllMasks(Layer* aLayer, Compositor* aCompositor,
   aLayer->AsLayerComposite()->AddBlendModeEffect(finalEffectChain);
   LayerManagerComposite::AutoAddMaskEffect autoMaskEffect(finalMask, finalEffectChain);
   if (!autoMaskEffect.Failed()) {
-    aCompositor->DrawQuad(gfx::Rect(surfaceRect), gfx::Rect(aClipRect),
+    aCompositor->DrawQuad(gfx::Rect(surfaceRect), aClipRect,
                           finalEffectChain, 1.0, gfx::Matrix4x4());
   }
 }

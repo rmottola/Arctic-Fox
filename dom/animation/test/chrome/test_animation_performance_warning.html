@@ -29,7 +29,13 @@
 // This is used for obtaining localized strings.
 var gStringBundle;
 
-SpecialPowers.pushPrefEnv({ "set": [["general.useragent.locale", "en-US"]] },
+SpecialPowers.pushPrefEnv({ "set": [
+                            ["general.useragent.locale", "en-US"],
+                            // Need to set devPixelsPerPx explicitly to gain
+                            // consistent pixel values in warning messages
+                            // regardless of platform DPIs.
+                            ["layout.css.devPixelsPerPx", 1],
+                          ] },
                           start);
 
 function compare_property_state(a, b) {
@@ -212,18 +218,6 @@ var gAnimationsTests = [
     ]
   },
 ];
-
-gAnimationsTests.forEach(function(subtest) {
-  promise_test(function(t) {
-    var div = addDiv(t, { class: 'compositable' });
-    var animation = div.animate(subtest.frames, 100 * MS_PER_SEC);
-    return animation.ready.then(function() {
-      assert_animation_property_state_equals(
-        animation.effect.getProperties(),
-        subtest.expected);
-    });
-  }, subtest.desc);
-});
 
 var gPerformanceWarningTests = [
   {
@@ -493,6 +487,44 @@ var gMultipleAsyncAnimationsWithGeometricAnimationTests = [
   },
 ];
 
+var gAnimationsOnTooSmallElementTests = [
+  {
+    desc: 'opacity on too small element',
+    frames: {
+      opacity: [0, 1]
+    },
+    style: { style: 'width: 8px; height: 8px; background-color: red;' +
+                    // We need to set transform here to try creating an
+                    // individual frame for this opacity element.
+                    // Without this, this small element is created on the same
+                    // nsIFrame of mochitest iframe, i.e. the document which are
+                    // running this test, as a result the layer corresponding
+                    // to the frame is sent to compositor.
+                    'transform: translateX(100px);' },
+    expected: [
+      {
+        property: 'opacity',
+        runningOnCompositor: false,
+        warning: /Animation cannot be run on the compositor because frame size \(8, 8\) is smaller than \(16, 16\)/
+      }
+    ]
+  },
+  {
+    desc: 'transform on too small element',
+    frames: {
+      transform: ['translate(0px)', 'translate(100px)']
+    },
+    style: { style: 'width: 8px; height: 8px; background-color: red;' },
+    expected: [
+      {
+        property: 'transform',
+        runningOnCompositor: false,
+        warning: /Animation cannot be run on the compositor because frame size \(8, 8\) is smaller than \(16, 16\)/
+      }
+    ]
+  },
+];
+
 function start() {
   var bundleService = SpecialPowers.Cc['@mozilla.org/intl/stringbundle;1']
     .getService(SpecialPowers.Ci.nsIStringBundleService);
@@ -501,8 +533,9 @@ function start() {
 
   gAnimationsTests.forEach(function(subtest) {
     promise_test(function(t) {
-      var div = addDiv(t, { class: 'compositable' });
-      var animation = div.animate(subtest.frames, 100 * MS_PER_SEC);
+      var animation = addDivAndAnimate(t,
+                                       { class: 'compositable' },
+                                       subtest.frames, 100 * MS_PER_SEC);
       return animation.ready.then(function() {
         assert_animation_property_state_equals(
           animation.effect.getProperties(),
@@ -513,19 +546,20 @@ function start() {
 
   gPerformanceWarningTests.forEach(function(subtest) {
     promise_test(function(t) {
-      var div = addDiv(t, { class: 'compositable' });
-      var animation = div.animate(subtest.frames, 100 * MS_PER_SEC);
+      var animation = addDivAndAnimate(t,
+                                       { class: 'compositable' },
+                                       subtest.frames, 100 * MS_PER_SEC);
       return animation.ready.then(function() {
         assert_property_state_on_compositor(
           animation.effect.getProperties(),
           subtest.expected);
-        div.style = subtest.style;
+        animation.effect.target.style = subtest.style;
         return waitForFrame();
       }).then(function() {
         assert_animation_property_state_equals(
           animation.effect.getProperties(),
           subtest.expected);
-        div.style = '';
+        animation.effect.target.style = '';
         return waitForFrame();
       }).then(function() {
         assert_property_state_on_compositor(
@@ -637,22 +671,37 @@ function start() {
     }, 'Multiple async animations and geometric animation: ' + subtest.desc);
   });
 
+  gAnimationsOnTooSmallElementTests.forEach(function(subtest) {
+    promise_test(function(t) {
+    var div = addDiv(t, subtest.style);
+    var animation = div.animate(subtest.frames, 100 * MS_PER_SEC);
+      return animation.ready.then(function() {
+        assert_animation_property_state_equals(
+          animation.effect.getProperties(),
+          subtest.expected);
+      });
+    }, subtest.desc);
+  });
+
   promise_test(function(t) {
-    var div = addDiv(t, { class: 'compositable' });
-    var animation = div.animate(
-      { transform: ['translate(0px)', 'translate(100px)'] }, 100 * MS_PER_SEC);
+    var animation = addDivAndAnimate(t,
+                                     { class: 'compositable' },
+                                     { transform: [ 'translate(0px)',
+                                                    'translate(100px)'] },
+                                     100 * MS_PER_SEC);
     return animation.ready.then(function() {
       assert_animation_property_state_equals(
         animation.effect.getProperties(),
         [ { property: 'transform', runningOnCompositor: true } ]);
-      div.style = 'width: 10000px; height: 10000px';
+      animation.effect.target.style = 'width: 10000px; height: 10000px';
       return waitForFrame();
     }).then(function() {
       // viewport depends on test environment.
       var expectedWarning = new RegExp(
-        "Async animation disabled because frame size \\(10000, 10000\\) is " +
-        "bigger than the viewport \\(\\d+, \\d+\\) or the visual rectangle " +
-        "\\(10000, 10000\\) is larger than the max allowed value \\(\\d+\\)");
+        "Animation cannot be run on the compositor because the frame size " +
+        "\\(10000, 10000\\) is bigger than the viewport \\(\\d+, \\d+\\) " +
+        "or the visual rectangle \\(10000, 10000\\) is larger than the " +
+        "maximum allowed value \\(\\d+\\)");
       assert_animation_property_state_equals(
         animation.effect.getProperties(),
         [ {
@@ -660,7 +709,7 @@ function start() {
           runningOnCompositor: false,
           warning: expectedWarning
         } ]);
-      div.style = 'width: 100px; height: 100px';
+      animation.effect.target.style = 'width: 100px; height: 100px';
       return waitForFrame();
     }).then(function() {
       // FIXME: Bug 1253164: the animation should get back on compositor.

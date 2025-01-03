@@ -37,7 +37,6 @@
 #include "jswin.h"
 #include "jswrapper.h"
 
-#include "asmjs/WasmModule.h"
 #include "builtin/Eval.h"
 #include "builtin/Object.h"
 #include "builtin/SymbolObject.h"
@@ -501,7 +500,7 @@ js::SetIntegrityLevel(JSContext* cx, HandleObject obj, IntegrityLevel level)
         // generic path below then any non-empty object will be converted to
         // dictionary mode.
         RootedShape last(cx, EmptyShape::getInitialShape(cx, nobj->getClass(),
-                                                         nobj->getTaggedProto(),
+                                                         nobj->taggedProto(),
                                                          nobj->numFixedSlots(),
                                                          nobj->lastProperty()->getObjectFlags()));
         if (!last)
@@ -689,7 +688,7 @@ NewObjectCache::fillProto(EntryIndex entry, const Class* clasp, js::TaggedProto 
                           gc::AllocKind kind, NativeObject* obj)
 {
     MOZ_ASSERT_IF(proto.isObject(), !proto.toObject()->is<GlobalObject>());
-    MOZ_ASSERT(obj->getTaggedProto() == proto);
+    MOZ_ASSERT(obj->taggedProto() == proto);
     return fill(entry, clasp, proto.raw(), kind, obj);
 }
 
@@ -914,7 +913,7 @@ CreateThisForFunctionWithGroup(JSContext* cx, HandleObjectGroup group,
                 return nullptr;
 
             if (newKind == SingletonObject) {
-                Rooted<TaggedProto> proto(cx, TaggedProto(templateObject->getProto()));
+                Rooted<TaggedProto> proto(cx, TaggedProto(templateObject->staticPrototype()));
                 if (!res->splicePrototype(cx, &PlainObject::class_, proto))
                     return nullptr;
             } else {
@@ -1341,13 +1340,13 @@ InitializePropertiesFromCompatibleNativeObject(JSContext* cx,
 
     MOZ_ASSERT(!src->hasPrivate());
     RootedShape shape(cx);
-    if (src->getProto() == dst->getProto()) {
+    if (src->staticPrototype() == dst->staticPrototype()) {
         shape = src->lastProperty();
     } else {
         // We need to generate a new shape for dst that has dst's proto but all
         // the property information from src.  Note that we asserted above that
         // dst's object flags are 0.
-        shape = EmptyShape::getInitialShape(cx, dst->getClass(), dst->getTaggedProto(),
+        shape = EmptyShape::getInitialShape(cx, dst->getClass(), dst->taggedProto(),
                                             dst->numFixedSlots(), 0);
         if (!shape)
             return false;
@@ -1943,7 +1942,7 @@ js::SetClassAndProto(JSContext* cx, HandleObject obj,
             MOZ_ASSERT(obj == oldproto);
             break;
         }
-        oldproto = oldproto->getProto();
+        oldproto = oldproto->staticPrototype();
     }
 
     if (proto.isObject() && !proto.toObject()->setDelegate(cx))
@@ -1993,7 +1992,7 @@ JSObject::changeToSingleton(JSContext* cx, HandleObject obj)
     MarkObjectGroupUnknownProperties(cx, obj->group());
 
     ObjectGroup* group = ObjectGroup::lazySingletonGroup(cx, obj->getClass(),
-                                                         obj->getTaggedProto());
+                                                         obj->taggedProto());
     if (!group)
         return false;
 
@@ -2295,7 +2294,7 @@ js::LookupPropertyPure(ExclusiveContext* cx, JSObject* obj, jsid id, JSObject** 
             return true;
         }
 
-        obj = obj->getProto();
+        obj = obj->staticPrototype();
     } while (obj);
 
     *objp = nullptr;
@@ -2498,13 +2497,11 @@ bool
 js::GetPrototypeIfOrdinary(JSContext* cx, HandleObject obj, bool* isOrdinary,
                            MutableHandleObject protop)
 {
-    if (obj->getTaggedProto().isLazy()) {
-        MOZ_ASSERT(obj->is<js::ProxyObject>());
+    if (obj->is<js::ProxyObject>())
         return js::Proxy::getPrototypeIfOrdinary(cx, obj, isOrdinary, protop);
-    }
 
     *isOrdinary = true;
-    protop.set(obj->getTaggedProto().toObjectOrNull());
+    protop.set(obj->staticPrototype());
     return true;
 }
 
@@ -2527,19 +2524,15 @@ JS_ImmutablePrototypesEnabled()
 bool
 js::SetPrototype(JSContext* cx, HandleObject obj, HandleObject proto, JS::ObjectOpResult& result)
 {
-    /*
-     * If |obj| has a "lazy" [[Prototype]], it is 1) a proxy 2) whose handler's
-     * {get,set}Prototype and setImmutablePrototype methods mediate access to
-     * |obj.[[Prototype]]|.  The Proxy subsystem is responsible for responding
-     * to such attempts.
-     */
-    if (obj->hasLazyPrototype()) {
+    // The proxy trap subsystem fully handles prototype-setting for proxies
+    // with dynamic [[Prototype]]s.
+    if (obj->hasDynamicPrototype()) {
         MOZ_ASSERT(obj->is<ProxyObject>());
         return Proxy::setPrototype(cx, obj, proto, result);
     }
 
     /* Disallow mutation of immutable [[Prototype]]s. */
-    if (obj->nonLazyPrototypeIsImmutable() && ImmutablePrototypesEnabled)
+    if (obj->staticPrototypeIsImmutable() && ImmutablePrototypesEnabled)
         return result.fail(JSMSG_CANT_SET_PROTO);
 
     /*
@@ -2576,7 +2569,7 @@ js::SetPrototype(JSContext* cx, HandleObject obj, HandleObject proto, JS::Object
      * ES6 9.1.2 step 3-4 if |obj.[[Prototype]]| has SameValue as |proto| return true.
      * Since the values in question are objects, we can just compare pointers.
      */
-    if (proto == obj->getProto())
+    if (proto == obj->staticPrototype())
         return result.succeed();
 
     /* ES6 9.1.2 step 5 forbids changing [[Prototype]] if not [[Extensible]]. */
@@ -2786,7 +2779,7 @@ js::DefineElement(ExclusiveContext* cx, HandleObject obj, uint32_t index, Handle
 bool
 js::SetImmutablePrototype(ExclusiveContext* cx, HandleObject obj, bool* succeeded)
 {
-    if (obj->hasLazyPrototype()) {
+    if (obj->hasDynamicPrototype()) {
         if (!cx->shouldBeJSContext())
             return false;
         return Proxy::setImmutablePrototype(cx->asJSContext(), obj, succeeded);
@@ -3332,114 +3325,114 @@ js::ReportGetterOnlyAssignment(JSContext* cx, bool strict)
  */
 
 static void
-dumpValue(const Value& v)
+dumpValue(const Value& v, FILE* fp)
 {
     if (v.isNull())
-        fprintf(stderr, "null");
+        fprintf(fp, "null");
     else if (v.isUndefined())
-        fprintf(stderr, "undefined");
+        fprintf(fp, "undefined");
     else if (v.isInt32())
-        fprintf(stderr, "%d", v.toInt32());
+        fprintf(fp, "%d", v.toInt32());
     else if (v.isDouble())
-        fprintf(stderr, "%g", v.toDouble());
+        fprintf(fp, "%g", v.toDouble());
     else if (v.isString())
-        v.toString()->dump();
+        v.toString()->dump(fp);
     else if (v.isSymbol())
-        v.toSymbol()->dump();
+        v.toSymbol()->dump(fp);
     else if (v.isObject() && v.toObject().is<JSFunction>()) {
         JSFunction* fun = &v.toObject().as<JSFunction>();
         if (fun->displayAtom()) {
-            fputs("<function ", stderr);
-            FileEscapedString(stderr, fun->displayAtom(), 0);
+            fputs("<function ", fp);
+            FileEscapedString(fp, fun->displayAtom(), 0);
         } else {
-            fputs("<unnamed function", stderr);
+            fputs("<unnamed function", fp);
         }
         if (fun->hasScript()) {
             JSScript* script = fun->nonLazyScript();
-            fprintf(stderr, " (%s:%" PRIuSIZE ")",
+            fprintf(fp, " (%s:%" PRIuSIZE ")",
                     script->filename() ? script->filename() : "", script->lineno());
         }
-        fprintf(stderr, " at %p>", (void*) fun);
+        fprintf(fp, " at %p>", (void*) fun);
     } else if (v.isObject()) {
         JSObject* obj = &v.toObject();
         const Class* clasp = obj->getClass();
-        fprintf(stderr, "<%s%s at %p>",
+        fprintf(fp, "<%s%s at %p>",
                 clasp->name,
                 (clasp == &PlainObject::class_) ? "" : " object",
                 (void*) obj);
     } else if (v.isBoolean()) {
         if (v.toBoolean())
-            fprintf(stderr, "true");
+            fprintf(fp, "true");
         else
-            fprintf(stderr, "false");
+            fprintf(fp, "false");
     } else if (v.isMagic()) {
-        fprintf(stderr, "<invalid");
+        fprintf(fp, "<invalid");
 #ifdef DEBUG
         switch (v.whyMagic()) {
-          case JS_ELEMENTS_HOLE:     fprintf(stderr, " elements hole");      break;
-          case JS_NO_ITER_VALUE:     fprintf(stderr, " no iter value");      break;
-          case JS_GENERATOR_CLOSING: fprintf(stderr, " generator closing");  break;
-          case JS_OPTIMIZED_OUT:     fprintf(stderr, " optimized out");      break;
-          default:                   fprintf(stderr, " ?!");                 break;
+          case JS_ELEMENTS_HOLE:     fprintf(fp, " elements hole");      break;
+          case JS_NO_ITER_VALUE:     fprintf(fp, " no iter value");      break;
+          case JS_GENERATOR_CLOSING: fprintf(fp, " generator closing");  break;
+          case JS_OPTIMIZED_OUT:     fprintf(fp, " optimized out");      break;
+          default:                   fprintf(fp, " ?!");                 break;
         }
 #endif
-        fprintf(stderr, ">");
+        fprintf(fp, ">");
     } else {
-        fprintf(stderr, "unexpected value");
+        fprintf(fp, "unexpected value");
     }
 }
 
 JS_FRIEND_API(void)
-js::DumpValue(const Value& val)
+js::DumpValue(const Value& val, FILE* fp)
 {
-    dumpValue(val);
-    fputc('\n', stderr);
+    dumpValue(val, fp);
+    fputc('\n', fp);
 }
 
 JS_FRIEND_API(void)
-js::DumpId(jsid id)
+js::DumpId(jsid id, FILE* fp)
 {
-    fprintf(stderr, "jsid %p = ", (void*) JSID_BITS(id));
-    dumpValue(IdToValue(id));
-    fputc('\n', stderr);
+    fprintf(fp, "jsid %p = ", (void*) JSID_BITS(id));
+    dumpValue(IdToValue(id), fp);
+    fputc('\n', fp);
 }
 
 static void
-DumpProperty(NativeObject* obj, Shape& shape)
+DumpProperty(const NativeObject* obj, Shape& shape, FILE* fp)
 {
     jsid id = shape.propid();
     uint8_t attrs = shape.attributes();
 
-    fprintf(stderr, "    ((js::Shape*) %p) ", (void*) &shape);
-    if (attrs & JSPROP_ENUMERATE) fprintf(stderr, "enumerate ");
-    if (attrs & JSPROP_READONLY) fprintf(stderr, "readonly ");
-    if (attrs & JSPROP_PERMANENT) fprintf(stderr, "permanent ");
-    if (attrs & JSPROP_SHARED) fprintf(stderr, "shared ");
+    fprintf(fp, "    ((js::Shape*) %p) ", (void*) &shape);
+    if (attrs & JSPROP_ENUMERATE) fprintf(fp, "enumerate ");
+    if (attrs & JSPROP_READONLY) fprintf(fp, "readonly ");
+    if (attrs & JSPROP_PERMANENT) fprintf(fp, "permanent ");
+    if (attrs & JSPROP_SHARED) fprintf(fp, "shared ");
 
     if (shape.hasGetterValue())
-        fprintf(stderr, "getterValue=%p ", (void*) shape.getterObject());
+        fprintf(fp, "getterValue=%p ", (void*) shape.getterObject());
     else if (!shape.hasDefaultGetter())
-        fprintf(stderr, "getterOp=%p ", JS_FUNC_TO_DATA_PTR(void*, shape.getterOp()));
+        fprintf(fp, "getterOp=%p ", JS_FUNC_TO_DATA_PTR(void*, shape.getterOp()));
 
     if (shape.hasSetterValue())
-        fprintf(stderr, "setterValue=%p ", (void*) shape.setterObject());
+        fprintf(fp, "setterValue=%p ", (void*) shape.setterObject());
     else if (!shape.hasDefaultSetter())
-        fprintf(stderr, "setterOp=%p ", JS_FUNC_TO_DATA_PTR(void*, shape.setterOp()));
+        fprintf(fp, "setterOp=%p ", JS_FUNC_TO_DATA_PTR(void*, shape.setterOp()));
 
     if (JSID_IS_ATOM(id) || JSID_IS_INT(id) || JSID_IS_SYMBOL(id))
-        dumpValue(js::IdToValue(id));
+        dumpValue(js::IdToValue(id), fp);
     else
-        fprintf(stderr, "unknown jsid %p", (void*) JSID_BITS(id));
+        fprintf(fp, "unknown jsid %p", (void*) JSID_BITS(id));
 
     uint32_t slot = shape.hasSlot() ? shape.maybeSlot() : SHAPE_INVALID_SLOT;
-    fprintf(stderr, ": slot %d", slot);
+    fprintf(fp, ": slot %d", slot);
     if (shape.hasSlot()) {
-        fprintf(stderr, " = ");
-        dumpValue(obj->getSlot(slot));
+        fprintf(fp, " = ");
+        dumpValue(obj->getSlot(slot), fp);
     } else if (slot != SHAPE_INVALID_SLOT) {
-        fprintf(stderr, " (INVALID!)");
+        fprintf(fp, " (INVALID!)");
     }
-    fprintf(stderr, "\n");
+    fprintf(fp, "\n");
 }
 
 bool
@@ -3449,124 +3442,132 @@ JSObject::uninlinedIsProxy() const
 }
 
 void
-JSObject::dump()
+JSObject::dump(FILE* fp) const
 {
-    JSObject* obj = this;
+    const JSObject* obj = this;
     JSObject* globalObj = &global();
-    fprintf(stderr, "object %p from global %p [%s]\n", (void*) obj,
+    fprintf(fp, "object %p from global %p [%s]\n", (void*) obj,
             (void*) globalObj, globalObj->getClass()->name);
     const Class* clasp = obj->getClass();
-    fprintf(stderr, "class %p %s\n", (const void*)clasp, clasp->name);
+    fprintf(fp, "class %p %s\n", (const void*)clasp, clasp->name);
 
-    fprintf(stderr, "flags:");
-    if (obj->isDelegate()) fprintf(stderr, " delegate");
-    if (!obj->is<ProxyObject>() && !obj->nonProxyIsExtensible()) fprintf(stderr, " not_extensible");
-    if (obj->isIndexed()) fprintf(stderr, " indexed");
-    if (obj->isBoundFunction()) fprintf(stderr, " bound_function");
-    if (obj->isQualifiedVarObj()) fprintf(stderr, " varobj");
-    if (obj->isUnqualifiedVarObj()) fprintf(stderr, " unqualified_varobj");
-    if (obj->watched()) fprintf(stderr, " watched");
-    if (obj->isIteratedSingleton()) fprintf(stderr, " iterated_singleton");
-    if (obj->isNewGroupUnknown()) fprintf(stderr, " new_type_unknown");
-    if (obj->hasUncacheableProto()) fprintf(stderr, " has_uncacheable_proto");
-    if (obj->hadElementsAccess()) fprintf(stderr, " had_elements_access");
-    if (obj->wasNewScriptCleared()) fprintf(stderr, " new_script_cleared");
-    if (!obj->hasLazyPrototype() && obj->nonLazyPrototypeIsImmutable()) fprintf(stderr, " immutable_prototype");
+    fprintf(fp, "flags:");
+    if (obj->isDelegate()) fprintf(fp, " delegate");
+    if (!obj->is<ProxyObject>() && !obj->nonProxyIsExtensible()) fprintf(fp, " not_extensible");
+    if (obj->isIndexed()) fprintf(fp, " indexed");
+    if (obj->isBoundFunction()) fprintf(fp, " bound_function");
+    if (obj->isQualifiedVarObj()) fprintf(fp, " varobj");
+    if (obj->isUnqualifiedVarObj()) fprintf(fp, " unqualified_varobj");
+    if (obj->watched()) fprintf(fp, " watched");
+    if (obj->isIteratedSingleton()) fprintf(fp, " iterated_singleton");
+    if (obj->isNewGroupUnknown()) fprintf(fp, " new_type_unknown");
+    if (obj->hasUncacheableProto()) fprintf(fp, " has_uncacheable_proto");
+    if (obj->hadElementsAccess()) fprintf(fp, " had_elements_access");
+    if (obj->wasNewScriptCleared()) fprintf(fp, " new_script_cleared");
+    if (obj->hasStaticPrototype() && obj->staticPrototypeIsImmutable())
+        fprintf(fp, " immutable_prototype");
 
     if (obj->isNative()) {
-        NativeObject* nobj = &obj->as<NativeObject>();
+        const NativeObject* nobj = &obj->as<NativeObject>();
         if (nobj->inDictionaryMode())
-            fprintf(stderr, " inDictionaryMode");
+            fprintf(fp, " inDictionaryMode");
         if (nobj->hasShapeTable())
-            fprintf(stderr, " hasShapeTable");
+            fprintf(fp, " hasShapeTable");
     }
-    fprintf(stderr, "\n");
+    fprintf(fp, "\n");
 
     if (obj->isNative()) {
-        NativeObject* nobj = &obj->as<NativeObject>();
+        const NativeObject* nobj = &obj->as<NativeObject>();
         uint32_t slots = nobj->getDenseInitializedLength();
         if (slots) {
-            fprintf(stderr, "elements\n");
+            fprintf(fp, "elements\n");
             for (uint32_t i = 0; i < slots; i++) {
-                fprintf(stderr, " %3d: ", i);
-                dumpValue(nobj->getDenseElement(i));
-                fprintf(stderr, "\n");
-                fflush(stderr);
+                fprintf(fp, " %3d: ", i);
+                dumpValue(nobj->getDenseElement(i), fp);
+                fprintf(fp, "\n");
+                fflush(fp);
             }
         }
     }
 
-    fprintf(stderr, "proto ");
-    TaggedProto proto = obj->getTaggedProto();
-    if (proto.isLazy())
-        fprintf(stderr, "<lazy>");
+    fprintf(fp, "proto ");
+    TaggedProto proto = obj->taggedProto();
+    if (proto.isDynamic())
+        fprintf(fp, "<dynamic>");
     else
-        dumpValue(ObjectOrNullValue(proto.toObjectOrNull()));
-    fputc('\n', stderr);
+        dumpValue(ObjectOrNullValue(proto.toObjectOrNull()), fp);
+    fputc('\n', fp);
 
     if (clasp->flags & JSCLASS_HAS_PRIVATE)
-        fprintf(stderr, "private %p\n", obj->as<NativeObject>().getPrivate());
+        fprintf(fp, "private %p\n", obj->as<NativeObject>().getPrivate());
 
     if (!obj->isNative())
-        fprintf(stderr, "not native\n");
+        fprintf(fp, "not native\n");
 
     uint32_t reservedEnd = JSCLASS_RESERVED_SLOTS(clasp);
     uint32_t slots = obj->isNative() ? obj->as<NativeObject>().slotSpan() : 0;
     uint32_t stop = obj->isNative() ? reservedEnd : slots;
     if (stop > 0)
-        fprintf(stderr, obj->isNative() ? "reserved slots:\n" : "slots:\n");
+        fprintf(fp, obj->isNative() ? "reserved slots:\n" : "slots:\n");
     for (uint32_t i = 0; i < stop; i++) {
-        fprintf(stderr, " %3d ", i);
+        fprintf(fp, " %3d ", i);
         if (i < reservedEnd)
-            fprintf(stderr, "(reserved) ");
-        fprintf(stderr, "= ");
-        dumpValue(obj->as<NativeObject>().getSlot(i));
-        fputc('\n', stderr);
+            fprintf(fp, "(reserved) ");
+        fprintf(fp, "= ");
+        dumpValue(obj->as<NativeObject>().getSlot(i), fp);
+        fputc('\n', fp);
     }
 
     if (obj->isNative()) {
-        fprintf(stderr, "properties:\n");
+        fprintf(fp, "properties:\n");
         Vector<Shape*, 8, SystemAllocPolicy> props;
         for (Shape::Range<NoGC> r(obj->as<NativeObject>().lastProperty()); !r.empty(); r.popFront()) {
             if (!props.append(&r.front())) {
-                fprintf(stderr, "(OOM while appending properties)\n");
+                fprintf(fp, "(OOM while appending properties)\n");
                 break;
             }
         }
         for (size_t i = props.length(); i-- != 0;)
-            DumpProperty(&obj->as<NativeObject>(), *props[i]);
+            DumpProperty(&obj->as<NativeObject>(), *props[i], fp);
     }
-    fputc('\n', stderr);
+    fputc('\n', fp);
+}
+
+// For debuggers.
+void
+JSObject::dump() const
+{
+    dump(stderr);
 }
 
 static void
-MaybeDumpObject(const char* name, JSObject* obj)
+MaybeDumpObject(const char* name, JSObject* obj, FILE* fp)
 {
     if (obj) {
-        fprintf(stderr, "  %s: ", name);
-        dumpValue(ObjectValue(*obj));
-        fputc('\n', stderr);
+        fprintf(fp, "  %s: ", name);
+        dumpValue(ObjectValue(*obj), fp);
+        fputc('\n', fp);
     }
 }
 
 static void
-MaybeDumpValue(const char* name, const Value& v)
+MaybeDumpValue(const char* name, const Value& v, FILE* fp)
 {
     if (!v.isNull()) {
-        fprintf(stderr, "  %s: ", name);
-        dumpValue(v);
-        fputc('\n', stderr);
+        fprintf(fp, "  %s: ", name);
+        dumpValue(v, fp);
+        fputc('\n', fp);
     }
 }
 
 JS_FRIEND_API(void)
-js::DumpInterpreterFrame(JSContext* cx, InterpreterFrame* start)
+js::DumpInterpreterFrame(JSContext* cx, FILE* fp, InterpreterFrame* start)
 {
     /* This should only called during live debugging. */
-    ScriptFrameIter i(cx, ScriptFrameIter::GO_THROUGH_SAVED);
+    ScriptFrameIter i(cx);
     if (!start) {
         if (i.done()) {
-            fprintf(stderr, "no stack for cx = %p\n", (void*) cx);
+            fprintf(fp, "no stack for cx = %p\n", (void*) cx);
             return;
         }
     } else {
@@ -3574,7 +3575,7 @@ js::DumpInterpreterFrame(JSContext* cx, InterpreterFrame* start)
             ++i;
 
         if (i.done()) {
-            fprintf(stderr, "fp = %p not found in cx = %p\n",
+            fprintf(fp, "fp = %p not found in cx = %p\n",
                     (void*)start, (void*)cx);
             return;
         }
@@ -3582,60 +3583,60 @@ js::DumpInterpreterFrame(JSContext* cx, InterpreterFrame* start)
 
     for (; !i.done(); ++i) {
         if (i.isJit())
-            fprintf(stderr, "JIT frame\n");
+            fprintf(fp, "JIT frame\n");
         else
-            fprintf(stderr, "InterpreterFrame at %p\n", (void*) i.interpFrame());
+            fprintf(fp, "InterpreterFrame at %p\n", (void*) i.interpFrame());
 
         if (i.isFunctionFrame()) {
-            fprintf(stderr, "callee fun: ");
+            fprintf(fp, "callee fun: ");
             RootedValue v(cx);
             JSObject* fun = i.callee(cx);
             v.setObject(*fun);
-            dumpValue(v);
+            dumpValue(v, fp);
         } else {
-            fprintf(stderr, "global or eval frame, no callee");
+            fprintf(fp, "global or eval frame, no callee");
         }
-        fputc('\n', stderr);
+        fputc('\n', fp);
 
-        fprintf(stderr, "file %s line %" PRIuSIZE "\n",
+        fprintf(fp, "file %s line %" PRIuSIZE "\n",
                 i.script()->filename(), i.script()->lineno());
 
         if (jsbytecode* pc = i.pc()) {
-            fprintf(stderr, "  pc = %p\n", pc);
-            fprintf(stderr, "  current op: %s\n", CodeName[*pc]);
-            MaybeDumpObject("staticScope", i.script()->getStaticBlockScope(pc));
+            fprintf(fp, "  pc = %p\n", pc);
+            fprintf(fp, "  current op: %s\n", CodeName[*pc]);
+            MaybeDumpObject("staticScope", i.script()->getStaticBlockScope(pc), fp);
         }
         if (i.isFunctionFrame())
-            MaybeDumpValue("this", i.thisArgument(cx));
+            MaybeDumpValue("this", i.thisArgument(cx), fp);
         if (!i.isJit()) {
-            fprintf(stderr, "  rval: ");
-            dumpValue(i.interpFrame()->returnValue());
-            fputc('\n', stderr);
+            fprintf(fp, "  rval: ");
+            dumpValue(i.interpFrame()->returnValue(), fp);
+            fputc('\n', fp);
         }
 
-        fprintf(stderr, "  flags:");
+        fprintf(fp, "  flags:");
         if (i.isConstructing())
-            fprintf(stderr, " constructing");
+            fprintf(fp, " constructing");
         if (!i.isJit() && i.interpFrame()->isDebuggerEvalFrame())
-            fprintf(stderr, " debugger eval");
+            fprintf(fp, " debugger eval");
         if (i.isEvalFrame())
-            fprintf(stderr, " eval");
-        fputc('\n', stderr);
+            fprintf(fp, " eval");
+        fputc('\n', fp);
 
-        fprintf(stderr, "  scopeChain: (JSObject*) %p\n", (void*) i.scopeChain(cx));
+        fprintf(fp, "  scopeChain: (JSObject*) %p\n", (void*) i.scopeChain(cx));
 
-        fputc('\n', stderr);
+        fputc('\n', fp);
     }
 }
 
 #endif /* DEBUG */
 
 JS_FRIEND_API(void)
-js::DumpBacktrace(JSContext* cx)
+js::DumpBacktrace(JSContext* cx, FILE* fp)
 {
     Sprinter sprinter(cx, false);
     if (!sprinter.init()) {
-        fprintf(stdout, "js::DumpBacktrace: OOM\n");
+        fprintf(fp, "js::DumpBacktrace: OOM\n");
         return;
     }
     size_t depth = 0;
@@ -3654,13 +3655,18 @@ js::DumpBacktrace(JSContext* cx)
                         depth, i.rawFramePtr(), frameType, filename, line,
                         script, script->pcToOffset(i.pc()));
     }
-    fprintf(stdout, "%s", sprinter.string());
+    fprintf(fp, "%s", sprinter.string());
 #ifdef XP_WIN32
     if (IsDebuggerPresent())
         OutputDebugStringA(sprinter.string());
 #endif
 }
 
+JS_FRIEND_API(void)
+js::DumpBacktrace(JSContext* cx)
+{
+    DumpBacktrace(cx, stdout);
+}
 
 /* * */
 
@@ -3781,9 +3787,6 @@ JSObject::addSizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::ClassIn
         ArrayBufferObject::addSizeOfExcludingThis(this, mallocSizeOf, info);
     } else if (is<SharedArrayBufferObject>()) {
         SharedArrayBufferObject::addSizeOfExcludingThis(this, mallocSizeOf, info);
-    } else if (is<WasmModuleObject>()) {
-        as<WasmModuleObject>().addSizeOfMisc(mallocSizeOf, &info->objectsNonHeapCodeAsmJS,
-                                             &info->objectsMallocHeapMisc);
 #ifdef JS_HAS_CTYPES
     } else {
         // This must be the last case.
@@ -3867,7 +3870,7 @@ JSObject::traceChildren(JSTracer* trc)
 
         do {
             if (nobj->denseElementsAreCopyOnWrite()) {
-                HeapPtrNativeObject& owner = nobj->getElementsHeader()->ownerObject();
+                GCPtrNativeObject& owner = nobj->getElementsHeader()->ownerObject();
                 if (owner != nobj) {
                     TraceEdge(trc, &owner, "objectElementsOwner");
                     break;

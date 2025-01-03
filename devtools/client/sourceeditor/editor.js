@@ -241,6 +241,7 @@ Editor.prototype = {
   container: null,
   version: null,
   config: null,
+  Doc: null,
 
   /**
    * Appends the current Editor instance to the element specified by
@@ -302,6 +303,31 @@ Editor.prototype = {
       // context menus won't work).
 
       cm = win.CodeMirror(win.document.body, this.config);
+      this.Doc = win.CodeMirror.Doc;
+
+      // Disable APZ for source editors. It currently causes the line numbers to
+      // "tear off" and swim around on top of the content. Bug 1160601 tracks
+      // finding a solution that allows APZ to work with CodeMirror.
+      cm.getScrollerElement().addEventListener("wheel", ev => {
+        // By handling the wheel events ourselves, we force the platform to
+        // scroll synchronously, like it did before APZ. However, we lose smooth
+        // scrolling for users with mouse wheels. This seems acceptible vs.
+        // doing nothing and letting the gutter slide around.
+        ev.preventDefault();
+
+        let { deltaX, deltaY } = ev;
+
+        if (ev.deltaMode == ev.DOM_DELTA_LINE) {
+          deltaX *= cm.defaultCharWidth();
+          deltaY *= cm.defaultTextHeight();
+        } else if (ev.deltaMode == ev.DOM_DELTA_PAGE) {
+          deltaX *= cm.getWrapperElement().clientWidth;
+          deltaY *= cm.getWrapperElement().clientHeight;
+        }
+
+        cm.getScrollerElement().scrollBy(deltaX, deltaY);
+      });
+
       cm.getWrapperElement().addEventListener("contextmenu", ev => {
         ev.preventDefault();
 
@@ -313,6 +339,8 @@ Editor.prototype = {
         if (typeof popup == "string") {
           popup = el.ownerDocument.getElementById(this.config.contextMenu);
         }
+
+        this.emit("popupOpen",  ev, popup);
         popup.openPopupAtScreen(ev.screenX, ev.screenY, true);
       }, false);
 
@@ -460,6 +488,22 @@ Editor.prototype = {
     }
     let win = this.container.contentWindow.wrappedJSObject;
     Services.scriptloader.loadSubScript(url, win, "utf8");
+  },
+
+  /**
+   * Creates a CodeMirror Document
+   * @returns CodeMirror.Doc
+   */
+  createDocument: function() {
+     return new this.Doc("");
+  },
+
+  /**
+   * Replaces the current document with a new source document
+   */
+  replaceDocument: function(doc) {
+    let cm = editors.get(this);
+    cm.swapDoc(doc);
   },
 
   /**

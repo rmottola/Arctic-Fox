@@ -34,6 +34,7 @@
 #include "nsAttrValue.h"
 #include "mozilla/EventForwards.h"
 #include "mozilla/dom/BindingDeclarations.h"
+#include "mozilla/dom/DOMTokenListSupportedTokens.h"
 #include "mozilla/dom/WindowBinding.h"
 #include "mozilla/dom/ElementBinding.h"
 #include "mozilla/dom/Nullable.h"
@@ -850,7 +851,7 @@ public:
 
   already_AddRefed<Animation>
   Animate(JSContext* aContext,
-          JS::Handle<JSObject*> aFrames,
+          JS::Handle<JSObject*> aKeyframes,
           const UnrestrictedDoubleOrKeyframeAnimationOptions& aOptions,
           ErrorResult& aError);
 
@@ -859,7 +860,7 @@ public:
   static already_AddRefed<Animation>
   Animate(const Nullable<ElementOrCSSPseudoElement>& aTarget,
           JSContext* aContext,
-          JS::Handle<JSObject*> aFrames,
+          JS::Handle<JSObject*> aKeyframes,
           const UnrestrictedDoubleOrKeyframeAnimationOptions& aOptions,
           ErrorResult& aError);
 
@@ -1332,9 +1333,8 @@ protected:
    */
   virtual void GetLinkTarget(nsAString& aTarget);
 
-  nsDOMTokenList* GetTokenList(nsIAtom* aAtom);
-  void GetTokenList(nsIAtom* aAtom, nsIVariant** aResult);
-  nsresult SetTokenList(nsIAtom* aAtom, nsIVariant* aValue);
+  nsDOMTokenList* GetTokenList(nsIAtom* aAtom,
+                               const DOMTokenListSupportedTokenArray aSupportedTokens = nullptr);
 
 private:
   /**

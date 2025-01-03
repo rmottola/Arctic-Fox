@@ -5,6 +5,7 @@
 
 #include "nsDeviceContextSpecX.h"
 
+#include "mozilla/gfx/PrintTargetThebes.h"
 #include "mozilla/RefPtr.h"
 #include "nsCRT.h"
 #include <unistd.h>
@@ -18,6 +19,9 @@
 
 // This must be the last include:
 #include "nsObjCExceptions.h"
+
+using namespace mozilla;
+using namespace mozilla::gfx;
 
 nsDeviceContextSpecX::nsDeviceContextSpecX()
 : mPrintSession(NULL)
@@ -136,7 +140,7 @@ void nsDeviceContextSpecX::GetPaperRect(double* aTop, double* aLeft, double* aBo
     NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
-NS_IMETHODIMP nsDeviceContextSpecX::GetSurfaceForPrinter(gfxASurface **surface)
+already_AddRefed<PrintTarget> nsDeviceContextSpecX::MakePrintTarget()
 {
     NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
 
@@ -144,6 +148,7 @@ NS_IMETHODIMP nsDeviceContextSpecX::GetSurfaceForPrinter(gfxASurface **surface)
     GetPaperRect(&top, &left, &bottom, &right);
     const double width = right - left;
     const double height = bottom - top;
+    IntSize size(floor(width), floor(height));
 
     CGContextRef context;
     ::PMSessionGetCGGraphicsContext(mPrintSession, &context);
@@ -155,18 +160,16 @@ NS_IMETHODIMP nsDeviceContextSpecX::GetSurfaceForPrinter(gfxASurface **surface)
         // Here, we translate it to top-left corner of the paper.
         CGContextTranslateCTM(context, 0, height);
         CGContextScaleCTM(context, 1.0, -1.0);
-        newSurface = new gfxQuartzSurface(context, gfxSize(width, height));
+        newSurface = new gfxQuartzSurface(context, size);
     } else {
-        newSurface = new gfxQuartzSurface(gfxSize((int32_t)width, (int32_t)height), SurfaceFormat::A8R8G8B8_UINT32);
+        newSurface = new gfxQuartzSurface(size, SurfaceFormat::A8R8G8B8_UINT32);
     }
 
-    if (!newSurface)
-        return NS_ERROR_FAILURE;
+    if (!newSurface) {
+        return nullptr;
+    }
 
-    *surface = newSurface;
-    NS_ADDREF(*surface);
+    return PrintTargetThebes::CreateOrNull(newSurface);
 
-    return NS_OK;
-
-    NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
+    NS_OBJC_END_TRY_ABORT_BLOCK_NSNULL;
 }

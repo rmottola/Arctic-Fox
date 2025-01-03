@@ -38,6 +38,9 @@ Request::Request(nsIGlobalObject* aOwner, InternalRequest* aRequest)
   , mOwner(aOwner)
   , mRequest(aRequest)
 {
+  MOZ_ASSERT(aRequest->Headers()->Guard() == HeadersGuardEnum::Immutable ||
+             aRequest->Headers()->Guard() == HeadersGuardEnum::Request ||
+             aRequest->Headers()->Guard() == HeadersGuardEnum::Request_no_cors);
   SetMimeType();
 }
 
@@ -285,18 +288,8 @@ Request::Constructor(const GlobalObject& aGlobal,
     request = inputReq->GetInternalRequest();
 
   } else {
-    request = new InternalRequest();
-  }
-
-  request = request->GetRequestConstructorCopy(global, aRv);
-  if (NS_WARN_IF(aRv.Failed())) {
-    return nullptr;
-  }
-
-  RequestMode fallbackMode = RequestMode::EndGuard_;
-  RequestCredentials fallbackCredentials = RequestCredentials::EndGuard_;
-  RequestCache fallbackCache = RequestCache::EndGuard_;
-  if (aInput.IsUSVString()) {
+    // aInput is USVString.
+    // We need to get url before we create a InternalRequest.
     nsAutoString input;
     input.Assign(aInput.GetAsUSVString());
 
@@ -317,7 +310,18 @@ Request::Constructor(const GlobalObject& aGlobal,
       return nullptr;
     }
 
-    request->SetURL(NS_ConvertUTF16toUTF8(requestURL));
+    request = new InternalRequest(NS_ConvertUTF16toUTF8(requestURL));
+  }
+
+  request = request->GetRequestConstructorCopy(global, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+  }
+
+  RequestMode fallbackMode = RequestMode::EndGuard_;
+  RequestCredentials fallbackCredentials = RequestCredentials::EndGuard_;
+  RequestCache fallbackCache = RequestCache::EndGuard_;
+  if (aInput.IsUSVString()) {
     fallbackMode = RequestMode::Cors;
     fallbackCredentials = RequestCredentials::Omit;
     fallbackCache = RequestCache::Default;
@@ -424,6 +428,14 @@ Request::Constructor(const GlobalObject& aGlobal,
   RequestCache cache = aInit.mCache.WasPassed() ?
                        aInit.mCache.Value() : fallbackCache;
   if (cache != RequestCache::EndGuard_) {
+    if (cache == RequestCache::Only_if_cached &&
+        request->Mode() != RequestMode::Same_origin) {
+      uint32_t t = static_cast<uint32_t>(request->Mode());
+      NS_ConvertASCIItoUTF16 modeString(RequestModeValues::strings[t].value,
+                                        RequestModeValues::strings[t].length);
+      aRv.ThrowTypeError<MSG_ONLY_IF_CACHED_WITHOUT_SAME_ORIGIN>(modeString);
+      return nullptr;
+    }
     request->ClearCreatedByFetchEvent();
     request->SetCacheMode(cache);
   }
@@ -512,8 +524,11 @@ Request::Constructor(const GlobalObject& aGlobal,
         bodyInitNullable.Value();
       nsCOMPtr<nsIInputStream> stream;
       nsAutoCString contentType;
+      uint64_t contentLengthUnused;
       aRv = ExtractByteStreamFromBody(bodyInit,
-                                      getter_AddRefs(stream), contentType);
+                                      getter_AddRefs(stream),
+                                      contentType,
+                                      contentLengthUnused);
       if (NS_WARN_IF(aRv.Failed())) {
         return nullptr;
       }

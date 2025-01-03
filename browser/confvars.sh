@@ -8,6 +8,12 @@ MOZ_APP_VENDOR=org.multix
 MOZ_UPDATER=1
 MOZ_PHOENIX=1
 
+if test "$MOZ_WIDGET_TOOLKIT" = "windows" -o \
+        "$MOZ_WIDGET_TOOLKIT" = "gtk2" -o \
+        "$MOZ_WIDGET_TOOLKIT" = "gtk3"; then
+  MOZ_BUNDLED_FONTS=1
+fi
+
 if test "$OS_ARCH" = "WINNT"; then
   MOZ_MAINTENANCE_SERVICE=1
   if ! test "$HAVE_64BIT_BUILD"; then
@@ -28,7 +34,6 @@ MOZ_ENABLE_SIGNMAR=1
 
 MOZ_SERVICES_COMMON=1
 MOZ_SERVICES_CRYPTO=1
-MOZ_SERVICES_SYNC=1
 MOZ_APP_VERSION=$FIREFOX_VERSION
 MOZ_APP_VERSION_DISPLAY=$FIREFOX_VERSION_DISPLAY
 MOZ_EXTENSIONS_DEFAULT=" gio"
@@ -58,9 +63,9 @@ MOZ_APP_ID={8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}
 # This should usually be the same as the value MAR_CHANNEL_ID.
 # If more than one ID is needed, then you should use a comma separated list
 # of values.
-ACCEPTED_MAR_CHANNEL_IDS=palemoon-release
+ACCEPTED_MAR_CHANNEL_IDS=arcticfox-release
 # The MAR_CHANNEL_ID must not contain the following 3 characters: ",\t "
-MAR_CHANNEL_ID=palemoon-release
+MAR_CHANNEL_ID=arcticfox-release
 MOZ_PROFILE_MIGRATOR=1
 MOZ_EXTENSION_MANAGER=1
 MOZ_APP_STATIC_INI=1

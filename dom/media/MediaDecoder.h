@@ -43,6 +43,10 @@ class nsIPrincipal;
 
 namespace mozilla {
 
+namespace dom {
+class Promise;
+}
+
 class VideoFrameContainer;
 class MediaDecoderStateMachine;
 
@@ -166,7 +170,8 @@ public:
   // Seek to the time position in (seconds) from the start of the video.
   // If aDoFastSeek is true, we'll seek to the sync point/keyframe preceeding
   // the seek target.
-  virtual nsresult Seek(double aTime, SeekTarget::Type aSeekType);
+  virtual nsresult Seek(double aTime, SeekTarget::Type aSeekType,
+                        dom::Promise* aPromise = nullptr);
 
   // Initialize state machine and schedule it.
   nsresult InitializeStateMachine();
@@ -180,7 +185,7 @@ public:
   // Dormant state is a state to free all scarce media resources
   //  (like hw video codec), did not decoding and stay dormant.
   // It is used to share scarece media resources in system.
-  virtual void NotifyOwnerActivityChanged();
+  virtual void NotifyOwnerActivityChanged(bool aIsVisible);
 
   void UpdateDormantState(bool aDormantTimeout, bool aActivity);
 
@@ -250,9 +255,6 @@ protected:
   void UpdateEstimatedMediaDuration(int64_t aDuration) override;
 
 public:
-  // Called from HTMLMediaElement when owner document activity changes
-  virtual void SetElementVisibility(bool aIsVisible) {}
-
   // Set a flag indicating whether random seeking is supported
   void SetMediaSeekable(bool aMediaSeekable);
   // Set a flag indicating whether seeking is supported only in buffered ranges
@@ -368,6 +370,9 @@ private:
   void SetAudioChannel(dom::AudioChannel aChannel) { mAudioChannel = aChannel; }
   dom::AudioChannel GetAudioChannel() { return mAudioChannel; }
 
+  // Called from HTMLMediaElement when owner document activity changes
+  virtual void SetElementVisibility(bool aIsVisible);
+
   /******
    * The following methods must only be called on the main
    * thread.
@@ -391,12 +396,7 @@ private:
   // Call on the main thread only.
   void PlaybackEnded();
 
-  void OnSeekRejected()
-  {
-    MOZ_ASSERT(NS_IsMainThread());
-    mSeekRequest.Complete();
-    mLogicallySeeking = false;
-  }
+  void OnSeekRejected();
   void OnSeekResolved(SeekResolveValue aVal);
 
   void SeekingChanged()
@@ -616,12 +616,24 @@ private:
 #endif
 
 protected:
-  virtual void CallSeek(const SeekTarget& aTarget);
+  // The promise resolving/rejection is queued as a "micro-task" which will be
+  // handled immediately after the current JS task and before any pending JS
+  // tasks.
+  // At the time we are going to resolve/reject a promise, the "seeking" event
+  // task should already be queued but might yet be processed, so we queue one
+  // more task to file the promise resolving/rejection micro-tasks
+  // asynchronously to make sure that the micro-tasks are processed after the
+  // "seeking" event task.
+  void AsyncResolveSeekDOMPromiseIfExists();
+  void AsyncRejectSeekDOMPromiseIfExists();
+  void DiscardOngoingSeekIfExists();
+  virtual void CallSeek(const SeekTarget& aTarget, dom::Promise* aPromise);
 
   // Returns true if heuristic dormant is supported.
   bool IsHeuristicDormantSupported() const;
 
   MozPromiseRequestHolder<SeekPromise> mSeekRequest;
+  RefPtr<dom::Promise> mSeekDOMPromise;
 
   // True when seeking or otherwise moving the play position around in
   // such a manner that progress event data is inaccurate. This is set
@@ -744,7 +756,7 @@ protected:
   // start playing back again.
   Mirror<int64_t> mPlaybackPosition;
 
-  // Used to distiguish whether the audio is producing sound.
+  // Used to distinguish whether the audio is producing sound.
   Mirror<bool> mIsAudioDataAudible;
 
   // Volume of playback.  0.0 = muted. 1.0 = full volume.
@@ -806,6 +818,9 @@ protected:
   // True if the media is only seekable within its buffered ranges.
   Canonical<bool> mMediaSeekableOnlyInBufferedRanges;
 
+  // True if the decoder is visible.
+  Canonical<bool> mIsVisible;
+
 public:
   AbstractCanonical<media::NullableTimeUnit>* CanonicalDurationOrNull() override;
   AbstractCanonical<double>* CanonicalVolume() {
@@ -852,6 +867,9 @@ public:
   }
   AbstractCanonical<bool>* CanonicalMediaSeekableOnlyInBufferedRanges() {
     return &mMediaSeekableOnlyInBufferedRanges;
+  }
+  AbstractCanonical<bool>* CanonicalIsVisible() {
+    return &mIsVisible;
   }
 
 private:

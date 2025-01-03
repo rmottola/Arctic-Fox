@@ -704,7 +704,7 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
         text->mTextAlign == NS_STYLE_TEXT_ALIGN_MOZ_RIGHT)
     {
       nsStyleText* uniqueText = GET_UNIQUE_STYLE_DATA(Text);
-      uniqueText->mTextAlign = NS_STYLE_TEXT_ALIGN_DEFAULT;
+      uniqueText->mTextAlign = NS_STYLE_TEXT_ALIGN_START;
     }
   }
 
@@ -857,7 +857,7 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
 }
 
 nsChangeHint
-nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
+nsStyleContext::CalcStyleDifference(nsStyleContext* aNewContext,
                                     nsChangeHint aParentHintsNotHandledForDescendants,
                                     uint32_t* aEqualStructs,
                                     uint32_t* aSamePointerStructs)
@@ -875,7 +875,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
   *aEqualStructs = 0;
 
   nsChangeHint hint = NS_STYLE_HINT_NONE;
-  NS_ENSURE_TRUE(aOther, hint);
+  NS_ENSURE_TRUE(aNewContext, hint);
   // We must always ensure that we populate the structs on the new style
   // context that are filled in on the old context, so that if we get
   // two style changes in succession, the second of which causes a real
@@ -898,7 +898,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
   // (Things like 'em' units are handled by the change hint produced
   // by font-size changing, so we don't need to worry about them like
   // we worry about 'inherit' values.)
-  bool compare = mSource != aOther->mSource;
+  bool compare = mSource != aNewContext->mSource;
 
   DebugOnly<uint32_t> structsFound = 0;
 
@@ -908,7 +908,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
   const nsStyleVariables* thisVariables = PeekStyleVariables();
   if (thisVariables) {
     structsFound |= NS_STYLE_INHERIT_BIT(Variables);
-    const nsStyleVariables* otherVariables = aOther->StyleVariables();
+    const nsStyleVariables* otherVariables = aNewContext->StyleVariables();
     if (thisVariables->mVariables == otherVariables->mVariables) {
       *aEqualStructs |= NS_STYLE_INHERIT_BIT(Variables);
     } else {
@@ -925,7 +925,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
     const nsStyle##struct_* this##struct_ = PeekStyle##struct_();             \
     if (this##struct_) {                                                      \
       structsFound |= NS_STYLE_INHERIT_BIT(struct_);                          \
-      const nsStyle##struct_* other##struct_ = aOther->Style##struct_();      \
+      const nsStyle##struct_* other##struct_ = aNewContext->Style##struct_(); \
       nsChangeHint maxDifference = nsStyle##struct_::MaxDifference();         \
       nsChangeHint differenceAlwaysHandledForDescendants =                    \
         nsStyle##struct_::DifferenceAlwaysHandledForDescendants();            \
@@ -934,15 +934,14 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
         /* differences.                                           */          \
         *aEqualStructs |= NS_STYLE_INHERIT_BIT(struct_);                      \
       } else if (compare ||                                                   \
-                 (NS_SubtractHint(maxDifference,                              \
-                                  differenceAlwaysHandledForDescendants) &    \
+                 ((maxDifference & ~differenceAlwaysHandledForDescendants) &  \
                   aParentHintsNotHandledForDescendants)) {                    \
         nsChangeHint difference =                                             \
           this##struct_->CalcDifference(*other##struct_ EXTRA_DIFF_ARGS);     \
         NS_ASSERTION(NS_IsHintSubset(difference, maxDifference),              \
                      "CalcDifference() returned bigger hint than "            \
                      "MaxDifference()");                                      \
-        NS_UpdateHint(hint, difference);                                      \
+        hint |= difference;                                                   \
         if (!difference) {                                                    \
           *aEqualStructs |= NS_STYLE_INHERIT_BIT(struct_);                    \
         }                                                                     \
@@ -1027,7 +1026,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
 #define STYLE_STRUCT(name_, callback_)                                        \
   {                                                                           \
     const nsStyle##name_* data = PeekStyle##name_();                          \
-    if (!data || data == aOther->Style##name_()) {                            \
+    if (!data || data == aNewContext->Style##name_()) {                       \
       *aSamePointerStructs |= NS_STYLE_INHERIT_BIT(name_);                    \
     }                                                                         \
   }
@@ -1035,7 +1034,7 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
 #undef STYLE_STRUCT
 
   // Note that we do not check whether this->RelevantLinkVisited() !=
-  // aOther->RelevantLinkVisited(); we don't need to since
+  // aNewContext->RelevantLinkVisited(); we don't need to since
   // nsCSSFrameConstructor::DoContentStateChanged always adds
   // nsChangeHint_RepaintFrame for NS_EVENT_STATE_VISITED changes (and
   // needs to, since HasStateDependentStyle probably doesn't work right
@@ -1051,11 +1050,11 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
   // things that can depend on :visited) for the properties on which we
   // call GetVisitedDependentColor.
   nsStyleContext *thisVis = GetStyleIfVisited(),
-                *otherVis = aOther->GetStyleIfVisited();
+                *otherVis = aNewContext->GetStyleIfVisited();
   if (!thisVis != !otherVis) {
     // One style context has a style-if-visited and the other doesn't.
     // Presume a difference.
-    NS_UpdateHint(hint, nsChangeHint_RepaintFrame);
+    hint |= nsChangeHint_RepaintFrame;
   } else if (thisVis && !NS_IsHintSubset(nsChangeHint_RepaintFrame, hint)) {
     // Both style contexts have a style-if-visited.
     bool change = false;
@@ -1172,11 +1171,11 @@ nsStyleContext::CalcStyleDifference(nsStyleContext* aOther,
     }
 
     if (change) {
-      NS_UpdateHint(hint, nsChangeHint_RepaintFrame);
+      hint |= nsChangeHint_RepaintFrame;
     }
   }
 
-  return NS_SubtractHint(hint, nsChangeHint_NeutralChange);
+  return hint & ~nsChangeHint_NeutralChange;
 }
 
 #ifdef DEBUG

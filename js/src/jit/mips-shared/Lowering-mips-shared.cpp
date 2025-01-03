@@ -226,25 +226,25 @@ LIRGeneratorMIPSShared::newLTableSwitchV(MTableSwitch* tableswitch)
 void
 LIRGeneratorMIPSShared::visitGuardShape(MGuardShape* ins)
 {
-    MOZ_ASSERT(ins->obj()->type() == MIRType::Object);
+    MOZ_ASSERT(ins->object()->type() == MIRType::Object);
 
     LDefinition tempObj = temp(LDefinition::OBJECT);
-    LGuardShape* guard = new(alloc()) LGuardShape(useRegister(ins->obj()), tempObj);
+    LGuardShape* guard = new(alloc()) LGuardShape(useRegister(ins->object()), tempObj);
     assignSnapshot(guard, ins->bailoutKind());
     add(guard, ins);
-    redefine(ins, ins->obj());
+    redefine(ins, ins->object());
 }
 
 void
 LIRGeneratorMIPSShared::visitGuardObjectGroup(MGuardObjectGroup* ins)
 {
-    MOZ_ASSERT(ins->obj()->type() == MIRType::Object);
+    MOZ_ASSERT(ins->object()->type() == MIRType::Object);
 
     LDefinition tempObj = temp(LDefinition::OBJECT);
-    LGuardObjectGroup* guard = new(alloc()) LGuardObjectGroup(useRegister(ins->obj()), tempObj);
+    LGuardObjectGroup* guard = new(alloc()) LGuardObjectGroup(useRegister(ins->object()), tempObj);
     assignSnapshot(guard, ins->bailoutKind());
     add(guard, ins);
-    redefine(ins, ins->obj());
+    redefine(ins, ins->object());
 }
 
 void
@@ -400,30 +400,6 @@ LIRGeneratorMIPSShared::visitSubstr(MSubstr* ins)
 
 void
 LIRGeneratorMIPSShared::visitStoreTypedArrayElementStatic(MStoreTypedArrayElementStatic* ins)
-{
-    MOZ_CRASH("NYI");
-}
-
-void
-LIRGeneratorMIPSShared::visitSimdBinaryArith(MSimdBinaryArith* ins)
-{
-    MOZ_CRASH("NYI");
-}
-
-void
-LIRGeneratorMIPSShared::visitSimdSelect(MSimdSelect* ins)
-{
-    MOZ_CRASH("NYI");
-}
-
-void
-LIRGeneratorMIPSShared::visitSimdSplatX4(MSimdSplatX4* ins)
-{
-    MOZ_CRASH("NYI");
-}
-
-void
-LIRGeneratorMIPSShared::visitSimdValueX4(MSimdValueX4* ins)
 {
     MOZ_CRASH("NYI");
 }
@@ -606,11 +582,35 @@ LIRGeneratorMIPSShared::visitAtomicTypedArrayElementBinop(MAtomicTypedArrayEleme
 void
 LIRGeneratorMIPSShared::visitWasmTruncateToInt64(MWasmTruncateToInt64* ins)
 {
-    MOZ_CRASH("NY");
+    MOZ_CRASH("NYI");
 }
 
 void
 LIRGeneratorMIPSShared::visitInt64ToFloatingPoint(MInt64ToFloatingPoint* ins)
 {
-    MOZ_CRASH("NY");
+    MOZ_CRASH("NYI");
+}
+
+void
+LIRGeneratorMIPSShared::visitCopySign(MCopySign* ins)
+{
+    MDefinition* lhs = ins->lhs();
+    MDefinition* rhs = ins->rhs();
+
+    MOZ_ASSERT(IsFloatingPointType(lhs->type()));
+    MOZ_ASSERT(lhs->type() == rhs->type());
+    MOZ_ASSERT(lhs->type() == ins->type());
+
+    LInstructionHelper<1, 2, 2>* lir;
+    if (lhs->type() == MIRType::Double)
+        lir = new(alloc()) LCopySignD();
+    else
+        lir = new(alloc()) LCopySignF();
+
+    lir->setTemp(0, temp());
+    lir->setTemp(1, temp());
+
+    lir->setOperand(0, useRegister(lhs));
+    lir->setOperand(1, useRegister(rhs));
+    defineReuseInput(lir, ins, 0);
 }

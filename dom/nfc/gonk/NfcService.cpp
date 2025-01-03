@@ -6,11 +6,12 @@
 
 #include "NfcService.h"
 #include <binder/Parcel.h>
-#include <cutils/properties.h>
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/dom/NfcOptionsBinding.h"
 #include "mozilla/dom/ToJSValue.h"
 #include "mozilla/dom/RootedDictionary.h"
+#include "mozilla/EndianUtils.h"
+#include "mozilla/Hal.h"
 #include "mozilla/ipc/ListenSocket.h"
 #include "mozilla/ipc/ListenSocketConsumer.h"
 #include "mozilla/ipc/NfcConnector.h"
@@ -31,6 +32,7 @@
 using namespace android;
 using namespace mozilla::dom;
 using namespace mozilla::ipc;
+using namespace mozilla::hal;
 
 namespace mozilla {
 
@@ -108,7 +110,7 @@ NfcConsumer::Start()
   // If we could not cleanup properly before and an old
   // instance of the daemon is still running, we kill it
   // here.
-  Unused << NS_WARN_IF(property_set("ctl.stop", "nfcd") < 0);
+  StopSystemService("nfcd");
 
   mHandler = new NfcMessageHandler();
 
@@ -333,10 +335,8 @@ NfcConsumer::Receive(UnixSocketBuffer* aBuffer)
 
   while (aBuffer->GetSize()) {
     const uint8_t* data = aBuffer->GetData();
-    uint32_t parcelSize = ((data[0] & 0xff) << 24) |
-                          ((data[1] & 0xff) << 16) |
-                          ((data[2] & 0xff) <<  8) |
-                           (data[3] & 0xff);
+    uint32_t parcelSize = BigEndian::readUint32(data);
+
     MOZ_ASSERT(parcelSize <= aBuffer->GetSize());
 
     // TODO: Zero-copy buffer transfers
@@ -378,9 +378,10 @@ NfcConsumer::OnConnectSuccess(int aIndex)
 
   switch (aIndex) {
     case LISTEN_SOCKET: {
-      nsCString value("nfcd:-S -a ");
-      value.Append(mListenSocketName);
-      if (NS_WARN_IF(property_set("ctl.start", value.get()) < 0)) {
+      nsCString args("-S -a ");
+      args.Append(mListenSocketName);
+      nsresult rv = StartSystemService("nfcd", args.get());
+      if (NS_FAILED(rv)) {
         OnConnectError(STREAM_SOCKET);
       }
       break;

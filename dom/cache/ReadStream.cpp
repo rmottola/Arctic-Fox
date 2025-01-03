@@ -10,8 +10,7 @@
 #include "mozilla/dom/cache/CacheStreamControlChild.h"
 #include "mozilla/dom/cache/CacheStreamControlParent.h"
 #include "mozilla/dom/cache/CacheTypes.h"
-#include "mozilla/ipc/FileDescriptor.h"
-#include "mozilla/ipc/InputStreamUtils.h"
+#include "mozilla/ipc/IPCStreamUtils.h"
 #include "mozilla/SnappyUncompressInputStream.h"
 #include "nsIAsyncInputStream.h"
 #include "nsTArray.h"
@@ -21,7 +20,8 @@ namespace dom {
 namespace cache {
 
 using mozilla::Unused;
-using mozilla::ipc::FileDescriptor;
+using mozilla::ipc::AutoIPCStream;
+using mozilla::ipc::IPCStream;
 
 // ----------------------------------------------------------------------------
 
@@ -35,10 +35,14 @@ public:
         nsIInputStream* aStream);
 
   void
-  Serialize(CacheReadStreamOrVoid* aReadStreamOut);
+  Serialize(CacheReadStreamOrVoid* aReadStreamOut,
+            nsTArray<UniquePtr<AutoIPCStream>>& aStreamCleanupList,
+            ErrorResult& aRv);
 
   void
-  Serialize(CacheReadStream* aReadStreamOut);
+  Serialize(CacheReadStream* aReadStreamOut,
+            nsTArray<UniquePtr<AutoIPCStream>>& aStreamCleanupList,
+            ErrorResult& aRv);
 
   // ReadStream::Controllable methods
   virtual void
@@ -197,35 +201,37 @@ ReadStream::Inner::Inner(StreamControl* aControl, const nsID& aId,
 }
 
 void
-ReadStream::Inner::Serialize(CacheReadStreamOrVoid* aReadStreamOut)
+ReadStream::Inner::Serialize(CacheReadStreamOrVoid* aReadStreamOut,
+                             nsTArray<UniquePtr<AutoIPCStream>>& aStreamCleanupList,
+                             ErrorResult& aRv)
 {
   MOZ_ASSERT(NS_GetCurrentThread() == mOwningThread);
   MOZ_ASSERT(aReadStreamOut);
-  CacheReadStream stream;
-  Serialize(&stream);
-  *aReadStreamOut = stream;
+  *aReadStreamOut = CacheReadStream();
+  Serialize(&aReadStreamOut->get_CacheReadStream(), aStreamCleanupList, aRv);
 }
 
 void
-ReadStream::Inner::Serialize(CacheReadStream* aReadStreamOut)
+ReadStream::Inner::Serialize(CacheReadStream* aReadStreamOut,
+                             nsTArray<UniquePtr<AutoIPCStream>>& aStreamCleanupList,
+                             ErrorResult& aRv)
 {
   MOZ_ASSERT(NS_GetCurrentThread() == mOwningThread);
   MOZ_ASSERT(aReadStreamOut);
-  MOZ_ASSERT(mState == Open);
-  MOZ_ASSERT(mControl);
 
-  // If we are sending a ReadStream, then we never want to set the
-  // pushStream actors at the same time.
-  aReadStreamOut->pushStreamChild() = nullptr;
-  aReadStreamOut->pushStreamParent() = nullptr;
+  if (mState != Open) {
+    aRv.ThrowTypeError<MSG_CACHE_STREAM_CLOSED>();
+    return;
+  }
+
+  MOZ_ASSERT(mControl);
 
   aReadStreamOut->id() = mId;
   mControl->SerializeControl(aReadStreamOut);
+  mControl->SerializeStream(aReadStreamOut, mStream, aStreamCleanupList);
 
-  AutoTArray<FileDescriptor, 4> fds;
-  SerializeInputStream(mStream, aReadStreamOut->params(), fds);
-
-  mControl->SerializeFds(aReadStreamOut, fds);
+  MOZ_ASSERT(aReadStreamOut->stream().type() ==
+             IPCStream::TInputStreamParamsWithFds);
 
   // We're passing ownership across the IPC barrier with the control, so
   // do not signal that the stream is closed here.
@@ -436,8 +442,8 @@ ReadStream::Create(const CacheReadStream& aReadStream)
     return nullptr;
   }
 
-  MOZ_ASSERT(!aReadStream.pushStreamChild());
-  MOZ_ASSERT(!aReadStream.pushStreamParent());
+  MOZ_ASSERT(aReadStream.stream().type() ==
+             IPCStream::TInputStreamParamsWithFds);
 
   // Control is guaranteed to survive this method as ActorDestroy() cannot
   // run on this thread until we complete.
@@ -451,11 +457,7 @@ ReadStream::Create(const CacheReadStream& aReadStream)
   }
   MOZ_ASSERT(control);
 
-  AutoTArray<FileDescriptor, 4> fds;
-  control->DeserializeFds(aReadStream, fds);
-
-  nsCOMPtr<nsIInputStream> stream =
-    DeserializeInputStream(aReadStream.params(), fds);
+  nsCOMPtr<nsIInputStream> stream = DeserializeIPCStream(aReadStream.stream());
   MOZ_ASSERT(stream);
 
   // Currently we expect all cache read streams to be blocking file streams.
@@ -482,15 +484,19 @@ ReadStream::Create(PCacheStreamControlParent* aControl, const nsID& aId,
 }
 
 void
-ReadStream::Serialize(CacheReadStreamOrVoid* aReadStreamOut)
+ReadStream::Serialize(CacheReadStreamOrVoid* aReadStreamOut,
+                      nsTArray<UniquePtr<AutoIPCStream>>& aStreamCleanupList,
+                      ErrorResult& aRv)
 {
-  mInner->Serialize(aReadStreamOut);
+  mInner->Serialize(aReadStreamOut, aStreamCleanupList, aRv);
 }
 
 void
-ReadStream::Serialize(CacheReadStream* aReadStreamOut)
+ReadStream::Serialize(CacheReadStream* aReadStreamOut,
+                      nsTArray<UniquePtr<AutoIPCStream>>& aStreamCleanupList,
+                      ErrorResult& aRv)
 {
-  mInner->Serialize(aReadStreamOut);
+  mInner->Serialize(aReadStreamOut, aStreamCleanupList, aRv);
 }
 
 ReadStream::ReadStream(ReadStream::Inner* aInner)

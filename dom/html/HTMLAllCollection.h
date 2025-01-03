@@ -7,7 +7,6 @@
 #ifndef mozilla_dom_HTMLAllCollection_h
 #define mozilla_dom_HTMLAllCollection_h
 
-#include "nsAutoPtr.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsISupportsImpl.h"
 #include "nsRefPtrHashtable.h"
@@ -62,11 +61,7 @@ public:
   void NamedGetter(const nsAString& aName,
                    bool& aFound,
                    Nullable<OwningNodeOrHTMLCollection>& aResult);
-  void GetSupportedNames(unsigned aFlags, nsTArray<nsString>& aNames);
-  bool NameIsEnumerable(const nsAString& aName)
-  {
-    return false;
-  }
+  void GetSupportedNames(nsTArray<nsString>& aNames);
   void LegacyCall(JS::Handle<JS::Value>, const nsAString& aName,
                   Nullable<OwningNodeOrHTMLCollection>& aResult)
   {

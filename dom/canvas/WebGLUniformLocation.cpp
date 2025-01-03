@@ -16,10 +16,13 @@ namespace mozilla {
 
 WebGLUniformLocation::WebGLUniformLocation(WebGLContext* webgl,
                                            const webgl::LinkedProgramInfo* linkInfo,
-                                           GLuint loc, const WebGLActiveInfo* activeInfo)
+                                           GLuint loc,
+                                           size_t arrayIndex,
+                                           const WebGLActiveInfo* activeInfo)
     : WebGLContextBoundObject(webgl)
     , mLinkInfo(linkInfo)
     , mLoc(loc)
+    , mArrayIndex(arrayIndex)
     , mActiveInfo(activeInfo)
 { }
 
@@ -112,7 +115,7 @@ IsUniformSetterTypeValid(GLenum setterType, GLenum uniformType)
         return setterType == LOCAL_GL_INT;
 
     default:
-        MOZ_CRASH("Bad `uniformType`.");
+        MOZ_CRASH("GFX: Bad `uniformType`.");
     }
 }
 
@@ -314,7 +317,7 @@ WebGLUniformLocation::GetUniform(JSContext* js, WebGLContext* webgl) const
         }
 
     default:
-        MOZ_CRASH("Invalid elemType.");
+        MOZ_CRASH("GFX: Invalid elemType.");
     }
 }
 

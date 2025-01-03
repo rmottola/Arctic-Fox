@@ -8,7 +8,6 @@
 #include "VolumeManager.h"
 #include "VolumeServiceIOThread.h"
 
-#include "nsAutoPtr.h"
 #include "nsCOMPtr.h"
 #include "nsDependentSubstring.h"
 #include "nsIDOMWakeLockListener.h"
@@ -29,6 +28,7 @@
 #include "nsXULAppAPI.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/Services.h"
+#include "base/task.h"
 
 #undef VOLUME_MANAGER_LOG_TAG
 #define VOLUME_MANAGER_LOG_TAG  "nsVolumeService"

@@ -1992,86 +1992,6 @@ nsHTMLDocument::GetElementsByName(const nsAString& aElementName,
   return NS_OK;
 }
 
-static bool MatchItems(nsIContent* aContent, int32_t aNameSpaceID, 
-                       nsIAtom* aAtom, void* aData)
-{
-  if (!aContent->IsHTMLElement()) {
-    return false;
-  }
-
-  nsGenericHTMLElement* elem = static_cast<nsGenericHTMLElement*>(aContent);
-  if (!elem->HasAttr(kNameSpaceID_None, nsGkAtoms::itemscope) ||
-      elem->HasAttr(kNameSpaceID_None, nsGkAtoms::itemprop)) {
-    return false;
-  }
-
-  nsTArray<nsCOMPtr<nsIAtom> >* tokens = static_cast<nsTArray<nsCOMPtr<nsIAtom> >*>(aData);
-  if (tokens->IsEmpty()) {
-    return true;
-  }
- 
-  const nsAttrValue* attr = elem->GetParsedAttr(nsGkAtoms::itemtype);
-  if (!attr)
-    return false;
-
-  for (uint32_t i = 0; i < tokens->Length(); i++) {
-    if (!attr->Contains(tokens->ElementAt(i), eCaseMatters)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-static void DestroyTokens(void* aData)
-{
-  nsTArray<nsCOMPtr<nsIAtom> >* tokens = static_cast<nsTArray<nsCOMPtr<nsIAtom> >*>(aData);
-  delete tokens;
-}
-
-static void* CreateTokens(nsINode* aRootNode, const nsString* types)
-{
-  nsTArray<nsCOMPtr<nsIAtom> >* tokens = new nsTArray<nsCOMPtr<nsIAtom> >();
-  nsAString::const_iterator iter, end;
-  types->BeginReading(iter);
-  types->EndReading(end);
-  
-  // skip initial whitespace
-  while (iter != end && nsContentUtils::IsHTMLWhitespace(*iter)) {
-    ++iter;
-  }
-
-  // parse the tokens
-  while (iter != end) {
-    nsAString::const_iterator start(iter);
-
-    do {
-      ++iter;
-    } while (iter != end && !nsContentUtils::IsHTMLWhitespace(*iter));
-
-    tokens->AppendElement(NS_Atomize(Substring(start, iter)));
-
-    // skip whitespace
-    while (iter != end && nsContentUtils::IsHTMLWhitespace(*iter)) {
-      ++iter;
-    }
-  }
-  return tokens;
-}
-
-NS_IMETHODIMP
-nsHTMLDocument::GetItems(const nsAString& types, nsIDOMNodeList** aReturn)
-{
-  *aReturn = GetItems(types).take();
-  return NS_OK;
-}
-
-already_AddRefed<nsINodeList>
-nsHTMLDocument::GetItems(const nsAString& aTypeNames)
-{
-  return NS_GetFuncStringNodeList(this, MatchItems, DestroyTokens, CreateTokens,
-                                  aTypeNames);
-}
-
 void
 nsHTMLDocument::AddedForm()
 {
@@ -2342,14 +2262,8 @@ nsHTMLDocument::NamedGetter(JSContext* cx, const nsAString& aName, bool& aFound,
   aRetval.set(&val.toObject());
 }
 
-bool
-nsHTMLDocument::NameIsEnumerable(const nsAString& aName)
-{
-  return true;
-}
-
 void
-nsHTMLDocument::GetSupportedNames(unsigned, nsTArray<nsString>& aNames)
+nsHTMLDocument::GetSupportedNames(nsTArray<nsString>& aNames)
 {
   for (auto iter = mIdentifierMap.Iter(); !iter.Done(); iter.Next()) {
     nsIdentifierMapEntry* entry = iter.Get();
@@ -2522,7 +2436,7 @@ nsHTMLDocument::MaybeEditingStateChanged()
       EditingStateChanged();
     } else if (!mInDestructor) {
       nsContentUtils::AddScriptRunner(
-        NS_NewRunnableMethod(this, &nsHTMLDocument::MaybeEditingStateChanged));
+        NewRunnableMethod(this, &nsHTMLDocument::MaybeEditingStateChanged));
     }
   }
 }
@@ -2986,7 +2900,7 @@ nsHTMLDocument::GetMidasCommandManager(nsICommandManager** aCmdMgr)
   if (!docshell)
     return NS_ERROR_FAILURE;
 
-  mMidasCommandManager = do_GetInterface(docshell);
+  mMidasCommandManager = docshell->GetCommandManager();
   if (!mMidasCommandManager)
     return NS_ERROR_FAILURE;
 

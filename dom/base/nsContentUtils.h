@@ -34,6 +34,7 @@
 #include "mozilla/Logging.h"
 #include "mozilla/NotNull.h"
 #include "nsIContentPolicy.h"
+#include "nsPIDOMWindow.h"
 
 #if defined(XP_WIN)
 // Undefine LoadImage to prevent naming conflict with Windows.
@@ -130,6 +131,11 @@ class Selection;
 class TabParent;
 } // namespace dom
 
+namespace ipc {
+class Shmem;
+class IShmemAllocator;
+}
+
 namespace gfx {
 class DataSourceSurface;
 } // namespace gfx
@@ -172,7 +178,7 @@ struct EventNameMapping
   mozilla::EventClassID mEventClassID;
 };
 
-typedef void (*CallOnRemoteChildFunction) (mozilla::dom::TabParent* aTabParent,
+typedef bool (*CallOnRemoteChildFunction) (mozilla::dom::TabParent* aTabParent,
                                            void* aArg);
 
 class nsContentUtils
@@ -394,7 +400,7 @@ public:
    */
   static bool IsFirstLetterPunctuation(uint32_t aChar);
   static bool IsFirstLetterPunctuationAt(const nsTextFragment* aFrag, uint32_t aOffset);
- 
+
   /**
    * Returns true if aChar is of class Lu, Ll, Lt, Lm, Lo, Nd, Nl or No
    */
@@ -909,15 +915,6 @@ public:
                                      nsXPIDLString& aResult);
 
   /**
-   * A helper function that parses a sandbox attribute (of an <iframe> or
-   * a CSP directive) and converts it to the set of flags used internally.
-   *
-   * @param sandboxAttr   the sandbox attribute
-   * @return              the set of flags (0 if sandboxAttr is null)
-   */
-  static uint32_t ParseSandboxAttributeToFlags(const nsAttrValue* sandboxAttr);
-
-  /**
    * Helper function that generates a UUID.
    */
   static nsresult GenerateUUIDInPlace(nsID& aUUID);
@@ -934,7 +931,7 @@ private:
                                         const char16_t** aParams,
                                         uint32_t aParamsLength,
                                         nsXPIDLString& aResult);
-  
+
 public:
   template<uint32_t N>
   static nsresult FormatLocalizedString(PropertiesFile aFile,
@@ -1607,9 +1604,9 @@ public:
    *                   scripts. Passing null is allowed and results in nothing
    *                   happening. It is also allowed to pass an object that
    *                   has not yet been AddRefed.
-   * @return false on out of memory, true otherwise.
    */
-  static bool AddScriptRunner(nsIRunnable* aRunnable);
+  static void AddScriptRunner(already_AddRefed<nsIRunnable> aRunnable);
+  static void AddScriptRunner(nsIRunnable* aRunnable);
 
   /**
    * Returns true if it's safe to execute content script and false otherwise.
@@ -1914,6 +1911,12 @@ public:
   static bool IsFullScreenApiEnabled();
 
   /**
+   * Returns true if the unprefixed fullscreen API is enabled.
+   */
+  static bool IsUnprefixedFullscreenApiEnabled()
+    { return sIsUnprefixedFullscreenApiEnabled; }
+
+  /**
    * Returns true if requests for full-screen are allowed in the current
    * context. Requests are only allowed if the user initiated them (like with
    * a mouse-click or key press), unless this check has been disabled by
@@ -1944,7 +1947,7 @@ public:
   {
     return sIsPerformanceTimingEnabled;
   }
-  
+
   /*
    * Returns true if user timing API should print to console.
    */
@@ -2250,11 +2253,11 @@ public:
 
   /**
    * Function checks if the user is idle.
-   * 
+   *
    * @param aRequestedIdleTimeInMS    The idle observer's requested idle time.
-   * @param aUserIsIdle               boolean indicating if the user 
+   * @param aUserIsIdle               boolean indicating if the user
    *                                  is currently idle or not.   *
-   * @return NS_OK                    NS_OK returned if the requested idle service and 
+   * @return NS_OK                    NS_OK returned if the requested idle service and
    *                                  the current idle time were successfully obtained.
    *                                  NS_ERROR_FAILURE returned if the the requested
    *                                  idle service or the current idle were not obtained.
@@ -2310,6 +2313,11 @@ public:
    * Returns true if the browser.dom.window.dump.enabled pref is set.
    */
   static bool DOMWindowDumpEnabled();
+
+  /**
+   * Returns true if the privacy.donottrackheader.enabled pref is set.
+   */
+  static bool DoNotTrackEnabled();
 
   /**
    * Returns a LogModule that dump calls from content script are logged to.
@@ -2374,11 +2382,20 @@ public:
 
   /*
    * Call the given callback on all remote children of the given top-level
-   * window.
+   * window. Return true from the callback to stop calling further children.
    */
   static void CallOnAllRemoteChildren(nsPIDOMWindowOuter* aWindow,
                                       CallOnRemoteChildFunction aCallback,
                                       void* aArg);
+
+  /*
+   * Call nsPIDOMWindow::SetKeyboardIndicators all all remote children. This is
+   * in here rather than nsGlobalWindow because TabParent indirectly includes
+   * Windows headers which aren't allowed there.
+   */
+  static void SetKeyboardIndicatorsOnRemoteChildren(nsPIDOMWindowOuter* aWindow,
+                                                    UIStateChangeType aShowAccelerators,
+                                                    UIStateChangeType aShowFocusRings);
 
   /**
    * Given an nsIFile, attempts to read it into aString.
@@ -2429,6 +2446,15 @@ public:
   static mozilla::UniquePtr<char[]> GetSurfaceData(
     mozilla::NotNull<mozilla::gfx::DataSourceSurface*> aSurface,
     size_t* aLength, int32_t* aStride);
+
+  /*
+   * Get the pixel data from the given source surface and fill it in Shmem.
+   * The length and stride will be assigned from the surface.
+   */
+  static void GetSurfaceData(mozilla::gfx::DataSourceSurface* aSurface,
+                             size_t* aLength, int32_t* aStride,
+                             mozilla::ipc::IShmemAllocator* aAlloc,
+                             mozilla::ipc::Shmem *aOutShmem);
 
   // Helpers shared by the implementations of nsContentUtils methods and
   // nsIDOMWindowUtils methods.
@@ -2558,6 +2584,12 @@ public:
 
   static void SetScrollbarsVisibility(nsIDocShell* aDocShell, bool aVisible);
 
+  /*
+   * Return the associated presentation URL of the presented content.
+   * Will return empty string if the docshell is not in a presented content.
+   */
+  static void GetPresentationURL(nsIDocShell* aDocShell, nsAString& aPresentationUrl);
+
 private:
   static bool InitializeEventTable();
 
@@ -2594,7 +2626,7 @@ private:
   static AutocompleteAttrState InternalSerializeAutocompleteAttribute(const nsAttrValue* aAttrVal,
                                                                       mozilla::dom::AutocompleteInfo& aInfo);
 
-  static void CallOnAllRemoteChildren(nsIMessageBroadcaster* aManager,
+  static bool CallOnAllRemoteChildren(nsIMessageBroadcaster* aManager,
                                       CallOnRemoteChildFunction aCallback,
                                       void* aArg);
 
@@ -2663,6 +2695,7 @@ private:
   static bool sIsHandlingKeyBoardEvent;
   static bool sAllowXULXBL_for_file;
   static bool sIsFullScreenApiEnabled;
+  static bool sIsUnprefixedFullscreenApiEnabled;
   static bool sTrustedFullScreenOnly;
   static bool sIsCutCopyAllowed;
   static uint32_t sHandlingInputTimeout;
@@ -2697,6 +2730,7 @@ private:
 #if !(defined(DEBUG) || defined(MOZ_ENABLE_JS_DUMP))
   static bool sDOMWindowDumpEnabled;
 #endif
+  static bool sDoNotTrackEnabled;
   static mozilla::LazyLogModule sDOMDumpLog;
 };
 

@@ -223,6 +223,13 @@ interface nsIDOMWindowUtils : nsISupports {
   void setResolutionAndScaleTo(in float aResolution);
 
   /**
+   * Set a resolution on the presShell which is the "restored" from history.
+   * This resolution should be used when painting for the first time. Calling
+   * this too late may have no effect.
+   */
+  void setRestoreResolution(in float aResolution);
+
+  /**
    * Whether the resolution has been set by the user.
    * This gives a way to check whether the provided resolution is the default
    * value or restored from a previous session.
@@ -1079,6 +1086,23 @@ interface nsIDOMWindowUtils : nsISupports {
   const unsigned long QUERY_CONTENT_FLAG_USE_XP_LINE_BREAK     = 0x0001;
 
   /**
+   * sendQueryContentEvent()'s aAdditionalFlags may have one of following
+   * flags when aType is QUERY_SELECTED_TEXT.  If one of them is set,
+   * the result is the first range of the selection type.  See also
+   * nsISelectionController::SELECTION_*.
+   */
+  const unsigned long QUERY_CONTENT_FLAG_SELECTION_SPELLCHECK          = 0x0002;
+  const unsigned long QUERY_CONTENT_FLAG_SELECTION_IME_RAWINPUT        = 0x0004;
+  const unsigned long QUERY_CONTENT_FLAG_SELECTION_IME_SELECTEDRAWTEXT = 0x0008;
+  const unsigned long QUERY_CONTENT_FLAG_SELECTION_IME_CONVERTEDTEXT   = 0x0010;
+  const unsigned long QUERY_CONTENT_FLAG_SELECTION_IME_SELECTEDCONVERTEDTEXT =
+                                                                         0x0020;
+  const unsigned long QUERY_CONTENT_FLAG_SELECTION_ACCESSIBILITY       = 0x0040;
+  const unsigned long QUERY_CONTENT_FLAG_SELECTION_FIND                = 0x0080;
+  const unsigned long QUERY_CONTENT_FLAG_SELECTION_URLSECONDARY        = 0x0100;
+  const unsigned long QUERY_CONTENT_FLAG_SELECTION_URLSTRIKEOUT        = 0x0200;
+
+  /**
    * Synthesize a query content event. Note that the result value returned here
    * is in LayoutDevice pixels rather than CSS pixels.
    *
@@ -1751,10 +1775,10 @@ interface nsIDOMWindowUtils : nsISupports {
   void postRestyleSelfEvent(in nsIDOMElement aElement);
 
   /**
-   * Used to pause or resume all MediaElements in this window. Use-cases are
-   * audio competing and remote media control.
+   * Used to pause or resume all media in this window. Use-cases are audio
+   * competing, remote media control and to prevent auto-playing media.
    */
-  attribute boolean mediaSuspended;
+  attribute uint32_t mediaSuspend;
 
   /**
    * With this it's possible to mute all the MediaElements in this window.
@@ -1780,6 +1804,17 @@ interface nsIDOMWindowUtils : nsISupports {
    * e10s support properly.
    */
   void askPermission(in nsIContentPermissionRequest aRequest);
+
+  /**
+   * Number of elements restyled for the curent document.
+   *
+   * Note that during a restyle operation we may restyle an element more
+   * than once (e.g., for an inline that contains blocks).  This also
+   * counts restyling of pseudo-elements and anonymous boxes.
+   *
+   * May throw NS_ERROR_NOT_AVAILABLE.
+   */
+  readonly attribute unsigned long long elementsRestyled;
 
   /**
    * Number of frames constructed (excluding breaking) for the curent

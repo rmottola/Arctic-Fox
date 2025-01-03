@@ -271,7 +271,7 @@ typedef NSInteger NSEventGestureAxis;
 
 - (void)sendMouseEnterOrExitEvent:(NSEvent*)aEvent
                             enter:(BOOL)aEnter
-                             type:(mozilla::WidgetMouseEvent::exitType)aType;
+                         exitFrom:(mozilla::WidgetMouseEvent::ExitFrom)aExitFrom;
 
 - (void)updateGLContext;
 - (void)_surfaceNeedsUpdate:(NSNotification*)notification;
@@ -502,6 +502,12 @@ public:
   const LayoutDeviceIntRegion& GetDraggableRegion() { return mDraggableRegion; }
 
   virtual void ReportSwipeStarted(uint64_t aInputBlockId, bool aStartSwipe) override;
+
+  virtual void LookUpDictionary(
+                 const nsAString& aText,
+                 const nsTArray<mozilla::FontRange>& aFontRangeArray,
+                 const bool aIsVertical,
+                 const LayoutDeviceIntPoint& aPoint) override;
 
   void              ResetParent();
 

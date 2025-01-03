@@ -12,7 +12,7 @@ const {CubicBezierWidget} =
 const {MdnDocsWidget} = require("devtools/client/shared/widgets/MdnDocsWidget");
 const {CSSFilterEditorWidget} = require("devtools/client/shared/widgets/FilterWidget");
 const EventEmitter = require("devtools/shared/event-emitter");
-const {colorUtils} = require("devtools/shared/css-color");
+const {colorUtils} = require("devtools/client/shared/css-color");
 const Heritage = require("sdk/core/heritage");
 const {Eyedropper} = require("devtools/client/eyedropper/eyedropper");
 const Editor = require("devtools/client/sourceeditor/editor");
@@ -830,7 +830,7 @@ Tooltip.prototype = {
    * the instance of the widget
    */
   setCubicBezierContent: function(bezier) {
-    let dimensions = {width: "410", height: "360"};
+    let dimensions = {width: "500", height: "360"};
     let panel = this.panel;
     return this.setIFrameContent(dimensions, CUBIC_BEZIER_FRAME).then(onLoaded);
 

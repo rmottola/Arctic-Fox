@@ -6,7 +6,6 @@
 #ifndef GLTEXTUREIMAGE_H_
 #define GLTEXTUREIMAGE_H_
 
-#include "nsAutoPtr.h"
 #include "nsRegion.h"
 #include "nsTArray.h"
 #include "gfxTypes.h"
@@ -198,7 +197,9 @@ public:
     virtual bool InUpdate() const = 0;
     GLenum GetWrapMode() const { return mWrapMode; }
 
-    void SetFilter(gfx::Filter aFilter) { mFilter = aFilter; }
+    void SetSamplingFilter(gfx::SamplingFilter aSamplingFilter) {
+      mSamplingFilter = aSamplingFilter;
+    }
 
 protected:
     friend class GLContext;
@@ -226,7 +227,7 @@ protected:
     GLenum mWrapMode;
     ContentType mContentType;
     gfx::SurfaceFormat mTextureFormat;
-    gfx::Filter mFilter;
+    gfx::SamplingFilter mSamplingFilter;
     Flags mFlags;
     size_t mUploadSize;
 };
@@ -351,6 +352,17 @@ CreateBasicTextureImage(GLContext* aGL,
                         TextureImage::ContentType aContentType,
                         GLenum aWrapMode,
                         TextureImage::Flags aFlags);
+
+/**
+ * Creates a TiledTextureImage backed by platform-specific or basic TextureImages.
+ * In doubt, use GLContext::CreateTextureImage instead.
+ */
+already_AddRefed<TextureImage>
+CreateTiledTextureImage(GLContext* aGL,
+                        const gfx::IntSize& aSize,
+                        TextureImage::ContentType aContentType,
+                        TextureImage::Flags aFlags,
+                        TextureImage::ImageFormat aImageFormat);
 
 /**
   * Return a valid, allocated TextureImage of |aSize| with

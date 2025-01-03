@@ -55,6 +55,7 @@
  **************************************************************/
 
 #include "gfx2DGlue.h"
+#include "gfxEnv.h"
 #include "gfxPlatform.h"
 #include "gfxPrefs.h"
 #include "mozilla/MathAlgorithms.h"
@@ -139,6 +140,7 @@
 #include "nsBidiKeyboard.h"
 #include "nsThemeConstants.h"
 #include "gfxConfig.h"
+#include "WinCompositorWidgetProxy.h"
 
 #include "nsIGfxInfo.h"
 #include "nsUXThemeConstants.h"
@@ -394,7 +396,6 @@ nsWindow::nsWindow()
   mWnd                  = nullptr;
   mTransitionWnd        = nullptr;
   mPaintDC              = nullptr;
-  mCompositeDC          = nullptr;
   mPrevWndProc          = nullptr;
   mNativeDragTarget     = nullptr;
   mInDtor               = false;
@@ -429,8 +430,6 @@ nsWindow::nsWindow()
   mCachedHitTestTime    = TimeStamp::Now();
   mCachedHitTestResult  = 0;
 #ifdef MOZ_XUL
-  mTransparentSurface   = nullptr;
-  mMemoryDC             = nullptr;
   mTransparencyMode     = eTransparencyOpaque;
   memset(&mGlassMargins, 0, sizeof mGlassMargins);
 #endif
@@ -1299,7 +1298,9 @@ NS_METHOD nsWindow::Show(bool bState)
       // Clear contents to avoid ghosting of old content if we display
       // this window again.
       if (wasVisible && mTransparencyMode == eTransparencyTransparent) {
-        ClearTranslucentWindow();
+        if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+          proxy->ClearTransparentWindow();
+        }
       }
       if (mWindowType != eWindowType_dialog) {
         ::ShowWindow(mWnd, SW_HIDE);
@@ -1555,10 +1556,11 @@ NS_METHOD nsWindow::Resize(double aWidth, double aHeight, bool aRepaint)
     return NS_OK;
   }
 
-#ifdef MOZ_XUL
-  if (eTransparencyTransparent == mTransparencyMode)
-    ResizeTranslucentWindow(width, height);
-#endif
+  if (mTransparencyMode == eTransparencyTransparent) {
+    if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+      proxy->ResizeTransparentWindow(width, height);
+    }
+  }
 
   // Set cached value for lightweight and printing
   mBounds.width  = width;
@@ -1613,10 +1615,11 @@ NS_METHOD nsWindow::Resize(double aX, double aY, double aWidth, double aHeight, 
     return NS_OK;
   }
 
-#ifdef MOZ_XUL
-  if (eTransparencyTransparent == mTransparencyMode)
-    ResizeTranslucentWindow(width, height);
-#endif
+  if (eTransparencyTransparent == mTransparencyMode) {
+    if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+      proxy->ResizeTransparentWindow(width, height);
+    }
+  }
 
   // Set cached value for lightweight and printing
   mBounds.x      = x;
@@ -3205,27 +3208,6 @@ nsWindow::MakeFullScreen(bool aFullScreen, nsIScreen* aTargetScreen)
   return rv;
 }
 
-HDC nsWindow::GetWindowSurface()
-{
-#ifdef MOZ_XUL
-  return eTransparencyTransparent == mTransparencyMode
-         ? mMemoryDC
-         : ::GetDC(mWnd);
-#else
-  return ::GetDC(mWnd);
-#endif
-}
-
-void nsWindow::FreeWindowSurface(HDC dc)
-{
-#ifdef MOZ_XUL
-  if (eTransparencyTransparent != mTransparencyMode)
-    ::ReleaseDC(mWnd, dc);
-#else
-  ::ReleaseDC(mWnd, dc);
-#endif
-}
-
 /**************************************************************
  *
  * SECTION: Native data storage
@@ -3646,7 +3628,14 @@ nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
   }
 
   if (!mLayerManager) {
-    MOZ_ASSERT(!mCompositorBridgeParent && !mCompositorBridgeChild);
+    MOZ_ASSERT(!mCompositorSession && !mCompositorBridgeChild);
+
+    // Ensure we have a widget proxy even if we're not using the compositor,
+    // since that's where we handle transparent windows.
+    if (!mCompositorWidgetProxy) {
+      mCompositorWidgetProxy = new WinCompositorWidgetProxy(this);
+    }
+
     mLayerManager = CreateBasicLayerManager();
   }
 
@@ -3707,57 +3696,16 @@ nsWindow::OnDefaultButtonLoaded(const LayoutDeviceIntRect& aButtonRect)
   return NS_OK;
 }
 
-already_AddRefed<mozilla::gfx::DrawTarget>
-nsWindow::StartRemoteDrawing()
+mozilla::widget::CompositorWidgetProxy*
+nsWindow::NewCompositorWidgetProxy()
 {
-  MOZ_ASSERT(!mCompositeDC);
-  HDC dc = GetWindowSurface();
-  RefPtr<gfxASurface> surf;
-
-  if (mTransparencyMode == eTransparencyTransparent) {
-    if (!mTransparentSurface) {
-      SetupTranslucentWindowMemoryBitmap(mTransparencyMode);
-    }
-    if (mTransparentSurface) {
-      surf = mTransparentSurface;
-    }
-  } 
-  
-  if (!surf) {
-    if (!dc) {
-      return nullptr;
-    }
-    uint32_t flags = (mTransparencyMode == eTransparencyOpaque) ? 0 :
-        gfxWindowsSurface::FLAG_IS_TRANSPARENT;
-    surf = new gfxWindowsSurface(dc, flags);
-  }
-
-  mozilla::gfx::IntSize size(surf->GetSize().width, surf->GetSize().height);
-  if (size.width <= 0 || size.height <= 0) {
-    if (dc) {
-      FreeWindowSurface(dc);
-    }
-    return nullptr;
-  }
-
-  MOZ_ASSERT(!mCompositeDC);
-  mCompositeDC = dc;
-
-  return mozilla::gfx::Factory::CreateDrawTargetForCairoSurface(surf->CairoSurface(), size);
+  return new WinCompositorWidgetProxy(this);
 }
 
-void
-nsWindow::EndRemoteDrawing()
+mozilla::widget::WinCompositorWidgetProxy*
+nsWindow::GetCompositorWidgetProxy()
 {
-  if (mTransparencyMode == eTransparencyTransparent) {
-    MOZ_ASSERT(gfxWindowsPlatform::GetPlatform()->IsDirect2DBackend()
-               || mTransparentSurface);
-    UpdateTranslucentWindow();
-  }
-  if (mCompositeDC) {
-    FreeWindowSurface(mCompositeDC);
-  }
-  mCompositeDC = nullptr;
+  return mCompositorWidgetProxy ? mCompositorWidgetProxy->AsWindowsProxy() : nullptr;
 }
 
 void
@@ -4150,17 +4098,18 @@ nsWindow::DispatchMouseEvent(EventMessage aEventMessage, WPARAM wParam,
       }
       break;
     case eMouseExitFromWidget:
-      event.exit = IsTopLevelMouseExit(mWnd) ?
-                     WidgetMouseEvent::eTopLevel : WidgetMouseEvent::eChild;
+      event.mExitFrom =
+        IsTopLevelMouseExit(mWnd) ? WidgetMouseEvent::eTopLevel :
+                                    WidgetMouseEvent::eChild;
       break;
     default:
       break;
   }
-  event.clickCount = sLastClickCount;
+  event.mClickCount = sLastClickCount;
 
 #ifdef NS_DEBUG_XX
   MOZ_LOG(gWindowsLog, LogLevel::Info,
-         ("Msg Time: %d Click Count: %d\n", curMsgTime, event.clickCount));
+         ("Msg Time: %d Click Count: %d\n", curMsgTime, event.mClickCount));
 #endif
 
   NPEvent pluginEvent;
@@ -4804,7 +4753,8 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
         obsServ->NotifyObservers(nullptr, "profile-change-net-teardown", context.get());
         obsServ->NotifyObservers(nullptr, "profile-change-teardown", context.get());
         obsServ->NotifyObservers(nullptr, "profile-before-change", context.get());
-        obsServ->NotifyObservers(nullptr, "profile-before-change2", context.get());
+        obsServ->NotifyObservers(nullptr, "profile-before-change-qm", context.get());
+        obsServ->NotifyObservers(nullptr, "profile-before-change-telemetry", context.get());
         // Then a controlled but very quick exit.
         _exit(0);
       }
@@ -4973,13 +4923,18 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
         //
         // To do this we take mPresentLock in nsWindow::PreRender and
         // if that lock is taken we wait before doing WM_SETTEXT
-        mPresentLock.Enter();
+        RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy();
+        if (proxy) {
+          proxy->EnterPresentLock();
+        }
         DWORD style = GetWindowLong(mWnd, GWL_STYLE);
         SetWindowLong(mWnd, GWL_STYLE, style & ~WS_VISIBLE);
         *aRetValue = CallWindowProcW(GetPrevWindowProc(), mWnd,
                                      msg, wParam, lParam);
         SetWindowLong(mWnd, GWL_STYLE, style);
-        mPresentLock.Leave();
+        if (proxy) {
+          proxy->LeavePresentLock();
+        }
 
         return true;
       }
@@ -4994,6 +4949,13 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
 
       if (!mCustomNonClient)
         break;
+
+      // There is a case that rendered result is not kept. Bug 1237617
+      if (wParam == TRUE &&
+          !gfxEnv::DisableForcePresent() &&
+          gfxWindowsPlatform::GetPlatform()->DwmCompositionEnabled()) {
+        NS_DispatchToMainThread(NewRunnableMethod(this, &nsWindow::ForcePresent));
+      }
 
       // let the dwm handle nc painting on glass
       // Never allow native painting if we are on fullscreen
@@ -5636,16 +5598,20 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
     // opened. For example, a dialog opened via a keyboard press on a button
     // should enable cues, whereas the same dialog opened via a mouse click of
     // the button should not.
-    int32_t action = LOWORD(wParam);
-    if (action == UIS_SET || action == UIS_CLEAR) {
-      int32_t flags = HIWORD(wParam);
-      UIStateChangeType showAccelerators = UIStateChangeType_NoChange;
-      UIStateChangeType showFocusRings = UIStateChangeType_NoChange;
-      if (flags & UISF_HIDEACCEL)
-        showAccelerators = (action == UIS_SET) ? UIStateChangeType_Clear : UIStateChangeType_Set;
-      if (flags & UISF_HIDEFOCUS)
-        showFocusRings = (action == UIS_SET) ? UIStateChangeType_Clear : UIStateChangeType_Set;
-      NotifyUIStateChanged(showAccelerators, showFocusRings);
+    if (mWindowType == eWindowType_toplevel ||
+        mWindowType == eWindowType_dialog) {
+      int32_t action = LOWORD(wParam);
+      if (action == UIS_SET || action == UIS_CLEAR) {
+        int32_t flags = HIWORD(wParam);
+        UIStateChangeType showAccelerators = UIStateChangeType_NoChange;
+        UIStateChangeType showFocusRings = UIStateChangeType_NoChange;
+        if (flags & UISF_HIDEACCEL)
+          showAccelerators = (action == UIS_SET) ? UIStateChangeType_Clear : UIStateChangeType_Set;
+        if (flags & UISF_HIDEFOCUS)
+          showFocusRings = (action == UIS_SET) ? UIStateChangeType_Clear : UIStateChangeType_Set;
+
+        NotifyUIStateChanged(showAccelerators, showFocusRings);
+      }
     }
 
     break;
@@ -6271,10 +6237,11 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp)
     newHeight = r.bottom - r.top;
     nsIntRect rect(wp->x, wp->y, newWidth, newHeight);
 
-#ifdef MOZ_XUL
-    if (eTransparencyTransparent == mTransparencyMode)
-      ResizeTranslucentWindow(newWidth, newHeight);
-#endif
+    if (eTransparencyTransparent == mTransparencyMode) {
+      if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+        proxy->ResizeTransparentWindow(newWidth, newHeight);
+      }
+    }
 
     if (newWidth > mLastSize.width)
     {
@@ -6792,11 +6759,9 @@ void nsWindow::OnDestroy()
   if (mCursor == -1)
     SetCursor(eCursor_standard);
 
-#ifdef MOZ_XUL
-  // Reset transparency
-  if (eTransparencyTransparent == mTransparencyMode)
-    SetupTranslucentWindowMemoryBitmap(eTransparencyOpaque);
-#endif
+  if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+    proxy->OnDestroyWindow();
+  }
 
   // Finalize panning feedback to possibly restore window displacement
   mGesture.PanFeedbackFinalize(mWnd, true);
@@ -7080,17 +7045,6 @@ nsWindow::GetAccessible()
 
 #ifdef MOZ_XUL
 
-void nsWindow::ResizeTranslucentWindow(int32_t aNewWidth, int32_t aNewHeight, bool force)
-{
-  if (!force && aNewWidth == mBounds.width && aNewHeight == mBounds.height)
-    return;
-
-  RefPtr<gfxWindowsSurface> newSurface =
-    new gfxWindowsSurface(IntSize(aNewWidth, aNewHeight), SurfaceFormat::A8R8G8B8_UINT32);
-  mTransparentSurface = newSurface;
-  mMemoryDC = newSurface->GetDC();
-}
-
 void nsWindow::SetWindowTranslucencyInner(nsTransparencyMode aMode)
 {
   if (aMode == mTransparencyMode)
@@ -7142,55 +7096,10 @@ void nsWindow::SetWindowTranslucencyInner(nsTransparencyMode aMode)
     memset(&mGlassMargins, 0, sizeof mGlassMargins);
   mTransparencyMode = aMode;
 
-  SetupTranslucentWindowMemoryBitmap(aMode);
+  if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+    proxy->UpdateTransparency(aMode);
+  }
   UpdateGlass();
-}
-
-void nsWindow::SetupTranslucentWindowMemoryBitmap(nsTransparencyMode aMode)
-{
-  if (eTransparencyTransparent == aMode) {
-    ResizeTranslucentWindow(mBounds.width, mBounds.height, true);
-  } else {
-    mTransparentSurface = nullptr;
-    mMemoryDC = nullptr;
-  }
-}
-
-void nsWindow::ClearTranslucentWindow()
-{
-  if (mTransparentSurface) {
-    IntSize size = mTransparentSurface->GetSize();
-    RefPtr<DrawTarget> drawTarget = gfxPlatform::GetPlatform()->
-      CreateDrawTargetForSurface(mTransparentSurface, size);
-    drawTarget->ClearRect(Rect(0, 0, size.width, size.height));
-    UpdateTranslucentWindow();
- }
-}
-
-nsresult nsWindow::UpdateTranslucentWindow()
-{
-  if (mBounds.IsEmpty())
-    return NS_OK;
-
-  ::GdiFlush();
-
-  BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
-  SIZE winSize = { mBounds.width, mBounds.height };
-  POINT srcPos = { 0, 0 };
-  HWND hWnd = WinUtils::GetTopLevelHWND(mWnd, true);
-  RECT winRect;
-  ::GetWindowRect(hWnd, &winRect);
-
-  // perform the alpha blend
-  bool updateSuccesful = 
-    ::UpdateLayeredWindow(hWnd, nullptr, (POINT*)&winRect, &winSize, mMemoryDC,
-                          &srcPos, 0, &bf, ULW_ALPHA);
-
-  if (!updateSuccesful) {
-    return NS_ERROR_FAILURE;
-  }
-
-  return NS_OK;
 }
 
 #endif //MOZ_XUL
@@ -7829,21 +7738,6 @@ void nsWindow::PickerClosed()
   if (!mPickerDisplayCount && mDestroyCalled) {
     Destroy();
   }
-}
-
-bool nsWindow::PreRender(LayerManagerComposite*)
-{
-  // This can block waiting for WM_SETTEXT to finish
-  // Using PreRender is unnecessarily pessimistic because
-  // we technically only need to block during the present call
-  // not all of compositor rendering
-  mPresentLock.Enter();
-  return true;
-}
-
-void nsWindow::PostRender(LayerManagerComposite*)
-{
-  mPresentLock.Leave();
 }
 
 bool

@@ -159,7 +159,8 @@ nsPluginInstanceOwner::NotifyPaintWaiter(nsDisplayListBuilder* aBuilder)
     nsCOMPtr<nsIRunnable> event = new AsyncPaintWaitEvent(content, false);
     // Run this event as soon as it's safe to do so, since listeners need to
     // receive it immediately
-    mWaitingForPaint = nsContentUtils::AddScriptRunner(event);
+    nsContentUtils::AddScriptRunner(event);
+    mWaitingForPaint = true;
   }
 }
 
@@ -886,16 +887,16 @@ nsPluginInstanceOwner::GetCompositionString(uint32_t aType,
       for (TextRange& range : *ranges) {
         uint8_t type = ATTR_INPUT;
         switch(range.mRangeType) {
-          case NS_TEXTRANGE_RAWINPUT:
+          case TextRangeType::eRawClause:
             type = ATTR_INPUT;
             break;
-          case NS_TEXTRANGE_SELECTEDRAWTEXT:
+          case TextRangeType::eSelectedRawClause:
             type = ATTR_TARGET_NOTCONVERTED;
             break;
-          case NS_TEXTRANGE_CONVERTEDTEXT:
+          case TextRangeType::eConvertedClause:
             type = ATTR_CONVERTED;
             break;
-          case NS_TEXTRANGE_SELECTEDCONVERTEDTEXT:
+          case TextRangeType::eSelectedClause:
             type = ATTR_TARGET_CONVERTED;
             break;
           default:
@@ -2229,7 +2230,7 @@ TranslateToNPCocoaEvent(WidgetGUIEvent* anEvent, nsIFrame* aObjectFrame)
           default:
             NS_WARNING("Mouse button we don't know about?");
         }
-        cocoaEvent.data.mouse.clickCount = mouseEvent->clickCount;
+        cocoaEvent.data.mouse.clickCount = mouseEvent->mClickCount;
       } else {
         NS_WARNING("eMouseUp/DOWN is not a WidgetMouseEvent?");
       }
@@ -2411,7 +2412,7 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
         static const int dblClickMsgs[] =
           { WM_LBUTTONDBLCLK, WM_MBUTTONDBLCLK, WM_RBUTTONDBLCLK };
         const WidgetMouseEvent* mouseEvent = anEvent.AsMouseEvent();
-        if (mouseEvent->clickCount == 2) {
+        if (mouseEvent->mClickCount == 2) {
           pluginEvent.event = dblClickMsgs[mouseEvent->button];
         } else {
           pluginEvent.event = downMsgs[mouseEvent->button];
@@ -2854,7 +2855,7 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
      {
        const WidgetKeyboardEvent& keyEvent = *anEvent.AsKeyboardEvent();
        LOG("Firing eKeyboardEventClass %d %d\n",
-           keyEvent.keyCode, keyEvent.charCode);
+           keyEvent.mKeyCode, keyEvent.mCharCode);
        // pluginEvent is initialized by nsWindow::InitKeyEvent().
        const ANPEvent* pluginEvent = static_cast<const ANPEvent*>(keyEvent.mPluginEvent);
        if (pluginEvent) {

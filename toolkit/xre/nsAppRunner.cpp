@@ -11,6 +11,7 @@
 
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/ContentChild.h"
+#include "mozilla/ipc/GeckoChildProcessHost.h"
 
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Attributes.h"
@@ -92,8 +93,6 @@
 #include "nsAppShellCID.h"
 #include "mozilla/scache/StartupCache.h"
 #include "gfxPrefs.h"
-
-#include "base/histogram.h"
 
 #include "mozilla/unused.h"
 
@@ -623,6 +622,22 @@ GetAndCleanTempDir()
     return nullptr;
   }
 
+  // If the NS_APP_CONTENT_PROCESS_TEMP_DIR is the real temp directory, don't
+  // attempt to delete it.
+  nsCOMPtr<nsIFile> realTempDir;
+  rv = NS_GetSpecialDirectory(NS_OS_TEMP_DIR, getter_AddRefs(realTempDir));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return nullptr;
+  }
+  bool isRealTemp;
+  rv = tempDir->Equals(realTempDir, &isRealTemp);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return nullptr;
+  }
+  if (isRealTemp) {
+    return tempDir.forget();
+  }
+
   // Don't return an error if the directory doesn't exist.
   // Windows Remove() returns NS_ERROR_FILE_NOT_FOUND while
   // OS X returns NS_ERROR_FILE_TARGET_DOES_NOT_EXIST.
@@ -945,9 +960,11 @@ SYNC_ENUMS(DEFAULT, Default)
 SYNC_ENUMS(PLUGIN, Plugin)
 SYNC_ENUMS(CONTENT, Content)
 SYNC_ENUMS(IPDLUNITTEST, IPDLUnitTest)
+SYNC_ENUMS(GMPLUGIN, GMPlugin)
+SYNC_ENUMS(GPU, GPU)
 
 // .. and ensure that that is all of them:
-static_assert(GeckoProcessType_GMPlugin + 1 == GeckoProcessType_End,
+static_assert(GeckoProcessType_GPU + 1 == GeckoProcessType_End,
               "Did not find the final GeckoProcessType");
 
 NS_IMETHODIMP
@@ -2875,21 +2892,6 @@ static void MakeOrSetMinidumpPath(nsIFile* profD)
 const nsXREAppData* gAppData = nullptr;
 
 #ifdef MOZ_WIDGET_GTK
-#include "prlink.h"
-typedef void (*_g_set_application_name_fn)(const gchar *application_name);
-typedef void (*_gtk_window_set_auto_startup_notification_fn)(gboolean setting);
-
-static PRFuncPtr FindFunction(const char* aName)
-{
-  PRLibrary *lib = nullptr;
-  PRFuncPtr result = PR_FindFunctionSymbolAndLibrary(aName, &lib);
-  // Since the library was already loaded, we can safely unload it here.
-  if (lib) {
-    PR_UnloadLibrary(lib);
-  }
-  return result;
-}
-
 static void MOZ_gdk_display_close(GdkDisplay *display)
 {
 #if CLEANUP_MEMORY
@@ -3393,10 +3395,11 @@ XREMain::XRE_mainInit(bool* aExitFlag)
 #endif
 
 #if defined(MOZ_SANDBOX) && defined(XP_WIN)
-  bool brokerInitialized = SandboxBroker::Initialize();
-  Telemetry::Accumulate(Telemetry::SANDBOX_BROKER_INITIALIZED,
-                        brokerInitialized);
-  if (!brokerInitialized) {
+  if (mAppData->sandboxBrokerServices) {
+    SandboxBroker::Initialize(mAppData->sandboxBrokerServices);
+    Telemetry::Accumulate(Telemetry::SANDBOX_BROKER_INITIALIZED, true);
+  } else {
+    Telemetry::Accumulate(Telemetry::SANDBOX_BROKER_INITIALIZED, false);
 #if defined(MOZ_CONTENT_SANDBOX)
     // If we're sandboxing content and we fail to initialize, then crashing here
     // seems like the sensible option.
@@ -3486,15 +3489,24 @@ XREMain::XRE_mainInit(bool* aExitFlag)
   // order bit will be 1 if the key is pressed. By masking the returned short
   // with 0x8000 the result will be 0 if the key is not pressed and non-zero
   // otherwise.
-  if (GetKeyState(VK_SHIFT) & 0x8000 &&
-      !(GetKeyState(VK_CONTROL) & 0x8000) && !(GetKeyState(VK_MENU) & 0x8000)) {
+  if ((GetKeyState(VK_SHIFT) & 0x8000) &&
+      !(GetKeyState(VK_CONTROL) & 0x8000) &&
+      !(GetKeyState(VK_MENU) & 0x8000) &&
+      !EnvHasValue("MOZ_DISABLE_SAFE_MODE_KEY")) {
     gSafeMode = true;
   }
 #endif
 
 #ifdef XP_MACOSX
-  if (GetCurrentEventKeyModifiers() & optionKey)
+  if ((GetCurrentEventKeyModifiers() & optionKey) &&
+      !EnvHasValue("MOZ_DISABLE_SAFE_MODE_KEY"))
     gSafeMode = true;
+#endif
+
+#ifdef MOZ_CRASHREPORTER
+    CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("SafeMode"),
+                                       gSafeMode ? NS_LITERAL_CSTRING("1") :
+                                                   NS_LITERAL_CSTRING("0"));
 #endif
 
   // Handle --no-remote and --new-instance command line arguments. Setup
@@ -3846,17 +3858,8 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
   }
 #endif
 #if defined(MOZ_WIDGET_GTK)
-  // g_set_application_name () is only defined in glib2.2 and higher.
-  _g_set_application_name_fn _g_set_application_name =
-    (_g_set_application_name_fn)FindFunction("g_set_application_name");
-  if (_g_set_application_name) {
-    _g_set_application_name(mAppData->name);
-  }
-  _gtk_window_set_auto_startup_notification_fn _gtk_window_set_auto_startup_notification =
-    (_gtk_window_set_auto_startup_notification_fn)FindFunction("gtk_window_set_auto_startup_notification");
-  if (_gtk_window_set_auto_startup_notification) {
-    _gtk_window_set_auto_startup_notification(false);
-  }
+  g_set_application_name(mAppData->name);
+  gtk_window_set_auto_startup_notification(false);
 
 #if (MOZ_WIDGET_GTK == 2)
   gtk_widget_set_default_colormap(gdk_rgb_get_colormap());
@@ -4581,12 +4584,9 @@ XRE_StopLateWriteChecks(void) {
 void
 XRE_CreateStatsObject()
 {
-  // A initializer to initialize histogram collection, a chromium
-  // thing used by Telemetry (and effectively a global; it's all static).
-  // Note: purposely leaked
-  base::StatisticsRecorder* statistics_recorder = new base::StatisticsRecorder();
-  MOZ_LSAN_INTENTIONALLY_LEAK_OBJECT(statistics_recorder);
-  Unused << statistics_recorder;
+  // Initialize global variables used by histogram collection
+  // machinery that is used by by Telemetry.  Note: is never de-initialised.
+  Telemetry::CreateStatisticsRecorder();
 }
 
 int
@@ -4715,9 +4715,9 @@ enum {
   kE10sDisabledForAddons = 7,
   kE10sForceDisabled = 8,
   kE10sDisabledForXPAcceleration = 9,
+  kE10sDisabledForOperatingSystem = 10,
 };
 
-#if defined(XP_WIN) || defined(XP_MACOSX)
 const char* kAccessibilityLastRunDatePref = "accessibility.lastLoadDate";
 const char* kAccessibilityLoadedLastSessionPref = "accessibility.loadedInLastSession";
 
@@ -4727,7 +4727,6 @@ PRTimeToSeconds(PRTime t_usec)
   PRTime usec_per_sec = PR_USEC_PER_SEC;
   return uint32_t(t_usec /= usec_per_sec);
 }
-#endif // XP_WIN || XP_MACOSX
 
 const char* kForceEnableE10sPref = "browser.tabs.remote.force-enable";
 const char* kForceDisableE10sPref = "browser.tabs.remote.force-disable";
@@ -4758,7 +4757,7 @@ MultiprocessBlockPolicy() {
   }
 
   bool disabledForA11y = false;
-#if defined(XP_WIN) || defined(XP_MACOSX)
+
   /**
    * Avoids enabling e10s if accessibility has recently loaded. Performs the
    * following checks:
@@ -4785,7 +4784,22 @@ MultiprocessBlockPolicy() {
       disabledForA11y = true;
     }
   }
-#endif // XP_WIN || XP_MACOSX
+
+  if (disabledForA11y) {
+    gMultiprocessBlockPolicy = kE10sDisabledForAccessibility;
+    return gMultiprocessBlockPolicy;
+  }
+
+  /**
+   * Avoids enabling e10s for Windows XP users on the release channel.
+   */
+#if defined(XP_WIN)
+  if (Preferences::GetDefaultCString("app.update.channel").EqualsLiteral("release") &&
+      !IsVistaOrLater()) {
+    gMultiprocessBlockPolicy = kE10sDisabledForOperatingSystem;
+    return gMultiprocessBlockPolicy;
+  }
+#endif
 
 #if defined(XP_WIN)
   /**
@@ -4801,41 +4815,24 @@ MultiprocessBlockPolicy() {
   }
 #endif // XP_WIN
 
-  if (disabledForA11y) {
-    gMultiprocessBlockPolicy = kE10sDisabledForAccessibility;
-    return gMultiprocessBlockPolicy;
-  }
-
+#if defined(MOZ_WIDGET_GTK)
   /**
    * Avoids enabling e10s for certain locales that require bidi selection,
    * which currently doesn't work well with e10s.
    */
   bool disabledForBidi = false;
 
-  nsAutoCString locale;
   nsCOMPtr<nsIXULChromeRegistry> registry =
    mozilla::services::GetXULChromeRegistryService();
   if (registry) {
-     registry->GetSelectedLocale(NS_LITERAL_CSTRING("global"), locale);
-  }
-
-  int32_t index = locale.FindChar('-');
-  if (index >= 0) {
-    locale.Truncate(index);
-  }
-
-  if (locale.EqualsLiteral("ar") ||
-      locale.EqualsLiteral("fa") ||
-      locale.EqualsLiteral("he") ||
-      locale.EqualsLiteral("ur")) {
-    disabledForBidi = true;
+     registry->IsLocaleRTL(NS_LITERAL_CSTRING("global"), &disabledForBidi);
   }
 
   if (disabledForBidi) {
     gMultiprocessBlockPolicy = kE10sDisabledForBidi;
     return gMultiprocessBlockPolicy;
   }
-
+#endif // MOZ_WIDGET_GTK
 
   /*
    * None of the blocking policies matched, so e10s is allowed to run.
@@ -4892,10 +4889,6 @@ mozilla::BrowserTabsRemoteAutostart()
   gBrowserTabsRemoteStatus = status;
 
   mozilla::Telemetry::Accumulate(mozilla::Telemetry::E10S_STATUS, status);
-  if (Preferences::GetBool("browser.enabledE10SFromPrompt", false)) {
-    mozilla::Telemetry::Accumulate(mozilla::Telemetry::E10S_STILL_ACCEPTED_FROM_PROMPT,
-                                    gBrowserTabsRemoteAutostart);
-  }
   if (prefEnabled) {
     mozilla::Telemetry::Accumulate(mozilla::Telemetry::E10S_BLOCKED_FROM_RUNNING,
                                     !gBrowserTabsRemoteAutostart);
@@ -4966,4 +4959,9 @@ OverrideDefaultLocaleIfNeeded() {
     // Otherwise fall back to the "C" locale, which is available on all platforms.
     setlocale(LC_ALL, "C.UTF-8") || setlocale(LC_ALL, "C");
   }
+}
+
+void
+XRE_EnableSameExecutableForContentProc() {
+  mozilla::ipc::GeckoChildProcessHost::EnableSameExecutableForContentProc();
 }

@@ -44,6 +44,7 @@
 #include <algorithm>
 
 using namespace mozilla;
+using namespace mozilla::net;
 
 /******************************************************************************
  * nsCacheProfilePrefObserver
@@ -296,6 +297,7 @@ public:
     {
         nsCacheServiceAutoLock autoLock(LOCK_TELEM(NSBLOCKONCACHETHREADEVENT_RUN));
         CACHE_LOG_DEBUG(("nsBlockOnCacheThreadEvent [%p]\n", this));
+        nsCacheService::gService->mNotified = true;
         nsCacheService::gService->mCondVar.Notify();
         return NS_OK;
     }
@@ -852,9 +854,12 @@ nsCacheService::SyncWithCacheIOThread()
     }
 
     // wait until notified, then return
-    rv = gService->mCondVar.Wait();
+    gService->mNotified = false;
+    while (!gService->mNotified) {
+      gService->mCondVar.Wait();
+    }
 
-    return rv;
+    return NS_OK;
 }
 
 
@@ -1073,6 +1078,7 @@ nsCacheService::nsCacheService()
     : mObserver(nullptr),
       mLock("nsCacheService.mLock"),
       mCondVar(mLock, "nsCacheService.mCondVar"),
+      mNotified(false),
       mTimeStampLock("nsCacheService.mTimeStampLock"),
       mInitialized(false),
       mClearingEntries(false),
@@ -1525,8 +1531,8 @@ nsresult nsCacheService::EvictEntriesInternal(nsCacheStoragePolicy storagePolicy
     if (storagePolicy == nsICache::STORE_ANYWHERE) {
         // if not called on main thread, dispatch the notification to the main thread to notify observers
         if (!NS_IsMainThread()) { 
-            nsCOMPtr<nsIRunnable> event = NS_NewRunnableMethod(this,
-                                                               &nsCacheService::FireClearNetworkCacheStoredAnywhereNotification);
+            nsCOMPtr<nsIRunnable> event = NewRunnableMethod(this,
+                                                            &nsCacheService::FireClearNetworkCacheStoredAnywhereNotification);
             NS_DispatchToMainThread(event);
         } else {
             // else you're already on main thread - notify observers

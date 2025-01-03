@@ -6,9 +6,11 @@
 #include "GMPServiceParent.h"
 #include "GMPService.h"
 #include "prio.h"
+#include "base/task.h"
 #include "mozilla/Logging.h"
 #include "GMPParent.h"
 #include "GMPVideoDecoderParent.h"
+#include "nsAutoPtr.h"
 #include "nsIObserverService.h"
 #include "GeckoChildProcessHost.h"
 #include "mozilla/Preferences.h"
@@ -22,7 +24,6 @@
 #include "GMPDecryptorParent.h"
 #include "GMPAudioDecoderParent.h"
 #include "nsComponentManagerUtils.h"
-#include "mozilla/Preferences.h"
 #include "runnable_utils.h"
 #include "VideoUtils.h"
 #if defined(XP_LINUX) && defined(MOZ_GMP_SANDBOX)
@@ -41,6 +42,7 @@
 #include "nsIXULRuntime.h"
 #include "GMPDecoderModule.h"
 #include <limits>
+#include "MediaPrefs.h"
 
 namespace mozilla {
 
@@ -80,10 +82,6 @@ NS_IMPL_ISUPPORTS_INHERITED(GeckoMediaPluginServiceParent,
                             GeckoMediaPluginService,
                             mozIGeckoMediaPluginChromeService)
 
-static int32_t sMaxAsyncShutdownWaitMs = 0;
-static bool sAllowInsecureGMP = false;
-static bool sHaveSetGMPServiceParentPrefCaches = false;
-
 GeckoMediaPluginServiceParent::GeckoMediaPluginServiceParent()
   : mShuttingDown(false)
 #ifdef MOZ_CRASHREPORTER
@@ -95,14 +93,6 @@ GeckoMediaPluginServiceParent::GeckoMediaPluginServiceParent()
   , mLoadPluginsFromDiskComplete(false)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  if (!sHaveSetGMPServiceParentPrefCaches) {
-    sHaveSetGMPServiceParentPrefCaches = true;
-    Preferences::AddIntVarCache(&sMaxAsyncShutdownWaitMs,
-                                "media.gmp.async-shutdown-timeout",
-                                GMP_DEFAULT_ASYNC_SHUTDONW_TIMEOUT);
-    Preferences::AddBoolVarCache(&sAllowInsecureGMP,
-                                 "media.gmp.insecure.allow", false);
-  }
   mInitPromise.SetMonitor(&mInitPromiseMonitor);
 }
 
@@ -115,8 +105,7 @@ GeckoMediaPluginServiceParent::~GeckoMediaPluginServiceParent()
 int32_t
 GeckoMediaPluginServiceParent::AsyncShutdownTimeoutMs()
 {
-  MOZ_ASSERT(sHaveSetGMPServiceParentPrefCaches);
-  return sMaxAsyncShutdownWaitMs;
+  return MediaPrefs::GMPAsyncShutdownTimeout();
 }
 
 nsresult
@@ -419,8 +408,8 @@ GeckoMediaPluginServiceParent::Observe(nsISupports* aSubject,
         NS_LITERAL_CSTRING("Dispatching UnloadPlugins"));
 #endif
       gmpThread->Dispatch(
-        NS_NewRunnableMethod(this,
-                             &GeckoMediaPluginServiceParent::UnloadPlugins),
+        NewRunnableMethod(this,
+                          &GeckoMediaPluginServiceParent::UnloadPlugins),
         NS_DISPATCH_NORMAL);
 
 #ifdef MOZ_CRASHREPORTER
@@ -493,7 +482,7 @@ GeckoMediaPluginServiceParent::Observe(nsISupports* aSubject,
   } else if (!strcmp("browser:purge-session-history", aTopic)) {
     // Clear everything!
     if (!aSomeData || nsDependentString(aSomeData).IsEmpty()) {
-      return GMPDispatch(NS_NewRunnableMethod(
+      return GMPDispatch(NewRunnableMethod(
           this, &GeckoMediaPluginServiceParent::ClearStorage));
     }
 
@@ -503,7 +492,7 @@ GeckoMediaPluginServiceParent::Observe(nsISupports* aSubject,
     if (NS_FAILED(rv)) {
       return rv;
     }
-    return GMPDispatch(NS_NewRunnableMethodWithArg<PRTime>(
+    return GMPDispatch(NewRunnableMethod<PRTime>(
         this, &GeckoMediaPluginServiceParent::ClearRecentHistoryOnGMPThread,
         t));
   }
@@ -605,7 +594,7 @@ GeckoMediaPluginServiceParent::AsyncShutdownComplete(GMPParent* aParent)
   if (mShuttingDownOnGMPThread) {
     // The main thread may be waiting for async shutdown of plugins,
     // one of which has completed. Wake up the main thread by sending a task.
-    nsCOMPtr<nsIRunnable> task(NS_NewRunnableMethod(
+    nsCOMPtr<nsIRunnable> task(NewRunnableMethod(
       this, &GeckoMediaPluginServiceParent::NotifyAsyncShutdownComplete));
     NS_DispatchToMainThread(task);
   }
@@ -737,7 +726,7 @@ GeckoMediaPluginServiceParent::UnloadPlugins()
       SetAsyncShutdownPluginState(nullptr, '3',
         NS_LITERAL_CSTRING("Dispatching sync-shutdown-complete"));
 #endif
-  nsCOMPtr<nsIRunnable> task(NS_NewRunnableMethod(
+  nsCOMPtr<nsIRunnable> task(NewRunnableMethod(
     this, &GeckoMediaPluginServiceParent::NotifySyncShutdownComplete));
   NS_DispatchToMainThread(task);
 }
@@ -1029,7 +1018,7 @@ CreateGMPParent()
 {
 #if defined(XP_LINUX) && defined(MOZ_GMP_SANDBOX)
   if (!SandboxInfo::Get().CanSandboxMedia()) {
-    if (!sAllowInsecureGMP) {
+    if (!MediaPrefs::GMPAllowInsecure()) {
       NS_WARNING("Denying media plugin load due to lack of sandboxing.");
       return nullptr;
     }
@@ -1298,6 +1287,17 @@ ReadSalt(nsIFile* aPath, nsACString& aOutData)
   return ReadFromFile(aPath, NS_LITERAL_CSTRING("salt"),
                       aOutData, NodeIdSaltLength);
 
+}
+
+already_AddRefed<GMPStorage>
+GeckoMediaPluginServiceParent::GetMemoryStorageFor(const nsACString& aNodeId)
+{
+  RefPtr<GMPStorage> s;
+  if (!mTempGMPStorage.Get(aNodeId, getter_AddRefs(s))) {
+    s = CreateGMPMemoryStorage();
+    mTempGMPStorage.Put(aNodeId, s);
+  }
+  return s.forget();
 }
 
 NS_IMETHODIMP
@@ -1749,7 +1749,7 @@ NS_IMETHODIMP
 GeckoMediaPluginServiceParent::ForgetThisSite(const nsAString& aSite)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  return GMPDispatch(NS_NewRunnableMethodWithArg<nsCString>(
+  return GMPDispatch(NewRunnableMethod<nsCString>(
       this, &GeckoMediaPluginServiceParent::ForgetThisSiteOnGMPThread,
       NS_ConvertUTF16toUTF8(aSite)));
 }
@@ -1776,6 +1776,10 @@ GeckoMediaPluginServiceParent::ClearStorage()
   if (NS_FAILED(DeleteDir(path))) {
     NS_WARNING("Failed to delete GMP storage directory");
   }
+
+  // Clear private-browsing storage.
+  mTempGMPStorage.Clear();
+
   NS_DispatchToMainThread(new NotifyObserversTask("gmp-clear-storage-complete"), NS_DISPATCH_NORMAL);
 }
 

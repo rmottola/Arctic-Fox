@@ -242,12 +242,16 @@ LIRGeneratorShared::defineReturn(LInstruction* lir, MDefinition* mir)
       case MIRType::Double:
         lir->setDef(0, LDefinition(vreg, LDefinition::DOUBLE, LFloatReg(ReturnDoubleReg)));
         break;
-      case MIRType::Bool32x4:
+      case MIRType::Int8x16:
+      case MIRType::Int16x8:
       case MIRType::Int32x4:
-        lir->setDef(0, LDefinition(vreg, LDefinition::INT32X4, LFloatReg(ReturnSimd128Reg)));
+      case MIRType::Bool8x16:
+      case MIRType::Bool16x8:
+      case MIRType::Bool32x4:
+        lir->setDef(0, LDefinition(vreg, LDefinition::SIMD128INT, LFloatReg(ReturnSimd128Reg)));
         break;
       case MIRType::Float32x4:
-        lir->setDef(0, LDefinition(vreg, LDefinition::FLOAT32X4, LFloatReg(ReturnSimd128Reg)));
+        lir->setDef(0, LDefinition(vreg, LDefinition::SIMD128FLOAT, LFloatReg(ReturnSimd128Reg)));
         break;
       default:
         LDefinition::Type type = LDefinition::TypeFrom(mir->type());
@@ -563,6 +567,18 @@ LDefinition
 LIRGeneratorShared::temp(LDefinition::Type type, LDefinition::Policy policy)
 {
     return LDefinition(getVirtualRegister(), type, policy);
+}
+
+LInt64Definition
+LIRGeneratorShared::tempInt64(LDefinition::Policy policy)
+{
+#if JS_BITS_PER_WORD == 32
+    LDefinition high = temp(LDefinition::GENERAL, policy);
+    LDefinition low = temp(LDefinition::GENERAL, policy);
+    return LInt64Definition(high, low);
+#else
+    return LInt64Definition(temp(LDefinition::GENERAL, policy));
+#endif
 }
 
 LDefinition

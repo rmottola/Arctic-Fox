@@ -57,7 +57,8 @@ const size_t ChunkRuntimeOffset = ChunkSize - sizeof(void*);
 const size_t ChunkTrailerSize = 2 * sizeof(uintptr_t) + sizeof(uint64_t);
 const size_t ChunkLocationOffset = ChunkSize - ChunkTrailerSize;
 const size_t ArenaZoneOffset = sizeof(size_t);
-const size_t ArenaHeaderSize = sizeof(size_t) + 2 * sizeof(uintptr_t) + sizeof(size_t);
+const size_t ArenaHeaderSize = sizeof(size_t) + 2 * sizeof(uintptr_t) +
+                               sizeof(size_t) + sizeof(uintptr_t);
 
 /*
  * Live objects are marked black. How many other additional colors are available
@@ -114,7 +115,9 @@ struct Zone
     JSTracer* const barrierTracer_;     // A pointer to the JSRuntime's |gcMarker|.
 
   public:
-    js::RootLists roots;
+    // Stack GC roots for Rooted GC pointers.
+    js::RootedListHeads stackRoots_;
+    template <typename T> friend class JS::Rooted;
 
     bool needsIncrementalBarrier_;
 
@@ -122,7 +125,11 @@ struct Zone
       : runtime_(runtime),
         barrierTracer_(barrierTracerArg),
         needsIncrementalBarrier_(false)
-    {}
+    {
+        for (auto& stackRootPtr : stackRoots_) {
+            stackRootPtr = nullptr;
+        }
+    }
 
     bool needsIncrementalBarrier() const {
         return needsIncrementalBarrier_;
@@ -145,7 +152,7 @@ struct Zone
         return runtime_;
     }
 
-    static JS::shadow::Zone* asShadowZone(JS::Zone* zone) {
+    static MOZ_ALWAYS_INLINE JS::shadow::Zone* asShadowZone(JS::Zone* zone) {
         return reinterpret_cast<JS::shadow::Zone*>(zone);
     }
 };

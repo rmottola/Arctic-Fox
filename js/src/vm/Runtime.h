@@ -43,6 +43,7 @@
 #include "vm/CommonPropertyNames.h"
 #include "vm/DateTime.h"
 #include "vm/MallocProvider.h"
+#include "vm/SharedImmutableStringsCache.h"
 #include "vm/SPSProfiler.h"
 #include "vm/Stack.h"
 #include "vm/Stopwatch.h"
@@ -582,8 +583,8 @@ class PerThreadData : public PerThreadDataFriendFields
     inline JSRuntime* runtimeIfOnOwnerThread();
 
     inline bool exclusiveThreadsPresent();
-    inline void addActiveCompilation();
-    inline void removeActiveCompilation();
+    inline void addActiveCompilation(AutoLockForExclusiveAccess& lock);
+    inline void removeActiveCompilation(AutoLockForExclusiveAccess& lock);
 
     // For threads which may be associated with different runtimes, depending
     // on the work they are doing.
@@ -670,6 +671,22 @@ struct JSRuntime : public JS::shadow::Runtime,
 
     // Information about the heap allocated backtrack stack used by RegExp JIT code.
     js::irregexp::RegExpStack regexpStack;
+
+#ifdef DEBUG
+  private:
+    // The number of possible bailing places encounters before forcefully bailing
+    // in that place. Zero means inactive.
+    uint32_t ionBailAfter_;
+
+  public:
+    void* addressOfIonBailAfter() { return &ionBailAfter_; }
+
+    // Set after how many bailing places we should forcefully bail.
+    // Zero disables this feature.
+    void setIonBailAfter(uint32_t after) {
+        ionBailAfter_ = after;
+    }
+#endif
 
   private:
     friend class js::Activation;
@@ -924,6 +941,9 @@ struct JSRuntime : public JS::shadow::Runtime,
     JSEnqueuePromiseJobCallback enqueuePromiseJobCallback;
     void* enqueuePromiseJobCallbackData;
 
+    JSPromiseRejectionTrackerCallback promiseRejectionTrackerCallback;
+    void* promiseRejectionTrackerCallbackData;
+
 #ifdef DEBUG
     void assertCanLock(js::RuntimeLock which);
 #else
@@ -1032,7 +1052,9 @@ struct JSRuntime : public JS::shadow::Runtime,
         return interpreterStack_;
     }
 
-    bool enqueuePromiseJob(JSContext* cx, js::HandleFunction job);
+    bool enqueuePromiseJob(JSContext* cx, js::HandleFunction job, js::HandleObject promise);
+    void addUnhandledRejectedPromise(JSContext* cx, js::HandleObject promise);
+    void removeUnhandledRejectedPromise(JSContext* cx, js::HandleObject promise);
 
     //-------------------------------------------------------------------------
     // Self-hosting support
@@ -1084,10 +1106,6 @@ struct JSRuntime : public JS::shadow::Runtime,
 
     /* The native stack size limit that runtime should not exceed. */
     size_t              nativeStackQuota[js::StackKindCount];
-
-    /* Context create/destroy callback. */
-    JSContextCallback   cxCallback;
-    void*              cxCallbackData;
 
     /* Compartment destroy callback. */
     JSDestroyCompartmentCallback destroyCompartmentCallback;
@@ -1258,8 +1276,8 @@ struct JSRuntime : public JS::shadow::Runtime,
     JSDestroyPrincipalsOp destroyPrincipals;
     JSReadPrincipalsOp readPrincipals;
 
-    /* Optional error reporter. */
-    JSErrorReporter     errorReporter;
+    /* Optional warning reporter. */
+    JS::WarningReporter warningReporter;
 
     JS::BuildIdOp buildIdOp;
 
@@ -1283,12 +1301,27 @@ struct JSRuntime : public JS::shadow::Runtime,
   private:
     js::MathCache* mathCache_;
     js::MathCache* createMathCache(JSContext* cx);
+    mozilla::Maybe<js::SharedImmutableStringsCache> sharedImmutableStrings_;
   public:
     js::MathCache* getMathCache(JSContext* cx) {
         return mathCache_ ? mathCache_ : createMathCache(cx);
     }
     js::MathCache* maybeGetMathCache() {
         return mathCache_;
+    }
+
+    // If this particular JSRuntime has a SharedImmutableStringsCache, return a
+    // pointer to it, otherwise return nullptr.
+    js::SharedImmutableStringsCache* maybeThisRuntimeSharedImmutableStrings() {
+        return sharedImmutableStrings_.isSome() ? &*sharedImmutableStrings_ : nullptr;
+    }
+
+    // Get a reference to this JSRuntime's or its parent's
+    // SharedImmutableStringsCache.
+    js::SharedImmutableStringsCache& sharedImmutableStrings() {
+        MOZ_ASSERT_IF(parentRuntime, !sharedImmutableStrings_);
+        MOZ_ASSERT_IF(!parentRuntime, sharedImmutableStrings_);
+        return parentRuntime ? parentRuntime->sharedImmutableStrings() : *sharedImmutableStrings_;
     }
 
     js::GSNCache        gsnCache;
@@ -1299,8 +1332,6 @@ struct JSRuntime : public JS::shadow::Runtime,
     js::EvalCache       evalCache;
     js::LazyScriptCache lazyScriptCache;
 
-    js::CompressedSourceSet compressedSourceSet;
-
     // Pool of maps used during parse/emit. This may be modified by threads
     // with an ExclusiveContext and requires a lock. Active compilations
     // prevent the pool from being purged during GCs.
@@ -1308,18 +1339,18 @@ struct JSRuntime : public JS::shadow::Runtime,
     js::frontend::ParseMapPool parseMapPool_;
     unsigned activeCompilations_;
   public:
-    js::frontend::ParseMapPool& parseMapPool() {
+    js::frontend::ParseMapPool& parseMapPool(js::AutoLockForExclusiveAccess& lock) {
         MOZ_ASSERT(currentThreadHasExclusiveAccess());
         return parseMapPool_;
     }
     bool hasActiveCompilations() {
         return activeCompilations_ != 0;
     }
-    void addActiveCompilation() {
+    void addActiveCompilation(js::AutoLockForExclusiveAccess& lock) {
         MOZ_ASSERT(currentThreadHasExclusiveAccess());
         activeCompilations_++;
     }
-    void removeActiveCompilation() {
+    void removeActiveCompilation(js::AutoLockForExclusiveAccess& lock) {
         MOZ_ASSERT(currentThreadHasExclusiveAccess());
         activeCompilations_--;
     }
@@ -1379,11 +1410,11 @@ struct JSRuntime : public JS::shadow::Runtime,
 
     void sweepAtoms();
 
-    js::AtomSet& atoms() {
+    js::AtomSet& atoms(js::AutoLockForExclusiveAccess& lock) {
         MOZ_ASSERT(currentThreadHasExclusiveAccess());
         return *atoms_;
     }
-    JSCompartment* atomsCompartment() {
+    JSCompartment* atomsCompartment(js::AutoLockForExclusiveAccess& lock) {
         MOZ_ASSERT(currentThreadHasExclusiveAccess());
         return atomsCompartment_;
     }
@@ -1397,7 +1428,7 @@ struct JSRuntime : public JS::shadow::Runtime,
 
     bool activeGCInAtomsZone();
 
-    js::SymbolRegistry& symbolRegistry() {
+    js::SymbolRegistry& symbolRegistry(js::AutoLockForExclusiveAccess& lock) {
         MOZ_ASSERT(currentThreadHasExclusiveAccess());
         return symbolRegistry_;
     }
@@ -1433,7 +1464,7 @@ struct JSRuntime : public JS::shadow::Runtime,
   private:
     js::ScriptDataTable scriptDataTable_;
   public:
-    js::ScriptDataTable& scriptDataTable() {
+    js::ScriptDataTable& scriptDataTable(js::AutoLockForExclusiveAccess& lock) {
         MOZ_ASSERT(currentThreadHasExclusiveAccess());
         return scriptDataTable_;
     }
@@ -1807,18 +1838,18 @@ PerThreadData::exclusiveThreadsPresent()
 }
 
 inline void
-PerThreadData::addActiveCompilation()
+PerThreadData::addActiveCompilation(AutoLockForExclusiveAccess& lock)
 {
     activeCompilations++;
-    runtime_->addActiveCompilation();
+    runtime_->addActiveCompilation(lock);
 }
 
 inline void
-PerThreadData::removeActiveCompilation()
+PerThreadData::removeActiveCompilation(AutoLockForExclusiveAccess& lock)
 {
     MOZ_ASSERT(activeCompilations);
     activeCompilations--;
-    runtime_->removeActiveCompilation();
+    runtime_->removeActiveCompilation(lock);
 }
 
 /************************************************************************/

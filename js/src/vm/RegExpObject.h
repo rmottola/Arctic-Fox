@@ -116,7 +116,7 @@ class RegExpShared
 
     struct RegExpCompilation
     {
-        RelocatablePtrJitCode jitCode;
+        HeapPtr<jit::JitCode*> jitCode;
         uint8_t* byteCode;
 
         RegExpCompilation() : byteCode(nullptr) {}
@@ -128,7 +128,7 @@ class RegExpShared
     };
 
     /* Source to the RegExp, for lazy compilation. */
-    RelocatablePtrAtom source;
+    HeapPtr<JSAtom*>     source;
 
     RegExpFlag         flags;
     size_t             parenCount;
@@ -536,10 +536,6 @@ HasRegExpMetaChars(const CharT* chars, size_t length);
 
 extern bool
 StringHasRegExpMetaChars(JSLinearString* str);
-
-/* Escape all meta chars in given string. */
-extern JSString*
-RegExpEscapeMetaChars(JSContext* cx, HandleString src);
 
 } /* namespace js */
 

@@ -19,7 +19,6 @@
 #include "js/TypeDecls.h"
 #include "nsIAudioChannelAgent.h"
 #ifdef MOZ_WIDGET_ANDROID
-#include "nsAutoPtr.h"
 #include "nsIRunnable.h"
 #include "GLContextTypes.h"
 #include "AndroidSurfaceTexture.h"
@@ -122,7 +121,6 @@ public:
   nsresult InvalidateRect(NPRect *invalidRect);
   nsresult InvalidateRegion(NPRegion invalidRegion);
   nsresult GetMIMEType(const char* *result);
-  nsresult GetJSContext(JSContext* *outContext);
 #if defined(XP_WIN)
   nsresult GetScrollCaptureContainer(mozilla::layers::ImageContainer **aContainer);
   nsresult UpdateScrollState(bool aIsScrolling);

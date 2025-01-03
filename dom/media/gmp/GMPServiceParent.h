@@ -14,6 +14,7 @@
 #include "mozilla/Atomics.h"
 #include "nsThreadUtils.h"
 #include "mozilla/MozPromise.h"
+#include "GMPStorage.h"
 
 template <class> struct already_AddRefed;
 
@@ -21,8 +22,6 @@ namespace mozilla {
 namespace gmp {
 
 class GMPParent;
-
-#define GMP_DEFAULT_ASYNC_SHUTDONW_TIMEOUT 3000
 
 class GeckoMediaPluginServiceParent final : public GeckoMediaPluginService
                                           , public mozIGeckoMediaPluginChromeService
@@ -61,6 +60,8 @@ public:
 
   // GMP thread access only
   bool IsShuttingDown();
+
+  already_AddRefed<GMPStorage> GetMemoryStorageFor(const nsACString& aNodeId);
 
 private:
   friend class GMPServiceParent;
@@ -204,6 +205,9 @@ private:
   Monitor mInitPromiseMonitor;
   MozPromiseHolder<GenericPromise> mInitPromise;
   bool mLoadPluginsFromDiskComplete;
+
+  // Hashes nodeId to the hashtable of storage for that nodeId.
+  nsRefPtrHashtable<nsCStringHashKey, GMPStorage> mTempGMPStorage;
 };
 
 nsresult ReadSalt(nsIFile* aPath, nsACString& aOutData);

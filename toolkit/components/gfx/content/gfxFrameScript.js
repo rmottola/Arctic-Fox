@@ -1,4 +1,4 @@
-const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 const gfxFrameScript = {
   domUtils: null,
@@ -39,6 +39,8 @@ const gfxFrameScript = {
     if (webProgress.isTopLevel &&
         (flags & Ci.nsIWebProgressListener.STATE_STOP) &&
         this.isSanityTest(req.name)) {
+
+      webProgress.removeProgressListener(this);
 
       // If no paint is pending, then the test already painted
       if (this.domUtils.isMozAfterPaintPending) {

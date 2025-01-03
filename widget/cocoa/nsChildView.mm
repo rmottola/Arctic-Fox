@@ -1786,7 +1786,7 @@ nsChildView::ExecuteNativeKeyBindingRemapped(NativeKeyBindingsType aType,
   NSEvent *originalEvent = reinterpret_cast<NSEvent*>(aEvent.mNativeKeyEvent);
 
   WidgetKeyboardEvent modifiedEvent(aEvent);
-  modifiedEvent.keyCode = aGeckoKeyCode;
+  modifiedEvent.mKeyCode = aGeckoKeyCode;
 
   unichar ch = nsCocoaUtils::ConvertGeckoKeyCodeToMacCharCode(aGeckoKeyCode);
   NSString *chars =
@@ -1818,8 +1818,7 @@ nsChildView::ExecuteNativeKeyBinding(NativeKeyBindingsType aType,
   // vertical writing-mode, we'll remap so that the movement command
   // generated (in terms of characters/lines) will be appropriate for
   // the physical direction of the arrow.
-  if (aEvent.keyCode >= nsIDOMKeyEvent::DOM_VK_LEFT &&
-      aEvent.keyCode <= nsIDOMKeyEvent::DOM_VK_DOWN) {
+  if (aEvent.mKeyCode >= NS_VK_LEFT && aEvent.mKeyCode <= NS_VK_DOWN) {
     WidgetQueryContentEvent query(true, eQuerySelectedText, this);
     DispatchWindowEvent(query);
 
@@ -1827,34 +1826,34 @@ nsChildView::ExecuteNativeKeyBinding(NativeKeyBindingsType aType,
       uint32_t geckoKey = 0;
       uint32_t cocoaKey = 0;
 
-      switch (aEvent.keyCode) {
-      case nsIDOMKeyEvent::DOM_VK_LEFT:
+      switch (aEvent.mKeyCode) {
+      case NS_VK_LEFT:
         if (query.mReply.mWritingMode.IsVerticalLR()) {
-          geckoKey = nsIDOMKeyEvent::DOM_VK_UP;
+          geckoKey = NS_VK_UP;
           cocoaKey = kVK_UpArrow;
         } else {
-          geckoKey = nsIDOMKeyEvent::DOM_VK_DOWN;
+          geckoKey = NS_VK_DOWN;
           cocoaKey = kVK_DownArrow;
         }
         break;
 
-      case nsIDOMKeyEvent::DOM_VK_RIGHT:
+      case NS_VK_RIGHT:
         if (query.mReply.mWritingMode.IsVerticalLR()) {
-          geckoKey = nsIDOMKeyEvent::DOM_VK_DOWN;
+          geckoKey = NS_VK_DOWN;
           cocoaKey = kVK_DownArrow;
         } else {
-          geckoKey = nsIDOMKeyEvent::DOM_VK_UP;
+          geckoKey = NS_VK_UP;
           cocoaKey = kVK_UpArrow;
         }
         break;
 
-      case nsIDOMKeyEvent::DOM_VK_UP:
-        geckoKey = nsIDOMKeyEvent::DOM_VK_LEFT;
+      case NS_VK_UP:
+        geckoKey = NS_VK_LEFT;
         cocoaKey = kVK_LeftArrow;
         break;
 
-      case nsIDOMKeyEvent::DOM_VK_DOWN:
-        geckoKey = nsIDOMKeyEvent::DOM_VK_RIGHT;
+      case NS_VK_DOWN:
+        geckoKey = NS_VK_RIGHT;
         cocoaKey = kVK_RightArrow;
         break;
       }
@@ -1950,6 +1949,8 @@ nsChildView::RectContainingTitlebarControls()
 void
 nsChildView::PrepareWindowEffects()
 {
+  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
+
   MutexAutoLock lock(mEffectsLock);
   mShowsResizeIndicator = ShowsResizeIndicator(&mResizeIndicatorRect);
   mHasRoundedBottomCorners = [(ChildView*)mView hasRoundedBottomCorners];
@@ -1967,6 +1968,8 @@ nsChildView::PrepareWindowEffects()
     mTitlebarRect = RectContainingTitlebarControls();
     UpdateTitlebarCGContext();
   }
+
+  NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
 void
@@ -2499,9 +2502,12 @@ nsChildView::UpdateVibrancy(const nsTArray<ThemeGeometry>& aThemeGeometries)
     GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeTooltip);
   LayoutDeviceIntRegion highlightedMenuItemRegion =
     GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeHighlightedMenuItem);
+  LayoutDeviceIntRegion sourceListRegion =
+    GatherThemeGeometryRegion(aThemeGeometries, nsNativeThemeCocoa::eThemeGeometryTypeSourceList);
 
   MakeRegionsNonOverlapping(sheetRegion, vibrantLightRegion, vibrantDarkRegion,
-                            menuRegion, tooltipRegion, highlightedMenuItemRegion);
+                            menuRegion, tooltipRegion, highlightedMenuItemRegion,
+                            sourceListRegion);
 
   auto& vm = EnsureVibrancyManager();
   vm.UpdateVibrantRegion(VibrancyType::LIGHT, vibrantLightRegion);
@@ -2509,6 +2515,7 @@ nsChildView::UpdateVibrancy(const nsTArray<ThemeGeometry>& aThemeGeometries)
   vm.UpdateVibrantRegion(VibrancyType::MENU, menuRegion);
   vm.UpdateVibrantRegion(VibrancyType::HIGHLIGHTED_MENUITEM, highlightedMenuItemRegion);
   vm.UpdateVibrantRegion(VibrancyType::SHEET, sheetRegion);
+  vm.UpdateVibrantRegion(VibrancyType::SOURCE_LIST, sourceListRegion);
   vm.UpdateVibrantRegion(VibrancyType::DARK, vibrantDarkRegion);
 }
 
@@ -2536,6 +2543,8 @@ ThemeGeometryTypeToVibrancyType(nsITheme::ThemeGeometryType aThemeGeometryType)
       return VibrancyType::HIGHLIGHTED_MENUITEM;
     case nsNativeThemeCocoa::eThemeGeometryTypeSheet:
       return VibrancyType::SHEET;
+    case nsNativeThemeCocoa::eThemeGeometryTypeSourceList:
+      return VibrancyType::SOURCE_LIST;
     default:
       MOZ_CRASH();
   }
@@ -2869,6 +2878,67 @@ nsChildView::DispatchAPZWheelInputEvent(InputData& aEvent, bool aCanTriggerSwipe
       (event.mDeltaX != 0 || event.mDeltaY != 0)) {
     DispatchEvent(&event, status);
   }
+}
+
+// When using 10.11, calling showDefinitionForAttributedString causes the
+// following exception on LookupViewService. (rdar://26476091)
+//
+// Exception: decodeObjectForKey: class "TitlebarAndBackgroundColor" not
+// loaded or does not exist
+//
+// So we set temporary color that is NSColor before calling it.
+
+class MOZ_RAII AutoBackgroundSetter final {
+public:
+  explicit AutoBackgroundSetter(NSView* aView) {
+    if (nsCocoaFeatures::OnElCapitanOrLater() &&
+        [[aView window] isKindOfClass:[ToolbarWindow class]]) {
+      mWindow = (ToolbarWindow*)[aView window];
+      [mWindow setTemporaryBackgroundColor];
+    } else {
+      mWindow = nullptr;
+    }
+  }
+
+  ~AutoBackgroundSetter() {
+    if (mWindow) {
+      [mWindow restoreBackgroundColor];
+    }
+  }
+
+private:
+  ToolbarWindow* mWindow;
+};
+
+void
+nsChildView::LookUpDictionary(
+               const nsAString& aText,
+               const nsTArray<mozilla::FontRange>& aFontRangeArray,
+               const bool aIsVertical,
+               const LayoutDeviceIntPoint& aPoint)
+{
+  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
+
+  NSMutableAttributedString* attrStr =
+    nsCocoaUtils::GetNSMutableAttributedString(aText, aFontRangeArray,
+                                               aIsVertical,
+                                               BackingScaleFactor());
+  NSPoint pt =
+    nsCocoaUtils::DevPixelsToCocoaPoints(aPoint, BackingScaleFactor());
+  NSDictionary* attributes = [attrStr attributesAtIndex:0 effectiveRange:nil];
+  NSFont* font = [attributes objectForKey:NSFontAttributeName];
+  if (font) {
+    if (aIsVertical) {
+      pt.x -= [font descender];
+    } else {
+      pt.y += [font ascender];
+    }
+  }
+
+  AutoBackgroundSetter setter(mView);
+  [mView showDefinitionForAttributedString:attrStr atPoint:pt];
+
+  NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
 #ifdef ACCESSIBILITY
@@ -3758,7 +3828,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
     return;
   }
   dt->AddUserData(&gfxContext::sDontUseAsSourceKey, dt, nullptr);
-  RefPtr<gfxContext> targetContext = gfxContext::ForDrawTarget(dt);
+  RefPtr<gfxContext> targetContext = gfxContext::CreateOrNull(dt);
   MOZ_ASSERT(targetContext); // already checked the draw target above
 
   // Set up the clip region.
@@ -3769,7 +3839,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
   }
   targetContext->Clip();
 
-  nsAutoRetainCocoaObject kungFuDeathGrip(self);
+  nsAutoRetainCocoaObject kungFuDeathGrCreateOrNullip(self);
   bool painted = false;
   if (mGeckoChild->GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_BASIC) {
     nsBaseWidget::AutoLayerManagerSetup
@@ -4011,6 +4081,8 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
 - (void)viewWillDraw
 {
+  nsAutoRetainCocoaObject kungFuDeathGrip(self);
+
   if (mGeckoChild) {
     // The OS normally *will* draw our NSWindow, no matter what we do here.
     // But Gecko can delete our parent widget(s) (along with mGeckoChild)
@@ -4551,7 +4623,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
     // blocked.
     clickCount--;
   }
-  geckoEvent.clickCount = clickCount;
+  geckoEvent.mClickCount = clickCount;
 
   if (modifierFlags & NSControlKeyMask)
     geckoEvent.button = WidgetMouseEvent::eRightButton;
@@ -4608,7 +4680,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
 - (void)sendMouseEnterOrExitEvent:(NSEvent*)aEvent
                             enter:(BOOL)aEnter
-                             type:(WidgetMouseEvent::exitType)aType
+                         exitFrom:(WidgetMouseEvent::ExitFrom)aExitFrom
 {
   if (!mGeckoChild)
     return;
@@ -4620,7 +4692,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
   WidgetMouseEvent event(true, msg, mGeckoChild, WidgetMouseEvent::eReal);
   event.mRefPoint = mGeckoChild->CocoaPointsToDevPixels(localEventLocation);
 
-  event.exit = aType;
+  event.mExitFrom = aExitFrom;
 
   nsEventStatus status; // ignored
   mGeckoChild->DispatchEvent(&event, status);
@@ -4750,7 +4822,7 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
   geckoEvent.button = WidgetMouseEvent::eRightButton;
-  geckoEvent.clickCount = [theEvent clickCount];
+  geckoEvent.mClickCount = [theEvent clickCount];
 
   mGeckoChild->DispatchInputEvent(&geckoEvent);
   if (!mGeckoChild)
@@ -4773,7 +4845,7 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
   geckoEvent.button = WidgetMouseEvent::eRightButton;
-  geckoEvent.clickCount = [theEvent clickCount];
+  geckoEvent.mClickCount = [theEvent clickCount];
 
   nsAutoRetainCocoaObject kungFuDeathGrip(self);
   mGeckoChild->DispatchInputEvent(&geckoEvent);
@@ -4813,7 +4885,7 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
                               WidgetMouseEvent::eReal);
   [self convertCocoaMouseEvent:theEvent toGeckoEvent:&geckoEvent];
   geckoEvent.button = WidgetMouseEvent::eMiddleButton;
-  geckoEvent.clickCount = [theEvent clickCount];
+  geckoEvent.mClickCount = [theEvent clickCount];
 
   mGeckoChild->DispatchInputEvent(&geckoEvent);
 
@@ -5400,6 +5472,17 @@ PanGestureTypeForEvent(NSEvent* aEvent)
 {
   NS_ENSURE_TRUE(mTextInputHandler, NSMakeRect(0.0, 0.0, 0.0, 0.0));
   return mTextInputHandler->FirstRectForCharacterRange(aRange, actualRange);
+}
+
+- (void)quickLookWithEvent:(NSEvent*)event
+{
+  // Show dictionary by current point
+  WidgetContentCommandEvent
+    contentCommandEvent(true, eContentCommandLookUpDictionary, mGeckoChild);
+  NSPoint point = [self convertPoint:[event locationInWindow] fromView:nil];
+  contentCommandEvent.mRefPoint = mGeckoChild->CocoaPointsToDevPixels(point);
+  mGeckoChild->DispatchWindowEvent(contentCommandEvent);
+  // The widget might have been destroyed.
 }
 
 - (NSInteger)windowLevel
@@ -6320,15 +6403,19 @@ ChildViewMouseTracker::ReEvaluateMouseEnterState(NSEvent* aEvent, ChildView* aOl
   sLastMouseEventView = ViewForEvent(aEvent);
   if (sLastMouseEventView != oldView) {
     // Send enter and / or exit events.
-    WidgetMouseEvent::exitType type =
+    WidgetMouseEvent::ExitFrom exitFrom =
       [sLastMouseEventView window] == [oldView window] ?
         WidgetMouseEvent::eChild : WidgetMouseEvent::eTopLevel;
-    [oldView sendMouseEnterOrExitEvent:aEvent enter:NO type:type];
+    [oldView sendMouseEnterOrExitEvent:aEvent
+                                 enter:NO
+                              exitFrom:exitFrom];
     // After the cursor exits the window set it to a visible regular arrow cursor.
-    if (type == WidgetMouseEvent::eTopLevel) {
+    if (exitFrom == WidgetMouseEvent::eTopLevel) {
       [[nsCursorManager sharedInstance] setCursor:eCursor_standard];
     }
-    [sLastMouseEventView sendMouseEnterOrExitEvent:aEvent enter:YES type:type];
+    [sLastMouseEventView sendMouseEnterOrExitEvent:aEvent
+                                             enter:YES
+                                          exitFrom:exitFrom];
   }
 }
 

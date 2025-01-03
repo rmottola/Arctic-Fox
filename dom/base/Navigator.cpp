@@ -37,6 +37,8 @@
 #include "mozilla/dom/WakeLock.h"
 #include "mozilla/dom/power/PowerManagerService.h"
 #include "mozilla/dom/CellBroadcast.h"
+#include "mozilla/dom/FlyWebPublishedServer.h"
+#include "mozilla/dom/FlyWebService.h"
 #include "mozilla/dom/IccManager.h"
 #include "mozilla/dom/InputPortManager.h"
 #include "mozilla/dom/MobileMessageManager.h"
@@ -129,7 +131,6 @@
 namespace mozilla {
 namespace dom {
 
-static bool sDoNotTrackEnabled = false;
 static bool sVibratorEnabled   = false;
 static uint32_t sMaxVibrateMS  = 0;
 static uint32_t sMaxVibrateListLen = 0;
@@ -138,9 +139,6 @@ static uint32_t sMaxVibrateListLen = 0;
 void
 Navigator::Init()
 {
-  Preferences::AddBoolVarCache(&sDoNotTrackEnabled,
-                               "privacy.donottrackheader.enabled",
-                               false);
   Preferences::AddBoolVarCache(&sVibratorEnabled,
                                "dom.vibrator.enabled", true);
   Preferences::AddUintVarCache(&sMaxVibrateMS,
@@ -698,7 +696,13 @@ Navigator::GetBuildID(nsAString& aBuildID)
 NS_IMETHODIMP
 Navigator::GetDoNotTrack(nsAString &aResult)
 {
-  if (sDoNotTrackEnabled) {
+  bool doNotTrack = nsContentUtils::DoNotTrackEnabled();
+  if (!doNotTrack) {
+    nsCOMPtr<nsILoadContext> loadContext = do_GetInterface(mWindow);
+    doNotTrack = loadContext && loadContext->UseTrackingProtection();
+  }
+
+  if (doNotTrack) {
     aResult.AssignLiteral("1");
   } else {
     aResult.AssignLiteral("unspecified");
@@ -1501,6 +1505,41 @@ Navigator::GetDeprecatedBattery(ErrorResult& aRv)
   }
 
   return mBatteryManager;
+}
+
+already_AddRefed<Promise>
+Navigator::PublishServer(const nsAString& aName,
+                         const FlyWebPublishOptions& aOptions,
+                         ErrorResult& aRv)
+{
+  RefPtr<FlyWebService> service = FlyWebService::GetOrCreate();
+  if (!service) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
+  RefPtr<FlyWebPublishPromise> mozPromise =
+    service->PublishServer(aName, aOptions, mWindow);
+  MOZ_ASSERT(mozPromise);
+
+  nsCOMPtr<nsIGlobalObject> global = do_QueryInterface(mWindow);
+  ErrorResult result;
+  RefPtr<Promise> domPromise = Promise::Create(global, result);
+  if (result.Failed()) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
+  mozPromise->Then(AbstractThread::MainThread(),
+                   __func__,
+                   [domPromise] (FlyWebPublishedServer* aServer) {
+                     domPromise->MaybeResolve(aServer);
+                   },
+                   [domPromise] (nsresult aStatus) {
+                     domPromise->MaybeReject(aStatus);
+                   });
+
+  return domPromise.forget();
 }
 
 already_AddRefed<Promise>
@@ -2307,40 +2346,38 @@ Navigator::HasPresentationSupport(JSContext* aCx, JSObject* aGlobal)
 
   // Grant access to browser receiving pages and their same-origin iframes. (App
   // pages should be controlled by "presentation" permission in app manifests.)
-  mozilla::dom::ContentChild* cc =
-    mozilla::dom::ContentChild::GetSingleton();
-  if (!cc || !cc->IsForBrowser()) {
+  nsCOMPtr<nsIDocShell> docshell = inner->GetDocShell();
+  if (!docshell) {
     return false;
   }
 
-  nsCOMPtr<nsPIDOMWindowOuter> win = inner->GetOuterWindow();
-  nsCOMPtr<nsPIDOMWindowOuter> top = win->GetTop();
-  nsCOMPtr<nsIScriptObjectPrincipal> sop = do_QueryInterface(win);
-  nsCOMPtr<nsIScriptObjectPrincipal> topSop = do_QueryInterface(top);
-  if (!sop || !topSop) {
+  if (!docshell->GetIsInMozBrowserOrApp()) {
     return false;
   }
 
-  nsIPrincipal* principal = sop->GetPrincipal();
-  nsIPrincipal* topPrincipal = topSop->GetPrincipal();
-  if (!principal || !topPrincipal || !principal->Subsumes(topPrincipal)) {
+  nsAutoString presentationURL;
+  nsContentUtils::GetPresentationURL(docshell, presentationURL);
+
+  if (presentationURL.IsEmpty()) {
     return false;
   }
 
-  nsCOMPtr<nsPIDOMWindowInner> topInner;
-  if (!(topInner = top->GetCurrentInnerWindow())) {
+  nsCOMPtr<nsIScriptSecurityManager> securityManager =
+    do_GetService(NS_SCRIPTSECURITYMANAGER_CONTRACTID);
+  if (!securityManager) {
     return false;
   }
 
-  nsCOMPtr<nsIPresentationService> presentationService =
-    do_GetService(PRESENTATION_SERVICE_CONTRACTID);
-  if (NS_WARN_IF(!presentationService)) {
+  nsCOMPtr<nsIURI> presentationURI;
+  nsresult rv = NS_NewURI(getter_AddRefs(presentationURI), presentationURL);
+  if (NS_FAILED(rv)) {
     return false;
   }
 
-  nsAutoString sessionId;
-  presentationService->GetExistentSessionIdAtLaunch(topInner->WindowID(), sessionId);
-  return !sessionId.IsEmpty();
+  nsCOMPtr<nsIURI> docURI = inner->GetDocumentURI();
+  return NS_SUCCEEDED(securityManager->CheckSameOriginURI(presentationURI,
+                                                          docURI,
+                                                          false));
 }
 
 /* static */

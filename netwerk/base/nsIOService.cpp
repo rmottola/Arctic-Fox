@@ -50,27 +50,24 @@
 #include "mozilla/Services.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/net/DNS.h"
+#include "mozilla/ipc/URIUtils.h"
+#include "mozilla/net/NeckoChild.h"
 #include "CaptivePortalService.h"
 #include "ReferrerPolicy.h"
 #include "nsContentSecurityManager.h"
 #include "nsContentUtils.h"
+#include "xpcpublic.h"
 
 #ifdef MOZ_WIDGET_GONK
 #include "nsINetworkManager.h"
 #include "nsINetworkInterface.h"
 #endif
 
-#if defined(XP_WIN)
-#include "nsNativeConnectionHelper.h"
-#endif
-
-using namespace mozilla;
-using mozilla::net::IsNeckoChild;
-using mozilla::net::CaptivePortalService;
+namespace mozilla {
+namespace net {
 
 #define PORT_PREF_PREFIX           "network.security.ports."
 #define PORT_PREF(x)               PORT_PREF_PREFIX x
-#define AUTODIAL_PREF              "network.autodial-helper.enabled"
 #define MANAGE_OFFLINE_STATUS_PREF "network.manage-offline-status"
 #define OFFLINE_MIRRORS_CONNECTIVITY "network.offline-mirrors-connectivity"
 
@@ -87,9 +84,9 @@ using mozilla::net::CaptivePortalService;
 nsIOService* gIOService = nullptr;
 static bool gHasWarnedUploadChannel2;
 
-static mozilla::LazyLogModule gIOServiceLog("nsIOService");
+static LazyLogModule gIOServiceLog("nsIOService");
 #undef LOG
-#define LOG(args)     MOZ_LOG(gIOServiceLog, mozilla::LogLevel::Debug, args)
+#define LOG(args)     MOZ_LOG(gIOServiceLog, LogLevel::Debug, args)
 
 // A general port blacklist.  Connections to these ports will not be allowed
 // unless the protocol overrides.
@@ -192,7 +189,6 @@ nsIOService::nsIOService()
     , mHttpHandlerAlreadyShutingDown(false)
     , mNetworkLinkServiceInitialized(false)
     , mChannelEventSinks(NS_CHANNEL_EVENT_SINK_CATEGORY)
-    , mAutoDialEnabled(false)
     , mNetworkNotifyChanged(true)
     , mPreviousWifiState(-1)
     , mLastOfflineStateChange(PR_IntervalNow())
@@ -236,7 +232,6 @@ nsIOService::Init()
     GetPrefBranch(getter_AddRefs(prefBranch));
     if (prefBranch) {
         prefBranch->AddObserver(PORT_PREF_PREFIX, this, true);
-        prefBranch->AddObserver(AUTODIAL_PREF, this, true);
         prefBranch->AddObserver(MANAGE_OFFLINE_STATUS_PREF, this, true);
         prefBranch->AddObserver(NECKO_BUFFER_CACHE_COUNT_PREF, this, true);
         prefBranch->AddObserver(NECKO_BUFFER_CACHE_SIZE_PREF, this, true);
@@ -246,8 +241,7 @@ nsIOService::Init()
     }
     
     // Register for profile change notifications
-    nsCOMPtr<nsIObserverService> observerService =
-        mozilla::services::GetObserverService();
+    nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
     if (observerService) {
         observerService->AddObserver(this, kProfileChangeNetTeardownTopic, true);
         observerService->AddObserver(this, kProfileChangeNetRestoreTopic, true);
@@ -309,7 +303,6 @@ nsIOService::InitializeSocketTransportService()
     if (mSocketTransportService) {
         rv = mSocketTransportService->Init();
         NS_ASSERTION(NS_SUCCEEDED(rv), "socket transport service init failed");
-        mSocketTransportService->SetAutodialEnabled(mAutoDialEnabled);
         mSocketTransportService->SetOffline(false);
     }
 
@@ -376,6 +369,16 @@ NS_IMPL_ISUPPORTS(nsIOService,
 ////////////////////////////////////////////////////////////////////////////////
 
 nsresult
+nsIOService::RecheckCaptivePortal()
+{
+  MOZ_ASSERT(NS_IsMainThread(), "Must be called on the main thread");
+  if (mCaptivePortalService) {
+    mCaptivePortalService->RecheckCaptivePortal();
+  }
+  return NS_OK;
+}
+
+nsresult
 nsIOService::RecheckCaptivePortalIfLocalRedirect(nsIChannel* newChan)
 {
     nsresult rv;
@@ -403,7 +406,7 @@ nsIOService::RecheckCaptivePortalIfLocalRedirect(nsIChannel* newChan)
         return NS_OK;
     }
 
-    mozilla::net::NetAddr netAddr;
+    NetAddr netAddr;
     PRNetAddrToNetAddr(&prAddr, &netAddr);
     if (IsIPAddrLocal(&netAddr)) {
         // Redirects to local IP addresses are probably captive portals
@@ -733,28 +736,6 @@ nsIOService::NewChannelFromURIWithProxyFlagsInternal(nsIURI* aURI,
     if (NS_FAILED(rv))
         return rv;
 
-    if (sTelemetryEnabled) {
-        nsAutoCString path;
-        aURI->GetPath(path);
-
-        bool endsInExcl = StringEndsWith(path, NS_LITERAL_CSTRING("!"));
-        int32_t bangSlashPos = path.Find("!/");
-
-        bool hasBangSlash = bangSlashPos != kNotFound;
-        bool hasBangDoubleSlash = false;
-
-        if (bangSlashPos != kNotFound) {
-            nsDependentCSubstring substr(path, bangSlashPos);
-            hasBangDoubleSlash = StringBeginsWith(substr, NS_LITERAL_CSTRING("!//"));
-        }
-
-        Telemetry::Accumulate(Telemetry::URL_PATH_ENDS_IN_EXCLAMATION, endsInExcl);
-        Telemetry::Accumulate(Telemetry::URL_PATH_CONTAINS_EXCLAMATION_SLASH,
-                              hasBangSlash);
-        Telemetry::Accumulate(Telemetry::URL_PATH_CONTAINS_EXCLAMATION_DOUBLE_SLASH,
-                              hasBangDoubleSlash);
-    }
-
     nsCOMPtr<nsIProtocolHandler> handler;
     rv = GetProtocolHandler(scheme.get(), getter_AddRefs(handler));
     if (NS_FAILED(rv))
@@ -876,11 +857,11 @@ nsIOService::NewChannelFromURIWithProxyFlags2(nsIURI* aURI,
     if (aLoadingNode || aLoadingPrincipal ||
         aContentPolicyType == nsIContentPolicy::TYPE_DOCUMENT) {
       nsCOMPtr<nsINode> loadingNode(do_QueryInterface(aLoadingNode));
-      loadInfo = new mozilla::LoadInfo(aLoadingPrincipal,
-                                       aTriggeringPrincipal,
-                                       loadingNode,
-                                       aSecurityFlags,
-                                       aContentPolicyType);
+      loadInfo = new LoadInfo(aLoadingPrincipal,
+                              aTriggeringPrincipal,
+                              loadingNode,
+                              aSecurityFlags,
+                              aContentPolicyType);
     }
     NS_ASSERTION(loadInfo, "Please pass security info when creating a channel");
     return NewChannelFromURIWithProxyFlagsInternal(aURI,
@@ -1044,8 +1025,7 @@ nsIOService::SetOffline(bool offline)
 
     mSettingOffline = true;
 
-    nsCOMPtr<nsIObserverService> observerService =
-        mozilla::services::GetObserverService();
+    nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
 
     NS_ASSERTION(observerService, "The observer service should not be null");
 
@@ -1158,8 +1138,7 @@ nsIOService::SetConnectivityInternal(bool aConnectivity)
     // we have statistic about network change event even if we are offline.
     mLastConnectivityChange = PR_IntervalNow();
 
-    nsCOMPtr<nsIObserverService> observerService =
-        mozilla::services::GetObserverService();
+    nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
     if (!observerService) {
         return NS_OK;
     }
@@ -1251,17 +1230,6 @@ nsIOService::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
     if (!pref || strcmp(pref, PORT_PREF("banned.override")) == 0)
         ParsePortList(prefs, PORT_PREF("banned.override"), true);
 
-    if (!pref || strcmp(pref, AUTODIAL_PREF) == 0) {
-        bool enableAutodial = false;
-        nsresult rv = prefs->GetBoolPref(AUTODIAL_PREF, &enableAutodial);
-        // If pref not found, default to disabled.
-        mAutoDialEnabled = enableAutodial;
-        if (NS_SUCCEEDED(rv)) {
-            if (mSocketTransportService)
-                mSocketTransportService->SetAutodialEnabled(enableAutodial);
-        }
-    }
-
     if (!pref || strcmp(pref, MANAGE_OFFLINE_STATUS_PREF) == 0) {
         bool manage;
         if (mNetworkLinkServiceInitialized &&
@@ -1304,20 +1272,10 @@ nsIOService::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
     }
 
     if (!pref || strcmp(pref, NETWORK_CAPTIVE_PORTAL_PREF) == 0) {
-        static int disabledForTest = -1;
-        if (disabledForTest == -1) {
-            char *s = getenv("MOZ_DISABLE_NONLOCAL_CONNECTIONS");
-            if (s) {
-                disabledForTest = (strncmp(s, "0", 1) == 0) ? 0 : 1;
-            } else {
-                disabledForTest = 0;
-            }
-        }
-
         bool captivePortalEnabled;
         nsresult rv = prefs->GetBoolPref(NETWORK_CAPTIVE_PORTAL_PREF, &captivePortalEnabled);
         if (NS_SUCCEEDED(rv) && mCaptivePortalService) {
-            if (captivePortalEnabled && !disabledForTest) {
+            if (captivePortalEnabled && !xpc::AreNonLocalConnectionsDisabled()) {
                 static_cast<CaptivePortalService*>(mCaptivePortalService.get())->Start();
             } else {
                 static_cast<CaptivePortalService*>(mCaptivePortalService.get())->Stop();
@@ -1434,8 +1392,7 @@ private:
 NS_IMETHODIMP
 nsIOService::NotifyWakeup()
 {
-    nsCOMPtr<nsIObserverService> observerService =
-        mozilla::services::GetObserverService();
+    nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
 
     NS_ASSERTION(observerService, "The observer service should not be null");
 
@@ -1446,9 +1403,7 @@ nsIOService::NotifyWakeup()
                             MOZ_UTF16(NS_NETWORK_LINK_DATA_CHANGED));
     }
 
-    if (mCaptivePortalService) {
-        mCaptivePortalService->RecheckCaptivePortal();
-    }
+    RecheckCaptivePortal();
 
     return NS_OK;
 }
@@ -1713,27 +1668,6 @@ nsIOService::OnNetworkLinkEvent(const char *data)
         return NS_OK;
     }
 
-    if (!strcmp(data, NS_NETWORK_LINK_DATA_DOWN)) {
-        // check to make sure this won't collide with Autodial
-        if (mSocketTransportService) {
-            bool autodialEnabled = false;
-            mSocketTransportService->GetAutodialEnabled(&autodialEnabled);
-            // If autodialing-on-link-down is enabled, check if the OS auto
-            // dial option is set to always autodial. If so, then we are
-            // always up for the purposes of offline management.
-            if (autodialEnabled) {
-                bool isUp = true;
-#if defined(XP_WIN)
-                // On Windows, we should first check with the OS to see if
-                // autodial is enabled.  If it is enabled then we are allowed
-                // to manage the offline state.
-                isUp = nsNativeConnectionHelper::IsAutodialEnabled();
-#endif
-                return SetConnectivityInternal(isUp);
-            }
-        }
-    }
-
     bool isUp = true;
     if (!strcmp(data, NS_NETWORK_LINK_DATA_CHANGED)) {
         mLastNetworkLinkChange = PR_IntervalNow();
@@ -1742,10 +1676,8 @@ nsIOService::OnNetworkLinkEvent(const char *data)
     } else if (!strcmp(data, NS_NETWORK_LINK_DATA_DOWN)) {
         isUp = false;
     } else if (!strcmp(data, NS_NETWORK_LINK_DATA_UP)) {
-        if (mCaptivePortalService) {
-            // Interface is up. Triggering a captive portal recheck.
-            mCaptivePortalService->RecheckCaptivePortal();
-        }
+        // Interface is up. Triggering a captive portal recheck.
+        RecheckCaptivePortal();
         isUp = true;
     } else if (!strcmp(data, NS_NETWORK_LINK_DATA_UNKNOWN)) {
         nsresult rv = mNetworkLinkService->GetIsLinkUp(&isUp);
@@ -1818,7 +1750,7 @@ nsIOService::ParseAttributePolicyString(const nsAString& policyString,
                                                 uint32_t *outPolicyEnum)
 {
   NS_ENSURE_ARG(outPolicyEnum);
-  *outPolicyEnum = (uint32_t)mozilla::net::AttributeReferrerPolicyFromString(policyString);
+  *outPolicyEnum = (uint32_t)AttributeReferrerPolicyFromString(policyString);
   return NS_OK;
 }
 
@@ -1895,6 +1827,13 @@ nsIOService::SpeculativeConnectInternal(nsIURI *aURI,
                                         nsIInterfaceRequestor *aCallbacks,
                                         bool aAnonymous)
 {
+    if (IsNeckoChild()) {
+        ipc::URIParams params;
+        SerializeURI(aURI, params);
+        gNeckoChild->SendSpeculativeConnect(params, aAnonymous);
+        return NS_OK;
+    }
+
     // Check for proxy information. If there is a proxy configured then a
     // speculative connect should not be performed because the potential
     // reward is slim with tcp peers closely located to the browser.
@@ -1963,8 +1902,7 @@ nsIOService::NotifyAppOfflineStatus(uint32_t appId, int32_t state)
     MOZ_RELEASE_ASSERT(NS_IsMainThread(),
             "Should be called on the main thread");
 
-    nsCOMPtr<nsIObserverService> observerService =
-        mozilla::services::GetObserverService();
+    nsCOMPtr<nsIObserverService> observerService = services::GetObserverService();
     MOZ_ASSERT(observerService, "The observer service should not be null");
 
     if (observerService) {
@@ -2120,3 +2058,6 @@ nsIOService::IsAppOffline(uint32_t aAppId, bool* aResult)
 
     return NS_OK;
 }
+
+} // namespace net
+} // namespace mozilla

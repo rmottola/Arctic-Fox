@@ -15,7 +15,6 @@
 #include "mozilla/gfx/BaseSize.h"       // for BaseSize
 #include "mozilla/gfx/Point.h"          // for IntSize
 #include "mozilla/mozalloc.h"           // for operator new, etc
-#include "nsAutoPtr.h"                  // for nsRefPtr, nsAutoPtr, etc
 #include "nsDataHashtable.h"            // for nsDataHashtable
 #include "nsDebug.h"                    // for NS_ASSERTION
 #include "nsHashKeys.h"                 // for nsPtrHashKey
@@ -24,6 +23,7 @@
 #include "nsTArray.h"                   // for AutoTArray, nsTArray_Impl
 #include "mozilla/layers/ImageHost.h"
 #include "mozilla/layers/LayerManagerComposite.h"
+#include "TreeTraversal.h"              // for ForEachNode
 
 using namespace mozilla::gfx;
 
@@ -102,28 +102,28 @@ AddRegion(nsIntRegion& aDest, const nsIntRegion& aSource)
  * then report that the entire bounds have changed.
  */
 static void
-NotifySubdocumentInvalidationRecursive(Layer* aLayer, NotifySubDocInvalidationFunc aCallback)
+NotifySubdocumentInvalidation(Layer* aLayer, NotifySubDocInvalidationFunc aCallback)
 {
-  aLayer->ClearInvalidRect();
-  ContainerLayer* container = aLayer->AsContainerLayer();
-
-  if (aLayer->GetMaskLayer()) {
-    NotifySubdocumentInvalidationRecursive(aLayer->GetMaskLayer(), aCallback);
-  }
-  for (size_t i = 0; i < aLayer->GetAncestorMaskLayerCount(); i++) {
-    Layer* maskLayer = aLayer->GetAncestorMaskLayerAt(i);
-    NotifySubdocumentInvalidationRecursive(maskLayer, aCallback);
-  }
-
-  if (!container) {
-    return;
-  }
-
-  for (Layer* child = container->GetFirstChild(); child; child = child->GetNextSibling()) {
-    NotifySubdocumentInvalidationRecursive(child, aCallback);
-  }
-
-  aCallback(container, container->GetLocalVisibleRegion().ToUnknownRegion());
+  ForEachNode<ForwardIterator>(
+      aLayer,
+      [aCallback] (Layer* layer)
+      {
+        layer->ClearInvalidRect();
+        if (layer->GetMaskLayer()) {
+          NotifySubdocumentInvalidation(layer->GetMaskLayer(), aCallback);
+        }
+        for (size_t i = 0; i < layer->GetAncestorMaskLayerCount(); i++) {
+          Layer* maskLayer = layer->GetAncestorMaskLayerAt(i);
+          NotifySubdocumentInvalidation(maskLayer, aCallback);
+        }
+      },
+      [aCallback] (Layer* layer)
+      {
+        ContainerLayer* container = layer->AsContainerLayer();
+        if (container) {
+          aCallback(container, container->GetLocalVisibleRegion().ToUnknownRegion());
+        }
+      });
 }
 
 struct LayerPropertiesBase : public LayerProperties
@@ -346,7 +346,7 @@ struct ContainerLayerProperties : public LayerPropertiesBase
         AddTransformedRegion(result, child->GetLocalVisibleRegion().ToUnknownRegion(),
                              GetTransformForInvalidation(child));
         if (aCallback) {
-          NotifySubdocumentInvalidationRecursive(child, aCallback);
+          NotifySubdocumentInvalidation(child, aCallback);
         } else {
           ClearInvalidations(child);
         }
@@ -457,7 +457,7 @@ struct ImageLayerProperties : public LayerPropertiesBase
     : LayerPropertiesBase(aImage)
     , mContainer(aImage->GetContainer())
     , mImageHost(GetImageHost(aImage))
-    , mFilter(aImage->GetFilter())
+    , mSamplingFilter(aImage->GetSamplingFilter())
     , mScaleToSize(aImage->GetScaleToSize())
     , mScaleMode(aImage->GetScaleMode())
     , mLastProducerID(-1)
@@ -485,7 +485,7 @@ struct ImageLayerProperties : public LayerPropertiesBase
     ImageContainer* container = imageLayer->GetContainer();
     ImageHost* host = GetImageHost(imageLayer);
     if (mContainer != container ||
-        mFilter != imageLayer->GetFilter() ||
+        mSamplingFilter != imageLayer->GetSamplingFilter() ||
         mScaleToSize != imageLayer->GetScaleToSize() ||
         mScaleMode != imageLayer->GetScaleMode() ||
         host != mImageHost ||
@@ -514,7 +514,7 @@ struct ImageLayerProperties : public LayerPropertiesBase
 
   RefPtr<ImageContainer> mContainer;
   RefPtr<ImageHost> mImageHost;
-  Filter mFilter;
+  SamplingFilter mSamplingFilter;
   gfx::IntSize mScaleToSize;
   ScaleMode mScaleMode;
   int32_t mLastProducerID;
@@ -588,22 +588,20 @@ LayerProperties::CloneFrom(Layer* aRoot)
 /* static */ void
 LayerProperties::ClearInvalidations(Layer *aLayer)
 {
-  aLayer->ClearInvalidRect();
-  if (aLayer->GetMaskLayer()) {
-    ClearInvalidations(aLayer->GetMaskLayer());
-  }
-  for (size_t i = 0; i < aLayer->GetAncestorMaskLayerCount(); i++) {
-    ClearInvalidations(aLayer->GetAncestorMaskLayerAt(i));
-  }
+  ForEachNode<ForwardIterator>(
+        aLayer,
+        [] (Layer* layer)
+        {
+          layer->ClearInvalidRect();
+          if (layer->GetMaskLayer()) {
+            ClearInvalidations(layer->GetMaskLayer());
+          }
+          for (size_t i = 0; i < layer->GetAncestorMaskLayerCount(); i++) {
+            ClearInvalidations(layer->GetAncestorMaskLayerAt(i));
+          }
 
-  ContainerLayer* container = aLayer->AsContainerLayer();
-  if (!container) {
-    return;
-  }
-
-  for (Layer* child = container->GetFirstChild(); child; child = child->GetNextSibling()) {
-    ClearInvalidations(child);
-  }
+        }
+      );
 }
 
 nsIntRegion
@@ -613,7 +611,7 @@ LayerPropertiesBase::ComputeDifferences(Layer* aRoot, NotifySubDocInvalidationFu
   NS_ASSERTION(aRoot, "Must have a layer tree to compare against!");
   if (mLayer != aRoot) {
     if (aCallback) {
-      NotifySubdocumentInvalidationRecursive(aRoot, aCallback);
+      NotifySubdocumentInvalidation(aRoot, aCallback);
     } else {
       ClearInvalidations(aRoot);
     }

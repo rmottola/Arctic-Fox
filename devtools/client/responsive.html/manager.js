@@ -115,7 +115,7 @@ const ResponsiveUIManager = exports.ResponsiveUIManager = {
    * @param args
    *        The GCLI command arguments.
    */
-  handleGcliCommand: function(window, tab, command, args) {
+  handleGcliCommand: function (window, tab, command, args) {
     let completed;
     switch (command) {
       case "resize to":
@@ -292,7 +292,7 @@ function tabLoaded(tab) {
 function waitForDocLoadComplete(gBrowser) {
   let deferred = promise.defer();
   let progressListener = {
-    onStateChange: function(webProgress, req, flags, status) {
+    onStateChange: function (webProgress, req, flags, status) {
       let docStop = Ci.nsIWebProgressListener.STATE_IS_NETWORK |
                     Ci.nsIWebProgressListener.STATE_STOP;
 

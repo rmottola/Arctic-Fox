@@ -748,13 +748,14 @@ nsImageFrame::MaybeDecodeForPredictedSize()
   // Determine the optimal image size to use.
   uint32_t flags = imgIContainer::FLAG_HIGH_QUALITY_SCALING
                  | imgIContainer::FLAG_ASYNC_NOTIFY;
-  Filter filter = nsLayoutUtils::GetGraphicsFilterForFrame(this);
+  SamplingFilter samplingFilter =
+    nsLayoutUtils::GetSamplingFilterForFrame(this);
   gfxSize gfxPredictedScreenSize = gfxSize(predictedScreenIntSize.width,
                                            predictedScreenIntSize.height);
   nsIntSize predictedImageSize =
     mImage->OptimalImageSizeForDest(gfxPredictedScreenSize,
                                     imgIContainer::FRAME_CURRENT,
-                                    filter, flags);
+                                    samplingFilter, flags);
 
   // Request a decode.
   mImage->RequestDecodeForSize(predictedImageSize, flags);
@@ -1411,7 +1412,7 @@ nsImageFrame::DisplayAltFeedback(nsRenderingContext& aRenderingContext,
       nsRect dest(flushRight ? inner.XMost() - size : inner.x,
                   inner.y, size, size);
       result = nsLayoutUtils::DrawSingleImage(*gfx, PresContext(), imgCon,
-        nsLayoutUtils::GetGraphicsFilterForFrame(this), dest, aDirtyRect,
+        nsLayoutUtils::GetSamplingFilterForFrame(this), dest, aDirtyRect,
         nullptr, aFlags);
     }
 
@@ -1685,7 +1686,7 @@ nsImageFrame::PaintImage(nsRenderingContext& aRenderingContext, nsPoint aPt,
   DrawResult result =
     nsLayoutUtils::DrawSingleImage(*aRenderingContext.ThebesContext(),
       PresContext(), aImage,
-      nsLayoutUtils::GetGraphicsFilterForFrame(this), dest, aDirtyRect,
+      nsLayoutUtils::GetSamplingFilterForFrame(this), dest, aDirtyRect,
       nullptr, flags, &anchorPoint);
 
   nsImageMap* map = GetImageMap();
@@ -2073,24 +2074,29 @@ nsImageFrame::AttributeChanged(int32_t aNameSpaceID,
 }
 
 void
-nsImageFrame::OnVisibilityChange(Visibility aNewVisibility,
+nsImageFrame::OnVisibilityChange(Visibility aOldVisibility,
+                                 Visibility aNewVisibility,
                                  Maybe<OnNonvisible> aNonvisibleAction)
 {
   nsCOMPtr<nsIImageLoadingContent> imageLoader = do_QueryInterface(mContent);
   if (!imageLoader) {
     MOZ_ASSERT_UNREACHABLE("Should have an nsIImageLoadingContent");
-    nsAtomicContainerFrame::OnVisibilityChange(aNewVisibility, aNonvisibleAction);
+    nsAtomicContainerFrame::OnVisibilityChange(aOldVisibility, aNewVisibility,
+                                               aNonvisibleAction);
     return;
   }
 
-  imageLoader->OnVisibilityChange(aNewVisibility, aNonvisibleAction);
+  imageLoader->OnVisibilityChange(aOldVisibility, aNewVisibility,
+                                  aNonvisibleAction);
 
-  if (aNewVisibility == Visibility::MAY_BECOME_VISIBLE ||
-      aNewVisibility == Visibility::IN_DISPLAYPORT) {
+  if (aOldVisibility == Visibility::NONVISIBLE &&
+        (aNewVisibility == Visibility::MAY_BECOME_VISIBLE ||
+         aNewVisibility == Visibility::IN_DISPLAYPORT)) {
     MaybeDecodeForPredictedSize();
   }
 
-  nsAtomicContainerFrame::OnVisibilityChange(aNewVisibility, aNonvisibleAction);
+  nsAtomicContainerFrame::OnVisibilityChange(aOldVisibility, aNewVisibility,
+                                             aNonvisibleAction);
 }
 
 nsIAtom*

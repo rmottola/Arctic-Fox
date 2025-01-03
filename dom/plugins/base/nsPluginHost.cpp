@@ -2015,7 +2015,7 @@ GetExtensionDirectories(nsCOMArray<nsIFile>& dirs)
     nsCOMPtr<nsIFile> file = do_QueryInterface(next);
     if (file) {
       file->Normalize();
-      dirs.AppendElement(file);
+      dirs.AppendElement(file.forget());
     }
   }
 }

@@ -12,8 +12,10 @@ DIRS += [
     'canvasdebugger',
     'commandline',
     'debugger',
+    'dom',
     'eyedropper',
     'framework',
+    'fronts',
     'inspector',
     'jsonview',
     'locales',
@@ -51,5 +53,4 @@ JAR_MANIFESTS += ['jar.mn']
 
 DevToolsModules(
     'definitions.js',
-    'main.js',
 )

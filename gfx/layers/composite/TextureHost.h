@@ -41,9 +41,14 @@ namespace layers {
 class BufferDescriptor;
 class Compositor;
 class CompositableParentManager;
+class ReadLockDescriptor;
+class CompositorBridgeParent;
+class GrallocTextureHostOGL;
 class SurfaceDescriptor;
+class HostIPCAllocator;
 class ISurfaceAllocator;
 class TextureHostOGL;
+class TextureReadLock;
 class TextureSourceOGL;
 class TextureSourceD3D9;
 class TextureSourceD3D11;
@@ -111,7 +116,10 @@ public:
   /**
    * Cast to a TextureSource for for each backend..
    */
-  virtual TextureSourceOGL* AsSourceOGL() { return nullptr; }
+  virtual TextureSourceOGL* AsSourceOGL() {
+    gfxCriticalNote << "Failed to cast " << Name() << " into a TextureSourceOGL";
+    return nullptr;
+  }
   virtual TextureSourceD3D9* AsSourceD3D9() { return nullptr; }
   virtual TextureSourceD3D11* AsSourceD3D11() { return nullptr; }
   virtual TextureSourceBasic* AsSourceBasic() { return nullptr; }
@@ -161,10 +169,33 @@ protected:
   int mCompositableCount;
 };
 
-/**
- * equivalent of a RefPtr<TextureSource>, that calls AddCompositableRef and
- * ReleaseCompositableRef in addition to the usual AddRef and Release.
- */
+/// Equivalent of a RefPtr<TextureSource>, that calls AddCompositableRef and
+/// ReleaseCompositableRef in addition to the usual AddRef and Release.
+///
+/// The semantoics of these CompositableTextureRefs are important because they
+/// are used both as a synchronization/safety mechanism, and as an optimization
+/// mechanism. They are also tricky and subtle because we use them in a very
+/// implicit way (assigning to a CompositableTextureRef is less visible than
+/// explicitly calling a method or whatnot).
+/// It is Therefore important to be careful about the way we use this tool.
+///
+/// CompositableTextureRef is a mechanism that lets us count how many compositables
+/// are using a given texture (for TextureSource and TextureHost).
+/// We use it to run specific code when a texture is not used anymore, and also
+/// we trigger fast paths on some operations when we can see that the texture's
+/// CompositableTextureRef counter is equal to 1 (the texture is not shared
+/// between compositables).
+/// This means that it is important to observe the following rules:
+/// * CompositableHosts that receive UseTexture and similar messages *must* store
+/// all of the TextureHosts they receive in CompositableTextureRef slots for as
+/// long as they may be using them.
+/// * CompositableHosts must store each texture in a *single* CompositableTextureRef
+/// slot to ensure that the counter properly reflects how many compositables are
+/// using the texture.
+/// If a compositable needs to hold two references to a given texture (for example
+/// to have a pointer to the current texture in a list of textures that may be
+/// used), it can hold its extra references with RefPtr or whichever pointer type
+/// makes sense.
 template<typename T>
 class CompositableTextureRef {
 public:
@@ -355,16 +386,6 @@ public:
     TextureFlags aFlags);
 
   /**
-   * Tell to TextureChild that TextureHost is recycled.
-   * This function should be called from TextureHost's RecycleCallback.
-   * If SetRecycleCallback is set to TextureHost.
-   * TextureHost can be recycled by calling RecycleCallback
-   * when reference count becomes one.
-   * One reference count is always added by TextureChild.
-   */
-  void CompositorRecycle();
-
-  /**
    * Lock the texture host for compositing.
    */
   virtual bool Lock() { return true; }
@@ -403,7 +424,7 @@ public:
   /**
    * Called when another TextureHost will take over.
    */
-  virtual void UnbindTextureSource() {}
+  virtual void UnbindTextureSource();
 
   /**
    * Is called before compositing if the shared data has changed since last
@@ -478,10 +499,11 @@ public:
    * are for use with the managing IPDL protocols only (so that they can
    * implement AllocPTextureParent and DeallocPTextureParent).
    */
-  static PTextureParent* CreateIPDLActor(CompositableParentManager* aManager,
+  static PTextureParent* CreateIPDLActor(HostIPCAllocator* aAllocator,
                                          const SurfaceDescriptor& aSharedData,
                                          LayersBackend aLayersBackend,
-                                         TextureFlags aFlags);
+                                         TextureFlags aFlags,
+                                         uint64_t aSerial);
   static bool DestroyIPDLActor(PTextureParent* actor);
 
   /**
@@ -495,6 +517,8 @@ public:
    * Get the TextureHost corresponding to the actor passed in parameter.
    */
   static TextureHost* AsTextureHost(PTextureParent* actor);
+
+  static uint64_t GetTextureSerial(PTextureParent* actor);
 
   /**
    * Return a pointer to the IPDLActor.
@@ -540,6 +564,8 @@ public:
     MOZ_ASSERT(mCompositableCount >= 0);
     if (mCompositableCount == 0) {
       UnbindTextureSource();
+      // Send mFwdTransactionId to client side if necessary.
+      NotifyNotUsed();
     }
   }
 
@@ -565,11 +591,26 @@ public:
 
   virtual void WaitAcquireFenceHandleSyncComplete() {};
 
+  void SetLastFwdTransactionId(uint64_t aTransactionId);
+
   virtual bool NeedsFenceHandle() { return false; }
 
   virtual FenceHandle GetCompositorReleaseFence() { return FenceHandle(); }
 
+  void DeserializeReadLock(const ReadLockDescriptor& aDesc,
+                           ISurfaceAllocator* aAllocator);
+
+  TextureReadLock* GetReadLock() { return mReadLock; }
+
+  virtual Compositor* GetCompositor() = 0;
+
+  virtual GrallocTextureHostOGL* AsGrallocTextureHostOGL() { return nullptr; }
+
+  void CallNotifyNotUsed();
+
 protected:
+  void ReadUnlock();
+
   FenceHandle mReleaseFenceHandle;
 
   FenceHandle mAcquireFenceHandle;
@@ -578,11 +619,19 @@ protected:
 
   virtual void UpdatedInternal(const nsIntRegion *Region) {}
 
+  /**
+   * Called when mCompositableCount becomes 0.
+   */
+  void NotifyNotUsed();
+
   PTextureParent* mActor;
+  RefPtr<TextureReadLock> mReadLock;
   TextureFlags mFlags;
   int mCompositableCount;
+  uint64_t mFwdTransactionId;
 
   friend class TextureParent;
+  friend class TiledLayerBufferComposite;
 };
 
 /**
@@ -617,9 +666,13 @@ public:
 
   virtual bool BindTextureSource(CompositableTextureSourceRef& aTexture) override;
 
+  virtual void UnbindTextureSource() override;
+
   virtual void DeallocateDeviceData() override;
 
   virtual void SetCompositor(Compositor* aCompositor) override;
+
+  virtual Compositor* GetCompositor() override { return mCompositor; }
 
   /**
    * Return the format that is exposed to the compositor when calling

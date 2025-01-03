@@ -31,6 +31,7 @@
 
 #if MOZ_WIDGET_GTK != 2
 #include <cairo-gobject.h>
+#include "WidgetStyleCache.h"
 #endif
 
 using mozilla::LookAndFeel;
@@ -1095,7 +1096,24 @@ nsLookAndFeel::Init()
     // Gtk manages a screen's CSS in the settings object so we
     // ask Gtk to create it explicitly. Otherwise we may end up
     // with wrong color theme, see Bug 972382
-    (void)gtk_settings_get_for_screen(gdk_screen_get_default());
+    GtkSettings *settings = gtk_settings_get_for_screen(gdk_screen_get_default());
+
+
+    bool allowDarkTheme = mozilla::Preferences::GetBool("widget.allow-gtk-dark-theme", false);
+
+    if (!allowDarkTheme) {
+        // Disable dark theme because it interacts poorly with widget styling in
+        // web content (see bug 1216658).
+        // To avoid triggering reload of theme settings unnecessarily, only set the
+        // setting when necessary.
+        const gchar* dark_setting = "gtk-application-prefer-dark-theme";
+        gboolean dark;
+        g_object_get(settings, dark_setting, &dark, nullptr);
+
+        if (dark) {
+            g_object_set(settings, dark_setting, FALSE, nullptr);
+        }
+    }
 
     GtkWidgetPath *path = gtk_widget_path_new();
     gtk_widget_path_append_type(path, GTK_TYPE_WINDOW);
@@ -1123,15 +1141,24 @@ nsLookAndFeel::Init()
     gtk_style_context_get_color(style, GTK_STATE_FLAG_NORMAL, &color);
     sMozWindowText = GDK_RGBA_TO_NS_RGBA(color);
     gtk_style_context_restore(style);
+    g_object_unref(style);
 
     // tooltip foreground and background
-    gtk_style_context_add_class(style, GTK_STYLE_CLASS_TOOLTIP);
-    gtk_style_context_add_class(style, GTK_STYLE_CLASS_BACKGROUND);
+    style = ClaimStyleContext(MOZ_GTK_TOOLTIP);
     gtk_style_context_get_background_color(style, GTK_STATE_FLAG_NORMAL, &color);
     sInfoBackground = GDK_RGBA_TO_NS_RGBA(color);
-    gtk_style_context_get_color(style, GTK_STATE_FLAG_NORMAL, &color);
+    {
+        GtkStyleContext* boxStyle =
+            CreateStyleForWidget(gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0),
+                                 style);
+        GtkStyleContext* labelStyle =
+            CreateStyleForWidget(gtk_label_new(nullptr), boxStyle);
+        gtk_style_context_get_color(labelStyle, GTK_STATE_FLAG_NORMAL, &color);
+        g_object_unref(labelStyle);
+        g_object_unref(boxStyle);
+    }
     sInfoText = GDK_RGBA_TO_NS_RGBA(color);
-    g_object_unref(style);
+    ReleaseStyleContext(style);
 
     // menu foreground & menu background
     GtkWidget *accel_label = gtk_accel_label_new("M");
@@ -1178,6 +1205,7 @@ nsLookAndFeel::Init()
     GtkWidget *treeView = gtk_tree_view_new();
     GtkWidget *linkButton = gtk_link_button_new("http://example.com/");
     GtkWidget *menuBar = gtk_menu_bar_new();
+    GtkWidget *menuBarItem = gtk_menu_item_new();
     GtkWidget *entry = gtk_entry_new();
     GtkWidget *textView = gtk_text_view_new();
 
@@ -1187,6 +1215,7 @@ nsLookAndFeel::Init()
     gtk_container_add(GTK_CONTAINER(parent), linkButton);
     gtk_container_add(GTK_CONTAINER(parent), combobox);
     gtk_container_add(GTK_CONTAINER(parent), menuBar);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menuBar), menuBarItem);
     gtk_container_add(GTK_CONTAINER(window), parent);
     gtk_container_add(GTK_CONTAINER(parent), entry);
     gtk_container_add(GTK_CONTAINER(parent), textView);
@@ -1299,7 +1328,7 @@ nsLookAndFeel::Init()
     sComboBoxText = GDK_RGBA_TO_NS_RGBA(color);
 
     // Menubar text and hover text colors    
-    style = gtk_widget_get_style_context(menuBar);
+    style = gtk_widget_get_style_context(menuBarItem);
     gtk_style_context_get_color(style, GTK_STATE_FLAG_NORMAL, &color);
     sMenuBarText = GDK_RGBA_TO_NS_RGBA(color);
     gtk_style_context_get_color(style, GTK_STATE_FLAG_PRELIGHT, &color);

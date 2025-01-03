@@ -14,7 +14,6 @@
 #include "nsIPrintOptions.h"
 #include "nsTArray.h"
 #include "nsCOMArray.h"
-#include "nsAutoPtr.h"
 
 // Classes
 class nsPrintObject;
@@ -50,6 +49,8 @@ public:
                           int32_t      aMaxProgress,
                           bool         aDoStartStop,
                           int32_t      aFlag);
+
+  void DoOnStatusChange(nsresult aStatus);
 
 
   ePrintDataType               mType;            // the type of data this is (Printing or Print Preview)

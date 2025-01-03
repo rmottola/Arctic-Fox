@@ -280,9 +280,6 @@ nsIAtom** const kURLAttributesHTML[] = {
 
 nsIAtom** const kElementsSVG[] = {
   &nsGkAtoms::a, // a
-  &nsGkAtoms::altGlyph, // altGlyph
-  &nsGkAtoms::altGlyphDef, // altGlyphDef
-  &nsGkAtoms::altGlyphItem, // altGlyphItem
   &nsGkAtoms::animate, // animate
   &nsGkAtoms::animateColor, // animateColor
   &nsGkAtoms::animateMotion, // animateMotion

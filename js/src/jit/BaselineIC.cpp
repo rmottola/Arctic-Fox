@@ -785,11 +785,13 @@ IsCacheableSetPropAddSlot(JSContext* cx, JSObject* obj, Shape* oldShape,
     size_t chainDepth = 0;
     // Walk up the object prototype chain and ensure that all prototypes are
     // native, and that all prototypes have no setter defined on the property.
-    for (JSObject* proto = obj->getProto(); proto; proto = proto->getProto()) {
+    for (JSObject* proto = obj->staticPrototype(); proto; proto = proto->staticPrototype()) {
         chainDepth++;
         // if prototype is non-native, don't optimize
         if (!proto->isNative())
             return false;
+
+        MOZ_ASSERT(proto->hasStaticPrototype());
 
         // if prototype defines this property in a non-plain way, don't optimize
         Shape* protoShape = proto->as<NativeObject>().lookup(cx, id);
@@ -1949,7 +1951,8 @@ ICGetElemNativeCompiler<T>::generateStubCode(MacroAssembler& masm)
             if (popR1)
                 masm.addToStackPtr(ImmWord(sizeof(size_t)));
 
-            emitCallNative(masm, objReg);
+            if (!emitCallNative(masm, objReg))
+                return false;
 
         } else {
             MOZ_ASSERT(acctype_ == ICGetElemNativeStub::ScriptedGetter);
@@ -1965,7 +1968,8 @@ ICGetElemNativeCompiler<T>::generateStubCode(MacroAssembler& masm)
             if (popR1)
                 masm.addToStackPtr(Imm32(sizeof(size_t)));
 
-            emitCallScripted(masm, objReg);
+            if (!emitCallScripted(masm, objReg))
+                return false;
         }
     }
 
@@ -2302,28 +2306,19 @@ ICGetElem_Arguments::Compiler::generateStubCode(MacroAssembler& masm)
     regs.takeUnchecked(idxReg);
     regs.take(scratchReg);
     Register argData = regs.takeAny();
-    Register tempReg = regs.takeAny();
 
     // Load ArgumentsData
     masm.loadPrivate(Address(objReg, ArgumentsObject::getDataSlotOffset()), argData);
 
-    // Load deletedBits bitArray pointer into scratchReg
-    masm.loadPtr(Address(argData, offsetof(ArgumentsData, deletedBits)), scratchReg);
+    // Fail if we have a RareArgumentsData (elements were deleted).
+    masm.branchPtr(Assembler::NotEqual,
+                   Address(argData, offsetof(ArgumentsData, rareData)),
+                   ImmWord(0),
+                   &failureReconstructInputs);
 
-    // In tempReg, calculate index of word containing bit: (idx >> logBitsPerWord)
-    masm.movePtr(idxReg, tempReg);
-    const uint32_t shift = mozilla::tl::FloorLog2<(sizeof(size_t) * JS_BITS_PER_BYTE)>::value;
-    MOZ_ASSERT(shift == 5 || shift == 6);
-    masm.rshiftPtr(Imm32(shift), tempReg);
-    masm.loadPtr(BaseIndex(scratchReg, tempReg, ScaleFromElemWidth(sizeof(size_t))), scratchReg);
-
-    // Don't bother testing specific bit, if any bit is set in the word, fail.
-    masm.branchPtr(Assembler::NotEqual, scratchReg, ImmPtr(nullptr), &failureReconstructInputs);
-
-    // Load the value.  use scratchReg and tempReg to form a ValueOperand to load into.
+    // Load the value. Use scratchReg to form a ValueOperand to load into.
     masm.addPtr(Imm32(ArgumentsData::offsetOfArgs()), argData);
     regs.add(scratchReg);
-    regs.add(tempReg);
     ValueOperand tempVal = regs.takeAnyValue();
     masm.loadValue(BaseValueIndex(argData, idxReg), tempVal);
 
@@ -2360,13 +2355,13 @@ SetElemAddHasSameShapes(ICSetElem_DenseOrUnboxedArrayAdd* stub, JSObject* obj)
     if (obj->maybeShape() != nstub->shape(0))
         return false;
 
-    JSObject* proto = obj->getProto();
+    JSObject* proto = obj->staticPrototype();
     for (size_t i = 0; i < stub->protoChainDepth(); i++) {
         if (!proto->isNative())
             return false;
         if (proto->as<NativeObject>().lastProperty() != nstub->shape(i + 1))
             return false;
-        proto = obj->getProto();
+        proto = obj->staticPrototype();
         if (!proto) {
             if (i != stub->protoChainDepth() - 1)
                 return false;
@@ -2487,12 +2482,12 @@ CanOptimizeDenseOrUnboxedArraySetElem(JSObject* obj, uint32_t index,
     // Scan the prototype and shape chain to make sure that this is not the case.
     if (obj->isIndexed())
         return false;
-    JSObject* curObj = obj->getProto();
+    JSObject* curObj = obj->staticPrototype();
     while (curObj) {
         ++*protoDepthOut;
         if (!curObj->isNative() || curObj->isIndexed())
             return false;
-        curObj = curObj->getProto();
+        curObj = curObj->staticPrototype();
     }
 
     if (*protoDepthOut > ICSetElem_DenseOrUnboxedArrayAdd::MAX_PROTO_CHAIN_DEPTH)
@@ -3706,7 +3701,7 @@ TryAttachGlobalNameValueStub(JSContext* cx, HandleScript script, jsbytecode* pc,
         if (current == globalLexical) {
             current = &globalLexical->global();
         } else {
-            JSObject* proto = current->getProto();
+            JSObject* proto = current->staticPrototype();
             if (!proto || !proto->is<NativeObject>())
                 return true;
             current = &proto->as<NativeObject>();
@@ -3781,7 +3776,7 @@ TryAttachGlobalNameAccessorStub(JSContext* cx, HandleScript script, jsbytecode* 
         shape = current->lookup(cx, id);
         if (shape)
             break;
-        JSObject* proto = current->getProto();
+        JSObject* proto = current->staticPrototype();
         if (!proto || !proto->is<NativeObject>())
             return true;
         current = &proto->as<NativeObject>();
@@ -5426,9 +5421,15 @@ GetTemplateObjectForSimd(JSContext* cx, JSFunction* target, MutableHandleObject 
     // Check if this is a native inlinable SIMD operation.
     SimdType ctrlType;
     switch (jitInfo->inlinableNative) {
+      case InlinableNative::SimdInt8x16:   ctrlType = SimdType::Int8x16;   break;
+      case InlinableNative::SimdUint8x16:  ctrlType = SimdType::Uint8x16;  break;
+      case InlinableNative::SimdInt16x8:   ctrlType = SimdType::Int16x8;   break;
+      case InlinableNative::SimdUint16x8:  ctrlType = SimdType::Uint16x8;  break;
       case InlinableNative::SimdInt32x4:   ctrlType = SimdType::Int32x4;   break;
       case InlinableNative::SimdUint32x4:  ctrlType = SimdType::Uint32x4;  break;
       case InlinableNative::SimdFloat32x4: ctrlType = SimdType::Float32x4; break;
+      case InlinableNative::SimdBool8x16:  ctrlType = SimdType::Bool8x16;  break;
+      case InlinableNative::SimdBool16x8:  ctrlType = SimdType::Bool16x8;  break;
       case InlinableNative::SimdBool32x4:  ctrlType = SimdType::Bool32x4;  break;
       // This is not an inlinable SIMD operation.
       default: return false;
@@ -7770,12 +7771,14 @@ TryAttachInstanceOfStub(JSContext* cx, BaselineFrame* frame, ICInstanceOf_Fallba
     // clobber it.
     if (!js::FunctionHasDefaultHasInstance(fun, cx->wellKnownSymbols()))
         return true;
+
     // Refuse to optimize any function whose [[Prototype]] isn't
     // Function.prototype.
-    if (fun->hasLazyPrototype() || fun->hasUncacheableProto())
+    if (!fun->hasStaticPrototype() || fun->hasUncacheableProto())
         return true;
+
     Value funProto = cx->global()->getPrototype(JSProto_Function);
-    if (funProto.isObject() && fun->getProto() != &funProto.toObject())
+    if (funProto.isObject() && fun->staticPrototype() != &funProto.toObject())
         return true;
 
     Shape* shape = fun->lookupPure(cx->names().prototype);

@@ -156,6 +156,7 @@ public:
   using nsObjectLoadingContent::GetContentDocument;
   nsPIDOMWindowOuter* GetContentWindow();
   using nsIConstraintValidation::CheckValidity;
+  using nsIConstraintValidation::ReportValidity;
   using nsIConstraintValidation::GetValidationMessage;
   void GetAlign(DOMString& aValue)
   {
@@ -192,7 +193,7 @@ public:
   }
   void SetHspace(uint32_t aValue, ErrorResult& aRv)
   {
-    SetUnsignedIntAttr(nsGkAtoms::hspace, aValue, aRv);
+    SetUnsignedIntAttr(nsGkAtoms::hspace, aValue, 0, aRv);
   }
   void GetStandby(DOMString& aValue)
   {
@@ -208,7 +209,7 @@ public:
   }
   void SetVspace(uint32_t aValue, ErrorResult& aRv)
   {
-    SetUnsignedIntAttr(nsGkAtoms::vspace, aValue, aRv);
+    SetUnsignedIntAttr(nsGkAtoms::vspace, aValue, 0, aRv);
   }
   // XPCOM GetCodebase is ok; note that it's a URI attribute
   void SetCodeBase(const nsAString& aValue, ErrorResult& aRv)
@@ -252,9 +253,6 @@ private:
   {
     return nsIContentPolicy::TYPE_INTERNAL_OBJECT;
   }
-
-  virtual void GetItemValueText(DOMString& text) override;
-  virtual void SetItemValueText(const nsAString& text) override;
 
   virtual ~HTMLObjectElement();
 

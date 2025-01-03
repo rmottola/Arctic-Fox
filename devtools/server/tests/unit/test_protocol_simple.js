@@ -5,9 +5,9 @@
  * Test simple requests using the protocol helpers.
  */
 
-let protocol = require("devtools/server/protocol");
-let {method, Arg, Option, RetVal} = protocol;
-let events = require("sdk/event/core");
+var protocol = require("devtools/shared/protocol");
+var {method, Arg, Option, RetVal} = protocol;
+var events = require("sdk/event/core");
 
 function simpleHello() {
   return {
@@ -17,7 +17,7 @@ function simpleHello() {
   }
 }
 
-let RootActor = protocol.ActorClass({
+var RootActor = protocol.ActorClass({
   typeName: "root",
   initialize: function(conn) {
     protocol.Actor.prototype.initialize.call(this, conn);

@@ -11,6 +11,7 @@
 #include "mozilla/CSSStyleSheet.h"
 #include "mozilla/Likely.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/Move.h"
 #include "mozilla/css/ImageLoader.h"
 #include "CSSCalc.h"
 #include "gfxFontConstants.h"
@@ -213,6 +214,19 @@ nsCSSValue& nsCSSValue::operator=(const nsCSSValue& aCopy)
     Reset();
     new (this) nsCSSValue(aCopy);
   }
+  return *this;
+}
+
+nsCSSValue&
+nsCSSValue::operator=(nsCSSValue&& aOther)
+{
+  MOZ_ASSERT(this != &aOther, "Self assigment with rvalue reference");
+
+  Reset();
+  mUnit = aOther.mUnit;
+  mValue = aOther.mValue;
+  aOther.mUnit = eCSSUnit_Null;
+
   return *this;
 }
 
@@ -628,9 +642,7 @@ nsCSSValue::AdoptListValue(UniquePtr<nsCSSValueList> aValue)
   // We have to copy the first element since for owned lists the first
   // element should be an nsCSSValueList_heap object.
   SetListValue();
-  // FIXME: If nsCSSValue gets a swap method or move assignment operator,
-  // we should use that here to avoid allocating an extra value.
-  mValue.mList->mValue = aValue->mValue;
+  mValue.mList->mValue = Move(aValue->mValue);
   mValue.mList->mNext  = aValue->mNext;
   aValue->mNext = nullptr;
   aValue.reset();
@@ -660,10 +672,8 @@ nsCSSValue::AdoptPairListValue(UniquePtr<nsCSSValuePairList> aValue)
   // We have to copy the first element, since for owned pair lists, the first
   // element should be an nsCSSValuePairList_heap object.
   SetPairListValue();
-  // FIXME: If nsCSSValue gets a swap method or move assignment operator,
-  // we should use that here to avoid allocating extra values.
-  mValue.mPairList->mXValue = aValue->mXValue;
-  mValue.mPairList->mYValue = aValue->mYValue;
+  mValue.mPairList->mXValue = Move(aValue->mXValue);
+  mValue.mPairList->mYValue = Move(aValue->mYValue);
   mValue.mPairList->mNext   = aValue->mNext;
   aValue->mNext = nullptr;
   aValue.reset();
@@ -1448,18 +1458,26 @@ nsCSSValue::AppendToString(nsCSSProperty aProperty, nsAString& aResult,
         }
         aResult.Append(char16_t(')'));
       }
-    } else if (eCSSUnit_HexColor == unit) {
+    } else if (eCSSUnit_HexColor == unit ||
+               eCSSUnit_HexColorAlpha == unit) {
       nscolor color = GetColorValue();
       aResult.Append('#');
       aResult.AppendPrintf("%02x", NS_GET_R(color));
       aResult.AppendPrintf("%02x", NS_GET_G(color));
       aResult.AppendPrintf("%02x", NS_GET_B(color));
-    } else if (eCSSUnit_ShortHexColor == unit) {
+      if (eCSSUnit_HexColorAlpha == unit) {
+        aResult.AppendPrintf("%02x", NS_GET_A(color));
+      }
+    } else if (eCSSUnit_ShortHexColor == unit ||
+               eCSSUnit_ShortHexColorAlpha == unit) {
       nscolor color = GetColorValue();
       aResult.Append('#');
       aResult.AppendInt(NS_GET_R(color) / 0x11, 16);
       aResult.AppendInt(NS_GET_G(color) / 0x11, 16);
       aResult.AppendInt(NS_GET_B(color) / 0x11, 16);
+      if (eCSSUnit_ShortHexColorAlpha == unit) {
+        aResult.AppendInt(NS_GET_A(color) / 0x11, 16);
+      }
     } else {
       MOZ_ASSERT(IsFloatColorUnit());
       mValue.mFloatColor->AppendToString(unit, aResult);
@@ -1755,6 +1773,8 @@ nsCSSValue::AppendToString(nsCSSProperty aProperty, nsAString& aResult,
     case eCSSUnit_RGBAColor:             break;
     case eCSSUnit_HexColor:              break;
     case eCSSUnit_ShortHexColor:         break;
+    case eCSSUnit_HexColorAlpha:         break;
+    case eCSSUnit_ShortHexColorAlpha:    break;
     case eCSSUnit_PercentageRGBColor:    break;
     case eCSSUnit_PercentageRGBAColor:   break;
     case eCSSUnit_HSLColor:              break;
@@ -1934,6 +1954,8 @@ nsCSSValue::SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
     case eCSSUnit_RGBAColor:
     case eCSSUnit_HexColor:
     case eCSSUnit_ShortHexColor:
+    case eCSSUnit_HexColorAlpha:
+    case eCSSUnit_ShortHexColorAlpha:
       break;
 
     // Float Color
@@ -2486,32 +2508,41 @@ nsCSSValue::Array::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) cons
   return n;
 }
 
-css::URLValue::URLValue(nsIURI* aURI, nsStringBuffer* aString,
-                        nsIURI* aReferrer, nsIPrincipal* aOriginPrincipal)
-  : mURI(aURI),
-    mString(aString),
-    mReferrer(aReferrer),
-    mOriginPrincipal(aOriginPrincipal),
-    mURIResolved(true)
+css::URLValueData::URLValueData(already_AddRefed<PtrHolder<nsIURI>> aURI,
+                                nsStringBuffer* aString,
+                                already_AddRefed<PtrHolder<nsIURI>> aReferrer,
+                                already_AddRefed<PtrHolder<nsIPrincipal>>
+                                  aOriginPrincipal)
+  : mURI(Move(aURI))
+  , mString(aString)
+  , mReferrer(Move(aReferrer))
+  , mOriginPrincipal(Move(aOriginPrincipal))
+  , mURIResolved(true)
 {
-  MOZ_ASSERT(aOriginPrincipal, "Must have an origin principal");
+  MOZ_ASSERT(mOriginPrincipal, "Must have an origin principal");
 }
 
-css::URLValue::URLValue(nsStringBuffer* aString, nsIURI* aBaseURI,
-                        nsIURI* aReferrer, nsIPrincipal* aOriginPrincipal)
-  : mURI(aBaseURI),
-    mString(aString),
-    mReferrer(aReferrer),
-    mOriginPrincipal(aOriginPrincipal),
-    mURIResolved(false)
+css::URLValueData::URLValueData(nsStringBuffer* aString,
+                                already_AddRefed<PtrHolder<nsIURI>> aBaseURI,
+                                already_AddRefed<PtrHolder<nsIURI>> aReferrer,
+                                already_AddRefed<PtrHolder<nsIPrincipal>>
+                                  aOriginPrincipal)
+  : mURI(Move(aBaseURI))
+  , mString(aString)
+  , mReferrer(Move(aReferrer))
+  , mOriginPrincipal(Move(aOriginPrincipal))
+  , mURIResolved(false)
 {
-  MOZ_ASSERT(aOriginPrincipal, "Must have an origin principal");
+  MOZ_ASSERT(mOriginPrincipal, "Must have an origin principal");
 }
 
 bool
-css::URLValue::operator==(const URLValue& aOther) const
+css::URLValueData::operator==(const URLValueData& aOther) const
 {
   bool eq;
+  // Cast away const so we can call nsIPrincipal::Equals.
+  auto& self = *const_cast<URLValueData*>(this);
+  auto& other = const_cast<URLValueData&>(aOther);
   return NS_strcmp(nsCSSValue::GetBufferValue(mString),
                    nsCSSValue::GetBufferValue(aOther.mString)) == 0 &&
           (GetURI() == aOther.GetURI() || // handles null == null
@@ -2519,16 +2550,18 @@ css::URLValue::operator==(const URLValue& aOther) const
             NS_SUCCEEDED(mURI->Equals(aOther.mURI, &eq)) &&
             eq)) &&
           (mOriginPrincipal == aOther.mOriginPrincipal ||
-           (NS_SUCCEEDED(mOriginPrincipal->Equals(aOther.mOriginPrincipal,
-                                                  &eq)) && eq));
+           self.mOriginPrincipal.get()->Equals(other.mOriginPrincipal.get()));
 }
 
 bool
-css::URLValue::URIEquals(const URLValue& aOther) const
+css::URLValueData::URIEquals(const URLValueData& aOther) const
 {
   MOZ_ASSERT(mURIResolved && aOther.mURIResolved,
              "How do you know the URIs aren't null?");
   bool eq;
+  // Cast away const so we can call nsIPrincipal::Equals.
+  auto& self = *const_cast<URLValueData*>(this);
+  auto& other = const_cast<URLValueData&>(aOther);
   // Worth comparing GetURI() to aOther.GetURI() and mOriginPrincipal to
   // aOther.mOriginPrincipal, because in the (probably common) case when this
   // value was one of the ones that in fact did not change this will be our
@@ -2536,12 +2569,11 @@ css::URLValue::URIEquals(const URLValue& aOther) const
   return (mURI == aOther.mURI ||
           (NS_SUCCEEDED(mURI->Equals(aOther.mURI, &eq)) && eq)) &&
          (mOriginPrincipal == aOther.mOriginPrincipal ||
-          (NS_SUCCEEDED(mOriginPrincipal->Equals(aOther.mOriginPrincipal,
-                                                 &eq)) && eq));
+          self.mOriginPrincipal.get()->Equals(other.mOriginPrincipal.get()));
 }
 
 nsIURI*
-css::URLValue::GetURI() const
+css::URLValueData::GetURI() const
 {
   if (!mURIResolved) {
     mURIResolved = true;
@@ -2550,10 +2582,44 @@ css::URLValue::GetURI() const
     NS_NewURI(getter_AddRefs(newURI),
               NS_ConvertUTF16toUTF8(nsCSSValue::GetBufferValue(mString)),
               nullptr, mURI);
-    newURI.swap(mURI);
+    mURI = new PtrHolder<nsIURI>(newURI.forget());
   }
 
   return mURI;
+}
+
+size_t
+css::URLValueData::SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
+{
+  size_t n = 0;
+  n += mString->SizeOfIncludingThisIfUnshared(aMallocSizeOf);
+
+  // Measurement of the following members may be added later if DMD finds it
+  // is worthwhile:
+  // - mURI
+  // - mReferrer
+  // - mOriginPrincipal
+  return n;
+}
+
+URLValue::URLValue(nsStringBuffer* aString, nsIURI* aBaseURI, nsIURI* aReferrer,
+                   nsIPrincipal* aOriginPrincipal)
+  : URLValueData(aString,
+                 do_AddRef(new PtrHolder<nsIURI>(aBaseURI)),
+                 do_AddRef(new PtrHolder<nsIURI>(aReferrer)),
+                 do_AddRef(new PtrHolder<nsIPrincipal>(aOriginPrincipal)))
+{
+  MOZ_ASSERT(NS_IsMainThread());
+}
+
+URLValue::URLValue(nsIURI* aURI, nsStringBuffer* aString, nsIURI* aReferrer,
+                   nsIPrincipal* aOriginPrincipal)
+  : URLValueData(do_AddRef(new PtrHolder<nsIURI>(aURI)),
+                 aString,
+                 do_AddRef(new PtrHolder<nsIURI>(aReferrer)),
+                 do_AddRef(new PtrHolder<nsIPrincipal>(aOriginPrincipal)))
+{
+  MOZ_ASSERT(NS_IsMainThread());
 }
 
 size_t
@@ -2563,23 +2629,21 @@ css::URLValue::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
   size_t n = 0;
   if (mRefCnt <= 1) {
     n += aMallocSizeOf(this);
-    n += mString->SizeOfIncludingThisIfUnshared(aMallocSizeOf);
-
-    // Measurement of the following members may be added later if DMD finds it
-    // is worthwhile:
-    // - mURI
-    // - mReferrer
-    // - mOriginPrincipal
+    n += URLValueData::SizeOfExcludingThis(aMallocSizeOf);
   }
   return n;
 }
 
-
 css::ImageValue::ImageValue(nsIURI* aURI, nsStringBuffer* aString,
                             nsIURI* aReferrer, nsIPrincipal* aOriginPrincipal,
                             nsIDocument* aDocument)
-  : URLValue(aURI, aString, aReferrer, aOriginPrincipal)
+  : URLValueData(do_AddRef(new PtrHolder<nsIURI>(aURI)),
+                 aString,
+                 do_AddRef(new PtrHolder<nsIURI>(aReferrer)),
+                 do_AddRef(new PtrHolder<nsIPrincipal>(aOriginPrincipal)))
 {
+  MOZ_ASSERT(NS_IsMainThread());
+
   // NB: If aDocument is not the original document, we may not be able to load
   // images from aDocument.  Instead we do the image load from the original doc
   // and clone it to aDocument.
@@ -2613,9 +2677,6 @@ css::ImageValue::~ImageValue()
     iter.Remove();
   }
 }
-
-NS_IMPL_ADDREF(css::ImageValue)
-NS_IMPL_RELEASE(css::ImageValue)
 
 nsCSSValueGradientStop::nsCSSValueGradientStop()
   : mLocation(eCSSUnit_None),

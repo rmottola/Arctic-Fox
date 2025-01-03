@@ -212,9 +212,9 @@ cairo-mask-extends-bug.patch: bug 918671, sometimes when building a mask we woul
 
 ft-no-subpixel-if-surface-disables.patch: bug 929451, don't use subpixel aa for ft fonts on surfaces that don't support it
 
-no-pixman-image-reuse-across-threads.patch, Don't reuse pixman images when not thread-safe
-
 win32-printing-axis-swap.patch: bug 1205854, workaround for Windows printer drivers that can't handle swapped X and Y axes
+
+no-pixman-image-reuse-across-threads.patch: bug 1273701, picked from 71e8a4c23019b01aa43b334fcb2784c70daae9b5
 
 ==== pixman patches ====
 

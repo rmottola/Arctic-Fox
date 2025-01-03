@@ -80,7 +80,8 @@ class GraphStoreInfo : public TempObject
 
   public:
     explicit GraphStoreInfo(TempAllocator& alloc)
-      : stores_(alloc),
+      : current_(nullptr),
+        stores_(alloc),
         empty_(alloc)
     { }
 
@@ -207,15 +208,21 @@ LoadAliasesStore(MDefinition* load, MDefinition* store)
         return true;
 
     // Check if the alias categories alias eachother.
-    if (!(load->getAliasSet() & store->getAliasSet()).isNone())
-        return true;
+    if ((load->getAliasSet() & store->getAliasSet()).isNone())
+        return false;
+
+    // On any operation that has a specific alias category we can use TI to know
+    // the objects operating on don't intersect.
+    MDefinition::AliasType mightAlias = AliasAnalysisShared::genericMightAlias(load, store);
+    if (mightAlias == MDefinition::AliasType::NoAlias)
+        return false;
 
     // Check if the instruction might alias eachother.
-    MDefinition::AliasType type = load->mightAlias(store);
-    if (type != MDefinition::AliasType::NoAlias)
-        return true;
+    mightAlias = load->mightAlias(store);
+    if (mightAlias == MDefinition::AliasType::NoAlias)
+        return false;
 
-    return false;
+    return true;
 }
 
 #ifdef JS_JITSPEW

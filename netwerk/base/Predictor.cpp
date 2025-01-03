@@ -142,6 +142,8 @@ static const char PREDICTOR_MAX_URI_LENGTH_PREF[] =
   "network.predictor.max-uri-length";
 static const uint32_t PREDICTOR_MAX_URI_LENGTH_DEFAULT = 500;
 
+static const char PREDICTOR_DOING_TESTS_PREF[] = "network.predictor.doing-tests";
+
 static const char PREDICTOR_CLEANED_UP_PREF[] = "network.predictor.cleaned-up";
 
 // All these time values are in sec
@@ -355,6 +357,7 @@ Predictor::Predictor()
   ,mMaxResourcesPerEntry(PREDICTOR_MAX_RESOURCES_DEFAULT)
   ,mStartupCount(1)
   ,mMaxURILength(PREDICTOR_MAX_URI_LENGTH_DEFAULT)
+  ,mDoingTests(false)
 {
   MOZ_ASSERT(!sSelf, "multiple Predictor instances!");
   sSelf = this;
@@ -455,6 +458,8 @@ Predictor::InstallObserver()
   Preferences::AddUintVarCache(&mMaxURILength, PREDICTOR_MAX_URI_LENGTH_PREF,
                                PREDICTOR_MAX_URI_LENGTH_DEFAULT);
 
+  Preferences::AddBoolVarCache(&mDoingTests, PREDICTOR_DOING_TESTS_PREF, false);
+
   if (!mCleanedUp) {
     mCleanupTimer = do_CreateInstance("@mozilla.org/timer;1");
     mCleanupTimer->Init(this, 60 * 1000, nsITimer::TYPE_ONE_SHOT);
@@ -504,13 +509,6 @@ NS_IMETHODIMP
 Predictor::GetIgnoreIdle(bool *ignoreIdle)
 {
   *ignoreIdle = true;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-Predictor::GetIgnorePossibleSpdyConnections(bool *ignorePossibleSpdyConnections)
-{
-  *ignorePossibleSpdyConnections = true;
   return NS_OK;
 }
 
@@ -988,10 +986,10 @@ Predictor::PredictInternal(PredictorPredictReason reason, nsICacheEntry *entry,
 
   switch (reason) {
     case nsINetworkPredictor::PREDICT_LOAD:
-      rv = PredictForPageload(entry, targetURI, stackCount, verifier);
+      rv = PredictForPageload(entry, targetURI, stackCount, fullUri, verifier);
       break;
     case nsINetworkPredictor::PREDICT_STARTUP:
-      rv = PredictForStartup(entry, verifier);
+      rv = PredictForStartup(entry, fullUri, verifier);
       break;
     default:
       PREDICTOR_LOG(("    invalid reason"));
@@ -1034,7 +1032,7 @@ Predictor::PredictForLink(nsIURI *targetURI, nsIURI *sourceURI,
 static const uint8_t MAX_PAGELOAD_DEPTH = 10;
 bool
 Predictor::PredictForPageload(nsICacheEntry *entry, nsIURI *targetURI,
-                              uint8_t stackCount,
+                              uint8_t stackCount, bool fullUri,
                               nsINetworkPredictorVerifier *verifier)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -1080,7 +1078,7 @@ Predictor::PredictForPageload(nsICacheEntry *entry, nsIURI *targetURI,
     return RunPredictions(nullptr, verifier);
   }
 
-  CalculatePredictions(entry, targetURI, lastLoad, loadCount, globalDegradation);
+  CalculatePredictions(entry, targetURI, lastLoad, loadCount, globalDegradation, fullUri);
 
   return RunPredictions(targetURI, verifier);
 }
@@ -1088,7 +1086,7 @@ Predictor::PredictForPageload(nsICacheEntry *entry, nsIURI *targetURI,
 // This is the driver for predicting at browser startup time based on pages that
 // have previously been loaded close to startup.
 bool
-Predictor::PredictForStartup(nsICacheEntry *entry,
+Predictor::PredictForStartup(nsICacheEntry *entry, bool fullUri,
                              nsINetworkPredictorVerifier *verifier)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -1096,7 +1094,7 @@ Predictor::PredictForStartup(nsICacheEntry *entry,
   PREDICTOR_LOG(("Predictor::PredictForStartup"));
   int32_t globalDegradation = CalculateGlobalDegradation(mLastStartupTime);
   CalculatePredictions(entry, nullptr, mLastStartupTime, mStartupCount,
-                       globalDegradation);
+                       globalDegradation, fullUri);
   return RunPredictions(nullptr, verifier);
 }
 
@@ -1249,7 +1247,7 @@ Predictor::SanitizePrefs()
 void
 Predictor::CalculatePredictions(nsICacheEntry *entry, nsIURI *referrer,
                                 uint32_t lastLoad, uint32_t loadCount,
-                                int32_t globalDegradation)
+                                int32_t globalDegradation, bool fullUri)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -1277,9 +1275,15 @@ Predictor::CalculatePredictions(nsICacheEntry *entry, nsIURI *referrer,
 
     int32_t confidence = CalculateConfidence(hitCount, loadCount, lastHit,
                                              lastLoad, globalDegradation);
-    UpdateRollingLoadCount(entry, flags, key, hitCount, lastHit);
+    if (fullUri) {
+      UpdateRollingLoadCount(entry, flags, key, hitCount, lastHit);
+    }
     PREDICTOR_LOG(("CalculatePredictions key=%s value=%s confidence=%d", key, value, confidence));
-    if (!referrer) {
+    if (!fullUri) {
+      // Not full URI - don't prefetch! No sense in it!
+      PREDICTOR_LOG(("    forcing non-cacheability - not full URI"));
+      flags &= ~FLAG_PREFETCHABLE;
+    } else if (!referrer) {
       // No referrer means we can't prefetch, so pretend it's non-cacheable,
       // no matter what.
       PREDICTOR_LOG(("    forcing non-cacheability - no referrer"));
@@ -1332,11 +1336,16 @@ Predictor::Prefetch(nsIURI *uri, nsIURI *referrer,
   PREDICTOR_LOG(("Predictor::Prefetch uri=%s referrer=%s verifier=%p",
                  strUri.get(), strReferrer.get(), verifier));
   nsCOMPtr<nsIChannel> channel;
-  nsresult rv = NS_NewChannelInternal(getter_AddRefs(channel), uri, nullptr,
-                                      nullptr, nullptr,
-                                      nsIRequest::LOAD_BACKGROUND);
+  nsresult rv = NS_NewChannel(getter_AddRefs(channel), uri,
+                              nsContentUtils::GetSystemPrincipal(),
+                              nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                              nsIContentPolicy::TYPE_OTHER,
+                              nullptr, /* aLoadGroup */
+                              nullptr, /* aCallbacks */
+                              nsIRequest::LOAD_BACKGROUND);
+
   if (NS_FAILED(rv)) {
-    PREDICTOR_LOG(("    NS_NewChannelInternal failed rv=0x%X", rv));
+    PREDICTOR_LOG(("    NS_NewChannel failed rv=0x%X", rv));
     return rv;
   }
 
@@ -1352,11 +1361,11 @@ Predictor::Prefetch(nsIURI *uri, nsIURI *referrer,
 
   nsCOMPtr<nsIStreamListener> listener = new PrefetchListener(verifier, uri,
                                                               this);
-  PREDICTOR_LOG(("    calling AsyncOpen listener=%p channel=%p", listener.get(),
+  PREDICTOR_LOG(("    calling AsyncOpen2 listener=%p channel=%p", listener.get(),
                  channel.get()));
-  rv = channel->AsyncOpen(listener, nullptr);
+  rv = channel->AsyncOpen2(listener);
   if (NS_FAILED(rv)) {
-    PREDICTOR_LOG(("    AsyncOpen failed rv=0x%X", rv));
+    PREDICTOR_LOG(("    AsyncOpen2 failed rv=0x%X", rv));
   }
 
   return rv;
@@ -1647,7 +1656,7 @@ Predictor::LearnInternal(PredictorLearnReason reason, nsICacheEntry *entry,
       // have no real page loads in xpcshell, and this is how we fake it up
       // so that all the work that normally happens behind the scenes in a
       // page load can be done for testing purposes.
-      if (fullUri) {
+      if (fullUri && mDoingTests) {
         PREDICTOR_LOG(("    WARNING - updating rolling load count. "
                        "If you see this outside tests, you did it wrong"));
         SanitizePrefs();

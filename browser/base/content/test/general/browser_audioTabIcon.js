@@ -109,6 +109,19 @@ function* test_muting_using_menu(tab, expectMuted) {
   is(toggleMute.label, expectedLabel, "Correct label expected");
   is(toggleMute.accessKey, "M", "Correct accessKey expected");
 
+  is(toggleMute.hasAttribute("muted"), expectMuted, "Should have the correct state for the muted attribute");
+  ok(!toggleMute.hasAttribute("soundplaying"), "Should not have the soundplaying attribute");
+
+  yield play(tab);
+
+  is(toggleMute.hasAttribute("muted"), expectMuted, "Should have the correct state for the muted attribute");
+  ok(toggleMute.hasAttribute("soundplaying"), "Should have the soundplaying attribute");
+
+  yield pause(tab);
+
+  is(toggleMute.hasAttribute("muted"), expectMuted, "Should have the correct state for the muted attribute");
+  ok(!toggleMute.hasAttribute("soundplaying"), "Should not have the soundplaying attribute");
+
   // Click on the menu and wait for the tab to be muted.
   let mutedPromise = get_wait_for_mute_promise(tab, !expectMuted);
   let popupHiddenPromise = BrowserTestUtils.waitForEvent(contextMenu, "popuphidden");

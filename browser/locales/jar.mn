@@ -13,11 +13,11 @@
     locale/browser/aboutPrivateBrowsing.properties (%chrome/browser/aboutPrivateBrowsing.properties)
     locale/browser/aboutRobots.dtd                 (%chrome/browser/aboutRobots.dtd)
     locale/browser/aboutHome.dtd                   (%chrome/browser/aboutHome.dtd)
+    locale/browser/aboutSearchReset.dtd            (%chrome/browser/aboutSearchReset.dtd)
     locale/browser/aboutSessionRestore.dtd         (%chrome/browser/aboutSessionRestore.dtd)
     locale/browser/aboutTabCrashed.dtd             (%chrome/browser/aboutTabCrashed.dtd)
-#ifdef MOZ_SERVICES_SYNC
+    locale/browser/syncCustomize.dtd               (%chrome/browser/syncCustomize.dtd)
     locale/browser/aboutSyncTabs.dtd               (%chrome/browser/aboutSyncTabs.dtd)
-#endif
     locale/browser/browser.dtd                     (%chrome/browser/browser.dtd)
     locale/browser/baseMenuOverlay.dtd             (%chrome/browser/baseMenuOverlay.dtd)
     locale/browser/charsetOverlay.dtd              (%chrome/browser/charsetOverlay.dtd)
@@ -79,12 +79,9 @@
     locale/browser/preferences/preferences.properties (%chrome/browser/preferences/preferences.properties)
     locale/browser/preferences/privacy.dtd            (%chrome/browser/preferences/privacy.dtd)
     locale/browser/preferences/security.dtd           (%chrome/browser/preferences/security.dtd)
-#ifdef MOZ_SERVICES_SYNC
     locale/browser/preferences/sync.dtd               (%chrome/browser/preferences/sync.dtd)
-#endif
     locale/browser/preferences/tabs.dtd               (%chrome/browser/preferences/tabs.dtd)
     locale/browser/preferences/translation.dtd        (%chrome/browser/preferences/translation.dtd)
-#ifdef MOZ_SERVICES_SYNC
     locale/browser/syncBrand.dtd                (%chrome/browser/syncBrand.dtd)
     locale/browser/syncSetup.dtd                (%chrome/browser/syncSetup.dtd)
     locale/browser/syncSetup.properties         (%chrome/browser/syncSetup.properties)
@@ -92,7 +89,6 @@
     locale/browser/syncKey.dtd                  (%chrome/browser/syncKey.dtd)
     locale/browser/syncQuota.dtd                (%chrome/browser/syncQuota.dtd)
     locale/browser/syncQuota.properties         (%chrome/browser/syncQuota.properties)
-#endif
 % resource search-plugins chrome://browser/locale/searchplugins/
 #if BUILD_FASTER
     locale/browser/searchplugins/list.txt       (%searchplugins/list.txt)

@@ -15,10 +15,10 @@
 #include "nsContentSecurityManager.h"
 #include "nsScreen.h"
 #include "nsHistory.h"
-#include "nsPerformance.h"
 #include "nsDOMNavigationTiming.h"
 #include "nsIDOMStorageManager.h"
 #include "mozilla/dom/DOMStorage.h"
+#include "mozilla/dom/Performance.h"
 #include "mozilla/dom/StorageEvent.h"
 #include "mozilla/dom/StorageEventBinding.h"
 #include "mozilla/IntegerPrintfMacros.h"
@@ -127,7 +127,6 @@
 #include "nsIControllers.h"
 #include "nsIControllerContext.h"
 #include "nsGlobalWindowCommands.h"
-#include "nsAutoPtr.h"
 #include "nsQueryObject.h"
 #include "nsContentUtils.h"
 #include "nsCSSProps.h"
@@ -228,8 +227,10 @@
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/dom/NavigatorBinding.h"
 #include "mozilla/dom/ImageBitmap.h"
+#include "mozilla/dom/ImageBitmapBinding.h"
 #include "mozilla/dom/ServiceWorkerRegistration.h"
 #include "mozilla/dom/U2F.h"
+#include "mozilla/dom/WebIDLGlobalNameHash.h"
 #ifdef HAVE_SIDEBAR
 #include "mozilla/dom/ExternalBinding.h"
 #endif
@@ -308,6 +309,16 @@ static int32_t gMinBackgroundTimeoutValue;
 inline int32_t
 nsGlobalWindow::DOMMinTimeoutValue() const {
   bool isBackground = !mOuterWindow || mOuterWindow->IsBackground();
+  if (isBackground) {
+    // Don't use the background timeout value when there are audio contexts with
+    // active nodes, so that background audio can keep running smoothly.
+    for (const AudioContext* ctx : mAudioContexts) {
+      if (ctx->ActiveNodeCount() > 0) {
+        isBackground = false;
+        break;
+      }
+    }
+  }
   return
     std::max(isBackground ? gMinBackgroundTimeoutValue : gMinTimeoutValue, 0);
 }
@@ -618,7 +629,8 @@ nsPIDOMWindow<T>::nsPIDOMWindow(nsPIDOMWindowOuter *aOuterWindow)
   mMayHavePointerEnterLeaveEventListener(false),
   mInnerObjectsFreed(false),
   mIsModalContentWindow(false),
-  mIsActive(false), mIsBackground(false), mMediaSuspended(false),
+  mIsActive(false), mIsBackground(false),
+  mMediaSuspend(nsISuspendedTypes::NONE_SUSPENDED),
   mAudioMuted(false), mAudioVolume(1.0), mAudioCaptured(false),
   mDesktopModeViewport(false), mInnerWindow(nullptr),
   mOuterWindow(aOuterWindow),
@@ -928,13 +940,14 @@ nsOuterWindowProxy::getPrototypeIfOrdinary(JSContext* cx,
   //
   //   https://html.spec.whatwg.org/multipage/browsers.html#windowproxy-getprototypeof
   //
-  // We nonetheless can implement it here using a non-"lazy" [[Prototype]],
-  // because wrapper-class handlers (particularly, XOW in FilteringWrapper.cpp)
-  // supply all the non-ordinary behavior.
+  // We nonetheless can implement it with a static [[Prototype]], because
+  // wrapper-class handlers (particularly, XOW in FilteringWrapper.cpp) supply
+  // all non-ordinary behavior.
   //
   // But from a spec point of view, it's the exact same object in both cases --
-  // only the observer's changed.  So both cases *must* report non-ordinary,
-  // even if non-"lazy" [[Prototype]] usually means ordinary.
+  // only the observer's changed.  So this getPrototypeIfOrdinary trap on the
+  // non-wrapper object *must* report non-ordinary, even if static [[Prototype]]
+  // usually means ordinary.
   *isOrdinary = false;
   return true;
 }
@@ -1095,7 +1108,9 @@ nsOuterWindowProxy::AppendIndexedPropertyNames(JSContext *cx, JSObject *proxy,
     return false;
   }
   for (int32_t i = 0; i < int32_t(length); ++i) {
-    props.append(INT_TO_JSID(i));
+    if (!props.append(INT_TO_JSID(i))) {
+      return false;
+    }
   }
 
   return true;
@@ -1195,13 +1210,6 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mCleanMessageManager(false),
     mNeedsFocus(true),
     mHasFocus(false),
-#if defined(XP_MACOSX)
-    mShowAccelerators(false),
-    mShowFocusRings(false),
-#else
-    mShowAccelerators(true),
-    mShowFocusRings(true),
-#endif
     mShowFocusRingForContent(false),
     mFocusByKeyOccurred(false),
     mHasGamepad(false),
@@ -1256,8 +1264,6 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
 
       Preferences::AddStrongObserver(mObserver, "intl.accept_languages");
     }
-
-    InitializeShowFocusRings();
   } else {
     // |this| is an outer window. Outer windows start out frozen and
     // remain frozen until they get an inner window, so freeze this
@@ -2250,7 +2256,7 @@ public:
   NS_DECLARE_STATIC_IID_ACCESSOR(WINDOWSTATEHOLDER_IID)
   NS_DECL_ISUPPORTS
 
-  WindowStateHolder(nsIScriptContext* aContext, nsGlobalWindow *aWindow);
+  explicit WindowStateHolder(nsGlobalWindow *aWindow);
 
   nsGlobalWindow* GetInnerWindow() { return mInnerWindow; }
 
@@ -2271,10 +2277,9 @@ protected:
 
 NS_DEFINE_STATIC_IID_ACCESSOR(WindowStateHolder, WINDOWSTATEHOLDER_IID)
 
-WindowStateHolder::WindowStateHolder(nsIScriptContext* aContext,
-                                     nsGlobalWindow* aWindow)
+WindowStateHolder::WindowStateHolder(nsGlobalWindow* aWindow)
   : mInnerWindow(aWindow),
-    mInnerWindowReflector(aContext->GetNativeContext(), aWindow->GetWrapper())
+    mInnerWindowReflector(nsContentUtils::RootingCx(), aWindow->GetWrapper())
 {
   NS_PRECONDITION(aWindow, "null window");
   NS_PRECONDITION(aWindow->IsInnerWindow(), "Saving an outer window");
@@ -2341,7 +2346,7 @@ InitializeLegacyNetscapeObject(JSContext* aCx, JS::Handle<JSObject*> aGlobal)
   // uses enablePrivilege. If you're not doing test automation, you _must_ not
   // flip this pref, or you will be exposing all your users to security
   // vulnerabilities.
-  if (!Preferences::GetBool("security.turn_off_all_security_so_that_viruses_can_take_over_this_computer")) {
+  if (!xpc::IsInAutomation()) {
     return true;
   }
 
@@ -2666,7 +2671,7 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
      under normal circumstances, but bug 49615 describes a case.) */
 
   nsContentUtils::AddScriptRunner(
-    NS_NewRunnableMethod(this, &nsGlobalWindow::ClearStatus));
+    NewRunnableMethod(this, &nsGlobalWindow::ClearStatus));
 
   // Sometimes, WouldReuseInnerWindow() returns true even if there's no inner
   // window (see bug 776497). Be safe.
@@ -2813,10 +2818,10 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
         currentInner->AsInner()->CreatePerformanceObjectIfNeeded();
         if (currentInner->mPerformance) {
           newInnerWindow->mPerformance =
-            new nsPerformance(newInnerWindow->AsInner(),
-                              currentInner->mPerformance->GetDOMTiming(),
-                              currentInner->mPerformance->GetChannel(),
-                              currentInner->mPerformance->GetParentPerformance());
+            Performance::CreateForMainThread(newInnerWindow->AsInner(),
+                                             currentInner->mPerformance->GetDOMTiming(),
+                                             currentInner->mPerformance->GetChannel(),
+                                             currentInner->mPerformance->GetParentPerformance());
         }
       }
 
@@ -2983,8 +2988,8 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
   // up with the outer. See bug 969156.
   if (createdInnerWindow) {
     nsContentUtils::AddScriptRunner(
-      NS_NewRunnableMethod(newInnerWindow,
-                           &nsGlobalWindow::FireOnNewGlobalObject));
+      NewRunnableMethod(newInnerWindow,
+                        &nsGlobalWindow::FireOnNewGlobalObject));
   }
 
   if (newInnerWindow && !newInnerWindow->mHasNotifiedGlobalCreated && mDoc) {
@@ -2997,7 +3002,7 @@ nsGlobalWindow::SetNewDocument(nsIDocument* aDocument,
         nsContentUtils::IsSystemPrincipal(mDoc->NodePrincipal())) {
       newInnerWindow->mHasNotifiedGlobalCreated = true;
       nsContentUtils::AddScriptRunner(
-        NS_NewRunnableMethod(this, &nsGlobalWindow::DispatchDOMWindowCreated));
+        NewRunnableMethod(this, &nsGlobalWindow::DispatchDOMWindowCreated));
     }
   }
 
@@ -3416,6 +3421,16 @@ nsGlobalWindow::AreDialogsEnabled()
     if (isHidden) {
       return false;
     }
+  }
+
+  // Dialogs are also blocked if the document is sandboxed with SANDBOXED_MODALS
+  // (or if we have no document, of course).  Which document?  Who knows; the
+  // spec is daft.  See <https://github.com/whatwg/html/issues/1206>.  For now
+  // just go ahead and check mDoc, since in everything except edge cases in
+  // which a frame is allow-same-origin but not allow-scripts and is being poked
+  // at by some other window this should be the right thing anyway.
+  if (!mDoc || (mDoc->GetSandboxFlags() & SANDBOXED_MODALS)) {
+    return false;
   }
 
   return topWindow->mAreDialogsEnabled;
@@ -3840,7 +3855,7 @@ nsGlobalWindow::GetHistory(ErrorResult& aError)
   return mHistory;
 }
 
-nsPerformance*
+Performance*
 nsPIDOMWindowInner::GetPerformance()
 {
   MOZ_ASSERT(IsInnerWindow());
@@ -3848,7 +3863,7 @@ nsPIDOMWindowInner::GetPerformance()
   return mPerformance;
 }
 
-nsPerformance*
+Performance*
 nsGlobalWindow::GetPerformance()
 {
   return AsInner()->GetPerformance();
@@ -3873,7 +3888,7 @@ nsPIDOMWindowInner::CreatePerformanceObjectIfNeeded()
   if (timing) {
     // If we are dealing with an iframe, we will need the parent's performance
     // object (so we can add the iframe as a resource of that page).
-    nsPerformance* parentPerformance = nullptr;
+    Performance* parentPerformance = nullptr;
     nsCOMPtr<nsPIDOMWindowOuter> parentWindow = GetScriptableParentOrNull();
     if (parentWindow) {
       nsPIDOMWindowInner* parentInnerWindow = nullptr;
@@ -3885,34 +3900,34 @@ nsPIDOMWindowInner::CreatePerformanceObjectIfNeeded()
       }
     }
     mPerformance =
-      new nsPerformance(this, timing, timedChannel, parentPerformance);
+      Performance::CreateForMainThread(this, timing, timedChannel,
+                                       parentPerformance);
   }
 }
 
-bool
-nsPIDOMWindowOuter::GetMediaSuspended() const
+SuspendTypes
+nsPIDOMWindowOuter::GetMediaSuspend() const
 {
   if (IsInnerWindow()) {
-    return mOuterWindow->GetMediaSuspended();
+    return mOuterWindow->GetMediaSuspend();
   }
 
-  return mMediaSuspended;
+  return mMediaSuspend;
 }
 
 void
-nsPIDOMWindowOuter::SetMediaSuspended(bool aSuspended)
+nsPIDOMWindowOuter::SetMediaSuspend(SuspendTypes aSuspend)
 {
   if (IsInnerWindow()) {
-    mOuterWindow->SetMediaSuspended(aSuspended);
+    mOuterWindow->SetMediaSuspend(aSuspend);
     return;
   }
 
-  if (mMediaSuspended == aSuspended) {
-    return;
+  if (!IsDisposableSuspend(aSuspend)) {
+    mMediaSuspend = aSuspend;
   }
 
-  mMediaSuspended = aSuspended;
-  RefreshMediaElements();
+  RefreshMediaElementsSuspend(aSuspend);
 }
 
 bool
@@ -3938,7 +3953,7 @@ nsPIDOMWindowOuter::SetAudioMuted(bool aMuted)
   }
 
   mAudioMuted = aMuted;
-  RefreshMediaElements();
+  RefreshMediaElementsVolume();
 }
 
 float
@@ -3967,17 +3982,33 @@ nsPIDOMWindowOuter::SetAudioVolume(float aVolume)
   }
 
   mAudioVolume = aVolume;
-  RefreshMediaElements();
+  RefreshMediaElementsVolume();
   return NS_OK;
 }
 
 void
-nsPIDOMWindowOuter::RefreshMediaElements()
+nsPIDOMWindowOuter::RefreshMediaElementsVolume()
 {
   RefPtr<AudioChannelService> service = AudioChannelService::GetOrCreate();
   if (service) {
     service->RefreshAgentsVolume(GetOuterWindow());
   }
+}
+
+void
+nsPIDOMWindowOuter::RefreshMediaElementsSuspend(SuspendTypes aSuspend)
+{
+  RefPtr<AudioChannelService> service = AudioChannelService::GetOrCreate();
+  if (service) {
+    service->RefreshAgentsSuspend(GetOuterWindow(), aSuspend);
+  }
+}
+
+bool
+nsPIDOMWindowOuter::IsDisposableSuspend(SuspendTypes aSuspend) const
+{
+  return (aSuspend == nsISuspendedTypes::SUSPENDED_PAUSE_DISPOSABLE ||
+          aSuspend == nsISuspendedTypes::SUSPENDED_STOP_DISPOSABLE);
 }
 
 void
@@ -4479,6 +4510,15 @@ nsGlobalWindow::DoResolve(JSContext* aCx, JS::Handle<JSObject*> aObj,
     return true;
   }
 
+  bool found;
+  if (!WebIDLGlobalNameHash::DefineIfEnabled(aCx, aObj, aId, aDesc, &found)) {
+    return false;
+  }
+
+  if (found) {
+    return true;
+  }
+
   nsresult rv = nsWindowSH::GlobalResolve(this, aCx, aObj, aId, aDesc);
   if (NS_FAILED(rv)) {
     return Throw(aCx, rv);
@@ -4507,6 +4547,10 @@ nsGlobalWindow::MayResolve(jsid aId)
     return true;
   }
 
+  if (WebIDLGlobalNameHash::MayResolve(aId)) {
+    return true;
+  }
+
   nsScriptNameSpaceManager *nameSpaceManager = PeekNameSpaceManager();
   if (!nameSpaceManager) {
     // Really shouldn't happen.  Fail safe.
@@ -4530,12 +4574,13 @@ nsGlobalWindow::GetOwnPropertyNames(JSContext* aCx, nsTArray<nsString>& aNames,
   nsScriptNameSpaceManager* nameSpaceManager = GetNameSpaceManager();
   if (nameSpaceManager) {
     JS::Rooted<JSObject*> wrapper(aCx, GetWrapper());
+
+    WebIDLGlobalNameHash::GetNames(aCx, wrapper, aNames);
+
     for (auto i = nameSpaceManager->GlobalNameIter(); !i.Done(); i.Next()) {
       const GlobalNameMapEntry* entry = i.Get();
       if (nsWindowSH::NameStructEnabled(aCx, this, entry->mKey,
-                                        entry->mGlobalName) &&
-          (!entry->mGlobalName.mConstructorEnabled ||
-           entry->mGlobalName.mConstructorEnabled(aCx, wrapper))) {
+                                        entry->mGlobalName)) {
         aNames.AppendElement(entry->mKey);
       }
     }
@@ -8092,7 +8137,6 @@ nsGlobalWindow::Open(const nsAString& aUrl, const nsAString& aName,
 		      aLoadInfo,
                       aForceNoOpener,
                       GetPrincipal(),    // aCalleePrincipal
-                      nullptr,           // aJSCallerContext
                       _retval);
 }
 
@@ -8111,7 +8155,6 @@ nsGlobalWindow::OpenJS(const nsAString& aUrl, const nsAString& aName,
 		      nullptr,        // aLoadInfo
 		      false,          // aForceNoOpener
                       GetPrincipal(),    // aCalleePrincipal
-                      nsContentUtils::GetCurrentJSContext(), // aJSCallerContext
                       _retval);
 }
 
@@ -8134,7 +8177,6 @@ nsGlobalWindow::OpenDialog(const nsAString& aUrl, const nsAString& aName,
                       nullptr,                 // aLoadInfo
 		      false,                   // aForceNoOpener
                       GetPrincipal(),          // aCalleePrincipal
-                      nullptr,                 // aJSCallerContext
                       _retval);
 }
 
@@ -8156,7 +8198,6 @@ nsGlobalWindow::OpenNoNavigate(const nsAString& aUrl,
                       nullptr,           // aLoadInfo
 		      false,             // aForceNoOpener
                       GetPrincipal(),    // aCalleePrincipal
-                      nullptr,           // aJSCallerContext
                       _retval);
 
 }
@@ -8188,7 +8229,6 @@ nsGlobalWindow::OpenDialogOuter(JSContext* aCx, const nsAString& aUrl,
                         nullptr,             // aLoadInfo
 			false,               // aForceNoOpener
                         GetPrincipal(),      // aCalleePrincipal
-                        aCx,                 // aJSCallerContext
                         getter_AddRefs(dialog));
   return dialog.forget();
 }
@@ -8626,13 +8666,14 @@ nsGlobalWindow::FinalClose()
   // broken addons. The chrome tests in toolkit/mozapps/downloads are a good
   // testing ground.
   //
-  // In particular, if |win|'s JSContext is at the top of the stack, we must
+  // In particular, if some inner of |win| is the entry global, we must
   // complete _two_ round-trips to the event loop before the call to
   // ReallyCloseWindow. This allows setTimeout handlers that are set after
   // FinalClose() is called to run before the window is torn down.
-  bool indirect = GetContextInternal() && // Occasionally null. See bug 877390.
-                  (nsContentUtils::GetCurrentJSContext() ==
-                   GetContextInternal()->GetNativeContext());
+  nsCOMPtr<nsPIDOMWindowInner> entryWindow =
+    do_QueryInterface(GetEntryGlobal());
+  bool indirect =
+    entryWindow && entryWindow->GetOuterWindow() == this->AsOuter();
   if (NS_FAILED(nsCloseEvent::PostCloseEvent(this, indirect))) {
     ReallyCloseWindow();
   } else {
@@ -9271,7 +9312,6 @@ nsGlobalWindow::ShowModalDialogOuter(const nsAString& aUrl, nsIVariant* aArgumen
                         nullptr,            // aLoadInfo
 			false,              // aForceNoOpener
                         GetPrincipal(),     // aCalleePrincipal
-                        nullptr,            // aJSCallerContext
                         getter_AddRefs(dlgWin));
   nsContentUtils::SetMicroTaskLevel(oldMicroTaskLevel);
   LeaveModalState();
@@ -9425,8 +9465,9 @@ nsGlobalWindow::GetSelectionOuter()
   if (!presShell) {
     return nullptr;
   }
-
-  return static_cast<Selection*>(presShell->GetCurrentSelection(nsISelectionController::SELECTION_NORMAL));
+  nsISelection* domSelection =
+    presShell->GetCurrentSelection(SelectionType::eNormal);
+  return domSelection ? domSelection->AsSelection() : nullptr;
 }
 
 Selection*
@@ -10026,57 +10067,50 @@ nsGlobalWindow::GetFocusMethod()
   return mFocusMethod;
 }
 
-void
-nsGlobalWindow::InitializeShowFocusRings()
-{
-  nsPIDOMWindowOuter* root = GetPrivateRoot();
-  if (root) {
-    bool showAccelerators = false, showFocusRings = false;
-    root->GetKeyboardIndicators(&showAccelerators, &showFocusRings);
-    mShowFocusRings = showFocusRings;
-  }
-}
-
 bool
 nsGlobalWindow::ShouldShowFocusRing()
 {
   FORWARD_TO_INNER(ShouldShowFocusRing, (), false);
 
-  return mShowFocusRings || mShowFocusRingForContent || mFocusByKeyOccurred;
+  if (mShowFocusRingForContent || mFocusByKeyOccurred) {
+    return true;
+  }
+
+  nsCOMPtr<nsPIWindowRoot> root = GetTopWindowRoot();
+  return root ? root->ShowFocusRings() : false;
 }
 
 void
 nsGlobalWindow::SetKeyboardIndicators(UIStateChangeType aShowAccelerators,
                                       UIStateChangeType aShowFocusRings)
 {
-  FORWARD_TO_INNER_VOID(SetKeyboardIndicators, (aShowAccelerators, aShowFocusRings));
+  MOZ_ASSERT(IsOuterWindow());
+
+  nsPIDOMWindowOuter* piWin = GetPrivateRoot();
+  if (!piWin) {
+    return;
+  }
+
+  MOZ_ASSERT(piWin == AsOuter());
 
   bool oldShouldShowFocusRing = ShouldShowFocusRing();
 
   // only change the flags that have been modified
-  if (aShowAccelerators != UIStateChangeType_NoChange)
-    mShowAccelerators = aShowAccelerators == UIStateChangeType_Set;
-  if (aShowFocusRings != UIStateChangeType_NoChange)
-    mShowFocusRings = aShowFocusRings == UIStateChangeType_Set;
-
-  // propagate the indicators to child windows
-  nsCOMPtr<nsIDocShell> docShell = GetDocShell();
-  if (docShell) {
-    int32_t childCount = 0;
-    docShell->GetChildCount(&childCount);
-
-    for (int32_t i = 0; i < childCount; ++i) {
-      nsCOMPtr<nsIDocShellTreeItem> childShell;
-      docShell->GetChildAt(i, getter_AddRefs(childShell));
-      if (!childShell) {
-        continue;
-      }
-
-      if (nsCOMPtr<nsPIDOMWindowOuter> childWindow = childShell->GetWindow()) {
-        childWindow->SetKeyboardIndicators(aShowAccelerators, aShowFocusRings);
-      }
-    }
+  nsCOMPtr<nsPIWindowRoot> windowRoot = do_QueryInterface(mChromeEventHandler);
+  if (!windowRoot) {
+    return;
   }
+
+  if (aShowAccelerators != UIStateChangeType_NoChange) {
+    windowRoot->SetShowAccelerators(aShowAccelerators == UIStateChangeType_Set);
+  }
+  if (aShowFocusRings != UIStateChangeType_NoChange) {
+    windowRoot->SetShowFocusRings(aShowFocusRings == UIStateChangeType_Set);
+  }
+
+  nsContentUtils::SetKeyboardIndicatorsOnRemoteChildren(GetOuterWindow(),
+                                                        aShowAccelerators,
+                                                        aShowFocusRings);
 
   bool newShouldShowFocusRing = ShouldShowFocusRing();
   if (mHasFocus && mFocusedNode &&
@@ -10089,16 +10123,6 @@ nsGlobalWindow::SetKeyboardIndicators(UIStateChangeType aShowAccelerators,
       mFocusedNode->AsElement()->RemoveStates(NS_EVENT_STATE_FOCUSRING);
     }
   }
-}
-
-void
-nsGlobalWindow::GetKeyboardIndicators(bool* aShowAccelerators,
-                                      bool* aShowFocusRings)
-{
-  FORWARD_TO_INNER_VOID(GetKeyboardIndicators, (aShowAccelerators, aShowFocusRings));
-
-  *aShowAccelerators = mShowAccelerators;
-  *aShowFocusRings = mShowFocusRings;
 }
 
 bool
@@ -10718,13 +10742,14 @@ nsGlobalWindow::GetCaches(ErrorResult& aRv)
   return ref.forget();
 }
 
-already_AddRefed<ServiceWorkerRegistrationMainThread>
+already_AddRefed<ServiceWorkerRegistration>
 nsPIDOMWindowInner::GetServiceWorkerRegistration(const nsAString& aScope)
 {
-  RefPtr<ServiceWorkerRegistrationMainThread> registration;
+  RefPtr<ServiceWorkerRegistration> registration;
   if (!mServiceWorkerRegistrationTable.Get(aScope,
                                            getter_AddRefs(registration))) {
-    registration = new ServiceWorkerRegistrationMainThread(this, aScope);
+    registration =
+      ServiceWorkerRegistration::CreateForMainThread(this, aScope);
     mServiceWorkerRegistrationTable.Put(aScope, registration);
   }
   return registration.forget();
@@ -11729,7 +11754,7 @@ public:
   ~AutoUnblockScriptClosing()
   {
     void (nsGlobalWindow::*run)() = &nsGlobalWindow::UnblockScriptedClosing;
-    NS_DispatchToCurrentThread(NS_NewRunnableMethod(mWin, run));
+    NS_DispatchToCurrentThread(NewRunnableMethod(mWin, run));
   }
 };
 
@@ -11743,7 +11768,6 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
 			     nsIDocShellLoadInfo* aLoadInfo,
 			     bool aForceNoOpener,
                              nsIPrincipal *aCalleePrincipal,
-                             JSContext *aJSCallerContext,
                              nsPIDOMWindowOuter **aReturn)
 {
   MOZ_ASSERT(IsOuterWindow());
@@ -11757,8 +11781,6 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
                   "Can't pass in arguments both ways");
   NS_PRECONDITION(!aCalledNoScript || (!argv && argc == 0),
                   "Can't pass JS args when called via the noscript methods");
-  NS_PRECONDITION(!aJSCallerContext || !aCalledNoScript,
-                  "Shouldn't have caller context when called noscript");
 
   mozilla::Maybe<AutoUnblockScriptClosing> closeUnblocker;
 
@@ -11834,13 +11856,18 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
   if (checkForPopup) {
     abuseLevel = RevisePopupAbuseLevel(abuseLevel);
     if (abuseLevel >= openAbused) {
-      if (aJSCallerContext) {
+      if (!aCalledNoScript) {
         // If script in some other window is doing a window.open on us and
         // it's being blocked, then it's OK to close us afterwards, probably.
         // But if we're doing a window.open on ourselves and block the popup,
         // prevent this window from closing until after this script terminates
         // so that whatever popup blocker UI the app has will be visible.
-        if (mContext == GetScriptContextFromJSContext(aJSCallerContext)) {
+        nsCOMPtr<nsPIDOMWindowInner> entryWindow =
+          do_QueryInterface(GetEntryGlobal());
+        // Note that entryWindow can be null here if some JS component was the
+        // place where script was entered for this JS execution.
+        if (entryWindow &&
+            entryWindow->GetOuterWindow() == this->AsOuter()) {
           mBlockScriptedClosingFlag = true;
           closeUnblocker.emplace(this);
         }
@@ -12288,7 +12315,7 @@ nsGlobalWindow::RunTimeoutHandler(nsTimeout* aTimeout,
     // New script entry point required, due to the "Create a script" sub-step of
     // http://www.whatwg.org/specs/web-apps/current-work/#timer-initialisation-steps
     nsAutoMicroTask mt;
-    AutoEntryScript aes(this, reason, true, aScx->GetNativeContext());
+    AutoEntryScript aes(this, reason, true);
     JS::CompileOptions options(aes.cx());
     options.setFileAndLine(filename, lineNo)
            .setVersion(JSVERSION_DEFAULT);
@@ -12965,7 +12992,7 @@ nsGlobalWindow::SaveWindowState()
   // to the page.
   inner->Freeze();
 
-  nsCOMPtr<nsISupports> state = new WindowStateHolder(mContext, inner);
+  nsCOMPtr<nsISupports> state = new WindowStateHolder(inner);
 
 #ifdef DEBUG_PAGE_CACHE
   printf("saving window state, state = %p\n", (void*)state);
@@ -14379,6 +14406,11 @@ already_AddRefed<Promise>
 nsGlobalWindow::CreateImageBitmap(const ImageBitmapSource& aImage,
                                   ErrorResult& aRv)
 {
+  if (aImage.IsArrayBuffer() || aImage.IsArrayBufferView()) {
+    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
+    return nullptr;
+  }
+
   return ImageBitmap::Create(this, aImage, Nothing(), aRv);
 }
 
@@ -14387,7 +14419,28 @@ nsGlobalWindow::CreateImageBitmap(const ImageBitmapSource& aImage,
                                   int32_t aSx, int32_t aSy, int32_t aSw, int32_t aSh,
                                   ErrorResult& aRv)
 {
+  if (aImage.IsArrayBuffer() || aImage.IsArrayBufferView()) {
+    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
+    return nullptr;
+  }
+
   return ImageBitmap::Create(this, aImage, Some(gfx::IntRect(aSx, aSy, aSw, aSh)), aRv);
+}
+
+already_AddRefed<mozilla::dom::Promise>
+nsGlobalWindow::CreateImageBitmap(const ImageBitmapSource& aImage,
+                                  int32_t aOffset, int32_t aLength,
+                                  ImageBitmapFormat aFormat,
+                                  const Sequence<ChannelPixelLayout>& aLayout,
+                                  ErrorResult& aRv)
+{
+  if (aImage.IsArrayBuffer() || aImage.IsArrayBufferView()) {
+    return ImageBitmap::Create(this, aImage, aOffset, aLength, aFormat, aLayout,
+                               aRv);
+  } else {
+    aRv.Throw(NS_ERROR_TYPE_ERR);
+    return nullptr;
+  }
 }
 
 // Helper called by methods that move/resize the window,
@@ -14404,6 +14457,35 @@ nsGlobalWindow::CheckForDPIChange()
         presContext->UIResolutionChanged();
       }
     }
+  }
+}
+
+nsGlobalWindow::TemporarilyDisableDialogs::TemporarilyDisableDialogs(
+  nsGlobalWindow* aWindow MOZ_GUARD_OBJECT_NOTIFIER_PARAM_IN_IMPL)
+{
+  MOZ_GUARD_OBJECT_NOTIFIER_INIT;
+
+  MOZ_ASSERT(aWindow);
+  nsGlobalWindow* topWindow = aWindow->GetScriptableTopInternal();
+  if (!topWindow) {
+    NS_ERROR("nsGlobalWindow::TemporarilyDisableDialogs used without a top "
+             "window?");
+    return;
+  }
+
+  // TODO: Warn if no top window?
+  topWindow = topWindow->GetCurrentInnerWindowInternal();
+  if (topWindow) {
+    mTopWindow = topWindow;
+    mSavedDialogsEnabled = mTopWindow->mAreDialogsEnabled;
+    mTopWindow->mAreDialogsEnabled = false;
+  }
+}
+
+nsGlobalWindow::TemporarilyDisableDialogs::~TemporarilyDisableDialogs()
+{
+  if (mTopWindow) {
+    mTopWindow->mAreDialogsEnabled = mSavedDialogsEnabled;
   }
 }
 

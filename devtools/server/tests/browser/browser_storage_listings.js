@@ -4,10 +4,8 @@
 
 "use strict";
 
-const {StorageFront} = require("devtools/server/actors/storage");
-let gWindow = null;
-
-const domStorageProperties = ['length', 'key', 'getItem','setItem', 'removeItem', 'clear'];
+const {StorageFront} = require("devtools/client/fronts/storage");
+Services.scriptloader.loadSubScript("chrome://mochitests/content/browser/devtools/server/tests/browser/storage-helpers.js", this);
 
 const storeMap = {
   cookies: {
@@ -321,53 +319,21 @@ const IDBValues = {
 }
 
 function finishTests(client) {
-  // Cleanup so that indexed db created from this test do not interfere next ones
-
-  /**
-   * This method iterates over iframes in a window and clears the indexed db
-   * created by this test.
-   */
-  let clearIDB = (w, i, c) => {
-    if (w[i] && w[i].clear) {
-      w[i].clearIterator = w[i].clear(() => clearIDB(w, i + 1, c));
-      w[i].clearIterator.next();
-    }
-    else if (w[i] && w[i + 1]) {
-      clearIDB(w, i + 1, c);
-    }
-    else {
-      c();
-    }
-  };
 
   let closeConnection = () => {
-    // Forcing GC/CC to get rid of docshells and windows created by this test.
-    forceCollections();
-    client.close(() => {
-      forceCollections();
-      DebuggerServer.destroy();
-      forceCollections();
-      gWindow = null;
-      finish();
-    });
+
   }
-  gWindow.clearIterator = gWindow.clear(() => {
-    clearIDB(gWindow, 0, closeConnection);
-  });
-  gWindow.clearIterator.next();
 }
 
-function testStores(data) {
-  return Task.spawn(function*() {
-    ok(data.cookies, "Cookies storage actor is present");
-    ok(data.localStorage, "Local Storage storage actor is present");
-    ok(data.sessionStorage, "Session Storage storage actor is present");
-    ok(data.indexedDB, "Indexed DB storage actor is present");
-    yield testCookies(data.cookies);
-    yield testLocalStorage(data.localStorage);
-    yield testSessionStorage(data.sessionStorage);
-    yield testIndexedDB(data.indexedDB);
-  });
+function* testStores(data) {
+  ok(data.cookies, "Cookies storage actor is present");
+  ok(data.localStorage, "Local Storage storage actor is present");
+  ok(data.sessionStorage, "Session Storage storage actor is present");
+  ok(data.indexedDB, "Indexed DB storage actor is present");
+  yield testCookies(data.cookies);
+  yield testLocalStorage(data.localStorage);
+  yield testSessionStorage(data.sessionStorage);
+  yield testIndexedDB(data.indexedDB);
 }
 
 function testCookies(cookiesActor) {
@@ -375,7 +341,7 @@ function testCookies(cookiesActor) {
   return testCookiesObjects(0, cookiesActor.hosts, cookiesActor);
 }
 
-let testCookiesObjects = Task.async(function*(index, hosts, cookiesActor) {
+var testCookiesObjects = Task.async(function* (index, hosts, cookiesActor) {
   let host = Object.keys(hosts)[index];
   let matchItems = data => {
     is(data.total, storeMap.cookies[host].length,
@@ -413,7 +379,7 @@ function testLocalStorage(localStorageActor) {
   return testLocalStorageObjects(0, localStorageActor.hosts, localStorageActor);
 }
 
-let testLocalStorageObjects = Task.async(function*(index, hosts, localStorageActor) {
+var testLocalStorageObjects = Task.async(function* (index, hosts, localStorageActor) {
   let host = Object.keys(hosts)[index];
   let matchItems = data => {
     is(data.total - domStorageProperties.length, storeMap.localStorage[host].length,
@@ -451,7 +417,7 @@ function testSessionStorage(sessionStorageActor) {
                                    sessionStorageActor);
 }
 
-let testSessionStorageObjects = Task.async(function*(index, hosts, sessionStorageActor) {
+var testSessionStorageObjects = Task.async(function* (index, hosts, sessionStorageActor) {
   let host = Object.keys(hosts)[index];
   let matchItems = data => {
     is(data.total - domStorageProperties.length, storeMap.sessionStorage[host].length,
@@ -482,7 +448,7 @@ let testSessionStorageObjects = Task.async(function*(index, hosts, sessionStorag
   yield testSessionStorageObjects(++index, hosts, sessionStorageActor);
 });
 
-let testIndexedDB = Task.async(function*(indexedDBActor) {
+var testIndexedDB = Task.async(function* (indexedDBActor) {
   is(Object.keys(indexedDBActor.hosts).length, 3,
      "Correct number of host entries for indexed db");
 
@@ -501,11 +467,11 @@ let testIndexedDB = Task.async(function*(indexedDBActor) {
   }
 
   yield testIndexedDBs(0, indexedDBActor.hosts, indexedDBActor);
-  yield  testObjectStores(0, indexedDBActor.hosts, indexedDBActor);
-  yield  testIDBEntries(0, indexedDBActor.hosts, indexedDBActor);
+  yield testObjectStores(0, indexedDBActor.hosts, indexedDBActor);
+  yield testIDBEntries(0, indexedDBActor.hosts, indexedDBActor);
 });
 
-let testIndexedDBs = Task.async(function*(index, hosts, indexedDBActor) {
+var testIndexedDBs = Task.async(function* (index, hosts, indexedDBActor) {
   let host = Object.keys(hosts)[index];
   let matchItems = data => {
     is(data.total, IDBValues.dbDetails[host].length,
@@ -535,7 +501,7 @@ let testIndexedDBs = Task.async(function*(index, hosts, indexedDBActor) {
   yield testIndexedDBs(++index, hosts, indexedDBActor);
 });
 
-let testObjectStores = Task.async(function*(index, hosts, indexedDBActor) {
+var testObjectStores = Task.async(function* (index, hosts, indexedDBActor) {
   let host = Object.keys(hosts)[index];
   let matchItems = (data, db) => {
     is(data.total, IDBValues.objectStoreDetails[host][db].length,
@@ -624,41 +590,22 @@ let testIDBEntries = Task.async(function*(index, hosts, indexedDBActor) {
   yield testObjectStores(++index, hosts, indexedDBActor);
 });
 
-function test() {
-  addTab(MAIN_DOMAIN + "storage-listings.html").then(function(browser) {
-    let doc = browser.contentDocument;
-    initDebuggerServer();
+add_task(function*() {
+  yield openTabAndSetupStorage(MAIN_DOMAIN + "storage-listings.html");
 
-    let createConnection = () => {
-      let client = new DebuggerClient(DebuggerServer.connectPipe());
-      connectDebuggerClient(client).then(form => {
-        let front = StorageFront(client, form);
-        front.listStores().then(data => testStores(data))
-                          .then(() => finishTests(client));
-      });
-    };
+  initDebuggerServer();
+  let client = new DebuggerClient(DebuggerServer.connectPipe());
+  let form = yield connectDebuggerClient(client);
+  let front = StorageFront(client, form);
+  let data = yield front.listStores();
+  yield testStores(data);
 
-    /**
-     * This method iterates over iframes in a window and setups the indexed db
-     * required for this test.
-     */
-    let setupIDBInFrames = (w, i, c) => {
-      if (w[i] && w[i].idbGenerator) {
-        w[i].setupIDB = w[i].idbGenerator(() => setupIDBInFrames(w, i + 1, c));
-        w[i].setupIDB.next();
-      }
-      else if (w[i] && w[i + 1]) {
-        setupIDBInFrames(w, i + 1, c);
-      }
-      else {
-        c();
-      }
-    };
-    // Setup the indexed db in main window.
-    gWindow = doc.defaultView.wrappedJSObject;
-    gWindow.setupIDB = gWindow.idbGenerator(() => {
-      setupIDBInFrames(gWindow, 0, createConnection);
-    });
-    gWindow.setupIDB.next();
-  });
-}
+  yield clearStorage();
+
+  // Forcing GC/CC to get rid of docshells and windows created by this test.
+  forceCollections();
+  yield client.close();
+  forceCollections();
+  DebuggerServer.destroy();
+  forceCollections();
+});

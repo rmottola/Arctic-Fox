@@ -6,8 +6,9 @@
 #ifndef FRAMEPROPERTYTABLE_H_
 #define FRAMEPROPERTYTABLE_H_
 
-#include "mozilla/TypeTraits.h"
 #include "mozilla/MemoryReporting.h"
+#include "mozilla/TypeTraits.h"
+#include "mozilla/unused.h"
 #include "nsTArray.h"
 #include "nsTHashtable.h"
 #include "nsHashKeys.h"
@@ -167,10 +168,35 @@ public:
   void Set(const nsIFrame* aFrame, Descriptor<T> aProperty,
            PropertyType<T> aValue)
   {
-    ReinterpretHelper<T> helper{};
-    helper.value = aValue;
-    SetInternal(aFrame, aProperty, helper.ptr);
+    void* ptr = ReinterpretHelper<T>::ToPointer(aValue);
+    SetInternal(aFrame, aProperty, ptr);
   }
+
+  /**
+   * @return true if @aProperty is set for @aFrame. This requires one hashtable
+   * lookup (using the frame as the key) and a linear search through the
+   * properties of that frame.
+   *
+   * In most cases, this shouldn't be used outside of assertions, because if
+   * you're doing a lookup anyway it would be far more efficient to call Get()
+   * or Remove() and check the aFoundResult outparam to find out whether the
+   * property is set. Legitimate non-assertion uses include:
+   *
+   *   - Checking if a frame property is set in cases where that's all we want
+   *     to know (i.e., we don't intend to read the actual value or remove the
+   *     property).
+   *
+   *   - Calling Has() before Set() in cases where we don't want to overwrite
+   *     an existing value for the frame property.
+   */
+  template<typename T>
+  bool Has(const nsIFrame* aFrame, Descriptor<T> aProperty)
+  {
+    bool foundResult = false;
+    mozilla::Unused << GetInternal(aFrame, aProperty, &foundResult);
+    return foundResult;
+  }
+
   /**
    * Get a property value for a frame. This requires one hashtable
    * lookup (using the frame as the key) and a linear search through
@@ -186,9 +212,8 @@ public:
   PropertyType<T> Get(const nsIFrame* aFrame, Descriptor<T> aProperty,
                       bool* aFoundResult = nullptr)
   {
-    ReinterpretHelper<T> helper;
-    helper.ptr = GetInternal(aFrame, aProperty, aFoundResult);
-    return helper.value;
+    void* ptr = GetInternal(aFrame, aProperty, aFoundResult);
+    return ReinterpretHelper<T>::FromPointer(ptr);
   }
   /**
    * Remove a property value for a frame. This requires one hashtable
@@ -206,9 +231,8 @@ public:
   PropertyType<T> Remove(const nsIFrame* aFrame, Descriptor<T> aProperty,
                          bool* aFoundResult = nullptr)
   {
-    ReinterpretHelper<T> helper;
-    helper.ptr = RemoveInternal(aFrame, aProperty, aFoundResult);
-    return helper.value;
+    void* ptr = RemoveInternal(aFrame, aProperty, aFoundResult);
+    return ReinterpretHelper<T>::FromPointer(ptr);
   }
   /**
    * Remove and destroy a property value for a frame. This requires one
@@ -245,16 +269,39 @@ protected:
 
   void DeleteInternal(const nsIFrame* aFrame, UntypedDescriptor aProperty);
 
-  // A helper union being used here rather than simple reinterpret_cast
-  // is because PropertyType<T> could be float, bool, uint8_t, etc.
-  // which do not have defined behavior for a direct cast.
   template<typename T>
-  union ReinterpretHelper
+  struct ReinterpretHelper
   {
-    void* ptr;
-    PropertyType<T> value;
     static_assert(sizeof(PropertyType<T>) <= sizeof(void*),
                   "size of the value must never be larger than a pointer");
+
+    static void* ToPointer(PropertyType<T> aValue)
+    {
+      void* ptr = nullptr;
+      memcpy(&ptr, &aValue, sizeof(aValue));
+      return ptr;
+    }
+
+    static PropertyType<T> FromPointer(void* aPtr)
+    {
+      PropertyType<T> value;
+      memcpy(&value, &aPtr, sizeof(value));
+      return value;
+    }
+  };
+
+  template<typename T>
+  struct ReinterpretHelper<T*>
+  {
+    static void* ToPointer(T* aValue)
+    {
+      return static_cast<void*>(aValue);
+    }
+
+    static T* FromPointer(void* aPtr)
+    {
+      return static_cast<T*>(aPtr);
+    }
   };
 
   /**
@@ -360,6 +407,13 @@ public:
   {
     mTable->Set(mFrame, aProperty, aValue);
   }
+
+  template<typename T>
+  bool Has(Descriptor<T> aProperty) const
+  {
+    return mTable->Has(mFrame, aProperty);
+  }
+
   template<typename T>
   PropertyType<T> Get(Descriptor<T> aProperty,
                       bool* aFoundResult = nullptr) const

@@ -96,6 +96,10 @@ DIST="$MOZ_BUILD_ROOT/dist"
 
 MOZ_DEFAULT_COMPILER
 
+if test "$COMPILE_ENVIRONMENT"; then
+    MOZ_ANDROID_NDK
+fi # COMPILE_ENVIRONMENT
+
 if test -n "$gonkdir" ; then
     dnl export for js/src/configure. We can't pass the option down normally,
     dnl because it's a `--enable-project=b2g`-only option.
@@ -108,11 +112,6 @@ if test -n "$gonkdir" ; then
     if test -n "${PLATFORM_SDK_VERSION}"; then
         ANDROID_VERSION="${PLATFORM_SDK_VERSION}"
     fi
-
-    if ! test -e "$gonkdir/ndk/sources/cxx-stl/stlport/src/iostream.cpp"; then
-        AC_MSG_ERROR([Couldn't find path to stlport sources in the gonk tree])
-    fi
-    STLPORT_CPPFLAGS="-I$_topsrcdir/build/stlport/stlport -I$gonkdir/ndk/sources/cxx-stl/system/include"
 
     case "$ANDROID_VERSION" in
     15)
@@ -184,13 +183,11 @@ if test -n "$gonkdir" ; then
         AC_MSG_ERROR([Unsupported platform version: $ANDROID_VERSION])
         ;;
     esac
-    CPPFLAGS="-DANDROID $TARGET_C_INCLUDES -I$gonkdir/system -I$gonkdir/system/core/include -isystem $gonkdir/bionic -I$gonkdir/hardware/libhardware/include -I$gonkdir/external/valgrind/fxos-include $GONK_INCLUDES $CPPFLAGS"
-    CFLAGS="-mandroid -fno-short-enums -fno-exceptions $CFLAGS"
-    CXXFLAGS="-mandroid -fno-short-enums -fno-exceptions $CXXFLAGS $STLPORT_CPPFLAGS"
+
+    CPPFLAGS="-I$gonkdir/system -I$gonkdir/system/core/include -I$gonkdir/hardware/libhardware/include -I$gonkdir/external/valgrind/fxos-include $GONK_INCLUDES $CPPFLAGS"
+    LDFLAGS="-L$gonkdir/out/target/product/$GONK_PRODUCT/obj/lib -Wl,-rpath-link=$gonkdir/out/target/product/$GONK_PRODUCT/obj/lib $LDFLAGS"
     dnl Add -llog by default, since we use it all over the place.
     LIBS="$LIBS -llog"
-
-    LDFLAGS="-mandroid -L$gonkdir/out/target/product/$GONK_PRODUCT/obj/lib -Wl,-rpath-link=$gonkdir/out/target/product/$GONK_PRODUCT/obj/lib --sysroot=$gonkdir/out/target/product/$GONK_PRODUCT/obj/ $LDFLAGS"
 
     AC_DEFINE(ANDROID)
     AC_DEFINE_UNQUOTED(ANDROID_VERSION, $ANDROID_VERSION)
@@ -198,12 +195,8 @@ if test -n "$gonkdir" ; then
     AC_DEFINE(HAVE_SYS_UIO_H)
     AC_DEFINE(HAVE_PTHREADS)
     direct_nspr_config=1
-    android_cxx_stl=mozstlport
-else
-    if test "$COMPILE_ENVIRONMENT"; then
-        MOZ_ANDROID_NDK
-    fi # COMPILE_ENVIRONMENT
 
+else
     case "$target" in
     *-android*|*-linuxandroid*)
         ZLIB_DIR=yes
@@ -878,6 +871,7 @@ if test "$GNU_CC"; then
     MMX_FLAGS="-mmmx"
     SSE_FLAGS="-msse"
     SSE2_FLAGS="-msse2"
+    SSSE3_FLAGS="-mssse3"
     # FIXME: Let us build with strict aliasing. bug 414641.
     CFLAGS="$CFLAGS -fno-strict-aliasing"
     MKSHLIB='$(CXX) $(CXXFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -Wl,-h,$(DSO_SONAME) -o $@'
@@ -1115,6 +1109,24 @@ if test "$MOZ_PROFILING" -a -z "$STRIP_FLAGS"; then
 fi
 
 dnl ========================================================
+dnl = Enable Gecko integrated IPC fuzzer
+dnl ========================================================
+MOZ_ARG_ENABLE_BOOL(ipc-fuzzer,
+[  --enable-ipc-fuzzer       Enable IPC fuzzer (default=no)],
+    MOZ_FAULTY=1,
+    MOZ_FAULTY= )
+AC_SUBST(MOZ_FAULTY)
+
+if test -n "$MOZ_FAULTY" && test "$OS_ARCH" = "WINNT"; then
+    AC_MSG_ERROR([--enable-ipc-fuzzer is not supported on this platform.])
+fi
+
+if test -n "$MOZ_FAULTY"; then
+    MOZ_FAULTY=1
+    AC_DEFINE(MOZ_FAULTY)
+fi
+
+dnl ========================================================
 dnl = Enable DMD
 dnl ========================================================
 
@@ -1322,17 +1334,12 @@ case "$target" in
         CXXFLAGS="$CXXFLAGS -mieee"
     ;;
     esac
-
-    if test -z "$MC"; then
-        MC=mc.exe
-    fi
     ;;
 *-mingw*)
     DSO_CFLAGS=
     DSO_PIC_CFLAGS=
     DLL_SUFFIX=.dll
     RC=rc.exe
-    MC=mc.exe
     # certain versions of cygwin's makedepend barf on the
     # #include <string> vs -I./dist/include/string issue so don't use it
     if test -n "$GNU_CC" -o -n "$CLANG_CC"; then
@@ -1351,7 +1358,7 @@ case "$target" in
         # Use temp file for windres (bug 213281)
         RCFLAGS='-O coff --use-temp-file'
         # mingw doesn't require kernel32, user32, and advapi32 explicitly
-        LIBS="$LIBS -luuid -lgdi32 -lwinmm -lwsock32 -luserenv -lsecur32 -lnetapi32"
+        LIBS="$LIBS -luuid -lgdi32 -lwinmm -lwsock32 -luserenv -lsecur32"
         MOZ_FIX_LINK_PATHS=
         DLL_PREFIX=
         IMPORT_LIB_SUFFIX=a
@@ -1408,6 +1415,9 @@ case "$target" in
             CXXFLAGS="$CXXFLAGS -arch:IA32"
             SSE_FLAGS="-arch:SSE"
             SSE2_FLAGS="-arch:SSE2"
+            dnl MSVC allows the use of intrinsics without any flags
+            dnl and doesn't have a separate arch for SSSE3
+            SSSE3_FLAGS="-arch:SSE2"
         fi
         dnl VS2013+ requires -FS when parallel building by make -jN.
         dnl If nothing, compiler sometimes causes C1041 error.
@@ -1498,7 +1508,7 @@ case "$target" in
         # make 'foo == bar;' error out
         CFLAGS="$CFLAGS -we4553"
         CXXFLAGS="$CXXFLAGS -we4553"
-        LIBS="$LIBS kernel32.lib user32.lib gdi32.lib winmm.lib wsock32.lib advapi32.lib secur32.lib netapi32.lib"
+        LIBS="$LIBS kernel32.lib user32.lib gdi32.lib winmm.lib wsock32.lib advapi32.lib secur32.lib"
         MOZ_DEBUG_LDFLAGS='-DEBUG -DEBUGTYPE:CV'
         WARNINGS_AS_ERRORS='-WX'
         MOZ_OPTIMIZE_FLAGS='-O1 -Oi'
@@ -1560,7 +1570,7 @@ case "$target" in
 
     case "$target" in
     i*86-*)
-        if test "$HAVE_64BIT_BUILD"; then
+        if test "$HAVE_64BIT_BUILD" -a -n "$COMPILE_ENVIRONMENT"; then
             AC_MSG_ERROR([You are targeting i386 but using the 64-bit compiler.])
         fi
 
@@ -1576,7 +1586,7 @@ case "$target" in
         AC_DEFINE(_X86_)
         ;;
     x86_64-*)
-        if test -z "$HAVE_64BIT_BUILD"; then
+        if test -z "$HAVE_64BIT_BUILD" -a -n "$COMPILE_ENVIRONMENT"; then
             AC_MSG_ERROR([You are targeting 64-bit but using the 32-bit compiler.])
         fi
         if test -n "$_WIN32_MSVC"; then
@@ -1635,6 +1645,7 @@ esac
 AC_SUBST_LIST(MMX_FLAGS)
 AC_SUBST_LIST(SSE_FLAGS)
 AC_SUBST_LIST(SSE2_FLAGS)
+AC_SUBST_LIST(SSSE3_FLAGS)
 
 AC_SUBST(MOZ_LINKER)
 if test -n "$MOZ_LINKER"; then
@@ -2682,33 +2693,9 @@ fi # SKIP_LIBRARY_CHECKS
 AC_SUBST(MOZ_PNG_ARM_NEON)
 
 dnl ========================================================
-dnl system HunSpell Support
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(system-hunspell,
-[  --enable-system-hunspell
-                          Use system hunspell (located with pkgconfig)],
-    MOZ_SYSTEM_HUNSPELL=1 )
-
-if test -n "$MOZ_SYSTEM_HUNSPELL"; then
-    PKG_CHECK_MODULES(MOZ_HUNSPELL, hunspell)
-fi
-
-AC_SUBST(MOZ_SYSTEM_HUNSPELL)
-
-dnl ========================================================
 dnl system libffi Support
 dnl ========================================================
 MOZ_CONFIG_FFI()
-
-dnl ========================================================
-dnl Java SDK support
-dnl ========================================================
-
-JAVA_BIN_PATH=
-MOZ_ARG_WITH_STRING(java-bin-path,
-[  --with-java-bin-path=dir
-                          Location of Java binaries (java, javac, jar)],
-    JAVA_BIN_PATH=$withval)
 
 dnl ========================================================
 dnl =
@@ -2718,7 +2705,6 @@ dnl ========================================================
 
 MOZ_ARG_HEADER(Application)
 
-ENABLE_TESTS=
 MOZ_DISABLE_PARENTAL_CONTROLS=1
 ENABLE_SYSTEM_EXTENSION_DIRS=1
 MOZ_BRANDING_DIRECTORY=
@@ -2758,8 +2744,6 @@ VPX_ARM_ASM=
 LIBJPEG_TURBO_AS=
 LIBJPEG_TURBO_ASFLAGS=
 MOZ_PERMISSIONS=1
-MOZ_PLACES=1
-MOZ_SOCIAL=1
 MOZ_PREF_EXTENSIONS=1
 MOZ_REFLOW_PERF=
 MOZ_SAFE_BROWSING=
@@ -2784,7 +2768,6 @@ if test -n "$MOZ_RTSP"; then
 fi
 BUILD_CTYPES=1
 MOZ_USE_NATIVE_POPUP_WINDOWS=
-MOZ_ANDROID_HISTORY=
 MOZ_WEBSMS_BACKEND=
 MOZ_ANDROID_READING_LIST_SERVICE=
 MOZ_EXCLUDE_HYPHENATION_DICTIONARIES=
@@ -3525,17 +3508,6 @@ fi
 AC_SUBST(MOZ_SYNTH_SPEECHD)
 
 dnl ========================================================
-dnl = Enable Android History instead of Places
-dnl ========================================================
-if test -n "$MOZ_ANDROID_HISTORY"; then
-    if test -z "$MOZ_PLACES"; then
-        AC_DEFINE(MOZ_ANDROID_HISTORY)
-    else
-        AC_MSG_ERROR([Cannot use MOZ_ANDROID_HISTORY alongside MOZ_PLACES.])
-    fi
-fi
-
-dnl ========================================================
 dnl = Disable WebSMS backend
 dnl ========================================================
 MOZ_ARG_DISABLE_BOOL(websms-backend,
@@ -3546,13 +3518,6 @@ MOZ_ARG_DISABLE_BOOL(websms-backend,
 
 if test -n "$MOZ_WEBSMS_BACKEND"; then
     AC_DEFINE(MOZ_WEBSMS_BACKEND)
-fi
-
-dnl ========================================================
-dnl = Include Reading List service on Android
-dnl ========================================================
-if test -n "$MOZ_ANDROID_READING_LIST_SERVICE"; then
-    AC_DEFINE(MOZ_ANDROID_READING_LIST_SERVICE)
 fi
 
 dnl =========================================================
@@ -4190,61 +4155,6 @@ MOZ_ARG_DISABLE_BOOL(universalchardet,
   MOZ_UNIVERSALCHARDET=,
   MOZ_UNIVERSALCHARDET=1 )
 
-if test -n "${JAVA_BIN_PATH}"; then
-  dnl Look for javac and jar in the specified path.
-  JAVA_PATH="$JAVA_BIN_PATH"
-else
-  dnl No path specified, so look for javac and jar in $JAVA_HOME & $PATH.
-  JAVA_PATH="$JAVA_HOME/bin:$PATH"
-fi
-
-MOZ_PATH_PROG(JAVA, java, :, [$JAVA_PATH])
-MOZ_PATH_PROG(JAVAC, javac, :, [$JAVA_PATH])
-MOZ_PATH_PROG(JAVAH, javah, :, [$JAVA_PATH])
-MOZ_PATH_PROG(JAR, jar, :, [$JAVA_PATH])
-MOZ_PATH_PROG(JARSIGNER, jarsigner, :, [$JAVA_PATH])
-MOZ_PATH_PROG(KEYTOOL, keytool, :, [$JAVA_PATH])
-
-if test -n "${JAVA_BIN_PATH}" -o \
-  \( "$OS_TARGET" = Android -a x"$MOZ_WIDGET_TOOLKIT" != x"gonk" \); then
-  if test -z "$JAVA" -o "$JAVA" = ":"; then
-    AC_MSG_ERROR([The program java was not found.  Set \$JAVA_HOME to your Java SDK directory or use --with-java-bin-path={java-bin-dir}])
-  fi
-  if test -z "$JAVAC" -o "$JAVAC" = ":"; then
-    AC_MSG_ERROR([The program javac was not found.  Set \$JAVA_HOME to your Java SDK directory or use --with-java-bin-path={java-bin-dir}])
-  fi
-  if test -z "$JAVAH" -o "$JAVAH" = ":"; then
-    AC_MSG_ERROR([The program javah was not found.  Set \$JAVA_HOME to your Java SDK directory or use --with-java-bin-path={java-bin-dir}])
-  fi
-  if test -z "$JAR" -o "$JAR" = ":"; then
-    AC_MSG_ERROR([The program jar was not found.  Set \$JAVA_HOME to your Java SDK directory or use --with-java-bin-path={java-bin-dir}])
-  fi
-  if test -z "$JARSIGNER" -o "$JARSIGNER" = ":"; then
-    AC_MSG_ERROR([The program jarsigner was not found.  Set \$JAVA_HOME to your Java SDK directory or use --with-java-bin-path={java-bin-dir}])
-  fi
-  if test -z "$KEYTOOL" -o "$KEYTOOL" = ":"; then
-    AC_MSG_ERROR([The program keytool was not found.  Set \$JAVA_HOME to your Java SDK directory or use --with-java-bin-path={java-bin-dir}])
-  fi
-
-  AC_MSG_CHECKING([for minimum required javac version >= 1.7])
-
-  dnl Javac spits out something like `javac 1.7.0`. This line cuts off the 'javac'
-  _javac_version=$($JAVAC -version 2>&1 | cut -d ' ' -f 2)
-
-  dnl Here, we extract the major (1) and minor (7) version numbers from the
-  dnl acquired version string.
-  _javac_major_version=$(echo $_javac_version | cut -d '.' -f 1)
-  _javac_minor_version=$(echo $_javac_version | cut -d '.' -f 2)
-
-  AC_MSG_RESULT([$_javac_version])
-
-  dnl Fail if we have a version other than 1.7.X
-  if test "$_javac_major_version" -ne "1" -o \
-       \( "$_javac_minor_version" -lt "7" \); then
-      AC_MSG_ERROR([javac 1.7 or higher is required.])
-  fi
-fi
-
 dnl ========================================================
 dnl = ANGLE OpenGL->D3D translator for WebGL
 dnl = * only applies to win32
@@ -4533,7 +4443,7 @@ if test -n "$MOZ_CRASHREPORTER"; then
   fi
 
   if test "$OS_ARCH" = "WINNT"; then
-    if test -z "$HAVE_64BIT_BUILD"; then
+    if test -z "$HAVE_64BIT_BUILD" -a -n "$COMPILE_ENVIRONMENT"; then
       MOZ_CRASHREPORTER_INJECTOR=1
       AC_DEFINE(MOZ_CRASHREPORTER_INJECTOR)
     fi
@@ -4926,40 +4836,6 @@ MOZ_ARG_DISABLE_BOOL(updater,
 
 if test -n "$MOZ_UPDATER"; then
     AC_DEFINE(MOZ_UPDATER)
-fi
-
-# tools/update-packaging is not checked out by default.
-MOZ_ARG_ENABLE_BOOL(update-packaging,
-[  --enable-update-packaging
-                          Enable tools/update-packaging],
-    MOZ_UPDATE_PACKAGING=1,
-    MOZ_UPDATE_PACKAGING= )
-AC_SUBST(MOZ_UPDATE_PACKAGING)
-
-dnl ========================================================
-dnl Do not build the tests by default
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(tests,
-[  --enable-tests         Build test libraries & programs],
-    ENABLE_TESTS=1,
-    ENABLE_TESTS= )
-
-if test -n "$ENABLE_TESTS"; then
-    GTEST_HAS_RTTI=0
-    AC_DEFINE(ENABLE_TESTS)
-    AC_DEFINE_UNQUOTED(GTEST_HAS_RTTI, 0)
-    AC_SUBST(GTEST_HAS_RTTI)
-    if test -n "$_WIN32_MSVC"; then
-          AC_DEFINE_UNQUOTED(_VARIADIC_MAX, 10)
-    fi
-    if test "${OS_TARGET}" = "Android"; then
-        AC_DEFINE(GTEST_OS_LINUX_ANDROID)
-        AC_DEFINE(GTEST_USE_OWN_TR1_TUPLE)
-        AC_DEFINE_UNQUOTED(GTEST_HAS_CLONE, 0)
-        AC_SUBST(GTEST_OS_LINUX_ANDROID)
-        AC_SUBST(GTEST_USE_OWN_TR1_TUPLE)
-        AC_SUBST(GTEST_HAS_CLONE)
-    fi
 fi
 
 dnl ========================================================
@@ -5445,31 +5321,6 @@ if test "$_ENABLE_LOGREFCNT" = "1"; then
     AC_DEFINE(FORCE_BUILD_REFCNT_LOGGING)
 elif test -z "$_ENABLE_LOGREFCNT"; then
     AC_DEFINE(NO_BUILD_REFCNT_LOGGING)
-fi
-
-dnl ========================================================
-dnl moz_aproximate_location
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(approximate_location,
-[ --enable-approximate-location    Enable approximate location ],
-    MOZ_APPROX_LOCATION=1,
-    MOZ_APPROX_LOCATION= )
-if test -n "$MOZ_APPROX_LOCATION"; then
-    AC_DEFINE(MOZ_APPROX_LOCATION)
-fi
-
-dnl ========================================================
-dnl moz_gps_debug
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(gps_debug,
-[ --enable-gps-debug    Enable gps specific debug messages ],
-    MOZ_GPS_DEBUG=1,
-    MOZ_GPS_DEBUG= )
-if test -n "$MOZ_GPS_DEBUG"; then
-    AC_DEFINE(MOZ_GPS_DEBUG)
-fi
-if test -n "$MOZ_DEBUG"; then
-    AC_DEFINE(MOZ_GPS_DEBUG)
 fi
 
 dnl ========================================================
@@ -6649,16 +6500,6 @@ if test "$BUILD_CTYPES"; then
     AC_DEFINE(BUILD_CTYPES)
 fi
 
-dnl Build Places if required
-if test "$MOZ_PLACES"; then
-  AC_DEFINE(MOZ_PLACES)
-fi
-
-dnl Build SocialAPI if required
-if test "$MOZ_SOCIAL"; then
-  AC_DEFINE(MOZ_SOCIAL)
-fi
-
 dnl Build Common JS modules provided by services.
 AC_SUBST(MOZ_SERVICES_COMMON)
 if test -n "$MOZ_SERVICES_COMMON"; then
@@ -6671,28 +6512,10 @@ if test -n "$MOZ_SERVICES_CRYPTO"; then
   AC_DEFINE(MOZ_SERVICES_CRYPTO)
 fi
 
-dnl Build Firefox Health Reporter Service
-AC_SUBST(MOZ_SERVICES_HEALTHREPORT)
-if test -n "$MOZ_SERVICES_HEALTHREPORT"; then
-  AC_DEFINE(MOZ_SERVICES_HEALTHREPORT)
-fi
-
 dnl Build Notifications if required
 AC_SUBST(MOZ_SERVICES_NOTIFICATIONS)
 if test -n "$MOZ_SERVICES_NOTIFICATIONS"; then
   AC_DEFINE(MOZ_SERVICES_NOTIFICATIONS)
-fi
-
-dnl Build Sync Services if required
-AC_SUBST(MOZ_SERVICES_SYNC)
-if test -n "$MOZ_SERVICES_SYNC"; then
-  AC_DEFINE(MOZ_SERVICES_SYNC)
-fi
-
-dnl Build Services/CloudSync if required
-AC_SUBST(MOZ_SERVICES_CLOUDSYNC)
-if test -n "$MOZ_SERVICES_CLOUDSYNC"; then
-  AC_DEFINE(MOZ_SERVICES_CLOUDSYNC)
 fi
 
 dnl ========================================================
@@ -6715,7 +6538,6 @@ AC_SUBST(AS_DASH_C_FLAG)
 AC_SUBST(LD)
 AC_SUBST(RC)
 AC_SUBST(RCFLAGS)
-AC_SUBST(MC)
 AC_SUBST(WINDRES)
 AC_SUBST(IMPLIB)
 AC_SUBST(FILTER)
@@ -6723,26 +6545,15 @@ AC_SUBST(BIN_FLAGS)
 AC_SUBST(MOZ_AUTH_EXTENSION)
 AC_SUBST(MOZ_PREF_EXTENSIONS)
 AC_SUBST(MOZ_DEBUG)
-AC_SUBST(MOZ_DEBUG_SYMBOLS)
 AC_SUBST(MOZ_DEBUG_LDFLAGS)
 AC_SUBST(WARNINGS_AS_ERRORS)
 AC_SUBST_SET(MOZ_EXTENSIONS)
 AC_SUBST(LIBICONV)
-AC_SUBST(MOZ_PLACES)
-AC_SUBST(MOZ_SOCIAL)
 AC_SUBST(MOZ_TOOLKIT_SEARCH)
 AC_SUBST(MOZ_FEEDS)
 AC_SUBST(NS_PRINTING)
 AC_SUBST(MOZ_HELP_VIEWER)
 
-AC_SUBST(JAVA)
-AC_SUBST(JAVAC)
-AC_SUBST(JAVAH)
-AC_SUBST(JAR)
-AC_SUBST(JARSIGNER)
-AC_SUBST(KEYTOOL)
-
-AC_SUBST(ENABLE_TESTS)
 AC_SUBST(MOZ_UNIVERSALCHARDET)
 AC_SUBST(ACCESSIBILITY)
 AC_SUBST(MOZ_SPELLCHECK)
@@ -6765,7 +6576,6 @@ AC_SUBST(MOZ_DIRECTX_SDK_PATH)
 AC_SUBST(MOZ_D3DCOMPILER_XP_DLL)
 AC_SUBST(MOZ_D3DCOMPILER_XP_CAB)
 
-AC_SUBST(MOZ_ANDROID_HISTORY)
 AC_SUBST(MOZ_WEBSMS_BACKEND)
 AC_SUBST(MOZ_DISABLE_GECKOVIEW)
 AC_SUBST(MOZ_ANDROID_GECKOLIBS_AAR)

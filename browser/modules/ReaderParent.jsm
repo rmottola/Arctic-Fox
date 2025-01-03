@@ -24,8 +24,6 @@ var ReaderParent = {
     "Reader:ArticleGet",
     "Reader:FaviconRequest",
     "Reader:UpdateReaderButton",
-    "Reader:SetIntPref",
-    "Reader:SetCharPref",
   ],
 
   init: function() {
@@ -74,18 +72,6 @@ var ReaderParent = {
         this.updateReaderButton(browser);
         break;
       }
-      case "Reader:SetIntPref": {
-        if (message.data && message.data.name !== undefined) {
-          Services.prefs.setIntPref(message.data.name, message.data.value);
-        }
-        break;
-      }
-      case "Reader:SetCharPref": {
-        if (message.data && message.data.name !== undefined) {
-          Services.prefs.setCharPref(message.data.name, message.data.value);
-        }
-        break;
-      }
     }
   },
 
@@ -121,7 +107,7 @@ var ReaderParent = {
     let url = browser.currentURI.spec;
 
     if (url.startsWith("about:reader")) {
-      let originalURL = this._getOriginalUrl(url);
+      let originalURL = ReaderMode.getOriginalUrl(url);
       if (!originalURL) {
         Cu.reportError("Error finding original URL for about:reader URL: " + url);
       } else {
@@ -130,28 +116,6 @@ var ReaderParent = {
     } else {
       browser.messageManager.sendAsyncMessage("Reader:ParseDocument", { url: url });
     }
-  },
-
-  parseReaderUrl: function(url) {
-    if (!url.startsWith("about:reader?")) {
-      return null;
-    }
-    return this._getOriginalUrl(url);
-  },
-
-  /**
-   * Returns original URL from an about:reader URL.
-   *
-   * @param url An about:reader URL.
-   * @return The original URL for the article, or null if we did not find
-   *         a properly formatted about:reader URL.
-   */
-  _getOriginalUrl: function(url) {
-    let searchParams = new URLSearchParams(url.substring("about:reader?".length));
-    if (!searchParams.has("url")) {
-      return null;
-    }
-    return decodeURIComponent(searchParams.get("url"));
   },
 
   /**

@@ -42,7 +42,6 @@ class   nsIRunnable;
 class   nsIKeyEventInPluginCallback;
 
 namespace mozilla {
-class CompositorVsyncDispatcher;
 namespace dom {
 class TabChild;
 } // namespace dom
@@ -132,6 +131,7 @@ typedef void* nsNativeWidget;
 #endif
 #ifdef MOZ_WIDGET_ANDROID
 #define NS_NATIVE_NEW_EGL_SURFACE      100
+#define NS_JAVA_SURFACE                101
 #endif
 
 #define NS_IWIDGET_IID \
@@ -347,7 +347,6 @@ class nsIWidget : public nsISupports
     typedef mozilla::widget::TextEventDispatcher TextEventDispatcher;
     typedef mozilla::widget::TextEventDispatcherListener
       TextEventDispatcherListener;
-    typedef mozilla::CompositorVsyncDispatcher CompositorVsyncDispatcher;
     typedef mozilla::LayoutDeviceIntMargin LayoutDeviceIntMargin;
     typedef mozilla::LayoutDeviceIntPoint LayoutDeviceIntPoint;
     typedef mozilla::LayoutDeviceIntRect LayoutDeviceIntRect;
@@ -556,11 +555,6 @@ class nsIWidget : public nsISupports
      * potentially multi-screen, mixed-resolution desktop.
      */
     virtual mozilla::DesktopToLayoutDeviceScale GetDesktopToDeviceScale() = 0;
-
-    /**
-     * Returns the CompositorVsyncDispatcher associated with this widget
-     */
-    virtual CompositorVsyncDispatcher* GetCompositorVsyncDispatcher() = 0;
 
     /**
      * Return the default scale factor for the window. This is the
@@ -1967,6 +1961,22 @@ public:
     virtual nsresult OnWindowedPluginKeyEvent(
                        const mozilla::NativeEventData& aKeyEventData,
                        nsIKeyEventInPluginCallback* aCallback);
+
+
+    /**
+     * LookUpDictionary shows the dictionary for the word around current point.
+     *
+     * @param aText            the word to look up dictiorary.
+     * @param aFontRangeArray  text decoration of aText
+     * @param aIsVertical      true if the word is vertical layout
+     * @param aPoint           top-left point of aText
+     */
+    virtual void LookUpDictionary(
+                   const nsAString& aText,
+                   const nsTArray<mozilla::FontRange>& aFontRangeArray,
+                   const bool aIsVertical,
+                   const LayoutDeviceIntPoint& aPoint)
+    { }
 
 protected:
     /**

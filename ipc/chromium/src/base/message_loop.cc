@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 // Copyright (c) 2009 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -271,6 +273,7 @@ void MessageLoop::PostDelayedTask(already_AddRefed<Runnable> task, int delay_ms)
 
 void MessageLoop::PostIdleTask(already_AddRefed<Runnable> task) {
   DCHECK(current() == this);
+  MOZ_ASSERT(NS_IsMainThread());
 
   PendingTask pending_task(Move(task), false);
   deferred_non_nestable_work_queue_.push(Move(pending_task));
@@ -278,6 +281,17 @@ void MessageLoop::PostIdleTask(already_AddRefed<Runnable> task) {
 
 // Possibly called on a background thread!
 void MessageLoop::PostTask_Helper(already_AddRefed<Runnable> task, int delay_ms) {
+  if (nsIEventTarget* target = pump_->GetXPCOMThread()) {
+    nsresult rv;
+    if (delay_ms) {
+      rv = target->DelayedDispatch(Move(task), delay_ms);
+    } else {
+      rv = target->Dispatch(Move(task), 0);
+    }
+    MOZ_ALWAYS_SUCCEEDS(rv);
+    return;
+  }
+
   PendingTask pending_task(Move(task), true);
 
   if (delay_ms > 0) {
@@ -409,7 +423,7 @@ bool MessageLoop::DoWork() {
       PendingTask pending_task = Move(work_queue_.front());
       work_queue_.pop();
       if (!pending_task.delayed_run_time.is_null()) {
-	// NB: Don't move, because we use this later!
+        // NB: Don't move, because we use this later!
         AddToDelayedWorkQueue(pending_task);
         // If we changed the topmost task, then it is time to re-schedule.
         if (delayed_work_queue_.top().task == pending_task.task)

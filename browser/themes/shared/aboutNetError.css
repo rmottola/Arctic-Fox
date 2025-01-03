@@ -83,6 +83,10 @@ button:disabled {
   cursor: pointer;
 }
 
+#prefChangeContainer {
+  display: none;
+}
+
 #learnMoreContainer {
   display: none;
 }

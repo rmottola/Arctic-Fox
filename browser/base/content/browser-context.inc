@@ -60,20 +60,8 @@
             label="&openLinkCmdInContainerTab.label;"
             accesskey="&openLinkCmdInContainerTab.accesskey;"
             hidden="true">
-        <menupopup oncommand="gContextMenu.openLinkInTab(event);">
-          <menuitem label="&userContextPersonal.label;"
-                    usercontextid="1"
-                    accesskey="&userContextPersonal.accesskey;"/>
-          <menuitem label="&userContextWork.label;"
-                    usercontextid="2"
-                    accesskey="&userContextWork.accesskey;"/>
-          <menuitem label="&userContextBanking.label;"
-                    usercontextid="3"
-                    accesskey="&userContextBanking.accesskey;"/>
-          <menuitem label="&userContextShopping.label;"
-                    usercontextid="4"
-                    accesskey="&userContextShopping.accesskey;"/>
-        </menupopup>
+        <menupopup oncommand="gContextMenu.openLinkInTab(event);"
+                   onpopupshowing="return createUserContextMenu(event, false);" />
       </menu>
 
       <menuitem id="context-openlink"
@@ -129,27 +117,33 @@
       <menu id="context-media-playbackrate" label="&mediaPlaybackRate.label;" accesskey="&mediaPlaybackRate.accesskey;">
         <menupopup>
           <menuitem id="context-media-playbackrate-050x"
-                    label="&mediaPlaybackRate050x.label;"
-                    accesskey="&mediaPlaybackRate050x.accesskey;"
+                    label="&mediaPlaybackRate050x2.label;"
+                    accesskey="&mediaPlaybackRate050x2.accesskey;"
                     type="radio"
                     name="playbackrate"
                     oncommand="gContextMenu.mediaCommand('playbackRate', 0.5);"/>
           <menuitem id="context-media-playbackrate-100x"
-                    label="&mediaPlaybackRate100x.label;"
-                    accesskey="&mediaPlaybackRate100x.accesskey;"
+                    label="&mediaPlaybackRate100x2.label;"
+                    accesskey="&mediaPlaybackRate100x2.accesskey;"
                     type="radio"
                     name="playbackrate"
                     checked="true"
                     oncommand="gContextMenu.mediaCommand('playbackRate', 1.0);"/>
+          <menuitem id="context-media-playbackrate-125x"
+                    label="&mediaPlaybackRate125x2.label;"
+                    accesskey="&mediaPlaybackRate125x2.accesskey;"
+                    type="radio"
+                    name="playbackrate"
+                    oncommand="gContextMenu.mediaCommand('playbackRate', 1.25);"/>
           <menuitem id="context-media-playbackrate-150x"
-                    label="&mediaPlaybackRate150x.label;"
-                    accesskey="&mediaPlaybackRate150x.accesskey;"
+                    label="&mediaPlaybackRate150x2.label;"
+                    accesskey="&mediaPlaybackRate150x2.accesskey;"
                     type="radio"
                     name="playbackrate"
                     oncommand="gContextMenu.mediaCommand('playbackRate', 1.5);"/>
           <menuitem id="context-media-playbackrate-200x"
-                    label="&mediaPlaybackRate200x.label;"
-                    accesskey="&mediaPlaybackRate200x.accesskey;"
+                    label="&mediaPlaybackRate200x2.label;"
+                    accesskey="&mediaPlaybackRate200x2.accesskey;"
                     type="radio"
                     name="playbackrate"
                     oncommand="gContextMenu.mediaCommand('playbackRate', 2.0);"/>
@@ -163,14 +157,6 @@
                 label="&mediaHideControls.label;"
                 accesskey="&mediaHideControls.accesskey;"
                 oncommand="gContextMenu.mediaCommand('hidecontrols');"/>
-      <menuitem id="context-video-showstats"
-                accesskey="&videoShowStats.accesskey;"
-                label="&videoShowStats.label;"
-                oncommand="gContextMenu.mediaCommand('showstats');"/>
-      <menuitem id="context-video-hidestats"
-                accesskey="&videoHideStats.accesskey;"
-                label="&videoHideStats.label;"
-                oncommand="gContextMenu.mediaCommand('hidestats');"/>
       <menuitem id="context-video-fullscreen"
                 accesskey="&videoFullScreen.accesskey;"
                 label="&videoFullScreen.label;"

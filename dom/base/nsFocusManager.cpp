@@ -22,6 +22,7 @@
 #include "nsIHTMLDocument.h"
 #include "nsIDocShell.h"
 #include "nsIDocShellTreeOwner.h"
+#include "nsIFormControl.h"
 #include "nsLayoutUtils.h"
 #include "nsIPresShell.h"
 #include "nsFrameTraversal.h"
@@ -45,6 +46,7 @@
 
 #include "mozilla/ContentEvents.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/dom/HTMLInputElement.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventStateManager.h"
 #include "mozilla/EventStates.h"
@@ -1110,11 +1112,12 @@ nsFocusManager::EnsureCurrentWidgetFocused()
   }
 }
 
-void
+bool
 ActivateOrDeactivateChild(TabParent* aParent, void* aArg)
 {
   bool active = static_cast<bool>(aArg);
   Unused << aParent->SendParentActivated(active);
+  return false;
 }
 
 void
@@ -2228,8 +2231,8 @@ nsFocusManager::MoveCaretToFocus(nsIPresShell* aPresShell, nsIContent* aContent)
   nsCOMPtr<nsIDOMDocument> domDoc = do_QueryInterface(aPresShell->GetDocument());
   if (domDoc) {
     RefPtr<nsFrameSelection> frameSelection = aPresShell->FrameSelection();
-    nsCOMPtr<nsISelection> domSelection = frameSelection->
-      GetSelection(nsISelectionController::SELECTION_NORMAL);
+    nsCOMPtr<nsISelection> domSelection =
+      frameSelection->GetSelection(SelectionType::eNormal);
     if (domSelection) {
       nsCOMPtr<nsIDOMNode> currentFocusNode(do_QueryInterface(aContent));
       // First clear the selection. This way, if there is no currently focused
@@ -2289,8 +2292,8 @@ nsFocusManager::SetCaretVisible(nsIPresShell* aPresShell,
 
   if (docFrameSelection && caret &&
      (frameSelection == docFrameSelection || !aContent)) {
-    nsISelection* domSelection = docFrameSelection->
-      GetSelection(nsISelectionController::SELECTION_NORMAL);
+    nsISelection* domSelection =
+      docFrameSelection->GetSelection(SelectionType::eNormal);
     if (domSelection) {
       nsCOMPtr<nsISelectionController> selCon(do_QueryInterface(aPresShell));
       if (!selCon) {
@@ -2332,8 +2335,7 @@ nsFocusManager::GetSelectionLocation(nsIDocument* aDocument,
 
   nsCOMPtr<nsISelection> domSelection;
   if (frameSelection) {
-    domSelection = frameSelection->
-      GetSelection(nsISelectionController::SELECTION_NORMAL);
+    domSelection = frameSelection->GetSelection(SelectionType::eNormal);
   }
 
   nsCOMPtr<nsIDOMNode> startNode, endNode;

@@ -12,6 +12,7 @@
 #define mozilla_RestyleTracker_h
 
 #include "mozilla/dom/Element.h"
+#include "nsAutoPtr.h"
 #include "nsClassHashtable.h"
 #include "nsContainerFrame.h"
 #include "mozilla/SplayTree.h"
@@ -19,7 +20,7 @@
 #include "GeckoProfiler.h"
 #include "mozilla/Maybe.h"
 
-#if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
+#if defined(MOZ_ENABLE_PROFILER_SPS)
 #include "ProfilerBacktrace.h"
 #endif
 
@@ -315,7 +316,7 @@ public:
     // that we called AddPendingRestyle for and found the element this is
     // the RestyleData for as its nearest restyle root.
     nsTArray<RefPtr<Element>> mDescendants;
-#if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
+#if defined(MOZ_ENABLE_PROFILER_SPS)
     UniquePtr<ProfilerBacktrace> mBacktrace;
 #endif
   };
@@ -452,7 +453,7 @@ RestyleTracker::AddPendingRestyleToTable(Element* aElement,
   if (!existingData) {
     RestyleData* rd =
       new RestyleData(aRestyleHint, aMinChangeHint, aRestyleHintData);
-#if defined(MOZ_ENABLE_PROFILER_SPS) && !defined(MOZILLA_XPCOMRT_API)
+#if defined(MOZ_ENABLE_PROFILER_SPS)
     if (profiler_feature_active("restyle")) {
       rd->mBacktrace.reset(profiler_get_backtrace());
     }
@@ -465,7 +466,7 @@ RestyleTracker::AddPendingRestyleToTable(Element* aElement,
     (existingData->mRestyleHint & eRestyle_LaterSiblings) != 0;
   existingData->mRestyleHint =
     nsRestyleHint(existingData->mRestyleHint | aRestyleHint);
-  NS_UpdateHint(existingData->mChangeHint, aMinChangeHint);
+  existingData->mChangeHint |= aMinChangeHint;
   if (aRestyleHintData) {
     existingData->mRestyleHintData.mSelectorsForDescendants
       .AppendElements(aRestyleHintData->mSelectorsForDescendants);

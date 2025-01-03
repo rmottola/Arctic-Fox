@@ -54,24 +54,24 @@ pref("extensions.blocklist.url", "https://addons.mozilla.org/blocklist/3/%APP_ID
 pref("extensions.blocklist.detailsURL", "https://www.mozilla.org/%LOCALE%/blocklist/");
 pref("extensions.blocklist.itemURL", "https://addons.mozilla.org/%LOCALE%/%APP%/blocked/%blockID%");
 
-// Kinto blocklist preferences
-pref("services.kinto.base", "https://firefox.settings.services.mozilla.com/v1");
-pref("services.kinto.changes.path", "/buckets/monitor/collections/changes/records");
-pref("services.kinto.bucket", "blocklists");
-pref("services.kinto.onecrl.collection", "certificates");
-pref("services.kinto.onecrl.checked", 0);
-pref("services.kinto.addons.collection", "addons");
-pref("services.kinto.addons.checked", 0);
-pref("services.kinto.plugins.collection", "plugins");
-pref("services.kinto.plugins.checked", 0);
-pref("services.kinto.gfx.collection", "gfx");
-pref("services.kinto.gfx.checked", 0);
+// Blocklist preferences
+pref("services.settings.server", "https://firefox.settings.services.mozilla.com/v1");
+pref("services.blocklist.changes.path", "/buckets/monitor/collections/changes/records");
+pref("services.blocklist.bucket", "blocklists");
+pref("services.blocklist.onecrl.collection", "certificates");
+pref("services.blocklist.onecrl.checked", 0);
+pref("services.blocklist.addons.collection", "addons");
+pref("services.blocklist.addons.checked", 0);
+pref("services.blocklist.plugins.collection", "plugins");
+pref("services.blocklist.plugins.checked", 0);
+pref("services.blocklist.gfx.collection", "gfx");
+pref("services.blocklist.gfx.checked", 0);
 
 // for now, let's keep kinto update out of the release channel
 #ifdef RELEASE_BUILD
-pref("services.kinto.update_enabled", false);
+pref("services.blocklist.update_enabled", false);
 #else
-pref("services.kinto.update_enabled", true);
+pref("services.blocklist.update_enabled", true);
 #endif
 
 pref("extensions.update.autoUpdateDefault", true);
@@ -426,6 +426,11 @@ pref("browser.search.redirectWindowsSearch", true);
 pref("browser.search.redirectWindowsSearch", false);
 #endif
 
+pref("browser.search.reset.enabled", true);
+
+pref("browser.usedOnWindows10", false);
+pref("browser.usedOnWindows10.introURL", "https://www.mozilla.org/%LOCALE%/firefox/windows-10/welcome/?utm_source=firefox-browser&utm_medium=firefox-browser");
+
 pref("browser.sessionhistory.max_entries", 50);
 
 // Built-in default permissions.
@@ -681,6 +686,8 @@ pref("accessibility.typeaheadfind", false);
 pref("accessibility.typeaheadfind.timeout", 5000);
 pref("accessibility.typeaheadfind.linksonly", false);
 pref("accessibility.typeaheadfind.flashBar", 1);
+pref("findbar.highlightAll", true);
+pref("findbar.modalHighlight", true);
 
 // Tracks when accessibility is loaded into the previous session.
 pref("accessibility.loadedInLastSession", false);
@@ -694,6 +701,7 @@ pref("plugins.update.notifyUser", false);
 
 //Enable tri-state option (Always/Never/Ask)
 pref("plugins.click_to_play", true);
+pref("plugins.testmode", false);
 
 pref("plugins.hideMissingPluginsNotification", false);
 
@@ -1099,7 +1107,6 @@ pref("browser.taskbar.lists.tasks.enabled", true);
 pref("browser.taskbar.lists.refreshInSeconds", 120);
 #endif
 
-#ifdef MOZ_SERVICES_SYNC
 // Info when outdated sync detected
 pref("services.sync.outdated.url", "http://www.palemoon.org/sync/update/");
 // The sync engines to use.
@@ -1172,7 +1179,6 @@ pref("services.sync.prefs.sync.security.tls.version.max", true);
 pref("services.sync.prefs.sync.signon.rememberSignons", true);
 pref("services.sync.prefs.sync.spellchecker.dictionary", true);
 pref("services.sync.prefs.sync.xpinstall.whitelist.required", true);
-#endif
 
 // Developer edition preferences
 #ifdef MOZ_DEV_EDITION
@@ -1423,6 +1429,12 @@ pref("experiments.manifest.fetchIntervalSeconds", 86400);
 pref("experiments.manifest.uri", "https://telemetry-experiment.cdn.mozilla.net/manifest/v1/firefox/%VERSION%/%CHANNEL%");
 // Whether experiments are supported by the current application profile.
 pref("experiments.supported", true);
+
+// For the about:tabcrashed page
+pref("browser.tabs.crashReporting.sendReport", true);
+pref("browser.tabs.crashReporting.includeURL", false);
+pref("browser.tabs.crashReporting.emailMe", false);
+pref("browser.tabs.crashReporting.email", "");
 
 #ifdef NIGHTLY_BUILD
 pref("privacy.trackingprotection.ui.enabled", false);

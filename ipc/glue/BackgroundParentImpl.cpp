@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -29,6 +31,8 @@
 #include "mozilla/ipc/BackgroundUtils.h"
 #include "mozilla/ipc/PBackgroundSharedTypes.h"
 #include "mozilla/ipc/PBackgroundTestParent.h"
+#include "mozilla/ipc/PSendStreamParent.h"
+#include "mozilla/ipc/SendStreamAlloc.h"
 #include "mozilla/layout/VsyncParent.h"
 #include "mozilla/dom/network/UDPSocketParent.h"
 #include "mozilla/Preferences.h"
@@ -305,6 +309,19 @@ BackgroundParentImpl::DeallocPNuwaParent(PNuwaParent *aActor)
   return mozilla::dom::NuwaParent::Dealloc(aActor);
 }
 
+PSendStreamParent*
+BackgroundParentImpl::AllocPSendStreamParent()
+{
+  return mozilla::ipc::AllocPSendStreamParent();
+}
+
+bool
+BackgroundParentImpl::DeallocPSendStreamParent(PSendStreamParent* aActor)
+{
+  delete aActor;
+  return true;
+}
+
 BackgroundParentImpl::PVsyncParent*
 BackgroundParentImpl::AllocPVsyncParent()
 {
@@ -450,13 +467,23 @@ mozilla::dom::PBroadcastChannelParent*
 BackgroundParentImpl::AllocPBroadcastChannelParent(
                                             const PrincipalInfo& aPrincipalInfo,
                                             const nsCString& aOrigin,
-                                            const nsString& aChannel,
-                                            const bool& aPrivateBrowsing)
+                                            const nsString& aChannel)
 {
   AssertIsInMainProcess();
   AssertIsOnBackgroundThread();
 
-  return new BroadcastChannelParent(aOrigin, aChannel, aPrivateBrowsing);
+  nsString originChannelKey;
+
+  // The format of originChannelKey is:
+  //  <channelName>|<origin+OriginAttributes>
+
+  originChannelKey.Assign(aChannel);
+
+  originChannelKey.AppendLiteral("|");
+
+  originChannelKey.Append(NS_ConvertUTF8toUTF16(aOrigin));
+
+  return new BroadcastChannelParent(originChannelKey);
 }
 
 namespace {
@@ -616,8 +643,7 @@ BackgroundParentImpl::RecvPBroadcastChannelConstructor(
                                             PBroadcastChannelParent* actor,
                                             const PrincipalInfo& aPrincipalInfo,
                                             const nsCString& aOrigin,
-                                            const nsString& aChannel,
-                                            const bool& aPrivateBrowsing)
+                                            const nsString& aChannel)
 {
   AssertIsInMainProcess();
   AssertIsOnBackgroundThread();

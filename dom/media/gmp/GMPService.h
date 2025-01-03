@@ -31,8 +31,6 @@ namespace gmp {
 
 class GetGMPContentParentCallback;
 
-#define GMP_DEFAULT_ASYNC_SHUTDONW_TIMEOUT 3000
-
 class GeckoMediaPluginService : public mozIGeckoMediaPluginService
                               , public nsIObserver
 {
@@ -66,8 +64,8 @@ public:
 
   int32_t AsyncShutdownTimeoutMs();
 
-  void RunPluginCrashCallbacks(const uint32_t aPluginId,
-                               const nsACString& aPluginName);
+  NS_IMETHOD RunPluginCrashCallbacks(uint32_t aPluginId,
+                                     const nsACString& aPluginName) override;
 
   // Sets the window to which 'PluginCrashed' chromeonly event is dispatched.
   // Note: if the plugin has crashed before the target window has been set,
@@ -90,6 +88,7 @@ protected:
                                     UniquePtr<GetGMPContentParentCallback>&& aCallback) = 0;
 
   nsresult GMPDispatch(nsIRunnable* event, uint32_t flags = NS_DISPATCH_NORMAL);
+  nsresult GMPDispatch(already_AddRefed<nsIRunnable> event, uint32_t flags = NS_DISPATCH_NORMAL);
   void ShutdownGMPThread();
 
   Mutex mMutex; // Protects mGMPThread and mGMPThreadShutdown and some members

@@ -10,7 +10,7 @@
 
 #include "jscntxt.h"
 
-#include "asmjs/WasmModule.h"
+#include "asmjs/WasmInstance.h"
 #include "gc/Marking.h"
 #include "jit/BaselineFrame.h"
 #include "jit/JitcodeMap.h"
@@ -517,21 +517,6 @@ FrameIter::settleOnActivation()
 
         Activation* activation = data_.activations_.activation();
 
-        // If JS_SaveFrameChain was called, stop iterating here (unless
-        // GO_THROUGH_SAVED is set).
-        if (data_.savedOption_ == STOP_AT_SAVED && activation->hasSavedFrameChain()) {
-            data_.state_ = DONE;
-            return;
-        }
-
-        // Skip activations from another context if needed.
-        MOZ_ASSERT(activation->cx());
-        MOZ_ASSERT(data_.cx_);
-        if (data_.contextOption_ == CURRENT_CONTEXT && activation->cx() != data_.cx_) {
-            ++data_.activations_;
-            continue;
-        }
-
         // If the caller supplied principals, only show activations which are subsumed (of the same
         // origin or of an origin accessible) by these principals.
         if (data_.principals_) {
@@ -597,12 +582,9 @@ FrameIter::settleOnActivation()
     }
 }
 
-FrameIter::Data::Data(JSContext* cx, SavedOption savedOption,
-                      ContextOption contextOption, DebuggerEvalOption debuggerEvalOption,
+FrameIter::Data::Data(JSContext* cx, DebuggerEvalOption debuggerEvalOption,
                       JSPrincipals* principals)
   : cx_(cx),
-    savedOption_(savedOption),
-    contextOption_(contextOption),
     debuggerEvalOption_(debuggerEvalOption),
     principals_(principals),
     pc_(nullptr),
@@ -616,8 +598,6 @@ FrameIter::Data::Data(JSContext* cx, SavedOption savedOption,
 
 FrameIter::Data::Data(const FrameIter::Data& other)
   : cx_(other.cx_),
-    savedOption_(other.savedOption_),
-    contextOption_(other.contextOption_),
     debuggerEvalOption_(other.debuggerEvalOption_),
     principals_(other.principals_),
     state_(other.state_),
@@ -630,8 +610,8 @@ FrameIter::Data::Data(const FrameIter::Data& other)
 {
 }
 
-FrameIter::FrameIter(JSContext* cx, SavedOption savedOption)
-  : data_(cx, savedOption, CURRENT_CONTEXT, FOLLOW_DEBUGGER_EVAL_PREV_LINK, nullptr),
+FrameIter::FrameIter(JSContext* cx, DebuggerEvalOption debuggerEvalOption)
+  : data_(cx, debuggerEvalOption, nullptr),
     ionInlineFrames_(cx, (js::jit::JitFrameIterator*) nullptr)
 {
     // settleOnActivation can only GC if principals are given.
@@ -639,20 +619,9 @@ FrameIter::FrameIter(JSContext* cx, SavedOption savedOption)
     settleOnActivation();
 }
 
-FrameIter::FrameIter(JSContext* cx, ContextOption contextOption,
-                     SavedOption savedOption, DebuggerEvalOption debuggerEvalOption)
-  : data_(cx, savedOption, contextOption, debuggerEvalOption, nullptr),
-    ionInlineFrames_(cx, (js::jit::JitFrameIterator*) nullptr)
-{
-    // settleOnActivation can only GC if principals are given.
-    JS::AutoSuppressGCAnalysis nogc;
-    settleOnActivation();
-}
-
-FrameIter::FrameIter(JSContext* cx, ContextOption contextOption,
-                     SavedOption savedOption, DebuggerEvalOption debuggerEvalOption,
+FrameIter::FrameIter(JSContext* cx, DebuggerEvalOption debuggerEvalOption,
                      JSPrincipals* principals)
-  : data_(cx, savedOption, contextOption, debuggerEvalOption, principals),
+  : data_(cx, debuggerEvalOption, principals),
     ionInlineFrames_(cx, (js::jit::JitFrameIterator*) nullptr)
 {
     settleOnActivation();
@@ -735,13 +704,6 @@ FrameIter::operator++()
         {
             AbstractFramePtr eifPrev = interpFrame()->evalInFramePrev();
 
-            // Eval-in-frame can cross contexts and works across saved frame
-            // chains.
-            ContextOption prevContextOption = data_.contextOption_;
-            SavedOption prevSavedOption = data_.savedOption_;
-            data_.contextOption_ = ALL_CONTEXTS;
-            data_.savedOption_ = GO_THROUGH_SAVED;
-
             popInterpreterFrame();
 
             while (!hasUsableAbstractFramePtr() || abstractFramePtr() != eifPrev) {
@@ -751,8 +713,6 @@ FrameIter::operator++()
                     popInterpreterFrame();
             }
 
-            data_.contextOption_ = prevContextOption;
-            data_.savedOption_ = prevSavedOption;
             data_.cx_ = data_.activations_->cx();
             break;
         }
@@ -905,7 +865,7 @@ FrameIter::filename() const
       case JIT:
         return script()->filename();
       case WASM:
-        return data_.activations_->asWasm()->module().filename();
+        return data_.activations_->asWasm()->instance().metadata().filename.get();
     }
 
     MOZ_CRASH("Unexpected state");
@@ -923,7 +883,7 @@ FrameIter::displayURL() const
         return ss->hasDisplayURL() ? ss->displayURL() : nullptr;
       }
       case WASM:
-        return data_.activations_->asWasm()->module().displayURL();
+        return data_.activations_->asWasm()->instance().metadata().displayURL();
     }
     MOZ_CRASH("Unexpected state");
 }
@@ -956,9 +916,8 @@ FrameIter::mutedErrors() const
       case JIT:
         return script()->mutedErrors();
       case WASM:
-        return data_.activations_->asWasm()->module().mutedErrors();
+        return data_.activations_->asWasm()->instance().metadata().mutedErrors();
     }
-
     MOZ_CRASH("Unexpected state");
 }
 
@@ -1674,9 +1633,9 @@ jit::JitActivation::markIonRecovery(JSTracer* trc)
         it->trace(trc);
 }
 
-WasmActivation::WasmActivation(JSContext* cx, wasm::Module& module)
+WasmActivation::WasmActivation(JSContext* cx, wasm::Instance& instance)
   : Activation(cx, Wasm),
-    module_(module),
+    instance_(instance),
     entrySP_(nullptr),
     resumePC_(nullptr),
     fp_(nullptr),
@@ -1684,8 +1643,8 @@ WasmActivation::WasmActivation(JSContext* cx, wasm::Module& module)
 {
     (void) entrySP_;  // squelch GCC warning
 
-    prevWasmForModule_ = module.activation();
-    module.activation() = this;
+    prevWasmForInstance_ = instance.activation();
+    instance.activation() = this;
 
     prevWasm_ = cx->runtime()->wasmActivationStack_;
     cx->runtime()->wasmActivationStack_ = this;
@@ -1702,8 +1661,8 @@ WasmActivation::~WasmActivation()
 
     MOZ_ASSERT(fp_ == nullptr);
 
-    MOZ_ASSERT(module_.activation() == this);
-    module_.activation() = prevWasmForModule_;
+    MOZ_ASSERT(instance_.activation() == this);
+    instance_.activation() = prevWasmForInstance_;
 
     MOZ_ASSERT(cx_->runtime()->wasmActivationStack_ == this);
 
@@ -1938,9 +1897,9 @@ JS::ProfilingFrameIterator::getPhysicalFrameAndEntry(jit::JitcodeGlobalEntry* en
     void* returnAddr = jitIter().returnAddressToFp();
     jit::JitcodeGlobalTable* table = rt_->jitRuntime()->getJitcodeGlobalTable();
     if (hasSampleBufferGen())
-        table->lookupForSampler(returnAddr, entry, rt_, sampleBufferGen_);
+        *entry = table->lookupForSamplerInfallible(returnAddr, rt_, sampleBufferGen_);
     else
-        table->lookupInfallible(returnAddr, entry, rt_);
+        *entry = table->lookupInfallible(returnAddr);
 
     MOZ_ASSERT(entry->isIon() || entry->isIonCache() || entry->isBaseline() || entry->isDummy());
 

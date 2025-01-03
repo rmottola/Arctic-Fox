@@ -6,6 +6,7 @@
 #include <stdint.h>                     // for uint32_t
 #include <stdlib.h>                     // for rand, RAND_MAX
 #include <sys/types.h>                  // for int32_t
+#include <stack>                        // for stack
 #include "BasicContainerLayer.h"        // for BasicContainerLayer
 #include "BasicLayersImpl.h"            // for ToData, BasicReadbackLayer, etc
 #include "GeckoProfiler.h"              // for PROFILER_LABEL
@@ -36,7 +37,6 @@
 #include "mozilla/gfx/Rect.h"           // for IntRect, Rect
 #include "mozilla/layers/LayersTypes.h"  // for BufferMode::BUFFER_NONE, etc
 #include "mozilla/mozalloc.h"           // for operator new
-#include "nsAutoPtr.h"                  // for nsRefPtr
 #include "nsCOMPtr.h"                   // for already_AddRefed
 #include "nsDebug.h"                    // for NS_ASSERTION, etc
 #include "nsISupportsImpl.h"            // for gfxContext::Release, etc
@@ -44,6 +44,8 @@
 #include "nsRect.h"                     // for mozilla::gfx::IntRect
 #include "nsRegion.h"                   // for nsIntRegion, etc
 #include "nsTArray.h"                   // for AutoTArray
+#include "TreeTraversal.h"              // for ForEachNode
+
 class nsIWidget;
 
 namespace mozilla {
@@ -107,7 +109,8 @@ BasicLayerManager::PushGroupForLayer(gfxContext* aContext, Layer* aLayer, const 
     if (!surfRect.IsEmpty()) {
       RefPtr<DrawTarget> dt = aContext->GetDrawTarget()->CreateSimilarDrawTarget(surfRect.Size(), SurfaceFormat::B8G8R8A8);
 
-      RefPtr<gfxContext> ctx = gfxContext::ForDrawTarget(dt, ToRect(rect).TopLeft());
+      RefPtr<gfxContext> ctx =
+        gfxContext::CreateOrNull(dt, ToRect(rect).TopLeft());
       if (!ctx) {
         gfxDevCrash(LogReason::InvalidContext) << "BasicLayerManager context problem " << gfx::hexa(dt);
         return group;
@@ -194,7 +197,7 @@ BasicLayerManager::PopGroupForLayer(PushedGroup &group)
     // always become null.
     dt->SetTransform(Matrix::Translation(-group.mFinalTarget->GetDeviceOffset()));
     dt->DrawSurface(src, Rect(group.mGroupOffset.x, group.mGroupOffset.y, src->GetSize().width, src->GetSize().height),
-                    Rect(0, 0, src->GetSize().width, src->GetSize().height), DrawSurfaceOptions(Filter::POINT), DrawOptions(group.mOpacity, group.mOperator));
+                    Rect(0, 0, src->GetSize().width, src->GetSize().height), DrawSurfaceOptions(SamplingFilter::POINT), DrawOptions(group.mOpacity, group.mOperator));
   }
 
   if (group.mNeedsClipToVisibleRegion) {
@@ -485,56 +488,71 @@ MarkLayersHidden(Layer* aLayer, const IntRect& aClipRect,
 static void
 ApplyDoubleBuffering(Layer* aLayer, const IntRect& aVisibleRect)
 {
-  BasicImplData* data = ToData(aLayer);
-  if (data->IsHidden())
-    return;
+  std::stack<IntRect> visibleRectStack;
+  visibleRectStack.push(aVisibleRect);
 
-  IntRect newVisibleRect(aVisibleRect);
-
-  {
-    const Maybe<ParentLayerIntRect>& clipRect = aLayer->GetLocalClipRect();
-    if (clipRect) {
-      IntRect cr = clipRect->ToUnknownRect();
-      // clipRect is in the container's coordinate system. Get it into the
-      // global coordinate system.
-      if (aLayer->GetParent()) {
-        Matrix tr;
-        if (aLayer->GetParent()->GetEffectiveTransform().CanDraw2D(&tr)) {
-          NS_ASSERTION(!ThebesMatrix(tr).HasNonIntegerTranslation(),
-                       "Parent can only have an integer translation");
-          cr += nsIntPoint(int32_t(tr._31), int32_t(tr._32));
-        } else {
-          NS_ERROR("Parent can only have an integer translation");
+  ForEachNode<ForwardIterator>(
+      aLayer,
+      [&aLayer, &visibleRectStack](Layer* layer) {
+        BasicImplData* data = ToData(layer);
+        if (layer != aLayer) {
+          data->SetClipToVisibleRegion(true);
         }
-      }
-      newVisibleRect.IntersectRect(newVisibleRect, cr);
-    }
-  }
+        if (data->IsHidden()) {
+          return TraversalFlag::Skip;
+        }
 
-  BasicContainerLayer* container =
-    static_cast<BasicContainerLayer*>(aLayer->AsContainerLayer());
-  // Layers that act as their own backbuffers should be drawn to the destination
-  // using OP_SOURCE to ensure that alpha values in a transparent window are
-  // cleared. This can also be faster than OP_OVER.
-  if (!container) {
-    data->SetOperator(CompositionOp::OP_SOURCE);
-    data->SetDrawAtomically(true);
-  } else {
-    if (container->UseIntermediateSurface() ||
-        !container->ChildrenPartitionVisibleRegion(newVisibleRect)) {
-      // We need to double-buffer this container.
-      data->SetOperator(CompositionOp::OP_SOURCE);
-      container->ForceIntermediateSurface();
-    } else {
-      // Tell the children to clip to their visible regions so our assumption
-      // that they don't paint outside their visible regions is valid!
-      for (Layer* child = aLayer->GetFirstChild(); child;
-           child = child->GetNextSibling()) {
-        ToData(child)->SetClipToVisibleRegion(true);
-        ApplyDoubleBuffering(child, newVisibleRect);
+        IntRect newVisibleRect(visibleRectStack.top());
+
+        {
+          const Maybe<ParentLayerIntRect>& clipRect = layer->GetLocalClipRect();
+          if (clipRect) {
+            IntRect cr = clipRect->ToUnknownRect();
+            // clipRect is in the container's coordinate system. Get it into the
+            // global coordinate system.
+            if (layer->GetParent()) {
+              Matrix tr;
+              if (layer->GetParent()->GetEffectiveTransform().CanDraw2D(&tr)) {
+                NS_ASSERTION(!ThebesMatrix(tr).HasNonIntegerTranslation(),
+                             "Parent can only have an integer translation");
+                cr += nsIntPoint(int32_t(tr._31), int32_t(tr._32));
+              } else {
+                NS_ERROR("Parent can only have an integer translation");
+              }
+            }
+            newVisibleRect.IntersectRect(newVisibleRect, cr);
+          }
+        }
+
+        BasicContainerLayer* container =
+          static_cast<BasicContainerLayer*>(layer->AsContainerLayer());
+        // Layers that act as their own backbuffers should be drawn to the destination
+        // using OP_SOURCE to ensure that alpha values in a transparent window are
+        // cleared. This can also be faster than OP_OVER.
+        if (!container) {
+          data->SetOperator(CompositionOp::OP_SOURCE);
+          data->SetDrawAtomically(true);
+          return TraversalFlag::Skip;
+        } else {
+          if (container->UseIntermediateSurface() ||
+              !container->ChildrenPartitionVisibleRegion(newVisibleRect)) {
+            // We need to double-buffer this container.
+            data->SetOperator(CompositionOp::OP_SOURCE);
+            container->ForceIntermediateSurface();
+            return TraversalFlag::Skip;
+          } else {
+            visibleRectStack.push(newVisibleRect);
+            return TraversalFlag::Continue;
+          }
+        }
+
+      },
+      [&visibleRectStack](Layer* layer)
+      {
+        visibleRectStack.pop();
+        return TraversalFlag::Continue;
       }
-    }
-  }
+  );
 }
 
 void
@@ -898,34 +916,29 @@ BasicLayerManager::PaintLayer(gfxContext* aTarget,
     }
 
     IntRect bounds = visibleRegion.GetBounds();
+    // DrawTarget without the 3D transform applied:
     RefPtr<DrawTarget> untransformedDT =
       gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(IntSize(bounds.width, bounds.height),
                                                                    SurfaceFormat::B8G8R8A8);
     if (!untransformedDT || !untransformedDT->IsValid()) {
       return;
     }
+    untransformedDT->SetTransform(Matrix::Translation(-Point(bounds.x, bounds.y)));
 
-    RefPtr<gfxContext> groupTarget = gfxContext::ForDrawTarget(untransformedDT,
-                                                               Point(bounds.x, bounds.y));
+    RefPtr<gfxContext> groupTarget =
+      gfxContext::CreatePreservingTransformOrNull(untransformedDT);
     MOZ_ASSERT(groupTarget); // already checked the target above
 
     PaintSelfOrChildren(paintLayerContext, groupTarget);
 
     // Temporary fast fix for bug 725886
     // Revert these changes when 725886 is ready
-    MOZ_ASSERT(untransformedDT && untransformedDT->IsValid(),
-               "We should always allocate an untransformed surface with 3d transforms!");
 #ifdef DEBUG
     if (aLayer->GetDebugColorIndex() != 0) {
       Color color((aLayer->GetDebugColorIndex() & 1) ? 1.f : 0.f,
                   (aLayer->GetDebugColorIndex() & 2) ? 1.f : 0.f,
                   (aLayer->GetDebugColorIndex() & 4) ? 1.f : 0.f);
-
-      RefPtr<gfxContext> temp = gfxContext::ForDrawTarget(untransformedDT,
-                                                          Point(bounds.x, bounds.y));
-      MOZ_ASSERT(temp); // already checked for target above
-      temp->SetColor(color);
-      temp->Paint();
+      untransformedDT->FillRect(Rect(bounds), ColorPattern(color));
     }
 #endif
     Matrix4x4 effectiveTransform = aLayer->GetEffectiveTransform();

@@ -311,13 +311,13 @@ UnboxedPlainObject::trace(JSTracer* trc, JSObject* obj)
 
     uint8_t* data = obj->as<UnboxedPlainObject>().data();
     while (*list != -1) {
-        HeapPtrString* heap = reinterpret_cast<HeapPtrString*>(data + *list);
+        GCPtrString* heap = reinterpret_cast<GCPtrString*>(data + *list);
         TraceEdge(trc, heap, "unboxed_string");
         list++;
     }
     list++;
     while (*list != -1) {
-        HeapPtrObject* heap = reinterpret_cast<HeapPtrObject*>(data + *list);
+        GCPtrObject* heap = reinterpret_cast<GCPtrObject*>(data + *list);
         TraceNullableEdge(trc, heap, "unboxed_object");
         list++;
     }
@@ -349,9 +349,9 @@ UnboxedPlainObject::ensureExpando(JSContext* cx, Handle<UnboxedPlainObject*> obj
     MOZ_ASSERT_IF(!IsInsideNursery(expando), !IsInsideNursery(obj));
 
     // As with setValue(), we need to manually trigger post barriers on the
-    // whole object. If we treat the field as a HeapPtrObject and later convert
-    // the object to its native representation, we will end up with a corrupted
-    // store buffer entry.
+    // whole object. If we treat the field as a GCPtrObject and later
+    // convert the object to its native representation, we will end up with a
+    // corrupted store buffer entry.
     if (IsInsideNursery(expando) && !IsInsideNursery(obj))
         cx->runtime()->gc.storeBuffer.putWholeCell(obj);
 
@@ -649,13 +649,13 @@ UnboxedPlainObject::create(ExclusiveContext* cx, HandleObjectGroup group, NewObj
     if (list) {
         uint8_t* data = res->data();
         while (*list != -1) {
-            HeapPtrString* heap = reinterpret_cast<HeapPtrString*>(data + *list);
+            GCPtrString* heap = reinterpret_cast<GCPtrString*>(data + *list);
             heap->init(cx->names().empty);
             list++;
         }
         list++;
         while (*list != -1) {
-            HeapPtrObject* heap = reinterpret_cast<HeapPtrObject*>(data + *list);
+            GCPtrObject* heap = reinterpret_cast<GCPtrObject*>(data + *list);
             heap->init(nullptr);
             list++;
         }
@@ -727,7 +727,7 @@ UnboxedPlainObject::obj_lookupProperty(JSContext* cx, HandleObject obj,
         return true;
     }
 
-    RootedObject proto(cx, obj->getProto());
+    RootedObject proto(cx, obj->staticPrototype());
     if (!proto) {
         objp.set(nullptr);
         propp.set(nullptr);
@@ -778,7 +778,7 @@ UnboxedPlainObject::obj_hasProperty(JSContext* cx, HandleObject obj, HandleId id
         return true;
     }
 
-    RootedObject proto(cx, obj->getProto());
+    RootedObject proto(cx, obj->staticPrototype());
     if (!proto) {
         *foundp = false;
         return true;
@@ -805,7 +805,7 @@ UnboxedPlainObject::obj_getProperty(JSContext* cx, HandleObject obj, HandleValue
         }
     }
 
-    RootedObject proto(cx, obj->getProto());
+    RootedObject proto(cx, obj->staticPrototype());
     if (!proto) {
         vp.setUndefined();
         return true;
@@ -1150,14 +1150,14 @@ UnboxedArrayObject::trace(JSTracer* trc, JSObject* obj)
     switch (type) {
       case JSVAL_TYPE_OBJECT:
         for (size_t i = 0; i < initlen; i++) {
-            HeapPtrObject* heap = reinterpret_cast<HeapPtrObject*>(elements + i);
+            GCPtrObject* heap = reinterpret_cast<GCPtrObject*>(elements + i);
             TraceNullableEdge(trc, heap, "unboxed_object");
         }
         break;
 
       case JSVAL_TYPE_STRING:
         for (size_t i = 0; i < initlen; i++) {
-            HeapPtrString* heap = reinterpret_cast<HeapPtrString*>(elements + i);
+            GCPtrString* heap = reinterpret_cast<GCPtrString*>(elements + i);
             TraceEdge(trc, heap, "unboxed_string");
         }
         break;
@@ -1428,7 +1428,7 @@ UnboxedArrayObject::obj_lookupProperty(JSContext* cx, HandleObject obj,
         return true;
     }
 
-    RootedObject proto(cx, obj->getProto());
+    RootedObject proto(cx, obj->staticPrototype());
     if (!proto) {
         objp.set(nullptr);
         propp.set(nullptr);
@@ -1479,7 +1479,7 @@ UnboxedArrayObject::obj_hasProperty(JSContext* cx, HandleObject obj, HandleId id
         return true;
     }
 
-    RootedObject proto(cx, obj->getProto());
+    RootedObject proto(cx, obj->staticPrototype());
     if (!proto) {
         *foundp = false;
         return true;
@@ -1500,7 +1500,7 @@ UnboxedArrayObject::obj_getProperty(JSContext* cx, HandleObject obj, HandleValue
         return true;
     }
 
-    RootedObject proto(cx, obj->getProto());
+    RootedObject proto(cx, obj->staticPrototype());
     if (!proto) {
         vp.setUndefined();
         return true;

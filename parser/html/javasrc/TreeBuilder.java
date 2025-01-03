@@ -189,7 +189,7 @@ public abstract class TreeBuilder<T> implements TokenHandler,
 
     final static int FIELDSET = 61;
 
-    final static int OUTPUT_OR_LABEL = 62;
+    final static int OUTPUT = 62;
 
     final static int OBJECT = 63;
 
@@ -2184,9 +2184,9 @@ public abstract class TreeBuilder<T> implements TokenHandler,
                                         break;
                                     } else if (eltPos == 0 || (node.isSpecial()
                                             && (node.ns != "http://www.w3.org/1999/xhtml"
-                                                || (node.name != "p"
-                                                        && node.name != "address"
-                                                        && node.name != "div")))) {
+                                                    || (node.name != "p"
+                                                            && node.name != "address"
+                                                            && node.name != "div")))) {
                                         break;
                                     }
                                     eltPos--;
@@ -2553,7 +2553,7 @@ public abstract class TreeBuilder<T> implements TokenHandler,
                             case HEAD:
                                 errStrayStartTag(name);
                                 break starttagloop;
-                            case OUTPUT_OR_LABEL:
+                            case OUTPUT:
                                 reconstructTheActiveFormattingElements();
                                 appendToCurrentNodeAndPushElementMayFoster(
                                         elementName,
@@ -4750,7 +4750,7 @@ public abstract class TreeBuilder<T> implements TokenHandler,
             int furthestBlockPos = formattingEltStackPos + 1;
             while (furthestBlockPos <= currentPtr) {
                 StackNode<T> node = stack[furthestBlockPos]; // weak ref
-                assert furthestBlockPos > 0: "How is formattingEltStackPos + 1 not > 0?"
+                assert furthestBlockPos > 0: "How is formattingEltStackPos + 1 not > 0?";
                 if (node.isSpecial()) {
                     break;
                 }

@@ -145,17 +145,10 @@ AccessibleCaretManager::OnSelectionChanged(nsIDOMDocument* aDoc,
   }
 
   // eSetSelection events from the Fennec widget IME can be generated
-  // by autoSuggest, autoCorrect, and nsCaret position changes.
+  // by autoSuggest / autoCorrect composition changes, or by TYPE_REPLACE_TEXT
+  // actions, either positioning cursor for text insert, or selecting
+  // text-to-be-replaced. None should affect AccessibleCaret visibility.
   if (aReason & nsISelectionListener::IME_REASON) {
-    if (GetCaretMode() == CaretMode::Cursor) {
-      // Caret position changes need us to open/update,
-      // or hide the AccessibleCaret.
-      FlushLayout();
-      UpdateCarets();
-    } else {
-      // Ignore transient autoSuggest selection styling,
-      // or autoCorrect text updates.
-    }
     return NS_OK;
   }
 
@@ -272,7 +265,7 @@ AccessibleCaretManager::HasNonEmptyTextContent(nsINode* aNode) const
 void
 AccessibleCaretManager::UpdateCaretsForCursorMode(UpdateCaretsHint aHint)
 {
-  AC_LOG("%s: selection: %p", __FUNCTION__, GetSelection());
+  AC_LOG("%s, selection: %p", __FUNCTION__, GetSelection());
 
   int32_t offset = 0;
   nsIFrame* frame = nullptr;
@@ -711,7 +704,7 @@ AccessibleCaretManager::GetSelection() const
   if (!fs) {
     return nullptr;
   }
-  return fs->GetSelection(nsISelectionController::SELECTION_NORMAL);
+  return fs->GetSelection(SelectionType::eNormal);
 }
 
 already_AddRefed<nsFrameSelection>
@@ -861,23 +854,41 @@ AccessibleCaretManager::SelectMoreIfPhoneNumber() const
 
   SetSelectionDirection(eDirPrevious);
   ExtendPhoneNumberSelection(NS_LITERAL_STRING("backward"));
+
+  SetSelectionDirection(eDirNext);
 }
 
 void
 AccessibleCaretManager::ExtendPhoneNumberSelection(const nsAString& aDirection) const
 {
-  nsIDocument* doc = mPresShell->GetDocument();
+  if (!mPresShell) {
+    return;
+  }
+
+  RefPtr<nsIDocument> doc = mPresShell->GetDocument();
 
   // Extend the phone number selection until we find a boundary.
-  Selection* selection = GetSelection();
+  RefPtr<Selection> selection = GetSelection();
 
   while (selection) {
+    const nsRange* anchorFocusRange = selection->GetAnchorFocusRange();
+    if (!anchorFocusRange) {
+      return;
+    }
+
+    // Backup the anchor focus range since both anchor node and focus node might
+    // be changed after calling Selection::Modify().
+    RefPtr<nsRange> oldAnchorFocusRange = anchorFocusRange->CloneRange();
+
     // Save current Focus position, and extend the selection one char.
     nsINode* focusNode = selection->GetFocusNode();
     uint32_t focusOffset = selection->FocusOffset();
     selection->Modify(NS_LITERAL_STRING("extend"),
                       aDirection,
                       NS_LITERAL_STRING("character"));
+    if (IsTerminated()) {
+      return;
+    }
 
     // If the selection didn't change, (can't extend further), we're done.
     if (selection->GetFocusNode() == focusNode &&
@@ -891,10 +902,9 @@ AccessibleCaretManager::ExtendPhoneNumberSelection(const nsAString& aDirection) 
     nsAutoString phoneRegex(NS_LITERAL_STRING("(^\\+)?[0-9\\s,\\-.()*#pw]{1,30}$"));
 
     if (!nsContentUtils::IsPatternMatching(selectedText, phoneRegex, doc)) {
-      // Backout the undesired selection extend, (collapse to original
-      // Anchor, extend to original Focus), before exit.
-      selection->Collapse(selection->GetAnchorNode(), selection->AnchorOffset());
-      selection->Extend(focusNode, focusOffset);
+      // Backout the undesired selection extend, restore the old anchor focus
+      // range before exit.
+      selection->SetAnchorFocusToRange(oldAnchorFocusRange);
       return;
     }
   }

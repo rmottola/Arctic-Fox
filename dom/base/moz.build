@@ -8,7 +8,6 @@ TEST_DIRS += ['test']
 
 XPIDL_SOURCES += [
     'mozIDOMWindow.idl',
-    'nsIConsoleAPIStorage.idl',
     'nsIContentPolicy.idl',
     'nsIContentPolicyBase.idl',
     'nsIDocumentEncoder.idl',
@@ -46,6 +45,7 @@ EXPORTS += [
     'AutocompleteFieldList.h',
     'Crypto.h',
     'HTMLSplitOnSpacesTokenizer.h',
+    'IframeSandboxKeywordList.h',
     'mozAutoDocUpdate.h',
     'mozFlushType.h',
     'nsAtomListUtils.h',
@@ -84,7 +84,6 @@ EXPORTS += [
     'nsHostObjectURI.h',
     'nsIAnimationObserver.h',
     'nsIAttribute.h',
-    'nsIConsoleReportCollector.h',
     'nsIContent.h',
     'nsIContentInlines.h',
     'nsIContentIterator.h',
@@ -112,7 +111,6 @@ EXPORTS += [
     'nsNameSpaceManager.h',
     'nsNodeInfoManager.h',
     'nsNodeUtils.h',
-    'nsPerformance.h',
     'nsPIDOMWindow.h',
     'nsPIDOMWindowInlines.h',
     'nsPIWindowRoot.h',
@@ -143,7 +141,6 @@ if CONFIG['MOZ_WEBRTC']:
     ]
 
 EXPORTS.mozilla += [
-    'ConsoleReportCollector.h',
     'CORSMode.h',
     'FeedWriterEnabled.h',
     'TextInputProcessor.h',
@@ -161,7 +158,6 @@ EXPORTS.mozilla.dom += [
     'ChromeNodeList.h',
     'ChromeUtils.h',
     'Comment.h',
-    'Console.h',
     'DirectionalityUtils.h',
     'DocumentFragment.h',
     'DocumentType.h',
@@ -176,6 +172,7 @@ EXPORTS.mozilla.dom += [
     'DOMRect.h',
     'DOMRequest.h',
     'DOMStringList.h',
+    'DOMTokenListSupportedTokens.h',
     'Element.h',
     'ElementInlines.h',
     'EventSource.h',
@@ -193,14 +190,6 @@ EXPORTS.mozilla.dom += [
     'NodeInfo.h',
     'NodeInfoInlines.h',
     'NodeIterator.h',
-    'PerformanceCompositeTiming.h',
-    'PerformanceEntry.h',
-    'PerformanceMark.h',
-    'PerformanceMeasure.h',
-    'PerformanceObserver.h',
-    'PerformanceObserverEntryList.h',
-    'PerformanceRenderTiming.h',
-    'PerformanceResourceTiming.h',
     'ProcessGlobal.h',
     'ResponsiveImageSelector.h',
     'SameProcessMessageQueue.h',
@@ -229,8 +218,6 @@ UNIFIED_SOURCES += [
     'ChromeNodeList.cpp',
     'ChromeUtils.cpp',
     'Comment.cpp',
-    'Console.cpp',
-    'ConsoleReportCollector.cpp',
     'Crypto.cpp',
     'DirectionalityUtils.cpp',
     'DocumentFragment.cpp',
@@ -309,7 +296,6 @@ UNIFIED_SOURCES += [
     'nsNodeInfoManager.cpp',
     'nsNodeUtils.cpp',
     'nsOpenURIInFrameParams.cpp',
-    'nsPerformance.cpp',
     'nsPlainTextSerializer.cpp',
     'nsPropertyTable.cpp',
     'nsQueryContentEventResult.cpp',
@@ -338,14 +324,6 @@ UNIFIED_SOURCES += [
     'nsXMLContentSerializer.cpp',
     'nsXMLHttpRequest.cpp',
     'nsXMLNameSpaceMap.cpp',
-    'PerformanceCompositeTiming.cpp',
-    'PerformanceEntry.cpp',
-    'PerformanceMark.cpp',
-    'PerformanceMeasure.cpp',
-    'PerformanceObserver.cpp',
-    'PerformanceObserverEntryList.cpp',
-    'PerformanceRenderTiming.cpp',
-    'PerformanceResourceTiming.cpp',
     'PostMessageEvent.cpp',
     'ProcessGlobal.cpp',
     'ResponsiveImageSelector.cpp',
@@ -398,8 +376,6 @@ if CONFIG['INTEL_ARCHITECTURE']:
     SOURCES['nsTextFragmentSSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
 
 EXTRA_COMPONENTS += [
-    'ConsoleAPI.manifest',
-    'ConsoleAPIStorage.js',
     'contentAreaDropListener.js',
     'contentAreaDropListener.manifest',
     'messageWakeupService.js',
@@ -494,3 +470,6 @@ countermap.inputs = ['UseCounters.conf']
 counterlist = GENERATED_FILES['UseCounterList.h']
 counterlist.script = 'gen-usecounters.py:use_counter_list'
 counterlist.inputs = ['UseCounters.conf']
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']

@@ -368,7 +368,9 @@ public:
 
   virtual bool CanContinueTextRun() const override;
 
-  virtual bool UpdateOverflow() override;
+  virtual bool ComputeCustomOverflow(nsOverflowAreas& aOverflowAreas) override;
+
+  virtual void UnionChildOverflow(nsOverflowAreas& aOverflowAreas) override;
 
   // Selection Methods
 
@@ -714,7 +716,7 @@ public:
 
   /**
    * See if style tree verification is enabled. To enable style tree
-   * verification add "styleverifytree:1" to your NSPR_LOG_MODULES
+   * verification add "styleverifytree:1" to your MOZ_LOG
    * environment variable (any non-zero debug level will work). Or,
    * call SetVerifyStyleTreeEnable with true.
    */

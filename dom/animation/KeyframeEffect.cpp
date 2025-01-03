@@ -19,6 +19,7 @@
 #include "nsCSSProps.h" // For nsCSSProps::PropHasFlags
 #include "nsCSSPseudoElements.h" // For CSSPseudoElementType
 #include "nsDOMMutationObserver.h" // For nsAutoAnimationMutationBatch
+#include "nsIPresShell.h" // For nsIPresShell
 
 namespace mozilla {
 
@@ -91,6 +92,7 @@ KeyframeEffectReadOnly::KeyframeEffectReadOnly(
   , mTarget(aTarget)
   , mTiming(aTiming)
   , mInEffectOnLastAnimationTimingUpdate(false)
+  , mCumulativeChangeHint(nsChangeHint(0))
 {
   MOZ_ASSERT(aTiming);
 }
@@ -168,18 +170,11 @@ KeyframeEffectReadOnly::NotifyAnimationTimingUpdated()
 
   // Request restyle if necessary.
   //
-  // Bug 1235002: We should skip requesting a restyle when mProperties is empty.
-  // However, currently we don't properly encapsulate mProperties so we can't
-  // detect when it changes. As a result, if we skip requesting restyles when
-  // mProperties is empty and we play an animation and *then* add properties to
-  // it (as we currently do when building CSS animations), we will fail to
-  // request a restyle at all. Since animations without properties are rare, we
-  // currently just request the restyle regardless of whether mProperties is
-  // empty or not.
-  //
   // Bug 1216843: When we implement iteration composite modes, we need to
   // also detect if the current iteration has changed.
-  if (mAnimation && GetComputedTiming().mProgress != mProgressOnLastCompose) {
+  if (mAnimation &&
+      !mProperties.IsEmpty() &&
+      GetComputedTiming().mProgress != mProgressOnLastCompose) {
     EffectCompositor::RestyleType restyleType =
       CanThrottle() ?
       EffectCompositor::RestyleType::Throttled :
@@ -429,11 +424,11 @@ KeyframesEqualIgnoringComputedOffsets(const nsTArray<Keyframe>& aLhs,
   return true;
 }
 
-// https://w3c.github.io/web-animations/#dom-keyframeeffect-setframes
+// https://w3c.github.io/web-animations/#dom-keyframeeffect-setkeyframes
 void
-KeyframeEffectReadOnly::SetFrames(JSContext* aContext,
-                                  JS::Handle<JSObject*> aFrames,
-                                  ErrorResult& aRv)
+KeyframeEffectReadOnly::SetKeyframes(JSContext* aContext,
+                                     JS::Handle<JSObject*> aKeyframes,
+                                     ErrorResult& aRv)
 {
   nsIDocument* doc = AnimationUtils::GetCurrentRealmDocument(aContext);
   if (!doc) {
@@ -442,7 +437,7 @@ KeyframeEffectReadOnly::SetFrames(JSContext* aContext,
   }
 
   nsTArray<Keyframe> keyframes =
-    KeyframeUtils::GetKeyframesFromObject(aContext, aFrames, aRv);
+    KeyframeUtils::GetKeyframesFromObject(aContext, aKeyframes, aRv);
   if (aRv.Failed()) {
     return;
   }
@@ -458,19 +453,19 @@ KeyframeEffectReadOnly::SetFrames(JSContext* aContext,
                                                     pseudo, shell);
   }
 
-  SetFrames(Move(keyframes), styleContext);
+  SetKeyframes(Move(keyframes), styleContext);
 }
 
 void
-KeyframeEffectReadOnly::SetFrames(nsTArray<Keyframe>&& aFrames,
+KeyframeEffectReadOnly::SetKeyframes(nsTArray<Keyframe>&& aKeyframes,
                                   nsStyleContext* aStyleContext)
 {
-  if (KeyframesEqualIgnoringComputedOffsets(aFrames, mFrames)) {
+  if (KeyframesEqualIgnoringComputedOffsets(aKeyframes, mKeyframes)) {
     return;
   }
 
-  mFrames = Move(aFrames);
-  KeyframeUtils::ApplyDistributeSpacing(mFrames);
+  mKeyframes = Move(aKeyframes);
+  KeyframeUtils::ApplyDistributeSpacing(mKeyframes);
 
   if (mAnimation && mAnimation->IsRelevant()) {
     nsNodeUtils::AnimationChanged(mAnimation);
@@ -521,7 +516,7 @@ KeyframeEffectReadOnly::UpdateProperties(nsStyleContext* aStyleContext)
       KeyframeUtils::GetAnimationPropertiesFromKeyframes(aStyleContext,
                                                          mTarget->mElement,
                                                          mTarget->mPseudoType,
-                                                         mFrames);
+                                                         mKeyframes);
   }
 
   if (mProperties == properties) {
@@ -549,6 +544,8 @@ KeyframeEffectReadOnly::UpdateProperties(nsStyleContext* aStyleContext)
     property.mIsRunningOnCompositor =
       runningOnCompositorProperties.HasProperty(property.mProperty);
   }
+
+  CalculateCumulativeChangeHint();
 
   if (mTarget) {
     EffectSet* effectSet = EffectSet::GetEffectSet(mTarget->mElement,
@@ -729,7 +726,7 @@ template <class KeyframeEffectType, class OptionsType>
 KeyframeEffectReadOnly::ConstructKeyframeEffect(
     const GlobalObject& aGlobal,
     const Nullable<ElementOrCSSPseudoElement>& aTarget,
-    JS::Handle<JSObject*> aFrames,
+    JS::Handle<JSObject*> aKeyframes,
     const OptionsType& aOptions,
     ErrorResult& aRv)
 {
@@ -749,7 +746,7 @@ KeyframeEffectReadOnly::ConstructKeyframeEffect(
   RefPtr<KeyframeEffectType> effect =
     new KeyframeEffectType(doc, target, timingParams);
 
-  effect->SetFrames(aGlobal.Context(), aFrames, aRv);
+  effect->SetKeyframes(aGlobal.Context(), aKeyframes, aRv);
   if (aRv.Failed()) {
     return nullptr;
   }
@@ -858,12 +855,12 @@ struct KeyframeValue
 KeyframeEffectReadOnly::Constructor(
     const GlobalObject& aGlobal,
     const Nullable<ElementOrCSSPseudoElement>& aTarget,
-    JS::Handle<JSObject*> aFrames,
+    JS::Handle<JSObject*> aKeyframes,
     const UnrestrictedDoubleOrKeyframeEffectOptions& aOptions,
     ErrorResult& aRv)
 {
   return ConstructKeyframeEffect<KeyframeEffectReadOnly>(aGlobal, aTarget,
-                                                         aFrames, aOptions,
+                                                         aKeyframes, aOptions,
                                                          aRv);
 }
 
@@ -982,19 +979,19 @@ KeyframeEffectReadOnly::GetProperties(
 }
 
 void
-KeyframeEffectReadOnly::GetFrames(JSContext*& aCx,
-                                  nsTArray<JSObject*>& aResult,
-                                  ErrorResult& aRv)
+KeyframeEffectReadOnly::GetKeyframes(JSContext*& aCx,
+                                     nsTArray<JSObject*>& aResult,
+                                     ErrorResult& aRv)
 {
   MOZ_ASSERT(aResult.IsEmpty());
   MOZ_ASSERT(!aRv.Failed());
 
-  if (!aResult.SetCapacity(mFrames.Length(), mozilla::fallible)) {
+  if (!aResult.SetCapacity(mKeyframes.Length(), mozilla::fallible)) {
     aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
     return;
   }
 
-  for (const Keyframe& keyframe : mFrames) {
+  for (const Keyframe& keyframe : mKeyframes) {
     // Set up a dictionary object for the explicit members
     BaseComputedKeyframe keyframeDict;
     if (keyframe.mOffset) {
@@ -1076,6 +1073,16 @@ KeyframeEffectReadOnly::CanThrottle() const
     // In either case we can throttle the animation because there is no
     // need to update on the main thread.
     return true;
+  }
+
+  // We can throttle the animation if the animation is paint only and
+  // the target frame is out of view or the document is in background tabs.
+  if (CanIgnoreIfNotVisible()) {
+    nsIPresShell* presShell = GetPresShell();
+    if ((presShell && !presShell->IsActive()) ||
+        frame->IsScrolledOutOfView()) {
+      return true;
+    }
   }
 
   // First we need to check layer generation and transform overflow
@@ -1208,14 +1215,20 @@ KeyframeEffectReadOnly::GetRenderedDocument() const
   return mTarget->mElement->GetComposedDoc();
 }
 
-nsPresContext*
-KeyframeEffectReadOnly::GetPresContext() const
+nsIPresShell*
+KeyframeEffectReadOnly::GetPresShell() const
 {
   nsIDocument* doc = GetRenderedDocument();
   if (!doc) {
     return nullptr;
   }
-  nsIPresShell* shell = doc->GetShell();
+  return doc->GetShell();
+}
+
+nsPresContext*
+KeyframeEffectReadOnly::GetPresContext() const
+{
+  nsIPresShell* shell = GetPresShell();
   if (!shell) {
     return nullptr;
   }
@@ -1330,6 +1343,31 @@ KeyframeEffectReadOnly::SetPerformanceWarning(
   }
 }
 
+void
+KeyframeEffectReadOnly::CalculateCumulativeChangeHint()
+{
+  mCumulativeChangeHint = nsChangeHint(0);
+
+  for (const AnimationProperty& property : mProperties) {
+    for (const AnimationPropertySegment& segment : property.mSegments) {
+      mCumulativeChangeHint |= segment.mChangeHint;
+    }
+  }
+}
+
+bool
+KeyframeEffectReadOnly::CanIgnoreIfNotVisible() const
+{
+  if (!AnimationUtils::IsOffscreenThrottlingEnabled()) {
+    return false;
+  }
+
+  // FIXME: For further sophisticated optimization we need to check
+  // change hint on the segment corresponding to computedTiming.progress.
+  return NS_IsHintSubset(
+    mCumulativeChangeHint, nsChangeHint_Hints_CanIgnoreIfNotVisible);
+}
+
 //---------------------------------------------------------------------
 //
 // KeyframeEffect
@@ -1355,11 +1393,11 @@ KeyframeEffect::WrapObject(JSContext* aCx,
 KeyframeEffect::Constructor(
     const GlobalObject& aGlobal,
     const Nullable<ElementOrCSSPseudoElement>& aTarget,
-    JS::Handle<JSObject*> aFrames,
+    JS::Handle<JSObject*> aKeyframes,
     const UnrestrictedDoubleOrKeyframeEffectOptions& aOptions,
     ErrorResult& aRv)
 {
-  return ConstructKeyframeEffect<KeyframeEffect>(aGlobal, aTarget, aFrames,
+  return ConstructKeyframeEffect<KeyframeEffect>(aGlobal, aTarget, aKeyframes,
                                                  aOptions, aRv);
 }
 
@@ -1367,11 +1405,11 @@ KeyframeEffect::Constructor(
 KeyframeEffect::Constructor(
     const GlobalObject& aGlobal,
     const Nullable<ElementOrCSSPseudoElement>& aTarget,
-    JS::Handle<JSObject*> aFrames,
+    JS::Handle<JSObject*> aKeyframes,
     const UnrestrictedDoubleOrKeyframeAnimationOptions& aOptions,
     ErrorResult& aRv)
 {
-  return ConstructKeyframeEffect<KeyframeEffect>(aGlobal, aTarget, aFrames,
+  return ConstructKeyframeEffect<KeyframeEffect>(aGlobal, aTarget, aKeyframes,
                                                  aOptions, aRv);
 }
 

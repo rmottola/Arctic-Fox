@@ -401,8 +401,9 @@ NotificationController::WillRefresh(mozilla::TimeStamp aTime)
   // events causes script to run.
   mObservingState = eRefreshProcessing;
 
-  mEventTree.Process();
-  mEventTree.Clear();
+  RefPtr<DocAccessible> deathGrip(mDocument);
+  mEventTree.Process(deathGrip);
+  deathGrip = nullptr;
 
   ProcessEventQueue();
 

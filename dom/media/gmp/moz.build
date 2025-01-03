@@ -4,6 +4,9 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+for cdm in CONFIG['MOZ_EME_MODULES']:
+    DEFINES['MOZ_%s_EME' % cdm.upper()] = True
+
 XPIDL_MODULE = 'content_geckomediaplugins'
 
 XPIDL_SOURCES += [
@@ -52,6 +55,7 @@ EXPORTS += [
     'GMPServiceChild.h',
     'GMPServiceParent.h',
     'GMPSharedMemManager.h',
+    'GMPStorage.h',
     'GMPStorageChild.h',
     'GMPStorageParent.h',
     'GMPTimerChild.h',
@@ -75,6 +79,9 @@ if CONFIG['OS_TARGET'] == 'Android':
     SOURCES += [
       'GMPLoader.cpp',
     ]
+    USE_LIBS += [
+        'rlz',
+    ]
 
 UNIFIED_SOURCES += [
     'GMPAudioDecoderChild.cpp',
@@ -85,7 +92,9 @@ UNIFIED_SOURCES += [
     'GMPContentParent.cpp',
     'GMPDecryptorChild.cpp',
     'GMPDecryptorParent.cpp',
+    'GMPDiskStorage.cpp',
     'GMPEncryptedBufferDataImpl.cpp',
+    'GMPMemoryStorage.cpp',
     'GMPParent.cpp',
     'GMPPlatform.cpp',
     'GMPProcessChild.cpp',
@@ -109,9 +118,13 @@ UNIFIED_SOURCES += [
     'GMPVideoPlaneImpl.cpp',
 ]
 
-if CONFIG['OS_TARGET'] in ('WINNT', 'Darwin'):
+DIRS += [
+    'rlz',
+]
+
+if 'widevine' in CONFIG['MOZ_EME_MODULES']:
   DIRS += [
-      'rlz',
+      'widevine-adapter',
   ]
 
 IPDL_SOURCES += [
@@ -140,3 +153,6 @@ LOCAL_INCLUDES += [
     '/xpcom/build',
     '/xpcom/threads',
 ]
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']

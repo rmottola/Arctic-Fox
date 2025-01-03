@@ -108,16 +108,14 @@ XPCOMUtils.defineLazyModuleGetter(this, "AsyncShutdown",
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
                                   "resource://gre/modules/LoginManagerParent.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
+                                  "resource://gre/modules/LoginHelper.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "SimpleServiceDiscovery",
                                   "resource://gre/modules/SimpleServiceDiscovery.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "ContentSearch",
                                   "resource:///modules/ContentSearch.jsm");
-
-if (AppConstants.E10S_TESTING_ONLY) {
-  XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
-                                    "resource://gre/modules/UpdateUtils.jsm");
-}
 
 XPCOMUtils.defineLazyModuleGetter(this, "TabCrashHandler",
                                   "resource:///modules/ContentCrashHandlers.jsm");
@@ -283,16 +281,7 @@ BrowserGlue.prototype = {
         this._onQuitRequest(subject, data);
         break;
       case "quit-application-granted":
-        // This pref must be set here because SessionStore will use its value
-        // on quit-application.
-        this._setPrefToSaveSession();
-        try {
-          let appStartup = Cc["@mozilla.org/toolkit/app-startup;1"].
-                           getService(Ci.nsIAppStartup);
-          appStartup.trackStartupCrashEnd();
-        } catch (e) {
-          Cu.reportError("Could not end startup crash tracking in quit-application-granted: " + e);
-        }
+        this._onQuitApplicationGranted();
         break;
       case "browser-lastwindow-close-requested":
         if (OBSERVE_LASTWINDOW_CLOSE_TOPICS) {
@@ -389,7 +378,10 @@ BrowserGlue.prototype = {
         }
         break;
       case "profile-before-change":
-        this._onProfileShutdown();
+         // Any component depending on Places should be finalized in
+         // _onPlacesShutdown.  Any component that doesn't need to act after
+         // the UI has gone should be finalized in _onQuitApplicationGranted.
+        this._dispose();
         break;
       case "keyword-search":
         // This notification is broadcast by the docshell when it "fixes up" a
@@ -488,6 +480,7 @@ BrowserGlue.prototype = {
       switchtab: 6,
       tag: 7,
       visiturl: 8,
+      remotetab: 9,
     };
     if (actionType in buckets) {
       Services.telemetry
@@ -1015,11 +1008,23 @@ BrowserGlue.prototype = {
   },
 
   /**
-   * Profile shutdown handler (contains profile cleanup routines).
-   * All components depending on Places should be shut down in
-   * _onPlacesShutdown() and not here.
+   * Application shutdown handler.
    */
-  _onProfileShutdown: function BG__onProfileShutdown() {
+  _onQuitApplicationGranted: function () {
+    // This pref must be set here because SessionStore will use its value
+    // on quit-application.
+    this._setPrefToSaveSession();
+
+    // Call trackStartupCrashEnd here in case the delayed call on startup hasn't
+    // yet occurred (see trackStartupCrashEnd caller in browser.js).
+    try {
+      let appStartup = Cc["@mozilla.org/toolkit/app-startup;1"]
+                         .getService(Ci.nsIAppStartup);
+      appStartup.trackStartupCrashEnd();
+    } catch (e) {
+      Cu.reportError("Could not end startup crash tracking in quit-application-granted: " + e);
+    }
+
     UserAgentOverrides.uninit();
 
     NewTabMessages.uninit();
@@ -1030,7 +1035,6 @@ BrowserGlue.prototype = {
     if (AppConstants.NIGHTLY_BUILD) {
       AddonWatcher.uninit();
     }
-    this._dispose();
   },
 
   _initServiceDiscovery: function () {
@@ -1200,9 +1204,6 @@ BrowserGlue.prototype = {
       }
     }
 
-    if (AppConstants.E10S_TESTING_ONLY) {
-      E10SUINotification.checkStatus();
-    }
     if (AppConstants.platform == "win" ||
         AppConstants.platform == "macosx") {
       // Handles prompting to inform about incompatibilites when accessibility
@@ -1748,7 +1749,7 @@ BrowserGlue.prototype = {
   },
 
   _migrateUI: function BG__migrateUI() {
-    const UI_VERSION = 36;
+    const UI_VERSION = 39;
     const BROWSER_DOCURL = "chrome://browser/content/browser.xul";
 
     let currentUIVersion;
@@ -2113,6 +2114,22 @@ BrowserGlue.prototype = {
                            "hidden");
     }
 
+    if (currentUIVersion < 37) {
+      Services.prefs.clearUserPref("browser.sessionstore.restore_on_demand");
+    }
+
+    if (currentUIVersion < 38) {
+      LoginHelper.removeLegacySignonFiles();
+    }
+
+    if (currentUIVersion < 39) {
+      // Remove the 'defaultset' value for all the toolbars
+      let toolbars = ["nav-bar", "PersonalToolbar",
+                      "addon-bar", "TabsToolbar", "toolbar-menubar"];
+      for (let toolbarId of toolbars) {
+        xulStore.removeValue(BROWSER_DOCURL, toolbarId, "defaultset");
+      }
+    }
     // Update the migration version.
     Services.prefs.setIntPref("browser.migration.version", UI_VERSION);
   },
@@ -2484,7 +2501,7 @@ ContentPermissionPrompt.prototype = {
     let types = aRequest.types.QueryInterface(Ci.nsIArray);
     if (types.length != 1) {
       aRequest.cancel();
-      return;
+      return undefined;
     }
 
     if (!aOptions)
@@ -2916,151 +2933,6 @@ var DefaultBrowserCheck = {
       delete this._notification;
     }
   },
-};
-
-var E10SUINotification = {
-  CURRENT_PROMPT_PREF: "browser.displayedE10SPrompt.1",
-  PREVIOUS_PROMPT_PREF: "browser.displayedE10SPrompt",
-
-  get forcedOn() {
-    try {
-      return Services.prefs.getBoolPref("browser.tabs.remote.force-enable");
-    } catch (e) {}
-    return false;
-  },
-
-  get a11yRecentlyRan() {
-    try {
-      if (Services.prefs.getBoolPref("accessibility.loadedInLastSession")) {
-        return true;
-      }
-    } catch (e) {}
-    try {
-      Services.prefs.getBoolPref("accessibility.lastLoadDate");
-      return true;
-    } catch (e) {}
-    return false;
-  },
-
-  checkStatus: function() {
-    let updateChannel = UpdateUtils.UpdateChannel;
-    let channelAuthorized = updateChannel == "nightly" || updateChannel == "aurora";
-    if (!channelAuthorized) {
-      return;
-    }
-
-    if (!Services.appinfo.browserTabsRemoteAutostart) {
-      let displayFeedbackRequest = false;
-      try {
-        displayFeedbackRequest = Services.prefs.getBoolPref("browser.requestE10sFeedback");
-      } catch (e) {}
-
-      if (displayFeedbackRequest) {
-        let win = RecentWindow.getMostRecentBrowserWindow();
-        if (!win) {
-          return;
-        }
-
-        Services.prefs.clearUserPref("browser.requestE10sFeedback");
-
-        let url = Services.urlFormatter.formatURLPref("app.feedback.baseURL");
-        url += "?utm_source=tab&utm_campaign=e10sfeedback";
-
-        win.openUILinkIn(url, "tab");
-        return;
-      }
-
-      // If accessibility recently ran, don't prompt about trying out e10s
-      if (this.a11yRecentlyRan) {
-        return;
-      }
-
-      let e10sPromptShownCount = 0;
-      try {
-        e10sPromptShownCount = Services.prefs.getIntPref(this.CURRENT_PROMPT_PREF);
-      } catch(e) {}
-
-      let isHardwareAccelerated = true;
-      try {
-        let win = RecentWindow.getMostRecentBrowserWindow();
-        let winutils = win.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindowUtils);
-        isHardwareAccelerated = winutils.layerManagerType != "Basic";
-      } catch (e) {}
-
-      if (!Services.appinfo.inSafeMode &&
-          !Services.appinfo.accessibilityEnabled &&
-          isHardwareAccelerated &&
-          e10sPromptShownCount < 5) {
-        Services.tm.mainThread.dispatch(() => {
-          try {
-            this._showE10SPrompt();
-            Services.prefs.setIntPref(this.CURRENT_PROMPT_PREF, e10sPromptShownCount + 1);
-            Services.prefs.clearUserPref(this.PREVIOUS_PROMPT_PREF);
-          } catch (ex) {
-            Cu.reportError("Failed to show e10s prompt: " + ex);
-          }
-        }, Ci.nsIThread.DISPATCH_NORMAL);
-      }
-    }
-  },
-
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver, Ci.nsISupportsWeakReference]),
-
-  _showE10SPrompt: function BG__showE10SPrompt() {
-    let win = RecentWindow.getMostRecentBrowserWindow();
-    if (!win)
-      return;
-
-    let browser = win.gBrowser.selectedBrowser;
-
-    let promptMessage = win.gNavigatorBundle.getFormattedString(
-                          "e10s.offerPopup.mainMessage",
-                          [gBrandBundle.GetStringFromName("brandShortName")]
-                        );
-    let mainAction = {
-      label: win.gNavigatorBundle.getString("e10s.offerPopup.enableAndRestart.label"),
-      accessKey: win.gNavigatorBundle.getString("e10s.offerPopup.enableAndRestart.accesskey"),
-      callback: function () {
-        Services.prefs.setBoolPref("browser.tabs.remote.autostart", true);
-        Services.prefs.setBoolPref("browser.enabledE10SFromPrompt", true);
-        // Restart the app
-        let cancelQuit = Cc["@mozilla.org/supports-PRBool;1"].createInstance(Ci.nsISupportsPRBool);
-        Services.obs.notifyObservers(cancelQuit, "quit-application-requested", "restart");
-        if (cancelQuit.data)
-          return; // somebody canceled our quit request
-        Services.startup.quit(Services.startup.eAttemptQuit | Services.startup.eRestart);
-      }
-    };
-    let secondaryActions = [
-      {
-        label: win.gNavigatorBundle.getString("e10s.offerPopup.noThanks.label"),
-        accessKey: win.gNavigatorBundle.getString("e10s.offerPopup.noThanks.accesskey"),
-        callback: function () {
-          Services.prefs.setIntPref(E10SUINotification.CURRENT_PROMPT_PREF, 5);
-        }
-      }
-    ];
-    let options = {
-      popupIconURL: "chrome://browser/skin/e10s-64@2x.png",
-      learnMoreURL: "https://wiki.mozilla.org/Electrolysis",
-      persistWhileVisible: true
-    };
-
-    win.PopupNotifications.show(browser, "enable-e10s", promptMessage, null, mainAction, secondaryActions, options);
-
-    let highlights = [
-      win.gNavigatorBundle.getString("e10s.offerPopup.highlight1"),
-      win.gNavigatorBundle.getString("e10s.offerPopup.highlight2")
-    ];
-
-    let doorhangerExtraContent = win.document.getElementById("enable-e10s-notification")
-                                             .querySelector("popupnotificationcontent");
-    for (let highlight of highlights) {
-      let highlightLabel = win.document.createElement("label");
-      highlightLabel.setAttribute("value", highlight);
-      doorhangerExtraContent.appendChild(highlightLabel);
-    }
-  }
 };
 
 var E10SAccessibilityCheck = {

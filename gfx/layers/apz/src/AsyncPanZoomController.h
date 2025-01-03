@@ -49,13 +49,25 @@ class GestureEventListener;
 class PCompositorBridgeParent;
 struct AsyncTransform;
 class AsyncPanZoomAnimation;
-class FlingAnimation;
+class AndroidFlingAnimation;
+class GenericFlingAnimation;
 class InputBlockState;
 class TouchBlockState;
 class PanGestureBlockState;
 class OverscrollHandoffChain;
 class StateChangeNotificationBlocker;
 class CheckerboardEvent;
+class OverscrollEffectBase;
+class WidgetOverscrollEffect;
+class GenericOverscrollEffect;
+class AndroidSpecificState;
+
+// Base class for grouping platform-specific APZC state variables.
+class PlatformSpecificStateBase {
+public:
+  virtual ~PlatformSpecificStateBase() {}
+  virtual AndroidSpecificState* AsAndroidSpecificState() { return nullptr; }
+};
 
 /**
  * Controller for all panning and zooming logic. Any time a user input is
@@ -644,6 +656,8 @@ protected:
      This function is only callable from the compositor thread. */
   PCompositorBridgeParent* GetSharedFrameMetricsCompositor();
 
+  PlatformSpecificStateBase* GetPlatformSpecificState();
+
 protected:
   // Both |mFrameMetrics| and |mLastContentPaintMetrics| are protected by the
   // monitor. Do not read from or modify either of them without locking.
@@ -699,6 +713,12 @@ private:
   ParentLayerPoint mLastZoomFocus;
 
   RefPtr<AsyncPanZoomAnimation> mAnimation;
+
+  UniquePtr<OverscrollEffectBase> mOverscrollEffect;
+
+  // Groups state variables that are specific to a platform.
+  // Initialized on first use.
+  UniquePtr<PlatformSpecificStateBase> mPlatformSpecificState;
 
   friend class Axis;
 
@@ -865,10 +885,14 @@ public:
   bool AttemptFling(FlingHandoffState& aHandoffState);
 
 private:
-  friend class FlingAnimation;
+  friend class AndroidFlingAnimation;
+  friend class GenericFlingAnimation;
   friend class OverscrollAnimation;
   friend class SmoothScrollAnimation;
   friend class WheelScrollAnimation;
+
+  friend class GenericOverscrollEffect;
+  friend class WidgetOverscrollEffect;
 
   // The initial velocity of the most recent fling.
   ParentLayerPoint mLastFlingVelocity;

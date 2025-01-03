@@ -25,6 +25,7 @@ interface nsIChannel;
 interface nsIContentViewer;
 interface nsIDOMEventTarget;
 interface nsIDocShellLoadInfo;
+interface nsIDocument;
 interface nsIEditor;
 interface nsIEditingSession;
 interface nsISimpleEnumerator;
@@ -42,6 +43,8 @@ interface nsIReflowObserver;
 interface nsIScrollObserver;
 interface nsITabParent;
 interface nsITabChild;
+interface nsICommandManager;
+interface nsICommandParams;
 native TabChildRef(already_AddRefed<nsITabChild>);
 
 typedef unsigned long nsLoadFlags;
@@ -126,9 +129,6 @@ interface nsIDocShell : nsIDocShellTreeItem
    * @param aOriginalURI    - The URI to set as the originalURI on the channel
    *                          that does the load. If null, aURI will be set as
    *                          the originalURI.
-   * @param aLoadReplace    - If set LOAD_REPLACE flag will be set on the
-   *                          channel. aOriginalURI is null, this argument is
-   *                          ignored.
    * @param aIsFromProcessingFrameAttributes
    *                        - If this is a load triggered by changing frame attributes.
    *                          See nsILoadInfo.isFromProcessingFrameAttributes
@@ -159,7 +159,6 @@ interface nsIDocShell : nsIDocShellTreeItem
    */
   [noscript]void internalLoad(in nsIURI aURI,
                               in nsIURI aOriginalURI,
-                              in boolean aLoadReplace,
                               in boolean aIsFromProcessingFrameAttributes,
                               in nsIURI aReferrer,
                               in unsigned long aReferrerPolicy,
@@ -650,7 +649,11 @@ interface nsIDocShell : nsIDocShellTreeItem
    * Puts the docshell in prerendering mode. noscript because we want only
    * native code to be able to put a docshell in prerendering.
    */
-  [noscript] void SetIsPrerendered(in boolean prerendered);
+  [noscript] void SetIsPrerendered();
+
+  /**
+   * Whether this docshell is in prerender mode.
+   */
   [infallible] readonly attribute boolean isPrerendered;
 
   /**
@@ -899,6 +902,11 @@ interface nsIDocShell : nsIDocShellTreeItem
   [noscript,notxpcom,nostdcall] bool isSandboxedFrom(in nsIDocShell aTargetDocShell);
 
   /**
+   * Apply sandbox flags and fullscreen enabled flag to the given document.
+   */
+  [noscript,notxpcom] void applySandboxAndFullscreenFlags(in nsIDocument aDoc);
+
+  /**
    * This member variable determines whether a document has Mixed Active Content that
    * was initially blocked from loading, but the user has choosen to override the
    * block and allow the content to load. mMixedContentChannel is set to the document's
@@ -1018,6 +1026,7 @@ interface nsIDocShell : nsIDocShellTreeItem
     */
   boolean isCommandEnabled(in string command);
   void doCommand(in string command);
+  void doCommandWithParams(in string command, in nsICommandParams aParams);
 
   /**
    * Invisible DocShell are dummy construct to simulate DOM windows
@@ -1109,4 +1118,6 @@ interface nsIDocShell : nsIDocShellTreeItem
    */
   [binaryname(ScriptableTabChild)] readonly attribute nsITabChild tabChild;
   [noscript,notxpcom,nostdcall] TabChildRef GetTabChild();
+
+  [noscript,nostdcall,notxpcom] nsICommandManager GetCommandManager();
 };

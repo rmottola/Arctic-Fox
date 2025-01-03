@@ -101,15 +101,15 @@ nsHttpTransaction::nsHttpTransaction()
     , mCaps(0)
     , mClassification(CLASS_GENERAL)
     , mPipelinePosition(0)
-    , mCapsToClear(0)
     , mHttpVersion(NS_HTTP_VERSION_UNKNOWN)
     , mHttpResponseCode(0)
+    , mCapsToClear(0)
+    , mResponseIsComplete(false)
     , mClosed(false)
     , mConnected(false)
     , mHaveStatusLine(false)
     , mHaveAllHeaders(false)
     , mTransactionDone(false)
-    , mResponseIsComplete(false)
     , mDidContentStart(false)
     , mNoContent(false)
     , mSentData(false)
@@ -584,7 +584,7 @@ nsHttpTransaction::OnTransportStatus(nsITransport* transport,
     // then the requestStart timestamp will be null, so we mark the timestamps
     // for domainLookupStart/End and connectStart/End
     // If we are using a persistent connection they will remain null,
-    // and the correct value will be returned in nsPerformance.
+    // and the correct value will be returned in Performance.
     if (TimingEnabled() && GetRequestStart().IsNull()) {
         if (status == NS_NET_STATUS_RESOLVING_HOST) {
             SetDomainLookupStart(TimeStamp::Now(), true);
@@ -977,6 +977,12 @@ nsHttpTransaction::Close(nsresult reason)
             PR_Now(), 0, EmptyCString());
     }
 
+    // we must no longer reference the connection!  find out if the
+    // connection was being reused before letting it go.
+    bool connReused = false;
+    if (mConnection) {
+        connReused = mConnection->IsReused();
+    }
     mConnected = false;
     mTunnelProvider = nullptr;
 
@@ -1030,7 +1036,7 @@ nsHttpTransaction::Close(nsresult reason)
 
         if (!mReceivedData &&
             ((mRequestHead && mRequestHead->IsSafeMethod()) ||
-             !reallySentData)) {
+             !reallySentData || connReused)) {
             // if restarting fails, then we must proceed to close the pipe,
             // which will notify the channel that the transaction failed.
 
@@ -1606,6 +1612,9 @@ nsHttpTransaction::HandleContentStart()
             LOG3(("http response [\n"));
             nsAutoCString headers;
             mResponseHead->Flatten(headers, false);
+            headers.AppendLiteral("  OriginalHeaders");
+            headers.AppendLiteral("\r\n");
+            mResponseHead->FlattenNetworkOriginalHeaders(headers);
             LogHeaders(headers.get());
             LOG3(("]\n"));
         }
@@ -1906,7 +1915,7 @@ nsHttpTransaction::ProcessData(char *buf, uint32_t count, uint32_t *countRead)
 
         if (!mContentDecodingCheck && mResponseHead) {
             mContentDecoding =
-                !!mResponseHead->PeekHeader(nsHttp::Content_Encoding);
+                mResponseHead->HasHeader(nsHttp::Content_Encoding);
             mContentDecodingCheck = true;
         }
     }
@@ -2268,14 +2277,14 @@ static bool
 matchOld(nsHttpResponseHead *newHead, nsCString &old,
          nsHttpAtom headerAtom)
 {
-    const char *val;
+    nsAutoCString val;
 
-    val = newHead->PeekHeader(headerAtom);
-    if (val && old.IsEmpty())
+    newHead->GetHeader(headerAtom, val);
+    if (!val.IsEmpty() && old.IsEmpty())
         return false;
-    if (!val && !old.IsEmpty())
+    if (val.IsEmpty() && !old.IsEmpty())
         return false;
-    if (val && !old.Equals(val))
+    if (!val.IsEmpty() && !old.Equals(val))
         return false;
     return true;
 }
@@ -2325,26 +2334,21 @@ nsHttpTransaction::RestartVerifier::Set(int64_t contentLength,
 
     mContentLength = contentLength;
 
-    const char *val;
-    val = head->PeekHeader(nsHttp::ETag);
-    if (val) {
-        mETag.Assign(val);
+    nsAutoCString val;
+    if (NS_SUCCEEDED(head->GetHeader(nsHttp::ETag, val))) {
+        mETag = val;
     }
-    val = head->PeekHeader(nsHttp::Last_Modified);
-    if (val) {
-        mLastModified.Assign(val);
+    if (NS_SUCCEEDED(head->GetHeader(nsHttp::Last_Modified, val))) {
+        mLastModified = val;
     }
-    val = head->PeekHeader(nsHttp::Content_Range);
-    if (val) {
-        mContentRange.Assign(val);
+    if (NS_SUCCEEDED(head->GetHeader(nsHttp::Content_Range, val))) {
+        mContentRange = val;
     }
-    val = head->PeekHeader(nsHttp::Content_Encoding);
-    if (val) {
-        mContentEncoding.Assign(val);
+    if (NS_SUCCEEDED(head->GetHeader(nsHttp::Content_Encoding, val))) {
+        mContentEncoding = val;
     }
-    val = head->PeekHeader(nsHttp::Transfer_Encoding);
-    if (val) {
-        mTransferEncoding.Assign(val);
+    if (NS_SUCCEEDED(head->GetHeader(nsHttp::Transfer_Encoding, val))) {
+        mTransferEncoding = val;
     }
 
     // We can only restart with any confidence if we have a stored etag or

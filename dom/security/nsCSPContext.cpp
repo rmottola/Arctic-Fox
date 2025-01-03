@@ -350,8 +350,21 @@ nsCSPContext::GetReferrerPolicy(uint32_t* outPolicy, bool* outIsSet)
     // an empty string in refpol means it wasn't set (that's the default in
     // nsCSPPolicy).
     if (!refpol.IsEmpty()) {
-      // if there are two policies that specify a referrer policy, then they
+      // Referrer Directive in CSP is no more used and going to be replaced by
+      // Referrer-Policy HTTP header. But we still keep using referrer directive,
+      // and would remove it later.
+      // Referrer Directive specs is not fully compliant with new referrer policy
+      // specs. What we are using here:
+      // - If the value of the referrer directive is invalid, the user agent
+      // should set the referrer policy to no-referrer.
+      // - If there are two policies that specify a referrer policy, then they
       // must agree or the employed policy is no-referrer.
+      if (!mozilla::net::IsValidReferrerPolicy(refpol)) {
+        *outPolicy = mozilla::net::RP_No_Referrer;
+        *outIsSet = true;
+        return NS_OK;
+      }
+
       uint32_t currentPolicy = mozilla::net::ReferrerPolicyFromString(refpol);
       if (*outIsSet && previousPolicy != currentPolicy) {
         *outPolicy = mozilla::net::RP_No_Referrer;
@@ -600,6 +613,11 @@ nsCSPContext::LogViolationDetails(uint16_t aViolationType,
                             CSP_UNSAFE_INLINE, SCRIPT_HASH_VIOLATION_OBSERVER_TOPIC);
       CASE_CHECK_AND_REPORT(HASH_STYLE,        STYLESHEET, aContent,
                             CSP_UNSAFE_INLINE, STYLE_HASH_VIOLATION_OBSERVER_TOPIC);
+      CASE_CHECK_AND_REPORT(REQUIRE_SRI_FOR_STYLE,   STYLESHEET, NS_LITERAL_STRING(""),
+                            CSP_REQUIRE_SRI_FOR, REQUIRE_SRI_STYLE_VIOLATION_OBSERVER_TOPIC);
+      CASE_CHECK_AND_REPORT(REQUIRE_SRI_FOR_SCRIPT,   SCRIPT, NS_LITERAL_STRING(""),
+                            CSP_REQUIRE_SRI_FOR, REQUIRE_SRI_SCRIPT_VIOLATION_OBSERVER_TOPIC);
+
 
       default:
         NS_ASSERTION(false, "LogViolationDetails with invalid type");
@@ -1138,6 +1156,21 @@ nsCSPContext::AsyncReportViolation(nsISupports* aBlockedContentSource,
                                                       aLineNum,
                                                       this));
    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsCSPContext::RequireSRIForType(nsContentPolicyType aContentType, bool* outRequiresSRIForType)
+{
+  *outRequiresSRIForType = false;
+  for (uint32_t i = 0; i < mPolicies.Length(); i++) {
+    if (mPolicies[i]->hasDirective(REQUIRE_SRI_FOR)) {
+      if (mPolicies[i]->requireSRIForType(aContentType)) {
+        *outRequiresSRIForType = true;
+        return NS_OK;
+      }
+    }
+  }
+  return NS_OK;
 }
 
 /**

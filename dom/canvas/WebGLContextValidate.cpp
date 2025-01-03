@@ -495,9 +495,10 @@ WebGLContext::ValidateUniformArraySetter(WebGLUniformLocation* loc,
     if (!loc->ValidateArrayLength(setterElemSize, setterArraySize, this, funcName))
         return false;
 
+    MOZ_ASSERT((size_t)loc->mActiveInfo->mElemCount > loc->mArrayIndex);
+    size_t uniformElemCount = loc->mActiveInfo->mElemCount - loc->mArrayIndex;
     *out_rawLoc = loc->mLoc;
-    *out_numElementsToUpload = std::min((size_t)loc->mActiveInfo->mElemCount,
-                                        setterArraySize / setterElemSize);
+    *out_numElementsToUpload = std::min(uniformElemCount, setterArraySize / setterElemSize);
     return true;
 }
 
@@ -529,9 +530,11 @@ WebGLContext::ValidateUniformMatrixArraySetter(WebGLUniformLocation* loc,
     if (!ValidateUniformMatrixTranspose(setterTranspose, funcName))
         return false;
 
+    MOZ_ASSERT((size_t)loc->mActiveInfo->mElemCount > loc->mArrayIndex);
+    size_t uniformElemCount = loc->mActiveInfo->mElemCount - loc->mArrayIndex;
     *out_rawLoc = loc->mLoc;
-    *out_numElementsToUpload = std::min((size_t)loc->mActiveInfo->mElemCount,
-                                        setterArraySize / setterElemSize);
+    *out_numElementsToUpload = std::min(uniformElemCount, setterArraySize / setterElemSize);
+
     return true;
 }
 
@@ -645,22 +648,27 @@ FloorPOT(int32_t x)
 }
 
 bool
-WebGLContext::InitAndValidateGL()
+WebGLContext::InitAndValidateGL(nsACString* const out_failReason, nsACString* const out_failureId)
 {
-    if (!gl)
-        return false;
+    MOZ_RELEASE_ASSERT(gl, "GFX: GL not initialized");
 
     // Unconditionally create a new format usage authority. This is
     // important when restoring contexts and extensions need to add
     // formats back into the authority.
     mFormatUsage = CreateFormatUsage(gl);
-    if (!mFormatUsage)
+    if (!mFormatUsage) {
+        *out_failureId = "FEATURE_FAILURE_WEBGL_FORMAT";
+        out_failReason->AssignLiteral("Failed to create mFormatUsage.");
         return false;
+    }
 
     GLenum error = gl->fGetError();
     if (error != LOCAL_GL_NO_ERROR) {
-        GenerateWarning("GL error 0x%x occurred during OpenGL context"
-                        " initialization, before WebGL initialization!", error);
+        *out_failureId = "FEATURE_FAILURE_WEBGL_GLERR_1";
+        const nsPrintfCString reason("GL error 0x%x occurred during OpenGL context"
+                                     " initialization, before WebGL initialization!",
+                                     error);
+        out_failReason->Assign(reason);
         return false;
     }
 
@@ -749,8 +757,10 @@ WebGLContext::InitAndValidateGL()
         gl->fGetIntegerv(LOCAL_GL_MAX_VERTEX_ATTRIBS, &mGLMaxVertexAttribs);
 
     if (mGLMaxVertexAttribs < 8) {
-        GenerateWarning("GL_MAX_VERTEX_ATTRIBS: %d is < 8!",
-                        mGLMaxVertexAttribs);
+        *out_failureId = "FEATURE_FAILURE_WEBGL_V_ATRB";
+        const nsPrintfCString reason("GL_MAX_VERTEX_ATTRIBS: %d is < 8!",
+                                     mGLMaxVertexAttribs);
+        out_failReason->Assign(reason);
         return false;
     }
 
@@ -763,8 +773,10 @@ WebGLContext::InitAndValidateGL()
         gl->fGetIntegerv(LOCAL_GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &mGLMaxTextureUnits);
 
     if (mGLMaxTextureUnits < 8) {
-        GenerateWarning("GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS: %d is < 8!",
-                        mGLMaxTextureUnits);
+        *out_failureId = "FEATURE_FAILURE_WEBGL_T_UNIT";
+        const nsPrintfCString reason("GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS: %d is < 8!",
+                                     mGLMaxTextureUnits);
+        out_failReason->Assign(reason);
         return false;
     }
 
@@ -920,7 +932,8 @@ WebGLContext::InitAndValidateGL()
 
     // initialize shader translator
     if (!ShInitialize()) {
-        GenerateWarning("GLSL translator initialization failed!");
+        *out_failureId = "FEATURE_FAILURE_WEBGL_GLSL";
+        out_failReason->AssignLiteral("GLSL translator initialization failed!");
         return false;
     }
 
@@ -934,13 +947,16 @@ WebGLContext::InitAndValidateGL()
     // getError call will give the correct result.
     error = gl->fGetError();
     if (error != LOCAL_GL_NO_ERROR) {
-        GenerateWarning("GL error 0x%x occurred during WebGL context"
-                        " initialization!", error);
+        *out_failureId = "FEATURE_FAILURE_WEBGL_GLERR_2";
+        const nsPrintfCString reason("GL error 0x%x occurred during WebGL context"
+                                     " initialization!",
+                                     error);
+        out_failReason->Assign(reason);
         return false;
     }
 
     if (IsWebGL2() &&
-        !InitWebGL2())
+        !InitWebGL2(out_failReason, out_failureId))
     {
         // Todo: Bug 898404: Only allow WebGL2 on GL>=3.0 on desktop GL.
         return false;

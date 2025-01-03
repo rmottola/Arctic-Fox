@@ -39,6 +39,10 @@ private:
 
   static EventTree* const kNoEventTree;
 
+#ifdef A11Y_LOG
+  static const char* PrefixLog(void* aData, Accessible*);
+#endif
+
   Accessible* mParent;
   uint32_t mStartIdx;
   uint32_t mStateFlagsCopy;
@@ -87,7 +91,7 @@ private:
   /**
    * Processes the event queue and fires events.
    */
-  void Process();
+  void Process(const RefPtr<DocAccessible>& aDeathGrip);
 
   /**
    * Return an event subtree for the given accessible.

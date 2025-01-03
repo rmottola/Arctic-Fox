@@ -295,6 +295,10 @@ js::GetBuiltinClass(JSContext* cx, HandleObject obj, ESClassValue* classValue)
         *classValue = ESClass_Map;
     else if (obj->is<PromiseObject>())
         *classValue = ESClass_Promise;
+    else if (obj->is<MapIteratorObject>())
+        *classValue = ESClass_MapIterator;
+    else if (obj->is<SetIteratorObject>())
+        *classValue = ESClass_SetIterator;
     else
         *classValue = ESClass_Other;
 
@@ -353,8 +357,7 @@ JS_FRIEND_API(JSObject*)
 js::GetPrototypeNoProxy(JSObject* obj)
 {
     MOZ_ASSERT(!obj->is<js::ProxyObject>());
-    MOZ_ASSERT(!obj->getTaggedProto().isLazy());
-    return obj->getTaggedProto().toObjectOrNull();
+    return obj->staticPrototype();
 }
 
 JS_FRIEND_API(void)
@@ -412,11 +415,16 @@ js::GetOutermostEnclosingFunctionOfScriptedCaller(JSContext* cx)
     if (!iter.isFunctionFrame())
         return nullptr;
 
+    if (iter.compartment() != cx->compartment())
+        return nullptr;
+
     RootedFunction curr(cx, iter.callee(cx));
     for (StaticScopeIter<NoGC> i(curr); !i.done(); i++) {
         if (i.type() == StaticScopeIter<NoGC>::Function)
             curr = &i.fun();
     }
+
+    assertSameCompartment(cx, curr);
     return curr;
 }
 
@@ -499,6 +507,13 @@ js::GetObjectProto(JSContext* cx, JS::Handle<JSObject*> obj, JS::MutableHandle<J
 
     proto.set(reinterpret_cast<const shadow::Object*>(obj.get())->group->proto);
     return true;
+}
+
+JS_FRIEND_API(JSObject*)
+js::GetStaticPrototype(JSObject* obj)
+{
+    MOZ_ASSERT(obj->hasStaticPrototype());
+    return obj->staticPrototype();
 }
 
 JS_FRIEND_API(bool)
@@ -587,15 +602,29 @@ js::ZoneGlobalsAreAllGray(JS::Zone* zone)
     return true;
 }
 
+namespace {
+struct VisitGrayCallbackFunctor {
+    GCThingCallback callback_;
+    void* closure_;
+    VisitGrayCallbackFunctor(GCThingCallback callback, void* closure)
+      : callback_(callback), closure_(closure)
+    {}
+
+    using ReturnType = void;
+    template <class T>
+    ReturnType operator()(T tp) const {
+        if ((*tp)->isTenured() && (*tp)->asTenured().isMarked(gc::GRAY))
+            callback_(closure_, JS::GCCellPtr(*tp));
+    }
+};
+} // namespace (anonymous)
+
 JS_FRIEND_API(void)
 js::VisitGrayWrapperTargets(Zone* zone, GCThingCallback callback, void* closure)
 {
     for (CompartmentsInZoneIter comp(zone); !comp.done(); comp.next()) {
-        for (JSCompartment::WrapperEnum e(comp); !e.empty(); e.popFront()) {
-            gc::Cell* thing = e.front().key().wrapped;
-            if (thing->isTenured() && thing->asTenured().isMarked(gc::GRAY))
-                callback(closure, JS::GCCellPtr(thing, thing->asTenured().getTraceKind()));
-        }
+        for (JSCompartment::WrapperEnum e(comp); !e.empty(); e.popFront())
+            e.front().mutableKey().applyToWrapped(VisitGrayCallbackFunctor(callback, closure));
     }
 }
 
@@ -627,34 +656,74 @@ JS_CloneObject(JSContext* cx, HandleObject obj, HandleObject protoArg)
 }
 
 #ifdef DEBUG
+
 JS_FRIEND_API(void)
-js::DumpString(JSString* str)
+js::DumpString(JSString* str, FILE* fp)
 {
-    str->dump();
+    str->dump(fp);
 }
 
 JS_FRIEND_API(void)
-js::DumpAtom(JSAtom* atom)
+js::DumpAtom(JSAtom* atom, FILE* fp)
 {
-    atom->dump();
+    atom->dump(fp);
 }
 
 JS_FRIEND_API(void)
-js::DumpChars(const char16_t* s, size_t n)
+js::DumpChars(const char16_t* s, size_t n, FILE* fp)
 {
-    fprintf(stderr, "char16_t * (%p) = ", (void*) s);
-    JSString::dumpChars(s, n);
-    fputc('\n', stderr);
+    fprintf(fp, "char16_t * (%p) = ", (void*) s);
+    JSString::dumpChars(s, n, fp);
+    fputc('\n', fp);
 }
 
 JS_FRIEND_API(void)
-js::DumpObject(JSObject* obj)
+js::DumpObject(JSObject* obj, FILE* fp)
 {
     if (!obj) {
-        fprintf(stderr, "NULL\n");
+        fprintf(fp, "NULL\n");
         return;
     }
-    obj->dump();
+    obj->dump(fp);
+}
+
+JS_FRIEND_API(void)
+js::DumpString(JSString* str) {
+    DumpString(str, stderr);
+}
+JS_FRIEND_API(void)
+js::DumpAtom(JSAtom* atom) {
+    DumpAtom(atom, stderr);
+}
+JS_FRIEND_API(void)
+js::DumpObject(JSObject* obj) {
+    DumpObject(obj, stderr);
+}
+JS_FRIEND_API(void)
+js::DumpChars(const char16_t* s, size_t n) {
+    DumpChars(s, n, stderr);
+}
+JS_FRIEND_API(void)
+js::DumpValue(const JS::Value& val) {
+    DumpValue(val, stderr);
+}
+JS_FRIEND_API(void)
+js::DumpId(jsid id) {
+    DumpId(id, stderr);
+}
+JS_FRIEND_API(void)
+js::DumpInterpreterFrame(JSContext* cx, InterpreterFrame* start)
+{
+    DumpInterpreterFrame(cx, stderr, start);
+}
+JS_FRIEND_API(bool)
+js::DumpPC(JSContext* cx) {
+    return DumpPC(cx, stdout);
+}
+JS_FRIEND_API(bool)
+js::DumpScript(JSContext* cx, JSScript* scriptArg)
+{
+    return DumpScript(cx, scriptArg, stdout);
 }
 
 #endif
@@ -1060,12 +1129,6 @@ js::DumpHeap(JSRuntime* rt, FILE* fp, js::DumpHeapNurseryBehaviour nurseryBehavi
     fflush(dtrc.output);
 }
 
-JS_FRIEND_API(bool)
-js::ContextHasOutstandingRequests(const JSContext* cx)
-{
-    return cx->outstandingRequests > 0;
-}
-
 JS_FRIEND_API(void)
 js::SetActivityCallback(JSRuntime* rt, ActivityCallback cb, void* arg)
 {
@@ -1181,23 +1244,10 @@ js::PrepareScriptEnvironmentAndInvoke(JSContext* cx, HandleObject scope, ScriptE
 {
     MOZ_ASSERT(!cx->isExceptionPending());
 
-    if (cx->runtime()->scriptEnvironmentPreparer) {
-        cx->runtime()->scriptEnvironmentPreparer->invoke(scope, closure);
-        return;
-    }
+    MOZ_RELEASE_ASSERT(cx->runtime()->scriptEnvironmentPreparer,
+                       "Embedding needs to set a scriptEnvironmentPreparer callback");
 
-    JSAutoCompartment ac(cx, scope);
-    bool ok = closure(cx);
-
-    MOZ_ASSERT_IF(ok, !cx->isExceptionPending());
-
-    // NB: This does not affect Gecko, which has a prepareScriptEnvironment
-    // callback.
-    if (!ok) {
-        JS_ReportPendingException(cx);
-    }
-
-    MOZ_ASSERT(!cx->isExceptionPending());
+    cx->runtime()->scriptEnvironmentPreparer->invoke(scope, closure);
 }
 
 JS_FRIEND_API(void)

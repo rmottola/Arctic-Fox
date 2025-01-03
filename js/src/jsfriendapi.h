@@ -209,39 +209,55 @@ GetPropertyNameFromPC(JSScript* script, jsbytecode* pc);
 #ifdef JS_DEBUG
 
 /*
- * Routines to print out values during debugging.  These are FRIEND_API to help
+ * Routines to print out values during debugging. These are FRIEND_API to help
  * the debugger find them and to support temporarily hacking js::Dump* calls
- * into other code.
+ * into other code. Note that there are overloads that do not require the FILE*
+ * parameter, which will default to stderr.
  */
 
 extern JS_FRIEND_API(void)
-DumpString(JSString* str);
+DumpString(JSString* str, FILE* fp);
 
 extern JS_FRIEND_API(void)
-DumpAtom(JSAtom* atom);
+DumpAtom(JSAtom* atom, FILE* fp);
 
 extern JS_FRIEND_API(void)
-DumpObject(JSObject* obj);
+DumpObject(JSObject* obj, FILE* fp);
 
 extern JS_FRIEND_API(void)
-DumpChars(const char16_t* s, size_t n);
+DumpChars(const char16_t* s, size_t n, FILE* fp);
 
 extern JS_FRIEND_API(void)
-DumpValue(const JS::Value& val);
+DumpValue(const JS::Value& val, FILE* fp);
 
 extern JS_FRIEND_API(void)
-DumpId(jsid id);
+DumpId(jsid id, FILE* fp);
 
 extern JS_FRIEND_API(void)
-DumpInterpreterFrame(JSContext* cx, InterpreterFrame* start = nullptr);
+DumpInterpreterFrame(JSContext* cx, FILE* fp, InterpreterFrame* start = nullptr);
 
 extern JS_FRIEND_API(bool)
-DumpPC(JSContext* cx);
+DumpPC(JSContext* cx, FILE* fp);
 
 extern JS_FRIEND_API(bool)
-DumpScript(JSContext* cx, JSScript* scriptArg);
+DumpScript(JSContext* cx, JSScript* scriptArg, FILE* fp);
+
+// Versions for use directly in a debugger (default parameters are not handled
+// well in gdb; built-in handles like stderr are not handled well in lldb.)
+extern JS_FRIEND_API(void) DumpString(JSString* str);
+extern JS_FRIEND_API(void) DumpAtom(JSAtom* atom);
+extern JS_FRIEND_API(void) DumpObject(JSObject* obj);
+extern JS_FRIEND_API(void) DumpChars(const char16_t* s, size_t n);
+extern JS_FRIEND_API(void) DumpValue(const JS::Value& val);
+extern JS_FRIEND_API(void) DumpId(jsid id);
+extern JS_FRIEND_API(void) DumpInterpreterFrame(JSContext* cx, InterpreterFrame* start = nullptr);
+extern JS_FRIEND_API(bool) DumpPC(JSContext* cx);
+extern JS_FRIEND_API(bool) DumpScript(JSContext* cx, JSScript* scriptArg);
 
 #endif
+
+extern JS_FRIEND_API(void)
+DumpBacktrace(JSContext* cx, FILE* fp);
 
 extern JS_FRIEND_API(void)
 DumpBacktrace(JSContext* cx);
@@ -720,6 +736,9 @@ FunctionHasNativeReserved(JSObject* fun);
 JS_FRIEND_API(bool)
 GetObjectProto(JSContext* cx, JS::HandleObject obj, JS::MutableHandleObject proto);
 
+extern JS_FRIEND_API(JSObject*)
+GetStaticPrototype(JSObject* obj);
+
 JS_FRIEND_API(bool)
 GetOriginalEval(JSContext* cx, JS::HandleObject scope,
                 JS::MutableHandleObject eval);
@@ -875,28 +894,50 @@ StringToLinearString(JSContext* cx, JSString* str)
     return reinterpret_cast<JSLinearString*>(str);
 }
 
+template<typename CharType>
 MOZ_ALWAYS_INLINE void
-CopyLinearStringChars(char16_t* dest, JSLinearString* s, size_t len)
+CopyLinearStringChars(CharType* dest, JSLinearString* s, size_t len, size_t start = 0);
+
+MOZ_ALWAYS_INLINE void
+CopyLinearStringChars(char16_t* dest, JSLinearString* s, size_t len, size_t start = 0)
 {
+    MOZ_ASSERT(start + len <= GetLinearStringLength(s));
     JS::AutoCheckCannotGC nogc;
     if (LinearStringHasLatin1Chars(s)) {
         const JS::Latin1Char* src = GetLatin1LinearStringChars(nogc, s);
         for (size_t i = 0; i < len; i++)
-            dest[i] = src[i];
+            dest[i] = src[start + i];
     } else {
         const char16_t* src = GetTwoByteLinearStringChars(nogc, s);
-        mozilla::PodCopy(dest, src, len);
+        mozilla::PodCopy(dest, src + start, len);
     }
 }
 
+MOZ_ALWAYS_INLINE void
+CopyLinearStringChars(char* dest, JSLinearString* s, size_t len, size_t start = 0)
+{
+    MOZ_ASSERT(start + len <= GetLinearStringLength(s));
+    JS::AutoCheckCannotGC nogc;
+    if (LinearStringHasLatin1Chars(s)) {
+        const JS::Latin1Char* src = GetLatin1LinearStringChars(nogc, s);
+        for (size_t i = 0; i < len; i++)
+           dest[i] = char(src[start + i]);
+    } else {
+      const char16_t* src = GetTwoByteLinearStringChars(nogc, s);
+      for (size_t i = 0; i < len; i++)
+          dest[i] = char(src[start + i]);
+    }
+}
+
+template<typename CharType>
 inline bool
-CopyStringChars(JSContext* cx, char16_t* dest, JSString* s, size_t len)
+CopyStringChars(JSContext* cx, CharType* dest, JSString* s, size_t len, size_t start = 0)
 {
     JSLinearString* linear = StringToLinearString(cx, s);
     if (!linear)
         return false;
 
-    CopyLinearStringChars(dest, linear, len);
+    CopyLinearStringChars(dest, linear, len, start);
     return true;
 }
 
@@ -1067,9 +1108,6 @@ GetPCCountScriptContents(JSContext* cx, size_t script);
  */
 JS_FRIEND_API(char*)
 GetCodeCoverageSummary(JSContext* cx, size_t* length);
-
-JS_FRIEND_API(bool)
-ContextHasOutstandingRequests(const JSContext* cx);
 
 typedef void
 (* ActivityCallback)(void* arg, bool active);
@@ -1498,6 +1536,8 @@ enum Type {
     MaxTypedArrayViewType,
 
     Float32x4,
+    Int8x16,
+    Int16x8,
     Int32x4
 };
 
@@ -1518,6 +1558,8 @@ byteSize(Type atype)
         return 4;
       case Float64:
         return 8;
+      case Int8x16:
+      case Int16x8:
       case Int32x4:
       case Float32x4:
         return 16;
@@ -1532,6 +1574,8 @@ isSignedIntType(Type atype) {
       case Int8:
       case Int16:
       case Int32:
+      case Int8x16:
+      case Int16x8:
       case Int32x4:
         return true;
       case Uint8:
@@ -1560,6 +1604,8 @@ isSimdType(Type atype) {
       case Float32:
       case Float64:
         return false;
+      case Int8x16:
+      case Int16x8:
       case Int32x4:
       case Float32x4:
         return true;
@@ -1572,6 +1618,10 @@ isSimdType(Type atype) {
 static inline size_t
 scalarByteSize(Type atype) {
     switch (atype) {
+      case Int8x16:
+        return 1;
+      case Int16x8:
+        return 2;
       case Int32x4:
       case Float32x4:
         return 4;

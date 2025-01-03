@@ -6,6 +6,7 @@
 
 #include "nsBindingManager.h"
 
+#include "nsAutoPtr.h"
 #include "nsCOMPtr.h"
 #include "nsXBLService.h"
 #include "nsIInputStream.h"
@@ -347,7 +348,7 @@ void
 nsBindingManager::PostProcessAttachedQueueEvent()
 {
   mProcessAttachedQueueEvent =
-    NS_NewRunnableMethod(this, &nsBindingManager::DoProcessAttachedQueue);
+    NewRunnableMethod(this, &nsBindingManager::DoProcessAttachedQueue);
   nsresult rv = NS_DispatchToCurrentThread(mProcessAttachedQueueEvent);
   if (NS_SUCCEEDED(rv) && mDocument) {
     mDocument->BlockOnload();

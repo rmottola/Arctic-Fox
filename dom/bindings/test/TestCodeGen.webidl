@@ -754,6 +754,9 @@ interface TestInterface {
   static void staticMethod(boolean arg);
   static void staticMethodWithContext(any arg);
 
+  // Testing static method with a reserved C++ keyword as the name
+  static void assert(boolean arg);
+
   // Deprecated static methods and attributes
   [Deprecated="GetAttributeNode"]
   static attribute byte staticDeprecatedAttribute;
@@ -863,6 +866,24 @@ interface TestInterface {
   void prefable23();
   [Pref="abc.def", Func="TestFuncControlledMember", AvailableIn=PrivilegedApps]
   void prefable24();
+
+  // Conditionally exposed methods/attributes involving [SecureContext]
+  [SecureContext]
+  readonly attribute boolean conditionalOnSecureContext1;
+  [SecureContext, Pref="abc.def"]
+  readonly attribute boolean conditionalOnSecureContext2;
+  [SecureContext, Pref="abc.def", Func="nsGenericHTMLElement::TouchEventsEnabled"]
+  readonly attribute boolean conditionalOnSecureContext3;
+  [SecureContext, Pref="abc.def", Func="TestFuncControlledMember"]
+  readonly attribute boolean conditionalOnSecureContext4;
+  [SecureContext]
+  void conditionalOnSecureContext5();
+  [SecureContext, Pref="abc.def"]
+  void conditionalOnSecureContext6();
+  [SecureContext, Pref="abc.def", Func="nsGenericHTMLElement::TouchEventsEnabled"]
+  void conditionalOnSecureContext7();
+  [SecureContext, Pref="abc.def", Func="TestFuncControlledMember"]
+  void conditionalOnSecureContext8();
 
   // Miscellania
   [LenientThis] attribute long attrWithLenientThis;
@@ -1079,6 +1100,15 @@ dictionary DictForConstructor {
   any any1 = null;
 };
 
+dictionary DictWithConditionalMembers {
+  [ChromeOnly]
+  long chromeOnlyMember;
+  [Func="TestFuncControlledMember"]
+  long funcControlledMember;
+  [ChromeOnly, Func="nsGenericHTMLElement::TouchEventsEnabled"]
+  long chromeOnlyFuncControlledMember;
+};
+
 interface TestIndexedGetterInterface {
   getter long item(unsigned long idx);
   readonly attribute unsigned long length;
@@ -1168,4 +1198,26 @@ interface TestDeprecatedInterface {
 
 [Constructor(Promise<void> promise)]
 interface TestInterfaceWithPromiseConstructorArg {
+};
+
+namespace TestNamespace {
+  readonly attribute boolean foo;
+  long bar();
+};
+
+partial namespace TestNamespace {
+  void baz();
+};
+
+[ClassString="RenamedNamespaceClassName"]
+namespace TestRenamedNamespace {
+};
+
+[ProtoObjectHack]
+namespace TestProtoObjectHackedNamespace {
+};
+
+[SecureContext]
+interface TestSecureContextInterface {
+  static void alsoSecureContext();
 };

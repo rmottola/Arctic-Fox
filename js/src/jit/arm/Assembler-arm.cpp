@@ -143,11 +143,6 @@ ABIArgGenerator::next(MIRType type)
     return softNext(type);
 }
 
-const Register ABIArgGenerator::NonArgReturnReg0 = r4;
-const Register ABIArgGenerator::NonArgReturnReg1 = r5;
-const Register ABIArgGenerator::NonReturn_VolatileReg0 = r2;
-const Register ABIArgGenerator::NonReturn_VolatileReg1 = r3;
-
 // Encode a standard register when it is being used as src1, the dest, and an
 // extra register. These should never be called with an InvalidReg.
 uint32_t
@@ -3311,20 +3306,19 @@ Assembler::BailoutTableStart(uint8_t* code)
     return (uint8_t*) inst;
 }
 
-void Assembler::UpdateBoundsCheck(uint32_t heapSize, Instruction* inst)
+void
+Assembler::UpdateBoundsCheck(uint8_t* patchAt, uint32_t heapLength)
 {
+    Instruction* inst = (Instruction*) patchAt;
     MOZ_ASSERT(inst->is<InstCMP>());
     InstCMP* cmp = inst->as<InstCMP>();
 
     Register index;
     cmp->extractOp1(&index);
 
-#ifdef DEBUG
-    Operand2 op = cmp->extractOp2();
-    MOZ_ASSERT(op.isImm8());
-#endif
+    MOZ_ASSERT(cmp->extractOp2().isImm8());
 
-    Imm8 imm8 = Imm8(heapSize);
+    Imm8 imm8 = Imm8(heapLength);
     MOZ_ASSERT(!imm8.invalid);
 
     *inst = InstALU(InvalidReg, index, imm8, OpCmp, SetCC, Always);

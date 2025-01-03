@@ -69,6 +69,7 @@
 #include "mozilla/dom/ProfileTimelineMarkerBinding.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/PromiseBinding.h"
+#include "mozilla/dom/PromiseDebugging.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "jsprf.h"
 #include "js/Debug.h"
@@ -471,6 +472,11 @@ CycleCollectedJSRuntime::~CycleCollectedJSRuntime()
   MOZ_ASSERT(mDebuggerPromiseMicroTaskQueue.empty());
   MOZ_ASSERT(mPromiseMicroTaskQueue.empty());
 
+#ifdef SPIDERMONKEY_PROMISE
+  mUncaughtRejections.reset();
+  mConsumedRejections.reset();
+#endif // SPIDERMONKEY_PROMISE
+
   JS_DestroyRuntime(mJSRuntime);
   mJSRuntime = nullptr;
   nsCycleCollector_forgetJSRuntime();
@@ -482,7 +488,7 @@ CycleCollectedJSRuntime::~CycleCollectedJSRuntime()
 }
 
 static void
-MozCrashErrorReporter(JSContext*, const char*, JSErrorReport*)
+MozCrashWarningReporter(JSContext*, const char*, JSErrorReport*)
 {
   MOZ_CRASH("Why is someone touching JSAPI without an AutoJSAPI?");
 }
@@ -505,7 +511,7 @@ CycleCollectedJSRuntime::Initialize(JSRuntime* aParentRuntime,
   }
 
   if (!JS_AddExtraGCRootsTracer(mJSRuntime, TraceBlackJS, this)) {
-    MOZ_CRASH();
+    MOZ_CRASH("JS_AddExtraGCRootsTracer failed");
   }
   JS_SetGrayGCRootsTracer(mJSRuntime, TraceGrayJS, this);
   JS_SetGCCallback(mJSRuntime, GCCallback, this);
@@ -527,11 +533,10 @@ CycleCollectedJSRuntime::Initialize(JSRuntime* aParentRuntime,
   JS::SetOutOfMemoryCallback(mJSRuntime, OutOfMemoryCallback, this);
   JS::SetLargeAllocationFailureCallback(mJSRuntime,
                                         LargeAllocationFailureCallback, this);
-  JS_SetContextCallback(mJSRuntime, ContextCallback, this);
   JS_SetDestroyZoneCallback(mJSRuntime, XPCStringConvert::FreeZoneCache);
   JS_SetSweepZoneCallback(mJSRuntime, XPCStringConvert::ClearZoneCache);
   JS::SetBuildIdOp(mJSRuntime, GetBuildId);
-  JS_SetErrorReporter(mJSRuntime, MozCrashErrorReporter);
+  JS::SetWarningReporter(mJSRuntime, MozCrashWarningReporter);
 
   static js::DOMCallbacks DOMcallbacks = {
     InstanceClassHasProtoAtDepth
@@ -541,6 +546,9 @@ CycleCollectedJSRuntime::Initialize(JSRuntime* aParentRuntime,
 
 #ifdef SPIDERMONKEY_PROMISE
   JS::SetEnqueuePromiseJobCallback(mJSRuntime, EnqueuePromiseJobCallback, this);
+  JS::SetPromiseRejectionTrackerCallback(mJSRuntime, PromiseRejectionTrackerCallback, this);
+  mUncaughtRejections.init(mJSRuntime, JS::GCVector<JSObject*, 0, js::SystemAllocPolicy>(js::SystemAllocPolicy()));
+  mConsumedRejections.init(mJSRuntime, JS::GCVector<JSObject*, 0, js::SystemAllocPolicy>(js::SystemAllocPolicy()));
 #endif // SPIDERMONKEY_PROMISE
 
   JS::dbg::SetDebuggerMallocSizeOf(mJSRuntime, moz_malloc_size_of);
@@ -906,23 +914,11 @@ CycleCollectedJSRuntime::LargeAllocationFailureCallback(void* aData)
   self->OnLargeAllocationFailure();
 }
 
-/* static */ bool
-CycleCollectedJSRuntime::ContextCallback(JSContext* aContext,
-                                         unsigned aOperation,
-                                         void* aData)
-{
-  CycleCollectedJSRuntime* self = static_cast<CycleCollectedJSRuntime*>(aData);
-
-  MOZ_ASSERT(JS_GetRuntime(aContext) == self->Runtime());
-
-  return self->CustomContextCallback(aContext, aOperation);
-}
-
 class PromiseJobRunnable final : public Runnable
 {
 public:
-  PromiseJobRunnable(JSContext* aCx, JS::HandleObject aCallback)
-    : mCallback(new PromiseJobCallback(aCx, aCallback, nullptr))
+  PromiseJobRunnable(JS::HandleObject aCallback, JS::HandleObject aAllocationSite)
+    : mCallback(new PromiseJobCallback(aCallback, aAllocationSite, nullptr))
   {
   }
 
@@ -949,16 +945,39 @@ private:
 bool
 CycleCollectedJSRuntime::EnqueuePromiseJobCallback(JSContext* aCx,
                                                    JS::HandleObject aJob,
+                                                   JS::HandleObject aAllocationSite,
                                                    void* aData)
 {
   CycleCollectedJSRuntime* self = static_cast<CycleCollectedJSRuntime*>(aData);
   MOZ_ASSERT(JS_GetRuntime(aCx) == self->Runtime());
   MOZ_ASSERT(Get() == self);
 
-  nsCOMPtr<nsIRunnable> runnable = new PromiseJobRunnable(aCx, aJob);
+  nsCOMPtr<nsIRunnable> runnable = new PromiseJobRunnable(aJob, aAllocationSite);
   self->DispatchToMicroTask(runnable);
   return true;
 }
+
+#ifdef SPIDERMONKEY_PROMISE
+/* static */
+void
+CycleCollectedJSRuntime::PromiseRejectionTrackerCallback(JSContext* aCx,
+                                                         JS::HandleObject aPromise,
+                                                         PromiseRejectionHandlingState state,
+                                                         void* aData)
+{
+#ifdef DEBUG
+  CycleCollectedJSRuntime* self = static_cast<CycleCollectedJSRuntime*>(aData);
+#endif // DEBUG
+  MOZ_ASSERT(JS_GetRuntime(aCx) == self->Runtime());
+  MOZ_ASSERT(Get() == self);
+
+  if (state == PromiseRejectionHandlingState::Unhandled) {
+    PromiseDebugging::AddUncaughtRejection(aPromise);
+  } else {
+    PromiseDebugging::AddConsumedRejection(aPromise);
+  }
+}
+#endif // SPIDERMONKEY_PROMISE
 
 struct JsGcTracer : public TraceCallbacks
 {
@@ -1175,39 +1194,9 @@ CycleCollectedJSRuntime::TraverseRoots(nsCycleCollectionNoteRootCallback& aCb)
   return NS_OK;
 }
 
-/*
- * Return true if there exists a JSContext with a default global whose current
- * inner is gray. The intent is to look for JS Object windows. We don't merge
- * system compartments, so we don't use them to trigger merging CCs.
- */
 bool
 CycleCollectedJSRuntime::UsefulToMergeZones() const
 {
-  MOZ_ASSERT(mJSRuntime);
-
-  if (!NS_IsMainThread()) {
-    return false;
-  }
-
-  JSContext* iter = nullptr;
-  JSContext* cx;
-  JSAutoRequest ar(nsContentUtils::GetSafeJSContext());
-  while ((cx = JS_ContextIterator(mJSRuntime, &iter))) {
-    // Skip anything without an nsIScriptContext.
-    nsIScriptContext* scx = GetScriptContextFromJSContext(cx);
-    JS::RootedObject obj(cx, scx ? scx->GetWindowProxyPreserveColor() : nullptr);
-    if (!obj) {
-      continue;
-    }
-    MOZ_ASSERT(js::IsWindowProxy(obj));
-    // Grab the global from the WindowProxy.
-    obj = js::ToWindowIfWindowProxy(obj);
-    MOZ_ASSERT(JS_IsGlobalObject(obj));
-    if (JS::ObjectIsMarkedGray(obj) &&
-        !js::IsSystemCompartment(js::GetObjectCompartment(obj))) {
-      return true;
-    }
-  }
   return false;
 }
 

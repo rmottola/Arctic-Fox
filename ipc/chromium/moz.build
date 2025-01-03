@@ -9,7 +9,6 @@ include(libevent_path_prefix + '/libeventcommon.mozbuild')
 
 UNIFIED_SOURCES += [
     'src/base/at_exit.cc',
-    'src/base/buffer.cc',
     'src/base/command_line.cc',
     'src/base/file_path.cc',
     'src/base/file_util.cc',
@@ -163,3 +162,6 @@ FINAL_LIBRARY = 'xul'
 DIRS += [
     'atomics',
 ]
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']

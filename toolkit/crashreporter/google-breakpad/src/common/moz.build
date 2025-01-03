@@ -54,6 +54,9 @@ if CONFIG['OS_TARGET'] == 'Android':
     SOURCES += [
         'android/breakpad_getcontext.S',
     ]
+    LOCAL_INCLUDES += [
+        '/toolkit/crashreporter/google-breakpad/src/common/android/include',
+    ]
 
 Library('breakpad_common_s')
 

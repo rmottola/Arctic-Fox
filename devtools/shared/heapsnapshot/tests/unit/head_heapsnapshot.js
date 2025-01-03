@@ -23,6 +23,7 @@ const Services = require("Services");
 const { censusReportToCensusTreeNode } = require("devtools/shared/heapsnapshot/census-tree-node");
 const CensusUtils = require("devtools/shared/heapsnapshot/CensusUtils");
 const DominatorTreeNode = require("devtools/shared/heapsnapshot/DominatorTreeNode");
+const { deduplicatePaths } = require("devtools/shared/heapsnapshot/shortest-paths");
 const { LabelAndShallowSizeVisitor } = DominatorTreeNode;
 
 
@@ -324,4 +325,102 @@ function assertLabelAndShallowSize(breakdown, givenDescription, expectedShallowS
   dumpn("Expected label: " + JSON.stringify(expectedLabel, null, 4));
   dumpn("Actual label: " + JSON.stringify(visitor.label(), null, 4));
   assertStructurallyEquivalent(visitor.label(), expectedLabel);
+}
+
+// Counter for mock DominatorTreeNode ids.
+let TEST_NODE_ID_COUNTER = 0;
+
+/**
+ * Create a mock DominatorTreeNode for testing, with sane defaults. Override any
+ * property by providing it on `opts`. Optionally pass child nodes as well.
+ *
+ * @param {Object} opts
+ * @param {Array<DominatorTreeNode>?} children
+ *
+ * @returns {DominatorTreeNode}
+ */
+function makeTestDominatorTreeNode(opts, children) {
+  const nodeId = TEST_NODE_ID_COUNTER++;
+
+  const node = Object.assign({
+    nodeId,
+    label: undefined,
+    shallowSize: 1,
+    retainedSize: (children || []).reduce((size, c) => size + c.retainedSize, 1),
+    parentId: undefined,
+    children,
+    moreChildrenAvailable: true,
+  }, opts);
+
+  if (children && children.length) {
+    children.map(c => c.parentId = node.nodeId);
+  }
+
+  return node;
+}
+
+/**
+ * Insert `newChildren` into the given dominator `tree` as specified by the
+ * `path` from the root to the node the `newChildren` should be inserted
+ * beneath. Assert that the resulting tree matches `expected`.
+ */
+function assertDominatorTreeNodeInsertion(tree, path, newChildren, moreChildrenAvailable, expected) {
+  dumpn("Inserting new children into a dominator tree:");
+  dumpn("Dominator tree: " + JSON.stringify(tree, null, 2));
+  dumpn("Path: " + JSON.stringify(path, null, 2));
+  dumpn("New children: " + JSON.stringify(newChildren, null, 2));
+  dumpn("Expected resulting tree: " + JSON.stringify(expected, null, 2));
+
+  const actual = DominatorTreeNode.insert(tree, path, newChildren, moreChildrenAvailable);
+  dumpn("Actual resulting tree: " + JSON.stringify(actual, null, 2));
+
+  assertStructurallyEquivalent(actual, expected);
+}
+
+function assertDeduplicatedPaths({ target, paths, expectedNodes, expectedEdges }) {
+  dumpn("Deduplicating paths:");
+  dumpn("target = " + target);
+  dumpn("paths = " + JSON.stringify(paths, null, 2));
+  dumpn("expectedNodes = " + expectedNodes);
+  dumpn("expectedEdges = " + JSON.stringify(expectedEdges, null, 2));
+
+  const { nodes, edges } = deduplicatePaths(target, paths);
+
+  dumpn("Actual nodes = " + nodes);
+  dumpn("Actual edges = " + JSON.stringify(edges, null, 2));
+
+  equal(nodes.length, expectedNodes.length,
+        "actual number of nodes is equal to the expected number of nodes");
+
+  equal(edges.length, expectedEdges.length,
+        "actual number of edges is equal to the expected number of edges");
+
+  const expectedNodeSet = new Set(expectedNodes);
+  const nodeSet = new Set(nodes);
+  ok(nodeSet.size === nodes.length,
+     "each returned node should be unique");
+
+  for (let node of nodes) {
+    ok(expectedNodeSet.has(node), `the ${node} node was expected`);
+  }
+
+  for (let expectedEdge of expectedEdges) {
+    let count = 0;
+    for (let edge of edges) {
+      if (edge.from === expectedEdge.from &&
+          edge.to === expectedEdge.to &&
+          edge.name === expectedEdge.name) {
+        count++;
+      }
+    }
+    equal(count, 1,
+          "should have exactly one matching edge for the expected edge = " + JSON.stringify(edge));
+  }
+}
+
+/**
+ * Create a mock path entry for the given predecessor and edge.
+ */
+function pathEntry(predecessor, edge) {
+  return { predecessor, edge };
 }

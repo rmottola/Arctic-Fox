@@ -436,11 +436,11 @@ HTMLTextAreaElement::GetAttributeChangeHint(const nsIAtom* aAttribute,
       nsGenericHTMLFormElementWithState::GetAttributeChangeHint(aAttribute, aModType);
   if (aAttribute == nsGkAtoms::rows ||
       aAttribute == nsGkAtoms::cols) {
-    NS_UpdateHint(retval, NS_STYLE_HINT_REFLOW);
+    retval |= NS_STYLE_HINT_REFLOW;
   } else if (aAttribute == nsGkAtoms::wrap) {
-    NS_UpdateHint(retval, nsChangeHint_ReconstructFrame);
+    retval |= nsChangeHint_ReconstructFrame;
   } else if (aAttribute == nsGkAtoms::placeholder) {
-    NS_UpdateHint(retval, NS_STYLE_HINT_FRAMECHANGE);
+    retval |= NS_STYLE_HINT_FRAMECHANGE;
   }
   return retval;
 }
@@ -1085,7 +1085,11 @@ HTMLTextAreaElement::SaveState()
                value,
                nsLinebreakConverter::eLinebreakPlatform,
                nsLinebreakConverter::eLinebreakContent);
-      NS_ASSERTION(NS_SUCCEEDED(rv), "Converting linebreaks failed!");
+
+      if (NS_FAILED(rv)) {
+        NS_ERROR("Converting linebreaks failed!");
+        return rv;
+      }
 
       nsCOMPtr<nsISupportsString> pState =
         do_CreateInstance(NS_SUPPORTS_STRING_CONTRACTID);

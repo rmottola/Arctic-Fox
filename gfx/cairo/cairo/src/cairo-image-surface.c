@@ -985,17 +985,19 @@ static struct {
 } cache[16];
 static int n_cached;
 
-#else /* !PIXMAN_HAS_ATOMIC_OPS */
+#else  /* !PIXMAN_HAS_ATOMIC_OPS */
 static pixman_image_t *
 _pixman_transparent_image (void)
 {
     return _pixman_image_for_solid (&_cairo_pattern_clear);
 }
+
 static pixman_image_t *
 _pixman_black_image (void)
 {
     return _pixman_image_for_solid (&_cairo_pattern_black);
 }
+
 static pixman_image_t *
 _pixman_white_image (void)
 {
@@ -1054,7 +1056,6 @@ _pixman_image_for_solid (const cairo_solid_pattern_t *pattern)
 	    return _pixman_white_image ();
 	}
     }
-
 
     CAIRO_MUTEX_LOCK (_cairo_image_solid_cache_mutex);
     for (i = 0; i < n_cached; i++) {
@@ -1126,31 +1127,31 @@ _pixman_image_for_gradient (const cairo_gradient_pattern_t *pattern,
     if (pattern->base.type == CAIRO_PATTERN_TYPE_LINEAR) {
 	cairo_linear_pattern_t *linear = (cairo_linear_pattern_t *) pattern;
 	pixman_point_fixed_t p1, p2;
-	cairo_fixed_t xdim, ydim;
-
-	xdim = fabs (linear->p2.x - linear->p1.x);
-	ydim = fabs (linear->p2.y - linear->p1.y);
+	double x0, y0, x1, y1, maxabs;
 
 	/*
 	 * Transform the matrix to avoid overflow when converting between
 	 * cairo_fixed_t and pixman_fixed_t (without incurring performance
 	 * loss when the transformation is unnecessary).
 	 *
-	 * XXX: Consider converting out-of-range co-ordinates and transforms.
 	 * Having a function to compute the required transformation to
 	 * "normalize" a given bounding box would be generally useful -
 	 * cf linear patterns, gradient patterns, surface patterns...
 	 */
-	if (_cairo_fixed_integer_ceil (xdim) > PIXMAN_MAX_INT ||
-	    _cairo_fixed_integer_ceil (ydim) > PIXMAN_MAX_INT)
+	x0 = _cairo_fixed_to_double (linear->p1.x);
+	y0 = _cairo_fixed_to_double (linear->p1.y);
+	x1 = _cairo_fixed_to_double (linear->p2.x);
+	y1 = _cairo_fixed_to_double (linear->p2.y);
+	cairo_matrix_transform_point (&matrix, &x0, &y0);
+	cairo_matrix_transform_point (&matrix, &x1, &y1);
+	maxabs = MAX (MAX (fabs (x0), fabs (x1)), MAX (fabs (y0), fabs (y1)));
+
+	if (maxabs > PIXMAN_MAX_INT)
 	{
 	    double sf;
 	    cairo_matrix_t scale;
 
-	    if (xdim > ydim)
-		sf = PIXMAN_MAX_INT / _cairo_fixed_to_double (xdim);
-	    else
-		sf = PIXMAN_MAX_INT / _cairo_fixed_to_double (ydim);
+	    sf = PIXMAN_MAX_INT / maxabs;
 
 	    p1.x = _cairo_fixed_16_16_from_double (_cairo_fixed_to_double (linear->p1.x) * sf);
 	    p1.y = _cairo_fixed_16_16_from_double (_cairo_fixed_to_double (linear->p1.y) * sf);

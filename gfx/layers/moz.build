@@ -115,6 +115,7 @@ EXPORTS.mozilla.layers += [
     'apz/util/InputAPZContext.h',
     'apz/util/ScrollInputMethods.h',
     'apz/util/ScrollLinkedEffectDetector.h',
+    'apz/util/TouchActionHelper.h',
     'AsyncCanvasRenderer.h',
     'AtomicRefCountedWithFinalize.h',
     'AxisPhysicsModel.h',
@@ -158,6 +159,7 @@ EXPORTS.mozilla.layers += [
     'ipc/CompositorBridgeChild.h',
     'ipc/CompositorBridgeParent.h',
     'ipc/CompositorLRU.h',
+    'ipc/CompositorThread.h',
     'ipc/FenceUtils.h',
     'ipc/GonkNativeHandle.h',
     'ipc/GonkNativeHandleUtils.h',
@@ -176,6 +178,7 @@ EXPORTS.mozilla.layers += [
     'ipc/SharedBufferManagerParent.h',
     'ipc/SharedPlanarYCbCrImage.h',
     'ipc/SharedRGBImage.h',
+    'ipc/TextureForwarder.h',
     'LayerMetricsWrapper.h',
     'LayersTypes.h',
     'opengl/CompositingRenderTargetOGL.h',
@@ -254,6 +257,11 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
         'ipc/ShadowLayerUtilsGralloc.cpp',
     ]
 
+if CONFIG['MOZ_ANDROID_APZ']:
+    UNIFIED_SOURCES += [
+        'apz/src/AndroidAPZ.cpp',
+    ]
+
 UNIFIED_SOURCES += [
     'apz/src/APZCTreeManager.cpp',
     'apz/src/AsyncPanZoomController.cpp',
@@ -278,6 +286,7 @@ UNIFIED_SOURCES += [
     'apz/util/DoubleTapToZoom.cpp',
     'apz/util/InputAPZContext.cpp',
     'apz/util/ScrollLinkedEffectDetector.cpp',
+    'apz/util/TouchActionHelper.cpp',
     'AsyncCanvasRenderer.cpp',
     'AxisPhysicsModel.cpp',
     'AxisPhysicsMSDModel.cpp',
@@ -338,6 +347,7 @@ UNIFIED_SOURCES += [
     'ipc/CompositorBridgeChild.cpp',
     'ipc/CompositorBridgeParent.cpp',
     'ipc/CompositorLRU.cpp',
+    'ipc/CompositorThread.cpp',
     'ipc/FenceUtils.cpp',
     'ipc/ImageBridgeChild.cpp',
     'ipc/ImageBridgeParent.cpp',
@@ -354,6 +364,7 @@ UNIFIED_SOURCES += [
     'ipc/SharedBufferManagerParent.cpp',
     'ipc/SharedPlanarYCbCrImage.cpp',
     'ipc/SharedRGBImage.cpp',
+    'ipc/TextureForwarder.cpp',
     'LayerScope.cpp',
     'LayersLogging.cpp',
     'LayerSorter.cpp',
@@ -419,6 +430,7 @@ LOCAL_INCLUDES += [
     '/docshell/base',  # for nsDocShell.h
     '/layout/base',    # for TouchManager.h
     '/layout/generic', # for nsTextFrame.h
+    '/media/libyuv/include', # for libyuv.h
 ]
 
 FINAL_LIBRARY = 'xul'
@@ -455,3 +467,6 @@ CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
 CXXFLAGS += CONFIG['TK_CFLAGS']
 
 LOCAL_INCLUDES += CONFIG['SKIA_INCLUDES']
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']

@@ -187,6 +187,9 @@ class ExclusiveContext : public ContextFriendFields,
     // Accessors for immutable runtime data.
     JSAtomState& names() { return *runtime_->commonNames; }
     StaticStrings& staticStrings() { return *runtime_->staticStrings; }
+    SharedImmutableStringsCache& sharedImmutableStrings() {
+        return runtime_->sharedImmutableStrings();
+    }
     bool isPermanentAtomsInitialized() { return !!runtime_->permanentAtoms; }
     FrozenAtomSet& permanentAtoms() { return *runtime_->permanentAtoms; }
     WellKnownSymbols& wellKnownSymbols() { return *runtime_->wellKnownSymbols; }
@@ -266,20 +269,20 @@ class ExclusiveContext : public ContextFriendFields,
     inline js::Handle<js::GlobalObject*> global() const;
 
     // Methods to access runtime data that must be protected by locks.
-    frontend::ParseMapPool& parseMapPool() {
-        return runtime_->parseMapPool();
+    frontend::ParseMapPool& parseMapPool(AutoLockForExclusiveAccess& lock) {
+        return runtime_->parseMapPool(lock);
     }
-    AtomSet& atoms() {
-        return runtime_->atoms();
+    AtomSet& atoms(js::AutoLockForExclusiveAccess& lock) {
+        return runtime_->atoms(lock);
     }
-    JSCompartment* atomsCompartment() {
-        return runtime_->atomsCompartment();
+    JSCompartment* atomsCompartment(js::AutoLockForExclusiveAccess& lock) {
+        return runtime_->atomsCompartment(lock);
     }
-    SymbolRegistry& symbolRegistry() {
-        return runtime_->symbolRegistry();
+    SymbolRegistry& symbolRegistry(js::AutoLockForExclusiveAccess& lock) {
+        return runtime_->symbolRegistry(lock);
     }
-    ScriptDataTable& scriptDataTable() {
-        return runtime_->scriptDataTable();
+    ScriptDataTable& scriptDataTable(AutoLockForExclusiveAccess& lock) {
+        return runtime_->scriptDataTable(lock);
     }
 
     // Methods specific to any HelperThread for the context.
@@ -287,6 +290,8 @@ class ExclusiveContext : public ContextFriendFields,
     void addPendingOverRecursed();
     void addPendingOutOfMemory();
 };
+
+void ReportOverRecursed(JSContext* cx, unsigned errorNumber);
 
 } /* namespace js */
 
@@ -309,15 +314,12 @@ struct JSContext : public js::ExclusiveContext,
     friend class js::ExclusiveContext;
     friend class JS::AutoSaveExceptionState;
     friend class js::jit::DebugModeOSRVolatileJitFrameIterator;
-    friend void js::ReportOverRecursed(JSContext*);
+    friend void js::ReportOverRecursed(JSContext*, unsigned errorNumber);
 
   private:
     /* Exception state -- the exception member is a GC root by definition. */
     bool                throwing;            /* is there a pending exception? */
     JS::PersistentRooted<JS::Value> unwrappedException_; /* most-recently-thrown exception */
-
-    /* Per-context options. */
-    JS::ContextOptions  options_;
 
     // True if the exception currently being thrown is by result of
     // ReportOverRecursed. See Debugger::slowPathOnExceptionUnwind.
@@ -339,21 +341,6 @@ struct JSContext : public js::ExclusiveContext,
     /* True if generating an error, to prevent runaway recursion. */
     bool                generatingError;
 
-    /* See JS_SaveFrameChain/JS_RestoreFrameChain. */
-  private:
-    struct SavedFrameChain {
-        SavedFrameChain(JSCompartment* comp, unsigned count)
-          : compartment(comp), enterCompartmentCount(count) {}
-        JSCompartment* compartment;
-        unsigned enterCompartmentCount;
-    };
-    typedef js::Vector<SavedFrameChain, 1, js::SystemAllocPolicy> SaveStack;
-    SaveStack           savedFrameChains_;
-  public:
-    bool saveFrameChain();
-    void restoreFrameChain();
-
-  public:
     /* State for object and array toSource conversion. */
     js::AutoCycleDetector::Set cycleDetectorSet;
 
@@ -372,14 +359,6 @@ struct JSContext : public js::ExclusiveContext,
      * Note: if this ever shows up in a profile, just add caching!
      */
     JSVersion findVersion() const;
-
-    const JS::ContextOptions& options() const {
-        return options_;
-    }
-
-    JS::ContextOptions& options() {
-        return options_;
-    }
 
     js::LifoAlloc& tempLifoAlloc() { return runtime()->tempLifoAlloc; }
 
@@ -613,10 +592,10 @@ PrintError(JSContext* cx, FILE* file, const char* message, JSErrorReport* report
            bool reportWarnings);
 
 /*
- * Send a JSErrorReport to the errorReporter callback.
+ * Send a JSErrorReport to the warningReporter callback.
  */
 void
-CallErrorReporter(JSContext* cx, const char* message, JSErrorReport* report);
+CallWarningReporter(JSContext* cx, const char* message, JSErrorReport* report);
 
 extern bool
 ReportIsNotDefined(JSContext* cx, HandlePropertyName name);

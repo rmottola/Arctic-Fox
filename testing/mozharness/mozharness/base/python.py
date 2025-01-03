@@ -24,6 +24,23 @@ from mozharness.base.errors import VirtualenvErrorList
 from mozharness.base.log import WARNING, FATAL
 from mozharness.mozilla.proxxy import Proxxy
 
+def get_tlsv1_post():
+    # Monkeypatch to work around SSL errors in non-bleeding-edge Python.
+    # Taken from https://lukasa.co.uk/2013/01/Choosing_SSL_Version_In_Requests/
+    import requests
+    from requests.packages.urllib3.poolmanager import PoolManager
+    import ssl
+
+    class TLSV1Adapter(requests.adapters.HTTPAdapter):
+        def init_poolmanager(self, connections, maxsize, block=False):
+            self.poolmanager = PoolManager(num_pools=connections,
+                                           maxsize=maxsize,
+                                           block=block,
+                                           ssl_version=ssl.PROTOCOL_TLSv1)
+    s = requests.Session()
+    s.mount('https://', TLSV1Adapter())
+    return s.post
+
 # Virtualenv {{{1
 virtualenv_config_options = [
     [["--venv-path", "--virtualenv-path"], {
@@ -564,6 +581,7 @@ class InfluxRecordingMixin(object):
         self.recording = False
         self.post = None
         self.posturl = None
+        self.build_metrics_summary = None
         self.res_props = self.config.get('build_resources_path') % self.query_abs_dirs()
         self.info("build_resources.json path: %s" % self.res_props)
         if self.res_props:
@@ -574,20 +592,27 @@ class InfluxRecordingMixin(object):
             if site_packages_path not in sys.path:
                 sys.path.append(site_packages_path)
 
-            import requests
-            self.post = requests.post
+            self.post = get_tlsv1_post()
 
             auth = os.path.join(os.getcwd(), self.config['influx_credentials_file'])
+            if not os.path.exists(auth):
+                self.warning("Unable to start influxdb recording: %s not found" % (auth,))
+                return
             credentials = {}
             execfile(auth, credentials)
-            self.posturl = credentials['influxdb_credentials']
+            if 'influxdb_credentials' in credentials:
+                self.posturl = credentials['influxdb_credentials']
+                self.recording = True
+            else:
+                self.warning("Unable to start influxdb recording: no credentials")
+                return
 
-            self.recording = True
         except Exception:
             # The exact reason for failing to start stats doesn't really matter.
             # If anything fails, we just won't record stats for this job.
             self.warning("Unable to start influxdb recording: %s" %
                          traceback.format_exc())
+            return
 
     @PreScriptAction
     def influxdb_recording_pre_action(self, action):
@@ -703,6 +728,7 @@ class InfluxRecordingMixin(object):
                     "cpu_percent",
                 ],
             }
+
             # The io and cpu_times fields aren't static - they may vary based
             # on the specific platform being measured. Mach records the field
             # names, which we use as the column names here.
@@ -711,13 +737,27 @@ class InfluxRecordingMixin(object):
             iolen = len(resources['io_fields'])
             cpulen = len(resources['cpu_times_fields'])
 
+            if 'duration' in resources:
+                self.build_metrics_summary = {
+                    'name': 'build times',
+                    'value': resources['duration'],
+                    'subtests': [],
+                }
+
             # The top-level data has the overall resource usage, which we record
-            # under the name 'TOTAL' to separate it from the individual tiers.
+            # under the name 'TOTAL' to separate it from the individual phases.
             data['points'].append(self._get_resource_usage(resources, 'TOTAL', iolen, cpulen))
 
-            # Each tier also has the same resource stats as the top-level.
-            for tier in resources['tiers']:
-                data['points'].append(self._get_resource_usage(tier, tier['name'], iolen, cpulen))
+            # Each phases also has the same resource stats as the top-level.
+            for phase in resources['phases']:
+                data['points'].append(self._get_resource_usage(phase, phase['name'], iolen, cpulen))
+                if 'duration' not in phase:
+                    self.build_metrics_summary = None
+                elif self.build_metrics_summary:
+                    self.build_metrics_summary['subtests'].append({
+                        'name': phase['name'],
+                        'value': phase['duration'],
+                    })
 
             self.record_influx_stat([data])
 

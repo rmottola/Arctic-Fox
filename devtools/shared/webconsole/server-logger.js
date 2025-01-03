@@ -6,7 +6,7 @@
 
 "use strict";
 
-const {Cu, Ci} = require("chrome");
+const {Ci} = require("chrome");
 const {Class} = require("sdk/core/heritage");
 const Services = require("Services");
 
@@ -17,9 +17,9 @@ loader.lazyGetter(this, "NetworkHelper", () => require("devtools/shared/webconso
 
 // Helper tracer. Should be generic sharable by other modules (bug 1171927)
 const trace = {
-  log: function(...args) {
+  log: function () {
   }
-}
+};
 
 // Constants
 const makeInfallible = DevToolsUtils.makeInfallible;
@@ -36,7 +36,7 @@ const acceptableHeaders = ["x-chromelogger-data"];
  * A listeners for "http-on-examine-response" is registered when
  * the listener starts and removed when destroy is executed.
  */
-var ServerLoggingListener = Class({
+let ServerLoggingListener = Class({
   /**
    * Initialization of the listener. The main step during the initialization
    * process is registering a listener for "http-on-examine-response" event.
@@ -47,7 +47,7 @@ var ServerLoggingListener = Class({
    * @param {Object} owner
    *        The {@WebConsoleActor} instance
    */
-  initialize: function(win, owner) {
+  initialize: function (win, owner) {
     trace.log("ServerLoggingListener.initialize; ", owner.actorID,
       ", child process: ", DebuggerServer.isInChildProcess);
 
@@ -64,7 +64,7 @@ var ServerLoggingListener = Class({
   /**
    * The destroy is called by the parent WebConsoleActor actor.
    */
-  destroy: function() {
+  destroy: function () {
     trace.log("ServerLoggingListener.destroy; ", this.owner.actorID,
       ", child process: ", DebuggerServer.isInChildProcess);
 
@@ -75,7 +75,7 @@ var ServerLoggingListener = Class({
    * The main responsibility of this method is registering a listener for
    * "http-on-examine-response" events.
    */
-  attach: makeInfallible(function() {
+  attach: makeInfallible(function () {
     trace.log("ServerLoggingListener.attach; child process: ",
       DebuggerServer.isInChildProcess);
 
@@ -94,7 +94,7 @@ var ServerLoggingListener = Class({
   /**
    * Remove the "http-on-examine-response" listener.
    */
-  detach: makeInfallible(function() {
+  detach: makeInfallible(function () {
     trace.log("ServerLoggingListener.detach; ", this.owner.actorID);
 
     if (DebuggerServer.isInChildProcess) {
@@ -107,7 +107,7 @@ var ServerLoggingListener = Class({
 
   // Parent Child Relationship
 
-  attachParentProcess: function() {
+  attachParentProcess: function () {
     trace.log("ServerLoggingListener.attachParentProcess;");
 
     this.owner.conn.setupInParent({
@@ -130,7 +130,7 @@ var ServerLoggingListener = Class({
     });
   },
 
-  detachParentProcess: makeInfallible(function() {
+  detachParentProcess: makeInfallible(function () {
     trace.log("ServerLoggingListener.detachParentProcess;");
 
     let mm = this.owner.conn.parentMessageManager;
@@ -143,7 +143,7 @@ var ServerLoggingListener = Class({
     removeMessageListener("debug:server-logger", this.onParentMessage);
   }),
 
-  onParentMessage: makeInfallible(function(msg) {
+  onParentMessage: makeInfallible(function (msg) {
     if (!msg.data) {
       return;
     }
@@ -162,7 +162,7 @@ var ServerLoggingListener = Class({
 
   // HTTP Observer
 
-  onExamineHeaders: function(event) {
+  onExamineHeaders: function (event) {
     let headers = event.data.headers;
 
     trace.log("ServerLoggingListener.onExamineHeaders;", headers);
@@ -188,7 +188,7 @@ var ServerLoggingListener = Class({
     }
   },
 
-  onExamineResponse: makeInfallible(function(subject) {
+  onExamineResponse: makeInfallible(function (subject) {
     let httpChannel = subject.QueryInterface(Ci.nsIHttpChannel);
 
     trace.log("ServerLoggingListener.onExamineResponse; ", httpChannel.name,
@@ -225,7 +225,7 @@ var ServerLoggingListener = Class({
    * @return boolean
    *         True if the network request should be logged, false otherwise.
    */
-  _matchRequest: function(channel) {
+  _matchRequest: function (channel) {
     trace.log("_matchRequest ", this.window, ", ", this.topFrame);
 
     // Log everything if the window is null (it's null in the browser context)
@@ -265,14 +265,14 @@ var ServerLoggingListener = Class({
    * Learn more about the data structure:
    * https://craig.is/writing/chrome-logger/techspecs
    */
-  parse: function(header, value) {
+  parse: function (header, value) {
     let data;
 
     try {
       let result = decodeURIComponent(escape(atob(value)));
       data = JSON.parse(result);
     } catch (err) {
-      Cu.reportError("Failed to parse HTTP log data! " + err);
+      console.error("Failed to parse HTTP log data! " + err);
       return null;
     }
 
@@ -322,7 +322,7 @@ var ServerLoggingListener = Class({
     return parsedMessage;
   },
 
-  parseBacktrace: function(backtrace) {
+  parseBacktrace: function (backtrace) {
     if (!backtrace) {
       return null;
     }
@@ -338,7 +338,7 @@ var ServerLoggingListener = Class({
     };
   },
 
-  getColumnMap: function(data) {
+  getColumnMap: function (data) {
     let columnMap = new Map();
     let columnName;
 
@@ -350,7 +350,7 @@ var ServerLoggingListener = Class({
     return columnMap;
   },
 
-  sendMessage: function(msg) {
+  sendMessage: function (msg) {
     trace.log("ServerLoggingListener.sendMessage; message", msg);
 
     let formatted = format(msg);
@@ -403,51 +403,25 @@ var ServerLoggingListener = Class({
  */
 function format(msg) {
   if (!msg.logs || !msg.logs[0]) {
-    return;
+    return null;
   }
 
   // Initialize the styles array (used for the "%c" specifier).
   msg.styles = [];
 
   // Remove and get the first log (in which the specifiers are).
-  let firstString = msg.logs.shift();
-  // Contains all the strings split by the specifiers
-  // (i.e. "a %f b" => ["a ", " b"]).
-  let splitLog = [];
-  // All the specifiers present in the first string.
-  let specifiers = [];
-  let specifierIndex = -1;
-  let splitLogRegExp = /(.*?)(%[oOcsdif]|$)/g;
-  let splitLogRegExpRes;
-
-  // Get the strings before the specifiers (or the last chunk before the end
-  // of the string).
-  while ((splitLogRegExpRes = splitLogRegExp.exec(firstString)) !== null) {
-    let [_, log, specifier] = splitLogRegExpRes;
-
-    // We can add an empty string if there is a specifier after (which
-    // means we haven't reached the end of the string). This empty string is
-    // necessary when rebuilding the logs after the formatting (we should ensure
-    // to alternate a log + a specifier to replace to make this loop work).
-    //
-    // Example: "%ctest" => first iteration: log = "", specifier = "%c".
-    //                   => second iteration: log = "test", specifier = "".
-    if (log || specifier) {
-      splitLog.push(log);
-    }
-
-    // Break now if there is no specifier anymore
-    // (means that we have reached the end of the string).
-    if (!specifier) {
-      break;
-    }
-
-    specifiers.push(specifier);
+  // Note that the first string doesn't have to be specified.
+  // An example of a log on the server side:
+  // ChromePhp::log("server info: ", $_SERVER);
+  // ChromePhp::log($_SERVER);
+  let firstString = "";
+  if (typeof msg.logs[0] == "string") {
+    firstString = msg.logs.shift();
   }
 
-  // This array represents the string of the log, in which the specifiers
-  // are replaced. It alternates strings and objects (%o;%O).
-  let rebuiltLogArray = [];
+  // All the specifiers present in the first string.
+  let splitLogRegExp = /(.*?)(%[oOcsdif]|$)/g;
+  let splitLogRegExpRes;
   let concatString = "";
   let pushConcatString = () => {
     if (concatString) {
@@ -456,26 +430,39 @@ function format(msg) {
     concatString = "";
   };
 
-  // Merge the split first string and the values associated to the specifiers.
-  splitLog.forEach((string, index) => {
-    // Concatenate the string in any case.
-    concatString += string;
-    if (specifiers.length === 0) {
-      return;
+  // This array represents the string of the log, in which the specifiers
+  // are replaced. It alternates strings and objects (%o;%O).
+  let rebuiltLogArray = [];
+
+  // Get the strings before the specifiers (or the last chunk before the end
+  // of the string).
+  while ((splitLogRegExpRes = splitLogRegExp.exec(firstString)) !== null) {
+    let [, log, specifier] = splitLogRegExpRes;
+
+    // We may start with a specifier or add consecutively several ones. In such
+    // a case, there is no log.
+    // Example: "%ctest" => first iteration: log = "", specifier = "%c".
+    //                   => second iteration: log = "test", specifier = "".
+    if (log) {
+      concatString += log;
+    }
+
+    // Break now if there is no specifier anymore
+    // (means that we have reached the end of the string).
+    if (!specifier) {
+      break;
     }
 
     let argument = msg.logs.shift();
-    switch (specifiers[index]) {
+    switch (specifier) {
       case "%i":
       case "%d":
         // Parse into integer.
-        argument |= 0;
-        concatString += argument;
+        concatString += (argument | 0);
         break;
       case "%f":
         // Parse into float.
-        argument =+ argument;
-        concatString += argument;
+        concatString += (+argument);
         break;
       case "%o":
       case "%O":
@@ -489,16 +476,12 @@ function format(msg) {
         break;
       case "%c":
         pushConcatString();
-        for (let j = msg.styles.length; j < rebuiltLogArray.length; j++) {
-          msg.styles.push(null);
-        }
-        msg.styles.push(argument);
+        let fillNullArrayLength = rebuiltLogArray.length - msg.styles.length;
+        let fillNullArray = Array(fillNullArrayLength).fill(null);
+        msg.styles.push(...fillNullArray, argument);
         break;
-      default:
-        // Should never happen.
-        return;
     }
-  });
+  }
 
   if (concatString) {
     rebuiltLogArray.push(concatString);
@@ -506,7 +489,7 @@ function format(msg) {
 
   // Append the rest of arguments that don't have corresponding
   // specifiers to the message logs.
-  msg.logs = rebuiltLogArray.concat(msg.logs);
+  msg.logs.unshift(...rebuiltLogArray);
 
   // Remove special ___class_name property that isn't supported
   // by the current implementation. This property represents object class

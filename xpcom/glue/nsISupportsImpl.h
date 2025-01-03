@@ -181,9 +181,11 @@ do {                                     \
 
 /* nsCOMPtr.h allows these macros to be defined by clients
  * These logging functions require dynamic_cast<void*>, so they don't
- * do anything useful if we don't have dynamic_cast<void*>. */
+ * do anything useful if we don't have dynamic_cast<void*>.
+ * Note: The explicit comparison to nullptr is needed to avoid warnings
+ *       when _p is a nullptr itself. */
 #define NSCAP_LOG_ASSIGNMENT(_c, _p)                                \
-  if (_p)                                                           \
+  if (_p != nullptr)                                                \
     NS_LogCOMPtrAddRef((_c),static_cast<nsISupports*>(_p))
 
 #define NSCAP_LOG_RELEASE(_c, _p)                                   \
@@ -375,6 +377,7 @@ public:                                                                       \
                             void** aInstancePtr) override;                    \
   NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;                 \
   NS_IMETHOD_(MozExternalRefCountType) Release(void) override;                \
+  typedef mozilla::FalseType HasThreadSafeRefCnt;                             \
 protected:                                                                    \
   nsAutoRefCnt mRefCnt;                                                       \
   NS_DECL_OWNINGTHREAD                                                        \
@@ -386,6 +389,7 @@ public:                                                                       \
                             void** aInstancePtr) override;                    \
   NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;                 \
   NS_IMETHOD_(MozExternalRefCountType) Release(void) override;                \
+  typedef mozilla::TrueType HasThreadSafeRefCnt;                              \
 protected:                                                                    \
   ::mozilla::ThreadSafeAutoRefCnt mRefCnt;                                    \
   NS_DECL_OWNINGTHREAD                                                        \
@@ -398,6 +402,7 @@ public:                                                                       \
   NS_IMETHOD_(MozExternalRefCountType) AddRef(void) override;                 \
   NS_IMETHOD_(MozExternalRefCountType) Release(void) override;                \
   NS_IMETHOD_(void) DeleteCycleCollectable(void);                             \
+  typedef mozilla::FalseType HasThreadSafeRefCnt;                             \
 protected:                                                                    \
   nsCycleCollectingAutoRefCnt mRefCnt;                                        \
   NS_DECL_OWNINGTHREAD                                                        \
@@ -475,6 +480,7 @@ public:                                                                       \
   NS_METHOD_(MozExternalRefCountType) Release(void) {                         \
     NS_IMPL_CC_NATIVE_RELEASE_BODY(_class)                                    \
   }                                                                           \
+  typedef mozilla::FalseType HasThreadSafeRefCnt;                             \
 protected:                                                                    \
   nsCycleCollectingAutoRefCnt mRefCnt;                                        \
   NS_DECL_OWNINGTHREAD                                                        \
@@ -513,6 +519,7 @@ public:                                                                       \
     }                                                                         \
     return mRefCnt;                                                           \
   }                                                                           \
+  typedef mozilla::FalseType HasThreadSafeRefCnt;                             \
 protected:                                                                    \
   nsAutoRefCnt mRefCnt;                                                       \
   NS_DECL_OWNINGTHREAD                                                        \
@@ -537,6 +544,7 @@ public:                                                                       \
     }                                                                         \
     return count;                                                             \
   }                                                                           \
+  typedef mozilla::TrueType HasThreadSafeRefCnt;                              \
 protected:                                                                    \
   ::mozilla::ThreadSafeAutoRefCnt mRefCnt;                                    \
 public:

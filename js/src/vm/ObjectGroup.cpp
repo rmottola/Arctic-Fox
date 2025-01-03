@@ -260,7 +260,7 @@ JSObject::shouldSplicePrototype(JSContext* cx)
      * object if their __proto__ had previously been set to null, as this
      * will change the prototype for all other objects with the same type.
      */
-    if (getProto() != nullptr)
+    if (staticPrototype() != nullptr)
         return false;
     return isSingleton();
 }
@@ -327,7 +327,7 @@ JSObject::makeLazyGroup(JSContext* cx, HandleObject obj)
     if (obj->is<ArrayObject>() && obj->as<ArrayObject>().length() > INT32_MAX)
         initialFlags |= OBJECT_FLAG_LENGTH_OVERFLOW;
 
-    Rooted<TaggedProto> proto(cx, obj->getTaggedProto());
+    Rooted<TaggedProto> proto(cx, obj->taggedProto());
     ObjectGroup* group = ObjectGroupCompartment::makeGroup(cx, obj->getClass(), proto,
                                                            initialFlags);
     if (!group)
@@ -495,7 +495,7 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
     }
 
     ObjectGroupFlags initialFlags = 0;
-    if (proto.isLazy() || (proto.isObject() && proto.toObject()->isNewGroupUnknown()))
+    if (proto.isDynamic() || (proto.isObject() && proto.toObject()->isNewGroupUnknown()))
         initialFlags = OBJECT_FLAG_DYNAMIC_MASK;
 
     Rooted<TaggedProto> protoRoot(cx, proto);
@@ -1215,7 +1215,7 @@ ObjectGroup::newPlainObject(ExclusiveContext* cx, IdValuePair* properties, size_
         // default (which will have unknown properties) so that the group we
         // just created will be collected by the GC.
         if (obj->slotSpan() != nproperties) {
-            ObjectGroup* group = defaultNewGroup(cx, obj->getClass(), obj->getTaggedProto());
+            ObjectGroup* group = defaultNewGroup(cx, obj->getClass(), obj->taggedProto());
             if (!group)
                 return nullptr;
             obj->setGroup(group);
@@ -1349,6 +1349,13 @@ struct ObjectGroupCompartment::AllocationSiteKey : public DefaultHasher<Allocati
         MOZ_ASSERT(offset_ < OFFSET_LIMIT);
     }
 
+    AllocationSiteKey(const AllocationSiteKey& key)
+      : script(key.script),
+        offset(key.offset),
+        kind(key.kind),
+        proto(key.proto)
+    { }
+
     AllocationSiteKey(AllocationSiteKey&& key)
       : script(mozilla::Move(key.script)),
         offset(key.offset),
@@ -1356,12 +1363,12 @@ struct ObjectGroupCompartment::AllocationSiteKey : public DefaultHasher<Allocati
         proto(mozilla::Move(key.proto))
     { }
 
-    AllocationSiteKey(const AllocationSiteKey& key)
-      : script(key.script),
-        offset(key.offset),
-        kind(key.kind),
-        proto(key.proto)
-    { }
+    void operator=(AllocationSiteKey&& key) {
+        script = mozilla::Move(key.script);
+        offset = key.offset;
+        kind = key.kind;
+        proto = mozilla::Move(key.proto);
+    }
 
     static inline uint32_t hash(AllocationSiteKey key) {
         return uint32_t(size_t(key.script->offsetToPC(key.offset)) ^ key.kind ^
@@ -1386,6 +1393,18 @@ struct ObjectGroupCompartment::AllocationSiteKey : public DefaultHasher<Allocati
     }
 };
 
+class ObjectGroupCompartment::AllocationSiteTable
+  : public JS::WeakCache<js::GCHashMap<AllocationSiteKey, ReadBarrieredObjectGroup,
+                                       AllocationSiteKey, SystemAllocPolicy>>
+{
+    using Table = js::GCHashMap<AllocationSiteKey, ReadBarrieredObjectGroup,
+                                AllocationSiteKey, SystemAllocPolicy>;
+    using Base = JS::WeakCache<Table>;
+
+  public:
+    explicit AllocationSiteTable(Zone* zone) : Base(zone, Table()) {}
+};
+
 /* static */ ObjectGroup*
 ObjectGroup::allocationSiteGroup(JSContext* cx, JSScript* scriptArg, jsbytecode* pc,
                                  JSProtoKey kind, HandleObject protoArg /* = nullptr */)
@@ -1405,7 +1424,7 @@ ObjectGroup::allocationSiteGroup(JSContext* cx, JSScript* scriptArg, jsbytecode*
         cx->compartment()->objectGroups.allocationSiteTable;
 
     if (!table) {
-        table = cx->new_<ObjectGroupCompartment::AllocationSiteTable>();
+        table = cx->new_<ObjectGroupCompartment::AllocationSiteTable>(cx->zone());
         if (!table || !table->init()) {
             ReportOutOfMemory(cx);
             js_delete(table);
@@ -1476,7 +1495,7 @@ ObjectGroupCompartment::replaceAllocationSiteGroup(JSScript* script, jsbytecode*
 
     AllocationSiteTable::Ptr p = allocationSiteTable->lookup(key);
     MOZ_RELEASE_ASSERT(p);
-    allocationSiteTable->remove(p);
+    allocationSiteTable->get().remove(p);
     {
         AutoEnterOOMUnsafeRegion oomUnsafe;
         if (!allocationSiteTable->putNew(key, group))
@@ -1737,8 +1756,6 @@ ObjectGroupCompartment::sweep(FreeOp* fop)
         arrayObjectTable->sweep();
     if (plainObjectTable)
         plainObjectTable->sweep();
-    if (allocationSiteTable)
-        allocationSiteTable->sweep();
 }
 
 void

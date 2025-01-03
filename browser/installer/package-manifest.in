@@ -50,7 +50,7 @@
 @RESPATH@/browser/defaults/profile/localstore.rdf
 @RESPATH@/browser/defaults/profile/mimeTypes.rdf
 @RESPATH@/dictionaries/*
-#if defined(XP_WIN)
+#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
 @RESPATH@/fonts/*
 #endif
 @RESPATH@/hyphenation/*
@@ -504,10 +504,8 @@
 @RESPATH@/browser/components/SelfSupportService.manifest
 @RESPATH@/browser/components/SelfSupportService.js
 #endif
-#ifdef MOZ_SERVICES_SYNC
 @RESPATH@/components/SyncComponents.manifest
 @RESPATH@/components/Weave.js
-#endif
 @RESPATH@/components/CaptivePortalDetectComponents.manifest
 @RESPATH@/components/captivedetect.js
 @RESPATH@/components/servicesComponents.manifest
@@ -551,13 +549,6 @@
 
 @RESPATH@/components/TVSimulatorService.js
 @RESPATH@/components/TVSimulatorService.manifest
-
-#ifndef RELEASE_BUILD
-@RESPATH@/components/InterAppComm.manifest
-@RESPATH@/components/InterAppCommService.js
-@RESPATH@/components/InterAppConnection.js
-@RESPATH@/components/InterAppMessagePort.js
-#endif
 
 #ifdef MOZ_ACTIVITIES
 @RESPATH@/components/SystemMessageCache.js
@@ -715,9 +706,7 @@
 #ifdef MOZ_SERVICES_NOTIFICATIONS
 @RESPATH@/defaults/pref/services-notifications.js
 #endif
-#ifdef MOZ_SERVICES_SYNC
 @RESPATH@/defaults/pref/services-sync.js
-#endif
 
 ; [Layout Engine Resources]
 ; Style Sheets, Graphics and other Resources used by the layout engine.
@@ -798,7 +787,6 @@
 ; For process sandboxing
 #if defined(MOZ_SANDBOX)
 #if defined(XP_WIN)
-@BINPATH@/@DLL_PREFIX@sandboxbroker@DLL_SUFFIX@
 #if defined(WOW_HELPER)
 @BINPATH@/wow_helper.exe
 #endif

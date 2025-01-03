@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -8,6 +10,7 @@
 #include "BackgroundChildImpl.h"
 #include "BackgroundParentImpl.h"
 #include "base/process_util.h"
+#include "base/task.h"
 #include "FileDescriptor.h"
 #include "GeckoProfiler.h"
 #include "InputStreamUtils.h"
@@ -433,9 +436,8 @@ private:
           ChildImpl* actor;
           threadLocalInfo->mActor.forget(&actor);
 
-          nsCOMPtr<nsIRunnable> releaser =
-            NS_NewNonOwningRunnableMethod(actor, &ChildImpl::Release);
-          MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(releaser));
+          MOZ_ALWAYS_SUCCEEDS(
+            NS_DispatchToMainThread(NewNonOwningRunnableMethod(actor, &ChildImpl::Release)));
         }
       }
       delete threadLocalInfo;
@@ -1003,11 +1005,8 @@ ParentImpl::GetContentParent(PBackgroundParent* aBackgroundActor)
     // it for us. This is safe since we are guaranteed that our AddRef runnable
     // will run before the reference we hand out can be released, and the
     // ContentParent can't die as long as the existing reference is maintained.
-    nsCOMPtr<nsIRunnable> runnable =
-      NS_NewNonOwningRunnableMethod(actor->mContent, &ContentParent::AddRef);
-    MOZ_ASSERT(runnable);
-
-    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(runnable));
+    MOZ_ALWAYS_SUCCEEDS(
+      NS_DispatchToMainThread(NewNonOwningRunnableMethod(actor->mContent, &ContentParent::AddRef)));
   }
 
   return already_AddRefed<ContentParent>(actor->mContent.get());
@@ -1261,7 +1260,7 @@ ParentImpl::ShutdownTimerCallback(nsITimer* aTimer, void* aClosure)
   nsCOMPtr<nsIRunnable> forceCloseRunnable =
     new ForceCloseBackgroundActorsRunnable(closure->mLiveActors);
   MOZ_ALWAYS_SUCCEEDS(closure->mThread->Dispatch(forceCloseRunnable,
-						 NS_DISPATCH_NORMAL));
+                                                 NS_DISPATCH_NORMAL));
 }
 
 void
@@ -1271,11 +1270,8 @@ ParentImpl::Destroy()
 
   AssertIsInMainProcess();
 
-  nsCOMPtr<nsIRunnable> destroyRunnable =
-    NS_NewNonOwningRunnableMethod(this, &ParentImpl::MainThreadActorDestroy);
-  MOZ_ASSERT(destroyRunnable);
-
-  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(destroyRunnable));
+  MOZ_ALWAYS_SUCCEEDS(
+    NS_DispatchToMainThread(NewNonOwningRunnableMethod(this, &ParentImpl::MainThreadActorDestroy)));
 }
 
 void
@@ -1363,11 +1359,9 @@ ParentImpl::ActorDestroy(ActorDestroyReason aWhy)
   // IPDL is about to call MessageChannel::Clear() on this thread! To avoid
   // racing with the main thread we must ensure that the MessageChannel lives
   // long enough to be cleared in this call stack.
-  nsCOMPtr<nsIRunnable> destroyRunnable =
-    NS_NewNonOwningRunnableMethod(this, &ParentImpl::Destroy);
-  MOZ_ASSERT(destroyRunnable);
 
-  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToCurrentThread(destroyRunnable));
+  MOZ_ALWAYS_SUCCEEDS(
+    NS_DispatchToCurrentThread(NewNonOwningRunnableMethod(this, &ParentImpl::Destroy)));
 }
 
 NS_IMPL_ISUPPORTS(ParentImpl::ShutdownObserver, nsIObserver)

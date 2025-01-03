@@ -14,7 +14,6 @@
 #include "mozilla/dom/Element.h"
 #include "mozilla/mozalloc.h"
 #include "nsAString.h"
-#include "nsAutoPtr.h"
 #include "nsCOMPtr.h"
 #include "nsColor.h"
 #include "nsComputedDOMStyle.h"
@@ -522,7 +521,7 @@ nsHTMLCSSUtils::GetCSSInlinePropertyBase(nsINode* aNode, nsIAtom* aProperty,
   }
   nsCSSProperty prop =
     nsCSSProps::LookupProperty(nsDependentAtomString(aProperty),
-                               nsCSSProps::eEnabledForAllContent);
+                               CSSEnabledState::eForAllContent);
   MOZ_ASSERT(prop != eCSSProperty_UNKNOWN);
   decl->GetValue(prop, aValue);
 
@@ -1106,7 +1105,7 @@ nsHTMLCSSUtils::IsCSSEquivalentToHTMLInlineStyleSet(nsIDOMNode *aNode,
         nsAutoString subStr;
         htmlValueString.Right(subStr, htmlValueString.Length() - 1);
         if (NS_ColorNameToRGB(htmlValueString, &rgba) ||
-            NS_HexToRGB(subStr, &rgba)) {
+            NS_HexToRGBA(subStr, nsHexColorType::NoAlpha, &rgba)) {
           nsAutoString htmlColor, tmpStr;
 
           if (NS_GET_A(rgba) != 255) {

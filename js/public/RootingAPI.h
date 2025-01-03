@@ -584,18 +584,31 @@ struct JS_PUBLIC_API(MovableCellHasher<JS::Heap<T>>)
 
 namespace js {
 
+// After switching to MSVC2015, this can be eliminated and replaced with
+// alignas(n) everywhere.
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+# define JS_ALIGNAS(n) __declspec(align(n))
+#else
+# define JS_ALIGNAS(n) alignas(n)
+#endif
+
+// The alignment must be set because the Rooted and PersistentRooted ptr fields
+// may be accessed through reinterpret_cast<Rooted<ConcreteTraceable>*>, and
+// the compiler may choose a different alignment for the ptr field when it
+// knows the actual type stored in DispatchWrapper<T>.
+//
+// It would make more sense to align only those specific fields of type
+// DispatchWrapper, rather than DispatchWrapper itself, but that causes MSVC to
+// fail when Rooted is used in an IsConvertible test.
 template <typename T>
-class DispatchWrapper
+class JS_ALIGNAS(8) DispatchWrapper
 {
     static_assert(JS::MapTypeToRootKind<T>::kind == JS::RootKind::Traceable,
                   "DispatchWrapper is intended only for usage with a Traceable");
 
     using TraceFn = void (*)(JSTracer*, T*, const char*);
     TraceFn tracer;
-#if JS_BITS_PER_WORD == 32
-    uint32_t padding; // Ensure the storage fields have CellSize alignment.
-#endif
-    T storage;
+    JS_ALIGNAS(gc::CellSize) T storage;
 
   public:
     template <typename U>
@@ -619,6 +632,8 @@ class DispatchWrapper
     }
 };
 
+#undef JS_ALIGNAS
+
 } /* namespace js */
 
 namespace JS {
@@ -634,24 +649,25 @@ namespace JS {
 template <typename T>
 class MOZ_RAII Rooted : public js::RootedBase<T>
 {
-    /* Note: CX is a subclass of either ContextFriendFields or PerThreadDataFriendFields. */
-    void registerWithRootLists(js::RootLists& roots) {
-        this->stack = &roots.stackRoots_[JS::MapTypeToRootKind<T>::kind];
+    inline void registerWithRootLists(js::RootedListHeads& roots) {
+        this->stack = &roots[JS::MapTypeToRootKind<T>::kind];
         this->prev = *stack;
         *stack = reinterpret_cast<Rooted<void*>*>(this);
     }
 
-    js::RootLists& rootLists(js::ContextFriendFields* cx) {
+    inline js::RootedListHeads& rootLists(js::ContextFriendFields* cx) {
         return rootLists(reinterpret_cast<JSContext*>(cx));
     }
-    js::RootLists& rootLists(JSContext* cx) {
+    inline js::RootedListHeads& rootLists(JSContext* cx) {
         if (JS::Zone* zone = js::GetContextZone(cx))
-            return JS::shadow::Zone::asShadowZone(zone)->roots;
+            return JS::shadow::Zone::asShadowZone(zone)->stackRoots_;
         return rootLists(js::GetRuntime(cx));
     }
-    js::RootLists& rootLists(js::PerThreadDataFriendFields* pt) { return pt->roots; }
-    js::RootLists& rootLists(JSRuntime* rt) {
-        return js::PerThreadDataFriendFields::getMainThread(rt)->roots;
+    inline js::RootedListHeads& rootLists(js::PerThreadDataFriendFields* pt) {
+        return pt->roots.stackRoots_;
+    }
+    inline js::RootedListHeads& rootLists(JSRuntime* rt) {
+        return js::PerThreadDataFriendFields::getMainThread(rt)->roots.stackRoots_;
     }
 
   public:
@@ -1058,7 +1074,6 @@ class PersistentRooted : public js::PersistentRootedBase<T>,
         MapTypeToRootKind<T>::kind == JS::RootKind::Traceable,
         js::DispatchWrapper<T>,
         T>::Type;
-
     MaybeWrapped ptr;
 } JS_HAZ_ROOTED;
 

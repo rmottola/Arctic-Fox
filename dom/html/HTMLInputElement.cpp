@@ -11,6 +11,7 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/dom/Date.h"
 #include "mozilla/dom/Directory.h"
+#include "mozilla/dom/FileSystemUtils.h"
 #include "nsAttrValueInlines.h"
 #include "nsCRTGlue.h"
 
@@ -78,6 +79,7 @@
 #include "nsIRadioGroupContainer.h"
 
 // input type=file
+#include "mozilla/dom/Entry.h"
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/FileList.h"
 #include "nsIFile.h"
@@ -110,11 +112,14 @@
 #include <limits>
 
 #include "nsIColorPicker.h"
+#include "nsIDatePicker.h"
 #include "nsIStringEnumerator.h"
 #include "HTMLSplitOnSpacesTokenizer.h"
 #include "nsIController.h"
 #include "nsIMIMEInfo.h"
 #include "nsFrameSelection.h"
+
+#include "nsIConsoleService.h"
 
 // input type=date
 #include "js/Date.h"
@@ -217,6 +222,474 @@ const Decimal HTMLInputElement::kStepAny = Decimal(0);
 #define PROGRESS_STR "progress"
 static const uint32_t kProgressEventInterval = 50; // ms
 
+class GetFilesCallback
+{
+public:
+  NS_INLINE_DECL_REFCOUNTING(GetFilesCallback);
+
+  virtual void
+  Callback(nsresult aStatus, const Sequence<RefPtr<File>>& aFiles) = 0;
+
+protected:
+  virtual ~GetFilesCallback() {}
+};
+
+// Retrieving the list of files can be very time/IO consuming. We use this
+// helper class to do it just once.
+class GetFilesHelper final : public Runnable
+{
+public:
+  static already_AddRefed<GetFilesHelper>
+  Create(nsIGlobalObject* aGlobal,
+         const nsTArray<OwningFileOrDirectory>& aFilesOrDirectory,
+         bool aRecursiveFlag, ErrorResult& aRv)
+  {
+    MOZ_ASSERT(aGlobal);
+
+    RefPtr<GetFilesHelper> helper = new GetFilesHelper(aGlobal, aRecursiveFlag);
+
+    nsAutoString directoryPath;
+
+    for (uint32_t i = 0; i < aFilesOrDirectory.Length(); ++i) {
+      const OwningFileOrDirectory& data = aFilesOrDirectory[i];
+      if (data.IsFile()) {
+        if (!helper->mFiles.AppendElement(data.GetAsFile(), fallible)) {
+          aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
+          return nullptr;
+        }
+      } else {
+        MOZ_ASSERT(data.IsDirectory());
+
+        // We support the upload of only 1 top-level directory from our
+        // directory picker. This means that we cannot have more than 1
+        // Directory object in aFilesOrDirectory array.
+        MOZ_ASSERT(directoryPath.IsEmpty());
+
+        RefPtr<Directory> directory = data.GetAsDirectory();
+        MOZ_ASSERT(directory);
+
+        aRv = directory->GetFullRealPath(directoryPath);
+        if (NS_WARN_IF(aRv.Failed())) {
+          return nullptr;
+        }
+      }
+    }
+
+    // No directories to explore.
+    if (directoryPath.IsEmpty()) {
+      helper->mListingCompleted = true;
+      return helper.forget();
+    }
+
+    MOZ_ASSERT(helper->mFiles.IsEmpty());
+    helper->SetDirectoryPath(directoryPath);
+
+    nsCOMPtr<nsIEventTarget> target =
+      do_GetService(NS_STREAMTRANSPORTSERVICE_CONTRACTID);
+    MOZ_ASSERT(target);
+
+    aRv = target->Dispatch(helper, NS_DISPATCH_NORMAL);
+    if (NS_WARN_IF(aRv.Failed())) {
+      return nullptr;
+    }
+
+    return helper.forget();
+  }
+
+  void
+  AddPromise(Promise* aPromise)
+  {
+    MOZ_ASSERT(aPromise);
+
+    // Still working.
+    if (!mListingCompleted) {
+      mPromises.AppendElement(aPromise);
+      return;
+    }
+
+    MOZ_ASSERT(mPromises.IsEmpty());
+    ResolveOrRejectPromise(aPromise);
+  }
+
+  void
+  AddCallback(GetFilesCallback* aCallback)
+  {
+    MOZ_ASSERT(aCallback);
+
+    // Still working.
+    if (!mListingCompleted) {
+      mCallbacks.AppendElement(aCallback);
+      return;
+    }
+
+    MOZ_ASSERT(mCallbacks.IsEmpty());
+    RunCallback(aCallback);
+  }
+
+  // CC methods
+  void Unlink()
+  {
+    mGlobal = nullptr;
+    mFiles.Clear();
+    mPromises.Clear();
+    mCallbacks.Clear();
+
+    MutexAutoLock lock(mMutex);
+    mCanceled = true;
+  }
+
+  void Traverse(nsCycleCollectionTraversalCallback &cb)
+  {
+    GetFilesHelper* tmp = this;
+    NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mGlobal);
+    NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFiles);
+    NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mPromises);
+  }
+
+private:
+  GetFilesHelper(nsIGlobalObject* aGlobal, bool aRecursiveFlag)
+    : mGlobal(aGlobal)
+    , mRecursiveFlag(aRecursiveFlag)
+    , mListingCompleted(false)
+    , mErrorResult(NS_OK)
+    , mMutex("GetFilesHelper::mMutex")
+    , mCanceled(false)
+  {
+    MOZ_ASSERT(aGlobal);
+  }
+
+  void
+  SetDirectoryPath(const nsAString& aDirectoryPath)
+  {
+    mDirectoryPath = aDirectoryPath;
+  }
+
+  bool
+  IsCanceled()
+  {
+    MutexAutoLock lock(mMutex);
+    return mCanceled;
+  }
+
+  NS_IMETHOD
+  Run() override
+  {
+    MOZ_ASSERT(!mDirectoryPath.IsEmpty());
+    MOZ_ASSERT(!mListingCompleted);
+
+    // First step is to retrieve the list of file paths.
+    // This happens in the I/O thread.
+    if (!NS_IsMainThread()) {
+      RunIO();
+
+      // If this operation has been canceled, we don't have to go back to
+      // main-thread.
+      if (IsCanceled()) {
+        return NS_OK;
+      }
+
+      return NS_DispatchToMainThread(this);
+    }
+
+    // We are here, but we should not do anything on this thread because, in the
+    // meantime, the operation has been canceled.
+    if (IsCanceled()) {
+      return NS_OK;
+    }
+
+    RunMainThread();
+
+    // We mark the operation as completed here.
+    mListingCompleted = true;
+
+    // Let's process the pending promises.
+    nsTArray<RefPtr<Promise>> promises;
+    promises.SwapElements(mPromises);
+
+    for (uint32_t i = 0; i < promises.Length(); ++i) {
+      ResolveOrRejectPromise(promises[i]);
+    }
+
+    // Let's process the pending callbacks.
+    nsTArray<RefPtr<GetFilesCallback>> callbacks;
+    callbacks.SwapElements(mCallbacks);
+
+    for (uint32_t i = 0; i < callbacks.Length(); ++i) {
+      RunCallback(callbacks[i]);
+    }
+
+    return NS_OK;
+  }
+
+  void
+  RunIO()
+  {
+    MOZ_ASSERT(!NS_IsMainThread());
+    MOZ_ASSERT(!mDirectoryPath.IsEmpty());
+    MOZ_ASSERT(!mListingCompleted);
+
+    nsCOMPtr<nsIFile> file;
+    mErrorResult = NS_NewNativeLocalFile(NS_ConvertUTF16toUTF8(mDirectoryPath), true,
+                                         getter_AddRefs(file));
+    if (NS_WARN_IF(NS_FAILED(mErrorResult))) {
+      return;
+    }
+
+    nsAutoString path;
+    path.AssignLiteral(FILESYSTEM_DOM_PATH_SEPARATOR_LITERAL);
+
+    mErrorResult = ExploreDirectory(path, file);
+  }
+
+  void
+  RunMainThread()
+  {
+    MOZ_ASSERT(NS_IsMainThread());
+    MOZ_ASSERT(!mDirectoryPath.IsEmpty());
+    MOZ_ASSERT(!mListingCompleted);
+
+    // If there is an error, do nothing.
+    if (NS_FAILED(mErrorResult)) {
+      return;
+    }
+
+    // Create the sequence of Files.
+    for (uint32_t i = 0; i < mTargetPathArray.Length(); ++i) {
+      nsCOMPtr<nsIFile> file;
+      mErrorResult =
+        NS_NewNativeLocalFile(NS_ConvertUTF16toUTF8(mTargetPathArray[i].mRealPath),
+                              true, getter_AddRefs(file));
+      if (NS_WARN_IF(NS_FAILED(mErrorResult))) {
+        mFiles.Clear();
+        return;
+      }
+
+      RefPtr<File> domFile =
+        File::CreateFromFile(mGlobal, file);
+      MOZ_ASSERT(domFile);
+
+      domFile->SetPath(mTargetPathArray[i].mDomPath);
+
+      if (!mFiles.AppendElement(domFile, fallible)) {
+        mErrorResult = NS_ERROR_OUT_OF_MEMORY;
+        mFiles.Clear();
+        return;
+      }
+    }
+  }
+
+  nsresult
+  ExploreDirectory(const nsAString& aDOMPath, nsIFile* aFile)
+  {
+    MOZ_ASSERT(!NS_IsMainThread());
+    MOZ_ASSERT(aFile);
+
+    // We check if this operation has to be terminated at each recursion.
+    if (IsCanceled()) {
+      return NS_OK;
+    }
+
+    nsCOMPtr<nsISimpleEnumerator> entries;
+    nsresult rv = aFile->GetDirectoryEntries(getter_AddRefs(entries));
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    for (;;) {
+      bool hasMore = false;
+      if (NS_WARN_IF(NS_FAILED(entries->HasMoreElements(&hasMore))) || !hasMore) {
+        break;
+      }
+
+      nsCOMPtr<nsISupports> supp;
+      if (NS_WARN_IF(NS_FAILED(entries->GetNext(getter_AddRefs(supp))))) {
+        break;
+      }
+
+      nsCOMPtr<nsIFile> currFile = do_QueryInterface(supp);
+      MOZ_ASSERT(currFile);
+
+      bool isLink, isSpecial, isFile, isDir;
+      if (NS_WARN_IF(NS_FAILED(currFile->IsSymlink(&isLink)) ||
+                     NS_FAILED(currFile->IsSpecial(&isSpecial))) ||
+          isLink || isSpecial) {
+        continue;
+      }
+
+      if (NS_WARN_IF(NS_FAILED(currFile->IsFile(&isFile)) ||
+                     NS_FAILED(currFile->IsDirectory(&isDir))) ||
+          !(isFile || isDir)) {
+        continue;
+      }
+
+      // The new domPath
+      nsAutoString domPath;
+      domPath.Assign(aDOMPath);
+      if (!aDOMPath.EqualsLiteral(FILESYSTEM_DOM_PATH_SEPARATOR_LITERAL)) {
+        domPath.AppendLiteral(FILESYSTEM_DOM_PATH_SEPARATOR_LITERAL);
+      }
+
+      nsAutoString leafName;
+      if (NS_WARN_IF(NS_FAILED(currFile->GetLeafName(leafName)))) {
+        continue;
+      }
+      domPath.Append(leafName);
+
+      if (isFile) {
+        FileData* data = mTargetPathArray.AppendElement(fallible);
+        if (!data) {
+          return NS_ERROR_OUT_OF_MEMORY;
+        }
+
+        if (NS_WARN_IF(NS_FAILED(currFile->GetPath(data->mRealPath)))) {
+          continue;
+        }
+
+        data->mDomPath = domPath;
+        continue;
+      }
+
+      MOZ_ASSERT(isDir);
+      if (!mRecursiveFlag) {
+        continue;
+      }
+
+      // Recursive.
+      rv = ExploreDirectory(domPath, currFile);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        return rv;
+      }
+    }
+
+    return NS_OK;
+  }
+
+  void
+  ResolveOrRejectPromise(Promise* aPromise)
+  {
+    MOZ_ASSERT(NS_IsMainThread());
+    MOZ_ASSERT(mListingCompleted);
+    MOZ_ASSERT(aPromise);
+
+    // Error propagation.
+    if (NS_FAILED(mErrorResult)) {
+      aPromise->MaybeReject(mErrorResult);
+      return;
+    }
+
+    aPromise->MaybeResolve(mFiles);
+  }
+
+  void
+  RunCallback(GetFilesCallback* aCallback)
+  {
+    MOZ_ASSERT(NS_IsMainThread());
+    MOZ_ASSERT(mListingCompleted);
+    MOZ_ASSERT(aCallback);
+
+    aCallback->Callback(mErrorResult, mFiles);
+  }
+
+  nsCOMPtr<nsIGlobalObject> mGlobal;
+
+  bool mRecursiveFlag;
+  bool mListingCompleted;
+  nsString mDirectoryPath;
+
+  // We populate this array in the I/O thread with the paths of the Files that
+  // we want to send as result to the promise objects.
+  struct FileData {
+    nsString mDomPath;
+    nsString mRealPath;
+  };
+  FallibleTArray<FileData> mTargetPathArray;
+
+  // This is the real File sequence that we expose via Promises.
+  Sequence<RefPtr<File>> mFiles;
+
+  // Error code to propagate.
+  nsresult mErrorResult;
+
+  nsTArray<RefPtr<Promise>> mPromises;
+  nsTArray<RefPtr<GetFilesCallback>> mCallbacks;
+
+  Mutex mMutex;
+
+  // This variable is protected by mutex.
+  bool mCanceled;
+};
+
+// An helper class for the dispatching of the 'change' event.
+class DispatchChangeEventCallback final : public GetFilesCallback
+{
+public:
+  explicit DispatchChangeEventCallback(HTMLInputElement* aInputElement)
+    : mInputElement(aInputElement)
+  {
+    MOZ_ASSERT(aInputElement);
+  }
+
+  virtual void
+  Callback(nsresult aStatus, const Sequence<RefPtr<File>>& aFiles) override
+  {
+    nsTArray<OwningFileOrDirectory> array;
+    for (uint32_t i = 0; i < aFiles.Length(); ++i) {
+      OwningFileOrDirectory* element = array.AppendElement();
+      element->SetAsFile() = aFiles[i];
+    }
+
+    mInputElement->SetFilesOrDirectories(array, true);
+    NS_WARN_IF(NS_FAILED(DispatchEvents()));
+  }
+
+  nsresult
+  DispatchEvents()
+  {
+    nsresult rv = NS_OK;
+    rv = nsContentUtils::DispatchTrustedEvent(mInputElement->OwnerDoc(),
+                                              static_cast<nsIDOMHTMLInputElement*>(mInputElement.get()),
+                                              NS_LITERAL_STRING("input"), true,
+                                              false);
+    NS_WARN_IF(NS_FAILED(rv));
+
+    rv = nsContentUtils::DispatchTrustedEvent(mInputElement->OwnerDoc(),
+                                              static_cast<nsIDOMHTMLInputElement*>(mInputElement.get()),
+                                              NS_LITERAL_STRING("change"), true,
+                                              false);
+
+    return rv;
+  }
+
+private:
+  RefPtr<HTMLInputElement> mInputElement;
+};
+
+// This callback is used for postponing the calling of SetFilesOrDirectories
+// when the exploration of the directory is completed.
+class AfterSetFilesOrDirectoriesCallback : public GetFilesCallback
+{
+public:
+  AfterSetFilesOrDirectoriesCallback(HTMLInputElement* aInputElement,
+                                     bool aSetValueChanged)
+    : mInputElement(aInputElement)
+    , mSetValueChanged(aSetValueChanged)
+  {
+    MOZ_ASSERT(aInputElement);
+  }
+
+  void
+  Callback(nsresult aStatus, const Sequence<RefPtr<File>>& aFiles) override
+  {
+    if (NS_SUCCEEDED(aStatus)) {
+      mInputElement->AfterSetFilesOrDirectoriesInternal(mSetValueChanged);
+    }
+  }
+
+private:
+  RefPtr<HTMLInputElement> mInputElement;
+  bool mSetValueChanged;
+};
+
 class HTMLInputElementState final : public nsISupports
 {
   public:
@@ -288,7 +761,18 @@ class HTMLInputElementState final : public nsISupports
         if (aArray[i].IsFile()) {
           BlobImplOrDirectoryPath* data = mBlobImplsOrDirectoryPaths.AppendElement();
 
-          data->mBlobImpl = aArray[i].GetAsFile()->Impl();
+          RefPtr<File> file = aArray[i].GetAsFile();
+
+          nsAutoString name;
+          file->GetName(name);
+
+          nsAutoString path;
+          path.AssignLiteral(FILESYSTEM_DOM_PATH_SEPARATOR_LITERAL);
+          path.Append(name);
+
+          file->SetPath(path);
+
+          data->mBlobImpl = file->Impl();
           data->mType = BlobImplOrDirectoryPath::eBlobImpl;
         } else {
           MOZ_ASSERT(aArray[i].IsDirectory());
@@ -457,6 +941,13 @@ GetDOMFileOrDirectoryPath(const OwningFileOrDirectory& aData,
 
 } // namespace
 
+/* static */
+bool
+HTMLInputElement::ValueAsDateEnabled(JSContext* cx, JSObject* obj)
+{
+  return Preferences::GetBool("dom.experimental_forms", false) ||
+    Preferences::GetBool("dom.forms.datepicker", false);
+}
 
 NS_IMETHODIMP
 HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
@@ -537,10 +1028,23 @@ HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
   // event because it will think this is done by a script.
   // So, we can safely send one by ourself.
   mInput->SetFilesOrDirectories(newFilesOrDirectories, true);
-  return nsContentUtils::DispatchTrustedEvent(mInput->OwnerDoc(),
-                                              static_cast<nsIDOMHTMLInputElement*>(mInput.get()),
-                                              NS_LITERAL_STRING("change"), true,
-                                              false);
+
+  RefPtr<DispatchChangeEventCallback> dispatchChangeEventCallback =
+    new DispatchChangeEventCallback(mInput);
+
+  if (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
+      mInput->HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory)) {
+    ErrorResult error;
+    GetFilesHelper* helper = mInput->GetOrCreateGetFilesHelper(true, error);
+    if (NS_WARN_IF(error.Failed())) {
+      return error.StealNSResult();
+    }
+
+    helper->AddCallback(dispatchChangeEventCallback);
+    return NS_OK;
+  }
+
+  return dispatchChangeEventCallback->DispatchEvents();
 }
 
 NS_IMPL_ISUPPORTS(HTMLInputElement::nsFilePickerShownCallback,
@@ -647,6 +1151,59 @@ nsColorPickerShownCallback::Done(const nsAString& aColor)
 
 NS_IMPL_ISUPPORTS(nsColorPickerShownCallback, nsIColorPickerShownCallback)
 
+class DatePickerShownCallback final : public nsIDatePickerShownCallback
+{
+  ~DatePickerShownCallback() {}
+public:
+  DatePickerShownCallback(HTMLInputElement* aInput,
+                          nsIDatePicker* aDatePicker)
+    : mInput(aInput)
+    , mDatePicker(aDatePicker)
+  {}
+
+  NS_DECL_ISUPPORTS
+
+  NS_IMETHOD Done(const nsAString& aDate) override;
+  NS_IMETHOD Cancel() override;
+
+private:
+  RefPtr<HTMLInputElement> mInput;
+  nsCOMPtr<nsIDatePicker> mDatePicker;
+};
+
+NS_IMETHODIMP
+DatePickerShownCallback::Cancel()
+{
+  mInput->PickerClosed();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+DatePickerShownCallback::Done(const nsAString& aDate)
+{
+  nsAutoString oldValue;
+
+  mInput->PickerClosed();
+  mInput->GetValue(oldValue);
+
+  if(!oldValue.Equals(aDate)){
+    mInput->SetValue(aDate);
+    nsContentUtils::DispatchTrustedEvent(mInput->OwnerDoc(),
+                            static_cast<nsIDOMHTMLInputElement*>(mInput.get()),
+                            NS_LITERAL_STRING("input"), true,
+                            false);
+    return nsContentUtils::DispatchTrustedEvent(mInput->OwnerDoc(),
+                            static_cast<nsIDOMHTMLInputElement*>(mInput.get()),
+                            NS_LITERAL_STRING("change"), true,
+                            false);
+  }
+
+  return NS_OK;
+}
+
+NS_IMPL_ISUPPORTS(DatePickerShownCallback, nsIDatePickerShownCallback)
+
+
 bool
 HTMLInputElement::IsPopupBlocked() const
 {
@@ -669,6 +1226,56 @@ HTMLInputElement::IsPopupBlocked() const
   uint32_t permission;
   pm->TestPermission(OwnerDoc()->NodePrincipal(), &permission);
   return permission == nsIPopupWindowManager::DENY_POPUP;
+}
+
+nsresult
+HTMLInputElement::InitDatePicker()
+{
+  if (!Preferences::GetBool("dom.forms.datepicker", false)) {
+    return NS_OK;
+  }
+
+  if (mPickerRunning) {
+    NS_WARNING("Just one nsIDatePicker is allowed");
+    return NS_ERROR_FAILURE;
+  }
+
+  nsCOMPtr<nsIDocument> doc = OwnerDoc();
+
+  nsCOMPtr<nsPIDOMWindowOuter> win = doc->GetWindow();
+  if (!win) {
+    return NS_ERROR_FAILURE;
+  }
+
+  if (IsPopupBlocked()) {
+    win->FirePopupBlockedEvent(doc, nullptr, EmptyString(), EmptyString());
+    return NS_OK;
+  }
+
+  // Get Loc title
+  nsXPIDLString title;
+  nsContentUtils::GetLocalizedString(nsContentUtils::eFORMS_PROPERTIES,
+                                     "DatePicker", title);
+
+  nsresult rv;
+  nsCOMPtr<nsIDatePicker> datePicker = do_CreateInstance("@mozilla.org/datepicker;1", &rv);
+  if (!datePicker) {
+    return rv;
+  }
+
+  nsAutoString initialValue;
+  GetValueInternal(initialValue);
+  rv = datePicker->Init(win, title, initialValue);
+
+  nsCOMPtr<nsIDatePickerShownCallback> callback =
+    new DatePickerShownCallback(this, datePicker);
+
+  rv = datePicker->Open(callback);
+  if (NS_SUCCEEDED(rv)) {
+    mPickerRunning = true;
+  }
+
+  return rv;
 }
 
 nsresult
@@ -1030,8 +1637,17 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLInputElement,
     tmp->mInputData.mState->Traverse(cb);
   }
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFilesOrDirectories)
+
+  if (tmp->mGetFilesRecursiveHelper) {
+    tmp->mGetFilesRecursiveHelper->Traverse(cb);
+  }
+
+  if (tmp->mGetFilesNonRecursiveHelper) {
+    tmp->mGetFilesNonRecursiveHelper->Traverse(cb);
+  }
+
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFileList)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFilesAndDirectoriesPromise)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mEntries)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLInputElement,
@@ -1040,10 +1656,13 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLInputElement,
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mControllers)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFilesOrDirectories)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFileList)
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mFilesAndDirectoriesPromise)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mEntries)
   if (tmp->IsSingleLineTextControl(false)) {
     tmp->mInputData.mState->Unlink();
   }
+
+  tmp->ClearGetFilesHelpers();
+
   //XXX should unlink more?
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
@@ -1097,6 +1716,7 @@ HTMLInputElement::Clone(mozilla::dom::NodeInfo* aNodeInfo, nsINode** aResult) co
         // we can just grab the pretty string and use it as wallpaper
         GetDisplayFileName(it->mStaticDocFileList);
       } else {
+        it->ClearGetFilesHelpers();
         it->mFilesOrDirectories.Clear();
         it->mFilesOrDirectories.AppendElements(mFilesOrDirectories);
       }
@@ -1507,10 +2127,14 @@ HTMLInputElement::SetWidth(uint32_t aWidth)
 NS_IMETHODIMP
 HTMLInputElement::GetValue(nsAString& aValue)
 {
-  GetValueInternal(aValue);
+  nsresult rv = GetValueInternal(aValue);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
 
   // Don't return non-sanitized value for types that are experimental on mobile.
-  if (IsExperimentalMobileType(mType)) {
+  //  or date types
+  if (IsExperimentalMobileType(mType) || mType == NS_FORM_INPUT_DATE) {
     SanitizeValue(aValue);
   }
 
@@ -1524,8 +2148,8 @@ HTMLInputElement::GetValueInternal(nsAString& aValue) const
     case VALUE_MODE_VALUE:
       if (IsSingleLineTextControl(false)) {
         mInputData.mState->GetValue(aValue, true);
-      } else {
-        aValue.Assign(mInputData.mValue);
+      } else if (!aValue.Assign(mInputData.mValue, fallible)) {
+        return NS_ERROR_OUT_OF_MEMORY;
       }
       return NS_OK;
 
@@ -1659,6 +2283,15 @@ HTMLInputElement::GetValueAsDecimal() const
 
   return !ConvertStringToNumber(stringValue, decimalValue) ? Decimal::nan()
                                                            : decimalValue;
+}
+
+void
+HTMLInputElement::GetValue(nsAString& aValue, ErrorResult& aRv)
+{
+  nsresult rv = GetValue(aValue);
+  if (NS_FAILED(rv)) {
+    aRv.Throw(rv);
+  }
 }
 
 void
@@ -2135,6 +2768,15 @@ HTMLInputElement::ApplyStep(int32_t aStep)
   return rv;
 }
 
+/* static */
+bool
+HTMLInputElement::IsExperimentalMobileType(uint8_t aType)
+{
+  return aType == NS_FORM_INPUT_TIME ||
+    (aType == NS_FORM_INPUT_DATE &&
+     !Preferences::GetBool("dom.forms.datepicker", false));
+}
+
 NS_IMETHODIMP
 HTMLInputElement::StepDown(int32_t n, uint8_t optional_argc)
 {
@@ -2324,7 +2966,7 @@ bool
 HTMLInputElement::MozIsTextField(bool aExcludePassword)
 {
   // TODO: temporary until bug 773205 is fixed.
-  if (IsExperimentalMobileType(mType)) {
+  if (IsExperimentalMobileType(mType) || mType == NS_FORM_INPUT_DATE) {
     return false;
   }
 
@@ -2542,6 +3184,8 @@ void
 HTMLInputElement::SetFilesOrDirectories(const nsTArray<OwningFileOrDirectory>& aFilesOrDirectories,
                                         bool aSetValueChanged)
 {
+  ClearGetFilesHelpers();
+
   mFilesOrDirectories.Clear();
   mFilesOrDirectories.AppendElements(aFilesOrDirectories);
 
@@ -2554,6 +3198,7 @@ HTMLInputElement::SetFiles(nsIDOMFileList* aFiles,
 {
   RefPtr<FileList> files = static_cast<FileList*>(aFiles);
   mFilesOrDirectories.Clear();
+  ClearGetFilesHelpers();
 
   if (aFiles) {
     uint32_t listLength;
@@ -2568,7 +3213,30 @@ HTMLInputElement::SetFiles(nsIDOMFileList* aFiles,
 }
 
 void
+HTMLInputElement::MozSetDndFilesAndDirectories(const nsTArray<OwningFileOrDirectory>& aFilesOrDirectories)
+{
+  if (Preferences::GetBool("dom.webkitBlink.filesystem.enabled", false)) {
+    UpdateEntries(aFilesOrDirectories);
+  }
+
+  SetFilesOrDirectories(aFilesOrDirectories, true);
+}
+
+void
 HTMLInputElement::AfterSetFilesOrDirectories(bool aSetValueChanged)
+{
+  if (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
+      HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory)) {
+    // This will call AfterSetFilesOrDirectoriesInternal eventually.
+    ExploreDirectoryRecursively(aSetValueChanged);
+    return;
+  }
+
+  AfterSetFilesOrDirectoriesInternal(aSetValueChanged);
+}
+
+void
+HTMLInputElement::AfterSetFilesOrDirectoriesInternal(bool aSetValueChanged)
 {
   // No need to flush here, if there's no frame at this point we
   // don't need to force creation of one just to tell it about this
@@ -2632,7 +3300,9 @@ HTMLInputElement::GetFiles()
   }
 
   if (Preferences::GetBool("dom.input.dirpicker", false) &&
-      HasAttr(kNameSpaceID_None, nsGkAtoms::directory)) {
+      HasAttr(kNameSpaceID_None, nsGkAtoms::directory) &&
+      (!Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) ||
+       !HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory))) {
     return nullptr;
   }
 
@@ -2679,9 +3349,6 @@ HTMLInputElement::UpdateFileList()
       }
     }
   }
-
-  // Make sure we (lazily) create a new Promise for GetFilesAndDirectories:
-  mFilesAndDirectoriesPromise = nullptr;
 }
 
 nsresult
@@ -3318,12 +3985,21 @@ HTMLInputElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
   // We must cache type because mType may change during JS event (bug 2369)
   aVisitor.mItemFlags |= mType;
 
+  if (aVisitor.mEvent->mMessage == eFocus &&
+      aVisitor.mEvent->IsTrusted() &&
+      MayFireChangeOnBlur() &&
+      // StartRangeThumbDrag already set mFocusedValue on 'mousedown' before
+      // we get the 'focus' event.
+      !mIsDraggingRange) {
+    GetValue(mFocusedValue);
+  }
+
   // Fire onchange (if necessary), before we do the blur, bug 357684.
   if (aVisitor.mEvent->mMessage == eBlur) {
     // Experimental mobile types rely on the system UI to prevent users to not
     // set invalid values but we have to be extra-careful. Especially if the
     // option has been enabled on desktop.
-    if (IsExperimentalMobileType(mType)) {
+    if (IsExperimentalMobileType(mType) || mType == NS_FORM_INPUT_DATE) {
       nsAutoString aValue;
       GetValueInternal(aValue);
       nsresult rv =
@@ -3411,7 +4087,8 @@ HTMLInputElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
       }
     } else if (aVisitor.mEvent->mMessage == eKeyUp) {
       WidgetKeyboardEvent* keyEvent = aVisitor.mEvent->AsKeyboardEvent();
-      if ((keyEvent->keyCode == NS_VK_UP || keyEvent->keyCode == NS_VK_DOWN) &&
+      if ((keyEvent->mKeyCode == NS_VK_UP ||
+           keyEvent->mKeyCode == NS_VK_DOWN) &&
           !(keyEvent->IsShift() || keyEvent->IsControl() ||
             keyEvent->IsAlt() || keyEvent->IsMeta() ||
             keyEvent->IsAltGraph() || keyEvent->IsFn() ||
@@ -3722,8 +4399,10 @@ HTMLInputElement::MaybeInitPickers(EventChainPostVisitor& aVisitor)
     if (target &&
         target->GetParent() == this &&
         target->IsRootOfNativeAnonymousSubtree() &&
-        target->HasAttr(kNameSpaceID_None, nsGkAtoms::directory)) {
-      MOZ_ASSERT(Preferences::GetBool("dom.input.dirpicker", false),
+        (target->HasAttr(kNameSpaceID_None, nsGkAtoms::directory) ||
+         target->HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory))) {
+      MOZ_ASSERT(Preferences::GetBool("dom.input.dirpicker", false) ||
+                 Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false),
                  "No API or UI should have been exposed to allow this code to "
                  "be reached");
       type = FILE_PICKER_DIRECTORY;
@@ -3733,6 +4412,10 @@ HTMLInputElement::MaybeInitPickers(EventChainPostVisitor& aVisitor)
   if (mType == NS_FORM_INPUT_COLOR) {
     return InitColorPicker();
   }
+  if (mType == NS_FORM_INPUT_DATE) {
+    return InitDatePicker();
+  }
+
   return NS_OK;
 }
 
@@ -3747,12 +4430,6 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
 
   if (aVisitor.mEvent->mMessage == eFocus ||
       aVisitor.mEvent->mMessage == eBlur) {
-    if (aVisitor.mEvent->mMessage == eFocus &&
-        MayFireChangeOnBlur() &&
-        !mIsDraggingRange) { // StartRangeThumbDrag already set mFocusedValue
-      GetValue(mFocusedValue);
-    }
-
     if (aVisitor.mEvent->mMessage == eBlur) {
       if (mIsDraggingRange) {
         FinishRangeThumbDrag();
@@ -3852,6 +4529,12 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
         DoSetChecked(originalCheckedValue, true, true);
       }
     } else {
+      // Fire input event and then change event.
+      nsContentUtils::DispatchTrustedEvent(OwnerDoc(),
+                                           static_cast<nsIDOMHTMLInputElement*>(this),
+                                           NS_LITERAL_STRING("input"), true,
+                                           false);
+
       nsContentUtils::DispatchTrustedEvent(OwnerDoc(),
                                            static_cast<nsIDOMHTMLInputElement*>(this),
                                            NS_LITERAL_STRING("change"), true,
@@ -3881,7 +4564,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
     if (mType ==  NS_FORM_INPUT_NUMBER &&
         keyEvent && keyEvent->mMessage == eKeyPress &&
         aVisitor.mEvent->IsTrusted() &&
-        (keyEvent->keyCode == NS_VK_UP || keyEvent->keyCode == NS_VK_DOWN) &&
+        (keyEvent->mKeyCode == NS_VK_UP || keyEvent->mKeyCode == NS_VK_DOWN) &&
         !(keyEvent->IsShift() || keyEvent->IsControl() ||
           keyEvent->IsAlt() || keyEvent->IsMeta() ||
           keyEvent->IsAltGraph() || keyEvent->IsFn() ||
@@ -3898,7 +4581,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
       // just ignore aVisitor.mEventStatus here and go ahead and handle the
       // event to increase/decrease the value of the number control.
       if (!aVisitor.mEvent->DefaultPreventedByContent() && IsMutable()) {
-        StepNumberControlForUserEvent(keyEvent->keyCode == NS_VK_UP ? 1 : -1);
+        StepNumberControlForUserEvent(keyEvent->mKeyCode == NS_VK_UP ? 1 : -1);
         aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
       }
     } else if (nsEventStatus_eIgnore == aVisitor.mEventStatus) {
@@ -3936,15 +4619,15 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           // space or enter (bug 25300)
           WidgetKeyboardEvent* keyEvent = aVisitor.mEvent->AsKeyboardEvent();
           if ((aVisitor.mEvent->mMessage == eKeyPress &&
-               keyEvent->keyCode == NS_VK_RETURN) ||
+               keyEvent->mKeyCode == NS_VK_RETURN) ||
               (aVisitor.mEvent->mMessage == eKeyUp &&
-               keyEvent->keyCode == NS_VK_SPACE)) {
+               keyEvent->mKeyCode == NS_VK_SPACE)) {
             switch(mType) {
               case NS_FORM_INPUT_CHECKBOX:
               case NS_FORM_INPUT_RADIO:
               {
                 // Checkbox and Radio try to submit on Enter press
-                if (keyEvent->keyCode != NS_VK_SPACE) {
+                if (keyEvent->mKeyCode != NS_VK_SPACE) {
                   MaybeSubmitForm(aVisitor.mPresContext);
 
                   break;  // If we are submitting, do not send click event
@@ -3968,7 +4651,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
               mType == NS_FORM_INPUT_RADIO && !keyEvent->IsAlt() &&
               !keyEvent->IsControl() && !keyEvent->IsMeta()) {
             bool isMovingBack = false;
-            switch (keyEvent->keyCode) {
+            switch (keyEvent->mKeyCode) {
               case NS_VK_UP:
               case NS_VK_LEFT:
                 isMovingBack = true;
@@ -4011,10 +4694,11 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
            */
 
           if (aVisitor.mEvent->mMessage == eKeyPress &&
-              keyEvent->keyCode == NS_VK_RETURN &&
+              keyEvent->mKeyCode == NS_VK_RETURN &&
                (IsSingleLineTextControl(false, mType) ||
                 mType == NS_FORM_INPUT_NUMBER ||
-                IsExperimentalMobileType(mType))) {
+                IsExperimentalMobileType(mType) ||
+                mType == NS_FORM_INPUT_DATE)) {
             FireChangeEventIfNeeded();
             rv = MaybeSubmitForm(aVisitor.mPresContext);
             NS_ENSURE_SUCCESS(rv, rv);
@@ -4023,14 +4707,14 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           if (aVisitor.mEvent->mMessage == eKeyPress &&
               mType == NS_FORM_INPUT_RANGE && !keyEvent->IsAlt() &&
               !keyEvent->IsControl() && !keyEvent->IsMeta() &&
-              (keyEvent->keyCode == NS_VK_LEFT ||
-               keyEvent->keyCode == NS_VK_RIGHT ||
-               keyEvent->keyCode == NS_VK_UP ||
-               keyEvent->keyCode == NS_VK_DOWN ||
-               keyEvent->keyCode == NS_VK_PAGE_UP ||
-               keyEvent->keyCode == NS_VK_PAGE_DOWN ||
-               keyEvent->keyCode == NS_VK_HOME ||
-               keyEvent->keyCode == NS_VK_END)) {
+              (keyEvent->mKeyCode == NS_VK_LEFT ||
+               keyEvent->mKeyCode == NS_VK_RIGHT ||
+               keyEvent->mKeyCode == NS_VK_UP ||
+               keyEvent->mKeyCode == NS_VK_DOWN ||
+               keyEvent->mKeyCode == NS_VK_PAGE_UP ||
+               keyEvent->mKeyCode == NS_VK_PAGE_DOWN ||
+               keyEvent->mKeyCode == NS_VK_HOME ||
+               keyEvent->mKeyCode == NS_VK_END)) {
             Decimal minimum = GetMinimum();
             Decimal maximum = GetMaximum();
             MOZ_ASSERT(minimum.isFinite() && maximum.isFinite());
@@ -4042,7 +4726,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
               }
               MOZ_ASSERT(value.isFinite() && step.isFinite());
               Decimal newValue;
-              switch (keyEvent->keyCode) {
+              switch (keyEvent->mKeyCode) {
                 case  NS_VK_LEFT:
                   newValue = value + (GetComputedDirectionality() == eDir_RTL
                                         ? step : -step);
@@ -4289,7 +4973,7 @@ HTMLInputElement::PostHandleEventForRangeThumb(EventChainPostVisitor& aVisitor)
 
     case eKeyPress:
       if (mIsDraggingRange &&
-          aVisitor.mEvent->AsKeyboardEvent()->keyCode == NS_VK_ESCAPE) {
+          aVisitor.mEvent->AsKeyboardEvent()->mKeyCode == NS_VK_ESCAPE) {
         CancelRangeThumbDrag();
       }
       break;
@@ -4341,7 +5025,7 @@ HTMLInputElement::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
       ClearBrokenState();
       RemoveStatesSilently(NS_EVENT_STATE_BROKEN);
       nsContentUtils::AddScriptRunner(
-        NS_NewRunnableMethod(this, &HTMLInputElement::MaybeLoadImage));
+        NewRunnableMethod(this, &HTMLInputElement::MaybeLoadImage));
     }
   }
 
@@ -4927,21 +5611,22 @@ HTMLInputElement::GetAttributeChangeHint(const nsIAtom* aAttribute,
   if (aAttribute == nsGkAtoms::type ||
       // The presence or absence of the 'directory' attribute determines what
       // buttons we show for type=file.
-      aAttribute == nsGkAtoms::directory) {
-    NS_UpdateHint(retval, NS_STYLE_HINT_FRAMECHANGE);
+      aAttribute == nsGkAtoms::directory ||
+      aAttribute == nsGkAtoms::webkitdirectory) {
+    retval |= NS_STYLE_HINT_FRAMECHANGE;
   } else if (mType == NS_FORM_INPUT_IMAGE &&
              (aAttribute == nsGkAtoms::alt ||
               aAttribute == nsGkAtoms::value)) {
     // We might need to rebuild our alt text.  Just go ahead and
     // reconstruct our frame.  This should be quite rare..
-    NS_UpdateHint(retval, NS_STYLE_HINT_FRAMECHANGE);
+    retval |= NS_STYLE_HINT_FRAMECHANGE;
   } else if (aAttribute == nsGkAtoms::value) {
-    NS_UpdateHint(retval, NS_STYLE_HINT_REFLOW);
+    retval |= NS_STYLE_HINT_REFLOW;
   } else if (aAttribute == nsGkAtoms::size &&
              IsSingleLineTextControl(false)) {
-    NS_UpdateHint(retval, NS_STYLE_HINT_REFLOW);
+    retval |= NS_STYLE_HINT_REFLOW;
   } else if (PlaceholderApplies() && aAttribute == nsGkAtoms::placeholder) {
-    NS_UpdateHint(retval, NS_STYLE_HINT_FRAMECHANGE);
+    retval |= NS_STYLE_HINT_FRAMECHANGE;
   }
   return retval;
 }
@@ -5012,10 +5697,6 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
     return nullptr;
   }
 
-  if (mFilesAndDirectoriesPromise) {
-    return RefPtr<Promise>(mFilesAndDirectoriesPromise).forget();
-  }
-
   nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
   MOZ_ASSERT(global);
   if (!global) {
@@ -5056,12 +5737,35 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
   }
 
   p->MaybeResolve(filesAndDirsSeq);
+  return p.forget();
+}
 
-  // Cache the Promise so that repeat getFilesAndDirectories() calls return
-  // the same Promise and array of File and Directory objects until the user
-  // picks different files/directories:
-  mFilesAndDirectoriesPromise = p;
+already_AddRefed<Promise>
+HTMLInputElement::GetFiles(bool aRecursiveFlag, ErrorResult& aRv)
+{
+  if (mType != NS_FORM_INPUT_FILE) {
+    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
+    return nullptr;
+  }
 
+  GetFilesHelper* helper = GetOrCreateGetFilesHelper(aRecursiveFlag, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+   }
+  MOZ_ASSERT(helper);
+
+  nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
+  MOZ_ASSERT(global);
+  if (!global) {
+    return nullptr;
+  }
+
+  RefPtr<Promise> p = Promise::Create(global, aRv);
+  if (aRv.Failed()) {
+    return nullptr;
+  }
+
+  helper->AddPromise(p);
   return p.forget();
 }
 
@@ -5747,13 +6451,23 @@ HTMLInputElement::SaveState()
 
       inputState = new HTMLInputElementState();
       nsAutoString value;
-      GetValue(value);
-      DebugOnly<nsresult> rv =
-        nsLinebreakConverter::ConvertStringLineBreaks(
-             value,
-             nsLinebreakConverter::eLinebreakPlatform,
-             nsLinebreakConverter::eLinebreakContent);
-      NS_ASSERTION(NS_SUCCEEDED(rv), "Converting linebreaks failed!");
+      nsresult rv = GetValue(value);
+      if (NS_FAILED(rv)) {
+        return rv;
+      }
+
+      if (!IsSingleLineTextControl(false)) {
+        rv = nsLinebreakConverter::ConvertStringLineBreaks(
+               value,
+               nsLinebreakConverter::eLinebreakPlatform,
+               nsLinebreakConverter::eLinebreakContent);
+
+        if (NS_FAILED(rv)) {
+          NS_ERROR("Converting linebreaks failed!");
+          return rv;
+        }
+      }
+
       inputState->SetValue(value);
       break;
   }
@@ -7560,6 +8274,98 @@ JSObject*
 HTMLInputElement::WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
   return HTMLInputElementBinding::Wrap(aCx, this, aGivenProto);
+}
+
+void
+HTMLInputElement::ClearGetFilesHelpers()
+{
+  if (mGetFilesRecursiveHelper) {
+    mGetFilesRecursiveHelper->Unlink();
+    mGetFilesRecursiveHelper = nullptr;
+  }
+
+  if (mGetFilesNonRecursiveHelper) {
+    mGetFilesNonRecursiveHelper->Unlink();
+    mGetFilesNonRecursiveHelper = nullptr;
+  }
+}
+
+GetFilesHelper*
+HTMLInputElement::GetOrCreateGetFilesHelper(bool aRecursiveFlag,
+                                            ErrorResult& aRv)
+{
+  nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
+  MOZ_ASSERT(global);
+  if (!global) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
+  if (aRecursiveFlag) {
+    if (!mGetFilesRecursiveHelper) {
+      mGetFilesRecursiveHelper =
+       GetFilesHelper::Create(global,
+                              GetFilesOrDirectoriesInternal(),
+                              aRecursiveFlag, aRv);
+      if (NS_WARN_IF(aRv.Failed())) {
+        return nullptr;
+      }
+    }
+
+    return mGetFilesRecursiveHelper;
+  }
+
+  if (!mGetFilesNonRecursiveHelper) {
+    mGetFilesNonRecursiveHelper =
+     GetFilesHelper::Create(global,
+                            GetFilesOrDirectoriesInternal(),
+                            aRecursiveFlag, aRv);
+    if (NS_WARN_IF(aRv.Failed())) {
+      return nullptr;
+    }
+  }
+
+  return mGetFilesNonRecursiveHelper;
+}
+
+void
+HTMLInputElement::ExploreDirectoryRecursively(bool aSetValueChanged)
+{
+  ErrorResult rv;
+  GetFilesHelper* helper = GetOrCreateGetFilesHelper(true /* recursionFlag */,
+                                                     rv);
+  if (NS_WARN_IF(rv.Failed())) {
+    AfterSetFilesOrDirectoriesInternal(aSetValueChanged);
+    return;
+  }
+
+  RefPtr<AfterSetFilesOrDirectoriesCallback> callback =
+    new AfterSetFilesOrDirectoriesCallback(this, aSetValueChanged);
+  helper->AddCallback(callback);
+}
+
+void
+HTMLInputElement::UpdateEntries(const nsTArray<OwningFileOrDirectory>& aFilesOrDirectories)
+{
+  mEntries.Clear();
+
+  nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
+  MOZ_ASSERT(global);
+
+  for (uint32_t i = 0; i < aFilesOrDirectories.Length(); ++i) {
+    RefPtr<Entry> entry = Entry::Create(global, aFilesOrDirectories[i]);
+    MOZ_ASSERT(entry);
+
+    if (!mEntries.AppendElement(entry, fallible)) {
+      return;
+    }
+  }
+}
+
+void
+HTMLInputElement::GetWebkitEntries(nsTArray<RefPtr<Entry>>& aSequence)
+{
+  aSequence.AppendElements(mEntries);
 }
 
 } // namespace dom

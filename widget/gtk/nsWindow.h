@@ -60,7 +60,6 @@ extern PRLogModuleInfo *gWidgetDrawLog;
 
 #endif /* MOZ_LOGGING */
 
-class gfxASurface;
 class gfxPattern;
 class nsPluginNativeWindowGtk;
 
@@ -72,6 +71,7 @@ class CurrentX11TimeGetter;
 class nsWindow : public nsBaseWidget
 {
 public:
+    typedef mozilla::gfx::DrawTarget DrawTarget;
     typedef mozilla::WidgetEventTime WidgetEventTime;
 
     nsWindow();
@@ -320,8 +320,8 @@ public:
                                                              mozilla::layers::BufferMode* aBufferMode);
 
 #if (MOZ_WIDGET_GTK == 2)
-    static already_AddRefed<gfxASurface> GetSurfaceForGdkDrawable(GdkDrawable* aDrawable,
-                                                                  const nsIntSize& aSize);
+    static already_AddRefed<DrawTarget> GetDrawTargetForGdkDrawable(GdkDrawable* aDrawable,
+                                                                    const mozilla::gfx::IntSize& aSize);
 #endif
     NS_IMETHOD         ReparentNativeWidget(nsIWidget* aNewParent) override;
 
@@ -421,10 +421,16 @@ private:
     bool               DispatchContentCommandEvent(mozilla::EventMessage aMsg);
     bool               CheckForRollup(gdouble aMouseX, gdouble aMouseY,
                                       bool aIsWheel, bool aAlwaysRollup);
+    void               CheckForRollupDuringGrab()
+    {
+      CheckForRollup(0, 0, false, true);
+    }
+
     bool               GetDragInfo(mozilla::WidgetMouseEvent* aMouseEvent,
                                    GdkWindow** aWindow, gint* aButton,
                                    gint* aRootX, gint* aRootY);
     void               ClearCachedResources();
+    nsIWidgetListener* GetListener();
 
     GtkWidget          *mShell;
     MozContainer       *mContainer;
@@ -461,6 +467,9 @@ private:
     RefPtr<nsShmImage>  mFrontShmImage;
     RefPtr<nsShmImage>  mBackShmImage;
 #endif
+
+    // A fallback image surface when a SHM surface is unavailable.
+    cairo_surface_t* mFallbackSurface;
 
 #ifdef ACCESSIBILITY
     RefPtr<mozilla::a11y::Accessible> mRootAccessible;

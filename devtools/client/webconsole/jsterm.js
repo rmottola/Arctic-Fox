@@ -1,14 +1,14 @@
 /* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
-/* vim: set ft= javascript ts=2 et sw=2 tw=80: */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 "use strict";
 
-const {Cc, Ci, Cu} = require("chrome");
+const {Ci, Cu} = require("chrome");
 
-const {Utils: WebConsoleUtils, CONSOLE_WORKER_IDS} =
+const {Utils: WebConsoleUtils} =
   require("devtools/shared/webconsole/utils");
 const promise = require("promise");
 const Debugger = require("Debugger");
@@ -303,11 +303,32 @@ JSTerm.prototype = {
       return;
     }
     if (response.error) {
-      Cu.reportError("Evaluation error " + response.error + ": " +
-                     response.message);
+      console.error("Evaluation error " + response.error + ": " +
+                    response.message);
       return;
     }
     let errorMessage = response.exceptionMessage;
+    let errorDocURL = response.exceptionDocURL;
+
+    let errorDocLink;
+    if (errorDocURL) {
+      errorMessage += " ";
+      errorDocLink = this.hud.document.createElementNS(XHTML_NS, "a");
+      errorDocLink.className = "learn-more-link webconsole-learn-more-link";
+      errorDocLink.textContent = `[${l10n.getStr("webConsoleMoreInfoLabel")}]`;
+      errorDocLink.title = errorDocURL;
+      errorDocLink.href = "#";
+      errorDocLink.draggable = false;
+      errorDocLink.addEventListener("click", () => {
+        this.hud.owner.openLink(errorDocURL);
+      });
+    }
+
+    // Wrap thrown strings in Error objects, so `throw "foo"` outputs
+    // "Error: foo"
+    if (typeof response.exception === "string") {
+      errorMessage = new Error(errorMessage).toString();
+    }
     let result = response.result;
     let helperResult = response.helperResult;
     let helperHasRawOutput = !!(helperResult || {}).rawOutput;
@@ -351,7 +372,13 @@ JSTerm.prototype = {
       return;
     }
 
-    let msg = new Messages.JavaScriptEvalOutput(response, errorMessage);
+    if (this.hud.NEW_CONSOLE_OUTPUT_ENABLED) {
+      this.hud.newConsoleOutput.dispatchMessageAdd(response);
+      // @TODO figure out what to do about the callback.
+      return;
+    }
+    let msg = new Messages.JavaScriptEvalOutput(response,
+                                                errorMessage, errorDocLink);
     this.hud.output.addMessage(msg);
 
     if (callback) {
@@ -403,7 +430,7 @@ JSTerm.prototype = {
     // attempt to execute the content of the inputNode
     executeString = executeString || this.getInputValue();
     if (!executeString) {
-      return;
+      return null;
     }
 
     let selectedNodeActor = null;
@@ -852,8 +879,8 @@ JSTerm.prototype = {
    */
   _silentEvalCallback: function(callback, response) {
     if (response.error) {
-      Cu.reportError("Web Console evaluation failed. " + response.error + ":" +
-                     response.message);
+      console.error("Web Console evaluation failed. " + response.error + ":" +
+                    response.message);
 
       callback && callback(response);
       return;
@@ -916,6 +943,10 @@ JSTerm.prototype = {
     }
 
     this._sidebarDestroy();
+
+    if (hud.NEW_CONSOLE_OUTPUT_ENABLED) {
+      hud.newConsoleOutput.dispatchMessagesClear();
+    }
 
     this.emit("messages-cleared");
   },
@@ -1001,6 +1032,7 @@ JSTerm.prototype = {
     }
   },
 
+  /* eslint-disable complexity */
   /**
    * The inputNode "keypress" event handler.
    *
@@ -1192,7 +1224,7 @@ JSTerm.prototype = {
         }
         break;
 
-      case Ci.nsIDOMKeyEvent.DOM_VK_RIGHT: {
+      case Ci.nsIDOMKeyEvent.DOM_VK_RIGHT:
         let cursorAtTheEnd = this.inputNode.selectionStart ==
                              this.inputNode.selectionEnd &&
                              this.inputNode.selectionStart ==
@@ -1210,7 +1242,7 @@ JSTerm.prototype = {
           this.clearCompletion();
         }
         break;
-      }
+
       case Ci.nsIDOMKeyEvent.DOM_VK_TAB:
         // Generate a completion and accept the first proposed value.
         if (this.complete(this.COMPLETE_HINT_ONLY) &&
@@ -1226,6 +1258,7 @@ JSTerm.prototype = {
         break;
     }
   },
+  /* eslint-enable complexity */
 
   /**
    * The inputNode "focus" event handler.

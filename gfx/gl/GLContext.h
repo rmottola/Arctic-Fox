@@ -41,7 +41,6 @@
 #include "GLLibraryLoader.h"
 #include "nsISupportsImpl.h"
 #include "plstr.h"
-#include "nsAutoPtr.h"
 #include "GLContextTypes.h"
 //#include "GLTextureImage.h"
 #include "SurfaceTypes.h"
@@ -95,6 +94,7 @@ enum class GLFeature {
     element_index_uint,
     ES2_compatibility,
     ES3_compatibility,
+    EXT_color_buffer_float,
     frag_color_float,
     frag_depth,
     framebuffer_blit,
@@ -127,6 +127,7 @@ enum class GLFeature {
     sRGB_texture,
     sampler_objects,
     seamless_cube_map_opt_in,
+    shader_texture_lod,
     split_framebuffer,
     standard_derivatives,
     sync,
@@ -422,6 +423,7 @@ public:
         ARB_robustness,
         ARB_sampler_objects,
         ARB_seamless_cube_map,
+        ARB_shader_texture_lod,
         ARB_sync,
         ARB_texture_compression,
         ARB_texture_float,
@@ -729,7 +731,7 @@ private:
                 printf_stderr("Fatal: %s called on non-current context %p. The"
                               " current context for this thread is %p.\n",
                               funcName, this, tlsContext);
-                MOZ_CRASH("GLContext is not current.");
+                MOZ_CRASH("GFX: GLContext is not current.");
             }
         }
     }
@@ -814,7 +816,7 @@ private:
                 MOZ_ASSERT(strstr(MOZ_FUNCTION_NAME, #func) != nullptr, "Mismatched symbol check.");\
                 if (MOZ_UNLIKELY(!mSymbols.func)) {\
                     printf_stderr("RUNTIME ASSERT: Uninitialized GL function: %s\n", #func);\
-                    MOZ_CRASH();\
+                    MOZ_CRASH("GFX: Uninitialized GL function");\
                 }\
             } while (0)
 

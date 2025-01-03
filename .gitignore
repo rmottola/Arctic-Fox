@@ -89,5 +89,5 @@ testing/web-platform/sync/
 # Android Gradle artifacts.
 mobile/android/gradle/.gradle
 
-# Ignore node_modules from eslint-plugin-mozilla
-testing/eslint-plugin-mozilla/node_modules/
+# Ignore node_modules
+tools/lint/eslint/node_modules/

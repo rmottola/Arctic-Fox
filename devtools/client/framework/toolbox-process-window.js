@@ -10,7 +10,7 @@ var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
 
 var { loader, require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 // Require this module to setup core modules
-loader.main("devtools/client/main");
+loader.require("devtools/client/framework/devtools-browser");
 
 var { gDevTools } = require("devtools/client/framework/devtools");
 var { TargetFactory } = require("devtools/client/framework/target");
@@ -73,7 +73,7 @@ window.addEventListener("load", function() {
     let errorMessage = document.getElementById("error-message");
     errorMessage.value = e;
     errorMessageContainer.hidden = false;
-    Cu.reportError(e);
+    console.error(e);
   });
 });
 
@@ -187,7 +187,7 @@ function onMessage(event) {
         setTitle(json.data.value);
         break;
     }
-  } catch(e) { Cu.reportError(e); }
+  } catch(e) { console.error(e); }
 }
 
 window.addEventListener("message", onMessage);

@@ -52,9 +52,8 @@ VISUAL_STUDIO_ADVERTISEMENT = '''
 ===============================
 Visual Studio Support Available
 
-You are building Firefox on Windows. Please help us test the experimental
-Visual Studio project files (yes, IntelliSense works) by running the
-following:
+You are building Firefox on Windows. You can generate Visual Studio
+files by running:
 
    mach build-backend --backend=VisualStudio
 
@@ -179,13 +178,3 @@ def config_status(topobjdir='.', topsrcdir='.', defines=None,
     if MachCommandConditions.is_android(env):
         if 'AndroidEclipse' not in options.backend:
             print(ANDROID_IDE_ADVERTISEMENT)
-
-    if env.substs.get('MOZ_ARTIFACT_BUILDS', False):
-        # Execute |mach artifact install| from the top source directory.
-        os.chdir(topsrcdir)
-        return subprocess.check_call([
-            sys.executable,
-            os.path.join(topsrcdir, 'mach'),
-            '--log-no-times',
-            'artifact',
-            'install'])

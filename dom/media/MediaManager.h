@@ -8,6 +8,7 @@
 #include "MediaEngine.h"
 #include "mozilla/Services.h"
 #include "mozilla/unused.h"
+#include "nsAutoPtr.h"
 #include "nsIMediaManager.h"
 
 #include "nsHashKeys.h"
@@ -277,11 +278,11 @@ public:
     switch (aEvent) {
       case EVENT_FINISHED:
         NS_DispatchToMainThread(
-          NS_NewRunnableMethod(this, &GetUserMediaCallbackMediaStreamListener::NotifyFinished));
+          NewRunnableMethod(this, &GetUserMediaCallbackMediaStreamListener::NotifyFinished));
         break;
       case EVENT_REMOVED:
         NS_DispatchToMainThread(
-          NS_NewRunnableMethod(this, &GetUserMediaCallbackMediaStreamListener::NotifyRemoved));
+          NewRunnableMethod(this, &GetUserMediaCallbackMediaStreamListener::NotifyRemoved));
         break;
       case EVENT_HAS_DIRECT_LISTENERS:
         NotifyDirectListeners(aGraph, true);

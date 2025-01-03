@@ -192,7 +192,7 @@ public:
     ++mLength; // Atomic
 
     nsCOMPtr<nsIRunnable> runnable =
-      NS_NewRunnableMethodWithArgs<StorensRefPtrPassByPtr<Image>, bool>(
+      NewRunnableMethod<StorensRefPtrPassByPtr<Image>, bool>(
         this, &VideoFrameConverter::ProcessVideoFrame,
         aChunk.mFrame.GetImage(), forceBlack);
     mTaskQueue->Dispatch(runnable.forget());
@@ -213,13 +213,16 @@ public:
     return mListeners.RemoveElement(aListener);
   }
 
+  void Shutdown()
+  {
+    mTaskQueue->BeginShutdown();
+    mTaskQueue->AwaitShutdownAndIdle();
+  }
+
 protected:
   virtual ~VideoFrameConverter()
   {
     MOZ_COUNT_DTOR(VideoFrameConverter);
-
-    mTaskQueue->BeginShutdown();
-    mTaskQueue->AwaitShutdownAndIdle();
   }
 
   void VideoFrameConverted(unsigned char* aVideoFrame,
@@ -1117,6 +1120,11 @@ public:
     } else {
       conduit_ = nullptr;
     }
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
+    if (converter_) {
+      converter_->Shutdown();
+    }
+#endif
   }
 
   // Dispatches setting the internal TrackID to TRACK_INVALID to the media
@@ -1976,13 +1984,6 @@ public:
   }
 
   // Implement MediaStreamListener
-  void NotifyQueuedTrackChanges(MediaStreamGraph* graph, TrackID tid,
-                                StreamTime offset,
-                                uint32_t events,
-                                const MediaSegment& queued_media,
-                                MediaStream* input_stream,
-                                TrackID input_tid) override {}
-
   void NotifyPull(MediaStreamGraph* graph, StreamTime desired_time) override
   {
     MOZ_ASSERT(source_);
@@ -2138,14 +2139,7 @@ public:
 #endif
   }
 
-
   // Implement MediaStreamListener
-  void NotifyQueuedTrackChanges(MediaStreamGraph* graph, TrackID tid,
-                                StreamTime offset,
-                                uint32_t events,
-                                const MediaSegment& queued_media,
-                                MediaStream* input_stream,
-                                TrackID input_tid) override {}
   void NotifyPull(MediaStreamGraph* graph, StreamTime desired_time) override
   {
     ReentrantMonitorAutoEnter enter(monitor_);

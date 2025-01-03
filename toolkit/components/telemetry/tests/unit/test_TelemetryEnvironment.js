@@ -581,6 +581,8 @@ function checkSystemSection(data) {
 
     let features = gfxInfo.getFeatures();
     Assert.equal(features.compositor, gfxData.features.compositor);
+    Assert.equal(features.opengl, gfxData.features.opengl);
+    Assert.equal(features.webgl, gfxData.features.webgl);
   }
   catch (e) {}
 }
@@ -1387,8 +1389,8 @@ add_task(function* test_defaultSearchEngine() {
 
   const EXPECTED_SEARCH_ENGINE_DATA = {
     name: "telemetry_default",
-    loadPath: null,
-    origin: "unverified"
+    loadPath: "[other]addEngineWithDetails",
+    origin: "verified"
   };
   Assert.deepEqual(data.settings.defaultSearchEngineData, EXPECTED_SEARCH_ENGINE_DATA);
   TelemetryEnvironment.unregisterChangeListener("testWatch_SearchDefault");

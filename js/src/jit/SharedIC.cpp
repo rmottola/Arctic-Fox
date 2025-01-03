@@ -829,7 +829,7 @@ ICStubCompiler::PushStubPayload(MacroAssembler& masm, Register scratch)
     masm.adjustFrame(sizeof(intptr_t));
 }
 
-bool
+void
 ICStubCompiler::emitPostWriteBarrierSlot(MacroAssembler& masm, Register obj, ValueOperand val,
                                          Register scratch, LiveGeneralRegisterSet saveRegs)
 {
@@ -851,7 +851,6 @@ ICStubCompiler::emitPostWriteBarrierSlot(MacroAssembler& masm, Register obj, Val
     masm.PopRegsInMask(saveRegs);
 
     masm.bind(&skipBarrier);
-    return true;
 }
 
 SharedStubInfo::SharedStubInfo(JSContext* cx, void* payload, ICEntry* icEntry)
@@ -1645,7 +1644,7 @@ DoCompareFallback(JSContext* cx, void* payload, ICCompare_Fallback* stub_, Handl
             return false;
         break;
       default:
-        MOZ_ASSERT(!"Unhandled baseline compare op");
+        MOZ_ASSERT_UNREACHABLE("Unhandled baseline compare op");
         return false;
     }
 
@@ -2172,7 +2171,7 @@ JSObject*
 GetDOMProxyProto(JSObject* obj)
 {
     MOZ_ASSERT(IsCacheableDOMProxy(obj));
-    return obj->getTaggedProto().toObjectOrNull();
+    return obj->staticPrototype();
 }
 
 // Look up a property's shape on an object, being careful never to do any effectful
@@ -2243,30 +2242,25 @@ IsCacheableProtoChain(JSObject* obj, JSObject* holder, bool isDOMProxy)
         }
     }
 
-    // Don't handle objects which require a prototype guard. This should
-    // be uncommon so handling it is likely not worth the complexity.
-    if (obj->hasUncacheableProto())
-        return false;
-
     JSObject* cur = obj;
     while (cur != holder) {
         // We cannot assume that we find the holder object on the prototype
         // chain and must check for null proto. The prototype chain can be
         // altered during the lookupProperty call.
-        JSObject* proto;
-        if (isDOMProxy && cur == obj)
-            proto = cur->getTaggedProto().toObjectOrNull();
-        else
-            proto = cur->getProto();
+        MOZ_ASSERT(!cur->hasDynamicPrototype());
 
-        if (!proto || !proto->isNative())
+        // Don't handle objects which require a prototype guard. This should
+        // be uncommon so handling it is likely not worth the complexity.
+        if (cur->hasUncacheableProto())
             return false;
 
-        if (proto->hasUncacheableProto())
+        JSObject* proto = cur->staticPrototype();
+        if (!proto || !proto->isNative())
             return false;
 
         cur = proto;
     }
+
     return true;
 }
 
@@ -2638,7 +2632,7 @@ CheckHasNoSuchProperty(JSContext* cx, JSObject* obj, PropertyName* name,
             return false;
         }
 
-        JSObject* proto = curObj->getTaggedProto().toObjectOrNull();
+        JSObject* proto = curObj->staticPrototype();
         if (!proto)
             break;
 
@@ -3057,13 +3051,15 @@ ICGetPropNativeCompiler::generateStubCode(MacroAssembler& masm)
 bool
 GetProtoShapes(JSObject* obj, size_t protoChainDepth, MutableHandle<ShapeVector> shapes)
 {
-    JSObject* curProto = obj->getProto();
+    JSObject* curProto = obj->staticPrototype();
     for (size_t i = 0; i < protoChainDepth; i++) {
         if (!shapes.append(curProto->as<NativeObject>().lastProperty()))
             return false;
-        curProto = curProto->getProto();
+        curProto = curProto->staticPrototype();
     }
-    MOZ_ASSERT(!curProto);
+
+    MOZ_ASSERT(!curProto,
+               "longer prototype chain encountered than this stub permits!");
     return true;
 }
 

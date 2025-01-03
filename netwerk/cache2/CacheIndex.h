@@ -17,7 +17,7 @@
 #include "nsWeakReference.h"
 #include "mozilla/SHA1.h"
 #include "mozilla/StaticMutex.h"
-#include "mozilla/Endian.h"
+#include "mozilla/EndianUtils.h"
 #include "mozilla/TimeStamp.h"
 
 class nsIFile;
@@ -835,6 +835,7 @@ private:
   // Following methods perform updating and building of the index.
   // Timer callback that starts update or build process.
   static void DelayedUpdate(nsITimer *aTimer, void *aClosure);
+  void DelayedUpdateLocked();
   // Posts timer event that start update or build process.
   nsresult ScheduleUpdateTimer(uint32_t aDelay);
   nsresult SetupDirectoryEnumerator();
@@ -990,6 +991,10 @@ private:
   uint32_t                  mRWBufSize;
   uint32_t                  mRWBufPos;
   RefPtr<CacheHash>         mRWHash;
+
+  // True if read or write operation is pending. It is used to ensure that
+  // mRWBuf is not freed until OnDataRead or OnDataWritten is called.
+  bool                      mRWPending;
 
   // Reading of journal succeeded if true.
   bool                      mJournalReadSuccessfully;

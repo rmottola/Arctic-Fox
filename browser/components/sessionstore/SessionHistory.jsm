@@ -145,10 +145,6 @@ var SessionHistoryInternal = {
       entry.originalURI = shEntry.originalURI.spec;
     }
 
-    if (shEntry.loadReplace) {
-      entry.loadReplace = shEntry.loadReplace;
-    }
-
     if (shEntry.srcdocData)
       entry.srcdocData = shEntry.srcdocData;
 
@@ -262,13 +258,6 @@ var SessionHistoryInternal = {
   restore: function (docShell, tabData) {
     let webNavigation = docShell.QueryInterface(Ci.nsIWebNavigation);
     let history = webNavigation.sessionHistory;
-
-    if ("userContextId" in tabData) {
-      let attrs = docShell.getOriginAttributes();
-      attrs.userContextId = tabData.userContextId;
-      docShell.setOriginAttributes(attrs);
-    }
-
     if (history.count > 0) {
       history.PurgeHistory(history.count);
     }
@@ -321,9 +310,6 @@ var SessionHistoryInternal = {
     }
     if (entry.originalURI) {
       shEntry.originalURI = Utils.makeURI(entry.originalURI);
-    }
-    if (entry.loadReplace) {
-      shEntry.loadReplace = entry.loadReplace;
     }
     if (entry.isSrcdocEntry)
       shEntry.srcdocData = entry.srcdocData;

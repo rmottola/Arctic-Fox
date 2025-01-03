@@ -16,6 +16,7 @@
 #include "mozilla/StaticMutex.h"
 #include "mozilla/Monitor.h"
 #include "mozilla/UniquePtr.h"
+#include "nsAutoPtr.h"
 #include "nsCOMPtr.h"
 #include "nsThreadUtils.h"
 #include "DOMMediaStream.h"
@@ -561,6 +562,9 @@ public:
   // Clients should ensure to clean-up sources video/audio sources
   // before invoking Shutdown on this class.
   void Shutdown() override;
+
+  // Returns whether the host supports duplex audio stream.
+  bool SupportsDuplex();
 
   void EnumerateVideoDevices(dom::MediaSourceEnum,
                              nsTArray<RefPtr<MediaEngineVideoSource>>*) override;

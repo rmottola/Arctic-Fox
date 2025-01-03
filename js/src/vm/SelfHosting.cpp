@@ -65,8 +65,11 @@ using mozilla::PodMove;
 using mozilla::Maybe;
 
 static void
-selfHosting_ErrorReporter(JSContext* cx, const char* message, JSErrorReport* report)
+selfHosting_WarningReporter(JSContext* cx, const char* message, JSErrorReport* report)
 {
+    MOZ_ASSERT(report);
+    MOZ_ASSERT(JSREPORT_IS_WARNING(report->flags));
+
     PrintError(cx, stderr, message, report, true);
 }
 
@@ -479,7 +482,7 @@ intrinsic_FinishBoundFunctionInit(JSContext* cx, unsigned argc, Value* vp)
     if (!GetPrototype(cx, targetObj, &proto))
         return false;
 
-    if (bound->getProto() != proto) {
+    if (bound->staticPrototype() != proto) {
         if (!SetPrototype(cx, bound, proto))
             return false;
     }
@@ -1172,7 +1175,7 @@ intrinsic_MoveTypedArrayElements(JSContext* cx, unsigned argc, Value* vp)
                "the not-detached requirement is wrong");
 
     if (tarray->hasDetachedBuffer()) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_TYPED_ARRAY_BAD_ARGS);
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_TYPED_ARRAY_DETACHED);
         return false;
     }
 
@@ -1565,11 +1568,11 @@ intrinsic_RegExpCreate(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    MOZ_ASSERT(args.length() == 2);
-    MOZ_ASSERT(args[1].isString() || args[1].isUndefined());
+    MOZ_ASSERT(args.length() == 1 || args.length() == 2);
+    MOZ_ASSERT_IF(args.length() == 2, args[1].isString() || args[1].isUndefined());
     MOZ_ASSERT(!args.isConstructing());
 
-    return RegExpCreate(cx, args[0], args[1], args.rval());
+    return RegExpCreate(cx, args[0], args.get(1), args.rval());
 }
 
 static bool
@@ -1621,21 +1624,6 @@ intrinsic_StringReplaceString(JSContext* cx, unsigned argc, Value* vp)
     RootedString pattern(cx, args[1].toString());
     RootedString replacement(cx, args[2].toString());
     JSString* result = str_replace_string_raw(cx, string, pattern, replacement);
-    if (!result)
-        return false;
-
-    args.rval().setString(result);
-    return true;
-}
-
-static bool
-intrinsic_RegExpEscapeMetaChars(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-
-    RootedString string(cx, args[0].toString());
-    JSString* result = RegExpEscapeMetaChars(cx, string);
     if (!result)
         return false;
 
@@ -1800,16 +1788,84 @@ js::ReportIncompatibleSelfHostedMethod(JSContext* cx, const CallArgs& args)
 
 // ES6, 25.4.1.6.
 static bool
-intrinsic_EnqueuePromiseJob(JSContext* cx, unsigned argc, Value* vp)
+intrinsic_EnqueuePromiseReactionJob(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
-    MOZ_ASSERT(args[0].isObject());
-    MOZ_ASSERT(args[0].toObject().is<JSFunction>());
+    MOZ_ASSERT(args.length() == 2);
+    MOZ_ASSERT(args[0].toObject().as<NativeObject>().getDenseInitializedLength() == 4);
 
-    RootedFunction job(cx, &args[0].toObject().as<JSFunction>());
-    if (!cx->runtime()->enqueuePromiseJob(cx, job))
+    // When using JS::AddPromiseReactions, no actual promise is created, so we
+    // might not have one here.
+    RootedObject promise(cx);
+    if (args[1].isObject())
+        promise = UncheckedUnwrap(&args[1].toObject());
+
+#ifdef DEBUG
+    MOZ_ASSERT_IF(promise, promise->is<PromiseObject>());
+    RootedNativeObject jobArgs(cx, &args[0].toObject().as<NativeObject>());
+    MOZ_ASSERT((jobArgs->getDenseElement(0).isNumber() &&
+                (jobArgs->getDenseElement(0).toNumber() == PROMISE_HANDLER_IDENTITY ||
+                 jobArgs->getDenseElement(0).toNumber() == PROMISE_HANDLER_THROWER)) ||
+               jobArgs->getDenseElement(0).toObject().isCallable());
+    MOZ_ASSERT(jobArgs->getDenseElement(2).toObject().isCallable());
+    MOZ_ASSERT(jobArgs->getDenseElement(3).toObject().isCallable());
+#endif
+
+    RootedAtom funName(cx, cx->names().empty);
+    RootedFunction job(cx, NewNativeFunction(cx, PromiseReactionJob, 0, funName,
+                                             gc::AllocKind::FUNCTION_EXTENDED));
+    if (!job)
         return false;
+
+    job->setExtendedSlot(0, args[0]);
+    if (!cx->runtime()->enqueuePromiseJob(cx, job, promise))
+        return false;
+    args.rval().setUndefined();
+    return true;
+}
+
+// ES6, 25.4.1.6.
+static bool
+intrinsic_EnqueuePromiseResolveThenableJob(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+
+#ifdef DEBUG
+    MOZ_ASSERT(args.length() == 2);
+    MOZ_ASSERT(UncheckedUnwrap(&args[1].toObject())->is<PromiseObject>());
+    RootedNativeObject jobArgs(cx, &args[0].toObject().as<NativeObject>());
+    MOZ_ASSERT(jobArgs->getDenseInitializedLength() == 3);
+    MOZ_ASSERT(jobArgs->getDenseElement(0).toObject().isCallable());
+    MOZ_ASSERT(jobArgs->getDenseElement(1).isObject());
+    MOZ_ASSERT(UncheckedUnwrap(&jobArgs->getDenseElement(2).toObject())->is<PromiseObject>());
+#endif
+
+    RootedAtom funName(cx, cx->names().empty);
+    RootedFunction job(cx, NewNativeFunction(cx, PromiseResolveThenableJob, 0, funName,
+                                             gc::AllocKind::FUNCTION_EXTENDED));
+    if (!job)
+        return false;
+
+    job->setExtendedSlot(0, args[0]);
+    RootedObject promise(cx, CheckedUnwrap(&args[1].toObject()));
+    if (!cx->runtime()->enqueuePromiseJob(cx, job, promise))
+        return false;
+    args.rval().setUndefined();
+    return true;
+}
+
+// ES2016, February 12 draft, 25.4.1.9.
+static bool
+intrinsic_HostPromiseRejectionTracker(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    MOZ_ASSERT(args.length() == 2);
+    MOZ_ASSERT(args[0].toObject().is<PromiseObject>());
+
+    Rooted<PromiseObject*> promise(cx, &args[0].toObject().as<PromiseObject>());
+    mozilla::DebugOnly<bool> isHandled = args[1].toBoolean();
+    MOZ_ASSERT(isHandled, "HostPromiseRejectionTracker intrinsic currently only marks as handled");
+    cx->runtime()->removeUnhandledRejectedPromise(cx, promise);
     args.rval().setUndefined();
     return true;
 }
@@ -2172,59 +2228,9 @@ intrinsic_onPromiseSettled(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     MOZ_ASSERT(args.length() == 1);
-    RootedObject promise(cx, &args[0].toObject());
-    JS::dbg::onPromiseSettled(cx, promise);
+    Rooted<PromiseObject*> promise(cx, &args[0].toObject().as<PromiseObject>());
+    promise->onSettled(cx);
     args.rval().setUndefined();
-    return true;
-}
-
-/**
- * Intrinsic used to tell the debugger about settled promises.
- *
- * This is invoked both when resolving and rejecting promises, after the
- * resulting state has been set on the promise, and it's up to the debugger
- * to act on this signal in whichever way it wants.
- */
-static bool
-intrinsic_captureCurrentStack(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() < 2);
-    unsigned maxFrameCount = 0;
-    if (args.length() == 1)
-        maxFrameCount = args[0].toInt32();
-
-    RootedObject stack(cx);
-    if (!JS::CaptureCurrentStack(cx, &stack, maxFrameCount))
-        return false;
-
-    args.rval().setObject(*stack);
-    return true;
-}
-
-static bool
-IsMatchFlagsArgumentEnabled(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 0);
-
-    args.rval().setBoolean(cx->runtime()->options().matchFlagArgument());
-    return true;
-}
-
-static bool
-WarnOnceAboutFlagsArgument(JSContext* cx, unsigned argc, Value* vp)
-{
-    if (!cx->compartment()->warnedAboutFlagsArgument) {
-        if (!JS_ReportErrorFlagsAndNumber(cx, JSREPORT_WARNING, GetErrorMessage, nullptr,
-                                          cx->runtime()->options().matchFlagArgument()
-                                          ? JSMSG_DEPRECATED_FLAGS_ARG
-                                          : JSMSG_OBSOLETE_FLAGS_ARG))
-        {
-            return false;
-        }
-        cx->compartment()->warnedAboutFlagsArgument = true;
-    }
     return true;
 }
 
@@ -2488,7 +2494,9 @@ static const JSFunctionSpec intrinsic_functions[] = {
 
     JS_FN("IsPromise",                      intrinsic_IsInstanceOfBuiltin<PromiseObject>, 1,0),
     JS_FN("IsWrappedPromise",               intrinsic_IsWrappedPromiseObject,     1, 0),
-    JS_FN("_EnqueuePromiseJob",             intrinsic_EnqueuePromiseJob,          1, 0),
+    JS_FN("_EnqueuePromiseReactionJob",     intrinsic_EnqueuePromiseReactionJob,  2, 0),
+    JS_FN("_EnqueuePromiseResolveThenableJob", intrinsic_EnqueuePromiseResolveThenableJob, 2, 0),
+    JS_FN("HostPromiseRejectionTracker",    intrinsic_HostPromiseRejectionTracker,2, 0),
     JS_FN("_GetOriginalPromiseConstructor", intrinsic_OriginalPromiseConstructor, 0, 0),
     JS_FN("RejectUnwrappedPromise",         intrinsic_RejectUnwrappedPromise,     2, 0),
     JS_FN("CallPromiseMethodIfWrapped",
@@ -2528,8 +2536,8 @@ static const JSFunctionSpec intrinsic_functions[] = {
 #undef LOAD_AND_STORE_SCALAR_FN_DECLS
 
 #define LOAD_AND_STORE_REFERENCE_FN_DECLS(_constant, _type, _name)      \
-    JS_FN("Store_" #_name, js::StoreReference##_type::Func, 3, 0),      \
-    JS_FN("Load_" #_name,  js::LoadReference##_type::Func, 3, 0),
+    JS_FN("Store_" #_name, js::StoreReference##_name::Func, 3, 0),      \
+    JS_FN("Load_" #_name,  js::LoadReference##_name::Func, 3, 0),
     JS_FOR_EACH_REFERENCE_TYPE_REPR(LOAD_AND_STORE_REFERENCE_FN_DECLS)
 #undef LOAD_AND_STORE_REFERENCE_FN_DECLS
 
@@ -2565,7 +2573,6 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_INLINABLE_FN("RegExpInstanceOptimizable", RegExpInstanceOptimizable, 1,0,
                     RegExpInstanceOptimizable),
     JS_FN("RegExpGetSubstitution", intrinsic_RegExpGetSubstitution, 6,0),
-    JS_FN("RegExpEscapeMetaChars", intrinsic_RegExpEscapeMetaChars, 1,0),
     JS_FN("GetElemBaseForLambda", intrinsic_GetElemBaseForLambda, 1,0),
     JS_FN("GetStringDataProperty", intrinsic_GetStringDataProperty, 2,0),
     JS_INLINABLE_FN("GetFirstDollarIndex", GetFirstDollarIndex, 1,0,
@@ -2582,11 +2589,7 @@ static const JSFunctionSpec intrinsic_functions[] = {
     // See builtin/RegExp.h for descriptions of the regexp_* functions.
     JS_FN("regexp_exec_no_statics", regexp_exec_no_statics, 2,0),
     JS_FN("regexp_test_no_statics", regexp_test_no_statics, 2,0),
-    JS_FN("regexp_construct", regexp_construct_self_hosting, 2,0),
     JS_FN("regexp_construct_no_sticky", regexp_construct_no_sticky, 2,0),
-
-    JS_FN("IsMatchFlagsArgumentEnabled", IsMatchFlagsArgumentEnabled, 0,0),
-    JS_FN("WarnOnceAboutFlagsArgument", WarnOnceAboutFlagsArgument, 0,0),
 
     JS_FN("IsModule", intrinsic_IsInstanceOfBuiltin<ModuleObject>, 1, 0),
     JS_FN("CallModuleMethodIfWrapped",
@@ -2606,7 +2609,6 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("ModuleNamespaceExports", intrinsic_ModuleNamespaceExports, 1, 0),
 
     JS_FN("_dbg_onPromiseSettled", intrinsic_onPromiseSettled, 1, 0),
-    JS_FN("_dbg_captureCurrentStack", intrinsic_captureCurrentStack, 1, 0),
 
     JS_FS_END
 };
@@ -2684,6 +2686,56 @@ JSRuntime::createSelfHostingGlobal(JSContext* cx)
     return shg;
 }
 
+static void
+MaybePrintAndClearPendingException(JSContext* cx, FILE* file)
+{
+    if (!cx->isExceptionPending())
+        return;
+
+    AutoClearPendingException acpe(cx);
+
+    RootedValue exn(cx);
+    if (!cx->getPendingException(&exn)) {
+        fprintf(file, "error getting pending exception\n");
+        return;
+    }
+    cx->clearPendingException();
+
+    ErrorReport report(cx);
+    if (!report.init(cx, exn, js::ErrorReport::WithSideEffects)) {
+        fprintf(file, "out of memory initializing ErrorReport\n");
+        return;
+    }
+
+    MOZ_ASSERT(!JSREPORT_IS_WARNING(report.report()->flags));
+    PrintError(cx, file, report.message(), report.report(), true);
+}
+
+class MOZ_STACK_CLASS AutoSelfHostingErrorReporter
+{
+    JSContext* cx_;
+    JS::WarningReporter oldReporter_;
+
+  public:
+    explicit AutoSelfHostingErrorReporter(JSContext* cx)
+      : cx_(cx)
+    {
+        oldReporter_ = JS::SetWarningReporter(cx_->runtime(), selfHosting_WarningReporter);
+    }
+    ~AutoSelfHostingErrorReporter() {
+        JS::SetWarningReporter(cx_->runtime(), oldReporter_);
+
+        // Exceptions in self-hosted code will usually be printed to stderr in
+        // ErrorToException, but not all exceptions are handled there. For
+        // instance, ReportOutOfMemory will throw the "out of memory" string
+        // without going through ErrorToException. We handle these other
+        // exceptions here.
+        MaybePrintAndClearPendingException(cx_, stderr);
+    }
+};
+
+
+
 // This function is miscompiled by LTCG with MSVC, and results in a crash
 // when running xpcshell during the build.  See bug 915735.
 #ifdef _MSC_VER
@@ -2711,21 +2763,25 @@ JSRuntime::initSelfHosting(JSContext* cx)
 
     JSAutoCompartment ac(cx, shg);
 
-    CompileOptions options(cx);
-    FillSelfHostingCompileOptions(options);
-
     /*
      * Set a temporary error reporter printing to stderr because it is too
      * early in the startup process for any other reporter to be registered
      * and we don't want errors in self-hosted code to be silently swallowed.
+     *
+     * This class also overrides the warning reporter to print warnings to
+     * stderr. See selfHosting_WarningReporter.
      */
-    JSErrorReporter oldReporter = JS_SetErrorReporter(cx->runtime(), selfHosting_ErrorReporter);
+    AutoSelfHostingErrorReporter errorReporter(cx);
+
+    CompileOptions options(cx);
+    FillSelfHostingCompileOptions(options);
+
     RootedValue rv(cx);
-    bool ok = true;
 
     char* filename = getenv("MOZ_SELFHOSTEDJS");
     if (filename) {
-        ok = ok && Evaluate(cx, options, filename, &rv);
+        if (!Evaluate(cx, options, filename, &rv))
+            return false;
     } else {
         uint32_t srcLen = GetRawScriptsSize();
 
@@ -2735,13 +2791,13 @@ JSRuntime::initSelfHosting(JSContext* cx)
         if (!src || !DecompressString(compressed, compressedLen,
                                       reinterpret_cast<unsigned char*>(src.get()), srcLen))
         {
-            ok = false;
+            return false;
         }
 
-        ok = ok && Evaluate(cx, options, src, srcLen, &rv);
+        if (!Evaluate(cx, options, src, srcLen, &rv))
+            return false;
     }
-    JS_SetErrorReporter(cx->runtime(), oldReporter);
-    return ok;
+    return true;
 }
 #ifdef _MSC_VER
 #pragma optimize("", on)
@@ -3123,8 +3179,16 @@ js::SelfHostedFunction(JSContext* cx, HandlePropertyName propName)
 bool
 js::IsSelfHostedFunctionWithName(JSFunction* fun, JSAtom* name)
 {
-    return fun->isSelfHostedBuiltin() &&
-           fun->getExtendedSlot(LAZY_FUNCTION_NAME_SLOT).toString() == name;
+    return fun->isSelfHostedBuiltin() && GetSelfHostedFunctionName(fun) == name;
+}
+
+JSAtom*
+js::GetSelfHostedFunctionName(JSFunction* fun)
+{
+    Value name = fun->getExtendedSlot(LAZY_FUNCTION_NAME_SLOT);
+    if (!name.isString())
+        return nullptr;
+    return &name.toString()->asAtom();
 }
 
 static_assert(JSString::MAX_LENGTH <= INT32_MAX,

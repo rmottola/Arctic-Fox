@@ -1459,8 +1459,8 @@ ScopeIter::settle()
         // function frame case above, if the script starts with a lexical
         // block, the SSI could see 2 block scopes here. So skip between 1-2
         // static block scopes here.
-        MOZ_ASSERT(ssi_.type() == StaticScopeIter<CanGC>::Block);
-        incrementStaticScopeIter();
+        if (ssi_.type() == StaticScopeIter<CanGC>::Block)
+            incrementStaticScopeIter();
         if (ssi_.type() == StaticScopeIter<CanGC>::Block)
             incrementStaticScopeIter();
         MOZ_ASSERT(ssi_.type() == StaticScopeIter<CanGC>::Eval);
@@ -2003,6 +2003,12 @@ class DebugScopeProxy : public BaseProxyHandler
         return isFunctionScope(scope) && !scope.as<CallObject>().callee().hasLexicalThis();
     }
 
+    bool getPrototypeIfOrdinary(JSContext* cx, HandleObject proxy, bool* isOrdinary,
+                                MutableHandleObject protop) const override
+    {
+        MOZ_CRASH("shouldn't be possible to access the prototype chain of a DebugScopeProxy");
+    }
+
     bool preventExtensions(JSContext* cx, HandleObject proxy,
                            ObjectOpResult& result) const override
     {
@@ -2313,7 +2319,8 @@ class DebugScopeProxy : public BaseProxyHandler
                 if (inScope)
                     props[j++].set(props[i]);
             }
-            props.resize(j);
+            if (!props.resize(j))
+                return false;
         }
 
         /*

@@ -169,7 +169,6 @@
     <broadcaster id="isFrameImage"/>
     <broadcaster id="singleFeedMenuitemState" disabled="true"/>
     <broadcaster id="multipleFeedsMenuState" hidden="true"/>
-#ifdef MOZ_SERVICES_SYNC
     <broadcaster id="sync-setup-state"/>
     <broadcaster id="sync-syncnow-state"/>
     <broadcaster id="sync-reauth-state" hidden="true"/>
@@ -177,7 +176,6 @@
                  type="checkbox" group="sidebar"
                  sidebarurl="chrome://browser/content/syncedtabs/sidebar.xhtml"
                  oncommand="SidebarUI.toggle('viewTabsSidebar');"/>
-#endif
     <broadcaster id="workOfflineMenuitemState"/>
 
     <!-- DevTools broadcasters -->

@@ -749,20 +749,27 @@ NS_ImplementChannelOpen(nsIChannel      *channel,
     nsCOMPtr<nsIInputStream> stream;
     nsresult rv = NS_NewSyncStreamListener(getter_AddRefs(listener),
                                            getter_AddRefs(stream));
-    if (NS_SUCCEEDED(rv)) {
-        rv = channel->AsyncOpen(listener, nullptr);
-        if (NS_SUCCEEDED(rv)) {
-            uint64_t n;
-            // block until the initial response is received or an error occurs.
-            rv = stream->Available(&n);
-            if (NS_SUCCEEDED(rv)) {
-                *result = nullptr;
-                stream.swap(*result);
-            }
-        }
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    nsCOMPtr<nsILoadInfo> loadInfo = channel->GetLoadInfo();
+    if (loadInfo && loadInfo->GetEnforceSecurity()) {
+      rv = channel->AsyncOpen2(listener);
     }
-    return rv;
-}
+    else {
+      rv = channel->AsyncOpen(listener, nullptr);
+    }
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    uint64_t n;
+    // block until the initial response is received or an error occurs.
+    rv = stream->Available(&n);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    *result = nullptr;
+    stream.swap(*result);
+
+    return NS_OK;
+ }
 
 nsresult
 NS_NewRequestObserverProxy(nsIRequestObserver **result,
@@ -1259,14 +1266,25 @@ NS_GetOriginAttributes(nsIChannel *aChannel,
                        mozilla::NeckoOriginAttributes &aAttributes)
 {
     nsCOMPtr<nsILoadContext> loadContext;
+    nsCOMPtr<nsILoadInfo> loadInfo = aChannel->GetLoadInfo();
     NS_QueryNotificationCallbacks(aChannel, loadContext);
-    if (!loadContext) {
+
+    if (!loadContext && !loadInfo) {
         return false;
     }
 
-    DocShellOriginAttributes doa;
-    loadContext->GetOriginAttributes(doa);
-    aAttributes.InheritFromDocShellToNecko(doa);
+    // Bug 1270678 - By default, we would acquire the originAttributes from
+    // the loadContext. But in some cases, say, loading the favicon, that the
+    // loadContext is not available. We would use the loadInfo to get
+    // originAttributes instead.
+    if (loadContext) {
+        DocShellOriginAttributes doa;
+        loadContext->GetOriginAttributes(doa);
+        aAttributes.InheritFromDocShellToNecko(doa);
+    } else {
+        loadInfo->GetOriginAttributes(&aAttributes);
+    }
+    aAttributes.SyncAttributesWithPrivateBrowsing(NS_UsePrivateBrowsing(aChannel));
     return true;
 }
 

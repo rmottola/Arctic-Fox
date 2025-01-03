@@ -13,7 +13,6 @@
 #include "GMPVideoDecoderParent.h"
 #include "nsIObserverService.h"
 #include "GeckoChildProcessHost.h"
-#include "mozilla/Preferences.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/SyncRunnable.h"
 #include "nsXPCOMPrivate.h"
@@ -24,7 +23,6 @@
 #include "GMPDecryptorParent.h"
 #include "GMPAudioDecoderParent.h"
 #include "nsComponentManagerUtils.h"
-#include "mozilla/Preferences.h"
 #include "runnable_utils.h"
 #include "VideoUtils.h"
 #if defined(XP_LINUX) && defined(MOZ_GMP_SANDBOX)
@@ -272,8 +270,8 @@ GeckoMediaPluginService::AddPluginCrashedEventTarget(const uint32_t aPluginId,
   mPluginCrashCallbacks.AppendElement(callback);
 }
 
-void
-GeckoMediaPluginService::RunPluginCrashCallbacks(const uint32_t aPluginId,
+NS_IMETHODIMP
+GeckoMediaPluginService::RunPluginCrashCallbacks(uint32_t aPluginId,
                                                  const nsACString& aPluginName)
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -293,6 +291,8 @@ GeckoMediaPluginService::RunPluginCrashCallbacks(const uint32_t aPluginId,
   if (mPluginCrashes.Length() > MAX_PLUGIN_CRASHES) {
     mPluginCrashes.RemoveElementAt(0);
   }
+
+  return NS_OK;
 }
 
 nsresult
@@ -326,7 +326,16 @@ GeckoMediaPluginService::ShutdownGMPThread()
 }
 
 nsresult
-GeckoMediaPluginService::GMPDispatch(nsIRunnable* event, uint32_t flags)
+GeckoMediaPluginService::GMPDispatch(nsIRunnable* event,
+                                     uint32_t flags)
+{
+  nsCOMPtr<nsIRunnable> r(event);
+  return GMPDispatch(r.forget());
+}
+
+nsresult
+GeckoMediaPluginService::GMPDispatch(already_AddRefed<nsIRunnable> event,
+                                     uint32_t flags)
 {
   nsCOMPtr<nsIRunnable> r(event);
   nsCOMPtr<nsIThread> thread;

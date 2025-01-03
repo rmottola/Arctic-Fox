@@ -8,7 +8,6 @@
 #include "mozilla/dom/HTMLObjectElement.h"
 #include "mozilla/dom/HTMLObjectElementBinding.h"
 #include "mozilla/dom/ElementInlines.h"
-#include "nsAutoPtr.h"
 #include "nsAttrValueInlines.h"
 #include "nsGkAtoms.h"
 #include "nsError.h"
@@ -244,18 +243,6 @@ HTMLObjectElement::GetForm(nsIDOMHTMLFormElement **aForm)
   return nsGenericHTMLFormElement::GetForm(aForm);
 }
 
-void
-HTMLObjectElement::GetItemValueText(DOMString& aValue)
-{
-  GetData(aValue);
-}
-
-void
-HTMLObjectElement::SetItemValueText(const nsAString& aValue)
-{
-  SetData(aValue);
-}
-
 nsresult
 HTMLObjectElement::BindToTree(nsIDocument *aDocument,
                               nsIContent *aParent,
@@ -280,7 +267,7 @@ HTMLObjectElement::BindToTree(nsIDocument *aDocument,
   // If we already have all the children, start the load.
   if (mIsDoneAddingChildren && !pluginDoc) {
     void (HTMLObjectElement::*start)() = &HTMLObjectElement::StartObjectLoad;
-    nsContentUtils::AddScriptRunner(NS_NewRunnableMethod(this, start));
+    nsContentUtils::AddScriptRunner(NewRunnableMethod(this, start));
   }
 
   return NS_OK;

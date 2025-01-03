@@ -49,6 +49,9 @@ const DOM_STORAGE_MAX_CHARS = 10000000; // 10M characters
 // or not, and should only be used for tests or debugging.
 const TIMEOUT_DISABLED_PREF = "browser.sessionstore.debug.no_auto_updates";
 
+const kNoIndex = Number.MAX_SAFE_INTEGER;
+const kLastIndex = Number.MAX_SAFE_INTEGER - 1;
+
 /**
  * Returns a lazy function that will evaluate the given
  * function |fn| only once and cache its return value.
@@ -81,6 +84,18 @@ var EventListener = {
     // Ignore load events from subframes.
     if (event.target != content.document) {
       return;
+    }
+
+    if (content.document.documentURI.startsWith("about:reader")) {
+      if (event.type == "load" &&
+          !content.document.body.classList.contains("loaded")) {
+        // Don't restore the scroll position of an about:reader page at this
+        // point; listen for the custom event dispatched from AboutReader.jsm.
+        content.addEventListener("AboutReaderContentReady", this);
+        return;
+      }
+
+      content.removeEventListener("AboutReaderContentReady", this);
     }
 
     // Restore the form data and scroll position. If we're not currently
@@ -139,7 +154,7 @@ var MessageListener = {
     }
   },
 
-  restoreHistory({epoch, tabData, loadArguments}) {
+  restoreHistory({epoch, tabData, loadArguments, isRemotenessUpdate}) {
     gContentRestore.restoreHistory(tabData, loadArguments, {
       // Note: The callbacks passed here will only be used when a load starts
       // that was not initiated by sessionstore itself. This can happen when
@@ -164,20 +179,20 @@ var MessageListener = {
     // sync about the state of the restore (particularly regarding
     // docShell.currentURI). Using a synchronous message is the easiest way
     // to temporarily synchronize them.
-    sendSyncMessage("SessionStore:restoreHistoryComplete", {epoch});
+    sendSyncMessage("SessionStore:restoreHistoryComplete", {epoch, isRemotenessUpdate});
   },
 
   restoreTabContent({loadArguments, isRemotenessUpdate}) {
     let epoch = gCurrentEpoch;
 
     // We need to pass the value of didStartLoad back to SessionStore.jsm.
-    let didStartLoad = gContentRestore.restoreTabContent(loadArguments, () => {
+    let didStartLoad = gContentRestore.restoreTabContent(loadArguments, isRemotenessUpdate, () => {
       // Tell SessionStore.jsm that it may want to restore some more tabs,
       // since it restores a max of MAX_CONCURRENT_TAB_RESTORES at a time.
       sendAsyncMessage("SessionStore:restoreTabContentComplete", {epoch, isRemotenessUpdate});
     });
 
-    sendAsyncMessage("SessionStore:restoreTabContentStarted", {epoch, didStartLoad});
+    sendAsyncMessage("SessionStore:restoreTabContentStarted", {epoch, isRemotenessUpdate});
 
     if (!didStartLoad) {
       // Pretend that the load succeeded so that event handlers fire correctly.
@@ -219,6 +234,13 @@ var SessionHistoryListener = {
     // Collect data if we start with a non-empty shistory.
     if (!SessionHistory.isEmpty(docShell)) {
       this.collect();
+      // When a tab is detached from the window, for the new window there is a
+      // new SessionHistoryListener created. Normally it is empty at this point
+      // but in a test env. the initial about:blank might have a children in which
+      // case we fire off a history message here with about:blank in it. If we
+      // don't do it ASAP then there is going to be a browser swap and the parent
+      // will be all confused by that message.
+      MessageQueue.send();
     }
 
     // Listen for page title changes.
@@ -233,9 +255,49 @@ var SessionHistoryListener = {
   },
 
   collect: function () {
+    this._fromIdx = kNoIndex;
     if (docShell) {
       MessageQueue.push("history", () => SessionHistory.collect(docShell));
     }
+  },
+
+  _fromIdx: kNoIndex,
+
+  // History can grow relatively big with the nested elements, so if we don't have to, we
+  // don't want to send the entire history all the time. For a simple optimization
+  // we keep track of the smallest index from after any change has occured and we just send
+  // the elements from that index. If something more complicated happens we just clear it
+  // and send the entire history. We always send the additional info like the current selected
+  // index (so for going back and forth between history entries we set the index to kLastIndex
+  // if nothing else changed send an empty array and the additonal info like the selected index)
+  collectFrom: function (idx) {
+    if (this._fromIdx <= idx) {
+      // If we already know that we need to update history fromn index N we can ignore any changes
+      // tha happened with an element with index larger than N.
+      // Note: initially we use kNoIndex which is MAX_SAFE_INTEGER which means we don't ignore anything
+      // here, and in case of navigation in the history back and forth we use kLastIndex which ignores
+      // only the subsequent navigations, but not any new elements added.
+      return;
+    }
+
+    this._fromIdx = idx;
+    MessageQueue.push("historychange", () => {
+      if (this._fromIdx === kNoIndex) {
+        return null;
+      }
+
+      let history = SessionHistory.collect(docShell);
+      if (kLastIndex == idx) {
+        history.entries = [];
+      } else {
+        history.entries.splice(0, this._fromIdx + 1);
+      }
+
+      history.fromIdx = this._fromIdx;
+
+      this._fromIdx = kNoIndex;
+      return history;
+    });
   },
 
   handleEvent(event) {
@@ -250,22 +312,22 @@ var SessionHistoryListener = {
     this.collect();
   },
 
-  OnHistoryNewEntry: function (newURI) {
-    this.collect();
+  OnHistoryNewEntry: function (newURI, oldIndex) {
+    this.collectFrom(oldIndex);
   },
 
   OnHistoryGoBack: function (backURI) {
-    this.collect();
+    this.collectFrom(kLastIndex);
     return true;
   },
 
   OnHistoryGoForward: function (forwardURI) {
-    this.collect();
+    this.collectFrom(kLastIndex);
     return true;
   },
 
   OnHistoryGotoIndex: function (index, gotoURI) {
-    this.collect();
+    this.collectFrom(kLastIndex);
     return true;
   },
 
@@ -477,7 +539,7 @@ var SessionStorageListener = {
 
   handleEvent: function (event) {
     if (gFrameTree.contains(event.target)) {
-      this.collect();
+      this.collectFromEvent(event);
     }
   },
 
@@ -518,8 +580,47 @@ var SessionStorageListener = {
     return size;
   },
 
+  // We don't want to send all the session storage data for all the frames
+  // for every change. So if only a few value changed we send them over as
+  // a "storagechange" event. If however for some reason before we send these
+  // changes we have to send over the entire sessions storage data, we just
+  // reset these changes.
+  _changes: undefined,
+
+  resetChanges: function () {
+    this._changes = undefined;
+  },
+
+  collectFromEvent: function (event) {
+    // TODO: we should take browser.sessionstore.dom_storage_limit into an account here.
+    if (docShell) {
+      let {url, key, newValue} = event;
+      let uri = Services.io.newURI(url, null, null);
+      let domain = uri.prePath;
+      if (!this._changes) {
+        this._changes = {};
+      }
+      if (!this._changes[domain]) {
+        this._changes[domain] = {};
+      }
+      this._changes[domain][key] = newValue;
+
+      MessageQueue.push("storagechange", () => {
+        let tmp = this._changes;
+        // If there were multiple changes we send them merged.
+        // First one will collect all the changes the rest of
+        // these messages will be ignored.
+        this.resetChanges();
+        return tmp;
+      });
+    }
+  },
+
   collect: function () {
     if (docShell) {
+      // We need the entire session storage, let's reset the pending individual change
+      // messages.
+      this.resetChanges();
       MessageQueue.push("storage", () => {
         let collected = SessionStorage.collect(docShell, gFrameTree);
 
@@ -708,10 +809,12 @@ var MessageQueue = {
         for (let histogramId of Object.keys(value)) {
           telemetry[histogramId] = value[histogramId];
         }
-      } else {
+      } else if (value || (key != "storagechange" && key != "historychange")) {
         data[key] = value;
       }
     }
+
+    this._data.clear();
 
     durationMs = Date.now() - durationMs;
     telemetry.FX_SESSION_RESTORE_CONTENT_COLLECT_DATA_LONGEST_OP_MS = durationMs;

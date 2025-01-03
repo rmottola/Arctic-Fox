@@ -9,16 +9,19 @@ include protocol PBlob;
 include protocol PColorPicker;
 include protocol PContent;
 include protocol PContentBridge;
+include protocol PDatePicker;
 include protocol PDocAccessible;
 include protocol PDocumentRenderer;
 include protocol PFilePicker;
 include protocol PIndexedDBPermissionRequest;
 include protocol PRenderFrame;
 include protocol PPluginWidget;
+include protocol PRemotePrintJob;
 include DOMTypes;
 include JavaScriptTypes;
 include URIParams;
 include BrowserConfiguration;
+include PPrintingTypes;
 include PTabContext;
 
 
@@ -69,6 +72,7 @@ using nsEventStatus from "mozilla/EventForwards.h";
 using nsSizeMode from "nsIWidgetListener.h";
 using mozilla::widget::CandidateWindowPosition from "ipc/nsGUIEventIPC.h";
 using class mozilla::NativeEventData from "ipc/nsGUIEventIPC.h";
+using mozilla::FontRange from "ipc/nsGUIEventIPC.h";
 
 namespace mozilla {
 namespace dom {
@@ -92,8 +96,15 @@ struct ShowInfo
   bool fullscreenAllowed;
   bool isPrivate;
   bool fakeShowInfo;
+  bool isTransparent;
   float dpi;
   double defaultScale;
+};
+
+union OptionalShmem
+{
+  void_t;
+  Shmem;
 };
 
 prio(normal upto urgent) sync protocol PBrowser
@@ -101,6 +112,7 @@ prio(normal upto urgent) sync protocol PBrowser
     manager PContent or PContentBridge;
 
     manages PColorPicker;
+    manages PDatePicker;
     manages PDocAccessible;
     manages PDocumentRenderer;
     manages PFilePicker;
@@ -158,6 +170,21 @@ parent:
      * the next or previous focusable element or document.
      */
     async MoveFocus(bool forward, bool forDocumentNavigation);
+
+    /**
+     * SizeShellTo request propagation to parent.
+     *
+     * aFlag            Can indicate if one of the dimensions should be ignored.
+     *                  If only one dimension has changed it has to be indicated
+     *                  by the nsIEmbeddingSiteWindow::DIM_FLAGS_IGNORE_* flags.
+     * aShellItemWidth,
+     * aShellItemHeight On parent side we won't be able to decide the dimensions
+     *                  of the shell item parameter in the original SizeShellTo
+     *                  call so we send over its dimensions that will be used
+     *                  for the actual resize.
+     **/
+    async SizeShellTo(uint32_t aFlag, int32_t aWidth, int32_t aHeight,
+                      int32_t aShellItemWidth, int32_t aShellItemHeight);
 
     async Event(RemoteDOMEvent aEvent);
 
@@ -395,6 +422,12 @@ parent:
      */
     async PColorPicker(nsString title, nsString initialColor);
 
+    /**
+     * Create an asynchronous date picker on the parent side,
+     * but don't open it yet.
+     */
+    async PDatePicker(nsString title, nsString initialDate);
+
     async PFilePicker(nsString aTitle, int16_t aMode);
 
     /**
@@ -442,6 +475,16 @@ parent:
      * OnAuthAvailable or OnAuthCancelled message.
      */
     async AsyncAuthPrompt(nsCString uri, nsString realm, uint64_t aCallbackId);
+
+    /**
+     * Look up dictionary by selected word for OSX
+     *
+     * @param aText       The word to look up
+     * @param aFontRange  Text decoration of aText
+     * @param aIsVertical true if vertical layout
+     */
+    async LookUpDictionary(nsString aText, FontRange[] aFontRangeArray,
+                           bool aIsVertical, LayoutDeviceIntPoint aPoint);
 
     async __delete__();
 
@@ -491,6 +534,8 @@ parent:
      */
     sync GetTabCount() returns (uint32_t value);
 
+    async AccessKeyNotHandled(WidgetKeyboardEvent event);
+
 child:
     async NativeSynthesisResponse(uint64_t aObserverId, nsCString aResponse);
 
@@ -517,7 +562,8 @@ parent:
     prio(high) sync DispatchKeyboardEvent(WidgetKeyboardEvent event);
 
     async InvokeDragSession(IPCDataTransfer[] transfers, uint32_t action,
-                            nsCString visualData, uint32_t width, uint32_t height,
+                            OptionalShmem visualData,
+                            uint32_t width, uint32_t height,
                             uint32_t stride, uint8_t format,
                             int32_t dragAreaX, int32_t dragAreaY);
 
@@ -561,6 +607,9 @@ child:
     async Deactivate();
 
     async ParentActivated(bool aActivated);
+
+    async SetKeyboardIndicators(UIStateChangeType showAccelerators,
+                                UIStateChangeType showFocusRings);
 
     /**
      * StopIMEStateManagement() is called when the process loses focus and
@@ -731,11 +780,12 @@ child:
      * A potential accesskey was just pressed. Look for accesskey targets
      * using the list of provided charCodes.
      *
-     * @param charCode array of potential character codes
+     * @param event keyboard event
      * @param isTrusted true if triggered by a trusted key event
      * @param modifierMask indicates which accesskey modifiers are pressed
      */
-    async HandleAccessKey(uint32_t[] charCodes, bool isTrusted, int32_t modifierMask);
+    async HandleAccessKey(WidgetKeyboardEvent event,
+                          uint32_t[] charCodes, int32_t modifierMask);
 
     /**
      * Propagate a refresh to the child process
@@ -762,6 +812,14 @@ child:
      */
     async HandledWindowedPluginKeyEvent(NativeEventData aKeyEventData,
                                         bool aIsConsumed);
+
+    /**
+     * Tell the child to print the current page with the given settings.
+     *
+     * @param aOuterWindowID the ID of the outer window to print
+     * @param aPrintData the serialized settings to print with
+     */
+    async Print(uint64_t aOuterWindowID, PrintData aPrintData);
 
 /*
  * FIXME: write protocol!

@@ -1215,7 +1215,7 @@ TypeSet::ObjectKey::clasp()
 TaggedProto
 TypeSet::ObjectKey::proto()
 {
-    return isGroup() ? group()->proto() : singleton()->getTaggedProto();
+    return isGroup() ? group()->proto() : singleton()->taggedProto();
 }
 
 TypeNewScript*
@@ -2422,7 +2422,7 @@ TemporaryTypeSet::getCommonPrototype(CompilerConstraintList* constraints, JSObje
 
         TaggedProto nproto = key->proto();
         if (isFirst) {
-            if (nproto.isLazy())
+            if (nproto.isDynamic())
                 return false;
             *proto = nproto.toObjectOrNull();
             isFirst = false;
@@ -2547,16 +2547,15 @@ js::PrintTypes(JSContext* cx, JSCompartment* comp, bool force)
     if (!force && !InferSpewActive(ISpewResult))
         return;
 
-    for (gc::ZoneCellIter i(zone, gc::AllocKind::SCRIPT); !i.done(); i.next()) {
-        RootedScript script(cx, i.get<JSScript>());
+    RootedScript script(cx);
+    for (auto iter = zone->cellIter<JSScript>(); !iter.done(); iter.next()) {
+        script = iter;
         if (script->types())
             script->types()->printTypes(cx, script);
     }
 
-    for (gc::ZoneCellIter i(zone, gc::AllocKind::OBJECT_GROUP); !i.done(); i.next()) {
-        ObjectGroup* group = i.get<ObjectGroup>();
+    for (auto group = zone->cellIter<ObjectGroup>(); !group.done(); group.next())
         group->print();
-    }
 #endif
 }
 
@@ -3009,8 +3008,11 @@ ObjectGroup::print()
     TaggedProto tagged(proto());
     fprintf(stderr, "%s : %s",
             TypeSet::ObjectGroupString(this),
-            tagged.isObject() ? TypeSet::TypeString(TypeSet::ObjectType(tagged.toObject()))
-                              : (tagged.isLazy() ? "(lazy)" : "(null)"));
+            tagged.isObject()
+            ? TypeSet::TypeString(TypeSet::ObjectType(tagged.toObject()))
+            : tagged.isDynamic()
+            ? "(dynamic)"
+            : "(null)");
 
     if (unknownProperties()) {
         fprintf(stderr, " unknown");
@@ -3121,7 +3123,7 @@ js::AddClearDefiniteGetterSetterForPrototypeChain(JSContext* cx, ObjectGroup* gr
             return false;
         if (!protoTypes->addConstraint(cx, cx->typeLifoAlloc().new_<TypeConstraintClearDefiniteGetterSetter>(group)))
             return false;
-        proto = proto->getProto();
+        proto = proto->staticPrototype();
     }
     return true;
 }
@@ -3321,7 +3323,7 @@ JSFunction::setTypeForScriptedFunction(ExclusiveContext* cx, HandleFunction fun,
         if (!setSingleton(cx, fun))
             return false;
     } else {
-        RootedObject funProto(cx, fun->getProto());
+        RootedObject funProto(cx, fun->staticPrototype());
         Rooted<TaggedProto> taggedProto(cx, TaggedProto(funProto));
         ObjectGroup* group = ObjectGroupCompartment::makeGroup(cx, &JSFunction::class_,
                                                                taggedProto);
@@ -3618,9 +3620,7 @@ ChangeObjectFixedSlotCount(JSContext* cx, PlainObject* obj, gc::AllocKind allocK
 {
     MOZ_ASSERT(OnlyHasDataProperties(obj->lastProperty()));
 
-    Shape* newShape = ReshapeForAllocKind(cx, obj->lastProperty(),
-                                          obj->getTaggedProto(),
-                                          allocKind);
+    Shape* newShape = ReshapeForAllocKind(cx, obj->lastProperty(), obj->taggedProto(), allocKind);
     if (!newShape)
         return false;
 
@@ -4070,14 +4070,20 @@ ConstraintTypeSet::trace(Zone* zone, JSTracer* trc)
     }
 }
 
-void
-ConstraintTypeSet::sweep(Zone* zone, AutoClearTypeInferenceStateOnOOM& oom)
+static inline void
+AssertGCStateForSweep(Zone* zone)
 {
     MOZ_ASSERT(zone->isGCSweepingOrCompacting());
 
     // IsAboutToBeFinalized doesn't work right on tenured objects when called
     // during a minor collection.
     MOZ_ASSERT(!zone->runtimeFromMainThread()->isHeapMinorCollecting());
+}
+
+void
+ConstraintTypeSet::sweep(Zone* zone, AutoClearTypeInferenceStateOnOOM& oom)
+{
+    AssertGCStateForSweep(zone);
 
     /*
      * Purge references to objects that are no longer live. Type sets hold
@@ -4196,8 +4202,7 @@ ObjectGroup::sweep(AutoClearTypeInferenceStateOnOOM* oom)
 
     setGeneration(zone()->types.generation);
 
-    MOZ_ASSERT(zone()->isGCSweepingOrCompacting());
-    MOZ_ASSERT(!zone()->runtimeFromMainThread()->isHeapMinorCollecting());
+    AssertGCStateForSweep(zone());
 
     Maybe<AutoClearTypeInferenceStateOnOOM> fallbackOOM;
     EnsureHasAutoClearTypeInferenceStateOnOOM(oom, zone(), fallbackOOM);
@@ -4291,8 +4296,7 @@ JSScript::maybeSweepTypes(AutoClearTypeInferenceStateOnOOM* oom)
 
     setTypesGeneration(zone()->types.generation);
 
-    MOZ_ASSERT(zone()->isGCSweepingOrCompacting());
-    MOZ_ASSERT(!zone()->runtimeFromMainThread()->isHeapMinorCollecting());
+    AssertGCStateForSweep(zone());
 
     Maybe<AutoClearTypeInferenceStateOnOOM> fallbackOOM;
     EnsureHasAutoClearTypeInferenceStateOnOOM(oom, zone(), fallbackOOM);
@@ -4436,10 +4440,8 @@ TypeZone::endSweep(JSRuntime* rt)
 void
 TypeZone::clearAllNewScriptsOnOOM()
 {
-    for (gc::ZoneCellIter iter(zone(), gc::AllocKind::OBJECT_GROUP);
-         !iter.done(); iter.next())
-    {
-        ObjectGroup* group = iter.get<ObjectGroup>();
+    for (auto iter = zone()->cellIter<ObjectGroup>(); !iter.done(); iter.next()) {
+        ObjectGroup* group = iter;
         if (!IsAboutToBeFinalizedUnbarriered(&group))
             group->maybeClearNewScriptOnOOM();
     }
@@ -4448,8 +4450,9 @@ TypeZone::clearAllNewScriptsOnOOM()
 AutoClearTypeInferenceStateOnOOM::~AutoClearTypeInferenceStateOnOOM()
 {
     if (oom) {
+        JSRuntime* rt = zone->runtimeFromMainThread();
         zone->setPreservingCode(false);
-        zone->discardJitCode(zone->runtimeFromMainThread()->defaultFreeOp());
+        zone->discardJitCode(rt->defaultFreeOp());
         zone->types.clearAllNewScriptsOnOOM();
     }
 }

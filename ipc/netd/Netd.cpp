@@ -9,10 +9,10 @@
 #include <sys/socket.h>
 
 #include "android/log.h"
+#include "base/task.h"
 
 #include "nsWhitespaceTokenizer.h"
 #include "nsXULAppAPI.h"
-#include "nsAutoPtr.h"
 #include "nsString.h"
 #include "nsThreadUtils.h"
 #include "mozilla/RefPtr.h"

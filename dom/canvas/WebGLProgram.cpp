@@ -10,6 +10,7 @@
 #include "mozilla/dom/WebGL2RenderingContextBinding.h"
 #include "mozilla/dom/WebGLRenderingContextBinding.h"
 #include "mozilla/RefPtr.h"
+#include "nsPrintfCString.h"
 #include "WebGLActiveInfo.h"
 #include "WebGLContext.h"
 #include "WebGLShader.h"
@@ -174,7 +175,7 @@ QueryProgramInfo(WebGLProgram* prog, gl::GLContext* gl)
         GLint loc = gl->fGetAttribLocation(prog->mGLName, mappedName.BeginReading());
         if (loc == -1) {
             if (mappedName != "gl_InstanceID")
-                MOZ_CRASH("Active attrib has no location.");
+                MOZ_CRASH("GFX: Active attrib has no location.");
         } else {
             info->activeAttribLocs.insert(loc);
         }
@@ -204,7 +205,7 @@ QueryProgramInfo(WebGLProgram* prog, gl::GLContext* gl)
         bool isArray;
         size_t arrayIndex;
         if (!ParseName(mappedName, &baseMappedName, &isArray, &arrayIndex))
-            MOZ_CRASH("Failed to parse `mappedName` received from driver.");
+            MOZ_CRASH("GFX: Failed to parse `mappedName` received from driver.");
 
         // Note that for good drivers, `isArray` should already be correct.
         // However, if FindUniform succeeds, it will be validator-guaranteed correct.
@@ -258,7 +259,7 @@ QueryProgramInfo(WebGLProgram* prog, gl::GLContext* gl)
             bool isArray;
             size_t arrayIndex;
             if (!ParseName(mappedName, &baseMappedName, &isArray, &arrayIndex))
-                MOZ_CRASH("Failed to parse `mappedName` received from driver.");
+                MOZ_CRASH("GFX: Failed to parse `mappedName` received from driver.");
 
             nsAutoCString baseUserName;
             if (!prog->FindUniformBlockByMappedName(baseMappedName, &baseUserName,
@@ -312,7 +313,7 @@ QueryProgramInfo(WebGLProgram* prog, gl::GLContext* gl)
             bool isArray;
             size_t arrayIndex;
             if (!ParseName(mappedName, &baseMappedName, &isArray, &arrayIndex))
-                MOZ_CRASH("Failed to parse `mappedName` received from driver.");
+                MOZ_CRASH("GFX: Failed to parse `mappedName` received from driver.");
 
             nsAutoCString baseUserName;
             if (!prog->FindVaryingByMappedName(mappedName, &baseUserName, &isArray)) {
@@ -785,8 +786,14 @@ WebGLProgram::GetUniformLocation(const nsAString& userName_wide) const
     const NS_LossyConvertUTF16toASCII userName(userName_wide);
 
     nsDependentCString baseUserName;
-    bool isArray;
-    size_t arrayIndex;
+    bool isArray = false;
+    // GLES 2.0.25, Section 2.10, p35
+    // If the the uniform location is an array, then the location of the first
+    // element of that array can be retrieved by either using the name of the
+    // uniform array, or the name of the uniform array appended with "[0]".
+    // The ParseName() can't recognize this rule. So always initialize
+    // arrayIndex with 0.
+    size_t arrayIndex = 0;
     if (!ParseName(userName, &baseUserName, &isArray, &arrayIndex))
         return nullptr;
 
@@ -811,7 +818,8 @@ WebGLProgram::GetUniformLocation(const nsAString& userName_wide) const
         return nullptr;
 
     RefPtr<WebGLUniformLocation> locObj = new WebGLUniformLocation(mContext, LinkInfo(),
-                                                                     loc, activeInfo);
+                                                                   loc, arrayIndex,
+                                                                   activeInfo);
     return locObj.forget();
 }
 
@@ -1053,7 +1061,7 @@ WebGLProgram::LinkAndUpdate()
         return;
 
     mMostRecentLinkInfo = QueryProgramInfo(this, gl);
-    MOZ_RELEASE_ASSERT(mMostRecentLinkInfo);
+    MOZ_RELEASE_ASSERT(mMostRecentLinkInfo, "GFX: most rent link info not set.");
 }
 
 bool

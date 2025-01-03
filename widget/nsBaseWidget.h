@@ -28,6 +28,7 @@ class nsAutoRollup;
 class gfxContext;
 
 namespace mozilla {
+class CompositorVsyncDispatcher;
 #ifdef ACCESSIBILITY
 namespace a11y {
 class Accessible;
@@ -45,6 +46,7 @@ class CompositorBridgeParent;
 class APZCTreeManager;
 class GeckoContentController;
 class APZEventState;
+class CompositorSession;
 struct ScrollableLayerGuid;
 } // namespace layers
 
@@ -111,6 +113,7 @@ protected:
   typedef mozilla::CSSRect CSSRect;
   typedef mozilla::ScreenRotation ScreenRotation;
   typedef mozilla::widget::CompositorWidgetProxy CompositorWidgetProxy;
+  typedef mozilla::layers::CompositorSession CompositorSession;
 
   virtual ~nsBaseWidget();
 
@@ -167,9 +170,8 @@ public:
                                           LayerManagerPersistence aPersistence = LAYER_MANAGER_CURRENT,
                                           bool* aAllowRetaining = nullptr) override;
 
-  CompositorVsyncDispatcher* GetCompositorVsyncDispatcher() override;
+  mozilla::CompositorVsyncDispatcher* GetCompositorVsyncDispatcher();
   void            CreateCompositorVsyncDispatcher();
-  virtual CompositorBridgeParent* NewCompositorBridgeParent(int aSurfaceWidth, int aSurfaceHeight);
   virtual void            CreateCompositor();
   virtual void            CreateCompositor(int aWidth, int aHeight);
   virtual void            PrepareWindowEffects() override {}
@@ -290,6 +292,10 @@ public:
   // Get the accessible for the window.
   mozilla::a11y::Accessible* GetRootAccessible();
 #endif
+
+  // Return true if this is a simple widget (that is typically not worth
+  // accelerating)
+  bool IsSmallPopup() const;
 
   nsPopupLevel PopupLevel() { return mPopupLevel; }
 
@@ -537,6 +543,11 @@ protected:
   bool UseAPZ();
 
 protected:
+  // Returns whether compositing should use an external surface size.
+  virtual bool UseExternalCompositingSurface() const {
+    return false;
+  }
+
   /**
    * Starts the OMTC compositor destruction sequence.
    *
@@ -555,8 +566,8 @@ protected:
   nsIWidgetListener* mAttachedWidgetListener;
   nsIWidgetListener* mPreviouslyAttachedWidgetListener;
   RefPtr<LayerManager> mLayerManager;
+  RefPtr<CompositorSession> mCompositorSession;
   RefPtr<CompositorBridgeChild> mCompositorBridgeChild;
-  RefPtr<CompositorBridgeParent> mCompositorBridgeParent;
   RefPtr<mozilla::CompositorVsyncDispatcher> mCompositorVsyncDispatcher;
   RefPtr<APZCTreeManager> mAPZC;
   RefPtr<GeckoContentController> mRootContentController;
@@ -581,7 +592,7 @@ protected:
   bool              mUpdateCursor;
   bool              mUseAttachedEvents;
   bool              mIMEHasFocus;
-#if defined(XP_WIN) || defined(XP_MACOSX)
+#if defined(XP_WIN) || defined(XP_MACOSX) || defined(MOZ_WIDGET_GTK)
   bool              mAccessibilityInUseFlag;
 #endif
   static nsIRollupListener* gRollupListener;

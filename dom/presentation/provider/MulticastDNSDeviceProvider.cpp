@@ -9,7 +9,6 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
 #include "mozilla/unused.h"
-#include "nsAutoPtr.h"
 #include "nsComponentManagerUtils.h"
 #include "nsIObserverService.h"
 #include "nsServiceManagerUtils.h"
@@ -721,7 +720,7 @@ MulticastDNSDeviceProvider::OnRegistrationFailed(nsIDNSServiceInfo* aServiceInfo
 
   if (aErrorCode == nsIDNSRegistrationListener::ERROR_SERVICE_NOT_RUNNING) {
     return NS_DispatchToMainThread(
-             NS_NewRunnableMethod(this, &MulticastDNSDeviceProvider::RegisterService));
+             NewRunnableMethod(this, &MulticastDNSDeviceProvider::RegisterService));
   }
 
   return NS_OK;

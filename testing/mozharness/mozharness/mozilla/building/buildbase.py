@@ -613,8 +613,8 @@ class BuildScript(BuildbotMixin, PurgeMixin, MockMixin, BalrogMixin,
         self.client_id = None
         self.access_token = None
 
-        # Call this before creating the virtualenv so that we have things like
-        # symbol_server_host in the config
+        # Call this before creating the virtualenv so that we can support
+        # substituting config values with other config values.
         self.query_build_env()
 
         # We need to create the virtualenv directly (without using an action) in
@@ -829,26 +829,24 @@ or run without that action (ie: --no-{action})"
         self.info("Skipping......")
         return
 
-    def query_build_env(self, replace_dict=None, **kwargs):
-        c = self.config
+    def query_is_nightly_promotion(self):
+        platform_enabled = self.config.get('enable_nightly_promotion')
+        branch_enabled = self.branch in self.config.get('nightly_promotion_branches')
+        return platform_enabled and branch_enabled
 
-        if not replace_dict:
-            replace_dict = {}
-        # now let's grab the right host based off staging/production
-        # symbol_server_host is defined in build_pool_specifics.py
-        replace_dict.update({"symbol_server_host": c['symbol_server_host']})
+    def query_build_env(self, **kwargs):
+        c = self.config
 
         # let's evoke the base query_env and make a copy of it
         # as we don't always want every key below added to the same dict
         env = copy.deepcopy(
-            super(BuildScript, self).query_env(replace_dict=replace_dict,
-                                               **kwargs)
+            super(BuildScript, self).query_env(**kwargs)
         )
 
         # first grab the buildid
         env['MOZ_BUILD_DATE'] = self.query_buildid()
 
-        if self.query_is_nightly():
+        if self.query_is_nightly() or self.query_is_nightly_promotion():
             env["IS_NIGHTLY"] = "yes"
             # in branch_specifics.py we might set update_channel explicitly
             if c.get('update_channel'):
@@ -885,15 +883,18 @@ or run without that action (ie: --no-{action})"
         mach_env = {}
         if c.get('upload_env'):
             mach_env.update(c['upload_env'])
-            mach_env['UPLOAD_HOST'] = mach_env['UPLOAD_HOST'] % {
-                'stage_server': c['stage_server']
-            }
-            mach_env['UPLOAD_USER'] = mach_env['UPLOAD_USER'] % {
-                'stage_username': c['stage_username']
-            }
-            mach_env['UPLOAD_SSH_KEY'] = mach_env['UPLOAD_SSH_KEY'] % {
-                'stage_ssh_key': c['stage_ssh_key']
-            }
+            if 'UPLOAD_HOST' in mach_env:
+                mach_env['UPLOAD_HOST'] = mach_env['UPLOAD_HOST'] % {
+                    'stage_server': c['stage_server']
+                }
+            if 'UPLOAD_USER' in mach_env:
+                mach_env['UPLOAD_USER'] = mach_env['UPLOAD_USER'] % {
+                    'stage_username': c['stage_username']
+                }
+            if 'UPLOAD_SSH_KEY' in mach_env:
+                mach_env['UPLOAD_SSH_KEY'] = mach_env['UPLOAD_SSH_KEY'] % {
+                    'stage_ssh_key': c['stage_ssh_key']
+                }
 
         if self.query_is_nightly():
             mach_env['LATEST_MAR_DIR'] = c['latest_mar_dir'] % {
@@ -1518,9 +1519,41 @@ or run without that action (ie: --no-{action})"
         else:
             paths.append( ('libxul.so', os.path.join(dirs['abs_obj_dir'], 'dist', 'bin', 'libxul.so')) )
 
+        size_measurements = []
+        installer_size = 0
         for (name, path) in paths:
+            # FIXME: Remove the tinderboxprints when bug 1161249 is fixed and
+            # we're displaying perfherder data for each job automatically
             if os.path.exists(path):
-                self.info('TinderboxPrint: Size of %s<br/>%s bytes\n' % (name, self.query_filesize(path)))
+                filesize = self.query_filesize(path)
+                self.info('TinderboxPrint: Size of %s<br/>%s bytes\n' % (
+                    name, filesize))
+                if any(name.endswith(extension) for extension in ['apk',
+                                                                  'dmg',
+                                                                  'bz2',
+                                                                  'zip']):
+                    installer_size = filesize
+                else:
+                    size_measurements.append({'name': name, 'value': filesize})
+
+        perfherder_data = {
+            "framework": {
+                "name": "build_metrics"
+            },
+            "suites": [],
+        }
+        if installer_size or size_measurements:
+            perfherder_data["suites"].append({
+                "name": "installer size",
+                "value": installer_size,
+                "subtests": size_measurements
+            })
+        if (hasattr(self, "build_metrics_summary") and
+            self.build_metrics_summary):
+            perfherder_data["suites"].append(self.build_metrics_summary)
+
+        if perfherder_data["suites"]:
+            self.info('PERFHERDER_DATA: %s' % json.dumps(perfherder_data))
 
     def _set_file_properties(self, file_name, find_dir, prop_type,
                              error_level=ERROR):

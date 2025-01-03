@@ -1223,11 +1223,10 @@ nsJARChannel::OnDataAvailable(nsIRequest *req, nsISupports *ctx,
         if (NS_IsMainThread()) {
             FireOnProgress(offset + count);
         } else {
-            nsCOMPtr<nsIRunnable> runnable =
-              NS_NewRunnableMethodWithArg<uint64_t>(this,
-                                                    &nsJARChannel::FireOnProgress,
-                                                    offset + count);
-            NS_DispatchToMainThread(runnable);
+            NS_DispatchToMainThread(NewRunnableMethod
+                                    <uint64_t>(this,
+                                               &nsJARChannel::FireOnProgress,
+                                               offset + count));
         }
     }
 

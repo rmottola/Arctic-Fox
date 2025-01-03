@@ -1,11 +1,11 @@
-let protocol = require("devtools/server/protocol");
-let {method, Arg, Option, RetVal} = protocol;
+var protocol = require("devtools/shared/protocol");
+var {method, Arg, Option, RetVal} = protocol;
 
 protocol.types.addActorType("child");
 protocol.types.addActorType("root");
 
 // The child actor doesn't provide a form description
-let ChildActor = protocol.ActorClass({
+var ChildActor = protocol.ActorClass({
   typeName: "child",
   initialize(conn) {
     protocol.Actor.prototype.initialize.call(this, conn);

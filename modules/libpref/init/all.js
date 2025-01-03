@@ -23,6 +23,9 @@ pref("keyword.enabled", false);
 pref("general.useragent.locale", "chrome://global/locale/intl.properties");
 pref("general.useragent.compatMode", 1);
 
+pref("app.releaseNotesURL", "https://github.com/rmottola/Arctic-Fox/releases/tag/v%VERSION%");
+
+
 // This pref exists only for testing purposes. In order to disable all
 // overrides by default, don't initialize UserAgentOverrides.jsm.
 pref("general.useragent.site_specific_overrides", true);
@@ -281,6 +284,9 @@ pref("browser.triple_click_selects_paragraph", true);
 // Print/Preview Shrink-To-Fit won't shrink below 20% for text-ish documents.
 pref("print.shrink-to-fit.scale-limit-percent", 20);
 
+// Whether we should display simplify page checkbox on print preview UI
+pref("print.use_simplify_page", false);
+
 // Enable scale transform for stretchy MathML operators. See bug 414277.
 pref("mathml.scale_stretchy_operators.enabled", true);
 
@@ -333,6 +339,7 @@ pref("media.wmf.decoder.thread-count", -1);
 pref("media.wmf.low-latency.enabled", false);
 pref("media.wmf.skip-blacklist", false);
 pref("media.windows-media-foundation.allow-d3d11-dxva", true);
+pref("media.wmf.disable-d3d11-for-dlls", "igd10umd32.dll: 9.17.10.2857; isonyvideoprocessor.dll: 4.1.2247.8090, 4.1.2153.6200; tosqep.dll: 1.2.15.526, 1.1.12.201, 1.0.11.318, 1.0.11.215; tosqep64.dll: 1.1.12.201, 1.0.11.215");
 #endif
 #if defined(MOZ_FFMPEG)
 pref("media.ffmpeg.enabled", true);
@@ -369,6 +376,9 @@ pref("media.apple.mp4.enabled", true);
 pref("media.decoder-doctor.notifications-allowed", "MediaWidevineNoWMFNoSilverlight");
 // Whether we report partial failures.
 pref("media.decoder-doctor.verbose", false);
+
+// Whether to suspend decoding of videos in background tabs.
+pref("media.suspend-bkgnd-video.enabled", true);
 
 #ifdef MOZ_WEBRTC
 pref("media.navigator.enabled", true);
@@ -467,7 +477,7 @@ pref("media.navigator.audio.full_duplex", false);
 #elif defined(XP_WIN)
 pref("media.peerconnection.capture_delay", 50);
 pref("media.getusermedia.playout_delay", 40);
-pref("media.navigator.audio.full_duplex", false);
+pref("media.navigator.audio.full_duplex", true);
 #elif defined(ANDROID)
 pref("media.peerconnection.capture_delay", 100);
 pref("media.getusermedia.playout_delay", 100);
@@ -533,8 +543,6 @@ pref("media.encoder.omx.enabled", true);
 
 // Whether to autostart a media element with an |autoplay| attribute
 pref("media.autoplay.enabled", true);
-// Whether to autostart a media element with an autoplaying script event
-pref("media.autoplay.allowscripted", true);
 
 // The default number of decoded video frames that are enqueued in
 // MediaDecoderReader's mVideoQueue.
@@ -789,6 +797,13 @@ pref("canvas.filters.enabled", false);
 pref("canvas.path.enabled", true);
 pref("canvas.capturestream.enabled", true);
 
+// Disable the ImageBitmap-extensions in the release build.
+#ifdef RELEASE_BUILD
+pref("canvas.imagebitmap_extensions.enabled", false);
+#else
+pref("canvas.imagebitmap_extensions.enabled", true);
+#endif
+
 // We want the ability to forcibly disable platform a11y, because
 // some non-a11y-related components attempt to bring it up.  See bug
 // 538530 for details about Windows; we have a pref here that allows it
@@ -829,8 +844,6 @@ pref("accessibility.typeaheadfind.autostart", true);
 //     1 - "always" (case-sensitive)
 // other - "auto"   (case-sensitive for mixed-case input, insensitive otherwise)
 pref("accessibility.typeaheadfind.casesensitive", 0);
-pref("accessibility.typeaheadfind.highlightallbydefault", false);
-pref("accessibility.typeaheadfind.highlightallremember", false);
 pref("accessibility.typeaheadfind.linksonly", true);
 pref("accessibility.typeaheadfind.startlinksonly", false);
 pref("accessibility.typeaheadfind.timeout", 4000);
@@ -842,8 +855,10 @@ pref("accessibility.typeaheadfind.prefillwithselection", false);
 #else
 pref("accessibility.typeaheadfind.prefillwithselection", true);
 #endif
-pref("accessibility.typeaheadfind.matchesCountTimeout", 250);
-pref("accessibility.typeaheadfind.matchesCountLimit", 100);
+pref("accessibility.typeaheadfind.matchesCountTimeout", 100);
+pref("accessibility.typeaheadfind.matchesCountLimit", 1000);
+pref("findbar.highlightAll", false);
+pref("findbar.modalHighlight", false);
 
 // use Mac OS X Appearance panel text smoothing setting when rendering text, disabled by default
 pref("gfx.use_text_smoothing_setting", false);
@@ -878,7 +893,7 @@ pref("toolkit.identity.enabled", false);
 pref("toolkit.identity.debug", false);
 
 // AsyncShutdown delay before crashing in case of shutdown freeze
-pref("toolkit.asyncshutdown.timeout.crash", 60000);
+pref("toolkit.asyncshutdown.crash_timeout", 60000);
 // Extra logging for AsyncShutdown barriers and phases
 pref("toolkit.asyncshutdown.log", false);
 
@@ -910,7 +925,7 @@ pref("devtools.debugger.prompt-connection", true);
 // Block tools from seeing / interacting with certified apps
 pref("devtools.debugger.forbid-certified-apps", true);
 // List of permissions that a sideloaded app can't ask for
-pref("devtools.apps.forbidden-permissions", "embed-apps,engineering-mode,embed-widgets");
+pref("devtools.apps.forbidden-permissions", "embed-apps,embed-widgets");
 
 // DevTools default color unit
 pref("devtools.defaultColorUnit", "authored");
@@ -1444,6 +1459,7 @@ pref("javascript.options.baselinejit",      true);
 pref("javascript.options.ion",              true);
 pref("javascript.options.asmjs",            true);
 pref("javascript.options.wasm",             false);
+pref("javascript.options.wasm_baselinejit", false);
 pref("javascript.options.native_regexp",    true);
 pref("javascript.options.parallel_parsing", true);
 #if !defined(RELEASE_BUILD) && !defined(ANDROID) && !defined(MOZ_B2G) && !defined(XP_IOS)
@@ -1467,7 +1483,6 @@ pref("javascript.options.mem.max", -1);
 pref("javascript.options.mem.gc_per_compartment", true);
 pref("javascript.options.mem.gc_incremental", true);
 pref("javascript.options.mem.gc_incremental_slice_ms", 20);
-pref("javascript.options.mem.gc_generational", false);
 pref("javascript.options.mem.gc_compacting", true);
 pref("javascript.options.mem.log", false);
 pref("javascript.options.mem.notify", false);
@@ -1665,7 +1680,7 @@ pref("network.http.referer.XOriginPolicy", 0);
 pref("network.http.sendSecureXSiteReferrer", true);
 
 // Controls whether referrer attributes in <a>, <img>, <area>, and <iframe> are honoured
-pref("network.http.enablePerElementReferrer", false);
+pref("network.http.enablePerElementReferrer", true);
 
 // Maximum number of consecutive redirects before aborting.
 pref("network.http.redirection-limit", 20);
@@ -1801,6 +1816,12 @@ pref("network.http.enable-packaged-apps", false);
 // Set to false if you don't need the signed packaged web app support (i.e. NSec).
 pref("network.http.signed-packages.enabled", false);
 
+// If it is set to false, headers with empty value will not appear in the header
+// array - behavior as it used to be. If it is true: empty headers coming from
+// the network will exist in header array as empty string. Call SetHeader with
+// an empty value will still delete the header.(Bug 6699259)
+pref("network.http.keep_empty_response_headers_as_empty_string", false);
+
 // default values for FTP
 // in a DSCP environment this should be 40 (0x28, or AF11), per RFC-4594,
 // Section 4.8 "High-Throughput Data Service Class", and 80 (0x50, or AF22)
@@ -1866,7 +1887,12 @@ pref("dom.server-events.default-reconnection-time", 5000); // in milliseconds
 // by the jar channel.
 pref("network.jar.open-unsafe-types", false);
 // If true, loading remote JAR files using the jar: protocol will be prevented.
+#ifdef RELEASE_BUILD
+// Keep allowing remote JAR files for IBM iNotes (see bug 1255139) for now.
 pref("network.jar.block-remote-files", false);
+#else
+pref("network.jar.block-remote-files", true);
+#endif
 
 // This preference, if true, causes all UTF-8 domain names to be normalized to
 // punycode.  The intention is to allow UTF-8 domain names as input, but never
@@ -2664,7 +2690,7 @@ pref("layout.css.text-align-unsafe-value.enabled", false);
 
 // Is support for CSS "float: inline-{start,end}" and
 // "clear: inline-{start,end}" enabled?
-#if defined(MOZ_B2G) || defined(NIGHTLY_BUILD)
+#if defined(MOZ_B2G) || !defined(RELEASE_BUILD)
 pref("layout.css.float-logical-values.enabled", true);
 #else
 pref("layout.css.float-logical-values.enabled", false);
@@ -2744,7 +2770,11 @@ pref("layout.css.variables.enabled", true);
 pref("layout.css.overflow-clip-box.enabled", false);
 
 // Is support for CSS grid enabled?
+#ifdef RELEASE_BUILD
 pref("layout.css.grid.enabled", false);
+#else
+pref("layout.css.grid.enabled", true);
+#endif
 
 // Is support for CSS "grid-template-{columns,rows}: subgrid X" enabled?
 pref("layout.css.grid-template-subgrid-value.enabled", false);
@@ -2851,6 +2881,9 @@ pref("dom.animations-api.core.enabled", true);
 // Note that if dom.animations-api.core.enabled is true, this preference is
 // ignored.
 pref("dom.animations-api.element-animate.enabled", true);
+
+// Pref to throttle offsreen animations
+pref("dom.animations.offscreen-throttling", true);
 
 // pref to permit users to make verified SOAP calls by default
 pref("capability.policy.default.SOAPCall.invokeVerifySourceHeader", "allAccess");
@@ -3555,10 +3588,6 @@ pref("plugin.scan.plid.all", true);
 
 // Whether sending WM_MOUSEWHEEL and WM_MOUSEHWHEEL to plugins on Windows.
 pref("plugin.mousewheel.enabled", true);
-
-// Help Windows NT, 2000, and XP dialup a RAS connection
-// when a network address is unreachable.
-pref("network.autodial-helper.enabled", true);
 
 // Switch the keyboard layout per window
 pref("intl.keyboard.per_window_layout", false);
@@ -4676,10 +4705,11 @@ pref("gfx.gralloc.fence-with-readpixels", false);
 pref("stagefright.force-enabled", false);
 pref("stagefright.disabled", false);
 
-#ifdef XP_WIN
-// The default TCP send window on Windows is too small, and autotuning only occurs on receive
-pref("network.tcp.sendbuffer", 131072);
-#endif
+// sendbuffer of 0 means use OS default, sendbuffer unset means use
+// gecko default which varies depending on windows version and is OS
+// default on non windows
+// pref("network.tcp.sendbuffer", 0);
+
 // TCP Keepalive
 pref("network.tcp.keepalive.enabled", true);
 // Default idle time before first TCP keepalive probe; same time for interval
@@ -4806,7 +4836,8 @@ pref("gfx.apitrace.enabled",false);
 #ifdef MOZ_X11
 pref("gfx.content.use-native-pushlayer", true);
 #ifdef MOZ_WIDGET_GTK
-pref("gfx.xrender.enabled",true);
+pref("gfx.xrender.enabled",false);
+pref("widget.allow-gtk-dark-theme", false);
 #endif
 #endif
 
@@ -4895,6 +4926,11 @@ pref("alerts.durationImmediate", 20000);
 
 // DOM full-screen API.
 pref("full-screen-api.enabled", false);
+#ifdef RELEASE_BUILD
+pref("full-screen-api.unprefix.enabled", false);
+#else
+pref("full-screen-api.unprefix.enabled", true);
+#endif
 pref("full-screen-api.allow-trusted-requests-only", true);
 pref("full-screen-api.pointer-lock.enabled", true);
 // transition duration of fade-to-black and fade-from-black, unit: ms
@@ -5222,6 +5258,8 @@ pref("dom.forms.inputmode", true);
 // InputMethods for soft keyboards in B2G
 pref("dom.mozInputMethod.enabled", false);
 
+pref("dom.flyweb.enabled", false);
+
 // Telephony API
 #ifdef MOZ_B2G_RIL
 pref("dom.telephony.enabled", true);
@@ -5263,9 +5301,6 @@ pref("dom.voicemail.enabled", false);
 // parameter omitted.
 pref("dom.voicemail.defaultServiceId", 0);
 
-// DOM Inter-App Communication API.
-pref("dom.inter-app-communication-api.enabled", false);
-
 // Disable mapped array buffer by default.
 pref("dom.mapped_arraybuffer.enabled", false);
 
@@ -5273,7 +5308,16 @@ pref("dom.mapped_arraybuffer.enabled", false);
 pref("urlclassifier.malwareTable", "goog-malware-shavar,goog-unwanted-shavar,test-malware-simple,test-unwanted-simple");
 pref("urlclassifier.phishTable", "goog-phish-shavar,test-phish-simple");
 pref("urlclassifier.downloadBlockTable", "");
+
+#ifdef XP_WIN
+ // Only download the whitelist on Windows, since the whitelist is
+ // only useful for suppressing remote lookups for signed binaries which we can
+ // only verify on Windows (Bug 974579). Other platforms always do remote lookups.
+pref("urlclassifier.downloadAllowTable", "goog-downloadwhite-digest256");
+#else
 pref("urlclassifier.downloadAllowTable", "");
+#endif
+
 pref("urlclassifier.disallow_completions", "test-malware-simple,test-phish-simple,test-unwanted-simple,test-track-simple,test-trackwhite-simple,test-forbid-simple,goog-downloadwhite-digest256,mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256,test-block-simple,mozplugin-block-digest256,mozplugin2-block-digest256");
 
 // The table and update/gethash URLs for Safebrowsing phishing and malware
@@ -5438,6 +5482,8 @@ pref("browser.search.update", true);
 pref("browser.search.update.log", false);
 pref("browser.search.update.interval", 21600);
 pref("browser.search.suggest.enabled", true);
+pref("browser.search.reset.enabled", false);
+pref("browser.search.reset.whitelist", "");
 pref("browser.search.geoSpecificDefaults", false);
 pref("browser.search.geoip.url", "https://location.services.mozilla.com/v1/country?key=%MOZILLA_API_KEY%");
 // NOTE: this timeout figure is also the "high" value for the telemetry probe
@@ -5505,6 +5551,12 @@ pref("reader.errors.includeURLs", false);
 
 // The default relative font size in reader mode (1-9)
 pref("reader.font_size", 5);
+
+// The default relative content width in reader mode (1-9)
+pref("reader.content_width", 3);
+
+// The default relative line height in reader mode (1-9)
+pref("reader.line_height", 4);
 
 // The default color scheme in reader mode (light, dark, sepia, auto)
 // auto = color automatically adjusts according to ambient light level
@@ -5592,3 +5644,17 @@ pref("dom.mozBrowserFramesEnabled", false);
 
 // Is support for 'color-adjust' CSS property enabled?
 pref("layout.css.color-adjust.enabled", true);
+
+pref("dom.audiochannel.audioCompeting", false);
+
+// Disable Node.rootNode in release builds.
+#ifdef RELEASE_BUILD
+pref("dom.node.rootNode.enabled", false);
+#else
+pref("dom.node.rootNode.enabled", true);
+#endif
+
+// Default media volume
+pref("media.default_volume", "1.0");
+
+pref("media.seekToNextFrame.enabled", true);

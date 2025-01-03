@@ -501,10 +501,6 @@ MainThreadStopSyncLoopRunnable::WorkerRun(JSContext* aCx,
   nsCOMPtr<nsIEventTarget> syncLoopTarget;
   mSyncLoopTarget.swap(syncLoopTarget);
 
-  if (!mResult) {
-    MaybeSetException();
-  }
-
   aWorkerPrivate->StopSyncLoop(syncLoopTarget, mResult);
   return true;
 }
@@ -563,13 +559,6 @@ WorkerControlRunnable::DispatchInternal()
   MOZ_ASSERT(mainThread);
 
   return NS_SUCCEEDED(mainThread->Dispatch(runnable.forget(), NS_DISPATCH_NORMAL));
-}
-
-void
-MainThreadWorkerControlRunnable::PostDispatch(WorkerPrivate* aWorkerPrivate,
-                                              bool aDispatchResult)
-{
-  AssertIsOnMainThread();
 }
 
 NS_IMPL_ISUPPORTS_INHERITED0(WorkerControlRunnable, WorkerRunnable)

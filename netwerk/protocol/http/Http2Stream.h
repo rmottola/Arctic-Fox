@@ -15,13 +15,13 @@
 #include "nsISupportsPriority.h"
 #include "SimpleBuffer.h"
 
-class nsStandardURL;
 class nsIInputStream;
 class nsIOutputStream;
 
 namespace mozilla {
 namespace net {
 
+class nsStandardURL;
 class Http2Session;
 class Http2Decompressor;
 
@@ -81,6 +81,7 @@ public:
   }
 
   void Close(nsresult reason);
+  void SetResponseIsComplete();
 
   void SetRecvdFin(bool aStatus);
   bool RecvdFin() { return mRecvdFin; }

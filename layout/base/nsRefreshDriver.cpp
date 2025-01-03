@@ -44,7 +44,7 @@
 #include "nsViewManager.h"
 #include "GeckoProfiler.h"
 #include "nsNPAPIPluginInstance.h"
-#include "nsPerformance.h"
+#include "mozilla/dom/Performance.h"
 #include "mozilla/dom/WindowBinding.h"
 #include "mozilla/RestyleManager.h"
 #include "mozilla/RestyleManagerHandle.h"
@@ -104,6 +104,11 @@ namespace {
   // vsync to the main thread has been delayed by at least 2^i ms. Use
   // GetJankLevels to grab a copy of this array.
   uint64_t sJankLevels[12];
+
+  // The number outstanding nsRefreshDrivers (that have been created but not
+  // disconnected). When this reaches zero we will call
+  // nsRefreshDriver::Shutdown.
+  static uint32_t sRefreshDriverCount = 0;
 }
 
 namespace mozilla {
@@ -420,9 +425,9 @@ private:
         }
 
         nsCOMPtr<nsIRunnable> vsyncEvent =
-             NS_NewRunnableMethodWithArg<TimeStamp>(this,
-                                                    &RefreshDriverVsyncObserver::TickRefreshDriver,
-                                                    aVsyncTimestamp);
+             NewRunnableMethod<TimeStamp>(this,
+                                          &RefreshDriverVsyncObserver::TickRefreshDriver,
+                                          aVsyncTimestamp);
         NS_DispatchToMainThread(vsyncEvent);
       } else {
         RefPtr<RefreshDriverVsyncObserver> kungFuDeathGrip(this);
@@ -894,11 +899,6 @@ GetFirstFrameDelay(imgIRequest* req)
 }
 
 /* static */ void
-nsRefreshDriver::InitializeStatics()
-{
-}
-
-/* static */ void
 nsRefreshDriver::Shutdown()
 {
   // clean up our timers
@@ -1028,18 +1028,29 @@ nsRefreshDriver::nsRefreshDriver(nsPresContext* aPresContext)
     mSkippedPaints(false),
     mResizeSuppressed(false)
 {
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(mPresContext,
+             "Need a pres context to tell us to call Disconnect() later "
+             "and decrement sRefreshDriverCount.");
+
   mMostRecentRefreshEpochTime = JS_Now();
   mMostRecentRefresh = TimeStamp::Now();
   mMostRecentTick = mMostRecentRefresh;
   mNextThrottledFrameRequestTick = mMostRecentTick;
   mNextRecomputeVisibilityTick = mMostRecentTick;
+
+  ++sRefreshDriverCount;
 }
 
 nsRefreshDriver::~nsRefreshDriver()
 {
+  MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(ObserverCount() == 0,
              "observers should have unregistered");
   MOZ_ASSERT(!mActiveTimer, "timer should be gone");
+  MOZ_ASSERT(!mPresContext,
+             "Should have called Disconnect() and decremented "
+             "sRefreshDriverCount!");
 
   if (mRootRefresh) {
     mRootRefresh->RemoveRefreshObserver(this, Flush_Style);
@@ -1598,7 +1609,7 @@ nsRefreshDriver::RunFrameRequestCallbacks(TimeStamp aNowTime)
         docCallbacks.mDocument->GetInnerWindow();
       DOMHighResTimeStamp timeStamp = 0;
       if (innerWindow && innerWindow->IsInnerWindow()) {
-        nsPerformance* perf = innerWindow->GetPerformance();
+        mozilla::dom::Performance* perf = innerWindow->GetPerformance();
         if (perf) {
           timeStamp = perf->GetDOMTiming()->TimeStampToDOMHighRes(aNowTime);
         }
@@ -1869,7 +1880,7 @@ nsRefreshDriver::Tick(int64_t aNowEpoch, TimeStamp aNowTime)
       MOZ_ASSERT(req, "Unable to retrieve the image request");
       nsCOMPtr<imgIContainer> image;
       if (NS_SUCCEEDED(req->GetImage(getter_AddRefs(image)))) {
-        imagesToRefresh.AppendElement(image);
+        imagesToRefresh.AppendElement(image.forget());
       }
     }
 
@@ -1980,7 +1991,7 @@ nsRefreshDriver::Thaw()
       // updates our mMostRecentRefresh, but the DoRefresh call won't run
       // and notify our observers until we get back to the event loop.
       // Thus MostRecentRefresh() will lie between now and the DoRefresh.
-      NS_DispatchToCurrentThread(NS_NewRunnableMethod(this, &nsRefreshDriver::DoRefresh));
+      NS_DispatchToCurrentThread(NewRunnableMethod(this, &nsRefreshDriver::DoRefresh));
       EnsureTimerStarted();
     }
   }
@@ -2208,6 +2219,21 @@ nsRefreshDriver::CancelPendingEvents(nsIDocument* aDocument)
   for (auto i : Reversed(MakeRange(mPendingEvents.Length()))) {
     if (mPendingEvents[i].mTarget->OwnerDoc() == aDocument) {
       mPendingEvents.RemoveElementAt(i);
+    }
+  }
+}
+
+void
+nsRefreshDriver::Disconnect()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  StopTimer();
+
+  if (mPresContext) {
+    mPresContext = nullptr;
+    if (--sRefreshDriverCount == 0) {
+      Shutdown();
     }
   }
 }

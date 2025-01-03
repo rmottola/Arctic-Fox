@@ -62,6 +62,7 @@ DIRS += [
     'fetch',
     'filehandle',
     'filesystem',
+    'flyweb',
     'fmradio',
     'geolocation',
     'html',
@@ -113,6 +114,8 @@ DIRS += [
     'vr',
     'newapps',
     'u2f',
+    'console',
+    'performance',
 ]
 
 if CONFIG['OS_ARCH'] == 'WINNT':
@@ -151,8 +154,7 @@ if CONFIG['MOZ_B2G']:
     DIRS += [
         'downloads',
         'identity',
-        'mobileid',
-        'engineeringmode'
+        'mobileid'
     ]
 
 DIRS += ['presentation']

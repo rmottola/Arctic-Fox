@@ -394,12 +394,7 @@ nsTextControlFrame::CreateAnonymousContent(nsTArray<ContentInfo>& aElements)
     }
     initializer = new EditorInitializer(this);
     Properties().Set(TextControlInitializer(),initializer);
-    if (!nsContentUtils::AddScriptRunner(initializer)) {
-      initializer->Revoke(); // paranoia
-      Properties().Delete(TextControlInitializer());
-      delete initializer;
-      return NS_ERROR_OUT_OF_MEMORY;
-    }
+    nsContentUtils::AddScriptRunner(initializer);
   }
 
   return NS_OK;
@@ -1044,7 +1039,7 @@ nsTextControlFrame::GetSelectionRange(int32_t* aSelectionStart,
   NS_ENSURE_SUCCESS(rv, rv);
   NS_ENSURE_TRUE(selection, NS_ERROR_FAILURE);
 
-  dom::Selection* sel = static_cast<dom::Selection*>(selection.get());
+  dom::Selection* sel = selection->AsSelection();
   if (aDirection) {
     nsDirection direction = sel->GetSelectionDirection();
     if (direction == eDirNext) {

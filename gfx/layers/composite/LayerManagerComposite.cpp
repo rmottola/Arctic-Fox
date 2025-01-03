@@ -68,6 +68,8 @@
 #endif
 #include "GeckoProfiler.h"
 #include "TextRenderer.h"               // for TextRenderer
+#include "mozilla/layers/CompositorBridgeParent.h"
+#include "TreeTraversal.h"              // for ForEachNode
 
 class gfxContext;
 
@@ -87,11 +89,12 @@ ToLayerComposite(Layer* aLayer)
 
 static void ClearSubtree(Layer* aLayer)
 {
-  ToLayerComposite(aLayer)->CleanupResources();
-  for (Layer* child = aLayer->GetFirstChild(); child;
-       child = child->GetNextSibling()) {
-    ClearSubtree(child);
-  }
+  ForEachNode<ForwardIterator>(
+      aLayer,
+      [] (Layer* layer)
+      {
+        ToLayerComposite(layer)->CleanupResources();
+      });
 }
 
 void
@@ -392,6 +395,7 @@ LayerManagerComposite::EndTransaction(const TimeStamp& aTimeStamp,
   if (mRoot && !(aFlags & END_NO_IMMEDIATE_REDRAW)) {
     MOZ_ASSERT(!aTimeStamp.IsNull());
     UpdateAndRender();
+    mCompositor->FlushPendingNotifyNotUsed();
   } else {
     // Modified the layer tree.
     mGeometryChanged = true;
@@ -564,7 +568,7 @@ LayerManagerComposite::InvalidateDebugOverlay(nsIntRegion& aInvalidRegion, const
 
 static uint16_t sFrameCount = 0;
 void
-LayerManagerComposite::RenderDebugOverlay(const Rect& aBounds)
+LayerManagerComposite::RenderDebugOverlay(const IntRect& aBounds)
 {
   bool drawFps = gfxPrefs::LayersDrawFPS();
   bool drawFrameCounter = gfxPrefs::DrawFrameCounter();
@@ -635,11 +639,11 @@ LayerManagerComposite::RenderDebugOverlay(const Rect& aBounds)
   }
 
   if (drawFrameColorBars) {
-    gfx::Rect sideRect(0, 0, 10, aBounds.height);
+    gfx::IntRect sideRect(0, 0, 10, aBounds.height);
 
     EffectChain effects;
     effects.mPrimaryEffect = new EffectSolidColor(gfxUtils::GetColorForFrameNumber(sFrameCount));
-    mCompositor->DrawQuad(sideRect,
+    mCompositor->DrawQuad(Rect(sideRect),
                           sideRect,
                           effects,
                           1.0,
@@ -656,7 +660,7 @@ LayerManagerComposite::RenderDebugOverlay(const Rect& aBounds)
     int padding = 2;
     float opacity = 1.0;
     const uint16_t bitWidth = 5;
-    gfx::Rect clip(0,0, bitWidth*640, bitWidth*640);
+    gfx::IntRect clip(0,0, bitWidth*640, bitWidth*640);
 
     // Draw the white squares at once
     gfx::Color bitColor(1.0, 1.0, 1.0, 1.0);
@@ -717,6 +721,7 @@ LayerManagerComposite::PushGroupForLayerEffects()
       mTwoPassTmpTarget->GetOrigin() != previousTarget->GetOrigin()) {
     mTwoPassTmpTarget = mCompositor->CreateRenderTarget(rect, INIT_MODE_NONE);
   }
+  MOZ_ASSERT(mTwoPassTmpTarget);
   mCompositor->SetRenderTarget(mTwoPassTmpTarget);
   return previousTarget;
 }
@@ -780,24 +785,21 @@ LayerManagerComposite::PopGroupForLayerEffects(RefPtr<CompositingRenderTarget> a
   effectChain.mPrimaryEffect = new EffectRenderTarget(mTwoPassTmpTarget);
   effectChain.mSecondaryEffects[EffectTypes::COLOR_MATRIX] = new EffectColorMatrix(effectMatrix);
 
-  gfx::Rect clipRectF(aClipRect.x, aClipRect.y, aClipRect.width, aClipRect.height);
-  mCompositor->DrawQuad(Rect(Point(0, 0), Size(mTwoPassTmpTarget->GetSize())), clipRectF, effectChain, 1.,
+  mCompositor->DrawQuad(Rect(Point(0, 0), Size(mTwoPassTmpTarget->GetSize())), aClipRect, effectChain, 1.,
                         Matrix4x4());
 }
 
 // Used to clear the 'mLayerComposited' flag at the beginning of each Render().
 static void
 ClearLayerFlags(Layer* aLayer) {
-  if (!aLayer) {
-    return;
-  }
-  if (aLayer->AsLayerComposite()) {
-    aLayer->AsLayerComposite()->SetLayerComposited(false);
-  }
-  for (Layer* child = aLayer->GetFirstChild(); child;
-       child = child->GetNextSibling()) {
-    ClearLayerFlags(child);
-  }
+  ForEachNode<ForwardIterator>(
+      aLayer,
+      [] (Layer* layer)
+      {
+        if (layer->AsLayerComposite()) {
+          layer->AsLayerComposite()->SetLayerComposited(false);
+        }
+      });
 }
 
 void
@@ -806,7 +808,7 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
   PROFILER_LABEL("LayerManagerComposite", "Render",
     js::ProfileEntry::Category::GRAPHICS);
 
-  if (mDestroyed) {
+  if (mDestroyed || !mCompositor || mCompositor->IsDestroyed()) {
     NS_WARNING("Call on destroyed layer manager");
     return;
   }
@@ -881,18 +883,18 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
   }
 
   ParentLayerIntRect clipRect;
-  Rect bounds(mRenderBounds.x, mRenderBounds.y, mRenderBounds.width, mRenderBounds.height);
-  Rect actualBounds;
+  IntRect bounds(mRenderBounds.x, mRenderBounds.y, mRenderBounds.width, mRenderBounds.height);
+  IntRect actualBounds;
 
   CompositorBench(mCompositor, bounds);
 
   MOZ_ASSERT(mRoot->GetOpacity() == 1);
   if (mRoot->GetClipRect()) {
     clipRect = *mRoot->GetClipRect();
-    Rect rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
+    IntRect rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
     mCompositor->BeginFrame(aInvalidRegion, &rect, bounds, aOpaqueRegion, nullptr, &actualBounds);
   } else {
-    gfx::Rect rect;
+    gfx::IntRect rect;
     mCompositor->BeginFrame(aInvalidRegion, nullptr, bounds, aOpaqueRegion, &rect, &actualBounds);
     clipRect = ParentLayerIntRect(rect.x, rect.y, rect.width, rect.height);
   }
@@ -904,7 +906,7 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
 
   // Allow widget to render a custom background.
   mCompositor->GetWidget()->DrawWindowUnderlay(
-    this, LayoutDeviceIntRect::FromUnknownRect(TruncatedToInt(actualBounds)));
+    this, LayoutDeviceIntRect::FromUnknownRect(actualBounds));
 
   RefPtr<CompositingRenderTarget> previousTarget;
   if (haveLayerEffects) {
@@ -932,7 +934,7 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
 
   // Allow widget to render a custom foreground.
   mCompositor->GetWidget()->DrawWindowOverlay(
-    this, LayoutDeviceIntRect::FromUnknownRect(TruncatedToInt(actualBounds)));
+    this, LayoutDeviceIntRect::FromUnknownRect(actualBounds));
 
   // Debugging
   RenderDebugOverlay(actualBounds);
@@ -944,7 +946,7 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
     mCompositor->EndFrame();
 
     // Call after EndFrame()
-    mCompositor->SetDispAcquireFence(mRoot, mCompositor->GetWidget()->RealWidget());
+    mCompositor->SetDispAcquireFence(mRoot);
   }
 
   if (composer2D) {
@@ -1065,7 +1067,7 @@ LayerManagerComposite::RenderToPresentationSurface()
 
 #elif defined(MOZ_WIDGET_GONK)
   CompositorOGL* compositor = mCompositor->AsCompositorOGL();
-  nsScreenGonk* screen = static_cast<nsWindow*>(mCompositor->GetWidget())->GetScreen();
+  nsScreenGonk* screen = static_cast<nsWindow*>(mCompositor->GetWidget()->RealWidget())->GetScreen();
   if (!screen->IsPrimaryScreen()) {
     // Only primary screen support mirroring
     return;
@@ -1145,8 +1147,8 @@ LayerManagerComposite::RenderToPresentationSurface()
   PostProcessLayers(mRoot, opaque, visible, Nothing());
 
   nsIntRegion invalid;
-  Rect bounds(0.0f, 0.0f, scale * pageWidth, (float)actualHeight);
-  Rect rect, actualBounds;
+  IntRect bounds(0, 0, scale * pageWidth, actualHeight);
+  IntRect rect, actualBounds;
   MOZ_ASSERT(mRoot->GetOpacity() == 1);
   mCompositor->BeginFrame(invalid, nullptr, bounds, nsIntRegion(), &rect, &actualBounds);
 
@@ -1164,8 +1166,7 @@ LayerManagerComposite::RenderToPresentationSurface()
 
   mCompositor->EndFrame();
 #ifdef MOZ_WIDGET_GONK
-  mCompositor->SetDispAcquireFence(mRoot,
-                                   mirrorScreenWidget); // Call after EndFrame()
+  mCompositor->SetDispAcquireFence(mRoot); // Call after EndFrame()
 
   RefPtr<Composer2D> composer2D;
   composer2D = mCompositor->GetWidget()->GetComposer2D();
@@ -1204,63 +1205,64 @@ LayerManagerComposite::ComputeRenderIntegrityInternal(Layer* aLayer,
                                                       nsIntRegion& aLowPrecisionScreenRegion,
                                                       const Matrix4x4& aTransform)
 {
-  if (aLayer->GetOpacity() <= 0.f ||
-      (aScreenRegion.IsEmpty() && aLowPrecisionScreenRegion.IsEmpty())) {
-    return;
-  }
-
-  // If the layer's a container, recurse into all of its children
-  ContainerLayer* container = aLayer->AsContainerLayer();
-  if (container) {
-    // Accumulate the transform of intermediate surfaces
-    Matrix4x4 transform = aTransform;
-    if (container->UseIntermediateSurface()) {
-      transform = aLayer->GetEffectiveTransform();
-      transform = aTransform * transform;
-    }
-    for (Layer* child = aLayer->GetFirstChild(); child;
-         child = child->GetNextSibling()) {
-      ComputeRenderIntegrityInternal(child, aScreenRegion, aLowPrecisionScreenRegion, transform);
-    }
-    return;
-  }
-
-  // Only painted layers can be incomplete
-  PaintedLayer* paintedLayer = aLayer->AsPaintedLayer();
-  if (!paintedLayer) {
-    return;
-  }
-
-  // See if there's any incomplete rendering
-  nsIntRegion incompleteRegion = aLayer->GetLocalVisibleRegion().ToUnknownRegion();
-  incompleteRegion.Sub(incompleteRegion, paintedLayer->GetValidRegion());
-
-  if (!incompleteRegion.IsEmpty()) {
-    // Calculate the transform to get between screen and layer space
-    Matrix4x4 transformToScreen = aLayer->GetEffectiveTransform();
-    transformToScreen = aTransform * transformToScreen;
-
-    SubtractTransformedRegion(aScreenRegion, incompleteRegion, transformToScreen);
-
-    // See if there's any incomplete low-precision rendering
-    TiledContentHost* composer = nullptr;
-    LayerComposite* shadow = aLayer->AsLayerComposite();
-    if (shadow) {
-      composer = shadow->GetCompositableHost()->AsTiledContentHost();
-      if (composer) {
-        incompleteRegion.Sub(incompleteRegion, composer->GetValidLowPrecisionRegion());
-        if (!incompleteRegion.IsEmpty()) {
-          SubtractTransformedRegion(aLowPrecisionScreenRegion, incompleteRegion, transformToScreen);
+  ForEachNode<ForwardIterator>(
+      aLayer,
+      [&aScreenRegion, &aLowPrecisionScreenRegion, &aTransform] (Layer* layer)
+      {
+        if (layer->GetOpacity() <= 0.f ||
+            (aScreenRegion.IsEmpty() && aLowPrecisionScreenRegion.IsEmpty())) {
+          return TraversalFlag::Skip;
         }
-      }
-    }
 
-    // If we can't get a valid low precision region, assume it's the same as
-    // the high precision region.
-    if (!composer) {
-      SubtractTransformedRegion(aLowPrecisionScreenRegion, incompleteRegion, transformToScreen);
-    }
-  }
+        // If the layer's a container, recurse into all of its children
+        ContainerLayer* container = layer->AsContainerLayer();
+        if (container) {
+          // Accumulate the transform of intermediate surfaces
+          Matrix4x4 transform = aTransform;
+          if (container->UseIntermediateSurface()) {
+            transform = layer->GetEffectiveTransform();
+            transform = aTransform * transform;
+          }
+          return TraversalFlag::Continue;
+        }
+
+        // Only painted layers can be incomplete
+        PaintedLayer* paintedLayer = layer->AsPaintedLayer();
+        if (!paintedLayer || !container) {
+          return TraversalFlag::Skip;
+        }
+        // See if there's any incomplete rendering
+        nsIntRegion incompleteRegion = layer->GetLocalVisibleRegion().ToUnknownRegion();
+        incompleteRegion.Sub(incompleteRegion, paintedLayer->GetValidRegion());
+
+        if (!incompleteRegion.IsEmpty()) {
+          // Calculate the transform to get between screen and layer space
+          Matrix4x4 transformToScreen = layer->GetEffectiveTransform();
+          transformToScreen = aTransform * transformToScreen;
+
+          SubtractTransformedRegion(aScreenRegion, incompleteRegion, transformToScreen);
+
+          // See if there's any incomplete low-precision rendering
+          TiledContentHost* composer = nullptr;
+          LayerComposite* shadow = layer->AsLayerComposite();
+          if (shadow) {
+            composer = shadow->GetCompositableHost()->AsTiledContentHost();
+            if (composer) {
+              incompleteRegion.Sub(incompleteRegion, composer->GetValidLowPrecisionRegion());
+              if (!incompleteRegion.IsEmpty()) {
+                SubtractTransformedRegion(aLowPrecisionScreenRegion, incompleteRegion, transformToScreen);
+              }
+            }
+          }
+
+          // If we can't get a valid low precision region, assume it's the same as
+          // the high precision region.
+          if (!composer) {
+            SubtractTransformedRegion(aLowPrecisionScreenRegion, incompleteRegion, transformToScreen);
+          }
+        }
+        return TraversalFlag::Skip;
+      });
 }
 
 #ifdef MOZ_WIDGET_ANDROID
@@ -1547,7 +1549,10 @@ LayerComposite::SetLayerManager(LayerManagerComposite* aManager)
 bool
 LayerManagerComposite::AsyncPanZoomEnabled() const
 {
-  return mCompositor->GetWidget()->RealWidget()->AsyncPanZoomEnabled();
+  if (CompositorBridgeParent* bridge = mCompositor->GetCompositorBridgeParent()) {
+    return bridge->AsyncPanZoomEnabled();
+  }
+  return false;
 }
 
 nsIntRegion
@@ -1565,7 +1570,7 @@ LayerComposite::GetFullyRenderedRegion() {
   }
 }
 
-const Matrix4x4
+Matrix4x4
 LayerComposite::GetShadowTransform() {
   Matrix4x4 transform = mShadowTransform;
   Layer* layer = GetLayer();

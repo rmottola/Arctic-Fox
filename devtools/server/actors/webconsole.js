@@ -13,6 +13,7 @@ const { EnvironmentActor } = require("devtools/server/actors/environment");
 const { ThreadActor } = require("devtools/server/actors/script");
 const { ObjectActor, LongStringActor, createValueGrip, stringIsLong } = require("devtools/server/actors/object");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
+const ErrorDocs = require("devtools/server/actors/errordocs");
 
 loader.lazyRequireGetter(this, "NetworkMonitor", "devtools/shared/webconsole/network-monitor", true);
 loader.lazyRequireGetter(this, "NetworkMonitorChild", "devtools/shared/webconsole/network-monitor", true);
@@ -320,7 +321,7 @@ WebConsoleActor.prototype =
       // We are very explicitly examining the "console" property of
       // the non-Xrayed object here.
       let console = aWindow.wrappedJSObject.console;
-      isNative = console instanceof aWindow.Console;
+      isNative = new XPCNativeWrapper(console).IS_NATIVE_CONSOLE
     }
     catch (ex) { }
     return isNative;
@@ -868,7 +869,7 @@ WebConsoleActor.prototype =
     let evalResult = evalInfo.result;
     let helperResult = evalInfo.helperResult;
 
-    let result, errorMessage, errorGrip = null;
+    let result, errorDocURL, errorMessage, errorGrip = null;
     if (evalResult) {
       if ("return" in evalResult) {
         result = evalResult.return;
@@ -883,7 +884,13 @@ WebConsoleActor.prototype =
                                 error.unsafeDereference();
         errorMessage = unsafeDereference && unsafeDereference.toString
           ? unsafeDereference.toString()
-          : "" + error;
+          : String(error);
+
+          // It is possible that we won't have permission to unwrap an
+          // object and retrieve its errorMessageName.
+          try {
+            errorDocURL = ErrorDocs.GetURL(error && error.errorMessageName);
+          } catch (ex) {}
       }
     }
 
@@ -905,6 +912,7 @@ WebConsoleActor.prototype =
       timestamp: timestamp,
       exception: errorGrip,
       exceptionMessage: this._createStringGrip(errorMessage),
+      exceptionDocURL: errorDocURL,
       helperResult: helperResult,
     };
   },

@@ -400,7 +400,7 @@ ParseContext<ParseHandler>::prepareToAddDuplicateArg(HandlePropertyName name, De
 }
 
 template <typename ParseHandler>
-void
+bool
 ParseContext<ParseHandler>::updateDecl(TokenStream& ts, JSAtom* atom, Node pn)
 {
     Definition* oldDecl = decls_.lookupFirst(atom);
@@ -424,7 +424,7 @@ ParseContext<ParseHandler>::updateDecl(TokenStream& ts, JSAtom* atom, Node pn)
         newDecl->pn_scopecoord = oldDecl->pn_scopecoord;
         newDecl->pn_dflags |= PND_BOUND;
         newDecl->setOp(JSOP_INITLEXICAL);
-        return;
+        return true;
     }
 
     if (sc->isGlobalContext() || oldDecl->isDeoptimized()) {
@@ -444,14 +444,16 @@ ParseContext<ParseHandler>::updateDecl(TokenStream& ts, JSAtom* atom, Node pn)
                     !sc->isGlobalContext())
                 {
                     newDecl->pn_dflags |= PND_BOUND;
-                    newDecl->pn_scopecoord.setSlot(ts, i);
+                    if (!newDecl->pn_scopecoord.setSlot(ts, i)) {
+                        return false;
+                    }
                     newDecl->setOp(JSOP_GETLOCAL);
                 }
                 vars_[i] = newDecl;
                 break;
             }
         }
-        return;
+        return true;
     }
 
     MOZ_ASSERT(oldDecl->isBound());
@@ -468,6 +470,7 @@ ParseContext<ParseHandler>::updateDecl(TokenStream& ts, JSAtom* atom, Node pn)
         MOZ_ASSERT(vars_[oldDecl->pn_scopecoord.slot()] == oldDecl);
         vars_[oldDecl->pn_scopecoord.slot()] = newDecl;
     }
+    return true;
 }
 
 template <typename ParseHandler>
@@ -701,7 +704,7 @@ Parser<ParseHandler>::Parser(ExclusiveContext* cx, LifoAlloc* alloc,
 {
     {
         AutoLockForExclusiveAccess lock(cx);
-        cx->perThreadData->addActiveCompilation();
+        cx->perThreadData->addActiveCompilation(lock);
     }
 
     // The Mozilla specific JSOPTION_EXTRA_WARNINGS option adds extra warnings
@@ -742,7 +745,7 @@ Parser<ParseHandler>::~Parser()
 
     {
         AutoLockForExclusiveAccess lock(context);
-        context->perThreadData->removeActiveCompilation();
+        context->perThreadData->removeActiveCompilation(lock);
     }
 }
 
@@ -1442,7 +1445,8 @@ bool
 Parser<FullParseHandler>::makeDefIntoUse(Definition* dn, ParseNode* pn, HandleAtom atom)
 {
     /* Turn pn into a definition. */
-    pc->updateDecl(tokenStream, atom, pn);
+    if (!pc->updateDecl(tokenStream, atom, pn))
+        return false;
 
     /* Change all uses of dn to be uses of pn. */
     for (ParseNode* pnu = dn->dn_uses; pnu; pnu = pnu->pn_link) {
@@ -2907,7 +2911,7 @@ Parser<SyntaxParseHandler>::finishFunctionDefinition(Node pn, FunctionBox* funbo
         freeVariables[i++] = LazyScript::FreeVariable(r.front().key());
     MOZ_ASSERT(i == numFreeVariables);
 
-    HeapPtrFunction* innerFunctions = lazy->innerFunctions();
+    GCPtrFunction* innerFunctions = lazy->innerFunctions();
     for (size_t i = 0; i < numInnerFunctions; i++)
         innerFunctions[i].init(pc->innerFunctions[i]);
 
@@ -3007,7 +3011,8 @@ Parser<FullParseHandler>::functionArgsAndBody(InHandling inHandling, ParseNode* 
         return true;
     } while (false);
 
-    blockScopes.resize(oldBlockScopesLength);
+    if (!blockScopes.resize(oldBlockScopesLength))
+        return false;
 
     // Continue doing a full parse for this inner function.
     ParseContext<FullParseHandler> funpc(this, pc, pn, funbox, newDirectives);
@@ -3079,7 +3084,8 @@ Parser<ParseHandler>::appendToCallSiteObj(Node callSiteObj)
     if (!rawNode)
         return false;
 
-    return handler.addToCallSiteObject(callSiteObj, rawNode, cookedNode);
+    handler.addToCallSiteObject(callSiteObj, rawNode, cookedNode);
+    return true;
 }
 
 template <>
@@ -9351,7 +9357,12 @@ Parser<ParseHandler>::objectLiteral(YieldHandling yieldHandling, PossibleError* 
                 return null();
 
             tokenStream.consumeKnownToken(TOK_ASSIGN);
+            bool saved = pc->inDeclDestructuring;
+            // Setting `inDeclDestructuring` to false allows name use to be noted
+            // in `identifierName` See Bug: 1255167.
+            pc->inDeclDestructuring = false;
             Node rhs = assignExpr(InAllowed, yieldHandling, TripledotProhibited);
+            pc->inDeclDestructuring = saved;
             if (!rhs)
                 return null();
 

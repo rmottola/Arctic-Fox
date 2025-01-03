@@ -173,9 +173,7 @@ public:
   {
     // Threads have to be shut down from another thread, so we'll ask the
     // main thread to do it for us.
-    nsCOMPtr<nsIRunnable> runnable =
-      NS_NewRunnableMethod(aThisThread, &nsIThread::Shutdown);
-    NS_DispatchToMainThread(runnable);
+    NS_DispatchToMainThread(NewRunnableMethod(aThisThread, &nsIThread::Shutdown));
   }
 
   /**
@@ -471,6 +469,7 @@ void
 DecodePool::NotifyProgress(Decoder* aDecoder)
 {
   MOZ_ASSERT(aDecoder);
+  MOZ_ASSERT(aDecoder->HasProgress() && !aDecoder->IsMetadataDecode());
 
   if (!NS_IsMainThread() ||
       (aDecoder->GetDecoderFlags() & DecoderFlags::ASYNC_NOTIFY)) {

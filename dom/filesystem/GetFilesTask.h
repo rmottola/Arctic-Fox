@@ -10,7 +10,6 @@
 #include "mozilla/dom/Directory.h"
 #include "mozilla/dom/FileSystemTaskBase.h"
 #include "mozilla/ErrorResult.h"
-#include "nsAutoPtr.h"
 
 namespace mozilla {
 namespace dom {
@@ -22,6 +21,7 @@ class GetFilesTaskChild final : public FileSystemTaskChildBase
 public:
   static already_AddRefed<GetFilesTaskChild>
   Create(FileSystemBase* aFileSystem,
+         Directory* aDirectory,
          nsIFile* aTargetPath,
          bool aRecursiveFlag,
          ErrorResult& aRv);
@@ -38,6 +38,7 @@ public:
 private:
   // If aDirectoryOnly is set, we should ensure that the target is a directory.
   GetFilesTaskChild(FileSystemBase* aFileSystem,
+                    Directory* aDirectory,
                     nsIFile* aTargetPath,
                     bool aRecursiveFlag);
 
@@ -53,11 +54,17 @@ private:
   HandlerCallback() override;
 
   RefPtr<Promise> mPromise;
+  RefPtr<Directory> mDirectory;
   nsCOMPtr<nsIFile> mTargetPath;
   bool mRecursiveFlag;
 
-  // We store the fullpath of Files.
-  FallibleTArray<nsString> mTargetData;
+  // We store the fullpath and the dom path of Files.
+  struct FileData {
+    nsString mRealPath;
+    nsString mDOMPath;
+  };
+
+  FallibleTArray<FileData> mTargetData;
 };
 
 class GetFilesTaskParent final : public FileSystemTaskParentBase
@@ -84,13 +91,19 @@ private:
   IOWork() override;
 
   nsresult
-  ExploreDirectory(nsIFile* aPath);
+  ExploreDirectory(const nsAString& aDOMPath, nsIFile* aPath);
 
+  nsString mDirectoryDOMPath;
   nsCOMPtr<nsIFile> mTargetPath;
   bool mRecursiveFlag;
 
-  // We store the fullpath of Files.
-  FallibleTArray<nsString> mTargetData;
+  // We store the fullpath and the dom path of Files.
+  struct FileData {
+    nsString mRealPath;
+    nsString mDOMPath;
+  };
+
+  FallibleTArray<FileData> mTargetData;
 };
 
 } // namespace dom

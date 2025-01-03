@@ -58,6 +58,7 @@
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventListenerManager.h"
 #include "mozilla/EventStateManager.h"
+#include "mozilla/gfx/DataSurfaceHelpers.h"
 #include "mozilla/IMEStateManager.h"
 #include "mozilla/InternalMutationEvent.h"
 #include "mozilla/Likely.h"
@@ -114,6 +115,7 @@
 #include "nsIDOMDocument.h"
 #include "nsIDOMDocumentType.h"
 #include "nsIDOMEvent.h"
+#include "nsIDOMElement.h"
 #include "nsIDOMHTMLElement.h"
 #include "nsIDOMHTMLFormElement.h"
 #include "nsIDOMHTMLInputElement.h"
@@ -202,7 +204,7 @@
 #include "nsICookieService.h"
 #include "mozilla/EnumSet.h"
 #include "mozilla/BloomFilter.h"
-#include "SourceSurfaceRawData.h"
+#include "TabChild.h"
 
 #include "nsIBidiKeyboard.h"
 
@@ -219,6 +221,7 @@ extern "C" int MOZ_XMLCheckQName(const char* ptr, const char* end,
 class imgLoader;
 
 using namespace mozilla::dom;
+using namespace mozilla::ipc;
 using namespace mozilla::gfx;
 using namespace mozilla::layers;
 using namespace mozilla::widget;
@@ -264,6 +267,7 @@ nsString* nsContentUtils::sModifierSeparator = nullptr;
 
 bool nsContentUtils::sInitialized = false;
 bool nsContentUtils::sIsFullScreenApiEnabled = false;
+bool nsContentUtils::sIsUnprefixedFullscreenApiEnabled = false;
 bool nsContentUtils::sTrustedFullScreenOnly = true;
 bool nsContentUtils::sIsCutCopyAllowed = true;
 bool nsContentUtils::sIsFrameTimingPrefEnabled = false;
@@ -289,6 +293,8 @@ bool nsContentUtils::sFragmentParsingActive = false;
 #if !(defined(DEBUG) || defined(MOZ_ENABLE_JS_DUMP))
 bool nsContentUtils::sDOMWindowDumpEnabled;
 #endif
+
+bool nsContentUtils::sDoNotTrackEnabled = false;
 
 mozilla::LazyLogModule nsContentUtils::sDOMDumpLog("Dump");
 
@@ -539,6 +545,9 @@ nsContentUtils::Init()
   Preferences::AddBoolVarCache(&sIsFullScreenApiEnabled,
                                "full-screen-api.enabled");
 
+  Preferences::AddBoolVarCache(&sIsUnprefixedFullscreenApiEnabled,
+                               "full-screen-api.unprefix.enabled");
+
   Preferences::AddBoolVarCache(&sTrustedFullScreenOnly,
                                "full-screen-api.allow-trusted-requests-only");
 
@@ -588,6 +597,9 @@ nsContentUtils::Init()
   Preferences::AddBoolVarCache(&sDOMWindowDumpEnabled,
                                "browser.dom.window.dump.enabled");
 #endif
+
+  Preferences::AddBoolVarCache(&sDoNotTrackEnabled,
+                               "privacy.donottrackheader.enabled", false);
 
   Element::InitCCCallbacks();
 
@@ -664,7 +676,7 @@ nsContentUtils::InitializeModifierStrings()
     rv = bundleService->CreateBundle( "chrome://global-platform/locale/platformKeys.properties",
                                       getter_AddRefs(bundle));
   }
-  
+
   NS_ASSERTION(NS_SUCCEEDED(rv) && bundle, "chrome://global/locale/platformKeys.properties could not be loaded");
   nsXPIDLString shiftModifier;
   nsXPIDLString metaModifier;
@@ -687,7 +699,7 @@ nsContentUtils::InitializeModifierStrings()
   sOSText = new nsString(osModifier);
   sAltText = new nsString(altModifier);
   sControlText = new nsString(controlModifier);
-  sModifierSeparator = new nsString(modifierSeparator);  
+  sModifierSeparator = new nsString(modifierSeparator);
 }
 
 // Because of SVG/SMIL we have several atoms mapped to the same
@@ -1210,16 +1222,13 @@ nsContentUtils::GetPseudoAttributeValue(const nsString& aSource, nsIAtom *aName,
         if (*chunkEnd == kAmpersand) {
           aValue.Append(start, chunkEnd - start);
 
-          // Point to first character after the ampersand.
-          ++chunkEnd;
-
           const char16_t *afterEntity = nullptr;
           char16_t result[2];
           uint32_t count =
             MOZ_XMLTranslateEntity(reinterpret_cast<const char*>(chunkEnd),
-                                  reinterpret_cast<const char*>(iter),
-                                  reinterpret_cast<const char**>(&afterEntity),
-                                  result);
+                                   reinterpret_cast<const char*>(iter),
+                                   reinterpret_cast<const char**>(&afterEntity),
+                                   result);
           if (count == 0) {
             aValue.Truncate();
 
@@ -1305,14 +1314,14 @@ nsContentUtils::SplitMimeType(const nsAString& aValue, nsString& aType,
   aType.StripWhitespace();
 }
 
-nsresult 
+nsresult
 nsContentUtils::IsUserIdle(uint32_t aRequestedIdleTimeInMS, bool* aUserIsIdle)
 {
   nsresult rv;
-  nsCOMPtr<nsIIdleService> idleService = 
+  nsCOMPtr<nsIIdleService> idleService =
     do_GetService("@mozilla.org/widget/idleservice;1", &rv);
   NS_ENSURE_SUCCESS(rv, rv);
-    
+
   uint32_t idleTimeInMS;
   rv = idleService->GetIdleTime(&idleTimeInMS);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -1340,48 +1349,6 @@ nsContentUtils::GetParserService()
   }
 
   return sParserService;
-}
-
-/**
- * A helper function that parses a sandbox attribute (of an <iframe> or
- * a CSP directive) and converts it to the set of flags used internally.
- *
- * @param sandboxAttr   the sandbox attribute
- * @return              the set of flags (0 if sandboxAttr is null)
- */
-uint32_t
-nsContentUtils::ParseSandboxAttributeToFlags(const nsAttrValue* sandboxAttr)
-{
-  // No sandbox attribute, no sandbox flags.
-  if (!sandboxAttr) { return 0; }
-
-  //  Start off by setting all the restriction flags.
-  uint32_t out = SANDBOXED_NAVIGATION
-               | SANDBOXED_AUXILIARY_NAVIGATION
-               | SANDBOXED_TOPLEVEL_NAVIGATION
-               | SANDBOXED_PLUGINS
-               | SANDBOXED_ORIGIN
-               | SANDBOXED_FORMS
-               | SANDBOXED_SCRIPTS
-               | SANDBOXED_AUTOMATIC_FEATURES
-               | SANDBOXED_POINTER_LOCK
-               | SANDBOXED_ORIENTATION_LOCK
-               | SANDBOXED_DOMAIN;
-
-// Macro for updating the flag according to the keywords
-#define IF_KEYWORD(atom, flags) \
-  if (sandboxAttr->Contains(nsGkAtoms::atom, eIgnoreCase)) { out &= ~(flags); }
-
-  IF_KEYWORD(allowsameorigin, SANDBOXED_ORIGIN)
-  IF_KEYWORD(allowforms,  SANDBOXED_FORMS)
-  IF_KEYWORD(allowscripts, SANDBOXED_SCRIPTS | SANDBOXED_AUTOMATIC_FEATURES)
-  IF_KEYWORD(allowtopnavigation, SANDBOXED_TOPLEVEL_NAVIGATION)
-  IF_KEYWORD(allowpointerlock, SANDBOXED_POINTER_LOCK)
-  IF_KEYWORD(alloworientationlock, SANDBOXED_ORIENTATION_LOCK)
-  IF_KEYWORD(allowpopups, SANDBOXED_AUXILIARY_NAVIGATION)
-
-  return out;
-#undef IF_KEYWORD
 }
 
 nsIBidiKeyboard*
@@ -1580,7 +1547,7 @@ bool nsContentUtils::IsAlphanumeric(uint32_t aChar)
 
   return (cat == nsIUGenCategory::kLetter || cat == nsIUGenCategory::kNumber);
 }
- 
+
 // static
 bool nsContentUtils::IsAlphanumericAt(const nsTextFragment* aFrag, uint32_t aOffset)
 {
@@ -1926,13 +1893,13 @@ nsContentUtils::Shutdown()
 
   delete sShiftText;
   sShiftText = nullptr;
-  delete sControlText;  
+  delete sControlText;
   sControlText = nullptr;
-  delete sMetaText;  
+  delete sMetaText;
   sMetaText = nullptr;
   delete sOSText;
   sOSText = nullptr;
-  delete sAltText;  
+  delete sAltText;
   sAltText = nullptr;
   delete sModifierSeparator;
   sModifierSeparator = nullptr;
@@ -2356,7 +2323,7 @@ nsContentUtils::ComparePoints(nsINode* aParent1, int32_t aOffset1,
 
   uint32_t pos1 = parents1.Length() - 1;
   uint32_t pos2 = parents2.Length() - 1;
-  
+
   bool disconnected = parents1.ElementAt(pos1) != parents2.ElementAt(pos2);
   if (aDisconnected) {
     *aDisconnected = disconnected;
@@ -2378,7 +2345,7 @@ nsContentUtils::ComparePoints(nsINode* aParent1, int32_t aOffset1,
     parent = child1;
   }
 
-  
+
   // The parent chains never differed, so one of the nodes is an ancestor of
   // the other
 
@@ -2815,7 +2782,7 @@ nsContentUtils::CheckQName(const nsAString& aQualifiedName,
   const char* colon = nullptr;
   const char16_t* begin = aQualifiedName.BeginReading();
   const char16_t* end = aQualifiedName.EndReading();
-  
+
   int result = MOZ_XMLCheckQName(reinterpret_cast<const char*>(begin),
                                  reinterpret_cast<const char*>(end),
                                  aNamespaceAware, &colon);
@@ -3095,10 +3062,11 @@ nsContentUtils::GetImgLoaderForDocument(nsIDocument* aDoc)
   NS_ENSURE_TRUE(!DocumentInactiveForImageLoads(aDoc), nullptr);
 
   if (!aDoc) {
-    return imgLoader::Singleton();
+    return imgLoader::NormalLoader();
   }
   bool isPrivate = IsInPrivateBrowsing(aDoc);
-  return isPrivate ? imgLoader::PBSingleton() : imgLoader::Singleton();
+  return isPrivate ? imgLoader::PrivateBrowsingLoader()
+                   : imgLoader::NormalLoader();
 }
 
 // static
@@ -3108,11 +3076,14 @@ nsContentUtils::GetImgLoaderForChannel(nsIChannel* aChannel,
 {
   NS_ENSURE_TRUE(!DocumentInactiveForImageLoads(aContext), nullptr);
 
-  if (!aChannel)
-    return imgLoader::Singleton();
+  if (!aChannel) {
+    return imgLoader::NormalLoader();
+  }
   nsCOMPtr<nsILoadContext> context;
   NS_QueryNotificationCallbacks(aChannel, context);
-  return context && context->UsePrivateBrowsing() ? imgLoader::PBSingleton() : imgLoader::Singleton();
+  return context && context->UsePrivateBrowsing() ?
+                      imgLoader::PrivateBrowsingLoader() :
+                      imgLoader::NormalLoader();
 }
 
 // static
@@ -3879,7 +3850,7 @@ Element *
 nsContentUtils::MatchElementId(nsIContent *aContent, const nsAString& aId)
 {
   NS_PRECONDITION(!aId.IsEmpty(), "Will match random elements");
-  
+
   // ID attrs are generally stored as atoms, so just atomize this up front
   nsCOMPtr<nsIAtom> id(NS_Atomize(aId));
   if (!id) {
@@ -3971,8 +3942,8 @@ nsContentUtils::RegisterShutdownObserver(nsIObserver* aObserver)
   nsCOMPtr<nsIObserverService> observerService =
     mozilla::services::GetObserverService();
   if (observerService) {
-    observerService->AddObserver(aObserver, 
-                                 NS_XPCOM_SHUTDOWN_OBSERVER_ID, 
+    observerService->AddObserver(aObserver,
+                                 NS_XPCOM_SHUTDOWN_OBSERVER_ID,
                                  false);
   }
 }
@@ -4286,7 +4257,7 @@ nsContentUtils::CreateContextualFragment(nsINode* aContextNode,
   if (isHTML) {
     RefPtr<DocumentFragment> frag =
       new DocumentFragment(document->NodeInfoManager());
-    
+
     nsCOMPtr<nsIContent> contextAsContent = do_QueryInterface(aContextNode);
     if (contextAsContent && !contextAsContent->IsElement()) {
       contextAsContent = contextAsContent->GetParent();
@@ -4295,7 +4266,7 @@ nsContentUtils::CreateContextualFragment(nsINode* aContextNode,
         contextAsContent = nullptr;
       }
     }
-    
+
     if (contextAsContent && !contextAsContent->IsHTMLElement(nsGkAtoms::html)) {
       aRv = ParseFragmentHTML(aFragment, frag,
                               contextAsContent->NodeInfo()->NameAtom(),
@@ -4707,7 +4678,7 @@ nsContentUtils::IsInSameAnonymousTree(const nsINode* aNode,
                   "Must have a node to work with");
   NS_PRECONDITION(aContent,
                   "Must have a content to work with");
-  
+
   if (!aNode->IsNodeOfType(nsINode::eCONTENT)) {
     /**
      * The root isn't an nsIContent, so it's a document or attribute.  The only
@@ -5041,21 +5012,27 @@ nsContentUtils::WarnScriptWasIgnored(nsIDocument* aDocument)
 }
 
 /* static */
-bool
-nsContentUtils::AddScriptRunner(nsIRunnable* aRunnable)
+void
+nsContentUtils::AddScriptRunner(already_AddRefed<nsIRunnable> aRunnable)
 {
-  if (!aRunnable) {
-    return false;
+  nsCOMPtr<nsIRunnable> runnable = aRunnable;
+  if (!runnable) {
+    return;
   }
 
   if (sScriptBlockerCount) {
-    return sBlockedScriptRunners->AppendElement(aRunnable) != nullptr;
+    sBlockedScriptRunners->AppendElement(runnable.forget());
+    return;
   }
-  
-  nsCOMPtr<nsIRunnable> run = aRunnable;
-  run->Run();
 
-  return true;
+  runnable->Run();
+}
+
+/* static */
+void
+nsContentUtils::AddScriptRunner(nsIRunnable* aRunnable) {
+  nsCOMPtr<nsIRunnable> runnable = aRunnable;
+  AddScriptRunner(runnable.forget());
 }
 
 /* static */
@@ -5119,14 +5096,14 @@ nsContentUtils::PerformMainThreadMicroTaskCheckpoint()
   nsDOMMutationObserver::HandleMutations();
 }
 
-/* 
+/*
  * Helper function for nsContentUtils::ProcessViewportInfo.
  *
  * Handles a single key=value pair. If it corresponds to a valid viewport
  * attribute, add it to the document header data. No validation is done on the
  * value itself (this is done at display time).
  */
-static void ProcessViewportToken(nsIDocument *aDocument, 
+static void ProcessViewportToken(nsIDocument *aDocument,
                                  const nsAString &token) {
 
   /* Iterators. */
@@ -5372,7 +5349,7 @@ nsContentUtils::CheckForSubFrameDrop(nsIDragSession* aDragSession,
   if (!target) {
     return true;
   }
-  
+
   nsIDocument* targetDoc = target->OwnerDoc();
   nsPIDOMWindowOuter* targetWin = targetDoc->GetWindow();
   if (!targetWin) {
@@ -5837,7 +5814,7 @@ nsContentUtils::GetUTFOrigin(nsIURI* aURI, nsAString& aOrigin)
   else {
     aOrigin.AssignLiteral("null");
   }
-  
+
   return NS_OK;
 }
 
@@ -6045,7 +6022,7 @@ nsContentUtils::MatchClassNames(nsIContent* aContent, int32_t aNamespaceID,
   if (!classAttr) {
     return false;
   }
-  
+
   // need to match *all* of the classes
   ClassMatchingInfo* info = static_cast<ClassMatchingInfo*>(aData);
   uint32_t length = info->mClasses.Length();
@@ -6060,7 +6037,7 @@ nsContentUtils::MatchClassNames(nsIContent* aContent, int32_t aNamespaceID,
       return false;
     }
   }
-  
+
   return true;
 }
 
@@ -6347,10 +6324,10 @@ nsContentUtils::AllowXULXBLForPrincipal(nsIPrincipal* aPrincipal)
   if (IsSystemPrincipal(aPrincipal)) {
     return true;
   }
-  
+
   nsCOMPtr<nsIURI> princURI;
   aPrincipal->GetURI(getter_AddRefs(princURI));
-  
+
   return princURI &&
          ((sAllowXULXBL_for_file && SchemeIs(princURI, "file")) ||
           IsSitePermAllow(aPrincipal, "allowXULXBL"));
@@ -6954,6 +6931,12 @@ nsContentUtils::DOMWindowDumpEnabled()
 #endif
 }
 
+bool
+nsContentUtils::DoNotTrackEnabled()
+{
+  return nsContentUtils::sDoNotTrackEnabled;
+}
+
 mozilla::LogModule*
 nsContentUtils::DOMDumpLog()
 {
@@ -7140,7 +7123,7 @@ nsContentUtils::GetHostOrIPv6WithBrackets(nsIURI* aURI, nsAString& aHost)
   return NS_OK;
 }
 
-void
+bool
 nsContentUtils::CallOnAllRemoteChildren(nsIMessageBroadcaster* aManager,
                                         CallOnRemoteChildFunction aCallback,
                                         void* aArg)
@@ -7156,7 +7139,9 @@ nsContentUtils::CallOnAllRemoteChildren(nsIMessageBroadcaster* aManager,
 
     nsCOMPtr<nsIMessageBroadcaster> nonLeafMM = do_QueryInterface(childMM);
     if (nonLeafMM) {
-      CallOnAllRemoteChildren(nonLeafMM, aCallback, aArg);
+      if (CallOnAllRemoteChildren(nonLeafMM, aCallback, aArg)) {
+        return true;
+      }
       continue;
     }
 
@@ -7168,10 +7153,14 @@ nsContentUtils::CallOnAllRemoteChildren(nsIMessageBroadcaster* aManager,
       nsFrameLoader* fl = static_cast<nsFrameLoader*>(cb);
       TabParent* remote = TabParent::GetFrom(fl);
       if (remote && aCallback) {
-        aCallback(remote, aArg);
+        if (aCallback(remote, aArg)) {
+          return true;
+        }
       }
     }
   }
+
+  return false;
 }
 
 void
@@ -7187,6 +7176,36 @@ nsContentUtils::CallOnAllRemoteChildren(nsPIDOMWindowOuter* aWindow,
       CallOnAllRemoteChildren(windowMM, aCallback, aArg);
     }
   }
+}
+
+struct UIStateChangeInfo {
+  UIStateChangeType mShowAccelerators;
+  UIStateChangeType mShowFocusRings;
+
+  UIStateChangeInfo(UIStateChangeType aShowAccelerators,
+                    UIStateChangeType aShowFocusRings)
+    : mShowAccelerators(aShowAccelerators),
+      mShowFocusRings(aShowFocusRings)
+  {}
+};
+
+bool
+SetKeyboardIndicatorsChild(TabParent* aParent, void* aArg)
+{
+  UIStateChangeInfo* stateInfo = static_cast<UIStateChangeInfo*>(aArg);
+  Unused << aParent->SendSetKeyboardIndicators(stateInfo->mShowAccelerators,
+                                               stateInfo->mShowFocusRings);
+  return false;
+}
+
+void
+nsContentUtils::SetKeyboardIndicatorsOnRemoteChildren(nsPIDOMWindowOuter* aWindow,
+                                                      UIStateChangeType aShowAccelerators,
+                                                      UIStateChangeType aShowFocusRings)
+{
+  UIStateChangeInfo stateInfo(aShowAccelerators, aShowFocusRings);
+  CallOnAllRemoteChildren(aWindow, SetKeyboardIndicatorsChild,
+                          (void *)&stateInfo);
 }
 
 void
@@ -7270,7 +7289,7 @@ nsresult
 nsContentUtils::DataTransferItemToImage(const IPCDataTransferItem& aItem,
                                         imgIContainer** aContainer)
 {
-  MOZ_ASSERT(aItem.data().type() == IPCDataTransferData::TnsCString);
+  MOZ_ASSERT(aItem.data().type() == IPCDataTransferData::TShmem);
   MOZ_ASSERT(IsFlavorImage(aItem.flavor()));
 
   const IPCDataTransferImage& imageDetails = aItem.imageDetails();
@@ -7279,16 +7298,13 @@ nsContentUtils::DataTransferItemToImage(const IPCDataTransferItem& aItem,
     return NS_ERROR_FAILURE;
   }
 
-  const nsCString& text = aItem.data().get_nsCString();
+  Shmem data = aItem.data().get_Shmem();
 
-  // InitWrappingData takes a non-const pointer for reading.
-  nsCString& nonConstText = const_cast<nsCString&>(text);
-  RefPtr<SourceSurfaceRawData> image = new SourceSurfaceRawData();
-  image->InitWrappingData(reinterpret_cast<uint8_t*>(nonConstText.BeginWriting()),
-                          size, imageDetails.stride(),
-                          static_cast<SurfaceFormat>(imageDetails.format()),
-                          false);
-  image->GuaranteePersistance();
+  RefPtr<DataSourceSurface> image =
+      CreateDataSourceSurfaceFromData(size,
+                                      static_cast<SurfaceFormat>(imageDetails.format()),
+                                      data.get<uint8_t>(),
+                                      imageDetails.stride());
 
   RefPtr<gfxDrawable> drawable = new gfxSurfaceDrawable(image, size);
   nsCOMPtr<imgIContainer> imageContainer =
@@ -7306,6 +7322,31 @@ nsContentUtils::IsFlavorImage(const nsACString& aFlavor)
          aFlavor.EqualsLiteral(kJPGImageMime) ||
          aFlavor.EqualsLiteral(kPNGImageMime) ||
          aFlavor.EqualsLiteral(kGIFImageMime);
+}
+
+static Shmem
+ConvertToShmem(mozilla::dom::nsIContentChild* aChild,
+               mozilla::dom::nsIContentParent* aParent,
+               const nsACString& aInput)
+{
+  MOZ_ASSERT((aChild && !aParent) || (!aChild && aParent));
+
+  IShmemAllocator* allocator =
+    aChild ? static_cast<IShmemAllocator*>(aChild)
+           : static_cast<IShmemAllocator*>(aParent);
+
+  Shmem result;
+  if (!allocator->AllocShmem(aInput.Length() + 1,
+                             SharedMemory::TYPE_BASIC,
+                             &result)) {
+    return result;
+  }
+
+  memcpy(result.get<char>(),
+         aInput.BeginReading(),
+         aInput.Length() + 1);
+
+  return result;
 }
 
 void
@@ -7352,7 +7393,13 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
           ctext->GetData(dataAsString);
           IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
           item->flavor() = flavorStr;
-          item->data() = dataAsString;
+
+          Shmem dataAsShmem = ConvertToShmem(aChild, aParent, dataAsString);
+          if (!dataAsShmem.IsReadable() || !dataAsShmem.Size<char>()) {
+            continue;
+          }
+
+          item->data() = dataAsShmem;
         } else {
           nsCOMPtr<nsISupportsInterfacePointer> sip =
             do_QueryInterface(data);
@@ -7368,7 +7415,13 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
 
             nsCString imageData;
             NS_ConsumeStream(stream, UINT32_MAX, imageData);
-            item->data() = imageData;
+
+            Shmem imageDataShmem = ConvertToShmem(aChild, aParent, imageData);
+            if (!imageDataShmem.IsReadable() || !imageDataShmem.Size<char>()) {
+              continue;
+            }
+
+            item->data() = imageDataShmem;
             continue;
           }
 
@@ -7388,15 +7441,17 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
             }
             size_t length;
             int32_t stride;
-            mozilla::UniquePtr<char[]> surfaceData =
-              nsContentUtils::GetSurfaceData(WrapNotNull(dataSurface), &length,
-                                             &stride);
+            Shmem surfaceData;
+            IShmemAllocator* allocator = aChild ? static_cast<IShmemAllocator*>(aChild)
+                                                : static_cast<IShmemAllocator*>(aParent);
+            GetSurfaceData(dataSurface, &length, &stride,
+                           allocator,
+                           &surfaceData);
 
             IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
             item->flavor() = flavorStr;
             // Turn item->data() into an nsCString prior to accessing it.
-            item->data() = EmptyCString();
-            item->data().get_nsCString().Adopt(surfaceData.release(), length);
+            item->data() = surfaceData;
 
             IPCDataTransferImage& imageDetails = item->imageDetails();
             mozilla::gfx::IntSize size = dataSurface->GetSize();
@@ -7424,7 +7479,9 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
                 item->flavor() = type;
                 nsAutoCString data;
                 SlurpFileToString(file, data);
-                item->data() = data;
+
+                Shmem dataAsShmem = ConvertToShmem(aChild, aParent, data);
+                item->data() = dataAsShmem;
               }
 
               continue;
@@ -7483,7 +7540,7 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
               // Empty element, transfer only the flavor
               IPCDataTransferItem* item = aIPCDataTransfer->items().AppendElement();
               item->flavor() = flavorStr;
-              item->data() = EmptyCString();
+              item->data() = nsString();
               continue;
             }
           }
@@ -7493,15 +7550,82 @@ nsContentUtils::TransferableToIPCTransferable(nsITransferable* aTransferable,
   }
 }
 
-mozilla::UniquePtr<char[]>
-nsContentUtils::GetSurfaceData(
-  NotNull<mozilla::gfx::DataSourceSurface*> aSurface,
-  size_t* aLength, int32_t* aStride)
+namespace {
+// The default type used for calling GetSurfaceData(). Gets surface data as
+// raw buffer.
+struct GetSurfaceDataRawBuffer
+{
+  using ReturnType = mozilla::UniquePtr<char[]>;
+  using BufferType = char*;
+
+  ReturnType Allocate(size_t aSize)
+  {
+    return ReturnType(new char[aSize]);
+  }
+
+  static BufferType
+  GetBuffer(const ReturnType& aReturnValue)
+  {
+    return aReturnValue.get();
+  }
+
+  static ReturnType
+  NullValue()
+  {
+    return ReturnType();
+  }
+};
+
+// The type used for calling GetSurfaceData() that allocates and writes to
+// a shared memory buffer.
+struct GetSurfaceDataShmem
+{
+  using ReturnType = Shmem;
+  using BufferType = char*;
+
+  explicit GetSurfaceDataShmem(IShmemAllocator* aAllocator)
+    : mAllocator(aAllocator)
+  { }
+
+  ReturnType Allocate(size_t aSize)
+  {
+    Shmem returnValue;
+    mAllocator->AllocShmem(aSize,
+                           SharedMemory::TYPE_BASIC,
+                           &returnValue);
+    return returnValue;
+  }
+
+  static BufferType
+  GetBuffer(ReturnType aReturnValue)
+  {
+    return aReturnValue.get<char>();
+  }
+
+  static ReturnType
+  NullValue()
+  {
+    return ReturnType();
+  }
+private:
+  IShmemAllocator* mAllocator;
+};
+
+/*
+ * Get the pixel data from the given source surface and return it as a buffer.
+ * The length and stride will be assigned from the surface.
+ */
+template <typename GetSurfaceDataContext = GetSurfaceDataRawBuffer>
+typename GetSurfaceDataContext::ReturnType
+GetSurfaceDataImpl(mozilla::gfx::DataSourceSurface* aSurface,
+                   size_t* aLength, int32_t* aStride,
+                   GetSurfaceDataContext aContext = GetSurfaceDataContext())
 {
   mozilla::gfx::DataSourceSurface::MappedSurface map;
-  if (NS_WARN_IF(!aSurface->Map(mozilla::gfx::DataSourceSurface::MapType::READ, &map))) {
-    return nullptr;
+  if (!aSurface->Map(mozilla::gfx::DataSourceSurface::MapType::READ, &map)) {
+    return GetSurfaceDataContext::NullValue();
   }
+
   mozilla::gfx::IntSize size = aSurface->GetSize();
   mozilla::CheckedInt32 requiredBytes =
     mozilla::CheckedInt32(map.mStride) * mozilla::CheckedInt32(size.height);
@@ -7513,15 +7637,40 @@ nsContentUtils::GetSurfaceData(
   size_t bufLen = maxBufLen - map.mStride + (size.width * BytesPerPixel(format));
 
   // nsDependentCString wants null-terminated string.
-  mozilla::UniquePtr<char[]> surfaceData(new char[maxBufLen + 1]);
-  memcpy(surfaceData.get(), reinterpret_cast<char*>(map.mData), bufLen);
-  memset(surfaceData.get() + bufLen, 0, maxBufLen - bufLen + 1);
+  typename GetSurfaceDataContext::ReturnType surfaceData = aContext.Allocate(maxBufLen + 1);
+  if (GetSurfaceDataContext::GetBuffer(surfaceData)) {
+    memcpy(GetSurfaceDataContext::GetBuffer(surfaceData),
+           reinterpret_cast<char*>(map.mData),
+           bufLen);
+    memset(GetSurfaceDataContext::GetBuffer(surfaceData) + bufLen,
+           0,
+           maxBufLen - bufLen + 1);
+  }
 
   *aLength = maxBufLen;
   *aStride = map.mStride;
 
   aSurface->Unmap();
   return surfaceData;
+}
+} // Anonymous namespace.
+
+mozilla::UniquePtr<char[]>
+nsContentUtils::GetSurfaceData(
+  NotNull<mozilla::gfx::DataSourceSurface*> aSurface,
+  size_t* aLength, int32_t* aStride)
+{
+  return GetSurfaceDataImpl(aSurface, aLength, aStride);
+}
+
+void
+nsContentUtils::GetSurfaceData(mozilla::gfx::DataSourceSurface* aSurface,
+                               size_t* aLength, int32_t* aStride,
+                               IShmemAllocator* aAllocator,
+                               Shmem *aOutShmem)
+{
+  *aOutShmem = GetSurfaceDataImpl(aSurface, aLength, aStride,
+                                  GetSurfaceDataShmem(aAllocator));
 }
 
 mozilla::Modifiers
@@ -7658,11 +7807,11 @@ nsContentUtils::SendKeyEvent(nsIWidget* aWidget,
   event.mModifiers = GetWidgetModifiers(aModifiers);
 
   if (msg == eKeyPress) {
-    event.keyCode = aCharCode ? 0 : aKeyCode;
-    event.charCode = aCharCode;
+    event.mKeyCode = aCharCode ? 0 : aKeyCode;
+    event.mCharCode = aCharCode;
   } else {
-    event.keyCode = aKeyCode;
-    event.charCode = 0;
+    event.mKeyCode = aKeyCode;
+    event.mCharCode = 0;
   }
 
   uint32_t locationFlag = (aAdditionalFlags &
@@ -7670,16 +7819,16 @@ nsContentUtils::SendKeyEvent(nsIWidget* aWidget,
      nsIDOMWindowUtils::KEY_FLAG_LOCATION_RIGHT | nsIDOMWindowUtils::KEY_FLAG_LOCATION_NUMPAD));
   switch (locationFlag) {
     case nsIDOMWindowUtils::KEY_FLAG_LOCATION_STANDARD:
-      event.location = nsIDOMKeyEvent::DOM_KEY_LOCATION_STANDARD;
+      event.mLocation = nsIDOMKeyEvent::DOM_KEY_LOCATION_STANDARD;
       break;
     case nsIDOMWindowUtils::KEY_FLAG_LOCATION_LEFT:
-      event.location = nsIDOMKeyEvent::DOM_KEY_LOCATION_LEFT;
+      event.mLocation = nsIDOMKeyEvent::DOM_KEY_LOCATION_LEFT;
       break;
     case nsIDOMWindowUtils::KEY_FLAG_LOCATION_RIGHT:
-      event.location = nsIDOMKeyEvent::DOM_KEY_LOCATION_RIGHT;
+      event.mLocation = nsIDOMKeyEvent::DOM_KEY_LOCATION_RIGHT;
       break;
     case nsIDOMWindowUtils::KEY_FLAG_LOCATION_NUMPAD:
-      event.location = nsIDOMKeyEvent::DOM_KEY_LOCATION_NUMPAD;
+      event.mLocation = nsIDOMKeyEvent::DOM_KEY_LOCATION_NUMPAD;
       break;
     default:
       if (locationFlag != 0) {
@@ -7703,16 +7852,16 @@ nsContentUtils::SendKeyEvent(nsIWidget* aWidget,
         case nsIDOMKeyEvent::DOM_VK_SUBTRACT:
         case nsIDOMKeyEvent::DOM_VK_DECIMAL:
         case nsIDOMKeyEvent::DOM_VK_DIVIDE:
-          event.location = nsIDOMKeyEvent::DOM_KEY_LOCATION_NUMPAD;
+          event.mLocation = nsIDOMKeyEvent::DOM_KEY_LOCATION_NUMPAD;
           break;
         case nsIDOMKeyEvent::DOM_VK_SHIFT:
         case nsIDOMKeyEvent::DOM_VK_CONTROL:
         case nsIDOMKeyEvent::DOM_VK_ALT:
         case nsIDOMKeyEvent::DOM_VK_META:
-          event.location = nsIDOMKeyEvent::DOM_KEY_LOCATION_LEFT;
+          event.mLocation = nsIDOMKeyEvent::DOM_KEY_LOCATION_LEFT;
           break;
         default:
-          event.location = nsIDOMKeyEvent::DOM_KEY_LOCATION_STANDARD;
+          event.mLocation = nsIDOMKeyEvent::DOM_KEY_LOCATION_STANDARD;
           break;
       }
       break;
@@ -7792,7 +7941,7 @@ nsContentUtils::SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
   event.buttons = GetButtonsFlagForButton(aButton);
   event.pressure = aPressure;
   event.inputSource = aInputSourceArg;
-  event.clickCount = aClickCount;
+  event.mClickCount = aClickCount;
   event.mTime = PR_IntervalNow();
   event.mFlags.mIsSynthesizedForTests = aIsSynthesized;
 
@@ -7801,7 +7950,7 @@ nsContentUtils::SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
     return NS_ERROR_FAILURE;
 
   event.mRefPoint = ToWidgetPoint(CSSPoint(aX, aY), offset, presContext);
-  event.ignoreRootScrollFrame = aIgnoreRootScrollFrame;
+  event.mIgnoreRootScrollFrame = aIgnoreRootScrollFrame;
 
   nsEventStatus status = nsEventStatus_eIgnore;
   if (aToWindow) {
@@ -8849,4 +8998,32 @@ nsContentUtils::SetScrollbarsVisibility(nsIDocShell* aDocShell, bool aVisible)
     scroller->SetDefaultScrollbarPreferences(
                 nsIScrollable::ScrollOrientation_X, prefValue);
   }
+}
+
+/* static */ void
+nsContentUtils::GetPresentationURL(nsIDocShell* aDocShell, nsAString& aPresentationUrl)
+{
+  MOZ_ASSERT(aDocShell);
+
+  if (XRE_IsContentProcess()) {
+    nsCOMPtr<nsIDocShellTreeItem> sameTypeRoot;
+    aDocShell->GetSameTypeRootTreeItem(getter_AddRefs(sameTypeRoot));
+    nsCOMPtr<nsIDocShellTreeItem> root;
+    aDocShell->GetRootTreeItem(getter_AddRefs(root));
+    if (sameTypeRoot.get() == root.get()) {
+      // presentation URL is stored in TabChild for the top most
+      // <iframe mozbrowser> in content process.
+      TabChild* tabChild = TabChild::GetFrom(aDocShell);
+      if (tabChild) {
+        aPresentationUrl = tabChild->PresentationURL();
+      }
+      return;
+    }
+  }
+
+  nsCOMPtr<nsILoadContext> loadContext(do_QueryInterface(aDocShell));
+  nsCOMPtr<nsIDOMElement> topFrameElement;
+  loadContext->GetTopFrameElement(getter_AddRefs(topFrameElement));
+
+  topFrameElement->GetAttribute(NS_LITERAL_STRING("mozpresentation"), aPresentationUrl);
 }

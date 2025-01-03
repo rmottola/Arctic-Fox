@@ -311,7 +311,7 @@ nsDisplayCanvasBackgroundImage::Paint(nsDisplayListBuilder* aBuilder,
                                                  ceil(destRect.height)),
                                          SurfaceFormat::B8G8R8A8);
     if (dt && dt->IsValid()) {
-      RefPtr<gfxContext> ctx = gfxContext::ForDrawTarget(dt);
+      RefPtr<gfxContext> ctx = gfxContext::CreateOrNull(dt);
       MOZ_ASSERT(ctx); // already checked draw target above
       ctx->SetMatrix(ctx->CurrentMatrix().Translate(-destRect.x, -destRect.y));
       nsRenderingContext context(ctx);
@@ -480,8 +480,9 @@ nsCanvasFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
 
     if (needBlendContainer) {
       aLists.BorderBackground()->AppendNewToTop(
-        new (aBuilder) nsDisplayBlendContainer(aBuilder, this, aLists.BorderBackground(),
-                                               scrollClip));
+        nsDisplayBlendContainer::CreateForBackgroundBlendMode(aBuilder, this,
+                                                              aLists.BorderBackground(),
+                                                              scrollClip));
     }
   }
 
@@ -623,7 +624,7 @@ nsCanvasFrame::Reflow(nsPresContext*           aPresContext,
       kidReflowState(aPresContext, aReflowState, kidFrame,
                      aReflowState.AvailableSize(kidFrame->GetWritingMode()));
 
-    if (aReflowState.IsBResize() &&
+    if (aReflowState.IsBResizeForWM(kidReflowState.GetWritingMode()) &&
         (kidFrame->GetStateBits() & NS_FRAME_CONTAINS_RELATIVE_BSIZE)) {
       // Tell our kid it's being block-dir resized too.  Bit of a
       // hack for framesets.

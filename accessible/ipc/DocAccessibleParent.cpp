@@ -5,7 +5,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "DocAccessibleParent.h"
-#include "nsAutoPtr.h"
 #include "mozilla/a11y/Platform.h"
 #include "ProxyAccessible.h"
 #include "mozilla/dom/TabParent.h"
@@ -46,8 +45,15 @@ DocAccessibleParent::RecvShowEvent(const ShowEventData& aData,
     return true;
   }
 
-  DebugOnly<uint32_t> consumed = AddSubtree(parent, aData.NewTree(), 0, newChildIdx);
+  uint32_t consumed = AddSubtree(parent, aData.NewTree(), 0, newChildIdx);
   MOZ_ASSERT(consumed == aData.NewTree().Length());
+
+  // XXX This shouldn't happen, but if we failed to add children then the below
+  // is pointless and can crash.
+  if (!consumed) {
+    return true;
+  }
+
 #ifdef DEBUG
   for (uint32_t i = 0; i < consumed; i++) {
     uint64_t id = aData.NewTree()[i].ID();
@@ -57,7 +63,21 @@ DocAccessibleParent::RecvShowEvent(const ShowEventData& aData,
 
   MOZ_DIAGNOSTIC_ASSERT(CheckDocTree());
 
-  ProxyShowHideEvent(parent->ChildAt(newChildIdx), parent, true, aFromUser);
+  ProxyAccessible* target = parent->ChildAt(newChildIdx);
+  ProxyShowHideEvent(target, parent, true, aFromUser);
+
+  if (!nsCoreUtils::AccEventObserversExist()) {
+    return true;
+  }
+
+  uint32_t type = nsIAccessibleEvent::EVENT_SHOW;
+  xpcAccessibleGeneric* xpcAcc = GetXPCAccessible(target);
+  xpcAccessibleDocument* doc = GetAccService()->GetXPCDocument(this);
+  nsIDOMNode* node = nullptr;
+  RefPtr<xpcAccEvent> event = new xpcAccEvent(type, xpcAcc, doc, node,
+                                              aFromUser);
+  nsCoreUtils::DispatchAccEvent(Move(event));
+
   return true;
 }
 
@@ -84,7 +104,8 @@ DocAccessibleParent::AddSubtree(ProxyAccessible* aParent,
 
   auto role = static_cast<a11y::role>(newChild.Role());
   ProxyAccessible* newProxy =
-    new ProxyAccessible(newChild.ID(), aParent, this, role);
+    new ProxyAccessible(newChild.ID(), aParent, this, role,
+                        newChild.Interfaces());
   aParent->AddChildAt(aIdxInParent, newProxy);
   mAccessibles.PutEntry(newChild.ID())->mProxy = newProxy;
   ProxyCreated(newProxy, newChild.Interfaces());
@@ -134,10 +155,30 @@ DocAccessibleParent::RecvHideEvent(const uint64_t& aRootID,
 
   ProxyAccessible* parent = root->Parent();
   ProxyShowHideEvent(root, parent, false, aFromUser);
+
+  RefPtr<xpcAccHideEvent> event = nullptr;
+  if (nsCoreUtils::AccEventObserversExist()) {
+    uint32_t type = nsIAccessibleEvent::EVENT_HIDE;
+    xpcAccessibleGeneric* xpcAcc = GetXPCAccessible(root);
+    xpcAccessibleGeneric* xpcParent = GetXPCAccessible(parent);
+    ProxyAccessible* next = root->NextSibling();
+    xpcAccessibleGeneric* xpcNext = next ? GetXPCAccessible(next) : nullptr;
+    ProxyAccessible* prev = root->PrevSibling();
+    xpcAccessibleGeneric* xpcPrev = prev ? GetXPCAccessible(prev) : nullptr;
+    xpcAccessibleDocument* doc = GetAccService()->GetXPCDocument(this);
+    nsIDOMNode* node = nullptr;
+    event = new xpcAccHideEvent(type, xpcAcc, doc, node, aFromUser, xpcParent,
+                                xpcNext, xpcPrev);
+  }
+
   parent->RemoveChild(root);
   root->Shutdown();
 
   MOZ_DIAGNOSTIC_ASSERT(CheckDocTree());
+
+  if (event) {
+    nsCoreUtils::DispatchAccEvent(Move(event));
+  }
 
   return true;
 }
@@ -249,7 +290,8 @@ DocAccessibleParent::RecvTextChangeEvent(const uint64_t& aID,
 
   xpcAccessibleGeneric* xpcAcc = GetXPCAccessible(target);
   xpcAccessibleDocument* doc = GetAccService()->GetXPCDocument(this);
-  uint32_t type = nsIAccessibleEvent::EVENT_TEXT_CHANGED;
+  uint32_t type = aIsInsert ? nsIAccessibleEvent::EVENT_TEXT_INSERTED :
+                              nsIAccessibleEvent::EVENT_TEXT_REMOVED;
   nsIDOMNode* node = nullptr;
   RefPtr<xpcAccTextChangeEvent> event =
     new xpcAccTextChangeEvent(type, xpcAcc, doc, node, aFromUser, aStart, aLen,
@@ -282,6 +324,18 @@ DocAccessibleParent::RecvSelectionEvent(const uint64_t& aID,
   nsCoreUtils::DispatchAccEvent(Move(event));
 
   return true;
+}
+
+bool
+DocAccessibleParent::RecvRoleChangedEvent(const uint32_t& aRole)
+{
+ if (aRole >= roles::LAST_ROLE) {
+   NS_ERROR("child sent bad role in RoleChangedEvent");
+   return false;
+ }
+
+ mRole = static_cast<a11y::role>(aRole);
+ return true;
 }
 
 bool

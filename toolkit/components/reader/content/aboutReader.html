@@ -13,20 +13,34 @@
 <body>
   <div id="container" class="container">
     <div id="reader-header" class="header">
+      <style scoped>
+        @import url("chrome://global/skin/aboutReaderControls.css");
+      </style>
       <a id="reader-domain" class="domain"></a>
       <div class="domain-border"></div>
       <h1 id="reader-title"></h1>
       <div id="reader-credits" class="credits"></div>
     </div>
 
-    <div id="moz-reader-content" class="content">
+    <div class="content">
+      <style scoped>
+        @import url("chrome://global/skin/aboutReaderContent.css");
+      </style>
+      <div id="moz-reader-content"></div>
     </div>
 
-    <div id="reader-message" class="message">
+    <div>
+      <style scoped>
+        @import url("chrome://global/skin/aboutReaderControls.css");
+      </style>
+      <div id="reader-message"></div>
     </div>
   </div>
 
   <ul id="reader-toolbar" class="toolbar">
+    <style scoped>
+      @import url("chrome://global/skin/aboutReaderControls.css");
+    </style>
     <li><button id="close-button" class="button close-button"/></li>
     <ul id="style-dropdown" class="dropdown">
       <li><button class="dropdown-toggle button style-button"/></li>
@@ -37,6 +51,16 @@
           <button id="font-size-minus" class="minus-button"/>
           <button id="font-size-sample"/>
           <button id="font-size-plus" class="plus-button"/>
+        </div>
+        <hr></hr>
+        <div id="content-width-buttons">
+          <button id="content-width-minus" class="content-width-minus-button"/>
+          <button id="content-width-plus" class="content-width-plus-button"/>
+        </div>
+        <hr></hr>
+        <div id="line-height-buttons">
+          <button id="line-height-minus" class="line-height-minus-button"/>
+          <button id="line-height-plus" class="line-height-plus-button"/>
         </div>
         <hr></hr>
         <div id="color-scheme-buttons"></div>

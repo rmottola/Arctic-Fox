@@ -19,6 +19,7 @@
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/RecordErrorEvent.h"
 #include "mozilla/dom/VideoStreamTrack.h"
+#include "nsAutoPtr.h"
 #include "nsContentUtils.h"
 #include "nsError.h"
 #include "nsIDocument.h"
@@ -833,10 +834,8 @@ private:
       new DispatchStartEventRunnable(this, NS_LITERAL_STRING("start")));
 
     if (NS_FAILED(rv)) {
-      nsCOMPtr<nsIRunnable> runnable =
-        NS_NewRunnableMethodWithArg<nsresult>(mRecorder,
-                                              &MediaRecorder::NotifyError, rv);
-      NS_DispatchToMainThread(runnable);
+      NS_DispatchToMainThread(NewRunnableMethod<nsresult>(mRecorder,
+                                                          &MediaRecorder::NotifyError, rv));
     }
     if (NS_FAILED(NS_DispatchToMainThread(new EncoderErrorNotifierRunnable(this)))) {
       MOZ_ASSERT(false, "NS_DispatchToMainThread EncoderErrorNotifierRunnable failed");

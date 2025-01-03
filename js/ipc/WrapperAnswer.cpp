@@ -410,9 +410,6 @@ WrapperAnswer::RecvCallOrConstruct(const ObjectId& objId,
 
     RootedValue rval(cx);
     {
-        AutoSaveContextOptions asco(cx);
-        ContextOptionsRef(cx).setDontReportUncaught(true);
-
         HandleValueArray args = HandleValueArray::subarray(vals, 2, vals.length() - 2);
         if (construct) {
             RootedObject obj(cx);
@@ -550,7 +547,8 @@ WrapperAnswer::RecvClassName(const ObjectId& objId, nsCString* name)
     RootedObject obj(cx, findObjectById(cx, objId));
     if (!obj) {
         // This is very unfortunate, but we have no choice.
-        return "<dead CPOW>";
+        *name = "<dead CPOW>";
+        return true;
     }
 
     LOG("%s.className()", ReceiverObj(objId));

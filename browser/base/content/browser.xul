@@ -12,6 +12,7 @@
 <?xml-stylesheet href="chrome://browser/content/browser-title.css" type="text/css"?>
 
 <?xml-stylesheet href="chrome://browser/content/places/places.css" type="text/css"?>
+<?xml-stylesheet href="chrome://browser/content/usercontext/usercontext.css" type="text/css"?>
 <?xml-stylesheet href="chrome://devtools/skin/devtools-browser.css" type="text/css"?>
 <?xml-stylesheet href="chrome://browser/skin/controlcenter/panel.css" type="text/css"?>
 <?xml-stylesheet href="chrome://browser/skin/customizableui/panelUIOverlay.css" type="text/css"?>
@@ -431,8 +432,7 @@
            iconsize="large">
     <!-- Menu -->
     <toolbar type="menubar" id="toolbar-menubar" class="chromeclass-menubar" customizable="true"
-             defaultset="menubar-items"
-             mode="icons" iconsize="small" defaulticonsize="small"
+             defaultset="menubar-items"             mode="icons" iconsize="small" defaulticonsize="small"
              lockiconsize="true"
 #ifdef MENUBAR_CAN_AUTOHIDE
              toolbarname="&menubarCmd.label;"
@@ -597,6 +597,10 @@
                                onclick="ReaderParent.handleReaderButtonEvent(event);"
                                onkeypress="ReaderParent.handleReaderButtonEvent(event);"/>
           </hbox>
+              <hbox id="userContext-icons" hidden="true">
+                <label id="userContext-label"/>
+                <image id="userContext-indicator"/>
+              </hbox>
           <toolbarbutton id="urlbar-go-button"
                          class="chromeclass-toolbar-additional"
                          onclick="gURLBar.handleCommand(event);"
@@ -749,13 +753,11 @@
                     key="key_sanitize"
                     command="Tools:Sanitize"/>
           <menuseparator id="HMB_sanitizeSeparator"/>
-#ifdef MOZ_SERVICES_SYNC
           <menuitem id="HMB_sync-tabs-menuitem"
                     class="syncTabsMenuItem"
                     label="&syncTabsMenu2.label;"
                     oncommand="BrowserOpenSyncTabs();"
                     disabled="true"/>
-#endif
           <menuitem id="HMB_historyRestoreLastSession"
                     label="&historyRestoreLastSession.label;"
                     command="Browser:RestoreLastSession"/>
@@ -819,7 +821,6 @@
              lockiconsize="true"
              class="chromeclass-directories"
              context="toolbar-context-menu"
-             defaultset="personal-bookmarks"
              toolbarname="&personalbarCmd.label;" accesskey="&personalbarCmd.accesskey;"
              collapsed="false"
              customizable="true">
@@ -879,8 +880,6 @@
              context="toolbar-context-menu"
 #ifdef APPMENU_ON_TABBAR
              defaultset="appmenu-toolbar-button,tabbrowser-tabs,new-tab-button,alltabs-button,tabs-closebutton"
-#else
-             defaultset="tabbrowser-tabs,new-tab-button,alltabs-button,tabs-closebutton"
 #endif
              collapsed="true">
 

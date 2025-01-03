@@ -6,7 +6,6 @@
 
 GeckoSimplePrograms([
     'BadCertServer',
-    'ClientAuthServer',
     'GenerateOCSPResponse',
     'OCSPStaplingServer',
 ], linkage=None)

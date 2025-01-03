@@ -356,22 +356,22 @@ public:
            mParsingMode == css::eUserSheetFeatures;
   }
 
-  nsCSSProps::EnabledState PropertyEnabledState() const {
-    static_assert(nsCSSProps::eEnabledForAllContent == 0,
-                  "nsCSSProps::eEnabledForAllContent should be zero for "
+  CSSEnabledState EnabledState() const {
+    static_assert(int(CSSEnabledState::eForAllContent) == 0,
+                  "CSSEnabledState::eForAllContent should be zero for "
                   "this bitfield to work");
-    nsCSSProps::EnabledState enabledState = nsCSSProps::eEnabledForAllContent;
+    CSSEnabledState enabledState = CSSEnabledState::eForAllContent;
     if (AgentRulesEnabled()) {
-      enabledState |= nsCSSProps::eEnabledInUASheets;
+      enabledState |= CSSEnabledState::eInUASheets;
     }
     if (mIsChrome) {
-      enabledState |= nsCSSProps::eEnabledInChrome;
+      enabledState |= CSSEnabledState::eInChrome;
     }
     return enabledState;
   }
 
   nsCSSProperty LookupEnabledProperty(const nsAString& aProperty) {
-    return nsCSSProps::LookupProperty(aProperty, PropertyEnabledState());
+    return nsCSSProps::LookupProperty(aProperty, EnabledState());
   }
 
 protected:
@@ -1905,7 +1905,7 @@ CSSParserImpl::ParseTransformProperty(const nsAString& aPropValue,
   if (parsedOK) {
     declaration->ExpandTo(&mData);
     changed = mData.TransferFromBlock(mTempData, eCSSProperty_transform,
-                                      PropertyEnabledState(), false,
+                                      EnabledState(), false,
                                       true, false, declaration,
                                       GetDocument());
     declaration->CompressFrom(&mData);
@@ -1952,7 +1952,7 @@ CSSParserImpl::ParseProperty(const nsCSSProperty aPropID,
 
   // Check for unknown or preffed off properties
   if (eCSSProperty_UNKNOWN == aPropID ||
-      !nsCSSProps::IsEnabled(aPropID, PropertyEnabledState())) {
+      !nsCSSProps::IsEnabled(aPropID, EnabledState())) {
     NS_ConvertASCIItoUTF16 propName(nsCSSProps::GetStringValue(aPropID));
     REPORT_UNEXPECTED_P(PEUnknownProperty, propName);
     REPORT_UNEXPECTED(PEDeclDropped);
@@ -1987,7 +1987,7 @@ CSSParserImpl::ParseProperty(const nsCSSProperty aPropID,
       // Do it the slow way
       aDeclaration->ExpandTo(&mData);
       *aChanged = mData.TransferFromBlock(mTempData, aPropID,
-                                          PropertyEnabledState(), aIsImportant,
+                                          EnabledState(), aIsImportant,
                                           true, false, aDeclaration,
                                           GetDocument());
       aDeclaration->CompressFrom(&mData);
@@ -3262,7 +3262,7 @@ CSSParserImpl::ParseAtRule(RuleAppendFunc aAppendFunc,
     newSection = eCSSSection_General;
 
   } else if ((nsCSSProps::IsEnabled(eCSSPropertyAlias_MozAnimation,
-                                    PropertyEnabledState()) &&
+                                    EnabledState()) &&
               mToken.mIdent.LowerCaseEqualsLiteral("-moz-keyframes")) ||
              (nsCSSProps::IsEnabled(eCSSPropertyAlias_WebkitAnimation) &&
               mToken.mIdent.LowerCaseEqualsLiteral("-webkit-keyframes")) ||
@@ -5914,22 +5914,17 @@ CSSParserImpl::ParsePseudoSelector(int32_t&       aDataMask,
 
   // stash away some info about this pseudo so we only have to get it once.
   bool isTreePseudo = false;
+  CSSEnabledState enabledState = EnabledState();
   CSSPseudoElementType pseudoElementType =
     nsCSSPseudoElements::GetPseudoType(pseudo);
   CSSPseudoClassType pseudoClassType =
-    nsCSSPseudoClasses::GetPseudoType(pseudo);
+    nsCSSPseudoClasses::GetPseudoType(pseudo, enabledState);
   bool pseudoClassIsUserAction =
     nsCSSPseudoClasses::IsUserActionPseudoClass(pseudoClassType);
 
-  if (!AgentRulesEnabled() &&
-      ((pseudoElementType < CSSPseudoElementType::Count &&
-        nsCSSPseudoElements::PseudoElementIsUASheetOnly(pseudoElementType)) ||
-       (pseudoClassType != CSSPseudoClassType::NotPseudo &&
-        nsCSSPseudoClasses::PseudoClassIsUASheetOnly(pseudoClassType)) ||
-       (!ChromeRulesEnabled() &&
-        (pseudoClassType != CSSPseudoClassType::NotPseudo &&
-         nsCSSPseudoClasses::PseudoClassIsUASheetAndChromeOnly(pseudoClassType))))) {
-    // This pseudo-element or pseudo-class is not exposed to content.
+  if (pseudoElementType < CSSPseudoElementType::Count && !AgentRulesEnabled() &&
+      nsCSSPseudoElements::PseudoElementIsUASheetOnly(pseudoElementType)) {
+    // This pseudo-element is not exposed to content.
     REPORT_UNEXPECTED_TOKEN(PEPseudoSelUnknown);
     UngetToken();
     return eSelectorParsingStatus_Error;
@@ -6622,13 +6617,25 @@ CSSParserImpl::ParseColor(nsCSSValue& aValue)
   switch (tk->mType) {
     case eCSSToken_ID:
     case eCSSToken_Hash:
-      // #xxyyzz
-      if (NS_HexToRGB(tk->mIdent, &rgba)) {
-        MOZ_ASSERT(tk->mIdent.Length() == 3 || tk->mIdent.Length() == 6,
-                   "unexpected hex color length");
-        nsCSSUnit unit = tk->mIdent.Length() == 3 ?
-                           eCSSUnit_ShortHexColor :
-                           eCSSUnit_HexColor;
+      // #rgb, #rrggbb, #rgba, #rrggbbaa
+      if (NS_HexToRGBA(tk->mIdent, nsHexColorType::AllowAlpha, &rgba)) {
+        nsCSSUnit unit;
+        switch (tk->mIdent.Length()) {
+          case 3:
+            unit = eCSSUnit_ShortHexColor;
+            break;
+          case 4:
+            unit = eCSSUnit_ShortHexColorAlpha;
+            break;
+          case 6:
+            unit = eCSSUnit_HexColor;
+            break;
+          default:
+            MOZ_FALLTHROUGH_ASSERT("unexpected hex color length");
+          case 8:
+            unit = eCSSUnit_HexColorAlpha;
+            break;
+        }
         aValue.SetIntegerColorValue(rgba, unit);
         return CSSParseResult::Ok;
       }
@@ -6777,7 +6784,8 @@ CSSParserImpl::ParseColor(nsCSSValue& aValue)
         // not handled by this switch.  Ignore them.
         break;
     }
-    if (NS_HexToRGB(str, &rgba)) {
+    // The hashless color quirk does not support 4 & 8 digit colors with alpha.
+    if (NS_HexToRGBA(str, nsHexColorType::NoAlpha, &rgba)) {
       aValue.SetIntegerColorValue(rgba, eCSSUnit_HexColor);
       return CSSParseResult::Ok;
     }
@@ -7376,8 +7384,7 @@ CSSParserImpl::ParseDeclaration(css::Declaration* aDeclaration,
     aDeclaration->AddVariableDeclaration(varName, variableType, variableValue,
                                          status == ePriority_Important, false);
   } else {
-    *aChanged |= mData.TransferFromBlock(mTempData, propID,
-                                         PropertyEnabledState(),
+    *aChanged |= mData.TransferFromBlock(mTempData, propID, EnabledState(),
                                          status == ePriority_Important,
                                          false, aMustCallValueAppended,
                                          aDeclaration, GetDocument());
@@ -9762,12 +9769,12 @@ CSSParserImpl::ParseGridGap()
     AppendValue(eCSSProperty_grid_column_gap, first);
     return true;
   }
-  if (ParseNonNegativeVariant(first, VARIANT_LCALC, nullptr) !=
+  if (ParseNonNegativeVariant(first, VARIANT_LPCALC, nullptr) !=
         CSSParseResult::Ok) {
     return false;
   }
   nsCSSValue second;
-  auto result = ParseNonNegativeVariant(second, VARIANT_LCALC, nullptr);
+  auto result = ParseNonNegativeVariant(second, VARIANT_LPCALC, nullptr);
   if (result == CSSParseResult::Error) {
     return false;
   }
@@ -11384,8 +11391,7 @@ CSSParserImpl::ParseProperty(nsCSSProperty aPropID)
         if (nsCSSProps::IsShorthand(aPropID)) {
           // If this is a shorthand property, we store the token stream on each
           // of its corresponding longhand properties.
-          CSSPROPS_FOR_SHORTHAND_SUBPROPERTIES(p, aPropID,
-                                               PropertyEnabledState()) {
+          CSSPROPS_FOR_SHORTHAND_SUBPROPERTIES(p, aPropID, EnabledState()) {
             nsCSSValueTokenStream* tokenStream = new nsCSSValueTokenStream;
             tokenStream->mPropertyID = *p;
             tokenStream->mShorthandPropertyID = aPropID;
@@ -12033,15 +12039,22 @@ CSSParserImpl::ParseImageLayersItem(
   // Fill in the values that the shorthand will set if we don't find
   // other values.
   aState.mImage->mValue.SetNoneValue();
-  aState.mRepeat->mXValue.SetIntValue(NS_STYLE_IMAGELAYER_REPEAT_REPEAT,
-                                      eCSSUnit_Enumerated);
-  aState.mRepeat->mYValue.Reset();
   aState.mAttachment->mValue.SetIntValue(NS_STYLE_IMAGELAYER_ATTACHMENT_SCROLL,
                                          eCSSUnit_Enumerated);
   aState.mClip->mValue.SetIntValue(NS_STYLE_IMAGELAYER_CLIP_BORDER,
                                    eCSSUnit_Enumerated);
-  aState.mOrigin->mValue.SetIntValue(NS_STYLE_IMAGELAYER_ORIGIN_PADDING,
-                                     eCSSUnit_Enumerated);
+
+  aState.mRepeat->mXValue.SetIntValue(NS_STYLE_IMAGELAYER_REPEAT_REPEAT,
+                                      eCSSUnit_Enumerated);
+  aState.mRepeat->mYValue.Reset();
+
+  if (eCSSProperty_mask == aTable[nsStyleImageLayers::shorthand]) {
+    aState.mOrigin->mValue.SetIntValue(NS_STYLE_IMAGELAYER_ORIGIN_BORDER,
+                                       eCSSUnit_Enumerated);
+  } else {
+    aState.mOrigin->mValue.SetIntValue(NS_STYLE_IMAGELAYER_ORIGIN_PADDING,
+                                       eCSSUnit_Enumerated);
+  }
 
   RefPtr<nsCSSValue::Array> positionXArr = nsCSSValue::Array::Create(2);
   RefPtr<nsCSSValue::Array> positionYArr = nsCSSValue::Array::Create(2);
@@ -17016,7 +17029,7 @@ CSSParserImpl::ParseAll()
   // instead of computing the correct EnabledState value we just expand out
   // to all content-visible properties.
   CSSPROPS_FOR_SHORTHAND_SUBPROPERTIES(p, eCSSProperty_all,
-                                       nsCSSProps::eEnabledForAllContent) {
+                                       CSSEnabledState::eForAllContent) {
     AppendValue(*p, value);
   }
   return true;

@@ -25,7 +25,6 @@ include moz-only/reftest.list
 # svg-integration tests (using svg effects in e.g. HTML)
 include svg-integration/reftest.list
 
-== altGlyph-01.svg altGlyph-01-ref.svg
 == baseline-middle-01.svg pass.svg
 == border-radius-01.html pass.svg
 == cssComment-in-attribute-01.svg cssComment-in-attribute-01-ref.svg
@@ -62,6 +61,7 @@ fuzzy-if(/^Windows\x20NT\x206\.[12]/.test(http.oscpu),1,5) fuzzy-if(azureQuartz,
 == dynamic-attr-removal-1.svg pass.svg
 == dynamic-attr-removal-2.svg pass.svg
 == dynamic-attr-change-1.svg pass.svg
+== dynamic-attr-change-2.svg pass.svg
 == dynamic-class-01.svg pass.svg
 fuzzy-if(Android,4,87) == dynamic-clipPath-01.svg pass.svg
 == dynamic-clipPath-02.svg pass.svg
@@ -295,6 +295,7 @@ fuzzy-if(cocoaWidget,4,15982) fuzzy-if(winWidget,4,92) == radialGradient-basic-0
 == script-empty-01.svg pass.svg
 == selector-01.svg pass.svg
 == stroke-linecap-circle-ellipse-01.svg stroke-linecap-circle-ellipse-01-ref.svg
+== stroke-linecap-circle-ellipse-dashed-01.svg pass.svg
 == stroke-width-percentage-01.svg pass.svg
 == stroke-width-percentage-02a.svg stroke-width-percentage-02-ref.svg
 == stroke-width-percentage-02b.svg stroke-width-percentage-02-ref.svg
@@ -345,6 +346,7 @@ HTTP(..) == text-scale-03.svg text-scale-03-ref.svg
 == stroke-dasharray-and-pathLength-01.svg pass.svg
 == stroke-dasharray-and-text-01.svg stroke-dasharray-and-text-01-ref.svg
 == stroke-dashoffset-01.svg pass.svg
+== stroke-dashoffset-and-pathLength-01.svg pass.svg
 == stroke-linecap-round-w-zero-length-segs-01.svg pass.svg
 == stroke-linecap-round-w-zero-length-segs-02.svg pass.svg
 == stroke-linecap-square-w-zero-length-segs-01.svg pass.svg

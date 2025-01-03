@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 // Copyright (c) 2006-2008 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -14,8 +16,6 @@
 #include "base/lock.h"
 #include "base/message_pump.h"
 #include "base/observer_list.h"
-#include "base/task.h"
-#include "base/timer.h"
 
 #if defined(OS_WIN)
 // We need this to declare base::MessagePumpWin::Dispatcher, which we should
@@ -26,6 +26,7 @@
 #endif
 
 #include "nsAutoPtr.h"
+#include "nsThreadUtils.h"
 
 class nsIThread;
 

@@ -103,6 +103,11 @@
 #include "nsXULPopupManager.h"
 #endif
 
+#ifdef NS_PRINTING
+#include "mozilla/embedding/printingui/PrintingParent.h"
+#include "nsIWebBrowserPrint.h"
+#endif
+
 using namespace mozilla;
 using namespace mozilla::hal;
 using namespace mozilla::dom;
@@ -177,9 +182,30 @@ nsFrameLoader::Create(Element* aOwner, bool aNetworkCreated)
 {
   NS_ENSURE_TRUE(aOwner, nullptr);
   nsIDocument* doc = aOwner->OwnerDoc();
+
+  // We never create nsFrameLoaders for elements in resource documents.
+  //
+  // We never create nsFrameLoaders for elements in data documents, unless the
+  // document is a static document.
+  // Static documents are an exception because any sub-documents need an
+  // nsFrameLoader to keep the relevant docShell alive, even though the
+  // nsFrameLoader isn't used to load anything (the sub-document is created by
+  // the static clone process).
+  //
+  // We never create nsFrameLoaders for elements that are not
+  // in-composed-document, unless the element belongs to a static document.
+  // Static documents are an exception because this method is called at a point
+  // in the static clone process before aOwner has been inserted into its
+  // document.  For other types of documents this wouldn't be a problem since
+  // we'd create the nsFrameLoader as necessary after aOwner is inserted into a
+  // document, but the mechanisms that take care of that don't apply for static
+  // documents so we need to create the nsFrameLoader now. (This isn't wasteful
+  // since for a static document we know aOwner will end up in a document and
+  // the nsFrameLoader will be used for its docShell.)
+  //
   NS_ENSURE_TRUE(!doc->IsResourceDoc() &&
-                 ((!doc->IsLoadedAsData() && aOwner->GetComposedDoc()) ||
-                   doc->IsStaticDocument()),
+                 ((!doc->IsLoadedAsData() && aOwner->IsInComposedDoc()) ||
+                  doc->IsStaticDocument()),
                  nullptr);
 
   return new nsFrameLoader(aOwner, aNetworkCreated);
@@ -217,6 +243,11 @@ nsFrameLoader::LoadFrame()
 
   nsIDocument* doc = mOwnerContent->OwnerDoc();
   if (doc->IsStaticDocument()) {
+    return NS_OK;
+  }
+
+  if (doc->IsLoadedAsInteractiveData()) {
+    // XBL bindings doc shouldn't load sub-documents.
     return NS_OK;
   }
 
@@ -308,6 +339,32 @@ nsFrameLoader::SetIsPrerendered()
 {
   MOZ_ASSERT(!mDocShell, "Please call SetIsPrerendered before docShell is created");
   mIsPrerendered = true;
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsFrameLoader::MakePrerenderedLoaderActive()
+{
+  MOZ_ASSERT(mIsPrerendered, "This frameloader was not in prerendered mode.");
+
+  mIsPrerendered = false;
+  if (IsRemoteFrame()) {
+    if (!mRemoteBrowser) {
+      NS_WARNING("Missing remote browser.");
+      return NS_ERROR_FAILURE;
+    }
+
+    mRemoteBrowser->SetDocShellIsActive(true);
+  } else {
+    if (!mDocShell) {
+      NS_WARNING("Missing docshell.");
+      return NS_ERROR_FAILURE;
+    }
+
+    nsresult rv = mDocShell->SetIsActive(true);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
 
   return NS_OK;
 }
@@ -1913,13 +1970,16 @@ nsFrameLoader::MaybeCreateDocShell()
   // XXXbz this is such a total hack.... We really need to have a
   // better setup for doing this.
   nsIDocument* doc = mOwnerContent->OwnerDoc();
+
+  MOZ_RELEASE_ASSERT(!doc->IsResourceDoc(), "We shouldn't even exist");
+
   if (!(doc->IsStaticDocument() || mOwnerContent->IsInComposedDoc())) {
     return NS_ERROR_UNEXPECTED;
   }
 
-  if (doc->IsResourceDoc() || !doc->IsActive()) {
-    // Don't allow subframe loads in resource documents, nor
-    // in non-active documents.
+  if (!doc->IsActive()) {
+    // Don't allow subframe loads in non-active documents.
+    // (See bug 610571 comment 5.)
     return NS_ERROR_NOT_AVAILABLE;
   }
 
@@ -1932,7 +1992,7 @@ nsFrameLoader::MaybeCreateDocShell()
   NS_ENSURE_TRUE(mDocShell, NS_ERROR_FAILURE);
 
   if (mIsPrerendered) {
-    nsresult rv = mDocShell->SetIsPrerendered(true);
+    nsresult rv = mDocShell->SetIsPrerendered();
     NS_ENSURE_SUCCESS(rv,rv);
   }
 
@@ -2086,14 +2146,21 @@ nsFrameLoader::MaybeCreateDocShell()
     return rv;
   }
 
-  nsDocShell::Cast(mDocShell)->SetOriginAttributes(attrs);
+  bool isPrivate = false;
+  nsCOMPtr<nsILoadContext> parentContext = do_QueryInterface(docShell);
+  NS_ENSURE_STATE(parentContext);
+
+  rv = parentContext->GetUsePrivateBrowsing(&isPrivate);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+  attrs.SyncAttributesWithPrivateBrowsing(isPrivate);
 
   if (OwnerIsMozBrowserOrAppFrame()) {
     // For inproc frames, set the docshell properties.
-    nsCOMPtr<nsIDocShellTreeItem> item = do_GetInterface(docShell);
     nsAutoString name;
     if (mOwnerContent->GetAttr(kNameSpaceID_None, nsGkAtoms::name, name)) {
-      item->SetName(name);
+      docShell->SetName(name);
     }
     mDocShell->SetFullscreenAllowed(
       mOwnerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::allowfullscreen) ||
@@ -2109,11 +2176,14 @@ nsFrameLoader::MaybeCreateDocShell()
           NS_LITERAL_CSTRING("mozprivatebrowsing"),
           nullptr);
       } else {
-        nsCOMPtr<nsILoadContext> context = do_GetInterface(mDocShell);
-        context->SetUsePrivateBrowsing(true);
+        // This handles the case where a frames private browsing is set by chrome flags
+        // and not inherited by its parent.
+        attrs.SyncAttributesWithPrivateBrowsing(isPrivate);
       }
     }
   }
+
+  nsDocShell::Cast(mDocShell)->SetOriginAttributes(attrs);
 
   ReallyLoadFrameScripts();
   InitializeBrowserAPI();
@@ -2246,9 +2316,7 @@ nsFrameLoader::GetWindowDimensions(nsIntRect& aRect)
     return NS_ERROR_FAILURE;
   }
 
-  if (doc->IsResourceDoc()) {
-    return NS_ERROR_FAILURE;
-  }
+  MOZ_RELEASE_ASSERT(!doc->IsResourceDoc(), "We shouldn't even exist");
 
   nsCOMPtr<nsPIDOMWindowOuter> win = doc->GetWindow();
   if (!win) {
@@ -2280,6 +2348,7 @@ nsFrameLoader::UpdatePositionAndSize(nsSubDocumentFrame *aIFrame)
       ScreenIntSize size = aIFrame->GetSubdocumentSize();
       nsIntRect dimensions;
       NS_ENSURE_SUCCESS(GetWindowDimensions(dimensions), NS_ERROR_FAILURE);
+      mLazySize = size;
       mRemoteBrowser->UpdateDimensions(dimensions, size);
     }
     return NS_OK;
@@ -2310,9 +2379,37 @@ nsFrameLoader::UpdateBaseWindowPositionAndSize(nsSubDocumentFrame *aIFrame)
     }
 
     ScreenIntSize size = aIFrame->GetSubdocumentSize();
+    mLazySize = size;
 
-    baseWindow->SetPositionAndSize(x, y, size.width, size.height, false);
+    baseWindow->SetPositionAndSize(x, y, size.width, size.height,
+                                   nsIBaseWindow::eDelayResize);
   }
+}
+
+NS_IMETHODIMP
+nsFrameLoader::GetLazyWidth(uint32_t* aLazyWidth)
+{
+  *aLazyWidth = mLazySize.width;
+
+  nsIFrame* frame = GetPrimaryFrameOfOwningContent();
+  if (frame) {
+    *aLazyWidth = frame->PresContext()->DevPixelsToIntCSSPixels(*aLazyWidth);
+  }
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsFrameLoader::GetLazyHeight(uint32_t* aLazyHeight)
+{
+  *aLazyHeight = mLazySize.height;
+
+  nsIFrame* frame = GetPrimaryFrameOfOwningContent();
+  if (frame) {
+    *aLazyHeight = frame->PresContext()->DevPixelsToIntCSSPixels(*aLazyHeight);
+  }
+
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -2404,8 +2501,11 @@ nsFrameLoader::TryRemoteBrowser()
     return false;
   }
 
-  if (doc->IsResourceDoc()) {
-    // Don't allow subframe loads in external reference documents
+  MOZ_RELEASE_ASSERT(!doc->IsResourceDoc(), "We shouldn't even exist");
+
+  if (!doc->IsActive()) {
+    // Don't allow subframe loads in non-active documents.
+    // (See bug 610571 comment 5.)
     return false;
   }
 
@@ -3102,6 +3202,44 @@ nsFrameLoader::RequestNotifyLayerTreeCleared()
   return NS_OK;
 }
 
+NS_IMETHODIMP
+nsFrameLoader::Print(uint64_t aOuterWindowID,
+                     nsIPrintSettings* aPrintSettings,
+                     nsIWebProgressListener* aProgressListener)
+{
+#if defined(NS_PRINTING)
+  if (mRemoteBrowser) {
+    RefPtr<embedding::PrintingParent> printingParent =
+      mRemoteBrowser->Manager()->AsContentParent()->GetPrintingParent();
+
+    embedding::PrintData printData;
+    nsresult rv = printingParent->SerializeAndEnsureRemotePrintJob(
+      aPrintSettings, aProgressListener, nullptr, &printData);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    bool success = mRemoteBrowser->SendPrint(aOuterWindowID, printData);
+    return success ? NS_OK : NS_ERROR_FAILURE;
+  }
+
+  nsGlobalWindow* outerWindow =
+    nsGlobalWindow::GetOuterWindowWithId(aOuterWindowID);
+  if (NS_WARN_IF(!outerWindow)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  nsCOMPtr<nsIWebBrowserPrint> webBrowserPrint =
+    do_GetInterface(outerWindow->AsOuter());
+  if (NS_WARN_IF(!webBrowserPrint)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  return webBrowserPrint->Print(aPrintSettings, aProgressListener);
+#endif
+  return NS_OK;
+}
+
 /* [infallible] */ NS_IMETHODIMP
 nsFrameLoader::SetVisible(bool aVisible)
 {
@@ -3183,7 +3321,8 @@ nsFrameLoader::StartPersistence(uint64_t aOuterWindowID,
     return mRemoteBrowser->StartPersistence(aOuterWindowID, aRecv);
   }
 
-  nsCOMPtr<nsIDocument> rootDoc = do_GetInterface(mDocShell);
+  nsCOMPtr<nsIDocument> rootDoc =
+    mDocShell ? mDocShell->GetDocument() : nullptr;
   nsCOMPtr<nsIDocument> foundDoc;
   if (aOuterWindowID) {
     foundDoc = nsContentUtils::GetSubdocumentWithOuterWindowId(rootDoc, aOuterWindowID);
@@ -3286,12 +3425,37 @@ nsFrameLoader::GetNewTabContext(MutableTabContext* aTabContext,
     attrs.mUserContextId = userContextId;
   }
 
+  nsAutoString presentationURLStr;
+  mOwnerContent->GetAttr(kNameSpaceID_None,
+                         nsGkAtoms::mozpresentation,
+                         presentationURLStr);
+
+  bool isPrivate = mOwnerContent->HasAttr(kNameSpaceID_None, nsGkAtoms::mozprivatebrowsing);
+  attrs.SyncAttributesWithPrivateBrowsing(isPrivate);
+
+  UIStateChangeType showAccelerators = UIStateChangeType_NoChange;
+  UIStateChangeType showFocusRings = UIStateChangeType_NoChange;
+  nsIDocument* doc = mOwnerContent->OwnerDoc();
+  if (doc) {
+    nsCOMPtr<nsPIWindowRoot> root = nsContentUtils::GetWindowRoot(doc);
+    if (root) {
+      showAccelerators =
+        root->ShowAccelerators() ? UIStateChangeType_Set : UIStateChangeType_Clear;
+      showFocusRings =
+        root->ShowFocusRings() ? UIStateChangeType_Set : UIStateChangeType_Clear;
+    }
+  }
+
   bool tabContextUpdated =
     aTabContext->SetTabContext(OwnerIsMozBrowserFrame(),
+                               mIsPrerendered,
                                ownApp,
                                containingApp,
+                               showAccelerators,
+                               showFocusRings,
                                attrs,
-                               signedPkgOrigin);
+                               signedPkgOrigin,
+                               presentationURLStr);
   NS_ENSURE_STATE(tabContextUpdated);
 
   return NS_OK;

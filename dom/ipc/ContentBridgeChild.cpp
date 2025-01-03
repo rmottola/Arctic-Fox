@@ -11,6 +11,7 @@
 #include "mozilla/dom/ipc/BlobChild.h"
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "mozilla/ipc/InputStreamUtils.h"
+#include "base/task.h"
 
 using namespace mozilla::ipc;
 using namespace mozilla::jsipc;
@@ -34,8 +35,7 @@ ContentBridgeChild::~ContentBridgeChild()
 void
 ContentBridgeChild::ActorDestroy(ActorDestroyReason aWhy)
 {
-  MessageLoop::current()->PostTask(
-    NewRunnableMethod(this, &ContentBridgeChild::DeferredDestroy));
+  MessageLoop::current()->PostTask(NewRunnableMethod(this, &ContentBridgeChild::DeferredDestroy));
 }
 
 /*static*/ ContentBridgeChild*

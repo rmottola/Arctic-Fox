@@ -155,12 +155,18 @@ EXPORTS.js += [
 UNIFIED_SOURCES += [
     'asmjs/AsmJS.cpp',
     'asmjs/Wasm.cpp',
+    'asmjs/WasmBaselineCompile.cpp',
     'asmjs/WasmBinary.cpp',
     'asmjs/WasmBinaryIterator.cpp',
+    'asmjs/WasmBinaryToAST.cpp',
+    'asmjs/WasmBinaryToExperimentalText.cpp',
     'asmjs/WasmBinaryToText.cpp',
+    'asmjs/WasmCode.cpp',
     'asmjs/WasmFrameIterator.cpp',
     'asmjs/WasmGenerator.cpp',
+    'asmjs/WasmInstance.cpp',
     'asmjs/WasmIonCompile.cpp',
+    'asmjs/WasmJS.cpp',
     'asmjs/WasmModule.cpp',
     'asmjs/WasmSignalHandlers.cpp',
     'asmjs/WasmStubs.cpp',
@@ -303,10 +309,9 @@ UNIFIED_SOURCES += [
     'proxy/BaseProxyHandler.cpp',
     'proxy/CrossCompartmentWrapper.cpp',
     'proxy/DeadObjectProxy.cpp',
-    'proxy/DirectProxyHandler.cpp',
     'proxy/OpaqueCrossCompartmentWrapper.cpp',
     'proxy/Proxy.cpp',
-    'proxy/ScriptedDirectProxyHandler.cpp',
+    'proxy/ScriptedProxyHandler.cpp',
     'proxy/SecurityWrapper.cpp',
     'proxy/Wrapper.cpp',
     'vm/ArgumentsObject.cpp',
@@ -343,6 +348,7 @@ UNIFIED_SOURCES += [
     'vm/SelfHosting.cpp',
     'vm/Shape.cpp',
     'vm/SharedArrayObject.cpp',
+    'vm/SharedImmutableStringsCache.cpp',
     'vm/SPSProfiler.cpp',
     'vm/Stack.cpp',
     'vm/Stopwatch.cpp',
@@ -560,6 +566,7 @@ if CONFIG['OS_ARCH'] == 'WINNT':
         'jit/ExecutableAllocatorWin.cpp',
         'threading/windows/ConditionVariable.cpp',
         'threading/windows/Mutex.cpp',
+        'threading/windows/Thread.cpp',
     ]
     # _CRT_RAND_S must be #defined before #including stdlib.h to get rand_s()
     DEFINES['_CRT_RAND_S'] = True
@@ -568,6 +575,7 @@ else:
         'jit/ExecutableAllocatorPosix.cpp',
         'threading/posix/ConditionVariable.cpp',
         'threading/posix/Mutex.cpp',
+        'threading/posix/Thread.cpp',
     ]
 
 if CONFIG['JS_HAS_CTYPES']:
@@ -595,9 +603,12 @@ else:
         'perf/pm_stub.cpp'
     ]
 
-HostSimplePrograms([
-    'host_jskwgen',
-])
+GENERATED_FILES += ['jsautokw.h']
+jsautokw = GENERATED_FILES['jsautokw.h']
+jsautokw.script = 'jsautokw.py'
+jsautokw.inputs += [
+    'vm/Keywords.h'
+]
 
 # JavaScript must be built shared, even for static builds, as it is used by
 # other modules which are always built shared. Failure to do so results in
@@ -640,13 +651,6 @@ USE_LIBS += [
     'nspr',
     'zlib',
 ]
-
-if CONFIG['MOZ_ETW']:
-    GENERATED_FILES = [
-        'ETWProvider.h',
-    ]
-    # This will get the ETW provider resources into the library mozjs.dll
-    RESFILE = 'ETWProvider.res'
 
 if CONFIG['NIGHTLY_BUILD']:
     DEFINES['ENABLE_BINARYDATA'] = True
@@ -769,6 +773,9 @@ if CONFIG['JS_HAS_CTYPES']:
     else:
         # Windows needs this to be linked with a static library.
         DEFINES['FFI_BUILDING'] = True
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-shadow']
 
 # Suppress warnings in third-party code.
 if CONFIG['CLANG_CXX']:

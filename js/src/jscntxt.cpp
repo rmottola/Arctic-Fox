@@ -92,6 +92,9 @@ js::NewContext(JSRuntime* rt, size_t stackChunkSize)
 {
     JS_AbortIfWrongThread(rt);
 
+    MOZ_RELEASE_ASSERT(!rt->haveCreatedContext,
+                       "There must be at most 1 JSContext per runtime");
+
     JSContext* cx = js_new<JSContext>(rt);
     if (!cx)
         return nullptr;
@@ -133,12 +136,6 @@ js::NewContext(JSRuntime* rt, size_t stackChunkSize)
         rt->haveCreatedContext = true;
     }
 
-    JSContextCallback cxCallback = rt->cxCallback;
-    if (cxCallback && !cxCallback(cx, JSCONTEXT_NEW, rt->cxCallbackData)) {
-        DestroyContext(cx, DCM_NEW_FAILED);
-        return nullptr;
-    }
-
     return cx;
 }
 
@@ -153,17 +150,6 @@ js::DestroyContext(JSContext* cx, DestroyContextMode mode)
 
     cx->roots.checkNoGCRooters();
     cx->roots.finishPersistentRoots();
-
-    if (mode != DCM_NEW_FAILED) {
-        if (JSContextCallback cxCallback = rt->cxCallback) {
-            /*
-             * JSCONTEXT_DESTROY callback is not allowed to fail and must
-             * return true.
-             */
-            JS_ALWAYS_TRUE(cxCallback(cx, JSCONTEXT_DESTROY,
-                                      rt->cxCallbackData));
-        }
-    }
 
     cx->remove();
     bool last = !rt->hasContexts();
@@ -222,23 +208,12 @@ ReportError(JSContext* cx, const char* message, JSErrorReport* reportp,
         reportp->flags |= JSREPORT_EXCEPTION;
     }
 
-    if (cx->options().autoJSAPIOwnsErrorReporting() || JS_IsRunning(cx)) {
-        if (ErrorToException(cx, message, reportp, callback, userRef))
-            return;
-
-        /*
-         * The AutoJSAPI error reporter only allows warnings to be reported so
-         * just ignore this error rather than try to report it.
-         */
-        if (cx->options().autoJSAPIOwnsErrorReporting() && !JSREPORT_IS_WARNING(reportp->flags))
-            return;
+    if (JSREPORT_IS_WARNING(reportp->flags)) {
+        CallWarningReporter(cx, message, reportp);
+        return;
     }
 
-    /*
-     * Call the error reporter only if an exception wasn't raised.
-     */
-    if (message)
-        CallErrorReporter(cx, message, reportp);
+    ErrorToException(cx, message, reportp, callback, userRef);
 }
 
 /*
@@ -301,40 +276,11 @@ js::ReportOutOfMemory(ExclusiveContext* cxArg)
     if (JS::OutOfMemoryCallback oomCallback = cx->runtime()->oomCallback)
         oomCallback(cx, cx->runtime()->oomCallbackData);
 
-    if (cx->options().autoJSAPIOwnsErrorReporting() || JS_IsRunning(cx)) {
-        cx->setPendingException(StringValue(cx->names().outOfMemory));
-        return;
-    }
-
-    /* Get the message for this error, but we don't expand any arguments. */
-    const JSErrorFormatString* efs = GetErrorMessage(nullptr, JSMSG_OUT_OF_MEMORY);
-    const char* msg = efs ? efs->format : "Out of memory";
-
-    /* Fill out the report, but don't do anything that requires allocation. */
-    JSErrorReport report;
-    report.flags = JSREPORT_ERROR;
-    report.errorNumber = JSMSG_OUT_OF_MEMORY;
-    PopulateReportBlame(cx, &report);
-
-    /* Report the error. */
-    if (JSErrorReporter onError = cx->runtime()->errorReporter)
-        onError(cx, msg, &report);
-
-    /*
-     * We would like to enforce the invariant that any exception reported
-     * during an OOM situation does not require wrapping. Besides avoiding
-     * allocation when memory is low, this reduces the number of places where
-     * we might need to GC.
-     *
-     * When JS code is running, we set the pending exception to an atom, which
-     * does not need wrapping. If no JS code is running, no exception should be
-     * set at all.
-     */
-    MOZ_ASSERT(!cx->isExceptionPending());
+    cx->setPendingException(StringValue(cx->names().outOfMemory));
 }
 
-JS_FRIEND_API(void)
-js::ReportOverRecursed(JSContext* maybecx)
+void
+js::ReportOverRecursed(JSContext* maybecx, unsigned errorNumber)
 {
 #ifdef JS_MORE_DETERMINISTIC
     /*
@@ -348,9 +294,15 @@ js::ReportOverRecursed(JSContext* maybecx)
     fprintf(stderr, "ReportOverRecursed called\n");
 #endif
     if (maybecx) {
-        JS_ReportErrorNumber(maybecx, GetErrorMessage, nullptr, JSMSG_OVER_RECURSED);
+        JS_ReportErrorNumber(maybecx, GetErrorMessage, nullptr, errorNumber);
         maybecx->overRecursed_ = true;
     }
+}
+
+JS_FRIEND_API(void)
+js::ReportOverRecursed(JSContext* maybecx)
+{
+    ReportOverRecursed(maybecx, JSMSG_OVER_RECURSED);
 }
 
 void
@@ -817,13 +769,14 @@ js::ReportErrorNumberUCArray(JSContext* cx, unsigned flags, JSErrorCallback call
 }
 
 void
-js::CallErrorReporter(JSContext* cx, const char* message, JSErrorReport* reportp)
+js::CallWarningReporter(JSContext* cx, const char* message, JSErrorReport* reportp)
 {
     MOZ_ASSERT(message);
     MOZ_ASSERT(reportp);
+    MOZ_ASSERT(JSREPORT_IS_WARNING(reportp->flags));
 
-    if (JSErrorReporter onError = cx->runtime()->errorReporter)
-        onError(cx, message, reportp);
+    if (JS::WarningReporter warningReporter = cx->runtime()->warningReporter)
+        warningReporter(cx, message, reportp);
 }
 
 bool
@@ -955,14 +908,12 @@ JSContext::JSContext(JSRuntime* rt)
   : ExclusiveContext(rt, &rt->mainThread, Context_JS),
     throwing(false),
     unwrappedException_(this),
-    options_(),
     overRecursed_(false),
     propagatingForcedReturn_(false),
     liveVolatileJitFrameIterators_(nullptr),
     reportGranularity(JS_DEFAULT_JITREPORT_GRANULARITY),
     resolvingList(nullptr),
     generatingError(false),
-    savedFrameChains_(),
     cycleDetectorSet(this),
     data(nullptr),
     data2(nullptr),
@@ -1018,42 +969,11 @@ JSContext::isThrowingDebuggeeWouldRun()
 }
 
 bool
-JSContext::saveFrameChain()
-{
-    if (!savedFrameChains_.append(SavedFrameChain(compartment(), enterCompartmentDepth_)))
-        return false;
-
-    if (Activation* act = runtime()->activation())
-        act->saveFrameChain();
-
-    setCompartment(nullptr);
-    enterCompartmentDepth_ = 0;
-
-    return true;
-}
-
-void
-JSContext::restoreFrameChain()
-{
-    MOZ_ASSERT(enterCompartmentDepth_ == 0); // We're about to clobber it, and it
-                                            // will be wrong forevermore.
-    SavedFrameChain sfc = savedFrameChains_.popCopy();
-    setCompartment(sfc.compartment);
-    enterCompartmentDepth_ = sfc.enterCompartmentCount;
-
-    if (Activation* act = runtime()->activation())
-        act->restoreFrameChain();
-}
-
-bool
 JSContext::currentlyRunning() const
 {
     for (ActivationIterator iter(runtime()); !iter.done(); ++iter) {
-        if (iter->cx() == this) {
-            if (iter->hasSavedFrameChain())
-                return false;
+        if (iter->cx() == this)
             return true;
-        }
     }
 
     return false;
@@ -1062,7 +982,7 @@ JSContext::currentlyRunning() const
 static bool
 ComputeIsJITBroken()
 {
-#if !defined(ANDROID) || defined(GONK)
+#if !defined(ANDROID)
     return false;
 #else  // ANDROID
     if (getenv("JS_IGNORE_JIT_BROKENNESS")) {
@@ -1233,4 +1153,18 @@ AutoEnterOOMUnsafeRegion::crash(const char* reason)
     JS_snprintf(msgbuf, sizeof(msgbuf), "[unhandlable oom] %s", reason);
     MOZ_ReportAssertionFailure(msgbuf, __FILE__, __LINE__);
     MOZ_CRASH();
+}
+
+AutoEnterOOMUnsafeRegion::AnnotateOOMAllocationSizeCallback
+AutoEnterOOMUnsafeRegion::annotateOOMSizeCallback = nullptr;
+
+void
+AutoEnterOOMUnsafeRegion::crash(size_t size, const char* reason)
+{
+    {
+        JS::AutoSuppressGCAnalysis suppress;
+        if (annotateOOMSizeCallback)
+            annotateOOMSizeCallback(size);
+    }
+    crash(reason);
 }

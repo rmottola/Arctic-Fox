@@ -18,13 +18,16 @@ namespace mozilla {
 namespace dom {
 
 class AnyCallback;
+struct ChannelPixelLayout;
 class Console;
 class Crypto;
 class Function;
 class IDBFactory;
+enum class ImageBitmapFormat : uint32_t;
+class Performance;
 class Promise;
 class RequestOrUSVString;
-class ServiceWorkerRegistrationWorkerThread;
+class ServiceWorkerRegistration;
 class WorkerLocation;
 class WorkerNavigator;
 
@@ -40,7 +43,6 @@ BEGIN_WORKERS_NAMESPACE
 
 class ServiceWorkerClients;
 class WorkerPrivate;
-class Performance;
 
 class WorkerGlobalScope : public DOMEventTargetHelper,
                           public nsIGlobalObject,
@@ -169,6 +171,13 @@ public:
                     int32_t aSx, int32_t aSy, int32_t aSw, int32_t aSh,
                     ErrorResult& aRv);
 
+  already_AddRefed<mozilla::dom::Promise>
+  CreateImageBitmap(const ImageBitmapSource& aImage,
+                    int32_t aOffset, int32_t aLength,
+                    mozilla::dom::ImageBitmapFormat aFormat,
+                    const mozilla::dom::Sequence<mozilla::dom::ChannelPixelLayout>& aLayout,
+                    mozilla::ErrorResult& aRv);
+
   bool
   WindowInteractionAllowed() const
   {
@@ -234,7 +243,7 @@ class ServiceWorkerGlobalScope final : public WorkerGlobalScope
 {
   const nsString mScope;
   RefPtr<ServiceWorkerClients> mClients;
-  RefPtr<ServiceWorkerRegistrationWorkerThread> mRegistration;
+  RefPtr<ServiceWorkerRegistration> mRegistration;
 
   ~ServiceWorkerGlobalScope();
 
@@ -262,7 +271,7 @@ public:
   ServiceWorkerClients*
   Clients();
 
-  ServiceWorkerRegistrationWorkerThread*
+  ServiceWorkerRegistration*
   Registration();
 
   already_AddRefed<Promise>

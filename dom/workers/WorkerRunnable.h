@@ -288,16 +288,6 @@ protected:
   virtual ~MainThreadStopSyncLoopRunnable()
   { }
 
-  // Called on the worker thread, in WorkerRun, right before stopping the
-  // syncloop to set an exception (however subclasses want to handle that) if
-  // mResult is false.  Note that overrides of this method must NOT set an
-  // actual exception on the JSContext; they may only set some state that will
-  // get turned into an exception once the syncloop actually terminates and
-  // control is returned to whoever was spinning the syncloop.
-  virtual void
-  MaybeSetException()
-  { }
-
 private:
   virtual bool
   PreDispatch(WorkerPrivate* aWorkerPrivate) override final
@@ -352,6 +342,35 @@ private:
   using WorkerRunnable::Cancel;
 };
 
+// A convenience class for WorkerRunnables that originate on the main
+// thread.
+class MainThreadWorkerRunnable : public WorkerRunnable
+{
+protected:
+  explicit MainThreadWorkerRunnable(WorkerPrivate* aWorkerPrivate)
+  : WorkerRunnable(aWorkerPrivate, WorkerThreadUnchangedBusyCount)
+  {
+    AssertIsOnMainThread();
+  }
+
+  virtual ~MainThreadWorkerRunnable()
+  {}
+
+  virtual bool
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override
+  {
+    AssertIsOnMainThread();
+    return true;
+  }
+
+  virtual void
+  PostDispatch(WorkerPrivate* aWorkerPrivate,
+               bool aDispatchResult) override
+  {
+    AssertIsOnMainThread();
+  }
+};
+
 // A convenience class for WorkerControlRunnables that originate on the main
 // thread.
 class MainThreadWorkerControlRunnable : public WorkerControlRunnable
@@ -372,7 +391,10 @@ protected:
   }
 
   virtual void
-  PostDispatch(WorkerPrivate* aWorkerPrivate, bool aDispatchResult) override;
+  PostDispatch(WorkerPrivate* aWorkerPrivate, bool aDispatchResult) override
+  {
+    AssertIsOnMainThread();
+  }
 };
 
 // A WorkerRunnable that should be dispatched from the worker to itself for

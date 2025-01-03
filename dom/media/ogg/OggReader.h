@@ -51,7 +51,8 @@ protected:
 
 public:
   nsresult Init() override;
-  nsresult ResetDecode() override;
+  nsresult ResetDecode(TrackSet aTracks = TrackSet(TrackInfo::kAudioTrack,
+                                                   TrackInfo::kVideoTrack)) override;
   bool DecodeAudioData() override;
 
   // If the Theora granulepos has not been captured, it may read several packets
@@ -86,7 +87,9 @@ private:
 
   // Specialized Reset() method to signal if the seek is
   // to the start of the stream.
-  nsresult ResetDecode(bool start);
+  nsresult ResetDecode(bool start,
+                       TrackSet aTracks = TrackSet(TrackInfo::kAudioTrack,
+                                                   TrackInfo::kVideoTrack));
 
   nsresult SeekInternal(int64_t aTime, int64_t aEndTime);
 
@@ -94,7 +97,7 @@ private:
     return mSkeletonState != 0 && mSkeletonState->mActive;
   }
 
-  // Seeks to the keyframe preceeding the target time using available
+  // Seeks to the keyframe preceding the target time using available
   // keyframe indexes.
   enum IndexedSeekResult {
     SEEK_OK,          // Success.

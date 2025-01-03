@@ -171,6 +171,15 @@ js::ExecuteRegExpLegacy(JSContext* cx, RegExpStatics* res, RegExpObject& reobj,
     return CreateRegExpMatchResult(cx, input, matches, rval);
 }
 
+static bool
+CheckPatternSyntax(JSContext* cx, HandleAtom pattern, RegExpFlag flags)
+{
+    CompileOptions options(cx);
+    frontend::TokenStream dummyTokenStream(cx, options, nullptr, 0, nullptr);
+    return irregexp::ParsePatternSyntax(dummyTokenStream, cx->tempLifoAlloc(), pattern,
+                                        flags & UnicodeFlag);
+}
+
 enum RegExpSharedUse {
     UseRegExpShared,
     DontUseRegExpShared
@@ -222,13 +231,8 @@ RegExpInitializeIgnoringLastIndex(JSContext* cx, Handle<RegExpObject*> obj,
         obj->setShared(*re);
     } else {
         /* Steps 7-8. */
-        CompileOptions options(cx);
-        frontend::TokenStream dummyTokenStream(cx, options, nullptr, 0, nullptr);
-        if (!irregexp::ParsePatternSyntax(dummyTokenStream, cx->tempLifoAlloc(), pattern,
-                                          flags & UnicodeFlag))
-        {
+        if (!CheckPatternSyntax(cx, pattern, flags))
             return false;
-        }
 
         /* Steps 9-12. */
         obj->initIgnoringLastIndex(pattern, flags);
@@ -243,7 +247,7 @@ js::RegExpCreate(JSContext* cx, HandleValue patternValue, HandleValue flagsValue
                  MutableHandleValue rval)
 {
     /* Step 1. */
-    Rooted<RegExpObject*> regexp(cx, RegExpAlloc(cx, nullptr));
+    Rooted<RegExpObject*> regexp(cx, RegExpAlloc(cx));
     if (!regexp)
          return false;
 
@@ -419,10 +423,9 @@ js::regexp_construct(JSContext* cx, unsigned argc, Value* vp)
                 return false;
             sourceAtom = g->getSource();
 
-            if (!args.hasDefined(1)) {
-                // Step 4.b.
-                flags = g->getFlags();
-            }
+            // Step 4.b.
+            // Get original flags in all cases, to compare with passed flags.
+            flags = g->getFlags();
         }
 
         // Step 7.
@@ -437,12 +440,22 @@ js::regexp_construct(JSContext* cx, unsigned argc, Value* vp)
         // Step 8.
         if (args.hasDefined(1)) {
             // Step 4.c / 21.2.3.2.2 RegExpInitialize step 4.
-            flags = RegExpFlag(0);
+            RegExpFlag flagsArg = RegExpFlag(0);
             RootedString flagStr(cx, ToString<CanGC>(cx, args[1]));
             if (!flagStr)
                 return false;
-            if (!ParseRegExpFlags(cx, flagStr, &flags))
+            if (!ParseRegExpFlags(cx, flagStr, &flagsArg))
                 return false;
+
+            if (!(flags & UnicodeFlag) && flagsArg & UnicodeFlag) {
+                // Have to check syntax again when adding 'u' flag.
+
+                // ES 2017 draft rev 9b49a888e9dfe2667008a01b2754c3662059ae56
+                // 21.2.3.2.2 step 7.
+                if (!CheckPatternSyntax(cx, sourceAtom, flagsArg))
+                    return false;
+            }
+            flags = flagsArg;
         }
 
         regexp->initAndZeroLastIndex(sourceAtom, flags, cx);
@@ -485,31 +498,6 @@ js::regexp_construct(JSContext* cx, unsigned argc, Value* vp)
 
     // Step 8.
     if (!RegExpInitializeIgnoringLastIndex(cx, regexp, P, F))
-        return false;
-    regexp->zeroLastIndex(cx);
-
-    args.rval().setObject(*regexp);
-    return true;
-}
-
-bool
-js::regexp_construct_self_hosting(JSContext* cx, unsigned argc, Value* vp)
-{
-    CallArgs args = CallArgsFromVp(argc, vp);
-
-    MOZ_ASSERT(args.length() == 1 || args.length() == 2);
-    MOZ_ASSERT(args[0].isString());
-    MOZ_ASSERT_IF(args.length() == 2, args[1].isString());
-    MOZ_ASSERT(!args.isConstructing());
-
-    /* Steps 1-6 are not required since pattern is always string. */
-
-    /* Steps 7-10. */
-    Rooted<RegExpObject*> regexp(cx, RegExpAlloc(cx));
-    if (!regexp)
-        return false;
-
-    if (!RegExpInitializeIgnoringLastIndex(cx, regexp, args[0], args.get(1)))
         return false;
     regexp->zeroLastIndex(cx);
 
@@ -1355,6 +1343,28 @@ DoReplace(HandleLinearString matched, HandleLinearString string,
     sb.infallibleAppend(currentChar, replacement->length() - (currentChar - replacementBegin));
 }
 
+static bool
+NeedTwoBytes(HandleLinearString string, HandleLinearString replacement,
+             HandleLinearString matched, Handle<GCVector<Value>> captures)
+{
+    if (string->hasTwoByteChars())
+        return true;
+    if (replacement->hasTwoByteChars())
+        return true;
+    if (matched->hasTwoByteChars())
+        return true;
+
+    for (size_t i = 0, len = captures.length(); i < len; i++) {
+        Value capture = captures[i];
+        if (capture.isUndefined())
+            continue;
+        if (capture.toString()->hasTwoByteChars())
+            return true;
+    }
+
+    return false;
+}
+
 /* ES 2016 draft Mar 25, 2016 21.1.3.14.1. */
 bool
 js::RegExpGetSubstitution(JSContext* cx, HandleLinearString matched, HandleLinearString string,
@@ -1421,7 +1431,7 @@ js::RegExpGetSubstitution(JSContext* cx, HandleLinearString matched, HandleLinea
     }
 
     StringBuffer result(cx);
-    if (string->hasTwoByteChars() || replacement->hasTwoByteChars()) {
+    if (NeedTwoBytes(string, replacement, matched, captures)) {
         if (!result.ensureTwoByteChars())
             return false;
     }
@@ -1453,6 +1463,9 @@ js::GetFirstDollarIndex(JSContext* cx, unsigned argc, Value* vp)
     MOZ_ASSERT(args.length() == 1);
     RootedString str(cx, args[0].toString());
 
+    // Should be handled in different path.
+    MOZ_ASSERT(str->length() != 0);
+
     int32_t index = -1;
     if (!GetFirstDollarIndexRaw(cx, str, &index))
         return false;
@@ -1477,8 +1490,6 @@ int32_t
 js::GetFirstDollarIndexRawFlat(JSLinearString* text)
 {
     uint32_t len = text->length();
-    // Should be handled in different path.
-    MOZ_ASSERT(len != 0);
 
     JS::AutoCheckCannotGC nogc;
     if (text->hasLatin1Chars())
@@ -1609,12 +1620,12 @@ js::RegExpInstanceOptimizableRaw(JSContext* cx, JSObject* rx, JSObject* proto, u
         return true;
     }
 
-    if (rx->hasLazyPrototype()) {
+    if (!rx->hasStaticPrototype()) {
         *result = false;
         return true;
     }
 
-    if (rx->getTaggedProto().toObjectOrNull() != proto) {
+    if (rx->staticPrototype() != proto) {
         *result = false;
         return true;
     }

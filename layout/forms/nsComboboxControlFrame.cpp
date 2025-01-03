@@ -30,7 +30,6 @@
 #include "nsIDocument.h"
 #include "nsIScrollableFrame.h"
 #include "nsListControlFrame.h"
-#include "nsAutoPtr.h"
 #include "mozilla/StyleSetHandle.h"
 #include "mozilla/StyleSetHandleInlines.h"
 #include "nsNodeInfoManager.h"
@@ -287,7 +286,7 @@ nsComboboxControlFrame::SetFocus(bool aOn, bool aRepaint)
       }
     }
     // May delete |this|.
-    mListControlFrame->FireOnChange();
+    mListControlFrame->FireOnInputAndOnChange();
   }
 
   if (!weakFrame.IsAlive()) {
@@ -595,8 +594,8 @@ nsComboboxControlFrame::GetAvailableDropdownSpace(WritingMode aWM,
                                containerSize);
     mLastDropDownAfterScreenBCoord = thisScreenRect.BEnd(aWM) +
                                      aTranslation->B(aWM);
-    mLastDropDownBeforeScreenBCoord = thisScreenRect.BEnd(aWM) +
-                                     aTranslation->B(aWM);
+    mLastDropDownBeforeScreenBCoord = thisScreenRect.BStart(aWM) +
+                                      aTranslation->B(aWM);
   }
 
   nscoord minBCoord;
@@ -1012,8 +1011,7 @@ nsComboboxControlFrame::RedisplayText(int32_t aIndex)
 
     RefPtr<RedisplayTextEvent> event = new RedisplayTextEvent(this);
     mRedisplayTextEvent = event;
-    if (!nsContentUtils::AddScriptRunner(event))
-      mRedisplayTextEvent.Forget();
+    nsContentUtils::AddScriptRunner(event);
   }
   return rv;
 }
@@ -1486,7 +1484,11 @@ nsComboboxControlFrame::Rollup(uint32_t aCount, bool aFlush,
     // The popup's visibility doesn't update until the minimize animation has
     // finished, so call UpdateWidgetGeometry to update it right away.
     nsViewManager* viewManager = mDropdownFrame->GetView()->GetViewManager();
-    viewManager->UpdateWidgetGeometry();
+    viewManager->UpdateWidgetGeometry(); // might destroy us
+  }
+
+  if (!weakFrame.IsAlive()) {
+    return consume;
   }
 
   if (aLastRolledUp) {

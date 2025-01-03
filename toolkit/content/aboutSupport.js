@@ -49,7 +49,7 @@ var snapshotFormatters = {
     if (data.updateChannel)
       $("updatechannel-box").textContent = data.updateChannel;
 
-    let statusStrName = ".unknown";
+    let statusText = stringBundle().GetStringFromName("multiProcessStatus.unknown");
 
     // Whitelist of known values with string descriptions:
     switch (data.autoStartStatus) {
@@ -57,19 +57,90 @@ var snapshotFormatters = {
       case 1:
       case 2:
       case 4:
-      case 5:
       case 6:
       case 7:
       case 8:
       case 9:
-        statusStrName = "." + data.autoStartStatus;
+        statusText = stringBundle().GetStringFromName("multiProcessStatus." + data.autoStartStatus);
+        break;
+
+      case 10:
+        statusText = "Windows XP";
+        break;
     }
 
-    let statusText = stringBundle().GetStringFromName("multiProcessStatus" + statusStrName);
     $("multiprocess-box").textContent = stringBundle().formatStringFromName("multiProcessWindows",
       [data.numRemoteWindows, data.numTotalWindows, statusText], 3);
 
     $("safemode-box").textContent = data.safeMode;
+  },
+
+  crashes: function crashes(data) {
+    if (!AppConstants.MOZ_CRASHREPORTER)
+      return;
+
+    let strings = stringBundle();
+    let daysRange = Troubleshoot.kMaxCrashAge / (24 * 60 * 60 * 1000);
+    $("crashes-title").textContent =
+      PluralForm.get(daysRange, strings.GetStringFromName("crashesTitle"))
+                .replace("#1", daysRange);
+    let reportURL;
+    try {
+      reportURL = Services.prefs.getCharPref("breakpad.reportURL");
+      // Ignore any non http/https urls
+      if (!/^https?:/i.test(reportURL))
+        reportURL = null;
+    }
+    catch (e) { }
+    if (!reportURL) {
+      $("crashes-noConfig").style.display = "block";
+      $("crashes-noConfig").classList.remove("no-copy");
+      return;
+    }
+    else {
+      $("crashes-allReports").style.display = "block";
+      $("crashes-allReports").classList.remove("no-copy");
+    }
+
+    if (data.pending > 0) {
+      $("crashes-allReportsWithPending").textContent =
+        PluralForm.get(data.pending, strings.GetStringFromName("pendingReports"))
+                  .replace("#1", data.pending);
+    }
+
+    let dateNow = new Date();
+    $.append($("crashes-tbody"), data.submitted.map(function (crash) {
+      let date = new Date(crash.date);
+      let timePassed = dateNow - date;
+      let formattedDate;
+      if (timePassed >= 24 * 60 * 60 * 1000)
+      {
+        let daysPassed = Math.round(timePassed / (24 * 60 * 60 * 1000));
+        let daysPassedString = strings.GetStringFromName("crashesTimeDays");
+        formattedDate = PluralForm.get(daysPassed, daysPassedString)
+                                  .replace("#1", daysPassed);
+      }
+      else if (timePassed >= 60 * 60 * 1000)
+      {
+        let hoursPassed = Math.round(timePassed / (60 * 60 * 1000));
+        let hoursPassedString = strings.GetStringFromName("crashesTimeHours");
+        formattedDate = PluralForm.get(hoursPassed, hoursPassedString)
+                                  .replace("#1", hoursPassed);
+      }
+      else
+      {
+        let minutesPassed = Math.max(Math.round(timePassed / (60 * 1000)), 1);
+        let minutesPassedString = strings.GetStringFromName("crashesTimeMinutes");
+        formattedDate = PluralForm.get(minutesPassed, minutesPassedString)
+                                  .replace("#1", minutesPassed);
+      }
+      return $.new("tr", [
+        $.new("td", [
+          $.new("a", crash.id, null, {href : reportURL + crash.id})
+        ]),
+        $.new("td", formattedDate)
+      ]);
+    }));
   },
 
   extensions: function extensions(data) {
@@ -203,7 +274,7 @@ var snapshotFormatters = {
     // @where    The name in "graphics-<name>-tbody", of the element to append to.
     // @trs      Array of row elements.
     function addRows(where, trs) {
-      $.append($('graphics-' + where + '-tbody'), trs);
+      $.append($("graphics-" + where + "-tbody"), trs);
     }
 
     // Build and append a row.
@@ -295,6 +366,7 @@ var snapshotFormatters = {
     delete data.windowLayerManagerType;
     delete data.numTotalWindows;
     delete data.numAcceleratedWindows;
+    delete data.numAcceleratedWindowsMessage;
 
     addRow("features", "asyncPanZoom",
            apzInfo.length
@@ -315,14 +387,14 @@ var snapshotFormatters = {
 
     // Adapter tbodies.
     let adapterKeys = [
-      ["adapterDescription"],
-      ["adapterVendorID"],
-      ["adapterDeviceID"],
-      ["driverVersion"],
-      ["driverDate"],
-      ["adapterDrivers"],
-      ["adapterSubsysID"],
-      ["adapterRAM"],
+      ["adapterDescription", "gpuDescription"],
+      ["adapterVendorID", "gpuVendorID"],
+      ["adapterDeviceID", "gpuDeviceID"],
+      ["driverVersion", "gpuDriverVersion"],
+      ["driverDate", "gpuDriverDate"],
+      ["adapterDrivers", "gpuDrivers"],
+      ["adapterSubsysID", "gpuSubsysID"],
+      ["adapterRAM", "gpuRAM"],
     ];
 
     function showGpu(id, suffix) {
@@ -331,8 +403,8 @@ var snapshotFormatters = {
       }
 
       let trs = [];
-      for (let key of adapterKeys) {
-        let value = get(key);
+      for (let [prop, key] of adapterKeys) {
+        let value = get(prop);
         if (value === undefined || value === "")
           continue;
         trs.push(buildRow(key, value));
@@ -347,23 +419,109 @@ var snapshotFormatters = {
       if ("isGPU2Active" in data && ((suffix == "2") != data.isGPU2Active)) {
         active = "no";
       }
-      addRow(id, "active", strings.GetStringFromName(active));
+      addRow(id, "gpuActive", strings.GetStringFromName(active));
       addRows(id, trs);
-    };
+    }
     showGpu("gpu-1", "");
     showGpu("gpu-2", "2");
 
     // Remove adapter keys.
-    for (let key of adapterKeys) {
-      delete data[key];
-      delete data[key + "2"];
+    for (let [prop, key] of adapterKeys) {
+      delete data[prop];
+      delete data[prop + "2"];
     }
     delete data.isGPU2Active;
+
+    let featureLog = data.featureLog;
+    delete data.featureLog;
+
+    let features = [];
+    for (let feature of featureLog.features) {
+      // Only add interesting decisions - ones that were not automatic based on
+      // all.js/gfxPrefs defaults.
+      if (feature.log.length > 1 || feature.log[0].status != "available") {
+        features.push(feature);
+      }
+    }
+
+    if (features.length) {
+      for (let feature of features) {
+        let trs = [];
+        for (let entry of feature.log) {
+          if (entry.type == "default" && entry.status == "available")
+            continue;
+
+          let contents;
+          if (entry.message.length > 0 && entry.message[0] == "#") {
+            // This is a failure ID. See nsIGfxInfo.idl.
+            let m;
+            if (m = /#BLOCKLIST_FEATURE_FAILURE_BUG_(\d+)/.exec(entry.message)) {
+              let bugSpan = $.new("span");
+              bugSpan.textContent = strings.GetStringFromName("blocklistedBug") + "; ";
+
+              let bugHref = $.new("a");
+              bugHref.href = "https://bugzilla.mozilla.org/show_bug.cgi?id=" + m[1];
+              bugHref.textContent = strings.formatStringFromName("bugLink", [m[1]], 1);
+
+              contents = [bugSpan, bugHref];
+            } else {
+              contents = strings.formatStringFromName(
+                "unknownFailure", [entry.message.substr(1)], 1);
+            }
+          } else {
+            contents = entry.status + " by " + entry.type + ": " + entry.message;
+          }
+
+          trs.push($.new("tr", [
+            $.new("td", contents),
+          ]));
+        }
+        addRow("decisions", feature.name, [$.new("table", trs)]);
+      }
+    } else {
+      $("graphics-decisions-tbody").style.display = "none";
+    }
+
+    if (featureLog.fallbacks.length) {
+      for (let fallback of featureLog.fallbacks) {
+        addRow("workarounds", fallback.name, fallback.message);
+      }
+    } else {
+      $("graphics-workarounds-tbody").style.display = "none";
+    }
+
+    let crashGuards = data.crashGuards;
+    delete data.crashGuards;
+
+    if (crashGuards.length) {
+      for (let guard of crashGuards) {
+        let resetButton = $.new("button");
+        let onClickReset = (function (guard) {
+          // Note - need this wrapper until bug 449811 fixes |guard| scoping.
+          return function () {
+            Services.prefs.setIntPref(guard.prefName, 0);
+            resetButton.removeEventListener("click", onClickReset);
+            resetButton.disabled = true;
+          };
+        })(guard);
+
+        resetButton.textContent = strings.GetStringFromName("resetOnNextRestart");
+        resetButton.addEventListener("click", onClickReset);
+
+        addRow("crashguards", guard.type + "CrashGuard", [resetButton]);
+      }
+    } else {
+      $("graphics-crashguards-tbody").style.display = "none";
+    }
 
     // Now that we're done, grab any remaining keys in data and drop them into
     // the diagnostics section.
     for (let key in data) {
-      addRow("diagnostics", key, data[key]);
+      let value = data[key];
+      if (Array.isArray(value)) {
+        value = localizedMsg(value);
+      }
+      addRow("diagnostics", key, value);
     }
   },
 
@@ -667,6 +825,10 @@ Serializer.prototype = {
     this._currentLine += text;
   },
 
+  _isHiddenSubHeading: function (th) {
+    return th.parentNode.parentNode.style.display == "none";
+  },
+
   _serializeTable: function (table) {
     // Collect the table's column headings if in fact there are any.  First
     // check thead.  If there's no thead, check the first tr.
@@ -679,12 +841,10 @@ Serializer.prototype = {
       // If there's a contiguous run of th's in the children starting from the
       // rightmost child, then consider them to be column headings.
       for (let i = tableHeadingCols.length - 1; i >= 0; i--) {
-        if (tableHeadingCols[i].localName != "th")
+        let col = tableHeadingCols[i];
+        if (col.localName != "th" || col.classList.contains("title-column"))
           break;
-        colHeadings[i] = this._nodeText(
-            tableHeadingCols[i],
-            (tableHeadingCols[i].classList &&
-             tableHeadingCols[i].classList.contains("endline"))).trim();
+        colHeadings[i] = this._nodeText(col).trim();
       }
     }
     let hasColHeadings = Object.keys(colHeadings).length > 0;
@@ -711,10 +871,7 @@ Serializer.prototype = {
           let text = "";
           if (colHeadings[j])
             text += colHeadings[j] + ": ";
-          text += this._nodeText(
-              children[j],
-              (children[j].classList &&
-               children[j].classList.contains("endline"))).trim();
+          text += this._nodeText(children[j]).trim();
           this._appendText(text);
           this._startNewLine();
         }
@@ -730,14 +887,23 @@ Serializer.prototype = {
       if (this._ignoreElement(trs[i]))
         continue;
       let children = trs[i].querySelectorAll("th,td");
-      let rowHeading = this._nodeText(
-          children[0],
-          (children[0].classList &&
-           children[0].classList.contains("endline"))).trim();
-      this._appendText(rowHeading + ": " + this._nodeText(
-          children[1],
-          (children[1].classList &&
-           children[1].classList.contains("endline"))).trim());
+      let rowHeading = this._nodeText(children[0]).trim();
+      if (children[0].classList.contains("title-column")) {
+        if (!this._isHiddenSubHeading(children[0]))
+          this._appendText(rowHeading);
+      } else if (children.length == 1) {
+        // This is a single-cell row.
+        this._appendText(rowHeading);
+      } else {
+        let childTables = trs[i].querySelectorAll("table");
+        if (childTables.length) {
+          // If we have child tables, don't use nodeText - its trs are already
+          // queued up from querySelectorAll earlier.
+          this._appendText(rowHeading + ": ");
+        } else {
+          this._appendText(rowHeading + ": " + this._nodeText(children[1]).trim());
+        }
+      }
       this._startNewLine();
     }
     this._startNewLine();

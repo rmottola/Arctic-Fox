@@ -814,7 +814,7 @@ toolbar[mode=full] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 }
 
 #stop-button {
-    -moz-image-region: rect(0, 54px, 18px, 36px);
+    -moz-image-region: rect(0, 108px, 18px, 90px);
 }
 
 #reload-button {
@@ -1255,13 +1255,13 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
     }
 }
 
-richlistitem[type~="action"][actiontype="switchtab"] > .ac-url-box > .ac-action-icon {
+richlistitem[type~="action"][actiontype$="tab"] > .ac-url-box > .ac-action-icon {
     list-style-image: url("chrome://browser/skin/actionicon-tab.png");
     -moz-image-region: rect(0, 16px, 11px, 0);
     padding: 0 3px;
 }
 
-richlistitem[type~="action"][actiontype="switchtab"][selected="true"] > .ac-url-box > .ac-action-icon {
+richlistitem[type~="action"][actiontype$="tab"][selected="true"] > .ac-url-box > .ac-action-icon {
     -moz-image-region: rect(11px, 16px, 22px, 0);
 }
 
@@ -1613,6 +1613,13 @@ richlistitem[type~="action"][actiontype="switchtab"][selected="true"] > .ac-url-
         linear-gradient(-moz-dialog, -moz-dialog);
 }
 
+/* ----- SIDEBAR ELEMENTS ----- */
+
+#sidebar-box {
+  -moz-appearance: -moz-mac-source-list;
+  box-shadow: inset -2px 0 0 hsla(0,0%,100%,.2);
+}
+
 .tabbrowser-tab:-moz-lwtheme {
     color: inherit;
     /* 0.99 opacity rquired to force an active layer, see bug #1028369 */
@@ -1621,6 +1628,23 @@ richlistitem[type~="action"][actiontype="switchtab"][selected="true"] > .ac-url-
 
 .tabbrowser-tab:-moz-lwtheme:not([selected="true"]) {
     opacity: 0.9;
+}
+
+@media (-moz-mac-yosemite-theme) {
+  #sidebar-box {
+    box-shadow: none;
+  }
+
+  sidebarheader {
+    text-shadow: none;
+    font-weight: 500;
+  }
+
+  .sidebar-title,
+  #sidebar-title {
+    color: #636363;
+    font-weight: 500;
+  }
 }
 
 /* Remove highlight fuzz on dark themes */
@@ -2318,5 +2342,3 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 .browser-extension-panel > .panel-arrowcontainer > .panel-arrowcontent {
   padding: 0;
 }
-
-%include ../shared/usercontext/usercontext.inc.css

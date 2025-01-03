@@ -24,6 +24,7 @@ EXPORTS.mozilla = [
     'Attributes.h',
     'BinarySearch.h',
     'BloomFilter.h',
+    'BufferList.h',
     'Casting.h',
     'ChaosMode.h',
     'Char16.h',
@@ -34,7 +35,7 @@ EXPORTS.mozilla = [
     'decimal/Decimal.h',
     'double-conversion/double-conversion.h',
     'double-conversion/utils.h',
-    'Endian.h',
+    'EndianUtils.h',
     'EnumeratedArray.h',
     'EnumeratedRange.h',
     'EnumSet.h',
@@ -125,6 +126,7 @@ DISABLE_STL_WRAPPING = True
 
 if CONFIG['GNU_CXX']:
     SOURCES['/mfbt/Compression.cpp'].flags += ['-Wno-unused-function']
+    CXXFLAGS += ['-Wno-error=shadow']
 
 if CONFIG['CLANG_CXX']:
     # Suppress warnings from third-party V8 Decimal code.

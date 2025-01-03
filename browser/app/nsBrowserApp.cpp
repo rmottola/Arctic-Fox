@@ -30,18 +30,19 @@
 #include "nsStringGlue.h"
 
 #ifdef XP_WIN
-// we want a wmain entry point
 #ifdef MOZ_ASAN
 // ASAN requires firefox.exe to be built with -MD, and it's OK if we don't
 // support Windows XP SP2 in ASAN builds.
 #define XRE_DONT_SUPPORT_XPSP2
 #endif
 #define XRE_WANT_ENVIRON
-#include "nsWindowsWMain.cpp"
 #if defined(_MSC_VER) && (_MSC_VER < 1900)
 #define snprintf _snprintf
 #endif
 #define strcasecmp _stricmp
+#ifdef MOZ_SANDBOX
+#include "mozilla/sandboxing/SandboxInitialization.h"
+#endif
 #endif
 #include "BinaryPath.h"
 
@@ -49,6 +50,12 @@
 
 #include "mozilla/Telemetry.h"
 #include "mozilla/WindowsDllBlocklist.h"
+
+#if !defined(MOZ_WIDGET_COCOA) && !defined(MOZ_WIDGET_ANDROID) \
+  && !(defined(XP_LINUX) && defined(MOZ_SANDBOX))
+#define MOZ_BROWSER_CAN_BE_CONTENTPROC
+#include "../../ipc/contentproc/plugin-container.cpp"
+#endif
 
 using namespace mozilla;
 
@@ -125,6 +132,10 @@ XRE_StartupTimelineRecordType XRE_StartupTimelineRecord;
 XRE_mainType XRE_main;
 XRE_StopLateWriteChecksType XRE_StopLateWriteChecks;
 XRE_XPCShellMainType XRE_XPCShellMain;
+XRE_GetProcessTypeType XRE_GetProcessType;
+XRE_SetProcessTypeType XRE_SetProcessType;
+XRE_InitChildProcessType XRE_InitChildProcess;
+XRE_EnableSameExecutableForContentProcType XRE_EnableSameExecutableForContentProc;
 
 static const nsDynamicFunctionLoad kXULFuncs[] = {
     { "XRE_GetFileFromPath", (NSFuncPtr*) &XRE_GetFileFromPath },
@@ -135,6 +146,10 @@ static const nsDynamicFunctionLoad kXULFuncs[] = {
     { "XRE_main", (NSFuncPtr*) &XRE_main },
     { "XRE_StopLateWriteChecks", (NSFuncPtr*) &XRE_StopLateWriteChecks },
     { "XRE_XPCShellMain", (NSFuncPtr*) &XRE_XPCShellMain },
+    { "XRE_GetProcessType", (NSFuncPtr*) &XRE_GetProcessType },
+    { "XRE_SetProcessType", (NSFuncPtr*) &XRE_SetProcessType },
+    { "XRE_InitChildProcess", (NSFuncPtr*) &XRE_InitChildProcess },
+    { "XRE_EnableSameExecutableForContentProc", (NSFuncPtr*) &XRE_EnableSameExecutableForContentProc },
     { nullptr, nullptr }
 };
 
@@ -168,7 +183,7 @@ static int do_main(int argc, char* argv[], char* envp[], nsIFile *xreDirectory)
 
     char appEnv[MAXPATHLEN];
     snprintf(appEnv, MAXPATHLEN, "XUL_APP_FILE=%s", argv[2]);
-    if (putenv(appEnv)) {
+    if (putenv(strdup(appEnv))) {
       Output("Couldn't set %s.\n", appEnv);
       return 255;
     }
@@ -179,7 +194,14 @@ static int do_main(int argc, char* argv[], char* envp[], nsIFile *xreDirectory)
     for (int i = 1; i < argc; i++) {
       argv[i] = argv[i + 1];
     }
-    return XRE_XPCShellMain(--argc, argv, envp);
+
+    XREShellData shellData;
+#if defined(XP_WIN) && defined(MOZ_SANDBOX)
+    shellData.sandboxBrokerServices =
+      sandboxing::GetInitializedBrokerServices();
+#endif
+
+    return XRE_XPCShellMain(--argc, argv, envp, &shellData);
   }
 
   if (appini) {
@@ -216,6 +238,18 @@ static int do_main(int argc, char* argv[], char* envp[], nsIFile *xreDirectory)
   SetStrongPtr(appData.directory, static_cast<nsIFile*>(appSubdir.get()));
   // xreDirectory already has a refcount from NS_NewLocalFile
   appData.xreDirectory = xreDirectory;
+
+#if defined(XP_WIN) && defined(MOZ_SANDBOX)
+  sandbox::BrokerServices* brokerServices =
+    sandboxing::GetInitializedBrokerServices();
+#if defined(MOZ_CONTENT_SANDBOX)
+  if (!brokerServices) {
+    Output("Couldn't initialize the broker services.\n");
+    return 255;
+  }
+#endif
+  appData.sandboxBrokerServices = brokerServices;
+#endif
 
   return XRE_main(argc, argv, &appData, mainFlags);
 }
@@ -274,25 +308,54 @@ sizeof(XPCOM_DLL) - 1))
   // This will set this thread as the main thread.
   NS_LogInit();
 
-  // chop XPCOM_DLL off exePath
-  *lastSlash = '\0';
+  if (xreDirectory) {
+    // chop XPCOM_DLL off exePath
+    *lastSlash = '\0';
 #ifdef XP_MACOSX
-  lastSlash = strrchr(exePath, XPCOM_FILE_PATH_SEPARATOR[0]);
-  strcpy(lastSlash + 1, kOSXResourcesFolder);
+    lastSlash = strrchr(exePath, XPCOM_FILE_PATH_SEPARATOR[0]);
+    strcpy(lastSlash + 1, kOSXResourcesFolder);
 #endif
 #ifdef XP_WIN
-  rv = NS_NewLocalFile(NS_ConvertUTF8toUTF16(exePath), false,
-                       xreDirectory);
+    rv = NS_NewLocalFile(NS_ConvertUTF8toUTF16(exePath), false,
+                         xreDirectory);
 #else
-  rv = NS_NewNativeLocalFile(nsDependentCString(exePath), false,
-                             xreDirectory);
+    rv = NS_NewNativeLocalFile(nsDependentCString(exePath), false,
+                               xreDirectory);
 #endif
+  }
 
   return rv;
 }
 
 int main(int argc, char* argv[], char* envp[])
 {
+#ifdef MOZ_BROWSER_CAN_BE_CONTENTPROC
+  // We are launching as a content process, delegate to the appropriate
+  // main
+  if (argc > 1 && IsArg(argv[1], "contentproc")) {
+#if defined(XP_WIN) && defined(MOZ_SANDBOX)
+    // We need to initialize the sandbox TargetServices before InitXPCOMGlue
+    // because we might need the sandbox broker to give access to some files.
+    if (IsSandboxedProcess() && !sandboxing::GetInitializedTargetServices()) {
+      Output("Failed to initialize the sandbox target services.");
+      return 255;
+    }
+#endif
+
+    nsresult rv = InitXPCOMGlue(argv[0], nullptr);
+    if (NS_FAILED(rv)) {
+      return 255;
+    }
+
+    int result = content_process_main(argc, argv);
+
+    // InitXPCOMGlue calls NS_LogInit, so we need to balance it here.
+    NS_LogTerm();
+
+    return result;
+  }
+#endif
+
   mozilla::TimeStamp start = mozilla::TimeStamp::Now();
 
 #ifdef XP_MACOSX
@@ -356,6 +419,10 @@ int main(int argc, char* argv[], char* envp[])
   #error "Unknown platform"  // having this here keeps cppcheck happy
 #endif
   }
+
+#ifdef MOZ_BROWSER_CAN_BE_CONTENTPROC
+  XRE_EnableSameExecutableForContentProc();
+#endif
 
   int result = do_main(argc, argv, envp, xreDirectory);
 

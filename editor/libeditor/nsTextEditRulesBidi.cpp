@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "nsAutoPtr.h"
 #include "nsCOMPtr.h"
 #include "nsDebug.h"
 #include "nsError.h"
@@ -48,7 +47,7 @@ nsTextEditRules::CheckBidiLevelForDeletion(Selection* aSelection,
   nsBidiLevel levelBefore;
   nsBidiLevel levelAfter;
   RefPtr<nsFrameSelection> frameSelection =
-    static_cast<Selection*>(aSelection)->GetFrameSelection();
+    aSelection->AsSelection()->GetFrameSelection();
   NS_ENSURE_TRUE(frameSelection, NS_ERROR_NULL_POINTER);
 
   nsPrevNextBidiLevels levels = frameSelection->

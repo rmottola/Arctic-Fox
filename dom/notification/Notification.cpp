@@ -46,6 +46,7 @@
 #include "nsProxyRelease.h"
 #include "nsServiceManagerUtils.h"
 #include "nsStructuredCloneContainer.h"
+#include "nsThreadUtils.h"
 #include "nsToolkitCompsCID.h"
 #include "nsXULAppAPI.h"
 #include "ServiceWorkerManager.h"
@@ -360,29 +361,12 @@ CheckScope(nsIPrincipal* aPrincipal, const nsACString& aScope)
 
 // Subclass that can be directly dispatched to child workers from the main
 // thread.
-class NotificationWorkerRunnable : public WorkerRunnable
+class NotificationWorkerRunnable : public MainThreadWorkerRunnable
 {
 protected:
   explicit NotificationWorkerRunnable(WorkerPrivate* aWorkerPrivate)
-    : WorkerRunnable(aWorkerPrivate, WorkerThreadUnchangedBusyCount)
+    : MainThreadWorkerRunnable(aWorkerPrivate)
   {
-  }
-
-  bool
-  PreDispatch(WorkerPrivate* aWorkerPrivate) override
-  {
-    // We don't call WorkerRunnable::PreDispatch because it would assert the
-    // wrong thing about which thread we're on.
-    AssertIsOnMainThread();
-    return true;
-  }
-
-  void
-  PostDispatch(WorkerPrivate* aWorkerPrivate, bool aDispatchResult) override
-  {
-    // We don't call WorkerRunnable::PostDispatch because it would assert the
-    // wrong thing about which thread we're on.
-    AssertIsOnMainThread();
   }
 
   bool
@@ -646,9 +630,8 @@ NotificationPermissionRequest::GetRequester(nsIContentPermissionRequester** aReq
 inline nsresult
 NotificationPermissionRequest::DispatchResolvePromise()
 {
-  nsCOMPtr<nsIRunnable> resolveRunnable = NS_NewRunnableMethod(this,
-    &NotificationPermissionRequest::ResolvePromise);
-  return NS_DispatchToMainThread(resolveRunnable);
+  return NS_DispatchToMainThread(NewRunnableMethod(this,
+                                                   &NotificationPermissionRequest::ResolvePromise));
 }
 
 nsresult
@@ -2577,7 +2560,7 @@ public:
     RefPtr<ServiceWorkerRegistrationInfo> registration =
       swm->GetRegistration(principal, mScope);
 
-    // This is coming from a ServiceWorkerRegistrationWorkerThread.
+    // This is coming from a ServiceWorkerRegistration.
     MOZ_ASSERT(registration);
 
     if (!registration->GetActive() ||

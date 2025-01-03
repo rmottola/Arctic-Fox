@@ -4,7 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 
-#include "nsAutoPtr.h"                  // for nsRefPtr, getter_AddRefs, etc
 #include "nsCOMPtr.h"                   // for nsCOMPtr, do_QueryInterface, etc
 #include "nsCRT.h"                      // for nsCRT
 #include "nsComposerCommands.h"         // for nsSetDocumentOptionsCommand, etc
@@ -400,7 +399,7 @@ nsSetDocumentStateCommand::GetCommandStateParams(const char *aCommandName,
  *  4. In the appropriate location in editorSession, editor, or commands code,
  *     trigger the notification of this observer by something like:
  *
- *  nsCOMPtr<nsICommandManager> commandManager = do_GetInterface(mDocShell);
+ *  nsCOMPtr<nsICommandManager> commandManager = mDocShell->GetCommandManager();
  *  nsCOMPtr<nsPICommandUpdater> commandUpdater = do_QueryInterface(commandManager);
  *  NS_ENSURE_TRUE(commandUpdater, NS_ERROR_FAILURE);
  *    commandUpdater->CommandStatusChanged(obs_documentCreated);

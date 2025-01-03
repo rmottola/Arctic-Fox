@@ -62,17 +62,15 @@ public:                                                                       \
 static Type Name() { MOZ_ASSERT(SingletonExists()); return GetSingleton().mPref##Name.mValue; } \
 static void Set##Name(Type aVal) { MOZ_ASSERT(SingletonExists()); \
     GetSingleton().mPref##Name.Set(UpdatePolicy::Update, Get##Name##PrefName(), aVal); } \
-private:                                                                      \
 static const char* Get##Name##PrefName() { return Pref; }                     \
 static Type Get##Name##PrefDefault() { return Default; }                      \
+private:                                                                      \
 PrefTemplate<UpdatePolicy::Update, Type, Get##Name##PrefDefault, Get##Name##PrefName> mPref##Name
 
 class PreferenceAccessImpl;
 class gfxPrefs;
 class gfxPrefs final
 {
-  friend class gfxWindowsPlatform;
-
 private:
   /// See Logging.h.  This lets Moz2D access preference values it owns.
   PreferenceAccessImpl* mMoz2DPrefAccess;
@@ -108,8 +106,7 @@ private:
           PrefAddVarCache(&mValue,aPreference, mValue);
           break;
         default:
-          MOZ_CRASH();
-          break;
+          MOZ_CRASH("Incomplete switch");
       }
     }
     void Set(UpdatePolicy aUpdate, const char* aPref, T aValue)
@@ -124,8 +121,7 @@ private:
           mValue = PrefGet(aPref, mValue);
           break;
         default:
-          MOZ_CRASH();
-          break;
+          MOZ_CRASH("Incomplete switch");
       }
     }
     T mValue;
@@ -134,12 +130,6 @@ private:
   // This is where DECL_GFX_PREF for each of the preferences should go.
   // We will keep these in an alphabetical order to make it easier to see if
   // a method accessing a pref already exists. Just add yours in the list.
-
-  // It's a short time fix, and will be removed after landing bug 1206637.
-  DECL_GFX_PREF(Live, "accessibility.monoaudio.enable",        MonoAudio, bool, false);
-  DECL_GFX_PREF(Live, "media.resampling.enabled",              AudioSinkResampling, bool, false);
-  DECL_GFX_PREF(Live, "media.resampling.rate",                 AudioSinkResampleRate, uint32_t, 48000);
-  DECL_GFX_PREF(Live, "media.forcestereo.enabled",             AudioSinkForceStereo, bool, true);
 
   // The apz prefs are explained in AsyncPanZoomController.cpp
   DECL_GFX_PREF(Live, "apz.allow_checkerboarding",             APZAllowCheckerboarding, bool, true);
@@ -373,6 +363,8 @@ private:
   DECL_GFX_PREF(Live, "layers.flash-borders",                  FlashLayerBorders, bool, false);
   DECL_GFX_PREF(Once, "layers.force-shmem-tiles",              ForceShmemTiles, bool, false);
   DECL_GFX_PREF(Live, "layers.frame-counter",                  DrawFrameCounter, bool, false);
+  DECL_GFX_PREF(Once, "layers.gpu-process.dev.enabled",        GPUProcessDevEnabled, bool, false);
+  DECL_GFX_PREF(Once, "layers.gpu-process.dev.timeout_ms",     GPUProcessDevTimeoutMs, int32_t, 5000);
   DECL_GFX_PREF(Once, "layers.gralloc.disable",                DisableGralloc, bool, false);
   DECL_GFX_PREF(Live, "layers.low-precision-buffer",           UseLowPrecisionBuffer, bool, false);
   DECL_GFX_PREF(Live, "layers.low-precision-opacity",          LowPrecisionOpacity, float, 1.0f);

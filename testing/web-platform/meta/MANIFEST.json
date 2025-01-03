@@ -23517,6 +23517,18 @@
         ]
       },
       "testharness": {
+        "XMLHttpRequest/xmlhttprequest-sync-block-defer-scripts.html": [
+          {
+            "path": "XMLHttpRequest/xmlhttprequest-sync-block-defer-scripts.html",
+            "url": "/XMLHttpRequest/xmlhttprequest-sync-block-defer-scripts.html"
+          }
+        ],
+        "XMLHttpRequest/xmlhttprequest-sync-block-scripts.html": [
+          {
+            "path": "XMLHttpRequest/xmlhttprequest-sync-block-scripts.html",
+            "url": "/XMLHttpRequest/xmlhttprequest-sync-block-scripts.html"
+          }
+        ],
         "DOM-parsing/createContextualFragment.html": [
           {
             "path": "DOM-parsing/createContextualFragment.html",
@@ -23593,6 +23605,18 @@
           {
             "path": "XMLHttpRequest/open-url-multi-window-6.htm",
             "url": "/XMLHttpRequest/open-url-multi-window-6.htm"
+          }
+        ],
+        "html/browsers/browsing-the-web/navigating-across-documents/javascript-url-return-value-handling.html": [
+          {
+            "path": "html/browsers/browsing-the-web/navigating-across-documents/javascript-url-return-value-handling.html",
+            "url": "/html/browsers/browsing-the-web/navigating-across-documents/javascript-url-return-value-handling.html"
+          }
+        ],
+        "html/browsers/history/the-location-interface/allow_prototype_cycle_through_location.sub.html": [
+          {
+            "path": "html/browsers/history/the-location-interface/allow_prototype_cycle_through_location.sub.html",
+            "url": "/html/browsers/history/the-location-interface/allow_prototype_cycle_through_location.sub.html"
           }
         ],
         "html/semantics/document-metadata/the-base-element/base_about_blank.html": [
@@ -23713,6 +23737,18 @@
           {
             "path": "web-animations/timing-model/animations/set-the-animation-start-time.html",
             "url": "/web-animations/timing-model/animations/set-the-animation-start-time.html"
+          }
+        ],
+        "web-animations/timing-model/animations/set-the-timeline-of-an-animation.html": [
+          {
+            "path": "web-animations/timing-model/animations/set-the-timeline-of-an-animation.html",
+            "url": "/web-animations/timing-model/animations/set-the-timeline-of-an-animation.html"
+          }
+        ],
+        "web-animations/timing-model/animations/current-time.html": [
+          {
+            "path": "web-animations/timing-model/animations/current-time.html",
+            "url": "/web-animations/timing-model/animations/current-time.html"
           }
         ]
       }

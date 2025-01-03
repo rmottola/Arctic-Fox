@@ -25,8 +25,10 @@
 - (CGFloat)backingScaleFactor;
 @end
 
-// When building with a pre-10.7 SDK, NSEventPhase is not defined.
 #if !defined(MAC_OS_X_VERSION_10_7) || MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_7
+// When building with a pre-10.7 SDK, NSEventPhase is not defined.
+extern NSString *const NSVerticalGlyphFormAttributeName;
+
 enum {
   NSEventPhaseNone        = 0,
   NSEventPhaseBegan       = 0x1 << 0,
@@ -372,6 +374,15 @@ public:
    * Unicode character.
    */
   static uint32_t ConvertGeckoKeyCodeToMacCharCode(uint32_t aKeyCode);
+
+  /**
+   * Convert string with font attribute to NSMutableAttributedString
+   */
+  static NSMutableAttributedString* GetNSMutableAttributedString(
+           const nsAString& aText,
+           const nsTArray<mozilla::FontRange>& aFontRanges,
+           const bool aIsVertical,
+           const CGFloat aBackingScaleFactor);
 };
 
 #endif // nsCocoaUtils_h_

@@ -7,6 +7,7 @@
 
 /* rendering object for CSS "display: flex" */
 
+#include "nsAutoPtr.h"
 #include "nsFlexContainerFrame.h"
 #include "nsContentUtils.h"
 #include "nsCSSAnonBoxes.h"
@@ -1026,7 +1027,7 @@ GetFirstNonAnonBoxDescendant(nsIFrame* aFrame)
     // column, we'll always return the column. This is fine; we're really just
     // looking for a handle to *anything* with a meaningful content node inside
     // the table, for use in DOM comparisons to things outside of the table.)
-    if (MOZ_UNLIKELY(aFrame->GetType() == nsGkAtoms::tableOuterFrame)) {
+    if (MOZ_UNLIKELY(aFrame->GetType() == nsGkAtoms::tableWrapperFrame)) {
       nsIFrame* captionDescendant =
         GetFirstNonAnonBoxDescendant(aFrame->GetChildList(kCaptionList).FirstChild());
       if (captionDescendant) {
@@ -1517,7 +1518,7 @@ nsFlexContainerFrame::
   // have a single-line (nowrap) flex container which itself has a definite
   // cross-size.  Otherwise, we'll wait to do stretching, since (in other
   // cases) we don't know how much the item should stretch yet.
-  const nsHTMLReflowState* flexContainerRS = aItemReflowState.parentReflowState;
+  const nsHTMLReflowState* flexContainerRS = aItemReflowState.mParentReflowState;
   MOZ_ASSERT(flexContainerRS,
              "flex item's reflow state should have ptr to container's state");
   if (NS_STYLE_FLEX_WRAP_NOWRAP == flexContainerRS->mStylePosition->mFlexWrap) {
@@ -1705,7 +1706,7 @@ FlexItem::FlexItem(nsHTMLReflowState& aFlexItemReflowState,
   MOZ_ASSERT(!(mFrame->GetStateBits() & NS_FRAME_OUT_OF_FLOW),
              "out-of-flow frames should not be treated as flex items");
 
-  const nsHTMLReflowState* containerRS = aFlexItemReflowState.parentReflowState;
+  const nsHTMLReflowState* containerRS = aFlexItemReflowState.mParentReflowState;
   if (IsLegacyBox(containerRS->mStyleDisplay,
                   containerRS->frame->StyleContext())) {
     // For -webkit-box/-webkit-inline-box, we need to:

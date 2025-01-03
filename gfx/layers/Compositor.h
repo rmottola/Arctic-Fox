@@ -133,6 +133,8 @@ class CompositorOGL;
 class CompositorD3D9;
 class CompositorD3D11;
 class BasicCompositor;
+class TextureHost;
+class TextureReadLock;
 
 enum SurfaceInitMode
 {
@@ -185,20 +187,13 @@ enum SurfaceInitMode
 class Compositor
 {
 protected:
-  virtual ~Compositor() {}
+  virtual ~Compositor();
 
 public:
   NS_INLINE_DECL_REFCOUNTING(Compositor)
 
   explicit Compositor(widget::CompositorWidgetProxy* aWidget,
-                      CompositorBridgeParent* aParent = nullptr)
-    : mCompositorID(0)
-    , mDiagnosticTypes(DiagnosticTypes::NO_DIAGNOSTIC)
-    , mParent(aParent)
-    , mScreenRotation(ROTATION_0)
-    , mWidget(aWidget)
-  {
-  }
+                      CompositorBridgeParent* aParent = nullptr);
 
   virtual already_AddRefed<DataTextureSource> CreateDataTextureSource(TextureFlags aFlags = TextureFlags::NO_FLAGS) = 0;
 
@@ -206,7 +201,8 @@ public:
   CreateDataTextureSourceAround(gfx::DataSourceSurface* aSurface) { return nullptr; }
 
   virtual bool Initialize() = 0;
-  virtual void Destroy() = 0;
+  virtual void Destroy();
+  bool IsDestroyed() const { return mIsDestroyed; }
 
   virtual void DetachWidget() { mWidget = nullptr; }
 
@@ -319,7 +315,7 @@ public:
    * aVisibleRect is used to determine which edges should be antialiased,
    * without applying the effect to the inner edges of a tiled layer.
    */
-  virtual void DrawQuad(const gfx::Rect& aRect, const gfx::Rect& aClipRect,
+  virtual void DrawQuad(const gfx::Rect& aRect, const gfx::IntRect& aClipRect,
                         const EffectChain& aEffectChain,
                         gfx::Float aOpacity, const gfx::Matrix4x4& aTransform,
                         const gfx::Rect& aVisibleRect) = 0;
@@ -329,7 +325,7 @@ public:
    * Use this when you are drawing a single quad that is not part of a tiled
    * layer.
    */
-  void DrawQuad(const gfx::Rect& aRect, const gfx::Rect& aClipRect,
+  void DrawQuad(const gfx::Rect& aRect, const gfx::IntRect& aClipRect,
                         const EffectChain& aEffectChain,
                         gfx::Float aOpacity, const gfx::Matrix4x4& aTransform) {
       DrawQuad(aRect, aClipRect, aEffectChain, aOpacity, aTransform, aRect);
@@ -339,7 +335,7 @@ public:
    * Draw an unfilled solid color rect. Typically used for debugging overlays.
    */
   void SlowDrawRect(const gfx::Rect& aRect, const gfx::Color& color,
-                const gfx::Rect& aClipRect = gfx::Rect(),
+                const gfx::IntRect& aClipRect = gfx::IntRect(),
                 const gfx::Matrix4x4& aTransform = gfx::Matrix4x4(),
                 int aStrokeWidth = 1);
 
@@ -347,7 +343,7 @@ public:
    * Draw a solid color filled rect. This is a simple DrawQuad helper.
    */
   void FillRect(const gfx::Rect& aRect, const gfx::Color& color,
-                    const gfx::Rect& aClipRect = gfx::Rect(),
+                    const gfx::IntRect& aClipRect = gfx::IntRect(),
                     const gfx::Matrix4x4& aTransform = gfx::Matrix4x4());
 
   /*
@@ -378,18 +374,20 @@ public:
    * opaque content.
    */
   virtual void BeginFrame(const nsIntRegion& aInvalidRegion,
-                          const gfx::Rect* aClipRectIn,
-                          const gfx::Rect& aRenderBounds,
+                          const gfx::IntRect* aClipRectIn,
+                          const gfx::IntRect& aRenderBounds,
                           const nsIntRegion& aOpaqueRegion,
-                          gfx::Rect* aClipRectOut = nullptr,
-                          gfx::Rect* aRenderBoundsOut = nullptr) = 0;
+                          gfx::IntRect* aClipRectOut = nullptr,
+                          gfx::IntRect* aRenderBoundsOut = nullptr) = 0;
 
   /**
    * Flush the current frame to the screen and tidy up.
+   *
+   * Derived class overriding this should call Compositor::EndFrame.
    */
-  virtual void EndFrame() = 0;
+  virtual void EndFrame();
 
-  virtual void SetDispAcquireFence(Layer* aLayer, nsIWidget* aWidget);
+  virtual void SetDispAcquireFence(Layer* aLayer);
 
   virtual FenceHandle GetReleaseFence();
 
@@ -417,13 +415,13 @@ public:
 
   void DrawDiagnostics(DiagnosticFlags aFlags,
                        const gfx::Rect& visibleRect,
-                       const gfx::Rect& aClipRect,
+                       const gfx::IntRect& aClipRect,
                        const gfx::Matrix4x4& transform,
                        uint32_t aFlashCounter = DIAGNOSTIC_FLASH_COUNTER_MAX);
 
   void DrawDiagnostics(DiagnosticFlags aFlags,
                        const nsIntRegion& visibleRegion,
-                       const gfx::Rect& aClipRect,
+                       const gfx::IntRect& aClipRect,
                        const gfx::Matrix4x4& transform,
                        uint32_t aFlashCounter = DIAGNOSTIC_FLASH_COUNTER_MAX);
 
@@ -533,11 +531,35 @@ public:
   // frames and should not be used.
   void SetInvalid();
   bool IsValid() const;
+  CompositorBridgeParent* GetCompositorBridgeParent() const {
+    return mParent;
+  }
+
+  /// Most compositor backends operate asynchronously under the hood. This
+  /// means that when a layer stops using a texture it is often desirable to
+  /// wait for the end of the next composition before releasing the texture's
+  /// ReadLock.
+  /// This function provides a convenient way to do this delayed unlocking, if
+  /// the texture itself requires it.
+  void UnlockAfterComposition(already_AddRefed<TextureReadLock> aLock)
+  {
+    mUnlockAfterComposition.AppendElement(aLock);
+  }
+
+  /// Most compositor backends operate asynchronously under the hood. This
+  /// means that when a layer stops using a texture it is often desirable to
+  /// wait for the end of the next composition before NotifyNotUsed() call.
+  /// This function provides a convenient way to do this delayed NotifyNotUsed()
+  /// call, if the texture itself requires it.
+  /// See bug 1260611 and bug 1252835
+  void NotifyNotUsedAfterComposition(TextureHost* aTextureHost);
+
+  void FlushPendingNotifyNotUsed();
 
 protected:
   void DrawDiagnosticsInternal(DiagnosticFlags aFlags,
                                const gfx::Rect& aVisibleRect,
-                               const gfx::Rect& aClipRect,
+                               const gfx::IntRect& aClipRect,
                                const gfx::Matrix4x4& transform,
                                uint32_t aFlashCounter);
 
@@ -553,10 +575,20 @@ protected:
    */
   gfx::IntRect ComputeBackdropCopyRect(
     const gfx::Rect& aRect,
-    const gfx::Rect& aClipRect,
+    const gfx::IntRect& aClipRect,
     const gfx::Matrix4x4& aTransform,
     gfx::Matrix4x4* aOutTransform,
     gfx::Rect* aOutLayerQuad = nullptr);
+
+  /**
+   * An array of locks that will need to be unlocked after the next composition.
+   */
+  nsTArray<RefPtr<TextureReadLock>> mUnlockAfterComposition;
+
+  /**
+   * An array of TextureHosts that will need to call NotifyNotUsed() after the next composition.
+   */
+  nsTArray<RefPtr<TextureHost>> mNotifyNotUsedAfterComposition;
 
   /**
    * Render time for the current composition.
@@ -587,6 +619,8 @@ protected:
   gfx::IntRect mTargetBounds;
 
   widget::CompositorWidgetProxy* mWidget;
+
+  bool mIsDestroyed;
 
 #if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
   FenceHandle mReleaseFenceHandle;

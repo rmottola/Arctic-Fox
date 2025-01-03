@@ -439,16 +439,14 @@ nsContextMenu.prototype = {
     this.showItem("context-media-unmute", onMedia && this.target.muted);
     this.showItem("context-media-playbackrate", onMedia);
     this.showItem("context-media-showcontrols", onMedia && !this.target.controls);
-    this.showItem("context-media-hidecontrols", onMedia && this.target.controls);
+    this.showItem("context-media-hidecontrols", this.target.controls && (this.onVideo || (this.onAudio && !this.inSyntheticDoc)));
     this.showItem("context-video-fullscreen", this.onVideo && this.target.ownerDocument.fullscreenElement == null);
-    var statsShowing = this.onVideo && this.target.mozMediaStatisticsShowing;
-    this.showItem("context-video-showstats", this.onVideo && this.target.controls && !statsShowing);
-    this.showItem("context-video-hidestats", this.onVideo && this.target.controls && statsShowing);
 
     // Disable them when there isn't a valid media source loaded.
     if (onMedia) {
       this.setItemAttr("context-media-playbackrate-050x", "checked", this.target.playbackRate == 0.5);
       this.setItemAttr("context-media-playbackrate-100x", "checked", this.target.playbackRate == 1.0);
+      this.setItemAttr("context-media-playbackrate-125x", "checked", this.target.playbackRate == 1.25);
       this.setItemAttr("context-media-playbackrate-150x", "checked", this.target.playbackRate == 1.5);
       this.setItemAttr("context-media-playbackrate-200x", "checked", this.target.playbackRate == 2.0);
       var hasError = this.target.error != null ||
@@ -460,6 +458,7 @@ nsContextMenu.prototype = {
       this.setItemAttr("context-media-playbackrate", "disabled", hasError);
       this.setItemAttr("context-media-playbackrate-050x", "disabled", hasError);
       this.setItemAttr("context-media-playbackrate-100x", "disabled", hasError);
+      this.setItemAttr("context-media-playbackrate-125x", "disabled", hasError);
       this.setItemAttr("context-media-playbackrate-150x", "disabled", hasError);
       this.setItemAttr("context-media-playbackrate-200x", "disabled", hasError);
       this.setItemAttr("context-media-showcontrols", "disabled", hasError);
@@ -468,8 +467,6 @@ nsContextMenu.prototype = {
         let canSaveSnapshot = this.target.readyState >= this.target.HAVE_CURRENT_DATA;
         this.setItemAttr("context-video-saveimage",  "disabled", !canSaveSnapshot);
         this.setItemAttr("context-video-fullscreen", "disabled", hasError);
-        this.setItemAttr("context-video-showstats", "disabled", hasError);
-        this.setItemAttr("context-video-hidestats", "disabled", hasError);
       }
     }
     this.showItem("context-media-sep-commands",  onMedia);
@@ -918,8 +915,17 @@ nsContextMenu.prototype = {
                    referrerURI: gContextMenuContentData.documentURIObject,
                    referrerPolicy: gContextMenuContentData.referrerPolicy,
                    noReferrer: this.linkHasNoReferrer };
-    for (let p in extra)
+    for (let p in extra) {
       params[p] = extra[p];
+    }
+
+    // If we want to change userContextId, we must be sure that we don't
+    // propagate the referrer.
+    if ("userContextId" in params &&
+        params.userContextId != this.principal.originAttributes.userContextId) {
+      params.noReferrer = true;
+    }
+
     return params;
   },
 
@@ -960,10 +966,6 @@ nsContextMenu.prototype = {
       allowMixedContent: persistAllowMixedContentInChildTab,
       userContextId: parseInt(event.target.getAttribute('usercontextid'))
     };
-
-    if (params.userContextId != this.principal.originAttributes.userContextId) {
-      params.noReferrer = true;
-    }
 
     openLinkIn(this.linkURL, "tab", this._openLinkInParameters(params));
   },

@@ -104,6 +104,33 @@ LogToConsole(const nsAString& aMsg)
 namespace {
 
 nsresult
+GetOriginFromPrincipal(nsIPrincipal* aPrincipal, nsACString& aOrigin)
+{
+  nsresult rv = aPrincipal->GetOriginNoSuffix(aOrigin);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsAutoCString suffix;
+  rv = aPrincipal->GetOriginSuffix(suffix);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  mozilla::PrincipalOriginAttributes attrs;
+  if (!attrs.PopulateFromSuffix(suffix)) {
+    return NS_ERROR_FAILURE;
+  }
+
+  // mPrivateBrowsingId must be set to false because PermissionManager is not supposed to have
+  // any knowledge of private browsing. Allowing it to be true changes the suffix being hashed.
+  attrs.mPrivateBrowsingId = 0;
+
+  // set to default to disable user context isolation for permissions
+  attrs.mUserContextId = nsIScriptSecurityManager::DEFAULT_USER_CONTEXT_ID;
+
+  attrs.CreateSuffix(suffix);
+  aOrigin.Append(suffix);
+  return NS_OK;
+}
+
+nsresult
 GetPrincipalFromOrigin(const nsACString& aOrigin, nsIPrincipal** aPrincipal)
 {
   nsAutoCString originNoSuffix;
@@ -111,6 +138,9 @@ GetPrincipalFromOrigin(const nsACString& aOrigin, nsIPrincipal** aPrincipal)
   if (!attrs.PopulateFromOrigin(aOrigin, originNoSuffix)) {
     return NS_ERROR_FAILURE;
   }
+
+  // set to default to disable user context isolation for permissions
+  attrs.mUserContextId = nsIScriptSecurityManager::DEFAULT_USER_CONTEXT_ID;
 
   nsCOMPtr<nsIURI> uri;
   nsresult rv = NS_NewURI(getter_AddRefs(uri), originNoSuffix);
@@ -391,7 +421,7 @@ UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsAFlatCString& aTyp
     NS_ENSURE_SUCCESS(rv, rv);
 
     nsAutoCString origin;
-    rv = principal->GetOrigin(origin);
+    rv = GetOriginFromPrincipal(principal, origin);
     NS_ENSURE_SUCCESS(rv, rv);
 
     return aHelper->Insert(origin, aType, aPermission,
@@ -499,7 +529,7 @@ UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsAFlatCString& aTyp
       if (NS_WARN_IF(NS_FAILED(rv))) continue;
 
       nsAutoCString origin;
-      rv = principal->GetOrigin(origin);
+      rv = GetOriginFromPrincipal(principal, origin);
       if (NS_WARN_IF(NS_FAILED(rv))) continue;
 
       // Ensure that we don't insert the same origin repeatedly
@@ -544,7 +574,7 @@ UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsAFlatCString& aTyp
     rv = GetPrincipal(uri, aAppId, aIsInIsolatedMozBrowserElement, getter_AddRefs(principal));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    rv = principal->GetOrigin(origin);
+    rv = GetOriginFromPrincipal(principal, origin);
     NS_ENSURE_SUCCESS(rv, rv);
 
     aHelper->Insert(origin, aType, aPermission,
@@ -557,7 +587,7 @@ UpgradeHostToOriginAndInsert(const nsACString& aHost, const nsAFlatCString& aTyp
     rv = GetPrincipal(uri, aAppId, aIsInIsolatedMozBrowserElement, getter_AddRefs(principal));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    rv = principal->GetOrigin(origin);
+    rv = GetOriginFromPrincipal(principal, origin);
     NS_ENSURE_SUCCESS(rv, rv);
 
     aHelper->Insert(origin, aType, aPermission,
@@ -580,7 +610,7 @@ IsExpandedPrincipal(nsIPrincipal* aPrincipal)
 
 nsPermissionManager::PermissionKey::PermissionKey(nsIPrincipal* aPrincipal)
 {
-  MOZ_ALWAYS_SUCCEEDS(aPrincipal->GetOrigin(mOrigin));
+  MOZ_ALWAYS_SUCCEEDS(GetOriginFromPrincipal(aPrincipal, mOrigin));
 }
 
 /**
@@ -1539,7 +1569,7 @@ nsPermissionManager::AddInternal(nsIPrincipal* aPrincipal,
                                  const bool            aIgnoreSessionPermissions)
 {
   nsAutoCString origin;
-  nsresult rv = aPrincipal->GetOrigin(origin);
+  nsresult rv = GetOriginFromPrincipal(aPrincipal, origin);
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (!IsChildProcess()) {
@@ -2165,8 +2195,14 @@ nsPermissionManager::GetPermissionHashKey(nsIPrincipal* aPrincipal,
     }
 
     // Copy the attributes over
-    mozilla::PrincipalOriginAttributes attrs = mozilla::BasePrincipal::Cast(aPrincipal)->OriginAttributesRef();
-    nsCOMPtr<nsIPrincipal> principal = mozilla::BasePrincipal::CreateCodebasePrincipal(newURI, attrs);
+    mozilla::PrincipalOriginAttributes attrs =
+      mozilla::BasePrincipal::Cast(aPrincipal)->OriginAttributesRef();
+
+    // ensure that the user context isolation is disabled
+    attrs.mUserContextId = nsIScriptSecurityManager::DEFAULT_USER_CONTEXT_ID;
+
+    nsCOMPtr<nsIPrincipal> principal =
+      mozilla::BasePrincipal::CreateCodebasePrincipal(newURI, attrs);
 
     return GetPermissionHashKey(principal, aType, aExactHostMatch);
   }

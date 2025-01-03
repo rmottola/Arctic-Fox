@@ -49,7 +49,6 @@
 #include "prenv.h"
 #include "mozilla/Logging.h"
 
-#include "nsAutoPtr.h"
 #include "nsCURILoader.h"
 #include "nsContentPolicyUtils.h"
 #include "nsContentUtils.h"
@@ -112,6 +111,7 @@ static const char *kPrefBlockURIs = "browser.safebrowsing.blockedURIs.enabled";
 
 using namespace mozilla;
 using namespace mozilla::dom;
+using namespace mozilla::net;
 
 static LogModule*
 GetObjectLog()

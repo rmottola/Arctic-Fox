@@ -20,8 +20,7 @@
 #include <utils/AndroidThreads.h>
 #endif
 
-extern mozilla::LogModule* GetPDMLog();
-#define LOG(...) MOZ_LOG(GetPDMLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(sPDMLog, mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 using namespace android;
 
@@ -331,7 +330,6 @@ GonkDecoderManager::OnTaskLooper()
 #endif
 
 GonkMediaDataDecoder::GonkMediaDataDecoder(GonkDecoderManager* aManager,
-                                           FlushableTaskQueue* aTaskQueue,
                                            MediaDataDecoderCallback* aCallback)
   : mManager(aManager)
 {

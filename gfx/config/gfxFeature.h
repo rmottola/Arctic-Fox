@@ -10,6 +10,7 @@
 #include "gfxTelemetry.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Function.h"
+#include "nsString.h"
 
 namespace mozilla {
 namespace gfx {
@@ -18,7 +19,10 @@ namespace gfx {
   /* Name,                        Type,         Description */                    \
   _(HW_COMPOSITING,               Feature,      "Compositing")                    \
   _(D3D11_COMPOSITING,            Feature,      "Direct3D11 Compositing")         \
+  _(D3D9_COMPOSITING,             Feature,      "Direct3D9 Compositing")          \
   _(DIRECT2D,                     Feature,      "Direct2D")                       \
+  _(D3D11_HW_ANGLE,               Feature,      "Direct3D11 hardware ANGLE")               \
+  _(GPU_PROCESS,                  Feature,      "GPU Process")                    \
   /* Add new entries above this comment */
 
 enum class Feature : uint32_t {
@@ -37,7 +41,7 @@ class FeatureState
   FeatureStatus GetValue() const;
 
   void EnableByDefault();
-  void DisableByDefault(FeatureStatus aStatus, const char* aMessage);
+  void DisableByDefault(FeatureStatus aStatus, const char* aMessage, const nsACString& aFailureId);
   bool SetDefault(bool aEnable, FeatureStatus aDisableStatus, const char* aDisableMessage);
   bool InitOrUpdate(bool aEnable,
                     FeatureStatus aDisableStatus,
@@ -47,14 +51,14 @@ class FeatureState
                           bool aDefaultValue);
   void UserEnable(const char* aMessage);
   void UserForceEnable(const char* aMessage);
-  void UserDisable(const char* aMessage);
-  void Disable(FeatureStatus aStatus, const char* aMessage);
-  void ForceDisable(FeatureStatus aStatus, const char* aMessage) {
-    SetFailed(aStatus, aMessage);
+  void UserDisable(const char* aMessage, const nsACString& aFailureId);
+  void Disable(FeatureStatus aStatus, const char* aMessage, const nsACString& aFailureId);
+  void ForceDisable(FeatureStatus aStatus, const char* aMessage, const nsACString& aFailureId) {
+    SetFailed(aStatus, aMessage, aFailureId);
   }
-  void SetFailed(FeatureStatus aStatus, const char* aMessage);
-  bool MaybeSetFailed(bool aEnable, FeatureStatus aStatus, const char* aMessage);
-  bool MaybeSetFailed(FeatureStatus aStatus, const char* aMessage);
+  void SetFailed(FeatureStatus aStatus, const char* aMessage, const nsACString& aFailureId);
+  bool MaybeSetFailed(bool aEnable, FeatureStatus aStatus, const char* aMessage, const nsACString& aFailureId);
+  bool MaybeSetFailed(FeatureStatus aStatus, const char* aMessage, const nsACString& aFailureId);
 
   // aType is "base", "user", "env", or "runtime".
   // aMessage may be null.
@@ -62,6 +66,8 @@ class FeatureState
                                  FeatureStatus aStatus,
                                  const char* aMessage)> StatusIterCallback;
   void ForEachStatusChange(const StatusIterCallback& aCallback) const;
+
+  const nsACString& GetFailureId() const;
 
  private:
   void SetUser(FeatureStatus aStatus, const char* aMessage);
@@ -79,6 +85,8 @@ class FeatureState
   }
 
  private:
+  void SetFailureId(const nsACString& aFailureId);
+
   struct Instance {
     char mMessage[64];
     FeatureStatus mStatus;
@@ -109,6 +117,10 @@ class FeatureState
   Instance mUser;
   Instance mEnvironment;
   Instance mRuntime;
+
+  // Store the first reported failureId for now but we might want to track this
+  // by instance later if we need a specific breakdown.
+  nsCString mFailureId;
 };
 
 } // namespace gfx

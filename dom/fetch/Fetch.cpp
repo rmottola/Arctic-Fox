@@ -262,7 +262,7 @@ MainThreadFetchResolver::~MainThreadFetchResolver()
   NS_ASSERT_OWNINGTHREAD(MainThreadFetchResolver);
 }
 
-class WorkerFetchResponseRunnable final : public WorkerRunnable
+class WorkerFetchResponseRunnable final : public MainThreadWorkerRunnable
 {
   RefPtr<WorkerFetchResolver> mResolver;
   // Passed from main thread to worker thread after being initialized.
@@ -271,7 +271,7 @@ public:
   WorkerFetchResponseRunnable(WorkerPrivate* aWorkerPrivate,
                               WorkerFetchResolver* aResolver,
                               InternalResponse* aResponse)
-    : WorkerRunnable(aWorkerPrivate, WorkerThreadModifyBusyCount)
+    : MainThreadWorkerRunnable(aWorkerPrivate)
     , mResolver(aResolver)
     , mInternalResponse(aResponse)
   {
@@ -298,26 +298,70 @@ public:
   }
 };
 
-class WorkerFetchResponseEndRunnable final : public WorkerRunnable
+class WorkerFetchResponseEndBase
 {
-  RefPtr<WorkerFetchResolver> mResolver;
+  RefPtr<PromiseWorkerProxy> mPromiseProxy;
 public:
-  WorkerFetchResponseEndRunnable(WorkerPrivate* aWorkerPrivate,
-                                 WorkerFetchResolver* aResolver)
-    : WorkerRunnable(aWorkerPrivate, WorkerThreadModifyBusyCount)
-    , mResolver(aResolver)
+  explicit WorkerFetchResponseEndBase(PromiseWorkerProxy* aPromiseProxy)
+    : mPromiseProxy(aPromiseProxy)
+  {
+    MOZ_ASSERT(mPromiseProxy);
+  }
+
+  void
+  WorkerRunInternal(WorkerPrivate* aWorkerPrivate)
+  {
+    MOZ_ASSERT(aWorkerPrivate);
+    aWorkerPrivate->AssertIsOnWorkerThread();
+    mPromiseProxy->CleanUp();
+  }
+};
+
+class WorkerFetchResponseEndRunnable final : public MainThreadWorkerRunnable
+                                           , public WorkerFetchResponseEndBase
+{
+public:
+  explicit WorkerFetchResponseEndRunnable(PromiseWorkerProxy* aPromiseProxy)
+    : MainThreadWorkerRunnable(aPromiseProxy->GetWorkerPrivate())
+    , WorkerFetchResponseEndBase(aPromiseProxy)
   {
   }
 
   bool
   WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
   {
-    MOZ_ASSERT(aWorkerPrivate);
-    aWorkerPrivate->AssertIsOnWorkerThread();
-
-    mResolver->mPromiseProxy->CleanUp();
+    WorkerRunInternal(aWorkerPrivate);
     return true;
   }
+
+  nsresult
+  Cancel() override
+  {
+    // Execute Run anyway to make sure we cleanup our promise proxy to avoid
+    // leaking the worker thread
+    Run();
+    return WorkerRunnable::Cancel();
+  }
+};
+
+class WorkerFetchResponseEndControlRunnable final : public MainThreadWorkerControlRunnable
+                                                  , public WorkerFetchResponseEndBase
+{
+public:
+  explicit WorkerFetchResponseEndControlRunnable(PromiseWorkerProxy* aPromiseProxy)
+    : MainThreadWorkerControlRunnable(aPromiseProxy->GetWorkerPrivate())
+    , WorkerFetchResponseEndBase(aPromiseProxy)
+  {
+  }
+
+  bool
+  WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
+  {
+    WorkerRunInternal(aWorkerPrivate);
+    return true;
+  }
+
+  // Control runnable cancel already calls Run().
 };
 
 void
@@ -349,19 +393,28 @@ WorkerFetchResolver::OnResponseEnd()
   }
 
   RefPtr<WorkerFetchResponseEndRunnable> r =
-    new WorkerFetchResponseEndRunnable(mPromiseProxy->GetWorkerPrivate(), this);
+    new WorkerFetchResponseEndRunnable(mPromiseProxy);
 
   if (!r->Dispatch()) {
-    NS_WARNING("Could not dispatch fetch response end");
+    RefPtr<WorkerFetchResponseEndControlRunnable> cr =
+      new WorkerFetchResponseEndControlRunnable(mPromiseProxy);
+    // This can fail if the worker thread is canceled or killed causing
+    // the PromiseWorkerProxy to give up its WorkerFeature immediately,
+    // allowing the worker thread to become Dead.
+    if (!cr->Dispatch()) {
+      NS_WARNING("Failed to dispatch WorkerFetchResponseEndControlRunnable");
+    }
   }
 }
 
 namespace {
 nsresult
 ExtractFromArrayBuffer(const ArrayBuffer& aBuffer,
-                       nsIInputStream** aStream)
+                       nsIInputStream** aStream,
+                       uint64_t& aContentLength)
 {
   aBuffer.ComputeLengthAndData();
+  aContentLength = aBuffer.Length();
   //XXXnsm reinterpret_cast<> is used in DOMParser, should be ok.
   return NS_NewByteInputStream(aStream,
                                reinterpret_cast<char*>(aBuffer.Data()),
@@ -370,9 +423,11 @@ ExtractFromArrayBuffer(const ArrayBuffer& aBuffer,
 
 nsresult
 ExtractFromArrayBufferView(const ArrayBufferView& aBuffer,
-                           nsIInputStream** aStream)
+                           nsIInputStream** aStream,
+                           uint64_t& aContentLength)
 {
   aBuffer.ComputeLengthAndData();
+  aContentLength = aBuffer.Length();
   //XXXnsm reinterpret_cast<> is used in DOMParser, should be ok.
   return NS_NewByteInputStream(aStream,
                                reinterpret_cast<char*>(aBuffer.Data()),
@@ -380,11 +435,18 @@ ExtractFromArrayBufferView(const ArrayBufferView& aBuffer,
 }
 
 nsresult
-ExtractFromBlob(const Blob& aBlob, nsIInputStream** aStream,
-                nsCString& aContentType)
+ExtractFromBlob(const Blob& aBlob,
+                nsIInputStream** aStream,
+                nsCString& aContentType,
+                uint64_t& aContentLength)
 {
   RefPtr<BlobImpl> impl = aBlob.Impl();
   ErrorResult rv;
+  aContentLength = impl->GetSize(rv);
+  if (NS_WARN_IF(rv.Failed())) {
+    return rv.StealNSResult();
+  }
+
   impl->GetInternalStream(aStream, rv);
   if (NS_WARN_IF(rv.Failed())) {
     return rv.StealNSResult();
@@ -397,19 +459,21 @@ ExtractFromBlob(const Blob& aBlob, nsIInputStream** aStream,
 }
 
 nsresult
-ExtractFromFormData(FormData& aFormData, nsIInputStream** aStream,
-                    nsCString& aContentType)
+ExtractFromFormData(FormData& aFormData,
+                    nsIInputStream** aStream,
+                    nsCString& aContentType,
+                    uint64_t& aContentLength)
 {
-  uint64_t unusedContentLength;
   nsAutoCString unusedCharset;
-  return aFormData.GetSendInfo(aStream, &unusedContentLength,
+  return aFormData.GetSendInfo(aStream, &aContentLength,
                                aContentType, unusedCharset);
 }
 
 nsresult
 ExtractFromUSVString(const nsString& aStr,
                      nsIInputStream** aStream,
-                     nsCString& aContentType)
+                     nsCString& aContentType,
+                     uint64_t& aContentLength)
 {
   nsCOMPtr<nsIUnicodeEncoder> encoder = EncodingUtils::EncoderForEncoding("UTF-8");
   if (!encoder) {
@@ -439,6 +503,7 @@ ExtractFromUSVString(const nsString& aStr,
   encoded.SetLength(outLen);
 
   aContentType = NS_LITERAL_CSTRING("text/plain;charset=UTF-8");
+  aContentLength = outLen;
 
   return NS_NewCStringInputStream(aStream, encoded);
 }
@@ -446,11 +511,13 @@ ExtractFromUSVString(const nsString& aStr,
 nsresult
 ExtractFromURLSearchParams(const URLSearchParams& aParams,
                            nsIInputStream** aStream,
-                           nsCString& aContentType)
+                           nsCString& aContentType,
+                           uint64_t& aContentLength)
 {
   nsAutoString serialized;
   aParams.Stringify(serialized);
   aContentType = NS_LITERAL_CSTRING("application/x-www-form-urlencoded;charset=UTF-8");
+  aContentLength = serialized.Length();
   return NS_NewCStringInputStream(aStream, NS_ConvertUTF16toUTF8(serialized));
 }
 } // namespace
@@ -458,29 +525,35 @@ ExtractFromURLSearchParams(const URLSearchParams& aParams,
 nsresult
 ExtractByteStreamFromBody(const OwningArrayBufferOrArrayBufferViewOrBlobOrFormDataOrUSVStringOrURLSearchParams& aBodyInit,
                           nsIInputStream** aStream,
-                          nsCString& aContentType)
+                          nsCString& aContentType,
+                          uint64_t& aContentLength)
 {
   MOZ_ASSERT(aStream);
 
   if (aBodyInit.IsArrayBuffer()) {
     const ArrayBuffer& buf = aBodyInit.GetAsArrayBuffer();
-    return ExtractFromArrayBuffer(buf, aStream);
-  } else if (aBodyInit.IsArrayBufferView()) {
+    return ExtractFromArrayBuffer(buf, aStream, aContentLength);
+  }
+  if (aBodyInit.IsArrayBufferView()) {
     const ArrayBufferView& buf = aBodyInit.GetAsArrayBufferView();
-    return ExtractFromArrayBufferView(buf, aStream);
-  } else if (aBodyInit.IsBlob()) {
+    return ExtractFromArrayBufferView(buf, aStream, aContentLength);
+  }
+  if (aBodyInit.IsBlob()) {
     const Blob& blob = aBodyInit.GetAsBlob();
-    return ExtractFromBlob(blob, aStream, aContentType);
-  } else if (aBodyInit.IsFormData()) {
+    return ExtractFromBlob(blob, aStream, aContentType, aContentLength);
+  }
+  if (aBodyInit.IsFormData()) {
     FormData& form = aBodyInit.GetAsFormData();
-    return ExtractFromFormData(form, aStream, aContentType);
-  } else if (aBodyInit.IsUSVString()) {
+    return ExtractFromFormData(form, aStream, aContentType, aContentLength);
+  }
+  if (aBodyInit.IsUSVString()) {
     nsAutoString str;
     str.Assign(aBodyInit.GetAsUSVString());
-    return ExtractFromUSVString(str, aStream, aContentType);
-  } else if (aBodyInit.IsURLSearchParams()) {
+    return ExtractFromUSVString(str, aStream, aContentType, aContentLength);
+  }
+  if (aBodyInit.IsURLSearchParams()) {
     URLSearchParams& params = aBodyInit.GetAsURLSearchParams();
-    return ExtractFromURLSearchParams(params, aStream, aContentType);
+    return ExtractFromURLSearchParams(params, aStream, aContentType, aContentLength);
   }
 
   NS_NOTREACHED("Should never reach here");
@@ -490,29 +563,36 @@ ExtractByteStreamFromBody(const OwningArrayBufferOrArrayBufferViewOrBlobOrFormDa
 nsresult
 ExtractByteStreamFromBody(const ArrayBufferOrArrayBufferViewOrBlobOrFormDataOrUSVStringOrURLSearchParams& aBodyInit,
                           nsIInputStream** aStream,
-                          nsCString& aContentType)
+                          nsCString& aContentType,
+                          uint64_t& aContentLength)
 {
   MOZ_ASSERT(aStream);
+  MOZ_ASSERT(!*aStream);
 
   if (aBodyInit.IsArrayBuffer()) {
     const ArrayBuffer& buf = aBodyInit.GetAsArrayBuffer();
-    return ExtractFromArrayBuffer(buf, aStream);
-  } else if (aBodyInit.IsArrayBufferView()) {
+    return ExtractFromArrayBuffer(buf, aStream, aContentLength);
+  }
+  if (aBodyInit.IsArrayBufferView()) {
     const ArrayBufferView& buf = aBodyInit.GetAsArrayBufferView();
-    return ExtractFromArrayBufferView(buf, aStream);
-  } else if (aBodyInit.IsBlob()) {
+    return ExtractFromArrayBufferView(buf, aStream, aContentLength);
+  }
+  if (aBodyInit.IsBlob()) {
     const Blob& blob = aBodyInit.GetAsBlob();
-    return ExtractFromBlob(blob, aStream, aContentType);
-  } else if (aBodyInit.IsFormData()) {
+    return ExtractFromBlob(blob, aStream, aContentType, aContentLength);
+  }
+  if (aBodyInit.IsFormData()) {
     FormData& form = aBodyInit.GetAsFormData();
-    return ExtractFromFormData(form, aStream, aContentType);
-  } else if (aBodyInit.IsUSVString()) {
+    return ExtractFromFormData(form, aStream, aContentType, aContentLength);
+  }
+  if (aBodyInit.IsUSVString()) {
     nsAutoString str;
     str.Assign(aBodyInit.GetAsUSVString());
-    return ExtractFromUSVString(str, aStream, aContentType);
-  } else if (aBodyInit.IsURLSearchParams()) {
+    return ExtractFromUSVString(str, aStream, aContentType, aContentLength);
+  }
+  if (aBodyInit.IsURLSearchParams()) {
     URLSearchParams& params = aBodyInit.GetAsURLSearchParams();
-    return ExtractFromURLSearchParams(params, aStream, aContentType);
+    return ExtractFromURLSearchParams(params, aStream, aContentType, aContentLength);
   }
 
   NS_NOTREACHED("Should never reach here");
@@ -524,7 +604,7 @@ namespace {
  * Called on successfully reading the complete stream.
  */
 template <class Derived>
-class ContinueConsumeBodyRunnable final : public WorkerRunnable
+class ContinueConsumeBodyRunnable final : public MainThreadWorkerRunnable
 {
   // This has been addrefed before this runnable is dispatched,
   // released in WorkerRun().
@@ -536,7 +616,7 @@ class ContinueConsumeBodyRunnable final : public WorkerRunnable
 public:
   ContinueConsumeBodyRunnable(FetchBody<Derived>* aFetchBody, nsresult aStatus,
                               uint32_t aLength, uint8_t* aResult)
-    : WorkerRunnable(aFetchBody->mWorkerPrivate, WorkerThreadModifyBusyCount)
+    : MainThreadWorkerRunnable(aFetchBody->mWorkerPrivate)
     , mFetchBody(aFetchBody)
     , mStatus(aStatus)
     , mLength(aLength)

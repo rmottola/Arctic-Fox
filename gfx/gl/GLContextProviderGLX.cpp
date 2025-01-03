@@ -169,6 +169,12 @@ GLXLibrary::EnsureInitialized()
         { nullptr, { nullptr } }
     };
 
+    GLLibraryLoader::SymLoadStruct symbols_videosync[] = {
+      { (PRFuncPtr*) &xGetVideoSyncInternal, { "glXGetVideoSyncSGI", nullptr } },
+      { (PRFuncPtr*) &xWaitVideoSyncInternal, { "glXWaitVideoSyncSGI", nullptr } },
+      { nullptr, { nullptr } }
+    };
+
     if (!GLLibraryLoader::LoadSymbols(mOGLLibrary, &symbols[0])) {
         NS_WARNING("Couldn't find required entry point in OpenGL shared library");
         return false;
@@ -246,6 +252,13 @@ GLXLibrary::EnsureInitialized()
         mHasRobustness = true;
     }
 
+    if (HasExtension(extensionsStr, "GLX_SGI_video_sync") &&
+        GLLibraryLoader::LoadSymbols(mOGLLibrary, symbols_videosync,
+                                     (GLLibraryLoader::PlatformLookupFunction)&xGetProcAddress))
+    {
+        mHasVideoSync = true;
+    }
+
     mIsATI = serverVendor && DoesStringMatch(serverVendor, "ATI");
     mIsNVIDIA = serverVendor && DoesStringMatch(serverVendor, "NVIDIA Corporation");
     mClientIsMesa = clientVendor && DoesStringMatch(clientVendor, "Mesa");
@@ -267,6 +280,16 @@ GLXLibrary::SupportsTextureFromPixmap(gfxASurface* aSurface)
     }
 
     return true;
+}
+
+bool
+GLXLibrary::SupportsVideoSync()
+{
+    if (!EnsureInitialized()) {
+        return false;
+    }
+
+    return mHasVideoSync;
 }
 
 GLXPixmap
@@ -733,6 +756,24 @@ GLXLibrary::xCreateContextAttribs(Display* display,
                                                       share_list,
                                                       direct,
                                                       attrib_list);
+    AFTER_GLX_CALL;
+    return result;
+}
+
+int
+GLXLibrary::xGetVideoSync(unsigned int* count)
+{
+    BEFORE_GLX_CALL;
+    int result = xGetVideoSyncInternal(count);
+    AFTER_GLX_CALL;
+    return result;
+}
+
+int
+GLXLibrary::xWaitVideoSync(int divisor, int remainder, unsigned int* count)
+{
+    BEFORE_GLX_CALL;
+    int result = xWaitVideoSyncInternal(divisor, remainder, count);
     AFTER_GLX_CALL;
     return result;
 }
@@ -1223,7 +1264,8 @@ GLContextGLX::FindFBConfigForWindow(Display* display, int screen, Window window,
 }
 
 static already_AddRefed<GLContextGLX>
-CreateOffscreenPixmapContext(const IntSize& size, const SurfaceCaps& minCaps, ContextProfile profile = ContextProfile::OpenGLCompatibility)
+CreateOffscreenPixmapContext(const IntSize& size, const SurfaceCaps& minCaps, nsACString& aFailureId,
+                             ContextProfile profile = ContextProfile::OpenGLCompatibility)
 {
     GLXLibrary* glx = &sGLXLibrary;
     if (!glx->EnsureInitialized())
@@ -1285,17 +1327,18 @@ DONE_CREATING_PIXMAP:
 }
 
 /*static*/ already_AddRefed<GLContext>
-GLContextProviderGLX::CreateHeadless(CreateContextFlags)
+GLContextProviderGLX::CreateHeadless(CreateContextFlags, nsACString& aFailureId)
 {
     IntSize dummySize = IntSize(16, 16);
     SurfaceCaps dummyCaps = SurfaceCaps::Any();
-    return CreateOffscreenPixmapContext(dummySize, dummyCaps);
+    return CreateOffscreenPixmapContext(dummySize, dummyCaps, aFailureId);
 }
 
 /*static*/ already_AddRefed<GLContext>
 GLContextProviderGLX::CreateOffscreen(const IntSize& size,
                                       const SurfaceCaps& minCaps,
-                                      CreateContextFlags flags)
+                                      CreateContextFlags flags,
+                                      nsACString& aFailureId)
 {
     SurfaceCaps minBackbufferCaps = minCaps;
     if (minCaps.antialias) {
@@ -1310,12 +1353,14 @@ GLContextProviderGLX::CreateOffscreen(const IntSize& size,
     }
 
     RefPtr<GLContext> gl;
-    gl = CreateOffscreenPixmapContext(size, minBackbufferCaps, profile);
+    gl = CreateOffscreenPixmapContext(size, minBackbufferCaps, aFailureId, profile);
     if (!gl)
         return nullptr;
 
-    if (!gl->InitOffscreen(size, minCaps))
+    if (!gl->InitOffscreen(size, minCaps)) {
+        aFailureId = NS_LITERAL_CSTRING("FEATURE_FAILURE_GLX_INIT");
         return nullptr;
+    }
 
     return gl.forget();
 }
@@ -1331,8 +1376,9 @@ GLContextProviderGLX::GetGlobalContext()
     if (!triedToCreateContext) {
         triedToCreateContext = true;
 
-        MOZ_RELEASE_ASSERT(!gGlobalContext);
-        RefPtr<GLContext> temp = CreateHeadless(CreateContextFlags::NONE);
+        MOZ_RELEASE_ASSERT(!gGlobalContext, "GFX: Global GL context already initialized.");
+        nsCString discardFailureId;
+        RefPtr<GLContext> temp = CreateHeadless(CreateContextFlags::NONE, discardFailureId);
         gGlobalContext = temp;
     }
 

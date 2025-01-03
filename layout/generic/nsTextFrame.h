@@ -33,6 +33,8 @@ class nsDisplayText;
 
 class nsTextFrame : public nsFrame {
   typedef mozilla::LayoutDeviceRect LayoutDeviceRect;
+  typedef mozilla::RawSelectionType RawSelectionType;
+  typedef mozilla::SelectionType SelectionType;
   typedef mozilla::TextRangeStyle TextRangeStyle;
   typedef mozilla::gfx::DrawTarget DrawTarget;
   typedef mozilla::gfx::Point Point;
@@ -169,7 +171,7 @@ public:
    * @param aType the type of selection added or removed
    */
   void SetSelectedRange(uint32_t aStart, uint32_t aEnd, bool aSelected,
-                        SelectionType aType);
+                        SelectionType aSelectionType);
 
   virtual FrameSearchResult PeekOffsetNoAmount(bool aForward, int32_t* aOffset) override;
   virtual FrameSearchResult PeekOffsetCharacter(bool aForward, int32_t* aOffset,
@@ -353,7 +355,7 @@ public:
      */
     virtual void NotifySelectionBackgroundNeedsFill(const Rect& aBackgroundRect,
                                                     nscolor aColor,
-                                                    DrawTarget& aDrawTarget);
+                                                    DrawTarget& aDrawTarget) { }
 
     /**
      * Called before (for under/over-line) or after (for line-through) the text
@@ -391,8 +393,6 @@ public:
      * has been emitted to the gfxContext.
      */
     virtual void NotifySelectionDecorationLinePathEmitted() { }
-
-    virtual void NotifyGlyphPathEmitted() override {}
   };
 
   struct PaintTextParams
@@ -402,6 +402,8 @@ public:
     LayoutDeviceRect dirtyRect;
     gfxTextContextPaint* contextPaint = nullptr;
     DrawPathCallbacks* callbacks = nullptr;
+    bool generateTextMask = false;
+    bool paintSelectionBackground = false;
     explicit PaintTextParams(gfxContext* aContext) : context(aContext) {}
   };
 
@@ -458,10 +460,11 @@ public:
   // our text, returned in aAllTypes.
   // Return false if the text was not painted and we should continue with
   // the fast path.
-  bool PaintTextWithSelectionColors(const PaintTextSelectionParams& aParams,
-                                    SelectionDetails* aDetails,
-                                    SelectionType* aAllTypes,
-                                    const nsCharClipDisplayItem::ClipEdges& aClipEdges);
+  bool PaintTextWithSelectionColors(
+         const PaintTextSelectionParams& aParams,
+         SelectionDetails* aDetails,
+         RawSelectionType* aAllRawSelectionTypes,
+         const nsCharClipDisplayItem::ClipEdges& aClipEdges);
   // helper: paint text decorations for text selected by aSelectionType
   void PaintTextSelectionDecorations(const PaintTextSelectionParams& aParams,
                                      SelectionDetails* aDetails,
@@ -575,7 +578,7 @@ public:
 
   bool IsFloatingFirstLetterChild() const;
 
-  virtual bool UpdateOverflow() override;
+  virtual bool ComputeCustomOverflow(nsOverflowAreas& aOverflowAreas) override;
 
   void AssignJustificationGaps(const mozilla::JustificationAssignment& aAssign);
   mozilla::JustificationAssignment GetJustificationAssignment() const;
@@ -744,7 +747,7 @@ protected:
    */
   void DrawSelectionDecorations(gfxContext* aContext,
                                 const LayoutDeviceRect& aDirtyRect,
-                                SelectionType aType,
+                                mozilla::SelectionType aSelectionType,
                                 nsTextPaintStyle& aTextPaintStyle,
                                 const TextRangeStyle &aRangeStyle,
                                 const Point& aPt,
@@ -777,7 +780,7 @@ protected:
    *                    background should be painted
    * @return            true if the selection affects colors, false otherwise
    */
-  static bool GetSelectionTextColors(SelectionType aType,
+  static bool GetSelectionTextColors(SelectionType aSelectionType,
                                      nsTextPaintStyle& aTextPaintStyle,
                                      const TextRangeStyle &aRangeStyle,
                                      nscolor* aForeground,

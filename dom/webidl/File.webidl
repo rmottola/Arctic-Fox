@@ -41,11 +41,11 @@ dictionary ChromeFilePropertyBag : FilePropertyBag {
 // Mozilla extensions
 partial interface File {
 
-  [GetterThrows]
+  [GetterThrows, Deprecated="FileLastModifiedDate"]
   readonly attribute Date lastModifiedDate;
 
-  [GetterThrows, ChromeOnly]
-  readonly attribute DOMString path;
+  [BinaryName="path", Func="mozilla::dom::Directory::WebkitBlinkDirectoryPickerEnabled"]
+  readonly attribute DOMString webkitRelativePath;
 
   [GetterThrows, ChromeOnly]
   readonly attribute DOMString mozFullPath;

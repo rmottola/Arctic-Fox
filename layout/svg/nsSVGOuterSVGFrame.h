@@ -7,6 +7,7 @@
 #define __NS_SVGOUTERSVGFRAME_H__
 
 #include "mozilla/Attributes.h"
+#include "nsAutoPtr.h"
 #include "nsISVGSVGFrame.h"
 #include "nsSVGContainerFrame.h"
 #include "nsRegion.h"
@@ -62,7 +63,7 @@ public:
                          const nsHTMLReflowState*  aReflowState,
                          nsDidReflowStatus aStatus) override;
 
-  virtual bool UpdateOverflow() override;
+  virtual void UnionChildOverflow(nsOverflowAreas& aOverflowAreas) override;
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
                                 const nsRect&           aDirtyRect,

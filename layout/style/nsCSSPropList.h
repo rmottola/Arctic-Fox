@@ -2143,10 +2143,10 @@ CSS_PROP_POSITION(
         CSS_PROPERTY_VALUE_NONNEGATIVE |
         CSS_PROPERTY_ENABLED_IN_UA_SHEETS,
     "layout.css.grid.enabled",
-    VARIANT_HL | VARIANT_CALC,
+    VARIANT_HLP | VARIANT_CALC,
     nullptr,
     offsetof(nsStylePosition, mGridColumnGap),
-    eStyleAnimType_nscoord)
+    eStyleAnimType_Coord)
 CSS_PROP_POSITION(
     grid-column-start,
     grid_column_start,
@@ -2187,10 +2187,10 @@ CSS_PROP_POSITION(
         CSS_PROPERTY_VALUE_NONNEGATIVE |
         CSS_PROPERTY_ENABLED_IN_UA_SHEETS,
     "layout.css.grid.enabled",
-    VARIANT_HL | VARIANT_CALC,
+    VARIANT_HLP | VARIANT_CALC,
     nullptr,
     offsetof(nsStylePosition, mGridRowGap),
-    eStyleAnimType_nscoord)
+    eStyleAnimType_Coord)
 CSS_PROP_POSITION(
     grid-row-start,
     grid_row_start,
@@ -3889,9 +3889,9 @@ CSS_PROP_TEXT(
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_None)
 CSS_PROP_TEXT(
-    -moz-text-align-last,
+    text-align-last,
     text_align_last,
-    CSS_PROP_DOMPROP_PREFIXED(TextAlignLast),
+    TextAlignLast,
     CSS_PROPERTY_PARSE_VALUE | CSS_PROPERTY_VALUE_PARSER_FUNCTION,
     "",
     VARIANT_HK,
@@ -4470,13 +4470,13 @@ CSS_PROP_TEXT(
     offsetof(nsStyleText, mWordSpacing),
     eStyleAnimType_Coord)
 CSS_PROP_TEXT(
-    word-wrap,
-    word_wrap,
-    WordWrap,
+    overflow-wrap,
+    overflow_wrap,
+    OverflowWrap,
     CSS_PROPERTY_PARSE_VALUE,
     "",
     VARIANT_HK,
-    kWordWrapKTable,
+    kOverflowWrapKTable,
     CSS_PROP_NO_OFFSET,
     eStyleAnimType_None)
 CSS_PROP_VISIBILITY(

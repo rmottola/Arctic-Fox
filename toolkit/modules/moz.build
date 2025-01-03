@@ -28,6 +28,7 @@ EXTRA_JS_MODULES += [
     'Battery.jsm',
     'BinarySearch.jsm',
     'BrowserUtils.jsm',
+    'CanonicalJSON.jsm',
     'CertUtils.jsm',
     'CharsetMenu.jsm',
     'ClientID.jsm',
@@ -37,6 +38,7 @@ EXTRA_JS_MODULES += [
     'Deprecated.jsm',
     'FileUtils.jsm',
     'Finder.jsm',
+    'FinderHighlighter.jsm',
     'Geometry.jsm',
     'GMPInstallManager.jsm',
     'GMPUtils.jsm',
@@ -67,6 +69,7 @@ EXTRA_JS_MODULES += [
     'RemoteSecurityUI.jsm',
     'RemoteWebProgress.jsm',
     'ResetProfile.jsm',
+    'secondscreen/PresentationApp.jsm',
     'secondscreen/RokuApp.jsm',
     'secondscreen/SimpleServiceDiscovery.jsm',
     'SelectContentHelper.jsm',
@@ -103,6 +106,10 @@ if 'Android' != CONFIG['OS_TARGET']:
     EXTRA_JS_MODULES += [
         'LightweightThemeConsumer.jsm',
     ]
+
+    DIRS += [
+        'subprocess',
+    ]
 else:
     DEFINES['ANDROID'] = True
 
@@ -127,7 +134,8 @@ for var in ('MOZ_TOOLKIT_SEARCH',
             'MOZ_REQUIRE_SIGNING',
             'MOZ_SYSTEM_NSS',
             'MOZ_UPDATER',
-            'MOZ_SWITCHBOARD'):
+            'MOZ_SWITCHBOARD',
+            'MOZ_SERVICES_CLOUDSYNC'):
     if CONFIG[var]:
         DEFINES[var] = True
 
