@@ -632,6 +632,7 @@ pref("apz.y_skate_highmem_adjust", "0.0");
 pref("apz.x_stationary_size_multiplier", "3.0");
 pref("apz.y_stationary_size_multiplier", "3.5");
 pref("apz.zoom_animation_duration_ms", 250);
+pref("apz.scale_repaint_delay_ms", 500);
 
 #ifdef XP_MACOSX
 pref("apz.pan_repaint_interval", 16);
