@@ -1238,7 +1238,7 @@ skip-if(B2G||Mulet) == 458296-1d.html 458296-1-ref.html # Initial mulet triage: 
 skip-if((B2G&&browserIsRemote)||Mulet) == 463217-1.xul 463217-1-ref.xul # bug 974780 # Initial mulet triage: parity with B2G/B2G Desktop
 skip-if(B2G||Mulet) == 463952-1.html 463952-1-ref.html # Initial mulet triage: parity with B2G/B2G Desktop
 == 464811-1.html 464811-1-ref.html
-fails == 465574-1.html 465574-1-ref.html # bug 421436
+== 465574-1.html 465574-1-ref.html # bug 421436
 == 466258-1.html 466258-1-ref.html
 == 466395-1.html 466395-1-ref.html
 == 466395-2.html 466395-2-ref.html
