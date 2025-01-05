@@ -272,8 +272,7 @@ public:
    */
   virtual bool DrainSelfOverflowList() override;
 
-  virtual nsresult StealFrame(nsIFrame* aChild,
-                              bool      aForceNormal = false) override;
+  virtual nsresult StealFrame(nsIFrame* aChild) override;
 
   virtual void DeleteNextInFlowChild(nsIFrame* aNextInFlow,
                                      bool      aDeletingEmptyFrames) override;
