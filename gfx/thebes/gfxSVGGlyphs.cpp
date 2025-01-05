@@ -316,6 +316,7 @@ gfxSVGGlyphsDocument::~gfxSVGGlyphsDocument()
         mPresShell->RemovePostRefreshObserver(this);
     }
     if (mViewer) {
+        mViewer->Close(nullptr);
         mViewer->Destroy();
     }
 }
