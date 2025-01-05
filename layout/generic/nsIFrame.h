@@ -3471,6 +3471,11 @@ public:
     ListTag(t, aFrame);
     fputs(t.get(), out);
   }
+  static void ListTag(FILE* out, const nsFrameList& aFrameList) {
+    for (nsIFrame* frame : aFrameList) {
+      ListTag(out, frame);
+    }
+  }
   void ListTag(nsACString& aTo) const;
   nsAutoCString ListTag() const {
     nsAutoCString tag;
