@@ -4377,6 +4377,15 @@
     "releaseChannelCollection": "opt-out",
     "description": "Whether the homepage was imported during browser migration. Only available on release builds during firstrun."
   },
+  "FX_STARTUP_MIGRATION_AUTOMATED_IMPORT_SUCCEEDED": {
+    "bug_numbers": [1271775],
+    "alert_emails": ["gijs@mozilla.com"],
+    "expires_in_version": "53",
+    "kind": "count",
+    "keyed": true,
+    "releaseChannelCollection": "opt-out",
+    "description": "Where automatic migration was attempted, indicates to what degree we succeeded."
+  },
   "FX_STARTUP_EXTERNAL_CONTENT_HANDLER": {
     "bug_numbers": [1276027],
     "alert_emails": ["jaws@mozilla.com"],
