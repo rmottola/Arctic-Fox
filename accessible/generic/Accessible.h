@@ -965,6 +965,12 @@ protected:
   virtual mozilla::a11y::ENameValueFlag NativeName(nsString& aName);
 
   /**
+   * Return the accessible description provided by native markup. It doesn't take
+   * into account ARIA markup used to specify the description.
+   */
+  virtual void NativeDescription(nsString& aDescription);
+
+  /**
    * Return object attributes provided by native markup. It doesn't take into
    * account ARIA.
    */
