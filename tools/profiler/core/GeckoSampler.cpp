@@ -647,7 +647,7 @@ void addDynamicTag(ThreadProfile &aProfile, char aTagName, const char *aStr)
 
 static
 void addPseudoEntry(volatile StackEntry &entry, ThreadProfile &aProfile,
-                    ProfileStack *stack, void *lastpc)
+                    PseudoStack *stack, void *lastpc)
 {
   // Pseudo-frames with the BEGIN_PSEUDO_JS flag are just annotations
   // and should not be recorded in the profile.
@@ -733,9 +733,9 @@ struct AutoWalkJSStack {
 static
 void mergeStacksIntoProfile(ThreadProfile& aProfile, TickSample* aSample, NativeStack& aNativeStack)
 {
-  ProfileStack* profileStack = aProfile.GetStack();
-  volatile StackEntry *pseudoFrames = profileStack->mStack;
-  uint32_t profileCount = profileStack->stackSize();
+  PseudoStack* pseudoStack = aProfile.GetPseudoStack();
+  volatile StackEntry *pseudoFrames = pseudoStack->mStack;
+  uint32_t pseudoCount = pseudoStack->stackSize();
 
   // Make a copy of the JS stack into a JSFrame array. This is necessary since,
   // like the native stack, the JS stack is iterated youngest-to-oldest and we
@@ -1247,7 +1247,7 @@ namespace {
 
 SyncProfile* NewSyncProfile()
 {
-  ProfileStack *stack = tlsStack.get();
+  PseudoStack* stack = tlsPseudoStack.get();
   if (!stack) {
     MOZ_ASSERT(stack);
     return nullptr;
@@ -1285,34 +1285,6 @@ SyncProfile* GeckoSampler::GetBacktrace()
   profile->EndUnwind();
 
   return profile;
-}
-
-void print_callback(const ProfileEntry& entry, const char* tagStringData) {
-{
-  switch (entry.getTagName()) {
-    case 's':
-    case 'c':
-      printf_stderr("  %s\n", tagStringData);
-  }
-}
-
-void mozilla_sampler_print_location1()
-{
-  if (!stack_key_initialized)
-    profiler_init(nullptr);
-
-  SyncProfile* syncProfile = NewSyncProfile();
-  if (!syncProfile) {
-    return;
-  }
-
-  syncProfile->BeginUnwind();
-  doSampleStackTrace(*syncProfile, nullptr, false);
-  syncProfile->EndUnwind();
-
-  printf_stderr("Backtrace:\n");
-  syncProfile->IterateTags(print_callback);
-  delete syncProfile;
 }
 
 void
