@@ -37,7 +37,6 @@ imply_option('--enable-profiling', jprof)
 
 @depends(target)
 def sps_profiler(target):
-    return False # FIXME hack
     if target.os == 'Android':
         return target.cpu in ('arm', 'x86')
     elif target.kernel == 'Linux':
