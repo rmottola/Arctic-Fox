@@ -231,24 +231,6 @@ const char* nsBlockFrame::kReflowCommandType[] = {
 };
 #endif
 
-#ifdef REALLY_NOISY_FIRST_LINE
-static void
-DumpStyleGeneaology(nsIFrame* aFrame, const char* gap)
-{
-  fputs(gap, stdout);
-  nsFrame::ListTag(stdout, aFrame);
-  printf(": ");
-  nsStyleContext* sc = aFrame->StyleContext();
-  while (nullptr != sc) {
-    nsStyleContext* psc;
-    printf("%p ", sc);
-    psc = sc->GetParent();
-    sc = psc;
-  }
-  printf("\n");
-}
-#endif
-
 #ifdef REFLOW_STATUS_COVERAGE
 static void
 RecordReflowStatus(bool aChildIsBlock, nsReflowStatus aFrameReflowStatus)
@@ -1512,7 +1494,7 @@ nsBlockFrame::ComputeFinalSize(const nsHTMLReflowState& aReflowState,
   ListTag(stdout);
   printf(": mBCoord=%d mIsBEndMarginRoot=%s mPrevBEndMargin=%d bp=%d,%d\n",
          aState.mBCoord, aState.GetFlag(BRS_ISBENDMARGINROOT) ? "yes" : "no",
-         aState.mPrevBEndMargin,
+         aState.mPrevBEndMargin.get(),
          borderPadding.BStart(wm), borderPadding.BEnd(wm));
 #endif
 
@@ -1739,7 +1721,10 @@ nsBlockFrame::ComputeOverflowAreas(const nsRect&         aBounds,
 
 #ifdef NOISY_COMBINED_AREA
   ListTag(stdout);
-  printf(": ca=%d,%d,%d,%d\n", area.x, area.y, area.width, area.height);
+  const nsRect& vis = areas.VisualOverflow();
+  printf(": VisualOverflowArea CA=%d,%d,%d,%d\n", vis.x, vis.y, vis.width, vis.height);
+  const nsRect& scr = areas.ScrollableOverflow();
+  printf(": ScrollableOverflowArea CA=%d,%d,%d,%d\n", scr.x, scr.y, scr.width, scr.height);
 #endif
 
   aOverflowAreas = areas;
@@ -3656,7 +3641,7 @@ nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
             printf(": reflow incomplete, frame=");
             nsFrame::ListTag(stdout, frame);
             printf(" prevBEndMargin=%d, setting to zero\n",
-                   aState.mPrevBEndMargin);
+                   aState.mPrevBEndMargin.get());
 #endif
             aState.mPrevBEndMargin.Zero();
           }
@@ -3684,7 +3669,7 @@ nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
             printf(": reflow complete but overflow incomplete for ");
             nsFrame::ListTag(stdout, frame);
             printf(" prevBEndMargin=%d collapsedBEndMargin=%d\n",
-                   aState.mPrevBEndMargin, collapsedBEndMargin.get());
+                   aState.mPrevBEndMargin.get(), collapsedBEndMargin.get());
 #endif
             aState.mPrevBEndMargin = collapsedBEndMargin;
           }
@@ -3695,7 +3680,7 @@ nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
           printf(": reflow complete for ");
           nsFrame::ListTag(stdout, frame);
           printf(" prevBEndMargin=%d collapsedBEndMargin=%d\n",
-                 aState.mPrevBEndMargin, collapsedBEndMargin.get());
+                 aState.mPrevBEndMargin.get(), collapsedBEndMargin.get());
 #endif
           aState.mPrevBEndMargin = collapsedBEndMargin;
         }
@@ -3704,8 +3689,8 @@ nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
         printf(": frame=");
         nsFrame::ListTag(stdout, frame);
         printf(" carriedOutBEndMargin=%d collapsedBEndMargin=%d => %d\n",
-               brc.GetCarriedOutBEndMargin(), collapsedBEndMargin.get(),
-               aState.mPrevBEndMargin);
+               brc.GetCarriedOutBEndMargin().get(), collapsedBEndMargin.get(),
+               aState.mPrevBEndMargin.get());
 #endif
       } else {
         if ((aLine == mLines.front() && !GetPrevInFlow()) ||
@@ -4118,7 +4103,7 @@ nsBlockFrame::ReflowInlineFrame(nsBlockReflowState& aState,
     aLineLayout.SetDirtyNextLine();
   }
 
-#ifdef REALLY_NOISY_REFLOW_CHILD
+#ifdef REALLY_NOISY_REFLOW
   nsFrame::ListTag(stdout, aFrame);
   printf(": status=%x\n", frameReflowStatus);
 #endif
@@ -5980,8 +5965,7 @@ FindLineFor(nsIFrame*             aChild,
 }
 
 nsresult
-nsBlockFrame::StealFrame(nsIFrame* aChild,
-                         bool      aForceNormal)
+nsBlockFrame::StealFrame(nsIFrame* aChild)
 {
   MOZ_ASSERT(aChild->GetParent() == this);
 
@@ -5991,9 +5975,8 @@ nsBlockFrame::StealFrame(nsIFrame* aChild,
     return NS_OK;
   }
 
-  if ((aChild->GetStateBits() & NS_FRAME_IS_OVERFLOW_CONTAINER)
-      && !aForceNormal) {
-    return nsContainerFrame::StealFrame(aChild);
+  if (MaybeStealOverflowContainerFrame(aChild)) {
+    return NS_OK;
   }
 
   MOZ_ASSERT(!(aChild->GetStateBits() & NS_FRAME_OUT_OF_FLOW));
@@ -6151,8 +6134,8 @@ nsBlockFrame::ReflowFloat(nsBlockReflowState& aState,
 #ifdef NOISY_FLOAT
   printf("Reflow Float %p in parent %p, availSpace(%d,%d,%d,%d)\n",
          aFloat, this,
-         aFloatAvailableSpace.IStart(wm), aFloatAvailableSpace.BStart(wm),
-         aFloatAvailableSpace.ISize(wm), aFloatAvailableSpace.BSize(wm)
+         aAdjustedAvailableSpace.IStart(wm), aAdjustedAvailableSpace.BStart(wm),
+         aAdjustedAvailableSpace.ISize(wm), aAdjustedAvailableSpace.BSize(wm)
   );
 #endif
 

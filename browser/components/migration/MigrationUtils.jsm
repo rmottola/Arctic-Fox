@@ -21,6 +21,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "BookmarkHTMLUtils",
                                   "resource://gre/modules/BookmarkHTMLUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PromiseUtils",
                                   "resource://gre/modules/PromiseUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "AutoMigrate",
+                                  "resource:///modules/AutoMigrate.jsm");
 
 var gMigrators = null;
 var gProfileStartup = null;
@@ -48,40 +50,6 @@ function getMigrationBundle() {
      "chrome://browser/locale/migration/migration.properties");
   }
   return gMigrationBundle;
-}
-
-/**
- * Figure out what is the default browser, and if there is a migrator
- * for it, return that migrator's internal name.
- * For the time being, the "internal name" of a migrator is its contract-id
- * trailer (e.g. ie for @mozilla.org/profile/migrator;1?app=browser&type=ie),
- * but it will soon be exposed properly.
- */
-function getMigratorKeyForDefaultBrowser() {
-  // Canary uses the same description as Chrome so we can't distinguish them.
-  const APP_DESC_TO_KEY = {
-    "Internet Explorer":                 "ie",
-    "Safari":                            "safari",
-    "Firefox":                           "firefox",
-    "Google Chrome":                     "chrome",  // Windows, Linux
-    "Chrome":                            "chrome",  // OS X
-    "Chromium":                          "chromium", // Windows, OS X
-    "Chromium Web Browser":              "chromium", // Linux
-    "360\u5b89\u5168\u6d4f\u89c8\u5668": "360se",
-  };
-
-  let browserDesc = "";
-  try {
-    let browserDesc =
-      Cc["@mozilla.org/uriloader/external-protocol-service;1"].
-      getService(Ci.nsIExternalProtocolService).
-      getApplicationDescription("http");
-    return APP_DESC_TO_KEY[browserDesc] || "";
-  }
-  catch(ex) {
-    Cu.reportError("Could not detect default browser: " + ex);
-  }
-  return "";
 }
 
 /**
@@ -129,7 +97,7 @@ this.MigratorPrototype = {
    * profiles.
    *
    * Each migration resource should provide:
-   * - a |type| getter, retunring any of the migration types (see
+   * - a |type| getter, returning any of the migration types (see
    *   nsIBrowserProfileMigrator).
    *
    * - a |migrate| method, taking a single argument, aCallback(bool success),
@@ -536,6 +504,40 @@ this.MigrationUtils = Object.freeze({
     } catch (ex) { Cu.reportError(ex); return null }
   },
 
+  /**
+   * Figure out what is the default browser, and if there is a migrator
+   * for it, return that migrator's internal name.
+   * For the time being, the "internal name" of a migrator is its contract-id
+   * trailer (e.g. ie for @mozilla.org/profile/migrator;1?app=browser&type=ie),
+   * but it will soon be exposed properly.
+   */
+  getMigratorKeyForDefaultBrowser() {
+    // Canary uses the same description as Chrome so we can't distinguish them.
+    const APP_DESC_TO_KEY = {
+      "Internet Explorer":                 "ie",
+      "Safari":                            "safari",
+      "Firefox":                           "firefox",
+      "Google Chrome":                     "chrome",  // Windows, Linux
+      "Chrome":                            "chrome",  // OS X
+      "Chromium":                          "chromium", // Windows, OS X
+      "Chromium Web Browser":              "chromium", // Linux
+      "360\u5b89\u5168\u6d4f\u89c8\u5668": "360se",
+    };
+
+    let browserDesc = "";
+    try {
+      let browserDesc =
+        Cc["@mozilla.org/uriloader/external-protocol-service;1"].
+        getService(Ci.nsIExternalProtocolService).
+        getApplicationDescription("http");
+      return APP_DESC_TO_KEY[browserDesc] || "";
+    }
+    catch(ex) {
+      Cu.reportError("Could not detect default browser: " + ex);
+    }
+    return "";
+  },
+
   // Whether or not we're in the process of startup migration
   get isStartupMigration() {
     return gProfileStartup != null;
@@ -676,7 +678,7 @@ this.MigrationUtils = Object.freeze({
       skipSourcePage = true;
     }
     else {
-      let defaultBrowserKey = getMigratorKeyForDefaultBrowser();
+      let defaultBrowserKey = this.getMigratorKeyForDefaultBrowser();
       if (defaultBrowserKey) {
         migrator = this.getMigrator(defaultBrowserKey);
         if (migrator)
@@ -696,8 +698,21 @@ this.MigrationUtils = Object.freeze({
       }
     }
 
+    let isRefresh = migrator && skipSourcePage &&
+                    migratorKey == AppConstants.MOZ_APP_NAME;
+
+    if (!isRefresh &&
+        Services.prefs.getBoolPref("browser.migration.automigrate")) {
+      try {
+        return AutoMigrate.migrate(aProfileStartup, aMigratorKey, aProfileToMigrate);
+      } catch (ex) {
+        // If automigration failed, continue and show the dialog.
+        Cu.reportError(ex);
+      }
+    }
+
     let migrationEntryPoint = this.MIGRATION_ENTRYPOINT_FIRSTRUN;
-    if (migrator && skipSourcePage && migratorKey == AppConstants.MOZ_APP_NAME) {
+    if (isRefresh) {
       migrationEntryPoint = this.MIGRATION_ENTRYPOINT_FXREFRESH;
     }
 
@@ -720,6 +735,8 @@ this.MigrationUtils = Object.freeze({
     gProfileStartup = null;
     gMigrationBundle = null;
   },
+
+  gAvailableMigratorKeys,
 
   MIGRATION_ENTRYPOINT_UNKNOWN: 0,
   MIGRATION_ENTRYPOINT_FIRSTRUN: 1,

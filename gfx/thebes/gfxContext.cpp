@@ -17,7 +17,6 @@
 #include "gfxASurface.h"
 #include "gfxPattern.h"
 #include "gfxPlatform.h"
-#include "gfxTeeSurface.h"
 #include "gfxPrefs.h"
 #include "GeckoProfiler.h"
 #include "gfx2DGlue.h"
@@ -730,25 +729,6 @@ gfxContext::Mask(SourceSurface* aSurface, Float aAlpha, const Matrix& aTransform
   mDT->MaskSurface(PatternFromState(this), aSurface, Point(),
                    DrawOptions(aAlpha, CurrentState().op, CurrentState().aaMode));
   ChangeTransform(old);
-}
-
-void
-gfxContext::Mask(gfxASurface *surface, const gfxPoint& offset)
-{
-  PROFILER_LABEL("gfxContext", "Mask",
-    js::ProfileEntry::Category::GRAPHICS);
-
-  // Lifetime needs to be limited here as we may simply wrap surface's data.
-  RefPtr<SourceSurface> sourceSurf =
-  gfxPlatform::GetPlatform()->GetSourceSurfaceForSurface(mDT, surface);
-
-  if (!sourceSurf) {
-    return;
-  }
-
-  gfxPoint pt = surface->GetDeviceOffset();
-
-  Mask(sourceSurf, 1.0f, Point(offset.x - pt.x, offset.y - pt.y));
 }
 
 void

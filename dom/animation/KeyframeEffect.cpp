@@ -694,6 +694,14 @@ KeyframeEffectReadOnly::SetIsRunningOnCompositor(nsCSSProperty aProperty,
   }
 }
 
+void
+KeyframeEffectReadOnly::ResetIsRunningOnCompositor()
+{
+  for (AnimationProperty& property : mProperties) {
+    property.mIsRunningOnCompositor = false;
+  }
+}
+
 KeyframeEffectReadOnly::~KeyframeEffectReadOnly()
 {
 }
@@ -752,14 +760,6 @@ KeyframeEffectReadOnly::ConstructKeyframeEffect(
   }
 
   return effect.forget();
-}
-
-void
-KeyframeEffectReadOnly::ResetIsRunningOnCompositor()
-{
-  for (AnimationProperty& property : mProperties) {
-    property.mIsRunningOnCompositor = false;
-  }
 }
 
 void
@@ -841,15 +841,6 @@ DumpAnimationProperties(nsTArray<AnimationProperty>& aAnimationProperties)
   }
 }
 #endif
-
-/**
- * A property and StyleAnimationValue pair.
- */
-struct KeyframeValue
-{
-  nsCSSProperty mProperty;
-  StyleAnimationValue mValue;
-};
 
 /* static */ already_AddRefed<KeyframeEffectReadOnly>
 KeyframeEffectReadOnly::Constructor(

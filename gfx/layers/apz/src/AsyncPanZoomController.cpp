@@ -69,6 +69,7 @@
 #include "nsStyleStruct.h"              // for nsTimingFunction
 #include "nsTArray.h"                   // for nsTArray, nsTArray_Impl, etc
 #include "nsThreadUtils.h"              // for NS_IsMainThread
+#include "nsViewportInfo.h"             // for kViewportMinScale, kViewportMaxScale
 #include "prsystem.h"                   // for PR_GetPhysicalMemorySize
 #include "SharedMemoryBasic.h"          // for SharedMemoryBasic
 #include "ScrollSnap.h"                 // for ScrollSnapUtils
@@ -239,6 +240,12 @@ typedef GenericFlingAnimation FlingAnimation;
  * that has elapsed between the two samples.\n
  * NOTE: Not currently used in Android fling calculations.
  *
+ * \li\b apz.fling_min_velocity_threshold
+ * Minimum velocity for a fling to actually kick off. If the user pans and lifts
+ * their finger such that the velocity is smaller than this amount, no fling
+ * is initiated.\n
+ * Units: screen pixels per millisecond
+ *
  * \li\b apz.fling_stop_on_tap_threshold
  * When flinging, if the velocity is above this number, then a tap on the
  * screen will stop the fling without dispatching a tap to content. If the
@@ -365,6 +372,12 @@ typedef GenericFlingAnimation FlingAnimation;
  * \li\b apz.zoom_animation_duration_ms
  * This controls how long the zoom-to-rect animation takes.\n
  * Units: ms
+ *
+ * \li\b apz.scale_repaint_delay_ms
+ * How long to delay between repaint requests during a scale.
+ * A negative number prevents repaint requests during a scale.\n
+ * Units: ms
+ *
  */
 
 /**
@@ -392,16 +405,6 @@ static bool IsHighMemSystem()
 {
   return gIsHighMemSystem;
 }
-
-/**
- * Maximum zoom amount, always used, even if a page asks for higher.
- */
-static const CSSToParentLayerScale MAX_ZOOM(8.0f);
-
-/**
- * Minimum zoom amount, always used, even if a page asks for lower.
- */
-static const CSSToParentLayerScale MIN_ZOOM(0.125f);
 
 /**
  * Is aAngle within the given threshold of the horizontal axis?
@@ -696,13 +699,16 @@ AsyncPanZoomController::AsyncPanZoomController(uint64_t aLayersId,
      mX(this),
      mY(this),
      mPanDirRestricted(false),
-     mZoomConstraints(false, false, MIN_ZOOM, MAX_ZOOM),
+     mZoomConstraints(false, false,
+        mFrameMetrics.GetDevPixelsPerCSSPixel() * kViewportMinScale / ParentLayerToScreenScale(1),
+        mFrameMetrics.GetDevPixelsPerCSSPixel() * kViewportMaxScale / ParentLayerToScreenScale(1)),
      mLastSampleTime(GetFrameTime()),
      mLastCheckerboardReport(GetFrameTime()),
      mOverscrollEffect(MakeUnique<OverscrollEffect>(*this)),
      mState(NOTHING),
      mNotificationBlockers(0),
      mInputQueue(aInputQueue),
+     mPinchPaintTimerSet(false),
      mAPZCId(sAsyncPanZoomControllerCount++),
      mSharedLock(nullptr),
      mAsyncTransformAppliedToContent(false),
@@ -1240,7 +1246,14 @@ nsEventStatus AsyncPanZoomController::OnTouchEnd(const MultiTouchInput& aEvent) 
     // what our final state is to avoid notification churn.
     StateChangeNotificationBlocker blocker(this);
     SetState(NOTHING);
-    APZC_LOG("%p starting a fling animation\n", this);
+
+    APZC_LOG("%p starting a fling animation if %f >= %f\n", this,
+        flingVelocity.Length(), gfxPrefs::APZFlingMinVelocityThreshold());
+
+    if (flingVelocity.Length() < gfxPrefs::APZFlingMinVelocityThreshold()) {
+      return nsEventStatus_eConsumeNoDefault;
+    }
+
     // Make a local copy of the tree manager pointer and check that it's not
     // null before calling DispatchFling(). This is necessary because Destroy(),
     // which nulls out mTreeManager, could be called concurrently.
@@ -1281,6 +1294,7 @@ nsEventStatus AsyncPanZoomController::OnTouchCancel(const MultiTouchInput& aEven
 nsEventStatus AsyncPanZoomController::OnScaleBegin(const PinchGestureInput& aEvent) {
   APZC_LOG("%p got a scale-begin in state %d\n", this, mState);
 
+  mPinchPaintTimerSet = false;
   // Note that there may not be a touch block at this point, if we received the
   // PinchGestureEvent directly from widget code without any touch events.
   if (HasReadyTouchBlock() && !CurrentTouchBlock()->TouchActionAllowsPinchZoom()) {
@@ -1375,8 +1389,21 @@ nsEventStatus AsyncPanZoomController::OnScale(const PinchGestureInput& aEvent) {
       }
 
       ScheduleComposite();
-      // We don't want to redraw on every scale, so don't use
-      // RequestContentRepaint()
+
+      // We don't want to redraw on every scale, so throttle it.
+      if (!mPinchPaintTimerSet) {
+        const int delay = gfxPrefs::APZScaleRepaintDelay();
+        if (delay >= 0) {
+          if (RefPtr<GeckoContentController> controller = GetGeckoContentController()) {
+            mPinchPaintTimerSet = true;
+            controller->PostDelayedTask(
+              NewRunnableMethod(this,
+                                &AsyncPanZoomController::DoDelayedRequestContentRepaint),
+              delay);
+          }
+        }
+      }
+
       UpdateSharedCompositorFrameMetrics();
     }
 
@@ -1388,6 +1415,8 @@ nsEventStatus AsyncPanZoomController::OnScale(const PinchGestureInput& aEvent) {
 
 nsEventStatus AsyncPanZoomController::OnScaleEnd(const PinchGestureInput& aEvent) {
   APZC_LOG("%p got a scale-end in state %d\n", this, mState);
+
+  mPinchPaintTimerSet = false;
 
   if (HasReadyTouchBlock() && !CurrentTouchBlock()->TouchActionAllowsPinchZoom()) {
     return nsEventStatus_eIgnore;
@@ -1611,6 +1640,15 @@ AsyncPanZoomController::AllowScrollHandoffInCurrentBlock() const
     }
   }
   return result;
+}
+
+void AsyncPanZoomController::DoDelayedRequestContentRepaint()
+{
+  if (!IsDestroyed() && mPinchPaintTimerSet) {
+    ReentrantMonitorAutoEnter lock(mMonitor);
+    RequestContentRepaint();
+  }
+  mPinchPaintTimerSet = false;
 }
 
 static ScrollInputMethod
@@ -3152,7 +3190,7 @@ AsyncPanZoomController::ReportCheckerboard(const TimeStamp& aSampleTime)
 bool AsyncPanZoomController::IsCurrentlyCheckerboarding() const {
   ReentrantMonitorAutoEnter lock(mMonitor);
 
-  if (!gfxPrefs::APZAllowCheckerboarding()) {
+  if (!gfxPrefs::APZAllowCheckerboarding() || mScrollMetadata.IsApzForceDisabled()) {
     return false;
   }
 
@@ -3314,7 +3352,10 @@ void AsyncPanZoomController::NotifyLayersUpdated(const ScrollMetadata& aScrollMe
     mScrollMetadata.SetLineScrollAmount(aScrollMetadata.GetLineScrollAmount());
     mScrollMetadata.SetPageScrollAmount(aScrollMetadata.GetPageScrollAmount());
     mScrollMetadata.SetSnapInfo(ScrollSnapInfo(aScrollMetadata.GetSnapInfo()));
-    mScrollMetadata.SetScrollClip(aScrollMetadata.GetScrollClip());
+    // The scroll clip can differ between layers associated a given scroll frame,
+    // so APZC (which keeps a single copy of ScrollMetadata per scroll frame)
+    // has no business using it.
+    mScrollMetadata.SetScrollClip(Nothing());
     mScrollMetadata.SetIsLayersIdRoot(aScrollMetadata.IsLayersIdRoot());
     mScrollMetadata.SetUsesContainerScrolling(aScrollMetadata.UsesContainerScrolling());
     mFrameMetrics.SetIsScrollInfoLayer(aLayerMetrics.IsScrollInfoLayer());
@@ -3389,6 +3430,12 @@ APZCTreeManager* AsyncPanZoomController::GetApzcTreeManager() const {
 void AsyncPanZoomController::ZoomToRect(CSSRect aRect, const uint32_t aFlags) {
   if (!aRect.IsFinite()) {
     NS_WARNING("ZoomToRect got called with a non-finite rect; ignoring...");
+    return;
+  } else if (aRect.IsEmpty() && (aFlags & DISABLE_ZOOM_OUT)) {
+    // Double-tap-to-zooming uses an empty rect to mean "zoom out".
+    // If zooming out is disabled, an empty rect is nonsensical
+    // and will produce undesirable scrolling.
+    NS_WARNING("ZoomToRect got called with an empty rect and zoom out disabled; ignoring...");
     return;
   }
 
@@ -3555,7 +3602,7 @@ AsyncPanZoomController::ResetTouchInputState()
   CancelAnimationAndGestureState();
   // Clear overscroll along the entire handoff chain, in case an APZC
   // later in the chain is overscrolled.
-  if (TouchBlockState* block = CurrentTouchBlock()) {
+  if (TouchBlockState* block = CurrentInputBlock()->AsTouchBlock()) {
     block->GetOverscrollHandoffChain()->ClearOverscroll();
   }
 }
@@ -3637,11 +3684,17 @@ void AsyncPanZoomController::UpdateZoomConstraints(const ZoomConstraints& aConst
     NS_WARNING("APZC received zoom constraints with NaN values; dropping...");
     return;
   }
+
+  CSSToParentLayerScale min = mFrameMetrics.GetDevPixelsPerCSSPixel()
+    * kViewportMinScale / ParentLayerToScreenScale(1);
+  CSSToParentLayerScale max = mFrameMetrics.GetDevPixelsPerCSSPixel()
+    * kViewportMaxScale / ParentLayerToScreenScale(1);
+
   // inf float values and other bad cases should be sanitized by the code below.
   mZoomConstraints.mAllowZoom = aConstraints.mAllowZoom;
   mZoomConstraints.mAllowDoubleTapZoom = aConstraints.mAllowDoubleTapZoom;
-  mZoomConstraints.mMinZoom = (MIN_ZOOM > aConstraints.mMinZoom ? MIN_ZOOM : aConstraints.mMinZoom);
-  mZoomConstraints.mMaxZoom = (MAX_ZOOM > aConstraints.mMaxZoom ? aConstraints.mMaxZoom : MAX_ZOOM);
+  mZoomConstraints.mMinZoom = (min > aConstraints.mMinZoom ? min : aConstraints.mMinZoom);
+  mZoomConstraints.mMaxZoom = (max > aConstraints.mMaxZoom ? aConstraints.mMaxZoom : max);
   if (mZoomConstraints.mMaxZoom < mZoomConstraints.mMinZoom) {
     mZoomConstraints.mMaxZoom = mZoomConstraints.mMinZoom;
   }
