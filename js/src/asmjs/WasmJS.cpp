@@ -120,7 +120,7 @@ wasm::Eval(JSContext* cx, Handle<TypedArrayObject*> code, HandleObject importObj
         return false;
 
     CompileArgs compileArgs;
-    if (!compileArgs.assumptions.init(SignalUsage(cx), cx->buildIdOp()))
+    if (!compileArgs.init(cx))
         return true;
 
     JS::AutoFilename af;
@@ -318,7 +318,7 @@ ModuleConstructor(JSContext* cx, unsigned argc, Value* vp)
     }
 
     CompileArgs compileArgs;
-    if (!compileArgs.assumptions.init(SignalUsage(cx), cx->buildIdOp()))
+    if (!compileArgs.init(cx))
         return true;
 
     JS::AutoFilename af;
