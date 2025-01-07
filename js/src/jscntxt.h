@@ -320,6 +320,7 @@ struct JSContext : public js::ExclusiveContext,
     using ExclusiveContext::pod_calloc;
     using ExclusiveContext::pod_malloc;
     using ExclusiveContext::staticStrings;
+    using ExclusiveContext::updateMallocCounter;
     using ExclusiveContext::wellKnownSymbols;
 
     JSRuntime* runtime() { return this; }
