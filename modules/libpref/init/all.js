@@ -147,7 +147,7 @@ pref("dom.select_events.textcontrols.enabled", true);
 // Whether or not Web Workers are enabled.
 pref("dom.workers.enabled", true);
 // The number of workers per domain allowed to run concurrently.
-pref("dom.workers.maxPerDomain", 20);
+pref("dom.workers.maxPerDomain", 50);
 
 pref("dom.serviceWorkers.enabled", false);
 
