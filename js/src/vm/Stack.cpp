@@ -1397,15 +1397,12 @@ jit::JitActivation::JitActivation(JSContext* cx, bool active)
 {
     if (active) {
         prevJitTop_ = cx->runtime()->jitTop;
-        prevJitJSContext_ = cx->runtime()->jitJSContext;
         prevJitActivation_ = cx->runtime()->jitActivation;
-        cx->runtime()->jitJSContext = cx;
         cx->runtime()->jitActivation = this;
 
         registerProfiling();
     } else {
         prevJitTop_ = nullptr;
-        prevJitJSContext_ = nullptr;
         prevJitActivation_ = nullptr;
     }
 }
@@ -1417,7 +1414,6 @@ jit::JitActivation::~JitActivation()
             unregisterProfiling();
 
         cx_->runtime()->jitTop = prevJitTop_;
-        cx_->runtime()->jitJSContext = prevJitJSContext_;
         cx_->runtime()->jitActivation = prevJitActivation_;
     }
 
@@ -1467,9 +1463,7 @@ jit::JitActivation::setActive(JSContext* cx, bool active)
     if (active) {
         *((volatile bool*) active_) = true;
         prevJitTop_ = cx->runtime()->jitTop;
-        prevJitJSContext_ = cx->runtime()->jitJSContext;
         prevJitActivation_ = cx->runtime()->jitActivation;
-        cx->runtime()->jitJSContext = cx;
         cx->runtime()->jitActivation = this;
 
         registerProfiling();
@@ -1478,7 +1472,6 @@ jit::JitActivation::setActive(JSContext* cx, bool active)
         unregisterProfiling();
 
         cx->runtime()->jitTop = prevJitTop_;
-        cx->runtime()->jitJSContext = prevJitJSContext_;
         cx->runtime()->jitActivation = prevJitActivation_;
 
         *((volatile bool*) active_) = false;
