@@ -384,7 +384,7 @@ JSContext::setPendingException(js::Value v)
 inline bool
 JSContext::runningWithTrustedPrincipals() const
 {
-    return !compartment() || compartment()->principals() == runtime()->trustedPrincipals();
+    return !compartment() || compartment()->principals() == trustedPrincipals();
 }
 
 inline void
@@ -452,7 +452,7 @@ JSContext::currentScript(jsbytecode** ppc,
     if (ppc)
         *ppc = nullptr;
 
-    js::Activation* act = runtime()->activation();
+    js::Activation* act = activation();
     while (act && (act->cx() != this || (act->isJit() && !act->asJit()->isActive())))
         act = act->prev();
 

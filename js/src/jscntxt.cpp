@@ -938,12 +938,7 @@ JSContext::isThrowingDebuggeeWouldRun()
 bool
 JSContext::currentlyRunning() const
 {
-    for (ActivationIterator iter(runtime()); !iter.done(); ++iter) {
-        if (iter->cx() == this)
-            return true;
-    }
-
-    return false;
+    return !!activation();
 }
 
 static bool
@@ -1063,7 +1058,7 @@ JSContext::findVersion() const
     if (compartment() && compartment()->behaviors().version() != JSVERSION_UNKNOWN)
         return compartment()->behaviors().version();
 
-    return runtime()->defaultVersion();
+    return defaultVersion();
 }
 
 #ifdef DEBUG
