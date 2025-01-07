@@ -7872,6 +7872,10 @@ TryInstantiate(JSContext* cx, CallArgs args, Module& module, const AsmJSMetadata
             return false;
     }
 
+    instanceObj.set(WasmInstanceObject::create(cx));
+    if (!instanceObj)
+        return false;
+
     if (!module.instantiate(cx, funcImports, heap, instanceObj))
         return false;
 
