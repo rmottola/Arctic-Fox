@@ -3411,7 +3411,7 @@ wasm::IonCompileFunction(IonCompileTask* task)
 
     // Set up for Ion compilation.
 
-    JitContext jitContext(CompileRuntime::get(task->runtime()), &results.alloc());
+    JitContext jitContext(&results.alloc());
     const JitCompileOptions options;
     MIRGraph graph(&results.alloc());
     CompileInfo compileInfo(locals.length());
