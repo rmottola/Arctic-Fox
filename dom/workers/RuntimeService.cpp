@@ -757,7 +757,7 @@ private:
 };
 
 JSContext*
-CreateJSContextForWorker(WorkerPrivate* aWorkerPrivate, JSRuntime* aRuntime)
+InitJSContextForWorker(WorkerPrivate* aWorkerPrivate, JSRuntime* aRuntime)
 {
   aWorkerPrivate->AssertIsOnWorkerThread();
   NS_ASSERTION(!aWorkerPrivate->GetJSContext(), "Already has a context!");
@@ -795,9 +795,9 @@ CreateJSContextForWorker(WorkerPrivate* aWorkerPrivate, JSRuntime* aRuntime)
   };
   JS::SetAsmJSCacheOps(aRuntime, &asmJSCacheOps);
 
-  JSContext* workerCx = JS_NewContext(aRuntime, 0);
-  if (!workerCx) {
-    NS_WARNING("Could not create new context!");
+  JSContext* workerCx = JS_GetContext(aRuntime);
+  if (!JS::InitSelfHostedCode(workerCx)) {
+    NS_WARNING("Could not init self-hosted code!");
     return nullptr;
   }
 
@@ -854,7 +854,7 @@ class WorkerJSRuntime : public mozilla::CycleCollectedJSRuntime
 {
 public:
   // The heap size passed here doesn't matter, we will change it later in the
-  // call to JS_SetGCParameter inside CreateJSContextForWorker.
+  // call to JS_SetGCParameter inside InitJSContextForWorker.
   explicit WorkerJSRuntime(WorkerPrivate* aWorkerPrivate)
     : mWorkerPrivate(aWorkerPrivate)
   {
@@ -2644,7 +2644,7 @@ WorkerThreadPrimaryRunnable::Run()
 
     JSRuntime* rt = runtime.Runtime();
 
-    JSContext* cx = CreateJSContextForWorker(mWorkerPrivate, rt);
+    JSContext* cx = InitJSContextForWorker(mWorkerPrivate, rt);
     if (!cx) {
       // XXX need to fire an error at parent.
       NS_ERROR("Failed to create runtime and context!");
@@ -2685,9 +2685,9 @@ WorkerThreadPrimaryRunnable::Run()
     // the garbage collector will crash.
     mWorkerPrivate->ClearDebuggerEventQueue();
 
-    // Destroy the main context. This will unroot the main worker global and GC,
+    // Perform a full GC. This will collect the main worker global and CC,
     // which should break all cycles that touch JS.
-    JS_DestroyContext(cx);
+    JS_GC(JS_GetRuntime(cx));
 
     // Before shutting down the cycle collector we need to do one more pass
     // through the event loop to clean up any C++ objects that need deferred

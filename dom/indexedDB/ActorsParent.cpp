@@ -7914,10 +7914,6 @@ protected:
   {
     MOZ_COUNT_DTOR(NormalJSRuntime);
 
-    if (mContext) {
-      JS_DestroyContext(mContext);
-    }
-
     if (mRuntime) {
       JS_DestroyRuntime(mRuntime);
     }
@@ -24171,8 +24167,8 @@ NormalJSRuntime::Init()
   // Not setting this will cause JS_CHECK_RECURSION to report false positives.
   JS_SetNativeStackQuota(mRuntime, 128 * sizeof(size_t) * 1024);
 
-  mContext = JS_NewContext(mRuntime, 0);
-  if (NS_WARN_IF(!mContext)) {
+  mContext = JS_GetContext(mRuntime);
+  if (NS_WARN_IF(!JS::InitSelfHostedCode(mContext))) {
     return false;
   }
 
