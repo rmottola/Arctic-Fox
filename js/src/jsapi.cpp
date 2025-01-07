@@ -4666,6 +4666,11 @@ JS_GetInterruptCallback(JSRuntime* rt)
 /*
  * Promises.
  */
+JS_PUBLIC_API(void)
+JS::SetGetIncumbentGlobalCallback(JSRuntime* rt, JSGetIncumbentGlobalCallback callback)
+{
+    rt->getIncumbentGlobalCallback = callback;
+}
 
 JS_PUBLIC_API(void)
 JS::SetEnqueuePromiseJobCallback(JSRuntime* rt, JSEnqueuePromiseJobCallback callback,
