@@ -2038,7 +2038,7 @@ class BaseCompiler
 
     void addInterruptCheck()
     {
-        if (mg_.args.useSignalHandlersForInterrupt)
+        if (mg_.usesSignal.forInterrupt)
             return;
 
         // FIXME - implement this.
@@ -2986,7 +2986,7 @@ class BaseCompiler
         // can't (yet) use the signal handlers.
 
 #if defined(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB)
-        if (mg_.args.useSignalHandlersForOOB && !access.isAtomicAccess())
+        if (mg_.usesSignal.forOOB && !access.isAtomicAccess())
             return false;
 #endif
 
