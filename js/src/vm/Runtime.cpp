@@ -206,6 +206,9 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
 #ifdef DEBUG
     handlingInitFailure(false),
 #endif
+#if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
+    runningOOMTest(false),
+#endif
     allowRelazificationForTesting(false),
     data(nullptr),
     signalHandlersInstalled_(false),
