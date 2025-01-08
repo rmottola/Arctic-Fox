@@ -4353,7 +4353,7 @@ NewGlobal(JSContext* cx, unsigned argc, Value* vp)
 
     RootedObject global(cx, NewGlobalObject(cx, options, principals));
     if (principals)
-        JS_DropPrincipals(cx->runtime(), principals);
+        JS_DropPrincipals(cx, principals);
     if (!global)
         return false;
 
