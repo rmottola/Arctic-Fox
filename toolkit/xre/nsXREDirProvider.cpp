@@ -1076,7 +1076,7 @@ nsXREDirProvider::DoShutdown()
 
       JSRuntime *rt = xpc::GetJSRuntime();
       if (rt) {
-        JS_GC(rt);
+        JS_GC(JS_GetContext(rt));
       }
 
       // Phase 3: Notify observers of a profile change
