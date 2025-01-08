@@ -684,17 +684,6 @@ public:
     XPCJSRuntime* GetRuntime() const {return mRuntime;}
     JSContext* GetJSContext() const {return mJSContext;}
 
-    nsresult GetException(nsIException** e)
-        {
-            nsCOMPtr<nsIException> rval = mException;
-            rval.forget(e);
-            return NS_OK;
-        }
-    void SetException(nsIException* e)
-        {
-            mException = e;
-        }
-
     void DebugDump(int16_t depth);
 
     ~XPCContext();
@@ -708,7 +697,6 @@ private:
 private:
     XPCJSRuntime* mRuntime;
     JSContext*  mJSContext;
-    nsCOMPtr<nsIException> mException;
     bool mErrorUnreported;
 };
 
@@ -2242,10 +2230,14 @@ public:
                                               nsIVariant** aResult);
 
 private:
+    // aSyntheticException, if not null, is the exception we should be using.
+    // If null, look for an exception on the JSContext hanging off the
+    // XPCCallContext.
     static nsresult CheckForException(XPCCallContext & ccx,
                                       mozilla::dom::AutoEntryScript& aes,
                                       const char * aPropertyName,
-                                      const char * anInterfaceName);
+                                      const char * anInterfaceName,
+                                      nsIException* aSyntheticException = nullptr);
     virtual ~nsXPCWrappedJSClass();
 
     nsXPCWrappedJSClass();   // not implemented
