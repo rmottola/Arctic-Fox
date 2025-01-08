@@ -1568,6 +1568,7 @@ ReloadPrefsCallback(const char* pref, void* data)
 {
     XPCJSRuntime* runtime = reinterpret_cast<XPCJSRuntime*>(data);
     JSRuntime* rt = runtime->Runtime();
+    JSContext* cx = runtime->Context();
 
     bool safeMode = false;
     nsCOMPtr<nsIXULRuntime> xr = do_GetService("@mozilla.org/xre/runtime;1");
@@ -1617,7 +1618,7 @@ ReloadPrefsCallback(const char* pref, void* data)
         Preferences::GetInt(JS_OPTIONS_DOT_STR "gczeal.frequency",
                             JS_DEFAULT_ZEAL_FREQ);
     if (zeal >= 0) {
-        JS_SetGCZeal(rt, (uint8_t)zeal, zeal_frequency);
+        JS_SetGCZeal(cx, (uint8_t)zeal, zeal_frequency);
     }
 #endif // JS_GC_ZEAL
 
