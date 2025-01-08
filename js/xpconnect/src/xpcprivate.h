@@ -695,9 +695,6 @@ public:
             mException = e;
         }
 
-    nsresult GetLastResult() {return mLastResult;}
-    void SetLastResult(nsresult rc) {mLastResult = rc;}
-
     void DebugDump(int16_t depth);
 
     ~XPCContext();
@@ -711,7 +708,6 @@ private:
 private:
     XPCJSRuntime* mRuntime;
     JSContext*  mJSContext;
-    nsresult mLastResult;
     nsCOMPtr<nsIException> mException;
     bool mErrorUnreported;
 };
