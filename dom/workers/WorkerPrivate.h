@@ -353,7 +353,7 @@ public:
                              ErrorResult& aRv);
 
   void
-  UpdateRuntimeOptions(const JS::RuntimeOptions& aRuntimeOptions);
+  UpdateContextOptions(const JS::ContextOptions& aContextOptions);
 
   void
   UpdateLanguages(const nsTArray<nsString>& aLanguages);
@@ -1165,7 +1165,7 @@ public:
   }
 
   void
-  UpdateRuntimeOptionsInternal(JSContext* aCx, const JS::RuntimeOptions& aRuntimeOptions);
+  UpdateContextOptionsInternal(JSContext* aCx, const JS::ContextOptions& aContextOptions);
 
   void
   UpdateLanguagesInternal(const nsTArray<nsString>& aLanguages);

@@ -1026,7 +1026,7 @@ Options(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    JS::RuntimeOptions oldRuntimeOptions = JS::RuntimeOptionsRef(cx);
+    JS::ContextOptions oldContextOptions = JS::ContextOptionsRef(cx);
     for (unsigned i = 0; i < args.length(); i++) {
         JSString* str = JS::ToString(cx, args[i]);
         if (!str)
@@ -1038,13 +1038,13 @@ Options(JSContext* cx, unsigned argc, Value* vp)
             return false;
 
         if (strcmp(opt.ptr(), "strict") == 0)
-            JS::RuntimeOptionsRef(cx).toggleExtraWarnings();
+            JS::ContextOptionsRef(cx).toggleExtraWarnings();
         else if (strcmp(opt.ptr(), "werror") == 0)
-            JS::RuntimeOptionsRef(cx).toggleWerror();
+            JS::ContextOptionsRef(cx).toggleWerror();
         else if (strcmp(opt.ptr(), "throw_on_asmjs_validation_failure") == 0)
-            JS::RuntimeOptionsRef(cx).toggleThrowOnAsmJSValidationFailure();
+            JS::ContextOptionsRef(cx).toggleThrowOnAsmJSValidationFailure();
         else if (strcmp(opt.ptr(), "strict_mode") == 0)
-            JS::RuntimeOptionsRef(cx).toggleStrictMode();
+            JS::ContextOptionsRef(cx).toggleStrictMode();
         else {
             JS_ReportError(cx,
                            "unknown option name '%s'."
@@ -1057,19 +1057,19 @@ Options(JSContext* cx, unsigned argc, Value* vp)
 
     char* names = strdup("");
     bool found = false;
-    if (names && oldRuntimeOptions.extraWarnings()) {
+    if (names && oldContextOptions.extraWarnings()) {
         names = JS_sprintf_append(names, "%s%s", found ? "," : "", "strict");
         found = true;
     }
-    if (names && oldRuntimeOptions.werror()) {
+    if (names && oldContextOptions.werror()) {
         names = JS_sprintf_append(names, "%s%s", found ? "," : "", "werror");
         found = true;
     }
-    if (names && oldRuntimeOptions.throwOnAsmJSValidationFailure()) {
+    if (names && oldContextOptions.throwOnAsmJSValidationFailure()) {
         names = JS_sprintf_append(names, "%s%s", found ? "," : "", "throw_on_asmjs_validation_failure");
         found = true;
     }
-    if (names && oldRuntimeOptions.strictMode()) {
+    if (names && oldContextOptions.strictMode()) {
         names = JS_sprintf_append(names, "%s%s", found ? "," : "", "strict_mode");
         found = true;
     }
@@ -2927,7 +2927,7 @@ struct WorkerInput
     }
 };
 
-static void SetWorkerRuntimeOptions(JSRuntime* rt);
+static void SetWorkerContextOptions(JSContext* cx);
 
 static void
 WorkerMain(void* arg)
@@ -2954,7 +2954,7 @@ WorkerMain(void* arg)
     JS_SetFutexCanWait(cx);
     JS::SetWarningReporter(cx, WarningReporter);
     JS_InitDestroyPrincipalsCallback(cx, ShellPrincipals::destroy);
-    SetWorkerRuntimeOptions(rt);
+    SetWorkerContextOptions(cx);
 
     if (!JS::InitSelfHostedCode(cx)) {
         JS_DestroyRuntime(rt);
@@ -6728,7 +6728,7 @@ ProcessArgs(JSContext* cx, OptionParser* op)
     ShellRuntime* sr = GetShellRuntime(cx);
 
     if (op->getBoolOption('s'))
-        JS::RuntimeOptionsRef(cx).toggleExtraWarnings();
+        JS::ContextOptionsRef(cx).toggleExtraWarnings();
 
     /* |scriptArgs| gets bound on the global before any code is run. */
     if (!BindScriptArgs(cx, op))
@@ -6801,7 +6801,7 @@ ProcessArgs(JSContext* cx, OptionParser* op)
 }
 
 static bool
-SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
+SetContextOptions(JSContext* cx, const OptionParser& op)
 {
     enableBaseline = !op.getBoolOption("no-baseline");
     enableIon = !op.getBoolOption("no-ion");
@@ -6810,7 +6810,7 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
     enableUnboxedArrays = op.getBoolOption("unboxed-arrays");
     enableWasmAlwaysBaseline = op.getBoolOption("wasm-always-baseline");
 
-    JS::RuntimeOptionsRef(rt).setBaseline(enableBaseline)
+    JS::ContextOptionsRef(cx).setBaseline(enableBaseline)
                              .setIon(enableIon)
                              .setAsmJS(enableAsmJS)
                              .setWasm(true)
@@ -6993,7 +6993,7 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
         else if (strcmp(str, "on") != 0)
             return OptionFailure("ion-offthread-compile", str);
     }
-    rt->setOffthreadIonCompilationEnabled(offthreadCompilation);
+    cx->setOffthreadIonCompilationEnabled(offthreadCompilation);
 
     if (op.getStringOption("ion-parallel-compile")) {
         fprintf(stderr, "--ion-parallel-compile is deprecated. Please use --ion-offthread-compile instead.\n");
@@ -7045,14 +7045,14 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
     printTiming = op.getBoolOption('b');
     enableCodeCoverage = op.getBoolOption("code-coverage");
     enableDisassemblyDumps = op.getBoolOption('D');
-    rt->profilingScripts = enableCodeCoverage || enableDisassemblyDumps;
+    cx->profilingScripts = enableCodeCoverage || enableDisassemblyDumps;
 
     jsCacheDir = op.getStringOption("js-cache");
     if (jsCacheDir) {
         if (!op.getBoolOption("no-js-cache-per-process"))
             jsCacheDir = JS_smprintf("%s/%u", jsCacheDir, (unsigned)getpid());
         else
-            jsCacheDir = JS_strdup(rt, jsCacheDir);
+            jsCacheDir = JS_strdup(cx, jsCacheDir);
         if (!jsCacheDir)
             return false;
         jsCacheAsmJSPath = JS_smprintf("%s/asmjs.cache", jsCacheDir);
@@ -7065,10 +7065,10 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
 #ifdef JS_GC_ZEAL
     const char* zealStr = op.getStringOption("gc-zeal");
     if (zealStr) {
-        if (!rt->gc.parseAndSetZeal(zealStr))
+        if (!cx->gc.parseAndSetZeal(zealStr))
             return false;
         uint32_t nextScheduled;
-        rt->gc.getZealBits(&gZealBits, &gZealFrequency, &nextScheduled);
+        cx->gc.getZealBits(&gZealBits, &gZealFrequency, &nextScheduled);
     }
 #endif
 
@@ -7076,30 +7076,30 @@ SetRuntimeOptions(JSRuntime* rt, const OptionParser& op)
 }
 
 static void
-SetWorkerRuntimeOptions(JSRuntime* rt)
+SetWorkerContextOptions(JSContext* cx)
 {
     // Copy option values from the main thread.
-    JS::RuntimeOptionsRef(rt).setBaseline(enableBaseline)
+    JS::ContextOptionsRef(cx).setBaseline(enableBaseline)
                              .setIon(enableIon)
                              .setAsmJS(enableAsmJS)
                              .setWasm(true)
                              .setWasmAlwaysBaseline(enableWasmAlwaysBaseline)
                              .setNativeRegExp(enableNativeRegExp)
                              .setUnboxedArrays(enableUnboxedArrays);
-    rt->setOffthreadIonCompilationEnabled(offthreadCompilation);
-    rt->profilingScripts = enableCodeCoverage || enableDisassemblyDumps;
+    cx->setOffthreadIonCompilationEnabled(offthreadCompilation);
+    cx->profilingScripts = enableCodeCoverage || enableDisassemblyDumps;
 
 #ifdef JS_GC_ZEAL
     if (gZealBits && gZealFrequency) {
 #define ZEAL_MODE(_, value)                        \
         if (gZealBits & (1 << value))              \
-            rt->gc.setZeal(value, gZealFrequency);
+            cx->gc.setZeal(value, gZealFrequency);
         JS_FOR_EACH_ZEAL_MODE(ZEAL_MODE)
 #undef ZEAL_MODE
     }
 #endif
 
-    JS_SetNativeStackQuota(JS_GetContext(rt), gMaxStackSize);
+    JS_SetNativeStackQuota(cx, gMaxStackSize);
 }
 
 static int
@@ -7467,7 +7467,7 @@ main(int argc, char** argv, char** envp)
     // Waiting is allowed on the shell's main thread, for now.
     JS_SetFutexCanWait(cx);
     JS::SetWarningReporter(cx, WarningReporter);
-    if (!SetRuntimeOptions(rt, op))
+    if (!SetContextOptions(cx, op))
         return 1;
 
     JS_SetGCParameter(cx, JSGC_MAX_BYTES, 0xffffffff);

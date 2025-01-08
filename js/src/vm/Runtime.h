@@ -1246,7 +1246,6 @@ struct JSRuntime : public JS::shadow::Runtime,
     void addSizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::RuntimeSizes* runtime);
 
   private:
-    JS::RuntimeOptions options_;
     const js::Class* windowProxyClass_;
 
     // Settings for how helper threads can be used.
@@ -1276,13 +1275,6 @@ struct JSRuntime : public JS::shadow::Runtime,
         MOZ_ASSERT(autoWritableJitCodeActive_ != b, "AutoWritableJitCode should not be nested.");
         MOZ_ASSERT(CurrentThreadCanAccessRuntime(this));
         autoWritableJitCodeActive_ = b;
-    }
-
-    const JS::RuntimeOptions& options() const {
-        return options_;
-    }
-    JS::RuntimeOptions& options() {
-        return options_;
     }
 
     const js::Class* maybeWindowProxyClass() const {
