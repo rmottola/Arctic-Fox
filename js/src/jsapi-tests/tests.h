@@ -264,7 +264,7 @@ class JSAPITest
 
     bool definePrint();
 
-    static void setNativeStackQuota(JSRuntime* rt)
+    static void setNativeStackQuota(JSContext* cx)
     {
         const size_t MAX_STACK_SIZE =
 /* Assume we can't use more than 5e5 bytes of C stack by default. */
@@ -279,7 +279,7 @@ class JSAPITest
 #endif
         ;
 
-        JS_SetNativeStackQuota(rt, MAX_STACK_SIZE);
+        JS_SetNativeStackQuota(cx, MAX_STACK_SIZE);
     }
 
     virtual JSRuntime * createRuntime() {
@@ -287,7 +287,7 @@ class JSAPITest
         if (!rt)
             return nullptr;
         JS::SetWarningReporter(JS_GetContext(rt), &reportWarning);
-        setNativeStackQuota(rt);
+        setNativeStackQuota(JS_GetContext(rt));
         return rt;
     }
 
