@@ -123,6 +123,8 @@ class CompileCompartment
 
     const JitCompartment* jitCompartment();
 
+    const GlobalObject* maybeGlobal();
+
     bool hasAllocationMetadataBuilder();
 
     // Mirror CompartmentOptions.
