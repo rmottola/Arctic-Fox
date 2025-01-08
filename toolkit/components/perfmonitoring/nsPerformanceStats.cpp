@@ -716,14 +716,15 @@ nsPerformanceStatsService::Dispose()
   }
 
   // Clear up and disconnect from JSAPI.
-  js::DisposePerformanceMonitoring(mRuntime);
+  JSContext* cx = JS_GetContext(mRuntime);
+  js::DisposePerformanceMonitoring(cx);
 
-  mozilla::Unused << js::SetStopwatchIsMonitoringCPOW(mRuntime, false);
-  mozilla::Unused << js::SetStopwatchIsMonitoringJank(mRuntime, false);
+  mozilla::Unused << js::SetStopwatchIsMonitoringCPOW(cx, false);
+  mozilla::Unused << js::SetStopwatchIsMonitoringJank(cx, false);
 
-  mozilla::Unused << js::SetStopwatchStartCallback(mRuntime, nullptr, nullptr);
-  mozilla::Unused << js::SetStopwatchCommitCallback(mRuntime, nullptr, nullptr);
-  mozilla::Unused << js::SetGetPerformanceGroupsCallback(mRuntime, nullptr, nullptr);
+  mozilla::Unused << js::SetStopwatchStartCallback(cx, nullptr, nullptr);
+  mozilla::Unused << js::SetStopwatchCommitCallback(cx, nullptr, nullptr);
+  mozilla::Unused << js::SetGetPerformanceGroupsCallback(cx, nullptr, nullptr);
 
   // Clear up and disconnect the alerts collector.
   if (mPendingAlertsCollector) {
@@ -789,13 +790,14 @@ nsPerformanceStatsService::InitInternal()
   }
 
   // Connect to JSAPI.
-  if (!js::SetStopwatchStartCallback(mRuntime, StopwatchStartCallback, this)) {
+  JSContext* cx = JS_GetContext(mRuntime);
+  if (!js::SetStopwatchStartCallback(cx, StopwatchStartCallback, this)) {
     return NS_ERROR_UNEXPECTED;
   }
-  if (!js::SetStopwatchCommitCallback(mRuntime, StopwatchCommitCallback, this)) {
+  if (!js::SetStopwatchCommitCallback(cx, StopwatchCommitCallback, this)) {
     return NS_ERROR_UNEXPECTED;
   }
-  if (!js::SetGetPerformanceGroupsCallback(mRuntime, GetPerformanceGroupsCallback, this)) {
+  if (!js::SetGetPerformanceGroupsCallback(cx, GetPerformanceGroupsCallback, this)) {
     return NS_ERROR_UNEXPECTED;
   }
 
@@ -837,8 +839,7 @@ nsPerformanceStatsService::GetIsMonitoringCPOW(JSContext* cx, bool *aIsStopwatch
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  JSRuntime *runtime = JS_GetRuntime(cx);
-  *aIsStopwatchActive = js::GetStopwatchIsMonitoringCPOW(runtime);
+  *aIsStopwatchActive = js::GetStopwatchIsMonitoringCPOW(cx);
   return NS_OK;
 }
 NS_IMETHODIMP
@@ -848,8 +849,7 @@ nsPerformanceStatsService::SetIsMonitoringCPOW(JSContext* cx, bool aIsStopwatchA
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  JSRuntime *runtime = JS_GetRuntime(cx);
-  if (!js::SetStopwatchIsMonitoringCPOW(runtime, aIsStopwatchActive)) {
+  if (!js::SetStopwatchIsMonitoringCPOW(cx, aIsStopwatchActive)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
   return NS_OK;
@@ -863,8 +863,7 @@ nsPerformanceStatsService::GetIsMonitoringJank(JSContext* cx, bool *aIsStopwatch
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  JSRuntime *runtime = JS_GetRuntime(cx);
-  *aIsStopwatchActive = js::GetStopwatchIsMonitoringJank(runtime);
+  *aIsStopwatchActive = js::GetStopwatchIsMonitoringJank(cx);
   return NS_OK;
 }
 NS_IMETHODIMP
@@ -874,8 +873,7 @@ nsPerformanceStatsService::SetIsMonitoringJank(JSContext* cx, bool aIsStopwatchA
     return NS_ERROR_NOT_AVAILABLE;
   }
 
-  JSRuntime *runtime = JS_GetRuntime(cx);
-  if (!js::SetStopwatchIsMonitoringJank(runtime, aIsStopwatchActive)) {
+  if (!js::SetStopwatchIsMonitoringJank(cx, aIsStopwatchActive)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
   return NS_OK;
@@ -1001,7 +999,7 @@ nsPerformanceStatsService::GetSnapshot(JSContext* cx, nsIPerformanceSnapshot * *
     }
   }
 
-  js::GetPerfMonitoringTestCpuRescheduling(JS_GetRuntime(cx), &mProcessStayed, &mProcessMoved);
+  js::GetPerfMonitoringTestCpuRescheduling(cx, &mProcessStayed, &mProcessMoved);
 
   if (++mProcessUpdateCounter % 10 == 0) {
     mozilla::Unused << UpdateTelemetry();
