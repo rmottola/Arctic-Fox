@@ -2002,7 +2002,7 @@ SetJitCompilerOption(JSContext* cx, unsigned argc, Value* vp)
         }
     }
 
-    JS_SetGlobalJitCompilerOption(cx->runtime(), opt, uint32_t(number));
+    JS_SetGlobalJitCompilerOption(cx, opt, uint32_t(number));
 
     args.rval().setUndefined();
     return true;
@@ -2020,7 +2020,7 @@ GetJitCompilerOptions(JSContext* cx, unsigned argc, Value* vp)
 
 #define JIT_COMPILER_MATCH(key, string)                                \
     opt = JSJITCOMPILER_ ## key;                                       \
-    value.setInt32(JS_GetGlobalJitCompilerOption(cx->runtime(), opt)); \
+    value.setInt32(JS_GetGlobalJitCompilerOption(cx, opt));            \
     if (!JS_SetProperty(cx, info, string, value))                      \
         return false;
 
