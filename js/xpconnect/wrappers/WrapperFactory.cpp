@@ -191,7 +191,7 @@ WrapperFactory::PrepareForWrapping(JSContext* cx, HandleObject scope,
     XPCWrappedNative* wn = XPCWrappedNative::Get(obj);
 
     JSAutoCompartment ac(cx, obj);
-    XPCCallContext ccx(JS_CALLER, cx, obj);
+    XPCCallContext ccx(cx, obj);
     RootedObject wrapScope(cx, scope);
 
     {
