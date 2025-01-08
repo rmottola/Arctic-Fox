@@ -1528,6 +1528,7 @@ class BaseCompiler
     void pushJoinReg(AnyReg r) {
         switch (r.tag) {
           case AnyReg::NONE:
+            pushVoid();
             break;
           case AnyReg::I32:
             pushI32(r.i32());
