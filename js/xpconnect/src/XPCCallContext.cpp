@@ -41,7 +41,6 @@ XPCCallContext::XPCCallContext(XPCContext::LangType callerLanguage,
         return;
 
     mXPCContext = XPCContext::GetXPCContext(mJSContext);
-    mPrevCallerLanguage = mXPCContext->SetCallingLangType(callerLanguage);
 
     // hook into call context chain.
     mPrevCallContext = XPCJSRuntime::Get()->SetCallContext(this);
@@ -208,8 +207,6 @@ XPCCallContext::SystemIsBeingShutDown()
 XPCCallContext::~XPCCallContext()
 {
     if (mXPCContext) {
-        mXPCContext->SetCallingLangType(mPrevCallerLanguage);
-
         DebugOnly<XPCCallContext*> old = XPCJSRuntime::Get()->SetCallContext(mPrevCallContext);
         MOZ_ASSERT(old == this, "bad pop from per thread data");
     }
