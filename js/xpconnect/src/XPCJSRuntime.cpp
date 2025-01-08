@@ -3409,7 +3409,8 @@ XPCJSRuntime::XPCJSRuntime()
    mObjectHolderRoots(nullptr),
    mWatchdogManager(new WatchdogManager(this)),
    mAsyncSnowWhiteFreer(new AsyncFreeSnowWhite()),
-   mTimeoutAccumulated(false)
+   mTimeoutAccumulated(false),
+   mPendingResult(NS_OK)
 {
 }
 
@@ -3837,6 +3838,8 @@ XPCJSRuntime::DebugDump(int16_t depth)
             }
             XPC_LOG_OUTDENT();
         }
+
+        XPC_LOG_ALWAYS(("mPendingResult of %x", mPendingResult));
 
         XPC_LOG_OUTDENT();
 #endif
