@@ -1753,6 +1753,9 @@ class Assembler : public AssemblerShared
     static bool SupportsFloatingPoint() {
         return HasVFP();
     }
+    static bool SupportsUnalignedAccesses() {
+        return HasARMv7();
+    }
     static bool SupportsSimd() {
         return js::jit::SupportsSimd;
     }

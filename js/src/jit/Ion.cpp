@@ -3507,6 +3507,12 @@ jit::JitSupportsFloatingPoint()
 }
 
 bool
+jit::JitSupportsUnalignedAccesses()
+{
+    return js::jit::MacroAssembler::SupportsUnalignedAccesses();
+}
+
+bool
 jit::JitSupportsSimd()
 {
     return js::jit::MacroAssembler::SupportsSimd();
