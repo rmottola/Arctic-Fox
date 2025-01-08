@@ -3918,7 +3918,7 @@ runOffThreadScript(JSContext* cx, unsigned argc, Value* vp)
 
     JSRuntime* rt = cx->runtime();
     if (OffThreadParsingMustWaitForGC(rt))
-        gc::FinishGC(rt);
+        gc::FinishGC(cx);
 
     void* token = offThreadState.waitUntilDone(cx, ScriptKind::Script);
     if (!token) {
@@ -4004,7 +4004,7 @@ FinishOffThreadModule(JSContext* cx, unsigned argc, Value* vp)
 
     JSRuntime* rt = cx->runtime();
     if (OffThreadParsingMustWaitForGC(rt))
-        gc::FinishGC(rt);
+        gc::FinishGC(cx);
 
     void* token = offThreadState.waitUntilDone(cx, ScriptKind::Module);
     if (!token) {
@@ -7031,7 +7031,7 @@ Shell(JSContext* cx, OptionParser* op, char** envp)
 
     Maybe<AutoDisableCompactingGC> nocgc;
     if (op->getBoolOption("no-cgc"))
-        nocgc.emplace(cx->runtime());
+        nocgc.emplace(cx);
 
     JSAutoRequest ar(cx);
 

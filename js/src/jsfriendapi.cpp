@@ -1157,6 +1157,14 @@ js::GetAnyCompartmentInZone(JS::Zone* zone)
 }
 
 void
+JS::ObjectPtr::finalize(JSRuntime* rt)
+{
+    if (IsIncrementalBarrierNeeded(rt->contextFromMainThread()))
+        IncrementalObjectBarrier(value);
+    value = nullptr;
+}
+
+void
 JS::ObjectPtr::updateWeakPointerAfterGC()
 {
     if (js::gc::IsAboutToBeFinalizedUnbarriered(value.unsafeGet()))
