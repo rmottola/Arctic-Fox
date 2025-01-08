@@ -744,7 +744,6 @@ public:
     inline bool                         IsValid() const ;
 
     inline XPCJSRuntime*                GetRuntime() const ;
-    inline XPCContext*                  GetXPCContext() const ;
     inline JSContext*                   GetJSContext() const ;
     inline bool                         GetContextPopRequired() const ;
     inline XPCCallContext*              GetPrevCallContext() const ;
@@ -803,7 +802,7 @@ private:
     enum State {
         INIT_FAILED,
         SYSTEM_SHUTDOWN,
-        HAVE_CONTEXT,
+        HAVE_RUNTIME,
         HAVE_OBJECT,
         HAVE_NAME,
         HAVE_ARGS,
@@ -823,7 +822,7 @@ private:
 
     RefPtr<nsXPConnect>           mXPC;
 
-    XPCContext*                     mXPCContext;
+    XPCJSRuntime*                   mXPCJSRuntime;
     JSContext*                      mJSContext;
 
     // ctor does not necessarily init the following. BEWARE!
