@@ -1658,7 +1658,7 @@ XPCJSRuntime::~XPCJSRuntime()
 
     JS::SetGCSliceCallback(Context(), mPrevGCSliceCallback);
 
-    xpc_DelocalizeRuntime(Runtime());
+    xpc_DelocalizeContext(Context());
 
     if (mWatchdogManager->GetWatchdog())
         mWatchdogManager->StopWatchdog();
@@ -3594,11 +3594,11 @@ XPCJSRuntime::Initialize()
     UniquePtr<XPCJSSourceHook> hook(new XPCJSSourceHook);
     js::SetSourceHook(cx, Move(hook));
 
-    // Set up locale information and callbacks for the newly-created runtime so
+    // Set up locale information and callbacks for the newly-created context so
     // that the various toLocaleString() methods, localeCompare(), and other
     // internationalization APIs work as desired.
-    if (!xpc_LocalizeRuntime(runtime))
-        NS_RUNTIMEABORT("xpc_LocalizeRuntime failed.");
+    if (!xpc_LocalizeContext(cx))
+        NS_RUNTIMEABORT("xpc_LocalizeContext failed.");
 
     // Register memory reporters and distinguished amount functions.
     RegisterStrongMemoryReporter(new JSMainRuntimeCompartmentsReporter());
