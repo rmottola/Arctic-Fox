@@ -360,7 +360,6 @@ private:
 // In the current xpconnect system there can only be one XPCJSRuntime.
 // So, xpconnect can only be used on one JSRuntime within the process.
 
-class XPCJSContextStack;
 class WatchdogManager;
 
 enum WatchdogTimestampCategory
@@ -425,9 +424,6 @@ class XPCJSRuntime : public mozilla::CycleCollectedJSRuntime
 public:
     static XPCJSRuntime* newXPCJSRuntime();
     static XPCJSRuntime* Get() { return nsXPConnect::XPConnect()->GetRuntime(); }
-
-    XPCJSContextStack* GetJSContextStack() {return mJSContextStack;}
-    void DestroyJSContextStack();
 
     void RemoveWrappedJS(nsXPCWrappedJS* wrapper);
     void AssertInvalidWrappedJSNotInTable(nsXPCWrappedJS* wrapper) const;
@@ -620,7 +616,6 @@ private:
     jsid mStrIDs[IDX_TOTAL_COUNT];
     JS::Value mStrJSVals[IDX_TOTAL_COUNT];
 
-    XPCJSContextStack*       mJSContextStack;
     XPCCallContext*          mCallContext;
     AutoMarkingPtr*          mAutoRoots;
     jsid                     mResolveName;
@@ -2674,27 +2669,6 @@ private:
 
 
 /***************************************************************************/
-// XPCJSContextStack is not actually an xpcom object, but xpcom calls are
-// delegated to it as an implementation detail.
-class XPCJSContextStack
-{
-public:
-    explicit XPCJSContextStack(XPCJSRuntime* aRuntime)
-      : mRuntime(aRuntime)
-      , mSafeJSContext(nullptr)
-    { }
-
-    virtual ~XPCJSContextStack();
-
-    void InitSafeJSContext();
-    JSContext* GetSafeJSContext();
-
-private:
-    XPCJSRuntime* mRuntime;
-    JSContext*  mSafeJSContext;
-};
-
-/***************************************************************************/
 // 'Components' object implementations. nsXPCComponentsBase has the
 // less-privileged stuff that we're willing to expose to XBL.
 
@@ -3179,7 +3153,7 @@ xpc_GetJSPrivate(JSObject* obj)
 inline JSContext*
 xpc_GetSafeJSContext()
 {
-    return XPCJSRuntime::Get()->GetJSContextStack()->GetSafeJSContext();
+    return XPCJSRuntime::Get()->Context();
 }
 
 namespace xpc {
