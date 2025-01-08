@@ -30,7 +30,6 @@ XPCCallContext::XPCCallContext(XPCContext::LangType callerLanguage,
         mXPC(nsXPConnect::XPConnect()),
         mXPCContext(nullptr),
         mJSContext(cx),
-        mCallerLanguage(callerLanguage),
         mWrapper(nullptr),
         mTearOff(nullptr),
         mName(cx)
@@ -42,7 +41,7 @@ XPCCallContext::XPCCallContext(XPCContext::LangType callerLanguage,
         return;
 
     mXPCContext = XPCContext::GetXPCContext(mJSContext);
-    mPrevCallerLanguage = mXPCContext->SetCallingLangType(mCallerLanguage);
+    mPrevCallerLanguage = mXPCContext->SetCallingLangType(callerLanguage);
 
     // hook into call context chain.
     mPrevCallContext = XPCJSRuntime::Get()->SetCallContext(this);
@@ -274,13 +273,5 @@ XPCCallContext::GetPreviousCallContext(nsAXPCNativeCallContext** aResult)
 {
   NS_ENSURE_ARG_POINTER(aResult);
   *aResult = GetPrevCallContext();
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-XPCCallContext::GetLanguage(uint16_t* aResult)
-{
-  NS_ENSURE_ARG_POINTER(aResult);
-  *aResult = GetCallerLanguage();
   return NS_OK;
 }

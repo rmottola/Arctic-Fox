@@ -770,7 +770,6 @@ public:
     NS_IMETHOD GetCalleeInterface(nsIInterfaceInfo** aResult);
     NS_IMETHOD GetCalleeClassInfo(nsIClassInfo** aResult);
     NS_IMETHOD GetPreviousCallContext(nsAXPCNativeCallContext** aResult);
-    NS_IMETHOD GetLanguage(uint16_t* aResult);
 
     enum {NO_ARGS = (unsigned) -1};
 
@@ -791,8 +790,6 @@ public:
     inline XPCContext*                  GetXPCContext() const ;
     inline JSContext*                   GetJSContext() const ;
     inline bool                         GetContextPopRequired() const ;
-    inline XPCContext::LangType         GetCallerLanguage() const ;
-    inline XPCContext::LangType         GetPrevCallerLanguage() const ;
     inline XPCCallContext*              GetPrevCallContext() const ;
 
     inline JSObject*                    GetFlattenedJSObject() const ;
@@ -871,8 +868,6 @@ private:
 
     XPCContext*                     mXPCContext;
     JSContext*                      mJSContext;
-
-    XPCContext::LangType            mCallerLanguage;
 
     // ctor does not necessarily init the following. BEWARE!
 
