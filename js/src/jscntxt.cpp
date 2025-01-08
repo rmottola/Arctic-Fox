@@ -884,8 +884,6 @@ JSContext::JSContext(JSRuntime* parentRuntime)
     resolvingList(nullptr),
     generatingError(false),
     cycleDetectorSet(this),
-    data(nullptr),
-    data2(nullptr),
     outstandingRequests(0),
     jitIsBroken(false)
 {
