@@ -2689,8 +2689,7 @@ PrepareScriptEnvironmentAndInvoke(JSContext* cx, JS::HandleObject scope,
                                   ScriptEnvironmentPreparer::Closure& closure);
 
 JS_FRIEND_API(void)
-SetScriptEnvironmentPreparer(JSRuntime* rt, ScriptEnvironmentPreparer*
-preparer);
+SetScriptEnvironmentPreparer(JSContext* cx, ScriptEnvironmentPreparer* preparer);
 
 enum CTypesActivityType {
     CTYPES_CALL_BEGIN,
@@ -2707,7 +2706,7 @@ typedef void
  * calling into C.
  */
 JS_FRIEND_API(void)
-SetCTypesActivityCallback(JSRuntime* rt, CTypesActivityCallback cb);
+SetCTypesActivityCallback(JSContext* cx, CTypesActivityCallback cb);
 
 class MOZ_RAII JS_FRIEND_API(AutoCTypesActivityCallback) {
   private:
