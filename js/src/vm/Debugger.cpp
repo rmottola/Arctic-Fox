@@ -8250,8 +8250,11 @@ DebuggerObject_getPromiseAllocationSite(JSContext* cx, unsigned argc, Value* vp)
     THIS_DEBUGOBJECT_PROMISE(cx, argc, vp, "get promiseAllocationSite", args, refobj);
 
     RootedObject allocSite(cx, promise->allocationSite());
-    if (!allocSite)
-        return null(args);
+    if (!allocSite) {
+        args.rval().setNull();
+        return true;
+    }
+
     if (!cx->compartment()->wrap(cx, &allocSite))
         return false;
     args.rval().set(ObjectValue(*allocSite));
@@ -8269,8 +8272,11 @@ DebuggerObject_getPromiseResolutionSite(JSContext* cx, unsigned argc, Value* vp)
     }
 
     RootedObject resolutionSite(cx, promise->resolutionSite());
-    if (!resolutionSite)
-        return null(args);
+    if (!resolutionSite) {
+        args.rval().setNull();
+        return true;
+    }
+
     if (!cx->compartment()->wrap(cx, &resolutionSite))
         return false;
     args.rval().set(ObjectValue(*resolutionSite));
