@@ -1191,15 +1191,15 @@ js::GetEnterCompartmentDepth(JSContext* cx)
 #endif
 
 JS_FRIEND_API(void)
-js::SetDOMCallbacks(JSRuntime* rt, const DOMCallbacks* callbacks)
+js::SetDOMCallbacks(JSContext* cx, const DOMCallbacks* callbacks)
 {
-    rt->DOMcallbacks = callbacks;
+    cx->DOMcallbacks = callbacks;
 }
 
 JS_FRIEND_API(const DOMCallbacks*)
-js::GetDOMCallbacks(JSRuntime* rt)
+js::GetDOMCallbacks(JSContext* cx)
 {
-    return rt->DOMcallbacks;
+    return cx->DOMcallbacks;
 }
 
 static const void* gDOMProxyHandlerFamily = nullptr;
@@ -1339,10 +1339,10 @@ js::GetPropertyNameFromPC(JSScript* script, jsbytecode* pc)
 }
 
 JS_FRIEND_API(void)
-js::SetWindowProxyClass(JSRuntime* rt, const js::Class* clasp)
+js::SetWindowProxyClass(JSContext* cx, const js::Class* clasp)
 {
-    MOZ_ASSERT(!rt->maybeWindowProxyClass());
-    rt->setWindowProxyClass(clasp);
+    MOZ_ASSERT(!cx->maybeWindowProxyClass());
+    cx->setWindowProxyClass(clasp);
 }
 
 JS_FRIEND_API(void)
