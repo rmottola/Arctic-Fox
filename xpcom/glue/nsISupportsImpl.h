@@ -512,7 +512,6 @@ public:                                                                       \
     --mRefCnt;                                                                \
     NS_LOG_RELEASE(this, mRefCnt, #_class);                                   \
     if (mRefCnt == 0) {                                                       \
-      NS_ASSERT_OWNINGTHREAD(_class);                                         \
       mRefCnt = 1; /* stabilize */                                            \
       delete this;                                                            \
       return 0;                                                               \
@@ -626,8 +625,6 @@ NS_IMETHODIMP_(MozExternalRefCountType) _class::Release(void)                 \
   nsrefcnt count = --mRefCnt;                                                 \
   NS_LOG_RELEASE(this, count, #_class);                                       \
   if (count == 0) {                                                           \
-    if (!mRefCnt.isThreadSafe)                                                \
-      NS_ASSERT_OWNINGTHREAD(_class);                                         \
     mRefCnt = 1; /* stabilize */                                              \
     _destroy;                                                                 \
     return 0;                                                                 \
