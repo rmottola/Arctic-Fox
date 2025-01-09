@@ -697,10 +697,12 @@ CodeGeneratorX86Shared::visitMinMaxD(LMinMaxD* ins)
     MOZ_ASSERT(first == output);
 #endif
 
-    bool specialHandling = !ins->mir()->range() || ins->mir()->range()->canBeNaN();
-    bool isMax = ins->mir()->isMax();
+    bool handleNaN = !ins->mir()->range() || ins->mir()->range()->canBeNaN();
 
-    masm.minMaxDouble(first, second, specialHandling, isMax);
+    if (ins->mir()->isMax())
+        masm.maxDouble(second, first, handleNaN);
+    else
+        masm.minDouble(second, first, handleNaN);
 }
 
 void
@@ -713,10 +715,12 @@ CodeGeneratorX86Shared::visitMinMaxF(LMinMaxF* ins)
     MOZ_ASSERT(first == output);
 #endif
 
-    bool specialHandling = !ins->mir()->range() || ins->mir()->range()->canBeNaN();
-    bool isMax = ins->mir()->isMax();
+    bool handleNaN = !ins->mir()->range() || ins->mir()->range()->canBeNaN();
 
-    masm.minMaxFloat32(first, second, specialHandling, isMax);
+    if (ins->mir()->isMax())
+        masm.maxFloat32(second, first, handleNaN);
+    else
+        masm.minFloat32(second, first, handleNaN);
 }
 
 void
