@@ -5304,9 +5304,8 @@ BaseCompiler::emitLoad(ValType type, Scalar::Type viewType)
     // TODO / OPTIMIZE: Disable bounds checking on constant accesses
     // below the minimum heap length.
 
-    MWasmMemoryAccess access(viewType);
+    MWasmMemoryAccess access(viewType, addr.align);
     access.setOffset(addr.offset);
-    access.setAlign(addr.align);
 
     switch (type) {
       case ValType::I32: {
@@ -5352,9 +5351,8 @@ BaseCompiler::emitStore(ValType resultType, Scalar::Type viewType)
     // TODO / OPTIMIZE: Disable bounds checking on constant accesses
     // below the minimum heap length.
 
-    MWasmMemoryAccess access(viewType);
+    MWasmMemoryAccess access(viewType, addr.align);
     access.setOffset(addr.offset);
-    access.setAlign(addr.align);
 
     switch (resultType) {
       case ValType::I32: {
@@ -5626,9 +5624,8 @@ BaseCompiler::emitStoreWithCoercion(ValType resultType, Scalar::Type viewType)
     // TODO / OPTIMIZE: Disable bounds checking on constant accesses
     // below the minimum heap length.
 
-    MWasmMemoryAccess access(viewType);
+    MWasmMemoryAccess access(viewType, addr.align);
     access.setOffset(addr.offset);
-    access.setAlign(addr.align);
 
     if (resultType == ValType::F32 && viewType == Scalar::Float64) {
         RegF32 rv = popF32();
