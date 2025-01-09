@@ -453,6 +453,8 @@ class BaseCompiler
 #endif
 
     // The join registers are used to carry values out of blocks.
+    // JoinRegI32 and joinRegI64 must overlap: emitBrIf and
+    // emitBrTable assume that.
 
     RegI32 joinRegI32;
     RegI64 joinRegI64;
@@ -4651,8 +4653,9 @@ BaseCompiler::emitBrIf()
     // allowing a conditional expression to be left on the stack and
     // reified here as part of the branch instruction.
 
-    // Don't use it for rc
-    if (type == ExprType::I32)
+    // We'll need the joinreg later, so don't use it for rc.
+    // We assume joinRegI32 and joinRegI64 overlap.
+    if (type == ExprType::I32 || type == ExprType::I64)
         needI32(joinRegI32);
 
     // Condition value is on top, always I32.
@@ -4663,7 +4666,7 @@ BaseCompiler::emitBrIf()
     if (IsVoid(type))
         pushVoid();
 
-    if (type == ExprType::I32)
+    if (type == ExprType::I32 || type == ExprType::I64)
         freeI32(joinRegI32);
 
     // Save any value in the designated join register, where the
@@ -4714,8 +4717,9 @@ BaseCompiler::emitBrTable()
     if (!iter_.readBrTableEntry(type, &defaultDepth))
         return false;
 
-    // We'll need this, so don't use it for rc
-    if (type == ExprType::I32)
+    // We'll need the joinreg later, so don't use it for rc.
+    // We assume joinRegI32 and joinRegI64 overlap.
+    if (type == ExprType::I32 || type == ExprType::I64)
         needI32(joinRegI32);
 
     // Table switch value always on top.
@@ -4726,7 +4730,7 @@ BaseCompiler::emitBrTable()
     if (IsVoid(type))
         pushVoid();
 
-    if (type == ExprType::I32)
+    if (type == ExprType::I32 || type == ExprType::I64)
         freeI32(joinRegI32);
 
     AnyReg r = popJoinReg();
