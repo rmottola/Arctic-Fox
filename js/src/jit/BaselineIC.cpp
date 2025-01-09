@@ -6992,12 +6992,6 @@ ICCall_Native::Compiler::generateStubCode(MacroAssembler& masm)
     else
         pushCallArguments(masm, regs, argcReg, /* isJitCall = */ false, isConstructing_);
 
-    if (isConstructing_) {
-        // Stack looks like: [ ..., Arg0Val, ThisVal, CalleeVal ]
-        // Replace ThisVal with MagicValue(JS_IS_CONSTRUCTING)
-        masm.storeValue(MagicValue(JS_IS_CONSTRUCTING), Address(masm.getStackPointer(), sizeof(Value)));
-    }
-
 
     // Native functions have the signature:
     //
@@ -7089,12 +7083,6 @@ ICCall_ClassHook::Compiler::generateStubCode(MacroAssembler& masm)
     regs.add(scratch);
     pushCallArguments(masm, regs, argcReg, /* isJitCall = */ false, isConstructing_);
     regs.take(scratch);
-
-    if (isConstructing_) {
-        // Stack looks like: [ ..., Arg0Val, ThisVal, CalleeVal ]
-        // Replace ThisVal with MagicValue(JS_IS_CONSTRUCTING)
-        masm.storeValue(MagicValue(JS_IS_CONSTRUCTING), Address(masm.getStackPointer(), sizeof(Value)));
-    }
 
     masm.checkStackAlignment();
 
