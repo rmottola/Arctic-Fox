@@ -301,7 +301,7 @@ AstDecodeCallImport(AstDecodeContext& c)
         return c.iter().fail("import index out of range");
 
     AstImport* import = c.module().imports()[importIndex];
-    AstSig* sig = c.module().sigs()[import->sig().index()];
+    AstSig* sig = c.module().sigs()[import->funcSig().index()];
     AstRef funcRef;
     if (!AstDecodeGenerateRef(c, AstName(MOZ_UTF16("import")), importIndex, &funcRef))
         return false;
@@ -1455,12 +1455,14 @@ AstDecodeDataSection(AstDecodeContext &c)
     uint32_t sectionStart, sectionSize;
     if (!c.d.startSection(DataSectionId, &sectionStart, &sectionSize))
         return AstDecodeFail(c, "failed to start section");
+
     AstSegmentVector segments(c.lifo);
     if (sectionStart == Decoder::NotStarted) {
         if (!c.initialSizePages)
             return true;
 
-        AstMemory* memory = new(c.lifo) AstMemory(*c.initialSizePages, c.maxSizePages, Move(segments));
+        AstMemorySignature memSig(*c.initialSizePages, c.maxSizePages);
+        AstMemory* memory = new(c.lifo) AstMemory(memSig, Move(segments));
         if (!memory)
             return false;
 
@@ -1507,7 +1509,8 @@ AstDecodeDataSection(AstDecodeContext &c)
         prevEnd = dstOffset + numBytes;
     }
 
-    AstMemory* memory = new(c.lifo) AstMemory(initialSizePages, c.maxSizePages, Move(segments));
+    AstMemorySignature memSig(initialSizePages, c.maxSizePages);
+    AstMemory* memory = new(c.lifo) AstMemory(memSig, Move(segments));
     if (!memory)
         return false;
 
