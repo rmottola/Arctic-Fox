@@ -3480,7 +3480,7 @@ NS_IMETHODIMP nsXPCComponents::ReportError(HandleValue error, JSContext* cx)
 class ComponentsSH : public nsIXPCScriptable
 {
 public:
-    explicit MOZ_CONSTEXPR ComponentsSH(unsigned dummy)
+    explicit constexpr ComponentsSH(unsigned dummy)
     {
     }
 
