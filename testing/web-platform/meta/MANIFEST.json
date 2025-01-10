@@ -23709,6 +23709,12 @@
             "url": "/web-animations/animation-model/keyframe-effects/effect-value-context.html"
           }
         ],
+        "web-animations/animation-model/keyframe-effects/the-effect-value-of-a-keyframe-effect.html": [
+          {
+            "path": "web-animations/animation-model/keyframe-effects/the-effect-value-of-a-keyframe-effect.html",
+            "url": "/web-animations/animation-model/keyframe-effects/the-effect-value-of-a-keyframe-effect.html"
+          }
+        ],
         "web-animations/animation/startTime.html": [
           {
             "path": "web-animations/animation/startTime.html",
