@@ -167,15 +167,15 @@ DecodeCallIndirect(FunctionDecoder& f)
 static bool
 DecodeCallImport(FunctionDecoder& f)
 {
-    uint32_t importIndex;
+    uint32_t funcImportIndex;
     uint32_t arity;
-    if (!f.iter().readCallImport(&importIndex, &arity))
+    if (!f.iter().readCallImport(&funcImportIndex, &arity))
         return false;
 
-    if (importIndex >= f.mg().numImports())
+    if (funcImportIndex >= f.mg().numFuncImports())
         return f.iter().fail("import index out of range");
 
-    const Sig& sig = *f.mg().import(importIndex).sig;
+    const Sig& sig = *f.mg().funcImport(funcImportIndex).sig;
     return DecodeCallArgs(f, arity, sig) &&
            DecodeCallReturn(f, sig);
 }
@@ -670,7 +670,7 @@ MaybeDecodeName(Decoder& d)
 }
 
 static bool
-DecodeImport(Decoder& d, bool newFormat, ModuleGeneratorData* init, ImportNameVector* importNames)
+DecodeImport(Decoder& d, bool newFormat, ModuleGeneratorData* init, ImportVector* imports)
 {
     if (!newFormat) {
         const DeclaredSig* sig = nullptr;
@@ -680,7 +680,7 @@ DecodeImport(Decoder& d, bool newFormat, ModuleGeneratorData* init, ImportNameVe
         if (!CheckTypeForJS(d, *sig))
             return false;
 
-        if (!init->imports.emplaceBack(sig))
+        if (!init->funcImports.emplaceBack(sig))
             return false;
 
         UniqueChars moduleName = MaybeDecodeName(d);
@@ -694,7 +694,7 @@ DecodeImport(Decoder& d, bool newFormat, ModuleGeneratorData* init, ImportNameVe
         if (!funcName)
             return Fail(d, "expected valid import func name");
 
-        return importNames->emplaceBack(Move(moduleName), Move(funcName));
+        return imports->emplaceBack(Move(moduleName), Move(funcName));
     }
 
     UniqueChars moduleName = MaybeDecodeName(d);
@@ -708,7 +708,7 @@ DecodeImport(Decoder& d, bool newFormat, ModuleGeneratorData* init, ImportNameVe
     if (!funcName)
         return Fail(d, "expected valid import func name");
 
-    if (!importNames->emplaceBack(Move(moduleName), Move(funcName)))
+    if (!imports->emplaceBack(Move(moduleName), Move(funcName)))
         return false;
 
     uint32_t importKind;
@@ -722,7 +722,7 @@ DecodeImport(Decoder& d, bool newFormat, ModuleGeneratorData* init, ImportNameVe
             return false;
         if (!CheckTypeForJS(d, *sig))
             return false;
-        if (!init->imports.emplaceBack(sig))
+        if (!init->funcImports.emplaceBack(sig))
             return false;
         break;
       }
@@ -734,7 +734,7 @@ DecodeImport(Decoder& d, bool newFormat, ModuleGeneratorData* init, ImportNameVe
 }
 
 static bool
-DecodeImportSection(Decoder& d, bool newFormat, ModuleGeneratorData* init, ImportNameVector* importNames)
+DecodeImportSection(Decoder& d, bool newFormat, ModuleGeneratorData* init, ImportVector* imports)
 {
     uint32_t sectionStart, sectionSize;
     if (!d.startSection(ImportSectionId, &sectionStart, &sectionSize))
@@ -750,7 +750,7 @@ DecodeImportSection(Decoder& d, bool newFormat, ModuleGeneratorData* init, Impor
         return Fail(d, "too many imports");
 
     for (uint32_t i = 0; i < numImports; i++) {
-        if (!DecodeImport(d, newFormat, init, importNames))
+        if (!DecodeImport(d, newFormat, init, imports))
             return false;
     }
 
@@ -1173,8 +1173,8 @@ wasm::Compile(Bytes&& bytecode, CompileArgs&& args, UniqueChars* error)
     if (!DecodeTypeSection(d, init.get()))
         return nullptr;
 
-    ImportNameVector importNames;
-    if (!DecodeImportSection(d, newFormat, init.get(), &importNames))
+    ImportVector imports;
+    if (!DecodeImportSection(d, newFormat, init.get(), &imports))
         return nullptr;
 
     if (!DecodeFunctionSection(d, init.get()))
@@ -1210,5 +1210,5 @@ wasm::Compile(Bytes&& bytecode, CompileArgs&& args, UniqueChars* error)
     if (!sharedBytes)
         return nullptr;
 
-    return mg.finish(Move(importNames), *sharedBytes);
+    return mg.finish(Move(imports), *sharedBytes);
 }
