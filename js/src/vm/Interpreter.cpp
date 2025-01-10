@@ -728,7 +728,7 @@ js::InstanceOfOperator(JSContext* cx, HandleObject obj, MutableHandleValue v, bo
 
     if (!hasInstance.isNullOrUndefined()) {
         if (!IsCallable(hasInstance))
-            ReportIsNotFunction(cx, hasInstance);
+            return ReportIsNotFunction(cx, hasInstance);
 
         /* Step 3. */
         RootedValue rval(cx);
@@ -742,8 +742,7 @@ js::InstanceOfOperator(JSContext* cx, HandleObject obj, MutableHandleValue v, bo
     /* Step 4. */
     if (!obj->isCallable()) {
         RootedValue val(cx, ObjectValue(*obj));
-        ReportIsNotFunction(cx, val);
-        return false;
+        return ReportIsNotFunction(cx, val);
     }
 
     /* Step 5. */
