@@ -247,9 +247,10 @@ CacheStorage::DefineCaches(JSContext* aCx, JS::Handle<JSObject*> aGlobal)
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(js::GetObjectClass(aGlobal)->flags & JSCLASS_DOM_GLOBAL,
              "Passed object is not a global object!");
+  js::AssertSameCompartment(aCx, aGlobal);
 
-  if (NS_WARN_IF(!CacheStorageBinding::GetConstructorObject(aCx, aGlobal) ||
-                 !CacheBinding::GetConstructorObject(aCx, aGlobal))) {
+  if (NS_WARN_IF(!CacheStorageBinding::GetConstructorObject(aCx) ||
+                 !CacheBinding::GetConstructorObject(aCx))) {
     return false;
   }
 
@@ -267,7 +268,6 @@ CacheStorage::DefineCaches(JSContext* aCx, JS::Handle<JSObject*> aGlobal)
   }
 
   JS::Rooted<JS::Value> caches(aCx);
-  js::AssertSameCompartment(aCx, aGlobal);
   if (NS_WARN_IF(!ToJSValue(aCx, storage, &caches))) {
     return false;
   }
