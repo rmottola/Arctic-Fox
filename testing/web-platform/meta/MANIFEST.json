@@ -23703,6 +23703,12 @@
             "url": "/service-workers/service-worker/update-recovery.https.html"
           }
         ],
+        "web-animations/animation-model/keyframe-effects/effect-value-context.html": [
+          {
+            "path": "web-animations/animation-model/keyframe-effects/effect-value-context.html",
+            "url": "/web-animations/animation-model/keyframe-effects/effect-value-context.html"
+          }
+        ],
         "web-animations/animation/startTime.html": [
           {
             "path": "web-animations/animation/startTime.html",
