@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "nsXMLHttpRequest.h"
+#include "XMLHttpRequestMainThread.h"
 
 #ifndef XP_WIN
 #include <unistd.h>
@@ -82,9 +82,10 @@
 #include "private/pprio.h"
 #include "XMLHttpRequestUpload.h"
 
-using namespace mozilla;
-using namespace mozilla::dom;
 using namespace mozilla::net;
+
+namespace mozilla {
+namespace dom {
 
 // Maximum size that we'll grow an ArrayBuffer instead of doubling,
 // once doubling reaches this threshold
@@ -141,16 +142,6 @@ using namespace mozilla::net;
 
 #define NS_PROGRESS_EVENT_INTERVAL 50
 
-#define IMPL_CSTRING_GETTER(_name)                                              \
-  NS_IMETHODIMP                                                                 \
-  nsXMLHttpRequest::_name(nsACString& aOut)                                     \
-  {                                                                             \
-    nsCString tmp;                                                              \
-    _name(tmp);                                                                 \
-    aOut = tmp;                                                                 \
-    return NS_OK;                                                               \
-  }
-
 NS_IMPL_ISUPPORTS(nsXHRParseEndListener, nsIDOMEventListener)
 
 class nsResumeTimeoutsEvent : public Runnable
@@ -185,9 +176,9 @@ static void AddLoadFlags(nsIRequest *request, nsLoadFlags newFlags)
 /////////////////////////////////////////////
 
 bool
-nsXMLHttpRequest::sDontWarnAboutSyncXHR = false;
+XMLHttpRequestMainThread::sDontWarnAboutSyncXHR = false;
 
-nsXMLHttpRequest::nsXMLHttpRequest()
+XMLHttpRequestMainThread::XMLHttpRequestMainThread()
   : mResponseBodyDecodedPos(0),
     mResponseType(XML_HTTP_RESPONSE_TYPE_DEFAULT),
     mRequestObserver(nullptr),
@@ -215,7 +206,7 @@ nsXMLHttpRequest::nsXMLHttpRequest()
 #endif
 }
 
-nsXMLHttpRequest::~nsXMLHttpRequest()
+XMLHttpRequestMainThread::~XMLHttpRequestMainThread()
 {
   mState |= XML_HTTP_REQUEST_DELETED;
 
@@ -233,7 +224,7 @@ nsXMLHttpRequest::~nsXMLHttpRequest()
 }
 
 void
-nsXMLHttpRequest::RootJSResultObjects()
+XMLHttpRequestMainThread::RootJSResultObjects()
 {
   mozilla::HoldJSObjects(this);
 }
@@ -242,7 +233,7 @@ nsXMLHttpRequest::RootJSResultObjects()
  * This Init method is called from the factory constructor.
  */
 nsresult
-nsXMLHttpRequest::Init()
+XMLHttpRequestMainThread::Init()
 {
   nsIScriptSecurityManager* secMan = nsContentUtils::GetSecurityManager();
   nsCOMPtr<nsIPrincipal> subjectPrincipal;
@@ -262,11 +253,11 @@ nsXMLHttpRequest::Init()
  * This Init method should only be called by C++ consumers.
  */
 NS_IMETHODIMP
-nsXMLHttpRequest::Init(nsIPrincipal* aPrincipal,
-                       nsIScriptContext* aScriptContext,
-                       nsIGlobalObject* aGlobalObject,
-                       nsIURI* aBaseURI,
-                       nsILoadGroup* aLoadGroup)
+XMLHttpRequestMainThread::Init(nsIPrincipal* aPrincipal,
+                               nsIScriptContext* aScriptContext,
+                               nsIGlobalObject* aGlobalObject,
+                               nsIURI* aBaseURI,
+                               nsILoadGroup* aLoadGroup)
 {
   NS_ENSURE_ARG_POINTER(aPrincipal);
   Construct(aPrincipal, aGlobalObject, aBaseURI, aLoadGroup);
@@ -274,7 +265,7 @@ nsXMLHttpRequest::Init(nsIPrincipal* aPrincipal,
 }
 
 void
-nsXMLHttpRequest::InitParameters(bool aAnon, bool aSystem)
+XMLHttpRequestMainThread::InitParameters(bool aAnon, bool aSystem)
 {
   if (!aAnon && !aSystem) {
     return;
@@ -316,7 +307,7 @@ nsXMLHttpRequest::InitParameters(bool aAnon, bool aSystem)
 }
 
 void
-nsXMLHttpRequest::ResetResponse()
+XMLHttpRequestMainThread::ResetResponse()
 {
   mResponseXML = nullptr;
   mResponseBody.Truncate();
@@ -333,14 +324,14 @@ nsXMLHttpRequest::ResetResponse()
 }
 
 void
-nsXMLHttpRequest::SetRequestObserver(nsIRequestObserver* aObserver)
+XMLHttpRequestMainThread::SetRequestObserver(nsIRequestObserver* aObserver)
 {
   mRequestObserver = aObserver;
 }
 
-NS_IMPL_CYCLE_COLLECTION_CLASS(nsXMLHttpRequest)
+NS_IMPL_CYCLE_COLLECTION_CLASS(XMLHttpRequestMainThread)
 
-NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(nsXMLHttpRequest)
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(XMLHttpRequestMainThread)
   bool isBlack = tmp->IsBlack();
   if (isBlack || tmp->mWaitingForOnStopRequest) {
     if (tmp->mListenerManager) {
@@ -354,16 +345,16 @@ NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_BEGIN(nsXMLHttpRequest)
   }
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_END
 
-NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_BEGIN(nsXMLHttpRequest)
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_BEGIN(XMLHttpRequestMainThread)
   return tmp->
     IsBlackAndDoesNotNeedTracing(static_cast<DOMEventTargetHelper*>(tmp));
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_IN_CC_END
 
-NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_BEGIN(nsXMLHttpRequest)
+NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_BEGIN(XMLHttpRequestMainThread)
   return tmp->IsBlack();
 NS_IMPL_CYCLE_COLLECTION_CAN_SKIP_THIS_END
 
-NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(nsXMLHttpRequest,
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(XMLHttpRequestMainThread,
                                                   XMLHttpRequestEventTarget)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mContext)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mChannel)
@@ -381,7 +372,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(nsXMLHttpRequest,
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mUpload)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
-NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(nsXMLHttpRequest,
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(XMLHttpRequestMainThread,
                                                 XMLHttpRequestEventTarget)
   tmp->mResultArrayBuffer = nullptr;
   tmp->mArrayBufferBuilder.reset();
@@ -402,14 +393,14 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(nsXMLHttpRequest,
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mUpload)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
-NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN_INHERITED(nsXMLHttpRequest,
+NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN_INHERITED(XMLHttpRequestMainThread,
                                                XMLHttpRequestEventTarget)
   NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mResultArrayBuffer)
   NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mResultJSON)
 NS_IMPL_CYCLE_COLLECTION_TRACE_END
 
-// QueryInterface implementation for nsXMLHttpRequest
-NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(nsXMLHttpRequest)
+// QueryInterface implementation for XMLHttpRequestMainThread
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(XMLHttpRequestMainThread)
   NS_INTERFACE_MAP_ENTRY(nsIXMLHttpRequest)
   NS_INTERFACE_MAP_ENTRY(nsIJSXMLHttpRequest)
   NS_INTERFACE_MAP_ENTRY(nsIRequestObserver)
@@ -422,20 +413,20 @@ NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(nsXMLHttpRequest)
   NS_INTERFACE_MAP_ENTRY(nsISizeOfEventTarget)
 NS_INTERFACE_MAP_END_INHERITING(XMLHttpRequestEventTarget)
 
-NS_IMPL_ADDREF_INHERITED(nsXMLHttpRequest, XMLHttpRequestEventTarget)
-NS_IMPL_RELEASE_INHERITED(nsXMLHttpRequest, XMLHttpRequestEventTarget)
+NS_IMPL_ADDREF_INHERITED(XMLHttpRequestMainThread, XMLHttpRequestEventTarget)
+NS_IMPL_RELEASE_INHERITED(XMLHttpRequestMainThread, XMLHttpRequestEventTarget)
 
-NS_IMPL_EVENT_HANDLER(nsXMLHttpRequest, readystatechange)
+NS_IMPL_EVENT_HANDLER(XMLHttpRequestMainThread, readystatechange)
 
 void
-nsXMLHttpRequest::DisconnectFromOwner()
+XMLHttpRequestMainThread::DisconnectFromOwner()
 {
   XMLHttpRequestEventTarget::DisconnectFromOwner();
   Abort();
 }
 
 size_t
-nsXMLHttpRequest::SizeOfEventTargetIncludingThis(
+XMLHttpRequestMainThread::SizeOfEventTargetIncludingThis(
   MallocSizeOf aMallocSizeOf) const
 {
   size_t n = aMallocSizeOf(this);
@@ -462,7 +453,7 @@ nsXMLHttpRequest::SizeOfEventTargetIncludingThis(
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetChannel(nsIChannel **aChannel)
+XMLHttpRequestMainThread::GetChannel(nsIChannel **aChannel)
 {
   NS_ENSURE_ARG_POINTER(aChannel);
   NS_IF_ADDREF(*aChannel = mChannel);
@@ -483,7 +474,7 @@ static void LogMessage(const char* aWarning, nsPIDOMWindowInner* aWindow)
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetResponseXML(nsIDOMDocument **aResponseXML)
+XMLHttpRequestMainThread::GetResponseXML(nsIDOMDocument **aResponseXML)
 {
   ErrorResult rv;
   nsIDocument* responseXML = GetResponseXML(rv);
@@ -500,7 +491,7 @@ nsXMLHttpRequest::GetResponseXML(nsIDOMDocument **aResponseXML)
 }
 
 nsIDocument*
-nsXMLHttpRequest::GetResponseXML(ErrorResult& aRv)
+XMLHttpRequestMainThread::GetResponseXML(ErrorResult& aRv)
 {
   if (mResponseType != XML_HTTP_RESPONSE_TYPE_DEFAULT &&
       mResponseType != XML_HTTP_RESPONSE_TYPE_DOCUMENT) {
@@ -522,7 +513,7 @@ nsXMLHttpRequest::GetResponseXML(ErrorResult& aRv)
  * from HTTP headers.
  */
 nsresult
-nsXMLHttpRequest::DetectCharset()
+XMLHttpRequestMainThread::DetectCharset()
 {
   mResponseCharset.Truncate();
   mDecoder = nullptr;
@@ -556,8 +547,8 @@ nsXMLHttpRequest::DetectCharset()
 }
 
 nsresult
-nsXMLHttpRequest::AppendToResponseText(const char * aSrcBuffer,
-                                       uint32_t aSrcBufferLen)
+XMLHttpRequestMainThread::AppendToResponseText(const char * aSrcBuffer,
+                                               uint32_t aSrcBufferLen)
 {
   NS_ENSURE_STATE(mDecoder);
 
@@ -599,7 +590,7 @@ nsXMLHttpRequest::AppendToResponseText(const char * aSrcBuffer,
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetResponseText(nsAString& aResponseText)
+XMLHttpRequestMainThread::GetResponseText(nsAString& aResponseText)
 {
   ErrorResult rv;
   nsString responseText;
@@ -609,7 +600,8 @@ nsXMLHttpRequest::GetResponseText(nsAString& aResponseText)
 }
 
 void
-nsXMLHttpRequest::GetResponseText(nsString& aResponseText, ErrorResult& aRv)
+XMLHttpRequestMainThread::GetResponseText(nsAString& aResponseText,
+                                          ErrorResult& aRv)
 {
   aResponseText.Truncate();
 
@@ -661,7 +653,7 @@ nsXMLHttpRequest::GetResponseText(nsString& aResponseText, ErrorResult& aRv)
 }
 
 nsresult
-nsXMLHttpRequest::CreateResponseParsedJSON(JSContext* aCx)
+XMLHttpRequestMainThread::CreateResponseParsedJSON(JSContext* aCx)
 {
   if (!aCx) {
     return NS_ERROR_FAILURE;
@@ -681,7 +673,7 @@ nsXMLHttpRequest::CreateResponseParsedJSON(JSContext* aCx)
 }
 
 void
-nsXMLHttpRequest::CreatePartialBlob(ErrorResult& aRv)
+XMLHttpRequestMainThread::CreatePartialBlob(ErrorResult& aRv)
 {
   if (mDOMBlob) {
     // Use progress info to determine whether load is complete, but use
@@ -709,7 +701,7 @@ nsXMLHttpRequest::CreatePartialBlob(ErrorResult& aRv)
   mResponseBlob = mBlobSet->GetBlobInternal(GetOwner(), contentType, aRv);
 }
 
-NS_IMETHODIMP nsXMLHttpRequest::GetResponseType(nsAString& aResponseType)
+NS_IMETHODIMP XMLHttpRequestMainThread::GetResponseType(nsAString& aResponseType)
 {
   switch (mResponseType) {
   case XML_HTTP_RESPONSE_TYPE_DEFAULT:
@@ -748,7 +740,7 @@ NS_IMETHODIMP nsXMLHttpRequest::GetResponseType(nsAString& aResponseType)
 
 #ifdef DEBUG
 void
-nsXMLHttpRequest::StaticAssertions()
+XMLHttpRequestMainThread::StaticAssertions()
 {
 #define ASSERT_ENUM_EQUAL(_lc, _uc) \
   static_assert(\
@@ -769,9 +761,9 @@ nsXMLHttpRequest::StaticAssertions()
 }
 #endif
 
-NS_IMETHODIMP nsXMLHttpRequest::SetResponseType(const nsAString& aResponseType)
+NS_IMETHODIMP XMLHttpRequestMainThread::SetResponseType(const nsAString& aResponseType)
 {
-  nsXMLHttpRequest::ResponseTypeEnum responseType;
+  XMLHttpRequestMainThread::ResponseTypeEnum responseType;
   if (aResponseType.IsEmpty()) {
     responseType = XML_HTTP_RESPONSE_TYPE_DEFAULT;
   } else if (aResponseType.EqualsLiteral("arraybuffer")) {
@@ -800,15 +792,15 @@ NS_IMETHODIMP nsXMLHttpRequest::SetResponseType(const nsAString& aResponseType)
 }
 
 void
-nsXMLHttpRequest::SetResponseType(XMLHttpRequestResponseType aType,
-                                  ErrorResult& aRv)
+XMLHttpRequestMainThread::SetResponseType(XMLHttpRequestResponseType aType,
+                                          ErrorResult& aRv)
 {
   SetResponseType(ResponseTypeEnum(static_cast<int>(aType)), aRv);
 }
 
 void
-nsXMLHttpRequest::SetResponseType(nsXMLHttpRequest::ResponseTypeEnum aResponseType,
-                                  ErrorResult& aRv)
+XMLHttpRequestMainThread::SetResponseType(XMLHttpRequestMainThread::ResponseTypeEnum aResponseType,
+                                          ErrorResult& aRv)
 {
   // If the state is LOADING or DONE raise an INVALID_STATE_ERR exception
   // and terminate these steps.
@@ -838,7 +830,7 @@ nsXMLHttpRequest::SetResponseType(nsXMLHttpRequest::ResponseTypeEnum aResponseTy
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetResponse(JSContext *aCx, JS::MutableHandle<JS::Value> aResult)
+XMLHttpRequestMainThread::GetResponse(JSContext *aCx, JS::MutableHandle<JS::Value> aResult)
 {
   ErrorResult rv;
   GetResponse(aCx, aResult, rv);
@@ -846,9 +838,9 @@ nsXMLHttpRequest::GetResponse(JSContext *aCx, JS::MutableHandle<JS::Value> aResu
 }
 
 void
-nsXMLHttpRequest::GetResponse(JSContext* aCx,
-                              JS::MutableHandle<JS::Value> aResponse,
-                              ErrorResult& aRv)
+XMLHttpRequestMainThread::GetResponse(JSContext* aCx,
+                                      JS::MutableHandle<JS::Value> aResponse,
+                                      ErrorResult& aRv)
 {
   switch (mResponseType) {
   case XML_HTTP_RESPONSE_TYPE_DEFAULT:
@@ -953,7 +945,7 @@ nsXMLHttpRequest::GetResponse(JSContext* aCx,
 }
 
 bool
-nsXMLHttpRequest::IsCrossSiteCORSRequest() const
+XMLHttpRequestMainThread::IsCrossSiteCORSRequest() const
 {
   if (!mChannel) {
     return false;
@@ -966,7 +958,7 @@ nsXMLHttpRequest::IsCrossSiteCORSRequest() const
 }
 
 bool
-nsXMLHttpRequest::IsDeniedCrossSiteCORSRequest()
+XMLHttpRequestMainThread::IsDeniedCrossSiteCORSRequest()
 {
   if (IsCrossSiteCORSRequest()) {
     nsresult rv;
@@ -979,7 +971,7 @@ nsXMLHttpRequest::IsDeniedCrossSiteCORSRequest()
 }
 
 void
-nsXMLHttpRequest::GetResponseURL(nsAString& aUrl)
+XMLHttpRequestMainThread::GetResponseURL(nsAString& aUrl)
 {
   aUrl.Truncate();
 
@@ -1007,14 +999,15 @@ nsXMLHttpRequest::GetResponseURL(nsAString& aUrl)
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetStatus(uint32_t *aStatus)
+XMLHttpRequestMainThread::GetStatus(uint32_t *aStatus)
 {
-  *aStatus = Status();
-  return NS_OK;
+  ErrorResult rv;
+  *aStatus = GetStatus(rv);
+  return rv.StealNSResult();
 }
 
 uint32_t
-nsXMLHttpRequest::Status()
+XMLHttpRequestMainThread::GetStatus(ErrorResult& aRv)
 {
   // Make sure we don't leak status information from denied cross-site
   // requests.
@@ -1059,9 +1052,17 @@ nsXMLHttpRequest::Status()
   return status;
 }
 
-IMPL_CSTRING_GETTER(GetStatusText)
+NS_IMETHODIMP
+XMLHttpRequestMainThread::GetStatusText(nsACString& aOut)
+{
+  ErrorResult rv;
+  GetStatusText(aOut, rv);
+  return rv.StealNSResult();
+}
+
 void
-nsXMLHttpRequest::GetStatusText(nsCString& aStatusText)
+XMLHttpRequestMainThread::GetStatusText(nsACString& aStatusText,
+                                        ErrorResult& aRv)
 {
   // Return an empty status text on all error loads.
   aStatusText.Truncate();
@@ -1094,8 +1095,8 @@ nsXMLHttpRequest::GetStatusText(nsCString& aStatusText)
 }
 
 void
-nsXMLHttpRequest::CloseRequestWithError(const nsAString& aType,
-                                        const uint32_t aFlag)
+XMLHttpRequestMainThread::CloseRequestWithError(const nsAString& aType,
+                                                const uint32_t aFlag)
 {
   if (mChannel) {
     mChannel->Cancel(NS_BINDING_ABORTED);
@@ -1130,7 +1131,7 @@ nsXMLHttpRequest::CloseRequestWithError(const nsAString& aType,
   }
 
   // The ChangeState call above calls onreadystatechange handlers which
-  // if they load a new url will cause nsXMLHttpRequest::Open to clear
+  // if they load a new url will cause XMLHttpRequestMainThread::Open to clear
   // the abort state bit. If this occurs we're not uninitialized (bug 361773).
   if (mState & XML_HTTP_REQUEST_ABORTED) {
     ChangeState(XML_HTTP_REQUEST_UNSENT, false);  // IE seems to do it
@@ -1140,13 +1141,13 @@ nsXMLHttpRequest::CloseRequestWithError(const nsAString& aType,
 }
 
 void
-nsXMLHttpRequest::Abort()
+XMLHttpRequestMainThread::Abort(ErrorResult& arv)
 {
   CloseRequestWithError(NS_LITERAL_STRING(ABORT_STR), XML_HTTP_REQUEST_ABORTED);
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::SlowAbort()
+XMLHttpRequestMainThread::SlowAbort()
 {
   Abort();
   return NS_OK;
@@ -1155,7 +1156,8 @@ nsXMLHttpRequest::SlowAbort()
 /*Method that checks if it is safe to expose a header value to the client.
 It is used to check what headers are exposed for CORS requests.*/
 bool
-nsXMLHttpRequest::IsSafeHeader(const nsACString& aHeader, NotNull<nsIHttpChannel*> aHttpChannel) const
+XMLHttpRequestMainThread::IsSafeHeader(const nsACString& aHeader,
+                                       NotNull<nsIHttpChannel*> aHttpChannel) const
 {
   // See bug #380418. Hide "Set-Cookie" headers from non-chrome scripts.
   if (!IsSystemXHR() && nsContentUtils::IsForbiddenResponseHeader(aHeader)) {
@@ -1208,9 +1210,17 @@ nsXMLHttpRequest::IsSafeHeader(const nsACString& aHeader, NotNull<nsIHttpChannel
   return isSafe;
 }
 
-IMPL_CSTRING_GETTER(GetAllResponseHeaders)
+NS_IMETHODIMP
+XMLHttpRequestMainThread::GetAllResponseHeaders(nsACString& aOut)
+{
+  ErrorResult rv;
+  GetAllResponseHeaders(aOut, rv);
+  return rv.StealNSResult();
+}
+
 void
-nsXMLHttpRequest::GetAllResponseHeaders(nsCString& aResponseHeaders)
+XMLHttpRequestMainThread::GetAllResponseHeaders(nsACString& aResponseHeaders,
+                                                ErrorResult& aRv)
 {
   aResponseHeaders.Truncate();
 
@@ -1259,8 +1269,8 @@ nsXMLHttpRequest::GetAllResponseHeaders(nsCString& aResponseHeaders)
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetResponseHeader(const nsACString& aHeader,
-                                    nsACString& aResult)
+XMLHttpRequestMainThread::GetResponseHeader(const nsACString& aHeader,
+                                            nsACString& aResult)
 {
   ErrorResult rv;
   GetResponseHeader(aHeader, aResult, rv);
@@ -1268,8 +1278,8 @@ nsXMLHttpRequest::GetResponseHeader(const nsACString& aHeader,
 }
 
 void
-nsXMLHttpRequest::GetResponseHeader(const nsACString& header,
-                                    nsACString& _retval, ErrorResult& aRv)
+XMLHttpRequestMainThread::GetResponseHeader(const nsACString& header,
+                                            nsACString& _retval, ErrorResult& aRv)
 {
   _retval.SetIsVoid(true);
 
@@ -1334,7 +1344,7 @@ nsXMLHttpRequest::GetResponseHeader(const nsACString& header,
 }
 
 already_AddRefed<nsILoadGroup>
-nsXMLHttpRequest::GetLoadGroup() const
+XMLHttpRequestMainThread::GetLoadGroup() const
 {
   if (mState & XML_HTTP_REQUEST_BACKGROUND) {
     return nullptr;
@@ -1354,7 +1364,7 @@ nsXMLHttpRequest::GetLoadGroup() const
 }
 
 nsresult
-nsXMLHttpRequest::CreateReadystatechangeEvent(nsIDOMEvent** aDOMEvent)
+XMLHttpRequestMainThread::CreateReadystatechangeEvent(nsIDOMEvent** aDOMEvent)
 {
   RefPtr<Event> event = NS_NewDOMEvent(this, nullptr, nullptr);
   event.forget(aDOMEvent);
@@ -1369,10 +1379,10 @@ nsXMLHttpRequest::CreateReadystatechangeEvent(nsIDOMEvent** aDOMEvent)
 }
 
 void
-nsXMLHttpRequest::DispatchProgressEvent(DOMEventTargetHelper* aTarget,
-                                        const nsAString& aType,
-                                        bool aLengthComputable,
-                                        int64_t aLoaded, int64_t aTotal)
+XMLHttpRequestMainThread::DispatchProgressEvent(DOMEventTargetHelper* aTarget,
+                                                const nsAString& aType,
+                                                bool aLengthComputable,
+                                                int64_t aLoaded, int64_t aTotal)
 {
   NS_ASSERTION(aTarget, "null target");
   NS_ASSERTION(!aType.IsEmpty(), "missing event type");
@@ -1407,29 +1417,29 @@ nsXMLHttpRequest::DispatchProgressEvent(DOMEventTargetHelper* aTarget,
 }
 
 already_AddRefed<nsIHttpChannel>
-nsXMLHttpRequest::GetCurrentHttpChannel()
+XMLHttpRequestMainThread::GetCurrentHttpChannel()
 {
   nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(mChannel);
   return httpChannel.forget();
 }
 
 already_AddRefed<nsIJARChannel>
-nsXMLHttpRequest::GetCurrentJARChannel()
+XMLHttpRequestMainThread::GetCurrentJARChannel()
 {
   nsCOMPtr<nsIJARChannel> appChannel = do_QueryInterface(mChannel);
   return appChannel.forget();
 }
 
 bool
-nsXMLHttpRequest::IsSystemXHR() const
+XMLHttpRequestMainThread::IsSystemXHR() const
 {
   return mIsSystem || nsContentUtils::IsSystemPrincipal(mPrincipal);
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::Open(const nsACString& method, const nsACString& url,
-                       bool async, const nsAString& user,
-                       const nsAString& password, uint8_t optional_argc)
+XMLHttpRequestMainThread::Open(const nsACString& method, const nsACString& url,
+                               bool async, const nsAString& user,
+                               const nsAString& password, uint8_t optional_argc)
 {
   if (!optional_argc) {
     // No optional arguments were passed in. Default async to true.
@@ -1447,9 +1457,9 @@ nsXMLHttpRequest::Open(const nsACString& method, const nsACString& url,
 }
 
 nsresult
-nsXMLHttpRequest::Open(const nsACString& inMethod, const nsACString& url,
-                       bool async, const Optional<nsAString>& user,
-                       const Optional<nsAString>& password)
+XMLHttpRequestMainThread::Open(const nsACString& inMethod, const nsACString& url,
+                               bool async, const Optional<nsAString>& user,
+                               const Optional<nsAString>& password)
 {
   if (inMethod.IsEmpty()) {
     return NS_ERROR_DOM_SYNTAX_ERR;
@@ -1627,7 +1637,7 @@ nsXMLHttpRequest::Open(const nsACString& inMethod, const nsACString& url,
 }
 
 void
-nsXMLHttpRequest::PopulateNetworkInterfaceId()
+XMLHttpRequestMainThread::PopulateNetworkInterfaceId()
 {
   if (mNetworkInterfaceId.IsEmpty()) {
     return;
@@ -1643,14 +1653,14 @@ nsXMLHttpRequest::PopulateNetworkInterfaceId()
  * "Copy" from a stream.
  */
 NS_METHOD
-nsXMLHttpRequest::StreamReaderFunc(nsIInputStream* in,
-                                   void* closure,
-                                   const char* fromRawSegment,
-                                   uint32_t toOffset,
-                                   uint32_t count,
-                                   uint32_t *writeCount)
+XMLHttpRequestMainThread::StreamReaderFunc(nsIInputStream* in,
+                                           void* closure,
+                                           const char* fromRawSegment,
+                                           uint32_t toOffset,
+                                           uint32_t count,
+                                           uint32_t *writeCount)
 {
-  nsXMLHttpRequest* xmlHttpRequest = static_cast<nsXMLHttpRequest*>(closure);
+  XMLHttpRequestMainThread* xmlHttpRequest = static_cast<XMLHttpRequestMainThread*>(closure);
   if (!xmlHttpRequest || !writeCount) {
     NS_WARNING("XMLHttpRequest cannot read from stream: no closure or writeCount");
     return NS_ERROR_FAILURE;
@@ -1728,7 +1738,7 @@ nsXMLHttpRequest::StreamReaderFunc(nsIInputStream* in,
   return rv;
 }
 
-bool nsXMLHttpRequest::CreateDOMBlob(nsIRequest *request)
+bool XMLHttpRequestMainThread::CreateDOMBlob(nsIRequest *request)
 {
   nsCOMPtr<nsIFile> file;
   nsCOMPtr<nsIFileChannel> fc = do_QueryInterface(request);
@@ -1751,11 +1761,11 @@ bool nsXMLHttpRequest::CreateDOMBlob(nsIRequest *request)
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::OnDataAvailable(nsIRequest *request,
-                                  nsISupports *ctxt,
-                                  nsIInputStream *inStr,
-                                  uint64_t sourceOffset,
-                                  uint32_t count)
+XMLHttpRequestMainThread::OnDataAvailable(nsIRequest *request,
+                                          nsISupports *ctxt,
+                                          nsIInputStream *inStr,
+                                          uint64_t sourceOffset,
+                                          uint32_t count)
 {
   NS_ENSURE_ARG_POINTER(inStr);
 
@@ -1772,7 +1782,7 @@ nsXMLHttpRequest::OnDataAvailable(nsIRequest *request,
   }
 
   uint32_t totalRead;
-  nsresult rv = inStr->ReadSegments(nsXMLHttpRequest::StreamReaderFunc,
+  nsresult rv = inStr->ReadSegments(XMLHttpRequestMainThread::StreamReaderFunc,
                                     (void*)this, count, &totalRead);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -1798,9 +1808,9 @@ nsXMLHttpRequest::OnDataAvailable(nsIRequest *request,
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
+XMLHttpRequestMainThread::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
 {
-  PROFILER_LABEL("nsXMLHttpRequest", "OnStartRequest",
+  PROFILER_LABEL("XMLHttpRequestMainThread", "OnStartRequest",
     js::ProfileEntry::Category::NETWORK);
 
   nsresult rv = NS_OK;
@@ -2059,9 +2069,9 @@ nsXMLHttpRequest::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult status)
+XMLHttpRequestMainThread::OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult status)
 {
-  PROFILER_LABEL("nsXMLHttpRequest", "OnStopRequest",
+  PROFILER_LABEL("XMLHttpRequestMainThread", "OnStopRequest",
     js::ProfileEntry::Category::NETWORK);
 
   if (request != mChannel) {
@@ -2213,7 +2223,7 @@ nsXMLHttpRequest::MatchCharsetAndDecoderToResponseDocument()
 }
 
 void
-nsXMLHttpRequest::ChangeStateToDone()
+XMLHttpRequestMainThread::ChangeStateToDone()
 {
   if (mIsHtml) {
     // In the HTML case, this has to be deferred, because the parser doesn't
@@ -2248,9 +2258,9 @@ nsXMLHttpRequest::ChangeStateToDone()
 }
 
 static nsresult
-GetRequestBody(nsIDOMDocument* aDoc, nsIInputStream** aResult,
-               uint64_t* aContentLength, nsACString& aContentType,
-               nsACString& aCharset)
+GetRequestBodyInternal(nsIDOMDocument* aDoc, nsIInputStream** aResult,
+                       uint64_t* aContentLength, nsACString& aContentType,
+                       nsACString& aCharset)
 {
   nsCOMPtr<nsIDocument> doc(do_QueryInterface(aDoc));
   NS_ENSURE_STATE(doc);
@@ -2303,9 +2313,9 @@ GetRequestBody(nsIDOMDocument* aDoc, nsIInputStream** aResult,
 }
 
 static nsresult
-GetRequestBody(const nsAString& aString, nsIInputStream** aResult,
-               uint64_t* aContentLength, nsACString& aContentType,
-               nsACString& aCharset)
+GetRequestBodyInternal(const nsAString& aString, nsIInputStream** aResult,
+                       uint64_t* aContentLength, nsACString& aContentType,
+                       nsACString& aCharset)
 {
   aContentType.AssignLiteral("text/plain");
   aCharset.AssignLiteral("UTF-8");
@@ -2316,9 +2326,9 @@ GetRequestBody(const nsAString& aString, nsIInputStream** aResult,
 }
 
 static nsresult
-GetRequestBody(nsIInputStream* aStream, nsIInputStream** aResult,
-               uint64_t* aContentLength, nsACString& aContentType,
-               nsACString& aCharset)
+GetRequestBodyInternal(nsIInputStream* aStream, nsIInputStream** aResult,
+                       uint64_t* aContentLength, nsACString& aContentType,
+                       nsACString& aCharset)
 {
   aContentType.AssignLiteral("text/plain");
   aCharset.Truncate();
@@ -2332,17 +2342,18 @@ GetRequestBody(nsIInputStream* aStream, nsIInputStream** aResult,
 }
 
 static nsresult
-GetRequestBody(nsIXHRSendable* aSendable, nsIInputStream** aResult, uint64_t* aContentLength,
-               nsACString& aContentType, nsACString& aCharset)
+GetRequestBodyInternal(nsIXHRSendable* aSendable, nsIInputStream** aResult,
+                       uint64_t* aContentLength, nsACString& aContentType,
+                       nsACString& aCharset)
 {
   return aSendable->GetSendInfo(aResult, aContentLength, aContentType, aCharset);
 }
 
 // Used for array buffers and array buffer views
 static nsresult
-GetRequestBody(const uint8_t* aData, uint32_t aDataLength,
-               nsIInputStream** aResult, uint64_t* aContentLength,
-               nsACString& aContentType, nsACString& aCharset)
+GetRequestBodyInternal(const uint8_t* aData, uint32_t aDataLength,
+                       nsIInputStream** aResult, uint64_t* aContentLength,
+                       nsACString& aContentType, nsACString& aCharset)
 {
   aContentType.SetIsVoid(true);
   aCharset.Truncate();
@@ -2361,8 +2372,9 @@ GetRequestBody(const uint8_t* aData, uint32_t aDataLength,
 }
 
 static nsresult
-GetRequestBody(nsIVariant* aBody, nsIInputStream** aResult, uint64_t* aContentLength,
-               nsACString& aContentType, nsACString& aCharset)
+GetRequestBodyInternal(nsIVariant* aBody, nsIInputStream** aResult,
+                       uint64_t* aContentLength, nsACString& aContentType,
+                       nsACString& aCharset)
 {
   *aResult = nullptr;
 
@@ -2382,7 +2394,8 @@ GetRequestBody(nsIVariant* aBody, nsIInputStream** aResult, uint64_t* aContentLe
     // document?
     nsCOMPtr<nsIDOMDocument> doc = do_QueryInterface(supports);
     if (doc) {
-      return GetRequestBody(doc, aResult, aContentLength, aContentType, aCharset);
+      return GetRequestBodyInternal(doc, aResult, aContentLength, aContentType,
+                                    aCharset);
     }
 
     // nsISupportsString?
@@ -2391,19 +2404,22 @@ GetRequestBody(nsIVariant* aBody, nsIInputStream** aResult, uint64_t* aContentLe
       nsAutoString string;
       wstr->GetData(string);
 
-      return GetRequestBody(string, aResult, aContentLength, aContentType, aCharset);
+      return GetRequestBodyInternal(string, aResult, aContentLength,
+                                    aContentType, aCharset);
     }
 
     // nsIInputStream?
     nsCOMPtr<nsIInputStream> stream = do_QueryInterface(supports);
     if (stream) {
-      return GetRequestBody(stream, aResult, aContentLength, aContentType, aCharset);
+      return GetRequestBodyInternal(stream, aResult, aContentLength,
+                                    aContentType, aCharset);
     }
 
     // nsIXHRSendable?
     nsCOMPtr<nsIXHRSendable> sendable = do_QueryInterface(supports);
     if (sendable) {
-      return GetRequestBody(sendable, aResult, aContentLength, aContentType, aCharset);
+      return GetRequestBodyInternal(sendable, aResult, aContentLength,
+                                    aContentType, aCharset);
     }
 
     // ArrayBuffer?
@@ -2416,8 +2432,8 @@ GetRequestBody(nsIVariant* aBody, nsIInputStream** aResult, uint64_t* aContentLe
       RootedTypedArray<ArrayBuffer> buf(rootingCx);
       if (buf.Init(obj)) {
           buf.ComputeLengthAndData();
-          return GetRequestBody(buf.Data(), buf.Length(), aResult,
-                                aContentLength, aContentType, aCharset);
+          return GetRequestBodyInternal(buf.Data(), buf.Length(), aResult,
+                                        aContentLength, aContentType, aCharset);
       }
     }
   }
@@ -2439,67 +2455,72 @@ GetRequestBody(nsIVariant* aBody, nsIInputStream** aResult, uint64_t* aContentLe
   nsString string;
   string.Adopt(data, len);
 
-  return GetRequestBody(string, aResult, aContentLength, aContentType, aCharset);
+  return GetRequestBodyInternal(string, aResult, aContentLength, aContentType,
+                                aCharset);
 }
 
 /* static */
 nsresult
-nsXMLHttpRequest::GetRequestBody(nsIVariant* aVariant,
-                                 const Nullable<RequestBody>& aBody,
-                                 nsIInputStream** aResult,
-                                 uint64_t* aContentLength,
-                                 nsACString& aContentType, nsACString& aCharset)
+XMLHttpRequestMainThread::GetRequestBody(nsIVariant* aVariant,
+                                         const Nullable<RequestBody>& aBody,
+                                         nsIInputStream** aResult,
+                                         uint64_t* aContentLength,
+                                         nsACString& aContentType,
+                                         nsACString& aCharset)
 {
   if (aVariant) {
-    return ::GetRequestBody(aVariant, aResult, aContentLength, aContentType, aCharset);
+    return GetRequestBodyInternal(aVariant, aResult, aContentLength,
+                                  aContentType, aCharset);
   }
 
   const RequestBody& body = aBody.Value();
   RequestBody::Value value = body.GetValue();
   switch (body.GetType()) {
-    case nsXMLHttpRequest::RequestBody::ArrayBuffer:
+    case XMLHttpRequestMainThread::RequestBody::eArrayBuffer:
     {
       const ArrayBuffer* buffer = value.mArrayBuffer;
       buffer->ComputeLengthAndData();
-      return ::GetRequestBody(buffer->Data(), buffer->Length(), aResult,
-                              aContentLength, aContentType, aCharset);
+      return GetRequestBodyInternal(buffer->Data(), buffer->Length(), aResult,
+                                    aContentLength, aContentType, aCharset);
     }
-    case nsXMLHttpRequest::RequestBody::ArrayBufferView:
+    case XMLHttpRequestMainThread::RequestBody::eArrayBufferView:
     {
       const ArrayBufferView* view = value.mArrayBufferView;
       view->ComputeLengthAndData();
-      return ::GetRequestBody(view->Data(), view->Length(), aResult,
-                              aContentLength, aContentType, aCharset);
+      return GetRequestBodyInternal(view->Data(), view->Length(), aResult,
+                                    aContentLength, aContentType, aCharset);
     }
-    case nsXMLHttpRequest::RequestBody::Blob:
+    case XMLHttpRequestMainThread::RequestBody::eBlob:
     {
       nsresult rv;
       nsCOMPtr<nsIDOMBlob> blob = value.mBlob;
       nsCOMPtr<nsIXHRSendable> sendable = do_QueryInterface(blob, &rv);
       NS_ENSURE_SUCCESS(rv, rv);
 
-      return ::GetRequestBody(sendable, aResult, aContentLength, aContentType, aCharset);
+      return GetRequestBodyInternal(sendable, aResult, aContentLength,
+                                    aContentType, aCharset);
     }
-    case nsXMLHttpRequest::RequestBody::Document:
+    case XMLHttpRequestMainThread::RequestBody::eDocument:
     {
       nsCOMPtr<nsIDOMDocument> document = do_QueryInterface(value.mDocument);
-      return ::GetRequestBody(document, aResult, aContentLength, aContentType, aCharset);
+      return GetRequestBodyInternal(document, aResult, aContentLength,
+                                    aContentType, aCharset);
     }
-    case nsXMLHttpRequest::RequestBody::DOMString:
+    case XMLHttpRequestMainThread::RequestBody::eDOMString:
     {
-      return ::GetRequestBody(*value.mString, aResult, aContentLength,
-                              aContentType, aCharset);
+      return GetRequestBodyInternal(*value.mString, aResult, aContentLength,
+                                    aContentType, aCharset);
     }
-    case nsXMLHttpRequest::RequestBody::FormData:
+    case XMLHttpRequestMainThread::RequestBody::eFormData:
     {
       MOZ_ASSERT(value.mFormData);
-      return ::GetRequestBody(value.mFormData, aResult, aContentLength,
-                              aContentType, aCharset);
+      return GetRequestBodyInternal(value.mFormData, aResult, aContentLength,
+                                    aContentType, aCharset);
     }
-    case nsXMLHttpRequest::RequestBody::InputStream:
+    case XMLHttpRequestMainThread::RequestBody::eInputStream:
     {
-      return ::GetRequestBody(value.mStream, aResult, aContentLength,
-                              aContentType, aCharset);
+      return GetRequestBodyInternal(value.mStream, aResult, aContentLength,
+                                    aContentType, aCharset);
     }
     default:
     {
@@ -2512,13 +2533,13 @@ nsXMLHttpRequest::GetRequestBody(nsIVariant* aVariant,
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::Send(nsIVariant *aBody)
+XMLHttpRequestMainThread::Send(nsIVariant *aBody)
 {
   return Send(aBody, Nullable<RequestBody>());
 }
 
 nsresult
-nsXMLHttpRequest::Send(nsIVariant* aVariant, const Nullable<RequestBody>& aBody)
+XMLHttpRequestMainThread::Send(nsIVariant* aVariant, const Nullable<RequestBody>& aBody)
 {
   NS_ENSURE_TRUE(mPrincipal, NS_ERROR_NOT_INITIALIZED);
 
@@ -2916,8 +2937,8 @@ nsXMLHttpRequest::Send(nsIVariant* aVariant, const Nullable<RequestBody>& aBody)
 
 // http://dvcs.w3.org/hg/xhr/raw-file/tip/Overview.html#dom-xmlhttprequest-setrequestheader
 NS_IMETHODIMP
-nsXMLHttpRequest::SetRequestHeader(const nsACString& header,
-                                   const nsACString& value)
+XMLHttpRequestMainThread::SetRequestHeader(const nsACString& header,
+                                           const nsACString& value)
 {
   // Step 1 and 2
   if (!(mState & XML_HTTP_REQUEST_OPENED)) {
@@ -3012,14 +3033,14 @@ nsXMLHttpRequest::SetRequestHeader(const nsACString& header,
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetTimeout(uint32_t *aTimeout)
+XMLHttpRequestMainThread::GetTimeout(uint32_t *aTimeout)
 {
   *aTimeout = Timeout();
   return NS_OK;
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::SetTimeout(uint32_t aTimeout)
+XMLHttpRequestMainThread::SetTimeout(uint32_t aTimeout)
 {
   ErrorResult rv;
   SetTimeout(aTimeout, rv);
@@ -3027,7 +3048,7 @@ nsXMLHttpRequest::SetTimeout(uint32_t aTimeout)
 }
 
 void
-nsXMLHttpRequest::SetTimeout(uint32_t aTimeout, ErrorResult& aRv)
+XMLHttpRequestMainThread::SetTimeout(uint32_t aTimeout, ErrorResult& aRv)
 {
   if (!(mState & (XML_HTTP_REQUEST_ASYNC | XML_HTTP_REQUEST_UNSENT)) &&
       HasOrHasHadOwner()) {
@@ -3045,7 +3066,7 @@ nsXMLHttpRequest::SetTimeout(uint32_t aTimeout, ErrorResult& aRv)
 }
 
 void
-nsXMLHttpRequest::StartTimeoutTimer()
+XMLHttpRequestMainThread::StartTimeoutTimer()
 {
   MOZ_ASSERT(mRequestSentTime,
              "StartTimeoutTimer mustn't be called before the request was sent!");
@@ -3075,14 +3096,14 @@ nsXMLHttpRequest::StartTimeoutTimer()
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetReadyState(uint16_t *aState)
+XMLHttpRequestMainThread::GetReadyState(uint16_t *aState)
 {
   *aState = ReadyState();
   return NS_OK;
 }
 
 uint16_t
-nsXMLHttpRequest::ReadyState()
+XMLHttpRequestMainThread::ReadyState() const
 {
   // Translate some of our internal states for external consumers
   if (mState & XML_HTTP_REQUEST_UNSENT) {
@@ -3101,7 +3122,7 @@ nsXMLHttpRequest::ReadyState()
   return DONE;
 }
 
-void nsXMLHttpRequest::OverrideMimeType(const nsAString& aMimeType, ErrorResult& aRv)
+void XMLHttpRequestMainThread::OverrideMimeType(const nsAString& aMimeType, ErrorResult& aRv)
 {
   if ((mState & XML_HTTP_REQUEST_LOADING) || (mState & XML_HTTP_REQUEST_DONE)) {
     ResetResponse();
@@ -3113,7 +3134,7 @@ void nsXMLHttpRequest::OverrideMimeType(const nsAString& aMimeType, ErrorResult&
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::SlowOverrideMimeType(const nsAString& aMimeType)
+XMLHttpRequestMainThread::SlowOverrideMimeType(const nsAString& aMimeType)
 {
   ErrorResult aRv;
   OverrideMimeType(aMimeType, aRv);
@@ -3121,38 +3142,28 @@ nsXMLHttpRequest::SlowOverrideMimeType(const nsAString& aMimeType)
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetMozBackgroundRequest(bool *_retval)
+XMLHttpRequestMainThread::GetMozBackgroundRequest(bool *_retval)
 {
   *_retval = MozBackgroundRequest();
   return NS_OK;
 }
 
 bool
-nsXMLHttpRequest::MozBackgroundRequest()
+XMLHttpRequestMainThread::MozBackgroundRequest() const
 {
   return !!(mState & XML_HTTP_REQUEST_BACKGROUND);
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::SetMozBackgroundRequest(bool aMozBackgroundRequest)
-{
-  nsresult rv = NS_OK;
-  SetMozBackgroundRequest(aMozBackgroundRequest, rv);
-  return rv;
-}
-
-void
-nsXMLHttpRequest::SetMozBackgroundRequest(bool aMozBackgroundRequest, nsresult& aRv)
+XMLHttpRequestMainThread::SetMozBackgroundRequest(bool aMozBackgroundRequest)
 {
   if (!IsSystemXHR()) {
-    aRv = NS_ERROR_DOM_SECURITY_ERR;
-    return;
+    return NS_ERROR_DOM_SECURITY_ERR;
   }
 
   if (!(mState & XML_HTTP_REQUEST_UNSENT)) {
     // Can't change this while we're in the middle of something.
-    aRv = NS_ERROR_IN_PROGRESS;
-    return;
+     return NS_ERROR_IN_PROGRESS;
   }
 
   if (aMozBackgroundRequest) {
@@ -3160,23 +3171,33 @@ nsXMLHttpRequest::SetMozBackgroundRequest(bool aMozBackgroundRequest, nsresult& 
   } else {
     mState &= ~XML_HTTP_REQUEST_BACKGROUND;
   }
+
+  return NS_OK;
+}
+
+void
+XMLHttpRequestMainThread::SetMozBackgroundRequest(bool aMozBackgroundRequest,
+                                                  ErrorResult& aRv)
+{
+  // No errors for this webIDL method on main-thread.
+  SetMozBackgroundRequest(aMozBackgroundRequest);
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetWithCredentials(bool *_retval)
+XMLHttpRequestMainThread::GetWithCredentials(bool *_retval)
 {
   *_retval = WithCredentials();
   return NS_OK;
 }
 
 bool
-nsXMLHttpRequest::WithCredentials()
+XMLHttpRequestMainThread::WithCredentials() const
 {
   return !!(mState & XML_HTTP_REQUEST_AC_WITH_CREDENTIALS);
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::SetWithCredentials(bool aWithCredentials)
+XMLHttpRequestMainThread::SetWithCredentials(bool aWithCredentials)
 {
   ErrorResult rv;
   SetWithCredentials(aWithCredentials, rv);
@@ -3184,7 +3205,7 @@ nsXMLHttpRequest::SetWithCredentials(bool aWithCredentials)
 }
 
 void
-nsXMLHttpRequest::SetWithCredentials(bool aWithCredentials, ErrorResult& aRv)
+XMLHttpRequestMainThread::SetWithCredentials(bool aWithCredentials, ErrorResult& aRv)
 {
   // Return error if we're already processing a request.  Note that we can't use
   // ReadyState() here, because it can't differentiate between "opened" and
@@ -3204,7 +3225,7 @@ nsXMLHttpRequest::SetWithCredentials(bool aWithCredentials, ErrorResult& aRv)
 }
 
 nsresult
-nsXMLHttpRequest::ChangeState(uint32_t aState, bool aBroadcast)
+XMLHttpRequestMainThread::ChangeState(uint32_t aState, bool aBroadcast)
 {
   // If we are setting one of the mutually exclusive states,
   // unset those state bits first.
@@ -3240,10 +3261,10 @@ nsXMLHttpRequest::ChangeState(uint32_t aState, bool aBroadcast)
 // nsIChannelEventSink methods:
 //
 NS_IMETHODIMP
-nsXMLHttpRequest::AsyncOnChannelRedirect(nsIChannel *aOldChannel,
-                                         nsIChannel *aNewChannel,
-                                         uint32_t    aFlags,
-                                         nsIAsyncVerifyRedirectCallback *callback)
+XMLHttpRequestMainThread::AsyncOnChannelRedirect(nsIChannel *aOldChannel,
+                                                 nsIChannel *aNewChannel,
+                                                 uint32_t    aFlags,
+                                                 nsIAsyncVerifyRedirectCallback *callback)
 {
   NS_PRECONDITION(aNewChannel, "Redirect without a channel?");
 
@@ -3269,7 +3290,7 @@ nsXMLHttpRequest::AsyncOnChannelRedirect(nsIChannel *aOldChannel,
 }
 
 nsresult
-nsXMLHttpRequest::OnRedirectVerifyCallback(nsresult result)
+XMLHttpRequestMainThread::OnRedirectVerifyCallback(nsresult result)
 {
   NS_ASSERTION(mRedirectCallback, "mRedirectCallback not set in callback");
   NS_ASSERTION(mNewRedirectChannel, "mNewRedirectChannel not set in callback");
@@ -3307,7 +3328,7 @@ nsXMLHttpRequest::OnRedirectVerifyCallback(nsresult result)
 //
 
 void
-nsXMLHttpRequest::MaybeDispatchProgressEvents(bool aFinalProgress)
+XMLHttpRequestMainThread::MaybeDispatchProgressEvents(bool aFinalProgress)
 {
   if (aFinalProgress && mProgressTimerIsActive) {
     mProgressTimerIsActive = false;
@@ -3355,7 +3376,7 @@ nsXMLHttpRequest::MaybeDispatchProgressEvents(bool aFinalProgress)
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::OnProgress(nsIRequest *aRequest, nsISupports *aContext, int64_t aProgress, int64_t aProgressMax)
+XMLHttpRequestMainThread::OnProgress(nsIRequest *aRequest, nsISupports *aContext, int64_t aProgress, int64_t aProgressMax)
 {
   // We're uploading if our state is XML_HTTP_REQUEST_OPENED or
   // XML_HTTP_REQUEST_SENT
@@ -3391,7 +3412,7 @@ nsXMLHttpRequest::OnProgress(nsIRequest *aRequest, nsISupports *aContext, int64_
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::OnStatus(nsIRequest *aRequest, nsISupports *aContext, nsresult aStatus, const char16_t *aStatusArg)
+XMLHttpRequestMainThread::OnStatus(nsIRequest *aRequest, nsISupports *aContext, nsresult aStatus, const char16_t *aStatusArg)
 {
   if (mProgressEventSink) {
     mProgressEventSink->OnStatus(aRequest, aContext, aStatus, aStatusArg);
@@ -3401,7 +3422,7 @@ nsXMLHttpRequest::OnStatus(nsIRequest *aRequest, nsISupports *aContext, nsresult
 }
 
 bool
-nsXMLHttpRequest::AllowUploadProgress()
+XMLHttpRequestMainThread::AllowUploadProgress()
 {
   return !IsCrossSiteCORSRequest() ||
     (mState & XML_HTTP_REQUEST_HAD_UPLOAD_LISTENERS_ON_SEND);
@@ -3411,7 +3432,7 @@ nsXMLHttpRequest::AllowUploadProgress()
 // nsIInterfaceRequestor methods:
 //
 NS_IMETHODIMP
-nsXMLHttpRequest::GetInterface(const nsIID & aIID, void **aResult)
+XMLHttpRequestMainThread::GetInterface(const nsIID & aIID, void **aResult)
 {
   nsresult rv;
 
@@ -3487,15 +3508,15 @@ nsXMLHttpRequest::GetInterface(const nsIID & aIID, void **aResult)
 }
 
 void
-nsXMLHttpRequest::GetInterface(JSContext* aCx, nsIJSID* aIID,
-                               JS::MutableHandle<JS::Value> aRetval,
-                               ErrorResult& aRv)
+XMLHttpRequestMainThread::GetInterface(JSContext* aCx, nsIJSID* aIID,
+                                       JS::MutableHandle<JS::Value> aRetval,
+                                       ErrorResult& aRv)
 {
   dom::GetInterface(aCx, this, aIID, aRetval, aRv);
 }
 
 XMLHttpRequestUpload*
-nsXMLHttpRequest::Upload()
+XMLHttpRequestMainThread::GetUpload(ErrorResult& aRv)
 {
   if (!mUpload) {
     mUpload = new XMLHttpRequestUpload(this);
@@ -3504,44 +3525,45 @@ nsXMLHttpRequest::Upload()
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetUpload(nsIXMLHttpRequestUpload** aUpload)
+XMLHttpRequestMainThread::GetUpload(nsIXMLHttpRequestUpload** aUpload)
 {
-  RefPtr<XMLHttpRequestUpload> upload = Upload();
+  ErrorResult rv;
+  RefPtr<XMLHttpRequestUpload> upload = GetUpload(rv);
   upload.forget(aUpload);
-  return NS_OK;
+  return rv.StealNSResult();
 }
 
 bool
-nsXMLHttpRequest::MozAnon()
+XMLHttpRequestMainThread::MozAnon() const
 {
   return mIsAnon;
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetMozAnon(bool* aAnon)
+XMLHttpRequestMainThread::GetMozAnon(bool* aAnon)
 {
   *aAnon = MozAnon();
   return NS_OK;
 }
 
 bool
-nsXMLHttpRequest::MozSystem()
+XMLHttpRequestMainThread::MozSystem() const
 {
   return IsSystemXHR();
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::GetMozSystem(bool* aSystem)
+XMLHttpRequestMainThread::GetMozSystem(bool* aSystem)
 {
   *aSystem = MozSystem();
   return NS_OK;
 }
 
 void
-nsXMLHttpRequest::HandleTimeoutCallback()
+XMLHttpRequestMainThread::HandleTimeoutCallback()
 {
   if (mState & XML_HTTP_REQUEST_DONE) {
-    NS_NOTREACHED("nsXMLHttpRequest::HandleTimeoutCallback with completed request");
+    NS_NOTREACHED("XMLHttpRequestMainThread::HandleTimeoutCallback with completed request");
     // do nothing!
     return;
   }
@@ -3551,7 +3573,7 @@ nsXMLHttpRequest::HandleTimeoutCallback()
 }
 
 NS_IMETHODIMP
-nsXMLHttpRequest::Notify(nsITimer* aTimer)
+XMLHttpRequestMainThread::Notify(nsITimer* aTimer)
 {
   if (mProgressNotifier == aTimer) {
     HandleProgressTimerCallback();
@@ -3569,14 +3591,14 @@ nsXMLHttpRequest::Notify(nsITimer* aTimer)
 }
 
 void
-nsXMLHttpRequest::HandleProgressTimerCallback()
+XMLHttpRequestMainThread::HandleProgressTimerCallback()
 {
   mProgressTimerIsActive = false;
   MaybeDispatchProgressEvents(false);
 }
 
 void
-nsXMLHttpRequest::StartProgressEventTimer()
+XMLHttpRequestMainThread::StartProgressEventTimer()
 {
   if (!mProgressNotifier) {
     mProgressNotifier = do_CreateInstance(NS_TIMER_CONTRACTID);
@@ -3590,7 +3612,7 @@ nsXMLHttpRequest::StartProgressEventTimer()
 }
 
 already_AddRefed<nsXMLHttpRequestXPCOMifier>
-nsXMLHttpRequest::EnsureXPCOMifier()
+XMLHttpRequestMainThread::EnsureXPCOMifier()
 {
   if (!mXPCOMifier) {
     mXPCOMifier = new nsXMLHttpRequestXPCOMifier(this);
@@ -3600,7 +3622,7 @@ nsXMLHttpRequest::EnsureXPCOMifier()
 }
 
 bool
-nsXMLHttpRequest::ShouldBlockAuthPrompt()
+XMLHttpRequestMainThread::ShouldBlockAuthPrompt()
 {
   // Verify that it's ok to prompt for credentials here, per spec
   // http://xhr.spec.whatwg.org/#the-send%28%29-method
@@ -3638,9 +3660,9 @@ nsXMLHttpRequest::ShouldBlockAuthPrompt()
   return false;
 }
 
-NS_IMPL_ISUPPORTS(nsXMLHttpRequest::nsHeaderVisitor, nsIHttpHeaderVisitor)
+NS_IMPL_ISUPPORTS(XMLHttpRequestMainThread::nsHeaderVisitor, nsIHttpHeaderVisitor)
 
-NS_IMETHODIMP nsXMLHttpRequest::
+NS_IMETHODIMP XMLHttpRequestMainThread::
 nsHeaderVisitor::VisitHeader(const nsACString &header, const nsACString &value)
 {
   if (mXHR.IsSafeHeader(header, mHttpChannel)) {
@@ -3696,8 +3718,6 @@ nsXMLHttpRequestXPCOMifier::GetInterface(const nsIID & aIID, void **aResult)
 
   return mXHR->GetInterface(aIID, aResult);
 }
-
-namespace mozilla {
 
 ArrayBufferBuilder::ArrayBufferBuilder()
   : mDataPtr(nullptr),
@@ -3888,4 +3908,5 @@ ArrayBufferBuilder::areOverlappingRegions(const uint8_t* aStart1,
   return max_start < min_end;
 }
 
-} // namespace mozilla
+} // dom namespace
+} // mozilla namespaceo
