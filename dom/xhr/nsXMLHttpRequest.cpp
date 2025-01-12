@@ -16,7 +16,6 @@
 #include "mozilla/dom/FetchUtil.h"
 #include "mozilla/dom/FormData.h"
 #include "mozilla/dom/XMLDocument.h"
-#include "mozilla/dom/XMLHttpRequestUploadBinding.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventListenerManager.h"
 #include "mozilla/LoadInfo.h"
@@ -81,6 +80,7 @@
 #include "nsZipArchive.h"
 #include "mozilla/Preferences.h"
 #include "private/pprio.h"
+#include "XMLHttpRequestUpload.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -177,21 +177,6 @@ static void AddLoadFlags(nsIRequest *request, nsLoadFlags newFlags)
   request->GetLoadFlags(&flags);
   flags |= newFlags;
   request->SetLoadFlags(flags);
-}
-
-/////////////////////////////////////////////
-
-NS_INTERFACE_MAP_BEGIN(nsXMLHttpRequestUpload)
-  NS_INTERFACE_MAP_ENTRY(nsIXMLHttpRequestUpload)
-NS_INTERFACE_MAP_END_INHERITING(XMLHttpRequestEventTarget)
-
-NS_IMPL_ADDREF_INHERITED(nsXMLHttpRequestUpload, XMLHttpRequestEventTarget)
-NS_IMPL_RELEASE_INHERITED(nsXMLHttpRequestUpload, XMLHttpRequestEventTarget)
-
-/* virtual */ JSObject*
-nsXMLHttpRequestUpload::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
-{
-  return XMLHttpRequestUploadBinding::Wrap(aCx, this, aGivenProto);
 }
 
 /////////////////////////////////////////////
@@ -3509,11 +3494,11 @@ nsXMLHttpRequest::GetInterface(JSContext* aCx, nsIJSID* aIID,
   dom::GetInterface(aCx, this, aIID, aRetval, aRv);
 }
 
-nsXMLHttpRequestUpload*
+XMLHttpRequestUpload*
 nsXMLHttpRequest::Upload()
 {
   if (!mUpload) {
-    mUpload = new nsXMLHttpRequestUpload(this);
+    mUpload = new XMLHttpRequestUpload(this);
   }
   return mUpload;
 }
@@ -3521,7 +3506,7 @@ nsXMLHttpRequest::Upload()
 NS_IMETHODIMP
 nsXMLHttpRequest::GetUpload(nsIXMLHttpRequestUpload** aUpload)
 {
-  RefPtr<nsXMLHttpRequestUpload> upload = Upload();
+  RefPtr<XMLHttpRequestUpload> upload = Upload();
   upload.forget(aUpload);
   return NS_OK;
 }
