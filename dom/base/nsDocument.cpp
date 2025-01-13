@@ -3216,7 +3216,7 @@ DocumentTimeline*
 nsDocument::Timeline()
 {
   if (!mDocumentTimeline) {
-    mDocumentTimeline = new DocumentTimeline(this);
+    mDocumentTimeline = new DocumentTimeline(this, TimeDuration(0));
   }
 
   return mDocumentTimeline;
