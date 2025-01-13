@@ -3309,12 +3309,6 @@ nsGlobalWindow::WillHandleEvent(EventChainPostVisitor& aVisitor)
   return NS_OK;
 }
 
-JSContext*
-nsGlobalWindow::GetJSContextForEventHandlers()
-{
-  return nullptr;
-}
-
 nsresult
 nsGlobalWindow::PreHandleEvent(EventChainPreVisitor& aVisitor)
 {
