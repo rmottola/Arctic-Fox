@@ -1026,9 +1026,15 @@ class MInstruction
     // protected, and delegates to the TempObject new operator. Thus, the
     // following code prevents calls to "new(alloc) MFoo" outside the MFoo
     // members.
-    template <typename... Args>
-    inline void* operator new(size_t nbytes, Args&&... args) {
-        return TempObject::operator new(nbytes, mozilla::Forward<Args>(args)...);
+    inline void* operator new(size_t nbytes, TempAllocator::Fallible view) throw() {
+        return TempObject::operator new(nbytes, view);
+    }
+    inline void* operator new(size_t nbytes, TempAllocator& alloc) {
+        return TempObject::operator new(nbytes, alloc);
+    }
+    template <class T>
+    inline void* operator new(size_t nbytes, T* pos) {
+        return TempObject::operator new(nbytes, pos);
     }
 
   public:
@@ -5204,6 +5210,7 @@ class MWasmTruncateToInt64
         isUnsigned_(isUnsigned)
     {
         setResultType(MIRType::Int64);
+        setGuard(); // not removable because of possible side-effects.
         setMovable();
     }
 
@@ -5236,6 +5243,7 @@ class MWasmTruncateToInt32
       : MUnaryInstruction(def), isUnsigned_(isUnsigned)
     {
         setResultType(MIRType::Int32);
+        setGuard(); // not removable because of possible side-effects.
         setMovable();
     }
 
@@ -6731,6 +6739,8 @@ class MDiv : public MBinaryArithInstruction
         MDiv* div = new(alloc) MDiv(left, right, type);
         div->unsigned_ = unsignd;
         div->trapOnError_ = trapOnError;
+        if (trapOnError)
+            div->setGuard(); // not removable because of possible side-effects.
         if (type == MIRType::Int32)
             div->setTruncateKind(Truncate);
         return div;
@@ -6855,6 +6865,8 @@ class MMod : public MBinaryArithInstruction
         MMod* mod = new(alloc) MMod(left, right, type);
         mod->unsigned_ = unsignd;
         mod->trapOnError_ = trapOnError;
+        if (trapOnError)
+            mod->setGuard(); // not removable because of possible side-effects.
         if (type == MIRType::Int32)
             mod->setTruncateKind(Truncate);
         return mod;

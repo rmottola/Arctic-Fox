@@ -38,9 +38,7 @@ EXPORTS.mozilla.dom.workers.bindings += [
     'ServiceWorkerWindowClient.h',
     'SharedWorker.h',
     'URL.h',
-    'WorkerFeature.h',
-    'XMLHttpRequest.h',
-    'XMLHttpRequestUpload.h',
+    'WorkerHolder.h',
 ]
 
 XPIDL_MODULE = 'dom_workers'
@@ -82,14 +80,13 @@ UNIFIED_SOURCES += [
     'SharedWorker.cpp',
     'URL.cpp',
     'WorkerDebuggerManager.cpp',
+    'WorkerHolder.cpp',
     'WorkerLocation.cpp',
     'WorkerNavigator.cpp',
     'WorkerPrivate.cpp',
     'WorkerRunnable.cpp',
     'WorkerScope.cpp',
     'WorkerThread.cpp',
-    'XMLHttpRequest.cpp',
-    'XMLHttpRequestUpload.cpp',
 ]
 
 IPDL_SOURCES += [
