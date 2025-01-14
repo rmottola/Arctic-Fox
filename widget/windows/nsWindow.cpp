@@ -140,7 +140,7 @@
 #include "nsBidiKeyboard.h"
 #include "nsThemeConstants.h"
 #include "gfxConfig.h"
-#include "WinCompositorWidgetProxy.h"
+#include "WinCompositorWidget.h"
 
 #include "nsIGfxInfo.h"
 #include "nsUXThemeConstants.h"
@@ -1298,7 +1298,7 @@ NS_METHOD nsWindow::Show(bool bState)
       // Clear contents to avoid ghosting of old content if we display
       // this window again.
       if (wasVisible && mTransparencyMode == eTransparencyTransparent) {
-        if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+        if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
           proxy->ClearTransparentWindow();
         }
       }
@@ -1557,7 +1557,7 @@ NS_METHOD nsWindow::Resize(double aWidth, double aHeight, bool aRepaint)
   }
 
   if (mTransparencyMode == eTransparencyTransparent) {
-    if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+    if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
       proxy->ResizeTransparentWindow(width, height);
     }
   }
@@ -1616,7 +1616,7 @@ NS_METHOD nsWindow::Resize(double aX, double aY, double aWidth, double aHeight, 
   }
 
   if (eTransparencyTransparent == mTransparencyMode) {
-    if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+    if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
       proxy->ResizeTransparentWindow(width, height);
     }
   }
@@ -3627,8 +3627,8 @@ nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
 
     // Ensure we have a widget proxy even if we're not using the compositor,
     // since that's where we handle transparent windows.
-    if (!mCompositorWidgetProxy) {
-      mCompositorWidgetProxy = NewCompositorWidgetProxy();
+    if (!mCompositorWidget) {
+      mCompositorWidget= NewCompositorWidget();
     }
 
     mLayerManager = CreateBasicLayerManager();
@@ -3691,20 +3691,20 @@ nsWindow::OnDefaultButtonLoaded(const LayoutDeviceIntRect& aButtonRect)
   return NS_OK;
 }
 
-mozilla::widget::CompositorWidgetProxy*
-nsWindow::NewCompositorWidgetProxy()
+mozilla::widget::CompositorWidget*
+nsWindow::NewCompositorWidget()
 {
-  return new WinCompositorWidgetProxy(
+  return new WinCompositorWidget(
     mWnd,
     reinterpret_cast<uintptr_t>(this),
     mTransparencyMode,
     this);
 }
 
-mozilla::widget::WinCompositorWidgetProxy*
-nsWindow::GetCompositorWidgetProxy()
+mozilla::widget::WinCompositorWidget*
+nsWindow::GetCompositorWidget()
 {
-  return mCompositorWidgetProxy ? mCompositorWidgetProxy->AsWindowsProxy() : nullptr;
+  return mCompositorWidget? mCompositorWidget->AsWindows() : nullptr;
 }
 
 void
@@ -4922,7 +4922,7 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
         //
         // To do this we take mPresentLock in nsWindow::PreRender and
         // if that lock is taken we wait before doing WM_SETTEXT
-        RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy();
+        RefPtr<WinCompositorWidget> proxy = GetCompositorWidget();
         if (proxy) {
           proxy->EnterPresentLock();
         }
@@ -6237,7 +6237,7 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp)
     nsIntRect rect(wp->x, wp->y, newWidth, newHeight);
 
     if (eTransparencyTransparent == mTransparencyMode) {
-      if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+      if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
         proxy->ResizeTransparentWindow(newWidth, newHeight);
       }
     }
@@ -6758,7 +6758,7 @@ void nsWindow::OnDestroy()
   if (mCursor == -1)
     SetCursor(eCursor_standard);
 
-  if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+  if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
     proxy->OnDestroyWindow();
   }
 
@@ -7095,7 +7095,7 @@ void nsWindow::SetWindowTranslucencyInner(nsTransparencyMode aMode)
     memset(&mGlassMargins, 0, sizeof mGlassMargins);
   mTransparencyMode = aMode;
 
-  if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
+  if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
     proxy->UpdateTransparency(aMode);
   }
   UpdateGlass();
