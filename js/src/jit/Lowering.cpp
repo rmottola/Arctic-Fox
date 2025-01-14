@@ -4084,6 +4084,12 @@ LIRGenerator::visitAsmJSStoreGlobalVar(MAsmJSStoreGlobalVar* ins)
 }
 
 void
+LIRGenerator::visitAsmJSLoadFuncPtr(MAsmJSLoadFuncPtr* ins)
+{
+    define(new(alloc()) LAsmJSLoadFuncPtr(useRegister(ins->index())), ins);
+}
+
+void
 LIRGenerator::visitAsmJSLoadFFIFunc(MAsmJSLoadFFIFunc* ins)
 {
     define(new(alloc()) LAsmJSLoadFFIFunc, ins);
