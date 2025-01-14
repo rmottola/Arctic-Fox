@@ -720,7 +720,8 @@ nsObjectLoadingContent::nsObjectLoadingContent()
   , mActivated(false)
   , mIsStopping(false)
   , mIsLoading(false)
-  , mScriptRequested(false) {}
+  , mScriptRequested(false)
+  , mRewrittenYoutubeEmbed(false) {}
 
 nsObjectLoadingContent::~nsObjectLoadingContent()
 {
@@ -1842,6 +1843,7 @@ nsObjectLoadingContent::UpdateObjectParameters(bool aJavaURI)
     NS_NOTREACHED("Unrecognized plugin-loading tag");
   }
 
+  mRewrittenYoutubeEmbed = false;
   // Note that the baseURI changing could affect the newURI, even if uriStr did
   // not change.
   if (!uriStr.IsEmpty()) {
@@ -1855,6 +1857,7 @@ nsObjectLoadingContent::UpdateObjectParameters(bool aJavaURI)
                              getter_AddRefs(rewrittenURI));
     if (rewrittenURI) {
       newURI = rewrittenURI;
+      mRewrittenYoutubeEmbed = true;
       newMime = NS_LITERAL_CSTRING("text/html");
     }
 
