@@ -323,8 +323,5 @@ if 'rtsp' in CONFIG['NECKO_PROTOCOLS']:
         '/netwerk/protocol/rtsp/rtsp',
     ]
 
-if CONFIG['ENABLE_TESTS']:
-    DEFINES['PREDICTOR_TESTS'] = True
-
 if CONFIG['GNU_CXX']:
     CXXFLAGS += ['-Wno-error=shadow']
