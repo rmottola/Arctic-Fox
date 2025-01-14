@@ -174,6 +174,7 @@ static const XP_CHAR dumpFileExtension[] = XP_TEXT(".dmp");
 static const XP_CHAR childCrashAnnotationBaseName[] = XP_TEXT("GeckoChildCrash");
 static const XP_CHAR extraFileExtension[] = XP_TEXT(".extra");
 static const XP_CHAR memoryReportExtension[] = XP_TEXT(".memory.json.gz");
+static xpstring *defaultMemoryReportPath = nullptr;
 
 // A whitelist of crash annotations which do not contain sensitive data
 // and are saved in the crash record and sent with Firefox Health Report.
@@ -2699,6 +2700,31 @@ SetMemoryReportFile(nsIFile* aFile)
 #endif
 }
 
+nsresult
+GetDefaultMemoryReportFile(nsIFile** aFile)
+{
+  nsCOMPtr<nsIFile> defaultMemoryReportFile;
+  if (!defaultMemoryReportPath) {
+    nsresult rv = NS_GetSpecialDirectory(NS_APP_PROFILE_DIR_STARTUP,
+                                         getter_AddRefs(defaultMemoryReportFile));
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+    defaultMemoryReportFile->AppendNative(NS_LITERAL_CSTRING("memory-report.json.gz"));
+    defaultMemoryReportPath = CreatePathFromFile(defaultMemoryReportFile);
+    if (!defaultMemoryReportPath) {
+      return NS_ERROR_FAILURE;
+    }
+  } else {
+    CreateFileFromPath(*defaultMemoryReportPath,
+                       getter_AddRefs(defaultMemoryReportFile));
+    if (!defaultMemoryReportFile) {
+      return NS_ERROR_FAILURE;
+    }
+  }
+  defaultMemoryReportFile.forget(aFile);
+  return NS_OK;
+}
 
 void
 SetTelemetrySessionId(const nsACString& id)
@@ -2891,6 +2917,13 @@ WriteAnnotation(PRFileDesc* fd, const nsACString& key, const nsACString& value)
   PR_Write(fd, "\n", 1);
 }
 
+template<int N>
+void
+WriteLiteral(PRFileDesc* fd, const char (&str)[N])
+{
+  PR_Write(fd, str, N - 1);
+}
+
 static bool
 WriteExtraData(nsIFile* extraFile,
                const AnnotationTable& data,
@@ -2933,6 +2966,10 @@ WriteExtraData(nsIFile* extraFile,
     WriteAnnotation(fd,
                     nsDependentCString("UptimeTS"),
                     nsDependentCString(uptimeTSString));
+  }
+
+  if (memoryReportPath) {
+    WriteLiteral(fd, "ContainsMemoryReport=1\n");
   }
 
   PR_Close(fd);
@@ -3085,8 +3122,10 @@ WriteExtraForMinidump(nsIFile* minidump,
 
 // It really only makes sense to call this function when
 // ShouldReport() is true.
+// Uses dumpFile's filename to generate memoryReport's filename (same name with
+// a different extension)
 static bool
-MoveToPending(nsIFile* dumpFile, nsIFile* extraFile)
+MoveToPending(nsIFile* dumpFile, nsIFile* extraFile, nsIFile* memoryReport)
 {
   nsCOMPtr<nsIFile> pendingDir;
   if (!GetPendingDir(getter_AddRefs(pendingDir)))
@@ -3098,6 +3137,20 @@ MoveToPending(nsIFile* dumpFile, nsIFile* extraFile)
 
   if (extraFile && NS_FAILED(extraFile->MoveTo(pendingDir, EmptyString()))) {
     return false;
+  }
+
+  if (memoryReport) {
+    nsAutoString leafName;
+    nsresult rv = dumpFile->GetLeafName(leafName);
+    if (NS_FAILED(rv)) {
+      return false;
+    }
+    // Generate the correct memory report filename from the dumpFile's name
+    leafName.Replace(leafName.Length() - 4, 4,
+                     static_cast<nsString>(CONVERT_XP_CHAR_TO_UTF16(memoryReportExtension)));
+    if (NS_FAILED(memoryReport->MoveTo(pendingDir, leafName))) {
+      return false;
+    }
   }
 
   return true;
@@ -3145,8 +3198,14 @@ OnChildProcessDumpRequested(void* aContext,
                              getter_AddRefs(extraFile)))
     return;
 
-  if (ShouldReport())
-    MoveToPending(minidump, extraFile);
+  if (ShouldReport()) {
+    nsCOMPtr<nsIFile> memoryReport;
+    if (memoryReportPath) {
+      CreateFileFromPath(memoryReportPath, getter_AddRefs(memoryReport));
+      MOZ_ASSERT(memoryReport);
+    }
+    MoveToPending(minidump, extraFile, memoryReport);
+  }
 
   {
 
@@ -3428,10 +3487,16 @@ CheckForLastRunCrash()
     return false;
   }
 
+  nsCOMPtr<nsIFile> memoryReportFile;
+  nsresult rv = GetDefaultMemoryReportFile(getter_AddRefs(memoryReportFile));
+  if (NS_FAILED(rv) || NS_FAILED(memoryReportFile->Exists(&exists)) || !exists) {
+    memoryReportFile = nullptr;
+  }
+
   FindPendingDir();
 
-  // Move {dump,extra} to pending folder
-  if (!MoveToPending(lastMinidumpFile, lastExtraFile)) {
+  // Move {dump,extra,memory} to pending folder
+  if (!MoveToPending(lastMinidumpFile, lastExtraFile, memoryReportFile)) {
     return false;
   }
 
@@ -3753,7 +3818,7 @@ bool TakeMinidump(nsIFile** aResult, bool aMoveToPending)
   }
 
   if (aMoveToPending) {
-    MoveToPending(*aResult, nullptr);
+    MoveToPending(*aResult, nullptr, nullptr);
   }
   return true;
 }
@@ -3817,8 +3882,8 @@ CreateMinidumpsAndPair(ProcessHandle aTargetPid,
   RenameAdditionalHangMinidump(incomingDump, targetMinidump, aIncomingPairName);
 
   if (ShouldReport()) {
-    MoveToPending(targetMinidump, targetExtra);
-    MoveToPending(incomingDump, nullptr);
+    MoveToPending(targetMinidump, targetExtra, nullptr);
+    MoveToPending(incomingDump, nullptr, nullptr);
   }
 
   targetMinidump.forget(aMainDumpOut);
