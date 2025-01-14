@@ -48,6 +48,3 @@ LOCAL_INCLUDES += [
     '/dom/base',
     '/dom/workers',
 ]
-
-if CONFIG['GNU_CXX']:
-    CXXFLAGS += ['-Wshadow']
