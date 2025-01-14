@@ -1304,7 +1304,7 @@ void nsBaseWidget::CreateCompositor(int aWidth, int aHeight)
     GetDefaultScale(),
     UseAPZ(),
     UseExternalCompositingSurface(),
-    aWidth, aHeight);
+    gfx::IntSize(aWidth, aHeight));
   mCompositorBridgeChild = mCompositorSession->GetCompositorBridgeChild();
 
   mAPZC = mCompositorSession->GetAPZCTreeManager();
