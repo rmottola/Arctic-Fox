@@ -2394,8 +2394,6 @@ ContentParent::ContentParent(mozIApplication* aApp,
     ? base::PRIVILEGES_INHERIT
     : base::PRIVILEGES_DEFAULT;
   mSubprocess = new GeckoChildProcessHost(GeckoProcessType_Content, privs);
-
-  IToplevelProtocol::SetTransport(mSubprocess->GetChannel());
 }
 
 #ifdef MOZ_NUWA_PROCESS
