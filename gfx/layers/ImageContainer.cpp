@@ -93,6 +93,16 @@ BufferRecycleBin::GetBuffer(uint32_t aSize)
   return result;
 }
 
+void
+BufferRecycleBin::ClearRecycledBuffers()
+{
+  MutexAutoLock lock(mLock);
+  if (!mRecycledBuffers.IsEmpty()) {
+    mRecycledBuffers.Clear();
+  }
+  mRecycledBufferSize = 0;
+}
+
 /**
  * The child side of PImageContainer. It's best to avoid ImageContainer filling
  * this role since IPDL objects should be associated with a single thread and
@@ -328,7 +338,7 @@ ImageContainer::SetCurrentImages(const nsTArray<NonOwningImage>& aImages)
   SetCurrentImageInternal(aImages);
 }
 
- void
+void
 ImageContainer::ClearAllImages()
 {
   if (IsAsync()) {
@@ -340,6 +350,16 @@ ImageContainer::ClearAllImages()
 
   ReentrantMonitorAutoEnter mon(mReentrantMonitor);
   SetCurrentImageInternal(nsTArray<NonOwningImage>());
+}
+
+void
+ImageContainer::ClearCachedResources()
+{
+  ReentrantMonitorAutoEnter mon(mReentrantMonitor);
+  if (mImageClient && mImageClient->AsImageClientSingle()) {
+    return;
+  }
+  return mRecycleBin->ClearRecycledBuffers();
 }
 
 void
