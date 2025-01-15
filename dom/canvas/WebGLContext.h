@@ -100,6 +100,7 @@ class WebGLRenderbuffer;
 class WebGLSampler;
 class WebGLShader;
 class WebGLShaderPrecisionFormat;
+class WebGLSync;
 class WebGLTexture;
 class WebGLTimerQuery;
 class WebGLTransformFeedback;
@@ -1416,6 +1417,7 @@ protected:
     LinkedList<WebGLRenderbuffer> mRenderbuffers;
     LinkedList<WebGLSampler> mSamplers;
     LinkedList<WebGLShader> mShaders;
+    LinkedList<WebGLSync> mSyncs;
     LinkedList<WebGLTexture> mTextures;
     LinkedList<WebGLTimerQuery> mTimerQueries;
     LinkedList<WebGLTransformFeedback> mTransformFeedbacks;
