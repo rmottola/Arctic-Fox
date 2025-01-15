@@ -651,6 +651,19 @@ protected:
                              RenderingMode aRenderMode = RenderingMode::DefaultBackendMode);
 
   /**
+   * This method is run at the end of the event-loop spin where
+   * ScheduleStableStateCallback was called.
+   *
+   * We use it to unlock resources that need to be locked while drawing.
+   */
+  void OnStableState();
+
+  /**
+   * Cf. OnStableState.
+   */
+  void ScheduleStableStateCallback();
+
+  /**
    * Disposes an old target and prepares to lazily create a new target.
    *
    * Parameters are the new dimensions to be used.
@@ -743,6 +756,8 @@ protected:
   // True if the current DrawTarget is using skia-gl, used so we can avoid
   // requesting the DT from mBufferProvider to check.
   bool mIsSkiaGL;
+
+  bool mHasPendingStableStateCallback;
 
   nsTArray<CanvasRenderingContext2DUserData*> mUserDatas;
 
