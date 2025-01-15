@@ -1299,8 +1299,8 @@ NS_METHOD nsWindow::Show(bool bState)
       // Clear contents to avoid ghosting of old content if we display
       // this window again.
       if (wasVisible && mTransparencyMode == eTransparencyTransparent) {
-        if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
-          proxy->ClearTransparentWindow();
+        if (mCompositorWidgetDelegate) {
+          mCompositorWidgetDelegate->ClearTransparentWindow();
         }
       }
       if (mWindowType != eWindowType_dialog) {
@@ -1558,8 +1558,8 @@ NS_METHOD nsWindow::Resize(double aWidth, double aHeight, bool aRepaint)
   }
 
   if (mTransparencyMode == eTransparencyTransparent) {
-    if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
-      proxy->ResizeTransparentWindow(width, height);
+    if (mCompositorWidgetDelegate) {
+      mCompositorWidgetDelegate->ResizeTransparentWindow(gfx::IntSize(width, height));
     }
   }
 
@@ -1617,8 +1617,8 @@ NS_METHOD nsWindow::Resize(double aX, double aY, double aWidth, double aHeight, 
   }
 
   if (eTransparencyTransparent == mTransparencyMode) {
-    if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
-      proxy->ResizeTransparentWindow(width, height);
+    if (mCompositorWidgetDelegate) {
+      mCompositorWidgetDelegate->ResizeTransparentWindow(gfx::IntSize(width, height));
     }
   }
 
@@ -3625,7 +3625,7 @@ nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
 
   if (!mLayerManager) {
     MOZ_ASSERT(!mCompositorSession && !mCompositorBridgeChild);
-    MOZ_ASSERT(!mCompositorWidget);
+    MOZ_ASSERT(!mCompositorWidgetDelegate);
 
     // Ensure we have a widget proxy even if we're not using the compositor,
     // since all our transparent window handling lives there.
@@ -3633,7 +3633,8 @@ nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
       reinterpret_cast<uintptr_t>(mWnd),
       reinterpret_cast<uintptr_t>(static_cast<nsIWidget*>(this)),
       mTransparencyMode);
-    mCompositorWidget = new WinCompositorWidget(initData, this);
+    mBasicLayersSurface = new WinCompositorWidget(initData, this);
+    mCompositorWidgetDelegate = mBasicLayersSurface;
     mLayerManager = CreateBasicLayerManager();
   }
 
@@ -3692,12 +3693,6 @@ nsWindow::OnDefaultButtonLoaded(const LayoutDeviceIntRect& aButtonRect)
     return NS_ERROR_FAILURE;
   }
   return NS_OK;
-}
-
-mozilla::widget::WinCompositorWidget*
-nsWindow::GetCompositorWidget()
-{
-  return mCompositorWidget? mCompositorWidget->AsWindows() : nullptr;
 }
 
 void
@@ -4915,17 +4910,16 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
         //
         // To do this we take mPresentLock in nsWindow::PreRender and
         // if that lock is taken we wait before doing WM_SETTEXT
-        RefPtr<WinCompositorWidget> proxy = GetCompositorWidget();
-        if (proxy) {
-          proxy->EnterPresentLock();
+        if (mCompositorWidgetDelegate) {
+          mCompositorWidgetDelegate->EnterPresentLock();
         }
         DWORD style = GetWindowLong(mWnd, GWL_STYLE);
         SetWindowLong(mWnd, GWL_STYLE, style & ~WS_VISIBLE);
         *aRetValue = CallWindowProcW(GetPrevWindowProc(), mWnd,
                                      msg, wParam, lParam);
         SetWindowLong(mWnd, GWL_STYLE, style);
-        if (proxy) {
-          proxy->LeavePresentLock();
+        if (mCompositorWidgetDelegate) {
+          mCompositorWidgetDelegate->LeavePresentLock();
         }
 
         return true;
@@ -6230,8 +6224,8 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp)
     nsIntRect rect(wp->x, wp->y, newWidth, newHeight);
 
     if (eTransparencyTransparent == mTransparencyMode) {
-      if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
-        proxy->ResizeTransparentWindow(newWidth, newHeight);
+      if (mCompositorWidgetDelegate) {
+        mCompositorWidgetDelegate->ResizeTransparentWindow(gfx::IntSize(newWidth, newHeight));
       }
     }
 
@@ -6751,9 +6745,10 @@ void nsWindow::OnDestroy()
   if (mCursor == -1)
     SetCursor(eCursor_standard);
 
-  if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
-    proxy->OnDestroyWindow();
+  if (mCompositorWidgetDelegate) {
+    mCompositorWidgetDelegate->OnDestroyWindow();
   }
+  mBasicLayersSurface = nullptr;
 
   // Finalize panning feedback to possibly restore window displacement
   mGesture.PanFeedbackFinalize(mWnd, true);
@@ -7088,8 +7083,8 @@ void nsWindow::SetWindowTranslucencyInner(nsTransparencyMode aMode)
     memset(&mGlassMargins, 0, sizeof mGlassMargins);
   mTransparencyMode = aMode;
 
-  if (RefPtr<WinCompositorWidget> proxy = GetCompositorWidget()) {
-    proxy->UpdateTransparency(aMode);
+  if (mCompositorWidgetDelegate) {
+    mCompositorWidgetDelegate->UpdateTransparency(aMode);
   }
   UpdateGlass();
 }
