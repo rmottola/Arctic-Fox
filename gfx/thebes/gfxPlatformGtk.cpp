@@ -670,6 +670,7 @@ public:
         }
 
         mGLContext = gl::GLContextGLX::CreateGLContext(
+            gl::CreateContextFlags::NONE,
             gl::SurfaceCaps::Any(),
             nullptr,
             false,
