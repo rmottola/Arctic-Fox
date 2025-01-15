@@ -4861,6 +4861,9 @@ pref("layers.d3d11.disable-warp", false);
 
 #endif
 
+// Copy-on-write canvas
+pref("layers.shared-buffer-provider.enabled", false);
+
 // Force all possible layers to be always active layers
 pref("layers.force-active", false);
 
