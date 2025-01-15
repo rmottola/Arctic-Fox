@@ -850,6 +850,15 @@ ClientLayerManager::DependsOnStaleDevice() const
   return gfxPlatform::GetPlatform()->GetDeviceCounter() != mDeviceCounter;
 }
 
+
+already_AddRefed<PersistentBufferProvider>
+ClientLayerManager::CreatePersistentBufferProvider(const gfx::IntSize& aSize,
+                                                   gfx::SurfaceFormat aFormat)
+{
+  return PersistentBufferProviderShared::Create(aSize, aFormat, AsShadowForwarder());
+}
+
+
 ClientLayer::~ClientLayer()
 {
   if (HasShadow()) {
