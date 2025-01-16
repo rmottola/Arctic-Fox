@@ -697,16 +697,15 @@ bool
 WebGLContext::CreateAndInitGL(bool forceEnabled,
                               std::vector<FailureReason>* const out_failReasons)
 {
-    bool blacklistOpenGL = false;
-    if (!forceEnabled) {
+    bool disableNativeGL = true;
+    if (forceEnabled) {
+        disableNativeGL = false;
+    } else if (IsWebGL2()) {
         const nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
+        const auto feature = nsIGfxInfo::FEATURE_WEBGL_OPENGL;
 
         FailureReason reason;
-        if (IsFeatureInBlacklist(gfxInfo, nsIGfxInfo::FEATURE_WEBGL_OPENGL,
-                                 &reason.key))
-        {
-            blacklistOpenGL = true;
-
+        if (IsFeatureInBlacklist(gfxInfo, feature, &reason.key)) {
             reason.info = "Refused to create native OpenGL context because of blacklist"
                           " entry: ";
             reason.info.Append(reason.key);
@@ -714,6 +713,8 @@ WebGLContext::CreateAndInitGL(bool forceEnabled,
             out_failReasons->push_back(reason);
 
             GenerateWarning(reason.info.BeginReading());
+        } else {
+            disableNativeGL = false;
         }
     }
 
@@ -729,7 +730,7 @@ WebGLContext::CreateAndInitGL(bool forceEnabled,
 
     //////
 
-    if (!blacklistOpenGL) {
+    if (!disableNativeGL) {
         const bool useEGL = PR_GetEnv("MOZ_WEBGL_FORCE_EGL");
 
         if (useEGL)
