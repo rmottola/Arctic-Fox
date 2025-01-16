@@ -810,11 +810,9 @@ GLContextGLX::CreateGLContext(CreateContextFlags flags, const SurfaceCaps& caps,
     int err = glx.xGetFBConfigAttrib(display, cfg,
                                       LOCAL_GLX_DOUBLEBUFFER, &db);
     if (LOCAL_GLX_BAD_ATTRIBUTE != err) {
-#ifdef DEBUG
-        if (DebugMode()) {
+        if (ShouldSpew()) {
             printf("[GLX] FBConfig is %sdouble-buffered\n", db ? "" : "not ");
         }
-#endif
     }
 
     GLXContext context;
