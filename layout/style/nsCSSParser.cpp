@@ -3290,7 +3290,7 @@ CSSParserImpl::ParseAtRule(RuleAppendFunc aAppendFunc,
   if (unnestable) {
     REPORT_UNEXPECTED_TOKEN(PEGroupRuleNestedAtRule);
   }
-  
+
   if (unnestable || !(this->*parseFunc)(aAppendFunc, aData)) {
     // Skip over invalid at rule, don't advance section
     OUTPUT_ERROR();
@@ -3301,7 +3301,7 @@ CSSParserImpl::ParseAtRule(RuleAppendFunc aAppendFunc,
   if (!aInAtRule) {
     mSection = newSection;
   }
-  
+
   return true;
 }
 
@@ -3825,7 +3825,7 @@ CSSParserImpl::ParseMozDocumentRule(RuleAppendFunc aAppendFunc, void* aData)
       delete urls;
       return false;
     }
-        
+
     if (!(eCSSToken_URL == mToken.mType ||
           (eCSSToken_Function == mToken.mType &&
            (mToken.mIdent.LowerCaseEqualsLiteral("url-prefix") ||
@@ -7805,9 +7805,9 @@ CSSParserImpl::ParseVariant(nsCSSValue& aValue,
       ((aVariantMask & (VARIANT_LENGTH | VARIANT_ZERO_ANGLE)) != 0 &&
        eCSSToken_Number == tk->mType &&
        tk->mNumber == 0.0f)) {
-    if (((aVariantMask & VARIANT_POSITIVE_DIMENSION) != 0 && 
+    if (((aVariantMask & VARIANT_POSITIVE_DIMENSION) != 0 &&
          tk->mNumber <= 0.0) ||
-        ((aVariantMask & VARIANT_NONNEGATIVE_DIMENSION) != 0 && 
+        ((aVariantMask & VARIANT_NONNEGATIVE_DIMENSION) != 0 &&
          tk->mNumber < 0.0)) {
         UngetToken();
         AssertNextTokenAt(lineBefore, colBefore);
@@ -8259,7 +8259,7 @@ CSSParserImpl::ParseImageOrientation(nsCSSValue& aValue)
     } else {
       aValue = angle;
     }
-    
+
     return true;
   }
 
@@ -8435,7 +8435,7 @@ CSSParserImpl::ParseFlex()
     if (ParseNonNegativeNumber(tmpVal)) {
       flexShrink = tmpVal;
     }
- 
+
     // d) Finally: If we didn't get flex-basis at the beginning, try to parse
     //    it now, at the end.
     //
@@ -9848,7 +9848,7 @@ CSSParserImpl::ParseJustifyItems()
 }
 
 // normal | stretch | <baseline-position> |
-// [ <overflow-position>? && <self-position> ] 
+// [ <overflow-position>? && <self-position> ]
 bool
 CSSParserImpl::ParseAlignItems()
 {
@@ -9866,7 +9866,7 @@ CSSParserImpl::ParseAlignItems()
 }
 
 // auto | normal | stretch | <baseline-position> |
-// [ <overflow-position>? && <self-position> ] 
+// [ <overflow-position>? && <self-position> ]
 bool
 CSSParserImpl::ParseAlignJustifySelf(nsCSSProperty aPropID)
 {
@@ -13106,7 +13106,7 @@ CSSParserImpl::ParseBorderImage()
               return false;
             }
           } else if (!foundBorderImageWidth) {
-            // If this part has an trailing slash, the whole declaration is 
+            // If this part has an trailing slash, the whole declaration is
             // invalid.
             return false;
           }
