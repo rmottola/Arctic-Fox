@@ -159,6 +159,12 @@ GLScreenBuffer::~GLScreenBuffer()
     mFactory = nullptr;
     mDraw = nullptr;
     mRead = nullptr;
+
+    if (!mBack)
+        return;
+
+    // Detach mBack cleanly.
+    mBack->Surf()->ProducerRelease();
 }
 
 void
