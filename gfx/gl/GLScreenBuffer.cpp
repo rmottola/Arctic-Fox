@@ -485,8 +485,10 @@ GLScreenBuffer::Attach(SharedSurface* surf, const gfx::IntSize& size)
 {
     ScopedBindFramebuffer autoFB(mGL);
 
-    if (mRead && SharedSurf())
+    const bool readNeedsUnlock = (mRead && SharedSurf());
+    if (readNeedsUnlock) {
         SharedSurf()->UnlockProd();
+    }
 
     surf->LockProd();
 
@@ -517,7 +519,9 @@ GLScreenBuffer::Attach(SharedSurface* surf, const gfx::IntSize& size)
 
         if (!drawOk || !readOk) {
             surf->UnlockProd();
-
+            if (readNeedsUnlock) {
+                SharedSurf()->LockProd();
+            }
             return false;
         }
 
@@ -560,8 +564,10 @@ GLScreenBuffer::Swap(const gfx::IntSize& size)
     // attachment to framebuffer succeeds in Attach() call.
     newBack->Surf()->ProducerAcquire();
 
-    if (!Attach(newBack->Surf(), size))
+    if (!Attach(newBack->Surf(), size)) {
+        newBack->Surf()->ProducerRelease();
         return false;
+    }
     // Attach was successful.
 
     mFront = mBack;
