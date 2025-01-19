@@ -91,7 +91,7 @@ gfxPlatformGtk::gfxPlatformGtk()
     mMaxGenericSubstitutions = UNINITIALIZED_VALUE;
 
 #ifdef MOZ_X11
-    sUseXRender = (GDK_IS_X11_DISPLAY(gdk_display_get_default())) ? 
+    sUseXRender = (GDK_IS_X11_DISPLAY(gdk_display_get_default())) ?
                     mozilla::Preferences::GetBool("gfx.xrender.enabled") : false;
 #endif
 
@@ -289,7 +289,7 @@ gfxPlatformGtk::LookupLocalFont(const nsAString& aFontName,
                                            aStretch, aStyle);
 }
 
-gfxFontEntry* 
+gfxFontEntry*
 gfxPlatformGtk::MakePlatformFont(const nsAString& aFontName,
                                  uint16_t aWeight,
                                  int16_t aStretch,
@@ -354,11 +354,19 @@ gfxPlatformGtk::GetDPI()
 double
 gfxPlatformGtk::GetDPIScale()
 {
-    // We want to set the default CSS to device pixel ratio as the
-    // closest _integer_ multiple, so round the ratio of actual dpi
-    // to CSS dpi (96)
+    // Integer scale factors work well with GTK window scaling, image scaling,
+    // and pixel alignment, but there is a range where 1 is too small and 2 is
+    // too big.  An additional step of 1.5 is added because this is common
+    // scale on WINNT and at this ratio the advantages of larger rendering
+    // outweigh the disadvantages from scaling and pixel mis-alignment.
     int32_t dpi = GetDPI();
-    return (dpi > 96) ? round(dpi/96.0) : 1.0;
+    if (dpi < 144) {
+        return 1.0;
+    } else if (dpi < 168) {
+        return 1.5;
+    } else {
+        return round(dpi/96.0);
+    }
 }
 
 bool
@@ -430,7 +438,7 @@ gfxPlatformGtk::GetPlatformCMSOutputProfile(void *&mem, size_t &size)
     // return with nullptr.
     if (!dpy)
         return;
- 
+
     Window root = gdk_x11_get_default_root_xwindow();
 
     Atom retAtom;
