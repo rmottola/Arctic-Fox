@@ -8094,12 +8094,18 @@ nsIFrame::FinishAndStoreOverflow(nsOverflowAreas& aOverflowAreas,
 
   /* If we're transformed, transform the overflow rect by the current transformation. */
   bool hasTransform = IsTransformed();
-  nsSize oldSize = aOldSize ? *aOldSize : mRect.Size();
-  bool sizeChanged = (oldSize != aNewSize);
+  nsSize oldSize = mRect.Size();
+  bool sizeChanged = ((aOldSize ? *aOldSize : oldSize) != aNewSize);
+
+  /* Since our size might not actually have been computed yet, we need to make sure that we use the
+   * correct dimensions by overriding the stored bounding rectangle with the value the caller has
+   * ensured us we'll use.
+   */
+  SetSize(aNewSize);
 
   if (ChildrenHavePerspective() && sizeChanged) {
     nsRect newBounds(nsPoint(0, 0), aNewSize);
-    RecomputePerspectiveChildrenOverflow(this, &newBounds);
+    RecomputePerspectiveChildrenOverflow(this);
   }
 
   if (hasTransform) {
@@ -8115,12 +8121,6 @@ nsIFrame::FinishAndStoreOverflow(nsOverflowAreas& aOverflowAreas,
        */
       aOverflowAreas.SetAllTo(nsRect());
     } else {
-      /* Since our size might not actually have been computed yet, we need to make sure that we use the
-       * correct dimensions by overriding the stored bounding rectangle with the value the caller has
-       * ensured us we'll use.
-       */
-      SetSize(aNewSize);
-
       NS_FOR_FRAME_OVERFLOW_TYPES(otype) {
         nsRect& o = aOverflowAreas.Overflow(otype);
         o = nsDisplayTransform::TransformRect(o, this);
@@ -8133,13 +8133,13 @@ nsIFrame::FinishAndStoreOverflow(nsOverflowAreas& aOverflowAreas,
       if (Extend3DContext()) {
         ComputePreserve3DChildrenOverflow(aOverflowAreas);
       }
-
-      /* Revert the size change in case some caller is depending on this. */
-      SetSize(oldSize);
     }
   } else {
     Properties().Delete(nsIFrame::PreTransformOverflowAreasProperty());
   }
+
+  /* Revert the size change in case some caller is depending on this. */
+  SetSize(oldSize);
 
   bool anyOverflowChanged;
   if (aOverflowAreas != nsOverflowAreas(bounds, bounds)) {
@@ -8155,13 +8155,8 @@ nsIFrame::FinishAndStoreOverflow(nsOverflowAreas& aOverflowAreas,
 }
 
 void
-nsIFrame::RecomputePerspectiveChildrenOverflow(const nsIFrame* aStartFrame, const nsRect* aBounds)
+nsIFrame::RecomputePerspectiveChildrenOverflow(const nsIFrame* aStartFrame)
 {
-  // Children may check our size when getting our transform, make sure it's valid.
-  nsSize oldSize = GetSize();
-  if (aBounds) {
-    SetSize(aBounds->Size());
-  }
   nsIFrame::ChildListIterator lists(this);
   for (; !lists.IsDone(); lists.Next()) {
     nsFrameList::Enumerator childFrames(lists.CurrentList());
@@ -8188,12 +8183,10 @@ nsIFrame::RecomputePerspectiveChildrenOverflow(const nsIFrame* aStartFrame, cons
         // style context. We must find any descendant frames using our size
         // (by recursing into frames that have the same containing block)
         // to update their overflow rects too.
-        child->RecomputePerspectiveChildrenOverflow(aStartFrame, nullptr);
+        child->RecomputePerspectiveChildrenOverflow(aStartFrame);
       }
     }
   }
-  // Restore our old size just in case something depends on this elesewhere.
-  SetSize(oldSize);
 }
 
 void
