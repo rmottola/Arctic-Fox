@@ -160,8 +160,8 @@ namespace {
 // Set to true once this global state has been initialized
 bool gInitDone = false;
 
-bool gCanRecordBase;
-bool gCanRecordExtended;
+bool gCanRecordBase = false;
+bool gCanRecordExtended = false;
 
 HistogramMapType gHistogramMap(mozilla::Telemetry::HistogramCount);
 
