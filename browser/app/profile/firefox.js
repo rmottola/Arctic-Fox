@@ -703,8 +703,6 @@ pref("plugins.update.notifyUser", false);
 pref("plugins.click_to_play", true);
 pref("plugins.testmode", false);
 
-pref("plugins.hideMissingPluginsNotification", false);
-
 
 #ifdef XP_MACOSX
 pref("browser.preferences.animateFadeIn", true);
