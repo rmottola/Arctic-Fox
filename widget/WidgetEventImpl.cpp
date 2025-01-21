@@ -495,7 +495,8 @@ WidgetKeyboardEvent::CodeNameIndexHashtable*
 bool
 WidgetKeyboardEvent::ShouldCauseKeypressEvents() const
 {
-  // Currently, we don't dispatch keypress events of modifier keys.
+  // Currently, we don't dispatch keypress events of modifier keys and
+  // dead keys.
   switch (mKeyNameIndex) {
     case KEY_NAME_INDEX_Alt:
     case KEY_NAME_INDEX_AltGraph:
@@ -512,6 +513,7 @@ WidgetKeyboardEvent::ShouldCauseKeypressEvents() const
     // case KEY_NAME_INDEX_Super:
     case KEY_NAME_INDEX_Symbol:
     case KEY_NAME_INDEX_SymbolLock:
+    case KEY_NAME_INDEX_Dead:
       return false;
     default:
       return true;
