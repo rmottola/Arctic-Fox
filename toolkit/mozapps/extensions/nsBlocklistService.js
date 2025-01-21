@@ -290,6 +290,26 @@ function parseRegExp(aStr) {
 }
 
 /**
+ * Helper function to test if the blockEntry matches with the plugin.
+ *
+ * @param   blockEntry
+ *          The plugin blocklist entries to compare against.
+ * @param   plugin
+ *          The nsIPluginTag to get the blocklist state for.
+ * @returns True if the blockEntry matches the plugin, false otherwise.
+ */
+function hasMatchingPluginName(blockEntry, plugin) {
+  for (let name in blockEntry.matches) {
+    if ((name in plugin) &&
+        typeof(plugin[name]) == "string" &&
+        blockEntry.matches[name].test(plugin[name])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Manages the Blocklist. The Blocklist is a representation of the contents of
  * blocklist.xml and allows us to remotely disable / re-enable blocklisted
  * items managed by the Extension Manager with an item's appDisabled property.

@@ -93,6 +93,14 @@ var gPluginHandler = {
     openUILinkIn(Services.urlFormatter.formatURLPref("plugins.update.url"), "tab");
   },
 
+  submitReport: function submitReport(runID, keyVals, submitURLOptIn) {
+    if (!AppConstants.MOZ_CRASHREPORTER) {
+      return;
+    }
+    Services.prefs.setBoolPref("dom.ipc.plugins.reportCrashURL", submitURLOptIn);
+    PluginCrashReporter.submitCrashReport(runID, keyVals);
+  },
+
   // Callback for user clicking a "reload page" link
   reloadPage: function (browser) {
     browser.reload();
@@ -224,13 +232,19 @@ var gPluginHandler = {
         continue;
       }
 
-      let url;
-      // TODO: allow the blocklist to specify a better link, bug 873093
+      // If a block contains an infoURL, we should always prefer that to the default
+      // URL that we construct in-product, even for other blocklist types.
+      let url = Services.blocklist.getPluginInfoURL(pluginInfo.pluginTag);
+
       if (pluginInfo.blocklistState == Ci.nsIBlocklistService.STATE_VULNERABLE_UPDATE_AVAILABLE) {
-        url = Services.urlFormatter.formatURLPref("plugins.update.url");
+        if (!url) {
+          url = Services.urlFormatter.formatURLPref("plugins.update.url");
+        }
       }
       else if (pluginInfo.blocklistState != Ci.nsIBlocklistService.STATE_NOT_BLOCKED) {
-        url = Services.blocklist.getPluginBlocklistURL(pluginInfo.pluginTag);
+        if (!url) {
+          url = Services.blocklist.getPluginBlocklistURL(pluginInfo.pluginTag);
+        }
       }
       else {
         url = Services.urlFormatter.formatURLPref("app.support.baseURL") + "clicktoplay";
