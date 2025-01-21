@@ -58,6 +58,8 @@ Windows/Mac use the term "Folder" instead of "Directory" -->
 <!ENTITY aboutSupport.appBasicsMemoryUse "Memory Use">
 <!ENTITY aboutSupport.appBasicsServiceWorkers "Registered ServiceWorkers">
 
+<!ENTITY aboutSupport.appBasicsProfiles "Profiles">
+
 <!ENTITY aboutSupport.appBasicsMultiProcessSupport "Multiprocess Windows">
 
 <!ENTITY aboutSupport.appBasicsSafeMode "Safe Mode">
