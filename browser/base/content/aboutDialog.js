@@ -7,12 +7,6 @@ Components.utils.import("resource://gre/modules/Services.jsm");
 
 const PREF_EM_HOTFIX_ID = "extensions.hotfix.id";
 
-var gMenuButton = null;
-try {
-  gMenuButton = Services.wm.getMostRecentWindow("navigator:browser")
-                        .document.getElementById("PanelUI-menu-button");
-} catch (ex) { };
-
 function init(aEvent)
 {
   if (aEvent.target != document)
@@ -51,17 +45,6 @@ function init(aEvent)
     let buildID = Services.appinfo.appBuildID;
     let buildDate = buildID.slice(0,4) + "-" + buildID.slice(4,6) + "-" + buildID.slice(6,8);
     document.getElementById("PMversion").textContent += " (" + buildDate + ")";
-  }
-
-  if (/^42/.test(version)) {
-    document.getElementById("version").addEventListener("click", event => {
-      if (gMenuButton) {
-        gMenuButton.classList.add("thumburger");
-        if (event.shiftKey) {
-          gMenuButton = null;
-        }
-      }
-    });
   }
 
 #ifdef MOZ_UPDATER
@@ -107,9 +90,6 @@ function onUnload(aEvent) {
   // Safe to call even when there isn't a download in progress.
   gAppUpdater.removeDownloadListener();
   gAppUpdater = null;
-  if (gMenuButton) {
-    gMenuButton.classList.remove("thumburger");
-  }
 }
 
 
