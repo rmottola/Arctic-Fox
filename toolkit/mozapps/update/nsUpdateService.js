@@ -4119,14 +4119,8 @@ UpdatePrompt.prototype = {
         this._getUpdateWindow() || this._getAltUpdateWindow())
       return;
 
-    var stringsPrefix = "updateAvailable_" + update.type + ".";
-    var title = gUpdateBundle.formatStringFromName(stringsPrefix + "title",
-                                                   [update.name], 1);
-    var text = gUpdateBundle.GetStringFromName(stringsPrefix + "text");
-    var imageUrl = "";
     this._showUnobtrusiveUI(null, URI_UPDATE_PROMPT_DIALOG, null,
-                           UPDATE_WINDOW_NAME, "updatesavailable", update,
-                           title, text, imageUrl);
+                           UPDATE_WINDOW_NAME, "updatesavailable", update);
   },
 
   /**
@@ -4137,17 +4131,8 @@ UpdatePrompt.prototype = {
       return;
 
     if (background) {
-      if (getPref("getBoolPref", PREF_APP_UPDATE_SILENT, false))
-        return;
-
-      var stringsPrefix = "updateDownloaded_" + update.type + ".";
-      var title = gUpdateBundle.formatStringFromName(stringsPrefix + "title",
-                                                     [update.name], 1);
-      var text = gUpdateBundle.GetStringFromName(stringsPrefix + "text");
-      var imageUrl = "";
       this._showUnobtrusiveUI(null, URI_UPDATE_PROMPT_DIALOG, null,
-                              UPDATE_WINDOW_NAME, "finishedBackground", update,
-                              title, text, imageUrl);
+                              UPDATE_WINDOW_NAME, "finishedBackground", update);
     } else {
       this._showUI(null, URI_UPDATE_PROMPT_DIALOG, null,
                    UPDATE_WINDOW_NAME, "finishedBackground", update);
@@ -4244,7 +4229,7 @@ UpdatePrompt.prototype = {
   },
 
   /**
-   * Initiate a less obtrusive UI, starting with a non-modal notification alert
+   * Display the update UI after the prompt wait time has elapsed.
    * @param   parent
    *          A parent window, can be null
    * @param   uri
@@ -4257,15 +4242,9 @@ UpdatePrompt.prototype = {
    * @param   update
    *          An update to pass to the UI in the window arguments.
    *          Can be null
-   * @param   title
-   *          The title for the notification alert.
-   * @param   text
-   *          The contents of the notification alert.
-   * @param   imageUrl
-   *          A URL identifying the image to put in the notification alert.
    */
   _showUnobtrusiveUI: function UP__showUnobUI(parent, uri, features, name, page,
-                                              update, title, text, imageUrl) {
+                                              update) {
     var observer = {
       updatePrompt: this,
       service: null,
@@ -4280,9 +4259,6 @@ UpdatePrompt.prototype = {
       },
       observe: function (aSubject, aTopic, aData) {
         switch (aTopic) {
-          case "alertclickcallback":
-            this.updatePrompt._showUI(parent, uri, features, name, page, update);
-            // fall thru
           case "quit-application":
             if (this.timer)
               this.timer.cancel();
@@ -4293,8 +4269,7 @@ UpdatePrompt.prototype = {
     };
 
     // bug 534090 - show the UI for update available notifications when the
-    // the system has been idle for at least IDLE_TIME without displaying an
-    // alert notification.
+    // the system has been idle for at least IDLE_TIME.
     if (page == "updatesavailable") {
       var idleService = Cc["@mozilla.org/widget/idleservice;1"].
                         getService(Ci.nsIIdleService);
@@ -4304,17 +4279,6 @@ UpdatePrompt.prototype = {
         this._showUI(parent, uri, features, name, page, update);
         return;
       }
-    }
-
-    try {
-      var notifier = Cc["@mozilla.org/alerts-service;1"].
-                     getService(Ci.nsIAlertsService);
-      notifier.showAlertNotification(imageUrl, title, text, true, "", observer);
-    }
-    catch (e) {
-      // Failed to retrieve alerts service, platform unsupported
-      this._showUIWhenIdle(parent, uri, features, name, page, update);
-      return;
     }
 
     observer.service = Services.obs;
