@@ -141,6 +141,15 @@ function display(profileData) {
     div.appendChild(defaultButton);
   }
 
+  if (!profileData.isCurrentProfile) {
+    let runButton = document.createElement('button');
+    runButton.appendChild(document.createTextNode(bundle.GetStringFromName('start')));
+    runButton.onclick = function() {
+      openProfile(profileData.profile);
+    };
+    div.appendChild(runButton);
+  }
+
   let sep = document.createElement('hr');
   div.appendChild(sep);
 }
@@ -218,6 +227,18 @@ function defaultProfile(profile) {
   ProfileService.defaultProfile = profile;
   ProfileService.flush();
   refreshUI();
+}
+
+function openProfile(profile) {
+  let cancelQuit = Cc["@mozilla.org/supports-PRBool;1"]
+                     .createInstance(Ci.nsISupportsPRBool);
+  Services.obs.notifyObservers(cancelQuit, "quit-application-requested", "restart");
+
+  if (cancelQuit.data) {
+    return;
+  }
+
+  Services.startup.createInstanceWithProfile(profile);
 }
 
 function restart(safeMode) {
