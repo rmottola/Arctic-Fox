@@ -1094,7 +1094,7 @@ nsEventStatus AsyncPanZoomController::OnTouchStart(const MultiTouchInput& aEvent
       mY.StartTouch(point.y, aEvent.mTime);
       if (RefPtr<GeckoContentController> controller = GetGeckoContentController()) {
         controller->NotifyAPZStateChange(
-            GetGuid(), APZStateChange::StartTouch,
+            GetGuid(), APZStateChange::eStartTouch,
             CurrentTouchBlock()->GetOverscrollHandoffChain()->CanBePanned(this));
       }
       SetState(TOUCHING);
@@ -2052,7 +2052,7 @@ nsEventStatus AsyncPanZoomController::GenerateSingleTap(const ScreenIntPoint& aP
 void AsyncPanZoomController::OnTouchEndOrCancel() {
   if (RefPtr<GeckoContentController> controller = GetGeckoContentController()) {
     controller->NotifyAPZStateChange(
-        GetGuid(), APZStateChange::EndTouch, CurrentTouchBlock()->SingleTapOccurred());
+        GetGuid(), APZStateChange::eEndTouch, CurrentTouchBlock()->SingleTapOccurred());
   }
 }
 
@@ -2276,7 +2276,7 @@ nsEventStatus AsyncPanZoomController::StartPanning(const MultiTouchInput& aEvent
 
   if (IsInPanningState()) {
     if (RefPtr<GeckoContentController> controller = GetGeckoContentController()) {
-      controller->NotifyAPZStateChange(GetGuid(), APZStateChange::StartPanning);
+      controller->NotifyAPZStateChange(GetGuid(), APZStateChange::eStartPanning);
     }
     return nsEventStatus_eConsumeNoDefault;
   }
@@ -3652,7 +3652,7 @@ void AsyncPanZoomController::DispatchStateChangeNotification(PanZoomState aOldSt
   if (RefPtr<GeckoContentController> controller = GetGeckoContentController()) {
     if (!IsTransformingState(aOldState) && IsTransformingState(aNewState)) {
       controller->NotifyAPZStateChange(
-          GetGuid(), APZStateChange::TransformBegin);
+          GetGuid(), APZStateChange::eTransformBegin);
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
       // Let the compositor know about scroll state changes so it can manage
       // windowed plugins.
@@ -3662,7 +3662,7 @@ void AsyncPanZoomController::DispatchStateChangeNotification(PanZoomState aOldSt
 #endif
     } else if (IsTransformingState(aOldState) && !IsTransformingState(aNewState)) {
       controller->NotifyAPZStateChange(
-          GetGuid(), APZStateChange::TransformEnd);
+          GetGuid(), APZStateChange::eTransformEnd);
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
       if (mCompositorBridgeParent) {
         mCompositorBridgeParent->ScheduleShowAllPluginWindows();
