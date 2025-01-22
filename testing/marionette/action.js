@@ -2,12 +2,26 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-this.EXPORTED_SYMBOLS = ["ActionChain"];
+const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+
+Cu.import("resource://gre/modules/Log.jsm");
+Cu.import("resource://gre/modules/Preferences.jsm");
+
+Cu.import("chrome://marionette/content/event.js");
+
+const CONTEXT_MENU_DELAY_PREF = "ui.click_hold_context_menus.delay";
+const DEFAULT_CONTEXT_MENU_DELAY = 750;  // ms
+
+this.EXPORTED_SYMBOLS = ["action"];
+
+const logger = Log.repository.getLogger("Marionette");
+
+this.action = {};
 
 /**
  * Functionality for (single finger) action chains.
  */
-this.ActionChain = function(utils, checkForInterrupted) {
+action.Chain = function(checkForInterrupted) {
   // for assigning unique ids to all touches
   this.nextTouchId = 1000;
   // keep track of active Touches
@@ -18,8 +32,7 @@ this.ActionChain = function(utils, checkForInterrupted) {
   this.scrolling = false;
   // whether to send mouse event
   this.mouseEventsOnly = false;
-  this.checkTimer = Components.classes["@mozilla.org/timer;1"]
-      .createInstance(Components.interfaces.nsITimer);
+  this.checkTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
 
   // callbacks for command completion
   this.onSuccess = null;
@@ -32,12 +45,9 @@ this.ActionChain = function(utils, checkForInterrupted) {
 
   // determines if we create touch events
   this.inputSource = null;
-
-  // test utilities providing some event synthesis code
-  this.utils = utils;
 };
 
-ActionChain.prototype.dispatchActions = function(
+action.Chain.prototype.dispatchActions = function(
     args,
     touchId,
     container,
@@ -74,7 +84,7 @@ ActionChain.prototype.dispatchActions = function(
   try {
     this.actions(commandArray, touchId, 0, keyModifiers);
   } catch (e) {
-    this.onError(e);
+    callbacks.onError(e);
     this.resetValues();
   }
 };
@@ -95,7 +105,7 @@ ActionChain.prototype.dispatchActions = function(
  * @param {Object} modifiers
  *     An object of modifier keys present.
  */
-ActionChain.prototype.emitMouseEvent = function(
+action.Chain.prototype.emitMouseEvent = function(
     doc,
     type,
     elClientX,
@@ -104,20 +114,19 @@ ActionChain.prototype.emitMouseEvent = function(
     clickCount,
     modifiers) {
   if (!this.checkForInterrupted()) {
-    let loggingInfo = "emitting Mouse event of type " + type +
-      " at coordinates (" + elClientX + ", " + elClientY +
-      ") relative to the viewport\n" +
-      " button: " + button + "\n" +
-      " clickCount: " + clickCount + "\n";
-    dump(Date.now() + " Marionette: " + loggingInfo);
+    logger.debug(`Emitting ${type} mouse event ` +
+      `at coordinates (${elClientX}, ${elClientY}) ` +
+      `relative to the viewport, ` +
+      `button: ${button}, ` +
+      `clickCount: ${clickCount}`);
 
     let win = doc.defaultView;
-    let domUtils = win.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-        .getInterface(Components.interfaces.nsIDOMWindowUtils);
+    let domUtils = win.QueryInterface(Ci.nsIInterfaceRequestor)
+        .getInterface(Ci.nsIDOMWindowUtils);
 
     let mods;
     if (typeof modifiers != "undefined") {
-      mods = this.utils._parseModifiers(modifiers);
+      mods = event.parseModifiers_(modifiers);
     } else {
       mods = 0;
     }
@@ -138,7 +147,7 @@ ActionChain.prototype.emitMouseEvent = function(
 /**
  * Reset any persisted values after a command completes.
  */
-ActionChain.prototype.resetValues = function() {
+action.Chain.prototype.resetValues = function() {
   this.onSuccess = null;
   this.onError = null;
   this.container = null;
@@ -154,9 +163,9 @@ ActionChain.prototype.resetValues = function() {
  * keyModifiers is an object keeping track keyDown/keyUp pairs through
  * an action chain.
  */
-ActionChain.prototype.actions = function(chain, touchId, i, keyModifiers) {
+action.Chain.prototype.actions = function(chain, touchId, i, keyModifiers) {
   if (i == chain.length) {
-    this.onSuccess({value: touchId || null});
+    this.onSuccess(touchId || null);
     this.resetValues();
     return;
   }
@@ -177,12 +186,12 @@ ActionChain.prototype.actions = function(chain, touchId, i, keyModifiers) {
 
   switch(command) {
     case "keyDown":
-      this.utils.sendKeyDown(pack[1], keyModifiers, this.container.frame);
+      event.sendKeyDown(pack[1], keyModifiers, this.container.frame);
       this.actions(chain, touchId, i, keyModifiers);
       break;
 
     case "keyUp":
-      this.utils.sendKeyUp(pack[1], keyModifiers, this.container.frame);
+      event.sendKeyUp(pack[1], keyModifiers, this.container.frame);
       this.actions(chain, touchId, i, keyModifiers);
       break;
 
@@ -213,7 +222,8 @@ ActionChain.prototype.actions = function(chain, touchId, i, keyModifiers) {
             "Invalid Command: press cannot follow an active touch event");
       }
 
-      // look ahead to check if we're scrolling. Needed for APZ touch dispatching.
+      // look ahead to check if we're scrolling,
+      // needed for APZ touch dispatching
       if ((i != chain.length) && (chain[i][0].indexOf('move') !== -1)) {
         this.scrolling = true;
       }
@@ -258,10 +268,9 @@ ActionChain.prototype.actions = function(chain, touchId, i, keyModifiers) {
         let time = pack[1] * 1000;
 
         // standard waiting time to fire contextmenu
-        let standard = 750;
-        try {
-          standard = Services.prefs.getIntPref("ui.click_hold_context_menus.delay");
-        } catch (e) {}
+        let standard = Preferences.get(
+            CONTEXT_MENU_DELAY_PREF,
+            DEFAULT_CONTEXT_MENU_DELAY);
 
         if (time >= standard && this.isTap) {
           chain.splice(i, 0, ["longPress"], ["wait", (time - standard) / 1000]);
@@ -269,7 +278,7 @@ ActionChain.prototype.actions = function(chain, touchId, i, keyModifiers) {
         }
         this.checkTimer.initWithCallback(
             () => this.actions(chain, touchId, i, keyModifiers),
-            time, Components.interfaces.nsITimer.TYPE_ONE_SHOT);
+            time, Ci.nsITimer.TYPE_ONE_SHOT);
       } else {
         this.actions(chain, touchId, i, keyModifiers);
       }
@@ -297,13 +306,13 @@ ActionChain.prototype.actions = function(chain, touchId, i, keyModifiers) {
           keyModifiers);
       this.actions(chain, touchId, i, keyModifiers);
       break;
-
   }
 };
 
 /**
- * This function generates a pair of coordinates relative to the viewport given a
- * target element and coordinates relative to that element's top-left corner.
+ * This function generates a pair of coordinates relative to the viewport
+ * given a target element and coordinates relative to that element's
+ * top-left corner.
  *
  * @param {DOMElement} target
  *     The target to calculate coordinates of.
@@ -314,7 +323,7 @@ ActionChain.prototype.actions = function(chain, touchId, i, keyModifiers) {
  *     Y coordinate relative to target.  If unspecified, the centre of
  *     the target is used.
  */
-ActionChain.prototype.coordinates = function(target, x, y) {
+action.Chain.prototype.coordinates = function(target, x, y) {
   let box = target.getBoundingClientRect();
   if (x == null) {
     x = box.width / 2;
@@ -332,7 +341,7 @@ ActionChain.prototype.coordinates = function(target, x, y) {
  * Given an element and a pair of coordinates, returns an array of the
  * form [clientX, clientY, pageX, pageY, screenX, screenY].
  */
-ActionChain.prototype.getCoordinateInfo = function(el, corx, cory) {
+action.Chain.prototype.getCoordinateInfo = function(el, corx, cory) {
   let win = el.ownerDocument.defaultView;
   return [
     corx, // clientX
@@ -352,7 +361,7 @@ ActionChain.prototype.getCoordinateInfo = function(el, corx, cory) {
  *     Y coordinate of the location to generate the event that is relative
  *     to the viewport.
  */
-ActionChain.prototype.generateEvents = function(
+action.Chain.prototype.generateEvents = function(
     type, x, y, touchId, target, keyModifiers) {
   this.lastCoordinates = [x, y];
   let doc = this.container.frame.document;
@@ -485,7 +494,7 @@ ActionChain.prototype.generateEvents = function(
   this.checkForInterrupted();
 };
 
-ActionChain.prototype.mouseTap = function(doc, x, y, button, count, mod) {
+action.Chain.prototype.mouseTap = function(doc, x, y, button, count, mod) {
   this.emitMouseEvent(doc, "mousemove", x, y, button, count, mod);
   this.emitMouseEvent(doc, "mousedown", x, y, button, count, mod);
   this.emitMouseEvent(doc, "mouseup", x, y, button, count, mod);
