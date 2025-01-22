@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-let {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+"use strict";
 
+const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+
+Cu.import("chrome://marionette/content/atom.js");
 Cu.import("chrome://marionette/content/error.js");
 
 /**
@@ -24,7 +27,7 @@ Cu.import("chrome://marionette/content/error.js");
  */
 
 this.EXPORTED_SYMBOLS = [
-  "elements",
+  "element",
   "ElementManager",
   "CLASS_NAME",
   "SELECTOR",
@@ -82,14 +85,14 @@ ElementManager.prototype = {
   * @return string
   *        Returns the server-assigned reference ID
   */
-  addToKnownElements: function EM_addToKnownElements(element) {
+  addToKnownElements: function EM_addToKnownElements(el) {
     for (let i in this.seenItems) {
       let foundEl = null;
       try {
         foundEl = this.seenItems[i].get();
       } catch (e) {}
       if (foundEl) {
-        if (XPCNativeWrapper(foundEl) == XPCNativeWrapper(element)) {
+        if (XPCNativeWrapper(foundEl) == XPCNativeWrapper(el)) {
           return i;
         }
       } else {
@@ -97,8 +100,8 @@ ElementManager.prototype = {
         delete this.seenItems[i];
       }
     }
-    let id = elements.generateUUID();
-    this.seenItems[id] = Cu.getWeakReference(element);
+    let id = element.generateUUID();
+    this.seenItems[id] = Cu.getWeakReference(el);
     return id;
   },
 
@@ -116,7 +119,7 @@ ElementManager.prototype = {
   getKnownElement: function EM_getKnownElement(id, container) {
     let el = this.seenItems[id];
     if (!el) {
-      throw new JavaScriptError("Element has not been seen before. Id given was " + id);
+      throw new JavaScriptError(`Element has not been seen before. Id given was ${id}`);
     }
     try {
       el = el.get();
@@ -299,7 +302,7 @@ ElementManager.prototype = {
    *        as its members.
    */
   applyNamedArgs: function EM_applyNamedArgs(args) {
-    namedArgs = {};
+    let namedArgs = {};
     args.forEach(function(arg) {
       if (arg && typeof(arg['__marionetteArgs']) === 'object') {
         for (let prop in arg['__marionetteArgs']) {
@@ -342,10 +345,16 @@ ElementManager.prototype = {
     let startNode = (values.element != undefined) ?
                     this.getKnownElement(values.element, container) : rootNode;
     if (this.elementStrategies.indexOf(values.using) < 0) {
-      throw new InvalidSelectorError("No such strategy: " + values.using);
+      throw new InvalidSelectorError(`No such strategy: ${values.using}`);
     }
-    let found = all ? this.findElements(values.using, values.value, rootNode, startNode) :
+
+    let found;
+    try {
+      found = all ? this.findElements(values.using, values.value, rootNode, startNode) :
                       this.findElement(values.using, values.value, rootNode, startNode);
+    } catch (e) {
+      throw new InvalidSelectorError(`Given ${values.using} expression "${values.value}" is invalid`);
+    }
     let type = Object.prototype.toString.call(found);
     let isArrayLike = ((type == '[object Array]') || (type == '[object HTMLCollection]') || (type == '[object NodeList]'));
     if (found == null || (isArrayLike && found.length <= 0)) {
@@ -354,11 +363,11 @@ ElementManager.prototype = {
           on_success([], command_id); // findElements should return empty list
         } else {
           // Format message depending on strategy if necessary
-          let message = "Unable to locate element: " + values.value;
+          let message = `Unable to locate element: ${values.value}`
           if (values.using == ANON) {
             message = "Unable to locate anonymous children";
           } else if (values.using == ANON_ATTRIBUTE) {
-            message = "Unable to locate anonymous element: " + JSON.stringify(values.value);
+            message = `Unable to locate anonymous element: ${JSON.stringify(values.value)}`;
           }
           on_error(new NoSuchElementError(message), command_id);
         }
@@ -458,13 +467,13 @@ ElementManager.prototype = {
       case ID:
         element = startNode.getElementById ?
                   startNode.getElementById(value) :
-                  this.findByXPath(rootNode, './/*[@id="' + value + '"]', startNode);
+                  this.findByXPath(rootNode, `.//*[@id="${value}"]`, startNode);
         break;
 
       case NAME:
         element = startNode.getElementsByName ?
                   startNode.getElementsByName(value)[0] :
-                  this.findByXPath(rootNode, './/*[@name="' + value + '"]', startNode);
+                  this.findByXPath(rootNode, `.//*[@name="${value}"]`, startNode);
         break;
 
       case CLASS_NAME:
@@ -514,7 +523,7 @@ ElementManager.prototype = {
         break;
 
       default:
-        throw new InvalidSelectorError("No such strategy: " + using);
+        throw new InvalidSelectorError(`No such strategy: ${using}`);
     }
 
     return element;
@@ -539,14 +548,14 @@ ElementManager.prototype = {
     let elements = [];
     switch (using) {
       case ID:
-        value = './/*[@id="' + value + '"]';
+        value = `.//*[@id="${value}"]`;
       case XPATH:
         elements = this.findByXPathAll(rootNode, value, startNode);
         break;
       case NAME:
         elements = startNode.getElementsByName ?
                    startNode.getElementsByName(value) :
-                   this.findByXPathAll(rootNode, './/*[@name="' + value + '"]', startNode);
+                   this.findByXPathAll(rootNode, `.//*[@name="${value}"]`, startNode);
         break;
       case CLASS_NAME:
         elements = startNode.getElementsByClassName(value);
@@ -582,14 +591,117 @@ ElementManager.prototype = {
         }
         break;
       default:
-        throw new InvalidSelectorError("No such strategy: " + using);
+        throw new InvalidSelectorError(`No such strategy: ${using}`);
     }
     return elements;
   },
-}
+};
 
-this.elements = {};
-elements.generateUUID = function() {
+
+this.element = {};
+element.generateUUID = function() {
   let uuid = uuidGen.generateUUID().toString();
   return uuid.substring(1, uuid.length - 1);
+};
+
+/**
+ * This function generates a pair of coordinates relative to the viewport
+ * given a target element and coordinates relative to that element's
+ * top-left corner.
+ *
+ * @param {Node} node
+ *     Target node.
+ * @param {number=} x
+ *     Horizontal offset relative to target.  Defaults to the centre of
+ *     the target's bounding box.
+ * @param {number=} y
+ *     Vertical offset relative to target.  Defaults to the centre of
+ *     the target's bounding box.
+ */
+// TODO(ato): Replicated from listener.js for the time being
+element.coordinates = function(node, x = undefined, y = undefined) {
+  let box = node.getBoundingClientRect();
+  if (!x) {
+    x = box.width / 2.0;
+  }
+  if (!y) {
+    y = box.height / 2.0;
+  }
+  return {
+    x: box.left + x,
+    y: box.top + y,
+  };
+}
+
+/**
+ * This function returns true if the node is in the viewport.
+ *
+ * @param {Element} element
+ *     Target element.
+ * @param {number=} x
+ *     Horizontal offset relative to target.  Defaults to the centre of
+ *     the target's bounding box.
+ * @param {number=} y
+ *     Vertical offset relative to target.  Defaults to the centre of
+ *     the target's bounding box.
+ */
+element.inViewport = function(el, x = undefined, y = undefined) {
+  let win = el.ownerDocument.defaultView;
+  let c = element.coordinates(el, x, y);
+  let vp = {
+    top: win.pageYOffset,
+    left: win.pageXOffset,
+    bottom: (win.pageYOffset + win.innerHeight),
+    right: (win.pageXOffset + win.innerWidth)
+  };
+
+  return (vp.left <= c.x + win.pageXOffset &&
+      c.x + win.pageXOffset <= vp.right &&
+      vp.top <= c.y + win.pageYOffset &&
+      c.y + win.pageYOffset <= vp.bottom);
+};
+
+/**
+ * This function throws the visibility of the element error if the element is
+ * not displayed or the given coordinates are not within the viewport.
+ *
+ * @param {Element} element
+ *     Element to check if visible.
+ * @param {Window} window
+ *     Window object.
+ * @param {number=} x
+ *     Horizontal offset relative to target.  Defaults to the centre of
+ *     the target's bounding box.
+ * @param {number=} y
+ *     Vertical offset relative to target.  Defaults to the centre of
+ *     the target's bounding box.
+ */
+element.checkVisible = function(el, win, x = undefined, y = undefined) {
+  // Bug 1094246: Webdriver's isShown doesn't work with content xul
+  let ns = atom.getElementAttribute(el, "namespaceURI", win);
+  if (ns.indexOf("there.is.only.xul") < 0 &&
+      !atom.isElementDisplayed(el, win)) {
+    return false;
+  }
+
+  if (el.tagName.toLowerCase() == "body") {
+    return true;
+  }
+
+  if (!element.inViewport(el, x, y)) {
+    if (el.scrollIntoView) {
+      el.scrollIntoView(false);
+      if (!element.inViewport(el)) {
+        return false;
+      }
+    } else {
+      return false;
+    }
+  }
+  return true;
+};
+
+element.isXULElement = function(el) {
+  let ns = atom.getElementAttribute(el, "namespaceURI");
+  return ns.indexOf("there.is.only.xul") >= 0;
 };
