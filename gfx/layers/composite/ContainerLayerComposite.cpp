@@ -891,6 +891,8 @@ void
 ContainerLayerComposite::CleanupResources()
 {
   mLastIntermediateSurface = nullptr;
+  mVRRenderTargetSet = nullptr;
+  mPrepared = nullptr;
 
   for (Layer* l = GetFirstChild(); l; l = l->GetNextSibling()) {
     LayerComposite* layerToCleanup = static_cast<LayerComposite*>(l->ImplData());
@@ -942,6 +944,8 @@ void
 RefLayerComposite::CleanupResources()
 {
   mLastIntermediateSurface = nullptr;
+  mVRRenderTargetSet = nullptr;
+  mPrepared = nullptr;
 }
 
 } // namespace layers
