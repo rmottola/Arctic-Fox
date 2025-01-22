@@ -16,6 +16,7 @@ Cu.import("chrome://marionette/content/error.js");
 
 this.EXPORTED_SYMBOLS = [
   "Accessibility",
+  "elements",
   "ElementManager",
   "CLASS_NAME",
   "SELECTOR",
@@ -238,8 +239,7 @@ ElementManager.prototype = {
         delete this.seenItems[i];
       }
     }
-    let uuid = uuidGen.generateUUID().toString();
-    let id = uuid.substring(1, uuid.length - 1);
+    let id = elements.generateUUID();
     this.seenItems[id] = Components.utils.getWeakReference(element);
     return id;
   },
@@ -707,3 +707,9 @@ ElementManager.prototype = {
     return elements;
   },
 }
+
+this.elements = {};
+elements.generateUUID = function() {
+  let uuid = uuidGen.generateUUID().toString();
+  return uuid.substring(1, uuid.length - 1);
+};
