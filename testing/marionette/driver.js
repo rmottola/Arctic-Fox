@@ -24,7 +24,7 @@ XPCOMUtils.defineLazyServiceGetter(
 
 Cu.import("chrome://marionette/content/actions.js");
 Cu.import("chrome://marionette/content/interactions.js");
-Cu.import("chrome://marionette/content/elements.js");
+Cu.import("chrome://marionette/content/element.js");
 Cu.import("chrome://marionette/content/error.js");
 Cu.import("chrome://marionette/content/modal.js");
 Cu.import("chrome://marionette/content/proxy.js");

@@ -15,7 +15,7 @@ loader.loadSubScript("chrome://marionette/content/common.js");
 loader.loadSubScript("chrome://marionette/content/actions.js");
 Cu.import("chrome://marionette/content/capture.js");
 Cu.import("chrome://marionette/content/cookies.js");
-Cu.import("chrome://marionette/content/elements.js");
+Cu.import("chrome://marionette/content/element.js");
 Cu.import("chrome://marionette/content/error.js");
 Cu.import("chrome://marionette/content/proxy.js");
 Cu.import("chrome://marionette/content/interactions.js");
