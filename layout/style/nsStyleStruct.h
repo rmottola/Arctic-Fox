@@ -1436,8 +1436,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleList
 
   nsChangeHint CalcDifference(const nsStyleList& aNewData) const;
   static nsChangeHint MaxDifference() {
-    return NS_STYLE_HINT_FRAMECHANGE |
-           nsChangeHint_NeutralChange;
+    return nsChangeHint_ReconstructFrame |
+           NS_STYLE_HINT_REFLOW;
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns the reflow hints that are sometimes
@@ -1999,7 +1999,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleText
 
   nsChangeHint CalcDifference(const nsStyleText& aNewData) const;
   static nsChangeHint MaxDifference() {
-    return NS_STYLE_HINT_FRAMECHANGE |
+    return nsChangeHint_ReconstructFrame |
+           NS_STYLE_HINT_REFLOW |
            nsChangeHint_UpdateSubtreeOverflow |
            nsChangeHint_NeutralChange;
   }
@@ -2219,7 +2220,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleVisibility
 
   nsChangeHint CalcDifference(const nsStyleVisibility& aNewData) const;
   static nsChangeHint MaxDifference() {
-    return NS_STYLE_HINT_FRAMECHANGE |
+    return nsChangeHint_ReconstructFrame |
+           NS_STYLE_HINT_REFLOW |
            nsChangeHint_NeutralChange;
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
@@ -2502,7 +2504,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleDisplay
   nsChangeHint CalcDifference(const nsStyleDisplay& aNewData) const;
   static nsChangeHint MaxDifference() {
     // All the parts of FRAMECHANGE are present in CalcDifference.
-    return nsChangeHint(NS_STYLE_HINT_FRAMECHANGE |
+    return nsChangeHint(nsChangeHint_ReconstructFrame |
+                        NS_STYLE_HINT_REFLOW |
                         nsChangeHint_UpdateTransformLayer |
                         nsChangeHint_UpdateOverflow |
                         nsChangeHint_UpdatePostTransformOverflow |
@@ -2773,7 +2776,10 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleTable
 
   nsChangeHint CalcDifference(const nsStyleTable& aNewData) const;
   static nsChangeHint MaxDifference() {
-    return NS_STYLE_HINT_FRAMECHANGE;
+    return nsChangeHint_ReconstructFrame |
+           nsChangeHint_NeedReflow |
+           nsChangeHint_ReflowChangesSizeOrPosition |
+           nsChangeHint_ClearAncestorIntrinsics;
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns the reflow hints that are sometimes
@@ -2806,7 +2812,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleTableBorder
 
   nsChangeHint CalcDifference(const nsStyleTableBorder& aNewData) const;
   static nsChangeHint MaxDifference() {
-    return NS_STYLE_HINT_FRAMECHANGE;
+    return nsChangeHint_ReconstructFrame |
+           NS_STYLE_HINT_REFLOW;
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns the reflow hints that are sometimes
@@ -2902,7 +2909,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleContent
 
   nsChangeHint CalcDifference(const nsStyleContent& aNewData) const;
   static nsChangeHint MaxDifference() {
-    return NS_STYLE_HINT_FRAMECHANGE;
+    return nsChangeHint_ReconstructFrame |
+           NS_STYLE_HINT_REFLOW;
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns the reflow hints that are sometimes
@@ -3017,7 +3025,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleUIReset
 
   nsChangeHint CalcDifference(const nsStyleUIReset& aNewData) const;
   static nsChangeHint MaxDifference() {
-    return NS_STYLE_HINT_FRAMECHANGE;
+    return nsChangeHint_ReconstructFrame |
+           NS_STYLE_HINT_REFLOW;
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns the reflow hints that are sometimes
@@ -3085,7 +3094,12 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleUserInterface
 
   nsChangeHint CalcDifference(const nsStyleUserInterface& aNewData) const;
   static nsChangeHint MaxDifference() {
-    return NS_STYLE_HINT_FRAMECHANGE |
+    return nsChangeHint_ReconstructFrame |
+           nsChangeHint_NeedReflow |
+           nsChangeHint_NeedDirtyReflow |
+           nsChangeHint_ReflowChangesSizeOrPosition |
+           nsChangeHint_ClearAncestorIntrinsics |
+           NS_STYLE_HINT_VISUAL |
            nsChangeHint_UpdateCursor |
            nsChangeHint_NeutralChange;
   }
@@ -3136,7 +3150,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleXUL
 
   nsChangeHint CalcDifference(const nsStyleXUL& aNewData) const;
   static nsChangeHint MaxDifference() {
-    return NS_STYLE_HINT_FRAMECHANGE;
+    return nsChangeHint_ReconstructFrame |
+           NS_STYLE_HINT_REFLOW;
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
     // CalcDifference never returns the reflow hints that are sometimes
@@ -3174,7 +3189,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleColumn
 
   nsChangeHint CalcDifference(const nsStyleColumn& aNewData) const;
   static nsChangeHint MaxDifference() {
-    return NS_STYLE_HINT_FRAMECHANGE |
+    return nsChangeHint_ReconstructFrame |
+           NS_STYLE_HINT_REFLOW |
            nsChangeHint_NeutralChange;
   }
   static nsChangeHint DifferenceAlwaysHandledForDescendants() {
