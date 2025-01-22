@@ -659,14 +659,14 @@ GeckoDriver.prototype.setSessionCapabilities = function(newCaps) {
   // clone, overwrite, and set
   let caps = copy(this.sessionCapabilities);
   caps = copy(newCaps, caps);
+  logger.config("Changing capabilities: " + JSON.stringify(caps));
   this.sessionCapabilities = caps;
 };
 
-GeckoDriver.prototype.setUpProxy = function (proxy) {
-  logger.debug("Setup Proxy has been entered. Will attempt to setup the following proxy");
-  logger.debug("Proxy object contains " + JSON.stringify(proxy));
-  if (typeof proxy == "object" && proxy.hasOwnProperty("proxyType")) {
+GeckoDriver.prototype.setUpProxy = function(proxy) {
+  logger.debug("User-provided proxy settings: " + JSON.stringify(proxy));
 
+  if (typeof proxy == "object" && proxy.hasOwnProperty("proxyType")) {
     switch (proxy.proxyType.toUpperCase()) {
       case "MANUAL":
         Services.prefs.setIntPref("network.proxy.type", 1);
@@ -705,7 +705,7 @@ GeckoDriver.prototype.setUpProxy = function (proxy) {
         Services.prefs.setIntPref("network.proxy.type", 0);
     }
   } else {
-    throw new InvalidArgumentError("the value of 'proxy' should be an object");
+    throw new InvalidArgumentError("Value of 'proxy' should be an object");
   }
 };
 

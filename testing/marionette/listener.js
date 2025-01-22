@@ -23,7 +23,7 @@ Cu.import("resource://gre/modules/FileUtils.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-let utils = {};
+var utils = {};
 utils.window = content;
 // Load Event/ChromeUtils for use with JS scripts:
 loader.loadSubScript("chrome://marionette/content/EventUtils.js", utils);
@@ -85,7 +85,7 @@ var cookies = new Cookies(() => curContainer.frame.document, chrome);
 
 Cu.import("resource://gre/modules/Log.jsm");
 var logger = Log.repository.getLogger("Marionette");
-logger.info("loaded listener.js");
+logger.debug("loaded listener.js");
 var modalHandler = function() {
   // This gets called on the system app only since it receives the mozbrowserprompt event
   sendSyncMessage("Marionette:switchedToFrame", { frameValue: null, storePrevious: true });
@@ -108,6 +108,9 @@ function registerSelf() {
 
   if (register[0]) {
     let {id, remotenessChange} = register[0][0];
+    let {B2G, raisesAccessibilityExceptions} = register[0][2];
+    isB2G = B2G;
+    accessibility.strict = raisesAccessibilityExceptions;
     listenerId = id;
     if (typeof id != "undefined") {
       // check if we're the main process
@@ -165,7 +168,6 @@ function dispatch(fn) {
     let id = msg.json.command_id;
 
     let req = Task.spawn(function*() {
-      let rv;
       if (typeof msg.json == "undefined" || msg.json instanceof Array) {
         return yield fn.apply(null, msg.json);
       } else {
@@ -263,6 +265,7 @@ function startListeners() {
   addMessageListenerId("Marionette:sendKeysToElement", sendKeysToElement);
   addMessageListenerId("Marionette:clearElement", clearElementFn);
   addMessageListenerId("Marionette:switchToFrame", switchToFrame);
+  addMessageListenerId("Marionette:switchToParentFrame", switchToParentFrame);
   addMessageListenerId("Marionette:switchToShadowRoot", switchToShadowRootFn);
   addMessageListenerId("Marionette:deleteSession", deleteSession);
   addMessageListenerId("Marionette:sleepSession", sleepSession);
@@ -367,6 +370,7 @@ function deleteSession(msg) {
   removeMessageListenerId("Marionette:sendKeysToElement", sendKeysToElement);
   removeMessageListenerId("Marionette:clearElement", clearElementFn);
   removeMessageListenerId("Marionette:switchToFrame", switchToFrame);
+  removeMessageListenerId("Marionette:switchToParentFrame", switchToParentFrame);
   removeMessageListenerId("Marionette:switchToShadowRoot", switchToShadowRootFn);
   removeMessageListenerId("Marionette:deleteSession", deleteSession);
   removeMessageListenerId("Marionette:sleepSession", sleepSession);
@@ -586,6 +590,7 @@ function executeScript(msg, directInject) {
 
   asyncTestCommandId = msg.json.command_id;
   let script = msg.json.script;
+  let filename = msg.json.filename;
   sandboxName = msg.json.sandboxName;
 
   if (msg.json.newSandbox ||
@@ -612,7 +617,7 @@ function executeScript(msg, directInject) {
         stream.close();
         script = data + script;
       }
-      let res = Cu.evalInSandbox(script, sandbox, "1.8", "dummy file" ,0);
+      let res = Cu.evalInSandbox(script, sandbox, "1.8", filename ? filename : "dummy file" ,0);
       sendSyncMessage("Marionette:shareData",
                       {log: elementManager.wrapValue(marionetteLogObj.getLogs())});
       marionetteLogObj.clearLogs();
@@ -633,7 +638,7 @@ function executeScript(msg, directInject) {
         return;
       }
 
-      script = "let __marionetteFunc = function(){" + script + "};" +
+      script = "var __marionetteFunc = function(){" + script + "};" +
                    "__marionetteFunc.apply(null, __marionetteParams);";
       if (importedScripts.exists()) {
         let stream = Components.classes["@mozilla.org/network/file-input-stream;1"].
@@ -643,7 +648,7 @@ function executeScript(msg, directInject) {
         stream.close();
         script = data + script;
       }
-      let res = Cu.evalInSandbox(script, sandbox, "1.8", "dummy file", 0);
+      let res = Cu.evalInSandbox(script, sandbox, "1.8", filename ? filename : "dummy file", 0);
       sendSyncMessage("Marionette:shareData",
                       {log: elementManager.wrapValue(marionetteLogObj.getLogs())});
       marionetteLogObj.clearLogs();
@@ -734,6 +739,7 @@ function executeWithCallback(msg, useFinish) {
   }
 
   let script = msg.json.script;
+  let filename = msg.json.filename;
   asyncTestCommandId = msg.json.command_id;
   sandboxName = msg.json.sandboxName;
 
@@ -784,7 +790,7 @@ function executeWithCallback(msg, useFinish) {
     }
 
     scriptSrc = "__marionetteParams.push(marionetteScriptFinished);" +
-                "let __marionetteFunc = function() { " + script + "};" +
+                "var __marionetteFunc = function() { " + script + "};" +
                 "__marionetteFunc.apply(null, __marionetteParams); ";
   }
 
@@ -798,7 +804,7 @@ function executeWithCallback(msg, useFinish) {
       stream.close();
       scriptSrc = data + scriptSrc;
     }
-    Cu.evalInSandbox(scriptSrc, sandbox, "1.8", "dummy file", 0);
+    Cu.evalInSandbox(scriptSrc, sandbox, "1.8", filename ? filename : "dummy file", 0);
   } catch (e) {
     let err = new JavaScriptError(
         e,
@@ -932,20 +938,21 @@ function singleTap(id, corx, cory) {
   if (!visible) {
     throw new ElementNotVisibleError("Element is not currently visible and may not be manipulated");
   }
-  let acc = accessibility.getAccessibleObject(el, true);
-  checkVisibleAccessibility(acc, el, visible);
-  checkActionableAccessibility(acc, el);
-  if (!curContainer.frame.document.createTouch) {
-    actions.mouseEventsOnly = true;
-  }
-  let c = coordinates(el, corx, cory);
-  if (!actions.mouseEventsOnly) {
-    let touchId = actions.nextTouchId++;
-    let touch = createATouch(el, c.x, c.y, touchId);
-    emitTouchEvent('touchstart', touch);
-    emitTouchEvent('touchend', touch);
-  }
-  actions.mouseTap(el.ownerDocument, c.x, c.y);
+  return accessibility.getAccessibleObject(el, true).then(acc => {
+    checkVisibleAccessibility(acc, el, visible);
+    checkActionableAccessibility(acc, el);
+    if (!curContainer.frame.document.createTouch) {
+      actions.mouseEventsOnly = true;
+    }
+    let c = coordinates(el, corx, cory);
+    if (!actions.mouseEventsOnly) {
+      let touchId = actions.nextTouchId++;
+      let touch = createATouch(el, c.x, c.y, touchId);
+      emitTouchEvent('touchstart', touch);
+      emitTouchEvent('touchend', touch);
+    }
+    actions.mouseTap(el.ownerDocument, c.x, c.y);
+  });
 }
 
 /**
@@ -1296,9 +1303,9 @@ function pollForReadyState(msg, start, callback) {
 
 /**
  * Navigate to the given URL.  The operation will be performed on the
- * current browser context, and handles the case where we navigate
- * within an iframe.  All other navigation is handled by the server
- * (in chrome space).
+ * current browsing context, which means it handles the case where we
+ * navigate within an iframe.  All other navigation is handled by the
+ * driver (in chrome space).
  */
 function get(msg) {
   let start = new Date().getTime();
@@ -1324,7 +1331,15 @@ function get(msg) {
     navTimer.initWithCallback(timerFunc, msg.json.pageTimeout, Ci.nsITimer.TYPE_ONE_SHOT);
   }
   addEventListener("DOMContentLoaded", onDOMContentLoaded, false);
-  curContainer.frame.location = msg.json.url;
+  if (isB2G) {
+    curContainer.frame.location = msg.json.url;
+  } else {
+    // We need to move to the top frame before navigating
+    sendSyncMessage("Marionette:switchedToFrame", { frameValue: null });
+    curContainer.frame = content;
+
+    curContainer.frame.location = msg.json.url;
+  }
 }
 
  /**
@@ -1450,16 +1465,16 @@ function clickElement(id) {
   if (!visible) {
     throw new ElementNotVisibleError("Element is not visible");
   }
-  let acc = accessibility.getAccessibleObject(el, true);
-  checkVisibleAccessibility(acc, el, visible);
-
-  if (utils.isElementEnabled(el)) {
-    checkEnabledAccessibility(acc, el, true);
-    checkActionableAccessibility(acc, el);
-    utils.synthesizeMouseAtCenter(el, {}, el.ownerDocument.defaultView);
-  } else {
-    throw new InvalidElementStateError("Element is not Enabled");
-  }
+  return accessibility.getAccessibleObject(el, true).then(acc => {
+    checkVisibleAccessibility(acc, el, visible);
+    if (utils.isElementEnabled(el)) {
+      checkEnabledAccessibility(acc, el, true);
+      checkActionableAccessibility(acc, el);
+      utils.synthesizeMouseAtCenter(el, {}, el.ownerDocument.defaultView);
+    } else {
+      throw new InvalidElementStateError("Element is not Enabled");
+    }
+  });
 }
 
 /**
@@ -1515,9 +1530,10 @@ function getElementTagName(id) {
 function isElementDisplayed(id) {
   let el = elementManager.getKnownElement(id, curContainer);
   let displayed = utils.isElementDisplayed(el);
-  checkVisibleAccessibility(
-    accessibility.getAccessibleObject(el), el, displayed);
-  return displayed;
+  return accessibility.getAccessibleObject(el).then(acc => {
+    checkVisibleAccessibility(acc, el, displayed);
+    return displayed;
+  });
 }
 
 /**
@@ -1570,9 +1586,10 @@ function getElementRect(id) {
 function isElementEnabled(id) {
   let el = elementManager.getKnownElement(id, curContainer);
   let enabled = utils.isElementEnabled(el);
-  checkEnabledAccessibility(
-    accessibility.getAccessibleObject(el), el, enabled);
-  return enabled;
+  return accessibility.getAccessibleObject(el).then(acc => {
+    checkEnabledAccessibility(acc, el, enabled);
+    return enabled;
+  });
 }
 
 /**
@@ -1583,10 +1600,11 @@ function isElementEnabled(id) {
  */
 function isElementSelected(id) {
   let el = elementManager.getKnownElement(id, curContainer);
-    let selected = utils.isElementSelected(el);
-    checkSelectedAccessibility(
-      accessibility.getAccessibleObject(el), el, selected);
-  return selected;
+  let selected = utils.isElementSelected(el);
+  return accessibility.getAccessibleObject(el).then(acc => {
+    checkSelectedAccessibility(acc, el, selected);
+    return selected;
+  });
 }
 
 /**
@@ -1595,27 +1613,28 @@ function isElementSelected(id) {
 function sendKeysToElement(msg) {
   let command_id = msg.json.command_id;
   let val = msg.json.value;
+  let el;
 
-  try {
-    let el = elementManager.getKnownElement(msg.json.id, curContainer);
-    // Element should be actionable from the accessibility standpoint to be able
-    // to send keys to it.
-    checkActionableAccessibility(
-      accessibility.getAccessibleObject(el, true), el);
-    if (el.type == "file") {
-      let p = val.join("");
-      fileInputElement = el;
-      // In e10s, we can only construct File objects in the parent process,
-      // so pass the filename to driver.js, which in turn passes them back
-      // to this frame script in receiveFiles.
-      sendSyncMessage("Marionette:getFiles",
-                      {value: p, command_id: command_id});
-    } else {
-      utils.sendKeysToElement(curContainer.frame, el, val, sendOk, sendError, command_id);
-    }
-  } catch (e) {
-    sendError(e, command_id);
-  }
+  return Promise.resolve(elementManager.getKnownElement(msg.json.id, curContainer))
+    .then(knownEl => {
+      el = knownEl;
+      // Element should be actionable from the accessibility standpoint to be able
+      // to send keys to it.
+      return accessibility.getAccessibleObject(el, true)
+    }).then(acc => {
+      checkActionableAccessibility(acc, el);
+      if (el.type == "file") {
+        let p = val.join("");
+        fileInputElement = el;
+        // In e10s, we can only construct File objects in the parent process,
+        // so pass the filename to driver.js, which in turn passes them back
+        // to this frame script in receiveFiles.
+        sendSyncMessage("Marionette:getFiles",
+                        {value: p, command_id: command_id});
+      } else {
+        utils.sendKeysToElement(curContainer.frame, el, val, sendOk, sendError, command_id);
+      }
+    }).catch(e => sendError(e, command_id));
 }
 
 /**
@@ -1675,6 +1694,20 @@ function switchToShadowRoot(id) {
   }
   curContainer.shadowRoot = foundShadowRoot;
 }
+
+/**
+ * Switch to the parent frame of the current Frame. If the frame is the top most
+ * is the current frame then no action will happen.
+ */
+ function switchToParentFrame(msg) {
+   let command_id = msg.json.command_id;
+   curContainer.frame = curContainer.frame.parent;
+   let parentElement = elementManager.addToKnownElements(curContainer.frame);
+
+   sendSyncMessage("Marionette:switchedToFrame", { frameValue: parentElement });
+
+   sendOk(msg.json.command_id);
+ }
 
 /**
  * Switch to frame given either the server-assigned element id,
@@ -1870,14 +1903,15 @@ function getAppCacheStatus(msg) {
 }
 
 // emulator callbacks
-let _emu_cb_id = 0;
-let _emu_cbs = {};
+var _emu_cb_id = 0;
+var _emu_cbs = {};
 
 function runEmulatorCmd(cmd, callback) {
   if (callback) {
     _emu_cbs[_emu_cb_id] = callback;
   }
-  sendAsyncMessage("Marionette:runEmulatorCmd", {emulator_cmd: cmd, id: _emu_cb_id});
+  sendAsyncMessage("Marionette:runEmulatorCmd",
+      {command: cmd, id: _emu_cb_id});
   _emu_cb_id += 1;
 }
 
@@ -1885,25 +1919,34 @@ function runEmulatorShell(args, callback) {
   if (callback) {
     _emu_cbs[_emu_cb_id] = callback;
   }
-  sendAsyncMessage("Marionette:runEmulatorShell", {emulator_shell: args, id: _emu_cb_id});
+  sendAsyncMessage("Marionette:runEmulatorShell",
+      {arguments: args, id: _emu_cb_id});
   _emu_cb_id += 1;
 }
 
 function emulatorCmdResult(msg) {
-  let message = msg.json;
+  let {error, result, id} = msg.json;
+
+  if (error) {
+    let err = new JavaScriptError(error);
+    sendError(err, id);
+    return;
+  }
+
   if (!sandboxes[sandboxName]) {
     return;
   }
-  let cb = _emu_cbs[message.id];
-  delete _emu_cbs[message.id];
+  let cb = _emu_cbs[id];
+  delete _emu_cbs[id];
   if (!cb) {
     return;
   }
+
   try {
-    cb(message.result);
+    cb(result);
   } catch (e) {
-    sendError(e, -1);
-    return;
+    let err = new JavaScriptError(e);
+    sendError(err, id);
   }
 }
 
