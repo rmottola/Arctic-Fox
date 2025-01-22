@@ -3309,6 +3309,8 @@ pref("ui.mouse.radius.inputSource.touchOnly", true);
 
 #ifdef XP_WIN
 
+pref("font.name-list.emoji", "Segoe UI Emoji, Twemoji Mozilla");
+
 pref("font.name.serif.ar", "Times New Roman");
 pref("font.name.sans-serif.ar", "Segoe UI");
 pref("font.name-list.sans-serif.ar", "Segoe UI, Tahoma, Arial");
@@ -3730,6 +3732,8 @@ pref("ui.key.saveLink.shift", false); // true = shift, false = meta
 // enable NSPR logging for module fontInfoLog:5
 // canonical names immediately follow '(fontinit) family:' in the log
 
+pref("font.name-list.emoji", "Apple Color Emoji");
+
 pref("font.name.serif.ar", "Al Bayan");
 pref("font.name.sans-serif.ar", "Geeza Pro");
 pref("font.name.monospace.ar", "Geeza Pro");
@@ -4150,6 +4154,10 @@ pref("print.print_paper_size", 0);
 pref("print.print_extra_margin", 0); // twips
 
 // font names
+
+// fontconfig doesn't support emoji yet
+// https://lists.freedesktop.org/archives/fontconfig/2016-October/005842.html
+pref("font.name-list.emoji", "Twemoji Mozilla");
 
 pref("font.name.serif.ar", "serif");
 pref("font.name.sans-serif.ar", "sans-serif");
