@@ -2,20 +2,28 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-let {utils: Cu} = Components;
+let {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("chrome://marionette/content/error.js");
 
 /**
- * The ElementManager manages DOM references and interactions with elements.
- * According to the WebDriver spec (http://code.google.com/p/selenium/wiki/JsonWireProtocol), the
- * server sends the client an element reference, and maintains the map of reference to element.
- * The client uses this reference when querying/interacting with the element, and the
- * server uses maps this reference to the actual element when it executes the command.
+ * The ElementManager manages DOM element references and
+ * interactions with elements.
+ *
+ * A web element is an abstraction used to identify an element when it
+ * is transported across the protocol, between remote- and local ends.
+ *
+ * Each element has an associated web element reference (a UUID) that
+ * uniquely identifies the the element across all browsing contexts. The
+ * web element reference for every element representing the same element
+ * is the same.
+ *
+ * The element manager provides a mapping between web element references
+ * and DOM elements for each browsing context.  It also provides
+ * functionality for looking up and retrieving elements.
  */
 
 this.EXPORTED_SYMBOLS = [
-  "Accessibility",
   "elements",
   "ElementManager",
   "CLASS_NAME",
@@ -32,8 +40,8 @@ this.EXPORTED_SYMBOLS = [
 
 const DOCUMENT_POSITION_DISCONNECTED = 1;
 
-const uuidGen = Components.classes["@mozilla.org/uuid-generator;1"]
-    .getService(Components.interfaces.nsIUUIDGenerator);
+const uuidGen = Cc["@mozilla.org/uuid-generator;1"]
+    .getService(Ci.nsIUUIDGenerator);
 
 this.CLASS_NAME = "class name";
 this.SELECTOR = "css selector";
@@ -46,159 +54,9 @@ this.XPATH = "xpath";
 this.ANON= "anon";
 this.ANON_ATTRIBUTE = "anon attribute";
 
-this.Accessibility = function Accessibility() {
-  // A flag indicating whether the accessibility issue should be logged or cause
-  // an exception. Default: log to stdout.
-  this.strict = false;
-  // An interface for in-process accessibility clients
-  // Note: we access it lazily to not enable accessibility when it is not needed
-  Object.defineProperty(this, 'accessibleRetrieval', {
-    configurable: true,
-    get: function() {
-      delete this.accessibleRetrieval;
-      this.accessibleRetrieval = Components.classes[
-        '@mozilla.org/accessibleRetrieval;1'].getService(
-          Components.interfaces.nsIAccessibleRetrieval);
-      return this.accessibleRetrieval;
-    }
-  });
-};
-
-Accessibility.prototype = {
-  /**
-   * Accessible object roles that support some action
-   * @type Object
-   */
-  actionableRoles: new Set([
-    'pushbutton',
-    'checkbutton',
-    'combobox',
-    'key',
-    'link',
-    'menuitem',
-    'check menu item',
-    'radio menu item',
-    'option',
-    'radiobutton',
-    'rowheader',
-    'switch',
-    'slider',
-    'spinbutton',
-    'pagetab',
-    'entry',
-    'outlineitem'
-  ]),
-
-  /**
-   * Get an accessible object for a DOM element
-   * @param nsIDOMElement element
-   * @param Boolean mustHaveAccessible a flag indicating that the element must
-   * have an accessible object
-   * @return nsIAccessible object for the element
-   */
-  getAccessibleObject(element, mustHaveAccessible = false) {
-    let acc = this.accessibleRetrieval.getAccessibleFor(element);
-    if (!acc && mustHaveAccessible) {
-      this.handleErrorMessage('Element does not have an accessible object',
-        element);
-    }
-    return acc;
-  },
-
-  /**
-   * Check if the accessible has a role that supports some action
-   * @param nsIAccessible object
-   * @return Boolean an indicator of role being actionable
-   */
-  isActionableRole(accessible) {
-    return this.actionableRoles.has(
-      this.accessibleRetrieval.getStringRole(accessible.role));
-  },
-
-  /**
-   * Determine if an accessible has at least one action that it supports
-   * @param nsIAccessible object
-   * @return Boolean an indicator of supporting at least one accessible action
-   */
-  hasActionCount(accessible) {
-    return accessible.actionCount > 0;
-  },
-
-  /**
-   * Determine if an accessible has a valid name
-   * @param nsIAccessible object
-   * @return Boolean an indicator that the element has a non empty valid name
-   */
-  hasValidName(accessible) {
-    return accessible.name && accessible.name.trim();
-  },
-
-  /**
-   * Check if an accessible has a set hidden attribute
-   * @param nsIAccessible object
-   * @return Boolean an indicator that the element has a hidden accessible
-   * attribute set to true
-   */
-  hasHiddenAttribute(accessible) {
-    let hidden;
-    try {
-      hidden = accessible.attributes.getStringProperty('hidden');
-    } finally {
-      // If the property is missing, exception will be thrown.
-      return hidden && hidden === 'true';
-    }
-  },
-
-  /**
-   * Verify if an accessible has a given state
-   * @param nsIAccessible object
-   * @param String stateName name of the state to match
-   * @return Boolean accessible has a state
-   */
-  matchState(accessible, stateName) {
-    let stateToMatch = Components.interfaces.nsIAccessibleStates[stateName];
-    let state = {};
-    accessible.getState(state, {});
-    return !!(state.value & stateToMatch);
-  },
-
-  /**
-   * Check if an accessible is hidden from the user of the accessibility API
-   * @param nsIAccessible object
-   * @return Boolean an indicator that the element is hidden from the user
-   */
-  isHidden(accessible) {
-    while (accessible) {
-      if (this.hasHiddenAttribute(accessible)) {
-        return true;
-      }
-      accessible = accessible.parent;
-    }
-    return false;
-  },
-
-  /**
-   * Send an error message or log the error message in the log
-   * @param String message
-   * @param DOMElement element that caused an error
-   */
-  handleErrorMessage(message, element) {
-    if (!message) {
-      return;
-    }
-    if (element) {
-      message += ` -> id: ${element.id}, tagName: ${element.tagName}, className: ${element.className}\n`;
-    }
-    if (this.strict) {
-      throw new ElementNotAccessibleError(message);
-    }
-    dump(Date.now() + " Marionette: " + message);
-  }
-};
-
 this.ElementManager = function ElementManager(notSupported) {
   this.seenItems = {};
-  this.timer = Components.classes["@mozilla.org/timer;1"].createInstance(Components.interfaces.nsITimer);
+  this.timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
   this.elementKey = 'ELEMENT';
   this.w3cElementKey = 'element-6066-11e4-a52e-4f735466cecf';
   this.elementStrategies = [CLASS_NAME, SELECTOR, ID, NAME, LINK_TEXT, PARTIAL_LINK_TEXT, TAG, XPATH, ANON, ANON_ATTRIBUTE];
@@ -240,7 +98,7 @@ ElementManager.prototype = {
       }
     }
     let id = elements.generateUUID();
-    this.seenItems[id] = Components.utils.getWeakReference(element);
+    this.seenItems[id] = Cu.getWeakReference(element);
     return id;
   },
 
@@ -359,7 +217,7 @@ ElementManager.prototype = {
         }
         else if (val.nodeType == 1) {
           let elementId = this.addToKnownElements(val);
-          result = {'ELEMENT': elementId, 'element-6066-11e4-a52e-4f735466cecf': elementId};
+          result = {[this.elementKey]: elementId, [this.w3cElementKey]: elementId};
         }
         else {
           result = {};
@@ -511,18 +369,23 @@ ElementManager.prototype = {
                                                    on_success, on_error,
                                                    command_id),
                                     100,
-                                    Components.interfaces.nsITimer.TYPE_ONE_SHOT);
+                                    Ci.nsITimer.TYPE_ONE_SHOT);
       }
     } else {
       if (isArrayLike) {
         let ids = []
         for (let i = 0 ; i < found.length ; i++) {
-          ids.push({"ELEMENT": this.addToKnownElements(found[i])});
+          let foundElement = this.addToKnownElements(found[i]);
+          let returnElement = {
+            [this.elementKey] : foundElement,
+            [this.w3cElementKey] : foundElement,
+          };
+          ids.push(returnElement);
         }
         on_success(ids, command_id);
       } else {
         let id = this.addToKnownElements(found);
-        on_success({"ELEMENT": id}, command_id);
+        on_success({[this.elementKey]: id, [this.w3cElementKey]:id}, command_id);
       }
     }
   },
@@ -542,7 +405,7 @@ ElementManager.prototype = {
    */
   findByXPath: function EM_findByXPath(root, value, node) {
     return root.evaluate(value, node, null,
-            Components.interfaces.nsIDOMXPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+            Ci.nsIDOMXPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
   },
 
   /**
@@ -560,7 +423,7 @@ ElementManager.prototype = {
    */
   findByXPathAll: function EM_findByXPathAll(root, value, node) {
     let values = root.evaluate(value, node, null,
-                      Components.interfaces.nsIDOMXPathResult.ORDERED_NODE_ITERATOR_TYPE, null);
+                      Ci.nsIDOMXPathResult.ORDERED_NODE_ITERATOR_TYPE, null);
     let elements = [];
     let element = values.iterateNext();
     while (element) {
@@ -571,42 +434,51 @@ ElementManager.prototype = {
   },
 
   /**
-   * Helper method to find. Finds one element using find's criteria
+   * Finds a single element.
    *
-   * @param string using
-   *        String identifying which search method to use
-   * @param string value
-   *        Value to look for
-   * @param nsIDOMElement rootNode
-   *        Document root
-   * @param nsIDOMElement startNode
-   *        Node from which we start searching
+   * @param {String} using
+   *     Which selector search method to use.
+   * @param {String} value
+   *     Selector query.
+   * @param {nsIDOMElement} rootNode
+   *     Document root.
+   * @param {nsIDOMElement=} startNode
+   *     Optional node from which we start searching.
    *
-   * @return nsIDOMElement
-   *        Returns found element or throws Exception if not found
+   * @return {nsIDOMElement}
+   *     Returns found element.
+   * @throws {InvalidSelectorError}
+   *     If the selector query string (value) is invalid, or the selector
+   *     search method (using) is unknown.
    */
   findElement: function EM_findElement(using, value, rootNode, startNode) {
     let element;
+
     switch (using) {
       case ID:
         element = startNode.getElementById ?
                   startNode.getElementById(value) :
                   this.findByXPath(rootNode, './/*[@id="' + value + '"]', startNode);
         break;
+
       case NAME:
         element = startNode.getElementsByName ?
                   startNode.getElementsByName(value)[0] :
                   this.findByXPath(rootNode, './/*[@name="' + value + '"]', startNode);
         break;
+
       case CLASS_NAME:
         element = startNode.getElementsByClassName(value)[0]; //works for >=FF3
         break;
+
       case TAG:
         element = startNode.getElementsByTagName(value)[0]; //works for all elements
         break;
+
       case XPATH:
         element = this.findByXPath(rootNode, value, startNode);
         break;
+
       case LINK_TEXT:
       case PARTIAL_LINK_TEXT:
         let allLinks = startNode.getElementsByTagName('A');
@@ -622,21 +494,29 @@ ElementManager.prototype = {
         }
         break;
       case SELECTOR:
-        element = startNode.querySelector(value);
+        try {
+          element = startNode.querySelector(value);
+        } catch (e) {
+          throw new InvalidSelectorError(`${e.message}: "${value}"`);
+        }
         break;
+
       case ANON:
         element = rootNode.getAnonymousNodes(startNode);
         if (element != null) {
           element = element[0];
         }
         break;
+
       case ANON_ATTRIBUTE:
         let attr = Object.keys(value)[0];
         element = rootNode.getAnonymousElementByAttribute(startNode, attr, value[attr]);
         break;
+
       default:
         throw new InvalidSelectorError("No such strategy: " + using);
     }
+
     return element;
   },
 
