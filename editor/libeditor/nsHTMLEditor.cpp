@@ -1506,7 +1506,7 @@ nsHTMLEditor::InsertElementAtSelection(nsIDOMElement* aElement, bool aDeleteSele
 
   // hand off to the rules system, see if it has anything to say about this
   bool cancel, handled;
-  nsTextRulesInfo ruleInfo(EditAction::insertElement);
+  TextRulesInfo ruleInfo(EditAction::insertElement);
   ruleInfo.insertElement = aElement;
   res = mRules->WillDoAction(selection, &ruleInfo, &cancel, &handled);
   if (cancel || (NS_FAILED(res))) return res;
@@ -1943,7 +1943,7 @@ nsHTMLEditor::MakeOrChangeList(const nsAString& aListType, bool entireList, cons
   RefPtr<Selection> selection = GetSelection();
   NS_ENSURE_TRUE(selection, NS_ERROR_NULL_POINTER);
 
-  nsTextRulesInfo ruleInfo(EditAction::makeList);
+  TextRulesInfo ruleInfo(EditAction::makeList);
   ruleInfo.blockType = &aListType;
   ruleInfo.entireList = entireList;
   ruleInfo.bulletType = &aBulletType;
@@ -2016,7 +2016,7 @@ nsHTMLEditor::RemoveList(const nsAString& aListType)
   RefPtr<Selection> selection = GetSelection();
   NS_ENSURE_TRUE(selection, NS_ERROR_NULL_POINTER);
 
-  nsTextRulesInfo ruleInfo(EditAction::removeList);
+  TextRulesInfo ruleInfo(EditAction::removeList);
   if (aListType.LowerCaseEqualsLiteral("ol"))
     ruleInfo.bOrdered = true;
   else  ruleInfo.bOrdered = false;
@@ -2047,7 +2047,7 @@ nsHTMLEditor::MakeDefinitionItem(const nsAString& aItemType)
   // pre-process
   RefPtr<Selection> selection = GetSelection();
   NS_ENSURE_TRUE(selection, NS_ERROR_NULL_POINTER);
-  nsTextRulesInfo ruleInfo(EditAction::makeDefListItem);
+  TextRulesInfo ruleInfo(EditAction::makeDefListItem);
   ruleInfo.blockType = &aItemType;
   res = mRules->WillDoAction(selection, &ruleInfo, &cancel, &handled);
   if (cancel || (NS_FAILED(res))) return res;
@@ -2079,7 +2079,7 @@ nsHTMLEditor::InsertBasicBlock(const nsAString& aBlockType)
   // pre-process
   RefPtr<Selection> selection = GetSelection();
   NS_ENSURE_TRUE(selection, NS_ERROR_NULL_POINTER);
-  nsTextRulesInfo ruleInfo(EditAction::makeBasicBlock);
+  TextRulesInfo ruleInfo(EditAction::makeBasicBlock);
   ruleInfo.blockType = &aBlockType;
   res = mRules->WillDoAction(selection, &ruleInfo, &cancel, &handled);
   if (cancel || (NS_FAILED(res))) return res;
@@ -2153,7 +2153,7 @@ nsHTMLEditor::Indent(const nsAString& aIndent)
   RefPtr<Selection> selection = GetSelection();
   NS_ENSURE_TRUE(selection, NS_ERROR_NULL_POINTER);
 
-  nsTextRulesInfo ruleInfo(opID);
+  TextRulesInfo ruleInfo(opID);
   res = mRules->WillDoAction(selection, &ruleInfo, &cancel, &handled);
   if (cancel || (NS_FAILED(res))) return res;
 
@@ -2227,7 +2227,7 @@ nsHTMLEditor::Align(const nsAString& aAlignType)
   // Find out if the selection is collapsed:
   RefPtr<Selection> selection = GetSelection();
   NS_ENSURE_TRUE(selection, NS_ERROR_NULL_POINTER);
-  nsTextRulesInfo ruleInfo(EditAction::align);
+  TextRulesInfo ruleInfo(EditAction::align);
   ruleInfo.alignType = &aAlignType;
   nsresult res = mRules->WillDoAction(selection, &ruleInfo, &cancel, &handled);
   if (cancel || NS_FAILED(res))
@@ -4569,7 +4569,7 @@ nsHTMLEditor::SetCSSBackgroundColor(const nsAString& aColor)
   AutoTransactionsConserveSelection dontSpazMySelection(this);
 
   bool cancel, handled;
-  nsTextRulesInfo ruleInfo(EditAction::setTextProperty);
+  TextRulesInfo ruleInfo(EditAction::setTextProperty);
   nsresult res = mRules->WillDoAction(selection, &ruleInfo, &cancel, &handled);
   NS_ENSURE_SUCCESS(res, res);
   if (!cancel && !handled) {
