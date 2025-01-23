@@ -109,7 +109,7 @@ nsHTMLEditor::LoadHTML(const nsAString & aInputString)
   // force IME commit; set up rules sniffing and batching
   ForceCompositionEnd();
   nsAutoEditBatch beginBatching(this);
-  nsAutoRules beginRulesSniffing(this, EditAction::loadHTML, nsIEditor::eNext);
+  AutoRules beginRulesSniffing(this, EditAction::loadHTML, nsIEditor::eNext);
 
   // Get selection
   RefPtr<Selection> selection = GetSelection();
@@ -210,7 +210,7 @@ nsHTMLEditor::DoInsertHTMLWithContext(const nsAString & aInputString,
   // force IME commit; set up rules sniffing and batching
   ForceCompositionEnd();
   nsAutoEditBatch beginBatching(this);
-  nsAutoRules beginRulesSniffing(this, EditAction::htmlPaste, nsIEditor::eNext);
+  AutoRules beginRulesSniffing(this, EditAction::htmlPaste, nsIEditor::eNext);
 
   // Get selection
   RefPtr<Selection> selection = GetSelection();
@@ -1574,7 +1574,8 @@ NS_IMETHODIMP nsHTMLEditor::PasteAsCitedQuotation(const nsAString & aCitation,
                                                   int32_t aSelectionType)
 {
   nsAutoEditBatch beginBatching(this);
-  nsAutoRules beginRulesSniffing(this, EditAction::insertQuotation, nsIEditor::eNext);
+  AutoRules beginRulesSniffing(this, EditAction::insertQuotation,
+                               nsIEditor::eNext);
 
   // get selection
   RefPtr<Selection> selection = GetSelection();
@@ -1766,7 +1767,8 @@ nsHTMLEditor::InsertAsPlaintextQuotation(const nsAString & aQuotedText,
   NS_ENSURE_TRUE(selection, NS_ERROR_NULL_POINTER);
 
   nsAutoEditBatch beginBatching(this);
-  nsAutoRules beginRulesSniffing(this, EditAction::insertQuotation, nsIEditor::eNext);
+  AutoRules beginRulesSniffing(this, EditAction::insertQuotation,
+                               nsIEditor::eNext);
 
   // give rules a chance to handle or cancel
   nsTextRulesInfo ruleInfo(EditAction::insertElement);
@@ -1855,7 +1857,8 @@ nsHTMLEditor::InsertAsCitedQuotation(const nsAString & aQuotedText,
   NS_ENSURE_TRUE(selection, NS_ERROR_NULL_POINTER);
 
   nsAutoEditBatch beginBatching(this);
-  nsAutoRules beginRulesSniffing(this, EditAction::insertQuotation, nsIEditor::eNext);
+  AutoRules beginRulesSniffing(this, EditAction::insertQuotation,
+                               nsIEditor::eNext);
 
   // give rules a chance to handle or cancel
   nsTextRulesInfo ruleInfo(EditAction::insertElement);
