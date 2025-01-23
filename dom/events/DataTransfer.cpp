@@ -1044,7 +1044,8 @@ DataTransfer::GetTransferable(uint32_t aIndex, nsILoadContext* aLoadContext)
     kTextMime, kHTMLMime, kNativeHTMLMime, kRTFMime,
     kURLMime, kURLDataMime, kURLDescriptionMime, kURLPrivateMime,
     kPNGImageMime, kJPEGImageMime, kGIFImageMime, kNativeImageMime,
-    kFileMime, kFilePromiseMime, kFilePromiseDirectoryMime,
+    kFileMime, kFilePromiseMime, kFilePromiseURLMime,
+    kFilePromiseDestFilename, kFilePromiseDirectoryMime,
     kMozTextInternal, kHTMLContext, kHTMLInfo };
 
   /*
