@@ -1578,7 +1578,7 @@ nsEditor::ReplaceContainer(Element* aOldContainer,
   AutoReplaceContainerSelNotify selStateNotify(mRangeUpdater, aOldContainer,
                                                ret);
   {
-    nsAutoTxnsConserveSelection conserveSelection(this);
+    AutoTransactionsConserveSelection conserveSelection(this);
     while (aOldContainer->HasChildren()) {
       nsCOMPtr<nsIContent> child = aOldContainer->GetFirstChild();
 
@@ -1672,7 +1672,7 @@ nsEditor::InsertContainerAbove(nsIContent* aNode,
   NS_ENSURE_SUCCESS(res, nullptr);
 
   {
-    nsAutoTxnsConserveSelection conserveSelection(this);
+    AutoTransactionsConserveSelection conserveSelection(this);
     res = InsertNode(*aNode, *newContent, 0);
     NS_ENSURE_SUCCESS(res, nullptr);
   }
@@ -2334,7 +2334,7 @@ nsEditor::InsertTextImpl(const nsAString& aStringToInsert,
                          int32_t* aInOutOffset,
                          nsIDocument* aDoc)
 {
-  // NOTE: caller *must* have already used nsAutoTxnsConserveSelection
+  // NOTE: caller *must* have already used AutoTransactionsConserveSelection
   // stack-based class to turn off txn selection updating.  Caller also turned
   // on rules sniffing if desired.
 

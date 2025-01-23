@@ -832,7 +832,7 @@ nsHTMLEditor::SetDocumentTitle(const nsAString &aTitle)
   NS_ENSURE_SUCCESS(result, result);
 
   //Don't let Rules System change the selection
-  nsAutoTxnsConserveSelection dontChangeSelection(this);
+  AutoTransactionsConserveSelection dontChangeSelection(this);
   return nsEditor::DoTransaction(txn);
 }
 
@@ -3740,7 +3740,7 @@ nsresult
 nsHTMLEditor::CollapseAdjacentTextNodes(nsRange* aInRange)
 {
   NS_ENSURE_TRUE(aInRange, NS_ERROR_NULL_POINTER);
-  nsAutoTxnsConserveSelection dontSpazMySelection(this);
+  AutoTransactionsConserveSelection dontSpazMySelection(this);
   nsTArray<nsCOMPtr<nsIDOMNode> > textNodes;
   // we can't actually do anything during iteration, so store the text nodes in an array
   // don't bother ref counting them because we know we can hold them for the
@@ -4559,7 +4559,7 @@ nsHTMLEditor::SetCSSBackgroundColor(const nsAString& aColor)
   nsAutoRules beginRulesSniffing(this, EditAction::insertElement,
                                  nsIEditor::eNext);
   nsAutoSelectionReset selectionResetter(selection, this);
-  nsAutoTxnsConserveSelection dontSpazMySelection(this);
+  AutoTransactionsConserveSelection dontSpazMySelection(this);
 
   bool cancel, handled;
   nsTextRulesInfo ruleInfo(EditAction::setTextProperty);
