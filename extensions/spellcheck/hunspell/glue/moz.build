@@ -20,7 +20,6 @@ else:
 
 LOCAL_INCLUDES += [
     '/dom/base',
-    '/editor/libeditor',
     '/extensions/spellcheck/src',
 ]
 
