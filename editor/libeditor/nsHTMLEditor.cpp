@@ -59,7 +59,7 @@
 // Misc
 #include "EditorUtils.h"
 #include "TextEditorTest.h"
-#include "nsWSRunObject.h"
+#include "WSRunObject.h"
 #include "nsGkAtoms.h"
 #include "nsIWidget.h"
 
@@ -551,7 +551,7 @@ nsHTMLEditor::BeginningOfDocument()
   nsCOMPtr<nsINode> curNode = rootElement.get(), selNode;
   int32_t curOffset = 0, selOffset = 0;
   while (!done) {
-    nsWSRunObject wsObj(this, curNode, curOffset);
+    WSRunObject wsObj(this, curNode, curOffset);
     int32_t visOffset = 0;
     WSType visType;
     nsCOMPtr<nsINode> visNode;
@@ -566,7 +566,7 @@ nsHTMLEditor::BeginningOfDocument()
       selOffset = selNode ? selNode->IndexOf(visNode) : -1;
       done = true;
     } else if (visType == WSType::otherBlock) {
-      // By definition of nsWSRunObject, a block element terminates a
+      // By definition of WSRunObject, a block element terminates a
       // whitespace run. That is, although we are calling a method that is
       // named "NextVisibleNode", the node returned might not be
       // visible/editable!
@@ -985,7 +985,7 @@ nsHTMLEditor::IsVisBreak(nsINode* aNode)
   nsCOMPtr<nsINode> selNode = GetNodeLocation(aNode, &selOffset);
   // Let's look after the break
   selOffset++;
-  nsWSRunObject wsObj(this, selNode, selOffset);
+  WSRunObject wsObj(this, selNode, selOffset);
   nsCOMPtr<nsINode> unused;
   int32_t visOffset = 0;
   WSType visType;
@@ -1446,7 +1446,7 @@ nsHTMLEditor::NormalizeEOLInsertPosition(nsINode* firstNodeToInsert,
   if (!IsBlockNode(firstNodeToInsert))
     return;
 
-  nsWSRunObject wsObj(this, *insertParentNode, *insertOffset);
+  WSRunObject wsObj(this, *insertParentNode, *insertOffset);
   nsCOMPtr<nsINode> nextVisNode, prevVisNode;
   int32_t nextVisOffset=0;
   WSType nextVisType;
@@ -4272,7 +4272,7 @@ nsHTMLEditor::IsVisTextNode(nsIContent* aNode,
   {
     if (aNode->TextIsOnlyWhitespace())
     {
-      nsWSRunObject wsRunObj(this, aNode, 0);
+      WSRunObject wsRunObj(this, aNode, 0);
       nsCOMPtr<nsINode> visNode;
       int32_t outVisOffset=0;
       WSType visType;
