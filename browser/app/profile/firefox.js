@@ -696,9 +696,6 @@ pref("accessibility.loadedInLastSession", false);
 pref("plugins.hide_infobar_for_blocked_plugin", false);
 pref("plugins.hide_infobar_for_outdated_plugin", false);
 
-pref("plugins.update.url", "https://www.mozilla.org/%LOCALE%/plugincheck/");
-pref("plugins.update.notifyUser", false);
-
 //Enable tri-state option (Always/Never/Ask)
 pref("plugins.click_to_play", true);
 pref("plugins.testmode", false);

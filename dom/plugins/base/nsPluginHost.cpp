@@ -2142,8 +2142,6 @@ nsresult nsPluginHost::ScanPluginsDirectory(nsIFile *pluginsDir,
   nsCOMArray<nsIFile> extensionDirs;
   GetExtensionDirectories(extensionDirs);
 
-  bool warnOutdated = false;
-
   for (int32_t i = (pluginFiles.Length() - 1); i >= 0; i--) {
     nsCOMPtr<nsIFile>& localfile = pluginFiles[i];
 
@@ -2243,13 +2241,8 @@ nsresult nsPluginHost::ScanPluginsDirectory(nsIFile *pluginsDir,
 
       // If the blocklist says it is risky and we have never seen this
       // plugin before, then disable it.
-      // If the blocklist says this is an outdated plugin, warn about
-      // outdated plugins.
       if (state == nsIBlocklistService::STATE_SOFTBLOCKED && !seenBefore) {
         pluginTag->SetEnabledState(nsIPluginTag::STATE_DISABLED);
-      }
-      if (state == nsIBlocklistService::STATE_OUTDATED && !seenBefore) {
-        warnOutdated = true;
       }
 
       // Plugin unloading is tag-based. If we created a new tag and loaded
@@ -2288,10 +2281,6 @@ nsresult nsPluginHost::ScanPluginsDirectory(nsIFile *pluginsDir,
     }
 
     AddPluginTag(pluginTag);
-  }
-
-  if (warnOutdated) {
-    Preferences::SetBool("plugins.update.notifyUser", true);
   }
 
   return NS_OK;
