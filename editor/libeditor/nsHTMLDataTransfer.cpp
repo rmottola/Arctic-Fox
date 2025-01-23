@@ -6,7 +6,10 @@
 
 #include <string.h>
 
+#include "EditorUtils.h"
+#include "mozilla/dom/DataTransfer.h"
 #include "mozilla/dom/DocumentFragment.h"
+#include "mozilla/dom/DOMStringList.h"
 #include "mozilla/OwningNonNull.h"
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Base64.h"
@@ -23,7 +26,6 @@
 #include "nsDependentSubstring.h"
 #include "nsEditRules.h"
 #include "nsEditor.h"
-#include "nsEditorUtils.h"
 #include "nsError.h"
 #include "nsGkAtoms.h"
 #include "nsHTMLEditUtils.h"
@@ -32,8 +34,6 @@
 #include "nsIContent.h"
 #include "nsIContentFilter.h"
 #include "nsIDOMComment.h"
-#include "mozilla/dom/DOMStringList.h"
-#include "mozilla/dom/DataTransfer.h"
 #include "nsIDOMDocument.h"
 #include "nsIDOMDocumentFragment.h"
 #include "nsIDOMElement.h"
@@ -475,8 +475,9 @@ nsHTMLEditor::DoInsertHTMLWithContext(const nsAString & aInputString,
       {
         // if we had to insert something higher up in the paste hierarchy, we want to
         // skip any further paste nodes that descend from that.  Else we will paste twice.
-        if (nsEditorUtils::IsDescendantOf(curNode, insertedContextParent))
+        if (EditorUtils::IsDescendantOf(curNode, insertedContextParent)) {
           continue;
+        }
       }
 
       // give the user a hand on table element insertion.  if they have
@@ -2297,7 +2298,7 @@ nsHTMLEditor::ReplaceOrphanedStructure(StartOrEnd aStartOrEnd,
     uint32_t idx = aStartOrEnd == StartOrEnd::start ?
       i : (aNodeArray.Length() - i - 1);
     OwningNonNull<nsINode> endpoint = aNodeArray[idx];
-    if (!nsEditorUtils::IsDescendantOf(endpoint, replaceNode)) {
+    if (!EditorUtils::IsDescendantOf(endpoint, replaceNode)) {
       shouldReplaceNodes = false;
       break;
     }
