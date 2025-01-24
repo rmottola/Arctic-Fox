@@ -8759,7 +8759,7 @@ nsLayoutUtils::HasDocumentLevelListenersForApzAwareEvents(nsIPresShell* aShell)
         nullptr, nullptr, &targets);
     NS_ENSURE_SUCCESS(rv, false);
     for (size_t i = 0; i < targets.Length(); i++) {
-      if (targets[i]->HasApzAwareListeners()) {
+      if (targets[i]->IsApzAware()) {
         return true;
       }
     }

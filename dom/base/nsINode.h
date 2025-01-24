@@ -941,7 +941,7 @@ public:
                                 mozilla::ErrorResult& aRv) override;
   using nsIDOMEventTarget::AddSystemEventListener;
 
-  virtual bool HasApzAwareListeners() const override;
+  virtual bool IsApzAware() const override;
 
   virtual nsPIDOMWindowOuter* GetOwnerGlobalForBindings() override;
   virtual nsIGlobalObject* GetOwnerGlobal() const override;
@@ -1222,6 +1222,30 @@ public:
   /**
    * The explicit base URI, if set, otherwise null
    */
+
+  /**
+   * Return true if the node may be apz aware. There are two cases. One is that
+   * the node is apz aware (such as HTMLInputElement with number type). The
+   * other is that the node has apz aware listeners. This is a non-virtual
+   * function which calls IsNodeApzAwareInternal only when the MayBeApzAware is
+   * set. We check the details in IsNodeApzAwareInternal which may be overriden
+   * by child classes
+   */
+  bool IsNodeApzAware() const
+  {
+    return NodeMayBeApzAware() ? IsNodeApzAwareInternal() : false;
+  }
+
+  /**
+   * Override this function and set the flag MayBeApzAware in case the node has
+   * to let APZC be aware of it. It's used when the node may handle the apz
+   * aware events and may do preventDefault to stop APZC to do default actions.
+   *
+   * For example, instead of scrolling page by APZ, we handle mouse wheel event
+   * in HTMLInputElement with number type as increasing / decreasing its value.
+   */
+  virtual bool IsNodeApzAwareInternal() const;
+
 protected:
   nsIURI* GetExplicitBaseURI() const {
     if (HasExplicitBaseURI()) {
@@ -1489,8 +1513,8 @@ private:
     ElementHasWeirdParserInsertionMode,
     // Parser sets this flag if it has notified about the node.
     ParserHasNotified,
-    // EventListenerManager sets this flag in case we have apz aware listeners.
-    MayHaveApzAwareListeners,
+    // Sets if the node is apz aware or we have apz aware listeners.
+    MayBeApzAware,
     // Guard value
     BooleanFlagCount
   };
@@ -1637,10 +1661,10 @@ public:
   void SetParserHasNotified() { SetBoolFlag(ParserHasNotified); };
   bool HasParserNotified() { return GetBoolFlag(ParserHasNotified); }
 
-  void SetMayHaveApzAwareListeners() { SetBoolFlag(MayHaveApzAwareListeners); }
-  bool NodeMayHaveApzAwareListeners() const
+  void SetMayBeApzAware() { SetBoolFlag(MayBeApzAware); }
+  bool NodeMayBeApzAware() const
   {
-    return GetBoolFlag(MayHaveApzAwareListeners);
+    return GetBoolFlag(MayBeApzAware);
   }
 protected:
   void SetParentIsContent(bool aValue) { SetBoolFlag(ParentIsContent, aValue); }

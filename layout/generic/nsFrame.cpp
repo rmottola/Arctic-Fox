@@ -2102,7 +2102,7 @@ CheckForApzAwareEventHandlers(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame)
     return;
   }
 
-  if (content->HasApzAwareListeners()) {
+  if (content->IsNodeApzAware()) {
     aBuilder->SetAncestorHasApzAwareEventHandler(true);
   }
 }
