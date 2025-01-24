@@ -1072,7 +1072,15 @@ public:
     return mCSSLoader;
   }
 
-  mozilla::StyleBackendType GetStyleBackendType() const;
+  mozilla::StyleBackendType GetStyleBackendType() const {
+    if (mStyleBackendType == mozilla::StyleBackendType(0)) {
+      const_cast<nsIDocument*>(this)->UpdateStyleBackendType();
+    }
+    MOZ_ASSERT(mStyleBackendType != mozilla::StyleBackendType(0));
+    return mStyleBackendType;
+  }
+
+  void UpdateStyleBackendType();
 
   bool IsStyledByServo() const {
     return GetStyleBackendType() == mozilla::StyleBackendType::Servo;
@@ -2942,6 +2950,10 @@ protected:
 
   // Our visibility state
   mozilla::dom::VisibilityState mVisibilityState;
+
+  // Whether this document has (or will have, once we have a pres shell) a
+  // Gecko- or Servo-backed style system.
+  mozilla::StyleBackendType mStyleBackendType;
 
   // True if BIDI is enabled.
   bool mBidiEnabled : 1;
