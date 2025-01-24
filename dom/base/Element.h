@@ -137,6 +137,7 @@ class UndoManager;
 class DOMRect;
 class DOMRectList;
 class DestinationInsertionPointList;
+class Grid;
 
 // IID for the dom::Element interface
 #define NS_ELEMENT_IID \
@@ -834,6 +835,8 @@ public:
            nsPresContext::AppUnitsToIntCSSPixels(sf->GetScrollRange().XMost()) :
            0;
   }
+
+  void GetGridFragments(nsTArray<RefPtr<Grid>>& aResult);
 
   virtual already_AddRefed<UndoManager> GetUndoManager()
   {
