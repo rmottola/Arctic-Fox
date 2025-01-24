@@ -3065,3 +3065,11 @@ nsINode::IsNodeApzAwareInternal() const
 {
   return EventTarget::IsApzAware();
 }
+
+#ifdef MOZ_STYLO
+bool
+nsINode::IsStyledByServo() const
+{
+  return OwnerDoc()->IsStyledByServo();
+}
+#endif
