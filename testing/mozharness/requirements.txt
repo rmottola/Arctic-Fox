@@ -13,7 +13,7 @@ mock==1.0.1
 nose==1.2.1
 ordereddict==1.1
 paramiko==1.10.0
-pycrypto==2.6
+pycrypto==2.6.1
 pyflakes==0.6.1
 pylint==0.27.0
 simplejson==2.1.1
