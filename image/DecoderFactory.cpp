@@ -10,6 +10,7 @@
 #include "nsString.h"
 
 #include "Decoder.h"
+#include "IDecodingTask.h"
 #include "nsPNGDecoder.h"
 #include "nsGIFDecoder2.h"
 #include "nsJPEGDecoder.h"
@@ -113,7 +114,7 @@ DecoderFactory::GetDecoder(DecoderType aType,
   return decoder.forget();
 }
 
-/* static */ already_AddRefed<Decoder>
+/* static */ already_AddRefed<IDecodingTask>
 DecoderFactory::CreateDecoder(DecoderType aType,
                               RasterImage* aImage,
                               SourceBuffer* aSourceBuffer,
@@ -148,10 +149,11 @@ DecoderFactory::CreateDecoder(DecoderType aType,
     return nullptr;
   }
 
-  return decoder.forget();
+  RefPtr<IDecodingTask> task = new DecodingTask(WrapNotNull(decoder));
+  return task.forget();
 }
 
-/* static */ already_AddRefed<Decoder>
+/* static */ already_AddRefed<IDecodingTask>
 DecoderFactory::CreateAnimationDecoder(DecoderType aType,
                                        RasterImage* aImage,
                                        SourceBuffer* aSourceBuffer,
@@ -180,10 +182,11 @@ DecoderFactory::CreateAnimationDecoder(DecoderType aType,
     return nullptr;
   }
 
-  return decoder.forget();
+  RefPtr<IDecodingTask> task = new DecodingTask(WrapNotNull(decoder));
+  return task.forget();
 }
 
-/* static */ already_AddRefed<Decoder>
+/* static */ already_AddRefed<IDecodingTask>
 DecoderFactory::CreateMetadataDecoder(DecoderType aType,
                                       RasterImage* aImage,
                                       SourceBuffer* aSourceBuffer,
@@ -207,7 +210,8 @@ DecoderFactory::CreateMetadataDecoder(DecoderType aType,
     return nullptr;
   }
 
-  return decoder.forget();
+  RefPtr<IDecodingTask> task = new MetadataDecodingTask(WrapNotNull(decoder));
+  return task.forget();
 }
 
 /* static */ already_AddRefed<Decoder>
