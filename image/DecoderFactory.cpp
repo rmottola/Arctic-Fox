@@ -116,8 +116,8 @@ DecoderFactory::GetDecoder(DecoderType aType,
 
 /* static */ already_AddRefed<IDecodingTask>
 DecoderFactory::CreateDecoder(DecoderType aType,
-                              RasterImage* aImage,
-                              SourceBuffer* aSourceBuffer,
+                              NotNull<RasterImage*> aImage,
+                              NotNull<SourceBuffer*> aSourceBuffer,
                               const Maybe<IntSize>& aTargetSize,
                               DecoderFlags aDecoderFlags,
                               SurfaceFlags aSurfaceFlags,
@@ -155,8 +155,8 @@ DecoderFactory::CreateDecoder(DecoderType aType,
 
 /* static */ already_AddRefed<IDecodingTask>
 DecoderFactory::CreateAnimationDecoder(DecoderType aType,
-                                       RasterImage* aImage,
-                                       SourceBuffer* aSourceBuffer,
+                                       NotNull<RasterImage*> aImage,
+                                       NotNull<SourceBuffer*> aSourceBuffer,
                                        DecoderFlags aDecoderFlags,
                                        SurfaceFlags aSurfaceFlags)
 {
@@ -188,8 +188,8 @@ DecoderFactory::CreateAnimationDecoder(DecoderType aType,
 
 /* static */ already_AddRefed<IDecodingTask>
 DecoderFactory::CreateMetadataDecoder(DecoderType aType,
-                                      RasterImage* aImage,
-                                      SourceBuffer* aSourceBuffer,
+                                      NotNull<RasterImage*> aImage,
+                                      NotNull<SourceBuffer*> aSourceBuffer,
                                       int aSampleSize)
 {
   if (aType == DecoderType::UNKNOWN) {
@@ -216,7 +216,7 @@ DecoderFactory::CreateMetadataDecoder(DecoderType aType,
 
 /* static */ already_AddRefed<Decoder>
 DecoderFactory::CreateAnonymousDecoder(DecoderType aType,
-                                       SourceBuffer* aSourceBuffer,
+                                       NotNull<SourceBuffer*> aSourceBuffer,
                                        const Maybe<IntSize>& aTargetSize,
                                        SurfaceFlags aSurfaceFlags)
 {
@@ -262,7 +262,7 @@ DecoderFactory::CreateAnonymousDecoder(DecoderType aType,
 
 /* static */ already_AddRefed<Decoder>
 DecoderFactory::CreateAnonymousMetadataDecoder(DecoderType aType,
-                                               SourceBuffer* aSourceBuffer)
+                                               NotNull<SourceBuffer*> aSourceBuffer)
 {
   if (aType == DecoderType::UNKNOWN) {
     return nullptr;
