@@ -72,12 +72,12 @@ nsWEBPDecoder::FinishInternal()
 }
 
 void
-nsWEBPDecoder::WriteInternal(const char *aBuffer, uint32_t aCount)
+nsWEBPDecoder::DoDecode(const char *aBuffer, size_t aLength)
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call WriteInternal after error!");
 
   const uint8_t* buf = (const uint8_t*)aBuffer;
-  VP8StatusCode rv = WebPIAppend(mDecoder, buf, aCount);
+  VP8StatusCode rv = WebPIAppend(mDecoder, buf, aLength);
   if (rv == VP8_STATUS_OUT_OF_MEMORY) {
     PostDecoderError(NS_ERROR_OUT_OF_MEMORY);
     return;
