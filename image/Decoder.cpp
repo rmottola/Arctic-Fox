@@ -427,7 +427,8 @@ Decoder::PostFrameStop(Opacity aFrameOpacity
                        DisposalMethod aDisposalMethod
                          /* = DisposalMethod::KEEP */,
                        int32_t aTimeout         /* = 0 */,
-                       BlendMethod aBlendMethod /* = BlendMethod::OVER */)
+                       BlendMethod aBlendMethod /* = BlendMethod::OVER */,
+                       const Maybe<nsIntRect>& aBlendRect /* = Nothing() */)
 {
   // We should be mid-frame
   MOZ_ASSERT(!IsMetadataDecode(), "Stopping frame during metadata decode");
@@ -437,7 +438,8 @@ Decoder::PostFrameStop(Opacity aFrameOpacity
   // Update our state
   mInFrame = false;
 
-  mCurrentFrame->Finish(aFrameOpacity, aDisposalMethod, aTimeout, aBlendMethod);
+  mCurrentFrame->Finish(aFrameOpacity, aDisposalMethod, aTimeout,
+                        aBlendMethod, aBlendRect);
 
   mProgress |= FLAG_FRAME_COMPLETE;
 
