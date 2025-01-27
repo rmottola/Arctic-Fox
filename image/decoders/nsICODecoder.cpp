@@ -104,54 +104,16 @@ nsICODecoder::GetFinalStateFromContainedDecoder()
 }
 
 bool
-nsICODecoder::FixBitmapHeight(int8_t* bih)
+nsICODecoder::CheckAndFixBitmapSize(int8_t* aBIH)
 {
-  // Get the height from the BMP file information header. This is signed,
-  // but in this case negative values are meaningful; see below.
-  int32_t height;
-  memcpy(&height, bih + 8, sizeof(height));
-  NativeEndian::swapFromLittleEndianInPlace(&height, 1);
-  if (height == 0) {
-    return false;
-  }
-  
-  // BMPs can be stored inverted by having a negative height
-  height = abs(height);
-
-  // The height field is double the actual height of the image to account for
-  // the AND mask. This is true even if the AND mask is not present.
-  height /= 2;
-
-  if (height > 256) {
-    return false;
-  }
-
-  // Verify that the BMP height matches the height we got from the ICO directory
-  // entry. If not, decoding fails, because if we were to allow it to continue
-  // the intrinsic size of the image wouldn't match the size of the decoded
-  // surface.
-  int32_t realHeight = GetRealHeight();
-  if (height != realHeight) {
-    return false;
-  }
-
-  // Fix the BMP height in the BIH so that the BMP decoder can work properly
-  NativeEndian::swapToLittleEndianInPlace(&realHeight, 1);
-  memcpy(bih + 8, &realHeight, sizeof(realHeight));
-  return true;
-}
-
-bool
-nsICODecoder::FixBitmapWidth(int8_t* bih)
-{
-  // Get the width from the BMP file information header.
-  // This is (unintuitively) a signed integer; see the documentation at:
+  // Get the width from the BMP file information header. This is
+  // (unintuitively) a signed integer; see the documentation at:
+  //
   //   https://msdn.microsoft.com/en-us/library/windows/desktop/dd183376(v=vs.85).aspx
+  //
   // However, we reject negative widths since they aren't meaningful.
-  int32_t width;
-  memcpy(&width, bih + 4, sizeof(width));
-  NativeEndian::swapFromLittleEndianInPlace(&width, 1);
-  if (width <=0 || width > 256) {
+  const int32_t width = LittleEndian::readInt32(aBIH + 4);
+  if (width <= 0 || width > 256) {
     return false;
   }
 
@@ -162,6 +124,35 @@ nsICODecoder::FixBitmapWidth(int8_t* bih)
   if (width != int32_t(GetRealWidth())) {
     return false;
   }
+
+  // Get the height from the BMP file information header. This is also signed,
+  // but in this case negative values are meaningful; see below.
+  int32_t height = LittleEndian::readInt32(aBIH + 8);
+  if (height == 0) {
+    return false;
+  }
+
+  // BMPs can be stored inverted by having a negative height.
+  // XXX(seth): Should we really be writing the absolute value into the BIH
+  // below? Seems like this could be problematic for inverted BMPs.
+  height = abs(height);
+
+  // The height field is double the actual height of the image to account for
+  // the AND mask. This is true even if the AND mask is not present.
+  height /= 2;
+  if (height > 256) {
+    return false;
+  }
+
+  // Verify that the BMP height matches the height we got from the ICO directory
+  // entry. If not, again, decoding fails.
+  if (height != int32_t(GetRealHeight())) {
+    return false;
+  }
+
+  // Fix the BMP height in the BIH so that the BMP decoder, which does not know
+  // about the AND mask that may follow the actual bitmap, can work properly.
+  LittleEndian::writeInt32(aBIH + 8, GetRealHeight());
 
   return true;
 }
@@ -390,15 +381,10 @@ nsICODecoder::ReadBIH(const char* aData)
   }
   mContainedDecoder->Init();
 
-  // Fix the ICO height from the BIH. It needs to be halved so our BMP decoder
-  // will understand, because the BMP decoder doesn't expect the alpha mask that
-  // follows the BMP data in an ICO.
-  if (!FixBitmapHeight(reinterpret_cast<int8_t*>(mBIHraw))) {
-    return Transition::TerminateFailure();
-  }
-
-  // Fix the ICO width from the BIH.
-  if (!FixBitmapWidth(reinterpret_cast<int8_t*>(mBIHraw))) {
+  // Verify that the BIH width and height values match the ICO directory entry,
+  // and fix the BIH height value to compensate for the fact that the underlying
+  // BMP decoder doesn't know about AND masks.
+  if (!CheckAndFixBitmapSize(reinterpret_cast<int8_t*>(mBIHraw))) {
     return Transition::TerminateFailure();
   }
 
