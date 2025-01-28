@@ -26,7 +26,7 @@ public:
   virtual ~nsWEBPDecoder();
 
   void InitInternal() override;
-  Maybe<TerminalState> DoDecode(const char* aBuffer, size_t aLength) override;
+  Maybe<TerminalState> DoDecode(SourceBufferIterator& aIterator) override;
   void FinishInternal() override;
 private:
   friend class DecoderFactory;
