@@ -75,28 +75,23 @@ nsWEBPDecoder::FinishInternal()
   }
 }
 
-void
+Maybe<TerminalState>
 nsWEBPDecoder::DoDecode(const char *aBuffer, size_t aLength)
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call WriteInternal after error!");
   MOZ_ASSERT(aBuffer);
   MOZ_ASSERT(aLength > 0);
 
-  Maybe<TerminalState> terminalState =
-    mLexer.Lex(aBuffer, aLength, [=](State aState,
-                                     const char* aData, size_t aLength) {
-      switch (aState) {
-        case State::WEBP_DATA:
-          return ReadWEBPData(aData, aLength);
-        case State::FINISHED_WEBP_DATA:
-          return FinishedWEBPData();
-      }
-      MOZ_CRASH("Unknown State");
-    });
-
-  if (terminalState == Some(TerminalState::FAILURE)) {
-    PostDataError();
-  }
+  return mLexer.Lex(aBuffer, aLength, [=](State aState,
+                    const char* aData, size_t aLength) {
+    switch (aState) {
+      case State::WEBP_DATA:
+        return ReadWEBPData(aData, aLength);
+      case State::FINISHED_WEBP_DATA:
+        return FinishedWEBPData();
+    }
+    MOZ_CRASH("Unknown State");
+  });
 }
 
 LexerTransition<nsWEBPDecoder::State>
