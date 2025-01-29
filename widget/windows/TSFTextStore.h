@@ -230,7 +230,7 @@ protected:
   static void MarkContextAsEmpty(ITfContext* aContext);
 
   bool     Init(nsWindowBase* aWidget);
-  bool     Destroy();
+  void     Destroy();
   void     ReleaseTSFObjects();
 
   bool     IsReadLock(DWORD aLock) const
@@ -838,6 +838,9 @@ protected:
   // Immediately after a call of Destroy(), mDestroyed becomes true.  If this
   // is true, the instance shouldn't grant any requests from the TIP anymore.
   bool                         mDestroyed;
+  // While the instance is being destroyed, this is set to true for avoiding
+  // recursive Destroy() calls.
+  bool                         mBeingDestroyed;
 
 
   // TSF thread manager object for the current application
