@@ -1222,6 +1222,7 @@ TSFTextStore::TSFTextStore()
   , mSinkMask(0)
   , mLock(0)
   , mLockQueued(0)
+  , mHandlingKeyMessage(0)
   , mLockedContent(mComposition, mSelection)
   , mRequestedAttrValues(false)
   , mIsRecordingActionsWithoutLock(false)
@@ -1326,9 +1327,10 @@ TSFTextStore::Destroy()
 {
   MOZ_LOG(sTextStoreLog, LogLevel::Info,
     ("TSF: 0x%p TSFTextStore::Destroy(), mLock=%s, "
-     "mComposition.IsComposing()=%s",
+     "mComposition.IsComposing()=%s, mHandlingKeyMessage=%u",
      this, GetLockFlagNameStr(mLock).get(),
-     GetBoolName(mComposition.IsComposing())));
+     GetBoolName(mComposition.IsComposing()),
+     mHandlingKeyMessage));
 
   mDestroyed = true;
 
@@ -1357,6 +1359,27 @@ TSFTextStore::Destroy()
   mLockedContent.Clear();
   mSelection.MarkDirty();
 
+  // If this is called during handling a keydown or keyup message, we should
+  // put off to release TSF objects until it completely finishes since
+  // MS-IME for Japanese refers some objects without grabbing them.
+  if (!mHandlingKeyMessage) {
+    ReleaseTSFObjects();
+  }
+
+  MOZ_LOG(sTextStoreLog, LogLevel::Info,
+    ("TSF: 0x%p   TSFTextStore::Destroy() succeeded", this));
+
+  return true;
+}
+
+void
+TSFTextStore::ReleaseTSFObjects()
+{
+  MOZ_ASSERT(!mHandlingKeyMessage);
+
+  MOZ_LOG(sTextStoreLog, LogLevel::Info,
+    ("TSF: 0x%p TSFTextStore::ReleaseTSFObjects()", this));
+
   mContext = nullptr;
   if (mDocumentMgr) {
     mDocumentMgr->Pop(TF_POPF_ALL);
@@ -1368,14 +1391,14 @@ TSFTextStore::Destroy()
 
   if (!mMouseTrackers.IsEmpty()) {
     MOZ_LOG(sTextStoreLog, LogLevel::Debug,
-      ("TSF: 0x%p   TSFTextStore::Destroy(), removing a mouse tracker...",
+      ("TSF: 0x%p   TSFTextStore::ReleaseTSFObjects(), "
+       "removing a mouse tracker...",
        this));
     mMouseTrackers.Clear();
   }
 
-  MOZ_LOG(sTextStoreLog, LogLevel::Info,
-    ("TSF: 0x%p   TSFTextStore::Destroy() succeeded", this));
-  return true;
+  MOZ_LOG(sTextStoreLog, LogLevel::Debug,
+    ("TSF: 0x%p   TSFTextStore::ReleaseTSFObjects() completed", this));
 }
 
 STDMETHODIMP
@@ -5347,7 +5370,14 @@ TSFTextStore::ProcessRawKeyMessage(const MSG& aMsg)
     if (FAILED(hr) || !eaten) {
       return false;
     }
+    RefPtr<TSFTextStore> textStore(sEnabledTextStore);
+    if (textStore) {
+      textStore->OnStartToHandleKeyMessage();
+    }
     hr = sKeystrokeMgr->KeyDown(aMsg.wParam, aMsg.lParam, &eaten);
+    if (textStore) {
+      textStore->OnEndHandlingKeyMessage();
+    }
     return SUCCEEDED(hr) && eaten;
   }
   if (aMsg.message == WM_KEYUP) {
@@ -5356,7 +5386,14 @@ TSFTextStore::ProcessRawKeyMessage(const MSG& aMsg)
     if (FAILED(hr) || !eaten) {
       return false;
     }
+    RefPtr<TSFTextStore> textStore(sEnabledTextStore);
+    if (textStore) {
+      textStore->OnStartToHandleKeyMessage();
+    }
     hr = sKeystrokeMgr->KeyUp(aMsg.wParam, aMsg.lParam, &eaten);
+    if (textStore) {
+      textStore->OnEndHandlingKeyMessage();
+    }
     return SUCCEEDED(hr) && eaten;
   }
   return false;
