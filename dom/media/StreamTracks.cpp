@@ -114,4 +114,10 @@ StreamTracks::ForgetUpTo(StreamTime aTime)
   }
 }
 
+void
+StreamTracks::Clear()
+{
+  mTracks.Clear();
+}
+
 } // namespace mozilla
