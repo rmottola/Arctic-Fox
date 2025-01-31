@@ -376,6 +376,8 @@ public:
    */
   bool IsForwardedThrough(MediaInputPort* aPort);
 
+  void SetMediaStreamSizeListener(DirectMediaStreamTrackListener* aListener);
+
 protected:
   virtual ~MediaStreamTrack();
 
@@ -414,6 +416,10 @@ protected:
   nsCOMPtr<nsIPrincipal> mPrincipal;
   nsCOMPtr<nsIPrincipal> mPendingPrincipal;
   RefPtr<PrincipalHandleListener> mPrincipalHandleListener;
+  // Keep tracking MediaStreamTrackListener and DirectMediaStreamTrackListener,
+  // so we can remove them in |Destory|.
+  nsTArray<RefPtr<MediaStreamTrackListener>> mTrackListeners;
+  nsTArray<RefPtr<DirectMediaStreamTrackListener>> mDirectTrackListeners;
   nsString mID;
   MediaStreamTrackState mReadyState;
   bool mEnabled;
