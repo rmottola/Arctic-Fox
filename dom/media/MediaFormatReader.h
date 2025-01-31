@@ -184,6 +184,8 @@ private:
 
   bool ShouldSkip(bool aSkipToNextKeyframe, media::TimeUnit aTimeThreshold);
 
+  void SetVideoDecodeThreshold();
+
   size_t SizeOfQueue(TrackType aTrack);
 
   RefPtr<PDMFactory> mPlatform;
