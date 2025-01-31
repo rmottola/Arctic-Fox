@@ -68,6 +68,7 @@
 #include "mozilla/dom/MediaSource.h"
 #include "MediaMetadataManager.h"
 #include "MediaSourceDecoder.h"
+#include "MediaStreamListener.h"
 #include "DOMMediaStream.h"
 #include "AudioStreamTrack.h"
 #include "VideoStreamTrack.h"
@@ -3166,9 +3167,9 @@ public:
     aGraph->DispatchToMainThreadAfterStreamStateUpdate(event.forget());
   }
   virtual void NotifyEvent(MediaStreamGraph* aGraph,
-                           MediaStreamListener::MediaStreamGraphEvent event) override
+                           MediaStreamGraphEvent event) override
   {
-    if (event == EVENT_FINISHED) {
+    if (event == MediaStreamGraphEvent::EVENT_FINISHED) {
       nsCOMPtr<nsIRunnable> event =
         NewRunnableMethod(this, &StreamListener::DoNotifyFinished);
       aGraph->DispatchToMainThreadAfterStreamStateUpdate(event.forget());
@@ -3228,7 +3229,7 @@ public:
 
   void NotifyQueuedTrackChanges(MediaStreamGraph* aGraph, TrackID aID,
                                 StreamTime aTrackOffset,
-                                uint32_t aTrackEvents,
+                                TrackEventCommand aTrackEvents,
                                 const MediaSegment& aQueuedMedia,
                                 MediaStream* aInputStream,
                                 TrackID aInputTrackID) override
