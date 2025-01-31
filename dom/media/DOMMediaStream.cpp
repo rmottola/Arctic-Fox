@@ -720,7 +720,7 @@ DOMMediaStream::CloneInternal(TrackForwardingOption aForwarding)
 }
 
 MediaStreamTrack*
-DOMMediaStream::GetTrackById(const nsString& aId)
+DOMMediaStream::GetTrackById(const nsAString& aId) const
 {
   for (const RefPtr<TrackPort>& info : mTracks) {
     nsString id;
@@ -733,7 +733,7 @@ DOMMediaStream::GetTrackById(const nsString& aId)
 }
 
 MediaStreamTrack*
-DOMMediaStream::GetOwnedTrackById(const nsString& aId)
+DOMMediaStream::GetOwnedTrackById(const nsAString& aId)
 {
   for (const RefPtr<TrackPort>& info : mOwnedTracks) {
     nsString id;
