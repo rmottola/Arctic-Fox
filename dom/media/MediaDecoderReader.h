@@ -291,6 +291,18 @@ public:
   // Notified by the OggReader during playback when chained ogg is detected.
   MediaEventSource<void>& OnMediaNotSeekable() { return mOnMediaNotSeekable; }
 
+  bool IsSuspended() const
+  {
+    MOZ_ASSERT(OnTaskQueue());
+    return mIsSuspended;
+  }
+
+  void SetIsSuspended(bool aState)
+  {
+    MOZ_ASSERT(OnTaskQueue());
+    mIsSuspended = aState;
+  }
+
 protected:
   virtual ~MediaDecoderReader();
 
@@ -436,6 +448,7 @@ private:
   // "discontinuity" in the stream. For example after a seek.
   bool mAudioDiscontinuity;
   bool mVideoDiscontinuity;
+  bool mIsSuspended;
 
   MediaEventListener mDataArrivedListener;
 };
