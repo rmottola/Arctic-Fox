@@ -72,9 +72,8 @@ DOMMediaStream::TrackPort::~TrackPort()
 {
   MOZ_COUNT_DTOR(TrackPort);
 
-  if (mOwnership == InputPortOwnership::OWNED && mInputPort) {
-    mInputPort->Destroy();
-    mInputPort = nullptr;
+  if (mOwnership == InputPortOwnership::OWNED) {
+    DestroyInputPort();
   }
 }
 
