@@ -842,6 +842,9 @@ private:
   CallbackID mWaitVideoCallbackID;
   const char* VideoRequestStatus() const;
 
+  void OnSuspendTimerResolved();
+  void OnSuspendTimerRejected();
+
   // True if we shouldn't play our audio (but still write it to any capturing
   // streams). When this is true, the audio thread will never start again after
   // it has stopped.
@@ -928,6 +931,12 @@ private:
   bool mSentFirstFrameLoadedEvent;
 
   bool mSentPlaybackEndedEvent;
+
+  // True if video decoding is suspended.
+  bool mVideoDecodeSuspended;
+
+  // Track enabling video decode suspension via timer
+  DelayedScheduler mVideoDecodeSuspendTimer;
 
   // Data about MediaStreams that are being fed by the decoder.
   const RefPtr<OutputStreamManager> mOutputStreamManager;
