@@ -159,6 +159,7 @@ interface nsIDocShell : nsIDocShellTreeItem
    */
   [noscript]void internalLoad(in nsIURI aURI,
                               in nsIURI aOriginalURI,
+                              in boolean aLoadReplace,
                               in boolean aIsFromProcessingFrameAttributes,
                               in nsIURI aReferrer,
                               in unsigned long aReferrerPolicy,
