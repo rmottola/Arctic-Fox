@@ -58,6 +58,34 @@ AppendStateToStr(SourceBufferAttributes::AppendState aState)
 
 static Atomic<uint32_t> sStreamSourceID(0u);
 
+#ifdef MOZ_EME
+class DispatchKeyNeededEvent : public Runnable {
+public:
+  DispatchKeyNeededEvent(AbstractMediaDecoder* aDecoder,
+                         nsTArray<uint8_t>& aInitData,
+                         const nsString& aInitDataType)
+    : mDecoder(aDecoder)
+    , mInitData(aInitData)
+    , mInitDataType(aInitDataType)
+  {
+  }
+  NS_IMETHOD Run() {
+    // Note: Null check the owner, as the decoder could have been shutdown
+    // since this event was dispatched.
+    MediaDecoderOwner* owner = mDecoder->GetOwner();
+    if (owner) {
+      owner->DispatchEncrypted(mInitData, mInitDataType);
+    }
+    mDecoder = nullptr;
+    return NS_OK;
+  }
+private:
+  RefPtr<AbstractMediaDecoder> mDecoder;
+  nsTArray<uint8_t> mInitData;
+  nsString mInitDataType;
+};
+#endif // MOZ_EME
+
 TrackBuffersManager::TrackBuffersManager(MediaSourceDecoder* aParentDecoder,
                                          const nsACString& aType)
   : mInputBuffer(new MediaByteBuffer)
@@ -1085,6 +1113,14 @@ TrackBuffersManager::OnDemuxerInitDone(nsresult)
 
   UniquePtr<EncryptionInfo> crypto = mInputDemuxer->GetCrypto();
   if (crypto && crypto->IsEncrypted()) {
+#ifdef MOZ_EME
+    // Try and dispatch 'encrypted'. Won't go if ready state still HAVE_NOTHING.
+    for (uint32_t i = 0; i < crypto->mInitDatas.Length(); i++) {
+      NS_DispatchToMainThread(
+        new DispatchKeyNeededEvent(mParentDecoder, crypto->mInitDatas[i].mInitData,
+                                   crypto->mInitDatas[i].mType));
+    }
+#endif // MOZ_EME
     info.mCrypto = *crypto;
     // We clear our crypto init data array, so the MediaFormatReader will
     // not emit an encrypted event for the same init data again.
