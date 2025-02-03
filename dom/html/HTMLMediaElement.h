@@ -20,6 +20,9 @@
 #include "mozilla/dom/TextTrackManager.h"
 #include "mozilla/WeakPtr.h"
 #include "MediaDecoder.h"
+#ifdef MOZ_EME
+#include "mozilla/dom/MediaKeys.h"
+#endif
 #include "mozilla/StateWatching.h"
 #include "nsGkAtoms.h"
 #include "PrincipalChangeObserver.h"
@@ -1118,6 +1121,9 @@ protected:
     return isPaused;
   }
 
+#ifdef MOZ_EME
+  void ReportEMETelemetry();
+#endif
   void ReportTelemetry();
 
   // Check the permissions for audiochannel.
@@ -1367,6 +1373,11 @@ protected:
 
   // Timer used for updating progress events
   nsCOMPtr<nsITimer> mProgressTimer;
+
+#ifdef MOZ_EME
+  // Encrypted Media Extension media keys.
+  RefPtr<MediaKeys> mMediaKeys;
+#endif
 
   // Stores the time at the start of the current 'played' range.
   double mCurrentPlayRangeStart;
