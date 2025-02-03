@@ -11,6 +11,9 @@
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/AsyncEventDispatcher.h"
+#ifdef MOZ_EME
+#include "mozilla/dom/MediaEncryptedEvent.h"
+#endif
 
 #include "base/basictypes.h"
 #include "nsIDOMHTMLMediaElement.h"
@@ -433,13 +436,12 @@ HTMLMediaElement::MediaLoadListener::OnStartRequest(nsIRequest* aRequest,
 
   nsCOMPtr<nsIChannel> channel = do_QueryInterface(aRequest);
   if (channel &&
-      element &&
       NS_SUCCEEDED(rv = element->InitializeDecoderForChannel(channel, getter_AddRefs(mNextListener))) &&
       mNextListener) {
     rv = mNextListener->OnStartRequest(aRequest, aContext);
   } else {
     // If InitializeDecoderForChannel() returned an error, fire a network error.
-    if (NS_FAILED(rv) && !mNextListener && element) {
+    if (NS_FAILED(rv) && !mNextListener) {
       // Load failed, attempt to load the next candidate resource. If there
       // are none, this will trigger a MEDIA_ERR_SRC_NOT_SUPPORTED error.
       element->NotifyLoadError();
