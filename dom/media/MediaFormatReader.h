@@ -426,6 +426,7 @@ private:
     media::TimeIntervals mTimeRanges;
     Maybe<media::TimeUnit> mLastTimeRangesEnd;
     RefPtr<SharedTrackInfo> mInfo;
+    Maybe<media::TimeUnit> mFirstDemuxedSampleTime;
   };
 
   class DecoderDataWithPromise : public DecoderData {
@@ -533,6 +534,8 @@ private:
   Atomic<bool> mDemuxOnly;
 
   // Seeking objects.
+  void SetSeekTarget(const SeekTarget& aTarget);
+  media::TimeUnit DemuxStartTime();
   bool IsSeeking() const { return mPendingSeekTime.isSome(); }
   bool IsVideoSeeking() const
   {
