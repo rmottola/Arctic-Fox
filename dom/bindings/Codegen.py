@@ -13006,7 +13006,6 @@ class CGResolveSystemBinding(CGAbstractMethod):
     def definition_body(self):
         descriptors = self.config.getDescriptors(hasInterfaceObject=True,
                                                  isExposedInSystemGlobals=True,
-                                                 workers=False,
                                                  register=True,
                                                  skipGen=False)
 
@@ -13369,11 +13368,8 @@ class CGBindingRoot(CGThing):
 
         # XXXkhuey ugly hack but this is going away soon.
         bindingHeaders['xpcprivate.h'] = webIDLFile.endswith("EventTarget.webidl")
-        hasWorkerStuff = len(config.getDescriptors(webIDLFile=webIDLFile,
-                                                   workers=True)) != 0
-        bindingHeaders["WorkerPrivate.h"] = hasWorkerStuff
 
-        hasThreadChecks = hasWorkerStuff or any(d.hasThreadChecks() for d in descriptors)
+        hasThreadChecks = any(d.hasThreadChecks() for d in descriptors)
         bindingHeaders["nsThreadUtils.h"] = hasThreadChecks
 
         dictionaries = config.getDictionaries(webIDLFile)
@@ -13491,7 +13487,7 @@ class CGBindingRoot(CGThing):
         # Do codegen for all the descriptors
         cgthings.extend([CGDescriptor(x) for x in descriptors])
 
-        # Do codegen for all the callback interfaces.  Skip worker callbacks.
+        # Do codegen for all the callback interfaces.
         cgthings.extend([CGCallbackInterface(x) for x in callbackDescriptors])
 
         cgthings.extend([CGNamespace('binding_detail',
@@ -16261,13 +16257,11 @@ class GlobalGenRoots():
         # Add the includes
         defineIncludes = [CGHeaders.getDeclarationFilename(desc.interface)
                           for desc in config.getDescriptors(hasInterfaceObject=True,
-                                                            workers=False,
                                                             isExposedInWindow=True,
                                                             register=True)]
         defineIncludes.append('mozilla/dom/WebIDLGlobalNameHash.h')
         defineIncludes.extend([CGHeaders.getDeclarationFilename(desc.interface)
                                for desc in config.getDescriptors(isNavigatorProperty=True,
-                                                                 workers=False,
                                                                  register=True)])
         curr = CGHeaders([], [], [], [], [], defineIncludes, 'RegisterBindings',
                          curr)
