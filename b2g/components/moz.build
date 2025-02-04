@@ -17,7 +17,6 @@ EXTRA_COMPONENTS += [
     'FilePicker.js',
     'FxAccountsUIGlue.js',
     'HelperAppDialog.js',
-    'KillSwitch.js',
     'MailtoProtocolHandler.js',
     'MobileIdentityUIGlue.js',
     'OMAContentHandler.js',
@@ -63,7 +62,6 @@ EXTRA_JS_MODULES += [
     'ErrorPage.jsm',
     'Frames.jsm',
     'FxAccountsMgmtService.jsm',
-    'KillSwitchMain.jsm',
     'LogCapture.jsm',
     'LogParser.jsm',
     'LogShake.jsm',
@@ -74,10 +72,6 @@ EXTRA_JS_MODULES += [
     'SystemAppProxy.jsm',
     'TelURIParser.jsm',
     'WebappsUpdater.jsm',
-]
-
-EXTRA_PP_JS_MODULES += [
-    'PersistentDataBlock.jsm'
 ]
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'gonk':
