@@ -13244,7 +13244,7 @@ class ForwardDeclarationBuilder:
         if t.isGeckoInterface():
             name = t.inner.identifier.name
             try:
-                desc = config.getDescriptor(name, False)
+                desc = config.getDescriptor(name)
                 self.add(desc.nativeType)
             except NoSuchDescriptorError:
                 pass
@@ -14341,8 +14341,7 @@ class CGExampleRoot(CGThing):
     respectively.
     """
     def __init__(self, config, interfaceName):
-        # Let's assume we're not doing workers stuff
-        descriptor = config.getDescriptor(interfaceName, False)
+        descriptor = config.getDescriptor(interfaceName)
 
         self.root = CGWrapper(CGExampleClass(descriptor),
                               pre="\n", post="\n")
@@ -16979,8 +16978,7 @@ class CGEventClass(CGBindingImplClass):
 
 class CGEventRoot(CGThing):
     def __init__(self, config, interfaceName):
-        # Let's assume we're not doing workers stuff, for now
-        descriptor = config.getDescriptor(interfaceName, False)
+        descriptor = config.getDescriptor(interfaceName)
 
         self.root = CGWrapper(CGEventClass(descriptor),
                               pre="\n", post="\n")
@@ -16999,7 +16997,7 @@ class CGEventRoot(CGThing):
             [],
             [],
             [
-                config.getDescriptor(parent, False).headerFile,
+                config.getDescriptor(parent).headerFile,
                 "mozilla/Attributes.h",
                 "mozilla/ErrorResult.h",
                 "mozilla/dom/%sBinding.h" % interfaceName,
