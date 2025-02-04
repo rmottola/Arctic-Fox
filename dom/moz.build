@@ -43,7 +43,6 @@ DIRS += [
     'apps',
     'base',
     'bluetooth',
-    'activities',
     'archivereader',
     'bindings',
     'battery',
