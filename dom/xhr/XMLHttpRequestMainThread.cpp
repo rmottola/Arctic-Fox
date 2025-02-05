@@ -2650,7 +2650,7 @@ XMLHttpRequestMainThread::Send(nsIVariant* aVariant, const Nullable<RequestBody>
 
     // Not doing this for system XHR uses since those don't use CORS.
     nsCOMPtr<nsILoadInfo> loadInfo = mChannel->GetLoadInfo();
-    static_cast<LoadInfo*>(loadInfo.get())->SetIncludeCookiesSecFlag();
+    static_cast<net::LoadInfo*>(loadInfo.get())->SetIncludeCookiesSecFlag();
   }
 
   // Blocking gets are common enough out of XHR that we should mark
@@ -2756,7 +2756,7 @@ XMLHttpRequestMainThread::Send(nsIVariant* aVariant, const Nullable<RequestBody>
   // Because of bug 682305, we can't let listener be the XHR object itself
   // because JS wouldn't be able to use it. So create a listener around 'this'.
   // Make sure to hold a strong reference so that we don't leak the wrapper.
-  nsCOMPtr<nsIStreamListener> listener = new nsStreamListenerWrapper(this);
+  nsCOMPtr<nsIStreamListener> listener = new net::nsStreamListenerWrapper(this);
   rv = mChannel->AsyncOpen2(listener);
   listener = nullptr;
 
