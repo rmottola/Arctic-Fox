@@ -692,7 +692,7 @@ protected:
 
   State mState;
 
-  bool mFlagAsynchronous;
+  bool mFlagSynchronous;
   bool mFlagAborted;
   bool mFlagParseBody;
   bool mFlagSyncLooping;
