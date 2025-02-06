@@ -214,14 +214,6 @@ nsCSPContext::permitsInternal(CSPDirective aDir,
         mPolicies[p]->getReportOnlyFlag()) {
       continue;
     }
-    
-    // Temporary work-around: if we have a CSP-3 deprecated child-src
-    // directive, allow the script or frame load. See #949
-    if ((aDir == nsIContentSecurityPolicy::SCRIPT_SRC_DIRECTIVE ||
-         aDir == nsIContentSecurityPolicy::FRAME_SRC_DIRECTIVE) &&
-        mPolicies[p]->hasDirective(nsIContentSecurityPolicy::CHILD_SRC_DIRECTIVE)) {
-      continue;
-    }
 
     if (!mPolicies[p]->permits(aDir,
                                aContentLocation,
