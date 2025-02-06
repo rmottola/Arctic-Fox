@@ -165,6 +165,7 @@ CSP_ContentTypeToDirective(nsContentPolicyType aType)
     case nsIContentPolicy::TYPE_WEBSOCKET:
     case nsIContentPolicy::TYPE_XMLHTTPREQUEST:
     case nsIContentPolicy::TYPE_BEACON:
+    case nsIContentPolicy::TYPE_PING:
     case nsIContentPolicy::TYPE_FETCH:
       return nsIContentSecurityPolicy::CONNECT_SRC_DIRECTIVE;
 
@@ -173,7 +174,6 @@ CSP_ContentTypeToDirective(nsContentPolicyType aType)
       return nsIContentSecurityPolicy::OBJECT_SRC_DIRECTIVE;
 
     case nsIContentPolicy::TYPE_XBL:
-    case nsIContentPolicy::TYPE_PING:
     case nsIContentPolicy::TYPE_DTD:
     case nsIContentPolicy::TYPE_OTHER:
       return nsIContentSecurityPolicy::DEFAULT_SRC_DIRECTIVE;
