@@ -287,7 +287,6 @@ static bool                 gMouseDown                 = false;
 static bool                 gDragServiceDisabled       = false;
 static FILE                *gDumpFile                  = nullptr;
 static uint32_t             gSerialCounter             = 0;
-static uint32_t             gTimeoutsRecentlySet       = 0;
 static TimeStamp            gLastRecordedRecentTimeouts;
 #define STATISTICS_INTERVAL (30 * PR_MSEC_PER_SEC)
 
@@ -9265,8 +9264,6 @@ nsGlobalWindow::ShowModalDialogOuter(const nsAString& aUrl, nsIVariant* aArgumen
     return nullptr;
   }
 
-  Telemetry::Accumulate(Telemetry::DOM_WINDOW_SHOWMODALDIALOG_USED, true);
-
   RefPtr<DialogValueHolder> argHolder =
     new DialogValueHolder(nsContentUtils::SubjectPrincipal(), aArgument);
 
@@ -12132,7 +12129,6 @@ nsGlobalWindow::SetTimeoutOrInterval(nsIScriptTimeoutHandler *aHandler,
     timeout->mPrincipal = ourPrincipal;
   }
 
-  ++gTimeoutsRecentlySet;
   TimeDuration delta = TimeDuration::FromMilliseconds(realInterval);
 
   if (!IsFrozen() && !mTimeoutsSuspendDepth) {
@@ -12515,9 +12511,6 @@ nsGlobalWindow::RunTimeout(nsTimeout *aTimeout)
   TimeDuration recordingInterval = TimeDuration::FromMilliseconds(STATISTICS_INTERVAL);
   if (gLastRecordedRecentTimeouts.IsNull() ||
       now - gLastRecordedRecentTimeouts > recordingInterval) {
-    uint32_t count = gTimeoutsRecentlySet;
-    gTimeoutsRecentlySet = 0;
-    Telemetry::Accumulate(Telemetry::DOM_TIMERS_RECENTLY_SET, count);
     gLastRecordedRecentTimeouts = now;
   }
 
@@ -12536,8 +12529,6 @@ nsGlobalWindow::RunTimeout(nsTimeout *aTimeout)
   // If we ever start setting mTimeoutInsertionPoint to a non-dummy timeout,
   // the logic in ResetTimersForNonBackgroundWindow will need to change.
   mTimeoutInsertionPoint = dummy_timeout;
-
-  Telemetry::AutoCounter<Telemetry::DOM_TIMERS_FIRED_PER_NATIVE_TIMEOUT> timeoutsRan;
 
   for (nsTimeout *timeout = mTimeouts.getFirst();
        timeout != dummy_timeout && !IsFrozen();
@@ -12572,7 +12563,6 @@ nsGlobalWindow::RunTimeout(nsTimeout *aTimeout)
     }
 
     // This timeout is good to run
-    ++timeoutsRan;
     bool timeout_was_cleared = RunTimeoutHandler(timeout, scx);
 
     if (timeout_was_cleared) {
