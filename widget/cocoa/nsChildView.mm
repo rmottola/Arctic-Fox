@@ -4630,6 +4630,9 @@ NSEvent* gLastDragMouseDownEvent = nil;
   // in order to send gecko events we'll need a gecko widget
   if (!mGeckoChild)
     return;
+  if (mTextInputHandler->OnHandleEvent(theEvent)) {
+    return;
+  }
 
   NSUInteger modifierFlags = [theEvent modifierFlags];
 
@@ -4664,6 +4667,9 @@ NSEvent* gLastDragMouseDownEvent = nil;
 
   if (!mGeckoChild || mBlockedLastMouseDown)
     return;
+  if (mTextInputHandler->OnHandleEvent(theEvent)) {
+    return;
+  }
 
   nsAutoRetainCocoaObject kungFuDeathGrip(self);
 
@@ -4793,6 +4799,9 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
 
   if (!mGeckoChild)
     return;
+  if (mTextInputHandler->OnHandleEvent(theEvent)) {
+    return;
+  }
 
   WidgetMouseEvent geckoEvent(true, eMouseMove, mGeckoChild,
                               WidgetMouseEvent::eReal);
@@ -4809,6 +4818,9 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
 
   if (!mGeckoChild)
     return;
+  if (mTextInputHandler->OnHandleEvent(theEvent)) {
+    return;
+  }
 
   gLastDragView = self;
 
@@ -4836,6 +4848,9 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
   [self maybeRollup:theEvent];
   if (!mGeckoChild)
     return;
+  if (mTextInputHandler->OnHandleEvent(theEvent)) {
+    return;
+  }
 
   // The right mouse went down, fire off a right mouse down event to gecko
   WidgetMouseEvent geckoEvent(true, eMouseDown, mGeckoChild,
@@ -4860,6 +4875,9 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
 
   if (!mGeckoChild)
     return;
+  if (mTextInputHandler->OnHandleEvent(theEvent)) {
+    return;
+  }
 
   WidgetMouseEvent geckoEvent(true, eMouseUp, mGeckoChild,
                               WidgetMouseEvent::eReal);
@@ -4877,6 +4895,9 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
 {
   if (!mGeckoChild)
     return;
+  if (mTextInputHandler->OnHandleEvent(theEvent)) {
+    return;
+  }
 
   WidgetMouseEvent geckoEvent(true, eMouseMove, mGeckoChild,
                               WidgetMouseEvent::eReal);
@@ -4900,6 +4921,9 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
 
   if (!mGeckoChild)
     return;
+  if (mTextInputHandler->OnHandleEvent(theEvent)) {
+    return;
+  }
 
   WidgetMouseEvent geckoEvent(true, eMouseDown, mGeckoChild,
                               WidgetMouseEvent::eReal);
@@ -4916,6 +4940,9 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
 {
   if (!mGeckoChild)
     return;
+  if (mTextInputHandler->OnHandleEvent(theEvent)) {
+    return;
+  }
 
   WidgetMouseEvent geckoEvent(true, eMouseUp, mGeckoChild,
                               WidgetMouseEvent::eReal);
@@ -4930,6 +4957,9 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
 {
   if (!mGeckoChild)
     return;
+  if (mTextInputHandler->OnHandleEvent(theEvent)) {
+    return;
+  }
 
   WidgetMouseEvent geckoEvent(true, eMouseMove, mGeckoChild,
                               WidgetMouseEvent::eReal);
