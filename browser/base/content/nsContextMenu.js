@@ -150,7 +150,7 @@ nsContextMenu.prototype = {
     this.showItem("context-openlinkprivate", shouldShow);
     this.showItem("context-openlinkintab", shouldShow);
     this.showItem("context-openlinkinusercontext-menu", shouldShow && showContainers);
-    this.showItem("context-openlinkincurrent", shouldShow);
+    this.showItem("context-openlinkincurrent", this.onPlainTextLink);
     this.showItem("context-sep-open", shouldShow);
   },
 
