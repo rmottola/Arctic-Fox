@@ -126,6 +126,8 @@ public:
 
   virtual ClientIPCAllocator* AsClientAllocator() override { return this; }
 
+  virtual base::ProcessId GetParentPid() const = 0;
+
   virtual MessageLoop * GetMessageLoop() const = 0;
 
   virtual int32_t GetMaxTextureSize() const;
