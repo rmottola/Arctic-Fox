@@ -11,6 +11,9 @@ MOCHITEST_MANIFESTS += ['tests/mochitest/mochitest.ini']
 MOCHITEST_CHROME_MANIFESTS += ['tests/mochitest/chrome.ini']
 
 EXPORTS.mozilla.dom += [
+    'DCPresentationChannelDescription.h',
+    'ipc/PresentationBuilderChild.h',
+    'ipc/PresentationBuilderParent.h',
     'ipc/PresentationChild.h',
     'ipc/PresentationIPCService.h',
     'ipc/PresentationParent.h',
@@ -18,6 +21,7 @@ EXPORTS.mozilla.dom += [
     'PresentationAvailability.h',
     'PresentationCallbacks.h',
     'PresentationConnection.h',
+    'PresentationConnectionList.h',
     'PresentationDeviceManager.h',
     'PresentationReceiver.h',
     'PresentationRequest.h',
@@ -28,13 +32,18 @@ EXPORTS.mozilla.dom += [
 ]
 
 UNIFIED_SOURCES += [
+    'DCPresentationChannelDescription.cpp',
+    'ipc/PresentationBuilderChild.cpp',
+    'ipc/PresentationBuilderParent.cpp',
     'ipc/PresentationChild.cpp',
+    'ipc/PresentationContentSessionInfo.cpp',
     'ipc/PresentationIPCService.cpp',
     'ipc/PresentationParent.cpp',
     'Presentation.cpp',
     'PresentationAvailability.cpp',
     'PresentationCallbacks.cpp',
     'PresentationConnection.cpp',
+    'PresentationConnectionList.cpp',
     'PresentationDeviceManager.cpp',
     'PresentationReceiver.cpp',
     'PresentationRequest.cpp',
@@ -64,6 +73,7 @@ EXTRA_JS_MODULES += [
 
 IPDL_SOURCES += [
     'ipc/PPresentation.ipdl',
+    'ipc/PPresentationBuilder.ipdl',
     'ipc/PPresentationRequest.ipdl'
 ]
 

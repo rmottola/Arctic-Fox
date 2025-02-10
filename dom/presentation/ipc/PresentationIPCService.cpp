@@ -11,6 +11,7 @@
 #include "nsIPresentationListener.h"
 #include "PresentationCallbacks.h"
 #include "PresentationChild.h"
+#include "PresentationContentSessionInfo.h"
 #include "PresentationIPCService.h"
 
 using namespace mozilla;
@@ -44,6 +45,7 @@ PresentationIPCService::~PresentationIPCService()
 
   mAvailabilityListeners.Clear();
   mSessionListeners.Clear();
+  mSessionInfos.Clear();
   sPresentationChild = nullptr;
 }
 
@@ -74,6 +76,12 @@ PresentationIPCService::SendSessionMessage(const nsAString& aSessionId,
   MOZ_ASSERT(!aSessionId.IsEmpty());
   MOZ_ASSERT(!aData.IsEmpty());
 
+  RefPtr<PresentationContentSessionInfo> info;
+  // data channel session transport is maintained by content process
+  if (mSessionInfos.Get(aSessionId, getter_AddRefs(info))) {
+    return info->Send(aData);
+  }
+
   return SendRequest(nullptr, SendSessionMessageRequest(nsString(aSessionId),
                                                         aRole,
                                                         nsString(aData)));
@@ -81,11 +89,25 @@ PresentationIPCService::SendSessionMessage(const nsAString& aSessionId,
 
 NS_IMETHODIMP
 PresentationIPCService::CloseSession(const nsAString& aSessionId,
-                                     uint8_t aRole)
+                                     uint8_t aRole,
+                                     uint8_t aClosedReason)
 {
   MOZ_ASSERT(!aSessionId.IsEmpty());
 
-  return SendRequest(nullptr, CloseSessionRequest(nsString(aSessionId), aRole));
+  nsresult rv = SendRequest(nullptr, CloseSessionRequest(nsString(aSessionId),
+                                                         aRole,
+                                                         aClosedReason));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  RefPtr<PresentationContentSessionInfo> info;
+  // data channel session transport is maintained by content process
+  if (mSessionInfos.Get(aSessionId, getter_AddRefs(info))) {
+    return info->Close(NS_OK);
+  }
+
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -94,7 +116,18 @@ PresentationIPCService::TerminateSession(const nsAString& aSessionId,
 {
   MOZ_ASSERT(!aSessionId.IsEmpty());
 
-  return SendRequest(nullptr, TerminateSessionRequest(nsString(aSessionId), aRole));
+  nsresult rv = SendRequest(nullptr, TerminateSessionRequest(nsString(aSessionId), aRole));
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  RefPtr<PresentationContentSessionInfo> info;
+  // data channel session transport is maintained by content process
+  if (mSessionInfos.Get(aSessionId, getter_AddRefs(info))) {
+    return info->Close(NS_OK);
+  }
+
+  return NS_OK;
 }
 
 nsresult
@@ -189,6 +222,21 @@ PresentationIPCService::UnregisterRespondingListener(uint64_t aWindowId)
   return NS_OK;
 }
 
+nsresult
+PresentationIPCService::NotifySessionTransport(const nsString& aSessionId,
+                                               const uint8_t& aRole,
+                                               nsIPresentationSessionTransport* aTransport)
+{
+  RefPtr<PresentationContentSessionInfo> info =
+    new PresentationContentSessionInfo(aSessionId, aRole, aTransport);
+
+  if (NS_WARN_IF(NS_FAILED(info->Init()))) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+  mSessionInfos.Put(aSessionId, info);
+  return NS_OK;
+}
+
 NS_IMETHODIMP
 PresentationIPCService::GetWindowIdBySessionId(const nsAString& aSessionId,
                                                uint64_t* aWindowId)
@@ -198,16 +246,18 @@ PresentationIPCService::GetWindowIdBySessionId(const nsAString& aSessionId,
 
 nsresult
 PresentationIPCService::NotifySessionStateChange(const nsAString& aSessionId,
-                                                 uint16_t aState)
+                                                 uint16_t aState,
+                                                 nsresult aReason)
 {
   nsCOMPtr<nsIPresentationSessionListener> listener;
   if (NS_WARN_IF(!mSessionListeners.Get(aSessionId, getter_AddRefs(listener)))) {
     return NS_OK;
   }
 
-  return listener->NotifyStateChange(aSessionId, aState);
+  return listener->NotifyStateChange(aSessionId, aState, aReason);
 }
 
+// Only used for OOP RTCDataChannel session transport case.
 nsresult
 PresentationIPCService::NotifyMessage(const nsAString& aSessionId,
                                       const nsACString& aData)
@@ -218,6 +268,19 @@ PresentationIPCService::NotifyMessage(const nsAString& aSessionId,
   }
 
   return listener->NotifyMessage(aSessionId, aData);
+}
+
+// Only used for OOP RTCDataChannel session transport case.
+nsresult
+PresentationIPCService::NotifyTransportClosed(const nsAString& aSessionId,
+                                              uint8_t aRole,
+                                              nsresult aReason)
+{
+  if (NS_WARN_IF(!mSessionInfos.Contains(aSessionId))) {
+    return NS_ERROR_NOT_AVAILABLE;
+  }
+  NS_WARN_IF(!sPresentationChild->SendNotifyTransportClosed(nsString(aSessionId), aRole, aReason));
+  return NS_OK;
 }
 
 nsresult
@@ -280,6 +343,10 @@ PresentationIPCService::UntrackSessionInfo(const nsAString& aSessionId,
 {
   // Remove the OOP responding info (if it has never been used).
   RemoveRespondingSessionId(aSessionId);
+  if (mSessionInfos.Contains(aSessionId)) {
+    mSessionInfos.Remove(aSessionId);
+  }
+
   return NS_OK;
 }
 

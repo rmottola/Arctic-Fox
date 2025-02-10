@@ -15,10 +15,12 @@
 
 class nsIPresentationSessionRequest;
 class nsIURI;
+class nsIPresentationSessionTransportBuilder;
 
 namespace mozilla {
 namespace dom {
 
+class PresentationDeviceRequest;
 class PresentationRespondingInfo;
 
 class PresentationService final : public nsIPresentationService
@@ -53,13 +55,25 @@ public:
                            const uint8_t aRole,
                            base::ProcessId aProcessId);
 
+  nsresult RegisterTransportBuilder(const nsAString& aSessionId,
+                                    uint8_t aRole,
+                                    nsIPresentationSessionTransportBuilder* aBuilder);
+
 private:
+  friend class PresentationDeviceRequest;
+
   virtual ~PresentationService();
   void HandleShutdown();
   nsresult HandleDeviceChange();
   nsresult HandleSessionRequest(nsIPresentationSessionRequest* aRequest);
   void NotifyAvailableChange(bool aIsAvailable);
   bool IsAppInstalled(nsIURI* aUri);
+
+  // This is meant to be called by PresentationDeviceRequest.
+  already_AddRefed<PresentationSessionInfo>
+  CreateControllingSessionInfo(const nsAString& aUrl,
+                               const nsAString& aSessionId,
+                               uint64_t aWindowId);
 
   bool mIsAvailable;
   nsTObserverArray<nsCOMPtr<nsIPresentationAvailabilityListener>> mAvailabilityListeners;

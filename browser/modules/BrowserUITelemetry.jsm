@@ -91,6 +91,7 @@ XPCOMUtils.defineLazyGetter(this, "PALETTE_ITEMS", function() {
     "email-link-button",
     "sync-button",
     "web-apps-button",
+    "containers-panelmenu",
   ];
 
   let panelPlacements = DEFAULT_AREA_PLACEMENTS["PanelUI-contents"];

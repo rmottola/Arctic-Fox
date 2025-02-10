@@ -902,10 +902,17 @@ toolbar[brighttext] #bookmarks-menu-button.bookmark-item {
     -moz-image-region: rect(0, 18px, 18px, 0);
 }
 
+  #containers-panelmenu@toolbarButtonPressed@ {
+    -moz-image-region: rect(36px, 1620px, 72px, 1584px);
+  }
+
 #feed-button {
     -moz-image-region: rect(0, 288px, 18px, 270px);
 }
 
+  #containers-panelmenu@toolbarButtonPressed@ {
+    -moz-image-region: rect(18px, 810px, 36px, 792px);
+  }
 
 /* ::::: fullscreen window controls ::::: */
 
