@@ -138,7 +138,9 @@ const mockedControlChannel = {
     }
     return isValid;
   },
-  close: function(reason) {
+  launch: function(presentationId, url) {
+  },
+  disconnect: function(reason) {
     sendAsyncMessage('control-channel-closed', reason);
     this._listener.QueryInterface(Ci.nsIPresentationControlChannelListener).notifyClosed(reason);
   },
@@ -406,7 +408,7 @@ addMessageListener('trigger-control-channel-open', function(reason) {
 });
 
 addMessageListener('trigger-control-channel-close', function(reason) {
-  mockedControlChannel.close(reason);
+  mockedControlChannel.disconnect(reason);
 });
 
 addMessageListener('trigger-data-transport-close', function(reason) {
