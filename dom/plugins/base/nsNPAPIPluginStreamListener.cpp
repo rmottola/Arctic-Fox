@@ -334,6 +334,8 @@ nsNPAPIPluginStreamListener::OnStartBinding(nsPluginStreamListenerPeer* streamPe
   if (error != NPERR_NO_ERROR)
     return NS_ERROR_FAILURE;
 
+  mStreamState = eNewStreamCalled;
+
   if (!SetStreamType(streamType, false)) {
     return NS_ERROR_FAILURE;
   }
