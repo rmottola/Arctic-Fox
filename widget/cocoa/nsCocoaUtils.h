@@ -190,14 +190,22 @@ public:
   static NSPoint
   ConvertPointFromScreen(NSWindow* aWindow, const NSPoint& aPt)
   {
+#if defined(MAC_OS_X_VERSION_10_7) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7)
     return [aWindow convertRectFromScreen:NSMakeRect(aPt.x, aPt.y, 0, 0)].origin;
+#else // not 10.7 or later
+    return [aWindow convertScreenToBase:aPt];
+#endif
   }
 
   // Implements an NSPoint equivalent of -[NSWindow convertRectToScreen:].
   static NSPoint
   ConvertPointToScreen(NSWindow* aWindow, const NSPoint& aPt)
   {
+#if defined(MAC_OS_X_VERSION_10_7) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7)
     return [aWindow convertRectToScreen:NSMakeRect(aPt.x, aPt.y, 0, 0)].origin;
+#else // not 10.7 or later
+    return [aWindow convertBaseToScreen:aPt];
+#endif
   }
 
   static NSRect
