@@ -5629,10 +5629,11 @@ float PresShell::GetCumulativeNonRootScaleResolution()
   return resolution;
 }
 
-void PresShell::SetRestoreResolution(float aResolution)
+void PresShell::SetRestoreResolution(float aResolution,
+                                     LayoutDeviceIntSize aDisplaySize)
 {
   if (mMobileViewportManager) {
-    mMobileViewportManager->SetRestoreResolution(aResolution);
+    mMobileViewportManager->SetRestoreResolution(aResolution, aDisplaySize);
   }
 }
 
