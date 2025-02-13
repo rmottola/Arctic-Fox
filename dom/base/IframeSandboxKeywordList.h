@@ -21,4 +21,5 @@ SANDBOX_KEYWORD("allow-orientation-lock", alloworientationlock,
 		SANDBOXED_ORIENTATION_LOCK)
 SANDBOX_KEYWORD("allow-popups", allowpopups, SANDBOXED_AUXILIARY_NAVIGATION)
 SANDBOX_KEYWORD("allow-modals", allowmodals, SANDBOXED_MODALS)
-
+SANDBOX_KEYWORD("allow-popups-to-escape-sandbox", allowpopupstoescapesandbox,
+                SANDBOX_PROPAGATES_TO_AUXILIARY_BROWSING_CONTEXTS)
