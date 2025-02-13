@@ -223,9 +223,9 @@ PDMFactory::CreatePDMs()
 #ifdef XP_WIN
   if (MediaPrefs::PDMWMFEnabled()) {
     m = new WMFDecoderModule();
-    if (!StartupPDM(m)) {
-      mWMFFailedToLoad = true;
-    }
+    mWMFFailedToLoad = !StartupPDM(m);
+  } else {
+    mWMFFailedToLoad = false;
   }
 #endif
 #ifdef MOZ_FFVPX
@@ -237,9 +237,9 @@ PDMFactory::CreatePDMs()
 #ifdef MOZ_FFMPEG
   if (MediaPrefs::PDMFFmpegEnabled()) {
     m = FFmpegRuntimeLinker::CreateDecoderModule();
-    if (!StartupPDM(m)) {
-      mFFmpegFailedToLoad = true;
-    }
+    mFFmpegFailedToLoad = !StartupPDM(m);
+  } else {
+    mFFmpegFailedToLoad = false;
   }
 #endif
 #ifdef MOZ_APPLEMEDIA
@@ -264,9 +264,9 @@ PDMFactory::CreatePDMs()
 
   if (MediaPrefs::PDMGMPEnabled()) {
     m = new GMPDecoderModule();
-    if (!StartupPDM(m)) {
-      mGMPPDMFailedToStartup = true;
-    }
+    mGMPPDMFailedToStartup = !StartupPDM(m);
+  } else {
+    mGMPPDMFailedToStartup = false;
   }
 }
 
