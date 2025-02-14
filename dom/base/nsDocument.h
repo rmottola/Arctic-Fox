@@ -1785,6 +1785,8 @@ private:
   nsTArray<nsCOMPtr<nsIRunnable> > mFrameLoaderFinalizers;
   RefPtr<nsRunnableMethod<nsDocument> > mFrameLoaderRunner;
 
+  nsCOMPtr<nsIRunnable> mMaybeEndOutermostXBLUpdateRunner;
+
   nsRevocableEventPtr<nsRunnableMethod<nsDocument, void, false> >
     mPendingTitleChangeEvent;
 
