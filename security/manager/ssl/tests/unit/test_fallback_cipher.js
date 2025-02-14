@@ -5,10 +5,13 @@
 
 // Tests the weak crypto override
 
-const TLS_RSA_WITH_RC4_128_MD5         = 0x0004;
-const TLS_RSA_WITH_RC4_128_SHA         = 0x0005;
-const TLS_ECDHE_ECDSA_WITH_RC4_128_SHA = 0xC007;
-const TLS_ECDHE_RSA_WITH_RC4_128_SHA   = 0xC011;
+const TLS_DHE_RSA_WITH_AES_128_CBC_SHA     = 0x0033;
+const TLS_DHE_RSA_WITH_AES_256_CBC_SHA     = 0x0039;
+
+const fallback_cipher_prefs = [
+  "security.ssl3.dhe_rsa_aes_128_sha",
+  "security.ssl3.dhe_rsa_aes_256_sha"
+];
 
 // Need profile dir to store the key / cert
 do_get_profile();
@@ -25,9 +28,13 @@ const socketTransportService =
   Cc["@mozilla.org/network/socket-transport-service;1"]
   .getService(Ci.nsISocketTransportService);
 
-function getCert() {
+function getCert(keyType = Ci.nsILocalCertService.KEY_TYPE_EC) {
   let deferred = Promise.defer();
-  certService.getOrCreateCert("tls-test", {
+  let nickname = "tls-test";
+  if (keyType == Ci.nsILocalCertService.KEY_TYPE_RSA) {
+    nickname = "tls-test-rsa";
+  }
+  certService.getOrCreateCert(nickname, {
     handleCert: function(c, rv) {
       if (rv) {
         deferred.reject(rv);
@@ -35,11 +42,11 @@ function getCert() {
       }
       deferred.resolve(c);
     }
-  });
+  }, keyType);
   return deferred.promise;
 }
 
-function startServer(cert, rc4only) {
+function startServer(cert, fallbackOnly) {
   let tlsServer = Cc["@mozilla.org/network/tls-server-socket;1"]
                   .createInstance(Ci.nsITLSServerSocket);
   tlsServer.init(-1, true, -1);
@@ -61,12 +68,12 @@ function startServer(cert, rc4only) {
 
       equal(status.tlsVersionUsed, Ci.nsITLSClientStatus.TLS_VERSION_1_2,
             "Using TLS 1.2");
-      let expectedCipher = rc4only ? "TLS_ECDHE_ECDSA_WITH_RC4_128_SHA"
-                                   : "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256";
+      let expectedCipher = fallbackOnly ? "TLS_DHE_RSA_WITH_AES_128_CBC_SHA"
+                                        : "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256";
       equal(status.cipherName, expectedCipher,
             "Using expected cipher");
       equal(status.keyLength, 128, "Using 128-bit key");
-      equal(status.macLength, rc4only ? 160 : 128, "Using MAC of expected length");
+      equal(status.macLength, fallbackOnly ? 160 : 128, "Using MAC of expected length");
 
       input.asyncWait({
         onInputStreamReady: function(input) {
@@ -80,12 +87,10 @@ function startServer(cert, rc4only) {
   tlsServer.setSessionCache(false);
   tlsServer.setSessionTickets(false);
   tlsServer.setRequestClientCertificate(Ci.nsITLSServerSocket.REQUEST_NEVER);
-  if (rc4only) {
+  if (fallbackOnly) {
     let cipherSuites = [
-      TLS_ECDHE_RSA_WITH_RC4_128_SHA,
-      TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
-      TLS_RSA_WITH_RC4_128_SHA,
-      TLS_RSA_WITH_RC4_128_MD5
+      TLS_DHE_RSA_WITH_AES_128_CBC_SHA,
+      TLS_DHE_RSA_WITH_AES_256_CBC_SHA
     ];
     tlsServer.setCipherSuites(cipherSuites, cipherSuites.length);
   }
@@ -102,7 +107,7 @@ function storeCertOverride(port, cert) {
                                                overrideBits, true);
 }
 
-function startClient(port, expectedResult, options = {}) {
+function startClient(name, port, expectedResult, options = {}) {
   let transport =
     socketTransportService.createTransport(["ssl"], 1, "127.0.0.1", port, null);
   if (options.isPrivate) {
