@@ -117,7 +117,6 @@
 #include "nsIWebBrowserFind.h"  // For window.find()
 #include "nsIWindowMediator.h"  // For window.find()
 #include "nsComputedDOMStyle.h"
-#include "nsIEntropyCollector.h"
 #include "nsDOMCID.h"
 #include "nsDOMWindowUtils.h"
 #include "nsIWindowWatcher.h"
@@ -278,7 +277,6 @@ nsGlobalWindow::WindowByIdTable *nsGlobalWindow::sWindowsById = nullptr;
 bool nsGlobalWindow::sWarnedAboutWindowInternal = false;
 bool nsGlobalWindow::sIdleObserversAPIFuzzTimeDisabled = false;
 
-static nsIEntropyCollector *gEntropyCollector          = nullptr;
 static int32_t              gRefCnt                    = 0;
 static int32_t              gOpenPopupSpamCount        = 0;
 static PopupControlState    gPopupControlState         = openAbused;
@@ -1343,10 +1341,6 @@ nsGlobalWindow::Init()
 {
   AssertIsOnMainThread();
 
-  CallGetService(NS_ENTROPYCOLLECTOR_CONTRACTID, &gEntropyCollector);
-  NS_ASSERTION(gEntropyCollector,
-               "gEntropyCollector should have been initialized!");
-
   NS_ASSERTION(gDOMLeakPRLog, "gDOMLeakPRLog should have been initialized!");
 
   sWindowsById = new WindowByIdTable();
@@ -1488,8 +1482,6 @@ nsGlobalWindow::ShutDown()
     fclose(gDumpFile);
   }
   gDumpFile = nullptr;
-
-  NS_IF_RELEASE(gEntropyCollector);
 
   delete sWindowsById;
   sWindowsById = nullptr;
@@ -3312,27 +3304,11 @@ nsresult
 nsGlobalWindow::PreHandleEvent(EventChainPreVisitor& aVisitor)
 {
   NS_PRECONDITION(IsInnerWindow(), "PreHandleEvent is used on outer window!?");
-  static uint32_t count = 0;
   EventMessage msg = aVisitor.mEvent->mMessage;
 
   aVisitor.mCanHandle = true;
   aVisitor.mForceContentDispatch = true; //FIXME! Bug 329119
-  if (msg == eMouseMove && gEntropyCollector) {
-    //Chances are this counter will overflow during the life of the
-    //process, but that's OK for our case. Means we get a little
-    //more entropy.
-    if (count++ % 100 == 0) {
-      //Since the high bits seem to be zero's most of the time,
-      //let's only take the lowest half of the point structure.
-      int16_t myCoord[2];
-
-      myCoord[0] = aVisitor.mEvent->mRefPoint.x;
-      myCoord[1] = aVisitor.mEvent->mRefPoint.y;
-      gEntropyCollector->RandomUpdate((void*)myCoord, sizeof(myCoord));
-      gEntropyCollector->RandomUpdate((void*)&(aVisitor.mEvent->mTime),
-                                      sizeof(uint32_t));
-    }
-  } else if (msg == eResize && aVisitor.mEvent->IsTrusted()) {
+  if (msg == eResize && aVisitor.mEvent->IsTrusted()) {
     // QIing to window so that we can keep the old behavior also in case
     // a child window is handling resize.
     nsCOMPtr<nsPIDOMWindowInner> window =
