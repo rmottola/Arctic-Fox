@@ -161,7 +161,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                 returnValue = action.params.url;
                 break;
               }
-              case "keyword": {
+              case "keyword": // Fall through.
+              case "searchengine": {
                 returnValue = action.params.input;
                 break;
               }
@@ -1228,6 +1229,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           // Check for middle-click or modified clicks on the URL bar
           if (gURLBar && this.mInput == gURLBar) {
             var url = controller.getValueAt(this.selectedIndex);
+            var options = {};
 
             // close the autocomplete popup and revert the entered address
             this.closePopup();
@@ -1261,7 +1263,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             }
 
             // respect the usual clicking subtleties
-            openUILink(url, aEvent);
+            openUILink(url, aEvent, options);
           }
         ]]>
         </body>
