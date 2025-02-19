@@ -829,6 +829,25 @@ function promiseSearchComplete() {
   });
 }
 
+function promiseNewSearchEngine(basename) {
+  return new Promise((resolve, reject) => {
+    info("Waiting for engine to be added: " + basename);
+    let url = getRootDirectory(gTestPath) + basename;
+    Services.search.addEngine(url, Ci.nsISearchEngine.TYPE_MOZSEARCH, "",
+                              false, {
+      onSuccess: function (engine) {
+        info("Search engine added: " + basename);
+        registerCleanupFunction(() => Services.search.removeEngine(engine));
+        resolve(engine);
+      },
+      onError: function (errCode) {
+        Assert.ok(false, "addEngine failed with error code " + errCode);
+        reject();
+      },
+    });
+  });
+}
+
 /**
  * Resolves when a bookmark with the given uri is added.
  */
