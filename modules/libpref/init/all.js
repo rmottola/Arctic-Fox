@@ -4957,6 +4957,8 @@ pref("dom.webnotifications.serviceworker.enabled", true);
 pref("alerts.disableSlidingEffect", false);
 // The immediate duration of the alert, in milliseconds.
 pref("alerts.durationImmediate", 20000);
+// Show favicons in web notifications.
+pref("alerts.showFavicons", false);
 
 // DOM full-screen API.
 pref("full-screen-api.enabled", false);
