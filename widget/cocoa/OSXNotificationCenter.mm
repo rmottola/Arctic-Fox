@@ -255,6 +255,14 @@ OSXNotificationCenter::ShowAlertNotification(const nsAString & aImageUrl, const 
 }
 
 NS_IMETHODIMP
+OSXNotificationCenter::ShowPersistentNotification(const nsAString& aPersistentData,
+                                                  nsIAlertNotification* aAlert,
+                                                  nsIObserver* aAlertListener)
+{
+  return ShowAlert(aAlert, aAlertListener);
+}
+
+NS_IMETHODIMP
 OSXNotificationCenter::ShowAlert(nsIAlertNotification* aAlert,
                                  nsIObserver* aAlertListener)
 {

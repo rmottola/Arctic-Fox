@@ -81,6 +81,14 @@ nsXULAlerts::ShowAlertNotification(const nsAString& aImageUrl, const nsAString& 
 }
 
 NS_IMETHODIMP
+nsXULAlerts::ShowPersistentNotification(const nsAString& aPersistentData,
+                                        nsIAlertNotification* aAlert,
+                                        nsIObserver* aAlertListener)
+{
+  return ShowAlert(aAlert, aAlertListener);
+}
+
+NS_IMETHODIMP
 nsXULAlerts::ShowAlert(nsIAlertNotification* aAlert,
                        nsIObserver* aAlertListener)
 {
