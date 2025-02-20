@@ -243,6 +243,15 @@ public:
   static inline void SetValue(nsStyleUnit& aUnit, nsStyleUnion& aValue,
                               const nsStyleCoord& aOther);
 
+  // Like the above, but do not reset before setting.
+  static inline void InitWithValue(nsStyleUnit& aUnit,
+                                   nsStyleUnion& aValue,
+                                   nsStyleUnit aOtherUnit,
+                                   const nsStyleUnion& aOtherValue);
+
+  static inline void InitWithValue(nsStyleUnit& aUnit, nsStyleUnion& aValue,
+                                   const nsStyleCoord& aOther);
+
 private:
   nsStyleUnit   mUnit;
   nsStyleUnion  mValue;
@@ -372,13 +381,13 @@ inline nsStyleCoord::nsStyleCoord(nscoord aValue, CoordConstructorType)
 inline nsStyleCoord::nsStyleCoord(const nsStyleCoord& aCopy)
   : mUnit(eStyleUnit_Null)
 {
-  SetValue(mUnit, mValue, aCopy);
+  InitWithValue(mUnit, mValue, aCopy);
 }
 
 inline nsStyleCoord::nsStyleCoord(const nsStyleUnion& aValue, nsStyleUnit aUnit)
   : mUnit(eStyleUnit_Null)
 {
-  SetValue(mUnit, mValue, aUnit, aValue);
+  InitWithValue(mUnit, mValue, aUnit, aValue);
 }
 
 inline bool nsStyleCoord::operator!=(const nsStyleCoord& aOther) const
@@ -487,7 +496,15 @@ nsStyleCoord::SetValue(nsStyleUnit& aUnit,
                        const nsStyleUnion& aOtherValue)
 {
   Reset(aUnit, aValue);
+  InitWithValue(aUnit, aValue, aOtherUnit, aOtherValue);
+}
 
+/* static */ inline void
+nsStyleCoord::InitWithValue(nsStyleUnit& aUnit,
+                            nsStyleUnion& aValue,
+                            nsStyleUnit aOtherUnit,
+                            const nsStyleUnion& aOtherValue)
+{
   aUnit = aOtherUnit;
   aValue = aOtherValue;
 
@@ -505,6 +522,13 @@ nsStyleCoord::SetValue(nsStyleUnit& aUnit, nsStyleUnion& aValue,
                        const nsStyleCoord& aOther)
 {
   SetValue(aUnit, aValue, aOther.mUnit, aOther.mValue);
+}
+
+/* static */ inline void
+nsStyleCoord::InitWithValue(nsStyleUnit& aUnit, nsStyleUnion& aValue,
+                            const nsStyleCoord& aOther)
+{
+  InitWithValue(aUnit, aValue, aOther.mUnit, aOther.mValue);
 }
 
 
