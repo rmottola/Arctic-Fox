@@ -142,3 +142,4 @@ load font-face-truncated-src.html
 load large_border_image_width.html
 skip load long-url-list-stack-overflow.html # skipped due to being slow (bug 477490)
 pref(layout.css.background-clip-text.enabled,true) load 1275026.html
+load 1278463-1.html
