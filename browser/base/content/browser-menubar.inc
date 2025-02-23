@@ -520,7 +520,10 @@
                   onpopupshowing="mirrorShow(this)">
               <menupopup id="menu_ToolsPopup"
 #ifdef MOZ_SERVICES_SYNC
-                         onpopupshowing="gSyncUI.updateUI();"
+# We have to use setTimeout() here to avoid a flickering menu bar when opening
+# the Tools menu, see bug 970769. This can be removed once we got rid of the
+# event loop spinning in Weave.Status._authManager.
+                         onpopupshowing="setTimeout(() => gSyncUI.updateUI());"
 #endif
                          >
               <menuitem id="menu_search"
