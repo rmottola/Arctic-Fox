@@ -347,9 +347,6 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
    */
   // Used by itself
   installWebIDEWidget: function() {
-    // No CustomizableUI -> short circuit
-    return;
-
     if (this.isWebIDEWidgetInstalled()) {
       return;
     }
@@ -374,9 +371,6 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
   },
 
   isWebIDEWidgetInstalled: function() {
-    // No CustomizableUI -> short circuit
-    return;
-
     let widgetWrapper = CustomizableUI.getWidget("webide-button");
     return !!(widgetWrapper && widgetWrapper.provider == CustomizableUI.PROVIDER_API);
   },
@@ -390,9 +384,6 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
    * Uninstall WebIDE widget
    */
   uninstallWebIDEWidget: function() {
-    // No CustomizableUI -> short circuit
-    return;
-
     if (this.isWebIDEWidgetInstalled()) {
       CustomizableUI.removeWidgetFromArea("webide-button");
     }
@@ -404,9 +395,6 @@ var gDevToolsBrowser = exports.gDevToolsBrowser = {
    */
    // Used by webide.js
   moveWebIDEWidgetInNavbar: function() {
-    // No CustomizableUI -> short circuit
-    return;
-
     CustomizableUI.addWidgetToArea("webide-button", CustomizableUI.AREA_NAVBAR);
   },
 
