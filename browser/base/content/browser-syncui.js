@@ -30,6 +30,7 @@ var gSyncUI = {
          "weave:ui:sync:error",
          "weave:ui:sync:finish",
          "weave:ui:clear-error",
+         "weave:engine:sync:finish"
   ],
 
   _unloaded: false,
@@ -432,6 +433,17 @@ var gSyncUI = {
     }
   },
 
+  onClientsSynced: function() {
+    let broadcaster = document.getElementById("sync-syncnow-state");
+    if (broadcaster) {
+      if (Weave.Service.clientsEngine.stats.numClients > 1) {
+        broadcaster.setAttribute("devices-status", "multi");
+      } else {
+        broadcaster.setAttribute("devices-status", "single");
+      }
+    }
+  },
+
   observe: function SUI_observe(subject, topic, data) {
     this.log.debug("observed", topic);
     if (this._unloaded) {
@@ -497,6 +509,12 @@ var gSyncUI = {
         // Stop the animation timer on shutdown, since we can't update the UI
         // after this.
         clearTimeout(this._syncAnimationTimer);
+        break;
+      case "weave:engine:sync:finish":
+        if (data != "clients") {
+          return;
+        }
+        this.onClientsSynced();
         break;
     }
   },
