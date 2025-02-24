@@ -5,9 +5,6 @@
 <panel id="identity-popup"
        type="arrow"
        hidden="true"
-       noautofocus="true"
-       onpopupshown="if (event.target == this)
-                       gIdentityHandler.onPopupShown(event);"
        orient="vertical">
   <hbox id="identity-popup-container" align="top">
     <image id="identity-popup-icon"/>
