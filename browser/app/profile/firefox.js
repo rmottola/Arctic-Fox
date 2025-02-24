@@ -1171,9 +1171,16 @@ pref("services.sync.prefs.sync.security.OCSP.require", true);
 pref("services.sync.prefs.sync.security.default_personal_cert", true);
 pref("services.sync.prefs.sync.security.tls.version.min", true);
 pref("services.sync.prefs.sync.security.tls.version.max", true);
+pref("services.sync.prefs.sync.services.sync.syncedTabs.showRemoteIcons", true);
 pref("services.sync.prefs.sync.signon.rememberSignons", true);
 pref("services.sync.prefs.sync.spellchecker.dictionary", true);
 pref("services.sync.prefs.sync.xpinstall.whitelist.required", true);
+
+// A preference that controls whether we should show the icon for a remote tab.
+// This pref has no UI but exists because some people may be concerned that
+// fetching these icons to show remote tabs may leak information about that
+// user's tabs and bookmarks. Note this pref is also synced.
+pref("services.sync.syncedTabs.showRemoteIcons", true);
 
 // Developer edition preferences
 #ifdef MOZ_DEV_EDITION
