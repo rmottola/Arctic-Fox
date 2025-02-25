@@ -79,3 +79,16 @@
 .searchbar-engine-menuitem[selected="true"] > .menu-iconic-text {
   font-weight: bold;
 }
+
+.searchbar-search-button {
+  list-style-image: url("chrome://browser/skin/search-indicator.png");
+  -moz-image-region: rect(0, 20px, 20px, 0);
+  margin-top: 1px;
+  margin-bottom: 1px;
+  margin-inline-start: 4px;
+  width: 20px;
+}
+
+.searchbar-search-button[addengines="true"] {
+  list-style-image: url("chrome://browser/skin/search-indicator-badge-add.png");
+}

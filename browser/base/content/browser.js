@@ -3531,8 +3531,28 @@ const BrowserSearch = {
 
     if (hidden)
       browser.hiddenEngines = engines;
-    else
+    else {
       browser.engines = engines;
+      if (browser == gBrowser.selectedBrowser)
+        this.updateOpenSearchBadge();
+    }
+  },
+
+  /**
+   * Update the browser UI to show whether or not additional engines are
+   * available when a page is loaded or the user switches tabs to a page that
+   * has search engines.
+   */
+  updateOpenSearchBadge: function() {
+    var searchBar = this.searchBar;
+    if (!searchBar)
+      return;
+
+    var engines = gBrowser.selectedBrowser.engines;
+    if (engines && engines.length > 0)
+      searchBar.setAttribute("addengines", "true");
+    else
+      searchBar.removeAttribute("addengines");
   },
 
   /**
@@ -4695,6 +4715,7 @@ var XULBrowserWindow = {
 
   asyncUpdateUI: function () {
     FeedHandler.updateFeeds();
+    BrowserSearch.updateOpenSearchBadge();
   },
 
   hideChromeForLocation: function(aLocation) {

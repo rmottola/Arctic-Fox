@@ -321,6 +321,13 @@ panel[noactions] > richlistbox > richlistitem[type~="action"] > .ac-url-box > .a
   -moz-binding: url("chrome://browser/content/urlbarBindings.xml#browser-autocomplete-result-popup");
 }
 
+/* Overlay a badge on top of the icon of additional open search providers
+   in the search panel. */
+.addengine-item > .button-box > .button-icon {
+  -moz-binding: url("chrome://browser/content/search/search.xml#addengine-icon");
+  display: -moz-stack;
+}
+
 #PopupAutoCompleteRichResult {
   -moz-binding: url("chrome://browser/content/urlbarBindings.xml#urlbar-rich-result-popup");
 }
