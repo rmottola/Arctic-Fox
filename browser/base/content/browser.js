@@ -2639,33 +2639,9 @@ function SetPageProxyState(aState)
   if (aState == "valid") {
     gLastValidURLStr = gURLBar.value;
     gURLBar.addEventListener("input", UpdatePageProxyState, false);
-    PageProxySetIcon(gBrowser.getIcon());
   } else if (aState == "invalid") {
     gURLBar.removeEventListener("input", UpdatePageProxyState, false);
-    PageProxyClearIcon();
   }
-}
-
-function PageProxySetIcon (aURL)
-{
-  if (!gProxyFavIcon)
-    return;
-
-  if (gBrowser.selectedBrowser.contentDocument instanceof ImageDocument) {
-    // PageProxyClearIcon();
-    gProxyFavIcon.setAttribute("src", "chrome://browser/skin/imagedocument.png");
-    return;
-  }
-
-  if (!aURL)
-    PageProxyClearIcon();
-  else if (gProxyFavIcon.getAttribute("src") != aURL)
-    gProxyFavIcon.setAttribute("src", aURL);
-}
-
-function PageProxyClearIcon ()
-{
-  gProxyFavIcon.removeAttribute("src");
 }
 
 function PageProxyClickHandler(aEvent)
@@ -4436,12 +4412,6 @@ var XULBrowserWindow = {
   onBeforeLinkTraversal: function(originalTarget, linkURI, linkNode, isAppTab) {
     let target = BrowserUtils.onBeforeLinkTraversal(originalTarget, linkURI, linkNode, isAppTab);
     return target;
-  },
-
-  onLinkIconAvailable: function (aIconURL) {
-    if (gProxyFavIcon && gBrowser.userTypedValue === null) {
-      PageProxySetIcon(aIconURL); // update the favicon in the URL bar
-    }
   },
 
   // Check whether this URI should load in the current process
