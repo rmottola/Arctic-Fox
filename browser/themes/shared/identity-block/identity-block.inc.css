@@ -106,8 +106,26 @@
   opacity: 1;
 }
 
-#urlbar[pageproxystate="invalid"] > #identity-box > #tracking-protection-icon {
-  visibility: collapse;
+/* MAIN IDENTITY ICON */
+
+#identity-icon {
+  width: 16px;
+  height: 16px;
+  list-style-image: url(chrome://browser/skin/identity-icon.svg#normal);
+}
+
+
+#identity-box:hover > #identity-icon,
+#identity-box[open=true] > #identity-icon {
+  list-style-image: url(chrome://browser/skin/identity-icon.svg#hover);
+}
+
+#urlbar[pageproxystate="valid"] > #identity-box.chromeUI > #identity-icon {
+  list-style-image: url(chrome://branding/content/identity-icons-brand.svg);
+}
+
+#urlbar[pageproxystate="invalid"] > #identity-box > #identity-icon {
+  opacity: 0.3;
 }
 
 /* CONNECTION ICON */
