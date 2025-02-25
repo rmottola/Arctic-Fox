@@ -4622,15 +4622,12 @@ var XULBrowserWindow = {
         gTabletModePageCounter.inc();
       }
 
-      // Show or hide browser chrome based on the whitelist
-      if (this.hideChromeForLocation(location)) {
+      // Show or hide browser chrome for apps
+      let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
+      if (ss.getTabValue(gBrowser.selectedTab, "appOrigin"))
         document.documentElement.setAttribute("disablechrome", "true");
-      } else {
-        if (SessionStore.getTabValue(gBrowser.selectedTab, "appOrigin"))
-          document.documentElement.setAttribute("disablechrome", "true");
-        else
-          document.documentElement.removeAttribute("disablechrome");
-      }
+      else
+        document.documentElement.removeAttribute("disablechrome");
 
       // Utility functions for disabling find
       var shouldDisableFind = function shouldDisableFind(aDocument) {
@@ -4718,12 +4715,8 @@ var XULBrowserWindow = {
     BrowserSearch.updateOpenSearchBadge();
   },
 
-  hideChromeForLocation: function(aLocation) {
-    aLocation = aLocation.toLowerCase();
-    return this.inContentWhitelist.some(function(aSpec) {
-      return aSpec == aLocation;
-    });
-  },
+  // Left here for add-on compatibility, see bug 752434
+  hideChromeForLocation: function() {},
 
   onStatusChange: function (aWebProgress, aRequest, aStatus, aMessage) {
     this.status = aMessage;
@@ -7376,6 +7369,28 @@ var gIdentityHandler = {
 
     // Now open the popup, anchored off the primary chrome element
     this._identityPopup.openPopup(this._identityIcon, "bottomcenter topleft");
+  },
+
+  onPopupShown(event) {
+    if (event.target == this._identityPopup) {
+      window.addEventListener("focus", this, true);
+    }
+  },
+
+  onPopupHidden(event) {
+    if (event.target == this._identityPopup) {
+      window.removeEventListener("focus", this, true);
+    }
+  },
+
+  handleEvent(event) {
+    let elem = document.activeElement;
+    let position = elem.compareDocumentPosition(this._identityPopup);
+
+    if (!(position & Node.DOCUMENT_POSITION_CONTAINS)) {
+      // Hide the panel when some element outside the panel received focus.
+      this._identityPopup.hidePopup();
+    }
   },
 
   onDragStart: function (event) {
