@@ -54,24 +54,7 @@ HUD_SERVICE.prototype =
    */
   consoles: null,
 
-  _browerConsoleSessionState: false,
-  storeBrowserConsoleSessionState() {
-    this._browerConsoleSessionState = !!this.getBrowserConsole();
-  },
-  getBrowserConsoleSessionState() {
-    return this._browerConsoleSessionState;
-  },
-
   /**
-   * Restore the Browser Console as provided by SessionStore.
-   */
-  restoreBrowserConsoleSession: function HS_restoreBrowserConsoleSession() {
-    if (!HUDService.getBrowserConsole()) {
-      HUDService.toggleBrowserConsole();
-    }
-  },
-
-   /**
    * Assign a function to this property to listen for every request that
    * completes. Used by unit tests. The callback takes one argument: the HTTP
    * activity object as received from the remote Web Console.
@@ -675,9 +658,6 @@ BrowserConsole.prototype = Heritage.extend(WebConsole.prototype,
       return this._bc_init;
     }
 
-    // Only add the shutdown observer if we've opened a Browser Console window.
-    ShutdownObserver.init();
-
     this.ui._filterPrefsPrefix = BROWSER_CONSOLE_FILTER_PREFS_PREFIX;
 
     let window = this.iframeWindow;
@@ -690,9 +670,6 @@ BrowserConsole.prototype = Heritage.extend(WebConsole.prototype,
       this.destroy();
     };
     window.addEventListener("unload", onClose);
-
-    // Make sure Ctrl-W closes the Browser Console window.
-    window.document.getElementById("cmd_close").removeAttribute("disabled");
 
     this._telemetry.toolOpened("browserconsole");
 
@@ -750,31 +727,3 @@ const HUDService = new HUD_SERVICE();
   exports.consoles = HUDService.consoles;
   exports.lastFinishedRequest = HUDService.lastFinishedRequest;
 })();
-
-/**
- * The ShutdownObserver listens for app shutdown and saves the current state
- * of the Browser Console for session restore.
- */
-var ShutdownObserver = {
-  _initialized: false,
-  init() {
-    if (this._initialized) {
-      return;
-    }
-
-    Services.obs.addObserver(this, "quit-application-granted", false);
-
-    this._initialized = true;
-  },
-
-  observe(message, topic) {
-    if (topic == "quit-application-granted") {
-      HUDService.storeBrowserConsoleSessionState();
-      this.uninit();
-    }
-  },
-
-  uninit() {
-    Services.obs.removeObserver(this, "quit-application-granted");
-  }
-};
