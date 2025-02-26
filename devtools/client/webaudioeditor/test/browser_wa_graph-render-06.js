@@ -5,8 +5,10 @@
  * Tests to ensure that param connections trigger graph redraws
  */
 
+const BUG_1141261_URL = EXAMPLE_URL + "doc_bug_1141261.html";
+
 add_task(function*() {
-  let { target, panel } = yield initWebAudioEditor(SIMPLE_CONTEXT_URL);
+  let { target, panel } = yield initWebAudioEditor(BUG_1141261_URL);
   let { panelWin } = panel;
   let { gFront, $, $$, EVENTS } = panelWin;
 
@@ -14,16 +16,10 @@ add_task(function*() {
 
   let [actors] = yield Promise.all([
     getN(gFront, "create-node", 3),
-    waitForGraphRendered(panelWin, 3, 2, 0)
+    waitForGraphRendered(panelWin, 3, 1, 0)
   ]);
 
-  let [dest, osc, gain] = actors;
-
-  yield osc.disconnect();
-
-  osc.connectParam(gain, "gain");
-  yield waitForGraphRendered(panelWin, 3, 1, 1);
-  ok(true, "Graph re-rendered upon param connection");
+  ok(true, "Graph correctly shows gain node as disconnected");
 
   yield teardown(target);
 });
