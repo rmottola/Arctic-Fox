@@ -3,10 +3,11 @@ Cu.import("resource://gre/modules/FormHistory.jsm");
 const ENGINE_NAME = "engine-suggestions.xml";
 const SERVER_PORT = 9000;
 const SUGGEST_PREF = "browser.urlbar.suggest.searches";
+const SUGGEST_ENABLED_PREF = "browser.search.suggest.enabled";
 const SUGGEST_RESTRICT_TOKEN = "$";
 
-let suggestionsFn;
-let previousSuggestionsFn;
+var suggestionsFn;
+var previousSuggestionsFn;
 
 function setSuggestionsFn(fn) {
   previousSuggestionsFn = suggestionsFn;
@@ -51,7 +52,10 @@ add_task(function* disabled_urlbarSuggestions() {
   Services.prefs.setBoolPref(SUGGEST_ENABLED_PREF, true);
   yield check_autocomplete({
     search: "hello",
-    matches: [],
+    searchParam: "enable-actions",
+    matches: [
+      makeSearchMatch("hello", { engineName: ENGINE_NAME, heuristic: true }),
+    ],
   });
   yield cleanUpSuggestions();
 });
@@ -61,7 +65,10 @@ add_task(function* disabled_allSuggestions() {
   Services.prefs.setBoolPref(SUGGEST_ENABLED_PREF, false);
   yield check_autocomplete({
     search: "hello",
-    matches: [],
+    searchParam: "enable-actions",
+    matches: [
+      makeSearchMatch("hello", { engineName: ENGINE_NAME, heuristic: true }),
+    ],
   });
   yield cleanUpSuggestions();
 });
@@ -71,19 +78,24 @@ add_task(function* disabled_privateWindow() {
   Services.prefs.setBoolPref(SUGGEST_ENABLED_PREF, true);
   yield check_autocomplete({
     search: "hello",
-    matches: [],
-    searchParam: "private-window",
+    searchParam: "private-window enable-actions",
+    matches: [
+      makeSearchMatch("hello", { engineName: ENGINE_NAME, heuristic: true }),
+    ],
   });
   yield cleanUpSuggestions();
 });
 
 add_task(function* singleWordQuery() {
   Services.prefs.setBoolPref(SUGGEST_PREF, true);
+  Services.prefs.setBoolPref(SUGGEST_ENABLED_PREF, true);
 
   yield check_autocomplete({
     search: "hello",
-    matches: [{
-      uri: makeActionURI(("searchengine"), {
+    searchParam: "enable-actions",
+    matches: [
+      makeSearchMatch("hello", { engineName: ENGINE_NAME, heuristic: true }),
+      { uri: makeActionURI(("searchengine"), {
         engineName: ENGINE_NAME,
         input: "hello foo",
         searchQuery: "hello",
@@ -110,11 +122,14 @@ add_task(function* singleWordQuery() {
 
 add_task(function* multiWordQuery() {
   Services.prefs.setBoolPref(SUGGEST_PREF, true);
+  Services.prefs.setBoolPref(SUGGEST_ENABLED_PREF, true);
 
   yield check_autocomplete({
     search: "hello world",
-    matches: [{
-      uri: makeActionURI(("searchengine"), {
+    searchParam: "enable-actions",
+    matches: [
+      makeSearchMatch("hello world", { engineName: ENGINE_NAME, heuristic: true }),
+      { uri: makeActionURI(("searchengine"), {
         engineName: ENGINE_NAME,
         input: "hello world foo",
         searchQuery: "hello world",
@@ -141,6 +156,7 @@ add_task(function* multiWordQuery() {
 
 add_task(function* suffixMatch() {
   Services.prefs.setBoolPref(SUGGEST_PREF, true);
+  Services.prefs.setBoolPref(SUGGEST_ENABLED_PREF, true);
 
   setSuggestionsFn(searchStr => {
     let prefixes = ["baz", "quux"];
@@ -149,8 +165,10 @@ add_task(function* suffixMatch() {
 
   yield check_autocomplete({
     search: "hello",
-    matches: [{
-      uri: makeActionURI(("searchengine"), {
+    searchParam: "enable-actions",
+    matches: [
+      makeSearchMatch("hello", { engineName: ENGINE_NAME, heuristic: true }),
+      { uri: makeActionURI(("searchengine"), {
         engineName: ENGINE_NAME,
         input: "baz hello",
         searchQuery: "hello",
@@ -184,8 +202,10 @@ add_task(function* queryIsNotASubstring() {
 
   yield check_autocomplete({
     search: "hello",
-    matches: [{
-      uri: makeActionURI(("searchengine"), {
+    searchParam: "enable-actions",
+    matches: [
+      makeSearchMatch("hello", { engineName: ENGINE_NAME, heuristic: true }),
+      { uri: makeActionURI(("searchengine"), {
         engineName: ENGINE_NAME,
         input: "aaa",
         searchQuery: "hello",
@@ -212,6 +232,7 @@ add_task(function* queryIsNotASubstring() {
 
 add_task(function* restrictToken() {
   Services.prefs.setBoolPref(SUGGEST_PREF, true);
+  Services.prefs.setBoolPref(SUGGEST_ENABLED_PREF, true);
 
   // Add a visit and a bookmark.  Actually, make the bookmark visited too so
   // that it's guaranteed, with its higher frecency, to appear above the search
@@ -236,7 +257,9 @@ add_task(function* restrictToken() {
   // the visit and bookmark.
   yield check_autocomplete({
     search: "hello",
+    searchParam: "enable-actions",
     matches: [
+      makeSearchMatch("hello", { engineName: ENGINE_NAME, heuristic: true }),
       {
         uri: NetUtil.newURI("http://example.com/hello-visit"),
         title: "hello visit",
@@ -274,7 +297,10 @@ add_task(function* restrictToken() {
   // Now do a restricted search to make sure only suggestions appear.
   yield check_autocomplete({
     search: SUGGEST_RESTRICT_TOKEN + " hello",
+    searchParam: "enable-actions",
     matches: [
+      // TODO (bug 1177895) This is wrong.
+      makeSearchMatch(SUGGEST_RESTRICT_TOKEN + " hello", { engineName: ENGINE_NAME, heuristic: true }),
       {
         uri: makeActionURI(("searchengine"), {
           engineName: ENGINE_NAME,
@@ -359,7 +385,9 @@ add_task(function* mixup_frecency() {
   yield check_autocomplete({
     checkSorting: true,
     search: "frecency",
+    searchParam: "enable-actions",
     matches: [
+      makeSearchMatch("frecency", { engineName: ENGINE_NAME, heuristic: true }),
       { uri: NetUtil.newURI("http://example.com/hi3"),
         title: "high frecency 3",
         style: [ "bookmark" ] },
@@ -415,7 +443,9 @@ add_task(function* prohibit_suggestions() {
 
   yield check_autocomplete({
     search: "localhost",
+    searchParam: "enable-actions",
     matches: [
+      makeSearchMatch("localhost", { engineName: ENGINE_NAME, heuristic: true }),
       {
         uri: makeActionURI(("searchengine"), {
           engineName: ENGINE_NAME,
@@ -446,33 +476,54 @@ add_task(function* prohibit_suggestions() {
   });
   yield check_autocomplete({
     search: "localhost",
-    matches: [],
+    searchParam: "enable-actions",
+    matches: [
+      makeVisitMatch("localhost", "http://localhost/", { heuristic: true }),
+    ],
   });
 
   yield check_autocomplete({
     search: "1.2.3.4",
-    matches: [],
+    searchParam: "enable-actions",
+    matches: [
+      makeVisitMatch("1.2.3.4", "http://1.2.3.4/", { heuristic: true }),
+    ],
   });
   yield check_autocomplete({
     search: "[2001::1]:30",
-    matches: [],
+    searchParam: "enable-actions",
+    matches: [
+      makeVisitMatch("[2001::1]:30", "http://[2001::1]:30/", { heuristic: true }),
+    ],
   });
   yield check_autocomplete({
     search: "user:pass@test",
-    matches: [],
+    searchParam: "enable-actions",
+    matches: [
+      makeSearchMatch("user:pass@test", { engineName: ENGINE_NAME, heuristic: true }),
+    ],
   });
   yield check_autocomplete({
     search: "test/test",
-    matches: [],
+    searchParam: "enable-actions",
+    matches: [
+      makeSearchMatch("test/test", { engineName: ENGINE_NAME, heuristic: true }),
+    ],
   });
   yield check_autocomplete({
     search: "data:text/plain,Content",
-    matches: [],
+    searchParam: "enable-actions",
+    matches: [
+      makeVisitMatch("data:text/plain,Content", "data:text/plain,Content", { heuristic: true }),
+    ],
   });
 
   yield check_autocomplete({
     search: "a",
-    matches: [],
+    searchParam: "enable-actions",
+    matches: [
+      makeSearchMatch("a", { engineName: ENGINE_NAME, heuristic: true }),
+    ],
   });
 
   yield cleanUpSuggestions();
@@ -488,7 +539,9 @@ add_task(function* avoid_url_suggestions() {
 
   yield check_autocomplete({
     search: "test",
+    searchParam: "enable-actions",
     matches: [
+      makeSearchMatch("test", { engineName: ENGINE_NAME, heuristic: true }),
       {
         uri: makeActionURI(("searchengine"), {
           engineName: ENGINE_NAME,

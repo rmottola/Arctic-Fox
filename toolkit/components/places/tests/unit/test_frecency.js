@@ -84,7 +84,7 @@ function ensure_results_internal(uris, searchTerm)
 
   // Make an AutoCompleteInput that uses our searches
   // and confirms results on search complete
-  var input = new AutoCompleteInput(["history"]);
+  var input = new AutoCompleteInput(["unifiedcomplete"]);
 
   controller.input = input;
 
@@ -266,18 +266,13 @@ function*() {
  * This deferred object contains a promise that is resolved when the
  * ensure_results_internal function has finished its execution.
  */
-let deferEnsureResults;
-
-/**
- * Test adaptive autocomplete
- */
-function run_test()
-{
-  run_next_test();
-}
+var deferEnsureResults;
 
 add_task(function* test_frecency()
 {
+  // Disable autoFill for this test.
+  Services.prefs.setBoolPref("browser.urlbar.autoFill", false);
+  do_register_cleanup(() => Services.prefs.clearUserPref("browser.urlbar.autoFill"));
   // always search in history + bookmarks, no matter what the default is
   var prefs = Cc["@mozilla.org/preferences-service;1"].
               getService(Ci.nsIPrefBranch);

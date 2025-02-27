@@ -510,7 +510,7 @@
         <textbox id="urlbar" flex="1"
                  placeholder=""
                  type="autocomplete"
-                 autocompletesearch="urlinline history"
+                 autocompletesearch="unifiedcomplete"
                  autocompletesearchparam="enable-actions"
                  autocompletepopup="PopupAutoCompleteRichResult"
                  completeselectedindex="true"

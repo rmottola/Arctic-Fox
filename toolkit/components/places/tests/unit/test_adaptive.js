@@ -75,7 +75,7 @@ function ensure_results(expected, searchTerm)
 
   // Make an AutoCompleteInput that uses our searches
   // and confirms results on search complete.
-  let input = new AutoCompleteInput(["history"]);
+  let input = new AutoCompleteInput(["unifiedcomplete"]);
 
   controller.input = input;
 
@@ -160,20 +160,20 @@ function doAdaptiveDecay()
   }, this);
 }
 
-let uri1 = uri("http://site.tld/1");
-let uri2 = uri("http://site.tld/2");
+var uri1 = uri("http://site.tld/1");
+var uri2 = uri("http://site.tld/2");
 
 // d1 is some date for the page visit
-let d1 = new Date(Date.now() - 1000 * 60 * 60) * 1000;
+var d1 = new Date(Date.now() - 1000 * 60 * 60) * 1000;
 // c1 is larger (should show up higher) than c2
-let c1 = 10;
-let c2 = 1;
+var c1 = 10;
+var c2 = 1;
 // s1 is a partial match of s2
-let s0 = "";
-let s1 = "si";
-let s2 = "site";
+var s0 = "";
+var s1 = "si";
+var s2 = "site";
 
-let observer = {
+var observer = {
   results: null,
   search: null,
   runCount: -1,
@@ -196,7 +196,7 @@ function makeResult(aURI, aStyle = "favicon") {
   };
 }
 
-let tests = [
+var tests = [
   // Test things without a search term.
   function*() {
     print("Test 0 same count, diff rank, same term; no search");
@@ -374,18 +374,16 @@ let tests = [
  * This deferred object contains a promise that is resolved when the
  * ensure_results function has finished its execution.
  */
-let deferEnsureResults;
+var deferEnsureResults;
 
 /**
  * Test adaptive autocomplete.
  */
-function run_test()
-{
-  run_next_test();
-}
-
 add_task(function* test_adaptive()
 {
+  // Disable autoFill for this test.
+  Services.prefs.setBoolPref("browser.urlbar.autoFill", false);
+  do_register_cleanup(() => Services.prefs.clearUserPref("browser.urlbar.autoFill"));
   for (let [, test] in Iterator(tests)) {
     // Cleanup.
     PlacesUtils.bookmarks.removeFolderChildren(PlacesUtils.unfiledBookmarksFolderId);

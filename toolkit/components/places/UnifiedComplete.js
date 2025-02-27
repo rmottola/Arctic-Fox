@@ -909,9 +909,11 @@ Search.prototype = {
     if (!this.pending)
       return;
 
-    yield this._matchSearchSuggestions();
-    if (!this.pending)
-      return;
+    if (this._enableActions) {
+      yield this._matchSearchSuggestions();
+      if (!this.pending)
+        return;
+    }
 
     for (let [query, params] of queries) {
       yield conn.executeCached(query, params, this._onResultRow.bind(this));
@@ -1936,6 +1938,8 @@ UnifiedComplete.prototype = {
     TelemetryStopwatch.cancel(TELEMETRY_6_FIRST_RESULTS, this);
     // Clear state now to avoid race conditions, see below.
     let search = this._currentSearch;
+    if (!search)
+      return;
     this._lastLowResultsSearchSuggestion = search._lastLowResultsSearchSuggestion;
     delete this._currentSearch;
 
