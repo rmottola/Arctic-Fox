@@ -52,6 +52,7 @@ EXPORTS += [
 
 EXPORTS.mozilla.gfx += [
     'PrintTarget.h',
+    'PrintTargetRecording.h',
     'PrintTargetThebes.h',
 ]
 
@@ -219,6 +220,7 @@ SOURCES += [
     'gfxPlatform.cpp',
     'gfxPrefs.cpp',
     'PrintTarget.cpp',
+    'PrintTargetRecording.cpp',
     'PrintTargetThebes.cpp',
 ]
 
