@@ -1263,7 +1263,7 @@ TSFTextStore::TSFTextStore()
   , mHasReturnedNoLayoutError(false)
   , mWaitingQueryLayout(false)
   , mPendingDestroy(false)
-  , mDeferClearingLockedContent(false)
+  , mDeferClearingContentForTSF(false)
   , mNativeCaretIsCreated(false)
   , mDeferNotifyingTSF(false)
   , mDeferCommittingComposition(false)
@@ -1737,7 +1737,7 @@ TSFTextStore::FlushPendingActions()
         // eCompositionStart always causes
         // NOTIFY_IME_OF_COMPOSITION_EVENT_HANDLED.  Therefore, we should
         // wait to clear the locked content until it's notified.
-        mDeferClearingLockedContent = true;
+        mDeferClearingContentForTSF = true;
 
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
                ("TSF: 0x%p   TSFTextStore::FlushPendingActions() "
@@ -1749,7 +1749,7 @@ TSFTextStore::FlushPendingActions()
           MOZ_LOG(sTextStoreLog, LogLevel::Error,
             ("TSF: 0x%p   TSFTextStore::FlushPendingActions() "
              "FAILED to dispatch compositionstart event.", this));
-          mDeferClearingLockedContent = false;
+          mDeferClearingContentForTSF = false;
         }
         if (!mWidget || mWidget->Destroyed()) {
           break;
@@ -1768,7 +1768,7 @@ TSFTextStore::FlushPendingActions()
         // of NOTIFY_IME_OF_COMPOSITION_EVENT_HANDLED.  In this case, we
         // should not clear the locked content until we notify the IME of the
         // composition update.
-        mDeferClearingLockedContent = true;
+        mDeferClearingContentForTSF = true;
 
         rv = mDispatcher->SetPendingComposition(action.mData,
                                                 action.mRanges);
@@ -1776,7 +1776,7 @@ TSFTextStore::FlushPendingActions()
           MOZ_LOG(sTextStoreLog, LogLevel::Error,
             ("TSF: 0x%p   TSFTextStore::FlushPendingActions() "
              "FAILED to setting pending composition...", this));
-          mDeferClearingLockedContent = false;
+          mDeferClearingContentForTSF = false;
         } else {
           MOZ_LOG(sTextStoreLog, LogLevel::Debug,
             ("TSF: 0x%p   TSFTextStore::FlushPendingActions() "
@@ -1788,7 +1788,7 @@ TSFTextStore::FlushPendingActions()
             MOZ_LOG(sTextStoreLog, LogLevel::Error,
               ("TSF: 0x%p   TSFTextStore::FlushPendingActions() "
                "FAILED to dispatch compositionchange event.", this));
-            mDeferClearingLockedContent = false;
+            mDeferClearingContentForTSF = false;
           }
           // Be aware, the mWidget might already have been destroyed.
         }
@@ -1804,7 +1804,7 @@ TSFTextStore::FlushPendingActions()
         // the IME will be notified of NOTIFY_IME_OF_COMPOSITION_EVENT_HANDLED.
         // In this case, we should not clear the locked content until we notify
         // the IME of the composition update.
-        mDeferClearingLockedContent = true;
+        mDeferClearingContentForTSF = true;
 
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
                ("TSF: 0x%p   TSFTextStore::FlushPendingActions(), "
@@ -1816,7 +1816,7 @@ TSFTextStore::FlushPendingActions()
           MOZ_LOG(sTextStoreLog, LogLevel::Error,
             ("TSF: 0x%p   TSFTextStore::FlushPendingActions() "
              "FAILED to dispatch compositioncommit event.", this));
-          mDeferClearingLockedContent = false;
+          mDeferClearingContentForTSF = false;
         }
         break;
       }
@@ -1909,7 +1909,7 @@ TSFTextStore::MaybeFlushPendingNotifications()
     return;
   }
 
-  if (!mDeferClearingLockedContent && mContentForTSF.IsInitialized()) {
+  if (!mDeferClearingContentForTSF && mContentForTSF.IsInitialized()) {
     mContentForTSF.Clear();
     MOZ_LOG(sTextStoreLog, LogLevel::Debug,
            ("TSF: 0x%p   TSFTextStore::MaybeFlushPendingNotifications(), "
@@ -2072,9 +2072,9 @@ TSFTextStore::ContentForTSFRef()
     mContentForTSF.Init(text);
     // Basically, the locked content should be cleared after the document is
     // unlocked.  However, in e10s mode, content will be modified
-    // asynchronously.  In such case, mDeferClearingLockedContent may be
+    // asynchronously.  In such case, mDeferClearingContentForTSF may be
     // true even after the document is unlocked.
-    mDeferClearingLockedContent = false;
+    mDeferClearingContentForTSF = false;
   }
 
   MOZ_LOG(sTextStoreLog, LogLevel::Debug,
@@ -4978,7 +4978,7 @@ TSFTextStore::OnUpdateCompositionInternal()
 
   // Now, all sent composition events are handled by the content even in
   // e10s mode.
-  mDeferClearingLockedContent = false;
+  mDeferClearingContentForTSF = false;
   mDeferNotifyingTSF = false;
   MaybeFlushPendingNotifications();
   return NS_OK;
