@@ -201,7 +201,7 @@ TEST_F(ImageDecoderMetadata, NoFrameDelayGIFFullDecode)
 
   // Create an image.
   RefPtr<Image> image =
-    ImageFactory::CreateAnonymousImage(nsAutoCString(testCase.mMimeType));
+    ImageFactory::CreateAnonymousImage(nsDependentCString(testCase.mMimeType));
   ASSERT_TRUE(!image->HasError());
 
   nsCOMPtr<nsIInputStream> inputStream = LoadFile(testCase.mPath);
