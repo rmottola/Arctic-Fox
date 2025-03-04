@@ -3544,18 +3544,28 @@ TSFTextStore::GetTextExt(TsViewCookie vcView,
   if (mComposition.IsComposing() && mComposition.mStart < acpEnd &&
       mLockedContent.IsLayoutChangedAfter(acpEnd)) {
     const Selection& currentSel = CurrentSelection();
-    if ((sDoNotReturnNoLayoutErrorToGoogleJaInputAtFirstChar ||
-         sDoNotReturnNoLayoutErrorToGoogleJaInputAtCaret) &&
-        kSink->IsGoogleJapaneseInputActive()) {
-      // Google Japanese Input doesn't handle ITfContextView::GetTextExt()
-      // properly due to the same bug of TSF mentioned above.  Google Japanese
-      // Input calls this twice for the first character of changing range of
-      // composition string and the caret which is typically at the end of
-      // composition string.  The formar is used for showing candidate window.
-      // This is typically shown at wrong position.  We should avoid only this
-      // case. This is not necessary on Windows 10.
-      if (sDoNotReturnNoLayoutErrorToGoogleJaInputAtFirstChar &&
-          !mLockedContent.IsLayoutChangedAfter(acpStart) &&
+
+    // The bug of Microsoft Office IME 2010 for Japanese is similar to
+    // MS-IME for Win 8.1 and Win 10.  Newer version of MS Office IME is not
+    // released yet.  So, we can hack it without prefs  because there must be
+    // no developers who want to disable this hack for tests.
+    const bool kIsMSOfficeJapaneseIME2010 =
+      kSink->IsMSOfficeJapaneseIME2010Active();
+    if (kIsMSOfficeJapaneseIME2010 ||
+        ((sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtFirstChar ||
+          sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtCaret) &&
+         kSink->IsMSJapaneseIMEActive())) {
+      // MS IME for Japanese doesn't support asynchronous handling at deciding
+      // its suggest list window position.  The feature was implemented
+      // starting from Windows 8.
+      if (IsWin8OrLater() || kIsMSOfficeJapaneseIME2010) {
+        // Basically, MS-IME tries to retrieve whole composition string rect
+        // at deciding suggest window immediately after unlocking the document.
+        // However, in e10s mode, the content hasn't updated yet in most cases.
+        // Therefore, if the first character at the retrieving range rect is
+        // available, we should use it as the result.
+        if ((kIsMSOfficeJapaneseIME2010 ||
+             sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtFirstChar) &&
           acpStart < acpEnd) {
         acpEnd = acpStart;
         MOZ_LOG(sTextStoreLog, LogLevel::Debug,
@@ -3564,12 +3574,12 @@ TSFTextStore::GetTextExt(TsViewCookie vcView,
                 "string for TIP acpStart=%d, acpEnd=%d",
                 this, acpStart, acpEnd));
       }
-      // Google Japanese Input sometimes uses caret position for deciding its
-      // candidate window position. In such case, we should return the previous
-      // offset of selected clause. However, it's difficult to get where is
-      // selected clause for now.  Instead, we should use the first character
-      // which is modified. This is useful in most cases.
-      else if (sDoNotReturnNoLayoutErrorToGoogleJaInputAtCaret &&
+      // Although, the condition is not clear, MS-IME sometimes retrieves the
+      // caret rect immediately after modifying the composition string but
+      // before unlocking the document.  In such case, we should return the
+      // nearest character rect.
+      else if ((kIsMSOfficeJapaneseIME2010 ||
+                sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtCaret) &&
                acpStart == acpEnd &&
                currentSel.IsCollapsed() && currentSel.EndOffset() == acpEnd) {
         acpEnd = acpStart = mLockedContent.MinOffsetOfLayoutChanged();
