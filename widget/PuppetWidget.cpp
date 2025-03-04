@@ -817,7 +817,6 @@ PuppetWidget::GetIMEUpdatePreference()
                                  nsIMEUpdatePreference::NOTIFY_POSITION_CHANGE);
   }
   return nsIMEUpdatePreference(mIMEPreferenceOfParent.mWantUpdates |
-                               nsIMEUpdatePreference::NOTIFY_SELECTION_CHANGE |
                                nsIMEUpdatePreference::NOTIFY_TEXT_CHANGE |
                                nsIMEUpdatePreference::NOTIFY_POSITION_CHANGE );
 #else
@@ -893,9 +892,8 @@ PuppetWidget::NotifyIMEOfSelectionChange(
     aIMENotification.mSelectionChangeData.mReversed,
     aIMENotification.mSelectionChangeData.GetWritingMode());
 
-  if (mIMEPreferenceOfParent.WantSelectionChange() &&
-      (mIMEPreferenceOfParent.WantChangesCausedByComposition() ||
-       !aIMENotification.mSelectionChangeData.mCausedByComposition)) {
+  if (mIMEPreferenceOfParent.WantChangesCausedByComposition() ||
+      !aIMENotification.mSelectionChangeData.mCausedByComposition) {
     mTabChild->SendNotifyIMESelection(mContentCache, aIMENotification);
   } else {
     mTabChild->SendUpdateContentCache(mContentCache);
