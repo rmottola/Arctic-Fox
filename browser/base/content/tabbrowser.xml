@@ -2318,7 +2318,7 @@
             if (this.tabs.length - this._removingTabs.length == 1) {
               closeWindow = aCloseWindowWithLastTab != null ? aCloseWindowWithLastTab :
                             !window.toolbar.visible ||
-                              this.tabContainer._closeWindowWithLastTab;
+                              Services.prefs.getBoolPref("browser.tabs.closeWindowWithLastTab");
 
               // Closing the tab and replacing it with a blank one is notably slower
               // than closing the window right away. If the caller opts in, take
@@ -4966,7 +4966,6 @@
         <![CDATA[
           this.mTabClipWidth = Services.prefs.getIntPref("browser.tabs.tabClipWidth");
           this.mCloseButtons = Services.prefs.getIntPref("browser.tabs.closeButtons");
-          this._closeWindowWithLastTab = Services.prefs.getBoolPref("browser.tabs.closeWindowWithLastTab");
 
           var tab = this.firstChild;
           tab.label = this.tabbrowser.mStringBundle.getString("tabs.emptyTabTitle");
@@ -4974,7 +4973,6 @@
           tab.setAttribute("onerror", "this.removeAttribute('image');");
           this.adjustTabstrip();
 
-          Services.prefs.addObserver("browser.tabs.", this._prefObserver, false);
           window.addEventListener("resize", this, false);
           window.addEventListener("load", this, false);
 
@@ -4986,12 +4984,6 @@
           this._browserNewtabpageEnabled = Services.prefs.getBoolPref("browser.newtabpage.enabled");
         ]]>
       </constructor>
-
-      <destructor>
-        <![CDATA[
-          Services.prefs.removeObserver("browser.tabs.", this._prefObserver);
-        ]]>
-      </destructor>
 
       <field name="tabbrowser" readonly="true">
         document.getElementById(this.getAttribute("tabbrowser"));
@@ -5064,25 +5056,6 @@
         ]]></body>
       </method>
 
-      <field name="_prefObserver"><![CDATA[({
-        tabContainer: this,
-
-        observe: function (subject, topic, data) {
-          switch (data) {
-            case "browser.tabs.closeButtons":
-              this.tabContainer.mCloseButtons = Services.prefs.getIntPref(data);
-              this.tabContainer.adjustTabstrip();
-              break;
-            case "browser.tabs.autoHide":
-              this.tabContainer.updateVisibility();
-              break;
-            case "browser.tabs.closeWindowWithLastTab":
-              this.tabContainer._closeWindowWithLastTab = Services.prefs.getBoolPref(data);
-              this.tabContainer.adjustTabstrip();
-              break;
-          }
-        }
-      });]]></field>
       <field name="_blockDblClick">false</field>
 
       <field name="_tabDropIndicator">
@@ -5872,8 +5845,7 @@
           return;
 
         if (event.target.localName == "tab") {
-          if (this.childNodes.length > 1 || !this._closeWindowWithLastTab)
-            this.tabbrowser.removeTab(event.target, {animate: true, byMouse: true});
+          this.tabbrowser.removeTab(event.target, {animate: true, byMouse: true});
         } else if (event.originalTarget.localName == "box") {
           BrowserOpenTab();
         } else {
