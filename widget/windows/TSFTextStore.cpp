@@ -1179,6 +1179,8 @@ bool TSFTextStore::sDoNotReturnNoLayoutErrorToMSSimplifiedTIP = false;
 bool TSFTextStore::sDoNotReturnNoLayoutErrorToMSTraditionalTIP = false;
 bool TSFTextStore::sDoNotReturnNoLayoutErrorToFreeChangJie = false;
 bool TSFTextStore::sDoNotReturnNoLayoutErrorToEasyChangjei = false;
+bool TSFTextStore::sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtFirstChar = false;
+bool TSFTextStore::sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtCaret = false;
 bool TSFTextStore::sDoNotReturnNoLayoutErrorToGoogleJaInputAtFirstChar = false;
 bool TSFTextStore::sDoNotReturnNoLayoutErrorToGoogleJaInputAtCaret = false;
 bool TSFTextStore::sHackQueryInsertForMSSimplifiedTIP = false;
@@ -5584,6 +5586,14 @@ TSFTextStore::Initialize()
   sDoNotReturnNoLayoutErrorToEasyChangjei =
     Preferences::GetBool(
       "intl.tsf.hack.easy_changjei.do_not_return_no_layout_error", true);
+  sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtFirstChar =
+    Preferences::GetBool(
+      "intl.tsf.hack.ms_japanese_ime."
+      "do_not_return_no_layout_error_at_first_char", true);
+  sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtCaret =
+    Preferences::GetBool(
+      "intl.tsf.hack.ms_japanese_ime.do_not_return_no_layout_error_at_caret",
+      true);
   sDoNotReturnNoLayoutErrorToGoogleJaInputAtFirstChar =
     Preferences::GetBool(
       "intl.tsf.hack.google_ja_input."
@@ -5606,6 +5616,8 @@ TSFTextStore::Initialize()
      "sCreateNativeCaretForATOK=%s, "
      "sDoNotReturnNoLayoutErrorToFreeChangJie=%s, "
      "sDoNotReturnNoLayoutErrorToEasyChangjei=%s, "
+     "sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtFirstChar=%s, "
+     "sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtCaret=%s",
      "sDoNotReturnNoLayoutErrorToGoogleJaInputAtFirstChar=%s, "
      "sDoNotReturnNoLayoutErrorToGoogleJaInputAtCaret=%s",
      sThreadMgr.get(), sClientId, sDisplayAttrMgr.get(),
@@ -5613,6 +5625,8 @@ TSFTextStore::Initialize()
      GetBoolName(sCreateNativeCaretForATOK),
      GetBoolName(sDoNotReturnNoLayoutErrorToFreeChangJie),
      GetBoolName(sDoNotReturnNoLayoutErrorToEasyChangjei),
+     GetBoolName(sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtFirstChar),
+     GetBoolName(sDoNotReturnNoLayoutErrorToMSJapaneseIMEAtCaret),
      GetBoolName(sDoNotReturnNoLayoutErrorToGoogleJaInputAtFirstChar),
      GetBoolName(sDoNotReturnNoLayoutErrorToGoogleJaInputAtCaret)));
 }
