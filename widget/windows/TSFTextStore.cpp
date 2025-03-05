@@ -5361,7 +5361,7 @@ TSFTextStore::SetInputContext(nsWindowBase* aWidget,
 
   if (aAction.mFocusChange != InputContextAction::FOCUS_NOT_CHANGED) {
     if (sEnabledTextStore) {
-      RefPtr<TSFTextStore> textStore = sEnabledTextStore;
+      RefPtr<TSFTextStore> textStore(sEnabledTextStore);
       textStore->SetInputScope(aContext.mHTMLInputType,
                                aContext.mHTMLInputInputmode);
     }
