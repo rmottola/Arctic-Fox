@@ -415,11 +415,6 @@ menuitem.spell-suggestion {
   -moz-user-focus: normal;
 }
 
-/* apply Fitts' law to the notification bar's close button */
-window[sizemode="maximized"] #content .notification-inner {
-  border-right: 0px !important;
-}
-
 /* Hide extension toolbars that neglected to set the proper class */
 window[chromehidden~="location"][chromehidden~="toolbar"] toolbar:not(.chromeclass-menubar),
 window[chromehidden~="toolbar"] toolbar:not(.toolbar-primary):not(#nav-bar):not(#TabsToolbar):not(#print-preview-toolbar):not(.chromeclass-menubar) {
