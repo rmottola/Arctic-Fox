@@ -1880,14 +1880,6 @@ toolbar[brighttext] #alltabs-button[type="menu"] {
     box-shadow: inset -5px 0 ThreeDShadow;
 }
 
-/* Tabstrip close button */
-.tabs-closebutton {
-    -moz-appearance: none;
-    padding: 4px 2px;
-    margin: 0px;
-    border: none;
-}
-
 toolbar[brighttext] .tabs-closebutton {
     list-style-image: url("chrome://global/skin/icons/close-inverted.png");
 }

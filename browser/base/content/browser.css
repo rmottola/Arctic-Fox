@@ -13,7 +13,6 @@ searchbar {
   -moz-binding: url("chrome://browser/content/tabbrowser.xml#tabbrowser-browser");
 }
 
-
 browser[remote="true"] {
   -moz-binding: url("chrome://browser/content/tabbrowser.xml#tabbrowser-remote-browser");
 }
@@ -406,13 +405,8 @@ toolbarbutton.bookmark-item {
 menupopup[emptyplacesresult="true"] > .hide-if-empty-places-result {
   display: none;
 }
-
 menuitem.spell-suggestion {
   font-weight: bold;
-}
-
-#sidebar-header > .tabs-closebutton {
-  -moz-user-focus: normal;
 }
 
 /* Hide extension toolbars that neglected to set the proper class */
