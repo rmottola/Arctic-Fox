@@ -22,8 +22,22 @@
 }
 
 .tab-close-button[pinned],
-.tabbrowser-tabs[closebuttons="activetab"] > * > * > * > .tab-close-button:not([selected="true"]) {
+.tabbrowser-tabs[closebuttons="activetab"] > * > * > * > .tab-close-button:not([selected="true"])
+.tab-icon-image:not([src]):not([pinned]):not([crashed])[selected],
+.tab-icon-image:not([src]):not([pinned]):not([crashed]):not([sharing]),
+.tab-icon-image[busy],
+.tab-throbber:not([busy]),
+.tab-icon-sound:not([soundplaying]):not([muted]),
+.tab-icon-sound[pinned],
+.tab-sharing-icon-overlay,
+.tab-icon-overlay {
   display: none;
+}
+
+.tab-sharing-icon-overlay[sharing]:not([selected]),
+.tab-icon-overlay[soundplaying][pinned],
+.tab-icon-overlay[muted][pinned],
+.tab-icon-overlay[crashed] {
   display: -moz-box;
 }
 
@@ -53,13 +67,6 @@ tabpanels {
   .tab-icon-image {
     image-rendering: -moz-crisp-edges;
   }
-}
-
-.tab-icon-image:not([src]):not([pinned]):not([crashed]),
-.tab-throbber:not([busy]),
-.tab-icon-image[busy],
-.tab-icon-overlay[busy] {
-  display: none;
 }
 
 .closing-tabs-spacer {
