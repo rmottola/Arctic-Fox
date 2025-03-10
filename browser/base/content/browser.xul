@@ -505,7 +505,6 @@
                      onclick="BrowserGoHome(event);"
                      aboutHomeOverrideTooltip="&abouthome.pageTitle;"/>
 
-      <hbox id="nav-bar-customization-target" flex="1">
       <toolbaritem id="urlbar-container" align="center" flex="400" persist="width" combined="true"
                    title="&locationItem.title;" class="chromeclass-location" removable="true">
         <textbox id="urlbar" flex="1"
@@ -793,7 +792,6 @@
           <!-- History menu items -->
         </menupopup>
       </toolbarbutton>
-      </hbox>
 
       <toolbaritem id="PanelUI-button"
                    hidden="true"
