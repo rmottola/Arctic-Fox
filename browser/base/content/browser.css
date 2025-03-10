@@ -294,6 +294,9 @@ toolbar[mode="icons"] > #reload-button[displaystop] {
 }
 %endif
 
+#zoom-controls[cui-areatype="toolbar"]:not([overflowedItem=true]) > #zoom-reset-button > .toolbarbutton-text {
+  display: -moz-box;
+}
 
 /* Ensure that empty parts of the bookmarks container can be dragged on OSX, and on other OSes
  * only when a lwtheme is in use. */
@@ -348,6 +351,22 @@ splitmenu {
      a constant width in case they haven't be resized manually. (bug 965772) */
   width: 1px;
   min-width: 1px;
+}
+
+#main-window:-moz-lwtheme {
+  background-repeat: no-repeat;
+  background-position: top right;
+}
+
+%ifdef XP_MACOSX
+#main-window[inFullscreen="true"] {
+  padding-top: 0; /* override drawintitlebar="true" */
+}
+%endif
+
+#browser-bottombox[lwthemefooter="true"] {
+  background-repeat: no-repeat;
+  background-position: bottom left;
 }
 
 .menuitem-tooltip {
