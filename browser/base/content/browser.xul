@@ -505,6 +505,7 @@
                      onclick="BrowserGoHome(event);"
                      aboutHomeOverrideTooltip="&abouthome.pageTitle;"/>
 
+      <hbox id="nav-bar-customization-target" flex="1">
       <toolbaritem id="urlbar-container" align="center" flex="400" persist="width" combined="true"
                    title="&locationItem.title;" class="chromeclass-location" removable="true">
         <textbox id="urlbar" flex="1"
@@ -549,21 +550,29 @@
                code fires onmousedown, and hence eats our favicon drag events.
                We only add the identity-box button to the tab order when the location bar
                has focus, otherwise pressing F6 focuses it instead of the location bar -->
-          <box id="identity-box" role="button"
-               align="center"
-               onclick="gIdentityHandler.handleIdentityButtonEvent(event);"
-               onkeypress="gIdentityHandler.handleIdentityButtonEvent(event);"
-               ondragstart="gIdentityHandler.onDragStart(event);">
+              <box id="identity-box" role="button"
+                   align="center"
+                   aria-label="&urlbar.viewSiteInfo.label;"
+                   onclick="gIdentityHandler.handleIdentityButtonEvent(event);"
+                   onkeypress="gIdentityHandler.handleIdentityButtonEvent(event);"
+                   ondragstart="gIdentityHandler.onDragStart(event);">
                 <image id="identity-icon"
                        consumeanchor="identity-box"
                        onclick="PageProxyClickHandler(event);"/>
+                <box id="notification-popup-box"
+                     hidden="true"
+                     tooltiptext=""
+                     onmouseover="document.getElementById('identity-icon').classList.add('no-hover');"
+                     onmouseout="document.getElementById('identity-icon').classList.remove('no-hover');"
+                     align="center">
+                </box>
                 <image id="tracking-protection-icon"/>
                 <image id="connection-icon"/>
-            <hbox id="identity-icon-labels">
-              <label id="identity-icon-label" class="plain" flex="1"/>
-              <label id="identity-icon-country-label" class="plain"/>
-            </hbox>
-          </box>
+                <hbox id="identity-icon-labels">
+                  <label id="identity-icon-label" class="plain" flex="1"/>
+                  <label id="identity-icon-country-label" class="plain"/>
+                </hbox>
+              </box>
           <box id="urlbar-display-box" align="center">
              <label class="urlbar-display urlbar-display-switchtab" value="&urlbar.switchToTab.label;"/>
           </box>
@@ -617,7 +626,7 @@
                          command="Browser:Stop"
                          tooltiptext="&stopButton.tooltip;"/>
         </textbox>
-      </toolbaritem>
+        </toolbaritem>
 
       <toolbaritem id="search-container" title="&searchItem.title;"
                    align="center" class="chromeclass-toolbar-additional"
@@ -784,6 +793,7 @@
           <!-- History menu items -->
         </menupopup>
       </toolbarbutton>
+      </hbox>
 
       <toolbaritem id="PanelUI-button"
                    hidden="true"
