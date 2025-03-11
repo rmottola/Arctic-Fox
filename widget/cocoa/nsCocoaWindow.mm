@@ -2905,6 +2905,10 @@ static NSMutableSet *gSwizzledFrameViewClasses = nil;
 {
   mDrawsIntoWindowFrame = NO;
   [super initWithContentRect:aContentRect styleMask:aStyle backing:aBufferingType defer:aFlag];
+  // MacOS 13 Ventura, doesn't seem to create the contentView... so create it ourselves
+  if(![super contentView]) {
+      [super setContentView:[[[NSView alloc] initWithFrame:aContentRect] autorelease]];
+  }
   mState = nil;
   mActiveTitlebarColor = nil;
   mInactiveTitlebarColor = nil;
