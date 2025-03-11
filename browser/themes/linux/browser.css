@@ -1064,6 +1064,8 @@ toolbar[iconsize="small"] #feed-button {
   -moz-margin-end: 3px;
 }
 
+%include ../shared/urlbarSearchSuggestionsNotification.inc.css
+
 /* Identity indicator */
 #identity-box {
   padding: 1px;

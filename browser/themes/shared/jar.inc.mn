@@ -38,6 +38,7 @@
   skin/classic/browser/fullscreen/insecure.svg                 (../shared/fullscreen/insecure.svg)
   skin/classic/browser/fullscreen/secure.svg                   (../shared/fullscreen/secure.svg)
   skin/classic/browser/identity-icon.svg                       (../shared/identity-block/identity-icon.svg)
+  skin/classic/browser/info.svg                                (../shared/info.svg)
   skin/classic/browser/newtab/close.png                        (../shared/newtab/close.png)
   skin/classic/browser/newtab/controls.svg                     (../shared/newtab/controls.svg)
   skin/classic/browser/newtab/whimsycorn.png                   (../shared/newtab/whimsycorn.png)

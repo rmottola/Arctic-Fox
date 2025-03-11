@@ -1213,6 +1213,8 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
     opacity: 0.3;
 }
 
+%include ../shared/urlbarSearchSuggestionsNotification.inc.css
+
 /* ----- AUTOCOMPLETE ----- */
 
 #treecolAutoCompleteImage {

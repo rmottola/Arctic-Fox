@@ -1430,6 +1430,8 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
   color: GrayText;
 }
 
+%include ../shared/urlbarSearchSuggestionsNotification.inc.css
+
 /* identity box */
 
 #identity-box {
@@ -1637,7 +1639,6 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
 
 .ac-url-text,
 .ac-action-text {
-  font-size: 1em;
   color: -moz-nativehyperlinktext;
 }
 
