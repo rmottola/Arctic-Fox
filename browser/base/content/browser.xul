@@ -510,6 +510,7 @@
         <textbox id="urlbar" flex="1"
                  placeholder=""
                  type="autocomplete"
+                 inputtype="url"
                  autocompletesearch="unifiedcomplete"
                  autocompletesearchparam="enable-actions"
                  autocompletepopup="PopupAutoCompleteRichResult"
