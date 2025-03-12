@@ -151,9 +151,11 @@
       </field>
 
       <field name="PrivateBrowsingUtils" readonly="true">
-        let utils = {};
-        Components.utils.import("resource://gre/modules/PrivateBrowsingUtils.jsm", utils);
-        utils.PrivateBrowsingUtils
+        {
+          let utils = {};
+          Components.utils.import("resource://gre/modules/PrivateBrowsingUtils.jsm", utils);
+          utils.PrivateBrowsingUtils
+        }
       </field>
 
       <property name="inPrivateContext" readonly="true"
@@ -429,6 +431,13 @@
 
       <field name="_selectionDetails">null</field>
       <method name="onKeyPress">
+        <parameter name="aEvent"/>
+        <body><![CDATA[
+          return this.handleKeyPress(aEvent);
+        ]]></body>
+      </method>
+
+      <method name="handleKeyPress">
         <parameter name="aEvent"/>
         <body><![CDATA[
           if (aEvent.target.localName != "textbox")
