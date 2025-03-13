@@ -733,7 +733,11 @@ function assertWebRTCIndicatorStatus(expected) {
 }
 
 function makeActionURI(action, params) {
-  let url = "moz-action:" + action + "," + JSON.stringify(params);
+  let encodedParams = {};
+  for (let key in params) {
+    encodedParams[key] = encodeURIComponent(params[key]);
+  }
+  let url = "moz-action:" + action + "," + JSON.stringify(encodedParams);
   return NetUtil.newURI(url);
 }
 

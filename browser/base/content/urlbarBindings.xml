@@ -154,7 +154,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               case "switchtab": // Fall through.
               case "remotetab": // Fall through.
               case "visiturl": {
-                returnValue = action.params.url;
+                returnValue = action.params.displayUrl;
                 break;
               }
               case "keyword": // Fall through.
@@ -345,9 +345,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               if (this.hasAttribute("actiontype")) {
                 this.handleRevert();
                 let prevTab = gBrowser.selectedTab;
-                if (switchToTabHavingURI(action.params.originalUrl || url) &&
-                    isTabEmpty(prevTab))
+                if (switchToTabHavingURI(url) && isTabEmpty(prevTab)) {
                   gBrowser.removeTab(prevTab);
+                }
                 return;
               }
             } else if (action.type == "remotetab") {
@@ -794,15 +794,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           } catch (ex) {}
 
           if (uri) {
-            let action = this._parseActionUrl(val);
-            if (action) {
-              if (action.params.url) {
-                // Store the original URL in the action URL.
-                action.params.originalUrl = action.params.url;
-                action.params.url = losslessDecodeURI(makeURI(action.params.url));
-                val = "moz-action:" + action.type + "," + JSON.stringify(action.params);
-              }
-            } else {
+            // Do not touch moz-action URIs at all.  They depend on being
+            // properly encoded and decoded and will break if decoded
+            // unexpectedly.
+            if (!this._parseActionUrl(val)) {
               val = losslessDecodeURI(uri);
             }
           }
@@ -855,13 +850,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             action.params[key] = decodeURIComponent(action.params[key]);
           }
 
-          for (let key of [
-            "input",
-            "searchQuery",
-            "searchSuggestion",
-          ]) {
-            if (action.params[key]) {
-              action.params[key] = decodeURIComponent(action.params[key]);
+          if ("url" in action.params) {
+            let uri;
+            try {
+              uri = makeURI(action.params.url);
+              action.params.displayUrl = losslessDecodeURI(uri);
+            } catch (e) {
+              action.params.displayUrl = action.params.url;
             }
           }
 
@@ -1444,9 +1439,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                 ];
                 break;
               case "switchtab":
+              case "remotetab":
                 parts = [
                   item.getAttribute("title"),
-                  action.params.url,
+                  item.getAttribute("displayurl"),
                 ];
                 break;
               }
