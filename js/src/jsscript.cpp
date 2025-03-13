@@ -1496,14 +1496,14 @@ ScriptCounts::getThrowCounts(size_t offset) {
 }
 
 void
-JSScript::setIonScript(JSContext* maybecx, js::jit::IonScript* ionScript)
+JSScript::setIonScript(JSRuntime* maybeRuntime, js::jit::IonScript* ionScript)
 {
     MOZ_ASSERT_IF(ionScript != ION_DISABLED_SCRIPT, !baselineScript()->hasPendingIonBuilder());
     if (hasIonScript())
         js::jit::IonScript::writeBarrierPre(zone(), ion);
     ion = ionScript;
     MOZ_ASSERT_IF(hasIonScript(), hasBaselineScript());
-    updateBaselineOrIonRaw(maybecx);
+    updateBaselineOrIonRaw(maybeRuntime);
 }
 
 js::PCCounts*
@@ -1879,7 +1879,7 @@ ScriptSource::chars(JSContext* cx, UncompressedSourceCache::AutoHoldEntry& holde
         }
 
         ReturnType match(Compressed& c) {
-            if (const char16_t* decompressed = cx->runtime()->uncompressedSourceCache.lookup(&ss, holder))
+            if (const char16_t* decompressed = cx->caches.uncompressedSourceCache.lookup(&ss, holder))
                 return decompressed;
 
             const size_t lengthWithNull = ss.length() + 1;
@@ -1917,7 +1917,7 @@ ScriptSource::chars(JSContext* cx, UncompressedSourceCache::AutoHoldEntry& holde
             }
 
             ReturnType ret = decompressed.get();
-            if (!cx->runtime()->uncompressedSourceCache.put(&ss, Move(decompressed), holder)) {
+            if (!cx->caches.uncompressedSourceCache.put(&ss, Move(decompressed), holder)) {
                 JS_ReportOutOfMemory(cx);
                 return nullptr;
             }
@@ -2495,8 +2495,8 @@ SaveSharedScriptData(ExclusiveContext* cx, Handle<JSScript*> script, SharedScrip
      * reachable. This is effectively a read barrier.
      */
     if (cx->isJSContext()) {
-        JSRuntime* rt = cx->asJSContext()->runtime();
-        if (JS::IsIncrementalGCInProgress(rt) && rt->gc.isFullGc())
+        JSContext* ncx = cx->asJSContext();
+        if (JS::IsIncrementalGCInProgress(ncx) && ncx->gc.isFullGc())
             ssd->marked = true;
     }
 
@@ -3158,7 +3158,7 @@ JSScript::finalize(FreeOp* fop)
         fop->free_(data);
     }
 
-    fop->runtime()->lazyScriptCache.remove(this);
+    fop->runtime()->contextFromMainThread()->caches.lazyScriptCache.remove(this);
 
     // In most cases, our LazyScript's script pointer will reference this
     // script, and thus be nulled out by normal weakref processing. However, if
@@ -3237,7 +3237,7 @@ js::GetSrcNote(GSNCache& cache, JSScript* script, jsbytecode* pc)
 jssrcnote*
 js::GetSrcNote(JSContext* cx, JSScript* script, jsbytecode* pc)
 {
-    return GetSrcNote(cx->runtime()->gsnCache, script, pc);
+    return GetSrcNote(cx->caches.gsnCache, script, pc);
 }
 
 unsigned
@@ -3563,7 +3563,9 @@ js::detail::CopyScript(JSContext* cx, HandleObject scriptStaticScope, HandleScri
     /* This assignment must occur before all the Rebase calls. */
     dst->data = data.forget();
     dst->dataSize_ = size;
-    memcpy(dst->data, src->data, size);
+    MOZ_ASSERT(bool(dst->data) == bool(src->data));
+    if (dst->data)
+        memcpy(dst->data, src->data, size);
 
     /* Script filenames, bytecodes and atoms are runtime-wide. */
     dst->setCode(src->code());
@@ -4400,13 +4402,13 @@ LazyScript::hasUncompiledEnclosingScript() const
 }
 
 void
-JSScript::updateBaselineOrIonRaw(JSContext* maybecx)
+JSScript::updateBaselineOrIonRaw(JSRuntime* maybeRuntime)
 {
     if (hasBaselineScript() && baseline->hasPendingIonBuilder()) {
-        MOZ_ASSERT(maybecx);
+        MOZ_ASSERT(maybeRuntime);
         MOZ_ASSERT(!isIonCompilingOffThread());
-        baselineOrIonRaw = maybecx->runtime()->jitRuntime()->lazyLinkStub()->raw();
-        baselineOrIonSkipArgCheck = maybecx->runtime()->jitRuntime()->lazyLinkStub()->raw();
+        baselineOrIonRaw = maybeRuntime->jitRuntime()->lazyLinkStub()->raw();
+        baselineOrIonSkipArgCheck = maybeRuntime->jitRuntime()->lazyLinkStub()->raw();
     } else if (hasIonScript()) {
         baselineOrIonRaw = ion->method()->raw();
         baselineOrIonSkipArgCheck = ion->method()->raw() + ion->getSkipArgCheckEntryOffset();

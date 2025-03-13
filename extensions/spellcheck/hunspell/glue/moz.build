@@ -20,7 +20,6 @@ else:
 
 LOCAL_INCLUDES += [
     '/dom/base',
-    '/editor/libeditor',
     '/extensions/spellcheck/src',
 ]
 
@@ -34,9 +33,6 @@ EXPORTS.mozilla += [
      'RemoteSpellCheckEngineChild.h',
      'RemoteSpellCheckEngineParent.h',
 ]
-
-if CONFIG['GNU_CXX']:
-    CXXFLAGS += ['-Wshadow']
 
 # This variable is referenced in configure.in.  Make sure to change that file
 # too if you need to change this variable.

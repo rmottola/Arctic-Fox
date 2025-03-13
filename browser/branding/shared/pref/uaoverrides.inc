@@ -25,7 +25,7 @@
 pref("@GUAO_PREF@.addons.palemoon.org", "Mozilla/5.0 (@OS_SLICE@ rv:@MOZILLA_UAVERSION_U@) @GK_SLICE@ @FX_SLICE@ PaleMoon/29.5");
 
 
-// Required for google to play nice with Arctic Fox "Mozilla/5.0 (@OS_SLICE@ rv:45.2) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/45.2 @AF_SLICE@");
+// Required for google to play nice with Arctic Fox "Mozilla/5.0 (@OS_SLICE@ rv:45.3) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/45.3 @AF_SLICE@");
 pref("@GUAO_PREF@.google.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @AF_SLICE@");
 pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @AF_SLICE@");
 pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @AF_SLICE@");

@@ -39,6 +39,7 @@ class Shmem;
 namespace layers {
 
 class BufferDescriptor;
+class BufferTextureHost;
 class Compositor;
 class CompositableParentManager;
 class ReadLockDescriptor;
@@ -56,6 +57,7 @@ class TextureSourceBasic;
 class DataTextureSource;
 class PTextureParent;
 class TextureParent;
+class WrappingTextureSourceYCbCrBasic;
 
 /**
  * A view on a TextureHost where the texture is internally represented as tiles
@@ -127,6 +129,7 @@ public:
    * Cast to a DataTextureSurce.
    */
   virtual DataTextureSource* AsDataTextureSource() { return nullptr; }
+  virtual WrappingTextureSourceYCbCrBasic* AsWrappingTextureSourceYCbCrBasic() { return nullptr; }
 
   /**
    * Overload this if the TextureSource supports big textures that don't fit in
@@ -135,6 +138,8 @@ public:
   virtual BigImageIterator* AsBigImageIterator() { return nullptr; }
 
   virtual void SetCompositor(Compositor* aCompositor) {}
+
+  virtual void Unbind() {}
 
   void SetNextSibling(TextureSource* aTexture) { mNextSibling = aTexture; }
 
@@ -604,9 +609,9 @@ public:
 
   virtual Compositor* GetCompositor() = 0;
 
-  virtual GrallocTextureHostOGL* AsGrallocTextureHostOGL() { return nullptr; }
+  virtual BufferTextureHost* AsBufferTextureHost() { return nullptr; }
 
-  void CallNotifyNotUsed();
+  virtual GrallocTextureHostOGL* AsGrallocTextureHostOGL() { return nullptr; }
 
 protected:
   void ReadUnlock();
@@ -624,12 +629,16 @@ protected:
    */
   void NotifyNotUsed();
 
+  // for Compositor.
+  void CallNotifyNotUsed();
+
   PTextureParent* mActor;
   RefPtr<TextureReadLock> mReadLock;
   TextureFlags mFlags;
   int mCompositableCount;
   uint64_t mFwdTransactionId;
 
+  friend class Compositor;
   friend class TextureParent;
   friend class TiledLayerBufferComposite;
 };
@@ -689,6 +698,10 @@ public:
 
   virtual bool HasIntermediateBuffer() const override { return mHasIntermediateBuffer; }
 
+  virtual BufferTextureHost* AsBufferTextureHost() override { return this; }
+
+  const BufferDescriptor& GetBufferDescriptor() const { return mDescriptor; }
+
 protected:
   bool Upload(nsIntRegion *aRegion = nullptr);
   bool MaybeUpload(nsIntRegion *aRegion = nullptr);
@@ -706,6 +719,8 @@ protected:
   bool mLocked;
   bool mNeedsFullUpdate;
   bool mHasIntermediateBuffer;
+
+  class DataTextureSourceYCbCrBasic;
 };
 
 /**

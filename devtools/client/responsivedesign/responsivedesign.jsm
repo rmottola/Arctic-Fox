@@ -16,7 +16,7 @@ var promise = require("promise");
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 var Services = require("Services");
 var EventEmitter = require("devtools/shared/event-emitter");
-var {ViewHelpers} = require("devtools/client/shared/widgets/ViewHelpers.jsm");
+var {ViewHelpers} = require("devtools/client/shared/widgets/view-helpers");
 var { LocalizationHelper } = require("devtools/client/shared/l10n");
 
 loader.lazyImporter(this, "SystemAppProxy",
@@ -442,14 +442,14 @@ ResponsiveUI.prototype = {
    * Check the menu items.
    */
    checkMenus: function RUI_checkMenus() {
-     this.chromeDoc.getElementById("Tools:ResponsiveUI").setAttribute("checked", "true");
+     this.chromeDoc.getElementById("menu_responsiveUI").setAttribute("checked", "true");
    },
 
   /**
    * Uncheck the menu items.
    */
    unCheckMenus: function RUI_unCheckMenus() {
-     this.chromeDoc.getElementById("Tools:ResponsiveUI").setAttribute("checked", "false");
+     this.chromeDoc.getElementById("menu_responsiveUI").setAttribute("checked", "false");
    },
 
   /**
@@ -602,19 +602,19 @@ ResponsiveUI.prototype = {
     let volumeUp = this.chromeDoc.createElement("button");
     volumeUp.className = "devtools-responsiveui-volume-up-button";
     volumeUp.addEventListener("mousedown", () => {
-      SystemAppProxy.dispatchKeyboardEvent("keydown", {key: "VolumeUp"});
+      SystemAppProxy.dispatchKeyboardEvent("keydown", {key: "AudioVolumeUp"});
     });
     volumeUp.addEventListener("mouseup", () => {
-      SystemAppProxy.dispatchKeyboardEvent("keyup", {key: "VolumeUp"});
+      SystemAppProxy.dispatchKeyboardEvent("keyup", {key: "AudioVolumeUp"});
     });
 
     let volumeDown = this.chromeDoc.createElement("button");
     volumeDown.className = "devtools-responsiveui-volume-down-button";
     volumeDown.addEventListener("mousedown", () => {
-      SystemAppProxy.dispatchKeyboardEvent("keydown", {key: "VolumeDown"});
+      SystemAppProxy.dispatchKeyboardEvent("keydown", {key: "AudioVolumeDown"});
     });
     volumeDown.addEventListener("mouseup", () => {
-      SystemAppProxy.dispatchKeyboardEvent("keyup", {key: "VolumeDown"});
+      SystemAppProxy.dispatchKeyboardEvent("keyup", {key: "AudioVolumeDown"});
     });
 
     volumeButtons.appendChild(volumeUp);

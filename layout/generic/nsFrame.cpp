@@ -177,7 +177,7 @@ InitBoxMetrics(nsIFrame* aFrame, bool aClear)
     props.Delete(BoxMetricsProperty());
   }
 
-  nsBoxLayoutMetrics *metrics = new nsBoxLayoutMetrics();
+  nsBoxLayoutMetrics* metrics = new nsBoxLayoutMetrics();
   props.Set(BoxMetricsProperty(), metrics);
 
   static_cast<nsFrame*>(aFrame)->nsFrame::MarkIntrinsicISizesDirty();
@@ -559,8 +559,8 @@ nsFrame::Init(nsIContent*       aContent,
   }
   const nsStyleDisplay *disp = StyleDisplay();
   if (disp->HasTransform(this) ||
-      EffectCompositor::HasAnimationsForCompositor(this,
-                                                   eCSSProperty_transform)) {
+      nsLayoutUtils::HasRelevantAnimationOfProperty(this,
+                                                    eCSSProperty_transform)) {
     // The frame gets reconstructed if we toggle the -moz-transform
     // property, so we can set this bit here and then ignore it.
     mState |= NS_FRAME_MAY_BE_TRANSFORMED;
@@ -664,8 +664,7 @@ nsFrame::DestroyFrom(nsIFrame* aDestructRoot)
   // because that clears our Properties() table.)
   if (mState & NS_FRAME_PART_OF_IBSPLIT) {
     // Delete previous sibling's reference to me.
-    nsIFrame* prevSib = static_cast<nsIFrame*>
-      (Properties().Get(nsIFrame::IBSplitPrevSibling()));
+    nsIFrame* prevSib = Properties().Get(nsIFrame::IBSplitPrevSibling());
     if (prevSib) {
       NS_WARN_IF_FALSE(this ==
          prevSib->Properties().Get(nsIFrame::IBSplitSibling()),
@@ -674,8 +673,7 @@ nsFrame::DestroyFrom(nsIFrame* aDestructRoot)
     }
 
     // Delete next sibling's reference to me.
-    nsIFrame* nextSib = static_cast<nsIFrame*>
-      (Properties().Get(nsIFrame::IBSplitSibling()));
+    nsIFrame* nextSib = Properties().Get(nsIFrame::IBSplitSibling());
     if (nextSib) {
       NS_WARN_IF_FALSE(this ==
          nextSib->Properties().Get(nsIFrame::IBSplitPrevSibling()),
@@ -967,8 +965,7 @@ nsIFrame::GetUsedMargin() const
       IsSVGText())
     return margin;
 
-  nsMargin *m = static_cast<nsMargin*>
-                           (Properties().Get(UsedMarginProperty()));
+  nsMargin *m = Properties().Get(UsedMarginProperty());
   if (m) {
     margin = *m;
   } else {
@@ -1007,8 +1004,7 @@ nsIFrame::GetUsedBorder() const
     return border;
   }
 
-  nsMargin *b = static_cast<nsMargin*>
-                           (Properties().Get(UsedBorderProperty()));
+  nsMargin *b = Properties().Get(UsedBorderProperty());
   if (b) {
     border = *b;
   } else {
@@ -1045,8 +1041,7 @@ nsIFrame::GetUsedPadding() const
     }
   }
 
-  nsMargin *p = static_cast<nsMargin*>
-                           (Properties().Get(UsedPaddingProperty()));
+  nsMargin *p = Properties().Get(UsedPaddingProperty());
   if (p) {
     padding = *p;
   } else {
@@ -1155,7 +1150,7 @@ nsIFrame::IsTransformed() const
           (StyleDisplay()->HasTransform(this) ||
            IsSVGTransformed() ||
            (mContent &&
-            EffectCompositor::HasAnimationsForCompositor(
+            nsLayoutUtils::HasRelevantAnimationOfProperty(
               this, eCSSProperty_transform) &&
             IsFrameOfType(eSupportsCSSTransforms) &&
             mContent->GetPrimaryFrame() == this)));
@@ -1168,7 +1163,7 @@ nsIFrame::HasOpacityInternal(float aThreshold) const
   return StyleEffects()->mOpacity < aThreshold ||
          (StyleDisplay()->mWillChangeBitField & NS_STYLE_WILL_CHANGE_OPACITY) ||
          (mContent &&
-           EffectCompositor::HasAnimationsForCompositor(
+           nsLayoutUtils::HasRelevantAnimationOfProperty(
              this, eCSSProperty_opacity) &&
            mContent->GetPrimaryFrame() == this);
 }
@@ -1194,6 +1189,10 @@ nsIFrame::Extend3DContext() const
     return false;
   }
 
+  if (HasOpacity()) {
+    return false;
+  }
+
   const nsStyleEffects* effects = StyleEffects();
   nsRect temp;
   return !nsFrame::ShouldApplyOverflowClipping(this, disp) &&
@@ -1207,13 +1206,13 @@ nsIFrame::Combines3DTransformWithAncestors() const
   if (!GetParent() || !GetParent()->Extend3DContext()) {
     return false;
   }
-  return StyleDisplay()->HasTransform(this) || StyleDisplay()->BackfaceIsHidden();
+  return StyleDisplay()->HasTransform(this) || BackfaceIsHidden();
 }
 
 bool
 nsIFrame::In3DContextAndBackfaceIsHidden() const
 {
-  return Combines3DTransformWithAncestors() && StyleDisplay()->BackfaceIsHidden();
+  return Combines3DTransformWithAncestors() && BackfaceIsHidden();
 }
 
 bool
@@ -2107,7 +2106,7 @@ CheckForApzAwareEventHandlers(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame)
     return;
   }
 
-  if (content->HasApzAwareListeners()) {
+  if (content->IsNodeApzAware()) {
     aBuilder->SetAncestorHasApzAwareEventHandler(true);
   }
 }
@@ -2135,8 +2134,7 @@ static bool
 ItemParticipatesIn3DContext(nsIFrame* aAncestor, nsDisplayItem* aItem)
 {
   nsIFrame* transformFrame;
-  if (aItem->GetType() == nsDisplayItem::TYPE_TRANSFORM ||
-      aItem->GetType() == nsDisplayItem::TYPE_OPACITY) {
+  if (aItem->GetType() == nsDisplayItem::TYPE_TRANSFORM) {
     transformFrame = aItem->Frame();
   } else if (aItem->GetType() == nsDisplayItem::TYPE_PERSPECTIVE) {
     transformFrame = static_cast<nsDisplayPerspective*>(aItem)->TransformFrame();
@@ -2160,26 +2158,6 @@ WrapSeparatorTransform(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
                                         aDirtyRect, Matrix4x4(), aIndex);
     sepIdItem->SetNoExtendContext();
     aTarget->AppendToTop(sepIdItem);
-  }
-}
-
-static void
-CreateOpacityItem(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
-                  nsDisplayList& aList, bool aItemForEventsOnly,
-                  const DisplayItemScrollClip* aScrollClip,
-                  bool aParticipatesInPreserve3D)
-{
-  // Don't clip nsDisplayOpacity items. We clip their descendants instead.
-  // The clip we would set on an element with opacity would clip
-  // all descendant content, but some should not be clipped.
-  DisplayListClipState::AutoSaveRestore opacityClipState(aBuilder);
-  opacityClipState.Clear();
-  nsDisplayOpacity* opacity =
-      new (aBuilder) nsDisplayOpacity(aBuilder, aFrame, &aList,
-                                      aScrollClip, aItemForEventsOnly);
-  if (opacity) {
-    opacity->SetParticipatesInPreserve3D(aParticipatesInPreserve3D);
-    aList.AppendToTop(opacity);
   }
 }
 
@@ -2252,7 +2230,7 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
                                                               this)) {
       dirtyRect = overflow;
     } else {
-      if (overflow.IsEmpty()) {
+      if (overflow.IsEmpty() && !Extend3DContext()) {
         return;
       }
 
@@ -2335,13 +2313,15 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
       dirtyRect.IntersectRect(dirtyRect, clipPropClip);
     }
 
-    MarkAbsoluteFramesForDisplayList(aBuilder, dirtyRect);
-
     // Extend3DContext() also guarantees that applyAbsPosClipping and usingSVGEffects are false
     // We only modify the preserve-3d rect if we are the top of a preserve-3d heirarchy
     if (Extend3DContext()) {
+      // Mark these first so MarkAbsoluteFramesForDisplayList knows if we are
+      // going to be forced to descend into frames.
       aBuilder->MarkPreserve3DFramesForDisplayList(this);
     }
+
+    MarkAbsoluteFramesForDisplayList(aBuilder, dirtyRect);
 
     nsDisplayLayerEventRegions* eventRegions = nullptr;
     if (aBuilder->IsBuildingLayerEventRegions()) {
@@ -2465,6 +2445,19 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
     aBuilder->ExitSVGEffectsContents();
     resultList.AppendToTop(&hoistedScrollInfoItemsStorage);
   }
+  /* Else, if the list is non-empty and there is CSS group opacity without SVG
+   * effects, wrap it up in an opacity item.
+   */
+  else if (useOpacity && !resultList.IsEmpty()) {
+    // Don't clip nsDisplayOpacity items. We clip their descendants instead.
+    // The clip we would set on an element with opacity would clip
+    // all descendant content, but some should not be clipped.
+    DisplayListClipState::AutoSaveRestore opacityClipState(aBuilder);
+    opacityClipState.Clear();
+    resultList.AppendNewToTop(
+        new (aBuilder) nsDisplayOpacity(aBuilder, this, &resultList,
+                                        containerItemScrollClip, opacityItemForEventsOnly));
+  }
 
   /* If we're going to apply a transformation and don't have preserve-3d set, wrap
    * everything in an nsDisplayTransform. If there's nothing in the list, don't add
@@ -2474,10 +2467,9 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
    * a separate nsDisplayTransform instead. When the child is already an nsDisplayTransform,
    * we can skip this step, as the computed transform will already include our own.
    *
-   * We also traverse into sublists created by nsDisplayWrapList or nsDisplayOpacity, so that
-   * we find all the correct children.
+   * We also traverse into sublists created by nsDisplayWrapList, so that we find all the
+   * correct children.
    */
-  bool hasPreserve3DChildren = false;
   if (isTransformed && !resultList.IsEmpty() && Extend3DContext()) {
     // Install dummy nsDisplayTransform as a leaf containing
     // descendants not participating this 3D rendering context.
@@ -2491,7 +2483,6 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
         WrapSeparatorTransform(aBuilder, this, dirtyRect,
                                &nonparticipants, &participants, index++);
         participants.AppendToTop(item);
-        hasPreserve3DChildren = true;
       } else {
         // The frame of the item doesn't participate the current
         // context, or has no transform.
@@ -2508,20 +2499,19 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
     resultList.AppendToTop(&participants);
   }
 
-  /* We create the opacity outside any transform separators we created,
-   * so that the opacity will be applied to them as groups. When we have
-   * opacity and preserve-3d we break the 'group' nature of opacity in order
-   * to maintain preserve-3d. This matches the behaviour of blink and WebKit,
-   * see bug 1250718.
+  /* If we're creating an nsDisplayTransform item that is going to combine its transform
+   * with its children (preserve-3d or perspective), then we can't have an intermediate
+   * surface. Mask layers force an intermediate surface, so if we're going to need both
+   * then create a separate wrapping layer for the mask.
    */
-  if (useOpacity && !resultList.IsEmpty()) {
-    CreateOpacityItem(aBuilder, this, resultList,
-                      opacityItemForEventsOnly, containerItemScrollClip, hasPreserve3DChildren);
-  }
+  bool needsLayerForMask = isTransformed && (Extend3DContext() || HasPerspective()) &&
+                           clipState.SavedStateHasRoundedCorners();
+  NS_ASSERTION(!Combines3DTransformWithAncestors() || !clipState.SavedStateHasRoundedCorners(),
+               "Can't support mask layers on intermediate preserve-3d frames");
 
   if (isTransformed && !resultList.IsEmpty()) {
     // Restore clip state now so nsDisplayTransform is clipped properly.
-    if (!HasPerspective() && !useFixedPosition && !useStickyPosition) {
+    if (!HasPerspective() && !useFixedPosition && !useStickyPosition && !needsLayerForMask) {
       clipState.ExitStackingContextContents(&containerItemScrollClip);
     }
     // Revert to the dirtyrect coming in from the parent, without our transform
@@ -2550,7 +2540,7 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
     }
 
     if (HasPerspective()) {
-      if (!useFixedPosition && !useStickyPosition) {
+      if (!useFixedPosition && !useStickyPosition && !needsLayerForMask) {
         clipState.ExitStackingContextContents(&containerItemScrollClip);
       }
       resultList.AppendNewToTop(
@@ -2560,8 +2550,15 @@ nsIFrame::BuildDisplayListForStackingContext(nsDisplayListBuilder* aBuilder,
     }
   }
 
-  if (useFixedPosition || useStickyPosition) {
+  if (useFixedPosition || useStickyPosition || needsLayerForMask) {
     clipState.ExitStackingContextContents(&containerItemScrollClip);
+  }
+
+  if (needsLayerForMask) {
+    resultList.AppendNewToTop(
+      new (aBuilder) nsDisplayOwnLayer(aBuilder, this, &resultList, 0,
+                                       mozilla::layers::FrameMetrics::NULL_SCROLL_ID,
+                                       0.0f, /* aForceActive = */ false));
   }
 
   /* If we have sticky positioning, wrap it in a sticky position item.
@@ -2605,8 +2602,21 @@ WrapInWrapList(nsDisplayListBuilder* aBuilder,
                nsIFrame* aFrame, nsDisplayList* aList)
 {
   nsDisplayItem* item = aList->GetBottom();
-  if (!item || item->GetAbove() ||
-      (item->Frame() != aFrame && item->GetType() != nsDisplayItem::TYPE_PERSPECTIVE)) {
+  if (!item) {
+    return nullptr;
+  }
+
+  // For perspective items we want to treat the 'frame' as being the transform
+  // frame that created it. This stops the transform frame from wrapping another
+  // nsDisplayWrapList around it (with mismatching reference frames), but still
+  // makes the perspective frame create one (so we have an atomic entry for z-index
+  // sorting).
+  nsIFrame *itemFrame = item->Frame();
+  if (item->GetType() == nsDisplayItem::TYPE_PERSPECTIVE) {
+    itemFrame = static_cast<nsDisplayPerspective*>(item)->TransformFrame();
+  }
+
+  if (item->GetAbove() || itemFrame != aFrame) {
     return new (aBuilder) nsDisplayWrapList(aBuilder, aFrame, aList);
   }
   aList->RemoveBottom();
@@ -2654,7 +2664,9 @@ nsIFrame::BuildDisplayListForChild(nsDisplayListBuilder*   aBuilder,
 
   nsIAtom* childType = child->GetType();
   nsDisplayListBuilder::OutOfFlowDisplayData* savedOutOfFlowData = nullptr;
+  bool isPlaceholder = false;
   if (childType == nsGkAtoms::placeholderFrame) {
+    isPlaceholder = true;
     nsPlaceholderFrame* placeholder = static_cast<nsPlaceholderFrame*>(child);
     child = placeholder->GetOutOfFlowFrame();
     NS_ASSERTION(child, "No out of flow frame?");
@@ -2787,10 +2799,26 @@ nsIFrame::BuildDisplayListForChild(nsDisplayListBuilder*   aBuilder,
   CheckForApzAwareEventHandlers(aBuilder, child);
 
   if (savedOutOfFlowData) {
+    aBuilder->SetBuildingInvisibleItems(false);
+
     clipState.SetClipForContainingBlockDescendants(
       &savedOutOfFlowData->mContainingBlockClip);
     clipState.SetScrollClipForContainingBlockDescendants(
       savedOutOfFlowData->mContainingBlockScrollClip);
+  } else if (GetStateBits() & NS_FRAME_FORCE_DISPLAY_LIST_DESCEND_INTO &&
+             isPlaceholder) {
+    NS_ASSERTION(dirty.IsEmpty(), "should have empty dirty rect");
+    // Every item we build from now until we descent into an out of flow that
+    // does have saved out of flow data should be invisible. This state gets
+    // restored when AutoBuildingDisplayList gets out of scope.
+    aBuilder->SetBuildingInvisibleItems(true);
+
+    // If we have nested out-of-flow frames and the outer one isn't visible
+    // then we won't have stored clip data for it. We can just clear the clip
+    // instead since we know we won't render anything, and the inner out-of-flow
+    // frame will setup the correct clip for itself.
+    clipState.SetClipForContainingBlockDescendants(nullptr);
+    clipState.SetScrollClipForContainingBlockDescendants(nullptr);
   }
 
   // Setup clipping for the parent's overflow:-moz-hidden-unscrollable,
@@ -2878,7 +2906,9 @@ nsIFrame::BuildDisplayListForChild(nsDisplayListBuilder*   aBuilder,
     DisplayDebugBorders(aBuilder, child, aLists);
 #endif
   }
-    
+
+  buildingForChild.RestoreBuildingInvisibleItemsValue();
+
   // Clear clip rect for the construction of the items below. Since we're
   // clipping all their contents, they themselves don't need to be clipped.
   clipState.Clear();
@@ -5445,7 +5475,7 @@ static void InvalidateFrameInternal(nsIFrame *aFrame, bool aHasDisplayItem = tru
   } else {
     nsIFrame *parent = nsLayoutUtils::GetCrossDocParentFrame(aFrame);
     while (parent && !parent->HasAnyStateBits(NS_FRAME_DESCENDANT_NEEDS_PAINT)) {
-      if (aHasDisplayItem) {
+      if (aHasDisplayItem && !parent->HasAnyStateBits(NS_FRAME_IS_NONDISPLAY)) {
         parent->AddStateBits(NS_FRAME_DESCENDANT_NEEDS_PAINT);
       }
       nsSVGEffects::InvalidateDirectRenderingObservers(parent);
@@ -5545,7 +5575,7 @@ nsIFrame::InvalidateFrameWithRect(const nsRect& aRect, uint32_t aDisplayItemKey)
     return;
   }
 
-  nsRect *rect = static_cast<nsRect*>(Properties().Get(InvalidationRect()));
+  nsRect* rect = Properties().Get(InvalidationRect());
   if (!rect) {
     if (alreadyInvalid) {
       return;
@@ -5652,7 +5682,7 @@ nsIFrame::IsInvalid(nsRect& aRect)
   }
   
   if (HasAnyStateBits(NS_FRAME_HAS_INVALID_RECT)) {
-    nsRect *rect = static_cast<nsRect*>(Properties().Get(InvalidationRect()));
+    nsRect* rect = Properties().Get(InvalidationRect());
     NS_ASSERTION(rect, "Must have an invalid rect if NS_FRAME_HAS_INVALID_RECT is set!");
     aRect = *rect;
   } else {
@@ -5664,8 +5694,8 @@ nsIFrame::IsInvalid(nsRect& aRect)
 void
 nsIFrame::SchedulePaint(PaintType aType)
 {
-  nsIFrame *displayRoot = nsLayoutUtils::GetDisplayRootFrame(this);
-  nsPresContext *pres = displayRoot->PresContext()->GetRootPresContext();
+  nsIFrame* displayRoot = nsLayoutUtils::GetDisplayRootFrame(this);
+  nsPresContext* pres = displayRoot->PresContext()->GetRootPresContext();
 
   // No need to schedule a paint for an external document since they aren't
   // painted directly.
@@ -5818,8 +5848,7 @@ nsIFrame::MovePositionBy(const nsPoint& aTranslation)
 
   const nsMargin* computedOffsets = nullptr;
   if (IsRelativelyPositioned()) {
-    computedOffsets = static_cast<nsMargin*>
-      (Properties().Get(nsIFrame::ComputedOffsetProperty()));
+    computedOffsets = Properties().Get(nsIFrame::ComputedOffsetProperty());
   }
   nsHTMLReflowState::ApplyRelativePositioning(this, computedOffsets ?
                                               *computedOffsets : nsMargin(),
@@ -5832,8 +5861,7 @@ nsIFrame::GetNormalRect() const
 {
   // It might be faster to first check
   // StyleDisplay()->IsRelativelyPositionedStyle().
-  nsPoint* normalPosition = static_cast<nsPoint*>
-    (Properties().Get(NormalPositionProperty()));
+  nsPoint* normalPosition = Properties().Get(NormalPositionProperty());
   if (normalPosition) {
     return nsRect(*normalPosition, GetSize());
   }
@@ -5845,8 +5873,7 @@ nsIFrame::GetNormalPosition() const
 {
   // It might be faster to first check
   // StyleDisplay()->IsRelativelyPositionedStyle().
-  nsPoint* normalPosition = static_cast<nsPoint*>
-    (Properties().Get(NormalPositionProperty()));
+  nsPoint* normalPosition = Properties().Get(NormalPositionProperty());
   if (normalPosition) {
     return *normalPosition;
   }
@@ -5904,8 +5931,8 @@ nsOverflowAreas
 nsIFrame::GetOverflowAreasRelativeToSelf() const
 {
   if (IsTransformed()) {
-    nsOverflowAreas* preTransformOverflows = static_cast<nsOverflowAreas*>
-      (Properties().Get(PreTransformOverflowAreasProperty()));
+    nsOverflowAreas* preTransformOverflows =
+      Properties().Get(PreTransformOverflowAreasProperty());
     if (preTransformOverflows) {
       return nsOverflowAreas(preTransformOverflows->VisualOverflow(),
                              preTransformOverflows->ScrollableOverflow());
@@ -5931,8 +5958,8 @@ nsRect
 nsIFrame::GetScrollableOverflowRectRelativeToSelf() const
 {
   if (IsTransformed()) {
-    nsOverflowAreas* preTransformOverflows = static_cast<nsOverflowAreas*>
-      (Properties().Get(PreTransformOverflowAreasProperty()));
+    nsOverflowAreas* preTransformOverflows =
+      Properties().Get(PreTransformOverflowAreasProperty());
     if (preTransformOverflows)
       return preTransformOverflows->ScrollableOverflow();
   }
@@ -5943,8 +5970,8 @@ nsRect
 nsIFrame::GetVisualOverflowRectRelativeToSelf() const
 {
   if (IsTransformed()) {
-    nsOverflowAreas* preTransformOverflows = static_cast<nsOverflowAreas*>
-      (Properties().Get(PreTransformOverflowAreasProperty()));
+    nsOverflowAreas* preTransformOverflows =
+      Properties().Get(PreTransformOverflowAreasProperty());
     if (preTransformOverflows)
       return preTransformOverflows->VisualOverflow();
   }
@@ -5954,8 +5981,7 @@ nsIFrame::GetVisualOverflowRectRelativeToSelf() const
 nsRect
 nsIFrame::GetPreEffectsVisualOverflowRect() const
 {
-  nsRect* r = static_cast<nsRect*>
-    (Properties().Get(nsIFrame::PreEffectsBBoxProperty()));
+  nsRect* r = Properties().Get(nsIFrame::PreEffectsBBoxProperty());
   return r ? *r : GetVisualOverflowRectRelativeToSelf();
 }
 
@@ -6577,6 +6603,14 @@ nsFrame::GetPointFromOffset(int32_t inOffset, nsPoint* outPoint)
   }
   *outPoint = pt;
   return NS_OK;
+}
+
+nsresult
+nsFrame::GetCharacterRectsInRange(int32_t aInOffset, int32_t aLength,
+                                  nsTArray<nsRect>& aOutRect)
+{
+  /* no text */
+  return NS_ERROR_FAILURE;
 }
 
 nsresult
@@ -7721,8 +7755,7 @@ nsOverflowAreas*
 nsIFrame::GetOverflowAreasProperty()
 {
   FrameProperties props = Properties();
-  nsOverflowAreas *overflow =
-    static_cast<nsOverflowAreas*>(props.Get(OverflowAreasProperty()));
+  nsOverflowAreas* overflow = props.Get(OverflowAreasProperty());
 
   if (overflow) {
     return overflow; // the property already exists
@@ -7742,8 +7775,7 @@ bool
 nsIFrame::SetOverflowAreas(const nsOverflowAreas& aOverflowAreas)
 {
   if (mOverflow.mType == NS_FRAME_OVERFLOW_LARGE) {
-    nsOverflowAreas *overflow =
-      static_cast<nsOverflowAreas*>(Properties().Get(OverflowAreasProperty()));
+    nsOverflowAreas* overflow = Properties().Get(OverflowAreasProperty());
     bool changed = *overflow != aOverflowAreas;
     *overflow = aOverflowAreas;
 
@@ -8009,7 +8041,7 @@ nsIFrame::FinishAndStoreOverflow(nsOverflowAreas& aOverflowAreas,
     if (!aOverflowAreas.VisualOverflow().IsEqualEdges(bounds) ||
         !aOverflowAreas.ScrollableOverflow().IsEqualEdges(bounds)) {
       nsOverflowAreas* initial =
-        static_cast<nsOverflowAreas*>(Properties().Get(nsIFrame::InitialOverflowProperty()));
+        Properties().Get(nsIFrame::InitialOverflowProperty());
       if (!initial) {
         Properties().Set(nsIFrame::InitialOverflowProperty(),
                          new nsOverflowAreas(aOverflowAreas));
@@ -8105,33 +8137,52 @@ nsIFrame::FinishAndStoreOverflow(nsOverflowAreas& aOverflowAreas,
 
   /* If we're transformed, transform the overflow rect by the current transformation. */
   bool hasTransform = IsTransformed();
-  nsSize oldSize = aOldSize ? *aOldSize : mRect.Size();
-  bool sizeChanged = (oldSize != aNewSize);
+  nsSize oldSize = mRect.Size();
+  bool sizeChanged = ((aOldSize ? *aOldSize : oldSize) != aNewSize);
+
+  /* Since our size might not actually have been computed yet, we need to make sure that we use the
+   * correct dimensions by overriding the stored bounding rectangle with the value the caller has
+   * ensured us we'll use.
+   */
+  SetSize(aNewSize);
+
+  if (ChildrenHavePerspective() && sizeChanged) {
+    nsRect newBounds(nsPoint(0, 0), aNewSize);
+    RecomputePerspectiveChildrenOverflow(this);
+  }
+
   if (hasTransform) {
     Properties().Set(nsIFrame::PreTransformOverflowAreasProperty(),
                      new nsOverflowAreas(aOverflowAreas));
-    /* Since our size might not actually have been computed yet, we need to make sure that we use the
-     * correct dimensions by overriding the stored bounding rectangle with the value the caller has
-     * ensured us we'll use.
-     */
-    nsRect newBounds(nsPoint(0, 0), aNewSize);
-    // Transform affects both overflow areas.
-    NS_FOR_FRAME_OVERFLOW_TYPES(otype) {
-      nsRect& o = aOverflowAreas.Overflow(otype);
-      o = nsDisplayTransform::TransformRect(o, this, &newBounds);
-    }
-    if (Extend3DContext()) {
-      ComputePreserve3DChildrenOverflow(aOverflowAreas, newBounds);
-    } else if (sizeChanged && ChildrenHavePerspective()) {
-      RecomputePerspectiveChildrenOverflow(this, &newBounds);
+
+    if (Combines3DTransformWithAncestors()) {
+      /* If we're a preserve-3d leaf frame, then our pre-transform overflow should be correct. Our
+       * post-transform overflow is empty though, because we only contribute to the overflow area
+       * of the preserve-3d root frame.
+       * If we're an intermediate frame then the pre-transform overflow should contain all our
+       * non-preserve-3d children, which is what we want. Again we have no post-transform overflow.
+       */
+      aOverflowAreas.SetAllTo(nsRect());
+    } else {
+      NS_FOR_FRAME_OVERFLOW_TYPES(otype) {
+        nsRect& o = aOverflowAreas.Overflow(otype);
+        o = nsDisplayTransform::TransformRect(o, this);
+      }
+
+      /* If we're the root of the 3d context, then we want to include the overflow areas of all
+       * the participants. This won't have happened yet as the code above set their overflow
+       * area to empty. Manually collect these overflow areas now.
+       */
+      if (Extend3DContext()) {
+        ComputePreserve3DChildrenOverflow(aOverflowAreas);
+      }
     }
   } else {
     Properties().Delete(nsIFrame::PreTransformOverflowAreasProperty());
-    if (ChildrenHavePerspective() && sizeChanged) {
-      nsRect newBounds(nsPoint(0, 0), aNewSize);
-      RecomputePerspectiveChildrenOverflow(this, &newBounds);
-    }
   }
+
+  /* Revert the size change in case some caller is depending on this. */
+  SetSize(oldSize);
 
   bool anyOverflowChanged;
   if (aOverflowAreas != nsOverflowAreas(bounds, bounds)) {
@@ -8147,13 +8198,8 @@ nsIFrame::FinishAndStoreOverflow(nsOverflowAreas& aOverflowAreas,
 }
 
 void
-nsIFrame::RecomputePerspectiveChildrenOverflow(const nsIFrame* aStartFrame, const nsRect* aBounds)
+nsIFrame::RecomputePerspectiveChildrenOverflow(const nsIFrame* aStartFrame)
 {
-  // Children may check our size when getting our transform, make sure it's valid.
-  nsSize oldSize = GetSize();
-  if (aBounds) {
-    SetSize(aBounds->Size());
-  }
   nsIFrame::ChildListIterator lists(this);
   for (; !lists.IsDone(); lists.Next()) {
     nsFrameList::Enumerator childFrames(lists.CurrentList());
@@ -8164,7 +8210,7 @@ nsIFrame::RecomputePerspectiveChildrenOverflow(const nsIFrame* aStartFrame, cons
       }
       if (child->HasPerspective()) {
         nsOverflowAreas* overflow = 
-          static_cast<nsOverflowAreas*>(child->Properties().Get(nsIFrame::InitialOverflowProperty()));
+          child->Properties().Get(nsIFrame::InitialOverflowProperty());
         nsRect bounds(nsPoint(0, 0), child->GetSize());
         if (overflow) {
           nsOverflowAreas overflowCopy = *overflow;
@@ -8180,87 +8226,19 @@ nsIFrame::RecomputePerspectiveChildrenOverflow(const nsIFrame* aStartFrame, cons
         // style context. We must find any descendant frames using our size
         // (by recursing into frames that have the same containing block)
         // to update their overflow rects too.
-        child->RecomputePerspectiveChildrenOverflow(aStartFrame, nullptr);
+        child->RecomputePerspectiveChildrenOverflow(aStartFrame);
       }
-    }
-  }
-  // Restore our old size just in case something depends on this elesewhere.
-  SetSize(oldSize);
-}
-
-/* The overflow rects for leaf nodes in a preserve-3d hierarchy depends on
- * the mRect value for their parents (since we use their transform, and transform
- * depends on this for transform-origin etc). These weren't necessarily correct
- * when we reflowed initially, so walk over all preserve-3d children and repeat the
- * overflow calculation.
- */
-static void
-RecomputePreserve3DChildrenOverflow(nsIFrame* aFrame, const nsRect* aBounds)
-{
-  // Children may check our size when getting our transform, make sure it's valid.
-  nsSize oldSize = aFrame->GetSize();
-  if (aBounds) {
-    aFrame->SetSize(aBounds->Size());
-  }
-  nsIFrame::ChildListIterator lists(aFrame);
-  for (; !lists.IsDone(); lists.Next()) {
-    nsFrameList::Enumerator childFrames(lists.CurrentList());
-    for (; !childFrames.AtEnd(); childFrames.Next()) {
-      nsIFrame* child = childFrames.get();
-      if (!child->FrameMaintainsOverflow()) {
-        continue; // frame does not maintain overflow rects
-      }
-      if (child->Extend3DContext()) {
-        RecomputePreserve3DChildrenOverflow(child, nullptr);
-      } else if (child->Combines3DTransformWithAncestors()) {
-        nsOverflowAreas* overflow = 
-          static_cast<nsOverflowAreas*>(child->Properties().Get(nsIFrame::InitialOverflowProperty()));
-        nsRect bounds(nsPoint(0, 0), child->GetSize());
-        if (overflow) {
-          nsOverflowAreas overflowCopy = *overflow;
-          child->FinishAndStoreOverflow(overflowCopy, bounds.Size());
-        } else {
-          nsOverflowAreas boundsOverflow;
-          boundsOverflow.SetAllTo(bounds);
-          child->FinishAndStoreOverflow(boundsOverflow, bounds.Size());
-        }
-      }
-    }
-  }
-  // Restore our old size just in case something depends on this elesewhere.
-  aFrame->SetSize(oldSize);
- 
-  // Only repeat computing our overflow in recursive calls since the initial caller is still
-  // in the middle of doing this and we don't want an infinite loop.
-  if (!aBounds) {
-    nsOverflowAreas* overflow = 
-      static_cast<nsOverflowAreas*>(aFrame->Properties().Get(nsIFrame::InitialOverflowProperty()));
-    nsRect bounds(nsPoint(0, 0), aFrame->GetSize());
-    if (overflow) {
-      nsOverflowAreas overflowCopy = *overflow;
-      overflowCopy.UnionAllWith(bounds); 
-      aFrame->FinishAndStoreOverflow(overflowCopy, bounds.Size());
-    } else {
-      nsOverflowAreas boundsOverflow;
-      boundsOverflow.SetAllTo(bounds);
-      aFrame->FinishAndStoreOverflow(boundsOverflow, bounds.Size());
     }
   }
 }
 
 void
-nsIFrame::ComputePreserve3DChildrenOverflow(nsOverflowAreas& aOverflowAreas, const nsRect& aBounds)
+nsIFrame::ComputePreserve3DChildrenOverflow(nsOverflowAreas& aOverflowAreas)
 {
-  // When we are preserving 3d we need to iterate over all children separately.
-  // If the child also preserves 3d then their overflow will already been in our
-  // coordinate space, otherwise we need to transform.
-
-  // If we're the top frame in a preserve 3d chain then we need to recalculate the overflow
-  // areas of all our children since they will have used our size/offset which was invalid at
-  // the time.
-  if (!Combines3DTransformWithAncestors()) {
-    RecomputePreserve3DChildrenOverflow(this, &aBounds);
-  }
+  // Find all descendants that participate in the 3d context, and include their overflow.
+  // These descendants have an empty overflow, so won't have been included in the normal
+  // overflow calculation. Any children that don't participate have normal overflow,
+  // so will have been included already.
 
   nsRect childVisual;
   nsRect childScrollable;
@@ -8269,27 +8247,28 @@ nsIFrame::ComputePreserve3DChildrenOverflow(nsOverflowAreas& aOverflowAreas, con
     nsFrameList::Enumerator childFrames(lists.CurrentList());
     for (; !childFrames.AtEnd(); childFrames.Next()) {
       nsIFrame* child = childFrames.get();
-      nsPoint offset = child->GetPosition();
-      nsRect visual = child->GetVisualOverflowRect();
-      nsRect scrollable = child->GetScrollableOverflowRect();
-      visual.MoveBy(offset);
-      scrollable.MoveBy(offset);
+
+      // If this child participates in the 3d context, then take the pre-transform
+      // region (which contains all descendants that aren't participating in the 3d context)
+      // and transform it into the 3d context root coordinate space.
       if (child->Combines3DTransformWithAncestors()) {
-        childVisual = childVisual.Union(visual);
-        childScrollable = childScrollable.Union(scrollable);
-      } else {
-        childVisual = 
-          childVisual.Union(nsDisplayTransform::TransformRect(visual, 
-                            this, &aBounds));
-        childScrollable = 
-          childScrollable.Union(nsDisplayTransform::TransformRect(scrollable,
-                                this, &aBounds));
+        nsOverflowAreas childOverflow = child->GetOverflowAreasRelativeToSelf();
+
+        NS_FOR_FRAME_OVERFLOW_TYPES(otype) {
+          nsRect& o = childOverflow.Overflow(otype);
+          o = nsDisplayTransform::TransformRect(o, child);
+        }
+
+        aOverflowAreas.UnionWith(childOverflow);
+
+        // If this child also extends the 3d context, then recurse into it
+        // looking for more participants.
+        if (child->Extend3DContext()) {
+          child->ComputePreserve3DChildrenOverflow(aOverflowAreas);
+        }
       }
     }
   }
-
-  aOverflowAreas.Overflow(eVisualOverflow) = aOverflowAreas.Overflow(eVisualOverflow).Union(childVisual);
-  aOverflowAreas.Overflow(eScrollableOverflow) = aOverflowAreas.Overflow(eScrollableOverflow).Union(childScrollable);
 }
 
 uint32_t
@@ -8342,8 +8321,8 @@ GetIBSplitSiblingForAnonymousBlock(const nsIFrame* aFrame)
    * Now look up the nsGkAtoms::IBSplitPrevSibling
    * property.
    */
-  nsIFrame *ibSplitSibling = static_cast<nsIFrame*>
-    (aFrame->Properties().Get(nsIFrame::IBSplitPrevSibling()));
+  nsIFrame *ibSplitSibling =
+    aFrame->Properties().Get(nsIFrame::IBSplitPrevSibling());
   NS_ASSERTION(ibSplitSibling, "Broken frame tree?");
   return ibSplitSibling;
 }
@@ -9250,8 +9229,7 @@ nsFrame::BoxReflow(nsBoxLayoutState&        aState,
 nsBoxLayoutMetrics*
 nsFrame::BoxMetrics() const
 {
-  nsBoxLayoutMetrics* metrics =
-    static_cast<nsBoxLayoutMetrics*>(Properties().Get(BoxMetricsProperty()));
+  nsBoxLayoutMetrics* metrics = Properties().Get(BoxMetricsProperty());
   NS_ASSERTION(metrics, "A box layout method was called but InitBoxMetrics was never called");
   return metrics;
 }
@@ -9349,7 +9327,7 @@ nsIFrame::SetParent(nsContainerFrame* aParent)
 
   if (HasInvalidFrameInSubtree()) {
     for (nsIFrame* f = aParent;
-         f && !f->HasAnyStateBits(NS_FRAME_DESCENDANT_NEEDS_PAINT);
+         f && !f->HasAnyStateBits(NS_FRAME_DESCENDANT_NEEDS_PAINT | NS_FRAME_IS_NONDISPLAY);
          f = nsLayoutUtils::GetCrossDocParentFrame(f)) {
       f->AddStateBits(NS_FRAME_DESCENDANT_NEEDS_PAINT);
     }

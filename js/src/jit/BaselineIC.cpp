@@ -32,6 +32,7 @@
 #include "vm/Opcodes.h"
 #include "vm/SelfHosting.h"
 #include "vm/TypedArrayCommon.h"
+#include "vm/TypedArrayObject.h"
 
 #include "jsboolinlines.h"
 #include "jsscriptinlines.h"
@@ -290,7 +291,7 @@ DoTypeUpdateFallback(JSContext* cx, BaselineFrame* frame, ICUpdatedStub* stub, H
         MOZ_ASSERT(obj->isNative() || obj->is<UnboxedPlainObject>());
         jsbytecode* pc = stub->getChainFallback()->icEntry()->pc(script);
         if (*pc == JSOP_SETALIASEDVAR || *pc == JSOP_INITALIASEDLEXICAL)
-            id = NameToId(ScopeCoordinateName(cx->runtime()->scopeCoordinateNameCache, script, pc));
+            id = NameToId(ScopeCoordinateName(cx->caches.scopeCoordinateNameCache, script, pc));
         else
             id = NameToId(script->getName(pc));
         AddTypePropertyId(cx, obj, id, value);
@@ -4503,7 +4504,7 @@ DoSetPropFallback(JSContext* cx, BaselineFrame* frame, ICSetProp_Fallback* stub_
 
     RootedPropertyName name(cx);
     if (op == JSOP_SETALIASEDVAR || op == JSOP_INITALIASEDLEXICAL)
-        name = ScopeCoordinateName(cx->runtime()->scopeCoordinateNameCache, script, pc);
+        name = ScopeCoordinateName(cx->caches.scopeCoordinateNameCache, script, pc);
     else
         name = script->getName(pc);
     RootedId id(cx, NameToId(name));
@@ -4885,7 +4886,7 @@ ICSetPropNativeAddCompiler::generateStubCode(MacroAssembler& masm)
         masm.loadPtr(Address(objReg, UnboxedPlainObject::offsetOfExpando()), holderReg);
 
         // Write the expando object's new shape.
-        Address shapeAddr(holderReg, JSObject::offsetOfShape());
+        Address shapeAddr(holderReg, ShapedObject::offsetOfShape());
         EmitPreBarrier(masm, shapeAddr, MIRType::Shape);
         masm.loadPtr(Address(ICStubReg, ICSetProp_NativeAdd::offsetOfNewShape()), scratch);
         masm.storePtr(scratch, shapeAddr);
@@ -4894,7 +4895,7 @@ ICSetPropNativeAddCompiler::generateStubCode(MacroAssembler& masm)
             masm.loadPtr(Address(holderReg, NativeObject::offsetOfSlots()), holderReg);
     } else {
         // Write the object's new shape.
-        Address shapeAddr(objReg, JSObject::offsetOfShape());
+        Address shapeAddr(objReg, ShapedObject::offsetOfShape());
         EmitPreBarrier(masm, shapeAddr, MIRType::Shape);
         masm.loadPtr(Address(ICStubReg, ICSetProp_NativeAdd::offsetOfNewShape()), scratch);
         masm.storePtr(scratch, shapeAddr);
@@ -5472,7 +5473,7 @@ GetTemplateObjectForSimd(JSContext* cx, JSFunction* target, MutableHandleObject 
 }
 
 static bool
-GetTemplateObjectForNative(JSContext* cx, JSFunction* target, const CallArgs& args,
+GetTemplateObjectForNative(JSContext* cx, HandleFunction target, const CallArgs& args,
                            MutableHandleObject res, bool* skipAttach)
 {
     Native native = target->native();
@@ -5506,6 +5507,12 @@ GetTemplateObjectForNative(JSContext* cx, JSFunction* target, const CallArgs& ar
                 return false;
             return true;
         }
+    }
+
+    if (args.length() == 1 && args[0].isInt32() && args[0].toInt32() >= 0) {
+        uint32_t len = args[0].toInt32();
+        if (TypedArrayObject::GetTemplateObjectForNative(cx, native, len, res))
+            return !!res;
     }
 
     if (native == js::array_slice) {
@@ -6985,12 +6992,6 @@ ICCall_Native::Compiler::generateStubCode(MacroAssembler& masm)
     else
         pushCallArguments(masm, regs, argcReg, /* isJitCall = */ false, isConstructing_);
 
-    if (isConstructing_) {
-        // Stack looks like: [ ..., Arg0Val, ThisVal, CalleeVal ]
-        // Replace ThisVal with MagicValue(JS_IS_CONSTRUCTING)
-        masm.storeValue(MagicValue(JS_IS_CONSTRUCTING), Address(masm.getStackPointer(), sizeof(Value)));
-    }
-
 
     // Native functions have the signature:
     //
@@ -7082,12 +7083,6 @@ ICCall_ClassHook::Compiler::generateStubCode(MacroAssembler& masm)
     regs.add(scratch);
     pushCallArguments(masm, regs, argcReg, /* isJitCall = */ false, isConstructing_);
     regs.take(scratch);
-
-    if (isConstructing_) {
-        // Stack looks like: [ ..., Arg0Val, ThisVal, CalleeVal ]
-        // Replace ThisVal with MagicValue(JS_IS_CONSTRUCTING)
-        masm.storeValue(MagicValue(JS_IS_CONSTRUCTING), Address(masm.getStackPointer(), sizeof(Value)));
-    }
 
     masm.checkStackAlignment();
 

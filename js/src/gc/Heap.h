@@ -329,7 +329,7 @@ class TenuredCell : public Cell
 /* Cells are aligned to CellShift, so the largest tagged null pointer is: */
 const uintptr_t LargestTaggedNullCellPointer = (1 << CellShift) - 1;
 
-MOZ_CONSTEXPR size_t
+constexpr size_t
 DivideAndRoundUp(size_t numerator, size_t divisor) {
     return (numerator + divisor - 1) / divisor;
 }
@@ -1287,10 +1287,8 @@ TenuredCell::readBarrier(TenuredCell* thing)
 {
     MOZ_ASSERT(!CurrentThreadIsIonCompiling());
     MOZ_ASSERT(!isNullLike(thing));
-    if (thing->shadowRuntimeFromAnyThread()->isHeapBusy())
+    if (thing->shadowRuntimeFromAnyThread()->isHeapCollecting())
         return;
-    MOZ_ASSERT_IF(CurrentThreadCanAccessRuntime(thing->runtimeFromAnyThread()),
-                  !thing->shadowRuntimeFromAnyThread()->isHeapCollecting());
 
     JS::shadow::Zone* shadowZone = thing->shadowZoneFromAnyThread();
     MOZ_ASSERT_IF(!CurrentThreadCanAccessRuntime(thing->runtimeFromAnyThread()),
@@ -1311,7 +1309,7 @@ TenuredCell::writeBarrierPre(TenuredCell* thing)
 {
     MOZ_ASSERT(!CurrentThreadIsIonCompiling());
     MOZ_ASSERT_IF(thing, !isNullLike(thing));
-    if (!thing || thing->shadowRuntimeFromAnyThread()->isHeapBusy())
+    if (!thing || thing->shadowRuntimeFromAnyThread()->isHeapCollecting())
         return;
 
     JS::shadow::Zone* shadowZone = thing->shadowZoneFromAnyThread();

@@ -78,7 +78,7 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitNewTypedObject(MNewTypedObject* ins);
     void visitNewDeclEnvObject(MNewDeclEnvObject* ins);
     void visitNewCallObject(MNewCallObject* ins);
-    void visitNewRunOnceCallObject(MNewRunOnceCallObject* ins);
+    void visitNewSingletonCallObject(MNewSingletonCallObject* ins);
     void visitNewStringObject(MNewStringObject* ins);
     void visitNewDerivedTypedObject(MNewDerivedTypedObject* ins);
     void visitInitElem(MInitElem* ins);
@@ -282,6 +282,7 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitHasClass(MHasClass* ins);
     void visitAsmJSLoadGlobalVar(MAsmJSLoadGlobalVar* ins);
     void visitAsmJSStoreGlobalVar(MAsmJSStoreGlobalVar* ins);
+    void visitAsmJSLoadFuncPtr(MAsmJSLoadFuncPtr* ins);
     void visitAsmJSLoadFFIFunc(MAsmJSLoadFFIFunc* ins);
     void visitAsmJSParameter(MAsmJSParameter* ins);
     void visitAsmJSReturn(MAsmJSReturn* ins);

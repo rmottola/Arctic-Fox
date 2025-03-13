@@ -284,7 +284,7 @@ GfxInfo::GetFeatureStatusImpl(int32_t aFeature,
   NS_ENSURE_ARG_POINTER(aStatus);
   *aStatus = nsIGfxInfo::FEATURE_STATUS_UNKNOWN;
   aSuggestedDriverVersion.SetIsVoid(true);
-  OperatingSystem os = DRIVER_OS_LINUX;
+  OperatingSystem os = OperatingSystem::Linux;
   if (aOS)
     *aOS = os;
 
@@ -303,14 +303,6 @@ GfxInfo::GetFeatureStatusImpl(int32_t aFeature,
     if (aFeature == nsIGfxInfo::FEATURE_OPENGL_LAYERS ||
         aFeature == nsIGfxInfo::FEATURE_WEBGL_OPENGL ||
         aFeature == nsIGfxInfo::FEATURE_WEBGL_MSAA) {
-
-      // Disable OpenGL layers when we don't have texture_from_pixmap because it regresses performance. 
-      if (aFeature == nsIGfxInfo::FEATURE_OPENGL_LAYERS && !mHasTextureFromPixmap) {
-        *aStatus = nsIGfxInfo::FEATURE_BLOCKED_DRIVER_VERSION;
-        aFailureId = "FEATURE_FAILURE_NO_PIXMAP";
-        aSuggestedDriverVersion.AssignLiteral("<Anything with EXT_texture_from_pixmap support>");
-        return NS_OK;
-      }
 
       // whitelist the linux test slaves' current configuration.
       // this is necessary as they're still using the slightly outdated 190.42 driver.

@@ -228,7 +228,10 @@ SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, Float aAlpha = 1.0)
       GradientStopsSkia *stops = static_cast<GradientStopsSkia*>(pat.mStops.get());
       SkShader::TileMode mode = ExtendModeToTileMode(stops->mExtendMode, Axis::BOTH);
 
-      if (stops->mCount >= 2) {
+      if (stops->mCount < 2 ||
+          !pat.mBegin.IsFinite() || !pat.mEnd.IsFinite()) {
+        aPaint.setColor(SK_ColorTRANSPARENT);
+      } else {
         SkPoint points[2];
         points[0] = SkPoint::Make(SkFloatToScalar(pat.mBegin.x), SkFloatToScalar(pat.mBegin.y));
         points[1] = SkPoint::Make(SkFloatToScalar(pat.mEnd.x), SkFloatToScalar(pat.mEnd.y));
@@ -241,8 +244,6 @@ SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, Float aAlpha = 1.0)
                                                               stops->mCount,
                                                               mode, 0, &mat);
         aPaint.setShader(shader);
-      } else {
-        aPaint.setColor(SK_ColorTRANSPARENT);
       }
       break;
     }
@@ -251,7 +252,11 @@ SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, Float aAlpha = 1.0)
       GradientStopsSkia *stops = static_cast<GradientStopsSkia*>(pat.mStops.get());
       SkShader::TileMode mode = ExtendModeToTileMode(stops->mExtendMode, Axis::BOTH);
 
-      if (stops->mCount >= 2) {
+      if (stops->mCount < 2 ||
+          !pat.mCenter1.IsFinite() || !IsFinite(pat.mRadius1) ||
+          !pat.mCenter2.IsFinite() || !IsFinite(pat.mRadius2)) {
+        aPaint.setColor(SK_ColorTRANSPARENT);
+      } else {
         SkPoint points[2];
         points[0] = SkPoint::Make(SkFloatToScalar(pat.mCenter1.x), SkFloatToScalar(pat.mCenter1.y));
         points[1] = SkPoint::Make(SkFloatToScalar(pat.mCenter2.x), SkFloatToScalar(pat.mCenter2.y));
@@ -267,8 +272,6 @@ SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, Float aAlpha = 1.0)
                                                                        stops->mCount,
                                                                        mode, 0, &mat);
         aPaint.setShader(shader);
-      } else {
-        aPaint.setColor(SK_ColorTRANSPARENT);
       }
       break;
     }
@@ -1378,10 +1381,8 @@ DrawTargetSkia::CopySurface(SourceSurface *aSurface,
   SkBitmap bitmap = GetBitmapForSurface(aSurface);
 
   mCanvas->save();
-  mCanvas->resetMatrix();
-  SkRect dest = IntRectToSkRect(IntRect(aDestination.x, aDestination.y, aSourceRect.width, aSourceRect.height));
-  SkIRect source = IntRectToSkIRect(aSourceRect);
-  mCanvas->clipRect(dest, SkRegion::kReplace_Op);
+  mCanvas->setMatrix(SkMatrix::MakeTrans(SkIntToScalar(aDestination.x), SkIntToScalar(aDestination.y)));
+  mCanvas->clipRect(SkRect::MakeIWH(aSourceRect.width, aSourceRect.height), SkRegion::kReplace_Op);
 
   SkPaint paint;
   if (!bitmap.isOpaque()) {
@@ -1389,12 +1390,12 @@ DrawTargetSkia::CopySurface(SourceSurface *aSurface,
     // http://code.google.com/p/skia/issues/detail?id=628
     paint.setXfermodeMode(SkXfermode::kSrc_Mode);
   }
-  // drawBitmapRect with A8 bitmaps ends up doing a mask operation
+  // drawBitmap with A8 bitmaps ends up doing a mask operation
   // so we need to clear before
   if (bitmap.colorType() == kAlpha_8_SkColorType) {
     mCanvas->clear(SK_ColorTRANSPARENT);
   }
-  mCanvas->drawBitmapRect(bitmap, source, dest, &paint);
+  mCanvas->drawBitmap(bitmap, -SkIntToScalar(aSourceRect.x), -SkIntToScalar(aSourceRect.y), &paint);
   mCanvas->restore();
 }
 

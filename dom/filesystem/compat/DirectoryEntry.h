@@ -15,13 +15,14 @@ namespace dom {
 
 class Directory;
 
-class DirectoryEntry final : public Entry
+class DirectoryEntry : public Entry
 {
 public:
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(DirectoryEntry, Entry)
 
-  DirectoryEntry(nsIGlobalObject* aGlobalObject, Directory* aDirectory);
+  DirectoryEntry(nsIGlobalObject* aGlobalObject, Directory* aDirectory,
+                 DOMFileSystem* aFileSystem);
 
   virtual JSObject*
   WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
@@ -38,42 +39,41 @@ public:
   virtual void
   GetFullPath(nsAString& aFullPath, ErrorResult& aRv) const override;
 
-  already_AddRefed<DirectoryReader>
-  CreateReader(ErrorResult& aRv) const
-  {
-    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
-    return nullptr;
-  }
+  virtual already_AddRefed<DirectoryReader>
+  CreateReader() const;
 
   void
   GetFile(const nsAString& aPath, const FileSystemFlags& aFlag,
           const Optional<OwningNonNull<EntryCallback>>& aSuccessCallback,
-          const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback,
-          ErrorResult& aRv) const
+          const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback) const
   {
-    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
+    GetInternal(aPath, aFlag, aSuccessCallback, aErrorCallback, eGetFile);
   }
 
   void
   GetDirectory(const nsAString& aPath, const FileSystemFlags& aFlag,
                const Optional<OwningNonNull<EntryCallback>>& aSuccessCallback,
-               const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback,
-               ErrorResult& aRv) const
+               const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback) const
   {
-    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
+    GetInternal(aPath, aFlag, aSuccessCallback, aErrorCallback, eGetDirectory);
   }
 
   void
   RemoveRecursively(VoidCallback& aSuccessCallback,
-                    const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback,
-                    ErrorResult& aRv) const
-  {
-    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
-  }
+                    const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback) const;
+
+  enum GetInternalType { eGetFile, eGetDirectory };
+
+  virtual void
+  GetInternal(const nsAString& aPath, const FileSystemFlags& aFlag,
+              const Optional<OwningNonNull<EntryCallback>>& aSuccessCallback,
+              const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback,
+              GetInternalType aType) const;
+
+protected:
+  virtual ~DirectoryEntry();
 
 private:
-  ~DirectoryEntry();
-
   RefPtr<Directory> mDirectory;
 };
 

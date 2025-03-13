@@ -13,17 +13,21 @@ var promise = require("promise");
 var EventEmitter = require("devtools/shared/event-emitter");
 var clipboard = require("sdk/clipboard");
 var {HostType} = require("devtools/client/framework/toolbox").Toolbox;
+const {executeSoon} = require("devtools/shared/DevToolsUtils");
+var {KeyShortcuts} = require("devtools/client/shared/key-shortcuts");
 
 loader.lazyRequireGetter(this, "CSS", "CSS");
 
-loader.lazyGetter(this, "MarkupView", () => require("devtools/client/inspector/markup/markup").MarkupView);
-loader.lazyGetter(this, "HTMLBreadcrumbs", () => require("devtools/client/inspector/breadcrumbs").HTMLBreadcrumbs);
-loader.lazyGetter(this, "ToolSidebar", () => require("devtools/client/framework/sidebar").ToolSidebar);
-loader.lazyGetter(this, "InspectorSearch", () => require("devtools/client/inspector/inspector-search").InspectorSearch);
-loader.lazyGetter(this, "RuleViewTool", () => require("devtools/client/inspector/rules/rules").RuleViewTool);
-loader.lazyGetter(this, "ComputedViewTool", () => require("devtools/client/inspector/computed/computed").ComputedViewTool);
-loader.lazyGetter(this, "FontInspector", () => require("devtools/client/inspector/fonts/fonts").FontInspector);
-loader.lazyGetter(this, "LayoutView", () => require("devtools/client/inspector/layout/layout").LayoutView);
+loader.lazyRequireGetter(this, "CommandUtils", "devtools/client/shared/developer-toolbar", true);
+loader.lazyRequireGetter(this, "ComputedViewTool", "devtools/client/inspector/computed/computed", true);
+loader.lazyRequireGetter(this, "FontInspector", "devtools/client/inspector/fonts/fonts", true);
+loader.lazyRequireGetter(this, "HTMLBreadcrumbs", "devtools/client/inspector/breadcrumbs", true);
+loader.lazyRequireGetter(this, "InspectorSearch", "devtools/client/inspector/inspector-search", true);
+loader.lazyRequireGetter(this, "LayoutView", "devtools/client/inspector/layout/layout", true);
+loader.lazyRequireGetter(this, "MarkupView", "devtools/client/inspector/markup/markup", true);
+loader.lazyRequireGetter(this, "RuleViewTool", "devtools/client/inspector/rules/rules", true);
+loader.lazyRequireGetter(this, "ToolSidebar", "devtools/client/framework/sidebar", true);
+loader.lazyRequireGetter(this, "ViewHelpers", "devtools/client/shared/widgets/view-helpers", true);
 
 loader.lazyGetter(this, "strings", () => {
   return Services.strings.createBundle("chrome://devtools/locale/inspector.properties");
@@ -35,7 +39,6 @@ loader.lazyGetter(this, "clipboardHelper", () => {
   return Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper);
 });
 
-loader.lazyRequireGetter(this, "CommandUtils", "devtools/client/shared/developer-toolbar", true);
 
 /**
  * Represents an open instance of the Inspector for a tab.
@@ -316,6 +319,20 @@ InspectorPanel.prototype = {
     this.search = new InspectorSearch(this, this.searchBox);
     this.search.on("search-cleared", this._updateSearchResultsLabel);
     this.search.on("search-result", this._updateSearchResultsLabel);
+
+    let shortcuts = new KeyShortcuts({
+      window: this.panelDoc.defaultView,
+    });
+    let key = strings.GetStringFromName("inspector.searchHTML.key");
+    shortcuts.on(key, (name, event) => {
+      // Prevent overriding same shortcut from the computed/rule views
+      if (event.target.closest("#sidebar-panel-ruleview") ||
+          event.target.closest("#sidebar-panel-computedview")) {
+        return;
+      }
+      event.preventDefault();
+      this.searchBox.focus();
+    });
   },
 
   get searchSuggestions() {
@@ -448,6 +465,25 @@ InspectorPanel.prototype = {
   },
 
   /**
+   * Can a new HTML element be inserted into the currently selected element?
+   * @return {Boolean}
+   */
+  canAddHTMLChild: function() {
+    let selection = this.selection;
+
+    // Don't allow to insert an element into these elements. This should only
+    // contain elements where walker.insertAdjacentHTML has no effect.
+    let invalidTagNames = ["html", "iframe"];
+
+    return selection.isHTMLNode() &&
+           selection.isElementNode() &&
+           !selection.isPseudoElementNode() &&
+           !selection.isAnonymousNode() &&
+           invalidTagNames.indexOf(
+            selection.nodeFront.nodeName.toLowerCase()) === -1;
+  },
+
+  /**
    * When a new node is selected.
    */
   onNewSelection: function(event, value, reason) {
@@ -458,6 +494,15 @@ InspectorPanel.prototype = {
     // Wait for all the known tools to finish updating and then let the
     // client know.
     let selection = this.selection.nodeFront;
+
+    // Update the state of the add button in the toolbar depending on the
+    // current selection.
+    let btn = this.panelDoc.querySelector("#inspector-element-add-button");
+    if (this.canAddHTMLChild()) {
+      btn.removeAttribute("disabled");
+    } else {
+      btn.setAttribute("disabled", "true");
+    }
 
     // On any new selection made by the user, store the unique css selector
     // of the selected node so it can be restored after reload of the same page
@@ -478,13 +523,13 @@ InspectorPanel.prototype = {
     }
 
     let selfUpdate = this.updating("inspector-panel");
-    Services.tm.mainThread.dispatch(() => {
+    executeSoon(() => {
       try {
         selfUpdate(selection);
-      } catch(ex) {
+      } catch (ex) {
         console.error(ex);
       }
-    }, Ci.nsIThread.DISPATCH_NORMAL);
+    });
   },
 
   /**
@@ -703,6 +748,14 @@ InspectorPanel.prototype = {
       deleteNode.removeAttribute("disabled");
     } else {
       deleteNode.setAttribute("disabled", "true");
+    }
+
+    // Disable add item if needed
+    let addNode = this.panelDoc.getElementById("node-menu-add");
+    if (this.canAddHTMLChild()) {
+      addNode.removeAttribute("disabled");
+    } else {
+      addNode.setAttribute("disabled", "true");
     }
 
     // Disable / enable "Copy Unique Selector", "Copy inner HTML",
@@ -1011,6 +1064,27 @@ InspectorPanel.prototype = {
       button.setAttribute("tooltiptext", strings.GetStringFromName("inspector.collapsePane"));
     }
   },
+
+  /**
+   * Create a new node as the last child of the current selection, expand the
+   * parent and select the new node.
+   */
+  addNode: Task.async(function*() {
+    let root = this.selection.nodeFront;
+    if (!this.canAddHTMLChild(root)) {
+      return;
+    }
+
+    let html = "<div></div>";
+
+    // Insert the html and expect a childList markup mutation.
+    let onMutations = this.once("markupmutation");
+    let {nodes} = yield this.walker.insertAdjacentHTML(root, "beforeEnd", html);
+    yield onMutations;
+
+    // Select the new node (this will auto-expand its parent).
+    this.selection.setNodeFront(nodes[0], "node-inserted");
+  }),
 
   /**
    * Toggle a pseudo class.

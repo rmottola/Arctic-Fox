@@ -26,7 +26,7 @@ class PrincipalInfo;
 namespace dom {
 
 namespace workers {
-class WorkerFeature;
+class WorkerHolder;
 } // namespace workers
 
 class BroadcastChannelChild;
@@ -105,17 +105,12 @@ private:
     return mIsKeptAlive;
   }
 
-  bool IsClosed() const
-  {
-    return mState != StateActive;
-  }
-
   void RemoveDocFromBFCache();
 
   RefPtr<BroadcastChannelChild> mActor;
   nsTArray<RefPtr<BroadcastChannelMessage>> mPendingMessages;
 
-  nsAutoPtr<workers::WorkerFeature> mWorkerFeature;
+  nsAutoPtr<workers::WorkerHolder> mWorkerHolder;
 
   nsAutoPtr<PrincipalInfo> mPrincipalInfo;
 

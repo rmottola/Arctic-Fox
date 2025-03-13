@@ -15,11 +15,14 @@ EXPORTS.mozilla.dom += [
 ]
 
 UNIFIED_SOURCES += [
+    'CallbackRunnables.cpp',
     'DirectoryEntry.cpp',
     'DirectoryReader.cpp',
     'DOMFileSystem.cpp',
     'Entry.cpp',
     'FileEntry.cpp',
+    'RootDirectoryEntry.cpp',
+    'RootDirectoryReader.cpp',
 ]
 
 FINAL_LIBRARY = 'xul'

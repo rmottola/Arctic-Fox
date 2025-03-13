@@ -67,6 +67,30 @@ CanvasClientBridge::UpdateAsync(AsyncCanvasRenderer* aRenderer)
 }
 
 void
+CanvasClient2D::UpdateFromTexture(TextureClient* aTexture)
+{
+  MOZ_ASSERT(aTexture);
+
+  if (!aTexture->IsSharedWithCompositor()) {
+    if (!AddTextureClient(aTexture)) {
+      return;
+    }
+  }
+
+  mBackBuffer = aTexture;
+
+  AutoTArray<CompositableForwarder::TimedTextureClient,1> textures;
+  CompositableForwarder::TimedTextureClient* t = textures.AppendElement();
+  t->mTextureClient = mBackBuffer;
+  t->mPictureRect = nsIntRect(nsIntPoint(0, 0), aTexture->GetSize());
+  t->mFrameID = mFrameID;
+  t->mInputFrameID = VRManagerChild::Get()->GetInputFrameID();
+
+  GetForwarder()->UseTextures(this, textures);
+  aTexture->SyncWithObject(GetForwarder()->GetSyncObject());
+}
+
+void
 CanvasClient2D::Update(gfx::IntSize aSize, ClientCanvasLayer* aLayer)
 {
   AutoRemoveTexture autoRemove(this);
@@ -387,9 +411,15 @@ CanvasClientSharedSurface::UpdateRenderer(gfx::IntSize aSize, Renderer& aRendere
       gfxCriticalError() << "Invalid canvas front buffer";
       return;
     }
+  } else if (layer && layer->mIsMirror) {
+    mShSurfClient = CloneSurface(gl->Screen()->Front()->Surf(), layer->mFactory.get());
+    if (!mShSurfClient) {
+      return;
+    }
   } else {
     mShSurfClient = gl->Screen()->Front();
-    if (mShSurfClient && mShSurfClient->GetAllocator() != GetForwarder()) {
+    if (mShSurfClient && mShSurfClient->GetAllocator() &&
+        mShSurfClient->GetAllocator()->AsCompositableForwarder() != GetForwarder()) {
       mShSurfClient = CloneSurface(mShSurfClient->Surf(), gl->Screen()->Factory());
     }
     if (!mShSurfClient) {
@@ -484,15 +514,15 @@ CanvasClientSharedSurface::Updated()
 
 void
 CanvasClientSharedSurface::OnDetach() {
-  if (mShSurfClient) {
-    mShSurfClient->CancelWaitForRecycle();
-  }
   ClearSurfaces();
 }
 
 void
 CanvasClientSharedSurface::ClearSurfaces()
 {
+  if (mFront) {
+    mFront->CancelWaitForRecycle();
+  }
   mFront = nullptr;
   mNewFront = nullptr;
   mShSurfClient = nullptr;

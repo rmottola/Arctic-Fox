@@ -6,6 +6,7 @@
 
 #include "ContentEventHandler.h"
 #include "mozilla/IMEStateManager.h"
+#include "mozilla/TextComposition.h"
 #include "mozilla/TextEvents.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/HTMLUnknownElement.h"
@@ -159,7 +160,7 @@ ContentEventHandler::InitRootContent(Selection* aNormalSelection)
 
   // If there is a selection, we should retrieve the selection root from
   // the range since when the window is inactivated, the ancestor limiter
-  // of selection was cleared by blur event handler of nsEditor but the
+  // of selection was cleared by blur event handler of EditorBase but the
   // selection range still keeps storing the nodes.  If the active element of
   // the deactive window is <input> or <textarea>, we can compute the
   // selection root from them.
@@ -274,6 +275,11 @@ ContentEventHandler::Init(WidgetQueryContentEvent* aEvent)
   MOZ_ASSERT(aEvent->mMessage == eQuerySelectedText ||
              aEvent->mInput.mSelectionType == SelectionType::eNormal);
 
+  if (NS_WARN_IF(!aEvent->mInput.IsValidOffset()) ||
+      NS_WARN_IF(!aEvent->mInput.IsValidEventMessage(aEvent->mMessage))) {
+    return NS_ERROR_FAILURE;
+  }
+
   // Note that we should ignore WidgetQueryContentEvent::Input::mSelectionType
   // if the event isn't eQuerySelectedText.
   SelectionType selectionType =
@@ -285,6 +291,33 @@ ContentEventHandler::Init(WidgetQueryContentEvent* aEvent)
 
   nsresult rv = InitCommon(selectionType);
   NS_ENSURE_SUCCESS(rv, rv);
+
+  // Be aware, WidgetQueryContentEvent::mInput::mOffset should be made absolute
+  // offset before sending it to ContentEventHandler because querying selection
+  // every time may be expensive.  So, if the caller caches selection, it
+  // should initialize the event with the cached value.
+  if (aEvent->mInput.mRelativeToInsertionPoint) {
+    MOZ_ASSERT(selectionType == SelectionType::eNormal);
+    RefPtr<TextComposition> composition =
+      IMEStateManager::GetTextCompositionFor(aEvent->mWidget);
+    if (composition) {
+      uint32_t compositionStart = composition->NativeOffsetOfStartComposition();
+      if (NS_WARN_IF(!aEvent->mInput.MakeOffsetAbsolute(compositionStart))) {
+        return NS_ERROR_FAILURE;
+      }
+    } else {
+      LineBreakType lineBreakType = GetLineBreakType(aEvent);
+      uint32_t selectionStart = 0;
+      rv = GetFlatTextLengthBefore(mFirstSelectedRange,
+                                   &selectionStart, lineBreakType);
+      if (NS_WARN_IF(NS_FAILED(rv))) {
+        return NS_ERROR_FAILURE;
+      }
+      if (NS_WARN_IF(!aEvent->mInput.MakeOffsetAbsolute(selectionStart))) {
+        return NS_ERROR_FAILURE;
+      }
+    }
+  }
 
   aEvent->mSucceeded = false;
 
@@ -1166,6 +1199,8 @@ ContentEventHandler::HandleQueryContentEvent(WidgetQueryContentEvent* aEvent)
       return OnQueryCaretRect(aEvent);
     case eQueryTextRect:
       return OnQueryTextRect(aEvent);
+    case eQueryTextRectArray:
+      return OnQueryTextRectArray(aEvent);
     case eQueryEditorRect:
       return OnQueryEditorRect(aEvent);
     case eQueryContentState:
@@ -1358,6 +1393,85 @@ static nsINode* AdjustTextRectNode(nsINode* aNode,
     }
   }
   return node;
+}
+
+static
+nsIFrame*
+GetFirstFrameInRange(nsRange* aRange)
+{
+  // used to iterate over all contents and their frames
+  nsCOMPtr<nsIContentIterator> iter = NS_NewContentIterator();
+  iter->Init(aRange);
+
+  // get the starting frame
+  int32_t nodeOffset = aRange->StartOffset();
+  nsINode* node = iter->GetCurrentNode();
+  if (!node) {
+    node = AdjustTextRectNode(aRange->GetStartParent(), nodeOffset);
+  }
+  nsIFrame* firstFrame = nullptr;
+  GetFrameForTextRect(node, nodeOffset, true, &firstFrame);
+  return firstFrame;
+}
+
+nsresult
+ContentEventHandler::OnQueryTextRectArray(WidgetQueryContentEvent* aEvent)
+{
+  nsresult rv = Init(aEvent);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return rv;
+  }
+
+  LineBreakType lineBreakType = GetLineBreakType(aEvent);
+  RefPtr<nsRange> range = new nsRange(mRootContent);
+  uint32_t offset = aEvent->mInput.mOffset;
+
+  LayoutDeviceIntRect rect;
+  WritingMode writingMode;
+  while (aEvent->mInput.mLength > aEvent->mReply.mRectArray.Length()) {
+    rv = SetRangeFromFlatTextOffset(range, offset, 1, lineBreakType, true,
+                                    nullptr);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    // get the starting frame
+    nsIFrame* firstFrame = GetFirstFrameInRange(range);
+    if (NS_WARN_IF(!firstFrame)) {
+      return NS_ERROR_FAILURE;
+    }
+
+    // get the starting frame rect
+    nsRect frameRect(nsPoint(0, 0), firstFrame->GetRect().Size());
+    rv = ConvertToRootRelativeOffset(firstFrame, frameRect);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    int32_t nodeOffset = range->StartOffset();
+    AutoTArray<nsRect, 16> charRects;
+    rv = firstFrame->GetCharacterRectsInRange(
+           nodeOffset,
+           aEvent->mInput.mLength - aEvent->mReply.mRectArray.Length(),
+           charRects);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
+    }
+
+    for (size_t i = 0; i < charRects.Length(); i++) {
+      nsRect charRect = charRects[i];
+      charRect.x += frameRect.x;
+      charRect.y += frameRect.y;
+
+      rect = LayoutDeviceIntRect::FromUnknownRect(
+               charRect.ToOutsidePixels(mPresContext->AppUnitsPerDevPixel()));
+
+      aEvent->mReply.mRectArray.AppendElement(rect);
+    }
+    offset += charRects.Length();
+  }
+  aEvent->mSucceeded = true;
+  return NS_OK;
 }
 
 nsresult
@@ -1702,7 +1816,8 @@ ContentEventHandler::OnQueryCharacterAtPoint(WidgetQueryContentEvent* aEvent)
   }
 
   WidgetQueryContentEvent textRect(true, eQueryTextRect, aEvent->mWidget);
-  textRect.InitForQueryTextRect(offset, 1, aEvent->mUseNativeLineBreak);
+  WidgetQueryContentEvent::Options options(*aEvent);
+  textRect.InitForQueryTextRect(offset, 1, options);
   rv = OnQueryTextRect(&textRect);
   NS_ENSURE_SUCCESS(rv, rv);
   NS_ENSURE_TRUE(textRect.mSucceeded, NS_ERROR_FAILURE);
@@ -1939,7 +2054,7 @@ ContentEventHandler::AdjustCollapsedRangeMaybeIntoTextNode(nsRange* aRange)
 
   // If the parent is not a text node but it has a text node at the offset,
   // we should adjust the range into the text node.
-  // NOTE: This is emulating similar situation of nsEditor.
+  // NOTE: This is emulating similar situation of EditorBase.
   nsINode* childNode = nullptr;
   int32_t offsetInChildNode = -1;
   if (!offsetInParentNode && parentNode->HasChildren()) {

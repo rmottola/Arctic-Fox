@@ -254,6 +254,7 @@ public:
 
     void               ThemeChanged(void);
     void               OnDPIChanged(void);
+    void               OnCheckResize(void);
 
 #ifdef MOZ_X11
     Window             mOldFocusWindow;
@@ -407,6 +408,8 @@ protected:
 #endif
     // true if this is a drag and drop feedback popup
     bool               mIsDragPopup;
+    // Can we access X?
+    bool               mIsX11Display;
 
 private:
     void               DestroyChildWindows();
@@ -470,6 +473,10 @@ private:
 
     // A fallback image surface when a SHM surface is unavailable.
     cairo_surface_t* mFallbackSurface;
+
+    // Upper bound on pending ConfigureNotify events to be dispatched to the
+    // window. See bug 1225044.
+    int mPendingConfigures;
 
 #ifdef ACCESSIBILITY
     RefPtr<mozilla::a11y::Accessible> mRootAccessible;
@@ -549,8 +556,7 @@ private:
     // nsBaseWidget
     virtual LayerManager* GetLayerManager(PLayerTransactionChild* aShadowManager = nullptr,
                                           LayersBackend aBackendHint = mozilla::layers::LayersBackend::LAYERS_NONE,
-                                          LayerManagerPersistence aPersistence = LAYER_MANAGER_CURRENT,
-                                          bool* aAllowRetaining = nullptr) override;
+                                          LayerManagerPersistence aPersistence = LAYER_MANAGER_CURRENT) override;
 
     void CleanLayerManagerRecursive();
 

@@ -795,7 +795,7 @@ ShadowLayerForwarder::AllocUnsafeShmem(size_t aSize,
   }
 
   ShmemAllocated(mShadowManager);
-  return mShadowManager->AllocUnsafeShmem(aSize, aShmType, aShmem);
+  return GetCompositorBridgeChild()->AllocUnsafeShmem(aSize, aShmType, aShmem);
 }
 
 bool
@@ -809,7 +809,7 @@ ShadowLayerForwarder::AllocShmem(size_t aSize,
   }
 
   ShmemAllocated(mShadowManager);
-  return mShadowManager->AllocShmem(aSize, aShmType, aShmem);
+  return GetCompositorBridgeChild()->AllocShmem(aSize, aShmType, aShmem);
 }
 
 void
@@ -817,7 +817,7 @@ ShadowLayerForwarder::DeallocShmem(ipc::Shmem& aShmem)
 {
   MOZ_ASSERT(HasShadowManager(), "no shadow manager");
   if (HasShadowManager() && mShadowManager->IPCOpen()) {
-    mShadowManager->DeallocShmem(aShmem);
+    GetCompositorBridgeChild()->DeallocShmem(aShmem);
   }
 }
 
@@ -1096,19 +1096,27 @@ ShadowLayerForwarder::DestroySurfaceDescriptor(SurfaceDescriptor* aSurface)
 void
 ShadowLayerForwarder::UpdateFwdTransactionId()
 {
-  GetCompositorBridgeChild()->UpdateFwdTransactionId();
+  auto compositorBridge = GetCompositorBridgeChild();
+  if (compositorBridge) {
+    compositorBridge->UpdateFwdTransactionId();
+  }
 }
 
 uint64_t
 ShadowLayerForwarder::GetFwdTransactionId()
 {
-  return GetCompositorBridgeChild()->GetFwdTransactionId();
+  auto compositorBridge = GetCompositorBridgeChild();
+  MOZ_DIAGNOSTIC_ASSERT(compositorBridge);
+  return compositorBridge ? compositorBridge->GetFwdTransactionId() : 0;
 }
 
 void
 ShadowLayerForwarder::CancelWaitForRecycle(uint64_t aTextureId)
 {
-  GetCompositorBridgeChild()->CancelWaitForRecycle(aTextureId);
+  auto compositorBridge = GetCompositorBridgeChild();
+  if (compositorBridge) {
+    compositorBridge->CancelWaitForRecycle(aTextureId);
+  }
 }
 
 CompositorBridgeChild*
@@ -1117,8 +1125,17 @@ ShadowLayerForwarder::GetCompositorBridgeChild()
   if (mCompositorBridgeChild) {
     return mCompositorBridgeChild;
   }
-  mCompositorBridgeChild = mClientLayerManager->GetCompositorBridgeChild();
+  if (!mShadowManager) {
+    return nullptr;
+  }
+  mCompositorBridgeChild = static_cast<CompositorBridgeChild*>(mShadowManager->Manager());
   return mCompositorBridgeChild;
+}
+
+TextureForwarder*
+ShadowLayerForwarder::AsTextureForwarder()
+{
+  return GetCompositorBridgeChild();
 }
 
 } // namespace layers

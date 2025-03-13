@@ -181,8 +181,20 @@ enum {
 
   NODE_IS_ROOT_OF_CHROME_ONLY_ACCESS =    NODE_FLAG_BIT(20),
 
+  // These two bits are shared by Gecko's and Servo's restyle systems for
+  // different purposes. They should not be accessed directly, and access to
+  // them should be properly guarded by asserts.
+  NODE_SHARED_RESTYLE_BIT_1 =             NODE_FLAG_BIT(21),
+  NODE_SHARED_RESTYLE_BIT_2 =             NODE_FLAG_BIT(22),
+
+  // Whether this node is dirty for Servo's style system.
+  NODE_IS_DIRTY_FOR_SERVO =               NODE_SHARED_RESTYLE_BIT_1,
+
+  // Whether this node has dirty descendants for Servo's style system.
+  NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO =  NODE_SHARED_RESTYLE_BIT_2,
+
   // Remaining bits are node type specific.
-  NODE_TYPE_SPECIFIC_BITS_OFFSET =        21
+  NODE_TYPE_SPECIFIC_BITS_OFFSET =        23
 };
 
 // Make sure we have space for our bits
@@ -481,10 +493,18 @@ public:
   virtual int32_t IndexOf(const nsINode* aPossibleChild) const = 0;
 
   /**
-   * Return the "owner document" of this node.  Note that this is not the same
-   * as the DOM ownerDocument -- that's null for Document nodes, whereas for a
-   * nsIDocument GetOwnerDocument returns the document itself.  For nsIContent
-   * implementations the two are the same.
+   * Returns the "node document" of this node.
+   *
+   * https://dom.spec.whatwg.org/#concept-node-document
+   *
+   * Note that in the case that this node is a document node this method
+   * will return |this|.  That is different to the Node.ownerDocument DOM
+   * attribute (implemented by nsINode::GetOwnerDocument) which is specified to
+   * be null in that case:
+   *
+   * https://dom.spec.whatwg.org/#dom-node-ownerdocument
+   *
+   * For all other cases OwnerDoc and GetOwnerDocument behave identically.
    */
   nsIDocument *OwnerDoc() const
   {
@@ -699,7 +719,7 @@ public:
   {
     return InsertChildAt(aKid, GetChildCount(), aNotify);
   }
-  
+
   /**
    * Remove a child from this node.  This method handles calling UnbindFromTree
    * on the child appropriately.
@@ -862,7 +882,7 @@ public:
   virtual void* UnsetProperty(uint16_t aCategory,
                               nsIAtom *aPropertyName,
                               nsresult *aStatus = nullptr);
-  
+
   bool HasProperties() const
   {
     return HasFlag(NODE_HAS_PROPERTIES);
@@ -894,7 +914,7 @@ public:
   {
     return mParent;
   }
-  
+
   /**
    * Get the parent nsINode for this node if it is an Element.
    * @return the parent node
@@ -941,10 +961,49 @@ public:
                                 mozilla::ErrorResult& aRv) override;
   using nsIDOMEventTarget::AddSystemEventListener;
 
-  virtual bool HasApzAwareListeners() const override;
+  virtual bool IsApzAware() const override;
 
   virtual nsPIDOMWindowOuter* GetOwnerGlobalForBindings() override;
   virtual nsIGlobalObject* GetOwnerGlobal() const override;
+
+  /**
+   * Returns true if this is a node belonging to a document that uses the Servo
+   * style system.
+   */
+#ifdef MOZ_STYLO
+  bool IsStyledByServo() const;
+#else
+  bool IsStyledByServo() const { return false; }
+#endif
+
+  inline bool IsDirtyForServo() const
+  {
+    MOZ_ASSERT(IsStyledByServo());
+    return HasFlag(NODE_IS_DIRTY_FOR_SERVO);
+  }
+
+  inline bool HasDirtyDescendantsForServo() const
+  {
+    MOZ_ASSERT(IsStyledByServo());
+    return HasFlag(NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO);
+  }
+
+  inline void SetIsDirtyForServo() {
+    MOZ_ASSERT(IsStyledByServo());
+    SetFlags(NODE_IS_DIRTY_FOR_SERVO);
+  }
+
+  inline void SetHasDirtyDescendantsForServo() {
+    MOZ_ASSERT(IsStyledByServo());
+    SetFlags(NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO);
+  }
+
+  inline void SetIsDirtyAndHasDirtyDescendantsForServo() {
+    MOZ_ASSERT(IsStyledByServo());
+    SetFlags(NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO | NODE_IS_DIRTY_FOR_SERVO);
+  }
+
+  inline void UnsetRestyleFlagsIfGecko();
 
   /**
    * Adds a mutation observer to be notified when this node, or any of its
@@ -1222,6 +1281,30 @@ public:
   /**
    * The explicit base URI, if set, otherwise null
    */
+
+  /**
+   * Return true if the node may be apz aware. There are two cases. One is that
+   * the node is apz aware (such as HTMLInputElement with number type). The
+   * other is that the node has apz aware listeners. This is a non-virtual
+   * function which calls IsNodeApzAwareInternal only when the MayBeApzAware is
+   * set. We check the details in IsNodeApzAwareInternal which may be overriden
+   * by child classes
+   */
+  bool IsNodeApzAware() const
+  {
+    return NodeMayBeApzAware() ? IsNodeApzAwareInternal() : false;
+  }
+
+  /**
+   * Override this function and set the flag MayBeApzAware in case the node has
+   * to let APZC be aware of it. It's used when the node may handle the apz
+   * aware events and may do preventDefault to stop APZC to do default actions.
+   *
+   * For example, instead of scrolling page by APZ, we handle mouse wheel event
+   * in HTMLInputElement with number type as increasing / decreasing its value.
+   */
+  virtual bool IsNodeApzAwareInternal() const;
+
 protected:
   nsIURI* GetExplicitBaseURI() const {
     if (HasExplicitBaseURI()) {
@@ -1229,7 +1312,7 @@ protected:
     }
     return nullptr;
   }
-  
+
 public:
   void GetTextContent(nsAString& aTextContent,
                       mozilla::ErrorResult& aError)
@@ -1284,7 +1367,7 @@ public:
   nsresult GetUserData(const nsAString& aKey, nsIVariant** aResult)
   {
     NS_IF_ADDREF(*aResult = GetUserData(aKey));
-  
+
     return NS_OK;
   }
 
@@ -1445,7 +1528,7 @@ private:
     NodeIsCCMarkedRoot,
     // Maybe set if this node is in black subtree.
     NodeIsCCBlackTree,
-    // Maybe set if the node is a root of a subtree 
+    // Maybe set if the node is a root of a subtree
     // which needs to be kept in the purple buffer.
     NodeIsPurpleRoot,
     // Set if the node has an explicit base URI stored
@@ -1489,8 +1572,8 @@ private:
     ElementHasWeirdParserInsertionMode,
     // Parser sets this flag if it has notified about the node.
     ParserHasNotified,
-    // EventListenerManager sets this flag in case we have apz aware listeners.
-    MayHaveApzAwareListeners,
+    // Sets if the node is apz aware or we have apz aware listeners.
+    MayBeApzAware,
     // Guard value
     BooleanFlagCount
   };
@@ -1637,14 +1720,24 @@ public:
   void SetParserHasNotified() { SetBoolFlag(ParserHasNotified); };
   bool HasParserNotified() { return GetBoolFlag(ParserHasNotified); }
 
-  void SetMayHaveApzAwareListeners() { SetBoolFlag(MayHaveApzAwareListeners); }
-  bool NodeMayHaveApzAwareListeners() const
+  void SetMayBeApzAware() { SetBoolFlag(MayBeApzAware); }
+  bool NodeMayBeApzAware() const
   {
-    return GetBoolFlag(MayHaveApzAwareListeners);
+    return GetBoolFlag(MayBeApzAware);
   }
 protected:
   void SetParentIsContent(bool aValue) { SetBoolFlag(ParentIsContent, aValue); }
-  void SetInDocument() { SetBoolFlag(IsInDocument); }
+  /**
+   * This is a special case of SetIsInDocument used to special-case it for the
+   * document constructor (which can't do the IsStyledByServo() check).
+   */
+  void SetIsDocument() { SetBoolFlag(IsInDocument); }
+  void SetIsInDocument() {
+    if (IsStyledByServo()) {
+      SetIsDirtyAndHasDirtyDescendantsForServo();
+    }
+    SetBoolFlag(IsInDocument);
+  }
   void SetNodeIsContent() { SetBoolFlag(NodeIsContent); }
   void ClearInDocument() { ClearBoolFlag(IsInDocument); }
   void SetIsElement() { SetBoolFlag(NodeIsElement); }
@@ -1976,8 +2069,8 @@ public:
 
   void SetServoNodeData(ServoNodeData* aData) {
 #ifdef MOZ_STYLO
-  MOZ_ASSERT(!mServoNodeData);
-  mServoNodeData = aData;
+    MOZ_ASSERT(!mServoNodeData);
+    mServoNodeData = aData;
 #else
     MOZ_CRASH("Setting servo node data in non-stylo build");
 #endif

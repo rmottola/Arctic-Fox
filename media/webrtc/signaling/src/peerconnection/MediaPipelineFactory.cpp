@@ -534,8 +534,6 @@ MediaPipelineFactory::CreateMediaPipelineReceiving(
   TrackID numericTrackId = stream->GetNumericTrackId(aTrack.GetTrackId());
   MOZ_ASSERT(IsTrackIDExplicit(numericTrackId));
 
-  bool queue_track = stream->ShouldQueueTracks();
-
   MOZ_MTLOG(ML_DEBUG, __FUNCTION__ << ": Creating pipeline for "
             << numericTrackId << " -> " << aTrack.GetTrackId());
 
@@ -551,8 +549,7 @@ MediaPipelineFactory::CreateMediaPipelineReceiving(
         static_cast<AudioSessionConduit*>(aConduit.get()), // Ugly downcast.
         aRtpFlow,
         aRtcpFlow,
-        aFilter,
-        queue_track);
+        aFilter);
   } else if (aTrack.GetMediaType() == SdpMediaSection::kVideo) {
     pipeline = new MediaPipelineReceiveVideo(
         mPC->GetHandle(),
@@ -565,8 +562,7 @@ MediaPipelineFactory::CreateMediaPipelineReceiving(
         static_cast<VideoSessionConduit*>(aConduit.get()), // Ugly downcast.
         aRtpFlow,
         aRtcpFlow,
-        aFilter,
-        queue_track);
+        aFilter);
   } else {
     MOZ_ASSERT(false);
     MOZ_MTLOG(ML_ERROR, "Invalid media type in CreateMediaPipelineReceiving");
@@ -875,24 +871,18 @@ MediaPipelineFactory::ConfigureVideoCodecMode(const JsepTrack& aTrack,
 {
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
   RefPtr<LocalSourceStreamInfo> stream =
-    mPCMedia->GetLocalStreamById(aTrack.GetStreamId());
+    mPCMedia->GetLocalStreamByTrackId(aTrack.GetTrackId());
 
   //get video track
+  RefPtr<mozilla::dom::MediaStreamTrack> track =
+    stream->GetTrackById(aTrack.GetTrackId());
+
   RefPtr<mozilla::dom::VideoStreamTrack> videotrack =
-    stream->GetVideoTrackByTrackId(aTrack.GetTrackId());
+    track->AsVideoStreamTrack();
 
   if (!videotrack) {
     MOZ_MTLOG(ML_ERROR, "video track not available");
     return NS_ERROR_FAILURE;
-  }
-
-  //get video source type
-  RefPtr<DOMMediaStream> mediastream =
-    mPCMedia->GetLocalStreamById(aTrack.GetStreamId())->GetMediaStream();
-
-  DOMLocalMediaStream* domLocalStream = mediastream->AsDOMLocalMediaStream();
-  if (!domLocalStream) {
-    return NS_OK;
   }
 
   dom::MediaSourceEnum source = videotrack->GetSource().GetMediaSource();

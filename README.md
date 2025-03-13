@@ -42,7 +42,7 @@ With enough swap, 1.2GB of RAM are the absolute minimum tested, 1.5GB is accepta
 
 ## Resources
 
- * [Mozilla Source Code Directory Structure and links to project pages](https://developer.mozilla.org/en/Mozilla_Source_Code_Directory_Structure)
+ * [Mozilla Source Code Directory Structure and links to project pages](https://www.devdoc.net/web/developer.mozilla.org/en-US/docs/Mozilla_Source_Code_Directory_Structure.html)
  * [Build Arctic Fox](https://github.com/rmottola/Arctic-Fox/wiki/Build-Instructions)
  
  ## Downloads and Add-ons

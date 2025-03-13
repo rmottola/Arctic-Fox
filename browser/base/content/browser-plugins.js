@@ -4,7 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 var gPluginHandler = {
-  PREF_HIDE_MISSING_PLUGINS_NOTIFICATION: "plugins.hideMissingPluginsNotification",
   PREF_SESSION_PERSIST_MINUTES: "plugin.sessionPermissionNow.intervalInMinutes",
   PREF_PERSISTENT_DAYS: "plugin.persistentPermissionAlways.intervalInDays",
   MESSAGES: [
@@ -73,7 +72,7 @@ var gPluginHandler = {
           case "managePlugins":
           case "openHelpPage":
           case "openPluginUpdatePage":
-            this[msg.data.name].apply(this);
+            this[msg.data.name].call(this, msg.data.pluginTag);
             break;
         }
         break;
@@ -83,111 +82,19 @@ var gPluginHandler = {
     }
   },
 
-  supportedPlugins: {
-    "mimetypes": {
-      "application/x-shockwave-flash": "flash",
-      "application/futuresplash": "flash",
-      "application/x-java-.*": "java",
-      "application/x-director": "shockwave",
-      "application/(sdp|x-(mpeg|rtsp|sdp))": "quicktime",
-      "audio/(3gpp(2)?|AMR|aiff|basic|mid(i)?|mp4|mpeg|vnd\.qcelp|wav|x-(aiff|m4(a|b|p)|midi|mpeg|wav))": "quicktime",
-      "image/(pict|png|tiff|x-(macpaint|pict|png|quicktime|sgi|targa|tiff))": "quicktime",
-      "video/(3gpp(2)?|flc|mp4|mpeg|quicktime|sd-video|x-mpeg)": "quicktime",
-      "application/x-unknown": "test",
-    },
-
-    "plugins": {
-      "flash": {
-        "displayName": "Flash",
-        "installWINNT": true,
-        "installDarwin": true,
-        "installLinux": true,
-      },
-      "java": {
-        "displayName": "Java",
-        "installWINNT": true,
-        "installDarwin": true,
-        "installLinux": true,
-      },
-      "shockwave": {
-        "displayName": "Shockwave",
-        "installWINNT": true,
-        "installDarwin": true,
-      },
-      "quicktime": {
-        "displayName": "QuickTime",
-        "installWINNT": true,
-      },
-      "test": {
-        "displayName": "Test plugin",
-        "installWINNT": true,
-        "installLinux": true,
-        "installDarwin": true,
-      }
-    }
+  // Callback for user clicking on a disabled plugin
+  managePlugins: function () {
+    BrowserOpenAddonsMgr("addons://list/plugin");
   },
 
-
-  nameForSupportedPlugin: function (aMimeType) {
-    for (let type in this.supportedPlugins.mimetypes) {
-      let re = new RegExp(type);
-      if (re.test(aMimeType)) {
-        return this.supportedPlugins.mimetypes[type];
-      }
+  // Callback for user clicking on the link in a click-to-play plugin
+  // (where the plugin has an update)
+  openPluginUpdatePage: function(pluginTag) {
+    let url = Services.blocklist.getPluginInfoURL(pluginTag);
+    if (!url) {
+      url = Services.blocklist.getPluginBlocklistURL(pluginTag);
     }
-    return null;
-  },
-
-  canInstallThisMimeType: function (aMimeType) {
-    let os = Services.appinfo.OS;
-    let pluginName = this.nameForSupportedPlugin(aMimeType);
-    if (pluginName && "install" + os in this.supportedPlugins.plugins[pluginName]) {
-      return true;
-    }
-    return false;
-  },
-
-  receiveMessage: function (msg) {
-    switch (msg.name) {
-      case "PluginContent:ShowClickToPlayNotification":
-        this.showClickToPlayNotification(msg.target, msg.data.plugins, msg.data.showNow,
-                                         msg.principal, msg.data.host);
-        break;
-      case "PluginContent:RemoveNotification":
-        this.removeNotification(msg.target, msg.data.name);
-        break;
-      case "PluginContent:UpdateHiddenPluginUI":
-        this.updateHiddenPluginUI(msg.target, msg.data.haveInsecure, msg.data.actions,
-                                  msg.principal, msg.data.host);
-        break;
-      case "PluginContent:HideNotificationBar":
-        this.hideNotificationBar(msg.target, msg.data.name);
-        break;
-      case "PluginContent:ShowInstallNotification":
-        return this.showInstallNotification(msg.target, msg.data.pluginInfo);
-      case "PluginContent:InstallSinglePlugin":
-        this.installSinglePlugin(msg.data.pluginInfo);
-        break;
-      case "PluginContent:ShowPluginCrashedNotification":
-        this.showPluginCrashedNotification(msg.target, msg.data.messageString,
-                                           msg.data.pluginDumpID, msg.data.browserDumpID);
-        break;
-      case "PluginContent:SubmitReport":
-        this.submitReport(msg.data.pluginDumpID, msg.data.browserDumpID, msg.data.keyVals);
-        break;
-      case "PluginContent:LinkClickCallback":
-        switch (msg.data.name) {
-          case "managePlugins":
-          case "openHelpPage":
-          case "openPluginUpdatePage":
-            this[msg.data.name].apply(this);
-            break;
-        }
-        break;
-      default:
-        Cu.reportError("gPluginHandler did not expect to handle message " + msg.name);
-        break;
-    }
+    openUILinkIn(url, "tab");
   },
 
   submitReport: function submitReport(runID, keyVals, submitURLOptIn) {
@@ -198,17 +105,6 @@ var gPluginHandler = {
     PluginCrashReporter.submitCrashReport(runID, keyVals);
   },
 
-  // Callback for user clicking on a disabled plugin
-  managePlugins: function () {
-    BrowserOpenAddonsMgr("addons://list/plugin");
-  },
-
-  // Callback for user clicking on the link in a click-to-play plugin
-  // (where the plugin has an update)
-  openPluginUpdatePage: function () {
-    openUILinkIn(Services.urlFormatter.formatURLPref("plugins.update.url"), "tab");
-  },
-
   // Callback for user clicking a "reload page" link
   reloadPage: function (browser) {
     browser.reload();
@@ -217,54 +113,6 @@ var gPluginHandler = {
   // Callback for user clicking the help icon
   openHelpPage: function () {
     openHelpLink("plugin-crashed", false);
-  },
-
-  showInstallNotification: function (browser, pluginInfo) {
-    let hideMissingPluginsNotification =
-      Services.prefs.getBoolPref(this.PREF_HIDE_MISSING_PLUGINS_NOTIFICATION);
-    if (hideMissingPluginsNotification) {
-      return false;
-    }
-
-    if (!browser.missingPlugins)
-      browser.missingPlugins = new Map();
-
-    browser.missingPlugins.set(pluginInfo.mimetype, pluginInfo);
-
-    // only show notification for small subset of plugins
-    let mimetype = pluginInfo.mimetype.split(";")[0];
-    if (!this.canInstallThisMimeType(mimetype))
-      return false;
-
-    let pluginIdentifier = this.nameForSupportedPlugin(mimetype);
-    if (!pluginIdentifier)
-      return false;
-
-    let displayName = this.supportedPlugins.plugins[pluginIdentifier].displayName;
-
-    // don't show several notifications
-    let notification = PopupNotifications.getNotification("plugins-not-found", browser);
-    if (notification)
-      return true;
-
-    let messageString = gNavigatorBundle.getString("installPlugin.message");
-    let mainAction = {
-      label: gNavigatorBundle.getFormattedString("installPlugin.button.label",
-                                                 [displayName]),
-      accessKey: gNavigatorBundle.getString("installPlugin.button.accesskey"),
-      callback: function () {
-        openDialog("chrome://mozapps/content/plugins/pluginInstallerWizard.xul",
-                   "PFSWindow", "chrome,centerscreen,resizable=yes",
-                   {plugins: browser.missingPlugins, browser: browser});
-      }
-    };
-    let secondaryActions = null;
-    let options = { dismissed: true };
-
-    PopupNotifications.show(browser, "plugins-not-found",
-                            messageString, "plugin-install-notification-icon",
-                            mainAction, secondaryActions, options);
-    return true;
   },
 
   _clickToPlayNotificationEventCallback: function PH_ctpEventCallback(event) {
@@ -388,13 +236,14 @@ var gPluginHandler = {
         continue;
       }
 
-      let url;
-      // TODO: allow the blocklist to specify a better link, bug 873093
-      if (pluginInfo.blocklistState == Ci.nsIBlocklistService.STATE_VULNERABLE_UPDATE_AVAILABLE) {
-        url = Services.urlFormatter.formatURLPref("plugins.update.url");
-      }
-      else if (pluginInfo.blocklistState != Ci.nsIBlocklistService.STATE_NOT_BLOCKED) {
-        url = Services.blocklist.getPluginBlocklistURL(pluginInfo.pluginTag);
+      // If a block contains an infoURL, we should always prefer that to the default
+      // URL that we construct in-product, even for other blocklist types.
+      let url = Services.blocklist.getPluginInfoURL(pluginInfo.pluginTag);
+
+      if (pluginInfo.blocklistState != Ci.nsIBlocklistService.STATE_NOT_BLOCKED) {
+        if (!url) {
+          url = Services.blocklist.getPluginBlocklistURL(pluginInfo.pluginTag);
+        }
       }
       else {
         url = Services.urlFormatter.formatURLPref("app.support.baseURL") + "clicktoplay";

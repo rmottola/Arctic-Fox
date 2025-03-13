@@ -68,7 +68,7 @@ var RootActor = protocol.ActorClass({
   }
 });
 
-let RootFront = protocol.FrontClass(RootActor, {
+var RootFront = protocol.FrontClass(RootActor, {
   initialize: function(client) {
     this.actorID = "root";
     protocol.Front.prototype.initialize.call(this, client);

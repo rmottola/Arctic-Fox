@@ -10,6 +10,7 @@
 #include "nsIContentPolicy.h"
 #include "nsIContentSecurityPolicy.h"
 #include "nsIDocShell.h"
+#include "nsIDOMDocument.h"
 #include "nsIHttpChannel.h"
 #include "nsIHttpChannelInternal.h"
 #include "nsIInputStreamPump.h"
@@ -52,13 +53,15 @@
 #include "mozilla/dom/ChannelInfo.h"
 #include "mozilla/dom/Exceptions.h"
 #include "mozilla/dom/InternalResponse.h"
+#include "mozilla/dom/nsCSPService.h"
+#include "mozilla/dom/nsCSPUtils.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/PromiseNativeHandler.h"
 #include "mozilla/dom/Response.h"
 #include "mozilla/dom/ScriptSettings.h"
 #include "mozilla/UniquePtr.h"
 #include "Principal.h"
-#include "WorkerFeature.h"
+#include "WorkerHolder.h"
 #include "WorkerPrivate.h"
 #include "WorkerRunnable.h"
 #include "WorkerScope.h"
@@ -111,15 +114,22 @@ ChannelFromScriptURL(nsIPrincipal* principal,
                      WorkerScriptType aWorkerScriptType,
                      nsContentPolicyType aContentPolicyType,
                      nsLoadFlags aLoadFlags,
+                     bool aDefaultURIEncoding,
                      nsIChannel** aChannel)
 {
   AssertIsOnMainThread();
 
   nsresult rv;
   nsCOMPtr<nsIURI> uri;
-  rv = nsContentUtils::NewURIWithDocumentCharset(getter_AddRefs(uri),
-                                                 aScriptURL, parentDoc,
-                                                 baseURI);
+
+  if (aDefaultURIEncoding) {
+    rv = NS_NewURI(getter_AddRefs(uri), aScriptURL, nullptr, baseURI);
+  } else {
+    rv = nsContentUtils::NewURIWithDocumentCharset(getter_AddRefs(uri),
+                                                   aScriptURL, parentDoc,
+                                                   baseURI);
+  }
+
   if (NS_FAILED(rv)) {
     return NS_ERROR_DOM_SYNTAX_ERR;
   }
@@ -531,7 +541,7 @@ private:
 
 NS_IMPL_ISUPPORTS(LoaderListener, nsIStreamLoaderObserver, nsIRequestObserver)
 
-class ScriptLoaderRunnable final : public WorkerFeature
+class ScriptLoaderRunnable final : public WorkerHolder
                                  , public nsIRunnable
 {
   friend class ScriptExecutorRunnable;
@@ -919,10 +929,14 @@ private:
     }
 
     if (!channel) {
+      // Only top level workers' main script use the document charset for the
+      // script uri encoding. Otherwise, default encoding (UTF-8) is applied.
+      bool useDefaultEncoding = !(!parentWorker && IsMainWorkerScript());
       rv = ChannelFromScriptURL(principal, baseURI, parentDoc, loadGroup, ios,
                                 secMan, loadInfo.mURL, IsMainWorkerScript(),
                                 mWorkerScriptType,
                                 mWorkerPrivate->ContentPolicyType(), loadFlags,
+                                useDefaultEncoding,
                                 getter_AddRefs(channel));
       if (NS_WARN_IF(NS_FAILED(rv))) {
         return rv;
@@ -1031,6 +1045,8 @@ private:
     // Make sure we're not seeing the result of a 404 or something by checking
     // the 'requestSucceeded' attribute on the http channel.
     nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(request);
+    nsAutoCString tCspHeaderValue, tCspROHeaderValue;
+
     if (httpChannel) {
       bool requestSucceeded;
       rv = httpChannel->GetRequestSucceeded(&requestSucceeded);
@@ -1039,6 +1055,14 @@ private:
       if (!requestSucceeded) {
         return NS_ERROR_NOT_AVAILABLE;
       }
+
+      httpChannel->GetResponseHeader(
+        NS_LITERAL_CSTRING("content-security-policy"),
+        tCspHeaderValue);
+
+      httpChannel->GetResponseHeader(
+        NS_LITERAL_CSTRING("content-security-policy-report-only"),
+        tCspROHeaderValue);
     }
 
     // May be null.
@@ -1144,9 +1168,58 @@ private:
       MOZ_ASSERT(NS_LoadGroupMatchesPrincipal(channelLoadGroup, channelPrincipal));
 
       mWorkerPrivate->SetPrincipal(channelPrincipal, channelLoadGroup);
+
+      // We did inherit CSP in bug 1223647. If we do not already have a CSP, we
+      // should get it from the HTTP headers on the worker script.
+      if (!mWorkerPrivate->GetCSP() && CSPService::sCSPEnabled) {
+        NS_ConvertASCIItoUTF16 cspHeaderValue(tCspHeaderValue);
+        NS_ConvertASCIItoUTF16 cspROHeaderValue(tCspROHeaderValue);
+
+        nsIPrincipal* principal = mWorkerPrivate->GetPrincipal();
+        MOZ_ASSERT(principal, "Should not be null");
+
+        nsCOMPtr<nsIContentSecurityPolicy> csp;
+        rv = principal->EnsureCSP(nullptr, getter_AddRefs(csp));
+
+        if (csp) {
+          // If there's a CSP header, apply it.
+          if (!cspHeaderValue.IsEmpty()) {
+            rv = CSP_AppendCSPFromHeader(csp, cspHeaderValue, false);
+            NS_ENSURE_SUCCESS(rv, rv);
+          }
+          // If there's a report-only CSP header, apply it.
+          if (!cspROHeaderValue.IsEmpty()) {
+            rv = CSP_AppendCSPFromHeader(csp, cspROHeaderValue, true);
+            NS_ENSURE_SUCCESS(rv, rv);
+          }
+
+          // Set evalAllowed, default value is set in GetAllowsEval
+          bool evalAllowed = false;
+          bool reportEvalViolations = false;
+          rv = csp->GetAllowsEval(&reportEvalViolations, &evalAllowed);
+          NS_ENSURE_SUCCESS(rv, rv);
+
+          mWorkerPrivate->SetCSP(csp);
+          mWorkerPrivate->SetEvalAllowed(evalAllowed);
+          mWorkerPrivate->SetReportCSPViolations(reportEvalViolations);
+
+          // Set ReferrerPolicy, default value is set in GetReferrerPolicy
+          bool hasReferrerPolicy = false;
+          uint32_t rp = mozilla::net::RP_Default;
+          rv = csp->GetReferrerPolicy(&rp, &hasReferrerPolicy);
+          NS_ENSURE_SUCCESS(rv, rv);
+
+          if (hasReferrerPolicy) {
+            mWorkerPrivate->SetReferrerPolicy(static_cast<net::ReferrerPolicy>(rp));
+          }
+        }
+      }
+      if (parent) {
+        // XHR Params Allowed
+        mWorkerPrivate->SetXHRParamsAllowed(parent->XHRParamsAllowed());
+      }
     }
 
-    DataReceived();
     return NS_OK;
   }
 
@@ -1697,6 +1770,8 @@ public:
                                                    mScriptURL,
                                                    // Nested workers are always dedicated.
                                                    nsIContentPolicy::TYPE_INTERNAL_WORKER,
+                                                   // Nested workers use default uri encoding.
+                                                   true,
                                                    getter_AddRefs(channel));
     if (NS_SUCCEEDED(mResult)) {
       channel.forget(mChannel);
@@ -1764,8 +1839,10 @@ ScriptExecutorRunnable::PreRun(WorkerPrivate* aWorkerPrivate)
     NS_WARNING("Failed to make global!");
     // There's no way to report the exception on jsapi right now, because there
     // is no way to even enter a compartment on this thread anymore.  Just clear
-    // the exception.  We'll report some sort of error to our caller thread in
-    // ShutdownScriptLoader.
+    // the exception.  We'll report some sort of error to our caller in
+    // ShutdownScriptLoader, but it will get squelched for the same reason we're
+    // squelching here: all the error reporting machinery relies on being able
+    // to enter a compartment to report the error.
     jsapi.ClearException();
     return false;
   }
@@ -1931,7 +2008,7 @@ ScriptExecutorRunnable::ShutdownScriptLoader(JSContext* aCx,
     }
   }
 
-  aWorkerPrivate->RemoveFeature(&mScriptLoader);
+  mScriptLoader.ReleaseWorker();
   aWorkerPrivate->StopSyncLoop(mSyncLoopTarget, aResult);
 }
 
@@ -1983,7 +2060,7 @@ LoadAllScripts(WorkerPrivate* aWorkerPrivate,
 
   NS_ASSERTION(aLoadInfos.IsEmpty(), "Should have swapped!");
 
-  if (!aWorkerPrivate->AddFeature(loader)) {
+  if (NS_WARN_IF(!loader->HoldWorker(aWorkerPrivate))) {
     aRv.Throw(NS_ERROR_FAILURE);
     return;
   }
@@ -1991,7 +2068,7 @@ LoadAllScripts(WorkerPrivate* aWorkerPrivate,
   if (NS_FAILED(NS_DispatchToMainThread(loader))) {
     NS_ERROR("Failed to dispatch!");
 
-    aWorkerPrivate->RemoveFeature(loader);
+    loader->ReleaseWorker();
     aRv.Throw(NS_ERROR_FAILURE);
     return;
   }
@@ -2012,6 +2089,7 @@ ChannelFromScriptURLMainThread(nsIPrincipal* aPrincipal,
                                nsILoadGroup* aLoadGroup,
                                const nsAString& aScriptURL,
                                nsContentPolicyType aContentPolicyType,
+                               bool aDefaultURIEncoding,
                                nsIChannel** aChannel)
 {
   AssertIsOnMainThread();
@@ -2024,7 +2102,7 @@ ChannelFromScriptURLMainThread(nsIPrincipal* aPrincipal,
   return ChannelFromScriptURL(aPrincipal, aBaseURI, aParentDoc, aLoadGroup,
                               ios, secMan, aScriptURL, true, WorkerScript,
                               aContentPolicyType, nsIRequest::LOAD_NORMAL,
-                              aChannel);
+                              aDefaultURIEncoding, aChannel);
 }
 
 nsresult

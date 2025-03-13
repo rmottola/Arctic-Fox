@@ -37,7 +37,9 @@
         >
 
   <script type="application/javascript" src="chrome://browser/content/aboutDialog.js"/>
-
+#ifdef MOZ_UPDATER
+  <script type="application/javascript" src="chrome://browser/content/aboutDialog-appUpdater.js"/>
+#endif
   <vbox id="aboutPMDialogContainer">
     <hbox id="PMclientBox">
       <vbox id="PMleftBox" flex="1"/>

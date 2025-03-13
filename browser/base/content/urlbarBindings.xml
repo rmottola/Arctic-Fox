@@ -67,6 +67,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         this.timeout = this._prefs.getIntPref("delay");
         this._formattingEnabled = this._prefs.getBoolPref("formatting.enabled");
         this._mayTrimURLs = this._prefs.getBoolPref("trimURLs");
+        this._userMadeSearchSuggestionsChoice =
+          this._prefs.getBoolPref("userMadeSearchSuggestionsChoice");
 
         this.inputField.controllers.insertControllerAt(0, this._copyCutController);
         this.inputField.addEventListener("paste", this, false);
@@ -75,12 +77,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         this.inputField.addEventListener("mouseout", this, false);
         this.inputField.addEventListener("overflow", this, false);
         this.inputField.addEventListener("underflow", this, false);
-
-        try {
-          if (this._prefs.getBoolPref("unifiedcomplete")) {
-            this.setAttribute("autocompletesearch", "unifiedcomplete");
-          }
-        } catch (ex) {}
 
         const kXULNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
         var textBox = document.getAnonymousElementByAttribute(this,
@@ -158,10 +154,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               case "switchtab": // Fall through.
               case "remotetab": // Fall through.
               case "visiturl": {
-                returnValue = action.params.url;
+                returnValue = action.params.displayUrl;
                 break;
               }
-              case "keyword": {
+              case "keyword": // Fall through.
+              case "searchengine": {
                 returnValue = action.params.input;
                 break;
               }
@@ -180,6 +177,22 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             this.removeAttribute("actiontype");
           }
           return returnValue;
+        ]]></body>
+      </method>
+
+      <method name="onKeyPress">
+        <parameter name="aEvent"/>
+        <body><![CDATA[
+          switch (aEvent.keyCode) {
+            case KeyEvent.DOM_VK_LEFT:
+            case KeyEvent.DOM_VK_RIGHT:
+            case KeyEvent.DOM_VK_HOME:
+              this.popup.hidePopup();
+              return;
+              break;
+          }
+
+          return this.handleKeyPress(aEvent);
         ]]></body>
       </method>
 
@@ -332,9 +345,9 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               if (this.hasAttribute("actiontype")) {
                 this.handleRevert();
                 let prevTab = gBrowser.selectedTab;
-                if (switchToTabHavingURI(action.params.originalUrl || url) &&
-                    isTabEmpty(prevTab))
+                if (switchToTabHavingURI(url) && isTabEmpty(prevTab)) {
                   gBrowser.removeTab(prevTab);
+                }
                 return;
               }
             } else if (action.type == "remotetab") {
@@ -342,13 +355,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             } else if (action.type == "keyword") {
               url = action.params.url;
             } else if (action.type == "searchengine") {
-              let engine = Services.search.getEngineByName(action.params.engineName);
-              let query = action.params.searchSuggestion ||
-                          action.params.searchQuery;
-              let submission = engine.getSubmission(query);
-
-              url = submission.uri.spec;
-              postData = submission.postData;
+              [url, postData] = this._parseAndRecordSearchEngineAction(action);
             } else if (action.type == "visiturl") {
               url = action.params.url;
             }
@@ -696,17 +703,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
               case "formatting.enabled":
                 this._formattingEnabled = this._prefs.getBoolPref(aData);
                 break;
+              case "userMadeSearchSuggestionsChoice":
+                this._userMadeSearchSuggestionsChoice =
+                  this._prefs.getBoolPref(aData);
+                break;
               case "trimURLs":
                 this._mayTrimURLs = this._prefs.getBoolPref(aData);
                 break;
-              case "unifiedcomplete":
-                let useUnifiedComplete = false;
-                try {
-                  useUnifiedComplete = this._prefs.getBoolPref(aData);
-                } catch (ex) {}
-                this.setAttribute("autocompletesearch",
-                                  useUnifiedComplete ? "unifiedcomplete"
-                                                     : "urlinline history");
             }
           } else {
             let originalUrl = ReaderParent.parseReaderUrl(aValue);
@@ -785,15 +788,10 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           } catch (ex) {}
 
           if (uri) {
-            let action = this._parseActionUrl(val);
-            if (action) {
-              if (action.params.url) {
-                // Store the original URL in the action URL.
-                action.params.originalUrl = action.params.url;
-                action.params.url = losslessDecodeURI(makeURI(action.params.url));
-                val = "moz-action:" + action.type + "," + JSON.stringify(action.params);
-              }
-            } else {
+            // Do not touch moz-action URIs at all.  They depend on being
+            // properly encoded and decoded and will break if decoded
+            // unexpectedly.
+            if (!this._parseActionUrl(val)) {
               val = losslessDecodeURI(uri);
             }
           }
@@ -841,26 +839,18 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             type: type,
           };
 
-          try {
-            action.params = JSON.parse(params);
-          } catch (e) {
-            // If this failed, we assume that params is not a JSON object, and
-            // is instead just a flat string. This will happen when
-            // UnifiedComplete is disabled - in which case, the param is always
-            // a URL.
-            action.params = {
-              url: params,
-            }
-            return action;
+          action.params = JSON.parse(params);
+          for (let key in action.params) {
+            action.params[key] = decodeURIComponent(action.params[key]);
           }
 
-          for (let key of [
-            "input",
-            "searchQuery",
-            "searchSuggestion",
-          ]) {
-            if (action.params[key]) {
-              action.params[key] = decodeURIComponent(action.params[key]);
+          if ("url" in action.params) {
+            let uri;
+            try {
+              uri = makeURI(action.params.url);
+              action.params.displayUrl = losslessDecodeURI(uri);
+            } catch (e) {
+              action.params.displayUrl = action.params.url;
             }
           }
 
@@ -899,22 +889,13 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
       <method name="handleEnter">
         <body><![CDATA[
-          // When UnifiedComplete is enabled, we need to ensure we're using
-          // a selected autocomplete result. A result should automatically be
-          // selected by default (UnifiedComplete guarantees at least one
-          // result), however autocomplete is async and therefore we may not
+          // We need to ensure we're using a selected autocomplete result.
+          // A result should automatically be selected by default,
+          // however autocomplete is async and therefore we may not
           // have a result set relating to the current input yet. If that
           // happens, we need to mark that when the first result does get added,
           // it needs to be handled as if enter was pressed with that first
           // result selected.
-          // With UnifiedComplete disabled we don't have this problem, as the
-          // default is to use the value directly from the input field (without
-          // relying on autocomplete).
-
-          if (!Services.prefs.getBoolPref("browser.urlbar.unifiedcomplete")) {
-            return this.mController.handleEnter(false);
-          }
-
           // If anything other than the default (first) result is selected, then
           // it must have been manually selected by the human. We let this
           // explicit choice be used, even if it may be related to a previous
@@ -949,6 +930,25 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         ]]></body>
       </method>
 
+      <field name="_userMadeSearchSuggestionsChoice"><![CDATA[
+        false
+      ]]></field>
+
+      <method name="_maybeShowSearchSuggestionsNotification">
+        <body><![CDATA[
+          let showNotification =
+            !this._userMadeSearchSuggestionsChoice &&
+            // When _urlbarFocused is true, tabbrowser would close the popup if
+            // it's opened here, so don't show the notification.
+            !gBrowser.selectedBrowser._urlbarFocused &&
+            Services.prefs.getBoolPref("browser.search.suggest.enabled") &&
+            this._prefs.getBoolPref("unifiedcomplete");
+          if (showNotification) {
+            this.popup.showSearchSuggestionsNotification(this, this);
+          }
+        ]]></body>
+      </method>
+
     </implementation>
 
     <handlers>
@@ -979,6 +979,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         if (event.originalTarget == this.inputField) {
           this._hideURLTooltip();
           this.formatValue();
+          this._maybeShowSearchSuggestionsNotification();
         }
       ]]></handler>
 
@@ -1113,6 +1114,29 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
   </binding>
 
   <binding id="urlbar-rich-result-popup" extends="chrome://global/content/bindings/autocomplete.xml#autocomplete-rich-result-popup">
+
+    <content ignorekeys="true" level="top" consumeoutsideclicks="never">
+      <xul:hbox anonid="search-suggestions-notification" align="center">
+        <xul:description flex="1">
+          &urlbar.searchSuggestionsNotification.question;
+          <xul:label anonid="search-suggestions-notification-learn-more"
+                     class="text-link"
+                     value="&urlbar.searchSuggestionsNotification.learnMore;"/>
+        </xul:description>
+        <xul:button anonid="search-suggestions-notification-disable"
+                    label="&urlbar.searchSuggestionsNotification.disable;"
+                    onclick="document.getBindingParent(this).dismissSearchSuggestionsNotification(false);"/>
+        <xul:button anonid="search-suggestions-notification-enable"
+                    label="&urlbar.searchSuggestionsNotification.enable;"
+                    onclick="document.getBindingParent(this).dismissSearchSuggestionsNotification(true);"/>
+      </xul:hbox>
+      <xul:richlistbox anonid="richlistbox" class="autocomplete-richlistbox"
+                       flex="1"/>
+      <xul:hbox anonid="footer">
+        <children/>
+      </xul:hbox>
+    </content>
+
     <implementation>
       <field name="_maxResults">0</field>
 
@@ -1122,10 +1146,41 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           createBundle("chrome://browser/locale/places/places.properties");
       </field>
 
+      <field name="searchSuggestionsNotification" readonly="true">
+        document.getAnonymousElementByAttribute(
+          this, "anonid", "search-suggestions-notification"
+        );
+      </field>
+
+      <field name="searchSuggestionsNotificationLearnMoreLink" readonly="true">
+        document.getAnonymousElementByAttribute(
+          this, "anonid", "search-suggestions-notification-learn-more"
+        );
+      </field>
+
+      <field name="footer" readonly="true">
+        document.getAnonymousElementByAttribute(this, "anonid", "footer");
+      </field>
+
+      <method name="dismissSearchSuggestionsNotification">
+        <parameter name="enableSuggestions"/>
+        <body><![CDATA[
+          Services.prefs.setBoolPref(
+            "browser.urlbar.userMadeSearchSuggestionsChoice", true
+          );
+          Services.prefs.setBoolPref(
+            "browser.urlbar.suggest.searches", enableSuggestions
+          );
+          this._hideSearchSuggestionsNotification(true);
+          if (enableSuggestions && this.input.textValue) {
+            // Start a new search so that suggestions appear immediately.
+            this.input.controller.startSearch(this.input.textValue);
+          }
+        ]]></body>
+      </method>
+
       <!-- Override this so that navigating between items results in an item
-           always being selected. This is contrary to the normal behaviour where
-           if you navigate beyond either end of the list, no item will be
-           selected. -->
+           always being selected. -->
       <method name="getNextIndex">
         <parameter name="reverse"/>
         <parameter name="amount"/>
@@ -1203,9 +1258,102 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           // to avoid impacting startup / new window performance
           aInput.popup.hidden = false;
 
-          // this method is defined on the base binding
+          // The popup may already be open if it's showing the search
+          // suggestions notification.  In that case, its footer visibility
+          // needs to be updated.
+          if (this.popupOpen) {
+            this._updateFooterVisibility();
+          }
+
           this._openAutocompletePopup(aInput, aElement);
-        ]]></body>
+          ]]>
+        </body>
+      </method>
+
+      <method name="_updateFooterVisibility">
+        <body>
+          <![CDATA[
+          this.footer.collapsed = this._matchCount == 0;
+          ]]>
+        </body>
+      </method>
+
+      <method name="showSearchSuggestionsNotification">
+        <parameter name="aInput"/>
+        <parameter name="aElement"/>
+        <body>
+          <![CDATA[
+          // Set the learn-more link href.
+          let link = this.searchSuggestionsNotificationLearnMoreLink;
+          if (!link.hasAttribute("href")) {
+            let url = Services.urlFormatter.formatURL(
+              Services.prefs.getCharPref("app.support.baseURL") + "suggestions"
+            );
+            link.setAttribute("href", url);
+          }
+
+          // With the notification shown, the listbox's height can sometimes be
+          // too small when it's flexed, as it normally is.  Also, it can start
+          // out slightly scrolled down.  Both problems appear together, most
+          // often when the popup is very narrow and the notification's text
+          // must wrap.  Work around them by removing the flex.
+          //
+          // But without flexing the listbox, the listbox's height animation
+          // sometimes fails to complete, leaving the popup too tall.  Work
+          // around that problem by disabling the listbox animation.
+          this.richlistbox.flex = 0;
+          this.setAttribute("dontanimate", "true");
+
+          this.classList.add("showSearchSuggestionsNotification");
+          this._updateFooterVisibility();
+          this.openAutocompletePopup(aInput, aElement);
+          ]]>
+        </body>
+      </method>
+
+      <method name="_hideSearchSuggestionsNotification">
+        <parameter name="animate"/>
+        <body>
+          <![CDATA[
+          if (animate) {
+            this._hideSearchSuggestionsNotificationWithAnimation();
+            return;
+          }
+          this.classList.remove("showSearchSuggestionsNotification");
+          this.richlistbox.flex = 1;
+          this.removeAttribute("dontanimate");
+          if (this._matchCount) {
+            // Update popup height.
+            this._invalidate();
+          } else {
+            this.closePopup();
+          }
+          ]]>
+        </body>
+      </method>
+
+      <method name="_hideSearchSuggestionsNotificationWithAnimation">
+        <body>
+          <![CDATA[
+          let notificationHeight = this.searchSuggestionsNotification
+                                       .getBoundingClientRect()
+                                       .height;
+          this.searchSuggestionsNotification.style.marginTop =
+            "-" + notificationHeight + "px";
+
+          let popupHeightPx =
+            (this.getBoundingClientRect().height - notificationHeight) + "px";
+          this.style.height = popupHeightPx;
+
+          let onTransitionEnd = () => {
+            this.removeEventListener("transitionend", onTransitionEnd, true);
+            this.searchSuggestionsNotification.style.marginTop = "0px";
+            this.style.removeProperty("height");
+            this._hideSearchSuggestionsNotification(false);
+          };
+          this.addEventListener("transitionend", onTransitionEnd, true);
+          ]]>
+        </body>
       </method>
 
       <method name="onPopupClick">
@@ -1228,6 +1376,7 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
           // Check for middle-click or modified clicks on the URL bar
           if (gURLBar && this.mInput == gURLBar) {
             var url = controller.getValueAt(this.selectedIndex);
+            var options = {};
 
             // close the autocomplete popup and revert the entered address
             this.closePopup();
@@ -1246,12 +1395,8 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
                   break;
                 }
                 case "searchengine": {
-                  let engine = Services.search.getEngineByName(action.params.engineName);
-                  let query = action.params.searchSuggestion ||
-                              action.params.searchQuery;
-                  let submission = engine.getSubmission(query, null, "keyword");
-                  url = submission.uri.spec;
-                  options.postData = submission.postData;
+                  [url, options.postData] =
+                    this.input._parseAndRecordSearchEngineAction(action);
                   break;
                 }
                 default: {
@@ -1261,26 +1406,47 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
             }
 
             // respect the usual clicking subtleties
-            openUILink(url, aEvent);
+            openUILink(url, aEvent, options);
           }
         ]]>
         </body>
       </method>
 
       <method name="createResultLabel">
-        <parameter name="aTitle"/>
-        <parameter name="aUrl"/>
-        <parameter name="aTypes"/>
+        <parameter name="item"/>
+        <parameter name="proposedLabel"/>
         <body>
           <![CDATA[
-            var label = aTitle + " " + aUrl;
-            let type = aTypes.find(v => v != "action" && v != "heuristic");
+            let parts = [proposedLabel];
+
+            let action = this.mInput._parseActionUrl(item.getAttribute("url"));
+            if (action) {
+              switch (action.type) {
+              case "searchengine":
+                parts = [
+                  action.params.searchSuggestion || action.params.searchQuery,
+                  action.params.engineName,
+                ];
+                break;
+              case "switchtab":
+              case "remotetab":
+                parts = [
+                  item.getAttribute("title"),
+                  item.getAttribute("displayurl"),
+                ];
+                break;
+              }
+            }
+
+            let types = item.getAttribute("type").split(/\s+/);
+            let type = types.find(type => type != "action" && type != "heuristic");
             try {
               // Some types intentionally do not map to strings, which is not
               // an error.
-              label += " " + this._bundle.GetStringFromName(type + "ResultLabel");
+              parts.push(this._bundle.GetStringFromName(type + "ResultLabel"));
             } catch (e) {}
-            return label;
+
+            return parts.filter(str => str).join(" ");
           ]]>
         </body>
       </method>
@@ -1288,9 +1454,6 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
       <method name="onResultsAdded">
         <body>
           <![CDATA[
-            if (!Services.prefs.getBoolPref("browser.urlbar.unifiedcomplete"))
-              return;
-
             // If nothing is selected yet, select the first result if it is a
             // pre-selected "heuristic" result.  (See UnifiedComplete.js.)
             if (this._matchCount > 0 && this.selectedIndex == -1) {
@@ -1315,13 +1478,22 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
     </implementation>
     <handlers>
 
-      <handler event="select"><![CDATA[
-        // When the user selects one of matches, stop the search to avoid
-        // changing the underlying result unexpectedly.
-        if (!this._ignoreNextSelect && this.selectedIndex >= 0) {
-          let controller = this.view.QueryInterface(Components.interfaces.nsIAutoCompleteController);
-          controller.stopSearch();
-        }
+      <handler event="mousedown"><![CDATA[
+        // Required to make the xul:label.text-link elements in the search
+        // suggestions notification work correctly when clicked on Linux.
+        // This is copied from the mousedown handler in
+        // browser-search-autocomplete-result-popup, which apparently had a
+        // similar problem.
+        event.preventDefault();
+      ]]></handler>
+
+      <handler event="mousedown"><![CDATA[
+        // Required to make the xul:label.text-link elements in the search
+        // suggestions notification work correctly when clicked on Linux.
+        // This is copied from the mousedown handler in
+        // browser-search-autocomplete-result-popup, which apparently had a
+        // similar problem.
+        event.preventDefault();
       ]]></handler>
 
     </handlers>

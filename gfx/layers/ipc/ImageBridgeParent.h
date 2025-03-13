@@ -28,7 +28,6 @@ class Thread;
 namespace mozilla {
 namespace ipc {
 class Shmem;
-class GeckoChildProcessHost;
 } // namespace ipc
 
 namespace layers {
@@ -47,7 +46,7 @@ public:
   typedef InfallibleTArray<OpDestroy> OpDestroyArray;
   typedef InfallibleTArray<EditReply> EditReplyArray;
 
-  ImageBridgeParent(MessageLoop* aLoop, Transport* aTransport, ProcessId aChildProcessId);
+  ImageBridgeParent(MessageLoop* aLoop, ProcessId aChildProcessId);
   ~ImageBridgeParent();
 
   virtual ShmemAllocator* AsShmemAllocator() override { return this; }
@@ -55,7 +54,7 @@ public:
   virtual void ActorDestroy(ActorDestroyReason aWhy) override;
 
   static PImageBridgeParent*
-  Create(Transport* aTransport, ProcessId aChildProcessId, ipc::GeckoChildProcessHost* aProcessHost);
+  Create(Transport* aTransport, ProcessId aChildProcessId);
 
   // CompositableParentManager
   virtual void SendAsyncMessage(const InfallibleTArray<AsyncParentMessageData>& aMessage) override;
@@ -147,15 +146,12 @@ protected:
 private:
   void DeferredDestroy();
   MessageLoop* mMessageLoop;
-  Transport* mTransport;
   // This keeps us alive until ActorDestroy(), at which point we do a
   // deferred destruction of ourselves.
   RefPtr<ImageBridgeParent> mSelfRef;
 
   bool mSetChildThreadPriority;
   bool mClosed;
-
-  ipc::GeckoChildProcessHost* mSubprocess;
 
   /**
    * Map of all living ImageBridgeParent instances

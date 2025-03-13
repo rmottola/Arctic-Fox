@@ -546,8 +546,6 @@ public:
 
   virtual bool HandleWindowsMessages(const Message& aMsg) const override;
 
-  bool HasGamepadListener() const { return mHasGamepadListener; }
-
   void SetNuwaParent(NuwaParent* aNuwaParent) { mNuwaParent = aNuwaParent; }
 
   void ForkNewProcess(bool aBlocking);
@@ -656,12 +654,6 @@ private:
   // should be send from this function. This function should only be
   // called after the process has been transformed to app or browser.
   void ForwardKnownInfo();
-
-  // If the frame element indicates that the child process is "critical" and
-  // has a pending system message, this function acquires the CPU wake lock on
-  // behalf of the child.  We'll release the lock when the system message is
-  // handled or after a timeout, whichever comes first.
-  void MaybeTakeCPUWakeLock(Element* aFrameElement);
 
   // Set the child process's priority and then check whether the child is
   // still alive.  Returns true if the process is still alive, and false
@@ -1001,6 +993,7 @@ private:
 
   virtual bool RecvLoadURIExternal(const URIParams& uri,
                                    PBrowserParent* windowContext) override;
+  virtual bool RecvExtProtocolChannelConnectParent(const uint32_t& registrarId) override;
 
   virtual bool RecvSyncMessage(const nsString& aMsg,
                                const ClonedMessageData& aData,
@@ -1058,8 +1051,6 @@ private:
   virtual bool RecvSpeakerManagerGetSpeakerStatus(bool* aValue) override;
 
   virtual bool RecvSpeakerManagerForceSpeaker(const bool& aEnable) override;
-
-  virtual bool RecvSystemMessageHandled() override;
 
   // Callbacks from NuwaParent.
   void OnNuwaReady();
@@ -1145,10 +1136,6 @@ private:
   virtual bool RecvGetBrowserConfiguration(const nsCString& aURI,
                                            BrowserConfiguration* aConfig) override;
 
-  virtual bool RecvGamepadListenerAdded() override;
-
-  virtual bool RecvGamepadListenerRemoved() override;
-
   virtual bool RecvProfile(const nsCString& aProfile) override;
 
   virtual bool RecvGetGraphicsDeviceInitData(DeviceInitData* aOut) override;
@@ -1179,6 +1166,8 @@ private:
 
   virtual bool RecvNotifyPushSubscriptionModifiedObservers(const nsCString& aScope,
                                                            const IPC::Principal& aPrincipal) override;
+
+  virtual bool RecvNotifyLowMemory() override;
 
   // If you add strong pointers to cycle collected objects here, be sure to
   // release these objects in ShutDownProcess.  See the comment there for more
@@ -1223,7 +1212,6 @@ private:
   bool mSendPermissionUpdates;
   bool mIsForBrowser;
   bool mIsNuwaProcess;
-  bool mHasGamepadListener;
 
   // These variables track whether we've called Close() and KillHard() on our
   // channel.

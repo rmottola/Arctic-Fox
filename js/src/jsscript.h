@@ -256,7 +256,6 @@ class Bindings
 
   public:
     static const uint32_t BODY_LEVEL_LEXICAL_LIMIT = UINT16_LIMIT;
-
     static const uint32_t BLOCK_SCOPED_LIMIT = UINT16_LIMIT;
 
     Binding* bindingArray() const {
@@ -1579,7 +1578,7 @@ class JSScript : public js::gc::TenuredCell
     js::jit::IonScript* const* addressOfIonScript() const {
         return &ion;
     }
-    void setIonScript(JSContext* maybecx, js::jit::IonScript* ionScript);
+    void setIonScript(JSRuntime* maybeRuntime, js::jit::IonScript* ionScript);
 
     bool hasBaselineScript() const {
         bool res = baseline && baseline != BASELINE_DISABLED_SCRIPT;
@@ -1593,9 +1592,9 @@ class JSScript : public js::gc::TenuredCell
         MOZ_ASSERT(hasBaselineScript());
         return baseline;
     }
-    inline void setBaselineScript(JSContext* maybecx, js::jit::BaselineScript* baselineScript);
+    inline void setBaselineScript(JSRuntime* maybeRuntime, js::jit::BaselineScript* baselineScript);
 
-    void updateBaselineOrIonRaw(JSContext* maybecx);
+    void updateBaselineOrIonRaw(JSRuntime* maybeRuntime);
 
     static size_t offsetOfBaselineScript() {
         return offsetof(JSScript, baseline);
@@ -2553,16 +2552,19 @@ CloneGlobalScript(JSContext* cx, Handle<StaticScope*> enclosingScope, HandleScri
 namespace JS {
 namespace ubi {
 template<>
-struct Concrete<js::LazyScript> : TracerConcrete<js::LazyScript> {
-    CoarseType coarseType() const final { return CoarseType::Script; }
-    Size size(mozilla::MallocSizeOf mallocSizeOf) const override;
-    const char* scriptFilename() const final;
-
+class Concrete<js::LazyScript> : TracerConcrete<js::LazyScript> {
   protected:
     explicit Concrete(js::LazyScript *ptr) : TracerConcrete<js::LazyScript>(ptr) { }
 
   public:
     static void construct(void *storage, js::LazyScript *ptr) { new (storage) Concrete(ptr); }
+
+    CoarseType coarseType() const final { return CoarseType::Script; }
+    Size size(mozilla::MallocSizeOf mallocSizeOf) const override;
+    const char* scriptFilename() const final;
+
+    const char16_t* typeName() const override { return concreteTypeName; }
+    static const char16_t concreteTypeName[];
 };
 } // namespace ubi
 } // namespace JS

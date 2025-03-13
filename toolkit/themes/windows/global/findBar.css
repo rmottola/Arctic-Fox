@@ -4,18 +4,8 @@
 
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 
-.findbar-closebutton {
-  border: none;
-  padding: 3px 5px;
-  -moz-appearance: none;
-}
-
-.findbar-closebutton:-moz-lwtheme-brighttext {
-  list-style-image: url("chrome://global/skin/icons/close-inverted.png");
-}
-
 findbar {
-  padding-top: 1px;
+  box-shadow: 0 1px 1px rgba(0,0,0,.1) inset;
   background-image: linear-gradient(rgba(0,0,0,.15) 1px, rgba(255,255,255,.15) 1px);
   background-size: 100% 2px;
   background-repeat: no-repeat;
@@ -39,94 +29,133 @@ findbar[noanim] {
   transition-delay: 0s !important;
 }
 
-/* find-next button */
-
-.findbar-find-next {
-  list-style-image: url("chrome://global/skin/icons/find.png");
-  -moz-image-region: rect(0px 16px 16px 0px);
+.findbar-container {
+  padding-inline-start: 8px;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 
-.findbar-find-next:hover {
-  -moz-image-region: rect(16px 16px 32px 0px);
+.findbar-closebutton {
+  margin-inline-start: 4px;
+  padding-inline-start: 0;
+  padding-inline-end: 8px;
+  border: none;
+  -moz-appearance: none;
 }
 
-.findbar-find-next[disabled="true"] {
-  -moz-image-region: rect(32px 16px 48px 0px) !important;
+
+/* Search field */
+
+.findbar-textbox {
+  -moz-appearance: none;
+  border: 1px solid ThreeDShadow;
+  border-radius: 2px 0 0 2px;
+  margin: 0;
+  padding: 1px 5px;
+  width: 14em;
 }
 
-/* find-previous button */
-
-.findbar-find-previous {
-  list-style-image: url("chrome://global/skin/icons/find.png");
-  -moz-image-region: rect(0px 32px 16px 16px);
+.findbar-textbox:-moz-locale-dir(rtl) {
+  border-radius: 0 2px 2px 0;
 }
 
-.findbar-find-previous:hover {
-  -moz-image-region: rect(16px 32px 32px 16px);
-}
-
-.findbar-find-previous[disabled="true"] {
-  -moz-image-region: rect(32px 32px 48px 16px) !important;
-}
-
-/* highlight button */
-
-.findbar-highlight {
-  list-style-image: url("chrome://global/skin/icons/find.png");
-  -moz-image-region: rect(0px 48px 16px 32px);
-}
-
-.findbar-highlight:hover {
-  -moz-image-region: rect(16px 48px 32px 32px);
-}
-
-.findbar-highlight[disabled="true"] {
-  -moz-image-region: rect(32px 48px 48px 32px) !important;
-}
-
-.findbar-highlight:active, .findbar-highlight[checked="true"] {
-  -moz-image-region: rect(48px 48px 64px 32px);
-}
-
-.findbar-highlight[checked="true"]:hover {
-  -moz-image-region: rect(64px 48px 80px 32px);
-}
-
-.find-status-icon {
-  list-style-image: none;
-  margin-top: 2px;
-  margin-bottom: 0px;
-  -moz-margin-start: 12px;
-  -moz-margin-end: 0px;
-  width: 16px;
-  height: 16px;
-}
-
-.findbar-find-status,
-.found-matches {
-  margin: 0 !important;
-  -moz-margin-start: 3px !important;
-  padding: 2px !important;
-}
-
-.find-status-icon[status="notfound"] {
-  list-style-image: url("chrome://global/skin/icons/information-16.png");
+.findbar-textbox[focused="true"] {
+  border-color: Highlight;
 }
 
 .findbar-textbox[status="notfound"] {
-  box-shadow: 0 0 0 1em #f66 inset;
+  background-color: #f66;
   color: white;
 }
 
 .findbar-textbox[flash="true"] {
-  box-shadow: 0 0 0 1em yellow inset;
+  background-color: yellow;
   color: black;
 }
 
-.find-status-icon[status="wrapped"] {
-  list-style-image: url("chrome://global/skin/icons/wrap.png");
+.findbar-textbox.minimal {
+  border-radius: 2px;
+}
+
+/* Buttons */
+
+.findbar-find-previous,
+.findbar-find-next {
+  margin-inline-start: 0;
+  -moz-appearance: none;
+  background: linear-gradient(rgba(255,255,255,.9), rgba(255,255,255,.2));
+  border: 1px solid ThreeDShadow;
+  box-shadow: 0 1px #fff inset;
+  padding: 1px 5px;
+  line-height: 1em;
+}
+
+.findbar-find-previous:not([disabled]):active,
+.findbar-find-next:not([disabled]):active {
+  background: rgba(23,50,76,.2);
+  box-shadow: 0 1px 2px rgba(10,31,51,.2) inset;
+}
+
+.findbar-find-previous {
+  list-style-image: url(chrome://global/skin/icons/find-arrows.svg#glyph-find-previous);
+}
+
+.findbar-find-next {
+  list-style-image: url(chrome://global/skin/icons/find-arrows.svg#glyph-find-next);
+}
+
+.findbar-find-previous,
+.findbar-find-previous:not([disabled]):active {
+  border-right: none;
+  border-left: none;
+}
+
+.findbar-find-previous > .toolbarbutton-icon,
+.findbar-find-next > .toolbarbutton-icon {
+  margin: 0;
+}
+
+.findbar-find-previous[disabled="true"] > .toolbarbutton-icon,
+.findbar-find-next[disabled="true"] > .toolbarbutton-icon {
+  opacity: .5;
+}
+
+.findbar-find-next:-moz-locale-dir(ltr) {
+  border-top-right-radius: 2px;
+  border-bottom-right-radius: 2px;
+}
+
+.findbar-find-next:-moz-locale-dir(rtl) {
+  border-top-left-radius: 2px;
+  border-bottom-left-radius: 2px;
+}
+
+.findbar-highlight,
+.findbar-case-sensitive,
+.findbar-entire-word {
+  margin-inline-start: 5px;
+}
+
+.findbar-highlight > .toolbarbutton-icon,
+.findbar-case-sensitive > .toolbarbutton-icon,
+.findbar-entire-word > .toolbarbutton-icon {
+  display: none;
+}
+
+.findbar-find-status,
+.found-matches {
+  color: GrayText;
+  margin: 0 !important;
+  margin-inline-start: 12px !important;
 }
 
 .find-status-icon[status="pending"] {
-  list-style-image: url("chrome://global/skin/icons/loading_16.png");
+  list-style-image: url("chrome://global/skin/icons/loading.png");
+}
+
+@media (min-resolution: 1.1dppx) {
+  .find-status-icon[status="pending"] {
+    width: 16px;
+    list-style-image: url("chrome://global/skin/icons/loading@2x.png");
+  }
 }

@@ -23,6 +23,7 @@
 namespace js {
 
 class AutoLockGC;
+class AutoLockHelperThreadState;
 class VerifyPreTracer;
 
 namespace gc {
@@ -697,7 +698,7 @@ class GCRuntime
     }
 
     void lockGC() {
-        PR_Lock(lock);
+        lock.lock();
 #ifdef DEBUG
         MOZ_ASSERT(!lockOwner);
         lockOwner = PR_GetCurrentThread();
@@ -709,7 +710,7 @@ class GCRuntime
         MOZ_ASSERT(lockOwner == PR_GetCurrentThread());
         lockOwner = nullptr;
 #endif
-        PR_Unlock(lock);
+        lock.unlock();
     }
 
 #ifdef DEBUG
@@ -1198,8 +1199,8 @@ class GCRuntime
     /*
      * Concurrent sweep infrastructure.
      */
-    void startTask(GCParallelTask& task, gcstats::Phase phase);
-    void joinTask(GCParallelTask& task, gcstats::Phase phase);
+    void startTask(GCParallelTask& task, gcstats::Phase phase, AutoLockHelperThreadState& locked);
+    void joinTask(GCParallelTask& task, gcstats::Phase phase, AutoLockHelperThreadState& locked);
 
     /*
      * List head of arenas allocated during the sweep phase.
@@ -1350,7 +1351,8 @@ class GCRuntime
 #endif
 
     /* Synchronize GC heap access between main thread and GCHelperState. */
-    PRLock* lock;
+    friend class js::AutoLockGC;
+    js::Mutex lock;
 #ifdef DEBUG
     mozilla::Atomic<PRThread*> lockOwner;
 #endif

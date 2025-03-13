@@ -47,15 +47,15 @@ function runTest() {
 
   // Two events should come in, when the audio starts, and stops playing.
   // The first one should have a detail of 'active' and the second one
-  // should have a detail of 'inactive'.
+  // should have a detail of 'inactive-pause'.
   let expectedNextData = 'active';
   iframe.addEventListener('mozbrowseraudioplaybackchange', (e) => {
     is(e.detail, expectedNextData, 'Audio detail should be correct')
     is(e.target, iframe, 'event target should be the first iframe')
-    if (e.detail === 'inactive') {
+    if (e.detail === 'inactive-pause') {
       SimpleTest.finish();
     }
-    expectedNextData = 'inactive';
+    expectedNextData = 'inactive-pause';
   });
 
   // Make sure an event only goes to the first iframe.
@@ -69,7 +69,7 @@ function runTest() {
 }
 
 addEventListener('testready', function() {
-  SpecialPowers.pushPrefEnv({'set': [["b2g.system_manifest_url", "http://mochi.test:8888/manifest.webapp"]]},
+  SpecialPowers.pushPrefEnv({'set': [["b2g.system_startup_url", window.location.href]]},
                             function() {
     SimpleTest.executeSoon(runTest);
   });

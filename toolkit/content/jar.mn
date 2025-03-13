@@ -1,7 +1,6 @@
 toolkit.jar:
 %  content global %content/global/ contentaccessible=yes
 %  content global-platform %content/global-platform/ platform
-%  content global-region %content/global-region/
 # provide the nsTransferable in nsDragAndDrop.js to extensions that have to
 # work with Geckos from before 1.9, when there was a separate file
 %  override chrome://global/content/nsTransferable.js chrome://global/content/nsDragAndDrop.js
@@ -23,6 +22,10 @@ toolkit.jar:
 #endif
    content/global/aboutNetworking.js
    content/global/aboutNetworking.xhtml
+#ifndef ANDROID
+   content/global/aboutProfiles.js
+   content/global/aboutProfiles.xhtml
+#endif
    content/global/aboutServiceWorkers.js
    content/global/aboutServiceWorkers.xhtml
    content/global/aboutwebrtc/aboutWebrtc.css   (aboutwebrtc/aboutWebrtc.css)

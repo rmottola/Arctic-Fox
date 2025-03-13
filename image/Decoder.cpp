@@ -9,7 +9,8 @@
 #include "mozilla/gfx/2D.h"
 #include "DecodePool.h"
 #include "GeckoProfiler.h"
-#include "imgIContainer.h"
+#include "IDecodingTask.h"
+#include "ISurfaceProvider.h"
 #include "nsProxyRelease.h"
 #include "nsServiceManagerUtils.h"
 #include "nsComponentManagerUtils.h"
@@ -20,6 +21,34 @@ using mozilla::gfx::SurfaceFormat;
 
 namespace mozilla {
 namespace image {
+
+class MOZ_STACK_CLASS AutoRecordDecoderTelemetry final
+{
+public:
+  AutoRecordDecoderTelemetry(Decoder* aDecoder, uint32_t aByteCount)
+    : mDecoder(aDecoder)
+  {
+    MOZ_ASSERT(mDecoder);
+
+    // Begin recording telemetry data.
+    mStartTime = TimeStamp::Now();
+    mDecoder->mChunkCount++;
+
+    // Keep track of the total number of bytes written.
+    mDecoder->mBytesDecoded += aByteCount;
+
+  }
+
+  ~AutoRecordDecoderTelemetry()
+  {
+    // Finish telemetry.
+    mDecoder->mDecodeTime += (TimeStamp::Now() - mStartTime);
+  }
+
+private:
+  Decoder* mDecoder;
+  TimeStamp mStartTime;
+};
 
 Decoder::Decoder(RasterImage* aImage)
   : mImageData(nullptr)
@@ -69,6 +98,9 @@ Decoder::Init()
   // No re-initializing
   MOZ_ASSERT(!mInitialized, "Can't re-initialize a decoder!");
 
+  // All decoders must have a SourceBufferIterator.
+  MOZ_ASSERT(mIterator);
+
   // It doesn't make sense to decode anything but the first frame if we can't
   // store anything in the SurfaceCache, since only the last frame we decode
   // will be retrievable.
@@ -81,18 +113,15 @@ Decoder::Init()
 }
 
 nsresult
-Decoder::Decode(IResumable* aOnResume)
+Decoder::Decode(NotNull<IResumable*> aOnResume)
 {
   MOZ_ASSERT(mInitialized, "Should be initialized here");
   MOZ_ASSERT(mIterator, "Should have a SourceBufferIterator");
 
-  // If no IResumable was provided, default to |this|.
-  IResumable* onResume = aOnResume ? aOnResume : this;
-
   // We keep decoding chunks until the decode completes or there are no more
   // chunks available.
   while (!GetDecodeDone() && !HasError()) {
-    auto newState = mIterator->AdvanceOrScheduleResume(onResume);
+    auto newState = mIterator->AdvanceOrScheduleResume(aOnResume.get());
 
     if (newState == SourceBufferIterator::WAITING) {
       // We can't continue because the rest of the data hasn't arrived from the
@@ -116,19 +145,23 @@ Decoder::Decode(IResumable* aOnResume)
 
     MOZ_ASSERT(newState == SourceBufferIterator::READY);
 
-    Write(mIterator->Data(), mIterator->Length());
+    {
+      PROFILER_LABEL("ImageDecoder", "Write",
+        js::ProfileEntry::Category::GRAPHICS);
+
+      AutoRecordDecoderTelemetry telemetry(this, mIterator->Length());
+
+      // Pass the data along to the implementation.
+      Maybe<TerminalState> terminalState = DoDecode(*mIterator);
+
+      if (terminalState == Some(TerminalState::FAILURE)) {
+        PostDataError();
+      }
+    }
   }
 
   CompleteDecode();
   return HasError() ? NS_ERROR_FAILURE : NS_OK;
-}
-
-void
-Decoder::Resume()
-{
-  DecodePool* decodePool = DecodePool::Singleton();
-  MOZ_ASSERT(decodePool);
-  decodePool->AsyncDecode(this);
 }
 
 bool
@@ -138,43 +171,6 @@ Decoder::ShouldSyncDecode(size_t aByteLimit)
   MOZ_ASSERT(mIterator, "Should have a SourceBufferIterator");
 
   return mIterator->RemainingBytesIsNoMoreThan(aByteLimit);
-}
-
-void
-Decoder::Write(const char* aBuffer, uint32_t aCount)
-{
-  PROFILER_LABEL("ImageDecoder", "Write",
-    js::ProfileEntry::Category::GRAPHICS);
-
-  MOZ_ASSERT(aBuffer);
-  MOZ_ASSERT(aCount > 0);
-
-  // We're strict about decoder errors
-  MOZ_ASSERT(!HasDecoderError(),
-             "Not allowed to make more decoder calls after error!");
-
-  // Begin recording telemetry data.
-  TimeStamp start = TimeStamp::Now();
-  mChunkCount++;
-
-  // Keep track of the total number of bytes written.
-  mBytesDecoded += aCount;
-
-  // If a data error occured, just ignore future data.
-  if (HasDataError()) {
-    return;
-  }
-
-  if (IsMetadataDecode() && HasSize()) {
-    // More data came in since we found the size. We have nothing to do here.
-    return;
-  }
-
-  // Pass the data along to the implementation.
-  WriteInternal(aBuffer, aCount);
-
-  // Finish telemetry.
-  mDecodeTime += (TimeStamp::Now() - start);
 }
 
 void
@@ -250,6 +246,12 @@ Decoder::SetTargetSize(const nsIntSize& aSize)
   return NS_OK;
 }
 
+Maybe<IntSize>
+Decoder::GetTargetSize()
+{
+  return mDownscaler ? Some(mDownscaler->TargetSize()) : Nothing();
+}
+
 nsresult
 Decoder::AllocateFrame(uint32_t aFrameNum,
                        const nsIntSize& aTargetSize,
@@ -311,7 +313,7 @@ Decoder::AllocateFrameInternal(uint32_t aFrameNum,
     return RawAccessFrameRef();
   }
 
-  RefPtr<imgFrame> frame = new imgFrame();
+  NotNull<RefPtr<imgFrame>> frame = WrapNotNull(new imgFrame());
   bool nonPremult = bool(mSurfaceFlags & SurfaceFlags::NO_PREMULTIPLY_ALPHA);
   if (NS_FAILED(frame->InitForDecoder(aTargetSize, aFrameRect, aFormat,
                                       aPaletteDepth, nonPremult))) {
@@ -326,8 +328,10 @@ Decoder::AllocateFrameInternal(uint32_t aFrameNum,
   }
 
   if (ShouldUseSurfaceCache()) {
+    NotNull<RefPtr<ISurfaceProvider>> provider =
+      WrapNotNull(new SimpleSurfaceProvider(frame));
     InsertOutcome outcome =
-      SurfaceCache::Insert(frame, ImageKey(mImage.get()),
+      SurfaceCache::Insert(provider, ImageKey(mImage.get()),
                            RasterSurfaceKey(aTargetSize,
                                             mSurfaceFlags,
                                             aFrameNum));
@@ -429,7 +433,8 @@ Decoder::PostFrameStop(Opacity aFrameOpacity
                        DisposalMethod aDisposalMethod
                          /* = DisposalMethod::KEEP */,
                        int32_t aTimeout         /* = 0 */,
-                       BlendMethod aBlendMethod /* = BlendMethod::OVER */)
+                       BlendMethod aBlendMethod /* = BlendMethod::OVER */,
+                       const Maybe<nsIntRect>& aBlendRect /* = Nothing() */)
 {
   // We should be mid-frame
   MOZ_ASSERT(!IsMetadataDecode(), "Stopping frame during metadata decode");
@@ -439,7 +444,8 @@ Decoder::PostFrameStop(Opacity aFrameOpacity
   // Update our state
   mInFrame = false;
 
-  mCurrentFrame->Finish(aFrameOpacity, aDisposalMethod, aTimeout, aBlendMethod);
+  mCurrentFrame->Finish(aFrameOpacity, aDisposalMethod, aTimeout,
+                        aBlendMethod, aBlendRect);
 
   mProgress |= FLAG_FRAME_COMPLETE;
 
@@ -453,7 +459,7 @@ Decoder::PostFrameStop(Opacity aFrameOpacity
   // If we are going to keep decoding we should notify now about the first frame being done.
   if (mImage && mFrameCount == 1 && HasAnimation()) {
     MOZ_ASSERT(HasProgress());
-    DecodePool::Singleton()->NotifyProgress(this);
+    IDecodingTask::NotifyProgress(WrapNotNull(this));
   }
 }
 

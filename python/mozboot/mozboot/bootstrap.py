@@ -7,7 +7,7 @@ from __future__ import print_function
 
 import platform
 import sys
-import os.path
+import os
 import subprocess
 
 # Don't forgot to add new mozboot modules to the bootstrap download
@@ -19,6 +19,11 @@ from mozboot.gentoo import GentooBootstrapper
 from mozboot.osx import OSXBootstrapper
 from mozboot.openbsd import OpenBSDBootstrapper
 from mozboot.archlinux import ArchlinuxBootstrapper
+from mozboot.windows import WindowsBootstrapper
+from mozboot.mozillabuild import MozillaBuildBootstrapper
+from mozboot.util import (
+    get_state_dir,
+)
 
 APPLICATION_CHOICE = '''
 Please choose the version of Firefox you want to build:
@@ -124,16 +129,6 @@ DEBIAN_DISTROS = (
 )
 
 
-def get_state_dir():
-    """Obtain path to a directory to hold state.
-
-    This code is shared with ``mach_bootstrap.py``.
-    """
-    state_user_dir = os.path.expanduser('~/.mozbuild')
-    state_env_dir = os.environ.get('MOZBUILD_STATE_PATH')
-    return state_env_dir or state_user_dir
-
-
 class Bootstrapper(object):
     """Main class that performs system bootstrap."""
 
@@ -183,6 +178,12 @@ class Bootstrapper(object):
             args['version'] = platform.release()
             args['flavor'] = platform.system()
 
+        elif sys.platform.startswith('win32') or sys.platform.startswith('msys'):
+            if 'MOZILLABUILD' in os.environ:
+                cls = MozillaBuildBootstrapper
+            else:
+                cls = WindowsBootstrapper
+
         if cls is None:
             raise NotImplementedError('Bootstrap support is not yet available '
                                       'for your OS.')
@@ -214,7 +215,7 @@ class Bootstrapper(object):
         # run in self-contained mode and only the files in this directory will
         # be available. We /could/ refactor parts of mach_bootstrap.py to be
         # part of this directory to avoid the code duplication.
-        state_dir = get_state_dir()
+        state_dir, _ = get_state_dir()
 
         if not os.path.exists(state_dir):
             if not self.instance.no_interactive:

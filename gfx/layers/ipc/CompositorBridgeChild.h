@@ -174,12 +174,16 @@ public:
 
   virtual void CancelWaitForRecycle(uint64_t aTextureId) override;
 
-  TextureClientPool* GetTexturePool(gfx::SurfaceFormat aFormat, TextureFlags aFlags);
+  TextureClientPool* GetTexturePool(LayersBackend aBackend,
+                                    gfx::SurfaceFormat aFormat,
+                                    TextureFlags aFlags);
   void ClearTexturePool();
 
   void HandleMemoryPressure();
 
   virtual MessageLoop* GetMessageLoop() const override { return mMessageLoop; }
+
+  virtual base::ProcessId GetParentPid() const override { return OtherPid(); }
 
   virtual bool AllocUnsafeShmem(size_t aSize,
                                 mozilla::ipc::SharedMemory::SharedMemoryType aShmType,
@@ -189,7 +193,12 @@ public:
                           mozilla::ipc::Shmem* aShmem) override;
   virtual void DeallocShmem(mozilla::ipc::Shmem& aShmem) override;
 
+  PCompositorWidgetChild* AllocPCompositorWidgetChild(const CompositorWidgetInitData& aInitData) override;
+  bool DeallocPCompositorWidgetChild(PCompositorWidgetChild* aActor) override;
+
   virtual ShmemAllocator* AsShmemAllocator() override { return this; }
+
+  void ProcessingError(Result aCode, const char* aReason) override;
 
 private:
   // Private destructor, to discourage deletion outside of Release():

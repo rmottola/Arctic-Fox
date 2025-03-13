@@ -639,9 +639,6 @@ class JSRuntimeWrapper
     mGlobal = nullptr;
 
     MOZ_COUNT_DTOR(JSRuntimeWrapper);
-    if (mContext) {
-      JS_DestroyContext(mContext);
-    }
 
     if (mRuntime) {
       JS_DestroyRuntime(mRuntime);
@@ -676,16 +673,19 @@ private:
 
   nsresult Init()
   {
+    mContext = JS_GetContext(mRuntime);
+
     /*
      * Not setting this will cause JS_CHECK_RECURSION to report false
      * positives
      */
-    JS_SetNativeStackQuota(mRuntime, 128 * sizeof(size_t) * 1024);
+    JS_SetNativeStackQuota(mContext, 128 * sizeof(size_t) * 1024);
 
-    JS::SetWarningReporter(mRuntime, PACWarningReporter);
+    JS::SetWarningReporter(mContext, PACWarningReporter);
 
-    mContext = JS_NewContext(mRuntime, 0);
-    NS_ENSURE_TRUE(mContext, NS_ERROR_OUT_OF_MEMORY);
+    if (!JS::InitSelfHostedCode(mContext)) {
+      return NS_ERROR_OUT_OF_MEMORY;
+    }
 
     JSAutoRequest ar(mContext);
 

@@ -9,7 +9,6 @@ findbar {
   background: @scopeBarBackground@;
   border-top: @scopeBarSeparatorBorder@;
   min-width: 1px;
-  padding: 4px 2px;
   transition-property: margin-bottom, opacity, visibility;
   transition-duration: 150ms, 150ms, 0s;
   transition-timing-function: ease-in-out, ease-in-out, linear;
@@ -35,10 +34,16 @@ findbar:-moz-lwtheme {
   border-style: none;
 }
 
+.findbar-container {
+  padding-inline-start: 2px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
 label.findbar-find-fast {
-  margin: 1px 3px 0 !important;
   color: @scopeBarTitleColor@;
-  font-weight: bold;
+  margin: 0;
+  margin-inline-start: 12px;
   text-shadow: @loweredShadow@;
 }
 
@@ -49,20 +54,15 @@ label.findbar-find-fast:-moz-lwtheme,
 }
 
 .findbar-closebutton {
-  padding: 0;
-  margin: 0 4px;
+  margin-inline-start: 4px;
+  padding-inline-start: 0;
+  padding-inline-end: 8px;
   border: none;
-}
-
-.findbar-closebutton:-moz-lwtheme-brighttext {
-  list-style-image: url("chrome://global/skin/icons/close-inverted.png");
+  /* make sure the closebutton is displayed as the first element in the bar: */
+  -moz-box-ordinal-group: 0;
 }
 
 @media (min-resolution: 2dppx) {
-  .findbar-closebutton:-moz-lwtheme-brighttext {
-    list-style-image: url("chrome://global/skin/icons/close-inverted@2x.png");
-  }
-  
   .findbar-closebutton > .toolbarbutton-icon {
     width: 16px;
   }
@@ -70,24 +70,42 @@ label.findbar-find-fast:-moz-lwtheme,
 
 .findbar-find-next,
 .findbar-find-previous,
-.findbar-highlight {
-  margin: 0 4px;
-  padding: 1px 3px;
+.findbar-highlight,
+.findbar-case-sensitive,
+.findbar-entire-word {
   -moz-appearance: none;
   border-radius: 10000px;
   border: @roundButtonBorder@;
   background: @roundButtonBackground@;
   box-shadow: @roundButtonShadow@;
   color: buttontext;
+  margin: 0;
 }
 
-.findbar-container > toolbarbutton:-moz-focusring {
+@media (-moz-mac-yosemite-theme) {
+  .findbar-find-previous,
+  .findbar-find-next {
+    border-radius: 3px;
+    box-shadow: none;
+  }
+}
+
+.findbar-highlight,
+.findbar-case-sensitive,
+.findbar-entire-word {
+  margin-inline-end: 5px;
+  padding: 2px 9px;
+}
+
+.findbar-highlight {
+  margin-inline-start: 8px;
+}
+
+.findbar-container > toolbarbutton:-moz-focusring,
+.findbar-find-next:-moz-focusring,
+.findbar-find-previous:-moz-focusring {
   position: relative;
   box-shadow: @focusRingShadow@, @roundButtonShadow@;
-}
-
-.findbar-container > toolbarbutton > .toolbarbutton-text {
-  margin: 0 6px !important;
 }
 
 .findbar-container > toolbarbutton[disabled] {
@@ -96,98 +114,52 @@ label.findbar-find-fast:-moz-lwtheme,
 
 .findbar-find-next:not([disabled]):hover:active,
 .findbar-find-previous:not([disabled]):hover:active,
-.findbar-highlight:not([disabled]):hover:active {
+.findbar-highlight:not([disabled]):hover:active,
+.findbar-case-sensitive:not([disabled]):hover:active,
+.findbar-entire-word:not([disabled]):hover:active,
+.findbar-highlight:not([disabled])[checked="true"],
+.findbar-case-sensitive:not([disabled])[checked="true"],
+.findbar-entire-word:not([disabled])[checked="true"] {
   text-shadow: @loweredShadow@;
   background: @roundButtonPressedBackground@;
   box-shadow: @roundButtonPressedShadow@;
 }
 
-.findbar-container > toolbarbutton:hover:active:-moz-focusring {
+.findbar-find-next:hover:active:-moz-focusring,
+.findbar-find-previous:hover:active:-moz-focusring {
   text-shadow: @loweredShadow@;
   background: @roundButtonPressedBackground@;
   box-shadow: @focusRingShadow@, @roundButtonPressedShadow@;
 }
 
-.findbar-closebutton > .toolbarbutton-text {
-  display: none;  
-}
-
-/* Match case checkbox */
-
-.findbar-container > checkbox {
-  list-style-image: url("chrome://global/skin/icons/checkbox.png");
-  -moz-image-region: rect(0px 16px 16px 0px);
-  -moz-appearance: none;
-  margin: 0 2px;
-  -moz-margin-start: 7px;
-}
-
-.findbar-container > checkbox:hover:active {
-  -moz-image-region: rect(0px 32px 16px 16px);
-}
-.findbar-container > checkbox[checked] {
-  -moz-image-region: rect(0px 48px 16px 32px);
-}
-.findbar-container > checkbox[checked]:hover:active {
-  -moz-image-region: rect(0px 64px 16px 48px);
-}
-
-@media (min-resolution: 2dppx) {
-  .findbar-container > checkbox {
-    list-style-image: url("chrome://global/skin/icons/checkbox@2x.png");
-    -moz-image-region: rect(0px 32px 32px 0px);
-  }
-
-  .findbar-container > checkbox:hover:active {
-    -moz-image-region: rect(0px 64px 32px 32px);
-  }
-  .findbar-container > checkbox[checked] {
-    -moz-image-region: rect(0px 96px 32px 64px);
-  }
-  .findbar-container > checkbox[checked]:hover:active {
-    -moz-image-region: rect(0px 128px 32px 96px);
-  }
-}
-
-
-
-.findbar-container > checkbox > .checkbox-check {
-  display: none;
-}
-
-.findbar-container > checkbox > .checkbox-label-box > .checkbox-label {
-  margin: 0 !important;
-  padding: 2px 0 0;
-}
-
-.findbar-container > checkbox > .checkbox-label-box > .checkbox-icon {
-  -moz-padding-start: 1px;
-  padding-bottom: 1px;
-}
-@media (min-resolution: 2dppx) {
-  .findbar-container > checkbox > .checkbox-label-box > .checkbox-icon {
-    width: 17px;
-    height: 17px;
-  }
-}
-
-.findbar-container > checkbox:-moz-focusring > .checkbox-label-box > .checkbox-icon {
-  border-radius: 4px;
-  box-shadow: @focusRingShadow@;
-}
-
 /* Search field */
 
 .findbar-textbox {
+  position: relative;
   -moz-appearance: none;
-  border-radius: 10000px;
-  border: none;
-  box-shadow: 0 1px 1.5px rgba(0, 0, 0, .7) inset,
-              0 0 0 1px rgba(0, 0, 0, .17) inset;
-  background: url("chrome://global/skin/icons/search-textbox.png") -moz-Field no-repeat 5px center;
-  margin: 0 4px -1px;
-  padding: 3px 8px 2px;
-  -moz-padding-start: 19px;
+  border: @roundButtonBorder@;
+  border-radius: 10000px 0 0 10000px;
+  box-shadow: @roundButtonShadow@;
+  background: url("chrome://global/skin/icons/search-textbox.svg") -moz-Field no-repeat 5px center;
+  margin: 0;
+  padding: 2px 8px;
+  padding-inline-start: 19px;
+}
+
+.findbar-textbox:-moz-locale-dir(rtl) {
+  border-radius: 0 10000px 10000px 0;
+}
+
+@media (-moz-mac-yosemite-theme) {
+  .findbar-textbox {
+    border-top-left-radius: 3px;
+    border-bottom-left-radius: 3px;
+    box-shadow: none;
+  }
+
+  .findbar-textbox:-moz-locale-dir(rtl) {
+    border-radius: 0 3px 3px 0;
+  }
 }
 
 .findbar-textbox:not([focused="true"]):-moz-lwtheme {
@@ -195,8 +167,7 @@ label.findbar-find-fast:-moz-lwtheme,
 }
 
 .findbar-textbox[focused="true"] {
-  box-shadow: @focusRingShadow@,
-              0 1px 1.5px rgba(0, 0, 0, .8) inset;
+  box-shadow: @focusRingShadow@;
 }
 
 .findbar-textbox[flash="true"] {
@@ -208,52 +179,48 @@ label.findbar-find-fast:-moz-lwtheme,
   color: #FFF;
 }
 
-/* find-next button */
+.findbar-textbox.minimal {
+  border-radius: 10000px;
+  margin-inline-start: 5px;
+}
 
+/* Find previous/next buttons */
+
+.findbar-find-previous,
 .findbar-find-next {
-  -moz-border-end: none;
-  -moz-margin-end: 0 !important;
+  margin-inline-start: 0;
+  padding: 3px 6px 1px;
 }
 
-.findbar-find-next:-moz-locale-dir(ltr),
-.findbar-find-previous:-moz-locale-dir(rtl) {
-  border-top-right-radius: 0px;
-  border-bottom-right-radius: 0px;
+.findbar-find-previous > .toolbarbutton-icon,
+.findbar-find-next > .toolbarbutton-icon {
+  margin: 0;
 }
-
-/* find-previous button */
 
 .findbar-find-previous {
-  -moz-margin-start: 0 !important;
+  border-left: none;
+  border-right: none;
+  margin-inline-end: 0;
+  list-style-image: url(chrome://global/skin/icons/find-arrows.svg#glyph-find-previous);
+  border-radius: 0;
 }
 
-.findbar-find-previous:-moz-locale-dir(ltr),
+.findbar-find-next {
+  list-style-image: url(chrome://global/skin/icons/find-arrows.svg#glyph-find-next);
+  padding-inline-end: 7px;
+}
+
+.findbar-find-next:-moz-locale-dir(ltr) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 .findbar-find-next:-moz-locale-dir(rtl) {
-  border-top-left-radius: 0px;
-  border-bottom-left-radius: 0px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
-/* highlight button */
-
-.findbar-highlight {
-  -moz-margin-start: 8px;
-}
-
-.findbar-highlight > .toolbarbutton-icon {
-  width: 13px;
-  height: 8px;
-  margin: 0 4px;
-  -moz-margin-end: 0;
-  border: 1px solid #818181;
-  border-radius: 4px;
-  background-color: #F4F4F3;
-}
-
-
-.findbar-highlight[checked="true"] > .toolbarbutton-icon {
-  background-color: #FFFF00;
-  border-color: #818100;
-}
+/* Status description */
 
 .find-status-icon {
   display: none;
@@ -261,14 +228,20 @@ label.findbar-find-fast:-moz-lwtheme,
 
 .find-status-icon[status="pending"] {
   display: block;
-  list-style-image: url("chrome://global/skin/icons/loading_16.png");
+  list-style-image: url("chrome://global/skin/icons/loading.png");
+}
+
+@media (min-resolution: 2dppx) {
+  .find-status-icon[status="pending"] {
+    width: 16px;
+    list-style-image: url("chrome://global/skin/icons/loading@2x.png");
+  }
 }
 
 .findbar-find-status,
 .found-matches {
-  color: #436599;
-  font-weight: bold;
-  text-shadow: 0 1px rgba(255, 255, 255, .4);
-  margin: 1px 1px 0 !important;
-  -moz-margin-start: 12px !important;
+  color: rgba(0,0,0,.5);
+  margin: 0 !important;
+  margin-inline-start: 12px !important;
+  text-shadow: 0 1px rgba(255,255,255,.4);
 }

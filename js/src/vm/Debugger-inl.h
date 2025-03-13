@@ -80,6 +80,31 @@ js::Debugger::onNewWasmInstance(JSContext* cx, Handle<WasmInstanceObject*> wasmI
 }
 
 inline js::Debugger*
+js::DebuggerEnvironment::owner() const
+{
+    JSObject* dbgobj = &getReservedSlot(OWNER_SLOT).toObject();
+    return Debugger::fromJSObject(dbgobj);
+}
+
+inline js::AbstractFramePtr
+js::DebuggerFrame::referent() const
+{
+    AbstractFramePtr frame = AbstractFramePtr::FromRaw(getPrivate());
+    if (frame.isScriptFrameIterData()) {
+        ScriptFrameIter iter(*(ScriptFrameIter::Data*)(frame.raw()));
+        frame = iter.abstractFramePtr();
+    }
+    return frame;
+}
+
+inline js::Debugger*
+js::DebuggerFrame::owner() const
+{
+    JSObject* dbgobj = &getReservedSlot(OWNER_SLOT).toObject();
+    return Debugger::fromJSObject(dbgobj);
+}
+
+inline js::Debugger*
 js::DebuggerObject::owner() const
 {
     JSObject* dbgobj = &getReservedSlot(OWNER_SLOT).toObject();

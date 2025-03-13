@@ -36,6 +36,7 @@
 #include "nsQueryObject.h"
 
 // form submission
+#include "HTMLFormSubmissionConstants.h"
 #include "mozilla/dom/FormData.h"
 #include "mozilla/Telemetry.h"
 #include "nsIFormSubmitObserver.h"
@@ -50,7 +51,6 @@
 #include "nsIInterfaceRequestorUtils.h"
 #include "nsIWebProgress.h"
 #include "nsIDocShell.h"
-#include "nsFormSubmissionConstants.h"
 #include "nsIPrompt.h"
 #include "nsISecurityUITelemetry.h"
 #include "nsIStringBundle.h"
@@ -646,7 +646,7 @@ HTMLFormElement::DoSubmit(WidgetEvent* aEvent)
   mIsSubmitting = true;
   NS_ASSERTION(!mWebProgress && !mSubmittingRequest, "Web progress / submitting request should not exist here!");
 
-  nsAutoPtr<nsFormSubmission> submission;
+  nsAutoPtr<HTMLFormSubmission> submission;
 
   //
   // prepare the submission object
@@ -686,7 +686,7 @@ HTMLFormElement::DoSubmit(WidgetEvent* aEvent)
 }
 
 nsresult
-HTMLFormElement::BuildSubmission(nsFormSubmission** aFormSubmission,
+HTMLFormElement::BuildSubmission(HTMLFormSubmission** aFormSubmission,
                                  WidgetEvent* aEvent)
 {
   NS_ASSERTION(!mPendingSubmission, "tried to build two submissions!");
@@ -711,7 +711,8 @@ HTMLFormElement::BuildSubmission(nsFormSubmission** aFormSubmission,
   //
   // Get the submission object
   //
-  rv = GetSubmissionFromForm(this, originatingElement, aFormSubmission);
+  rv = HTMLFormSubmission::GetFromForm(this, originatingElement,
+                                       aFormSubmission);
   NS_ENSURE_SUBMIT_SUCCESS(rv);
 
   //
@@ -724,7 +725,7 @@ HTMLFormElement::BuildSubmission(nsFormSubmission** aFormSubmission,
 }
 
 nsresult
-HTMLFormElement::SubmitSubmission(nsFormSubmission* aFormSubmission)
+HTMLFormElement::SubmitSubmission(HTMLFormSubmission* aFormSubmission)
 {
   nsresult rv;
   nsIContent* originatingElement = aFormSubmission->GetOriginatingElement();
@@ -1035,7 +1036,7 @@ HTMLFormElement::NotifySubmitObservers(nsIURI* aActionURL,
 
 
 nsresult
-HTMLFormElement::WalkFormElements(nsFormSubmission* aFormSubmission)
+HTMLFormElement::WalkFormElements(HTMLFormSubmission* aFormSubmission)
 {
   nsTArray<nsGenericHTMLFormElement*> sortedControls;
   nsresult rv = mControls->GetSortedControls(sortedControls);
@@ -1611,7 +1612,7 @@ HTMLFormElement::FlushPendingSubmission()
   if (mPendingSubmission) {
     // Transfer owning reference so that the submissioin doesn't get deleted
     // if we reenter
-    nsAutoPtr<nsFormSubmission> submission = Move(mPendingSubmission);
+    nsAutoPtr<HTMLFormSubmission> submission = Move(mPendingSubmission);
 
     SubmitSubmission(submission);
   }
@@ -1728,7 +1729,7 @@ HTMLFormElement::GetActionURL(nsIURI** aActionURL,
                       true, &permitsFormAction);
     NS_ENSURE_SUCCESS(rv, rv);
     if (!permitsFormAction) {
-      rv = NS_ERROR_CSP_FORM_ACTION_VIOLATION;
+      return NS_ERROR_CSP_FORM_ACTION_VIOLATION;
     }
   }
 

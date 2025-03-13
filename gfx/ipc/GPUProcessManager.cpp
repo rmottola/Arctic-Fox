@@ -19,13 +19,13 @@ static StaticAutoPtr<GPUProcessManager> sSingleton;
 GPUProcessManager*
 GPUProcessManager::Get()
 {
-  MOZ_ASSERT(sSingleton);
   return sSingleton;
 }
 
 void
 GPUProcessManager::Initialize()
 {
+  MOZ_ASSERT(XRE_IsParentProcess());
   sSingleton = new GPUProcessManager();
 }
 
@@ -150,30 +150,27 @@ GPUProcessManager::DestroyProcess()
 }
 
 already_AddRefed<CompositorSession>
-GPUProcessManager::CreateTopLevelCompositor(widget::CompositorWidgetProxy* aProxy,
+GPUProcessManager::CreateTopLevelCompositor(nsIWidget* aWidget,
                                             ClientLayerManager* aLayerManager,
                                             CSSToLayoutDeviceScale aScale,
                                             bool aUseAPZ,
                                             bool aUseExternalSurfaceSize,
-                                            int aSurfaceWidth,
-                                            int aSurfaceHeight)
+                                            const gfx::IntSize& aSurfaceSize)
 {
   return CompositorSession::CreateInProcess(
-    aProxy,
+    aWidget,
     aLayerManager,
     aScale,
     aUseAPZ,
     aUseExternalSurfaceSize,
-    aSurfaceWidth,
-    aSurfaceHeight);
+    aSurfaceSize);
 }
 
 PCompositorBridgeParent*
 GPUProcessManager::CreateTabCompositorBridge(ipc::Transport* aTransport,
-                                             base::ProcessId aOtherProcess,
-                                             ipc::GeckoChildProcessHost* aSubprocess)
+                                             base::ProcessId aOtherProcess)
 {
-  return CompositorBridgeParent::Create(aTransport, aOtherProcess, aSubprocess);
+  return CompositorBridgeParent::Create(aTransport, aOtherProcess);
 }
 
 already_AddRefed<APZCTreeManager>

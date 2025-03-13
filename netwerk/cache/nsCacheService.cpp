@@ -1030,7 +1030,7 @@ public:
 
     NS_IMETHOD Run()
     {
-        nsCacheServiceAutoLock lock(LOCK_TELEM(NSDOOMEVENT_RUN));
+        nsCacheServiceAutoLock lock;
 
         bool foundActive = true;
         nsresult status = NS_ERROR_NOT_AVAILABLE;
@@ -1616,9 +1616,6 @@ nsCacheService::CreateDiskDevice()
         mDiskDevice = nullptr;
         return rv;
     }
-
-    Telemetry::Accumulate(Telemetry::DISK_CACHE_SMART_SIZE_USING_OLD_MAX,
-                          mObserver->ShouldUseOldMaxSmartSize());
 
     NS_ASSERTION(!mSmartSizeTimer, "Smartsize timer was already fired!");
 

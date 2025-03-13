@@ -127,7 +127,7 @@ NSPoint nsCocoaUtils::ScreenLocationForEvent(NSEvent* anEvent)
   if (IsMomentumScrollEvent(anEvent))
     return ChildViewMouseTracker::sLastScrollEventScreenLocation;
 
-  return [[anEvent window] convertBaseToScreen:[anEvent locationInWindow]];
+  return nsCocoaUtils::ConvertPointToScreen([anEvent window], [anEvent locationInWindow]);
 
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(NSMakePoint(0.0, 0.0));
 }
@@ -145,7 +145,7 @@ NSPoint nsCocoaUtils::EventLocationForWindow(NSEvent* anEvent, NSWindow* aWindow
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK_RETURN;
 
-  return [aWindow convertScreenToBase:ScreenLocationForEvent(anEvent)];
+  return nsCocoaUtils::ConvertPointFromScreen(aWindow, ScreenLocationForEvent(anEvent));
 
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(NSMakePoint(0.0, 0.0));
 }

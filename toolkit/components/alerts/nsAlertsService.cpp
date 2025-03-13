@@ -5,6 +5,7 @@
 
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/PermissionMessageUtils.h"
+#include "mozilla/Preferences.h"
 #include "mozilla/Telemetry.h"
 #include "nsXULAppAPI.h"
 
@@ -126,11 +127,14 @@ nsresult
 ShowWithBackend(nsIAlertsService* aBackend, nsIAlertNotification* aAlert,
                 nsIObserver* aAlertListener)
 {
-  nsresult rv = ShowWithIconBackend(aBackend, aAlert, aAlertListener);
-  if (NS_SUCCEEDED(rv)) {
-    return rv;
+  if (Preferences::GetBool("alerts.showFavicons")) {
+    nsresult rv = ShowWithIconBackend(aBackend, aAlert, aAlertListener);
+    if (NS_SUCCEEDED(rv)) {
+      return rv;
+    }
   }
-  // If the backend doesn't support favicons, show the alert without one.
+  // If favicons are disabled, or the backend doesn't support them, show the
+  // alert without one.
   return aBackend->ShowAlert(aAlert, aAlertListener);
 }
 
@@ -204,6 +208,13 @@ NS_IMETHODIMP nsAlertsService::ShowAlertNotification(const nsAString & aImageUrl
 NS_IMETHODIMP nsAlertsService::ShowAlert(nsIAlertNotification * aAlert,
                                          nsIObserver * aAlertListener)
 {
+  return ShowPersistentNotification(EmptyString(), aAlert, aAlertListener);
+}
+
+NS_IMETHODIMP nsAlertsService::ShowPersistentNotification(const nsAString & aPersistentData,
+                                                          nsIAlertNotification * aAlert,
+                                                          nsIObserver * aAlertListener)
+{
   NS_ENSURE_ARG(aAlert);
 
   nsAutoString cookie;
@@ -241,8 +252,14 @@ NS_IMETHODIMP nsAlertsService::ShowAlert(nsIAlertNotification * aAlert,
   rv = aAlert->GetPrincipal(getter_AddRefs(principal));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  mozilla::AndroidBridge::Bridge()->ShowAlertNotification(imageUrl, title, text, cookie,
-                                                          aAlertListener, name, principal);
+  if (!aPersistentData.IsEmpty()) {
+    mozilla::AndroidBridge::Bridge()->ShowPersistentAlertNotification
+        (aPersistentData, imageUrl, title, text, cookie, name, principal);
+  } else {
+    mozilla::AndroidBridge::Bridge()->ShowAlertNotification
+        (imageUrl, title, text, cookie, aAlertListener, name, principal);
+  }
+
   return NS_OK;
 #else
   // Check if there is an optional service that handles system-level notifications

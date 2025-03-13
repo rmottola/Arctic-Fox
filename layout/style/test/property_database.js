@@ -3672,6 +3672,45 @@ var gCSSProperties = {
     other_values: [ "double", "dotted", "dashed", "wavy", "-moz-none" ],
     invalid_values: [ "none", "groove", "ridge", "inset", "outset", "solid dashed", "wave" ]
   },
+  "text-emphasis": {
+    domProp: "textEmphasis",
+    inherited: true,
+    type: CSS_TYPE_TRUE_SHORTHAND,
+    prerequisites: { "color": "black" },
+    subproperties: [ "text-emphasis-style", "text-emphasis-color" ],
+    initial_values: [ "none currentColor", "currentColor none", "none", "currentColor", "none black" ],
+    other_values: [ "filled dot black", "#f00 circle open", "sesame filled rgba(0,0,255,0.5)", "red", "green none", "currentColor filled", "currentColor open" ],
+    invalid_values: [ "filled black dot", "filled filled red", "open open circle #000", "circle dot #f00", "rubbish" ]
+  },
+  "text-emphasis-color": {
+    domProp: "textEmphasisColor",
+    inherited: true,
+    type: CSS_TYPE_LONGHAND,
+    prerequisites: { "color": "black" },
+    initial_values: [ "currentColor", "black", "rgb(0,0,0)" ],
+    other_values: [ "red", "rgba(255,255,255,0.5)", "transparent" ],
+    invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000", "000000", "ff00ff", "rgb(255,xxx,255)" ]
+  },
+  "text-emphasis-position": {
+    domProp: "textEmphasisPosition",
+    inherited: true,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: [ "over right", "right over" ],
+    other_values: [ "over left", "left over", "under left", "left under", "under right", "right under" ],
+    invalid_values: [ "over over", "left left", "over right left", "rubbish left", "over rubbish" ]
+  },
+  "text-emphasis-style": {
+    domProp: "textEmphasisStyle",
+    inherited: true,
+    type: CSS_TYPE_LONGHAND,
+    initial_values: [ "none" ],
+    other_values: [ "filled", "open", "dot", "circle", "double-circle", "triangle", "sesame", "'#'",
+                    "filled dot", "filled circle", "filled double-circle", "filled triangle", "filled sesame",
+                    "dot filled", "circle filled", "double-circle filled", "triangle filled", "sesame filled",
+                    "dot open", "circle open", "double-circle open", "triangle open", "sesame open" ],
+    invalid_values: [ "rubbish", "dot rubbish", "rubbish dot", "open rubbish", "rubbish open", "open filled", "dot circle",
+                      "open '#'", "'#' filled", "dot '#'", "'#' circle", "1", "1 open", "open 1" ]
+  },
   "text-indent": {
     domProp: "textIndent",
     inherited: true,
@@ -3792,7 +3831,7 @@ var gCSSProperties = {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "normal" ],
-    other_values: [ "embed", "bidi-override", "-moz-isolate", "-moz-plaintext", "-moz-isolate-override" ],
+    other_values: [ "embed", "bidi-override", "isolate", "plaintext", "isolate-override", "-moz-isolate", "-moz-plaintext", "-moz-isolate-override" ],
     invalid_values: [ "auto", "none" ]
   },
   "vertical-align": {
@@ -6013,18 +6052,19 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
       "-40px",
       "-12%",
       "-2fr",
-      "(foo)",
-      "(inherit) 40px",
-      "(initial) 40px",
-      "(unset) 40px",
-      "(default) 40px",
-      "(6%) 40px",
-      "(5th) 40px",
-      "(foo() bar) 40px",
-      "(foo)) 40px",
+      "[foo]",
+      "[inherit] 40px",
+      "[initial] 40px",
+      "[unset] 40px",
+      "[default] 40px",
+      "[span] 40px",
+      "[6%] 40px",
+      "[5th] 40px",
+      "[foo[] bar] 40px",
+      "[foo]] 40px",
       "(foo) 40px",
-      "(foo) (bar) 40px",
-      "40px (foo) (bar)",
+      "[foo] [bar] 40px",
+      "40px [foo] [bar]",
       "minmax()",
       "minmax(20px)",
       "mİnmax(20px, 100px)",
@@ -6081,18 +6121,23 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
       "subgrid [x] repeat(auto-fill, []) [y z]"
     );
     gCSSProperties["grid-template-columns"].invalid_values.push(
-      "subgrid (foo) 40px",
-      "subgrid (foo 40px)",
-      "(foo) subgrid",
-      "subgrid rêpeat(1, ())",
-      "subgrid repeat(0, ())",
-      "subgrid repeat(-3, ())",
-      "subgrid repeat(2.0, ())",
-      "subgrid repeat(2.5, ())",
-      "subgrid repeat(3px, ())",
+      "subgrid [inherit]",
+      "subgrid [initial]",
+      "subgrid [unset]",
+      "subgrid [default]",
+      "subgrid [span]",
+      "subgrid [foo] 40px",
+      "subgrid [foo 40px]",
+      "[foo] subgrid",
+      "subgrid rêpeat(1, [])",
+      "subgrid repeat(0, [])",
+      "subgrid repeat(-3, [])",
+      "subgrid repeat(2.0, [])",
+      "subgrid repeat(2.5, [])",
+      "subgrid repeat(3px, [])",
       "subgrid repeat(1)",
       "subgrid repeat(1, )",
-      "subgrid repeat(2, (40px))",
+      "subgrid repeat(2, [40px])",
       "subgrid repeat(2, foo)",
       "subgrid repeat(1, repeat(1, []))",
       "subgrid repeat(auto-fit,[])",
@@ -6764,8 +6809,8 @@ if (SupportsMaskShorthand()) {
       "repeat-y",
       "no-repeat",
       "none repeat-y alpha add 0% 0%",
-      "substract",
-      "0% top substract alpha repeat none",
+      "subtract",
+      "0% top subtract alpha repeat none",
       "top",
       "left",
       "50% 50%",
@@ -6792,9 +6837,9 @@ if (SupportsMaskShorthand()) {
       "-moz-element(#test) alpha",
       /* multiple mask-image */
       "url(404.png), url(404.png)",
-      "repeat-x, substract, none",
+      "repeat-x, subtract, none",
       "0% top url(404.png), url(404.png) 0% top",
-      "substract repeat-y top left url(404.png), repeat-x alpha",
+      "subtract repeat-y top left url(404.png), repeat-x alpha",
       "url(404.png), -moz-linear-gradient(20px 20px -45deg, blue, green), -moz-element(#a) alpha",
       "top left / contain, bottom right / cover",
       /* test cases with clip+origin in the shorthand */
@@ -6862,8 +6907,8 @@ if (SupportsMaskShorthand()) {
     inherited: false,
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "add" ],
-    other_values: [ "substract", "intersect", "exclude", "add, add", "substract, intersect", "substract, substract, add"],
-    invalid_values: [ "add substract", "intersect exclude" ]
+    other_values: [ "subtract", "intersect", "exclude", "add, add", "subtract, intersect", "subtract, subtract, add"],
+    invalid_values: [ "add subtract", "intersect exclude" ]
   };
   gCSSProperties["mask-origin"] = {
     domProp: "maskOrigin",
@@ -7475,48 +7520,6 @@ if (IsCSSPropertyPrefEnabled("layout.css.float-logical-values.enabled")) {
   gCSSProperties["float"].invalid_values.push("inline-end");
   gCSSProperties["clear"].invalid_values.push("inline-start");
   gCSSProperties["clear"].invalid_values.push("inline-end");
-}
-
-if (IsCSSPropertyPrefEnabled("layout.css.text-emphasis.enabled")) {
-  gCSSProperties["text-emphasis"] = {
-    domProp: "textEmphasis",
-    inherited: true,
-    type: CSS_TYPE_TRUE_SHORTHAND,
-    prerequisites: { "color": "black" },
-    subproperties: [ "text-emphasis-style", "text-emphasis-color" ],
-    initial_values: [ "none currentColor", "currentColor none", "none", "currentColor", "none black" ],
-    other_values: [ "filled dot black", "#f00 circle open", "sesame filled rgba(0,0,255,0.5)", "red", "green none", "currentColor filled", "currentColor open" ],
-    invalid_values: [ "filled black dot", "filled filled red", "open open circle #000", "circle dot #f00", "rubbish" ]
-  };
-  gCSSProperties["text-emphasis-color"] = {
-    domProp: "textEmphasisColor",
-    inherited: true,
-    type: CSS_TYPE_LONGHAND,
-    prerequisites: { "color": "black" },
-    initial_values: [ "currentColor", "black", "rgb(0,0,0)" ],
-    other_values: [ "red", "rgba(255,255,255,0.5)", "transparent" ],
-    invalid_values: [ "#0", "#00", "#00000", "#0000000", "#000000000", "000000", "ff00ff", "rgb(255,xxx,255)" ]
-  };
-  gCSSProperties["text-emphasis-position"] = {
-    domProp: "textEmphasisPosition",
-    inherited: true,
-    type: CSS_TYPE_LONGHAND,
-    initial_values: [ "over right", "right over" ],
-    other_values: [ "over left", "left over", "under left", "left under", "under right", "right under" ],
-    invalid_values: [ "over over", "left left", "over right left", "rubbish left", "over rubbish" ]
-  };
-  gCSSProperties["text-emphasis-style"] = {
-    domProp: "textEmphasisStyle",
-    inherited: true,
-    type: CSS_TYPE_LONGHAND,
-    initial_values: [ "none" ],
-    other_values: [ "filled", "open", "dot", "circle", "double-circle", "triangle", "sesame", "'#'",
-                    "filled dot", "filled circle", "filled double-circle", "filled triangle", "filled sesame",
-                    "dot filled", "circle filled", "double-circle filled", "triangle filled", "sesame filled",
-                    "dot open", "circle open", "double-circle open", "triangle open", "sesame open" ],
-    invalid_values: [ "rubbish", "dot rubbish", "rubbish dot", "open rubbish", "rubbish open", "open filled", "dot circle",
-                      "open '#'", "'#' filled", "dot '#'", "'#' circle", "1", "1 open", "open 1" ]
-  };
 }
 
 if (IsCSSPropertyPrefEnabled("layout.css.background-clip-text.enabled")) {

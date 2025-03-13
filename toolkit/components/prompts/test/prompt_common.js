@@ -121,3 +121,14 @@ function getDialogDoc() {
 
   return null;
 }
+
+function checkEchoedAuthInfo(expectedState, doc) {
+    // The server echos back the HTTP auth info it received.
+    let username = doc.getElementById("user").textContent;
+    let password = doc.getElementById("pass").textContent;
+    let authok = doc.getElementById("ok").textContent;
+
+    is(authok, "PASS", "Checking for successful authentication");
+    is(username, expectedState.user, "Checking for echoed username");
+    is(password, expectedState.pass, "Checking for echoed password");
+}

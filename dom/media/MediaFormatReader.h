@@ -102,6 +102,7 @@ public:
   void GetMozDebugReaderData(nsAString& aString);
 
 private:
+
   bool HasVideo() { return mVideo.mTrackDemuxer; }
   bool HasAudio() { return mAudio.mTrackDemuxer; }
 
@@ -183,6 +184,8 @@ private:
   void DropDecodedSamples(TrackType aTrack);
 
   bool ShouldSkip(bool aSkipToNextKeyframe, media::TimeUnit aTimeThreshold);
+
+  void SetVideoDecodeThreshold();
 
   size_t SizeOfQueue(TrackType aTrack);
 
@@ -423,6 +426,7 @@ private:
     media::TimeIntervals mTimeRanges;
     Maybe<media::TimeUnit> mLastTimeRangesEnd;
     RefPtr<SharedTrackInfo> mInfo;
+    Maybe<media::TimeUnit> mFirstDemuxedSampleTime;
   };
 
   class DecoderDataWithPromise : public DecoderData {
@@ -530,6 +534,8 @@ private:
   Atomic<bool> mDemuxOnly;
 
   // Seeking objects.
+  void SetSeekTarget(const SeekTarget& aTarget);
+  media::TimeUnit DemuxStartTime();
   bool IsSeeking() const { return mPendingSeekTime.isSome(); }
   bool IsVideoSeeking() const
   {
@@ -565,10 +571,7 @@ private:
 #ifdef MOZ_EME
   RefPtr<CDMProxy> mCDMProxy;
 #endif
-
-#if defined(READER_DORMANT_HEURISTIC)
-  const bool mDormantEnabled;
-#endif
+  RefPtr<GMPCrashHelper> mCrashHelper;
 };
 
 } // namespace mozilla

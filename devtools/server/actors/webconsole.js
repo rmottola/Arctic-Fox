@@ -18,6 +18,7 @@ const ErrorDocs = require("devtools/server/actors/errordocs");
 loader.lazyRequireGetter(this, "NetworkMonitor", "devtools/shared/webconsole/network-monitor", true);
 loader.lazyRequireGetter(this, "NetworkMonitorChild", "devtools/shared/webconsole/network-monitor", true);
 loader.lazyRequireGetter(this, "ConsoleProgressListener", "devtools/shared/webconsole/network-monitor", true);
+loader.lazyRequireGetter(this, "StackTraceCollector", "devtools/shared/webconsole/network-monitor", true);
 loader.lazyRequireGetter(this, "events", "sdk/event/core");
 loader.lazyRequireGetter(this, "ServerLoggingListener", "devtools/shared/webconsole/server-logger", true);
 loader.lazyRequireGetter(this, "JSPropertyProvider", "devtools/shared/webconsole/js-property-provider", true);
@@ -161,8 +162,12 @@ WebConsoleActor.prototype =
   },
 
   /**
-   * The window we work with.
-   * @type nsIDOMWindow
+   * The window or sandbox we work with.
+   * Note that even if it is named `window` it refers to the current
+   * global we are debugging, which can be a Sandbox for addons
+   * or browser content toolbox.
+   *
+   * @type nsIDOMWindow or Sandbox
    */
   get window() {
     if (this.parentActor.isRootActor) {
@@ -594,6 +599,12 @@ WebConsoleActor.prototype =
           break;
         case "NetworkActivity":
           if (!this.networkMonitor) {
+            // Create a StackTraceCollector that's going to be shared both by the
+            // NetworkMonitorChild (getting messages about requests from parent) and
+            // by the NetworkMonitor that directly watches service workers requests.
+            this.stackTraceCollector = new StackTraceCollector({ window, appId });
+            this.stackTraceCollector.init();
+
             if (appId || messageManager) {
               // Start a network monitor in the parent process to listen to
               // most requests than happen in parent
@@ -602,12 +613,10 @@ WebConsoleActor.prototype =
                                         this.parentActor.actorID, this);
               this.networkMonitor.init();
               // Spawn also one in the child to listen to service workers
-              this.networkMonitorChild = new NetworkMonitor({ window: window },
-                                                            this);
+              this.networkMonitorChild = new NetworkMonitor({ window }, this);
               this.networkMonitorChild.init();
-            }
-            else {
-              this.networkMonitor = new NetworkMonitor({ window: window }, this);
+            } else {
+              this.networkMonitor = new NetworkMonitor({ window }, this);
               this.networkMonitor.init();
             }
           }
@@ -696,6 +705,10 @@ WebConsoleActor.prototype =
             this.networkMonitorChild.destroy();
             this.networkMonitorChild = null;
           }
+          if (this.stackTraceCollector) {
+            this.stackTraceCollector.destroy();
+            this.stackTraceCollector = null;
+          }
           stoppedListeners.push(listener);
           break;
         case "FileActivity":
@@ -759,7 +772,8 @@ WebConsoleActor.prototype =
             break;
           }
 
-          let requestStartTime = this.window ?
+          // See `window` definition. It isn't always a DOM Window.
+          let requestStartTime = this.window && this.window.performance ?
             this.window.performance.timing.requestStart : 0;
 
           let cache = this.consoleAPIListener
@@ -935,11 +949,12 @@ WebConsoleActor.prototype =
     // This is the case of the paused debugger
     if (frameActorId) {
       let frameActor = this.conn.getActor(frameActorId);
-      if (frameActor) {
+      try {
+        // Need to try/catch since accessing frame.environment
+        // can throw "Debugger.Frame is not live"
         let frame = frameActor.frame;
         environment = frame.environment;
-      }
-      else {
+      } catch(e) {
         DevToolsUtils.reportException("onAutocomplete",
           Error("The frame actor was not found: " + frameActorId));
       }
@@ -1296,11 +1311,50 @@ WebConsoleActor.prototype =
           ast = {"body": []};
         }
         for (let line of ast.body) {
-          if (line.type == "VariableDeclaration" &&
-            (line.kind == "let" || line.kind == "const")) {
-            for (let decl of line.declarations)
-              dbgWindow.forceLexicalInitializationByName(decl.id.name);
+          // Only let and const declarations put bindings into an
+          // "initializing" state.
+          if (!(line.kind == "let" || line.kind == "const"))
+                continue;
+
+          let identifiers = [];
+          for (let decl of line.declarations) {
+            switch (decl.id.type) {
+              case "Identifier":
+                // let foo = bar;
+                identifiers.push(decl.id.name);
+                break;
+              case "ArrayPattern":
+                // let [foo, bar]    = [1, 2];
+                // let [foo=99, bar] = [1, 2];
+                for (let e of decl.id.elements) {
+                    if (e.type == "Identifier") {
+                      identifiers.push(e.name);
+                    } else if (e.type == "AssignmentExpression") {
+                      identifiers.push(e.left.name);
+                    }
+                }
+                break;
+              case "ObjectPattern":
+                // let {bilbo, my}    = {bilbo: "baggins", my: "precious"};
+                // let {blah: foo}    = {blah: yabba()}
+                // let {blah: foo=99} = {blah: yabba()}
+                for (let prop of decl.id.properties) {
+                  // key
+                  if (prop.key.type == "Identifier")
+                    identifiers.push(prop.key.name);
+                  // value
+                  if (prop.value.type == "Identifier") {
+                    identifiers.push(prop.value.name);
+                  } else if (prop.value.type == "AssignmentExpression") {
+                    identifiers.push(prop.value.left.name);
+                  }
+                }
+                break;
+            }
           }
+
+          for (let name of identifiers)
+            dbgWindow.forceLexicalInitializationByName(name);
         }
       }
     }
@@ -1783,6 +1837,7 @@ NetworkEventActor.prototype =
       url: this._request.url,
       method: this._request.method,
       isXHR: this._isXHR,
+      cause: this._cause,
       fromCache: this._fromCache,
       fromServiceWorker: this._fromServiceWorker,
       private: this._private,
@@ -1828,6 +1883,7 @@ NetworkEventActor.prototype =
   {
     this._startedDateTime = aNetworkEvent.startedDateTime;
     this._isXHR = aNetworkEvent.isXHR;
+    this._cause = aNetworkEvent.cause;
     this._fromCache = aNetworkEvent.fromCache;
     this._fromServiceWorker = aNetworkEvent.fromServiceWorker;
 
@@ -2157,6 +2213,7 @@ NetworkEventActor.prototype =
       updateType: "responseContent",
       mimeType: aContent.mimeType,
       contentSize: aContent.size,
+      encoding: aContent.encoding,
       transferredSize: aContent.transferredSize,
       discardResponseBody: aDiscardedResponseBody,
     };

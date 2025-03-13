@@ -880,15 +880,6 @@ var gViewController = {
       }
     },
 
-    cmd_pluginCheck: {
-      isEnabled: function() {
-        return true;
-      },
-      doCommand: function() {
-        openURL(Services.urlFormatter.formatURLPref("plugins.update.url"));
-      }
-    },
-
     cmd_toggleAutoUpdateDefault: {
       isEnabled: function() {
         return true;
@@ -3243,7 +3234,7 @@ var gDetailView = {
         );
         let warningLink = document.getElementById("detail-warning-link");
         warningLink.value = gStrings.ext.GetStringFromName("details.notification.outdated.link");
-        warningLink.href = Services.urlFormatter.formatURLPref("plugins.update.url");
+        warningLink.href = this._addon.blocklistURL;
         warningLink.hidden = false;
       } else if (this._addon.blocklistState == Ci.nsIBlocklistService.STATE_VULNERABLE_UPDATE_AVAILABLE) {
         this.node.setAttribute("notification", "error");

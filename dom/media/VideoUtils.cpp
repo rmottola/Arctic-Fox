@@ -4,12 +4,12 @@
 
 #include "VideoUtils.h"
 
-#include "mozilla/Preferences.h"
 #include "mozilla/Base64.h"
 #include "mozilla/TaskQueue.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/Function.h"
 
+#include "MediaPrefs.h"
 #include "MediaResource.h"
 #include "TimeUnits.h"
 #include "nsMathUtils.h"
@@ -204,8 +204,7 @@ already_AddRefed<SharedThreadPool> GetMediaThreadPool(MediaThreadType aType)
       break;
   }
   return SharedThreadPool::
-    Get(nsDependentCString(name),
-        Preferences::GetUint("media.num-decode-threads", 12));
+    Get(nsDependentCString(name), MediaPrefs::MediaThreadPoolDefaultCount());
 }
 
 bool
@@ -488,6 +487,43 @@ IsAACContentType(const nsAString& aContentType)
       return codec.EqualsLiteral("mp4a.40.2") || // MPEG4 AAC-LC
              codec.EqualsLiteral("mp4a.40.5") || // MPEG4 HE-AAC
              codec.EqualsLiteral("mp4a.67");     // MPEG2 AAC-LC
+    });
+}
+
+bool
+IsVorbisContentType(const nsAString& aContentType)
+{
+  return CheckContentType(aContentType,
+    [](const nsAString& type) {
+      return type.EqualsLiteral("audio/webm") ||
+             type.EqualsLiteral("audio/ogg");
+    },
+    [](const nsAString& codec) {
+      return codec.EqualsLiteral("vorbis");
+    });
+}
+
+bool
+IsVP8ContentType(const nsAString& aContentType)
+{
+  return CheckContentType(aContentType,
+    [](const nsAString& type) {
+      return type.EqualsLiteral("video/webm");
+    },
+    [](const nsAString& codec) {
+      return codec.EqualsLiteral("vp8");
+    });
+}
+
+bool
+IsVP9ContentType(const nsAString& aContentType)
+{
+  return CheckContentType(aContentType,
+    [](const nsAString& type) {
+      return type.EqualsLiteral("video/webm");
+    },
+    [](const nsAString& codec) {
+      return codec.EqualsLiteral("vp9");
     });
 }
 

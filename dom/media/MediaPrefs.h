@@ -34,6 +34,7 @@ PrefTemplate<Type, Get##Name##PrefDefault, Get##Name##PrefName> mPref##Name
 
 // Custom Definitions.
 #define GMP_DEFAULT_ASYNC_SHUTDOWN_TIMEOUT 3000
+#define SUSPEND_BACKGROUND_VIDEO_DELAY_MS 10000
 #define TEST_PREFERENCE_FAKE_RECOGNITION_SERVICE "media.webspeech.test.fake_recognition_service"
 
 namespace mozilla {
@@ -92,6 +93,7 @@ private:
 #endif
 #ifdef XP_WIN
   DECL_MEDIA_PREF("media.wmf.enabled",                        PDMWMFEnabled, bool, true);
+  DECL_MEDIA_PREF("media.decoder-doctor.wmf-disabled-is-failure", DecoderDoctorWMFDisabledIsFailure, bool, false);
   DECL_MEDIA_PREF("media.webm.intel_decoder.enabled",         PDMWMFIntelDecoderEnabled, bool, false);
   DECL_MEDIA_PREF("media.wmf.low-latency.enabled",            PDMWMFLowLatencyEnabled, bool, false);
   DECL_MEDIA_PREF("media.wmf.decoder.thread-count",           PDMWMFThreadCount, int32_t, -1);
@@ -106,6 +108,10 @@ private:
   DECL_MEDIA_PREF("media.gmp.decoder.aac",                    GMPAACPreferred, uint32_t, 0);
   DECL_MEDIA_PREF("media.gmp.decoder.h264",                   GMPH264Preferred, uint32_t, 0);
 
+  // MediaDecoderStateMachine
+  DECL_MEDIA_PREF("media.suspend-bkgnd-video.enabled",        MDSMSuspendBackgroundVideoEnabled, bool, false);
+  DECL_MEDIA_PREF("media.suspend-bkgnd-video.delay-ms",       MDSMSuspendBackgroundVideoDelay, uint32_t, SUSPEND_BACKGROUND_VIDEO_DELAY_MS);
+
   // WebSpeech
   DECL_MEDIA_PREF("media.webspeech.synth.force_global_queue", WebSpeechForceGlobal, bool, false);
   DECL_MEDIA_PREF("media.webspeech.test.enable",              WebSpeechTestEnabled, bool, false);
@@ -113,6 +119,9 @@ private:
   DECL_MEDIA_PREF(TEST_PREFERENCE_FAKE_RECOGNITION_SERVICE,   WebSpeechFakeRecognitionService, bool, false);
   DECL_MEDIA_PREF("media.webspeech.recognition.enable",       WebSpeechRecognitionEnabled, bool, false);
   DECL_MEDIA_PREF("media.webspeech.recognition.force_enable", WebSpeechRecognitionForceEnabled, bool, false);
+
+  DECL_MEDIA_PREF("media.num-decode-threads",                 MediaThreadPoolDefaultCount, uint32_t, 4);
+  DECL_MEDIA_PREF("media.decoder.limit",                      MediaDecoderLimit, uint32_t, -1);
 
 public:
   // Manage the singleton:

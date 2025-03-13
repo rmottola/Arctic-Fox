@@ -359,16 +359,6 @@ private:
   void OnAudioDecoded(MediaData* aAudioSample);
   void OnVideoDecoded(MediaData* aVideoSample, TimeStamp aDecodeStartTime);
   void OnNotDecoded(MediaData::Type aType, MediaDecoderReader::NotDecodedReason aReason);
-  void OnAudioNotDecoded(MediaDecoderReader::NotDecodedReason aReason)
-  {
-    MOZ_ASSERT(OnTaskQueue());
-    OnNotDecoded(MediaData::AUDIO_DATA, aReason);
-  }
-  void OnVideoNotDecoded(MediaDecoderReader::NotDecodedReason aReason)
-  {
-    MOZ_ASSERT(OnTaskQueue());
-    OnNotDecoded(MediaData::VIDEO_DATA, aReason);
-  }
 
   // Resets all state related to decoding and playback, emptying all buffers
   // and aborting all pending operations on the decode task queue.
@@ -381,6 +371,8 @@ protected:
   void SetState(State aState);
 
   void BufferedRangeUpdated();
+
+  void ReaderSuspendedChanged();
 
   // Inserts MediaData* samples into their respective MediaQueues.
   // aSample must not be null.
@@ -519,10 +511,11 @@ protected:
   // The decoder monitor must be held.
   void InitiateSeek(SeekJob aSeekJob);
 
-  // Clears any previous seeking state and initiates a video-only seek on the
-  // decoder to catch up the video to the current audio position, when recovering
-  // from video decoding being suspended in background.
-  void InitiateVideoDecodeRecoverySeek();
+  // Clears any previous seeking state and initiates a seek on the decoder to
+  // resync the video and audio positions, when recovering from video decoding
+  // being suspended in background or from audio and video decoding being
+  // suspended due to the decoder limit.
+  void InitiateDecodeRecoverySeek(TrackSet aTracks);
 
   nsresult DispatchAudioDecodeTaskIfNeeded();
 
@@ -834,13 +827,16 @@ private:
   // Only one of a given pair of ({Audio,Video}DataPromise, WaitForDataPromise)
   // should exist at any given moment.
 
-  CallbackID mAudioCallbackID;
-  CallbackID mWaitAudioCallbackID;
-  const char* AudioRequestStatus() const;
+  MediaEventListener mAudioCallback;
+  MediaEventListener mVideoCallback;
+  MediaEventListener mAudioWaitCallback;
+  MediaEventListener mVideoWaitCallback;
 
-  CallbackID mVideoCallbackID;
-  CallbackID mWaitVideoCallbackID;
+  const char* AudioRequestStatus() const;
   const char* VideoRequestStatus() const;
+
+  void OnSuspendTimerResolved();
+  void OnSuspendTimerRejected();
 
   // True if we shouldn't play our audio (but still write it to any capturing
   // streams). When this is true, the audio thread will never start again after
@@ -929,6 +925,12 @@ private:
 
   bool mSentPlaybackEndedEvent;
 
+  // True if video decoding is suspended.
+  bool mVideoDecodeSuspended;
+
+  // Track enabling video decode suspension via timer
+  DelayedScheduler mVideoDecodeSuspendTimer;
+
   // Data about MediaStreams that are being fed by the decoder.
   const RefPtr<OutputStreamManager> mOutputStreamManager;
 
@@ -966,6 +968,8 @@ private:
 private:
   // The buffered range. Mirrored from the decoder thread.
   Mirror<media::TimeIntervals> mBuffered;
+
+  Mirror<bool> mIsReaderSuspended;
 
   // The duration according to the demuxer's current estimate, mirrored from the main thread.
   Mirror<media::NullableTimeUnit> mEstimatedDuration;

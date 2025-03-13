@@ -20,7 +20,8 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(FileEntry, Entry)
 
-  FileEntry(nsIGlobalObject* aGlobalObject, File* aFile);
+  FileEntry(nsIGlobalObject* aGlobalObject, File* aFile,
+            DOMFileSystem* aFileSystem);
 
   virtual JSObject*
   WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
@@ -39,19 +40,11 @@ public:
 
   void
   CreateWriter(VoidCallback& aSuccessCallback,
-               const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback,
-               ErrorResult& aRv) const
-  {
-    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
-  }
+               const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback) const;
 
   void
   GetFile(BlobCallback& aSuccessCallback,
-          const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback,
-          ErrorResult& aRv) const
-  {
-    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
-  }
+          const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback) const;
 
 private:
   ~FileEntry();

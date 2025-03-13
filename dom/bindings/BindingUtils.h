@@ -185,10 +185,6 @@ IsDOMObject(JSObject* obj)
   mozilla::dom::UnwrapObject<mozilla::dom::prototypes::id::Interface,        \
     mozilla::dom::Interface##Binding::NativeType>(obj, value)
 
-#define UNWRAP_WORKER_OBJECT(Interface, obj, value)                           \
-  UnwrapObject<prototypes::id::Interface##_workers,                           \
-    mozilla::dom::Interface##Binding_workers::NativeType>(obj, value)
-
 // Some callers don't want to set an exception when unwrapping fails
 // (for example, overload resolution uses unwrapping to tell what sort
 // of thing it's looking at).
@@ -245,12 +241,12 @@ IsNotDateOrRegExp(JSContext* cx, JS::Handle<JSObject*> obj,
 {
   MOZ_ASSERT(obj);
 
-  js::ESClassValue cls;
+  js::ESClass cls;
   if (!js::GetBuiltinClass(cx, obj, &cls)) {
     return false;
   }
 
-  *notDateOrRegExp = cls != js::ESClass_Date && cls != js::ESClass_RegExp;
+  *notDateOrRegExp = cls != js::ESClass::Date && cls != js::ESClass::RegExp;
   return true;
 }
 
@@ -2513,9 +2509,9 @@ XrayGetNativeProto(JSContext* cx, JS::Handle<JSObject*> obj,
     if (domClass) {
       ProtoHandleGetter protoGetter = domClass->mGetProto;
       if (protoGetter) {
-        protop.set(protoGetter(cx, global));
+        protop.set(protoGetter(cx));
       } else {
-        protop.set(JS_GetObjectPrototype(cx, global));
+        protop.set(JS::GetRealmObjectPrototype(cx));
       }
     } else if (JS_ObjectIsFunction(cx, obj)) {
       MOZ_ASSERT(JS_IsNativeFunction(obj, Constructor));
@@ -2525,7 +2521,7 @@ XrayGetNativeProto(JSContext* cx, JS::Handle<JSObject*> obj,
       MOZ_ASSERT(IsDOMIfaceAndProtoClass(clasp));
       ProtoGetter protoGetter =
         DOMIfaceAndProtoJSClass::FromJSClass(clasp)->mGetParentProto;
-      protop.set(protoGetter(cx, global));
+      protop.set(protoGetter(cx));
     }
   }
 
@@ -2963,21 +2959,21 @@ class GetCCParticipant
 {
   // Helper for GetCCParticipant for classes that participate in CC.
   template<class U>
-  static MOZ_CONSTEXPR nsCycleCollectionParticipant*
+  static constexpr nsCycleCollectionParticipant*
   GetHelper(int, typename U::NS_CYCLE_COLLECTION_INNERCLASS* dummy=nullptr)
   {
     return T::NS_CYCLE_COLLECTION_INNERCLASS::GetParticipant();
   }
   // Helper for GetCCParticipant for classes that don't participate in CC.
   template<class U>
-  static MOZ_CONSTEXPR nsCycleCollectionParticipant*
+  static constexpr nsCycleCollectionParticipant*
   GetHelper(double)
   {
     return nullptr;
   }
 
 public:
-  static MOZ_CONSTEXPR nsCycleCollectionParticipant*
+  static constexpr nsCycleCollectionParticipant*
   Get()
   {
     // Passing int() here will try to call the GetHelper that takes an int as
@@ -2992,7 +2988,7 @@ template<class T>
 class GetCCParticipant<T, true>
 {
 public:
-  static MOZ_CONSTEXPR nsCycleCollectionParticipant*
+  static constexpr nsCycleCollectionParticipant*
   Get()
   {
     return nullptr;
@@ -3029,7 +3025,7 @@ EnumerateGlobal(JSContext* aCx, JS::Handle<JSObject*> aObj);
 template <class T>
 struct CreateGlobalOptions
 {
-  static MOZ_CONSTEXPR_VAR ProtoAndIfaceCache::Kind ProtoAndIfaceCacheKind =
+  static constexpr ProtoAndIfaceCache::Kind ProtoAndIfaceCacheKind =
     ProtoAndIfaceCache::NonWindowLike;
   static void TraceGlobal(JSTracer* aTrc, JSObject* aObj)
   {
@@ -3046,7 +3042,7 @@ struct CreateGlobalOptions
 template <>
 struct CreateGlobalOptions<nsGlobalWindow>
 {
-  static MOZ_CONSTEXPR_VAR ProtoAndIfaceCache::Kind ProtoAndIfaceCacheKind =
+  static constexpr ProtoAndIfaceCache::Kind ProtoAndIfaceCacheKind =
     ProtoAndIfaceCache::WindowLike;
   static void TraceGlobal(JSTracer* aTrc, JSObject* aObj);
   static bool PostCreateGlobal(JSContext* aCx, JS::Handle<JSObject*> aGlobal);
@@ -3103,7 +3099,7 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
     return nullptr;
   }
 
-  JS::Handle<JSObject*> proto = GetProto(aCx, aGlobal);
+  JS::Handle<JSObject*> proto = GetProto(aCx);
   if (!proto || !JS_SplicePrototype(aCx, aGlobal, proto)) {
     NS_WARNING("Failed to set proto");
     return nullptr;
@@ -3278,24 +3274,10 @@ struct StrongPtrForMember
                                RefPtr<T>, nsAutoPtr<T>>::Type Type;
 };
 
-inline
-JSObject*
-GetErrorPrototype(JSContext* aCx, JS::Handle<JSObject*>)
-{
-  return JS_GetErrorPrototype(aCx);
-}
-
-inline
-JSObject*
-GetIteratorPrototype(JSContext* aCx, JS::Handle<JSObject*>)
-{
-  return JS_GetIteratorPrototype(aCx);
-}
-
 namespace binding_detail {
 inline
 JSObject*
-GetHackedNamespaceProtoObject(JSContext* aCx, JS::Handle<JSObject*>)
+GetHackedNamespaceProtoObject(JSContext* aCx)
 {
   return JS_NewPlainObject(aCx);
 }

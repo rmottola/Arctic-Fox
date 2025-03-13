@@ -15,6 +15,7 @@
 #include "gfxFcPlatformFontList.h"
 #include "gfxFontconfigUtils.h"
 #include "gfxFontconfigFonts.h"
+#include "gfxConfig.h"
 #include "gfxContext.h"
 #include "gfxUserFontSet.h"
 #include "gfxUtils.h"
@@ -90,7 +91,7 @@ gfxPlatformGtk::gfxPlatformGtk()
     mMaxGenericSubstitutions = UNINITIALIZED_VALUE;
 
 #ifdef MOZ_X11
-    sUseXRender = (GDK_IS_X11_DISPLAY(gdk_display_get_default())) ? 
+    sUseXRender = (GDK_IS_X11_DISPLAY(gdk_display_get_default())) ?
                     mozilla::Preferences::GetBool("gfx.xrender.enabled") : false;
 #endif
 
@@ -205,6 +206,7 @@ static const char kFontDejaVuSerif[] = "DejaVu Serif";
 static const char kFontFreeSans[] = "FreeSans";
 static const char kFontFreeSerif[] = "FreeSerif";
 static const char kFontTakaoPGothic[] = "TakaoPGothic";
+static const char kFontTwemojiMozilla[] = "Twemoji Mozilla";
 static const char kFontDroidSansFallback[] = "Droid Sans Fallback";
 static const char kFontWenQuanYiMicroHei[] = "WenQuanYi Micro Hei";
 static const char kFontNanumGothic[] = "NanumGothic";
@@ -214,10 +216,24 @@ gfxPlatformGtk::GetCommonFallbackFonts(uint32_t aCh, uint32_t aNextCh,
                                        Script aRunScript,
                                        nsTArray<const char*>& aFontList)
 {
+    if (aNextCh == 0xfe0fu) {
+      // if char is followed by VS16, try for a color emoji glyph
+      aFontList.AppendElement(kFontTwemojiMozilla);
+    }
+
     aFontList.AppendElement(kFontDejaVuSerif);
     aFontList.AppendElement(kFontFreeSerif);
     aFontList.AppendElement(kFontDejaVuSans);
     aFontList.AppendElement(kFontFreeSans);
+
+    if (!IS_IN_BMP(aCh)) {
+        uint32_t p = aCh >> 16;
+        if (p == 1) { // try color emoji font, unless VS15 (text style) present
+            if (aNextCh != 0xfe0fu && aNextCh != 0xfe0eu) {
+                aFontList.AppendElement(kFontTwemojiMozilla);
+            }
+        }
+    }
 
     // add fonts for CJK ranges
     // xxx - this isn't really correct, should use the same CJK font ordering
@@ -288,7 +304,7 @@ gfxPlatformGtk::LookupLocalFont(const nsAString& aFontName,
                                            aStretch, aStyle);
 }
 
-gfxFontEntry* 
+gfxFontEntry*
 gfxPlatformGtk::MakePlatformFont(const nsAString& aFontName,
                                  uint16_t aWeight,
                                  int16_t aStretch,
@@ -353,11 +369,19 @@ gfxPlatformGtk::GetDPI()
 double
 gfxPlatformGtk::GetDPIScale()
 {
-    // We want to set the default CSS to device pixel ratio as the
-    // closest _integer_ multiple, so round the ratio of actual dpi
-    // to CSS dpi (96)
+    // Integer scale factors work well with GTK window scaling, image scaling,
+    // and pixel alignment, but there is a range where 1 is too small and 2 is
+    // too big.  An additional step of 1.5 is added because this is common
+    // scale on WINNT and at this ratio the advantages of larger rendering
+    // outweigh the disadvantages from scaling and pixel mis-alignment.
     int32_t dpi = GetDPI();
-    return (dpi > 96) ? round(dpi/96.0) : 1.0;
+    if (dpi < 144) {
+        return 1.0;
+    } else if (dpi < 168) {
+        return 1.5;
+    } else {
+        return round(dpi/96.0);
+    }
 }
 
 bool
@@ -429,7 +453,7 @@ gfxPlatformGtk::GetPlatformCMSOutputProfile(void *&mem, size_t &size)
     // return with nullptr.
     if (!dpy)
         return;
- 
+
     Window root = gdk_x11_get_default_root_xwindow();
 
     Atom retAtom;
@@ -616,6 +640,7 @@ public:
 
   public:
     GLXDisplay() : mGLContext(nullptr)
+                 , mXDisplay(nullptr)
                  , mSetupLock("GLXVsyncSetupLock")
                  , mVsyncThread("GLXVsyncThread")
                  , mVsyncTask(nullptr)
@@ -670,6 +695,7 @@ public:
         }
 
         mGLContext = gl::GLContextGLX::CreateGLContext(
+            gl::CreateContextFlags::NONE,
             gl::SurfaceCaps::Any(),
             nullptr,
             false,
@@ -677,6 +703,11 @@ public:
             root,
             config,
             false);
+
+        if (!mGLContext) {
+          lock.NotifyAll();
+          return;
+        }
 
         mGLContext->MakeCurrent();
 
@@ -757,23 +788,32 @@ public:
         }
 
         TimeStamp lastVsync = TimeStamp::Now();
+        bool useSoftware = false;
+
         // Wait until the video sync counter reaches the next value by waiting
         // until the parity of the counter value changes.
         unsigned int nextSync = syncCounter + 1;
-        if (gl::sGLXLibrary.xWaitVideoSync(2, nextSync % 2,
-                                           &syncCounter) == 0) {
-          if (syncCounter == (nextSync - 1)) {
-            gfxWarning() << "GLX sync counter failed to increment after glXWaitVideoSync!\n";
-            // If we failed to block until the next sync, fallback to software.
-            double remaining = (1000.f / 60.f) -
-                               (TimeStamp::Now() - lastVsync).ToMilliseconds();
-            if (remaining > 0) {
-              PlatformThread::Sleep(remaining);
-            }
-          }
-          lastVsync = TimeStamp::Now();
-          NotifyVsync(lastVsync);
+        int status;
+        if ((status = gl::sGLXLibrary.xWaitVideoSync(2, nextSync % 2, &syncCounter)) != 0) {
+          gfxWarningOnce() << "glXWaitVideoSync returned " << status;
+          useSoftware = true;
         }
+
+        if (syncCounter == (nextSync - 1)) {
+          gfxWarningOnce() << "glXWaitVideoSync failed to increment the sync counter.";
+          useSoftware = true;
+        }
+
+        if (useSoftware) {
+          double remaining = (1000.f / 60.f) -
+            (TimeStamp::Now() - lastVsync).ToMilliseconds();
+          if (remaining > 0) {
+            PlatformThread::Sleep(remaining);
+          }
+        }
+
+        lastVsync = TimeStamp::Now();
+        NotifyVsync(lastVsync);
       }
     }
 
@@ -801,17 +841,29 @@ private:
 already_AddRefed<gfx::VsyncSource>
 gfxPlatformGtk::CreateHardwareVsyncSource()
 {
-  if (gl::sGLXLibrary.SupportsVideoSync()) {
-    RefPtr<VsyncSource> vsyncSource = new GLXVsyncSource();
-    VsyncSource::Display& display = vsyncSource->GetGlobalDisplay();
-    if (!static_cast<GLXVsyncSource::GLXDisplay&>(display).Setup()) {
-      NS_WARNING("Failed to setup GLContext, falling back to software vsync.");
-      return gfxPlatform::CreateHardwareVsyncSource();
+  // Only use GLX vsync when the OpenGL compositor is being used.
+  // The extra cost of initializing a GLX context while blocking the main
+  // thread is not worth it when using basic composition.
+  if (gfxConfig::IsEnabled(Feature::HW_COMPOSITING)) {
+    if (gl::sGLXLibrary.SupportsVideoSync()) {
+      RefPtr<VsyncSource> vsyncSource = new GLXVsyncSource();
+      VsyncSource::Display& display = vsyncSource->GetGlobalDisplay();
+      if (!static_cast<GLXVsyncSource::GLXDisplay&>(display).Setup()) {
+        NS_WARNING("Failed to setup GLContext, falling back to software vsync.");
+        return gfxPlatform::CreateHardwareVsyncSource();
+      }
+      return vsyncSource.forget();
     }
-    return vsyncSource.forget();
+    NS_WARNING("SGI_video_sync unsupported. Falling back to software vsync.");
   }
-  NS_WARNING("SGI_video_sync unsupported. Falling back to software vsync.");
   return gfxPlatform::CreateHardwareVsyncSource();
+}
+
+bool
+gfxPlatformGtk::SupportsApzTouchInput() const
+{
+  int value = gfxPrefs::TouchEventsEnabled();
+  return value == 1 || value == 2;
 }
 
 #endif

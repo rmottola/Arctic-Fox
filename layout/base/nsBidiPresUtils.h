@@ -281,14 +281,14 @@ public:
   static nsIFrame* GetFirstLeaf(nsIFrame* aFrame);
     
   /**
+   * Get the bidi data of the given (inline) frame.
+   */
+  static mozilla::FrameBidiData GetFrameBidiData(nsIFrame* aFrame);
+
+  /**
    * Get the bidi embedding level of the given (inline) frame.
    */
   static nsBidiLevel GetFrameEmbeddingLevel(nsIFrame* aFrame);
-    
-  /**
-   * Get the paragraph depth of the given (inline) frame.
-   */
-  static uint8_t GetParagraphDepth(nsIFrame* aFrame);
 
   /**
    * Get the bidi base level of the given (inline) frame.

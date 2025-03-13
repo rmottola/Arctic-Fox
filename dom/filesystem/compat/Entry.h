@@ -11,6 +11,7 @@
 #include "mozilla/ErrorResult.h"
 #include "mozilla/dom/BindingDeclarations.h"
 #include "nsCycleCollectionParticipant.h"
+#include "nsIGlobalObject.h"
 #include "nsWrapperCache.h"
 
 namespace mozilla {
@@ -29,7 +30,8 @@ public:
 
   static already_AddRefed<Entry>
   Create(nsIGlobalObject* aGlobalObject,
-         const OwningFileOrDirectory& aFileOrDirectory);
+         const OwningFileOrDirectory& aFileOrDirectory,
+         DOMFileSystem* aFileSystem);
 
   nsIGlobalObject*
   GetParentObject() const
@@ -59,18 +61,19 @@ public:
   GetFullPath(nsAString& aFullPath, ErrorResult& aRv) const = 0;
 
   DOMFileSystem*
-  GetFilesystem(ErrorResult& aRv) const
+  Filesystem() const
   {
-    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
-    return nullptr;
+    return mFileSystem;
   }
 
 protected:
-  Entry(nsIGlobalObject* aGlobalObject);
+  Entry(nsIGlobalObject* aGlobalObject,
+        DOMFileSystem* aFileSystem);
   virtual ~Entry();
 
 private:
   nsCOMPtr<nsIGlobalObject> mParent;
+  RefPtr<DOMFileSystem> mFileSystem;
 };
 
 } // namespace dom

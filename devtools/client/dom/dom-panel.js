@@ -23,6 +23,9 @@ function DomPanel(iframeWindow, toolbox) {
 
   this.onTabNavigated = this.onTabNavigated.bind(this);
   this.onContentMessage = this.onContentMessage.bind(this);
+  this.onPanelVisibilityChange = this.onPanelVisibilityChange.bind(this);
+
+  this.pendingRequests = new Map();
 
   EventEmitter.decorate(this);
 }
@@ -34,7 +37,7 @@ DomPanel.prototype = {
    * @return object
    *         A promise that is resolved when the DOM panel completes opening.
    */
-  open: Task.async(function*() {
+  open: Task.async(function* () {
     if (this._opening) {
       return this._opening;
     }
@@ -51,8 +54,8 @@ DomPanel.prototype = {
 
     this.isReady = true;
     this.emit("ready");
-
     deferred.resolve(this);
+
     return this._opening;
   }),
 
@@ -63,6 +66,7 @@ DomPanel.prototype = {
       this.onContentMessage, true);
 
     this.target.on("navigate", this.onTabNavigated);
+    this._toolbox.on("select", this.onPanelVisibilityChange);
 
     let provider = {
       getPrototypeAndProperties: this.getPrototypeAndProperties.bind(this)
@@ -70,10 +74,10 @@ DomPanel.prototype = {
 
     exportIntoContentScope(this.panelWin, provider, "DomProvider");
 
-    this.doRefresh();
+    this.shouldRefresh = true;
   },
 
-  destroy: Task.async(function*() {
+  destroy: Task.async(function* () {
     if (this._destroying) {
       return this._destroying;
     }
@@ -82,6 +86,7 @@ DomPanel.prototype = {
     this._destroying = deferred.promise;
 
     this.target.off("navigate", this.onTabNavigated);
+    this._toolbox.off("select", this.onPanelVisibilityChange);
 
     this.emit("destroyed");
 
@@ -91,17 +96,52 @@ DomPanel.prototype = {
 
   // Events
 
-  doRefresh: function() {
-    this.refresh().then(rootGrip => {
+  refresh: function () {
+    // Do not refresh if the panel isn't visible.
+    if (!this.isPanelVisible()) {
+      return;
+    }
+
+    // Do not refresh if it isn't necessary.
+    if (!this.shouldRefresh) {
+      return;
+    }
+
+    // Alright reset the flag we are about to refresh the panel.
+    this.shouldRefresh = false;
+
+    this.getRootGrip().then(rootGrip => {
       this.postContentMessage("initialize", rootGrip);
     });
   },
 
-  onTabNavigated: function() {
-    this.doRefresh();
+  /**
+   * Make sure the panel is refreshed when the page is reloaded.
+   * The panel is refreshed immediatelly if it's currently selected
+   * or lazily  when the user actually selects it.
+   */
+  onTabNavigated: function () {
+    this.shouldRefresh = true;
+    this.refresh();
   },
 
-  getPrototypeAndProperties: function(grip) {
+  /**
+   * Make sure the panel is refreshed (if needed) when it's selected.
+   */
+  onPanelVisibilityChange: function () {
+    this.refresh();
+  },
+
+  // Helpers
+
+  /**
+   * Return true if the DOM panel is currently selected.
+   */
+  isPanelVisible: function () {
+    return this._toolbox.currentToolId === "dom";
+  },
+
+  getPrototypeAndProperties: function (grip) {
     let deferred = defer();
 
     if (!grip.actor) {
@@ -110,21 +150,35 @@ DomPanel.prototype = {
       return deferred.promise;
     }
 
+    // Bail out if target doesn't exist (toolbox maybe closed already).
     if (!this.target) {
-      console.error("No target!", grip);
-      deferred.reject(new Error("Failed to get debugger target."));
       return deferred.promise;
     }
 
+    // If a request for the grips is already in progress
+    // use the same promise.
+    let request = this.pendingRequests.get(grip.actor);
+    if (request) {
+      return request;
+    }
+
     let client = new ObjectClient(this.target.client, grip);
-    client.getPrototypeAndProperties(deferred.resolve);
+    client.getPrototypeAndProperties(response => {
+      this.pendingRequests.delete(grip.actor, deferred.promise);
+      deferred.resolve(response);
+
+      // Fire an event about not having any pending requests.
+      if (!this.pendingRequests.size) {
+        this.emit("no-pending-requests");
+      }
+    });
+
+    this.pendingRequests.set(grip.actor, deferred.promise);
 
     return deferred.promise;
   },
 
-  // Refresh
-
-  refresh: function() {
+  getRootGrip: function () {
     let deferred = defer();
 
     // Attach Console. It might involve RDP communication, so wait
@@ -135,8 +189,6 @@ DomPanel.prototype = {
 
     return deferred.promise;
   },
-
-  // Helpers
 
   postContentMessage: function (type, args) {
     let data = {

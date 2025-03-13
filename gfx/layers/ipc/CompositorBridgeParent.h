@@ -33,10 +33,10 @@
 #include "mozilla/layers/PCompositorBridgeParent.h"
 #include "mozilla/layers/ShadowLayersManager.h" // for ShadowLayersManager
 #include "mozilla/layers/APZTestData.h"
+#include "mozilla/widget/CompositorWidget.h"
 #include "nsISupportsImpl.h"
 #include "ThreadSafeRefcountingWithMainThreadDestruction.h"
 #include "mozilla/VsyncDispatcher.h"
-#include "CompositorWidgetProxy.h"
 
 class MessageLoop;
 class nsIWidget;
@@ -51,7 +51,6 @@ class GPUProcessManager;
 } // namespace gfx
 
 namespace ipc {
-class GeckoChildProcessHost;
 class Shmem;
 } // namespace ipc
 
@@ -91,7 +90,7 @@ class CompositorVsyncScheduler
 
 public:
   explicit CompositorVsyncScheduler(CompositorBridgeParent* aCompositorBridgeParent,
-                                    widget::CompositorWidgetProxy* aWidgetProxy);
+                                    widget::CompositorWidget* aWidget);
 
 #ifdef MOZ_WIDGET_GONK
   // emulator-ics never trigger the display on/off, so compositor will always
@@ -213,11 +212,11 @@ class CompositorBridgeParent final : public PCompositorBridgeParent,
   friend class gfx::GPUProcessManager;
 
 public:
-  explicit CompositorBridgeParent(widget::CompositorWidgetProxy* aWidget,
+  explicit CompositorBridgeParent(widget::CompositorWidget* aWidget,
                                   CSSToLayoutDeviceScale aScale,
                                   bool aUseAPZ,
-                                  bool aUseExternalSurfaceSize = false,
-                                  int aSurfaceWidth = -1, int aSurfaceHeight = -1);
+                                  bool aUseExternalSurfaceSize,
+                                  const gfx::IntSize& aSurfaceSize);
 
   virtual bool RecvGetFrameUniformity(FrameUniformityData* aOutData) override;
   virtual bool RecvRequestOverfill() override;
@@ -306,6 +305,9 @@ public:
 
   virtual void DeallocShmem(mozilla::ipc::Shmem& aShmem) override;
 
+  PCompositorWidgetParent* AllocPCompositorWidgetParent(const CompositorWidgetInitData& aInitData) override;
+  bool DeallocPCompositorWidgetParent(PCompositorWidgetParent* aActor) override;
+
   virtual base::ProcessId GetChildProcessId() override
   {
     return OtherPid();
@@ -382,9 +384,9 @@ public:
   void InvalidateRemoteLayers();
 
   /**
-   * Returns a pointer to the compositor corresponding to the given ID.
+   * Returns a pointer to the CompositorBridgeParent corresponding to the given ID.
    */
-  static CompositorBridgeParent* GetCompositor(uint64_t id);
+  static CompositorBridgeParent* GetCompositorBridgeParent(uint64_t id);
 
   /**
    * Set aController as the pan/zoom callback for the subtree referred
@@ -400,7 +402,7 @@ public:
    * directly to us.  Transport is to its thread context.
    */
   static PCompositorBridgeParent*
-  Create(Transport* aTransport, ProcessId aOtherProcess, mozilla::ipc::GeckoChildProcessHost* aProcessHost);
+  Create(Transport* aTransport, ProcessId aOtherProcess);
 
   struct LayerTreeState {
     LayerTreeState();
@@ -465,7 +467,7 @@ public:
 
   float ComputeRenderIntegrity();
 
-  widget::CompositorWidgetProxy* GetWidgetProxy() { return mWidgetProxy; }
+  widget::CompositorWidget* GetWidget() { return mWidget; }
 
   void ForceComposeToTarget(gfx::DrawTarget* aTarget, const gfx::IntRect* aRect = nullptr);
 
@@ -587,7 +589,7 @@ protected:
   RefPtr<LayerManagerComposite> mLayerManager;
   RefPtr<Compositor> mCompositor;
   RefPtr<AsyncCompositionManager> mCompositionManager;
-  widget::CompositorWidgetProxy* mWidgetProxy;
+  widget::CompositorWidget* mWidget;
   TimeStamp mTestTime;
   bool mIsTesting;
 

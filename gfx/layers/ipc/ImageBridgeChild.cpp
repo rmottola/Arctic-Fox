@@ -295,6 +295,9 @@ void
 ImageBridgeChild::HoldUntilFenceHandleDelivery(TextureClient* aClient, uint64_t aTransactionId)
 {
   MOZ_ASSERT(NS_IsMainThread());
+  // XXX Re-enable fence handling
+  return;
+
 #ifdef MOZ_WIDGET_GONK
   if (!aClient) {
     return;
@@ -311,6 +314,9 @@ ImageBridgeChild::HoldUntilFenceHandleDelivery(TextureClient* aClient, uint64_t 
 void
 ImageBridgeChild::DeliverFenceToNonRecycle(uint64_t aTextureId, FenceHandle& aReleaseFenceHandle)
 {
+  // XXX Re-enable fence handling
+  return;
+
 #ifdef MOZ_WIDGET_GONK
   MutexAutoLock lock(mWaitingFenceHandleMutex);
   TextureClient* client = mTexturesWaitingFenceHandle.Get(aTextureId).get();
@@ -327,6 +333,9 @@ ImageBridgeChild::DeliverFenceToNonRecycle(uint64_t aTextureId, FenceHandle& aRe
 void
 ImageBridgeChild::NotifyNotUsedToNonRecycle(uint64_t aTextureId, uint64_t aTransactionId)
 {
+  // XXX Re-enable fence handling
+  return;
+
 #ifdef MOZ_WIDGET_GONK
   MutexAutoLock lock(mWaitingFenceHandleMutex);
 
@@ -343,10 +352,11 @@ ImageBridgeChild::NotifyNotUsedToNonRecycle(uint64_t aTextureId, uint64_t aTrans
   mTexturesWaitingFenceHandle.Remove(aTextureId);
 
   // Release TextureClient on allocator's message loop.
-  TextureClientReleaseTask* task = new TextureClientReleaseTask(client);
+  RefPtr<TextureClientReleaseTask> task =
+    MakeAndAddRef<TextureClientReleaseTask>(client);
   RefPtr<ClientIPCAllocator> allocator = client->GetAllocator();
   client = nullptr;
-  allocator->AsClientAllocator()->GetMessageLoop()->PostTask(FROM_HERE, task);
+  allocator->AsClientAllocator()->GetMessageLoop()->PostTask(task.forget());
 #else
   NS_RUNTIMEABORT("not reached");
 #endif
@@ -355,6 +365,9 @@ ImageBridgeChild::NotifyNotUsedToNonRecycle(uint64_t aTextureId, uint64_t aTrans
 void
 ImageBridgeChild::CancelWaitFenceHandle(TextureClient* aClient)
 {
+  // XXX Re-enable fence handling
+  return;
+
 #ifdef MOZ_WIDGET_GONK
   MutexAutoLock lock(mWaitingFenceHandleMutex);
   aClient->ClearWaitFenceHandleOnImageBridge(mWaitingFenceHandleMutex);
@@ -498,11 +511,6 @@ ImageBridgeChild::ImageBridgeChild()
 ImageBridgeChild::~ImageBridgeChild()
 {
   MOZ_ASSERT(NS_IsMainThread());
-
-  RefPtr<DeleteTask<Transport>> task = new DeleteTask<Transport>(GetTransport());
-
-  XRE_GetIOMessageLoop()->PostTask(task.forget());
-
   delete mTxn;
 }
 
@@ -991,7 +999,7 @@ bool ImageBridgeChild::StartUpOnThread(Thread* aThread)
     }
     sImageBridgeChildSingleton = new ImageBridgeChild();
     sImageBridgeParentSingleton = new ImageBridgeParent(
-      CompositorThreadHolder::Loop(), nullptr, base::GetCurrentProcId());
+      CompositorThreadHolder::Loop(), base::GetCurrentProcId());
     sImageBridgeChildSingleton->ConnectAsync(sImageBridgeParentSingleton);
     sImageBridgeChildSingleton->GetMessageLoop()->PostTask(
       NewRunnableFunction(CallSendImageBridgeThreadId,

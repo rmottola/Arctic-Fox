@@ -23649,6 +23649,24 @@
             "url": "/html/semantics/embedded-content/the-iframe-element/iframe-load-event.html"
           }
         ],
+        "html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_escaping.html": [
+          {
+            "path": "html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_escaping.html",
+            "url": "/html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_escaping.html"
+          }
+        ],
+        "html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_nonescaping.html": [
+          {
+            "path": "html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_nonescaping.html",
+            "url": "/html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_nonescaping.html"
+          }
+        ],
+        "html/syntax/serializing-html-fragments/serializing.html": [
+          {
+            "path": "html/syntax/serializing-html-fragments/serializing.html",
+            "url": "/html/syntax/serializing-html-fragments/serializing.html"
+          }
+        ],
         "html/syntax/serializing-html-fragments/serializing.html": [
           {
             "path": "html/syntax/serializing-html-fragments/serializing.html",
@@ -23701,6 +23719,18 @@
           {
             "path": "service-workers/service-worker/update-recovery.https.html",
             "url": "/service-workers/service-worker/update-recovery.https.html"
+          }
+        ],
+        "web-animations/animation-model/keyframe-effects/effect-value-context.html": [
+          {
+            "path": "web-animations/animation-model/keyframe-effects/effect-value-context.html",
+            "url": "/web-animations/animation-model/keyframe-effects/effect-value-context.html"
+          }
+        ],
+        "web-animations/animation-model/keyframe-effects/the-effect-value-of-a-keyframe-effect.html": [
+          {
+            "path": "web-animations/animation-model/keyframe-effects/the-effect-value-of-a-keyframe-effect.html",
+            "url": "/web-animations/animation-model/keyframe-effects/the-effect-value-of-a-keyframe-effect.html"
           }
         ],
         "web-animations/animation/startTime.html": [

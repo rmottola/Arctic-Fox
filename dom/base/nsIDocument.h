@@ -352,6 +352,10 @@ public:
     return mUpgradeInsecureRequests;
   }
 
+  void SetReferrer(const nsACString& aReferrer) {
+    mReferrer = aReferrer;
+  }
+
   /**
    * Set the principal responsible for this document.
    */
@@ -705,6 +709,11 @@ public:
   }
 
   /**
+   * Get string representation of sandbox flags (null if no flags are set)
+   */
+  void GetSandboxFlagsAsString(nsAString& aFlags);
+
+  /**
    * Set the sandbox flags for this document.
    * @see nsSandboxFlags.h for the possible flags
    */
@@ -865,6 +874,13 @@ public:
                          mozilla::ErrorResult& aError);
   void RemoveAnonymousContent(mozilla::dom::AnonymousContent& aContent,
                               mozilla::ErrorResult& aError);
+  /**
+   * If aNode is a descendant of anonymous content inserted by
+   * InsertAnonymousContent, this method returns the root element of the
+   * inserted anonymous content (in other words, the clone of the aElement
+   * that was passed to InsertAnonymousContent).
+   */
+  Element* GetAnonRootIfInAnonymousContentContainer(nsINode* aNode) const;
   nsTArray<RefPtr<mozilla::dom::AnonymousContent>>& GetAnonymousContents() {
     return mAnonymousContents;
   }
@@ -1072,7 +1088,19 @@ public:
     return mCSSLoader;
   }
 
-  mozilla::StyleBackendType GetStyleBackendType() const;
+  mozilla::StyleBackendType GetStyleBackendType() const {
+    if (mStyleBackendType == mozilla::StyleBackendType(0)) {
+      const_cast<nsIDocument*>(this)->UpdateStyleBackendType();
+    }
+    MOZ_ASSERT(mStyleBackendType != mozilla::StyleBackendType(0));
+    return mStyleBackendType;
+  }
+
+  void UpdateStyleBackendType();
+
+  bool IsStyledByServo() const {
+    return GetStyleBackendType() == mozilla::StyleBackendType::Servo;
+  }
 
   /**
    * Get this document's StyleImageLoader.  This is guaranteed to not return null.
@@ -2613,11 +2641,6 @@ public:
     return !!GetFullscreenElement();
   }
   void ExitFullscreen();
-  bool FullscreenEnabledInternal() const { return mFullscreenEnabled; }
-  void SetFullscreenEnabled(bool aEnabled)
-  {
-    mFullscreenEnabled = aEnabled;
-  }
   Element* GetMozPointerLockElement();
   void MozExitPointerLock()
   {
@@ -2939,6 +2962,10 @@ protected:
   // Our visibility state
   mozilla::dom::VisibilityState mVisibilityState;
 
+  // Whether this document has (or will have, once we have a pres shell) a
+  // Gecko- or Servo-backed style system.
+  mozilla::StyleBackendType mStyleBackendType;
+
   // True if BIDI is enabled.
   bool mBidiEnabled : 1;
   // True if a MathML element has ever been owned by this document.
@@ -3080,10 +3107,6 @@ protected:
 
   // Do we currently have an event posted to call FlushUserFontSet?
   bool mPostedFlushUserFontSet : 1;
-
-  // Whether fullscreen is enabled for this document. This corresponds
-  // to the "fullscreen enabled flag" in the HTML spec.
-  bool mFullscreenEnabled : 1;
 
   enum Type {
     eUnknown, // should never be used

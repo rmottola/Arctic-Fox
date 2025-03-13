@@ -214,7 +214,6 @@ TextTrack::UpdateActiveCueList()
 TextTrackCueList*
 TextTrack::GetActiveCues() {
   if (mMode != TextTrackMode::Disabled) {
-    UpdateActiveCueList();
     return mActiveCueList;
   }
   return nullptr;
@@ -224,7 +223,6 @@ void
 TextTrack::GetActiveCueArray(nsTArray<RefPtr<TextTrackCue> >& aCues)
 {
   if (mMode != TextTrackMode::Disabled) {
-    UpdateActiveCueList();
     mActiveCueList->GetArray(aCues);
   }
 }

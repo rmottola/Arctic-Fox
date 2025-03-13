@@ -10,6 +10,7 @@ UNIFIED_SOURCES += [
     'TestCloneInputStream.cpp',
     'TestCRT.cpp',
     'TestEncoding.cpp',
+    'TestEscapeURL.cpp',
     'TestExpirationTracker.cpp',
     'TestNSPRLogModulesParser.cpp',
     'TestPipes.cpp',
@@ -34,6 +35,3 @@ LOCAL_INCLUDES += [
 ]
 
 FINAL_LIBRARY = 'xul-gtest'
-
-if CONFIG['GNU_CXX']:
-    CXXFLAGS += ['-Wshadow']

@@ -31,6 +31,7 @@
 #include "nsIObjectInputStream.h"
 #include "nsIObjectOutputStream.h"
 #include "nsScriptSecurityManager.h"
+#include "nsContentUtils.h"
 
 #include "jsfriendapi.h"
 
@@ -71,7 +72,6 @@ nsXPConnect::nsXPConnect()
 nsXPConnect::~nsXPConnect()
 {
     mRuntime->DeleteSingletonScopes();
-    mRuntime->DestroyJSContextStack();
 
     // In order to clean up everything properly, we need to GC twice: once now,
     // to clean anything that can go away on its own (like the Junk Scope, which
@@ -123,8 +123,10 @@ nsXPConnect::InitStatics()
     gScriptSecurityManager->GetSystemPrincipal(&gSystemPrincipal);
     MOZ_RELEASE_ASSERT(gSystemPrincipal);
 
-    // Initialize the SafeJSContext.
-    gSelf->mRuntime->GetJSContextStack()->InitSafeJSContext();
+    if (!JS::InitSelfHostedCode(gSelf->mRuntime->Context()))
+        MOZ_CRASH("InitSelfHostedCode failed");
+    if (!gSelf->mRuntime->JSContextInitialized(gSelf->mRuntime->Context()))
+        MOZ_CRASH("JSContextInitialized failed");
 
     // Initialize our singleton scopes.
     gSelf->mRuntime->InitSingletonScopes();
@@ -291,7 +293,7 @@ xpc::ErrorReport::ErrorReportToMessageString(JSErrorReport* aReport,
     aString.Truncate();
     const char16_t* m = aReport->ucmessage;
     if (m) {
-        JSFlatString* name = js::GetErrorTypeName(CycleCollectedJSRuntime::Get()->Runtime(), aReport->exnType);
+        JSFlatString* name = js::GetErrorTypeName(CycleCollectedJSRuntime::Get()->Context(), aReport->exnType);
         if (name) {
             AssignJSFlatString(aString, name);
             aString.AppendLiteral(": ");
@@ -934,7 +936,7 @@ nsXPConnect::DebugPrintJSStack(bool showArgs,
                                bool showLocals,
                                bool showThisProps)
 {
-    JSContext* cx = GetCurrentJSContext();
+    JSContext* cx = nsContentUtils::GetCurrentJSContext();
     if (!cx)
         printf("there is no JSContext on the nsIThreadJSContextStack!\n");
     else
@@ -977,37 +979,6 @@ nsXPConnect::JSToVariant(JSContext* ctx, HandleValue value, nsIVariant** _retval
 
     return NS_OK;
 }
-
-/* virtual */
-JSContext*
-nsXPConnect::GetCurrentJSContext()
-{
-    return GetRuntime()->GetJSContextStack()->Peek();
-}
-
-/* virtual */
-JSContext*
-nsXPConnect::GetSafeJSContext()
-{
-    return GetRuntime()->GetJSContextStack()->GetSafeJSContext();
-}
-
-namespace xpc {
-
-void
-PushNullJSContext()
-{
-    XPCJSRuntime::Get()->GetJSContextStack()->Push(nullptr);
-}
-
-void
-PopNullJSContext()
-{
-    MOZ_ASSERT(XPCJSRuntime::Get()->GetJSContextStack()->Peek() == nullptr);
-    XPCJSRuntime::Get()->GetJSContextStack()->Pop();
-}
-
-} // namespace xpc
 
 nsIPrincipal*
 nsXPConnect::GetPrincipal(JSObject* obj, bool allowShortCircuit) const
@@ -1106,7 +1077,7 @@ SetLocationForGlobal(JSObject* global, nsIURI* locationURI)
 NS_IMETHODIMP
 nsXPConnect::NotifyDidPaint()
 {
-    JS::NotifyDidPaint(GetRuntime()->Runtime());
+    JS::NotifyDidPaint(GetRuntime()->Context());
     return NS_OK;
 }
 
@@ -1308,6 +1279,20 @@ SetAddonInterposition(const nsACString& addonIdStr, nsIAddonInterposition* inter
     if (!addonId)
         return false;
     return XPCWrappedNativeScope::SetAddonInterposition(jsapi.cx(), addonId, interposition);
+}
+
+bool
+AllowCPOWsInAddon(const nsACString& addonIdStr, bool allow)
+{
+    JSAddonId* addonId;
+    // We enter the junk scope just to allocate a string, which actually will go
+    // in the system zone.
+    AutoJSAPI jsapi;
+    jsapi.Init(xpc::PrivilegedJunkScope());
+    addonId = NewAddonId(jsapi.cx(), addonIdStr);
+    if (!addonId)
+        return false;
+    return XPCWrappedNativeScope::AllowCPOWsInAddon(jsapi.cx(), addonId, allow);
 }
 
 } // namespace xpc

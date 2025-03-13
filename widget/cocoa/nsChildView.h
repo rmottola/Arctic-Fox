@@ -38,7 +38,6 @@ class nsCocoaWindow;
 
 namespace {
 class GLPresenter;
-class RectTextureImage;
 } // namespace
 
 namespace mozilla {
@@ -51,6 +50,9 @@ namespace layers {
 class GLManager;
 class APZCTreeManager;
 } // namespace layers
+namespace widget {
+class RectTextureImage;
+} // namespace widget
 } // namespace mozilla
 
 @interface NSEvent (Undocumented)
@@ -205,6 +207,10 @@ typedef NSInteger NSEventGestureAxis;
   // to send its pair event first, in case we didn't yet for any reason.
   BOOL mExpectingWheelStop;
 
+  // Set to YES when our GL surface has been updated and we need to call
+  // updateGLContext before we composite.
+  BOOL mNeedsGLUpdate;
+
   // Holds our drag service across multiple drag calls. The reference to the
   // service is obtained when the mouse enters the view and is released when
   // the mouse exits or there is a drop. This prevents us from having to
@@ -276,7 +282,6 @@ typedef NSInteger NSEventGestureAxis;
 - (void)updateGLContext;
 - (void)_surfaceNeedsUpdate:(NSNotification*)notification;
 
-- (void)setGLContext:(NSOpenGLContext *)aGLContext;
 - (bool)preRender:(NSOpenGLContext *)aGLContext;
 - (void)postRender:(NSOpenGLContext *)aGLContext;
 
@@ -656,10 +661,10 @@ protected:
   CGContextRef mTitlebarCGContext;
 
   // Compositor thread only
-  mozilla::UniquePtr<RectTextureImage> mResizerImage;
-  mozilla::UniquePtr<RectTextureImage> mCornerMaskImage;
-  mozilla::UniquePtr<RectTextureImage> mTitlebarImage;
-  mozilla::UniquePtr<RectTextureImage> mBasicCompositorImage;
+  mozilla::UniquePtr<mozilla::widget::RectTextureImage> mResizerImage;
+  mozilla::UniquePtr<mozilla::widget::RectTextureImage> mCornerMaskImage;
+  mozilla::UniquePtr<mozilla::widget::RectTextureImage> mTitlebarImage;
+  mozilla::UniquePtr<mozilla::widget::RectTextureImage> mBasicCompositorImage;
 
   // The area of mTitlebarCGContext that has changed and needs to be
   // uploaded to to mTitlebarImage. Main thread only.

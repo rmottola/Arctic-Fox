@@ -1045,8 +1045,10 @@ js::GCMarker::eagerlyMarkChildren(Shape* shape)
         // be traced by this loop they do not need to be traced here as well.
         BaseShape* base = shape->base();
         CheckTraversedEdge(shape, base);
-        if (mark(base))
+        if (mark(base)) {
+            MOZ_ASSERT(base->canSkipMarkingShapeTable(shape));
             base->traceChildrenSkipShapeTable(this);
+        }
 
         traverseEdge(shape, shape->propidRef().get());
 
@@ -1883,7 +1885,11 @@ GCMarker::enterWeakMarkingMode()
         return;
 
     // During weak marking mode, we maintain a table mapping weak keys to
-    // entries in known-live weakmaps.
+    // entries in known-live weakmaps. Initialize it with the keys of marked
+    // weakmaps -- or more precisely, the keys of marked weakmaps that are
+    // mapped to not yet live values. (Once bug 1167452 implements incremental
+    // weakmap marking, this initialization step will become unnecessary, as
+    // the table will already hold all such keys.)
     if (weakMapAction() == ExpandWeakMaps) {
         tag_ = TracerKindTag::WeakMarking;
 
@@ -2753,7 +2759,7 @@ TypedUnmarkGrayCellRecursively(T* t)
     MOZ_ASSERT(t);
 
     JSRuntime* rt = t->runtimeFromMainThread();
-    MOZ_ASSERT(!rt->isHeapBusy());
+    MOZ_ASSERT(!rt->isHeapCollecting());
 
     bool unmarkedArg = false;
     if (t->isTenured()) {

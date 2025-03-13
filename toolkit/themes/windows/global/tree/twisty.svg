@@ -8,25 +8,21 @@
       display: none;
     }
     use {
-      stroke: #74747b;
-      stroke-opacity: 0.85;
+      stroke: #b6b6b6;
+      stroke-width: 1.6;
       fill: none;
     }
     use[id^="open"] {
       stroke: #636363;
-      stroke-opacity: 1;
     }
     use[id*="-hover"] {
-      stroke: #1cc4f7;
-      stroke-opacity: 1;
-      fill: #c0e8f9;
+      stroke: #4ed0f9;
     }
   </style>
   <defs>
-    <path id="clsd-shape" d="m 2.5,0.5 4,4 -4,4 z"/>
-    <path id="open-shape" d="M 7.5,3 7.5,7.5 3,7.5 3,6.5 6.5,3 Z"/>
-    <path id="clsd-rtl-shape" d="m 6.5,0.5 -4,4 4,4 z"/>
-    <path id="open-rtl-shape" d="m 1.5,3 0,4.5 4.5,0 0,-1 L 2.5,3 Z"/>
+    <path id="clsd-shape" d="m 2.5,0.5 4,4 -4,4"/>
+    <path id="open-shape" d="m 8.5,2.5 -4,4 -4,-4"/>
+    <path id="clsd-rtl-shape" d="m 6.5,0.5 -4,4 4,4"/>
   </defs>
   <use id="clsd" xlink:href="#clsd-shape"/>
   <use id="clsd-hover" xlink:href="#clsd-shape"/>
@@ -34,6 +30,6 @@
   <use id="open-hover" xlink:href="#open-shape"/>
   <use id="clsd-rtl" xlink:href="#clsd-rtl-shape"/>
   <use id="clsd-hover-rtl" xlink:href="#clsd-rtl-shape"/>
-  <use id="open-rtl" xlink:href="#open-rtl-shape"/>
-  <use id="open-hover-rtl" xlink:href="#open-rtl-shape"/>
+  <use id="open-rtl" xlink:href="#open-shape"/>
+  <use id="open-hover-rtl" xlink:href="#open-shape"/>
 </svg>

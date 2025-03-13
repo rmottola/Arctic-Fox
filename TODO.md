@@ -32,7 +32,6 @@
 - Bug 1362167 - 2017-05-04 - Use strongly-typed enum classes instead of generic uint
 - Bug 1352528 - 2017-04-03 - Hoist call to GetRoundOffsetsToPixels out of the inner 
 - 1297276 - Rename mfbt/unused.h to mfbt/Unused.h for consistency
-- 1276938 - Optimize string usage in setAttribute when dealing with
 - 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - Bug 1310721 - 2016-10-15- Remove support for the b2g PAC generator; r=mcmanus
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
@@ -46,7 +45,6 @@
 
 If applied, breaks build:
 Bug 1146738 - Fix race condition between js/src/target and js/src/host. r=mshal
-Bug 1274516 - Add a helper to iterate over all ContentParents and use it to clear the image cache in both the parent and child processe
 
 
 impacting download and shutdown:

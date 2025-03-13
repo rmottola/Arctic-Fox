@@ -185,6 +185,8 @@ static bool LockD3DTexture(T* aTexture)
     HRESULT hr = mutex->AcquireSync(0, 10000);
     if (hr == WAIT_TIMEOUT) {
       gfxDevCrash(LogReason::D3DLockTimeout) << "D3D lock mutex timeout";
+    } else if (hr == WAIT_ABANDONED) {
+      gfxCriticalNote << "GFX: D3D11 lock mutex abandoned";
     }
 
     if (FAILED(hr)) {
@@ -395,6 +397,7 @@ D3D11TextureData::Create(IntSize aSize, SurfaceFormat aFormat, TextureAllocation
 void
 D3D11TextureData::Deallocate(ClientIPCAllocator* aAllocator)
 {
+  mDrawTarget = nullptr;
   mTexture = nullptr;
 }
 

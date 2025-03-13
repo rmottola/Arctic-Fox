@@ -134,6 +134,11 @@ public:
   virtual void Blur(ErrorResult& aError) override;
   virtual void Focus(ErrorResult& aError) override;
 
+  // nsINode
+#if defined(XP_WIN) || defined(XP_LINUX)
+  virtual bool IsNodeApzAwareInternal() const override;
+#endif
+
   // Element
   virtual bool IsInteractiveHTMLContent(bool aIgnoreTabindex) const override;
 
@@ -154,7 +159,7 @@ public:
   // Overriden nsIFormControl methods
   NS_IMETHOD_(uint32_t) GetType() const override { return mType; }
   NS_IMETHOD Reset() override;
-  NS_IMETHOD SubmitNamesValues(nsFormSubmission* aFormSubmission) override;
+  NS_IMETHOD SubmitNamesValues(HTMLFormSubmission* aFormSubmission) override;
   NS_IMETHOD SaveState() override;
   virtual bool RestoreState(nsPresState* aState) override;
   virtual bool AllowDrop() override;
@@ -1017,7 +1022,11 @@ protected:
   /**
    * Returns if the step attribute apply for the current type.
    */
-  bool DoesStepApply() const { return DoesMinMaxApply(); }
+  bool DoesStepApply() const
+  {
+    // TODO: this is temporary until bug 888324 is fixed.
+    return DoesMinMaxApply() && mType != NS_FORM_INPUT_MONTH;
+  }
 
   /**
    * Returns if stepDown and stepUp methods apply for the current type.
@@ -1027,7 +1036,11 @@ protected:
   /**
    * Returns if valueAsNumber attribute applies for the current type.
    */
-  bool DoesValueAsNumberApply() const { return DoesMinMaxApply(); }
+  bool DoesValueAsNumberApply() const
+  {
+    // TODO: this is temporary until bug 888324 is fixed.
+    return DoesMinMaxApply() && mType != NS_FORM_INPUT_MONTH;
+  }
 
   /**
    * Returns if autocomplete attribute applies for the current type.
@@ -1251,6 +1264,12 @@ protected:
    */
   static bool IsExperimentalMobileType(uint8_t aType);
 
+  /*
+   * Returns if the current type is one of the date/time input types: date,
+   * time and month. TODO: week and datetime-local.
+   */
+  static bool IsDateTimeInputType(uint8_t aType);
+
   /**
    * Flushes the layout frame tree to make sure we have up-to-date frames.
    */
@@ -1291,6 +1310,17 @@ protected:
                                             ErrorResult& aRv);
 
   void ClearGetFilesHelpers();
+
+  /**
+   * nsINode::SetMayBeApzAware() will be invoked in this function if necessary 
+   * to prevent default action of APZC so that we can increase/decrease the
+   * value of this InputElement when mouse wheel event comes without scrolling
+   * the page.
+   *
+   * SetMayBeApzAware() will set flag MayBeApzAware which is checked by apzc to
+   * decide whether to add this element into its dispatch-to-content region.
+   */
+  void UpdateApzAwareFlag();
 
   nsCOMPtr<nsIControllers> mControllers;
 

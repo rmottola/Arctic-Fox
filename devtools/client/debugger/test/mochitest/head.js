@@ -588,9 +588,9 @@ AddonDebugger.prototype = {
     info("Addon debugger panel shown successfully.");
 
     this.debuggerPanel = toolbox.getCurrentPanel();
+    yield waitForSourceShown(this.debuggerPanel, '');
 
-    // Wait for the initial resume...
-    yield prepareDebugger(this.debuggerPanel);
+    prepareDebugger(this.debuggerPanel);
     yield this._attachConsole();
   }),
 
@@ -846,7 +846,7 @@ function intendOpenVarPopup(aPanel, aPosition, aButtonPushed) {
         deferred.resolve(true);
       }
     },
-    tooltip.defaultShowDelay + 1000
+    bubble.TOOLTIP_SHOW_DELAY + 1000
   );
 
   return deferred.promise;

@@ -317,7 +317,7 @@
       <stack id="allTabs-stack">
         <vbox id="allTabs-container"><hbox/></vbox>
         <toolbarbutton id="allTabs-tab-close-button"
-                       class="tabs-closebutton close-icon"
+                       class="close-icon"
                        oncommand="allTabs.closeTab(event);"
                        tooltiptext="&closeCmd.label;"
                        style="visibility:hidden"/>
@@ -510,10 +510,12 @@
         <textbox id="urlbar" flex="1"
                  placeholder=""
                  type="autocomplete"
-                 autocompletesearch="urlinline history"
+                 inputtype="url"
+                 autocompletesearch="unifiedcomplete"
                  autocompletesearchparam="enable-actions"
                  autocompletepopup="PopupAutoCompleteRichResult"
                  completeselectedindex="true"
+                 shrinkdelay="250"
                  tabscrolling="true"
                  showcommentcolumn="true"
                  showimagecolumn="true"
@@ -549,19 +551,29 @@
                code fires onmousedown, and hence eats our favicon drag events.
                We only add the identity-box button to the tab order when the location bar
                has focus, otherwise pressing F6 focuses it instead of the location bar -->
-          <box id="identity-box" role="button"
-               align="center"
-               onclick="gIdentityHandler.handleIdentityButtonEvent(event);"
-               onkeypress="gIdentityHandler.handleIdentityButtonEvent(event);"
-               ondragstart="gIdentityHandler.onDragStart(event);">
-            <image id="page-proxy-favicon"
-                   onclick="PageProxyClickHandler(event);"
-                   pageproxystate="invalid"/>
-            <hbox id="identity-icon-labels">
-              <label id="identity-icon-label" class="plain" flex="1"/>
-              <label id="identity-icon-country-label" class="plain"/>
-            </hbox>
-          </box>
+              <box id="identity-box" role="button"
+                   align="center"
+                   aria-label="&urlbar.viewSiteInfo.label;"
+                   onclick="gIdentityHandler.handleIdentityButtonEvent(event);"
+                   onkeypress="gIdentityHandler.handleIdentityButtonEvent(event);"
+                   ondragstart="gIdentityHandler.onDragStart(event);">
+                <image id="identity-icon"
+                       consumeanchor="identity-box"
+                       onclick="PageProxyClickHandler(event);"/>
+                <box id="notification-popup-box"
+                     hidden="true"
+                     tooltiptext=""
+                     onmouseover="document.getElementById('identity-icon').classList.add('no-hover');"
+                     onmouseout="document.getElementById('identity-icon').classList.remove('no-hover');"
+                     align="center">
+                </box>
+                <image id="tracking-protection-icon"/>
+                <image id="connection-icon"/>
+                <hbox id="identity-icon-labels">
+                  <label id="identity-icon-label" class="plain" flex="1"/>
+                  <label id="identity-icon-country-label" class="plain"/>
+                </hbox>
+              </box>
           <box id="urlbar-display-box" align="center">
              <label class="urlbar-display urlbar-display-switchtab" value="&urlbar.switchToTab.label;"/>
           </box>
@@ -615,7 +627,7 @@
                          command="Browser:Stop"
                          tooltiptext="&stopButton.tooltip;"/>
         </textbox>
-      </toolbaritem>
+        </toolbaritem>
 
       <toolbaritem id="search-container" title="&searchItem.title;"
                    align="center" class="chromeclass-toolbar-additional"
@@ -879,7 +891,7 @@
              aria-label="&tabsToolbar.label;"
              context="toolbar-context-menu"
 #ifdef APPMENU_ON_TABBAR
-             defaultset="appmenu-toolbar-button,tabbrowser-tabs,new-tab-button,alltabs-button,tabs-closebutton"
+             defaultset="appmenu-toolbar-button,tabbrowser-tabs,new-tab-button,alltabs-button"
 #endif
              collapsed="true">
 
@@ -928,15 +940,14 @@
                     key="key_undoCloseTab"
                     label="&undoCloseTab.label;"
                     observes="History:UndoCloseTab"/>
-          <menuseparator id="alltabs-popup-separator"/>
+          <menuseparator id="alltabs-popup-separator-1"/>
+          <menu id="alltabs_containersTab"
+                label="&newUserContext.label;">
+            <menupopup id="alltabs_containersMenuTab" />
+          </menu>
+          <menuseparator id="alltabs-popup-separator-2"/>
         </menupopup>
       </toolbarbutton>
-
-      <toolbarbutton id="tabs-closebutton"
-                     class="close-button tabs-closebutton close-icon"
-                     command="cmd_close"
-                     label="&closeTab.label;"
-                     tooltiptext="&closeTab.label;"/>
 
 #ifdef CAN_DRAW_IN_TITLEBAR
       <hbox class="titlebar-placeholder" type="appmenu-button" ordinal="0"/>
@@ -1070,7 +1081,7 @@
       <sidebarheader id="sidebar-header" align="center">
         <label id="sidebar-title" persist="value" flex="1" crop="end" control="sidebar"/>
         <image id="sidebar-throbber"/>
-        <toolbarbutton class="tabs-closebutton close-icon" tooltiptext="&sidebarCloseButton.tooltip;" oncommand="SidebarUI.hide();"/>
+        <toolbarbutton class="close-icon tabbable" tooltiptext="&sidebarCloseButton.tooltip;" oncommand="SidebarUI.hide();"/>
       </sidebarheader>
       <browser id="sidebar" flex="1" autoscroll="false" disablehistory="true"
                 style="min-width: 14em; width: 18em; max-width: 36em;" tooltip="aHTMLTooltip"/>
@@ -1078,7 +1089,7 @@
 
     <splitter id="sidebar-splitter" class="chromeclass-extrachrome sidebar-splitter" hidden="true"/>
     <vbox id="appcontent" flex="1">
-      <notificationbox id="high-priority-global-notificationbox"/>
+      <notificationbox id="high-priority-global-notificationbox" notificationside="top"/>
       <tabbrowser id="content"
                   flex="1" contenttooltip="aHTMLTooltip"
                   tabcontainer="tabbrowser-tabs"
@@ -1109,7 +1120,7 @@
   </hbox>
 
   <vbox id="browser-bottombox" layer="true">
-    <notificationbox id="global-notificationbox"/>
+    <notificationbox id="global-notificationbox" notificationside="bottom"/>
   </vbox>
 
 #ifndef XP_UNIX

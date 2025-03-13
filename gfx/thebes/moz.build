@@ -39,7 +39,6 @@ EXPORTS += [
     'gfxQuaternion.h',
     'gfxRect.h',
     'gfxSharedImageSurface.h',
-    'gfxSharedQuartzSurface.h',
     'gfxSkipChars.h',
     'gfxSVGGlyphs.h',
     'gfxTextRun.h',
@@ -96,12 +95,16 @@ elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
         'gfxQuartzNativeDrawing.h',
         'gfxQuartzSurface.h',
     ]
+    EXPORTS.mozilla.gfx += [
+        'PrintTargetCG.h',
+    ]
     SOURCES += [
         'gfxCoreTextShaper.cpp',
         'gfxMacFont.cpp',
         'gfxPlatformMac.cpp',
         'gfxQuartzNativeDrawing.cpp',
         'gfxQuartzSurface.cpp',
+        'PrintTargetCG.cpp',
     ]
 elif 'gtk' in CONFIG['MOZ_WIDGET_TOOLKIT']:
     EXPORTS += [
@@ -267,9 +270,6 @@ if CONFIG['ENABLE_INTL_API']:
     USE_LIBS += [
         'icu',
     ]
-
-if CONFIG['GNU_CXX']:
-    CXXFLAGS += ['-Wshadow']
 
 include('/ipc/chromium/chromium-config.mozbuild')
 

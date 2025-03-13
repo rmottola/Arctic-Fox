@@ -17,6 +17,7 @@
 %define forwardTransitionLength 150ms
 %define conditionalForwardWithUrlbar window:not([chromehidden~=toolbar]) #navigator-toolbox[iconsize=large][mode=icons] > :-moz-any(#nav-bar[currentset*="unified-back-forward-button"],#nav-bar:not([currentset])) > #unified-back-forward-button
 %define conditionalForwardWithUrlbarWidth 27
+%define toolbarButtonPressed :hover:active:not([disabled="true"]):not([cui-areatype="menu-panel"])
 
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 @namespace html url("http://www.w3.org/1999/xhtml");
@@ -902,10 +903,17 @@ toolbar[brighttext] #bookmarks-menu-button.bookmark-item {
     -moz-image-region: rect(0, 18px, 18px, 0);
 }
 
+  #containers-panelmenu@toolbarButtonPressed@ {
+    -moz-image-region: rect(36px, 1620px, 72px, 1584px);
+  }
+
 #feed-button {
     -moz-image-region: rect(0, 288px, 18px, 270px);
 }
 
+  #containers-panelmenu@toolbarButtonPressed@ {
+    -moz-image-region: rect(18px, 810px, 36px, 792px);
+  }
 
 /* ::::: fullscreen window controls ::::: */
 
@@ -1205,6 +1213,8 @@ html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
     opacity: 0.3;
 }
 
+%include ../shared/urlbarSearchSuggestionsNotification.inc.css
+
 /* ----- AUTOCOMPLETE ----- */
 
 #treecolAutoCompleteImage {
@@ -1271,6 +1281,12 @@ richlistitem[type~="action"][actiontype$="tab"][selected="true"] > .ac-url-box >
     color: inherit !important;
 }
 
+richlistitem[type~="action"][actiontype="searchengine"] > .ac-title-box > .ac-site-icon {
+  list-style-image: url("chrome://global/skin/icons/autocomplete-search.svg#search-icon");
+}
+richlistitem[type~="action"][actiontype="searchengine"][selected="true"] > .ac-title-box > .ac-site-icon {
+  list-style-image: url("chrome://global/skin/icons/autocomplete-search.svg#search-icon-inverted");
+}
 .autocomplete-treebody::-moz-tree-cell-text(treecolAutoCompleteComment) {
     color: GrayText;
 }
@@ -1864,14 +1880,6 @@ toolbar[brighttext] #alltabs-button[type="menu"] {
 .alltabs-item[tabIsVisible] {
     /* box-shadow instead of background-color to work around native styling */
     box-shadow: inset -5px 0 ThreeDShadow;
-}
-
-/* Tabstrip close button */
-.tabs-closebutton {
-    -moz-appearance: none;
-    padding: 4px 2px;
-    margin: 0px;
-    border: none;
 }
 
 toolbar[brighttext] .tabs-closebutton {

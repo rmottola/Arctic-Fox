@@ -57,29 +57,14 @@ TreeWalker::~TreeWalker()
   MOZ_COUNT_DTOR(TreeWalker);
 }
 
-Accessible*
-TreeWalker::Scope(nsIContent* aAnchorNode)
-{
-  Reset();
-
-  mAnchorNode = aAnchorNode;
-
-  bool skipSubtree = false;
-  Accessible* acc = AccessibleFor(aAnchorNode, 0, &skipSubtree);
-  if (acc) {
-    mPhase = eAtEnd;
-    return acc;
-  }
-
-  return skipSubtree ? nullptr : Next();
-}
-
 bool
 TreeWalker::Seek(nsIContent* aChildNode)
 {
   MOZ_ASSERT(aChildNode, "Child cannot be null");
 
-  Reset();
+  mPhase = eAtStart;
+  mStateStack.Clear();
+  mARIAOwnsIdx = 0;
 
   nsIContent* childNode = nullptr;
   nsINode* parentNode = aChildNode;
@@ -125,7 +110,7 @@ TreeWalker::Seek(nsIContent* aChildNode)
 }
 
 Accessible*
-TreeWalker::Next()
+TreeWalker::Next(nsIContent* aStopNode)
 {
   if (mStateStack.IsEmpty()) {
     if (mPhase == eAtEnd) {
@@ -154,6 +139,10 @@ TreeWalker::Next()
 
   dom::AllChildrenIterator* top = &mStateStack[mStateStack.Length() - 1];
   while (top) {
+    if (aStopNode && top->Get() == aStopNode) {
+      return nullptr;
+    }
+
     while (nsIContent* childNode = top->GetNextChild()) {
       bool skipSubtree = false;
       Accessible* child = AccessibleFor(childNode, mFlags, &skipSubtree);
@@ -161,9 +150,13 @@ TreeWalker::Next()
         return child;
       }
 
-      // Walk down the subtree if allowed.
+      // Walk down the subtree if allowed, otherwise check if we have reached
+      // a stop node.
       if (!skipSubtree && childNode->IsElement()) {
         top = PushState(childNode, true);
+      }
+      else if (childNode == aStopNode) {
+        return nullptr;
       }
     }
     top = PopState();
@@ -178,7 +171,7 @@ TreeWalker::Next()
       mPhase = eAtEnd;
       return nullptr;
     }
-    return Next();
+    return Next(aStopNode);
   }
 
   nsINode* contextNode = mContext->GetNode();
@@ -191,7 +184,7 @@ TreeWalker::Next()
     top = PushState(parent, true);
     if (top->Seek(mAnchorNode)) {
       mAnchorNode = parent;
-      return Next();
+      return Next(aStopNode);
     }
 
     // XXX We really should never get here, it means we're trying to find an
@@ -201,7 +194,7 @@ TreeWalker::Next()
     mAnchorNode = parent;
   }
 
-  return Next();
+  return Next(aStopNode);
 }
 
 Accessible*
@@ -295,7 +288,14 @@ TreeWalker::AccessibleFor(nsIContent* aNode, uint32_t aFlags, bool* aSkipSubtree
 
   // Create an accessible if allowed.
   if (!(aFlags & eWalkCache) && mContext->IsAcceptableChild(aNode)) {
-    if (mDoc->RelocateARIAOwnedIfNeeded(aNode)) {
+    // We may have ARIA owned element in the dependent attributes map, but the
+    // element may be not allowed for this ARIA owns relation, if the relation
+    // crosses out XBL anonymous content boundaries. In this case we won't
+    // create an accessible object for it, when aria-owns is processed, which
+    // may make the element subtree inaccessible. To avoid that let's create
+    // an accessible object now, and later, if allowed, move it in the tree,
+    // when aria-owns relation is processed.
+    if (mDoc->RelocateARIAOwnedIfNeeded(aNode) && !aNode->IsXULElement()) {
       *aSkipSubtree = true;
       return nullptr;
     }

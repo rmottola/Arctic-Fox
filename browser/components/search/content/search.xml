@@ -27,6 +27,7 @@
       <xul:textbox class="searchbar-textbox"
                    anonid="searchbar-textbox"
                    type="autocomplete"
+                   inputtype="search"
                    flex="1"
                    autocompletepopup="PopupAutoComplete"
                    autocompletesearch="search-autocomplete"
@@ -34,6 +35,7 @@
                    timeout="250"
                    maxrows="10"
                    completeselectedindex="true"
+                   minresultsforpopup="0"
                    showcommentcolumn="true"
                    tabscrolling="true"
                    xbl:inherits="disabled,disableautocomplete,searchengine,src,newlines">
@@ -785,12 +787,15 @@
               break;
             buttons.push(oneOff);
           }
+
           if (aCycleEngines)
             return buttons;
+
           let addEngine =
             document.getAnonymousElementByAttribute(this.popup, "anonid", "add-engines");
           for (addEngine = addEngine.firstChild; addEngine; addEngine = addEngine.nextSibling)
             buttons.push(addEngine);
+
           buttons.push(document.getAnonymousElementByAttribute(this.popup, "anonid",
                                                                "search-settings"));
           return buttons;
@@ -807,18 +812,21 @@
                                                              "search-panel-one-offs");
           let selectedButton = this.selectedButton;
           let buttons = this.getSelectableButtons(aCycleEngines);
+
           let suggestionsHidden;
           if (!aSkipSuggestions) {
             let suggestions = document.getAnonymousElementByAttribute(popup, "anonid", "tree");
             suggestionsHidden = suggestions.getAttribute("collapsed") == "true";
             aSkipSuggestions = suggestionsHidden;
           }
+
           // If the last suggestion is selected, DOWN selects the first button.
           if (!aSkipSuggestions && aForward &&
               popup.selectedIndex + 1 == popup.view.rowCount) {
             this.selectedButton = buttons[0];
             return false;
           }
+
           // If a one-off is selected and no suggestion is selected (or we skip them)
           if (selectedButton && (popup.selectedIndex == -1 || aSkipSuggestions)) {
             // cycle through one-off buttons.
@@ -831,8 +839,10 @@
               this.selectedButton = buttons[index];
             else
               this.selectedButton = null;
+
             if (this.selectedButton || aCycleEngines || suggestionsHidden)
               return true;
+
             // Set the selectedIndex to something that will make
             // handleKeyNavigation (called by autocomplete.xml's onKeyPress
             // method) reset the text field value to what the user typed.
@@ -843,12 +853,14 @@
               popup.selectedIndex = popup.view.rowCount;
             return false;
           }
+
           if (!selectedButton) {
             // If no selection, select the first button or ...
             if (aForward && aSkipSuggestions) {
               this.selectedButton = buttons[0];
               return true;
             }
+
             if (!aForward && (aCycleEngines || suggestionsHidden ||
                               (!aSkipSuggestions && popup.selectedIndex == -1))) {
               // the last button.
@@ -856,10 +868,10 @@
               return true;
             }
           }
+
           return false;
         ]]></body>
       </method>
-
 
       <method name="handleKeyboardNavigation">
         <parameter name="aEvent"/>
@@ -867,15 +879,19 @@
           let popup = this.popup;
           if (!popup.popupOpen)
             return;
+
           let list = document.getAnonymousElementByAttribute(popup, "anonid",
                                                              "search-panel-one-offs");
           if (!list) // remove this check when removing the old search UI.
             return;
+
           // accel + up/down changes the default engine and shouldn't affect
           // the selection on the one-off buttons.
           if (aEvent.getModifierState("Accel"))
             return;
+
           let stopEvent = false;
+
           // Alt + up/down is very similar to (shift +) tab but differs in that
           // it loops through the list, whereas tab will move the focus out.
           if (aEvent.altKey &&
@@ -892,6 +908,7 @@
           else if (aEvent.keyCode == KeyEvent.DOM_VK_TAB) {
             stopEvent = this.advanceSelection(!aEvent.shiftKey, true);
           }
+
           if (stopEvent) {
             aEvent.preventDefault();
             aEvent.stopPropagation();

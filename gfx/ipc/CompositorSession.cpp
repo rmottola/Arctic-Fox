@@ -6,21 +6,24 @@
 #include "CompositorSession.h"
 #include "mozilla/layers/CompositorBridgeChild.h"
 #include "mozilla/layers/CompositorBridgeParent.h"
+#include "mozilla/widget/PlatformWidgetTypes.h"
 #include "base/process_util.h"
 
 namespace mozilla {
 namespace layers {
 
+using namespace widget;
+
 class InProcessCompositorSession final : public CompositorSession
 {
 public:
   InProcessCompositorSession(
-    widget::CompositorWidgetProxy* aWidgetProxy,
+    nsIWidget* aWidget,
     ClientLayerManager* aLayerManager,
     CSSToLayoutDeviceScale aScale,
     bool aUseAPZ,
     bool aUseExternalSurfaceSize,
-    int aSurfaceWidth, int aSurfaceHeight);
+    const gfx::IntSize& aSurfaceSize);
 
   CompositorBridgeParent* GetInProcessBridge() const override;
   void SetContentController(GeckoContentController* aController) override;
@@ -30,27 +33,29 @@ public:
 
 private:
   RefPtr<CompositorBridgeParent> mCompositorBridgeParent;
+  RefPtr<CompositorWidget> mCompositorWidget;
 };
 
 already_AddRefed<CompositorSession>
-CompositorSession::CreateInProcess(widget::CompositorWidgetProxy* aWidgetProxy,
+CompositorSession::CreateInProcess(nsIWidget* aWidget,
                                    ClientLayerManager* aLayerManager,
                                    CSSToLayoutDeviceScale aScale,
                                    bool aUseAPZ,
                                    bool aUseExternalSurfaceSize,
-                                   int aSurfaceWidth, int aSurfaceHeight)
+                                   const gfx::IntSize& aSurfaceSize)
 {
   RefPtr<InProcessCompositorSession> session = new InProcessCompositorSession(
-    aWidgetProxy,
+    aWidget,
     aLayerManager,
     aScale,
     aUseAPZ,
     aUseExternalSurfaceSize,
-    aSurfaceWidth, aSurfaceHeight);
+    aSurfaceSize);
   return session.forget();
 }
 
 CompositorSession::CompositorSession()
+ : mCompositorWidgetDelegate(nullptr)
 {
 }
 
@@ -64,20 +69,24 @@ CompositorSession::GetCompositorBridgeChild()
   return mCompositorBridgeChild;
 }
 
-InProcessCompositorSession::InProcessCompositorSession(widget::CompositorWidgetProxy* aWidgetProxy,
+InProcessCompositorSession::InProcessCompositorSession(nsIWidget* aWidget,
                                                        ClientLayerManager* aLayerManager,
                                                        CSSToLayoutDeviceScale aScale,
                                                        bool aUseAPZ,
                                                        bool aUseExternalSurfaceSize,
-                                                       int aSurfaceWidth, int aSurfaceHeight)
+                                                       const gfx::IntSize& aSurfaceSize)
 {
+  CompositorWidgetInitData initData;
+  aWidget->GetCompositorWidgetInitData(&initData);
+  mCompositorWidget = CompositorWidget::CreateLocal(initData, aWidget);
+  mCompositorWidgetDelegate = mCompositorWidget->AsDelegate();
+
   mCompositorBridgeParent = new CompositorBridgeParent(
-    aWidgetProxy,
+    mCompositorWidget,
     aScale,
     aUseAPZ,
     aUseExternalSurfaceSize,
-    aSurfaceWidth,
-    aSurfaceHeight);
+    aSurfaceSize);
   mCompositorBridgeChild = new CompositorBridgeChild(aLayerManager);
   mCompositorBridgeChild->OpenSameProcess(mCompositorBridgeParent);
   mCompositorBridgeParent->SetOtherProcessId(base::GetCurrentProcId());
@@ -110,12 +119,14 @@ InProcessCompositorSession::GetAPZCTreeManager() const
 void
 InProcessCompositorSession::Shutdown()
 {
-  // XXX CompositorBridgeChild and CompositorBridgeParent might be re-created in
-  // ClientLayerManager destructor. See bug 1133426.
-  RefPtr<CompositorBridgeChild> compositorChild = mCompositorBridgeChild;
-  RefPtr<CompositorBridgeParent> compositorParent = mCompositorBridgeParent;
+  // Destroy will synchronously wait for the parent to acknowledge shutdown,
+  // at which point CBP will defer a Release on the compositor thread. We
+  // can safely release our reference now, and let the destructor run on either
+  // thread.
   mCompositorBridgeChild->Destroy();
   mCompositorBridgeChild = nullptr;
+  mCompositorBridgeParent = nullptr;
+  mCompositorWidget = nullptr;
 }
 
 } // namespace layers

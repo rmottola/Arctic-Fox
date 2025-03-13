@@ -56,11 +56,12 @@ public:
   void RemoveGMPContentParent(GMPContentParent* aGMPContentParent);
 
 protected:
-  void InitializePlugins() override
+  void InitializePlugins(AbstractThread*) override
   {
     // Nothing to do here.
   }
-  bool GetContentParentFrom(const nsACString& aNodeId,
+  bool GetContentParentFrom(GMPCrashHelper* aHelper,
+                            const nsACString& aNodeId,
                             const nsCString& aAPI,
                             const nsTArray<nsCString>& aTags,
                             UniquePtr<GetGMPContentParentCallback>&& aCallback)

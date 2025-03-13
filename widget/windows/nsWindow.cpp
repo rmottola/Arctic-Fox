@@ -136,11 +136,12 @@
 #include "mozilla/TextEvents.h" // For WidgetKeyboardEvent
 #include "mozilla/TextEventDispatcherListener.h"
 #include "mozilla/widget/WinNativeEventData.h"
+#include "mozilla/widget/PlatformWidgetTypes.h"
 #include "nsThemeConstants.h"
 #include "nsBidiKeyboard.h"
 #include "nsThemeConstants.h"
 #include "gfxConfig.h"
-#include "WinCompositorWidgetProxy.h"
+#include "WinCompositorWidget.h"
 
 #include "nsIGfxInfo.h"
 #include "nsUXThemeConstants.h"
@@ -1298,8 +1299,8 @@ NS_METHOD nsWindow::Show(bool bState)
       // Clear contents to avoid ghosting of old content if we display
       // this window again.
       if (wasVisible && mTransparencyMode == eTransparencyTransparent) {
-        if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
-          proxy->ClearTransparentWindow();
+        if (mCompositorWidgetDelegate) {
+          mCompositorWidgetDelegate->ClearTransparentWindow();
         }
       }
       if (mWindowType != eWindowType_dialog) {
@@ -1557,8 +1558,8 @@ NS_METHOD nsWindow::Resize(double aWidth, double aHeight, bool aRepaint)
   }
 
   if (mTransparencyMode == eTransparencyTransparent) {
-    if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
-      proxy->ResizeTransparentWindow(width, height);
+    if (mCompositorWidgetDelegate) {
+      mCompositorWidgetDelegate->ResizeTransparentWindow(gfx::IntSize(width, height));
     }
   }
 
@@ -1616,8 +1617,8 @@ NS_METHOD nsWindow::Resize(double aX, double aY, double aWidth, double aHeight, 
   }
 
   if (eTransparencyTransparent == mTransparencyMode) {
-    if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
-      proxy->ResizeTransparentWindow(width, height);
+    if (mCompositorWidgetDelegate) {
+      mCompositorWidgetDelegate->ResizeTransparentWindow(gfx::IntSize(width, height));
     }
   }
 
@@ -3607,13 +3608,8 @@ nsWindow::HasPendingInputEvent()
 LayerManager*
 nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
                           LayersBackend aBackendHint,
-                          LayerManagerPersistence aPersistence,
-                          bool* aAllowRetaining)
+                          LayerManagerPersistence aPersistence)
 {
-  if (aAllowRetaining) {
-    *aAllowRetaining = true;
-  }
-
   RECT windowRect;
   ::GetClientRect(mWnd, &windowRect);
 
@@ -3629,13 +3625,16 @@ nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
 
   if (!mLayerManager) {
     MOZ_ASSERT(!mCompositorSession && !mCompositorBridgeChild);
+    MOZ_ASSERT(!mCompositorWidgetDelegate);
 
     // Ensure we have a widget proxy even if we're not using the compositor,
-    // since that's where we handle transparent windows.
-    if (!mCompositorWidgetProxy) {
-      mCompositorWidgetProxy = new WinCompositorWidgetProxy(this);
-    }
-
+    // since all our transparent window handling lives there.
+    CompositorWidgetInitData initData(
+      reinterpret_cast<uintptr_t>(mWnd),
+      reinterpret_cast<uintptr_t>(static_cast<nsIWidget*>(this)),
+      mTransparencyMode);
+    mBasicLayersSurface = new WinCompositorWidget(initData, this);
+    mCompositorWidgetDelegate = mBasicLayersSurface;
     mLayerManager = CreateBasicLayerManager();
   }
 
@@ -3694,18 +3693,6 @@ nsWindow::OnDefaultButtonLoaded(const LayoutDeviceIntRect& aButtonRect)
     return NS_ERROR_FAILURE;
   }
   return NS_OK;
-}
-
-mozilla::widget::CompositorWidgetProxy*
-nsWindow::NewCompositorWidgetProxy()
-{
-  return new WinCompositorWidgetProxy(this);
-}
-
-mozilla::widget::WinCompositorWidgetProxy*
-nsWindow::GetCompositorWidgetProxy()
-{
-  return mCompositorWidgetProxy ? mCompositorWidgetProxy->AsWindowsProxy() : nullptr;
 }
 
 void
@@ -4923,17 +4910,16 @@ nsWindow::ProcessMessage(UINT msg, WPARAM& wParam, LPARAM& lParam,
         //
         // To do this we take mPresentLock in nsWindow::PreRender and
         // if that lock is taken we wait before doing WM_SETTEXT
-        RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy();
-        if (proxy) {
-          proxy->EnterPresentLock();
+        if (mCompositorWidgetDelegate) {
+          mCompositorWidgetDelegate->EnterPresentLock();
         }
         DWORD style = GetWindowLong(mWnd, GWL_STYLE);
         SetWindowLong(mWnd, GWL_STYLE, style & ~WS_VISIBLE);
         *aRetValue = CallWindowProcW(GetPrevWindowProc(), mWnd,
                                      msg, wParam, lParam);
         SetWindowLong(mWnd, GWL_STYLE, style);
-        if (proxy) {
-          proxy->LeavePresentLock();
+        if (mCompositorWidgetDelegate) {
+          mCompositorWidgetDelegate->LeavePresentLock();
         }
 
         return true;
@@ -6238,8 +6224,8 @@ void nsWindow::OnWindowPosChanged(WINDOWPOS* wp)
     nsIntRect rect(wp->x, wp->y, newWidth, newHeight);
 
     if (eTransparencyTransparent == mTransparencyMode) {
-      if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
-        proxy->ResizeTransparentWindow(newWidth, newHeight);
+      if (mCompositorWidgetDelegate) {
+        mCompositorWidgetDelegate->ResizeTransparentWindow(gfx::IntSize(newWidth, newHeight));
       }
     }
 
@@ -6759,9 +6745,10 @@ void nsWindow::OnDestroy()
   if (mCursor == -1)
     SetCursor(eCursor_standard);
 
-  if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
-    proxy->OnDestroyWindow();
+  if (mCompositorWidgetDelegate) {
+    mCompositorWidgetDelegate->OnDestroyWindow();
   }
+  mBasicLayersSurface = nullptr;
 
   // Finalize panning feedback to possibly restore window displacement
   mGesture.PanFeedbackFinalize(mWnd, true);
@@ -6838,7 +6825,7 @@ nsWindow::HasBogusPopupsDropShadowOnMultiMonitor() {
     if (!sHasBogusPopupsDropShadowOnMultiMonitor) {
       // Otherwise check if Direct3D 9 may be used.
       if (gfxConfig::IsEnabled(Feature::HW_COMPOSITING) &&
-          !gfxPrefs::LayersPreferOpenGL())
+          !gfxConfig::IsEnabled(Feature::OPENGL_COMPOSITING))
       {
         nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
         if (gfxInfo) {
@@ -7096,8 +7083,8 @@ void nsWindow::SetWindowTranslucencyInner(nsTransparencyMode aMode)
     memset(&mGlassMargins, 0, sizeof mGlassMargins);
   mTransparencyMode = aMode;
 
-  if (RefPtr<WinCompositorWidgetProxy> proxy = GetCompositorWidgetProxy()) {
-    proxy->UpdateTransparency(aMode);
+  if (mCompositorWidgetDelegate) {
+    mCompositorWidgetDelegate->UpdateTransparency(aMode);
   }
   UpdateGlass();
 }
@@ -7856,4 +7843,12 @@ DWORD ChildWindow::WindowStyle()
     style |= WS_CHILD; // WS_POPUP and WS_CHILD are mutually exclusive.
   VERIFY_WINDOW_STYLE(style);
   return style;
+}
+
+void
+nsWindow::GetCompositorWidgetInitData(mozilla::widget::CompositorWidgetInitData* aInitData)
+{
+  aInitData->hWnd() = reinterpret_cast<uintptr_t>(mWnd);
+  aInitData->widgetKey() = reinterpret_cast<uintptr_t>(static_cast<nsIWidget*>(this));
+  aInitData->transparencyMode() = mTransparencyMode;
 }

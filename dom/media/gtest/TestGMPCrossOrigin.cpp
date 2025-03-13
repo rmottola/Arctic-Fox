@@ -50,7 +50,8 @@ private:
 };
 
 template<class T, class Base,
-         nsresult (NS_STDCALL GeckoMediaPluginService::*Getter)(nsTArray<nsCString>*,
+         nsresult (NS_STDCALL GeckoMediaPluginService::*Getter)(GMPCrashHelper*,
+                                                                nsTArray<nsCString>*,
                                                                 const nsACString&,
                                                                 UniquePtr<Base>&&)>
 class RunTestGMPVideoCodec : public Base
@@ -89,7 +90,7 @@ protected:
 
     RefPtr<GeckoMediaPluginService> service =
       GeckoMediaPluginService::GetGeckoMediaPluginService();
-    return ((*service).*Getter)(&tags, aNodeId, Move(aCallback));
+    return ((*service).*Getter)(nullptr, &tags, aNodeId, Move(aCallback));
   }
 
 protected:
@@ -669,7 +670,7 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
     UniquePtr<GetGMPDecryptorCallback> callback(
       new CreateDecryptorDone(this, aContinuation));
     nsresult rv =
-      service->GetGMPDecryptor(&tags, mNodeId, Move(callback));
+      service->GetGMPDecryptor(nullptr, &tags, mNodeId, Move(callback));
     EXPECT_TRUE(NS_SUCCEEDED(rv));
   }
 

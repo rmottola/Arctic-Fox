@@ -182,6 +182,7 @@
 #include "nsIContentSecurityPolicy.h"
 #include "mozilla/dom/nsCSPContext.h"
 #include "mozilla/dom/nsCSPService.h"
+#include "mozilla/dom/nsCSPUtils.h"
 #include "nsHTMLStyleSheet.h"
 #include "nsHTMLCSSStyleSheet.h"
 #include "SVGAttrAnimationRuleProcessor.h"
@@ -1454,13 +1455,15 @@ nsIDocument::nsIDocument()
     mFontFaceSetDirty(true),
     mGetUserFontSetCalled(false),
     mPostedFlushUserFontSet(false),
-    mFullscreenEnabled(false),
     mPartID(0),
     mDidFireDOMContentLoaded(true),
     mHasScrollLinkedEffect(false),
     mUserHasInteracted(false)
 {
-  SetInDocument();
+  SetIsDocument();
+  if (IsStyledByServo()) {
+    SetFlags(NODE_IS_DIRTY_FOR_SERVO | NODE_HAS_DIRTY_DESCENDANTS_FOR_SERVO);
+  }
 
   PR_INIT_CLIST(&mDOMMediaQueryLists);
 }
@@ -1810,6 +1813,13 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsDocument)
     return NS_SUCCESS_INTERRUPTED_TRAVERSE;
   }
 
+  if (tmp->mMaybeEndOutermostXBLUpdateRunner) {
+    // The cached runnable keeps a reference to the document object..
+    NS_CYCLE_COLLECTION_NOTE_EDGE_NAME(cb,
+                                       "mMaybeEndOutermostXBLUpdateRunner.mObj");
+    cb.NoteXPCOMChild(ToSupports(tmp));
+  }
+
   for (auto iter = tmp->mIdentifierMap.ConstIter(); !iter.Done();
        iter.Next()) {
     iter.Get()->Traverse(&cb);
@@ -1960,6 +1970,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsDocument)
   tmp->mCachedRootElement = nullptr; // Avoid a dangling pointer
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDisplayDocument)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFirstBaseNodeWithHref)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mMaybeEndOutermostXBLUpdateRunner)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mDOMImplementation)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mImageMaps)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mCachedEncoder)
@@ -2587,7 +2598,8 @@ nsDocument::StartDocumentLoad(const char* aCommand, nsIChannel* aChannel,
   nsCOMPtr<nsIDocShell> docShell = do_QueryInterface(aContainer);
 
   if (docShell) {
-    docShell->ApplySandboxAndFullscreenFlags(this);
+    nsresult rv = docShell->GetSandboxFlags(&mSandboxFlags);
+    NS_ENSURE_SUCCESS(rv, rv);
     WarnIfSandboxIneffective(docShell, mSandboxFlags, GetChannel());
   }
 
@@ -2638,29 +2650,6 @@ nsDocument::SendToConsole(nsCOMArray<nsISecurityConsoleMessage>& aMessages)
                                     this, nsContentUtils::eSECURITY_PROPERTIES,
                                     NS_ConvertUTF16toUTF8(messageTag).get());
   }
-}
-
-static nsresult
-AppendCSPFromHeader(nsIContentSecurityPolicy* csp,
-                    const nsAString& aHeaderValue,
-                    bool aReportOnly)
-{
-  // Need to tokenize the header value since multiple headers could be
-  // concatenated into one comma-separated list of policies.
-  // See RFC2616 section 4.2 (last paragraph)
-  nsresult rv = NS_OK;
-  nsCharSeparatedTokenizer tokenizer(aHeaderValue, ',');
-  while (tokenizer.hasMoreTokens()) {
-      const nsSubstring& policy = tokenizer.nextToken();
-      rv = csp->AppendPolicy(policy, aReportOnly, false);
-      NS_ENSURE_SUCCESS(rv, rv);
-      {
-        MOZ_LOG(gCspPRLog, LogLevel::Debug,
-                ("CSP refined with policy: \"%s\"",
-                NS_ConvertUTF16toUTF8(policy).get()));
-      }
-  }
-  return NS_OK;
 }
 
 bool
@@ -2752,6 +2741,8 @@ nsDocument::ApplySettingsFromCSP(bool aSpeculative)
 nsresult
 nsDocument::InitCSP(nsIChannel* aChannel)
 {
+  MOZ_ASSERT(!mScriptGlobalObject,
+             "CSP must be initialized before mScriptGlobalObject is set!");
   if (!CSPService::sCSPEnabled) {
     MOZ_LOG(gCspPRLog, LogLevel::Debug,
            ("CSP is disabled, skipping CSP init for document %p", this));
@@ -2784,7 +2775,7 @@ nsDocument::InitCSP(nsIChannel* aChannel)
   NS_ConvertASCIItoUTF16 cspROHeaderValue(tCspROHeaderValue);
 
   // Figure out if we need to apply an app default CSP or a CSP from an app manifest
-  nsIPrincipal* principal = NodePrincipal();
+  nsCOMPtr<nsIPrincipal> principal = NodePrincipal();
 
   uint16_t appStatus = principal->GetAppStatus();
   bool applyAppDefaultCSP = false;
@@ -2906,14 +2897,32 @@ nsDocument::InitCSP(nsIChannel* aChannel)
 
   // ----- if there's a full-strength CSP header, apply it.
   if (!cspHeaderValue.IsEmpty()) {
-    rv = AppendCSPFromHeader(csp, cspHeaderValue, false);
+    rv = CSP_AppendCSPFromHeader(csp, cspHeaderValue, false);
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
   // ----- if there's a report-only CSP header, apply it.
   if (!cspROHeaderValue.IsEmpty()) {
-    rv = AppendCSPFromHeader(csp, cspROHeaderValue, true);
+    rv = CSP_AppendCSPFromHeader(csp, cspROHeaderValue, true);
     NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  // ----- Enforce sandbox policy if supplied in CSP header
+  // The document may already have some sandbox flags set (e.g. if the document
+  // is an iframe with the sandbox attribute set). If we have a CSP sandbox
+  // directive, intersect the CSP sandbox flags with the existing flags. This
+  // corresponds to the _least_ permissive policy.
+  uint32_t cspSandboxFlags = SANDBOXED_NONE;
+  rv = csp->GetCSPSandboxFlags(&cspSandboxFlags);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  mSandboxFlags |= cspSandboxFlags;
+
+  if (cspSandboxFlags & SANDBOXED_ORIGIN) {
+    // If the new CSP sandbox flags do not have the allow-same-origin flag
+    // reset the document principal to a null principal
+    principal = do_CreateInstance("@mozilla.org/nullprincipal;1");
+    SetPrincipal(principal);
   }
 
   // ----- Enforce frame-ancestor policy on any applied policies
@@ -3152,10 +3161,6 @@ nsDocument::GetContentType(nsAString& aContentType)
 void
 nsDocument::SetContentType(const nsAString& aContentType)
 {
-  NS_ASSERTION(GetContentTypeInternal().IsEmpty() ||
-               GetContentTypeInternal().Equals(NS_ConvertUTF16toUTF8(aContentType)),
-               "Do you really want to change the content-type?");
-
   SetContentTypeInternal(NS_ConvertUTF16toUTF8(aContentType));
 }
 
@@ -3216,7 +3221,7 @@ DocumentTimeline*
 nsDocument::Timeline()
 {
   if (!mDocumentTimeline) {
-    mDocumentTimeline = new DocumentTimeline(this);
+    mDocumentTimeline = new DocumentTimeline(this, TimeDuration(0));
   }
 
   return mDocumentTimeline;
@@ -3645,6 +3650,12 @@ void
 nsDocument::RemoveCharSetObserver(nsIObserver* aObserver)
 {
   mCharSetObservers.RemoveElement(aObserver);
+}
+
+void
+nsIDocument::GetSandboxFlagsAsString(nsAString& aFlags)
+{
+  nsContentUtils::SandboxFlagsToString(mSandboxFlags, aFlags);
 }
 
 void
@@ -4345,7 +4356,7 @@ nsDocument::SetStyleSheetApplicableState(StyleSheetHandle aSheet,
 
   // We have to always notify, since this will be called for sheets
   // that are children of sheets in our style set, as well as some
-  // sheets for nsHTMLEditor.
+  // sheets for HTMLEditor.
 
   NS_DOCUMENT_NOTIFY_OBSERVERS(StyleSheetApplicableStateChanged, (aSheet));
 
@@ -4947,8 +4958,11 @@ nsDocument::MaybeEndOutermostXBLUpdate()
       mInXBLUpdate = false;
       BindingManager()->EndOutermostUpdate();
     } else if (!mInDestructor) {
-      nsContentUtils::AddScriptRunner(
-        NewRunnableMethod(this, &nsDocument::MaybeEndOutermostXBLUpdate));
+      if (!mMaybeEndOutermostXBLUpdateRunner) {
+        mMaybeEndOutermostXBLUpdateRunner =
+          NewRunnableMethod(this, &nsDocument::MaybeEndOutermostXBLUpdate);
+      }
+      nsContentUtils::AddScriptRunner(mMaybeEndOutermostXBLUpdateRunner);
     }
   }
 }
@@ -5418,6 +5432,40 @@ nsIDocument::RemoveAnonymousContent(AnonymousContent& aContent,
   if (mAnonymousContents.IsEmpty()) {
     shell->GetCanvasFrame()->HideCustomContentContainer();
   }
+}
+
+Element*
+nsIDocument::GetAnonRootIfInAnonymousContentContainer(nsINode* aNode) const
+{
+  if (!aNode->IsInNativeAnonymousSubtree()) {
+    return nullptr;
+  }
+
+  nsIPresShell* shell = GetShell();
+  if (!shell || !shell->GetCanvasFrame()) {
+    return nullptr;
+  }
+
+  nsAutoScriptBlocker scriptBlocker;
+  nsCOMPtr<Element> customContainer = shell->GetCanvasFrame()
+                                           ->GetCustomContentContainer();
+  if (!customContainer) {
+    return nullptr;
+  }
+
+  // An arbitrary number of elements can be inserted as children of the custom
+  // container frame.  We want the one that was added that contains aNode, so
+  // we need to keep track of the last child separately using |child| here.
+  nsINode* child = aNode;
+  nsINode* parent = aNode->GetParentNode();
+  while (parent && parent->IsInNativeAnonymousSubtree()) {
+    if (parent == customContainer) {
+      return child->IsElement() ? child->AsElement() : nullptr;
+    }
+    child = parent;
+    parent = child->GetParentNode();
+  }
+  return nullptr;
 }
 
 //
@@ -6201,13 +6249,13 @@ nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
     {
       JSAutoCompartment ac(aCx, global);
 
-      htmlProto = HTMLElementBinding::GetProtoObjectHandle(aCx, global);
+      htmlProto = HTMLElementBinding::GetProtoObjectHandle(aCx);
       if (!htmlProto) {
         rv.Throw(NS_ERROR_OUT_OF_MEMORY);
         return;
       }
 
-      svgProto = SVGElementBinding::GetProtoObjectHandle(aCx, global);
+      svgProto = SVGElementBinding::GetProtoObjectHandle(aCx);
       if (!svgProto) {
         rv.Throw(NS_ERROR_OUT_OF_MEMORY);
         return;
@@ -11564,7 +11612,7 @@ nsDocument::FullScreenStackPop()
   while (!mFullScreenStack.IsEmpty()) {
     Element* element = FullScreenStackTop();
     if (!element || !element->IsInUncomposedDoc() || element->OwnerDoc() != this) {
-      NS_ASSERTION(!element->IsFullScreenAncestor(),
+      NS_ASSERTION(!element->State().HasState(NS_EVENT_STATE_FULL_SCREEN),
                    "Should have already removed full-screen styles");
       uint32_t last = mFullScreenStack.Length() - 1;
       mFullScreenStack.RemoveElementAt(last);
@@ -11704,7 +11752,11 @@ GetFullscreenError(nsIDocument* aDoc, bool aCallerIsChrome)
   if (!nsContentUtils::IsFullScreenApiEnabled()) {
     return "FullscreenDeniedDisabled";
   }
-  if (!aDoc->FullscreenEnabledInternal()) {
+
+  // Ensure that all containing elements are <iframe> and have
+  // allowfullscreen attribute set.
+  nsCOMPtr<nsIDocShell> docShell(aDoc->GetDocShell());
+  if (!docShell || !docShell->GetFullscreenAllowed()) {
     return "FullscreenDeniedContainerNotAllowed";
   }
   return nullptr;
@@ -12126,7 +12178,7 @@ nsDocument::GetFullscreenElement()
 {
   Element* element = FullScreenStackTop();
   NS_ASSERTION(!element ||
-               element->IsFullScreenAncestor(),
+               element->State().HasState(NS_EVENT_STATE_FULL_SCREEN),
     "Fullscreen element should have fullscreen styles applied");
   return element;
 }
@@ -13536,14 +13588,27 @@ nsIDocument::ReportHasScrollLinkedEffect()
                                   "ScrollLinkedEffectFound2");
 }
 
-mozilla::StyleBackendType
-nsIDocument::GetStyleBackendType() const
+void
+nsIDocument::UpdateStyleBackendType()
 {
-  if (!mPresShell) {
+  MOZ_ASSERT(mStyleBackendType == StyleBackendType(0),
+             "no need to call UpdateStyleBackendType now");
 #ifdef MOZ_STYLO
-    NS_WARNING("GetStyleBackendType() called on document without a pres shell");
+  // XXX For now we use a Servo-backed style set only for (X)HTML documents
+  // in content docshells.  This should let us avoid implementing XUL-specific
+  // CSS features.  And apart from not supporting SVG properties in Servo
+  // yet, the root SVG element likes to create a style sheet for an SVG
+  // document before we have a pres shell (i.e. before we make the decision
+  // here about whether to use a Gecko- or Servo-backed style system), so
+  // we avoid Servo-backed style sets for SVG documents.
+  NS_ASSERTION(mDocumentContainer, "stylo: calling UpdateStyleBackendType "
+                                   "before we have a docshell");
+  mStyleBackendType =
+    nsLayoutUtils::SupportsServoStyleBackend(this) &&
+    mDocumentContainer ?
+      StyleBackendType::Servo :
+      StyleBackendType::Gecko;
+#else
+  mStyleBackendType = StyleBackendType::Gecko;
 #endif
-    return StyleBackendType::Gecko;
-  }
-  return mPresShell->StyleSet()->BackendType();
 }

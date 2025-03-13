@@ -100,7 +100,7 @@ inline EventListenerFlags TrustedEventsAtCapture()
   return flags;
 }
 
-inline EventListenerFlags AllEventsAtBubbe()
+inline EventListenerFlags AllEventsAtBubble()
 {
   EventListenerFlags flags;
   flags.mAllowUntrustedEvents = true;
@@ -446,7 +446,7 @@ public:
   dom::EventTarget* GetTarget() { return mTarget; }
 
   bool HasApzAwareListeners();
-
+  bool IsApzAwareListener(Listener* aListener);
   bool IsApzAwareEvent(nsIAtom* aEvent);
 
 protected:

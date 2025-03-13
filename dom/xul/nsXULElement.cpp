@@ -386,9 +386,9 @@ nsXULElement::Clone(mozilla::dom::NodeInfo *aNodeInfo, nsINode **aResult) const
         nsAttrValue attrValue;
 
         // Style rules need to be cloned.
-        if (originalValue->Type() == nsAttrValue::eCSSDeclaration) {
-            RefPtr<css::Declaration> declClone =
-              new css::Declaration(*originalValue->GetCSSDeclarationValue());
+        if (originalValue->Type() == nsAttrValue::eGeckoCSSDeclaration) {
+            RefPtr<css::Declaration> declClone = new css::Declaration(
+                *originalValue->GetGeckoCSSDeclarationValue());
 
             nsString stringValue;
             originalValue->ToString(stringValue);
@@ -1444,7 +1444,7 @@ nsXULElement::GetAttributeChangeHint(const nsIAtom* aAttribute,
         // value attribute is being added or removed, then we need to
         // return a hint of frame change.  (See bugzilla bug 95475 for
         // details.)
-        retval = NS_STYLE_HINT_FRAMECHANGE;
+        retval = nsChangeHint_ReconstructFrame;
     } else {
         // if left or top changes we reflow. This will happen in xul
         // containers that manage positioned children such as a stack.
@@ -1885,9 +1885,9 @@ nsXULElement::MakeHeavyweight(nsXULPrototypeElement* aPrototype)
         nsAttrValue attrValue;
 
         // Style rules need to be cloned.
-        if (protoattr->mValue.Type() == nsAttrValue::eCSSDeclaration) {
+        if (protoattr->mValue.Type() == nsAttrValue::eGeckoCSSDeclaration) {
             RefPtr<css::Declaration> declClone = new css::Declaration(
-              *protoattr->mValue.GetCSSDeclarationValue());
+              *protoattr->mValue.GetGeckoCSSDeclarationValue());
 
             nsString stringValue;
             protoattr->mValue.ToString(stringValue);

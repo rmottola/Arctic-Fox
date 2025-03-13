@@ -16,7 +16,6 @@
 #include "mozilla/ipc/MessageChannel.h" // for MessageChannel, etc
 #include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/ipc/Transport.h"      // for Transport
-#include "mozilla/ipc/GeckoChildProcessHost.h"
 #include "mozilla/media/MediaSystemResourceManagerParent.h" // for MediaSystemResourceManagerParent
 #include "mozilla/layers/CompositableTransactionParent.h"
 #include "mozilla/layers/LayerManagerComposite.h"
@@ -51,14 +50,11 @@ MessageLoop* ImageBridgeParent::sMainLoop = nullptr;
 CompositorThreadHolder* GetCompositorThreadHolder();
 
 ImageBridgeParent::ImageBridgeParent(MessageLoop* aLoop,
-                                     Transport* aTransport,
                                      ProcessId aChildProcessId)
   : CompositableParentManager("ImageBridgeParent")
   , mMessageLoop(aLoop)
-  , mTransport(aTransport)
   , mSetChildThreadPriority(false)
   , mClosed(false)
-  , mSubprocess(nullptr)
 {
   MOZ_ASSERT(NS_IsMainThread());
   sMainLoop = MessageLoop::current();
@@ -79,12 +75,6 @@ ImageBridgeParent::~ImageBridgeParent()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (mTransport) {
-    MOZ_ASSERT(XRE_GetIOMessageLoop());
-    RefPtr<DeleteTask<Transport>> task(new DeleteTask<Transport>(mTransport));
-    XRE_GetIOMessageLoop()->PostTask(task.forget());
-  }
-
   nsTArray<PImageContainerParent*> parents;
   ManagedPImageContainerParent(parents);
   for (PImageContainerParent* p : parents) {
@@ -99,11 +89,6 @@ ImageBridgeParent::ActorDestroy(ActorDestroyReason aWhy)
 {
   // Can't alloc/dealloc shmems from now on.
   mClosed = true;
-
-  if (mSubprocess) {
-    mSubprocess->DissociateActor();
-    mSubprocess = nullptr;
-  }
 
   MessageLoop::current()->PostTask(NewRunnableMethod(this, &ImageBridgeParent::DeferredDestroy));
 
@@ -203,15 +188,10 @@ ConnectImageBridgeInParentProcess(ImageBridgeParent* aBridge,
 }
 
 /*static*/ PImageBridgeParent*
-ImageBridgeParent::Create(Transport* aTransport, ProcessId aChildProcessId, GeckoChildProcessHost* aProcessHost)
+ImageBridgeParent::Create(Transport* aTransport, ProcessId aChildProcessId)
 {
   MessageLoop* loop = CompositorThreadHolder::Loop();
-  RefPtr<ImageBridgeParent> bridge = new ImageBridgeParent(loop, aTransport, aChildProcessId);
-
-  if (aProcessHost) {
-    bridge->mSubprocess = aProcessHost;
-    aProcessHost->AssociateActor();
-  }
+  RefPtr<ImageBridgeParent> bridge = new ImageBridgeParent(loop, aChildProcessId);
 
   loop->PostTask(NewRunnableFunction(ConnectImageBridgeInParentProcess,
                                      bridge.get(), aTransport, aChildProcessId));
@@ -367,11 +347,11 @@ ImageBridgeParent::CloneToplevel(const InfallibleTArray<ProtocolFdMapping>& aFds
 {
   for (unsigned int i = 0; i < aFds.Length(); i++) {
     if (aFds[i].protocolId() == unsigned(GetProtocolId())) {
-      Transport* transport = OpenDescriptor(aFds[i].fd(),
-                                            Transport::MODE_SERVER);
-      PImageBridgeParent* bridge = Create(transport, base::GetProcId(aPeerProcess), mSubprocess);
+      UniquePtr<Transport> transport =
+        OpenDescriptor(aFds[i].fd(), Transport::MODE_SERVER);
+      PImageBridgeParent* bridge = Create(transport.get(), base::GetProcId(aPeerProcess));
       bridge->CloneManagees(this, aCtx);
-      bridge->IToplevelProtocol::SetTransport(transport);
+      bridge->IToplevelProtocol::SetTransport(Move(transport));
       // The reference to the compositor thread is held in OnChannelConnected().
       // We need to do this for cloned actors, too.
       bridge->OnChannelConnected(base::GetProcId(aPeerProcess));

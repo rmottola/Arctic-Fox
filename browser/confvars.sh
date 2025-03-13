@@ -73,8 +73,6 @@ MOZ_WEBGL_CONFORMANT=1
 if test "$OS_TARGET" = "WINNT" -o "$OS_TARGET" = "Darwin"; then
   MOZ_FOLD_LIBS=1
 fi
-# Enable activities. These are used for FxOS developers currently.
-MOZ_ACTIVITIES=1
 MOZ_JSDOWNLOADS=1
 MOZ_RUST_MP4PARSE=1
 

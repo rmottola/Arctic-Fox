@@ -137,10 +137,32 @@ JitContext::JitContext(CompileRuntime* rt)
     SetJitContext(this);
 }
 
+JitContext::JitContext(TempAllocator* temp)
+  : cx(nullptr),
+    temp(temp),
+    runtime(nullptr),
+    compartment(nullptr),
+    prev_(CurrentJitContext()),
+    assemblerCount_(0)
+{
+    SetJitContext(this);
+}
+
 JitContext::JitContext(CompileRuntime* rt, TempAllocator* temp)
   : cx(nullptr),
     temp(temp),
     runtime(rt),
+    compartment(nullptr),
+    prev_(CurrentJitContext()),
+    assemblerCount_(0)
+{
+    SetJitContext(this);
+}
+
+JitContext::JitContext()
+  : cx(nullptr),
+    temp(nullptr),
+    runtime(nullptr),
     compartment(nullptr),
     prev_(CurrentJitContext()),
     assemblerCount_(0)
@@ -451,7 +473,7 @@ JitCompartment::ensureIonStubsExist(JSContext* cx)
 }
 
 void
-jit::FinishOffThreadBuilder(JSContext* cx, IonBuilder* builder)
+jit::FinishOffThreadBuilder(JSRuntime* runtime, IonBuilder* builder)
 {
     MOZ_ASSERT(HelperThreadState().isLocked());
 
@@ -463,8 +485,10 @@ jit::FinishOffThreadBuilder(JSContext* cx, IonBuilder* builder)
     }
 
     // If the builder is still in one of the helper thread list, then remove it.
-    if (builder->isInList())
-        HelperThreadState().ionLazyLinkListRemove(builder);
+    if (builder->isInList()) {
+        MOZ_ASSERT(runtime);
+        runtime->ionLazyLinkListRemove(builder);
+    }
 
     // Clear the recompiling flag of the old ionScript, since we continue to
     // use the old ionScript if recompiling fails.
@@ -473,9 +497,9 @@ jit::FinishOffThreadBuilder(JSContext* cx, IonBuilder* builder)
 
     // Clean up if compilation did not succeed.
     if (builder->script()->isIonCompilingOffThread()) {
-        builder->script()->setIonScript(cx, builder->abortReason() == AbortReason_Disable
-                                            ? ION_DISABLED_SCRIPT
-                                            : nullptr);
+        IonScript* ion =
+            builder->abortReason() == AbortReason_Disable ? ION_DISABLED_SCRIPT : nullptr;
+        builder->script()->setIonScript(runtime, ion);
     }
 
     // The builder is allocated into its LifoAlloc, so destroying that will
@@ -547,7 +571,7 @@ jit::LazyLink(JSContext* cx, HandleScript calleeScript)
         calleeScript->baselineScript()->removePendingIonBuilder(calleeScript);
 
         // Remove from pending.
-        HelperThreadState().ionLazyLinkListRemove(builder);
+        cx->runtime()->ionLazyLinkListRemove(builder);
     }
 
     {
@@ -565,7 +589,7 @@ jit::LazyLink(JSContext* cx, HandleScript calleeScript)
 
     {
         AutoLockHelperThreadState lock;
-        FinishOffThreadBuilder(cx, builder);
+        FinishOffThreadBuilder(cx->runtime(), builder);
     }
 }
 
@@ -1479,7 +1503,7 @@ OptimizeMIR(MIRGenerator* mir)
     MIRGraph& graph = mir->graph();
     GraphSpewer& gs = mir->graphSpewer();
     TraceLoggerThread* logger;
-    if (GetJitContext()->runtime->onMainThread())
+    if (GetJitContext()->onMainThread())
         logger = TraceLoggerForMainThread(GetJitContext()->runtime);
     else
         logger = TraceLoggerForCurrentThread();
@@ -1881,7 +1905,7 @@ GenerateLIR(MIRGenerator* mir)
     GraphSpewer& gs = mir->graphSpewer();
 
     TraceLoggerThread* logger;
-    if (GetJitContext()->runtime->onMainThread())
+    if (GetJitContext()->onMainThread())
         logger = TraceLoggerForMainThread(GetJitContext()->runtime);
     else
         logger = TraceLoggerForCurrentThread();
@@ -1960,7 +1984,7 @@ CodeGenerator*
 GenerateCode(MIRGenerator* mir, LIRGraph* lir)
 {
     TraceLoggerThread* logger;
-    if (GetJitContext()->runtime->onMainThread())
+    if (GetJitContext()->onMainThread())
         logger = TraceLoggerForMainThread(GetJitContext()->runtime);
     else
         logger = TraceLoggerForCurrentThread();
@@ -2033,14 +2057,14 @@ AttachFinishedCompilations(JSContext* cx)
 
             JSScript* script = builder->script();
             MOZ_ASSERT(script->hasBaselineScript());
-            script->baselineScript()->setPendingIonBuilder(cx, script, builder);
-            HelperThreadState().ionLazyLinkListAdd(builder);
+            script->baselineScript()->setPendingIonBuilder(cx->runtime(), script, builder);
+            cx->runtime()->ionLazyLinkListAdd(builder);
 
             // Don't keep more than 100 lazy link builders.
             // Throw away the oldest items.
-            while (HelperThreadState().ionLazyLinkListSize() > 100) {
-                jit::IonBuilder* builder = HelperThreadState().ionLazyLinkList().getLast();
-                jit::FinishOffThreadBuilder(nullptr, builder);
+            while (cx->runtime()->ionLazyLinkListSize() > 100) {
+                jit::IonBuilder* builder = cx->runtime()->ionLazyLinkList().getLast();
+                jit::FinishOffThreadBuilder(cx->runtime(), builder);
             }
 
             continue;
@@ -2248,7 +2272,7 @@ IonCompile(JSContext* cx, JSScript* script,
         }
 
         if (!recompile)
-            builderScript->setIonScript(cx, ION_COMPILING_SCRIPT);
+            builderScript->setIonScript(cx->runtime(), ION_COMPILING_SCRIPT);
 
         // The allocator and associated data will be destroyed after being
         // processed in the finishedOffThreadCompilations list.
@@ -3293,7 +3317,7 @@ jit::ForbidCompilation(JSContext* cx, JSScript* script)
     if (script->hasIonScript())
         Invalidate(cx, script, false);
 
-    script->setIonScript(cx, ION_DISABLED_SCRIPT);
+    script->setIonScript(cx->runtime(), ION_DISABLED_SCRIPT);
 }
 
 AutoFlushICache*
@@ -3316,7 +3340,7 @@ PerThreadData::setAutoFlushICache(AutoFlushICache* afc)
 void
 AutoFlushICache::setRange(uintptr_t start, size_t len)
 {
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     AutoFlushICache* afc = TlsPerThreadData.get()->PerThreadData::autoFlushICache();
     MOZ_ASSERT(afc);
     MOZ_ASSERT(!afc->start_);
@@ -3403,14 +3427,14 @@ AutoFlushICache::setInhibit()
 // the respective AutoFlushICache dynamic context.
 //
 AutoFlushICache::AutoFlushICache(const char* nonce, bool inhibit)
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
   : start_(0),
     stop_(0),
     name_(nonce),
     inhibit_(inhibit)
 #endif
 {
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     PerThreadData* pt = TlsPerThreadData.get();
     AutoFlushICache* afc = pt->PerThreadData::autoFlushICache();
     if (afc)
@@ -3425,7 +3449,7 @@ AutoFlushICache::AutoFlushICache(const char* nonce, bool inhibit)
 
 AutoFlushICache::~AutoFlushICache()
 {
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     PerThreadData* pt = TlsPerThreadData.get();
     MOZ_ASSERT(pt->PerThreadData::autoFlushICache() == this);
 
@@ -3480,6 +3504,12 @@ bool
 jit::JitSupportsFloatingPoint()
 {
     return js::jit::MacroAssembler::SupportsFloatingPoint();
+}
+
+bool
+jit::JitSupportsUnalignedAccesses()
+{
+    return js::jit::MacroAssembler::SupportsUnalignedAccesses();
 }
 
 bool

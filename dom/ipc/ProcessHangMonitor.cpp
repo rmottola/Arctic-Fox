@@ -162,14 +162,25 @@ public:
     mActor = nullptr;
   }
 
+  /** Sets the information associated with this hang: this includes the ID of
+   * the plugin which caused the hang as well as the content PID.
+   *
+   * @param aHangData The hang information
+   */
   void SetHangData(const HangData& aHangData) { mHangData = aHangData; }
-  void SetBrowserDumpId(nsAutoString& aId) {
-    mBrowserDumpId = aId;
+
+  /** Sets the ID of the crash dump associated with this hang. When the ID has
+   * been set then the corresponding crash dump will be used for reporting
+   * instead of generating a new one.
+   *
+   * @param aId The ID of the crash dump taken when the hang was detected. */
+  void SetDumpId(nsString& aId) {
+    mDumpId = aId;
   }
 
   void ClearHang() {
     mHangData = HangData();
-    mBrowserDumpId.Truncate();
+    mDumpId.Truncate();
   }
 
 private:
@@ -179,7 +190,7 @@ private:
   HangMonitorParent* mActor;
   ContentParent* mContentParent;
   HangData mHangData;
-  nsAutoString mBrowserDumpId;
+  nsAutoString mDumpId;
 };
 
 class HangMonitorParent
@@ -247,11 +258,6 @@ HangMonitorChild::HangMonitorChild(ProcessHangMonitor* aMonitor)
 
 HangMonitorChild::~HangMonitorChild()
 {
-  // For some reason IPDL doesn't automatically delete the channel for a
-  // bridged protocol (bug 1090570). So we have to do it ourselves.
-  RefPtr<DeleteTask<Transport>> task = new DeleteTask<Transport>(GetTransport());
-  XRE_GetIOMessageLoop()->PostTask(task.forget());
-
   MOZ_RELEASE_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(sInstance == this);
   sInstance = nullptr;
@@ -464,11 +470,6 @@ HangMonitorParent::HangMonitorParent(ProcessHangMonitor* aMonitor)
 
 HangMonitorParent::~HangMonitorParent()
 {
-  // For some reason IPDL doesn't automatically delete the channel for a
-  // bridged protocol (bug 1090570). So we have to do it ourselves.
-  RefPtr<DeleteTask<Transport>> task = new DeleteTask<Transport>(GetTransport());
-  XRE_GetIOMessageLoop()->PostTask(task.forget());
-
 #ifdef MOZ_CRASHREPORTER
   MutexAutoLock lock(mBrowserCrashDumpHashLock);
 
@@ -551,8 +552,16 @@ public:
   {
     // chrome process, main thread
     MOZ_RELEASE_ASSERT(NS_IsMainThread());
+
+    nsString dumpId;
+    if (mHangData.type() == HangData::TPluginHangData) {
+      const PluginHangData& phd = mHangData.get_PluginHangData();
+      plugins::TakeFullMinidump(phd.pluginId(), phd.contentProcessId(),
+                                mBrowserDumpId, dumpId);
+    }
+
     mProcess->SetHangData(mHangData);
-    mProcess->SetBrowserDumpId(mBrowserDumpId);
+    mProcess->SetDumpId(dumpId);
 
     nsCOMPtr<nsIObserverService> observerService =
       mozilla::services::GetObserverService();
@@ -861,12 +870,11 @@ HangMonitoredProcess::TerminatePlugin()
     return NS_ERROR_UNEXPECTED;
   }
 
-  // generates a crash report that includes a browser report taken here
-  // earlier, the content process, and any plugin process(es).
+  // Use the multi-process crash report generated earlier.
   uint32_t id = mHangData.get_PluginHangData().pluginId();
   base::ProcessId contentPid = mHangData.get_PluginHangData().contentProcessId();
   plugins::TerminatePlugin(id, contentPid, NS_LITERAL_CSTRING("HangMonitor"),
-                           mBrowserDumpId);
+                           mDumpId);
 
   if (mActor) {
     mActor->CleanupPluginHang(id, false);

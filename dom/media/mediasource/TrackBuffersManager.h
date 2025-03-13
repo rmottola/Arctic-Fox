@@ -338,9 +338,12 @@ private:
   void InsertFrames(TrackBuffer& aSamples,
                     const media::TimeIntervals& aIntervals,
                     TrackData& aTrackData);
-  void RemoveFrames(const media::TimeIntervals& aIntervals,
-                    TrackData& aTrackData,
-                    uint32_t aStartIndex);
+  // Remove all frames and their dependencies contained in aIntervals.
+  // Return the index at which frames were first removed or 0 if no frames
+  // removed.
+  size_t RemoveFrames(const media::TimeIntervals& aIntervals,
+                      TrackData& aTrackData,
+                      uint32_t aStartIndex);
   // Find index of sample. Return a negative value if not found.
   uint32_t FindSampleIndex(const TrackBuffer& aTrackBuffer,
                            const media::TimeInterval& aInterval);
@@ -382,6 +385,7 @@ private:
 
   // SourceBuffer Queues and running context.
   SourceBufferTaskQueue mQueue;
+  void QueueTask(SourceBufferTask* aTask);
   void ProcessTasks();
   void CancelAllTasks();
   // Set if the TrackBuffersManager is currently processing a task.
@@ -400,9 +404,6 @@ private:
 
   // Set to true if mediasource state changed to ended.
   Atomic<bool> mEnded;
-  // Set to true if the parent SourceBuffer has shutdown.
-  // We will not reschedule or process new task once mDetached is set.
-  Atomic<bool> mDetached;
 
   // Global size of this source buffer content.
   Atomic<int64_t> mSizeSourceBuffer;

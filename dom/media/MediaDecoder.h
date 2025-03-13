@@ -129,7 +129,7 @@ public:
 
   // Cleanup internal data structures. Must be called on the main
   // thread by the owning object before that object disposes of this object.
-  virtual RefPtr<ShutdownPromise> Shutdown();
+  virtual void Shutdown();
 
   // Start downloading the media. Decode the downloaded data up to the
   // point of the first frame of data.
@@ -242,6 +242,8 @@ public:
   // Return true if the MediaDecoderOwner's error attribute is not null.
   // If the MediaDecoder is shutting down, OwnerHasError will return true.
   bool OwnerHasError() const;
+
+  already_AddRefed<GMPCrashHelper> GetCrashHelper() override;
 
 protected:
   // Updates the media duration. This is called while the media is being
@@ -411,11 +413,15 @@ private:
   // thread.
   void SeekingStarted(MediaDecoderEventVisibility aEventVisibility = MediaDecoderEventVisibility::Observable);
 
-  void UpdateLogicalPosition(MediaDecoderEventVisibility aEventVisibility);
+  void UpdateLogicalPositionInternal(MediaDecoderEventVisibility aEventVisibility);
   void UpdateLogicalPosition()
   {
     MOZ_ASSERT(NS_IsMainThread());
-    UpdateLogicalPosition(MediaDecoderEventVisibility::Observable);
+    // Per spec, offical position remains stable during pause and seek.
+    if (mPlayState == PLAY_STATE_PAUSED || IsSeeking()) {
+      return;
+    }
+    UpdateLogicalPositionInternal(MediaDecoderEventVisibility::Observable);
   }
 
   // Find the end of the cached data starting at the current decoder
@@ -595,7 +601,7 @@ private:
     SetMediaSeekable(false);
   }
 
-  RefPtr<ShutdownPromise> FinishShutdown();
+  void FinishShutdown();
 
   MediaEventProducer<void> mDataArrivedEvent;
 
@@ -662,7 +668,7 @@ protected:
   // Counters related to decode and presentation of frames.
   const RefPtr<FrameStatistics> mFrameStats;
 
-  const RefPtr<VideoFrameContainer> mVideoFrameContainer;
+  RefPtr<VideoFrameContainer> mVideoFrameContainer;
 
   // Data needed to estimate playback data rate. The timeline used for
   // this estimate is "decode time" (where the "current time" is the

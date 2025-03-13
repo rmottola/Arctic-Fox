@@ -244,12 +244,6 @@ LIRGeneratorARM64::visitAsmJSStoreHeap(MAsmJSStoreHeap* ins)
 }
 
 void
-LIRGeneratorARM64::visitAsmJSLoadFuncPtr(MAsmJSLoadFuncPtr* ins)
-{
-    MOZ_CRASH("visitAsmJSLoadFuncPtr");
-}
-
-void
 LIRGeneratorARM64::visitAsmJSCompareExchangeHeap(MAsmJSCompareExchangeHeap* ins)
 {
     MOZ_CRASH("visitAsmJSCompareExchangeHeap");
@@ -320,6 +314,24 @@ LIRGeneratorARM64::visitRandom(MRandom* ins)
 
 void
 LIRGeneratorARM64::visitWasmTruncateToInt64(MWasmTruncateToInt64* ins)
+{
+    MOZ_CRASH("NY");
+}
+
+void
+LIRGeneratorARM64::visitWasmBoundsCheck(MWasmBoundsCheck* ins)
+{
+    MOZ_CRASH("NY");
+}
+
+void
+LIRGeneratorARM64::visitWasmLoad(MWasmLoad* ins)
+{
+    MOZ_CRASH("NY");
+}
+
+void
+LIRGeneratorARM64::visitWasmStore(MWasmStore* ins)
 {
     MOZ_CRASH("NY");
 }

@@ -15,7 +15,7 @@
 #include "APZTestCommon.h"
 #include "gfxPlatform.h"
 
-class APZCTreeManagerTester : public ::testing::Test {
+class APZCTreeManagerTester : public APZCTesterBase {
 protected:
   virtual void SetUp() {
     gfxPrefs::GetSingleton();
@@ -23,7 +23,6 @@ protected:
     APZThreadUtils::SetThreadAssertionsEnabled(false);
     APZThreadUtils::SetControllerThread(MessageLoop::current());
 
-    mcc = new NiceMock<MockContentControllerDelayed>();
     manager = new TestAPZCTreeManager(mcc);
   }
 
@@ -47,8 +46,6 @@ protected:
       }
     }
   }
-
-  RefPtr<MockContentControllerDelayed> mcc;
 
   nsTArray<RefPtr<Layer> > layers;
   RefPtr<LayerManager> lm;
@@ -177,6 +174,7 @@ protected:
     root = CreateLayerTree(layerTreeSyntax, layerVisibleRegion, nullptr, lm, layers);
     SetScrollableFrameMetrics(layers[0], FrameMetrics::START_SCROLL_ID);
     SetScrollableFrameMetrics(layers[1], FrameMetrics::START_SCROLL_ID + 1);
+    SetScrollHandoff(layers[1], layers[0]);
 
     // Make layers[1] the root content
     ScrollMetadata childMetadata = layers[1]->GetScrollMetadata(0);

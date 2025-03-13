@@ -108,7 +108,6 @@
 #include "nsAnonymousTemporaryFile.h"
 #include "nsISpellChecker.h"
 #include "nsClipboardProxy.h"
-#include "nsISystemMessageCache.h"
 #include "nsDirectoryService.h"
 #include "nsDirectoryServiceUtils.h"
 #include "nsDirectoryServiceDefs.h"
@@ -172,10 +171,6 @@
 #include "ipc/Nuwa.h"
 #endif
 #include "NuwaChild.h"
-
-#ifdef MOZ_GAMEPAD
-#include "mozilla/dom/GamepadService.h"
-#endif
 
 #ifndef MOZ_SIMPLEPUSH
 #include "mozilla/dom/PushNotifier.h"
@@ -491,39 +486,6 @@ ConsoleListener::Observe(nsIConsoleMessage* aMessage)
   return NS_OK;
 }
 
-class SystemMessageHandledObserver final : public nsIObserver
-{
-  ~SystemMessageHandledObserver() {}
-
-public:
-  NS_DECL_ISUPPORTS
-  NS_DECL_NSIOBSERVER
-
-  void Init();
-};
-
-void SystemMessageHandledObserver::Init()
-{
-  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
-
-  if (os) {
-    os->AddObserver(this, "handle-system-messages-done", /* ownsWeak */ false);
-  }
-}
-
-NS_IMETHODIMP
-SystemMessageHandledObserver::Observe(nsISupports* aSubject,
-                                      const char* aTopic,
-                                      const char16_t* aData)
-{
-  if (ContentChild::GetSingleton()) {
-    ContentChild::GetSingleton()->SendSystemMessageHandled();
-  }
-  return NS_OK;
-}
-
-NS_IMPL_ISUPPORTS(SystemMessageHandledObserver, nsIObserver)
-
 class BackgroundChildPrimer final :
   public nsIIPCBackgroundChildCreateCallback
 {
@@ -572,10 +534,6 @@ InitOnContentProcessCreated()
     MOZ_ASSERT(false, "Failed updating permission in child process");
   }
 #endif
-
-  nsCOMPtr<nsISystemMessageCache> smc =
-    do_GetService("@mozilla.org/system-message-cache;1");
-  NS_WARN_IF(!smc);
 
   // This will register cross-process observer.
   mozilla::dom::time::InitializeDateCacheCleaner();
@@ -1084,11 +1042,6 @@ ContentChild::InitXPCOM()
     ProcessGlobal* global = ProcessGlobal::Get();
     global->SetInitialProcessData(data);
   }
-
-  // This object is held alive by the observer service.
-  RefPtr<SystemMessageHandledObserver> sysMsgObserver =
-    new SystemMessageHandledObserver();
-  sysMsgObserver->Init();
 
   InitOnContentProcessCreated();
 }
@@ -3230,18 +3183,6 @@ ContentChild::DeallocPWebBrowserPersistDocumentChild(PWebBrowserPersistDocumentC
 }
 
 bool
-ContentChild::RecvGamepadUpdate(const GamepadChangeEvent& aGamepadEvent)
-{
-#ifdef MOZ_GAMEPAD
-  RefPtr<GamepadService> svc(GamepadService::GetService());
-  if (svc) {
-    svc->Update(aGamepadEvent);
-  }
-#endif
-  return true;
-}
-
-bool
 ContentChild::RecvSetAudioSessionData(const nsID& aId,
                                       const nsString& aDisplayName,
                                       const nsString& aIconPath)
@@ -3308,6 +3249,19 @@ ContentChild::RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
     dragService->GetCurrentSession(getter_AddRefs(session));
     if (session) {
       session->SetDragAction(aAction);
+      // Check if we are receiving any file objects. If we are we will want
+      // to hide any of the other objects coming in from content.
+      bool hasFiles = false;
+      for (uint32_t i = 0; i < aTransfers.Length() && !hasFiles; ++i) {
+        auto& items = aTransfers[i].items();
+        for (uint32_t j = 0; j < items.Length() && !hasFiles; ++j) {
+          if (items[j].data().type() == IPCDataTransferData::TPBlobChild) {
+            hasFiles = true;
+          }
+        }
+      }
+
+      // Add the entries from the IPC to the new DataTransfer
       nsCOMPtr<DataTransfer> dataTransfer =
         new DataTransfer(nullptr, eDragStart, false, -1);
       for (uint32_t i = 0; i < aTransfers.Length(); ++i) {
@@ -3329,9 +3283,11 @@ ContentChild::RecvInvokeDragSession(nsTArray<IPCDataTransfer>&& aTransfers,
           } else {
             continue;
           }
+          // We should hide this data from content if we have a file, and we aren't a file.
+          bool hidden = hasFiles && item.data().type() != IPCDataTransferData::TPBlobChild;
           dataTransfer->SetDataWithPrincipalFromOtherProcess(
             NS_ConvertUTF8toUTF16(item.flavor()), variant, i,
-            nsContentUtils::GetSystemPrincipal());
+            nsContentUtils::GetSystemPrincipal(), hidden);
         }
       }
       session->SetDataTransfer(dataTransfer);

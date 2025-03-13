@@ -44,7 +44,7 @@ const PREF_SUGGEST_HISTORY =        [ "suggest.history",        true ];
 const PREF_SUGGEST_BOOKMARK =       [ "suggest.bookmark",       true ];
 const PREF_SUGGEST_OPENPAGE =       [ "suggest.openpage",       true ];
 const PREF_SUGGEST_HISTORY_ONLYTYPED = [ "suggest.history.onlyTyped", false ];
-const PREF_SUGGEST_SEARCHES =       [ "suggest.searches",       true ];
+const PREF_SUGGEST_SEARCHES =       [ "suggest.searches",       false ];
 
 const PREF_MAX_CHARS_FOR_SUGGEST =  [ "maxCharsForSearchSuggestions", 20];
 
@@ -582,9 +582,11 @@ function stripHttpAndTrim(spec) {
  * @return String representation of the built moz-action: URL
  */
 function makeActionURL(action, params) {
-  let url = "moz-action:" + action + "," + JSON.stringify(params);
-  // Make a nsIURI out of this to ensure it's encoded properly.
-  return NetUtil.newURI(url).spec;
+  let encodedParams = {};
+  for (let key in params) {
+    encodedParams[key] = encodeURIComponent(params[key]);
+  }
+  return "moz-action:" + action + "," + JSON.stringify(encodedParams);
 }
 
 /**
@@ -909,9 +911,11 @@ Search.prototype = {
     if (!this.pending)
       return;
 
-    yield this._matchSearchSuggestions();
-    if (!this.pending)
-      return;
+    if (this._enableActions) {
+      yield this._matchSearchSuggestions();
+      if (!this.pending)
+        return;
+    }
 
     for (let [query, params] of queries) {
       yield conn.executeCached(query, params, this._onResultRow.bind(this));
@@ -1303,14 +1307,22 @@ Search.prototype = {
       return false;
     }
 
+    // getFixupURIInfo() escaped the URI, so it may not be pretty.  Embed the
+    // escaped URL in the action URI since that URL should be "canonical".  But
+    // pass the pretty, unescaped URL as the match comment, since it's likely
+    // to be displayed to the user, and in any case the front-end should not
+    // rely on it being canonical.
+    let escapedURL = uri.spec;
+    let displayURL = textURIService.unEscapeURIForUI("UTF-8", uri.spec);
+
     let value = makeActionURL("visiturl", {
-      url: uri.spec,
+      url: escapedURL,
       input: this._originalSearchString,
     });
 
     let match = {
       value: value,
-      comment: uri.spec,
+      comment: displayURL,
       style: "action visiturl",
       frecency: 0,
     };
@@ -1936,6 +1948,8 @@ UnifiedComplete.prototype = {
     TelemetryStopwatch.cancel(TELEMETRY_6_FIRST_RESULTS, this);
     // Clear state now to avoid race conditions, see below.
     let search = this._currentSearch;
+    if (!search)
+      return;
     this._lastLowResultsSearchSuggestion = search._lastLowResultsSearchSuggestion;
     delete this._currentSearch;
 

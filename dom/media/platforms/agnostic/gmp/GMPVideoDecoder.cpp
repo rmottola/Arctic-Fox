@@ -104,6 +104,54 @@ VideoCallbackAdapter::Terminated()
   mCallback->Error(MediaDataDecoderError::FATAL_ERROR);
 }
 
+GMPVideoDecoderParams::GMPVideoDecoderParams(const CreateDecoderParams& aParams)
+  : mConfig(aParams.VideoConfig())
+  , mTaskQueue(aParams.mTaskQueue)
+  , mCallback(nullptr)
+  , mAdapter(nullptr)
+  , mImageContainer(aParams.mImageContainer)
+  , mLayersBackend(aParams.mLayersBackend)
+  , mCrashHelper(aParams.mCrashHelper)
+{}
+
+GMPVideoDecoderParams&
+GMPVideoDecoderParams::WithCallback(MediaDataDecoderProxy* aWrapper)
+{
+  MOZ_ASSERT(aWrapper);
+  MOZ_ASSERT(!mCallback); // Should only be called once per instance.
+  mCallback = aWrapper->Callback();
+  mAdapter = nullptr;
+  return *this;
+}
+
+GMPVideoDecoderParams&
+GMPVideoDecoderParams::WithAdapter(VideoCallbackAdapter* aAdapter)
+{
+  MOZ_ASSERT(aAdapter);
+  MOZ_ASSERT(!mAdapter); // Should only be called once per instance.
+  mCallback = aAdapter->Callback();
+  mAdapter = aAdapter;
+  return *this;
+}
+
+GMPVideoDecoder::GMPVideoDecoder(const GMPVideoDecoderParams& aParams)
+  : mConfig(aParams.mConfig)
+  , mCallback(aParams.mCallback)
+  , mGMP(nullptr)
+  , mHost(nullptr)
+  , mAdapter(aParams.mAdapter)
+  , mConvertNALUnitLengths(false)
+  , mCrashHelper(aParams.mCrashHelper)
+{
+  MOZ_ASSERT(!mAdapter || mCallback == mAdapter->Callback());
+  if (!mAdapter) {
+    mAdapter = new VideoCallbackAdapter(mCallback,
+                                        VideoInfo(mConfig.mDisplay.width,
+                                                  mConfig.mDisplay.height),
+                                        aParams.mImageContainer);
+  }
+}
+
 void
 GMPVideoDecoder::InitTags(nsTArray<nsCString>& aTags)
 {
@@ -235,7 +283,7 @@ GMPVideoDecoder::Init()
   nsTArray<nsCString> tags;
   InitTags(tags);
   UniquePtr<GetGMPVideoDecoderCallback> callback(new GMPInitDoneCallback(this));
-  if (NS_FAILED(mMPS->GetGMPVideoDecoder(&tags, GetNodeId(), Move(callback)))) {
+  if (NS_FAILED(mMPS->GetGMPVideoDecoder(mCrashHelper, &tags, GetNodeId(), Move(callback)))) {
     mInitPromise.Reject(MediaDataDecoder::DecoderFailureReason::INIT_ERROR, __func__);
   }
 

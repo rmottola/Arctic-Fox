@@ -4,15 +4,52 @@
 
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 @namespace html url("http://www.w3.org/1999/xhtml");
+@namespace svg url("http://www.w3.org/2000/svg");
+
+:root {
+  --identity-popup-expander-width: 38px;
+  --panelui-subview-transition-duration: 150ms;
+}
+
+#main-window:not([chromehidden~="toolbar"]) {
+%ifdef XP_MACOSX
+  min-width: 335px;
+%else
+  min-width: 300px;
+%endif
+}
+
+/* These values are chosen to keep the Loop detached chat window from
+ * getting too small.  When it's too small, three bad things happen:
+ *
+ * - It looks terrible
+ * - It's not really usable
+ * - It's possible for the user to be transmitting video that's cropped by the
+ *   the edge of the window, so that they're not aware of it, which is a
+ *   privacy problem
+ *
+ * Note that if the chat window grows more users than Loop who want this
+ * ability, we'll need to generalize.  A partial patch for this is in
+ * bug 1112264.
+ */
+
+#main-window[customize-entered] {
+  min-width: -moz-fit-content;
+}
 
 searchbar {
   -moz-binding: url("chrome://browser/content/search/search.xml#searchbar");
 }
 
+/* Prevent shrinking the page content to 0 height and width */
+.browserStack > browser {
+  min-height: 25px;
+  min-width: 25px;
+}
+
 .browserStack > browser {
   -moz-binding: url("chrome://browser/content/tabbrowser.xml#tabbrowser-browser");
 }
-
 
 browser[remote="true"] {
   -moz-binding: url("chrome://browser/content/tabbrowser.xml#tabbrowser-remote-browser");
@@ -23,6 +60,17 @@ browser[remote="true"] {
   -moz-binding: url("chrome://browser/content/customizableui/toolbar.xml#toolbar-menubar-stub");
 }
 %endif
+
+#toolbar-menubar[autohide="true"] {
+  -moz-binding: url("chrome://browser/content/customizableui/toolbar.xml#toolbar-menubar-autohide");
+}
+
+#status-bar {
+  height: 0 !important;
+  -moz-binding: none;
+  padding: 0;
+  margin: 0;
+}
 
 browser[frameType="social"][remote="true"] {
   -moz-binding: url("chrome://global/content/bindings/remote-browser.xml#remote-browser");
@@ -122,6 +170,7 @@ toolbar[printpreview="true"] {
 }
 
 %ifdef CAN_DRAW_IN_TITLEBAR
+#main-window:not([chromemargin]) > #titlebar,
 #main-window[inFullscreen] > #titlebar,
 #main-window[inFullscreen] .titlebar-placeholder,
 #main-window:not([tabsintitlebar]) .titlebar-placeholder {
@@ -140,6 +189,35 @@ toolbar[printpreview="true"] {
 #main-window[tabsintitlebar] #appmenu-button-container,
 #main-window[tabsintitlebar] #titlebar-buttonbox {
   position: relative;
+}
+
+#titlebar-buttonbox {
+  -moz-appearance: -moz-window-button-box;
+}
+
+%ifdef XP_MACOSX
+#titlebar-fullscreen-button {
+  -moz-appearance: -moz-mac-fullscreen-button;
+}
+
+/* Fullscreen and caption buttons don't move with RTL on OS X so override the automatic ordering. */
+#titlebar-secondary-buttonbox:-moz-locale-dir(ltr),
+#titlebar-buttonbox-container:-moz-locale-dir(rtl),
+.titlebar-placeholder[type="fullscreen-button"]:-moz-locale-dir(ltr),
+.titlebar-placeholder[type="caption-buttons"]:-moz-locale-dir(rtl) {
+  -moz-box-ordinal-group: 1000;
+}
+
+#titlebar-secondary-buttonbox:-moz-locale-dir(rtl),
+#titlebar-buttonbox-container:-moz-locale-dir(ltr),
+.titlebar-placeholder[type="caption-buttons"]:-moz-locale-dir(ltr),
+.titlebar-placeholder[type="fullscreen-button"]:-moz-locale-dir(rtl) {
+  -moz-box-ordinal-group: 0;
+}
+%else
+/* On non-OSX, these should be start-aligned */
+#titlebar-buttonbox-container {
+  -moz-box-align: start;
 }
 %endif
 
@@ -164,6 +242,8 @@ toolbar[printpreview="true"] {
 #main-window[tabsintitlebar] #navigator-toolbox > toolbar:not(#toolbar-menubar):-moz-lwtheme {
   -moz-window-dragging: drag;
 }
+%endif
+
 %endif
 
 #main-window[inDOMFullscreen] #sidebar-box,
@@ -214,6 +294,9 @@ toolbar[mode="icons"] > #reload-button[displaystop] {
 }
 %endif
 
+#zoom-controls[cui-areatype="toolbar"]:not([overflowedItem=true]) > #zoom-reset-button > .toolbarbutton-text {
+  display: -moz-box;
+}
 
 /* Ensure that empty parts of the bookmarks container can be dragged on OSX, and on other OSes
  * only when a lwtheme is in use. */
@@ -253,6 +336,37 @@ splitmenu {
 #appmenu-editmenu > .menu-text,
 #appmenu-editmenu > .menu-accel-container {
   display: none;
+}
+
+/* Apply crisp rendering for favicons at exactly 2dppx resolution */
+@media (resolution: 2dppx) {
+  .searchbar-engine-image {
+    image-rendering: -moz-crisp-edges;
+  }
+}
+
+#urlbar,
+.searchbar-textbox {
+  /* Setting a width and min-width to let the location & search bars maintain
+     a constant width in case they haven't be resized manually. (bug 965772) */
+  width: 1px;
+  min-width: 1px;
+}
+
+#main-window:-moz-lwtheme {
+  background-repeat: no-repeat;
+  background-position: top right;
+}
+
+%ifdef XP_MACOSX
+#main-window[inFullscreen="true"] {
+  padding-top: 0; /* override drawintitlebar="true" */
+}
+%endif
+
+#browser-bottombox[lwthemefooter="true"] {
+  background-repeat: no-repeat;
+  background-position: bottom left;
 }
 
 .menuitem-tooltip {
@@ -321,8 +435,45 @@ panel[noactions] > richlistbox > richlistitem[type~="action"] > .ac-url-box > .a
   -moz-binding: url("chrome://browser/content/urlbarBindings.xml#browser-autocomplete-result-popup");
 }
 
+/* Overlay a badge on top of the icon of additional open search providers
+   in the search panel. */
+.addengine-item > .button-box > .button-icon {
+  -moz-binding: url("chrome://browser/content/search/search.xml#addengine-icon");
+  display: -moz-stack;
+}
+
 #PopupAutoCompleteRichResult {
   -moz-binding: url("chrome://browser/content/urlbarBindings.xml#urlbar-rich-result-popup");
+}
+
+#PopupAutoCompleteRichResult.showSearchSuggestionsNotification {
+  transition: height 100ms;
+}
+
+#PopupAutoCompleteRichResult > hbox[anonid="search-suggestions-notification"] {
+  visibility: collapse;
+  transition: margin-top 100ms;
+}
+
+#PopupAutoCompleteRichResult.showSearchSuggestionsNotification > hbox[anonid="search-suggestions-notification"] {
+  visibility: visible;
+}
+
+#PopupAutoCompleteRichResult > richlistbox {
+  transition: height 100ms;
+}
+
+#PopupAutoCompleteRichResult.showSearchSuggestionsNotification > richlistbox {
+  transition: none;
+}
+
+#urlbar-container[combined] > #urlbar > #urlbar-icons > #go-button,
+#urlbar[pageproxystate="invalid"] > #urlbar-icons > .urlbar-icon:not(#go-button),
+#urlbar[pageproxystate="valid"] > #urlbar-icons > #go-button,
+#urlbar[pageproxystate="invalid"][focused="true"] > #urlbar-go-button ~ toolbarbutton,
+#urlbar[pageproxystate="valid"] > #urlbar-go-button,
+#urlbar:not([focused="true"]) > #urlbar-go-button {
+  visibility: collapse;
 }
 
 /* Pale Moon: Address bar: Feeds */
@@ -336,15 +487,6 @@ panel[noactions] > richlistbox > richlistitem[type~="action"] > .ac-url-box > .a
 }
 
 
-#urlbar-container[combined] > #urlbar > #urlbar-icons > #go-button,
-#urlbar[pageproxystate="invalid"] > #urlbar-icons > .urlbar-icon:not(#go-button),
-#urlbar[pageproxystate="valid"] > #urlbar-icons > #go-button,
-#urlbar[pageproxystate="invalid"][focused="true"] > #urlbar-go-button ~ toolbarbutton,
-#urlbar[pageproxystate="valid"] > #urlbar-go-button,
-#urlbar:not([focused="true"]) > #urlbar-go-button {
-  visibility: collapse;
-}
-
 #urlbar[pageproxystate="invalid"] > #identity-box > #identity-icon-labels {
   visibility: collapse;
 }
@@ -353,8 +495,44 @@ panel[noactions] > richlistbox > richlistitem[type~="action"] > .ac-url-box > .a
   pointer-events: none;
 }
 
+#urlbar[pageproxystate="invalid"] > #identity-box > #notification-popup-box {
+  pointer-events: auto;
+}
+
 #identity-icon-labels {
   max-width: 18em;
+}
+@media (max-width: 700px) {
+  #urlbar-container {
+    min-width: 45ch;
+  }
+  #identity-icon-labels {
+    max-width: 70px;
+  }
+}
+@media (max-width: 600px) {
+  #urlbar-container {
+    min-width: 40ch;
+  }
+  #identity-icon-labels {
+    max-width: 60px;
+  }
+}
+@media (max-width: 500px) {
+  #urlbar-container {
+    min-width: 35ch;
+  }
+  #identity-icon-labels {
+    max-width: 50px;
+  }
+}
+@media (max-width: 400px) {
+  #urlbar-container {
+    min-width: 28ch;
+  }
+  #identity-icon-labels {
+    max-width: 40px;
+  }
 }
 
 #identity-icon-country-label {
@@ -382,6 +560,20 @@ toolbarbutton.bookmark-item {
   max-width: 13em;
 }
 
+/* Apply crisp rendering for favicons at exactly 2dppx resolution */
+@media (resolution: 2dppx) {
+  #alltabs-popup > .menuitem-iconic > .menu-iconic-left > .menu-iconic-icon,
+  .menuitem-with-favicon > .menu-iconic-left > .menu-iconic-icon {
+    image-rendering: -moz-crisp-edges;
+  }
+
+  .bookmark-item > .toolbarbutton-icon,
+  .bookmark-item > .menu-iconic-left > .menu-iconic-icon,
+  #personal-bookmarks[cui-areatype="toolbar"] > #bookmarks-toolbar-placeholder > .toolbarbutton-icon {
+    image-rendering: -moz-crisp-edges;
+  }
+}
+
 %ifdef MENUBAR_CAN_AUTOHIDE
 #toolbar-menubar:not([autohide="true"]) ~ toolbar > #bookmarks-menu-button,
 #toolbar-menubar:not([autohide="true"]) > #bookmarks-menu-button,
@@ -399,18 +591,8 @@ toolbarbutton.bookmark-item {
 menupopup[emptyplacesresult="true"] > .hide-if-empty-places-result {
   display: none;
 }
-
 menuitem.spell-suggestion {
   font-weight: bold;
-}
-
-#sidebar-header > .tabs-closebutton {
-  -moz-user-focus: normal;
-}
-
-/* apply Fitts' law to the notification bar's close button */
-window[sizemode="maximized"] #content .notification-inner {
-  border-right: 0px !important;
 }
 
 /* Hide extension toolbars that neglected to set the proper class */
@@ -491,6 +673,9 @@ window[chromehidden~="toolbar"] toolbar:not(.toolbar-primary):not(#nav-bar):not(
   /* Use -10px to hide the border and border-radius on the top */
   transform: translate(-50%, -10px);
 }
+#main-window[OSXLionFullscreen] html|*.pointerlockfswarning[ontop] {
+  transform: translate(-50%, 80px);
+}
 
 #fullscreen-domain-text,
 #fullscreen-generic-text {
@@ -519,6 +704,8 @@ window[chromehidden~="toolbar"] toolbar:not(.toolbar-primary):not(#nav-bar):not(
   -moz-binding: url("chrome://global/content/bindings/toolbarbutton.xml#toolbarbutton-image");
 }
 
+/* ::::: Ctrl-Tab Panel ::::: */
+
 :-moz-any(.ctrlTab-preview, .allTabs-preview) > html|img,
 :-moz-any(.ctrlTab-preview, .allTabs-preview) > html|canvas {
   min-width: inherit;
@@ -543,7 +730,13 @@ window[chromehidden~="toolbar"] toolbar:not(.toolbar-primary):not(#nav-bar):not(
   height: 16px;
 }
 
-/* ::::: Ctrl-Tab Panel ::::: */
+/* Apply crisp rendering for favicons at exactly 2dppx resolution */
+@media (resolution: 2dppx) {
+  .ctrlTab-favicon {
+    image-rendering: -moz-crisp-edges;
+  }
+}
+
 .ctrlTab-preview {
   -moz-binding: url("chrome://browser/content/browser-tabPreviews.xml#ctrlTab-preview");
 }
@@ -799,6 +992,9 @@ toolbarbutton[pmkit-button="true"] > .toolbarbutton-badge-container > .toolbarbu
 /* Combobox dropdown renderer */
 #ContentSelectDropdown > menupopup {
   max-height: 350px;
+  /* The menupopup itself should always be rendered LTR to ensure the scrollbar aligns with
+   * the dropdown arrow on the dropdown widget. If a menuitem is RTL, its style will be set accordingly */
+  direction: ltr;
 }
 
 /* Indent options in optgroups */
@@ -825,8 +1021,22 @@ menuitems are really transparent against white background.
   box-shadow: 0 0 2px 2px rgba(255,0,0,0.4);
 }
 
+/* Combined context-menu items */
+#context-navigation > .menuitem-iconic > .menu-iconic-text,
+#context-navigation > .menuitem-iconic > .menu-accel-container {
+  display: none;
+}
+
 #login-fill-doorhanger:not([inDetailView]) > #login-fill-clickcapturer {
   pointer-events: none;
+}
+
+.popup-notification-invalid-input {
+  box-shadow: 0 0 1.5px 1px red;
+}
+
+.popup-notification-invalid-input[focused] {
+  box-shadow: 0 0 2px 2px rgba(255,0,0,0.4);
 }
 
 .dragfeedback-tab {

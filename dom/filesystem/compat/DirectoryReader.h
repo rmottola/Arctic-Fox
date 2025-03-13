@@ -18,7 +18,10 @@ class nsIGlobalObject;
 namespace mozilla {
 namespace dom {
 
-class DirectoryReader final
+class Directory;
+class DOMFileSystem;
+
+class DirectoryReader
   : public nsISupports
   , public nsWrapperCache
 {
@@ -26,7 +29,9 @@ public:
   NS_DECL_CYCLE_COLLECTING_ISUPPORTS
   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS(DirectoryReader)
 
-  explicit DirectoryReader(nsIGlobalObject* aGlobalObject);
+  explicit DirectoryReader(nsIGlobalObject* aGlobalObject,
+                           DOMFileSystem* aFileSystem,
+                           Directory* aDirectory);
 
   nsIGlobalObject*
   GetParentObject() const
@@ -37,18 +42,20 @@ public:
   virtual JSObject*
   WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
-  void
+  virtual void
   ReadEntries(EntriesCallback& aSuccessCallback,
               const Optional<OwningNonNull<ErrorCallback>>& aErrorCallback,
-              ErrorResult& aRv) const
-  {
-    aRv.Throw(NS_ERROR_NOT_IMPLEMENTED);
-  }
+              ErrorResult& aRv);
+
+protected:
+  virtual ~DirectoryReader();
 
 private:
-  ~DirectoryReader();
-
   nsCOMPtr<nsIGlobalObject> mParent;
+  RefPtr<DOMFileSystem> mFileSystem;
+  RefPtr<Directory> mDirectory;
+
+  bool mAlreadyRead;
 };
 
 } // namespace dom

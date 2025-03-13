@@ -65,6 +65,10 @@ toolbar[brighttext] #sync-button[status="active"] {
   list-style-image: url("chrome://browser/skin/syncProgress-toolbar-inverted.png");
 }
 
+#containers-panelmenu[cui-areatype="toolbar"] {
+  -moz-image-region: rect(0, 810px, 18px, 792px);
+}
+
 #feed-button[cui-areatype="toolbar"] {
   -moz-image-region: rect(0, 288px, 18px, 270px);
 }
@@ -238,6 +242,10 @@ toolbar[brighttext] #sync-button[status="active"] {
 
   #sync-button[cui-areatype="toolbar"] {
     -moz-image-region: rect(0, 1584px, 36px, 1548px);
+  }
+
+  #containers-panelmenu[cui-areatype="toolbar"] {
+    -moz-image-region: rect(0, 1620px, 36px, 1584px);
   }
 
   #feed-button[cui-areatype="toolbar"] {

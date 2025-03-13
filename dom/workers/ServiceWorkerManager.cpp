@@ -962,6 +962,37 @@ ServiceWorkerManager::SendPushSubscriptionChangeEvent(const nsACString& aOriginA
 #endif
 }
 
+nsresult
+ServiceWorkerManager::SendNotificationEvent(const nsAString& aEventName,
+                                            const nsACString& aOriginSuffix,
+                                            const nsACString& aScope,
+                                            const nsAString& aID,
+                                            const nsAString& aTitle,
+                                            const nsAString& aDir,
+                                            const nsAString& aLang,
+                                            const nsAString& aBody,
+                                            const nsAString& aTag,
+                                            const nsAString& aIcon,
+                                            const nsAString& aData,
+                                            const nsAString& aBehavior)
+{
+  PrincipalOriginAttributes attrs;
+  if (!attrs.PopulateFromSuffix(aOriginSuffix)) {
+    return NS_ERROR_INVALID_ARG;
+  }
+
+  ServiceWorkerInfo* info = GetActiveWorkerInfoForScope(attrs, aScope);
+  if (!info) {
+    return NS_ERROR_FAILURE;
+  }
+
+  ServiceWorkerPrivate* workerPrivate = info->WorkerPrivate();
+  return workerPrivate->SendNotificationEvent(aEventName, aID, aTitle, aDir,
+                                              aLang, aBody, aTag,
+                                              aIcon, aData, aBehavior,
+                                              NS_ConvertUTF8toUTF16(aScope));
+}
+
 NS_IMETHODIMP
 ServiceWorkerManager::SendNotificationClickEvent(const nsACString& aOriginSuffix,
                                                  const nsACString& aScope,
@@ -975,21 +1006,27 @@ ServiceWorkerManager::SendNotificationClickEvent(const nsACString& aOriginSuffix
                                                  const nsAString& aData,
                                                  const nsAString& aBehavior)
 {
-  PrincipalOriginAttributes attrs;
-  if (!attrs.PopulateFromSuffix(aOriginSuffix)) {
-    return NS_ERROR_INVALID_ARG;
-  }
+  return SendNotificationEvent(NS_LITERAL_STRING(NOTIFICATION_CLICK_EVENT_NAME),
+                               aOriginSuffix, aScope, aID, aTitle, aDir, aLang,
+                               aBody, aTag, aIcon, aData, aBehavior);
+}
 
-  ServiceWorkerInfo* info = GetActiveWorkerInfoForScope(attrs, aScope);
-  if (!info) {
-    return NS_ERROR_FAILURE;
-  }
-
-  ServiceWorkerPrivate* workerPrivate = info->WorkerPrivate();
-  return workerPrivate->SendNotificationClickEvent(aID, aTitle, aDir,
-                                                   aLang, aBody, aTag,
-                                                   aIcon, aData, aBehavior,
-                                                   NS_ConvertUTF8toUTF16(aScope));
+NS_IMETHODIMP
+ServiceWorkerManager::SendNotificationCloseEvent(const nsACString& aOriginSuffix,
+                                                 const nsACString& aScope,
+                                                 const nsAString& aID,
+                                                 const nsAString& aTitle,
+                                                 const nsAString& aDir,
+                                                 const nsAString& aLang,
+                                                 const nsAString& aBody,
+                                                 const nsAString& aTag,
+                                                 const nsAString& aIcon,
+                                                 const nsAString& aData,
+                                                 const nsAString& aBehavior)
+{
+  return SendNotificationEvent(NS_LITERAL_STRING(NOTIFICATION_CLOSE_EVENT_NAME),
+                               aOriginSuffix, aScope, aID, aTitle, aDir, aLang,
+                               aBody, aTag, aIcon, aData, aBehavior);
 }
 
 NS_IMETHODIMP
@@ -1452,6 +1489,36 @@ ServiceWorkerManager::ReportToAllClients(const nsCString& aScope,
                                                 aColumnNumber,
                                                 nsContentUtils::eOMIT_LOCATION);
     return;
+  }
+}
+
+/* static */
+void
+ServiceWorkerManager::LocalizeAndReportToAllClients(
+                                          const nsCString& aScope,
+                                          const char* aStringKey,
+                                          const nsTArray<nsString>& aParamArray,
+                                          uint32_t aFlags,
+                                          const nsString& aFilename,
+                                          const nsString& aLine,
+                                          uint32_t aLineNumber,
+                                          uint32_t aColumnNumber)
+{
+  RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+  if (!swm) {
+    return;
+  }
+
+  nsresult rv;
+  nsXPIDLString message;
+  rv = nsContentUtils::FormatLocalizedString(nsContentUtils::eDOM_PROPERTIES,
+                                             aStringKey, aParamArray, message);
+  if (NS_SUCCEEDED(rv)) {
+    swm->ReportToAllClients(aScope, message,
+                            aFilename, aLine, aLineNumber, aColumnNumber,
+                            aFlags);
+  } else {
+    NS_WARNING("Failed to format and therefore report localized error.");
   }
 }
 
@@ -1921,13 +1988,10 @@ ServiceWorkerManager::StopControllingADocument(ServiceWorkerRegistrationInfo* aR
     if (aRegistration->mPendingUninstall) {
       RemoveRegistration(aRegistration);
     } else {
-      // If the registration has an active worker that is running
-      // this might be a good time to stop it.
-      if (aRegistration->GetActive()) {
-        ServiceWorkerPrivate* serviceWorkerPrivate =
-          aRegistration->GetActive()->WorkerPrivate();
-        serviceWorkerPrivate->NoteStoppedControllingDocuments();
-      }
+      // We use to aggressively terminate the worker at this point, but it
+      // caused problems.  There are more uses for a service worker than actively
+      // controlled documents.  We need to let the worker naturally terminate
+      // in case its handling push events, message events, etc.
       aRegistration->TryToActivateAsync();
     }
   }
@@ -2294,7 +2358,10 @@ NS_IMETHODIMP
 ServiceWorkerManager::GetDocumentController(nsPIDOMWindowInner* aWindow,
                                             nsISupports** aServiceWorker)
 {
-  MOZ_ASSERT(aWindow);
+  if (NS_WARN_IF(!aWindow)) {
+    return NS_ERROR_DOM_INVALID_STATE_ERR;
+  }
+
   nsCOMPtr<nsIDocument> doc = aWindow->GetExtantDoc();
   if (!doc) {
     return NS_ERROR_DOM_INVALID_STATE_ERR;

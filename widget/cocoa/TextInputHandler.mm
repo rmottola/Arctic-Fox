@@ -993,12 +993,23 @@ TISInputSourceWrapper::InitKeyEvent(NSEvent *aNativeKeyEvent,
     } else {
       nsCocoaUtils::GetStringForNSString([aNativeKeyEvent characters],
                                          aKeyEvent.mKeyValue);
+      // If the key value is empty, the event may be a dead key event.
+      // If TranslateToChar() returns non-zero value, that means that
+      // the key may input a character with different dead key state.
+      if (aKeyEvent.mKeyValue.IsEmpty()) {
+        NSUInteger cocoaState = [aNativeKeyEvent modifierFlags];
+        UInt32 carbonState = nsCocoaUtils::ConvertToCarbonModifier(cocoaState);
+        if (TranslateToChar(nativeKeyCode, carbonState, kbType)) {
+          aKeyEvent.mKeyNameIndex = KEY_NAME_INDEX_Dead;
+        }
+      }
     }
 
     // Last resort.  If .key value becomes empty string, we should use
     // charactersIgnoringModifiers, if it's available.
-    if (aKeyEvent.mKeyValue.IsEmpty() ||
-        IsControlChar(aKeyEvent.mKeyValue[0])) {
+    if (aKeyEvent.mKeyNameIndex == KEY_NAME_INDEX_USE_STRING &&
+        (aKeyEvent.mKeyValue.IsEmpty() ||
+         IsControlChar(aKeyEvent.mKeyValue[0]))) {
       nsCocoaUtils::GetStringForNSString(
         [aNativeKeyEvent charactersIgnoringModifiers], aKeyEvent.mKeyValue);
       // But don't expose it if it's a control character.
@@ -1456,12 +1467,12 @@ TextInputHandler::DebugPrintAllKeyboardLayouts()
       tis.GetLocalizedName(name);
       tis.GetInputSourceID(isid);
       MOZ_LOG(gLog, LogLevel::Info,
-             ("  %s\t<%s>%s%s\n",
-              NS_ConvertUTF16toUTF8(name).get(),
-              NS_ConvertUTF16toUTF8(isid).get(),
-              tis.IsASCIICapable() ? "" : "\t(Isn't ASCII capable)",
-              tis.IsKeyboardLayout() && tis.GetUCKeyboardLayout() ?
-                "" : "\t(uchr is NOT AVAILABLE)"));
+        ("  %s\t<%s>%s%s\n",
+         NS_ConvertUTF16toUTF8(name).get(),
+         NS_ConvertUTF16toUTF8(isid).get(),
+         tis.IsASCIICapable() ? "" : "\t(Isn't ASCII capable)",
+         tis.IsKeyboardLayout() && tis.GetUCKeyboardLayout() ?
+           "" : "\t(uchr is NOT AVAILABLE)"));
     }
     ::CFRelease(list);
   }
@@ -2441,11 +2452,11 @@ IMEInputHandler::DebugPrintAllIMEModes()
       tis.GetLocalizedName(name);
       tis.GetInputSourceID(isid);
       MOZ_LOG(gLog, LogLevel::Info,
-             ("  %s\t<%s>%s%s\n",
-              NS_ConvertUTF16toUTF8(name).get(),
-              NS_ConvertUTF16toUTF8(isid).get(),
-              tis.IsASCIICapable() ? "" : "\t(Isn't ASCII capable)",
-              tis.IsEnabled() ? "" : "\t(Isn't Enabled)"));
+        ("  %s\t<%s>%s%s\n",
+         NS_ConvertUTF16toUTF8(name).get(),
+         NS_ConvertUTF16toUTF8(isid).get(),
+         tis.IsASCIICapable() ? "" : "\t(Isn't ASCII capable)",
+         tis.IsEnabled() ? "" : "\t(Isn't Enabled)"));
     }
     ::CFRelease(list);
   }
@@ -3481,7 +3492,7 @@ IMEInputHandler::FirstRectForCharacterRange(NSRange& aRange,
   }
   rect = nsCocoaUtils::DevPixelsToCocoaPoints(r, mWidget->BackingScaleFactor());
   rect = [rootView convertRect:rect toView:nil];
-  rect.origin = [rootWindow convertBaseToScreen:rect.origin];
+  rect.origin = nsCocoaUtils::ConvertPointToScreen(rootWindow, rect.origin);
 
   if (aActualRange) {
     *aActualRange = actualRange;
@@ -3515,7 +3526,7 @@ IMEInputHandler::CharacterIndexForPoint(NSPoint& aPoint)
   }
 
   WidgetQueryContentEvent charAt(true, eQueryCharacterAtPoint, mWidget);
-  NSPoint ptInWindow = [mainWindow convertScreenToBase:aPoint];
+  NSPoint ptInWindow = nsCocoaUtils::ConvertPointFromScreen(mainWindow, aPoint);
   NSPoint ptInView = [mView convertPoint:ptInWindow fromView:nil];
   charAt.mRefPoint.x =
     static_cast<int32_t>(ptInView.x) * mWidget->BackingScaleFactor();
@@ -3920,6 +3931,16 @@ IMEInputHandler::OnSelectionChange(const IMENotification& aIMENotification)
   if (mIMEHasFocus) {
     mSelectedRange = mRangeForWritingMode;
   }
+}
+
+bool
+IMEInputHandler::OnHandleEvent(NSEvent* aEvent)
+{
+  if (!IsFocused()) {
+    return false;
+  }
+  NSTextInputContext* inputContext = [mView inputContext];
+  return [inputContext handleEvent:aEvent];
 }
 
 #pragma mark -

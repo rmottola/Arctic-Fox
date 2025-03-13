@@ -76,6 +76,7 @@ browser/components/tabview/**
 browser/components/translation/**
 browser/components/uitour/**
 browser/extensions/pdfjs/**
+browser/extensions/pocket/content/panels/js/vendor/**
 browser/extensions/shumway/**
 browser/fuel/**
 browser/locales/**
@@ -126,6 +127,7 @@ devtools/client/webconsole/**
 devtools/client/webide/**
 devtools/server/**
 !devtools/server/actors/webbrowser.js
+!devtools/server/actors/styles.js
 devtools/shared/*.js
 !devtools/shared/css-lexer.js
 devtools/shared/*.jsm

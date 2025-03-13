@@ -79,7 +79,7 @@ typedef HashMap<void*, VerifyNode*, DefaultHasher<void*>, SystemAllocPolicy> Nod
  * The nodemap field is a hashtable that maps from the address of the GC thing
  * to the VerifyNode that represents it.
  */
-class js::VerifyPreTracer : public JS::CallbackTracer
+class js::VerifyPreTracer final : public JS::CallbackTracer
 {
     JS::AutoDisableGenerationalGC noggc;
 
@@ -183,7 +183,7 @@ gc::GCRuntime::startVerifyPreBarriers()
     if (!trc)
         return;
 
-    AutoPrepareForTracing prep(rt, WithAtoms);
+    AutoPrepareForTracing prep(rt->contextFromMainThread(), WithAtoms);
 
     for (auto chunk = allNonEmptyChunks(); !chunk.done(); chunk.next())
         chunk->bitmap.clear();
@@ -312,7 +312,7 @@ gc::GCRuntime::endVerifyPreBarriers()
 
     MOZ_ASSERT(!JS::IsGenerationalGCEnabled(rt));
 
-    AutoPrepareForTracing prep(rt, SkipAtoms);
+    AutoPrepareForTracing prep(rt->contextFromMainThread(), SkipAtoms);
 
     bool compartmentCreated = false;
 

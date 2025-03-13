@@ -3,6 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "ClippedImage.h"
+
+#include <algorithm>
 #include <new>      // Workaround for bug in VS10; see bug 981264.
 #include <cmath>
 #include <utility>
@@ -20,14 +23,13 @@
 #include "Orientation.h"
 #include "SVGImageContext.h"
 
-#include "ClippedImage.h"
-
 namespace mozilla {
 
 using namespace gfx;
 using layers::LayerManager;
 using layers::ImageContainer;
 using std::make_pair;
+using std::max;
 using std::modf;
 using std::pair;
 
@@ -405,24 +407,6 @@ ClippedImage::Draw(gfxContext* aContext,
                         aSamplingFilter, aSVGContext, aFlags);
 }
 
-static SVGImageContext
-UnclipViewport(const SVGImageContext& aOldContext,
-               const pair<nsIntSize, nsIntSize>& aInnerAndClipSize)
-{
-  nsIntSize innerSize(aInnerAndClipSize.first);
-  nsIntSize clipSize(aInnerAndClipSize.second);
-
-  // Map the viewport to the inner image. (Note that we don't take the aSize
-  // parameter of Draw into account, just the clipping region.)
-  CSSIntSize vSize(aOldContext.GetViewportSize());
-  vSize.width = ceil(vSize.width * double(innerSize.width) / clipSize.width);
-  vSize.height =
-    ceil(vSize.height * double(innerSize.height) / clipSize.height);
-
-  return SVGImageContext(vSize,
-                         aOldContext.GetPreserveAspectRatio());
-}
-
 DrawResult
 ClippedImage::DrawSingleTile(gfxContext* aContext,
                              const nsIntSize& aSize,
@@ -468,10 +452,24 @@ ClippedImage::DrawSingleTile(gfxContext* aContext,
   gfxContextMatrixAutoSaveRestore saveMatrix(aContext);
   aContext->Multiply(gfxMatrix::Translation(-clip.x, -clip.y));
 
+  auto unclipViewport = [&](const SVGImageContext& aOldContext) {
+    // Map the viewport to the inner image. Note that we don't take the aSize
+    // parameter of imgIContainer::Draw into account, just the clipping region.
+    // The size in pixels at which the output will ultimately be drawn is
+    // irrelevant here since the purpose of the SVG viewport size is to
+    // determine what *region* of the SVG document will be drawn.
+    CSSIntSize vSize(aOldContext.GetViewportSize());
+    vSize.width = ceil(vSize.width * double(innerSize.width) / mClip.width);
+    vSize.height =
+      ceil(vSize.height * double(innerSize.height) / mClip.height);
+
+    return SVGImageContext(vSize,
+                           aOldContext.GetPreserveAspectRatio());
+  };
+
   return InnerImage()->Draw(aContext, size, region,
                             aWhichFrame, aSamplingFilter,
-                            aSVGContext.map(UnclipViewport,
-                                            make_pair(innerSize, mClip.Size())),
+                            aSVGContext.map(unclipViewport),
                             aFlags);
 }
 
@@ -505,10 +503,12 @@ ClippedImage::OptimalImageSizeForDest(const gfxSize& aDest,
 
   int32_t imgWidth, imgHeight;
   bool needScale = false;
+  bool forceUniformScaling = false;
   if (mSVGViewportSize && !mSVGViewportSize->IsEmpty()) {
     imgWidth = mSVGViewportSize->width;
     imgHeight = mSVGViewportSize->height;
     needScale = true;
+    forceUniformScaling = (aFlags & imgIContainer::FLAG_FORCE_UNIFORM_SCALING);
   } else if (NS_SUCCEEDED(InnerImage()->GetWidth(&imgWidth)) &&
              NS_SUCCEEDED(InnerImage()->GetHeight(&imgHeight))) {
     needScale = true;
@@ -522,6 +522,10 @@ ClippedImage::OptimalImageSizeForDest(const gfxSize& aDest,
     // multiple of the size of the clipping region is always fine.
     nsIntSize scale(ceil(aDest.width / mClip.width),
                     ceil(aDest.height / mClip.height));
+
+    if (forceUniformScaling) {
+      scale.width = scale.height = max(scale.height, scale.width);
+    }
 
     // Determine the size we'd prefer to render the inner image at, and ask the
     // inner image what size we should actually use.

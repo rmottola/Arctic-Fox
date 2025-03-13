@@ -141,7 +141,6 @@ static_assert(sizeof(kVirtualKeyName) / sizeof(const char*) == 0x100,
 // Unique id counter associated with a keydown / keypress events. Used in
 // identifing keypress events for removal from async event dispatch queue
 // in metrofx after preventDefault is called on keydown events.
-// XXX: Do we still need this?
 static uint32_t sUniqueKeyEventId = 0;
 
 struct DeadKeyEntry
@@ -258,8 +257,8 @@ ModifierKeyState::Unset(Modifiers aRemovingModifiers)
 {
   mModifiers &= ~aRemovingModifiers;
   // Note that we don't need to unset AltGr flag here automatically.
-  // For nsEditor, we need to remove Alt and Control flags but AltGr isn't
-  // checked in nsEditor, so, it can be kept.
+  // For EditorBase, we need to remove Alt and Control flags but AltGr isn't
+  // checked in EditorBase, so, it can be kept.
 }
 
 void
@@ -584,7 +583,7 @@ VirtualKey::GetUniChars(ShiftState aShiftState) const
     // Even if the shifted chars and the unshifted chars are same, we
     // should consume the Alt key state and the Ctrl key state when
     // AltGr key is pressed. Because if we don't consume them, the input
-    // events are ignored on nsEditor. (I.e., Users cannot input the
+    // events are ignored on EditorBase. (I.e., Users cannot input the
     // characters with this key combination.)
     Modifiers finalModifiers = ShiftStateToModifiers(aShiftState);
     finalModifiers &= ~(MODIFIER_ALT | MODIFIER_CONTROL);
@@ -1700,7 +1699,7 @@ NativeKey::HandleCharMessage(const MSG& aCharMsg,
     }
 
     // When AltGr (Alt+Ctrl) is pressed, that causes normal text input.
-    // At this time, if either alt or ctrl flag is set, nsEditor ignores the
+    // At this time, if either alt or ctrl flag is set, EditorBase ignores the
     // keypress event.  For avoiding this issue, we should remove ctrl and alt
     // flags.
     ModifierKeyState modKeyState(mModKeyState);
@@ -2450,16 +2449,13 @@ NativeKey::DispatchKeyPressEventForFollowingCharMessage(
 KeyboardLayout* KeyboardLayout::sInstance = nullptr;
 nsIIdleServiceInternal* KeyboardLayout::sIdleService = nullptr;
 
-PRLogModuleInfo* sKeyboardLayoutLogger = nullptr;
+LazyLogModule sKeyboardLayoutLogger("KeyboardLayoutWidgets");
 
 // static
 KeyboardLayout*
 KeyboardLayout::GetInstance()
 {
   if (!sInstance) {
-    if (!sKeyboardLayoutLogger) {
-      sKeyboardLayoutLogger = PR_NewLogModule("KeyboardLayoutWidgets");
-    }
     sInstance = new KeyboardLayout();
     nsCOMPtr<nsIIdleServiceInternal> idleService =
       do_GetService("@mozilla.org/widget/idleservice;1");

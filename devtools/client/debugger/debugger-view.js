@@ -5,7 +5,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const SOURCE_SYNTAX_HIGHLIGHT_MAX_FILE_SIZE = 1048576; // 1 MB in bytes
 const SOURCE_URL_DEFAULT_MAX_LENGTH = 64; // chars
 const STACK_FRAMES_SOURCE_URL_MAX_LENGTH = 15; // chars
 const STACK_FRAMES_SOURCE_URL_TRIM_SECTION = "center";
@@ -24,8 +23,6 @@ const SEARCH_TOKEN_FLAG = "#";
 const SEARCH_LINE_FLAG = ":";
 const SEARCH_VARIABLE_FLAG = "*";
 const SEARCH_AUTOFILL = [SEARCH_GLOBAL_FLAG, SEARCH_FUNCTION_FLAG, SEARCH_TOKEN_FLAG];
-const EDITOR_VARIABLE_HOVER_DELAY = 750; // ms
-const EDITOR_VARIABLE_POPUP_POSITION = "topcenter bottomleft";
 const TOOLBAR_ORDER_POPUP_POSITION = "topcenter bottomleft";
 const RESIZE_REFRESH_RATE = 50; // ms
 const PROMISE_DEBUGGER_URL =
@@ -376,14 +373,15 @@ var DebuggerView = {
 
     if (source && source.actor === location.actor) {
       this.editor.removeBreakpoint(location.line - 1);
+      this.editor.removeBreakpointCondition(location.line - 1);
     }
   },
 
   renderEditorBreakpointCondition: function (breakpoint) {
-    const { location, condition } = breakpoint;
+    const { location, condition, disabled } = breakpoint;
     const source = queries.getSelectedSource(this.controller.getState());
 
-    if (source && source.actor === location.actor) {
+    if (source && source.actor === location.actor && !disabled) {
       if (condition) {
         this.editor.setBreakpointCondition(location.line - 1);
       } else {
@@ -453,12 +451,6 @@ var DebuggerView = {
    *        The source text content.
    */
   _setEditorMode: function(aUrl, aContentType = "", aTextContent = "") {
-    // Avoid setting the editor mode for very large files.
-    // Is this still necessary? See bug 929225.
-    if (aTextContent.length >= SOURCE_SYNTAX_HIGHLIGHT_MAX_FILE_SIZE) {
-      return void this.editor.setMode(Editor.modes.text);
-    }
-
     // Use JS mode for files with .js and .jsm extensions.
     if (SourceUtils.isJavaScript(aUrl, aContentType)) {
       return void this.editor.setMode(Editor.modes.js);

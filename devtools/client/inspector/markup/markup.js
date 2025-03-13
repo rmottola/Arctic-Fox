@@ -553,19 +553,25 @@ MarkupView.prototype = {
   },
 
   /**
-   * Focus the current node selection's MarkupContainer if the selection
-   * happened because the user picked an element using the element picker or
-   * browser context menu.
+   * Maybe focus the current node selection's MarkupContainer depending on why
+   * the current node got selected.
    */
-  maybeFocusNewSelection: function () {
+  maybeFocusNewSelection: function() {
     let {reason, nodeFront} = this._inspector.selection;
 
-    if (reason !== "browser-context-menu" &&
-        reason !== "picker-node-picked") {
-      return;
-    }
+    // The list of reasons that should lead to focusing the node.
+    let reasonsToFocus = [
+      // If the user picked an element with the element picker.
+      "picker-node-picked",
+      // If the user selected an element with the browser context menu.
+      "browser-context-menu",
+      // If the user added a new node by clicking in the inspector toolbar.
+      "node-inserted"
+    ];
 
-    this.getContainer(nodeFront).focus();
+    if (reasonsToFocus.includes(reason)) {
+      this.getContainer(nodeFront).focus();
+    }
   },
 
   /**
@@ -2359,10 +2365,10 @@ MarkupElementContainer.prototype = Heritage.extend(MarkupContainer.prototype, {
    *         rejects if no preview is required. This promise is then used by
    *         Tooltip.js to decide if/when to show the tooltip
    */
-  isImagePreviewTarget: function (target, tooltip) {
+  isImagePreviewTarget: Task.async(function* (target, tooltip) {
     // Is this Element previewable.
     if (!this.isPreviewable()) {
-      return promise.reject(false);
+      return false;
     }
 
     // If the Element has an src attribute, the tooltip is shown when hovering
@@ -2371,17 +2377,20 @@ MarkupElementContainer.prototype = Heritage.extend(MarkupContainer.prototype, {
     let src = this.editor.getAttributeElement("src");
     let expectedTarget = src ? src.querySelector(".link") : this.editor.tag;
     if (target !== expectedTarget) {
-      return promise.reject(false);
+      return false;
     }
 
-    return this._getPreview().then(({data, size}) => {
+    try {
+      let {data, size} = yield this._getPreview();
       // The preview is ready.
       tooltip.setImageContent(data, size);
-    }, () => {
+    } catch (e) {
       // Indicate the failure but show the tooltip anyway.
       tooltip.setBrokenImageContent();
-    });
-  },
+    }
+
+    return true;
+  }),
 
   copyImageDataUri: function () {
     // We need to send again a request to gettooltipData even if one was sent

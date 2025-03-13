@@ -153,7 +153,7 @@ TEST_F(APZCBasicTester, Fling) {
   AsyncTransform viewTransformOut;
 
   // Fling down. Each step scroll further down
-  Pan(apzc, mcc, touchStart, touchEnd);
+  Pan(apzc, touchStart, touchEnd);
   ParentLayerPoint lastPoint;
   for (int i = 1; i < 50; i+=1) {
     apzc->SampleContentTransformForFrame(&viewTransformOut, pointOut, TimeDuration::FromMilliseconds(1));
@@ -168,12 +168,12 @@ TEST_F(APZCBasicTester, FlingIntoOverscroll) {
   SCOPED_GFX_PREF(APZFlingMinVelocityThreshold, float, 0.0f);
 
   // Scroll down by 25 px. Don't fling for simplicity.
-  ApzcPanNoFling(apzc, mcc, 50, 25);
+  ApzcPanNoFling(apzc, 50, 25);
 
   // Now scroll back up by 20px, this time flinging after.
   // The fling should cover the remaining 5 px of room to scroll, then
   // go into overscroll, and finally snap-back to recover from overscroll.
-  Pan(apzc, mcc, 25, 45);
+  Pan(apzc, 25, 45);
   const TimeDuration increment = TimeDuration::FromMilliseconds(1);
   bool reachedOverscroll = false;
   bool recoveredFromOverscroll = false;
@@ -206,24 +206,24 @@ TEST_F(APZCBasicTester, PanningTransformNotifications) {
   {
     InSequence s;
     EXPECT_CALL(check, Call("Simple pan"));
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::StartTouch,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::TransformBegin,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::StartPanning,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::EndTouch,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::TransformEnd,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::eStartTouch,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::eTransformBegin,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::eStartPanning,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::eEndTouch,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::eTransformEnd,_)).Times(1);
     EXPECT_CALL(check, Call("Complex pan"));
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::StartTouch,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::TransformBegin,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::StartPanning,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::EndTouch,_)).Times(1);
-    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::TransformEnd,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::eStartTouch,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::eTransformBegin,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::eStartPanning,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::eEndTouch,_)).Times(1);
+    EXPECT_CALL(*mcc, NotifyAPZStateChange(_,GeckoContentController::APZStateChange::eTransformEnd,_)).Times(1);
     EXPECT_CALL(check, Call("Done"));
   }
 
   check.Call("Simple pan");
-  ApzcPanNoFling(apzc, mcc, 50, 25);
+  ApzcPanNoFling(apzc, 50, 25);
   check.Call("Complex pan");
-  Pan(apzc, mcc, 25, 45);
+  Pan(apzc, 25, 45);
   apzc->AdvanceAnimationsUntilEnd();
   check.Call("Done");
 }
@@ -232,7 +232,7 @@ void APZCBasicTester::PanIntoOverscroll()
 {
   int touchStart = 500;
   int touchEnd = 10;
-  Pan(apzc, mcc, touchStart, touchEnd);
+  Pan(apzc, touchStart, touchEnd);
   EXPECT_TRUE(apzc->IsOverscrolled());
 }
 
@@ -299,7 +299,11 @@ TEST_F(APZCBasicTester, OverScroll_Bug1152051b) {
   // to schedule a new one since we're still overscrolled. We don't pan because
   // panning can trigger functions that clear the overscroll animation state
   // in other ways.
-  TouchDown(apzc, ScreenIntPoint(10, 10), mcc->Time(), nullptr);
+  uint64_t blockId;
+  nsEventStatus status = TouchDown(apzc, ScreenIntPoint(10, 10), mcc->Time(), &blockId);
+  if (gfxPrefs::TouchActionEnabled() && status != nsEventStatus_eConsumeNoDefault) {
+    SetDefaultAllowedTouchBehavior(apzc, blockId);
+  }
   TouchUp(apzc, ScreenIntPoint(10, 10), mcc->Time());
 
   // Sample the second overscroll animation to its end.
@@ -315,7 +319,7 @@ TEST_F(APZCBasicTester, OverScrollAbort) {
   // Pan sufficiently to hit overscroll behavior
   int touchStart = 500;
   int touchEnd = 10;
-  Pan(apzc, mcc, touchStart, touchEnd);
+  Pan(apzc, touchStart, touchEnd);
   EXPECT_TRUE(apzc->IsOverscrolled());
 
   ParentLayerPoint pointOut;
@@ -340,7 +344,7 @@ TEST_F(APZCBasicTester, OverScrollPanningAbort) {
   // the pan does not end.
   int touchStart = 500;
   int touchEnd = 10;
-  Pan(apzc, mcc, touchStart, touchEnd, true); // keep finger down
+  Pan(apzc, touchStart, touchEnd, true); // keep finger down
   EXPECT_TRUE(apzc->IsOverscrolled());
 
   // Check that calling CancelAnimation() while the user is still panning

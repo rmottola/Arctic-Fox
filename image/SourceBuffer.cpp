@@ -103,6 +103,7 @@ SourceBuffer::CreateChunk(size_t aCapacity, bool aRoundUp /* = true */)
   // so if we could store the source data in the SurfaceCache, we assume that
   // there's no way we'll be able to store the decoded version.
   if (MOZ_UNLIKELY(!SurfaceCache::CanHold(finalCapacity))) {
+    NS_WARNING("SourceBuffer refused to create chunk too large for SurfaceCache");
     return Nothing();
   }
 
@@ -136,6 +137,13 @@ SourceBuffer::Compact()
   size_t length = 0;
   for (uint32_t i = 0 ; i < mChunks.Length() ; ++i) {
     length += mChunks[i].Length();
+  }
+
+  // If our total length is zero (which means ExpectLength() got called, but no
+  // data ever actually got written) then just empty our chunk list.
+  if (MOZ_UNLIKELY(length == 0)) {
+    mChunks.Clear();
+    return NS_OK;
   }
 
   Maybe<Chunk> newChunk = CreateChunk(length, /* aRoundUp = */ false);

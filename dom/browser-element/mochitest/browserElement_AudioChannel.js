@@ -12,7 +12,6 @@ browserElementTestHelpers.addPermission();
 function noaudio() {
   var iframe = document.createElement('iframe');
   iframe.setAttribute('mozbrowser', 'true');
-  iframe.setAttribute('mozapp', 'http://example.org/manifest.webapp');
   iframe.src = 'http://example.org/tests/dom/browser-element/mochitest/file_empty.html';
 
   function noaudio_loadend() {
@@ -103,7 +102,6 @@ function noaudio() {
 function audio() {
   var iframe = document.createElement('iframe');
   iframe.setAttribute('mozbrowser', 'true');
-  iframe.setAttribute('mozapp', 'http://example.org/manifest.webapp');
   iframe.src = 'http://example.org/tests/dom/browser-element/mochitest/iframe_file_audio.html';
 
   function audio_loadend() {
@@ -121,7 +119,7 @@ function audio() {
     ok("isActive" in ac, "ac.isActive exists");
 
     ac.onactivestatechanged = function() {
-      ok("activestatechanged event received.");
+      ok(true, "activestatechanged event received.");
       ac.onactivestatechanged = null;
       runTests();
     }
@@ -145,7 +143,7 @@ function runTests() {
 
 
 addEventListener('testready', function() {
-  SpecialPowers.pushPrefEnv({'set': [["b2g.system_manifest_url", "http://mochi.test:8888/manifest.webapp"]]},
+  SpecialPowers.pushPrefEnv({'set': [["b2g.system_startup_url", window.location.href]]},
                             function() {
     SimpleTest.executeSoon(runTests);
   });

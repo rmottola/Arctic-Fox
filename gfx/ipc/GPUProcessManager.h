@@ -11,6 +11,7 @@
 #include "Units.h"
 #include "mozilla/dom/ipc/IdType.h"
 #include "mozilla/gfx/GPUProcessHost.h"
+#include "mozilla/gfx/Point.h"
 #include "mozilla/ipc/Transport.h"
 #include "nsIObserverService.h"
 
@@ -23,7 +24,7 @@ class CompositorUpdateObserver;
 class PCompositorBridgeParent;
 } // namespace layers
 namespace widget {
-class CompositorWidgetProxy;
+class CompositorWidget;
 } // namespace widget
 namespace dom {
 class ContentParent;
@@ -60,18 +61,16 @@ public:
   void EnsureGPUReady();
 
   already_AddRefed<layers::CompositorSession> CreateTopLevelCompositor(
-    widget::CompositorWidgetProxy* aProxy,
+    nsIWidget* aWidget,
     layers::ClientLayerManager* aLayerManager,
     CSSToLayoutDeviceScale aScale,
     bool aUseAPZ,
     bool aUseExternalSurfaceSize,
-    int aSurfaceWidth,
-    int aSurfaceHeight);
+    const gfx::IntSize& aSurfaceSize);
 
   layers::PCompositorBridgeParent* CreateTabCompositorBridge(
     ipc::Transport* aTransport,
-    base::ProcessId aOtherProcess,
-    ipc::GeckoChildProcessHost* aSubprocess);
+    base::ProcessId aOtherProcess);
 
   // This returns a reference to the APZCTreeManager to which
   // pan/zoom-related events can be sent.
@@ -106,6 +105,11 @@ public:
 
   void OnProcessLaunchComplete(GPUProcessHost* aHost) override;
   void OnProcessUnexpectedShutdown(GPUProcessHost* aHost) override;
+
+  // Returns access to the PGPU protocol if a GPU process is present.
+  GPUChild* GetGPUChild() {
+    return mGPUChild;
+  }
 
 private:
   // Called from our xpcom-shutdown observer.

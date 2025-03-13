@@ -81,10 +81,6 @@ browser.jar:
   skin/classic/browser/webRTC-sharingScreen-menubar.png
   skin/classic/browser/webRTC-sharingScreen-menubar@2x.png
 * skin/classic/browser/controlcenter/panel.css        (controlcenter/panel.css)
-  skin/classic/browser/customizableui/thumburger-inverted.png  (customizableui/thumburger-inverted.png)
-  skin/classic/browser/customizableui/thumburger-inverted@2x.png  (customizableui/thumburger-inverted@2x.png)
-  skin/classic/browser/customizableui/thumburger.png  (customizableui/thumburger.png)
-  skin/classic/browser/customizableui/thumburger@2x.png  (customizableui/thumburger@2x.png)
 * skin/classic/browser/customizableui/panelUIOverlay.css    (customizableui/panelUIOverlay.css)
   skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
   skin/classic/browser/downloads/buttons.png                   (downloads/buttons.png)
@@ -166,13 +162,9 @@ browser.jar:
   skin/classic/browser/syncSetup.css
   skin/classic/browser/syncCommon.css
   skin/classic/browser/syncQuota.css
-  skin/classic/browser/yosemite/thumburger.png              (customizableui/thumburger-yosemite.png)
-  skin/classic/browser/yosemite/thumburger@2x.png           (customizableui/thumburger-yosemite@2x.png)
 
 [extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}] chrome.jar:
 % override chrome://browser/skin/feeds/audioFeedIcon.png                   chrome://browser/skin/feeds/feedIcon.png
 % override chrome://browser/skin/feeds/audioFeedIcon16.png                 chrome://browser/skin/feeds/feedIcon16.png
 % override chrome://browser/skin/feeds/videoFeedIcon.png                   chrome://browser/skin/feeds/feedIcon.png
 % override chrome://browser/skin/feeds/videoFeedIcon16.png                 chrome://browser/skin/feeds/feedIcon16.png
-% override chrome://browser/skin/customizableui/thumburger.png             chrome://browser/skin/yosemite/thumburger.png                           os=Darwin osversion>=10.10
-% override chrome://browser/skin/customizableui/thumburger@2x.png          chrome://browser/skin/yosemite/thumburger@2x.png                        os=Darwin osversion>=10.10

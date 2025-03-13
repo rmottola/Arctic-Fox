@@ -1049,9 +1049,7 @@ pref("identity.fxaccounts.enabled", true);
 pref("services.mobileid.server.uri", "https://msisdn.services.mozilla.com");
 
 // Enable mapped array buffer.
-#ifndef XP_WIN
 pref("dom.mapped_arraybuffer.enabled", true);
-#endif
 
 // SystemUpdate API
 pref("dom.system_update.enabled", true);

@@ -10,7 +10,7 @@
 
 const { Cc, Ci, Cu, Cr } = require("chrome");
 const { L10N } = require("devtools/client/performance/modules/global");
-const { Heritage } = require("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
+const { Heritage } = require("devtools/client/shared/widgets/view-helpers");
 const { AbstractTreeItem } = require("resource://devtools/client/shared/widgets/AbstractTreeItem.jsm");
 
 const URL_LABEL_TOOLTIP = L10N.getStr("table.url.tooltiptext");
@@ -260,8 +260,6 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
     if (frameName) {
       let nameNode = doc.createElement("description");
       nameNode.className = "plain call-tree-name";
-      nameNode.setAttribute("flex", "1");
-      nameNode.setAttribute("crop", "end");
       nameNode.textContent = frameName;
       cell.appendChild(nameNode);
     }
@@ -295,8 +293,6 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
     if (frameInfo.fileName) {
       let urlNode = doc.createElement("description");
       urlNode.className = "plain call-tree-url";
-      urlNode.setAttribute("flex", "1");
-      urlNode.setAttribute("crop", "end");
       urlNode.textContent = frameInfo.fileName;
       urlNode.setAttribute("tooltiptext", URL_LABEL_TOOLTIP + " → " + frameInfo.url);
       urlNode.addEventListener("mousedown", this._onUrlClick);
@@ -323,10 +319,6 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
       hostNode.textContent = frameInfo.host;
       cell.appendChild(hostNode);
     }
-
-    let spacerNode = doc.createElement("spacer");
-    spacerNode.setAttribute("flex", "10000");
-    cell.appendChild(spacerNode);
 
     if (frameInfo.categoryData.label) {
       let categoryNode = doc.createElement("description");
@@ -388,7 +380,10 @@ CallView.prototype = Heritage.extend(AbstractTreeItem.prototype, {
   _onUrlClick: function(e) {
     e.preventDefault();
     e.stopPropagation();
-    this.root.emit("link", this);
+    // Only emit for left click events
+    if (e.button === 0) {
+      this.root.emit("link", this);
+    }
   },
 });
 

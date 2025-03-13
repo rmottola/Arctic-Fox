@@ -457,8 +457,7 @@ nsWindowWatcher::OpenWindow2(mozIDOMWindowProxy* aParent,
 }
 
 // This static function checks if the aDocShell uses an UserContextId equal to
-// nsIScriptSecurityManager::DEFAULT_USER_CONTEXT_ID or equal to the
-// userContextId of subjectPrincipal, if not null.
+// the userContextId of subjectPrincipal, if not null.
 static bool
 CheckUserContextCompatibility(nsIDocShell* aDocShell)
 {
@@ -467,16 +466,20 @@ CheckUserContextCompatibility(nsIDocShell* aDocShell)
   uint32_t userContextId =
     static_cast<nsDocShell*>(aDocShell)->GetOriginAttributes().mUserContextId;
 
-  if (userContextId == nsIScriptSecurityManager::DEFAULT_USER_CONTEXT_ID) {
-    return true;
-  }
-
   nsCOMPtr<nsIPrincipal> subjectPrincipal =
     nsContentUtils::GetCurrentJSContext()
       ? nsContentUtils::SubjectPrincipal() : nullptr;
 
+  // If we don't have a valid principal, probably we are in e10s mode, parent
+  // side.
   if (!subjectPrincipal) {
-    return false;
+    return true;
+  }
+
+  // DocShell can have UsercontextID set but loading a document with system
+  // principal. In this case, we consider everything ok.
+  if (nsContentUtils::IsSystemPrincipal(subjectPrincipal)) {
+    return true;
   }
 
   uint32_t principalUserContextId;
@@ -876,9 +879,11 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
   nsCOMPtr<nsIDocShell> newDocShell(do_QueryInterface(newDocShellItem));
   NS_ENSURE_TRUE(newDocShell, NS_ERROR_UNEXPECTED);
 
-  // Set up sandboxing attributes if the window is new.
-  // The flags can only be non-zero for new windows.
-  if (activeDocsSandboxFlags != 0) {
+  // Copy sandbox flags to the new window if activeDocsSandboxFlags says to do
+  // so.  Note that it's only nonzero if the window is new, so clobbering
+  // sandbox flags on the window makes sense in that case.
+  if (activeDocsSandboxFlags &
+        SANDBOX_PROPAGATES_TO_AUXILIARY_BROWSING_CONTEXTS) {
     newDocShell->SetSandboxFlags(activeDocsSandboxFlags);
     if (parentWindow) {
       newDocShell->SetOnePermittedSandboxedNavigator(
@@ -1543,7 +1548,7 @@ nsWindowWatcher::URIfromURL(const char* aURL,
 #define NS_CALCULATE_CHROME_FLAG_FOR(feature, flag)                            \
   prefBranch->GetBoolPref(feature, &forceEnable);                              \
   if (forceEnable && !(aDialog && !openedFromContentScript) &&                 \
-      !(!openedFromContentScript && aHasChromeParent) && !aChromeURL) {                  \
+      !(!openedFromContentScript && aHasChromeParent) && !aChromeURL) {        \
     chromeFlags |= flag;                                                       \
   } else {                                                                     \
     chromeFlags |=                                                             \
@@ -1658,12 +1663,15 @@ nsWindowWatcher::CalculateChromeFlags(mozIDOMWindowProxy* aParent,
                                nsIWebBrowserChrome::CHROME_STATUSBAR);
   NS_CALCULATE_CHROME_FLAG_FOR("menubar",
                                nsIWebBrowserChrome::CHROME_MENUBAR);
-  NS_CALCULATE_CHROME_FLAG_FOR("scrollbars",
-                               nsIWebBrowserChrome::CHROME_SCROLLBARS);
   NS_CALCULATE_CHROME_FLAG_FOR("resizable",
                                nsIWebBrowserChrome::CHROME_WINDOW_RESIZE);
   NS_CALCULATE_CHROME_FLAG_FOR("minimizable",
                                nsIWebBrowserChrome::CHROME_WINDOW_MIN);
+
+  // default scrollbar to "on," unless explicitly turned off
+  if (WinHasOption(aFeatures, "scrollbars", 1, &presenceFlag) || !presenceFlag) {
+    chromeFlags |= nsIWebBrowserChrome::CHROME_SCROLLBARS;
+  }
 
   chromeFlags |= WinHasOption(aFeatures, "popup", 0, &presenceFlag) ?
     nsIWebBrowserChrome::CHROME_WINDOW_POPUP : 0;

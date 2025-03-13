@@ -4,7 +4,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 /* import-globals-from ./netmonitor-controller.js */
-/* import-globals-from ../shared/widgets/ViewHelpers.jsm */
 /* globals gNetwork, setInterval, setTimeout, clearInterval,
    clearTimeout btoa */
 "use strict";
@@ -24,14 +23,16 @@ const {Tooltip} = require("devtools/client/shared/widgets/Tooltip");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const {LocalizationHelper} = require("devtools/client/shared/l10n");
 const {PrefsHelper} = require("devtools/client/shared/prefs");
-
-Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
+const {ViewHelpers, Heritage, WidgetMethods, setNamedTimeout} =
+  require("devtools/client/shared/widgets/view-helpers");
 
 /**
  * Localization convenience methods.
  */
 const NET_STRINGS_URI = "chrome://devtools/locale/netmonitor.properties";
+const WEBCONSOLE_STRINGS_URI = "chrome://devtools/locale/webconsole.properties";
 var L10N = new LocalizationHelper(NET_STRINGS_URI);
+const WEBCONSOLE_L10N = new LocalizationHelper(WEBCONSOLE_STRINGS_URI);
 
 // ms
 const WDA_DEFAULT_VERIFY_INTERVAL = 50;
@@ -62,6 +63,8 @@ const RESIZE_REFRESH_RATE = 50;
 // ms
 const REQUESTS_REFRESH_RATE = 50;
 const REQUESTS_TOOLTIP_POSITION = "topcenter bottomleft";
+// tooltip show/hide delay in ms
+const REQUESTS_TOOLTIP_TOGGLE_DELAY = 500;
 // px
 const REQUESTS_TOOLTIP_IMAGE_MAX_DIM = 400;
 // px
@@ -103,6 +106,31 @@ const CONTENT_MIME_TYPE_MAPPINGS = {
   "/rss": Editor.modes.css,
   "/css": Editor.modes.css
 };
+const LOAD_CAUSE_STRINGS = {
+  [Ci.nsIContentPolicy.TYPE_INVALID]: "invalid",
+  [Ci.nsIContentPolicy.TYPE_OTHER]: "other",
+  [Ci.nsIContentPolicy.TYPE_SCRIPT]: "script",
+  [Ci.nsIContentPolicy.TYPE_IMAGE]: "img",
+  [Ci.nsIContentPolicy.TYPE_STYLESHEET]: "stylesheet",
+  [Ci.nsIContentPolicy.TYPE_OBJECT]: "object",
+  [Ci.nsIContentPolicy.TYPE_DOCUMENT]: "document",
+  [Ci.nsIContentPolicy.TYPE_SUBDOCUMENT]: "subdocument",
+  [Ci.nsIContentPolicy.TYPE_REFRESH]: "refresh",
+  [Ci.nsIContentPolicy.TYPE_XBL]: "xbl",
+  [Ci.nsIContentPolicy.TYPE_PING]: "ping",
+  [Ci.nsIContentPolicy.TYPE_XMLHTTPREQUEST]: "xhr",
+  [Ci.nsIContentPolicy.TYPE_OBJECT_SUBREQUEST]: "objectSubdoc",
+  [Ci.nsIContentPolicy.TYPE_DTD]: "dtd",
+  [Ci.nsIContentPolicy.TYPE_FONT]: "font",
+  [Ci.nsIContentPolicy.TYPE_MEDIA]: "media",
+  [Ci.nsIContentPolicy.TYPE_WEBSOCKET]: "websocket",
+  [Ci.nsIContentPolicy.TYPE_CSP_REPORT]: "csp",
+  [Ci.nsIContentPolicy.TYPE_XSLT]: "xslt",
+  [Ci.nsIContentPolicy.TYPE_BEACON]: "beacon",
+  [Ci.nsIContentPolicy.TYPE_FETCH]: "fetch",
+  [Ci.nsIContentPolicy.TYPE_IMAGESET]: "imageset",
+  [Ci.nsIContentPolicy.TYPE_WEB_MANIFEST]: "webManifest"
+};
 const DEFAULT_EDITOR_CONFIG = {
   mode: Editor.modes.text,
   readOnly: true,
@@ -123,6 +151,13 @@ const GENERIC_VARIABLES_VIEW_SETTINGS = {
 const NETWORK_ANALYSIS_PIE_CHART_DIAMETER = 200;
 // ms
 const FREETEXT_FILTER_SEARCH_DELAY = 200;
+// Constants for formatting bytes.
+const BYTES_IN_KB = 1024;
+const BYTES_IN_MB = Math.pow(BYTES_IN_KB, 2);
+const BYTES_IN_GB = Math.pow(BYTES_IN_KB, 3);
+const MAX_BYTES_SIZE = 1000;
+const MAX_KB_SIZE = 1000 * BYTES_IN_KB;
+const MAX_MB_SIZE = 1000 * BYTES_IN_MB;
 
 const {DeferredTask} = Cu.import("resource://gre/modules/DeferredTask.jsm", {});
 
@@ -425,6 +460,20 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     this.userInputTimer = Cc["@mozilla.org/timer;1"]
       .createInstance(Ci.nsITimer);
 
+    // Create a tooltip for the newly appended network request item.
+    this.tooltip = new Tooltip(document, {
+      closeOnEvents: [{
+        emitter: $("#requests-menu-contents"),
+        event: "scroll",
+        useCapture: true
+      }]
+    });
+    this.tooltip.startTogglingOnHover(this.widget, this._onHover, {
+      toggleDelay: REQUESTS_TOOLTIP_TOGGLE_DELAY,
+      interactive: true
+    });
+    this.tooltip.defaultPosition = REQUESTS_TOOLTIP_POSITION;
+
     Prefs.filters.forEach(type => this.filterOn(type));
     this.sortContents(this._byTiming);
 
@@ -631,15 +680,20 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    *        Specifies the request's url.
    * @param boolean isXHR
    *        True if this request was initiated via XHR.
+   * @param object cause
+   *        Specifies the request's cause. Has the following properties:
+   *        - type: nsContentPolicyType constant
+   *        - loadingDocumentUri: URI of the request origin
+   *        - stacktrace: JS stacktrace of the request
    * @param boolean fromCache
    *        Indicates if the result came from the browser cache
    * @param boolean fromServiceWorker
    *        Indicates if the request has been intercepted by a Service Worker
    */
-  addRequest: function (id, startedDateTime, method, url, isXHR, fromCache,
-    fromServiceWorker) {
-    this._addQueue.push([id, startedDateTime, method, url, isXHR, fromCache,
-      fromServiceWorker]);
+  addRequest: function (id, startedDateTime, method, url, isXHR, cause,
+    fromCache, fromServiceWorker) {
+    this._addQueue.push([id, startedDateTime, method, url, isXHR, cause,
+      fromCache, fromServiceWorker]);
 
     // Lazy updating is disabled in some tests.
     if (!this.lazyUpdate) {
@@ -879,7 +933,8 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     let selected = this.selectedItem.attachment;
 
     // Create the element node for the network request item.
-    let menuView = this._createMenuView(selected.method, selected.url);
+    let menuView = this._createMenuView(selected.method, selected.url,
+      selected.cause);
 
     // Append a network request item to this container.
     let newItem = this.push([menuView], {
@@ -1450,19 +1505,6 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
   },
 
   /**
-   * Refreshes the toggling anchor for the specified item's tooltip.
-   *
-   * @param object item
-   *        The network request item in this container.
-   */
-  refreshTooltip: function (item) {
-    let tooltip = item.attachment.tooltip;
-    tooltip.hide();
-    tooltip.startTogglingOnHover(item.target, this._onHover);
-    tooltip.defaultPosition = REQUESTS_TOOLTIP_POSITION;
-  },
-
-  /**
    * Attaches security icon click listener for the given request menu item.
    *
    * @param object item
@@ -1508,13 +1550,13 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
     let widget = NetMonitorView.RequestsMenu.widget;
     let isScrolledToBottom = widget.isScrolledToBottom();
 
-    for (let [id, startedDateTime, method, url, isXHR, fromCache,
+    for (let [id, startedDateTime, method, url, isXHR, cause, fromCache,
       fromServiceWorker] of this._addQueue) {
       // Convert the received date/time string to a unix timestamp.
       let unixTime = Date.parse(startedDateTime);
 
       // Create the element node for the network request item.
-      let menuView = this._createMenuView(method, url);
+      let menuView = this._createMenuView(method, url, cause);
 
       // Remember the first and last event boundaries.
       this._registerFirstRequestStart(unixTime);
@@ -1528,21 +1570,11 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
           method: method,
           url: url,
           isXHR: isXHR,
+          cause: cause,
           fromCache: fromCache,
           fromServiceWorker: fromServiceWorker
         }
       });
-
-      // Create a tooltip for the newly appended network request item.
-      requestItem.attachment.tooltip = new Tooltip(document, {
-        closeOnEvents: [{
-          emitter: $("#requests-menu-contents"),
-          event: "scroll",
-          useCapture: true
-        }]
-      });
-
-      this.refreshTooltip(requestItem);
 
       if (id == this._preferredItemId) {
         this.selectedItem = requestItem;
@@ -1752,22 +1784,50 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    *        Specifies the request method (e.g. "GET", "POST", etc.)
    * @param string url
    *        Specifies the request's url.
+   * @param object cause
+   *        Specifies the request's cause. Has two properties:
+   *        - type: nsContentPolicyType constant
+   *        - uri: URI of the request origin
    * @return nsIDOMNode
    *         The network request view.
    */
-  _createMenuView: function (method, url) {
+  _createMenuView: function (method, url, cause) {
     let template = $("#requests-menu-item-template");
     let fragment = document.createDocumentFragment();
-
-    this.updateMenuView(template, "method", method);
-    this.updateMenuView(template, "url", url);
 
     // Flatten the DOM by removing one redundant box (the template container).
     for (let node of template.childNodes) {
       fragment.appendChild(node.cloneNode(true));
     }
 
+    this.updateMenuView(fragment, "method", method);
+    this.updateMenuView(fragment, "url", url);
+    this.updateMenuView(fragment, "cause", cause);
+
     return fragment;
+  },
+
+  /**
+   * Get a human-readable string from a number of bytes, with the B, KB, MB, or
+   * GB value. Note that the transition between abbreviations is by 1000 rather
+   * than 1024 in order to keep the displayed digits smaller as "1016 KB" is
+   * more awkward than 0.99 MB"
+   */
+  getFormattedSize(bytes) {
+    if (bytes < MAX_BYTES_SIZE) {
+      return L10N.getFormatStr("networkMenu.sizeB", bytes);
+    } else if (bytes < MAX_KB_SIZE) {
+      let kb = bytes / BYTES_IN_KB;
+      let size = L10N.numberWithDecimals(kb, CONTENT_SIZE_DECIMALS);
+      return L10N.getFormatStr("networkMenu.sizeKB", size);
+    } else if (bytes < MAX_MB_SIZE) {
+      let mb = bytes / BYTES_IN_MB;
+      let size = L10N.numberWithDecimals(mb, CONTENT_SIZE_DECIMALS);
+      return L10N.getFormatStr("networkMenu.sizeMB", size);
+    }
+    let gb = bytes / BYTES_IN_GB;
+    let size = L10N.numberWithDecimals(gb, CONTENT_SIZE_DECIMALS);
+    return L10N.getFormatStr("networkMenu.sizeGB", size);
   },
 
   /**
@@ -1875,11 +1935,25 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
         node.setAttribute("tooltiptext", value);
         break;
       }
+      case "cause": {
+        let labelNode = $(".requests-menu-cause-label", target);
+        let text = LOAD_CAUSE_STRINGS[value.type] || "unknown";
+        labelNode.setAttribute("value", text);
+        if (value.loadingDocumentUri) {
+          labelNode.setAttribute("tooltiptext", value.loadingDocumentUri);
+        }
+
+        let stackNode = $(".requests-menu-cause-stack", target);
+        if (value.stacktrace && value.stacktrace.length > 0) {
+          stackNode.removeAttribute("hidden");
+        }
+        break;
+      }
       case "contentSize": {
-        let kb = value / 1024;
-        let size = L10N.numberWithDecimals(kb, CONTENT_SIZE_DECIMALS);
         let node = $(".requests-menu-size", target);
-        let text = L10N.getFormatStr("networkMenu.sizeKB", size);
+
+        let text = this.getFormattedSize(value);
+
         node.setAttribute("value", text);
         node.setAttribute("tooltiptext", text);
         break;
@@ -1897,9 +1971,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
           text = L10N.getStr("networkMenu.sizeServiceWorker");
           node.classList.add("theme-comment");
         } else {
-          let kb = value / 1024;
-          let size = L10N.numberWithDecimals(kb, CONTENT_SIZE_DECIMALS);
-          text = L10N.getFormatStr("networkMenu.sizeKB", size);
+          text = this.getFormattedSize(value);
         }
 
         node.setAttribute("value", text);
@@ -2207,11 +2279,6 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    * Called when two items switch places, when the contents are sorted.
    */
   _onSwap: function ({ detail: [firstItem, secondItem] }) {
-    // Sorting will create new anchor nodes for all the swapped request items
-    // in this container, so it's necessary to refresh the Tooltip instances.
-    this.refreshTooltip(firstItem);
-    this.refreshTooltip(secondItem);
-
     // Reattach click listener to the security icons
     this.attachSecurityIconClickListener(firstItem);
     this.attachSecurityIconClickListener(secondItem);
@@ -2225,32 +2292,95 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
    *        The element node currently being hovered.
    * @param object tooltip
    *        The current tooltip instance.
+   * @return {Promise}
    */
-  _onHover: function (target, tooltip) {
+  _onHover: Task.async(function* (target, tooltip) {
     let requestItem = this.getItemForElement(target);
-    if (!requestItem || !requestItem.attachment.responseContent) {
-      return null;
+    if (!requestItem) {
+      return false;
     }
 
     let hovered = requestItem.attachment;
-    let { mimeType, text, encoding } = hovered.responseContent.content;
-
-    if (mimeType && mimeType.includes("image/") && (
-      target.classList.contains("requests-menu-icon") ||
-      target.classList.contains("requests-menu-file"))) {
-      return gNetwork.getString(text).then(string => {
-        let anchor = $(".requests-menu-icon", requestItem.target);
-        let src = formDataURI(mimeType, encoding, string);
-
-        tooltip.setImageContent(src, {
-          maxDim: REQUESTS_TOOLTIP_IMAGE_MAX_DIM
-        });
-
-        return anchor;
-      });
+    if (hovered.responseContent && target.closest(".requests-menu-icon-and-file")) {
+      return this._setTooltipImageContent(tooltip, requestItem);
+    } else if (hovered.cause && target.closest(".requests-menu-cause-stack")) {
+      return this._setTooltipStackTraceContent(tooltip, requestItem);
     }
-    return undefined;
-  },
+
+    return false;
+  }),
+
+  _setTooltipImageContent: Task.async(function* (tooltip, requestItem) {
+    let { mimeType, text, encoding } = requestItem.attachment.responseContent.content;
+
+    if (!mimeType || !mimeType.includes("image/")) {
+      return false;
+    }
+
+    let string = yield gNetwork.getString(text);
+    let anchor = $(".requests-menu-icon", requestItem.target);
+    let src = formDataURI(mimeType, encoding, string);
+
+    tooltip.setImageContent(src, {
+      maxDim: REQUESTS_TOOLTIP_IMAGE_MAX_DIM
+    });
+
+    return anchor;
+  }),
+
+  _setTooltipStackTraceContent: Task.async(function* (tooltip, requestItem) {
+    let {stacktrace} = requestItem.attachment.cause;
+
+    if (!stacktrace || stacktrace.length == 0) {
+      return false;
+    }
+
+    let doc = tooltip.doc;
+    let el = doc.createElement("vbox");
+    el.className = "requests-menu-stack-trace";
+
+    for (let f of stacktrace) {
+      let { functionName, filename, lineNumber, columnNumber } = f;
+
+      let frameEl = doc.createElement("hbox");
+      frameEl.className = "requests-menu-stack-frame devtools-monospace";
+
+      let funcEl = doc.createElement("label");
+      funcEl.className = "requests-menu-stack-frame-function-name";
+      funcEl.setAttribute("value",
+        functionName || WEBCONSOLE_L10N.getStr("stacktrace.anonymousFunction"));
+      frameEl.appendChild(funcEl);
+
+      let fileEl = doc.createElement("label");
+      fileEl.className = "requests-menu-stack-frame-file-name";
+      // Parse a stack frame in format "url -> url"
+      let sourceUrl = filename.split(" -> ").pop();
+      fileEl.setAttribute("value", sourceUrl);
+      fileEl.setAttribute("tooltiptext", sourceUrl);
+      fileEl.setAttribute("crop", "start");
+      frameEl.appendChild(fileEl);
+
+      let lineEl = doc.createElement("label");
+      lineEl.className = "requests-menu-stack-frame-line";
+      lineEl.setAttribute("value", `:${lineNumber}:${columnNumber}`);
+      frameEl.appendChild(lineEl);
+
+      frameEl.addEventListener("click", () => {
+        // avoid an ugly visual artefact when the view is switched to debugger and the
+        // tooltip is hidden only after a delay - the tooltip is moved outside the browser
+        // window.
+        tooltip.hide();
+        NetMonitorController.viewSourceInDebugger(filename, lineNumber);
+      }, false);
+
+      el.appendChild(frameEl);
+    }
+
+    tooltip.content = el;
+    tooltip.panel.setAttribute("wide", "");
+
+    return true;
+  }),
 
   /**
    * A handler that opens the security tab in the details view if secure or

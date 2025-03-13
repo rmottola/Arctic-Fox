@@ -19,7 +19,6 @@ PREPROCESSED_WEBIDL_FILES = [
 
 WEBIDL_FILES = [
     'AbstractWorker.webidl',
-    'ActivityRequestHandler.webidl',
     'AddonManager.webidl',
     'AnalyserNode.webidl',
     'Animatable.webidl',
@@ -110,6 +109,8 @@ WEBIDL_FILES = [
     'CSSValueList.webidl',
     'DataContainerEvent.webidl',
     'DataTransfer.webidl',
+    'DataTransferItem.webidl',
+    'DataTransferItemList.webidl',
     'DecoderDoctorNotification.webidl',
     'DedicatedWorkerGlobalScope.webidl',
     'DelayNode.webidl',
@@ -143,7 +144,6 @@ WEBIDL_FILES = [
     'DOMTransaction.webidl',
     'Downloads.webidl',
     'DragEvent.webidl',
-    'DummyBinding.webidl',
     'DynamicsCompressorNode.webidl',
     'Element.webidl',
     'Event.webidl',
@@ -175,6 +175,7 @@ WEBIDL_FILES = [
     'Geolocation.webidl',
     'GeometryUtils.webidl',
     'GetUserMediaRequest.webidl',
+    'Grid.webidl',
     'HDMIInputPort.webidl',
     'Headers.webidl',
     'HeapSnapshot.webidl',
@@ -286,7 +287,6 @@ WEBIDL_FILES = [
     'KeyboardEvent.webidl',
     'KeyEvent.webidl',
     'KeyframeEffect.webidl',
-    'KillSwitch.webidl',
     'LegacyQueryInterface.webidl',
     'LinkStyle.webidl',
     'ListBoxObject.webidl',
@@ -319,7 +319,6 @@ WEBIDL_FILES = [
     'MobileMessageThread.webidl',
     'MouseEvent.webidl',
     'MouseScrollEvent.webidl',
-    'MozActivity.webidl',
     'MozCellBroadcast.webidl',
     'MozCellBroadcastMessage.webidl',
     'MozIcc.webidl',
@@ -384,6 +383,7 @@ WEBIDL_FILES = [
     'Presentation.webidl',
     'PresentationAvailability.webidl',
     'PresentationConnection.webidl',
+    'PresentationConnectionList.webidl',
     'PresentationDeviceInfoManager.webidl',
     'PresentationReceiver.webidl',
     'PresentationRequest.webidl',
@@ -658,6 +658,7 @@ if CONFIG['MOZ_WEBSPEECH']:
 if CONFIG['MOZ_GAMEPAD']:
     WEBIDL_FILES += [
         'Gamepad.webidl',
+        'GamepadServiceTest.webidl'
     ]
 
 WEBIDL_FILES += [
@@ -764,6 +765,7 @@ if CONFIG['MOZ_B2G_FM']:
     ]
 
 GENERATED_EVENTS_WEBIDL_FILES = [
+    'AddonEvent.webidl',
     'AnimationPlaybackEvent.webidl',
     'AutocompleteErrorEvent.webidl',
     'BlobEvent.webidl',
@@ -790,6 +792,7 @@ GENERATED_EVENTS_WEBIDL_FILES = [
     'IccChangeEvent.webidl',
     'ImageCaptureErrorEvent.webidl',
     'MediaStreamEvent.webidl',
+    'MediaStreamTrackEvent.webidl',
     'MozCellBroadcastEvent.webidl',
     'MozClirModeEvent.webidl',
     'MozContactChangeEvent.webidl',
@@ -808,6 +811,7 @@ GENERATED_EVENTS_WEBIDL_FILES = [
     'PopStateEvent.webidl',
     'PopupBlockedEvent.webidl',
     'PresentationConnectionAvailableEvent.webidl',
+    'PresentationConnectionClosedEvent.webidl',
     'ProgressEvent.webidl',
     'RecordErrorEvent.webidl',
     'ScrollViewChangeEvent.webidl',
@@ -830,7 +834,6 @@ GENERATED_EVENTS_WEBIDL_FILES = [
 
 if CONFIG['MOZ_WEBRTC']:
     GENERATED_EVENTS_WEBIDL_FILES += [
-        'MediaStreamTrackEvent.webidl',
         'RTCDataChannelEvent.webidl',
         'RTCPeerConnectionIceEvent.webidl',
         'RTCTrackEvent.webidl',

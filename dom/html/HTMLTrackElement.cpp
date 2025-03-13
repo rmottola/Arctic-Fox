@@ -60,7 +60,7 @@ namespace mozilla {
 namespace dom {
 
 // Map html attribute string values to TextTrackKind enums.
-static MOZ_CONSTEXPR nsAttrValue::EnumTable kKindTable[] = {
+static constexpr nsAttrValue::EnumTable kKindTable[] = {
   { "subtitles", static_cast<int16_t>(TextTrackKind::Subtitles) },
   { "captions", static_cast<int16_t>(TextTrackKind::Captions) },
   { "descriptions", static_cast<int16_t>(TextTrackKind::Descriptions) },
@@ -69,8 +69,9 @@ static MOZ_CONSTEXPR nsAttrValue::EnumTable kKindTable[] = {
   { 0 }
 };
 
-// The default value for kKindTable is "subtitles"
-static MOZ_CONSTEXPR const char* kKindTableDefaultString = kKindTable[0].tag;
+// Invalid values are treated as "metadata" in ParseAttribute, but if no value
+// at all is specified, it's treated as "subtitles" in GetKind
+static constexpr const nsAttrValue::EnumTable* kKindTableInvalidValueDefault = &kKindTable[4];
 
 /** HTMLTrackElement */
 HTMLTrackElement::HTMLTrackElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo)
@@ -96,7 +97,7 @@ NS_INTERFACE_MAP_END_INHERITING(nsGenericHTMLElement)
 void
 HTMLTrackElement::GetKind(DOMString& aKind) const
 {
-  GetEnumAttr(nsGkAtoms::kind, kKindTableDefaultString, aKind);
+  GetEnumAttr(nsGkAtoms::kind, kKindTable[0].tag, aKind);
 }
 
 void
@@ -170,7 +171,8 @@ HTMLTrackElement::ParseAttribute(int32_t aNamespaceID,
 {
   if (aNamespaceID == kNameSpaceID_None && aAttribute == nsGkAtoms::kind) {
     // Case-insensitive lookup, with the first element as the default.
-    return aResult.ParseEnumValue(aValue, kKindTable, false, kKindTable);
+    return aResult.ParseEnumValue(aValue, kKindTable, false,
+                                  kKindTableInvalidValueDefault);
   }
 
   // Otherwise call the generic implementation.

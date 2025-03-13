@@ -6,11 +6,12 @@
 /* This is a Cross-Platform ICO Decoder, which should work everywhere, including
  * Big-Endian machines like the PowerPC. */
 
+#include "nsICODecoder.h"
+
 #include <stdlib.h>
 
 #include "mozilla/EndianUtils.h"
 #include "mozilla/Move.h"
-#include "nsICODecoder.h"
 
 #include "RasterImage.h"
 
@@ -53,6 +54,7 @@ nsICODecoder::GetNumColors()
 nsICODecoder::nsICODecoder(RasterImage* aImage)
   : Decoder(aImage)
   , mLexer(Transition::To(ICOState::HEADER, ICOHEADERSIZE))
+  , mDoNotResume(WrapNotNull(new DoNotResume))
   , mBiggestResourceColorDepth(0)
   , mBestResourceDelta(INT_MIN)
   , mBestResourceColorDepth(0)
@@ -87,9 +89,18 @@ nsICODecoder::GetFinalStateFromContainedDecoder()
     return;
   }
 
-  // Finish the internally used decoder.
-  mContainedDecoder->CompleteDecode();
+  MOZ_ASSERT(mContainedSourceBuffer,
+             "Should have a SourceBuffer if we have a decoder");
 
+  // Let the contained decoder finish up if necessary.
+  if (!mContainedSourceBuffer->IsComplete()) {
+    mContainedSourceBuffer->Complete(NS_OK);
+    if (NS_FAILED(mContainedDecoder->Decode(mDoNotResume))) {
+      PostDataError();
+    }
+  }
+
+  // Make our state the same as the state of the contained decoder.
   mDecodeDone = mContainedDecoder->GetDecodeDone();
   mDataError = mDataError || mContainedDecoder->HasDataError();
   mFailCode = NS_SUCCEEDED(mFailCode) ? mContainedDecoder->GetDecoderError()
@@ -103,54 +114,16 @@ nsICODecoder::GetFinalStateFromContainedDecoder()
 }
 
 bool
-nsICODecoder::FixBitmapHeight(int8_t* bih)
+nsICODecoder::CheckAndFixBitmapSize(int8_t* aBIH)
 {
-  // Get the height from the BMP file information header. This is signed,
-  // but in this case negative values are meaningful; see below.
-  int32_t height;
-  memcpy(&height, bih + 8, sizeof(height));
-  NativeEndian::swapFromLittleEndianInPlace(&height, 1);
-  if (height == 0) {
-    return false;
-  }
-  
-  // BMPs can be stored inverted by having a negative height
-  height = abs(height);
-
-  // The height field is double the actual height of the image to account for
-  // the AND mask. This is true even if the AND mask is not present.
-  height /= 2;
-
-  if (height > 256) {
-    return false;
-  }
-
-  // Verify that the BMP height matches the height we got from the ICO directory
-  // entry. If not, decoding fails, because if we were to allow it to continue
-  // the intrinsic size of the image wouldn't match the size of the decoded
-  // surface.
-  int32_t realHeight = GetRealHeight();
-  if (height != realHeight) {
-    return false;
-  }
-
-  // Fix the BMP height in the BIH so that the BMP decoder can work properly
-  NativeEndian::swapToLittleEndianInPlace(&realHeight, 1);
-  memcpy(bih + 8, &realHeight, sizeof(realHeight));
-  return true;
-}
-
-bool
-nsICODecoder::FixBitmapWidth(int8_t* bih)
-{
-  // Get the width from the BMP file information header.
-  // This is (unintuitively) a signed integer; see the documentation at:
+  // Get the width from the BMP file information header. This is
+  // (unintuitively) a signed integer; see the documentation at:
+  //
   //   https://msdn.microsoft.com/en-us/library/windows/desktop/dd183376(v=vs.85).aspx
+  //
   // However, we reject negative widths since they aren't meaningful.
-  int32_t width;
-  memcpy(&width, bih + 4, sizeof(width));
-  NativeEndian::swapFromLittleEndianInPlace(&width, 1);
-  if (width <=0 || width > 256) {
+  const int32_t width = LittleEndian::readInt32(aBIH + 4);
+  if (width <= 0 || width > 256) {
     return false;
   }
 
@@ -161,6 +134,35 @@ nsICODecoder::FixBitmapWidth(int8_t* bih)
   if (width != int32_t(GetRealWidth())) {
     return false;
   }
+
+  // Get the height from the BMP file information header. This is also signed,
+  // but in this case negative values are meaningful; see below.
+  int32_t height = LittleEndian::readInt32(aBIH + 8);
+  if (height == 0) {
+    return false;
+  }
+
+  // BMPs can be stored inverted by having a negative height.
+  // XXX(seth): Should we really be writing the absolute value into the BIH
+  // below? Seems like this could be problematic for inverted BMPs.
+  height = abs(height);
+
+  // The height field is double the actual height of the image to account for
+  // the AND mask. This is true even if the AND mask is not present.
+  height /= 2;
+  if (height > 256) {
+    return false;
+  }
+
+  // Verify that the BMP height matches the height we got from the ICO directory
+  // entry. If not, again, decoding fails.
+  if (height != int32_t(GetRealHeight())) {
+    return false;
+  }
+
+  // Fix the BMP height in the BIH so that the BMP decoder, which does not know
+  // about the AND mask that may follow the actual bitmap, can work properly.
+  LittleEndian::writeInt32(aBIH + 8, GetRealHeight());
 
   return true;
 }
@@ -299,14 +301,12 @@ nsICODecoder::SniffResource(const char* aData)
                        PNGSIGNATURESIZE);
   if (isPNG) {
     // Create a PNG decoder which will do the rest of the work for us.
-    mContainedDecoder = new nsPNGDecoder(mImage);
-    mContainedDecoder->SetMetadataDecode(IsMetadataDecode());
-    mContainedDecoder->SetDecoderFlags(GetDecoderFlags());
-    mContainedDecoder->SetSurfaceFlags(GetSurfaceFlags());
-    if (mDownscaler) {
-      mContainedDecoder->SetTargetSize(mDownscaler->TargetSize());
-    }
-    mContainedDecoder->Init();
+    mContainedSourceBuffer = new SourceBuffer();
+    mContainedSourceBuffer->ExpectLength(mDirEntry.mBytesInRes);
+    mContainedDecoder =
+      DecoderFactory::CreateDecoderForICOResource(DecoderType::PNG,
+                                                  WrapNotNull(mContainedSourceBuffer),
+                                                  WrapNotNull(this));
 
     if (!WriteToContainedDecoder(aData, PNGSIGNATURESIZE)) {
       return Transition::TerminateFailure();
@@ -379,25 +379,20 @@ nsICODecoder::ReadBIH(const char* aData)
 
   // Create a BMP decoder which will do most of the work for us; the exception
   // is the AND mask, which isn't present in standalone BMPs.
-  RefPtr<nsBMPDecoder> bmpDecoder = new nsBMPDecoder(mImage, dataOffset);
-  mContainedDecoder = bmpDecoder;
-  mContainedDecoder->SetMetadataDecode(IsMetadataDecode());
-  mContainedDecoder->SetDecoderFlags(GetDecoderFlags());
-  mContainedDecoder->SetSurfaceFlags(GetSurfaceFlags());
-  if (mDownscaler) {
-    mContainedDecoder->SetTargetSize(mDownscaler->TargetSize());
-  }
-  mContainedDecoder->Init();
+  mContainedSourceBuffer = new SourceBuffer();
+  mContainedSourceBuffer->ExpectLength(mDirEntry.mBytesInRes);
+  mContainedDecoder =
+    DecoderFactory::CreateDecoderForICOResource(DecoderType::BMP,
+                                                WrapNotNull(mContainedSourceBuffer),
+                                                WrapNotNull(this),
+                                                Some(dataOffset));
+  RefPtr<nsBMPDecoder> bmpDecoder =
+    static_cast<nsBMPDecoder*>(mContainedDecoder.get());
 
-  // Fix the ICO height from the BIH. It needs to be halved so our BMP decoder
-  // will understand, because the BMP decoder doesn't expect the alpha mask that
-  // follows the BMP data in an ICO.
-  if (!FixBitmapHeight(reinterpret_cast<int8_t*>(mBIHraw))) {
-    return Transition::TerminateFailure();
-  }
-
-  // Fix the ICO width from the BIH.
-  if (!FixBitmapWidth(reinterpret_cast<int8_t*>(mBIHraw))) {
+  // Verify that the BIH width and height values match the ICO directory entry,
+  // and fix the BIH height value to compensate for the fact that the underlying
+  // BMP decoder doesn't know about AND masks.
+  if (!CheckAndFixBitmapSize(reinterpret_cast<int8_t*>(mBIHraw))) {
     return Transition::TerminateFailure();
   }
 
@@ -602,57 +597,67 @@ nsICODecoder::FinishResource()
   return Transition::TerminateSuccess();
 }
 
-void
-nsICODecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
+Maybe<TerminalState>
+nsICODecoder::DoDecode(SourceBufferIterator& aIterator)
 {
-  MOZ_ASSERT(!HasError(), "Shouldn't call WriteInternal after error!");
-  MOZ_ASSERT(aBuffer);
-  MOZ_ASSERT(aCount > 0);
+  MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
+  MOZ_ASSERT(aIterator.Data());
+  MOZ_ASSERT(aIterator.Length() > 0);
 
-  Maybe<TerminalState> terminalState =
-    mLexer.Lex(aBuffer, aCount,
-               [=](ICOState aState, const char* aData, size_t aLength) {
-      switch (aState) {
-        case ICOState::HEADER:
-          return ReadHeader(aData);
-        case ICOState::DIR_ENTRY:
-          return ReadDirEntry(aData);
-        case ICOState::SKIP_TO_RESOURCE:
-          return Transition::ContinueUnbuffered(ICOState::SKIP_TO_RESOURCE);
-        case ICOState::FOUND_RESOURCE:
-          return Transition::To(ICOState::SNIFF_RESOURCE, PNGSIGNATURESIZE);
-        case ICOState::SNIFF_RESOURCE:
-          return SniffResource(aData);
-        case ICOState::READ_PNG:
-          return ReadPNG(aData, aLength);
-        case ICOState::READ_BIH:
-          return ReadBIH(aData);
-        case ICOState::READ_BMP:
-          return ReadBMP(aData, aLength);
-        case ICOState::PREPARE_FOR_MASK:
-          return PrepareForMask();
-        case ICOState::READ_MASK_ROW:
-          return ReadMaskRow(aData);
-        case ICOState::FINISH_MASK:
-          return FinishMask();
-        case ICOState::SKIP_MASK:
-          return Transition::ContinueUnbuffered(ICOState::SKIP_MASK);
-        case ICOState::FINISHED_RESOURCE:
-          return FinishResource();
-        default:
-          MOZ_CRASH("Unknown ICOState");
-      }
-    });
-
-  if (terminalState == Some(TerminalState::FAILURE)) {
-    PostDataError();
-  }
+  return mLexer.Lex(aIterator.Data(), aIterator.Length(),
+                    [=](ICOState aState, const char* aData, size_t aLength) {
+    switch (aState) {
+      case ICOState::HEADER:
+        return ReadHeader(aData);
+      case ICOState::DIR_ENTRY:
+        return ReadDirEntry(aData);
+      case ICOState::SKIP_TO_RESOURCE:
+        return Transition::ContinueUnbuffered(ICOState::SKIP_TO_RESOURCE);
+      case ICOState::FOUND_RESOURCE:
+        return Transition::To(ICOState::SNIFF_RESOURCE, PNGSIGNATURESIZE);
+      case ICOState::SNIFF_RESOURCE:
+        return SniffResource(aData);
+      case ICOState::READ_PNG:
+        return ReadPNG(aData, aLength);
+      case ICOState::READ_BIH:
+        return ReadBIH(aData);
+      case ICOState::READ_BMP:
+        return ReadBMP(aData, aLength);
+      case ICOState::PREPARE_FOR_MASK:
+        return PrepareForMask();
+      case ICOState::READ_MASK_ROW:
+        return ReadMaskRow(aData);
+      case ICOState::FINISH_MASK:
+        return FinishMask();
+      case ICOState::SKIP_MASK:
+        return Transition::ContinueUnbuffered(ICOState::SKIP_MASK);
+      case ICOState::FINISHED_RESOURCE:
+        return FinishResource();
+      default:
+        MOZ_CRASH("Unknown ICOState");
+    }
+  });
 }
 
 bool
 nsICODecoder::WriteToContainedDecoder(const char* aBuffer, uint32_t aCount)
 {
-  mContainedDecoder->Write(aBuffer, aCount);
+  MOZ_ASSERT(mContainedDecoder);
+  MOZ_ASSERT(mContainedSourceBuffer);
+
+  // Append the provided data to the SourceBuffer that the contained decoder is
+  // reading from.
+  mContainedSourceBuffer->Append(aBuffer, aCount);
+
+  // Write to the contained decoder. If we run out of data, the ICO decoder will
+  // get resumed when there's more data available, as usual, so we don't need
+  // the contained decoder to get resumed too. To avoid that, we provide an
+  // IResumable which just does nothing.
+  if (NS_FAILED(mContainedDecoder->Decode(mDoNotResume))) {
+    PostDataError();
+  }
+
+  // Make our state the same as the state of the contained decoder.
   mProgress |= mContainedDecoder->TakeProgress();
   mInvalidRect.UnionRect(mInvalidRect, mContainedDecoder->TakeInvalidRect());
   if (mContainedDecoder->HasDataError()) {
@@ -661,6 +666,7 @@ nsICODecoder::WriteToContainedDecoder(const char* aBuffer, uint32_t aCount)
   if (mContainedDecoder->HasDecoderError()) {
     PostDecoderError(mContainedDecoder->GetDecoderError());
   }
+
   return !HasError();
 }
 

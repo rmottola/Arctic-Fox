@@ -16,6 +16,7 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/dom/Animation.h"
 #include "mozilla/dom/Attr.h"
+#include "mozilla/dom/Grid.h"
 #include "nsDOMAttributeMap.h"
 #include "nsIAtom.h"
 #include "nsIContentInlines.h"
@@ -953,7 +954,6 @@ Element::GetClientRects()
   return rectList.forget();
 }
 
-
 //----------------------------------------------------------------------
 
 void
@@ -1181,17 +1181,11 @@ Element::SetAttribute(const nsAString& aName,
   if (aError.Failed()) {
     return;
   }
-  const nsAttrName* name = InternalGetExistingAttrNameFromQName(aName);
+
+  nsAutoString nameToUse;
+  const nsAttrName* name = InternalGetAttrNameFromQName(aName, &nameToUse);
   if (!name) {
-    nsCOMPtr<nsIAtom> nameAtom;
-    if (IsHTMLElement() && IsInHTMLDocument()) {
-      nsAutoString lower;
-      nsContentUtils::ASCIIToLower(aName, lower);
-      nameAtom = NS_Atomize(lower);
-    }
-    else {
-      nameAtom = NS_Atomize(aName);
-    }
+    nsCOMPtr<nsIAtom> nameAtom = NS_Atomize(nameToUse);
     if (!nameAtom) {
       aError.Throw(NS_ERROR_OUT_OF_MEMORY);
       return;
@@ -1208,7 +1202,7 @@ Element::SetAttribute(const nsAString& aName,
 void
 Element::RemoveAttribute(const nsAString& aName, ErrorResult& aError)
 {
-  const nsAttrName* name = InternalGetExistingAttrNameFromQName(aName);
+  const nsAttrName* name = InternalGetAttrNameFromQName(aName);
 
   if (!name) {
     // If there is no canonical nsAttrName for this attribute name, then the
@@ -1532,7 +1526,7 @@ Element::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
     ClearSubtreeRootPointer();
 
     // Being added to a document.
-    SetInDocument();
+    SetIsInDocument();
 
     // Unset this flag since we now really are in a document.
     UnsetFlags(NODE_FORCE_XBL_BINDINGS |
@@ -1739,18 +1733,17 @@ Element::UnbindFromTree(bool aDeep, bool aNullParent)
   if (HasPointerLock()) {
     nsIDocument::UnlockPointer();
   }
+  if (mState.HasState(NS_EVENT_STATE_FULL_SCREEN)) {
+    // The element being removed is an ancestor of the full-screen element,
+    // exit full-screen state.
+    nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
+                                    NS_LITERAL_CSTRING("DOM"), OwnerDoc(),
+                                    nsContentUtils::eDOM_PROPERTIES,
+                                    "RemovedFullscreenElement");
+    // Fully exit full-screen.
+    nsIDocument::ExitFullscreenInDocTree(OwnerDoc());
+  }
   if (aNullParent) {
-    if (IsFullScreenAncestor()) {
-      // The element being removed is an ancestor of the full-screen element,
-      // exit full-screen state.
-      nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
-                                      NS_LITERAL_CSTRING("DOM"), OwnerDoc(),
-                                      nsContentUtils::eDOM_PROPERTIES,
-                                      "RemovedFullscreenElement");
-      // Fully exit full-screen.
-      nsIDocument::ExitFullscreenInDocTree(OwnerDoc());
-    }
-
     if (GetParent() && GetParent()->IsInUncomposedDoc()) {
       // Update the editable descendant count in the ancestors before we
       // lose the reference to the parent.
@@ -1991,7 +1984,7 @@ Element::FindAttributeDependence(const nsIAtom* aAttribute,
 already_AddRefed<mozilla::dom::NodeInfo>
 Element::GetExistingAttrNameFromQName(const nsAString& aStr) const
 {
-  const nsAttrName* name = InternalGetExistingAttrNameFromQName(aStr);
+  const nsAttrName* name = InternalGetAttrNameFromQName(aStr);
   if (!name) {
     return nullptr;
   }
@@ -2167,9 +2160,27 @@ Element::SetEventHandler(nsIAtom* aEventName,
 //----------------------------------------------------------------------
 
 const nsAttrName*
-Element::InternalGetExistingAttrNameFromQName(const nsAString& aStr) const
+Element::InternalGetAttrNameFromQName(const nsAString& aStr,
+                                      nsAutoString* aNameToUse) const
 {
-  return mAttrsAndChildren.GetExistingAttrNameFromQName(aStr);
+  MOZ_ASSERT(!aNameToUse || aNameToUse->IsEmpty());
+  const nsAttrName* val = nullptr;
+  if (IsHTMLElement() && IsInHTMLDocument()) {
+    nsAutoString lower;
+    nsAutoString& outStr = aNameToUse ? *aNameToUse : lower;
+    nsContentUtils::ASCIIToLower(aStr, outStr);
+    val = mAttrsAndChildren.GetExistingAttrNameFromQName(outStr);
+    if (val) {
+      outStr.Truncate();
+    }
+  } else {
+    val = mAttrsAndChildren.GetExistingAttrNameFromQName(aStr);
+    if (!val && aNameToUse) {
+      *aNameToUse = aStr;
+    }
+  }
+
+  return val;
 }
 
 bool
@@ -3276,6 +3287,22 @@ void
 Element::MozRequestPointerLock()
 {
   OwnerDoc()->RequestPointerLock(this);
+}
+
+void
+Element::GetGridFragments(nsTArray<RefPtr<Grid>>& aResult)
+{
+  nsGridContainerFrame* frame =
+    nsGridContainerFrame::GetGridFrameWithComputedInfo(GetPrimaryFrame());
+
+  // If we get a nsGridContainerFrame from the prior call,
+  // all the next-in-flow frames will also be nsGridContainerFrames.
+  while (frame) {
+    aResult.AppendElement(
+      new Grid(this, frame)
+    );
+    frame = static_cast<nsGridContainerFrame*>(frame->GetNextInFlow());
+  }
 }
 
 already_AddRefed<Animation>

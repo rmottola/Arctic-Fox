@@ -17,11 +17,11 @@
 #include "mozilla/layers/CompositorTypes.h"  // for DiagnosticTypes, etc
 #include "mozilla/layers/FenceUtils.h"  // for FenceHandle
 #include "mozilla/layers/LayersTypes.h"  // for LayersBackend
+#include "mozilla/widget/CompositorWidget.h"
 #include "nsISupportsImpl.h"            // for MOZ_COUNT_CTOR, etc
 #include "nsRegion.h"
 #include <vector>
 #include "mozilla/WidgetUtils.h"
-#include "CompositorWidgetProxy.h"
 
 /**
  * Different elements of a web pages are rendered into separate "layers" before
@@ -192,7 +192,7 @@ protected:
 public:
   NS_INLINE_DECL_REFCOUNTING(Compositor)
 
-  explicit Compositor(widget::CompositorWidgetProxy* aWidget,
+  explicit Compositor(widget::CompositorWidget* aWidget,
                       CompositorBridgeParent* aParent = nullptr);
 
   virtual already_AddRefed<DataTextureSource> CreateDataTextureSource(TextureFlags aFlags = TextureFlags::NO_FLAGS) = 0;
@@ -200,7 +200,10 @@ public:
   virtual already_AddRefed<DataTextureSource>
   CreateDataTextureSourceAround(gfx::DataSourceSurface* aSurface) { return nullptr; }
 
-  virtual bool Initialize() = 0;
+  virtual already_AddRefed<DataTextureSource>
+  CreateDataTextureSourceAroundYCbCr(TextureHost* aTexture) { return nullptr; }
+
+  virtual bool Initialize(nsCString* const out_failureReason) = 0;
   virtual void Destroy();
   bool IsDestroyed() const { return mIsDestroyed; }
 
@@ -474,7 +477,7 @@ public:
 
   virtual void ForcePresent() { }
 
-  widget::CompositorWidgetProxy* GetWidget() const { return mWidget; }
+  widget::CompositorWidget* GetWidget() const { return mWidget; }
 
   virtual bool HasImageHostOverlays() { return false; }
 
@@ -541,10 +544,7 @@ public:
   /// ReadLock.
   /// This function provides a convenient way to do this delayed unlocking, if
   /// the texture itself requires it.
-  void UnlockAfterComposition(already_AddRefed<TextureReadLock> aLock)
-  {
-    mUnlockAfterComposition.AppendElement(aLock);
-  }
+  void UnlockAfterComposition(TextureHost* aTexture);
 
   /// Most compositor backends operate asynchronously under the hood. This
   /// means that when a layer stops using a texture it is often desirable to
@@ -565,6 +565,9 @@ protected:
 
   bool ShouldDrawDiagnostics(DiagnosticFlags);
 
+  // Should be called at the end of each composition.
+  void ReadUnlockTextures();
+
   /**
    * Given a layer rect, clip, and transform, compute the area of the backdrop that
    * needs to be copied for mix-blending. The output transform translates from 0..1
@@ -583,7 +586,7 @@ protected:
   /**
    * An array of locks that will need to be unlocked after the next composition.
    */
-  nsTArray<RefPtr<TextureReadLock>> mUnlockAfterComposition;
+  nsTArray<RefPtr<TextureHost>> mUnlockAfterComposition;
 
   /**
    * An array of TextureHosts that will need to call NotifyNotUsed() after the next composition.
@@ -618,7 +621,7 @@ protected:
   RefPtr<gfx::DrawTarget> mTarget;
   gfx::IntRect mTargetBounds;
 
-  widget::CompositorWidgetProxy* mWidget;
+  widget::CompositorWidget* mWidget;
 
   bool mIsDestroyed;
 

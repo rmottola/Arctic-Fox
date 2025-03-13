@@ -68,11 +68,13 @@ main(int argc, const char** argv)
 {
     if (!JS_Init()) return 1;
     JSRuntime* runtime = checkPtr(JS_NewRuntime(1024 * 1024));
-    JS_SetGCParameter(runtime, JSGC_MAX_BYTES, 0xffffffff);
-    JS_SetNativeStackQuota(runtime, 5000000);
+    JSContext* cx = JS_GetContext(runtime);
 
-    JSContext* cx = checkPtr(JS_NewContext(runtime, 8192));
-    JS::SetWarningReporter(runtime, reportWarning);
+    JS_SetGCParameter(cx, JSGC_MAX_BYTES, 0xffffffff);
+    JS_SetNativeStackQuota(cx, 5000000);
+
+    checkBool(JS::InitSelfHostedCode(cx));
+    JS::SetWarningReporter(cx, reportWarning);
 
     JSAutoRequest ar(cx);
 

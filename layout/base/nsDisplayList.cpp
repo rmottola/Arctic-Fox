@@ -744,7 +744,8 @@ nsDisplayListBuilder::nsDisplayListBuilder(nsIFrame* aReferenceFrame,
       mWindowDraggingAllowed(false),
       mIsBuildingForPopup(nsLayoutUtils::IsPopup(aReferenceFrame)),
       mForceLayerForScrollParent(false),
-      mAsyncPanZoomEnabled(nsLayoutUtils::AsyncPanZoomEnabled(aReferenceFrame))
+      mAsyncPanZoomEnabled(nsLayoutUtils::AsyncPanZoomEnabled(aReferenceFrame)),
+      mBuildingInvisibleItems(false)
 {
   MOZ_COUNT_CTOR(nsDisplayListBuilder);
   PL_InitArenaPool(&mPool, "displayListArena", 4096,
@@ -879,8 +880,10 @@ void nsDisplayListBuilder::MarkOutOfFlowFrameForDisplay(nsIFrame* aDirtyFrame,
     overflowRect.Inflate(nsPresContext::CSSPixelsToAppUnits(32));
   }
 
-  if (!dirty.IntersectRect(dirty, overflowRect))
+  if (!dirty.IntersectRect(dirty, overflowRect) &&
+      !(aFrame->GetStateBits() & NS_FRAME_FORCE_DISPLAY_LIST_DESCEND_INTO)) {
     return;
+  }
 
   const DisplayItemClip* oldClip = mClipState.GetClipForContainingBlockDescendants();
   const DisplayItemScrollClip* sc = mClipState.GetCurrentInnermostScrollClip();
@@ -1642,11 +1645,17 @@ nsDisplayList::ComputeVisibilityForSublist(nsDisplayListBuilder* aBuilder,
 
   for (int32_t i = elements.Length() - 1; i >= 0; --i) {
     nsDisplayItem* item = elements[i];
-    nsRect bounds = item->GetClippedBounds(aBuilder);
 
-    nsRegion itemVisible;
-    itemVisible.And(*aVisibleRegion, bounds);
-    item->mVisibleRect = itemVisible.GetBounds();
+    if (item->mForceNotVisible) {
+      NS_ASSERTION(item->mVisibleRect.IsEmpty(),
+        "invisible items should have empty vis rect");
+    } else {
+      nsRect bounds = item->GetClippedBounds(aBuilder);
+
+      nsRegion itemVisible;
+      itemVisible.And(*aVisibleRegion, bounds);
+      item->mVisibleRect = itemVisible.GetBounds();
+    }
 
     if (item->ComputeVisibility(aBuilder, aVisibleRegion)) {
       anyVisible = true;
@@ -1691,7 +1700,7 @@ TriggerPendingAnimations(nsIDocument* aDocument,
 }
 
 LayerManager*
-nsDisplayListBuilder::GetWidgetLayerManager(nsView** aView, bool* aAllowRetaining)
+nsDisplayListBuilder::GetWidgetLayerManager(nsView** aView)
 {
   nsView* view = RootReferenceFrame()->GetView();
   if (aView) {
@@ -1702,7 +1711,7 @@ nsDisplayListBuilder::GetWidgetLayerManager(nsView** aView, bool* aAllowRetainin
   }
   nsIWidget* window = RootReferenceFrame()->GetNearestWidget();
   if (window) {
-    return window->GetLayerManager(aAllowRetaining);
+    return window->GetLayerManager();
   }
   return nullptr;
 }
@@ -1720,11 +1729,10 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
 
   RefPtr<LayerManager> layerManager;
   bool widgetTransaction = false;
-  bool allowRetaining = false;
   bool doBeginTransaction = true;
   nsView *view = nullptr;
   if (aFlags & PAINT_USE_WIDGET_LAYERS) {
-    layerManager = aBuilder->GetWidgetLayerManager(&view, &allowRetaining);
+    layerManager = aBuilder->GetWidgetLayerManager(&view);
     if (layerManager) {
       doBeginTransaction = !(aFlags & PAINT_EXISTING_TRANSACTION);
       widgetTransaction = true;
@@ -2087,11 +2095,11 @@ void nsDisplayList::HitTest(nsDisplayListBuilder* aBuilder, const nsRect& aRect,
     bool same3DContext =
       (itemType == nsDisplayItem::TYPE_TRANSFORM &&
        static_cast<nsDisplayTransform*>(item)->IsParticipating3DContext()) ||
-      ((itemType == nsDisplayItem::TYPE_PERSPECTIVE ||
-        itemType == nsDisplayItem::TYPE_OPACITY) &&
-       static_cast<nsDisplayPerspective*>(item)->Frame()->Extend3DContext());
+      (itemType == nsDisplayItem::TYPE_PERSPECTIVE &&
+       item->Frame()->Extend3DContext());
     if (same3DContext &&
-        !static_cast<nsDisplayTransform*>(item)->IsLeafOf3DContext()) {
+        (itemType != nsDisplayItem::TYPE_TRANSFORM ||
+         !static_cast<nsDisplayTransform*>(item)->IsLeafOf3DContext())) {
       if (!item->GetClip().MayIntersect(aRect)) {
         continue;
       }
@@ -2243,6 +2251,7 @@ nsDisplayItem::nsDisplayItem(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
   , mClip(aBuilder->ClipState().GetCurrentCombinedClip(aBuilder))
   , mScrollClip(aScrollClip)
   , mAnimatedGeometryRoot(nullptr)
+  , mForceNotVisible(aBuilder->IsBuildingInvisibleItems())
 #ifdef MOZ_DUMP_PAINTING
   , mPainted(false)
 #endif
@@ -2305,11 +2314,16 @@ nsDisplayItem::ComputeVisibility(nsDisplayListBuilder* aBuilder,
 bool
 nsDisplayItem::RecomputeVisibility(nsDisplayListBuilder* aBuilder,
                                    nsRegion* aVisibleRegion) {
-  nsRect bounds = GetClippedBounds(aBuilder);
+  if (mForceNotVisible) {
+    NS_ASSERTION(mVisibleRect.IsEmpty(),
+      "invisible items should have empty vis rect");
+  } else {
+    nsRect bounds = GetClippedBounds(aBuilder);
 
-  nsRegion itemVisible;
-  itemVisible.And(*aVisibleRegion, bounds);
-  mVisibleRect = itemVisible.GetBounds();
+    nsRegion itemVisible;
+    itemVisible.And(*aVisibleRegion, bounds);
+    mVisibleRect = itemVisible.GetBounds();
+  }
 
   // When we recompute visibility within layers we don't need to
   // expand the visible region for content behind plugins (the plugin
@@ -4325,7 +4339,6 @@ nsDisplayOpacity::nsDisplayOpacity(nsDisplayListBuilder* aBuilder,
     : nsDisplayWrapList(aBuilder, aFrame, aList, aScrollClip)
     , mOpacity(aFrame->StyleEffects()->mOpacity)
     , mForEventsOnly(aForEventsOnly)
-    , mParticipatesInPreserve3D(false)
 {
   MOZ_COUNT_CTOR(nsDisplayOpacity);
 }
@@ -4363,12 +4376,6 @@ nsDisplayOpacity::BuildLayer(nsDisplayListBuilder* aBuilder,
   nsDisplayListBuilder::AddAnimationsAndTransitionsToLayer(container, aBuilder,
                                                            this, mFrame,
                                                            eCSSProperty_opacity);
-
-  if (mParticipatesInPreserve3D) {
-    container->SetContentFlags(container->GetContentFlags() | Layer::CONTENT_EXTEND_3D_CONTEXT);
-  } else {
-    container->SetContentFlags(container->GetContentFlags() & ~Layer::CONTENT_EXTEND_3D_CONTEXT);
-  }
   return container.forget();
 }
 
@@ -4716,11 +4723,13 @@ bool nsDisplayBlendContainer::TryMerge(nsDisplayItem* aItem) {
 nsDisplayOwnLayer::nsDisplayOwnLayer(nsDisplayListBuilder* aBuilder,
                                      nsIFrame* aFrame, nsDisplayList* aList,
                                      uint32_t aFlags, ViewID aScrollTarget,
-                                     float aScrollbarThumbRatio)
+                                     float aScrollbarThumbRatio,
+                                     bool aForceActive)
     : nsDisplayWrapList(aBuilder, aFrame, aList)
     , mFlags(aFlags)
     , mScrollTarget(aScrollTarget)
     , mScrollbarThumbRatio(aScrollbarThumbRatio)
+    , mForceActive(aForceActive)
 {
   MOZ_COUNT_CTOR(nsDisplayOwnLayer);
 }
@@ -4730,6 +4739,18 @@ nsDisplayOwnLayer::~nsDisplayOwnLayer() {
   MOZ_COUNT_DTOR(nsDisplayOwnLayer);
 }
 #endif
+
+LayerState
+nsDisplayOwnLayer::GetLayerState(nsDisplayListBuilder* aBuilder,
+                                 LayerManager* aManager,
+                                 const ContainerLayerParameters& aParameters)
+{
+  if (mForceActive) {
+    return mozilla::LAYER_ACTIVE_FORCE;
+  }
+
+  return RequiredLayerStateForChildren(aBuilder, aManager, aParameters, mList, mAnimatedGeometryRoot);
+}
 
 // nsDisplayOpacity uses layers for rendering
 already_AddRefed<Layer>
@@ -5476,7 +5497,7 @@ nsDisplayTransform::GetDeltaToTransformOrigin(const nsIFrame* aFrame,
 {
   NS_PRECONDITION(aFrame, "Can't get delta for a null frame!");
   NS_PRECONDITION(aFrame->IsTransformed() ||
-                  aFrame->StyleDisplay()->BackfaceIsHidden() ||
+                  aFrame->BackfaceIsHidden() ||
                   aFrame->Combines3DTransformWithAncestors(),
                   "Shouldn't get a delta for an untransformed frame!");
 
@@ -5549,7 +5570,7 @@ nsDisplayTransform::ComputePerspectiveMatrix(const nsIFrame* aFrame,
 {
   NS_PRECONDITION(aFrame, "Can't get delta for a null frame!");
   NS_PRECONDITION(aFrame->IsTransformed() ||
-                  aFrame->StyleDisplay()->BackfaceIsHidden() ||
+                  aFrame->BackfaceIsHidden() ||
                   aFrame->Combines3DTransformWithAncestors(),
                   "Shouldn't get a delta for an untransformed frame!");
   NS_PRECONDITION(aOutMatrix.IsIdentity(), "Must have a blank output matrix");
@@ -5883,8 +5904,7 @@ static bool IsFrameVisible(nsIFrame* aFrame, const Matrix4x4& aMatrix)
   if (aMatrix.IsSingular()) {
     return false;
   }
-  if (aFrame->StyleDisplay()->mBackfaceVisibility == NS_STYLE_BACKFACE_VISIBILITY_HIDDEN &&
-      aMatrix.IsBackfaceVisible()) {
+  if (aFrame->BackfaceIsHidden() && aMatrix.IsBackfaceVisible()) {
     return false;
   }
   return true;

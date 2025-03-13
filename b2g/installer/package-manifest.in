@@ -216,6 +216,7 @@
 @RESPATH@/components/dom_webspeechrecognition.xpt
 #endif
 @RESPATH@/components/dom_xbl.xpt
+@RESPATH@/components/dom_xhr.xpt
 @RESPATH@/components/dom_xpath.xpt
 @RESPATH@/components/dom_xul.xpt
 @RESPATH@/components/dom_time.xpt
@@ -418,7 +419,7 @@
 @RESPATH@/components/PresentationDeviceInfoManager.manifest
 @RESPATH@/components/PresentationDeviceInfoManager.js
 @RESPATH@/components/BuiltinProviders.manifest
-@RESPATH@/components/TCPPresentationServer.js
+@RESPATH@/components/PresentationControlService.js
 @RESPATH@/components/PresentationDataChannelSessionTransport.js
 @RESPATH@/components/PresentationDataChannelSessionTransport.manifest
 
@@ -549,9 +550,6 @@
 @RESPATH@/components/nsLivemarkService.js
 @RESPATH@/components/nsTaggingService.js
 @RESPATH@/components/nsPlacesDBFlush.js
-@RESPATH@/components/nsPlacesAutoComplete.manifest
-@RESPATH@/components/nsPlacesAutoComplete.js
-@RESPATH@/components/UnifiedComplete.manifest
 @RESPATH@/components/UnifiedComplete.js
 @RESPATH@/components/nsPlacesExpiration.js
 @RESPATH@/components/PlacesCategoriesStarter.js
@@ -636,7 +634,6 @@
 @RESPATH@/components/HCIEventTransactionSystemMessage.manifest
 @RESPATH@/components/HCIEventTransactionSystemMessageConfigurator.js
 
-@RESPATH@/components/Activities.manifest
 @RESPATH@/components/ActivityProxy.js
 @RESPATH@/components/ActivityRequestHandler.js
 @RESPATH@/components/ActivityWrapper.js
@@ -871,7 +868,6 @@ bin/libfreebl_32int64_3.so
 #endif
 @RESPATH@/components/WebappsUpdateTimer.js
 @RESPATH@/components/DirectoryProvider.js
-@RESPATH@/components/ActivitiesGlue.js
 @RESPATH@/components/ProcessGlobal.js
 @RESPATH@/components/OMAContentHandler.js
 @RESPATH@/components/PaymentGlue.js
@@ -888,7 +884,6 @@ bin/libfreebl_32int64_3.so
 @RESPATH@/components/B2GAppMigrator.js
 @RESPATH@/components/B2GPresentationDevicePrompt.js
 @RESPATH@/components/PresentationRequestUIGlue.js
-@RESPATH@/components/KillSwitch.js
 
 #ifndef MOZ_WIDGET_GONK
 @RESPATH@/components/SimulatorScreen.js

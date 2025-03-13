@@ -420,7 +420,7 @@ EventListenerManager::AddEventListenerInternal(
     }
   }
 
-  if (IsApzAwareEvent(aTypeAtom)) {
+  if (IsApzAwareListener(listener)) {
     ProcessApzAwareEventListenerAdd();
   }
 
@@ -440,7 +440,7 @@ EventListenerManager::ProcessApzAwareEventListenerAdd()
   // Mark the node as having apz aware listeners
   nsCOMPtr<nsINode> node = do_QueryInterface(mTarget);
   if (node) {
-    node->SetMayHaveApzAwareListeners();
+    node->SetMayBeApzAware();
   }
 
   // Schedule a paint so event regions on the layer tree gets updated
@@ -700,9 +700,11 @@ EventListenerManager::AddEventListenerByType(
                         const nsAString& aType,
                         const EventListenerFlags& aFlags)
 {
-  nsCOMPtr<nsIAtom> atom =
-    mIsMainThreadELM ? NS_Atomize(NS_LITERAL_STRING("on") + aType) : nullptr;
-  EventMessage message = nsContentUtils::GetEventMessage(atom);
+  nsCOMPtr<nsIAtom> atom;
+  EventMessage message = mIsMainThreadELM ?
+    nsContentUtils::GetEventMessageAndAtomForListener(aType,
+                                                      getter_AddRefs(atom)) :
+    eUnidentifiedEvent;
   AddEventListenerInternal(aListenerHolder, message, atom, aType, aFlags);
 }
 
@@ -712,9 +714,11 @@ EventListenerManager::RemoveEventListenerByType(
                         const nsAString& aType,
                         const EventListenerFlags& aFlags)
 {
-  nsCOMPtr<nsIAtom> atom =
-    mIsMainThreadELM ? NS_Atomize(NS_LITERAL_STRING("on") + aType) : nullptr;
-  EventMessage message = nsContentUtils::GetEventMessage(atom);
+  nsCOMPtr<nsIAtom> atom;
+  EventMessage message = mIsMainThreadELM ?
+    nsContentUtils::GetEventMessageAndAtomForListener(aType,
+                                                      getter_AddRefs(atom)) :
+    eUnidentifiedEvent;
   RemoveEventListenerInternal(aListenerHolder, message, atom, aType, aFlags);
 }
 
@@ -1711,11 +1715,17 @@ EventListenerManager::HasApzAwareListeners()
   uint32_t count = mListeners.Length();
   for (uint32_t i = 0; i < count; ++i) {
     Listener* listener = &mListeners.ElementAt(i);
-    if (IsApzAwareEvent(listener->mTypeAtom)) {
+    if (IsApzAwareListener(listener)) {
       return true;
     }
   }
   return false;
+}
+
+bool
+EventListenerManager::IsApzAwareListener(Listener* aListener)
+{
+  return !aListener->mFlags.mPassive && IsApzAwareEvent(aListener->mTypeAtom);
 }
 
 bool

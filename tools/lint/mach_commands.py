@@ -23,7 +23,6 @@ from mach.decorators import (
     CommandArgument,
     CommandProvider,
     Command,
-    SubCommand,
 )
 
 
@@ -33,7 +32,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 ESLINT_PACKAGES = [
     "eslint@2.9.0",
     "eslint-plugin-html@1.4.0",
-    "eslint-plugin-mozilla@0.0.3",
+    "eslint-plugin-mozilla@0.1.0",
     "eslint-plugin-react@4.2.3"
 ]
 
@@ -63,77 +62,24 @@ Valid installation paths:
 '''.strip()
 
 
+def setup_argument_parser():
+    from mozlint import cli
+    return cli.MozlintParser()
+
+
 @CommandProvider
 class MachCommands(MachCommandBase):
 
     @Command(
         'lint', category='devenv',
-        description='Run linters.')
-    @CommandArgument(
-        'paths', nargs='*', default=None,
-        help="Paths to file or directories to lint, like "
-             "'browser/components/loop' or 'mobile/android'. "
-             "Defaults to the current directory if not given.")
-    @CommandArgument(
-        '-l', '--linter', dest='linters', default=None, action='append',
-        help="Linters to run, e.g 'eslint'. By default all linters are run "
-             "for all the appropriate files.")
-    @CommandArgument(
-        '-f', '--format', dest='fmt', default='stylish',
-        help="Formatter to use. Defaults to 'stylish'.")
-    @CommandArgument(
-        '-n', '--no-filter', dest='use_filters', default=True, action='store_false',
-        help="Ignore all filtering. This is useful for quickly testing a "
-             "directory that otherwise wouldn't be run, without needing to "
-             "modify the config file.")
-    def lint(self, paths, linters=None, fmt='stylish', **lintargs):
+        description='Run linters.',
+        parser=setup_argument_parser)
+    def lint(self, *runargs, **lintargs):
         """Run linters."""
-        from mozlint import LintRoller, formatters
-
-        paths = paths or ['.']
-
-        lint_files = self.find_linters(linters)
-
+        from mozlint import cli
         lintargs['exclude'] = ['obj*']
-        lint = LintRoller(**lintargs)
-        lint.read(lint_files)
-
-        # run all linters
-        results = lint.roll(paths)
-
-        formatter = formatters.get(fmt)
-        print(formatter(results))
-
-    @SubCommand('lint', 'setup',
-                "Setup required libraries for specified lints.")
-    @CommandArgument(
-        '-l', '--linter', dest='linters', default=None, action='append',
-        help="Linters to run, e.g 'eslint'. By default all linters are run "
-             "for all the appropriate files.")
-    def lint_setup(self, linters=None, **lintargs):
-        from mozlint import LintRoller
-
-        lint_files = self.find_linters(linters)
-        lint = LintRoller(lintargs=lintargs)
-        lint.read(lint_files)
-
-        for l in lint.linters:
-            if 'setup' in l:
-                l['setup']()
-
-    def find_linters(self, linters=None):
-        lints = []
-        files = os.listdir(here)
-        for f in files:
-            name, ext = os.path.splitext(f)
-            if ext != '.lint':
-                continue
-
-            if linters and name not in linters:
-                continue
-
-            lints.append(os.path.join(here, f))
-        return lints
+        cli.SEARCH_PATHS.append(here)
+        return cli.run(*runargs, **lintargs)
 
     @Command('eslint', category='devenv',
              description='Run eslint or help configure eslint for optimal development.')
@@ -384,7 +330,7 @@ class MachCommands(MachCommandBase):
         return os.path.dirname(fullpath)
 
     def get_eslint_module_path(self):
-        return os.path.join(self.get_project_root(), "testing", "eslint")
+        return os.path.join(self.get_project_root(), "tools", "lint", "eslint")
 
     def _prompt_yn(self, msg):
         if not sys.stdin.isatty():
