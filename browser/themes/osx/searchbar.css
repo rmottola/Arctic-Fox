@@ -88,3 +88,23 @@
 .searchbar-search-button[addengines="true"] {
   list-style-image: url("chrome://browser/skin/search-indicator-badge-add.png");
 }
+
+.search-panel-tree > .autocomplete-treebody::-moz-tree-cell {
+  border-top: none !important;
+}
+
+.search-panel-tree > .autocomplete-treebody::-moz-tree-image {
+  padding-inline-start: 4px;
+  padding-inline-end: 2px;
+  width: 14px;
+  height: 14px;
+}
+
+.search-panel-tree > .autocomplete-treebody::-moz-tree-image(fromhistory) {
+  list-style-image: url("chrome://browser/skin/search-history-icon.svg#search-history-icon");
+}
+
+.search-panel-tree > .autocomplete-treebody::-moz-tree-image(fromhistory, selected) {
+  list-style-image: url("chrome://browser/skin/search-history-icon.svg#search-history-icon-active");
+}
+
