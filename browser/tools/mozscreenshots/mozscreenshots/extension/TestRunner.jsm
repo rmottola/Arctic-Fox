@@ -9,7 +9,9 @@ this.EXPORTED_SYMBOLS = ["TestRunner"];
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 const defaultSetNames = ["TabsInTitlebar", "Tabs", "WindowSize", "Toolbars", "LightweightThemes"];
 const env = Cc["@mozilla.org/process/environment;1"].getService(Ci.nsIEnvironment);
+const HOME_PAGE = "chrome://mozscreenshots/content/lib/mozscreenshots.html";
 
+Cu.import("resource://testing-common/BrowserTestUtils.jsm");
 Cu.import("resource://gre/modules/FileUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
@@ -68,7 +70,7 @@ this.TestRunner = {
   /**
    * Load specified sets, execute all combinations of them, and capture screenshots.
    */
-  start(setNames = null) {
+  start: Task.async(function*(setNames = null) {
     setNames = setNames || defaultSetNames;
     let sets = this.loadSets(setNames);
 
@@ -79,18 +81,20 @@ this.TestRunner = {
     this.currentComboIndex = this.completedCombos = 0;
     this._lastCombo = null;
 
-    return Task.spawn(function* doStart() {
-      for (let i = 0; i < this.combos.length;
-           i++){
-        this.currentComboIndex = i;
-        yield* this._performCombo(this.combos.item(this.currentComboIndex));
-      }
+    let browserWindow = Services.wm.getMostRecentWindow("navigator:browser");
+    let selectedBrowser = browserWindow.gBrowser.selectedBrowser;
+    yield BrowserTestUtils.loadURI(selectedBrowser, HOME_PAGE);
+    yield BrowserTestUtils.browserLoaded(selectedBrowser);
 
-      log.info("Done: Completed " + this.completedCombos + " out of " +
-               this.combos.length + " configurations.");
-      this.cleanup();
-    }.bind(this));
-  },
+    for (let i = 0; i < this.combos.length; i++){
+      this.currentComboIndex = i;
+      yield this._performCombo(this.combos.item(this.currentComboIndex));
+    }
+
+    log.info("Done: Completed " + this.completedCombos + " out of " +
+             this.combos.length + " configurations.");
+    this.cleanup();
+  }),
 
   /**
    * Load sets of configurations from JSMs.
