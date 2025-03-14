@@ -5702,3 +5702,8 @@ pref("dom.node.rootNode.enabled", true);
 pref("media.default_volume", "1.0");
 
 pref("media.seekToNextFrame.enabled", true);
+
+// Shutdown the osfile worker if its no longer needed.
+#if !defined(RELEASE_BUILD)
+pref("osfile.reset_worker_delay", 30000);
+#endif
