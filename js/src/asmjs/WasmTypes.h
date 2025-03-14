@@ -779,8 +779,7 @@ struct SignalUsage
     bool forOOB;
     bool forInterrupt;
 
-    SignalUsage() = default;
-    explicit SignalUsage(ExclusiveContext* cx);
+    SignalUsage();
     bool operator==(SignalUsage rhs) const;
     bool operator!=(SignalUsage rhs) const { return !(*this == rhs); }
 };
@@ -796,8 +795,8 @@ struct Assumptions
     JS::BuildIdCharVector buildId;
     bool                  newFormat;
 
-    Assumptions() : cpuId(0), newFormat(false) {}
-    MOZ_MUST_USE bool init(SignalUsage usesSignal, JS::BuildIdOp buildIdOp);
+    Assumptions() : usesSignal(), cpuId(0), newFormat(false) {}
+    MOZ_MUST_USE bool init(JS::BuildIdOp buildIdOp);
 
     bool operator==(const Assumptions& rhs) const;
     bool operator!=(const Assumptions& rhs) const { return !(*this == rhs); }

@@ -558,7 +558,7 @@ MemoryConstructor(JSContext* cx, unsigned argc, Value* vp)
     }
 
     uint32_t bytes = uint32_t(initialDbl) * PageSize;
-    bool signalsForOOB = SignalUsage(cx).forOOB;
+    bool signalsForOOB = SignalUsage().forOOB;
     RootedArrayBufferObject buffer(cx, ArrayBufferObject::createForWasm(cx, bytes, signalsForOOB));
     if (!buffer)
         return false;

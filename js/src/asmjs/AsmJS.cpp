@@ -8387,7 +8387,7 @@ LookupAsmJSModuleInCache(ExclusiveContext* cx, AsmJSParser& parser, bool* loaded
         return true;
 
     Assumptions assumptions;
-    if (!assumptions.init(SignalUsage(cx), cx->buildIdOp()))
+    if (!assumptions.init(cx->buildIdOp()))
         return true;
 
     if (assumptions != (*module)->metadata().assumptions)

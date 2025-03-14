@@ -1231,7 +1231,7 @@ bool
 CompileArgs::init(ExclusiveContext* cx)
 {
     alwaysBaseline = cx->options().wasmAlwaysBaseline();
-    if (!assumptions.init(SignalUsage(cx), cx->buildIdOp())) {
+    if (!assumptions.init(cx->buildIdOp())) {
         ReportOutOfMemory(cx);
         return false;
     }
