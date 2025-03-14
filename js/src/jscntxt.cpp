@@ -885,6 +885,7 @@ JSContext::JSContext(JSRuntime* parentRuntime)
     reportGranularity(JS_DEFAULT_JITREPORT_GRANULARITY),
     resolvingList(nullptr),
     generatingError(false),
+    data(nullptr),
     outstandingRequests(0),
     jitIsBroken(false)
 {
