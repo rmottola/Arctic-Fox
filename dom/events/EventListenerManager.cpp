@@ -54,12 +54,6 @@
 
 namespace mozilla {
 
-namespace dom {
-namespace workers {
-extern bool IsCurrentThreadRunningChromeWorker();
-} // namespace workers
-} // namespace dom
-
 using namespace dom;
 using namespace hal;
 
@@ -1343,24 +1337,6 @@ EventListenerManager::Disconnect()
   RemoveAllListeners();
 }
 
-static EventListenerFlags
-GetEventListenerFlagsFromOptions(const EventListenerOptions& aOptions,
-                                 bool aIsMainThread)
-{
-  EventListenerFlags flags;
-  flags.mCapture = aOptions.mCapture;
-  if (aOptions.mMozSystemGroup) {
-    if (aIsMainThread) {
-      JSContext* cx = nsContentUtils::GetCurrentJSContext();
-      MOZ_ASSERT(cx, "Not being called from JS?");
-      flags.mInSystemGroup = IsChromeOrXBL(cx, nullptr);
-    } else {
-      flags.mInSystemGroup = workers::IsCurrentThreadRunningChromeWorker();
-    }
-  }
-  return flags;
-}
-
 void
 EventListenerManager::AddEventListener(
                         const nsAString& aType,
@@ -1386,7 +1362,8 @@ EventListenerManager::AddEventListener(
     flags.mCapture = aOptions.GetAsBoolean();
   } else {
     const auto& options = aOptions.GetAsAddEventListenerOptions();
-    flags = GetEventListenerFlagsFromOptions(options, mIsMainThreadELM);
+    flags.mCapture = options.mCapture;
+    flags.mInSystemGroup = options.mMozSystemGroup;
     flags.mPassive = options.mPassive;
   }
   flags.mAllowUntrustedEvents = aWantsUntrusted;
@@ -1415,7 +1392,8 @@ EventListenerManager::RemoveEventListener(
     flags.mCapture = aOptions.GetAsBoolean();
   } else {
     const auto& options = aOptions.GetAsEventListenerOptions();
-    flags = GetEventListenerFlagsFromOptions(options, mIsMainThreadELM);
+    flags.mCapture = options.mCapture;
+    flags.mInSystemGroup = options.mMozSystemGroup;
   }
   RemoveEventListenerByType(aListenerHolder, aType, flags);
 }
