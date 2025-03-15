@@ -1288,7 +1288,8 @@ SetAddonInterposition(const nsACString& addonIdStr, nsIAddonInterposition* inter
     // We enter the junk scope just to allocate a string, which actually will go
     // in the system zone.
     AutoJSAPI jsapi;
-    jsapi.Init(xpc::PrivilegedJunkScope());
+    if (!jsapi.Init(xpc::PrivilegedJunkScope()))
+        return false;
     addonId = NewAddonId(jsapi.cx(), addonIdStr);
     if (!addonId)
         return false;
@@ -1302,7 +1303,8 @@ AllowCPOWsInAddon(const nsACString& addonIdStr, bool allow)
     // We enter the junk scope just to allocate a string, which actually will go
     // in the system zone.
     AutoJSAPI jsapi;
-    jsapi.Init(xpc::PrivilegedJunkScope());
+    if (!jsapi.Init(xpc::PrivilegedJunkScope()))
+        return false;
     addonId = NewAddonId(jsapi.cx(), addonIdStr);
     if (!addonId)
         return false;
