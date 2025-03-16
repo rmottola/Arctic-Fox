@@ -240,6 +240,14 @@ LIRGenerator::visitNewArrayDynamicLength(MNewArrayDynamicLength* ins)
 }
 
 void
+LIRGenerator::visitNewTypedArray(MNewTypedArray* ins)
+{
+    LNewTypedArray* lir = new(alloc()) LNewTypedArray(temp(), temp());
+    define(lir, ins);
+    assignSafepoint(lir, ins);
+}
+
+void
 LIRGenerator::visitNewObject(MNewObject* ins)
 {
     LNewObject* lir = new(alloc()) LNewObject(temp());
