@@ -1115,7 +1115,7 @@ GLContextProviderGLX::CreateForWindow(nsIWidget* aWidget, bool aForceAccelerated
     // performance might be suboptimal.  But using the existing visual
     // is a relatively safe intermediate step.
 
-    Display* display = (Display*)aWidget->GetNativeData(NS_NATIVE_DISPLAY);
+    Display* display = (Display*)aWidget->GetNativeData(NS_NATIVE_COMPOSITOR_DISPLAY);
     if (!display) {
         NS_ERROR("X Display required for GLX Context provider");
         return nullptr;
