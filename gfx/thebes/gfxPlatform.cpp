@@ -884,7 +884,6 @@ gfxPlatform::InitLayersIPC()
 #ifdef MOZ_WIDGET_GONK
         SharedBufferManagerChild::StartUp();
 #endif
-        mozilla::layers::ImageBridgeChild::StartUp();
         gfx::VRManagerChild::StartUpSameProcess();
     }
 }
@@ -898,16 +897,13 @@ gfxPlatform::ShutdownLayersIPC()
     sLayersIPCIsUp = false;
 
     if (XRE_IsContentProcess()) {
-
         gfx::VRManagerChild::ShutDown();
         // cf bug 1215265.
         if (gfxPrefs::ChildProcessShutdown()) {
           layers::CompositorBridgeChild::ShutDown();
           layers::ImageBridgeChild::ShutDown();
         }
-
     } else if (XRE_IsParentProcess()) {
-
         gfx::VRManagerChild::ShutDown();
         layers::CompositorBridgeChild::ShutDown();
         layers::ImageBridgeChild::ShutDown();
