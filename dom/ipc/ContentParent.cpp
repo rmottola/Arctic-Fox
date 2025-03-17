@@ -5501,7 +5501,7 @@ ContentParent::PermissionManagerRelease(const ContentParentId& aCpId,
 }
 
 bool
-ContentParent::RecvGetBrowserConfiguration(BrowserConfiguration* aConfig)
+ContentParent::RecvGetServiceWorkerConfiguration(ServiceWorkerConfiguration* aConfig)
 {
   MOZ_ASSERT(XRE_IsParentProcess());
 
