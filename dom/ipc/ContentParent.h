@@ -348,7 +348,7 @@ public:
   PermissionManagerRelease(const ContentParentId& aCpId, const TabId& aTabId);
 
   static bool
-  GetBrowserConfiguration(const nsCString& aURI, BrowserConfiguration& aConfig);
+  GetBrowserConfiguration(BrowserConfiguration& aConfig);
 
   void ReportChildAlreadyBlocked();
 
@@ -1124,8 +1124,7 @@ private:
   virtual bool RecvUpdateDropEffect(const uint32_t& aDragAction,
                                     const uint32_t& aDropEffect) override;
 
-  virtual bool RecvGetBrowserConfiguration(const nsCString& aURI,
-                                           BrowserConfiguration* aConfig) override;
+  virtual bool RecvGetBrowserConfiguration(BrowserConfiguration* aConfig) override;
 
   virtual bool RecvProfile(const nsCString& aProfile) override;
 
