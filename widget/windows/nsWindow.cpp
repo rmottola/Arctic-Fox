@@ -141,7 +141,7 @@
 #include "nsBidiKeyboard.h"
 #include "nsThemeConstants.h"
 #include "gfxConfig.h"
-#include "WinCompositorWidget.h"
+#include "InProcessWinCompositorWidget.h"
 
 #include "nsIGfxInfo.h"
 #include "nsUXThemeConstants.h"
@@ -3633,7 +3633,7 @@ nsWindow::GetLayerManager(PLayerTransactionChild* aShadowManager,
       reinterpret_cast<uintptr_t>(mWnd),
       reinterpret_cast<uintptr_t>(static_cast<nsIWidget*>(this)),
       mTransparencyMode);
-    mBasicLayersSurface = new WinCompositorWidget(initData, this);
+    mBasicLayersSurface = new InProcessWinCompositorWidget(initData, this);
     mCompositorWidgetDelegate = mBasicLayersSurface;
     mLayerManager = CreateBasicLayerManager();
   }
