@@ -244,7 +244,7 @@ CompositorVsyncScheduler::CompositorVsyncScheduler(CompositorBridgeParent* aComp
   , mIsObservingVsync(false)
   , mNeedsComposite(0)
   , mVsyncNotificationsSkipped(0)
-  , mCompositorVsyncDispatcher(aWidget->GetCompositorVsyncDispatcher())
+  , mWidget(aWidget)
   , mCurrentCompositeTaskMonitor("CurrentCompositeTaskMonitor")
   , mCurrentCompositeTask(nullptr)
   , mSetNeedsCompositeMonitor("SetNeedsCompositeMonitor")
@@ -527,7 +527,7 @@ void
 CompositorVsyncScheduler::ObserveVsync()
 {
   MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
-  mCompositorVsyncDispatcher->SetCompositorVsyncObserver(mVsyncObserver);
+  mWidget->ObserveVsync(mVsyncObserver);
   mIsObservingVsync = true;
 }
 
@@ -535,7 +535,7 @@ void
 CompositorVsyncScheduler::UnobserveVsync()
 {
   MOZ_ASSERT(CompositorThreadHolder::IsInCompositorThread());
-  mCompositorVsyncDispatcher->SetCompositorVsyncObserver(nullptr);
+  mWidget->ObserveVsync(nullptr);
   mIsObservingVsync = false;
 }
 
@@ -710,7 +710,6 @@ CompositorBridgeParent::ForceIsFirstPaint()
 void
 CompositorBridgeParent::StopAndClearResources()
 {
-  CancelCurrentCompositeTask();
   if (mForceCompositionTask) {
     mForceCompositionTask->Cancel();
     mForceCompositionTask = nullptr;
@@ -735,6 +734,12 @@ CompositorBridgeParent::StopAndClearResources()
     mCompositor->DetachWidget();
     mCompositor->Destroy();
     mCompositor = nullptr;
+  }
+
+  // This must be destroyed now since it accesses the widget.
+  if (mCompositorScheduler) {
+    mCompositorScheduler->Destroy();
+    mCompositorScheduler = nullptr;
   }
 
   // After this point, it is no longer legal to access the widget.
@@ -909,8 +914,6 @@ CompositorBridgeParent::ActorDestroy(ActorDestroyReason why)
     mApzcTreeManager->ClearTree();
     mApzcTreeManager = nullptr;
   }
-
-  mCompositorScheduler->Destroy();
 
   { // scope lock
     MonitorAutoLock lock(*sIndirectLayerTreesLock);
