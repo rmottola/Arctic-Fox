@@ -25,4 +25,10 @@ TEST_HARNESS_FILES.gtest += [
     'test_case_1216748.mp4',
 ]
 
+if CONFIG['MOZ_RUST']:
+    UNIFIED_SOURCES += ['TestMP4Rust.cpp',]
+    TEST_HARNESS_FILES.gtest += [
+        '../../../dom/media/test/street.mp4',
+    ]
+
 FINAL_LIBRARY = 'xul-gtest'
