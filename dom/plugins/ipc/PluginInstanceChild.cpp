@@ -54,9 +54,6 @@ using namespace std;
 #include <gdk/gdk.h>
 #include "gtk2xtbin.h"
 
-#elif defined(MOZ_WIDGET_QT)
-#undef KeyPress
-#undef KeyRelease
 #elif defined(OS_WIN)
 
 #include <windows.h>
@@ -1387,8 +1384,6 @@ PluginInstanceChild::AnswerNPP_SetWindow(const NPRemoteWindow& aWindow)
 
 #elif defined(ANDROID)
     // TODO: Need Android impl
-#elif defined(MOZ_WIDGET_QT)
-    // TODO: Need QT-nonX impl
 #elif defined(MOZ_WIDGET_UIKIT)
     // Don't care
 #else
