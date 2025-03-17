@@ -1251,11 +1251,10 @@ ContentChild::DeallocPAPZChild(PAPZChild* aActor)
   return true;
 }
 
-PCompositorBridgeChild*
-ContentChild::AllocPCompositorBridgeChild(mozilla::ipc::Transport* aTransport,
-                                          base::ProcessId aOtherProcess)
+bool
+ContentChild::RecvInitCompositor(Endpoint<PCompositorBridgeChild>&& aEndpoint)
 {
-  return CompositorBridgeChild::Create(aTransport, aOtherProcess);
+  return CompositorBridgeChild::InitForContent(Move(aEndpoint));
 }
 
 PSharedBufferManagerChild*
