@@ -685,6 +685,10 @@ class Decoder
         *error_ = Move(msg);
         return false;
     }
+    void clearError() {
+        if (error_)
+            error_->reset();
+    }
 
     bool done() const {
         MOZ_ASSERT(cur_ <= end_);
