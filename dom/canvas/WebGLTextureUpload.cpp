@@ -1977,15 +1977,6 @@ WebGLTexture::CopyTexImage2D(TexImageTarget target, GLint level, GLenum internal
     if (!ValidateCopyTexImageForFeedback(funcName, level))
         return;
 
-    // GLES 3.0.4 p145:
-    // "Calling CopyTexSubImage3D, CopyTexImage2D, or CopyTexSubImage2D will result in an
-    //  INVALID_OPERATION error if any of the following conditions is true: READ_BUFFER
-    //  is NONE"
-    if (srcMode == LOCAL_GL_NONE) {
-        mContext->ErrorInvalidOperation("%s: READ_BUFFER is NONE. ", funcName);
-        return;
-    }
-
     ////////////////////////////////////
     // Check that source and dest info are compatible
 
@@ -2118,15 +2109,6 @@ WebGLTexture::CopyTexSubImage(const char* funcName, TexImageTarget target, GLint
 
     if (!ValidateCopyTexImageForFeedback(funcName, level))
         return;
-
-    // GLES 3.0.4 p145:
-    // "Calling CopyTexSubImage3D, CopyTexImage2D, or CopyTexSubImage2D will result in an
-    //  INVALID_OPERATION error if any of the following conditions is true: READ_BUFFER
-    //  is NONE"
-    if (srcMode == LOCAL_GL_NONE) {
-        mContext->ErrorInvalidOperation("%s: READ_BUFFER is NONE. ", funcName);
-        return;
-    }
 
     ////////////////////////////////////
     // Check that source and dest info are compatible
