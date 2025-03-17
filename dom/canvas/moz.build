@@ -13,8 +13,11 @@ TEST_DIRS += [
 # * Implement ReadPixel with PBOs.
 
 MOCHITEST_MANIFESTS += [
+    'test/crash/mochitest.ini',
     'test/crossorigin/mochitest.ini',
     'test/mochitest.ini',
+    'test/webgl-conf/generated-mochitest.ini',
+    'test/webgl-mochitest/mochitest.ini',
 ]
 
 MOCHITEST_CHROME_MANIFESTS += ['test/chrome/chrome.ini']
