@@ -6368,7 +6368,7 @@ GCRuntime::collect(bool nonincrementalByAPI, SliceBudget budget, JS::gcreason::R
 
 js::AutoEnqueuePendingParseTasksAfterGC::~AutoEnqueuePendingParseTasksAfterGC()
 {
-    if (!gc_.isIncrementalGCInProgress())
+    if (!OffThreadParsingMustWaitForGC(gc_.rt))
         EnqueuePendingParseTasksAfterGC(gc_.rt);
 }
 
@@ -6436,6 +6436,7 @@ GCRuntime::abortGC()
     MOZ_ASSERT(!rt->mainThread.suppressGC);
 
     AutoStopVerifyingBarriers av(rt, false);
+    AutoEnqueuePendingParseTasksAfterGC aept(*this);
 
     gcstats::AutoGCSlice agc(stats, scanZonesBeforeGC(), invocationKind,
                              SliceBudget::unlimited(), JS::gcreason::ABORT_GC);
