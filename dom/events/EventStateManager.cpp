@@ -2797,7 +2797,7 @@ EventStateManager::DecideGestureEvent(WidgetGestureNotifyEvent* aEvent,
   } //ancestor chain
 
   aEvent->displayPanFeedback = displayPanFeedback;
-  aEvent->panDirection = panDirection;
+  aEvent->mPanDirection = panDirection;
 }
 
 #ifdef XP_MACOSX
