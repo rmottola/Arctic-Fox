@@ -8318,18 +8318,17 @@ DebuggerObject::errorMessageNameGetter(JSContext *cx, unsigned argc, Value* vp)
 }
 
 #ifdef SPIDERMONKEY_PROMISE
-static bool
-DebuggerObject_getIsPromise(JSContext* cx, unsigned argc, Value* vp)
+/* static */ bool
+DebuggerObject::isPromiseGetter(JSContext* cx, unsigned argc, Value* vp)
 {
-    THIS_DEBUGOBJECT_REFERENT(cx, argc, vp, "get isPromise", args, refobj);
+    THIS_DEBUGOBJECT(cx, argc, vp, "get isPromise", args, object)
 
-    refobj = CheckedUnwrap(refobj);
-    args.rval().setBoolean(refobj->is<PromiseObject>());
+    args.rval().setBoolean(object->isPromise());
     return true;
 }
 
-static bool
-DebuggerObject_getPromiseState(JSContext* cx, unsigned argc, Value* vp)
+/* static */ bool
+DebuggerObject::promiseStateGetter(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_DEBUGOBJECT_OWNER_PROMISE(cx, argc, vp, "get promiseState", args, dbg, refobj);
 
@@ -8368,8 +8367,8 @@ DebuggerObject_getPromiseState(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-static bool
-DebuggerObject_getPromiseLifetime(JSContext* cx, unsigned argc, Value* vp)
+/* static */ bool
+DebuggerObject::promiseLifetimeGetter(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_DEBUGOBJECT_PROMISE(cx, argc, vp, "get promiseLifetime", args, refobj);
 
@@ -8377,8 +8376,8 @@ DebuggerObject_getPromiseLifetime(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-static bool
-DebuggerObject_getPromiseTimeToResolution(JSContext* cx, unsigned argc, Value* vp)
+/* static */ bool
+DebuggerObject::promiseTimeToResolutionGetter(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_DEBUGOBJECT_PROMISE(cx, argc, vp, "get promiseTimeToResolution", args, refobj);
 
@@ -8391,8 +8390,8 @@ DebuggerObject_getPromiseTimeToResolution(JSContext* cx, unsigned argc, Value* v
     return true;
 }
 
-static bool
-DebuggerObject_getPromiseAllocationSite(JSContext* cx, unsigned argc, Value* vp)
+/* static */ bool
+DebuggerObject::promiseAllocationSiteGetter(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_DEBUGOBJECT_PROMISE(cx, argc, vp, "get promiseAllocationSite", args, refobj);
 
@@ -8408,8 +8407,8 @@ DebuggerObject_getPromiseAllocationSite(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-static bool
-DebuggerObject_getPromiseResolutionSite(JSContext* cx, unsigned argc, Value* vp)
+/* static */ bool
+DebuggerObject::promiseResolutionSiteGetter(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_DEBUGOBJECT_PROMISE(cx, argc, vp, "get promiseResolutionSite", args, refobj);
 
@@ -8430,8 +8429,8 @@ DebuggerObject_getPromiseResolutionSite(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-static bool
-DebuggerObject_getPromiseID(JSContext* cx, unsigned argc, Value* vp)
+/* static */ bool
+DebuggerObject::promiseIDGetter(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_DEBUGOBJECT_PROMISE(cx, argc, vp, "get promiseID", args, refobj);
 
@@ -8439,8 +8438,8 @@ DebuggerObject_getPromiseID(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
-static bool
-DebuggerObject_getPromiseDependentPromises(JSContext* cx, unsigned argc, Value* vp)
+/* static */ bool
+DebuggerObject::promiseDependentPromisesGetter(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_DEBUGOBJECT_OWNER_PROMISE(cx, argc, vp, "get promiseDependentPromises", args, dbg, refobj);
 
@@ -8889,14 +8888,14 @@ const JSPropertySpec DebuggerObject::properties_[] = {
 
 #ifdef SPIDERMONKEY_PROMISE
 const JSPropertySpec DebuggerObject::promiseProperties_[] = {
-    JS_PSG("isPromise", DebuggerObject_getIsPromise, 0),
-    JS_PSG("promiseState", DebuggerObject_getPromiseState, 0),
-    JS_PSG("promiseLifetime", DebuggerObject_getPromiseLifetime, 0),
-    JS_PSG("promiseTimeToResolution", DebuggerObject_getPromiseTimeToResolution, 0),
-    JS_PSG("promiseAllocationSite", DebuggerObject_getPromiseAllocationSite, 0),
-    JS_PSG("promiseResolutionSite", DebuggerObject_getPromiseResolutionSite, 0),
-    JS_PSG("promiseID", DebuggerObject_getPromiseID, 0),
-    JS_PSG("promiseDependentPromises", DebuggerObject_getPromiseDependentPromises, 0),
+    JS_PSG("isPromise", DebuggerObject::isPromiseGetter, 0),
+    JS_PSG("promiseState", DebuggerObject::promiseStateGetter, 0),
+    JS_PSG("promiseLifetime", DebuggerObject::promiseLifetimeGetter, 0),
+    JS_PSG("promiseTimeToResolution", DebuggerObject::promiseTimeToResolutionGetter, 0),
+    JS_PSG("promiseAllocationSite", DebuggerObject::promiseAllocationSiteGetter, 0),
+    JS_PSG("promiseResolutionSite", DebuggerObject::promiseResolutionSiteGetter, 0),
+    JS_PSG("promiseID", DebuggerObject::promiseIDGetter, 0),
+    JS_PSG("promiseDependentPromises", DebuggerObject::promiseDependentPromisesGetter, 0),
     JS_PS_END
 };
 #endif // SPIDERMONKEY_PROMISE
@@ -9001,6 +9000,16 @@ bool
 DebuggerObject::isGlobal() const
 {
     return referent()->is<GlobalObject>();
+}
+
+bool
+DebuggerObject::isPromise() const
+{
+    JSObject* obj = referent();
+    if (IsCrossCompartmentWrapper(obj))
+        obj = CheckedUnwrap(obj);
+
+    return obj->is<PromiseObject>();
 }
 
 /* static */ bool
