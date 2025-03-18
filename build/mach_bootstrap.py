@@ -52,6 +52,7 @@ SEARCH_PATHS = [
     'python/requests',
     'python/slugid',
     'build',
+    'build/pymake',
     'config',
     'dom/bindings',
     'dom/bindings/parser',
