@@ -61,7 +61,7 @@
             accesskey="&openLinkCmdInContainerTab.accesskey;"
             hidden="true">
         <menupopup oncommand="gContextMenu.openLinkInTab(event);"
-                   onpopupshowing="return createUserContextMenu(event, false);" />
+                   onpopupshowing="return gContextMenu.createContainerMenu(event);" />
       </menu>
 
       <menuitem id="context-openlink"

@@ -1,0 +1,298 @@
+diff --git a/browser/base/content/browser-context.inc b/browser/base/content/browser-context.inc
+index 17d67833d06f68..78363ecc8346ec 100644
+--- a/browser/base/content/browser-context.inc
++++ b/browser/base/content/browser-context.inc
+@@ -54,6 +54,10 @@
+                 label="&openLinkCmdInCurrent.label;"
+                 accesskey="&openLinkCmdInCurrent.accesskey;"
+                 oncommand="gContextMenu.openLinkInCurrent();"/>
++# label and usercontextid are dynamically set.
++      <menuitem id="context-openlinkincontainertab"
++                accesskey="&openLinkCmdInTab.accesskey;"
++                oncommand="gContextMenu.openLinkInTab(event);"/>
+       <menuitem id="context-openlinkintab"
+                 label="&openLinkCmdInTab.label;"
+                 accesskey="&openLinkCmdInTab.accesskey;"
+@@ -65,7 +69,7 @@
+             accesskey="&openLinkCmdInContainerTab.accesskey;"
+             hidden="true">
+         <menupopup oncommand="gContextMenu.openLinkInTab(event);"
+-                   onpopupshowing="return createUserContextMenu(event, false);" />
++                   onpopupshowing="return gContextMenu.createContainerMenu(event);" />
+       </menu>
+ 
+       <menuitem id="context-openlink"
+diff --git a/browser/base/content/nsContextMenu.js b/browser/base/content/nsContextMenu.js
+index c37d80e405b24d..2a7aea75945a74 100644
+--- a/browser/base/content/nsContextMenu.js
++++ b/browser/base/content/nsContextMenu.js
+@@ -11,6 +11,8 @@ Components.utils.import("resource://gre/modules/BrowserUtils.jsm");
+ Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ Components.utils.import("resource://gre/modules/Services.jsm");
+ 
++XPCOMUtils.defineLazyModuleGetter(this, "ContextualIdentityService",
++                                  "resource:///modules/ContextualIdentityService.jsm");
+ 
+ XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
+   "resource://gre/modules/LoginHelper.jsm");
+@@ -143,12 +145,27 @@ nsContextMenu.prototype = {
+       this.onPlainTextLink = true;
+     }
+ 
++    var inContainer = false;
++    var userContextId = this.browser.contentPrincipal.originAttributes.userContextId;
++    if (userContextId) {
++      inContainer = true;
++      var item = document.getElementById("context-openlinkincontainertab");
++
++      item.setAttribute("usercontextid", userContextId);
++
++      var label = ContextualIdentityService.getUserContextLabel(userContextId);
++      item.setAttribute("label",
++         gBrowserBundle.formatStringFromName("userContextOpenLink.label",
++                                             [label], 1));
++    }
++
+     var shouldShow = this.onSaveableLink || isMailtoInternal || this.onPlainTextLink;
+     var isWindowPrivate = PrivateBrowsingUtils.isWindowPrivate(window);
+     var showContainers = Services.prefs.getBoolPref("privacy.userContext.enabled");
+     this.showItem("context-openlink", shouldShow && !isWindowPrivate);
+     this.showItem("context-openlinkprivate", shouldShow);
+-    this.showItem("context-openlinkintab", shouldShow);
++    this.showItem("context-openlinkintab", shouldShow && !inContainer);
++    this.showItem("context-openlinkincontainertab", shouldShow && inContainer);
+     this.showItem("context-openlinkinusercontext-menu", shouldShow && !isWindowPrivate && showContainers);
+     this.showItem("context-openlinkincurrent", this.onPlainTextLink);
+     this.showItem("context-sep-open", shouldShow);
+@@ -1860,4 +1877,9 @@ nsContextMenu.prototype = {
+     this._telemetryHadCustomItems = this.hasPageMenu;
+     this._getTelemetryClickInfo(aXulMenu);
+   },
++
++  createContainerMenu: function(aEvent) {
++    var userContextId = this.browser.contentPrincipal.originAttributes.userContextId;
++    return createUserContextMenu(aEvent, false, userContextId);
++  },
+ };
+diff --git a/browser/base/content/test/referrer/browser.ini b/browser/base/content/test/referrer/browser.ini
+index 21df432dc646f8..13b712850fcd3e 100644
+--- a/browser/base/content/test/referrer/browser.ini
++++ b/browser/base/content/test/referrer/browser.ini
+@@ -11,8 +11,6 @@ support-files =
+ skip-if = os == 'linux' # Bug 1145199
+ [browser_referrer_open_link_in_tab.js]
+ skip-if = os == 'linux' # Bug 1144816
+-[browser_referrer_open_link_in_tab_in_container.js]
+-skip-if = os == 'linux' # Bug 1144816
+ [browser_referrer_open_link_in_window.js]
+ skip-if = os == 'linux' # Bug 1145199
+ [browser_referrer_open_link_in_window_in_container.js]
+diff --git a/browser/base/content/test/referrer/browser_referrer_middle_click_in_container.js b/browser/base/content/test/referrer/browser_referrer_middle_click_in_container.js
+index 7a1849aa3bf727..1af135610a0a9c 100644
+--- a/browser/base/content/test/referrer/browser_referrer_middle_click_in_container.js
++++ b/browser/base/content/test/referrer/browser_referrer_middle_click_in_container.js
+@@ -15,6 +15,12 @@ function startMiddleClickTestCase(aTestNumber) {
+ }
+ 
+ function test() {
+-  requestLongerTimeout(10);  // slowwww shutdown on e10s
+-  startReferrerTest(startMiddleClickTestCase, { userContextId: 3 });
++  waitForExplicitFinish();
++
++  SpecialPowers.pushPrefEnv(
++    {set: [["privacy.userContext.enabled", true]]},
++    function() {
++      requestLongerTimeout(10);  // slowwww shutdown on e10s
++      startReferrerTest(startMiddleClickTestCase, { userContextId: 3 });
++    });
+ }
+diff --git a/browser/base/content/test/referrer/browser_referrer_open_link_in_container_tab2.js b/browser/base/content/test/referrer/browser_referrer_open_link_in_container_tab2.js
+index fe3dfef4613786..77a5645c603b6c 100644
+--- a/browser/base/content/test/referrer/browser_referrer_open_link_in_container_tab2.js
++++ b/browser/base/content/test/referrer/browser_referrer_open_link_in_container_tab2.js
+@@ -15,28 +15,7 @@ function startNewTabTestCase(aTestNumber) {
+                                     startNewTabTestCase, { userContextId: 1 });
+     });
+ 
+-    let menu = gTestWindow.document.getElementById("context-openlinkinusercontext-menu");
+-    let menupopup = menu.menupopup;
+-    menu.addEventListener("popupshown", function onPopupShown() {
+-      menu.removeEventListener("popupshown", onPopupShown);
+-
+-      is(menupopup.nodeType, Node.ELEMENT_NODE, "We have a menupopup.");
+-      ok(menupopup.firstChild, "We have a first container entry.");
+-
+-      let firstContext = menupopup.firstChild;
+-      is(firstContext.nodeType, Node.ELEMENT_NODE, "We have a first container entry.");
+-      ok(firstContext.hasAttribute("usercontextid"), "We have a usercontextid value.");
+-      is("1", firstContext.getAttribute("usercontextid"), "We have the right usercontextid value.");
+-
+-      aContextMenu.addEventListener("popuphidden", function onPopupHidden() {
+-        aContextMenu.removeEventListener("popuphidden", onPopupHidden);
+-        firstContext.doCommand();
+-      });
+-
+-      aContextMenu.hidePopup();
+-    });
+-
+-    menupopup.showPopup();
++    doContextMenuCommand(gTestWindow, aContextMenu, "context-openlinkincontainertab");
+   });
+ }
+ 
+diff --git a/browser/base/content/test/referrer/browser_referrer_open_link_in_container_tab3.js b/browser/base/content/test/referrer/browser_referrer_open_link_in_container_tab3.js
+index d4cdb991af5b18..0c07b79cdc0b73 100644
+--- a/browser/base/content/test/referrer/browser_referrer_open_link_in_container_tab3.js
++++ b/browser/base/content/test/referrer/browser_referrer_open_link_in_container_tab3.js
+@@ -37,7 +37,7 @@ function startNewTabTestCase(aTestNumber) {
+       let firstContext = menupopup.firstChild;
+       is(firstContext.nodeType, Node.ELEMENT_NODE, "We have a first container entry.");
+       ok(firstContext.hasAttribute("usercontextid"), "We have a usercontextid value.");
+-      is("1", firstContext.getAttribute("usercontextid"), "We have the right usercontextid value.");
++      is("0", firstContext.getAttribute("usercontextid"), "We have the right usercontextid value.");
+ 
+       aContextMenu.addEventListener("popuphidden", function onPopupHidden() {
+         aContextMenu.removeEventListener("popuphidden", onPopupHidden);
+diff --git a/browser/base/content/test/referrer/browser_referrer_open_link_in_tab_in_container.js b/browser/base/content/test/referrer/browser_referrer_open_link_in_tab_in_container.js
+deleted file mode 100644
+index 6bcceae42e6fa3..00000000000000
+--- a/browser/base/content/test/referrer/browser_referrer_open_link_in_tab_in_container.js
++++ /dev/null
+@@ -1,34 +0,0 @@
+-// Tests referrer on context menu navigation - open link in new tab.
+-// Selects "open link in new tab" from the context menu.
+-
+-// This test starts from a container tab. We don't want to propagate the
+-// referrer.
+-function getReferrerTest(aTestNumber) {
+-  let test = _referrerTests[aTestNumber];
+-  if (test) {
+-    // We want all the referrer tests to fail!
+-    test.result = "";
+-  }
+-
+-  return test;
+-}
+-
+-function startNewTabTestCase(aTestNumber) {
+-  info("browser_referrer_open_link_in_tab: " +
+-       getReferrerTestDescription(aTestNumber));
+-  contextMenuOpened(gTestWindow, "testlink").then(function(aContextMenu) {
+-    someTabLoaded(gTestWindow).then(function(aNewTab) {
+-      gTestWindow.gBrowser.selectedTab = aNewTab;
+-      checkReferrerAndStartNextTest(aTestNumber, null, aNewTab,
+-                                    startNewTabTestCase,
+-                                    { userContextId: 4 });
+-    });
+-
+-    doContextMenuCommand(gTestWindow, aContextMenu, "context-openlinkintab");
+-  });
+-}
+-
+-function test() {
+-  requestLongerTimeout(10);  // slowwww shutdown on e10s
+-  startReferrerTest(startNewTabTestCase, { userContextId: 4 });
+-}
+diff --git a/browser/base/content/test/referrer/browser_referrer_open_link_in_window_in_container.js b/browser/base/content/test/referrer/browser_referrer_open_link_in_window_in_container.js
+index 8dc9d3365c235e..3c45c4dd57c644 100644
+--- a/browser/base/content/test/referrer/browser_referrer_open_link_in_window_in_container.js
++++ b/browser/base/content/test/referrer/browser_referrer_open_link_in_window_in_container.js
+@@ -21,6 +21,12 @@ function startNewWindowTestCase(aTestNumber) {
+ }
+ 
+ function test() {
+-  requestLongerTimeout(10);  // slowwww shutdown on e10s
+-  startReferrerTest(startNewWindowTestCase, { userContextId: 1 });
++  waitForExplicitFinish();
++
++  SpecialPowers.pushPrefEnv(
++    {set: [["privacy.userContext.enabled", true]]},
++    function() {
++      requestLongerTimeout(10);  // slowwww shutdown on e10s
++      startReferrerTest(startNewWindowTestCase, { userContextId: 1 });
++    });
+ }
+diff --git a/browser/base/content/utilityOverlay.js b/browser/base/content/utilityOverlay.js
+index cdc8179374c497..eadb2a41c0181e 100644
+--- a/browser/base/content/utilityOverlay.js
++++ b/browser/base/content/utilityOverlay.js
+@@ -415,7 +415,7 @@ function checkForMiddleClick(node, event) {
+ // Populate a menu with user-context menu items. This method should be called
+ // by onpopupshowing passing the event as first argument. addCommandAttribute
+ // param is used to set the 'command' attribute in the new menuitem elements.
+-function createUserContextMenu(event, addCommandAttribute = true) {
++function createUserContextMenu(event, addCommandAttribute = true, excludeUserContextId = 0) {
+   while (event.target.hasChildNodes()) {
+     event.target.removeChild(event.target.firstChild);
+   }
+@@ -423,7 +423,28 @@ function createUserContextMenu(event, addCommandAttribute = true) {
+   let bundle = document.getElementById("bundle_browser");
+   let docfrag = document.createDocumentFragment();
+ 
++  // If we are excluding a userContextId, we want to add a 'no-container' item.
++  if (excludeUserContextId) {
++    let menuitem = document.createElement("menuitem");
++    menuitem.setAttribute("usercontextid", "0");
++    menuitem.setAttribute("label", bundle.getString("userContextNone.label"));
++    menuitem.setAttribute("accesskey", bundle.getString("userContextNone.accesskey"));
++
++    // We don't set an oncommand/command attribute attribute because if we have
++    // to exclude a userContextId we are generating the contextMenu and
++    // addCommandAttribute will be false.
++
++    docfrag.appendChild(menuitem);
++
++    let menuseparator = document.createElement("menuseparator");
++    docfrag.appendChild(menuseparator);
++  }
++
+   ContextualIdentityService.getIdentities().forEach(identity => {
++    if (identity.userContextId == excludeUserContextId) {
++      return;
++    }
++
+     let menuitem = document.createElement("menuitem");
+     menuitem.setAttribute("usercontextid", identity.userContextId);
+     menuitem.setAttribute("label", bundle.getString(identity.label));
+diff --git a/browser/locales/en-US/chrome/browser/browser.properties b/browser/locales/en-US/chrome/browser/browser.properties
+index 1a2eba9dd10322..bf7a631f484719 100644
+--- a/browser/locales/en-US/chrome/browser/browser.properties
++++ b/browser/locales/en-US/chrome/browser/browser.properties
+@@ -707,7 +707,8 @@ e10s.accessibilityNotice.enableAndRestart.accesskey = E
+ # LOCALIZATION NOTE (userContextPersonal.label,
+ #                    userContextWork.label,
+ #                    userContextShopping.label,
+-#                    userContextBanking.label):
++#                    userContextBanking.label,
++#                    userContextNone.label):
+ # These strings specify the four predefined contexts included in support of the
+ # Contextual Identity / Containers project. Each context is meant to represent
+ # the context that the user is in when interacting with the site. Different
+@@ -721,11 +722,15 @@ userContextPersonal.label = Personal
+ userContextWork.label = Work
+ userContextBanking.label = Banking
+ userContextShopping.label = Shopping
++userContextNone.label = No Container
+ 
+ userContextPersonal.accesskey = P
+ userContextWork.accesskey = W
+ userContextBanking.accesskey = B
+ userContextShopping.accesskey = S
++userContextNone.accesskey = N
++
++userContextOpenLink.label = Open Link in New %S Tab
+ 
+ muteTab.label = Mute Tab
+ muteTab.accesskey = M
+diff --git a/browser/themes/linux/browser.css b/browser/themes/linux/browser.css
+index 3a6bd6860569fc..166866cd224c61 100644
+--- a/browser/themes/linux/browser.css
++++ b/browser/themes/linux/browser.css
+@@ -350,6 +350,7 @@ menuitem:not([type]):not(.menuitem-tooltip):not(.menuitem-iconic-tooltip) {
+ #placesContext_openContainer\:tabs,
+ #menu_newNavigatorTab,
+ #context-openlinkintab,
++#context-openlinkincontainertab,
+ #context-openframeintab {
+   list-style-image: url("chrome://browser/skin/Toolbar-small.png");
+   -moz-image-region: rect(0px 64px 16px 48px);
