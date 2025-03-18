@@ -2010,8 +2010,11 @@
               t.setAttribute("label", aURI);
             }
 
-            if (aUserContextId)
+            if (aUserContextId) {
               t.setAttribute("usercontextid", aUserContextId);
+              ContextualIdentityService.setTabStyle(t);
+            }
+
             t.setAttribute("crop", "end");
             t.setAttribute("validate", "never"); //PMed
             t.setAttribute("onerror", "this.removeAttribute('image');");
@@ -2673,6 +2676,7 @@
             }
             if (aOtherTab.hasAttribute("usercontextid")) {
               aOurTab.setUserContextId(aOtherTab.getAttribute("usercontextid"));
+              ContextualIdentityService.setTabStyle(aOurTab)
               modifiedAttrs.push("usercontextid");
             }
 
