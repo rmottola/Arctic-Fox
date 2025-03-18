@@ -8000,6 +8000,10 @@ DebuggerObject::checkThis(JSContext* cx, const CallArgs& args, const char* fnnam
 #define THIS_DEBUGOBJECT_PROMISE(cx, argc, vp, fnname, args, obj)                   \
    THIS_DEBUGOBJECT_REFERENT(cx, argc, vp, fnname, args, obj);                      \
    obj = CheckedUnwrap(obj);                                                        \
+   if (!obj) {                                                                      \
+       JS_ReportError(cx, "Permission denied to access object");                    \
+       return false;                                                                \
+   }                                                                                \
    if (!obj->is<PromiseObject>()) {                                                 \
        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_EXPECTED_TYPE,  \
                             "Debugger", "Promise", obj->getClass()->name);          \
@@ -8010,6 +8014,10 @@ DebuggerObject::checkThis(JSContext* cx, const CallArgs& args, const char* fnnam
 #define THIS_DEBUGOBJECT_OWNER_PROMISE(cx, argc, vp, fnname, args, dbg, obj)        \
    THIS_DEBUGOBJECT_OWNER_REFERENT(cx, argc, vp, fnname, args, dbg, obj);           \
    obj = CheckedUnwrap(obj);                                                        \
+   if (!obj) {                                                                      \
+       JS_ReportError(cx, "Permission denied to access object");                    \
+       return false;                                                                \
+   }                                                                                \
    if (!obj->is<PromiseObject>()) {                                                 \
        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_EXPECTED_TYPE,  \
                             "Debugger", "Promise", obj->getClass()->name);          \
@@ -8323,7 +8331,11 @@ DebuggerObject::isPromiseGetter(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_DEBUGOBJECT(cx, argc, vp, "get isPromise", args, object)
 
-    args.rval().setBoolean(object->isPromise());
+    bool result;
+    if (!DebuggerObject::isPromise(cx, object, result))
+      return false;
+
+    args.rval().setBoolean(result);
     return true;
 }
 
@@ -9002,14 +9014,22 @@ DebuggerObject::isGlobal() const
     return referent()->is<GlobalObject>();
 }
 
-bool
-DebuggerObject::isPromise() const
+/* static */ bool
+DebuggerObject::isPromise(JSContext* cx, Handle<DebuggerObject*> object,
+                          bool& result)
 {
-    JSObject* obj = referent();
-    if (IsCrossCompartmentWrapper(obj))
-        obj = CheckedUnwrap(obj);
+    JSObject* referent = object->referent();
+    if (IsCrossCompartmentWrapper(referent)) {
+        referent = CheckedUnwrap(referent);
 
-    return obj->is<PromiseObject>();
+        if (!referent) {
+            JS_ReportError(cx, "Permission denied to access object");
+            return false;
+        }
+      }
+
+    result = referent->is<PromiseObject>();
+    return true;
 }
 
 /* static */ bool
@@ -10104,7 +10124,7 @@ DebuggerEnvironment::getNames(JSContext* cx, Handle<DebuggerEnvironment*> enviro
         if (JSID_IS_ATOM(id) && IsIdentifier(JSID_TO_ATOM(id))) {
             if (!result.append(id))
                 return false;
-        } 
+        }
     }
 
     return true;
