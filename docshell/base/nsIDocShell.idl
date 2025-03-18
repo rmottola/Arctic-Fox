@@ -128,6 +128,9 @@ interface nsIDocShell : nsIDocShellTreeItem
    * @param aOriginalURI    - The URI to set as the originalURI on the channel
    *                          that does the load. If null, aURI will be set as
    *                          the originalURI.
+   * @param aLoadReplace    - If set LOAD_REPLACE flag will be set on the
+   *                          channel. aOriginalURI is null, this argument is
+   *                          ignored.
    * @param aIsFromProcessingFrameAttributes
    *                        - If this is a load triggered by changing frame attributes.
    *                          See nsILoadInfo.isFromProcessingFrameAttributes
