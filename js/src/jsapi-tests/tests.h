@@ -146,6 +146,9 @@ class JSAPITest
         return JSAPITestString(JS_VersionToString(v));
     }
 
+    // Note that in some still-supported GCC versions (we think anything before
+    // GCC 4.6), this template does not work when the second argument is
+    // nullptr. It infers type U = long int. Use CHECK_NULL instead.
     template <typename T, typename U>
     bool checkEqual(const T& actual, const U& expected,
                     const char* actualExpr, const char* expectedExpr,
