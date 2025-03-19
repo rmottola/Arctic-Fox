@@ -15,6 +15,7 @@
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/FetchUtil.h"
 #include "mozilla/dom/FormData.h"
+#include "mozilla/dom/URLSearchParams.h"
 #include "mozilla/dom/XMLDocument.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/EventListenerManager.h"
@@ -2244,6 +2245,15 @@ GetRequestBodyInternal(nsIInputStream* aStream, nsIInputStream** aResult,
 }
 
 static nsresult
+GetRequestBodyInternal(URLSearchParams* aURLSearchParams,
+                       nsIInputStream** aResult, uint64_t* aContentLength,
+                       nsACString& aContentType, nsACString& aCharset)
+{
+  return aURLSearchParams->GetSendInfo(aResult, aContentLength,
+                                       aContentType, aCharset);
+}
+
+static nsresult
 GetRequestBodyInternal(nsIXHRSendable* aSendable, nsIInputStream** aResult,
                        uint64_t* aContentLength, nsACString& aContentType,
                        nsACString& aCharset)
@@ -2422,6 +2432,12 @@ XMLHttpRequestMainThread::GetRequestBody(nsIVariant* aVariant,
       MOZ_ASSERT(value.mFormData);
       return GetRequestBodyInternal(value.mFormData, aResult, aContentLength,
                                     aContentType, aCharset);
+    }
+    case XMLHttpRequestMainThread::RequestBody::eURLSearchParams:
+    {
+      MOZ_ASSERT(value.mURLSearchParams);
+      return GetRequestBodyInternal(value.mURLSearchParams, aResult,
+                                    aContentLength, aContentType, aCharset);
     }
     case XMLHttpRequestMainThread::RequestBody::eInputStream:
     {
