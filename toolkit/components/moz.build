@@ -19,6 +19,7 @@ DIRS += [
     'commandlines',
     'console',
     'contentprefs',
+    'contextualidentity',
     'cookie',
     'crashmonitor',
     'diskspacewatcher',
