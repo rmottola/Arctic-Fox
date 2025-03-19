@@ -235,7 +235,6 @@ XMLHttpRequestMainThread::Init()
  */
 NS_IMETHODIMP
 XMLHttpRequestMainThread::Init(nsIPrincipal* aPrincipal,
-                               nsIScriptContext* aScriptContext,
                                nsIGlobalObject* aGlobalObject,
                                nsIURI* aBaseURI,
                                nsILoadGroup* aLoadGroup)
