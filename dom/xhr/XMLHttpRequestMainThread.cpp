@@ -1000,7 +1000,7 @@ XMLHttpRequestMainThread::GetStatusText(nsACString& aStatusText,
 }
 
 void
-XMLHttpRequestMainThread::CloseRequestWithError(const ProgressEventType aType)
+XMLHttpRequestMainThread::CloseRequest()
 {
   if (mChannel) {
     mChannel->Cancel(NS_BINDING_ABORTED);
@@ -1008,6 +1008,13 @@ XMLHttpRequestMainThread::CloseRequestWithError(const ProgressEventType aType)
   if (mTimeoutTimer) {
     mTimeoutTimer->Cancel();
   }
+}
+
+void
+XMLHttpRequestMainThread::CloseRequestWithError(const ProgressEventType aType)
+{
+  CloseRequest();
+
   uint32_t responseLength = mResponseBody.Length();
   ResetResponse();
 
@@ -1400,17 +1407,8 @@ XMLHttpRequestMainThread::Open(const nsACString& inMethod, const nsACString& url
 
   nsCOMPtr<nsIURI> uri;
 
-  if (mState == State::opened || mState == State::headers_received ||
-      mState == State::loading) {
-    // IE aborts as well
-    Abort();
-
-    // XXX We should probably send a warning to the JS console
-    //     that load was aborted and event listeners were cleared
-    //     since this looks like a situation that could happen
-    //     by accident and you could spend a lot of time wondering
-    //     why things didn't work.
-  }
+  CloseRequest(); // spec step 10
+  ResetResponse(); // (part of) spec step 11
 
   mFlagSend = false;
 
@@ -1531,7 +1529,9 @@ XMLHttpRequestMainThread::Open(const nsACString& inMethod, const nsACString& url
     }
   }
 
-  ChangeState(State::opened);
+  if (mState != State::opened) {
+    ChangeState(State::opened);
+  }
 
   return NS_OK;
 }
