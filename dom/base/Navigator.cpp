@@ -118,8 +118,6 @@
 #endif
 #include "mozilla/dom/ContentChild.h"
 
-#include "mozilla/dom/FeatureList.h"
-
 #ifdef MOZ_WIDGET_GONK
 #include <cutils/properties.h>
 #endif
@@ -1777,11 +1775,7 @@ Navigator::HasFeature(const nsAString& aName, ErrorResult& aRv)
       return p.forget();
     }
 
-    if (IsFeatureDetectible(featureName)) {
-      p->MaybeResolve(true);
-    } else {
-      p->MaybeResolve(JS::UndefinedHandleValue);
-    }
+    p->MaybeResolve(JS::UndefinedHandleValue);
     return p.forget();
   }
 
