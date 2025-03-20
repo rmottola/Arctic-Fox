@@ -2764,7 +2764,7 @@ Promise::Settle(JS::Handle<JS::Value> aValue, PromiseState aState)
   if (aState == PromiseState::Rejected &&
       !mHadRejectCallback &&
       !NS_IsMainThread()) {
-    workers::WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
+    WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
     MOZ_ASSERT(worker);
     worker->AssertIsOnWorkerThread();
 
@@ -2828,9 +2828,9 @@ Promise::RemoveWorkerHolder()
 }
 
 bool
-PromiseReportRejectWorkerHolder::Notify(workers::Status aStatus)
+PromiseReportRejectWorkerHolder::Notify(Status aStatus)
 {
-  MOZ_ASSERT(aStatus > workers::Running);
+  MOZ_ASSERT(aStatus > Running);
   mPromise->MaybeReportRejectedOnce();
   // After this point, `this` has been deleted by RemoveWorkerHolder!
   return true;
@@ -2882,7 +2882,7 @@ Promise::GetDependentPromises(nsTArray<RefPtr<Promise>>& aPromises)
 
 // A WorkerRunnable to resolve/reject the Promise on the worker thread.
 // Calling thread MUST hold PromiseWorkerProxy's mutex before creating this.
-class PromiseWorkerProxyRunnable : public workers::WorkerRunnable
+class PromiseWorkerProxyRunnable : public WorkerRunnable
 {
 public:
   PromiseWorkerProxyRunnable(PromiseWorkerProxy* aPromiseWorkerProxy,
@@ -2897,7 +2897,7 @@ public:
   }
 
   virtual bool
-  WorkerRun(JSContext* aCx, workers::WorkerPrivate* aWorkerPrivate)
+  WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate)
   {
     MOZ_ASSERT(aWorkerPrivate);
     aWorkerPrivate->AssertIsOnWorkerThread();
@@ -2932,7 +2932,7 @@ private:
 
 /* static */
 already_AddRefed<PromiseWorkerProxy>
-PromiseWorkerProxy::Create(workers::WorkerPrivate* aWorkerPrivate,
+PromiseWorkerProxy::Create(WorkerPrivate* aWorkerPrivate,
                            Promise* aWorkerPromise,
                            const PromiseWorkerProxyStructuredCloneCallbacks* aCb)
 {
@@ -2958,7 +2958,7 @@ PromiseWorkerProxy::Create(workers::WorkerPrivate* aWorkerPrivate,
 
 NS_IMPL_ISUPPORTS0(PromiseWorkerProxy)
 
-PromiseWorkerProxy::PromiseWorkerProxy(workers::WorkerPrivate* aWorkerPrivate,
+PromiseWorkerProxy::PromiseWorkerProxy(WorkerPrivate* aWorkerPrivate,
                                        Promise* aWorkerPromise,
                                        const PromiseWorkerProxyStructuredCloneCallbacks* aCallbacks)
   : mWorkerPrivate(aWorkerPrivate)
@@ -2984,7 +2984,7 @@ void
 PromiseWorkerProxy::CleanProperties()
 {
 #ifdef DEBUG
-  workers::WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
+  WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
   MOZ_ASSERT(worker);
   worker->AssertIsOnWorkerThread();
 #endif
@@ -3017,7 +3017,7 @@ PromiseWorkerProxy::AddRefObject()
   return true;
 }
 
-workers::WorkerPrivate*
+WorkerPrivate*
 PromiseWorkerProxy::GetWorkerPrivate() const
 {
 #ifdef DEBUG
@@ -3037,7 +3037,7 @@ Promise*
 PromiseWorkerProxy::WorkerPromise() const
 {
 #ifdef DEBUG
-  workers::WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
+  WorkerPrivate* worker = GetCurrentThreadWorkerPrivate();
   MOZ_ASSERT(worker);
   worker->AssertIsOnWorkerThread();
 #endif
