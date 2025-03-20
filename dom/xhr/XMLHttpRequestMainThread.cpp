@@ -1422,8 +1422,7 @@ XMLHttpRequestMainThread::Open(const nsACString& inMethod, const nsACString& url
   if (!doc) {
     // This could be because we're no longer current or because we're in some
     // non-window context...
-    nsresult rv = CheckInnerWindowCorrectness();
-    if (NS_WARN_IF(NS_FAILED(rv))) {
+    if (NS_WARN_IF(NS_FAILED(CheckInnerWindowCorrectness()))) {
       return NS_ERROR_DOM_INVALID_STATE_ERR;
     }
   }
@@ -1444,8 +1443,10 @@ XMLHttpRequestMainThread::Open(const nsACString& inMethod, const nsACString& url
     }
     return rv;
   }
-  rv = CheckInnerWindowCorrectness();
-  NS_ENSURE_SUCCESS(rv, rv);
+
+  if (NS_WARN_IF(NS_FAILED(CheckInnerWindowCorrectness()))) {
+    return NS_ERROR_DOM_INVALID_STATE_ERR;
+  }
 
   // XXXbz this is wrong: we should only be looking at whether
   // user/password were passed, not at the values!  See bug 759624.
@@ -1896,8 +1897,9 @@ XMLHttpRequestMainThread::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
     } else {
       // If we're no longer current, just kill the load, though it really should
       // have been killed already.
-      nsresult rv = CheckInnerWindowCorrectness();
-      NS_ENSURE_SUCCESS(rv, rv);
+      if (NS_WARN_IF(NS_FAILED(CheckInnerWindowCorrectness()))) {
+        return NS_ERROR_DOM_INVALID_STATE_ERR;
+      }
     }
 
     // Create an empty document from it.
@@ -2474,7 +2476,9 @@ XMLHttpRequestMainThread::Send(nsIVariant* aVariant, const Nullable<RequestBody>
   PopulateNetworkInterfaceId();
 
   nsresult rv = CheckInnerWindowCorrectness();
-  NS_ENSURE_SUCCESS(rv, rv);
+  if (NS_FAILED(rv)) {
+    return NS_ERROR_DOM_INVALID_STATE_ERR;
+  }
 
   if (mState != State::opened || // Step 1
       mFlagSend || // Step 2
