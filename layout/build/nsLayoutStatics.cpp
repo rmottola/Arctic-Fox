@@ -307,7 +307,6 @@ nsLayoutStatics::Initialize()
 #endif
 
   MediaDecoder::InitStatics();
-  MediaPrefs::GetSingleton();
 
   PromiseDebugging::Init();
 
