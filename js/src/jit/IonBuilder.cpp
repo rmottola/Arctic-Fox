@@ -7862,7 +7862,9 @@ IonBuilder::newOsrPreheader(MBasicBlock* predecessor, jsbytecode* loopEntry, jsb
         uint32_t slot = info().localSlot(i);
         ptrdiff_t offset = BaselineFrame::reverseOffsetOfLocal(i);
 
-        MOsrValue* osrv = MOsrValue::New(alloc(), entry, offset);
+        MOsrValue* osrv = MOsrValue::New(alloc().fallible(), entry, offset);
+        if (!osrv)
+            return nullptr;
         osrBlock->add(osrv);
         osrBlock->initSlot(slot, osrv);
     }
@@ -7873,7 +7875,9 @@ IonBuilder::newOsrPreheader(MBasicBlock* predecessor, jsbytecode* loopEntry, jsb
         uint32_t slot = info().stackSlot(i);
         ptrdiff_t offset = BaselineFrame::reverseOffsetOfLocal(info().nlocals() + i);
 
-        MOsrValue* osrv = MOsrValue::New(alloc(), entry, offset);
+        MOsrValue* osrv = MOsrValue::New(alloc().fallible(), entry, offset);
+        if (!osrv)
+            return nullptr;
         osrBlock->add(osrv);
         osrBlock->initSlot(slot, osrv);
     }
