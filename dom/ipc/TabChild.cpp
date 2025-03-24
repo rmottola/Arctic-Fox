@@ -147,19 +147,6 @@ static const char BEFORE_FIRST_PAINT[] = "before-first-paint";
 typedef nsDataHashtable<nsUint64HashKey, TabChild*> TabChildMap;
 static TabChildMap* sTabChildren;
 
-static bool
-UsingCompositorLRU()
-{
-  static bool sHavePrefs = false;
-  static uint32_t sCompositorLRUSize = 0;
-  if (!sHavePrefs) {
-    sHavePrefs = true;
-    Preferences::AddUintVarCache(&sCompositorLRUSize,
-                                 "layers.compositor-lru-size", 0);
-  }
-  return sCompositorLRUSize != 0;
-}
-
 TabChildBase::TabChildBase()
   : mTabChildGlobal(nullptr)
 {
@@ -2866,11 +2853,6 @@ TabChild::NotifyPainted()
 void
 TabChild::MakeVisible()
 {
-  CompositorBridgeChild* compositor = CompositorBridgeChild::Get();
-  if (UsingCompositorLRU()) {
-    compositor->SendNotifyVisible(mLayersId);
-  }
-
   if (mPuppetWidget) {
     mPuppetWidget->Show(true);
   }
@@ -2880,14 +2862,10 @@ void
 TabChild::MakeHidden()
 {
   CompositorBridgeChild* compositor = CompositorBridgeChild::Get();
-  if (UsingCompositorLRU()) {
-    compositor->SendNotifyHidden(mLayersId);
-  } else {
-    // Clear cached resources directly. This avoids one extra IPC
-    // round-trip from CompositorBridgeChild to CompositorBridgeParent when
-    // CompositorLRU is not used.
-    compositor->RecvClearCachedResources(mLayersId);
-  }
+
+  // Clear cached resources directly. This avoids one extra IPC
+  // round-trip from CompositorBridgeChild to CompositorBridgeParent.
+  compositor->RecvClearCachedResources(mLayersId);
 
   if (mPuppetWidget) {
     mPuppetWidget->Show(false);

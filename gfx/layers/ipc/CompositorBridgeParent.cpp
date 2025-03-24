@@ -36,7 +36,6 @@
 #include "mozilla/layers/AsyncCompositionManager.h"
 #include "mozilla/layers/BasicCompositor.h"  // for BasicCompositor
 #include "mozilla/layers/Compositor.h"  // for Compositor
-#include "mozilla/layers/CompositorLRU.h"  // for CompositorLRU
 #include "mozilla/layers/CompositorOGL.h"  // for CompositorOGL
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/layers/CompositorTypes.h"
@@ -1946,8 +1945,6 @@ public:
   virtual bool RecvWillClose() override { return true; }
   virtual bool RecvPause() override { return true; }
   virtual bool RecvResume() override { return true; }
-  virtual bool RecvNotifyHidden(const uint64_t& id) override;
-  virtual bool RecvNotifyVisible(const uint64_t& id) override;
   virtual bool RecvNotifyChildCreated(const uint64_t& child) override;
   virtual bool RecvAdoptChild(const uint64_t& child) override { return false; }
   virtual bool RecvMakeSnapshot(const SurfaceDescriptor& aInSnapshot,
@@ -2349,22 +2346,6 @@ CompositorBridgeParent::IsSameProcess() const
 }
 
 bool
-CrossProcessCompositorBridgeParent::RecvNotifyHidden(const uint64_t& id)
-{
-  RefPtr<CompositorLRU> lru = CompositorLRU::GetSingleton();
-  lru->Add(this, id);
-  return true;
-}
-
-bool
-CrossProcessCompositorBridgeParent::RecvNotifyVisible(const uint64_t& id)
-{
-  RefPtr<CompositorLRU> lru = CompositorLRU::GetSingleton();
-  lru->Remove(this, id);
-  return true;
-}
-
-bool
 CrossProcessCompositorBridgeParent::RecvRequestNotifyAfterRemotePaint()
 {
   mNotifyAfterRemotePaint = true;
@@ -2374,9 +2355,6 @@ CrossProcessCompositorBridgeParent::RecvRequestNotifyAfterRemotePaint()
 void
 CrossProcessCompositorBridgeParent::ActorDestroy(ActorDestroyReason aWhy)
 {
-  RefPtr<CompositorLRU> lru = CompositorLRU::GetSingleton();
-  lru->Remove(this);
-
   // We must keep this object alive untill the code handling message
   // reception is finished on this thread.
   MessageLoop::current()->PostTask(NewRunnableMethod(this, &CrossProcessCompositorBridgeParent::DeferredDestroy));
