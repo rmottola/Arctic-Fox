@@ -35,7 +35,7 @@
 
 #snapshots-pane > tabs,
 #snapshots-pane .devtools-toolbar {
-  -moz-border-end: 1px solid var(--theme-splitter-color);
+  border-inline-end: 1px solid var(--theme-splitter-color);
 }
 
 #record-snapshot {
@@ -61,7 +61,7 @@
 }
 
 .snapshot-item-details {
-  -moz-padding-start: 6px;
+  padding-inline-start: 6px;
 }
 
 .snapshot-item-calls {
@@ -134,7 +134,7 @@
 }
 
 #calls-slider {
-  -moz-padding-end: 24px;
+  padding-inline-end: 24px;
 }
 
 #calls-slider .scale-slider {
@@ -200,8 +200,8 @@
   padding-inline-end: 4px;
   padding-top: 2px;
   padding-bottom: 2px;
-  -moz-border-end: 1px solid;
-  -moz-margin-end: 6px;
+  border-inline-end: 1px solid;
+  margin-inline-end: 6px;
 }
 
 .selected .call-item-gutter {
@@ -236,8 +236,8 @@
 }
 
 .call-item-location {
-  -moz-padding-start: 2px;
-  -moz-padding-end: 6px;
+  padding-inline-start: 2px;
+  padding-inline-end: 6px;
   text-align: end;
   cursor: pointer;
   color: var(--theme-highlight-bluegrey);
@@ -261,7 +261,7 @@
 }
 
 .call-item-stack {
-  -moz-padding-start: calc(var(--gutter-width) + var(--gutter-padding-start));
+  padding-inline-start: calc(var(--gutter-width) + var(--gutter-padding-start));
   padding-bottom: 10px;
 }
 
@@ -279,8 +279,8 @@
 }
 
 .call-item-stack-fn-location {
-  -moz-padding-start: 2px;
-  -moz-padding-end: 6px;
+  padding-inline-start: 2px;
+  padding-inline-end: 6px;
   text-align: end;
   cursor: pointer;
   text-decoration: underline;

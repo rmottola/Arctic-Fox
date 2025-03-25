@@ -137,8 +137,8 @@ a {
 }
 
 #output-container.hideTimestamps > .message {
-  -moz-padding-start: 0;
-  -moz-margin-start: 7px;
+  padding-inline-start: 0;
+  margin-inline-start: 7px;
   width: calc(100% - 7px);
 }
 
@@ -209,7 +209,7 @@ a {
 }
 
 .message[category=network] > .indent {
-  -moz-border-end: solid var(--theme-body-color-alt) 6px;
+  border-inline-end: solid var(--theme-body-color-alt) 6px;
 }
 
 .message[category=network][severity=error] > .icon::before {
@@ -237,7 +237,7 @@ a {
 
 .message[category=network] .status {
   flex: none;
-  -moz-margin-start: 6px;
+  margin-inline-start: 6px;
 }
 
 .message[category=network].mixed-content .url {
@@ -268,7 +268,7 @@ a {
 }
 
 .message[category=cssparser] > .indent {
-  -moz-border-end: solid #00b6f0 6px;
+  border-inline-end: solid #00b6f0 6px;
 }
 
 .message[category=cssparser][severity=error] > .icon::before {
@@ -286,7 +286,7 @@ a {
 }
 
 .message[category=exception] > .indent {
-  -moz-border-end: solid #fb9500 6px;
+  border-inline-end: solid #fb9500 6px;
 }
 
 .message[category=exception][severity=error] > .icon::before {
@@ -304,7 +304,7 @@ a {
 }
 
 .message[category=console] > .indent {
-  -moz-border-end: solid #cbcbcb 6px;
+  border-inline-end: solid #cbcbcb 6px;
 }
 
 .message[category=console][severity=error] > .icon::before,
@@ -331,13 +331,13 @@ a {
 }
 
 .message[category=server] > .indent {
-  -moz-border-end: solid #90B090 6px;
+  border-inline-end: solid #90B090 6px;
 }
 
 /* Input and output styles */
 .message[category=input] > .indent,
 .message[category=output] > .indent {
-  -moz-border-end: solid #808080 6px;
+  border-inline-end: solid #808080 6px;
 }
 
 .message[category=input] > .icon::before {
@@ -406,7 +406,7 @@ a {
   flex: 1;
   margin-top: 5px;
   margin-bottom: 15px;
-  -moz-margin-end: 15px;
+  margin-inline-end: 15px;
   border: 1px solid var(--theme-splitter-color);
   border-radius: 3px;
 }
@@ -423,7 +423,7 @@ a {
 /* Security styles */
 
 .message[category=security] > .indent {
-  -moz-border-end: solid red 6px;
+  border-inline-end: solid red 6px;
 }
 
 .webconsole-filter-button[category="security"] > .toolbarbutton-menubutton-button:before {
@@ -449,7 +449,7 @@ a {
 }
 
 .navigation-marker .url {
-  -moz-padding-end: 9px;
+  padding-inline-end: 9px;
   text-decoration: none;
   background: var(--theme-body-background);
 }
