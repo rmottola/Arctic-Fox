@@ -1204,12 +1204,6 @@ PluginInstanceParent::GetScrollCaptureContainer(ImageContainer** aContainer)
 
   return NS_OK;
 }
-
-nsresult
-PluginInstanceParent::UpdateScrollState(bool aIsScrolling)
-{
-  return NS_OK;
-}
 #endif // XP_WIN
 
 PluginAsyncSurrogate*
