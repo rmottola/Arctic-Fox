@@ -84,6 +84,7 @@
 #include "mozilla/Telemetry.h"
 #include "AlternateServices.h"
 #include "InterceptedChannel.h"
+#include "imgLoader.h"
 #include "nsIHttpPushListener.h"
 #include "nsIX509Cert.h"
 #include "ScopedNSSTypes.h"
@@ -935,6 +936,85 @@ CallTypeSniffers(void *aClosure, const uint8_t *aData, uint32_t aCount)
   }
 }
 
+// Check and potentially enforce X-Content-Type-Options: nosniff
+nsresult
+ProcessXCTO(nsHttpResponseHead* aResponseHead, nsILoadInfo* aLoadInfo)
+{
+    if (!aResponseHead || !aLoadInfo) {
+        // if there is no response head or no loadInfo, then there is nothing to do
+        return NS_OK;
+    }
+
+    // 1) Query the XCTO header and check if 'nosniff' is the first value.
+    nsAutoCString contentTypeOptionsHeader;
+    aResponseHead->GetHeader(nsHttp::X_Content_Type_Options, contentTypeOptionsHeader);
+    if (contentTypeOptionsHeader.IsEmpty()) {
+        // if there is no XCTO header, then there is nothing to do.
+        return NS_OK;
+    }
+    // XCTO header might contain multiple values which are comma separated, so:
+    // a) let's skip all subsequent values
+    //     e.g. "   NoSniFF   , foo " will be "   NoSniFF   "
+    int32_t idx = contentTypeOptionsHeader.Find(",");
+    if (idx > 0) {
+      contentTypeOptionsHeader = Substring(contentTypeOptionsHeader, 0, idx);
+    }
+    // b) let's trim all surrounding whitespace
+    //    e.g. "   NoSniFF   " -> "NoSniFF"
+    contentTypeOptionsHeader.StripWhitespace();
+    // c) let's compare the header (ignoring case)
+    //    e.g. "NoSniFF" -> "nosniff"
+    //    if it's not 'nosniff' then there is nothing to do here
+    if (!contentTypeOptionsHeader.EqualsIgnoreCase("nosniff")) {
+        // since we are getting here, the XCTO header was sent;
+        // a non matching value most likely means a mistake happenend;
+        // e.g. sending 'nosnif' instead of 'nosniff', let's log a warning.
+        NS_ConvertUTF8toUTF16 char16_header(contentTypeOptionsHeader);
+        const char16_t* params[] = { char16_header.get() };
+        nsCOMPtr<nsIDocument> doc;
+        nsCOMPtr<nsIDOMDocument> domDoc;
+        aLoadInfo->GetLoadingDocument(getter_AddRefs(domDoc));
+        if (domDoc) {
+          doc = do_QueryInterface(domDoc);
+        }
+        nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
+                                        NS_LITERAL_CSTRING("XCTO"),
+                                        doc,
+                                        nsContentUtils::eSECURITY_PROPERTIES,
+                                        "XCTOHeaderValueMissing",
+                                        params, ArrayLength(params));
+        return NS_OK;
+    }
+
+    // 2) Query the content type from the channel
+    nsAutoCString contentType;
+    aResponseHead->ContentType(contentType);
+
+    // 3) Compare the expected MIME type with the actual type
+    if (aLoadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_STYLESHEET) {
+        if (contentType.EqualsLiteral(TEXT_CSS)) {
+            return NS_OK;
+        }
+        return NS_ERROR_CORRUPTED_CONTENT;
+    }
+
+    if (aLoadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_IMAGE) {
+        if (imgLoader::SupportImageWithMimeType(contentType.get(),
+                                                AcceptedMimeTypes::IMAGES_AND_DOCUMENTS)) {
+            return NS_OK;
+        }
+        return NS_ERROR_CORRUPTED_CONTENT;
+    }
+
+    if (aLoadInfo->GetExternalContentPolicyType() == nsIContentPolicy::TYPE_SCRIPT) {
+        if (nsContentUtils::IsScriptType(contentType)) {
+            return NS_OK;
+        }
+        return NS_ERROR_CORRUPTED_CONTENT;
+    }
+    return NS_OK;
+}
+
 nsresult
 nsHttpChannel::CallOnStartRequest()
 {
@@ -944,7 +1024,45 @@ nsHttpChannel::CallOnStartRequest()
                        "CORS preflight must have been finished by the time we "
                        "call OnStartRequest");
 
-    nsresult rv;
+    nsresult rv = ProcessXCTO(mResponseHead, mLoadInfo);
+    if (NS_FAILED(rv)) {
+        LOG(("XCTO: nosniff verification failed.\n"));
+        // log a warning to the console that loading the resrouce was
+        // blocked due to MIME type mismatch.
+        nsAutoCString spec;
+        mURI->GetSpec(spec);
+        NS_ConvertUTF8toUTF16 specUTF16(spec);
+        const char16_t* params[] = { specUTF16.get() };
+        nsCOMPtr<nsIDocument> doc;
+        if (mLoadInfo) {
+            nsCOMPtr<nsIDOMDocument> domDoc;
+            mLoadInfo->GetLoadingDocument(getter_AddRefs(domDoc));
+            if (domDoc) {
+                doc = do_QueryInterface(domDoc);
+            }
+        }
+        nsContentUtils::ReportToConsole(nsIScriptError::errorFlag,
+                                        NS_LITERAL_CSTRING("XCTO"),
+                                        doc,
+                                        nsContentUtils::eSECURITY_PROPERTIES,
+                                        "MimeTypeMismatch",
+                                        params, ArrayLength(params));
+        return rv;
+    }
+
+    if (mOnStartRequestCalled) {
+        // This can only happen when a range request loading rest of the data
+        // after interrupted concurrent cache read asynchronously failed, e.g.
+        // the response range bytes are not as expected or this channel has
+        // been externally canceled.
+        //
+        // It's legal to bypass CallOnStartRequest for that case since we've
+        // already called OnStartRequest on our listener and also added all
+        // content converters before.
+        MOZ_ASSERT(mConcurrentCacheAccess);
+        LOG(("CallOnStartRequest already invoked before"));
+        return mStatus;
+    }
 
     mTracingEnabled = false;
 
@@ -1590,115 +1708,10 @@ nsHttpChannel::ProcessAltService()
                                  mCaps & NS_HTTP_DISALLOW_SPDY);
 }
 
-bool IsSuccessfulStatus(uint32_t status)
-{
-    return status == 200 || status == 201 || status == 202 || status == 203 ||
-           status == 204 || status == 205 || status == 206 || status == 207 || 
-           status == 208 || status == 226;
-}
-
-// Check and potentially enforce X-Content-Type-Options: nosniff
-nsresult
-ProcessXCTO(nsHttpResponseHead* aResponseHead, nsILoadInfo* aLoadInfo)
-{
-    if (!aResponseHead || !IsSuccessfulStatus(aResponseHead->Status()) || !aLoadInfo) {
-        // if there is no response head or no loadInfo, then there is nothing to do
-        // we also skip the check if response code is not 2xx
-        return NS_OK;
-    }
-
-    // 1) Query the XCTO header and check if 'nosniff' is the first value.
-    nsAutoCString contentTypeOptionsHeader;
-    aResponseHead->GetHeader(nsHttp::X_Content_Type_Options, contentTypeOptionsHeader);
-    if (contentTypeOptionsHeader.IsEmpty()) {
-        // if there is no XCTO header, then there is nothing to do.
-        return NS_OK;
-    }
-    // XCTO header might contain multiple values which are comma separated, so:
-    // a) let's skip all subsequent values
-    //     e.g. "   NoSniFF   , foo " will be "   NoSniFF   "
-    int32_t idx = contentTypeOptionsHeader.Find(",");
-    if (idx > 0) {
-      contentTypeOptionsHeader = Substring(contentTypeOptionsHeader, 0, idx);
-    }
-    // b) let's trim all surrounding whitespace
-    //    e.g. "   NoSniFF   " -> "NoSniFF"
-    contentTypeOptionsHeader.StripWhitespace();
-    // c) let's compare the header (ignoring case)
-    //    e.g. "NoSniFF" -> "nosniff"
-    //    if it's not 'nosniff' then there is nothing to do here
-    if (!contentTypeOptionsHeader.EqualsIgnoreCase("nosniff")) {
-        // since we are getting here, the XCTO header was sent;
-        // a non matching value most likely means a mistake happenend;
-        // e.g. sending 'nosnif' instead of 'nosniff', let's log a warning.
-        NS_ConvertUTF8toUTF16 char16_header(contentTypeOptionsHeader);
-        const char16_t* params[] = { char16_header.get() };
-        nsCOMPtr<nsIDocument> doc;
-        nsCOMPtr<nsIDOMDocument> domDoc;
-        aLoadInfo->GetLoadingDocument(getter_AddRefs(domDoc));
-        if (domDoc) {
-          doc = do_QueryInterface(domDoc);
-        }
-        nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
-                                        NS_LITERAL_CSTRING("XCTO"),
-                                        doc,
-                                        nsContentUtils::eSECURITY_PROPERTIES,
-                                        "XCTOHeaderValueMissing",
-                                        params, ArrayLength(params));
-        return NS_OK;
-    }
-
-    // 2) Query the content type from the channel
-    nsAutoCString contentType;
-    aResponseHead->ContentType(contentType);
-
-    // 3) Compare the expected MIME type with the actual type
-    if (aLoadInfo->InternalContentPolicyType() == nsIContentPolicy::TYPE_STYLESHEET) {
-        if (contentType.EqualsLiteral(TEXT_CSS)) {
-            return NS_OK;
-        }
-        return NS_ERROR_CORRUPTED_CONTENT;
-    }
-
-    if (aLoadInfo->InternalContentPolicyType() == nsIContentPolicy::TYPE_SCRIPT) {
-        if (nsContentUtils::IsJavascriptMIMEType(NS_ConvertUTF8toUTF16(contentType))) {
-            return NS_OK;
-        }
-        return NS_ERROR_CORRUPTED_CONTENT;
-    }
-    return NS_OK;
-}
-
 nsresult
 nsHttpChannel::ProcessResponse()
 {
-    nsresult rv = ProcessXCTO(mResponseHead, mLoadInfo);
-    if (NS_FAILED(rv)) {
-        LOG(("XCTO: nosniff verification failed.\n"));
-        // log a warning to the console that loading the resrouce was
-        // blocked due to MIME type mismatch.
-        nsAutoCString spec;
-        mURI->GetSpec(spec);
-        NS_ConvertUTF8toUTF16 specUTF16(spec);
-        const char16_t* params[] = { specUTF16.get() };
-        nsCOMPtr<nsIDocument> doc;
-        if (mLoadInfo) {
-            nsCOMPtr<nsIDOMDocument> domDoc;
-            mLoadInfo->GetLoadingDocument(getter_AddRefs(domDoc));
-            if (domDoc) {
-                doc = do_QueryInterface(domDoc);
-            }
-        }
-        nsContentUtils::ReportToConsole(nsIScriptError::errorFlag,
-                                        NS_LITERAL_CSTRING("XCTO"),
-                                        doc,
-                                        nsContentUtils::eSECURITY_PROPERTIES,
-                                        "MimeTypeMismatch",
-                                        params, ArrayLength(params));
-        Cancel(rv);
-        return CallOnStartRequest();
-    }
-
+    nsresult rv;
     uint32_t httpStatus = mResponseHead->Status();
 
     LOG(("nsHttpChannel::ProcessResponse [this=%p httpStatus=%u]\n",
