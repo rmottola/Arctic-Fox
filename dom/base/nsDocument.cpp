@@ -13092,12 +13092,6 @@ nsDocument::Evaluate(const nsAString& aExpression, nsIDOMNode* aContextNode,
                                     aInResult, aResult);
 }
 
-bool
-nsIDocument::HasScriptsBlockedBySandbox()
-{
-  return mSandboxFlags & SANDBOXED_SCRIPTS;
-}
-
 nsIDocument*
 nsIDocument::GetTopLevelContentDocument()
 {
@@ -13196,6 +13190,12 @@ nsIDocument::SetPageUseCounter(UseCounter aUseCounter)
   }
 
   contentParent->SetChildDocumentUseCounter(aUseCounter);
+}
+
+bool
+nsIDocument::HasScriptsBlockedBySandbox()
+{
+  return mSandboxFlags & SANDBOXED_SCRIPTS;
 }
 
 static bool
