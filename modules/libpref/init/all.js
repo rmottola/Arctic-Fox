@@ -2400,6 +2400,10 @@ pref("security.ssl.enable_ocsp_must_staple", true);
 // Enable pinning checks by default.
 pref("security.cert_pinning.enforcement_level", 2);
 
+// Controls whether signing should be enforced on signature-capable blocklist
+// collections.
+pref("services.blocklist.signing.enforced", false);
+
 #ifdef RELEASE_BUILD
 pref("security.onecrl.via.amo", true);
 #else
