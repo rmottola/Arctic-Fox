@@ -144,8 +144,6 @@ public:
 
     ////////////////
 
-    bool FindActiveOutputMappedNameByUserName(const nsACString& userName,
-                                              nsCString* const out_mappedName) const;
     bool FindAttribUserNameByMappedName(const nsACString& mappedName,
                                         nsDependentCString* const out_userName) const;
     bool FindVaryingByMappedName(const nsACString& mappedName,
