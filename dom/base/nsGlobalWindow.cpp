@@ -468,8 +468,6 @@ nsGlobalWindow::DOMMinTimeoutValue() const {
 // CIDs
 static NS_DEFINE_CID(kXULControllersCID, NS_XULCONTROLLERS_CID);
 
-static const char sPopStatePrefStr[] = "browser.history.allowPopState";
-
 #define NETWORK_UPLOAD_EVENT_NAME     NS_LITERAL_STRING("moznetworkupload")
 #define NETWORK_DOWNLOAD_EVENT_NAME   NS_LITERAL_STRING("moznetworkdownload")
 
@@ -10251,11 +10249,6 @@ nsGlobalWindow::DispatchSyncPopState()
   MOZ_RELEASE_ASSERT(IsInnerWindow());
   NS_ASSERTION(nsContentUtils::IsSafeToRunScript(),
                "Must be safe to run script here.");
-
-  // Check that PopState hasn't been pref'ed off.
-  if (!Preferences::GetBool(sPopStatePrefStr, false)) {
-    return NS_OK;
-  }
 
   nsresult rv = NS_OK;
 
