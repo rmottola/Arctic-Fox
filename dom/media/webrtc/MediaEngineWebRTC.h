@@ -577,7 +577,7 @@ private:
   nsString mDeviceName;
   nsCString mDeviceUUID;
 
-  uint32_t mSampleFrequency;
+  int32_t mSampleFrequency;
   int32_t mPlayoutDelay;
 
   NullTransport *mNullTransport;
