@@ -222,7 +222,8 @@ nsresult
 MediaEngineWebRTCMicrophoneSource::Allocate(const dom::MediaTrackConstraints &aConstraints,
                                             const MediaEnginePrefs &aPrefs,
                                             const nsString& aDeviceId,
-                                            const nsACString& aOrigin)
+                                            const nsACString& aOrigin,
+                                            BaseAllocationHandle** aOutHandle)
 {
   AssertIsOnOwningThread();
   if (mState == kReleased) {
@@ -258,6 +259,7 @@ MediaEngineWebRTCMicrophoneSource::Allocate(const dom::MediaTrackConstraints &aC
     }
   }
   ++mNrAllocations;
+  aOutHandle = nullptr;
   return Restart(aConstraints, aPrefs, aDeviceId);
 }
 
@@ -331,9 +333,10 @@ MediaEngineWebRTCMicrophoneSource::Restart(const dom::MediaTrackConstraints& aCo
 }
 
 nsresult
-MediaEngineWebRTCMicrophoneSource::Deallocate()
+MediaEngineWebRTCMicrophoneSource::Deallocate(BaseAllocationHandle* aHandle)
 {
   AssertIsOnOwningThread();
+  MOZ_ASSERT(!aHandle);
   --mNrAllocations;
   MOZ_ASSERT(mNrAllocations >= 0, "Double-deallocations are prohibited");
   if (mNrAllocations == 0) {
@@ -693,8 +696,9 @@ MediaEngineWebRTCMicrophoneSource::Shutdown()
     MOZ_ASSERT(mState == kStopped);
   }
 
-  if (mState == kAllocated || mState == kStopped) {
-    Deallocate();
+  while (mNrAllocations) {
+    MOZ_ASSERT(mState == kAllocated || mState == kStopped);
+    Deallocate(nullptr); // XXX Extend concurrent constraints code to mics.
   }
 
   FreeChannel();
