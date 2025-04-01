@@ -2390,6 +2390,10 @@ static bool HttpsStateIsModern(nsIDocument* aDocument)
 {
   nsCOMPtr<nsIPrincipal> principal = aDocument->NodePrincipal();
 
+  if (principal->GetIsSystemPrincipal()) {
+    return true;
+  }
+
   // If aDocument is sandboxed, try and get the principal that it would have
   // been given had it not been sandboxed:
   if (principal->GetIsNullPrincipal() &&
@@ -2402,6 +2406,18 @@ static bool HttpsStateIsModern(nsIDocument* aDocument)
         ssm->GetChannelResultPrincipalIfNotSandboxed(channel,
                                                      getter_AddRefs(principal));
       if (NS_FAILED(rv)) {
+        return false;
+      }
+      if (principal->GetIsSystemPrincipal()) {
+        // If a document with the system principal is sandboxing a subdocument
+        // that would normally inherit the embedding element's principal (e.g.
+        // a srcdoc document) then the embedding document does not trust the
+        // content that is written to the embedded document.  Unlike when the
+        // embedding document is https, in this case we have no indication as
+        // to whether the embedded document's contents are delivered securely
+        // or not, and the sandboxing would possibly indicate that they were
+        // not.  To play it safe we return false here.  (See bug 1162772
+        // comment 73-80.)
         return false;
       }
     }
@@ -7997,7 +8013,6 @@ nsGlobalWindow::FirePopupBlockedEvent(nsIDocument* aDoc,
   bool defaultActionEnabled;
   aDoc->DispatchEvent(event, &defaultActionEnabled);
 }
-
 
 // static
 bool
