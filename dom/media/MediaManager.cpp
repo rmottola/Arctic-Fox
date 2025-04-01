@@ -898,7 +898,7 @@ nsresult MediaDevice::Allocate(const dom::MediaTrackConstraints &aConstraints,
 
 nsresult MediaDevice::Restart(const dom::MediaTrackConstraints &aConstraints,
                               const MediaEnginePrefs &aPrefs) {
-  return GetSource()->Restart(aConstraints, aPrefs, mID);
+  return GetSource()->Restart(mAllocationHandle, aConstraints, aPrefs, mID);
 }
 
 nsresult MediaDevice::Deallocate() {

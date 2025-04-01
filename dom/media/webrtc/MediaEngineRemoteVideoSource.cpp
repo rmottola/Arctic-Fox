@@ -120,7 +120,7 @@ MediaEngineRemoteVideoSource::Allocate(
     // Note: if shared, we don't allow a later opener to affect the resolution.
     // (This may change depending on spec changes for Constraints/settings)
 
-    if (!ChooseCapability(aConstraints, aPrefs, aDeviceId)) {
+    if (!ChooseCapability(handle->mConstraints, aPrefs, aDeviceId)) {
       return NS_ERROR_UNEXPECTED;
     }
 
@@ -263,7 +263,8 @@ MediaEngineRemoteVideoSource::Stop(mozilla::SourceMediaStream* aSource,
 }
 
 nsresult
-MediaEngineRemoteVideoSource::Restart(const dom::MediaTrackConstraints& aConstraints,
+MediaEngineRemoteVideoSource::Restart(BaseAllocationHandle* aHandle,
+                                      const dom::MediaTrackConstraints& aConstraints,
                                       const MediaEnginePrefs& aPrefs,
                                       const nsString& aDeviceId)
 {
@@ -272,7 +273,10 @@ MediaEngineRemoteVideoSource::Restart(const dom::MediaTrackConstraints& aConstra
     LOG(("Init not done"));
     return NS_ERROR_FAILURE;
   }
-  if (!ChooseCapability(aConstraints, aPrefs, aDeviceId)) {
+  MOZ_ASSERT(aHandle);
+  auto handle = static_cast<AllocationHandle*>(aHandle);
+  handle->mConstraints = NormalizedConstraints(aConstraints);
+  if (!ChooseCapability(handle->mConstraints, aPrefs, aDeviceId)) {
     return NS_ERROR_NOT_AVAILABLE;
   }
   if (mState != kStarted) {
@@ -449,7 +453,8 @@ MediaEngineRemoteVideoSource::NumCapabilities()
 }
 
 bool
-MediaEngineRemoteVideoSource::ChooseCapability(const MediaTrackConstraints &aConstraints,
+MediaEngineRemoteVideoSource::ChooseCapability(
+    const NormalizedConstraints &aConstraints,
     const MediaEnginePrefs &aPrefs,
     const nsString& aDeviceId)
 {
