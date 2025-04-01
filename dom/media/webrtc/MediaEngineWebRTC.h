@@ -439,10 +439,6 @@ public:
     , mNrAllocations(0)
     , mStarted(false)
     , mSampleFrequency(MediaEngine::DEFAULT_SAMPLE_RATE)
-    , mEchoOn(false), mAgcOn(false), mNoiseOn(false)
-    , mEchoCancel(webrtc::kEcDefault)
-    , mAGC(webrtc::kAgcDefault)
-    , mNoiseSuppress(webrtc::kNsDefault)
     , mPlayoutDelay(0)
     , mNullTransport(nullptr)
     , mInputBufferLen(0) {
@@ -565,10 +561,6 @@ private:
   nsCString mDeviceUUID;
 
   uint32_t mSampleFrequency;
-  bool mEchoOn, mAgcOn, mNoiseOn;
-  webrtc::EcModes  mEchoCancel;
-  webrtc::AgcModes mAGC;
-  webrtc::NsModes  mNoiseSuppress;
   int32_t mPlayoutDelay;
 
   NullTransport *mNullTransport;
