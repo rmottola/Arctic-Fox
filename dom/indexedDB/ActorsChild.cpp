@@ -1868,6 +1868,20 @@ BackgroundDatabaseChild::RecvInvalidate()
   return true;
 }
 
+bool
+BackgroundDatabaseChild::RecvCloseAfterInvalidationComplete()
+{
+  AssertIsOnOwningThread();
+
+  MaybeCollectGarbageOnIPCMessage();
+
+  if (mDatabase) {
+    mDatabase->DispatchTrustedEvent(nsDependentString(kCloseEventType));
+  }
+
+  return true;
+}
+
 /*******************************************************************************
  * BackgroundDatabaseRequestChild
  ******************************************************************************/
