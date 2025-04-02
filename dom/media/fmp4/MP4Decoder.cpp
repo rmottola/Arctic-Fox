@@ -20,7 +20,6 @@
 #endif
 #ifdef MOZ_WIDGET_ANDROID
 #include "nsIGfxInfo.h"
-#include "AndroidBridge.h"
 #endif
 #ifdef MOZ_APPLEMEDIA
 #include "AppleDecoderModule.h"
