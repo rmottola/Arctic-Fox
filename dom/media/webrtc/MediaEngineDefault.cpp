@@ -97,6 +97,12 @@ MediaEngineDefaultVideoSource::Allocate(const dom::MediaTrackConstraints &aConst
     return NS_ERROR_FAILURE;
   }
 
+  // Mock failure for automated tests.
+  if (aConstraints.mDeviceId.IsString() &&
+      aConstraints.mDeviceId.GetAsString().EqualsASCII("bad device")) {
+    return NS_ERROR_FAILURE;
+  }
+
   mOpts = aPrefs;
   mOpts.mWidth = mOpts.mWidth ? mOpts.mWidth : MediaEngine::DEFAULT_43_VIDEO_WIDTH;
   mOpts.mHeight = mOpts.mHeight ? mOpts.mHeight : MediaEngine::DEFAULT_43_VIDEO_HEIGHT;
@@ -414,6 +420,12 @@ MediaEngineDefaultAudioSource::Allocate(const dom::MediaTrackConstraints &aConst
                                         const char** aOutBadConstraint)
 {
   if (mState != kReleased) {
+    return NS_ERROR_FAILURE;
+  }
+
+  // Mock failure for automated tests.
+  if (aConstraints.mDeviceId.IsString() &&
+      aConstraints.mDeviceId.GetAsString().EqualsASCII("bad device")) {
     return NS_ERROR_FAILURE;
   }
 
