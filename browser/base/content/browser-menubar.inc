@@ -509,7 +509,7 @@
 #ifndef XP_MACOSX
                 class="menuitem-iconic"
 #endif
-                label="&unsortedBookmarksCmd.label;"
+                label="&otherBookmarksCmd.label;"
                 oncommand="PlacesCommandHook.showPlacesOrganizer('UnfiledBookmarks');"/>
     </menupopup>
   </menu>
