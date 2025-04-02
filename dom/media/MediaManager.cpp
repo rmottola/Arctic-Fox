@@ -2185,7 +2185,7 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
             !(loop || HostHasPermission(*docURI))) {
           RefPtr<MediaStreamError> error =
               new MediaStreamError(aWindow,
-                                   NS_LITERAL_STRING("SecurityError"));
+                                   NS_LITERAL_STRING("NotAllowedError"));
           onFailure->OnError(error);
           return NS_OK;
         }
@@ -2266,7 +2266,7 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
         if (!Preferences::GetBool("media.getusermedia.audiocapture.enabled")) {
           RefPtr<MediaStreamError> error =
             new MediaStreamError(aWindow,
-                                 NS_LITERAL_STRING("SecurityError"));
+                                 NS_LITERAL_STRING("NotAllowedError"));
           onFailure->OnError(error);
           return NS_OK;
         }
@@ -2332,7 +2332,7 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
         (IsOn(c.mAudio) && audioPerm == nsIPermissionManager::DENY_ACTION) ||
         (IsOn(c.mVideo) && videoPerm == nsIPermissionManager::DENY_ACTION)) {
       RefPtr<MediaStreamError> error =
-          new MediaStreamError(aWindow, NS_LITERAL_STRING("SecurityError"));
+          new MediaStreamError(aWindow, NS_LITERAL_STRING("NotAllowedError"));
       onFailure->OnError(error);
       RemoveFromWindowList(windowID, listener);
       return NS_OK;
@@ -3047,7 +3047,7 @@ MediaManager::Observe(nsISupports* aSubject, const char* aTopic,
       MOZ_ASSERT(needVideo || needAudio);
 
       if ((needVideo && !videoFound) || (needAudio && !audioFound)) {
-        task->Denied(NS_LITERAL_STRING("SecurityError"));
+        task->Denied(NS_LITERAL_STRING("NotAllowedError"));
         return NS_OK;
       }
     }
@@ -3060,7 +3060,7 @@ MediaManager::Observe(nsISupports* aSubject, const char* aTopic,
     return NS_OK;
 
   } else if (!strcmp(aTopic, "getUserMedia:response:deny")) {
-    nsString errorMessage(NS_LITERAL_STRING("SecurityError"));
+    nsString errorMessage(NS_LITERAL_STRING("NotAllowedError"));
 
     if (aSubject) {
       nsCOMPtr<nsISupportsString> msg(do_QueryInterface(aSubject));
