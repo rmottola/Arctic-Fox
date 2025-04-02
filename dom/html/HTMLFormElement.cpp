@@ -934,12 +934,12 @@ HTMLFormElement::DoSecureToInsecureSubmitCheck(nsIURI* aActionURL,
   nsAutoString message;
   nsAutoString cont;
   stringBundle->GetStringFromName(
-    MOZ_UTF16("formPostSecureToInsecureWarning.title"), getter_Copies(title));
+    u"formPostSecureToInsecureWarning.title", getter_Copies(title));
   stringBundle->GetStringFromName(
-    MOZ_UTF16("formPostSecureToInsecureWarning.message"),
+    u"formPostSecureToInsecureWarning.message",
     getter_Copies(message));
   stringBundle->GetStringFromName(
-    MOZ_UTF16("formPostSecureToInsecureWarning.continue"),
+    u"formPostSecureToInsecureWarning.continue",
     getter_Copies(cont));
   int32_t buttonPressed;
   bool checkState = false; // this is unused (ConfirmEx requires this parameter)
@@ -1759,7 +1759,7 @@ HTMLFormElement::GetActionURL(nsIURI** aActionURL,
     NS_ConvertUTF8toUTF16 reportScheme(scheme);
 
     const char16_t* params[] = { reportSpec.get(), reportScheme.get() };
-    CSP_LogLocalizedStr(MOZ_UTF16("upgradeInsecureRequest"),
+    CSP_LogLocalizedStr(u"upgradeInsecureRequest",
                         params, ArrayLength(params),
                         EmptyString(), // aSourceFile
                         EmptyString(), // aScriptSample
