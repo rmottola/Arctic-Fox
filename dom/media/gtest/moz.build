@@ -21,6 +21,7 @@ UNIFIED_SOURCES += [
     'TestTrackEncoder.cpp',
     'TestVideoSegment.cpp',
     'TestVideoUtils.cpp',
+    'TestVPXDecoding.cpp',
     'TestWebMBuffered.cpp',
 ]
 
