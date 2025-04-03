@@ -2962,12 +2962,12 @@ EvalInContext(JSContext* cx, unsigned argc, Value* vp)
 
 struct WorkerInput
 {
-    JSRuntime* runtime;
+    JSContext* context;
     char16_t* chars;
     size_t length;
 
-    WorkerInput(JSRuntime* runtime, char16_t* chars, size_t length)
-      : runtime(runtime), chars(chars), length(length)
+    WorkerInput(JSContext* context, char16_t* chars, size_t length)
+      : context(context), chars(chars), length(length)
     {}
 
     ~WorkerInput() {
@@ -2982,17 +2982,15 @@ WorkerMain(void* arg)
 {
     WorkerInput* input = (WorkerInput*) arg;
 
-    JSRuntime* rt = JS_NewRuntime(8L * 1024L * 1024L, 2L * 1024L * 1024L, input->runtime);
-    if (!rt) {
+    JSContext* cx = JS_NewContext(8L * 1024L * 1024L, 2L * 1024L * 1024L, input->context);
+    if (!cx) {
         js_delete(input);
         return;
     }
 
-    JSContext* cx = JS_GetContext(rt);
-
     UniquePtr<ShellContext> sc = MakeUnique<ShellContext>(cx);
     if (!sc) {
-        JS_DestroyRuntime(rt);
+        JS_DestroyContext(cx);
         js_delete(input);
         return;
     }
@@ -3006,7 +3004,7 @@ WorkerMain(void* arg)
     SetWorkerContextOptions(cx);
 
     if (!JS::InitSelfHostedCode(cx)) {
-        JS_DestroyRuntime(rt);
+        JS_DestroyContext(cx);
         js_delete(input);
         return;
     }
@@ -3054,7 +3052,7 @@ WorkerMain(void* arg)
 
     KillWatchdog(cx);
 
-    JS_DestroyRuntime(rt);
+    JS_DestroyContext(cx);
 
     js_delete(input);
 }
@@ -3116,7 +3114,7 @@ EvalInWorker(JSContext* cx, unsigned argc, Value* vp)
 
     CopyChars(chars, *str);
 
-    WorkerInput* input = js_new<WorkerInput>(JS_GetParentRuntime(JS_GetRuntime(cx)), chars, str->length());
+    WorkerInput* input = js_new<WorkerInput>(JS_GetParentContext(cx), chars, str->length());
     if (!input) {
         ReportOutOfMemory(cx);
         return false;
@@ -7492,11 +7490,9 @@ main(int argc, char** argv, char** envp)
     nurseryBytes = op.getIntOption("nursery-size") * 1024L * 1024L;
 
     /* Use the same parameters as the browser in xpcjsruntime.cpp. */
-    JSRuntime* rt = JS_NewRuntime(JS::DefaultHeapMaxBytes, nurseryBytes);
-    if (!rt)
+    JSContext* cx = JS_NewContext(JS::DefaultHeapMaxBytes, nurseryBytes);
+    if (!cx)
         return 1;
-
-    JSContext* cx = JS_GetContext(rt);
 
     UniquePtr<ShellContext> sc = MakeUnique<ShellContext>(cx);
     if (!sc)
@@ -7576,7 +7572,7 @@ main(int argc, char** argv, char** envp)
 
     DestructSharedArrayBufferMailbox();
 
-    JS_DestroyRuntime(rt);
+    JS_DestroyContext(cx);
     JS_ShutDown();
     return result;
 }
