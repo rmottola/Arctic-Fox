@@ -235,6 +235,7 @@ TextTrackManager::UpdateCueDisplay()
   }
 
   nsCOMPtr<nsIContent> overlay = videoFrame->GetCaptionOverlay();
+  nsCOMPtr<nsIContent> controls = videoFrame->GetVideoControls();
   if (!overlay) {
     return;
   }
@@ -252,7 +253,7 @@ TextTrackManager::UpdateCueDisplay()
 
     nsPIDOMWindowInner* window = mMediaElement->OwnerDoc()->GetInnerWindow();
     if (window) {
-      sParserWrapper->ProcessCues(window, jsCues, overlay);
+      sParserWrapper->ProcessCues(window, jsCues, overlay, controls);
     }
   } else if (overlay->Length() > 0) {
     nsContentUtils::SetNodeTextContent(overlay, EmptyString(), true);
@@ -302,6 +303,10 @@ TextTrackManager::AddListeners()
   if (mMediaElement) {
     mMediaElement->AddEventListener(NS_LITERAL_STRING("resizevideocontrols"),
                                     this, false, false);
+    mMediaElement->AddEventListener(NS_LITERAL_STRING("seeked"),
+                                    this, false, false);
+    mMediaElement->AddEventListener(NS_LITERAL_STRING("controlbarchange"),
+                                    this, false, true);
   }
 }
 
@@ -411,11 +416,17 @@ TextTrackManager::HandleEvent(nsIDOMEvent* aEvent)
 
   nsAutoString type;
   aEvent->GetType(type);
-  if (type.EqualsLiteral("resizevideocontrols")) {
+  if (type.EqualsLiteral("resizevideocontrols") ||
+      type.EqualsLiteral("seeked")) {
     for (uint32_t i = 0; i< mTextTracks->Length(); i++) {
       ((*mTextTracks)[i])->SetCuesDirty();
     }
   }
+
+  if (type.EqualsLiteral("controlbarchange")) {
+    UpdateCueDisplay();
+  }
+
   return NS_OK;
 }
 

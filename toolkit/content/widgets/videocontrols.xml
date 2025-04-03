@@ -1320,6 +1320,7 @@
 
                 onControlBarTransitioned : function () {
                   this.textTrackList.setAttribute("hidden", "true");
+                  this.video.dispatchEvent(new CustomEvent("controlbarchange"));
                 },
 
                 toggleClosedCaption : function () {
