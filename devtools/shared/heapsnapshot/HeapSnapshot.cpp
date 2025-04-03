@@ -569,7 +569,7 @@ HeapSnapshot::ComputeDominatorTree(ErrorResult& rv)
     MOZ_ASSERT(ccrt);
     auto cx = ccrt->Context();
     MOZ_ASSERT(cx);
-    JS::AutoCheckCannotGC nogc(JS_GetRuntime(cx));
+    JS::AutoCheckCannotGC nogc(cx);
     maybeTree = JS::ubi::DominatorTree::Create(cx, nogc, getRoot());
   }
 
@@ -632,7 +632,7 @@ HeapSnapshot::ComputeShortestPaths(JSContext*cx, uint64_t start,
 
   Maybe<ShortestPaths> maybeShortestPaths;
   {
-    JS::AutoCheckCannotGC nogc(JS_GetRuntime(cx));
+    JS::AutoCheckCannotGC nogc(cx);
     maybeShortestPaths = ShortestPaths::Create(cx, nogc, maxNumPaths, *startNode,
                                                Move(targetsSet));
   }
