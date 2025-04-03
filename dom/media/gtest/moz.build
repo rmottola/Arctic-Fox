@@ -20,6 +20,7 @@ UNIFIED_SOURCES += [
     'TestMP4Reader.cpp',
     'TestTrackEncoder.cpp',
     'TestVideoSegment.cpp',
+    'TestVideoUtils.cpp',
     'TestWebMBuffered.cpp',
 ]
 
