@@ -43,6 +43,10 @@ class nsIPrincipal;
 #include "GonkGPSGeolocationProvider.h"
 #endif
 
+#ifdef MOZ_GPSD
+#include "GpsdLocationProvider.h"
+#endif
+
 #ifdef MOZ_WIDGET_COCOA
 #include "CoreLocationLocationProvider.h"
 #endif
@@ -705,6 +709,14 @@ nsresult nsGeolocationService::Init()
   // do_Createinstance will create multiple instances of the provider which is not right.
   // bug 993041
   mProvider = do_GetService(GONK_GPS_GEOLOCATION_PROVIDER_CONTRACTID);
+#endif
+
+#ifdef MOZ_WIDGET_GTK
+#ifdef MOZ_GPSD
+  if (Preferences::GetBool("geo.provider.use_gpsd", false)) {
+    mProvider = new GpsdLocationProvider();
+  }
+#endif
 #endif
 
 #ifdef MOZ_WIDGET_COCOA

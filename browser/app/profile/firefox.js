@@ -1332,10 +1332,16 @@ pref("geo.provider.use_corelocation", true);
 #endif
 
 #ifdef XP_WIN
-#ifdef RELEASE_BUILD
 pref("geo.provider.ms-windows-location", false);
+#endif
+
+#ifdef MOZ_WIDGET_GTK
+#ifdef MOZ_GPSD
+#ifdef RELEASE_BUILD
+pref("geo.provider.use_gpsd", false);
 #else
-pref("geo.provider.ms-windows-location", true);
+pref("geo.provider.use_gpsd", true);
+#endif
 #endif
 #endif
 
