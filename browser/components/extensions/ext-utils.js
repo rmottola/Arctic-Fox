@@ -303,7 +303,7 @@ class BasePopup {
   resizeBrowser() {
     if (this.resizeTimeout == null) {
       this._resizeBrowser();
-      this.resizeTimeout = setTimeout(this._resizeBrowser.bind(this), RESIZE_TIMEOUT);
+      this.resizeTimeout = this.window.setTimeout(this._resizeBrowser.bind(this), RESIZE_TIMEOUT);
     }
   }
 
