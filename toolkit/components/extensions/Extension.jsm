@@ -547,6 +547,10 @@ GlobalManager = {
     schemaApi.extensionTypes = {};
 
     let schemaWrapper = {
+      get principal() {
+        return context.principal;
+      },
+
       get cloneScope() {
         return context.cloneScope;
       },
