@@ -27,8 +27,6 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/ExtensionContent.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "EventEmitter",
-                                  "resource://devtools/shared/event-emitter.js");
 XPCOMUtils.defineLazyModuleGetter(this, "Locale",
                                   "resource://gre/modules/Locale.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Log",
@@ -95,6 +93,7 @@ ExtensionManagement.registerSchema("chrome://extensions/content/schemas/web_requ
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   BaseContext,
+  EventEmitter,
   LocaleData,
   Messenger,
   injectAPI,
@@ -227,7 +226,7 @@ var Management = {
 
   // Ask to run all the callbacks that are registered for a given hook.
   emit(hook, ...args) {
-    this.emitter.emit(hook, ...args);
+    return this.emitter.emit(hook, ...args);
   },
 
   off(hook, callback) {
@@ -682,16 +681,11 @@ GlobalManager = {
     let alertDisplayedWarning = false;
     let alertOverwrite = text => {
       if (!alertDisplayedWarning) {
-        let consoleWindow = Services.wm.getMostRecentWindow("devtools:webconsole");
-        if (!consoleWindow) {
-          let {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
-          require("devtools/client/framework/devtools-browser");
-          let hudservice = require("devtools/client/webconsole/hudservice");
-          hudservice.toggleBrowserConsole().catch(Cu.reportError);
-        } else {
-          // the Browser Console was already open
-          consoleWindow.focus();
-        }
+        let {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
+        require("devtools/client/framework/devtools-browser");
+
+        let hudservice = require("devtools/client/webconsole/hudservice");
+        hudservice.openBrowserConsoleOrFocus();
 
         contentWindow.console.warn("alert() is not supported in background windows; please use console.log instead.");
 
@@ -1221,18 +1215,21 @@ function MockExtension(id, file, rootURI) {
   this.file = file;
   this.rootURI = rootURI;
 
-  this._extension = null;
-  this._extensionPromise = new Promise(resolve => {
+  let promiseEvent = eventName => new Promise(resolve => {
     let onstartup = (msg, extension) => {
       if (extension.id == this.id) {
-        Management.off("startup", onstartup);
+        Management.off(eventName, onstartup);
 
         this._extension = extension;
         resolve(extension);
       }
     };
-    Management.on("startup", onstartup);
+    Management.on(eventName, onstartup);
   });
+
+  this._extension = null;
+  this._extensionPromise = promiseEvent("startup");
+  this._readyPromise = promiseEvent("ready");
 }
 
 MockExtension.prototype = {
@@ -1255,7 +1252,7 @@ MockExtension.prototype = {
   startup() {
     return AddonManager.installTemporaryAddon(this.file).then(addon => {
       this.addon = addon;
-      return this._extensionPromise;
+      return this._readyPromise;
     });
   },
 
@@ -1384,9 +1381,10 @@ Extension.prototype = extend(Object.create(ExtensionData.prototype), {
 
     this.webAccessibleResources = new MatchGlobs(strippedWebAccessibleResources);
 
+    let promises = [];
     for (let directive in manifest) {
       if (manifest[directive] !== null) {
-        Management.emit("manifest_" + directive, directive, this, manifest);
+        promises.push(Management.emit(`manifest_${directive}`, directive, this, manifest));
       }
     }
 
@@ -1397,7 +1395,9 @@ Extension.prototype = extend(Object.create(ExtensionData.prototype), {
     let serial = this.serialize();
     data["Extension:Extensions"].push(serial);
 
-    return this.broadcast("Extension:Startup", serial);
+    return this.broadcast("Extension:Startup", serial).then(() => {
+      return Promise.all(promises);
+    });
   },
 
   callOnClose(obj) {
@@ -1459,6 +1459,8 @@ Extension.prototype = extend(Object.create(ExtensionData.prototype), {
       Management.emit("startup", this);
 
       return this.runManifest(this.manifest);
+    }).then(() => {
+      Management.emit("ready", this);
     }).catch(e => {
       dump(`Extension error: ${e.message} ${e.filename || e.fileName}:${e.lineNumber} :: ${e.stack || new Error().stack}\n`);
       Cu.reportError(e);
