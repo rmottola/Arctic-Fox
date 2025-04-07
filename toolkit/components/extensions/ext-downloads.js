@@ -159,6 +159,7 @@ const DownloadMap = {
           onDownloadRemoved(download) {
             const item = self.byDownload.get(download);
             if (item != null) {
+              self.emit("erase", item);
               self.byDownload.delete(download);
               self.byId.delete(item.id);
             }
@@ -222,8 +223,6 @@ const DownloadMap = {
     // only work with downloads in the DownloadList from getAll()
     return this.getDownloadList().then(list => {
       list.remove(item.download);
-      this.byId.delete(item.id);
-      this.byDownload.delete(item.download);
     });
   },
 };
@@ -590,7 +589,20 @@ extensions.registerSchemaAPI("downloads", "downloads", (extension, context) => {
         };
       }).api(),
 
-      onErased: ignoreEvent(context, "downloads.onErased"),
+      onErased: new SingletonEventManager(context, "downloads.onErased", fire => {
+        const handler = (what, item) => {
+          runSafeSync(context, fire, item.id);
+        };
+        let registerPromise = DownloadMap.getDownloadList().then(() => {
+          DownloadMap.on("erase", handler);
+        });
+        return () => {
+          registerPromise.then(() => {
+            DownloadMap.off("erase", handler);
+          });
+        };
+      }).api(),
+
       onDeterminingFilename: ignoreEvent(context, "downloads.onDeterminingFilename"),
     },
   };
