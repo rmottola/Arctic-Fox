@@ -3861,7 +3861,11 @@ bool TakeMinidump(nsIFile** aResult, bool aMoveToPending)
          true,
 #endif
          PairedDumpCallback,
-         static_cast<void*>(aResult))) {
+         static_cast<void*>(aResult)
+#ifdef XP_WIN32
+         , GetMinidumpType()
+#endif
+      )) {
     return false;
   }
 
@@ -3902,7 +3906,11 @@ CreateMinidumpsAndPair(ProcessHandle aTargetPid,
          targetThread,
          dump_path,
          PairedDumpCallbackExtra,
-         static_cast<void*>(&targetMinidump)))
+         static_cast<void*>(&targetMinidump)
+#ifdef XP_WIN32
+         , GetMinidumpType()
+#endif
+      ))
     return false;
 
   nsCOMPtr<nsIFile> targetExtra;
@@ -3917,8 +3925,11 @@ CreateMinidumpsAndPair(ProcessHandle aTargetPid,
         true,
 #endif
         PairedDumpCallback,
-        static_cast<void*>(&incomingDump))) {
-
+        static_cast<void*>(&incomingDump)
+#ifdef XP_WIN32
+        , GetMinidumpType()
+#endif
+        )) {
       targetMinidump->Remove(false);
       targetExtra->Remove(false);
       return false;
@@ -3968,7 +3979,11 @@ CreateAdditionalChildMinidump(ProcessHandle childPid,
          childThread,
          dump_path,
          PairedDumpCallback,
-         static_cast<void*>(&childMinidump))) {
+         static_cast<void*>(&childMinidump)
+#ifdef XP_WIN32
+         , GetMinidumpType()
+#endif
+      )) {
     return false;
   }
 
