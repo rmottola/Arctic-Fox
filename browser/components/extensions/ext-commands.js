@@ -223,7 +223,7 @@ extensions.on("shutdown", (type, extension) => {
 });
 /* eslint-enable mozilla/balanced-listeners */
 
-extensions.registerSchemaAPI("commands", null, (extension, context) => {
+extensions.registerSchemaAPI("commands", (extension, context) => {
   return {
     commands: {
       getAll() {
