@@ -21,9 +21,6 @@ var gContextMenuMap = new Map();
 // Map[Extension -> MenuItem]
 var gRootItems = new Map();
 
-// Not really used yet, will be used for event pages.
-var gOnClickedCallbacksMap = new WeakMap();
-
 // If id is not specified for an item we use an integer.
 var gNextMenuItemID = 0;
 
@@ -174,6 +171,9 @@ var gMenuBuilder = {
     }
 
     element.addEventListener("command", event => {  // eslint-disable-line mozilla/balanced-listeners
+      if (event.target !== event.currentTarget) {
+        return;
+      }
       if (item.type == "checkbox") {
         item.checked = !item.checked;
       } else if (item.type == "radio") {
@@ -188,9 +188,12 @@ var gMenuBuilder = {
       }
 
       item.tabManager.addActiveTabPermission();
+
+      let tab = item.tabManager.convert(contextData.tab);
+      let info = item.getClickInfo(contextData, event);
+      item.extension.emit("webext-contextmenu-menuitem-click", info, tab);
       if (item.onclick) {
-        let clickData = item.getClickData(contextData, event);
-        runSafe(item.extContext, item.onclick, clickData);
+        runSafe(item.extContext, item.onclick, info, tab);
       }
     });
 
@@ -396,7 +399,7 @@ MenuItem.prototype = {
     }
   },
 
-  getClickData(contextData, event) {
+  getClickInfo(contextData, event) {
     let mediaType;
     if (contextData.onVideo) {
       mediaType = "video";
@@ -408,18 +411,15 @@ MenuItem.prototype = {
       mediaType = "image";
     }
 
-    let clickData = {
+    let info = {
       menuItemId: this.id,
     };
 
     function setIfDefined(argName, value) {
       if (value) {
-        clickData[argName] = value;
+        info[argName] = value;
       }
     }
-
-    let tab = contextData.tab ? TabManager.convert(this.extension, contextData.tab)
-                              : undefined;
 
     setIfDefined("parentMenuItemId", this.parentId);
     setIfDefined("mediaType", mediaType);
@@ -429,9 +429,8 @@ MenuItem.prototype = {
     setIfDefined("frameUrl", contextData.frameUrl);
     setIfDefined("selectionText", contextData.selectionText);
     setIfDefined("editable", contextData.onEditableArea);
-    setIfDefined("tab", tab);
 
-    return clickData;
+    return info;
   },
 
   enabledForContext(contextData) {
@@ -513,15 +512,14 @@ extensions.registerSchemaAPI("contextMenus", (extension, context) => {
         return Promise.resolve();
       },
 
-      // TODO: implement this once event pages are ready.
       onClicked: new EventManager(context, "contextMenus.onClicked", fire => {
-        let callback = menuItem => {
-          fire(menuItem.data);
+        let listener = (event, info, tab) => {
+          fire(info, tab);
         };
 
-        gOnClickedCallbacksMap.set(extension, callback);
+        extension.on("webext-contextmenu-menuitem-click", listener);
         return () => {
-          gOnClickedCallbacksMap.delete(extension);
+          extension.off("webext-contextmenu-menuitem-click", listener);
         };
       }).api(),
     },
