@@ -40,7 +40,7 @@ function test() {
       waitForTime(4000),
     ]);
 
-    is(gSources.values.length, 1, "Should have 1 source");
+    is(gSources.values.length, 2, "Should have 2 sources");
 
     let item = gSources.getItemForAttachment(attachment => {
       return attachment.source.url.includes("moz-extension");
