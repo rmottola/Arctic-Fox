@@ -62,7 +62,7 @@ XPCOMUtils.defineLazyGetter(global, "stylesheets", () => {
 });
 
 class BasePopup {
-  constructor(extension, viewNode, popupURL) {
+  constructor(extension, viewNode, popupURL, browserStyle) {
     let popupURI = Services.io.newURI(popupURL, null, extension.baseURI);
 
     Services.scriptSecurityManager.checkLoadURIWithPrincipal(
@@ -72,6 +72,7 @@ class BasePopup {
     this.extension = extension;
     this.popupURI = popupURI;
     this.viewNode = viewNode;
+    this.browserStyle = browserStyle;
     this.window = viewNode.ownerDocument.defaultView;
 
     this.contentReady = new Promise(resolve => {
@@ -112,7 +113,7 @@ class BasePopup {
         break;
 
       case "DOMWindowCreated":
-        if (event.target === this.browser.contentDocument) {
+        if (this.browserStyle && event.target === this.browser.contentDocument) {
           let winUtils = this.browser.contentWindow
               .QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindowUtils);
           for (let stylesheet of global.stylesheets) {
@@ -244,7 +245,7 @@ class BasePopup {
 }
 
 global.PanelPopup = class PanelPopup extends BasePopup {
-  constructor(extension, imageNode, popupURL) {
+  constructor(extension, imageNode, popupURL, browserStyle) {
     let document = imageNode.ownerDocument;
 
     let panel = document.createElement("panel");
@@ -255,7 +256,7 @@ global.PanelPopup = class PanelPopup extends BasePopup {
 
     document.getElementById("mainPopupSet").appendChild(panel);
 
-    super(extension, panel, popupURL);
+    super(extension, panel, popupURL, browserStyle);
 
     this.contentReady.then(() => {
       panel.openPopup(imageNode, "bottomcenter topright", 0, 0, false, false);
