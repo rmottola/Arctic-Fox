@@ -895,7 +895,6 @@ gfxPlatform::InitLayersIPC()
 #ifdef MOZ_WIDGET_GONK
         SharedBufferManagerChild::StartUp();
 #endif
-        gfx::VRManagerChild::StartUpSameProcess();
     }
 }
 
