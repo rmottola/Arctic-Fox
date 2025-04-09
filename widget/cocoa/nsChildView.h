@@ -48,7 +48,7 @@ struct SwipeEventQueue;
 class VibrancyManager;
 namespace layers {
 class GLManager;
-class APZCTreeManager;
+class IAPZCTreeManager;
 } // namespace layers
 namespace widget {
 class RectTextureImage;
@@ -353,7 +353,7 @@ class nsChildView : public nsBaseWidget
 {
 private:
   typedef nsBaseWidget Inherited;
-  typedef mozilla::layers::APZCTreeManager APZCTreeManager;
+  typedef mozilla::layers::IAPZCTreeManager IAPZCTreeManager;
 
 public:
   nsChildView();
@@ -483,7 +483,7 @@ public:
                                                     nsIObserver* aObserver) override;
 
   // Mac specific methods
-  
+
   virtual bool      DispatchWindowEvent(mozilla::WidgetGUIEvent& event);
 
   void WillPaintWindow();
@@ -559,7 +559,7 @@ public:
   void CleanupRemoteDrawing() override;
   bool InitCompositor(mozilla::layers::Compositor* aCompositor) override;
 
-  APZCTreeManager* APZCTM() { return mAPZC ; }
+  IAPZCTreeManager* APZCTM() { return mAPZC ; }
 
   NS_IMETHOD StartPluginIME(const mozilla::WidgetKeyboardEvent& aKeyboardEvent,
                             int32_t aPanelX, int32_t aPanelY,
@@ -634,7 +634,7 @@ protected:
   nsIWidget*            mParentWidget;
 
 #ifdef ACCESSIBILITY
-  // weak ref to this childview's associated mozAccessible for speed reasons 
+  // weak ref to this childview's associated mozAccessible for speed reasons
   // (we get queried for it *a lot* but don't want to own it)
   nsWeakPtr             mAccessible;
 #endif
