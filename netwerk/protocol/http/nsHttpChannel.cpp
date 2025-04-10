@@ -6326,6 +6326,8 @@ nsHttpChannel::OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult st
     MOZ_ASSERT(NS_IsMainThread(),
                "OnStopRequest should only be called from the main thread");
 
+    mUploadStream = nullptr;
+
     if (NS_FAILED(status)) {
         ProcessSecurityReport(status);
     }
