@@ -3182,11 +3182,6 @@ nsBlockFrame::ReflowBlockFrame(BlockReflowInput& aState,
     nscoord curBCoord = aState.mBCoord + aState.mPrevBEndMargin.get();
     nscoord clearBCoord = aState.ClearFloats(curBCoord, breakType, replacedBlock);
     if (clearBCoord != curBCoord) {
-      // Looks like that assumption was invalid, we do need
-      // clearance. Tell our ancestor so it can reflow again. It is
-      // responsible for actually setting our clearance flag before
-      // the next reflow.
-      treatWithClearance = true;
       // Only record the first frame that requires clearance
       if (!*aState.mReflowState.mDiscoveredClearance) {
         *aState.mReflowState.mDiscoveredClearance = frame;
