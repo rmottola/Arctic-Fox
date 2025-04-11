@@ -1123,7 +1123,7 @@ nsBlockFrame::Reflow(nsPresContext*           aPresContext,
 
   // Cache the consumed height in the block reflow state so that we don't have
   // to continually recompute it.
-  nsBlockReflowState state(*reflowState, aPresContext, this,
+  BlockReflowInput state(*reflowState, aPresContext, this,
                            blockStartMarginRoot, blockEndMarginRoot,
                            needFloatManager, consumedBSize);
 
@@ -1280,7 +1280,7 @@ nsBlockFrame::Reflow(nsPresContext*           aPresContext,
   // lines that were placed relative to mContainerSize during reflow, as
   // we typically do not know the true container size until we've reflowed all
   // its children. So we use a dummy mContainerSize during reflow (see
-  // nsBlockReflowState's constructor) and then fix up the positions of the
+  // BlockReflowInput's constructor) and then fix up the positions of the
   // lines here, once the final block size is known.
   //
   // Note that writing-mode:vertical-rl is the only case where the block
@@ -1484,7 +1484,7 @@ nsBlockFrame::CheckForCollapsedBEndMarginFromClearanceLine()
 
 void
 nsBlockFrame::ComputeFinalSize(const ReflowInput& aReflowState,
-                               nsBlockReflowState&      aState,
+                               BlockReflowInput&      aState,
                                nsHTMLReflowMetrics&     aMetrics,
                                nscoord*                 aBEndEdgeOfChildren)
 {
@@ -1855,7 +1855,7 @@ IsAlignedLeft(uint8_t aAlignment,
 }
 
 void
-nsBlockFrame::PrepareResizeReflow(nsBlockReflowState& aState)
+nsBlockFrame::PrepareResizeReflow(BlockReflowInput& aState)
 {
   // See if we can try and avoid marking all the lines as dirty
   bool tryAndSkipLines =
@@ -1958,7 +1958,7 @@ nsBlockFrame::PrepareResizeReflow(nsBlockReflowState& aState)
  * doesn't get marked dirty and reflowed entirely).
  */
 void
-nsBlockFrame::PropagateFloatDamage(nsBlockReflowState& aState,
+nsBlockFrame::PropagateFloatDamage(BlockReflowInput& aState,
                                    nsLineBox* aLine,
                                    nscoord aDeltaBCoord)
 {
@@ -2057,7 +2057,7 @@ nsBlockFrame::ReparentFloats(nsIFrame* aFirstFrame, nsBlockFrame* aOldParent,
   }
 }
 
-static void DumpLine(const nsBlockReflowState& aState, nsLineBox* aLine,
+static void DumpLine(const BlockReflowInput& aState, nsLineBox* aLine,
                      nscoord aDeltaBCoord, int32_t aDeltaIndent) {
 #ifdef DEBUG
   if (nsBlockFrame::gNoisyReflow) {
@@ -2077,7 +2077,7 @@ static void DumpLine(const nsBlockReflowState& aState, nsLineBox* aLine,
 }
 
 void
-nsBlockFrame::ReflowDirtyLines(nsBlockReflowState& aState)
+nsBlockFrame::ReflowDirtyLines(BlockReflowInput& aState)
 {
   bool keepGoing = true;
   bool repositionViews = false; // should we really need this?
@@ -2716,7 +2716,7 @@ nsBlockFrame::MarkLineDirtyForInterrupt(nsLineBox* aLine)
 }
 
 void
-nsBlockFrame::DeleteLine(nsBlockReflowState& aState,
+nsBlockFrame::DeleteLine(BlockReflowInput& aState,
                          nsLineList::iterator aLine,
                          nsLineList::iterator aLineEnd)
 {
@@ -2741,7 +2741,7 @@ nsBlockFrame::DeleteLine(nsBlockReflowState& aState,
  * whether or not the caller should continue to reflow more lines.
  */
 void
-nsBlockFrame::ReflowLine(nsBlockReflowState& aState,
+nsBlockFrame::ReflowLine(BlockReflowInput& aState,
                          line_iterator aLine,
                          bool* aKeepReflowGoing)
 {
@@ -2763,7 +2763,7 @@ nsBlockFrame::ReflowLine(nsBlockReflowState& aState,
 }
 
 nsIFrame*
-nsBlockFrame::PullFrame(nsBlockReflowState& aState,
+nsBlockFrame::PullFrame(BlockReflowInput& aState,
                         line_iterator       aLine)
 {
   // First check our remaining lines.
@@ -2860,7 +2860,7 @@ nsBlockFrame::PullFrameFrom(nsLineBox*           aLine,
 }
 
 void
-nsBlockFrame::SlideLine(nsBlockReflowState& aState,
+nsBlockFrame::SlideLine(BlockReflowInput& aState,
                         nsLineBox* aLine, nscoord aDeltaBCoord)
 {
   NS_PRECONDITION(aDeltaBCoord != 0, "why slide a line nowhere?");
@@ -3076,7 +3076,7 @@ nsBlockFrame::IsEmpty()
 }
 
 bool
-nsBlockFrame::ShouldApplyBStartMargin(nsBlockReflowState& aState,
+nsBlockFrame::ShouldApplyBStartMargin(BlockReflowInput& aState,
                                       nsLineBox* aLine,
                                       nsIFrame* aChildFrame)
 {
@@ -3121,7 +3121,7 @@ nsBlockFrame::ShouldApplyBStartMargin(nsBlockReflowState& aState,
 }
 
 void
-nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
+nsBlockFrame::ReflowBlockFrame(BlockReflowInput& aState,
                                line_iterator aLine,
                                bool* aKeepReflowGoing)
 {
@@ -3724,7 +3724,7 @@ nsBlockFrame::ReflowBlockFrame(nsBlockReflowState& aState,
 }
 
 void
-nsBlockFrame::ReflowInlineFrames(nsBlockReflowState& aState,
+nsBlockFrame::ReflowInlineFrames(BlockReflowInput& aState,
                                  line_iterator aLine,
                                  bool* aKeepReflowGoing)
 {
@@ -3799,7 +3799,7 @@ nsBlockFrame::ReflowInlineFrames(nsBlockReflowState& aState,
 }
 
 void
-nsBlockFrame::PushTruncatedLine(nsBlockReflowState& aState,
+nsBlockFrame::PushTruncatedLine(BlockReflowInput& aState,
                                 line_iterator       aLine,
                                 bool*               aKeepReflowGoing)
 {
@@ -3817,7 +3817,7 @@ static const char* LineReflowStatusNames[] = {
 #endif
 
 void
-nsBlockFrame::DoReflowInlineFrames(nsBlockReflowState& aState,
+nsBlockFrame::DoReflowInlineFrames(BlockReflowInput& aState,
                                    nsLineLayout& aLineLayout,
                                    line_iterator aLine,
                                    nsFlowAreaRect& aFloatAvailableSpace,
@@ -3984,7 +3984,7 @@ nsBlockFrame::DoReflowInlineFrames(nsBlockReflowState& aState,
                  aFloatAvailableSpace.mRect.BSize(outerWM),
                  "unconstrained block size on totally empty line");
 
-    // See the analogous code for blocks in nsBlockReflowState::ClearFloats.
+    // See the analogous code for blocks in BlockReflowInput::ClearFloats.
     if (aFloatAvailableSpace.mRect.BSize(outerWM) > 0) {
       NS_ASSERTION(aFloatAvailableSpace.mHasFloats,
                    "redo line on totally empty line with non-empty band...");
@@ -4073,7 +4073,7 @@ nsBlockFrame::DoReflowInlineFrames(nsBlockReflowState& aState,
  * to something other than NS_STYLE_CLEAR_NONE.
  */
 void
-nsBlockFrame::ReflowInlineFrame(nsBlockReflowState& aState,
+nsBlockFrame::ReflowInlineFrame(BlockReflowInput& aState,
                                 nsLineLayout& aLineLayout,
                                 line_iterator aLine,
                                 nsIFrame* aFrame,
@@ -4214,7 +4214,7 @@ nsBlockFrame::ReflowInlineFrame(nsBlockReflowState& aState,
 }
 
 bool
-nsBlockFrame::CreateContinuationFor(nsBlockReflowState& aState,
+nsBlockFrame::CreateContinuationFor(BlockReflowInput& aState,
                                     nsLineBox*          aLine,
                                     nsIFrame*           aFrame)
 {
@@ -4237,7 +4237,7 @@ nsBlockFrame::CreateContinuationFor(nsBlockReflowState& aState,
 }
 
 nsresult
-nsBlockFrame::SplitFloat(nsBlockReflowState& aState,
+nsBlockFrame::SplitFloat(BlockReflowInput& aState,
                          nsIFrame*           aFloat,
                          nsReflowStatus      aFloatStatus)
 {
@@ -4308,7 +4308,7 @@ CheckPlaceholderInLine(nsIFrame* aBlock, nsLineBox* aLine, nsFloatCache* aFC)
 }
 
 void
-nsBlockFrame::SplitLine(nsBlockReflowState& aState,
+nsBlockFrame::SplitLine(BlockReflowInput& aState,
                         nsLineLayout& aLineLayout,
                         line_iterator aLine,
                         nsIFrame* aFrame,
@@ -4382,7 +4382,7 @@ nsBlockFrame::SplitLine(nsBlockReflowState& aState,
 }
 
 bool
-nsBlockFrame::IsLastLine(nsBlockReflowState& aState,
+nsBlockFrame::IsLastLine(BlockReflowInput& aState,
                          line_iterator aLine)
 {
   while (++aLine != end_lines()) {
@@ -4415,7 +4415,7 @@ nsBlockFrame::IsLastLine(nsBlockReflowState& aState,
 }
 
 bool
-nsBlockFrame::PlaceLine(nsBlockReflowState& aState,
+nsBlockFrame::PlaceLine(BlockReflowInput& aState,
                         nsLineLayout&       aLineLayout,
                         line_iterator       aLine,
                         nsFloatManager::SavedState *aFloatStateBeforeLine,
@@ -4627,7 +4627,7 @@ nsBlockFrame::PlaceLine(nsBlockReflowState& aState,
 }
 
 void
-nsBlockFrame::PushLines(nsBlockReflowState&  aState,
+nsBlockFrame::PushLines(BlockReflowInput&  aState,
                         nsLineList::iterator aLineBefore)
 {
   // NOTE: aLineBefore is always a normal line, not an overflow line.
@@ -4821,7 +4821,7 @@ nsBlockFrame::DrainSelfOverflowList()
  * DrainPushedFloats sets up pushed floats the way we need them at the
  * start of reflow; they are then reflowed by ReflowPushedFloats (which
  * might push some of them on).  Floats with placeholders in this block
- * are reflowed by (nsBlockReflowState/nsLineLayout)::AddFloat, which
+ * are reflowed by (BlockReflowInput/nsLineLayout)::AddFloat, which
  * also maintains these invariants.
  *
  * DrainSelfPushedFloats moves any pushed floats from this block's own
@@ -5384,7 +5384,7 @@ nsBlockFrame::RemoveFloat(nsIFrame* aFloat)
   nsFrameList* list = GetPushedFloats();
   if (list && list->ContinueRemoveFrame(aFloat)) {
 #if 0
-    // XXXmats not yet - need to investigate nsBlockReflowState::mPushedFloats
+    // XXXmats not yet - need to investigate BlockReflowInput::mPushedFloats
     // first so we don't leave it pointing to a deleted list.
     if (list->IsEmpty()) {
       delete RemovePushedFloats();
@@ -6054,7 +6054,7 @@ nsBlockFrame::StyleTextForLineLayout()
 // Float support
 
 LogicalRect
-nsBlockFrame::AdjustFloatAvailableSpace(nsBlockReflowState& aState,
+nsBlockFrame::AdjustFloatAvailableSpace(BlockReflowInput& aState,
                                         const LogicalRect& aFloatAvailableSpace,
                                         nsIFrame* aFloatFrame)
 {
@@ -6069,7 +6069,7 @@ nsBlockFrame::AdjustFloatAvailableSpace(nsBlockReflowState& aState,
     availISize = aState.ContentISize();
   }
   else {
-    // This quirk matches the one in nsBlockReflowState::FlowAndPlaceFloat
+    // This quirk matches the one in BlockReflowInput::FlowAndPlaceFloat
     // give tables only the available space
     // if they can shrink we may not be constrained to place
     // them in the next line
@@ -6095,7 +6095,7 @@ nsBlockFrame::AdjustFloatAvailableSpace(nsBlockReflowState& aState,
 }
 
 nscoord
-nsBlockFrame::ComputeFloatISize(nsBlockReflowState& aState,
+nsBlockFrame::ComputeFloatISize(BlockReflowInput& aState,
                                 const LogicalRect&  aFloatAvailableSpace,
                                 nsIFrame*           aFloat)
 {
@@ -6116,7 +6116,7 @@ nsBlockFrame::ComputeFloatISize(nsBlockReflowState& aState,
 }
 
 void
-nsBlockFrame::ReflowFloat(nsBlockReflowState& aState,
+nsBlockFrame::ReflowFloat(BlockReflowInput& aState,
                           const LogicalRect&  aAdjustedAvailableSpace,
                           nsIFrame*           aFloat,
                           LogicalMargin&      aFloatMargin,
@@ -6221,7 +6221,7 @@ nsBlockFrame::ReflowFloat(nsBlockReflowState& aState,
   // Set the rect, make sure the view is properly sized and positioned,
   // and tell the frame we're done reflowing it
   // XXXldb This seems like the wrong place to be doing this -- shouldn't
-  // we be doing this in nsBlockReflowState::FlowAndPlaceFloat after
+  // we be doing this in BlockReflowInput::FlowAndPlaceFloat after
   // we've positioned the float, and shouldn't we be doing the equivalent
   // of |PlaceFrameView| here?
   WritingMode metricsWM = metrics.GetWritingMode();
@@ -6258,7 +6258,7 @@ nsBlockFrame::FindTrailingClear()
 }
 
 void
-nsBlockFrame::ReflowPushedFloats(nsBlockReflowState& aState,
+nsBlockFrame::ReflowPushedFloats(BlockReflowInput& aState,
                                  nsOverflowAreas&    aOverflowAreas,
                                  nsReflowStatus&     aStatus)
 {
@@ -7184,7 +7184,7 @@ nsBlockFrame::RenumberListsFor(nsPresContext* aPresContext,
 
 void
 nsBlockFrame::ReflowBullet(nsIFrame* aBulletFrame,
-                           nsBlockReflowState& aState,
+                           BlockReflowInput& aState,
                            nsHTMLReflowMetrics& aMetrics,
                            nscoord aLineTop)
 {
@@ -7289,7 +7289,7 @@ nsBlockFrame::DoCollectFloats(nsIFrame* aFrame, nsFrameList& aList,
 }
 
 void
-nsBlockFrame::CheckFloats(nsBlockReflowState& aState)
+nsBlockFrame::CheckFloats(BlockReflowInput& aState)
 {
 #ifdef DEBUG
   // If any line is still dirty, that must mean we're going to reflow this
@@ -7404,7 +7404,7 @@ nsBlockFrame::BlockCanIntersectFloats(nsIFrame* aFrame)
 // matter.
 /* static */
 nsBlockFrame::ReplacedElementISizeToClear
-nsBlockFrame::ISizeToClearPastFloats(const nsBlockReflowState& aState,
+nsBlockFrame::ISizeToClearPastFloats(const BlockReflowInput& aState,
                                      const LogicalRect& aFloatAvailableSpace,
                                      nsIFrame* aFrame)
 {
