@@ -470,7 +470,7 @@ nsComboboxControlFrame::ReflowDropdown(nsPresContext*  aPresContext,
   // by AbsolutelyPositionDropDown().
   WritingMode outerWM = GetWritingMode();
   const nsSize dummyContainerSize;
-  nsHTMLReflowMetrics desiredSize(aReflowState);
+  ReflowOutput desiredSize(aReflowState);
   nsReflowStatus ignoredStatus;
   ReflowChild(mDropdownFrame, aPresContext, desiredSize,
               kidReflowState, outerWM, LogicalPoint(outerWM),
@@ -808,7 +808,7 @@ nsComboboxControlFrame::GetPrefISize(nsRenderingContext *aRenderingContext)
 
 void
 nsComboboxControlFrame::Reflow(nsPresContext*          aPresContext,
-                               nsHTMLReflowMetrics&     aDesiredSize,
+                               ReflowOutput&     aDesiredSize,
                                const ReflowInput& aReflowState,
                                nsReflowStatus&          aStatus)
 {
@@ -1290,7 +1290,7 @@ public:
   }
 
   virtual void Reflow(nsPresContext*           aPresContext,
-                          nsHTMLReflowMetrics&     aDesiredSize,
+                          ReflowOutput&     aDesiredSize,
                           const ReflowInput& aReflowState,
                           nsReflowStatus&          aStatus) override;
 
@@ -1312,7 +1312,7 @@ nsComboboxDisplayFrame::GetType() const
 
 void
 nsComboboxDisplayFrame::Reflow(nsPresContext*           aPresContext,
-                               nsHTMLReflowMetrics&     aDesiredSize,
+                               ReflowOutput&     aDesiredSize,
                                const ReflowInput& aReflowState,
                                nsReflowStatus&          aStatus)
 {
