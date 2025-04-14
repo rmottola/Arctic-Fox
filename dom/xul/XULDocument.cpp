@@ -93,6 +93,7 @@
 #include "mozilla/dom/URL.h"
 #include "nsIContentPolicy.h"
 #include "mozAutoDocUpdate.h"
+#include "xpcpublic.h"
 #include "mozilla/StyleSheetHandle.h"
 #include "mozilla/StyleSheetHandleInlines.h"
 
@@ -1015,7 +1016,7 @@ XULDocument::AttributeChanged(nsIDocument* aDocument,
     if (ShouldPersistAttribute(aElement, aAttribute) && !persist.IsEmpty() &&
         // XXXldb This should check that it's a token, not just a substring.
         persist.Find(nsDependentAtomString(aAttribute)) >= 0) {
-        nsContentUtils::AddScriptRunner(NS_NewRunnableMethodWithArgs
+        nsContentUtils::AddScriptRunner(NewRunnableMethod
             <nsIContent*, int32_t, nsIAtom*>
             (this, &XULDocument::DoPersist, aElement, kNameSpaceID_None,
             aAttribute));
@@ -1433,7 +1434,7 @@ XULDocument::GetPopupNode(nsIDOMNode** aNode)
 
     if (node && nsContentUtils::CanCallerAccess(node)
         && GetScopeObjectOfNode(node)) {
-        node.swap(*aNode);
+        node.forget(aNode);
     }
 
     return NS_OK;
@@ -1545,7 +1546,7 @@ XULDocument::GetTooltipNode(nsIDOMNode** aNode)
     if (pm) {
         nsCOMPtr<nsIDOMNode> node = pm->GetLastTriggerTooltipNode(this);
         if (node && nsContentUtils::CanCallerAccess(node))
-            node.swap(*aNode);
+            node.forget(aNode);
     }
 
     return NS_OK;
@@ -3135,7 +3136,7 @@ XULDocument::MaybeBroadcast()
         if (!nsContentUtils::IsSafeToRunScript()) {
             if (!mInDestructor) {
                 nsContentUtils::AddScriptRunner(
-                    NS_NewRunnableMethod(this, &XULDocument::MaybeBroadcast));
+                    NewRunnableMethod(this, &XULDocument::MaybeBroadcast));
             }
             return;
         }
@@ -3146,7 +3147,7 @@ XULDocument::MaybeBroadcast()
                 if (mDelayedAttrChangeBroadcasts[i].mNeedsAttrChange) {
                     nsCOMPtr<nsIContent> listener =
                         do_QueryInterface(mDelayedAttrChangeBroadcasts[i].mListener);
-                    nsString value = mDelayedAttrChangeBroadcasts[i].mAttr;
+                    const nsString& value = mDelayedAttrChangeBroadcasts[i].mAttr;
                     if (mDelayedAttrChangeBroadcasts[i].mSetAttr) {
                         listener->SetAttr(kNameSpaceID_None, attrName, value,
                                           true);
@@ -3510,7 +3511,7 @@ XULDocument::ExecuteScript(nsXULPrototypeScript *aScript)
     AutoEntryScript aes(mScriptGlobalObject, "precompiled XUL <script> element");
     JSContext* cx = aes.cx();
     JS::Rooted<JSObject*> baseGlobal(cx, JS::CurrentGlobalOrNull(cx));
-    NS_ENSURE_TRUE(nsContentUtils::GetSecurityManager()->ScriptAllowed(baseGlobal), NS_OK);
+    NS_ENSURE_TRUE(xpc::Scriptability::Get(baseGlobal).Allowed(), NS_OK);
 
     JSAddonId* addonId = mCurrentPrototype ? MapURIToAddonID(mCurrentPrototype->GetURI()) : nullptr;
     JS::Rooted<JSObject*> global(cx, xpc::GetAddonScope(cx, baseGlobal, addonId));
@@ -3523,7 +3524,8 @@ XULDocument::ExecuteScript(nsXULPrototypeScript *aScript)
     // The script is in the compilation scope. Clone it into the target scope
     // and execute it. On failure, ~AutoScriptEntry will handle exceptions, so
     // there is no need to manually check the return value.
-    JS::CloneAndExecuteScript(cx, scriptObject);
+    JS::RootedValue rval(cx);
+    JS::CloneAndExecuteScript(cx, scriptObject, &rval);
 
     return NS_OK;
 }
@@ -3577,7 +3579,7 @@ XULDocument::CreateElementFromPrototype(nsXULPrototypeElement* aPrototype,
         if (NS_FAILED(rv)) return rv;
     }
 
-    result.swap(*aResult);
+    result.forget(aResult);
 
     return NS_OK;
 }

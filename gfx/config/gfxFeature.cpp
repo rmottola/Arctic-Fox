@@ -6,6 +6,7 @@
 #include "mozilla/Preferences.h"
 #include "prprf.h"
 #include "gfxFeature.h"
+#include "nsString.h"
 
 namespace mozilla {
 namespace gfx {
@@ -13,7 +14,7 @@ namespace gfx {
 bool
 FeatureState::IsEnabled() const
 {
-  return IsFeatureStatusSuccess(GetValue());
+  return IsInitialized() && IsFeatureStatusSuccess(GetValue());
 }
 
 FeatureStatus
@@ -42,7 +43,8 @@ FeatureState::SetDefault(bool aEnable,
                          const char* aDisableMessage)
 {
   if (!aEnable) {
-    DisableByDefault(aDisableStatus, aDisableMessage);
+    DisableByDefault(aDisableStatus, aDisableMessage,
+                     NS_LITERAL_CSTRING("FEATURE_FAILURE_DISABLED"));
     return false;
   }
   EnableByDefault();
@@ -60,9 +62,13 @@ FeatureState::SetDefaultFromPref(const char* aPrefName,
   if (Preferences::HasUserValue(aPrefName)) {
     bool userValue = Preferences::GetBool(aPrefName, aDefaultValue);
     if (userValue == aIsEnablePref) {
-      UserEnable("Enabled by user preference");
+      nsCString message("Enabled via ");
+      message.AppendASCII(aPrefName);
+      UserEnable(message.get());
     } else {
-      UserDisable("Disabled by user preference");
+      nsCString message("Disabled via ");
+      message.AppendASCII(aPrefName);
+      UserDisable(message.get(), NS_LITERAL_CSTRING("FEATURE_FAILURE_PREF_OFF"));
     }
   }
 }
@@ -75,7 +81,7 @@ FeatureState::InitOrUpdate(bool aEnable,
   if (!IsInitialized()) {
     return SetDefault(aEnable, aDisableStatus, aDisableMessage);
   }
-  return MaybeSetFailed(aEnable, aDisableStatus, aDisableMessage);
+  return MaybeSetFailed(aEnable, aDisableStatus, aDisableMessage, nsCString());
 }
 
 void
@@ -93,14 +99,16 @@ FeatureState::UserForceEnable(const char* aMessage)
 }
 
 void
-FeatureState::UserDisable(const char* aMessage)
+FeatureState::UserDisable(const char* aMessage, const nsACString& aFailureId)
 {
   AssertInitialized();
   SetUser(FeatureStatus::Disabled, aMessage);
+  SetFailureId(aFailureId);
 }
 
 void
-FeatureState::Disable(FeatureStatus aStatus, const char* aMessage)
+FeatureState::Disable(FeatureStatus aStatus, const char* aMessage,
+                      const nsACString& aFailureId)
 {
   AssertInitialized();
 
@@ -109,10 +117,12 @@ FeatureState::Disable(FeatureStatus aStatus, const char* aMessage)
   MOZ_ASSERT(IsFeatureStatusFailure(aStatus));
 
   SetEnvironment(aStatus, aMessage);
+  SetFailureId(aFailureId);
 }
 
 void
-FeatureState::SetFailed(FeatureStatus aStatus, const char* aMessage)
+FeatureState::SetFailed(FeatureStatus aStatus, const char* aMessage,
+                        const nsACString& aFailureId)
 {
   AssertInitialized();
 
@@ -121,22 +131,26 @@ FeatureState::SetFailed(FeatureStatus aStatus, const char* aMessage)
   MOZ_ASSERT(IsFeatureStatusFailure(aStatus));
 
   SetRuntime(aStatus, aMessage);
+  SetFailureId(aFailureId);
 }
 
 bool
-FeatureState::MaybeSetFailed(bool aEnable, FeatureStatus aStatus, const char* aMessage)
+FeatureState::MaybeSetFailed(bool aEnable, FeatureStatus aStatus, const char* aMessage,
+                             const nsACString& aFailureId)
 {
   if (!aEnable) {
-    SetFailed(aStatus, aMessage);
+    SetFailed(aStatus, aMessage, aFailureId);
     return false;
   }
   return true;
 }
 
 bool
-FeatureState::MaybeSetFailed(FeatureStatus aStatus, const char* aMessage)
+FeatureState::MaybeSetFailed(FeatureStatus aStatus, const char* aMessage,
+                             const nsACString& aFailureId)
 {
-  return MaybeSetFailed(IsFeatureStatusSuccess(aStatus), aStatus, aMessage);
+  return MaybeSetFailed(IsFeatureStatusSuccess(aStatus), aStatus, aMessage,
+                        aFailureId);
 }
 
 bool
@@ -165,7 +179,8 @@ FeatureState::EnableByDefault()
 }
 
 void
-FeatureState::DisableByDefault(FeatureStatus aStatus, const char* aMessage)
+FeatureState::DisableByDefault(FeatureStatus aStatus, const char* aMessage,
+                               const nsACString& aFailureId)
 {
   // User/runtime decisions should not have been made yet.
   MOZ_ASSERT(!mUser.IsInitialized());
@@ -173,6 +188,7 @@ FeatureState::DisableByDefault(FeatureStatus aStatus, const char* aMessage)
   MOZ_ASSERT(!mRuntime.IsInitialized());
 
   mDefault.Set(aStatus, aMessage);
+  SetFailureId(aFailureId);
 }
 
 void
@@ -226,6 +242,21 @@ FeatureState::ForEachStatusChange(const StatusIterCallback& aCallback) const
   if (mRuntime.IsInitialized()) {
     aCallback("runtime", mRuntime.mStatus, mRuntime.Message());
   }
+}
+
+void
+FeatureState::SetFailureId(const nsACString& aFailureId)
+{
+  if (mFailureId.IsEmpty()) {
+    mFailureId = aFailureId;
+  }
+}
+
+const nsACString&
+FeatureState::GetFailureId() const
+{
+  MOZ_ASSERT(!IsEnabled());
+  return mFailureId;
 }
 
 void

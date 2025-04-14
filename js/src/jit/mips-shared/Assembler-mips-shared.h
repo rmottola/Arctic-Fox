@@ -22,45 +22,45 @@
 namespace js {
 namespace jit {
 
-static MOZ_CONSTEXPR_VAR Register zero = { Registers::zero };
-static MOZ_CONSTEXPR_VAR Register at = { Registers::at };
-static MOZ_CONSTEXPR_VAR Register v0 = { Registers::v0 };
-static MOZ_CONSTEXPR_VAR Register v1 = { Registers::v1 };
-static MOZ_CONSTEXPR_VAR Register a0 = { Registers::a0 };
-static MOZ_CONSTEXPR_VAR Register a1 = { Registers::a1 };
-static MOZ_CONSTEXPR_VAR Register a2 = { Registers::a2 };
-static MOZ_CONSTEXPR_VAR Register a3 = { Registers::a3 };
-static MOZ_CONSTEXPR_VAR Register a4 = { Registers::ta0 };
-static MOZ_CONSTEXPR_VAR Register a5 = { Registers::ta1 };
-static MOZ_CONSTEXPR_VAR Register a6 = { Registers::ta2 };
-static MOZ_CONSTEXPR_VAR Register a7 = { Registers::ta3 };
-static MOZ_CONSTEXPR_VAR Register t0 = { Registers::t0 };
-static MOZ_CONSTEXPR_VAR Register t1 = { Registers::t1 };
-static MOZ_CONSTEXPR_VAR Register t2 = { Registers::t2 };
-static MOZ_CONSTEXPR_VAR Register t3 = { Registers::t3 };
-static MOZ_CONSTEXPR_VAR Register t4 = { Registers::ta0 };
-static MOZ_CONSTEXPR_VAR Register t5 = { Registers::ta1 };
-static MOZ_CONSTEXPR_VAR Register t6 = { Registers::ta2 };
-static MOZ_CONSTEXPR_VAR Register t7 = { Registers::ta3 };
-static MOZ_CONSTEXPR_VAR Register s0 = { Registers::s0 };
-static MOZ_CONSTEXPR_VAR Register s1 = { Registers::s1 };
-static MOZ_CONSTEXPR_VAR Register s2 = { Registers::s2 };
-static MOZ_CONSTEXPR_VAR Register s3 = { Registers::s3 };
-static MOZ_CONSTEXPR_VAR Register s4 = { Registers::s4 };
-static MOZ_CONSTEXPR_VAR Register s5 = { Registers::s5 };
-static MOZ_CONSTEXPR_VAR Register s6 = { Registers::s6 };
-static MOZ_CONSTEXPR_VAR Register s7 = { Registers::s7 };
-static MOZ_CONSTEXPR_VAR Register t8 = { Registers::t8 };
-static MOZ_CONSTEXPR_VAR Register t9 = { Registers::t9 };
-static MOZ_CONSTEXPR_VAR Register k0 = { Registers::k0 };
-static MOZ_CONSTEXPR_VAR Register k1 = { Registers::k1 };
-static MOZ_CONSTEXPR_VAR Register gp = { Registers::gp };
-static MOZ_CONSTEXPR_VAR Register sp = { Registers::sp };
-static MOZ_CONSTEXPR_VAR Register fp = { Registers::fp };
-static MOZ_CONSTEXPR_VAR Register ra = { Registers::ra };
+static constexpr Register zero = { Registers::zero };
+static constexpr Register at = { Registers::at };
+static constexpr Register v0 = { Registers::v0 };
+static constexpr Register v1 = { Registers::v1 };
+static constexpr Register a0 = { Registers::a0 };
+static constexpr Register a1 = { Registers::a1 };
+static constexpr Register a2 = { Registers::a2 };
+static constexpr Register a3 = { Registers::a3 };
+static constexpr Register a4 = { Registers::ta0 };
+static constexpr Register a5 = { Registers::ta1 };
+static constexpr Register a6 = { Registers::ta2 };
+static constexpr Register a7 = { Registers::ta3 };
+static constexpr Register t0 = { Registers::t0 };
+static constexpr Register t1 = { Registers::t1 };
+static constexpr Register t2 = { Registers::t2 };
+static constexpr Register t3 = { Registers::t3 };
+static constexpr Register t4 = { Registers::ta0 };
+static constexpr Register t5 = { Registers::ta1 };
+static constexpr Register t6 = { Registers::ta2 };
+static constexpr Register t7 = { Registers::ta3 };
+static constexpr Register s0 = { Registers::s0 };
+static constexpr Register s1 = { Registers::s1 };
+static constexpr Register s2 = { Registers::s2 };
+static constexpr Register s3 = { Registers::s3 };
+static constexpr Register s4 = { Registers::s4 };
+static constexpr Register s5 = { Registers::s5 };
+static constexpr Register s6 = { Registers::s6 };
+static constexpr Register s7 = { Registers::s7 };
+static constexpr Register t8 = { Registers::t8 };
+static constexpr Register t9 = { Registers::t9 };
+static constexpr Register k0 = { Registers::k0 };
+static constexpr Register k1 = { Registers::k1 };
+static constexpr Register gp = { Registers::gp };
+static constexpr Register sp = { Registers::sp };
+static constexpr Register fp = { Registers::fp };
+static constexpr Register ra = { Registers::ra };
 
-static MOZ_CONSTEXPR_VAR Register ScratchRegister = at;
-static MOZ_CONSTEXPR_VAR Register SecondScratchReg = t8;
+static constexpr Register ScratchRegister = at;
+static constexpr Register SecondScratchReg = t8;
 
 // Helper classes for ScratchRegister usage. Asserts that only one piece
 // of code thinks it has exclusive ownership of each scratch register.
@@ -78,34 +78,34 @@ struct SecondScratchRegisterScope : public AutoRegisterScope
 };
 
 // Use arg reg from EnterJIT function as OsrFrameReg.
-static MOZ_CONSTEXPR_VAR Register OsrFrameReg = a3;
-static MOZ_CONSTEXPR_VAR Register ArgumentsRectifierReg = s3;
-static MOZ_CONSTEXPR_VAR Register CallTempReg0 = t0;
-static MOZ_CONSTEXPR_VAR Register CallTempReg1 = t1;
-static MOZ_CONSTEXPR_VAR Register CallTempReg2 = t2;
-static MOZ_CONSTEXPR_VAR Register CallTempReg3 = t3;
+static constexpr Register OsrFrameReg = a3;
+static constexpr Register ArgumentsRectifierReg = s3;
+static constexpr Register CallTempReg0 = t0;
+static constexpr Register CallTempReg1 = t1;
+static constexpr Register CallTempReg2 = t2;
+static constexpr Register CallTempReg3 = t3;
 
-static MOZ_CONSTEXPR_VAR Register IntArgReg0 = a0;
-static MOZ_CONSTEXPR_VAR Register IntArgReg1 = a1;
-static MOZ_CONSTEXPR_VAR Register IntArgReg2 = a2;
-static MOZ_CONSTEXPR_VAR Register IntArgReg3 = a3;
-static MOZ_CONSTEXPR_VAR Register IntArgReg4 = a4;
-static MOZ_CONSTEXPR_VAR Register IntArgReg5 = a5;
-static MOZ_CONSTEXPR_VAR Register IntArgReg6 = a6;
-static MOZ_CONSTEXPR_VAR Register IntArgReg7 = a7;
-static MOZ_CONSTEXPR_VAR Register GlobalReg = s6; // used by Odin
-static MOZ_CONSTEXPR_VAR Register HeapReg = s7; // used by Odin
+static constexpr Register IntArgReg0 = a0;
+static constexpr Register IntArgReg1 = a1;
+static constexpr Register IntArgReg2 = a2;
+static constexpr Register IntArgReg3 = a3;
+static constexpr Register IntArgReg4 = a4;
+static constexpr Register IntArgReg5 = a5;
+static constexpr Register IntArgReg6 = a6;
+static constexpr Register IntArgReg7 = a7;
+static constexpr Register GlobalReg = s6; // used by Odin
+static constexpr Register HeapReg = s7; // used by Odin
 
-static MOZ_CONSTEXPR_VAR Register PreBarrierReg = a1;
+static constexpr Register PreBarrierReg = a1;
 
-static MOZ_CONSTEXPR_VAR Register InvalidReg = { Registers::invalid_reg };
-static MOZ_CONSTEXPR_VAR FloatRegister InvalidFloatReg;
+static constexpr Register InvalidReg = { Registers::invalid_reg };
+static constexpr FloatRegister InvalidFloatReg;
 
-static MOZ_CONSTEXPR_VAR Register StackPointer = sp;
-static MOZ_CONSTEXPR_VAR Register FramePointer = InvalidReg;
-static MOZ_CONSTEXPR_VAR Register ReturnReg = v0;
-static MOZ_CONSTEXPR_VAR FloatRegister ReturnSimd128Reg = InvalidFloatReg;
-static MOZ_CONSTEXPR_VAR FloatRegister ScratchSimd128Reg = InvalidFloatReg;
+static constexpr Register StackPointer = sp;
+static constexpr Register FramePointer = InvalidReg;
+static constexpr Register ReturnReg = v0;
+static constexpr FloatRegister ReturnSimd128Reg = InvalidFloatReg;
+static constexpr FloatRegister ScratchSimd128Reg = InvalidFloatReg;
 
 // A bias applied to the GlobalReg to allow the use of instructions with small
 // negative immediate offsets which doubles the range of global data that can be
@@ -113,35 +113,34 @@ static MOZ_CONSTEXPR_VAR FloatRegister ScratchSimd128Reg = InvalidFloatReg;
 static const int32_t AsmJSGlobalRegBias = 32768;
 
 // Registers used in the GenerateFFIIonExit Enable Activation block.
-static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegCallee = t0;
-static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegE0 = a0;
-static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegE1 = a1;
-static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegE2 = a2;
-static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegE3 = a3;
+static constexpr Register AsmJSIonExitRegCallee = t0;
+static constexpr Register AsmJSIonExitRegE0 = a0;
+static constexpr Register AsmJSIonExitRegE1 = a1;
+static constexpr Register AsmJSIonExitRegE2 = a2;
 
 // Registers used in the GenerateFFIIonExit Disable Activation block.
 // None of these may be the second scratch register (t8).
-static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegD0 = a0;
-static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegD1 = a1;
-static MOZ_CONSTEXPR_VAR Register AsmJSIonExitRegD2 = t0;
+static constexpr Register AsmJSIonExitRegD0 = a0;
+static constexpr Register AsmJSIonExitRegD1 = a1;
+static constexpr Register AsmJSIonExitRegD2 = t0;
 
 // Registerd used in RegExpMatcher instruction (do not use JSReturnOperand).
-static MOZ_CONSTEXPR_VAR Register RegExpMatcherRegExpReg = CallTempReg0;
-static MOZ_CONSTEXPR_VAR Register RegExpMatcherStringReg = CallTempReg1;
-static MOZ_CONSTEXPR_VAR Register RegExpMatcherLastIndexReg = CallTempReg2;
+static constexpr Register RegExpMatcherRegExpReg = CallTempReg0;
+static constexpr Register RegExpMatcherStringReg = CallTempReg1;
+static constexpr Register RegExpMatcherLastIndexReg = CallTempReg2;
 
 // Registerd used in RegExpTester instruction (do not use ReturnReg).
-static MOZ_CONSTEXPR_VAR Register RegExpTesterRegExpReg = CallTempReg0;
-static MOZ_CONSTEXPR_VAR Register RegExpTesterStringReg = CallTempReg1;
-static MOZ_CONSTEXPR_VAR Register RegExpTesterLastIndexReg = CallTempReg2;
+static constexpr Register RegExpTesterRegExpReg = CallTempReg0;
+static constexpr Register RegExpTesterStringReg = CallTempReg1;
+static constexpr Register RegExpTesterLastIndexReg = CallTempReg2;
 
-static MOZ_CONSTEXPR_VAR uint32_t CodeAlignment = 4;
+static constexpr uint32_t CodeAlignment = 4;
 
 // This boolean indicates whether we support SIMD instructions flavoured for
 // this architecture or not. Rather than a method in the LIRGenerator, it is
 // here such that it is accessible from the entire codebase. Once full support
 // for SIMD is reached on all tier-1 platforms, this constant can be deleted.
-static MOZ_CONSTEXPR_VAR bool SupportsSimd = false;
+static constexpr bool SupportsSimd = false;
 
 // MIPS instruction types
 //                +---------------------------------------------------------------+
@@ -168,6 +167,8 @@ static const uint32_t RTShift = 16;
 static const uint32_t RTBits = 5;
 static const uint32_t RDShift = 11;
 static const uint32_t RDBits = 5;
+static const uint32_t RZShift = 0;
+static const uint32_t RZBits = 5;
 static const uint32_t SAShift = 6;
 static const uint32_t SABits = 5;
 static const uint32_t FunctionShift = 0;
@@ -224,6 +225,8 @@ uint32_t RT(FloatRegister r);
 uint32_t RD(Register r);
 uint32_t RD(FloatRegister r);
 uint32_t RD(uint32_t regCode);
+uint32_t RZ(Register r);
+uint32_t RZ(FloatRegister r);
 uint32_t SA(uint32_t value);
 uint32_t SA(FloatRegister r);
 
@@ -288,12 +291,16 @@ enum Opcode {
 
     op_ll       = 48 << OpcodeShift,
     op_lwc1     = 49 << OpcodeShift,
+    op_lwc2     = 50 << OpcodeShift,
     op_ldc1     = 53 << OpcodeShift,
+    op_ldc2     = 54 << OpcodeShift,
     op_ld       = 55 << OpcodeShift,
 
     op_sc       = 56 << OpcodeShift,
     op_swc1     = 57 << OpcodeShift,
+    op_swc2     = 58 << OpcodeShift,
     op_sdc1     = 61 << OpcodeShift,
+    op_sdc2     = 62 << OpcodeShift,
     op_sd       = 63 << OpcodeShift,
 };
 
@@ -447,6 +454,20 @@ enum FunctionField {
     ff_madd_s      = 32,
     ff_madd_d      = 33,
 
+    // Loongson encoding of function field.
+    ff_gsxbx       = 0,
+    ff_gsxhx       = 1,
+    ff_gsxwx       = 2,
+    ff_gsxdx       = 3,
+    ff_gsxwlc1     = 4,
+    ff_gsxwrc1     = 5,
+    ff_gsxdlc1     = 6,
+    ff_gsxdrc1     = 7,
+    ff_gsxwxc1     = 6,
+    ff_gsxdxc1     = 7,
+    ff_gsxq        = 0x20,
+    ff_gsxqc1      = 0x8020,
+
     ff_null        = 0
 };
 
@@ -562,6 +583,61 @@ class Imm16
     }
     static Imm16 Upper (Imm32 imm) {
         return Imm16((imm.value >> 16) & 0xffff);
+    }
+};
+
+class Imm8
+{
+    uint8_t value;
+
+  public:
+    Imm8();
+    Imm8(uint32_t imm)
+      : value(imm)
+    { }
+    uint32_t encode(uint32_t shift) {
+        return value << shift;
+    }
+    int32_t decodeSigned() {
+        return value;
+    }
+    uint32_t decodeUnsigned() {
+        return value;
+    }
+    static bool IsInSignedRange(int32_t imm) {
+        return imm >= INT8_MIN  && imm <= INT8_MAX;
+    }
+    static bool IsInUnsignedRange(uint32_t imm) {
+        return imm <= UINT8_MAX ;
+    }
+    static Imm8 Lower (Imm16 imm) {
+        return Imm8(imm.decodeSigned() & 0xff);
+    }
+    static Imm8 Upper (Imm16 imm) {
+        return Imm8((imm.decodeSigned() >> 8) & 0xff);
+    }
+};
+
+class GSImm13
+{
+    uint16_t value;
+
+  public:
+    GSImm13();
+    GSImm13(uint32_t imm)
+      : value(imm & ~0xf)
+    { }
+    uint32_t encode(uint32_t shift) {
+        return ((value >> 4) & 0x1f) << shift;
+    }
+    int32_t decodeSigned() {
+        return value;
+    }
+    uint32_t decodeUnsigned() {
+        return value;
+    }
+    static bool IsInRange(int32_t imm) {
+        return imm >= (-256 << 4) && imm <= (255 << 4);
     }
 };
 
@@ -736,6 +812,16 @@ class AssemblerMIPSShared : public AssemblerShared
         FCC5,
         FCC6,
         FCC7
+    };
+
+    enum FPControl {
+        FIR  = 0,
+        UFR,
+        UNFR = 4,
+        FCCR = 25,
+        FEXR,
+        FENR = 28,
+        FCSR = 31
     };
 
     enum FloatFormat {
@@ -954,6 +1040,18 @@ class AssemblerMIPSShared : public AssemblerShared
     BufferOffset as_sdl(Register rd, Register rs, int16_t off);
     BufferOffset as_sdr(Register rd, Register rs, int16_t off);
 
+    // Loongson-specific load and store instructions
+    BufferOffset as_gslbx(Register rd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gssbx(Register rd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gslhx(Register rd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gsshx(Register rd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gslwx(Register rd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gsswx(Register rd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gsldx(Register rd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gssdx(Register rd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gslq(Register rh, Register rl, Register rs, int16_t off);
+    BufferOffset as_gssq(Register rh, Register rl, Register rs, int16_t off);
+
     // Move from HI/LO register.
     BufferOffset as_mfhi(Register rd);
     BufferOffset as_mflo(Register rd);
@@ -996,8 +1094,27 @@ class AssemblerMIPSShared : public AssemblerShared
     BufferOffset as_ls(FloatRegister fd, Register base, int32_t off);
     BufferOffset as_ss(FloatRegister fd, Register base, int32_t off);
 
+    // Loongson-specific FP load and store instructions
+    BufferOffset as_gsldl(FloatRegister fd, Register base, int32_t off);
+    BufferOffset as_gsldr(FloatRegister fd, Register base, int32_t off);
+    BufferOffset as_gssdl(FloatRegister fd, Register base, int32_t off);
+    BufferOffset as_gssdr(FloatRegister fd, Register base, int32_t off);
+    BufferOffset as_gslsl(FloatRegister fd, Register base, int32_t off);
+    BufferOffset as_gslsr(FloatRegister fd, Register base, int32_t off);
+    BufferOffset as_gsssl(FloatRegister fd, Register base, int32_t off);
+    BufferOffset as_gsssr(FloatRegister fd, Register base, int32_t off);
+    BufferOffset as_gslsx(FloatRegister fd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gsssx(FloatRegister fd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gsldx(FloatRegister fd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gssdx(FloatRegister fd, Register rs, Register ri, int16_t off);
+    BufferOffset as_gslq(FloatRegister rh, FloatRegister rl, Register rs, int16_t off);
+    BufferOffset as_gssq(FloatRegister rh, FloatRegister rl, Register rs, int16_t off);
+
     BufferOffset as_movs(FloatRegister fd, FloatRegister fs);
     BufferOffset as_movd(FloatRegister fd, FloatRegister fs);
+
+    BufferOffset as_ctc1(Register rt, FPControl fc);
+    BufferOffset as_cfc1(Register rt, FPControl fc);
 
     BufferOffset as_mtc1(Register rt, FloatRegister fs);
     BufferOffset as_mfc1(Register rt, FloatRegister fs);
@@ -1013,11 +1130,13 @@ class AssemblerMIPSShared : public AssemblerShared
     BufferOffset as_floorws(FloatRegister fd, FloatRegister fs);
     BufferOffset as_roundws(FloatRegister fd, FloatRegister fs);
     BufferOffset as_truncws(FloatRegister fd, FloatRegister fs);
+    BufferOffset as_truncls(FloatRegister fd, FloatRegister fs);
 
     BufferOffset as_ceilwd(FloatRegister fd, FloatRegister fs);
     BufferOffset as_floorwd(FloatRegister fd, FloatRegister fs);
     BufferOffset as_roundwd(FloatRegister fd, FloatRegister fs);
     BufferOffset as_truncwd(FloatRegister fd, FloatRegister fs);
+    BufferOffset as_truncld(FloatRegister fd, FloatRegister fs);
 
     BufferOffset as_cvtdl(FloatRegister fd, FloatRegister fs);
     BufferOffset as_cvtds(FloatRegister fd, FloatRegister fs);
@@ -1104,6 +1223,9 @@ class AssemblerMIPSShared : public AssemblerShared
 #else
         return false;
 #endif
+    }
+    static bool SupportsUnalignedAccesses() {
+        return false;
     }
     static bool SupportsSimd() {
         return js::jit::SupportsSimd;
@@ -1359,6 +1481,33 @@ class InstJump : public Instruction
     uint32_t extractImm26Value() {
         return extractBitField(Imm26Shift + Imm26Bits - 1, Imm26Shift);
     }
+};
+
+// Class for Loongson-specific instructions
+class InstGS : public Instruction
+{
+  public:
+    // For indexed loads and stores.
+    InstGS(Opcode op, Register rs, Register rt, Register rd, Imm8 off, FunctionField ff)
+      : Instruction(op | RS(rs) | RT(rt) | RD(rd) | off.encode(3) | ff)
+    { }
+    InstGS(Opcode op, Register rs, FloatRegister rt, Register rd, Imm8 off, FunctionField ff)
+      : Instruction(op | RS(rs) | RT(rt) | RD(rd) | off.encode(3) | ff)
+    { }
+    // For quad-word loads and stores.
+    InstGS(Opcode op, Register rs, Register rt, Register rz, GSImm13 off, FunctionField ff)
+      : Instruction(op | RS(rs) | RT(rt) | RZ(rz) | off.encode(6) | ff)
+    { }
+    InstGS(Opcode op, Register rs, FloatRegister rt, FloatRegister rz, GSImm13 off, FunctionField ff)
+      : Instruction(op | RS(rs) | RT(rt) | RZ(rz) | off.encode(6) | ff)
+    { }
+    InstGS(uint32_t raw)
+      : Instruction(raw)
+    { }
+    // For floating-point unaligned loads and stores.
+    InstGS(Opcode op, Register rs, FloatRegister rt, Imm8 off, FunctionField ff)
+      : Instruction(op | RS(rs) | RT(rt) | off.encode(6) | ff)
+    { }
 };
 
 } // namespace jit

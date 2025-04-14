@@ -20,9 +20,10 @@ namespace mozilla {
 namespace dom {
 namespace cache {
 
+using mozilla::dom::OptionalFileDescriptorSet;
+using mozilla::ipc::AutoIPCStream;
 using mozilla::ipc::FileDescriptor;
 using mozilla::ipc::FileDescriptorSetChild;
-using mozilla::ipc::OptionalFileDescriptorSet;
 using mozilla::ipc::PFileDescriptorSetChild;
 
 // declared in ActorUtils.h
@@ -57,8 +58,8 @@ CacheStreamControlChild::StartDestroy()
 {
   NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
   // This can get called twice under some circumstances.  For example, if the
-  // actor is added to a Feature that has already been notified and the Cache
-  // actor has no mListener.
+  // actor is added to a CacheWorkerHolder that has already been notified and
+  // the Cache actor has no mListener.
   if (mDestroyStarted) {
     return;
   }
@@ -93,42 +94,16 @@ CacheStreamControlChild::SerializeControl(CacheReadStream* aReadStreamOut)
 }
 
 void
-CacheStreamControlChild::SerializeFds(CacheReadStream* aReadStreamOut,
-                                      const nsTArray<FileDescriptor>& aFds)
+CacheStreamControlChild::SerializeStream(CacheReadStream* aReadStreamOut,
+                                         nsIInputStream* aStream,
+                                         nsTArray<UniquePtr<AutoIPCStream>>& aStreamCleanupList)
 {
   NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
-  PFileDescriptorSetChild* fdSet = nullptr;
-  if (!aFds.IsEmpty()) {
-    fdSet = Manager()->SendPFileDescriptorSetConstructor(aFds[0]);
-    for (uint32_t i = 1; i < aFds.Length(); ++i) {
-      Unused << fdSet->SendAddFileDescriptor(aFds[i]);
-    }
-  }
-
-  if (fdSet) {
-    aReadStreamOut->fds() = fdSet;
-  } else {
-    aReadStreamOut->fds() = void_t();
-  }
-}
-
-void
-CacheStreamControlChild::DeserializeFds(const CacheReadStream& aReadStream,
-                                        nsTArray<FileDescriptor>& aFdsOut)
-{
-  if (aReadStream.fds().type() !=
-      OptionalFileDescriptorSet::TPFileDescriptorSetChild) {
-    return;
-  }
-
-  auto fdSetActor = static_cast<FileDescriptorSetChild*>(
-    aReadStream.fds().get_PFileDescriptorSetChild());
-  MOZ_ASSERT(fdSetActor);
-
-  fdSetActor->ForgetFileDescriptors(aFdsOut);
-  MOZ_ASSERT(!aFdsOut.IsEmpty());
-
-  Unused << fdSetActor->Send__delete__(fdSetActor);
+  MOZ_ASSERT(aReadStreamOut);
+  MOZ_ASSERT(aStream);
+  UniquePtr<AutoIPCStream> autoStream(new AutoIPCStream(aReadStreamOut->stream()));
+  autoStream->Serialize(aStream, Manager());
+  aStreamCleanupList.AppendElement(Move(autoStream));
 }
 
 void
@@ -160,7 +135,7 @@ CacheStreamControlChild::ActorDestroy(ActorDestroyReason aReason)
 {
   NS_ASSERT_OWNINGTHREAD(CacheStreamControlChild);
   CloseAllReadStreamsWithoutReporting();
-  RemoveFeature();
+  RemoveWorkerHolder();
 }
 
 bool

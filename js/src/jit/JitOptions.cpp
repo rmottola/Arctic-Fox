@@ -103,13 +103,16 @@ DefaultJitOptions::DefaultJitOptions()
     SET_DEFAULT(disableLoopUnrolling, true);
 
     // Toggle whether Profile Guided Optimization is globally disabled.
-    SET_DEFAULT(disablePgo, true);
+    SET_DEFAULT(disablePgo, false);
 
     // Toggles whether instruction reordering is globally disabled.
     SET_DEFAULT(disableInstructionReordering, false);
 
     // Toggles whether Range Analysis is globally disabled.
     SET_DEFAULT(disableRangeAnalysis, false);
+
+    // Toggles wheter Recover instructions is globally disabled.
+    SET_DEFAULT(disableRecoverIns, false);
 
     // Toggle whether eager scalar replacement is globally disabled.
     SET_DEFAULT(disableScalarReplacement, false);
@@ -163,11 +166,22 @@ DefaultJitOptions::DefaultJitOptions()
     SET_DEFAULT(osrPcMismatchesBeforeRecompile, 6000);
 
     // The bytecode length limit for small function.
-    SET_DEFAULT(smallFunctionMaxBytecodeLength_, 120);
+    SET_DEFAULT(smallFunctionMaxBytecodeLength_, 130);
 
     // An artificial testing limit for the maximum supported offset of
     // pc-relative jump and call instructions.
     SET_DEFAULT(jumpThreshold, UINT32_MAX);
+
+    // Branch pruning heuristic is based on a scoring system, which is look at
+    // different metrics and provide a score. The score is computed as a
+    // projection where each factor defines the weight of each metric. Then this
+    // score is compared against a threshold to prevent a branch from being
+    // removed.
+    SET_DEFAULT(branchPruningHitCountFactor, 1);
+    SET_DEFAULT(branchPruningInstFactor, 10);
+    SET_DEFAULT(branchPruningBlockSpanFactor, 100);
+    SET_DEFAULT(branchPruningEffectfulInstFactor, 3500);
+    SET_DEFAULT(branchPruningThreshold, 4000);
 
     // Force how many invocation or loop iterations are needed before compiling
     // a function with the highest ionmonkey optimization level.
@@ -179,6 +193,17 @@ DefaultJitOptions::DefaultJitOptions()
             forcedDefaultIonWarmUpThreshold.emplace(value.ref());
         else
             Warn(forcedDefaultIonWarmUpThresholdEnv, env);
+    }
+
+    // Same but for compiling small functions.
+    const char* forcedDefaultIonSmallFunctionWarmUpThresholdEnv =
+        "JIT_OPTION_forcedDefaultIonSmallFunctionWarmUpThreshold";
+    if (const char* env = getenv(forcedDefaultIonSmallFunctionWarmUpThresholdEnv)) {
+        Maybe<int> value = ParseInt(env);
+        if (value.isSome())
+            forcedDefaultIonSmallFunctionWarmUpThreshold.emplace(value.ref());
+        else
+            Warn(forcedDefaultIonSmallFunctionWarmUpThresholdEnv, env);
     }
 
     // Force the used register allocator instead of letting the optimization
@@ -195,6 +220,10 @@ DefaultJitOptions::DefaultJitOptions()
 
     // Test whether wasm int64 / double NaN bits testing is enabled.
     SET_DEFAULT(wasmTestMode, false);
+
+    // Determines whether explicit bounds check will be used for OOB
+    // instead of signals (even when signals are available).
+    SET_DEFAULT(wasmExplicitBoundsChecks, false);
 }
 
 bool
@@ -216,6 +245,8 @@ DefaultJitOptions::setEagerCompilation()
     baselineWarmUpThreshold = 0;
     forcedDefaultIonWarmUpThreshold.reset();
     forcedDefaultIonWarmUpThreshold.emplace(0);
+    forcedDefaultIonSmallFunctionWarmUpThreshold.reset();
+    forcedDefaultIonSmallFunctionWarmUpThreshold.emplace(0);
 }
 
 void
@@ -223,6 +254,8 @@ DefaultJitOptions::setCompilerWarmUpThreshold(uint32_t warmUpThreshold)
 {
     forcedDefaultIonWarmUpThreshold.reset();
     forcedDefaultIonWarmUpThreshold.emplace(warmUpThreshold);
+    forcedDefaultIonSmallFunctionWarmUpThreshold.reset();
+    forcedDefaultIonSmallFunctionWarmUpThreshold.emplace(warmUpThreshold);
 
     // Undo eager compilation
     if (eagerCompilation && warmUpThreshold != 0) {

@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -17,7 +17,7 @@ else:
 
 if CONFIG['OS_TARGET'] == 'Android' and CONFIG['MOZ_ANDROID_CXX_STL'] == 'mozstlport':
     DIRS += ['stlport']
-    if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'android' and CONFIG['ENABLE_INTL_API']:
+    if CONFIG['ENABLE_INTL_API']:
         DIRS += ['gabi++']
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'android':
@@ -60,6 +60,8 @@ if CONFIG['MOZ_DMD']:
 # Put a useful .gdbinit in the bin directory, to be picked up automatically
 # by GDB when we debug executables there.
 FINAL_TARGET_FILES += ['/.gdbinit']
+FINAL_TARGET_PP_FILES += ['.gdbinit_python.in']
+OBJDIR_FILES += ['!/dist/bin/.gdbinit_python']
 
 # Install the clang-cl runtime library for ASAN next to the binaries we produce.
 if CONFIG['MOZ_ASAN'] and CONFIG['CLANG_CL']:
@@ -69,6 +71,12 @@ if CONFIG['MOZ_APP_BASENAME']:
     FINAL_TARGET_PP_FILES += ['application.ini']
     if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'android' and CONFIG['MOZ_UPDATER']:
         FINAL_TARGET_PP_FILES += ['update-settings.ini']
+
+    if CONFIG['MOZ_APP_STATIC_INI']:
+        GENERATED_FILES += ['application.ini.h']
+        appini = GENERATED_FILES['application.ini.h']
+        appini.script = 'appini_header.py'
+        appini.inputs = ['!/dist/bin/application.ini']
 
 DEFINES['TOPOBJDIR'] = TOPOBJDIR
 

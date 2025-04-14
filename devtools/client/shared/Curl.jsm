@@ -219,7 +219,7 @@ this.CurlUtils = {
    * @return string
    *         Post data parameters.
    */
-  writePostDataTextParams: function(aPostDataText) {
+  writePostDataTextParams: function (aPostDataText) {
     if (!aPostDataText) {
       return "";
     }

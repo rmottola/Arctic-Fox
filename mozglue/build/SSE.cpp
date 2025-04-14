@@ -16,6 +16,7 @@ namespace {
 
 #ifdef HAVE_CPUID_H
 
+// cpuid.h is available on gcc 4.3 and higher on i386 and x86_64
 #include <cpuid.h>
 
 enum CPUIDRegister { eax = 0, ebx = 1, ecx = 2, edx = 3 };

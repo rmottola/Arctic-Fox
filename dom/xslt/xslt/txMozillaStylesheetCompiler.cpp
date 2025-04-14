@@ -34,7 +34,6 @@
 #include "nsAttrName.h"
 #include "nsIScriptError.h"
 #include "nsIURL.h"
-#include "nsCORSListenerProxy.h"
 #include "nsError.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/dom/Element.h"
@@ -356,9 +355,7 @@ txStylesheetSink::GetInterface(const nsIID& aIID, void** aResult)
         rv = wwatcher->GetNewAuthPrompter(nullptr, getter_AddRefs(prompt));
         NS_ENSURE_SUCCESS(rv, rv);
 
-        nsIAuthPrompt* rawPtr = nullptr;
-        prompt.swap(rawPtr);
-        *aResult = rawPtr;
+        prompt.forget(aResult);
 
         return NS_OK;
     }
@@ -417,11 +414,10 @@ txCompileObserver::loadURI(const nsAString& aUri,
     rv = NS_NewURI(getter_AddRefs(referrerUri), aReferrerUri);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsCOMPtr<nsIPrincipal> referrerPrincipal;
-    rv = nsContentUtils::GetSecurityManager()->
-      GetSimpleCodebasePrincipal(referrerUri,
-                                 getter_AddRefs(referrerPrincipal));
-    NS_ENSURE_SUCCESS(rv, rv);
+    PrincipalOriginAttributes attrs;
+    nsCOMPtr<nsIPrincipal> referrerPrincipal =
+      BasePrincipal::CreateCodebasePrincipal(referrerUri, attrs);
+    NS_ENSURE_TRUE(referrerPrincipal, NS_ERROR_FAILURE);
 
     return startLoad(uri, aCompiler, referrerPrincipal, aReferrerPolicy);
 }
@@ -622,11 +618,9 @@ txSyncCompileObserver::loadURI(const nsAString& aUri,
     rv = NS_NewURI(getter_AddRefs(referrerUri), aReferrerUri);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    nsCOMPtr<nsIPrincipal> referrerPrincipal;
-    rv = nsContentUtils::GetSecurityManager()->
-      GetSimpleCodebasePrincipal(referrerUri,
-                                 getter_AddRefs(referrerPrincipal));
-    NS_ENSURE_SUCCESS(rv, rv);
+    nsCOMPtr<nsIPrincipal> referrerPrincipal =
+      BasePrincipal::CreateCodebasePrincipal(referrerUri, PrincipalOriginAttributes());
+    NS_ENSURE_TRUE(referrerPrincipal, NS_ERROR_FAILURE);
 
     // This is probably called by js, a loadGroup for the channel doesn't
     // make sense.

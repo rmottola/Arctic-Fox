@@ -77,8 +77,9 @@ GetStrokeDashData(SVGContentUtils::AutoStrokeOptions* aStrokeOptions,
 {
   size_t dashArrayLength;
   Float totalLengthOfDashes = 0.0, totalLengthOfGaps = 0.0;
+  Float pathScale = 1.0;
 
-  if (aContextPaint && aStyleSVG->mStrokeDasharrayFromObject) {
+  if (aContextPaint && aStyleSVG->StrokeDasharrayFromObject()) {
     const FallibleTArray<gfxFloat>& dashSrc = aContextPaint->GetStrokeDashArray();
     dashArrayLength = dashSrc.Length();
     if (dashArrayLength <= 0) {
@@ -96,12 +97,11 @@ GetStrokeDashData(SVGContentUtils::AutoStrokeOptions* aStrokeOptions,
       (i % 2 ? totalLengthOfGaps : totalLengthOfDashes) += dashSrc[i];
     }
   } else {
-    const nsStyleCoord *dasharray = aStyleSVG->mStrokeDasharray;
-    dashArrayLength = aStyleSVG->mStrokeDasharrayLength;
+    const nsTArray<nsStyleCoord>& dasharray = aStyleSVG->mStrokeDasharray;
+    dashArrayLength = aStyleSVG->mStrokeDasharray.Length();
     if (dashArrayLength <= 0) {
       return eContinuousStroke;
     }
-    Float pathScale = 1.0;
     if (aElement->IsSVGElement(nsGkAtoms::path)) {
       pathScale = static_cast<SVGPathElement*>(aElement)->
         GetPathLengthScale(SVGPathElement::eForStroking);
@@ -155,11 +155,12 @@ GetStrokeDashData(SVGContentUtils::AutoStrokeOptions* aStrokeOptions,
     return eNoStroke;
   }
 
-  if (aContextPaint && aStyleSVG->mStrokeDashoffsetFromObject) {
+  if (aContextPaint && aStyleSVG->StrokeDashoffsetFromObject()) {
     aStrokeOptions->mDashOffset = Float(aContextPaint->GetStrokeDashOffset());
   } else {
     aStrokeOptions->mDashOffset =
-      SVGContentUtils::CoordToFloat(aElement, aStyleSVG->mStrokeDashoffset);
+      SVGContentUtils::CoordToFloat(aElement, aStyleSVG->mStrokeDashoffset) *
+      pathScale;
   }
 
   return eDashedStroke;
@@ -187,6 +188,7 @@ SVGContentUtils::GetStrokeOptions(AutoStrokeOptions* aStrokeOptions,
 
   const nsStyleSVG* styleSVG = styleContext->StyleSVG();
 
+  bool checkedDashAndStrokeIsDashed = false;
   if (aFlags != eIgnoreStrokeDashing) {
     DashState dashState =
       GetStrokeDashData(aStrokeOptions, aElement, styleSVG, aContextPaint);
@@ -200,6 +202,7 @@ SVGContentUtils::GetStrokeOptions(AutoStrokeOptions* aStrokeOptions,
       // Prevent our caller from wasting time looking at a pattern without gaps:
       aStrokeOptions->DiscardDashPattern();
     }
+    checkedDashAndStrokeIsDashed = (dashState == eDashedStroke);
   }
 
   aStrokeOptions->mLineWidth =
@@ -219,10 +222,12 @@ SVGContentUtils::GetStrokeOptions(AutoStrokeOptions* aStrokeOptions,
     break;
   }
 
-  if (ShapeTypeHasNoCorners(aElement)) {
+  if (ShapeTypeHasNoCorners(aElement) && !checkedDashAndStrokeIsDashed) {
+    // Note: if aFlags == eIgnoreStrokeDashing then we may be returning the
+    // wrong linecap value here, since the actual linecap used on render in this
+    // case depends on whether the stroke is dashed or not.
     aStrokeOptions->mLineCap = CapStyle::BUTT;
-  }
-  else {
+  } else {
     switch (styleSVG->mStrokeLinecap) {
       case NS_STYLE_STROKE_LINECAP_BUTT:
         aStrokeOptions->mLineCap = CapStyle::BUTT;
@@ -257,7 +262,7 @@ SVGContentUtils::GetStrokeWidth(nsSVGElement* aElement,
 
   const nsStyleSVG* styleSVG = styleContext->StyleSVG();
 
-  if (aContextPaint && styleSVG->mStrokeWidthFromObject) {
+  if (aContextPaint && styleSVG->StrokeWidthFromObject()) {
     return aContextPaint->GetStrokeWidth();
   }
 

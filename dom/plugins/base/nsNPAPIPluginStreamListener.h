@@ -10,7 +10,6 @@
 #include "nsIHTTPHeaderListener.h"
 #include "nsIRequest.h"
 #include "nsITimer.h"
-#include "nsAutoPtr.h"
 #include "nsCOMArray.h"
 #include "nsIOutputStream.h"
 #include "nsIPluginInstanceOwner.h"
@@ -113,7 +112,16 @@ protected:
     eStreamTypeSet      // The stream is fully initialized
   };
 
+  enum StreamStopMode
+  {
+    eNormalStop = 0,
+    eDoDeferredStop,
+    eStopPending
+  };
+
   virtual ~nsNPAPIPluginStreamListener();
+  bool MaybeRunStopBinding();
+
   char* mStreamBuffer;
   char* mNotifyURL;
   RefPtr<nsNPAPIPluginInstance> mInst;
@@ -131,6 +139,8 @@ protected:
   char* mResponseHeaderBuf;
   nsCOMPtr<nsITimer> mDataPumpTimer;
   nsCOMPtr<nsIAsyncVerifyRedirectCallback> mHTTPRedirectCallback;
+  StreamStopMode mStreamStopMode;
+  nsresult mPendingStopBindingStatus;
 
 public:
   RefPtr<nsPluginStreamListenerPeer> mStreamListenerPeer;

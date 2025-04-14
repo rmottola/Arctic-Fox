@@ -112,8 +112,6 @@ public:
                                                   const dom::BrowserElementExecuteScriptOptions& aOptions,
                                                   ErrorResult& aRv);
 
-  already_AddRefed<dom::DOMRequest> GetStructuredData(ErrorResult& aRv);
-
   already_AddRefed<dom::DOMRequest> GetWebManifest(ErrorResult& aRv);
 
   void SetNFCFocus(bool isFocus,
@@ -124,8 +122,6 @@ public:
                  nsPIDOMWindowInner* aWindow,
                  nsIFrameLoader* aFrameLoader,
                  nsIBrowserElementAPI* aAPI,
-                 const nsAString& aManifestURL,
-                 mozIApplication* aParentApp,
                  nsTArray<RefPtr<dom::BrowserElementAudioChannel>>& aAudioChannels,
                  ErrorResult& aRv);
 

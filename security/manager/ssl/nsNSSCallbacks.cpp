@@ -6,8 +6,11 @@
 
 #include "nsNSSCallbacks.h"
 
+#include "mozilla/ArrayUtils.h"
+#include "mozilla/Casting.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/TimeStamp.h"
+#include "mozilla/unused.h"
 #include "nsContentUtils.h"
 #include "nsICertOverrideService.h"
 #include "nsIHttpChannelInternal.h"
@@ -188,7 +191,7 @@ struct nsCancelHTTPDownloadEvent : Runnable {
 Result
 nsNSSHttpServerSession::createSessionFcn(const char* host,
                                          uint16_t portnum,
-                                         SEC_HTTP_SERVER_SESSION* pSession)
+                                 /*out*/ nsNSSHttpServerSession** pSession)
 {
   if (!host || !pSession) {
     return Result::FATAL_ERROR_INVALID_ARGS;
@@ -207,20 +210,15 @@ nsNSSHttpServerSession::createSessionFcn(const char* host,
 }
 
 Result
-nsNSSHttpRequestSession::createFcn(SEC_HTTP_SERVER_SESSION session,
+nsNSSHttpRequestSession::createFcn(const nsNSSHttpServerSession* session,
                                    const char* http_protocol_variant,
                                    const char* path_and_query_string,
                                    const char* http_request_method,
                                    const PRIntervalTime timeout,
-                                   SEC_HTTP_REQUEST_SESSION* pRequest)
+                           /*out*/ nsNSSHttpRequestSession** pRequest)
 {
   if (!session || !http_protocol_variant || !path_and_query_string ||
       !http_request_method || !pRequest) {
-    return Result::FATAL_ERROR_INVALID_ARGS;
-  }
-
-  nsNSSHttpServerSession* hss = static_cast<nsNSSHttpServerSession*>(session);
-  if (!hss) {
     return Result::FATAL_ERROR_INVALID_ARGS;
   }
 
@@ -240,14 +238,14 @@ nsNSSHttpRequestSession::createFcn(SEC_HTTP_SERVER_SESSION session,
 
   rs->mURL.Assign(http_protocol_variant);
   rs->mURL.AppendLiteral("://");
-  rs->mURL.Append(hss->mHost);
+  rs->mURL.Append(session->mHost);
   rs->mURL.Append(':');
-  rs->mURL.AppendInt(hss->mPort);
+  rs->mURL.AppendInt(session->mPort);
   rs->mURL.Append(path_and_query_string);
 
   rs->mRequestMethod = http_request_method;
 
-  *pRequest = (void*)rs;
+  *pRequest = rs;
   return Success;
 }
 
@@ -867,17 +865,18 @@ PreliminaryHandshakeDone(PRFileDesc* fd)
   unsigned char npnbuf[256];
   unsigned int npnlen;
 
-  if (SSL_GetNextProto(fd, &state, npnbuf, &npnlen, 256) == SECSuccess) {
+  if (SSL_GetNextProto(fd, &state, npnbuf, &npnlen,
+                       AssertedCast<unsigned int>(ArrayLength(npnbuf)))
+        == SECSuccess) {
     if (state == SSL_NEXT_PROTO_NEGOTIATED ||
         state == SSL_NEXT_PROTO_SELECTED) {
-      infoObject->SetNegotiatedNPN(reinterpret_cast<char *>(npnbuf), npnlen);
-    }
-    else {
+      infoObject->SetNegotiatedNPN(BitwiseCast<char*, unsigned char*>(npnbuf),
+                                   npnlen);
+    } else {
       infoObject->SetNegotiatedNPN(nullptr, 0);
     }
     mozilla::Telemetry::Accumulate(Telemetry::SSL_NPN_TYPE, state);
-  }
-  else {
+  } else {
     infoObject->SetNegotiatedNPN(nullptr, 0);
   }
 
@@ -1173,10 +1172,6 @@ void HandshakeCallback(PRFileDesc* fd, void* client_data) {
               AccumulateNonECCKeySize(Telemetry::SSL_AUTH_RSA_KEY_SIZE_FULL,
                                       channelInfo.authKeyBits);
               break;
-            case ssl_auth_dsa:
-              AccumulateNonECCKeySize(Telemetry::SSL_AUTH_DSA_KEY_SIZE_FULL,
-                                      channelInfo.authKeyBits);
-              break;
             case ssl_auth_ecdsa:
               AccumulateECCCurve(Telemetry::SSL_AUTH_ECDSA_CURVE_FULL,
                                  channelInfo.authKeyBits);
@@ -1251,25 +1246,17 @@ void HandshakeCallback(PRFileDesc* fd, void* client_data) {
     status->SetServerCert(nssc, nsNSSCertificate::ev_status_unknown);
   }
 
-  nsCOMPtr<nsICertOverrideService> overrideService =
-      do_GetService(NS_CERTOVERRIDE_CONTRACTID);
-
-  if (overrideService) {
-    bool haveOverride;
-    uint32_t overrideBits = 0; // Unused.
-    bool isTemporaryOverride; // Unused.
-    const nsACString& hostString(infoObject->GetHostName());
-    const int32_t port(infoObject->GetPort());
-    nsCOMPtr<nsIX509Cert> cert;
-    status->GetServerCert(getter_AddRefs(cert));
-    nsresult nsrv = overrideService->HasMatchingOverride(hostString, port,
-                                                         cert,
-                                                         &overrideBits,
-                                                         &isTemporaryOverride,
-                                                         &haveOverride);
-    if (NS_SUCCEEDED(nsrv) && haveOverride) {
-      state |= nsIWebProgressListener::STATE_CERT_USER_OVERRIDDEN;
-    }
+  bool domainMismatch;
+  bool untrusted;
+  bool notValidAtThisTime;
+  // These all return NS_OK, so don't even bother checking the return values.
+  Unused << status->GetIsDomainMismatch(&domainMismatch);
+  Unused << status->GetIsUntrusted(&untrusted);
+  Unused << status->GetIsNotValidAtThisTime(&notValidAtThisTime);
+  // If we're here, the TLS handshake has succeeded. Thus if any of these
+  // booleans are true, the user has added an override for a certificate error.
+  if (domainMismatch || untrusted || notValidAtThisTime) {
+    state |= nsIWebProgressListener::STATE_CERT_USER_OVERRIDDEN;
   }
 
   infoObject->SetSecurityState(state);

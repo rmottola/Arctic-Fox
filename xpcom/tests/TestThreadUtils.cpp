@@ -5,8 +5,11 @@
 #include "TestHarness.h"
 #include "nsThreadUtils.h"
 
+using namespace mozilla;
+
 enum {
   TEST_CALL_VOID_ARG_VOID_RETURN,
+  TEST_CALL_VOID_ARG_VOID_RETURN_CONST,
   TEST_CALL_VOID_ARG_NONVOID_RETURN,
   TEST_CALL_NONVOID_ARG_VOID_RETURN,
   TEST_CALL_NONVOID_ARG_NONVOID_RETURN,
@@ -63,6 +66,9 @@ public:
   void DoBar1(void) {
     gRunnableExecuted[TEST_CALL_VOID_ARG_VOID_RETURN] = true;
   }
+  void DoBar1Const(void) const {
+    gRunnableExecuted[TEST_CALL_VOID_ARG_VOID_RETURN_CONST] = true;
+  }
   nsresult DoBar2(void) {
     gRunnableExecuted[TEST_CALL_VOID_ARG_NONVOID_RETURN] = true;
     return NS_OK;
@@ -110,8 +116,225 @@ public:
 
 NS_IMPL_ISUPPORTS0(nsBar)
 
+struct TestCopyWithNoMove
+{
+  explicit TestCopyWithNoMove(int* aCopyCounter) : mCopyCounter(aCopyCounter) {}
+  TestCopyWithNoMove(const TestCopyWithNoMove& a) : mCopyCounter(a.mCopyCounter) { ++mCopyCounter; };
+  // No 'move' declaration, allows passing object by rvalue copy.
+  // Destructor nulls member variable...
+  ~TestCopyWithNoMove() { mCopyCounter = nullptr; }
+  // ... so we can check that the object is called when still alive.
+  void operator()() { MOZ_ASSERT(mCopyCounter); }
+  int* mCopyCounter;
+};
+struct TestCopyWithDeletedMove
+{
+  explicit TestCopyWithDeletedMove(int* aCopyCounter) : mCopyCounter(aCopyCounter) {}
+  TestCopyWithDeletedMove(const TestCopyWithDeletedMove& a) : mCopyCounter(a.mCopyCounter) { ++mCopyCounter; };
+  // Deleted move prevents passing by rvalue (even if copy would work)
+  TestCopyWithDeletedMove(TestCopyWithDeletedMove&&) = delete;
+  ~TestCopyWithDeletedMove() { mCopyCounter = nullptr; }
+  void operator()() { MOZ_ASSERT(mCopyCounter); }
+  int* mCopyCounter;
+};
+struct TestMove
+{
+  explicit TestMove(int* aMoveCounter) : mMoveCounter(aMoveCounter) {}
+  TestMove(const TestMove&) = delete;
+  TestMove(TestMove&& a) : mMoveCounter(a.mMoveCounter) { a.mMoveCounter = nullptr; ++mMoveCounter; }
+  ~TestMove() { mMoveCounter = nullptr; }
+  void operator()() { MOZ_ASSERT(mMoveCounter); }
+  int* mMoveCounter;
+};
+struct TestCopyMove
+{
+  TestCopyMove(int* aCopyCounter, int* aMoveCounter) : mCopyCounter(aCopyCounter), mMoveCounter(aMoveCounter) {}
+  TestCopyMove(const TestCopyMove& a) : mCopyCounter(a.mCopyCounter), mMoveCounter(a.mMoveCounter) { ++mCopyCounter; };
+  TestCopyMove(TestCopyMove&& a) : mCopyCounter(a.mCopyCounter), mMoveCounter(a.mMoveCounter) { a.mMoveCounter = nullptr; ++mMoveCounter; }
+  ~TestCopyMove() { mCopyCounter = nullptr; mMoveCounter = nullptr; }
+  void operator()() { MOZ_ASSERT(mCopyCounter); MOZ_ASSERT(mMoveCounter); }
+  int* mCopyCounter;
+  int* mMoveCounter;
+};
+
+static int Expect(const char* aContext, int aCounter, int aMaxExpected)
+{
+  if (aCounter > aMaxExpected) {
+    fail("%s: expected %d max, got %d", aContext, aMaxExpected, aCounter);
+    return 1;
+  }
+  passed("%s: got %d <= %d as expected", aContext, aCounter, aMaxExpected);
+  return 0;
+}
+
+int TestNS_NewRunnableFunction()
+{
+  int result = 0;
+
+  // Test NS_NewRunnableFunction with copyable-only function object.
+  {
+    int copyCounter = 0;
+    {
+      nsCOMPtr<nsIRunnable> trackedRunnable;
+      {
+        TestCopyWithNoMove tracker(&copyCounter);
+        trackedRunnable = NS_NewRunnableFunction(tracker);
+        // Original 'tracker' is destroyed here.
+      }
+      // Verify that the runnable contains a non-destroyed function object.
+      trackedRunnable->Run();
+    }
+    result |= Expect("NS_NewRunnableFunction with copyable-only (and no move) function, copies",
+                     copyCounter, 1);
+  }
+  {
+    int copyCounter = 0;
+    {
+      nsCOMPtr<nsIRunnable> trackedRunnable;
+      {
+        // Passing as rvalue, but using copy.
+        // (TestCopyWithDeletedMove wouldn't allow this.)
+        trackedRunnable = NS_NewRunnableFunction(TestCopyWithNoMove(&copyCounter));
+      }
+      trackedRunnable->Run();
+    }
+    result |= Expect("NS_NewRunnableFunction with copyable-only (and no move) function rvalue, copies",
+                     copyCounter, 1);
+  }
+  {
+    int copyCounter = 0;
+    {
+      nsCOMPtr<nsIRunnable> trackedRunnable;
+      {
+        TestCopyWithDeletedMove tracker(&copyCounter);
+        trackedRunnable = NS_NewRunnableFunction(tracker);
+      }
+      trackedRunnable->Run();
+    }
+    result |= Expect("NS_NewRunnableFunction with copyable-only (and deleted move) function, copies",
+                     copyCounter, 1);
+  }
+
+  // Test NS_NewRunnableFunction with movable-only function object.
+  {
+    int moveCounter = 0;
+    {
+      nsCOMPtr<nsIRunnable> trackedRunnable;
+      {
+        TestMove tracker(&moveCounter);
+        trackedRunnable = NS_NewRunnableFunction(Move(tracker));
+      }
+      trackedRunnable->Run();
+    }
+    result |= Expect("NS_NewRunnableFunction with movable-only function, moves",
+                     moveCounter, 1);
+  }
+  {
+    int moveCounter = 0;
+    {
+      nsCOMPtr<nsIRunnable> trackedRunnable;
+      {
+        trackedRunnable = NS_NewRunnableFunction(TestMove(&moveCounter));
+      }
+      trackedRunnable->Run();
+    }
+    result |= Expect("NS_NewRunnableFunction with movable-only function rvalue, moves",
+                     moveCounter, 1);
+  }
+
+  // Test NS_NewRunnableFunction with copyable&movable function object.
+  {
+    int copyCounter = 0;
+    int moveCounter = 0;
+    {
+      nsCOMPtr<nsIRunnable> trackedRunnable;
+      {
+        TestCopyMove tracker(&copyCounter, &moveCounter);
+        trackedRunnable = NS_NewRunnableFunction(Move(tracker));
+      }
+      trackedRunnable->Run();
+    }
+    result |= Expect("NS_NewRunnableFunction with copyable&movable function, copies",
+                     copyCounter, 0);
+    result |= Expect("NS_NewRunnableFunction with copyable&movable function, moves",
+                     moveCounter, 1);
+  }
+  {
+    int copyCounter = 0;
+    int moveCounter = 0;
+    {
+      nsCOMPtr<nsIRunnable> trackedRunnable;
+      {
+        trackedRunnable =
+          NS_NewRunnableFunction(TestCopyMove(&copyCounter, &moveCounter));
+      }
+      trackedRunnable->Run();
+    }
+    result |= Expect("NS_NewRunnableFunction with copyable&movable function rvalue, copies",
+                     copyCounter, 0);
+    result |= Expect("NS_NewRunnableFunction with copyable&movable function rvalue, moves",
+                     moveCounter, 1);
+  }
+
+  // Test NS_NewRunnableFunction with copyable-only lambda capture.
+  {
+    int copyCounter = 0;
+    {
+      nsCOMPtr<nsIRunnable> trackedRunnable;
+      {
+        TestCopyWithNoMove tracker(&copyCounter);
+        // Expect 2 copies (here -> local lambda -> runnable lambda).
+        trackedRunnable = NS_NewRunnableFunction([tracker]() mutable { tracker(); });
+      }
+      trackedRunnable->Run();
+    }
+    result |= Expect("NS_NewRunnableFunction with copyable-only (and no move) capture, copies",
+                     copyCounter, 2);
+  }
+  {
+    int copyCounter = 0;
+    {
+      nsCOMPtr<nsIRunnable> trackedRunnable;
+      {
+        TestCopyWithDeletedMove tracker(&copyCounter);
+        // Expect 2 copies (here -> local lambda -> runnable lambda).
+        trackedRunnable = NS_NewRunnableFunction([tracker]() mutable { tracker(); });
+      }
+      trackedRunnable->Run();
+    }
+    result |= Expect("NS_NewRunnableFunction with copyable-only (and deleted move) capture, copies",
+                     copyCounter, 2);
+  }
+
+  // Note: Not possible to use move-only captures.
+  // (Until we can use C++14 generalized lambda captures)
+
+  // Test NS_NewRunnableFunction with copyable&movable lambda capture.
+  {
+    int copyCounter = 0;
+    int moveCounter = 0;
+    {
+      nsCOMPtr<nsIRunnable> trackedRunnable;
+      {
+        TestCopyMove tracker(&copyCounter, &moveCounter);
+        trackedRunnable = NS_NewRunnableFunction([tracker]() mutable { tracker(); });
+        // Expect 1 copy (here -> local lambda) and 1 move (local -> runnable lambda).
+      }
+      trackedRunnable->Run();
+    }
+    result |= Expect("NS_NewRunnableFunction with copyable&movable capture, copies",
+                     copyCounter, 1);
+    result |= Expect("NS_NewRunnableFunction with copyable&movable capture, moves",
+                     moveCounter, 1);
+  }
+
+  return result;
+}
+
 int main(int argc, char** argv)
 {
+  int result = TestNS_NewRunnableFunction();
+
   ScopedXPCOM xpcom("ThreadUtils");
   NS_ENSURE_FALSE(xpcom.failed(), 1);
 
@@ -120,6 +343,7 @@ int main(int argc, char** argv)
   {
     RefPtr<nsFoo> foo = new nsFoo();
     RefPtr<nsBar> bar = new nsBar();
+    RefPtr<const nsBar> constBar = bar;
 
     // This pointer will be freed at the end of the block
     // Do not dereference this pointer in the runnable method!
@@ -128,23 +352,24 @@ int main(int argc, char** argv)
     // Read only string. Dereferencing in runnable method to check this works.
     char* message = (char*)"Test message";
 
-    NS_DispatchToMainThread(NS_NewRunnableMethod(bar, &nsBar::DoBar1));
-    NS_DispatchToMainThread(NS_NewRunnableMethod(bar, &nsBar::DoBar2));
-    NS_DispatchToMainThread(NS_NewRunnableMethodWithArg< RefPtr<nsFoo> >
+    NS_DispatchToMainThread(NewRunnableMethod(bar, &nsBar::DoBar1));
+    NS_DispatchToMainThread(NewRunnableMethod(constBar, &nsBar::DoBar1Const));
+    NS_DispatchToMainThread(NewRunnableMethod(bar, &nsBar::DoBar2));
+    NS_DispatchToMainThread(NewRunnableMethod<RefPtr<nsFoo>>
       (bar, &nsBar::DoBar3, foo));
-    NS_DispatchToMainThread(NS_NewRunnableMethodWithArg< RefPtr<nsFoo> >
+    NS_DispatchToMainThread(NewRunnableMethod<RefPtr<nsFoo>>
       (bar, &nsBar::DoBar4, foo));
-    NS_DispatchToMainThread(NS_NewRunnableMethodWithArg<nsFoo*>(bar, &nsBar::DoBar5, rawFoo));
-    NS_DispatchToMainThread(NS_NewRunnableMethodWithArg<char*>(bar, &nsBar::DoBar6, message));
+    NS_DispatchToMainThread(NewRunnableMethod<nsFoo*>(bar, &nsBar::DoBar5, rawFoo));
+    NS_DispatchToMainThread(NewRunnableMethod<char*>(bar, &nsBar::DoBar6, message));
 #ifdef HAVE_STDCALL
-    NS_DispatchToMainThread(NS_NewRunnableMethod(bar, &nsBar::DoBar1std));
-    NS_DispatchToMainThread(NS_NewRunnableMethod(bar, &nsBar::DoBar2std));
-    NS_DispatchToMainThread(NS_NewRunnableMethodWithArg< RefPtr<nsFoo> >
+    NS_DispatchToMainThread(NewRunnableMethod(bar, &nsBar::DoBar1std));
+    NS_DispatchToMainThread(NewRunnableMethod(bar, &nsBar::DoBar2std));
+    NS_DispatchToMainThread(NewRunnableMethod<RefPtr<nsFoo>>
       (bar, &nsBar::DoBar3std, foo));
-    NS_DispatchToMainThread(NS_NewRunnableMethodWithArg< RefPtr<nsFoo> >
+    NS_DispatchToMainThread(NewRunnableMethod<RefPtr<nsFoo>>
       (bar, &nsBar::DoBar4std, foo));
-    NS_DispatchToMainThread(NS_NewRunnableMethodWithArg<nsFoo*>(bar, &nsBar::DoBar5std, rawFoo));
-    NS_DispatchToMainThread(NS_NewRunnableMethodWithArg<char*>(bar, &nsBar::DoBar6std, message));
+    NS_DispatchToMainThread(NewRunnableMethod<nsFoo*>(bar, &nsBar::DoBar5std, rawFoo));
+    NS_DispatchToMainThread(NewRunnableMethod<char*>(bar, &nsBar::DoBar6std, message));
 #endif
   }
 
@@ -159,8 +384,6 @@ int main(int argc, char** argv)
   while (!gRunnableExecuted[TEST_CALL_NEWTHREAD_SUICIDAL]) {
     NS_ProcessPendingEvents(nullptr);
   }
-
-  int result = 0;
 
   for (uint32_t i = 0; i < MAX_TESTS; i++) {
     if (gRunnableExecuted[i]) {

@@ -54,7 +54,8 @@ public:
     static already_AddRefed<PeriodicWave> create(float sampleRate,
                                                  const float* real,
                                                  const float* imag,
-                                                 size_t numberOfComponents);
+                                                 size_t numberOfComponents,
+                                                 bool disableNormalization);
 
     // Returns pointers to the lower and higher wave data for the pitch range
     // containing the given fundamental frequency. These two tables are in
@@ -76,7 +77,7 @@ public:
     size_t sizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const;
 
 private:
-    explicit PeriodicWave(float sampleRate, size_t numberOfComponents);
+    explicit PeriodicWave(float sampleRate, size_t numberOfComponents, bool disableNormalization);
     ~PeriodicWave() {}
 
     void generateBasicWaveform(mozilla::dom::OscillatorType);
@@ -106,8 +107,9 @@ private:
 
     // Creates table for specified index based on fundamental frequency.
     void createBandLimitedTables(float fundamentalFrequency, unsigned rangeIndex);
-    float m_lowestRequestedFundamentalFrequency;
+    unsigned m_maxPartialsInBandLimitedTable;
     float m_normalizationScale;
+    bool m_disableNormalization;
     nsTArray<nsAutoPtr<AlignedAudioFloatArray> > m_bandLimitedTables;
 };
 

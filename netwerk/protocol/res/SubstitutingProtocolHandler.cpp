@@ -20,6 +20,7 @@
 using mozilla::dom::ContentParent;
 
 namespace mozilla {
+namespace net {
 
 // Log module for Substituting Protocol logging. We keep the pre-existing module
 // name of "nsResProtocol" to avoid disruption.
@@ -342,6 +343,12 @@ SubstitutingProtocolHandler::ResolveURI(nsIURI *uri, nsACString &result)
 
   nsAutoCString host;
   nsAutoCString path;
+  nsAutoCString pathname;
+
+  nsCOMPtr<nsIURL> url = do_QueryInterface(uri);
+  if (!url) {
+    return NS_ERROR_MALFORMED_URI;
+  }
 
   rv = uri->GetAsciiHost(host);
   if (NS_FAILED(rv)) return rv;
@@ -349,7 +356,10 @@ SubstitutingProtocolHandler::ResolveURI(nsIURI *uri, nsACString &result)
   rv = uri->GetPath(path);
   if (NS_FAILED(rv)) return rv;
 
-  if (ResolveSpecialCases(host, path, result)) {
+  rv = url->GetFilePath(pathname);
+  if (NS_FAILED(rv)) return rv;
+
+  if (ResolveSpecialCases(host, path, pathname, result)) {
     return NS_OK;
   }
 
@@ -358,17 +368,8 @@ SubstitutingProtocolHandler::ResolveURI(nsIURI *uri, nsACString &result)
   if (NS_FAILED(rv)) return rv;
 
   // Unescape the path so we can perform some checks on it.
-  nsCOMPtr<nsIURL> url = do_QueryInterface(uri);
-  if (!url) {
-    return NS_ERROR_MALFORMED_URI;
-  }
-
-  nsAutoCString unescapedPath;
-  rv = url->GetFilePath(unescapedPath);
-  if (NS_FAILED(rv)) return rv;
-
-  NS_UnescapeURL(unescapedPath);
-  if (unescapedPath.FindChar('\\') != -1) {
+  NS_UnescapeURL(pathname);
+  if (pathname.FindChar('\\') != -1) {
     return NS_ERROR_MALFORMED_URI;
   }
 
@@ -396,4 +397,5 @@ SubstitutingProtocolHandler::ResolveURI(nsIURI *uri, nsACString &result)
   return rv;
 }
 
+} // namespace net
 } // namespace mozilla

@@ -13,6 +13,7 @@
 #include "MediaData.h"
 #include "MediaQueue.h"
 #include "MediaStreamGraph.h"
+#include "MediaStreamListener.h"
 #include "OutputStreamManager.h"
 #include "SharedBuffer.h"
 #include "VideoSegment.h"
@@ -30,7 +31,6 @@ struct PlaybackInfoInit {
 };
 
 class DecodedStreamGraphListener : public MediaStreamListener {
-  typedef MediaStreamListener::MediaStreamGraphEvent MediaStreamGraphEvent;
 public:
   DecodedStreamGraphListener(MediaStream* aStream,
                              MozPromiseHolder<GenericPromise>&& aPromise)
@@ -52,9 +52,9 @@ public:
 
   void NotifyEvent(MediaStreamGraph* aGraph, MediaStreamGraphEvent event) override
   {
-    if (event == EVENT_FINISHED) {
+    if (event == MediaStreamGraphEvent::EVENT_FINISHED) {
       nsCOMPtr<nsIRunnable> event =
-        NS_NewRunnableMethod(this, &DecodedStreamGraphListener::DoNotifyFinished);
+        NewRunnableMethod(this, &DecodedStreamGraphListener::DoNotifyFinished);
       aGraph->DispatchToMainThreadAfterStreamStateUpdate(event.forget());
     }
   }
@@ -99,9 +99,9 @@ UpdateStreamSuspended(MediaStream* aStream, bool aBlocking)
   } else {
     nsCOMPtr<nsIRunnable> r;
     if (aBlocking) {
-      r = NS_NewRunnableMethod(aStream, &MediaStream::Suspend);
+      r = NewRunnableMethod(aStream, &MediaStream::Suspend);
     } else {
-      r = NS_NewRunnableMethod(aStream, &MediaStream::Resume);
+      r = NewRunnableMethod(aStream, &MediaStream::Resume);
     }
     AbstractThread::MainThread()->Dispatch(r.forget());
   }
@@ -162,7 +162,7 @@ DecodedStreamData::DecodedStreamData(OutputStreamManager* aOutputStreamManager,
   , mHaveSentFinish(false)
   , mHaveSentFinishAudio(false)
   , mHaveSentFinishVideo(false)
-  , mStream(aOutputStreamManager->Graph()->CreateSourceStream(nullptr))
+  , mStream(aOutputStreamManager->Graph()->CreateSourceStream())
   // DecodedStreamGraphListener will resolve this promise.
   , mListener(new DecodedStreamGraphListener(mStream, Move(aPromise)))
   // mPlaying is initially true because MDSM won't start playback until playing

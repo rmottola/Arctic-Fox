@@ -15,14 +15,13 @@ JSAPITest* JSAPITest::list;
 
 bool JSAPITest::init()
 {
-    rt = createRuntime();
-    if (!rt)
-        return false;
     cx = createContext();
     if (!cx)
         return false;
+    if (!JS::InitSelfHostedCode(cx))
+        return false;
     JS_BeginRequest(cx);
-    global.init(rt);
+    global.init(cx);
     createGlobal();
     if (!global)
         return false;
@@ -42,12 +41,8 @@ void JSAPITest::uninit()
     }
     if (cx) {
         JS_EndRequest(cx);
-        JS_DestroyContext(cx);
+        destroyContext();
         cx = nullptr;
-    }
-    if (rt) {
-        destroyRuntime();
-        rt = nullptr;
     }
 }
 
@@ -58,6 +53,14 @@ bool JSAPITest::exec(const char* bytes, const char* filename, int lineno)
     opts.setFileAndLine(filename, lineno);
     return JS::Evaluate(cx, opts, bytes, strlen(bytes), &v) ||
         fail(JSAPITestString(bytes), filename, lineno);
+}
+
+bool JSAPITest::execDontReport(const char* bytes, const char* filename, int lineno)
+{
+    JS::RootedValue v(cx);
+    JS::CompileOptions opts(cx);
+    opts.setFileAndLine(filename, lineno);
+    return JS::Evaluate(cx, opts, bytes, strlen(bytes), &v);
 }
 
 bool JSAPITest::evaluate(const char* bytes, const char* filename, int lineno,

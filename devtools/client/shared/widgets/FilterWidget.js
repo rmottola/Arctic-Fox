@@ -11,9 +11,7 @@
 
 const EventEmitter = require("devtools/shared/event-emitter");
 const { Cu, Cc, Ci } = require("chrome");
-const { ViewHelpers } =
-      Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm",
-                {});
+const { ViewHelpers } = require("devtools/client/shared/widgets/view-helpers");
 
 const { LocalizationHelper } = require("devtools/client/shared/l10n");
 const STRINGS_URI = "chrome://devtools/locale/filterwidget.properties";
@@ -541,7 +539,7 @@ CSSFilterEditorWidget.prototype = {
       if (el.classList.contains("remove-button")) {
         // If the click happened on the remove button.
         presets.splice(id, 1);
-        this.setPresets(presets).then(this.renderPresets, Cu.reportError);
+        this.setPresets(presets).then(this.renderPresets, e => console.error(e));
       } else {
         // Or if the click happened on a preset.
         let p = presets[id];
@@ -549,7 +547,7 @@ CSSFilterEditorWidget.prototype = {
         this.setCssValue(p.value);
         this.addPresetInput.value = p.name;
       }
-    }, Cu.reportError);
+    }, e => console.error(e));
   },
 
   _togglePresets: function() {
@@ -577,8 +575,8 @@ CSSFilterEditorWidget.prototype = {
         presets.push({name, value});
       }
 
-      this.setPresets(presets).then(this.renderPresets, Cu.reportError);
-    }, Cu.reportError);
+      this.setPresets(presets).then(this.renderPresets, e => console.error(e));
+    }, e => console.error(e));
   },
 
   /**
@@ -900,12 +898,12 @@ CSSFilterEditorWidget.prototype = {
       }
 
       return presets;
-    }, Cu.reportError);
+    }, e => console.error(e));
   },
 
   setPresets: function(presets) {
     return asyncStorage.setItem("cssFilterPresets", presets)
-                       .catch(Cu.reportError);
+      .catch(e => console.error(e));
   }
 };
 

@@ -20,7 +20,7 @@ protected:
   ~RawReader();
 
 public:
-  nsresult ResetDecode() override;
+  nsresult ResetDecode(TrackSet aTracks) override;
   bool DecodeAudioData() override;
 
   bool DecodeVideoFrame(bool &aKeyframeSkip,

@@ -132,16 +132,8 @@ private:
   nsString mChangedResource;
 };
 
-static PRLogModuleInfo* GetFileWatcherContextLog()
-{
-  static PRLogModuleInfo *gNativeWatcherPRLog;
-  if (!gNativeWatcherPRLog) {
-    gNativeWatcherPRLog = PR_NewLogModule("NativeFileWatcherService");
-  }
-  return gNativeWatcherPRLog;
-}
-
-#define FILEWATCHERLOG(...) MOZ_LOG(GetFileWatcherContextLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
+static mozilla::LazyLogModule gNativeWatcherPRLog("NativeFileWatcherService");
+#define FILEWATCHERLOG(...) MOZ_LOG(gNativeWatcherPRLog, mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 // The number of notifications to store within WatchedResourceDescriptor:mNotificationBuffer.
 // If the buffer overflows, its contents are discarded and a change callback is dispatched
@@ -1319,7 +1311,7 @@ NativeFileWatcherService::AddPath(const nsAString& aPathToWatch,
   nsMainThreadPtrHandle<nsINativeFileWatcherSuccessCallback> successCallbackHandle(
     new nsMainThreadPtrHolder<nsINativeFileWatcherSuccessCallback>(aOnSuccess));
 
-  // Wrap the path and the callbacks in order to pass them using NS_NewRunnableMethodWithArg.
+  // Wrap the path and the callbacks in order to pass them using NewRunnableMethod.
   UniquePtr<PathRunnablesParametersWrapper> wrappedCallbacks(
     new PathRunnablesParametersWrapper(
       aPathToWatch,
@@ -1330,7 +1322,7 @@ NativeFileWatcherService::AddPath(const nsAString& aPathToWatch,
   // Since this function does a bit of I/O stuff , run it in the IO thread.
   nsresult rv =
     mIOThread->Dispatch(
-      NS_NewRunnableMethodWithArg<PathRunnablesParametersWrapper*>(
+      NewRunnableMethod<PathRunnablesParametersWrapper*>(
         static_cast<NativeFileWatcherIOTask*>(mWorkerIORunnable.get()),
         &NativeFileWatcherIOTask::AddPathRunnableMethod,
         wrappedCallbacks.get()),
@@ -1389,7 +1381,7 @@ NativeFileWatcherService::RemovePath(const nsAString& aPathToRemove,
   nsMainThreadPtrHandle<nsINativeFileWatcherSuccessCallback> successCallbackHandle(
     new nsMainThreadPtrHolder<nsINativeFileWatcherSuccessCallback>(aOnSuccess));
 
-  // Wrap the path and the callbacks in order to pass them using NS_NewRunnableMethodWithArg.
+  // Wrap the path and the callbacks in order to pass them using NewRunnableMethod.
   UniquePtr<PathRunnablesParametersWrapper> wrappedCallbacks(
     new PathRunnablesParametersWrapper(
       aPathToRemove,
@@ -1400,7 +1392,7 @@ NativeFileWatcherService::RemovePath(const nsAString& aPathToRemove,
   // Since this function does a bit of I/O stuff, run it in the IO thread.
   nsresult rv =
     mIOThread->Dispatch(
-      NS_NewRunnableMethodWithArg<PathRunnablesParametersWrapper*>(
+      NewRunnableMethod<PathRunnablesParametersWrapper*>(
         static_cast<NativeFileWatcherIOTask*>(mWorkerIORunnable.get()),
         &NativeFileWatcherIOTask::RemovePathRunnableMethod,
         wrappedCallbacks.get()),
@@ -1449,7 +1441,7 @@ NativeFileWatcherService::Uninit()
   // in the IO thread.
   nsresult rv =
     ioThread->Dispatch(
-      NS_NewRunnableMethod(
+      NewRunnableMethod(
         static_cast<NativeFileWatcherIOTask*>(mWorkerIORunnable.get()),
         &NativeFileWatcherIOTask::DeactivateRunnableMethod),
       nsIEventTarget::DISPATCH_NORMAL);

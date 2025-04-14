@@ -21,13 +21,15 @@
 #include "nsNetCID.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/ipc/URIUtils.h"
-#include "mozilla/CheckedInt.h"
 #include <algorithm>
 #include "mozilla/dom/EncodingUtils.h"
 #include "nsContentUtils.h"
 
 using mozilla::dom::EncodingUtils;
 using namespace mozilla::ipc;
+
+namespace mozilla {
+namespace net {
 
 static NS_DEFINE_CID(kThisImplCID, NS_THIS_STANDARDURL_IMPL_CID);
 static NS_DEFINE_CID(kStandardURLCID, NS_STANDARDURL_CID);
@@ -39,15 +41,15 @@ bool nsStandardURL::gAlwaysEncodeInUTF8 = true;
 char nsStandardURL::gHostLimitDigits[] = { '/', '\\', '?', '#', 0 };
 
 //
-// setenv NSPR_LOG_MODULES nsStandardURL:5
+// setenv MOZ_LOG nsStandardURL:5
 //
-static mozilla::LazyLogModule gStandardURLLog("nsStandardURL");
+static LazyLogModule gStandardURLLog("nsStandardURL");
 
 // The Chromium code defines its own LOG macro which we don't want
 #undef LOG
-#define LOG(args)     MOZ_LOG(gStandardURLLog, mozilla::LogLevel::Debug, args)
+#define LOG(args)     MOZ_LOG(gStandardURLLog, LogLevel::Debug, args)
 #undef LOG_ENABLED
-#define LOG_ENABLED() MOZ_LOG_TEST(gStandardURLLog, mozilla::LogLevel::Debug)
+#define LOG_ENABLED() MOZ_LOG_TEST(gStandardURLLog, LogLevel::Debug)
 
 //----------------------------------------------------------------------------
 
@@ -264,6 +266,7 @@ nsStandardURL::nsStandardURL(bool aSupportsFileURL, bool aTrackURL)
     mParser = net_GetStdURLParser();
 
 #ifdef DEBUG_DUMP_URLS_AT_SHUTDOWN
+    memset(&mDebugCList, 0, sizeof(mDebugCList));
     if (NS_IsMainThread()) {
         if (aTrackURL) {
             PR_APPEND_LINK(&mDebugCList, &gAllURLs);
@@ -605,9 +608,10 @@ nsStandardURL::BuildNormalizedSpec(const char *spec)
         }
     }
 
-    // In case we must use encoded strings, we have to make a copy of every
-    // segment because they are pointing to the |spec| while we are changing
-    // their value.
+    // We must take a copy of every single segment because they are pointing to
+    // the |spec| while we are changing their value, in case we must use
+    // encoded strings.
+    URLSegment username(mUsername);
     URLSegment password(mPassword);
     URLSegment host(mHost);
     URLSegment path(mPath);
@@ -622,7 +626,7 @@ nsStandardURL::BuildNormalizedSpec(const char *spec)
     // generate the normalized URL string
     //
     // approxLen should be correct or 1 high
-    if (!mSpec.SetLength(approxLen+1, mozilla::fallible)) // buf needs a trailing '\0' below
+    if (!mSpec.SetLength(approxLen+1, fallible)) // buf needs a trailing '\0' below
         return NS_ERROR_OUT_OF_MEMORY;
     char *buf;
     mSpec.BeginWriting(buf);
@@ -640,7 +644,7 @@ nsStandardURL::BuildNormalizedSpec(const char *spec)
 
     // append authority
     if (mUsername.mLen > 0) {
-        i = AppendSegmentToBuf(buf, i, spec, mUsername, mUsername,
+        i = AppendSegmentToBuf(buf, i, spec, username, mUsername,
                                &encUsername, useEncUsername, &diff);
         ShiftFromPassword(diff);
         if (password.mLen >= 0) {
@@ -1290,21 +1294,17 @@ nsStandardURL::SetSpec(const nsACString &input)
     ENSURE_MUTABLE();
 
     const nsPromiseFlatCString &flat = PromiseFlatCString(input);
-    const char *spec = flat.get();
-    int32_t specLength = flat.Length();
-
-    LOG(("nsStandardURL::SetSpec [spec=%s]\n", spec));
-
-    if (!spec || !*spec)
-        return NS_ERROR_MALFORMED_URI;
+    LOG(("nsStandardURL::SetSpec [spec=%s]\n", flat.get()));
 
     if (input.Length() > (uint32_t) net_GetURLMaxLength()) {
         return NS_ERROR_MALFORMED_URI;
     }
 
-    // NUL characters aren't allowed
-    // \r\n\t are stripped out instead of returning error(see below)
-    if (input.Contains('\0')) {
+    // filter out unexpected chars "\r\n\t" if necessary
+    nsAutoCString filteredURI;
+    net_FilterURIString(flat, filteredURI);
+
+    if (filteredURI.Length() == 0) {
         return NS_ERROR_MALFORMED_URI;
     }
 
@@ -1312,14 +1312,6 @@ nsStandardURL::SetSpec(const nsACString &input)
     nsStandardURL prevURL(false,false);
     prevURL.CopyMembers(this, eHonorRef);
     Clear();
-
-    // filter out unexpected chars "\r\n\t" if necessary
-    nsAutoCString filteredURI;
-    if (!net_FilterURIString(spec, filteredURI)) {
-        // Copy the content into filteredURI even if no whitespace was stripped.
-        // We need a non-const buffer to perform backslash replacement.
-        filteredURI = input;
-    }
 
     if (IsSpecialProtocol(filteredURI)) {
         // Bug 652186: Replace all backslashes with slashes when parsing paths
@@ -1339,9 +1331,8 @@ nsStandardURL::SetSpec(const nsACString &input)
         }
     }
 
-    spec = filteredURI.get();
-    specLength = filteredURI.Length();
-
+    const char *spec = filteredURI.get();
+    int32_t specLength = filteredURI.Length();
 
     // parse the given URL...
     nsresult rv = ParseURL(spec, specLength);
@@ -1857,7 +1848,7 @@ void
 nsStandardURL::ReplacePortInSpec(int32_t aNewPort)
 {
     MOZ_ASSERT(mMutable, "Caller should ensure we're mutable");
-    NS_ASSERTION(aNewPort != mDefaultPort,
+    NS_ASSERTION(aNewPort != mDefaultPort || mDefaultPort == -1,
                  "Caller should check its passed-in value and pass -1 instead of "
                  "mDefaultPort, to avoid encoding default port into mSpec");
 
@@ -2119,19 +2110,12 @@ NS_IMETHODIMP
 nsStandardURL::Resolve(const nsACString &in, nsACString &out)
 {
     const nsPromiseFlatCString &flat = PromiseFlatCString(in);
-    const char *relpath = flat.get();
-
     // filter out unexpected chars "\r\n\t" if necessary
     nsAutoCString buf;
-    int32_t relpathLen;
-    if (!net_FilterURIString(relpath, buf)) {
-        // Copy the content into filteredURI even if no whitespace was stripped.
-        // We need a non-const buffer to perform backslash replacement.
-        buf = in;
-    }
+    net_FilterURIString(flat, buf);
 
-    relpath = buf.get();
-    relpathLen = buf.Length();
+    const char *relpath = buf.get();
+    int32_t relpathLen = buf.Length();
 
     char *result = nullptr;
 
@@ -2537,7 +2521,7 @@ nsStandardURL::SetFilePath(const nsACString &input)
         int32_t dirLen, baseLen, extLen;
         nsresult rv;
 
-        rv = mParser->ParseFilePath(filepath, -1,
+        rv = mParser->ParseFilePath(filepath, flat.Length(),
                                     &dirPos, &dirLen,
                                     &basePos, &baseLen,
                                     &extPos, &extLen);
@@ -2626,7 +2610,7 @@ nsStandardURL::SetQuery(const nsACString &input)
         return NS_OK;
     }
 
-    int32_t queryLen = strlen(query);
+    int32_t queryLen = flat.Length();
     if (query[0] == '?') {
         query++;
         queryLen--;
@@ -2676,10 +2660,6 @@ nsStandardURL::SetRef(const nsACString &input)
 
     LOG(("nsStandardURL::SetRef [ref=%s]\n", ref));
 
-    if (input.Contains('\0')) {
-        return NS_ERROR_MALFORMED_URI;
-    }
-
     if (mPath.mLen < 0)
         return SetPath(flat);
 
@@ -2706,7 +2686,7 @@ nsStandardURL::SetRef(const nsACString &input)
         ref++;
         refLen--;
     }
-    
+
     if (mRef.mLen < 0) {
         mSpec.Append('#');
         ++mPath.mLen;  // Include the # in the path.
@@ -2777,7 +2757,7 @@ nsStandardURL::SetFileName(const nsACString &input)
         URLSegment basename, extension;
 
         // let the parser locate the basename and extension
-        rv = mParser->ParseFileName(filename, -1,
+        rv = mParser->ParseFileName(filename, flat.Length(),
                                     &basename.mPos, &basename.mLen,
                                     &extension.mPos, &extension.mLen);
         if (NS_FAILED(rv)) return rv;
@@ -3001,22 +2981,8 @@ nsStandardURL::Init(uint32_t urlType,
 
     mOriginCharset.Truncate();
 
-    if (charset == nullptr || *charset == '\0') {
-        // check if baseURI provides an origin charset and use that.
-        if (baseURI)
-            baseURI->GetOriginCharset(mOriginCharset);
-
-        // URI can't be encoded in UTF-16, UTF-16BE, UTF-16LE, UTF-32,
-        // UTF-32-LE, UTF-32LE, UTF-32BE (yet?). Truncate mOriginCharset if
-        // it starts with "utf" (since an empty mOriginCharset implies
-        // UTF-8, this is safe even if mOriginCharset is UTF-8).
-
-        if (mOriginCharset.Length() > 3 &&
-            IsUTFCharset(mOriginCharset.get())) {
-            mOriginCharset.Truncate();
-        }
-    }
-    else if (!IsUTFCharset(charset)) {
+    //if charset override is absent, use UTF8 as url encoding
+    if (charset != nullptr && *charset != '\0' && !IsUTFCharset(charset)) {
         mOriginCharset = charset;
     }
 
@@ -3273,15 +3239,15 @@ nsStandardURL::Write(nsIObjectOutputStream *stream)
 //---------------------------------------------------------------------------
 
 inline
-mozilla::ipc::StandardURLSegment
+ipc::StandardURLSegment
 ToIPCSegment(const nsStandardURL::URLSegment& aSegment)
 {
-    return mozilla::ipc::StandardURLSegment(aSegment.mPos, aSegment.mLen);
+    return ipc::StandardURLSegment(aSegment.mPos, aSegment.mLen);
 }
 
 inline
 nsStandardURL::URLSegment
-FromIPCSegment(const mozilla::ipc::StandardURLSegment& aSegment)
+FromIPCSegment(const ipc::StandardURLSegment& aSegment)
 {
     return nsStandardURL::URLSegment(aSegment.position(), aSegment.length());
 }
@@ -3440,7 +3406,7 @@ nsStandardURL::GetClassIDNoAlloc(nsCID *aClassIDNoAlloc)
 //----------------------------------------------------------------------------
 
 size_t
-nsStandardURL::SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
+nsStandardURL::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const
 {
   return mSpec.SizeOfExcludingThisIfUnshared(aMallocSizeOf) +
          mOriginCharset.SizeOfExcludingThisIfUnshared(aMallocSizeOf) +
@@ -3453,6 +3419,9 @@ nsStandardURL::SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
 }
 
 size_t
-nsStandardURL::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const {
+nsStandardURL::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const {
   return aMallocSizeOf(this) + SizeOfExcludingThis(aMallocSizeOf);
 }
+
+} // namespace net
+} // namespace mozilla

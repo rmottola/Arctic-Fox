@@ -22,6 +22,7 @@ const SCREENSIZE_HISTOGRAM = "DEVTOOLS_SCREEN_RESOLUTION_ENUMERATED_PER_USER";
 var {Cc, Ci, Cu} = require("chrome");
 var promise = require("promise");
 var Services = require("Services");
+var {Task} = require("resource://gre/modules/Task.jsm");
 var {gDevTools} = require("devtools/client/framework/devtools");
 var EventEmitter = require("devtools/shared/event-emitter");
 var Telemetry = require("devtools/client/shared/telemetry");
@@ -31,7 +32,6 @@ var { attachThread, detachThread } = require("./attach-thread");
 
 Cu.import("resource://devtools/client/scratchpad/scratchpad-manager.jsm");
 Cu.import("resource://devtools/client/shared/DOMHelpers.jsm");
-Cu.import("resource://gre/modules/Task.jsm");
 
 loader.lazyGetter(this, "toolboxStrings", () => {
   const properties = "chrome://devtools/locale/toolbox.properties";
@@ -43,7 +43,7 @@ loader.lazyGetter(this, "toolboxStrings", () => {
       }
       return bundle.formatStringFromName(name, args, args.length);
     } catch (ex) {
-      Services.console.logStringMessage("Error reading '" + name + "'");
+      console.log("Error reading '" + name + "'");
       return null;
     }
   };
@@ -57,7 +57,7 @@ loader.lazyRequireGetter(this, "Hosts",
 loader.lazyRequireGetter(this, "Selection",
   "devtools/client/framework/selection", true);
 loader.lazyRequireGetter(this, "InspectorFront",
-  "devtools/server/actors/inspector", true);
+  "devtools/shared/fronts/inspector", true);
 loader.lazyRequireGetter(this, "DevToolsUtils",
   "devtools/shared/DevToolsUtils");
 loader.lazyRequireGetter(this, "showDoorhanger",
@@ -364,7 +364,14 @@ Toolbox.prototype = {
       let iframe = yield this._host.create();
       let domReady = promise.defer();
 
-      iframe.setAttribute("src", this._URL);
+      // Prevent reloading the document when the toolbox is opened in a tab
+      let location = iframe.contentWindow.location.href;
+      if (!location.startsWith(this._URL)) {
+        iframe.setAttribute("src", this._URL);
+      } else {
+        // Update the URL so that onceDOMReady watch for the right url.
+        this._URL = location;
+      }
       iframe.setAttribute("aria-label", toolboxStrings("toolbox.label"));
       let domHelper = new DOMHelpers(iframe.contentWindow);
       domHelper.onceDOMReady(() => domReady.resolve(), this._URL);
@@ -706,7 +713,10 @@ Toolbox.prototype = {
     zoomValue = Math.max(zoomValue, MIN_ZOOM);
     zoomValue = Math.min(zoomValue, MAX_ZOOM);
 
-    let contViewer = this.frame.docShell.contentViewer;
+    let docShell = this.frame.contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
+      .getInterface(Ci.nsIWebNavigation)
+      .QueryInterface(Ci.nsIDocShell);
+    let contViewer = docShell.contentViewer;
 
     contViewer.fullZoom = zoomValue;
 

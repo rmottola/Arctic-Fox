@@ -18,7 +18,6 @@
 #include "nsTextEquivUtils.h"
 #include "DocAccessibleChild.h"
 #include "EventTree.h"
-#include "Logging.h"
 #include "Relation.h"
 #include "Role.h"
 #include "RootAccessible.h"
@@ -94,8 +93,7 @@ using namespace mozilla::a11y;
 ////////////////////////////////////////////////////////////////////////////////
 // Accessible: nsISupports and cycle collection
 
-NS_IMPL_CYCLE_COLLECTION(Accessible,
-                         mContent, mParent, mChildren)
+NS_IMPL_CYCLE_COLLECTION(Accessible, mContent)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(Accessible)
   if (aIID.Equals(NS_GET_IID(Accessible)))
@@ -191,16 +189,7 @@ Accessible::Description(nsString& aDescription)
                            aDescription);
 
   if (aDescription.IsEmpty()) {
-    bool isXUL = mContent->IsXULElement();
-    if (isXUL) {
-      // Try XUL <description control="[id]">description text</description>
-      XULDescriptionIterator iter(Document(), mContent);
-      Accessible* descr = nullptr;
-      while ((descr = iter.Next())) {
-        nsTextEquivUtils::AppendTextEquivFromContent(this, descr->GetContent(),
-                                                     &aDescription);
-      }
-    }
+    NativeDescription(aDescription);
 
     if (aDescription.IsEmpty()) {
       // Keep the Name() method logic.
@@ -1971,6 +1960,22 @@ Accessible::NativeName(nsString& aName)
 
 // Accessible protected
 void
+Accessible::NativeDescription(nsString& aDescription)
+{
+  bool isXUL = mContent->IsXULElement();
+  if (isXUL) {
+    // Try XUL <description control="[id]">description text</description>
+    XULDescriptionIterator iter(Document(), mContent);
+    Accessible* descr = nullptr;
+    while ((descr = iter.Next())) {
+      nsTextEquivUtils::AppendTextEquivFromContent(this, descr->GetContent(),
+                                                   &aDescription);
+    }
+  }
+}
+
+// Accessible protected
+void
 Accessible::BindToParent(Accessible* aParent, uint32_t aIndexInParent)
 {
   MOZ_ASSERT(aParent, "This method isn't used to set null parent");
@@ -1979,7 +1984,7 @@ Accessible::BindToParent(Accessible* aParent, uint32_t aIndexInParent)
 #ifdef A11Y_LOG
   if (mParent) {
     logging::TreeInfo("BindToParent: stealing accessible", 0,
-                      "old parent", mParent.get(),
+                      "old parent", mParent,
                       "new parent", aParent,
                       "child", this, nullptr);
   }
@@ -2082,6 +2087,10 @@ Accessible::InsertChildAt(uint32_t aIndex, Accessible* aChild)
       return false;
 
     MOZ_ASSERT(mStateFlags & eKidsMutating, "Illicit children change");
+
+    for (uint32_t idx = aIndex + 1; idx < mChildren.Length(); idx++) {
+      mChildren[idx]->mIndexInParent = idx;
+    }
   }
 
   if (aChild->IsText()) {
@@ -2105,17 +2114,16 @@ Accessible::RemoveChild(Accessible* aChild)
              "Illicit children change");
 
   int32_t index = static_cast<uint32_t>(aChild->mIndexInParent);
-
-  // If we adopt a child during a tree construction, then indexes might be not
-  // rebuilt yet.
-  if (mChildren.SafeElementAt(index) != aChild) {
-    index = mChildren.IndexOf(aChild);
-    MOZ_ASSERT(index != -1,
-               "Child is bound to parent but parent hasn't this child at its index.");
-  }
+  MOZ_ASSERT(mChildren.SafeElementAt(index) == aChild,
+             "A wrong child index");
 
   aChild->UnbindFromParent();
   mChildren.RemoveElementAt(index);
+
+  for (uint32_t idx = index; idx < mChildren.Length(); idx++) {
+    mChildren[idx]->mIndexInParent = idx;
+  }
+
   return true;
 }
 
@@ -2202,7 +2210,7 @@ Accessible::EmbeddedChildCount()
 {
   if (mStateFlags & eHasTextKids) {
     if (!mEmbeddedObjCollector)
-      mEmbeddedObjCollector = new EmbeddedObjCollector(this);
+      mEmbeddedObjCollector.reset(new EmbeddedObjCollector(this));
     return mEmbeddedObjCollector->Count();
   }
 
@@ -2214,8 +2222,8 @@ Accessible::GetEmbeddedChildAt(uint32_t aIndex)
 {
   if (mStateFlags & eHasTextKids) {
     if (!mEmbeddedObjCollector)
-      mEmbeddedObjCollector = new EmbeddedObjCollector(this);
-    return mEmbeddedObjCollector ?
+      mEmbeddedObjCollector.reset(new EmbeddedObjCollector(this));
+    return mEmbeddedObjCollector.get() ?
       mEmbeddedObjCollector->GetAccessibleAt(aIndex) : nullptr;
   }
 
@@ -2227,8 +2235,8 @@ Accessible::GetIndexOfEmbeddedChild(Accessible* aChild)
 {
   if (mStateFlags & eHasTextKids) {
     if (!mEmbeddedObjCollector)
-      mEmbeddedObjCollector = new EmbeddedObjCollector(this);
-    return mEmbeddedObjCollector ?
+      mEmbeddedObjCollector.reset(new EmbeddedObjCollector(this));
+    return mEmbeddedObjCollector.get() ?
       mEmbeddedObjCollector->GetIndexAt(aChild) : -1;
   }
 
@@ -2753,12 +2761,12 @@ KeyBinding::ToPlatformFormat(nsAString& aValue) const
     return;
 
   nsAutoString separator;
-  keyStringBundle->GetStringFromName(MOZ_UTF16("MODIFIER_SEPARATOR"),
+  keyStringBundle->GetStringFromName(u"MODIFIER_SEPARATOR",
                                      getter_Copies(separator));
 
   nsAutoString modifierName;
   if (mModifierMask & kControl) {
-    keyStringBundle->GetStringFromName(MOZ_UTF16("VK_CONTROL"),
+    keyStringBundle->GetStringFromName(u"VK_CONTROL",
                                        getter_Copies(modifierName));
 
     aValue.Append(modifierName);
@@ -2766,7 +2774,7 @@ KeyBinding::ToPlatformFormat(nsAString& aValue) const
   }
 
   if (mModifierMask & kAlt) {
-    keyStringBundle->GetStringFromName(MOZ_UTF16("VK_ALT"),
+    keyStringBundle->GetStringFromName(u"VK_ALT",
                                        getter_Copies(modifierName));
 
     aValue.Append(modifierName);
@@ -2774,7 +2782,7 @@ KeyBinding::ToPlatformFormat(nsAString& aValue) const
   }
 
   if (mModifierMask & kShift) {
-    keyStringBundle->GetStringFromName(MOZ_UTF16("VK_SHIFT"),
+    keyStringBundle->GetStringFromName(u"VK_SHIFT",
                                        getter_Copies(modifierName));
 
     aValue.Append(modifierName);
@@ -2782,7 +2790,7 @@ KeyBinding::ToPlatformFormat(nsAString& aValue) const
   }
 
   if (mModifierMask & kMeta) {
-    keyStringBundle->GetStringFromName(MOZ_UTF16("VK_META"),
+    keyStringBundle->GetStringFromName(u"VK_META",
                                        getter_Copies(modifierName));
 
     aValue.Append(modifierName);

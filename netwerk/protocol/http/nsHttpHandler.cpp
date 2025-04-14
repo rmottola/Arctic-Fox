@@ -54,6 +54,7 @@
 #include "nsComponentManagerUtils.h"
 #include "nsSocketTransportService2.h"
 #include "nsIOService.h"
+#include "nsIUUIDGenerator.h"
 
 #include "mozilla/net/NeckoChild.h"
 #include "mozilla/net/NeckoParent.h"
@@ -125,6 +126,30 @@ NewURI(const nsACString &aSpec,
     url.forget(aURI);
     return NS_OK;
 }
+
+#ifdef ANDROID
+static nsCString
+GetDeviceModelId() {
+    // Assumed to be running on the main thread
+    // We need the device property in either case
+    nsAutoCString deviceModelId;
+    nsCOMPtr<nsIPropertyBag2> infoService = do_GetService("@mozilla.org/system-info;1");
+    MOZ_ASSERT(infoService, "Could not find a system info service");
+    nsAutoString androidDevice;
+    nsresult rv = infoService->GetPropertyAsAString(NS_LITERAL_STRING("device"), androidDevice);
+    if (NS_SUCCEEDED(rv)) {
+        deviceModelId = NS_LossyConvertUTF16toASCII(androidDevice);
+    }
+    nsAutoCString deviceString;
+    rv = Preferences::GetCString(UA_PREF("device_string"), &deviceString);
+    if (NS_SUCCEEDED(rv)) {
+        deviceString.Trim(" ", true, true);
+        deviceString.ReplaceSubstring(NS_LITERAL_CSTRING("%DEVICEID%"), deviceModelId);
+        return deviceString;
+    }
+    return deviceModelId;
+}
+#endif
 
 //-----------------------------------------------------------------------------
 // nsHttpHandler <public>
@@ -214,6 +239,7 @@ nsHttpHandler::nsHttpHandler()
     , mTCPKeepaliveLongLivedEnabled(false)
     , mTCPKeepaliveLongLivedIdleTimeS(600)
     , mEnforceH1Framing(FRAMECHECK_BARELY)
+    , mKeepEmptyResponseHeadersAsEmtpyString(false)
 {
     LOG(("Creating nsHttpHandler [this=%p].\n", this));
 
@@ -296,12 +322,13 @@ nsHttpHandler::Init()
     nsHttpChannelAuthProvider::InitializePrefs();
 
     if (mCompatFirefoxEnabled) {
+      mAppName.AssignLiteral("Firefox");
       mMisc.AssignLiteral("rv:" MOZILLA_COMPATVERSION);
     } else {
+      mAppName.AssignLiteral(MOZ_APP_UA_NAME);
       mMisc.AssignLiteral("rv:" MOZILLA_UAVERSION);
     }
 
-    mCompatGecko.AssignLiteral("Gecko/20100101");
     mCompatFirefox.AssignLiteral("Firefox/" MOZILLA_COMPATVERSION);
 
     nsCOMPtr<nsIXULAppInfo> appInfo =
@@ -341,13 +368,9 @@ nsHttpHandler::Init()
     if (mCompatFirefoxEnabled) {
       mProductSub.AssignLiteral(MOZILLA_UAVERSION);
     } else {
-      mProductSub.AssignLiteral(MOZ_UA_BUILDID);
+      mProductSub.AssignLiteral("20100101");
     }
 #endif
-    if (mProductSub.IsEmpty() && appInfo)
-        appInfo->GetPlatformBuildID(mProductSub);
-    if (mProductSub.Length() > 8)
-        mProductSub.SetLength(8);
 
 #if DEBUG
     // dump user agent prefs
@@ -361,7 +384,6 @@ nsHttpHandler::Init()
     LOG(("> app-name = %s\n", mAppName.get()));
     LOG(("> app-version = %s\n", mAppVersion.get()));
     LOG(("> compat-firefox = %s\n", mCompatFirefox.get()));
-    LOG(("> compat-gecko = %s\n", mCompatGecko.get()));
     LOG(("> user-agent = %s\n", UserAgent().get()));
 #endif
 
@@ -439,13 +461,13 @@ nsHttpHandler::InitConnectionMgr()
 }
 
 nsresult
-nsHttpHandler::AddStandardRequestHeaders(nsHttpHeaderArray *request, bool isSecure)
+nsHttpHandler::AddStandardRequestHeaders(nsHttpRequestHead *request, bool isSecure)
 {
     nsresult rv;
 
     // Add the "User-Agent" header
     rv = request->SetHeader(nsHttp::User_Agent, UserAgent(),
-                            false, nsHttpHeaderArray::eVarietyDefault);
+                            false, nsHttpHeaderArray::eVarietyRequestDefault);
     if (NS_FAILED(rv)) return rv;
 
     // MIME based content negotiation lives!
@@ -453,7 +475,7 @@ nsHttpHandler::AddStandardRequestHeaders(nsHttpHeaderArray *request, bool isSecu
     // service worker expects to see it.  The other "default" headers are
     // hidden from service worker interception.
     rv = request->SetHeader(nsHttp::Accept, mAccept,
-                            false, nsHttpHeaderArray::eVarietyOverride);
+                            false, nsHttpHeaderArray::eVarietyRequestOverride);
     if (NS_FAILED(rv)) return rv;
 
     // Add the "Accept-Language" header.  This header is also exposed to the
@@ -461,38 +483,35 @@ nsHttpHandler::AddStandardRequestHeaders(nsHttpHeaderArray *request, bool isSecu
     if (!mAcceptLanguages.IsEmpty()) {
         // Add the "Accept-Language" header
         rv = request->SetHeader(nsHttp::Accept_Language, mAcceptLanguages,
-                                false, nsHttpHeaderArray::eVarietyOverride);
+                                false,
+                                nsHttpHeaderArray::eVarietyRequestOverride);
         if (NS_FAILED(rv)) return rv;
     }
 
     // Add the "Accept-Encoding" header
     if (isSecure) {
         rv = request->SetHeader(nsHttp::Accept_Encoding, mHttpsAcceptEncodings,
-                                false, nsHttpHeaderArray::eVarietyDefault);
+                                false,
+                                nsHttpHeaderArray::eVarietyRequestDefault);
     } else {
         rv = request->SetHeader(nsHttp::Accept_Encoding, mHttpAcceptEncodings,
-                                false, nsHttpHeaderArray::eVarietyDefault);
+                                false,
+                                nsHttpHeaderArray::eVarietyRequestDefault);
     }
     if (NS_FAILED(rv)) return rv;
-
-    // Add the "Do-Not-Track" header
-    if (mDoNotTrackEnabled) {
-      rv = request->SetHeader(nsHttp::DoNotTrack, NS_LITERAL_CSTRING("1"),
-                              false, nsHttpHeaderArray::eVarietyDefault);
-      if (NS_FAILED(rv)) return rv;
-    }
 
     // add the "Send Hint" header
     if (mSafeHintEnabled || mParentalControlEnabled) {
       rv = request->SetHeader(nsHttp::Prefer, NS_LITERAL_CSTRING("safe"),
-                              false, nsHttpHeaderArray::eVarietyDefault);
+                              false,
+                              nsHttpHeaderArray::eVarietyRequestDefault);
       if (NS_FAILED(rv)) return rv;
     }
     return NS_OK;
 }
 
 nsresult
-nsHttpHandler::AddConnectionHeader(nsHttpHeaderArray *request,
+nsHttpHandler::AddConnectionHeader(nsHttpRequestHead *request,
                                    uint32_t caps)
 {
     // RFC2616 section 19.6.2 states that the "Connection: keep-alive"
@@ -673,11 +692,10 @@ nsHttpHandler::BuildUserAgent()
                            mProductSub.Length() +
                            mAppName.Length() +
                            mAppVersion.Length() +
-                           mCompatGecko.Length() +
                            mCompatFirefox.Length() +
                            mCompatDevice.Length() +
                            mDeviceModelId.Length() +
-                           14);
+                           13);
 
     // Application portion
     mUserAgent.Assign(mLegacyAppName);
@@ -708,28 +726,26 @@ nsHttpHandler::BuildUserAgent()
     mUserAgent += mMisc;
     mUserAgent += ')';
 
-    if (mCompatGeckoEnabled) {
-        // Provide frozen Gecko/20100101 (compatibility) slice
-        mUserAgent += ' ';
-        mUserAgent += mCompatGecko;
-    }
-
     // Product portion
     mUserAgent += ' ';
     mUserAgent += mProduct;
     mUserAgent += '/';
     mUserAgent += mProductSub;
 
-    if (mCompatFirefoxEnabled) {
-        // Provide "Firefox/x.y" (compatibility) app token
+    bool isFirefox = mAppName.EqualsLiteral("Firefox");
+    if (isFirefox || mCompatFirefoxEnabled || mCompatFirefoxStrict) {
+        // "Firefox/x.y" (compatibility) app token
         mUserAgent += ' ';
         mUserAgent += mCompatFirefox;
     }
-    // App portion
-    mUserAgent += ' ';
-    mUserAgent += mAppName;
-    mUserAgent += '/';
-    mUserAgent += mAppVersion;
+    // If not "strict Firefox", advertise an app name.
+    if (!isFirefox && !mCompatFirefoxStrict) {
+        // App portion
+        mUserAgent += ' ';
+        mUserAgent += mAppName;
+        mUserAgent += '/';
+        mUserAgent += mAppVersion;
+    }
 }
 
 #ifdef XP_WIN
@@ -796,6 +812,10 @@ nsHttpHandler::InitUserAgentComponents()
         } else {
             mCompatDevice.AssignLiteral("Mobile");
         }
+    }
+
+    if (Preferences::GetBool(UA_PREF("use_device"), false)) {
+        mDeviceModelId = mozilla::net::GetDeviceModelId();
     }
 #endif // ANDROID
 
@@ -966,30 +986,27 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
         rv = prefs->GetIntPref(UA_PREF("compatMode"), &val);
         if (NS_SUCCEEDED(rv)) {
           switch(val) {
-            case 1: // Generic Gecko
-                    mCompatGeckoEnabled = true;
-                    mCompatFirefoxEnabled = false;
-                    break;
-            case 2: // Firefox Compatibility
-                    mCompatGeckoEnabled = true;
+            case 1: // Generic Firefox
                     mCompatFirefoxEnabled = true;
+                    mCompatFirefoxStrict = false;
+                    break;
+            case 2: // Strict Compatibility
+                    mCompatFirefoxEnabled = true;
+                    mCompatFirefoxStrict = true;
                     break;
             default: // Native
-                     mCompatGeckoEnabled = false;
                      mCompatFirefoxEnabled = false;
+                     mCompatFirefoxStrict = false;
                      break;
           }
         }
         // Update UA components as-needed for this change:
-        // Compatmode on ->  rv:{FF-appversion}  Gecko/{Gecko-version}
-        // Compatmode off -> rv:{Gecko-version} Gecko/{BuildID}
         if (mCompatFirefoxEnabled) {
           mMisc.AssignLiteral("rv:" MOZILLA_COMPATVERSION);
-          mProductSub.AssignLiteral(MOZILLA_UAVERSION);          
         } else {
           mMisc.AssignLiteral("rv:" MOZILLA_UAVERSION);
-          mProductSub.AssignLiteral(MOZ_UA_BUILDID);
         }
+        mProductSub.AssignLiteral("20100101");
         nsCOMPtr<nsIXULAppInfo> appInfo = 
             do_GetService("@mozilla.org/xre/app-info;1");
         if (mProductSub.IsEmpty() && appInfo)
@@ -1006,6 +1023,18 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
                             getter_Copies(mUserAgentOverride));
         mUserAgentIsDirty = true;
     }
+
+#ifdef ANDROID
+    // general.useragent.use_device
+    if (PREF_CHANGED(UA_PREF("use_device"))) {
+        if (Preferences::GetBool(UA_PREF("use_device"), false)) {
+            mDeviceModelId = mozilla::net::GetDeviceModelId();
+        } else {
+            mDeviceModelId = EmptyCString();
+        }
+        mUserAgentIsDirty = true;
+    }
+#endif
 
     //
     // HTTP options
@@ -1093,7 +1122,7 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
     if (PREF_CHANGED(HTTP_PREF("referer.trimmingPolicy"))) {
         rv = prefs->GetIntPref(HTTP_PREF("referer.trimmingPolicy"), &val);
         if (NS_SUCCEEDED(rv))
-            mReferrerTrimmingPolicy = (uint8_t) clamped(val, 0, 0xff);
+            mReferrerTrimmingPolicy = (uint8_t) clamped(val, 0, 2);
     }
 
     if (PREF_CHANGED(HTTP_PREF("referer.XOriginPolicy"))) {
@@ -1705,6 +1734,14 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
         }
     }
 
+    if (PREF_CHANGED(HTTP_PREF("keep_empty_response_headers_as_empty_string"))) {
+        rv = prefs->GetBoolPref(HTTP_PREF("keep_empty_response_headers_as_empty_string"),
+                                &cVar);
+        if (NS_SUCCEEDED(rv)) {
+            mKeepEmptyResponseHeadersAsEmtpyString = cVar;
+        }
+    }
+
     // Enable HTTP response timeout if TCP Keepalives are disabled.
     mResponseTimeoutEnabled = !mTCPKeepaliveShortLivedEnabled &&
                               !mTCPKeepaliveLongLivedEnabled;
@@ -1891,6 +1928,7 @@ nsHttpHandler::SetAcceptEncodings(const char *aAcceptEncodings, bool isSecure)
             mHttpsAcceptEncodings = aAcceptEncodings;
         }
     }
+
     return NS_OK;
 }
 
@@ -2028,7 +2066,11 @@ nsHttpHandler::NewProxiedChannel2(nsIURI *uri,
         net_EnsurePSMInit();
     }
 
-    rv = httpChannel->Init(uri, caps, proxyInfo, proxyResolveFlags, proxyURI);
+    nsID channelId;
+    rv = NewChannelId(&channelId);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = httpChannel->Init(uri, caps, proxyInfo, proxyResolveFlags, proxyURI, channelId);
     if (NS_FAILED(rv))
         return rv;
 
@@ -2174,8 +2216,8 @@ nsHttpHandler::Observe(nsISupports *subject,
         if (mConnMgr) {
             if (gSocketTransportService) {
                 nsCOMPtr<nsIRunnable> event =
-                    NS_NewRunnableMethod(mConnMgr,
-                                         &nsHttpConnectionMgr::ClearConnectionHistory);
+                    NewRunnableMethod(mConnMgr,
+                                      &nsHttpConnectionMgr::ClearConnectionHistory);
                 gSocketTransportService->Dispatch(event, NS_DISPATCH_NORMAL);
             }
             mConnMgr->ClearAltServiceMappings();
@@ -2432,6 +2474,19 @@ nsHttpHandler::ShutdownConnectionManager()
     if (mConnMgr) {
         mConnMgr->Shutdown();
     }
+}
+
+nsresult
+nsHttpHandler::NewChannelId(nsID *channelId)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!mUUIDGen) {
+    nsresult rv;
+    mUUIDGen = do_GetService("@mozilla.org/uuid-generator;1", &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  return mUUIDGen->GenerateUUIDInPlace(channelId);
 }
 
 } // namespace net

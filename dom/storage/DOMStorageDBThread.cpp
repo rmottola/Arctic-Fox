@@ -489,8 +489,6 @@ DOMStorageDBThread::OpenAndUpdateDatabase()
 nsresult
 DOMStorageDBThread::InitDatabase()
 {
-  Telemetry::AutoTimer<Telemetry::LOCALDOMSTORAGE_INIT_DATABASE_MS> timer;
-
   nsresult rv;
 
   // Here we are on the worker thread. This opens the worker connection.
@@ -721,7 +719,7 @@ DOMStorageDBThread::NotifyFlushCompletion()
 #ifdef DOM_STORAGE_TESTS
   if (!NS_IsMainThread()) {
     RefPtr<nsRunnableMethod<DOMStorageDBThread, void, false> > event =
-      NS_NewNonOwningRunnableMethod(this, &DOMStorageDBThread::NotifyFlushCompletion);
+      NewNonOwningRunnableMethod(this, &DOMStorageDBThread::NotifyFlushCompletion);
     NS_DispatchToMainThread(event);
     return;
   }

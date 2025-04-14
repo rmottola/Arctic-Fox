@@ -1,26 +1,23 @@
 {
+  "plugins": [
+    "react"
+  ],
   "globals": {
     "atob": true,
     "btoa": true,
-    "Cc": true,
-    "Ci": true,
     "Components": true,
+    "clearInterval": true,
+    "clearTimeout": true,
     "console": true,
-    "Cr": true,
-    "Cu": true,
-    "devtools": true,
     "dump": true,
-    "EventEmitter": true,
     "exports": true,
     "isWorker": true,
     "loader": true,
     "module": true,
-    "reportError": true,
     "require": true,
-    "Services": true,
-    "Task": true,
-    "XPCNativeWrapper": true,
-    "XPCOMUtils": true,
+    "setInterval": true,
+    "setTimeout": true,
+    "XMLHttpRequest": true,
     "_Iterator": true,
   },
   "rules": {
@@ -34,26 +31,44 @@
     "mozilla/import-headjs-globals": 1,
     "mozilla/mark-test-function-used": 1,
     "mozilla/no-aArgs": 1,
-    "mozilla/no-cpows-in-tests": 1,
+    "mozilla/no-cpows-in-tests": 2,
     // See bug 1224289.
     "mozilla/reject-importGlobalProperties": 1,
     "mozilla/var-only-at-top-level": 1,
+
+    // Rules from the React plugin
+    "react/display-name": 2,
+    "react/no-danger": 2,
+    "react/no-did-mount-set-state": 2,
+    "react/no-did-update-set-state": 2,
+    "react/no-direct-mutation-state": 2,
+    "react/no-unknown-property": 2,
+    "react/prefer-es6-class": [1, "never"],
+    // Disabled temporarily until errors are fixed.
+    "react/prop-types": 0,
+    "react/sort-comp": [2, {
+      order: [
+        "propTypes",
+        "everything-else",
+        "render"
+      ]
+    }],
 
     // Disallow using variables outside the blocks they are defined (especially
     // since only let and const are used, see "no-var").
     "block-scoped-var": 2,
     // Enforce one true brace style (opening brace on the same line) and avoid
     // start and end braces on the same line.
-    "brace-style": [2, "1tbs", {"allowSingleLine": false}],
+    "brace-style": [1, "1tbs", {"allowSingleLine": false}],
     // Require camel case names
-    "camelcase": 2,
+    "camelcase": 1,
     // Allow trailing commas for easy list extension.  Having them does not
     // impair readability, but also not required either.
     "comma-dangle": 0,
     // Enforce spacing before and after comma
-    "comma-spacing": [2, {"before": false, "after": true}],
+    "comma-spacing": [1, {"before": false, "after": true}],
     // Enforce one true comma style.
-    "comma-style": [2, "last"],
+    "comma-style": [1, "last"],
     // Warn about cyclomatic complexity in functions.
     "complexity": 1,
     // Require return statements to either always or never specify values.
@@ -92,7 +107,7 @@
     // Only useful in a node environment.
     "handle-callback-err": 0,
     // Tab width.
-    "indent": [2, 2, {"SwitchCase": 1}],
+    "indent": [1, 2, {"SwitchCase": 1}],
     // Enforces spacing between keys and values in object literal properties.
     "key-spacing": [1, {"beforeColon": false, "afterColon": true}],
     // Allow mixed 'LF' and 'CRLF' as linebreaks.
@@ -101,7 +116,7 @@
     // rule is a better rule to check this.
     "max-depth": 0,
     // Maximum length of a line.
-    "max-len": [2, 80, 2, {"ignoreUrls": true, "ignorePattern": "\\s*require\\s*\\(|^\\s*loader\\.lazy|-\\*-"}],
+    "max-len": [2, 80, 2, {"ignoreUrls": true, "ignorePattern": "data:image\/|\\s*require\\s*\\(|^\\s*loader\\.lazy|-\\*-"}],
     // Maximum depth callbacks can be nested.
     "max-nested-callbacks": [2, 3],
     // Don't limit the number of parameters that can be used in a function.
@@ -176,7 +191,7 @@
     // Allow unnecessary parentheses, as they may make the code more readable.
     "no-extra-parens": 0,
     // Disallow unnecessary semicolons.
-    "no-extra-semi": 2,
+    "no-extra-semi": 1,
     // Deprecated, will be removed in 1.0.
     "no-extra-strict": 0,
     // Disallow fallthrough of case statements, except if there is a comment.

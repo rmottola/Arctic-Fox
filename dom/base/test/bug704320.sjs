@@ -28,7 +28,7 @@ function create2ndLevelIframeUrl(schemeFrom, schemeTo, policy, type) {
 //   <iframe>
 //   <audio>
 //   <video>
-//   <object type="bogus"> 
+//   <object type="bogus">
 //   <object type="image/svg+xml">
 //   <a>
 //   <a ping>
@@ -86,6 +86,7 @@ function createTest(schemeFrom, schemeTo, policy, optionalEarlierPolicy) {
            <iframe src="' + _create2ndLevelIframeUrl('form') + '"></iframe>\n\
            <iframe src="' + _create2ndLevelIframeUrl('window.location') + '"></iframe>\n\
            <script>\n\
+              var _testFinished = 0\n\
              (function() {\n\
                var x = new XMLHttpRequest();\n\
                x.open("GET", "' + _createTestUrl('xmlhttprequest') + '");\n\
@@ -119,8 +120,10 @@ function createTest(schemeFrom, schemeTo, policy, optionalEarlierPolicy) {
              // called by the two things that must complete: window.open page
              // and the window load event.  When both are complete, this
              // "finishes" the iframe subtest by clicking the link.
+             // _testFinished avoids calling this function twice (which may happen)
              'function checkForFinish() {\n\
-               if (window._isLoaded && window._openedWindowLoaded) {\n\
+               if (window._isLoaded && window._openedWindowLoaded && !window._testFinished) {\n\
+                 window._testFinished = 1;\n\
                  document.getElementById("link").click();\n\
                }\n\
              }\n\

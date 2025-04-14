@@ -252,6 +252,8 @@ pref("security.warn_viewing_mixed", false); // Warning is disabled.  See Bug 616
 // added, there may be a need to change this pref.
 pref("security.cert_pinning.enforcement_level", 2);
 
+// Audio competing between tabs
+pref("dom.audiochannel.audioCompeting", false);
 
 // Override some named colors to avoid inverse OS themes
 pref("ui.-moz-dialog", "#efebe7");
@@ -914,9 +916,6 @@ pref("network.sntp.pools", // Servers separated by ';'.
 pref("network.sntp.port", 123);
 pref("network.sntp.timeout", 30); // In seconds.
 
-// DOM Inter-App Communication API.
-pref("dom.inter-app-communication-api.enabled", true);
-
 // Allow ADB to run for this many hours before disabling
 // (only applies when marionette is disabled)
 // 0 disables the timer.
@@ -1050,9 +1049,7 @@ pref("identity.fxaccounts.enabled", true);
 pref("services.mobileid.server.uri", "https://msisdn.services.mozilla.com");
 
 // Enable mapped array buffer.
-#ifndef XP_WIN
 pref("dom.mapped_arraybuffer.enabled", true);
-#endif
 
 // SystemUpdate API
 pref("dom.system_update.enabled", true);

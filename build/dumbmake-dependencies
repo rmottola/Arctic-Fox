@@ -61,6 +61,7 @@ browser/app
   toolkit/components
   toolkit/components/jsdownloads
   toolkit/content
+  toolkit/crashreporter
   toolkit/forgetaboutsite
   toolkit/identity
   toolkit/modules

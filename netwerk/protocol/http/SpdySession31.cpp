@@ -338,6 +338,17 @@ SpdySession31::AddStream(nsAHttpTransaction *aHttpTransaction,
     mConnection = aHttpTransaction->Connection();
   }
 
+  if (mClosed || mShouldGoAway) {
+    nsHttpTransaction *trans = aHttpTransaction->QueryHttpTransaction();
+    if (trans && !trans->GetPushedStream()) {
+      LOG3(("SpdySession31::AddStream %p atrans=%p trans=%p session unusable - resched.\n",
+            this, aHttpTransaction, trans));
+      aHttpTransaction->SetConnection(nullptr);
+      gHttpHandler->InitiateTransaction(trans, trans->Priority());
+      return true;
+    }
+  }
+
   aHttpTransaction->SetConnection(this);
 
   if (aUseTunnel) {
@@ -2111,6 +2122,8 @@ SpdySession31::WriteSegmentsAgain(nsAHttpSegmentWriter *writer,
     MOZ_ASSERT(!mNeedsCleanup, "cleanup stream set unexpectedly");
     mNeedsCleanup = nullptr;                     /* just in case */
 
+    // The writesegments() stack can clear mInputFrameDataStream so
+    // only reference this local copy of it afterwards
     SpdyStream31 *stream = mInputFrameDataStream;
     mSegmentWriter = writer;
     rv = mInputFrameDataStream->WriteSegments(this, count, countWritten);
@@ -2119,7 +2132,7 @@ SpdySession31::WriteSegmentsAgain(nsAHttpSegmentWriter *writer,
       LOG3(("SpdySession31::WriteSegments session=%p stream=%p 0x%X "
             "stream channel pipe full\n",
             this, stream, stream ? stream->StreamID() : 0));
-      channelPipeFull = mInputFrameDataStream->ChannelPipeFull();
+      channelPipeFull = stream->ChannelPipeFull();
     }
     mSegmentWriter = nullptr;
 
@@ -2172,15 +2185,16 @@ SpdySession31::WriteSegmentsAgain(nsAHttpSegmentWriter *writer,
 
   if (mDownstreamState == DISCARDING_DATA_FRAME) {
     char trash[4096];
-    uint32_t count = std::min(4096U, mInputFrameDataSize - mInputFrameDataRead);
+    uint32_t discardCount = std::min(mInputFrameDataSize - mInputFrameDataRead,
+                                     4096U);
 
-    if (!count) {
+    if (!discardCount) {
       ResetDownstreamState();
       ResumeRecv();
       return NS_BASE_STREAM_WOULD_BLOCK;
     }
 
-    rv = NetworkRead(writer, trash, count, countWritten);
+    rv = NetworkRead(writer, trash, discardCount, countWritten);
 
     if (NS_FAILED(rv)) {
       LOG3(("SpdySession31 %p discard frame read failure %x\n", this, rv));
@@ -2633,6 +2647,7 @@ SpdySession31::SetNeedsCleanup()
 
   // This will result in Close() being called
   MOZ_ASSERT(!mNeedsCleanup, "mNeedsCleanup unexpectedly set");
+  mInputFrameDataStream->SetResponseIsComplete();
   mNeedsCleanup = mInputFrameDataStream;
   ResetDownstreamState();
 }

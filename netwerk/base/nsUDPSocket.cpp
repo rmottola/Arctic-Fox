@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/Attributes.h"
-#include "mozilla/Endian.h"
+#include "mozilla/EndianUtils.h"
 #include "mozilla/dom/TypedArray.h"
 #include "mozilla/HoldDropJSObjects.h"
 #include "mozilla/Telemetry.h"
@@ -35,8 +35,8 @@
 #include "NetStatistics.h"
 #endif
 
-using namespace mozilla::net;
-using namespace mozilla;
+namespace mozilla {
+namespace net {
 
 static const uint32_t UDP_PACKET_CHUNK_SIZE = 1400;
 static NS_DEFINE_CID(kSocketTransportServiceCID2, NS_SOCKETTRANSPORTSERVICE_CID);
@@ -48,12 +48,10 @@ typedef void (nsUDPSocket:: *nsUDPSocketFunc)(void);
 static nsresult
 PostEvent(nsUDPSocket *s, nsUDPSocketFunc func)
 {
-  nsCOMPtr<nsIRunnable> ev = NS_NewRunnableMethod(s, func);
-
   if (!gSocketTransportService)
     return NS_ERROR_FAILURE;
 
-  return gSocketTransportService->Dispatch(ev, NS_DISPATCH_NORMAL);
+  return gSocketTransportService->Dispatch(NewRunnableMethod(s, func), NS_DISPATCH_NORMAL);
 }
 
 static nsresult
@@ -197,7 +195,7 @@ nsUDPMessage::nsUDPMessage(NetAddr* aAddr,
 
 nsUDPMessage::~nsUDPMessage()
 {
-  mozilla::DropJSObjects(this);
+  DropJSObjects(this);
 }
 
 NS_IMETHODIMP
@@ -231,8 +229,8 @@ nsUDPMessage::GetRawData(JSContext* cx,
                          JS::MutableHandleValue aRawData)
 {
   if(!mJsobj){
-    mJsobj = mozilla::dom::Uint8Array::Create(cx, nullptr, mData.Length(), mData.Elements());
-    mozilla::HoldJSObjects(this);
+    mJsobj = dom::Uint8Array::Create(cx, nullptr, mData.Length(), mData.Elements());
+    HoldJSObjects(this);
   }
   aRawData.setObject(*mJsobj);
   return NS_OK;
@@ -347,7 +345,7 @@ nsUDPSocket::TryAttach()
   if (!gSocketTransportService->CanAttachSocket())
   {
     nsCOMPtr<nsIRunnable> event =
-      NS_NewRunnableMethod(this, &nsUDPSocket::OnMsgAttach);
+      NewRunnableMethod(this, &nsUDPSocket::OnMsgAttach);
 
     nsresult rv = gSocketTransportService->NotifyWhenCanAttachSocket(event);
     if (NS_FAILED(rv))
@@ -1587,3 +1585,6 @@ nsUDPSocket::SetMulticastInterfaceInternal(const PRNetAddr& aIface)
 
   return NS_OK;
 }
+
+} // namespace net
+} // namespace mozilla

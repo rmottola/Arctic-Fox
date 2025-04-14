@@ -174,7 +174,7 @@ HTMLOptionElement::GetAttributeChangeHint(const nsIAtom* aAttribute,
 
   if (aAttribute == nsGkAtoms::label ||
       aAttribute == nsGkAtoms::text) {
-    NS_UpdateHint(retval, NS_STYLE_HINT_REFLOW);
+    retval |= NS_STYLE_HINT_REFLOW;
   }
   return retval;
 }
@@ -353,19 +353,21 @@ HTMLOptionElement::IntrinsicState() const
 HTMLSelectElement*
 HTMLOptionElement::GetSelect()
 {
-  nsIContent* parent = this;
-  while ((parent = parent->GetParent()) &&
-         parent->IsHTMLElement()) {
-    HTMLSelectElement* select = HTMLSelectElement::FromContent(parent);
-    if (select) {
-      return select;
-    }
-    if (!parent->IsHTMLElement(nsGkAtoms::optgroup)) {
-      break;
-    }
+  nsIContent* parent = GetParent();
+  if (!parent) {
+    return nullptr;
   }
 
-  return nullptr;
+  HTMLSelectElement* select = HTMLSelectElement::FromContent(parent);
+  if (select) {
+    return select;
+  }
+
+  if (!parent->IsHTMLElement(nsGkAtoms::optgroup)) {
+    return nullptr;
+  }
+
+  return HTMLSelectElement::FromContentOrNull(parent->GetParent());
 }
 
 already_AddRefed<HTMLOptionElement>

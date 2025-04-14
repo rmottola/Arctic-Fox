@@ -11,7 +11,6 @@
 #include "mozilla/Attributes.h"
 #include "nsCoord.h"
 #include "nsCycleCollectionParticipant.h"
-#include "nsAutoPtr.h"
 #include "nsWrapperCache.h"
 #include "nsString.h"
 
@@ -186,9 +185,8 @@ public:
   nsTreeColumn* IndexedGetter(uint32_t aIndex, bool& aFound);
   nsTreeColumn* GetColumnAt(uint32_t aIndex);
   nsTreeColumn* NamedGetter(const nsAString& aId, bool& aFound);
-  bool NameIsEnumerable(const nsAString& aName);
   nsTreeColumn* GetNamedColumn(const nsAString& aId);
-  void GetSupportedNames(unsigned, nsTArray<nsString>& aNames);
+  void GetSupportedNames(nsTArray<nsString>& aNames);
 
   // Uses XPCOM InvalidateColumns().
   // Uses XPCOM RestoreNaturalOrder().

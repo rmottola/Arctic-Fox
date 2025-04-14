@@ -39,7 +39,24 @@ case "$target" in
         ;;
     esac
 
-    android_platform="$android_ndk"/platforms/android-"$android_version"/arch-"$target_name"
+    dnl Not all Android releases have their own platform release. We use
+    dnl the next lower platform version in these cases.
+    case $android_version in
+    11|10)
+        android_platform_version=9
+        ;;
+    20)
+        android_platform_version=19
+        ;;
+    22)
+        android_platform_version=21
+        ;;
+    *)
+        android_platform_version=$android_version
+        ;;
+    esac
+
+    android_platform="$android_ndk"/platforms/android-"$android_platform_version"/arch-"$target_name"
 
     if test -d "$android_platform" ; then
         AC_MSG_RESULT([$android_platform])
@@ -70,7 +87,7 @@ esac
 AC_DEFUN([MOZ_ANDROID_CPU_ARCH],
 [
 
-if test "$OS_TARGET" = "Android" -a -z "$gonkdir"; then
+if test "$OS_TARGET" = "Android"; then
     case "${CPU_ARCH}-${MOZ_ARCH}" in
     arm-armv7*)
         ANDROID_CPU_ARCH=armeabi-v7a
@@ -93,7 +110,7 @@ fi
 AC_DEFUN([MOZ_ANDROID_STLPORT],
 [
 
-if test "$OS_TARGET" = "Android" -a -z "$gonkdir"; then
+if test "$OS_TARGET" = "Android"; then
     cpu_arch_dir="$ANDROID_CPU_ARCH"
     if test "$MOZ_THUMB2" = 1; then
         cpu_arch_dir="$cpu_arch_dir/thumb"

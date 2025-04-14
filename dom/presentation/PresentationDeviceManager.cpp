@@ -14,6 +14,7 @@
 #include "nsIObserverService.h"
 #include "nsXULAppAPI.h"
 #include "PresentationSessionRequest.h"
+#include "PresentationTerminateRequest.h"
 
 namespace mozilla {
 namespace dom {
@@ -155,7 +156,7 @@ PresentationDeviceManager::GetAvailableDevices(nsIArray** aRetVal)
   // Bug 1194049: some providers may discontinue discovery after timeout.
   // Call |ForceDiscovery()| here to make sure device lists are updated.
   NS_DispatchToMainThread(
-      NS_NewRunnableMethod(this, &PresentationDeviceManager::ForceDiscovery));
+      NewRunnableMethod(this, &PresentationDeviceManager::ForceDiscovery));
 
   nsCOMPtr<nsIMutableArray> devices = do_CreateInstance(NS_ARRAY_CONTRACTID);
   for (uint32_t i = 0; i < mDevices.Length(); ++i) {
@@ -180,7 +181,7 @@ PresentationDeviceManager::AddDevice(nsIPresentationDevice* aDevice)
 
   mDevices.AppendElement(aDevice);
 
-  NotifyDeviceChange(aDevice, MOZ_UTF16("add"));
+  NotifyDeviceChange(aDevice, u"add");
 
   return NS_OK;
 }
@@ -198,7 +199,7 @@ PresentationDeviceManager::RemoveDevice(nsIPresentationDevice* aDevice)
 
   mDevices.RemoveElementAt(index);
 
-  NotifyDeviceChange(aDevice, MOZ_UTF16("remove"));
+  NotifyDeviceChange(aDevice, u"remove");
 
   return NS_OK;
 }
@@ -213,7 +214,7 @@ PresentationDeviceManager::UpdateDevice(nsIPresentationDevice* aDevice)
     return NS_ERROR_FAILURE;
   }
 
-  NotifyDeviceChange(aDevice, MOZ_UTF16("update"));
+  NotifyDeviceChange(aDevice, u"update");
 
   return NS_OK;
 }
@@ -234,6 +235,28 @@ PresentationDeviceManager::OnSessionRequest(nsIPresentationDevice* aDevice,
     new PresentationSessionRequest(aDevice, aUrl, aPresentationId, aControlChannel);
   obs->NotifyObservers(request,
                        PRESENTATION_SESSION_REQUEST_TOPIC,
+                       nullptr);
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+PresentationDeviceManager::OnTerminateRequest(nsIPresentationDevice* aDevice,
+                                              const nsAString& aPresentationId,
+                                              nsIPresentationControlChannel* aControlChannel,
+                                              bool aIsFromReceiver)
+{
+  NS_ENSURE_ARG(aDevice);
+  NS_ENSURE_ARG(aControlChannel);
+
+  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+  NS_ENSURE_TRUE(obs, NS_ERROR_FAILURE);
+
+  RefPtr<PresentationTerminateRequest> request =
+    new PresentationTerminateRequest(aDevice, aPresentationId,
+                                     aControlChannel, aIsFromReceiver);
+  obs->NotifyObservers(request,
+                       PRESENTATION_TERMINATE_REQUEST_TOPIC,
                        nullptr);
 
   return NS_OK;

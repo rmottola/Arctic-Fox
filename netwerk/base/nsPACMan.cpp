@@ -22,17 +22,14 @@
 #endif
 
 //-----------------------------------------------------------------------------
-using namespace mozilla;
-using namespace mozilla::net;
 
 namespace mozilla {
 namespace net {
+
 LazyLogModule gProxyLog("proxy");
-} // namespace net
-} // namespace mozilla
 
 #undef LOG
-#define LOG(args) MOZ_LOG(mozilla::net::gProxyLog, mozilla::LogLevel::Debug, args)
+#define LOG(args) MOZ_LOG(gProxyLog, LogLevel::Debug, args)
 
 // The PAC thread does evaluations of both PAC files and
 // nsISystemProxySettings because they can both block the calling thread and we
@@ -183,6 +180,7 @@ public:
   explicit ExecutePACThreadAction(nsPACMan *aPACMan)
     : mPACMan(aPACMan)
     , mCancel(false)
+    , mCancelStatus(NS_OK)
     , mSetupPAC(false)
   { }
 
@@ -415,10 +413,8 @@ nsPACMan::LoadPACFromURI(const nsCString &spec)
   // queries the enter between now and when we actually load the PAC file.
 
   if (!mLoadPending) {
-    nsCOMPtr<nsIRunnable> event =
-      NS_NewRunnableMethod(this, &nsPACMan::StartLoading);
     nsresult rv;
-    if (NS_FAILED(rv = NS_DispatchToCurrentThread(event)))
+    if (NS_FAILED(rv = NS_DispatchToCurrentThread(NewRunnableMethod(this, &nsPACMan::StartLoading))))
       return rv;
     mLoadPending = true;
   }
@@ -784,9 +780,12 @@ nsPACMan::Init(nsISystemProxySettings *systemProxySettings)
   if (NS_FAILED(rv))
     return rv;
 
-  nsCOMPtr<nsIRunnable> event = NS_NewRunnableMethod(this, &nsPACMan::NamePACThread);
   // don't check return value as it is not a big deal for this to fail.
-  mPACThread->Dispatch(event, nsIEventTarget::DISPATCH_NORMAL);
+  mPACThread->Dispatch(NewRunnableMethod(this, &nsPACMan::NamePACThread),
+                       nsIEventTarget::DISPATCH_NORMAL);
 
   return NS_OK;
 }
+
+} // namespace net
+} // namespace mozilla

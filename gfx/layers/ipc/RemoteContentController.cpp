@@ -12,10 +12,10 @@
 #include "MainThreadUtils.h"
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/TabParent.h"
-#include "mozilla/layers/APZCTreeManager.h"
+#include "mozilla/layers/IAPZCTreeManager.h"
 #include "mozilla/layers/APZThreadUtils.h"
-#include "mozilla/layers/CompositorBridgeParent.h"
 #include "mozilla/layout/RenderFrameParent.h"
+#include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/unused.h"
 #include "Units.h"
 #ifdef MOZ_WIDGET_ANDROID
@@ -24,6 +24,8 @@
 
 namespace mozilla {
 namespace layers {
+
+using namespace mozilla::gfx;
 
 static std::map<uint64_t, RefPtr<RemoteContentController>> sDestroyedControllers;
 
@@ -51,73 +53,37 @@ RemoteContentController::RequestContentRepaint(const FrameMetrics& aFrameMetrics
 }
 
 void
-RemoteContentController::HandleDoubleTap(const CSSPoint& aPoint,
-                                         Modifiers aModifiers,
-                                         const ScrollableLayerGuid& aGuid)
+RemoteContentController::HandleTap(TapType aTapType,
+                                   const CSSPoint& aPoint,
+                                   Modifiers aModifiers,
+                                   const ScrollableLayerGuid& aGuid,
+                                   uint64_t aInputBlockId)
 {
   if (MessageLoop::current() != mUILoop) {
     // We have to send this message from the "UI thread" (main
     // thread).
-    mUILoop->PostTask(
-      NewRunnableMethod(this, &RemoteContentController::HandleDoubleTap,
-                        aPoint, aModifiers, aGuid));
-    return;
-  }
-  if (CanSend()) {
-    Unused << SendHandleDoubleTap(mBrowserParent->AdjustTapToChildWidget(aPoint),
-            aModifiers, aGuid);
-  }
-}
-
-void
-RemoteContentController::HandleSingleTap(const CSSPoint& aPoint,
-                                         Modifiers aModifiers,
-                                         const ScrollableLayerGuid& aGuid)
-{
-  if (MessageLoop::current() != mUILoop) {
-    // We have to send this message from the "UI thread" (main
-    // thread).
-    mUILoop->PostTask(
-      NewRunnableMethod(this, &RemoteContentController::HandleSingleTap,
-                        aPoint, aModifiers, aGuid));
+    mUILoop->PostTask(NewRunnableMethod<TapType, CSSPoint, Modifiers,
+                                        ScrollableLayerGuid, uint64_t>(this,
+                                          &RemoteContentController::HandleTap,
+                                          aTapType, aPoint, aModifiers, aGuid,
+                                          aInputBlockId));
     return;
   }
 
-  bool callTakeFocusForClickFromTap;
-  layout::RenderFrameParent* frame;
-  if (mBrowserParent && (frame = mBrowserParent->GetRenderFrame()) &&
-      mLayersId == frame->GetLayersId()) {
-    // Avoid going over IPC and back for calling TakeFocusForClickFromTap,
-    // since the right RenderFrameParent is living in this process.
-    frame->TakeFocusForClickFromTap();
-    callTakeFocusForClickFromTap = false;
-  } else {
-    callTakeFocusForClickFromTap = true;
+  bool callTakeFocusForClickFromTap = (aTapType == TapType::eSingleTap);
+  if (callTakeFocusForClickFromTap && mBrowserParent) {
+    layout::RenderFrameParent* frame = mBrowserParent->GetRenderFrame();
+    if (frame && mLayersId == frame->GetLayersId()) {
+      // Avoid going over IPC and back for calling TakeFocusForClickFromTap,
+      // since the right RenderFrameParent is living in this process.
+      frame->TakeFocusForClickFromTap();
+      callTakeFocusForClickFromTap = false;
+    }
   }
 
   if (CanSend()) {
-    Unused << SendHandleSingleTap(mBrowserParent->AdjustTapToChildWidget(aPoint),
-            aModifiers, aGuid, callTakeFocusForClickFromTap);
-  }
-}
-
-void
-RemoteContentController::HandleLongTap(const CSSPoint& aPoint,
-                                       Modifiers aModifiers,
-                                       const ScrollableLayerGuid& aGuid,
-                                       uint64_t aInputBlockId)
-{
-  if (MessageLoop::current() != mUILoop) {
-    // We have to send this message from the "UI thread" (main
-    // thread).
-    mUILoop->PostTask(
-      NewRunnableMethod(this, &RemoteContentController::HandleLongTap,
-                        aPoint, aModifiers, aGuid, aInputBlockId));
-    return;
-  }
-  if (CanSend()) {
-    Unused << SendHandleLongTap(mBrowserParent->AdjustTapToChildWidget(aPoint),
-            aModifiers, aGuid, aInputBlockId);
+    Unused << SendHandleTap(aTapType, mBrowserParent->AdjustTapToChildWidget(aPoint),
+            aModifiers, aGuid, aInputBlockId, callTakeFocusForClickFromTap);
   }
 }
 
@@ -150,9 +116,11 @@ RemoteContentController::NotifyAPZStateChange(const ScrollableLayerGuid& aGuid,
                                               int aArg)
 {
   if (MessageLoop::current() != mUILoop) {
-    mUILoop->PostTask(
-      NewRunnableMethod(this, &RemoteContentController::NotifyAPZStateChange,
-                        aGuid, aChange, aArg));
+    mUILoop->PostTask(NewRunnableMethod<ScrollableLayerGuid,
+                                        APZStateChange,
+                                        int>(this,
+                                             &RemoteContentController::NotifyAPZStateChange,
+                                             aGuid, aChange, aArg));
     return;
   }
   if (CanSend()) {
@@ -165,9 +133,10 @@ RemoteContentController::NotifyMozMouseScrollEvent(const FrameMetrics::ViewID& a
                                                    const nsString& aEvent)
 {
   if (MessageLoop::current() != mUILoop) {
-    mUILoop->PostTask(
-      NewRunnableMethod(this, &RemoteContentController::NotifyMozMouseScrollEvent,
-                        aScrollId, aEvent));
+    mUILoop->PostTask(NewRunnableMethod<FrameMetrics::ViewID,
+                                        nsString>(this,
+                                                  &RemoteContentController::NotifyMozMouseScrollEvent,
+                                                  aScrollId, aEvent));
     return;
   }
 
@@ -199,7 +168,7 @@ RemoteContentController::RecvZoomToRect(const uint32_t& aPresShellId,
                                         const CSSRect& aRect,
                                         const uint32_t& aFlags)
 {
-  if (RefPtr<APZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
+  if (RefPtr<IAPZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
     apzcTreeManager->ZoomToRect(ScrollableLayerGuid(mLayersId, aPresShellId, aViewId),
                                 aRect, aFlags);
   }
@@ -216,10 +185,12 @@ RemoteContentController::RecvContentReceivedInputBlock(const ScrollableLayerGuid
     NS_ERROR("Unexpected layers id in RecvContentReceivedInputBlock; dropping message...");
     return false;
   }
-  if (RefPtr<APZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
-    APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
-        apzcTreeManager.get(), &APZCTreeManager::ContentReceivedInputBlock,
-        aInputBlockId, aPreventDefault));
+  if (RefPtr<IAPZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
+    APZThreadUtils::RunOnControllerThread(NewRunnableMethod<uint64_t,
+                                                            bool>(apzcTreeManager,
+                                                                  &IAPZCTreeManager::ContentReceivedInputBlock,
+                                                                  aInputBlockId, aPreventDefault));
+
   }
   return true;
 }
@@ -227,14 +198,15 @@ RemoteContentController::RecvContentReceivedInputBlock(const ScrollableLayerGuid
 bool
 RemoteContentController::RecvStartScrollbarDrag(const AsyncDragMetrics& aDragMetrics)
 {
-  if (RefPtr<APZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
+  if (RefPtr<IAPZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
     ScrollableLayerGuid guid(mLayersId, aDragMetrics.mPresShellId,
                              aDragMetrics.mViewId);
 
-    APZThreadUtils::RunOnControllerThread(
-      NewRunnableMethod(apzcTreeManager.get(),
-                        &APZCTreeManager::StartScrollbarDrag,
-                        guid, aDragMetrics));
+    APZThreadUtils::RunOnControllerThread(NewRunnableMethod
+                                          <ScrollableLayerGuid,
+                                           AsyncDragMetrics>(apzcTreeManager,
+                                                             &IAPZCTreeManager::StartScrollbarDrag,
+                                                             guid, aDragMetrics));
   }
   return true;
 }
@@ -250,13 +222,15 @@ RemoteContentController::RecvSetTargetAPZC(const uint64_t& aInputBlockId,
       return false;
     }
   }
-  if (RefPtr<APZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
+  if (RefPtr<IAPZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
     // need a local var to disambiguate between the SetTargetAPZC overloads.
-    void (APZCTreeManager::*setTargetApzcFunc)(uint64_t, const nsTArray<ScrollableLayerGuid>&)
-        = &APZCTreeManager::SetTargetAPZC;
-    APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
-        apzcTreeManager.get(), setTargetApzcFunc,
-        aInputBlockId, aTargets));
+    void (IAPZCTreeManager::*setTargetApzcFunc)(uint64_t, const nsTArray<ScrollableLayerGuid>&)
+        = &IAPZCTreeManager::SetTargetAPZC;
+    APZThreadUtils::RunOnControllerThread(NewRunnableMethod
+                                          <uint64_t,
+                                           StoreCopyPassByRRef<nsTArray<ScrollableLayerGuid>>>
+                                          (apzcTreeManager, setTargetApzcFunc, aInputBlockId, aTargets));
+
   }
   return true;
 }
@@ -265,10 +239,13 @@ bool
 RemoteContentController::RecvSetAllowedTouchBehavior(const uint64_t& aInputBlockId,
                                                      nsTArray<TouchBehaviorFlags>&& aFlags)
 {
-  if (RefPtr<APZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
-    APZThreadUtils::RunOnControllerThread(NewRunnableMethod(
-        apzcTreeManager.get(), &APZCTreeManager::SetAllowedTouchBehavior,
-        aInputBlockId, Move(aFlags)));
+  if (RefPtr<IAPZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
+    APZThreadUtils::RunOnControllerThread(NewRunnableMethod
+                                          <uint64_t,
+                                           StoreCopyPassByRRef<nsTArray<TouchBehaviorFlags>>>
+                                          (apzcTreeManager,
+                                           &IAPZCTreeManager::SetAllowedTouchBehavior,
+                                           aInputBlockId, Move(aFlags)));
   }
   return true;
 }
@@ -278,7 +255,7 @@ RemoteContentController::RecvUpdateZoomConstraints(const uint32_t& aPresShellId,
                                                    const ViewID& aViewId,
                                                    const MaybeZoomConstraints& aConstraints)
 {
-  if (RefPtr<APZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
+  if (RefPtr<IAPZCTreeManager> apzcTreeManager = GetApzcTreeManager()) {
     apzcTreeManager->UpdateZoomConstraints(ScrollableLayerGuid(mLayersId, aPresShellId, aViewId),
                                            aConstraints);
   }
@@ -329,7 +306,7 @@ RemoteContentController::ChildAdopted()
   mApzcTreeManager = nullptr;
 }
 
-already_AddRefed<APZCTreeManager>
+already_AddRefed<IAPZCTreeManager>
 RemoteContentController::GetApzcTreeManager()
 {
   // We can't get a ref to the APZCTreeManager until after the child is
@@ -338,9 +315,9 @@ RemoteContentController::GetApzcTreeManager()
   // we first need it and cache the result.
   MutexAutoLock lock(mMutex);
   if (!mApzcTreeManager) {
-    mApzcTreeManager = CompositorBridgeParent::GetAPZCTreeManager(mLayersId);
+    mApzcTreeManager = GPUProcessManager::Get()->GetAPZCTreeManagerForLayers(mLayersId);
   }
-  RefPtr<APZCTreeManager> apzcTreeManager(mApzcTreeManager);
+  RefPtr<IAPZCTreeManager> apzcTreeManager(mApzcTreeManager);
   return apzcTreeManager.forget();
 }
 

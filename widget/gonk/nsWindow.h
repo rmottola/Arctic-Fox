@@ -113,11 +113,8 @@ public:
     virtual mozilla::layers::LayerManager*
         GetLayerManager(PLayerTransactionChild* aShadowManager = nullptr,
                         LayersBackend aBackendHint = mozilla::layers::LayersBackend::LAYERS_NONE,
-                        LayerManagerPersistence aPersistence = LAYER_MANAGER_CURRENT,
-                        bool* aAllowRetaining = nullptr);
+                        LayerManagerPersistence aPersistence = LAYER_MANAGER_CURRENT);
     virtual void DestroyCompositor();
-
-    virtual CompositorBridgeParent* NewCompositorBridgeParent(int aSurfaceWidth, int aSurfaceHeight);
 
     NS_IMETHOD_(void) SetInputContext(const InputContext& aContext,
                                       const InputContextAction& aAction);
@@ -147,6 +144,11 @@ protected:
     // Call this function when the users activity is the direct cause of an
     // event (like a keypress or mouse click).
     void UserActivity();
+
+    bool UseExternalCompositingSurface() const override {
+      return true;
+    }
+    CompositorBridgeParent* GetCompositorBridgeParent() const;
 
 private:
     // This is used by SynthesizeNativeTouchPoint to maintain state between

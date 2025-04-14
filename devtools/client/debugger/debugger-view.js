@@ -5,7 +5,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const SOURCE_SYNTAX_HIGHLIGHT_MAX_FILE_SIZE = 1048576; // 1 MB in bytes
 const SOURCE_URL_DEFAULT_MAX_LENGTH = 64; // chars
 const STACK_FRAMES_SOURCE_URL_MAX_LENGTH = 15; // chars
 const STACK_FRAMES_SOURCE_URL_TRIM_SECTION = "center";
@@ -24,8 +23,6 @@ const SEARCH_TOKEN_FLAG = "#";
 const SEARCH_LINE_FLAG = ":";
 const SEARCH_VARIABLE_FLAG = "*";
 const SEARCH_AUTOFILL = [SEARCH_GLOBAL_FLAG, SEARCH_FUNCTION_FLAG, SEARCH_TOKEN_FLAG];
-const EDITOR_VARIABLE_HOVER_DELAY = 750; // ms
-const EDITOR_VARIABLE_POPUP_POSITION = "topcenter bottomleft";
 const TOOLBAR_ORDER_POPUP_POSITION = "topcenter bottomleft";
 const RESIZE_REFRESH_RATE = 50; // ms
 const PROMISE_DEBUGGER_URL =
@@ -68,6 +65,7 @@ var DebuggerView = {
     this._startup = deferred.promise;
 
     this._initializePanes();
+    this._initializeEditor(deferred.resolve);
     this.Toolbar.initialize();
     this.Options.initialize();
     this.Filtering.initialize();
@@ -81,8 +79,8 @@ var DebuggerView = {
     this.GlobalSearch.initialize();
     this._initializeVariablesView();
 
-    this._initializeEditor(deferred.resolve);
     this._editorSource = {};
+    this._editorDocuments = {};
 
     document.title = L10N.getStr("DebuggerWindowTitle");
 
@@ -375,14 +373,15 @@ var DebuggerView = {
 
     if (source && source.actor === location.actor) {
       this.editor.removeBreakpoint(location.line - 1);
+      this.editor.removeBreakpointCondition(location.line - 1);
     }
   },
 
   renderEditorBreakpointCondition: function (breakpoint) {
-    const { location, condition } = breakpoint;
+    const { location, condition, disabled } = breakpoint;
     const source = queries.getSelectedSource(this.controller.getState());
 
-    if (source && source.actor === location.actor) {
+    if (source && source.actor === location.actor && !disabled) {
       if (condition) {
         this.editor.setBreakpointCondition(location.line - 1);
       } else {
@@ -416,14 +415,28 @@ var DebuggerView = {
    * Sets the currently displayed text contents in the source editor.
    * This resets the mode and undo stack.
    *
+   * @param string documentKey
+   *        Key to get the correct editor document
+   *
    * @param string aTextContent
    *        The source text content.
+   *
+   * @param boolean shouldUpdateText
+            Forces a text and mode reset
    */
-  _setEditorText: function(aTextContent = "") {
-    this.editor.setMode(Editor.modes.text);
-    this.editor.setText(aTextContent);
+  _setEditorText: function(documentKey, aTextContent = "", shouldUpdateText = false) {
+    const isNew = this._setEditorDocument(documentKey);
+
     this.editor.clearDebugLocation();
     this.editor.clearHistory();
+    this.editor.setCursor({ line: 0, ch: 0});
+    this.editor.removeBreakpoints();
+
+    // Only set editor's text and mode if it is a new document
+    if (isNew || shouldUpdateText) {
+      this.editor.setMode(Editor.modes.text);
+      this.editor.setText(aTextContent);
+    }
   },
 
   /**
@@ -438,12 +451,6 @@ var DebuggerView = {
    *        The source text content.
    */
   _setEditorMode: function(aUrl, aContentType = "", aTextContent = "") {
-    // Avoid setting the editor mode for very large files.
-    // Is this still necessary? See bug 929225.
-    if (aTextContent.length >= SOURCE_SYNTAX_HIGHLIGHT_MAX_FILE_SIZE) {
-      return void this.editor.setMode(Editor.modes.text);
-    }
-
     // Use JS mode for files with .js and .jsm extensions.
     if (SourceUtils.isJavaScript(aUrl, aContentType)) {
       return void this.editor.setMode(Editor.modes.js);
@@ -457,6 +464,29 @@ var DebuggerView = {
 
     // Unknown language, use text.
     this.editor.setMode(Editor.modes.text);
+  },
+
+  /**
+   * Sets the editor's displayed document.
+   * If there isn't a document for the source, create one
+   *
+   * @param string key - key used to access the editor document cache
+   *
+   * @return boolean isNew - was the document just created
+   */
+  _setEditorDocument: function(key) {
+    let isNew;
+
+    if (!this._editorDocuments[key]) {
+      isNew = true;
+      this._editorDocuments[key] = this.editor.createDocument();
+    } else {
+      isNew = false;
+    }
+
+    const doc = this._editorDocuments[key];
+    this.editor.replaceDocument(doc);
+    return isNew;
   },
 
   renderBlackBoxed: function(source) {
@@ -484,6 +514,7 @@ var DebuggerView = {
   _renderSourceText: function(source, textInfo, opts = {}) {
     const selectedSource = queries.getSelectedSource(this.controller.getState());
 
+    // Exit early if we're attempting to render an unselected source
     if (!selectedSource || selectedSource.actor !== source.actor) {
       return;
     }
@@ -503,13 +534,13 @@ var DebuggerView = {
       // TODO: bug 1228866, we need to update `_editorSource` here but
       // still make the editor be updated when the full text comes
       // through somehow.
-      this._setEditorText(L10N.getStr("loadingText"));
+      this._setEditorText('loading', L10N.getStr("loadingText"));
       return;
     }
     else if (textInfo.error) {
       let msg = L10N.getFormatStr("errorLoadingText2", textInfo.error);
-      this._setEditorText(msg);
-      Cu.reportError(msg);
+      this._setEditorText('error', msg);
+      console.error(new Error(msg));
       dumpn(msg);
 
       this.showEditor();
@@ -535,14 +566,18 @@ var DebuggerView = {
       return;
     }
 
+    let { text, contentType } = textInfo;
+    let shouldUpdateText = this._editorSource.prettyPrinted != source.isPrettyPrinted;
+    this._setEditorText(source.actor, text, shouldUpdateText);
+
     this._editorSource.actor = source.actor;
     this._editorSource.prettyPrinted = source.isPrettyPrinted;
     this._editorSource.blackboxed = source.isBlackBoxed;
+    this._editorSource.prettyPrinted = source.isPrettyPrinted;
 
-    let { text, contentType } = textInfo;
-    this._setEditorText(text);
     this._setEditorMode(source.url, contentType, text);
     this.updateEditorBreakpoints(source);
+
     setTimeout(() => {
       window.emit(EVENTS.SOURCE_SHOWN, source);
     }, 0);
@@ -794,7 +829,6 @@ var DebuggerView = {
    */
   handleTabNavigation: function() {
     dumpn("Handling tab navigation in the DebuggerView");
-
     this.Filtering.clearSearch();
     this.GlobalSearch.clearView();
     this.StackFrames.empty();
@@ -807,6 +841,7 @@ var DebuggerView = {
       this.editor.setText("");
       this.editor.clearHistory();
       this._editorSource = {};
+      this._editorDocuments = {};
     }
   },
 

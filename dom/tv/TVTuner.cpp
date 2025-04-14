@@ -235,8 +235,10 @@ TVTuner::CreateSimulatedMediaStream()
   }
 
   ErrorResult error;
-  RefPtr<Element> element = doc->CreateElement(VIDEO_TAG, error);
+  ElementCreationOptions options;
+  RefPtr<Element> element = doc->CreateElement(VIDEO_TAG, options, error);
   if (NS_WARN_IF(error.Failed())) {
+    error.SuppressException();
     return nullptr;
   }
 
@@ -252,11 +254,13 @@ TVTuner::CreateSimulatedMediaStream()
 
   mediaElement->SetAutoplay(true, error);
   if (NS_WARN_IF(error.Failed())) {
+    error.SuppressException();
     return nullptr;
   }
 
   mediaElement->SetLoop(true, error);
   if (NS_WARN_IF(error.Failed())) {
+    error.SuppressException();
     return nullptr;
   }
 
@@ -292,6 +296,7 @@ TVTuner::CreateSimulatedMediaStream()
 
   mediaElement->SetSrc(currentVideoBlobUrl, error);
   if (NS_WARN_IF(error.Failed())) {
+    error.SuppressException();
     return nullptr;
   }
 
@@ -299,6 +304,7 @@ TVTuner::CreateSimulatedMediaStream()
   // http://www.w3.org/TR/mediacapture-fromelement/
   RefPtr<DOMMediaStream> stream = mediaElement->MozCaptureStream(error);
   if (NS_WARN_IF(error.Failed())) {
+    error.SuppressException();
     return nullptr;
   }
 
@@ -315,9 +321,9 @@ TVTuner::DispatchCurrentSourceChangedEvent(TVSource* aSource)
                                              NS_LITERAL_STRING("currentsourcechanged"),
                                              init);
   nsCOMPtr<nsIRunnable> runnable =
-    NS_NewRunnableMethodWithArg<nsCOMPtr<nsIDOMEvent>>(this,
-                                                       &TVTuner::DispatchTVEvent,
-                                                       event);
+    NewRunnableMethod<nsCOMPtr<nsIDOMEvent>>(this,
+                                             &TVTuner::DispatchTVEvent,
+                                             event);
   return NS_DispatchToCurrentThread(runnable);
 }
 

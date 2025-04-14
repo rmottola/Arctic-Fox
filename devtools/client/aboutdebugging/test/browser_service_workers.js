@@ -26,7 +26,7 @@ add_task(function* () {
 
   let swTab = yield addTab(TAB_URL);
 
-  let serviceWorkersElement = document.getElementById("service-workers");
+  let serviceWorkersElement = getServiceWorkerList(document);
 
   yield waitForMutation(serviceWorkersElement, { childList: true });
 
@@ -41,14 +41,14 @@ add_task(function* () {
     { childList: true });
 
   // Use message manager to work with e10s
-  let frameScript = function() {
+  let frameScript = function () {
     // Retrieve the `sw` promise created in the html page
     let { sw } = content.wrappedJSObject;
-    sw.then(function(registration) {
-      registration.unregister().then(function() {
+    sw.then(function (registration) {
+      registration.unregister().then(function () {
         sendAsyncMessage("sw-unregistered");
       },
-      function(e) {
+      function (e) {
         dump("SW not unregistered; " + e + "\n");
       });
     });

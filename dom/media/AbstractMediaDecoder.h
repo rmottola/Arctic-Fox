@@ -16,6 +16,8 @@
 #include "nsDataHashtable.h"
 #include "nsThreadUtils.h"
 
+class GMPCrashHelper;
+
 namespace mozilla
 {
 
@@ -62,7 +64,7 @@ public:
 
   // Return an event that will be notified when data arrives in MediaResource.
   // MediaDecoderReader will register with this event to receive notifications
-  // in order to udpate buffer ranges.
+  // in order to update buffer ranges.
   // Return null if this decoder doesn't support the event.
   virtual MediaEventSource<void>* DataArrivedEvent()
   {
@@ -74,10 +76,9 @@ protected:
 public:
   void DispatchUpdateEstimatedMediaDuration(int64_t aDuration)
   {
-    nsCOMPtr<nsIRunnable> r =
-      NS_NewRunnableMethodWithArg<int64_t>(this, &AbstractMediaDecoder::UpdateEstimatedMediaDuration,
-                                           aDuration);
-    NS_DispatchToMainThread(r);
+    NS_DispatchToMainThread(NewRunnableMethod<int64_t>(this,
+                                                       &AbstractMediaDecoder::UpdateEstimatedMediaDuration,
+                                                       aDuration));
   }
 
   virtual VideoFrameContainer* GetVideoFrameContainer() = 0;
@@ -89,6 +90,8 @@ public:
 
   // Set by Reader if the current audio track can be offloaded
   virtual void SetPlatformCanOffloadAudio(bool aCanOffloadAudio) {}
+
+  virtual already_AddRefed<GMPCrashHelper> GetCrashHelper() { return nullptr; }
 
   // Stack based class to assist in notifying the frame statistics of
   // parsed and decoded frames. Use inside video demux & decode functions

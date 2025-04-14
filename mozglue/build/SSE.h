@@ -42,6 +42,11 @@
  *     ...
  *   }
  *
+ * Note that these functions depend on cpuid intrinsics only available in gcc
+ * 4.3 or later and MSVC 8.0 (Visual C++ 2005) or later, so they return false
+ * in older compilers.  (This could be fixed by replacing the code with inline
+ * assembly.)
+ *
  *
  * USING INTRINSICS
  * ================

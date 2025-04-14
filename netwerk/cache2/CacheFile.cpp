@@ -1087,14 +1087,6 @@ CacheFile::ReleaseOutsideLock(RefPtr<nsISupports> aObject)
 }
 
 nsresult
-CacheFile::GetChunk(uint32_t aIndex, ECallerType aCaller,
-                    CacheFileChunkListener *aCallback, CacheFileChunk **_retval)
-{
-  CacheFileAutoLock lock(this);
-  return GetChunkLocked(aIndex, aCaller, aCallback, _retval);
-}
-
-nsresult
 CacheFile::GetChunkLocked(uint32_t aIndex, ECallerType aCaller,
                           CacheFileChunkListener *aCallback,
                           CacheFileChunk **_retval)
@@ -1171,7 +1163,7 @@ CacheFile::GetChunkLocked(uint32_t aIndex, ECallerType aCaller,
     return NS_OK;
   }
 
-  int64_t off = aIndex * kChunkSize;
+  int64_t off = aIndex * static_cast<int64_t>(kChunkSize);
 
   if (off < mDataSize) {
     // We cannot be here if this is memory only entry since the chunk must exist
@@ -1313,7 +1305,7 @@ CacheFile::PreloadChunks(uint32_t aIndex)
   uint32_t limit = aIndex + mPreloadChunkCount;
 
   for (uint32_t i = aIndex; i < limit; ++i) {
-    int64_t off = i * kChunkSize;
+    int64_t off = i * static_cast<int64_t>(kChunkSize);
 
     if (off >= mDataSize) {
       // This chunk is beyond EOF.
@@ -1540,7 +1532,7 @@ CacheFile::BytesFromChunk(uint32_t aIndex)
 
     chunk = mChunks.GetWeak(i);
     if (chunk) {
-      MOZ_ASSERT(i == lastChunk || chunk->mDataSize == kChunkSize);
+      MOZ_ASSERT(i == lastChunk || chunk->DataSize() == kChunkSize);
       if (chunk->IsReady()) {
         continue;
       }
@@ -1551,7 +1543,7 @@ CacheFile::BytesFromChunk(uint32_t aIndex)
 
     chunk = mCachedChunks.GetWeak(i);
     if (chunk) {
-      MOZ_ASSERT(i == lastChunk || chunk->mDataSize == kChunkSize);
+      MOZ_ASSERT(i == lastChunk || chunk->DataSize() == kChunkSize);
       continue;
     }
 
@@ -1808,6 +1800,8 @@ CacheFile::DataSize(int64_t* aSize)
 bool
 CacheFile::IsDoomed()
 {
+  CacheFileAutoLock lock(this);
+
   if (!mHandle)
     return false;
 
@@ -1876,7 +1870,7 @@ CacheFile::WriteMetadataIfNeededLocked(bool aFireAndForget)
     return;
 
   if (!IsDirty() || mOutput || mInputs.Length() || mChunks.Count() ||
-      mWritingMetadata || mOpeningFile)
+      mWritingMetadata || mOpeningFile || mKill)
     return;
 
   if (!aFireAndForget) {
@@ -1948,16 +1942,16 @@ CacheFile::PadChunkWithZeroes(uint32_t aChunkIdx)
   LOG(("CacheFile::PadChunkWithZeroes() - Zeroing hole in chunk %d, range %d-%d"
        " [this=%p]", aChunkIdx, chunk->DataSize(), kChunkSize - 1, this));
 
-  rv = chunk->EnsureBufSize(kChunkSize);
-  if (NS_FAILED(rv)) {
+  CacheFileChunkWriteHandle hnd = chunk->GetWriteHandle(kChunkSize);
+  if (!hnd.Buf()) {
     ReleaseOutsideLock(chunk.forget());
-    SetError(rv);
-    return rv;
+    SetError(NS_ERROR_OUT_OF_MEMORY);
+    return NS_ERROR_OUT_OF_MEMORY;
   }
-  memset(chunk->BufForWriting() + chunk->DataSize(), 0, kChunkSize - chunk->DataSize());
 
-  chunk->UpdateDataSize(chunk->DataSize(), kChunkSize - chunk->DataSize(),
-                        false);
+  uint32_t offset = hnd.DataSize();
+  memset(hnd.Buf() + offset, 0, kChunkSize - offset);
+  hnd.UpdateDataSize(offset, kChunkSize - offset);
 
   ReleaseOutsideLock(chunk.forget());
 

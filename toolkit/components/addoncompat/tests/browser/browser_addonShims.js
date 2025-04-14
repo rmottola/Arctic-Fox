@@ -1,4 +1,4 @@
-let {AddonManager} = Cu.import("resource://gre/modules/AddonManager.jsm", {});
+var {AddonManager} = Cu.import("resource://gre/modules/AddonManager.jsm", {});
 
 const ADDON_URL = "http://example.com/browser/toolkit/components/addoncompat/tests/browser/addon.xpi";
 

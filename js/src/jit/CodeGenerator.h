@@ -53,10 +53,10 @@ class OutOfLineRegExpPrototypeOptimizable;
 class OutOfLineRegExpInstanceOptimizable;
 class OutOfLineLambdaArrow;
 
-class CodeGenerator : public CodeGeneratorSpecific
+class CodeGenerator final : public CodeGeneratorSpecific
 {
     void generateArgumentsChecks(bool bailout = true);
-    bool generateBody();
+    MOZ_MUST_USE bool generateBody();
 
     ConstantOrRegister toConstantOrRegister(LInstruction* lir, size_t n, MIRType type);
 
@@ -65,10 +65,10 @@ class CodeGenerator : public CodeGeneratorSpecific
     ~CodeGenerator();
 
   public:
-    bool generate();
-    bool generateAsmJS(wasm::FuncOffsets *offsets);
-    bool link(JSContext* cx, CompilerConstraintList* constraints);
-    bool linkSharedStubs(JSContext* cx);
+    MOZ_MUST_USE bool generate();
+    MOZ_MUST_USE bool generateWasm(wasm::SigIdDesc sigId, wasm::FuncOffsets *offsets);
+    MOZ_MUST_USE bool link(JSContext* cx, CompilerConstraintList* constraints);
+    MOZ_MUST_USE bool linkSharedStubs(JSContext* cx);
 
     void visitOsiPoint(LOsiPoint* lir);
     void visitGoto(LGoto* lir);
@@ -194,6 +194,7 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitOutOfLineNewArray(OutOfLineNewArray* ool);
     void visitNewArrayCopyOnWrite(LNewArrayCopyOnWrite* lir);
     void visitNewArrayDynamicLength(LNewArrayDynamicLength* lir);
+    void visitNewTypedArray(LNewTypedArray* lir);
     void visitNewObjectVMCall(LNewObject* lir);
     void visitNewObject(LNewObject* lir);
     void visitOutOfLineNewObject(OutOfLineNewObject* ool);
@@ -362,6 +363,8 @@ class CodeGenerator : public CodeGeneratorSpecific
     void visitAsmJSParameter(LAsmJSParameter* lir);
     void visitAsmJSReturn(LAsmJSReturn* ret);
     void visitAsmJSVoidReturn(LAsmJSVoidReturn* ret);
+    void visitAsmJSLoadFuncPtr(LAsmJSLoadFuncPtr* ins);
+    void visitAsmJSLoadFFIFunc(LAsmJSLoadFFIFunc* ins);
     void visitLexicalCheck(LLexicalCheck* ins);
     void visitThrowRuntimeLexicalError(LThrowRuntimeLexicalError* ins);
     void visitGlobalNameConflictsCheck(LGlobalNameConflictsCheck* ins);
@@ -416,6 +419,10 @@ class CodeGenerator : public CodeGeneratorSpecific
 
     void visitRandom(LRandom* ins);
 
+#ifdef DEBUG
+    void emitDebugForceBailing(LInstruction* lir);
+#endif
+
     IonScriptCounts* extractScriptCounts() {
         IonScriptCounts* counts = scriptCounts_;
         scriptCounts_ = nullptr;  // prevent delete in dtor
@@ -433,7 +440,8 @@ class CodeGenerator : public CodeGeneratorSpecific
                              bool strict, bool needsTypeBarrier, bool guardHoles,
                              jsbytecode* profilerLeavePc);
 
-    bool generateBranchV(const ValueOperand& value, Label* ifTrue, Label* ifFalse, FloatRegister fr);
+    MOZ_MUST_USE bool generateBranchV(const ValueOperand& value, Label* ifTrue, Label* ifFalse,
+                                      FloatRegister fr);
 
     void emitLambdaInit(Register resultReg, Register scopeChainReg,
                         const LambdaFunctionInfo& info);
@@ -513,6 +521,8 @@ class CodeGenerator : public CodeGeneratorSpecific
 
     void emitAssertRangeI(const Range* r, Register input);
     void emitAssertRangeD(const Range* r, FloatRegister input, FloatRegister temp);
+
+    void maybeEmitGlobalBarrierCheck(const LAllocation* maybeGlobal, OutOfLineCode* ool);
 
     Vector<CodeOffset, 0, JitAllocPolicy> ionScriptLabels_;
 

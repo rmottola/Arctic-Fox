@@ -38,7 +38,7 @@ namespace workers {
 namespace cache {
 
 class CacheStorageChild;
-class Feature;
+class CacheWorkerHolder;
 
 class CacheStorage final : public nsIIPCBackgroundChildCreateCallback
                          , public nsWrapperCache
@@ -92,12 +92,13 @@ public:
   virtual void AssertOwningThread() const override;
 #endif
 
-  virtual CachePushStreamChild*
-  CreatePushStream(nsIAsyncInputStream* aStream) override;
+  virtual mozilla::ipc::PBackgroundChild*
+  GetIPCManager() override;
 
 private:
   CacheStorage(Namespace aNamespace, nsIGlobalObject* aGlobal,
-               const mozilla::ipc::PrincipalInfo& aPrincipalInfo, Feature* aFeature);
+               const mozilla::ipc::PrincipalInfo& aPrincipalInfo,
+               CacheWorkerHolder* aWorkerHolder);
   explicit CacheStorage(nsresult aFailureResult);
   ~CacheStorage();
 
@@ -106,7 +107,7 @@ private:
   const Namespace mNamespace;
   nsCOMPtr<nsIGlobalObject> mGlobal;
   UniquePtr<mozilla::ipc::PrincipalInfo> mPrincipalInfo;
-  RefPtr<Feature> mFeature;
+  RefPtr<CacheWorkerHolder> mWorkerHolder;
 
   // weak ref cleared in DestroyInternal
   CacheStorageChild* mActor;

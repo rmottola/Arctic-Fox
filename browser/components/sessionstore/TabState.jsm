@@ -9,19 +9,13 @@ this.EXPORTED_SYMBOLS = ["TabState"];
 const Cu = Components.utils;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm", this);
-Cu.import("resource://gre/modules/Promise.jsm", this);
-Cu.import("resource://gre/modules/Task.jsm", this);
 
-XPCOMUtils.defineLazyModuleGetter(this, "console",
-  "resource://gre/modules/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivacyFilter",
   "resource:///modules/sessionstore/PrivacyFilter.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TabStateCache",
   "resource:///modules/sessionstore/TabStateCache.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "TabAttributes",
   "resource:///modules/sessionstore/TabAttributes.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "Utils",
-  "resource:///modules/sessionstore/Utils.jsm");
 
 /**
  * Module that contains tab state collection methods.
@@ -129,12 +123,17 @@ var TabStateInternal = {
     }
 
     // If there is a userTypedValue set, then either the user has typed something
-    // in the URL bar, or a new tab was opened with a URI to load. userTypedClear
-    // is used to indicate whether the tab was in some sort of loading state with
-    // userTypedValue.
+    // in the URL bar, or a new tab was opened with a URI to load.
+    // If so, we also track whether we were still in the process of loading something.
     if (!("userTypedValue" in tabData) && browser.userTypedValue) {
       tabData.userTypedValue = browser.userTypedValue;
-      tabData.userTypedClear = browser.userTypedClear;
+      // We always used to keep track of the loading state as an integer, where
+      // '0' indicated the user had typed since the last load (or no load was
+      // ongoing), and any positive value indicated we had started a load since
+      // the last time the user typed in the URL bar. Mimic this to keep the
+      // session store representation in sync, even though we now represent this
+      // more explicitly:
+      tabData.userTypedClear = browser.didStartLoadSinceLastUserTyping() ? 1 : 0;
     }
 
     return tabData;
@@ -158,7 +157,7 @@ var TabStateInternal = {
 
     // The caller may explicitly request to omit privacy checks.
     let includePrivateData = options && options.includePrivateData;
-    let isPinned = tabData.pinned || false;
+    let isPinned = !!tabData.pinned;
 
     for (let key of Object.keys(data)) {
       let value = data[key];

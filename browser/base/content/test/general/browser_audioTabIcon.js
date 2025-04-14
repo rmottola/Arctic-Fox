@@ -1,14 +1,19 @@
 const PAGE = "https://example.com/browser/browser/base/content/test/general/file_mediaPlayback.html";
 
 function* wait_for_tab_playing_event(tab, expectPlaying) {
-  yield BrowserTestUtils.waitForEvent(tab, "TabAttrModified", false, (event) => {
-    if (event.detail.changed.indexOf("soundplaying") >= 0) {
-      is(tab.hasAttribute("soundplaying"), expectPlaying, "The tab should " + (expectPlaying ? "" : "not ") + "be playing");
-      is(tab.soundPlaying, expectPlaying, "The tab should " + (expectPlaying ? "" : "not ") + "be playing");
-      return true;
-    }
-    return false;
-  });
+  if (tab.soundPlaying == expectPlaying) {
+    ok(true, "The tab should " + (expectPlaying ? "" : "not ") + "be playing");
+    return true;
+  } else {
+    yield BrowserTestUtils.waitForEvent(tab, "TabAttrModified", false, (event) => {
+      if (event.detail.changed.indexOf("soundplaying") >= 0) {
+        is(tab.hasAttribute("soundplaying"), expectPlaying, "The tab should " + (expectPlaying ? "" : "not ") + "be playing");
+        is(tab.soundPlaying, expectPlaying, "The tab should " + (expectPlaying ? "" : "not ") + "be playing");
+        return true;
+      }
+      return false;
+    });
+  }
 }
 
 function disable_non_test_mouse(disable) {
@@ -108,6 +113,19 @@ function* test_muting_using_menu(tab, expectMuted) {
   let toggleMute = document.getElementById("context_toggleMuteTab");
   is(toggleMute.label, expectedLabel, "Correct label expected");
   is(toggleMute.accessKey, "M", "Correct accessKey expected");
+
+  is(toggleMute.hasAttribute("muted"), expectMuted, "Should have the correct state for the muted attribute");
+  ok(!toggleMute.hasAttribute("soundplaying"), "Should not have the soundplaying attribute");
+
+  yield play(tab);
+
+  is(toggleMute.hasAttribute("muted"), expectMuted, "Should have the correct state for the muted attribute");
+  ok(toggleMute.hasAttribute("soundplaying"), "Should have the soundplaying attribute");
+
+  yield pause(tab);
+
+  is(toggleMute.hasAttribute("muted"), expectMuted, "Should have the correct state for the muted attribute");
+  ok(!toggleMute.hasAttribute("soundplaying"), "Should not have the soundplaying attribute");
 
   // Click on the menu and wait for the tab to be muted.
   let mutedPromise = get_wait_for_mute_promise(tab, !expectMuted);

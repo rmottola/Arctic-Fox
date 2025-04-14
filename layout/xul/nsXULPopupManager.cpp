@@ -524,6 +524,14 @@ nsXULPopupManager::PopupResized(nsIFrame* aFrame, LayoutDeviceIntSize aSize)
   if (curDevSize.width == aSize.width && curDevSize.height == aSize.height)
     return;
 
+  nsIContent* popup = menuPopupFrame->GetContent();
+
+  // Only set the width and height if the popup already has these attributes.
+  if (!popup->HasAttr(kNameSpaceID_None, nsGkAtoms::width) ||
+      !popup->HasAttr(kNameSpaceID_None, nsGkAtoms::height)) {
+    return;
+  }
+
   // The size is different. Convert the actual size to css pixels and store it
   // as 'width' and 'height' attributes on the popup.
   nsPresContext* presContext = menuPopupFrame->PresContext();
@@ -531,7 +539,6 @@ nsXULPopupManager::PopupResized(nsIFrame* aFrame, LayoutDeviceIntSize aSize)
   CSSIntSize newCSS(presContext->DevPixelsToIntCSSPixels(aSize.width),
                     presContext->DevPixelsToIntCSSPixels(aSize.height));
 
-  nsIContent* popup = menuPopupFrame->GetContent();
   nsAutoString width, height;
   width.AppendInt(newCSS.width);
   height.AppendInt(newCSS.height);
@@ -2566,6 +2573,12 @@ nsXULPopupManager::KeyDown(nsIDOMKeyEvent* aKeyEvent)
   if (!mActiveMenuBar && (!item || item->PopupType() != ePopupTypeMenu))
     return NS_OK;
 
+  // Since a menu was open, stop propagation of the event to keep other event
+  // listeners from becoming confused.
+  if (!item || item->IgnoreKeys() != eIgnoreKeys_Handled) {
+    aKeyEvent->AsEvent()->StopPropagation();
+  }
+
   int32_t menuAccessKey = -1;
 
   // If the key just pressed is the access key (usually Alt),
@@ -2596,17 +2609,13 @@ nsXULPopupManager::KeyDown(nsIDOMKeyEvent* aKeyEvent)
           Rollup(0, false, nullptr, nullptr);
         else if (mActiveMenuBar)
           mActiveMenuBar->MenuClosed();
+
+        // Clear the item to avoid bugs as it may have been deleted during rollup.
+        item = nullptr; 
       }
       aKeyEvent->AsEvent()->StopPropagation();
       aKeyEvent->AsEvent()->PreventDefault();
     }
-  }
-
-  // Since a menu was open, stop propagation of the event to keep other event
-  // listeners from becoming confused.
-
-  if (!item || item->IgnoreKeys() != eIgnoreKeys_Handled) {
-    aKeyEvent->AsEvent()->StopPropagation();
   }
 
   aKeyEvent->AsEvent()->StopCrossProcessForwarding();

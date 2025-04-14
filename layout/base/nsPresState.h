@@ -33,7 +33,7 @@ public:
     mScrollState = aState;
   }
 
-  nsPoint GetScrollState() const
+  nsPoint GetScrollPosition() const
   {
     return mScrollState;
   }

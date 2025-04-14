@@ -78,7 +78,6 @@ public:
 
   AsyncPanZoomController* GetApzc() const;
   AsyncPanZoomController* GetNearestContainingApzc() const;
-  AsyncPanZoomController* GetNearestContainingApzcWithSameLayersId() const;
   bool IsPrimaryHolder() const;
   uint64_t GetLayersId() const;
 
@@ -99,6 +98,11 @@ public:
   bool MatchesScrollDragMetrics(const AsyncDragMetrics& aDragMetrics) const;
   int32_t GetScrollSize() const;
   bool IsScrollbarNode() const;
+
+  /* Fixed pos info */
+
+  void SetFixedPosData(FrameMetrics::ViewID aFixedPosTarget);
+  FrameMetrics::ViewID GetFixedPosTarget() const;
 
   /* Convert aPoint into the LayerPixel space for the layer corresponding to
    * this node. */
@@ -128,6 +132,8 @@ private:
   Layer::ScrollDirection mScrollDir;
   int32_t mScrollSize;
   bool mIsScrollbarContainer;
+
+  FrameMetrics::ViewID mFixedPosTarget;
 
   /* Let {L,M} be the {layer, scrollable metrics} pair that this node
    * corresponds to in the layer tree. mEventRegions contains the event regions

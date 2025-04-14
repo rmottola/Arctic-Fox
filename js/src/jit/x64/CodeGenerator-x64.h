@@ -27,9 +27,17 @@ class CodeGeneratorX64 : public CodeGeneratorX86Shared
                            Operand dest, MIRType slotType);
     void memoryBarrier(MemoryBarrierBits barrier);
 
+    void load(Scalar::Type type, const Operand& srcAddr, AnyRegister out);
+    void loadI64(Scalar::Type type, const Operand& srcAddr, AnyRegister out);
+    void visitWasmLoadBase(const MWasmLoad* mir, const LAllocation* ptr, const LDefinition* output,
+                           bool isInt64);
+
+    void store(Scalar::Type type, const LAllocation* value, const Operand& dstAddr);
+
     void loadSimd(Scalar::Type type, unsigned numElems, const Operand& srcAddr, FloatRegister out);
-    void emitSimdLoad(LAsmJSLoadHeap* ins);
     void storeSimd(Scalar::Type type, unsigned numElems, FloatRegister in, const Operand& dstAddr);
+
+    void emitSimdLoad(LAsmJSLoadHeap* ins);
     void emitSimdStore(LAsmJSStoreHeap* ins);
   public:
     CodeGeneratorX64(MIRGenerator* gen, LIRGraph* graph, MacroAssembler* masm);
@@ -52,6 +60,10 @@ class CodeGeneratorX64 : public CodeGeneratorX86Shared
     void visitMulI64(LMulI64* lir);
     void visitDivOrModI64(LDivOrModI64* lir);
     void visitUDivOrMod64(LUDivOrMod64* lir);
+    void visitNotI64(LNotI64* lir);
+    void visitClzI64(LClzI64* lir);
+    void visitCtzI64(LCtzI64* lir);
+    void visitPopcntI64(LPopcntI64* lir);
     void visitTruncateDToInt32(LTruncateDToInt32* ins);
     void visitTruncateFToInt32(LTruncateFToInt32* ins);
     void visitWrapInt64ToInt32(LWrapInt64ToInt32* lir);
@@ -60,6 +72,11 @@ class CodeGeneratorX64 : public CodeGeneratorX86Shared
     void visitInt64ToFloatingPoint(LInt64ToFloatingPoint* lir);
     void visitLoadTypedArrayElementStatic(LLoadTypedArrayElementStatic* ins);
     void visitStoreTypedArrayElementStatic(LStoreTypedArrayElementStatic* ins);
+    void visitWasmLoad(LWasmLoad* ins);
+    void visitWasmLoadI64(LWasmLoadI64* ins);
+    void visitWasmStore(LWasmStore* ins);
+    void visitWasmLoadGlobalVar(LWasmLoadGlobalVar* ins);
+    void visitWasmStoreGlobalVar(LWasmStoreGlobalVar* ins);
     void visitAsmSelectI64(LAsmSelectI64* ins);
     void visitAsmJSCall(LAsmJSCall* ins);
     void visitAsmJSLoadHeap(LAsmJSLoadHeap* ins);
@@ -68,14 +85,11 @@ class CodeGeneratorX64 : public CodeGeneratorX86Shared
     void visitAsmJSAtomicExchangeHeap(LAsmJSAtomicExchangeHeap* ins);
     void visitAsmJSAtomicBinopHeap(LAsmJSAtomicBinopHeap* ins);
     void visitAsmJSAtomicBinopHeapForEffect(LAsmJSAtomicBinopHeapForEffect* ins);
-    void visitAsmJSLoadGlobalVar(LAsmJSLoadGlobalVar* ins);
-    void visitAsmJSStoreGlobalVar(LAsmJSStoreGlobalVar* ins);
-    void visitAsmJSLoadFuncPtr(LAsmJSLoadFuncPtr* ins);
-    void visitAsmJSLoadFFIFunc(LAsmJSLoadFFIFunc* ins);
     void visitAsmJSUInt32ToDouble(LAsmJSUInt32ToDouble* lir);
     void visitAsmJSUInt32ToFloat32(LAsmJSUInt32ToFloat32* lir);
     void visitAsmReinterpretFromI64(LAsmReinterpretFromI64* lir);
     void visitAsmReinterpretToI64(LAsmReinterpretToI64* lir);
+    void visitTestI64AndBranch(LTestI64AndBranch* lir);
 
     void visitWasmTruncateToInt32(LWasmTruncateToInt32* lir);
 };

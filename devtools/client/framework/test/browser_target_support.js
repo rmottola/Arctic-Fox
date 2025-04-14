@@ -6,9 +6,7 @@
 // Test support methods on Target, such as `hasActor`, `getActorDescription`,
 // `actorHasMethod` and `getTrait`.
 
-let { Task } =
-  Cu.import("resource://gre/modules/Task.jsm", {});
-let { WebAudioFront } =
+var { WebAudioFront } =
   require("devtools/server/actors/webaudio");
 
 function* testTarget (client, target) {

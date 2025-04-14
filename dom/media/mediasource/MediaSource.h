@@ -30,11 +30,6 @@ namespace mozilla {
 class ErrorResult;
 template <typename T> class AsyncEventRunner;
 
-enum MSRangeRemovalAction: uint8_t {
-  RUN = 0,
-  SKIP = 1
-};
-
 namespace dom {
 
 class GlobalObject;
@@ -70,12 +65,13 @@ public:
   void ClearLiveSeekableRange(ErrorResult& aRv);
 
   static bool IsTypeSupported(const GlobalObject&, const nsAString& aType);
+  static nsresult IsTypeSupported(const nsAString& aType, DecoderDoctorDiagnostics* aDiagnostics);
 
   static bool Enabled(JSContext* cx, JSObject* aGlobal);
 
   IMPL_EVENT_HANDLER(sourceopen);
   IMPL_EVENT_HANDLER(sourceended);
-  IMPL_EVENT_HANDLER(sourceclosed)
+  IMPL_EVENT_HANDLER(sourceclosed);
 
   /** End WebIDL Methods. */
 
@@ -116,9 +112,6 @@ public:
   }
 
 private:
-  // MediaSourceDecoder uses DurationChange to set the duration
-  // without hitting the checks in SetDuration.
-  friend class mozilla::MediaSourceDecoder;
   // SourceBuffer uses SetDuration and SourceBufferIsActive
   friend class mozilla::dom::SourceBuffer;
 
@@ -130,10 +123,10 @@ private:
   void DispatchSimpleEvent(const char* aName);
   void QueueAsyncSimpleEvent(const char* aName);
 
-  void DurationChange(double aOldDuration, double aNewDuration);
+  void DurationChange(double aNewDuration, ErrorResult& aRv);
 
   // SetDuration with no checks.
-  void SetDuration(double aDuration, MSRangeRemovalAction aAction);
+  void SetDuration(double aDuration);
 
   // Mark SourceBuffer as active and rebuild ActiveSourceBuffers.
   void SourceBufferIsActive(SourceBuffer* aSourceBuffer);
@@ -149,7 +142,7 @@ private:
   RefPtr<nsIPrincipal> mPrincipal;
 
   MediaSourceReadyState mReadyState;
-  
+
   Maybe<media::TimeInterval> mLiveSeekableRange;
 };
 

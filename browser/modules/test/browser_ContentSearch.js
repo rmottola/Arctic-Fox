@@ -283,35 +283,32 @@ function addTab() {
   return deferred.promise;
 }
 
-function currentStateObj() {
-  return Task.spawn(function* () {
-    let state = {
-      engines: [],
-      currentEngine: yield currentEngineObj(),
-    };
-    for (let engine of Services.search.getVisibleEngines()) {
-      let uri = engine.getIconURLBySize(16, 16);
-      state.engines.push({
-        name: engine.name,
-        iconBuffer: yield arrayBufferFromDataURI(uri),
-      });
-    }
-    return state;
-  }.bind(this));
-}
-
-function currentEngineObj() {
-  return Task.spawn(function* () {
-    let engine = Services.search.currentEngine;
-    let uri1x = engine.getIconURLBySize(65, 26);
-    let uri2x = engine.getIconURLBySize(130, 52);
-    return {
+var currentStateObj = Task.async(function* () {
+  let state = {
+    engines: [],
+    currentEngine: yield currentEngineObj(),
+  };
+  for (let engine of Services.search.getVisibleEngines()) {
+    let uri = engine.getIconURLBySize(16, 16);
+    state.engines.push({
       name: engine.name,
-      logoBuffer: yield arrayBufferFromDataURI(uri1x),
-      logo2xBuffer: yield arrayBufferFromDataURI(uri2x),
-    };
-  }.bind(this));
-}
+      iconBuffer: yield arrayBufferFromDataURI(uri),
+      hidden: false,
+    });
+  }
+  return state;
+});
+
+var currentEngineObj = Task.async(function* () {
+  let engine = Services.search.currentEngine;
+  let uriFavicon = engine.getIconURLBySize(16, 16);
+  let bundle = Services.strings.createBundle("chrome://global/locale/autocomplete.properties");
+  return {
+    name: engine.name,
+    placeholder: bundle.formatStringFromName("searchWithEngine", [engine.name], 1),
+    iconBuffer: yield arrayBufferFromDataURI(uriFavicon),
+  };
+});
 
 function arrayBufferFromDataURI(uri) {
   if (!uri) {
@@ -325,6 +322,11 @@ function arrayBufferFromDataURI(uri) {
   xhr.onloadend = () => {
     deferred.resolve(xhr.response);
   };
-  xhr.send();
+  try {
+    xhr.send();
+  }
+  catch (err) {
+    return Promise.resolve(null);
+  }
   return deferred.promise;
 }

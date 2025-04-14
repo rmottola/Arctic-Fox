@@ -266,8 +266,7 @@ void MediaOmxReader::HandleResourceAllocated()
 
   if (mLastParserDuration >= 0) {
     // Prefer the parser duration if we have it.
-    ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-    mDecoder->SetMediaDuration(mLastParserDuration);
+    mInfo.mMetadataDuration = Some(TimeUnit::FromMicroseconds(mLastParserDuration));
   } else {
     // MP3 parser failed to find a duration.
     // Set the total duration (the max of the audio and video track).
@@ -381,9 +380,8 @@ bool MediaOmxReader::DecodeVideoFrame(bool &aKeyframeSkip,
       picture.height = (frame.Y.mHeight * mPicture.height) / mInitialFrame.height;
     }
 
-    MOZ_ASSERT(mStreamSource);
     // This is the approximate byte position in the stream.
-    int64_t pos = mStreamSource->Tell();
+    int64_t pos = mStreamSource ? mStreamSource->Tell() : 0;
 
     RefPtr<VideoData> v;
     if (!frame.mGraphicBuffer) {
@@ -496,9 +494,8 @@ bool MediaOmxReader::DecodeAudioData()
   MOZ_ASSERT(OnTaskQueue());
   EnsureActive();
 
-  MOZ_ASSERT(mStreamSource);
   // This is the approximate byte position in the stream.
-  int64_t pos = mStreamSource->Tell();
+  int64_t pos = mStreamSource ? mStreamSource->Tell() : 0;
 
   // Read next frame
   MPAPI::AudioFrame source;
@@ -542,7 +539,7 @@ MediaOmxReader::Seek(SeekTarget aTarget, int64_t aEndTime)
     // stream to the preceeding keyframe first, get the stream time, and then
     // seek the audio stream to match the video stream's time. Otherwise, the
     // audio and video streams won't be in sync after the seek.
-    mVideoSeekTimeUs = aTarget.mTime;
+    mVideoSeekTimeUs = aTarget.GetTime().ToMicroseconds();
 
     RefPtr<MediaOmxReader> self = this;
     mSeekRequest.Begin(DecodeToFirstVideoData()->Then(OwnerThread(), __func__, [self] (MediaData* v) {
@@ -555,7 +552,7 @@ MediaOmxReader::Seek(SeekTarget aTarget, int64_t aEndTime)
       self->mSeekPromise.Resolve(aTarget.GetTime(), __func__);
     }));
   } else {
-    mAudioSeekTimeUs = mVideoSeekTimeUs = GetTime().ToMicroseconds();
+    mAudioSeekTimeUs = mVideoSeekTimeUs = aTarget.GetTime().ToMicroseconds();
     mSeekPromise.Resolve(aTarget.GetTime(), __func__);
   }
 

@@ -44,7 +44,7 @@ const PREF_SUGGEST_HISTORY =        [ "suggest.history",        true ];
 const PREF_SUGGEST_BOOKMARK =       [ "suggest.bookmark",       true ];
 const PREF_SUGGEST_OPENPAGE =       [ "suggest.openpage",       true ];
 const PREF_SUGGEST_HISTORY_ONLYTYPED = [ "suggest.history.onlyTyped", false ];
-const PREF_SUGGEST_SEARCHES =       [ "suggest.searches",       true ];
+const PREF_SUGGEST_SEARCHES =       [ "suggest.searches",       false ];
 
 const PREF_MAX_CHARS_FOR_SUGGEST =  [ "maxCharsForSearchSuggestions", 20];
 
@@ -263,6 +263,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "Task",
                                   "resource://gre/modules/Task.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PlacesSearchAutocompleteProvider",
                                   "resource://gre/modules/PlacesSearchAutocompleteProvider.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PlacesRemoteTabsAutocompleteProvider",
+                                  "resource://gre/modules/PlacesRemoteTabsAutocompleteProvider.jsm");
 
 XPCOMUtils.defineLazyServiceGetter(this, "textURIService",
                                    "@mozilla.org/intl/texttosuburi;1",
@@ -580,9 +582,47 @@ function stripHttpAndTrim(spec) {
  * @return String representation of the built moz-action: URL
  */
 function makeActionURL(action, params) {
-  let url = "moz-action:" + action + "," + JSON.stringify(params);
-  // Make a nsIURI out of this to ensure it's encoded properly.
-  return NetUtil.newURI(url).spec;
+  let encodedParams = {};
+  for (let key in params) {
+    encodedParams[key] = encodeURIComponent(params[key]);
+  }
+  return "moz-action:" + action + "," + JSON.stringify(encodedParams);
+}
+
+/**
+ * Returns the key to be used for a URL in a map for the purposes of removing
+ * duplicate entries - any 2 URLs that should be considered the same should
+ * return the same key. For some moz-action URLs this will unwrap the params
+ * and return a key based on the wrapped URL.
+ */
+function makeKeyForURL(actionUrl) {
+  // At this stage we only consider moz-action URLs.
+  if (!actionUrl.startsWith("moz-action:")) {
+    return stripHttpAndTrim(actionUrl);
+  }
+  let [, type, params] = actionUrl.match(/^moz-action:([^,]+),(.*)$/);
+  try {
+    params = JSON.parse(params);
+  } catch (ex) {
+    // This is unexpected in this context, so just return the input.
+    return stripHttpAndTrim(actionUrl);
+  }
+  // For now we only handle these 2 action types and treat them as the same.
+  switch (type) {
+    case "remotetab":
+    case "switchtab":
+      if (params.url) {
+        return "moz-action:tab:" + stripHttpAndTrim(params.url);
+      }
+      break;
+      // TODO (bug 1222435) - "switchtab" should be handled as an "autofill"
+      // entry.
+    default:
+      // do nothing.
+      // TODO (bug 1222436) - extend this method so it can be used instead of
+      // the |placeId| that's also used to remove duplicate entries.
+  }
+  return stripHttpAndTrim(actionUrl);
 }
 
 /**
@@ -871,9 +911,11 @@ Search.prototype = {
     if (!this.pending)
       return;
 
-    yield this._matchSearchSuggestions();
-    if (!this.pending)
-      return;
+    if (this._enableActions) {
+      yield this._matchSearchSuggestions();
+      if (!this.pending)
+        return;
+    }
 
     for (let [query, params] of queries) {
       yield conn.executeCached(query, params, this._onResultRow.bind(this));
@@ -1196,6 +1238,35 @@ Search.prototype = {
     });
   },
 
+  *_matchRemoteTabs() {
+    let matches = yield PlacesRemoteTabsAutocompleteProvider.getMatches(this._originalSearchString);
+    for (let {url, title, icon, deviceClass, deviceName} of matches) {
+      // It's rare that Sync supplies the icon for the page (but if it does, it
+      // is a string URL)
+      if (!icon) {
+        try {
+          let favicon = yield PlacesUtils.promiseFaviconLinkUrl(url);
+          if (favicon) {
+            icon = favicon.spec;
+          }
+        } catch (ex) {} // no favicon for this URL.
+      }
+
+      let match = {
+        // We include the deviceName in the action URL so we can render it in
+        // the URLBar.
+        value: makeActionURL("remotetab", { url, deviceName }),
+        comment: title || url,
+        style: "action",
+        // we want frecency > FRECENCY_DEFAULT so it doesn't get pushed out
+        // by "remote" matches.
+        frecency: FRECENCY_DEFAULT + 1,
+        icon,
+      }
+      this._addMatch(match);
+    }
+  },
+
   // TODO (bug 1054814): Use visited URLs to inform which scheme to use, if the
   // scheme isn't specificed.
   _matchUnknownUrl: function* () {
@@ -1236,14 +1307,22 @@ Search.prototype = {
       return false;
     }
 
+    // getFixupURIInfo() escaped the URI, so it may not be pretty.  Embed the
+    // escaped URL in the action URI since that URL should be "canonical".  But
+    // pass the pretty, unescaped URL as the match comment, since it's likely
+    // to be displayed to the user, and in any case the front-end should not
+    // rely on it being canonical.
+    let escapedURL = uri.spec;
+    let displayURL = textURIService.unEscapeURIForUI("UTF-8", uri.spec);
+
     let value = makeActionURL("visiturl", {
-      url: uri.spec,
+      url: escapedURL,
       input: this._originalSearchString,
     });
 
     let match = {
       value: value,
-      comment: uri.spec,
+      comment: displayURL,
       style: "action visiturl",
       frecency: 0,
     };
@@ -1315,7 +1394,7 @@ Search.prototype = {
       return;
 
     // Must check both id and url, cause keywords dynamically modify the url.
-    let urlMapKey = stripHttpAndTrim(match.value);
+    let urlMapKey = makeKeyForURL(match.value);
     if ((match.placeId && this._usedPlaceIds.has(match.placeId)) ||
         this._usedURLs.has(urlMapKey)) {
       return;
@@ -1338,7 +1417,11 @@ Search.prototype = {
       this._maybeRestyleSearchMatch(match);
     }
 
-    match.icon = match.icon || PlacesUtils.favicons.defaultFavicon.spec;
+    if (this._addingHeuristicFirstMatch) {
+      match.style += " heuristic";
+    }
+
+    match.icon = match.icon || "";
     match.finalCompleteValue = match.finalCompleteValue || "";
 
     this._result.insertMatchAt(this._getInsertIndexForMatch(match),
@@ -1620,7 +1703,7 @@ Search.prototype = {
     if (!Prefs.autofill)
       return false;
 
-    if (!this._searchTokens.length == 1)
+    if (this._searchTokens.length != 1)
       return false;
 
     // autoFill can only cope with history or bookmarks entries.
@@ -1865,6 +1948,8 @@ UnifiedComplete.prototype = {
     TelemetryStopwatch.cancel(TELEMETRY_6_FIRST_RESULTS, this);
     // Clear state now to avoid race conditions, see below.
     let search = this._currentSearch;
+    if (!search)
+      return;
     this._lastLowResultsSearchSuggestion = search._lastLowResultsSearchSuggestion;
     delete this._currentSearch;
 

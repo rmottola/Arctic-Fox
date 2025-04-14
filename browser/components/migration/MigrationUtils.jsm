@@ -19,6 +19,10 @@ XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils",
                                   "resource://gre/modules/PlacesUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "BookmarkHTMLUtils",
                                   "resource://gre/modules/BookmarkHTMLUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "PromiseUtils",
+                                  "resource://gre/modules/PromiseUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "AutoMigrate",
+                                  "resource:///modules/AutoMigrate.jsm");
 
 var gMigrators = null;
 var gProfileStartup = null;
@@ -46,40 +50,6 @@ function getMigrationBundle() {
      "chrome://browser/locale/migration/migration.properties");
   }
   return gMigrationBundle;
-}
-
-/**
- * Figure out what is the default browser, and if there is a migrator
- * for it, return that migrator's internal name.
- * For the time being, the "internal name" of a migrator is its contract-id
- * trailer (e.g. ie for @mozilla.org/profile/migrator;1?app=browser&type=ie),
- * but it will soon be exposed properly.
- */
-function getMigratorKeyForDefaultBrowser() {
-  // Canary uses the same description as Chrome so we can't distinguish them.
-  const APP_DESC_TO_KEY = {
-    "Internet Explorer":                 "ie",
-    "Safari":                            "safari",
-    "Firefox":                           "firefox",
-    "Google Chrome":                     "chrome",  // Windows, Linux
-    "Chrome":                            "chrome",  // OS X
-    "Chromium":                          "chromium", // Windows, OS X
-    "Chromium Web Browser":              "chromium", // Linux
-    "360\u5b89\u5168\u6d4f\u89c8\u5668": "360se",
-  };
-
-  let browserDesc = "";
-  try {
-    let browserDesc =
-      Cc["@mozilla.org/uriloader/external-protocol-service;1"].
-      getService(Ci.nsIExternalProtocolService).
-      getApplicationDescription("http");
-    return APP_DESC_TO_KEY[browserDesc] || "";
-  }
-  catch(ex) {
-    Cu.reportError("Could not detect default browser: " + ex);
-  }
-  return "";
 }
 
 /**
@@ -127,7 +97,7 @@ this.MigratorPrototype = {
    * profiles.
    *
    * Each migration resource should provide:
-   * - a |type| getter, retunring any of the migration types (see
+   * - a |type| getter, returning any of the migration types (see
    *   nsIBrowserProfileMigrator).
    *
    * - a |migrate| method, taking a single argument, aCallback(bool success),
@@ -227,16 +197,21 @@ this.MigratorPrototype = {
     if (aItems != Ci.nsIBrowserProfileMigrator.ALL)
       resources = resources.filter(r => aItems & r.type);
 
+    // Used to periodically give back control to the main-thread loop.
+    let unblockMainThread = function () {
+      return new Promise(resolve => {
+        Services.tm.mainThread.dispatch(resolve, Ci.nsIThread.DISPATCH_NORMAL);
+      });
+    };
+
     // Called either directly or through the bookmarks import callback.
-    function doMigrate() {
-      // TODO: use Map (for the items) and Set (for the resources)
-      // once they are iterable.
+    let doMigrate = Task.async(function*() {
       let resourcesGroupedByItems = new Map();
       resources.forEach(function(resource) {
-        if (resourcesGroupedByItems.has(resource.type))
-          resourcesGroupedByItems.get(resource.type).push(resource);
-        else
-          resourcesGroupedByItems.set(resource.type, [resource]);
+        if (!resourcesGroupedByItems.has(resource.type)) {
+          resourcesGroupedByItems.set(resource.type, new Set());
+        }
+        resourcesGroupedByItems.get(resource.type).add(resource)
       });
 
       if (resourcesGroupedByItems.size == 0)
@@ -248,44 +223,52 @@ this.MigratorPrototype = {
 
       notify("Migration:Started");
       for (let [key, value] of resourcesGroupedByItems) {
-        // TODO: (bug 449811).
+        // Workaround bug 449811.
         let migrationType = key, itemResources = value;
 
         notify("Migration:ItemBeforeMigrate", migrationType);
 
         let itemSuccess = false;
         for (let res of itemResources) {
+          // Workaround bug 449811.
           let resource = res;
+          let completeDeferred = PromiseUtils.defer();
           let resourceDone = function(aSuccess) {
-            let resourceIndex = itemResources.indexOf(resource);
-            if (resourceIndex != -1) {
-              itemResources.splice(resourceIndex, 1);
-              itemSuccess |= aSuccess;
-              if (itemResources.length == 0) {
-                resourcesGroupedByItems.delete(migrationType);
-                notify(itemSuccess ?
-                       "Migration:ItemAfterMigrate" : "Migration:ItemError",
-                       migrationType);
-                if (resourcesGroupedByItems.size == 0)
-                  notify("Migration:Ended");
+            itemResources.delete(resource);
+            itemSuccess |= aSuccess;
+            if (itemResources.size == 0) {
+              notify(itemSuccess ?
+                     "Migration:ItemAfterMigrate" : "Migration:ItemError",
+                     migrationType);
+              resourcesGroupedByItems.delete(migrationType);
+              if (resourcesGroupedByItems.size == 0) {
+                notify("Migration:Ended");
               }
             }
+            completeDeferred.resolve();
           }
 
-          Services.tm.mainThread.dispatch(function() {
-            // If migrate throws, an error occurred, and the callback
-            // (itemMayBeDone) might haven't been called.
-            try {
-              resource.migrate(resourceDone);
-            }
-            catch(ex) {
-              Cu.reportError(ex);
-              resourceDone(false);
-            }
-          }, Ci.nsIThread.DISPATCH_NORMAL);
+          // If migrate throws, an error occurred, and the callback
+          // (itemMayBeDone) might haven't been called.
+          try {
+            resource.migrate(resourceDone);
+          }
+          catch(ex) {
+            Cu.reportError(ex);
+            resourceDone(false);
+          }
+
+          // Certain resources must be ran sequentially or they could fail,
+          // for example bookmarks and history (See bug 1272652).
+          if (migrationType == MigrationUtils.resourceTypes.BOOKMARKS ||
+              migrationType == MigrationUtils.resourceTypes.HISTORY) {
+            yield completeDeferred.promise;
+          }
+
+          yield unblockMainThread();
         }
       }
-    }
+    });
 
     if (MigrationUtils.isStartupMigration && !this.startupOnlyMigrator) {
       MigrationUtils.profileStartup.doStartup();
@@ -521,6 +504,40 @@ this.MigrationUtils = Object.freeze({
     } catch (ex) { Cu.reportError(ex); return null }
   },
 
+  /**
+   * Figure out what is the default browser, and if there is a migrator
+   * for it, return that migrator's internal name.
+   * For the time being, the "internal name" of a migrator is its contract-id
+   * trailer (e.g. ie for @mozilla.org/profile/migrator;1?app=browser&type=ie),
+   * but it will soon be exposed properly.
+   */
+  getMigratorKeyForDefaultBrowser() {
+    // Canary uses the same description as Chrome so we can't distinguish them.
+    const APP_DESC_TO_KEY = {
+      "Internet Explorer":                 "ie",
+      "Safari":                            "safari",
+      "Firefox":                           "firefox",
+      "Google Chrome":                     "chrome",  // Windows, Linux
+      "Chrome":                            "chrome",  // OS X
+      "Chromium":                          "chromium", // Windows, OS X
+      "Chromium Web Browser":              "chromium", // Linux
+      "360\u5b89\u5168\u6d4f\u89c8\u5668": "360se",
+    };
+
+    let browserDesc = "";
+    try {
+      let browserDesc =
+        Cc["@mozilla.org/uriloader/external-protocol-service;1"].
+        getService(Ci.nsIExternalProtocolService).
+        getApplicationDescription("http");
+      return APP_DESC_TO_KEY[browserDesc] || "";
+    }
+    catch(ex) {
+      Cu.reportError("Could not detect default browser: " + ex);
+    }
+    return "";
+  },
+
   // Whether or not we're in the process of startup migration
   get isStartupMigration() {
     return gProfileStartup != null;
@@ -552,6 +569,7 @@ this.MigrationUtils = Object.freeze({
    *        - {nsIBrowserProfileMigrator} actual migrator object
    *        - {Boolean} whether this is a startup migration
    *        - {Boolean} whether to skip the 'source' page
+   *        - {String} an identifier for the profile to use when migrating
    *        NB: If you add new consumers, please add a migration entry point
    *        constant below, and specify at least the first element of the array
    *        (the migration entry point for purposes of telemetry).
@@ -634,11 +652,13 @@ this.MigrationUtils = Object.freeze({
    *        migrator for it, or with the first option selected as a fallback
    *        (The first option is hardcoded to be the most common browser for
    *         the OS we run on.  See migration.xul).
+   * @param [optional] aProfileToMigrate
+   *        If set, the migration wizard will import from the profile indicated.
    * @throws if aMigratorKey is invalid or if it points to a non-existent
    *         source.
    */
   startupMigration:
-  function MU_startupMigrator(aProfileStartup, aMigratorKey) {
+  function MU_startupMigrator(aProfileStartup, aMigratorKey, aProfileToMigrate) {
     if (!aProfileStartup) {
       throw new Error("a profile-startup instance is required for startup-migration");
     }
@@ -658,7 +678,7 @@ this.MigrationUtils = Object.freeze({
       skipSourcePage = true;
     }
     else {
-      let defaultBrowserKey = getMigratorKeyForDefaultBrowser();
+      let defaultBrowserKey = this.getMigratorKeyForDefaultBrowser();
       if (defaultBrowserKey) {
         migrator = this.getMigrator(defaultBrowserKey);
         if (migrator)
@@ -678,8 +698,21 @@ this.MigrationUtils = Object.freeze({
       }
     }
 
+    let isRefresh = migrator && skipSourcePage &&
+                    migratorKey == AppConstants.MOZ_APP_NAME;
+
+    if (!isRefresh &&
+        Services.prefs.getBoolPref("browser.migration.automigrate")) {
+      try {
+        return AutoMigrate.migrate(aProfileStartup, aMigratorKey, aProfileToMigrate);
+      } catch (ex) {
+        // If automigration failed, continue and show the dialog.
+        Cu.reportError(ex);
+      }
+    }
+
     let migrationEntryPoint = this.MIGRATION_ENTRYPOINT_FIRSTRUN;
-    if (migrator && skipSourcePage && migratorKey == AppConstants.MOZ_APP_NAME) {
+    if (isRefresh) {
       migrationEntryPoint = this.MIGRATION_ENTRYPOINT_FXREFRESH;
     }
 
@@ -688,7 +721,8 @@ this.MigrationUtils = Object.freeze({
       migratorKey,
       migrator,
       aProfileStartup,
-      skipSourcePage
+      skipSourcePage,
+      aProfileToMigrate,
     ];
     this.showMigrationWizard(null, params);
   },
@@ -701,6 +735,8 @@ this.MigrationUtils = Object.freeze({
     gProfileStartup = null;
     gMigrationBundle = null;
   },
+
+  gAvailableMigratorKeys,
 
   MIGRATION_ENTRYPOINT_UNKNOWN: 0,
   MIGRATION_ENTRYPOINT_FIRSTRUN: 1,

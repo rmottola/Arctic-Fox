@@ -103,6 +103,7 @@ nsXULWindow::nsXULWindow(uint32_t aChromeFlags)
     mChromeFlagsFrozen(false),
     mIgnoreXULSizeMode(false),
     mDestroying(false),
+    mRegistered(false),
     mContextFlags(0),
     mPersistentAttributesDirty(0),
     mPersistentAttributesMask(0),
@@ -549,7 +550,7 @@ NS_IMETHODIMP nsXULWindow::Destroy()
     mWindow = nullptr;
   }
 
-  if (!mIsHiddenWindow) {
+  if (!mIsHiddenWindow && mRegistered) {
     /* Inform appstartup we've destroyed this window and it could
        quit now if it wanted. This must happen at least after mDocShell
        is destroyed, because onunload handlers fire then, and those being
@@ -641,7 +642,7 @@ NS_IMETHODIMP nsXULWindow::GetSize(int32_t* aCX, int32_t* aCY)
 }
 
 NS_IMETHODIMP nsXULWindow::SetPositionAndSize(int32_t aX, int32_t aY, 
-   int32_t aCX, int32_t aCY, bool aRepaint)
+   int32_t aCX, int32_t aCY, uint32_t aFlags)
 {
   /* any attempt to set the window's size or position overrides the window's
      zoom state. this is important when these two states are competing while
@@ -653,7 +654,7 @@ NS_IMETHODIMP nsXULWindow::SetPositionAndSize(int32_t aX, int32_t aY,
   DesktopToLayoutDeviceScale scale = mWindow->GetDesktopToDeviceScale();
   DesktopRect rect = LayoutDeviceIntRect(aX, aY, aCX, aCY) / scale;
   nsresult rv = mWindow->Resize(rect.x, rect.y, rect.width, rect.height,
-                                aRepaint);
+                                !!(aFlags & nsIBaseWindow::eRepaint));
   NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
   if (!mChromeLoaded) {
     // If we're called before the chrome is loaded someone obviously wants this
@@ -1815,22 +1816,7 @@ NS_IMETHODIMP nsXULWindow::SizeShellTo(nsIDocShellTreeItem* aShellItem,
   int32_t height = 0;
   shellAsWin->GetSize(&width, &height);
 
-  int32_t widthDelta = aCX - width;
-  int32_t heightDelta = aCY - height;
-
-  if (widthDelta || heightDelta) {
-    int32_t winCX = 0;
-    int32_t winCY = 0;
-
-    GetSize(&winCX, &winCY);
-    // There's no point in trying to make the window smaller than the
-    // desired docshell size --- that's not likely to work. This whole
-    // function assumes that the outer docshell is adding some constant
-    // "border" chrome to aShellItem.
-    winCX = std::max(winCX + widthDelta, aCX);
-    winCY = std::max(winCY + heightDelta, aCY);
-    SetSize(winCX, winCY, true);
-  }
+  SizeShellToWithLimit(aCX, aCY, width, height);
 
   return NS_OK;
 }
@@ -2194,6 +2180,27 @@ NS_IMETHODIMP nsXULWindow::SetXULBrowserWindow(nsIXULBrowserWindow * aXULBrowser
 {
   mXULBrowserWindow = aXULBrowserWindow;
   return NS_OK;
+}
+
+void nsXULWindow::SizeShellToWithLimit(int32_t aCX, int32_t aCY,
+                                       int32_t shellItemCx, int32_t shellItemCy)
+{
+  int32_t widthDelta = aCX - shellItemCx;
+  int32_t heightDelta = aCY - shellItemCy;
+
+  if (widthDelta || heightDelta) {
+    int32_t winCX = 0;
+    int32_t winCY = 0;
+
+    GetSize(&winCX, &winCY);
+    // There's no point in trying to make the window smaller than the
+    // desired docshell size --- that's not likely to work. This whole
+    // function assumes that the outer docshell is adding some constant
+    // "border" chrome to aShellItem.
+    winCX = std::max(winCX + widthDelta, aCX);
+    winCY = std::max(winCY + heightDelta, aCY);
+    SetSize(winCX, winCY, true);
+  }
 }
 
 //*****************************************************************************

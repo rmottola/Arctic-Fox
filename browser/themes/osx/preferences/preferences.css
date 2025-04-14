@@ -39,11 +39,9 @@ radio[pane=paneAdvanced] {
   -moz-image-region: rect(0, 224px, 32px, 192px);
 }
 
-%ifdef MOZ_SERVICES_SYNC
 radio[pane=paneSync] {
   list-style-image: url("chrome://browser/skin/preferences/Options-sync.png") !important;
 }
-%endif
 
 /* Applications Pane */
 #BrowserPreferences[animated="true"] #handlersView {
@@ -125,7 +123,6 @@ html|a.inline-link:-moz-focusring {
   padding-bottom: 4px;
 }
 
-%ifdef MOZ_SERVICES_SYNC
 /* Sync Pane */
 
 #syncDesc {
@@ -145,4 +142,3 @@ html|a.inline-link:-moz-focusring {
   margin-bottom: 1em;
 }
 
-%endif

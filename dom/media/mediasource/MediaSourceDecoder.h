@@ -51,7 +51,7 @@ public:
     mDormantSupported = aSupported;
   }
 
-  RefPtr<ShutdownPromise> Shutdown() override;
+  void Shutdown() override;
 
   static already_AddRefed<MediaResource> CreateResource(nsIPrincipal* aPrincipal = nullptr);
 
@@ -64,8 +64,7 @@ public:
   double GetDuration() override;
 
   void SetInitialDuration(int64_t aDuration);
-  void SetMediaSourceDuration(double aDuration, MSRangeRemovalAction aAction);
-  double GetMediaSourceDuration();
+  void SetMediaSourceDuration(double aDuration);
 
   MediaSourceDemuxer* GetDemuxer()
   {
@@ -83,6 +82,7 @@ public:
 
 private:
   void DoSetMediaSourceDuration(double aDuration);
+  media::TimeInterval ClampIntervalToEnd(const media::TimeInterval& aInterval);
 
   // The owning MediaSource holds a strong reference to this decoder, and
   // calls Attach/DetachMediaSource on this decoder to set and clear

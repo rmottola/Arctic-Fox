@@ -123,8 +123,11 @@ nsGenericHTMLFrameElement::GetContentWindow()
 
   nsCOMPtr<nsIDocShell> doc_shell;
   mFrameLoader->GetDocShell(getter_AddRefs(doc_shell));
+  if (!doc_shell) {
+    return nullptr;
+  }
 
-  nsCOMPtr<nsPIDOMWindowOuter> win = do_GetInterface(doc_shell);
+  nsCOMPtr<nsPIDOMWindowOuter> win = doc_shell->GetWindow();
 
   if (!win) {
     return nullptr;
@@ -589,19 +592,6 @@ nsGenericHTMLFrameElement::GetIsolated(bool *aOut)
 
   // Isolation is only disabled if the attribute is present
   *aOut = !HasAttr(kNameSpaceID_None, nsGkAtoms::noisolation);
-  return NS_OK;
-}
-
-/* [infallible] */ NS_IMETHODIMP
-nsGenericHTMLFrameElement::GetIsExpectingSystemMessage(bool *aOut)
-{
-  *aOut = false;
-
-  if (!nsIMozBrowserFrame::GetReallyIsApp()) {
-    return NS_OK;
-  }
-
-  *aOut = HasAttr(kNameSpaceID_None, nsGkAtoms::expectingSystemMessage);
   return NS_OK;
 }
 

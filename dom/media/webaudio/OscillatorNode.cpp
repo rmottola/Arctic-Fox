@@ -38,8 +38,11 @@ public:
     , mDetune(0.f)
     , mType(OscillatorType::Sine)
     , mPhase(0.)
+    , mFinalFrequency(0.)
+    , mPhaseIncrement(0.)
     , mRecomputeParameters(true)
     , mCustomLength(0)
+    , mCustomDisableNormalization(false)
   {
     MOZ_ASSERT(NS_IsMainThread());
     mBasicWaveFormCache = aDestination->Context()->GetBasicWaveFormCache();
@@ -54,7 +57,8 @@ public:
     FREQUENCY,
     DETUNE,
     TYPE,
-    PERIODICWAVE,
+    PERIODICWAVE_LENGTH,
+    DISABLE_NORMALIZATION,
     START,
     STOP,
   };
@@ -102,6 +106,7 @@ public:
         if (mType == OscillatorType::Sine) {
           // Forget any previous custom data.
           mCustomLength = 0;
+          mCustomDisableNormalization = false;
           mCustom = nullptr;
           mPeriodicWave = nullptr;
           mRecomputeParameters = true;
@@ -122,9 +127,13 @@ public:
         }
         // End type switch.
         break;
-      case PERIODICWAVE:
+      case PERIODICWAVE_LENGTH:
         MOZ_ASSERT(aParam >= 0, "negative custom array length");
         mCustomLength = static_cast<uint32_t>(aParam);
+        break;
+      case DISABLE_NORMALIZATION:
+        MOZ_ASSERT(aParam >= 0, "negative custom array length");
+        mCustomDisableNormalization = static_cast<uint32_t>(aParam);
         break;
       default:
         NS_ERROR("Bad OscillatorNodeEngine Int32Parameter.");
@@ -139,7 +148,10 @@ public:
     MOZ_ASSERT(mCustom->GetChannels() == 2,
                "PeriodicWave should have sent two channels");
     mPeriodicWave = WebCore::PeriodicWave::create(mSource->SampleRate(),
-    mCustom->GetData(0), mCustom->GetData(1), mCustomLength);
+                                                  mCustom->GetData(0),
+                                                  mCustom->GetData(1),
+                                                  mCustomLength,
+                                                  mCustomDisableNormalization);
   }
 
   void IncrementPhase()
@@ -153,14 +165,16 @@ public:
     }
   }
 
-  void UpdateParametersIfNeeded(StreamTime ticks, size_t count)
+  // Returns true if the final frequency (and thus the phase increment) changed,
+  // false otherwise. This allow some optimizations at callsite.
+  bool UpdateParametersIfNeeded(StreamTime ticks, size_t count)
   {
     double frequency, detune;
 
     // Shortcut if frequency-related AudioParam are not automated, and we
     // already have computed the frequency information and related parameters.
     if (!ParametersMayNeedUpdate()) {
-      return;
+      return false;
     }
 
     bool simpleFrequency = mFrequency.HasSimpleValue();
@@ -177,11 +191,17 @@ public:
       detune = mDetune.GetValueAtTime(ticks, count);
     }
 
-    mFinalFrequency = frequency * pow(2., detune / 1200.);
-    float signalPeriod = mSource->SampleRate() / mFinalFrequency;
+    float finalFrequency = frequency * pow(2., detune / 1200.);
+    float signalPeriod = mSource->SampleRate() / finalFrequency;
     mRecomputeParameters = false;
 
     mPhaseIncrement = 2 * M_PI / signalPeriod;
+
+    if (finalFrequency != mFinalFrequency) {
+      mFinalFrequency = finalFrequency;
+      return true;
+    }
+    return false;
   }
 
   void FillBounds(float* output, StreamTime ticks,
@@ -209,6 +229,8 @@ public:
   void ComputeSine(float * aOutput, StreamTime ticks, uint32_t aStart, uint32_t aEnd)
   {
     for (uint32_t i = aStart; i < aEnd; ++i) {
+      // We ignore the return value, changing the frequency has no impact on
+      // performances here.
       UpdateParametersIfNeeded(ticks, i);
 
       aOutput[i] = sin(mPhase);
@@ -243,7 +265,7 @@ public:
     // mPhase runs [0,periodicWaveSize) here instead of [0,2*M_PI).
     float basePhaseIncrement = mPeriodicWave->rateScale();
 
-    UpdateParametersIfNeeded(ticks, aStart);
+    bool needToFetchWaveData = UpdateParametersIfNeeded(ticks, aStart);
 
     bool parametersMayNeedUpdate = ParametersMayNeedUpdate();
     mPeriodicWave->waveDataForFundamentalFrequency(mFinalFrequency,
@@ -253,11 +275,13 @@ public:
 
     for (uint32_t i = aStart; i < aEnd; ++i) {
       if (parametersMayNeedUpdate) {
-        mPeriodicWave->waveDataForFundamentalFrequency(mFinalFrequency,
-                                                       lowerWaveData,
-                                                       higherWaveData,
-                                                       tableInterpolationFactor);
-        UpdateParametersIfNeeded(ticks, i);
+        if (needToFetchWaveData) {
+          mPeriodicWave->waveDataForFundamentalFrequency(mFinalFrequency,
+                                                         lowerWaveData,
+                                                         higherWaveData,
+                                                         tableInterpolationFactor);
+        }
+        needToFetchWaveData = UpdateParametersIfNeeded(ticks, i);
       }
       // Bilinear interpolation between adjacent samples in each table.
       float floorPhase = floorf(mPhase);
@@ -379,6 +403,7 @@ public:
   RefPtr<ThreadSharedFloatArrayBufferList> mCustom;
   RefPtr<BasicWaveFormCache> mBasicWaveFormCache;
   uint32_t mCustomLength;
+  bool mCustomDisableNormalization;
   RefPtr<WebCore::PeriodicWave> mPeriodicWave;
 };
 
@@ -458,8 +483,10 @@ void OscillatorNode::SendPeriodicWaveToStream()
                "Sending custom waveform to engine thread with non-custom type");
   MOZ_ASSERT(mStream, "Missing node stream.");
   MOZ_ASSERT(mPeriodicWave, "Send called without PeriodicWave object.");
-  SendInt32ParameterToStream(OscillatorNodeEngine::PERIODICWAVE,
+  SendInt32ParameterToStream(OscillatorNodeEngine::PERIODICWAVE_LENGTH,
                              mPeriodicWave->DataLength());
+  SendInt32ParameterToStream(OscillatorNodeEngine::DISABLE_NORMALIZATION,
+                             mPeriodicWave->DisableNormalization());
   RefPtr<ThreadSharedFloatArrayBufferList> data =
     mPeriodicWave->GetThreadSharedBuffer();
   mStream->SetBuffer(data.forget());

@@ -629,6 +629,8 @@ ModuleEnvironmentObject*
 ModuleObject::environment() const
 {
     Value value = getReservedSlot(EnvironmentSlot);
+    MOZ_ASSERT(!value.isNull());
+
     if (value.isUndefined())
         return nullptr;
 
@@ -722,35 +724,45 @@ FreezeObjectProperty(JSContext* cx, HandleNativeObject obj, uint32_t slot)
 }
 
 /* static */ bool
-ModuleObject::FreezeArrayProperties(JSContext* cx, HandleModuleObject self)
+ModuleObject::Freeze(JSContext* cx, HandleModuleObject self)
 {
     return FreezeObjectProperty(cx, self, RequestedModulesSlot) &&
            FreezeObjectProperty(cx, self, ImportEntriesSlot) &&
            FreezeObjectProperty(cx, self, LocalExportEntriesSlot) &&
            FreezeObjectProperty(cx, self, IndirectExportEntriesSlot) &&
-           FreezeObjectProperty(cx, self, StarExportEntriesSlot);
+           FreezeObjectProperty(cx, self, StarExportEntriesSlot) &&
+           FreezeObject(cx, self);
 }
 
-static inline void
-AssertObjectPropertyFrozen(JSContext* cx, HandleNativeObject obj, uint32_t slot)
-{
 #ifdef DEBUG
+
+static inline bool
+IsObjectFrozen(JSContext* cx, HandleObject obj)
+{
     bool frozen = false;
-    RootedObject property(cx, &obj->getSlot(slot).toObject());
-    MOZ_ALWAYS_TRUE(TestIntegrityLevel(cx, property, IntegrityLevel::Frozen, &frozen));
-    MOZ_ASSERT(frozen);
-#endif
+    MOZ_ALWAYS_TRUE(TestIntegrityLevel(cx, obj, IntegrityLevel::Frozen, &frozen));
+    return frozen;
 }
 
-/* static */ inline void
-ModuleObject::AssertArrayPropertiesFrozen(JSContext* cx, HandleModuleObject self)
+static inline bool
+IsObjectPropertyFrozen(JSContext* cx, HandleNativeObject obj, uint32_t slot)
 {
-    AssertObjectPropertyFrozen(cx, self, RequestedModulesSlot);
-    AssertObjectPropertyFrozen(cx, self, ImportEntriesSlot);
-    AssertObjectPropertyFrozen(cx, self, LocalExportEntriesSlot);
-    AssertObjectPropertyFrozen(cx, self, IndirectExportEntriesSlot);
-    AssertObjectPropertyFrozen(cx, self, StarExportEntriesSlot);
+    RootedObject property(cx, &obj->getSlot(slot).toObject());
+    return IsObjectFrozen(cx, property);
 }
+
+/* static */ inline bool
+ModuleObject::IsFrozen(JSContext* cx, HandleModuleObject self)
+{
+    return IsObjectPropertyFrozen(cx, self, RequestedModulesSlot) &&
+           IsObjectPropertyFrozen(cx, self, ImportEntriesSlot) &&
+           IsObjectPropertyFrozen(cx, self, LocalExportEntriesSlot) &&
+           IsObjectPropertyFrozen(cx, self, IndirectExportEntriesSlot) &&
+           IsObjectPropertyFrozen(cx, self, StarExportEntriesSlot) &&
+           IsObjectFrozen(cx, self);
+}
+
+#endif
 
 inline static void
 AssertModuleScopesMatch(ModuleObject* module)
@@ -788,6 +800,18 @@ bool
 ModuleObject::evaluated() const
 {
     return getReservedSlot(EvaluatedSlot).toBoolean();
+}
+
+Value
+ModuleObject::hostDefinedField() const
+{
+    return getReservedSlot(HostDefinedSlot);
+}
+
+void
+ModuleObject::setHostDefinedField(JS::Value value)
+{
+    setReservedSlot(HostDefinedSlot, value);
 }
 
 ModuleEnvironmentObject&
@@ -846,7 +870,7 @@ ModuleObject::noteFunctionDeclaration(ExclusiveContext* cx, HandleAtom name, Han
 /* static */ bool
 ModuleObject::instantiateFunctionDeclarations(JSContext* cx, HandleModuleObject self)
 {
-    AssertArrayPropertiesFrozen(cx, self);
+    MOZ_ASSERT(IsFrozen(cx, self));
 
     FunctionDeclarationVector* funDecls = self->functionDeclarations();
     if (!funDecls) {
@@ -884,7 +908,7 @@ ModuleObject::setEvaluated()
 /* static */ bool
 ModuleObject::evaluate(JSContext* cx, HandleModuleObject self, MutableHandleValue rval)
 {
-    AssertArrayPropertiesFrozen(cx, self);
+    MOZ_ASSERT(IsFrozen(cx, self));
 
     RootedScript script(cx, self->script());
     RootedModuleEnvironmentObject scope(cx, self->environment());
@@ -918,6 +942,29 @@ ModuleObject::createNamespace(JSContext* cx, HandleModuleObject self, HandleObje
     self->initReservedSlot(NamespaceExportsSlot, ObjectValue(*exports));
     self->initReservedSlot(NamespaceBindingsSlot, PrivateValue(bindings));
     return ns;
+}
+
+static bool
+InvokeSelfHostedMethod(JSContext* cx, HandleModuleObject self, HandlePropertyName name)
+{
+    RootedValue fval(cx);
+    if (!GlobalObject::getSelfHostedFunction(cx, cx->global(), name, name, 0, &fval))
+        return false;
+
+    RootedValue ignored(cx);
+    return Call(cx, fval, self, &ignored);
+}
+
+/* static */ bool
+ModuleObject::DeclarationInstantiation(JSContext* cx, HandleModuleObject self)
+{
+    return InvokeSelfHostedMethod(cx, self, cx->names().ModuleDeclarationInstantiation);
+}
+
+/* static */ bool
+ModuleObject::Evaluation(JSContext* cx, HandleModuleObject self)
+{
+    return InvokeSelfHostedMethod(cx, self, cx->names().ModuleEvaluation);
 }
 
 DEFINE_GETTER_FUNCTIONS(ModuleObject, namespace_, NamespaceSlot)
@@ -959,15 +1006,6 @@ GlobalObject::initModuleProto(JSContext* cx, Handle<GlobalObject*> global)
 
     global->setReservedSlot(MODULE_PROTO, ObjectValue(*proto));
     return true;
-}
-
-bool
-js::InitModuleClasses(JSContext* cx, HandleObject obj)
-{
-    Rooted<GlobalObject*> global(cx, &obj->as<GlobalObject>());
-    return GlobalObject::initModuleProto(cx, global) &&
-           GlobalObject::initImportEntryProto(cx, global) &&
-           GlobalObject::initExportEntryProto(cx, global);
 }
 
 #undef DEFINE_GETTER_FUNCTIONS

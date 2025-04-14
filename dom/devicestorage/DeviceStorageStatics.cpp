@@ -488,7 +488,7 @@ DeviceStorageStatics::AddListener(nsDOMDeviceStorage* aListener)
   MOZ_ASSERT(sInstance->mInitialized);
   if (sInstance->mListeners.IsEmpty()) {
     NS_DispatchToMainThread(
-      NS_NewRunnableMethod(sInstance.get(), &DeviceStorageStatics::Register));
+      NewRunnableMethod(sInstance.get(), &DeviceStorageStatics::Register));
   }
 
   RefPtr<ListenerWrapper> wrapper =
@@ -519,7 +519,7 @@ DeviceStorageStatics::RemoveListener(nsDOMDeviceStorage* aListener)
 
   if (removed && sInstance->mListeners.IsEmpty()) {
     NS_DispatchToMainThread(
-      NS_NewRunnableMethod(sInstance.get(), &DeviceStorageStatics::Deregister));
+      NewRunnableMethod(sInstance.get(), &DeviceStorageStatics::Deregister));
   }
 }
 
@@ -703,9 +703,9 @@ DeviceStorageStatics::Observe(nsISupports* aSubject,
     // of a file in a specific location while a low device storage situation
     // exists or after recovery of a low storage situation. For Firefox OS,
     // these notifications are specific for apps storage.
-    if (!NS_strcmp(aData, MOZ_UTF16("full"))) {
+    if (!NS_strcmp(aData, u"full")) {
       sInstance->mLowDiskSpace = true;
-    } else if (!NS_strcmp(aData, MOZ_UTF16("free"))) {
+    } else if (!NS_strcmp(aData, u"free")) {
       sInstance->mLowDiskSpace = false;
     } else {
       return NS_OK;

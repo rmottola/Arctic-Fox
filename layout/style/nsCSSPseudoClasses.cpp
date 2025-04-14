@@ -25,6 +25,14 @@ using namespace mozilla;
 #include "nsCSSPseudoClassList.h"
 #undef CSS_PSEUDO_CLASS
 
+#define CSS_PSEUDO_CLASS(name_, value_, flags_, pref_) \
+  static_assert(!((flags_) & CSS_PSEUDO_CLASS_ENABLED_IN_CHROME) || \
+                ((flags_) & CSS_PSEUDO_CLASS_ENABLED_IN_UA_SHEETS), \
+                "Pseudo-class '" #name_ "' is enabled in chrome, so it " \
+                "should also be enabled in UA sheets");
+#include "nsCSSPseudoClassList.h"
+#undef CSS_PSEUDO_CLASS
+
 // Array of nsStaticAtom for each of the pseudo-classes.
 static const nsStaticAtom CSSPseudoClasses_info[] = {
 #define CSS_PSEUDO_CLASS(name_, value_, flags_, pref_) \
@@ -36,18 +44,28 @@ static const nsStaticAtom CSSPseudoClasses_info[] = {
 // Flags data for each of the pseudo-classes, which must be separate
 // from the previous array since there's no place for it in
 // nsStaticAtom.
-static const uint32_t CSSPseudoClasses_flags[] = {
+/* static */ const uint32_t
+nsCSSPseudoClasses::kPseudoClassFlags[] = {
 #define CSS_PSEUDO_CLASS(name_, value_, flags_, pref_) \
   flags_,
 #include "nsCSSPseudoClassList.h"
 #undef CSS_PSEUDO_CLASS
 };
 
-static bool sPseudoClassEnabled[] = {
+/* static */ bool
+nsCSSPseudoClasses::sPseudoClassEnabled[] = {
+// If the pseudo class has any "ENABLED_IN" flag set, it is disabled by
+// default. Note that, if a pseudo class has pref, whatever its default
+// value is, it'll later be changed in nsCSSPseudoClasses::AddRefAtoms()
+// If the pseudo class has "ENABLED_IN" flags but doesn't have a pref,
+// it is an internal pseudo class which is disabled elsewhere.
+#define IS_ENABLED_BY_DEFAULT(flags_) \
+  (!((flags_) & CSS_PSEUDO_CLASS_ENABLED_MASK))
 #define CSS_PSEUDO_CLASS(name_, value_, flags_, pref_) \
-  true,
+  IS_ENABLED_BY_DEFAULT(flags_),
 #include "nsCSSPseudoClassList.h"
 #undef CSS_PSEUDO_CLASS
+#undef IS_ENABLED_BY_DEFAULT
 };
 
 void nsCSSPseudoClasses::AddRefAtoms()
@@ -91,15 +109,15 @@ nsCSSPseudoClasses::PseudoTypeToString(Type aType, nsAString& aString)
   (*CSSPseudoClasses_info[idx].mAtom)->ToString(aString);
 }
 
-CSSPseudoClassType
-nsCSSPseudoClasses::GetPseudoType(nsIAtom* aAtom)
+/* static */ CSSPseudoClassType
+nsCSSPseudoClasses::GetPseudoType(nsIAtom* aAtom, EnabledState aEnabledState)
 {
   for (uint32_t i = 0; i < ArrayLength(CSSPseudoClasses_info); ++i) {
     if (*CSSPseudoClasses_info[i].mAtom == aAtom) {
-      return sPseudoClassEnabled[i] ? Type(i) : Type::NotPseudo;
+      Type type = Type(i);
+      return IsEnabled(type, aEnabledState) ? type : Type::NotPseudo;
     }
   }
-
   return Type::NotPseudo;
 }
 
@@ -111,13 +129,3 @@ nsCSSPseudoClasses::IsUserActionPseudoClass(Type aType)
          aType == Type::active ||
          aType == Type::focus;
 }
-
-/* static */ uint32_t
-nsCSSPseudoClasses::FlagsForPseudoClass(const Type aType)
-{
-  size_t index = static_cast<size_t>(aType);
-  NS_ASSERTION(index < ArrayLength(CSSPseudoClasses_flags),
-               "argument must be a pseudo-class");
-  return CSSPseudoClasses_flags[index];
-}
-

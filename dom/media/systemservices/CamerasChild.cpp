@@ -5,7 +5,6 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "CamerasChild.h"
-#include "CamerasUtils.h"
 
 #include "webrtc/video_engine/include/vie_capture.h"
 #undef FF
@@ -53,9 +52,8 @@ public:
     // If it's not spun up yet, block until it is, and retry
     if (!existingBackgroundChild) {
       LOG(("No existingBackgroundChild"));
-      SynchronouslyCreatePBackground();
       existingBackgroundChild =
-        ipc::BackgroundChild::GetForCurrentThread();
+        ipc::BackgroundChild::SynchronouslyCreateForCurrentThread();
       LOG(("BackgroundChild: %p", existingBackgroundChild));
     }
     // By now PBackground is guaranteed to be up
@@ -94,7 +92,8 @@ GetCamerasChild() {
     // At this point we are in the MediaManager thread, and the thread we are
     // dispatching to is the specific Cameras IPC thread that was just made
     // above, so now we will fire off a runnable to run
-    // SynchronouslyCreatePBackground there, while we block in this thread.
+    // BackgroundChild::SynchronouslyCreateForCurrentThread there, while we
+    // block in this thread.
     // We block until the following happens in the Cameras IPC thread:
     // 1) Creation of PBackground finishes
     // 2) Creation of PCameras finishes by sending a message to the parent
@@ -486,23 +485,21 @@ Shutdown(void)
 
 class ShutdownRunnable : public Runnable {
 public:
-  ShutdownRunnable(RefPtr<Runnable> aReplyEvent,
-                   nsIThread* aReplyThread)
-    : mReplyEvent(aReplyEvent), mReplyThread(aReplyThread) {};
+  explicit
+  ShutdownRunnable(already_AddRefed<Runnable>&& aReplyEvent)
+    : mReplyEvent(aReplyEvent) {};
 
   NS_IMETHOD Run() override {
     LOG(("Closing BackgroundChild"));
     ipc::BackgroundChild::CloseForCurrentThread();
 
-    LOG(("PBackground thread exists, shutting down thread"));
-    mReplyThread->Dispatch(mReplyEvent, NS_DISPATCH_NORMAL);
+    NS_DispatchToMainThread(mReplyEvent.forget());
 
     return NS_OK;
   }
 
 private:
   RefPtr<Runnable> mReplyEvent;
-  nsIThread* mReplyThread;
 };
 
 void
@@ -546,11 +543,10 @@ CamerasChild::ShutdownChild()
     LOG(("PBackground thread exists, dispatching close"));
     // Dispatch closing the IPC thread back to us when the
     // BackgroundChild is closed.
-    RefPtr<Runnable> event =
-      new ThreadDestructor(CamerasSingleton::Thread());
     RefPtr<ShutdownRunnable> runnable =
-      new ShutdownRunnable(event, NS_GetCurrentThread());
-    CamerasSingleton::Thread()->Dispatch(runnable, NS_DISPATCH_NORMAL);
+      new ShutdownRunnable(NewRunnableMethod(CamerasSingleton::Thread(),
+                                             &nsIThread::Shutdown));
+    CamerasSingleton::Thread()->Dispatch(runnable.forget(), NS_DISPATCH_NORMAL);
   } else {
     LOG(("Shutdown called without PBackground thread"));
   }

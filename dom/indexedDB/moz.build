@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -98,6 +98,7 @@ if CONFIG['GNU_CC']:
     # Suppress gcc warning about a comparison being always false due to the
     # range of the data type
     SOURCES['Key.cpp'].flags += ['-Wno-error=type-limits']
+    CXXFLAGS += ['-Wno-error=shadow']
 
 LOCAL_INCLUDES += [
     '/db/sqlite3/src',
@@ -108,7 +109,3 @@ LOCAL_INCLUDES += [
     '/xpcom/build',
     '/xpcom/threads',
 ]
-
-if CONFIG['ENABLE_INTL_API']:
-    CXXFLAGS += CONFIG['MOZ_ICU_CFLAGS']
-    LOCAL_INCLUDES += CONFIG['MOZ_ICU_INCLUDES']

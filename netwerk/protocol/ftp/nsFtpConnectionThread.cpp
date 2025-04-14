@@ -43,6 +43,7 @@
 #include "nsILoadInfo.h"
 #include "nsNullPrincipal.h"
 #include "nsIAuthPrompt2.h"
+#include "nsIFTPChannelParentInternal.h"
 
 #ifdef MOZ_WIDGET_GONK
 #include "NetStatistics.h"
@@ -1831,10 +1832,6 @@ nsFtpState::StopProcessing()
 
     LOG_INFO(("FTP:(%x) nsFtpState stopping", this));
 
-#ifdef DEBUG_dougt
-    printf("FTP Stopped: [response code %d] [response msg follows:]\n%s\n", mResponseCode, mResponseMsg.get());
-#endif
-
     if (NS_FAILED(mInternalError) && !mResponseMsg.IsEmpty()) {
         // check to see if the control status is bad.
         // web shell wont throw an alert.  we better:
@@ -1852,6 +1849,11 @@ nsFtpState::StopProcessing()
                     NS_ConvertASCIItoUTF16(mResponseMsg));
             }
             NS_DispatchToMainThread(alertEvent);
+        }
+        nsCOMPtr<nsIFTPChannelParentInternal> ftpChanP;
+        mChannel->GetCallback(ftpChanP);
+        if (ftpChanP) {
+          ftpChanP->SetErrorMsg(mResponseMsg.get(), mUseUTF8);
         }
     }
 

@@ -1,3 +1,5 @@
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* vim: set ts=8 sts=2 et sw=2 tw=80: */
 // Copyright (c) 2009 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -13,21 +15,11 @@ class ResourceDispatcher;
 
 // Child processes's background thread should derive from this class.
 class ChildThread : public IPC::Channel::Listener,
-                    public IPC::Message::Sender,
                     public base::Thread {
  public:
   // Creates the thread.
   explicit ChildThread(Thread::Options options);
   virtual ~ChildThread();
-
-  // IPC::Message::Sender implementation:
-  virtual bool Send(IPC::Message* msg);
-
-  // See documentation on MessageRouter for AddRoute and RemoveRoute
-  void AddRoute(int32_t routing_id, IPC::Channel::Listener* listener);
-  void RemoveRoute(int32_t routing_id);
-
-  MessageLoop* owner_loop() { return owner_loop_; }
 
  protected:
   friend class ChildProcess;
@@ -35,18 +27,7 @@ class ChildThread : public IPC::Channel::Listener,
   // Starts the thread.
   bool Run();
 
-  // Overrides the channel name.  Used for --single-process mode.
-  void SetChannelName(const std::wstring& name) { channel_name_ = name; }
-
-  // Called when the process refcount is 0.
-  void OnProcessFinalRelease();
-
  protected:
-  // The required stack size if V8 runs on a thread.
-  static const size_t kV8StackSize;
-
-  virtual void OnControlMessageReceived(const IPC::Message& msg) { }
-
   // Returns the one child thread.
   static ChildThread* current();
 
@@ -72,11 +53,6 @@ class ChildThread : public IPC::Channel::Listener,
   mozilla::UniquePtr<IPC::Channel> channel_;
 
   Thread::Options options_;
-
-  // If true, checks with the browser process before shutdown.  This avoids race
-  // conditions if the process refcount is 0 but there's an IPC message inflight
-  // that would addref it.
-  bool check_with_browser_before_shutdown_;
 
   DISALLOW_EVIL_CONSTRUCTORS(ChildThread);
 };

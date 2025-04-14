@@ -271,7 +271,7 @@ NotificationController::WillRefresh(mozilla::TimeStamp aTime)
       if (text.mString.IsEmpty()) {
   #ifdef A11Y_LOG
         if (logging::IsEnabled(logging::eTree | logging::eText)) {
-          logging::MsgBegin("TREE", "text node lost its content");
+          logging::MsgBegin("TREE", "text node lost its content; doc: %p", mDocument);
           logging::Node("container", containerElm);
           logging::Node("content", textNode);
           logging::MsgEnd();
@@ -285,7 +285,7 @@ NotificationController::WillRefresh(mozilla::TimeStamp aTime)
       // Update text of the accessible and fire text change events.
   #ifdef A11Y_LOG
       if (logging::IsEnabled(logging::eText)) {
-        logging::MsgBegin("TEXT", "text may be changed");
+        logging::MsgBegin("TEXT", "text may be changed; doc: %p", mDocument);
         logging::Node("container", containerElm);
         logging::Node("content", textNode);
         logging::MsgEntry("old text '%s'",
@@ -304,7 +304,7 @@ NotificationController::WillRefresh(mozilla::TimeStamp aTime)
     if (!text.mString.IsEmpty()) {
   #ifdef A11Y_LOG
       if (logging::IsEnabled(logging::eTree | logging::eText)) {
-        logging::MsgBegin("TREE", "text node gains new content");
+        logging::MsgBegin("TREE", "text node gains new content; doc: %p", mDocument);
         logging::Node("container", containerElm);
         logging::Node("content", textNode);
         logging::MsgEnd();
@@ -401,8 +401,9 @@ NotificationController::WillRefresh(mozilla::TimeStamp aTime)
   // events causes script to run.
   mObservingState = eRefreshProcessing;
 
-  mEventTree.Process();
-  mEventTree.Clear();
+  RefPtr<DocAccessible> deathGrip(mDocument);
+  mEventTree.Process(deathGrip);
+  deathGrip = nullptr;
 
   ProcessEventQueue();
 

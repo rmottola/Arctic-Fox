@@ -55,14 +55,9 @@ public: // new functions
     }
 
     virtual void AddSizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf,
-                                        FontCacheSizes* aSizes) const;
+                                        FontCacheSizes* aSizes) const override;
     virtual void AddSizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf,
-                                        FontCacheSizes* aSizes) const;
-
-#ifdef USE_SKIA
-    virtual already_AddRefed<mozilla::gfx::GlyphRenderingOptions>
-        GetGlyphRenderingOptions(const TextRunDrawParams* aRunParams = nullptr) override;
-#endif
+                                        FontCacheSizes* aSizes) const override;
 
 protected:
     virtual bool ShapeText(DrawTarget      *aDrawTarget,
@@ -71,7 +66,7 @@ protected:
                            uint32_t         aLength,
                            Script           aScript,
                            bool             aVertical,
-                           gfxShapedText   *aShapedText);
+                           gfxShapedText   *aShapedText) override;
 
     void FillGlyphDataForChar(uint32_t ch, CachedGlyphData *gd);
 

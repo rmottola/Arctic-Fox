@@ -7,9 +7,14 @@
 
 include LayersSurfaces;
 include LayersMessages;
+include PlatformWidgetTypes;
 include protocol PBrowser;
+include protocol PCompositable;
+include protocol PCompositorWidget;
+include protocol PImageContainer;
 include protocol PLayer;
 include protocol PLayerTransaction;
+include protocol PTexture;
 include "mozilla/GfxMessageUtils.h";
 
 using struct mozilla::null_t from "ipc/IPCMessageUtils.h";
@@ -28,6 +33,7 @@ using mozilla::LayoutDeviceIntRegion from "Units.h";
 using mozilla::VisibilityCounter from "VisibilityIPC.h";
 using class mozilla::TimeStamp from "mozilla/TimeStamp.h";
 using class mozilla::layers::FrameUniformityData from "mozilla/layers/FrameUniformityData.h";
+using mozilla::layers::TextureFlags from "mozilla/layers/CompositorTypes.h";
 
 namespace mozilla {
 namespace layers {
@@ -42,6 +48,8 @@ sync protocol PCompositorBridge
 {
   // A Compositor manages a single Layer Manager (PLayerTransaction)
   manages PLayerTransaction;
+  manages PTexture;
+  manages PCompositorWidget;
 
 child:
   // The child should invalidate retained layers. This is used for local
@@ -84,6 +92,13 @@ child:
                                    PluginWindowData[] aPlugins);
 
   /**
+   * Captures an image for all visible child plugins of a given widget for use
+   * during scrolling.
+   * @param aParentWidget parent of widgets to be captured
+   */
+  async CaptureAllPlugins(uintptr_t aParentWidget);
+
+  /**
    * Hides all registered plugin widgets associated with a particular chrome
    * widget.
    */
@@ -95,7 +110,15 @@ child:
    */
   async ClearCachedResources(uint64_t id);
 
+  async ParentAsyncMessages(AsyncParentMessageData[] aMessages);
+
 parent:
+  // Must be called before Initialize().
+  async PCompositorWidget(CompositorWidgetInitData aInitData);
+
+  // When out-of-process, this must be called to finish initialization.
+  sync Initialize(uint64_t rootLayerTreeId);
+
   /**
    * Confirmation callback for UpdatePluginConfigurations and HideAllPlugins.
    */
@@ -118,14 +141,6 @@ parent:
   // the compositor needs to pause/resume in lockstep with the application.
   sync Pause();
   sync Resume();
-
-  // The child layer tree is hidden. id is the layers id of the child
-  // layer tree.
-  async NotifyHidden(uint64_t id);
-
-  // The child layer tree is visible. id is the layers id of the child
-  // layer tree.
-  async NotifyVisible(uint64_t id);
 
   async NotifyChildCreated(uint64_t id);
   async AdoptChild(uint64_t id);
@@ -186,6 +201,13 @@ parent:
   async UpdateVisibleRegion(VisibilityCounter counter,
                             ScrollableLayerGuid guid,
                             CSSIntRegion region);
+
+  /**
+   * Sent when the child has finished CaptureAllPlugins.
+   */
+  async AllPluginsCaptured();
+
+  async PTexture(SurfaceDescriptor aSharedData, LayersBackend aBackend, TextureFlags aTextureFlags, uint64_t id, uint64_t aSerial);
 
 child:
   // Send back Compositor Frame Metrics from APZCs so tiled layers can

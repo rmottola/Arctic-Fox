@@ -599,7 +599,7 @@ skip-if(B2G||Mulet) == 367247-l-scroll.html 367247-l-auto.html # Initial mulet t
 == 367612-1e.html 367612-1-ref.html
 == 367612-1f.html 367612-1-ref.html
 != 367612-1g.html 367612-1-ref.html
-skip-if(B2G||Mulet) random-if(/^Windows\x20NT\x205\.1/.test(http.oscpu)) == 368020-1.html 368020-1-ref.html # Initial mulet triage: parity with B2G/B2G Desktop
+skip-if(B2G||Mulet) random-if(/^Windows\x20NT\x205\.1/.test(http.oscpu)) fuzzy-if(winWidget,5,2) fuzzy-if(skiaContent,1,28) == 368020-1.html 368020-1-ref.html # Initial mulet triage: parity with B2G/B2G Desktop
 == 368020-2.html 368020-2-ref.html
 == 368020-3.html 368020-3-ref.html
 pref(layout.css.box-decoration-break.enabled,true) == 368020-5.html 368020-5-ref.html
@@ -1238,7 +1238,7 @@ skip-if(B2G||Mulet) == 458296-1d.html 458296-1-ref.html # Initial mulet triage: 
 skip-if((B2G&&browserIsRemote)||Mulet) == 463217-1.xul 463217-1-ref.xul # bug 974780 # Initial mulet triage: parity with B2G/B2G Desktop
 skip-if(B2G||Mulet) == 463952-1.html 463952-1-ref.html # Initial mulet triage: parity with B2G/B2G Desktop
 == 464811-1.html 464811-1-ref.html
-fails == 465574-1.html 465574-1-ref.html # bug 421436
+== 465574-1.html 465574-1-ref.html # bug 421436
 == 466258-1.html 466258-1-ref.html
 == 466395-1.html 466395-1-ref.html
 == 466395-2.html 466395-2-ref.html
@@ -1711,7 +1711,7 @@ needs-focus != 703186-1.html 703186-2.html
 == 714519-1-q.html 714519-1-ref.html
 == 714519-2-as.html 714519-2-ref.html
 == 714519-2-q.html 714519-2-ref.html
-skip-if(B2G||Mulet) fuzzy-if(true,1,21) fuzzy-if(cocoaWidget,1,170) fuzzy-if(Android&&browserIsRemote,7,157) fails-if(Android&&!browserIsRemote&&AndroidVersion==15) == 718521.html 718521-ref.html # bug 760270 # bug 773482 # Initial mulet triage: parity with B2G/B2G Desktop
+skip-if(B2G||Mulet) fuzzy-if(true,1,21) fuzzy-if(d2d,68,173) fuzzy-if(cocoaWidget,1,170) == 718521.html 718521-ref.html # bug 773482 # Initial mulet triage: parity with B2G/B2G Desktop
 == 720987.html 720987-ref.html
 == 722888-1.html 722888-1-ref.html
 == 722923-1.html 722923-1-ref.html
@@ -1835,14 +1835,15 @@ fuzzy-if(/^Windows\x20NT\x205\.1/.test(http.oscpu),255,1) == 1013054-1.html 1013
 == 1021564-3.html 1021564-ref.html
 == 1021564-4.html 1021564-ref.html
 pref(browser.display.use_document_fonts,0) == 1022481-1.html 1022481-1-ref.html
-fuzzy-if(d2d,1,125200) == 1022612-1.html 1022612-1-ref.html
+fuzzy-if(d2d,1,125200) fuzzy-if(skiaContent,1,126000) == 1022612-1.html 1022612-1-ref.html
 == 1024473-1.html 1024473-1-ref.html
-== 1025914-1.html 1025914-1-ref.html
+fuzzy-if(skiaContent,1,24000) == 1025914-1.html 1025914-1-ref.html
 == 1042104-1.html 1042104-1-ref.html
+== 1043537-1.html 1043537-1-ref.html
 == 1044198-1.html 1044198-1-ref.html
 == 1049499-1.html 1049499-1-ref.html
 == 1050493-1.html 1050493-1-ref.html
-random-if(Android&&AndroidVersion==15) == 1050788-1.html about:blank # see bug 1192616, re-enable once we're off the pandaboards
+== 1050788-1.html about:blank
 == 1053035-1-flex.html 1053035-1-ref.html
 test-pref(layout.css.grid.enabled,true) == 1053035-1-grid.html 1053035-1-ref.html
 == 1059167-1.html 1059167-1-ref.html
@@ -1951,4 +1952,6 @@ random-if(OSX==1006) == 1238243-2.html 1238243-2-ref.html # fails on 10.6 with d
 fuzzy(100,2000) == 1239564.html 1239564-ref.html
 == 1242172-1.html 1242172-1-ref.html
 == 1242172-2.html 1242172-2-ref.html
+random-if(!winWidget) == 1273154-2.html 1273154-2-ref.html # depends on Windows font
+== 1263845.html 1263845-ref.html
 == 1260543-1.html 1260543-1-ref.html

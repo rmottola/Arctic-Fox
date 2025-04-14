@@ -3,10 +3,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
+const { immutableUpdate } = require("resource://devtools/shared/ThreadSafeDevToolsUtils.js");
 const { Visitor, walk } = require("resource://devtools/shared/heapsnapshot/CensusUtils.js");
+const { deduplicatePaths } = require("resource://devtools/shared/heapsnapshot/shortest-paths");
 
 const DEFAULT_MAX_DEPTH = 4;
 const DEFAULT_MAX_SIBLINGS = 15;
+const DEFAULT_MAX_NUM_PATHS = 5;
 
 /**
  * A single node in a dominator tree.
@@ -32,6 +35,10 @@ function DominatorTreeNode(nodeId, label, shallowSize, retainedSize) {
 
   // An array of immediately dominated child `DominatorTreeNode`s, or undefined.
   this.children = undefined;
+
+  // An object of the form returned by `deduplicatePaths`, encoding the set of
+  // the N shortest retaining paths for this node as a graph.
+  this.shortestPaths = undefined;
 
   // True iff the `children` property does not contain every immediately
   // dominated node.
@@ -180,6 +187,8 @@ DominatorTreeNode.getLabelAndShallowSize = function (nodeId,
  * `maxSiblings` within any single node's children.
  *
  * @param {DominatorTree} dominatorTree
+ * @param {HeapSnapshot} snapshot
+ * @param {Object} breakdown
  * @param {Number} maxDepth
  * @param {Number} maxSiblings
  *
@@ -203,7 +212,7 @@ DominatorTreeNode.partialTraversal = function (dominatorTree,
       for (let i = 0; i < endIdx; i++) {
         DominatorTreeNode.addChild(node, dfs(childNodeIds[i], newDepth));
       }
-      node.moreChildrenAvailable = childNodeIds.length < endIdx;
+      node.moreChildrenAvailable = endIdx < childNodeIds.length;
     } else {
       node.moreChildrenAvailable = childNodeIds.length > 0;
     }
@@ -212,4 +221,116 @@ DominatorTreeNode.partialTraversal = function (dominatorTree,
   }
 
   return dfs(dominatorTree.root, 0);
+};
+
+/**
+ * Insert more children into the given (partially complete) dominator tree.
+ *
+ * The tree is updated in an immutable and persistent manner: a new tree is
+ * returned, but all unmodified subtrees (which is most) are shared with the
+ * original tree. Only the modified nodes are re-allocated.
+ *
+ * @param {DominatorTreeNode} tree
+ * @param {Array<NodeId>} path
+ * @param {Array<DominatorTreeNode>} newChildren
+ * @param {Boolean} moreChildrenAvailable
+ *
+ * @returns {DominatorTreeNode}
+ */
+DominatorTreeNode.insert = function (tree, path, newChildren, moreChildrenAvailable) {
+  function insert(tree, i) {
+    if (tree.nodeId !== path[i]) {
+      return tree;
+    }
+
+    if (i == path.length - 1) {
+      return immutableUpdate(tree, {
+        children: (tree.children || []).concat(newChildren),
+        moreChildrenAvailable,
+      });
+    }
+
+    return tree.children
+      ? immutableUpdate(tree, {
+        children: tree.children.map(c => insert(c, i + 1))
+      })
+      : tree;
+  }
+
+  return insert(tree, 0);
+};
+
+/**
+ * Get the new canonical node with the given `id` in `tree` that exists along
+ * `path`. If there is no such node along `path`, return null.
+ *
+ * This is useful if we have a reference to a now-outdated DominatorTreeNode due
+ * to a recent call to DominatorTreeNode.insert and want to get the up-to-date
+ * version. We don't have to walk the whole tree: if there is an updated version
+ * of the node then it *must* be along the path.
+ *
+ * @param {NodeId} id
+ * @param {DominatorTreeNode} tree
+ * @param {Array<NodeId>} path
+ *
+ * @returns {DominatorTreeNode|null}
+ */
+DominatorTreeNode.getNodeByIdAlongPath = function (id, tree, path) {
+  function find(node, i) {
+    if (!node || node.nodeId !== path[i]) {
+      return null;
+    }
+
+    if (node.nodeId === id) {
+      return node;
+    }
+
+    if (i === path.length - 1 || !node.children) {
+      return null;
+    }
+
+    const nextId = path[i + 1];
+    return find(node.children.find(c => c.nodeId === nextId), i + 1);
+  }
+
+  return find(tree, 0);
+};
+
+/**
+ * Find the shortest retaining paths for the given set of DominatorTreeNodes,
+ * and populate each node's `shortestPaths` property with them in place.
+ *
+ * @param {HeapSnapshot} snapshot
+ * @param {Object} breakdown
+ * @param {NodeId} start
+ * @param {Array<DominatorTreeNode>} treeNodes
+ * @param {Number} maxNumPaths
+ */
+DominatorTreeNode.attachShortestPaths = function (snapshot,
+                                                  breakdown,
+                                                  start,
+                                                  treeNodes,
+                                                  maxNumPaths = DEFAULT_MAX_NUM_PATHS) {
+  const idToTreeNode = new Map();
+  const targets = [];
+  for (let node of treeNodes) {
+    const id = node.nodeId;
+    idToTreeNode.set(id, node);
+    targets.push(id);
+  }
+
+  const shortestPaths = snapshot.computeShortestPaths(start,
+                                                      targets,
+                                                      maxNumPaths);
+
+  for (let [target, paths] of shortestPaths) {
+    const deduped = deduplicatePaths(target, paths);
+    deduped.nodes = deduped.nodes.map(id => {
+      const { label } =
+        DominatorTreeNode.getLabelAndShallowSize(id, snapshot, breakdown);
+      return { id, label };
+    });
+
+    idToTreeNode.get(target).shortestPaths = deduped;
+  }
 };

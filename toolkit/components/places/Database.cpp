@@ -266,23 +266,6 @@ CreateRoot(nsCOMPtr<mozIStorageConnection>& aDBConn,
   rv = stmt->Execute();
   if (NS_FAILED(rv)) return rv;
 
-  // Create an entry in moz_bookmarks_roots to link the folder to the root.
-  nsCOMPtr<mozIStorageStatement> newRootStmt;
-  rv = aDBConn->CreateStatement(NS_LITERAL_CSTRING(
-    "INSERT INTO moz_bookmarks_roots (root_name, folder_id) "
-    "VALUES (:root_name, (SELECT id from moz_bookmarks WHERE guid = :guid))"
-  ), getter_AddRefs(newRootStmt));
-  if (NS_FAILED(rv)) return rv;
-
-  rv = newRootStmt->BindUTF8StringByName(NS_LITERAL_CSTRING("root_name"),
-                                         aRootName);
-  if (NS_FAILED(rv)) return rv;
-  rv = newRootStmt->BindUTF8StringByName(NS_LITERAL_CSTRING("guid"),
-                                         aGuid);
-  if (NS_FAILED(rv)) return rv;
-  rv = newRootStmt->Execute();
-  if (NS_FAILED(rv)) return rv;
-
   // The 'places' root is a folder containing the other roots.
   // The first bookmark in a folder has position 0.
   if (!aRootName.EqualsLiteral("places"))
@@ -816,6 +799,13 @@ Database::InitSchema(bool* aDatabaseMigrated)
 
       // Firefox 41 uses schema version 30.
 
+      if (currentSchemaVersion < 31) {
+        rv = MigrateV31Up();
+        NS_ENSURE_SUCCESS(rv, rv);
+      }
+
+      // Firefox 48 uses schema version 31.
+
       // Schema Upgrades must add migration code here.
 
       rv = UpdateBookmarkRootTitles();
@@ -873,10 +863,6 @@ Database::InitSchema(bool* aDatabaseMigrated)
     rv = mMainConn->ExecuteSimpleSQL(CREATE_IDX_MOZ_BOOKMARKS_PLACELASTMODIFIED);
     NS_ENSURE_SUCCESS(rv, rv);
     rv = mMainConn->ExecuteSimpleSQL(CREATE_IDX_MOZ_BOOKMARKS_GUID);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    // moz_bookmarks_roots.
-    rv = mMainConn->ExecuteSimpleSQL(CREATE_MOZ_BOOKMARKS_ROOTS);
     NS_ENSURE_SUCCESS(rv, rv);
 
     // moz_keywords.
@@ -946,28 +932,28 @@ Database::CreateBookmarkRoots()
   if (NS_FAILED(rv)) return rv;
 
   // Fetch the internationalized folder name from the string bundle.
-  rv = bundle->GetStringFromName(MOZ_UTF16("BookmarksMenuFolderTitle"),
+  rv = bundle->GetStringFromName(u"BookmarksMenuFolderTitle",
                                  getter_Copies(rootTitle));
   if (NS_FAILED(rv)) return rv;
   rv = CreateRoot(mMainConn, NS_LITERAL_CSTRING("menu"),
                   NS_LITERAL_CSTRING("menu________"), rootTitle);
   if (NS_FAILED(rv)) return rv;
 
-  rv = bundle->GetStringFromName(MOZ_UTF16("BookmarksToolbarFolderTitle"),
+  rv = bundle->GetStringFromName(u"BookmarksToolbarFolderTitle",
                                  getter_Copies(rootTitle));
   if (NS_FAILED(rv)) return rv;
   rv = CreateRoot(mMainConn, NS_LITERAL_CSTRING("toolbar"),
                   NS_LITERAL_CSTRING("toolbar_____"), rootTitle);
   if (NS_FAILED(rv)) return rv;
 
-  rv = bundle->GetStringFromName(MOZ_UTF16("TagsFolderTitle"),
+  rv = bundle->GetStringFromName(u"TagsFolderTitle",
                                  getter_Copies(rootTitle));
   if (NS_FAILED(rv)) return rv;
   rv = CreateRoot(mMainConn, NS_LITERAL_CSTRING("tags"),
                   NS_LITERAL_CSTRING("tags________"), rootTitle);
   if (NS_FAILED(rv)) return rv;
 
-  rv = bundle->GetStringFromName(MOZ_UTF16("UnsortedBookmarksFolderTitle"),
+  rv = bundle->GetStringFromName(u"OtherBookmarksFolderTitle",
                                  getter_Copies(rootTitle));
   if (NS_FAILED(rv)) return rv;
   rv = CreateRoot(mMainConn, NS_LITERAL_CSTRING("unfiled"),
@@ -1086,7 +1072,7 @@ Database::UpdateBookmarkRootTitles()
   const char *titleStringIDs[] = { "BookmarksMenuFolderTitle"
                                  , "BookmarksToolbarFolderTitle"
                                  , "TagsFolderTitle"
-                                 , "UnsortedBookmarksFolderTitle"
+                                 , "OtherBookmarksFolderTitle"
                                  };
 
   for (uint32_t i = 0; i < ArrayLength(rootGuids); ++i) {
@@ -1627,6 +1613,18 @@ Database::MigrateV30Up() {
 
   nsresult rv = mMainConn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
     "DROP INDEX IF EXISTS moz_favicons_guid_uniqueindex"
+  ));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  return NS_OK;
+}
+
+nsresult
+Database::MigrateV31Up() {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  nsresult rv = mMainConn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+    "DROP TABLE IF EXISTS moz_bookmarks_roots"
   ));
   NS_ENSURE_SUCCESS(rv, rv);
 

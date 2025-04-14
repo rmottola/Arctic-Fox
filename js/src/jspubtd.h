@@ -118,8 +118,8 @@ typedef JSConstScalarSpec<double> JSConstDoubleSpec;
 typedef JSConstScalarSpec<int32_t> JSConstIntegerSpec;
 
 /*
- * Generic trace operation that calls JS_CallTracer on each traceable thing
- * stored in data.
+ * Generic trace operation that calls JS::TraceEdge on each traceable thing's
+ * location reachable from data.
  */
 typedef void
 (* JSTraceDataOp)(JSTracer* trc, void* data);
@@ -265,12 +265,15 @@ enum StackKind
     StackKindCount
 };
 
+using RootedListHeads = mozilla::EnumeratedArray<JS::RootKind, JS::RootKind::Limit,
+                                                 JS::Rooted<void*>*>;
+
 // Abstracts JS rooting mechanisms so they can be shared between the JSContext
 // and JSRuntime.
 class RootLists
 {
     // Stack GC roots for Rooted GC heap pointers.
-    mozilla::EnumeratedArray<JS::RootKind, JS::RootKind::Limit, JS::Rooted<void*>*> stackRoots_;
+    RootedListHeads stackRoots_;
     template <typename T> friend class JS::Rooted;
 
     // Stack GC roots for AutoFooRooter classes.
@@ -432,5 +435,12 @@ struct PerThreadDataFriendFields
 };
 
 } /* namespace js */
+
+MOZ_BEGIN_EXTERN_C
+
+// Defined in NSPR prio.h.
+typedef struct PRFileDesc PRFileDesc;
+
+MOZ_END_EXTERN_C
 
 #endif /* jspubtd_h */

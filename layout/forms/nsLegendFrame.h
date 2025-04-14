@@ -18,8 +18,8 @@ public:
   explicit nsLegendFrame(nsStyleContext* aContext) : nsBlockFrame(aContext) {}
 
   virtual void Reflow(nsPresContext*           aPresContext,
-                      nsHTMLReflowMetrics&     aDesiredSize,
-                      const nsHTMLReflowState& aReflowState,
+                      ReflowOutput&     aDesiredSize,
+                      const ReflowInput& aReflowInput,
                       nsReflowStatus&          aStatus) override;
 
   virtual void DestroyFrom(nsIFrame* aDestructRoot) override;
@@ -30,7 +30,7 @@ public:
   virtual nsresult GetFrameName(nsAString& aResult) const override;
 #endif
 
-  int32_t GetAlign();
+  int32_t GetLogicalAlign(WritingMode aCBWM);
 };
 
 

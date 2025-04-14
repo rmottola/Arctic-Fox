@@ -175,7 +175,6 @@ MOCHITEST_BROWSER_FILES = \
                  browser_contextSearchTabPosition.js \
                  browser_ctrlTab.js \
                  browser_customize_popupNotification.js \
-                 browser_disablechrome.js \
                  browser_discovery.js \
                  browser_duplicateIDs.js \
                  browser_fullscreen-window-open.js \
@@ -243,7 +242,6 @@ MOCHITEST_BROWSER_FILES = \
                  browser_visibleTabs_bookmarkAllTabs.js \
                  browser_visibleTabs_tabPreview.js \
                  bug592338.html \
-                 disablechrome.html \
                  discovery.html \
                  domplate_test.js \
                  file_bug822367_1.html \

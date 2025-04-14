@@ -32,9 +32,6 @@
 - Bug 1362167 - 2017-05-04 - Use strongly-typed enum classes instead of generic uint
 - Bug 1352528 - 2017-04-03 - Hoist call to GetRoundOffsetsToPixels out of the inner 
 - 1297276 - Rename mfbt/unused.h to mfbt/Unused.h for consistency
-- 1276938 - Optimize string usage in setAttribute when dealing with
-- 1263778 - Rename a bunch of low-level [[Prototype]] access methods to make their interactions with statically-known and dynamically-computed [[Prototype]]s clearer : Too much work for now
-- 1244098 - fold jspo_in, would improve performance, but we are missing testNotDefinedProperty and for that we need shouldAbortOnPreliminaryGroups() and that needs preliminaryObjects in the ObjectGroup
 - 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - Bug 1310721 - 2016-10-15- Remove support for the b2g PAC generator; r=mcmanus
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
@@ -42,10 +39,13 @@
 - Bug 1287520 - 2026-07-29 - Check IsPackedArray for the result array in Array.proto
 - 1114580 - toStringTag - several diffs still to analyze
 - Bug 1263340 - finish to part 8
-- Bug 1278838 2016-06-09- Remove separate worker binding for Performance API
-- Bug 1245024 - 2016-06-09 - Implement Object.getOwnPropertyDescriptors. r=efaust,bz (check https://forum.manjaro.org/ still works after applying)
 - Bug 1296851 - 2016-10-27 Always allow SetPrototype with the same value as the cu
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
+
+
+If applied, breaks build:
+Bug 1146738 - Fix race condition between js/src/target and js/src/host. r=mshal
+
 
 impacting download and shutdown:
 Bug 875648 - Use Downloads.jsm functions to get download directories
@@ -53,9 +53,6 @@ Bug 875648 - Use Downloads.jsm functions to get download directories
 
 # Mac Specific
 Bug 1180725 - use AVFoundation for camera capture on OSX. r=jib
-
-# Win specific Check with Roy Tam:
-- bug 1139012 - telemetry for MLS vs win8 geolocation response.
 
 
 ## Enhancing JS

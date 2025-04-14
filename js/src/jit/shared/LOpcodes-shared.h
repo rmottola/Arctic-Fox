@@ -20,9 +20,11 @@
     _(Float32)                      \
     _(SimdBox)                      \
     _(SimdUnbox)                    \
+    _(SimdSplatX16)                 \
+    _(SimdSplatX8)                  \
     _(SimdSplatX4)                  \
-    _(Int32x4)                      \
-    _(Float32x4)                    \
+    _(Simd128Int)                   \
+    _(Simd128Float)                 \
     _(SimdAllTrue)                  \
     _(SimdAnyTrue)                  \
     _(SimdReinterpretCast)          \
@@ -37,13 +39,21 @@
     _(SimdSwizzleI)                 \
     _(SimdSwizzleF)                 \
     _(SimdShuffle)                  \
+    _(SimdShuffleX4)                \
+    _(SimdUnaryArithIx16)           \
+    _(SimdUnaryArithIx8)            \
     _(SimdUnaryArithIx4)            \
     _(SimdUnaryArithFx4)            \
+    _(SimdBinaryCompIx16)           \
+    _(SimdBinaryCompIx8)            \
     _(SimdBinaryCompIx4)            \
     _(SimdBinaryCompFx4)            \
+    _(SimdBinaryArithIx16)          \
+    _(SimdBinaryArithIx8)           \
     _(SimdBinaryArithIx4)           \
     _(SimdBinaryArithFx4)           \
-    _(SimdBinaryBitwiseX4)          \
+    _(SimdBinarySaturating)         \
+    _(SimdBinaryBitwise)            \
     _(SimdShift)                    \
     _(SimdSelect)                   \
     _(Value)                        \
@@ -57,6 +67,7 @@
     _(NewArray)                     \
     _(NewArrayCopyOnWrite)          \
     _(NewArrayDynamicLength)        \
+    _(NewTypedArray)                \
     _(ArraySplice)                  \
     _(NewObject)                    \
     _(NewTypedObject)               \
@@ -106,6 +117,7 @@
     _(Throw)                        \
     _(Phi)                          \
     _(TestIAndBranch)               \
+    _(TestI64AndBranch)             \
     _(TestDAndBranch)               \
     _(TestFAndBranch)               \
     _(TestVAndBranch)               \
@@ -142,10 +154,15 @@
     _(AbsD)                         \
     _(AbsF)                         \
     _(ClzI)                         \
+    _(ClzI64)                       \
     _(CtzI)                         \
+    _(CtzI64)                       \
     _(PopcntI)                      \
+    _(PopcntI64)                    \
     _(SqrtD)                        \
     _(SqrtF)                        \
+    _(CopySignD)                    \
+    _(CopySignF)                    \
     _(Atan2D)                       \
     _(Hypot)                        \
     _(PowI)                         \
@@ -155,6 +172,7 @@
     _(MathFunctionD)                \
     _(MathFunctionF)                \
     _(NotI)                         \
+    _(NotI64)                       \
     _(NotD)                         \
     _(NotF)                         \
     _(NotO)                         \
@@ -367,11 +385,15 @@
     _(HasClass)                     \
     _(AsmSelect)                    \
     _(AsmSelectI64)                 \
+    _(WasmLoad)                     \
+    _(WasmLoadI64)                  \
+    _(WasmStore)                    \
+    _(WasmBoundsCheck)              \
+    _(WasmLoadGlobalVar)            \
+    _(WasmStoreGlobalVar)           \
     _(AsmJSLoadHeap)                \
     _(AsmJSStoreHeap)               \
     _(AsmJSLoadFuncPtr)             \
-    _(AsmJSLoadGlobalVar)           \
-    _(AsmJSStoreGlobalVar)          \
     _(AsmJSLoadFFIFunc)             \
     _(AsmJSParameter)               \
     _(AsmJSReturn)                  \

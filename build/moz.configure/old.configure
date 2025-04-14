@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -160,7 +160,6 @@ def old_configure_options(*options):
     '--enable-alsa',
     '--enable-altivec',
     '--enable-android-omx',
-    '--enable-android-resource-constrained',
     '--enable-approximate-location',
     '--enable-b2g-bt',
     '--enable-b2g-camera',
@@ -174,9 +173,7 @@ def old_configure_options(*options):
     '--enable-ctypes',
     '--enable-dbm',
     '--enable-dbus',
-    '--enable-debug',
     '--enable-debug-js-modules',
-    '--enable-debug-symbols',
     '--enable-directshow',
     '--enable-dtrace',
     '--enable-dump-painting',
@@ -199,7 +196,6 @@ def old_configure_options(*options):
     '--enable-ios-target',
     '--enable-ipdl-tests',
     '--enable-jitspew',
-    '--enable-jxr',
     '--enable-libjpeg-turbo',
     '--enable-libproxy',
     '--enable-llvm-hacks',
@@ -234,7 +230,6 @@ def old_configure_options(*options):
     '--enable-reflow-perf',
     '--enable-release',
     '--enable-require-all-d3dc-versions',
-    '--enable-rust',
     '--enable-safe-browsing',
     '--enable-sandbox',
     '--enable-signmar',
@@ -251,18 +246,14 @@ def old_configure_options(*options):
     '--enable-system-cairo',
     '--enable-system-extension-dirs',
     '--enable-system-ffi',
-    '--enable-system-hunspell',
     '--enable-system-pixman',
     '--enable-system-sqlite',
     '--enable-tasktracer',
-    '--enable-tests',
     '--enable-thread-sanitizer',
     '--enable-trace-logging',
     '--enable-tree-freetype',
     '--enable-ui-locale',
     '--enable-universalchardet',
-    '--enable-update-channel',
-    '--enable-update-packaging',
     '--enable-updater',
     '--enable-url-classifier',
     '--enable-valgrind',
@@ -303,7 +294,6 @@ def old_configure_options(*options):
     '--with-google-oauth-api-keyfile',
     '--with-intl-api',
     '--with-ios-sdk',
-    '--with-java-bin-path',
     '--with-jitreport-granularity',
     '--with-linux-headers',
     '--with-macbundlename-prefix',
@@ -318,7 +308,6 @@ def old_configure_options(*options):
     '--with-nss-prefix',
     '--with-pthreads',
     '--with-qemu-exe',
-    '--with-qtdir',
     '--with-servo',
     '--with-sixgill',
     '--with-soft-float',
@@ -345,6 +334,8 @@ def old_configure_options(*options):
     '--enable-mapi',
     '--enable-calendar',
     '--enable-incomplete-external-linkage',
+
+    '--enable-ipc-fuzzer',
 )
 @imports(_from='__builtin__', _import='compile')
 @imports(_from='__builtin__', _import='open')

@@ -130,7 +130,7 @@ TaskbarPreview::GetActive(bool *active) {
 NS_IMETHODIMP
 TaskbarPreview::Invalidate() {
   if (!mVisible)
-    return NS_ERROR_FAILURE;
+    return NS_OK;
 
   // DWM Composition is required for previews
   if (!nsUXThemeData::CheckForCompositor())
@@ -175,6 +175,11 @@ TaskbarPreview::Enable() {
 
 nsresult
 TaskbarPreview::Disable() {
+  if (!IsWindowAvailable()) {
+    // Window is already destroyed
+    return NS_OK;
+  }
+
   WindowHook &hook = GetWindowHook();
   (void) hook.RemoveMonitor(nsAppShell::GetTaskbarButtonCreatedMessage(), MainWindowHook, this);
 

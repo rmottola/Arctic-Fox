@@ -497,7 +497,13 @@ static CompositorD3D9* AssertD3D9Compositor(Compositor* aCompositor)
 {
   CompositorD3D9* compositor = aCompositor ? aCompositor->AsCompositorD3D9()
                                            : nullptr;
-  MOZ_DIAGNOSTIC_ASSERT(!!compositor);
+  if (!compositor) {
+    // We probably had a device reset and this D3D9 texture was already sent but
+    // we are now falling back to a basic compositor. That can happen if a video
+    // is playing while the device reset occurs and it's not too bad if we miss a
+    // few frames.
+    gfxCriticalNote << "[D3D9] Attempt to set an incompatible compositor";
+  }
   return compositor;
 }
 
@@ -744,7 +750,7 @@ DXGID3D9TextureData::DXGID3D9TextureData(gfx::SurfaceFormat aFormat,
 
 DXGID3D9TextureData::~DXGID3D9TextureData()
 {
-  gfxWindowsPlatform::sD3D9SharedTextureUsed -= mDesc.Width * mDesc.Height * 4;
+  gfxWindowsPlatform::sD3D9SharedTextures -= mDesc.Width * mDesc.Height * 4;
   MOZ_COUNT_DTOR(DXGID3D9TextureData);
 }
 
@@ -781,7 +787,7 @@ DXGID3D9TextureData::Create(gfx::IntSize aSize, gfx::SurfaceFormat aFormat,
   DXGID3D9TextureData* data = new DXGID3D9TextureData(aFormat, texture, shareHandle, aDevice);
   data->mDesc = surfaceDesc;
 
-  gfxWindowsPlatform::sD3D9SharedTextureUsed += aSize.width * aSize.height * 4;
+  gfxWindowsPlatform::sD3D9SharedTextures += aSize.width * aSize.height * 4;
   return data;
 }
 
@@ -929,6 +935,8 @@ TextureHostD3D9::UpdatedInternal(const nsIntRegion* aRegion)
   if (!mTextureSource->UpdateFromTexture(mTexture, regionToUpdate)) {
     gfxCriticalNote << "[D3D9] DataTextureSourceD3D9::UpdateFromTexture failed";
   }
+
+  ReadUnlock();
 }
 
 IDirect3DDevice9*
@@ -951,6 +959,12 @@ TextureHostD3D9::SetCompositor(Compositor* aCompositor)
   if (mTextureSource) {
     mTextureSource->SetCompositor(aCompositor);
   }
+}
+
+Compositor*
+TextureHostD3D9::GetCompositor()
+{
+  return mCompositor;
 }
 
 bool
@@ -1047,6 +1061,11 @@ DXGITextureHostD3D9::Lock()
 {
   MOZ_ASSERT(!mIsLocked);
 
+  if (!mCompositor) {
+    NS_WARNING("no suitable compositor");
+    return false;
+  }
+
   if (!GetDevice()) {
     return false;
   }
@@ -1072,6 +1091,12 @@ DXGITextureHostD3D9::SetCompositor(Compositor* aCompositor)
   if (!mCompositor) {
     mTextureSource = nullptr;
   }
+}
+
+Compositor*
+DXGITextureHostD3D9::GetCompositor()
+{
+  return mCompositor;
 }
 
 void
@@ -1113,9 +1138,20 @@ DXGIYCbCrTextureHostD3D9::SetCompositor(Compositor* aCompositor)
   }
 }
 
+Compositor*
+DXGIYCbCrTextureHostD3D9::GetCompositor()
+{
+  return mCompositor;
+}
+
 bool
 DXGIYCbCrTextureHostD3D9::Lock()
 {
+  if (!mCompositor) {
+    NS_WARNING("no suitable compositor");
+    return false;
+  }
+
   if (!GetDevice()) {
     NS_WARNING("trying to lock a TextureHost without a D3D device");
     return false;

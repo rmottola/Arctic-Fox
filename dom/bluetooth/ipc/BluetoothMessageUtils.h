@@ -24,7 +24,7 @@ struct ParamTraits<mozilla::dom::bluetooth::BluetoothAddress>
     }
   }
 
-  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
   {
     for (size_t i = 0; i < MOZ_ARRAY_LENGTH(aResult->mAddr); ++i) {
       if (!ReadParam(aMsg, aIter, aResult->mAddr + i)) {
@@ -50,13 +50,18 @@ struct ParamTraits<mozilla::dom::bluetooth::BluetoothPinCode>
 
   static void Write(Message* aMsg, const paramType& aParam)
   {
-    WriteParam(aMsg, aParam.mLength);
-    for (uint8_t i = 0; i < aParam.mLength; ++i) {
+    auto length = aParam.mLength;
+    if (length > MOZ_ARRAY_LENGTH(aParam.mPinCode)) {
+      length = MOZ_ARRAY_LENGTH(aParam.mPinCode);
+    }
+
+    WriteParam(aMsg, length);
+    for (uint8_t i = 0; i < length; ++i) {
       WriteParam(aMsg, aParam.mPinCode[i]);
     }
   }
 
-  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
   {
     if (!ReadParam(aMsg, aIter, &aResult->mLength)) {
       return false;
@@ -92,7 +97,7 @@ struct ParamTraits<mozilla::dom::bluetooth::BluetoothRemoteName>
     }
   }
 
-  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
   {
     if (!ReadParam(aMsg, aIter, &aResult->mLength)) {
       return false;
@@ -153,7 +158,7 @@ struct ParamTraits<mozilla::dom::bluetooth::BluetoothUuid>
     }
   }
 
-  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
   {
     for (uint8_t i = 0; i < 16; i++) {
       if (!ReadParam(aMsg, aIter, &(aResult->mUuid[i]))) {
@@ -176,7 +181,7 @@ struct ParamTraits<mozilla::dom::bluetooth::BluetoothGattId>
     WriteParam(aMsg, aParam.mInstanceId);
   }
 
-  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
   {
     if (!ReadParam(aMsg, aIter, &(aResult->mUuid)) ||
         !ReadParam(aMsg, aIter, &(aResult->mInstanceId))) {
@@ -198,7 +203,7 @@ struct ParamTraits<mozilla::dom::bluetooth::BluetoothGattServiceId>
     WriteParam(aMsg, aParam.mIsPrimary);
   }
 
-  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
   {
     if (!ReadParam(aMsg, aIter, &(aResult->mId)) ||
         !ReadParam(aMsg, aIter, &(aResult->mIsPrimary))) {
@@ -221,7 +226,7 @@ struct ParamTraits<mozilla::dom::bluetooth::BluetoothGattCharAttribute>
     WriteParam(aMsg, aParam.mWriteType);
   }
 
-  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
   {
     if (!ReadParam(aMsg, aIter, &(aResult->mId)) ||
         !ReadParam(aMsg, aIter, &(aResult->mProperties)) ||
@@ -243,7 +248,7 @@ struct ParamTraits<mozilla::dom::bluetooth::BluetoothAttributeHandle>
     WriteParam(aMsg, aParam.mHandle);
   }
 
-  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
   {
     if (!ReadParam(aMsg, aIter, &(aResult->mHandle))) {
       return false;
@@ -260,21 +265,30 @@ struct ParamTraits<mozilla::dom::bluetooth::BluetoothGattResponse>
 
   static void Write(Message* aMsg, const paramType& aParam)
   {
+    auto length = aParam.mLength;
+    if (length > MOZ_ARRAY_LENGTH(aParam.mValue)) {
+      length = MOZ_ARRAY_LENGTH(aParam.mValue);
+    }
+
     WriteParam(aMsg, aParam.mHandle);
     WriteParam(aMsg, aParam.mOffset);
-    WriteParam(aMsg, aParam.mLength);
+    WriteParam(aMsg, length);
     WriteParam(aMsg, aParam.mAuthReq);
-    for (uint16_t i = 0; i < aParam.mLength; i++) {
+    for (uint16_t i = 0; i < length; i++) {
       WriteParam(aMsg, aParam.mValue[i]);
     }
   }
 
-  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
   {
     if (!ReadParam(aMsg, aIter, &(aResult->mHandle)) ||
         !ReadParam(aMsg, aIter, &(aResult->mOffset)) ||
         !ReadParam(aMsg, aIter, &(aResult->mLength)) ||
         !ReadParam(aMsg, aIter, &(aResult->mAuthReq))) {
+      return false;
+    }
+
+    if (aResult->mLength > MOZ_ARRAY_LENGTH(aResult->mValue)) {
       return false;
     }
 
@@ -298,7 +312,7 @@ struct ParamTraits<mozilla::dom::bluetooth::ControlPlayStatus>
     WriteParam(aMsg, static_cast<uint8_t>(aParam));
   }
 
-  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
   {
     uint8_t value;
     if (!ReadParam(aMsg, aIter, &value)) {
@@ -338,7 +352,7 @@ struct ParamTraits<mozilla::dom::bluetooth::BluetoothGattAdvertisingData>
     WriteParam(aMsg, aParam.mServiceUuids);
   }
 
-  static bool Read(const Message* aMsg, void** aIter, paramType* aResult)
+  static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
   {
     if (!ReadParam(aMsg, aIter, &(aResult->mAppearance)) ||
         !ReadParam(aMsg, aIter, &(aResult->mIncludeDevName)) ||

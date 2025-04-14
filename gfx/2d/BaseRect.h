@@ -135,6 +135,8 @@ struct BaseRect {
   // this and aRect2.
   // Thus, empty input rectangles are ignored.
   // If both rectangles are empty, returns this.
+  // WARNING! This is not safe against overflow, prefer using SafeUnion instead
+  // when dealing with int-based rects.
   MOZ_MUST_USE Sub Union(const Sub& aRect) const
   {
     if (IsEmpty()) {
@@ -148,6 +150,8 @@ struct BaseRect {
   // Returns the smallest rectangle that contains both the points (including
   // edges) of both aRect1 and aRect2.
   // Thus, empty input rectangles are allowed to affect the result.
+  // WARNING! This is not safe against overflow, prefer using SafeUnionEdges
+  // instead when dealing with int-based rects.
   MOZ_MUST_USE Sub UnionEdges(const Sub& aRect) const
   {
     Sub result;
@@ -323,7 +327,7 @@ struct BaseRect {
       case RectCorner::BottomRight: return BottomRight();
       case RectCorner::BottomLeft: return BottomLeft();
     }
-    MOZ_CRASH("Incomplete switch");
+    MOZ_CRASH("GFX: Incomplete switch");
   }
   Point CCWCorner(mozilla::Side side) const {
     switch (side) {
@@ -332,7 +336,7 @@ struct BaseRect {
       case NS_SIDE_BOTTOM: return BottomRight();
       case NS_SIDE_LEFT: return BottomLeft();
     }
-    MOZ_CRASH("Incomplete switch");
+    MOZ_CRASH("GFX: Incomplete switch");
   }
   Point CWCorner(mozilla::Side side) const {
     switch (side) {
@@ -341,7 +345,7 @@ struct BaseRect {
       case NS_SIDE_BOTTOM: return BottomLeft();
       case NS_SIDE_LEFT: return TopLeft();
     }
-    MOZ_CRASH("Incomplete switch");
+    MOZ_CRASH("GFX: Incomplete switch");
   }
   Point Center() const { return Point(x, y) + Point(width, height)/2; }
   SizeT Size() const { return SizeT(width, height); }
@@ -365,7 +369,7 @@ struct BaseRect {
       case NS_SIDE_BOTTOM: return YMost();
       case NS_SIDE_LEFT: return X();
     }
-    MOZ_CRASH("Incomplete switch");
+    MOZ_CRASH("GFX: Incomplete switch");
   }
 
   // Moves one edge of the rect without moving the opposite edge.

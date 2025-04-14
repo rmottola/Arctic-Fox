@@ -17,7 +17,9 @@
 #include "mozilla/css/Loader.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/FragmentOrElement.h"
+#include "mozilla/dom/HTMLLinkElement.h"
 #include "mozilla/dom/ShadowRoot.h"
+#include "mozilla/dom/SRILogHelper.h"
 #include "mozilla/Preferences.h"
 #include "nsIContent.h"
 #include "nsIDocument.h"
@@ -34,13 +36,6 @@
 
 using namespace mozilla;
 using namespace mozilla::dom;
-
-static LogModule*
-GetSriLog()
-{
-  static LazyLogModule gSriPRLog("SRI");
-  return gSriPRLog;
-}
 
 nsStyleLinkElement::nsStyleLinkElement()
   : mDontLoadStyle(false)
@@ -150,7 +145,8 @@ nsStyleLinkElement::IsImportEnabled()
 }
 
 static uint32_t ToLinkMask(const nsAString& aLink, nsIPrincipal* aPrincipal)
-{ 
+{
+  // Keep this in sync with sRelValues in HTMLLinkElement.cpp
   if (aLink.EqualsLiteral("prefetch"))
     return nsStyleLinkElement::ePREFETCH;
   else if (aLink.EqualsLiteral("dns-prefetch"))
@@ -435,9 +431,18 @@ nsStyleLinkElement::DoUpdateStyleSheet(nsIDocument* aOldDocument,
     nsAutoString integrity;
     thisContent->GetAttr(kNameSpaceID_None, nsGkAtoms::integrity, integrity);
     if (!integrity.IsEmpty()) {
-      MOZ_LOG(GetSriLog(), mozilla::LogLevel::Debug,
+      MOZ_LOG(SRILogHelper::GetSriLog(), mozilla::LogLevel::Debug,
               ("nsStyleLinkElement::DoUpdateStyleSheet, integrity=%s",
                NS_ConvertUTF16toUTF8(integrity).get()));
+    }
+
+    // if referrer attributes are enabled in preferences, load the link's referrer
+    // attribute. If the link does not provide a referrer attribute, ignore this
+    // and use the document's referrer policy
+
+    net::ReferrerPolicy referrerPolicy = GetLinkReferrerPolicy();
+    if (referrerPolicy == net::RP_Unset) {
+      referrerPolicy = doc->GetReferrerPolicy();
     }
 
     // XXXbz clone the URI here to work around content policies modifying URIs.
@@ -446,7 +451,7 @@ nsStyleLinkElement::DoUpdateStyleSheet(nsIDocument* aOldDocument,
     NS_ENSURE_TRUE(clonedURI, NS_ERROR_OUT_OF_MEMORY);
     rv = doc->CSSLoader()->
       LoadStyleLink(thisContent, clonedURI, title, media, isAlternate,
-                    GetCORSMode(), doc->GetReferrerPolicy(), integrity,
+                    GetCORSMode(), referrerPolicy, integrity,
                     aObserver, &isAlternate);
     if (NS_FAILED(rv)) {
       // Don't propagate LoadStyleLink() errors further than this, since some

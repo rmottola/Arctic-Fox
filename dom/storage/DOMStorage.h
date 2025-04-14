@@ -10,7 +10,6 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/ErrorResult.h"
 #include "nsIDOMStorage.h"
-#include "nsAutoPtr.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsWeakReference.h"
 #include "nsWrapperCache.h"
@@ -81,12 +80,7 @@ public:
 
   void GetItem(const nsAString& aKey, nsAString& aResult, ErrorResult& aRv);
 
-  bool NameIsEnumerable(const nsAString& aName) const
-  {
-    return true;
-  }
-
-  void GetSupportedNames(unsigned, nsTArray<nsString>& aKeys);
+  void GetSupportedNames(nsTArray<nsString>& aKeys);
 
   void NamedGetter(const nsAString& aKey, bool& aFound, nsAString& aResult,
                    ErrorResult& aRv)

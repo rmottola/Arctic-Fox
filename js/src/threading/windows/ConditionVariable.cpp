@@ -9,7 +9,7 @@
 #include <float.h>
 #include <intrin.h>
 #include <stdlib.h>
-#include <Windows.h>
+#include <windows.h>
 
 #include "threading/ConditionVariable.h"
 #include "threading/Mutex.h"
@@ -61,7 +61,7 @@ public:
 private:
   template <typename T>
   inline bool loadSymbol(HMODULE module, const char* name, T& fn) {
-    void* ptr = GetProcAddress(module, name);
+    FARPROC ptr = GetProcAddress(module, name);
     if (!ptr)
       return false;
 
@@ -381,10 +381,12 @@ js::ConditionVariable::wait_for(UniqueLock<Mutex>& lock,
   CRITICAL_SECTION* cs = &lock.lock.platformData()->criticalSection;
 
   // Note that DWORD is unsigned, so we have to be careful to clamp at 0.
+  // If rel_time is Forever, then ToMilliseconds is +inf, which evaluates as
+  // greater than UINT32_MAX, resulting in the correct INFINITE wait.
   double msecd = rel_time.ToMilliseconds();
   DWORD msec = msecd < 0.0
                ? 0
-               : msecd > DBL_MAX
+               : msecd > UINT32_MAX
                  ? INFINITE
                  : static_cast<DWORD>(msecd);
 

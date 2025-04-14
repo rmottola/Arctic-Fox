@@ -7,6 +7,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 import errno
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -21,6 +22,12 @@ from buildconfig import (
     topobjdir,
     topsrcdir,
 )
+
+
+def ensure_exe_extension(path):
+    if sys.platform.startswith('win'):
+        return path + '.exe'
+    return path
 
 
 class ConfigureTestVFS(object):
@@ -109,11 +116,12 @@ class ConfigureTestSandbox(ConfigureSandbox):
 
         return super(ConfigureTestSandbox, self)._get_one_import(what)
 
-    def which(self, command):
-        for parent in self._search_path:
-            path = mozpath.join(parent, command)
-            if self.OS.path.exists(path):
-                return path
+    def which(self, command, path=None):
+        for parent in (path or self._search_path):
+            c = mozpath.abspath(mozpath.join(parent, command))
+            for candidate in (c, ensure_exe_extension(c)):
+                if self.OS.path.exists(candidate):
+                    return candidate
         raise WhichError()
 
     def Popen(self, args, stdin=None, stdout=None, stderr=None, **kargs):

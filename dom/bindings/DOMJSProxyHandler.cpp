@@ -252,6 +252,16 @@ BaseDOMProxyHandler::ownPropertyKeys(JSContext* cx,
 }
 
 bool
+BaseDOMProxyHandler::getPrototypeIfOrdinary(JSContext* cx, JS::Handle<JSObject*> proxy,
+                                            bool* isOrdinary,
+                                            JS::MutableHandle<JSObject*> proto) const
+{
+  *isOrdinary = true;
+  proto.set(GetStaticPrototype(proxy));
+  return true;
+}
+
+bool
 BaseDOMProxyHandler::getOwnEnumerablePropertyKeys(JSContext* cx,
                                                   JS::Handle<JSObject*> proxy,
                                                   JS::AutoIdVector& props) const
@@ -285,6 +295,27 @@ DOMProxyHandler::GetExpandoObject(JSObject *obj)
     static_cast<js::ExpandoAndGeneration*>(v.toPrivate());
   v = expandoAndGeneration->expando;
   return v.isUndefined() ? nullptr : &v.toObject();
+}
+
+void
+ShadowingDOMProxyHandler::trace(JSTracer* trc, JSObject* proxy) const
+{
+  DOMProxyHandler::trace(trc, proxy);
+
+  MOZ_ASSERT(IsDOMProxy(proxy), "expected a DOM proxy object");
+  JS::Value v = js::GetProxyExtra(proxy, JSPROXYSLOT_EXPANDO);
+  MOZ_ASSERT(!v.isObject(), "Should not have expando object directly!");
+
+  if (v.isUndefined()) {
+    // This can happen if we GC while creating our object, before we get a
+    // chance to set up its JSPROXYSLOT_EXPANDO slot.
+    return;
+  }
+
+  js::ExpandoAndGeneration* expandoAndGeneration =
+    static_cast<js::ExpandoAndGeneration*>(v.toPrivate());
+  JS::TraceEdge(trc, &expandoAndGeneration->expando,
+                "Shadowing DOM proxy expando");
 }
 
 } // namespace dom

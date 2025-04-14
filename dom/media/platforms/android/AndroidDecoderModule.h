@@ -6,33 +6,26 @@
 #define AndroidDecoderModule_h_
 
 #include "PlatformDecoderModule.h"
-#include "AndroidSurfaceTexture.h"
 
 #include "MediaCodec.h"
+#include "SurfaceTexture.h"
 #include "TimeUnits.h"
 #include "mozilla/Monitor.h"
+#include "mozilla/Maybe.h"
 
-#include <queue>
+#include <deque>
 
 namespace mozilla {
 
-typedef std::queue<RefPtr<MediaRawData>> SampleQueue;
+typedef std::deque<RefPtr<MediaRawData>> SampleQueue;
 
 class AndroidDecoderModule : public PlatformDecoderModule {
 public:
   already_AddRefed<MediaDataDecoder>
-  CreateVideoDecoder(const VideoInfo& aConfig,
-                     layers::LayersBackend aLayersBackend,
-                     layers::ImageContainer* aImageContainer,
-                     FlushableTaskQueue* aVideoTaskQueue,
-                     MediaDataDecoderCallback* aCallback,
-                     DecoderDoctorDiagnostics* aDiagnostics) override;
+  CreateVideoDecoder(const CreateDecoderParams& aParams) override;
 
   already_AddRefed<MediaDataDecoder>
-  CreateAudioDecoder(const AudioInfo& aConfig,
-                     FlushableTaskQueue* aAudioTaskQueue,
-                     MediaDataDecoderCallback* aCallback,
-                     DecoderDoctorDiagnostics* aDiagnostics) override;
+  CreateAudioDecoder(const CreateDecoderParams& aParams) override;
 
 
   AndroidDecoderModule() {}
@@ -50,7 +43,7 @@ public:
 
   MediaCodecDataDecoder(MediaData::Type aType,
                         const nsACString& aMimeType,
-                        widget::sdk::MediaFormat::Param aFormat,
+                        java::sdk::MediaFormat::Param aFormat,
                         MediaDataDecoderCallback* aCallback);
 
   virtual ~MediaCodecDataDecoder();
@@ -80,16 +73,16 @@ protected:
 
   static const char* ModuleStateStr(ModuleState aState);
 
-  virtual nsresult InitDecoder(widget::sdk::Surface::Param aSurface);
+  virtual nsresult InitDecoder(java::sdk::Surface::Param aSurface);
 
-  virtual nsresult Output(widget::sdk::BufferInfo::Param aInfo, void* aBuffer,
-      widget::sdk::MediaFormat::Param aFormat, const media::TimeUnit& aDuration)
+  virtual nsresult Output(java::sdk::BufferInfo::Param aInfo, void* aBuffer,
+      java::sdk::MediaFormat::Param aFormat, const media::TimeUnit& aDuration)
   {
     return NS_OK;
   }
 
-  virtual nsresult PostOutput(widget::sdk::BufferInfo::Param aInfo,
-      widget::sdk::MediaFormat::Param aFormat, const media::TimeUnit& aDuration)
+  virtual nsresult PostOutput(java::sdk::BufferInfo::Param aInfo,
+      java::sdk::MediaFormat::Param aFormat, const media::TimeUnit& aDuration)
   {
     return NS_OK;
   }
@@ -101,16 +94,17 @@ protected:
 
   nsresult GetInputBuffer(JNIEnv* env, int index, jni::Object::LocalRef* buffer);
   bool WaitForInput();
-  MediaRawData* PeekNextSample();
+  already_AddRefed<MediaRawData> PeekNextSample();
   nsresult QueueSample(const MediaRawData* aSample);
   nsresult QueueEOS();
   void HandleEOS(int32_t aOutputStatus);
-  media::TimeUnit GetOutputDuration();
-  nsresult ProcessOutput(widget::sdk::BufferInfo::Param aInfo,
-                         widget::sdk::MediaFormat::Param aFormat,
+  Maybe<media::TimeUnit> GetOutputDuration();
+  nsresult ProcessOutput(java::sdk::BufferInfo::Param aInfo,
+                         java::sdk::MediaFormat::Param aFormat,
                          int32_t aStatus);
   ModuleState State() const;
-  void State(ModuleState aState);
+  // Sets decoder state and returns whether the new state has become effective.
+  bool State(ModuleState aState);
   void DecoderLoop();
 
   virtual void ClearQueue();
@@ -118,11 +112,11 @@ protected:
   MediaData::Type mType;
 
   nsAutoCString mMimeType;
-  widget::sdk::MediaFormat::GlobalRef mFormat;
+  java::sdk::MediaFormat::GlobalRef mFormat;
 
   MediaDataDecoderCallback* mCallback;
 
-  widget::sdk::MediaCodec::GlobalRef mDecoder;
+  java::sdk::MediaCodec::GlobalRef mDecoder;
 
   jni::ObjectArray::GlobalRef mInputBuffers;
   jni::ObjectArray::GlobalRef mOutputBuffers;
@@ -136,7 +130,7 @@ protected:
 
   SampleQueue mQueue;
   // Durations are stored in microseconds.
-  std::queue<media::TimeUnit> mDurations;
+  std::deque<media::TimeUnit> mDurations;
 };
 
 } // namespace mozilla

@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /* eslint-env browser */
-/* globals AddonsTab, WorkersTab */
+/* globals AddonsPanel, WorkersPanel */
 
 "use strict";
 
@@ -11,36 +11,38 @@ const { createFactory, createClass, DOM: dom } =
   require("devtools/client/shared/vendor/react");
 const Services = require("Services");
 
-const TabMenu = createFactory(require("./tab-menu"));
+const PanelMenu = createFactory(require("./panel-menu"));
 
-loader.lazyGetter(this, "AddonsTab",
-  () => createFactory(require("./addons-tab")));
-loader.lazyGetter(this, "WorkersTab",
-  () => createFactory(require("./workers-tab")));
+loader.lazyGetter(this, "AddonsPanel",
+  () => createFactory(require("./addons/panel")));
+loader.lazyGetter(this, "WorkersPanel",
+  () => createFactory(require("./workers/panel")));
 
 const Strings = Services.strings.createBundle(
   "chrome://devtools/locale/aboutdebugging.properties");
 
-const tabs = [{
+const panels = [{
   id: "addons",
+  panelId: "addons-panel",
   name: Strings.GetStringFromName("addons"),
   icon: "chrome://devtools/skin/images/debugging-addons.svg",
-  component: AddonsTab
+  component: AddonsPanel
 }, {
   id: "workers",
+  panelId: "workers-panel",
   name: Strings.GetStringFromName("workers"),
   icon: "chrome://devtools/skin/images/debugging-workers.svg",
-  component: WorkersTab
+  component: WorkersPanel
 }];
 
-const defaultTabId = "addons";
+const defaultPanelId = "addons";
 
 module.exports = createClass({
   displayName: "AboutDebuggingApp",
 
   getInitialState() {
     return {
-      selectedTabId: defaultTabId
+      selectedPanelId: defaultPanelId
     };
   },
 
@@ -56,35 +58,37 @@ module.exports = createClass({
     this.props.telemetry.destroy();
   },
 
-  render() {
-    let { client } = this.props;
-    let { selectedTabId } = this.state;
-    let selectTab = this.selectTab;
-
-    let selectedTab = tabs.find(t => t.id == selectedTabId);
-
-    return dom.div({ className: "app" },
-      TabMenu({ tabs, selectedTabId, selectTab }),
-      dom.div({ className: "main-content" },
-        selectedTab.component({ client })
-      )
-    );
-  },
-
   onHashChange() {
-    let tabId = window.location.hash.substr(1);
+    let hash = window.location.hash;
+    // Default to defaultTabId if no hash is provided.
+    let panelId = hash ? hash.substr(1) : defaultPanelId;
 
-    let isValid = tabs.some(t => t.id == tabId);
+    let isValid = panels.some(p => p.id == panelId);
     if (isValid) {
-      this.setState({ selectedTabId: tabId });
+      this.setState({ selectedPanelId: panelId });
     } else {
       // If the current hash matches no valid category, navigate to the default
-      // tab.
-      this.selectTab(defaultTabId);
+      // panel.
+      this.selectPanel(defaultPanelId);
     }
   },
 
-  selectTab(tabId) {
-    window.location.hash = "#" + tabId;
+  selectPanel(panelId) {
+    window.location.hash = "#" + panelId;
+  },
+
+  render() {
+    let { client } = this.props;
+    let { selectedPanelId } = this.state;
+    let selectPanel = this.selectPanel;
+
+    let selectedPanel = panels.find(p => p.id == selectedPanelId);
+
+    return dom.div({ className: "app" },
+      PanelMenu({ panels, selectedPanelId, selectPanel }),
+      dom.div({ className: "main-content" },
+        selectedPanel.component({ client, id: selectedPanel.panelId })
+      )
+    );
   }
 });

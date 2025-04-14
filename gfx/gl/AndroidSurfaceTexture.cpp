@@ -20,8 +20,8 @@
 
 using namespace mozilla;
 using namespace mozilla::jni;
-using namespace mozilla::widget;
-using namespace mozilla::widget::sdk;
+using namespace mozilla::java;
+using namespace mozilla::java::sdk;
 
 namespace mozilla {
 namespace gl {
@@ -293,8 +293,7 @@ AndroidSurfaceTexture::NotifyFrameAvailable()
     // Proxy to main thread if we aren't on it
     if (!NS_IsMainThread()) {
       // Proxy to main thread
-      nsCOMPtr<nsIRunnable> event = NS_NewRunnableMethod(this, &AndroidSurfaceTexture::NotifyFrameAvailable);
-      NS_DispatchToCurrentThread(event);
+      NS_DispatchToCurrentThread(NewRunnableMethod(this, &AndroidSurfaceTexture::NotifyFrameAvailable));
     } else {
       mFrameAvailableCallback->Run();
     }

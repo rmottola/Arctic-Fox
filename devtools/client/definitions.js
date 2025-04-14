@@ -23,6 +23,7 @@ loader.lazyGetter(this, "PerformancePanel", () => require("devtools/client/perfo
 loader.lazyGetter(this, "NetMonitorPanel", () => require("devtools/client/netmonitor/panel").NetMonitorPanel);
 loader.lazyGetter(this, "StoragePanel", () => require("devtools/client/storage/panel").StoragePanel);
 loader.lazyGetter(this, "ScratchpadPanel", () => require("devtools/client/scratchpad/scratchpad-panel").ScratchpadPanel);
+loader.lazyGetter(this, "DomPanel", () => require("devtools/client/dom/dom-panel").DomPanel);
 
 // Strings
 const toolboxProps = "chrome://devtools/locale/toolbox.properties";
@@ -38,6 +39,7 @@ const netMonitorProps = "chrome://devtools/locale/netmonitor.properties";
 const storageProps = "chrome://devtools/locale/storage.properties";
 const scratchpadProps = "chrome://devtools/locale/scratchpad.properties";
 const memoryProps = "chrome://devtools/locale/memory.properties";
+const domProps = "chrome://devtools/locale/dom.properties";
 
 loader.lazyGetter(this, "toolboxStrings", () => Services.strings.createBundle(toolboxProps));
 loader.lazyGetter(this, "performanceStrings", () => Services.strings.createBundle(performanceProps));
@@ -52,6 +54,7 @@ loader.lazyGetter(this, "netMonitorStrings", () => Services.strings.createBundle
 loader.lazyGetter(this, "storageStrings", () => Services.strings.createBundle(storageProps));
 loader.lazyGetter(this, "scratchpadStrings", () => Services.strings.createBundle(scratchpadProps));
 loader.lazyGetter(this, "memoryStrings", () => Services.strings.createBundle(memoryProps));
+loader.lazyGetter(this, "domStrings", () => Services.strings.createBundle(domProps));
 
 var Tools = {};
 exports.Tools = Tools;
@@ -70,11 +73,11 @@ Tools.options = {
   tooltip: l10n("optionsButton.tooltip", toolboxStrings),
   inMenu: false,
 
-  isTargetSupported: function() {
+  isTargetSupported: function () {
     return true;
   },
 
-  build: function(iframeWindow, toolbox) {
+  build: function (iframeWindow, toolbox) {
     return new OptionsPanel(iframeWindow, toolbox);
   }
 };
@@ -102,15 +105,15 @@ Tools.inspector = {
   ],
 
   preventClosingOnKey: true,
-  onkey: function(panel, toolbox) {
+  onkey: function (panel, toolbox) {
     toolbox.highlighterUtils.togglePicker();
   },
 
-  isTargetSupported: function(target) {
+  isTargetSupported: function (target) {
     return target.hasActor("inspector");
   },
 
-  build: function(iframeWindow, toolbox) {
+  build: function (iframeWindow, toolbox) {
     return new InspectorPanel(iframeWindow, toolbox);
   }
 };
@@ -135,7 +138,7 @@ Tools.webConsole = {
   commands: "devtools/client/webconsole/console-commands",
 
   preventClosingOnKey: true,
-  onkey: function(panel, toolbox) {
+  onkey: function (panel, toolbox) {
     if (toolbox.splitConsole) {
       return toolbox.focusConsoleInput();
     }
@@ -144,11 +147,11 @@ Tools.webConsole = {
     return undefined;
   },
 
-  isTargetSupported: function() {
+  isTargetSupported: function () {
     return true;
   },
 
-  build: function(iframeWindow, toolbox) {
+  build: function (iframeWindow, toolbox) {
     return new WebConsolePanel(iframeWindow, toolbox);
   }
 };
@@ -172,11 +175,11 @@ Tools.jsdebugger = {
   inMenu: true,
   commands: "devtools/client/debugger/debugger-commands",
 
-  isTargetSupported: function() {
+  isTargetSupported: function () {
     return true;
   },
 
-  build: function(iframeWindow, toolbox) {
+  build: function (iframeWindow, toolbox) {
     return new DebuggerPanel(iframeWindow, toolbox);
   }
 };
@@ -199,11 +202,11 @@ Tools.styleEditor = {
   inMenu: true,
   commands: "devtools/client/styleeditor/styleeditor-commands",
 
-  isTargetSupported: function(target) {
+  isTargetSupported: function (target) {
     return target.hasActor("styleEditor") || target.hasActor("styleSheets");
   },
 
-  build: function(iframeWindow, toolbox) {
+  build: function (iframeWindow, toolbox) {
     return new StyleEditorPanel(iframeWindow, toolbox);
   }
 };
@@ -219,11 +222,11 @@ Tools.shaderEditor = {
   panelLabel: l10n("ToolboxShaderEditor.panelLabel", shaderEditorStrings),
   tooltip: l10n("ToolboxShaderEditor.tooltip", shaderEditorStrings),
 
-  isTargetSupported: function(target) {
+  isTargetSupported: function (target) {
     return target.hasActor("webgl") && !target.chrome;
   },
 
-  build: function(iframeWindow, toolbox) {
+  build: function (iframeWindow, toolbox) {
     return new ShaderEditorPanel(iframeWindow, toolbox);
   }
 };
@@ -241,11 +244,11 @@ Tools.canvasDebugger = {
 
   // Hide the Canvas Debugger in the Add-on Debugger and Browser Toolbox
   // (bug 1047520).
-  isTargetSupported: function(target) {
+  isTargetSupported: function (target) {
     return target.hasActor("canvas") && !target.chrome;
   },
 
-  build: function(iframeWindow, toolbox) {
+  build: function (iframeWindow, toolbox) {
     return new CanvasDebuggerPanel(iframeWindow, toolbox);
   }
 };
@@ -269,11 +272,11 @@ Tools.performance = {
   modifiers: "shift",
   inMenu: true,
 
-  isTargetSupported: function(target) {
+  isTargetSupported: function (target) {
     return target.hasActor("profiler");
   },
 
-  build: function(frame, target) {
+  build: function (frame, target) {
     return new PerformancePanel(frame, target);
   }
 };
@@ -290,11 +293,11 @@ Tools.memory = {
   panelLabel: l10n("memory.panelLabel", memoryStrings),
   tooltip: l10n("memory.tooltip", memoryStrings),
 
-  isTargetSupported: function(target) {
+  isTargetSupported: function (target) {
     return target.getTrait("heapSnapshots");
   },
 
-  build: function(frame, target) {
+  build: function (frame, target) {
     return new MemoryPanel(frame, target);
   }
 };
@@ -317,11 +320,11 @@ Tools.netMonitor = {
   },
   inMenu: true,
 
-  isTargetSupported: function(target) {
+  isTargetSupported: function (target) {
     return target.getTrait("networkMonitor");
   },
 
-  build: function(iframeWindow, toolbox) {
+  build: function (iframeWindow, toolbox) {
     return new NetMonitorPanel(iframeWindow, toolbox);
   }
 };
@@ -345,12 +348,12 @@ Tools.storage = {
   },
   inMenu: true,
 
-  isTargetSupported: function(target) {
+  isTargetSupported: function (target) {
     return target.isLocalTab ||
            (target.hasActor("storage") && target.getTrait("storageInspector"));
   },
 
-  build: function(iframeWindow, toolbox) {
+  build: function (iframeWindow, toolbox) {
     return new StoragePanel(iframeWindow, toolbox);
   }
 };
@@ -366,11 +369,11 @@ Tools.webAudioEditor = {
   panelLabel: l10n("ToolboxWebAudioEditor1.panelLabel", webAudioEditorStrings),
   tooltip: l10n("ToolboxWebAudioEditor1.tooltip", webAudioEditorStrings),
 
-  isTargetSupported: function(target) {
+  isTargetSupported: function (target) {
     return !target.chrome && target.hasActor("webaudio");
   },
 
-  build: function(iframeWindow, toolbox) {
+  build: function (iframeWindow, toolbox) {
     return new WebAudioEditorPanel(iframeWindow, toolbox);
   }
 };
@@ -388,12 +391,39 @@ Tools.scratchpad = {
   inMenu: false,
   commands: "devtools/client/scratchpad/scratchpad-commands",
 
-  isTargetSupported: function(target) {
+  isTargetSupported: function (target) {
     return target.hasActor("console");
   },
 
-  build: function(iframeWindow, toolbox) {
+  build: function (iframeWindow, toolbox) {
     return new ScratchpadPanel(iframeWindow, toolbox);
+  }
+};
+
+Tools.dom = {
+  id: "dom",
+  accesskey: l10n("dom.accesskey", domStrings),
+  key: l10n("dom.commandkey", domStrings),
+  ordinal: 13,
+  modifiers: osString == "Darwin" ? "accel,alt" : "accel,shift",
+  visibilityswitch: "devtools.dom.enabled",
+  icon: "chrome://devtools/skin/images/tool-dom.svg",
+  invertIconForLightTheme: true,
+  url: "chrome://devtools/content/dom/dom.html",
+  label: l10n("dom.label", domStrings),
+  panelLabel: l10n("dom.panelLabel", domStrings),
+  get tooltip() {
+    return l10n("dom.tooltip", domStrings,
+    (osString == "Darwin" ? "Cmd+Opt+" : "Ctrl+Shift+") + this.key);
+  },
+  inMenu: true,
+
+  isTargetSupported: function (target) {
+    return target.getTrait("webConsoleCommands");
+  },
+
+  build: function (iframeWindow, toolbox) {
+    return new DomPanel(iframeWindow, toolbox);
   }
 };
 
@@ -411,6 +441,7 @@ var defaultTools = [
   Tools.storage,
   Tools.scratchpad,
   Tools.memory,
+  Tools.dom,
 ];
 
 exports.defaultTools = defaultTools;
@@ -459,7 +490,7 @@ function l10n(name, bundle, arg) {
     return arg ? bundle.formatStringFromName(name, [arg], 1)
     : bundle.GetStringFromName(name);
   } catch (ex) {
-    Services.console.logStringMessage("Error reading '" + name + "'");
+    console.log("Error reading '" + name + "'");
     throw new Error("l10n error with " + name);
   }
 }

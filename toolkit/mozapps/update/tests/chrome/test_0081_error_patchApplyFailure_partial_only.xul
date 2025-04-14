@@ -41,7 +41,7 @@ function runTest() {
   writeStatusFile(STATE_FAILED + ": " + CRC_ERROR);
   reloadUpdateManagerData();
 
-  initUpdateServiceStub();
+  testPostUpdateProcessing();
 }
 
 ]]>

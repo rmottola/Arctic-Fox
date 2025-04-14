@@ -188,8 +188,10 @@ public:
 
 class nsDisplayBullet final : public nsDisplayItem {
 public:
-  nsDisplayBullet(nsDisplayListBuilder* aBuilder, nsBulletFrame* aFrame) :
-    nsDisplayItem(aBuilder, aFrame) {
+  nsDisplayBullet(nsDisplayListBuilder* aBuilder, nsBulletFrame* aFrame)
+    : nsDisplayItem(aBuilder, aFrame)
+    , mDisableSubpixelAA(false)
+  {
     MOZ_COUNT_CTOR(nsDisplayBullet);
   }
 #ifdef NS_BUILD_REFCNT_LOGGING
@@ -219,6 +221,10 @@ public:
     return GetBounds(aBuilder, &snap);
   }
 
+  virtual void DisableComponentAlpha() override {
+    mDisableSubpixelAA = true;
+  }
+
   virtual nsDisplayItemGeometry* AllocateGeometry(nsDisplayListBuilder* aBuilder) override
   {
     return new nsDisplayBulletGeometry(this, aBuilder);
@@ -246,6 +252,9 @@ public:
 
     return nsDisplayItem::ComputeInvalidationRegion(aBuilder, aGeometry, aInvalidRegion);
   }
+
+protected:
+  bool mDisableSubpixelAA;
 };
 
 void nsDisplayBullet::Paint(nsDisplayListBuilder* aBuilder,
@@ -257,7 +266,8 @@ void nsDisplayBullet::Paint(nsDisplayListBuilder* aBuilder,
   }
 
   DrawResult result = static_cast<nsBulletFrame*>(mFrame)->
-    PaintBullet(*aCtx, ToReferenceFrame(), mVisibleRect, flags);
+    PaintBullet(*aCtx, ToReferenceFrame(), mVisibleRect, flags,
+                mDisableSubpixelAA);
 
   nsDisplayBulletGeometry::UpdateDrawResult(this, result);
 }
@@ -278,7 +288,8 @@ nsBulletFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
 
 DrawResult
 nsBulletFrame::PaintBullet(nsRenderingContext& aRenderingContext, nsPoint aPt,
-                           const nsRect& aDirtyRect, uint32_t aFlags)
+                           const nsRect& aDirtyRect, uint32_t aFlags,
+                           bool aDisableSubpixelAA)
 {
   const nsStyleList* myList = StyleList();
   CounterStyle* listStyleType = myList->GetCounterStyle();
@@ -298,7 +309,7 @@ nsBulletFrame::PaintBullet(nsRenderingContext& aRenderingContext, nsPoint aPt,
         return
           nsLayoutUtils::DrawSingleImage(*aRenderingContext.ThebesContext(),
              PresContext(),
-             imageCon, nsLayoutUtils::GetGraphicsFilterForFrame(this),
+             imageCon, nsLayoutUtils::GetSamplingFilterForFrame(this),
              dest + aPt, aDirtyRect, nullptr, aFlags);
       }
     }
@@ -408,6 +419,9 @@ nsBulletFrame::PaintBullet(nsRenderingContext& aRenderingContext, nsPoint aPt,
 
   default:
     {
+      DrawTargetAutoDisableSubpixelAntialiasing
+        disable(aRenderingContext.GetDrawTarget(), aDisableSubpixelAA);
+
       aRenderingContext.ThebesContext()->SetColor(
         Color::FromABGR(nsLayoutUtils::GetColor(this, eCSSProperty_color)));
 
@@ -523,7 +537,7 @@ nsBulletFrame::AppendSpacingToPadding(nsFontMetrics* aFontMetrics,
 void
 nsBulletFrame::GetDesiredSize(nsPresContext*  aCX,
                               nsRenderingContext *aRenderingContext,
-                              nsHTMLReflowMetrics& aMetrics,
+                              ReflowOutput& aMetrics,
                               float aFontSizeInflation,
                               LogicalMargin* aPadding)
 {
@@ -616,25 +630,25 @@ nsBulletFrame::GetDesiredSize(nsPresContext*  aCX,
 
 void
 nsBulletFrame::Reflow(nsPresContext* aPresContext,
-                      nsHTMLReflowMetrics& aMetrics,
-                      const nsHTMLReflowState& aReflowState,
+                      ReflowOutput& aMetrics,
+                      const ReflowInput& aReflowInput,
                       nsReflowStatus& aStatus)
 {
   MarkInReflow();
   DO_GLOBAL_REFLOW_COUNT("nsBulletFrame");
-  DISPLAY_REFLOW(aPresContext, this, aReflowState, aMetrics, aStatus);
+  DISPLAY_REFLOW(aPresContext, this, aReflowInput, aMetrics, aStatus);
 
   float inflation = nsLayoutUtils::FontSizeInflationFor(this);
   SetFontSizeInflation(inflation);
 
   // Get the base size
-  GetDesiredSize(aPresContext, aReflowState.rendContext, aMetrics, inflation,
+  GetDesiredSize(aPresContext, aReflowInput.mRenderingContext, aMetrics, inflation,
                  &mPadding);
 
   // Add in the border and padding; split the top/bottom between the
   // ascent and descent to make things look nice
-  WritingMode wm = aReflowState.GetWritingMode();
-  const LogicalMargin& bp = aReflowState.ComputedLogicalBorderPadding();
+  WritingMode wm = aReflowInput.GetWritingMode();
+  const LogicalMargin& bp = aReflowInput.ComputedLogicalBorderPadding();
   mPadding.BStart(wm) += NSToCoordRound(bp.BStart(wm) * inflation);
   mPadding.IEnd(wm) += NSToCoordRound(bp.IEnd(wm) * inflation);
   mPadding.BEnd(wm) += NSToCoordRound(bp.BEnd(wm) * inflation);
@@ -654,14 +668,14 @@ nsBulletFrame::Reflow(nsPresContext* aPresContext,
   aMetrics.SetOverflowAreasToDesiredBounds();
 
   aStatus = NS_FRAME_COMPLETE;
-  NS_FRAME_SET_TRUNCATION(aStatus, aReflowState, aMetrics);
+  NS_FRAME_SET_TRUNCATION(aStatus, aReflowInput, aMetrics);
 }
 
 /* virtual */ nscoord
 nsBulletFrame::GetMinISize(nsRenderingContext *aRenderingContext)
 {
   WritingMode wm = GetWritingMode();
-  nsHTMLReflowMetrics metrics(wm);
+  ReflowOutput metrics(wm);
   DISPLAY_MIN_WIDTH(this, metrics.ISize(wm));
   LogicalMargin padding(wm);
   GetDesiredSize(PresContext(), aRenderingContext, metrics, 1.0f, &padding);
@@ -673,7 +687,7 @@ nsBulletFrame::GetMinISize(nsRenderingContext *aRenderingContext)
 nsBulletFrame::GetPrefISize(nsRenderingContext *aRenderingContext)
 {
   WritingMode wm = GetWritingMode();
-  nsHTMLReflowMetrics metrics(wm);
+  ReflowOutput metrics(wm);
   DISPLAY_PREF_WIDTH(this, metrics.ISize(wm));
   LogicalMargin padding(wm);
   GetDesiredSize(PresContext(), aRenderingContext, metrics, 1.0f, &padding);

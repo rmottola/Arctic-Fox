@@ -1,5 +1,8 @@
-/* Any copyright is dedicated to the Public Domain.
- * http://creativecommons.org/publicdomain/zero/1.0/ */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft= javascript ts=2 et sw=2 tw=80: */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 "use strict";
 
@@ -65,8 +68,8 @@ function _attachConsole(aListeners, aCallback, aAttachToTab, aAttachToWorker)
   function _onAttachConsole(aState, aResponse, aWebConsoleClient)
   {
     if (aResponse.error) {
-      Cu.reportError("attachConsole failed: " + aResponse.error + " " +
-                     aResponse.message);
+      console.error("attachConsole failed: " + aResponse.error + " " +
+                    aResponse.message);
     }
 
     aState.client = aWebConsoleClient;
@@ -76,8 +79,8 @@ function _attachConsole(aListeners, aCallback, aAttachToTab, aAttachToWorker)
 
   connectToDebugger(function _onConnect(aState, aResponse) {
     if (aResponse.error) {
-      Cu.reportError("client.connect() failed: " + aResponse.error + " " +
-                     aResponse.message);
+      console.error("client.connect() failed: " + aResponse.error + " " +
+                    aResponse.message);
       aCallback(aState, aResponse);
       return;
     }
@@ -85,22 +88,42 @@ function _attachConsole(aListeners, aCallback, aAttachToTab, aAttachToWorker)
     if (aAttachToTab) {
       aState.dbgClient.listTabs(function _onListTabs(aResponse) {
         if (aResponse.error) {
-          Cu.reportError("listTabs failed: " + aResponse.error + " " +
-                         aResponse.message);
+          console.error("listTabs failed: " + aResponse.error + " " +
+                        aResponse.message);
           aCallback(aState, aResponse);
           return;
         }
-        let consoleActor = aResponse.tabs[aResponse.selected].consoleActor;
-        aState.actor = consoleActor;
-        aState.dbgClient.attachConsole(consoleActor, aListeners,
-                                       _onAttachConsole.bind(null, aState));
+        let tab = aResponse.tabs[aResponse.selected];
+        aState.dbgClient.attachTab(tab.actor, function (response, tabClient) {
+          if (aAttachToWorker) {
+            var worker = new Worker("console-test-worker.js");
+            worker.addEventListener("message", function listener() {
+              worker.removeEventListener("message", listener);
+              tabClient.listWorkers(function (response) {
+                tabClient.attachWorker(response.workers[0].actor, function (response, workerClient) {
+                  workerClient.attachThread({}, function(aResponse) {
+                    aState.actor = workerClient.consoleActor;
+                    aState.dbgClient.attachConsole(workerClient.consoleActor, aListeners,
+                                                   _onAttachConsole.bind(null, aState));
+                  });
+                });
+              });
+            });
+          } else {
+            aState.actor = tab.consoleActor;
+            aState.dbgClient.attachConsole(tab.consoleActor, aListeners,
+                                           _onAttachConsole.bind(null, aState));
+          }
+        });
       });
     } else {
       aState.dbgClient.getProcess().then(response => {
-        let consoleActor = response.form.consoleActor;
-        aState.actor = consoleActor;
-        aState.dbgClient.attachConsole(consoleActor, aListeners,
-                                       _onAttachConsole.bind(null, aState));
+        aState.dbgClient.attachTab(response.form.actor, function () {
+          let consoleActor = response.form.consoleActor;
+          aState.actor = consoleActor;
+          aState.dbgClient.attachConsole(consoleActor, aListeners,
+                                         _onAttachConsole.bind(null, aState));
+        });
       });
     }
   });

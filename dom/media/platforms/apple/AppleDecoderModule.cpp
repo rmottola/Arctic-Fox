@@ -12,7 +12,7 @@
 #include "AppleVTDecoder.h"
 #include "AppleVTLinker.h"
 #include "MacIOSurfaceImage.h"
-#include "mozilla/Preferences.h"
+#include "MediaPrefs.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Logging.h"
 
@@ -23,7 +23,6 @@ bool AppleDecoderModule::sIsCoreMediaAvailable = false;
 bool AppleDecoderModule::sIsVTAvailable = false;
 bool AppleDecoderModule::sIsVTHWAvailable = false;
 bool AppleDecoderModule::sIsVDAAvailable = false;
-bool AppleDecoderModule::sForceVDA = false;
 bool AppleDecoderModule::sCanUseHardwareVideoDecoder = true;
 
 AppleDecoderModule::AppleDecoderModule()
@@ -38,13 +37,9 @@ AppleDecoderModule::~AppleDecoderModule()
 void
 AppleDecoderModule::Init()
 {
-  MOZ_ASSERT(NS_IsMainThread(), "Must be on main thread.");
-
   if (sInitialized) {
     return;
   }
-
-  Preferences::AddBoolVarCache(&sForceVDA, "media.apple.forcevda", false);
 
   // Ensure IOSurface framework is loaded.
   MacIOSurfaceLib::LoadLibrary();
@@ -79,21 +74,16 @@ AppleDecoderModule::Startup()
 }
 
 already_AddRefed<MediaDataDecoder>
-AppleDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
-                                       layers::LayersBackend aLayersBackend,
-                                       layers::ImageContainer* aImageContainer,
-                                       FlushableTaskQueue* aVideoTaskQueue,
-                                       MediaDataDecoderCallback* aCallback,
-                                       DecoderDoctorDiagnostics* aDiagnostics)
+AppleDecoderModule::CreateVideoDecoder(const CreateDecoderParams& aParams)
 {
   RefPtr<MediaDataDecoder> decoder;
 
-  if (sIsVDAAvailable && (!sIsVTHWAvailable || sForceVDA)) {
+  if (sIsVDAAvailable && (!sIsVTHWAvailable || MediaPrefs::AppleForceVDA())) {
     decoder =
-      AppleVDADecoder::CreateVDADecoder(aConfig,
-                                        aVideoTaskQueue,
-                                        aCallback,
-                                        aImageContainer);
+      AppleVDADecoder::CreateVDADecoder(aParams.VideoConfig(),
+                                        aParams.mTaskQueue,
+                                        aParams.mCallback,
+                                        aParams.mImageContainer);
     if (decoder) {
       return decoder.forget();
     }
@@ -102,19 +92,21 @@ AppleDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
   // supported by the current platform.
   if (sIsVTAvailable) {
     decoder =
-      new AppleVTDecoder(aConfig, aVideoTaskQueue, aCallback, aImageContainer);
+      new AppleVTDecoder(aParams.VideoConfig(),
+                         aParams.mTaskQueue,
+                         aParams.mCallback,
+                         aParams.mImageContainer);
   }
   return decoder.forget();
 }
 
 already_AddRefed<MediaDataDecoder>
-AppleDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
-                                       FlushableTaskQueue* aAudioTaskQueue,
-                                       MediaDataDecoderCallback* aCallback,
-                                       DecoderDoctorDiagnostics* aDiagnostics)
+AppleDecoderModule::CreateAudioDecoder(const CreateDecoderParams& aParams)
 {
   RefPtr<MediaDataDecoder> decoder =
-    new AppleATDecoder(aConfig, aAudioTaskQueue, aCallback);
+    new AppleATDecoder(aParams.AudioConfig(),
+                       aParams.mTaskQueue,
+                       aParams.mCallback);
   return decoder.forget();
 }
 

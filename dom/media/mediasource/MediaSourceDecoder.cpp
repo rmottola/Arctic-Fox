@@ -7,7 +7,6 @@
 
 #include "mozilla/Logging.h"
 #include "mozilla/dom/HTMLMediaElement.h"
-#include "mozilla/Preferences.h"
 #include "MediaDecoderStateMachine.h"
 #include "MediaSource.h"
 #include "MediaSourceResource.h"
@@ -152,7 +151,7 @@ MediaSourceDecoder::GetBuffered()
   return buffered;
 }
 
-RefPtr<ShutdownPromise>
+void
 MediaSourceDecoder::Shutdown()
 {
   MOZ_ASSERT(NS_IsMainThread());
@@ -164,7 +163,7 @@ MediaSourceDecoder::Shutdown()
   }
   mDemuxer = nullptr;
 
-  return MediaDecoder::Shutdown();
+  MediaDecoder::Shutdown();
 }
 
 /*static*/
@@ -219,14 +218,13 @@ MediaSourceDecoder::SetInitialDuration(int64_t aDuration)
   if (aDuration >= 0) {
     duration /= USECS_PER_S;
   }
-  SetMediaSourceDuration(duration, MSRangeRemovalAction::SKIP);
+  SetMediaSourceDuration(duration);
 }
 
 void
-MediaSourceDecoder::SetMediaSourceDuration(double aDuration, MSRangeRemovalAction aAction)
+MediaSourceDecoder::SetMediaSourceDuration(double aDuration)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  double oldDuration = ExplicitDuration();
   if (aDuration >= 0) {
     int64_t checkedDuration;
     if (NS_FAILED(SecondsToUsecs(aDuration, checkedDuration))) {
@@ -238,17 +236,6 @@ MediaSourceDecoder::SetMediaSourceDuration(double aDuration, MSRangeRemovalActio
   } else {
     SetExplicitDuration(PositiveInfinity<double>());
   }
-
-  if (mMediaSource && aAction != MSRangeRemovalAction::SKIP) {
-    mMediaSource->DurationChange(oldDuration, aDuration);
-  }
-}
-
-double
-MediaSourceDecoder::GetMediaSourceDuration()
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  return ExplicitDuration();
 }
 
 void
@@ -283,7 +270,7 @@ MediaSourceDecoder::NextFrameBufferedStatus()
   TimeInterval interval(currentPosition,
                         currentPosition + media::TimeUnit::FromMicroseconds(DEFAULT_NEXT_FRAME_AVAILABLE_BUFFERED),
                         MediaSourceDemuxer::EOS_FUZZ);
-  return GetBuffered().Contains(interval)
+  return GetBuffered().Contains(ClampIntervalToEnd(interval))
     ? MediaDecoderOwner::NEXT_FRAME_AVAILABLE
     : MediaDecoderOwner::NEXT_FRAME_UNAVAILABLE;
 }
@@ -313,7 +300,17 @@ MediaSourceDecoder::CanPlayThrough()
   TimeInterval interval(currentPosition,
                         timeAhead,
                         MediaSourceDemuxer::EOS_FUZZ);
-  return GetBuffered().Contains(interval);
+  return GetBuffered().Contains(ClampIntervalToEnd(interval));
+}
+
+TimeInterval
+MediaSourceDecoder::ClampIntervalToEnd(const TimeInterval& aInterval)
+{
+  if (!mEnded) {
+    return aInterval;
+  }
+  TimeInterval interval(TimeUnit(), TimeUnit::FromSeconds(GetDuration()));
+  return aInterval.Intersection(interval);
 }
 
 #undef MSE_DEBUG

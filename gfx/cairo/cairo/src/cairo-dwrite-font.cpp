@@ -641,8 +641,9 @@ _cairo_dwrite_scaled_show_glyphs(void			*scaled_font,
 	    run.fontEmSize = 1.0f;
 	}
 
+	HRESULT hr;
 	if (!transform) {
-	    DWriteFactory::Instance()->CreateGlyphRunAnalysis(&run,
+	    hr = DWriteFactory::Instance()->CreateGlyphRunAnalysis(&run,
 							      1.0f,
 							      NULL,
 							      DWRITE_RENDERING_MODE_CLEARTYPE_NATURAL_SYMMETRIC,
@@ -652,7 +653,7 @@ _cairo_dwrite_scaled_show_glyphs(void			*scaled_font,
 							      &analysis);
 	} else {
 	    DWRITE_MATRIX dwmatrix = _cairo_dwrite_matrix_from_matrix(&dwritesf->mat);
-	    DWriteFactory::Instance()->CreateGlyphRunAnalysis(&run,
+	    hr = DWriteFactory::Instance()->CreateGlyphRunAnalysis(&run,
 							      1.0f,
 							      &dwmatrix,
 							      DWRITE_RENDERING_MODE_CLEARTYPE_NATURAL_SYMMETRIC,
@@ -660,6 +661,10 @@ _cairo_dwrite_scaled_show_glyphs(void			*scaled_font,
 							      0,
 							      0,
 							      &analysis);
+	}
+
+	if (FAILED(hr) || !analysis) {
+	    return CAIRO_INT_STATUS_UNSUPPORTED;
 	}
 
 	RECT r;
@@ -1134,14 +1139,22 @@ _dwrite_draw_glyphs_to_gdi_surface_gdi(cairo_win32_surface_t *surface,
     IDWriteGdiInterop *gdiInterop;
     DWriteFactory::Instance()->GetGdiInterop(&gdiInterop);
     IDWriteBitmapRenderTarget *rt;
+    HRESULT rv;
 
     IDWriteRenderingParams *params =
         DWriteFactory::RenderingParams(scaled_font->rendering_mode);
 
-    gdiInterop->CreateBitmapRenderTarget(surface->dc, 
-					 area.right - area.left, 
-					 area.bottom - area.top, 
-					 &rt);
+    rv = gdiInterop->CreateBitmapRenderTarget(surface->dc,
+					      area.right - area.left,
+					      area.bottom - area.top,
+					      &rt);
+    if (FAILED(rv)) {
+	if (rv == E_OUTOFMEMORY) {
+	    return (cairo_int_status_t)CAIRO_STATUS_NO_MEMORY;
+	} else {
+	    return CAIRO_INT_STATUS_UNSUPPORTED;
+	}
+    }
 
     /**
      * We set the number of pixels per DIP to 1.0. This is because we always want

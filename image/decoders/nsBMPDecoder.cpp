@@ -82,13 +82,14 @@
 // - We treat OS2-BMPv2 files as if they are WinBMPv3 (i.e. ignore the extra 24
 //   bytes in the info header), which in practice is good enough.
 
+#include "ImageLogging.h"
+#include "nsBMPDecoder.h"
+
 #include <stdlib.h>
 
-#include "ImageLogging.h"
 #include "mozilla/Attributes.h"
-#include "mozilla/Endian.h"
+#include "mozilla/EndianUtils.h"
 #include "mozilla/Likely.h"
-#include "nsBMPDecoder.h"
 
 #include "nsIInputStream.h"
 #include "RasterImage.h"
@@ -177,6 +178,7 @@ nsBMPDecoder::nsBMPDecoder(RasterImage* aImage, State aState, size_t aLength)
   , mColors(nullptr)
   , mBytesPerColor(0)
   , mPreGapLength(0)
+  , mPixelRowSize(0)
   , mCurrentRow(0)
   , mCurrentPos(0)
   , mAbsoluteModeNumPixels(0)
@@ -433,36 +435,31 @@ nsBMPDecoder::FinishRow()
   mCurrentRow--;
 }
 
-void
-nsBMPDecoder::WriteInternal(const char* aBuffer, uint32_t aCount)
+Maybe<TerminalState>
+nsBMPDecoder::DoDecode(SourceBufferIterator& aIterator)
 {
-  MOZ_ASSERT(!HasError(), "Shouldn't call WriteInternal after error!");
-  MOZ_ASSERT(aBuffer);
-  MOZ_ASSERT(aCount > 0);
+  MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
+  MOZ_ASSERT(aIterator.Data());
+  MOZ_ASSERT(aIterator.Length() > 0);
 
-  Maybe<TerminalState> terminalState =
-    mLexer.Lex(aBuffer, aCount, [=](State aState,
-                                    const char* aData, size_t aLength) {
-      switch (aState) {
-        case State::FILE_HEADER:      return ReadFileHeader(aData, aLength);
-        case State::INFO_HEADER_SIZE: return ReadInfoHeaderSize(aData, aLength);
-        case State::INFO_HEADER_REST: return ReadInfoHeaderRest(aData, aLength);
-        case State::BITFIELDS:        return ReadBitfields(aData, aLength);
-        case State::COLOR_TABLE:      return ReadColorTable(aData, aLength);
-        case State::GAP:              return SkipGap();
-        case State::AFTER_GAP:        return AfterGap();
-        case State::PIXEL_ROW:        return ReadPixelRow(aData);
-        case State::RLE_SEGMENT:      return ReadRLESegment(aData);
-        case State::RLE_DELTA:        return ReadRLEDelta(aData);
-        case State::RLE_ABSOLUTE:     return ReadRLEAbsolute(aData, aLength);
-        default:
-          MOZ_CRASH("Unknown State");
-      }
-    });
-
-  if (terminalState == Some(TerminalState::FAILURE)) {
-    PostDataError();
-  }
+  return mLexer.Lex(aIterator.Data(), aIterator.Length(),
+                    [=](State aState, const char* aData, size_t aLength) {
+    switch (aState) {
+      case State::FILE_HEADER:      return ReadFileHeader(aData, aLength);
+      case State::INFO_HEADER_SIZE: return ReadInfoHeaderSize(aData, aLength);
+      case State::INFO_HEADER_REST: return ReadInfoHeaderRest(aData, aLength);
+      case State::BITFIELDS:        return ReadBitfields(aData, aLength);
+      case State::COLOR_TABLE:      return ReadColorTable(aData, aLength);
+      case State::GAP:              return SkipGap();
+      case State::AFTER_GAP:        return AfterGap();
+      case State::PIXEL_ROW:        return ReadPixelRow(aData);
+      case State::RLE_SEGMENT:      return ReadRLESegment(aData);
+      case State::RLE_DELTA:        return ReadRLEDelta(aData);
+      case State::RLE_ABSOLUTE:     return ReadRLEAbsolute(aData, aLength);
+      default:
+        MOZ_CRASH("Unknown State");
+    }
+  });
 }
 
 LexerTransition<nsBMPDecoder::State>
@@ -541,7 +538,7 @@ nsBMPDecoder::ReadInfoHeaderRest(const char* aData, size_t aLength)
     // of the color bitfields (see below).
   }
 
-  // Run with NSPR_LOG_MODULES=BMPDecoder:4 set to see this output.
+  // Run with MOZ_LOG=BMPDecoder:5 set to see this output.
   MOZ_LOG(sBMPLog, LogLevel::Debug,
           ("BMP: bihsize=%u, %d x %d, bpp=%u, compression=%u, colors=%u\n",
           mH.mBIHSize, mH.mWidth, mH.mHeight, uint32_t(mH.mBpp),
@@ -682,10 +679,11 @@ nsBMPDecoder::ReadBitfields(const char* aData, size_t aLength)
 
   if (mDownscaler) {
     // BMPs store their rows in reverse order, so the downscaler needs to
-    // reverse them again when writing its output.
+    // reverse them again when writing its output. Unless the height is
+    // negative!
     rv = mDownscaler->BeginFrame(GetSize(), Nothing(),
                                  mImageData, mMayHaveTransparency,
-                                 /* aFlipVertically = */ true);
+                                 /* aFlipVertically = */ mH.mHeight >= 0);
     if (NS_FAILED(rv)) {
       return Transition::TerminateFailure();
     }

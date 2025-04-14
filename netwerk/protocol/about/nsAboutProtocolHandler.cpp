@@ -21,6 +21,9 @@
 #include "nsIChannel.h"
 #include "nsIScriptError.h"
 
+namespace mozilla {
+namespace net {
+
 static NS_DEFINE_CID(kSimpleURICID,     NS_SIMPLEURI_CID);
 static NS_DEFINE_CID(kNestedAboutURICID, NS_NESTEDABOUTURI_CID);
 
@@ -191,8 +194,8 @@ nsAboutProtocolHandler::NewChannel2(nsIURI* uri,
                     NS_ASSERTION(false,
                         "nsIAboutModule->newChannel(aURI, aLoadInfo) needs to set LoadInfo");
                     const char16_t* params[] = {
-                        MOZ_UTF16("nsIAboutModule->newChannel(aURI)"),
-                        MOZ_UTF16("nsIAboutModule->newChannel(aURI, aLoadInfo)")
+                        u"nsIAboutModule->newChannel(aURI)",
+                        u"nsIAboutModule->newChannel(aURI, aLoadInfo)"
                     };
                     nsContentUtils::ReportToConsole(
                         nsIScriptError::warningFlag,
@@ -418,3 +421,6 @@ nsNestedAboutURI::GetClassIDNoAlloc(nsCID *aClassIDNoAlloc)
     *aClassIDNoAlloc = kNestedAboutURICID;
     return NS_OK;
 }
+
+} // namespace net
+} // namespace mozilla

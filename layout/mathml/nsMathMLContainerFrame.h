@@ -34,6 +34,7 @@ public:
   explicit nsMathMLContainerFrame(nsStyleContext* aContext)
     : nsContainerFrame(aContext)
     , mIntrinsicWidth(NS_INTRINSIC_WIDTH_UNKNOWN)
+    , mBlockStartAscent(0)
   {}
 
   NS_DECL_QUERYFRAME_TARGET(nsMathMLContainerFrame)
@@ -47,7 +48,7 @@ public:
   Stretch(DrawTarget*          aDrawTarget,
           nsStretchDirection   aStretchDirection,
           nsBoundingMetrics&   aContainerSize,
-          nsHTMLReflowMetrics& aDesiredStretchSize) override;
+          ReflowOutput& aDesiredStretchSize) override;
 
   NS_IMETHOD
   UpdatePresentationDataFromChildAt(int32_t         aFirstIndex,
@@ -107,28 +108,28 @@ public:
    */
   virtual void
   GetIntrinsicISizeMetrics(nsRenderingContext* aRenderingContext,
-                           nsHTMLReflowMetrics& aDesiredSize);
+                           ReflowOutput& aDesiredSize);
 
   virtual void
   Reflow(nsPresContext*          aPresContext,
-         nsHTMLReflowMetrics&     aDesiredSize,
-         const nsHTMLReflowState& aReflowState,
+         ReflowOutput&     aDesiredSize,
+         const ReflowInput& aReflowInput,
          nsReflowStatus&          aStatus) override;
 
   virtual void DidReflow(nsPresContext*           aPresContext,
-            const nsHTMLReflowState*  aReflowState,
+            const ReflowInput*  aReflowInput,
             nsDidReflowStatus         aStatus) override
 
   {
     mPresentationData.flags &= ~NS_MATHML_STRETCH_DONE;
-    return nsContainerFrame::DidReflow(aPresContext, aReflowState, aStatus);
+    return nsContainerFrame::DidReflow(aPresContext, aReflowInput, aStatus);
   }
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
                                 const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists) override;
 
-  virtual bool UpdateOverflow() override;
+  virtual bool ComputeCustomOverflow(nsOverflowAreas& aOverflowAreas) override;
 
   virtual void MarkIntrinsicISizesDirty() override;
 
@@ -198,7 +199,7 @@ protected:
   virtual nsresult
   Place(DrawTarget*          aDrawTarget,
         bool                 aPlaceOrigin,
-        nsHTMLReflowMetrics& aDesiredSize);
+        ReflowOutput& aDesiredSize);
 
   // MeasureForWidth:
   //
@@ -210,7 +211,7 @@ protected:
   // nsMathMLContainerFrame::Place.
   virtual nsresult
   MeasureForWidth(DrawTarget* aDrawTarget,
-                  nsHTMLReflowMetrics& aDesiredSize);
+                  ReflowOutput& aDesiredSize);
 
 
   // helper to re-sync the automatic data in our children and notify our parent to
@@ -235,7 +236,7 @@ public:
   // error handlers to provide a visual feedback to the user when an error
   // (typically invalid markup) was encountered during reflow.
   nsresult
-  ReflowError(DrawTarget* aDrawTarget, nsHTMLReflowMetrics& aDesiredSize);
+  ReflowError(DrawTarget* aDrawTarget, ReflowOutput& aDesiredSize);
   /*
    * Helper to call ReportErrorToConsole for parse errors involving 
    * attribute/value pairs.
@@ -276,8 +277,8 @@ public:
   void
   ReflowChild(nsIFrame*                aKidFrame,
               nsPresContext*          aPresContext,
-              nsHTMLReflowMetrics&     aDesiredSize,
-              const nsHTMLReflowState& aReflowState,
+              ReflowOutput&     aDesiredSize,
+              const ReflowInput& aReflowInput,
               nsReflowStatus&          aStatus);
 
 protected:
@@ -289,17 +290,17 @@ protected:
   // emulate the spacing that would have been done by a <mrow> container.
   // e.g., it fixes <math> <mi>f</mi> <mo>q</mo> <mi>f</mi> <mo>I</mo> </math>
   virtual nscoord
-  FixInterFrameSpacing(nsHTMLReflowMetrics& aDesiredSize);
+  FixInterFrameSpacing(ReflowOutput& aDesiredSize);
 
   // helper method to complete the post-reflow hook and ensure that embellished
   // operators don't terminate their Reflow without receiving a Stretch command.
   virtual nsresult
-  FinalizeReflow(DrawTarget* aDrawTarget, nsHTMLReflowMetrics& aDesiredSize);
+  FinalizeReflow(DrawTarget* aDrawTarget, ReflowOutput& aDesiredSize);
 
   // Record metrics of a child frame for recovery through the following method
   static void
   SaveReflowAndBoundingMetricsFor(nsIFrame*                  aFrame,
-                                  const nsHTMLReflowMetrics& aReflowMetrics,
+                                  const ReflowOutput& aReflowMetrics,
                                   const nsBoundingMetrics&   aBoundingMetrics);
 
   // helper method to facilitate getting the reflow and bounding metrics of a
@@ -311,7 +312,7 @@ protected:
   // during Reflow/Stretch() and GetPrefISize().
   static void
   GetReflowAndBoundingMetricsFor(nsIFrame*            aFrame,
-                                 nsHTMLReflowMetrics& aReflowMetrics,
+                                 ReflowOutput& aReflowMetrics,
                                  nsBoundingMetrics&   aBoundingMetrics,
                                  eMathMLFrameType*    aMathMLFrameType = nullptr);
 
@@ -377,7 +378,7 @@ protected:
   // A variant on FinishAndStoreOverflow() that uses the union of child
   // overflows, the frame bounds, and mBoundingMetrics to set and store the
   // overflow.
-  void GatherAndStoreOverflow(nsHTMLReflowMetrics* aMetrics);
+  void GatherAndStoreOverflow(ReflowOutput* aMetrics);
 
   /**
    * Call DidReflow() if the NS_FRAME_IN_REFLOW frame bit is set on aFirst and
@@ -393,6 +394,8 @@ protected:
   void UpdateIntrinsicWidth(nsRenderingContext* aRenderingContext);
 
   nscoord mIntrinsicWidth;
+
+  nscoord mBlockStartAscent;
 
 private:
   class RowChildFrameIterator;

@@ -151,7 +151,7 @@ load 374193-1.xhtml
 load 374297-1.html
 load 374297-2.html
 load 376223-1.xhtml
-asserts(0-99) load 378325-1.html # bug 531589
+load 378325-1.html
 load 378682.html
 load 379105-1.xhtml
 load 379419-1.xhtml
@@ -466,4 +466,6 @@ load 1162813.xul
 load 1163583.html
 load 1234622-1.html
 load 1235467-1.html
+load 1270797-1.html
+load 1286889.html
 load 1297835.html

@@ -7,7 +7,6 @@
 #define nsButtonFrameRenderer_h___
 
 #include "imgIContainer.h"
-#include "nsAutoPtr.h"
 #include "nsMargin.h"
 
 class nsIFrame;
@@ -45,11 +44,11 @@ public:
                                          const nsRect& aDirtyRect,
                                          const nsRect& aRect);
 
-  DrawResult PaintBorderAndBackground(nsDisplayListBuilder* aBuilder,
-                                      nsPresContext* aPresContext,
-                                      nsRenderingContext& aRenderingContext,
-                                      const nsRect& aDirtyRect,
-                                      const nsRect& aRect);
+  DrawResult PaintBorder(nsDisplayListBuilder* aBuilder,
+                         nsPresContext* aPresContext,
+                         nsRenderingContext& aRenderingContext,
+                         const nsRect& aDirtyRect,
+                         const nsRect& aRect);
 
   void SetFrame(nsFrame* aFrame, nsPresContext* aPresContext);
  

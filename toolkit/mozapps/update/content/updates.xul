@@ -36,24 +36,13 @@
 
   <wizardpage id="dummy" pageid="dummy" firstpage="true"/>
 
-  <wizardpage id="checking" pageid="checking" next="pluginupdatesfound"
+  <wizardpage id="checking" pageid="checking" next="noupdatesfound"
               object="gCheckingPage" onpageshow="gCheckingPage.onPageShow();">
     <updateheader label="&checking.title;"/>
     <vbox class="update-content" flex="1">
       <label>&updateCheck.label;</label>
       <separator class="thin"/>
       <progressmeter id="checkingProgress" mode="undetermined"/>
-    </vbox>
-  </wizardpage>
-
-  <wizardpage id="pluginupdatesfound" pageid="pluginupdatesfound"
-              object="gPluginsPage" onpageshow="gPluginsPage.onPageShow();">
-    <updateheader label="&pluginupdatesfound.title;"/>
-    <vbox class="update-content" flex="1">
-      <label>&pluginupdatesfound.label;</label>
-      <separator class="thin"/>
-      <label id="pluginupdateslink" class="text-link"
-             onclick="openUpdateURL(event);">&pluginupdateslink.label;</label>
     </vbox>
   </wizardpage>
 
@@ -95,17 +84,6 @@
     </vbox>
   </wizardpage>
 
-  <wizardpage id="incompatibleCheck" pageid="incompatibleCheck"
-              next="updatesfoundbasic" object="gIncompatibleCheckPage"
-              onpageshow="gIncompatibleCheckPage.onPageShow();">
-    <updateheader label="&incompatibleCheck.title;"/>
-    <vbox class="update-content" flex="1">
-      <label>&incompatibleCheck.label;</label>
-      <separator class="thin"/>
-      <progressmeter id="incompatibleCheckProgress" mode="undetermined"/>
-    </vbox>
-  </wizardpage>
-
   <wizardpage id="updatesfoundbasic" pageid="updatesfoundbasic"
               object="gUpdatesFoundBasicPage" next="downloading"
               onpageshow="gUpdatesFoundBasicPage.onPageShow();"
@@ -137,39 +115,6 @@
                id for the remotecontent (e.g. updateMoreInfoContentNotFound,
                updateMoreInfoContentDownloading, etc.) -->
     <remotecontent id="updateMoreInfoContent" flex="1" remotetype="billboard"/>
-  </wizardpage>
-
-  <wizardpage id="license" pageid="license" next="downloading"
-              object="gLicensePage" onpageshow="gLicensePage.onPageShow();"
-              onextra1="gLicensePage.onExtra1();">
-    <updateheader label="&license.titleText;"/>
-    <vbox class="update-content" flex="1">
-      <label>&license.instructionText;</label>
-      <!-- note: the localized strings used by remotecontent are prefixed by
-                 the id for the remotecontent (e.g. licenseContentNotFound,
-                 licenseContentDownloading, etc.) -->
-      <remotecontent id="licenseContent" flex="1" remotetype="license"/>
-      <separator class="thin"/>
-      <radiogroup id="acceptDeclineLicense" align="start"
-                  onselect="gLicensePage.onAcceptDeclineRadio();">
-        <radio id="accept" label="&license.accept;"
-               accesskey="&license.accept.accesskey;"/>
-        <radio id="decline" label="&license.decline;"
-               accesskey="&license.decline.accesskey;"
-               selected="true"/>
-      </radiogroup>
-    </vbox>
-  </wizardpage>
-
-  <wizardpage id="incompatibleList" pageid="incompatibleList"
-              next="downloading" object="gIncompatibleListPage"
-              onpageshow="gIncompatibleListPage.onPageShow();"
-              onextra1="gIncompatibleListPage.onExtra1();">
-    <updateheader label="&incompatibleList.title;"/>
-    <vbox class="update-content" flex="1">
-      <label id="incompatibleListDesc"/>
-      <listbox id="incompatibleListbox" flex="1"/>
-    </vbox>
   </wizardpage>
 
   <wizardpage id="downloading" pageid="downloading"
@@ -249,6 +194,7 @@
 
   <wizardpage id="finishedBackground" pageid="finishedBackground"
               object="gFinishedPage" onextra1="gFinishedPage.onExtra1()"
+              onextra2="gFinishedPage.onExtra2()"
               onpageshow="gFinishedPage.onPageShowBackground();">
     <updateheader label="&finishedPage.title;"/>
     <vbox class="update-content" flex="1">
@@ -262,6 +208,14 @@
       </hbox>
       <spacer flex="1"/>
       <label id="finishedBackgroundMore">&finishedBackground.more;</label>
+      <label id="finishedBackgroundMoreElevated"
+             hidden="true">&finishedBackground.moreElevated;</label>
+      <label id="finishedBackgroundMoreElevatedLink"
+             hidden="true">&errorManual.label;</label>
+      <hbox>
+        <label class="text-link" id="finishedBackgroundMoreElevatedLinkLabel"
+               value="" onclick="openUpdateURL(event);" hidden="true"/>
+      </hbox>
     </vbox>
   </wizardpage>
 

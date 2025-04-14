@@ -113,14 +113,15 @@ private:
 class NS_NO_VTABLE nsCycleCollectionParticipant
 {
 public:
-  MOZ_CONSTEXPR nsCycleCollectionParticipant() : mMightSkip(false) {}
-  MOZ_CONSTEXPR explicit nsCycleCollectionParticipant(bool aSkip) : mMightSkip(aSkip) {}
+  constexpr nsCycleCollectionParticipant() : mMightSkip(false) {}
+  constexpr explicit nsCycleCollectionParticipant(bool aSkip) : mMightSkip(aSkip) {}
 
   NS_IMETHOD Traverse(void* aPtr, nsCycleCollectionTraversalCallback& aCb) = 0;
 
   NS_IMETHOD_(void) Root(void* aPtr) = 0;
   NS_IMETHOD_(void) Unlink(void* aPtr) = 0;
   NS_IMETHOD_(void) Unroot(void* aPtr) = 0;
+  NS_IMETHOD_(const char*) ClassName() = 0;
 
   NS_IMETHOD_(void) Trace(void* aPtr, const TraceCallbacks& aCb,
                           void* aClosure) {}
@@ -176,11 +177,11 @@ private:
 class NS_NO_VTABLE nsScriptObjectTracer : public nsCycleCollectionParticipant
 {
 public:
-  MOZ_CONSTEXPR nsScriptObjectTracer()
+  constexpr nsScriptObjectTracer()
     : nsCycleCollectionParticipant(false)
   {
   }
-  MOZ_CONSTEXPR explicit nsScriptObjectTracer(bool aSkip)
+  constexpr explicit nsScriptObjectTracer(bool aSkip)
     : nsCycleCollectionParticipant(aSkip)
   {
   }
@@ -196,11 +197,11 @@ public:
 class NS_NO_VTABLE nsXPCOMCycleCollectionParticipant : public nsScriptObjectTracer
 {
 public:
-  MOZ_CONSTEXPR nsXPCOMCycleCollectionParticipant()
+  constexpr nsXPCOMCycleCollectionParticipant()
     : nsScriptObjectTracer(false)
   {
   }
-  MOZ_CONSTEXPR explicit nsXPCOMCycleCollectionParticipant(bool aSkip)
+  constexpr explicit nsXPCOMCycleCollectionParticipant(bool aSkip)
     : nsScriptObjectTracer(aSkip)
   {
   }
@@ -506,10 +507,15 @@ DowncastCCParticipant(void* aPtr)
 #define NS_CHECK_FOR_RIGHT_PARTICIPANT_IMPL_INHERITED(_class)
 #endif
 
+#define NS_DECL_CYCLE_COLLECTION_CLASS_NAME_METHOD(_class) \
+  NS_IMETHOD_(const char*) ClassName() override { return #_class; };
+
+
 #define NS_DECL_CYCLE_COLLECTION_CLASS_BODY_NO_UNLINK(_class, _base)           \
 public:                                                                        \
   NS_IMETHOD Traverse(void *p, nsCycleCollectionTraversalCallback &cb)         \
     override;                                                                  \
+  NS_DECL_CYCLE_COLLECTION_CLASS_NAME_METHOD(_class)                           \
   NS_IMETHOD_(void) DeleteCycleCollectable(void *p) override                   \
   {                                                                            \
     DowncastCCParticipant<_class>(p)->DeleteCycleCollectable();                \
@@ -534,7 +540,7 @@ public:                                                                        \
   const_cast<type*>(reinterpret_cast<const type*>(participant))
 
 #define NS_IMPL_GET_XPCOM_CYCLE_COLLECTION_PARTICIPANT(_class)                 \
-  static MOZ_CONSTEXPR nsXPCOMCycleCollectionParticipant* GetParticipant()     \
+  static constexpr nsXPCOMCycleCollectionParticipant* GetParticipant()         \
   {                                                                            \
     return &_class::NS_CYCLE_COLLECTION_INNERNAME;                             \
   }
@@ -571,7 +577,7 @@ class NS_CYCLE_COLLECTION_INNERCLASS                                            
  : public nsXPCOMCycleCollectionParticipant                                      \
 {                                                                                \
 public:                                                                          \
-  MOZ_CONSTEXPR NS_CYCLE_COLLECTION_INNERCLASS ()                                \
+  constexpr NS_CYCLE_COLLECTION_INNERCLASS ()                                    \
   : nsXPCOMCycleCollectionParticipant(true) {}                                   \
 private:                                                                         \
   NS_DECL_CYCLE_COLLECTION_CLASS_BODY(_class, _base)                             \
@@ -604,7 +610,7 @@ class NS_CYCLE_COLLECTION_INNERCLASS                                            
  : public nsXPCOMCycleCollectionParticipant                                               \
 {                                                                                         \
 public:                                                                                   \
-  MOZ_CONSTEXPR NS_CYCLE_COLLECTION_INNERCLASS ()                                         \
+  constexpr NS_CYCLE_COLLECTION_INNERCLASS ()                                             \
   : nsXPCOMCycleCollectionParticipant(true) {}                                            \
 private:                                                                                  \
   NS_DECL_CYCLE_COLLECTION_CLASS_BODY(_class, _base)                                      \
@@ -644,6 +650,7 @@ static NS_CYCLE_COLLECTION_INNERCLASS NS_CYCLE_COLLECTION_INNERNAME;
 public:                                                                        \
   NS_IMETHOD Traverse(void *p, nsCycleCollectionTraversalCallback &cb)         \
     override;                                                                  \
+  NS_DECL_CYCLE_COLLECTION_CLASS_NAME_METHOD(_class)                           \
   static _class* Downcast(nsISupports* s)                                      \
   {                                                                            \
     return static_cast<_class*>(static_cast<_base_class*>(                     \
@@ -698,7 +705,8 @@ static NS_CYCLE_COLLECTION_INNERCLASS NS_CYCLE_COLLECTION_INNERNAME;
     NS_IMETHOD_(void) Unlink(void *n) override;                                \
     NS_IMETHOD_(void) Unroot(void *n) override;                                \
     NS_IMETHOD Traverse(void *n, nsCycleCollectionTraversalCallback &cb)       \
-  override;                                                                    \
+      override;                                                                \
+    NS_DECL_CYCLE_COLLECTION_CLASS_NAME_METHOD(_class)                         \
     NS_IMETHOD_(void) DeleteCycleCollectable(void *n) override                 \
     {                                                                          \
       DowncastCCParticipant<_class>(n)->DeleteCycleCollectable();              \
@@ -721,7 +729,7 @@ static NS_CYCLE_COLLECTION_INNERCLASS NS_CYCLE_COLLECTION_INNERNAME;
    : public nsCycleCollectionParticipant                                       \
   {                                                                            \
     NS_DECL_CYCLE_COLLECTION_NATIVE_CLASS_BODY(_class)                         \
-    static MOZ_CONSTEXPR nsCycleCollectionParticipant* GetParticipant()        \
+    static constexpr nsCycleCollectionParticipant* GetParticipant()            \
     {                                                                          \
       return &_class::NS_CYCLE_COLLECTION_INNERNAME;                           \
     }                                                                          \
@@ -737,7 +745,7 @@ static NS_CYCLE_COLLECTION_INNERCLASS NS_CYCLE_COLLECTION_INNERNAME;
    : public nsCycleCollectionParticipant                                       \
   {                                                                            \
   public:                                                                      \
-    MOZ_CONSTEXPR NS_CYCLE_COLLECTION_INNERCLASS ()                            \
+    constexpr NS_CYCLE_COLLECTION_INNERCLASS ()                                \
     : nsCycleCollectionParticipant(true) {}                                    \
   private:                                                                     \
     NS_DECL_CYCLE_COLLECTION_NATIVE_CLASS_BODY(_class)                         \
@@ -756,7 +764,7 @@ class NS_CYCLE_COLLECTION_INNERCLASS                                           \
  : public nsCycleCollectionParticipant                                         \
 {                                                                              \
 public:                                                                        \
-  MOZ_CONSTEXPR NS_CYCLE_COLLECTION_INNERCLASS ()                              \
+  constexpr NS_CYCLE_COLLECTION_INNERCLASS ()                                  \
   : nsCycleCollectionParticipant(true) {}                                      \
 private:                                                                       \
   NS_DECL_CYCLE_COLLECTION_NATIVE_CLASS_BODY(_class)                           \
@@ -781,7 +789,7 @@ static NS_CYCLE_COLLECTION_INNERCLASS NS_CYCLE_COLLECTION_INNERNAME;
     NS_DECL_CYCLE_COLLECTION_NATIVE_CLASS_BODY(_class)                         \
     NS_IMETHOD_(void) Trace(void *p, const TraceCallbacks &cb, void *closure)  \
       override;                                                                \
-    static MOZ_CONSTEXPR nsScriptObjectTracer* GetParticipant()                \
+    static constexpr nsScriptObjectTracer* GetParticipant()                    \
     {                                                                          \
       return &_class::NS_CYCLE_COLLECTION_INNERNAME;                           \
     }                                                                          \

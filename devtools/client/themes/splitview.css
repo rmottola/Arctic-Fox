@@ -44,7 +44,7 @@
   /* To compensate for the top and bottom borders */
   margin-top: -1px;
   margin-bottom: -1px;
-  -moz-padding-end: 8px;
+  padding-inline-end: 8px;
   -moz-box-align: center;
   outline: 0;
   vertical-align: bottom;
@@ -108,7 +108,7 @@
 
 .splitview-main > toolbar,
 .loading .splitview-nav-container {
-  -moz-border-end: 1px solid var(--smw-margin);
+  border-inline-end: 1px solid var(--smw-margin);
 }
 
 .splitview-main > .devtools-toolbarbutton {

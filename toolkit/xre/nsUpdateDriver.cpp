@@ -31,6 +31,7 @@
 #include "nsILocalFileMac.h"
 #include "nsCommandLineServiceMac.h"
 #include "MacLaunchHelper.h"
+#include "updaterfileutils_osx.h"
 #endif
 
 #if defined(XP_WIN)
@@ -83,6 +84,8 @@ GetUpdateLog()
 
 #ifdef XP_WIN
 #define UPDATER_BIN "updater.exe"
+#elif XP_MACOSX
+#define UPDATER_BIN "org.mozilla.updater"
 #else
 #define UPDATER_BIN "updater"
 #endif
@@ -251,8 +254,9 @@ typedef enum {
   eNoUpdateAction,
   ePendingUpdate,
   ePendingService,
+  ePendingElevate,
   eAppliedUpdate,
-  eAppliedService
+  eAppliedService,
 } UpdateStatus;
 
 /**
@@ -271,8 +275,12 @@ GetUpdateStatus(nsIFile* dir, nsCOMPtr<nsIFile> &statusFile)
     if (GetStatusFileContents(statusFile, buf)) {
       const char kPending[] = "pending";
       const char kPendingService[] = "pending-service";
+      const char kPendingElevate[] = "pending-elevate";
       const char kApplied[] = "applied";
       const char kAppliedService[] = "applied-service";
+      if (!strncmp(buf, kPendingElevate, sizeof(kPendingElevate) - 1)) {
+        return ePendingElevate;
+      }
       if (!strncmp(buf, kPendingService, sizeof(kPendingService) - 1)) {
         return ePendingService;
       }
@@ -952,13 +960,21 @@ ApplyUpdate(nsIFile *greDir, nsIFile *updateDir, nsIFile *statusFile,
     _exit(0);
   }
 #elif defined(XP_MACOSX)
-  CommandLineServiceMac::SetupMacCommandLine(argc, argv, true);
-  // LaunchChildMac uses posix_spawnp and prefers the current
-  // architecture when launching. It doesn't require a
-  // null-terminated string but it doesn't matter if we pass one.
-  LaunchChildMac(argc, argv, 0, outpid);
-  if (restart) {
+  CommandLineServiceMac::SetupMacCommandLine(argc, argv, restart);
+  // We need to detect whether elevation is required for this update. This can
+  // occur when an admin user installs the application, but another admin
+  // user attempts to update (see bug 394984).
+  if (restart && !IsRecursivelyWritable(installDirPath.get())) {
+    if (!LaunchElevatedUpdate(argc, argv, 0, outpid)) {
+      LOG(("Failed to launch elevated update!"));
+      exit(1);
+    }
     exit(0);
+  } else {
+    LaunchChildMac(argc, argv, 0, outpid);
+    if (restart) {
+      exit(0);
+    }
   }
 #else
   *outpid = PR_CreateProcess(updaterPath.get(), argv, nullptr, nullptr);
@@ -1023,6 +1039,19 @@ ProcessUpdates(nsIFile *greDir, nsIFile *appDir, nsIFile *updRootDir,
   nsCOMPtr<nsIFile> statusFile;
   UpdateStatus status = GetUpdateStatus(updatesDir, statusFile);
   switch (status) {
+  case ePendingElevate: {
+    if (NS_IsMainThread()) {
+      // Only do this if we're called from the main thread.
+      nsCOMPtr<nsIUpdatePrompt> up =
+        do_GetService("@mozilla.org/updates/update-prompt;1");
+      if (up) {
+        up->ShowUpdateElevationRequired();
+      }
+      break;
+    }
+    // Intentional fallthrough to ePendingUpdate and ePendingService.
+    MOZ_FALLTHROUGH;
+  }
   case ePendingUpdate:
   case ePendingService: {
     nsCOMPtr<nsIFile> versionFile;
@@ -1204,8 +1233,8 @@ nsUpdateProcessor::ProcessUpdate(nsIUpdate* aUpdate)
 #endif
 
   MOZ_ASSERT(NS_IsMainThread(), "not main thread");
-  return NS_NewThread(getter_AddRefs(mProcessWatcher),
-                      NS_NewRunnableMethod(this, &nsUpdateProcessor::StartStagedUpdate));
+  nsCOMPtr<nsIRunnable> r = NewRunnableMethod(this, &nsUpdateProcessor::StartStagedUpdate);
+  return NS_NewThread(getter_AddRefs(mProcessWatcher), r);
 }
 
 
@@ -1229,13 +1258,13 @@ nsUpdateProcessor::StartStagedUpdate()
 
   if (mUpdaterPID) {
     // Track the state of the updater process while it is staging an update.
-    rv = NS_DispatchToCurrentThread(NS_NewRunnableMethod(this, &nsUpdateProcessor::WaitForProcess));
+    rv = NS_DispatchToCurrentThread(NewRunnableMethod(this, &nsUpdateProcessor::WaitForProcess));
     NS_ENSURE_SUCCESS_VOID(rv);
   } else {
     // Failed to launch the updater process for some reason.
     // We need to shutdown the current thread as there isn't anything more for
     // us to do...
-    rv = NS_DispatchToMainThread(NS_NewRunnableMethod(this, &nsUpdateProcessor::ShutdownWatcherThread));
+    rv = NS_DispatchToMainThread(NewRunnableMethod(this, &nsUpdateProcessor::ShutdownWatcherThread));
     NS_ENSURE_SUCCESS_VOID(rv);
   }
 }
@@ -1253,7 +1282,7 @@ nsUpdateProcessor::WaitForProcess()
 {
   MOZ_ASSERT(!NS_IsMainThread(), "main thread");
   ::WaitForProcess(mUpdaterPID);
-  NS_DispatchToMainThread(NS_NewRunnableMethod(this, &nsUpdateProcessor::UpdateDone));
+  NS_DispatchToMainThread(NewRunnableMethod(this, &nsUpdateProcessor::UpdateDone));
 }
 
 void

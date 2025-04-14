@@ -23,6 +23,8 @@
 #include "mozilla/HashFunctions.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/Move.h"
+#include "mozilla/RefCounted.h"
+#include "mozilla/RefPtr.h"
 
 #include "NamespaceImports.h"
 
@@ -36,6 +38,7 @@
 namespace js {
 
 class PropertyName;
+namespace jit { struct BaselineScript; }
 
 namespace wasm {
 
@@ -44,8 +47,68 @@ using mozilla::EnumeratedArray;
 using mozilla::Maybe;
 using mozilla::Move;
 using mozilla::MallocSizeOf;
+using mozilla::Nothing;
+using mozilla::PodZero;
+using mozilla::PodCopy;
+using mozilla::PodEqual;
+using mozilla::RefCounted;
+using mozilla::Some;
 
 typedef Vector<uint32_t, 0, SystemAllocPolicy> Uint32Vector;
+
+// To call Vector::podResizeToFit, a type must specialize mozilla::IsPod
+// which is pretty verbose to do within js::wasm, so factor that process out
+// into a macro.
+
+#define WASM_DECLARE_POD_VECTOR(Type, VectorName)                               \
+} } namespace mozilla {                                                         \
+template <> struct IsPod<js::wasm::Type> : TrueType {};                         \
+} namespace js { namespace wasm {                                               \
+typedef Vector<Type, 0, SystemAllocPolicy> VectorName;
+
+// A wasm Module and everything it contains must support serialization and
+// deserialization. Some data can be simply copied as raw bytes and,
+// as a convention, is stored in an inline CacheablePod struct. Everything else
+// should implement the below methods which are called recusively by the
+// containing Module.
+
+#define WASM_DECLARE_SERIALIZABLE(Type)                                         \
+    size_t serializedSize() const;                                              \
+    uint8_t* serialize(uint8_t* cursor) const;                                  \
+    const uint8_t* deserialize(const uint8_t* cursor);                          \
+    size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
+
+#define WASM_DECLARE_SERIALIZABLE_VIRTUAL(Type)                                 \
+    virtual size_t serializedSize() const;                                      \
+    virtual uint8_t* serialize(uint8_t* cursor) const;                          \
+    virtual const uint8_t* deserialize(const uint8_t* cursor);                  \
+    virtual size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const;
+
+#define WASM_DECLARE_SERIALIZABLE_OVERRIDE(Type)                                \
+    size_t serializedSize() const override;                                     \
+    uint8_t* serialize(uint8_t* cursor) const override;                         \
+    const uint8_t* deserialize(const uint8_t* cursor) override;                 \
+    size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const override;
+
+// This reusable base class factors out the logic for a resource that is shared
+// by multiple instances/modules but should only be counted once when computing
+// about:memory stats.
+
+template <class T>
+struct ShareableBase : RefCounted<T>
+{
+    using SeenSet = HashSet<const T*, DefaultHasher<const T*>, SystemAllocPolicy>;
+
+    size_t sizeOfIncludingThisIfNotSeen(MallocSizeOf mallocSizeOf, SeenSet* seen) const {
+        const T* self = static_cast<const T*>(this);
+        typename SeenSet::AddPtr p = seen->lookupForAdd(self);
+        if (p)
+            return 0;
+        bool ok = seen->add(p, self);
+        (void)ok;  // oh well
+        return mallocSizeOf(self) + self->sizeOfExcludingThis(mallocSizeOf);
+    }
+};
 
 // ValType/ExprType utilities
 
@@ -89,7 +152,18 @@ ToExprType(ValType vt)
 static inline bool
 IsSimdType(ValType vt)
 {
-    return vt == ValType::I32x4 || vt == ValType::F32x4 || vt == ValType::B32x4;
+    switch (vt) {
+      case ValType::I8x16:
+      case ValType::I16x8:
+      case ValType::I32x4:
+      case ValType::F32x4:
+      case ValType::B8x16:
+      case ValType::B16x8:
+      case ValType::B32x4:
+        return true;
+      default:
+        return false;
+    }
 }
 
 static inline uint32_t
@@ -97,6 +171,12 @@ NumSimdElements(ValType vt)
 {
     MOZ_ASSERT(IsSimdType(vt));
     switch (vt) {
+      case ValType::I8x16:
+      case ValType::B8x16:
+        return 16;
+      case ValType::I16x8:
+      case ValType::B16x8:
+        return 8;
       case ValType::I32x4:
       case ValType::F32x4:
       case ValType::B32x4:
@@ -111,10 +191,14 @@ SimdElementType(ValType vt)
 {
     MOZ_ASSERT(IsSimdType(vt));
     switch (vt) {
+      case ValType::I8x16:
+      case ValType::I16x8:
       case ValType::I32x4:
         return ValType::I32;
       case ValType::F32x4:
         return ValType::F32;
+      case ValType::B8x16:
+      case ValType::B16x8:
       case ValType::B32x4:
         return ValType::I32;
      default:
@@ -127,6 +211,12 @@ SimdBoolType(ValType vt)
 {
     MOZ_ASSERT(IsSimdType(vt));
     switch (vt) {
+      case ValType::I8x16:
+      case ValType::B8x16:
+        return ValType::B8x16;
+      case ValType::I16x8:
+      case ValType::B16x8:
+        return ValType::B16x8;
       case ValType::I32x4:
       case ValType::F32x4:
       case ValType::B32x4:
@@ -145,7 +235,7 @@ IsSimdType(ExprType et)
 static inline bool
 IsSimdBoolType(ValType vt)
 {
-    return vt == ValType::B32x4;
+    return vt == ValType::B8x16 || vt == ValType::B16x8 || vt == ValType::B32x4;
 }
 
 static inline jit::MIRType
@@ -156,8 +246,12 @@ ToMIRType(ValType vt)
       case ValType::I64: return jit::MIRType::Int64;
       case ValType::F32: return jit::MIRType::Float32;
       case ValType::F64: return jit::MIRType::Double;
+      case ValType::I8x16: return jit::MIRType::Int8x16;
+      case ValType::I16x8: return jit::MIRType::Int16x8;
       case ValType::I32x4: return jit::MIRType::Int32x4;
       case ValType::F32x4: return jit::MIRType::Float32x4;
+      case ValType::B8x16: return jit::MIRType::Bool8x16;
+      case ValType::B16x8: return jit::MIRType::Bool16x8;
       case ValType::B32x4: return jit::MIRType::Bool32x4;
       case ValType::Limit: break;
     }
@@ -179,8 +273,12 @@ ToCString(ExprType type)
       case ExprType::I64:   return "i64";
       case ExprType::F32:   return "f32";
       case ExprType::F64:   return "f64";
+      case ExprType::I8x16: return "i8x16";
+      case ExprType::I16x8: return "i16x8";
       case ExprType::I32x4: return "i32x4";
       case ExprType::F32x4: return "f32x4";
+      case ExprType::B8x16: return "b8x16";
+      case ExprType::B16x8: return "b16x8";
       case ExprType::B32x4: return "b32x4";
       case ExprType::Limit:;
     }
@@ -208,6 +306,8 @@ class Val
         uint64_t i64_;
         float f32_;
         double f64_;
+        I8x16 i8x16_;
+        I16x8 i16x8_;
         I32x4 i32x4_;
         F32x4 f32x4_;
     } u;
@@ -220,11 +320,21 @@ class Val
     explicit Val(float f32) : type_(ValType::F32) { u.f32_ = f32; }
     explicit Val(double f64) : type_(ValType::F64) { u.f64_ = f64; }
 
+    explicit Val(const I8x16& i8x16, ValType type = ValType::I8x16) : type_(type) {
+        MOZ_ASSERT(type_ == ValType::I8x16 || type_ == ValType::B8x16);
+        memcpy(u.i8x16_, i8x16, sizeof(u.i8x16_));
+    }
+    explicit Val(const I16x8& i16x8, ValType type = ValType::I16x8) : type_(type) {
+        MOZ_ASSERT(type_ == ValType::I16x8 || type_ == ValType::B16x8);
+        memcpy(u.i16x8_, i16x8, sizeof(u.i16x8_));
+    }
     explicit Val(const I32x4& i32x4, ValType type = ValType::I32x4) : type_(type) {
         MOZ_ASSERT(type_ == ValType::I32x4 || type_ == ValType::B32x4);
         memcpy(u.i32x4_, i32x4, sizeof(u.i32x4_));
     }
-    explicit Val(const F32x4& f32x4) : type_(ValType::F32x4) { memcpy(u.f32x4_, f32x4, sizeof(u.f32x4_)); }
+    explicit Val(const F32x4& f32x4) : type_(ValType::F32x4) {
+        memcpy(u.f32x4_, f32x4, sizeof(u.f32x4_));
+    }
 
     ValType type() const { return type_; }
     bool isSimd() const { return IsSimdType(type()); }
@@ -233,11 +343,25 @@ class Val
     uint64_t i64() const { MOZ_ASSERT(type_ == ValType::I64); return u.i64_; }
     float f32() const { MOZ_ASSERT(type_ == ValType::F32); return u.f32_; }
     double f64() const { MOZ_ASSERT(type_ == ValType::F64); return u.f64_; }
+
+    const I8x16& i8x16() const {
+        MOZ_ASSERT(type_ == ValType::I8x16 || type_ == ValType::B8x16);
+        return u.i8x16_;
+    }
+    const I16x8& i16x8() const {
+        MOZ_ASSERT(type_ == ValType::I16x8 || type_ == ValType::B16x8);
+        return u.i16x8_;
+    }
     const I32x4& i32x4() const {
         MOZ_ASSERT(type_ == ValType::I32x4 || type_ == ValType::B32x4);
         return u.i32x4_;
     }
-    const F32x4& f32x4() const { MOZ_ASSERT(type_ == ValType::F32x4); return u.f32x4_; }
+    const F32x4& f32x4() const {
+        MOZ_ASSERT(type_ == ValType::F32x4);
+        return u.f32x4_;
+    }
+
+    void writePayload(uint8_t* dst);
 };
 
 // The Sig class represents a WebAssembly function signature which takes a list
@@ -255,23 +379,14 @@ class Sig
     ValTypeVector args_;
     ExprType ret_;
 
-    Sig(const Sig&) = delete;
-    Sig& operator=(const Sig&) = delete;
-
   public:
     Sig() : args_(), ret_(ExprType::Void) {}
-    Sig(Sig&& rhs) : args_(Move(rhs.args_)), ret_(rhs.ret_) {}
     Sig(ValTypeVector&& args, ExprType ret) : args_(Move(args)), ret_(ret) {}
 
-    bool clone(const Sig& rhs) {
+    MOZ_MUST_USE bool clone(const Sig& rhs) {
         ret_ = rhs.ret_;
         MOZ_ASSERT(args_.empty());
         return args_.appendAll(rhs.args_);
-    }
-    Sig& operator=(Sig&& rhs) {
-        ret_ = rhs.ret_;
-        args_ = Move(rhs.args_);
-        return *this;
     }
 
     ValType arg(unsigned i) const { return args_[i]; }
@@ -287,6 +402,8 @@ class Sig
     bool operator!=(const Sig& rhs) const {
         return !(*this == rhs);
     }
+
+    WASM_DECLARE_SERIALIZABLE(Sig)
 };
 
 struct SigHashPolicy
@@ -295,6 +412,61 @@ struct SigHashPolicy
     static HashNumber hash(Lookup sig) { return sig.hash(); }
     static bool match(const Sig* lhs, Lookup rhs) { return *lhs == rhs; }
 };
+
+// SigIdDesc describes a signature id that can be used by call_indirect and
+// table-entry prologues to structurally compare whether the caller and callee's
+// signatures *structurally* match. To handle the general case, a Sig is
+// allocated and stored in a process-wide hash table, so that pointer equality
+// implies structural equality. As an optimization for the 99% case where the
+// Sig has a small number of parameters, the Sig is bit-packed into a uint32
+// immediate value so that integer equality implies structural equality. Both
+// cases can be handled with a single comparison by always setting the LSB for
+// the immediates (the LSB is necessarily 0 for allocated Sig pointers due to
+// alignment).
+
+class SigIdDesc
+{
+  public:
+    enum class Kind { None, Immediate, Global };
+    static const uintptr_t ImmediateBit = 0x1;
+
+  private:
+    Kind kind_;
+    size_t bits_;
+
+    SigIdDesc(Kind kind, size_t bits) : kind_(kind), bits_(bits) {}
+
+  public:
+    Kind kind() const { return kind_; }
+    static bool isGlobal(const Sig& sig);
+
+    SigIdDesc() : kind_(Kind::None), bits_(0) {}
+    static SigIdDesc global(const Sig& sig, uint32_t globalDataOffset);
+    static SigIdDesc immediate(const Sig& sig);
+
+    bool isGlobal() const { return kind_ == Kind::Global; }
+
+    size_t immediate() const { MOZ_ASSERT(kind_ == Kind::Immediate); return bits_; }
+    uint32_t globalDataOffset() const { MOZ_ASSERT(kind_ == Kind::Global); return bits_; }
+};
+
+// SigWithId pairs a Sig with SigIdDesc, describing either how to compile code
+// that compares this signature's id or, at instantiation what signature ids to
+// allocate in the global hash and where to put them.
+
+struct SigWithId : Sig
+{
+    SigIdDesc id;
+
+    SigWithId() = default;
+    explicit SigWithId(Sig&& sig, SigIdDesc id) : Sig(Move(sig)), id(id) {}
+    void operator=(Sig&& rhs) { Sig::operator=(Move(rhs)); }
+
+    WASM_DECLARE_SERIALIZABLE(SigWithId)
+};
+
+typedef Vector<SigWithId, 0, SystemAllocPolicy> SigWithIdVector;
+typedef Vector<const SigWithId*, 0, SystemAllocPolicy> SigWithIdPtrVector;
 
 // A GlobalDesc describes a single global variable. Currently, globals are only
 // exposed through asm.js.
@@ -310,23 +482,6 @@ struct GlobalDesc
 };
 
 typedef Vector<GlobalDesc, 0, SystemAllocPolicy> GlobalDescVector;
-
-// A "declared" signature is a Sig object that is created and owned by the
-// ModuleGenerator. These signature objects are read-only and have the same
-// lifetime as the ModuleGenerator. This type is useful since some uses of Sig
-// need this extended lifetime and want to statically distinguish from the
-// common stack-allocated Sig objects that get passed around.
-
-struct DeclaredSig : Sig
-{
-    DeclaredSig() = default;
-    DeclaredSig(DeclaredSig&& rhs) : Sig(Move(rhs)) {}
-    explicit DeclaredSig(Sig&& sig) : Sig(Move(sig)) {}
-    void operator=(Sig&& rhs) { Sig& base = *this; base = Move(rhs); }
-};
-
-typedef Vector<DeclaredSig, 0, SystemAllocPolicy> DeclaredSigVector;
-typedef Vector<const DeclaredSig*, 0, SystemAllocPolicy> DeclaredSigPtrVector;
 
 // The (,Profiling,Func)Offsets classes are used to record the offsets of
 // different key points in a CodeRange during compilation.
@@ -371,14 +526,21 @@ struct ProfilingOffsets : Offsets
 
 struct FuncOffsets : ProfilingOffsets
 {
-    MOZ_IMPLICIT FuncOffsets(uint32_t nonProfilingEntry = 0,
-                             uint32_t profilingJump = 0,
-                             uint32_t profilingEpilogue = 0)
+    MOZ_IMPLICIT FuncOffsets()
       : ProfilingOffsets(),
-        nonProfilingEntry(nonProfilingEntry),
-        profilingJump(profilingJump),
-        profilingEpilogue(profilingEpilogue)
+        tableEntry(0),
+        tableProfilingJump(0),
+        nonProfilingEntry(0),
+        profilingJump(0),
+        profilingEpilogue(0)
     {}
+
+    // Function CodeRanges have a table entry which takes an extra signature
+    // argument which is checked against the callee's signature before falling
+    // through to the normal prologue. When profiling is enabled, a nop on the
+    // fallthrough is patched to instead jump to the profiling epilogue.
+    uint32_t tableEntry;
+    uint32_t tableProfilingJump;
 
     // Function CodeRanges have an additional non-profiling entry that comes
     // after the profiling entry and a non-profiling epilogue that comes before
@@ -392,6 +554,8 @@ struct FuncOffsets : ProfilingOffsets
 
     void offsetBy(uint32_t offset) {
         ProfilingOffsets::offsetBy(offset);
+        tableEntry += offset;
+        tableProfilingJump += offset;
         nonProfilingEntry += offset;
         profilingJump += offset;
         profilingEpilogue += offset;
@@ -451,6 +615,8 @@ class CallSite : public CallSiteDesc
     uint32_t stackDepth() const { return stackDepth_; }
 };
 
+WASM_DECLARE_POD_VECTOR(CallSite, CallSiteVector)
+
 class CallSiteAndTarget : public CallSite
 {
     uint32_t targetIndex_;
@@ -466,8 +632,25 @@ class CallSiteAndTarget : public CallSite
     uint32_t targetIndex() const { MOZ_ASSERT(isInternal()); return targetIndex_; }
 };
 
-typedef Vector<CallSite, 0, SystemAllocPolicy> CallSiteVector;
 typedef Vector<CallSiteAndTarget, 0, SystemAllocPolicy> CallSiteAndTargetVector;
+
+// Metadata for a bounds check that may need patching later.
+
+class BoundsCheck
+{
+  public:
+    BoundsCheck() = default;
+
+    explicit BoundsCheck(uint32_t cmpOffset)
+      : cmpOffset_(cmpOffset)
+    { }
+
+    uint8_t* patchAt(uint8_t* code) const { return code + cmpOffset_; }
+    void offsetBy(uint32_t offset) { cmpOffset_ += offset; }
+
+  private:
+    uint32_t cmpOffset_; // absolute offset of the comparison
+};
 
 // Summarizes a heap access made by wasm code that needs to be patched later
 // and/or looked up by the wasm signal handlers. Different architectures need
@@ -475,100 +658,70 @@ typedef Vector<CallSiteAndTarget, 0, SystemAllocPolicy> CallSiteAndTargetVector;
 // heap length, x86: where to patch in heap length and base).
 
 #if defined(JS_CODEGEN_X86)
-class HeapAccess
+class MemoryAccess
 {
-    uint32_t insnOffset_;
-    uint8_t opLength_;  // the length of the load/store instruction
-    uint8_t cmpDelta_;  // the number of bytes from the cmp to the load/store instruction
+    uint32_t nextInsOffset_;
 
   public:
-    HeapAccess() = default;
-    static const uint32_t NoLengthCheck = UINT32_MAX;
+    MemoryAccess() = default;
 
-    // If 'cmp' equals 'insnOffset' or if it is not supplied then the
-    // cmpDelta_ is zero indicating that there is no length to patch.
-    HeapAccess(uint32_t insnOffset, uint32_t after, uint32_t cmp = NoLengthCheck) {
-        mozilla::PodZero(this);  // zero padding for Valgrind
-        insnOffset_ = insnOffset;
-        opLength_ = after - insnOffset;
-        cmpDelta_ = cmp == NoLengthCheck ? 0 : insnOffset - cmp;
-    }
+    explicit MemoryAccess(uint32_t nextInsOffset)
+      : nextInsOffset_(nextInsOffset)
+    { }
 
-    uint32_t insnOffset() const { return insnOffset_; }
-    void setInsnOffset(uint32_t insnOffset) { insnOffset_ = insnOffset; }
-    void offsetInsnOffsetBy(uint32_t offset) { insnOffset_ += offset; }
-    void* patchHeapPtrImmAt(uint8_t* code) const { return code + (insnOffset_ + opLength_); }
-    bool hasLengthCheck() const { return cmpDelta_ > 0; }
-    void* patchLengthAt(uint8_t* code) const {
-        MOZ_ASSERT(hasLengthCheck());
-        return code + (insnOffset_ - cmpDelta_);
-    }
+    void* patchMemoryPtrImmAt(uint8_t* code) const { return code + nextInsOffset_; }
+    void offsetBy(uint32_t offset) { nextInsOffset_ += offset; }
 };
 #elif defined(JS_CODEGEN_X64)
-class HeapAccess
+class MemoryAccess
 {
-  public:
-    enum WhatToDoOnOOB {
-        CarryOn, // loads return undefined, stores do nothing.
-        Throw    // throw a RangeError
-    };
-
-  private:
     uint32_t insnOffset_;
     uint8_t offsetWithinWholeSimdVector_; // if is this e.g. the Z of an XYZ
     bool throwOnOOB_;                     // should we throw on OOB?
-    uint8_t cmpDelta_;                    // the number of bytes from the cmp to the load/store instruction
+    bool wrapOffset_;                     // should we wrap the offset on OOB?
 
   public:
-    HeapAccess() = default;
-    static const uint32_t NoLengthCheck = UINT32_MAX;
+    enum OutOfBoundsBehavior {
+        Throw,
+        CarryOn,
+    };
+    enum WrappingBehavior {
+        WrapOffset,
+        DontWrapOffset,
+    };
 
-    // If 'cmp' equals 'insnOffset' or if it is not supplied then the
-    // cmpDelta_ is zero indicating that there is no length to patch.
-    HeapAccess(uint32_t insnOffset, WhatToDoOnOOB oob,
-               uint32_t cmp = NoLengthCheck,
-               uint32_t offsetWithinWholeSimdVector = 0)
+    MemoryAccess() = default;
+
+    MemoryAccess(uint32_t insnOffset, OutOfBoundsBehavior onOOB, WrappingBehavior onWrap,
+                 uint32_t offsetWithinWholeSimdVector = 0)
+      : insnOffset_(insnOffset),
+        offsetWithinWholeSimdVector_(offsetWithinWholeSimdVector),
+        throwOnOOB_(onOOB == OutOfBoundsBehavior::Throw),
+        wrapOffset_(onWrap == WrappingBehavior::WrapOffset)
     {
-        mozilla::PodZero(this);  // zero padding for Valgrind
-        insnOffset_ = insnOffset;
-        offsetWithinWholeSimdVector_ = offsetWithinWholeSimdVector;
-        throwOnOOB_ = oob == Throw;
-        cmpDelta_ = cmp == NoLengthCheck ? 0 : insnOffset - cmp;
-        MOZ_ASSERT(offsetWithinWholeSimdVector_ == offsetWithinWholeSimdVector);
+        MOZ_ASSERT(offsetWithinWholeSimdVector_ == offsetWithinWholeSimdVector, "fits in uint8");
     }
 
     uint32_t insnOffset() const { return insnOffset_; }
-    void setInsnOffset(uint32_t insnOffset) { insnOffset_ = insnOffset; }
-    void offsetInsnOffsetBy(uint32_t offset) { insnOffset_ += offset; }
-    bool throwOnOOB() const { return throwOnOOB_; }
     uint32_t offsetWithinWholeSimdVector() const { return offsetWithinWholeSimdVector_; }
-    bool hasLengthCheck() const { return cmpDelta_ > 0; }
-    void* patchLengthAt(uint8_t* code) const {
-        MOZ_ASSERT(hasLengthCheck());
-        return code + (insnOffset_ - cmpDelta_);
-    }
+    bool throwOnOOB() const { return throwOnOOB_; }
+    bool wrapOffset() const { return wrapOffset_; }
+
+    void offsetBy(uint32_t offset) { insnOffset_ += offset; }
 };
 #elif defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || \
-      defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
-class HeapAccess
-{
-    uint32_t insnOffset_;
+      defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64) || \
+      defined(JS_CODEGEN_NONE)
+// Nothing! We just want bounds checks on these platforms.
+class MemoryAccess {
   public:
-    HeapAccess() = default;
-    explicit HeapAccess(uint32_t insnOffset) : insnOffset_(insnOffset) {}
-    uint32_t insnOffset() const { return insnOffset_; }
-    void setInsnOffset(uint32_t insnOffset) { insnOffset_ = insnOffset; }
-    void offsetInsnOffsetBy(uint32_t offset) { insnOffset_ += offset; }
-};
-#elif defined(JS_CODEGEN_NONE)
-class HeapAccess {
-  public:
-    void offsetInsnOffsetBy(uint32_t) { MOZ_CRASH(); }
+    void offsetBy(uint32_t) { MOZ_CRASH(); }
     uint32_t insnOffset() const { MOZ_CRASH(); }
 };
 #endif
 
-typedef Vector<HeapAccess, 0, SystemAllocPolicy> HeapAccessVector;
+WASM_DECLARE_POD_VECTOR(MemoryAccess, MemoryAccessVector)
+WASM_DECLARE_POD_VECTOR(BoundsCheck, BoundsCheckVector)
 
 // A wasm::SymbolicAddress represents a pointer to a well-known function or
 // object that is embedded in wasm code. Since wasm code is serialized and
@@ -602,6 +755,10 @@ enum class SymbolicAddress
     CeilF,
     FloorD,
     FloorF,
+    TruncD,
+    TruncF,
+    NearbyIntD,
+    NearbyIntF,
     ExpD,
     LogD,
     PowD,
@@ -610,17 +767,12 @@ enum class SymbolicAddress
     RuntimeInterruptUint32,
     StackLimit,
     ReportOverRecursed,
-    OnOutOfBounds,
-    OnImpreciseConversion,
-    BadIndirectCall,
-    UnreachableTrap,
-    IntegerOverflowTrap,
-    InvalidConversionToIntegerTrap,
     HandleExecutionInterrupt,
-    InvokeImport_Void,
-    InvokeImport_I32,
-    InvokeImport_I64,
-    InvokeImport_F64,
+    HandleTrap,
+    CallImport_Void,
+    CallImport_I32,
+    CallImport_I64,
+    CallImport_F64,
     CoerceInPlace_ToInt32,
     CoerceInPlace_ToNumber,
     Limit
@@ -629,9 +781,32 @@ enum class SymbolicAddress
 void*
 AddressOf(SymbolicAddress imm, ExclusiveContext* cx);
 
-// Extracts low and high from an int64 object {low: int32, high: int32}, for
-// testing purposes mainly.
-bool ReadI64Object(JSContext* cx, HandleValue v, int64_t* val);
+// A wasm::Trap is a reason for why we reached a trap in executed code. Each
+// different trap is mapped to a different error message.
+
+enum class Trap
+{
+    // The Unreachable opcode has been executed.
+    Unreachable,
+    // An integer arithmetic operation led to an overflow.
+    IntegerOverflow,
+    // Trying to coerce NaN to an integer.
+    InvalidConversionToInteger,
+    // Integer division by zero.
+    IntegerDivideByZero,
+    // Out of bounds on wasm memory accesses and asm.js SIMD/atomic accesses.
+    OutOfBounds,
+    // Unaligned memory access.
+    UnalignedAccess,
+    // Bad signature for an indirect call.
+    BadIndirectCall,
+
+    // (asm.js only) SIMD float to int conversion failed because the input
+    // wasn't in bounds.
+    ImpreciseSimdConversion,
+
+    Limit
+};
 
 // A wasm::JumpTarget represents one of a special set of stubs that can be
 // jumped to from any function. Because wasm modules can be larger than the
@@ -640,32 +815,60 @@ bool ReadI64Object(JSContext* cx, HandleValue v, int64_t* val);
 
 enum class JumpTarget
 {
+    // Traps
+    Unreachable = unsigned(Trap::Unreachable),
+    IntegerOverflow = unsigned(Trap::IntegerOverflow),
+    InvalidConversionToInteger = unsigned(Trap::InvalidConversionToInteger),
+    IntegerDivideByZero = unsigned(Trap::IntegerDivideByZero),
+    OutOfBounds = unsigned(Trap::OutOfBounds),
+    UnalignedAccess = unsigned(Trap::UnalignedAccess),
+    BadIndirectCall = unsigned(Trap::BadIndirectCall),
+    ImpreciseSimdConversion = unsigned(Trap::ImpreciseSimdConversion),
+    // Non-traps
     StackOverflow,
-    OutOfBounds,
-    ConversionError,
-    BadIndirectCall,
-    UnreachableTrap,
-    IntegerOverflowTrap,
-    InvalidConversionToIntegerTrap,
     Throw,
     Limit
 };
 
 typedef EnumeratedArray<JumpTarget, JumpTarget::Limit, Uint32Vector> JumpSiteArray;
 
-// The CompileArgs struct captures global parameters that affect all wasm code
+// The SignalUsage struct captures global parameters that affect all wasm code
 // generation. It also currently is the single source of truth for whether or
 // not to use signal handlers for different purposes.
 
-struct CompileArgs
+struct SignalUsage
 {
-    bool useSignalHandlersForOOB;
-    bool useSignalHandlersForInterrupt;
+    // NB: these fields are serialized as a POD in Assumptions.
+    bool forOOB;
+    bool forInterrupt;
 
-    CompileArgs() = default;
-    explicit CompileArgs(ExclusiveContext* cx);
-    bool operator==(CompileArgs rhs) const;
-    bool operator!=(CompileArgs rhs) const { return !(*this == rhs); }
+    SignalUsage();
+    bool operator==(SignalUsage rhs) const;
+    bool operator!=(SignalUsage rhs) const { return !(*this == rhs); }
+};
+
+// Assumptions captures ambient state that must be the same when compiling and
+// deserializing a module for the compiled code to be valid. If it's not, then
+// the module must be recompiled from scratch.
+
+struct Assumptions
+{
+    SignalUsage           usesSignal;
+    uint32_t              cpuId;
+    JS::BuildIdCharVector buildId;
+    bool                  newFormat;
+
+    explicit Assumptions(JS::BuildIdCharVector&& buildId);
+
+    // If Assumptions is constructed without arguments, initBuildIdFromContext()
+    // must be called to complete initialization.
+    Assumptions();
+    bool initBuildIdFromContext(ExclusiveContext* cx);
+
+    bool operator==(const Assumptions& rhs) const;
+    bool operator!=(const Assumptions& rhs) const { return !(*this == rhs); }
+
+    WASM_DECLARE_SERIALIZABLE(Assumptions)
 };
 
 // A Module can either be asm.js or wasm.
@@ -676,7 +879,39 @@ enum ModuleKind
     AsmJS
 };
 
+// FuncImportExit describes the region of wasm global memory allocated for a
+// function import. This is accessed directly from JIT code and mutated by
+// Instance as exits become optimized and deoptimized.
+
+struct FuncImportExit
+{
+    void* code;
+    jit::BaselineScript* baselineScript;
+    GCPtrFunction fun;
+    static_assert(sizeof(GCPtrFunction) == sizeof(void*), "for JIT access");
+};
+
+// ExportArg holds the unboxed operands to the wasm entry trampoline which can
+// be called through an ExportFuncPtr.
+
+struct ExportArg
+{
+    uint64_t lo;
+    uint64_t hi;
+};
+
+typedef int32_t (*ExportFuncPtr)(ExportArg* args, uint8_t* global);
+
 // Constants:
+
+// The WebAssembly spec hard-codes the virtual page size to be 64KiB and
+// requires linear memory to always be a multiple of 64KiB.
+static const unsigned PageSize = 64 * 1024;
+
+#ifdef ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB
+static const uint64_t Uint32Range = uint64_t(UINT32_MAX) + 1;
+static const uint64_t MappedSize = 2 * Uint32Range + PageSize;
+#endif
 
 static const unsigned ActivationGlobalDataOffset = 0;
 static const unsigned HeapGlobalDataOffset       = ActivationGlobalDataOffset + sizeof(void*);
@@ -689,7 +924,10 @@ static const unsigned MaxFuncs                   =      512 * 1024;
 static const unsigned MaxLocals                  =       64 * 1024;
 static const unsigned MaxImports                 =       64 * 1024;
 static const unsigned MaxExports                 =       64 * 1024;
+static const unsigned MaxTables                  =        4 * 1024;
 static const unsigned MaxTableElems              =      128 * 1024;
+static const unsigned MaxDataSegments            =       64 * 1024;
+static const unsigned MaxElemSegments            =       64 * 1024;
 static const unsigned MaxArgsPerFunc             =        4 * 1024;
 static const unsigned MaxBrTableElems            = 4 * 1024 * 1024;
 

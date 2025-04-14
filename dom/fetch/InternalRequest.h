@@ -11,6 +11,7 @@
 #include "mozilla/dom/InternalHeaders.h"
 #include "mozilla/dom/RequestBinding.h"
 #include "mozilla/LoadTainting.h"
+#include "mozilla/net/ReferrerPolicy.h"
 
 #include "nsIContentPolicy.h"
 #include "nsIInputStream.h"
@@ -78,6 +79,7 @@ namespace dom {
  */
 
 class Request;
+class IPCInternalRequest;
 
 #define kFETCH_CLIENT_REFERRER_STR "about:client"
 
@@ -88,12 +90,13 @@ class InternalRequest final
 public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(InternalRequest)
 
-  InternalRequest()
+  explicit InternalRequest(const nsACString& aURL)
     : mMethod("GET")
     , mHeaders(new InternalHeaders(HeadersGuardEnum::None))
     , mContentPolicyType(nsIContentPolicy::TYPE_FETCH)
     , mReferrer(NS_LITERAL_STRING(kFETCH_CLIENT_REFERRER_STR))
     , mReferrerPolicy(ReferrerPolicy::_empty)
+    , mEnvironmentReferrerPolicy(net::RP_Default)
     , mMode(RequestMode::No_cors)
     , mCredentialsMode(RequestCredentials::Omit)
     , mResponseTainting(LoadTainting::Basic)
@@ -112,6 +115,8 @@ public:
     , mUnsafeRequest(false)
     , mUseURLCredentials(false)
   {
+    MOZ_ASSERT(!aURL.IsEmpty());
+    AddURL(aURL);
   }
 
   InternalRequest(const nsACString& aURL,
@@ -125,11 +130,11 @@ public:
                   ReferrerPolicy aReferrerPolicy,
                   nsContentPolicyType aContentPolicyType)
     : mMethod(aMethod)
-    , mURL(aURL)
     , mHeaders(aHeaders)
     , mContentPolicyType(aContentPolicyType)
     , mReferrer(aReferrer)
     , mReferrerPolicy(aReferrerPolicy)
+    , mEnvironmentReferrerPolicy(net::RP_Default)
     , mMode(aMode)
     , mCredentialsMode(aRequestCredentials)
     , mResponseTainting(LoadTainting::Basic)
@@ -145,13 +150,13 @@ public:
     , mUnsafeRequest(false)
     , mUseURLCredentials(false)
   {
-    // Normally we strip the fragment from the URL in Request::Constructor.
-    // If internal code is directly constructing this object they must
-    // strip the fragment first.  Since these should be well formed URLs we
-    // can use a simple check for a fragment here.  The full parser is
-    // difficult to use off the main thread.
-    MOZ_ASSERT(mURL.Find(NS_LITERAL_CSTRING("#")) == kNotFound);
+    MOZ_ASSERT(!aURL.IsEmpty());
+    AddURL(aURL);
   }
+
+  explicit InternalRequest(const IPCInternalRequest& aIPCRequest);
+
+  void ToIPC(IPCInternalRequest* aIPCRequest);
 
   already_AddRefed<InternalRequest> Clone();
 
@@ -175,16 +180,34 @@ public:
            mMethod.LowerCaseEqualsASCII("head");
   }
 
+  // GetURL should get the request's current url. A request has an associated
+  // current url. It is a pointer to the last fetch URL in request's url list.
   void
-  GetURL(nsCString& aURL) const
+  GetURL(nsACString& aURL) const
   {
-    aURL.Assign(mURL);
+    MOZ_RELEASE_ASSERT(!mURLList.IsEmpty(), "Internal Request's urlList should not be empty.");
+
+    aURL.Assign(mURLList.LastElement());
+  }
+
+  // AddURL should append the url into url list.
+  // Normally we strip the fragment from the URL in Request::Constructor.
+  // If internal code is directly constructing this object they must
+  // strip the fragment first.  Since these should be well formed URLs we
+  // can use a simple check for a fragment here.  The full parser is
+  // difficult to use off the main thread.
+  void
+  AddURL(const nsACString& aURL)
+  {
+    MOZ_ASSERT(!aURL.IsEmpty());
+    mURLList.AppendElement(aURL);
+    MOZ_ASSERT(mURLList.LastElement().Find(NS_LITERAL_CSTRING("#")) == kNotFound);
   }
 
   void
-  SetURL(const nsACString& aURL)
+  GetURLList(nsTArray<nsCString>& aURLList)
   {
-    mURL.Assign(aURL);
+    aURLList.Assign(mURLList);
   }
 
   void
@@ -244,6 +267,18 @@ public:
   SetReferrerPolicy(ReferrerPolicy aReferrerPolicy)
   {
     mReferrerPolicy = aReferrerPolicy;
+  }
+
+  net::ReferrerPolicy
+  GetEnvironmentReferrerPolicy() const
+  {
+    return mEnvironmentReferrerPolicy;
+  }
+
+  void
+  SetEnvironmentReferrerPolicy(net::ReferrerPolicy aReferrerPolicy)
+  {
+    mEnvironmentReferrerPolicy = aReferrerPolicy;
   }
 
   bool
@@ -459,8 +494,8 @@ private:
   IsWorkerContentPolicy(nsContentPolicyType aContentPolicyType);
 
   nsCString mMethod;
-  // mURL always stores the url with the ref stripped
-  nsCString mURL;
+  // mURLList: a list of one or more fetch URLs
+  nsTArray<nsCString> mURLList;
   RefPtr<InternalHeaders> mHeaders;
   nsCOMPtr<nsIInputStream> mBodyStream;
 
@@ -472,20 +507,27 @@ private:
   nsString mReferrer;
   ReferrerPolicy mReferrerPolicy;
 
+  // This will be used for request created from Window or Worker contexts
+  // In case there's no Referrer Policy in Request, this will be passed to
+  // channel.
+  // The Environment Referrer Policy should be net::ReferrerPolicy so that it
+  // could be associated with nsIHttpChannel.
+  net::ReferrerPolicy mEnvironmentReferrerPolicy;
+
   RequestMode mMode;
   RequestCredentials mCredentialsMode;
-  LoadTainting mResponseTainting;
+  MOZ_INIT_OUTSIDE_CTOR LoadTainting mResponseTainting;
   RequestCache mCacheMode;
   RequestRedirect mRedirectMode;
 
-  bool mAuthenticationFlag;
-  bool mForceOriginHeader;
-  bool mPreserveContentCodings;
-  bool mSameOriginDataURL;
-  bool mSkipServiceWorker;
-  bool mSynchronous;
-  bool mUnsafeRequest;
-  bool mUseURLCredentials;
+  MOZ_INIT_OUTSIDE_CTOR bool mAuthenticationFlag;
+  MOZ_INIT_OUTSIDE_CTOR bool mForceOriginHeader;
+  MOZ_INIT_OUTSIDE_CTOR bool mPreserveContentCodings;
+  MOZ_INIT_OUTSIDE_CTOR bool mSameOriginDataURL;
+  MOZ_INIT_OUTSIDE_CTOR bool mSkipServiceWorker;
+  MOZ_INIT_OUTSIDE_CTOR bool mSynchronous;
+  MOZ_INIT_OUTSIDE_CTOR bool mUnsafeRequest;
+  MOZ_INIT_OUTSIDE_CTOR bool mUseURLCredentials;
   // This is only set when a Request object is created by a fetch event.  We
   // use it to check if Service Workers are simply fetching intercepted Request
   // objects without modifying them.

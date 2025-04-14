@@ -17,6 +17,7 @@
 #include "nsIRunnable.h"
 #include "nsIAsyncShutdown.h"
 #include "Latency.h"
+#include "mozilla/Services.h"
 #include "mozilla/UniquePtr.h"
 #include "mozilla/WeakPtr.h"
 #include "GraphDriver.h"
@@ -91,8 +92,9 @@ public:
  * file. It's not in the anonymous namespace because MediaStream needs to
  * be able to friend it.
  *
- * Currently we have one global instance per process, and one per each
- * OfflineAudioContext object.
+ * There can be multiple MediaStreamGraph per process: one per AudioChannel.
+ * Additionaly, each OfflineAudioContext object creates its own MediaStreamGraph
+ * object too.
  */
 class MediaStreamGraphImpl : public MediaStreamGraph,
                              public nsIMemoryReporter
@@ -104,10 +106,10 @@ public:
   /**
    * Use aGraphDriverRequested with SYSTEM_THREAD_DRIVER or AUDIO_THREAD_DRIVER
    * to create a MediaStreamGraph which provides support for real-time audio
-   * and/or video.  Set it to false in order to create a non-realtime instance
-   * which just churns through its inputs and produces output.  Those objects
-   * currently only support audio, and are used to implement
-   * OfflineAudioContext.  They do not support MediaStream inputs.
+   * and/or video.  Set it to OFFLINE_THREAD_DRIVER in order to create a
+   * non-realtime instance which just churns through its inputs and produces
+   * output.  Those objects currently only support audio, and are used to
+   * implement OfflineAudioContext.  They do not support MediaStream inputs.
    */
   explicit MediaStreamGraphImpl(GraphDriverType aGraphDriverRequested,
                                 TrackRate aSampleRate,
@@ -155,8 +157,9 @@ public:
     nsCOMPtr<nsIAsyncShutdownClient> barrier;
     nsresult rv = svc->GetProfileBeforeChange(getter_AddRefs(barrier));
     if (!barrier) {
-      // We are probably in a content process.
-      rv = svc->GetContentChildShutdown(getter_AddRefs(barrier));
+      // We are probably in a content process. We need to do cleanup at
+      // XPCOM shutdown in leakchecking builds.
+      rv = svc->GetXpcomWillShutdown(getter_AddRefs(barrier));
     }
     MOZ_RELEASE_ASSERT(NS_SUCCEEDED(rv));
     MOZ_RELEASE_ASSERT(barrier);
@@ -190,6 +193,15 @@ public:
    * Called before the thread runs.
    */
   void Init();
+
+  /**
+   * Respond to CollectReports with sizes collected on the graph thread.
+   */
+  static void
+  FinishCollectReports(nsIHandleReportCallback* aHandleReport,
+                       nsISupports* aData,
+                       const nsTArray<AudioNodeSizes>& aAudioStreamSizes);
+
   // The following methods run on the graph thread (or possibly the main thread if
   // mLifecycleState > LIFECYCLE_RUNNING)
   void AssertOnGraphThreadOrNotRunning() const
@@ -208,7 +220,9 @@ public:
 #endif
   }
 
-  void MaybeProduceMemoryReport();
+  void CollectSizesForMemoryReport(
+         already_AddRefed<nsIHandleReportCallback> aHandleReport,
+         already_AddRefed<nsISupports> aHandlerData);
 
   /**
    * Returns true if this MediaStreamGraph should keep running
@@ -741,6 +755,9 @@ public:
     // realtime graph when it has no streams.
     LIFECYCLE_WAITING_FOR_STREAM_DESTRUCTION
   };
+  /**
+   * Modified only on the main thread in mMonitor.
+   */
   LifecycleState mLifecycleState;
   /**
    * The graph should stop processing at or after this time.
@@ -815,10 +832,6 @@ private:
   MOZ_DEFINE_MALLOC_SIZE_OF(MallocSizeOf)
 
   /**
-   * Used to signal that a memory report has been requested.
-   */
-  Monitor mMemoryReportMonitor;
-  /**
    * This class uses manual memory management, and all pointers to it are raw
    * pointers. However, in order for it to implement nsIMemoryReporter, it needs
    * to implement nsISupports and so be ref-counted. So it maintains a single
@@ -826,10 +839,6 @@ private:
    * and Destroy() nulls this self-reference in order to trigger self-deletion.
    */
   RefPtr<MediaStreamGraphImpl> mSelfRef;
-  /**
-   * Used to pass memory report information across threads.
-   */
-  nsTArray<AudioNodeSizes> mAudioStreamSizes;
 
   struct WindowAndStream
   {
@@ -840,10 +849,6 @@ private:
    * Stream for window audio capture.
    */
   nsTArray<WindowAndStream> mWindowCaptureStreams;
-  /**
-   * Indicates that the MSG thread should gather data for a memory report.
-   */
-  bool mNeedsMemoryReport;
 
 #ifdef DEBUG
   /**

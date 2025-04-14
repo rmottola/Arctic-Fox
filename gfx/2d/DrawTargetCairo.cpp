@@ -516,7 +516,7 @@ GfxPatternToCairoPattern(const Pattern& aPattern,
 
       matrix = &pattern.mMatrix;
 
-      cairo_pattern_set_filter(pat, GfxFilterToCairoFilter(pattern.mFilter));
+      cairo_pattern_set_filter(pat, GfxSamplingFilterToCairoFilter(pattern.mSamplingFilter));
       cairo_pattern_set_extend(pat, GfxExtendToCairoExtend(pattern.mExtendMode));
 
       cairo_surface_destroy(surf);
@@ -849,11 +849,15 @@ DrawTargetCairo::DrawSurface(SourceSurface *aSurface,
   cairo_matrix_scale(&src_mat, sx, sy);
 
   cairo_surface_t* surf = GetCairoSurfaceForSourceSurface(aSurface);
+  if (!surf) {
+    gfxWarning() << "Failed to create cairo surface for DrawTargetCairo::DrawSurface";
+    return;
+  }
   cairo_pattern_t* pat = cairo_pattern_create_for_surface(surf);
   cairo_surface_destroy(surf);
 
   cairo_pattern_set_matrix(pat, &src_mat);
-  cairo_pattern_set_filter(pat, GfxFilterToCairoFilter(aSurfOptions.mFilter));
+  cairo_pattern_set_filter(pat, GfxSamplingFilterToCairoFilter(aSurfOptions.mSamplingFilter));
   cairo_pattern_set_extend(pat, CAIRO_EXTEND_PAD);
 
   cairo_set_antialias(mContext, GfxAntialiasToCairoAntialias(aOptions.mAntialiasMode));
@@ -1178,7 +1182,7 @@ DrawTargetCairo::ClearRect(const Rect& aRect)
 
   AutoPrepareForDrawing prep(this, mContext);
 
-  if (!mContext || aRect.Width() <= 0 || aRect.Height() <= 0 ||
+  if (!mContext || aRect.Width() < 0 || aRect.Height() < 0 ||
       !IsFinite(aRect.X()) || !IsFinite(aRect.Width()) ||
       !IsFinite(aRect.Y()) || !IsFinite(aRect.Height())) {
     gfxCriticalNote << "ClearRect with invalid argument " << gfx::hexa(mContext) << " with " << aRect.Width() << "x" << aRect.Height() << " [" << aRect.X() << ", " << aRect.Y() << "]";
@@ -1960,11 +1964,17 @@ DrawTarget::Draw3DTransformedSurface(SourceSurface* aSurface, const Matrix4x4& a
     pixman_image_create_bits(PIXMAN_a8r8g8b8,
                              xformBounds.width, xformBounds.height,
                              (uint32_t*)dstSurf->GetData(), dstSurf->Stride());
+  if (!dst) {
+    return false;
+  }
   pixman_image_t* src =
     pixman_image_create_bits(srcFormat,
                              srcSurf->GetSize().width, srcSurf->GetSize().height,
                              (uint32_t*)srcMap.GetData(), srcMap.GetStride());
-  MOZ_ASSERT(src && dst, "Failed to create pixman images?");
+  if (!src) {
+    pixman_image_unref(dst);
+    return false;
+  }
 
   pixman_image_set_filter(src, PIXMAN_FILTER_BILINEAR, nullptr, 0);
   pixman_image_set_transform(src, &xform);

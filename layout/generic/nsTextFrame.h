@@ -33,6 +33,8 @@ class nsDisplayText;
 
 class nsTextFrame : public nsFrame {
   typedef mozilla::LayoutDeviceRect LayoutDeviceRect;
+  typedef mozilla::RawSelectionType RawSelectionType;
+  typedef mozilla::SelectionType SelectionType;
   typedef mozilla::TextRangeStyle TextRangeStyle;
   typedef mozilla::gfx::DrawTarget DrawTarget;
   typedef mozilla::gfx::Point Point;
@@ -169,7 +171,7 @@ public:
    * @param aType the type of selection added or removed
    */
   void SetSelectedRange(uint32_t aStart, uint32_t aEnd, bool aSelected,
-                        SelectionType aType);
+                        SelectionType aSelectionType);
 
   virtual FrameSearchResult PeekOffsetNoAmount(bool aForward, int32_t* aOffset) override;
   virtual FrameSearchResult PeekOffsetCharacter(bool aForward, int32_t* aOffset,
@@ -192,6 +194,9 @@ public:
   
   virtual nsresult GetPointFromOffset(int32_t  inOffset,
                                       nsPoint* outPoint) override;
+  virtual nsresult GetCharacterRectsInRange(int32_t  aInOffset,
+                                            int32_t  aLength,
+                                            nsTArray<nsRect>& aRects) override;
   
   virtual nsresult GetChildFrameContainingOffset(int32_t inContentOffset,
                                                  bool    inHint,
@@ -252,8 +257,8 @@ public:
                                            nscoord* aX,
                                            nscoord* aXMost) override;
   virtual void Reflow(nsPresContext* aPresContext,
-                      nsHTMLReflowMetrics& aMetrics,
-                      const nsHTMLReflowState& aReflowState,
+                      ReflowOutput& aMetrics,
+                      const ReflowInput& aReflowInput,
                       nsReflowStatus& aStatus) override;
   virtual bool CanContinueTextRun() const override;
   // Method that is called for a text frame that is logically
@@ -353,7 +358,7 @@ public:
      */
     virtual void NotifySelectionBackgroundNeedsFill(const Rect& aBackgroundRect,
                                                     nscolor aColor,
-                                                    DrawTarget& aDrawTarget);
+                                                    DrawTarget& aDrawTarget) { }
 
     /**
      * Called before (for under/over-line) or after (for line-through) the text
@@ -391,8 +396,6 @@ public:
      * has been emitted to the gfxContext.
      */
     virtual void NotifySelectionDecorationLinePathEmitted() { }
-
-    virtual void NotifyGlyphPathEmitted() override {}
   };
 
   struct PaintTextParams
@@ -402,7 +405,21 @@ public:
     LayoutDeviceRect dirtyRect;
     gfxTextContextPaint* contextPaint = nullptr;
     DrawPathCallbacks* callbacks = nullptr;
+    enum {
+      PaintText,           // Normal text painting.
+      PaintTextBGColor,    // Only paint background color of the selected text
+                           // range in this state.
+      GenerateTextMask     // To generate a mask from a text frame. Should
+                           // only paint text itself with opaque color.
+                           // Text shadow, text selection color and text
+                           // decoration are all discarded in this state.
+    };
+    uint8_t state = PaintText;
     explicit PaintTextParams(gfxContext* aContext) : context(aContext) {}
+
+    bool IsPaintText() const { return state == PaintText; }
+    bool IsGenerateTextMask() const { return state == GenerateTextMask; }
+    bool IsPaintBGColor() const { return state == PaintTextBGColor; }
   };
 
   struct PaintTextSelectionParams : PaintTextParams
@@ -458,10 +475,11 @@ public:
   // our text, returned in aAllTypes.
   // Return false if the text was not painted and we should continue with
   // the fast path.
-  bool PaintTextWithSelectionColors(const PaintTextSelectionParams& aParams,
-                                    SelectionDetails* aDetails,
-                                    SelectionType* aAllTypes,
-                                    const nsCharClipDisplayItem::ClipEdges& aClipEdges);
+  bool PaintTextWithSelectionColors(
+         const PaintTextSelectionParams& aParams,
+         SelectionDetails* aDetails,
+         RawSelectionType* aAllRawSelectionTypes,
+         const nsCharClipDisplayItem::ClipEdges& aClipEdges);
   // helper: paint text decorations for text selected by aSelectionType
   void PaintTextSelectionDecorations(const PaintTextSelectionParams& aParams,
                                      SelectionDetails* aDetails,
@@ -571,11 +589,11 @@ public:
   // Similar to Reflow(), but for use from nsLineLayout
   void ReflowText(nsLineLayout& aLineLayout, nscoord aAvailableWidth,
                   DrawTarget* aDrawTarget,
-                  nsHTMLReflowMetrics& aMetrics, nsReflowStatus& aStatus);
+                  ReflowOutput& aMetrics, nsReflowStatus& aStatus);
 
   bool IsFloatingFirstLetterChild() const;
 
-  virtual bool UpdateOverflow() override;
+  virtual bool ComputeCustomOverflow(nsOverflowAreas& aOverflowAreas) override;
 
   void AssignJustificationGaps(const mozilla::JustificationAssignment& aAssign);
   mozilla::JustificationAssignment GetJustificationAssignment() const;
@@ -744,7 +762,7 @@ protected:
    */
   void DrawSelectionDecorations(gfxContext* aContext,
                                 const LayoutDeviceRect& aDirtyRect,
-                                SelectionType aType,
+                                mozilla::SelectionType aSelectionType,
                                 nsTextPaintStyle& aTextPaintStyle,
                                 const TextRangeStyle &aRangeStyle,
                                 const Point& aPt,
@@ -777,7 +795,7 @@ protected:
    *                    background should be painted
    * @return            true if the selection affects colors, false otherwise
    */
-  static bool GetSelectionTextColors(SelectionType aType,
+  static bool GetSelectionTextColors(SelectionType aSelectionType,
                                      nsTextPaintStyle& aTextPaintStyle,
                                      const TextRangeStyle &aRangeStyle,
                                      nscolor* aForeground,
@@ -798,7 +816,19 @@ protected:
 
   virtual bool HasAnyNoncollapsedCharacters() override;
 
-  void ClearMetrics(nsHTMLReflowMetrics& aMetrics);
+  void ClearMetrics(ReflowOutput& aMetrics);
+
+  /**
+   * UpdateIteratorFromOffset() updates the iterator from a given offset.
+   * Also, aInOffset may be updated to cluster start if aInOffset isn't
+   * the offset of cluster start.
+   */
+  void UpdateIteratorFromOffset(const PropertyProvider& aProperties,
+                                int32_t& aInOffset,
+                                gfxSkipCharsIterator& aIter);
+
+  nsPoint GetPointFromIterator(const gfxSkipCharsIterator& aIter,
+                               PropertyProvider& aProperties);
 };
 
 #endif

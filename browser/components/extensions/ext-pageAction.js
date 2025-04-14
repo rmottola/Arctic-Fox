@@ -2,14 +2,15 @@
 /* vim: set sts=2 sw=2 et tw=80: */
 "use strict";
 
+Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   EventManager,
+  IconDetails,
 } = ExtensionUtils;
 
 // WeakMap[Extension -> PageAction]
 var pageActionMap = new WeakMap();
-
 
 // Handles URL bar icons, including the |page_action| manifest entry
 // and associated API.
@@ -25,6 +26,12 @@ function PageAction(options, extension) {
     icon: IconDetails.normalize({path: options.default_icon}, extension),
     popup: options.default_popup || "",
   };
+
+  this.browserStyle = options.browser_style || false;
+  if (options.browser_style === null) {
+    this.extension.logger.warn("Please specify whether you want browser_style " +
+                               "or not in your page_action options.");
+  }
 
   this.tabContext = new TabContext(tab => Object.create(this.defaults),
                                    extension);
@@ -85,8 +92,19 @@ PageAction.prototype = {
       button.setAttribute("tooltiptext", title);
       button.setAttribute("aria-label", title);
 
-      let icon = IconDetails.getURL(tabData.icon, window, this.extension);
-      button.setAttribute("src", icon);
+      // These URLs should already be properly escaped, but make doubly sure CSS
+      // string escape characters are escaped here, since they could lead to a
+      // sandbox break.
+      let escape = str => str.replace(/[\\\s"]/g, encodeURIComponent);
+
+      let getIcon = size => escape(IconDetails.getPreferredIcon(tabData.icon, this.extension, size).icon);
+
+      button.setAttribute("style", `
+        --webextension-urlbar-image: url("${getIcon(16)}");
+        --webextension-urlbar-image-2x: url("${getIcon(32)}");
+      `);
+
+      button.classList.add("webextension-page-action");
     }
 
     button.hidden = !tabData.show;
@@ -123,6 +141,21 @@ PageAction.prototype = {
     return this.buttons.get(window);
   },
 
+  /**
+   * Triggers this page action for the given window, with the same effects as
+   * if it were clicked by a user.
+   *
+   * This has no effect if the page action is hidden for the selected tab.
+   *
+   * @param {Window} window
+   */
+  triggerAction(window) {
+    let pageAction = pageActionMap.get(this.extension);
+    if (pageAction.getProperty(window.gBrowser.selectedTab, "show")) {
+      pageAction.handleClick(window);
+    }
+  },
+
   // Handles a click event on the page action button for the given
   // window.
   // If the page action has a |popup| property, a panel is opened to
@@ -139,7 +172,8 @@ PageAction.prototype = {
     // If it has no popup URL defined, we dispatch a click event, but do not
     // open a popup.
     if (popupURL) {
-      new PanelPopup(this.extension, this.getButton(window), popupURL);
+      new PanelPopup(this.extension, this.getButton(window), popupURL,
+                     this.browserStyle);
     } else {
       this.emit("click", tab);
     }
@@ -163,11 +197,6 @@ PageAction.prototype = {
   },
 };
 
-PageAction.for = extension => {
-  return pageActionMap.get(extension);
-};
-
-
 /* eslint-disable mozilla/balanced-listeners */
 extensions.on("manifest_page_action", (type, directive, extension, manifest) => {
   let pageAction = new PageAction(manifest.page_action, extension);
@@ -182,8 +211,13 @@ extensions.on("shutdown", (type, extension) => {
 });
 /* eslint-enable mozilla/balanced-listeners */
 
+PageAction.for = extension => {
+  return pageActionMap.get(extension);
+};
 
-extensions.registerSchemaAPI("pageAction", null, (extension, context) => {
+global.pageActionFor = PageAction.for;
+
+extensions.registerSchemaAPI("pageAction", (extension, context) => {
   return {
     pageAction: {
       onClicked: new EventManager(context, "pageAction.onClicked", fire => {
@@ -201,11 +235,13 @@ extensions.registerSchemaAPI("pageAction", null, (extension, context) => {
       show(tabId) {
         let tab = TabManager.getTab(tabId);
         PageAction.for(extension).setProperty(tab, "show", true);
+        return Promise.resolve();
       },
 
       hide(tabId) {
         let tab = TabManager.getTab(tabId);
         PageAction.for(extension).setProperty(tab, "show", false);
+        return Promise.resolve();
       },
 
       setTitle(details) {

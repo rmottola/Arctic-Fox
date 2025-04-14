@@ -49,11 +49,11 @@ var FullScreen = {
       fullscreenCommand.removeAttribute("checked");
     }
 
-#ifdef XP_MACOSX
-    // Make sure the menu items are adjusted.
-    document.getElementById("enterFullScreenItem").hidden = enterFS;
-    document.getElementById("exitFullScreenItem").hidden = !enterFS;
-#endif
+    if (AppConstants.platform == "macosx") {
+      // Make sure the menu items are adjusted.
+      document.getElementById("enterFullScreenItem").hidden = enterFS;
+      document.getElementById("exitFullScreenItem").hidden = !enterFS;
+    }
 
     if (!this._fullScrToggler) {
       this._fullScrToggler = document.getElementById("fullscr-toggler");
@@ -131,10 +131,12 @@ var FullScreen = {
           let topWin = event.target.ownerDocument.defaultView.top;
           browser = gBrowser.getBrowserForContentWindow(topWin);
         }
+        TelemetryStopwatch.start("FULLSCREEN_CHANGE_MS");
         this.enterDomFullscreen(browser);
         break;
       }
       case "MozDOMFullscreen:Exited":
+        TelemetryStopwatch.start("FULLSCREEN_CHANGE_MS");
         this.cleanupDomFullscreen();
         break;
     }
@@ -157,6 +159,7 @@ var FullScreen = {
       }
       case "DOMFullscreen:Painted": {
         Services.obs.notifyObservers(window, "fullscreen-painted", "");
+        TelemetryStopwatch.finish("FULLSCREEN_CHANGE_MS");
         break;
       }
     }
@@ -191,8 +194,9 @@ var FullScreen = {
 
     document.documentElement.setAttribute("inDOMFullscreen", true);
 
-    if (gFindBarInitialized)
-      gFindBar.close();
+    if (gFindBarInitialized) {
+      gFindBar.close(true);
+    }
 
     // Exit DOM full-screen mode upon open, close, or change tab.
     gBrowser.tabContainer.addEventListener("TabOpen", this.exitDomFullScreen);
@@ -297,8 +301,11 @@ var FullScreen = {
         aEvent.target.localName != "tooltip" && aEvent.target.localName != "window")
       FullScreen._isPopupOpen = true;
     else if (aEvent.type == "popuphidden" && aEvent.target.localName != "tooltip" &&
-             aEvent.target.localName != "window")
+             aEvent.target.localName != "window") {
       FullScreen._isPopupOpen = false;
+      // Try again to hide toolbar when we close the popup.
+      FullScreen.hideNavToolbox(true);
+    }
   },
 
   // Autohide helpers for the context menu item
@@ -309,6 +316,8 @@ var FullScreen = {
   setAutohide: function()
   {
     gPrefService.setBoolPref("browser.fullscreen.autohide", !gPrefService.getBoolPref("browser.fullscreen.autohide"));
+    // Try again to hide toolbar when we change the pref.
+    FullScreen.hideNavToolbox(true);
   },
 
   _WarningBox: {
@@ -384,11 +393,11 @@ var FullScreen = {
         textElem.setAttribute("hidden", true);
       } else {
         textElem.removeAttribute("hidden");
-        let hostLabel = document.getElementById("fullscreen-domain");
+        let hostElem = document.getElementById("fullscreen-domain");
         // Document's principal's URI has a host. Display a warning including it.
         let utils = {};
         Cu.import("resource://gre/modules/DownloadUtils.jsm", utils);
-        hostLabel.value = utils.DownloadUtils.getURIHost(uri.spec)[0];
+        hostElem.textContent = utils.DownloadUtils.getURIHost(uri.spec)[0];
       }
       this._element.className = gIdentityHandler.getMode();
 
@@ -624,10 +633,6 @@ XPCOMUtils.defineLazyGetter(FullScreen, "useLionFullScreen", function() {
   // * on OS X
   // * on Lion or higher (Darwin 11+)
   // * have fullscreenbutton="true"
-#ifdef XP_MACOSX
-  return parseFloat(Services.sysinfo.getProperty("version")) >= 11 &&
+  return AppConstants.isPlatformAndVersionAtLeast("macosx", 11) &&
          document.documentElement.getAttribute("fullscreenbutton") == "true";
-#else
-  return false;
-#endif
 });

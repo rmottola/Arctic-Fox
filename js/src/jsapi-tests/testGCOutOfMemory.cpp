@@ -8,18 +8,8 @@
 
 #include "jsapi-tests/tests.h"
 
-static unsigned errorCount = 0;
-
-static void
-ErrorCounter(JSContext* cx, const char* message, JSErrorReport* report)
-{
-    ++errorCount;
-}
-
 BEGIN_TEST(testGCOutOfMemory)
 {
-    JS_SetErrorReporter(rt, ErrorCounter);
-
     JS::RootedValue root(cx);
 
     // Count the number of allocations until we hit OOM, and store it in 'max'.
@@ -35,9 +25,14 @@ BEGIN_TEST(testGCOutOfMemory)
 
     /* Check that we get OOM. */
     CHECK(!ok);
-    CHECK(!JS_IsExceptionPending(cx));
-    CHECK_EQUAL(errorCount, 1u);
-    JS_GC(rt);
+    CHECK(JS_GetPendingException(cx, &root));
+    CHECK(root.isString());
+    bool match = false;
+    CHECK(JS_StringEqualsAscii(cx, root.toString(), "out of memory", &match));
+    CHECK(match);
+    JS_ClearPendingException(cx);
+
+    JS_GC(cx);
 
     // The above GC should have discarded everything. Verify that we can now
     // allocate half as many objects without OOMing.
@@ -48,11 +43,11 @@ BEGIN_TEST(testGCOutOfMemory)
          "        array.push({});"
          "    }"
          "})();", &root);
-    CHECK_EQUAL(errorCount, 1u);
+    CHECK(!JS_IsExceptionPending(cx));
     return true;
 }
 
-virtual JSRuntime * createRuntime() override {
+virtual JSContext* createContext() override {
     // Note that the max nursery size must be less than the whole heap size, or
     // the test will fail because 'max' (the number of allocations required for
     // OOM) will be based on the nursery size, and that will overflow the
@@ -60,15 +55,15 @@ virtual JSRuntime * createRuntime() override {
     // OOM. (Actually, this only happens with nursery zeal, because normally
     // the nursery will start out with only a single chunk before triggering a
     // major GC.)
-    JSRuntime* rt = JS_NewRuntime(768 * 1024, 128 * 1024);
-    if (!rt)
+    JSContext* cx = JS_NewContext(768 * 1024, 128 * 1024);
+    if (!cx)
         return nullptr;
-    setNativeStackQuota(rt);
-    return rt;
+    setNativeStackQuota(cx);
+    return cx;
 }
 
-virtual void destroyRuntime() override {
-    JS_DestroyRuntime(rt);
+virtual void destroyContext() override {
+    JS_DestroyContext(cx);
 }
 
 END_TEST(testGCOutOfMemory)

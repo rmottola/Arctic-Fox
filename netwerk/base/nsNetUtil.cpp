@@ -749,20 +749,21 @@ NS_ImplementChannelOpen(nsIChannel      *channel,
     nsCOMPtr<nsIInputStream> stream;
     nsresult rv = NS_NewSyncStreamListener(getter_AddRefs(listener),
                                            getter_AddRefs(stream));
-    if (NS_SUCCEEDED(rv)) {
-        rv = channel->AsyncOpen(listener, nullptr);
-        if (NS_SUCCEEDED(rv)) {
-            uint64_t n;
-            // block until the initial response is received or an error occurs.
-            rv = stream->Available(&n);
-            if (NS_SUCCEEDED(rv)) {
-                *result = nullptr;
-                stream.swap(*result);
-            }
-        }
-    }
-    return rv;
-}
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = NS_MaybeOpenChannelUsingAsyncOpen2(channel, listener);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    uint64_t n;
+    // block until the initial response is received or an error occurs.
+    rv = stream->Available(&n);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    *result = nullptr;
+    stream.swap(*result);
+
+    return NS_OK;
+ }
 
 nsresult
 NS_NewRequestObserverProxy(nsIRequestObserver **result,
@@ -1259,14 +1260,25 @@ NS_GetOriginAttributes(nsIChannel *aChannel,
                        mozilla::NeckoOriginAttributes &aAttributes)
 {
     nsCOMPtr<nsILoadContext> loadContext;
+    nsCOMPtr<nsILoadInfo> loadInfo = aChannel->GetLoadInfo();
     NS_QueryNotificationCallbacks(aChannel, loadContext);
-    if (!loadContext) {
+
+    if (!loadContext && !loadInfo) {
         return false;
     }
 
-    DocShellOriginAttributes doa;
-    loadContext->GetOriginAttributes(doa);
-    aAttributes.InheritFromDocShellToNecko(doa);
+    // Bug 1270678 - By default, we would acquire the originAttributes from
+    // the loadContext. But in some cases, say, loading the favicon, that the
+    // loadContext is not available. We would use the loadInfo to get
+    // originAttributes instead.
+    if (loadContext) {
+        DocShellOriginAttributes doa;
+        loadContext->GetOriginAttributes(doa);
+        aAttributes.InheritFromDocShellToNecko(doa);
+    } else {
+        loadInfo->GetOriginAttributes(&aAttributes);
+    }
+    aAttributes.SyncAttributesWithPrivateBrowsing(NS_UsePrivateBrowsing(aChannel));
     return true;
 }
 
@@ -1295,7 +1307,16 @@ NS_HasBeenCrossOrigin(nsIChannel* aChannel, bool aReport)
 {
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->GetLoadInfo();
   MOZ_RELEASE_ASSERT(loadInfo, "Origin tracking only works for channels created with a loadinfo");
-  MOZ_ASSERT(loadInfo->GetExternalContentPolicyType() != nsIContentPolicy::TYPE_DOCUMENT,
+
+#ifdef DEBUG
+  // Don't enforce TYPE_DOCUMENT assertions for loads
+  // initiated by javascript tests.
+  bool skipContentTypeCheck = false;
+  skipContentTypeCheck = Preferences::GetBool("network.loadinfo.skip_type_assertion");
+#endif
+
+  MOZ_ASSERT(skipContentTypeCheck ||
+             loadInfo->GetExternalContentPolicyType() != nsIContentPolicy::TYPE_DOCUMENT,
              "calling NS_HasBeenCrossOrigin on a top level load");
 
   // Always treat tainted channels as cross-origin.
@@ -1985,6 +2006,26 @@ nsresult NS_MakeRandomInvalidURLString(nsCString &result)
 #undef NS_FAKE_SCHEME
 #undef NS_FAKE_TLD
 
+nsresult NS_MaybeOpenChannelUsingOpen2(nsIChannel* aChannel,
+                                       nsIInputStream **aStream)
+{
+  nsCOMPtr<nsILoadInfo> loadInfo = aChannel->GetLoadInfo();
+  if (loadInfo && loadInfo->GetSecurityMode() != 0) {
+    return aChannel->Open2(aStream);
+  }
+  return aChannel->Open(aStream);
+}
+
+nsresult NS_MaybeOpenChannelUsingAsyncOpen2(nsIChannel* aChannel,
+                                            nsIStreamListener *aListener)
+{
+  nsCOMPtr<nsILoadInfo> loadInfo = aChannel->GetLoadInfo();
+  if (loadInfo && loadInfo->GetSecurityMode() != 0) {
+    return aChannel->AsyncOpen2(aListener);
+  }
+  return aChannel->AsyncOpen(aListener, nullptr);
+}
+
 nsresult
 NS_CheckIsJavaCompatibleURLString(nsCString &urlString, bool *result)
 {
@@ -2276,7 +2317,7 @@ NS_ShouldSecureUpgrade(nsIURI* aURI,
 
         const char16_t* params[] = { reportSpec.get(), reportScheme.get() };
         uint32_t innerWindowId = aLoadInfo->GetInnerWindowID();
-        CSP_LogLocalizedStr(MOZ_UTF16("upgradeInsecureRequest"),
+        CSP_LogLocalizedStr(u"upgradeInsecureRequest",
                             params, ArrayLength(params),
                             EmptyString(), // aSourceFile
                             EmptyString(), // aScriptSample

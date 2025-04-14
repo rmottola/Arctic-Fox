@@ -657,3 +657,23 @@ function modifySessionStorage(browser, data, options = {}) {
     });
   });
 }
+
+function pushPrefs(...aPrefs) {
+  return new Promise(resolve => {
+    SpecialPowers.pushPrefEnv({"set": aPrefs}, resolve);
+  });
+}
+
+function popPrefs() {
+  return new Promise(resolve => {
+    SpecialPowers.popPrefEnv(resolve);
+  });
+}
+
+function* checkScroll(tab, expected, msg) {
+  let browser = tab.linkedBrowser;
+  yield TabStateFlusher.flush(browser);
+
+  let scroll = JSON.parse(ss.getTabState(tab)).scroll || null;
+  is(JSON.stringify(scroll), JSON.stringify(expected), msg);
+}

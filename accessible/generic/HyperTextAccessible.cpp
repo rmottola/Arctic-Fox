@@ -408,15 +408,23 @@ HyperTextAccessible::OffsetToDOMPoint(int32_t aOffset)
   Accessible* child = GetChildAt(childIdx);
   int32_t innerOffset = aOffset - GetChildOffset(childIdx);
 
-  // A text leaf case. The point is inside the text node.
+  // A text leaf case.
   if (child->IsTextLeaf()) {
-    nsIContent* content = child->GetContent();
-    int32_t idx = 0;
-    if (NS_FAILED(RenderedToContentOffset(content->GetPrimaryFrame(),
-                                          innerOffset, &idx)))
-      return DOMPoint();
+    // The point is inside the text node. This is always true for any text leaf
+    // except a last child one. See assertion below.
+    if (aOffset < GetChildOffset(childIdx + 1)) {
+      nsIContent* content = child->GetContent();
+      int32_t idx = 0;
+      if (NS_FAILED(RenderedToContentOffset(content->GetPrimaryFrame(),
+                                            innerOffset, &idx)))
+        return DOMPoint();
 
-    return DOMPoint(content, idx);
+      return DOMPoint(content, idx);
+    }
+
+    // Set the DOM point right after the text node.
+    MOZ_ASSERT(static_cast<uint32_t>(aOffset) == CharacterCount());
+    innerOffset = 1;
   }
 
   // Case of embedded object. The point is either before or after the element.
@@ -1435,8 +1443,7 @@ HyperTextAccessible::CaretLineNumber()
   if (!frameSelection)
     return -1;
 
-  dom::Selection* domSel =
-    frameSelection->GetSelection(nsISelectionController::SELECTION_NORMAL);
+  dom::Selection* domSel = frameSelection->GetSelection(SelectionType::eNormal);
   if (!domSel)
     return - 1;
 
@@ -1538,7 +1545,7 @@ HyperTextAccessible::GetCaretRect(nsIWidget** aWidget)
 }
 
 void
-HyperTextAccessible::GetSelectionDOMRanges(int16_t aType,
+HyperTextAccessible::GetSelectionDOMRanges(SelectionType aSelectionType,
                                            nsTArray<nsRange*>* aRanges)
 {
   // Ignore selection if it is not visible.
@@ -1547,7 +1554,7 @@ HyperTextAccessible::GetSelectionDOMRanges(int16_t aType,
       frameSelection->GetDisplaySelection() <= nsISelectionController::SELECTION_HIDDEN)
     return;
 
-  dom::Selection* domSel = frameSelection->GetSelection(aType);
+  dom::Selection* domSel = frameSelection->GetSelection(aSelectionType);
   if (!domSel)
     return;
 
@@ -1583,7 +1590,7 @@ int32_t
 HyperTextAccessible::SelectionCount()
 {
   nsTArray<nsRange*> ranges;
-  GetSelectionDOMRanges(nsISelectionController::SELECTION_NORMAL, &ranges);
+  GetSelectionDOMRanges(SelectionType::eNormal, &ranges);
   return ranges.Length();
 }
 
@@ -1595,7 +1602,7 @@ HyperTextAccessible::SelectionBoundsAt(int32_t aSelectionNum,
   *aStartOffset = *aEndOffset = 0;
 
   nsTArray<nsRange*> ranges;
-  GetSelectionDOMRanges(nsISelectionController::SELECTION_NORMAL, &ranges);
+  GetSelectionDOMRanges(SelectionType::eNormal, &ranges);
 
   uint32_t rangeCount = ranges.Length();
   if (aSelectionNum < 0 || aSelectionNum >= static_cast<int32_t>(rangeCount))
@@ -1895,7 +1902,17 @@ HyperTextAccessible::RemoveChild(Accessible* aAccessible)
   if (count > 0)
     mOffsets.RemoveElementsAt(childIndex, count);
 
-  return Accessible::RemoveChild(aAccessible);
+  return AccessibleWrap::RemoveChild(aAccessible);
+}
+
+bool
+HyperTextAccessible::InsertChildAt(uint32_t aIndex, Accessible* aChild)
+{
+  int32_t count = mOffsets.Length() - aIndex;
+  if (count > 0 ) {
+    mOffsets.RemoveElementsAt(aIndex, count);
+  }
+  return AccessibleWrap::InsertChildAt(aIndex, aChild);
 }
 
 Relation
@@ -2119,7 +2136,7 @@ HyperTextAccessible::GetSpellTextAttr(nsINode* aNode,
   if (!fs)
     return;
 
-  dom::Selection* domSel = fs->GetSelection(nsISelectionController::SELECTION_SPELLCHECK);
+  dom::Selection* domSel = fs->GetSelection(SelectionType::eSpellCheck);
   if (!domSel)
     return;
 

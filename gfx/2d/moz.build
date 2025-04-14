@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -17,6 +17,7 @@ EXPORTS.mozilla.gfx += [
     'BasePoint4D.h',
     'BaseRect.h',
     'BaseSize.h',
+    'BezierUtils.h',
     'Blur.h',
     'BorrowedContext.h',
     'Coord.h',
@@ -32,13 +33,13 @@ EXPORTS.mozilla.gfx += [
     'JobScheduler_posix.h',
     'JobScheduler_win32.h',
     'Logging.h',
+    'LoggingConstants.h',
     'Matrix.h',
     'MatrixFwd.h',
     'NumericTools.h',
     'PathHelpers.h',
     'PatternHelpers.h',
     'Point.h',
-    'Preferences.h',
     'Quaternion.h',
     'RecordedEvent.h',
     'RecordingTypes.h',
@@ -53,6 +54,8 @@ EXPORTS.mozilla.gfx += [
     'Types.h',
     'UserData.h',
 ]
+
+EXPORTS.mozilla.gfx += ['ssse3-scaler.h']
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('cocoa', 'uikit'):
     EXPORTS.mozilla.gfx += [
@@ -85,6 +88,11 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'windows':
         'JobScheduler_posix.cpp',
     ]
 
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3'):
+    SOURCES += [
+        'ScaledFontFontconfig.cpp',
+    ]
+
 if CONFIG['MOZ_ENABLE_SKIA']:
     UNIFIED_SOURCES += [
         'convolver.cpp',
@@ -111,6 +119,7 @@ if CONFIG['INTEL_ARCHITECTURE']:
         'BlurSSE2.cpp',
         'FilterProcessingSSE2.cpp',
         'ImageScalingSSE2.cpp',
+        'ssse3-scaler.c',
     ]
     if CONFIG['MOZ_ENABLE_SKIA']:
         SOURCES += [
@@ -122,6 +131,7 @@ if CONFIG['INTEL_ARCHITECTURE']:
     SOURCES['BlurSSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
     SOURCES['FilterProcessingSSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
     SOURCES['ImageScalingSSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
+    SOURCES['ssse3-scaler.c'].flags += CONFIG['SSSE3_FLAGS']
     if CONFIG['MOZ_ENABLE_SKIA']:
         SOURCES['convolverSSE2.cpp'].flags += CONFIG['SSE2_FLAGS']
 elif CONFIG['CPU_ARCH'].startswith('mips'):
@@ -140,6 +150,7 @@ if CONFIG['HAVE_ALTIVEC']:
     DEFINES['USE_VMX'] = True
 
 UNIFIED_SOURCES += [
+    'BezierUtils.cpp',
     'Blur.cpp',
     'DataSourceSurface.cpp',
     'DataSurfaceHelpers.cpp',
@@ -161,7 +172,6 @@ UNIFIED_SOURCES += [
     'PathCairo.cpp',
     'PathHelpers.cpp',
     'PathRecording.cpp',
-    'Preferences.cpp',
     'Quaternion.cpp',
     'RecordedEvent.cpp',
     'Scale.cpp',
@@ -179,6 +189,9 @@ SOURCES += [
 
 if CONFIG['CLANG_CXX']:
     SOURCES['Factory.cpp'].flags += ['-Wno-implicit-fallthrough']
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']
 
 if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
     EXPORTS.mozilla.gfx += [
@@ -200,12 +213,12 @@ FINAL_LIBRARY = 'xul'
 for var in ('USE_CAIRO', 'MOZ2D_HAS_MOZ_CAIRO'):
     DEFINES[var] = True
 
-if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gtk3', 'gonk', 'qt'):
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gtk3', 'gonk'):
     DEFINES['MOZ_ENABLE_FREETYPE'] = True
 
 CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
 
-if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gtk3', 'gonk', 'qt'):
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('android', 'gtk2', 'gtk3', 'gonk'):
     CXXFLAGS += CONFIG['CAIRO_FT_CFLAGS']
 
 if CONFIG['MOZ_X11']:

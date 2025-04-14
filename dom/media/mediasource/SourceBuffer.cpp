@@ -33,12 +33,6 @@ extern mozilla::LogModule* GetMediaSourceAPILog();
 #define MSE_DEBUGV(arg, ...) MOZ_LOG(GetMediaSourceLog(), mozilla::LogLevel::Verbose, ("SourceBuffer(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
 #define MSE_API(arg, ...) MOZ_LOG(GetMediaSourceAPILog(), mozilla::LogLevel::Debug, ("SourceBuffer(%p:%s)::%s: " arg, this, mType.get(), __func__, ##__VA_ARGS__))
 
-#if defined(MOZ_GONK_MEDIACODEC) || defined(XP_WIN) || defined(MOZ_APPLEMEDIA) || defined(MOZ_FFMPEG)
-#define MP4_READER_DORMANT_HEURISTIC
-#else
-#undef MP4_READER_DORMANT_HEURISTIC
-#endif
-
 namespace mozilla {
 
 using media::TimeUnit;
@@ -198,6 +192,10 @@ SourceBuffer::Abort(ErrorResult& aRv)
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
   }
+  if (mPendingRemoval.Exists()) {
+    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
+    return;
+  }
   AbortBufferAppend();
   ResetParserState();
   mCurrentAttributes.SetAppendWindowStart(0);
@@ -254,11 +252,15 @@ SourceBuffer::RangeRemoval(double aStart, double aEnd)
   StartUpdating();
 
   RefPtr<SourceBuffer> self = this;
-  mTrackBuffersManager->RangeRemoval(TimeUnit::FromSeconds(aStart),
-                                     TimeUnit::FromSeconds(aEnd))
-    ->Then(AbstractThread::MainThread(), __func__,
-           [self] (bool) { self->StopUpdating(); },
-           []() { MOZ_ASSERT(false); });
+  mPendingRemoval.Begin(
+    mTrackBuffersManager->RangeRemoval(TimeUnit::FromSeconds(aStart),
+                                       TimeUnit::FromSeconds(aEnd))
+      ->Then(AbstractThread::MainThread(), __func__,
+             [self] (bool) {
+               self->mPendingRemoval.Complete();
+               self->StopUpdating();
+             },
+             []() { MOZ_ASSERT(false); }));
 }
 
 void
@@ -308,9 +310,7 @@ SourceBuffer::SourceBuffer(MediaSource* aMediaSource, const nsACString& aType)
     new TrackBuffersManager(aMediaSource->GetDecoder(), aType);
 
   // Now that we know what type we're dealing with, enable dormant as needed.
-#if defined(MP4_READER_DORMANT_HEURISTIC)
   aMediaSource->GetDecoder()->NotifyDormantSupported(Preferences::GetBool("media.decoder.heuristic.dormant.enabled", false));
-#endif
 
   MSE_DEBUG("Create mTrackBuffersManager=%p",
             mTrackBuffersManager.get());
@@ -400,7 +400,7 @@ SourceBuffer::CheckEndTime()
   double endTime = mCurrentAttributes.GetGroupEndTimestamp().ToSeconds();
   double duration = mMediaSource->Duration();
   if (endTime > duration) {
-    mMediaSource->SetDuration(endTime, MSRangeRemovalAction::SKIP);
+    mMediaSource->SetDuration(endTime);
   }
 }
 
@@ -546,6 +546,15 @@ SourceBuffer::GetBufferedEnd()
   ErrorResult dummy;
   RefPtr<TimeRanges> ranges = GetBuffered(dummy);
   return ranges->Length() > 0 ? ranges->GetEndTime() : 0;
+}
+
+double
+SourceBuffer::HighestStartTime()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  return mTrackBuffersManager
+         ? mTrackBuffersManager->HighestStartTime().ToSeconds()
+         : 0.0;
 }
 
 NS_IMPL_CYCLE_COLLECTION_CLASS(SourceBuffer)

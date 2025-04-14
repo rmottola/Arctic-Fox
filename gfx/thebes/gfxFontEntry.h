@@ -265,6 +265,7 @@ public:
 
     bool     TryGetColorGlyphs();
     bool     GetColorLayersInfo(uint32_t aGlyphId,
+                                const mozilla::gfx::Color& aDefaultColor,
                                 nsTArray<uint16_t>& layerGlyphs,
                                 nsTArray<mozilla::gfx::Color>& layerColors);
 
@@ -375,11 +376,16 @@ public:
     // the fonts belonging to this font entry.
     void NotifyFontDestroyed(gfxFont* aFont);
 
-    // For memory reporting
+    // For memory reporting of the platform font list.
     virtual void AddSizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf,
                                         FontListSizes* aSizes) const;
     virtual void AddSizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf,
                                         FontListSizes* aSizes) const;
+
+    // Used for reporting on individual font entries in the user font cache,
+    // which are not present in the platform font list.
+    size_t
+    ComputedSizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const;
 
     // Used when checking for complex script support, to mask off cmap ranges
     struct ScriptRange {
@@ -453,6 +459,7 @@ protected:
     friend class gfxUserFcFontEntry;
     friend class gfxFontFamily;
     friend class gfxSingleFaceMacFontFamily;
+    friend class gfxUserFontEntry;
 
     gfxFontEntry();
 
@@ -530,6 +537,12 @@ protected:
                                   size_t *aLen);
     static void GrReleaseTable(const void *aAppFaceHandle,
                                const void *aTableBuffer);
+
+    // For memory reporting: size of user-font data belonging to this entry.
+    // We record this in the font entry because the actual data block may be
+    // handed over to platform APIs, so that it would become difficult (and
+    // platform-specific) to measure it directly at report-gathering time.
+    uint32_t mComputedSizeOfUserFont;
 
 private:
     /**

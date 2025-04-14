@@ -21,13 +21,6 @@
 #include "nsIScriptSecurityManager.h"
 #include "nsNetUtil.h"
 
-//
-// set NSPR_LOG_MODULES=TCPSocket:5
-//
-extern mozilla::LazyLogModule gTCPSocketLog;
-#define TCPSOCKET_LOG(args)     MOZ_LOG(gTCPSocketLog, mozilla::LogLevel::Debug, args)
-#define TCPSOCKET_LOG_ENABLED() MOZ_LOG_TEST(gTCPSocketLog, mozilla::LogLevel::Debug)
-
 namespace IPC {
 
 //Defined in TCPSocketChild.cpp
@@ -39,6 +32,16 @@ DeserializeArrayBuffer(JSContext* aCx,
 } // namespace IPC
 
 namespace mozilla {
+
+namespace net {
+//
+// set MOZ_LOG=TCPSocket:5
+//
+extern LazyLogModule gTCPSocketLog;
+#define TCPSOCKET_LOG(args)     MOZ_LOG(gTCPSocketLog, LogLevel::Debug, args)
+#define TCPSOCKET_LOG_ENABLED() MOZ_LOG_TEST(gTCPSocketLog, LogLevel::Debug)
+} // namespace net
+
 namespace dom {
 
 static void
@@ -271,7 +274,10 @@ TCPSocketParent::RecvStartTLS()
   NS_ENSURE_TRUE(mSocket, true);
   ErrorResult rv;
   mSocket->UpgradeToSecure(rv);
-  NS_ENSURE_FALSE(rv.Failed(), true);
+  if (NS_WARN_IF(rv.Failed())) {
+    rv.SuppressException();
+  }
+
   return true;
 }
 
@@ -289,7 +295,10 @@ TCPSocketParent::RecvResume()
   NS_ENSURE_TRUE(mSocket, true);
   ErrorResult rv;
   mSocket->Resume(rv);
-  NS_ENSURE_FALSE(rv.Failed(), true);
+  if (NS_WARN_IF(rv.Failed())) {
+    rv.SuppressException();
+  }
+
   return true;
 }
 

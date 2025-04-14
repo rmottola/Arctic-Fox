@@ -102,6 +102,23 @@ function promiseHistoryLength(browser, length) {
 }
 
 /**
+ * Returns a Promise that resolves when a browser has fired the
+ * AboutTabCrashedReady event.
+ *
+ * @param browser
+ *        The remote <xul:browser> that will fire the event.
+ * @return Promise
+ */
+function promiseTabCrashedReady(browser) {
+  return new Promise((resolve) => {
+    browser.addEventListener("AboutTabCrashedReady", function ready(e) {
+      browser.removeEventListener("AboutTabCrashedReady", ready, false, true);
+      resolve();
+    }, false, true);
+  });
+}
+
+/**
  * Checks that if a tab crashes, that information about the tab crashed
  * page does not get added to the tab history.
  */
@@ -340,4 +357,55 @@ add_task(function test_close_tab_after_crash() {
   yield promise;
 
   is(gBrowser.tabs.length, 1, "Should have closed the tab");
+});
+
+/**
+ * Checks that "restore all" button is only shown if more than one tab
+ * has crashed.
+ */
+add_task(function* test_hide_restore_all_button() {
+  let newTab = gBrowser.addTab();
+  gBrowser.selectedTab = newTab;
+  let browser = newTab.linkedBrowser;
+  ok(browser.isRemoteBrowser, "Should be a remote browser");
+  yield promiseBrowserLoaded(browser);
+
+  browser.loadURI(PAGE_1);
+  yield promiseBrowserLoaded(browser);
+
+  yield TabStateFlusher.flush(browser);
+
+  // Crash the tab
+  yield BrowserTestUtils.crashBrowser(browser);
+
+  let doc = browser.contentDocument;
+  let restoreAllButton = doc.getElementById("restoreAll");
+  let restoreOneButton = doc.getElementById("restoreTab");
+
+  is(restoreAllButton.getAttribute("hidden"), "true", "Restore All button should be hidden");
+  ok(restoreOneButton.classList.contains("primary"), "Restore Tab button should have the primary class");
+
+  let newTab2 = gBrowser.addTab();
+  gBrowser.selectedTab = newTab;
+
+  browser.loadURI(PAGE_2);
+  yield promiseBrowserLoaded(browser);
+
+  // We'll need to make sure the second tab's browser has finished
+  // sending its AboutTabCrashedReady event before we know for
+  // sure whether or not we're showing the right Restore buttons.
+  let otherBrowserReady = promiseTabCrashedReady(newTab2.linkedBrowser);
+  // Crash the tab
+  yield BrowserTestUtils.crashBrowser(browser);
+  yield otherBrowserReady;
+
+  doc = browser.contentDocument;
+  restoreAllButton = doc.getElementById("restoreAll");
+  restoreOneButton = doc.getElementById("restoreTab");
+
+  ok(!restoreAllButton.hasAttribute("hidden"), "Restore All button should not be hidden");
+  ok(!(restoreOneButton.classList.contains("primary")), "Restore Tab button should not have the primary class");
+
+  gBrowser.removeTab(newTab);
+  gBrowser.removeTab(newTab2);
 });

@@ -21,7 +21,6 @@
 
 #include "nsTextEditorState.h"
 
-class nsFormSubmission;
 class nsIControllers;
 class nsIDocument;
 class nsPresContext;
@@ -34,6 +33,8 @@ class EventChainPreVisitor;
 class EventStates;
 
 namespace dom {
+
+class HTMLFormSubmission;
 
 class HTMLTextAreaElement final : public nsGenericHTMLFormElementWithState,
                                   public nsIDOMHTMLTextAreaElement,
@@ -72,7 +73,7 @@ public:
   // nsIFormControl
   NS_IMETHOD_(uint32_t) GetType() const override { return NS_FORM_TEXTAREA; }
   NS_IMETHOD Reset() override;
-  NS_IMETHOD SubmitNamesValues(nsFormSubmission* aFormSubmission) override;
+  NS_IMETHOD SubmitNamesValues(HTMLFormSubmission* aFormSubmission) override;
   NS_IMETHOD SaveState() override;
   virtual bool RestoreState(nsPresState* aState) override;
   virtual bool IsDisabledForEvents(EventMessage aMessage) override;
@@ -179,7 +180,7 @@ public:
     if (aCols == 0) {
       aError.Throw(NS_ERROR_DOM_INDEX_SIZE_ERR);
     } else {
-      SetUnsignedIntAttr(nsGkAtoms::cols, aCols, aError);
+      SetUnsignedIntAttr(nsGkAtoms::cols, aCols, DEFAULT_COLS, aError);
     }
   }
   bool Disabled()
@@ -247,7 +248,7 @@ public:
     if (aRows == 0) {
       aError.Throw(NS_ERROR_DOM_INDEX_SIZE_ERR);
     } else {
-      SetUnsignedIntAttr(nsGkAtoms::rows, aRows, aError);
+      SetUnsignedIntAttr(nsGkAtoms::rows, aRows, DEFAULT_ROWS_TEXTAREA, aError);
     }
   }
   // XPCOM GetWrap is fine
@@ -265,6 +266,7 @@ public:
   // nsIConstraintValidation::GetValidationMessage() is fine.
   // nsIConstraintValidation::CheckValidity() is fine.
   using nsIConstraintValidation::CheckValidity;
+  using nsIConstraintValidation::ReportValidity;
   // nsIConstraintValidation::SetCustomValidity() is fine.
   // XPCOM Select is fine
   uint32_t GetSelectionStart(ErrorResult& aError);
@@ -304,9 +306,9 @@ protected:
   bool                     mCanShowInvalidUI;
   /** Whether we should make :-moz-ui-valid apply on the element. **/
   bool                     mCanShowValidUI;
-  
+
   void FireChangeEventIfNeeded();
-  
+
   nsString mFocusedValue;
 
   /** The state of the text editor (selection controller and the editor) **/

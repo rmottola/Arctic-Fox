@@ -108,21 +108,21 @@ nsTableCellFrame::DestroyFrom(nsIFrame* aDestructRoot)
 // nsIPercentBSizeObserver methods
 
 void
-nsTableCellFrame::NotifyPercentBSize(const nsHTMLReflowState& aReflowState)
+nsTableCellFrame::NotifyPercentBSize(const ReflowInput& aReflowInput)
 {
-  // nsHTMLReflowState ensures the mCBReflowState of blocks inside a
+  // ReflowInput ensures the mCBReflowInput of blocks inside a
   // cell is the cell frame, not the inner-cell block, and that the
   // containing block of an inner table is the containing block of its
-  // outer table.
+  // table wrapper.
   // XXXldb Given the now-stricter |NeedsToObserve|, many if not all of
   // these tests are probably unnecessary.
 
   // Maybe the cell reflow state; we sure if we're inside the |if|.
-  const nsHTMLReflowState *cellRS = aReflowState.mCBReflowState;
+  const ReflowInput *cellRI = aReflowInput.mCBReflowInput;
 
-  if (cellRS && cellRS->frame == this &&
-      (cellRS->ComputedBSize() == NS_UNCONSTRAINEDSIZE ||
-       cellRS->ComputedBSize() == 0)) { // XXXldb Why 0?
+  if (cellRI && cellRI->mFrame == this &&
+      (cellRI->ComputedBSize() == NS_UNCONSTRAINEDSIZE ||
+       cellRI->ComputedBSize() == 0)) { // XXXldb Why 0?
     // This is a percentage bsize on a frame whose percentage bsizes
     // are based on the bsize of the cell, since its containing block
     // is the inner cell frame.
@@ -131,43 +131,43 @@ nsTableCellFrame::NotifyPercentBSize(const nsHTMLReflowState& aReflowState)
     // have specified/pct bsize. (Also, siblings only count for this if
     // both this cell and the sibling cell span exactly 1 row.)
 
-    if (nsTableFrame::AncestorsHaveStyleBSize(*cellRS) ||
+    if (nsTableFrame::AncestorsHaveStyleBSize(*cellRI) ||
         (GetTableFrame()->GetEffectiveRowSpan(*this) == 1 &&
-         cellRS->parentReflowState->frame->
+         cellRI->mParentReflowInput->mFrame->
            HasAnyStateBits(NS_ROW_HAS_CELL_WITH_STYLE_BSIZE))) {
 
-      for (const nsHTMLReflowState *rs = aReflowState.parentReflowState;
-           rs != cellRS;
-           rs = rs->parentReflowState) {
-        rs->frame->AddStateBits(NS_FRAME_CONTAINS_RELATIVE_BSIZE);
+      for (const ReflowInput *rs = aReflowInput.mParentReflowInput;
+           rs != cellRI;
+           rs = rs->mParentReflowInput) {
+        rs->mFrame->AddStateBits(NS_FRAME_CONTAINS_RELATIVE_BSIZE);
       }
 
-      nsTableFrame::RequestSpecialBSizeReflow(*cellRS);
+      nsTableFrame::RequestSpecialBSizeReflow(*cellRI);
     }
   }
 }
 
 // The cell needs to observe its block and things inside its block but nothing below that
 bool
-nsTableCellFrame::NeedsToObserve(const nsHTMLReflowState& aReflowState)
+nsTableCellFrame::NeedsToObserve(const ReflowInput& aReflowInput)
 {
-  const nsHTMLReflowState *rs = aReflowState.parentReflowState;
+  const ReflowInput *rs = aReflowInput.mParentReflowInput;
   if (!rs)
     return false;
-  if (rs->frame == this) {
+  if (rs->mFrame == this) {
     // We always observe the child block.  It will never send any
     // notifications, but we need this so that the observer gets
     // propagated to its kids.
     return true;
   }
-  rs = rs->parentReflowState;
+  rs = rs->mParentReflowInput;
   if (!rs) {
     return false;
   }
 
   // We always need to let the percent bsize observer be propagated
-  // from an outer table frame to an inner table frame.
-  nsIAtom *fType = aReflowState.frame->GetType();
+  // from a table wrapper frame to an inner table frame.
+  nsIAtom *fType = aReflowInput.mFrame->GetType();
   if (fType == nsGkAtoms::tableFrame) {
     return true;
   }
@@ -178,9 +178,9 @@ nsTableCellFrame::NeedsToObserve(const nsHTMLReflowState& aReflowState)
   // XXX This may not be true in the case of orthogonal flows within
   // the cell (bug 1174711 comment 8); we may need to observe isizes
   // instead of bsizes for orthogonal children.
-  return rs->frame == this &&
+  return rs->mFrame == this &&
          (PresContext()->CompatibilityMode() == eCompatibility_NavQuirks ||
-          fType == nsGkAtoms::tableOuterFrame);
+          fType == nsGkAtoms::tableWrapperFrame);
 }
 
 nsresult
@@ -372,8 +372,12 @@ nsTableCellFrame::PaintBackground(nsRenderingContext& aRenderingContext,
                                   uint32_t             aFlags)
 {
   nsRect rect(aPt, GetSize());
-  return nsCSSRendering::PaintBackground(PresContext(), aRenderingContext, this,
-                                         aDirtyRect, rect, aFlags);
+  nsCSSRendering::PaintBGParams params =
+    nsCSSRendering::PaintBGParams::ForAllLayers(*PresContext(),
+                                                aRenderingContext,
+                                                aDirtyRect, rect,
+                                                this, aFlags);
+  return nsCSSRendering::PaintBackground(params);
 }
 
 // Called by nsTablePainter
@@ -504,10 +508,10 @@ nsTableCellFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
           // The cell background was not painted by the nsTablePainter,
           // so we need to do it. We have special background processing here
           // so we need to duplicate some code from nsFrame::DisplayBorderBackgroundOutline
-          nsDisplayTableItem* item =
-            new (aBuilder) nsDisplayTableCellBackground(aBuilder, this);
-          aLists.BorderBackground()->AppendNewToTop(item);
-          item->UpdateForFrameBackground(this);
+          nsDisplayBackgroundImage::AppendBackgroundItemsToTop(aBuilder,
+              this,
+              GetRectRelativeToSelf(),
+              aLists.BorderBackground());
         } else {
           // The nsTablePainter will paint our background. Make sure it
           // knows if we're background-attachment:fixed.
@@ -557,7 +561,7 @@ nsTableCellFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
 }
 
 nsIFrame::LogicalSides
-nsTableCellFrame::GetLogicalSkipSides(const nsHTMLReflowState* aReflowState) const
+nsTableCellFrame::GetLogicalSkipSides(const ReflowInput* aReflowInput) const
 {
   if (MOZ_UNLIKELY(StyleBorder()->mBoxDecorationBreak ==
                      NS_STYLE_BOX_DECORATION_BREAK_CLONE)) {
@@ -636,7 +640,7 @@ void nsTableCellFrame::BlockDirAlignChild(WritingMode aWM, nscoord aMaxAscent)
 
   firstKid->SetPosition(aWM, LogicalPoint(aWM, kidRect.IStart(aWM),
                                           kidBStart), containerSize);
-  nsHTMLReflowMetrics desiredSize(aWM);
+  ReflowOutput desiredSize(aWM);
   desiredSize.SetSize(aWM, GetLogicalSize(aWM));
 
   nsRect overflow(nsPoint(0,0), GetSize());
@@ -660,15 +664,13 @@ void nsTableCellFrame::BlockDirAlignChild(WritingMode aWM, nscoord aMaxAscent)
 }
 
 bool
-nsTableCellFrame::UpdateOverflow()
+nsTableCellFrame::ComputeCustomOverflow(nsOverflowAreas& aOverflowAreas)
 {
   nsRect bounds(nsPoint(0,0), GetSize());
   bounds.Inflate(GetBorderOverflow());
-  nsOverflowAreas overflowAreas(bounds, bounds);
 
-  nsLayoutUtils::UnionChildOverflow(this, overflowAreas);
-
-  return FinishAndStoreOverflow(overflowAreas, GetSize());
+  aOverflowAreas.UnionAllWith(bounds);
+  return nsContainerFrame::ComputeCustomOverflow(aOverflowAreas);
 }
 
 // Per CSS 2.1, we map 'sub', 'super', 'text-top', 'text-bottom',
@@ -807,7 +809,7 @@ nsTableCellFrame::IntrinsicISizeOffsets()
 #define PROBABLY_TOO_LARGE 1000000
 static
 void DebugCheckChildSize(nsIFrame*            aChild,
-                         nsHTMLReflowMetrics& aMet)
+                         ReflowOutput& aMet)
 {
   WritingMode wm = aMet.GetWritingMode();
   if ((aMet.ISize(wm) < 0) || (aMet.ISize(wm) > PROBABLY_TOO_LARGE)) {
@@ -855,27 +857,27 @@ CalcUnpaginatedBSize(nsTableCellFrame& aCellFrame,
 
 void
 nsTableCellFrame::Reflow(nsPresContext*           aPresContext,
-                         nsHTMLReflowMetrics&     aDesiredSize,
-                         const nsHTMLReflowState& aReflowState,
+                         ReflowOutput&     aDesiredSize,
+                         const ReflowInput& aReflowInput,
                          nsReflowStatus&          aStatus)
 {
   MarkInReflow();
   DO_GLOBAL_REFLOW_COUNT("nsTableCellFrame");
-  DISPLAY_REFLOW(aPresContext, this, aReflowState, aDesiredSize, aStatus);
+  DISPLAY_REFLOW(aPresContext, this, aReflowInput, aDesiredSize, aStatus);
 
-  if (aReflowState.mFlags.mSpecialBSizeReflow) {
+  if (aReflowInput.mFlags.mSpecialBSizeReflow) {
     FirstInFlow()->AddStateBits(NS_TABLE_CELL_HAD_SPECIAL_REFLOW);
   }
 
   // see if a special bsize reflow needs to occur due to having a pct height
-  nsTableFrame::CheckRequestSpecialBSizeReflow(aReflowState);
+  nsTableFrame::CheckRequestSpecialBSizeReflow(aReflowInput);
 
   aStatus = NS_FRAME_COMPLETE;
-  WritingMode wm = aReflowState.GetWritingMode();
-  LogicalSize availSize(wm, aReflowState.AvailableISize(),
-                            aReflowState.AvailableBSize());
+  WritingMode wm = aReflowInput.GetWritingMode();
+  LogicalSize availSize(wm, aReflowInput.AvailableISize(),
+                            aReflowInput.AvailableBSize());
 
-  LogicalMargin borderPadding = aReflowState.ComputedLogicalPadding();
+  LogicalMargin borderPadding = aReflowInput.ComputedLogicalPadding();
   LogicalMargin border = GetBorderWidth(wm);
   borderPadding += border;
 
@@ -891,15 +893,15 @@ nsTableCellFrame::Reflow(nsPresContext*           aPresContext,
     availSize.BSize(wm) = 1;
   }
 
-  nsHTMLReflowMetrics kidSize(wm, aDesiredSize.mFlags);
+  ReflowOutput kidSize(wm, aDesiredSize.mFlags);
   kidSize.ClearSize();
-  SetPriorAvailISize(aReflowState.AvailableISize());
+  SetPriorAvailISize(aReflowInput.AvailableISize());
   nsIFrame* firstKid = mFrames.FirstChild();
   NS_ASSERTION(firstKid, "Frame construction error, a table cell always has an inner cell frame");
   nsTableFrame* tableFrame = GetTableFrame();
 
-  if (aReflowState.mFlags.mSpecialBSizeReflow) {
-    const_cast<nsHTMLReflowState&>(aReflowState).
+  if (aReflowInput.mFlags.mSpecialBSizeReflow) {
+    const_cast<ReflowInput&>(aReflowInput).
       SetComputedBSize(BSize(wm) - borderPadding.BStartEnd(wm));
     DISPLAY_REFLOW_CHANGE();
   }
@@ -908,7 +910,7 @@ nsTableCellFrame::Reflow(nsPresContext*           aPresContext,
       CalcUnpaginatedBSize((nsTableCellFrame&)*this,
                            *tableFrame, borderPadding.BStartEnd(wm));
     if (computedUnpaginatedBSize > 0) {
-      const_cast<nsHTMLReflowState&>(aReflowState).SetComputedBSize(computedUnpaginatedBSize);
+      const_cast<ReflowInput&>(aReflowInput).SetComputedBSize(computedUnpaginatedBSize);
       DISPLAY_REFLOW_CHANGE();
     }
   }
@@ -917,31 +919,31 @@ nsTableCellFrame::Reflow(nsPresContext*           aPresContext,
   }
 
   WritingMode kidWM = firstKid->GetWritingMode();
-  nsHTMLReflowState kidReflowState(aPresContext, aReflowState, firstKid,
+  ReflowInput kidReflowInput(aPresContext, aReflowInput, firstKid,
                                    availSize.ConvertTo(kidWM, wm));
 
   // Don't be a percent height observer if we're in the middle of
   // special-bsize reflow, in case we get an accidental NotifyPercentBSize()
   // call (which we shouldn't honor during special-bsize reflow)
-  if (!aReflowState.mFlags.mSpecialBSizeReflow) {
+  if (!aReflowInput.mFlags.mSpecialBSizeReflow) {
     // mPercentBSizeObserver is for children of cells in quirks mode,
     // but only those than are tables in standards mode.  NeedsToObserve
     // will determine how far this is propagated to descendants.
-    kidReflowState.mPercentBSizeObserver = this;
+    kidReflowInput.mPercentBSizeObserver = this;
   }
   // Don't propagate special bsize reflow state to our kids
-  kidReflowState.mFlags.mSpecialBSizeReflow = false;
+  kidReflowInput.mFlags.mSpecialBSizeReflow = false;
 
-  if (aReflowState.mFlags.mSpecialBSizeReflow ||
+  if (aReflowInput.mFlags.mSpecialBSizeReflow ||
       FirstInFlow()->HasAnyStateBits(NS_TABLE_CELL_HAD_SPECIAL_REFLOW)) {
     // We need to force the kid to have mBResize set if we've had a
     // special reflow in the past, since the non-special reflow needs to
     // resize back to what it was without the special bsize reflow.
-    kidReflowState.SetBResize(true);
+    kidReflowInput.SetBResize(true);
   }
 
   nsSize containerSize =
-    aReflowState.ComputedSizeAsContainerIfConstrained();
+    aReflowInput.ComputedSizeAsContainerIfConstrained();
 
   LogicalPoint kidOrigin(wm, borderPadding.IStart(wm),
                          borderPadding.BStart(wm));
@@ -949,7 +951,7 @@ nsTableCellFrame::Reflow(nsPresContext*           aPresContext,
   nsRect origVisualOverflow = firstKid->GetVisualOverflowRect();
   bool firstReflow = firstKid->HasAnyStateBits(NS_FRAME_FIRST_REFLOW);
 
-  ReflowChild(firstKid, aPresContext, kidSize, kidReflowState,
+  ReflowChild(firstKid, aPresContext, kidSize, kidReflowInput,
               wm, kidOrigin, containerSize, 0, aStatus);
   if (NS_FRAME_OVERFLOW_IS_INCOMPLETE(aStatus)) {
     // Don't pass OVERFLOW_INCOMPLETE through tables until they can actually handle it
@@ -979,7 +981,7 @@ nsTableCellFrame::Reflow(nsPresContext*           aPresContext,
   SetContentEmpty(isEmpty);
 
   // Place the child
-  FinishReflowChild(firstKid, aPresContext, kidSize, &kidReflowState,
+  FinishReflowChild(firstKid, aPresContext, kidSize, &kidReflowInput,
                     wm, kidOrigin, containerSize, 0);
 
   nsTableFrame::InvalidateTableFrame(firstKid, origRect, origVisualOverflow,
@@ -1007,13 +1009,13 @@ nsTableCellFrame::Reflow(nsPresContext*           aPresContext,
 
   // the overflow area will be computed when BlockDirAlignChild() gets called
 
-  if (aReflowState.mFlags.mSpecialBSizeReflow) {
+  if (aReflowInput.mFlags.mSpecialBSizeReflow) {
     if (aDesiredSize.BSize(wm) > BSize(wm)) {
       // set a bit indicating that the pct bsize contents exceeded
       // the height that they could honor in the pass 2 reflow
       SetHasPctOverBSize(true);
     }
-    if (NS_UNCONSTRAINEDSIZE == aReflowState.AvailableBSize()) {
+    if (NS_UNCONSTRAINEDSIZE == aReflowInput.AvailableBSize()) {
       aDesiredSize.BSize(wm) = BSize(wm);
     }
   }
@@ -1033,7 +1035,7 @@ nsTableCellFrame::Reflow(nsPresContext*           aPresContext,
   // dirtiness to them before our parent clears our dirty bits.
   PushDirtyBitToAbsoluteFrames();
 
-  NS_FRAME_SET_TRUNCATION(aStatus, aReflowState, aDesiredSize);
+  NS_FRAME_SET_TRUNCATION(aStatus, aReflowInput, aDesiredSize);
 }
 
 /* ----- global methods ----- */
@@ -1220,11 +1222,13 @@ nsBCTableCellFrame::PaintBackground(nsRenderingContext& aRenderingContext,
     myBorder.SetBorderWidth(side, borderWidth.Side(side));
   }
 
-  nsRect rect(aPt, GetSize());
   // bypassing nsCSSRendering::PaintBackground is safe because this kind
   // of frame cannot be used for the root element
-  return nsCSSRendering::PaintBackgroundWithSC(PresContext(), aRenderingContext,
-                                               this, aDirtyRect, rect,
-                                               StyleContext(), myBorder,
-                                               aFlags, nullptr);
+  nsRect rect(aPt, GetSize());
+  nsCSSRendering::PaintBGParams params =
+    nsCSSRendering::PaintBGParams::ForAllLayers(*PresContext(),
+                                                aRenderingContext, aDirtyRect,
+                                                rect, this,
+                                                aFlags);
+  return nsCSSRendering::PaintBackgroundWithSC(params, StyleContext(), myBorder);
 }

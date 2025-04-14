@@ -27,9 +27,13 @@ class AliasAnalysisShared
         graph_(graph)
     {}
 
-    virtual bool analyze() {
+    virtual MOZ_MUST_USE bool analyze() {
         return true;
     }
+
+    static MDefinition::AliasType genericMightAlias(const MDefinition* load,
+                                                    const MDefinition* store);
+
 
   protected:
     void spewDependencyList();

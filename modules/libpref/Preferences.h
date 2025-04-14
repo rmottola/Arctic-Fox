@@ -52,6 +52,11 @@ public:
   nsresult Init();
 
   /**
+   * Returns true if the Preferences service is available, false otherwise.
+   */
+  static bool IsServiceAvailable();
+
+  /**
    * Reset loaded user prefs then read them
    */
   static nsresult ResetAndReadUserPrefs();
@@ -246,18 +251,28 @@ public:
 
   /**
    * Registers/Unregisters the callback function for the aPref.
+   *
+   * Pass ExactMatch for aMatchKind to only get callbacks for
+   * exact matches and not prefixes.
    */
+  enum MatchKind {
+    PrefixMatch,
+    ExactMatch,
+  };
   static nsresult RegisterCallback(PrefChangedFunc aCallback,
                                    const char* aPref,
-                                   void* aClosure = nullptr);
+                                   void* aClosure = nullptr,
+                                   MatchKind aMatchKind = PrefixMatch);
   static nsresult UnregisterCallback(PrefChangedFunc aCallback,
                                      const char* aPref,
-                                     void* aClosure = nullptr);
+                                     void* aClosure = nullptr,
+                                     MatchKind aMatchKind = PrefixMatch);
   // Like RegisterCallback, but also calls the callback immediately for
   // initialization.
   static nsresult RegisterCallbackAndCall(PrefChangedFunc aCallback,
                                           const char* aPref,
-                                          void* aClosure = nullptr);
+                                          void* aClosure = nullptr,
+                                          MatchKind aMatchKind = PrefixMatch);
 
   /**
    * Adds the aVariable to cache table.  aVariable must be a pointer for a

@@ -53,13 +53,13 @@ const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const promise = require("promise");
 const Services = require("Services");
 const {gDevTools} = require("devtools/client/framework/devtools");
+const {Heritage} = require("devtools/client/shared/widgets/view-helpers");
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://devtools/client/scratchpad/scratchpad-manager.jsm");
 Cu.import("resource://gre/modules/jsdebugger.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
-Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
 Cu.import("resource://gre/modules/reflect.jsm");
 
 XPCOMUtils.defineConstant(this, "SCRATCHPAD_CONTEXT_CONTENT", SCRATCHPAD_CONTEXT_CONTENT);
@@ -606,8 +606,8 @@ var Scratchpad = {
     let deferred = promise.defer();
 
     if (this.executionContext !== SCRATCHPAD_CONTEXT_CONTENT) {
-      Cu.reportError(this.strings.
-          GetStringFromName("scratchpadContext.invalid"));
+      console.error(this.strings.
+                    GetStringFromName("scratchpadContext.invalid"));
       return;
     }
 
@@ -2389,8 +2389,8 @@ ScratchpadSidebar.prototype = {
  */
 function reportError(aAction, aResponse)
 {
-  Cu.reportError(aAction + " failed: " + aResponse.error + " " +
-                 aResponse.message);
+  console.error(aAction + " failed: " + aResponse.error + " " +
+                aResponse.message);
 }
 
 

@@ -41,26 +41,6 @@ HTMLSharedObjectElement::HTMLSharedObjectElement(already_AddRefed<mozilla::dom::
   AddStatesSilently(NS_EVENT_STATE_LOADING);
 }
 
-void
-HTMLSharedObjectElement::GetItemValueText(DOMString& aValue)
-{
-  if (mNodeInfo->Equals(nsGkAtoms::applet)) {
-    nsGenericHTMLElement::GetItemValueText(aValue);
-  } else {
-    GetSrc(aValue);
-  }
-}
-
-void
-HTMLSharedObjectElement::SetItemValueText(const nsAString& aValue)
-{
-  if (mNodeInfo->Equals(nsGkAtoms::applet)) {
-    nsGenericHTMLElement::SetItemValueText(aValue);
-  } else {
-    SetSrc(aValue);
-  }
-}
-
 HTMLSharedObjectElement::~HTMLSharedObjectElement()
 {
 #ifdef XP_MACOSX
@@ -153,7 +133,7 @@ HTMLSharedObjectElement::BindToTree(nsIDocument *aDocument,
   if (mIsDoneAddingChildren && !pluginDoc) {
     void (HTMLSharedObjectElement::*start)() =
       &HTMLSharedObjectElement::StartObjectLoad;
-    nsContentUtils::AddScriptRunner(NS_NewRunnableMethod(this, start));
+    nsContentUtils::AddScriptRunner(NewRunnableMethod(this, start));
   }
 
   return NS_OK;

@@ -13,7 +13,6 @@
 #include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/dom/TypedArray.h"
-#include "nsAutoPtr.h"
 #include "nsCOMPtr.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsHashKeys.h"
@@ -57,9 +56,10 @@ class ConvolverNode;
 class DelayNode;
 class DynamicsCompressorNode;
 class GainNode;
-class HTMLMediaElement;
-class MediaElementAudioSourceNode;
 class GlobalObject;
+class HTMLMediaElement;
+class IIRFilterNode;
+class MediaElementAudioSourceNode;
 class MediaStreamAudioDestinationNode;
 class MediaStreamAudioSourceNode;
 class OscillatorNode;
@@ -78,7 +78,7 @@ enum class OscillatorType : uint32_t;
 class BasicWaveFormCache
 {
 public:
-  BasicWaveFormCache(uint32_t aSampleRate);
+  explicit BasicWaveFormCache(uint32_t aSampleRate);
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(BasicWaveFormCache)
   WebCore::PeriodicWave* GetBasicWaveForm(OscillatorType aType);
 private:
@@ -251,6 +251,11 @@ public:
   already_AddRefed<BiquadFilterNode>
   CreateBiquadFilter(ErrorResult& aRv);
 
+  already_AddRefed<IIRFilterNode>
+  CreateIIRFilter(const mozilla::dom::binding_detail::AutoSequence<double>& aFeedforward,
+                  const mozilla::dom::binding_detail::AutoSequence<double>& aFeedback,
+                  mozilla::ErrorResult& aRv);
+
   already_AddRefed<OscillatorNode>
   CreateOscillator(ErrorResult& aRv);
 
@@ -268,6 +273,7 @@ public:
   // OfflineAudioContext methods
   already_AddRefed<Promise> StartRendering(ErrorResult& aRv);
   IMPL_EVENT_HANDLER(complete)
+  unsigned long Length();
 
   bool IsOffline() const { return mIsOffline; }
 
@@ -293,6 +299,8 @@ public:
 
   uint32_t MaxChannelCount() const;
 
+  uint32_t ActiveNodeCount() const;
+
   void Mute() const;
   void Unmute() const;
 
@@ -313,6 +321,7 @@ public:
   IMPL_EVENT_HANDLER(mozinterruptend)
 
 private:
+  void DisconnectFromWindow();
   void RemoveFromDecodeQueue(WebAudioDecodeJob* aDecodeJob);
   void ShutdownDecoder();
 

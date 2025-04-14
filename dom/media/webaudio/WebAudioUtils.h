@@ -20,6 +20,10 @@ namespace mozilla {
 
 class AudioNodeStream;
 
+extern LazyLogModule gWebAudioAPILog;
+#define WEB_AUDIO_API_LOG(...) \
+  MOZ_LOG(gWebAudioAPILog, LogLevel::Debug, (__VA_ARGS__))
+
 namespace dom {
 
 struct AudioTimelineEvent;
@@ -221,6 +225,10 @@ namespace WebAudioUtils {
                         uint32_t aChannel,
                         const int16_t* aIn, uint32_t* aInLen,
                         int16_t* aOut, uint32_t* aOutLen);
+
+  void
+  LogToDeveloperConsole(uint64_t aWindowID, const char* aKey);
+
   } // namespace WebAudioUtils
 
 } // namespace dom

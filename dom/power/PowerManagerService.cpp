@@ -10,6 +10,7 @@
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
+#include "jsprf.h"
 #include "nsIDOMWakeLockListener.h"
 #include "nsIDOMWindow.h"
 #include "nsIObserverService.h"
@@ -32,6 +33,7 @@ static void LogFunctionAndJSStack(const char* funcname) {
                       "Call to %s. The JS stack is:\n%s\n",
                       funcname,
                       jsstack ? jsstack : "<no JS stack>");
+  JS_smprintf_free(jsstack);
 }
 // bug 839452
 #define LOG_FUNCTION_AND_JS_STACK() \
@@ -126,7 +128,8 @@ PowerManagerService::SyncProfile()
     obsServ->NotifyObservers(nullptr, "profile-change-net-teardown", context.get());
     obsServ->NotifyObservers(nullptr, "profile-change-teardown", context.get());
     obsServ->NotifyObservers(nullptr, "profile-before-change", context.get());
-    obsServ->NotifyObservers(nullptr, "profile-before-change2", context.get());
+    obsServ->NotifyObservers(nullptr, "profile-before-change-qm", context.get());
+    obsServ->NotifyObservers(nullptr, "profile-before-change-telemetry", context.get());
   }
 }
 

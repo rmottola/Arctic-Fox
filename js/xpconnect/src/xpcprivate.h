@@ -309,12 +309,6 @@ public:
                                     bool showLocals,
                                     bool showThisProps) override;
 
-
-    static bool ReportAllJSExceptions()
-    {
-      return gReportAllJSExceptions > 0;
-    }
-
 protected:
     virtual ~nsXPConnect();
 
@@ -327,8 +321,6 @@ private:
 
     XPCJSRuntime*                   mRuntime;
     bool                            mShuttingDown;
-
-    static uint32_t gReportAllJSExceptions;
 
 public:
     static nsIScriptSecurityManager* gScriptSecurityManager;
@@ -368,7 +360,6 @@ private:
 // In the current xpconnect system there can only be one XPCJSRuntime.
 // So, xpconnect can only be used on one JSRuntime within the process.
 
-class XPCJSContextStack;
 class WatchdogManager;
 
 enum WatchdogTimestampCategory
@@ -434,9 +425,6 @@ public:
     static XPCJSRuntime* newXPCJSRuntime();
     static XPCJSRuntime* Get() { return nsXPConnect::XPConnect()->GetRuntime(); }
 
-    XPCJSContextStack* GetJSContextStack() {return mJSContextStack;}
-    void DestroyJSContextStack();
-
     void RemoveWrappedJS(nsXPCWrappedJS* wrapper);
     void AssertInvalidWrappedJSNotInTable(nsXPCWrappedJS* wrapper) const;
 
@@ -480,7 +468,7 @@ public:
     XPCWrappedNativeProtoMap* GetDetachedWrappedNativeProtoMap() const
         {return mDetachedWrappedNativeProtoMap;}
 
-    bool OnJSContextNew(JSContext* cx);
+    bool JSContextInitialized(JSContext* cx);
 
     virtual bool
     DescribeCustomObjects(JSObject* aObject, const js::Class* aClasp,
@@ -557,6 +545,7 @@ public:
         return mStrings[index];
     }
 
+    virtual bool UsefulToMergeZones() const override;
     void TraceNativeBlackRoots(JSTracer* trc) override;
     void TraceAdditionalNativeGrayRoots(JSTracer* aTracer) override;
     void TraverseAdditionalNativeRoots(nsCycleCollectionNoteRootCallback& cb) override;
@@ -569,16 +558,15 @@ public:
     void CustomGCCallback(JSGCStatus status) override;
     void CustomOutOfMemoryCallback() override;
     void CustomLargeAllocationFailureCallback() override;
-    bool CustomContextCallback(JSContext* cx, unsigned operation) override;
-    static void GCSliceCallback(JSRuntime* rt,
+    static void GCSliceCallback(JSContext* cx,
                                 JS::GCProgress progress,
                                 const JS::GCDescription& desc);
     static void FinalizeCallback(JSFreeOp* fop,
                                  JSFinalizeStatus status,
                                  bool isCompartmentGC,
                                  void* data);
-    static void WeakPointerZoneGroupCallback(JSRuntime* rt, void* data);
-    static void WeakPointerCompartmentCallback(JSRuntime* rt, JSCompartment* comp, void* data);
+    static void WeakPointerZoneGroupCallback(JSContext* cx, void* data);
+    static void WeakPointerCompartmentCallback(JSContext* cx, JSCompartment* comp, void* data);
 
     inline void AddVariantRoot(XPCTraceableVariant* variant);
     inline void AddWrappedJSRoot(nsXPCWrappedJS* wrappedJS);
@@ -614,6 +602,9 @@ public:
 
     PRTime GetWatchdogTimestamp(WatchdogTimestampCategory aCategory);
 
+    nsresult GetPendingResult() { return mPendingResult; }
+    void SetPendingResult(nsresult rv) { mPendingResult = rv; }
+
 private:
     XPCJSRuntime();
 
@@ -625,7 +616,6 @@ private:
     jsid mStrIDs[IDX_TOTAL_COUNT];
     JS::Value mStrJSVals[IDX_TOTAL_COUNT];
 
-    XPCJSContextStack*       mJSContextStack;
     XPCCallContext*          mCallContext;
     AutoMarkingPtr*          mAutoRoots;
     jsid                     mResolveName;
@@ -653,24 +643,17 @@ private:
     JS::PersistentRootedObject mCompilationScope;
     RefPtr<AsyncFreeSnowWhite> mAsyncSnowWhiteFreer;
 
-    // If we spend too much time running JS code in an event handler, then we
-    // want to show the slow script UI. The timeout T is controlled by prefs. We
-    // invoke the interrupt callback once after T/2 seconds and set
-    // mSlowScriptSecondHalf to true. After another T/2 seconds, we invoke the
-    // interrupt callback again. Since mSlowScriptSecondHalf is now true, it
-    // shows the slow script UI. The reason we invoke the callback twice is to
-    // ensure that putting the computer to sleep while running a script doesn't
-    // cause the UI to be shown. If the laptop goes to sleep during one of the
-    // timeout periods, the script still has the other T/2 seconds to complete
-    // before the slow script UI is shown.
-    bool mSlowScriptSecondHalf;
-
-    // mSlowScriptCheckpoint is set to the time when:
-    // 1. We started processing the current event, or
-    // 2. mSlowScriptSecondHalf was set to true
-    // (whichever comes later). We use it to determine whether the interrupt
-    // callback needs to do anything.
+    // mSlowScriptCheckpoint is set to the time when we started processing the
+    // current event.  We use it to determine whether the interrupt callback
+    // needs to do anything.
     mozilla::TimeStamp mSlowScriptCheckpoint;
+    // Accumulates total time we actually waited for telemetry
+    mozilla::TimeDuration mSlowScriptActualWait;
+    bool mTimeoutAccumulated;
+
+    // mPendingResult is used to implement Components.returnCode.  Only really
+    // meaningful while calling through XPCWrappedJS.
+    nsresult mPendingResult;
 
     friend class Watchdog;
     friend class AutoLockWatchdog;
@@ -678,90 +661,6 @@ private:
 };
 
 /***************************************************************************/
-/***************************************************************************/
-// XPCContext is mostly a dumb class to hold JSContext specific data and
-// maps that let us find wrappers created for the given JSContext.
-
-// no virtuals
-class XPCContext
-{
-    friend class XPCJSRuntime;
-public:
-    static XPCContext* GetXPCContext(JSContext* aJSContext)
-        {
-            MOZ_ASSERT(JS_GetSecondContextPrivate(aJSContext), "should already have XPCContext");
-            return static_cast<XPCContext*>(JS_GetSecondContextPrivate(aJSContext));
-        }
-
-    XPCJSRuntime* GetRuntime() const {return mRuntime;}
-    JSContext* GetJSContext() const {return mJSContext;}
-
-    enum LangType {LANG_UNKNOWN, LANG_JS, LANG_NATIVE};
-
-    LangType GetCallingLangType() const
-        {
-            return mCallingLangType;
-        }
-    LangType SetCallingLangType(LangType lt)
-        {
-            LangType tmp = mCallingLangType;
-            mCallingLangType = lt;
-            return tmp;
-        }
-    bool CallerTypeIsJavaScript() const
-        {
-            return LANG_JS == mCallingLangType;
-        }
-    bool CallerTypeIsNative() const
-        {
-            return LANG_NATIVE == mCallingLangType;
-        }
-    bool CallerTypeIsKnown() const
-        {
-            return LANG_UNKNOWN != mCallingLangType;
-        }
-
-    nsresult GetException(nsIException** e)
-        {
-            nsCOMPtr<nsIException> rval = mException;
-            rval.forget(e);
-            return NS_OK;
-        }
-    void SetException(nsIException* e)
-        {
-            mException = e;
-        }
-
-    nsresult GetLastResult() {return mLastResult;}
-    void SetLastResult(nsresult rc) {mLastResult = rc;}
-
-    nsresult GetPendingResult() {return mPendingResult;}
-    void SetPendingResult(nsresult rc) {mPendingResult = rc;}
-
-    void DebugDump(int16_t depth);
-
-    ~XPCContext();
-
-private:
-    XPCContext();    // no implementation
-    XPCContext(XPCJSRuntime* aRuntime, JSContext* aJSContext);
-
-    static XPCContext* newXPCContext(XPCJSRuntime* aRuntime,
-                                     JSContext* aJSContext);
-private:
-    XPCJSRuntime* mRuntime;
-    JSContext*  mJSContext;
-    nsresult mLastResult;
-    nsresult mPendingResult;
-    nsCOMPtr<nsIException> mException;
-    LangType mCallingLangType;
-    bool mErrorUnreported;
-};
-
-/***************************************************************************/
-
-#define NATIVE_CALLER  XPCContext::LANG_NATIVE
-#define JS_CALLER      XPCContext::LANG_JS
 
 // No virtuals
 // XPCCallContext is ALWAYS declared as a local variable in some function;
@@ -789,31 +688,24 @@ public:
     NS_IMETHOD GetCalleeInterface(nsIInterfaceInfo** aResult);
     NS_IMETHOD GetCalleeClassInfo(nsIClassInfo** aResult);
     NS_IMETHOD GetPreviousCallContext(nsAXPCNativeCallContext** aResult);
-    NS_IMETHOD GetLanguage(uint16_t* aResult);
 
     enum {NO_ARGS = (unsigned) -1};
 
-    static JSContext* GetDefaultJSContext();
-
-    XPCCallContext(XPCContext::LangType callerLanguage,
-                   JSContext* cx,
-                   JS::HandleObject obj    = nullptr,
-                   JS::HandleObject funobj = nullptr,
-                   JS::HandleId id         = JSID_VOIDHANDLE,
-                   unsigned argc           = NO_ARGS,
-                   JS::Value* argv         = nullptr,
-                   JS::Value* rval         = nullptr);
+    explicit XPCCallContext(JSContext* cx,
+                            JS::HandleObject obj    = nullptr,
+                            JS::HandleObject funobj = nullptr,
+                            JS::HandleId id         = JSID_VOIDHANDLE,
+                            unsigned argc           = NO_ARGS,
+                            JS::Value* argv         = nullptr,
+                            JS::Value* rval         = nullptr);
 
     virtual ~XPCCallContext();
 
     inline bool                         IsValid() const ;
 
     inline XPCJSRuntime*                GetRuntime() const ;
-    inline XPCContext*                  GetXPCContext() const ;
     inline JSContext*                   GetJSContext() const ;
     inline bool                         GetContextPopRequired() const ;
-    inline XPCContext::LangType         GetCallerLanguage() const ;
-    inline XPCContext::LangType         GetPrevCallerLanguage() const ;
     inline XPCCallContext*              GetPrevCallContext() const ;
 
     inline JSObject*                    GetFlattenedJSObject() const ;
@@ -870,7 +762,7 @@ private:
     enum State {
         INIT_FAILED,
         SYSTEM_SHUTDOWN,
-        HAVE_CONTEXT,
+        HAVE_RUNTIME,
         HAVE_OBJECT,
         HAVE_NAME,
         HAVE_ARGS,
@@ -890,14 +782,10 @@ private:
 
     RefPtr<nsXPConnect>           mXPC;
 
-    XPCContext*                     mXPCContext;
+    XPCJSRuntime*                   mXPCJSRuntime;
     JSContext*                      mJSContext;
 
-    XPCContext::LangType            mCallerLanguage;
-
     // ctor does not necessarily init the following. BEWARE!
-
-    XPCContext::LangType            mPrevCallerLanguage;
 
     XPCCallContext*                 mPrevCallContext;
 
@@ -1115,6 +1003,10 @@ public:
                         js::PointerHasher<JSAddonId*, 3>,
                         js::SystemAllocPolicy> InterpositionMap;
 
+    typedef js::HashSet<JSAddonId*,
+                        js::PointerHasher<JSAddonId*, 3>,
+                        js::SystemAllocPolicy> AddonSet;
+
     // Gets the appropriate scope object for XBL in this scope. The context
     // must be same-compartment with the global upon entering, and the scope
     // object is wrapped into the compartment of the global.
@@ -1147,6 +1039,8 @@ public:
     void SetAddonCallInterposition() { mHasCallInterpositions = true; }
     bool HasCallInterposition() { return mHasCallInterpositions; };
 
+    static bool AllowCPOWsInAddon(JSContext* cx, JSAddonId* addonId, bool allow);
+
 protected:
     virtual ~XPCWrappedNativeScope();
 
@@ -1164,7 +1058,9 @@ private:
     static XPCWrappedNativeScope* gScopes;
     static XPCWrappedNativeScope* gDyingScopes;
 
+    static bool                      gShutdownObserverInitialized;
     static InterpositionMap*         gInterpositionMap;
+    static AddonSet*                 gAllowCPOWAddonSet;
 
     static InterpositionWhitelistArray* gInterpositionWhitelists;
 
@@ -1846,10 +1742,10 @@ public:
         TraceInside(trc);
     }
 
-    void WriteBarrierPre(JSRuntime* rt)
+    void WriteBarrierPre(JSContext* cx)
     {
-        if (JS::IsIncrementalBarrierNeeded(rt) && mJSProtoObject)
-            mJSProtoObject.writeBarrierPre(rt);
+        if (JS::IsIncrementalBarrierNeeded(cx) && mJSProtoObject)
+            mJSProtoObject.writeBarrierPre(cx);
     }
 
     // NOP. This is just here to make the AutoMarkingPtr code compile.
@@ -2301,11 +2197,14 @@ public:
                                               nsIVariant** aResult);
 
 private:
+    // aSyntheticException, if not null, is the exception we should be using.
+    // If null, look for an exception on the JSContext hanging off the
+    // XPCCallContext.
     static nsresult CheckForException(XPCCallContext & ccx,
                                       mozilla::dom::AutoEntryScript& aes,
                                       const char * aPropertyName,
                                       const char * anInterfaceName,
-                                      bool aForceReport);
+                                      nsIException* aSyntheticException = nullptr);
     virtual ~nsXPCWrappedJSClass();
 
     nsXPCWrappedJSClass();   // not implemented
@@ -2358,7 +2257,7 @@ private:
 // interface on the single underlying (possibly aggregate) JSObject.
 
 class nsXPCWrappedJS final : protected nsAutoXPTCStub,
-                             public nsIXPConnectWrappedJS,
+                             public nsIXPConnectWrappedJSUnmarkGray,
                              public nsSupportsWeakReference,
                              public nsIPropertyBag,
                              public XPCRootSetElem
@@ -2367,6 +2266,7 @@ public:
     NS_DECL_CYCLE_COLLECTING_ISUPPORTS
     NS_DECL_NSIXPCONNECTJSOBJECTHOLDER
     NS_DECL_NSIXPCONNECTWRAPPEDJS
+    NS_DECL_NSIXPCONNECTWRAPPEDJSUNMARKGRAY
     NS_DECL_NSISUPPORTSWEAKREFERENCE
     NS_DECL_NSIPROPERTYBAG
 
@@ -2775,76 +2675,6 @@ private:
     RefPtr<nsJSID> mDetails;
 };
 
-
-/***************************************************************************/
-// XPCJSContextStack is not actually an xpcom object, but xpcom calls are
-// delegated to it as an implementation detail.
-struct XPCJSContextInfo {
-    explicit XPCJSContextInfo(JSContext* aCx) :
-        cx(aCx),
-        savedFrameChain(false)
-    {}
-    JSContext* cx;
-
-    // Whether the frame chain was saved
-    bool savedFrameChain;
-};
-
-namespace xpc {
-bool PushNullJSContext();
-void PopNullJSContext();
-
-} /* namespace xpc */
-
-namespace mozilla {
-namespace dom {
-namespace danger {
-class AutoCxPusher;
-} // namespace danger
-} // namespace dom
-} // namespace mozilla
-
-class XPCJSContextStack
-{
-public:
-    explicit XPCJSContextStack(XPCJSRuntime* aRuntime)
-      : mRuntime(aRuntime)
-      , mSafeJSContext(nullptr)
-    { }
-
-    virtual ~XPCJSContextStack();
-
-    uint32_t Count()
-    {
-        return mStack.Length();
-    }
-
-    JSContext* Peek()
-    {
-        return mStack.IsEmpty() ? nullptr : mStack[mStack.Length() - 1].cx;
-    }
-
-    JSContext* InitSafeJSContext();
-    JSContext* GetSafeJSContext();
-    bool HasJSContext(JSContext* cx);
-
-    const InfallibleTArray<XPCJSContextInfo>* GetStack()
-    { return &mStack; }
-
-private:
-    friend class mozilla::dom::danger::AutoCxPusher;
-    friend bool xpc::PushNullJSContext();
-    friend void xpc::PopNullJSContext();
-
-    // We make these private so that stack manipulation can only happen
-    // through one of the above friends.
-    JSContext* Pop();
-    bool Push(JSContext* cx);
-
-    AutoTArray<XPCJSContextInfo, 16> mStack;
-    XPCJSRuntime* mRuntime;
-    JSContext*  mSafeJSContext;
-};
 
 /***************************************************************************/
 // 'Components' object implementations. nsXPCComponentsBase has the
@@ -3331,7 +3161,7 @@ xpc_GetJSPrivate(JSObject* obj)
 inline JSContext*
 xpc_GetSafeJSContext()
 {
-    return XPCJSRuntime::Get()->GetJSContextStack()->GetSafeJSContext();
+    return XPCJSRuntime::Get()->Context();
 }
 
 namespace xpc {
@@ -3375,6 +3205,7 @@ struct GlobalProperties {
     bool atob : 1;
     bool btoa : 1;
     bool Blob : 1;
+    bool Directory : 1;
     bool File : 1;
     bool crypto : 1;
     bool rtcIdentityProvider : 1;
@@ -3411,6 +3242,7 @@ protected:
     bool ParseString(const char* name, nsCString& prop);
     bool ParseString(const char* name, nsString& prop);
     bool ParseId(const char* name, JS::MutableHandleId id);
+    bool ParseUInt32(const char* name, uint32_t* prop);
 
     JSContext* mCx;
     JS::RootedObject mObject;
@@ -3435,6 +3267,7 @@ public:
         , invisibleToDebugger(false)
         , discardSource(false)
         , metadata(cx)
+        , userContextId(0)
     { }
 
     virtual bool Parse();
@@ -3455,6 +3288,7 @@ public:
     bool discardSource;
     GlobalProperties globalProperties;
     JS::RootedValue metadata;
+    uint32_t userContextId;
 
 protected:
     bool ParseGlobalProperties();
@@ -3801,9 +3635,7 @@ bool EnableUniversalXPConnect(JSContext* cx);
 inline void
 CrashIfNotInAutomation()
 {
-    const char* prefName =
-      "security.turn_off_all_security_so_that_viruses_can_take_over_this_computer";
-    MOZ_RELEASE_ASSERT(mozilla::Preferences::GetBool(prefName));
+    MOZ_RELEASE_ASSERT(IsInAutomation());
 }
 
 inline XPCWrappedNativeScope*
@@ -3829,9 +3661,9 @@ DefineStaticJSVals(JSContext* cx);
 } // namespace mozilla
 
 bool
-xpc_LocalizeRuntime(JSRuntime* rt);
+xpc_LocalizeContext(JSContext* cx);
 void
-xpc_DelocalizeRuntime(JSRuntime* rt);
+xpc_DelocalizeContext(JSContext* cx);
 
 /***************************************************************************/
 // Inlines use the above - include last.

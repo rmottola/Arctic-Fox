@@ -9,7 +9,6 @@
 #include "mozilla/layers/Compositor.h"
 #include "mozilla/layers/TextureHost.h"
 #include "mozilla/gfx/2D.h"
-#include "nsAutoPtr.h"
 
 namespace mozilla {
 namespace layers {
@@ -42,7 +41,7 @@ public:
 class BasicCompositor : public Compositor
 {
 public:
-  explicit BasicCompositor(CompositorBridgeParent* aParent, widget::CompositorWidgetProxy *aWidget);
+  explicit BasicCompositor(CompositorBridgeParent* aParent, widget::CompositorWidget* aWidget);
 
 protected:
   virtual ~BasicCompositor();
@@ -51,9 +50,7 @@ public:
 
   virtual BasicCompositor* AsBasicCompositor() override { return this; }
 
-  virtual bool Initialize() override;
-
-  virtual void Destroy() override {}
+  virtual bool Initialize(nsCString* const out_failureReason) override;
 
   virtual void DetachWidget() override;
 
@@ -78,6 +75,9 @@ public:
   virtual already_AddRefed<DataTextureSource>
   CreateDataTextureSourceAround(gfx::DataSourceSurface* aSurface) override;
 
+  virtual already_AddRefed<DataTextureSource>
+  CreateDataTextureSourceAroundYCbCr(TextureHost* aTexture) override;
+
   virtual bool SupportsEffect(EffectTypes aEffect) override;
 
   virtual void SetRenderTarget(CompositingRenderTarget *aSource) override
@@ -91,7 +91,7 @@ public:
   }
 
   virtual void DrawQuad(const gfx::Rect& aRect,
-                        const gfx::Rect& aClipRect,
+                        const gfx::IntRect& aClipRect,
                         const EffectChain &aEffectChain,
                         gfx::Float aOpacity,
                         const gfx::Matrix4x4& aTransform,
@@ -100,11 +100,11 @@ public:
   virtual void ClearRect(const gfx::Rect& aRect) override;
 
   virtual void BeginFrame(const nsIntRegion& aInvalidRegion,
-                          const gfx::Rect *aClipRectIn,
-                          const gfx::Rect& aRenderBounds,
+                          const gfx::IntRect *aClipRectIn,
+                          const gfx::IntRect& aRenderBounds,
                           const nsIntRegion& aOpaqueRegion,
-                          gfx::Rect *aClipRectOut = nullptr,
-                          gfx::Rect *aRenderBoundsOut = nullptr) override;
+                          gfx::IntRect *aClipRectOut = nullptr,
+                          gfx::IntRect *aRenderBoundsOut = nullptr) override;
   virtual void EndFrame() override;
   virtual void EndFrameForExternalComposition(const gfx::Matrix& aTransform) override;
 

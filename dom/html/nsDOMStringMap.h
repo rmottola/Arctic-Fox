@@ -8,7 +8,6 @@
 #define nsDOMStringMap_h
 
 #include "nsCycleCollectionParticipant.h"
-#include "nsAutoPtr.h"
 #include "nsTArray.h"
 #include "nsString.h"
 #include "nsWrapperCache.h"
@@ -42,8 +41,7 @@ public:
   void NamedSetter(const nsAString& aProp, const nsAString& aValue,
                    mozilla::ErrorResult& rv);
   void NamedDeleter(const nsAString& aProp, bool &found);
-  bool NameIsEnumerable(const nsAString& aName);
-  void GetSupportedNames(unsigned, nsTArray<nsString>& aNames);
+  void GetSupportedNames(nsTArray<nsString>& aNames);
 
   js::ExpandoAndGeneration mExpandoAndGeneration;
 

@@ -133,7 +133,8 @@ public:
       return false;
     }
 
-    if (mLastDrawResult == mozilla::image::DrawResult::SUCCESS) {
+    if (mLastDrawResult == mozilla::image::DrawResult::SUCCESS ||
+        mLastDrawResult == mozilla::image::DrawResult::BAD_IMAGE) {
       return false;
     }
 
@@ -241,6 +242,7 @@ public:
 };
 
 class nsDisplaySVGEffectsGeometry : public nsDisplayItemGeometry
+  , public nsImageGeometryMixin<nsDisplaySVGEffectsGeometry>
 {
 public:
   nsDisplaySVGEffectsGeometry(nsDisplaySVGEffects* aItem, nsDisplayListBuilder* aBuilder);

@@ -67,16 +67,14 @@ public:
   }
 
   void NotifyQueuedTrackChanges(MediaStreamGraph* aGraph, TrackID aID,
-                                StreamTime aTrackOffset, uint32_t aTrackEvents,
+                                StreamTime aTrackOffset, TrackEventCommand aTrackEvents,
                                 const MediaSegment& aQueuedMedia,
                                 MediaStream* aInputStream,
                                 TrackID aInputTrackID) override
   {
-    if (aTrackEvents & TRACK_EVENT_CREATED) {
-      nsCOMPtr<nsIRunnable> runnable =
-        NS_NewRunnableMethodWithArgs<TrackID>(
-          this, &TrackCreatedListener::DoNotifyTrackCreated, aID);
-      aGraph->DispatchToMainThreadAfterStreamStateUpdate(runnable.forget());
+    if (aTrackEvents & TrackEventCommand::TRACK_EVENT_CREATED) {
+      aGraph->DispatchToMainThreadAfterStreamStateUpdate(NewRunnableMethod<TrackID>(
+          this, &TrackCreatedListener::DoNotifyTrackCreated, aID));
     }
   }
 
@@ -261,7 +259,8 @@ nsDOMCameraControl::nsDOMCameraControl(uint32_t aCameraId,
   , mSetInitialConfig(false)
 {
   DOM_CAMERA_LOGT("%s:%d : this=%p\n", __func__, __LINE__, this);
-  mInput = new CameraPreviewMediaStream(this);
+  mInput = new CameraPreviewMediaStream();
+  mOwnedStream = mInput;
 
   BindToOwner(aWindow);
 
@@ -1187,9 +1186,8 @@ nsDOMCameraControl::NotifyRecordingStatusChange(const nsString& aMsg)
     // Camera app will stop recording when it falls to the background, so no callback is necessary.
     mAudioChannelAgent->Init(mWindow, (int32_t)AudioChannel::Content, nullptr);
     // Video recording doesn't output any sound, so it's not necessary to check canPlay.
-    float volume = 0.0;
-    bool muted = true;
-    rv = mAudioChannelAgent->NotifyStartedPlaying(&volume, &muted);
+    AudioPlaybackConfig config;
+    rv = mAudioChannelAgent->NotifyStartedPlaying(&config, AudioChannelService::AudibleState::eAudible);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }

@@ -33,6 +33,7 @@ class EventChainPreVisitor;
 
 namespace dom {
 
+class HTMLFormSubmission;
 class HTMLSelectElement;
 
 #define NS_SELECT_STATE_IID                        \
@@ -210,7 +211,7 @@ public:
   }
   void SetSize(uint32_t aSize, ErrorResult& aRv)
   {
-    SetUnsignedIntAttr(nsGkAtoms::size, aSize, aRv);
+    SetUnsignedIntAttr(nsGkAtoms::size, aSize, 0, aRv);
   }
 
   // Uses XPCOM GetType.
@@ -267,6 +268,7 @@ public:
   // nsIConstraintValidation::GetValidationMessage() is fine.
   // nsIConstraintValidation::CheckValidity() is fine.
   using nsIConstraintValidation::CheckValidity;
+  using nsIConstraintValidation::ReportValidity;
   // nsIConstraintValidation::SetCustomValidity() is fine.
 
   using nsINode::Remove;
@@ -288,7 +290,7 @@ public:
   // Overriden nsIFormControl methods
   NS_IMETHOD_(uint32_t) GetType() const override { return NS_FORM_SELECT; }
   NS_IMETHOD Reset() override;
-  NS_IMETHOD SubmitNamesValues(nsFormSubmission* aFormSubmission) override;
+  NS_IMETHOD SubmitNamesValues(HTMLFormSubmission* aFormSubmission) override;
   NS_IMETHOD SaveState() override;
   virtual bool RestoreState(nsPresState* aState) override;
   virtual bool IsDisabledForEvents(EventMessage aMessage) override;
@@ -378,7 +380,7 @@ public:
                                 const nsAttrValue* aValue, bool aNotify) override;
   virtual nsresult UnsetAttr(int32_t aNameSpaceID, nsIAtom* aAttribute,
                              bool aNotify) override;
-  
+
   virtual void DoneAddingChildren(bool aHaveNotified) override;
   virtual bool IsDoneAddingChildren() override {
     return mIsDoneAddingChildren;

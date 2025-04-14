@@ -54,7 +54,7 @@ public:
   NS_DECL_NSICACHEENTRY
   NS_DECL_NSIRUNNABLE
 
-  CacheEntry(const nsACString& aStorageID, nsIURI* aURI, const nsACString& aEnhanceID,
+  CacheEntry(const nsACString& aStorageID, const nsACString& aURI, const nsACString& aEnhanceID,
              bool aUseDisk, bool aSkipSizeCheck, bool aPin);
 
   void AsyncOpen(nsICacheEntryOpenCallback* aCallback, uint32_t aFlags);
@@ -68,7 +68,7 @@ public:
   uint32_t GetMetadataMemoryConsumption();
   nsCString const &GetStorageID() const { return mStorageID; }
   nsCString const &GetEnhanceID() const { return mEnhanceID; }
-  nsIURI* GetURI() const { return mURI; }
+  nsCString const &GetURI() const { return mURI; }
   // Accessible at any time
   bool IsUsingDisk() const { return mUseDisk; }
   bool IsReferenced() const;
@@ -288,14 +288,20 @@ private:
   // When mFileStatus is read and found success it is ensured there is mFile and
   // that it is after a successful call to Init().
   ::mozilla::Atomic<nsresult, ::mozilla::ReleaseAcquire> mFileStatus;
-  nsCOMPtr<nsIURI> mURI;
+  nsCString mURI;
   nsCString mEnhanceID;
   nsCString mStorageID;
 
+  // mUseDisk, mSkipSizeCheck, mIsDoomed are plain "bool", not "bool:1",
+  // so as to avoid bitfield races with the byte containing
+  // mSecurityInfoLoaded et al.  See bug 1278524.
+  //
   // Whether it's allowed to persist the data to disk
-  bool const mUseDisk : 1;
+  bool const mUseDisk;
   // Whether it should skip max size check.
-  bool const mSkipSizeCheck : 1;
+  bool const mSkipSizeCheck;
+  // Set when entry is doomed with AsyncDoom() or DoomAlreadyRemoved().
+  bool mIsDoomed;
 
   // Following flags are all synchronized with the cache entry lock.
 
@@ -315,10 +321,6 @@ private:
   // Whether the pinning state of the entry is known (equals to the actual state
   // of the cache file)
   bool mPinningKnown : 1;
-
-  // Set when entry is doomed with AsyncDoom() or DoomAlreadyRemoved().
-  // Left as a standalone flag to not bother with locking (there is no need).
-  bool mIsDoomed;
 
   static char const * StateString(uint32_t aState);
 
@@ -375,7 +377,6 @@ private:
   int64_t mPredictedDataSize;
   mozilla::TimeStamp mLoadStart;
   uint32_t mUseCount;
-  nsCOMPtr<nsIThread> mReleaseThread;
 };
 
 

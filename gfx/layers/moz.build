@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -98,6 +98,7 @@ EXPORTS.mozilla.dom += [
 
 EXPORTS.mozilla.layers += [
     'apz/public/GeckoContentController.h',
+    'apz/public/IAPZCTreeManager.h',
     # exporting things from apz/src is temporary until we extract a
     # proper interface for the code there
     'apz/src/APZCTreeManager.h',
@@ -115,6 +116,7 @@ EXPORTS.mozilla.layers += [
     'apz/util/InputAPZContext.h',
     'apz/util/ScrollInputMethods.h',
     'apz/util/ScrollLinkedEffectDetector.h',
+    'apz/util/TouchActionHelper.h',
     'AsyncCanvasRenderer.h',
     'AtomicRefCountedWithFinalize.h',
     'AxisPhysicsModel.h',
@@ -152,12 +154,14 @@ EXPORTS.mozilla.layers += [
     'Effects.h',
     'ImageDataSerializer.h',
     'ipc/APZChild.h',
+    'ipc/APZCTreeManagerChild.h',
+    'ipc/APZCTreeManagerParent.h',
     'ipc/AsyncTransactionTracker.h',
     'ipc/CompositableForwarder.h',
     'ipc/CompositableTransactionParent.h',
     'ipc/CompositorBridgeChild.h',
     'ipc/CompositorBridgeParent.h',
-    'ipc/CompositorLRU.h',
+    'ipc/CompositorThread.h',
     'ipc/FenceUtils.h',
     'ipc/GonkNativeHandle.h',
     'ipc/GonkNativeHandleUtils.h',
@@ -176,6 +180,7 @@ EXPORTS.mozilla.layers += [
     'ipc/SharedBufferManagerParent.h',
     'ipc/SharedPlanarYCbCrImage.h',
     'ipc/SharedRGBImage.h',
+    'ipc/TextureForwarder.h',
     'LayerMetricsWrapper.h',
     'LayersTypes.h',
     'opengl/CompositingRenderTargetOGL.h',
@@ -254,7 +259,13 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gonk':
         'ipc/ShadowLayerUtilsGralloc.cpp',
     ]
 
+if CONFIG['MOZ_ANDROID_APZ']:
+    UNIFIED_SOURCES += [
+        'apz/src/AndroidAPZ.cpp',
+    ]
+
 UNIFIED_SOURCES += [
+    'apz/public/IAPZCTreeManager.cpp',
     'apz/src/APZCTreeManager.cpp',
     'apz/src/AsyncPanZoomController.cpp',
     'apz/src/Axis.cpp',
@@ -278,6 +289,7 @@ UNIFIED_SOURCES += [
     'apz/util/DoubleTapToZoom.cpp',
     'apz/util/InputAPZContext.cpp',
     'apz/util/ScrollLinkedEffectDetector.cpp',
+    'apz/util/TouchActionHelper.cpp',
     'AsyncCanvasRenderer.cpp',
     'AxisPhysicsModel.cpp',
     'AxisPhysicsMSDModel.cpp',
@@ -332,12 +344,14 @@ UNIFIED_SOURCES += [
     'ImageDataSerializer.cpp',
     'ImageLayers.cpp',
     'ipc/APZChild.cpp',
+    'ipc/APZCTreeManagerChild.cpp',
+    'ipc/APZCTreeManagerParent.cpp',
     'ipc/AsyncTransactionTracker.cpp',
     'ipc/CompositableTransactionParent.cpp',
     'ipc/CompositorBench.cpp',
     'ipc/CompositorBridgeChild.cpp',
     'ipc/CompositorBridgeParent.cpp',
-    'ipc/CompositorLRU.cpp',
+    'ipc/CompositorThread.cpp',
     'ipc/FenceUtils.cpp',
     'ipc/ImageBridgeChild.cpp',
     'ipc/ImageBridgeParent.cpp',
@@ -354,6 +368,7 @@ UNIFIED_SOURCES += [
     'ipc/SharedBufferManagerParent.cpp',
     'ipc/SharedPlanarYCbCrImage.cpp',
     'ipc/SharedRGBImage.cpp',
+    'ipc/TextureForwarder.cpp',
     'LayerScope.cpp',
     'LayersLogging.cpp',
     'LayerSorter.cpp',
@@ -403,6 +418,7 @@ IPDL_SOURCES = [
     'ipc/LayersMessages.ipdlh',
     'ipc/LayersSurfaces.ipdlh',
     'ipc/PAPZ.ipdl',
+    'ipc/PAPZCTreeManager.ipdl',
     'ipc/PCompositable.ipdl',
     'ipc/PCompositorBridge.ipdl',
     'ipc/PImageBridge.ipdl',
@@ -419,6 +435,7 @@ LOCAL_INCLUDES += [
     '/docshell/base',  # for nsDocShell.h
     '/layout/base',    # for TouchManager.h
     '/layout/generic', # for nsTextFrame.h
+    '/media/libyuv/include', # for libyuv.h
 ]
 
 FINAL_LIBRARY = 'xul'
@@ -455,3 +472,6 @@ CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
 CXXFLAGS += CONFIG['TK_CFLAGS']
 
 LOCAL_INCLUDES += CONFIG['SKIA_INCLUDES']
+
+if CONFIG['GNU_CXX']:
+    CXXFLAGS += ['-Wno-error=shadow']

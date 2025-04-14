@@ -15,6 +15,10 @@
 #include <sstream>
 #include <vector>
 
+#ifdef MOZ_WIDGET_COCOA
+#include <ApplicationServices/ApplicationServices.h>
+#endif
+
 namespace mozilla {
 namespace gfx {
 
@@ -74,6 +78,16 @@ public:
   virtual void Fill(const Path *aPath,
                     const Pattern &aPattern,
                     const DrawOptions &aOptions = DrawOptions()) override;
+#ifdef MOZ_WIDGET_COCOA
+  CGContextRef BorrowCGContext(const DrawOptions &aOptions);
+  void ReturnCGContext(CGContextRef);
+  bool FillGlyphsWithCG(ScaledFont *aFont,
+                        const GlyphBuffer &aBuffer,
+                        const Pattern &aPattern,
+                        const DrawOptions &aOptions = DrawOptions(),
+                        const GlyphRenderingOptions *aRenderingOptions = nullptr);
+#endif
+
   virtual void FillGlyphs(ScaledFont *aFont,
                           const GlyphBuffer &aBuffer,
                           const Pattern &aPattern,
@@ -111,6 +125,7 @@ public:
   virtual already_AddRefed<FilterNode> CreateFilter(FilterType aType) override;
   virtual void SetTransform(const Matrix &aTransform) override;
   virtual void *GetNativeSurface(NativeSurfaceType aType) override;
+  virtual void DetachAllSnapshots() override { MarkChanged(); }
 
   bool Init(const IntSize &aSize, SurfaceFormat aFormat);
   void Init(unsigned char* aData, const IntSize &aSize, int32_t aStride, SurfaceFormat aFormat, bool aUninitialized = false);
@@ -177,6 +192,13 @@ private:
   IntSize mSize;
   RefPtrSkia<SkCanvas> mCanvas;
   SourceSurfaceSkia* mSnapshot;
+
+#ifdef MOZ_WIDGET_COCOA
+  CGContextRef mCG;
+  CGColorSpaceRef mColorSpace;
+  uint8_t* mCanvasData;
+  IntSize mCGSize;
+#endif
 };
 
 } // namespace gfx

@@ -20,6 +20,7 @@ this.Feeds = {
   init() {
     let mm = Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageListenerManager);
     mm.addMessageListener("WCCR:registerProtocolHandler", this);
+    mm.addMessageListener("WCCR:registerContentHandler", this);
 
     Services.ppmm.addMessageListener("WCCR:setAutoHandler", this);
     Services.ppmm.addMessageListener("FeedConverter:addLiveBookmark", this);
@@ -83,9 +84,11 @@ this.Feeds = {
 
     if (aIsFeed) {
       // re-create the principal as it may be a CPOW.
+      // once this can't be a CPOW anymore, we should just use aPrincipal instead
+      // of creating a new one.
       let principalURI = BrowserUtils.makeURIFromCPOW(aPrincipal.URI);
       let principalToCheck =
-        Services.scriptSecurityManager.createCodebasePrincipal(principalURI, {});
+        Services.scriptSecurityManager.createCodebasePrincipal(principalURI, aPrincipal.originAttributes);
       try {
         BrowserUtils.urlSecurityCheck(aLink.href, principalToCheck,
                                       Ci.nsIScriptSecurityManager.DISALLOW_INHERIT_PRINCIPAL);

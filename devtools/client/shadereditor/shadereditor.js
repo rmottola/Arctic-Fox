@@ -8,8 +8,6 @@ var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Task.jsm");
 Cu.import("resource://devtools/client/shared/widgets/SideMenuWidget.jsm");
-Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
-Cu.import("resource://gre/modules/Console.jsm");
 
 const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const promise = require("promise");
@@ -18,6 +16,8 @@ const EventEmitter = require("devtools/shared/event-emitter");
 const {Tooltip} = require("devtools/client/shared/widgets/Tooltip");
 const Editor = require("devtools/client/sourceeditor/editor");
 const {LocalizationHelper} = require("devtools/client/shared/l10n");
+const {Heritage, WidgetMethods, setNamedTimeout} =
+  require("devtools/client/shared/widgets/view-helpers");
 
 // The panel's window global is an EventEmitter firing the following events:
 const EVENTS = {
@@ -314,7 +314,7 @@ var ShadersListView = Heritage.extend(WidgetMethods, {
     getShaders()
       .then(getSources)
       .then(showSources)
-      .then(null, Cu.reportError);
+      .then(null, e => console.error(e));
   },
 
   /**

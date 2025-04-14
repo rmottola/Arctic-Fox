@@ -13,8 +13,7 @@
 #include "mozilla/Telemetry.h"
 #include "mozilla/Logging.h"
 
-extern mozilla::LogModule* GetPDMLog();
-#define LOG(...) MOZ_LOG(GetPDMLog(), mozilla::LogLevel::Debug, (__VA_ARGS__))
+#define LOG(...) MOZ_LOG(sPDMLog, mozilla::LogLevel::Debug, (__VA_ARGS__))
 
 namespace mozilla {
 
@@ -194,6 +193,11 @@ WMFAudioMFTManager::UpdateOutputType()
 
   hr = type->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &mAudioChannels);
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
+
+  AudioConfig::ChannelLayout layout(mAudioChannels);
+  if (!layout.IsValid()) {
+    return E_FAIL;
+  }
 
   return S_OK;
 }

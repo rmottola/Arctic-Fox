@@ -11,6 +11,10 @@
   locale/@AB_CD@/global/aboutReader.properties          (%chrome/global/aboutReader.properties)
   locale/@AB_CD@/global/aboutRights.dtd                 (%chrome/global/aboutRights.dtd)
   locale/@AB_CD@/global/aboutNetworking.dtd             (%chrome/global/aboutNetworking.dtd)
+#ifndef ANDROID
+  locale/@AB_CD@/global/aboutProfiles.dtd               (%chrome/global/aboutProfiles.dtd)
+  locale/@AB_CD@/global/aboutProfiles.properties        (%chrome/global/aboutProfiles.properties)
+#endif
   locale/@AB_CD@/global/aboutServiceWorkers.dtd         (%chrome/global/aboutServiceWorkers.dtd)
   locale/@AB_CD@/global/aboutServiceWorkers.properties  (%chrome/global/aboutServiceWorkers.properties)
   locale/@AB_CD@/global/aboutSupport.dtd                (%chrome/global/aboutSupport.dtd)
@@ -81,8 +85,8 @@
   locale/@AB_CD@/global/webapps.properties              (%chrome/global/webapps.properties)
   locale/@AB_CD@/global/wizard.dtd                      (%chrome/global/wizard.dtd)
   locale/@AB_CD@/global/wizard.properties               (%chrome/global/wizard.properties)
-% locale global-region @AB_CD@ %locale/@AB_CD@/global-region/
-  locale/@AB_CD@/global-region/region.properties        (%chrome/global-region/region.properties)
+  locale/@AB_CD@/global/crashes.dtd                     (%crashreporter/crashes.dtd)
+  locale/@AB_CD@/global/crashes.properties              (%crashreporter/crashes.properties)
 % locale global-platform @AB_CD@ %locale/@AB_CD@/global-platform/
   locale/@AB_CD@/global-platform/mac/platformKeys.properties  (%chrome/global-platform/mac/platformKeys.properties)
   locale/@AB_CD@/global-platform/unix/platformKeys.properties (%chrome/global-platform/unix/platformKeys.properties)

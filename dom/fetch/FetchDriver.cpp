@@ -21,7 +21,6 @@
 #include "nsIPipe.h"
 
 #include "nsContentPolicyUtils.h"
-#include "nsCORSListenerProxy.h"
 #include "nsDataHandler.h"
 #include "nsHostObjectProtocolHandler.h"
 #include "nsNetUtil.h"
@@ -83,9 +82,7 @@ FetchDriver::Fetch(FetchDriverObserver* aObserver)
   MOZ_RELEASE_ASSERT(!mRequest->IsSynchronous(),
                      "Synchronous fetch not supported");
 
-  nsCOMPtr<nsIRunnable> r =
-    NS_NewRunnableMethod(this, &FetchDriver::ContinueFetch);
-  return NS_DispatchToCurrentThread(r);
+  return NS_DispatchToCurrentThread(NewRunnableMethod(this, &FetchDriver::ContinueFetch));
 }
 
 nsresult
@@ -97,7 +94,7 @@ FetchDriver::ContinueFetch()
   if (NS_FAILED(rv)) {
     FailWithNetworkError();
   }
- 
+
   return rv;
 }
 
@@ -263,11 +260,15 @@ FetchDriver::HttpFetch()
     // Step 2. Set the referrer.
     nsAutoString referrer;
     mRequest->GetReferrer(referrer);
+
+    // The Referrer Policy in Request can be used to override a referrer policy
+    // associated with an environment settings object.
+    // If there's no Referrer Policy in the request, it should be inherited
+    // from environment.
     ReferrerPolicy referrerPolicy = mRequest->ReferrerPolicy_();
-    net::ReferrerPolicy net_referrerPolicy = net::RP_Unset;
+    net::ReferrerPolicy net_referrerPolicy = mRequest->GetEnvironmentReferrerPolicy();
     switch (referrerPolicy) {
     case ReferrerPolicy::_empty:
-      net_referrerPolicy = net::RP_Default;
       break;
     case ReferrerPolicy::No_referrer:
       net_referrerPolicy = net::RP_No_Referrer;
@@ -305,12 +306,10 @@ FetchDriver::HttpFetch()
       rv = NS_NewURI(getter_AddRefs(referrerURI), referrer, nullptr, nullptr);
       NS_ENSURE_SUCCESS(rv, rv);
 
-      uint32_t documentReferrerPolicy = mDocument ? mDocument->GetReferrerPolicy() :
-                                                    net::RP_Default;
       rv =
         httpChan->SetReferrerWithPolicy(referrerURI,
                                         referrerPolicy == ReferrerPolicy::_empty ?
-                                          documentReferrerPolicy :
+                                          mRequest->GetEnvironmentReferrerPolicy() :
                                           net_referrerPolicy);
       NS_ENSURE_SUCCESS(rv, rv);
     }
@@ -375,18 +374,15 @@ FetchDriver::HttpFetch()
 
 already_AddRefed<InternalResponse>
 FetchDriver::BeginAndGetFilteredResponse(InternalResponse* aResponse,
-                                         nsIURI* aFinalURI,
                                          bool aFoundOpaqueRedirect)
 {
   MOZ_ASSERT(aResponse);
-  nsAutoCString reqURL;
-  if (aFinalURI) {
-    aFinalURI->GetSpec(reqURL);
-  } else {
-    mRequest->GetURL(reqURL);
-  }
-  DebugOnly<nsresult> rv = aResponse->StripFragmentAndSetUrl(reqURL);
-  MOZ_ASSERT(NS_SUCCEEDED(rv));
+
+  AutoTArray<nsCString, 4> reqURLList;
+  mRequest->GetURLList(reqURLList);
+
+  MOZ_ASSERT(!reqURLList.IsEmpty());
+  aResponse->SetURLList(reqURLList);
 
   RefPtr<InternalResponse> filteredResponse;
   if (aFoundOpaqueRedirect) {
@@ -491,21 +487,11 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
   // On a successful redirect we perform the following substeps of HTTP Fetch,
   // step 5, "redirect status", step 11.
 
-  // Step 11.5 "Append locationURL to request's url list." so that when we set the
-  // Response's URL from the Request's URL in Main Fetch, step 15, we get the
-  // final value. Note, we still use a single URL value instead of a list.
-  // Because of that we only need to do this after the request finishes.
-  nsCOMPtr<nsIURI> newURI;
-  rv = NS_GetFinalChannelURI(channel, getter_AddRefs(newURI));
-  if (NS_FAILED(rv)) {
-    FailWithNetworkError();
-    return rv;
-  }
-  nsAutoCString newUrl;
-  newURI->GetSpec(newUrl);
-  mRequest->SetURL(newUrl);
-
   bool foundOpaqueRedirect = false;
+
+  int64_t contentLength = InternalResponse::UNKNOWN_BODY_SIZE;
+  rv = channel->GetContentLength(&contentLength);
+  MOZ_ASSERT_IF(NS_FAILED(rv), contentLength == InternalResponse::UNKNOWN_BODY_SIZE);
 
   if (httpChannel) {
     uint32_t responseStatus;
@@ -531,6 +517,17 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
     if (NS_WARN_IF(NS_FAILED(rv))) {
       NS_WARNING("Failed to visit all headers.");
     }
+
+    // If Content-Encoding or Transfer-Encoding headers are set, then the actual
+    // Content-Length (which refer to the decoded data) is obscured behind the encodings.
+    ErrorResult result;
+    if (response->Headers()->Has(NS_LITERAL_CSTRING("content-encoding"), result) ||
+        response->Headers()->Has(NS_LITERAL_CSTRING("transfer-encoding"), result)) {
+      NS_WARNING("Cannot know response Content-Length due to presence of Content-Encoding "
+                 "or Transfer-Encoding headers.");
+      contentLength = InternalResponse::UNKNOWN_BODY_SIZE;
+    }
+    MOZ_ASSERT(!result.Failed());
   } else {
     response = new InternalResponse(200, NS_LITERAL_CSTRING("OK"));
 
@@ -550,9 +547,7 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
       MOZ_ASSERT(!result.Failed());
     }
 
-    int64_t contentLength;
-    rv = channel->GetContentLength(&contentLength);
-    if (NS_SUCCEEDED(rv) && contentLength) {
+    if (contentLength > 0) {
       nsAutoCString contentLenStr;
       contentLenStr.AppendInt(contentLength);
       response->Headers()->Append(NS_LITERAL_CSTRING("Content-Length"),
@@ -580,7 +575,7 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
     // Cancel request.
     return rv;
   }
-  response->SetBody(pipeInputStream);
+  response->SetBody(pipeInputStream, contentLength);
 
   response->InitChannelInfo(channel);
 
@@ -609,8 +604,7 @@ FetchDriver::OnStartRequest(nsIRequest* aRequest,
 
   // Resolves fetch() promise which may trigger code running in a worker.  Make
   // sure the Response is fully initialized before calling this.
-  mResponse = BeginAndGetFilteredResponse(response, channelURI,
-                                          foundOpaqueRedirect);
+  mResponse = BeginAndGetFilteredResponse(response, foundOpaqueRedirect);
 
   nsCOMPtr<nsIEventTarget> sts = do_GetService(NS_STREAMTRANSPORTSERVICE_CONTRACTID, &rv);
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -687,6 +681,64 @@ FetchDriver::AsyncOnChannelRedirect(nsIChannel* aOldChannel,
   nsCOMPtr<nsIHttpChannel> httpChannel = do_QueryInterface(aNewChannel);
   if (httpChannel) {
     SetRequestHeaders(httpChannel);
+  }
+
+  nsCOMPtr<nsIHttpChannel> oldHttpChannel = do_QueryInterface(aOldChannel);
+  nsAutoCString tRPHeaderCValue;
+  if (oldHttpChannel) {
+    oldHttpChannel->GetResponseHeader(NS_LITERAL_CSTRING("referrer-policy"),
+                                      tRPHeaderCValue);
+  }
+
+  // "HTTP-redirect fetch": step 14 "Append locationURL to request's URL list."
+  nsCOMPtr<nsIURI> uri;
+  MOZ_ALWAYS_SUCCEEDS(aNewChannel->GetURI(getter_AddRefs(uri)));
+
+  nsCOMPtr<nsIURI> uriClone;
+  nsresult rv = uri->CloneIgnoringRef(getter_AddRefs(uriClone));
+  if(NS_WARN_IF(NS_FAILED(rv))){
+    return rv;
+  }
+
+  nsCString spec;
+  rv = uriClone->GetSpec(spec);
+  if(NS_WARN_IF(NS_FAILED(rv))){
+    return rv;
+  }
+
+  mRequest->AddURL(spec);
+
+  NS_ConvertUTF8toUTF16 tRPHeaderValue(tRPHeaderCValue);
+  // updates request’s associated referrer policy according to the
+  // Referrer-Policy header (if any).
+  if (!tRPHeaderValue.IsEmpty()) {
+    net::ReferrerPolicy net_referrerPolicy =
+      nsContentUtils::GetReferrerPolicyFromHeader(tRPHeaderValue);
+    if (net_referrerPolicy != net::RP_Unset) {
+      ReferrerPolicy referrerPolicy = mRequest->ReferrerPolicy_();
+      switch (net_referrerPolicy) {
+        case net::RP_No_Referrer:
+          referrerPolicy = ReferrerPolicy::No_referrer;
+          break;
+        case net::RP_No_Referrer_When_Downgrade:
+          referrerPolicy = ReferrerPolicy::No_referrer_when_downgrade;
+          break;
+        case net::RP_Origin:
+          referrerPolicy = ReferrerPolicy::Origin;
+          break;
+        case net::RP_Origin_When_Crossorigin:
+          referrerPolicy = ReferrerPolicy::Origin_when_cross_origin;
+          break;
+        case net::RP_Unsafe_URL:
+          referrerPolicy = ReferrerPolicy::Unsafe_url;
+          break;
+        default:
+          MOZ_ASSERT_UNREACHABLE("Invalid ReferrerPolicy value");
+          break;
+      }
+
+      mRequest->SetReferrerPolicy(referrerPolicy);
+    }
   }
 
   aCallback->OnRedirectVerifyCallback(NS_OK);

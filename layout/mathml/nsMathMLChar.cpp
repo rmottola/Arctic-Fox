@@ -11,6 +11,7 @@
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/unused.h"
 
+#include "nsAutoPtr.h"
 #include "nsCOMPtr.h"
 #include "nsDeviceContext.h"
 #include "nsFontMetrics.h"
@@ -1914,12 +1915,12 @@ void nsDisplayMathMLCharBackground::Paint(nsDisplayListBuilder* aBuilder,
 {
   const nsStyleBorder* border = mStyleContext->StyleBorder();
   nsRect rect(mRect + ToReferenceFrame());
-
+  nsCSSRendering::PaintBGParams params =
+    nsCSSRendering::PaintBGParams::ForAllLayers(*mFrame->PresContext(), *aCtx,
+                                                mVisibleRect, rect, mFrame,
+                                                aBuilder->GetBackgroundPaintFlags());
   DrawResult result =
-    nsCSSRendering::PaintBackgroundWithSC(mFrame->PresContext(), *aCtx, mFrame,
-                                          mVisibleRect, rect,
-                                          mStyleContext, *border,
-                                          aBuilder->GetBackgroundPaintFlags());
+    nsCSSRendering::PaintBackgroundWithSC(params, mStyleContext, *border);
 
   nsDisplayItemGenericImageGeometry::UpdateDrawResult(this, result);
 }

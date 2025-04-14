@@ -47,14 +47,26 @@ nsReferencedElement::Reset(nsIContent* aFromContent, nsIURI* aURI,
     return;
 
   // Get the current document
-  nsIDocument *doc = aFromContent->GetComposedDoc();
+  nsIDocument *doc = aFromContent->OwnerDoc();
   if (!doc)
     return;
 
   nsIContent* bindingParent = aFromContent->GetBindingParent();
   if (bindingParent) {
     nsXBLBinding* binding = bindingParent->GetXBLBinding();
-    if (binding) {
+    if (!binding) {
+      // This happens, for example, if aFromContent is part of the content
+      // inserted by a call to nsIDocument::InsertAnonymousContent, which we
+      // also want to handle.
+      Element* anonRoot =
+        doc->GetAnonRootIfInAnonymousContentContainer(aFromContent);
+      if (anonRoot) {
+        mElement = nsContentUtils::MatchElementId(anonRoot, ref);
+      }
+
+      // We don't have watching working yet for anonymous content, so bail out here.
+      return;
+    } else {
       bool isEqualExceptRef;
       rv = aURI->EqualsExceptRef(binding->PrototypeBinding()->DocURI(),
                                  &isEqualExceptRef);
@@ -124,7 +136,7 @@ void
 nsReferencedElement::ResetWithID(nsIContent* aFromContent, const nsString& aID,
                                  bool aWatch)
 {
-  nsIDocument *doc = aFromContent->GetComposedDoc();
+  nsIDocument *doc = aFromContent->OwnerDoc();
   if (!doc)
     return;
 

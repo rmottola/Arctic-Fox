@@ -8,7 +8,7 @@
 #ifndef MOZILLA_GFX_VR_VRMANAGERPARENT_H
 #define MOZILLA_GFX_VR_VRMANAGERPARENT_H
 
-#include "mozilla/layers/CompositorBridgeParent.h" // for CompositorThreadHolder
+#include "mozilla/layers/CompositorThread.h" // for CompositorThreadHolder
 #include "mozilla/gfx/PVRManagerParent.h" // for PVRManagerParent
 #include "mozilla/ipc/ProtocolUtils.h"    // for IToplevelProtocol
 #include "mozilla/TimeStamp.h"            // for TimeStamp
@@ -23,12 +23,11 @@ class VRManagerParent final : public PVRManagerParent
 {
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING_WITH_MAIN_THREAD_DESTRUCTION(VRManagerParent)
 public:
-  VRManagerParent(MessageLoop* aLoop, Transport* aTransport, ProcessId aChildProcessId);
+  explicit VRManagerParent(ProcessId aChildProcessId);
 
-  static VRManagerParent* CreateCrossProcess(Transport* aTransport,
-                                              ProcessId aOtherProcess);
   static VRManagerParent* CreateSameProcess();
-
+  static bool CreateForGPUProcess(Endpoint<PVRManagerParent>&& aEndpoint);
+  static bool CreateForContent(Endpoint<PVRManagerParent>&& aEndpoint);
 
   // Overriden from IToplevelProtocol
   ipc::IToplevelProtocol*
@@ -52,14 +51,12 @@ protected:
                           const double& zFar) override;
 
 private:
-
   void RegisterWithManager();
   void UnregisterFromManager();
 
+  void Bind(Endpoint<PVRManagerParent>&& aEndpoint);
+
   static void RegisterVRManagerInCompositorThread(VRManagerParent* aVRManager);
-  static void ConnectVRManagerInParentProcess(VRManagerParent* aVRManager,
-                                              ipc::Transport* aTransport,
-                                              base::ProcessId aOtherPid);
 
   void DeferredDestroy();
 

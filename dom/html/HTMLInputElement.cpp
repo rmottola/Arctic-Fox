@@ -11,6 +11,9 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/dom/Date.h"
 #include "mozilla/dom/Directory.h"
+#include "mozilla/dom/HTMLFormSubmission.h"
+#include "mozilla/dom/FileSystemUtils.h"
+#include "mozilla/dom/GetFilesHelper.h"
 #include "nsAttrValueInlines.h"
 #include "nsCRTGlue.h"
 
@@ -20,6 +23,7 @@
 #include "nsIRadioVisitor.h"
 #include "nsIPhonetic.h"
 
+#include "HTMLFormSubmissionConstants.h"
 #include "mozilla/Telemetry.h"
 #include "nsIControllers.h"
 #include "nsIStringBundle.h"
@@ -37,9 +41,6 @@
 #include "nsPresContext.h"
 #include "nsMappedAttributes.h"
 #include "nsIFormControl.h"
-#include "nsIForm.h"
-#include "nsFormSubmission.h"
-#include "nsFormSubmissionConstants.h"
 #include "nsIDocument.h"
 #include "nsIPresShell.h"
 #include "nsIFormControlFrame.h"
@@ -78,6 +79,8 @@
 #include "nsIRadioGroupContainer.h"
 
 // input type=file
+#include "mozilla/dom/Entry.h"
+#include "mozilla/dom/DOMFileSystem.h"
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/FileList.h"
 #include "nsIFile.h"
@@ -110,11 +113,14 @@
 #include <limits>
 
 #include "nsIColorPicker.h"
+#include "nsIDatePicker.h"
 #include "nsIStringEnumerator.h"
 #include "HTMLSplitOnSpacesTokenizer.h"
 #include "nsIController.h"
 #include "nsIMIMEInfo.h"
 #include "nsFrameSelection.h"
+
+#include "nsIConsoleService.h"
 
 // input type=date
 #include "js/Date.h"
@@ -160,6 +166,7 @@ static const nsAttrValue::EnumTable kInputTypeTable[] = {
   { "hidden", NS_FORM_INPUT_HIDDEN },
   { "reset", NS_FORM_INPUT_RESET },
   { "image", NS_FORM_INPUT_IMAGE },
+  { "month", NS_FORM_INPUT_MONTH },
   { "number", NS_FORM_INPUT_NUMBER },
   { "password", NS_FORM_INPUT_PASSWORD },
   { "radio", NS_FORM_INPUT_RADIO },
@@ -174,7 +181,7 @@ static const nsAttrValue::EnumTable kInputTypeTable[] = {
 };
 
 // Default type is 'text'.
-static const nsAttrValue::EnumTable* kInputDefaultType = &kInputTypeTable[16];
+static const nsAttrValue::EnumTable* kInputDefaultType = &kInputTypeTable[17];
 
 static const uint8_t NS_INPUT_INPUTMODE_AUTO              = 0;
 static const uint8_t NS_INPUT_INPUTMODE_NUMERIC           = 1;
@@ -216,6 +223,55 @@ const Decimal HTMLInputElement::kStepAny = Decimal(0);
 
 #define PROGRESS_STR "progress"
 static const uint32_t kProgressEventInterval = 50; // ms
+
+// An helper class for the dispatching of the 'change' event.
+// This class is used when the FilePicker finished its task (or when files and
+// directories are set by some chrome/test only method).
+// The task of this class is to postpone the dispatching of 'change' and 'input'
+// events at the end of the exploration of the directories.
+class DispatchChangeEventCallback final : public GetFilesCallback
+{
+public:
+  explicit DispatchChangeEventCallback(HTMLInputElement* aInputElement)
+    : mInputElement(aInputElement)
+  {
+    MOZ_ASSERT(aInputElement);
+  }
+
+  virtual void
+  Callback(nsresult aStatus, const Sequence<RefPtr<File>>& aFiles) override
+  {
+    nsTArray<OwningFileOrDirectory> array;
+    for (uint32_t i = 0; i < aFiles.Length(); ++i) {
+      OwningFileOrDirectory* element = array.AppendElement();
+      element->SetAsFile() = aFiles[i];
+    }
+
+    mInputElement->SetFilesOrDirectories(array, true);
+    NS_WARN_IF(NS_FAILED(DispatchEvents()));
+  }
+
+  nsresult
+  DispatchEvents()
+  {
+    nsresult rv = NS_OK;
+    rv = nsContentUtils::DispatchTrustedEvent(mInputElement->OwnerDoc(),
+                                              static_cast<nsIDOMHTMLInputElement*>(mInputElement.get()),
+                                              NS_LITERAL_STRING("input"), true,
+                                              false);
+    NS_WARN_IF(NS_FAILED(rv));
+
+    rv = nsContentUtils::DispatchTrustedEvent(mInputElement->OwnerDoc(),
+                                              static_cast<nsIDOMHTMLInputElement*>(mInputElement.get()),
+                                              NS_LITERAL_STRING("change"), true,
+                                              false);
+
+    return rv;
+  }
+
+private:
+  RefPtr<HTMLInputElement> mInputElement;
+};
 
 class HTMLInputElementState final : public nsISupports
 {
@@ -288,7 +344,18 @@ class HTMLInputElementState final : public nsISupports
         if (aArray[i].IsFile()) {
           BlobImplOrDirectoryPath* data = mBlobImplsOrDirectoryPaths.AppendElement();
 
-          data->mBlobImpl = aArray[i].GetAsFile()->Impl();
+          RefPtr<File> file = aArray[i].GetAsFile();
+
+          nsAutoString name;
+          file->GetName(name);
+
+          nsAutoString path;
+          path.AssignLiteral(FILESYSTEM_DOM_PATH_SEPARATOR_LITERAL);
+          path.Append(name);
+
+          file->SetPath(path);
+
+          data->mBlobImpl = file->Impl();
           data->mType = BlobImplOrDirectoryPath::eBlobImpl;
         } else {
           MOZ_ASSERT(aArray[i].IsDirectory());
@@ -438,7 +505,9 @@ GetDOMFileOrDirectoryName(const OwningFileOrDirectory& aData,
     MOZ_ASSERT(aData.IsDirectory());
     ErrorResult rv;
     aData.GetAsDirectory()->GetName(aName, rv);
-    NS_WARN_IF(rv.Failed());
+    if (NS_WARN_IF(rv.Failed())) {
+      rv.SuppressException();
+    }
   }
 }
 
@@ -457,6 +526,13 @@ GetDOMFileOrDirectoryPath(const OwningFileOrDirectory& aData,
 
 } // namespace
 
+/* static */
+bool
+HTMLInputElement::ValueAsDateEnabled(JSContext* cx, JSObject* obj)
+{
+  return Preferences::GetBool("dom.experimental_forms", false) ||
+    Preferences::GetBool("dom.forms.datepicker", false);
+}
 
 NS_IMETHODIMP
 HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
@@ -537,10 +613,23 @@ HTMLInputElement::nsFilePickerShownCallback::Done(int16_t aResult)
   // event because it will think this is done by a script.
   // So, we can safely send one by ourself.
   mInput->SetFilesOrDirectories(newFilesOrDirectories, true);
-  return nsContentUtils::DispatchTrustedEvent(mInput->OwnerDoc(),
-                                              static_cast<nsIDOMHTMLInputElement*>(mInput.get()),
-                                              NS_LITERAL_STRING("change"), true,
-                                              false);
+
+  RefPtr<DispatchChangeEventCallback> dispatchChangeEventCallback =
+    new DispatchChangeEventCallback(mInput);
+
+  if (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
+      mInput->HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory)) {
+    ErrorResult error;
+    GetFilesHelper* helper = mInput->GetOrCreateGetFilesHelper(true, error);
+    if (NS_WARN_IF(error.Failed())) {
+      return error.StealNSResult();
+    }
+
+    helper->AddCallback(dispatchChangeEventCallback);
+    return NS_OK;
+  }
+
+  return dispatchChangeEventCallback->DispatchEvents();
 }
 
 NS_IMPL_ISUPPORTS(HTMLInputElement::nsFilePickerShownCallback,
@@ -647,6 +736,59 @@ nsColorPickerShownCallback::Done(const nsAString& aColor)
 
 NS_IMPL_ISUPPORTS(nsColorPickerShownCallback, nsIColorPickerShownCallback)
 
+class DatePickerShownCallback final : public nsIDatePickerShownCallback
+{
+  ~DatePickerShownCallback() {}
+public:
+  DatePickerShownCallback(HTMLInputElement* aInput,
+                          nsIDatePicker* aDatePicker)
+    : mInput(aInput)
+    , mDatePicker(aDatePicker)
+  {}
+
+  NS_DECL_ISUPPORTS
+
+  NS_IMETHOD Done(const nsAString& aDate) override;
+  NS_IMETHOD Cancel() override;
+
+private:
+  RefPtr<HTMLInputElement> mInput;
+  nsCOMPtr<nsIDatePicker> mDatePicker;
+};
+
+NS_IMETHODIMP
+DatePickerShownCallback::Cancel()
+{
+  mInput->PickerClosed();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+DatePickerShownCallback::Done(const nsAString& aDate)
+{
+  nsAutoString oldValue;
+
+  mInput->PickerClosed();
+  mInput->GetValue(oldValue);
+
+  if(!oldValue.Equals(aDate)){
+    mInput->SetValue(aDate);
+    nsContentUtils::DispatchTrustedEvent(mInput->OwnerDoc(),
+                            static_cast<nsIDOMHTMLInputElement*>(mInput.get()),
+                            NS_LITERAL_STRING("input"), true,
+                            false);
+    return nsContentUtils::DispatchTrustedEvent(mInput->OwnerDoc(),
+                            static_cast<nsIDOMHTMLInputElement*>(mInput.get()),
+                            NS_LITERAL_STRING("change"), true,
+                            false);
+  }
+
+  return NS_OK;
+}
+
+NS_IMPL_ISUPPORTS(DatePickerShownCallback, nsIDatePickerShownCallback)
+
+
 bool
 HTMLInputElement::IsPopupBlocked() const
 {
@@ -669,6 +811,56 @@ HTMLInputElement::IsPopupBlocked() const
   uint32_t permission;
   pm->TestPermission(OwnerDoc()->NodePrincipal(), &permission);
   return permission == nsIPopupWindowManager::DENY_POPUP;
+}
+
+nsresult
+HTMLInputElement::InitDatePicker()
+{
+  if (!Preferences::GetBool("dom.forms.datepicker", false)) {
+    return NS_OK;
+  }
+
+  if (mPickerRunning) {
+    NS_WARNING("Just one nsIDatePicker is allowed");
+    return NS_ERROR_FAILURE;
+  }
+
+  nsCOMPtr<nsIDocument> doc = OwnerDoc();
+
+  nsCOMPtr<nsPIDOMWindowOuter> win = doc->GetWindow();
+  if (!win) {
+    return NS_ERROR_FAILURE;
+  }
+
+  if (IsPopupBlocked()) {
+    win->FirePopupBlockedEvent(doc, nullptr, EmptyString(), EmptyString());
+    return NS_OK;
+  }
+
+  // Get Loc title
+  nsXPIDLString title;
+  nsContentUtils::GetLocalizedString(nsContentUtils::eFORMS_PROPERTIES,
+                                     "DatePicker", title);
+
+  nsresult rv;
+  nsCOMPtr<nsIDatePicker> datePicker = do_CreateInstance("@mozilla.org/datepicker;1", &rv);
+  if (!datePicker) {
+    return rv;
+  }
+
+  nsAutoString initialValue;
+  GetValueInternal(initialValue);
+  rv = datePicker->Init(win, title, initialValue);
+
+  nsCOMPtr<nsIDatePickerShownCallback> callback =
+    new DatePickerShownCallback(this, datePicker);
+
+  rv = datePicker->Open(callback);
+  if (NS_SUCCEEDED(rv)) {
+    mPickerRunning = true;
+  }
+
+  return rv;
 }
 
 nsresult
@@ -980,6 +1172,7 @@ HTMLInputElement::HTMLInputElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
   AddStatesSilently(NS_EVENT_STATE_ENABLED |
                     NS_EVENT_STATE_OPTIONAL |
                     NS_EVENT_STATE_VALID);
+  UpdateApzAwareFlag();
 }
 
 HTMLInputElement::~HTMLInputElement()
@@ -1030,8 +1223,17 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(HTMLInputElement,
     tmp->mInputData.mState->Traverse(cb);
   }
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFilesOrDirectories)
+
+  if (tmp->mGetFilesRecursiveHelper) {
+    tmp->mGetFilesRecursiveHelper->Traverse(cb);
+  }
+
+  if (tmp->mGetFilesNonRecursiveHelper) {
+    tmp->mGetFilesNonRecursiveHelper->Traverse(cb);
+  }
+
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFileList)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mFilesAndDirectoriesPromise)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mEntries)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLInputElement,
@@ -1040,10 +1242,13 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(HTMLInputElement,
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mControllers)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFilesOrDirectories)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mFileList)
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mFilesAndDirectoriesPromise)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mEntries)
   if (tmp->IsSingleLineTextControl(false)) {
     tmp->mInputData.mState->Unlink();
   }
+
+  tmp->ClearGetFilesHelpers();
+
   //XXX should unlink more?
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
@@ -1097,6 +1302,7 @@ HTMLInputElement::Clone(mozilla::dom::NodeInfo* aNodeInfo, nsINode** aResult) co
         // we can just grab the pretty string and use it as wallpaper
         GetDisplayFileName(it->mStaticDocFileList);
       } else {
+        it->ClearGetFilesHelpers();
         it->mFilesOrDirectories.Clear();
         it->mFilesOrDirectories.AppendElements(mFilesOrDirectories);
       }
@@ -1507,10 +1713,14 @@ HTMLInputElement::SetWidth(uint32_t aWidth)
 NS_IMETHODIMP
 HTMLInputElement::GetValue(nsAString& aValue)
 {
-  GetValueInternal(aValue);
+  nsresult rv = GetValueInternal(aValue);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
 
-  // Don't return non-sanitized value for types that are experimental on mobile.
-  if (IsExperimentalMobileType(mType)) {
+  // Don't return non-sanitized value for types that are experimental on mobile
+  // or datetime types
+  if (IsExperimentalMobileType(mType) || IsDateTimeInputType(mType)) {
     SanitizeValue(aValue);
   }
 
@@ -1524,30 +1734,14 @@ HTMLInputElement::GetValueInternal(nsAString& aValue) const
     case VALUE_MODE_VALUE:
       if (IsSingleLineTextControl(false)) {
         mInputData.mState->GetValue(aValue, true);
-      } else {
-        aValue.Assign(mInputData.mValue);
+      } else if (!aValue.Assign(mInputData.mValue, fallible)) {
+        return NS_ERROR_OUT_OF_MEMORY;
       }
       return NS_OK;
 
     case VALUE_MODE_FILENAME:
       if (nsContentUtils::LegacyIsCallerChromeOrNativeCode()) {
-#ifndef MOZ_CHILD_PERMISSIONS
         aValue.Assign(mFirstFilePath);
-#else
-        // XXX We'd love to assert that this can't happen, but some mochitests
-        // use SpecialPowers to circumvent our more sane security model.
-        if (!mFilesOrDirectories.IsEmpty()) {
-          ErrorResult rv;
-          GetDOMFileOrDirectoryPath(mFilesOrDirectories[0], aValue, rv);
-          if (NS_WARN_IF(rv.Failed())) {
-            return rv.StealNSResult();
-          }
-          return NS_OK;
-        }
-        else {
-          aValue.Truncate();
-        }
-#endif
       } else {
         // Just return the leaf name
         if (mFilesOrDirectories.IsEmpty()) {
@@ -1659,6 +1853,15 @@ HTMLInputElement::GetValueAsDecimal() const
 
   return !ConvertStringToNumber(stringValue, decimalValue) ? Decimal::nan()
                                                            : decimalValue;
+}
+
+void
+HTMLInputElement::GetValue(nsAString& aValue, ErrorResult& aRv)
+{
+  nsresult rv = GetValue(aValue);
+  if (NS_FAILED(rv)) {
+    aRv.Throw(rv);
+  }
 }
 
 void
@@ -2135,6 +2338,25 @@ HTMLInputElement::ApplyStep(int32_t aStep)
   return rv;
 }
 
+/* static */
+bool
+HTMLInputElement::IsExperimentalMobileType(uint8_t aType)
+{
+  return (aType == NS_FORM_INPUT_DATE &&
+    !Preferences::GetBool("dom.forms.datetime", false) &&
+    !Preferences::GetBool("dom.forms.datepicker", false)) ||
+    (aType == NS_FORM_INPUT_TIME &&
+     !Preferences::GetBool("dom.forms.datetime", false));
+}
+
+bool
+HTMLInputElement::IsDateTimeInputType(uint8_t aType)
+{
+  return aType == NS_FORM_INPUT_DATE || aType == NS_FORM_INPUT_TIME ||
+    aType == NS_FORM_INPUT_MONTH;
+
+}
+
 NS_IMETHODIMP
 HTMLInputElement::StepDown(int32_t n, uint8_t optional_argc)
 {
@@ -2323,8 +2545,8 @@ HTMLInputElement::MozSetDirectory(const nsAString& aDirectoryPath,
 bool
 HTMLInputElement::MozIsTextField(bool aExcludePassword)
 {
-  // TODO: temporary until bug 773205 is fixed.
-  if (IsExperimentalMobileType(mType)) {
+  // TODO: temporary until bug 888320 is fixed.
+  if (IsExperimentalMobileType(mType) || IsDateTimeInputType(mType)) {
     return false;
   }
 
@@ -2519,7 +2741,13 @@ HTMLInputElement::GetDisplayFileName(nsAString& aValue) const
   nsXPIDLString value;
 
   if (mFilesOrDirectories.IsEmpty()) {
-    if (HasAttr(kNameSpaceID_None, nsGkAtoms::multiple)) {
+    if ((Preferences::GetBool("dom.input.dirpicker", false) &&
+         HasAttr(kNameSpaceID_None, nsGkAtoms::directory)) ||
+        (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
+         HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory))) {
+      nsContentUtils::GetLocalizedString(nsContentUtils::eFORMS_PROPERTIES,
+                                         "NoDirSelected", value);
+    } else if (HasAttr(kNameSpaceID_None, nsGkAtoms::multiple)) {
       nsContentUtils::GetLocalizedString(nsContentUtils::eFORMS_PROPERTIES,
                                          "NoFilesSelected", value);
     } else {
@@ -2542,6 +2770,8 @@ void
 HTMLInputElement::SetFilesOrDirectories(const nsTArray<OwningFileOrDirectory>& aFilesOrDirectories,
                                         bool aSetValueChanged)
 {
+  ClearGetFilesHelpers();
+
   mFilesOrDirectories.Clear();
   mFilesOrDirectories.AppendElements(aFilesOrDirectories);
 
@@ -2554,6 +2784,7 @@ HTMLInputElement::SetFiles(nsIDOMFileList* aFiles,
 {
   RefPtr<FileList> files = static_cast<FileList*>(aFiles);
   mFilesOrDirectories.Clear();
+  ClearGetFilesHelpers();
 
   if (aFiles) {
     uint32_t listLength;
@@ -2565,6 +2796,35 @@ HTMLInputElement::SetFiles(nsIDOMFileList* aFiles,
   }
 
   AfterSetFilesOrDirectories(aSetValueChanged);
+}
+
+// This method is used for testing only.
+void
+HTMLInputElement::MozSetDndFilesAndDirectories(const nsTArray<OwningFileOrDirectory>& aFilesOrDirectories)
+{
+  if (Preferences::GetBool("dom.webkitBlink.filesystem.enabled", false)) {
+    UpdateEntries(aFilesOrDirectories);
+  }
+
+  SetFilesOrDirectories(aFilesOrDirectories, true);
+
+  RefPtr<DispatchChangeEventCallback> dispatchChangeEventCallback =
+    new DispatchChangeEventCallback(this);
+
+  if (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
+      HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory)) {
+    ErrorResult rv;
+    GetFilesHelper* helper = GetOrCreateGetFilesHelper(true /* recursionFlag */,
+                                                       rv);
+    if (NS_WARN_IF(rv.Failed())) {
+      rv.SuppressException();
+      return;
+    }
+
+    helper->AddCallback(dispatchChangeEventCallback);
+  } else {
+    dispatchChangeEventCallback->DispatchEvents();
+  }
 }
 
 void
@@ -2580,7 +2840,6 @@ HTMLInputElement::AfterSetFilesOrDirectories(bool aSetValueChanged)
     formControlFrame->SetFormProperty(nsGkAtoms::value, readableValue);
   }
 
-#ifndef MOZ_CHILD_PERMISSIONS
   // Grab the full path here for any chrome callers who access our .value via a
   // CPOW. This path won't be called from a CPOW meaning the potential sync IPC
   // call under GetMozFullPath won't be rejected for not being urgent.
@@ -2595,7 +2854,6 @@ HTMLInputElement::AfterSetFilesOrDirectories(bool aSetValueChanged)
       rv.SuppressException();
     }
   }
-#endif
 
   UpdateFileList();
 
@@ -2632,7 +2890,9 @@ HTMLInputElement::GetFiles()
   }
 
   if (Preferences::GetBool("dom.input.dirpicker", false) &&
-      HasAttr(kNameSpaceID_None, nsGkAtoms::directory)) {
+      HasAttr(kNameSpaceID_None, nsGkAtoms::directory) &&
+      (!Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) ||
+       !HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory))) {
     return nullptr;
   }
 
@@ -2679,9 +2939,6 @@ HTMLInputElement::UpdateFileList()
       }
     }
   }
-
-  // Make sure we (lazily) create a new Promise for GetFilesAndDirectories:
-  mFilesAndDirectoriesPromise = nullptr;
 }
 
 nsresult
@@ -3068,6 +3325,16 @@ HTMLInputElement::Focus(ErrorResult& aError)
   return;
 }
 
+#if defined(XP_WIN) || defined(XP_LINUX)
+bool
+HTMLInputElement::IsNodeApzAwareInternal() const
+{
+  // Tell APZC we may handle mouse wheel event and do preventDefault when input
+  // type is number.
+  return (mType == NS_FORM_INPUT_NUMBER) || nsINode::IsNodeApzAwareInternal();
+}
+#endif
+
 bool
 HTMLInputElement::IsInteractiveHTMLContent(bool aIgnoreTabindex) const
 {
@@ -3318,12 +3585,21 @@ HTMLInputElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
   // We must cache type because mType may change during JS event (bug 2369)
   aVisitor.mItemFlags |= mType;
 
+  if (aVisitor.mEvent->mMessage == eFocus &&
+      aVisitor.mEvent->IsTrusted() &&
+      MayFireChangeOnBlur() &&
+      // StartRangeThumbDrag already set mFocusedValue on 'mousedown' before
+      // we get the 'focus' event.
+      !mIsDraggingRange) {
+    GetValue(mFocusedValue);
+  }
+
   // Fire onchange (if necessary), before we do the blur, bug 357684.
   if (aVisitor.mEvent->mMessage == eBlur) {
     // Experimental mobile types rely on the system UI to prevent users to not
     // set invalid values but we have to be extra-careful. Especially if the
     // option has been enabled on desktop.
-    if (IsExperimentalMobileType(mType)) {
+    if (IsExperimentalMobileType(mType) || IsDateTimeInputType(mType)) {
       nsAutoString aValue;
       GetValueInternal(aValue);
       nsresult rv =
@@ -3411,7 +3687,8 @@ HTMLInputElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
       }
     } else if (aVisitor.mEvent->mMessage == eKeyUp) {
       WidgetKeyboardEvent* keyEvent = aVisitor.mEvent->AsKeyboardEvent();
-      if ((keyEvent->keyCode == NS_VK_UP || keyEvent->keyCode == NS_VK_DOWN) &&
+      if ((keyEvent->mKeyCode == NS_VK_UP ||
+           keyEvent->mKeyCode == NS_VK_DOWN) &&
           !(keyEvent->IsShift() || keyEvent->IsControl() ||
             keyEvent->IsAlt() || keyEvent->IsMeta() ||
             keyEvent->IsAltGraph() || keyEvent->IsFn() ||
@@ -3722,10 +3999,10 @@ HTMLInputElement::MaybeInitPickers(EventChainPostVisitor& aVisitor)
     if (target &&
         target->GetParent() == this &&
         target->IsRootOfNativeAnonymousSubtree() &&
-        target->HasAttr(kNameSpaceID_None, nsGkAtoms::directory)) {
-      MOZ_ASSERT(Preferences::GetBool("dom.input.dirpicker", false),
-                 "No API or UI should have been exposed to allow this code to "
-                 "be reached");
+        ((Preferences::GetBool("dom.input.dirpicker", false) &&
+          HasAttr(kNameSpaceID_None, nsGkAtoms::directory)) ||
+         (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
+          HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory)))) {
       type = FILE_PICKER_DIRECTORY;
     }
     return InitFilePicker(type);
@@ -3733,6 +4010,10 @@ HTMLInputElement::MaybeInitPickers(EventChainPostVisitor& aVisitor)
   if (mType == NS_FORM_INPUT_COLOR) {
     return InitColorPicker();
   }
+  if (mType == NS_FORM_INPUT_DATE) {
+    return InitDatePicker();
+  }
+
   return NS_OK;
 }
 
@@ -3747,12 +4028,6 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
 
   if (aVisitor.mEvent->mMessage == eFocus ||
       aVisitor.mEvent->mMessage == eBlur) {
-    if (aVisitor.mEvent->mMessage == eFocus &&
-        MayFireChangeOnBlur() &&
-        !mIsDraggingRange) { // StartRangeThumbDrag already set mFocusedValue
-      GetValue(mFocusedValue);
-    }
-
     if (aVisitor.mEvent->mMessage == eBlur) {
       if (mIsDraggingRange) {
         FinishRangeThumbDrag();
@@ -3852,6 +4127,12 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
         DoSetChecked(originalCheckedValue, true, true);
       }
     } else {
+      // Fire input event and then change event.
+      nsContentUtils::DispatchTrustedEvent(OwnerDoc(),
+                                           static_cast<nsIDOMHTMLInputElement*>(this),
+                                           NS_LITERAL_STRING("input"), true,
+                                           false);
+
       nsContentUtils::DispatchTrustedEvent(OwnerDoc(),
                                            static_cast<nsIDOMHTMLInputElement*>(this),
                                            NS_LITERAL_STRING("change"), true,
@@ -3881,7 +4162,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
     if (mType ==  NS_FORM_INPUT_NUMBER &&
         keyEvent && keyEvent->mMessage == eKeyPress &&
         aVisitor.mEvent->IsTrusted() &&
-        (keyEvent->keyCode == NS_VK_UP || keyEvent->keyCode == NS_VK_DOWN) &&
+        (keyEvent->mKeyCode == NS_VK_UP || keyEvent->mKeyCode == NS_VK_DOWN) &&
         !(keyEvent->IsShift() || keyEvent->IsControl() ||
           keyEvent->IsAlt() || keyEvent->IsMeta() ||
           keyEvent->IsAltGraph() || keyEvent->IsFn() ||
@@ -3898,7 +4179,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
       // just ignore aVisitor.mEventStatus here and go ahead and handle the
       // event to increase/decrease the value of the number control.
       if (!aVisitor.mEvent->DefaultPreventedByContent() && IsMutable()) {
-        StepNumberControlForUserEvent(keyEvent->keyCode == NS_VK_UP ? 1 : -1);
+        StepNumberControlForUserEvent(keyEvent->mKeyCode == NS_VK_UP ? 1 : -1);
         aVisitor.mEventStatus = nsEventStatus_eConsumeNoDefault;
       }
     } else if (nsEventStatus_eIgnore == aVisitor.mEventStatus) {
@@ -3936,15 +4217,15 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           // space or enter (bug 25300)
           WidgetKeyboardEvent* keyEvent = aVisitor.mEvent->AsKeyboardEvent();
           if ((aVisitor.mEvent->mMessage == eKeyPress &&
-               keyEvent->keyCode == NS_VK_RETURN) ||
+               keyEvent->mKeyCode == NS_VK_RETURN) ||
               (aVisitor.mEvent->mMessage == eKeyUp &&
-               keyEvent->keyCode == NS_VK_SPACE)) {
+               keyEvent->mKeyCode == NS_VK_SPACE)) {
             switch(mType) {
               case NS_FORM_INPUT_CHECKBOX:
               case NS_FORM_INPUT_RADIO:
               {
                 // Checkbox and Radio try to submit on Enter press
-                if (keyEvent->keyCode != NS_VK_SPACE) {
+                if (keyEvent->mKeyCode != NS_VK_SPACE) {
                   MaybeSubmitForm(aVisitor.mPresContext);
 
                   break;  // If we are submitting, do not send click event
@@ -3968,7 +4249,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
               mType == NS_FORM_INPUT_RADIO && !keyEvent->IsAlt() &&
               !keyEvent->IsControl() && !keyEvent->IsMeta()) {
             bool isMovingBack = false;
-            switch (keyEvent->keyCode) {
+            switch (keyEvent->mKeyCode) {
               case NS_VK_UP:
               case NS_VK_LEFT:
                 isMovingBack = true;
@@ -4011,10 +4292,11 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
            */
 
           if (aVisitor.mEvent->mMessage == eKeyPress &&
-              keyEvent->keyCode == NS_VK_RETURN &&
+              keyEvent->mKeyCode == NS_VK_RETURN &&
                (IsSingleLineTextControl(false, mType) ||
                 mType == NS_FORM_INPUT_NUMBER ||
-                IsExperimentalMobileType(mType))) {
+                IsExperimentalMobileType(mType) ||
+                IsDateTimeInputType(mType))) {
             FireChangeEventIfNeeded();
             rv = MaybeSubmitForm(aVisitor.mPresContext);
             NS_ENSURE_SUCCESS(rv, rv);
@@ -4023,14 +4305,14 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           if (aVisitor.mEvent->mMessage == eKeyPress &&
               mType == NS_FORM_INPUT_RANGE && !keyEvent->IsAlt() &&
               !keyEvent->IsControl() && !keyEvent->IsMeta() &&
-              (keyEvent->keyCode == NS_VK_LEFT ||
-               keyEvent->keyCode == NS_VK_RIGHT ||
-               keyEvent->keyCode == NS_VK_UP ||
-               keyEvent->keyCode == NS_VK_DOWN ||
-               keyEvent->keyCode == NS_VK_PAGE_UP ||
-               keyEvent->keyCode == NS_VK_PAGE_DOWN ||
-               keyEvent->keyCode == NS_VK_HOME ||
-               keyEvent->keyCode == NS_VK_END)) {
+              (keyEvent->mKeyCode == NS_VK_LEFT ||
+               keyEvent->mKeyCode == NS_VK_RIGHT ||
+               keyEvent->mKeyCode == NS_VK_UP ||
+               keyEvent->mKeyCode == NS_VK_DOWN ||
+               keyEvent->mKeyCode == NS_VK_PAGE_UP ||
+               keyEvent->mKeyCode == NS_VK_PAGE_DOWN ||
+               keyEvent->mKeyCode == NS_VK_HOME ||
+               keyEvent->mKeyCode == NS_VK_END)) {
             Decimal minimum = GetMinimum();
             Decimal maximum = GetMaximum();
             MOZ_ASSERT(minimum.isFinite() && maximum.isFinite());
@@ -4042,7 +4324,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
               }
               MOZ_ASSERT(value.isFinite() && step.isFinite());
               Decimal newValue;
-              switch (keyEvent->keyCode) {
+              switch (keyEvent->mKeyCode) {
                 case  NS_VK_LEFT:
                   newValue = value + (GetComputedDirectionality() == eDir_RTL
                                         ? step : -step);
@@ -4138,6 +4420,26 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           }
           break;
         }
+#if defined(XP_WIN) || defined(XP_LINUX)
+        case eWheel: {
+          // Handle wheel events as increasing / decreasing the input element's
+          // value when it's focused and it's type is number.
+          WidgetWheelEvent* wheelEvent = aVisitor.mEvent->AsWheelEvent();
+          if (!aVisitor.mEvent->DefaultPrevented() &&
+              aVisitor.mEvent->IsTrusted() && IsMutable() && wheelEvent &&
+              wheelEvent->mDeltaY != 0 &&
+              wheelEvent->mDeltaMode != nsIDOMWheelEvent::DOM_DELTA_PIXEL &&
+              mType == NS_FORM_INPUT_NUMBER) {
+            nsNumberControlFrame* numberControlFrame =
+              do_QueryFrame(GetPrimaryFrame());
+            if (numberControlFrame && numberControlFrame->IsFocused()) {
+              StepNumberControlForUserEvent(wheelEvent->mDeltaY > 0 ? -1 : 1);
+              aVisitor.mEvent->PreventDefault();
+            }
+          }
+          break;
+        }
+#endif
         default:
           break;
       }
@@ -4289,7 +4591,7 @@ HTMLInputElement::PostHandleEventForRangeThumb(EventChainPostVisitor& aVisitor)
 
     case eKeyPress:
       if (mIsDraggingRange &&
-          aVisitor.mEvent->AsKeyboardEvent()->keyCode == NS_VK_ESCAPE) {
+          aVisitor.mEvent->AsKeyboardEvent()->mKeyCode == NS_VK_ESCAPE) {
         CancelRangeThumbDrag();
       }
       break;
@@ -4341,7 +4643,7 @@ HTMLInputElement::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
       ClearBrokenState();
       RemoveStatesSilently(NS_EVENT_STATE_BROKEN);
       nsContentUtils::AddScriptRunner(
-        NS_NewRunnableMethod(this, &HTMLInputElement::MaybeLoadImage));
+        NewRunnableMethod(this, &HTMLInputElement::MaybeLoadImage));
     }
   }
 
@@ -4486,6 +4788,8 @@ HTMLInputElement::HandleTypeChange(uint8_t aNewType)
 
   // Do not notify, it will be done after if needed.
   UpdateAllValidityStates(false);
+
+  UpdateApzAwareFlag();
 }
 
 void
@@ -4811,6 +5115,20 @@ HTMLInputElement::ParseTime(const nsAString& aValue, uint32_t* aResult)
   return true;
 }
 
+static bool
+IsDateTimeEnabled(int32_t aNewType)
+{
+  return (aNewType == NS_FORM_INPUT_DATE &&
+          (Preferences::GetBool("dom.forms.datetime", false) ||
+           Preferences::GetBool("dom.experimental_forms", false) ||
+           Preferences::GetBool("dom.forms.datepicker", false))) ||
+         (aNewType == NS_FORM_INPUT_TIME &&
+          (Preferences::GetBool("dom.forms.datetime", false) ||
+           Preferences::GetBool("dom.experimental_forms", false))) ||
+         (aNewType == NS_FORM_INPUT_MONTH &&
+          Preferences::GetBool("dom.forms.datetime", false));
+}
+
 bool
 HTMLInputElement::ParseAttribute(int32_t aNamespaceID,
                                  nsIAtom* aAttribute,
@@ -4830,7 +5148,8 @@ HTMLInputElement::ParseAttribute(int32_t aNamespaceID,
             (newType == NS_FORM_INPUT_NUMBER &&
              !Preferences::GetBool("dom.forms.number", false)) ||
             (newType == NS_FORM_INPUT_COLOR &&
-             !Preferences::GetBool("dom.forms.color", false))) {
+             !Preferences::GetBool("dom.forms.color", false)) ||
+            (IsDateTimeInputType(newType) && !IsDateTimeEnabled(newType))) {
           newType = kInputDefaultType->value;
           aResult.SetTo(newType, &aValue);
         }
@@ -4927,21 +5246,22 @@ HTMLInputElement::GetAttributeChangeHint(const nsIAtom* aAttribute,
   if (aAttribute == nsGkAtoms::type ||
       // The presence or absence of the 'directory' attribute determines what
       // buttons we show for type=file.
-      aAttribute == nsGkAtoms::directory) {
-    NS_UpdateHint(retval, NS_STYLE_HINT_FRAMECHANGE);
+      aAttribute == nsGkAtoms::directory ||
+      aAttribute == nsGkAtoms::webkitdirectory) {
+    retval |= nsChangeHint_ReconstructFrame;
   } else if (mType == NS_FORM_INPUT_IMAGE &&
              (aAttribute == nsGkAtoms::alt ||
               aAttribute == nsGkAtoms::value)) {
     // We might need to rebuild our alt text.  Just go ahead and
     // reconstruct our frame.  This should be quite rare..
-    NS_UpdateHint(retval, NS_STYLE_HINT_FRAMECHANGE);
+    retval |= nsChangeHint_ReconstructFrame;
   } else if (aAttribute == nsGkAtoms::value) {
-    NS_UpdateHint(retval, NS_STYLE_HINT_REFLOW);
+    retval |= NS_STYLE_HINT_REFLOW;
   } else if (aAttribute == nsGkAtoms::size &&
              IsSingleLineTextControl(false)) {
-    NS_UpdateHint(retval, NS_STYLE_HINT_REFLOW);
+    retval |= NS_STYLE_HINT_REFLOW;
   } else if (PlaceholderApplies() && aAttribute == nsGkAtoms::placeholder) {
-    NS_UpdateHint(retval, NS_STYLE_HINT_FRAMECHANGE);
+    retval |= nsChangeHint_ReconstructFrame;
   }
   return retval;
 }
@@ -5012,10 +5332,6 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
     return nullptr;
   }
 
-  if (mFilesAndDirectoriesPromise) {
-    return RefPtr<Promise>(mFilesAndDirectoriesPromise).forget();
-  }
-
   nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
   MOZ_ASSERT(global);
   if (!global) {
@@ -5056,12 +5372,35 @@ HTMLInputElement::GetFilesAndDirectories(ErrorResult& aRv)
   }
 
   p->MaybeResolve(filesAndDirsSeq);
+  return p.forget();
+}
 
-  // Cache the Promise so that repeat getFilesAndDirectories() calls return
-  // the same Promise and array of File and Directory objects until the user
-  // picks different files/directories:
-  mFilesAndDirectoriesPromise = p;
+already_AddRefed<Promise>
+HTMLInputElement::GetFiles(bool aRecursiveFlag, ErrorResult& aRv)
+{
+  if (mType != NS_FORM_INPUT_FILE) {
+    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
+    return nullptr;
+  }
 
+  GetFilesHelper* helper = GetOrCreateGetFilesHelper(aRecursiveFlag, aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
+    return nullptr;
+   }
+  MOZ_ASSERT(helper);
+
+  nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
+  MOZ_ASSERT(global);
+  if (!global) {
+    return nullptr;
+  }
+
+  RefPtr<Promise> p = Promise::Create(global, aRv);
+  if (aRv.Failed()) {
+    return nullptr;
+  }
+
+  helper->AddPromise(p);
   return p.forget();
 }
 
@@ -5550,6 +5889,16 @@ FireEventForAccessibility(nsIDOMHTMLInputElement* aTarget,
 }
 #endif
 
+void
+HTMLInputElement::UpdateApzAwareFlag()
+{
+#if defined(XP_WIN) || defined(XP_LINUX)
+  if (mType == NS_FORM_INPUT_NUMBER) {
+    SetMayBeApzAware();
+  }
+#endif
+}
+
 nsresult
 HTMLInputElement::SetDefaultValueAsValue()
 {
@@ -5603,7 +5952,7 @@ HTMLInputElement::Reset()
 }
 
 NS_IMETHODIMP
-HTMLInputElement::SubmitNamesValues(nsFormSubmission* aFormSubmission)
+HTMLInputElement::SubmitNamesValues(HTMLFormSubmission* aFormSubmission)
 {
   // Disabled elements don't submit
   // For type=reset, and type=button, we just never submit, period.
@@ -5688,16 +6037,18 @@ HTMLInputElement::SubmitNamesValues(nsFormSubmission* aFormSubmission)
     const nsTArray<OwningFileOrDirectory>& files =
       GetFilesOrDirectoriesInternal();
 
-    bool hasBlobs = false;
-    for (uint32_t i = 0; i < files.Length(); ++i) {
-      if (files[i].IsFile()) {
-        hasBlobs = true;
-        aFormSubmission->AddNameBlobOrNullPair(name, files[i].GetAsFile());
-      }
+    if (files.IsEmpty()) {
+      aFormSubmission->AddNameBlobOrNullPair(name, nullptr);
+      return NS_OK;
     }
 
-    if (!hasBlobs) {
-      aFormSubmission->AddNameBlobOrNullPair(name, nullptr);
+    for (uint32_t i = 0; i < files.Length(); ++i) {
+      if (files[i].IsFile()) {
+        aFormSubmission->AddNameBlobOrNullPair(name, files[i].GetAsFile());
+      } else {
+        MOZ_ASSERT(files[i].IsDirectory());
+        aFormSubmission->AddNameDirectoryPair(name, files[i].GetAsDirectory());
+      }
     }
 
     return NS_OK;
@@ -5747,13 +6098,23 @@ HTMLInputElement::SaveState()
 
       inputState = new HTMLInputElementState();
       nsAutoString value;
-      GetValue(value);
-      DebugOnly<nsresult> rv =
-        nsLinebreakConverter::ConvertStringLineBreaks(
-             value,
-             nsLinebreakConverter::eLinebreakPlatform,
-             nsLinebreakConverter::eLinebreakContent);
-      NS_ASSERTION(NS_SUCCEEDED(rv), "Converting linebreaks failed!");
+      nsresult rv = GetValue(value);
+      if (NS_FAILED(rv)) {
+        return rv;
+      }
+
+      if (!IsSingleLineTextControl(false)) {
+        rv = nsLinebreakConverter::ConvertStringLineBreaks(
+               value,
+               nsLinebreakConverter::eLinebreakPlatform,
+               nsLinebreakConverter::eLinebreakContent);
+
+        if (NS_FAILED(rv)) {
+          NS_ERROR("Converting linebreaks failed!");
+          return rv;
+        }
+      }
+
       inputState->SetValue(value);
       break;
   }
@@ -6186,6 +6547,7 @@ HTMLInputElement::GetValueMode() const
     case NS_FORM_INPUT_DATE:
     case NS_FORM_INPUT_TIME:
     case NS_FORM_INPUT_COLOR:
+    case NS_FORM_INPUT_MONTH:
       return VALUE_MODE_VALUE;
     default:
       NS_NOTYETIMPLEMENTED("Unexpected input type in GetValueMode()");
@@ -6231,6 +6593,7 @@ HTMLInputElement::DoesReadOnlyApply() const
     case NS_FORM_INPUT_NUMBER:
     case NS_FORM_INPUT_DATE:
     case NS_FORM_INPUT_TIME:
+    case NS_FORM_INPUT_MONTH:
       return true;
     default:
       NS_NOTYETIMPLEMENTED("Unexpected input type in DoesReadOnlyApply()");
@@ -6268,6 +6631,7 @@ HTMLInputElement::DoesRequiredApply() const
     case NS_FORM_INPUT_NUMBER:
     case NS_FORM_INPUT_DATE:
     case NS_FORM_INPUT_TIME:
+    case NS_FORM_INPUT_MONTH:
       return true;
     default:
       NS_NOTYETIMPLEMENTED("Unexpected input type in DoesRequiredApply()");
@@ -6282,8 +6646,7 @@ HTMLInputElement::DoesRequiredApply() const
 bool
 HTMLInputElement::PlaceholderApplies() const
 {
-  if (mType == NS_FORM_INPUT_DATE ||
-      mType == NS_FORM_INPUT_TIME) {
+  if (IsDateTimeInputType(mType)) {
     return false;
   }
 
@@ -6294,7 +6657,7 @@ bool
 HTMLInputElement::DoesPatternApply() const
 {
   // TODO: temporary until bug 773205 is fixed.
-  if (IsExperimentalMobileType(mType)) {
+  if (IsExperimentalMobileType(mType) || IsDateTimeInputType(mType)) {
     return false;
   }
 
@@ -6310,6 +6673,7 @@ HTMLInputElement::DoesMinMaxApply() const
     case NS_FORM_INPUT_DATE:
     case NS_FORM_INPUT_TIME:
     case NS_FORM_INPUT_RANGE:
+    case NS_FORM_INPUT_MONTH:
     // TODO:
     // All date/time types.
       return true;
@@ -6357,6 +6721,7 @@ HTMLInputElement::DoesAutocompleteApply() const
     case NS_FORM_INPUT_NUMBER:
     case NS_FORM_INPUT_RANGE:
     case NS_FORM_INPUT_COLOR:
+    case NS_FORM_INPUT_MONTH:
       return true;
 #ifdef DEBUG
     case NS_FORM_INPUT_RESET:
@@ -6534,7 +6899,8 @@ HTMLInputElement::HasPatternMismatch() const
 bool
 HTMLInputElement::IsRangeOverflow() const
 {
-  if (!DoesMinMaxApply()) {
+  // TODO: this is temporary until bug 888324 is fixed.
+  if (!DoesMinMaxApply() || mType == NS_FORM_INPUT_MONTH) {
     return false;
   }
 
@@ -6554,7 +6920,8 @@ HTMLInputElement::IsRangeOverflow() const
 bool
 HTMLInputElement::IsRangeUnderflow() const
 {
-  if (!DoesMinMaxApply()) {
+  // TODO: this is temporary until bug 888324 is fixed.
+  if (!DoesMinMaxApply() || mType == NS_FORM_INPUT_MONTH) {
     return false;
   }
 
@@ -7333,15 +7700,15 @@ HTMLInputElement::SetFilePickerFiltersFromAccept(nsIFilePicker* filePicker)
     // First, check for image/audio/video filters...
     if (token.EqualsLiteral("image/*")) {
       filterMask = nsIFilePicker::filterImages;
-      filterBundle->GetStringFromName(MOZ_UTF16("imageFilter"),
+      filterBundle->GetStringFromName(u"imageFilter",
                                       getter_Copies(extensionListStr));
     } else if (token.EqualsLiteral("audio/*")) {
       filterMask = nsIFilePicker::filterAudio;
-      filterBundle->GetStringFromName(MOZ_UTF16("audioFilter"),
+      filterBundle->GetStringFromName(u"audioFilter",
                                       getter_Copies(extensionListStr));
     } else if (token.EqualsLiteral("video/*")) {
       filterMask = nsIFilePicker::filterVideo;
-      filterBundle->GetStringFromName(MOZ_UTF16("videoFilter"),
+      filterBundle->GetStringFromName(u"videoFilter",
                                       getter_Copies(extensionListStr));
     } else if (token.First() == '.') {
       if (token.Contains(';') || token.Contains('*')) {
@@ -7533,7 +7900,8 @@ HTMLInputElement::UpdateHasRange()
 
   mHasRange = false;
 
-  if (!DoesMinMaxApply()) {
+  // TODO: this is temporary until bug 888324 is fixed.
+  if (!DoesMinMaxApply() || mType == NS_FORM_INPUT_MONTH) {
     return;
   }
 
@@ -7560,6 +7928,94 @@ JSObject*
 HTMLInputElement::WrapNode(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
   return HTMLInputElementBinding::Wrap(aCx, this, aGivenProto);
+}
+
+void
+HTMLInputElement::ClearGetFilesHelpers()
+{
+  if (mGetFilesRecursiveHelper) {
+    mGetFilesRecursiveHelper->Unlink();
+    mGetFilesRecursiveHelper = nullptr;
+  }
+
+  if (mGetFilesNonRecursiveHelper) {
+    mGetFilesNonRecursiveHelper->Unlink();
+    mGetFilesNonRecursiveHelper = nullptr;
+  }
+}
+
+GetFilesHelper*
+HTMLInputElement::GetOrCreateGetFilesHelper(bool aRecursiveFlag,
+                                            ErrorResult& aRv)
+{
+  nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
+  MOZ_ASSERT(global);
+  if (!global) {
+    aRv.Throw(NS_ERROR_FAILURE);
+    return nullptr;
+  }
+
+  if (aRecursiveFlag) {
+    if (!mGetFilesRecursiveHelper) {
+      mGetFilesRecursiveHelper =
+       GetFilesHelper::Create(global,
+                              GetFilesOrDirectoriesInternal(),
+                              aRecursiveFlag, aRv);
+      if (NS_WARN_IF(aRv.Failed())) {
+        return nullptr;
+      }
+    }
+
+    return mGetFilesRecursiveHelper;
+  }
+
+  if (!mGetFilesNonRecursiveHelper) {
+    mGetFilesNonRecursiveHelper =
+     GetFilesHelper::Create(global,
+                            GetFilesOrDirectoriesInternal(),
+                            aRecursiveFlag, aRv);
+    if (NS_WARN_IF(aRv.Failed())) {
+      return nullptr;
+    }
+  }
+
+  return mGetFilesNonRecursiveHelper;
+}
+
+void
+HTMLInputElement::UpdateEntries(const nsTArray<OwningFileOrDirectory>& aFilesOrDirectories)
+{
+  mEntries.Clear();
+
+  nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
+  MOZ_ASSERT(global);
+
+  RefPtr<DOMFileSystem> fs = DOMFileSystem::Create(global);
+  if (NS_WARN_IF(!fs)) {
+    return;
+  }
+
+  Sequence<RefPtr<Entry>> entries;
+  for (uint32_t i = 0; i < aFilesOrDirectories.Length(); ++i) {
+    RefPtr<Entry> entry = Entry::Create(global, aFilesOrDirectories[i], fs);
+    MOZ_ASSERT(entry);
+
+    if (!entries.AppendElement(entry, fallible)) {
+      return;
+    }
+  }
+
+  // The root fileSystem is a DirectoryEntry object that contains only the
+  // dropped fileEntry and directoryEntry objects.
+  fs->CreateRoot(entries);
+
+  mEntries.SwapElements(entries);
+}
+
+void
+HTMLInputElement::GetWebkitEntries(nsTArray<RefPtr<Entry>>& aSequence)
+{
+  aSequence.AppendElements(mEntries);
 }
 
 } // namespace dom

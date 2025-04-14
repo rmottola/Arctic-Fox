@@ -36,6 +36,9 @@ typedef _cairo_surface cairo_surface_t;
 struct _cairo_scaled_font;
 typedef _cairo_scaled_font cairo_scaled_font_t;
 
+struct _FcPattern;
+typedef _FcPattern FcPattern;
+
 struct ID3D11Texture2D;
 struct ID3D11Device;
 struct ID2D1Device;
@@ -136,13 +139,13 @@ struct StrokeOptions {
  */
 struct DrawSurfaceOptions {
   /// For constructor parameter description, see member data documentation.
-  explicit DrawSurfaceOptions(Filter aFilter = Filter::LINEAR,
+  explicit DrawSurfaceOptions(SamplingFilter aSamplingFilter = SamplingFilter::LINEAR,
                               SamplingBounds aSamplingBounds = SamplingBounds::UNBOUNDED)
-    : mFilter(aFilter)
+    : mSamplingFilter(aSamplingFilter)
     , mSamplingBounds(aSamplingBounds)
   { }
 
-  Filter mFilter;                 /**< Filter used when resampling source surface
+  SamplingFilter mSamplingFilter; /**< SamplingFilter used when resampling source surface
                                        region to the destination region. */
   SamplingBounds mSamplingBounds; /**< This indicates whether the implementation is
                                        allowed to sample pixels outside the source
@@ -287,11 +290,12 @@ class SurfacePattern : public Pattern
 public:
   /// For constructor parameter description, see member data documentation.
   SurfacePattern(SourceSurface *aSourceSurface, ExtendMode aExtendMode,
-                 const Matrix &aMatrix = Matrix(), Filter aFilter = Filter::GOOD,
+                 const Matrix &aMatrix = Matrix(),
+                 SamplingFilter aSamplingFilter = SamplingFilter::GOOD,
                  const IntRect &aSamplingRect = IntRect())
     : mSurface(aSourceSurface)
     , mExtendMode(aExtendMode)
-    , mFilter(aFilter)
+    , mSamplingFilter(aSamplingFilter)
     , mMatrix(aMatrix)
     , mSamplingRect(aSamplingRect)
   {}
@@ -304,7 +308,7 @@ public:
   RefPtr<SourceSurface> mSurface; //!< Surface to use for drawing
   ExtendMode mExtendMode;         /**< This determines how the image is extended
                                        outside the bounds of the image */
-  Filter mFilter;                 //!< Resampling filter for resampling the image.
+  SamplingFilter mSamplingFilter; //!< Resampling filter for resampling the image.
   Matrix mMatrix;                 //!< Transforms the pattern into user space
 
   IntRect mSamplingRect;          /**< Rect that must not be sampled outside of,
@@ -1007,14 +1011,14 @@ public:
                          SourceSurface* aMask,
                          const Matrix& aMaskTransform,
                          const IntRect& aBounds = IntRect(),
-                         bool aCopyBackground = false) { MOZ_CRASH(); }
+                         bool aCopyBackground = false) { MOZ_CRASH("GFX: PushLayer"); }
 
   /**
    * This balances a call to PushLayer and proceeds to blend the layer back
    * onto the background. This blend will blend the temporary surface back
    * onto the target in device space using POINT sampling and operator over.
    */
-  virtual void PopLayer() { MOZ_CRASH(); }
+  virtual void PopLayer() { MOZ_CRASH("GFX: PopLayer"); }
 
   /**
    * Create a SourceSurface optimized for use with this DrawTarget from
@@ -1023,9 +1027,9 @@ public:
    * The SourceSurface does not take ownership of aData, and may be freed at any time.
    */
   virtual already_AddRefed<SourceSurface> CreateSourceSurfaceFromData(unsigned char *aData,
-                                                                  const IntSize &aSize,
-                                                                  int32_t aStride,
-                                                                  SurfaceFormat aFormat) const = 0;
+                                                                      const IntSize &aSize,
+                                                                      int32_t aStride,
+                                                                      SurfaceFormat aFormat) const = 0;
 
   /**
    * Create a SourceSurface optimized for use with this DrawTarget from an
@@ -1037,7 +1041,7 @@ public:
   /**
    * Create a SourceSurface for a type of NativeSurface. This may fail if the
    * draw target does not know how to deal with the type of NativeSurface passed
-   * in.
+   * in. If this succeeds, the SourceSurface takes the ownersip of the NativeSurface.
    */
   virtual already_AddRefed<SourceSurface>
     CreateSourceSurfaceFromNativeSurface(const NativeSurface &aSurface) const = 0;
@@ -1174,12 +1178,23 @@ public:
     return mPermitSubpixelAA;
   }
 
+  /**
+   * Ensures that no snapshot is still pointing to this DrawTarget's surface data.
+   *
+   * This can be useful if the DrawTarget is wrapped around data that it does not
+   * own, and for some reason the owner of the data has to make it temporarily
+   * unavailable without the DrawTarget knowing about it.
+   * This can cause costly surface copies, so it should not be used without a
+   * a good reason.
+   */
+  virtual void DetachAllSnapshots() = 0;
+
 #ifdef USE_SKIA_GPU
   virtual bool InitWithGrContext(GrContext* aGrContext,
                                  const IntSize &aSize,
                                  SurfaceFormat aFormat)
   {
-    MOZ_CRASH();
+    MOZ_CRASH("GFX: InitWithGrContext");
   }
 #endif
 
@@ -1237,9 +1252,21 @@ public:
   static bool HasSSE2();
   static bool HasVMX();
 
-  /** Make sure that the given dimensions don't overflow a 32-bit signed int
-   * using 4 bytes per pixel; optionally, make sure that either dimension
-   * doesn't exceed the given limit.
+  /**
+   * Returns false if any of the following are true:
+   *
+   *   - the width/height of |sz| are less than or equal to zero
+   *   - the width/height of |sz| are greater than |limit|
+   *   - the number of bytes that need to be allocated for the surface is too
+   *     big to fit in an int32_t, or bigger than |allocLimit|, if specifed
+   *
+   * To calculate the number of bytes that need to be allocated for the surface
+   * this function makes the conservative assumption that there need to be
+   * 4 bytes-per-pixel, and the stride alignment is 16 bytes.
+   *
+   * The reason for using int32_t rather than uint32_t is again to be
+   * conservative; some code has in the past and may in the future use signed
+   * integers to store buffer lengths etc.
    */
   static bool CheckSurfaceSize(const IntSize &sz,
                                int32_t limit = 0,
@@ -1272,6 +1299,11 @@ public:
 
   static already_AddRefed<ScaledFont>
     CreateScaledFontForNativeFont(const NativeFont &aNativeFont, Float aSize);
+
+#ifdef MOZ_WIDGET_GTK
+  static already_AddRefed<ScaledFont>
+    CreateScaledFontForFontconfigFont(cairo_scaled_font_t* aScaledFont, FcPattern* aPattern, Float aSize);
+#endif
 
   /**
    * This creates a NativeFontResource from TrueType data.
@@ -1311,15 +1343,28 @@ public:
   static already_AddRefed<DataSourceSurface>
     CreateDataSourceSurfaceWithStride(const IntSize &aSize, SurfaceFormat aFormat, int32_t aStride, bool aZero = false);
 
+  typedef void (*SourceSurfaceDeallocator)(void* aClosure);
+
   /**
    * This creates a simple data source surface for some existing data. It will
-   * wrap this data and the data for this source surface. The caller is
-   * responsible for deallocating the memory only after destruction of the
-   * surface.
+   * wrap this data and the data for this source surface.
+   *
+   * We can provide a custom destroying function for |aData|. This will be
+   * called in the surface dtor using |aDeallocator| and the |aClosure|. If
+   * there are errors during construction(return a nullptr surface), the caller
+   * is responsible for the deallocation.
+   *
+   * If there is no destroying function, the caller is responsible for
+   * deallocating the aData memory only after destruction of this
+   * DataSourceSurface.
    */
   static already_AddRefed<DataSourceSurface>
-    CreateWrappingDataSourceSurface(uint8_t *aData, int32_t aStride,
-                                    const IntSize &aSize, SurfaceFormat aFormat);
+    CreateWrappingDataSourceSurface(uint8_t *aData,
+                                    int32_t aStride,
+                                    const IntSize &aSize,
+                                    SurfaceFormat aFormat,
+                                    SourceSurfaceDeallocator aDeallocator = nullptr,
+                                    void* aClosure = nullptr);
 
   static void
     CopyDataSourceSurface(DataSourceSurface* aSource,
@@ -1351,10 +1396,6 @@ public:
 
   static void PurgeAllCaches();
 
-#if defined(USE_SKIA) && defined(MOZ_ENABLE_FREETYPE)
-  static already_AddRefed<GlyphRenderingOptions>
-    CreateCairoGlyphRenderingOptions(FontHinting aHinting, bool aAutoHinting, AntialiasMode aAntialiasMode = AntialiasMode::DEFAULT);
-#endif
   static already_AddRefed<DrawTarget>
     CreateDualDrawTarget(DrawTarget *targetA, DrawTarget *targetB);
 

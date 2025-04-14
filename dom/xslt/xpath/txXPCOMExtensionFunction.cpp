@@ -18,7 +18,7 @@
 #include "txXPathObjectAdaptor.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/UniquePtr.h"
-#include "nsContentUtils.h"
+#include "mozilla/dom/ScriptSettings.h"
 #include "nsIClassInfo.h"
 #include "nsIInterfaceInfo.h"
 #include "js/RootingAPI.h"
@@ -288,8 +288,8 @@ txXPCOMExtensionFunctionCall::GetParamType(const nsXPTParamInfo &aParam,
             if (iid.Equals(NS_GET_IID(txIXPathObject))) {
                 return eOBJECT;
             }
+            return eUNKNOWN;
         }
-        // FALLTHROUGH
         default:
         {
             // XXX Error!
@@ -384,7 +384,7 @@ txXPCOMExtensionFunctionCall::evaluate(txIEvalContext* aContext,
     uint8_t paramCount = methodInfo->GetParamCount();
     uint8_t inArgs = paramCount - 1;
 
-    JS::Rooted<txParamArrayHolder> invokeParams(nsContentUtils::RootingCxForThread());
+    JS::Rooted<txParamArrayHolder> invokeParams(mozilla::dom::GetJSRuntime());
     if (!invokeParams.get().Init(paramCount)) {
         return NS_ERROR_OUT_OF_MEMORY;
     }

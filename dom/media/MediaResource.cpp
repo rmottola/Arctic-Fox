@@ -23,7 +23,6 @@
 #include "nsIRequestObserver.h"
 #include "nsIStreamListener.h"
 #include "nsIScriptSecurityManager.h"
-#include "nsCORSListenerProxy.h"
 #include "mozilla/dom/HTMLMediaElement.h"
 #include "nsError.h"
 #include "nsICachingChannel.h"
@@ -56,9 +55,8 @@ MediaResource::Destroy()
     delete this;
     return;
   }
-  nsCOMPtr<nsIRunnable> destroyRunnable =
-    NS_NewNonOwningRunnableMethod(this, &MediaResource::Destroy);
-  MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(destroyRunnable));
+  MOZ_ALWAYS_SUCCEEDS(
+    NS_DispatchToMainThread(NewNonOwningRunnableMethod(this, &MediaResource::Destroy)));
 }
 
 NS_IMPL_ADDREF(MediaResource)
@@ -76,7 +74,6 @@ ChannelMediaResource::ChannelMediaResource(MediaResourceCallback* aCallback,
     mCacheStream(this),
     mLock("ChannelMediaResource.mLock"),
     mIgnoreResume(false),
-    mIsTransportSeekable(true),
     mSuspendAgent(mChannel)
 {
 }
@@ -298,7 +295,6 @@ ChannelMediaResource::OnStartRequest(nsIRequest* aRequest)
 
   {
     MutexAutoLock lock(mLock);
-    mIsTransportSeekable = seekable;
     mChannelStatistics->Start();
   }
 
@@ -316,8 +312,7 @@ ChannelMediaResource::OnStartRequest(nsIRequest* aRequest)
 bool
 ChannelMediaResource::IsTransportSeekable()
 {
-  MutexAutoLock lock(mLock);
-  return mIsTransportSeekable;
+  return mCacheStream.IsTransportSeekable();
 }
 
 nsresult
@@ -871,7 +866,7 @@ ChannelMediaResource::CacheClientNotifyDataReceived()
     return;
 
   mDataReceivedEvent =
-    NS_NewNonOwningRunnableMethod(this, &ChannelMediaResource::DoNotifyDataReceived);
+    NewNonOwningRunnableMethod(this, &ChannelMediaResource::DoNotifyDataReceived);
   NS_DispatchToMainThread(mDataReceivedEvent.get());
 }
 

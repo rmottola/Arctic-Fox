@@ -27,6 +27,7 @@ ApplicationAccessible::ApplicationAccessible() :
 {
   mType = eApplicationType;
   mAppInfo = do_GetService("@mozilla.org/xre/app-info;1");
+  MOZ_ASSERT(mAppInfo, "no application info");
 }
 
 NS_IMPL_ISUPPORTS_INHERITED0(ApplicationAccessible, Accessible)
@@ -53,7 +54,7 @@ ApplicationAccessible::Name(nsString& aName)
     return eNameOK;
 
   nsXPIDLString appName;
-  rv = bundle->GetStringFromName(MOZ_UTF16("brandShortName"),
+  rv = bundle->GetStringFromName(u"brandShortName",
                                  getter_Copies(appName));
   if (NS_FAILED(rv) || appName.IsEmpty()) {
     NS_WARNING("brandShortName not found, using default app name");

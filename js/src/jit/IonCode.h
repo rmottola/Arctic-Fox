@@ -31,6 +31,7 @@ class IonBuilder;
 class IonICEntry;
 
 typedef Vector<JSObject*, 4, JitAllocPolicy> ObjectVector;
+typedef Vector<TraceLoggerEvent, 0, SystemAllocPolicy> TraceLoggerEventVector;
 
 class JitCode : public gc::TenuredCell
 {
@@ -114,7 +115,6 @@ class JitCode : public gc::TenuredCell
 
     void traceChildren(JSTracer* trc);
     void finalize(FreeOp* fop);
-    void fixupAfterMovingGC() {}
     void setInvalidated() {
         invalidated_ = true;
     }
@@ -284,8 +284,8 @@ struct IonScript
     // Allocated space for fallback stubs.
     FallbackICStubSpace fallbackStubSpace_;
 
-    // The tracelogger event used to log the start/stop of this IonScript.
-    TraceLoggerEvent traceLoggerScriptEvent_;
+    // TraceLogger events that are baked into the IonScript.
+    TraceLoggerEventVector traceLoggerEvents_;
 
   private:
     inline uint8_t* bottomBuffer() {
@@ -331,6 +331,12 @@ struct IonScript
   public:
     // Do not call directly, use IonScript::New. This is public for cx->new_.
     IonScript();
+
+    ~IonScript() {
+        // The contents of the fallback stub space are removed and freed
+        // separately after the next minor GC. See IonScript::Destroy.
+        MOZ_ASSERT(fallbackStubSpace_.isEmpty());
+    }
 
     static IonScript* New(JSContext* cx, RecompileInfo recompileInfo,
                           uint32_t frameSlots, uint32_t argumentSlots, uint32_t frameSize,
@@ -430,8 +436,9 @@ struct IonScript
     bool hasProfilingInstrumentation() const {
         return hasProfilingInstrumentation_;
     }
-    void setTraceLoggerEvent(TraceLoggerEvent& event) {
-        traceLoggerScriptEvent_ = event;
+    MOZ_MUST_USE bool addTraceLoggerEvent(TraceLoggerEvent& event) {
+        MOZ_ASSERT(event.hasPayload());
+        return traceLoggerEvents_.append(Move(event));
     }
     const uint8_t* snapshots() const {
         return reinterpret_cast<const uint8_t*>(this) + snapshots_;
@@ -612,7 +619,8 @@ struct IonBlockCounts
 
   public:
 
-    bool init(uint32_t id, uint32_t offset, char* description, uint32_t numSuccessors) {
+    MOZ_MUST_USE bool init(uint32_t id, uint32_t offset, char* description,
+                           uint32_t numSuccessors) {
         id_ = id;
         offset_ = offset;
         description_ = description;
@@ -711,7 +719,7 @@ struct IonScriptCounts
         }
     }
 
-    bool init(size_t numBlocks) {
+    MOZ_MUST_USE bool init(size_t numBlocks) {
         blocks_ = js_pod_calloc<IonBlockCounts>(numBlocks);
         if (!blocks_)
             return false;
@@ -743,7 +751,7 @@ struct VMFunction;
 struct AutoFlushICache
 {
   private:
-#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
+#if defined(JS_CODEGEN_ARM) || defined(JS_CODEGEN_ARM64) || defined(JS_CODEGEN_MIPS32) || defined(JS_CODEGEN_MIPS64)
     uintptr_t start_;
     uintptr_t stop_;
     const char* name_;
@@ -780,7 +788,13 @@ IsMarked(const jit::VMFunction*)
 namespace JS {
 namespace ubi {
 template<>
-struct Concrete<js::jit::JitCode> : TracerConcrete<js::jit::JitCode> {
+class Concrete<js::jit::JitCode> : TracerConcrete<js::jit::JitCode> {
+  protected:
+    explicit Concrete(js::jit::JitCode *ptr) : TracerConcrete<js::jit::JitCode>(ptr) { }
+
+  public:
+    static void construct(void *storage, js::jit::JitCode *ptr) { new (storage) Concrete(ptr); }
+
     CoarseType coarseType() const final { return CoarseType::Script; }
 
     Size size(mozilla::MallocSizeOf mallocSizeOf) const override {
@@ -790,14 +804,22 @@ struct Concrete<js::jit::JitCode> : TracerConcrete<js::jit::JitCode> {
         return size;
     }
 
-  protected:
-    explicit Concrete(js::jit::JitCode *ptr) : TracerConcrete<js::jit::JitCode>(ptr) { }
-
-  public:
-    static void construct(void *storage, js::jit::JitCode *ptr) { new (storage) Concrete(ptr); }
+    const char16_t* typeName() const override { return concreteTypeName; }
+    static const char16_t concreteTypeName[];
 };
 
 } // namespace ubi
+
+template <>
+struct DeletePolicy<js::jit::IonScript>
+{
+    explicit DeletePolicy(JSRuntime* rt) : rt_(rt) {}
+    void operator()(const js::jit::IonScript* script);
+
+  private:
+    JSRuntime* rt_;
+};
+
 } // namespace JS
 
 #endif /* jit_IonCode_h */

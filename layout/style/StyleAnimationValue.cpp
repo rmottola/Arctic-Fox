@@ -12,6 +12,7 @@
 #include "mozilla/StyleAnimationValue.h"
 #include "mozilla/UniquePtr.h"
 #include "nsStyleTransformMatrix.h"
+#include "nsAutoPtr.h"
 #include "nsCOMArray.h"
 #include "nsIStyleRule.h"
 #include "mozilla/css/StyleRule.h"
@@ -274,7 +275,7 @@ AppendCSSShadowValue(const nsCSSShadowItem *aShadow,
     arr->Item(4).SetColorValue(aShadow->mColor);
   }
   if (aShadow->mInset) {
-    arr->Item(5).SetIntValue(NS_STYLE_BOX_SHADOW_INSET,
+    arr->Item(5).SetIntValue(uint8_t(StyleBoxShadowType::Inset),
                              eCSSUnit_Enumerated);
   }
 
@@ -2507,15 +2508,6 @@ StyleAnimationValue::AddWeighted(nsCSSProperty aProperty,
         ++len2;
       }
       MOZ_ASSERT(len1 > 0 && len2 > 0, "unexpected length");
-      if (list1->mValue.GetUnit() == eCSSUnit_None ||
-          list2->mValue.GetUnit() == eCSSUnit_None) {
-        // One of our values is "none".  Can't do addition with that.
-        MOZ_ASSERT(
-          (list1->mValue.GetUnit() != eCSSUnit_None || len1 == 1) &&
-          (list2->mValue.GetUnit() != eCSSUnit_None || len2 == 1),
-          "multi-value valuelist with 'none' as first element");
-        return false;
-      }
 
       nsAutoPtr<nsCSSValueList> result;
       nsCSSValueList **resultTail = getter_Transfers(result);
@@ -2821,7 +2813,7 @@ BuildStyleRule(nsCSSProperty aProperty,
 
 static bool
 ComputeValuesFromStyleRule(nsCSSProperty aProperty,
-                           nsCSSProps::EnabledState aEnabledState,
+                           CSSEnabledState aEnabledState,
                            dom::Element* aTargetElement,
                            nsStyleContext* aStyleContext,
                            css::StyleRule* aStyleRule,
@@ -2942,7 +2934,7 @@ StyleAnimationValue::ComputeValue(nsCSSProperty aProperty,
 
   AutoTArray<PropertyStyleAnimationValuePair,1> values;
   bool ok = ComputeValuesFromStyleRule(aProperty,
-                                       nsCSSProps::eIgnoreEnabledState,
+                                       CSSEnabledState::eIgnoreEnabledState,
                                        aTargetElement, aStyleContext, styleRule,
                                        values, aIsContextSensitive);
   if (!ok) {
@@ -2960,7 +2952,7 @@ template <class T>
 bool
 ComputeValuesFromSpecifiedValue(
     nsCSSProperty aProperty,
-    nsCSSProps::EnabledState aEnabledState,
+    CSSEnabledState aEnabledState,
     dom::Element* aTargetElement,
     nsStyleContext* aStyleContext,
     T& aSpecifiedValue,
@@ -2988,7 +2980,7 @@ ComputeValuesFromSpecifiedValue(
 /* static */ bool
 StyleAnimationValue::ComputeValues(
     nsCSSProperty aProperty,
-    nsCSSProps::EnabledState aEnabledState,
+    CSSEnabledState aEnabledState,
     dom::Element* aTargetElement,
     nsStyleContext* aStyleContext,
     const nsAString& aSpecifiedValue,
@@ -3004,7 +2996,7 @@ StyleAnimationValue::ComputeValues(
 /* static */ bool
 StyleAnimationValue::ComputeValues(
     nsCSSProperty aProperty,
-    nsCSSProps::EnabledState aEnabledState,
+    CSSEnabledState aEnabledState,
     dom::Element* aTargetElement,
     nsStyleContext* aStyleContext,
     const nsCSSValue& aSpecifiedValue,
@@ -3581,7 +3573,8 @@ StyleClipBasicShapeToCSSArray(const nsStyleClipPath& aClipPath,
       MOZ_ASSERT_UNREACHABLE("Unknown shape type");
       return false;
   }
-  aResult->Item(1).SetIntValue(aClipPath.GetSizingBox(), eCSSUnit_Enumerated);
+  aResult->Item(1).SetIntValue(uint8_t(aClipPath.GetSizingBox()),
+                               eCSSUnit_Enumerated);
   return true;
 }
 
@@ -3773,15 +3766,10 @@ StyleAnimationValue::ExtractComputedValue(nsCSSProperty aProperty,
 
         case eCSSProperty_stroke_dasharray: {
           const nsStyleSVG *svg = static_cast<const nsStyleSVG*>(styleStruct);
-          MOZ_ASSERT((svg->mStrokeDasharray != nullptr) ==
-                     (svg->mStrokeDasharrayLength != 0),
-                     "pointer/length mismatch");
-          nsAutoPtr<nsCSSValueList> result;
-          if (svg->mStrokeDasharray) {
-            MOZ_ASSERT(svg->mStrokeDasharrayLength > 0,
-                       "non-null list should have positive length");
+          if (!svg->mStrokeDasharray.IsEmpty()) {
+            nsAutoPtr<nsCSSValueList> result;
             nsCSSValueList **resultTail = getter_Transfers(result);
-            for (uint32_t i = 0, i_end = svg->mStrokeDasharrayLength;
+            for (uint32_t i = 0, i_end = svg->mStrokeDasharray.Length();
                  i != i_end; ++i) {
               nsCSSValueList *item = new nsCSSValueList;
               *resultTail = item;
@@ -3810,12 +3798,17 @@ StyleAnimationValue::ExtractComputedValue(nsCSSProperty aProperty,
                   return false;
               }
             }
+            aComputedValue.SetAndAdoptCSSValueListValue(result.forget(),
+                                                        eUnit_Dasharray);
+          } else if (svg->StrokeDasharrayFromObject()) {
+            // An empty dasharray with StrokeDasharrayFromObject() == true
+            // corresponds to the "context-value" keyword.
+            aComputedValue.SetIntValue(NS_STYLE_STROKE_PROP_CONTEXT_VALUE,
+                                       eUnit_Enumerated);
           } else {
-            result = new nsCSSValueList;
-            result->mValue.SetNoneValue();
+            // Otherwise, an empty dasharray corresponds to the "none" keyword.
+            aComputedValue.SetNoneValue();
           }
-          aComputedValue.SetAndAdoptCSSValueListValue(result.forget(),
-                                                      eUnit_Dasharray);
           break;
         }
 
@@ -3956,9 +3949,9 @@ StyleAnimationValue::ExtractComputedValue(nsCSSProperty aProperty,
           const nsStyleSVGReset* svgReset =
             static_cast<const nsStyleSVGReset*>(styleStruct);
           const nsStyleClipPath& clipPath = svgReset->mClipPath;
-          const int32_t type = clipPath.GetType();
+          const StyleClipPathType type = clipPath.GetType();
 
-          if (type == NS_STYLE_CLIP_PATH_URL) {
+          if (type == StyleClipPathType::URL) {
             nsIDocument* doc = aStyleContext->PresContext()->Document();
             RefPtr<nsStringBuffer> uriAsStringBuffer =
               GetURIAsUtf16StringBuffer(clipPath.GetURL());
@@ -3970,9 +3963,10 @@ StyleAnimationValue::ExtractComputedValue(nsCSSProperty aProperty,
             auto result = MakeUnique<nsCSSValue>();
             result->SetURLValue(url);
             aComputedValue.SetAndAdoptCSSValueValue(result.release(), eUnit_URL);
-          } else if (type == NS_STYLE_CLIP_PATH_BOX) {
-            aComputedValue.SetIntValue(clipPath.GetSizingBox(), eUnit_Enumerated);
-          } else if (type == NS_STYLE_CLIP_PATH_SHAPE) {
+          } else if (type == StyleClipPathType::Box) {
+            aComputedValue.SetIntValue(uint8_t(clipPath.GetSizingBox()),
+                                       eUnit_Enumerated);
+          } else if (type == StyleClipPathType::Shape) {
             RefPtr<nsCSSValue::Array> result = nsCSSValue::Array::Create(2);
             if (!StyleClipBasicShapeToCSSArray(clipPath, result)) {
               return false;
@@ -3980,7 +3974,7 @@ StyleAnimationValue::ExtractComputedValue(nsCSSProperty aProperty,
             aComputedValue.SetCSSValueArrayValue(result, eUnit_Shape);
 
           } else {
-            MOZ_ASSERT(type == NS_STYLE_CLIP_PATH_NONE, "unknown type");
+            MOZ_ASSERT(type == StyleClipPathType::None_, "unknown type");
             aComputedValue.SetNoneValue();
           }
           break;

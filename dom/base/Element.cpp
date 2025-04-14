@@ -16,6 +16,7 @@
 #include "mozilla/DebugOnly.h"
 #include "mozilla/dom/Animation.h"
 #include "mozilla/dom/Attr.h"
+#include "mozilla/dom/Grid.h"
 #include "nsDOMAttributeMap.h"
 #include "nsIAtom.h"
 #include "nsIContentInlines.h"
@@ -495,7 +496,7 @@ Element::WrapObject(JSContext *aCx, JS::Handle<JSObject*> aGivenProto)
   }
 
   nsCOMPtr<nsIURI> uri = bindingURL->GetURI();
-  nsCOMPtr<nsIPrincipal> principal = bindingURL->mOriginPrincipal;
+  nsCOMPtr<nsIPrincipal> principal = bindingURL->mOriginPrincipal.get();
 
   // We have a binding that must be installed.
   bool dummy;
@@ -517,7 +518,7 @@ Element::WrapObject(JSContext *aCx, JS::Handle<JSObject*> aGivenProto)
       }
       else {
         nsContentUtils::AddScriptRunner(
-          NS_NewRunnableMethod(binding, &nsXBLBinding::ExecuteAttachedHandler));
+          NewRunnableMethod(binding, &nsXBLBinding::ExecuteAttachedHandler));
       }
     }
   }
@@ -953,7 +954,6 @@ Element::GetClientRects()
   return rectList.forget();
 }
 
-
 //----------------------------------------------------------------------
 
 void
@@ -1181,17 +1181,11 @@ Element::SetAttribute(const nsAString& aName,
   if (aError.Failed()) {
     return;
   }
-  const nsAttrName* name = InternalGetExistingAttrNameFromQName(aName);
+
+  nsAutoString nameToUse;
+  const nsAttrName* name = InternalGetAttrNameFromQName(aName, &nameToUse);
   if (!name) {
-    nsCOMPtr<nsIAtom> nameAtom;
-    if (IsHTMLElement() && IsInHTMLDocument()) {
-      nsAutoString lower;
-      nsContentUtils::ASCIIToLower(aName, lower);
-      nameAtom = NS_Atomize(lower);
-    }
-    else {
-      nameAtom = NS_Atomize(aName);
-    }
+    nsCOMPtr<nsIAtom> nameAtom = NS_Atomize(nameToUse);
     if (!nameAtom) {
       aError.Throw(NS_ERROR_OUT_OF_MEMORY);
       return;
@@ -1208,7 +1202,7 @@ Element::SetAttribute(const nsAString& aName,
 void
 Element::RemoveAttribute(const nsAString& aName, ErrorResult& aError)
 {
-  const nsAttrName* name = InternalGetExistingAttrNameFromQName(aName);
+  const nsAttrName* name = InternalGetAttrNameFromQName(aName);
 
   if (!name) {
     // If there is no canonical nsAttrName for this attribute name, then the
@@ -1532,7 +1526,7 @@ Element::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
     ClearSubtreeRootPointer();
 
     // Being added to a document.
-    SetInDocument();
+    SetIsInDocument();
 
     // Unset this flag since we now really are in a document.
     UnsetFlags(NODE_FORCE_XBL_BINDINGS |
@@ -1739,18 +1733,17 @@ Element::UnbindFromTree(bool aDeep, bool aNullParent)
   if (HasPointerLock()) {
     nsIDocument::UnlockPointer();
   }
+  if (mState.HasState(NS_EVENT_STATE_FULL_SCREEN)) {
+    // The element being removed is an ancestor of the full-screen element,
+    // exit full-screen state.
+    nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
+                                    NS_LITERAL_CSTRING("DOM"), OwnerDoc(),
+                                    nsContentUtils::eDOM_PROPERTIES,
+                                    "RemovedFullscreenElement");
+    // Fully exit full-screen.
+    nsIDocument::ExitFullscreenInDocTree(OwnerDoc());
+  }
   if (aNullParent) {
-    if (IsFullScreenAncestor()) {
-      // The element being removed is an ancestor of the full-screen element,
-      // exit full-screen state.
-      nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
-                                      NS_LITERAL_CSTRING("DOM"), OwnerDoc(),
-                                      nsContentUtils::eDOM_PROPERTIES,
-                                      "RemovedFullscreenElement");
-      // Fully exit full-screen.
-      nsIDocument::ExitFullscreenInDocTree(OwnerDoc());
-    }
-
     if (GetParent() && GetParent()->IsInUncomposedDoc()) {
       // Update the editable descendant count in the ancestors before we
       // lose the reference to the parent.
@@ -1991,7 +1984,7 @@ Element::FindAttributeDependence(const nsIAtom* aAttribute,
 already_AddRefed<mozilla::dom::NodeInfo>
 Element::GetExistingAttrNameFromQName(const nsAString& aStr) const
 {
-  const nsAttrName* name = InternalGetExistingAttrNameFromQName(aStr);
+  const nsAttrName* name = InternalGetAttrNameFromQName(aStr);
   if (!name) {
     return nullptr;
   }
@@ -2089,14 +2082,14 @@ Element::DispatchClickEvent(nsPresContext* aPresContext,
   uint16_t inputSource = 0;
   WidgetMouseEvent* sourceMouseEvent = aSourceEvent->AsMouseEvent();
   if (sourceMouseEvent) {
-    clickCount = sourceMouseEvent->clickCount;
+    clickCount = sourceMouseEvent->mClickCount;
     pressure = sourceMouseEvent->pressure;
     inputSource = sourceMouseEvent->inputSource;
   } else if (aSourceEvent->mClass == eKeyboardEventClass) {
     inputSource = nsIDOMMouseEvent::MOZ_SOURCE_KEYBOARD;
   }
   event.pressure = pressure;
-  event.clickCount = clickCount;
+  event.mClickCount = clickCount;
   event.inputSource = inputSource;
   event.mModifiers = aSourceEvent->mModifiers;
   if (aExtraEventFlags) {
@@ -2167,9 +2160,27 @@ Element::SetEventHandler(nsIAtom* aEventName,
 //----------------------------------------------------------------------
 
 const nsAttrName*
-Element::InternalGetExistingAttrNameFromQName(const nsAString& aStr) const
+Element::InternalGetAttrNameFromQName(const nsAString& aStr,
+                                      nsAutoString* aNameToUse) const
 {
-  return mAttrsAndChildren.GetExistingAttrNameFromQName(aStr);
+  MOZ_ASSERT(!aNameToUse || aNameToUse->IsEmpty());
+  const nsAttrName* val = nullptr;
+  if (IsHTMLElement() && IsInHTMLDocument()) {
+    nsAutoString lower;
+    nsAutoString& outStr = aNameToUse ? *aNameToUse : lower;
+    nsContentUtils::ASCIIToLower(aStr, outStr);
+    val = mAttrsAndChildren.GetExistingAttrNameFromQName(outStr);
+    if (val) {
+      outStr.Truncate();
+    }
+  } else {
+    val = mAttrsAndChildren.GetExistingAttrNameFromQName(aStr);
+    if (!val && aNameToUse) {
+      *aNameToUse = aStr;
+    }
+  }
+
+  return val;
 }
 
 bool
@@ -3040,7 +3051,7 @@ Element::PostHandleEventForLinks(EventChainPostVisitor& aVisitor)
   case eKeyPress:
     {
       WidgetKeyboardEvent* keyEvent = aVisitor.mEvent->AsKeyboardEvent();
-      if (keyEvent && keyEvent->keyCode == NS_VK_RETURN) {
+      if (keyEvent && keyEvent->mKeyCode == NS_VK_RETURN) {
         nsEventStatus status = nsEventStatus_eIgnore;
         rv = DispatchClickEvent(aVisitor.mPresContext, keyEvent, this,
                                 false, nullptr, &status);
@@ -3077,10 +3088,6 @@ nsDOMTokenListPropertyDestructor(void *aObject, nsIAtom *aProperty,
 
 static nsIAtom** sPropertiesToTraverseAndUnlink[] =
   {
-    &nsGkAtoms::microdataProperties,
-    &nsGkAtoms::itemtype,
-    &nsGkAtoms::itemref,
-    &nsGkAtoms::itemprop,
     &nsGkAtoms::sandbox,
     &nsGkAtoms::sizes,
     nullptr
@@ -3094,7 +3101,8 @@ Element::HTMLSVGPropertiesToTraverseAndUnlink()
 }
 
 nsDOMTokenList*
-Element::GetTokenList(nsIAtom* aAtom)
+Element::GetTokenList(nsIAtom* aAtom,
+                      const DOMTokenListSupportedTokenArray aSupportedTokens)
 {
 #ifdef DEBUG
   nsIAtom*** props =
@@ -3114,31 +3122,11 @@ Element::GetTokenList(nsIAtom* aAtom)
     list = static_cast<nsDOMTokenList*>(GetProperty(aAtom));
   }
   if (!list) {
-    list = new nsDOMTokenList(this, aAtom);
+    list = new nsDOMTokenList(this, aAtom, aSupportedTokens);
     NS_ADDREF(list);
     SetProperty(aAtom, list, nsDOMTokenListPropertyDestructor);
   }
   return list;
-}
-
-void
-Element::GetTokenList(nsIAtom* aAtom, nsIVariant** aResult)
-{
-  nsISupports* itemType = GetTokenList(aAtom);
-  nsCOMPtr<nsIWritableVariant> out = new nsVariant();
-  out->SetAsInterface(NS_GET_IID(nsISupports), itemType);
-  out.forget(aResult);
-}
-
-nsresult
-Element::SetTokenList(nsIAtom* aAtom, nsIVariant* aValue)
-{
-  nsDOMTokenList* itemType = GetTokenList(aAtom);
-  nsAutoString string;
-  aValue->GetAsAString(string);
-  ErrorResult rv;
-  itemType->SetValue(string, rv);
-  return rv.StealNSResult();
 }
 
 Element*
@@ -3301,21 +3289,37 @@ Element::MozRequestPointerLock()
   OwnerDoc()->RequestPointerLock(this);
 }
 
+void
+Element::GetGridFragments(nsTArray<RefPtr<Grid>>& aResult)
+{
+  nsGridContainerFrame* frame =
+    nsGridContainerFrame::GetGridFrameWithComputedInfo(GetPrimaryFrame());
+
+  // If we get a nsGridContainerFrame from the prior call,
+  // all the next-in-flow frames will also be nsGridContainerFrames.
+  while (frame) {
+    aResult.AppendElement(
+      new Grid(this, frame)
+    );
+    frame = static_cast<nsGridContainerFrame*>(frame->GetNextInFlow());
+  }
+}
+
 already_AddRefed<Animation>
 Element::Animate(JSContext* aContext,
-                 JS::Handle<JSObject*> aFrames,
+                 JS::Handle<JSObject*> aKeyframes,
                  const UnrestrictedDoubleOrKeyframeAnimationOptions& aOptions,
                  ErrorResult& aError)
 {
   Nullable<ElementOrCSSPseudoElement> target;
   target.SetValue().SetAsElement() = this;
-  return Animate(target, aContext, aFrames, aOptions, aError);
+  return Animate(target, aContext, aKeyframes, aOptions, aError);
 }
 
 /* static */ already_AddRefed<Animation>
 Element::Animate(const Nullable<ElementOrCSSPseudoElement>& aTarget,
                  JSContext* aContext,
-                 JS::Handle<JSObject*> aFrames,
+                 JS::Handle<JSObject*> aKeyframes,
                  const UnrestrictedDoubleOrKeyframeAnimationOptions& aOptions,
                  ErrorResult& aError)
 {
@@ -3339,27 +3343,28 @@ Element::Animate(const Nullable<ElementOrCSSPseudoElement>& aTarget,
   GlobalObject global(aContext, ownerGlobal->GetGlobalJSObject());
   MOZ_ASSERT(!global.Failed());
 
-  // Wrap the aFrames object for the cross-compartment case.
-  JS::Rooted<JSObject*> frames(aContext);
-  frames = aFrames;
+  // Wrap the aKeyframes object for the cross-compartment case.
+  JS::Rooted<JSObject*> keyframes(aContext);
+  keyframes = aKeyframes;
   Maybe<JSAutoCompartment> ac;
   if (js::GetContextCompartment(aContext) !=
       js::GetObjectCompartment(ownerGlobal->GetGlobalJSObject())) {
     ac.emplace(aContext, ownerGlobal->GetGlobalJSObject());
-    if (!JS_WrapObject(aContext, &frames)) {
+    if (!JS_WrapObject(aContext, &keyframes)) {
       return nullptr;
     }
   }
 
   RefPtr<KeyframeEffect> effect =
-    KeyframeEffect::Constructor(global, aTarget, frames, aOptions, aError);
+    KeyframeEffect::Constructor(global, aTarget, keyframes, aOptions, aError);
   if (aError.Failed()) {
     return nullptr;
   }
 
+  AnimationTimeline* timeline = referenceElement->OwnerDoc()->Timeline();
   RefPtr<Animation> animation =
     Animation::Constructor(global, effect,
-                           referenceElement->OwnerDoc()->Timeline(), aError);
+                           Optional<AnimationTimeline*>(timeline), aError);
   if (aError.Failed()) {
     return nullptr;
   }
@@ -3788,7 +3793,7 @@ Element::FontSizeInflation()
 net::ReferrerPolicy
 Element::GetReferrerPolicyAsEnum()
 {
-  if (Preferences::GetBool("network.http.enablePerElementReferrer", false) &&
+  if (Preferences::GetBool("network.http.enablePerElementReferrer", true) &&
       IsHTMLElement()) {
     const nsAttrValue* referrerValue = GetParsedAttr(nsGkAtoms::referrerpolicy);
     if (referrerValue && referrerValue->Type() == nsAttrValue::eEnum) {

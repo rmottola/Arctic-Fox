@@ -189,7 +189,7 @@ nsTArray_base<Alloc, Copy>::EnsureCapacity(size_type aCapacity,
       return ActualAlloc::FailureResult();
     }
 
-    Copy::CopyHeaderAndElements(header, mHdr, Length(), aElemSize);
+    Copy::MoveNonOverlappingRegionWithHeader(header, mHdr, Length(), aElemSize);
 
     if (!UsesAutoArrayBuffer()) {
       ActualAlloc::Free(mHdr);
@@ -232,9 +232,9 @@ nsTArray_base<Alloc, Copy>::ShrinkCapacity(size_type aElemSize,
   if (IsAutoArray() && GetAutoArrayBuffer(aElemAlign)->mCapacity >= length) {
     Header* header = GetAutoArrayBuffer(aElemAlign);
 
-    // Copy data, but don't copy the header to avoid overwriting mCapacity
+    // Move the data, but don't copy the header to avoid overwriting mCapacity.
     header->mLength = length;
-    Copy::CopyElements(header + 1, mHdr + 1, length, aElemSize);
+    Copy::MoveNonOverlappingRegion(header + 1, mHdr + 1, length, aElemSize);
 
     nsTArrayFallibleAllocator::Free(mHdr);
     mHdr = header;
@@ -285,29 +285,32 @@ nsTArray_base<Alloc, Copy>::ShiftData(index_type aStart,
     aNewLen *= aElemSize;
     aOldLen *= aElemSize;
     char* baseAddr = reinterpret_cast<char*>(mHdr + 1) + aStart;
-    Copy::MoveElements(baseAddr + aNewLen, baseAddr + aOldLen, num, aElemSize);
+    Copy::MoveOverlappingRegion(baseAddr + aNewLen, baseAddr + aOldLen, num, aElemSize);
   }
 }
 
 template<class Alloc, class Copy>
 template<typename ActualAlloc>
-typename ActualAlloc::ResultTypeProxy
+bool
 nsTArray_base<Alloc, Copy>::InsertSlotsAt(index_type aIndex, size_type aCount,
                                           size_type aElemSize,
                                           size_t aElemAlign)
 {
   MOZ_ASSERT(aIndex <= Length(), "Bogus insertion index");
+  size_type newLen = Length() + aCount;
 
+  EnsureCapacity<ActualAlloc>(newLen, aElemSize);
 
-  if (!ActualAlloc::Successful(this->ExtendCapacity<ActualAlloc>(Length(), aCount, aElemSize))) {
-    return ActualAlloc::FailureResult();
+  // Check for out of memory conditions
+  if (Capacity() < newLen) {
+    return false;
   }
 
   // Move the existing elements as needed.  Note that this will
   // change our mLength, so no need to call IncrementLength.
   ShiftData<ActualAlloc>(aIndex, 0, aCount, aElemSize, aElemAlign);
 
-  return ActualAlloc::SuccessResult();
+  return true;
 }
 
 // nsTArray_base::IsAutoArrayRestorer is an RAII class which takes
@@ -422,9 +425,9 @@ nsTArray_base<Alloc, Copy>::SwapArrayElements(nsTArray_base<Allocator,
     return ActualAlloc::FailureResult();
   }
 
-  Copy::CopyElements(temp.Elements(), smallerElements, smallerLength, aElemSize);
-  Copy::CopyElements(smallerElements, largerElements, largerLength, aElemSize);
-  Copy::CopyElements(largerElements, temp.Elements(), smallerLength, aElemSize);
+  Copy::MoveNonOverlappingRegion(temp.Elements(), smallerElements, smallerLength, aElemSize);
+  Copy::MoveNonOverlappingRegion(smallerElements, largerElements, largerLength, aElemSize);
+  Copy::MoveNonOverlappingRegion(largerElements, temp.Elements(), smallerLength, aElemSize);
 
   // Swap the arrays' lengths.
   MOZ_ASSERT((aOther.Length() == 0 || mHdr != EmptyHdr()) &&
@@ -467,7 +470,7 @@ nsTArray_base<Alloc, Copy>::EnsureNotUsingAutoArrayBuffer(size_type aElemSize)
       return false;
     }
 
-    Copy::CopyHeaderAndElements(header, mHdr, Length(), aElemSize);
+    Copy::MoveNonOverlappingRegionWithHeader(header, mHdr, Length(), aElemSize);
     header->mCapacity = Length();
     mHdr = header;
   }

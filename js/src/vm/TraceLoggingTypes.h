@@ -21,6 +21,7 @@
     _(Internal)                                       \
     _(Interpreter)                                    \
     _(InlinedScripts)                                 \
+    _(IonAnalysis)                                    \
     _(IonCompilation)                                 \
     _(IonCompilationPaused)                           \
     _(IonLinking)                                     \
@@ -34,6 +35,8 @@
     _(ParserCompileModule)                            \
     _(Scripts)                                        \
     _(VM)                                             \
+    _(CompressSource)                                 \
+    _(WasmCompilation)                                \
                                                       \
     /* Specific passes during ion compilation */      \
     _(PruneUnusedBranches)                            \
@@ -63,7 +66,9 @@
     _(AddKeepAliveInstructions)                       \
     _(GenerateLIR)                                    \
     _(RegisterAllocation)                             \
-    _(GenerateCode)
+    _(GenerateCode)                                   \
+    _(IonBuilderRestartLoop)                          \
+    _(VMSpecific)
 
 #define TRACELOGGER_LOG_ITEMS(_)                      \
     _(Bailout)                                        \

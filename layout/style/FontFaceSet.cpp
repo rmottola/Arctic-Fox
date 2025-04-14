@@ -20,7 +20,7 @@
 #include "mozilla/SizePrintfMacros.h"
 #include "mozilla/Snprintf.h"
 #include "mozilla/Telemetry.h"
-#include "nsCORSListenerProxy.h"
+#include "nsAutoPtr.h"
 #include "nsContentPolicyUtils.h"
 #include "nsCSSParser.h"
 #include "nsDeviceContext.h"
@@ -1471,7 +1471,7 @@ FontFaceSet::OnFontFaceStatusChanged(FontFace* aFontFace)
     if (!mDelayedLoadCheck) {
       mDelayedLoadCheck = true;
       nsCOMPtr<nsIRunnable> checkTask =
-        NS_NewRunnableMethod(this, &FontFaceSet::CheckLoadingFinishedAfterDelay);
+        NewRunnableMethod(this, &FontFaceSet::CheckLoadingFinishedAfterDelay);
       NS_DispatchToMainThread(checkTask);
     }
   }

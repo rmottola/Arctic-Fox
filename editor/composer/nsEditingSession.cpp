@@ -828,7 +828,7 @@ nsEditingSession::OnLocationChange(nsIWebProgress *aWebProgress,
   nsIDocShell *docShell = piWindow->GetDocShell();
   NS_ENSURE_TRUE(docShell, NS_ERROR_FAILURE);
 
-  nsCOMPtr<nsICommandManager> commandManager = do_GetInterface(docShell);
+  nsCOMPtr<nsICommandManager> commandManager = docShell->GetCommandManager();
   nsCOMPtr<nsPICommandUpdater> commandUpdater =
                                   do_QueryInterface(commandManager);
   NS_ENSURE_TRUE(commandUpdater, NS_ERROR_FAILURE);
@@ -1041,7 +1041,7 @@ nsEditingSession::TimerCallback(nsITimer* aTimer, void* aClosure)
   {
     nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(docShell));
     if (webNav)
-      webNav->LoadURI(MOZ_UTF16("about:blank"),
+      webNav->LoadURI(u"about:blank",
                       0, nullptr, nullptr, nullptr);
   }
 }

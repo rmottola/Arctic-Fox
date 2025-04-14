@@ -379,6 +379,7 @@ function loadPageInfo(frameOuterWindowID, imageElement)
     let windowInfo = pageInfoData.windowInfo;
     let uri = makeURI(docInfo.documentURIObject.spec,
                       docInfo.documentURIObject.originCharset);
+    let principal = docInfo.principal;
     gDocInfo = docInfo;
 
     gImageElement = pageInfoData.imageInfo;
@@ -391,7 +392,7 @@ function loadPageInfo(frameOuterWindowID, imageElement)
 
     makeGeneralTab(pageInfoData.metaViewRows, docInfo);
     initFeedTab(pageInfoData.feeds);
-    onLoadPermission(uri);
+    onLoadPermission(uri, principal);
     securityOnLoad(uri, windowInfo);
   });
 
@@ -410,7 +411,10 @@ function loadPageInfo(frameOuterWindowID, imageElement)
       return;
     }
 
-    addImage(message.data.imageViewRow);
+    for (let item of message.data.mediaItems) {
+      addImage(item);
+    }
+
     selectImage();
   });
 

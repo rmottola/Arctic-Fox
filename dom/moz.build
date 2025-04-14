@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -31,11 +31,8 @@ interfaces = [
     'svg',
     'smil',
     'apps',
-    'gamepad',
+    'push',
 ]
-
-if not CONFIG['MOZ_SIMPLEPUSH']:
-    interfaces += ['push']
 
 DIRS += ['interfaces/' + i for i in interfaces]
 
@@ -44,7 +41,6 @@ DIRS += [
     'apps',
     'base',
     'bluetooth',
-    'activities',
     'archivereader',
     'bindings',
     'battery',
@@ -62,8 +58,11 @@ DIRS += [
     'fetch',
     'filehandle',
     'filesystem',
+    'flyweb',
     'fmradio',
+    'gamepad',
     'geolocation',
+    'grid',
     'html',
     'icc',
     'inputport',
@@ -72,7 +71,6 @@ DIRS += [
     'asmjscache',
     'mathml',
     'media',
-    'messages',
     'mobileconnection',
     'notification',
     'offline',
@@ -101,6 +99,7 @@ DIRS += [
     'smil',
     'telephony',
     'tv',
+    'url',
     'voicemail',
     'inputmethod',
     'webidl',
@@ -113,6 +112,9 @@ DIRS += [
     'vr',
     'newapps',
     'u2f',
+    'console',
+    'performance',
+    'xhr',
 ]
 
 if CONFIG['OS_ARCH'] == 'WINNT':
@@ -133,9 +135,6 @@ if CONFIG['MOZ_B2G_RIL']:
 if CONFIG['MOZ_PAY']:
     DIRS += ['payment']
 
-if CONFIG['MOZ_GAMEPAD']:
-    DIRS += ['gamepad']
-
 if CONFIG['MOZ_NFC']:
     DIRS += ['nfc']
 
@@ -151,8 +150,7 @@ if CONFIG['MOZ_B2G']:
     DIRS += [
         'downloads',
         'identity',
-        'mobileid',
-        'engineeringmode'
+        'mobileid'
     ]
 
 DIRS += ['presentation']
@@ -162,6 +160,6 @@ TEST_DIRS += [
     'imptests',
 ]
 
-if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3', 'cocoa', 'windows', 'android', 'qt'):
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3', 'cocoa', 'windows', 'android'):
     TEST_DIRS += ['plugins/test']
 

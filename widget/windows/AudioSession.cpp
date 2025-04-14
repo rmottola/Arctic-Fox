@@ -209,7 +209,7 @@ AudioSession::Start()
                                 getter_AddRefs(bundle));
     NS_ENSURE_TRUE(bundle, NS_ERROR_FAILURE);
 
-    bundle->GetStringFromName(MOZ_UTF16("brandFullName"),
+    bundle->GetStringFromName(u"brandFullName",
                               getter_Copies(mDisplayName));
 
     wchar_t *buffer;
@@ -296,10 +296,11 @@ AudioSession::Start()
 void
 AudioSession::StopInternal()
 {
-  if (mAudioSessionControl) {
+  if (mAudioSessionControl &&
+      (mState == STARTED || mState == STOPPED)) {
     mAudioSessionControl->UnregisterAudioSessionNotification(this);
-    mAudioSessionControl = nullptr;
   }
+  mAudioSessionControl = nullptr;
 }
 
 nsresult
@@ -408,7 +409,7 @@ AudioSession::OnSessionDisconnected(AudioSessionDisconnectReason aReason)
   // Run our code asynchronously.  Per MSDN we can't do anything interesting
   // in this callback.
   nsCOMPtr<nsIRunnable> runnable =
-    NS_NewRunnableMethod(this, &AudioSession::OnSessionDisconnectedInternal);
+    NewRunnableMethod(this, &AudioSession::OnSessionDisconnectedInternal);
   NS_DispatchToMainThread(runnable);
   return S_OK;
 }

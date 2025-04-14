@@ -19,9 +19,26 @@ const CensusUtils = require("resource://devtools/shared/heapsnapshot/CensusUtils
 const DEFAULT_START_INDEX = 0;
 const DEFAULT_MAX_COUNT = 50;
 
-// The set of HeapSnapshot instances this worker has read into memory. Keyed by
-// snapshot file path.
+/**
+ * The set of HeapSnapshot instances this worker has read into memory. Keyed by
+ * snapshot file path.
+ */
 const snapshots = Object.create(null);
+
+/**
+ * The set of `DominatorTree`s that have been computed, mapped by their id (aka
+ * the index into this array).
+ *
+ * @see /dom/webidl/DominatorTree.webidl
+ */
+const dominatorTrees = [];
+
+/**
+ * The i^th HeapSnapshot in this array is the snapshot used to generate the i^th
+ * dominator tree in `dominatorTrees` above. This lets us map from a dominator
+ * tree id to the snapshot it came from.
+ */
+const dominatorTreeSnapshots = [];
 
 /**
  * @see HeapAnalysesClient.prototype.readHeapSnapshot
@@ -30,6 +47,24 @@ workerHelper.createTask(self, "readHeapSnapshot", ({ snapshotFilePath }) => {
   snapshots[snapshotFilePath] =
     ThreadSafeChromeUtils.readHeapSnapshot(snapshotFilePath);
   return true;
+});
+
+/**
+ * @see HeapAnalysesClient.prototype.deleteHeapSnapshot
+ */
+workerHelper.createTask(self, "deleteHeapSnapshot", ({ snapshotFilePath }) => {
+  let snapshot = snapshots[snapshotFilePath];
+  if (!snapshot) {
+    throw new Error(`No known heap snapshot for '${snapshotFilePath}'`);
+  }
+
+  snapshots[snapshotFilePath] = undefined;
+
+  let dominatorTreeId = dominatorTreeSnapshots.indexOf(snapshot);
+  if (dominatorTreeId != -1) {
+    dominatorTreeSnapshots[dominatorTreeId] = undefined;
+    dominatorTrees[dominatorTreeId] = undefined;
+  }
 });
 
 /**
@@ -53,6 +88,49 @@ workerHelper.createTask(self, "takeCensus", ({ snapshotFilePath, censusOptions, 
   }
 
   return { report, parentMap };
+});
+
+/**
+ * @see HeapAnalysesClient.prototype.getCensusIndividuals
+ */
+workerHelper.createTask(self, "getCensusIndividuals", request => {
+  const {
+    dominatorTreeId,
+    indices,
+    censusBreakdown,
+    labelBreakdown,
+    maxRetainingPaths,
+    maxIndividuals,
+  } = request;
+
+  const dominatorTree = dominatorTrees[dominatorTreeId];
+  if (!dominatorTree) {
+    throw new Error(
+      `There does not exist a DominatorTree with the id ${dominatorTreeId}`);
+  }
+
+  const snapshot = dominatorTreeSnapshots[dominatorTreeId];
+  const nodeIds = CensusUtils.getCensusIndividuals(indices, censusBreakdown, snapshot);
+
+  const nodes = nodeIds
+    .sort((a, b) => dominatorTree.getRetainedSize(b) - dominatorTree.getRetainedSize(a))
+    .slice(0, maxIndividuals)
+    .map(id => {
+      const { label, shallowSize } =
+        DominatorTreeNode.getLabelAndShallowSize(id, snapshot, labelBreakdown);
+      const retainedSize = dominatorTree.getRetainedSize(id);
+      const node = new DominatorTreeNode(id, label, shallowSize, retainedSize);
+      node.moreChildrenAvailable = false;
+      return node;
+    });
+
+  DominatorTreeNode.attachShortestPaths(snapshot,
+                                        labelBreakdown,
+                                        dominatorTree.root,
+                                        nodes,
+                                        maxRetainingPaths);
+
+  return { nodes };
 });
 
 /**
@@ -95,24 +173,11 @@ workerHelper.createTask(self, "takeCensusDiff", request => {
  * @see HeapAnalysesClient.prototype.getCreationTime
  */
 workerHelper.createTask(self, "getCreationTime", snapshotFilePath => {
-  let snapshot = snapshots[snapshotFilePath];
-  return snapshot ? snapshot.creationTime : null;
+  if (!snapshots[snapshotFilePath]) {
+    throw new Error(`No known heap snapshot for '${snapshotFilePath}'`);
+  }
+  return snapshots[snapshotFilePath].creationTime;
 });
-
-/**
- * The set of `DominatorTree`s that have been computed, mapped by their id (aka
- * the index into this array).
- *
- * @see /dom/webidl/DominatorTree.webidl
- */
-const dominatorTrees = [];
-
-/**
- * The i^th HeapSnapshot in this array is the snapshot used to generate the i^th
- * dominator tree in `dominatorTrees` above. This lets us map from a dominator
- * tree id to the snapshot it came from.
- */
-const dominatorTreeSnapshots = [];
 
 /**
  * @see HeapAnalysesClient.prototype.computeDominatorTree
@@ -137,7 +202,8 @@ workerHelper.createTask(self, "getDominatorTree", request => {
     dominatorTreeId,
     breakdown,
     maxDepth,
-    maxSiblings
+    maxSiblings,
+    maxRetainingPaths,
   } = request;
 
   if (!(0 <= dominatorTreeId && dominatorTreeId < dominatorTrees.length)) {
@@ -148,11 +214,29 @@ workerHelper.createTask(self, "getDominatorTree", request => {
   const dominatorTree = dominatorTrees[dominatorTreeId];
   const snapshot = dominatorTreeSnapshots[dominatorTreeId];
 
-  return DominatorTreeNode.partialTraversal(dominatorTree,
-                                            snapshot,
-                                            breakdown,
-                                            maxDepth,
-                                            maxSiblings);
+  const tree = DominatorTreeNode.partialTraversal(dominatorTree,
+                                                  snapshot,
+                                                  breakdown,
+                                                  maxDepth,
+                                                  maxSiblings);
+
+  const nodes = [];
+  (function getNodes(node) {
+    nodes.push(node);
+    if (node.children) {
+      for (let i = 0, length = node.children.length; i < length; i++) {
+        getNodes(node.children[i]);
+      }
+    }
+  }(tree));
+
+  DominatorTreeNode.attachShortestPaths(snapshot,
+                                        breakdown,
+                                        dominatorTree.root,
+                                        nodes,
+                                        maxRetainingPaths);
+
+  return tree;
 });
 
 /**
@@ -164,7 +248,8 @@ workerHelper.createTask(self, "getImmediatelyDominated", request => {
     nodeId,
     breakdown,
     startIndex,
-    maxCount
+    maxCount,
+    maxRetainingPaths,
   } = request;
 
   if (!(0 <= dominatorTreeId && dominatorTreeId < dominatorTrees.length)) {
@@ -198,7 +283,21 @@ workerHelper.createTask(self, "getImmediatelyDominated", request => {
       return node;
     });
 
+  const path = [];
+  let id = nodeId;
+  do {
+    path.push(id);
+    id = dominatorTree.getImmediateDominator(id);
+  } while (id !== null);
+  path.reverse();
+
   const moreChildrenAvailable = childIds.length > end;
 
-  return { nodes, moreChildrenAvailable };
+  DominatorTreeNode.attachShortestPaths(snapshot,
+                                        breakdown,
+                                        dominatorTree.root,
+                                        nodes,
+                                        maxRetainingPaths);
+
+  return { nodes, moreChildrenAvailable, path };
 });

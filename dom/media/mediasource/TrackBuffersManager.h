@@ -18,6 +18,7 @@
 #include "MediaSourceDecoder.h"
 #include "SourceBufferTask.h"
 #include "TimeUnits.h"
+#include "nsAutoPtr.h"
 #include "nsProxyRelease.h"
 #include "nsString.h"
 #include "nsTArray.h"
@@ -30,11 +31,16 @@ class MediaRawData;
 class MediaSourceDemuxer;
 class SourceBufferResource;
 
-class SourceBufferTaskQueue {
+class SourceBufferTaskQueue
+{
 public:
   SourceBufferTaskQueue()
   : mMonitor("SourceBufferTaskQueue")
   {}
+  ~SourceBufferTaskQueue()
+  {
+    MOZ_ASSERT(mQueue.IsEmpty(), "All tasks must have been processed");
+  }
 
   void Push(SourceBufferTask* aTask)
   {
@@ -64,7 +70,8 @@ private:
   nsTArray<RefPtr<SourceBufferTask>> mQueue;
 };
 
-class TrackBuffersManager {
+class TrackBuffersManager
+{
 public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(TrackBuffersManager);
 
@@ -115,6 +122,7 @@ public:
   // This may be called on any thread.
   // Buffered must conform to http://w3c.github.io/media-source/index.html#widl-SourceBuffer-buffered
   media::TimeIntervals Buffered();
+  media::TimeUnit HighestStartTime();
 
   // Return the size of the data managed by this SourceBufferContentManager.
   int64_t GetSize() const;
@@ -141,11 +149,15 @@ public:
                        const media::TimeUnit& aFuzz);
   uint32_t SkipToNextRandomAccessPoint(TrackInfo::TrackType aTrack,
                                        const media::TimeUnit& aTimeThreadshold,
+                                       const media::TimeUnit& aFuzz,
                                        bool& aFound);
   already_AddRefed<MediaRawData> GetSample(TrackInfo::TrackType aTrack,
                                            const media::TimeUnit& aFuzz,
                                            bool& aError);
-  media::TimeUnit GetNextRandomAccessPoint(TrackInfo::TrackType aTrack);
+  int32_t FindCurrentPosition(TrackInfo::TrackType aTrack,
+                              const media::TimeUnit& aFuzz);
+  media::TimeUnit GetNextRandomAccessPoint(TrackInfo::TrackType aTrack,
+                                           const media::TimeUnit& aFuzz);
 
   void AddSizeOfResources(MediaSourceDecoder::ResourceSizes* aSizes);
 
@@ -154,7 +166,7 @@ private:
 
   // for MediaSourceDemuxer::GetMozDebugReaderData
   friend class MediaSourceDemuxer;
-  virtual ~TrackBuffersManager();
+  ~TrackBuffersManager();
   // All following functions run on the taskqueue.
   RefPtr<AppendPromise> DoAppendData(RefPtr<MediaByteBuffer> aData,
                                      SourceBufferAttributes aAttributes);
@@ -243,7 +255,8 @@ private:
 
   void DoEvictData(const media::TimeUnit& aPlaybackTime, int64_t aSizeToEvict);
 
-  struct TrackData {
+  struct TrackData
+  {
     TrackData()
       : mNumTracks(0)
       , mNeedRandomAccessPoint(true)
@@ -268,6 +281,10 @@ private:
     // The variable is initially unset to indicate that no coded frames have
     // been appended yet.
     Maybe<media::TimeUnit> mHighestEndTimestamp;
+    // Highest presentation timestamp in track buffer.
+    // Protected by global monitor, except when reading on the task queue as it
+    // is only written there.
+    media::TimeUnit mHighestStartTimestamp;
     // Longest frame duration seen since last random access point.
     // Only ever accessed when mLastDecodeTimestamp and mLastFrameDuration are
     // set.
@@ -333,12 +350,22 @@ private:
   void InsertFrames(TrackBuffer& aSamples,
                     const media::TimeIntervals& aIntervals,
                     TrackData& aTrackData);
-  void RemoveFrames(const media::TimeIntervals& aIntervals,
-                    TrackData& aTrackData,
-                    uint32_t aStartIndex);
+  void UpdateHighestTimestamp(TrackData& aTrackData,
+                              const media::TimeUnit& aHighestTime);
+  // Remove all frames and their dependencies contained in aIntervals.
+  // Return the index at which frames were first removed or 0 if no frames
+  // removed.
+  size_t RemoveFrames(const media::TimeIntervals& aIntervals,
+                      TrackData& aTrackData,
+                      uint32_t aStartIndex);
   // Find index of sample. Return a negative value if not found.
   uint32_t FindSampleIndex(const TrackBuffer& aTrackBuffer,
                            const media::TimeInterval& aInterval);
+  const MediaRawData* GetSample(TrackInfo::TrackType aTrack,
+                                size_t aIndex,
+                                const media::TimeUnit& aExpectedDts,
+                                const media::TimeUnit& aExpectedPts,
+                                const media::TimeUnit& aFuzz);
   void UpdateBufferedRanges();
   void RejectProcessing(nsresult aRejectValue, const char* aName);
   void ResolveProcessing(bool aResolveValue, const char* aName);
@@ -361,7 +388,8 @@ private:
   TrackData mAudioTracks;
 
   // TaskQueue methods and objects.
-  AbstractThread* GetTaskQueue() {
+  AbstractThread* GetTaskQueue()
+  {
     return mTaskQueue;
   }
   bool OnTaskQueue()
@@ -372,8 +400,8 @@ private:
 
   // SourceBuffer Queues and running context.
   SourceBufferTaskQueue mQueue;
+  void QueueTask(SourceBufferTask* aTask);
   void ProcessTasks();
-  void CancelAllTasks();
   // Set if the TrackBuffersManager is currently processing a task.
   // At this stage, this task is always a AppendBufferTask.
   RefPtr<SourceBufferTask> mCurrentTask;
@@ -390,9 +418,6 @@ private:
 
   // Set to true if mediasource state changed to ended.
   Atomic<bool> mEnded;
-  // Set to true if the parent SourceBuffer has shutdown.
-  // We will not reschedule or process new task once mDetached is set.
-  Atomic<bool> mDetached;
 
   // Global size of this source buffer content.
   Atomic<int64_t> mSizeSourceBuffer;

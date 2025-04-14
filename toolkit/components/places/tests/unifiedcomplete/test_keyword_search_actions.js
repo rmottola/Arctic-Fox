@@ -75,4 +75,3 @@ add_task(function* test_keyword_search() {
 
   yield cleanup();
 });
-

@@ -172,7 +172,7 @@ var check_use_counter_iframe = Task.async(function* (file, use_counter_middlefix
   }
 });
 
-let check_use_counter_img = Task.async(function* (file, use_counter_middlefix) {
+var check_use_counter_img = Task.async(function* (file, use_counter_middlefix) {
   info("checking " + file + " as image with histogram " + use_counter_middlefix);
 
   let newTab = gBrowser.addTab("about:blank");
@@ -230,7 +230,7 @@ let check_use_counter_img = Task.async(function* (file, use_counter_middlefix) {
      "document counts " + use_counter_middlefix + " after are correct");
 });
 
-let check_use_counter_direct = Task.async(function* (file, use_counter_middlefix, xfail=false) {
+var check_use_counter_direct = Task.async(function* (file, use_counter_middlefix, xfail=false) {
   info("checking " + file + " with histogram " + use_counter_middlefix);
 
   let newTab = gBrowser.addTab( "about:blank");

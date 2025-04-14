@@ -105,14 +105,14 @@ AndroidMediaReader::Shutdown()
 }
 
 // Resets all state related to decoding, emptying all buffers etc.
-nsresult AndroidMediaReader::ResetDecode()
+nsresult AndroidMediaReader::ResetDecode(TrackSet aTracks)
 {
   if (mLastVideoFrame) {
     mLastVideoFrame = nullptr;
   }
   mSeekRequest.DisconnectIfExists();
   mSeekPromise.RejectIfExists(NS_OK, __func__);
-  return MediaDecoderReader::ResetDecode();
+  return MediaDecoderReader::ResetDecode(aTracks);
 }
 
 bool AndroidMediaReader::DecodeVideoFrame(bool &aKeyframeSkip,

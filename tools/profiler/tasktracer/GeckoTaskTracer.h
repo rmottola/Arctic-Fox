@@ -7,7 +7,9 @@
 #ifndef GECKO_TASK_TRACER_H
 #define GECKO_TASK_TRACER_H
 
+#include "mozilla/UniquePtr.h"
 #include "nsCOMPtr.h"
+#include "nsTArrayForwardDeclare.h"
 
 /**
  * TaskTracer provides a way to trace the correlation between different tasks
@@ -26,7 +28,6 @@
 class Task;
 class nsIRunnable;
 class nsCString;
-template <class> class nsTArray;
 
 namespace mozilla {
 
@@ -64,7 +65,7 @@ void AddLabel(const char* aFormat, ...);
 
 void StartLogging();
 void StopLogging();
-nsTArray<nsCString>* GetLoggedData(TimeStamp aStartTime);
+UniquePtr<nsTArray<nsCString>> GetLoggedData(TimeStamp aStartTime);
 
 // Returns the timestamp when Task Tracer is enabled in this process.
 const PRTime GetStartTime();

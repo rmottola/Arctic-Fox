@@ -27,7 +27,7 @@ registerCleanupFunction(function () {
   delete window.Troubleshoot;
 });
 
-let tests = [
+var tests = [
 
   function snapshotSchema(done) {
     Troubleshoot.snapshot(function (snapshot) {
@@ -36,7 +36,7 @@ let tests = [
         ok(true, "The snapshot should conform to the schema.");
       }
       catch (err) {
-        ok(false, err);
+        ok(false, "Schema mismatch, " + err);
       }
       done();
     });
@@ -302,6 +302,12 @@ const SNAPSHOT_SCHEMA = {
           items: {
             type: "string",
           },
+        },
+        featureLog: {
+          type: "object",
+        },
+        crashGuards: {
+          type: "array",
         },
         direct2DEnabledMessage: {
           type: "array",

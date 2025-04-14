@@ -578,18 +578,19 @@ public:
   friend class CounterStyleManager;
 
   // will be initialized by CounterStyleManager::InitializeBuiltinCounterStyles
-  MOZ_CONSTEXPR BuiltinCounterStyle()
+  constexpr BuiltinCounterStyle()
     : CounterStyle(NS_STYLE_LIST_STYLE_NONE)
   {
   }
 
 protected:
-  MOZ_CONSTEXPR explicit BuiltinCounterStyle(int32_t aStyle)
+  constexpr explicit BuiltinCounterStyle(int32_t aStyle)
     : CounterStyle(aStyle)
   {
   }
 
 public:
+  virtual void GetStyleName(nsSubstring& aResult) override;
   virtual void GetPrefix(nsSubstring& aResult) override;
   virtual void GetSuffix(nsSubstring& aResult) override;
   virtual void GetSpokenCounterText(CounterValue aOrdinal,
@@ -615,6 +616,16 @@ public:
   NS_IMETHOD_(MozExternalRefCountType) AddRef() override { return 2; }
   NS_IMETHOD_(MozExternalRefCountType) Release() override { return 2; }
 };
+
+/* virtual */ void
+BuiltinCounterStyle::GetStyleName(nsSubstring& aResult)
+{
+  MOZ_ASSERT(mStyle != NS_STYLE_LIST_STYLE_CUSTOM);
+  const nsAFlatCString& str =
+    nsCSSProps::ValueToKeyword(mStyle, nsCSSProps::kListStyleKTable);
+  MOZ_ASSERT(!str.IsEmpty());
+  aResult.Assign(NS_ConvertUTF8toUTF16(str));
+}
 
 /* virtual */ void
 BuiltinCounterStyle::GetPrefix(nsSubstring& aResult)
@@ -651,11 +662,11 @@ BuiltinCounterStyle::GetSuffix(nsSubstring& aResult)
     case NS_STYLE_LIST_STYLE_KOREAN_HANGUL_FORMAL:
     case NS_STYLE_LIST_STYLE_KOREAN_HANJA_INFORMAL:
     case NS_STYLE_LIST_STYLE_KOREAN_HANJA_FORMAL:
-      aResult.AssignLiteral(MOZ_UTF16(", "));
+      aResult.AssignLiteral(u", ");
       break;
 
     default:
-      aResult.AssignLiteral(MOZ_UTF16(". "));
+      aResult.AssignLiteral(u". ");
       break;
   }
 }
@@ -747,7 +758,7 @@ BuiltinCounterStyle::GetNegative(NegativeType& aResult)
       break;
 
     default:
-      aResult.before.AssignLiteral(MOZ_UTF16("-"));
+      aResult.before.AssignLiteral(u"-");
   }
   aResult.after.Truncate();
 }
@@ -1021,9 +1032,11 @@ class CustomCounterStyle final : public CounterStyle
 private:
   ~CustomCounterStyle() {}
 public:
-  CustomCounterStyle(CounterStyleManager* aManager,
+  CustomCounterStyle(const nsAString& aName,
+                     CounterStyleManager* aManager,
                      nsCSSCounterStyleRule* aRule)
     : CounterStyle(NS_STYLE_LIST_STYLE_CUSTOM),
+      mName(aName),
       mManager(aManager),
       mRule(aRule),
       mRuleGeneration(aRule->GetGeneration()),
@@ -1051,6 +1064,7 @@ public:
   nsCSSCounterStyleRule* GetRule() const { return mRule; }
   uint32_t GetRuleGeneration() const { return mRuleGeneration; }
 
+  virtual void GetStyleName(nsSubstring& aResult) override;
   virtual void GetPrefix(nsSubstring& aResult) override;
   virtual void GetSuffix(nsSubstring& aResult) override;
   virtual void GetSpokenCounterText(CounterValue aOrdinal,
@@ -1119,6 +1133,8 @@ private:
   CounterStyle* ComputeExtends();
   CounterStyle* GetExtends();
   CounterStyle* GetExtendsRoot();
+
+  nsString mName;
 
   // CounterStyleManager should always overlive any CounterStyle as it
   // is owned by nsPresContext, and will be released after all nodes and
@@ -1215,6 +1231,12 @@ CustomCounterStyle::ResetDependentData()
 }
 
 /* virtual */ void
+CustomCounterStyle::GetStyleName(nsSubstring& aResult)
+{
+  aResult.Assign(mName);
+}
+
+/* virtual */ void
 CustomCounterStyle::GetPrefix(nsSubstring& aResult)
 {
   if (!(mFlags & FLAG_PREFIX_INITED)) {
@@ -1244,7 +1266,7 @@ CustomCounterStyle::GetSuffix(nsSubstring& aResult)
     } else if (IsExtendsSystem()) {
       GetExtends()->GetSuffix(mSuffix);
     } else {
-      mSuffix.AssignLiteral(MOZ_UTF16(". "));
+      mSuffix.AssignLiteral(u". ");
     }
   }
   aResult = mSuffix;
@@ -1303,7 +1325,7 @@ CustomCounterStyle::GetNegative(NegativeType& aResult)
         if (IsExtendsSystem()) {
           GetExtends()->GetNegative(mNegative);
         } else {
-          mNegative.before.AssignLiteral(MOZ_UTF16("-"));
+          mNegative.before.AssignLiteral(u"-");
           mNegative.after.Truncate();
         }
       }
@@ -1717,6 +1739,12 @@ AnonymousCounterStyle::AnonymousCounterStyle(const nsCSSValue::Array* aParams)
 }
 
 /* virtual */ void
+AnonymousCounterStyle::GetStyleName(nsAString& aResult)
+{
+  aResult.Truncate();
+}
+
+/* virtual */ void
 AnonymousCounterStyle::GetPrefix(nsAString& aResult)
 {
   aResult.Truncate();
@@ -1747,7 +1775,7 @@ AnonymousCounterStyle::IsBullet()
 /* virtual */ void
 AnonymousCounterStyle::GetNegative(NegativeType& aResult)
 {
-  aResult.before.AssignLiteral(MOZ_UTF16("-"));
+  aResult.before.AssignLiteral(u"-");
   aResult.after.Truncate();
 }
 
@@ -2008,7 +2036,7 @@ CounterStyleManager::BuildCounterStyle(const nsSubstring& aName)
   nsCSSCounterStyleRule* rule = styleSet->IsGecko() ?
     styleSet->AsGecko()->CounterStyleRuleForName(aName) : nullptr;
   if (rule) {
-    data = new (mPresContext) CustomCounterStyle(this, rule);
+    data = new (mPresContext) CustomCounterStyle(aName, this, rule);
   } else {
     int32_t type;
     nsCSSKeyword keyword = nsCSSKeywords::LookupKeyword(aName);

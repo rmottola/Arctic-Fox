@@ -26,6 +26,7 @@ public:
   using nsGenericHTMLFormElement::GetForm;
   using nsIConstraintValidation::Validity;
   using nsIConstraintValidation::CheckValidity;
+  using nsIConstraintValidation::ReportValidity;
   using nsIConstraintValidation::GetValidationMessage;
 
   explicit HTMLFieldSetElement(already_AddRefed<mozilla::dom::NodeInfo>& aNodeInfo);
@@ -50,7 +51,7 @@ public:
   // nsIFormControl
   NS_IMETHOD_(uint32_t) GetType() const override { return NS_FORM_FIELDSET; }
   NS_IMETHOD Reset() override;
-  NS_IMETHOD SubmitNamesValues(nsFormSubmission* aFormSubmission) override;
+  NS_IMETHOD SubmitNamesValues(HTMLFormSubmission* aFormSubmission) override;
   virtual bool IsDisabledForEvents(EventMessage aMessage) override;
   virtual nsresult Clone(mozilla::dom::NodeInfo *aNodeInfo, nsINode **aResult) const override;
 

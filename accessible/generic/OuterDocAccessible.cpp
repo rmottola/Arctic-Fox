@@ -84,12 +84,6 @@ OuterDocAccessible::ChildAtPoint(int32_t aX, int32_t aY,
 void
 OuterDocAccessible::Shutdown()
 {
-  // XXX: sometimes outerdoc accessible is shutdown because of layout style
-  // change however the presshell of underlying document isn't destroyed and
-  // the document doesn't get pagehide events. Schedule a document rebind
-  // to its parent document. Otherwise a document accessible may be lost if its
-  // outerdoc has being recreated (see bug 862863 for details).
-
 #ifdef A11Y_LOG
   if (logging::IsEnabled(logging::eDocDestroy))
     logging::OuterDocDestroy(this);
@@ -104,7 +98,15 @@ OuterDocAccessible::Shutdown()
     }
 #endif
     RemoveChild(child);
-    mDoc->BindChildDocument(child->AsDoc());
+
+    // XXX: sometimes outerdoc accessible is shutdown because of layout style
+    // change however the presshell of underlying document isn't destroyed and
+    // the document doesn't get pagehide events. Schedule a document rebind
+    // to its parent document. Otherwise a document accessible may be lost if
+    // its outerdoc has being recreated (see bug 862863 for details).
+    if (!mDoc->IsDefunct()) {
+      mDoc->BindChildDocument(child->AsDoc());
+    }
   }
 
   AccessibleWrap::Shutdown();
@@ -113,8 +115,9 @@ OuterDocAccessible::Shutdown()
 bool
 OuterDocAccessible::InsertChildAt(uint32_t aIdx, Accessible* aAccessible)
 {
-  NS_ASSERTION(aAccessible->IsDoc(),
-               "OuterDocAccessible should only have document child!");
+  MOZ_RELEASE_ASSERT(aAccessible->IsDoc(),
+                     "OuterDocAccessible can have a document child only!");
+
   // We keep showing the old document for a bit after creating the new one,
   // and while building the new DOM and frame tree. That's done on purpose
   // to avoid weird flashes of default background color.
@@ -160,6 +163,14 @@ OuterDocAccessible::RemoveChild(Accessible* aAccessible)
                "This child document of outerdoc accessible wasn't removed!");
 
   return wasRemoved;
+}
+
+bool
+OuterDocAccessible::IsAcceptableChild(nsIContent* aEl) const
+{
+  // outer document accessible doesn't not participate in ordinal tree
+  // mutations.
+  return false;
 }
 
 ProxyAccessible*

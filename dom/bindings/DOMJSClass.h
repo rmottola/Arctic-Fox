@@ -31,6 +31,39 @@ class nsCycleCollectionParticipant;
 namespace mozilla {
 namespace dom {
 
+/**
+ * Returns true if code running in the given JSContext is allowed to access
+ * [SecureContext] API on the given JSObject.
+ *
+ * [SecureContext] API exposure is restricted to use by code in a Secure
+ * Contexts:
+ *
+ *   https://w3c.github.io/webappsec-secure-contexts/
+ *
+ * Since we want [SecureContext] exposure to depend on the privileges of the
+ * running code (rather than the privileges of an object's creator), this
+ * function checks to see whether the given JSContext's Compartment is flagged
+ * as a Secure Context.  That allows us to make sure that system principal code
+ * (which is marked as a Secure Context) can access Secure Context API on an
+ * object in a different compartment, regardless of whether the other
+ * compartment is a Secure Context or not.
+ *
+ * Checking the JSContext's Compartment doesn't work for expanded principal
+ * globals accessing a Secure Context web page though (e.g. those used by frame
+ * scripts).  To handle that we fall back to checking whether the JSObject came
+ * from a Secure Context.
+ *
+ * Note: We'd prefer this function to live in BindingUtils.h, but we need to
+ * call it in this header, and BindingUtils.h includes us (i.e. we'd have a
+ * circular dependency between headers if it lived there).
+ */
+inline bool
+IsSecureContextOrObjectIsFromSecureContext(JSContext* aCx, JSObject* aObj)
+{
+  return JS::CompartmentCreationOptionsRef(js::GetContextCompartment(aCx)).secureContext() ||
+         JS::CompartmentCreationOptionsRef(js::GetObjectCompartment(aObj)).secureContext();
+}
+
 typedef bool
 (* ResolveOwnProperty)(JSContext* cx, JS::Handle<JSObject*> wrapper,
                        JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
@@ -40,18 +73,6 @@ typedef bool
 (* EnumerateOwnProperties)(JSContext* cx, JS::Handle<JSObject*> wrapper,
                            JS::Handle<JSObject*> obj,
                            JS::AutoIdVector& props);
-
-// Returns true if aObj's global has any of the permissions named in
-// aPermissions set to nsIPermissionManager::ALLOW_ACTION. aPermissions must be
-// null-terminated.
-bool
-CheckAnyPermissions(JSContext* aCx, JSObject* aObj, const char* const aPermissions[]);
-
-// Returns true if aObj's global has all of the permissions named in
-// aPermissions set to nsIPermissionManager::ALLOW_ACTION. aPermissions must be
-// null-terminated.
-bool
-CheckAllPermissions(JSContext* aCx, JSObject* aObj, const char* const aPermissions[]);
 
 // Returns true if the given global is of a type whose bit is set in
 // aNonExposedGlobals.
@@ -98,22 +119,11 @@ struct PrefableDisablers {
     if (!enabled) {
       return false;
     }
+    if (secureContext && !IsSecureContextOrObjectIsFromSecureContext(cx, obj)) {
+      return false;
+    }
     if (enabledFunc &&
         !enabledFunc(cx, js::GetGlobalForObjectCrossCompartment(obj))) {
-      return false;
-    }
-    if (availableFunc &&
-        !availableFunc(cx, js::GetGlobalForObjectCrossCompartment(obj))) {
-      return false;
-    }
-    if (checkAnyPermissions &&
-        !CheckAnyPermissions(cx, js::GetGlobalForObjectCrossCompartment(obj),
-                             checkAnyPermissions)) {
-      return false;
-    }
-    if (checkAllPermissions &&
-        !CheckAllPermissions(cx, js::GetGlobalForObjectCrossCompartment(obj),
-                             checkAllPermissions)) {
       return false;
     }
     return true;
@@ -123,21 +133,16 @@ struct PrefableDisablers {
   // because it will change at runtime if the corresponding pref is changed.
   bool enabled;
 
+  // A boolean indicating whether a Secure Context is required.
+  const bool secureContext;
+
   // Bitmask of global names that we should not be exposed in.
   const uint16_t nonExposedGlobals;
 
   // A function pointer to a function that can say the property is disabled
   // even if "enabled" is set to true.  If the pointer is null the value of
-  // "enabled" is used as-is unless availableFunc overrides.
+  // "enabled" is used as-is.
   const PropertyEnabled enabledFunc;
-
-  // A function pointer to a function that can be used to disable a
-  // property even if "enabled" is true and enabledFunc allowed.  This
-  // is basically a hack to avoid having to codegen PropertyEnabled
-  // implementations in case when we need to do two separate checks.
-  const PropertyEnabled availableFunc;
-  const char* const* const checkAnyPermissions;
-  const char* const* const checkAllPermissions;
 };
 
 template<typename T>
@@ -199,7 +204,7 @@ struct NativePropertiesN {
 
   const int32_t iteratorAliasMethodIndex;
 
-  MOZ_CONSTEXPR const NativePropertiesN<7>* Upcast() const {
+  constexpr const NativePropertiesN<7>* Upcast() const {
     return reinterpret_cast<const NativePropertiesN<7>*>(this);
   }
 
@@ -315,16 +320,16 @@ IsInterfacePrototype(DOMObjectType type)
 
 typedef JSObject* (*ParentGetter)(JSContext* aCx, JS::Handle<JSObject*> aObj);
 
-typedef JSObject* (*ProtoGetter)(JSContext* aCx,
-                                 JS::Handle<JSObject*> aGlobal);
+typedef JSObject* (*ProtoGetter)(JSContext* aCx);
+
 /**
- * Returns a handle to the relevent WebIDL prototype object for the given global
- * (which may be a handle to null on out of memory).  Once allocated, the
- * prototype object is guaranteed to exist as long as the global does, since the
- * global traces its array of WebIDL prototypes and constructors.
+ * Returns a handle to the relevant WebIDL prototype object for the current
+ * compartment global (which may be a handle to null on out of memory).  Once
+ * allocated, the prototype object is guaranteed to exist as long as the global
+ * does, since the global traces its array of WebIDL prototypes and
+ * constructors.
  */
-typedef JS::Handle<JSObject*> (*ProtoHandleGetter)(JSContext* aCx,
-                                                   JS::Handle<JSObject*> aGlobal);
+typedef JS::Handle<JSObject*> (*ProtoHandleGetter)(JSContext* aCx);
 
 // Special JSClass for reflected DOM objects.
 struct DOMJSClass
@@ -404,11 +409,20 @@ struct DOMIfaceAndProtoJSClass
 class ProtoAndIfaceCache;
 
 inline bool
-HasProtoAndIfaceCache(JSObject* global)
+DOMGlobalHasProtoAndIFaceCache(JSObject* global)
 {
   MOZ_ASSERT(js::GetObjectClass(global)->flags & JSCLASS_DOM_GLOBAL);
   // This can be undefined if we GC while creating the global
   return !js::GetReservedSlot(global, DOM_PROTOTYPE_SLOT).isUndefined();
+}
+
+inline bool
+HasProtoAndIfaceCache(JSObject* global)
+{
+  if (!(js::GetObjectClass(global)->flags & JSCLASS_DOM_GLOBAL)) {
+    return false;
+  }
+  return DOMGlobalHasProtoAndIFaceCache(global);
 }
 
 inline ProtoAndIfaceCache*

@@ -22,7 +22,8 @@ using namespace mozilla::layers;
 using ::testing::_;
 
 // Timeout for vsync events to occur in milliseconds
-const int kVsyncTimeoutMS = 50;
+// Windows 8.1 has intermittents at 50 ms. Raise limit to 5 vsync intervals.
+const int kVsyncTimeoutMS = 80;
 
 class TestVsyncObserver : public VsyncObserver {
 public:
@@ -79,7 +80,7 @@ protected:
     gfxPlatform::GetPlatform();
     gfxPrefs::GetSingleton();
     mVsyncSource = gfxPlatform::GetPlatform()->GetHardwareVsync();
-    MOZ_RELEASE_ASSERT(mVsyncSource);
+    MOZ_RELEASE_ASSERT(mVsyncSource, "GFX: Vsync source not found.");
   }
 
   virtual ~VsyncTester()
@@ -124,8 +125,6 @@ TEST_F(VsyncTester, EnableVsync)
 // Test that if we have vsync enabled, the display should get vsync notifications
 TEST_F(VsyncTester, CompositorGetVsyncNotifications)
 {
-  CompositorVsyncDispatcher::SetThreadAssertionsEnabled(false);
-
   VsyncSource::Display& globalDisplay = mVsyncSource->GetGlobalDisplay();
   globalDisplay.DisableVsync();
   ASSERT_FALSE(globalDisplay.IsVsyncEnabled());
@@ -194,4 +193,13 @@ TEST_F(VsyncTester, ChildRefreshDriverGetVsyncNotifications)
 
   vsyncDispatcher = nullptr;
   testVsyncObserver = nullptr;
+}
+
+// Test that we can read the vsync rate
+TEST_F(VsyncTester, VsyncSourceHasVsyncRate)
+{
+  VsyncSource::Display& globalDisplay = mVsyncSource->GetGlobalDisplay();
+  TimeDuration vsyncRate = globalDisplay.GetVsyncRate();
+  ASSERT_NE(vsyncRate, TimeDuration::Forever());
+  ASSERT_GT(vsyncRate.ToMilliseconds(), 0);
 }

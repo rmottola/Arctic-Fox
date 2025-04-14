@@ -14,6 +14,7 @@
 #include "mozilla/dom/PFMRadioChild.h"
 #include "mozilla/dom/FMRadioService.h"
 #include "mozilla/dom/TypedArray.h"
+#include "AudioChannelService.h"
 #include "DOMRequest.h"
 #include "nsDOMClassInfo.h"
 #include "nsIDocShell.h"
@@ -27,7 +28,6 @@
 // If the pref is true, the antanna will be always available.
 #define DOM_FM_ANTENNA_INTERNAL_PREF "dom.fmradio.antenna.internal"
 
-using namespace mozilla::hal;
 using mozilla::Preferences;
 
 BEGIN_FMRADIO_NAMESPACE
@@ -59,8 +59,6 @@ public:
     mFMRadio = do_GetWeakReference(static_cast<nsIDOMEventTarget*>(aFMRadio));
     mType = aType;
   }
-
-  ~FMRadioRequest() { }
 
   NS_IMETHODIMP
   Run()
@@ -97,6 +95,9 @@ public:
     return NS_OK;
   }
 
+protected:
+  ~FMRadioRequest() { }
+
 private:
   FMRadioRequestArgs::Type mType;
   nsWeakPtr mFMRadio;
@@ -105,7 +106,7 @@ private:
 NS_IMPL_ISUPPORTS_INHERITED0(FMRadioRequest, DOMRequest)
 
 FMRadio::FMRadio()
-  : mHeadphoneState(SWITCH_STATE_OFF)
+  : mHeadphoneState(hal::SWITCH_STATE_OFF)
   , mRdsGroupMask(0)
   , mAudioChannelAgentEnabled(false)
   , mHasInternalAntenna(false)
@@ -130,8 +131,8 @@ FMRadio::Init(nsPIDOMWindowInner *aWindow)
   if (mHasInternalAntenna) {
     LOG("We have an internal antenna.");
   } else {
-    mHeadphoneState = GetCurrentSwitchState(SWITCH_HEADPHONES);
-    RegisterSwitchObserver(SWITCH_HEADPHONES, this);
+    mHeadphoneState = hal::GetCurrentSwitchState(hal::SWITCH_HEADPHONES);
+    hal::RegisterSwitchObserver(hal::SWITCH_HEADPHONES, this);
   }
 
   nsCOMPtr<nsIAudioChannelAgent> audioChannelAgent =
@@ -154,7 +155,7 @@ FMRadio::Shutdown()
   IFMRadioService::Singleton()->RemoveObserver(this);
 
   if (!mHasInternalAntenna) {
-    UnregisterSwitchObserver(SWITCH_HEADPHONES, this);
+    hal::UnregisterSwitchObserver(hal::SWITCH_HEADPHONES, this);
   }
 
   mIsShutdown = true;
@@ -167,7 +168,7 @@ FMRadio::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 }
 
 void
-FMRadio::Notify(const SwitchEvent& aEvent)
+FMRadio::Notify(const hal::SwitchEvent& aEvent)
 {
   MOZ_ASSERT(!mHasInternalAntenna);
 
@@ -240,8 +241,8 @@ FMRadio::RdsEnabled()
 bool
 FMRadio::AntennaAvailable() const
 {
-  return mHasInternalAntenna ? true : (mHeadphoneState != SWITCH_STATE_OFF) &&
-    (mHeadphoneState != SWITCH_STATE_UNKNOWN);
+  return mHasInternalAntenna ? true : (mHeadphoneState != hal::SWITCH_STATE_OFF) &&
+    (mHeadphoneState != hal::SWITCH_STATE_UNKNOWN);
 }
 
 Nullable<double>
@@ -388,7 +389,7 @@ FMRadio::SeekUp()
   }
 
   RefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
-  IFMRadioService::Singleton()->Seek(FM_RADIO_SEEK_DIRECTION_UP, r);
+  IFMRadioService::Singleton()->Seek(hal::FM_RADIO_SEEK_DIRECTION_UP, r);
 
   return r.forget();
 }
@@ -402,7 +403,7 @@ FMRadio::SeekDown()
   }
 
   RefPtr<FMRadioRequest> r = new FMRadioRequest(win, this);
-  IFMRadioService::Singleton()->Seek(FM_RADIO_SEEK_DIRECTION_DOWN, r);
+  IFMRadioService::Singleton()->Seek(hal::FM_RADIO_SEEK_DIRECTION_DOWN, r);
 
   return r.forget();
 }
@@ -452,10 +453,15 @@ FMRadio::EnableAudioChannelAgent()
 {
   NS_ENSURE_TRUE_VOID(mAudioChannelAgent);
 
-  float volume = 0.0;
-  bool muted = true;
-  mAudioChannelAgent->NotifyStartedPlaying(&volume, &muted);
-  WindowVolumeChanged(volume, muted);
+  AudioPlaybackConfig config;
+  nsresult rv = mAudioChannelAgent->NotifyStartedPlaying(&config,
+                                                         AudioChannelService::AudibleState::eAudible);
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return;
+  }
+
+  WindowVolumeChanged(config.mVolume, config.mMuted);
+  WindowSuspendChanged(config.mSuspend);
 
   mAudioChannelAgentEnabled = true;
 }
@@ -463,8 +469,16 @@ FMRadio::EnableAudioChannelAgent()
 NS_IMETHODIMP
 FMRadio::WindowVolumeChanged(float aVolume, bool aMuted)
 {
+  // TODO : Not support to change volume now, so we just close it.
   IFMRadioService::Singleton()->EnableAudio(!aMuted);
-  // TODO: what about the volume?
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+FMRadio::WindowSuspendChanged(nsSuspendedTypes aSuspend)
+{
+  bool enable = (aSuspend == nsISuspendedTypes::NONE_SUSPENDED);
+  IFMRadioService::Singleton()->EnableAudio(enable);
   return NS_OK;
 }
 

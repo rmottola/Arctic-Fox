@@ -79,7 +79,7 @@ function makeTest(id, expectedJSON, useReportOnlyPolicy, callback) {
 
   let ssm = Cc["@mozilla.org/scriptsecuritymanager;1"]
               .getService(Ci.nsIScriptSecurityManager);
-  principal = ssm.getSimpleCodebasePrincipal(selfuri);
+  principal = ssm.createCodebasePrincipal(selfuri, {});
   csp.setRequestContext(null, principal);
 
   // Load up the policy
@@ -172,4 +172,13 @@ function run_test() {
                                   4);
         }
       });
+
+  // test scheme of ftp:
+  makeTest(8, {"blocked-uri": "ftp://blocked.test"}, false,
+    function(csp) {
+      // shouldLoad creates and sends out the report here.
+      csp.shouldLoad(Ci.nsIContentPolicy.TYPE_SCRIPT,
+                    NetUtil.newURI("ftp://blocked.test/profile.png"),
+                    null, null, null, null);
+    });
 }

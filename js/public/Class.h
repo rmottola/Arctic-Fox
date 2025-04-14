@@ -9,8 +9,6 @@
 #ifndef js_Class_h
 #define js_Class_h
 
-#include "mozilla/DebugOnly.h"
-
 #include "jstypes.h"
 
 #include "js/CallArgs.h"
@@ -383,8 +381,8 @@ typedef bool
 /**
  * Function type for trace operation of the class called to enumerate all
  * traceable things reachable from obj's private data structure. For each such
- * thing, a trace implementation must call one of the JS_Call*Tracer variants
- * on the thing.
+ * thing, a trace implementation must call JS::TraceEdge on the thing's
+ * location.
  *
  * JSTraceOp implementation can assume that no other threads mutates object
  * state. It must not change state of the object or corresponding native
@@ -453,15 +451,25 @@ class JS_FRIEND_API(ElementAdder)
     JS::Value* vp_;
 
     uint32_t index_;
-    mozilla::DebugOnly<uint32_t> length_;
+#ifdef DEBUG
+    uint32_t length_;
+#endif
     GetBehavior getBehavior_;
 
   public:
     ElementAdder(JSContext* cx, JSObject* obj, uint32_t length, GetBehavior behavior)
-      : resObj_(cx, obj), vp_(nullptr), index_(0), length_(length), getBehavior_(behavior)
+      : resObj_(cx, obj), vp_(nullptr), index_(0),
+#ifdef DEBUG
+        length_(length),
+#endif
+        getBehavior_(behavior)
     {}
     ElementAdder(JSContext* cx, JS::Value* vp, uint32_t length, GetBehavior behavior)
-      : resObj_(cx), vp_(vp), index_(0), length_(length), getBehavior_(behavior)
+      : resObj_(cx), vp_(vp), index_(0),
+#ifdef DEBUG
+        length_(length),
+#endif
+        getBehavior_(behavior)
     {}
 
     GetBehavior getBehavior() const { return getBehavior_; }
@@ -480,7 +488,7 @@ typedef void
 // The special treatment of |finalize| and |trace| is necessary because if we
 // assign either of those hooks to a local variable and then call it -- as is
 // done with the other hooks -- the GC hazard analysis gets confused.
-#define JS_CLASS_MEMBERS(ClassOpsType, FinalizeOpType, FreeOpType) \
+#define JS_CLASS_MEMBERS(ClassOpsType, FreeOpType) \
     const char* name; \
     uint32_t flags; \
     const ClassOpsType* cOps; \
@@ -697,7 +705,7 @@ struct JSClassOps
 #define JS_NULL_CLASS_OPS nullptr
 
 struct JSClass {
-    JS_CLASS_MEMBERS(JSClassOps, JSFinalizeOp, JSFreeOp);
+    JS_CLASS_MEMBERS(JSClassOps, JSFreeOp);
 
     void* reserved[3];
 };
@@ -804,7 +812,7 @@ namespace js {
 
 struct Class
 {
-    JS_CLASS_MEMBERS(js::ClassOps, FinalizeOp, FreeOp);
+    JS_CLASS_MEMBERS(js::ClassOps, FreeOp);
     const ClassSpec* spec;
     const ClassExtension* ext;
     const ObjectOps* oOps;
@@ -950,13 +958,26 @@ Valueify(const JSClass* c)
  * Enumeration describing possible values of the [[Class]] internal property
  * value of objects.
  */
-enum ESClassValue {
-    ESClass_Object, ESClass_Array, ESClass_Number, ESClass_String,
-    ESClass_Boolean, ESClass_RegExp, ESClass_ArrayBuffer, ESClass_SharedArrayBuffer,
-    ESClass_Date, ESClass_Set, ESClass_Map, ESClass_Promise,
+enum class ESClass {
+    Object,
+    Array,
+    Number,
+    String,
+    Boolean,
+    RegExp,
+    ArrayBuffer,
+    SharedArrayBuffer,
+    Date,
+    Set,
+    Map,
+    Promise,
+    MapIterator,
+    SetIterator,
+    Arguments,
+    Error,
 
     /** None of the above. */
-    ESClass_Other
+    Other
 };
 
 /* Fills |vp| with the unboxed value for boxed types, or undefined otherwise. */

@@ -9,7 +9,6 @@
 #include <sstream>
 #include <vector>
 
-#include "base/histogram.h"
 #include "CSFLog.h"
 #include "timecard.h"
 
@@ -56,9 +55,9 @@
 #endif // XP_WIN
 
 #include "nsIDocument.h"
-#include "nsPerformance.h"
 #include "nsGlobalWindow.h"
 #include "nsDOMDataChannel.h"
+#include "mozilla/dom/Performance.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/Preferences.h"
@@ -82,6 +81,7 @@
 #include "mozilla/dom/RTCPeerConnectionBinding.h"
 #include "mozilla/dom/PeerConnectionImplBinding.h"
 #include "mozilla/dom/DataChannelBinding.h"
+#include "mozilla/dom/PerformanceTiming.h"
 #include "mozilla/dom/PluginCrashedEvent.h"
 #include "MediaStreamList.h"
 #include "MediaStreamTrack.h"
@@ -96,6 +96,10 @@
 #include "nsIDOMCustomEvent.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/net/DataChannelProtocol.h"
+#endif
+
+#ifndef USE_FAKE_MEDIA_STREAMS
+#include "MediaStreamGraphImpl.h"
 #endif
 
 #ifdef XP_WIN
@@ -134,7 +138,15 @@ static const char* logTag = "PeerConnectionImpl";
 
 // Getting exceptions back down from PCObserver is generally not harmful.
 namespace {
-class JSErrorResult : public ErrorResult
+// This is a terrible hack.  The problem is that SuppressException is not
+// inline, and we link this file without libxul in some cases (e.g. for our test
+// setup).  So we can't use ErrorResult or IgnoredErrorResult because those call
+// SuppressException...  And we can't use FastErrorResult because we can't
+// include BindingUtils.h, because our linking is completely fucked up.  Use
+// BaseErrorResult directly.  Please do not let me see _anyone_ doing this
+// without really careful review from someone who knows what they are doing.
+class JSErrorResult :
+    public binding_danger::TErrorResult<binding_danger::JustAssertCleanupPolicy>
 {
 public:
   ~JSErrorResult()
@@ -165,108 +177,12 @@ public:
     }
   }
   operator JSErrorResult &() { return mRv; }
+  operator ErrorResult &() { return mRv; }
 private:
   JSErrorResult mRv;
   bool isCopy;
 };
 }
-
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
-class TracksAvailableCallback : public OnTracksAvailableCallback
-{
-public:
-  TracksAvailableCallback(size_t numNewAudioTracks,
-                          size_t numNewVideoTracks,
-                          const std::string& pcHandle,
-                          RefPtr<PeerConnectionObserver> aObserver)
-  : OnTracksAvailableCallback()
-  , mObserver(aObserver)
-  , mPcHandle(pcHandle)
-  {}
-
-  virtual void NotifyTracksAvailable(DOMMediaStream* aStream) override
-  {
-    MOZ_ASSERT(NS_IsMainThread());
-    MOZ_ASSERT(aStream);
-
-    PeerConnectionWrapper wrapper(mPcHandle);
-
-    if (!wrapper.impl() || wrapper.impl()->IsClosed()) {
-      return;
-    }
-
-    nsTArray<RefPtr<MediaStreamTrack>> tracks;
-    aStream->GetTracks(tracks);
-
-    std::string streamId = PeerConnectionImpl::GetStreamId(*aStream);
-    bool notifyStream = true;
-
-    Sequence<OwningNonNull<DOMMediaStream>> streams;
-    if (!streams.AppendElement(OwningNonNull<DOMMediaStream>(*aStream),
-                               fallible)) {
-      MOZ_ASSERT(false);
-      return;
-    }
-
-    for (size_t i = 0; i < tracks.Length(); i++) {
-      std::string trackId;
-      // This is the first chance we get to set the string track id on this
-      // track. It would be nice if we could specify this along with the numeric
-      // track id from the start, but we're stuck doing this fixup after the
-      // fact.
-      nsresult rv = wrapper.impl()->GetRemoteTrackId(streamId,
-                                                     *tracks[i],
-                                                     &trackId);
-
-      if (NS_FAILED(rv)) {
-        CSFLogError(logTag, "%s: Failed to get string track id for %p, rv = %u",
-                            __FUNCTION__, tracks[i].get(),
-                            static_cast<unsigned>(rv));
-        MOZ_ASSERT(false);
-        continue;
-      }
-
-      std::string origTrackId = PeerConnectionImpl::GetTrackId(*tracks[i]);
-
-      if (origTrackId == trackId) {
-        // Pre-existing track
-        notifyStream = false;
-        continue;
-      }
-
-      tracks[i]->AssignId(NS_ConvertUTF8toUTF16(trackId.c_str()));
-
-      JSErrorResult jrv;
-      CSFLogInfo(logTag, "Calling OnAddTrack(%s)", trackId.c_str());
-      mObserver->OnAddTrack(*tracks[i], streams, jrv);
-      if (jrv.Failed()) {
-        CSFLogError(logTag, ": OnAddTrack(%u) failed! Error: %u",
-                    static_cast<unsigned>(i),
-                    jrv.ErrorCodeAsInt());
-      }
-    }
-
-    if (notifyStream) {
-      // Start currentTime from the point where this stream was successfully
-      // returned.
-      aStream->SetLogicalStreamStartTime(
-          aStream->GetPlaybackStream()->GetCurrentTime());
-
-      JSErrorResult rv;
-      CSFLogInfo(logTag, "Calling OnAddStream(%s)", streamId.c_str());
-      mObserver->OnAddStream(*aStream, rv);
-      if (rv.Failed()) {
-        CSFLogError(logTag, ": OnAddStream() failed! Error: %u",
-                    rv.ErrorCodeAsInt());
-      }
-    }
-  }
-
-private:
-  RefPtr<PeerConnectionObserver> mObserver;
-  const std::string mPcHandle;
-};
-#endif
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
 static nsresult InitNSSInContent()
@@ -1833,6 +1749,61 @@ static void DeferredSetRemote(const std::string& aPcHandle,
   }
 }
 
+static void StartTrack(MediaStream* aSource,
+                       TrackID aTrackId,
+                       nsAutoPtr<MediaSegment>&& aSegment) {
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
+  class Message : public ControlMessage {
+   public:
+    Message(MediaStream* aStream,
+            TrackID aTrack,
+            nsAutoPtr<MediaSegment>&& aSegment)
+      : ControlMessage(aStream),
+        track_id_(aTrack),
+        segment_(aSegment) {}
+
+    virtual void Run() override {
+      TrackRate track_rate = segment_->GetType() == MediaSegment::AUDIO ?
+        WEBRTC_DEFAULT_SAMPLE_RATE : mStream->GraphRate();
+      StreamTime current_end = mStream->GetTracksEnd();
+      TrackTicks current_ticks =
+        mStream->TimeToTicksRoundUp(track_rate, current_end);
+
+      // Add a track 'now' to avoid possible underrun, especially if we add
+      // a track "later".
+
+      if (current_end != 0L) {
+        CSFLogDebug(logTag, "added track @ %u -> %f",
+                    static_cast<unsigned>(current_end),
+                    mStream->StreamTimeToSeconds(current_end));
+      }
+
+      // To avoid assertions, we need to insert a dummy segment that covers up
+      // to the "start" time for the track
+      segment_->AppendNullData(current_ticks);
+      if (segment_->GetType() == MediaSegment::AUDIO) {
+        mStream->AsSourceStream()->AddAudioTrack(
+            track_id_,
+            WEBRTC_DEFAULT_SAMPLE_RATE,
+            0,
+            static_cast<AudioSegment*>(segment_.forget()));
+      } else {
+        mStream->AsSourceStream()->AddTrack(track_id_, 0, segment_.forget());
+      }
+    }
+   private:
+    TrackID track_id_;
+    nsAutoPtr<MediaSegment> segment_;
+  };
+
+  aSource->GraphImpl()->AppendMessage(
+      MakeUnique<Message>(aSource, aTrackId, Move(aSegment)));
+  CSFLogInfo(logTag, "Dispatched track-add for track id %u on stream %p",
+             aTrackId, aSource);
+#endif
+}
+
+
 nsresult
 PeerConnectionImpl::CreateNewRemoteTracks(RefPtr<PeerConnectionObserver>& aPco)
 {
@@ -1858,9 +1829,11 @@ PeerConnectionImpl::CreateNewRemoteTracks(RefPtr<PeerConnectionObserver>& aPco)
     std::string streamId = i->first;
     std::vector<RefPtr<JsepTrack>>& tracks = i->second;
 
+    bool newStream = false;
     RefPtr<RemoteSourceStreamInfo> info =
       mMedia->GetRemoteStreamById(streamId);
     if (!info) {
+      newStream = true;
       nsresult nrv = CreateRemoteSourceStreamInfo(&info, streamId);
       if (NS_FAILED(nrv)) {
         aPco->OnSetRemoteDescriptionError(
@@ -1883,82 +1856,100 @@ PeerConnectionImpl::CreateNewRemoteTracks(RefPtr<PeerConnectionObserver>& aPco)
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
       info->GetMediaStream()->AssignId(NS_ConvertUTF8toUTF16(streamId.c_str()));
+      info->GetMediaStream()->SetLogicalStreamStartTime(
+          info->GetMediaStream()->GetPlaybackStream()->GetCurrentTime());
 #else
       info->GetMediaStream()->AssignId((streamId));
 #endif
     }
 
-    size_t numNewAudioTracks = 0;
-    size_t numNewVideoTracks = 0;
-    size_t numPreexistingTrackIds = 0;
-
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
-      // Set the principal used for creating the tracks. This makes the stream
-      // data (audio/video samples) accessible to the receiving page. We're
-      // only certain that privacy hasn't been requested if we're connected.
-      nsCOMPtr<nsIPrincipal> principal;
-      nsIDocument* doc = GetWindow()->GetExtantDoc();
-      MOZ_ASSERT(doc);
-      if (mDtlsConnected && !PrivacyRequested()) {
-        principal = doc->NodePrincipal();
-      } else {
-        // we're either certain that we need isolation for the streams, OR
-        // we're not sure and we can fix the stream in SetDtlsConnected
-        principal =  nsNullPrincipal::CreateWithInheritedAttributes(doc->NodePrincipal());
-      }
+    Sequence<OwningNonNull<DOMMediaStream>> streams;
+    if (!streams.AppendElement(OwningNonNull<DOMMediaStream>(
+            *info->GetMediaStream()),
+            fallible)) {
+      MOZ_ASSERT(false);
+      return NS_ERROR_FAILURE;
+    }
+
+    // Set the principal used for creating the tracks. This makes the stream
+    // data (audio/video samples) accessible to the receiving page. We're
+    // only certain that privacy hasn't been requested if we're connected.
+    nsCOMPtr<nsIPrincipal> principal;
+    nsIDocument* doc = GetWindow()->GetExtantDoc();
+    MOZ_ASSERT(doc);
+    if (mDtlsConnected && !PrivacyRequested()) {
+      principal = doc->NodePrincipal();
+    } else {
+      // we're either certain that we need isolation for the streams, OR
+      // we're not sure and we can fix the stream in SetDtlsConnected
+      principal =  nsNullPrincipal::CreateWithInheritedAttributes(doc->NodePrincipal());
+    }
 #endif
 
-    for (auto j = tracks.begin(); j != tracks.end(); ++j) {
-      RefPtr<JsepTrack> track = *j;
-      if (!info->HasTrack(track->GetTrackId())) {
-        if (track->GetMediaType() == SdpMediaSection::kAudio) {
-          ++numNewAudioTracks;
-        } else if (track->GetMediaType() == SdpMediaSection::kVideo) {
-          ++numNewVideoTracks;
-        } else {
-          MOZ_ASSERT(false);
-          continue;
-        }
+    // We need to select unique ids, just use max + 1
+    TrackID maxTrackId = 0;
+    {
+      nsTArray<RefPtr<dom::MediaStreamTrack>> domTracks;
+      info->GetMediaStream()->GetTracks(domTracks);
+      for (auto& track : domTracks) {
+        maxTrackId = std::max(maxTrackId, track->mTrackID);
+      }
+    }
+
+    for (RefPtr<JsepTrack>& track : tracks) {
+      std::string webrtcTrackId(track->GetTrackId());
+      if (!info->HasTrack(webrtcTrackId)) {
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
         RefPtr<RemoteTrackSource> source =
           new RemoteTrackSource(principal, nsString());
 #else
         RefPtr<MediaStreamTrackSource> source = new MediaStreamTrackSource();
 #endif
-        TrackID trackID = info->GetNextAvailableNumericTrackId();
+        TrackID trackID = ++maxTrackId;
         RefPtr<MediaStreamTrack> domTrack;
+        nsAutoPtr<MediaSegment> segment;
         if (track->GetMediaType() == SdpMediaSection::kAudio) {
           domTrack =
             info->GetMediaStream()->CreateDOMTrack(trackID,
                                                    MediaSegment::AUDIO,
                                                    source);
+          segment = new AudioSegment;
         } else {
           domTrack =
             info->GetMediaStream()->CreateDOMTrack(trackID,
                                                    MediaSegment::VIDEO,
                                                    source);
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
+          segment = new VideoSegment;
+#endif
         }
-        info->AddTrack(track->GetTrackId(), domTrack);
+
+        StartTrack(info->GetMediaStream()->GetInputStream()->AsSourceStream(),
+                   trackID, Move(segment));
+        info->AddTrack(webrtcTrackId, domTrack);
         CSFLogDebug(logTag, "Added remote track %s/%s",
-                    info->GetId().c_str(), track->GetTrackId().c_str());
-      } else {
-        ++numPreexistingTrackIds;
+                    info->GetId().c_str(), webrtcTrackId.c_str());
+
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
+        domTrack->AssignId(NS_ConvertUTF8toUTF16(webrtcTrackId.c_str()));
+        aPco->OnAddTrack(*domTrack, streams, jrv);
+        if (jrv.Failed()) {
+          CSFLogError(logTag, ": OnAddTrack(%s) failed! Error: %u",
+                      webrtcTrackId.c_str(),
+                      jrv.ErrorCodeAsInt());
+        }
+#endif
       }
     }
 
-    // Now that the streams are all set up, notify about track availability.
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
-    TracksAvailableCallback* tracksAvailableCallback =
-      new TracksAvailableCallback(numNewAudioTracks,
-                                  numNewVideoTracks,
-                                  mHandle,
-                                  aPco);
-    info->GetMediaStream()->OnTracksAvailable(tracksAvailableCallback);
-#else
-    if (!numPreexistingTrackIds) {
+    if (newStream) {
       aPco->OnAddStream(*info->GetMediaStream(), jrv);
+      if (jrv.Failed()) {
+        CSFLogError(logTag, ": OnAddStream() failed! Error: %u",
+                    jrv.ErrorCodeAsInt());
+      }
     }
-#endif
   }
   return NS_OK;
 }
@@ -2103,7 +2094,7 @@ PeerConnectionImpl::SetRemoteDescription(int32_t action, const char* aSDP)
 nsresult
 PeerConnectionImpl::GetTimeSinceEpoch(DOMHighResTimeStamp *result) {
   MOZ_ASSERT(NS_IsMainThread());
-  nsPerformance *perf = mWindow->GetPerformance();
+  Performance *perf = mWindow->GetPerformance();
   NS_ENSURE_TRUE(perf && perf->Timing(), NS_ERROR_UNEXPECTED);
   *result = perf->Now() + perf->Timing()->NavigationStart();
   return NS_OK;
@@ -2293,20 +2284,6 @@ PeerConnectionImpl::PrincipalChanged(MediaStreamTrack* aTrack) {
   } else {
     CSFLogInfo(logTag, "Can't update sink principal; document gone");
   }
-}
-#endif
-
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
-nsresult
-PeerConnectionImpl::GetRemoteTrackId(const std::string streamId,
-                                     const MediaStreamTrack& aTrack,
-                                     std::string* trackId) const
-{
-  if (IsClosed()) {
-    return NS_ERROR_UNEXPECTED;
-  }
-
-  return mMedia->GetRemoteTrackId(streamId, aTrack, trackId);
 }
 #endif
 
@@ -3900,13 +3877,8 @@ PeerConnectionImpl::startCallTelem() {
   mStartTime = TimeStamp::Now();
 
   // Increment session call counter
-  // If we want to track Loop calls independently here, we need two mConnectionCounters
-  int &cnt = PeerConnectionCtx::GetInstance()->mConnectionCounter;
-  if (cnt > 0) {
-    Telemetry::GetHistogramById(Telemetry::WEBRTC_CALL_COUNT)->Subtract(cnt);
-  }
-  cnt++;
-  Telemetry::GetHistogramById(Telemetry::WEBRTC_CALL_COUNT)->Add(cnt);
+  // If we want to track Loop calls independently here, we need two histograms.
+  Telemetry::Accumulate(Telemetry::WEBRTC_CALL_COUNT_2, 1);
 }
 #endif
 

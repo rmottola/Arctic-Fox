@@ -29,6 +29,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "FileUtils",
                                   "resource://gre/modules/FileUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ProfileAge",
                                   "resource://gre/modules/ProfileAge.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
+                                  "resource://gre/modules/AppConstants.jsm");
 
 
 function FirefoxProfileMigrator() {
@@ -132,7 +134,7 @@ FirefoxProfileMigrator.prototype._getResourcesInternal = function(sourceProfileD
   let sessionFile = this._getFileObject(sourceProfileDir, "sessionstore.js");
   let session;
   if (sessionFile) {
-    session = aProfile ? getFileResource(types.SESSION, ["sessionstore.js"]) : {
+    session = {
       type: types.SESSION,
       migrate: function(aCallback) {
         sessionCheckpoints.copyTo(currentProfileDir, "sessionCheckpoints.json");
@@ -148,6 +150,11 @@ FirefoxProfileMigrator.prototype._getResourcesInternal = function(sourceProfileD
           // session with the "what's new" page:
           Services.prefs.setCharPref("browser.startup.homepage_override.mstone", mstone);
           Services.prefs.setCharPref("browser.startup.homepage_override.buildID", buildID);
+          // Also set the Windows 10 pref to avoid the win10 intro page to show up
+          // on startup.
+          if (AppConstants.isPlatformAndVersionAtLeast("win", "10")) {
+            Services.prefs.setBoolPref("browser.usedOnWindows10", true);
+          }
           // It's too early in startup for the pref service to have a profile directory,
           // so we have to manually tell it where to save the prefs file.
           let newPrefsFile = currentProfileDir.clone();
@@ -158,10 +165,10 @@ FirefoxProfileMigrator.prototype._getResourcesInternal = function(sourceProfileD
           aCallback(false);
         });
       }
-    }
+    };
   }
 
-  // FHR related migrations.
+  // Telemetry related migrations.
   let times = {
     name: "times", // name is used only by tests.
     type: types.OTHERDATA,
@@ -178,69 +185,60 @@ FirefoxProfileMigrator.prototype._getResourcesInternal = function(sourceProfileD
       );
     }
   };
-  let healthReporter = {
-    name: "healthreporter", // name is used only by tests...
+  let telemetry = {
+    name: "telemetry", // name is used only by tests...
     type: types.OTHERDATA,
     migrate: aCallback => {
-      // the health-reporter can't have been initialized yet so it's safe to
-      // copy the SQL file.
+      let createSubDir = (name) => {
+        let dir = currentProfileDir.clone();
+        dir.append(name);
+        dir.create(Ci.nsIFile.DIRECTORY_TYPE, FileUtils.PERMS_DIRECTORY);
+        return dir;
+      };
 
-      // We only support the default database name - copied from healthreporter.jsm
-      const DEFAULT_DATABASE_NAME = "healthreport.sqlite";
-      let path = OS.Path.join(sourceProfileDir.path, DEFAULT_DATABASE_NAME);
-      let sqliteFile = FileUtils.File(path);
-      if (sqliteFile.exists()) {
-        sqliteFile.copyTo(currentProfileDir, "");
-      }
-      // In unusual cases there may be 2 additional files - a "write ahead log"
-      // (-wal) file and a "shared memory file" (-shm).  The wal file contains
-      // data that will be replayed when the DB is next opened, while the shm
-      // file is ignored in that case - the replay happens using only the wal.
-      // So we *do* copy a wal if it exists, but not a shm.
-      // See https://www.sqlite.org/tempfiles.html for more.
-      // (Note also we attempt these copies even if we can't find the DB, and
-      // rely on FHR itself to do the right thing if it can)
-      path = OS.Path.join(sourceProfileDir.path, DEFAULT_DATABASE_NAME + "-wal");
-      let sqliteWal = FileUtils.File(path);
-      if (sqliteWal.exists()) {
-        sqliteWal.copyTo(currentProfileDir, "");
-      }
-
-      // If the 'healthreport' directory exists we copy everything from it.
-      let subdir = this._getFileObject(sourceProfileDir, "healthreport");
+      // If the 'datareporting' directory exists we migrate files from it.
+      let haveStateFile = false;
+      let subdir = this._getFileObject(sourceProfileDir, "datareporting");
       if (subdir && subdir.isDirectory()) {
-        // Copy all regular files.
-        let dest = currentProfileDir.clone();
-        dest.append("healthreport");
-        dest.create(Components.interfaces.nsIFile.DIRECTORY_TYPE,
-                    FileUtils.PERMS_DIRECTORY);
+        // Copy only specific files.
+        let toCopy = ["state.json", "session-state.json"];
+
+        let dest = createSubDir("datareporting");
         let enumerator = subdir.directoryEntries;
         while (enumerator.hasMoreElements()) {
-          let file = enumerator.getNext().QueryInterface(Components.interfaces.nsIFile);
-          if (file.isDirectory()) {
+          let file = enumerator.getNext().QueryInterface(Ci.nsIFile);
+          if (file.isDirectory() || toCopy.indexOf(file.leafName) == -1) {
             continue;
+          }
+
+          if (file.leafName == "state.json") {
+            haveStateFile = true;
           }
           file.copyTo(dest, "");
         }
       }
-      // If the 'datareporting' directory exists we copy just state.json
-      subdir = this._getFileObject(sourceProfileDir, "datareporting");
-      if (subdir && subdir.isDirectory()) {
-        let stateFile = this._getFileObject(subdir, "state.json");
-        if (stateFile) {
-          let dest = currentProfileDir.clone();
-          dest.append("datareporting");
-          dest.create(Components.interfaces.nsIFile.DIRECTORY_TYPE,
-                      FileUtils.PERMS_DIRECTORY);
-          stateFile.copyTo(dest, "");
+
+      if (!haveStateFile) {
+        // Fall back to migrating the state file that contains the client id from healthreport/.
+        // We first moved the client id management from the FHR implementation to the datareporting
+        // service.
+        // Consequently, we try to migrate an existing FHR state file here as a fallback.
+        let subdir = this._getFileObject(sourceProfileDir, "healthreport");
+        if (subdir && subdir.isDirectory()) {
+          let stateFile = this._getFileObject(subdir, "state.json");
+          if (stateFile) {
+            let dest = createSubDir("healthreport");
+            stateFile.copyTo(dest, "");
+          }
         }
       }
+
       aCallback(true);
     }
   }
 
   return [places, cookies, passwords, formData, dictionary, bookmarksBackups,
-          session, times, healthReporter].filter(r => r);
+          session, times, telemetry].filter(r => r);
 };
 
 Object.defineProperty(FirefoxProfileMigrator.prototype, "startupOnlyMigrator", {

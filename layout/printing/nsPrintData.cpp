@@ -41,7 +41,7 @@ nsPrintData::nsPrintData(ePrintDataType aType) :
   if (svc) {
     svc->CreateBundle( "chrome://branding/locale/brand.properties", getter_AddRefs( brandBundle ) );
     if (brandBundle) {
-      brandBundle->GetStringFromName(MOZ_UTF16("brandShortName"), &mBrandName );
+      brandBundle->GetStringFromName(u"brandShortName", &mBrandName );
     }
   }
 
@@ -116,6 +116,18 @@ nsPrintData::DoOnProgressChange(int32_t      aProgress,
     wpl->OnProgressChange(nullptr, nullptr, aProgress, aMaxProgress, aProgress, aMaxProgress);
     if (aDoStartStop) {
       wpl->OnStateChange(nullptr, nullptr, aFlag, NS_OK);
+    }
+  }
+}
+
+void
+nsPrintData::DoOnStatusChange(nsresult aStatus)
+{
+  uint32_t numberOfListeners = mPrintProgressListeners.Length();
+  for (uint32_t i = 0; i < numberOfListeners; ++i) {
+    nsIWebProgressListener* listener = mPrintProgressListeners.SafeElementAt(i);
+    if (listener) {
+      listener->OnStatusChange(nullptr, nullptr, aStatus, nullptr);
     }
   }
 }

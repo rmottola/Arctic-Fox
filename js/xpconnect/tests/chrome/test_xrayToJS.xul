@@ -171,8 +171,8 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=933681
      "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__",
      "__proto__"];
   gConstructorProperties['Object'] =
-    constructorProps(["setPrototypeOf", "getOwnPropertyDescriptor", "keys",
-                      "is", "defineProperty", "defineProperties", "create",
+    constructorProps(["setPrototypeOf", "getOwnPropertyDescriptor", "getOwnPropertyDescriptors",
+                      "keys", "is", "defineProperty", "defineProperties", "create",
                       "getOwnPropertyNames", "getOwnPropertySymbols",
                       "preventExtensions", "freeze", "isFrozen", "seal",
                       "isSealed", "assign", "getPrototypeOf", "values",
@@ -214,7 +214,7 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=933681
 
   gPrototypeProperties['Function'] =
     ["constructor", "toSource", "toString", "apply", "call", "bind",
-     "isGenerator", "length", "name", "arguments", "caller"];
+     "isGenerator", "length", "name", "arguments", "caller", Symbol.hasInstance];
   gConstructorProperties['Function'] = constructorProps([])
 
   gPrototypeProperties['RegExp'] =
@@ -579,7 +579,7 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=933681
     trickyArray[1] = "hi";
     is(trickyArray.length, 0, "Length remains non-writable");
     is(trickyArray[1], undefined, "Frozen length forbids new properties");
-
+    is(trickyArray instanceof iwin.Array, true, "instanceof should work across xray wrappers.");
     testTrickyObject(trickyArray);
 
     testArrayIterators(new iwin.Array(1, 1, 2, 3, 5), [1, 1, 2, 3, 5]);
@@ -773,8 +773,8 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=933681
       }
       testProperty('message', x => x == 'some message', 'some other message', 42);
       testProperty('fileName', x => x == '', 'otherFilename.html', new iwin.Object());
-      testProperty('columnNumber', x => x > 5 && x < 100, 99, 99.5);
-      testProperty('lineNumber', x => x > 100 && x < 10000, 50, 'foo');
+      testProperty('columnNumber', x => x == 1, 99, 99.5);
+      testProperty('lineNumber', x => x == 0, 50, 'foo');
 
       // Note - an Exception newed via Xrays is going to have an empty stack given the
       // current semantics and implementation. This tests the current behavior, but that

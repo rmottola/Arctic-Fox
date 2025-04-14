@@ -10,6 +10,9 @@
 
 using namespace mozilla::unicode;
 
+static_assert(mozilla::kBidiLevelNone > NSBIDI_MAX_EXPLICIT_LEVEL + 1,
+              "The pseudo embedding level should be out-of-range");
+
 // These are #defined in <sys/regset.h> under Solaris 10 x86
 #undef CS
 #undef ES
@@ -389,7 +392,9 @@ nsresult nsBidi::SetPara(const char16_t *aText, int32_t aLength,
           level=nextLevel;
 
           /* search for the limit of this run */
-          while(++limit<aLength && levels[limit]==level) {}
+          while(++limit<aLength &&
+                (levels[limit]==level ||
+                 (DIRPROP_FLAG(mDirProps[limit])&MASK_BN_EXPLICIT))) {}
 
           /* get the correct level of the next run */
           if(limit<aLength) {
@@ -653,7 +658,8 @@ nsBidi::BracketData::ProcessLRI_RLI(nsBidiLevel aLevel)
 void
 nsBidi::BracketData::ProcessPDI()
 {
-  mIsoRuns[mIsoRunLast].lastBase = O_N;
+  MOZ_ASSERT(mIsoRunLast > 0);
+  mIsoRuns[--mIsoRunLast].lastBase = O_N;
 }
 
 /* newly found opening bracket: create an openings entry */
@@ -1441,6 +1447,7 @@ void nsBidi::ProcessPropertySeq(LevState *pLevState, uint8_t _prop, int32_t star
       break;
 
     case 2:                         /* prepend ON seq to current seq */
+      MOZ_ASSERT(pLevState->startON >= 0, "no valid ON sequence start!");
       start = pLevState->startON;
       break;
 
@@ -1489,6 +1496,7 @@ void nsBidi::ResolveImplicitLevels(int32_t aStart, int32_t aLimit,
   levState.runLevel = mLevels[aStart];
   levState.pImpTab = impTab[levState.runLevel & 1];
   levState.pImpAct = impAct0;
+  levState.startON = -1; /* initialize to invalid start position */
 
   /* The isolates[] entries contain enough information to
      resume the bidi algorithm in the same state as it was
@@ -1513,11 +1521,14 @@ void nsBidi::ResolveImplicitLevels(int32_t aStart, int32_t aLimit,
 
   for (i = aStart; i <= aLimit; i++) {
     if (i >= aLimit) {
-      if (aLimit > aStart) {
-        dirProp = mDirProps[aLimit - 1];
-        if (dirProp == LRI || dirProp == RLI) {
-          break;  /* no forced closing for sequence ending with LRI/RLI */
-        }
+      int32_t k;
+      for (k = aLimit - 1;
+           k > aStart && (DIRPROP_FLAG(dirProps[k]) & MASK_BN_EXPLICIT); k--) {
+        // empty loop body
+      }
+      dirProp = mDirProps[k];
+      if (dirProp == LRI || dirProp == RLI) {
+        break;  /* no forced closing for sequence ending with LRI/RLI */
       }
       gprop = aEOR;
     } else {
@@ -1560,7 +1571,11 @@ void nsBidi::ResolveImplicitLevels(int32_t aStart, int32_t aLimit,
     }
   }
 
-  dirProp = dirProps[aLimit - 1];
+  for (i = aLimit - 1;
+       i > aStart && (DIRPROP_FLAG(dirProps[i]) & MASK_BN_EXPLICIT); i--) {
+    // empty loop body
+  }
+  dirProp = dirProps[i];
   if ((dirProp == LRI || dirProp == RLI) && aLimit < mLength) {
     mIsolateCount++;
     mIsolates[mIsolateCount].stateImp = stateImp;

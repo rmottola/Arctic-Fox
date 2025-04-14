@@ -48,8 +48,10 @@ class JitContext
     JitContext(JSContext* cx, TempAllocator* temp);
     JitContext(ExclusiveContext* cx, TempAllocator* temp);
     JitContext(CompileRuntime* rt, CompileCompartment* comp, TempAllocator* temp);
-    explicit JitContext(CompileRuntime* rt);
     JitContext(CompileRuntime* rt, TempAllocator* temp);
+    explicit JitContext(CompileRuntime* rt);
+    explicit JitContext(TempAllocator* temp);
+    JitContext();
     ~JitContext();
 
     // Running context when executing on the main thread. Not available during
@@ -64,6 +66,13 @@ class JitContext
     CompileRuntime* runtime;
     CompileCompartment* compartment;
 
+    bool onMainThread() const {
+        return runtime && runtime->onMainThread();
+    }
+    bool hasProfilingScripts() const {
+        return runtime && !!runtime->profilingScripts();
+    }
+
     int getNextAssemblerId() {
         return assemblerCount_++;
     }
@@ -73,7 +82,7 @@ class JitContext
 };
 
 // Initialize Ion statically for all JSRuntimes.
-bool InitializeIon();
+MOZ_MUST_USE bool InitializeIon();
 
 // Get and set the current JIT context.
 JitContext* GetJitContext();
@@ -83,7 +92,7 @@ void SetJitContext(JitContext* ctx);
 
 bool CanIonCompileScript(JSContext* cx, JSScript* script, bool osr);
 
-bool IonCompileScriptForBaseline(JSContext* cx, BaselineFrame* frame, jsbytecode* pc);
+MOZ_MUST_USE bool IonCompileScriptForBaseline(JSContext* cx, BaselineFrame* frame, jsbytecode* pc);
 
 MethodStatus CanEnter(JSContext* cx, RunState& state);
 MethodStatus CanEnterUsingFastInvoke(JSContext* cx, HandleScript script, uint32_t numActualArgs);
@@ -114,8 +123,8 @@ IsErrorStatus(JitExecStatus status)
 
 struct EnterJitData;
 
-bool SetEnterJitData(JSContext* cx, EnterJitData& data, RunState& state,
-                     MutableHandle<GCVector<Value>> vals);
+MOZ_MUST_USE bool SetEnterJitData(JSContext* cx, EnterJitData& data, RunState& state,
+                                  MutableHandle<GCVector<Value>> vals);
 
 JitExecStatus IonCannon(JSContext* cx, RunState& state);
 
@@ -138,17 +147,17 @@ class MIRGenerator;
 class LIRGraph;
 class CodeGenerator;
 
-bool OptimizeMIR(MIRGenerator* mir);
+MOZ_MUST_USE bool OptimizeMIR(MIRGenerator* mir);
 LIRGraph* GenerateLIR(MIRGenerator* mir);
 CodeGenerator* GenerateCode(MIRGenerator* mir, LIRGraph* lir);
 CodeGenerator* CompileBackEnd(MIRGenerator* mir);
 
 void AttachFinishedCompilations(JSContext* cx);
-void FinishOffThreadBuilder(JSContext* cx, IonBuilder* builder);
+void FinishOffThreadBuilder(JSRuntime* runtime, IonBuilder* builder);
 void StopAllOffThreadCompilations(Zone* zone);
 void StopAllOffThreadCompilations(JSCompartment* comp);
 
-void LazyLink(JSContext* cx, HandleScript calleescript);
+void LinkIonScript(JSContext* cx, HandleScript calleescript);
 uint8_t* LazyLinkTopActivation(JSContext* cx);
 
 static inline bool
@@ -158,8 +167,8 @@ IsIonEnabled(JSContext* cx)
 #if defined(JS_CODEGEN_NONE) || defined(JS_CODEGEN_ARM64)
     return false;
 #else
-    return cx->runtime()->options().ion() &&
-           cx->runtime()->options().baseline() &&
+    return cx->options().ion() &&
+           cx->options().baseline() &&
            cx->runtime()->jitSupportsFloatingPoint;
 #endif
 }
@@ -203,6 +212,7 @@ void DestroyJitScripts(FreeOp* fop, JSScript* script);
 void TraceJitScripts(JSTracer* trc, JSScript* script);
 
 bool JitSupportsFloatingPoint();
+bool JitSupportsUnalignedAccesses();
 bool JitSupportsSimd();
 bool JitSupportsAtomics();
 

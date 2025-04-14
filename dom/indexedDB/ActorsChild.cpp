@@ -746,7 +746,7 @@ DispatchErrorEvent(IDBRequest* aRequest,
     WidgetEvent* internalEvent = aEvent->WidgetEventPtr();
     MOZ_ASSERT(internalEvent);
 
-    if (internalEvent->mFlags.mExceptionHasBeenRisen) {
+    if (internalEvent->mFlags.mExceptionWasRaised) {
       transaction->Abort(NS_ERROR_DOM_INDEXEDDB_ABORT_ERR);
     } else if (doDefault) {
       transaction->Abort(request);
@@ -821,7 +821,7 @@ DispatchSuccessEvent(ResultHelper* aResultHelper,
 
   if (transaction &&
       transaction->IsOpen() &&
-      internalEvent->mFlags.mExceptionHasBeenRisen) {
+      internalEvent->mFlags.mExceptionWasRaised) {
     transaction->Abort(NS_ERROR_DOM_INDEXEDDB_ABORT_ERR);
   }
 }
@@ -899,7 +899,6 @@ protected:
 };
 
 class WorkerPermissionChallenge final : public Runnable
-                                      , public WorkerFeature
 {
 public:
   WorkerPermissionChallenge(WorkerPrivate* aWorkerPrivate,
@@ -917,6 +916,22 @@ public:
     mWorkerPrivate->AssertIsOnWorkerThread();
   }
 
+  bool
+  Dispatch()
+  {
+    mWorkerPrivate->AssertIsOnWorkerThread();
+    if (NS_WARN_IF(!mWorkerPrivate->ModifyBusyCountFromWorker(true))) {
+      return false;
+    }
+
+    if (NS_WARN_IF(NS_FAILED(NS_DispatchToMainThread(this)))) {
+      mWorkerPrivate->ModifyBusyCountFromWorker(false);
+      return false;
+    }
+
+    return true;
+  }
+
   NS_IMETHOD
   Run() override
   {
@@ -926,14 +941,6 @@ public:
     }
 
     return NS_OK;
-  }
-
-  virtual bool
-  Notify(workers::Status aStatus) override
-  {
-    // We don't care about the notification. We just want to keep the
-    // mWorkerPrivate alive.
-    return true;
   }
 
   void
@@ -959,7 +966,7 @@ public:
     mActor = nullptr;
 
     mWorkerPrivate->AssertIsOnWorkerThread();
-    mWorkerPrivate->RemoveFeature(this);
+    mWorkerPrivate->ModifyBusyCountFromWorker(false);
   }
 
 private:
@@ -1410,13 +1417,7 @@ BackgroundFactoryRequestChild::RecvPermissionChallenge(
     RefPtr<WorkerPermissionChallenge> challenge =
       new WorkerPermissionChallenge(workerPrivate, this, mFactory,
                                     aPrincipalInfo);
-
-    if (NS_WARN_IF(!workerPrivate->AddFeature(challenge))) {
-      return false;
-    }
-
-    MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(challenge));
-    return true;
+    return challenge->Dispatch();
   }
 
   nsresult rv;
@@ -1862,6 +1863,20 @@ BackgroundDatabaseChild::RecvInvalidate()
 
   if (mDatabase) {
     mDatabase->Invalidate();
+  }
+
+  return true;
+}
+
+bool
+BackgroundDatabaseChild::RecvCloseAfterInvalidationComplete()
+{
+  AssertIsOnOwningThread();
+
+  MaybeCollectGarbageOnIPCMessage();
+
+  if (mDatabase) {
+    mDatabase->DispatchTrustedEvent(nsDependentString(kCloseEventType));
   }
 
   return true;

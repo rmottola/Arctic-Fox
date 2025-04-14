@@ -31,7 +31,7 @@ inline TrackTicks RateConvertTicksRoundDown(TrackRate aOutRate,
 {
   NS_ASSERTION(0 < aOutRate && aOutRate <= TRACK_RATE_MAX, "Bad out rate");
   NS_ASSERTION(0 < aInRate && aInRate <= TRACK_RATE_MAX, "Bad in rate");
-  NS_WARN_IF_FALSE(0 <= aTicks && aTicks <= TRACK_TICKS_MAX, "Bad ticks"); // bug 957691
+  NS_ASSERTION(0 <= aTicks && aTicks <= TRACK_TICKS_MAX, "Bad ticks");
   return (aTicks * aOutRate) / aInRate;
 }
 inline TrackTicks RateConvertTicksRoundUp(TrackRate aOutRate,
@@ -302,6 +302,11 @@ public:
    * Can't be used to forget beyond GetEnd().
    */
   void ForgetUpTo(StreamTime aTime);
+  /**
+   * Clears out all Tracks and the data they are holding.
+   * MediaStreamGraph calls this during forced shutdown.
+   */
+  void Clear();
   /**
    * Returns the latest time passed to ForgetUpTo.
    */

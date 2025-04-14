@@ -114,12 +114,8 @@ function resetCustomization() {
   return CustomizableUI.reset();
 }
 
-XPCOMUtils.defineLazyGetter(this, 'gDeveloperButtonInNavbar', function() {
-  return getAreaWidgetIds(CustomizableUI.AREA_NAVBAR).indexOf("developer-button") != -1;
-});
-
 function isInDevEdition() {
-  return gDeveloperButtonInNavbar;
+  return AppConstants.MOZ_DEV_EDITION;
 }
 
 function removeDeveloperButtonIfDevEdition(areaPanelPlacements) {

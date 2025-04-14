@@ -31,7 +31,7 @@ class StaticBlockScope;
 class ClonedBlockObject;
 
 class SimdTypeDescr;
-enum class SimdType : uint8_t;
+enum class SimdType;
 
 /*
  * Global object slots are reserved as follows:
@@ -241,12 +241,6 @@ class GlobalObject : public NativeObject
     }
 
   private:
-    static bool defineConstructorPropertiesAndLinkPrototype(JSContext* cx,
-                                                            Handle<GlobalObject*> global,
-                                                            JSProtoKey key, const Class* clasp,
-                                                            HandleId id, HandleObject ctor,
-                                                            HandleObject proto);
-
     bool arrayClassInitialized() const {
         return classIsInitialized(JSProto_Array);
     }
@@ -278,7 +272,6 @@ class GlobalObject : public NativeObject
 
     Value createArrayFromBufferHelper(uint32_t slot) const {
         MOZ_ASSERT(FROM_BUFFER_UINT8 <= slot && slot <= FROM_BUFFER_UINT8CLAMPED);
-        MOZ_ASSERT(!getSlot(slot).isUndefined());
         return getSlot(slot);
     }
 
@@ -350,6 +343,10 @@ class GlobalObject : public NativeObject
         return &self->getPrototype(JSProto_Object).toObject().as<NativeObject>();
     }
 
+    static NativeObject* getOrCreateObjectPrototype(JSContext* cx, Handle<GlobalObject*> global) {
+        return global->getOrCreateObjectPrototype(cx);
+    }
+
     NativeObject* getOrCreateFunctionPrototype(JSContext* cx) {
         if (functionObjectClassesInitialized())
             return &getPrototype(JSProto_Function).toObject().as<NativeObject>();
@@ -357,6 +354,10 @@ class GlobalObject : public NativeObject
         if (!ensureConstructor(cx, self, JSProto_Object))
             return nullptr;
         return &self->getPrototype(JSProto_Function).toObject().as<NativeObject>();
+    }
+
+    static NativeObject* getOrCreateFunctionPrototype(JSContext* cx, Handle<GlobalObject*> global) {
+        return global->getOrCreateFunctionPrototype(cx);
     }
 
     static NativeObject* getOrCreateArrayPrototype(JSContext* cx, Handle<GlobalObject*> global) {

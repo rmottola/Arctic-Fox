@@ -9,7 +9,7 @@
 
 const { Cc, Ci, Cu, Cr } = require("chrome");
 const { Task } = require("resource://gre/modules/Task.jsm");
-const { Heritage } = require("resource://devtools/client/shared/widgets/ViewHelpers.jsm");
+const { Heritage } = require("devtools/client/shared/widgets/view-helpers");
 const LineGraphWidget = require("devtools/client/shared/widgets/LineGraphWidget");
 const BarGraphWidget = require("devtools/client/shared/widgets/BarGraphWidget");
 const MountainGraphWidget = require("devtools/client/shared/widgets/MountainGraphWidget");
@@ -18,7 +18,7 @@ const { CanvasGraphUtils } = require("devtools/client/shared/widgets/Graphs");
 const promise = require("promise");
 const EventEmitter = require("devtools/shared/event-emitter");
 
-const { colorUtils } = require("devtools/shared/css-color");
+const { colorUtils } = require("devtools/client/shared/css-color");
 const { getColor } = require("devtools/client/shared/theme");
 const ProfilerGlobal = require("devtools/client/performance/modules/global");
 const { MarkersOverview } = require("devtools/client/performance/modules/widgets/markers-overview");
@@ -470,7 +470,7 @@ OptimizationsGraph.prototype = Heritage.extend(MountainGraphWidget.prototype, {
     // have optimizations, but it shouldn't be at this point if it doesn't),
     // log an error.
     if (!data) {
-      Cu.reportError(`FrameNode#${frameNode.location} does not have optimizations data to render.`);
+      console.error(`FrameNode#${frameNode.location} does not have optimizations data to render.`);
       return;
     }
 

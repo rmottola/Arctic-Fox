@@ -44,11 +44,14 @@
 #include "nsCOMArray.h"
 #include "mozilla/net/ChannelEventQueue.h"
 
-class nsPerformance;
 class nsISecurityConsoleMessage;
 class nsIPrincipal;
 
 namespace mozilla {
+
+namespace dom {
+class Performance;
+}
 
 class LogCollector;
 
@@ -92,7 +95,8 @@ public:
 
   virtual nsresult Init(nsIURI *aURI, uint32_t aCaps, nsProxyInfo *aProxyInfo,
                         uint32_t aProxyResolveFlags,
-                        nsIURI *aProxyURI);
+                        nsIURI *aProxyURI,
+                        const nsID& aChannelId);
 
   // nsIRequest
   NS_IMETHOD GetName(nsACString& aName) override;
@@ -155,6 +159,9 @@ public:
   NS_IMETHOD SetResponseHeader(const nsACString& header,
                                const nsACString& value, bool merge) override;
   NS_IMETHOD VisitResponseHeaders(nsIHttpHeaderVisitor *visitor) override;
+  NS_IMETHOD GetOriginalResponseHeader(const nsACString &aHeader,
+                                       nsIHttpHeaderVisitor *aVisitor) override;
+  NS_IMETHOD VisitOriginalResponseHeaders(nsIHttpHeaderVisitor *aVisitor) override;
   NS_IMETHOD GetAllowPipelining(bool *value) override;
   NS_IMETHOD SetAllowPipelining(bool value) override;
   NS_IMETHOD GetAllowSTS(bool *value) override;
@@ -176,6 +183,8 @@ public:
   NS_IMETHOD GetIsMainDocumentChannel(bool* aValue) override;
   NS_IMETHOD SetIsMainDocumentChannel(bool aValue) override;
   NS_IMETHOD GetProtocolVersion(nsACString & aProtocolVersion) override;
+  NS_IMETHOD GetChannelId(nsACString& aChannelId) override;
+  NS_IMETHOD SetChannelId(const nsACString& aChannelId) override;
 
   // nsIHttpChannelInternal
   NS_IMETHOD GetDocumentURI(nsIURI **aDocumentURI) override;
@@ -305,6 +314,8 @@ public: /* Necko internal use only... */
     // the new mUploadStream.
     void EnsureUploadStreamIsCloneableComplete(nsresult aStatus);
 
+    bool HaveListenerForTraceableChannel() { return mHaveListenerForTraceableChannel; }
+
 protected:
   nsCOMArray<nsISecurityConsoleMessage> mSecurityConsoleMessages;
 
@@ -315,7 +326,7 @@ protected:
   // drop reference to listener, its callbacks, and the progress sink
   void ReleaseListeners();
 
-  nsPerformance* GetPerformance();
+  mozilla::dom::Performance* GetPerformance();
   nsIURI* GetReferringPage();
   nsPIDOMWindowInner* GetInnerDOMWindow();
 
@@ -403,29 +414,30 @@ protected:
   int16_t                           mPriority;
   uint8_t                           mRedirectionLimit;
 
-  uint32_t                          mApplyConversion            : 1;
-  uint32_t                          mCanceled                   : 1;
-  uint32_t                          mIsPending                  : 1;
-  uint32_t                          mWasOpened                  : 1;
+  uint32_t                          mApplyConversion                 : 1;
+  uint32_t                          mHaveListenerForTraceableChannel : 1;
+  uint32_t                          mCanceled                        : 1;
+  uint32_t                          mIsPending                       : 1;
+  uint32_t                          mWasOpened                       : 1;
   // if 1 all "http-on-{opening|modify|etc}-request" observers have been called
-  uint32_t                          mRequestObserversCalled     : 1;
-  uint32_t                          mResponseHeadersModified    : 1;
-  uint32_t                          mAllowPipelining            : 1;
-  uint32_t                          mAllowSTS                   : 1;
-  uint32_t                          mThirdPartyFlags            : 3;
-  uint32_t                          mUploadStreamHasHeaders     : 1;
-  uint32_t                          mInheritApplicationCache    : 1;
-  uint32_t                          mChooseApplicationCache     : 1;
-  uint32_t                          mLoadedFromApplicationCache : 1;
-  uint32_t                          mChannelIsForDownload       : 1;
-  uint32_t                          mTracingEnabled             : 1;
+  uint32_t                          mRequestObserversCalled          : 1;
+  uint32_t                          mResponseHeadersModified         : 1;
+  uint32_t                          mAllowPipelining                 : 1;
+  uint32_t                          mAllowSTS                        : 1;
+  uint32_t                          mThirdPartyFlags                 : 3;
+  uint32_t                          mUploadStreamHasHeaders          : 1;
+  uint32_t                          mInheritApplicationCache         : 1;
+  uint32_t                          mChooseApplicationCache          : 1;
+  uint32_t                          mLoadedFromApplicationCache      : 1;
+  uint32_t                          mChannelIsForDownload            : 1;
+  uint32_t                          mTracingEnabled                  : 1;
   // True if timing collection is enabled
-  uint32_t                          mTimingEnabled              : 1;
-  uint32_t                          mAllowSpdy                  : 1;
-  uint32_t                          mAllowAltSvc                : 1;
-  uint32_t                          mResponseTimeoutEnabled     : 1;
+  uint32_t                          mTimingEnabled                   : 1;
+  uint32_t                          mAllowSpdy                       : 1;
+  uint32_t                          mAllowAltSvc                     : 1;
+  uint32_t                          mResponseTimeoutEnabled          : 1;
   // A flag that should be false only if a cross-domain redirect occurred
-  uint32_t                          mAllRedirectsSameOrigin     : 1;
+  uint32_t                          mAllRedirectsSameOrigin          : 1;
 
   // Is 1 if no redirects have occured or if all redirects
   // pass the Resource Timing timing-allow-check
@@ -512,6 +524,8 @@ protected:
   nsCOMPtr<nsIConsoleReportCollector> mReportCollector;
 
   bool mForceMainDocumentChannel;
+
+  nsID mChannelId;
 };
 
 // Share some code while working around C++'s absurd inability to handle casting
@@ -582,11 +596,11 @@ inline void HttpAsyncAborter<T>::HandleAsyncAbort()
 
 template <class T>
 nsresult HttpAsyncAborter<T>::AsyncCall(void (T::*funcPtr)(),
-                                   nsRunnableMethod<T> **retval)
+                                        nsRunnableMethod<T> **retval)
 {
   nsresult rv;
 
-  RefPtr<nsRunnableMethod<T> > event = NS_NewRunnableMethod(mThis, funcPtr);
+  RefPtr<nsRunnableMethod<T>> event = NewRunnableMethod(mThis, funcPtr);
   rv = NS_DispatchToCurrentThread(event);
   if (NS_SUCCEEDED(rv) && retval) {
     *retval = event;

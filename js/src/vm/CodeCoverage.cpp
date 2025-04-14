@@ -252,29 +252,37 @@ LCovSource::writeScript(JSScript* script)
             // Get the low and high from the tableswitch
             int32_t low = GET_JUMP_OFFSET(pc + JUMP_OFFSET_LEN * 1);
             int32_t high = GET_JUMP_OFFSET(pc + JUMP_OFFSET_LEN * 2);
-            int32_t numCases = high - low + 1;
+            MOZ_ASSERT(high - low + 1 >= 0);
+            size_t numCases = high - low + 1;
             jsbytecode* jumpTable = pc + JUMP_OFFSET_LEN * 3;
 
             jsbytecode* firstcasepc = exitpc;
-            for (int j = 0; j < numCases; j++) {
+            for (size_t j = 0; j < numCases; j++) {
                 jsbytecode* testpc = pc + GET_JUMP_OFFSET(jumpTable + JUMP_OFFSET_LEN * j);
                 if (testpc < firstcasepc)
                     firstcasepc = testpc;
             }
 
-            jsbytecode* lastcasepc = firstcasepc;
-            uint64_t allCaseHits = 0;
-            for (int i = 0; i < numCases; i++) {
+            // Count the number of hits of the default branch, by subtracting
+            // the number of hits of each cases.
+            uint64_t defaultHits = hits;
+
+            // Count the number of hits of the previous case entry.
+            uint64_t fallsThroughHits = 0;
+
+            // Record branches for each cases.
+            size_t caseId = 0;
+            for (size_t i = 0; i < numCases; i++) {
                 jsbytecode* casepc = pc + GET_JUMP_OFFSET(jumpTable + JUMP_OFFSET_LEN * i);
                 // The case is not present, and jumps to the default pc if used.
                 if (casepc == pc)
                     continue;
 
                 // PCs might not be in increasing order of case indexes.
-                lastcasepc = firstcasepc - 1;
-                for (int j = 0; j < numCases; j++) {
+                jsbytecode* lastcasepc = firstcasepc - 1;
+                for (size_t j = 0; j < numCases; j++) {
                     jsbytecode* testpc = pc + GET_JUMP_OFFSET(jumpTable + JUMP_OFFSET_LEN * j);
-                    if (lastcasepc < testpc && testpc < casepc)
+                    if (lastcasepc < testpc && (testpc < casepc || (j < i && testpc == casepc)))
                         lastcasepc = testpc;
                 }
 
@@ -287,19 +295,20 @@ LCovSource::writeScript(JSScript* script)
                             caseHits = counts->numExec();
 
                         // Remove fallthrough.
+                        fallsThroughHits = 0;
                         if (casepc != firstcasepc) {
                             jsbytecode* endpc = lastcasepc;
                             while (GetNextPc(endpc) < casepc)
                                 endpc = GetNextPc(endpc);
 
                             if (BytecodeFallsThrough(JSOp(*endpc)))
-                                caseHits -= script->getHitCount(endpc);
+                                fallsThroughHits = script->getHitCount(endpc);
                         }
 
-                        allCaseHits += caseHits;
+                        caseHits -= fallsThroughHits;
                     }
 
-                    outBRDA_.printf("BRDA:%d,%d,%d,", lineno, branchId, i);
+                    outBRDA_.printf("BRDA:%d,%d,%d,", lineno, branchId, caseId);
                     if (caseHits)
                         outBRDA_.printf("%d\n", caseHits);
                     else
@@ -307,31 +316,57 @@ LCovSource::writeScript(JSScript* script)
 
                     numBranchesFound_++;
                     numBranchesHit_ += !!caseHits;
-                    lastcasepc = casepc;
+                    defaultHits -= caseHits;
+                    caseId++;
                 }
             }
 
-            // Add one branch entry for the default statement.
-            uint64_t defaultHits = 0;
+            // Compute the number of hits of the default branch, if it has its
+            // own case clause.
+            bool defaultHasOwnClause = true;
+            if (defaultpc != exitpc) {
+                defaultHits = 0;
 
-            if (sc) {
-                const PCCounts* counts = sc->maybeGetPCCounts(script->pcToOffset(defaultpc));
-                if (counts)
-                    defaultHits = counts->numExec();
+                // Look for the last case entry before the default pc.
+                jsbytecode* lastcasepc = firstcasepc - 1;
+                for (size_t j = 0; j < numCases; j++) {
+                    jsbytecode* testpc = pc + GET_JUMP_OFFSET(jumpTable + JUMP_OFFSET_LEN * j);
+                    if (lastcasepc < testpc && testpc <= defaultpc)
+                        lastcasepc = testpc;
+                }
 
-                // Note: currently we do not track edges, so we might have
-                // false-positive if we have any throw / return inside some
-                // of the case statements.
-                defaultHits -= allCaseHits;
+                if (lastcasepc == defaultpc)
+                    defaultHasOwnClause = false;
+
+                // Look if the last case entry fallthrough to the default case,
+                // in which case we have to remove the number of fallthrough
+                // hits out of the default case hits.
+                if (sc && lastcasepc != pc) {
+                    jsbytecode* endpc = lastcasepc;
+                    while (GetNextPc(endpc) < defaultpc)
+                        endpc = GetNextPc(endpc);
+
+                    if (BytecodeFallsThrough(JSOp(*endpc)))
+                        fallsThroughHits = script->getHitCount(endpc);
+                }
+
+                if (sc) {
+                    const PCCounts* counts = sc->maybeGetPCCounts(script->pcToOffset(defaultpc));
+                    if (counts)
+                        defaultHits = counts->numExec();
+                }
+                defaultHits -= fallsThroughHits;
             }
 
-            outBRDA_.printf("BRDA:%d,%d,%d,", lineno, branchId, numCases);
-            if (defaultHits)
-                outBRDA_.printf("%d\n", defaultHits);
-            else
-                outBRDA_.put("-\n", 2);
-            numBranchesFound_++;
-            numBranchesHit_ += !!defaultHits;
+            if (defaultHasOwnClause) {
+                outBRDA_.printf("BRDA:%d,%d,%d,", lineno, branchId, caseId);
+                if (defaultHits)
+                    outBRDA_.printf("%d\n", defaultHits);
+                else
+                    outBRDA_.put("-\n", 2);
+                numBranchesFound_++;
+                numBranchesHit_ += !!defaultHits;
+            }
 
             // Increment the branch identifier, and go to the next instruction.
             branchId++;
@@ -473,7 +508,7 @@ LCovCompartment::exportInto(GenericPrinter& out, bool* isEmpty) const
 bool
 LCovCompartment::writeCompartmentName(JSCompartment* comp)
 {
-    JSRuntime* rt = comp->runtimeFromMainThread();
+    JSContext* cx = comp->contextFromMainThread();
 
     // lcov trace files are starting with an optional test case name, that we
     // recycle to be a compartment name.
@@ -482,12 +517,12 @@ LCovCompartment::writeCompartmentName(JSCompartment* comp)
     // thus we escape invalid chracters with a "_" symbol in front of its
     // hexadecimal code.
     outTN_.put("TN:");
-    if (rt->compartmentNameCallback) {
+    if (cx->compartmentNameCallback) {
         char name[1024];
         {
             // Hazard analysis cannot tell that the callback does not GC.
             JS::AutoSuppressGCAnalysis nogc;
-            (*rt->compartmentNameCallback)(rt, comp, name, sizeof(name));
+            (*cx->compartmentNameCallback)(cx, comp, name, sizeof(name));
         }
         for (char *s = name; s < name + sizeof(name) && *s; s++) {
             if (('a' <= *s && *s <= 'z') ||

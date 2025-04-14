@@ -77,8 +77,8 @@ public:
 #endif
 
   virtual void Reflow(nsPresContext* aPresContext,
-                      nsHTMLReflowMetrics& aMetrics,
-                      const nsHTMLReflowState& aReflowState,
+                      ReflowOutput& aMetrics,
+                      const ReflowInput& aReflowInput,
                       nsReflowStatus& aStatus) override;
   virtual nscoord GetMinISize(nsRenderingContext *aRenderingContext) override;
   virtual nscoord GetPrefISize(nsRenderingContext *aRenderingContext) override;
@@ -97,7 +97,8 @@ public:
   void GetSpokenText(nsAString& aText);
                          
   DrawResult PaintBullet(nsRenderingContext& aRenderingContext, nsPoint aPt,
-                         const nsRect& aDirtyRect, uint32_t aFlags);
+                         const nsRect& aDirtyRect, uint32_t aFlags,
+                         bool aDisableSubpixelAA);
   
   virtual bool IsEmpty() override;
   virtual bool IsSelfEmpty() override;
@@ -120,7 +121,7 @@ protected:
                               mozilla::LogicalMargin* aPadding);
   void GetDesiredSize(nsPresContext* aPresContext,
                       nsRenderingContext *aRenderingContext,
-                      nsHTMLReflowMetrics& aMetrics,
+                      ReflowOutput& aMetrics,
                       float aFontSizeInflation,
                       mozilla::LogicalMargin* aPadding);
 

@@ -13,7 +13,7 @@
 #include "nsUrlClassifierUtils.h"
 
 // NSPR_LOG_MODULES=UrlClassifierProtocolParser:5
-PRLogModuleInfo *gUrlClassifierProtocolParserLog = nullptr;
+mozilla::LazyLogModule gUrlClassifierProtocolParserLog("UrlClassifierProtocolParser");
 #define PARSER_LOG(args) MOZ_LOG(gUrlClassifierProtocolParserLog, mozilla::LogLevel::Debug, args)
 
 namespace mozilla {
@@ -65,6 +65,7 @@ ProtocolParser::ProtocolParser()
   , mUpdateStatus(NS_OK)
   , mUpdateWait(0)
   , mResetRequested(false)
+  , mTableUpdate(nullptr)
 {
 }
 
@@ -76,10 +77,6 @@ ProtocolParser::~ProtocolParser()
 nsresult
 ProtocolParser::Init(nsICryptoHash* aHasher)
 {
-  if (!gUrlClassifierProtocolParserLog) {
-    gUrlClassifierProtocolParserLog =
-      PR_NewLogModule("UrlClassifierProtocolParser");
-  }
   mCryptoHash = aHasher;
   return NS_OK;
 }
@@ -133,7 +130,7 @@ ProtocolParser::ProcessControl(bool* aDone)
     } else if (StringBeginsWith(line, NS_LITERAL_CSTRING("n:"))) {
       if (PR_sscanf(line.get(), "n:%d", &mUpdateWait) != 1) {
         PARSER_LOG(("Error parsing n: '%s' (%d)", line.get(), mUpdateWait));
-        mUpdateWait = 0;
+        return NS_ERROR_FAILURE;
       }
     } else if (line.EqualsLiteral("r:pleasereset")) {
       mResetRequested = true;

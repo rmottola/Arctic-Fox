@@ -18,6 +18,11 @@ const actions = Object.assign(
   require('../actions/breakpoints')
 );
 const { bindActionCreators } = require('devtools/client/shared/vendor/redux');
+const {
+  Heritage,
+  WidgetMethods,
+  setNamedTimeout
+} = require("devtools/client/shared/widgets/view-helpers");
 
 const NEW_SOURCE_DISPLAY_DELAY = 200; // ms
 const FUNCTION_SEARCH_POPUP_POSITION = "topcenter bottomleft";
@@ -63,8 +68,10 @@ function SourcesView(controller, DebuggerView) {
   this._onConditionalPopupShown = this._onConditionalPopupShown.bind(this);
   this._onConditionalPopupHiding = this._onConditionalPopupHiding.bind(this);
   this._onConditionalTextboxKeyPress = this._onConditionalTextboxKeyPress.bind(this);
+  this._onEditorContextMenuOpen = this._onEditorContextMenuOpen.bind(this);
   this._onCopyUrlCommand = this._onCopyUrlCommand.bind(this);
   this._onNewTabCommand = this._onNewTabCommand.bind(this);
+  this._onConditionalPopupHidden = this._onConditionalPopupHidden.bind(this);
 }
 
 SourcesView.prototype = Heritage.extend(WidgetMethods, {
@@ -112,10 +119,12 @@ SourcesView.prototype = Heritage.extend(WidgetMethods, {
     this._cbPanel.addEventListener("popupshowing", this._onConditionalPopupShowing, false);
     this._cbPanel.addEventListener("popupshown", this._onConditionalPopupShown, false);
     this._cbPanel.addEventListener("popuphiding", this._onConditionalPopupHiding, false);
+    this._cbPanel.addEventListener("popuphidden", this._onConditionalPopupHidden, false);
     this._cbTextbox.addEventListener("keypress", this._onConditionalTextboxKeyPress, false);
     this._copyUrlMenuItem.addEventListener("command", this._onCopyUrlCommand, false);
     this._newTabMenuItem.addEventListener("command", this._onNewTabCommand, false);
 
+    this._cbPanel.hidden = true;
     this.allowFocusOnRightClick = true;
     this.autoFocusOnSelection = false;
     this.autoFocusOnFirstItem = false;
@@ -134,6 +143,8 @@ SourcesView.prototype = Heritage.extend(WidgetMethods, {
       return (a in KNOWN_SOURCE_GROUPS) ? 1 : -1;
     };
 
+    this.DebuggerView.editor.on("popupOpen", this._onEditorContextMenuOpen);
+
     this._addCommands();
   },
 
@@ -146,11 +157,13 @@ SourcesView.prototype = Heritage.extend(WidgetMethods, {
     this.widget.removeEventListener("select", this._onSourceSelect, false);
     this._stopBlackBoxButton.removeEventListener("click", this._onStopBlackBoxing, false);
     this._cbPanel.removeEventListener("popupshowing", this._onConditionalPopupShowing, false);
-    this._cbPanel.removeEventListener("popupshowing", this._onConditionalPopupShown, false);
+    this._cbPanel.removeEventListener("popupshown", this._onConditionalPopupShown, false);
     this._cbPanel.removeEventListener("popuphiding", this._onConditionalPopupHiding, false);
+    this._cbPanel.removeEventListener("popuphidden", this._onConditionalPopupHidden, false);
     this._cbTextbox.removeEventListener("keypress", this._onConditionalTextboxKeyPress, false);
     this._copyUrlMenuItem.removeEventListener("command", this._onCopyUrlCommand, false);
     this._newTabMenuItem.removeEventListener("command", this._onNewTabCommand, false);
+    this.DebuggerView.editor.off("popupOpen", this._onEditorContextMenuOpen, false);
   },
 
   empty: function() {
@@ -673,26 +686,37 @@ SourcesView.prototype = Heritage.extend(WidgetMethods, {
     // retrieve the current conditional epression.
     let bp = getBreakpoint(this.getState(), attachment);
     let expr = (bp ? (bp.condition || "") : "");
+    let cbPanel = this._cbPanel;
 
     // Update the conditional expression textbox. If no expression was
     // previously set, revert to using an empty string by default.
     this._cbTextbox.value = expr;
 
-    // Show the conditional expression panel. The popup arrow should be pointing
-    // at the line number node in the breakpoint item view.
-    this._cbPanel.hidden = false;
-    this._cbPanel.openPopup(breakpointItem.attachment.view.lineNumber,
-                            BREAKPOINT_CONDITIONAL_POPUP_POSITION,
-                            BREAKPOINT_CONDITIONAL_POPUP_OFFSET_X,
-                            BREAKPOINT_CONDITIONAL_POPUP_OFFSET_Y);
+
+    function openPopup() {
+      // Show the conditional expression panel. The popup arrow should be pointing
+      // at the line number node in the breakpoint item view.
+      cbPanel.hidden = false;
+      cbPanel.openPopup(breakpointItem.attachment.view.lineNumber,
+                              BREAKPOINT_CONDITIONAL_POPUP_POSITION,
+                              BREAKPOINT_CONDITIONAL_POPUP_OFFSET_X,
+                              BREAKPOINT_CONDITIONAL_POPUP_OFFSET_Y);
+
+      cbPanel.removeEventListener('popuphidden', openPopup, false);
+    }
+
+    // Wait until the other cb panel is closed
+    if (!this._cbPanel.hidden) {
+      this._cbPanel.addEventListener('popuphidden', openPopup, false);
+    } else {
+      openPopup();
+    }
   },
 
   /**
    * Hides a conditional breakpoint's expression input popup.
    */
   _hideConditionalPopup: function() {
-    this._cbPanel.hidden = true;
-
     // Sometimes this._cbPanel doesn't have hidePopup method which doesn't
     // break anything but simply outputs an exception to the console.
     if (this._cbPanel.hidePopup) {
@@ -1078,6 +1102,29 @@ SourcesView.prototype = Heritage.extend(WidgetMethods, {
   }),
 
   /**
+   * The source editor's contextmenu handler.
+   * - Toggles "Add Conditional Breakpoint" and "Edit Conditional Breakpoint" items
+   */
+  _onEditorContextMenuOpen: function(message, ev, popup) {
+    let actor = this.selectedValue;
+    let line = this.DebuggerView.editor.getCursor().line + 1;
+    let location = { actor, line };
+
+    let breakpoint = getBreakpoint(this.getState(), location);
+    let addConditionalBreakpointMenuItem = popup.querySelector("#se-dbg-cMenu-addConditionalBreakpoint");
+    let editConditionalBreakpointMenuItem = popup.querySelector("#se-dbg-cMenu-editConditionalBreakpoint");
+
+    if (breakpoint && !!breakpoint.condition) {
+      editConditionalBreakpointMenuItem.removeAttribute("hidden");
+      addConditionalBreakpointMenuItem.setAttribute("hidden", true);
+    }
+    else {
+      addConditionalBreakpointMenuItem.removeAttribute("hidden");
+      editConditionalBreakpointMenuItem.setAttribute("hidden", true);
+    }
+  },
+
+  /**
    * The click listener for a breakpoint container.
    */
   _onBreakpointClick: function(e) {
@@ -1146,6 +1193,13 @@ SourcesView.prototype = Heritage.extend(WidgetMethods, {
   },
 
   /**
+   * The popup hidden listener for the breakpoints conditional expression panel.
+   */
+  _onConditionalPopupHidden: function() {
+    this._cbPanel.hidden = true;
+  },
+
+  /**
    * The keypress listener for the breakpoints conditional expression textbox.
    */
   _onConditionalTextboxKeyPress: function(e) {
@@ -1159,7 +1213,7 @@ SourcesView.prototype = Heritage.extend(WidgetMethods, {
    */
   _onCmdAddBreakpoint: function(e) {
     let actor = this.selectedValue;
-    let line = (e && e.sourceEvent.target.tagName == 'menuitem' ?
+    let line = (this.DebuggerView.clickedLine ?
                 this.DebuggerView.clickedLine + 1 :
                 this.DebuggerView.editor.getCursor().line + 1);
     let location = { actor, line };
@@ -1180,9 +1234,10 @@ SourcesView.prototype = Heritage.extend(WidgetMethods, {
    */
   _onCmdAddConditionalBreakpoint: function(e) {
     let actor = this.selectedValue;
-    let line = (e && e.sourceEvent.target.tagName == 'menuitem' ?
+    let line = (this.DebuggerView.clickedLine ?
                 this.DebuggerView.clickedLine + 1 :
                 this.DebuggerView.editor.getCursor().line + 1);
+
     let location = { actor, line };
     let bp = getBreakpoint(this.getState(), location);
 

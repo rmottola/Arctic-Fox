@@ -397,7 +397,6 @@ class XPCShellRemote(xpcshell.XPCShellTests, object):
                     "certutil",
                     "pk12util",
                     "BadCertServer",
-                    "ClientAuthServer",
                     "OCSPStaplingServer",
                     "GenerateOCSPResponse"]
         for fname in binaries:

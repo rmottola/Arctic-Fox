@@ -148,6 +148,8 @@ nsNPAPIPluginStreamListener::nsNPAPIPluginStreamListener(nsNPAPIPluginInstance* 
                                           sizeof("javascript:") - 1) == 0)
   , mRedirectDenied(false)
   , mResponseHeaderBuf(nullptr)
+  , mStreamStopMode(eNormalStop)
+  , mPendingStopBindingStatus(NS_OK)
 {
   mNPStreamWrapper = new nsNPAPIStreamWrapper(nullptr, this);
   mNPStreamWrapper->mNPStream.notifyData = notifyData;
@@ -332,9 +334,8 @@ nsNPAPIPluginStreamListener::OnStartBinding(nsPluginStreamListenerPeer* streamPe
   if (error != NPERR_NO_ERROR)
     return NS_ERROR_FAILURE;
 
-  if (streamType == nsPluginStreamListenerPeer::STREAM_TYPE_UNKNOWN) {
-    SuspendRequest();
-  }
+  mStreamState = eNewStreamCalled;
+
   if (!SetStreamType(streamType, false)) {
     return NS_ERROR_FAILURE;
   }
@@ -368,8 +369,9 @@ nsNPAPIPluginStreamListener::SetStreamType(uint16_t aType, bool aNeedsResume)
     case nsPluginStreamListenerPeer::STREAM_TYPE_UNKNOWN:
       MOZ_ASSERT(!aNeedsResume);
       mStreamType = nsPluginStreamListenerPeer::STREAM_TYPE_UNKNOWN;
-      // In this case we just want to set mStreamType but we do not want to
-      // execute anything else in this function.
+      SuspendRequest();
+      mStreamStopMode = eDoDeferredStop;
+      // In this case we do not want to execute anything else in this function.
       return true;
     default:
       return false;
@@ -535,13 +537,14 @@ nsNPAPIPluginStreamListener::OnDataAvailable(nsPluginStreamListenerPeer* streamP
   nsresult rv = NS_OK;
   while (NS_SUCCEEDED(rv) && length > 0) {
     if (input && length) {
-      if (mStreamBufferSize < mStreamBufferByteCount + length && mIsSuspended) {
+      if (mStreamBufferSize < mStreamBufferByteCount + length) {
         // We're in the ::OnDataAvailable() call that we might get
         // after suspending a request, or we suspended the request
         // from within this ::OnDataAvailable() call while there's
-        // still data in the input, and we don't have enough space to
-        // store what we got off the network. Reallocate our internal
-        // buffer.
+        // still data in the input, or we have resumed a previously
+        // suspended request and our buffer is already full, and we
+        // don't have enough space to store what we got off the network.
+        // Reallocate our internal buffer.
         mStreamBufferSize = mStreamBufferByteCount + length;
         char *buf = (char*)PR_Realloc(mStreamBuffer, mStreamBufferSize);
         if (!buf)
@@ -549,10 +552,11 @@ nsNPAPIPluginStreamListener::OnDataAvailable(nsPluginStreamListenerPeer* streamP
         
         mStreamBuffer = buf;
       }
-      
+
       uint32_t bytesToRead =
       std::min(length, mStreamBufferSize - mStreamBufferByteCount);
-      
+      MOZ_ASSERT(bytesToRead > 0);
+
       uint32_t amountRead = 0;
       rv = input->Read(mStreamBuffer + mStreamBufferByteCount, bytesToRead,
                        &amountRead);
@@ -764,8 +768,6 @@ nsresult
 nsNPAPIPluginStreamListener::OnStopBinding(nsPluginStreamListenerPeer* streamPeer, 
                                            nsresult status)
 {
-  StopDataPump();
-  
   if (NS_FAILED(status)) {
     // The stream was destroyed, or died for some reason. Make sure we
     // cancel the underlying request.
@@ -773,9 +775,24 @@ nsNPAPIPluginStreamListener::OnStopBinding(nsPluginStreamListenerPeer* streamPee
       mStreamListenerPeer->CancelRequests(status);
     }
   }
-  
-  if (!mInst || !mInst->CanFireNotifications())
+
+  if (!mInst || !mInst->CanFireNotifications()) {
+    StopDataPump();
     return NS_ERROR_FAILURE;
+  }
+
+  // We need to detect that the stop is due to async stream init completion.
+  if (mStreamStopMode == eDoDeferredStop) {
+    // We shouldn't be delivering this until async init is done
+    mStreamStopMode = eStopPending;
+    mPendingStopBindingStatus = status;
+    if (!mDataPumpTimer) {
+      StartDataPump();
+    }
+    return NS_OK;
+  }
+
+  StopDataPump();
 
   NPReason reason = NS_FAILED(status) ? NPRES_NETWORK_ERR : NPRES_DONE;
   if (mRedirectDenied || status == NS_BINDING_ABORTED) {
@@ -805,6 +822,17 @@ nsNPAPIPluginStreamListener::GetStreamType(int32_t *result)
   return NS_OK;
 }
 
+bool
+nsNPAPIPluginStreamListener::MaybeRunStopBinding()
+{
+  if (mIsSuspended || mStreamStopMode != eStopPending) {
+    return false;
+  }
+  OnStopBinding(mStreamListenerPeer, mPendingStopBindingStatus);
+  mStreamStopMode = eNormalStop;
+  return true;
+}
+
 NS_IMETHODIMP
 nsNPAPIPluginStreamListener::Notify(nsITimer *aTimer)
 {
@@ -816,7 +844,8 @@ nsNPAPIPluginStreamListener::Notify(nsITimer *aTimer)
   
   if (NS_FAILED(rv)) {
     // We ran into an error, no need to keep firing this timer then.
-    aTimer->Cancel();
+    StopDataPump();
+    MaybeRunStopBinding();
     return NS_OK;
   }
   
@@ -831,7 +860,8 @@ nsNPAPIPluginStreamListener::Notify(nsITimer *aTimer)
         // Necko will pump data now that we've resumed the request.
         StopDataPump();
       }
-  
+
+  MaybeRunStopBinding();
   return NS_OK;
 }
 

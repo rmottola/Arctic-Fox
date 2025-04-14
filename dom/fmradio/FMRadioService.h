@@ -159,7 +159,6 @@ class FMRadioService final : public IFMRadioService
 
 public:
   static FMRadioService* Singleton();
-  virtual ~FMRadioService();
 
   NS_DECL_ISUPPORTS
 
@@ -197,10 +196,15 @@ public:
   /* FMRadioRDSObserver */
   void Notify(const hal::FMRadioRDSGroup& aRDSGroup) override;
 
+  void EnableFMRadio();
+  void DisableFMRadio();
+  void DispatchFMRadioEventToMainThread(enum FMRadioEventType aType);
+
   NS_DECL_NSIOBSERVER
 
 protected:
   FMRadioService();
+  virtual ~FMRadioService();
 
 private:
   int32_t RoundFrequency(double aFrequencyInMHz);

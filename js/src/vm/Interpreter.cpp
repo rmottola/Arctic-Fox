@@ -107,34 +107,6 @@ js::BoxNonStrictThis(JSContext* cx, HandleValue thisv, MutableHandleValue vp)
     return true;
 }
 
-/*
- * ECMA requires "the global object", but in embeddings such as the browser,
- * which have multiple top-level objects (windows, frames, etc. in the DOM),
- * we prefer fun's parent.  An example that causes this code to run:
- *
- *   // in window w1
- *   function f() { return this }
- *   function g() { return f }
- *
- *   // in window w2
- *   var h = w1.g()
- *   alert(h() == w1)
- *
- * The alert should display "true".
- */
-bool
-js::BoxNonStrictThis(JSContext* cx, const CallReceiver& call)
-{
-    MOZ_ASSERT(!call.thisv().isMagic());
-
-#ifdef DEBUG
-    JSFunction* fun = call.callee().is<JSFunction>() ? &call.callee().as<JSFunction>() : nullptr;
-    MOZ_ASSERT_IF(fun && fun->isInterpreted(), !fun->strict());
-#endif
-
-    return BoxNonStrictThis(cx, call.thisv(), call.mutableThisv());
-}
-
 bool
 js::GetFunctionThis(JSContext* cx, AbstractFramePtr frame, MutableHandleValue res)
 {
@@ -349,6 +321,7 @@ RunState::maybeCreateThisForConstructor(JSContext* cx)
                 MOZ_ASSERT(callee->as<JSFunction>().isClassConstructor());
                 invoke.args().setThis(MagicValue(JS_UNINITIALIZED_LEXICAL));
             } else {
+                MOZ_ASSERT(invoke.args().thisv().isMagic(JS_IS_CONSTRUCTING));
                 RootedObject newTarget(cx, &invoke.args().newTarget().toObject());
                 NewObjectKind newKind = invoke.createSingleton() ? SingletonObject : GenericObject;
                 JSObject* obj = CreateThisForFunction(cx, callee, newTarget, newKind);
@@ -561,6 +534,8 @@ InternalConstruct(JSContext* cx, const AnyConstructArgs& args)
     MOZ_ASSERT(IsConstructor(args.CallArgs::newTarget()),
                "provided new.target value must be a constructor");
 
+    MOZ_ASSERT(args.thisv().isMagic(JS_IS_CONSTRUCTING) || args.thisv().isObject());
+
     JSObject& callee = args.callee();
     if (callee.is<JSFunction>()) {
         RootedFunction fun(cx, &callee.as<JSFunction>());
@@ -604,7 +579,6 @@ js::ConstructFromStack(JSContext* cx, const CallArgs& args)
     if (!StackCheckIsConstructorCalleeNewTarget(cx, args.calleev(), args.newTarget()))
         return false;
 
-    args.setThis(MagicValue(JS_IS_CONSTRUCTING));
     return InternalConstruct(cx, static_cast<const AnyConstructArgs&>(args));
 }
 
@@ -612,9 +586,10 @@ bool
 js::Construct(JSContext* cx, HandleValue fval, const AnyConstructArgs& args, HandleValue newTarget,
               MutableHandleObject objp)
 {
+    MOZ_ASSERT(args.thisv().isMagic(JS_IS_CONSTRUCTING));
+
     // Explicitly qualify to bypass AnyConstructArgs's deliberate shadowing.
     args.CallArgs::setCallee(fval);
-    args.CallArgs::setThis(MagicValue(JS_IS_CONSTRUCTING));
     args.CallArgs::newTarget().set(newTarget);
 
     if (!InternalConstruct(cx, args))
@@ -753,7 +728,7 @@ js::InstanceOfOperator(JSContext* cx, HandleObject obj, MutableHandleValue v, bo
 
     if (!hasInstance.isNullOrUndefined()) {
         if (!IsCallable(hasInstance))
-            ReportIsNotFunction(cx, hasInstance);
+            return ReportIsNotFunction(cx, hasInstance);
 
         /* Step 3. */
         RootedValue rval(cx);
@@ -767,8 +742,7 @@ js::InstanceOfOperator(JSContext* cx, HandleObject obj, MutableHandleValue v, bo
     /* Step 4. */
     if (!obj->isCallable()) {
         RootedValue val(cx, ObjectValue(*obj));
-        ReportIsNotFunction(cx, val);
-        return false;
+        return ReportIsNotFunction(cx, val);
     }
 
     /* Step 5. */
@@ -782,11 +756,7 @@ js::HasInstance(JSContext* cx, HandleObject obj, HandleValue v, bool* bp)
     RootedValue local(cx, v);
     if (JSHasInstanceOp hasInstance = clasp->getHasInstance())
         return hasInstance(cx, obj, &local, bp);
-
-    RootedValue val(cx, ObjectValue(*obj));
-    ReportValueError(cx, JSMSG_BAD_INSTANCEOF_RHS,
-                        JSDVG_SEARCH_STACK, val, nullptr);
-    return false;
+    return js::InstanceOfOperator(cx, obj, &local, bp);
 }
 
 static inline bool
@@ -1299,8 +1269,7 @@ HandleError(JSContext* cx, InterpreterRegs& regs)
 #define PUSH_STRING(s)           do { REGS.sp++->setString(s); assertSameCompartmentDebugOnly(cx, REGS.sp[-1]); } while (0)
 #define PUSH_OBJECT(obj)         do { REGS.sp++->setObject(obj); assertSameCompartmentDebugOnly(cx, REGS.sp[-1]); } while (0)
 #define PUSH_OBJECT_OR_NULL(obj) do { REGS.sp++->setObjectOrNull(obj); assertSameCompartmentDebugOnly(cx, REGS.sp[-1]); } while (0)
-#define PUSH_HOLE()              REGS.sp++->setMagic(JS_ELEMENTS_HOLE)
-#define PUSH_UNINITIALIZED()     REGS.sp++->setMagic(JS_UNINITIALIZED_LEXICAL)
+#define PUSH_MAGIC(magic)        REGS.sp++->setMagic(magic)
 #define POP_COPY_TO(v)           (v) = *--REGS.sp
 #define POP_RETURN_VALUE()       REGS.fp()->setReturnValue(*--REGS.sp)
 
@@ -1667,6 +1636,44 @@ Interpret(JSContext* cx, RunState& state)
         ADVANCE_AND_DISPATCH(nlen);                                           \
     JS_END_MACRO
 
+    /*
+     * Initialize code coverage vectors.
+     */
+#define INIT_COVERAGE()                                                       \
+    JS_BEGIN_MACRO                                                            \
+        if (!script->hasScriptCounts()) {                                     \
+            if (cx->compartment()->collectCoverageForDebug()) {               \
+                if (!script->initScriptCounts(cx))                            \
+                    goto error;                                               \
+            }                                                                 \
+        }                                                                     \
+    JS_END_MACRO
+
+    /*
+     * Increment the code coverage counter associated with the given pc.
+     */
+#define COUNT_COVERAGE_PC(PC)                                                 \
+    JS_BEGIN_MACRO                                                            \
+        if (script->hasScriptCounts()) {                                      \
+            PCCounts* counts = script->maybeGetPCCounts(PC);                  \
+            MOZ_ASSERT(counts);                                               \
+            counts->numExec()++;                                              \
+        }                                                                     \
+    JS_END_MACRO
+
+#define COUNT_COVERAGE_MAIN()                                                 \
+    JS_BEGIN_MACRO                                                            \
+        jsbytecode* main = script->main();                                    \
+        if (!BytecodeIsJumpTarget(JSOp(*main)))                               \
+            COUNT_COVERAGE_PC(main);                                          \
+    JS_END_MACRO
+
+#define COUNT_COVERAGE()                                                      \
+    JS_BEGIN_MACRO                                                            \
+        MOZ_ASSERT(BytecodeIsJumpTarget(JSOp(*REGS.pc)));                     \
+        COUNT_COVERAGE_PC(REGS.pc);                                           \
+    JS_END_MACRO
+
 #define LOAD_DOUBLE(PCOFF, dbl)                                               \
     ((dbl) = script->getConst(GET_UINT32_INDEX(REGS.pc + (PCOFF))).toDouble())
 
@@ -1680,8 +1687,6 @@ Interpret(JSContext* cx, RunState& state)
 #define SANITY_CHECKS()                                                       \
     JS_BEGIN_MACRO                                                            \
         js::gc::MaybeVerifyBarriers(cx);                                      \
-        MOZ_ASSERT_IF(script->hasScriptCounts(),                              \
-                      activation.opMask() == EnableInterruptsPseudoOpcode);   \
     JS_END_MACRO
 
     gc::MaybeVerifyBarriers(cx, true);
@@ -1742,8 +1747,9 @@ Interpret(JSContext* cx, RunState& state)
         MOZ_CRASH("bad Debugger::onEnterFrame status");
     }
 
-    if (cx->compartment()->collectCoverage())
-        activation.enableInterruptsUnconditionally();
+    // Increment the coverage for the main entry point.
+    INIT_COVERAGE();
+    COUNT_COVERAGE_MAIN();
 
     // Enter the interpreter loop starting at the current pc.
     ADVANCE_AND_DISPATCH(0);
@@ -1755,17 +1761,9 @@ CASE(EnableInterruptsPseudoOpcode)
     bool moreInterrupts = false;
     jsbytecode op = *REGS.pc;
 
-    if (!script->hasScriptCounts() && cx->compartment()->collectCoverage()) {
+    if (!script->hasScriptCounts() && cx->compartment()->collectCoverageForDebug()) {
         if (!script->initScriptCounts(cx))
             goto error;
-        moreInterrupts = true;
-    }
-
-    if (script->hasScriptCounts()) {
-        PCCounts* counts = script->maybeGetPCCounts(REGS.pc);
-        if (counts)
-            counts->numExec()++;
-        moreInterrupts = true;
     }
 
     if (script->isDebuggee()) {
@@ -1827,9 +1825,9 @@ CASE(EnableInterruptsPseudoOpcode)
 
 /* Various 1-byte no-ops. */
 CASE(JSOP_NOP)
+CASE(JSOP_NOP_DESTRUCTURING)
 CASE(JSOP_UNUSED14)
-CASE(JSOP_UNUSED65)
-CASE(JSOP_BACKPATCH)
+CASE(JSOP_UNUSED149)
 CASE(JSOP_UNUSED179)
 CASE(JSOP_UNUSED180)
 CASE(JSOP_UNUSED181)
@@ -1847,19 +1845,25 @@ CASE(JSOP_UNUSED221)
 CASE(JSOP_UNUSED222)
 CASE(JSOP_UNUSED223)
 CASE(JSOP_CONDSWITCH)
-CASE(JSOP_TRY)
 {
     MOZ_ASSERT(CodeSpec[*REGS.pc].length == 1);
     ADVANCE_AND_DISPATCH(1);
 }
 
+CASE(JSOP_TRY)
+CASE(JSOP_JUMPTARGET)
 CASE(JSOP_LOOPHEAD)
-END_CASE(JSOP_LOOPHEAD)
+{
+    MOZ_ASSERT(CodeSpec[*REGS.pc].length == 1);
+    COUNT_COVERAGE();
+    ADVANCE_AND_DISPATCH(1);
+}
 
 CASE(JSOP_LABEL)
 END_CASE(JSOP_LABEL)
 
 CASE(JSOP_LOOPENTRY)
+    COUNT_COVERAGE();
     // Attempt on-stack replacement with Baseline code.
     if (jit::IsBaselineEnabled(cx)) {
         jit::MethodStatus status = jit::CanEnterBaselineAtBranch(cx, REGS.fp(), false);
@@ -2114,6 +2118,7 @@ END_CASE(JSOP_ISNOITER)
 CASE(JSOP_ENDITER)
 {
     MOZ_ASSERT(REGS.stackDepth() >= 1);
+    COUNT_COVERAGE();
     ReservedRooted<JSObject*> obj(&rootObject0, &REGS.sp[-1].toObject());
     bool ok = CloseIterator(cx, obj);
     REGS.sp--;
@@ -2955,6 +2960,10 @@ CASE(JSOP_FUNCALL)
         MOZ_CRASH("bad Debugger::onEnterFrame status");
     }
 
+    // Increment the coverage for the main entry point.
+    INIT_COVERAGE();
+    COUNT_COVERAGE_MAIN();
+
     /* Load first op and dispatch it (safe since JSOP_RETRVAL). */
     ADVANCE_AND_DISPATCH(0);
 }
@@ -3214,7 +3223,7 @@ CASE(JSOP_GETALIASEDVAR)
 #ifdef DEBUG
     // Only the .this slot can hold the TDZ MagicValue.
     if (IsUninitializedLexical(val)) {
-        PropertyName* name = ScopeCoordinateName(cx->runtime()->scopeCoordinateNameCache,
+        PropertyName* name = ScopeCoordinateName(cx->caches.scopeCoordinateNameCache,
                                                  script, REGS.pc);
         MOZ_ASSERT(name == cx->names().dotThis);
         JSOp next = JSOp(*GetNextPc(REGS.pc));
@@ -3288,7 +3297,7 @@ CASE(JSOP_INITGLEXICAL)
 END_CASE(JSOP_INITGLEXICAL)
 
 CASE(JSOP_UNINITIALIZED)
-    PUSH_UNINITIALIZED();
+    PUSH_MAGIC(JS_UNINITIALIZED_LEXICAL);
 END_CASE(JSOP_UNINITIALIZED)
 
 CASE(JSOP_GETARG)
@@ -3401,7 +3410,8 @@ CASE(JSOP_LAMBDA)
     JSObject* obj = Lambda(cx, fun, REGS.fp()->scopeChain());
     if (!obj)
         goto error;
-    MOZ_ASSERT(obj->getProto());
+
+    MOZ_ASSERT(obj->staticPrototype());
     PUSH_OBJECT(*obj);
 }
 END_CASE(JSOP_LAMBDA)
@@ -3414,7 +3424,8 @@ CASE(JSOP_LAMBDA_ARROW)
     JSObject* obj = LambdaArrow(cx, fun, REGS.fp()->scopeChain(), newTarget);
     if (!obj)
         goto error;
-    MOZ_ASSERT(obj->getProto());
+
+    MOZ_ASSERT(obj->staticPrototype());
     REGS.sp[-1].setObject(*obj);
 }
 END_CASE(JSOP_LAMBDA_ARROW)
@@ -3461,7 +3472,7 @@ CASE(JSOP_INITHIDDENELEM_SETTER)
 END_CASE(JSOP_INITELEM_GETTER)
 
 CASE(JSOP_HOLE)
-    PUSH_HOLE();
+    PUSH_MAGIC(JS_ELEMENTS_HOLE);
 END_CASE(JSOP_HOLE)
 
 CASE(JSOP_NEWINIT)
@@ -4016,6 +4027,10 @@ CASE(JSOP_DEBUGCHECKSELFHOSTED)
 #endif
 }
 END_CASE(JSOP_DEBUGCHECKSELFHOSTED)
+
+CASE(JSOP_IS_CONSTRUCTING)
+    PUSH_MAGIC(JS_IS_CONSTRUCTING);
+END_CASE(JSOP_IS_CONSTRUCTING)
 
 DEFAULT()
 {
@@ -4930,7 +4945,7 @@ js::ReportRuntimeLexicalError(JSContext* cx, unsigned errorNumber,
         name = script->getName(pc);
     } else {
         MOZ_ASSERT(IsAliasedVarOp(op));
-        name = ScopeCoordinateName(cx->runtime()->scopeCoordinateNameCache, script, pc);
+        name = ScopeCoordinateName(cx->caches.scopeCoordinateNameCache, script, pc);
     }
 
     ReportRuntimeLexicalError(cx, errorNumber, name);

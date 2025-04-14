@@ -31,7 +31,8 @@ public:
   nsresult Output(int64_t aStreamOffset,
                           RefPtr<MediaData>& aOutput) override;
 
-  virtual nsresult Flush() override;
+  void ProcessFlush() override;
+  virtual void ResetEOS() override;
 
   const char* GetDescriptionName() const override
   {

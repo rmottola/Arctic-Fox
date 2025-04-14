@@ -229,8 +229,8 @@ public:
                     const nsAString *aInsertString = nullptr);
 
   /**
-   * WillDispatchKeyboardEvent() computes aKeyEvent.alternativeCharCodes and
-   * recompute aKeyEvent.charCode if it's necessary.
+   * WillDispatchKeyboardEvent() computes aKeyEvent.mAlternativeCharCodes and
+   * recompute aKeyEvent.mCharCode if it's necessary.
    *
    * @param aNativeKeyEvent       A native key event for which you want to
    *                              dispatch a Gecko key event.
@@ -758,6 +758,11 @@ public:
   void OnSelectionChange(const IMENotification& aIMENotification);
 
   /**
+   * Call [NSTextInputContext handleEvent] for mouse event support of IME
+   */
+  bool OnHandleEvent(NSEvent* aEvent);
+
+  /**
    * SetMarkedText() is a handler of setMarkedText of NSTextInput.
    *
    * @param aAttrString           This mut be an instance of NSAttributedString.
@@ -972,8 +977,8 @@ private:
    * @param aSelectedRange        Current selected range (or caret position).
    * @return                      NS_TEXTRANGE_*.
    */
-  uint32_t ConvertToTextRangeType(uint32_t aUnderlineStyle,
-                                  NSRange& aSelectedRange);
+  TextRangeType ConvertToTextRangeType(uint32_t aUnderlineStyle,
+                                       NSRange& aSelectedRange);
 
   /**
    * GetRangeCount() computes the range count of aAttrString.

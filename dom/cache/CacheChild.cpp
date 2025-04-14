@@ -10,7 +10,6 @@
 #include "mozilla/dom/cache/ActorUtils.h"
 #include "mozilla/dom/cache/Cache.h"
 #include "mozilla/dom/cache/CacheOpChild.h"
-#include "mozilla/dom/cache/CachePushStreamChild.h"
 
 namespace mozilla {
 namespace dom {
@@ -71,17 +70,7 @@ CacheChild::ExecuteOp(nsIGlobalObject* aGlobal, Promise* aPromise,
 {
   mNumChildActors += 1;
   MOZ_ALWAYS_TRUE(SendPCacheOpConstructor(
-    new CacheOpChild(GetFeature(), aGlobal, aParent, aPromise), aArgs));
-}
-
-CachePushStreamChild*
-CacheChild::CreatePushStream(nsISupports* aParent, nsIAsyncInputStream* aStream)
-{
-  mNumChildActors += 1;
-  auto actor = SendPCachePushStreamConstructor(
-    new CachePushStreamChild(GetFeature(), aParent, aStream));
-  MOZ_ASSERT(actor);
-  return static_cast<CachePushStreamChild*>(actor);
+    new CacheOpChild(GetWorkerHolder(), aGlobal, aParent, aPromise), aArgs));
 }
 
 void
@@ -114,7 +103,7 @@ CacheChild::StartDestroy()
 
   RefPtr<Cache> listener = mListener;
 
-  // StartDestroy() can get called from either Cache or the Feature.
+  // StartDestroy() can get called from either Cache or the WorkerHolder.
   // Theoretically we can get double called if the right race happens.  Handle
   // that by just ignoring the second StartDestroy() call.
   if (!listener) {
@@ -141,7 +130,7 @@ CacheChild::ActorDestroy(ActorDestroyReason aReason)
     MOZ_ASSERT(!mListener);
   }
 
-  RemoveFeature();
+  RemoveWorkerHolder();
 }
 
 PCacheOpChild*
@@ -153,21 +142,6 @@ CacheChild::AllocPCacheOpChild(const CacheOpArgs& aOpArgs)
 
 bool
 CacheChild::DeallocPCacheOpChild(PCacheOpChild* aActor)
-{
-  delete aActor;
-  NoteDeletedActor();
-  return true;
-}
-
-PCachePushStreamChild*
-CacheChild::AllocPCachePushStreamChild()
-{
-  MOZ_CRASH("CachePushStreamChild should be manually constructed.");
-  return nullptr;
-}
-
-bool
-CacheChild::DeallocPCachePushStreamChild(PCachePushStreamChild* aActor)
 {
   delete aActor;
   NoteDeletedActor();

@@ -178,9 +178,10 @@ public:
      */
     virtual bool IsFontFormatSupported(nsIURI *aFontURI, uint32_t aFormatFlags) override;
 
+    virtual void CompositorUpdated() override;
+
     bool DidRenderingDeviceReset(DeviceResetReason* aResetReason = nullptr) override;
     void SchedulePaintIfDeviceReset() override;
-    void UpdateRenderModeIfDeviceReset() override;
 
     mozilla::gfx::BackendType GetContentBackendFor(mozilla::layers::LayersBackend aLayers) override;
 
@@ -227,7 +228,7 @@ public:
 
     static bool IsOptimus();
 
-    bool IsWARP() { return mIsWARP; }
+    bool IsWARP() const { return mIsWARP; }
 
     // Returns whether the compositor's D3D11 device supports texture sharing.
     bool CompositorD3D11TextureSharingWorks() const {
@@ -249,9 +250,8 @@ public:
     void TestDeviceReset(DeviceResetReason aReason);
 
     virtual already_AddRefed<mozilla::gfx::VsyncSource> CreateHardwareVsyncSource() override;
-    static mozilla::Atomic<size_t> sD3D11MemoryUsed;
-    static mozilla::Atomic<size_t> sD3D9MemoryUsed;
-    static mozilla::Atomic<size_t> sD3D9SharedTextureUsed;
+    static mozilla::Atomic<size_t> sD3D11SharedTextures;
+    static mozilla::Atomic<size_t> sD3D9SharedTextures;
 
     void GetDeviceInitData(mozilla::gfx::DeviceInitData* aOut) override;
 
@@ -283,9 +283,11 @@ private:
     void InitializeD2D();
     bool InitDWriteSupport();
 
-    void DisableD2D(mozilla::gfx::FeatureStatus aStatus, const char* aMessage);
+    void DisableD2D(mozilla::gfx::FeatureStatus aStatus, const char* aMessage,
+                    const nsACString& aFailureId);
 
     void InitializeConfig();
+    void InitializeD3D9Config();
     void InitializeD3D11Config();
     void InitializeD2DConfig();
 
@@ -329,10 +331,10 @@ private:
     RefPtr<ID3D11Device> mD3D11ContentDevice;
     RefPtr<ID3D11Device> mD3D11ImageBridgeDevice;
     RefPtr<mozilla::layers::DeviceManagerD3D9> mDeviceManager;
-    bool mIsWARP;
+    mozilla::Atomic<bool> mIsWARP;
     bool mHasDeviceReset;
     bool mHasFakeDeviceReset;
-    bool mCompositorD3D11TextureSharingWorks;
+    mozilla::Atomic<bool> mCompositorD3D11TextureSharingWorks;
     mozilla::Atomic<bool> mHasD3D9DeviceReset;
     DeviceResetReason mDeviceResetReason;
 

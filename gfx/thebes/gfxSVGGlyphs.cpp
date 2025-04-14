@@ -256,6 +256,22 @@ gfxSVGGlyphs::HasSVGGlyph(uint32_t aGlyphId)
     return !!GetGlyphElement(aGlyphId);
 }
 
+size_t
+gfxSVGGlyphs::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const
+{
+    // We don't include the size of mSVGData here, because (depending on the
+    // font backend implementation) it will either wrap a block of data owned
+    // by the system (and potentially shared), or a table that's in our font
+    // table cache and therefore already counted.
+    size_t result = aMallocSizeOf(this)
+                    + mGlyphDocs.ShallowSizeOfExcludingThis(aMallocSizeOf)
+                    + mGlyphIdMap.ShallowSizeOfExcludingThis(aMallocSizeOf);
+    for (auto iter = mGlyphDocs.ConstIter(); !iter.Done(); iter.Next()) {
+        result += iter.Data()->SizeOfIncludingThis(aMallocSizeOf);
+    }
+    return result;
+}
+
 Element *
 gfxSVGGlyphsDocument::GetGlyphElement(uint32_t aGlyphId)
 {
@@ -291,15 +307,13 @@ gfxSVGGlyphsDocument::gfxSVGGlyphsDocument(const uint8_t *aBuffer,
 gfxSVGGlyphsDocument::~gfxSVGGlyphsDocument()
 {
     if (mDocument) {
-        nsSMILAnimationController* controller = mDocument->GetAnimationController();
-        if (controller) {
-            controller->Pause(nsSMILTimeContainer::PAUSE_PAGEHIDE);
-        }
+        mDocument->OnPageHide(false, nullptr);
     }
     if (mPresShell) {
         mPresShell->RemovePostRefreshObserver(this);
     }
     if (mViewer) {
+        mViewer->Close(nullptr);
         mViewer->Destroy();
     }
 }
@@ -435,6 +449,15 @@ gfxSVGGlyphsDocument::InsertGlyphId(Element *aGlyphElement)
     }
 
     mGlyphIdMap.Put(id, aGlyphElement);
+}
+
+size_t
+gfxSVGGlyphsDocument::SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const
+{
+    return aMallocSizeOf(this)
+           + mGlyphIdMap.ShallowSizeOfExcludingThis(aMallocSizeOf)
+           + mSVGGlyphsDocumentURI.SizeOfExcludingThisIfUnshared(aMallocSizeOf);
+
 }
 
 void

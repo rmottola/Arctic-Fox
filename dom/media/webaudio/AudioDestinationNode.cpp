@@ -5,10 +5,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "AudioDestinationNode.h"
+#include "AlignmentUtils.h"
 #include "AudioContext.h"
 #include "mozilla/dom/AudioDestinationNodeBinding.h"
 #include "mozilla/dom/ScriptSettings.h"
-#include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
 #include "AudioChannelAgent.h"
 #include "AudioChannelService.h"
@@ -55,18 +55,26 @@ public:
     // will not go anywhere.
     *aOutput = aInput;
 
-    // The output buffer is allocated lazily, on the rendering thread.
-    if (!mBufferAllocated) {
+    // The output buffer is allocated lazily, on the rendering thread, when
+    // non-null input is received.
+    if (!mBufferAllocated && !aInput.IsNull()) {
       // These allocations might fail if content provides a huge number of
       // channels or size, but it's OK since we'll deal with the failure
       // gracefully.
       mBuffer = ThreadSharedFloatArrayBufferList::
         Create(mNumberOfChannels, mLength, fallible);
+      if (mBuffer && mWriteIndex) {
+        // Zero leading for any null chunks that were skipped.
+        for (uint32_t i = 0; i < mNumberOfChannels; ++i) {
+          float* channelData = mBuffer->GetDataForWrite(i);
+          PodZero(channelData, mWriteIndex);
+        }
+      }
 
       mBufferAllocated = true;
     }
 
-    // Handle the case of allocation failure in the input buffer
+    // Skip copying if there is no buffer.
     uint32_t outputChannelCount = mBuffer ? mNumberOfChannels : 0;
 
     // Record our input buffer
@@ -79,7 +87,7 @@ public:
         PodZero(outputData, duration);
       } else {
         const float* inputBuffer = static_cast<const float*>(aInput.mChannelData[i]);
-        if (duration == WEBAUDIO_BLOCK_SIZE) {
+        if (duration == WEBAUDIO_BLOCK_SIZE && IS_ALIGNED16(inputBuffer)) {
           // Use the optimized version of the copy with scale operation
           AudioBlockCopyChannelWithScale(inputBuffer, aInput.mVolume,
                                          outputData);
@@ -149,6 +157,7 @@ public:
       AudioBuffer::Create(context, mNumberOfChannels, mLength, mSampleRate,
                           mBuffer.forget(), rv);
     if (rv.Failed()) {
+      rv.SuppressException();
       return;
     }
 
@@ -296,11 +305,6 @@ private:
   bool mSuspended;
 };
 
-static bool UseAudioChannelAPI()
-{
-  return Preferences::GetBool("media.useAudioChannelAPI");
-}
-
 NS_IMPL_CYCLE_COLLECTION_INHERITED(AudioDestinationNode, AudioNode,
                                    mAudioChannelAgent,
                                    mOfflineRenderingPromise)
@@ -322,9 +326,7 @@ AudioDestinationNode::AudioDestinationNode(AudioContext* aContext,
   , mFramesToProduce(aLength)
   , mAudioChannel(AudioChannel::Normal)
   , mIsOffline(aIsOffline)
-  , mAudioChannelAgentPlaying(false)
-  , mExtraCurrentTimeSinceLastStartedBlocking(0)
-  , mExtraCurrentTimeUpdatedSinceLastStableState(false)
+  , mAudioChannelSuspended(false)
   , mCaptured(false)
 {
   MediaStreamGraph* graph = aIsOffline ?
@@ -403,9 +405,8 @@ AudioDestinationNode::NotifyMainThreadStreamFinished()
   MOZ_ASSERT(mStream->IsFinished());
 
   if (mIsOffline) {
-    nsCOMPtr<nsIRunnable> runnable =
-      NS_NewRunnableMethod(this, &AudioDestinationNode::FireOfflineCompletionEvent);
-    NS_DispatchToCurrentThread(runnable);
+    NS_DispatchToCurrentThread(NewRunnableMethod(this,
+                                                 &AudioDestinationNode::FireOfflineCompletionEvent));
   }
 }
 
@@ -494,31 +495,36 @@ AudioDestinationNode::StartRendering(Promise* aPromise)
   mStream->Graph()->StartNonRealtimeProcessing(mFramesToProduce);
 }
 
-void
-AudioDestinationNode::SetCanPlay(float aVolume, bool aMuted)
-{
-  if (!mStream) {
-    return;
-  }
-
-  mStream->SetTrackEnabled(AudioNodeStream::AUDIO_TRACK, !aMuted);
-  mStream->SetAudioOutputVolume(&gWebAudioOutputKey, aVolume);
-}
-
 NS_IMETHODIMP
 AudioDestinationNode::WindowVolumeChanged(float aVolume, bool aMuted)
 {
-  if (aMuted != mAudioChannelAgentPlaying) {
-    mAudioChannelAgentPlaying = aMuted;
-
-    if (UseAudioChannelAPI()) {
-      Context()->DispatchTrustedEvent(
-        !aMuted ? NS_LITERAL_STRING("mozinterruptend")
-                : NS_LITERAL_STRING("mozinterruptbegin"));
-    }
+  if (!mStream) {
+    return NS_OK;
   }
 
-  SetCanPlay(aVolume, aMuted);
+  float volume = aMuted ? 0.0 : aVolume;
+  mStream->SetAudioOutputVolume(&gWebAudioOutputKey, volume);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+AudioDestinationNode::WindowSuspendChanged(nsSuspendedTypes aSuspend)
+{
+  if (!mStream) {
+    return NS_OK;
+  }
+
+  bool suspended = (aSuspend != nsISuspendedTypes::NONE_SUSPENDED);
+  if (mAudioChannelSuspended == suspended) {
+    return NS_OK;
+  }
+
+  mAudioChannelSuspended = suspended;
+  Context()->DispatchTrustedEvent(!suspended ?
+    NS_LITERAL_STRING("mozinterruptend") :
+    NS_LITERAL_STRING("mozinterruptbegin"));
+
+  mStream->SetTrackEnabled(AudioNodeStream::AUDIO_TRACK, !suspended);
   return NS_OK;
 }
 
@@ -641,74 +647,6 @@ AudioDestinationNode::CreateAudioChannelAgent()
 }
 
 void
-AudioDestinationNode::NotifyStableState()
-{
-  mExtraCurrentTimeUpdatedSinceLastStableState = false;
-}
-
-void
-AudioDestinationNode::ScheduleStableStateNotification()
-{
-  nsCOMPtr<nsIRunnable> event =
-    NS_NewRunnableMethod(this, &AudioDestinationNode::NotifyStableState);
-  // Dispatch will fail if this is called on AudioNode destruction during
-  // shutdown, in which case failure can be ignored.
-  nsContentUtils::RunInStableState(event.forget());
-}
-
-StreamTime
-AudioDestinationNode::ExtraCurrentTime()
-{
-  if (!mStartedBlockingDueToBeingOnlyNode.IsNull() &&
-      !mExtraCurrentTimeUpdatedSinceLastStableState) {
-    mExtraCurrentTimeUpdatedSinceLastStableState = true;
-    // Round to nearest processing block.
-    double seconds =
-      (TimeStamp::Now() - mStartedBlockingDueToBeingOnlyNode).ToSeconds();
-    mExtraCurrentTimeSinceLastStartedBlocking = WEBAUDIO_BLOCK_SIZE *
-      StreamTime(seconds * Context()->SampleRate() / WEBAUDIO_BLOCK_SIZE + 0.5);
-    ScheduleStableStateNotification();
-  }
-  return mExtraCurrentTimeSinceLastStartedBlocking;
-}
-
-void
-AudioDestinationNode::SetIsOnlyNodeForContext(bool aIsOnlyNode)
-{
-  if (!mStartedBlockingDueToBeingOnlyNode.IsNull() == aIsOnlyNode) {
-    // Nothing changed.
-    return;
-  }
-
-  if (!mStream) {
-    // DestroyMediaStream has been called, presumably during CC Unlink().
-    return;
-  }
-
-  if (mIsOffline) {
-    // Don't block the destination stream for offline AudioContexts, since
-    // we expect the zero data produced when there are no other nodes to
-    // show up in its result buffer. Also, we would get confused by adding
-    // ExtraCurrentTime before StartRendering has even been called.
-    return;
-  }
-
-  if (aIsOnlyNode) {
-    mStream->Suspend();
-    mStartedBlockingDueToBeingOnlyNode = TimeStamp::Now();
-    // Don't do an update of mExtraCurrentTimeSinceLastStartedBlocking until the next stable state.
-    mExtraCurrentTimeUpdatedSinceLastStableState = true;
-    ScheduleStableStateNotification();
-  } else {
-    // Force update of mExtraCurrentTimeSinceLastStartedBlocking if necessary
-    ExtraCurrentTime();
-    mStream->AdvanceAndResume(mExtraCurrentTimeSinceLastStartedBlocking);
-    mExtraCurrentTimeSinceLastStartedBlocking = 0;
-    mStartedBlockingDueToBeingOnlyNode = TimeStamp();
-  }
-}
-
-void
 AudioDestinationNode::InputMuted(bool aMuted)
 {
   MOZ_ASSERT(Context() && !Context()->IsOffline());
@@ -725,14 +663,15 @@ AudioDestinationNode::InputMuted(bool aMuted)
     return;
   }
 
-  float volume = 0.0;
-  bool muted = true;
-  nsresult rv = mAudioChannelAgent->NotifyStartedPlaying(&volume, &muted);
+  AudioPlaybackConfig config;
+  nsresult rv = mAudioChannelAgent->NotifyStartedPlaying(&config,
+                                                         AudioChannelService::AudibleState::eAudible);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return;
   }
 
-  WindowVolumeChanged(volume, muted);
+  WindowVolumeChanged(config.mVolume, config.mMuted);
+  WindowSuspendChanged(config.mSuspend);
 }
 
 } // namespace dom

@@ -320,6 +320,7 @@ class RemoteAutomation(Automation):
 
             self.logBuffer += newLogContent
             lines = self.logBuffer.split('\n')
+            lines = [l for l in lines if l]
 
             if lines:
                 # We only keep the last (unfinished) line in the buffer
@@ -331,7 +332,6 @@ class RemoteAutomation(Automation):
 
             for line in lines:
                 # This passes the line to the logger (to be logged or buffered)
-                # and returns a list of structured messages (dict)
                 parsed_messages = self.messageLogger.write(line)
                 for message in parsed_messages:
                     if isinstance(message, dict) and message.get('action') == 'test_start':

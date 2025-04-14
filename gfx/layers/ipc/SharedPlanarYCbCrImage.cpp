@@ -14,6 +14,7 @@
 #include "mozilla/layers/ImageClient.h"  // for ImageClient
 #include "mozilla/layers/LayersSurfaces.h"  // for SurfaceDescriptor, etc
 #include "mozilla/layers/TextureClient.h"
+#include "mozilla/layers/TextureClientRecycleAllocator.h"
 #include "mozilla/layers/BufferTexture.h"
 #include "mozilla/layers/ImageDataSerializer.h"
 #include "mozilla/layers/ImageBridgeChild.h"  // for ImageBridgeChild
@@ -118,7 +119,7 @@ SharedPlanarYCbCrImage::AllocateAndGetNewBuffer(uint32_t aSize)
   }
 
   mTextureClient = TextureClient::CreateForYCbCrWithBufferSize(mCompositable->GetForwarder(),
-                                                               gfx::SurfaceFormat::YUV, size,
+                                                               size,
                                                                mCompositable->GetTextureFlags());
 
   // get new buffer _without_ setting mBuffer.
@@ -135,7 +136,7 @@ SharedPlanarYCbCrImage::AllocateAndGetNewBuffer(uint32_t aSize)
     // buffer which is where the y channel starts by default.
     return mapped.y.data;
   } else {
-    MOZ_CRASH();
+    MOZ_CRASH("GFX: Cannot borrow mapped YCbCr data");
   }
 }
 
@@ -151,15 +152,21 @@ SharedPlanarYCbCrImage::AdoptData(const Data &aData)
   }
   mData = aData;
   mSize = aData.mPicSize;
+  mOrigin = gfx::IntPoint(aData.mPicX, aData.mPicY);
 
   uint8_t *base = GetBuffer();
   uint32_t yOffset = aData.mYChannel - base;
   uint32_t cbOffset = aData.mCbChannel - base;
   uint32_t crOffset = aData.mCrChannel - base;
 
+  auto fwd = mCompositable->GetForwarder()->AsCompositableForwarder();
+  bool hasIntermediateBuffer = fwd ? ComputeHasIntermediateBuffer(gfx::SurfaceFormat::YUV,
+                                                                  fwd->GetCompositorBackendType())
+                                   : true;
+
   static_cast<BufferTextureData*>(mTextureClient->GetInternalData())->SetDesciptor(
     YCbCrDescriptor(aData.mYSize, aData.mCbCrSize, yOffset, cbOffset, crOffset,
-                    aData.mStereoMode)
+                    aData.mStereoMode, hasIntermediateBuffer)
   );
 
   return true;
@@ -175,11 +182,18 @@ SharedPlanarYCbCrImage::Allocate(PlanarYCbCrData& aData)
 {
   MOZ_ASSERT(!mTextureClient,
              "This image already has allocated data");
+  static const uint32_t MAX_POOLED_VIDEO_COUNT = 5;
 
-  mTextureClient = TextureClient::CreateForYCbCr(mCompositable->GetForwarder(),
-                                                 aData.mYSize, aData.mCbCrSize,
-                                                 aData.mStereoMode,
-                                                 mCompositable->GetTextureFlags());
+  if (!mCompositable->HasTextureClientRecycler()) {
+    // Initialize TextureClientRecycler
+    mCompositable->GetTextureClientRecycler()->SetMaxPoolSize(MAX_POOLED_VIDEO_COUNT);
+  }
+
+  {
+    YCbCrTextureClientAllocationHelper helper(aData, mCompositable->GetTextureFlags());
+    mTextureClient = mCompositable->GetTextureClientRecycler()->CreateOrRecycle(helper);
+  }
+
   if (!mTextureClient) {
     NS_WARNING("SharedPlanarYCbCrImage::Allocate failed.");
     return false;
@@ -191,7 +205,7 @@ SharedPlanarYCbCrImage::Allocate(PlanarYCbCrData& aData)
   // because the underlyin BufferTextureData is always mapped in memory even outside
   // of the lock/unlock interval. That's sad and new code should follow this example.
   if (!mTextureClient->Lock(OpenMode::OPEN_READ) || !mTextureClient->BorrowMappedYCbCrData(mapped)) {
-    MOZ_CRASH();
+    MOZ_CRASH("GFX: Cannot lock or borrow mapped YCbCr");
   }
 
   aData.mYChannel = mapped.y.data;
@@ -221,6 +235,7 @@ SharedPlanarYCbCrImage::Allocate(PlanarYCbCrData& aData)
   // shmem.
   mBufferSize = ImageDataSerializer::ComputeYCbCrBufferSize(mData.mYSize, mData.mCbCrSize);
   mSize = mData.mPicSize;
+  mOrigin = gfx::IntPoint(aData.mPicX, aData.mPicY);
 
   mTextureClient->Unlock();
 

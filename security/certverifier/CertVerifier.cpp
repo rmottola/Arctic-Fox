@@ -40,7 +40,8 @@ CertVerifier::CertVerifier(OcspDownloadConfig odc,
                            uint32_t certShortLifetimeInDays,
                            PinningMode pinningMode,
                            SHA1Mode sha1Mode,
-                           BRNameMatchingPolicy::Mode nameMatchingMode)
+                           BRNameMatchingPolicy::Mode nameMatchingMode,
+                           NetscapeStepUpPolicy netscapeStepUpPolicy)
   : mOCSPDownloadConfig(odc)
   , mOCSPStrict(osc == ocspStrict)
   , mOCSPGETEnabled(ogc == ocspGetEnabled)
@@ -48,6 +49,7 @@ CertVerifier::CertVerifier(OcspDownloadConfig odc,
   , mPinningMode(pinningMode)
   , mSHA1Mode(sha1Mode)
   , mNameMatchingMode(nameMatchingMode)
+  , mNetscapeStepUpPolicy(netscapeStepUpPolicy)
 {
 }
 
@@ -61,7 +63,7 @@ InitCertVerifierLog()
 }
 
 Result
-IsCertChainRootBuiltInRoot(CERTCertList* chain, bool& result)
+IsCertChainRootBuiltInRoot(const UniqueCERTCertList& chain, bool& result)
 {
   if (!chain || CERT_LIST_EMPTY(chain)) {
     return Result::FATAL_ERROR_LIBRARY_FAILURE;
@@ -81,13 +83,12 @@ Result
 IsCertBuiltInRoot(CERTCertificate* cert, bool& result)
 {
   result = false;
+#ifdef DEBUG
   nsCOMPtr<nsINSSComponent> component(do_GetService(PSM_COMPONENT_CONTRACTID));
   if (!component) {
     return Result::FATAL_ERROR_LIBRARY_FAILURE;
   }
-  nsresult rv;
-#ifdef DEBUG
-  rv = component->IsCertTestBuiltInRoot(cert, result);
+  nsresult rv = component->IsCertTestBuiltInRoot(cert, result);
   if (NS_FAILED(rv)) {
     return Result::FATAL_ERROR_LIBRARY_FAILURE;
   }
@@ -95,31 +96,23 @@ IsCertBuiltInRoot(CERTCertificate* cert, bool& result)
     return Success;
   }
 #endif // DEBUG
-  nsAutoString modName;
-  rv = component->GetPIPNSSBundleString("RootCertModuleName", modName);
-  if (NS_FAILED(rv)) {
-    return Result::FATAL_ERROR_LIBRARY_FAILURE;
+  AutoSECMODListReadLock lock;
+  for (SECMODModuleList* list = SECMOD_GetDefaultModuleList(); list;
+       list = list->next) {
+    for (int i = 0; i < list->module->slotCount; i++) {
+      PK11SlotInfo* slot = list->module->slots[i];
+      // PK11_HasRootCerts should return true if and only if the given slot has
+      // an object with a CKA_CLASS of CKO_NETSCAPE_BUILTIN_ROOT_LIST, which
+      // should be true only of the builtin root list.
+      // If we can find a copy of the given certificate on the slot with the
+      // builtin root list, that certificate must be a builtin.
+      if (PK11_IsPresent(slot) && PK11_HasRootCerts(slot) &&
+          PK11_FindCertInSlot(slot, cert, nullptr) != CK_INVALID_HANDLE) {
+        result = true;
+        return Success;
+      }
+    }
   }
-  NS_ConvertUTF16toUTF8 modNameUTF8(modName);
-  UniqueSECMODModule builtinRootsModule(SECMOD_FindModule(modNameUTF8.get()));
-  // If the built-in roots module isn't loaded, nothing is a built-in root.
-  if (!builtinRootsModule) {
-    return Success;
-  }
-  UniquePK11SlotInfo builtinSlot(SECMOD_FindSlot(builtinRootsModule.get(),
-                                                 "Builtin Object Token"));
-  // This could happen if the user loaded a module that is acting like the
-  // built-in roots module but doesn't actually have a slot called "Builtin
-  // Object Token". In that case, again nothing is a built-in root.
-  if (!builtinSlot) {
-    return Success;
-  }
-  // Attempt to find a copy of the given certificate in the "Builtin Object
-  // Token" slot of the built-in root module. If we get a valid handle, this
-  // certificate exists in the root module, so we consider it a built-in root.
-  CK_OBJECT_HANDLE handle = PK11_FindCertInSlot(builtinSlot.get(), cert,
-                                                nullptr);
-  result = (handle != CK_INVALID_HANDLE);
   return Success;
 }
 
@@ -181,7 +174,7 @@ static const unsigned int MIN_RSA_BITS_WEAK = 1024;
 SECStatus
 CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                          Time time, void* pinArg, const char* hostname,
-                 /*out*/ ScopedCERTCertList& builtChain,
+                 /*out*/ UniqueCERTCertList& builtChain,
             /*optional*/ const Flags flags,
             /*optional*/ const SECItem* stapledOCSPResponseSECItem,
         /*optional out*/ SECOidTag* evOidPolicy,
@@ -273,8 +266,9 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                        mCertShortLifetimeInDays,
                                        pinningDisabled, MIN_RSA_BITS_WEAK,
                                        ValidityCheckingMode::CheckingOff,
-                                       SHA1Mode::Allowed, builtChain, nullptr,
-                                       nullptr);
+                                       SHA1Mode::Allowed,
+                                       NetscapeStepUpPolicy::NeverMatch,
+                                       builtChain, nullptr, nullptr);
       rv = BuildCertChain(trustDomain, certDER, time,
                           EndEntityOrCA::MustBeEndEntity,
                           KeyUsage::digitalSignature,
@@ -347,8 +341,8 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                       mOCSPCache, pinArg, ocspGETConfig,
                       mCertShortLifetimeInDays, mPinningMode, MIN_RSA_BITS,
                       ValidityCheckingMode::CheckForEV,
-                      sha1ModeConfigurations[i], builtChain,
-                      pinningTelemetryInfo, hostname);
+                      sha1ModeConfigurations[i], mNetscapeStepUpPolicy,
+                      builtChain, pinningTelemetryInfo, hostname);
         rv = BuildCertChainForOneKeyUsage(trustDomain, certDER, time,
                                           KeyUsage::digitalSignature,// (EC)DHE
                                           KeyUsage::keyEncipherment, // RSA
@@ -438,8 +432,8 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                            mPinningMode, keySizeOptions[i],
                                            ValidityCheckingMode::CheckingOff,
                                            sha1ModeConfigurations[j],
-                                           builtChain, pinningTelemetryInfo,
-                                           hostname);
+                                           mNetscapeStepUpPolicy, builtChain,
+                                           pinningTelemetryInfo, hostname);
           rv = BuildCertChainForOneKeyUsage(trustDomain, certDER, time,
                                             KeyUsage::digitalSignature,//(EC)DHE
                                             KeyUsage::keyEncipherment,//RSA
@@ -502,7 +496,8 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                        mCertShortLifetimeInDays,
                                        pinningDisabled, MIN_RSA_BITS_WEAK,
                                        ValidityCheckingMode::CheckingOff,
-                                       mSHA1Mode, builtChain, nullptr, nullptr);
+                                       mSHA1Mode, mNetscapeStepUpPolicy,
+                                       builtChain, nullptr, nullptr);
       rv = BuildCertChain(trustDomain, certDER, time,
                           EndEntityOrCA::MustBeCA, KeyUsage::keyCertSign,
                           KeyPurposeId::id_kp_serverAuth,
@@ -516,8 +511,9 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                        mCertShortLifetimeInDays,
                                        pinningDisabled, MIN_RSA_BITS_WEAK,
                                        ValidityCheckingMode::CheckingOff,
-                                       SHA1Mode::Allowed, builtChain, nullptr,
-                                       nullptr);
+                                       SHA1Mode::Allowed,
+                                       NetscapeStepUpPolicy::NeverMatch,
+                                       builtChain, nullptr, nullptr);
       rv = BuildCertChain(trustDomain, certDER, time,
                           EndEntityOrCA::MustBeEndEntity,
                           KeyUsage::digitalSignature,
@@ -542,8 +538,9 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                        mCertShortLifetimeInDays,
                                        pinningDisabled, MIN_RSA_BITS_WEAK,
                                        ValidityCheckingMode::CheckingOff,
-                                       SHA1Mode::Allowed, builtChain, nullptr,
-                                       nullptr);
+                                       SHA1Mode::Allowed,
+                                       NetscapeStepUpPolicy::NeverMatch,
+                                       builtChain, nullptr, nullptr);
       rv = BuildCertChain(trustDomain, certDER, time,
                           EndEntityOrCA::MustBeEndEntity,
                           KeyUsage::keyEncipherment, // RSA
@@ -565,8 +562,9 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                        mCertShortLifetimeInDays,
                                        pinningDisabled, MIN_RSA_BITS_WEAK,
                                        ValidityCheckingMode::CheckingOff,
-                                       SHA1Mode::Allowed, builtChain, nullptr,
-                                       nullptr);
+                                       SHA1Mode::Allowed,
+                                       NetscapeStepUpPolicy::NeverMatch,
+                                       builtChain, nullptr, nullptr);
       rv = BuildCertChain(trustDomain, certDER, time,
                           EndEntityOrCA::MustBeEndEntity,
                           KeyUsage::digitalSignature,
@@ -597,8 +595,9 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                     pinArg, ocspGETConfig, mCertShortLifetimeInDays,
                                     pinningDisabled, MIN_RSA_BITS_WEAK,
                                     ValidityCheckingMode::CheckingOff,
-                                    SHA1Mode::Allowed, builtChain, nullptr,
-                                    nullptr);
+                                    SHA1Mode::Allowed,
+                                    NetscapeStepUpPolicy::NeverMatch,
+                                    builtChain, nullptr, nullptr);
       rv = BuildCertChain(sslTrust, certDER, time, endEntityOrCA,
                           keyUsage, eku, CertPolicyId::anyPolicy,
                           stapledOCSPResponse);
@@ -608,8 +607,9 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                         mCertShortLifetimeInDays,
                                         pinningDisabled, MIN_RSA_BITS_WEAK,
                                         ValidityCheckingMode::CheckingOff,
-                                        SHA1Mode::Allowed, builtChain, nullptr,
-                                        nullptr);
+                                        SHA1Mode::Allowed,
+                                        NetscapeStepUpPolicy::NeverMatch,
+                                        builtChain, nullptr, nullptr);
         rv = BuildCertChain(emailTrust, certDER, time, endEntityOrCA,
                             keyUsage, eku, CertPolicyId::anyPolicy,
                             stapledOCSPResponse);
@@ -621,8 +621,9 @@ CertVerifier::VerifyCert(CERTCertificate* cert, SECCertificateUsage usage,
                                                   pinningDisabled,
                                                   MIN_RSA_BITS_WEAK,
                                                   ValidityCheckingMode::CheckingOff,
-                                                  SHA1Mode::Allowed, builtChain,
-                                                  nullptr, nullptr);
+                                                  SHA1Mode::Allowed,
+                                                  NetscapeStepUpPolicy::NeverMatch,
+                                                  builtChain, nullptr, nullptr);
           rv = BuildCertChain(objectSigningTrust, certDER, time,
                               endEntityOrCA, keyUsage, eku,
                               CertPolicyId::anyPolicy, stapledOCSPResponse);
@@ -650,7 +651,7 @@ CertVerifier::VerifySSLServerCert(const UniqueCERTCertificate& peerCert,
                                   Time time,
                      /*optional*/ void* pinarg,
                                   const char* hostname,
-                          /*out*/ ScopedCERTCertList& builtChain,
+                          /*out*/ UniqueCERTCertList& builtChain,
                      /*optional*/ bool saveIntermediatesInPermanentDatabase,
                      /*optional*/ Flags flags,
                  /*optional out*/ SECOidTag* evOidPolicy,

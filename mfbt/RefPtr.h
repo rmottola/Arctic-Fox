@@ -19,6 +19,7 @@ class nsCOMPtr_helper;
 
 namespace mozilla {
 template<class T> class OwningNonNull;
+template<class T> class StaticRefPtr;
 
 // Traditionally, RefPtr supports automatic refcounting of any pointer type
 // with AddRef() and Release() methods that follow the traditional semantics.
@@ -148,6 +149,10 @@ public:
   template<class U>
   MOZ_IMPLICIT RefPtr(const mozilla::OwningNonNull<U>& aOther);
 
+  // Defined in StaticPtr.h
+  template<class U>
+  MOZ_IMPLICIT RefPtr(const mozilla::StaticRefPtr<U>& aOther);
+
   // Assignment operators
 
   RefPtr<T>&
@@ -207,6 +212,11 @@ public:
   template<class U>
   RefPtr<T>&
   operator=(const mozilla::OwningNonNull<U>& aOther);
+
+  // Defined in StaticPtr.h
+  template<class U>
+  RefPtr<T>&
+  operator=(const mozilla::StaticRefPtr<U>& aOther);
 
   // Other pointer operators
 
@@ -381,10 +391,10 @@ private:
   struct ConstRemovingRefPtrTraits<const U>
   {
     static void AddRef(const U* aPtr) {
-      mozilla::RefPtrTraits<typename mozilla::RemoveConst<U>::Type>::AddRef(const_cast<U*>(aPtr));
+      mozilla::RefPtrTraits<U>::AddRef(const_cast<U*>(aPtr));
     }
     static void Release(const U* aPtr) {
-      mozilla::RefPtrTraits<typename mozilla::RemoveConst<U>::Type>::Release(const_cast<U*>(aPtr));
+      mozilla::RefPtrTraits<U>::Release(const_cast<U*>(aPtr));
     }
   };
 };
@@ -597,6 +607,14 @@ operator!=(decltype(nullptr), const RefPtr<T>& aRhs)
 template <class T>
 inline already_AddRefed<T>
 do_AddRef(T* aObj)
+{
+  RefPtr<T> ref(aObj);
+  return ref.forget();
+}
+
+template <class T>
+inline already_AddRefed<T>
+do_AddRef(const RefPtr<T>& aObj)
 {
   RefPtr<T> ref(aObj);
   return ref.forget();

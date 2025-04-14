@@ -49,13 +49,25 @@ class GestureEventListener;
 class PCompositorBridgeParent;
 struct AsyncTransform;
 class AsyncPanZoomAnimation;
-class FlingAnimation;
+class AndroidFlingAnimation;
+class GenericFlingAnimation;
 class InputBlockState;
 class TouchBlockState;
 class PanGestureBlockState;
 class OverscrollHandoffChain;
 class StateChangeNotificationBlocker;
 class CheckerboardEvent;
+class OverscrollEffectBase;
+class WidgetOverscrollEffect;
+class GenericOverscrollEffect;
+class AndroidSpecificState;
+
+// Base class for grouping platform-specific APZC state variables.
+class PlatformSpecificStateBase {
+public:
+  virtual ~PlatformSpecificStateBase() {}
+  virtual AndroidSpecificState* AsAndroidSpecificState() { return nullptr; }
+};
 
 /**
  * Controller for all panning and zooming logic. Any time a user input is
@@ -611,8 +623,11 @@ protected:
 
   static AxisLockMode GetAxisLockMode();
 
-  // Helper function for OnSingleTapUp() and OnSingleTapConfirmed().
-  nsEventStatus GenerateSingleTap(const ScreenIntPoint& aPoint, mozilla::Modifiers aModifiers);
+  // Helper function for OnSingleTapUp(), OnSingleTapConfirmed(), and
+  // OnLongPressUp().
+  nsEventStatus GenerateSingleTap(GeckoContentController::TapType aType,
+                                  const ScreenIntPoint& aPoint,
+                                  mozilla::Modifiers aModifiers);
 
   // Common processing at the end of a touch block.
   void OnTouchEndOrCancel();
@@ -643,6 +658,8 @@ protected:
   /* Utility function to get the Compositor with which we share the FrameMetrics.
      This function is only callable from the compositor thread. */
   PCompositorBridgeParent* GetSharedFrameMetricsCompositor();
+
+  PlatformSpecificStateBase* GetPlatformSpecificState();
 
 protected:
   // Both |mFrameMetrics| and |mLastContentPaintMetrics| are protected by the
@@ -699,6 +716,12 @@ private:
   ParentLayerPoint mLastZoomFocus;
 
   RefPtr<AsyncPanZoomAnimation> mAnimation;
+
+  UniquePtr<OverscrollEffectBase> mOverscrollEffect;
+
+  // Groups state variables that are specific to a platform.
+  // Initialized on first use.
+  UniquePtr<PlatformSpecificStateBase> mPlatformSpecificState;
 
   friend class Axis;
 
@@ -865,15 +888,21 @@ public:
   bool AttemptFling(FlingHandoffState& aHandoffState);
 
 private:
-  friend class FlingAnimation;
+  friend class AndroidFlingAnimation;
+  friend class GenericFlingAnimation;
   friend class OverscrollAnimation;
   friend class SmoothScrollAnimation;
   friend class WheelScrollAnimation;
+
+  friend class GenericOverscrollEffect;
+  friend class WidgetOverscrollEffect;
 
   // The initial velocity of the most recent fling.
   ParentLayerPoint mLastFlingVelocity;
   // The time at which the most recent fling started.
   TimeStamp mLastFlingTime;
+  // Indicates if the repaint-during-pinch timer is currently set
+  bool mPinchPaintTimerSet;
 
   // Deal with overscroll resulting from a fling animation. This is only ever
   // called on APZC instances that were actually performing a fling.
@@ -896,6 +925,9 @@ private:
 
   // Returns whether overscroll is allowed during an event.
   bool AllowScrollHandoffInCurrentBlock() const;
+
+  // Invoked by the pinch repaint timer.
+  void DoDelayedRequestContentRepaint();
 
   /* ===================================================================
    * The functions and members in this section are used to make ancestor chains

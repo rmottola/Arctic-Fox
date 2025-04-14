@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # Copyright 2013 Mozilla Foundation and Mozilla contributors
 #
@@ -96,6 +96,8 @@ if CONFIG['ANDROID_VERSION'] >= '18':
             'frameworks/native/opengl/include',
         ]
     ]
+
+DEFINES['HAVE_ANDROID_OS'] = True
 
 # Suppress some GCC warnings being treated as errors:
 #  - about attributes on forward declarations for types that are already

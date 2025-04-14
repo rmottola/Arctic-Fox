@@ -117,6 +117,7 @@ export MOZ_DEBUG_SYMBOLS
 
 DEFAULT_GMAKE_FLAGS =
 DEFAULT_GMAKE_FLAGS += CC='$(CC)'
+DEFAULT_GMAKE_FLAGS += MT='$(MT)'
 DEFAULT_GMAKE_FLAGS += SOURCE_MD_DIR=$(ABS_DIST)
 DEFAULT_GMAKE_FLAGS += SOURCE_MDHEADERS_DIR=$(NSPR_INCLUDE_DIR)
 DEFAULT_GMAKE_FLAGS += DIST=$(ABS_DIST)
@@ -276,13 +277,6 @@ ifdef MOZ_FOLD_LIBS_FLAGS
 DEFAULT_GMAKE_FLAGS += XCFLAGS='$(MOZ_FOLD_LIBS_FLAGS)'
 endif
 
-ifndef WARNINGS_AS_ERRORS
-DEFAULT_GMAKE_FLAGS += NSS_ENABLE_WERROR=0
-endif
-ifeq ($(OS_TARGET),Android)
-DEFAULT_GMAKE_FLAGS += NSS_ENABLE_WERROR=0
-endif
-
 NSS_SRCDIR = $(topsrcdir)
 
 NSS_DIRS =
@@ -362,15 +356,14 @@ endif # MOZ_FOLD_LIBS
 
 include $(topsrcdir)/config/rules.mk
 
+ifeq (1,$(ALLOW_COMPILER_WARNINGS))
+DEFAULT_GMAKE_FLAGS += NSS_ENABLE_WERROR=0
+endif
+
 # Can't pass this in DEFAULT_GMAKE_FLAGS because that overrides
 # definitions in NSS, so just export it into the sub-make's environment.
 ifeq (WINNT_1,$(OS_TARGET)_$(MOZ_MEMORY))
-ifdef MOZ_CRT
-# OS_LIBS comes from having mozcrt as a dependency in moz.build.
-DLLFLAGS := $(OS_LIBS)
-else
 DLLFLAGS := -LIBPATH:$(ABS_DIST)/../mozglue/build -DEFAULTLIB:mozglue
-endif
 export DLLFLAGS
 endif
 

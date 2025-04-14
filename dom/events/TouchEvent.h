@@ -52,8 +52,7 @@ public:
     return mParent;
   }
 
-  static bool PrefEnabled(JSContext* aCx = nullptr,
-                          JSObject* aGlobal = nullptr);
+  static bool PrefEnabled(JSContext* aCx, JSObject* aGlobal);
 
   uint32_t Length() const
   {
@@ -71,7 +70,6 @@ public:
     }
     return mPoints[aIndex];
   }
-  Touch* IdentifiedTouch(int32_t aIdentifier) const;
 
 protected:
   ~TouchList() {}
@@ -120,8 +118,8 @@ public:
                       TouchList* aTargetTouches,
                       TouchList* aChangedTouches);
 
-  static bool PrefEnabled(JSContext* aCx = nullptr,
-                          JSObject* aGlobal = nullptr);
+  static bool PrefEnabled(JSContext* aCx, JSObject* aGlobal);
+  static bool PrefEnabled(nsIDocShell* aDocShell);
 
   static already_AddRefed<Event> Constructor(const GlobalObject& aGlobal,
                                              const nsAString& aType,

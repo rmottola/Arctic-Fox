@@ -24,6 +24,7 @@ const errors = [
   "SessionNotCreatedError",
   "StaleElementReferenceError",
   "TimeoutError",
+  "UnableToSetCookieError",
   "UnknownCommandError",
   "UnknownError",
   "UnsupportedOperationError",
@@ -54,19 +55,6 @@ const XPCOM_EXCEPTIONS = [];
 
 this.error = {};
 
-error.toJSON = function(err) {
-  return {
-    message: err.message,
-    stacktrace: err.stack || null,
-    status: err.status
-  };
-};
-
-/**
- * Determines if the given status is successful.
- */
-error.isSuccess = status => status === "success";
-
 /**
  * Checks if obj is an instance of the Error prototype in a safe manner.
  * Prefer using this over using instanceof since the Error prototype
@@ -93,7 +81,7 @@ error.isError = function(val) {
  */
 error.isWebDriverError = function(obj) {
   return error.isError(obj) &&
-      ("name" in obj && errors.indexOf(obj.name) > 0);
+      ("name" in obj && errors.indexOf(obj.name) >= 0);
 };
 
 /**
@@ -301,6 +289,14 @@ this.TimeoutError = function(msg) {
   this.status = "timeout";
 };
 TimeoutError.prototype = Object.create(WebDriverError.prototype);
+
+this.UnableToSetCookieError = function(msg) {
+  WebDriverError.call(this, msg);
+  this.name = "UnableToSetCookieError";
+  this.status = "unable to set cookie";
+  this.code = 25;
+};
+UnableToSetCookieError.prototype = Object.create(WebDriverError.prototype);
 
 this.UnknownCommandError = function(msg) {
   WebDriverError.call(this, msg);

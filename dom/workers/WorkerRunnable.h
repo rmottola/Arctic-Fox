@@ -91,7 +91,8 @@ public:
   FromRunnable(nsIRunnable* aRunnable);
 
 protected:
-  WorkerRunnable(WorkerPrivate* aWorkerPrivate, TargetAndBusyBehavior aBehavior)
+  WorkerRunnable(WorkerPrivate* aWorkerPrivate,
+                 TargetAndBusyBehavior aBehavior = WorkerThreadModifyBusyCount)
 #ifdef DEBUG
   ;
 #else
@@ -264,58 +265,6 @@ private:
   PostDispatch(WorkerPrivate* aWorkerPrivate, bool aDispatchResult) override;
 };
 
-// This runnable is used to stop a sync loop and it's meant to be used on the
-// main-thread only. As sync loops keep the busy count incremented as long as
-// they run this runnable does not modify the busy count
-// in any way.
-class MainThreadStopSyncLoopRunnable : public WorkerSyncRunnable
-{
-  bool mResult;
-
-public:
-  // Passing null for aSyncLoopTarget is not allowed.
-  MainThreadStopSyncLoopRunnable(
-                               WorkerPrivate* aWorkerPrivate,
-                               already_AddRefed<nsIEventTarget>&& aSyncLoopTarget,
-                               bool aResult);
-
-  // By default StopSyncLoopRunnables cannot be canceled since they could leave
-  // a sync loop spinning forever.
-  nsresult
-  Cancel() override;
-
-protected:
-  virtual ~MainThreadStopSyncLoopRunnable()
-  { }
-
-  // Called on the worker thread, in WorkerRun, right before stopping the
-  // syncloop to set an exception (however subclasses want to handle that) if
-  // mResult is false.  Note that overrides of this method must NOT set an
-  // actual exception on the JSContext; they may only set some state that will
-  // get turned into an exception once the syncloop actually terminates and
-  // control is returned to whoever was spinning the syncloop.
-  virtual void
-  MaybeSetException()
-  { }
-
-private:
-  virtual bool
-  PreDispatch(WorkerPrivate* aWorkerPrivate) override final
-  {
-    AssertIsOnMainThread();
-    return true;
-  }
-
-  virtual void
-  PostDispatch(WorkerPrivate* aWorkerPrivate, bool aDispatchResult) override;
-
-  virtual bool
-  WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override;
-
-  virtual bool
-  DispatchInternal() override final;
-};
-
 // This runnable is processed as soon as it is received by the worker,
 // potentially running before previously queued runnables and perhaps even with
 // other JS code executing on the stack. These runnables must not alter the
@@ -327,7 +276,7 @@ class WorkerControlRunnable : public WorkerRunnable
 
 protected:
   WorkerControlRunnable(WorkerPrivate* aWorkerPrivate,
-                        TargetAndBusyBehavior aBehavior)
+                        TargetAndBusyBehavior aBehavior = WorkerThreadModifyBusyCount)
 #ifdef DEBUG
   ;
 #else
@@ -352,6 +301,35 @@ private:
   using WorkerRunnable::Cancel;
 };
 
+// A convenience class for WorkerRunnables that are originated on the main
+// thread.
+class MainThreadWorkerRunnable : public WorkerRunnable
+{
+protected:
+  explicit MainThreadWorkerRunnable(WorkerPrivate* aWorkerPrivate)
+  : WorkerRunnable(aWorkerPrivate, WorkerThreadUnchangedBusyCount)
+  {
+    AssertIsOnMainThread();
+  }
+
+  virtual ~MainThreadWorkerRunnable()
+  {}
+
+  virtual bool
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override
+  {
+    AssertIsOnMainThread();
+    return true;
+  }
+
+  virtual void
+  PostDispatch(WorkerPrivate* aWorkerPrivate,
+               bool aDispatchResult) override
+  {
+    AssertIsOnMainThread();
+  }
+};
+
 // A convenience class for WorkerControlRunnables that originate on the main
 // thread.
 class MainThreadWorkerControlRunnable : public WorkerControlRunnable
@@ -372,7 +350,10 @@ protected:
   }
 
   virtual void
-  PostDispatch(WorkerPrivate* aWorkerPrivate, bool aDispatchResult) override;
+  PostDispatch(WorkerPrivate* aWorkerPrivate, bool aDispatchResult) override
+  {
+    AssertIsOnMainThread();
+  }
 };
 
 // A WorkerRunnable that should be dispatched from the worker to itself for
@@ -428,6 +409,34 @@ private:
   NS_IMETHOD Run() override;
 };
 
+// This runnable is an helper class for dispatching something from a worker
+// thread to the main-thread and back to the worker-thread. During this
+// operation, this class will keep the worker alive.
+class WorkerProxyToMainThreadRunnable : public Runnable
+{
+protected:
+  explicit WorkerProxyToMainThreadRunnable(WorkerPrivate* aWorkerPrivate);
+
+  virtual ~WorkerProxyToMainThreadRunnable();
+
+  // First this method is called on the main-thread.
+  virtual void RunOnMainThread() = 0;
+
+  // After this second method is called on the worker-thread.
+  virtual void RunBackOnWorkerThread() = 0;
+
+public:
+  bool Dispatch();
+
+private:
+  NS_IMETHOD Run() override;
+
+  void PostDispatchOnMainThread();
+
+protected:
+  WorkerPrivate* mWorkerPrivate;
+};
+
 // Class for checking API exposure.  This totally violates the "MUST" in the
 // comments on WorkerMainThreadRunnable::Dispatch, because API exposure checks
 // can't throw.  Maybe we should change it so they _could_ throw.  But for now
@@ -447,6 +456,48 @@ public:
   // Returns whether the dispatch succeeded.  If this returns false, the API
   // should not be exposed.
   bool Dispatch();
+};
+
+// This runnable is used to stop a sync loop and it's meant to be used on the
+// main-thread only. As sync loops keep the busy count incremented as long as
+// they run this runnable does not modify the busy count
+// in any way.
+class MainThreadStopSyncLoopRunnable : public WorkerSyncRunnable
+{
+  bool mResult;
+
+public:
+  // Passing null for aSyncLoopTarget is not allowed.
+  MainThreadStopSyncLoopRunnable(
+                               WorkerPrivate* aWorkerPrivate,
+                               already_AddRefed<nsIEventTarget>&& aSyncLoopTarget,
+                               bool aResult);
+
+  // By default StopSyncLoopRunnables cannot be canceled since they could leave
+  // a sync loop spinning forever.
+  nsresult
+  Cancel() override;
+
+protected:
+  virtual ~MainThreadStopSyncLoopRunnable()
+  { }
+
+private:
+  virtual bool
+  PreDispatch(WorkerPrivate* aWorkerPrivate) override final
+  {
+    AssertIsOnMainThread();
+    return true;
+  }
+
+  virtual void
+  PostDispatch(WorkerPrivate* aWorkerPrivate, bool aDispatchResult) override;
+
+  virtual bool
+  WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override;
+
+  virtual bool
+  DispatchInternal() override final;
 };
 
 END_WORKERS_NAMESPACE

@@ -245,7 +245,7 @@ struct AdjustedPattern
         mPattern =
           new (mSurfPat) SurfacePattern(GetSourceSurface(surfPat->mSurface),
                                         surfPat->mExtendMode, surfPat->mMatrix,
-                                        surfPat->mFilter);
+                                        surfPat->mSamplingFilter);
         return mPattern;
       }
     case PatternType::LINEAR_GRADIENT:
@@ -389,10 +389,6 @@ DrawTargetRecording::FillGlyphs(ScaledFont *aFont,
 {
   EnsurePatternDependenciesStored(aPattern);
 
-  if (aFont->GetType() != FontType::DWRITE && aFont->GetType() != FontType::GDI) {
-    gfxDevCrash(LogReason::GetFontFileDataFailed) << "Unexpected ScaledFont type " << (int)aFont->GetType();
-  }
-
   if (!aFont->GetUserData(reinterpret_cast<UserDataKey*>(mRecorder.get()))) {
   // TODO support font in b2g recordings
 #ifndef MOZ_WIDGET_GONK
@@ -479,6 +475,12 @@ DrawTargetRecording::Snapshot()
   mRecorder->RecordEvent(RecordedSnapshot(retSurf, this));
 
   return retSurf.forget();
+}
+
+void
+DrawTargetRecording::DetachAllSnapshots()
+{
+  mFinalDT->DetachAllSnapshots();
 }
 
 void

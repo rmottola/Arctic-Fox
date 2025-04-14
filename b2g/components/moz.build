@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -7,7 +7,6 @@
 DIRS += ['test']
 
 EXTRA_COMPONENTS += [
-    'ActivitiesGlue.js',
     'AlertsService.js',
     'B2GAboutRedirector.js',
     'B2GAppMigrator.js',
@@ -17,8 +16,6 @@ EXTRA_COMPONENTS += [
     'FilePicker.js',
     'FxAccountsUIGlue.js',
     'HelperAppDialog.js',
-    'InterAppCommUIGlue.js',
-    'KillSwitch.js',
     'MailtoProtocolHandler.js',
     'MobileIdentityUIGlue.js',
     'OMAContentHandler.js',
@@ -27,7 +24,7 @@ EXTRA_COMPONENTS += [
     'PresentationRequestUIGlue.js',
     'ProcessGlobal.js',
     'SmsProtocolHandler.js',
-    'SystemMessageGlue.js',
+    'SystemMessageInternal.js',
     'TelProtocolHandler.js',
     'WebappsUpdateTimer.js',
 ]
@@ -56,6 +53,7 @@ if CONFIG['MOZ_UPDATER']:
 
 EXTRA_JS_MODULES += [
     'AboutServiceWorkers.jsm',
+    'ActivityChannel.jsm',
     'AlertsHelper.jsm',
     'Bootstraper.jsm',
     'ContentRequestHelper.jsm',
@@ -63,11 +61,9 @@ EXTRA_JS_MODULES += [
     'ErrorPage.jsm',
     'Frames.jsm',
     'FxAccountsMgmtService.jsm',
-    'KillSwitchMain.jsm',
     'LogCapture.jsm',
     'LogParser.jsm',
     'LogShake.jsm',
-    'MultiscreenHandler.jsm',
     'OrientationChangeHandler.jsm',
     'SafeMode.jsm',
     'Screenshot.jsm',
@@ -77,11 +73,13 @@ EXTRA_JS_MODULES += [
     'WebappsUpdater.jsm',
 ]
 
-EXTRA_PP_JS_MODULES += [
-    'PersistentDataBlock.jsm'
-]
-
 if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'gonk':
     EXTRA_JS_MODULES += [
       'GlobalSimulatorScreen.jsm'
     ]
+
+XPIDL_SOURCES += [
+    'nsISystemMessagesInternal.idl'
+]
+
+XPIDL_MODULE = 'gaia_chrome'

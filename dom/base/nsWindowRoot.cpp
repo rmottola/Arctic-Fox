@@ -37,6 +37,15 @@ nsWindowRoot::nsWindowRoot(nsPIDOMWindowOuter* aWindow)
 {
   mWindow = aWindow;
   MOZ_ASSERT(mWindow->IsOuterWindow());
+
+  // Keyboard indicators are not shown on Mac by default.
+#if defined(XP_MACOSX)
+  mShowAccelerators = false;
+  mShowFocusRings = false;
+#else
+  mShowAccelerators = true;
+  mShowFocusRings = true;
+#endif
 }
 
 nsWindowRoot::~nsWindowRoot()
@@ -49,7 +58,6 @@ nsWindowRoot::~nsWindowRoot()
 NS_IMPL_CYCLE_COLLECTION_WRAPPERCACHE(nsWindowRoot,
                                       mWindow,
                                       mListenerManager,
-                                      mPopupNode,
                                       mParent)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsWindowRoot)
@@ -117,7 +125,7 @@ nsWindowRoot::AddEventListener(const nsAString& aType,
 void
 nsWindowRoot::AddEventListener(const nsAString& aType,
                                 EventListener* aListener,
-                                bool aUseCapture,
+                                const AddEventListenerOptionsOrBoolean& aOptions,
                                 const Nullable<bool>& aWantsUntrusted,
                                 ErrorResult& aRv)
 {
@@ -127,7 +135,7 @@ nsWindowRoot::AddEventListener(const nsAString& aType,
     aRv.Throw(NS_ERROR_UNEXPECTED);
     return;
   }
-  elm->AddEventListener(aType, aListener, aUseCapture, wantsUntrusted);
+  elm->AddEventListener(aType, aListener, aOptions, wantsUntrusted);
 }
 
 
@@ -287,7 +295,7 @@ nsWindowRoot::GetControllerForCommand(const char * aCommand,
     nsGlobalWindow *win = nsGlobalWindow::Cast(focusedWindow);
     focusedWindow = win->GetPrivateParent();
   }
-  
+
   return NS_OK;
 }
 
@@ -363,13 +371,14 @@ nsWindowRoot::GetEnabledDisabledCommands(nsTArray<nsCString>& aEnabledCommands,
 nsIDOMNode*
 nsWindowRoot::GetPopupNode()
 {
-  return mPopupNode;
+  nsCOMPtr<nsIDOMNode> popupNode = do_QueryReferent(mPopupNode);
+  return popupNode;
 }
 
 void
 nsWindowRoot::SetPopupNode(nsIDOMNode* aNode)
 {
-  mPopupNode = aNode;
+  mPopupNode = do_GetWeakReference(aNode);
 }
 
 nsIGlobalObject*

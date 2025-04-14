@@ -23517,6 +23517,18 @@
         ]
       },
       "testharness": {
+        "XMLHttpRequest/xmlhttprequest-sync-block-defer-scripts.html": [
+          {
+            "path": "XMLHttpRequest/xmlhttprequest-sync-block-defer-scripts.html",
+            "url": "/XMLHttpRequest/xmlhttprequest-sync-block-defer-scripts.html"
+          }
+        ],
+        "XMLHttpRequest/xmlhttprequest-sync-block-scripts.html": [
+          {
+            "path": "XMLHttpRequest/xmlhttprequest-sync-block-scripts.html",
+            "url": "/XMLHttpRequest/xmlhttprequest-sync-block-scripts.html"
+          }
+        ],
         "DOM-parsing/createContextualFragment.html": [
           {
             "path": "DOM-parsing/createContextualFragment.html",
@@ -23595,6 +23607,18 @@
             "url": "/XMLHttpRequest/open-url-multi-window-6.htm"
           }
         ],
+        "html/browsers/browsing-the-web/navigating-across-documents/javascript-url-return-value-handling.html": [
+          {
+            "path": "html/browsers/browsing-the-web/navigating-across-documents/javascript-url-return-value-handling.html",
+            "url": "/html/browsers/browsing-the-web/navigating-across-documents/javascript-url-return-value-handling.html"
+          }
+        ],
+        "html/browsers/history/the-location-interface/allow_prototype_cycle_through_location.sub.html": [
+          {
+            "path": "html/browsers/history/the-location-interface/allow_prototype_cycle_through_location.sub.html",
+            "url": "/html/browsers/history/the-location-interface/allow_prototype_cycle_through_location.sub.html"
+          }
+        ],
         "html/semantics/document-metadata/the-base-element/base_about_blank.html": [
           {
             "path": "html/semantics/document-metadata/the-base-element/base_about_blank.html",
@@ -23623,6 +23647,24 @@
           {
             "path": "html/semantics/embedded-content/the-iframe-element/iframe-load-event.html",
             "url": "/html/semantics/embedded-content/the-iframe-element/iframe-load-event.html"
+          }
+        ],
+        "html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_escaping.html": [
+          {
+            "path": "html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_escaping.html",
+            "url": "/html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_escaping.html"
+          }
+        ],
+        "html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_nonescaping.html": [
+          {
+            "path": "html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_nonescaping.html",
+            "url": "/html/semantics/embedded-content/the-iframe-element/iframe_sandbox_popups_nonescaping.html"
+          }
+        ],
+        "html/syntax/serializing-html-fragments/serializing.html": [
+          {
+            "path": "html/syntax/serializing-html-fragments/serializing.html",
+            "url": "/html/syntax/serializing-html-fragments/serializing.html"
           }
         ],
         "html/syntax/serializing-html-fragments/serializing.html": [
@@ -23679,6 +23721,18 @@
             "url": "/service-workers/service-worker/update-recovery.https.html"
           }
         ],
+        "web-animations/animation-model/keyframe-effects/effect-value-context.html": [
+          {
+            "path": "web-animations/animation-model/keyframe-effects/effect-value-context.html",
+            "url": "/web-animations/animation-model/keyframe-effects/effect-value-context.html"
+          }
+        ],
+        "web-animations/animation-model/keyframe-effects/the-effect-value-of-a-keyframe-effect.html": [
+          {
+            "path": "web-animations/animation-model/keyframe-effects/the-effect-value-of-a-keyframe-effect.html",
+            "url": "/web-animations/animation-model/keyframe-effects/the-effect-value-of-a-keyframe-effect.html"
+          }
+        ],
         "web-animations/animation/startTime.html": [
           {
             "path": "web-animations/animation/startTime.html",
@@ -23713,6 +23767,18 @@
           {
             "path": "web-animations/timing-model/animations/set-the-animation-start-time.html",
             "url": "/web-animations/timing-model/animations/set-the-animation-start-time.html"
+          }
+        ],
+        "web-animations/timing-model/animations/set-the-timeline-of-an-animation.html": [
+          {
+            "path": "web-animations/timing-model/animations/set-the-timeline-of-an-animation.html",
+            "url": "/web-animations/timing-model/animations/set-the-timeline-of-an-animation.html"
+          }
+        ],
+        "web-animations/timing-model/animations/current-time.html": [
+          {
+            "path": "web-animations/timing-model/animations/current-time.html",
+            "url": "/web-animations/timing-model/animations/current-time.html"
           }
         ]
       }

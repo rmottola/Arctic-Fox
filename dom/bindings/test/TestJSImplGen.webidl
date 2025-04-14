@@ -733,14 +733,24 @@ interface TestJSImplInterface {
   void prefable19();
   [Pref="abc.def", Func="TestFuncControlledMember", ChromeOnly]
   void prefable20();
-  [Func="TestFuncControlledMember", AvailableIn=CertifiedApps]
-  void prefable21();
-  [Func="TestFuncControlledMember", AvailableIn=CertifiedApps]
-  void prefable22();
-  [Pref="abc.def", Func="TestFuncControlledMember", AvailableIn=CertifiedApps]
-  void prefable23();
-  [Pref="abc.def", Func="TestFuncControlledMember", AvailableIn=PrivilegedApps]
-  void prefable24();
+
+  // Conditionally exposed methods/attributes involving [SecureContext]
+  [SecureContext]
+  readonly attribute boolean conditionalOnSecureContext1;
+  [SecureContext, Pref="abc.def"]
+  readonly attribute boolean conditionalOnSecureContext2;
+  [SecureContext, Pref="abc.def", Func="nsGenericHTMLElement::TouchEventsEnabled"]
+  readonly attribute boolean conditionalOnSecureContext3;
+  [SecureContext, Pref="abc.def", Func="TestFuncControlledMember"]
+  readonly attribute boolean conditionalOnSecureContext4;
+  [SecureContext]
+  void conditionalOnSecureContext5();
+  [SecureContext, Pref="abc.def"]
+  void conditionalOnSecureContext6();
+  [SecureContext, Pref="abc.def", Func="nsGenericHTMLElement::TouchEventsEnabled"]
+  void conditionalOnSecureContext7();
+  [SecureContext, Pref="abc.def", Func="TestFuncControlledMember"]
+  void conditionalOnSecureContext8();
 
   // Miscellania
   [LenientThis] attribute long attrWithLenientThis;

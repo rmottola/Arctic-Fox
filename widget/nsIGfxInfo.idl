@@ -107,9 +107,9 @@ interface nsIGfxInfo : nsISupports
   const long FEATURE_WEBRTC_HW_ACCELERATION_DECODE = 15;
   /* Whether Canvas acceleration is supported, starting in 45 */
   const long FEATURE_CANVAS2D_ACCELERATION = 16;
-  /* Whether hardware VP8 decoding is supported. */
+  /* Whether hardware VP8 decoding is supported, starting in 48. */
   const long FEATURE_VP8_HW_DECODE = 17;
-  /* Whether hardware VP9 decoding is supported. */
+  /* Whether hardware VP9 decoding is supported, starting in 48. */
   const long FEATURE_VP9_HW_DECODE = 18;
 
   /*
@@ -185,6 +185,16 @@ interface nsIGfxInfo : nsISupports
   //       "message": <string>
   //     ]
   //   }
+  //
+  // When a message is prefixed with a '#', it is a special status code. Status
+  // codes are unique identifiers that can be searched in the codebase to find
+  // which line of code caused the message. Some codes are standardized to
+  // improve about:support messaging:
+  //
+  //   "[CONTEXT_]FEATURE_FAILURE_BUG_<number>"
+  //     CONTEXT is optional and can currently only be "BLOCKLIST".
+  //     <number> refers to a bug number in Bugzilla.
+  //
   [implicit_jscontext]
   jsval getFeatureLog();
 
@@ -213,5 +223,20 @@ interface nsIGfxInfo : nsISupports
   //   }
   [implicit_jscontext]
   jsval getFeatures();
+
+  // Returns an array listing any active crash guards.
+  //
+  //   [
+  //     {
+  //       // Type is one of "d3d11layers", "d3d9video", "glcontext",
+  //       // or "d3d11video".
+  //       "type":        "<identifier>",
+  //
+  //       // Preference that must be deleted/reset to retrigger the guard.
+  //       "prefName":    "<preference>",
+  //     }
+  //   ]
+  [implicit_jscontext]
+  jsval getActiveCrashGuards();
 };
 

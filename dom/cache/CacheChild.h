@@ -22,7 +22,6 @@ namespace cache {
 
 class Cache;
 class CacheOpArgs;
-class CachePushStreamChild;
 
 class CacheChild final : public PCacheChild
                        , public ActorChild
@@ -60,16 +59,13 @@ public:
   ExecuteOp(nsIGlobalObject* aGlobal, Promise* aPromise,
             nsISupports* aParent, const CacheOpArgs& aArgs);
 
-  CachePushStreamChild*
-  CreatePushStream(nsISupports* aParent, nsIAsyncInputStream* aStream);
-
   // Our parent Listener object has gone out of scope and is being destroyed.
   void StartDestroyFromListener();
 
 private:
   // ActorChild methods
 
-  // Feature is trying to destroy due to worker shutdown.
+  // WorkerHolder is trying to destroy due to worker shutdown.
   virtual void StartDestroy() override;
 
   // PCacheChild methods
@@ -81,12 +77,6 @@ private:
 
   virtual bool
   DeallocPCacheOpChild(PCacheOpChild* aActor) override;
-
-  virtual PCachePushStreamChild*
-  AllocPCachePushStreamChild() override;
-
-  virtual bool
-  DeallocPCachePushStreamChild(PCachePushStreamChild* aActor) override;
 
   // utility methods
   void

@@ -33,8 +33,11 @@ static const char FunctionSectionId[]    = "function";
 static const char TableSectionId[]       = "table";
 static const char MemorySectionId[]      = "memory";
 static const char ExportSectionId[]      = "export";
+static const char StartSectionId[]       = "start";
 static const char CodeSectionId[]        = "code";
+static const char ElemSectionId[]        = "elem";
 static const char DataSectionId[]        = "data";
+static const char NameSectionId[]        = "name";
 
 enum class ValType
 {
@@ -47,8 +50,12 @@ enum class ValType
     // The rest of these types are currently only emitted internally when
     // compiling asm.js and are rejected by wasm validation.
 
+    I8x16,
+    I16x8,
     I32x4,
     F32x4,
+    B8x16,
+    B16x8,
     B32x4,
 
     Limit
@@ -57,6 +64,20 @@ enum class ValType
 enum class TypeConstructor
 {
     Function                             = 0x40
+};
+
+enum class DefinitionKind
+{
+    Function                             = 0x00,
+    Table                                = 0x01,
+    Memory                               = 0x02
+};
+
+enum class ResizableFlags
+{
+    Default                              = 0x1,
+    HasMaximum                           = 0x2,
+    AllowedMask                          = 0x3
 };
 
 enum class Expr
@@ -285,6 +306,40 @@ enum class Expr
 
     // SIMD
 #define SIMD_OPCODE(TYPE, OP) TYPE##OP,
+#define _(OP) SIMD_OPCODE(I8x16, OP)
+    FORALL_INT8X16_ASMJS_OP(_)
+    I8x16Constructor,
+    I8x16Const,
+#undef _
+    // Unsigned I8x16 operations. These are the SIMD.Uint8x16 operations that
+    // behave differently from their SIMD.Int8x16 counterparts.
+    I8x16extractLaneU,
+    I8x16addSaturateU,
+    I8x16subSaturateU,
+    I8x16shiftRightByScalarU,
+    I8x16lessThanU,
+    I8x16lessThanOrEqualU,
+    I8x16greaterThanU,
+    I8x16greaterThanOrEqualU,
+
+#define SIMD_OPCODE(TYPE, OP) TYPE##OP,
+#define _(OP) SIMD_OPCODE(I16x8, OP)
+    FORALL_INT16X8_ASMJS_OP(_)
+    I16x8Constructor,
+    I16x8Const,
+#undef _
+    // Unsigned I16x8 operations. These are the SIMD.Uint16x8 operations that
+    // behave differently from their SIMD.Int16x8 counterparts.
+    I16x8extractLaneU,
+    I16x8addSaturateU,
+    I16x8subSaturateU,
+    I16x8shiftRightByScalarU,
+    I16x8lessThanU,
+    I16x8lessThanOrEqualU,
+    I16x8greaterThanU,
+    I16x8greaterThanOrEqualU,
+
+#define SIMD_OPCODE(TYPE, OP) TYPE##OP,
 #define _(OP) SIMD_OPCODE(I32x4, OP)
     FORALL_INT32X4_ASMJS_OP(_)
     I32x4Constructor,
@@ -303,6 +358,21 @@ enum class Expr
     F32x4Constructor,
     F32x4Const,
 #undef _
+
+#define _(OP) SIMD_OPCODE(B8x16, OP)
+    FORALL_BOOL_SIMD_OP(_)
+    B8x16Constructor,
+    B8x16Const,
+#undef _
+#undef OPCODE
+
+#define _(OP) SIMD_OPCODE(B16x8, OP)
+    FORALL_BOOL_SIMD_OP(_)
+    B16x8Constructor,
+    B16x8Const,
+#undef _
+#undef OPCODE
+
 #define _(OP) SIMD_OPCODE(B32x4, OP)
     FORALL_BOOL_SIMD_OP(_)
     B32x4Constructor,
@@ -325,13 +395,19 @@ enum class ExprType
     I64   = uint8_t(ValType::I64),
     F32   = uint8_t(ValType::F32),
     F64   = uint8_t(ValType::F64),
+    I8x16 = uint8_t(ValType::I8x16),
+    I16x8 = uint8_t(ValType::I16x8),
     I32x4 = uint8_t(ValType::I32x4),
     F32x4 = uint8_t(ValType::F32x4),
+    B8x16 = uint8_t(ValType::B8x16),
+    B16x8 = uint8_t(ValType::B16x8),
     B32x4 = uint8_t(ValType::B32x4),
 
     Limit
 };
 
+typedef int8_t I8x16[16];
+typedef int16_t I16x8[8];
 typedef int32_t I32x4[4];
 typedef float F32x4[4];
 typedef Vector<uint8_t, 0, SystemAllocPolicy> Bytes;
@@ -427,6 +503,12 @@ class Encoder
     MOZ_MUST_USE bool writeFixedF64(double d) {
         return write<double>(d);
     }
+    MOZ_MUST_USE bool writeFixedI8x16(const I8x16& i8x16) {
+        return write<I8x16>(i8x16);
+    }
+    MOZ_MUST_USE bool writeFixedI16x8(const I16x8& i16x8) {
+        return write<I16x8>(i16x8);
+    }
     MOZ_MUST_USE bool writeFixedI32x4(const I32x4& i32x4) {
         return write<I32x4>(i32x4);
     }
@@ -506,6 +588,7 @@ class Decoder
     const uint8_t* const beg_;
     const uint8_t* const end_;
     const uint8_t* cur_;
+    UniqueChars* error_;
 
     template <class T>
     MOZ_MUST_USE bool read(T* out) {
@@ -581,27 +664,42 @@ class Decoder
     static const size_t ExprLimit = 2 * UINT8_MAX - 1;
 
   public:
-    Decoder(const uint8_t* begin, const uint8_t* end)
+    Decoder(const uint8_t* begin, const uint8_t* end, UniqueChars* error = nullptr)
       : beg_(begin),
         end_(end),
-        cur_(begin)
+        cur_(begin),
+        error_(error)
     {
         MOZ_ASSERT(begin <= end);
     }
-    explicit Decoder(const Bytes& bytes)
+    explicit Decoder(const Bytes& bytes, UniqueChars* error = nullptr)
       : beg_(bytes.begin()),
         end_(bytes.end()),
-        cur_(bytes.begin())
+        cur_(bytes.begin()),
+        error_(error)
     {}
+
+    bool fail(const char* msg) {
+        error_->reset(strdup(msg));
+        return false;
+    }
+    bool fail(UniqueChars msg) {
+        *error_ = Move(msg);
+        return false;
+    }
+    void clearError() {
+        if (error_)
+            error_->reset();
+    }
 
     bool done() const {
         MOZ_ASSERT(cur_ <= end_);
         return cur_ == end_;
     }
 
-    uintptr_t bytesRemain() const {
+    size_t bytesRemain() const {
         MOZ_ASSERT(end_ >= cur_);
-        return uintptr_t(end_ - cur_);
+        return size_t(end_ - cur_);
     }
     const uint8_t* currentPosition() const {
         return cur_;
@@ -624,6 +722,12 @@ class Decoder
     }
     MOZ_MUST_USE bool readFixedF64(double* d) {
         return read<double>(d);
+    }
+    MOZ_MUST_USE bool readFixedI8x16(I8x16* i8x16) {
+        return read<I8x16>(i8x16);
+    }
+    MOZ_MUST_USE bool readFixedI16x8(I16x8* i16x8) {
+        return read<I16x8>(i16x8);
     }
     MOZ_MUST_USE bool readFixedI32x4(I32x4* i32x4) {
         return read<I32x4>(i32x4);
@@ -673,19 +777,7 @@ class Decoder
 
     // See writeBytes comment.
 
-    MOZ_MUST_USE bool readBytes(Bytes* bytes) {
-        uint32_t numBytes;
-        if (!readVarU32(&numBytes))
-            return false;
-        if (bytesRemain() < numBytes)
-            return false;
-        if (!bytes->resize(numBytes))
-            return false;
-        memcpy(bytes->begin(), cur_, numBytes);
-        cur_ += numBytes;
-        return true;
-    }
-    MOZ_MUST_USE bool readBytesRaw(uint32_t numBytes, const uint8_t** bytes) {
+    MOZ_MUST_USE bool readBytes(uint32_t numBytes, const uint8_t** bytes = nullptr) {
         if (bytes)
             *bytes = cur_;
         if (bytesRemain() < numBytes)
@@ -699,8 +791,9 @@ class Decoder
     static const uint32_t NotStarted = UINT32_MAX;
 
     template <size_t IdSizeWith0>
-    MOZ_MUST_USE bool startSection(const char (&id)[IdSizeWith0], uint32_t* startOffset,
-                                             uint32_t* size) {
+    MOZ_MUST_USE bool startSection(const char (&id)[IdSizeWith0],
+                                   uint32_t* startOffset,
+                                   uint32_t* size) {
         static const size_t IdSize = IdSizeWith0 - 1;
         MOZ_ASSERT(id[IdSize] == '\0');
         const uint8_t* before = cur_;
@@ -725,6 +818,10 @@ class Decoder
     }
     MOZ_MUST_USE bool finishSection(uint32_t startOffset, uint32_t size) {
         return size == (cur_ - beg_) - startOffset;
+    }
+    void ignoreSection(uint32_t startOffset, uint32_t size) {
+        cur_ = (beg_ + startOffset) + size;
+        MOZ_ASSERT(cur_ <= end_);
     }
     MOZ_MUST_USE bool skipSection() {
         uint32_t idSize;
@@ -798,6 +895,16 @@ class Decoder
                ? Expr(u8)
                : Expr(uncheckedReadFixedU8() + UINT8_MAX);
     }
+    void uncheckedReadFixedI8x16(I8x16* i8x16) {
+        struct T { I8x16 v; };
+        T t = uncheckedRead<T>();
+        memcpy(i8x16, &t, sizeof(t));
+    }
+    void uncheckedReadFixedI16x8(I16x8* i16x8) {
+        struct T { I16x8 v; };
+        T t = uncheckedRead<T>();
+        memcpy(i16x8, &t, sizeof(t));
+    }
     void uncheckedReadFixedI32x4(I32x4* i32x4) {
         struct T { I32x4 v; };
         T t = uncheckedRead<T>();
@@ -815,10 +922,10 @@ class Decoder
 
 typedef Vector<ValType, 8, SystemAllocPolicy> ValTypeVector;
 
-bool
+MOZ_MUST_USE bool
 EncodeLocalEntries(Encoder& d, const ValTypeVector& locals);
 
-bool
+MOZ_MUST_USE bool
 DecodeLocalEntries(Decoder& d, ValTypeVector* locals);
 
 } // namespace wasm

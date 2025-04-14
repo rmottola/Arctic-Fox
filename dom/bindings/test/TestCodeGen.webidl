@@ -11,7 +11,7 @@ typedef CustomEventInit TestDictionaryTypedef;
 
 interface TestExternalInterface;
 
-[AvailableIn=PrivilegedApps, Pref="xyz"]
+[Pref="xyz"]
 interface TestRenamedInterface {
 };
 
@@ -117,6 +117,8 @@ callback TestOptionalArguments = void(optional DOMString aString,
                                       optional TestInterface? anInterface,
                                       optional TestInterface anotherInterface,
                                       optional long aLong);
+// If you add a new test callback, add it to the forceCallbackGeneration
+// method on TestInterface so it actually gets tested.
 
 TestInterface implements ImplementedInterface;
 
@@ -133,7 +135,6 @@ interface OnlyForUseInConstructor {
  Constructor(ArrayBuffer arrayBuf),
  Constructor(Uint8Array typedArr),
  // Constructor(long arg1, long arg2, (TestInterface or OnlyForUseInConstructor) arg3),
- AvailableIn=CertifiedApps,
  NamedConstructor=Test,
  NamedConstructor=Test(DOMString str),
  NamedConstructor=Test2(DictForConstructor dict, any any1, object obj1,
@@ -519,6 +520,33 @@ interface TestInterface {
   attribute TestTreatAsNullCallback treatAsNullCallback;
   attribute TestTreatAsNullCallback? nullableTreatAsNullCallback;
 
+  // Force code generation of the various test callbacks we have.
+  void forceCallbackGeneration(TestIntegerReturn arg1,
+                               TestNullableIntegerReturn arg2,
+                               TestBooleanReturn arg3,
+                               TestFloatReturn arg4,
+                               TestStringReturn arg5,
+                               TestEnumReturn arg6,
+                               TestInterfaceReturn arg7,
+                               TestNullableInterfaceReturn arg8,
+                               TestExternalInterfaceReturn arg9,
+                               TestNullableExternalInterfaceReturn arg10,
+                               TestCallbackInterfaceReturn arg11,
+                               TestNullableCallbackInterfaceReturn arg12,
+                               TestCallbackReturn arg13,
+                               TestNullableCallbackReturn arg14,
+                               TestObjectReturn arg15,
+                               TestNullableObjectReturn arg16,
+                               TestTypedArrayReturn arg17,
+                               TestNullableTypedArrayReturn arg18,
+                               TestSequenceReturn arg19,
+                               TestNullableSequenceReturn arg20,
+                               TestIntegerArguments arg21,
+                               TestInterfaceArguments arg22,
+                               TestStringEnumArguments arg23,
+                               TestObjectArguments arg24,
+                               TestOptionalArguments arg25);
+
   // Any types
   void passAny(any arg);
   void passVariadicAny(any... arg);
@@ -754,6 +782,9 @@ interface TestInterface {
   static void staticMethod(boolean arg);
   static void staticMethodWithContext(any arg);
 
+  // Testing static method with a reserved C++ keyword as the name
+  static void assert(boolean arg);
+
   // Deprecated static methods and attributes
   [Deprecated="GetAttributeNode"]
   static attribute byte staticDeprecatedAttribute;
@@ -855,14 +886,24 @@ interface TestInterface {
   void prefable19();
   [Pref="abc.def", Func="TestFuncControlledMember", ChromeOnly]
   void prefable20();
-  [Func="TestFuncControlledMember", AvailableIn=CertifiedApps]
-  void prefable21();
-  [Func="TestFuncControlledMember", AvailableIn=CertifiedApps]
-  void prefable22();
-  [Pref="abc.def", Func="TestFuncControlledMember", AvailableIn=CertifiedApps]
-  void prefable23();
-  [Pref="abc.def", Func="TestFuncControlledMember", AvailableIn=PrivilegedApps]
-  void prefable24();
+
+  // Conditionally exposed methods/attributes involving [SecureContext]
+  [SecureContext]
+  readonly attribute boolean conditionalOnSecureContext1;
+  [SecureContext, Pref="abc.def"]
+  readonly attribute boolean conditionalOnSecureContext2;
+  [SecureContext, Pref="abc.def", Func="nsGenericHTMLElement::TouchEventsEnabled"]
+  readonly attribute boolean conditionalOnSecureContext3;
+  [SecureContext, Pref="abc.def", Func="TestFuncControlledMember"]
+  readonly attribute boolean conditionalOnSecureContext4;
+  [SecureContext]
+  void conditionalOnSecureContext5();
+  [SecureContext, Pref="abc.def"]
+  void conditionalOnSecureContext6();
+  [SecureContext, Pref="abc.def", Func="nsGenericHTMLElement::TouchEventsEnabled"]
+  void conditionalOnSecureContext7();
+  [SecureContext, Pref="abc.def", Func="TestFuncControlledMember"]
+  void conditionalOnSecureContext8();
 
   // Miscellania
   [LenientThis] attribute long attrWithLenientThis;
@@ -1079,6 +1120,15 @@ dictionary DictForConstructor {
   any any1 = null;
 };
 
+dictionary DictWithConditionalMembers {
+  [ChromeOnly]
+  long chromeOnlyMember;
+  [Func="TestFuncControlledMember"]
+  long funcControlledMember;
+  [ChromeOnly, Func="nsGenericHTMLElement::TouchEventsEnabled"]
+  long chromeOnlyFuncControlledMember;
+};
+
 interface TestIndexedGetterInterface {
   getter long item(unsigned long idx);
   readonly attribute unsigned long length;
@@ -1168,4 +1218,26 @@ interface TestDeprecatedInterface {
 
 [Constructor(Promise<void> promise)]
 interface TestInterfaceWithPromiseConstructorArg {
+};
+
+namespace TestNamespace {
+  readonly attribute boolean foo;
+  long bar();
+};
+
+partial namespace TestNamespace {
+  void baz();
+};
+
+[ClassString="RenamedNamespaceClassName"]
+namespace TestRenamedNamespace {
+};
+
+[ProtoObjectHack]
+namespace TestProtoObjectHackedNamespace {
+};
+
+[SecureContext]
+interface TestSecureContextInterface {
+  static void alsoSecureContext();
 };

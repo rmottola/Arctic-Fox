@@ -25,7 +25,6 @@
 #  include "mozilla/throw_msvc.h"
 #endif
 
-
 #ifdef _DEBUG
 // From
 //   http://msdn.microsoft.com/en-us/library/aa985982%28VS.80%29.aspx

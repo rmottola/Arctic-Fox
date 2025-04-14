@@ -32,15 +32,10 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsDOMStringMap)
     tmp->mElement->RemoveMutationObserver(tmp);
     tmp->mElement = nullptr;
   }
-  tmp->mExpandoAndGeneration.Unlink();
+  tmp->mExpandoAndGeneration.OwnerUnlinked();
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
-NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(nsDOMStringMap)
-  NS_IMPL_CYCLE_COLLECTION_TRACE_PRESERVED_WRAPPER
-  if (tmp->PreservingWrapper()) {
-    NS_IMPL_CYCLE_COLLECTION_TRACE_JS_MEMBER_CALLBACK(mExpandoAndGeneration.expando)
-  }
-NS_IMPL_CYCLE_COLLECTION_TRACE_END
+NS_IMPL_CYCLE_COLLECTION_TRACE_WRAPPERCACHE(nsDOMStringMap)
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsDOMStringMap)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
@@ -87,12 +82,6 @@ nsDOMStringMap::NamedGetter(const nsAString& aProp, bool& found,
   }
 
   found = mElement->GetAttr(attr, aResult);
-}
-
-bool
-nsDOMStringMap::NameIsEnumerable(const nsAString& aName)
-{
-  return true;
 }
 
 void
@@ -149,7 +138,7 @@ nsDOMStringMap::NamedDeleter(const nsAString& aProp, bool& found)
 }
 
 void
-nsDOMStringMap::GetSupportedNames(unsigned, nsTArray<nsString>& aNames)
+nsDOMStringMap::GetSupportedNames(nsTArray<nsString>& aNames)
 {
   uint32_t attrCount = mElement->GetAttrCount();
 

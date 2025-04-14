@@ -11,9 +11,7 @@ browser.jar:
   skin/classic/browser/aboutCertError_sectionCollapsed.png
   skin/classic/browser/aboutCertError_sectionCollapsed-rtl.png
   skin/classic/browser/aboutCertError_sectionExpanded.png
-#ifdef MOZ_SERVICES_SYNC
   skin/classic/browser/aboutSyncTabs.css
-#endif
   skin/classic/browser/aboutTabCrashed.css                   (../shared/aboutTabCrashed.css)
 * skin/classic/browser/syncedtabs/sidebar.css          (syncedtabs/sidebar.css)
   skin/classic/browser/syncedtabs/arrow-open.svg       (syncedtabs/arrow-open.svg)
@@ -83,16 +81,13 @@ browser.jar:
   skin/classic/browser/webRTC-sharingScreen-menubar.png
   skin/classic/browser/webRTC-sharingScreen-menubar@2x.png
 * skin/classic/browser/controlcenter/panel.css        (controlcenter/panel.css)
+* skin/classic/browser/customizableui/panelUIOverlay.css    (customizableui/panelUIOverlay.css)
   skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
   skin/classic/browser/downloads/buttons.png                   (downloads/buttons.png)
   skin/classic/browser/downloads/contentAreaDownloadsView.css  (downloads/contentAreaDownloadsView.css)
   skin/classic/browser/downloads/download-glow.png             (downloads/download-glow.png)
   skin/classic/browser/downloads/download-notification-finish.png (downloads/download-notification-finish.png)
   skin/classic/browser/downloads/download-notification-start.png (downloads/download-notification-start.png)
-  skin/classic/browser/customizableui/thumburger-inverted.png  (customizableui/thumburger-inverted.png)
-  skin/classic/browser/customizableui/thumburger-inverted@2x.png  (customizableui/thumburger-inverted@2x.png)
-  skin/classic/browser/customizableui/thumburger.png  (customizableui/thumburger.png)
-  skin/classic/browser/customizableui/thumburger@2x.png  (customizableui/thumburger@2x.png)
   skin/classic/browser/downloads/download-summary.png       (downloads/download-summary.png)
   skin/classic/browser/downloads/downloads.css              (downloads/downloads.css)
   skin/classic/browser/feeds/feedIcon.png                   (feeds/feedIcon.png)
@@ -133,11 +128,9 @@ browser.jar:
   skin/classic/browser/preferences/application.png          (preferences/application.png)
   skin/classic/browser/preferences/mail.png                 (preferences/mail.png)
   skin/classic/browser/preferences/Options.png              (preferences/Options.png)
-#ifdef MOZ_SERVICES_SYNC
   skin/classic/browser/preferences/Options-sync.png         (preferences/Options-sync.png)
-#endif
   skin/classic/browser/preferences/saveFile.png             (preferences/saveFile.png)
-* skin/classic/browser/preferences/preferences.css          (preferences/preferences.css)
+  skin/classic/browser/preferences/preferences.css          (preferences/preferences.css)
   skin/classic/browser/preferences/applications.css         (preferences/applications.css)
   skin/classic/browser/preferences/aboutPermissions.css     (preferences/aboutPermissions.css)
   skin/classic/browser/statusbar/dynamic.css                   (../shared/statusbar/dynamic.css)
@@ -158,7 +151,6 @@ browser.jar:
   skin/classic/browser/tabbrowser/tab-arrow-left-inverted.png  (tabbrowser/tab-arrow-left-inverted.png)
   skin/classic/browser/tabbrowser/tab-overflow-border.png      (tabbrowser/tab-overflow-border.png)
   skin/classic/browser/tabbrowser/tabDragIndicator.png         (tabbrowser/tabDragIndicator.png)
-#ifdef MOZ_SERVICES_SYNC
   skin/classic/browser/sync-throbber.png
   skin/classic/browser/sync-16.png
   skin/classic/browser/sync-32.png
@@ -170,14 +162,9 @@ browser.jar:
   skin/classic/browser/syncSetup.css
   skin/classic/browser/syncCommon.css
   skin/classic/browser/syncQuota.css
-#endif
-  skin/classic/browser/yosemite/thumburger.png              (customizableui/thumburger-yosemite.png)
-  skin/classic/browser/yosemite/thumburger@2x.png           (customizableui/thumburger-yosemite@2x.png)
 
 [extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}] chrome.jar:
 % override chrome://browser/skin/feeds/audioFeedIcon.png                   chrome://browser/skin/feeds/feedIcon.png
 % override chrome://browser/skin/feeds/audioFeedIcon16.png                 chrome://browser/skin/feeds/feedIcon16.png
 % override chrome://browser/skin/feeds/videoFeedIcon.png                   chrome://browser/skin/feeds/feedIcon.png
 % override chrome://browser/skin/feeds/videoFeedIcon16.png                 chrome://browser/skin/feeds/feedIcon16.png
-% override chrome://browser/skin/customizableui/thumburger.png             chrome://browser/skin/yosemite/thumburger.png                           os=Darwin osversion>=10.10
-% override chrome://browser/skin/customizableui/thumburger@2x.png          chrome://browser/skin/yosemite/thumburger@2x.png                        os=Darwin osversion>=10.10

@@ -54,9 +54,6 @@ using namespace std;
 #include <gdk/gdk.h>
 #include "gtk2xtbin.h"
 
-#elif defined(MOZ_WIDGET_QT)
-#undef KeyPress
-#undef KeyRelease
 #elif defined(OS_WIN)
 
 #include <windows.h>
@@ -112,13 +109,6 @@ static const TCHAR kPluginIgnoreSubclassProperty[] = TEXT("PluginIgnoreSubclassP
 #include "PluginUtilsOSX.h"
 #endif // defined(XP_MACOSX)
 
-template<>
-struct RunnableMethodTraits<PluginInstanceChild>
-{
-    static void RetainCallee(PluginInstanceChild* obj) { }
-    static void ReleaseCallee(PluginInstanceChild* obj) { }
-};
-
 /**
  * We can't use gfxPlatform::CreateDrawTargetForSurface() because calling
  * gfxPlatform::GetPlatform() instantiates the prefs service, and that's not
@@ -136,7 +126,6 @@ CreateDrawTargetForSurface(gfxASurface *aSurface)
   if (!drawTarget) {
     NS_RUNTIMEABORT("CreateDrawTargetForSurface failed in plugin");
   }
-  aSurface->SetData(&kDrawTarget, drawTarget, nullptr);
   return drawTarget;
 }
 
@@ -1395,8 +1384,6 @@ PluginInstanceChild::AnswerNPP_SetWindow(const NPRemoteWindow& aWindow)
 
 #elif defined(ANDROID)
     // TODO: Need Android impl
-#elif defined(MOZ_WIDGET_QT)
-    // TODO: Need QT-nonX impl
 #elif defined(MOZ_WIDGET_UIKIT)
     // Don't care
 #else
@@ -3299,11 +3286,8 @@ PluginInstanceChild::RecvAsyncSetWindow(const gfxSurfaceType& aSurfaceType,
     // RPC call, and both Flash and Java don't expect to receive setwindow calls
     // at arbitrary times.
     mCurrentAsyncSetWindowTask =
-        NewRunnableMethod<PluginInstanceChild,
-                          void (PluginInstanceChild::*)(const gfxSurfaceType&, const NPRemoteWindow&, bool),
-                          const gfxSurfaceType&, const NPRemoteWindow&, bool>
-        (this, &PluginInstanceChild::DoAsyncSetWindow,
-         aSurfaceType, aWindow, true);
+        NewNonOwningCancelableRunnableMethod<gfxSurfaceType, NPRemoteWindow, bool>
+        (this, &PluginInstanceChild::DoAsyncSetWindow, aSurfaceType, aWindow, true);
     RefPtr<Runnable> addrefedTask = mCurrentAsyncSetWindowTask;
     MessageLoop::current()->PostTask(addrefedTask.forget());
 
@@ -4223,7 +4207,7 @@ PluginInstanceChild::AsyncShowPluginFrame(void)
     }
 
     mCurrentInvalidateTask =
-        NewRunnableMethod(this, &PluginInstanceChild::InvalidateRectDelayed);
+        NewNonOwningCancelableRunnableMethod(this, &PluginInstanceChild::InvalidateRectDelayed);
     RefPtr<Runnable> addrefedTask = mCurrentInvalidateTask;
     MessageLoop::current()->PostTask(addrefedTask.forget());
 }

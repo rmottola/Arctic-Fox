@@ -6,6 +6,7 @@
 #include "CompositingRenderTargetOGL.h"
 #include "GLContext.h"
 #include "GLReadTexImageHelper.h"
+#include "ScopedGLHelpers.h"
 #include "mozilla/gfx/2D.h"
 
 namespace mozilla {
@@ -16,7 +17,7 @@ using namespace mozilla::gl;
 
 CompositingRenderTargetOGL::~CompositingRenderTargetOGL()
 {
-  if (mGL->MakeCurrent()) {
+  if (mGL && mGL->MakeCurrent()) {
     mGL->fDeleteTextures(1, &mTextureHandle);
     mGL->fDeleteFramebuffers(1, &mFBO);
   }
@@ -69,7 +70,9 @@ CompositingRenderTargetOGL::BindRenderTarget()
   }
 
   if (needsClear) {
-    mGL->fScissor(0, 0, mInitParams.mSize.width, mInitParams.mSize.height);
+    ScopedGLState scopedScissorTestState(mGL, LOCAL_GL_SCISSOR_TEST, true);
+    ScopedScissorRect autoScissorRect(mGL, 0, 0, mInitParams.mSize.width,
+                                      mInitParams.mSize.height);
     mGL->fClearColor(0.0, 0.0, 0.0, 0.0);
     mGL->fClearDepth(0.0);
     mGL->fClear(LOCAL_GL_COLOR_BUFFER_BIT | LOCAL_GL_DEPTH_BUFFER_BIT);

@@ -50,7 +50,7 @@ struct Register {
         Register r = { Encoding(Codes::Invalid) };
         return r;
     }
-    MOZ_CONSTEXPR Code code() const {
+    constexpr Code code() const {
         return Code(reg_);
     }
     Encoding encoding() const {
@@ -109,17 +109,29 @@ struct Register64
 #endif
 
 #ifdef JS_PUNBOX64
-    explicit MOZ_CONSTEXPR Register64(Register r)
+    explicit constexpr Register64(Register r)
       : reg(r)
     {}
+    bool operator ==(Register64 other) const {
+        return reg == other.reg;
+    }
+    bool operator !=(Register64 other) const {
+        return reg != other.reg;
+    }
 #else
     explicit Register64(Register r)
       : high(Register::Invalid()), low(Register::Invalid())
     {}
 
-    MOZ_CONSTEXPR Register64(Register h, Register l)
+    constexpr Register64(Register h, Register l)
       : high(h), low(l)
     {}
+    bool operator ==(Register64 other) const {
+        return high == other.high && low == other.low;
+    }
+    bool operator !=(Register64 other) const {
+        return high != other.high || low != other.low;
+    }
 #endif
 };
 
@@ -216,7 +228,7 @@ struct AutoGenericRegisterScope : public RegisterType
     explicit AutoGenericRegisterScope(MacroAssembler& masm, RegisterType reg);
     ~AutoGenericRegisterScope();
 #else
-    MOZ_CONSTEXPR explicit AutoGenericRegisterScope(MacroAssembler& masm, RegisterType reg)
+    constexpr explicit AutoGenericRegisterScope(MacroAssembler& masm, RegisterType reg)
       : RegisterType(reg)
     { }
 #endif

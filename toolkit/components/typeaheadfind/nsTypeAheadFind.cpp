@@ -80,7 +80,8 @@ nsTypeAheadFind::nsTypeAheadFind():
   mDidAddObservers(false),
   mLastFindLength(0),
   mIsSoundInitialized(false),
-  mCaseSensitive(false)
+  mCaseSensitive(false),
+  mEntireWord(false)
 {
 }
 
@@ -163,6 +164,26 @@ NS_IMETHODIMP
 nsTypeAheadFind::GetCaseSensitive(bool* isCaseSensitive)
 {
   *isCaseSensitive = mCaseSensitive;
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsTypeAheadFind::SetEntireWord(bool isEntireWord)
+{
+  mEntireWord = isEntireWord;
+
+  if (mFind) {
+    mFind->SetEntireWord(mEntireWord);
+  }
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsTypeAheadFind::GetEntireWord(bool* isEntireWord)
+{
+  *isEntireWord = mEntireWord;
 
   return NS_OK;
 }
@@ -314,6 +335,10 @@ nsTypeAheadFind::FindItNow(nsIPresShell *aPresShell, bool aIsLinksOnly,
     if (!presShell)
       return NS_ERROR_FAILURE;
   }
+
+  // There could be unflushed notifications which hide textareas or other
+  // elements that we don't want to find text in.
+  presShell->FlushPendingNotifications(Flush_Layout);
 
   RefPtr<nsPresContext> presContext = presShell->GetPresContext();
 

@@ -366,6 +366,31 @@ pref_savePrefs(PLDHashTable* aTable)
     return savedPrefs;
 }
 
+bool
+pref_EntryHasAdvisablySizedValues(PrefHashEntry* aHashEntry)
+{
+    if (aHashEntry->prefFlags.GetPrefType() != PrefType::String) {
+        return true;
+    }
+
+    char* stringVal;
+    if (aHashEntry->prefFlags.HasDefault()) {
+        stringVal = aHashEntry->defaultPref.stringVal;
+        if (strlen(stringVal) > MAX_ADVISABLE_PREF_LENGTH) {
+            return false;
+        }
+    }
+
+    if (aHashEntry->prefFlags.HasUserValue()) {
+        stringVal = aHashEntry->userPref.stringVal;
+        if (strlen(stringVal) > MAX_ADVISABLE_PREF_LENGTH) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static void
 GetPrefValueFromEntry(PrefHashEntry *aHashEntry, dom::PrefSetting* aPref,
                       WhichValue aWhich)
@@ -677,7 +702,7 @@ static PrefTypeFlags pref_SetValue(PrefValue* existingValue, PrefTypeFlags flags
     }
     flags.SetPrefType(newType);
     if (flags.IsTypeString()) {
-        PR_ASSERT(newValue.stringVal);
+        MOZ_ASSERT(newValue.stringVal);
         existingValue->stringVal = newValue.stringVal ? PL_strdup(newValue.stringVal) : nullptr;
     }
     else {

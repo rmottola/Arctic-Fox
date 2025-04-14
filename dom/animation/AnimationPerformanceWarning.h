@@ -17,6 +17,7 @@ namespace mozilla {
 struct AnimationPerformanceWarning
 {
   enum class Type : uint8_t {
+    ContentTooSmall,
     ContentTooLarge,
     TransformBackfaceVisibilityHidden,
     TransformPreserve3D,
@@ -48,7 +49,7 @@ struct AnimationPerformanceWarning
   // this variable, please include this header file directly.
   // This value is the same as the limit of nsStringBundle::FormatString.
   // See the implementation of nsStringBundle::FormatString.
-  static MOZ_CONSTEXPR_VAR uint8_t kMaxParamsForLocalization = 10;
+  static constexpr uint8_t kMaxParamsForLocalization = 10;
 
   // Indicates why this property could not be animated on the compositor.
   Type mType;
@@ -57,6 +58,9 @@ struct AnimationPerformanceWarning
   Maybe<nsTArray<int32_t>> mParams;
 
   bool ToLocalizedString(nsXPIDLString& aLocalizedString) const;
+  template<uint32_t N>
+  nsresult ToLocalizedStringWithIntParams(
+    const char* aKey, nsXPIDLString& aLocalizedString) const;
 
   bool operator==(const AnimationPerformanceWarning& aOther) const
   {

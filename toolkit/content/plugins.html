@@ -12,7 +12,6 @@
   var Ci = Components.interfaces;
   var strBundleService = Components.classes["@mozilla.org/intl/stringbundle;1"].getService(Ci.nsIStringBundleService);
   var pluginsbundle = strBundleService.createBundle("chrome://global/locale/plugins.properties");
-  var regionbundle = strBundleService.createBundle("chrome://global-region/locale/region.properties");
 
   document.writeln("<title>" + pluginsbundle.GetStringFromName("title_label") + "<\/title>");
 </script>
@@ -129,7 +128,7 @@
         state.setAttribute("label", "state");
         state.appendChild(document.createTextNode(pluginsbundle.GetStringFromName("state_label") + " "));
         stateDd.appendChild(state);
-        status = plugin.isActive ? pluginsbundle.GetStringFromName("state_enabled") : pluginsbundle.GetStringFromName("state_disabled");
+        var status = plugin.isActive ? pluginsbundle.GetStringFromName("state_enabled") : pluginsbundle.GetStringFromName("state_disabled");
         if (plugin.blocklistState in stateNames) {
           status += " (" + stateNames[plugin.blocklistState] + ")";
         }

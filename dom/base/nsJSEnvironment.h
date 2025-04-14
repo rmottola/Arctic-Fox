@@ -50,7 +50,6 @@ public:
   virtual nsIScriptGlobalObject *GetGlobalObject() override;
   inline nsIScriptGlobalObject *GetGlobalObjectRef() { return mGlobalObjectRef; }
 
-  virtual JSContext* GetNativeContext() override;
   virtual nsresult InitContext() override;
   virtual bool IsContextInitialized() override;
 
@@ -88,7 +87,6 @@ public:
                                 IsIncremental aIncremental = NonIncrementalGC,
                                 IsShrinking aShrinking = NonShrinkingGC,
                                 int64_t aSliceMillis = 0);
-  static void ShrinkGCBuffersNow();
 
   // If aExtraForgetSkippableCalls is -1, forgetSkippable won't be
   // called even if the previous collection was GC.
@@ -112,9 +110,6 @@ public:
 
   static void PokeGC(JS::gcreason::Reason aReason, int aDelay = 0);
   static void KillGCTimer();
-
-  static void PokeShrinkGCBuffers();
-  static void KillShrinkGCBuffersTimer();
 
   static void PokeShrinkingGC();
   static void KillShrinkingGCTimer();
@@ -150,11 +145,8 @@ protected:
   nsresult AddSupportsPrimitiveTojsvals(nsISupports *aArg, JS::Value *aArgv);
 
 private:
-  void DestroyJSContext();
+  void Destroy();
 
-  nsrefcnt GetCCRefcnt();
-
-  JSContext *mContext;
   JS::Heap<JSObject*> mWindowProxy;
 
   bool mIsInitialized;
@@ -167,8 +159,6 @@ private:
   // mGlobalObjectRef ensures that the outer window stays alive as long as the
   // context does. It is eventually collected by the cycle collector.
   nsCOMPtr<nsIScriptGlobalObject> mGlobalObjectRef;
-
-  static void JSOptionChangedCallback(const char *pref, void *data);
 
   static bool DOMOperationCallback(JSContext *cx);
 };

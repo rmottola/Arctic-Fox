@@ -30,13 +30,13 @@ public:
 
 private:
   bool mInitialized;
-  mozilla::ScopedPK11SymKey mWrappingKey;
+  mozilla::UniquePK11SymKey mWrappingKey;
 
   static const nsCString mSecretNickname;
   static const nsString mVersion;
 
   ~nsNSSU2FToken();
-  nsresult GetOrCreateWrappingKey(PK11SlotInfo* aSlot,
+  nsresult GetOrCreateWrappingKey(const mozilla::UniquePK11SlotInfo& aSlot,
                                   const nsNSSShutDownPreventionLock&);
 };
 

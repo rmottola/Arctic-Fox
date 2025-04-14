@@ -4,6 +4,7 @@ var Cr = Components.results;
 var Cc = Components.classes;
 
 Cu.import("resource://testing-common/httpd.js");
+Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/LoadContextInfo.jsm");
 
@@ -460,14 +461,13 @@ function test_prefetch_prime() {
     }
 
     // This runs in the parent or only process
-    var ios = Cc["@mozilla.org/network/io-service;1"].getService(Ci.nsIIOService);
-    var channel = ios.newChannel2(prefetch_sruri.asciiSpec, null, null, null,
-        Services.scriptSecurityManager.getSystemPrincipal(), null,
-        Ci.nsILoadInfo.SEC_NORMAL,
-        Ci.nsIContentPolicy.TYPE_OTHER).QueryInterface(Ci.nsIHttpChannel);
+    var channel = NetUtil.newChannel({
+      uri: prefetch_sruri.asciiSpec,
+      loadUsingSystemPrincipal: true
+    }).QueryInterface(Ci.nsIHttpChannel);
     channel.requestMethod = "GET";
     channel.referrer = prefetch_tluri;
-    channel.asyncOpen(prefetchListener, channel);
+    channel.asyncOpen2(prefetchListener);
   });
 }
 
@@ -562,15 +562,18 @@ function unregisterObserver() {
 
 function run_test_real() {
   tests.forEach(add_test);
-  do_get_profile()
-  predictor = Cc["@mozilla.org/network/predictor;1"].getService(Ci.nsINetworkPredictor);
-
-  registerObserver();
+  do_get_profile();
 
   Services.prefs.setBoolPref("network.predictor.enabled", true);
   Services.prefs.setBoolPref("network.predictor.cleaned-up", true);
   Services.prefs.setBoolPref("browser.cache.use_new_backend_temp", true);
   Services.prefs.setIntPref("browser.cache.use_new_backend", 1);
+  Services.prefs.setBoolPref("network.predictor.doing-tests", true);
+
+  predictor = Cc["@mozilla.org/network/predictor;1"].getService(Ci.nsINetworkPredictor);
+
+  registerObserver();
+
   do_register_cleanup(() => {
     Services.prefs.clearUserPref("network.predictor.preconnect-min-confidence");
     Services.prefs.clearUserPref("network.predictor.enabled");
@@ -580,6 +583,7 @@ function run_test_real() {
     Services.prefs.clearUserPref("network.predictor.preresolve-min-confidence");
     Services.prefs.clearUserPref("network.predictor.enable-prefetch");
     Services.prefs.clearUserPref("network.predictor.prefetch-rolling-load-count");
+    Services.prefs.clearUserPref("network.predictor.doing-tests");
   });
 
   run_next_test();

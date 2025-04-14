@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -43,10 +43,7 @@ LOCAL_INCLUDES += [
 ]
 
 if CONFIG['GNU_CC']:
-    CFLAGS += [
-        '-Wshadow',
-        '-Wno-unused',  # too many annoying fatal warnings from mfbt/ headers
-    ]
+    CFLAGS += ['-Wno-unused'] # too many annoying warnings from mfbt/ headers
 
 if CONFIG['_MSC_VER']:
     CFLAGS += ['-wd4273'] # inconsistent dll linkage (bug 558163)

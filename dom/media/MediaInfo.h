@@ -34,6 +34,9 @@ public:
   nsCString mValue;
 };
 
+  // Maximum channel number we can currently handle (7.1)
+#define MAX_AUDIO_CHANNELS 8
+
 class TrackInfo {
 public:
   enum TrackType {
@@ -185,16 +188,21 @@ public:
   {
   }
 
-  VideoInfo(int32_t aWidth, int32_t aHeight)
+  explicit VideoInfo(int32_t aWidth, int32_t aHeight)
+    : VideoInfo(nsIntSize(aWidth, aHeight))
+  {
+  }
+
+  explicit VideoInfo(const nsIntSize& aSize)
     : TrackInfo(kVideoTrack, NS_LITERAL_STRING("2"), NS_LITERAL_STRING("main"),
                 EmptyString(), EmptyString(), true, 2)
-    , mDisplay(nsIntSize(aWidth, aHeight))
+    , mDisplay(aSize)
     , mStereoMode(StereoMode::MONO)
-    , mImage(nsIntSize(aWidth, aHeight))
+    , mImage(aSize)
     , mCodecSpecificConfig(new MediaByteBuffer)
     , mExtraData(new MediaByteBuffer)
     , mRotation(kDegree_0)
-    , mImageRect(nsIntRect(0, 0, aWidth, aHeight))
+    , mImageRect(nsIntRect(nsIntPoint(), aSize))
   {
   }
 
@@ -331,7 +339,7 @@ public:
 
   bool IsValid() const override
   {
-    return mChannels > 0 && mRate > 0;
+    return mChannels > 0 && mChannels <= MAX_AUDIO_CHANNELS && mRate > 0;
   }
 
   AudioInfo* GetAsAudioInfo() override
@@ -543,9 +551,6 @@ public:
   const nsCString& mMimeType;
 };
 
-// Maximum channel number we can currently handle (7.1)
-#define MAX_AUDIO_CHANNELS 8
-
 class AudioConfig {
 public:
   enum Channel {
@@ -683,6 +688,11 @@ public:
   bool operator!=(const AudioConfig& aOther) const
   {
     return !(*this == aOther);
+  }
+
+  bool IsValid() const
+  {
+    return mChannelLayout.IsValid() && Format() != FORMAT_NONE && Rate() > 0;
   }
 
   static const char* FormatToString(SampleFormat aFormat);

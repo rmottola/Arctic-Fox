@@ -7,8 +7,9 @@
 "use strict";
 
 const {Cc, Ci, Cu} = require("chrome");
-const {angleUtils} = require("devtools/shared/css-angle");
-const {colorUtils} = require("devtools/shared/css-color");
+const {angleUtils} = require("devtools/client/shared/css-angle");
+const {colorUtils} = require("devtools/client/shared/css-color");
+const {getCSSLexer} = require("devtools/shared/css-lexer");
 const Services = require("Services");
 const EventEmitter = require("devtools/shared/event-emitter");
 
@@ -165,7 +166,7 @@ OutputParser.prototype = {
     text = text.trim();
     this.parsed.length = 0;
 
-    let tokenStream = DOMUtils.getCSSLexer(text);
+    let tokenStream = getCSSLexer(text);
     let parenDepth = 0;
     let outerMostFunctionTakesColor = false;
 
@@ -209,7 +210,7 @@ OutputParser.prototype = {
 
             if (options.expectCubicBezier && token.text === "cubic-bezier") {
               this._appendCubicBezier(functionText, options);
-            } else if (colorOK() && DOMUtils.isValidCSSColor(functionText)) {
+            } else if (colorOK() && colorUtils.isValidCSSColor(functionText)) {
               this._appendColor(functionText, options);
             } else {
               this._appendTextNode(functionText);
@@ -222,7 +223,7 @@ OutputParser.prototype = {
           if (options.expectCubicBezier &&
               BEZIER_KEYWORDS.indexOf(token.text) >= 0) {
             this._appendCubicBezier(token.text, options);
-          } else if (colorOK() && DOMUtils.isValidCSSColor(token.text)) {
+          } else if (colorOK() && colorUtils.isValidCSSColor(token.text)) {
             this._appendColor(token.text, options);
           } else if (angleOK(token.text)) {
             this._appendAngle(token.text, options);
@@ -235,7 +236,7 @@ OutputParser.prototype = {
         case "id":
         case "hash": {
           let original = text.substring(token.startOffset, token.endOffset);
-          if (colorOK() && DOMUtils.isValidCSSColor(original)) {
+          if (colorOK() && colorUtils.isValidCSSColor(original)) {
             this._appendColor(original, options);
           } else {
             this._appendTextNode(original);
@@ -491,7 +492,7 @@ OutputParser.prototype = {
    */
   _sanitizeURL: function(url) {
     // Re-lex the URL and add any needed termination characters.
-    let urlTokenizer = DOMUtils.getCSSLexer(url);
+    let urlTokenizer = getCSSLexer(url);
     // Just read until EOF; there will only be a single token.
     while (urlTokenizer.nextToken()) {
       // Nothing.

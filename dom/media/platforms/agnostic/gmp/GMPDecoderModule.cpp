@@ -9,10 +9,11 @@
 #include "GMPAudioDecoder.h"
 #include "GMPVideoDecoder.h"
 #include "MediaDataDecoderProxy.h"
+#include "MediaPrefs.h"
 #include "mozIGeckoMediaPluginService.h"
 #include "nsServiceManagerUtils.h"
-#include "mozilla/Preferences.h"
 #include "mozilla/StaticMutex.h"
+#include "mozilla/SyncRunnable.h"
 #include "gmp-audio-decode.h"
 #include "gmp-video-decode.h"
 #ifdef XP_WIN
@@ -45,54 +46,42 @@ CreateDecoderWrapper(MediaDataDecoderCallback* aCallback)
 }
 
 already_AddRefed<MediaDataDecoder>
-GMPDecoderModule::CreateVideoDecoder(const VideoInfo& aConfig,
-                                     layers::LayersBackend aLayersBackend,
-                                     layers::ImageContainer* aImageContainer,
-                                     FlushableTaskQueue* aVideoTaskQueue,
-                                     MediaDataDecoderCallback* aCallback,
-                                     DecoderDoctorDiagnostics* aDiagnostics)
+GMPDecoderModule::CreateVideoDecoder(const CreateDecoderParams& aParams)
 {
-  if (!aConfig.mMimeType.EqualsLiteral("video/avc")) {
+  if (!aParams.mConfig.mMimeType.EqualsLiteral("video/avc")) {
     return nullptr;
   }
 
-  if (aDiagnostics) {
-    const Maybe<nsCString> preferredGMP = PreferredGMP(aConfig.mMimeType);
+  if (aParams.mDiagnostics) {
+    const Maybe<nsCString> preferredGMP = PreferredGMP(aParams.mConfig.mMimeType);
     if (preferredGMP.isSome()) {
-      aDiagnostics->SetGMP(preferredGMP.value());
+      aParams.mDiagnostics->SetGMP(preferredGMP.value());
     }
   }
 
-  RefPtr<MediaDataDecoderProxy> wrapper = CreateDecoderWrapper(aCallback);
-  wrapper->SetProxyTarget(new GMPVideoDecoder(aConfig,
-                                              aLayersBackend,
-                                              aImageContainer,
-                                              aVideoTaskQueue,
-                                              wrapper->Callback()));
+  RefPtr<MediaDataDecoderProxy> wrapper = CreateDecoderWrapper(aParams.mCallback);
+  auto params = GMPVideoDecoderParams(aParams).WithCallback(wrapper);
+  wrapper->SetProxyTarget(new GMPVideoDecoder(params));
   return wrapper.forget();
 }
 
 already_AddRefed<MediaDataDecoder>
-GMPDecoderModule::CreateAudioDecoder(const AudioInfo& aConfig,
-                                     FlushableTaskQueue* aAudioTaskQueue,
-                                     MediaDataDecoderCallback* aCallback,
-                                     DecoderDoctorDiagnostics* aDiagnostics)
+GMPDecoderModule::CreateAudioDecoder(const CreateDecoderParams& aParams)
 {
-  if (!aConfig.mMimeType.EqualsLiteral("audio/mp4a-latm")) {
+  if (!aParams.mConfig.mMimeType.EqualsLiteral("audio/mp4a-latm")) {
     return nullptr;
   }
 
-  if (aDiagnostics) {
-    const Maybe<nsCString> preferredGMP = PreferredGMP(aConfig.mMimeType);
+  if (aParams.mDiagnostics) {
+    const Maybe<nsCString> preferredGMP = PreferredGMP(aParams.mConfig.mMimeType);
     if (preferredGMP.isSome()) {
-      aDiagnostics->SetGMP(preferredGMP.value());
+      aParams.mDiagnostics->SetGMP(preferredGMP.value());
     }
   }
 
-  RefPtr<MediaDataDecoderProxy> wrapper = CreateDecoderWrapper(aCallback);
-  wrapper->SetProxyTarget(new GMPAudioDecoder(aConfig,
-                                              aAudioTaskQueue,
-                                              wrapper->Callback()));
+  RefPtr<MediaDataDecoderProxy> wrapper = CreateDecoderWrapper(aParams.mCallback);
+  auto params = GMPAudioDecoderParams(aParams).WithCallback(wrapper);
+  wrapper->SetProxyTarget(new GMPAudioDecoder(params));
   return wrapper.forget();
 }
 
@@ -112,7 +101,6 @@ HasGMPFor(const nsACString& aAPI,
           const nsACString& aCodec,
           const nsACString& aGMP)
 {
-  MOZ_ASSERT(NS_IsMainThread());
 #ifdef XP_WIN
   // gmp-clearkey uses WMF for decoding, so if we're using clearkey we must
   // verify that WMF works before continuing.
@@ -130,6 +118,8 @@ HasGMPFor(const nsACString& aAPI,
     }
   }
 #endif
+  MOZ_ASSERT(NS_IsMainThread(),
+             "HasPluginForAPI must be called on the main thread");
   nsTArray<nsCString> tags;
   tags.AppendElement(aCodec);
   tags.AppendElement(aGMP);
@@ -174,24 +164,21 @@ GMPDecoderModule::UpdateUsableCodecs()
   }
 }
 
-static uint32_t sPreferredAacGmp = 0;
-static uint32_t sPreferredH264Gmp = 0;
-
 /* static */
 void
 GMPDecoderModule::Init()
 {
-  MOZ_ASSERT(NS_IsMainThread());
-
+  if (!NS_IsMainThread()) {
+    nsCOMPtr<nsIThread> mainThread = do_GetMainThread();
+    nsCOMPtr<nsIRunnable> runnable =
+      NS_NewRunnableFunction([]() { Init(); });
+    SyncRunnable::DispatchToThread(mainThread, runnable);
+    return;
+  }
   // GMPService::HasPluginForAPI is main thread only, so to implement
   // SupportsMimeType() we build a table of the codecs which each whitelisted
   // GMP has and update it when any GMPs are removed or added at runtime.
   UpdateUsableCodecs();
-
-  Preferences::AddUintVarCache(&sPreferredAacGmp,
-                               "media.gmp.decoder.aac", 0);
-  Preferences::AddUintVarCache(&sPreferredH264Gmp,
-                               "media.gmp.decoder.h264", 0);
 }
 
 /* static */
@@ -200,7 +187,7 @@ GMPDecoderModule::PreferredGMP(const nsACString& aMimeType)
 {
   Maybe<nsCString> rv;
   if (aMimeType.EqualsLiteral("audio/mp4a-latm")) {
-    switch (sPreferredAacGmp) {
+    switch (MediaPrefs::GMPAACPreferred()) {
       case 1: rv.emplace(NS_LITERAL_CSTRING("org.w3.clearkey")); break;
       case 2: rv.emplace(NS_LITERAL_CSTRING("com.adobe.primetime")); break;
       default: break;
@@ -209,7 +196,7 @@ GMPDecoderModule::PreferredGMP(const nsACString& aMimeType)
 
   if (aMimeType.EqualsLiteral("video/avc") ||
       aMimeType.EqualsLiteral("video/mp4")) {
-    switch (sPreferredH264Gmp) {
+    switch (MediaPrefs::GMPH264Preferred()) {
       case 1: rv.emplace(NS_LITERAL_CSTRING("org.w3.clearkey")); break;
       case 2: rv.emplace(NS_LITERAL_CSTRING("com.adobe.primetime")); break;
       default: break;

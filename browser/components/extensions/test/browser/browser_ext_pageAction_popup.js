@@ -18,7 +18,11 @@ add_task(function* testPageActionPopup() {
     files: {
       "popup-a.html": scriptPage("popup-a.js"),
       "popup-a.js": function() {
-        browser.runtime.sendMessage("from-popup-a");
+        window.onload = () => {
+          let background = window.getComputedStyle(document.body).backgroundColor;
+          browser.test.assertEq("transparent", background);
+          browser.runtime.sendMessage("from-popup-a");
+        };
         browser.runtime.onMessage.addListener(msg => {
           if (msg == "close-popup") {
             window.close();
@@ -124,8 +128,9 @@ add_task(function* testPageActionPopup() {
         browser.tabs.query({active: true, currentWindow: true}, tabs => {
           tabId = tabs[0].id;
 
-          browser.pageAction.show(tabId);
-          browser.test.sendMessage("next-test");
+          browser.pageAction.show(tabId).then(() => {
+            browser.test.sendMessage("next-test");
+          });
         });
       },
     },

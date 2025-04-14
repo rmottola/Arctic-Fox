@@ -14,9 +14,12 @@ XPCOMUtils.defineLazyGetter(this, "serverPort", function() {
   return httpServer.identity.primaryPort;
 });
 
+var handlerDone;
+var handlerPromise = new Promise(r => handlerDone = after(2, r));
+
 function resubscribeHandler(metadata, response) {
   ok(true, "Ask for new subscription");
-  do_test_finished();
+  handlerDone();
   response.setHeader("Location",
                   'http://localhost:' + serverPort + '/newSubscription')
   response.setHeader("Link",
@@ -27,7 +30,7 @@ function resubscribeHandler(metadata, response) {
 
 function listenSuccessHandler(metadata, response) {
   do_check_true(true, "New listener point");
-  httpServer.stop(do_test_finished);
+  httpServer.stop(handlerDone);
   response.setStatusLine(metadata.httpVersion, 204, "Try again");
 }
 
@@ -55,9 +58,6 @@ add_task(function* test1() {
   do_register_cleanup(() => {
     return db.drop().then(_ => db.close());
   });
-
-  do_test_pending();
-  do_test_pending();
 
   var serverURL = "http://localhost:" + httpServer.identity.primaryPort;
 
@@ -88,5 +88,18 @@ add_task(function* test1() {
     serverURI: serverURL + "/subscribe",
     db
   });
+
+  yield handlerPromise;
+
+  let record = yield db.getByIdentifiers({
+    scope: 'https://example.com/page',
+    originAttributes: '',
+  });
+  equal(record.keyID, serverURL + '/newSubscription',
+    'Should update subscription URL');
+  equal(record.pushEndpoint, serverURL + '/newPushEndpoint',
+    'Should update push endpoint');
+  equal(record.pushReceiptEndpoint, serverURL + '/newReceiptPushEndpoint',
+    'Should update push receipt endpoint');
 
 });

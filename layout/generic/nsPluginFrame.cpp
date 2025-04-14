@@ -153,7 +153,6 @@ nsPluginFrame::nsPluginFrame(nsStyleContext* aContext)
   : nsFrame(aContext)
   , mInstanceOwner(nullptr)
   , mReflowCallbackPosted(false)
-  , mIsHiddenDueToScroll(false)
 {
   MOZ_LOG(sPluginFrameLog, LogLevel::Debug,
          ("Created new nsPluginFrame %p\n", this));
@@ -418,7 +417,7 @@ nsPluginFrame::GetWidgetConfiguration(nsTArray<nsIWidget::Configuration>* aConfi
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
   if (XRE_IsContentProcess()) {
     configuration->mWindowID = (uintptr_t)mWidget->GetNativeData(NS_NATIVE_PLUGIN_PORT);
-    configuration->mVisible = !mIsHiddenDueToScroll && mWidget->IsVisible();
+    configuration->mVisible = mWidget->IsVisible();
 
   }
 #endif // defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
@@ -426,8 +425,8 @@ nsPluginFrame::GetWidgetConfiguration(nsTArray<nsIWidget::Configuration>* aConfi
 
 void
 nsPluginFrame::GetDesiredSize(nsPresContext* aPresContext,
-                              const nsHTMLReflowState& aReflowState,
-                              nsHTMLReflowMetrics& aMetrics)
+                              const ReflowInput& aReflowInput,
+                              ReflowOutput& aMetrics)
 {
   // By default, we have no area
   aMetrics.ClearSize();
@@ -436,21 +435,21 @@ nsPluginFrame::GetDesiredSize(nsPresContext* aPresContext,
     return;
   }
 
-  aMetrics.Width() = aReflowState.ComputedWidth();
-  aMetrics.Height() = aReflowState.ComputedHeight();
+  aMetrics.Width() = aReflowInput.ComputedWidth();
+  aMetrics.Height() = aReflowInput.ComputedHeight();
 
   // for EMBED and APPLET, default to 240x200 for compatibility
   if (mContent->IsAnyOfHTMLElements(nsGkAtoms::applet,
                                     nsGkAtoms::embed)) {
     if (aMetrics.Width() == NS_UNCONSTRAINEDSIZE) {
       aMetrics.Width() = clamped(nsPresContext::CSSPixelsToAppUnits(EMBED_DEF_WIDTH),
-                               aReflowState.ComputedMinWidth(),
-                               aReflowState.ComputedMaxWidth());
+                               aReflowInput.ComputedMinWidth(),
+                               aReflowInput.ComputedMaxWidth());
     }
     if (aMetrics.Height() == NS_UNCONSTRAINEDSIZE) {
       aMetrics.Height() = clamped(nsPresContext::CSSPixelsToAppUnits(EMBED_DEF_HEIGHT),
-                                aReflowState.ComputedMinHeight(),
-                                aReflowState.ComputedMaxHeight());
+                                aReflowInput.ComputedMinHeight(),
+                                aReflowInput.ComputedMaxHeight());
     }
 
 #if defined(MOZ_WIDGET_GTK)
@@ -468,8 +467,8 @@ nsPluginFrame::GetDesiredSize(nsPresContext* aPresContext,
   // Make up a number.
   if (aMetrics.Width() == NS_UNCONSTRAINEDSIZE) {
     aMetrics.Width() =
-      (aReflowState.ComputedMinWidth() != NS_UNCONSTRAINEDSIZE) ?
-        aReflowState.ComputedMinWidth() : 0;
+      (aReflowInput.ComputedMinWidth() != NS_UNCONSTRAINEDSIZE) ?
+        aReflowInput.ComputedMinWidth() : 0;
   }
 
   // At this point, the height has an unconstrained value only in two cases:
@@ -478,8 +477,8 @@ nsPluginFrame::GetDesiredSize(nsPresContext* aPresContext,
   // In either case, we have to make up a number.
   if (aMetrics.Height() == NS_UNCONSTRAINEDSIZE) {
     aMetrics.Height() =
-      (aReflowState.ComputedMinHeight() != NS_UNCONSTRAINEDSIZE) ?
-        aReflowState.ComputedMinHeight() : 0;
+      (aReflowInput.ComputedMinHeight() != NS_UNCONSTRAINEDSIZE) ?
+        aReflowInput.ComputedMinHeight() : 0;
   }
 
   // XXXbz don't add in the border and padding, because we screw up our
@@ -491,16 +490,16 @@ nsPluginFrame::GetDesiredSize(nsPresContext* aPresContext,
 
 void
 nsPluginFrame::Reflow(nsPresContext*           aPresContext,
-                      nsHTMLReflowMetrics&     aMetrics,
-                      const nsHTMLReflowState& aReflowState,
+                      ReflowOutput&     aMetrics,
+                      const ReflowInput& aReflowInput,
                       nsReflowStatus&          aStatus)
 {
   MarkInReflow();
   DO_GLOBAL_REFLOW_COUNT("nsPluginFrame");
-  DISPLAY_REFLOW(aPresContext, this, aReflowState, aMetrics, aStatus);
+  DISPLAY_REFLOW(aPresContext, this, aReflowInput, aMetrics, aStatus);
 
   // Get our desired size
-  GetDesiredSize(aPresContext, aReflowState, aMetrics);
+  GetDesiredSize(aPresContext, aReflowInput, aMetrics);
   aMetrics.SetOverflowAreasToDesiredBounds();
   FinishAndStoreOverflow(&aMetrics);
 
@@ -519,7 +518,7 @@ nsPluginFrame::Reflow(nsPresContext*           aPresContext,
   }
 
   nsRect r(0, 0, aMetrics.Width(), aMetrics.Height());
-  r.Deflate(aReflowState.ComputedPhysicalBorderPadding());
+  r.Deflate(aReflowInput.ComputedPhysicalBorderPadding());
 
   if (mInnerView) {
     nsViewManager* vm = mInnerView->GetViewManager();
@@ -535,7 +534,7 @@ nsPluginFrame::Reflow(nsPresContext*           aPresContext,
 
   aStatus = NS_FRAME_COMPLETE;
 
-  NS_FRAME_SET_TRUNCATION(aStatus, aReflowState, aMetrics);
+  NS_FRAME_SET_TRUNCATION(aStatus, aReflowInput, aMetrics);
 }
 
 ///////////// nsIReflowCallback ///////////////
@@ -770,24 +769,6 @@ nsPluginFrame::IsHidden(bool aCheckVisibilityStyle) const
   return false;
 }
 
-// Clips windowed plugin frames during remote content scroll operations managed
-// by nsGfxScrollFrame.
-void
-nsPluginFrame::SetScrollVisibility(bool aState)
-{
-  // Limit this setting to windowed plugins by checking if we have a widget
-  if (mWidget) {
-    bool changed = mIsHiddenDueToScroll != aState;
-    mIsHiddenDueToScroll = aState;
-    // Force a paint so plugin window visibility gets flushed via
-    // the compositor.
-    if (changed && mInstanceOwner) {
-      mInstanceOwner->UpdateScrollState(mIsHiddenDueToScroll);
-      SchedulePaint();
-    }
-  }
-}
-
 mozilla::LayoutDeviceIntPoint
 nsPluginFrame::GetRemoteTabChromeOffset()
 {
@@ -839,7 +820,7 @@ nsPluginFrame::GetWindowOriginInPixels(bool aWindowless)
 
 void
 nsPluginFrame::DidReflow(nsPresContext*            aPresContext,
-                         const nsHTMLReflowState*  aReflowState,
+                         const ReflowInput*  aReflowInput,
                          nsDidReflowStatus         aStatus)
 {
   // Do this check before calling the superclass, as that clears
@@ -851,7 +832,7 @@ nsPluginFrame::DidReflow(nsPresContext*            aPresContext,
     objContent->HasNewFrame(this);
   }
 
-  nsFrame::DidReflow(aPresContext, aReflowState, aStatus);
+  nsFrame::DidReflow(aPresContext, aReflowInput, aStatus);
 
   // The view is created hidden; once we have reflowed it and it has been
   // positioned then we show it.
@@ -1136,13 +1117,6 @@ nsPluginFrame::DidSetWidgetGeometry()
 bool
 nsPluginFrame::IsOpaque() const
 {
-#if defined(MOZ_WIDGET_GTK)
-  // Insure underlying content gets painted when we clip windowed plugins
-  // during remote content scroll operations managed by nsGfxScrollFrame.
-  if (mIsHiddenDueToScroll) {
-    return false;
-  }
-#endif
 #if defined(XP_MACOSX)
   return false;
 #elif defined(MOZ_WIDGET_ANDROID)
@@ -1188,14 +1162,6 @@ nsPluginFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
                                 const nsRect&           aDirtyRect,
                                 const nsDisplayListSet& aLists)
 {
-#if defined(MOZ_WIDGET_GTK)
-  // Clip windowed plugin frames from the list during remote content scroll
-  // operations managed by nsGfxScrollFrame.
-  if (mIsHiddenDueToScroll) {
-    return;
-  }
-#endif
-
   // XXX why are we painting collapsed object frames?
   if (!IsVisibleOrCollapsedForPainting(aBuilder))
     return;
@@ -1513,14 +1479,14 @@ nsPluginFrame::BuildLayer(nsDisplayListBuilder* aBuilder,
 
     imglayer->SetScaleToSize(size, ScaleMode::STRETCH);
     imglayer->SetContainer(container);
-    Filter filter = nsLayoutUtils::GetGraphicsFilterForFrame(this);
+    SamplingFilter samplingFilter = nsLayoutUtils::GetSamplingFilterForFrame(this);
 #ifdef MOZ_GFX_OPTIMIZE_MOBILE
     if (!aManager->IsCompositingCheap()) {
       // Pixman just horrible with bilinear filter scaling
-      filter = Filter::POINT;
+      samplingFilter = SamplingFilter::POINT;
     }
 #endif
-    imglayer->SetFilter(filter);
+    imglayer->SetSamplingFilter(samplingFilter);
 
     layer->SetContentFlags(IsOpaque() ? Layer::CONTENT_OPAQUE : 0);
 
@@ -1531,9 +1497,9 @@ nsPluginFrame::BuildLayer(nsDisplayListBuilder* aBuilder,
     {
       RefPtr<ClientLayerManager> lm = aBuilder->GetWidgetLayerManager()->AsClientLayerManager();
       if (!mDidCompositeObserver || !mDidCompositeObserver->IsValid(lm)) {
-        mDidCompositeObserver = new PluginFrameDidCompositeObserver(mInstanceOwner, lm);
+        mDidCompositeObserver = MakeUnique<PluginFrameDidCompositeObserver>(mInstanceOwner, lm);
       }
-      lm->AddDidCompositeObserver(mDidCompositeObserver);
+      lm->AddDidCompositeObserver(mDidCompositeObserver.get());
     }
 #ifdef MOZ_WIDGET_ANDROID
   } else if (aItem->GetType() == nsDisplayItem::TYPE_PLUGIN_VIDEO) {

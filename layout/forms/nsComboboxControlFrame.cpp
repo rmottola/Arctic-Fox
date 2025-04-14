@@ -30,7 +30,6 @@
 #include "nsIDocument.h"
 #include "nsIScrollableFrame.h"
 #include "nsListControlFrame.h"
-#include "nsAutoPtr.h"
 #include "mozilla/StyleSetHandle.h"
 #include "mozilla/StyleSetHandleInlines.h"
 #include "nsNodeInfoManager.h"
@@ -287,7 +286,7 @@ nsComboboxControlFrame::SetFocus(bool aOn, bool aRepaint)
       }
     }
     // May delete |this|.
-    mListControlFrame->FireOnChange();
+    mListControlFrame->FireOnInputAndOnChange();
   }
 
   if (!weakFrame.IsAlive()) {
@@ -419,12 +418,12 @@ public:
 
 void
 nsComboboxControlFrame::ReflowDropdown(nsPresContext*  aPresContext,
-                                       const nsHTMLReflowState& aReflowState)
+                                       const ReflowInput& aReflowInput)
 {
   // All we want out of it later on, really, is the block size of a row, so we
   // don't even need to cache mDropdownFrame's ascent or anything.  If we don't
   // need to reflow it, just bail out here.
-  if (!aReflowState.ShouldReflowAllKids() &&
+  if (!aReflowInput.ShouldReflowAllKids() &&
       !NS_SUBTREE_DIRTY(mDropdownFrame)) {
     return;
   }
@@ -433,19 +432,19 @@ nsComboboxControlFrame::ReflowDropdown(nsPresContext*  aPresContext,
   // on the appropriate edge for the scrollbar we don't show... but
   // that's the best we can do here for now.
   WritingMode wm = mDropdownFrame->GetWritingMode();
-  LogicalSize availSize = aReflowState.AvailableSize(wm);
+  LogicalSize availSize = aReflowInput.AvailableSize(wm);
   availSize.BSize(wm) = NS_UNCONSTRAINEDSIZE;
-  nsHTMLReflowState kidReflowState(aPresContext, aReflowState, mDropdownFrame,
+  ReflowInput kidReflowInput(aPresContext, aReflowInput, mDropdownFrame,
                                    availSize);
 
   // If the dropdown's intrinsic inline size is narrower than our
   // specified inline size, then expand it out.  We want our border-box
   // inline size to end up the same as the dropdown's so account for
   // both sets of mComputedBorderPadding.
-  nscoord forcedISize = aReflowState.ComputedISize() +
-    aReflowState.ComputedLogicalBorderPadding().IStartEnd(wm) -
-    kidReflowState.ComputedLogicalBorderPadding().IStartEnd(wm);
-  kidReflowState.SetComputedISize(std::max(kidReflowState.ComputedISize(),
+  nscoord forcedISize = aReflowInput.ComputedISize() +
+    aReflowInput.ComputedLogicalBorderPadding().IStartEnd(wm) -
+    kidReflowInput.ComputedLogicalBorderPadding().IStartEnd(wm);
+  kidReflowInput.SetComputedISize(std::max(kidReflowInput.ComputedISize(),
                                          forcedISize));
 
   // ensure we start off hidden
@@ -471,14 +470,14 @@ nsComboboxControlFrame::ReflowDropdown(nsPresContext*  aPresContext,
   // by AbsolutelyPositionDropDown().
   WritingMode outerWM = GetWritingMode();
   const nsSize dummyContainerSize;
-  nsHTMLReflowMetrics desiredSize(aReflowState);
+  ReflowOutput desiredSize(aReflowInput);
   nsReflowStatus ignoredStatus;
   ReflowChild(mDropdownFrame, aPresContext, desiredSize,
-              kidReflowState, outerWM, LogicalPoint(outerWM),
+              kidReflowInput, outerWM, LogicalPoint(outerWM),
               dummyContainerSize, flags, ignoredStatus);
 
    // Set the child's width and height to its desired size
-  FinishReflowChild(mDropdownFrame, aPresContext, desiredSize, &kidReflowState,
+  FinishReflowChild(mDropdownFrame, aPresContext, desiredSize, &kidReflowInput,
                     outerWM, LogicalPoint(outerWM), dummyContainerSize, flags);
 }
 
@@ -595,8 +594,8 @@ nsComboboxControlFrame::GetAvailableDropdownSpace(WritingMode aWM,
                                containerSize);
     mLastDropDownAfterScreenBCoord = thisScreenRect.BEnd(aWM) +
                                      aTranslation->B(aWM);
-    mLastDropDownBeforeScreenBCoord = thisScreenRect.BEnd(aWM) +
-                                     aTranslation->B(aWM);
+    mLastDropDownBeforeScreenBCoord = thisScreenRect.BStart(aWM) +
+                                      aTranslation->B(aWM);
   }
 
   nscoord minBCoord;
@@ -809,8 +808,8 @@ nsComboboxControlFrame::GetPrefISize(nsRenderingContext *aRenderingContext)
 
 void
 nsComboboxControlFrame::Reflow(nsPresContext*          aPresContext,
-                               nsHTMLReflowMetrics&     aDesiredSize,
-                               const nsHTMLReflowState& aReflowState,
+                               ReflowOutput&     aDesiredSize,
+                               const ReflowInput& aReflowInput,
                                nsReflowStatus&          aStatus)
 {
   MarkInReflow();
@@ -849,7 +848,7 @@ nsComboboxControlFrame::Reflow(nsPresContext*          aPresContext,
   }
 
   // First reflow our dropdown so that we know how tall we should be.
-  ReflowDropdown(aPresContext, aReflowState);
+  ReflowDropdown(aPresContext, aReflowInput);
   RefPtr<nsResizeDropdownAtFinalPosition> resize =
     new nsResizeDropdownAtFinalPosition(this);
   if (NS_SUCCEEDED(aPresContext->PresShell()->PostReflowCallback(resize))) {
@@ -860,7 +859,7 @@ nsComboboxControlFrame::Reflow(nsPresContext*          aPresContext,
 
   // Get the width of the vertical scrollbar.  That will be the inline
   // size of the dropdown button.
-  WritingMode wm = aReflowState.GetWritingMode();
+  WritingMode wm = aReflowInput.GetWritingMode();
   nscoord buttonISize;
   const nsStyleDisplay *disp = StyleDisplay();
   if ((IsThemed(disp) && !aPresContext->GetTheme()->ThemeNeedsComboboxDropmarker()) ||
@@ -871,25 +870,25 @@ nsComboboxControlFrame::Reflow(nsPresContext*          aPresContext,
     nsIScrollableFrame* scrollable = do_QueryFrame(mListControlFrame);
     NS_ASSERTION(scrollable, "List must be a scrollable frame");
     buttonISize = scrollable->GetNondisappearingScrollbarWidth(
-      PresContext(), aReflowState.rendContext, wm);
-    if (buttonISize > aReflowState.ComputedISize()) {
+      PresContext(), aReflowInput.mRenderingContext, wm);
+    if (buttonISize > aReflowInput.ComputedISize()) {
       buttonISize = 0;
     }
   }
 
-  mDisplayISize = aReflowState.ComputedISize() - buttonISize;
+  mDisplayISize = aReflowInput.ComputedISize() - buttonISize;
 
-  nsBlockFrame::Reflow(aPresContext, aDesiredSize, aReflowState, aStatus);
+  nsBlockFrame::Reflow(aPresContext, aDesiredSize, aReflowInput, aStatus);
 
   // The button should occupy the same space as a scrollbar
   nsSize containerSize = aDesiredSize.PhysicalSize();
   LogicalRect buttonRect = mButtonFrame->GetLogicalRect(containerSize);
 
   buttonRect.IStart(wm) =
-    aReflowState.ComputedLogicalBorderPadding().IStartEnd(wm) +
+    aReflowInput.ComputedLogicalBorderPadding().IStartEnd(wm) +
     mDisplayISize -
-    (aReflowState.ComputedLogicalBorderPadding().IEnd(wm) -
-     aReflowState.ComputedLogicalPadding().IEnd(wm));
+    (aReflowInput.ComputedLogicalBorderPadding().IEnd(wm) -
+     aReflowInput.ComputedLogicalPadding().IEnd(wm));
   buttonRect.ISize(wm) = buttonISize;
 
   buttonRect.BStart(wm) = this->GetLogicalUsedBorder(wm).BStart(wm);
@@ -1012,8 +1011,7 @@ nsComboboxControlFrame::RedisplayText(int32_t aIndex)
 
     RefPtr<RedisplayTextEvent> event = new RedisplayTextEvent(this);
     mRedisplayTextEvent = event;
-    if (!nsContentUtils::AddScriptRunner(event))
-      mRedisplayTextEvent.Forget();
+    nsContentUtils::AddScriptRunner(event);
   }
   return rv;
 }
@@ -1292,8 +1290,8 @@ public:
   }
 
   virtual void Reflow(nsPresContext*           aPresContext,
-                          nsHTMLReflowMetrics&     aDesiredSize,
-                          const nsHTMLReflowState& aReflowState,
+                          ReflowOutput&     aDesiredSize,
+                          const ReflowInput& aReflowInput,
                           nsReflowStatus&          aStatus) override;
 
   virtual void BuildDisplayList(nsDisplayListBuilder*   aBuilder,
@@ -1314,18 +1312,18 @@ nsComboboxDisplayFrame::GetType() const
 
 void
 nsComboboxDisplayFrame::Reflow(nsPresContext*           aPresContext,
-                               nsHTMLReflowMetrics&     aDesiredSize,
-                               const nsHTMLReflowState& aReflowState,
+                               ReflowOutput&     aDesiredSize,
+                               const ReflowInput& aReflowInput,
                                nsReflowStatus&          aStatus)
 {
-  nsHTMLReflowState state(aReflowState);
+  ReflowInput state(aReflowInput);
   if (state.ComputedBSize() == NS_INTRINSICSIZE) {
     // Note that the only way we can have a computed block size here is
     // if the combobox had a specified block size.  If it didn't, size
     // based on what our rows look like, for lack of anything better.
     state.SetComputedBSize(mComboBox->mListControlFrame->GetBSizeOfARow());
   }
-  WritingMode wm = aReflowState.GetWritingMode();
+  WritingMode wm = aReflowInput.GetWritingMode();
   nscoord computedISize = mComboBox->mDisplayISize -
     state.ComputedLogicalBorderPadding().IStartEnd(wm);
   if (computedISize < 0) {
@@ -1486,7 +1484,11 @@ nsComboboxControlFrame::Rollup(uint32_t aCount, bool aFlush,
     // The popup's visibility doesn't update until the minimize animation has
     // finished, so call UpdateWidgetGeometry to update it right away.
     nsViewManager* viewManager = mDropdownFrame->GetView()->GetViewManager();
-    viewManager->UpdateWidgetGeometry();
+    viewManager->UpdateWidgetGeometry(); // might destroy us
+  }
+
+  if (!weakFrame.IsAlive()) {
+    return consume;
   }
 
   if (aLastRolledUp) {

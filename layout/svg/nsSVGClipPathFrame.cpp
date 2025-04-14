@@ -87,10 +87,14 @@ nsSVGClipPathFrame::GetClipMask(gfxContext& aReferenceContext,
                                 const gfxMatrix& aMatrix,
                                 Matrix* aMaskTransform,
                                 SourceSurface* aExtraMask,
-                                const Matrix& aExtraMasksTransform)
+                                const Matrix& aExtraMasksTransform,
+                                DrawResult* aResult)
 {
   MOZ_ASSERT(!IsTrivial(), "Caller needs to use ApplyClipPath");
 
+  if (aResult) {
+    *aResult = DrawResult::SUCCESS;
+  }
   DrawTarget& aReferenceDT = *aReferenceContext.GetDrawTarget();
 
   // A clipPath can reference another clipPath.  We re-enter this method for
@@ -132,7 +136,7 @@ nsSVGClipPathFrame::GetClipMask(gfxContext& aReferenceContext,
 
   // Paint this clipPath's contents into maskDT:
   {
-    RefPtr<gfxContext> ctx = gfxContext::ForDrawTarget(maskDT);
+    RefPtr<gfxContext> ctx = gfxContext::CreateOrNull(maskDT);
     if (!ctx) {
       gfxCriticalError() << "SVGClipPath context problem " << gfx::hexa(maskDT);
       return nullptr;
@@ -212,7 +216,10 @@ nsSVGClipPathFrame::GetClipMask(gfxContext& aReferenceContext,
         // Our children have NS_STATE_SVG_CLIPPATH_CHILD set on them, and
         // nsSVGPathGeometryFrame::Render checks for that state bit and paints
         // only the geometry (opaque black) if set.
-        SVGFrame->PaintSVG(*ctx, toChildsUserSpace);
+        DrawResult result = SVGFrame->PaintSVG(*ctx, toChildsUserSpace);
+        if (aResult) {
+          *aResult &= result;
+        }
 
         if (clipPathThatClipsChild) {
           if (childsClipPathRequiresMasking) {
@@ -380,25 +387,27 @@ nsSVGClipPathFrame::IsValid()
   for (nsIFrame* kid = mFrames.FirstChild(); kid;
        kid = kid->GetNextSibling()) {
 
-    nsIAtom *type = kid->GetType();
+    nsIAtom* kidType = kid->GetType();
 
-    if (type == nsGkAtoms::svgUseFrame) {
+    if (kidType == nsGkAtoms::svgUseFrame) {
       for (nsIFrame* grandKid : kid->PrincipalChildList()) {
 
-        nsIAtom *type = grandKid->GetType();
+        nsIAtom* grandKidType = grandKid->GetType();
 
-        if (type != nsGkAtoms::svgPathGeometryFrame &&
-            type != nsGkAtoms::svgTextFrame) {
+        if (grandKidType != nsGkAtoms::svgPathGeometryFrame &&
+            grandKidType != nsGkAtoms::svgTextFrame) {
           return false;
         }
       }
       continue;
     }
-    if (type != nsGkAtoms::svgPathGeometryFrame &&
-        type != nsGkAtoms::svgTextFrame) {
+
+    if (kidType != nsGkAtoms::svgPathGeometryFrame &&
+        kidType != nsGkAtoms::svgTextFrame) {
       return false;
     }
   }
+
   return true;
 }
 

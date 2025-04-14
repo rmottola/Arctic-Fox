@@ -68,13 +68,13 @@ SyncedTabsDeckView.prototype = {
     let bundle = this._getBrowserBundle();
     let formatArgs = ["android", "ios"].map(os => {
       let link = this._doc.createElement("a");
-      link.textContent = bundle.getString(`appMenuRemoteTabs.mobilePromo.${os}`)
+      link.textContent = bundle.getString(`appMenuRemoteTabs.mobilePromo.${os}`);
       link.className = `${os}-link text-link`;
       link.setAttribute("href", "#");
       return link.outerHTML;
     });
     // Put it all together...
-    let contents = bundle.getFormattedString("appMenuRemoteTabs.mobilePromo", formatArgs);
+    let contents = bundle.getFormattedString("appMenuRemoteTabs.mobilePromo.text2", formatArgs);
     this.container.querySelector(".device-promo").innerHTML = contents;
   },
 

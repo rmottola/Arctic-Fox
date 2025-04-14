@@ -20,7 +20,7 @@ BEGIN_TEST(testGCExactRooting)
     JS::RootedObject rootCx(cx, JS_NewPlainObject(cx));
     JS::RootedObject rootRt(cx->runtime(), JS_NewPlainObject(cx));
 
-    JS_GC(cx->runtime());
+    JS_GC(cx);
 
     /* Use the objects we just created to ensure that they are still alive. */
     JS_DefineProperty(cx, rootCx, "foo", JS::UndefinedHandleValue, 0);
@@ -36,9 +36,9 @@ BEGIN_TEST(testGCSuppressions)
     JS::AutoCheckCannotGC checkgc;
     JS::AutoSuppressGCAnalysis noanalysis;
 
-    JS::AutoAssertOnGC nogcRt(cx->runtime());
-    JS::AutoCheckCannotGC checkgcRt(cx->runtime());
-    JS::AutoSuppressGCAnalysis noanalysisRt(cx->runtime());
+    JS::AutoAssertOnGC nogcCx(cx);
+    JS::AutoCheckCannotGC checkgcCx(cx);
+    JS::AutoSuppressGCAnalysis noanalysisCx(cx);
 
     return true;
 }
@@ -46,8 +46,8 @@ END_TEST(testGCSuppressions)
 
 struct MyContainer
 {
-    RelocatablePtrObject obj;
-    RelocatablePtrString str;
+    HeapPtr<JSObject*> obj;
+    HeapPtr<JSString*> str;
 
     MyContainer() : obj(nullptr), str(nullptr) {}
     void trace(JSTracer* trc) {
@@ -59,15 +59,15 @@ struct MyContainer
 namespace js {
 template <>
 struct RootedBase<MyContainer> {
-    RelocatablePtrObject& obj() { return static_cast<Rooted<MyContainer>*>(this)->get().obj; }
-    RelocatablePtrString& str() { return static_cast<Rooted<MyContainer>*>(this)->get().str; }
+    HeapPtr<JSObject*>& obj() { return static_cast<Rooted<MyContainer>*>(this)->get().obj; }
+    HeapPtr<JSString*>& str() { return static_cast<Rooted<MyContainer>*>(this)->get().str; }
 };
 template <>
 struct PersistentRootedBase<MyContainer> {
-    RelocatablePtrObject& obj() {
+    HeapPtr<JSObject*>& obj() {
         return static_cast<PersistentRooted<MyContainer>*>(this)->get().obj;
     }
-    RelocatablePtrString& str() {
+    HeapPtr<JSString*>& str() {
         return static_cast<PersistentRooted<MyContainer>*>(this)->get().str;
     }
 };
@@ -79,8 +79,8 @@ BEGIN_TEST(testGCRootedStaticStructInternalStackStorageAugmented)
     container.obj() = JS_NewObject(cx, nullptr);
     container.str() = JS_NewStringCopyZ(cx, "Hello");
 
-    JS_GC(cx->runtime());
-    JS_GC(cx->runtime());
+    JS_GC(cx);
+    JS_GC(cx);
 
     JS::RootedObject obj(cx, container.obj());
     JS::RootedValue val(cx, StringValue(container.str()));
@@ -93,7 +93,7 @@ BEGIN_TEST(testGCRootedStaticStructInternalStackStorageAugmented)
         bool same;
 
         // Automatic move from stack to heap.
-        JS::PersistentRooted<MyContainer> heap(rt, container);
+        JS::PersistentRooted<MyContainer> heap(cx->runtime(), container);
 
         // clear prior rooting.
         container.obj() = nullptr;
@@ -107,8 +107,8 @@ BEGIN_TEST(testGCRootedStaticStructInternalStackStorageAugmented)
         obj = nullptr;
         actual = nullptr;
 
-        JS_GC(cx->runtime());
-        JS_GC(cx->runtime());
+        JS_GC(cx);
+        JS_GC(cx);
 
         obj = heap.obj();
         CHECK(JS_GetProperty(cx, obj, "foo", &val));
@@ -126,7 +126,7 @@ END_TEST(testGCRootedStaticStructInternalStackStorageAugmented)
 static JS::PersistentRooted<JSObject*> sLongLived;
 BEGIN_TEST(testGCPersistentRootedOutlivesRuntime)
 {
-    sLongLived.init(rt, JS_NewObject(cx, nullptr));
+    sLongLived.init(cx, JS_NewObject(cx, nullptr));
     CHECK(sLongLived);
     return true;
 }
@@ -142,7 +142,7 @@ BEGIN_TEST(testGCPersistentRootedTraceableCannotOutliveRuntime)
     JS::Rooted<MyContainer> container(cx);
     container.obj() = JS_NewObject(cx, nullptr);
     container.str() = JS_NewStringCopyZ(cx, "Hello");
-    sContainer.init(rt, container);
+    sContainer.init(cx, container);
 
     // Commenting the following line will trigger an assertion that the
     // PersistentRooted outlives the runtime it is attached to.
@@ -172,8 +172,8 @@ BEGIN_TEST(testGCRootedHashMap)
         CHECK(map.putNew(obj->as<NativeObject>().lastProperty(), obj));
     }
 
-    JS_GC(rt);
-    JS_GC(rt);
+    JS_GC(cx);
+    JS_GC(cx);
 
     for (auto r = map.all(); !r.empty(); r.popFront()) {
         RootedObject obj(cx, r.front().value());
@@ -222,8 +222,8 @@ BEGIN_TEST(testGCHandleHashMap)
 
     CHECK(FillMyHashMap(cx, &map));
 
-    JS_GC(rt);
-    JS_GC(rt);
+    JS_GC(cx);
+    JS_GC(cx);
 
     CHECK(CheckMyHashMap(cx, map));
 
@@ -249,8 +249,8 @@ BEGIN_TEST(testGCRootedVector)
         CHECK(shapes.append(obj->as<NativeObject>().lastProperty()));
     }
 
-    JS_GC(rt);
-    JS_GC(rt);
+    JS_GC(cx);
+    JS_GC(cx);
 
     for (size_t i = 0; i < 10; ++i) {
         // Check the shape to ensure it did not get collected.
@@ -327,8 +327,8 @@ BEGIN_TEST(testTraceableFifo)
 
     CHECK(shapes.length() == 10);
 
-    JS_GC(rt);
-    JS_GC(rt);
+    JS_GC(cx);
+    JS_GC(cx);
 
     for (size_t i = 0; i < 10; ++i) {
         // Check the shape to ensure it did not get collected.
@@ -404,8 +404,8 @@ BEGIN_TEST(testGCHandleVector)
 
     CHECK(FillVector(cx, &vec));
 
-    JS_GC(rt);
-    JS_GC(rt);
+    JS_GC(cx);
+    JS_GC(cx);
 
     CHECK(CheckVector(cx, vec));
 

@@ -203,7 +203,6 @@ nsIAtom** const kAttributesHTML[] = {
   &nsGkAtoms::media,
   &nsGkAtoms::method,
   &nsGkAtoms::min,
-  &nsGkAtoms::mozdonotsend,
   &nsGkAtoms::multiple,
   &nsGkAtoms::muted,
   &nsGkAtoms::name,
@@ -281,9 +280,6 @@ nsIAtom** const kURLAttributesHTML[] = {
 
 nsIAtom** const kElementsSVG[] = {
   &nsGkAtoms::a, // a
-  &nsGkAtoms::altGlyph, // altGlyph
-  &nsGkAtoms::altGlyphDef, // altGlyphDef
-  &nsGkAtoms::altGlyphItem, // altGlyphItem
   &nsGkAtoms::animate, // animate
   &nsGkAtoms::animateColor, // animateColor
   &nsGkAtoms::animateMotion, // animateMotion
@@ -334,9 +330,9 @@ nsIAtom** const kElementsSVG[] = {
   &nsGkAtoms::font_face_uri, // font-face-uri
   &nsGkAtoms::foreignObject, // foreignObject
   &nsGkAtoms::g, // g
-  &nsGkAtoms::glyph, // glyph
+  // glyph
   &nsGkAtoms::glyphRef, // glyphRef
-  &nsGkAtoms::hkern, // hkern
+  // hkern
   &nsGkAtoms::image, // image
   &nsGkAtoms::line, // line
   &nsGkAtoms::linearGradient, // linearGradient
@@ -363,7 +359,7 @@ nsIAtom** const kElementsSVG[] = {
   &nsGkAtoms::tspan, // tspan
   &nsGkAtoms::use, // use
   &nsGkAtoms::view, // view
-  &nsGkAtoms::vkern, // vkern
+  // vkern
   nullptr
 };
 
@@ -436,8 +432,8 @@ nsIAtom** const kAttributesSVG[] = {
   // g2
   // glyph-name
   // glyphRef
-  &nsGkAtoms::glyph_orientation_horizontal, // glyph-orientation-horizontal
-  &nsGkAtoms::glyph_orientation_vertical, // glyph-orientation-vertical
+  // glyph-orientation-horizontal
+  // glyph-orientation-vertical
   &nsGkAtoms::gradientTransform, // gradientTransform
   &nsGkAtoms::gradientUnits, // gradientUnits
   &nsGkAtoms::height, // height
@@ -455,7 +451,7 @@ nsIAtom** const kAttributesSVG[] = {
   &nsGkAtoms::k2, // k2
   &nsGkAtoms::k3, // k3
   &nsGkAtoms::k4, // k4
-  &nsGkAtoms::kerning, // kerning
+  // kerning
   &nsGkAtoms::kernelMatrix, // kernelMatrix
   &nsGkAtoms::kernelUnitLength, // kernelUnitLength
   &nsGkAtoms::keyPoints, // keyPoints
@@ -585,7 +581,7 @@ nsIAtom** const kAttributesSVG[] = {
   &nsGkAtoms::width, // width
   // widths
   &nsGkAtoms::word_spacing, // word-spacing
-  // writing-mode
+  &nsGkAtoms::writing_mode, // writing-mode
   &nsGkAtoms::x, // x
   // x-height
   &nsGkAtoms::x1, // x1

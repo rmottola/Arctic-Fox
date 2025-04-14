@@ -91,6 +91,7 @@ XPCOMUtils.defineLazyGetter(this, "PALETTE_ITEMS", function() {
     "email-link-button",
     "sync-button",
     "web-apps-button",
+    "containers-panelmenu",
   ];
 
   let panelPlacements = DEFAULT_AREA_PLACEMENTS["PanelUI-contents"];
@@ -133,6 +134,7 @@ XPCOMUtils.defineLazyGetter(this, "ALL_BUILTIN_ITEMS", function() {
     "BMB_unsortedBookmarksPopup",
     "BMB_bookmarksToolbarPopup",
     "search-go-button",
+    "soundplaying-icon",
   ]
   return DEFAULT_ITEMS.concat(PALETTE_ITEMS)
                       .concat(SPECIAL_CASES);
@@ -535,7 +537,7 @@ this.BrowserUITelemetry = {
     let paletteItems =
       CustomizableUI.getUnusedWidgets(aWindow.gNavToolbox.palette);
     let defaultRemoved = [];
-    for (item of paletteItems) {
+    for (let item of paletteItems) {
       if (DEFAULT_ITEMS.indexOf(item.id) != -1) {
         defaultRemoved.push(item.id);
       }
@@ -611,6 +613,10 @@ this.BrowserUITelemetry = {
     this._countEvent(["forget-button", timeId]);
   },
 
+  countTabMutingEvent: function(action, reason) {
+    this._countEvent(["tab-audio-control", action, reason || "no reason given"]);
+  },
+
   _logAwesomeBarSearchResult: function (url) {
     let spec = Services.search.parseSubmissionURL(url);
     if (spec.engine) {
@@ -666,9 +672,9 @@ this.BrowserUITelemetry = {
     "marklinkMenu", "copyemail", "copylink", "media-play", "media-pause",
     "media-mute", "media-unmute", "media-playbackrate",
     "media-playbackrate-050x", "media-playbackrate-100x",
-    "media-playbackrate-150x", "media-playbackrate-200x",
-    "media-showcontrols", "media-hidecontrols", "video-showstats",
-    "video-hidestats", "video-fullscreen", "leave-dom-fullscreen",
+    "media-playbackrate-125x", "media-playbackrate-150x", "media-playbackrate-200x",
+    "media-showcontrols", "media-hidecontrols",
+    "video-fullscreen", "leave-dom-fullscreen",
     "reloadimage", "viewimage", "viewvideo", "copyimage-contents", "copyimage",
     "copyvideourl", "copyaudiourl", "saveimage", "shareimage", "sendimage",
     "setDesktopBackground", "viewimageinfo", "viewimagedesc", "savevideo",

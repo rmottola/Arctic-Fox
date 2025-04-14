@@ -8,8 +8,8 @@
 
 #include "WebGLElementArrayCache.cpp"
 
+#include <cstdio>
 #include <cstdlib>
-#include <iostream>
 #include "nscore.h"
 #include "nsTArray.h"
 
@@ -21,7 +21,7 @@ VerifyImplFunction(bool condition, const char* file, int line)
   if (condition) {
     gTestsPassed++;
   } else {
-    std::cerr << "Test failed at " << file << ":" << line << std::endl;
+    std::fprintf(stderr, "Test failed at %s:%d\n", file, line);
     abort();
   }
 }
@@ -116,7 +116,7 @@ CheckSanity()
                         // ensure we exercise some nontrivial tree-walking
   T data[numElems] = {1,0,3,1,2,6,5,4}; // intentionally specify only 8 elements for now
   size_t numBytes = numElems * sizeof(T);
-  MOZ_RELEASE_ASSERT(numBytes == sizeof(data));
+  MOZ_RELEASE_ASSERT(numBytes == sizeof(data), "GFX: number of bytes from size of each element * number of elements equals size of data.");
 
   GLenum type = GLType<T>();
 
@@ -140,7 +140,7 @@ CheckSanity()
   CheckValidate(true,  c, type, numElems,     0, numElems);
   CheckValidate(false, c, type, numElems - 1, 0, numElems);
 
-  MOZ_RELEASE_ASSERT(numElems > 10);
+  MOZ_RELEASE_ASSERT(numElems > 10, "GFX: Less than 10 elements in array cache");
   CheckValidate(true,  c, type, numElems - 10, 10, numElems - 10);
   CheckValidate(false, c, type, numElems - 11, 10, numElems - 10);
 }
@@ -157,7 +157,7 @@ CheckUintOverflow()
                               // ensure we exercise some nontrivial tree-walking
   T data[numElems];
   size_t numBytes = numElems * sizeof(T);
-  MOZ_RELEASE_ASSERT(numBytes == sizeof(data));
+  MOZ_RELEASE_ASSERT(numBytes == sizeof(data), "GFX: size of data doesnt equal number of bytes of each element multiplied by number of elements.");
 
   GLenum type = GLType<T>();
 
@@ -226,7 +226,7 @@ main(int argc, char* argv[])
     } // i
   } // maxBufferSize
 
-  std::cerr << argv[0] << ": all " << gTestsPassed << " tests passed" << std::endl;
+  std::fprintf(stderr, "%s: all %d tests passed\n", argv[0], gTestsPassed);
   return 0;
 }
 
