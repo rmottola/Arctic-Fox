@@ -475,10 +475,9 @@ private:
     nsXPIDLCString mProductSub;
     nsXPIDLCString mAppName;
     nsXPIDLCString mAppVersion;
-    nsCString      mCompatGecko;
-    bool           mCompatGeckoEnabled;
     nsCString      mCompatFirefox;
     bool           mCompatFirefoxEnabled;
+    bool           mCompatFirefoxStrict;
     nsXPIDLCString mCompatDevice;
     nsCString      mDeviceModelId;
 
