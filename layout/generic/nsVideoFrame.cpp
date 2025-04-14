@@ -205,7 +205,7 @@ nsVideoFrame::BuildLayer(nsDisplayListBuilder* aBuilder,
   RefPtr<ImageContainer> container = element->GetImageContainer();
   if (!container)
     return nullptr;
-  
+
   // Retrieve the size of the decoded video frame, before being scaled
   // by pixel aspect ratio.
   mozilla::gfx::IntSize frameSize = container->GetCurrentSize();
@@ -399,7 +399,7 @@ public:
     MOZ_COUNT_DTOR(nsDisplayVideo);
   }
 #endif
-  
+
   NS_DISPLAY_DECL_NAME("Video", TYPE_VIDEO)
 
   // It would be great if we could override GetOpaqueRegion to return nonempty here,
@@ -669,15 +669,16 @@ nsVideoFrame::OnVisibilityChange(Visibility aOldVisibility,
                                  Visibility aNewVisibility,
                                  Maybe<OnNonvisible> aNonvisibleAction)
 {
-  nsCOMPtr<nsIImageLoadingContent> imageLoader = do_QueryInterface(mPosterImage);
-  if (!imageLoader) {
-    nsContainerFrame::OnVisibilityChange(aOldVisibility, aNewVisibility,
-                                         aNonvisibleAction);
-    return;
+  if (HasVideoElement()) {
+    nsCOMPtr<nsIDOMHTMLMediaElement> mediaDomElement = do_QueryInterface(mContent);
+    mediaDomElement->OnVisibilityChange(aOldVisibility, aNewVisibility);
   }
 
-  imageLoader->OnVisibilityChange(aOldVisibility, aNewVisibility,
-                                  aNonvisibleAction);
+  nsCOMPtr<nsIImageLoadingContent> imageLoader = do_QueryInterface(mPosterImage);
+  if (imageLoader) {
+    imageLoader->OnVisibilityChange(aOldVisibility, aNewVisibility,
+                                    aNonvisibleAction);
+  }
 
   nsContainerFrame::OnVisibilityChange(aOldVisibility, aNewVisibility,
                                        aNonvisibleAction);
