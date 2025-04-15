@@ -2822,7 +2822,7 @@ private:
   nsCOMPtr<nsIRunnable> mEvent;
 };
 
-} // anonymous namespace
+} // namespace
 
 NS_IMETHODIMP
 WebSocketImpl::DispatchFromScript(nsIRunnable* aEvent, uint32_t aFlags)
