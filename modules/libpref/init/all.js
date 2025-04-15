@@ -5372,6 +5372,9 @@ pref("urlclassifier.trackingWhitelistTable", "test-trackwhite-simple,mozpub-trac
 pref("browser.safebrowsing.forbiddenURIs.enabled", false);
 pref("urlclassifier.forbiddenTable", "test-forbid-simple");
 
+// Enable phishing protection
+pref("browser.safebrowsing.phishing.enabled", true);
+
 // The table and global pref for blocking plugin content
 pref("browser.safebrowsing.blockedURIs.enabled", false);
 pref("urlclassifier.blockedTable", "test-block-simple,mozplugin-block-digest256");

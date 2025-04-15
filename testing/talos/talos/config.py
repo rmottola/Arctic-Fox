@@ -107,7 +107,7 @@ DEFAULTS = dict(
             'http://127.0.0.1/safebrowsing-dummy/update',
         'privacy.trackingprotection.introURL':
             'http://127.0.0.1/trackingprotection/tour',
-        'browser.safebrowsing.enabled': False,
+        'browser.safebrowsing.phishing.enabled': False,
         'browser.safebrowsing.malware.enabled': False,
         'browser.safebrowsing.blockedURIs.enabled': False,
         'browser.search.isUS': True,
