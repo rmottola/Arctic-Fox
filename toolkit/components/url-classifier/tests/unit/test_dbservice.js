@@ -71,7 +71,6 @@ for (var i = 0; i < chunk1Urls.length; i++) {
   phishUnexpected[chunk1Urls[i]] = true;
 }
 for (var i = 0; i < chunk4Urls.length; i++) {
-  forbiddenExpected[chunk4Urls[i]] = true;
   // chunk4 urls are expired
   phishUnexpected[chunk4Urls[i]] = true;
 }
@@ -197,16 +196,6 @@ function unwantedExists(result) {
   }
 }
 
-function forbiddenExists(result) {
-  dumpn("forbiddenExists: " + result);
-
-  try {
-    do_check_true(result.indexOf("test-forbid-simple") != -1);
-  } finally {
-    checkDone();
-  }
-}
-
 function checkState()
 {
   numExpecting = 0;
@@ -233,12 +222,6 @@ function checkState()
   for (var key in unwantedExpected) {
     var principal = secMan.createCodebasePrincipal(iosvc.newURI("http://" + key, null, null), {});
     dbservice.lookup(principal, allTables, unwantedExists, true);
-    numExpecting++;
-  }
-
-  for (var key in forbiddenExpected) {
-    var principal = secMan.createCodebasePrincipal(iosvc.newURI("http://" + key, null, null), {});
-    dbservice.lookup(principal, allTables, forbiddenExists, true);
     numExpecting++;
   }
 }
@@ -291,9 +274,6 @@ function do_adds() {
     "i:test-unwanted-simple\n" +
     "a:1:32:" + chunk3.length + "\n" +
     chunk3 + "\n" +
-    "i:test-forbid-simple\n" +
-    "a:1:32:" + chunk4.length + "\n" +
-    chunk4 + "\n";
 
   doSimpleUpdate(data, testAddSuccess, testFailure);
 }

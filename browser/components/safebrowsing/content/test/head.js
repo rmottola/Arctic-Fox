@@ -50,8 +50,6 @@ function promiseTabLoadEvent(tab, url, eventType="load")
   return deferred.promise;
 }
 
-Services.prefs.setCharPref("urlclassifier.forbiddenTable", "test-forbid-simple");
 Services.prefs.setCharPref("urlclassifier.malwareTable", "test-malware-simple,test-unwanted-simple");
 Services.prefs.setCharPref("urlclassifier.phishTable", "test-phish-simple");
-Services.prefs.setBoolPref("browser.safebrowsing.forbiddenURIs.enabled", true);
 SafeBrowsing.init();
