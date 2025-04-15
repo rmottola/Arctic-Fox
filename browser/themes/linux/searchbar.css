@@ -26,7 +26,7 @@
   height: 16px;
   width: 16px;
   list-style-image: url("chrome://mozapps/skin/places/defaultFavicon.png");
-  -moz-margin-start: 2px;
+  margin-inline-start: 2px;
 }
 
 .searchbar-engine-button {
@@ -41,7 +41,7 @@
 .searchbar-engine-button > .button-box {
   -moz-appearance: none;
   padding: 2px 0;
-  -moz-padding-end: 2px;
+  padding-inline-end: 2px;
   border: 0;
 }
 

@@ -9,6 +9,7 @@ Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 var {
   EventManager,
+  IconDetails,
   runSafe,
 } = ExtensionUtils;
 
@@ -19,9 +20,6 @@ var gContextMenuMap = new Map();
 
 // Map[Extension -> MenuItem]
 var gRootItems = new Map();
-
-// Not really used yet, will be used for event pages.
-var gOnClickedCallbacksMap = new WeakMap();
 
 // If id is not specified for an item we use an integer.
 var gNextMenuItemID = 0;
@@ -43,7 +41,7 @@ var gMenuBuilder = {
     this.xulMenu = xulMenu;
     for (let [, root] of gRootItems) {
       let rootElement = this.buildElementWithChildren(root, contextData);
-      if (!rootElement.childNodes.length) {
+      if (!rootElement.firstChild || !rootElement.firstChild.childNodes.length) {
         // If the root has no visible children, there is no reason to show
         // the root menu item itself either.
         continue;
@@ -56,8 +54,13 @@ var gMenuBuilder = {
         let parentWindow = contextData.menu.ownerDocument.defaultView;
         let extension = root.extension;
 
-        let url = IconDetails.getURL(extension.manifest.icons, parentWindow, extension, 16 /* size */);
-        let resolvedURL = root.extension.baseURI.resolve(url);
+        let {icon} = IconDetails.getPreferredIcon(extension.manifest.icons, extension,
+                                                  16 * parentWindow.devicePixelRatio);
+
+        // The extension icons in the manifest are not pre-resolved, since
+        // they're sometimes used by the add-on manager when the extension is
+        // not enabled, and its URLs are not resolvable.
+        let resolvedURL = root.extension.baseURI.resolve(icon);
 
         if (rootElement.localName == "menu") {
           rootElement.setAttribute("class", "menu-iconic");
@@ -168,6 +171,9 @@ var gMenuBuilder = {
     }
 
     element.addEventListener("command", event => {  // eslint-disable-line mozilla/balanced-listeners
+      if (event.target !== event.currentTarget) {
+        return;
+      }
       if (item.type == "checkbox") {
         item.checked = !item.checked;
       } else if (item.type == "radio") {
@@ -182,9 +188,12 @@ var gMenuBuilder = {
       }
 
       item.tabManager.addActiveTabPermission();
+
+      let tab = item.tabManager.convert(contextData.tab);
+      let info = item.getClickInfo(contextData, event);
+      item.extension.emit("webext-contextmenu-menuitem-click", info, tab);
       if (item.onclick) {
-        let clickData = item.getClickData(contextData, event);
-        runSafe(item.extContext, item.onclick, clickData);
+        runSafe(item.extContext, item.onclick, info, tab);
       }
     });
 
@@ -390,7 +399,7 @@ MenuItem.prototype = {
     }
   },
 
-  getClickData(contextData, event) {
+  getClickInfo(contextData, event) {
     let mediaType;
     if (contextData.onVideo) {
       mediaType = "video";
@@ -402,18 +411,15 @@ MenuItem.prototype = {
       mediaType = "image";
     }
 
-    let clickData = {
+    let info = {
       menuItemId: this.id,
     };
 
     function setIfDefined(argName, value) {
       if (value) {
-        clickData[argName] = value;
+        info[argName] = value;
       }
     }
-
-    let tab = contextData.tab ? TabManager.convert(this.extension, contextData.tab)
-                              : undefined;
 
     setIfDefined("parentMenuItemId", this.parentId);
     setIfDefined("mediaType", mediaType);
@@ -423,9 +429,8 @@ MenuItem.prototype = {
     setIfDefined("frameUrl", contextData.frameUrl);
     setIfDefined("selectionText", contextData.selectionText);
     setIfDefined("editable", contextData.onEditableArea);
-    setIfDefined("tab", tab);
 
-    return clickData;
+    return info;
   },
 
   enabledForContext(contextData) {
@@ -454,7 +459,6 @@ var gExtensionCount = 0;
 /* eslint-disable mozilla/balanced-listeners */
 extensions.on("startup", (type, extension) => {
   gContextMenuMap.set(extension, new Map());
-  gRootItems.delete(extension);
   if (++gExtensionCount == 1) {
     Services.obs.addObserver(contextMenuObserver,
                              "on-build-contextmenu",
@@ -464,6 +468,7 @@ extensions.on("startup", (type, extension) => {
 
 extensions.on("shutdown", (type, extension) => {
   gContextMenuMap.delete(extension);
+  gRootItems.delete(extension);
   if (--gExtensionCount == 0) {
     Services.obs.removeObserver(contextMenuObserver,
                                 "on-build-contextmenu");
@@ -471,7 +476,7 @@ extensions.on("shutdown", (type, extension) => {
 });
 /* eslint-enable mozilla/balanced-listeners */
 
-extensions.registerSchemaAPI("contextMenus", "contextMenus", (extension, context) => {
+extensions.registerSchemaAPI("contextMenus", (extension, context) => {
   return {
     contextMenus: {
       create: function(createProperties, callback) {
@@ -507,15 +512,14 @@ extensions.registerSchemaAPI("contextMenus", "contextMenus", (extension, context
         return Promise.resolve();
       },
 
-      // TODO: implement this once event pages are ready.
       onClicked: new EventManager(context, "contextMenus.onClicked", fire => {
-        let callback = menuItem => {
-          fire(menuItem.data);
+        let listener = (event, info, tab) => {
+          fire(info, tab);
         };
 
-        gOnClickedCallbacksMap.set(extension, callback);
+        extension.on("webext-contextmenu-menuitem-click", listener);
         return () => {
-          gOnClickedCallbacksMap.delete(extension);
+          extension.off("webext-contextmenu-menuitem-click", listener);
         };
       }).api(),
     },

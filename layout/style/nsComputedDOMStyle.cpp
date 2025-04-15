@@ -27,7 +27,7 @@
 #include "nsFlexContainerFrame.h"
 #include "nsGridContainerFrame.h"
 #include "nsGkAtoms.h"
-#include "nsHTMLReflowState.h"
+#include "mozilla/ReflowInput.h"
 #include "nsStyleUtil.h"
 #include "nsStyleStructInlines.h"
 #include "nsROCSSPrimitiveValue.h"
@@ -2135,7 +2135,26 @@ nsComputedDOMStyle::DoGetImageLayerImage(const nsStyleImageLayers& aLayers)
     RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
 
     const nsStyleImage& image = aLayers.mLayers[i].mImage;
-    SetValueToStyleImage(image, val);
+    // Layer::mImage::GetType() returns eStyleImageType_Null in two conditions:
+    // 1. The value of mask-image/bg-image is 'none'.
+    //    Since this layer does not refer to any source, Layer::mSourceURI must
+    //    be nullptr too.
+    // 2. This layer refers to a local resource, e.g. mask-image:url(#mymask).
+    //    For local references, there is no need to download any external
+    //    resource, so Layer::mImage is not used.
+    //    Instead, we store the local URI in one place -- on Layer::mSourceURI.
+    //    Hence, we must serialize using mSourceURI (instead of
+    //    SetValueToStyleImage()/mImage) in this case.
+    bool isLocalURI = image.GetType() == eStyleImageType_Null &&
+                      aLayers.mLayers[i].mSourceURI;
+    if (isLocalURI) {
+      // This is how we represent a 'mask-image' reference for a local URI,
+      // such as 'mask-image:url(#mymask)' or 'mask:url(#mymask)'
+      val->SetURI(aLayers.mLayers[i].mSourceURI);
+    } else {
+      SetValueToStyleImage(image, val);
+    }
+
     valueList->AppendCSSValue(val.forget());
   }
 
@@ -3385,8 +3404,9 @@ nsComputedDOMStyle::GetCSSShadowArray(nsCSSShadowArray* aArray,
       // This is an inset box-shadow
       val = new nsROCSSPrimitiveValue;
       val->SetIdent(
-        nsCSSProps::ValueToKeywordEnum(NS_STYLE_BOX_SHADOW_INSET,
-                                       nsCSSProps::kBoxShadowTypeKTable));
+        nsCSSProps::ValueToKeywordEnum(
+            uint8_t(StyleBoxShadowType::Inset),
+            nsCSSProps::kBoxShadowTypeKTable));
       itemList->AppendCSSValue(val.forget());
     }
     valueList->AppendCSSValue(itemList.forget());
@@ -4384,7 +4404,7 @@ nsComputedDOMStyle::DoGetFloatEdge()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(StyleBorder()->mFloatEdge,
+    nsCSSProps::ValueToKeywordEnum(uint8_t(StyleBorder()->mFloatEdge),
                                    nsCSSProps::kFloatEdgeKTable));
   return val.forget();
 }
@@ -4433,7 +4453,7 @@ nsComputedDOMStyle::DoGetUserFocus()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(StyleUserInterface()->mUserFocus,
+    nsCSSProps::ValueToKeywordEnum(uint8_t(StyleUserInterface()->mUserFocus),
                                    nsCSSProps::kUserFocusKTable));
   return val.forget();
 }
@@ -5106,7 +5126,7 @@ nsComputedDOMStyle::GetLineHeightCoord(nscoord& aCoord)
 
   // lie about font size inflation since we lie about font size (since
   // the inflation only applies to text)
-  aCoord = nsHTMLReflowState::CalcLineHeight(mContent, mStyleContext,
+  aCoord = ReflowInput::CalcLineHeight(mContent, mStyleContext,
                                              blockHeight, 1.0f);
 
   // CalcLineHeight uses font->mFont.size, but we want to use
@@ -5956,7 +5976,8 @@ nsComputedDOMStyle::CreatePrimitiveValueForBasicShape(
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::CreatePrimitiveValueForClipPath(
-  const nsStyleBasicShape* aStyleBasicShape, uint8_t aSizingBox)
+  const nsStyleBasicShape* aStyleBasicShape,
+  StyleClipShapeSizing aSizingBox)
 {
   RefPtr<nsDOMCSSValueList> valueList = GetROCSSValueList(false);
   if (aStyleBasicShape) {
@@ -5964,13 +5985,13 @@ nsComputedDOMStyle::CreatePrimitiveValueForClipPath(
       CreatePrimitiveValueForBasicShape(aStyleBasicShape));
   }
 
-  if (aSizingBox == NS_STYLE_CLIP_SHAPE_SIZING_NOBOX) {
+  if (aSizingBox == StyleClipShapeSizing::NoBox) {
     return valueList.forget();
   }
 
   nsAutoString boxString;
   AppendASCIItoUTF16(
-    nsCSSProps::ValueToKeyword(aSizingBox,
+    nsCSSProps::ValueToKeyword(uint8_t(aSizingBox),
                                nsCSSProps::kClipShapeSizingKTable),
                                boxString);
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
@@ -5985,18 +6006,18 @@ nsComputedDOMStyle::DoGetClipPath()
 {
   const nsStyleSVGReset* svg = StyleSVGReset();
   switch (svg->mClipPath.GetType()) {
-    case NS_STYLE_CLIP_PATH_SHAPE:
+    case StyleClipPathType::Shape:
       return CreatePrimitiveValueForClipPath(svg->mClipPath.GetBasicShape(),
                                              svg->mClipPath.GetSizingBox());
-    case NS_STYLE_CLIP_PATH_BOX:
+    case StyleClipPathType::Box:
       return CreatePrimitiveValueForClipPath(nullptr,
                                              svg->mClipPath.GetSizingBox());
-    case NS_STYLE_CLIP_PATH_URL: {
+    case StyleClipPathType::URL: {
       RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
       val->SetURI(svg->mClipPath.GetURL());
       return val.forget();
     }
-    case NS_STYLE_CLIP_PATH_NONE: {
+    case StyleClipPathType::None_: {
       RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
       val->SetIdent(eCSSKeyword_none);
       return val.forget();

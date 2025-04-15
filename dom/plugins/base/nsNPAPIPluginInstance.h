@@ -123,7 +123,6 @@ public:
   nsresult GetMIMEType(const char* *result);
 #if defined(XP_WIN)
   nsresult GetScrollCaptureContainer(mozilla::layers::ImageContainer **aContainer);
-  nsresult UpdateScrollState(bool aIsScrolling);
 #endif
   nsresult HandledWindowedPluginKeyEvent(
              const mozilla::NativeEventData& aKeyEventData,

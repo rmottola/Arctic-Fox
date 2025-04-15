@@ -14,7 +14,7 @@
 #browser-style-checkbox {
   /* Bug 1200073 - extra space before the browser styles checkbox so
      they aren't squished together in a small window. */
-  -moz-margin-start: 5px;
+  margin-inline-start: 5px;
 }
 
 #propertyContainer {
@@ -175,7 +175,7 @@
   width: 1em;
   height: 1em;
   vertical-align: text-top;
-  -moz-margin-end: 5px;
+  margin-inline-end: 5px;
   display: inline-block;
   position: relative;
 }

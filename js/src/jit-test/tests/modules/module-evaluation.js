@@ -42,7 +42,8 @@ parseAndEvaluate("var foo = 1;");
 parseAndEvaluate("let foo = 1;");
 parseAndEvaluate("const foo = 1");
 parseAndEvaluate("function foo() {}");
-parseAndEvaluate("class foo { constructor() {} }");
+if (classesEnabled())
+    parseAndEvaluate("class foo { constructor() {} }");
 
 // Check we can evaluate all module-related syntax.
 parseAndEvaluate("export var foo = 1;");
@@ -50,16 +51,16 @@ parseAndEvaluate("export let foo = 1;");
 parseAndEvaluate("export const foo = 1;");
 parseAndEvaluate("var x = 1; export { x };");
 parseAndEvaluate("export default 1");
-parseAndEvaluate("export default class { constructor() {} };");
 parseAndEvaluate("export default function() {};");
-parseAndEvaluate("export default class foo { constructor() {} };");
 parseAndEvaluate("export default function foo() {};");
 parseAndEvaluate("import a from 'a';");
 parseAndEvaluate("import { x } from 'a';");
 parseAndEvaluate("import * as ns from 'a';");
 parseAndEvaluate("export * from 'a'");
-parseAndEvaluate("export default class { constructor() {} };");
-parseAndEvaluate("export default class foo { constructor() {} };");
+if (classesEnabled()) {
+    parseAndEvaluate("export default class { constructor() {} };");
+    parseAndEvaluate("export default class foo { constructor() {} };");
+}
 
 // Test default import
 m = parseModule("import a from 'a'; a;")
@@ -83,7 +84,7 @@ assertEq(parseAndEvaluate("import { z } from 'b'; z"), 1);
 // Test cyclic dependencies
 moduleRepo['c1'] = parseModule("export var x = 1; export {y} from 'c2'");
 moduleRepo['c2'] = parseModule("export var y = 2; export {x} from 'c1'");
-assertDeepEq(parseAndEvaluate(`import { x as x1, y as y1 } from 'c1';
+assertDeepEq(parseAndEvaluate(`import { x as x1, y as y1 } from 'c1'; 
                                import { x as x2, y as y2 } from 'c2';
                                [x1, y1, x2, y2]`),
              [1, 2, 1, 2]);

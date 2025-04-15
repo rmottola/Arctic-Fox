@@ -60,7 +60,7 @@
 toolbar[mode="icons"] #status4evar-download-button[forcelabel="true"] > label
 {
 	margin: 0px 2px !important;
-	-moz-margin-start: 3px !important;
+	margin-inline-start: 3px !important;
 }
 
 /*

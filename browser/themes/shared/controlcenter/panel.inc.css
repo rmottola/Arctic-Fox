@@ -35,13 +35,13 @@
 .identity-popup-label {
   font-size: 120%;
   white-space: pre-wrap;
-  -moz-padding-start: 15px;
+  padding-inline-start: 15px;
   margin: 0;
 }
 
 .identity-popup-description {
   white-space: pre-wrap;
-  -moz-padding-start: 15px;
+  padding-inline-start: 15px;
   margin: 2px 0 4px;
   font-size: 110%;
 }
@@ -109,7 +109,7 @@
 }
 
 .identity-popup-permission-label {
-  -moz-margin-start: 0;
+  margin-inline-start: 0;
   word-wrap: break-word;
 }
 

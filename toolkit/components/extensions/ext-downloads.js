@@ -20,6 +20,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "EventEmitter",
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 const {
   ignoreEvent,
+  normalizeTime,
   runSafeSync,
   SingletonEventManager,
 } = ExtensionUtils;
@@ -158,6 +159,7 @@ const DownloadMap = {
           onDownloadRemoved(download) {
             const item = self.byDownload.get(download);
             if (item != null) {
+              self.emit("erase", item);
               self.byDownload.delete(download);
               self.byId.delete(item.id);
             }
@@ -215,6 +217,14 @@ const DownloadMap = {
     this.byDownload.set(download, item);
     return item;
   },
+
+  erase(item) {
+    // This will need to get more complicated for bug 1255507 but for now we
+    // only work with downloads in the DownloadList from getAll()
+    return this.getDownloadList().then(list => {
+      list.remove(item.download);
+    });
+  },
 };
 
 // Create a callable function that filters a DownloadItem based on a
@@ -232,24 +242,18 @@ function downloadQuery(query) {
     }
   }
 
-  function normalizeTime(arg, before) {
+  function normalizeDownloadTime(arg, before) {
     if (arg == null) {
       return before ? Number.MAX_VALUE : 0;
+    } else {
+      return normalizeTime(arg).getTime();
     }
-
-    // We accept several formats: a Date object, an ISO8601 string, or a
-    // number of milliseconds since the epoch as either a number or a string.
-    // The "number of milliseconds since the epoch as a string" is an outlier,
-    // everything else can just be passed directly to the Date constructor.
-    const date = new Date((typeof arg == "string" && /^\d+$/.test(arg))
-                          ? parseInt(arg, 10) : arg);
-    return date.valueOf();
   }
 
-  const startedBefore = normalizeTime(query.startedBefore, true);
-  const startedAfter = normalizeTime(query.startedAfter, false);
-  // const endedBefore = normalizeTime(query.endedBefore, true);
-  // const endedAfter = normalizeTime(query.endedAfter, false);
+  const startedBefore = normalizeDownloadTime(query.startedBefore, true);
+  const startedAfter = normalizeDownloadTime(query.startedAfter, false);
+  // const endedBefore = normalizeDownloadTime(query.endedBefore, true);
+  // const endedAfter = normalizeDownloadTime(query.endedAfter, false);
 
   const totalBytesGreater = query.totalBytesGreater || 0;
   const totalBytesLess = (query.totalBytesLess != null)
@@ -331,7 +335,60 @@ function downloadQuery(query) {
   };
 }
 
-extensions.registerSchemaAPI("downloads", "downloads", (extension, context) => {
+function queryHelper(query) {
+  let matchFn;
+  try {
+    matchFn = downloadQuery(query);
+  } catch (err) {
+    return Promise.reject({message: err.message});
+  }
+
+  let compareFn;
+  if (query.orderBy != null) {
+    const fields = query.orderBy.map(field => field[0] == "-"
+                                     ? {reverse: true, name: field.slice(1)}
+                                     : {reverse: false, name: field});
+
+    for (let field of fields) {
+      if (!DOWNLOAD_ITEM_FIELDS.includes(field.name)) {
+        return Promise.reject({message: `Invalid orderBy field ${field.name}`});
+      }
+    }
+
+    compareFn = (dl1, dl2) => {
+      for (let field of fields) {
+        const val1 = dl1[field.name];
+        const val2 = dl2[field.name];
+
+        if (val1 < val2) {
+          return field.reverse ? 1 : -1;
+        } else if (val1 > val2) {
+          return field.reverse ? -1 : 1;
+        }
+      }
+      return 0;
+    };
+  }
+
+  return DownloadMap.getAll().then(downloads => {
+    if (compareFn) {
+      downloads = Array.from(downloads);
+      downloads.sort(compareFn);
+    }
+    let results = [];
+    for (let download of downloads) {
+      if (query.limit && results.length >= query.limit) {
+        break;
+      }
+      if (matchFn(download)) {
+        results.push(download);
+      }
+    }
+    return results;
+  });
+}
+
+extensions.registerSchemaAPI("downloads", (extension, context) => {
   return {
     downloads: {
       download(options) {
@@ -363,8 +420,13 @@ extensions.registerSchemaAPI("downloads", "downloads", (extension, context) => {
           if (options.filename) {
             target = OS.Path.join(downloadsDir, options.filename);
           } else {
-            let uri = NetUtil.newURI(options.url).QueryInterface(Ci.nsIURL);
-            target = OS.Path.join(downloadsDir, uri.fileName);
+            let uri = NetUtil.newURI(options.url);
+
+            let filename;
+            if (uri instanceof Ci.nsIURL) {
+              filename = uri.fileName;
+            }
+            target = OS.Path.join(downloadsDir, filename || "download");
           }
 
           // This has a race, something else could come along and create
@@ -411,63 +473,34 @@ extensions.registerSchemaAPI("downloads", "downloads", (extension, context) => {
           });
       },
 
-      search(query) {
-        let matchFn;
-        try {
-          matchFn = downloadQuery(query);
-        } catch (err) {
-          return Promise.reject({message: err.message});
-        }
-
-        let compareFn;
-        if (query.orderBy != null) {
-          const fields = query.orderBy.map(field => field[0] == "-"
-                                           ? {reverse: true, name: field.slice(1)}
-                                           : {reverse: false, name: field});
-
-          for (let field of fields) {
-            if (!DOWNLOAD_ITEM_FIELDS.includes(field.name)) {
-              return Promise.reject({message: `Invalid orderBy field ${field.name}`});
-            }
+      removeFile(id) {
+        return DownloadMap.lazyInit().then(() => {
+          let item;
+          try {
+            item = DownloadMap.fromId(id);
+          } catch (err) {
+            return Promise.reject({message: `Invalid download id ${id}`});
           }
-
-          compareFn = (dl1, dl2) => {
-            for (let field of fields) {
-              const val1 = dl1[field.name];
-              const val2 = dl2[field.name];
-
-              if (val1 < val2) {
-                return field.reverse ? 1 : -1;
-              } else if (val1 > val2) {
-                return field.reverse ? -1 : 1;
-              }
-            }
-            return 0;
-          };
-        }
-
-        return DownloadMap.getAll().then(downloads => {
-          if (compareFn) {
-            downloads = Array.from(downloads);
-            downloads.sort(compareFn);
+          if (item.state !== "complete") {
+            return Promise.reject({message: `Cannot remove incomplete download id ${id}`});
           }
-          let results = [];
-          for (let download of downloads) {
-            if (query.limit && results.length >= query.limit) {
-              break;
-            }
-            if (matchFn(download)) {
-              results.push(download.serialize());
-            }
-          }
-          return results;
+          return OS.File.remove(item.filename, {ignoreAbsent: false}).catch((err) => {
+            return Promise.reject({message: `Could not remove download id ${item.id} because the file doesn't exist`});
+          });
         });
+      },
+
+      search(query) {
+        return queryHelper(query)
+          .then(items => items.map(item => item.serialize()));
       },
 
       pause(id) {
         return DownloadMap.lazyInit().then(() => {
-          let item = DownloadMap.fromId(id);
-          if (!item) {
+          let item;
+          try {
+            item = DownloadMap.fromId(id);
+          } catch (err) {
             return Promise.reject({message: `Invalid download id ${id}`});
           }
           if (item.state != "in_progress") {
@@ -480,8 +513,10 @@ extensions.registerSchemaAPI("downloads", "downloads", (extension, context) => {
 
       resume(id) {
         return DownloadMap.lazyInit().then(() => {
-          let item = DownloadMap.fromId(id);
-          if (!item) {
+          let item;
+          try {
+            item = DownloadMap.fromId(id);
+          } catch (err) {
             return Promise.reject({message: `Invalid download id ${id}`});
           }
           if (!item.canResume) {
@@ -494,8 +529,10 @@ extensions.registerSchemaAPI("downloads", "downloads", (extension, context) => {
 
       cancel(id) {
         return DownloadMap.lazyInit().then(() => {
-          let item = DownloadMap.fromId(id);
-          if (!item) {
+          let item;
+          try {
+            item = DownloadMap.fromId(id);
+          } catch (err) {
             return Promise.reject({message: `Invalid download id ${id}`});
           }
           if (item.download.succeeded) {
@@ -516,15 +553,111 @@ extensions.registerSchemaAPI("downloads", "downloads", (extension, context) => {
         }).catch(Cu.reportError);
       },
 
-      // When we do open(), check for additional downloads.open permission.
+      erase(query) {
+        return queryHelper(query).then(items => {
+          let results = [];
+          let promises = [];
+          for (let item of items) {
+            promises.push(DownloadMap.erase(item));
+            results.push(item.id);
+          }
+          return Promise.all(promises).then(() => results);
+        });
+      },
+
+      open(downloadId) {
+        return DownloadMap.lazyInit().then(() => {
+          let download = DownloadMap.fromId(downloadId).download;
+          if (download.succeeded) {
+            return download.launch();
+          } else {
+            return Promise.reject({message: "Download has not completed."});
+          }
+        }).catch((error) => {
+          return Promise.reject({message: error.message});
+        });
+      },
+
+      show(downloadId) {
+        return DownloadMap.lazyInit().then(() => {
+          let download = DownloadMap.fromId(downloadId);
+          return download.download.showContainingDirectory();
+        }).then(() => {
+          return true;
+        }).catch(error => {
+          return Promise.reject({message: error.message});
+        });
+      },
+
+      getFileIcon(downloadId, options) {
+        return DownloadMap.lazyInit().then(() => {
+          let size = options && options.size ? options.size : 32;
+          let download = DownloadMap.fromId(downloadId).download;
+          let pathPrefix = "";
+          let path;
+
+          if (download.succeeded) {
+            let file = FileUtils.File(download.target.path);
+            path = Services.io.newFileURI(file).spec;
+          } else {
+            path = OS.Path.basename(download.target.path);
+            pathPrefix = "//";
+          }
+
+          return new Promise((resolve, reject) => {
+            let chromeWebNav = Services.appShell.createWindowlessBrowser(true);
+            chromeWebNav
+              .QueryInterface(Ci.nsIInterfaceRequestor)
+              .getInterface(Ci.nsIDocShell)
+              .createAboutBlankContentViewer(Services.scriptSecurityManager.getSystemPrincipal());
+
+            let img = chromeWebNav.document.createElement("img");
+            img.width = size;
+            img.height = size;
+
+            let handleLoad;
+            let handleError;
+            const cleanup = () => {
+              img.removeEventListener("load", handleLoad);
+              img.removeEventListener("error", handleError);
+              chromeWebNav.close();
+              chromeWebNav = null;
+            };
+
+            handleLoad = () => {
+              let canvas = chromeWebNav.document.createElement("canvas");
+              canvas.width = size;
+              canvas.height = size;
+              let context = canvas.getContext("2d");
+              context.drawImage(img, 0, 0, size, size);
+              let dataURL = canvas.toDataURL("image/png");
+              cleanup();
+              resolve(dataURL);
+            };
+
+            handleError = (error) => {
+              Cu.reportError(error);
+              cleanup();
+              reject(new Error("An unexpected error occurred"));
+            };
+
+            img.addEventListener("load", handleLoad);
+            img.addEventListener("error", handleError);
+            img.src = `moz-icon:${pathPrefix}${path}?size=${size}`;
+          });
+        }).catch((error) => {
+          return Promise.reject({message: error.message});
+        });
+      },
+
+      // When we do setShelfEnabled(), check for additional "downloads.shelf" permission.
       // i.e.:
-      // open(downloadId) {
-      //   if (!extension.hasPermission("downloads.open")) {
-      //     throw new context.cloneScope.Error("Permission denied because 'downloads.open' permission is missing.");
+      // setShelfEnabled(enabled) {
+      //   if (!extension.hasPermission("downloads.shelf")) {
+      //     throw new context.cloneScope.Error("Permission denied because 'downloads.shelf' permission is missing.");
       //   }
       //   ...
       // }
-      // likewise for setShelfEnabled() and the "download.shelf" permission
 
       onChanged: new SingletonEventManager(context, "downloads.onChanged", fire => {
         const handler = (what, item) => {
@@ -568,7 +701,20 @@ extensions.registerSchemaAPI("downloads", "downloads", (extension, context) => {
         };
       }).api(),
 
-      onErased: ignoreEvent(context, "downloads.onErased"),
+      onErased: new SingletonEventManager(context, "downloads.onErased", fire => {
+        const handler = (what, item) => {
+          runSafeSync(context, fire, item.id);
+        };
+        let registerPromise = DownloadMap.getDownloadList().then(() => {
+          DownloadMap.on("erase", handler);
+        });
+        return () => {
+          registerPromise.then(() => {
+            DownloadMap.off("erase", handler);
+          });
+        };
+      }).api(),
+
       onDeterminingFilename: ignoreEvent(context, "downloads.onDeterminingFilename"),
     },
   };

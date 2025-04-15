@@ -33,12 +33,12 @@
 /* Toolbar */
 
 #performance-toolbar-control-other {
-  -moz-padding-end: 5px;
+  padding-inline-end: 5px;
 }
 
 #performance-toolbar-controls-detail-views .toolbarbutton-text {
-  -moz-padding-start: 4px;
-  -moz-padding-end: 8px;
+  padding-inline-start: 4px;
+  padding-inline-end: 8px;
 }
 
 #filter-button {
@@ -256,13 +256,13 @@
   text-overflow: ellipsis;
   padding: 1px 4px;
   color: var(--theme-body-color);
-  -moz-border-end-color: var(--cell-border-color);
+  border-inline-end-color: var(--cell-border-color);
 }
 
 .call-tree-header:not(:last-child),
 .call-tree-cell:not(:last-child) {
-  -moz-border-end-width: 1px;
-  -moz-border-end-style: solid;
+  border-inline-end-width: 1px;
+  border-inline-end-style: solid;
 }
 
 .call-tree-header:not(:last-child) {
@@ -310,7 +310,7 @@
 }
 
 .call-tree-item:focus .call-tree-cell {
-  -moz-border-end-color: var(--focus-cell-border-color);
+  border-inline-end-color: var(--focus-cell-border-color);
 }
 
 .call-tree-item:not([origin="content"]) .call-tree-name,
@@ -322,7 +322,7 @@
 }
 
 .call-tree-name {
-  -moz-margin-end: 4px !important;
+  margin-inline-end: 4px !important;
 }
 
 .call-tree-url {
@@ -347,7 +347,7 @@
 }
 
 .call-tree-host {
-  -moz-margin-start: 8px !important;
+  margin-inline-start: 8px !important;
   font-size: 90%;
   color: var(--theme-content-color2);
 }
@@ -378,7 +378,7 @@
 }
 
 .waterfall-header-tick:not(:first-child) {
-  -moz-margin-start: -100px !important; /* Don't affect layout. */
+  margin-inline-start: -100px !important; /* Don't affect layout. */
 }
 
 .waterfall-background-ticks {
@@ -470,7 +470,7 @@
  */
 
 .waterfall-sidebar {
-  -moz-border-end: 1px solid var(--cell-border-color);
+  border-inline-end: 1px solid var(--cell-border-color);
 }
 
 .waterfall-tree-item > .waterfall-sidebar:hover,
@@ -482,8 +482,8 @@
 .waterfall-marker-bullet {
   width: 8px;
   height: 8px;
-  -moz-margin-start: 8px;
-  -moz-margin-end: 6px;
+  margin-inline-start: 8px;
+  margin-inline-end: 6px;
   border-radius: 1px;
 }
 
@@ -509,7 +509,7 @@
 .waterfall-marker > .theme-twisty {
   /* Don't affect layout. */
   width: 14px;
-  -moz-margin-end: -14px;
+  margin-inline-end: -14px;
 }
 
 /**
@@ -528,8 +528,8 @@
  */
 
 #waterfall-details {
-  -moz-padding-start: 8px;
-  -moz-padding-end: 8px;
+  padding-inline-start: 8px;
+  padding-inline-end: 8px;
   padding-top: 2vh;
   overflow: auto;
   min-width: 50px;
@@ -546,7 +546,7 @@
 }
 
 .marker-details-name-label {
-  -moz-padding-end: 4px;
+  padding-inline-end: 4px;
 }
 
 .marker-details-type {

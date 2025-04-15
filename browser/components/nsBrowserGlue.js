@@ -122,6 +122,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "TabCrashHandler",
 if (AppConstants.MOZ_CRASHREPORTER) {
   XPCOMUtils.defineLazyModuleGetter(this, "PluginCrashReporter",
                                     "resource:///modules/ContentCrashHandlers.jsm");
+  XPCOMUtils.defineLazyModuleGetter(this, "CrashSubmit",
+                                    "resource://gre/modules/CrashSubmit.jsm");
+  XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
+                                    "resource://gre/modules/PluralForm.jsm");
+
 }
 
 XPCOMUtils.defineLazyGetter(this, "gBrandBundle", function() {
@@ -767,6 +772,61 @@ BrowserGlue.prototype = {
     }
   },
 
+  checkForPendingCrashReports: function() {
+    // We don't process crash reports older than 28 days, so don't bother submitting them
+    const PENDING_CRASH_REPORT_DAYS = 28;
+    if (AppConstants.MOZ_CRASHREPORTER) {
+      let dateLimit = new Date();
+      dateLimit.setDate(dateLimit.getDate() - PENDING_CRASH_REPORT_DAYS);
+      CrashSubmit.pendingIDsAsync(dateLimit).then(
+        function onSuccess(ids) {
+          let count = ids.length;
+          if (count) {
+            let win = RecentWindow.getMostRecentBrowserWindow();
+            let nb =  win.document.getElementById("global-notificationbox");
+            let notification = nb.getNotificationWithValue("pending-crash-reports");
+            if (notification) {
+              return;
+            }
+            let buttons = [
+              {
+                label: win.gNavigatorBundle.getString("pendingCrashReports.submitAll"),
+                callback: function() {
+                  ids.forEach(function(id) {
+                    CrashSubmit.submit(id, {extraExtraKeyVals: {"SubmittedFromInfobar": true}});
+                  });
+                }
+              },
+              {
+                label: win.gNavigatorBundle.getString("pendingCrashReports.ignoreAll"),
+                callback: function() {
+                  ids.forEach(function(id) {
+                    CrashSubmit.ignore(id);
+                  });
+                }
+              },
+              {
+                label: win.gNavigatorBundle.getString("pendingCrashReports.viewAll"),
+                callback: function() {
+                  win.openUILinkIn("about:crashes", "tab");
+                  return true;
+                }
+              }
+            ];
+            nb.appendNotification(PluralForm.get(count,
+                                                 win.gNavigatorBundle.getString("pendingCrashReports.label")).replace("#1", count),
+                                  "pending-crash-reports",
+                                  "chrome://browser/skin/tab-crashed.svg",
+                                  nb.PRIORITY_INFO_HIGH, buttons);
+          }
+        },
+        function onError(err) {
+          Cu.reportError(err);
+        }
+      );
+    }
+  },
+
   _onSafeModeRestart: function BG_onSafeModeRestart() {
     // prompt the user to confirm
     let strings = gBrowserBundle;
@@ -998,6 +1058,10 @@ BrowserGlue.prototype = {
           this._resetProfileNotification("uninstall");
         }
       }
+    }
+
+    if ("release" != AppConstants.MOZ_UPDATE_CHANNEL) {
+      this.checkForPendingCrashReports();
     }
 
     this._firstWindowTelemetry(aWindow);
@@ -2166,7 +2230,7 @@ BrowserGlue.prototype = {
     // be set to the version it has been added in.  We will compare its value
     // to users' smartBookmarksVersion and add new smart bookmarks without
     // recreating old deleted ones.
-    const SMART_BOOKMARKS_VERSION = 7;
+    const SMART_BOOKMARKS_VERSION = 8;
     const SMART_BOOKMARKS_ANNO = "Places/SmartBookmark";
     const SMART_BOOKMARKS_PREF = "browser.places.smartBookmarksVersion";
 
@@ -2197,18 +2261,6 @@ BrowserGlue.prototype = {
           url: "place:sort=" + queryOptions.SORT_BY_VISITCOUNT_DESCENDING +
                     "&maxResults=" + MAX_RESULTS,
           parentGuid: PlacesUtils.bookmarks.toolbarGuid,
-          newInVersion: 1
-        },
-        RecentlyBookmarked: {
-          title: bundle.GetStringFromName("recentlyBookmarkedTitle"),
-          url: "place:folder=BOOKMARKS_MENU" +
-                    "&folder=UNFILED_BOOKMARKS" +
-                    "&folder=TOOLBAR" +
-                    "&queryType=" + queryOptions.QUERY_TYPE_BOOKMARKS +
-                    "&sort=" + queryOptions.SORT_BY_DATEADDED_DESCENDING +
-                    "&maxResults=" + MAX_RESULTS +
-                    "&excludeQueries=1",
-          parentGuid: PlacesUtils.bookmarks.menuGuid,
           newInVersion: 1
         },
         RecentTags: {

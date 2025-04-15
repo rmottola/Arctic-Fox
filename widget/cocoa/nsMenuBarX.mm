@@ -163,8 +163,8 @@ void nsMenuBarX::ConstructFallbackNativeMenus()
   nsXPIDLString labelUTF16;
   nsXPIDLString keyUTF16;
 
-  const char16_t* labelProp = MOZ_UTF16("quitMenuitem.label");
-  const char16_t* keyProp = MOZ_UTF16("quitMenuitem.key");
+  const char16_t* labelProp = u"quitMenuitem.label";
+  const char16_t* keyProp = u"quitMenuitem.key";
 
   stringBundle->GetStringFromName(labelProp, getter_Copies(labelUTF16));
   stringBundle->GetStringFromName(keyProp, getter_Copies(keyUTF16));
@@ -387,6 +387,9 @@ nsMenuX* nsMenuBarX::GetXULHelpMenu()
 // This resolves bugs 489196 and 539317.
 void nsMenuBarX::SetSystemHelpMenu()
 {
+  if (![NSApp respondsToSelector:@selector(setHelpMenu:)])
+    return;
+
   nsMenuX* xulHelpMenu = GetXULHelpMenu();
   if (xulHelpMenu) {
     NSMenu* helpMenu = (NSMenu*)xulHelpMenu->NativeData();

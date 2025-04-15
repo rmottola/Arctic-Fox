@@ -105,7 +105,7 @@ html|html {
   }
 
   menulist {
-    -moz-padding-end: 0;
+    padding-inline-end: 0;
   }
 
   colorpicker[type="button"]:-moz-focusring:not([open="true"]) > .colorpicker-button-colorbox {

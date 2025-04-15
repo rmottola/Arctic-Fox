@@ -43,8 +43,6 @@
 #include "gfxQuartzSurface.h"
 #elif defined(MOZ_WIDGET_GTK)
 #include "gfxPlatformGtk.h"
-#elif defined(MOZ_WIDGET_QT)
-#include "gfxQtPlatform.h"
 #elif defined(ANDROID)
 #include "gfxAndroidPlatform.h"
 #endif
@@ -113,6 +111,9 @@
 #  include "skia/include/gpu/GrContext.h"
 #  include "skia/include/gpu/gl/GrGLInterface.h"
 #  include "SkiaGLGlue.h"
+# endif
+# ifdef MOZ_ENABLE_FREETYPE
+#  include "skia/include/ports/SkTypeface_cairo.h"
 # endif
 # ifdef __GNUC__
 #  pragma GCC diagnostic pop // -Wshadow
@@ -418,7 +419,7 @@ SRGBOverrideObserver::Observe(nsISupports *aSubject,
                               const char16_t* someData)
 {
     NS_ASSERTION(NS_strcmp(someData,
-                           MOZ_UTF16(GFX_PREF_CMS_FORCE_SRGB)) == 0,
+                           (u"" GFX_PREF_CMS_FORCE_SRGB)) == 0,
                  "Restarting CMS on wrong pref!");
     ShutdownCMS();
     // Update current cms profile.
@@ -487,6 +488,7 @@ gfxPlatform::gfxPlatform()
   , mTileHeight(-1)
   , mAzureCanvasBackendCollector(this, &gfxPlatform::GetAzureBackendInfo)
   , mApzSupportCollector(this, &gfxPlatform::GetApzSupportInfo)
+  , mTilesInfoCollector(this, &gfxPlatform::GetTilesSupportInfo)
   , mCompositorBackend(layers::LayersBackend::LAYERS_NONE)
   , mScreenDepth(0)
   , mDeviceCounter(0)
@@ -665,8 +667,6 @@ gfxPlatform::Init()
     gPlatform = new gfxPlatformMac;
 #elif defined(MOZ_WIDGET_GTK)
     gPlatform = new gfxPlatformGtk;
-#elif defined(MOZ_WIDGET_QT)
-    gPlatform = new gfxQtPlatform;
 #elif defined(ANDROID)
     gPlatform = new gfxAndroidPlatform;
 #else
@@ -676,6 +676,9 @@ gfxPlatform::Init()
 
 #ifdef USE_SKIA
     SkGraphics::Init();
+#  ifdef MOZ_ENABLE_FREETYPE
+    SkInitCairoFT(gPlatform->FontHintingEnabled());
+#  endif
 #endif
 
 #ifdef MOZ_GL_DEBUG
@@ -692,8 +695,6 @@ gfxPlatform::Init()
     bool usePlatformFontList = true;
 #if defined(MOZ_WIDGET_GTK)
     usePlatformFontList = gfxPlatformGtk::UseFcFontList();
-#elif defined(MOZ_WIDGET_QT)
-    usePlatformFontList = false;
 #endif
 
     if (usePlatformFontList) {
@@ -775,9 +776,7 @@ gfxPlatform::Init()
     }
 #endif
 
-    ScrollMetadata::sNullMetadata = new ScrollMetadata();
-    ClearOnShutdown(&ScrollMetadata::sNullMetadata);
-
+    InitNullMetadata();
     InitOpenGLConfig();
 
     if (obs) {
@@ -786,6 +785,13 @@ gfxPlatform::Init()
 }
 
 static bool sLayersIPCIsUp = false;
+
+/* static */ void
+gfxPlatform::InitNullMetadata()
+{
+  ScrollMetadata::sNullMetadata = new ScrollMetadata();
+  ClearOnShutdown(&ScrollMetadata::sNullMetadata);
+}
 
 void
 gfxPlatform::Shutdown()
@@ -890,8 +896,6 @@ gfxPlatform::InitLayersIPC()
 #ifdef MOZ_WIDGET_GONK
         SharedBufferManagerChild::StartUp();
 #endif
-        mozilla::layers::ImageBridgeChild::StartUp();
-        gfx::VRManagerChild::StartUpSameProcess();
     }
 }
 
@@ -904,16 +908,13 @@ gfxPlatform::ShutdownLayersIPC()
     sLayersIPCIsUp = false;
 
     if (XRE_IsContentProcess()) {
-
         gfx::VRManagerChild::ShutDown();
         // cf bug 1215265.
         if (gfxPrefs::ChildProcessShutdown()) {
           layers::CompositorBridgeChild::ShutDown();
           layers::ImageBridgeChild::ShutDown();
         }
-
     } else if (XRE_IsParentProcess()) {
-
         gfx::VRManagerChild::ShutDown();
         layers::CompositorBridgeChild::ShutDown();
         layers::ImageBridgeChild::ShutDown();
@@ -2280,20 +2281,19 @@ gfxPlatform::IsInLayoutAsapMode()
   // the second is that the compositor goes ASAP and the refresh driver
   // goes at whatever the configurated rate is. This only checks the version
   // talos uses, which is the refresh driver and compositor are in lockstep.
-  return Preferences::GetInt("layout.frame_rate", -1) == 0;
+  return gfxPrefs::LayoutFrameRate() == 0;
 }
 
 /* static */ bool
 gfxPlatform::ForceSoftwareVsync()
 {
-  return Preferences::GetInt("layout.frame_rate", -1) > 0;
+  return gfxPrefs::LayoutFrameRate() > 0;
 }
 
 /* static */ int
 gfxPlatform::GetSoftwareVsyncRate()
 {
-  int preferenceRate = Preferences::GetInt("layout.frame_rate",
-                                           gfxPlatform::GetDefaultFrameRate());
+  int preferenceRate = gfxPrefs::LayoutFrameRate();
   if (preferenceRate <= 0) {
     return gfxPlatform::GetDefaultFrameRate();
   }
@@ -2357,6 +2357,17 @@ gfxPlatform::GetApzSupportInfo(mozilla::widget::InfoObject& aObj)
   if (SupportsApzDragInput()) {
     aObj.DefineProperty("ApzDragInput", 1);
   }
+}
+
+void
+gfxPlatform::GetTilesSupportInfo(mozilla::widget::InfoObject& aObj)
+{
+  if (!gfxPrefs::LayersTilesEnabled()) {
+    return;
+  }
+
+  aObj.DefineProperty("TileHeight", mTileHeight);
+  aObj.DefineProperty("TileWidth", mTileWidth);
 }
 
 /*static*/ bool

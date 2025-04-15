@@ -55,12 +55,12 @@ public:
               ComputeSizeFlags aFlags) override;
 
   virtual void Reflow(nsPresContext*           aPresContext,
-                      nsHTMLReflowMetrics&     aDesiredSize,
-                      const nsHTMLReflowState& aReflowState,
+                      ReflowOutput&     aDesiredSize,
+                      const ReflowInput& aReflowInput,
                       nsReflowStatus&          aStatus) override;
 
   virtual void DidReflow(nsPresContext*   aPresContext,
-                         const nsHTMLReflowState*  aReflowState,
+                         const ReflowInput*  aReflowInput,
                          nsDidReflowStatus aStatus) override;
 
   virtual void UnionChildOverflow(nsOverflowAreas& aOverflowAreas) override;
@@ -114,9 +114,9 @@ public:
   virtual void NotifyViewportOrTransformChanged(uint32_t aFlags) override;
 
   // nsISVGChildFrame methods:
-  virtual nsresult PaintSVG(gfxContext& aContext,
-                            const gfxMatrix& aTransform,
-                            const nsIntRect* aDirtyRect = nullptr) override;
+  virtual DrawResult PaintSVG(gfxContext& aContext,
+                              const gfxMatrix& aTransform,
+                              const nsIntRect* aDirtyRect = nullptr) override;
   virtual SVGBBox GetBBoxContribution(const Matrix &aToBBoxUserspace,
                                       uint32_t aFlags) override;
 

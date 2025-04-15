@@ -114,16 +114,23 @@ struct ZoneGCStats
     /* Total number of zones in the Runtime at the start of this GC. */
     int zoneCount;
 
-    /* Total number of comaprtments in all zones collected. */
+    /* Number of zones swept in this GC. */
+    int sweptZoneCount;
+
+    /* Total number of compartments in all zones collected. */
     int collectedCompartmentCount;
 
     /* Total number of compartments in the Runtime at the start of this GC. */
     int compartmentCount;
 
+    /* Total number of compartments swept by this GC. */
+    int sweptCompartmentCount;
+
     bool isCollectingAllZones() const { return collectedZoneCount == zoneCount; }
 
     ZoneGCStats()
-      : collectedZoneCount(0), zoneCount(0), collectedCompartmentCount(0), compartmentCount(0)
+      : collectedZoneCount(0), zoneCount(0), sweptZoneCount(0),
+        collectedCompartmentCount(0), compartmentCount(0), sweptCompartmentCount(0)
     {}
 };
 
@@ -194,6 +201,10 @@ struct Statistics
     MOZ_MUST_USE bool startTimingMutator();
     MOZ_MUST_USE bool stopTimingMutator(double& mutator_ms, double& gc_ms);
 
+    // Note when we sweep a zone or compartment.
+    void sweptZone() { ++zoneStats.sweptZoneCount; }
+    void sweptCompartment() { ++zoneStats.sweptCompartmentCount; }
+
     void reset(const char* reason) {
         if (!aborted)
             slices.back().resetReason = reason;
@@ -208,22 +219,8 @@ struct Statistics
         counts[s]++;
     }
 
-    void beginNurseryCollection(JS::gcreason::Reason reason) {
-        count(STAT_MINOR_GC);
-        if (nurseryCollectionCallback) {
-            (*nurseryCollectionCallback)(runtime,
-                                         JS::GCNurseryProgress::GC_NURSERY_COLLECTION_START,
-                                         reason);
-        }
-    }
-
-    void endNurseryCollection(JS::gcreason::Reason reason) {
-        if (nurseryCollectionCallback) {
-            (*nurseryCollectionCallback)(runtime,
-                                         JS::GCNurseryProgress::GC_NURSERY_COLLECTION_END,
-                                         reason);
-        }
-    }
+    void beginNurseryCollection(JS::gcreason::Reason reason);
+    void endNurseryCollection(JS::gcreason::Reason reason);
 
     int64_t beginSCC();
     void endSCC(unsigned scc, int64_t start);

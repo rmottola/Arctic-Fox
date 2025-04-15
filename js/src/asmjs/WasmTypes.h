@@ -47,10 +47,12 @@ using mozilla::EnumeratedArray;
 using mozilla::Maybe;
 using mozilla::Move;
 using mozilla::MallocSizeOf;
+using mozilla::Nothing;
 using mozilla::PodZero;
 using mozilla::PodCopy;
 using mozilla::PodEqual;
 using mozilla::RefCounted;
+using mozilla::Some;
 
 typedef Vector<uint32_t, 0, SystemAllocPolicy> Uint32Vector;
 
@@ -87,6 +89,26 @@ typedef Vector<Type, 0, SystemAllocPolicy> VectorName;
     uint8_t* serialize(uint8_t* cursor) const override;                         \
     const uint8_t* deserialize(const uint8_t* cursor) override;                 \
     size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const override;
+
+// This reusable base class factors out the logic for a resource that is shared
+// by multiple instances/modules but should only be counted once when computing
+// about:memory stats.
+
+template <class T>
+struct ShareableBase : RefCounted<T>
+{
+    using SeenSet = HashSet<const T*, DefaultHasher<const T*>, SystemAllocPolicy>;
+
+    size_t sizeOfIncludingThisIfNotSeen(MallocSizeOf mallocSizeOf, SeenSet* seen) const {
+        const T* self = static_cast<const T*>(this);
+        typename SeenSet::AddPtr p = seen->lookupForAdd(self);
+        if (p)
+            return 0;
+        bool ok = seen->add(p, self);
+        (void)ok;  // oh well
+        return mallocSizeOf(self) + self->sizeOfExcludingThis(mallocSizeOf);
+    }
+};
 
 // ValType/ExprType utilities
 
@@ -380,6 +402,8 @@ class Sig
     bool operator!=(const Sig& rhs) const {
         return !(*this == rhs);
     }
+
+    WASM_DECLARE_SERIALIZABLE(Sig)
 };
 
 struct SigHashPolicy
@@ -388,6 +412,61 @@ struct SigHashPolicy
     static HashNumber hash(Lookup sig) { return sig.hash(); }
     static bool match(const Sig* lhs, Lookup rhs) { return *lhs == rhs; }
 };
+
+// SigIdDesc describes a signature id that can be used by call_indirect and
+// table-entry prologues to structurally compare whether the caller and callee's
+// signatures *structurally* match. To handle the general case, a Sig is
+// allocated and stored in a process-wide hash table, so that pointer equality
+// implies structural equality. As an optimization for the 99% case where the
+// Sig has a small number of parameters, the Sig is bit-packed into a uint32
+// immediate value so that integer equality implies structural equality. Both
+// cases can be handled with a single comparison by always setting the LSB for
+// the immediates (the LSB is necessarily 0 for allocated Sig pointers due to
+// alignment).
+
+class SigIdDesc
+{
+  public:
+    enum class Kind { None, Immediate, Global };
+    static const uintptr_t ImmediateBit = 0x1;
+
+  private:
+    Kind kind_;
+    size_t bits_;
+
+    SigIdDesc(Kind kind, size_t bits) : kind_(kind), bits_(bits) {}
+
+  public:
+    Kind kind() const { return kind_; }
+    static bool isGlobal(const Sig& sig);
+
+    SigIdDesc() : kind_(Kind::None), bits_(0) {}
+    static SigIdDesc global(const Sig& sig, uint32_t globalDataOffset);
+    static SigIdDesc immediate(const Sig& sig);
+
+    bool isGlobal() const { return kind_ == Kind::Global; }
+
+    size_t immediate() const { MOZ_ASSERT(kind_ == Kind::Immediate); return bits_; }
+    uint32_t globalDataOffset() const { MOZ_ASSERT(kind_ == Kind::Global); return bits_; }
+};
+
+// SigWithId pairs a Sig with SigIdDesc, describing either how to compile code
+// that compares this signature's id or, at instantiation what signature ids to
+// allocate in the global hash and where to put them.
+
+struct SigWithId : Sig
+{
+    SigIdDesc id;
+
+    SigWithId() = default;
+    explicit SigWithId(Sig&& sig, SigIdDesc id) : Sig(Move(sig)), id(id) {}
+    void operator=(Sig&& rhs) { Sig::operator=(Move(rhs)); }
+
+    WASM_DECLARE_SERIALIZABLE(SigWithId)
+};
+
+typedef Vector<SigWithId, 0, SystemAllocPolicy> SigWithIdVector;
+typedef Vector<const SigWithId*, 0, SystemAllocPolicy> SigWithIdPtrVector;
 
 // A GlobalDesc describes a single global variable. Currently, globals are only
 // exposed through asm.js.
@@ -403,22 +482,6 @@ struct GlobalDesc
 };
 
 typedef Vector<GlobalDesc, 0, SystemAllocPolicy> GlobalDescVector;
-
-// A "declared" signature is a Sig object that is created and owned by the
-// ModuleGenerator. These signature objects are read-only and have the same
-// lifetime as the ModuleGenerator. This type is useful since some uses of Sig
-// need this extended lifetime and want to statically distinguish from the
-// common stack-allocated Sig objects that get passed around.
-
-struct DeclaredSig : Sig
-{
-    DeclaredSig() = default;
-    explicit DeclaredSig(Sig&& sig) : Sig(Move(sig)) {}
-    void operator=(Sig&& rhs) { Sig::operator=(Move(rhs)); }
-};
-
-typedef Vector<DeclaredSig, 0, SystemAllocPolicy> DeclaredSigVector;
-typedef Vector<const DeclaredSig*, 0, SystemAllocPolicy> DeclaredSigPtrVector;
 
 // The (,Profiling,Func)Offsets classes are used to record the offsets of
 // different key points in a CodeRange during compilation.
@@ -779,8 +842,7 @@ struct SignalUsage
     bool forOOB;
     bool forInterrupt;
 
-    SignalUsage() = default;
-    explicit SignalUsage(ExclusiveContext* cx);
+    SignalUsage();
     bool operator==(SignalUsage rhs) const;
     bool operator!=(SignalUsage rhs) const { return !(*this == rhs); }
 };
@@ -796,8 +858,12 @@ struct Assumptions
     JS::BuildIdCharVector buildId;
     bool                  newFormat;
 
-    Assumptions() : cpuId(0), newFormat(false) {}
-    MOZ_MUST_USE bool init(SignalUsage usesSignal, JS::BuildIdOp buildIdOp);
+    explicit Assumptions(JS::BuildIdCharVector&& buildId);
+
+    // If Assumptions is constructed without arguments, initBuildIdFromContext()
+    // must be called to complete initialization.
+    Assumptions();
+    bool initBuildIdFromContext(ExclusiveContext* cx);
 
     bool operator==(const Assumptions& rhs) const;
     bool operator!=(const Assumptions& rhs) const { return !(*this == rhs); }
@@ -861,6 +927,7 @@ static const unsigned MaxExports                 =       64 * 1024;
 static const unsigned MaxTables                  =        4 * 1024;
 static const unsigned MaxTableElems              =      128 * 1024;
 static const unsigned MaxDataSegments            =       64 * 1024;
+static const unsigned MaxElemSegments            =       64 * 1024;
 static const unsigned MaxArgsPerFunc             =        4 * 1024;
 static const unsigned MaxBrTableElems            = 4 * 1024 * 1024;
 

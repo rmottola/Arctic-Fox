@@ -36,10 +36,6 @@ class PFileDescriptorSetChild;
 class URIParams;
 }// namespace ipc
 
-namespace layers {
-class PCompositorBridgeChild;
-} // namespace layers
-
 namespace dom {
 
 class AlertObserver;
@@ -150,25 +146,20 @@ public:
   bool
   DeallocPAPZChild(PAPZChild* aActor) override;
 
-  PCompositorBridgeChild*
-  AllocPCompositorBridgeChild(mozilla::ipc::Transport* aTransport,
-                              base::ProcessId aOtherProcess) override;
+  bool
+  RecvInitCompositor(Endpoint<PCompositorBridgeChild>&& aEndpoint) override;
+  bool
+  RecvInitImageBridge(Endpoint<PImageBridgeChild>&& aEndpoint) override;
+  bool
+  RecvInitVRManager(Endpoint<PVRManagerChild>&& aEndpoint) override;
 
   PSharedBufferManagerChild*
   AllocPSharedBufferManagerChild(mozilla::ipc::Transport* aTransport,
                                   base::ProcessId aOtherProcess) override;
 
-  PImageBridgeChild*
-  AllocPImageBridgeChild(mozilla::ipc::Transport* aTransport,
-                         base::ProcessId aOtherProcess) override;
-
   PProcessHangMonitorChild*
   AllocPProcessHangMonitorChild(Transport* aTransport,
                                 ProcessId aOtherProcess) override;
-
-  PVRManagerChild*
-  AllocPVRManagerChild(Transport* aTransport,
-                       ProcessId aOtherProcess) override;
 
   virtual bool RecvSetProcessSandbox(const MaybeFileDesc& aBroker) override;
 
@@ -181,8 +172,7 @@ public:
                                             const uint32_t& aChromeFlags,
                                             const ContentParentId& aCpID,
                                             const bool& aIsForApp,
-                                            const bool& aIsForBrowser)
-                                            override;
+                                            const bool& aIsForBrowser) override;
 
   virtual bool DeallocPBrowserChild(PBrowserChild*) override;
 
@@ -457,6 +447,9 @@ public:
                            const nsCString& ID, const nsCString& vendor) override;
 
   virtual bool RecvAppInit() override;
+
+  virtual bool
+  RecvInitServiceWorkers(const ServiceWorkerConfiguration& aConfig) override;
 
   virtual bool RecvLastPrivateDocShellDestroyed() override;
 

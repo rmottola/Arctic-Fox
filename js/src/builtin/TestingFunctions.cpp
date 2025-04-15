@@ -23,6 +23,7 @@
 #include "asmjs/WasmBinaryToExperimentalText.h"
 #include "asmjs/WasmBinaryToText.h"
 #include "asmjs/WasmJS.h"
+#include "asmjs/WasmSignalHandlers.h"
 #include "asmjs/WasmTextToBinary.h"
 #include "builtin/Promise.h"
 #include "builtin/SelfHostingDefines.h"
@@ -406,7 +407,7 @@ GCParameter(JSContext* cx, unsigned argc, Value* vp)
 
     // Request mode.
     if (args.length() == 1) {
-        uint32_t value = JS_GetGCParameter(cx->runtime(), param);
+        uint32_t value = JS_GetGCParameter(cx, param);
         args.rval().setNumber(value);
         return true;
     }
@@ -437,7 +438,7 @@ GCParameter(JSContext* cx, unsigned argc, Value* vp)
     }
 
     if (param == JSGC_MAX_BYTES) {
-        uint32_t gcBytes = JS_GetGCParameter(cx->runtime(), JSGC_BYTES);
+        uint32_t gcBytes = JS_GetGCParameter(cx, JSGC_BYTES);
         if (value < gcBytes) {
             JS_ReportError(cx,
                            "attempt to set maxBytes to the value less than the current "
@@ -515,7 +516,21 @@ static bool
 WasmUsesSignalForOOB(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    args.rval().setBoolean(wasm::SignalUsage(cx).forOOB);
+    args.rval().setBoolean(wasm::SignalUsage().forOOB);
+    return true;
+}
+
+static bool
+SuppressSignalHandlers(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+
+    if (!args.requireAtLeast(cx, "suppressSignalHandlers", 1))
+        return false;
+
+    wasm::SuppressSignalHandlersForTesting(ToBoolean(args[0]));
+
+    args.rval().setUndefined();
     return true;
 }
 
@@ -860,6 +875,8 @@ GCState(JSContext* cx, unsigned argc, Value* vp)
         state = "finalize";
     else if (globalState == gc::COMPACT)
         state = "compact";
+    else if (globalState == gc::DECOMMIT)
+        state = "decommit";
     else
         MOZ_CRASH("Unobserveable global GC state");
 
@@ -1086,7 +1103,7 @@ SaveStack(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    unsigned maxFrameCount = 0;
+    JS::StackCapture capture((JS::AllFrames()));
     if (args.length() >= 1) {
         double d;
         if (!ToNumber(cx, args[0], &d))
@@ -1097,7 +1114,8 @@ SaveStack(JSContext* cx, unsigned argc, Value* vp)
                                   "not a valid maximum frame count", NULL);
             return false;
         }
-        maxFrameCount = d;
+        if (d > 0)
+            capture = JS::StackCapture(JS::MaxFrames(d));
     }
 
     JSCompartment* targetCompartment = cx->compartment();
@@ -1117,7 +1135,7 @@ SaveStack(JSContext* cx, unsigned argc, Value* vp)
     RootedObject stack(cx);
     {
         AutoCompartment ac(cx, targetCompartment);
-        if (!JS::CaptureCurrentStack(cx, &stack, maxFrameCount))
+        if (!JS::CaptureCurrentStack(cx, &stack, mozilla::Move(capture)))
             return false;
     }
 
@@ -1125,6 +1143,37 @@ SaveStack(JSContext* cx, unsigned argc, Value* vp)
         return false;
 
     args.rval().setObjectOrNull(stack);
+    return true;
+}
+
+static bool
+CaptureFirstSubsumedFrame(JSContext* cx, unsigned argc, JS::Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    if (!args.requireAtLeast(cx, "captureFirstSubsumedFrame", 1))
+        return false;
+
+    if (!args[0].isObject()) {
+        JS_ReportError(cx, "The argument must be an object");
+        return false;
+    }
+
+    RootedObject obj(cx, &args[0].toObject());
+    obj = CheckedUnwrap(obj);
+    if (!obj) {
+        JS_ReportError(cx, "Denied permission to object.");
+        return false;
+    }
+
+    JS::StackCapture capture(JS::FirstSubsumedFrame(cx, obj->compartment()->principals()));
+    if (args.length() > 1)
+        capture.as<JS::FirstSubsumedFrame>().ignoreSelfHosted = JS::ToBoolean(args[1]);
+
+    JS::RootedObject capturedStack(cx);
+    if (!JS::CaptureCurrentStack(cx, &capturedStack, mozilla::Move(capture)))
+        return false;
+
+    args.rval().setObjectOrNull(capturedStack);
     return true;
 }
 
@@ -1499,6 +1548,15 @@ FinalizeCount(JSContext* cx, unsigned argc, Value* vp)
 }
 
 static bool
+ResetFinalizeCount(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    finalizeCount = 0;
+    args.rval().setUndefined();
+    return true;
+}
+
+static bool
 DumpHeap(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -1585,6 +1643,13 @@ ReadSPSProfilingStack(JSContext* cx, unsigned argc, Value* vp)
     RootedObject stack(cx, NewDenseEmptyArray(cx));
     if (!stack)
         return false;
+
+    // If profiler sampling has been suppressed, return an empty
+    // stack.
+    if (!cx->runtime()->isProfilerSamplingEnabled()) {
+      args.rval().setObject(*stack);
+      return true;
+    }
 
     RootedObject inlineStack(cx);
     RootedObject inlineFrameInfo(cx);
@@ -2633,7 +2698,7 @@ FindPath(JSContext* cx, unsigned argc, Value* vp)
         JS::ubi::Node start(args[0]), target(args[1]);
 
         heaptools::FindPathHandler handler(cx, start, target, &nodes, edges);
-        heaptools::FindPathHandler::Traversal traversal(cx->runtime(), handler, autoCannotGC);
+        heaptools::FindPathHandler::Traversal traversal(cx, handler, autoCannotGC);
         if (!traversal.init() || !traversal.addStart(start)) {
             ReportOutOfMemory(cx);
             return false;
@@ -2762,7 +2827,7 @@ ShortestPaths(JSContext* cx, unsigned argc, Value* vp)
     Vector<Vector<Vector<JS::ubi::EdgeName>>> names(cx);
 
     {
-        JS::AutoCheckCannotGC noGC(cx->runtime());
+        JS::AutoCheckCannotGC noGC(cx);
 
         JS::ubi::NodeSet targets;
         if (!targets.init()) {
@@ -2780,7 +2845,7 @@ ShortestPaths(JSContext* cx, unsigned argc, Value* vp)
         }
 
         JS::ubi::Node root(args[0]);
-        auto maybeShortestPaths = JS::ubi::ShortestPaths::Create(cx->runtime(), noGC, maxNumPaths,
+        auto maybeShortestPaths = JS::ubi::ShortestPaths::Create(cx, noGC, maxNumPaths,
                                                                  root, mozilla::Move(targets));
         if (maybeShortestPaths.isNothing()) {
             ReportOutOfMemory(cx);
@@ -3014,7 +3079,8 @@ ShellCloneAndExecuteScript(JSContext* cx, unsigned argc, Value* vp)
 
     AutoCompartment ac(cx, global);
 
-    if (!JS::CloneAndExecuteScript(cx, script))
+    JS::RootedValue rval(cx);
+    if (!JS::CloneAndExecuteScript(cx, script, &rval))
         return false;
 
     args.rval().setUndefined();
@@ -3220,7 +3286,7 @@ struct MajorGC {
 };
 
 static void
-majorGC(JSRuntime* rt, JSGCStatus status, void* data)
+majorGC(JSContext* cx, JSGCStatus status, void* data)
 {
     auto info = static_cast<MajorGC*>(data);
     if (!(info->phases & (1 << status)))
@@ -3228,8 +3294,8 @@ majorGC(JSRuntime* rt, JSGCStatus status, void* data)
 
     if (info->depth > 0) {
         info->depth--;
-        JS::PrepareForFullGC(rt->contextFromMainThread());
-        JS::GCForReason(rt->contextFromMainThread(), GC_NORMAL, JS::gcreason::API);
+        JS::PrepareForFullGC(cx);
+        JS::GCForReason(cx, GC_NORMAL, JS::gcreason::API);
         info->depth++;
     }
 }
@@ -3240,7 +3306,7 @@ struct MinorGC {
 };
 
 static void
-minorGC(JSRuntime* rt, JSGCStatus status, void* data)
+minorGC(JSContext* cx, JSGCStatus status, void* data)
 {
     auto info = static_cast<MinorGC*>(data);
     if (!(info->phases & (1 << status)))
@@ -3248,7 +3314,7 @@ minorGC(JSRuntime* rt, JSGCStatus status, void* data)
 
     if (info->active) {
         info->active = false;
-        rt->gc.evictNursery(JS::gcreason::DEBUG_GC);
+        cx->gc.evictNursery(JS::gcreason::DEBUG_GC);
         info->active = true;
     }
 }
@@ -3569,6 +3635,12 @@ static const JSFunctionSpecWithHelp TestingFunctions[] = {
 "  of frames. If 'compartment' is given, allocate the js::SavedFrame instances\n"
 "  with the given object's compartment."),
 
+    JS_FN_HELP("captureFirstSubsumedFrame", CaptureFirstSubsumedFrame, 1, 0,
+"saveStack(object [, shouldIgnoreSelfHosted = true]])",
+"  Capture a stack back to the first frame whose principals are subsumed by the\n"
+"  object's compartment's principals. If 'shouldIgnoreSelfHosted' is given,\n"
+"  control whether self-hosted frames are considered when checking principals."),
+
     JS_FN_HELP("callFunctionFromNativeFrame", CallFunctionFromNativeFrame, 1, 0,
 "callFunctionFromNativeFrame(function)",
 "  Call 'function' with a (C++-)native frame on stack.\n"
@@ -3655,6 +3727,10 @@ static const JSFunctionSpecWithHelp TestingFunctions[] = {
 "finalizeCount()",
 "  Return the current value of the finalization counter that is incremented\n"
 "  each time an object returned by the makeFinalizeObserver is finalized."),
+
+    JS_FN_HELP("resetFinalizeCount", ResetFinalizeCount, 0, 0,
+"resetFinalizeCount()",
+"  Reset the value returned by finalizeCount()."),
 
     JS_FN_HELP("gcPreserveCode", GCPreserveCode, 0, 0,
 "gcPreserveCode()",
@@ -3785,6 +3861,11 @@ gc::ZealModeHelpText),
     JS_FN_HELP("wasmUsesSignalForOOB", WasmUsesSignalForOOB, 0, 0,
 "wasmUsesSignalForOOB()",
 "  Return whether wasm and asm.js use a signal handler for detecting out-of-bounds."),
+
+    JS_FN_HELP("suppressSignalHandlers", SuppressSignalHandlers, 1, 0,
+"suppressSignalHandlers(suppress)",
+"  This function allows artificially suppressing signal handler support, even if the underlying "
+"  platform supports it."),
 
     JS_FN_HELP("wasmTextToBinary", WasmTextToBinary, 1, 0,
 "wasmTextToBinary(str)",

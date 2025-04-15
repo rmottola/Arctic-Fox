@@ -1301,6 +1301,8 @@ struct SetEnumValueHelper
   }
 
   DEFINE_ENUM_CLASS_SETTER(StyleBoxSizing, Content, Border)
+  DEFINE_ENUM_CLASS_SETTER(StyleFloatEdge, ContentBox, MarginBox)
+  DEFINE_ENUM_CLASS_SETTER(StyleUserFocus, None, SelectMenu)
 
 #undef DEF_SET_ENUMERATED_VALUE
 };
@@ -4241,7 +4243,8 @@ nsRuleNode::GetShadowData(const nsCSSValueList* aList,
     }
 
     if (aIsBoxShadow && arr->Item(5).GetUnit() == eCSSUnit_Enumerated) {
-      NS_ASSERTION(arr->Item(5).GetIntValue() == NS_STYLE_BOX_SHADOW_INSET,
+      NS_ASSERTION(arr->Item(5).GetIntValue()
+                   == uint8_t(StyleBoxShadowType::Inset),
                    "invalid keyword type for box shadow");
       item->mInset = true;
     } else {
@@ -4259,37 +4262,33 @@ struct TextEmphasisChars
 };
 
 #define TEXT_EMPHASIS_CHARS_LIST() \
-  TEXT_EMPHASIS_CHARS_ITEM("", "", NONE) \
-  TEXT_EMPHASIS_CHARS_ITEM("\u2022", "\u25e6", DOT) \
-  TEXT_EMPHASIS_CHARS_ITEM("\u25cf", "\u25cb", CIRCLE) \
-  TEXT_EMPHASIS_CHARS_ITEM("\u25c9", "\u25ce", DOUBLE_CIRCLE) \
-  TEXT_EMPHASIS_CHARS_ITEM("\u25b2", "\u25b3", TRIANGLE) \
-  TEXT_EMPHASIS_CHARS_ITEM("\ufe45", "\ufe46", SESAME)
+  TEXT_EMPHASIS_CHARS_ITEM(u"", u"", NONE) \
+  TEXT_EMPHASIS_CHARS_ITEM(u"\u2022", u"\u25e6", DOT) \
+  TEXT_EMPHASIS_CHARS_ITEM(u"\u25cf", u"\u25cb", CIRCLE) \
+  TEXT_EMPHASIS_CHARS_ITEM(u"\u25c9", u"\u25ce", DOUBLE_CIRCLE) \
+  TEXT_EMPHASIS_CHARS_ITEM(u"\u25b2", u"\u25b3", TRIANGLE) \
+  TEXT_EMPHASIS_CHARS_ITEM(u"\ufe45", u"\ufe46", SESAME)
 
 static constexpr TextEmphasisChars kTextEmphasisChars[] =
 {
 #define TEXT_EMPHASIS_CHARS_ITEM(filled_, open_, type_) \
-  { MOZ_UTF16(filled_), MOZ_UTF16(open_) }, // type_
+  { filled_, open_ }, // type_
   TEXT_EMPHASIS_CHARS_LIST()
 #undef TEXT_EMPHASIS_CHARS_ITEM
 };
 
-// MSVC before 2015 doesn't consider string literal as a constant expr,
-// and doesn't have constexpr either, so we cannot do the checks below.
-#if !defined(_MSC_VER) || _MSC_VER >= 1900
 #define TEXT_EMPHASIS_CHARS_ITEM(filled_, open_, type_) \
-  static_assert(ArrayLength(MOZ_UTF16(filled_)) <= 2 && \
-                ArrayLength(MOZ_UTF16(open_)) <= 2, \
+  static_assert(ArrayLength(filled_) <= 2 && \
+                ArrayLength(open_) <= 2, \
                 "emphasis marks should have no more than one char"); \
   static_assert( \
     *kTextEmphasisChars[NS_STYLE_TEXT_EMPHASIS_STYLE_##type_].mFilled == \
-    *MOZ_UTF16(filled_), "filled " #type_ " should be " #filled_); \
+    *filled_, "filled " #type_ " should be " #filled_); \
   static_assert( \
     *kTextEmphasisChars[NS_STYLE_TEXT_EMPHASIS_STYLE_##type_].mOpen == \
-    *MOZ_UTF16(open_), "open " #type_ " should be " #open_);
+    *open_, "open " #type_ " should be " #open_);
 TEXT_EMPHASIS_CHARS_LIST()
 #undef TEXT_EMPHASIS_CHARS_ITEM
-#endif
 
 #undef TEXT_EMPHASIS_CHARS_LIST
 
@@ -4696,7 +4695,7 @@ nsRuleNode::ComputeTextData(void* aStartStruct,
     case eCSSUnit_Initial:
     case eCSSUnit_None: {
       text->mTextEmphasisStyle = NS_STYLE_TEXT_EMPHASIS_STYLE_NONE;
-      text->mTextEmphasisStyleString = MOZ_UTF16("");
+      text->mTextEmphasisStyleString = u"";
       break;
     }
     case eCSSUnit_Inherit:
@@ -5060,7 +5059,7 @@ nsRuleNode::ComputeUserInterfaceData(void* aStartStruct,
            ui->mUserFocus, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INHERIT,
            parentUI->mUserFocus,
-           NS_STYLE_USER_FOCUS_NONE);
+           StyleUserFocus::None_);
 
   // pointer-events: enum, inherit, initial
   SetValue(*aRuleData->ValueForPointerEvents(), ui->mPointerEvents,
@@ -5909,7 +5908,7 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
 
   // Backup original display value for calculation of a hypothetical
   // box (CSS2 10.6.4/10.6.5), in addition to getting our style data right later.
-  // See nsHTMLReflowState::CalculateHypotheticalBox
+  // See ReflowInput::CalculateHypotheticalBox
   display->mOriginalDisplay = display->mDisplay;
 
   // appearance: enum, inherit, initial
@@ -7570,7 +7569,7 @@ nsRuleNode::ComputeBorderData(void* aStartStruct,
            border->mFloatEdge, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INITIAL,
            parentBorder->mFloatEdge,
-           NS_STYLE_FLOAT_EDGE_CONTENT_BOX);
+           StyleFloatEdge::ContentBox);
 
   // border-image-source
   const nsCSSValue* borderImageSource = aRuleData->ValueForBorderImageSource();
@@ -7885,16 +7884,16 @@ nsRuleNode::ComputeListData(void* aStartStruct,
       nsAutoString name;
       switch (intValue) {
         case NS_STYLE_LIST_STYLE_LOWER_ROMAN:
-          name.AssignLiteral(MOZ_UTF16("lower-roman"));
+          name.AssignLiteral(u"lower-roman");
           break;
         case NS_STYLE_LIST_STYLE_UPPER_ROMAN:
-          name.AssignLiteral(MOZ_UTF16("upper-roman"));
+          name.AssignLiteral(u"upper-roman");
           break;
         case NS_STYLE_LIST_STYLE_LOWER_ALPHA:
-          name.AssignLiteral(MOZ_UTF16("lower-alpha"));
+          name.AssignLiteral(u"lower-alpha");
           break;
         case NS_STYLE_LIST_STYLE_UPPER_ALPHA:
-          name.AssignLiteral(MOZ_UTF16("upper-alpha"));
+          name.AssignLiteral(u"upper-alpha");
           break;
         default:
           CopyASCIItoUTF16(nsCSSProps::ValueToKeyword(
@@ -9702,17 +9701,17 @@ nsRuleNode::SetStyleClipPathToCSSValue(nsStyleClipPath* aStyleClipPath,
   MOZ_ASSERT(array->Count() == 1 || array->Count() == 2,
              "Expect one or both of a shape function and geometry-box");
 
-  uint8_t sizingBox = NS_STYLE_CLIP_SHAPE_SIZING_NOBOX;
+  StyleClipShapeSizing sizingBox = StyleClipShapeSizing::NoBox;
   RefPtr<nsStyleBasicShape> basicShape;
   for (size_t i = 0; i < array->Count(); ++i) {
     if (array->Item(i).GetUnit() == eCSSUnit_Enumerated) {
       int32_t type = array->Item(i).GetIntValue();
-      if (type > NS_STYLE_CLIP_SHAPE_SIZING_VIEW ||
-          type < NS_STYLE_CLIP_SHAPE_SIZING_NOBOX) {
+      if (type > uint8_t(StyleClipShapeSizing::View) ||
+          type < uint8_t(StyleClipShapeSizing::NoBox)) {
         NS_NOTREACHED("unexpected reference box");
         return;
       }
-      sizingBox = (uint8_t)type;
+      sizingBox = static_cast<StyleClipShapeSizing>(type);
     } else if (array->Item(i).GetUnit() == eCSSUnit_Function) {
       basicShape = GetStyleBasicShapeFromCSSValue(array->Item(i), aStyleContext,
                                                   aPresContext, aConditions);

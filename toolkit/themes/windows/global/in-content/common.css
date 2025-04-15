@@ -21,7 +21,7 @@ xul|menulist:not([editable="true"]) > xul|*.menulist-dropmarker {
 }
 
 xul|checkbox {
-  -moz-padding-start: 0;
+  padding-inline-start: 0;
 }
 
 @media not all and (-moz-windows-default-theme) {
@@ -37,7 +37,7 @@ xul|checkbox {
 
 xul|radio {
   -moz-binding: url("chrome://global/content/bindings/radio.xml#radio");
-  -moz-padding-start: 0;
+  padding-inline-start: 0;
 }
 
 @media not all and (-moz-windows-default-theme) {
@@ -53,7 +53,7 @@ xul|radio {
 
 xul|*.radio-icon,
 xul|*.checkbox-icon {
-  -moz-margin-end: 0;
+  margin-inline-end: 0;
 }
 
 html|a:-moz-focusring,
@@ -92,7 +92,7 @@ xul|menulist:not(:-moz-focusring) > xul|*.menulist-label-box {
 
 xul|radio:not([focused="true"]) > xul|*.radio-label-box,
 xul|checkbox:not(:-moz-focusring) > xul|*.checkbox-label-box {
-  -moz-margin-start: 0;
+  margin-inline-start: 0;
 }
 
 /* Use a 2px border so that selected row highlight is still visible behind

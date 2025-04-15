@@ -29,11 +29,13 @@ DEFINE_KEYNAME_WITH_SAME_NAME(Unidentified)
  * Our Internal Key Values (must have "Moz" prefix)
  *****************************************************************************/
 DEFINE_KEYNAME_INTERNAL(PrintableKey, "MozPrintableKey")
-DEFINE_KEYNAME_INTERNAL(HomeScreen, "MozHomeScreen")
-DEFINE_KEYNAME_INTERNAL(CameraFocusAdjust, "MozCameraFocusAdjust")
-DEFINE_KEYNAME_INTERNAL(PhoneCall, "MozPhoneCall")
 DEFINE_KEYNAME_INTERNAL(SoftLeft, "MozSoftLeft")
 DEFINE_KEYNAME_INTERNAL(SoftRight, "MozSoftRight")
+
+#ifdef MOZ_B2G
+DEFINE_KEYNAME_INTERNAL(HomeScreen, "MozHomeScreen")
+DEFINE_KEYNAME_INTERNAL(CameraFocusAdjust, "MozCameraFocusAdjust")
+#endif // #ifdef MOZ_B2G
 
 /******************************************************************************
  * Modifier Keys
@@ -271,7 +273,6 @@ DEFINE_KEYNAME_WITH_SAME_NAME(LaunchCalendar)
 DEFINE_KEYNAME_WITH_SAME_NAME(LaunchContacts)
 DEFINE_KEYNAME_WITH_SAME_NAME(LaunchMail)
 DEFINE_KEYNAME_WITH_SAME_NAME(LaunchMediaPlayer)
-DEFINE_KEYNAME_WITH_SAME_NAME(MediaSelect)
 DEFINE_KEYNAME_WITH_SAME_NAME(LaunchMusicPlayer)
 DEFINE_KEYNAME_WITH_SAME_NAME(LaunchMyComputer)
 DEFINE_KEYNAME_WITH_SAME_NAME(LaunchPhone)

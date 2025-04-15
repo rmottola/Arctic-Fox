@@ -1,6 +1,7 @@
 duckduckgo-palemoon
 bing
 ecosia
+google
 twitter
 wikipedia
 yahoo

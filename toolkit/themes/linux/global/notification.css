@@ -41,8 +41,8 @@ notification[type="critical"] {
 .messageImage {
   width: 16px;
   height: 16px;
-  -moz-margin-start: 6px;
-  -moz-margin-end: 1px;
+  margin-inline-start: 6px;
+  margin-inline-end: 1px;
 }
 
 /* Default icons for notifications */

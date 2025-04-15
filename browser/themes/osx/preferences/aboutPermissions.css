@@ -38,7 +38,7 @@
 .site-favicon {
   height: 16px;
   width: 16px;
-  -moz-margin-end: 4px;
+  margin-inline-end: 4px;
   list-style-image: url("chrome://mozapps/skin/places/defaultFavicon.png");
 }
 
@@ -49,18 +49,18 @@
 /* permissions box */
 
 #permissions-box {
-  -moz-padding-start: 10px;
+  padding-inline-start: 10px;
 }
 
 #permissions-list {
   overflow-y: auto;
   padding-top: 5px;
-  -moz-padding-end: 44px;
+  padding-inline-end: 44px;
 }
 
 #site-description {
   font-size: 125%;
-  -moz-margin-start: 6px; /* to match button margin */
+  margin-inline-start: 6px; /* to match button margin */
 }
 
 #site-label {
@@ -72,7 +72,7 @@
 #defaults-description {
   font-size: 125%;
   font-weight: bold;
-  -moz-margin-start: 6px;
+  margin-inline-start: 6px;
 }
 
 .pref-item {
@@ -82,7 +82,7 @@
 .pref-icon {
   width: 36px;
   height: 36px;
-  -moz-margin-end: 10px;
+  margin-inline-end: 10px;
 }
 
 .pref-icon[type="password"] {

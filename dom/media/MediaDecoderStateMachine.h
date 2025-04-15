@@ -88,7 +88,6 @@ hardware (via AudioStream).
 
 #include "nsAutoPtr.h"
 #include "nsThreadUtils.h"
-#include "MediaCallbackID.h"
 #include "MediaDecoder.h"
 #include "MediaDecoderReader.h"
 #include "MediaDecoderOwner.h"
@@ -97,6 +96,7 @@ hardware (via AudioStream).
 #include "MediaStatistics.h"
 #include "MediaTimer.h"
 #include "ImageContainer.h"
+#include "SeekJob.h"
 #include "SeekTask.h"
 
 namespace mozilla {
@@ -410,7 +410,7 @@ protected:
   bool OutOfDecodedVideo()
   {
     MOZ_ASSERT(OnTaskQueue());
-    return IsVideoDecoding() && !VideoQueue().IsFinished() && VideoQueue().GetSize() <= 1;
+    return IsVideoDecoding() && VideoQueue().GetSize() <= 1;
   }
 
 
@@ -508,8 +508,7 @@ protected:
   void EnqueueFirstFrameLoadedEvent();
 
   // Clears any previous seeking state and initiates a new seek on the decoder.
-  // The decoder monitor must be held.
-  void InitiateSeek(SeekJob aSeekJob);
+  RefPtr<MediaDecoder::SeekPromise> InitiateSeek(SeekJob aSeekJob);
 
   // Clears any previous seeking state and initiates a seek on the decoder to
   // resync the video and audio positions, when recovering from video decoding
@@ -686,6 +685,7 @@ private:
 
   // Queued seek - moves to mCurrentSeek when DecodeFirstFrame completes.
   SeekJob mQueuedSeek;
+  SeekJob mCurrentSeek;
 
   // mSeekTask is responsible for executing the current seek request.
   RefPtr<SeekTask> mSeekTask;

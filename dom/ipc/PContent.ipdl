@@ -67,7 +67,7 @@ include PluginTypes;
 include ProtocolTypes;
 include PBackgroundSharedTypes;
 include PContentPermission;
-include BrowserConfiguration;
+include ServiceWorkerConfiguration;
 include GraphicsMessages;
 include ProfilerTypes;
 
@@ -361,12 +361,9 @@ prio(normal upto urgent) sync protocol PContent
 {
     parent spawns PPluginModule;
 
-    parent opens PCompositorBridge;
     parent opens PProcessHangMonitor;
     parent opens PSharedBufferManager;
-    parent opens PImageBridge;
     parent opens PGMPService;
-    parent opens PVRManager;
     child opens PBackground;
 
     manages PAPZ;
@@ -448,6 +445,11 @@ both:
                                      uint64_t aOuterWindowID);
 
 child:
+    // Give the content process its endpoints to the compositor.
+    async InitCompositor(Endpoint<PCompositorBridgeChild> compositor);
+    async InitImageBridge(Endpoint<PImageBridgeChild> bridge);
+    async InitVRManager(Endpoint<PVRManagerChild> endpoint);
+
     /**
      * Enable system-level sandboxing features, if available.  Can
      * usually only be performed zero or one times.  The child may
@@ -525,6 +527,11 @@ child:
     async AppInfo(nsCString version, nsCString buildID, nsCString name, nsCString UAName,
                   nsCString ID, nsCString vendor);
     async AppInit();
+
+    /**
+     * Send ServiceWorkerRegistrationData to child process.
+     */
+    async InitServiceWorkers(ServiceWorkerConfiguration aConfig);
 
     // Notify child that last-pb-context-exited notification was observed
     async LastPrivateDocShellDestroyed();
@@ -1083,12 +1090,6 @@ parent:
      */
     async PContentPermissionRequest(PermissionRequest[] aRequests, Principal aPrincipal,
                                     TabId tabId);
-
-    /**
-     * Send ServiceWorkerRegistrationData to child process.
-     */
-    sync GetBrowserConfiguration(nsCString aUri)
-        returns (BrowserConfiguration aConfig);
 
     async Profile(nsCString aProfile);
 

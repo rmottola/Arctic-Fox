@@ -25,6 +25,7 @@
 
 #include "asmjs/WasmInstance.h"
 #include "asmjs/WasmSerialize.h"
+#include "asmjs/WasmSignalHandlers.h"
 #include "jit/MacroAssembler.h"
 #include "js/Conversions.h"
 #include "vm/Interpreter.h"
@@ -272,18 +273,19 @@ wasm::AddressOf(SymbolicAddress imm, ExclusiveContext* cx)
     MOZ_CRASH("Bad SymbolicAddress");
 }
 
-SignalUsage::SignalUsage(ExclusiveContext* cx)
+SignalUsage::SignalUsage()
   :
 #ifdef ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_OOB
     // Signal-handling is only used to eliminate bounds checks when the OS page
     // size is an even divisor of the WebAssembly page size.
-    forOOB(cx->canUseSignalHandlers() &&
+    forOOB(HaveSignalHandlers() &&
            gc::SystemPageSize() <= PageSize &&
-           PageSize % gc::SystemPageSize() == 0),
+           PageSize % gc::SystemPageSize() == 0 &&
+           !JitOptions.wasmExplicitBoundsChecks),
 #else
     forOOB(false),
 #endif
-    forInterrupt(cx->canUseSignalHandlers())
+    forInterrupt(HaveSignalHandlers())
 {}
 
 bool
@@ -292,8 +294,8 @@ SignalUsage::operator==(SignalUsage rhs) const
     return forOOB == rhs.forOOB && forInterrupt == rhs.forInterrupt;
 }
 
-static inline MOZ_MUST_USE bool
-GetCPUID(uint32_t* cpuId)
+static uint32_t
+GetCPUID()
 {
     enum Arch {
         X86 = 0x1,
@@ -306,40 +308,197 @@ GetCPUID(uint32_t* cpuId)
 
 #if defined(JS_CODEGEN_X86)
     MOZ_ASSERT(uint32_t(jit::CPUInfo::GetSSEVersion()) <= (UINT32_MAX >> ARCH_BITS));
-    *cpuId = X86 | (uint32_t(jit::CPUInfo::GetSSEVersion()) << ARCH_BITS);
-    return true;
+    return X86 | (uint32_t(jit::CPUInfo::GetSSEVersion()) << ARCH_BITS);
 #elif defined(JS_CODEGEN_X64)
     MOZ_ASSERT(uint32_t(jit::CPUInfo::GetSSEVersion()) <= (UINT32_MAX >> ARCH_BITS));
-    *cpuId = X64 | (uint32_t(jit::CPUInfo::GetSSEVersion()) << ARCH_BITS);
-    return true;
+    return X64 | (uint32_t(jit::CPUInfo::GetSSEVersion()) << ARCH_BITS);
 #elif defined(JS_CODEGEN_ARM)
     MOZ_ASSERT(jit::GetARMFlags() <= (UINT32_MAX >> ARCH_BITS));
-    *cpuId = ARM | (jit::GetARMFlags() << ARCH_BITS);
-    return true;
+    return ARM | (jit::GetARMFlags() << ARCH_BITS);
+#elif defined(JS_CODEGEN_ARM64)
+    MOZ_CRASH("not enabled");
 #elif defined(JS_CODEGEN_MIPS32)
     MOZ_ASSERT(jit::GetMIPSFlags() <= (UINT32_MAX >> ARCH_BITS));
-    *cpuId = MIPS | (jit::GetMIPSFlags() << ARCH_BITS);
-    return true;
+    return MIPS | (jit::GetMIPSFlags() << ARCH_BITS);
 #elif defined(JS_CODEGEN_MIPS64)
     MOZ_ASSERT(jit::GetMIPSFlags() <= (UINT32_MAX >> ARCH_BITS));
-    *cpuId = MIPS64 | (jit::GetMIPSFlags() << ARCH_BITS);
-    return true;
+    return MIPS64 | (jit::GetMIPSFlags() << ARCH_BITS);
+#elif defined(JS_CODEGEN_NONE)
+    return 0;
 #else
-    return false;
+# error "unknown architecture"
 #endif
 }
 
-MOZ_MUST_USE bool
-Assumptions::init(SignalUsage usesSignal, JS::BuildIdOp buildIdOp)
+typedef uint32_t ImmediateType;  // for 32/64 consistency
+static const unsigned sImmediateBits = sizeof(ImmediateType) * 8 - 1;  // -1 for ImmediateBit
+static const unsigned sReturnBit = 1;
+static const unsigned sLengthBits = 4;
+static const unsigned sTypeBits = 2;
+static const unsigned sMaxTypes = (sImmediateBits - sReturnBit - sLengthBits) / sTypeBits;
+
+static bool
+IsImmediateType(ValType vt)
 {
-    this->usesSignal = usesSignal;
+    MOZ_ASSERT(uint32_t(vt) > 0);
+    return (uint32_t(vt) - 1) < (1 << sTypeBits);
+}
 
-    if (!GetCPUID(&cpuId))
+static bool
+IsImmediateType(ExprType et)
+{
+    return et == ExprType::Void || IsImmediateType(NonVoidToValType(et));
+}
+
+/* static */ bool
+SigIdDesc::isGlobal(const Sig& sig)
+{
+    unsigned numTypes = (sig.ret() == ExprType::Void ? 0 : 1) +
+                        (sig.args().length());
+    if (numTypes > sMaxTypes)
+        return true;
+
+    if (!IsImmediateType(sig.ret()))
+        return true;
+
+    for (ValType v : sig.args()) {
+        if (!IsImmediateType(v))
+            return true;
+    }
+
+    return false;
+}
+
+/* static */ SigIdDesc
+SigIdDesc::global(const Sig& sig, uint32_t globalDataOffset)
+{
+    MOZ_ASSERT(isGlobal(sig));
+    return SigIdDesc(Kind::Global, globalDataOffset);
+}
+
+static ImmediateType
+LengthToBits(uint32_t length)
+{
+    static_assert(sMaxTypes <= ((1 << sLengthBits) - 1), "fits");
+    MOZ_ASSERT(length <= sMaxTypes);
+    return length;
+}
+
+static ImmediateType
+TypeToBits(ValType type)
+{
+    static_assert(3 <= ((1 << sTypeBits) - 1), "fits");
+    MOZ_ASSERT(uint32_t(type) >= 1 && uint32_t(type) <= 4);
+    return uint32_t(type) - 1;
+}
+
+size_t
+Sig::serializedSize() const
+{
+    return sizeof(ret_) +
+           SerializedPodVectorSize(args_);
+}
+
+uint8_t*
+Sig::serialize(uint8_t* cursor) const
+{
+    cursor = WriteScalar<ExprType>(cursor, ret_);
+    cursor = SerializePodVector(cursor, args_);
+    return cursor;
+}
+
+const uint8_t*
+Sig::deserialize(const uint8_t* cursor)
+{
+    (cursor = ReadScalar<ExprType>(cursor, &ret_)) &&
+    (cursor = DeserializePodVector(cursor, &args_));
+    return cursor;
+}
+
+size_t
+Sig::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const
+{
+    return args_.sizeOfExcludingThis(mallocSizeOf);
+}
+
+/* static */ SigIdDesc
+SigIdDesc::immediate(const Sig& sig)
+{
+    ImmediateType immediate = ImmediateBit;
+    uint32_t shift = 1;
+
+    if (sig.ret() != ExprType::Void) {
+        immediate |= (1 << shift);
+        shift += sReturnBit;
+
+        immediate |= TypeToBits(NonVoidToValType(sig.ret())) << shift;
+        shift += sTypeBits;
+    } else {
+        shift += sReturnBit;
+    }
+
+    immediate |= LengthToBits(sig.args().length()) << shift;
+    shift += sLengthBits;
+
+    for (ValType argType : sig.args()) {
+        immediate |= TypeToBits(argType) << shift;
+        shift += sTypeBits;
+    }
+
+    MOZ_ASSERT(shift <= sImmediateBits);
+    return SigIdDesc(Kind::Immediate, immediate);
+}
+
+size_t
+SigWithId::serializedSize() const
+{
+    return Sig::serializedSize() +
+           sizeof(id);
+}
+
+uint8_t*
+SigWithId::serialize(uint8_t* cursor) const
+{
+    cursor = Sig::serialize(cursor);
+    cursor = WriteBytes(cursor, &id, sizeof(id));
+    return cursor;
+}
+
+const uint8_t*
+SigWithId::deserialize(const uint8_t* cursor)
+{
+    (cursor = Sig::deserialize(cursor)) &&
+    (cursor = ReadBytes(cursor, &id, sizeof(id)));
+    return cursor;
+}
+
+size_t
+SigWithId::sizeOfExcludingThis(MallocSizeOf mallocSizeOf) const
+{
+    return Sig::sizeOfExcludingThis(mallocSizeOf);
+}
+
+Assumptions::Assumptions(JS::BuildIdCharVector&& buildId)
+  : usesSignal(),
+    cpuId(GetCPUID()),
+    buildId(Move(buildId)),
+    newFormat(false)
+{}
+
+Assumptions::Assumptions()
+  : usesSignal(),
+    cpuId(GetCPUID()),
+    buildId(),
+    newFormat(false)
+{}
+
+bool
+Assumptions::initBuildIdFromContext(ExclusiveContext* cx)
+{
+    if (!cx->buildIdOp() || !cx->buildIdOp()(&buildId)) {
+        ReportOutOfMemory(cx);
         return false;
-
-    if (!buildIdOp || !buildIdOp(&buildId))
-        return false;
-
+    }
     return true;
 }
 

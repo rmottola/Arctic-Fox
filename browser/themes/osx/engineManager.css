@@ -5,8 +5,8 @@
 %endif
 
 #engineList treechildren::-moz-tree-image(engineName) {
-  -moz-margin-end: 4px;
-  -moz-margin-start: 1px;
+  margin-inline-end: 4px;
+  margin-inline-start: 1px;
   width: 16px;
   height: 16px;
 }

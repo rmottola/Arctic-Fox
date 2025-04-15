@@ -129,8 +129,8 @@ treechildren.autocomplete-treebody::-moz-tree-cell-text(selected) {
   height: 16px;
   max-width: 16px;
   max-height: 16px;
-  -moz-margin-start: 0;
-  -moz-margin-end: 11px;
+  margin-inline-start: 0;
+  margin-inline-end: 11px;
   list-style-image: url("chrome://mozapps/skin/places/defaultFavicon.png");
 }
 
@@ -151,8 +151,8 @@ treechildren.autocomplete-treebody::-moz-tree-cell-text(selected) {
 .ac-type-icon {
   width: 16px;
   height: 16px;
-  -moz-margin-start: 6px;
-  -moz-margin-end: 4px;
+  margin-inline-start: 6px;
+  margin-inline-end: 4px;
 }
 
 .ac-url-box > .ac-site-icon,

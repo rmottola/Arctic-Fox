@@ -12,7 +12,9 @@
 
 #include <Cocoa/Cocoa.h>
 #include <crt_externs.h>
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
 #include <ServiceManagement/ServiceManagement.h>
+#endif
 #include <Security/Authorization.h>
 #include <spawn.h>
 #include <stdio.h>
@@ -101,6 +103,8 @@ BOOL InstallPrivilegedHelper()
                                         kAuthorizationFlagDefaults |
                                         kAuthorizationFlagInteractionAllowed,
                                         &authRef);
+
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   if (status != errAuthorizationSuccess) {
     // AuthorizationCreate really shouldn't fail.
     NSLog(@"AuthorizationCreate failed! NSOSStatusErrorDomain / %d",
@@ -142,6 +146,9 @@ BOOL InstallPrivilegedHelper()
   }
 
   return result;
+#else
+  return NO;
+#endif
 }
 
 void AbortElevatedUpdate()

@@ -564,6 +564,8 @@ struct JS_PUBLIC_API(MovableCellHasher)
     using Key = T;
     using Lookup = T;
 
+    static bool hasHash(const Lookup& l);
+    static bool ensureHash(const Lookup& l);
     static HashNumber hash(const Lookup& l);
     static bool match(const Key& k, const Lookup& l);
     static void rekey(Key& k, const Key& newKey) { k = newKey; }
@@ -575,22 +577,27 @@ struct JS_PUBLIC_API(MovableCellHasher<JS::Heap<T>>)
     using Key = JS::Heap<T>;
     using Lookup = T;
 
+    static bool hasHash(const Lookup& l) { return MovableCellHasher<T>::hasHash(l); }
+    static bool ensureHash(const Lookup& l) { return MovableCellHasher<T>::ensureHash(l); }
     static HashNumber hash(const Lookup& l) { return MovableCellHasher<T>::hash(l); }
     static bool match(const Key& k, const Lookup& l) { return MovableCellHasher<T>::match(k, l); }
     static void rekey(Key& k, const Key& newKey) { k.unsafeSet(newKey); }
 };
 
+template <typename T>
+struct FallibleHashMethods<MovableCellHasher<T>>
+{
+    template <typename Lookup> static bool hasHash(Lookup&& l) {
+        return MovableCellHasher<T>::hasHash(mozilla::Forward<Lookup>(l));
+    }
+    template <typename Lookup> static bool ensureHash(Lookup&& l) {
+        return MovableCellHasher<T>::ensureHash(mozilla::Forward<Lookup>(l));
+    }
+};
+
 } /* namespace js */
 
 namespace js {
-
-// After switching to MSVC2015, this can be eliminated and replaced with
-// alignas(n) everywhere.
-#if defined(_MSC_VER) && (_MSC_VER < 1900)
-# define JS_ALIGNAS(n) __declspec(align(n))
-#else
-# define JS_ALIGNAS(n) alignas(n)
-#endif
 
 // The alignment must be set because the Rooted and PersistentRooted ptr fields
 // may be accessed through reinterpret_cast<Rooted<ConcreteTraceable>*>, and
@@ -601,14 +608,14 @@ namespace js {
 // DispatchWrapper, rather than DispatchWrapper itself, but that causes MSVC to
 // fail when Rooted is used in an IsConvertible test.
 template <typename T>
-class JS_ALIGNAS(8) DispatchWrapper
+class alignas(8) DispatchWrapper
 {
     static_assert(JS::MapTypeToRootKind<T>::kind == JS::RootKind::Traceable,
                   "DispatchWrapper is intended only for usage with a Traceable");
 
     using TraceFn = void (*)(JSTracer*, T*, const char*);
     TraceFn tracer;
-    JS_ALIGNAS(gc::CellSize) T storage;
+    alignas(gc::CellSize) T storage;
 
   public:
     template <typename U>
@@ -631,8 +638,6 @@ class JS_ALIGNAS(8) DispatchWrapper
         wrapper->tracer(trc, &wrapper->storage, name);
     }
 };
-
-#undef JS_ALIGNAS
 
 } /* namespace js */
 

@@ -1062,6 +1062,26 @@ pref("browser.tabs.remote", false);
 #endif
 pref("browser.tabs.remote.autostart", false);
 
+#if defined(XP_LINUX) && defined(MOZ_SANDBOX) && defined(MOZ_CONTENT_SANDBOX)
+// This pref is introduced as part of bug 742434, the naming is inspired from
+// its Windows/Mac counterpart, but on Linux it's an integer which means:
+// 0 -> "no sandbox"
+// 1 -> "content sandbox using seccomp-bpf when available"
+// 2 -> "seccomp-bpf + file broker"
+// Content sandboxing on Linux is currently in the stage of
+// 'just getting it enabled', which includes a very permissive whitelist. We
+// enable seccomp-bpf on nightly to see if everything is running, or if we need
+// to whitelist more system calls.
+//
+// So the purpose of this setting is to allow nightly users to disable the
+// sandbox while we fix their problems. This way, they won't have to wait for
+// another nightly release which disables seccomp-bpf again.
+//
+// This setting may not be required anymore once we decide to permanently
+// enable the content sandbox.
+pref("security.sandbox.content.level", 1);
+#endif
+
 #if defined(XP_MACOSX) || defined(XP_WIN)
 #if defined(MOZ_SANDBOX) && defined(MOZ_CONTENT_SANDBOX)
 // ID (a UUID when set by gecko) that is used to form the name of a
@@ -1312,10 +1332,16 @@ pref("geo.provider.use_corelocation", true);
 #endif
 
 #ifdef XP_WIN
-#ifdef RELEASE_BUILD
 pref("geo.provider.ms-windows-location", false);
+#endif
+
+#ifdef MOZ_WIDGET_GTK
+#ifdef MOZ_GPSD
+#ifdef RELEASE_BUILD
+pref("geo.provider.use_gpsd", false);
 #else
-pref("geo.provider.ms-windows-location", true);
+pref("geo.provider.use_gpsd", true);
+#endif
 #endif
 #endif
 

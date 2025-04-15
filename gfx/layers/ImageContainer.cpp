@@ -209,11 +209,28 @@ ImageContainer::ImageContainer(Mode flag)
         break;
     }
   }
+  mAsyncContainerID = mImageClient ? mImageClient->GetAsyncID()
+                                   : sInvalidAsyncContainerId;
+}
+
+ImageContainer::ImageContainer(uint64_t aAsyncContainerID)
+  : mReentrantMonitor("ImageContainer.mReentrantMonitor"),
+  mGenerationCounter(++sGenerationCounter),
+  mPaintCount(0),
+  mDroppedImageCount(0),
+  mImageFactory(nullptr),
+  mRecycleBin(nullptr),
+  mImageClient(nullptr),
+  mAsyncContainerID(aAsyncContainerID),
+  mCurrentProducerID(-1),
+  mIPDLChild(nullptr)
+{
+  MOZ_ASSERT(mAsyncContainerID != sInvalidAsyncContainerId);
 }
 
 ImageContainer::~ImageContainer()
 {
-  if (IsAsync()) {
+  if (mIPDLChild) {
     mIPDLChild->ForgetImageContainer();
     ImageBridgeChild::DispatchReleaseImageClient(mImageClient, mIPDLChild);
   }
@@ -333,7 +350,7 @@ ImageContainer::SetCurrentImages(const nsTArray<NonOwningImage>& aImages)
 {
   MOZ_ASSERT(!aImages.IsEmpty());
   ReentrantMonitorAutoEnter mon(mReentrantMonitor);
-  if (IsAsync()) {
+  if (mImageClient) {
     ImageBridgeChild::DispatchImageClientUpdate(mImageClient, this);
   }
   SetCurrentImageInternal(aImages);
@@ -342,7 +359,7 @@ ImageContainer::SetCurrentImages(const nsTArray<NonOwningImage>& aImages)
 void
 ImageContainer::ClearAllImages()
 {
-  if (IsAsync()) {
+  if (mImageClient) {
     // Let ImageClient release all TextureClients. This doesn't return
     // until ImageBridge has called ClearCurrentImageFromImageBridge.
     ImageBridgeChild::FlushAllImages(mImageClient, this);
@@ -386,17 +403,13 @@ ImageContainer::SetCurrentImagesInTransaction(const nsTArray<NonOwningImage>& aI
 
 bool ImageContainer::IsAsync() const
 {
-  return mImageClient != nullptr;
+  return mAsyncContainerID != sInvalidAsyncContainerId;
 }
 
 uint64_t ImageContainer::GetAsyncContainerID() const
 {
   NS_ASSERTION(IsAsync(),"Shared image ID is only relevant to async ImageContainers");
-  if (IsAsync()) {
-    return mImageClient->GetAsyncID();
-  } else {
-    return 0; // zero is always an invalid AsyncID
-  }
+  return mAsyncContainerID;
 }
 
 bool

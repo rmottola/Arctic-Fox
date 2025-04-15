@@ -51,7 +51,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "gDNSService",
 XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
                                   "resource://gre/modules/LightweightThemeManager.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "ContextualIdentityService",
-                                  "resource:///modules/ContextualIdentityService.jsm");
+                                  "resource://gre/modules/ContextualIdentityService.jsm");
 XPCOMUtils.defineLazyServiceGetter(this, "gAboutNewTabService",
                                    "@mozilla.org/browser/aboutnewtab-service;1",
                                    "nsIAboutNewTabService");
@@ -397,10 +397,8 @@ const gSessionHistoryObserver = {
     // Hide session restore button on about:home
     window.messageManager.broadcastAsyncMessage("Browser:HideSessionRestoreButton");
 
-    if (gURLBar) {
-      // Clear undo history of the URL bar
-      gURLBar.editor.transactionManager.clear()
-    }
+    // Clear undo history of the URL bar
+    gURLBar.editor.transactionManager.clear()
   }
 };
 
@@ -493,13 +491,12 @@ var gPopupBlockerObserver = {
     if (aEvent.originalTarget != gBrowser.selectedBrowser)
       return;
 
-    if (!this._reportButton && gURLBar)
+    if (!this._reportButton)
       this._reportButton = document.getElementById("page-report-button");
 
     if (!gBrowser.selectedBrowser.blockedPopups) {
       // Hide the icon in the location bar (if the location bar exists)
-      if (gURLBar)
-        this._reportButton.hidden = true;
+      this._reportButton.hidden = true;
 
       // Hide the notification box (if it's visible).
       let notificationBox = gBrowser.getNotificationBox();
@@ -510,8 +507,7 @@ var gPopupBlockerObserver = {
       return;
     }
 
-    if (gURLBar)
-      this._reportButton.hidden = false;
+    this._reportButton.hidden = false;
 
     // Only show the notification again if we've not already shown it. Since
     // notifications are per-browser, we don't need to worry about re-adding
@@ -1073,10 +1069,8 @@ var gBrowserInit = {
 
     if (!window.toolbar.visible) {
       // adjust browser UI for popups
-      if (gURLBar) {
-        gURLBar.setAttribute("readonly", "true");
-        gURLBar.setAttribute("enablehistory", "false");
-      }
+      gURLBar.setAttribute("readonly", "true");
+      gURLBar.setAttribute("enablehistory", "false");
       goSetCommandEnabled("cmd_newNavigatorTab", false);
     }
 
@@ -1456,8 +1450,6 @@ var gBrowserInit = {
         appMenuOpening = null;
       }, false);
     }
-
-    UserContextStyleManager.init();
 
     window.addEventListener("mousemove", MousePosTracker, false);
     window.addEventListener("dragover", MousePosTracker, false);
@@ -4614,13 +4606,11 @@ var XULBrowserWindow = {
         this.reloadCommand.removeAttribute("disabled");
       }
 
-      if (gURLBar) {
-        URLBarSetURI(aLocationURI);
+      URLBarSetURI(aLocationURI);
 
-        // Update starring UI
-        BookmarkingUI.updateStarState();
-        gTabletModePageCounter.inc();
-      }
+      // Update starring UI
+      BookmarkingUI.updateStarState();
+      gTabletModePageCounter.inc();
 
       // Show or hide browser chrome for apps
       let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
@@ -7534,19 +7524,17 @@ var gPrivateBrowsingUI = {
       }
     }
 
-    if (gURLBar) {
-      let value = gURLBar.getAttribute("autocompletesearchparam") || "";
-      if (!PrivateBrowsingUtils.permanentPrivateBrowsing &&
-          !value.includes("disable-private-actions")) {
-        // Disable switch to tab autocompletion for private windows.
-        // We leave it enabled for permanent private browsing mode though.
-        value += " disable-private-actions";
-      }
-      if (!value.includes("private-window")) {
-        value += " private-window";
-      }
-      gURLBar.setAttribute("autocompletesearchparam", value);
+    let urlBarSearchParam = gURLBar.getAttribute("autocompletesearchparam") || "";
+    if (!PrivateBrowsingUtils.permanentPrivateBrowsing &&
+        !urlBarSearchParam.includes("disable-private-actions")) {
+      // Disable switch to tab autocompletion for private windows.
+      // We leave it enabled for permanent private browsing mode though.
+      urlBarSearchParam += " disable-private-actions";
     }
+    if (!urlBarSearchParam.includes("private-window")) {
+      urlBarSearchParam += " private-window";
+    }
+    gURLBar.setAttribute("autocompletesearchparam", urlBarSearchParam);
   }
 };
 
@@ -8213,34 +8201,5 @@ TabModalPromptBox.prototype = {
       throw "Stale promptbox! The associated browser is gone.";
     }
     return browser;
-  },
-};
-
-let UserContextStyleManager = {
-  init() {
-    for (let styleId in document.styleSheets) {
-      let styleSheet = document.styleSheets[styleId];
-      if (styleSheet.href != "chrome://browser/content/usercontext/usercontext.css") {
-        continue;
-      }
-
-      if (ContextualIdentityService.needsCssRule()) {
-        for (let ruleId in styleSheet.cssRules) {
-          let cssRule = styleSheet.cssRules[ruleId];
-          if (cssRule.selectorText != ":root") {
-            continue;
-          }
-
-          ContextualIdentityService.storeCssRule(cssRule.cssText);
-          break;
-        }
-      }
-
-      ContextualIdentityService.cssRules().forEach(rule => {
-        styleSheet.insertRule(rule, styleSheet.cssRules.length);
-      });
-
-      break;
-    }
   },
 };

@@ -31,11 +31,16 @@ class MediaRawData;
 class MediaSourceDemuxer;
 class SourceBufferResource;
 
-class SourceBufferTaskQueue {
+class SourceBufferTaskQueue
+{
 public:
   SourceBufferTaskQueue()
   : mMonitor("SourceBufferTaskQueue")
   {}
+  ~SourceBufferTaskQueue()
+  {
+    MOZ_ASSERT(mQueue.IsEmpty(), "All tasks must have been processed");
+  }
 
   void Push(SourceBufferTask* aTask)
   {
@@ -65,7 +70,8 @@ private:
   nsTArray<RefPtr<SourceBufferTask>> mQueue;
 };
 
-class TrackBuffersManager {
+class TrackBuffersManager
+{
 public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(TrackBuffersManager);
 
@@ -116,6 +122,7 @@ public:
   // This may be called on any thread.
   // Buffered must conform to http://w3c.github.io/media-source/index.html#widl-SourceBuffer-buffered
   media::TimeIntervals Buffered();
+  media::TimeUnit HighestStartTime();
 
   // Return the size of the data managed by this SourceBufferContentManager.
   int64_t GetSize() const;
@@ -159,7 +166,7 @@ private:
 
   // for MediaSourceDemuxer::GetMozDebugReaderData
   friend class MediaSourceDemuxer;
-  virtual ~TrackBuffersManager();
+  ~TrackBuffersManager();
   // All following functions run on the taskqueue.
   RefPtr<AppendPromise> DoAppendData(RefPtr<MediaByteBuffer> aData,
                                      SourceBufferAttributes aAttributes);
@@ -248,7 +255,8 @@ private:
 
   void DoEvictData(const media::TimeUnit& aPlaybackTime, int64_t aSizeToEvict);
 
-  struct TrackData {
+  struct TrackData
+  {
     TrackData()
       : mNumTracks(0)
       , mNeedRandomAccessPoint(true)
@@ -273,6 +281,10 @@ private:
     // The variable is initially unset to indicate that no coded frames have
     // been appended yet.
     Maybe<media::TimeUnit> mHighestEndTimestamp;
+    // Highest presentation timestamp in track buffer.
+    // Protected by global monitor, except when reading on the task queue as it
+    // is only written there.
+    media::TimeUnit mHighestStartTimestamp;
     // Longest frame duration seen since last random access point.
     // Only ever accessed when mLastDecodeTimestamp and mLastFrameDuration are
     // set.
@@ -338,6 +350,8 @@ private:
   void InsertFrames(TrackBuffer& aSamples,
                     const media::TimeIntervals& aIntervals,
                     TrackData& aTrackData);
+  void UpdateHighestTimestamp(TrackData& aTrackData,
+                              const media::TimeUnit& aHighestTime);
   // Remove all frames and their dependencies contained in aIntervals.
   // Return the index at which frames were first removed or 0 if no frames
   // removed.
@@ -374,7 +388,8 @@ private:
   TrackData mAudioTracks;
 
   // TaskQueue methods and objects.
-  AbstractThread* GetTaskQueue() {
+  AbstractThread* GetTaskQueue()
+  {
     return mTaskQueue;
   }
   bool OnTaskQueue()
@@ -387,7 +402,6 @@ private:
   SourceBufferTaskQueue mQueue;
   void QueueTask(SourceBufferTask* aTask);
   void ProcessTasks();
-  void CancelAllTasks();
   // Set if the TrackBuffersManager is currently processing a task.
   // At this stage, this task is always a AppendBufferTask.
   RefPtr<SourceBufferTask> mCurrentTask;

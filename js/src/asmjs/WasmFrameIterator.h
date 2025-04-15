@@ -33,6 +33,7 @@ namespace wasm {
 class CallSite;
 class CodeRange;
 class Instance;
+class SigIdDesc;
 struct CallThunk;
 struct FuncOffsets;
 struct Metadata;
@@ -73,7 +74,6 @@ enum class ExitReason : uint32_t
     None,          // default state, the pc is in wasm code
     ImportJit,     // fast-path call directly into JIT code
     ImportInterp,  // slow-path call into C++ Invoke()
-    Error,         // call to error generation
     Native         // call to native C++ code (e.g., Math.sin, ToInt32(), interrupt)
 };
 
@@ -112,7 +112,7 @@ void
 GenerateExitEpilogue(jit::MacroAssembler& masm, unsigned framePushed, ExitReason reason,
                      ProfilingOffsets* offsets);
 void
-GenerateFunctionPrologue(jit::MacroAssembler& masm, unsigned framePushed, uint32_t sigIndex,
+GenerateFunctionPrologue(jit::MacroAssembler& masm, unsigned framePushed, const SigIdDesc& sigId,
                          FuncOffsets* offsets);
 void
 GenerateFunctionEpilogue(jit::MacroAssembler& masm, unsigned framePushed, FuncOffsets* offsets);

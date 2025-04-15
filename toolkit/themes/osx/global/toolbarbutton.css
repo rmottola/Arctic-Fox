@@ -42,14 +42,14 @@ toolbarbutton[disabled="true"][open="true"] {
   background-color: transparent !important;
   list-style-image: url("chrome://global/skin/arrow/arrow-dn.png");
   padding: 0;
-  -moz-padding-start: 2px;
+  padding-inline-start: 2px;
   width: auto;
 }
 
 .toolbarbutton-menu-dropmarker[disabled="true"] {
   list-style-image: url("chrome://global/skin/arrow/arrow-dn-dis.png");
   padding: 0;
-  -moz-padding-start: 2px;
+  padding-inline-start: 2px;
 }
 
 /* ::::: toolbarbutton menu-button ::::: */

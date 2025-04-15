@@ -705,7 +705,7 @@ AsmJSCacheOpenEntryForWrite(JS::Handle<JSObject*> aGlobal,
 
 class WorkerJSRuntime;
 
-class WorkerThreadRuntimePrivate : private PerThreadAtomCache
+class WorkerThreadContextPrivate : private PerThreadAtomCache
 {
   friend class WorkerJSRuntime;
 
@@ -725,7 +725,7 @@ public:
 
 private:
   explicit
-  WorkerThreadRuntimePrivate(WorkerPrivate* aWorkerPrivate)
+  WorkerThreadContextPrivate(WorkerPrivate* aWorkerPrivate)
     : mWorkerPrivate(aWorkerPrivate)
   {
     MOZ_ASSERT(!NS_IsMainThread());
@@ -736,15 +736,15 @@ private:
     MOZ_ASSERT(mWorkerPrivate);
   }
 
-  ~WorkerThreadRuntimePrivate()
+  ~WorkerThreadContextPrivate()
   {
     MOZ_ASSERT(!NS_IsMainThread());
   }
 
-  WorkerThreadRuntimePrivate(const WorkerThreadRuntimePrivate&) = delete;
+  WorkerThreadContextPrivate(const WorkerThreadContextPrivate&) = delete;
 
-  WorkerThreadRuntimePrivate&
-  operator=(const WorkerThreadRuntimePrivate&) = delete;
+  WorkerThreadContextPrivate&
+  operator=(const WorkerThreadContextPrivate&) = delete;
 };
 
 JSContext*
@@ -860,8 +860,9 @@ public:
       return;   // Initialize() must have failed
     }
 
-    delete static_cast<WorkerThreadRuntimePrivate*>(JS_GetRuntimePrivate(rt));
-    JS_SetRuntimePrivate(rt, nullptr);
+    JSContext* cx = JS_GetContext(rt);
+    delete static_cast<WorkerThreadContextPrivate*>(JS_GetContextPrivate(cx));
+    JS_SetContextPrivate(cx, nullptr);
 
     // The worker global should be unrooted and the shutdown cycle collection
     // should break all remaining cycles. The superclass destructor will run
@@ -874,22 +875,19 @@ public:
     mWorkerPrivate = nullptr;
   }
 
-  nsresult Initialize(JSRuntime* aParentRuntime)
+  nsresult Initialize(JSContext* aParentContext)
   {
     nsresult rv =
-      CycleCollectedJSRuntime::Initialize(aParentRuntime,
+      CycleCollectedJSRuntime::Initialize(aParentContext,
                                           WORKER_DEFAULT_RUNTIME_HEAPSIZE,
                                           WORKER_DEFAULT_NURSERY_SIZE);
      if (NS_WARN_IF(NS_FAILED(rv))) {
        return rv;
      }
 
-    JSRuntime* rt = Runtime();
-    MOZ_ASSERT(rt);
+    JSContext* cx = Context();
 
-    JS_SetRuntimePrivate(rt, new WorkerThreadRuntimePrivate(mWorkerPrivate));
-
-    JSContext* cx = JS_GetContext(rt);
+    JS_SetContextPrivate(cx, new WorkerThreadContextPrivate(mWorkerPrivate));
 
     js::SetPreserveWrapperCallback(cx, PreserveWrapper);
     JS_InitDestroyPrincipalsCallback(cx, DestroyWorkerPrincipals);
@@ -986,7 +984,7 @@ class WorkerThreadPrimaryRunnable final : public Runnable
 {
   WorkerPrivate* mWorkerPrivate;
   RefPtr<WorkerThread> mThread;
-  JSRuntime* mParentRuntime;
+  JSContext* mParentContext;
 
   class FinishedRunnable final : public Runnable
   {
@@ -1011,8 +1009,8 @@ class WorkerThreadPrimaryRunnable final : public Runnable
 public:
   WorkerThreadPrimaryRunnable(WorkerPrivate* aWorkerPrivate,
                               WorkerThread* aThread,
-                              JSRuntime* aParentRuntime)
-  : mWorkerPrivate(aWorkerPrivate), mThread(aThread), mParentRuntime(aParentRuntime)
+                              JSContext* aParentContext)
+  : mWorkerPrivate(aWorkerPrivate), mThread(aThread), mParentContext(aParentContext)
   {
     MOZ_ASSERT(aWorkerPrivate);
     MOZ_ASSERT(aThread);
@@ -1235,14 +1233,11 @@ GetWorkerPrivateFromContext(JSContext* aCx)
   MOZ_ASSERT(!NS_IsMainThread());
   MOZ_ASSERT(aCx);
 
-  JSRuntime* rt = JS_GetRuntime(aCx);
-  MOZ_ASSERT(rt);
-
-  void* rtPrivate = JS_GetRuntimePrivate(rt);
-  MOZ_ASSERT(rtPrivate);
+  void* cxPrivate = JS_GetContextPrivate(aCx);
+  MOZ_ASSERT(cxPrivate);
 
   return
-    static_cast<WorkerThreadRuntimePrivate*>(rtPrivate)->GetWorkerPrivate();
+    static_cast<WorkerThreadContextPrivate*>(cxPrivate)->GetWorkerPrivate();
 }
 
 WorkerPrivate*
@@ -1255,14 +1250,14 @@ GetCurrentThreadWorkerPrivate()
     return nullptr;
   }
 
-  JSRuntime* rt = ccrt->Runtime();
-  MOZ_ASSERT(rt);
+  JSContext* cx = ccrt->Context();
+  MOZ_ASSERT(cx);
 
-  void* rtPrivate = JS_GetRuntimePrivate(rt);
-  MOZ_ASSERT(rtPrivate);
+  void* cxPrivate = JS_GetContextPrivate(cx);
+  MOZ_ASSERT(cxPrivate);
 
   return
-    static_cast<WorkerThreadRuntimePrivate*>(rtPrivate)->GetWorkerPrivate();
+    static_cast<WorkerThreadContextPrivate*>(cxPrivate)->GetWorkerPrivate();
 }
 
 bool
@@ -1625,10 +1620,10 @@ RuntimeService::ScheduleWorker(WorkerPrivate* aWorkerPrivate)
     NS_WARNING("Could not set the thread's priority!");
   }
 
-  JSRuntime* rt = CycleCollectedJSRuntime::Get()->Runtime();
+  JSContext* cx = CycleCollectedJSRuntime::Get()->Context();
   nsCOMPtr<nsIRunnable> runnable =
     new WorkerThreadPrimaryRunnable(aWorkerPrivate, thread,
-                                    JS_GetParentRuntime(rt));
+                                    JS_GetParentContext(cx));
   if (NS_FAILED(thread->DispatchPrimaryRunnable(friendKey, runnable.forget()))) {
     UnregisterWorker(aWorkerPrivate);
     return false;
@@ -2525,7 +2520,37 @@ WorkerThreadPrimaryRunnable::Run()
     return NS_ERROR_UNEXPECTED;
   }
 
-  mWorkerPrivate->SetThread(mThread);
+  class MOZ_STACK_CLASS SetThreadHelper final
+  {
+    // Raw pointer: this class is on the stack.
+    WorkerPrivate* mWorkerPrivate;
+
+  public:
+    SetThreadHelper(WorkerPrivate* aWorkerPrivate, WorkerThread* aThread)
+      : mWorkerPrivate(aWorkerPrivate)
+    {
+      MOZ_ASSERT(aWorkerPrivate);
+      MOZ_ASSERT(aThread);
+
+      mWorkerPrivate->SetThread(aThread);
+    }
+
+    ~SetThreadHelper()
+    {
+      if (mWorkerPrivate) {
+        mWorkerPrivate->SetThread(nullptr);
+      }
+    }
+
+    void Nullify()
+    {
+      MOZ_ASSERT(mWorkerPrivate);
+      mWorkerPrivate->SetThread(nullptr);
+      mWorkerPrivate = nullptr;
+    }
+  };
+
+  SetThreadHelper threadHelper(mWorkerPrivate, mThread);
 
   mWorkerPrivate->AssertIsOnWorkerThread();
 
@@ -2533,7 +2558,7 @@ WorkerThreadPrimaryRunnable::Run()
     nsCycleCollector_startup();
 
     WorkerJSRuntime runtime(mWorkerPrivate);
-    nsresult rv = runtime.Initialize(mParentRuntime);
+    nsresult rv = runtime.Initialize(mParentContext);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return rv;
     }
@@ -2595,7 +2620,7 @@ WorkerThreadPrimaryRunnable::Run()
     // any remaining C++ objects.
   }
 
-  mWorkerPrivate->SetThread(nullptr);
+  threadHelper.Nullify();
 
   mWorkerPrivate->ScheduleDeletion(WorkerPrivate::WorkerRan);
 

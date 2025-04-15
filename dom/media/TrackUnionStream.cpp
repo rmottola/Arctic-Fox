@@ -328,7 +328,10 @@ TrackUnionStream::TrackUnionStream() :
         // Separate Audio and Video.
         if (segment->GetType() == MediaSegment::AUDIO) {
           l->NotifyQueuedAudioData(Graph(), outputTrack->GetID(),
-                                   outputStart, *static_cast<AudioSegment*>(segment));
+                                   outputStart,
+                                   *static_cast<AudioSegment*>(segment),
+                                   map->mInputPort->GetSource(),
+                                   map->mInputTrackID);
         } else {
           // This part will be removed in bug 1201363.
           l->NotifyQueuedTrackChanges(Graph(), outputTrack->GetID(),

@@ -57,7 +57,7 @@ toolbar[mode="icons"] #status4evar-download-button[forcelabel="true"] > label
 {
 	margin: 0px 2px !important;
 	margin-top: -1px !important;
-	-moz-margin-start: 4px !important;
+	margin-inline-start: 4px !important;
 }
 
 /*
@@ -81,7 +81,7 @@ splitter.status4evar-status-splitter
 
 #notification-popup-box
 {
-	-moz-margin-start: -1px;
+	margin-inline-start: -1px;
 }
 
 #urlbar .urlbar-over-link-box

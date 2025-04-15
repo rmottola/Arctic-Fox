@@ -13,8 +13,8 @@
 }
 
 .downloadTypeIcon {
-  -moz-margin-start: 8px;
-  -moz-margin-end: 8px;
+  margin-inline-start: 8px;
+  margin-inline-end: 8px;
   /* explicitly size the icon, so size doesn't vary on hidpi systems */
   height: 32px;
   width: 32px;

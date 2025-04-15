@@ -28,7 +28,7 @@
   min-width: 0;
   margin: 0;
   padding: 0;
-  -moz-padding-end: 2px;
+  padding-inline-end: 2px;
   -moz-box-align: center;
   background: none;
   border: none;

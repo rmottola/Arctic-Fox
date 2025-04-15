@@ -28,8 +28,8 @@ body.private .showNormal {
 .titleText {
   background: url("chrome://browser/skin/mask.png") left 0 no-repeat;
   background-size: 45px;
-  -moz-margin-start: -2em;
-  -moz-padding-start: 2em;
+  margin-inline-start: -2em;
+  padding-inline-start: 2em;
 }
 
 .titleText:-moz-dir(rtl) {
@@ -46,8 +46,8 @@ body.private .showNormal {
   .titleText {
     padding-top: 0;
     background-image: none;
-    -moz-margin-start: 0;
-    -moz-padding-start: 0;
+    margin-inline-start: 0;
+    padding-inline-start: 0;
   }
 }
 
@@ -57,5 +57,5 @@ a {
 
 button {
   margin-top: 1.2em;
-  -moz-margin-start: 0;
+  margin-inline-start: 0;
 }

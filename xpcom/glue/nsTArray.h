@@ -337,6 +337,8 @@ struct nsTArray_SafeElementAtHelper<mozilla::OwningNonNull<E>, Derived>
   }
 };
 
+extern "C" void Gecko_EnsureTArrayCapacity(void* aArray, size_t aCapacity, size_t aElemSize);
+
 //
 // This class serves as a base class for nsTArray.  It shouldn't be used
 // directly.  It holds common implementation code that does not depend on the
@@ -350,6 +352,7 @@ class nsTArray_base
   // the same free().
   template<class Allocator, class Copier>
   friend class nsTArray_base;
+  friend void Gecko_EnsureTArrayCapacity(void* aArray, size_t aCapacity, size_t aElemSize);
 
 protected:
   typedef nsTArrayHeader Header;
@@ -543,9 +546,6 @@ public:
   bool Equals(const A& aA, const B& aB) const { return aA == aB; }
   bool LessThan(const A& aA, const B& aB) const { return aA < aB; }
 };
-
-template<class E> class InfallibleTArray;
-template<class E> class FallibleTArray;
 
 template<bool IsPod, bool IsSameType>
 struct AssignRangeAlgorithm
@@ -1885,7 +1885,7 @@ template<typename E, class Alloc>
 template<class Item, typename ActualAlloc>
 auto
 nsTArray_Impl<E, Alloc>::ReplaceElementsAt(index_type aStart, size_type aCount,
-                                           const Item* aArray, size_type aArrayLen) -> elem_type* 
+                                           const Item* aArray, size_type aArrayLen) -> elem_type*
 {
   // Adjust memory allocation up-front to catch errors.
   if (!ActualAlloc::Successful(this->template EnsureCapacity<ActualAlloc>(

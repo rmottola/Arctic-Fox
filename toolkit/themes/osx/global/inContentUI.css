@@ -82,14 +82,14 @@ colorpicker[type="button"][open="true"]:not([disabled="true"]) {
 }
 
 menulist {
-  -moz-padding-end: 0;
+  padding-inline-end: 0;
   margin-left: 5px;
   margin-right: 5px;
 }
 
 /* Tweak margins so the focus ring is in the right place. */
 menulist > .menulist-label-box {
-  -moz-margin-end: 3px;
+  margin-inline-end: 3px;
   margin-top: 1px;
 }
 
@@ -103,7 +103,7 @@ menulist > .menulist-dropmarker {
   display: -moz-box;
   background: transparent;
   border: none;
-  -moz-border-start: 1px solid rgba(60,73,97,0.5);
+  border-inline-start: 1px solid rgba(60,73,97,0.5);
   margin-top: -1px;
   margin-bottom: -1px;
 }

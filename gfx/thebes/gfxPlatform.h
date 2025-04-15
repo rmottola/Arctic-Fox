@@ -174,6 +174,11 @@ public:
     static void ShutdownLayersIPC();
 
     /**
+     * Initialize ScrollMetadata statics. Does not depend on gfxPlatform.
+     */
+    static void InitNullMetadata();
+
+    /**
      * Create an offscreen surface of the given dimensions
      * and image format.
      */
@@ -270,6 +275,7 @@ public:
       aObj.DefineProperty("AzureContentBackend", GetBackendName(mContentBackend));
     }
     void GetApzSupportInfo(mozilla::widget::InfoObject& aObj);
+    void GetTilesSupportInfo(mozilla::widget::InfoObject& aObj);
 
     // Get the default content backend that will be used with the default
     // compositor. If the compositor is known when calling this function,
@@ -802,6 +808,7 @@ private:
 
     mozilla::widget::GfxInfoCollector<gfxPlatform> mAzureCanvasBackendCollector;
     mozilla::widget::GfxInfoCollector<gfxPlatform> mApzSupportCollector;
+    mozilla::widget::GfxInfoCollector<gfxPlatform> mTilesInfoCollector;
 
     RefPtr<mozilla::gfx::DrawEventRecorder> mRecorder;
     RefPtr<mozilla::gl::SkiaGLGlue> mSkiaGlue;

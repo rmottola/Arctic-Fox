@@ -41,15 +41,83 @@ using namespace js::wasm;
 using mozilla::BinarySearch;
 using mozilla::Swap;
 
+class SigIdSet
+{
+    typedef HashMap<const Sig*, uint32_t, SigHashPolicy, SystemAllocPolicy> Map;
+    Map map_;
+
+  public:
+    ~SigIdSet() {
+        MOZ_ASSERT_IF(!JSRuntime::hasLiveRuntimes(), !map_.initialized() || map_.empty());
+    }
+
+    bool ensureInitialized(JSContext* cx) {
+        if (!map_.initialized() && !map_.init()) {
+            ReportOutOfMemory(cx);
+            return false;
+        }
+
+        return true;
+    }
+
+    bool allocateSigId(JSContext* cx, const Sig& sig, const void** sigId) {
+        Map::AddPtr p = map_.lookupForAdd(sig);
+        if (p) {
+            MOZ_ASSERT(p->value() > 0);
+            p->value()++;
+            *sigId = p->key();
+            return true;
+        }
+
+        UniquePtr<Sig> clone = MakeUnique<Sig>();
+        if (!clone || !clone->clone(sig) || !map_.add(p, clone.get(), 1)) {
+            ReportOutOfMemory(cx);
+            return false;
+        }
+
+        *sigId = clone.release();
+        MOZ_ASSERT(!(uintptr_t(*sigId) & SigIdDesc::ImmediateBit));
+        return true;
+    }
+
+    void deallocateSigId(const Sig& sig, const void* sigId) {
+        Map::Ptr p = map_.lookup(sig);
+        MOZ_RELEASE_ASSERT(p && p->key() == sigId && p->value() > 0);
+
+        p->value()--;
+        if (!p->value()) {
+            js_delete(p->key());
+            map_.remove(p);
+        }
+    }
+};
+
+ExclusiveData<SigIdSet> sigIdSet;
+
 uint8_t**
 Instance::addressOfMemoryBase() const
 {
     return (uint8_t**)(codeSegment_->globalData() + HeapGlobalDataOffset);
 }
 
+void**
+Instance::addressOfTableBase(size_t tableIndex) const
+{
+    MOZ_ASSERT(metadata_->tables[tableIndex].globalDataOffset >= InitialGlobalDataBytes);
+    return (void**)(codeSegment_->globalData() + metadata_->tables[tableIndex].globalDataOffset);
+}
+
+const void**
+Instance::addressOfSigId(const SigIdDesc& sigId) const
+{
+    MOZ_ASSERT(sigId.globalDataOffset() >= InitialGlobalDataBytes);
+    return (const void**)(codeSegment_->globalData() + sigId.globalDataOffset());
+}
+
 FuncImportExit&
 Instance::funcImportToExit(const FuncImport& fi)
 {
+    MOZ_ASSERT(fi.exitGlobalDataOffset() >= InitialGlobalDataBytes);
     return *(FuncImportExit*)(codeSegment_->globalData() + fi.exitGlobalDataOffset());
 }
 
@@ -111,13 +179,17 @@ Instance::toggleProfiling(JSContext* cx)
         funcLabels_.clear();
     }
 
-    // Homogeneous table elements point directly to the prologue and must be
-    // updated to reflect the profiling mode. In wasm, table elements point to
-    // the (one) table entry which checks signature before jumping to the
-    // appropriate prologue (which is patched by ToggleProfiling).
-    for (const TypedFuncTable& table : typedFuncTables_) {
-        auto array = reinterpret_cast<void**>(codeSegment_->globalData() + table.globalDataOffset);
-        for (size_t i = 0; i < table.numElems; i++) {
+    // Typed-function tables' elements point directly to either the profiling or
+    // non-profiling prologue and must therefore be updated when the profiling
+    // mode is toggled.
+
+    for (const SharedTable& table : tables_) {
+        if (!table->isTypedFunction())
+            continue;
+
+        void** array = table->array();
+        uint32_t length = table->length();
+        for (size_t i = 0; i < length; i++) {
             const CodeRange* codeRange = lookupCodeRange(array[i]);
             void* from = codeSegment_->code() + codeRange->funcNonProfilingEntry();
             void* to = codeSegment_->code() + codeRange->funcProfilingEntry();
@@ -348,17 +420,19 @@ Instance::callImport_f64(int32_t funcImportIndex, int32_t argc, uint64_t* argv)
 Instance::Instance(UniqueCodeSegment codeSegment,
                    const Metadata& metadata,
                    const ShareableBytes* maybeBytecode,
-                   TypedFuncTableVector&& typedFuncTables,
                    HandleWasmMemoryObject memory,
+                   SharedTableVector&& tables,
                    Handle<FunctionVector> funcImports)
   : codeSegment_(Move(codeSegment)),
     metadata_(&metadata),
     maybeBytecode_(maybeBytecode),
-    typedFuncTables_(Move(typedFuncTables)),
     memory_(memory),
+    tables_(Move(tables)),
     profilingEnabled_(false)
 {
     MOZ_ASSERT(funcImports.length() == metadata.funcImports.length());
+    MOZ_ASSERT(tables_.length() == metadata.tables.length());
+
     for (size_t i = 0; i < metadata.funcImports.length(); i++) {
         const FuncImport& fi = metadata.funcImports[i];
         FuncImportExit& exit = funcImportToExit(fi);
@@ -369,6 +443,30 @@ Instance::Instance(UniqueCodeSegment codeSegment,
 
     if (memory)
         *addressOfMemoryBase() = memory->buffer().dataPointerEither().unwrap();
+
+    for (size_t i = 0; i < tables_.length(); i++)
+        *addressOfTableBase(i) = tables_[i]->array();
+}
+
+bool
+Instance::init(JSContext* cx)
+{
+    if (!metadata_->sigIds.empty()) {
+        ExclusiveData<SigIdSet>::Guard lockedSigIdSet = sigIdSet.lock();
+
+        if (!lockedSigIdSet->ensureInitialized(cx))
+            return false;
+
+        for (const SigWithId& sig : metadata_->sigIds) {
+            const void* sigId;
+            if (!lockedSigIdSet->allocateSigId(cx, sig, &sigId))
+                return false;
+
+            *addressOfSigId(sig.id) = sigId;
+        }
+    }
+
+    return true;
 }
 
 Instance::~Instance()
@@ -377,6 +475,15 @@ Instance::~Instance()
         FuncImportExit& exit = funcImportToExit(metadata_->funcImports[i]);
         if (exit.baselineScript)
             exit.baselineScript->removeDependentWasmImport(*this, i);
+    }
+
+    if (!metadata_->sigIds.empty()) {
+        ExclusiveData<SigIdSet>::Guard lockedSigIdSet = sigIdSet.lock();
+
+        for (const SigWithId& sig : metadata_->sigIds) {
+            if (const void* sigId = *addressOfSigId(sig.id))
+                lockedSigIdSet->deallocateSigId(sig, sigId);
+        }
     }
 }
 
@@ -403,9 +510,9 @@ Instance::memoryLength() const
 }
 
 bool
-Instance::callExport(JSContext* cx, uint32_t exportIndex, CallArgs args)
+Instance::callExport(JSContext* cx, uint32_t funcIndex, CallArgs args)
 {
-    const Export& exp = metadata_->exports[exportIndex];
+    const FuncExport& func = metadata_->lookupFuncExport(funcIndex);
 
     // Enable/disable profiling in the Module to match the current global
     // profiling state. Don't do this if the Module is already active on the
@@ -425,13 +532,13 @@ Instance::callExport(JSContext* cx, uint32_t exportIndex, CallArgs args)
     // value is stored in the first element of the array (which, therefore, must
     // have length >= 1).
     Vector<ExportArg, 8> exportArgs(cx);
-    if (!exportArgs.resize(Max<size_t>(1, exp.sig().args().length())))
+    if (!exportArgs.resize(Max<size_t>(1, func.sig().args().length())))
         return false;
 
     RootedValue v(cx);
-    for (unsigned i = 0; i < exp.sig().args().length(); ++i) {
+    for (unsigned i = 0; i < func.sig().args().length(); ++i) {
         v = i < args.length() ? args[i] : UndefinedValue();
-        switch (exp.sig().arg(i)) {
+        switch (func.sig().arg(i)) {
           case ValType::I32:
             if (!ToInt32(cx, v, (int32_t*)&exportArgs[i]))
                 return false;
@@ -516,7 +623,7 @@ Instance::callExport(JSContext* cx, uint32_t exportIndex, CallArgs args)
         JitActivation jitActivation(cx, /* active */ false);
 
         // Call the per-exported-function trampoline created by GenerateEntry.
-        auto funcPtr = JS_DATA_TO_FUNC_PTR(ExportFuncPtr, codeSegment_->code() + exp.stubOffset());
+        auto funcPtr = JS_DATA_TO_FUNC_PTR(ExportFuncPtr, codeSegment_->code() + func.entryOffset());
         if (!CALL_GENERATED_2(funcPtr, exportArgs.begin(), codeSegment_->globalData()))
             return false;
     }
@@ -535,7 +642,7 @@ Instance::callExport(JSContext* cx, uint32_t exportIndex, CallArgs args)
 
     void* retAddr = &exportArgs[0];
     JSObject* retObj = nullptr;
-    switch (exp.sig().ret()) {
+    switch (func.sig().ret()) {
       case ExprType::Void:
         args.rval().set(UndefinedValue());
         break;
@@ -611,6 +718,8 @@ const char experimentalWarning[] =
     "`---'    `---` '.(_,_).'   `-...-'  '--'      '--'\n"
     "text support (Work In Progress):\n\n";
 
+const size_t experimentalWarningLinesCount = 12;
+
 const char enabledMessage[] =
     "Restart with developer tools open to view WebAssembly source";
 
@@ -622,13 +731,71 @@ Instance::createText(JSContext* cx)
         const Bytes& bytes = maybeBytecode_->bytes;
         if (!buffer.append(experimentalWarning))
             return nullptr;
-        if (!BinaryToExperimentalText(cx, bytes.begin(), bytes.length(), buffer))
+        maybeSourceMap_.reset(cx->runtime()->new_<GeneratedSourceMap>(cx));
+        if (!maybeSourceMap_)
             return nullptr;
+        if (!BinaryToExperimentalText(cx, bytes.begin(), bytes.length(), buffer,
+                                      ExperimentalTextFormatting(), maybeSourceMap_.get()))
+            return nullptr;
+#if DEBUG
+        // Checking source map invariant: expression and function locations must be sorted
+        // by line number.
+        uint32_t lastLineno = 0;
+        for (size_t i = 0; i < maybeSourceMap_->exprlocs().length(); i++) {
+            MOZ_ASSERT(lastLineno <= maybeSourceMap_->exprlocs()[i].lineno);
+            lastLineno = maybeSourceMap_->exprlocs()[i].lineno;
+        }
+        lastLineno = 0;
+        for (size_t i = 0; i < maybeSourceMap_->functionlocs().length(); i++) {
+            MOZ_ASSERT(lastLineno <= maybeSourceMap_->functionlocs()[i].startLineno &&
+                maybeSourceMap_->functionlocs()[i].startLineno <=
+                  maybeSourceMap_->functionlocs()[i].endLineno);
+            lastLineno = maybeSourceMap_->functionlocs()[i].endLineno + 1;
+        }
+#endif
     } else {
         if (!buffer.append(enabledMessage))
             return nullptr;
     }
     return buffer.finishString();
+}
+
+struct GeneratedSourceMapLinenoComparator
+{
+    int operator()(const ExprLoc& loc) const {
+        return lineno == loc.lineno ? 0 : lineno < loc.lineno ? -1 : 1;
+    }
+    explicit GeneratedSourceMapLinenoComparator(uint32_t lineno_) : lineno(lineno_) {}
+    const uint32_t lineno;
+};
+
+bool
+Instance::getLineOffsets(size_t lineno, Vector<uint32_t>& offsets)
+{
+    // TODO Ensure text was generated?
+    if (!maybeSourceMap_)
+        return false;
+
+    if (lineno < experimentalWarningLinesCount)
+        return true;
+    lineno -= experimentalWarningLinesCount;
+
+    ExprLocVector& exprlocs = maybeSourceMap_->exprlocs();
+
+    // Binary search for the expression with the specified line number and
+    // rewind to the first expression, if more than one expression on the same line.
+    size_t match;
+    if (!BinarySearchIf(exprlocs, 0, exprlocs.length(),
+                        GeneratedSourceMapLinenoComparator(lineno), &match))
+        return true;
+    while (match > 0 && exprlocs[match - 1].lineno == lineno)
+        match--;
+    // Returning all expression offsets that were printed on the specified line.
+    for (size_t i = match; i < exprlocs.length() && exprlocs[i].lineno == lineno; i++) {
+        if (!offsets.append(exprlocs[i].offset))
+            return false;
+    }
+    return true;
 }
 
 bool
@@ -725,13 +892,17 @@ void
 Instance::addSizeOfMisc(MallocSizeOf mallocSizeOf,
                         Metadata::SeenSet* seenMetadata,
                         ShareableBytes::SeenSet* seenBytes,
-                        size_t* code, size_t* data) const
+                        Table::SeenSet* seenTables,
+                        size_t* code,
+                        size_t* data) const
 {
     *code += codeSegment_->codeLength();
     *data += mallocSizeOf(this) +
              codeSegment_->globalDataLength() +
-             metadata_->sizeOfIncludingThisIfNotSeen(mallocSizeOf, seenMetadata) +
-             typedFuncTables_.sizeOfExcludingThis(mallocSizeOf);
+             metadata_->sizeOfIncludingThisIfNotSeen(mallocSizeOf, seenMetadata);
+
+    for (const SharedTable& table : tables_)
+         *data += table->sizeOfIncludingThisIfNotSeen(mallocSizeOf, seenTables);
 
     if (maybeBytecode_)
         *data += maybeBytecode_->sizeOfIncludingThisIfNotSeen(mallocSizeOf, seenBytes);

@@ -331,7 +331,7 @@ GenerateProfilingEpilogue(MacroAssembler& masm, unsigned framePushed, ExitReason
 // Specifically, ToggleProfiling patches all callsites to either call the
 // profiling or non-profiling entry point.
 void
-wasm::GenerateFunctionPrologue(MacroAssembler& masm, unsigned framePushed, uint32_t sigIndex,
+wasm::GenerateFunctionPrologue(MacroAssembler& masm, unsigned framePushed, const SigIdDesc& sigId,
                                FuncOffsets* offsets)
 {
 #if defined(JS_CODEGEN_ARM)
@@ -349,8 +349,21 @@ wasm::GenerateFunctionPrologue(MacroAssembler& masm, unsigned framePushed, uint3
     // Generate table entry thunk:
     masm.haltingAlign(CodeAlignment);
     offsets->tableEntry = masm.currentOffset();
-    masm.branch32(Assembler::Condition::NotEqual, WasmTableCallSigReg, Imm32(sigIndex),
-                  JumpTarget::BadIndirectCall);
+    switch (sigId.kind()) {
+      case SigIdDesc::Kind::Global: {
+        Register scratch = WasmTableCallPtrReg; // clobbered by the indirect call
+        masm.loadWasmGlobalPtr(sigId.globalDataOffset(), scratch);
+        masm.branch32(Assembler::Condition::NotEqual, WasmTableCallSigReg, scratch,
+                      JumpTarget::BadIndirectCall);
+        break;
+      }
+      case SigIdDesc::Kind::Immediate:
+        masm.branch32(Assembler::Condition::NotEqual, WasmTableCallSigReg, Imm32(sigId.immediate()),
+                      JumpTarget::BadIndirectCall);
+        break;
+      case SigIdDesc::Kind::None:
+        break;
+    }
     offsets->tableProfilingJump = masm.nopPatchableToNearJump().offset();
 
     // Generate normal prologue:
@@ -708,7 +721,6 @@ ProfilingFrameIterator::label() const
     //     devtools/client/performance/modules/logic/frame-utils.js
     const char* importJitDescription = "fast FFI trampoline (in asm.js)";
     const char* importInterpDescription = "slow FFI trampoline (in asm.js)";
-    const char* errorDescription = "error generation (in asm.js)";
     const char* nativeDescription = "native call (in asm.js)";
 
     switch (exitReason_) {
@@ -718,8 +730,6 @@ ProfilingFrameIterator::label() const
         return importJitDescription;
       case ExitReason::ImportInterp:
         return importInterpDescription;
-      case ExitReason::Error:
-        return errorDescription;
       case ExitReason::Native:
         return nativeDescription;
     }

@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -306,6 +306,7 @@ WEBIDL_FILES = [
     'MediaStreamError.webidl',
     'MediaStreamTrack.webidl',
     'MediaTrackConstraintSet.webidl',
+    'MediaTrackSettings.webidl',
     'MediaTrackSupportedConstraints.webidl',
     'MenuBoxObject.webidl',
     'MessageChannel.webidl',
@@ -895,6 +896,19 @@ if CONFIG['MOZ_BUILD_APP'] in ['browser', 'xulrunner'] or CONFIG['MOZ_SUITE']:
 if CONFIG['MOZ_BUILD_APP'] in ['browser', 'mobile/android', 'xulrunner']:
     WEBIDL_FILES += [
         'External.webidl',
+    ]
+
+if CONFIG['MOZ_EME']:
+    WEBIDL_FILES += [
+        'MediaEncryptedEvent.webidl',
+        'MediaKeyError.webidl',
+        'MediaKeyMessageEvent.webidl',
+        'MediaKeys.webidl',
+        'MediaKeySession.webidl',
+        'MediaKeysRequestStatus.webidl',
+        'MediaKeyStatusMap.webidl',
+        'MediaKeySystemAccess.webidl',
+        'WidevineCDMManifest.webidl',
     ]
 
 if CONFIG['MOZ_PAY']:

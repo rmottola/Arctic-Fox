@@ -207,7 +207,7 @@ nsStyleFont::CalcDifference(const nsStyleFont& aNewData) const
     return nsChangeHint_NeutralChange;
   }
 
-  return NS_STYLE_HINT_NONE;
+  return nsChangeHint(0);
 }
 
 /* static */ nscoord
@@ -283,7 +283,7 @@ nsChangeHint
 nsStyleMargin::CalcDifference(const nsStyleMargin& aNewData) const
 {
   if (mMargin == aNewData.mMargin) {
-    return NS_STYLE_HINT_NONE;
+    return nsChangeHint(0);
   }
   // Margin differences can't affect descendant intrinsic sizes and
   // don't need to force children to reflow.
@@ -318,7 +318,7 @@ nsChangeHint
 nsStylePadding::CalcDifference(const nsStylePadding& aNewData) const
 {
   if (mPadding == aNewData.mPadding) {
-    return NS_STYLE_HINT_NONE;
+    return nsChangeHint(0);
   }
   // Padding differences can't affect descendant intrinsic sizes, but do need
   // to force children to reflow so that we can reposition them, since their
@@ -332,7 +332,7 @@ nsStyleBorder::nsStyleBorder(StyleStructContext aContext)
   , mBorderImageFill(NS_STYLE_BORDER_IMAGE_SLICE_NOFILL)
   , mBorderImageRepeatH(NS_STYLE_BORDER_IMAGE_REPEAT_STRETCH)
   , mBorderImageRepeatV(NS_STYLE_BORDER_IMAGE_REPEAT_STRETCH)
-  , mFloatEdge(NS_STYLE_FLOAT_EDGE_CONTENT_BOX)
+  , mFloatEdge(StyleFloatEdge::ContentBox)
   , mBoxDecorationBreak(NS_STYLE_BOX_DECORATION_BREAK_SLICE)
   , mComputedBorder(0, 0, 0, 0)
 {
@@ -527,7 +527,7 @@ nsStyleBorder::CalcDifference(const nsStyleBorder& aNewData) const
     return nsChangeHint_NeutralChange;
   }
 
-  return NS_STYLE_HINT_NONE;
+  return nsChangeHint(0);
 }
 
 nsStyleOutline::nsStyleOutline(StyleStructContext aContext)
@@ -602,7 +602,7 @@ nsStyleOutline::CalcDifference(const nsStyleOutline& aNewData) const
     return nsChangeHint_NeutralChange;
   }
 
-  return NS_STYLE_HINT_NONE;
+  return nsChangeHint(0);
 }
 
 // --------------------
@@ -698,7 +698,7 @@ nsStyleList::CalcDifference(const nsStyleList& aNewData) const
   if (EqualImages(mListStyleImage, aNewData.mListStyleImage) &&
       mCounterStyle == aNewData.mCounterStyle) {
     if (mImageRegion.IsEqualInterior(aNewData.mImageRegion)) {
-      return NS_STYLE_HINT_NONE;
+      return nsChangeHint(0);
     }
     if (mImageRegion.width == aNewData.mImageRegion.width &&
         mImageRegion.height == aNewData.mImageRegion.height) {
@@ -757,7 +757,7 @@ nsStyleXUL::CalcDifference(const nsStyleXUL& aNewData) const
       mBoxPack == aNewData.mBoxPack &&
       mBoxOrdinal == aNewData.mBoxOrdinal &&
       mStretchStack == aNewData.mStretchStack) {
-    return NS_STYLE_HINT_NONE;
+    return nsChangeHint(0);
   }
   if (mBoxOrdinal != aNewData.mBoxOrdinal) {
     return nsChangeHint_ReconstructFrame;
@@ -836,7 +836,7 @@ nsStyleColumn::CalcDifference(const nsStyleColumn& aNewData) const
     return nsChangeHint_NeutralChange;
   }
 
-  return NS_STYLE_HINT_NONE;
+  return nsChangeHint(0);
 }
 
 // --------------------
@@ -1005,22 +1005,22 @@ nsStyleBasicShape::GetShapeTypeName() const
 // nsStyleClipPath
 //
 nsStyleClipPath::nsStyleClipPath()
-  : mType(NS_STYLE_CLIP_PATH_NONE)
-  , mURL(nullptr)
-  , mSizingBox(NS_STYLE_CLIP_SHAPE_SIZING_NOBOX)
+  : mURL(nullptr)
+  , mType(StyleClipPathType::None_)
+  , mSizingBox(StyleClipShapeSizing::NoBox)
 {
 }
 
 nsStyleClipPath::nsStyleClipPath(const nsStyleClipPath& aSource)
-  : mType(NS_STYLE_CLIP_PATH_NONE)
-  , mURL(nullptr)
-  , mSizingBox(NS_STYLE_CLIP_SHAPE_SIZING_NOBOX)
+  : mURL(nullptr)
+  , mType(StyleClipPathType::None_)
+  , mSizingBox(StyleClipShapeSizing::NoBox)
 {
-  if (aSource.mType == NS_STYLE_CLIP_PATH_URL) {
+  if (aSource.mType == StyleClipPathType::URL) {
     SetURL(aSource.mURL);
-  } else if (aSource.mType == NS_STYLE_CLIP_PATH_SHAPE) {
+  } else if (aSource.mType == StyleClipPathType::Shape) {
     SetBasicShape(aSource.mBasicShape, aSource.mSizingBox);
-  } else if (aSource.mType == NS_STYLE_CLIP_PATH_BOX) {
+  } else if (aSource.mType == StyleClipPathType::Box) {
     SetSizingBox(aSource.mSizingBox);
   }
 }
@@ -1037,16 +1037,16 @@ nsStyleClipPath::operator=(const nsStyleClipPath& aOther)
     return *this;
   }
 
-  if (aOther.mType == NS_STYLE_CLIP_PATH_URL) {
+  if (aOther.mType == StyleClipPathType::URL) {
     SetURL(aOther.mURL);
-  } else if (aOther.mType == NS_STYLE_CLIP_PATH_SHAPE) {
+  } else if (aOther.mType == StyleClipPathType::Shape) {
     SetBasicShape(aOther.mBasicShape, aOther.mSizingBox);
-  } else if (aOther.mType == NS_STYLE_CLIP_PATH_BOX) {
+  } else if (aOther.mType == StyleClipPathType::Box) {
     SetSizingBox(aOther.mSizingBox);
   } else {
     ReleaseRef();
-    mSizingBox = NS_STYLE_CLIP_SHAPE_SIZING_NOBOX;
-    mType = NS_STYLE_CLIP_PATH_NONE;
+    mSizingBox = StyleClipShapeSizing::NoBox;
+    mType = StyleClipPathType::None_;
   }
   return *this;
 }
@@ -1058,12 +1058,12 @@ nsStyleClipPath::operator==(const nsStyleClipPath& aOther) const
     return false;
   }
 
-  if (mType == NS_STYLE_CLIP_PATH_URL) {
+  if (mType == StyleClipPathType::URL) {
     return EqualURIs(mURL, aOther.mURL);
-  } else if (mType == NS_STYLE_CLIP_PATH_SHAPE) {
+  } else if (mType == StyleClipPathType::Shape) {
     return *mBasicShape == *aOther.mBasicShape &&
            mSizingBox == aOther.mSizingBox;
-  } else if (mType == NS_STYLE_CLIP_PATH_BOX) {
+  } else if (mType == StyleClipPathType::Box) {
     return mSizingBox == aOther.mSizingBox;
   }
 
@@ -1073,10 +1073,10 @@ nsStyleClipPath::operator==(const nsStyleClipPath& aOther) const
 void
 nsStyleClipPath::ReleaseRef()
 {
-  if (mType == NS_STYLE_CLIP_PATH_SHAPE) {
+  if (mType == StyleClipPathType::Shape) {
     NS_ASSERTION(mBasicShape, "expected pointer");
     mBasicShape->Release();
-  } else if (mType == NS_STYLE_CLIP_PATH_URL) {
+  } else if (mType == StyleClipPathType::URL) {
     NS_ASSERTION(mURL, "expected pointer");
     mURL->Release();
   }
@@ -1092,26 +1092,27 @@ nsStyleClipPath::SetURL(nsIURI* aURL)
   ReleaseRef();
   mURL = aURL;
   mURL->AddRef();
-  mType = NS_STYLE_CLIP_PATH_URL;
+  mType = StyleClipPathType::URL;
 }
 
 void
-nsStyleClipPath::SetBasicShape(nsStyleBasicShape* aBasicShape, uint8_t aSizingBox)
+nsStyleClipPath::SetBasicShape(nsStyleBasicShape* aBasicShape,
+                               StyleClipShapeSizing aSizingBox)
 {
   NS_ASSERTION(aBasicShape, "expected pointer");
   ReleaseRef();
   mBasicShape = aBasicShape;
   mBasicShape->AddRef();
   mSizingBox = aSizingBox;
-  mType = NS_STYLE_CLIP_PATH_SHAPE;
+  mType = StyleClipPathType::Shape;
 }
 
 void
-nsStyleClipPath::SetSizingBox(uint8_t aSizingBox)
+nsStyleClipPath::SetSizingBox(StyleClipShapeSizing aSizingBox)
 {
   ReleaseRef();
   mSizingBox = aSizingBox;
-  mType = NS_STYLE_CLIP_PATH_BOX;
+  mType = StyleClipPathType::Box;
 }
 
 // --------------------
@@ -1756,7 +1757,7 @@ nsStyleTable::CalcDifference(const nsStyleTable& aNewData) const
       mLayoutStrategy != aNewData.mLayoutStrategy) {
     return nsChangeHint_ReconstructFrame;
   }
-  return NS_STYLE_HINT_NONE;
+  return nsChangeHint(0);
 }
 
 // -----------------------
@@ -1802,7 +1803,7 @@ nsStyleTableBorder::CalcDifference(const nsStyleTableBorder& aNewData) const
       (mBorderSpacingCol == aNewData.mBorderSpacingCol) &&
       (mBorderSpacingRow == aNewData.mBorderSpacingRow)) {
     if (mEmptyCells == aNewData.mEmptyCells) {
-      return NS_STYLE_HINT_NONE;
+      return nsChangeHint(0);
     }
     return NS_STYLE_HINT_VISUAL;
   } else {
@@ -1830,7 +1831,7 @@ nsChangeHint
 nsStyleColor::CalcDifference(const nsStyleColor& aNewData) const
 {
   if (mColor == aNewData.mColor) {
-    return NS_STYLE_HINT_NONE;
+    return nsChangeHint(0);
   }
   return nsChangeHint_RepaintFrame;
 }
@@ -2037,7 +2038,7 @@ nsStyleImage::UntrackImage(nsPresContext* aContext)
   // Unregister the image with the document
   nsIDocument* doc = aContext->Document();
   if (doc) {
-    doc->RemoveImage(mImage, nsIDocument::REQUEST_DISCARD);
+    doc->RemoveImage(mImage);
   }
 
   // Mark state
@@ -2654,11 +2655,35 @@ nsStyleImageLayers::Layer::CalcDifference(const nsStyleImageLayers::Layer& aNewL
 {
   nsChangeHint hint = nsChangeHint(0);
   if (!EqualURIs(mSourceURI, aNewLayer.mSourceURI)) {
-    hint |= nsChangeHint_UpdateEffects |
-            nsChangeHint_RepaintFrame;
-    // Mask changes require that we update the PreEffectsBBoxProperty,
-    // which is done during overflow computation.
-    hint |= nsChangeHint_UpdateOverflow;
+    hint |= nsChangeHint_RepaintFrame;
+
+    // If Layer::mSourceURI links to a SVG mask, it has a fragment. Not vice
+    // versa. Here are examples of URI contains a fragment, two of them link
+    // to a SVG mask:
+    //   mask:url(a.svg#maskID); // The fragment of this URI is an ID of a mask
+    //                           // element in a.svg.
+    //   mask:url(#localMaskID); // The fragment of this URI is an ID of a mask
+    //                           // element in local document.
+    //   mask:url(b.svg#viewBoxID); // The fragment of this URI is an ID of a
+    //                              // viewbox defined in b.svg.
+    // That is, if mSourceURI has a fragment, it may link to a SVG mask; If
+    // not, it "must" not link to a SVG mask.
+    bool maybeSVGMask = false;
+    if (mSourceURI) {
+      mSourceURI->GetHasRef(&maybeSVGMask);
+    }
+    if (!maybeSVGMask && aNewLayer.mSourceURI) {
+      aNewLayer.mSourceURI->GetHasRef(&maybeSVGMask);
+    }
+
+    // Return nsChangeHint_UpdateEffects and nsChangeHint_UpdateOverflow if
+    // either URI might link to an SVG mask.
+    if (maybeSVGMask) {
+      hint |= nsChangeHint_UpdateEffects;
+      // Mask changes require that we update the PreEffectsBBoxProperty,
+      // which is done during overflow computation.
+      hint |= nsChangeHint_UpdateOverflow;
+    }
   } else if (mAttachment != aNewLayer.mAttachment ||
              mClip != aNewLayer.mClip ||
              mOrigin != aNewLayer.mOrigin ||
@@ -2796,7 +2821,7 @@ nsTimingFunction::AssignFromKeyword(int32_t aTimingFunctionType)
   mFunc.mY2 = timingFunctionValues[aTimingFunctionType][3];
 }
 
-mozilla::StyleTransition::StyleTransition(const StyleTransition& aCopy)
+StyleTransition::StyleTransition(const StyleTransition& aCopy)
   : mTimingFunction(aCopy.mTimingFunction)
   , mDuration(aCopy.mDuration)
   , mDelay(aCopy.mDelay)
@@ -2806,7 +2831,7 @@ mozilla::StyleTransition::StyleTransition(const StyleTransition& aCopy)
 }
 
 void
-mozilla::StyleTransition::SetInitialValues()
+StyleTransition::SetInitialValues()
 {
   mTimingFunction = nsTimingFunction(NS_STYLE_TRANSITION_TIMING_FUNCTION_EASE);
   mDuration = 0.0;
@@ -2815,7 +2840,7 @@ mozilla::StyleTransition::SetInitialValues()
 }
 
 void
-mozilla::StyleTransition::SetUnknownProperty(nsCSSProperty aProperty,
+StyleTransition::SetUnknownProperty(nsCSSProperty aProperty,
                                              const nsAString& aPropertyString)
 {
   MOZ_ASSERT(nsCSSProps::LookupProperty(aPropertyString,
@@ -2830,7 +2855,7 @@ mozilla::StyleTransition::SetUnknownProperty(nsCSSProperty aProperty,
 }
 
 bool
-mozilla::StyleTransition::operator==(const mozilla::StyleTransition& aOther) const
+StyleTransition::operator==(const StyleTransition& aOther) const
 {
   return mTimingFunction == aOther.mTimingFunction &&
          mDuration == aOther.mDuration &&
@@ -2840,7 +2865,7 @@ mozilla::StyleTransition::operator==(const mozilla::StyleTransition& aOther) con
           mUnknownProperty == aOther.mUnknownProperty);
 }
 
-mozilla::StyleAnimation::StyleAnimation(const mozilla::StyleAnimation& aCopy)
+StyleAnimation::StyleAnimation(const StyleAnimation& aCopy)
   : mTimingFunction(aCopy.mTimingFunction)
   , mDuration(aCopy.mDuration)
   , mDelay(aCopy.mDelay)
@@ -2853,7 +2878,7 @@ mozilla::StyleAnimation::StyleAnimation(const mozilla::StyleAnimation& aCopy)
 }
 
 void
-mozilla::StyleAnimation::SetInitialValues()
+StyleAnimation::SetInitialValues()
 {
   mTimingFunction = nsTimingFunction(NS_STYLE_TRANSITION_TIMING_FUNCTION_EASE);
   mDuration = 0.0;
@@ -2866,7 +2891,7 @@ mozilla::StyleAnimation::SetInitialValues()
 }
 
 bool
-mozilla::StyleAnimation::operator==(const mozilla::StyleAnimation& aOther) const
+StyleAnimation::operator==(const StyleAnimation& aOther) const
 {
   return mTimingFunction == aOther.mTimingFunction &&
          mDuration == aOther.mDuration &&
@@ -3389,7 +3414,7 @@ nsStyleContentData::UntrackImage(nsPresContext* aContext)
   // Unregister the image with the document
   nsIDocument* doc = aContext->Document();
   if (doc) {
-    doc->RemoveImage(mContent.mImage, nsIDocument::REQUEST_DISCARD);
+    doc->RemoveImage(mContent.mImage);
   }
 
   // Mark state
@@ -3522,7 +3547,7 @@ nsStyleContent::CalcDifference(const nsStyleContent& aNewData) const
   if (mMarkerOffset != aNewData.mMarkerOffset) {
     return NS_STYLE_HINT_REFLOW;
   }
-  return NS_STYLE_HINT_NONE;
+  return nsChangeHint(0);
 }
 
 nsresult
@@ -3602,7 +3627,7 @@ nsStyleTextReset::CalcDifference(const nsStyleTextReset& aNewData) const
     return nsChangeHint_RepaintFrame;
   }
 
-  return NS_STYLE_HINT_NONE;
+  return nsChangeHint(0);
 }
 
 // Returns true if the given shadow-arrays are equal.
@@ -3664,7 +3689,7 @@ nsStyleText::nsStyleText(StyleStructContext aContext)
   MOZ_COUNT_CTOR(nsStyleText);
   nsCOMPtr<nsIAtom> language = aContext.GetContentLanguage();
   mTextEmphasisPosition = language &&
-    nsStyleUtil::MatchesLanguagePrefix(language, MOZ_UTF16("zh")) ?
+    nsStyleUtil::MatchesLanguagePrefix(language, u"zh") ?
     NS_STYLE_TEXT_EMPHASIS_POSITION_DEFAULT_ZH :
     NS_STYLE_TEXT_EMPHASIS_POSITION_DEFAULT;
 }
@@ -3797,7 +3822,7 @@ nsStyleText::CalcDifference(const nsStyleText& aNewData) const
     return nsChangeHint_NeutralChange;
   }
 
-  return NS_STYLE_HINT_NONE;
+  return nsChangeHint(0);
 }
 
 LogicalSide
@@ -3858,7 +3883,7 @@ nsCursorImage::operator=(const nsCursorImage& aOther)
 nsStyleUserInterface::nsStyleUserInterface(StyleStructContext aContext)
   : mUserInput(NS_STYLE_USER_INPUT_AUTO)
   , mUserModify(NS_STYLE_USER_MODIFY_READ_ONLY)
-  , mUserFocus(NS_STYLE_USER_FOCUS_NONE)
+  , mUserFocus(StyleUserFocus::None_)
   , mPointerEvents(NS_STYLE_POINTER_EVENTS_AUTO)
   , mCursor(NS_STYLE_CURSOR_AUTO)
   , mCursorArrayLength(0)
@@ -3992,7 +4017,7 @@ nsStyleUIReset::CalcDifference(const nsStyleUIReset& aNewData) const
     return nsChangeHint_SchedulePaint;
   }
 
-  return NS_STYLE_HINT_NONE;
+  return nsChangeHint(0);
 }
 
 //-----------------------

@@ -93,7 +93,6 @@ TextTrack::SetMode(TextTrackMode aValue)
   if (mMode != aValue) {
     mMode = aValue;
     if (aValue == TextTrackMode::Disabled) {
-      SetCuesInactive();
       // Remove all the cues in MediaElement.
       if (mTextTrackList) {
         HTMLMediaElement* mediaElement = mTextTrackList->GetMediaElement();
@@ -103,6 +102,7 @@ TextTrack::SetMode(TextTrackMode aValue)
           }
         }
       }
+      SetCuesInactive();
     } else {
       // Add all the cues into MediaElement.
       if (mTextTrackList) {
@@ -153,6 +153,7 @@ TextTrack::RemoveCue(TextTrackCue& aCue, ErrorResult& aRv)
   aCue.SetActive(false);
 
   mCueList->RemoveCue(aCue, aRv);
+  aCue.SetTrack(nullptr);
   if (mTextTrackList) {
     HTMLMediaElement* mediaElement = mTextTrackList->GetMediaElement();
     if (mediaElement) {
@@ -296,6 +297,25 @@ TextTrack::NotifyCueUpdated(TextTrackCue *aCue)
     }
   }
   SetDirty();
+}
+
+void
+TextTrack::GetLabel(nsAString& aLabel) const
+{
+  if (mTrackElement) {
+    mTrackElement->GetLabel(aLabel);
+  } else {
+    aLabel = mLabel;
+  }
+}
+void
+TextTrack::GetLanguage(nsAString& aLanguage) const
+{
+  if (mTrackElement) {
+    mTrackElement->GetSrclang(aLanguage);
+  } else {
+    aLanguage = mLanguage;
+  }
 }
 
 } // namespace dom

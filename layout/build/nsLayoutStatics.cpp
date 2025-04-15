@@ -125,7 +125,6 @@ using namespace mozilla::system;
 #include "TouchManager.h"
 #include "MediaDecoder.h"
 #include "MediaPrefs.h"
-#include "mozilla/layers/CompositorLRU.h"
 #include "mozilla/dom/devicestorage/DeviceStorageStatics.h"
 #include "mozilla/ServoBindings.h"
 #include "mozilla/StaticPresData.h"
@@ -307,11 +306,8 @@ nsLayoutStatics::Initialize()
 #endif
 
   MediaDecoder::InitStatics();
-  MediaPrefs::GetSingleton();
 
   PromiseDebugging::Init();
-
-  layers::CompositorLRU::Init();
 
   mozilla::dom::devicestorage::DeviceStorageStatics::Initialize();
 
@@ -319,6 +315,11 @@ nsLayoutStatics::Initialize()
 
 #ifdef MOZ_STYLO
   Servo_Initialize();
+#endif
+
+#ifndef MOZ_WIDGET_ANDROID
+  // On Android, we instantiate it when constructing AndroidBridge.
+  MediaPrefs::GetSingleton();
 #endif
 
   return NS_OK;

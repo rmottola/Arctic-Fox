@@ -45,12 +45,15 @@ SEARCH_PATHS = [
     'python/futures',
     'python/jsmin',
     'python/psutil',
+    'python/pylru',
     'python/which',
     'python/pystache',
     'python/pyyaml/lib',
     'python/requests',
     'python/slugid',
+    'python/voluptuous',
     'build',
+    'build/pymake',
     'config',
     'dom/bindings',
     'dom/bindings/parser',
@@ -175,21 +178,6 @@ CATEGORIES = {
 TELEMETRY_SUBMISSION_FREQUENCY = 10
 
 
-def get_state_dir():
-    """Obtain the path to a directory to hold state.
-
-    Returns a tuple of the path and a bool indicating whether the value came
-    from an environment variable.
-    """
-    state_user_dir = os.path.expanduser('~/.mozbuild')
-    state_env_dir = os.environ.get('MOZBUILD_STATE_PATH', None)
-
-    if state_env_dir:
-        return state_env_dir, True
-    else:
-        return state_user_dir, False
-
-
 def bootstrap(topsrcdir, mozilla_dir=None):
     if mozilla_dir is None:
         mozilla_dir = topsrcdir
@@ -212,6 +200,7 @@ def bootstrap(topsrcdir, mozilla_dir=None):
     # like surprises.
     sys.path[0:0] = [os.path.join(mozilla_dir, path) for path in SEARCH_PATHS]
     import mach.main
+    from mozboot.util import get_state_dir
 
     def telemetry_handler(context, data):
         # We have not opted-in to telemetry

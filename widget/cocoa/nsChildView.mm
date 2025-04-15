@@ -59,7 +59,7 @@
 #include "GLContextCGL.h"
 #include "ScopedGLHelpers.h"
 #include "HeapCopyOfStackArray.h"
-#include "mozilla/layers/APZCTreeManager.h"
+#include "mozilla/layers/IAPZCTreeManager.h"
 #include "mozilla/layers/APZThreadUtils.h"
 #include "mozilla/layers/GLManager.h"
 #include "mozilla/layers/CompositorOGL.h"
@@ -105,6 +105,19 @@ using namespace mozilla::gl;
 using namespace mozilla::widget;
 
 using mozilla::gfx::Matrix4x4;
+
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+@interface NSProcessInfo (SPIExt)
+- (NSTimeInterval) systemUptime;
+@end
+@implementation NSProcessInfo (SPIExt)
+- (NSTimeInterval) systemUptime
+{
+  // FIXME just a hack, not 1:1 replacement
+  return [NSDate timeIntervalSinceReferenceDate];
+}
+@end
+#endif
 
 #undef DEBUG_UPDATE
 #undef INVALIDATE_DEBUGGING  // flash areas as they are invalidated
@@ -199,7 +212,7 @@ static uint32_t gNumberOfWidgetsNeedingEventThread = 0;
 #endif
 
 - (LayoutDeviceIntPoint)convertWindowCoordinates:(NSPoint)aPoint;
-- (APZCTreeManager*)apzctm;
+- (IAPZCTreeManager*)apzctm;
 
 - (BOOL)inactiveWindowAcceptsMouseEvent:(NSEvent*)aEvent;
 - (void)updateWindowDraggableState;
@@ -705,6 +718,7 @@ bool nsChildView::IsVisible() const
 // private method -[NSWindow _setNeedsDisplayInRect:]. Our BaseWindow
 // implementation of that method is augmented to let us ignore those calls
 // using -[BaseWindow disable/enableSetNeedsDisplay].
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
 static void
 ManipulateViewWithoutNeedingDisplay(NSView* aView, void (^aCallback)())
 {
@@ -716,6 +730,15 @@ ManipulateViewWithoutNeedingDisplay(NSView* aView, void (^aCallback)())
   aCallback();
   [win enableSetNeedsDisplay];
 }
+#else
+#define MVWND(x,y) \
+	{ BaseWindow* win = nil; \
+	if ([[x window] isKindOfClass:[BaseWindow class]]) \
+	  { win = (BaseWindow*)[x window]; } \
+	[win disableSetNeedsDisplay]; \
+	y; \
+	[win enableSetNeedsDisplay]; }
+#endif
 
 // Hide or show this component
 NS_IMETHODIMP nsChildView::Show(bool aState)
@@ -728,9 +751,13 @@ NS_IMETHODIMP nsChildView::Show(bool aState)
     // no pool in place.
     nsAutoreleasePool localPool;
 
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
     ManipulateViewWithoutNeedingDisplay(mView, ^{
       [mView setHidden:!aState];
     });
+#else
+    MVWND(mView, [mView setHidden:!aState]);
+#endif
 
     mVisible = aState;
   }
@@ -969,9 +996,13 @@ NS_IMETHODIMP nsChildView::Move(double aX, double aY)
   mBounds.x = x;
   mBounds.y = y;
 
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   ManipulateViewWithoutNeedingDisplay(mView, ^{
     [mView setFrame:DevPixelsToCocoaPoints(mBounds)];
   });
+#else
+  MVWND(mView, [mView setFrame:DevPixelsToCocoaPoints(mBounds)]);
+#endif
 
   NotifyRollupGeometryChange();
   ReportMoveEvent();
@@ -994,9 +1025,13 @@ NS_IMETHODIMP nsChildView::Resize(double aWidth, double aHeight, bool aRepaint)
   mBounds.width  = width;
   mBounds.height = height;
 
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   ManipulateViewWithoutNeedingDisplay(mView, ^{
     [mView setFrame:DevPixelsToCocoaPoints(mBounds)];
   });
+#else
+  MVWND(mView, [mView setFrame:DevPixelsToCocoaPoints(mBounds)]);
+#endif
 
   if (mVisible && aRepaint)
     [mView setNeedsDisplay:YES];
@@ -1033,9 +1068,13 @@ NS_IMETHODIMP nsChildView::Resize(double aX, double aY,
     mBounds.height = height;
   }
 
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   ManipulateViewWithoutNeedingDisplay(mView, ^{
     [mView setFrame:DevPixelsToCocoaPoints(mBounds)];
   });
+#else
+  MVWND(mView, [mView setFrame:DevPixelsToCocoaPoints(mBounds)]);
+#endif
 
   if (mVisible && aRepaint)
     [mView setNeedsDisplay:YES];
@@ -1888,7 +1927,12 @@ nsChildView::RectContainingTitlebarControls()
   }
 
   // Add the rects of the titlebar controls.
-  for (id view in [window titlebarControls]) {
+  NSView *view;
+  NSArray *views =  [window titlebarControls];
+  NSUInteger i;
+
+  for (i = 0; i < [views count]; i++)  {
+    view = [views objectAtIndex:i];
     rect = NSUnionRect(rect, [mView convertRect:[view bounds] fromView:view]);
   }
   return CocoaPointsToDevPixels(rect);
@@ -2024,6 +2068,14 @@ DrawResizer(CGContextRef aCtx)
   CGContextStrokeLineSegments(aCtx, points, 6);
 }
 
+static void MaybeDrawResizeIndicatorCallback(gfx::DrawTarget* drawTarget,
+	const LayoutDeviceIntRegion& updateRegion, int value) {
+    ClearRegion(drawTarget, updateRegion);
+    gfx::BorrowedCGContext borrow(drawTarget);
+    DrawResizer(borrow.cg);
+    borrow.Finish();
+}
+
 void
 nsChildView::MaybeDrawResizeIndicator(GLManager* aManager)
 {
@@ -2037,13 +2089,17 @@ nsChildView::MaybeDrawResizeIndicator(GLManager* aManager)
   }
 
   LayoutDeviceIntSize size = mResizeIndicatorRect.Size();
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   mResizerImage->UpdateIfNeeded(size, LayoutDeviceIntRegion(), ^(gfx::DrawTarget* drawTarget, const LayoutDeviceIntRegion& updateRegion) {
     ClearRegion(drawTarget, updateRegion);
     gfx::BorrowedCGContext borrow(drawTarget);
     DrawResizer(borrow.cg);
     borrow.Finish();
   });
-
+#else
+  mResizerImage->UpdateIfNeeded(size, LayoutDeviceIntRegion(),
+	&MaybeDrawResizeIndicatorCallback, 0);
+#endif
   mResizerImage->Draw(aManager, mResizeIndicatorRect.TopLeft());
 }
 
@@ -2164,7 +2220,11 @@ nsChildView::UpdateTitlebarCGContext()
   }
 
   // Draw the titlebar controls into the titlebar image.
-  for (id view in [window titlebarControls]) {
+  NSUInteger i;
+  NSArray *views;
+  views = [window titlebarControls];
+  for (i = 0; i < [views count]; i++) {
+    NSView *view = [views objectAtIndex:i];
     NSRect viewFrame = [view frame];
     NSRect viewRect = [mView convertRect:viewFrame fromView:frameView];
     if (!NSIntersectsRect(dirtyTitlebarRect, viewRect)) {
@@ -2274,6 +2334,17 @@ DrawTopLeftCornerMask(CGContextRef aCtx, int aRadius)
   CGContextFillEllipseInRect(aCtx, CGRectMake(0, 0, aRadius * 2, aRadius * 2));
 }
 
+static void MaybeDrawRoundedCornersCallback(gfx::DrawTarget* drawTarget,
+	const LayoutDeviceIntRegion& updateRegion, int mDevPixelCornerRadius) {
+    ClearRegion(drawTarget, updateRegion);
+    RefPtr<gfx::PathBuilder> builder = drawTarget->CreatePathBuilder();
+    builder->Arc(gfx::Point(mDevPixelCornerRadius, mDevPixelCornerRadius), mDevPixelCornerRadius, 0, 2.0f * M_PI);
+    RefPtr<gfx::Path> path = builder->Finish();
+    drawTarget->Fill(path,
+                     gfx::ColorPattern(gfx::Color(1.0, 1.0, 1.0, 1.0)),
+                     gfx::DrawOptions(1.0f, gfx::CompositionOp::OP_SOURCE));
+}
+
 void
 nsChildView::MaybeDrawRoundedCorners(GLManager* aManager,
                                      const LayoutDeviceIntRect& aRect)
@@ -2285,6 +2356,7 @@ nsChildView::MaybeDrawRoundedCorners(GLManager* aManager,
   }
 
   LayoutDeviceIntSize size(mDevPixelCornerRadius, mDevPixelCornerRadius);
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   mCornerMaskImage->UpdateIfNeeded(size, LayoutDeviceIntRegion(), ^(gfx::DrawTarget* drawTarget, const LayoutDeviceIntRegion& updateRegion) {
     ClearRegion(drawTarget, updateRegion);
     RefPtr<gfx::PathBuilder> builder = drawTarget->CreatePathBuilder();
@@ -2294,6 +2366,10 @@ nsChildView::MaybeDrawRoundedCorners(GLManager* aManager,
                      gfx::ColorPattern(gfx::Color(1.0, 1.0, 1.0, 1.0)),
                      gfx::DrawOptions(1.0f, gfx::CompositionOp::OP_SOURCE));
   });
+#else
+  mCornerMaskImage->UpdateIfNeeded(size, LayoutDeviceIntRegion(),
+	&MaybeDrawRoundedCornersCallback, mDevPixelCornerRadius);
+#endif
 
   // Use operator destination in: multiply all 4 channels with source alpha.
   aManager->gl()->fBlendFuncSeparate(LOCAL_GL_ZERO, LOCAL_GL_SRC_ALPHA,
@@ -3142,6 +3218,13 @@ NSEvent* gLastDragMouseDownEvent = nil;
   NS_OBJC_END_TRY_ABORT_BLOCK_NIL;
 }
 
+// From TenFourFox:
+// NEVER define this in pre-10.6 builds. If you do, NSTextInput doesn't work
+// properly (see http://prod.lists.apple.com/archives/cocoa-dev/2013/Dec/msg00068.html ).
+// It seems to have something to do with the secret underlying NSInputContext
+// and NSTSMInputContext, which became NSTextInputContext in 10.6.
+
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
 // ComplexTextInputPanel's interpretKeyEvent hack won't work without this.
 // It makes calls to +[NSTextInputContext currentContext], deep in system
 // code, return the appropriate context.
@@ -3170,6 +3253,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
     return [super inputContext];
   }
 }
+#endif
 
 - (void)installTextInputHandler:(TextInputHandler*)aHandler
 {
@@ -4306,10 +4390,14 @@ NSEvent* gLastDragMouseDownEvent = nil;
    * changed. Documentation couldn't be found for the meaning of the subtype
    * 0x16, but it will probably never change. See bug 863841.
    */
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_7) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7)
   return nsCocoaFeatures::OnLionOrLater() &&
          !nsCocoaFeatures::OnMountainLionOrLater() &&
          [anEvent type] == NSEventTypeGesture &&
          [anEvent subtype] == 0x16;
+#else
+  return NO;
+#endif
 }
 
 - (bool)shouldConsiderStartingSwipeFromEvent:(NSEvent*)anEvent
@@ -4527,6 +4615,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
   return NSRectToCGRect(inWindowCoords);
 }
 
+#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
 static CGSRegionObj
 NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
                        CGRect (^aRectConverter)(const LayoutDeviceIntRect&))
@@ -4560,6 +4649,30 @@ NewCGSRegionFromRegion(const LayoutDeviceIntRegion& aRegion,
     return [self convertToFlippedWindowCoordinates:mGeckoChild->DevPixelsToCocoaPoints(r)];
   });
 }
+#else // non-block version from TenFourFox
+- (CGSRegionObj)_regionForOpaqueDescendants:(NSRect)aRect forMove:(BOOL)aForMove
+{
+  if (!aForMove || !mGeckoChild) {
+    return [super _regionForOpaqueDescendants:aRect forMove:aForMove];
+  }
+
+  LayoutDeviceIntRect boundingRect = mGeckoChild->CocoaPointsToDevPixels(aRect);
+
+  LayoutDeviceIntRegion opaqueRegion;
+  opaqueRegion.Sub(boundingRect, mGeckoChild->GetDraggableRegion());
+
+  nsTArray<CGRect> rects;
+  for (auto iter=opaqueRegion.RectIter(); !iter.Done(); iter.Next()) {
+    // We can cheat here if needed, because the backing scale is always 1.
+    NSRect n = mGeckoChild->DevPixelsToCocoaPoints(iter.Get());
+    rects.AppendElement([self convertToFlippedWindowCoordinates:n]);
+  }
+  
+  CGSRegionObj region;
+  CGSNewRegionWithRectList(rects.Elements(), rects.Length(), &region);
+  return region;
+}
+#endif
 
 // Starting with 10.10, in addition to the traditional
 // -[NSView _regionForOpaqueDescendants:forMove:] method, there's a new form with
@@ -4936,7 +5049,7 @@ PanGestureTypeForEvent(NSEvent* aEvent)
 
 - (void)handleAsyncScrollEvent:(CGEventRef)cgEvent ofType:(CGEventType)type
 {
-  APZCTreeManager* apzctm = [self apzctm];
+  IAPZCTreeManager* apzctm = [self apzctm];
   if (!apzctm) {
     return;
   }
@@ -5584,7 +5697,7 @@ PanGestureTypeForEvent(NSEvent* aEvent)
   return mGeckoChild->CocoaPointsToDevPixels(localPoint);
 }
 
-- (APZCTreeManager*)apzctm
+- (IAPZCTreeManager*)apzctm
 {
   return mGeckoChild ? mGeckoChild->APZCTM() : nullptr;
 }

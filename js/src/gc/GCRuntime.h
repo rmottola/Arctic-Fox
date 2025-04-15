@@ -85,7 +85,24 @@ class BackgroundAllocTask : public GCParallelTask
     bool enabled() const { return enabled_; }
 
   protected:
-    virtual void run() override;
+    void run() override;
+};
+
+// Search the provided Chunks for free arenas and decommit them.
+class BackgroundDecommitTask : public GCParallelTask
+{
+  public:
+    using ChunkVector = mozilla::Vector<Chunk*>;
+
+    explicit BackgroundDecommitTask(JSRuntime *rt) : runtime(rt) {}
+    void setChunksToScan(ChunkVector &chunks);
+
+  protected:
+    void run() override;
+
+  private:
+    JSRuntime* runtime;
+    ChunkVector toDecommit;
 };
 
 /*
@@ -909,7 +926,8 @@ class GCRuntime
      * Return the list of chunks that can be released outside the GC lock.
      * Must be called either during the GC or with the GC lock taken.
      */
-    ChunkPool expireEmptyChunkPool(bool shrinkBuffers, const AutoLockGC& lock);
+    friend class BackgroundDecommitTask;
+    ChunkPool expireEmptyChunkPool(const AutoLockGC& lock);
     void freeEmptyChunks(JSRuntime* rt, const AutoLockGC& lock);
     void prepareToFreeChunk(ChunkInfo& info);
 
@@ -966,8 +984,7 @@ class GCRuntime
     void endSweepPhase(bool lastGC, AutoLockForExclusiveAccess& lock);
     void sweepZones(FreeOp* fop, bool lastGC);
     void decommitAllWithoutUnlocking(const AutoLockGC& lock);
-    void decommitArenas(AutoLockGC& lock);
-    void expireChunksAndArenas(bool shouldShrink, AutoLockGC& lock);
+    void startDecommit();
     void queueZonesForBackgroundSweep(ZoneList& zones);
     void sweepBackgroundThings(ZoneList& zones, LifoAlloc& freeBlocks, ThreadType threadType);
     void assertBackgroundSweepingFinished();
@@ -1358,6 +1375,7 @@ class GCRuntime
 #endif
 
     BackgroundAllocTask allocTask;
+    BackgroundDecommitTask decommitTask;
     GCHelperState helperState;
 
     /*

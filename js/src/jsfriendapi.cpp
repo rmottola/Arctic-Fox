@@ -590,9 +590,9 @@ js::TraceWeakMaps(WeakMapTracer* trc)
 }
 
 extern JS_FRIEND_API(bool)
-js::AreGCGrayBitsValid(JSRuntime* rt)
+js::AreGCGrayBitsValid(JSContext* cx)
 {
-    return rt->gc.areGrayBitsValid();
+    return cx->gc.areGrayBitsValid();
 }
 
 JS_FRIEND_API(bool)
@@ -614,9 +614,8 @@ struct VisitGrayCallbackFunctor {
       : callback_(callback), closure_(closure)
     {}
 
-    using ReturnType = void;
     template <class T>
-    ReturnType operator()(T tp) const {
+    void operator()(T tp) const {
         if ((*tp)->isTenured() && (*tp)->asTenured().isMarked(gc::GRAY))
             callback_(closure_, JS::GCCellPtr(*tp));
     }
@@ -1065,11 +1064,11 @@ DumpHeapVisitZone(JSRuntime* rt, void* data, Zone* zone)
 }
 
 static void
-DumpHeapVisitCompartment(JSRuntime* rt, void* data, JSCompartment* comp)
+DumpHeapVisitCompartment(JSContext* cx, void* data, JSCompartment* comp)
 {
     char name[1024];
-    if (rt->compartmentNameCallback)
-        (*rt->compartmentNameCallback)(rt, comp, name, sizeof(name));
+    if (cx->compartmentNameCallback)
+        (*cx->compartmentNameCallback)(cx, comp, name, sizeof(name));
     else
         strcpy(name, "<unknown>");
 

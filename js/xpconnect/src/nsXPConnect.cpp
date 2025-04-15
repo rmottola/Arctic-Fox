@@ -1274,7 +1274,8 @@ SetAddonInterposition(const nsACString& addonIdStr, nsIAddonInterposition* inter
     // We enter the junk scope just to allocate a string, which actually will go
     // in the system zone.
     AutoJSAPI jsapi;
-    jsapi.Init(xpc::PrivilegedJunkScope());
+    if (!jsapi.Init(xpc::PrivilegedJunkScope()))
+        return false;
     addonId = NewAddonId(jsapi.cx(), addonIdStr);
     if (!addonId)
         return false;
@@ -1288,7 +1289,8 @@ AllowCPOWsInAddon(const nsACString& addonIdStr, bool allow)
     // We enter the junk scope just to allocate a string, which actually will go
     // in the system zone.
     AutoJSAPI jsapi;
-    jsapi.Init(xpc::PrivilegedJunkScope());
+    if (!jsapi.Init(xpc::PrivilegedJunkScope()))
+        return false;
     addonId = NewAddonId(jsapi.cx(), addonIdStr);
     if (!addonId)
         return false;
@@ -1313,6 +1315,19 @@ IsChromeOrXBL(JSContext* cx, JSObject* /* unused */)
     // and instead rely on the fact that AllowContentXBLScope() only returns false in
     // remote XUL situations.
     return AccessCheck::isChrome(c) || IsContentXBLScope(c) || !AllowContentXBLScope(c);
+}
+
+namespace workers {
+extern bool IsCurrentThreadRunningChromeWorker();
+} // namespace workers
+
+bool
+ThreadSafeIsChromeOrXBL(JSContext* cx, JSObject* obj)
+{
+    if (NS_IsMainThread()) {
+        return IsChromeOrXBL(cx, obj);
+    }
+    return workers::IsCurrentThreadRunningChromeWorker();
 }
 
 } // namespace dom

@@ -65,7 +65,6 @@ class PJavaScriptParent;
 } // namespace jsipc
 
 namespace layers {
-class PCompositorBridgeParent;
 class PSharedBufferManagerParent;
 struct TextureFactoryIdentifier;
 } // namespace layers
@@ -185,6 +184,11 @@ public:
 
     ContentParentIterator begin()
     {
+      // Move the cursor to the first element that matches the policy.
+      while (mPolicy != eAll && mCurrent && !mCurrent->mIsAlive) {
+        mCurrent = mCurrent->LinkedListElement<ContentParent>::getNext();
+      }
+
       return *this;
     }
     ContentParentIterator end()
@@ -347,9 +351,6 @@ public:
    */
   static bool
   PermissionManagerRelease(const ContentParentId& aCpId, const TabId& aTabId);
-
-  static bool
-  GetBrowserConfiguration(const nsCString& aURI, BrowserConfiguration& aConfig);
 
   void ReportChildAlreadyBlocked();
 
@@ -724,14 +725,6 @@ private:
   bool
   DeallocPAPZParent(PAPZParent* aActor) override;
 
-  PCompositorBridgeParent*
-  AllocPCompositorBridgeParent(mozilla::ipc::Transport* aTransport,
-                               base::ProcessId aOtherProcess) override;
-
-  PImageBridgeParent*
-  AllocPImageBridgeParent(mozilla::ipc::Transport* aTransport,
-                          base::ProcessId aOtherProcess) override;
-
   PSharedBufferManagerParent*
   AllocPSharedBufferManagerParent(mozilla::ipc::Transport* aTranport,
                                    base::ProcessId aOtherProcess) override;
@@ -743,10 +736,6 @@ private:
   PProcessHangMonitorParent*
   AllocPProcessHangMonitorParent(Transport* aTransport,
                                  ProcessId aOtherProcess) override;
-
-  PVRManagerParent*
-  AllocPVRManagerParent(Transport* aTransport,
-                        ProcessId aOtherProcess) override;
 
   virtual bool RecvGetProcessAttributes(ContentParentId* aCpId,
                                         bool* aIsForApp,
@@ -1132,9 +1121,6 @@ private:
 
   virtual bool RecvUpdateDropEffect(const uint32_t& aDragAction,
                                     const uint32_t& aDropEffect) override;
-
-  virtual bool RecvGetBrowserConfiguration(const nsCString& aURI,
-                                           BrowserConfiguration* aConfig) override;
 
   virtual bool RecvProfile(const nsCString& aProfile) override;
 

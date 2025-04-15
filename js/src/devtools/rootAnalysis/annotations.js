@@ -84,7 +84,7 @@ var ignoreCallees = {
     "GrGLInterface.fCallback" : true,
     "std::strstreambuf._M_alloc_fun" : true,
     "std::strstreambuf._M_free_fun" : true,
-    "struct js::gc::Callback<void (*)(JSRuntime*, void*)>.op" : true,
+    "struct js::gc::Callback<void (*)(JSContext*, void*)>.op" : true,
     "mozilla::ThreadSharedFloatArrayBufferList::Storage.mFree" : true,
 };
 
@@ -306,6 +306,8 @@ function isRootedGCPointerTypeName(name)
     if (name == "ErrorResult" ||
         name == "JSErrorResult" ||
         name == "WrappableJSErrorResult" ||
+        name == "binding_detail::FastErrorResult" ||
+        name == "IgnoredErrorResult" ||
         name == "frontend::TokenStream" ||
         name == "frontend::TokenStream::Position" ||
         name == "ModuleValidator")

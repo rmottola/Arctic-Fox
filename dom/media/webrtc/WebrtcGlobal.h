@@ -491,6 +491,7 @@ struct ParamTraits<mozilla::dom::RTCMediaStreamTrackStats>
     return true;
   }
 };
+
 } // namespace ipc
 
 #endif  // _WEBRTC_GLOBAL_H_

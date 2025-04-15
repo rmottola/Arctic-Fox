@@ -68,7 +68,7 @@ MediaEngineGonkVideoSource::NotifyPull(MediaStreamGraph* aGraph,
                                        SourceMediaStream* aSource,
                                        TrackID aID,
                                        StreamTime aDesiredTime,
-                                       const PrincipalID& aPrincipalHandle)
+                                       const PrincipalHandle& aPrincipalHandle)
 {
   VideoSegment segment;
 
@@ -80,8 +80,8 @@ MediaEngineGonkVideoSource::NotifyPull(MediaStreamGraph* aGraph,
   // Note: we're not giving up mImage here
   RefPtr<layers::Image> image = mImage;
   StreamTime delta = aDesiredTime - aSource->GetEndOfAppendedData(aID);
-  LOGFRAME(("NotifyPull, desired = %ld, delta = %ld %s", (int64_t) aDesiredTime,
-            (int64_t) delta, image ? "" : "<null>"));
+  LOGFRAME(("NotifyPull, desired = %" PRIi64 ", delta = %" PRIi64 " %s",
+            (int64_t) aDesiredTime, (int64_t) delta, image ? "" : "<null>"));
 
   // Bug 846188 We may want to limit incoming frames to the requested frame rate
   // mFps - if you want 30FPS, and the camera gives you 60FPS, this could
@@ -99,12 +99,12 @@ MediaEngineGonkVideoSource::NotifyPull(MediaStreamGraph* aGraph,
     segment.AppendFrame(image.forget(), delta, size, aPrincipalHandle);
     // This can fail if either a) we haven't added the track yet, or b)
     // we've removed or finished the track.
-    aSource->AppendToTrack(aID, &(segment), aPrincipalHandle);
+    aSource->AppendToTrack(aID, &(segment));
   }
 }
 
 size_t
-MediaEngineGonkVideoSource::NumCapabilities()
+MediaEngineGonkVideoSource::NumCapabilities() const
 {
   // TODO: Stop hardcoding. Use GetRecorderProfiles+GetProfileInfo (Bug 1128550)
   //
@@ -149,13 +149,17 @@ MediaEngineGonkVideoSource::NumCapabilities()
 nsresult
 MediaEngineGonkVideoSource::Allocate(const dom::MediaTrackConstraints& aConstraints,
                                      const MediaEnginePrefs& aPrefs,
-                                     const nsString& aDeviceId)
+                                     const nsString& aDeviceId,
+                                     const nsACString& aOrigin,
+                                     BaseAllocationHandle** aOutHandle,
+                                     const char** aOutBadConstraint)
 {
   LOG((__FUNCTION__));
 
   ReentrantMonitorAutoEnter sync(mCallbackMonitor);
   if (mState == kReleased && mInitDone) {
-    ChooseCapability(aConstraints, aPrefs, aDeviceId);
+    NormalizedConstraints constraints(aConstraints);
+    ChooseCapability(constraints, aPrefs, aDeviceId);
     NS_DispatchToMainThread(WrapRunnable(RefPtr<MediaEngineGonkVideoSource>(this),
                                          &MediaEngineGonkVideoSource::AllocImpl));
     mCallbackMonitor.Wait();
@@ -164,13 +168,17 @@ MediaEngineGonkVideoSource::Allocate(const dom::MediaTrackConstraints& aConstrai
     }
   }
 
+  aOutHandle = nullptr;
   return NS_OK;
 }
 
 nsresult
-MediaEngineGonkVideoSource::Deallocate()
+MediaEngineGonkVideoSource::Deallocate(BaseAllocationHandle* aHandle)
 {
   LOG((__FUNCTION__));
+  AssertIsOnOwningThread();
+  MOZ_ASSERT(!aHandle);
+
   bool empty;
   {
     MonitorAutoLock lock(mMonitor);
@@ -202,7 +210,8 @@ MediaEngineGonkVideoSource::Deallocate()
 }
 
 nsresult
-MediaEngineGonkVideoSource::Start(SourceMediaStream* aStream, TrackID aID)
+MediaEngineGonkVideoSource::Start(SourceMediaStream* aStream, TrackID aID,
+                                  const PrincipalHandle& aPrincipalHandle)
 {
   LOG((__FUNCTION__));
   if (!mInitDone || !aStream) {
@@ -218,8 +227,11 @@ MediaEngineGonkVideoSource::Start(SourceMediaStream* aStream, TrackID aID)
 
   ReentrantMonitorAutoEnter sync(mCallbackMonitor);
 
+  MOZ_ASSERT(mCameraControl, "mCameraControl is nullptr");
   if (mState == kStarted) {
     return NS_OK;
+  } else if (!mCameraControl) {
+    return NS_ERROR_FAILURE;
   }
   mTrackID = aID;
   mImageContainer = layers::LayerManager::CreateImageContainer();
@@ -327,9 +339,11 @@ MediaEngineGonkVideoSource::Stop(SourceMediaStream* aSource, TrackID aID)
 }
 
 nsresult
-MediaEngineGonkVideoSource::Restart(const dom::MediaTrackConstraints& aConstraints,
+MediaEngineGonkVideoSource::Restart(BaseAllocationHandle* aHandle,
+                                    const dom::MediaTrackConstraints& aConstraints,
                                     const MediaEnginePrefs& aPrefs,
-                                    const nsString& aDeviceId)
+                                    const nsString& aDeviceId,
+                                    const char** aOutBadConstraint)
 {
   return NS_OK;
 }
@@ -379,7 +393,7 @@ MediaEngineGonkVideoSource::Shutdown()
   }
 
   if (mState == kAllocated || mState == kStopped) {
-    Deallocate();
+    Deallocate(nullptr);
   }
 
   mState = kReleased;
@@ -475,8 +489,9 @@ MediaEngineGonkVideoSource::StartImpl(webrtc::CaptureCapability aCapability) {
   config.mMode = ICameraControl::kPictureMode;
   config.mPreviewSize.width = aCapability.width;
   config.mPreviewSize.height = aCapability.height;
+  config.mPictureSize.width = aCapability.width;
+  config.mPictureSize.height = aCapability.height;
   mCameraControl->Start(&config);
-  mCameraControl->Set(CAMERA_PARAM_PICTURE_SIZE, config.mPreviewSize);
 
   hal::RegisterScreenConfigurationObserver(this);
 }
@@ -777,7 +792,7 @@ MediaEngineGonkVideoSource::RotateImage(layers::Image* aImage, uint32_t aWidth, 
                           dstPtr + (yStride * dstHeight + (uvStride * dstHeight / 2)), uvStride,
                           dstPtr + (yStride * dstHeight), uvStride,
                           0, 0,
-                          aWidth, aHeight,
+                          graphicBuffer->getStride(), aHeight,
                           aWidth, aHeight,
                           static_cast<libyuv::RotationMode>(mRotation),
                           libyuv::FOURCC_NV21);
@@ -794,7 +809,7 @@ MediaEngineGonkVideoSource::RotateImage(layers::Image* aImage, uint32_t aWidth, 
                           dstPtr + (dstWidth * dstHeight), half_width,
                           dstPtr + (dstWidth * dstHeight * 5 / 4), half_width,
                           0, 0,
-                          aWidth, aHeight,
+                          graphicBuffer->getStride(), aHeight,
                           aWidth, aHeight,
                           static_cast<libyuv::RotationMode>(mRotation),
                           ConvertPixelFormatToFOURCC(graphicBuffer->getPixelFormat()));

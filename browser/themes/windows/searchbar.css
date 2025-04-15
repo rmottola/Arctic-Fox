@@ -22,7 +22,7 @@
   width: 16px;
   list-style-image: url("chrome://global/skin/icons/folder-item.png");
   -moz-image-region: rect(0px, 16px, 16px, 0px);
-  -moz-margin-start: 2px;
+  margin-inline-start: 2px;
 }
 
 .searchbar-engine-button {
@@ -30,7 +30,7 @@
   min-width: 0;
   margin: 0;
   padding: 0;
-  -moz-padding-end: 2px;
+  padding-inline-end: 2px;
   -moz-box-align: center;
   background: none;
   border: none;

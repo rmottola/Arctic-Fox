@@ -321,7 +321,7 @@ Censor(JSContext* cx, unsigned argc, JS::Value* vp)
 
 BEGIN_TEST(testParseJSON_reviver)
 {
-    JSFunction *fun = JS_NewFunction(cx, Censor, 0, 0, "censor");
+    JSFunction* fun = JS_NewFunction(cx, Censor, 0, 0, "censor");
     CHECK(fun);
 
     JS::RootedValue filter(cx, JS::ObjectValue(*JS_GetFunctionObject(fun)));

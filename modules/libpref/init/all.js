@@ -648,7 +648,7 @@ pref("apz.record_checkerboarding", false);
 pref("apz.test.logging_enabled", false);
 pref("apz.touch_start_tolerance", "0.2222222");  // 0.2222222 came from 1.0/4.5
 pref("apz.touch_move_tolerance", "0.0");
-pref("apz.velocity_bias", "1.0");
+pref("apz.velocity_bias", "0.0");
 pref("apz.velocity_relevance_time_ms", 150);
 pref("apz.x_skate_highmem_adjust", "0.0");
 pref("apz.y_skate_highmem_adjust", "0.0");
@@ -2399,6 +2399,10 @@ pref("security.ssl.enable_ocsp_must_staple", true);
 
 // Enable pinning checks by default.
 pref("security.cert_pinning.enforcement_level", 2);
+
+// Controls whether signing should be enforced on signature-capable blocklist
+// collections.
+pref("services.blocklist.signing.enforced", false);
 
 #ifdef RELEASE_BUILD
 pref("security.onecrl.via.amo", true);
@@ -4902,9 +4906,6 @@ pref("layers.force-active", false);
 // platform and are the optimal surface type.
 pref("layers.gralloc.disable", false);
 
-// Don't use compositor-lru on this platform
-pref("layers.compositor-lru-size", 0);
-
 // Enable/Disable the geolocation API for content
 pref("geo.enabled", true);
 
@@ -4928,9 +4929,6 @@ pref("html5.flushtimer.initialdelay", 120);
 pref("html5.flushtimer.subsequentdelay", 120);
 
 // Push/Pop/Replace State prefs
-pref("browser.history.allowPushState", true);
-pref("browser.history.allowReplaceState", true);
-pref("browser.history.allowPopState", true);
 pref("browser.history.maxStateObjectSize", 655360);
 
 pref("browser.meta_refresh_when_inactive.disabled", false);
@@ -4975,7 +4973,7 @@ pref("full-screen-api.pointer-lock.enabled", true);
 pref("full-screen-api.transition-duration.enter", "200 200");
 pref("full-screen-api.transition-duration.leave", "200 200");
 // timeout for black screen in fullscreen transition, unit: ms
-pref("full-screen-api.transition.timeout", 500);
+pref("full-screen-api.transition.timeout", 1000);
 // time for the warning box stays on the screen before sliding out, unit: ms
 pref("full-screen-api.warning.timeout", 3000);
 // delay for the warning box to show when pointer stays on the top, unit: ms
@@ -5702,3 +5700,8 @@ pref("dom.node.rootNode.enabled", true);
 pref("media.default_volume", "1.0");
 
 pref("media.seekToNextFrame.enabled", true);
+
+// Shutdown the osfile worker if its no longer needed.
+#if !defined(RELEASE_BUILD)
+pref("osfile.reset_worker_delay", 30000);
+#endif

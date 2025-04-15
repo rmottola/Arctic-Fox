@@ -760,6 +760,7 @@ public:
       RefPtr<ExtendableMessageEvent> event = ExtendableMessageEvent::Constructor(
         aTarget, NS_LITERAL_STRING("message"), init, rv);
       if (NS_WARN_IF(rv.Failed())) {
+        rv.SuppressException();
         return false;
       }
       event->SetSource(client);
@@ -1877,8 +1878,6 @@ WorkerLoadInfo::WorkerLoadInfo()
   , mReportCSPViolations(false)
   , mXHRParamsAllowed(false)
   , mPrincipalIsSystem(false)
-  , mIsInPrivilegedApp(false)
-  , mIsInCertifiedApp(false)
   , mStorageAllowed(false)
   , mPrivateBrowsing(true)
   , mServiceWorkersTestingInWindow(false)
@@ -1937,8 +1936,6 @@ WorkerLoadInfo::StealFrom(WorkerLoadInfo& aOther)
   mReportCSPViolations = aOther.mReportCSPViolations;
   mXHRParamsAllowed = aOther.mXHRParamsAllowed;
   mPrincipalIsSystem = aOther.mPrincipalIsSystem;
-  mIsInPrivilegedApp = aOther.mIsInPrivilegedApp;
-  mIsInCertifiedApp = aOther.mIsInCertifiedApp;
   mStorageAllowed = aOther.mStorageAllowed;
   mPrivateBrowsing = aOther.mPrivateBrowsing;
   mServiceWorkersTestingInWindow = aOther.mServiceWorkersTestingInWindow;
@@ -2502,11 +2499,7 @@ WorkerPrivateParent<Derived>::DispatchControlRunnable(
 
     if (JSContext* cx = self->mJSContext) {
       MOZ_ASSERT(self->mThread);
-
-      JSRuntime* rt = JS_GetRuntime(cx);
-      MOZ_ASSERT(rt);
-
-      JS_RequestInterruptCallback(rt);
+      JS_RequestInterruptCallback(cx);
     }
 
     mCondVar.Notify();
@@ -3556,11 +3549,6 @@ WorkerPrivateParent<Derived>::SetPrincipal(nsIPrincipal* aPrincipal,
 
   mLoadInfo.mPrincipal = aPrincipal;
   mLoadInfo.mPrincipalIsSystem = nsContentUtils::IsSystemPrincipal(aPrincipal);
-  uint16_t appStatus = aPrincipal->GetAppStatus();
-  mLoadInfo.mIsInPrivilegedApp =
-    (appStatus == nsIPrincipal::APP_STATUS_CERTIFIED ||
-     appStatus == nsIPrincipal::APP_STATUS_PRIVILEGED);
-  mLoadInfo.mIsInCertifiedApp = (appStatus == nsIPrincipal::APP_STATUS_CERTIFIED);
 
   aPrincipal->GetCsp(getter_AddRefs(mLoadInfo.mCSP));
 
@@ -4393,11 +4381,6 @@ WorkerPrivate::GetLoadInfo(JSContext* aCx, nsPIDOMWindowInner* aWindow,
 
       loadInfo.mXHRParamsAllowed = perm == nsIPermissionManager::ALLOW_ACTION;
 
-      uint16_t appStatus = loadInfo.mPrincipal->GetAppStatus();
-      loadInfo.mIsInPrivilegedApp =
-        (appStatus == nsIPrincipal::APP_STATUS_CERTIFIED ||
-         appStatus == nsIPrincipal::APP_STATUS_PRIVILEGED);
-      loadInfo.mIsInCertifiedApp = (appStatus == nsIPrincipal::APP_STATUS_CERTIFIED);
       loadInfo.mFromWindow = true;
       loadInfo.mWindowID = globalWindow->WindowID();
       nsContentUtils::StorageAccess access =
@@ -4921,13 +4904,12 @@ WorkerPrivate::BlockAndCollectRuntimeStats(JS::RuntimeStats* aRtStats,
   mMemoryReporterRunning = true;
 
   NS_ASSERTION(mJSContext, "This must never be null!");
-  JSRuntime* rt = JS_GetRuntime(mJSContext);
 
   // If the worker is not already blocked (e.g. waiting for a worker event or
   // currently in a ctypes call) then we need to trigger the interrupt
   // callback to trap the worker.
   if (!mBlockedForMemoryReporter) {
-    JS_RequestInterruptCallback(rt);
+    JS_RequestInterruptCallback(mJSContext);
 
     // Wait until the worker actually blocks.
     while (!mBlockedForMemoryReporter) {
@@ -6585,6 +6567,7 @@ WorkerPrivate::ConnectMessagePort(JSContext* aCx,
   ErrorResult rv;
   RefPtr<MessagePort> port = MessagePort::Create(globalScope, aIdentifier, rv);
   if (NS_WARN_IF(rv.Failed())) {
+    rv.SuppressException();
     return false;
   }
 

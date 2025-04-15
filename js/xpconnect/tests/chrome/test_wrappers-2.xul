@@ -86,8 +86,7 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=500931
        'wrapper iterators are properly iterators');
 
     let sjow_answer = [];
-    {
-        let obj = { a: 3, next:1 };
+    let (obj = { a: 3, next:1 }) {
         for (let i in wrap.to_iterate)
             sjow_answer.push(i);
         is(sjow_answer.sort().toString(), ['a', 'next'].sort().toString(),
@@ -151,8 +150,7 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=500931
     isnot(wrap.document.body != document.body, "body should not be the same");
 
     XPCNativeWrapper.prototype = {};
-    {
-        let w = new XPCNativeWrapper(iwin);
+    let (w = new XPCNativeWrapper(iwin)) {
         ok(iwin.location, "able to set XPCNativeWrapper.prototype and do stuff with it");
     }
 
@@ -165,8 +163,7 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=500931
         ok(/ILLEGAL_VALUE/(e), "not able to wrap a document in a Window XPCNativeWrapper");
     }
 
-    {
-        let w = new XPCNativeWrapper($('ifr').contentWindow);
+    let (w = new XPCNativeWrapper($('ifr').contentWindow)) {
         w.foopybar = 5;
         ok(!("foopybar" in iwin), "XPCNativeWrappers allow expandos through");
         is(w.foopybar, 5, "can set expandos on XPCNativeWrappers, though");

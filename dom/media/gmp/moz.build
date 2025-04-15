@@ -1,11 +1,8 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-for cdm in CONFIG['MOZ_EME_MODULES']:
-    DEFINES['MOZ_%s_EME' % cdm.upper()] = True
 
 XPIDL_MODULE = 'content_geckomediaplugins'
 
@@ -120,12 +117,8 @@ UNIFIED_SOURCES += [
 
 DIRS += [
     'rlz',
+    'widevine-adapter',
 ]
-
-if 'widevine' in CONFIG['MOZ_EME_MODULES']:
-  DIRS += [
-      'widevine-adapter',
-  ]
 
 IPDL_SOURCES += [
   'GMPTypes.ipdlh',

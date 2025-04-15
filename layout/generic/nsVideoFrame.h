@@ -74,8 +74,8 @@ public:
   virtual bool IsLeaf() const override;
 
   virtual void Reflow(nsPresContext*           aPresContext,
-                      nsHTMLReflowMetrics&     aDesiredSize,
-                      const nsHTMLReflowState& aReflowState,
+                      ReflowOutput&     aDesiredSize,
+                      const ReflowInput& aReflowInput,
                       nsReflowStatus&          aStatus) override;
 
 #ifdef ACCESSIBILITY
@@ -101,6 +101,8 @@ public:
   bool ShouldDisplayPoster();
 
   nsIContent *GetCaptionOverlay() { return mCaptionDiv; }
+
+  nsIContent *GetVideoControls() { return mVideoControls; }
 
 #ifdef DEBUG_FRAME_DUMP
   virtual nsresult GetFrameName(nsAString& aResult) const override;

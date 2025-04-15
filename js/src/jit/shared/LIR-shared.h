@@ -1061,6 +1061,29 @@ class LNewArrayDynamicLength : public LInstructionHelper<1, 1, 1>
     }
 };
 
+class LNewTypedArray : public LInstructionHelper<1, 0, 2>
+{
+  public:
+    LIR_HEADER(NewTypedArray)
+
+    explicit LNewTypedArray(const LDefinition& temp1, const LDefinition& temp2) {
+        setTemp(0, temp1);
+        setTemp(1, temp2);
+    }
+
+    const LDefinition* temp1() {
+        return getTemp(0);
+    }
+
+    const LDefinition* temp2() {
+        return getTemp(1);
+    }
+
+    MNewTypedArray* mir() const {
+        return mir_->toNewTypedArray();
+    }
+};
+
 class LNewObject : public LInstructionHelper<1, 0, 1>
 {
   public:
@@ -7715,12 +7738,19 @@ class LWasmLoad : public details::LWasmLoadBase<1, 1>
     LIR_HEADER(WasmLoad);
 };
 
-class LWasmLoadI64 : public details::LWasmLoadBase<INT64_PIECES, 0>
+class LWasmLoadI64 : public details::LWasmLoadBase<INT64_PIECES, 1>
 {
   public:
     explicit LWasmLoadI64(const LAllocation& ptr)
       : LWasmLoadBase(ptr)
-    {}
+    {
+        setTemp(0, LDefinition::BogusTemp());
+    }
+
+    const LDefinition* ptrCopy() {
+        return Base::getTemp(0);
+    }
+
     LIR_HEADER(WasmLoadI64);
 };
 
@@ -8023,24 +8053,24 @@ class LAsmJSAtomicBinopHeapForEffect : public LInstructionHelper<0, 2, 5>
     }
 };
 
-class LAsmJSLoadGlobalVar : public LInstructionHelper<1, 0, 0>
+class LWasmLoadGlobalVar : public LInstructionHelper<1, 0, 0>
 {
   public:
-    LIR_HEADER(AsmJSLoadGlobalVar);
-    MAsmJSLoadGlobalVar* mir() const {
-        return mir_->toAsmJSLoadGlobalVar();
+    LIR_HEADER(WasmLoadGlobalVar);
+    MWasmLoadGlobalVar* mir() const {
+        return mir_->toWasmLoadGlobalVar();
     }
 };
 
-class LAsmJSStoreGlobalVar : public LInstructionHelper<0, 1, 0>
+class LWasmStoreGlobalVar : public LInstructionHelper<0, 1, 0>
 {
   public:
-    LIR_HEADER(AsmJSStoreGlobalVar);
-    explicit LAsmJSStoreGlobalVar(const LAllocation& value) {
+    LIR_HEADER(WasmStoreGlobalVar);
+    explicit LWasmStoreGlobalVar(const LAllocation& value) {
         setOperand(0, value);
     }
-    MAsmJSStoreGlobalVar* mir() const {
-        return mir_->toAsmJSStoreGlobalVar();
+    MWasmStoreGlobalVar* mir() const {
+        return mir_->toWasmStoreGlobalVar();
     }
     const LAllocation* value() {
         return getOperand(0);

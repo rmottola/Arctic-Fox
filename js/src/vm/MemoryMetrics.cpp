@@ -272,6 +272,7 @@ struct StatsClosure
     SourceSet seenSources;
     wasm::Metadata::SeenSet wasmSeenMetadata;
     wasm::ShareableBytes::SeenSet wasmSeenBytes;
+    wasm::Table::SeenSet wasmSeenTables;
     bool anonymize;
 
     StatsClosure(RuntimeStats* rt, ObjectPrivateVisitor* v, bool anon)
@@ -283,7 +284,8 @@ struct StatsClosure
     bool init() {
         return seenSources.init() &&
                wasmSeenMetadata.init() &&
-               wasmSeenBytes.init();
+               wasmSeenBytes.init() &&
+               wasmSeenTables.init();
     }
 };
 
@@ -324,7 +326,7 @@ StatsZoneCallback(JSRuntime* rt, void* data, Zone* zone)
 }
 
 static void
-StatsCompartmentCallback(JSRuntime* rt, void* data, JSCompartment* compartment)
+StatsCompartmentCallback(JSContext* cx, void* data, JSCompartment* compartment)
 {
     // Append a new CompartmentStats to the vector.
     RuntimeStats* rtStats = static_cast<StatsClosure*>(data)->rtStats;
@@ -332,7 +334,7 @@ StatsCompartmentCallback(JSRuntime* rt, void* data, JSCompartment* compartment)
     // CollectRuntimeStats reserves enough space.
     MOZ_ALWAYS_TRUE(rtStats->compartmentStatsVector.growBy(1));
     CompartmentStats& cStats = rtStats->compartmentStatsVector.back();
-    if (!cStats.initClasses(rt))
+    if (!cStats.initClasses(cx))
         MOZ_CRASH("oom");
     rtStats->initExtraCompartmentStats(compartment, &cStats);
 
@@ -476,6 +478,7 @@ StatsCellCallback(JSRuntime* rt, void* data, void* thing, JS::TraceKind traceKin
             instance.addSizeOfMisc(rtStats->mallocSizeOf_,
                                    &closure->wasmSeenMetadata,
                                    &closure->wasmSeenBytes,
+                                   &closure->wasmSeenTables,
                                    &info.objectsNonHeapCodeAsmJS,
                                    &info.objectsMallocHeapMisc);
         }
@@ -779,10 +782,10 @@ CollectRuntimeStatsHelper(JSContext* cx, RuntimeStats* rtStats, ObjectPrivateVis
         return false;
 
     rtStats->gcHeapChunkTotal =
-        size_t(JS_GetGCParameter(rt, JSGC_TOTAL_CHUNKS)) * gc::ChunkSize;
+        size_t(JS_GetGCParameter(cx, JSGC_TOTAL_CHUNKS)) * gc::ChunkSize;
 
     rtStats->gcHeapUnusedChunks =
-        size_t(JS_GetGCParameter(rt, JSGC_UNUSED_CHUNKS)) * gc::ChunkSize;
+        size_t(JS_GetGCParameter(cx, JSGC_UNUSED_CHUNKS)) * gc::ChunkSize;
 
     IterateChunks(cx, &rtStats->gcHeapDecommittedArenas,
                   DecommittedArenasChunkCallback);
