@@ -55,23 +55,26 @@ function cleanUp() {
   delFile("safebrowsing/test-phish-simple.sbstore");
   delFile("safebrowsing/test-malware-simple.sbstore");
   delFile("safebrowsing/test-unwanted-simple.sbstore");
+  delFile("safebrowsing/test-block-simple.sbstore");
   delFile("safebrowsing/test-track-simple.sbstore");
   delFile("safebrowsing/test-trackwhite-simple.sbstore");
   delFile("safebrowsing/test-phish-simple.cache");
   delFile("safebrowsing/test-malware-simple.cache");
   delFile("safebrowsing/test-unwanted-simple.cache");
+  delFile("safebrowsing/test-block-simple.cache");
   delFile("safebrowsing/test-track-simple.cache");
   delFile("safebrowsing/test-trackwhite-simple.cache");
   delFile("safebrowsing/test-phish-simple.pset");
   delFile("safebrowsing/test-malware-simple.pset");
   delFile("safebrowsing/test-unwanted-simple.pset");
+  delFile("safebrowsing/test-block-simple.pset");
   delFile("safebrowsing/test-track-simple.pset");
   delFile("safebrowsing/test-trackwhite-simple.pset");
   delFile("testLarge.pset");
   delFile("testNoDelta.pset");
 }
 
-var allTables = "test-phish-simple,test-malware-simple,test-unwanted-simple,test-forbid-simple,test-track-simple,test-trackwhite-simple";
+var allTables = "test-phish-simple,test-malware-simple,test-unwanted-simple,test-track-simple,test-trackwhite-simple,test-block-simple";
 
 var dbservice = Cc["@mozilla.org/url-classifier/dbservice;1"].getService(Ci.nsIUrlClassifierDBService);
 var streamUpdater = Cc["@mozilla.org/url-classifier/streamupdater;1"]
@@ -126,6 +129,10 @@ function buildMalwareUpdate(chunks, hashSize) {
 
 function buildUnwantedUpdate(chunks, hashSize) {
   return buildUpdate({"test-unwanted-simple" : chunks}, hashSize);
+}
+
+function buildBlockedUpdate(chunks, hashSize) {
+  return buildUpdate({"test-block-simple" : chunks}, hashSize);
 }
 
 function buildBareUpdate(chunks, hashSize) {
@@ -253,6 +260,11 @@ malwareUrlsExist: function(urls, cb)
 unwantedUrlsExist: function(urls, cb)
 {
   this.checkUrls(urls, 'test-unwanted-simple', cb);
+},
+
+blockedUrlsExist: function(urls, cb)
+{
+  this.checkUrls(urls, 'test-block-simple', cb);
 },
 
 subsDontExist: function(urls, cb)

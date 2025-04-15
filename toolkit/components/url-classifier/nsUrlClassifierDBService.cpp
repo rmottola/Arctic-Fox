@@ -72,17 +72,21 @@ LazyLogModule gUrlClassifierDbServiceLog("UrlClassifierDbService");
 #define CHECK_TRACKING_PB_PREF    "privacy.trackingprotection.pbmode.enabled"
 #define CHECK_TRACKING_PB_DEFAULT false
 
+#define CHECK_BLOCKED_PREF    "browser.safebrowsing.blockedURIs.enabled"
+#define CHECK_BLOCKED_DEFAULT false
+
 #define GETHASH_NOISE_PREF      "urlclassifier.gethashnoise"
 #define GETHASH_NOISE_DEFAULT   4
 
 // Comma-separated lists
-#define MALWARE_TABLE_PREF      "urlclassifier.malwareTable"
-#define PHISH_TABLE_PREF        "urlclassifier.phishTable"
-#define TRACKING_TABLE_PREF     "urlclassifier.trackingTable"
-#define TRACKING_WHITELIST_TABLE_PREF "urlclassifier.trackingWhitelistTable"
-#define DOWNLOAD_BLOCK_TABLE_PREF "urlclassifier.downloadBlockTable"
-#define DOWNLOAD_ALLOW_TABLE_PREF "urlclassifier.downloadAllowTable"
-#define DISALLOW_COMPLETION_TABLE_PREF "urlclassifier.disallow_completions"
+#define MALWARE_TABLE_PREF              "urlclassifier.malwareTable"
+#define PHISH_TABLE_PREF                "urlclassifier.phishTable"
+#define TRACKING_TABLE_PREF             "urlclassifier.trackingTable"
+#define TRACKING_WHITELIST_TABLE_PREF   "urlclassifier.trackingWhitelistTable"
+#define BLOCKED_TABLE_PREF              "urlclassifier.blockedTable"
+#define DOWNLOAD_BLOCK_TABLE_PREF       "urlclassifier.downloadBlockTable"
+#define DOWNLOAD_ALLOW_TABLE_PREF       "urlclassifier.downloadAllowTable"
+#define DISALLOW_COMPLETION_TABLE_PREF  "urlclassifier.disallow_completions"
 
 #define CONFIRM_AGE_PREF        "urlclassifier.max-complete-age"
 #define CONFIRM_AGE_DEFAULT_SEC (45 * 60)
@@ -186,6 +190,9 @@ TablesToResponse(const nsACString& tables)
   }
   if (FindInReadable(NS_LITERAL_CSTRING("-unwanted-"), tables)) {
     return NS_ERROR_UNWANTED_URI;
+  }
+  if (FindInReadable(NS_LITERAL_CSTRING("-block-"), tables)) {
+    return NS_ERROR_BLOCKED_URI;
   }
   return NS_OK;
 }
@@ -1022,7 +1029,8 @@ public:
   nsUrlClassifierClassifyCallback(nsIURIClassifierCallback *c,
                                   bool checkMalware,
                                   bool checkPhishing,
-                                  bool checkTracking)
+                                  bool checkTracking,
+                                  bool checkBlocked)
     : mCallback(c)
     {}
 
@@ -1082,6 +1090,7 @@ nsUrlClassifierDBService::nsUrlClassifierDBService()
  : mCheckMalware(CHECK_MALWARE_DEFAULT)
  , mCheckPhishing(CHECK_PHISHING_DEFAULT)
  , mCheckTracking(CHECK_TRACKING_DEFAULT)
+ , mCheckBlockedURIs(CHECK_BLOCKED_DEFAULT)
  , mInUpdate(false)
 {
 }
@@ -1128,6 +1137,12 @@ nsUrlClassifierDBService::ReadTablesFromPrefs()
     allTables.Append(tables);
   }
 
+  Preferences::GetCString(BLOCKED_TABLE_PREF, &tables);
+  if (!tables.IsEmpty()) {
+    allTables.Append(',');
+    allTables.Append(tables);
+  }
+
   Classifier::SplitTables(allTables, mGethashTables);
 
   Preferences::GetCString(DISALLOW_COMPLETION_TABLE_PREF, &tables);
@@ -1157,26 +1172,13 @@ nsUrlClassifierDBService::Init()
   mCheckTracking =
     Preferences::GetBool(CHECK_TRACKING_PREF, CHECK_TRACKING_DEFAULT) ||
     Preferences::GetBool(CHECK_TRACKING_PB_PREF, CHECK_TRACKING_PB_DEFAULT);
+  mCheckBlockedURIs = Preferences::GetBool(CHECK_BLOCKED_PREF,
+    CHECK_BLOCKED_DEFAULT);
   uint32_t gethashNoise = Preferences::GetUint(GETHASH_NOISE_PREF,
     GETHASH_NOISE_DEFAULT);
   gFreshnessGuarantee = Preferences::GetInt(CONFIRM_AGE_PREF,
     CONFIRM_AGE_DEFAULT_SEC);
   ReadTablesFromPrefs();
-
-  // Do we *really* need to be able to change all of these at runtime?
-  Preferences::AddStrongObserver(this, CHECK_MALWARE_PREF);
-  Preferences::AddStrongObserver(this, CHECK_PHISHING_PREF);
-  Preferences::AddStrongObserver(this, CHECK_TRACKING_PREF);
-  Preferences::AddStrongObserver(this, CHECK_TRACKING_PB_PREF);
-  Preferences::AddStrongObserver(this, GETHASH_NOISE_PREF);
-  Preferences::AddStrongObserver(this, CONFIRM_AGE_PREF);
-  Preferences::AddStrongObserver(this, PHISH_TABLE_PREF);
-  Preferences::AddStrongObserver(this, MALWARE_TABLE_PREF);
-  Preferences::AddStrongObserver(this, TRACKING_TABLE_PREF);
-  Preferences::AddStrongObserver(this, TRACKING_WHITELIST_TABLE_PREF);
-  Preferences::AddStrongObserver(this, DOWNLOAD_BLOCK_TABLE_PREF);
-  Preferences::AddStrongObserver(this, DOWNLOAD_ALLOW_TABLE_PREF);
-  Preferences::AddStrongObserver(this, DISALLOW_COMPLETION_TABLE_PREF);
 
   // Force PSM loading on main thread
   nsresult rv;
@@ -1226,6 +1228,26 @@ nsUrlClassifierDBService::Init()
   observerService->AddObserver(this, "profile-before-change", false);
   observerService->AddObserver(this, "xpcom-shutdown-threads", false);
 
+  // XXX: Do we *really* need to be able to change all of these at runtime?
+  // Note: These observers should only be added when everything else above has
+  //       succeeded. Failing to do so can cause long shutdown times in certain
+  //       situations. See Bug 1247798 and Bug 1244803.
+  Preferences::AddStrongObserver(this, CHECK_MALWARE_PREF);
+  Preferences::AddStrongObserver(this, CHECK_PHISHING_PREF);
+  Preferences::AddStrongObserver(this, CHECK_TRACKING_PREF);
+  Preferences::AddStrongObserver(this, CHECK_TRACKING_PB_PREF);
+  Preferences::AddStrongObserver(this, CHECK_BLOCKED_PREF);
+  Preferences::AddStrongObserver(this, GETHASH_NOISE_PREF);
+  Preferences::AddStrongObserver(this, CONFIRM_AGE_PREF);
+  Preferences::AddStrongObserver(this, PHISH_TABLE_PREF);
+  Preferences::AddStrongObserver(this, MALWARE_TABLE_PREF);
+  Preferences::AddStrongObserver(this, TRACKING_TABLE_PREF);
+  Preferences::AddStrongObserver(this, TRACKING_WHITELIST_TABLE_PREF);
+  Preferences::AddStrongObserver(this, BLOCKED_TABLE_PREF);
+  Preferences::AddStrongObserver(this, DOWNLOAD_BLOCK_TABLE_PREF);
+  Preferences::AddStrongObserver(this, DOWNLOAD_ALLOW_TABLE_PREF);
+  Preferences::AddStrongObserver(this, DISALLOW_COMPLETION_TABLE_PREF);
+
   return NS_OK;
 }
 
@@ -1258,6 +1280,12 @@ nsUrlClassifierDBService::BuildTables(bool aTrackingProtectionEnabled,
       tables.Append(trackingWhitelist);
     }
   }
+  nsAutoCString blocked;
+  Preferences::GetCString(BLOCKED_TABLE_PREF, &blocked);
+  if (mCheckBlockedURIs && !blocked.IsEmpty()) {
+    tables.Append(',');
+    tables.Append(blocked);
+  }
 
   if (StringBeginsWith(tables, NS_LITERAL_CSTRING(","))) {
     tables.Cut(0, 1);
@@ -1274,14 +1302,15 @@ nsUrlClassifierDBService::Classify(nsIPrincipal* aPrincipal,
   NS_ENSURE_ARG(aPrincipal);
   NS_ENSURE_TRUE(gDbBackgroundThread, NS_ERROR_NOT_INITIALIZED);
 
-  if (!(mCheckMalware || mCheckPhishing || aTrackingProtectionEnabled )) {
+  if (!(mCheckMalware || mCheckPhishing || aTrackingProtectionEnabled ||
+        mCheckBlockedURIs)) {
     *result = false;
     return NS_OK;
   }
 
   RefPtr<nsUrlClassifierClassifyCallback> callback =
     new nsUrlClassifierClassifyCallback(c, mCheckMalware, mCheckPhishing,
-                                        mCheckTracking );
+                                        mCheckTracking, mCheckBlockedURIs);
   if (!callback) return NS_ERROR_OUT_OF_MEMORY;
 
   nsAutoCString tables;
@@ -1592,11 +1621,15 @@ nsUrlClassifierDBService::Observe(nsISupports *aSubject, const char *aTopic,
       mCheckTracking =
         Preferences::GetBool(CHECK_TRACKING_PREF, CHECK_TRACKING_DEFAULT) ||
         Preferences::GetBool(CHECK_TRACKING_PB_PREF, CHECK_TRACKING_PB_DEFAULT);
+    } else if (NS_LITERAL_STRING(CHECK_BLOCKED_PREF).Equals(aData)) {
+      mCheckBlockedURIs = Preferences::GetBool(CHECK_BLOCKED_PREF,
+        CHECK_BLOCKED_DEFAULT);
     } else if (
       NS_LITERAL_STRING(PHISH_TABLE_PREF).Equals(aData) ||
       NS_LITERAL_STRING(MALWARE_TABLE_PREF).Equals(aData) ||
       NS_LITERAL_STRING(TRACKING_TABLE_PREF).Equals(aData) ||
       NS_LITERAL_STRING(TRACKING_WHITELIST_TABLE_PREF).Equals(aData) ||
+      NS_LITERAL_STRING(BLOCKED_TABLE_PREF).Equals(aData) ||
       NS_LITERAL_STRING(DOWNLOAD_BLOCK_TABLE_PREF).Equals(aData) ||
       NS_LITERAL_STRING(DOWNLOAD_ALLOW_TABLE_PREF).Equals(aData) ||
       NS_LITERAL_STRING(DISALLOW_COMPLETION_TABLE_PREF).Equals(aData)) {
@@ -1633,10 +1666,12 @@ nsUrlClassifierDBService::Shutdown()
     prefs->RemoveObserver(CHECK_PHISHING_PREF, this);
     prefs->RemoveObserver(CHECK_TRACKING_PREF, this);
     prefs->RemoveObserver(CHECK_TRACKING_PB_PREF, this);
+    prefs->RemoveObserver(CHECK_BLOCKED_PREF, this);
     prefs->RemoveObserver(PHISH_TABLE_PREF, this);
     prefs->RemoveObserver(MALWARE_TABLE_PREF, this);
     prefs->RemoveObserver(TRACKING_TABLE_PREF, this);
     prefs->RemoveObserver(TRACKING_WHITELIST_TABLE_PREF, this);
+    prefs->RemoveObserver(BLOCKED_TABLE_PREF, this);
     prefs->RemoveObserver(DOWNLOAD_BLOCK_TABLE_PREF, this);
     prefs->RemoveObserver(DOWNLOAD_ALLOW_TABLE_PREF, this);
     prefs->RemoveObserver(DISALLOW_COMPLETION_TABLE_PREF, this);

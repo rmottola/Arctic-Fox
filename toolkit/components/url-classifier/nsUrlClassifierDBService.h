@@ -118,6 +118,10 @@ private:
   // uris on document loads.
   bool mCheckTracking;
 
+  // TRUE if the nsURIClassifier implementation should check for blocked
+  // uris on document loads.
+  bool mCheckBlockedURIs;
+
   // TRUE if a BeginUpdate() has been called without an accompanying
   // CancelUpdate()/FinishUpdate().  This is used to prevent competing
   // updates, not to determine whether an update is still being

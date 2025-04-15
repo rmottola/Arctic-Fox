@@ -354,7 +354,8 @@ this.SafeBrowsing = {
     };
 
     try {
-      let tables = "test-malware-simple,test-phish-simple,test-unwanted-simple,test-track-simple,test-trackwhite-simple,test-forbid-simple,test-block-simple";      db.beginUpdate(dummyListener, tables, "");
+      let tables = "test-malware-simple,test-phish-simple,test-unwanted-simple,test-track-simple,test-trackwhite-simple,test-block-simple";
+      db.beginUpdate(dummyListener, tables, "");
       db.beginStream("", "");
       db.updateStream(update);
       db.finishStream();
