@@ -36,6 +36,7 @@ public:
                   LayoutDeviceIntRegion());
   void EndUpdate();
 
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   void UpdateIfNeeded(const LayoutDeviceIntSize& aNewSize,
                       const LayoutDeviceIntRegion& aDirtyRegion,
                       void (^aCallback)(gfx::DrawTarget*,
@@ -47,6 +48,19 @@ public:
       EndUpdate();
     }
   }
+#else
+ void UpdateIfNeeded(const LayoutDeviceIntSize& aNewSize,
+                      const LayoutDeviceIntRegion& aDirtyRegion,
+                      void (*aCallback)(gfx::DrawTarget*, const LayoutDeviceIntRegion&, int radius),
+                      int radius)
+  {
+    RefPtr<gfx::DrawTarget> drawTarget = BeginUpdate(aNewSize, aDirtyRegion);
+    if (drawTarget) {
+      aCallback(drawTarget, GetUpdateRegion(), radius);
+      EndUpdate();
+    }
+  }
+#endif
 
   void UpdateFromCGContext(const LayoutDeviceIntSize& aNewSize,
                            const LayoutDeviceIntRegion& aDirtyRegion,
