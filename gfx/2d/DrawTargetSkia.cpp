@@ -862,6 +862,7 @@ DrawTargetSkia::BorrowCGContext(const DrawOptions &aOptions)
   mCanvasData = aSurfaceData;
   mCGSize = size;
 
+#if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
   mCG = CGBitmapContextCreateWithData(mCanvasData,
                                       mCGSize.width,
                                       mCGSize.height,
@@ -871,6 +872,16 @@ DrawTargetSkia::BorrowCGContext(const DrawOptions &aOptions)
                                       kCGBitmapByteOrder32Host | kCGImageAlphaPremultipliedFirst,
                                       NULL, /* Callback when released */
                                       NULL);
+#else
+  mCG = CGBitmapContextCreate(mCanvasData,
+                              mCGSize.width,
+                              mCGSize.height,
+                              8, /* bits per component */
+                              stride,
+                              mColorSpace,
+                              kCGBitmapByteOrder32Host | kCGImageAlphaPremultipliedFirst);
+#endif
+
   if (!mCG) {
     ReleaseBits(mCanvasData);
     NS_WARNING("Could not create bitmap around skia data\n");
