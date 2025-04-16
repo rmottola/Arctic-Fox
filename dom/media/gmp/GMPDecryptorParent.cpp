@@ -428,6 +428,7 @@ GMPDecryptorParent::ActorDestroy(ActorDestroyReason aWhy)
     mPlugin->DecryptorDestroyed(this);
     mPlugin = nullptr;
   }
+  MaybeDisconnect(aWhy == AbnormalShutdown);
 }
 
 bool
