@@ -1682,6 +1682,9 @@ bool
 ContentChild::RecvNotifyGMPsChanged()
 {
   GMPDecoderModule::UpdateUsableCodecs();
+  MOZ_ASSERT(NS_IsMainThread());
+  nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+  obs->NotifyObservers(nullptr, "gmp-changed", nullptr);
   return true;
 }
 
