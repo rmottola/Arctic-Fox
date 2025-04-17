@@ -74,6 +74,7 @@ EXPORTS += [
 if CONFIG['MOZ_EME']:
     EXPORTS += [
         'GMPCDMCallbackProxy.h',
+        'GMPCDMProxy.h',
     ]
 
 # We link GMPLoader into xul on B2G/Fennec as its code does not need to be
