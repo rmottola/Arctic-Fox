@@ -35,7 +35,7 @@ public:
             bool aInPrivateBrowsing) override;
 
   void CreateSession(uint32_t aCreateSessionToken,
-                     dom::SessionType aSessionType,
+                     dom::MediaKeySessionType aSessionType,
                      PromiseId aPromiseId,
                      const nsAString& aInitDataType,
                      nsTArray<uint8_t>& aInitData) override;
@@ -136,7 +136,7 @@ private:
   void OnCDMCreated(uint32_t aPromiseId);
 
   struct CreateSessionData {
-    dom::SessionType mSessionType;
+    dom::MediaKeySessionType mSessionType;
     uint32_t mCreateSessionToken;
     PromiseId mPromiseId;
     nsCString mInitDataType;
