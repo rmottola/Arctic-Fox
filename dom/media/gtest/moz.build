@@ -25,6 +25,11 @@ UNIFIED_SOURCES += [
     'TestWebMBuffered.cpp',
 ]
 
+if CONFIG['MOZ_EME']:
+    UNIFIED_SOURCES += [
+        'TestEME.cpp',
+    ]
+
 if CONFIG['MOZ_WEBM_ENCODER']:
     UNIFIED_SOURCES += [
         'TestVideoTrackEncoder.cpp',
