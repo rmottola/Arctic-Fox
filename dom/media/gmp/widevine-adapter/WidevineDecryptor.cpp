@@ -199,6 +199,7 @@ WidevineDecryptor::DecryptingComplete()
 {
   Log("WidevineDecryptor::DecryptingComplete() this=%p", this);
   mCDM = nullptr;
+  mCallback = nullptr;
   Release();
 }
 
