@@ -157,10 +157,35 @@ ThreadedDriver::ThreadedDriver(MediaStreamGraphImpl* aGraphImpl)
   : GraphDriver(aGraphImpl)
 { }
 
+class MediaStreamGraphShutdownThreadRunnable : public Runnable {
+public:
+  explicit MediaStreamGraphShutdownThreadRunnable(already_AddRefed<nsIThread> aThread)
+    : mThread(aThread)
+  {
+  }
+  NS_IMETHOD Run()
+  {
+    MOZ_ASSERT(NS_IsMainThread());
+    MOZ_ASSERT(mThread);
+
+    mThread->Shutdown();
+    mThread = nullptr;
+    return NS_OK;
+  }
+private:
+  nsCOMPtr<nsIThread> mThread;
+};
+
 ThreadedDriver::~ThreadedDriver()
 {
   if (mThread) {
-    mThread->Shutdown();
+    if (NS_IsMainThread()) {
+      mThread->Shutdown();
+    } else {
+      nsCOMPtr<nsIRunnable> event =
+        new MediaStreamGraphShutdownThreadRunnable(mThread.forget());
+      NS_DispatchToMainThread(event);
+    }
   }
 }
 class MediaStreamGraphInitThreadRunnable : public Runnable {
@@ -405,34 +430,8 @@ OfflineClockDriver::OfflineClockDriver(MediaStreamGraphImpl* aGraphImpl, GraphTi
 
 }
 
-class MediaStreamGraphShutdownThreadRunnable : public Runnable {
-public:
-  explicit MediaStreamGraphShutdownThreadRunnable(nsIThread* aThread)
-    : mThread(aThread)
-  {
-  }
-  NS_IMETHOD Run()
-  {
-    MOZ_ASSERT(NS_IsMainThread());
-    MOZ_ASSERT(mThread);
-
-    mThread->Shutdown();
-    mThread = nullptr;
-    return NS_OK;
-  }
-private:
-  nsCOMPtr<nsIThread> mThread;
-};
-
 OfflineClockDriver::~OfflineClockDriver()
 {
-  // transfer the ownership of mThread to the event
-  // XXX should use .forget()/etc
-  if (mThread) {
-    nsCOMPtr<nsIRunnable> event = new MediaStreamGraphShutdownThreadRunnable(mThread);
-    mThread = nullptr;
-    NS_DispatchToMainThread(event);
-  }
 }
 
 MediaTime
@@ -560,7 +559,7 @@ AudioCallbackDriver::Init()
 {
   cubeb_stream_params output;
   cubeb_stream_params input;
-  uint32_t latency;
+  uint32_t latency_frames;
   bool firstStream = CubebUtils::GetFirstStream();
 
   MOZ_ASSERT(!NS_IsMainThread(),
@@ -589,7 +588,7 @@ AudioCallbackDriver::Init()
     output.format = CUBEB_SAMPLE_FLOAT32NE;
   }
 
-  if (cubeb_get_min_latency(CubebUtils::GetCubebContext(), output, &latency) != CUBEB_OK) {
+  if (cubeb_get_min_latency(CubebUtils::GetCubebContext(), output, &latency_frames) != CUBEB_OK) {
     NS_WARNING("Could not get minimal latency from cubeb.");
     return;
   }
@@ -625,7 +624,7 @@ AudioCallbackDriver::Init()
                           input_id,
                           mGraphImpl->mInputWanted ? &input : nullptr,
                           output_id,
-                          mGraphImpl->mOutputWanted ? &output : nullptr, latency,
+                          mGraphImpl->mOutputWanted ? &output : nullptr, latency_frames,
                           DataCallback_s, StateCallback_s, this) == CUBEB_OK) {
       mAudioStream.own(stream);
       DebugOnly<int> rv = cubeb_stream_set_volume(mAudioStream, CubebUtils::GetVolumeScale());
@@ -850,6 +849,15 @@ AudioCallbackDriver::DataCallback(const AudioDataValue* aInputBuffer,
     mIterationDurationMS /= 4;
   }
 
+  // Process mic data if any/needed
+  if (aInputBuffer) {
+    if (mAudioInput) { // for this specific input-only or full-duplex stream
+      mAudioInput->NotifyInputData(mGraphImpl, aInputBuffer,
+                                   static_cast<size_t>(aFrames),
+                                   mSampleRate, mInputChannels);
+    }
+  }
+
   mBuffer.SetBuffer(aOutputBuffer, aFrames);
   // fill part or all with leftover data from last iteration (since we
   // align to Audio blocks)
@@ -905,15 +913,6 @@ AudioCallbackDriver::DataCallback(const AudioDataValue* aInputBuffer,
   // use separate callback methods.
   mGraphImpl->NotifyOutputData(aOutputBuffer, static_cast<size_t>(aFrames),
                                mSampleRate, ChannelCount);
-
-  // Process mic data if any/needed -- after inserting far-end data for AEC!
-  if (aInputBuffer) {
-    if (mAudioInput) { // for this specific input-only or full-duplex stream
-      mAudioInput->NotifyInputData(mGraphImpl, aInputBuffer,
-                                   static_cast<size_t>(aFrames),
-                                   mSampleRate, mInputChannels);
-    }
-  }
 
   bool switching = false;
   {
