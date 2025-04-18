@@ -510,7 +510,6 @@ MediaDecoder::MediaDecoder(MediaDecoderOwner* aOwner)
   , mMediaTracksConstructed(false)
   , mFiredMetadataLoaded(false)
   , mIsDormant(false)
-  , mWasEndedWhenEnteredDormant(false)
   , mIsHeuristicDormantSupported(
       Preferences::GetBool("media.decoder.heuristic.dormant.enabled", false))
   , mHeuristicDormantTimeout(
@@ -817,7 +816,6 @@ MediaDecoder::Seek(double aTime, SeekTarget::Type aSeekType, dom::Promise* aProm
   int64_t timeUsecs = TimeUnit::FromSeconds(aTime).ToMicroseconds();
 
   mLogicalPosition = aTime;
-  mWasEndedWhenEnteredDormant = false;
 
   mLogicallySeeking = true;
   SeekTarget target = SeekTarget(timeUsecs, aSeekType);
@@ -1121,8 +1119,7 @@ bool
 MediaDecoder::IsEnded() const
 {
   MOZ_ASSERT(NS_IsMainThread());
-  return mPlayState == PLAY_STATE_ENDED ||
-         (mWasEndedWhenEnteredDormant && (mPlayState != PLAY_STATE_SHUTDOWN));
+  return mPlayState == PLAY_STATE_ENDED;
 }
 
 void
