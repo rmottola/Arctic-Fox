@@ -2867,13 +2867,13 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
       }
       break;
     case NS_THEME_SCROLLBARTHUMB_VERTICAL:
-    case NS_THEME_SCROLLBARTHUMB_HORIZONTAL: {
-      BOOL isOverlay = nsLookAndFeel::UseOverlayScrollbars();
-      BOOL isHorizontal = (aWidgetType == NS_THEME_SCROLLBARTHUMB_HORIZONTAL);
-      BOOL isRolledOver = IsParentScrollbarRolledOver(aFrame);
-      nsIFrame* scrollbarFrame = GetParentScrollbarFrame(aFrame);
-      bool isSmall = (scrollbarFrame && scrollbarFrame->StyleDisplay()->mAppearance == NS_THEME_SCROLLBAR_SMALL);
+    case NS_THEME_SCROLLBARTHUMB_HORIZONTAL:
       if (ScrollbarTrackAndThumbDrawSeparately()) {
+        BOOL isOverlay = nsLookAndFeel::UseOverlayScrollbars();
+        BOOL isHorizontal = (aWidgetType == NS_THEME_SCROLLBARTHUMB_HORIZONTAL);
+        BOOL isRolledOver = IsParentScrollbarRolledOver(aFrame);
+        nsIFrame* scrollbarFrame = GetParentScrollbarFrame(aFrame);
+        bool isSmall = (scrollbarFrame && scrollbarFrame->StyleDisplay()->mAppearance == NS_THEME_SCROLLBAR_SMALL);
         if (isOverlay && (!nsCocoaFeatures::OnMountainLionOrLater() || !isRolledOver)) {
           if (isHorizontal) {
             macRect.origin.y += 4;
@@ -2886,24 +2886,22 @@ nsNativeThemeCocoa::DrawWidgetBackground(nsRenderingContext* aContext,
             macRect.size.width -= 4;
           }
         }
+        const BOOL isOnTopOfDarkBackground = IsDarkBackground(aFrame);
+        NSMutableDictionary* options = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+          (isOverlay ? @"kCUIWidgetOverlayScrollBar" : @"scrollbar"), @"widget",
+          (isSmall ? @"small" : @"regular"), @"size",
+          (isHorizontal ? @"kCUIOrientHorizontal" : @"kCUIOrientVertical"), @"kCUIOrientationKey",
+          (isOnTopOfDarkBackground ? @"kCUIVariantWhite" : @""), @"kCUIVariantKey",
+          [NSNumber numberWithBool:YES], @"indiconly",
+          [NSNumber numberWithBool:YES], @"kCUIThumbProportionKey",
+          [NSNumber numberWithBool:YES], @"is.flipped",
+          nil];
+        if (isRolledOver) {
+          [options setObject:@"rollover" forKey:@"state"];
+        }
+        RenderWithCoreUI(macRect, cgContext, options, true);
       }
-      const BOOL isOnTopOfDarkBackground = IsDarkBackground(aFrame);
-      NSMutableDictionary* options = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-        (isOverlay ? @"kCUIWidgetOverlayScrollBar" : @"scrollbar"), @"widget",
-        (isSmall ? @"small" : @"regular"), @"size",
-        (isHorizontal ? @"kCUIOrientHorizontal" : @"kCUIOrientVertical"), @"kCUIOrientationKey",
-        (isOnTopOfDarkBackground ? @"kCUIVariantWhite" : @""), @"kCUIVariantKey",
-        [NSNumber numberWithBool:YES], @"indiconly",
-        [NSNumber numberWithBool:YES], @"kCUIThumbProportionKey",
-        [NSNumber numberWithBool:YES], @"is.flipped",
-        nil];
-      if (isRolledOver) {
-        [options setObject:@"rollover" forKey:@"state"];
-      }
-      RenderWithCoreUI(macRect, cgContext, options, true);
-    }
       break;
-
     case NS_THEME_SCROLLBARBUTTON_UP:
     case NS_THEME_SCROLLBARBUTTON_LEFT:
 #if SCROLLBARS_VISUAL_DEBUG
