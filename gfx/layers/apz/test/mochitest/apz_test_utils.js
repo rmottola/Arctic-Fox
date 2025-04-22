@@ -224,6 +224,10 @@ function runSubtestsSeriallyInFreshWindows(aSubtests) {
   });
 }
 
+function pushPrefs(prefs) {
+  return SpecialPowers.pushPrefEnv({'set': prefs});
+}
+
 function waitUntilApzStable() {
   return new Promise(function(resolve, reject) {
     SimpleTest.waitForFocus(function() {
