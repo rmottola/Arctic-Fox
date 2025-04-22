@@ -24,7 +24,8 @@ nsWEBPDecoder::nsWEBPDecoder(RasterImage* aImage)
  : Decoder(aImage)
  , mLexer(Transition::ToUnbuffered(State::FINISHED_WEBP_DATA,
                                    State::WEBP_DATA,
-                                   SIZE_MAX))
+                                   SIZE_MAX),
+          Transition::TerminateSuccess())
  , mDecoder(nullptr)
  , mData(nullptr)
  , mPreviousLastLine(0)
