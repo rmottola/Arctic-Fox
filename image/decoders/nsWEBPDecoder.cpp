@@ -54,10 +54,14 @@ nsWEBPDecoder::InitInternal()
   mDecoder = WebPINewRGB(MODE_rgbA, nullptr, 0, 0);
 #endif
 
-  return NS_ERROR_FAILURE;
+  if (!mDecoder) {
+    return NS_ERROR_FAILURE;
+  }
+
+  return NS_OK;
 }
 
-void
+nsresult
 nsWEBPDecoder::FinishInternal()
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call FinishInternal after error!");
@@ -70,6 +74,8 @@ nsWEBPDecoder::FinishInternal()
     PostFrameStop();
     PostDecodeDone();
   }
+
+  return NS_OK;
 }
 
 Maybe<TerminalState>
@@ -101,7 +107,6 @@ nsWEBPDecoder::ReadWEBPData(const char* aData, size_t aLength)
     return Transition::TerminateFailure();
   } else if (rv == VP8_STATUS_INVALID_PARAM ||
              rv == VP8_STATUS_BITSTREAM_ERROR) {
-    PostDataError();
     return Transition::TerminateFailure();
   } else if (rv == VP8_STATUS_UNSUPPORTED_FEATURE ||
              rv == VP8_STATUS_USER_ABORT) {
@@ -124,7 +129,6 @@ nsWEBPDecoder::ReadWEBPData(const char* aData, size_t aLength)
     return Transition::TerminateFailure();
 
   if (width <= 0 || height <= 0) {
-    PostDataError();
     return Transition::TerminateFailure();
   }
 

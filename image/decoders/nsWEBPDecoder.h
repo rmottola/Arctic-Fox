@@ -27,7 +27,7 @@ public:
 
   nsresult InitInternal() override;
   Maybe<TerminalState> DoDecode(SourceBufferIterator& aIterator) override;
-  void FinishInternal() override;
+  nsresult FinishInternal() override;
 private:
   friend class DecoderFactory;
 
