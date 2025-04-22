@@ -56,7 +56,7 @@ class AddonIDTest(unittest.TestCase):
      <em:targetApplication>
        <!-- Firefox -->
        <Description>
-         <em:id>{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}</em:id>
+         <em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id>
          <em:minVersion>3.5</em:minVersion>
          <em:maxVersion>8.*</em:maxVersion>
        </Description>
@@ -108,7 +108,7 @@ class AddonIDTest(unittest.TestCase):
      <em:targetApplication>
        <!-- Firefox -->
        <Description>
-         <em:id>{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}</em:id>
+         <em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id>
          <em:minVersion>3.5</em:minVersion>
          <em:maxVersion>8.*</em:maxVersion>
        </Description>
@@ -136,7 +136,7 @@ class AddonIDTest(unittest.TestCase):
      <foobar:targetApplication>
        <!-- Firefox -->
        <Description>
-         <foobar:id>{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}</foobar:id>
+         <foobar:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</foobar:id>
          <foobar:minVersion>3.5</foobar:minVersion>
          <foobar:maxVersion>8.*</foobar:maxVersion>
        </Description>

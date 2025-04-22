@@ -750,7 +750,7 @@ Blocklist.prototype = {
 #            <pref>accessibility.blockautorefresh</pref>
 #          </prefs>
 #          <versionRange minVersion="1.0" maxVersion="2.0.*">
-#            <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+#            <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 #              <versionRange minVersion="1.5" maxVersion="1.5.*"/>
 #              <versionRange minVersion="1.7" maxVersion="1.7.*"/>
 #            </targetApplication>
@@ -759,7 +759,7 @@ Blocklist.prototype = {
 #            </targetApplication>
 #          </versionRange>
 #          <versionRange minVersion="3.0" maxVersion="3.0.*">
-#            <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+#            <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 #              <versionRange minVersion="1.5" maxVersion="1.5.*"/>
 #            </targetApplication>
 #            <targetApplication id="toolkit@mozilla.org">
@@ -772,7 +772,7 @@ Blocklist.prototype = {
 #        </emItem>
 #        <emItem id="item_3@domain">
 #          <versionRange>
-#            <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+#            <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 #              <versionRange minVersion="1.5" maxVersion="1.5.*"/>
 #            </targetApplication>
 #          </versionRange>

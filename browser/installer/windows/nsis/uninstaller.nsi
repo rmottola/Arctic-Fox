@@ -200,7 +200,7 @@ Section "Uninstall"
   ${If} "$0" == "1"
     ${un.DeleteRelativeProfiles} "Arctic Fox Developers\Arctic Fox"
     ${un.DeleteRelativeProfiles} "Arctic Fox Developers\MetroPM"
-    RmDir "$APPDATA\Mozilla\Extensions\{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}"
+    RmDir "$APPDATA\Mozilla\Extensions\{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"
     RmDir "$APPDATA\Mozilla\Extensions"
     RmDir "$APPDATA\Mozilla"
   ${EndIf}

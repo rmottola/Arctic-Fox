@@ -73,7 +73,7 @@ var AboutReader = function(mm, win, articlePromise) {
   this._setupStyleDropdown();
   this._setupButton("close-button", this._onReaderClose.bind(this), "aboutReader.toolbar.close");
 
-  const gIsFirefoxDesktop = Services.appinfo.ID == "{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}";
+  const gIsFirefoxDesktop = Services.appinfo.ID == "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}";
   if (gIsFirefoxDesktop) {
     // we're ready for any external setup, send a signal for that.
     this._mm.sendAsyncMessage("Reader:OnSetup");
