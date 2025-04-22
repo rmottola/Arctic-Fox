@@ -2,16 +2,43 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Sanity tapping test</title>
+  <title>Various touch tests that spawn in new windows</title>
   <script type="application/javascript" src="/tests/SimpleTest/SimpleTest.js"></script>
   <link rel="stylesheet" type="text/css" href="/tests/SimpleTest/test.css"/>
   <script type="application/javascript">
 
-SimpleTest.waitForExplicitFinish();
+var basic_pan_prefs = [
+  // Dropping the touch slop to 0 makes the tests easier to write because
+  // we can just do a one-pixel drag to get over the pan threshold rather
+  // than having to hard-code some larger value.
+  ["apz.touch_start_tolerance", "0.0"],
+  // The touchstart from the drag can turn into a long-tap if the touch-move
+  // events get held up. Try to prevent that by making long-taps require
+  // a 10 second hold. Note that we also cannot enable chaos mode on this
+  // test for this reason, since chaos mode can cause the long-press timer
+  // to fire sooner than the pref dictates.
+  ["ui.click_hold_context_menus.delay", 10000],
+  // The subtests in this test do touch-drags to pan the page, but we don't
+  // want those pans to turn into fling animations, so we increase the
+  // fling-stop threshold velocity to absurdly high.
+  ["apz.fling_stopped_threshold", "10000"],
+  // The helper_div_pan's div gets a displayport on scroll, but if the
+  // test takes too long the displayport can expire before the new scroll
+  // position is synced back to the main thread. So we disable displayport
+  // expiry for these tests.
+  ["apz.displayport_expiry_ms", 0],
+];
 
-// this page just serially loads each one of the following test helper pages in
-// a new window and waits for it to call testDone()
-var tests = [
+var touch_action_prefs = basic_pan_prefs.slice(); // make a copy
+touch_action_prefs.push(["layout.css.touch_action.enabled", true]);
+
+var subtests = [
+  // Simple tests to exercise basic panning behaviour
+  {'file': 'helper_basic_pan.html', 'prefs': basic_pan_prefs},
+  {'file': 'helper_div_pan.html', 'prefs': basic_pan_prefs},
+  {'file': 'helper_iframe_pan.html', 'prefs': basic_pan_prefs},
+
+  // Simple test to exercise touch-tapping behaviour
   {'file': 'helper_tap.html'},
   // For the following two tests, disable displayport suppression to make sure it
   // doesn't interfere with the test by scheduling paints non-deterministically.
@@ -29,63 +56,18 @@ var tests = [
   {'file': 'helper_tap_passive.html', 'prefs': [["apz.content_response_timeout", 24 * 60 * 60 * 1000]]},
 ];
 
-var testIndex = -1;
-var w = null;
-
-function testDone() {
-  var test = tests[testIndex];
-  if (w) {
-    if (typeof test.dp_suppression != 'undefined') {
-      // We modified the suppression when starting the test, so now undo that.
-      SpecialPowers.getDOMWindowUtils(window).respectDisplayPortSuppression(!test.dp_suppression);
-    }
-    if (!!test.prefs) {
-      // We pushed some prefs for this test, pop them, and re-invoke
-      // testDone() after that's been processed
-      SpecialPowers.popPrefEnv(function() {
-        w.close();
-        w = null;
-        testDone();
-      });
-      return;
-    }
-
-    w.close();
+if (isApzEnabled()) {
+  if (getPlatform() == "android") {
+    // This has a lot of subtests, and Android emulators are slow.
+    SimpleTest.requestLongerTimeout(2);
   }
 
-  testIndex++;
-  if (testIndex >= tests.length) {
-    SimpleTest.finish();
-    return;
-  }
-
-  test = tests[testIndex];
-  if (typeof test.dp_suppression != 'undefined') {
-    // Normally during a test, the displayport will get suppressed during page
-    // load, and unsuppressed at a non-deterministic time during the test. The
-    // unsuppression can trigger a repaint which interferes with the test, so
-    // to avoid that we can force the displayport to be unsuppressed for the
-    // entire test which is more deterministic.
-    SpecialPowers.getDOMWindowUtils(window).respectDisplayPortSuppression(test.dp_suppression);
-  }
-  if (!!test.prefs) {
-    // Got some prefs for this subtest, push them
-    SpecialPowers.pushPrefEnv({"set": test.prefs}, function() {
-      w = window.open(test.file, "_blank");
-    });
-  } else {
-    w = window.open(test.file, "_blank");
-  }
+  SimpleTest.waitForExplicitFinish();
+  window.onload = function() {
+    runSubtestsSeriallyInFreshWindows(subtests)
+    .then(SimpleTest.finish);
+  };
 }
-
-window.onload = function() {
-  if (!SpecialPowers.getDOMWindowUtils(window).asyncPanZoomEnabled) {
-    ok(true, "APZ is not enabled, this test is not relevant, sorry!\n");
-    SimpleTest.finish();
-    return;
-  }
-  testDone();
-};
 
   </script>
 </head>
