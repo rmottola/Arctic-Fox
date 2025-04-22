@@ -269,7 +269,7 @@ nsPNGDecoder::EndImageFrame()
                 mAnimInfo.mBlend, Some(mFrameRect));
 }
 
-void
+nsresult
 nsPNGDecoder::InitInternal()
 {
   mCMSMode = gfxPlatform::GetCMSMode();
@@ -305,15 +305,13 @@ nsPNGDecoder::InitInternal()
                                 nullptr, nsPNGDecoder::error_callback,
                                 nsPNGDecoder::warning_callback);
   if (!mPNG) {
-    PostDecoderError(NS_ERROR_OUT_OF_MEMORY);
-    return;
+    return NS_ERROR_OUT_OF_MEMORY;
   }
 
   mInfo = png_create_info_struct(mPNG);
   if (!mInfo) {
-    PostDecoderError(NS_ERROR_OUT_OF_MEMORY);
     png_destroy_read_struct(&mPNG, nullptr, nullptr);
-    return;
+    return NS_ERROR_OUT_OF_MEMORY;
   }
 
 #ifdef PNG_HANDLE_AS_UNKNOWN_SUPPORTED
@@ -362,6 +360,7 @@ nsPNGDecoder::InitInternal()
                               nsPNGDecoder::row_callback,
                               nsPNGDecoder::end_callback);
 
+  return NS_OK;
 }
 
 Maybe<TerminalState>

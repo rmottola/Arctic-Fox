@@ -45,7 +45,7 @@ nsWEBPDecoder::~nsWEBPDecoder()
 }
 
 
-void
+nsresult
 nsWEBPDecoder::InitInternal()
 {
 #if MOZ_BIG_ENDIAN
@@ -54,10 +54,7 @@ nsWEBPDecoder::InitInternal()
   mDecoder = WebPINewRGB(MODE_rgbA, nullptr, 0, 0);
 #endif
 
-  if (!mDecoder) {
-    PostDecoderError(NS_ERROR_FAILURE);
-    return;
-  }
+  return NS_ERROR_FAILURE;
 }
 
 void
@@ -101,7 +98,6 @@ nsWEBPDecoder::ReadWEBPData(const char* aData, size_t aLength)
 
   VP8StatusCode rv = WebPIAppend(mDecoder, buf, aLength);
   if (rv == VP8_STATUS_OUT_OF_MEMORY) {
-    PostDecoderError(NS_ERROR_OUT_OF_MEMORY);
     return Transition::TerminateFailure();
   } else if (rv == VP8_STATUS_INVALID_PARAM ||
              rv == VP8_STATUS_BITSTREAM_ERROR) {
@@ -109,13 +105,11 @@ nsWEBPDecoder::ReadWEBPData(const char* aData, size_t aLength)
     return Transition::TerminateFailure();
   } else if (rv == VP8_STATUS_UNSUPPORTED_FEATURE ||
              rv == VP8_STATUS_USER_ABORT) {
-    PostDecoderError(NS_ERROR_FAILURE);
     return Transition::TerminateFailure();
   }
 
   // Catch any remaining erroneous return value.
   if (rv != VP8_STATUS_OK && rv != VP8_STATUS_SUSPENDED) {
-    PostDecoderError(NS_ERROR_FAILURE);
     return Transition::TerminateFailure();
   }
 

@@ -1801,7 +1801,7 @@ RasterImage::ReportDecoderError(Decoder* aDecoder)
   nsCOMPtr<nsIScriptError> errorObject =
     do_CreateInstance(NS_SCRIPTERROR_CONTRACTID);
 
-  if (consoleService && errorObject && !aDecoder->HasDecoderError()) {
+  if (consoleService && errorObject) {
     nsAutoString msg(NS_LITERAL_STRING("Image corrupt or truncated."));
     nsAutoString src;
     if (GetURI()) {

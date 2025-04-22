@@ -144,8 +144,7 @@ DecoderFactory::CreateDecoder(DecoderType aType,
     MOZ_ASSERT(NS_SUCCEEDED(rv), "Bad downscale-during-decode target size?");
   }
 
-  decoder->Init();
-  if (NS_FAILED(decoder->GetDecoderError())) {
+  if (NS_FAILED(decoder->Init())) {
     return nullptr;
   }
 
@@ -189,8 +188,7 @@ DecoderFactory::CreateAnimationDecoder(DecoderType aType,
   decoder->SetDecoderFlags(aDecoderFlags | DecoderFlags::IS_REDECODE);
   decoder->SetSurfaceFlags(aSurfaceFlags);
 
-  decoder->Init();
-  if (NS_FAILED(decoder->GetDecoderError())) {
+  if (NS_FAILED(decoder->Init())) {
     return nullptr;
   }
 
@@ -227,8 +225,7 @@ DecoderFactory::CreateMetadataDecoder(DecoderType aType,
   decoder->SetIterator(aSourceBuffer->Iterator());
   decoder->SetSampleSize(aSampleSize);
 
-  decoder->Init();
-  if (NS_FAILED(decoder->GetDecoderError())) {
+  if (NS_FAILED(decoder->Init())) {
     return nullptr;
   }
 
@@ -276,8 +273,7 @@ DecoderFactory::CreateDecoderForICOResource(DecoderType aType,
     MOZ_ASSERT(NS_SUCCEEDED(rv), "Bad downscale-during-decode target size?");
   }
 
-  decoder->Init();
-  if (NS_FAILED(decoder->GetDecoderError())) {
+  if (NS_FAILED(decoder->Init())) {
     return nullptr;
   }
 
@@ -322,8 +318,7 @@ DecoderFactory::CreateAnonymousDecoder(DecoderType aType,
     MOZ_ASSERT(NS_SUCCEEDED(rv), "Bad downscale-during-decode target size?");
   }
 
-  decoder->Init();
-  if (NS_FAILED(decoder->GetDecoderError())) {
+  if (NS_FAILED(decoder->Init())) {
     return nullptr;
   }
 
@@ -347,8 +342,7 @@ DecoderFactory::CreateAnonymousMetadataDecoder(DecoderType aType,
   decoder->SetIterator(aSourceBuffer->Iterator());
   decoder->SetDecoderFlags(DecoderFlags::FIRST_FRAME_ONLY);
 
-  decoder->Init();
-  if (NS_FAILED(decoder->GetDecoderError())) {
+  if (NS_FAILED(decoder->Init())) {
     return nullptr;
   }
 
