@@ -78,7 +78,7 @@ nsWEBPDecoder::FinishInternal()
   return NS_OK;
 }
 
-Maybe<TerminalState>
+LexerResult
 nsWEBPDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call WriteInternal after error!");
