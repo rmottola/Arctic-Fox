@@ -29,14 +29,6 @@
 #include "SurfaceCache.h"
 #include "FrameAnimator.h"
 
-#include "nsPNGDecoder.h"
-#include "nsGIFDecoder2.h"
-#include "nsJPEGDecoder.h"
-#include "nsBMPDecoder.h"
-#include "nsICODecoder.h"
-#include "nsIconDecoder.h"
-#include "nsWEBPDecoder.h"
-
 #include "gfxContext.h"
 
 #include "mozilla/gfx/2D.h"
