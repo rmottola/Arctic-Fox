@@ -520,7 +520,7 @@ nsWindowWatcher::CreateChromeWindow(const nsACString& aFeatures,
   bool cancel = false;
   nsCOMPtr<nsIWebBrowserChrome> newWindowChrome;
   nsresult rv =
-    windowCreator2->CreateChromeWindow2(aParentChrome, aChromeFlags, aContextFlags, nullptr,
+    windowCreator2->CreateChromeWindow2(aParentChrome, aChromeFlags, aContextFlags,
                                         aOpeningTabParent, &cancel,
                                         getter_AddRefs(newWindowChrome));
 
