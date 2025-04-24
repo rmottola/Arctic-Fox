@@ -6,8 +6,6 @@
 
 
 // Original author: ekr@rtfm.com
-// Contributors:
-//   Moonchild <moonchild@palemoon.org>
 
 // Some of this code is cut-and-pasted from nICEr. Copyright is:
 
@@ -214,7 +212,7 @@ nsresult NrIceStunServer::ToNicerStunStruct(nr_ice_stun_server *server) const {
   } else if (transport_ == kNrIceTransportTcp) {
     server->transport = IPPROTO_TCP;
   } else {
-    MOZ_ASSERT(false);
+    MOZ_MTLOG(ML_ERROR, "Unsupported STUN server transport: " << transport_);
     return NS_ERROR_FAILURE;
   }
 
