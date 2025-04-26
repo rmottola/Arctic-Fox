@@ -333,7 +333,7 @@ public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSIGETUSERMEDIADEVICESSUCCESSCALLBACK
 
-  MediaDeviceSuccessCallback(RefPtr<dom::GetUserMediaRequest> &aRequest)
+  explicit MediaDeviceSuccessCallback(RefPtr<dom::GetUserMediaRequest> &aRequest)
     : mRequest(aRequest) {}
 
 protected:
@@ -398,7 +398,7 @@ public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSIDOMGETUSERMEDIAERRORCALLBACK
 
-  MediaDeviceErrorCallback(const nsAString &aCallID)
+  explicit MediaDeviceErrorCallback(const nsAString &aCallID)
     : mCallID(aCallID) {}
 
 protected:
