@@ -23763,6 +23763,17 @@
             "url": "/web-animations/timing-model/animation-effects/simple-iteration-progress.html"
           }
         ],
+        "fetch/api/basic/request-referrer.html": [
+          {
+            "path": "fetch/api/basic/request-referrer.html",
+            "url": "/fetch/api/basic/request-referrer.html"
+          }
+        ],
+        "fetch/api/policies/referrer-origin-when-cross-origin-worker.html": [
+          {
+            "path": "fetch/api/policies/referrer-origin-when-cross-origin-worker.html",
+            "url": "/fetch/api/policies/referrer-origin-when-cross-origin-worker.html"
+          }
         "web-animations/timing-model/animations/set-the-animation-start-time.html": [
           {
             "path": "web-animations/timing-model/animations/set-the-animation-start-time.html",
