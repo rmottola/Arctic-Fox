@@ -135,13 +135,3 @@ if CONFIG['INTEL_ARCHITECTURE']:
 
 if CONFIG['MACOS_SDK_DIR']:
     gyp_vars['mac_sdk_path'] = CONFIG['MACOS_SDK_DIR']
-
-if CONFIG['MOZ_AVFOUNDATION']:
-    gyp_vars['mac_avfoundation'] = 1
-else:
-    gyp_vars['mac_avfoundation'] = 0
-
-if CONFIG['MOZ_QTKIT']:
-    gyp_vars['mac_qtkit'] = 1
-else:
-    gyp_vars['mac_qtkit'] = 0

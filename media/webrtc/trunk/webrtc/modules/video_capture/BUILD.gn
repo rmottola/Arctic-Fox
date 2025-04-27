@@ -90,7 +90,7 @@ if (!build_with_chromium) {
       ]
       deps += [ "../..:webrtc_common" ]
     }
-    if (is_mac && use_avfoundation) {
+    if (is_mac and use_avfoundation) {
       sources = [
         "mac/avfoundation/video_capture_avfoundation.h",
         "mac/avfoundation/video_capture_avfoundation.mm",
@@ -108,7 +108,7 @@ if (!build_with_chromium) {
         "CoreVideo.framework",
       ]
     }
-    if (is_mac && use_qtkit) {
+    if (is_mac and use_qtkit) {
       sources = [
         "mac/qtkit/video_capture_qtkit.h",
         "mac/qtkit/video_capture_qtkit.mm",

@@ -76,7 +76,7 @@
                 'linux/video_capture_linux.h',
               ],
             }],  # linux
-            ['OS=="mac" and mac_avfoundation==1', {
+            ['OS=="mac" and use_avfoundation==1', {
               'sources': [
                 'mac/avfoundation/video_capture_avfoundation.h',
                 'mac/avfoundation/video_capture_avfoundation.mm',
@@ -98,7 +98,7 @@
                 },
               },
             }],  # mac
-            ['OS=="mac" and mac_qtkit==1', {
+            ['OS=="mac" and use_qtkit==1', {
               'sources': [
                 'mac/qtkit/video_capture_qtkit.h',
                 'mac/qtkit/video_capture_qtkit.mm',
