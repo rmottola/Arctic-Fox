@@ -15423,6 +15423,16 @@ CSSParserImpl::ParseFunctionInternals(const uint32_t aVariantMask[],
       break;
     }
 
+    if (nsCSSValue::IsFloatUnit(newValue.GetUnit())) {
+      // Clamp infinity or -infinity values to max float or -max float to avoid
+      // calculations with infinity.
+      newValue.SetFloatValue(
+        mozilla::clamped(newValue.GetFloatValue(),
+                         -std::numeric_limits<float>::max(),
+                          std::numeric_limits<float>::max()),
+        newValue.GetUnit());
+    }
+
     aOutput.AppendElement(newValue);
 
     if (ExpectSymbol(',', true)) {
