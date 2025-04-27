@@ -265,7 +265,7 @@ nsSubDocumentFrame::GetSubdocumentSize()
         nsSize size = view->GetBounds().Size();
         nsPresContext* presContext = detachedFrame->PresContext();
         return ScreenIntSize(presContext->AppUnitsToDevPixels(size.width),
-                         presContext->AppUnitsToDevPixels(size.height));
+                             presContext->AppUnitsToDevPixels(size.height));
       }
     }
     // Pick some default size for now.  Using 10x10 because that's what the
@@ -988,6 +988,7 @@ nsSubDocumentFrame::DestroyFrom(nsIFrame* aDestructRoot)
   RefPtr<nsFrameLoader> frameloader = FrameLoader();
   if (frameloader) {
     nsView* detachedViews = ::BeginSwapDocShellsForViews(mInnerView->GetFirstChild());
+
     if (detachedViews && detachedViews->GetFrame()) {
       MOZ_ASSERT(mContent->OwnerDoc());
       frameloader->SetDetachedSubdocFrame(
