@@ -13,6 +13,7 @@
  *
  */
 
+#include <AvailabilityMacros.h>
 #include <QuickTime/QuickTime.h>
 
 #include "webrtc/modules/video_capture/device_info_impl.h"
@@ -23,10 +24,10 @@
 
 // 10.4 support must be decided runtime. We will just decide which framework to
 // use at compile time "work" classes. One for QTKit, one for QuickTime
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == __MAC_10_4 // QuickTime version
+#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1040 // QuickTime version
 #include <QuickTime/video_capture_quick_time.h>
 #include <QuickTime/video_capture_quick_time_info.h>
-#elseif __MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_10_7
+#elif __MAC_OS_X_VERSION_MIN_REQUIRED < 1070
 #include "webrtc/modules/video_capture/mac/qtkit/video_capture_qtkit.h"
 #include "webrtc/modules/video_capture/mac/qtkit/video_capture_qtkit_info.h"
 #else
@@ -124,7 +125,7 @@ VideoCaptureModule* VideoCaptureImpl::Create(
         return NULL;
     }
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == __MAC_10_4 // QuickTime version
+#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1040 // QuickTime version
     if (webrtc::videocapturemodule::CheckQTVersion() == false)
     {
         WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoCapture, id,
@@ -167,7 +168,7 @@ VideoCaptureModule* VideoCaptureImpl::Create(
                  deviceUniqueIdUTF8);
     return newCaptureModule;
 
-#elseif __MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_10_7 // QTKit version
+#elif __MAC_OS_X_VERSION_MIN_REQUIRED < 1070 // QTKit version
 
     WEBRTC_TRACE(webrtc::kTraceInfo, webrtc::kTraceVideoCapture, id,
                  "Using QTKit framework to capture video", id);
@@ -247,7 +248,7 @@ VideoCaptureImpl::CreateDeviceInfo(const int32_t id)
         return NULL;
     }
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED == __MAC_10_4 // QuickTime version
+#if __MAC_OS_X_VERSION_MIN_REQUIRED == 1040 // QuickTime version
     if (webrtc::videocapturemodule::CheckQTVersion() == false)
     {
         WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideoCapture, id,
@@ -272,7 +273,7 @@ VideoCaptureImpl::CreateDeviceInfo(const int32_t id)
                  "VideoCaptureModule created for id", id);
     return newCaptureInfoModule;
 
-#elseif __MAC_OS_X_VERSION_MIN_REQUIRED < __MAC_10_7 // QTKit version
+#elif __MAC_OS_X_VERSION_MIN_REQUIRED < 1070 // QTKit version
     webrtc::videocapturemodule::VideoCaptureMacQTKitInfo* newCaptureInfoModule =
         new webrtc::videocapturemodule::VideoCaptureMacQTKitInfo(id);
 
