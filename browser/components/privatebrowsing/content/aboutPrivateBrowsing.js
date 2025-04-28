@@ -50,6 +50,8 @@ document.addEventListener("DOMContentLoaded", function () {
           .addEventListener("click", toggleTrackingProtection);
   document.getElementById("disableTrackingProtection")
           .addEventListener("click", toggleTrackingProtection);
+  document.getElementById("startTour")
+          .addEventListener("click", dontShowIntroPanelAgain);
 
   let formatURLPref = Cc["@mozilla.org/toolkit/URLFormatterService;1"]
                         .getService(Ci.nsIURLFormatter).formatURLPref;
@@ -84,5 +86,12 @@ function toggleTrackingProtection() {
   // Ask chrome to enable tracking protection
   document.dispatchEvent(
     new CustomEvent("AboutPrivateBrowsingToggleTrackingProtection",
+                    {bubbles:true}));
+}
+
+function dontShowIntroPanelAgain() {
+  // Ask chrome to disable the doorhanger
+  document.dispatchEvent(
+    new CustomEvent("AboutPrivateBrowsingDontShowIntroPanelAgain",
                     {bubbles:true}));
 }
