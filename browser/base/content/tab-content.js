@@ -629,7 +629,6 @@ if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
 
 
 var DOMFullscreenHandler = {
-  _fullscreenDoc: null,
 
   init: function() {
     addMessageListener("DOMFullscreen:Entered", this);
@@ -672,7 +671,6 @@ var DOMFullscreenHandler = {
           this._lastTransactionId = windowUtils.lastTransactionId;
           windowUtils.exitFullscreen();
         }
-        this._fullscreenDoc = null;
         break;
       }
     }
@@ -685,9 +683,8 @@ var DOMFullscreenHandler = {
         break;
       }
       case "MozDOMFullscreen:NewOrigin": {
-        this._fullscreenDoc = aEvent.target;
         sendAsyncMessage("DOMFullscreen:NewOrigin", {
-          originNoSuffix: this._fullscreenDoc.nodePrincipal.originNoSuffix,
+          originNoSuffix: aEvent.target.nodePrincipal.originNoSuffix,
         });
         break;
       }
