@@ -238,6 +238,8 @@ var AboutPrivateBrowsingListener = {
   init(chromeGlobal) {
     chromeGlobal.addEventListener("AboutPrivateBrowsingOpenWindow", this,
                                   false, true);
+    chromeGlobal.addEventListener("AboutPrivateBrowsingEnableTrackingProtection", this,
+                                  false, true);
   },
 
   get isAboutPrivateBrowsing() {
@@ -251,6 +253,9 @@ var AboutPrivateBrowsingListener = {
     switch (aEvent.type) {
       case "AboutPrivateBrowsingOpenWindow":
         sendAsyncMessage("AboutPrivateBrowsing:OpenPrivateWindow");
+        break;
+      case "AboutPrivateBrowsingEnableTrackingProtection":
+        sendAsyncMessage("AboutPrivateBrowsing:EnableTrackingProtection");
         break;
     }
   },

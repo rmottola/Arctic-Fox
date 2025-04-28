@@ -8146,6 +8146,11 @@ var AboutPrivateBrowsingListener = {
       msg => {
         OpenBrowserWindow({private: true});
     });
+    window.messageManager.addMessageListener(
+      "AboutPrivateBrowsing:EnableTrackingProtection",
+      msg => {
+        Services.prefs.setBoolPref("privacy.trackingprotection.pbmode.enabled", true);
+    });
   }
 };
 
