@@ -1408,7 +1408,9 @@ var gBrowserInit = {
     if (Win7Features)
       Win7Features.onOpenWindow();
 
+    PointerlockFsWarning.init();
     FullScreen.init();
+    PointerLock.init();
 
     // initialize the sync UI
     gSyncUI.init();
@@ -7085,6 +7087,22 @@ var gIdentityHandler = {
       // to the full domain.
       return this._lastUri.host;
     }
+  },
+
+  /**
+   * Return the CSS class name to set on the "fullscreen-warning" element to
+   * display information about connection security in the notification shown
+   * when a site enters the fullscreen mode.
+   */
+  get pointerlockFsWarningClassName() {
+    // Note that the fullscreen warning does not handle _isSecureInternalUI.
+    if (this._uriHasHost && this._isEV) {
+      return "verifiedIdentity";
+    }
+    if (this._uriHasHost && this._isSecure) {
+      return "verifiedDomain";
+    }
+    return "unknownIdentity";
   },
 
   /**
