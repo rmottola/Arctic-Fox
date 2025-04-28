@@ -603,11 +603,10 @@
                    class="urlbar-icon"
                    tooltiptext="&goEndCap.tooltip;"
                    onclick="gURLBar.handleCommand(event);"/>
-                <toolbarbutton id="reader-mode-button"
-                               class="tabbable"
-                               hidden="true"
-                               onclick="ReaderParent.handleReaderButtonEvent(event);"
-                               onkeypress="ReaderParent.handleReaderButtonEvent(event);"/>
+                <image id="reader-mode-button"
+                       class="urlbar-icon"
+                       hidden="true"
+                       onclick="ReaderParent.buttonClick(event);"/>
           </hbox>
               <hbox id="userContext-icons" hidden="true">
                 <label id="userContext-label"/>
