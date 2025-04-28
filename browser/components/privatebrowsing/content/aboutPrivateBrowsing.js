@@ -2,24 +2,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
-var stringBundle = Services.strings.createBundle(
-                    "chrome://browser/locale/aboutPrivateBrowsing.properties");
+const FAVICON_QUESTION = "chrome://global/skin/icons/question-16.png";
+const FAVICON_PRIVACY = "chrome://browser/skin/Privacy-16.png";
 
-if (!PrivateBrowsingUtils.isWindowPrivate(window)) {
-  document.title = stringBundle.GetStringFromName("title.normal");
-  setFavIcon("chrome://global/skin/icons/question-16.png");
-} else {
-  document.title = stringBundle.GetStringFromName("title");
-  setFavIcon("chrome://browser/skin/Privacy-16.png");
-}
+let stringBundle = Services.strings.createBundle(
+                     "chrome://browser/locale/aboutPrivateBrowsing.properties");
 
-var prefBranch = Services.prefs.getBranch("privacy.trackingprotection.pbmode.");
+let prefBranch = Services.prefs.getBranch("privacy.trackingprotection.pbmode.");
 let prefObserver = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver,
                                          Ci.nsISupportsWeakReference]),
@@ -34,33 +29,49 @@ let prefObserver = {
 prefBranch.addObserver("enabled", prefObserver, true);
 
 function setFavIcon(url) {
-  var icon = document.createElement("link");
-  icon.setAttribute("rel", "icon");
-  icon.setAttribute("type", "image/png");
-  icon.setAttribute("href", url);
-  var head = document.getElementsByTagName("head")[0];
-  head.insertBefore(icon, head.firstChild);
+  document.getElementById("favicon").setAttribute("href", url);
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-  if (!PrivateBrowsingUtils.isWindowPrivate(window)) {
+  if (!PrivateBrowsingUtils.isContentWindowPrivate(window)) {
     document.body.setAttribute("class", "normal");
+    document.title = stringBundle.GetStringFromName("title.normal");
+    document.getElementById("favicon")
+            .setAttribute("href", FAVICON_QUESTION);
+    document.getElementById("startPrivateBrowsing")
+            .addEventListener("command", openPrivateWindow);
+    return;
   }
 
-  // Set up the help link
-  let learnMoreURL = Cc["@mozilla.org/toolkit/URLFormatterService;1"]
-                     .getService(Ci.nsIURLFormatter)
-                     .formatURLPref("app.support.baseURL");
-  let learnMore = document.getElementById("learnMore");
-  if (learnMore) {
-    learnMore.setAttribute("href", learnMoreURL + "private-browsing");
-  }
-  
- document.getElementById("startTour").setAttribute("href",
-                    formatURLPref("privacy.trackingprotection.introURL"));
- document.getElementById("learnMore").setAttribute("href",
-                    formatURLPref("app.support.baseURL") + "private-browsing");
+  document.title = stringBundle.GetStringFromName("title");
+  document.getElementById("favicon")
+          .setAttribute("href", FAVICON_PRIVACY);
+  document.getElementById("enableTrackingProtection")
+          .addEventListener("click", toggleTrackingProtection);
+  document.getElementById("disableTrackingProtection")
+          .addEventListener("click", toggleTrackingProtection);
 
+  let formatURLPref = Cc["@mozilla.org/toolkit/URLFormatterService;1"]
+                        .getService(Ci.nsIURLFormatter).formatURLPref;
+  document.getElementById("startTour").setAttribute("href",
+                     formatURLPref("privacy.trackingprotection.introURL"));
+  document.getElementById("learnMore").setAttribute("href",
+                     formatURLPref("app.support.baseURL") + "private-browsing");
+
+  // Update state that depends on preferences.
+  prefObserver.observe();
+
+  // This check can be removed when Tracking Protection is always available.
+  let tpUIEnabled = false;
+  try {
+    tpUIEnabled = Services.prefs.getBoolPref("privacy.trackingprotection.ui.enabled");
+  } catch (ex) {
+    // The preference is not available.
+  }
+  if (!tpUIEnabled) {
+    document.getElementById("trackingProtectionSection")
+            .setAttribute("hidden", "true");
+  }
 }, false);
 
 function openPrivateWindow() {
@@ -69,9 +80,9 @@ function openPrivateWindow() {
     new CustomEvent("AboutPrivateBrowsingOpenWindow", {bubbles:true}));
 }
 
-function enableTrackingProtection() {
+function toggleTrackingProtection() {
   // Ask chrome to enable tracking protection
   document.dispatchEvent(
-    new CustomEvent("AboutPrivateBrowsingEnableTrackingProtection",
+    new CustomEvent("AboutPrivateBrowsingToggleTrackingProtection",
                     {bubbles:true}));
 }

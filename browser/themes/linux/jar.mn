@@ -32,8 +32,6 @@ browser.jar:
   skin/classic/browser/identity-mixed-passive-loaded.svg    (../shared/identity-block/identity-mixed-passive-loaded.svg)
   skin/classic/browser/identity-mixed-active-loaded.svg     (../shared/identity-block/identity-mixed-active-loaded.svg)
   skin/classic/browser/Info.png
-  skin/classic/browser/mask.png                             (../shared/mask.png)
-  skin/classic/browser/mask@2x.png                          (../shared/mask@2x.png)
   skin/classic/browser/KUI-close.png
   skin/classic/browser/bad-content-blocked-16.png
   skin/classic/browser/bad-content-blocked-64.png
@@ -98,6 +96,13 @@ browser.jar:
   skin/classic/browser/preferences/preferences.css    (preferences/preferences.css)
   skin/classic/browser/preferences/applications.css   (preferences/applications.css)
   skin/classic/browser/preferences/aboutPermissions.css (preferences/aboutPermissions.css)
+  skin/classic/browser/privatebrowsing/attention.png          (../shared/privatebrowsing/attention.png)
+  skin/classic/browser/privatebrowsing/attention@2x.png       (../shared/privatebrowsing/attention@2x.png)
+  skin/classic/browser/privatebrowsing/check.png              (../shared/privatebrowsing/check.png)
+  skin/classic/browser/privatebrowsing/check@2x.png           (../shared/privatebrowsing/check@2x.png)
+  skin/classic/browser/privatebrowsing/mask.svg               (../shared/privatebrowsing/mask.svg)
+  skin/classic/browser/privatebrowsing/shield-page.png        (../shared/privatebrowsing/shield-page.png)
+  skin/classic/browser/privatebrowsing/shield-page@2x.png     (../shared/privatebrowsing/shield-page@2x.png)
   skin/classic/browser/statusbar/dynamic.css                   (../shared/statusbar/dynamic.css)
 * skin/classic/browser/statusbar/overlay.css                   (statusbar/overlay.css)
 * skin/classic/browser/statusbar/prefs.css                     (statusbar/prefs.css)
