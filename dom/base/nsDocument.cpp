@@ -4532,6 +4532,32 @@ nsDocument::SetScopeObject(nsIGlobalObject* aGlobal)
   }
 }
 
+#ifdef MOZ_EME
+static void
+CheckIfContainsEMEContent(nsISupports* aSupports, void* aContainsEME)
+{
+  nsCOMPtr<nsIDOMHTMLMediaElement> domMediaElem(do_QueryInterface(aSupports));
+  if (domMediaElem) {
+    nsCOMPtr<nsIContent> content(do_QueryInterface(domMediaElem));
+    MOZ_ASSERT(content, "aSupports is not a content");
+    HTMLMediaElement* mediaElem = static_cast<HTMLMediaElement*>(content.get());
+    bool* contains = static_cast<bool*>(aContainsEME);
+    if (mediaElem->GetMediaKeys()) {
+      *contains = true;
+    }
+  }
+}
+
+bool
+nsDocument::ContainsEMEContent()
+{
+  bool containsEME = false;
+  EnumerateActivityObservers(CheckIfContainsEMEContent,
+                             static_cast<void*>(&containsEME));
+  return containsEME;
+}
+#endif // MOZ_EME
+
 static void
 CheckIfContainsMSEContent(nsISupports* aSupports, void* aContainsMSE)
 {
@@ -8937,6 +8963,14 @@ nsDocument::CanSavePresentation(nsIRequest *aNewRequest)
   }
 #endif // MOZ_WEBRTC
 
+#ifdef MOZ_EME
+  // Don't save presentations for documents containing EME content, so that
+  // CDMs reliably shutdown upon user navigation.
+  if (ContainsEMEContent()) {
+    return false;
+  }
+#endif
+
   // Don't save presentations for documents containing MSE content, to
   // reduce memory usage.
   if (ContainsMSEContent()) {
@@ -12261,6 +12295,65 @@ private:
   bool mUserInputOrChromeCaller;
 };
 
+static bool
+ShouldLockPointer(Element* aElement, Element* aCurrentLock,
+                  bool aNoFocusCheck = false)
+{
+  // Check if pointer lock pref is enabled
+  if (!Preferences::GetBool("full-screen-api.pointer-lock.enabled")) {
+    NS_WARNING("ShouldLockPointer(): Pointer Lock pref not enabled");
+    return false;
+  }
+
+  nsCOMPtr<nsIDocument> ownerDoc = aElement->OwnerDoc();
+  if (aCurrentLock && aCurrentLock->OwnerDoc() != ownerDoc) {
+    NS_WARNING("ShouldLockPointer(): Existing pointer lock element in a different document");
+    return false;
+  }
+
+  if (!aElement->IsInUncomposedDoc()) {
+    NS_WARNING("ShouldLockPointer(): Element without Document");
+    return false;
+  }
+
+  if (ownerDoc->GetSandboxFlags() & SANDBOXED_POINTER_LOCK) {
+    NS_WARNING("ShouldLockPointer(): Document is sandboxed and doesn't allow pointer-lock");
+    return false;
+  }
+
+  // Check if the element is in a document with a docshell.
+  if (!ownerDoc->GetContainer()) {
+    return false;
+  }
+  nsCOMPtr<nsPIDOMWindowOuter> ownerWindow = ownerDoc->GetWindow();
+  if (!ownerWindow) {
+    return false;
+  }
+  nsCOMPtr<nsPIDOMWindowInner> ownerInnerWindow = ownerDoc->GetInnerWindow();
+  if (!ownerInnerWindow) {
+    return false;
+  }
+  if (ownerWindow->GetCurrentInnerWindow() != ownerInnerWindow) {
+    return false;
+  }
+
+  nsCOMPtr<nsPIDOMWindowOuter> top = ownerWindow->GetScriptableTop();
+  if (!top || !top->GetExtantDoc() || top->GetExtantDoc()->Hidden()) {
+    NS_WARNING("ShouldLockPointer(): Top document isn't visible.");
+    return false;
+  }
+
+  if (!aNoFocusCheck) {
+    mozilla::ErrorResult rv;
+    if (!top->GetExtantDoc()->HasFocus(rv)) {
+      NS_WARNING("ShouldLockPointer(): Top document isn't focused.");
+      return false;
+    }
+  }
+
+  return true;
+}
+
 NS_IMETHODIMP
 PointerLockRequest::Run()
 {
@@ -12280,7 +12373,7 @@ PointerLockRequest::Run()
   }
 
   // Note, we must bypass focus change, so pass true as the last parameter!
-  if (!d->ShouldLockPointer(e, pointerLockedElement, true)) {
+  if (!ShouldLockPointer(e, pointerLockedElement, true)) {
     DispatchPointerLockError(d);
     return NS_OK;
   }
@@ -12407,65 +12500,6 @@ nsDocument::RequestPointerLock(Element* aElement)
                                  nsContentUtils::IsCallerChrome();
   NS_DispatchToMainThread(new PointerLockRequest(aElement,
                                                  userInputOrChromeCaller));
-}
-
-bool
-nsDocument::ShouldLockPointer(Element* aElement, Element* aCurrentLock,
-                              bool aNoFocusCheck)
-{
-  // Check if pointer lock pref is enabled
-  if (!Preferences::GetBool("full-screen-api.pointer-lock.enabled")) {
-    NS_WARNING("ShouldLockPointer(): Pointer Lock pref not enabled");
-    return false;
-  }
-
-  if (aCurrentLock && aCurrentLock->OwnerDoc() != aElement->OwnerDoc()) {
-    NS_WARNING("ShouldLockPointer(): Existing pointer lock element in a different document");
-    return false;
-  }
-
-  if (!aElement->IsInUncomposedDoc()) {
-    NS_WARNING("ShouldLockPointer(): Element without Document");
-    return false;
-  }
-
-  if (mSandboxFlags & SANDBOXED_POINTER_LOCK) {
-    NS_WARNING("ShouldLockPointer(): Document is sandboxed and doesn't allow pointer-lock");
-    return false;
-  }
-
-  // Check if the element is in a document with a docshell.
-  nsCOMPtr<nsIDocument> ownerDoc = aElement->OwnerDoc();
-  if (!ownerDoc->GetContainer()) {
-    return false;
-  }
-  nsCOMPtr<nsPIDOMWindowOuter> ownerWindow = ownerDoc->GetWindow();
-  if (!ownerWindow) {
-    return false;
-  }
-  nsCOMPtr<nsPIDOMWindowInner> ownerInnerWindow = ownerDoc->GetInnerWindow();
-  if (!ownerInnerWindow) {
-    return false;
-  }
-  if (ownerWindow->GetCurrentInnerWindow() != ownerInnerWindow) {
-    return false;
-  }
-
-  nsCOMPtr<nsPIDOMWindowOuter> top = ownerWindow->GetScriptableTop();
-  if (!top || !top->GetExtantDoc() || top->GetExtantDoc()->Hidden()) {
-    NS_WARNING("ShouldLockPointer(): Top document isn't visible.");
-    return false;
-  }
-
-  if (!aNoFocusCheck) {
-    mozilla::ErrorResult rv;
-    if (!top->GetExtantDoc()->HasFocus(rv)) {
-      NS_WARNING("ShouldLockPointer(): Top document isn't focused.");
-      return false;
-    }
-  }
-
-  return true;
 }
 
 bool
