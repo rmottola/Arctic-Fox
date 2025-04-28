@@ -2791,11 +2791,19 @@ nsDocument::InitCSP(nsIChannel* aChannel)
   // Check if this is part of the Loop/Hello service
   bool applyLoopCSP = IsLoopDocument(aChannel);
 
+  // Check if this is a signed content to apply default CSP.
+  bool applySignedContentCSP = false;
+  nsCOMPtr<nsILoadInfo> loadInfo = aChannel->GetLoadInfo();
+  if (loadInfo && loadInfo->GetVerifySignedContent()) {
+    applySignedContentCSP = true;
+  }
+
   // If there's no CSP to apply, go ahead and return early
   if (!applyAppDefaultCSP &&
       !applyAppManifestCSP &&
       !applyAddonCSP &&
       !applyLoopCSP &&
+      !applySignedContentCSP &&
       cspHeaderValue.IsEmpty() &&
       cspROHeaderValue.IsEmpty()) {
     if (MOZ_LOG_TEST(gCspPRLog, LogLevel::Debug)) {
@@ -2867,6 +2875,15 @@ nsDocument::InitCSP(nsIChannel* aChannel)
     if (NS_SUCCEEDED(rv)) {
       csp->AppendPolicy(addonCSP, false, false);
     }
+  }
+
+  // ----- if the doc is a signed content, apply the default CSP.
+  // Note that when the content signing becomes a standard, we might have
+  // to restrict this enforcement to "remote content" only.
+  if (applySignedContentCSP) {
+    nsAdoptingString signedContentCSP =
+      Preferences::GetString("security.signed_content.CSP.default");
+    csp->AppendPolicy(signedContentCSP, false, false);
   }
 
   // ----- if the doc is part of Loop, apply the loop CSP
@@ -12352,6 +12369,39 @@ GetPointerLockError(Element* aElement, Element* aCurrentLock,
   return nullptr;
 }
 
+static void
+ChangePointerLockedElement(Element* aElement, nsIDocument* aDocument,
+                           Element* aPointerLockedElement)
+{
+  // aDocument here is not really necessary, as it is the uncomposed
+  // document of both aElement and aPointerLockedElement as far as one
+  // is not nullptr, and they wouldn't both be nullptr in any case.
+  // But since the caller of this function should have known what the
+  // document is, we just don't try to figure out what it should be.
+  MOZ_ASSERT(aDocument);
+  MOZ_ASSERT(aElement != aPointerLockedElement);
+  if (aPointerLockedElement) {
+    MOZ_ASSERT(aPointerLockedElement->GetUncomposedDoc() == aDocument);
+    aPointerLockedElement->ClearPointerLock();
+  }
+  if (aElement) {
+    MOZ_ASSERT(aElement->GetUncomposedDoc() == aDocument);
+    aElement->SetPointerLock();
+    EventStateManager::sPointerLockedElement = do_GetWeakReference(aElement);
+    EventStateManager::sPointerLockedDoc = do_GetWeakReference(aDocument);
+    NS_ASSERTION(EventStateManager::sPointerLockedElement &&
+                 EventStateManager::sPointerLockedDoc,
+                 "aElement and this should support weak references!");
+  } else {
+    EventStateManager::sPointerLockedElement = nullptr;
+    EventStateManager::sPointerLockedDoc = nullptr;
+  }
+  // Retarget all events to aElement via capture or
+  // stop retargeting if aElement is nullptr.
+  nsIPresShell::SetCapturingContent(aElement, CAPTURE_POINTERLOCK);
+  DispatchPointerLockChange(aDocument);
+}
+
 NS_IMETHODIMP
 PointerLockRequest::Run()
 {
@@ -12373,6 +12423,12 @@ PointerLockRequest::Run()
     }
     // Note, we must bypass focus change, so pass true as the last parameter!
     error = GetPointerLockError(e, pointerLockedElement, true);
+    // Another element in the same document is requesting pointer lock,
+    // just grant it without user input check.
+    if (!error && pointerLockedElement) {
+      ChangePointerLockedElement(e, d, pointerLockedElement);
+      return NS_OK;
+    }
   }
   // If it is neither user input initiated, nor requested in fullscreen,
   // it should be rejected.
@@ -12387,18 +12443,10 @@ PointerLockRequest::Run()
     return NS_OK;
   }
 
-  e->SetPointerLock();
-  EventStateManager::sPointerLockedElement = do_GetWeakReference(e);
-  EventStateManager::sPointerLockedDoc = do_GetWeakReference(doc);
-  NS_ASSERTION(EventStateManager::sPointerLockedElement &&
-               EventStateManager::sPointerLockedDoc,
-               "aElement and this should support weak references!");
-
+  ChangePointerLockedElement(e, d, nullptr);
   nsContentUtils::DispatchEventOnlyToChrome(
     doc, ToSupports(e), NS_LITERAL_STRING("MozDOMPointerLock:Entered"),
     /* Bubbles */ true, /* Cancelable */ false, /* DefaultAction */ nullptr);
-
-  DispatchPointerLockChange(d);
   return NS_OK;
 }
 
@@ -12563,19 +12611,12 @@ nsDocument::UnlockPointer(nsIDocument* aDoc)
 
   nsCOMPtr<Element> pointerLockedElement =
     do_QueryReferent(EventStateManager::sPointerLockedElement);
-  if (pointerLockedElement) {
-    pointerLockedElement->ClearPointerLock();
-  }
-
-  EventStateManager::sPointerLockedElement = nullptr;
-  EventStateManager::sPointerLockedDoc = nullptr;
+  ChangePointerLockedElement(nullptr, doc, pointerLockedElement);
 
   nsContentUtils::DispatchEventOnlyToChrome(
     doc, ToSupports(pointerLockedElement),
     NS_LITERAL_STRING("MozDOMPointerLock:Exited"),
     /* Bubbles */ true, /* Cancelable */ false, /* DefaultAction */ nullptr);
-
-  DispatchPointerLockChange(pointerLockedDoc);
 }
 
 void
