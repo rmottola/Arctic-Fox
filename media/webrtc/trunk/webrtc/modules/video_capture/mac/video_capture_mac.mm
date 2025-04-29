@@ -14,7 +14,6 @@
  */
 
 #include <AvailabilityMacros.h>
-#include <QuickTime/QuickTime.h>
 
 #include "webrtc/modules/video_capture/device_info_impl.h"
 #include "webrtc/modules/video_capture/video_capture_config.h"
@@ -25,6 +24,7 @@
 // 10.4 support must be decided runtime. We will just decide which framework to
 // use at compile time "work" classes. One for QTKit, one for QuickTime
 #if __MAC_OS_X_VERSION_MIN_REQUIRED == 1040 // QuickTime version
+#include <QuickTime/QuickTime.h>
 #include <QuickTime/video_capture_quick_time.h>
 #include <QuickTime/video_capture_quick_time_info.h>
 #elif __MAC_OS_X_VERSION_MIN_REQUIRED < 1070
