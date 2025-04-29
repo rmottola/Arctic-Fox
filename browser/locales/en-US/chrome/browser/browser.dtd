@@ -204,6 +204,12 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY urlbar.webRTCShareScreenNotificationAnchor.label       "Manage sharing your windows or screen with the site">
 <!ENTITY urlbar.webRTCSharingScreenNotificationAnchor.label     "You are sharing a window or your screen with the site">
 
+<!ENTITY urlbar.pointerLockNotificationAnchor.label     "Change whether the site can hide the pointer">
+<!ENTITY urlbar.servicesNotificationAnchor.label        "View the service install message">
+<!ENTITY urlbar.translateNotificationAnchor.label       "Translate this page">
+<!ENTITY urlbar.translatedNotificationAnchor.label      "Manage page translation">
+<!ENTITY urlbar.emeNotificationAnchor.label             "Manage use of DRM software">
+
 <!ENTITY backForwardItem.title        "Back/Forward">
 <!ENTITY locationItem.title           "Location">
 <!ENTITY searchItem.title             "Search">

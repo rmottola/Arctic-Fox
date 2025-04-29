@@ -6797,6 +6797,8 @@ var gIdentityHandler = {
   _lastUri : null,
   _mode : "unknownIdentity",
 
+
+
   /**
    * Whether this._uri refers to an internally implemented browser page.
    *
@@ -7234,6 +7236,7 @@ var gIdentityHandler = {
           icon_label = rawHost;
         }
       }
+    }
     if (this._isCertUserOverridden) {
       this._identityBox.classList.add("certUserOverridden");
       // Cert is trusted because of a security exception, verifier is a special string.
@@ -7251,7 +7254,7 @@ var gIdentityHandler = {
     let hasGrantedPermissions = false;
 
     // show permission icons
-    for (let permission of SitePermissions.getAllByURI(this._uri)) {
+    for (let permission of SitePermissions.getAllByURI(this._lastUri)) {
       if (permission.state === SitePermissions.BLOCK) {
 
         let icon = permissionAnchors[permission.id];
