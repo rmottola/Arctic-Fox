@@ -54,6 +54,9 @@ can reach it easily. -->
 <!ENTITY tabCmd.label "New Tab">
 <!ENTITY tabCmd.accesskey "T">
 <!ENTITY tabCmd.commandkey "t">
+<!-- LOCALIZATION NOTE (openLocationCmd.label): "Open Location" is only
+displayed on OS X, and only on windows that aren't main browser windows, or
+when there are no windows but Firefox is still running. -->
 <!ENTITY openLocationCmd.label "Open Location…">
 <!ENTITY openLocationCmd.accesskey "L">
 <!ENTITY openFileCmd.label "Open File…">
@@ -147,6 +150,15 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY leaveDOMFullScreen.label "Exit Full Screen">
 <!ENTITY leaveDOMFullScreen.accesskey "u">
 
+<!-- LOCALIZATION NOTE (pointerlockWarning.beforeDomain.label,
+     pointerlockWarning.afterDomain.label): these two strings are used
+     respectively before and after the domain requiring pointerlock.
+     Localizers can use one of them, or both, to better adapt this
+     sentence to their language. -->
+<!ENTITY pointerlockWarning.beforeDomain.label "">
+<!ENTITY pointerlockWarning.afterDomain.label "has control of your pointer. Press Esc to take back control.">
+<!ENTITY pointerlockWarning.generic.label "This document has control of your pointer. Press Esc to take back control.">
+
 <!ENTITY closeWindow.label "Close Window">
 <!ENTITY closeWindow.accesskey "d">
 
@@ -156,6 +168,23 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY editThisBookmarkCmd.label "Edit This Bookmark">
 <!ENTITY bookmarkThisPageCmd.commandkey "d">
 <!ENTITY markPageCmd.commandkey "l">
+<!-- LOCALIZATION NOTE (findShareServices.label):
+  -  Use the unicode ellipsis char, \u2026,
+  -  or use "..." if \u2026 doesn't suit traditions in your locale. -->
+<!ENTITY findShareServices.label "Find more Share services…">
+<!ENTITY sharePageCmd.label "Share This Page">
+<!ENTITY sharePageCmd.commandkey "S">
+<!ENTITY sharePageCmd.accesskey "s">
+<!-- LOCALIZATION NOTE (shareLink.accesskey): must be different than the following share access keys -->
+<!ENTITY shareLink.label "Share This Link">
+<!ENTITY shareLink.accesskey "h">
+<!ENTITY shareImage.label "Share This Image">
+<!ENTITY shareImage.accesskey "r">
+<!ENTITY shareSelect.label "Share Selection">
+<!ENTITY shareSelect.accesskey "r">
+<!ENTITY shareVideo.label "Share This Video">
+<!ENTITY shareVideo.accesskey "r">
+<!ENTITY feedsMenu2.label "Subscribe to This Page">
 <!ENTITY subscribeToPageMenupopup.label "Subscribe to This Page">
 <!ENTITY subscribeToPageMenuitem.label "Subscribe to This Page…">
 <!ENTITY addCurPagesCmd.label "Bookmark All Tabs…">
@@ -164,6 +193,10 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY recentBookmarks.label "Recently Bookmarked">
 <!ENTITY otherBookmarksCmd.label "Other Bookmarks">
 <!ENTITY bookmarksToolbarChevron.tooltip "Show more bookmarks">
+<!ENTITY showRecentlyBookmarked.label     "Show Recently Bookmarked">
+<!ENTITY showRecentlyBookmarked.accesskey "h">
+<!ENTITY hideRecentlyBookmarked.label     "Hide Recently Bookmarked">
+<!ENTITY hideRecentlyBookmarked.accesskey "H">
 
 <!ENTITY backCmd.label                "Back">
 <!ENTITY backCmd.accesskey            "B">
@@ -747,7 +780,39 @@ you can use these alternative items. Otherwise, their values should be empty.  -
 
 <!ENTITY identity.connectionSecure "Secure Connection">
 <!ENTITY identity.connectionNotSecure "Connection is Not Secure">
+<!ENTITY identity.connectionFile "This page is stored on your computer.">
+<!ENTITY identity.connectionVerified2 "You are securely connected to this site, owned by:">
+<!ENTITY identity.connectionInternal "This is a secure &brandShortName; page.">
+<!ENTITY identity.insecureLoginForms2 "Logins entered on this page could be compromised.">
 
+<!-- Strings for connection state warnings. -->
+<!ENTITY identity.activeBlocked "&brandShortName; has blocked parts of this page that are not secure.">
+<!ENTITY identity.passiveLoaded "Parts of this page are not secure (such as images).">
+<!ENTITY identity.activeLoaded "You have disabled protection on this page.">
+<!ENTITY identity.weakEncryption "This page uses weak encryption.">
+
+<!-- Strings for connection state warnings in the subview. -->
+<!ENTITY identity.description.insecure "Your connection to this site is not private. Information you submit could be viewed by others (like passwords, messages, credit cards, etc.).">
+<!ENTITY identity.description.insecureLoginForms "The login information you enter on this page is not secure and could be compromised.">
+<!ENTITY identity.description.weakCipher "Your connection to this website uses weak encryption and is not private.">
+<!ENTITY identity.description.weakCipher2 "Other people can view your information or modify the website’s behavior.">
+<!ENTITY identity.description.activeBlocked "&brandShortName; has blocked parts of this page that are not secure.">
+<!ENTITY identity.description.passiveLoaded "Your connection is not private and information you share with the site could be viewed by others.">
+<!ENTITY identity.description.passiveLoaded2 "This website contains content that is not secure (such as images).">
+<!ENTITY identity.description.passiveLoaded3 "Although &brandShortName; has blocked some content, there is still content on the page that is not secure (such as images).">
+<!ENTITY identity.description.activeLoaded "This website contains content that is not secure (such as scripts) and your connection to it is not private.">
+<!ENTITY identity.description.activeLoaded2 "Information you share with this site could be viewed by others (like passwords, messages, credit cards, etc.).">
+
+<!ENTITY identity.enableMixedContentBlocking.label "Enable protection">
+<!ENTITY identity.enableMixedContentBlocking.accesskey "E">
+<!ENTITY identity.disableMixedContentBlocking.label "Disable protection for now">
+<!ENTITY identity.disableMixedContentBlocking.accesskey "D">
+<!ENTITY identity.learnMore "Learn More">
+
+<!ENTITY identity.removeCertException.label "Remove Exception">
+<!ENTITY identity.removeCertException.accesskey "R">
+
+<!ENTITY identity.moreInfoLinkText2 "More Information">
 <!ENTITY identity.moreInfoLinkText "More Information…">
 
 <!ENTITY identity.permissions "Permissions">
@@ -811,6 +876,33 @@ you can use these alternative items. Otherwise, their values should be empty.  -
 <!ENTITY getUserMedia.audioCapture.label "Audio from the tab will be shared.">
 <!ENTITY getUserMedia.allWindowsShared.message "All visible windows on your screen will be shared.">
 
+<!ENTITY trackingProtection.title "Tracking Protection">
+<!ENTITY trackingProtection.detectedBlocked3 "&brandShortName; is blocking parts of the page that may track your browsing.">
+<!ENTITY trackingProtection.detectedNotBlocked3 "This site includes elements that may track your browsing. You have disabled protection.">
+<!ENTITY trackingProtection.notDetected3 "No tracking elements detected on this page.">
+<!-- LOCALIZATION NOTE (trackingProtection.unblock.label, trackingProtection.unblock.accesskey):
+     The associated button with this label and accesskey is only shown when opening the control
+     center while looking at a site with trackers in NON-private browsing mode. -->
+<!ENTITY trackingProtection.unblock.label "Disable protection for this site">
+<!ENTITY trackingProtection.unblock.accesskey "D">
+<!-- LOCALIZATION NOTE (trackingProtection.unblockPrivate.label, trackingProtection.unblockPrivate.accesskey):
+     The associated button with this label and accesskey is only shown when opening the control
+     center while looking at a site with trackers in PRIVATE browsing mode. -->
+<!ENTITY trackingProtection.unblockPrivate.label "Disable protection for this session">
+<!ENTITY trackingProtection.unblockPrivate.accesskey "D">
+<!ENTITY trackingProtection.block2.label "Enable protection">
+<!ENTITY trackingProtection.block2.accesskey "E">
+
+<!ENTITY trackingContentBlocked.message "Tracking">
+<!ENTITY trackingContentBlocked.moreinfo "Parts of the page that track your online activity have been blocked.">
+<!ENTITY trackingContentBlocked.learnMore "Learn More">
+<!ENTITY trackingContentBlocked.options "Options">
+<!ENTITY trackingContentBlocked.unblock2.label "Disable protection for this site">
+<!ENTITY trackingContentBlocked.unblock2.accesskey "D">
+<!ENTITY trackingContentBlocked.block.label "Enable protection">
+<!ENTITY trackingContentBlocked.block.accesskey "E">
+<!ENTITY trackingContentBlocked.disabled.message "Tracking protection is disabled">
+
 <!-- Bad Content Blocker Doorhanger Notification -->
 <!ENTITY badContentBlocked.moreinfo "Most websites will work properly even if content is blocked.">
 
@@ -830,6 +922,14 @@ you can use these alternative items. Otherwise, their values should be empty.  -
 <!ENTITY pluginActivateNow.label "Allow Now">
 <!ENTITY pluginActivateAlways.label "Allow and Remember">
 <!ENTITY pluginBlockNow.label "Block Plugin">
+
+<!-- LOCALIZATION NOTE: (pluginNotification.width): This is used to determine the
+     width of the plugin popup notification that can appear if a plugin has been
+     blocked on a page. Should be wide enough to fit the pluginActivateNow.label
+     and pluginActivateAlways.label strings above on a single line. This must be
+     a CSS length value. -->
+<!ENTITY pluginNotification.width "28em">
+
 <!-- LOCALIZATION NOTE: (panicButton.view.mainTimeframeDesc, panicButton.view.5min, panicButton.view.2hr, panicButton.view.day):
      The .mainTimeframeDesc string combined with any of the 3 others is meant to form a complete sentence, e.g. "Forget the last: Five minutes".
      Please ensure that this remains the case in the translation. -->
@@ -854,6 +954,9 @@ you can use these alternative items. Otherwise, their values should be empty.  -
 <!ENTITY panicButton.thankyou.msg1                "Your recent history is cleared.">
 <!ENTITY panicButton.thankyou.msg2                "Safe browsing!">
 <!ENTITY panicButton.thankyou.buttonlabel         "Thanks!">
+
+<!ENTITY emeLearnMoreContextMenu.label            "Learn more about DRM…">
+<!ENTITY emeLearnMoreContextMenu.accesskey        "D">
 
 <!ENTITY readingList.label                        "Reading List">
 <!ENTITY readingList.sidebar.commandKey           "R">
