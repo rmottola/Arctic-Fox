@@ -6918,6 +6918,14 @@ var gIdentityHandler = {
     delete this._permissionList;
     return this._permissionList = document.getElementById("identity-popup-permission-list");
   },
+  get _permissionAnchors () {
+    delete this._permissionAnchors;
+    let permissionAnchors = {};
+    for (let anchor of document.getElementById("blocked-permissions-container").children) {
+      permissionAnchors[anchor.getAttribute("data-permission-id")] = anchor;
+    }
+    return this._permissionAnchors = permissionAnchors;
+  },
 
   /**
    * Handler for mouseclicks on the "More Information" button in the
@@ -7231,6 +7239,34 @@ var gIdentityHandler = {
       // Cert is trusted because of a security exception, verifier is a special string.
       tooltip = gNavigatorBundle.getString("identity.identified.verified_by_you");
     }
+
+    let permissionAnchors = this._permissionAnchors;
+
+    // hide all permission icons
+    for (let icon of Object.values(permissionAnchors)) {
+      icon.removeAttribute("showing");
+    }
+
+    // keeps track if we should show an indicator that there are active permissions
+    let hasGrantedPermissions = false;
+
+    // show permission icons
+    for (let permission of SitePermissions.getAllByURI(this._uri)) {
+      if (permission.state === SitePermissions.BLOCK) {
+
+        let icon = permissionAnchors[permission.id];
+        if (icon) {
+          icon.setAttribute("showing", "true");
+        }
+
+      } else if (permission.state === SitePermissions.ALLOW ||
+                 permission.state === SitePermissions.SESSION) {
+        hasGrantedPermissions = true;
+      }
+    }
+
+    if (hasGrantedPermissions) {
+      this._identityBox.classList.add("grantedPermissions");
     }
 
     // Push the appropriate strings out to the UI
@@ -7445,7 +7481,7 @@ var gIdentityHandler = {
 
     let uri = gBrowser.currentURI;
 
-    for (let permission of SitePermissions.getPermissionsByURI(uri)) {
+    for (let permission of SitePermissions.getPermissionDetailsByURI(uri)) {
       let item = this._createPermissionItem(permission);
       this._permissionList.appendChild(item);
     }
