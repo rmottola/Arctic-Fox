@@ -12,7 +12,7 @@
 
 from __future__ import print_function
 
-import argparse, bitstring, pprint, hashlib, os, subprocess, sys, tempfile
+import argparse, bitstring, pprint, hashlib, os, subprocess, sys, tempfile, macholib, macholib.MachO
 from pyasn1.codec.der import encoder as der_encoder
 from pyasn1.type import univ, namedtype, namedval, constraint
 
@@ -62,18 +62,22 @@ class SetOfCodeSegmentDigest(univ.SetOf):
 class CPUType(univ.Enumerated):
 	namedValues = namedval.NamedValues(
 		('IMAGE_FILE_MACHINE_I386', 0x14c),
-		('IMAGE_FILE_MACHINE_AMD64',0x8664 )
+		('IMAGE_FILE_MACHINE_AMD64',0x8664 ),
+		('MACHO_CPU_TYPE_I386',0x7 ),
+		('MACHO_CPU_TYPE_X86_64',0x1000007 ),
 	)
 	subtypeSpec = univ.Enumerated.subtypeSpec + \
-				  constraint.SingleValueConstraint(0x14c, 0x8664)
+				  constraint.SingleValueConstraint(0x14c, 0x8664, 0x7, 0x1000007)
 
 
 class CPUSubType(univ.Enumerated):
 	namedValues = namedval.NamedValues(
 		('IMAGE_UNUSED', 0x0),
+		('CPU_SUBTYPE_X86_ALL', 0x3),
+		('CPU_SUBTYPE_X86_64_ALL', 0x80000003)
 	)
 	subtypeSpec = univ.Enumerated.subtypeSpec + \
-				  constraint.SingleValueConstraint(0)
+				  constraint.SingleValueConstraint(0, 0x3, 0x80000003)
 
 
 class ArchitectureDigest(univ.Sequence):
@@ -151,6 +155,22 @@ def parse_items(stream, items_in, items_out):
 			raise Exception("unrecognized item" + pprint.pformat(item))
 
 	return bits_read, total_bits_read
+
+
+# macho stuff
+# Constant for the magic field of the mach_header (32-bit architectures)
+MH_MAGIC =0xfeedface	# the mach magic number
+MH_CIGAM =0xcefaedfe	# NXSwapInt(MH_MAGIC)
+
+MH_MAGIC_64 =0xfeedfacf	# the the 64-bit mach magic number
+MH_CIGAM_64 =0xcffaedfe	# NXSwapInt(MH_MAGIC_64)
+
+FAT_CIGAM = 0xbebafeca
+FAT_MAGIC =	0xcafebabe
+
+LC_SEGMENT = 0x1
+LC_SEGMENT_64	= 0x19	# 64-bit segment of this file to be
+
 
 
 # TODO: perhaps switch to pefile module when it officially supports python3
@@ -485,7 +505,7 @@ def processCOFFBinary(stream):
 	# read 4 bytes, make sure it's a PE signature.
 	signature = stream.read('uintle:32')
 	if signature != 0x00004550:
-		raise Exception("Invalid File")
+		return outDict
 
 	# after signature is the actual COFF file header.
 	coff_header = COFFFileHeader(stream)
@@ -498,7 +518,7 @@ def processCOFFBinary(stream):
 
 	arch_digest.setComponentByName('cpuSubType', CPUSubType('IMAGE_UNUSED'))
 
-	text_section_headers = list(filter(lambda x: (x.items['Characteristics'] & 0x20000000) == 0x20000000, coff_header.section_headers))
+	text_section_headers = list(filter(lambda x: (x.items['Characteristics'] & IMAGE_SCN_MEM_EXECUTE) == IMAGE_SCN_MEM_EXECUTE, coff_header.section_headers))
 
 	code_segment_digests = SetOfCodeSegmentDigest()
 	code_segment_idx = 0
