@@ -359,7 +359,7 @@ option('--enable-avfoundation',
 def avfoundation(value, toolkit):
     enabled = bool(value)
     if value.origin == 'default':
-       enabled = toolkit in ('cocoa', 'uikit')
+        enabled = toolkit in ('cocoa', 'uikit')
     if enabled:
         return True
 
@@ -372,7 +372,7 @@ option('--enable-qtkit',
 def qtkit(value, avfoundation):
     enabled = bool(value)
     if value.origin == 'default':
-       enabled = False
+        enabled = False
     if enabled:
         return True
 
