@@ -957,7 +957,6 @@ you can use these alternative items. Otherwise, their values should be empty.  -
 
 <!ENTITY emeLearnMoreContextMenu.label            "Learn more about DRM…">
 <!ENTITY emeLearnMoreContextMenu.accesskey        "D">
-
 <!ENTITY readingList.label                        "Reading List">
 <!ENTITY readingList.sidebar.commandKey           "R">
 <!-- Pre-landed string for bug 1124400 -->

@@ -6912,10 +6912,6 @@ var gIdentityHandler = {
     delete this._identityIcon;
     return this._identityIcon = document.getElementById("identity-icon");
   },
-  get _permissionsContainer () {
-    delete this._permissionsContainer;
-    return this._permissionsContainer = document.getElementById("identity-popup-permissions");
-  },
   get _permissionList () {
     delete this._permissionList;
     return this._permissionList = document.getElementById("identity-popup-permission-list");
@@ -7488,8 +7484,6 @@ var gIdentityHandler = {
       let item = this._createPermissionItem(permission);
       this._permissionList.appendChild(item);
     }
-
-    this._permissionsContainer.hidden = !this._permissionList.hasChildNodes();
   },
 
   setPermission: function (aPermission, aState) {
