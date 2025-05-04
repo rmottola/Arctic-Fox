@@ -599,6 +599,10 @@ input[type="radio"]:hover:active {
   border-style: inset !important;
 }
 
+input[type="search"] {
+  box-sizing: border-box;
+}
+
 /* buttons */
 
 /* Note: Values in nsNativeTheme IsWidgetStyled function
