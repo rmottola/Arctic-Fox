@@ -459,12 +459,13 @@ function createUserContextMenu(event, addCommandAttribute = true, excludeUserCon
     menuitem.setAttribute("usercontextid", identity.userContextId);
     menuitem.setAttribute("label", bundle.getString(identity.label));
     menuitem.setAttribute("accesskey", bundle.getString(identity.accessKey));
+    menuitem.classList.add("menuitem-iconic");
 
     if (addCommandAttribute) {
       menuitem.setAttribute("command", "Browser:NewUserContextTab");
     }
 
-    menuitem.style.listStyleImage = "url(" + identity.icon + ")";
+    menuitem.setAttribute("image", identity.icon);
 
     docfrag.appendChild(menuitem);
   });

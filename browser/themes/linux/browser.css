@@ -2040,3 +2040,7 @@ toolbar[iconsize="small"] .toolbarbutton-badge-container {
 .browser-extension-panel > .panel-arrowcontainer > .panel-arrowcontent {
   padding: 0;
 }
+
+.menuitem-iconic[command="Browser:NewUserContextTab"] > .menu-iconic-left > .menu-iconic-icon {
+  visibility: visible;
+}
