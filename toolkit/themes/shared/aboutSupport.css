@@ -107,7 +107,7 @@ td {
   display: none;
 }
 
-#action-box:-moz-dir(rtl) {
+#action-box:dir(rtl) {
   float: left;
 }
 

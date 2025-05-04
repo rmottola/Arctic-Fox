@@ -64,7 +64,7 @@ td {
   width: 30%;
 }
 
-#action-box:-moz-dir(rtl) {
+#action-box:dir(rtl) {
   float: left;
 }
 
