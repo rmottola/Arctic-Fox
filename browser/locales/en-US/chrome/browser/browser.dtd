@@ -264,7 +264,7 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY bookmarksMenuButton.label          "Bookmarks">
 <!ENTITY bookmarksMenuButton.tooltip        "Display your bookmarks">
 <!ENTITY bookmarksMenuButton.other.label "Other Bookmarks">
-<!ENTITY viewBookmarksSidebar.label         "Show in Sidebar">
+<!ENTITY viewBookmarksSidebar2.label        "View Bookmarks Sidebar">
 <!ENTITY viewBookmarksToolbar.label         "View Bookmarks Toolbar">
 
 <!ENTITY containersMenu.label "Containers">
@@ -437,8 +437,18 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY showAllHistoryCmd2.label "Show All History">
 <!ENTITY showAllHistoryCmd.commandkey "H">
 
-<!ENTITY appMenuEdit.label "Edit">
 <!ENTITY appMenuCustomize.label "Customize">
+<!ENTITY appMenuCustomize.tooltip "Customize the Menu and Toolbars">
+<!ENTITY appMenuCustomizeExit.label "Exit Customize">
+<!ENTITY appMenuCustomizeExit.tooltip "Finish Customizing">
+<!ENTITY appMenuHistory.label "History">
+<!ENTITY appMenuHistory.showAll.label "Show All History">
+<!ENTITY appMenuHistory.clearRecent.label "Clear Recent History…">
+<!ENTITY appMenuHistory.restoreSession.label "Restore Previous Session">
+<!ENTITY appMenuHistory.viewSidebar.label "View History Sidebar">
+<!ENTITY appMenuHelp.tooltip "Open Help Menu">
+
+<!ENTITY appMenuEdit.label "Edit">
 <!ENTITY appMenuToolbarLayout.label "Toolbar Layout">
 <!ENTITY appMenuSidebars.label "Sidebars">
 <!ENTITY appMenuFind.label "Find…">
@@ -446,13 +456,24 @@ These should match what Safari and other Apple applications use on OS X Lion. --
 <!ENTITY appMenuWebDeveloper.label "Web Developer">
 <!ENTITY appMenuGettingStarted.label "Getting Started">
 <!ENTITY appMenuSafeMode.label "Restart in Safe Mode…">
-<!ENTITY customizeMenu.addToPanel.label "Add to Menu">
-<!ENTITY customizeMenu.addToPanel.accesskey "M">
 <!ENTITY appMenuRemoteTabs.sidebar.label "View Synced Tabs Sidebar">
 
 <!ENTITY appMenuRemoteTabs.noclients.title "No synced tabs… yet!">
 <!ENTITY appMenuRemoteTabs.noclients.subtitle "Want to see your tabs from other devices here?">
 
+<!ENTITY customizeMenu.addToToolbar.label "Add to Toolbar">
+<!ENTITY customizeMenu.addToToolbar.accesskey "A">
+<!ENTITY customizeMenu.addToPanel.label "Add to Menu">
+<!ENTITY customizeMenu.addToPanel.accesskey "M">
+<!ENTITY customizeMenu.moveToToolbar.label "Move to Toolbar">
+<!ENTITY customizeMenu.moveToToolbar.accesskey "o">
+<!-- LOCALIZATION NOTE (customizeMenu.moveToPanel.accesskey) can appear on the
+     same context menu as menubarCmd and personalbarCmd, so they should have
+     different access keys. customizeMenu.moveToToolbar and 
+     customizeMenu.moveToPanel are mutually exclusive, so can share access
+     keys.  -->
+<!ENTITY customizeMenu.moveToPanel.label "Move to Menu">
+<!ENTITY customizeMenu.moveToPanel.accesskey "o">
 <!ENTITY customizeMenu.removeFromToolbar.label "Remove from Toolbar">
 <!ENTITY customizeMenu.removeFromToolbar.accesskey "R">
 <!ENTITY customizeMenu.removeFromMenu.label "Remove from Menu">
