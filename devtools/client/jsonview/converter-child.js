@@ -83,7 +83,7 @@ var Converter = Class({
       var str = {};
       var bytesRead = is.readString(aCount, str);
       if (!bytesRead) {
-        throw new Error("Stream converter failed to read the input stream!");
+        break;
       }
       aCount -= bytesRead;
       this.data += str.value;
