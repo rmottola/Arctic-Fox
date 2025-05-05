@@ -86,7 +86,6 @@ devtools/client/framework/**
 devtools/client/inspector/fonts/**
 devtools/client/inspector/test/**
 devtools/client/inspector/*.js
-!devtools/client/inspector/breadcrumbs.js
 devtools/client/jsonview/lib/**
 devtools/client/memory/**
 devtools/client/netmonitor/test/**
