@@ -34,7 +34,7 @@ module.exports = createClass({
 
     return dom.div(
       {
-        className: "viewport-toolbar",
+        className: "toolbar viewport-toolbar",
       },
       DeviceSelector({
         devices,
