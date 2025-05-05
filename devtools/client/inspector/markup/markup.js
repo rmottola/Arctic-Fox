@@ -719,7 +719,8 @@ MarkupView.prototype = {
           this.cancelDragging();
           break;
         }
-        // falls through
+        handled = false;
+        break;
       }
       default:
         handled = false;
