@@ -101,3 +101,7 @@
   skin/classic/browser/panic-panel/header-small@2x.png         (../shared/panic-panel/header-small@2x.png)
   skin/classic/browser/panic-panel/icons.png                   (../shared/panic-panel/icons.png)
   skin/classic/browser/panic-panel/icons@2x.png                (../shared/panic-panel/icons@2x.png)
+  skin/classic/browser/usercontext/personal.svg                (../shared/usercontext/personal.svg)
+  skin/classic/browser/usercontext/work.svg                    (../shared/usercontext/work.svg)
+  skin/classic/browser/usercontext/banking.svg                 (../shared/usercontext/banking.svg)
+  skin/classic/browser/usercontext/shopping.svg                (../shared/usercontext/shopping.svg)
