@@ -159,13 +159,13 @@ function doOK() {
           project.manifest.name = projectName;
           AppManager.writeManifest(project).then(() => {
             AppManager.validateAndUpdateProject(project).then(
-              () => {window.close()}, bail)
-          }, bail)
+              () => {window.close();}, bail);
+          }, bail);
         } else {
           bail("Manifest not found");
         }
-      }, bail)
-    }, bail)
+      }, bail);
+    }, bail);
   }, bail);
 
   return false;

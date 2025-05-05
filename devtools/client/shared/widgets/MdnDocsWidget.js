@@ -103,11 +103,8 @@ function appendSyntaxHighlightedCSS(cssText, parentElement) {
   function updateIdentClass(tokenText) {
     if (tokenText === ":") {
       identClass = PROPERTY_VALUE_COLOR;
-    }
-    else {
-      if (tokenText === ";") {
-        identClass = PROPERTY_NAME_COLOR;
-      }
+    } else if (tokenText === ";") {
+      identClass = PROPERTY_NAME_COLOR;
     }
   }
 
@@ -171,8 +168,7 @@ function getMdnPage(pageUrl) {
   function onLoaded(e) {
     if (xhr.status != 200) {
       deferred.reject({page: pageUrl, status: xhr.status});
-    }
-    else {
+    } else {
       deferred.resolve(xhr.responseXML);
     }
   }
@@ -213,8 +209,7 @@ function getCssDocs(cssProperty) {
     theDocs.syntax = getSyntax(responseDocument);
     if (theDocs.summary || theDocs.syntax) {
       deferred.resolve(theDocs);
-    }
-    else {
+    } else {
       deferred.reject("Couldn't find the docs in the page.");
     }
   }
@@ -263,7 +258,7 @@ function MdnDocsWidget(tooltipDocument) {
 
   // listen for clicks and open in the browser window instead
   let browserWindow = Services.wm.getMostRecentWindow(BROWSER_WINDOW);
-  this.elements.linkToMdn.addEventListener("click", function(e) {
+  this.elements.linkToMdn.addEventListener("click", function (e) {
     e.stopPropagation();
     e.preventDefault();
     let link = e.target.href;
@@ -294,7 +289,7 @@ MdnDocsWidget.prototype = {
    * @param {string} propertyName
    * The name of the CSS property for which we need to display help.
    */
-  loadCssDocs: function(propertyName) {
+  loadCssDocs: function (propertyName) {
 
     /**
      * Do all the setup we can do synchronously, and get the document in
@@ -365,11 +360,11 @@ MdnDocsWidget.prototype = {
     return deferred.promise;
   },
 
-  destroy: function() {
+  destroy: function () {
     this.elements = null;
     this.doc = null;
   }
-}
+};
 
 /**
  * L10N utility class
@@ -414,7 +409,9 @@ function isIgnorable(node) {
  */
 function nodeAfter(sib) {
   while ((sib = sib.nextSibling)) {
-    if (!isIgnorable(sib)) return sib;
+    if (!isIgnorable(sib)) {
+      return sib;
+    }
   }
   return null;
 }
@@ -486,7 +483,6 @@ function getSummary(mdnDocument) {
  * The syntax section as a string, or null if it could not be found.
  */
 function getSyntax(mdnDocument) {
-
   let syntax = mdnDocument.getElementById("Syntax");
   if (!hasTagName(syntax, "H2")) {
     return null;
@@ -501,9 +497,7 @@ function getSyntax(mdnDocument) {
   if (hasTagName(secondParagraph, "PRE")) {
     return secondParagraph.textContent;
   }
-  else {
-    return firstParagraph.textContent;
-  }
+  return firstParagraph.textContent;
 }
 
 /**

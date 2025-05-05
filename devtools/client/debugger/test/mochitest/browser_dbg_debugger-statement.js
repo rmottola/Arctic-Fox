@@ -32,7 +32,7 @@ function test() {
     addTab(TAB_URL)
       .then((aTab) => {
         gTab = aTab;
-        return attachTabActorForUrl(gClient, TAB_URL)
+        return attachTabActorForUrl(gClient, TAB_URL);
       })
       .then(testEarlyDebuggerStatement)
       .then(testDebuggerStatement)
@@ -47,7 +47,7 @@ function test() {
 function testEarlyDebuggerStatement([aGrip, aResponse]) {
   let deferred = promise.defer();
 
-  let onPaused = function(aEvent, aPacket) {
+  let onPaused = function (aEvent, aPacket) {
     ok(false, "Pause shouldn't be called before we've attached!");
     deferred.reject();
   };
@@ -91,6 +91,6 @@ function closeConnection() {
   return deferred.promise;
 }
 
-registerCleanupFunction(function() {
+registerCleanupFunction(function () {
   gClient = null;
 });

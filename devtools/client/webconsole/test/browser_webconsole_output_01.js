@@ -119,7 +119,7 @@ function test() {
     DebuggerServer.LONG_STRING_INITIAL_LENGTH = LONG_STRING_INITIAL_LENGTH;
   });
 
-  Task.spawn(function*() {
+  Task.spawn(function* () {
     let {tab} = yield loadTab(TEST_URI);
     let hud = yield openConsole(tab);
     return checkOutputForInputs(hud, inputTests);

@@ -51,19 +51,19 @@ InspectorSearch.prototype = {
     return this.inspector.walker;
   },
 
-  destroy: function() {
+  destroy: function () {
     this.searchBox.removeEventListener("keydown", this._onKeyDown, true);
     this.searchBox.removeEventListener("command", this._onCommand, true);
     this.searchBox = null;
     this.autocompleter.destroy();
   },
 
-  _onSearch: function(reverse = false) {
+  _onSearch: function (reverse = false) {
     this.doFullTextSearch(this.searchBox.value, reverse)
         .catch(e => console.error(e));
   },
 
-  doFullTextSearch: Task.async(function*(query, reverse) {
+  doFullTextSearch: Task.async(function* (query, reverse) {
     let lastSearched = this._lastSearched;
     this._lastSearched = query;
 
@@ -94,13 +94,13 @@ InspectorSearch.prototype = {
     }
   }),
 
-  _onCommand: function() {
+  _onCommand: function () {
     if (this.searchBox.value.length === 0) {
       this._onSearch();
     }
   },
 
-  _onKeyDown: function(event) {
+  _onKeyDown: function (event) {
     if (this.searchBox.value.length === 0) {
       this.searchBox.removeAttribute("filled");
     } else {
@@ -259,7 +259,7 @@ SelectorAutocompleter.prototype = {
   /**
    * Removes event listeners and cleans up references.
    */
-  destroy: function() {
+  destroy: function () {
     this.searchBox.removeEventListener("input", this.showSuggestions, true);
     this.searchBox.removeEventListener("keypress", this._onSearchKeypress, true);
     this.inspector.off("markupmutation", this._onMarkupMutation);
@@ -272,9 +272,9 @@ SelectorAutocompleter.prototype = {
   /**
    * Handles keypresses inside the input box.
    */
-  _onSearchKeypress: function(event) {
+  _onSearchKeypress: function (event) {
     let query = this.searchBox.value;
-    switch(event.keyCode) {
+    switch (event.keyCode) {
       case event.DOM_VK_RETURN:
       case event.DOM_VK_TAB:
         if (this.searchPopup.isOpen &&
@@ -326,8 +326,8 @@ SelectorAutocompleter.prototype = {
   /**
    * Handles keypress and mouse click on the suggestions richlistbox.
    */
-  _onListBoxKeypress: function(event) {
-    switch(event.keyCode || event.button) {
+  _onListBoxKeypress: function (event) {
+    switch (event.keyCode || event.button) {
       case event.DOM_VK_RETURN:
       case event.DOM_VK_TAB:
       case 0: // left mouse button
@@ -382,7 +382,7 @@ SelectorAutocompleter.prototype = {
    * Reset previous search results on markup-mutations to make sure we search
    * again after nodes have been added/removed/changed.
    */
-  _onMarkupMutation: function() {
+  _onMarkupMutation: function () {
     this._searchResults = null;
     this._lastSearched = null;
   },
@@ -448,7 +448,7 @@ SelectorAutocompleter.prototype = {
   /**
    * Hide the suggestion popup if necessary.
    */
-  hidePopup: function() {
+  hidePopup: function () {
     if (this.searchPopup.isOpen) {
       this.searchPopup.hidePopup();
     }
@@ -458,7 +458,7 @@ SelectorAutocompleter.prototype = {
    * Suggests classes,ids and tags based on the user input as user types in the
    * searchbox.
    */
-  showSuggestions: function() {
+  showSuggestions: function () {
     let query = this.searchBox.value;
     let state = this.state;
     let firstPart = "";

@@ -3,7 +3,7 @@
 /* Any copyright is dedicated to the Public Domain.
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 
-///////////////////
+// /////////////////
 //
 // Whitelisting this test.
 // As part of bug 1077403, the leaking uncaught rejections should be fixed.
@@ -34,7 +34,7 @@ function runTests1(aTab) {
     visibilityswitch: "devtools.test-tool.enabled",
     url: "about:blank",
     label: "someLabel",
-    build: function(iframeWindow, toolbox) {
+    build: function (iframeWindow, toolbox) {
       let panel = new DevToolPanel(iframeWindow, toolbox);
       return panel.open();
     },
@@ -95,7 +95,7 @@ function runTests2() {
     visibilityswitch: "devtools.test-tool.enabled",
     url: "about:blank",
     label: "someLabel",
-    build: function(iframeWindow, toolbox) {
+    build: function (iframeWindow, toolbox) {
       return new DevToolPanel(iframeWindow, toolbox);
     },
   };
@@ -209,7 +209,7 @@ function DevToolPanel(iframeWindow, toolbox) {
 
   this._toolbox = toolbox;
 
-  /*let doc = iframeWindow.document
+  /* let doc = iframeWindow.document
   let label = doc.createElement("label");
   let textNode = doc.createTextNode("Some Tool");
 
@@ -218,7 +218,7 @@ function DevToolPanel(iframeWindow, toolbox) {
 }
 
 DevToolPanel.prototype = {
-  open: function() {
+  open: function () {
     let deferred = promise.defer();
 
     executeSoon(() => {

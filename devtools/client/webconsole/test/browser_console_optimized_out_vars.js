@@ -33,12 +33,12 @@ function test() {
     // This is the meat of the test: evaluate the optimized out variable.
     hud.jsterm.execute("upvar");
     yield waitForMessages({
-            webconsole: hud,
-            messages: [{
-              text: "optimized out",
-              category: CATEGORY_OUTPUT,
-            }]
-          });
+      webconsole: hud,
+      messages: [{
+        text: "optimized out",
+        category: CATEGORY_OUTPUT,
+      }]
+    });
 
     finishTest();
   }).then(null, aError => {

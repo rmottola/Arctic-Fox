@@ -35,43 +35,43 @@ function* addTabWithToolbarRunTests(win) {
   // Test input status
   yield helpers.audit(options, [
     {
-      setup: 'screenshot',
+      setup: "screenshot",
       check: {
-        input:  'screenshot',
-        markup: 'VVVVVVVVVV',
-        status: 'VALID',
+        input:  "screenshot",
+        markup: "VVVVVVVVVV",
+        status: "VALID",
         args: {
         }
       },
     },
     {
-      setup: 'screenshot abc.png',
+      setup: "screenshot abc.png",
       check: {
-        input:  'screenshot abc.png',
-        markup: 'VVVVVVVVVVVVVVVVVV',
-        status: 'VALID',
+        input:  "screenshot abc.png",
+        markup: "VVVVVVVVVVVVVVVVVV",
+        status: "VALID",
         args: {
           filename: { value: "abc.png"},
         }
       },
     },
     {
-      setup: 'screenshot --fullpage',
+      setup: "screenshot --fullpage",
       check: {
-        input:  'screenshot --fullpage',
-        markup: 'VVVVVVVVVVVVVVVVVVVVV',
-        status: 'VALID',
+        input:  "screenshot --fullpage",
+        markup: "VVVVVVVVVVVVVVVVVVVVV",
+        status: "VALID",
         args: {
           fullpage: { value: true},
         }
       },
     },
     {
-      setup: 'screenshot abc --delay 5',
+      setup: "screenshot abc --delay 5",
       check: {
-        input:  'screenshot abc --delay 5',
-        markup: 'VVVVVVVVVVVVVVVVVVVVVVVV',
-        status: 'VALID',
+        input:  "screenshot abc --delay 5",
+        markup: "VVVVVVVVVVVVVVVVVVVVVVVV",
+        status: "VALID",
         args: {
           filename: { value: "abc"},
           delay: { value: 5 },
@@ -79,11 +79,11 @@ function* addTabWithToolbarRunTests(win) {
       },
     },
     {
-      setup: 'screenshot --selector img#testImage',
+      setup: "screenshot --selector img#testImage",
       check: {
-        input:  'screenshot --selector img#testImage',
-        markup: 'VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV',
-        status: 'VALID',
+        input:  "screenshot --selector img#testImage",
+        markup: "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+        status: "VALID",
       },
     },
   ]);
@@ -93,7 +93,7 @@ function* addTabWithToolbarRunTests(win) {
 
   yield helpers.audit(options, [
     {
-      setup: 'screenshot ' + file.path,
+      setup: "screenshot " + file.path,
       check: {
         args: {
           filename: { value: "" + file.path },
@@ -105,7 +105,7 @@ function* addTabWithToolbarRunTests(win) {
       exec: {
         output: new RegExp("^Saved to "),
       },
-      post: function() {
+      post: function () {
         // Bug 849168: screenshot command tests fail in try but not locally
         // ok(file.exists(), "Screenshot file exists");
 
@@ -200,11 +200,11 @@ function* addTabWithToolbarRunTests(win) {
   // (non-floating scrollbars).  With default OS settings, this means Windows
   // and Linux are affected, but Mac is not.  For Mac to exhibit this behavior,
   // change System Preferences -> General -> Show scroll bars to Always.
-  yield ContentTask.spawn(browser, {}, function*() {
+  yield ContentTask.spawn(browser, {}, function* () {
     content.document.body.classList.add("overflow");
   });
 
-  let scrollbarSize = yield ContentTask.spawn(browser, {}, function*() {
+  let scrollbarSize = yield ContentTask.spawn(browser, {}, function* () {
     const winUtils = content.QueryInterface(Ci.nsIInterfaceRequestor)
                             .getInterface(Ci.nsIDOMWindowUtils);
     let scrollbarHeight = {};
@@ -320,7 +320,7 @@ function addWindow(windowOptions) {
   });
 }
 
-let getImageSizeFromClipboard = Task.async(function*() {
+let getImageSizeFromClipboard = Task.async(function* () {
   let clipid = Ci.nsIClipboard;
   let clip = Cc["@mozilla.org/widget/clipboard;1"].getService(clipid);
   let trans = Cc["@mozilla.org/widget/transferable;1"]

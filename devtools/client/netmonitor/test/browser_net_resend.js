@@ -150,7 +150,7 @@ function testSentRequest(aData, aOrigData) {
 
   let hasHeader = aData.requestHeaders.headers.some((header) => {
     return (header.name + ": " + header.value) == ADD_HEADER;
-  })
+  });
   ok(hasHeader, "new header added to sent request");
 
   is(aData.requestPostData.postData.text,

@@ -138,7 +138,7 @@ let RuntimeScanners = {
     return this._scanPromise;
   },
 
-  listRuntimes: function*() {
+  listRuntimes: function* () {
     for (let scanner of this._scanners) {
       for (let runtime of scanner.listRuntimes()) {
         yield runtime;
@@ -221,7 +221,7 @@ let SimulatorScanner = {
     return promise.resolve();
   },
 
-  listRuntimes: function() {
+  listRuntimes: function () {
     return this._runtimes;
   }
 
@@ -276,7 +276,7 @@ let DeprecatedAdbScanner = {
     return promise.resolve();
   },
 
-  listRuntimes: function() {
+  listRuntimes: function () {
     return this._runtimes;
   }
 
@@ -328,7 +328,7 @@ let WiFiScanner = {
     return promise.resolve();
   },
 
-  listRuntimes: function() {
+  listRuntimes: function () {
     return this._runtimes;
   },
 
@@ -393,7 +393,7 @@ DeprecatedUSBRuntime.prototype = {
   get device() {
     return Devices.getByName(this._id);
   },
-  connect: function(connection) {
+  connect: function (connection) {
     if (!this.device) {
       return promise.reject(new Error("Can't find device: " + this.name));
     }
@@ -409,7 +409,7 @@ DeprecatedUSBRuntime.prototype = {
   get name() {
     return this._productModel || this._id;
   },
-  updateNameFromADB: function() {
+  updateNameFromADB: function () {
     if (this._productModel) {
       return promise.reject();
     }
@@ -438,7 +438,7 @@ WiFiRuntime.prototype = {
   type: RuntimeTypes.WIFI,
   // Mark runtime as taking a long time to connect
   prolongedConnection: true,
-  connect: function(connection) {
+  connect: function (connection) {
     let service = discovery.getRemoteService("devtools", this.deviceName);
     if (!service) {
       return promise.reject(new Error("Can't find device: " + this.name));
@@ -544,7 +544,7 @@ function SimulatorRuntime(simulator) {
 
 SimulatorRuntime.prototype = {
   type: RuntimeTypes.SIMULATOR,
-  connect: function(connection) {
+  connect: function (connection) {
     return this.simulator.launch().then(port => {
       connection.host = "localhost";
       connection.port = port;
@@ -569,7 +569,7 @@ exports._SimulatorRuntime = SimulatorRuntime;
 
 let gLocalRuntime = {
   type: RuntimeTypes.LOCAL,
-  connect: function(connection) {
+  connect: function (connection) {
     if (!DebuggerServer.initialized) {
       DebuggerServer.init();
       DebuggerServer.addBrowserActors();
@@ -593,7 +593,7 @@ exports._gLocalRuntime = gLocalRuntime;
 
 let gRemoteRuntime = {
   type: RuntimeTypes.REMOTE,
-  connect: function(connection) {
+  connect: function (connection) {
     let win = Services.wm.getMostRecentWindow("devtools:webide");
     if (!win) {
       return promise.reject(new Error("No WebIDE window found"));
@@ -602,7 +602,7 @@ let gRemoteRuntime = {
     let title = Strings.GetStringFromName("remote_runtime_promptTitle");
     let message = Strings.GetStringFromName("remote_runtime_promptMessage");
     let ok = Services.prompt.prompt(win, title, message, ret, null, {});
-    let [host,port] = ret.value.split(":");
+    let [host, port] = ret.value.split(":");
     if (!ok) {
       return promise.reject({canceled: true});
     }

@@ -31,7 +31,7 @@ function test() {
          "The valid error loading message is displayed.");
     }
 
-    Task.spawn(function*() {
+    Task.spawn(function* () {
       yield waitForSourceShown(gPanel, "-01.js");
       yield showBogusSource();
       yield testDebuggerLoadingError();

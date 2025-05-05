@@ -3,7 +3,7 @@
 
 "use strict";
 
-add_task(function*() {
+add_task(function* () {
   let tab = yield addTab("data:text/html;charset=utf8,Test RDM custom presets");
 
   let { rdm, manager } = yield openRDM(tab);
@@ -12,7 +12,7 @@ add_task(function*() {
   Services.prompt = {
     value: "",
     returnBool: true,
-    prompt: function(parent, dialogTitle, text, value, checkMsg, checkState) {
+    prompt: function (parent, dialogTitle, text, value, checkMsg, checkState) {
       value.value = this.value;
       return this.returnBool;
     }
@@ -103,8 +103,8 @@ add_task(function*() {
   yield closeRDM(rdm);
 });
 
-var getPresetIndex = Task.async(function*(rdm, manager, presetLabel) {
-  var testOnePreset = Task.async(function*(c) {
+var getPresetIndex = Task.async(function* (rdm, manager, presetLabel) {
+  var testOnePreset = Task.async(function* (c) {
     if (c == 0) {
       return -1;
     }

@@ -48,7 +48,7 @@ if (url.search.length > 1) {
         DebuggerServer.addBrowserActors();
       }
       let client = new DebuggerClient(DebuggerServer.connectPipe());
-      Task.spawn(function*() {
+      Task.spawn(function* () {
         yield client.connect();
         // Creates a target for a given browser iframe.
         let response = yield client.getTab({ tab });

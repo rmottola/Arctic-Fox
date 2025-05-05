@@ -41,7 +41,7 @@ const ConsoleOutput = createClass({
   },
 
   render() {
-    let messageNodes = this.props.messages.map(function(message) {
+    let messageNodes = this.props.messages.map(function (message) {
       return (
         MessageContainer({ message })
       );

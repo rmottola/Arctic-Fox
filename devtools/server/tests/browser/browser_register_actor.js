@@ -33,9 +33,9 @@ function test() {
             // Clean up
             actorFront.unregister().then(() => {
               gClient.close(() => {
-                 DebuggerServer.destroy();
-                 gClient = null;
-                 finish();
+                DebuggerServer.destroy();
+                gClient = null;
+                finish();
               });
             });
           });

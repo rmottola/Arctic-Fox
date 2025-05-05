@@ -34,8 +34,7 @@ const BROWSER_CONSOLE_FILTER_PREFS_PREFIX = "devtools.browserconsole.filter.";
 
 var gHudId = 0;
 
-///////////////////////////////////////////////////////////////////////////
-//// The HUD service
+// The HUD service
 
 function HUD_SERVICE()
 {
@@ -234,7 +233,7 @@ HUD_SERVICE.prototype =
         .then((aBrowserConsole) => {
           this._browserConsoleDefer.resolve(aBrowserConsole);
           this._browserConsoleDefer = null;
-        })
+        });
     }, console.error.bind(console));
 
     return this._browserConsoleDefer.promise;
@@ -490,7 +489,7 @@ WebConsole.prototype = {
     }
     toolbox.viewSourceInDebugger(aSourceURL, aSourceLine).then(() => {
       this.ui.emit("source-in-debugger-opened");
-    })
+    });
   },
 
   /**
@@ -588,7 +587,7 @@ WebConsole.prototype = {
       }
     }
 
-    let onDestroy = Task.async(function*() {
+    let onDestroy = Task.async(function* () {
       if (!this._browserConsole) {
         try {
           yield this.target.activeTab.focus();
@@ -639,12 +638,12 @@ function BrowserConsole()
 }
 
 BrowserConsole.prototype = Heritage.extend(WebConsole.prototype,
-{
-  _browserConsole: true,
-  _bc_init: null,
-  _bc_destroyer: null,
+  {
+    _browserConsole: true,
+    _bc_init: null,
+    _bc_destroyer: null,
 
-  $init: WebConsole.prototype.init,
+    $init: WebConsole.prototype.init,
 
   /**
    * Initialize the Browser Console instance.

@@ -19,7 +19,7 @@ let Framerate = exports.Framerate = Class({
     this._onGlobalCreated = this._onGlobalCreated.bind(this);
     on(this.tabActor, "window-ready", this._onGlobalCreated);
   },
-  destroy: function(conn) {
+  destroy: function (conn) {
     off(this.tabActor, "window-ready", this._onGlobalCreated);
     this.stopRecording();
   },

@@ -121,7 +121,7 @@ let editFieldInteger = Task.async(function*() {
 
   try {
     yield iframe.contentWindow.configView._defaultField;
-  } catch(err) {
+  } catch (err) {
     let fieldRow = doc.querySelector("#row-new-integer-field");
     if (!fieldRow) {
       found = false;

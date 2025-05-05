@@ -202,7 +202,7 @@ function createAndLoadTemporaryFile(aFile, aFileName, aFileContent)
             0o644, fout.DEFER_OPEN);
 
   gScratchpad.setFilename(aFile.path);
-  gScratchpad.importFromFile(aFile.QueryInterface(Ci.nsILocalFile),  true,
+  gScratchpad.importFromFile(aFile.QueryInterface(Ci.nsILocalFile), true,
                             fileImported);
   gScratchpad.saveFile(fileSaved);
 
@@ -308,7 +308,7 @@ var PreferenceObserver = {
     }
   },
 
-  uninit: function PO_uninit () {
+  uninit: function PO_uninit() {
     this.branch.removeObserver("", this);
   }
 };

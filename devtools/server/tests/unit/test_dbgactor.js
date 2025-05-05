@@ -17,9 +17,9 @@ function run_test()
 
   let transport = DebuggerServer.connectPipe();
   gClient = new DebuggerClient(transport);
-  gClient.addListener("connected", function(aEvent, aType, aTraits) {
+  gClient.addListener("connected", function (aEvent, aType, aTraits) {
     gClient.listTabs((aResponse) => {
-      do_check_true('tabs' in aResponse);
+      do_check_true("tabs" in aResponse);
       for (let tab of aResponse.tabs) {
         if (tab.title == "test-1") {
           test_attach_tab(tab.actor);
@@ -39,7 +39,7 @@ function run_test()
 // Attach to |aTabActor|, and check the response.
 function test_attach_tab(aTabActor)
 {
-  gClient.request({ to: aTabActor, type: "attach" }, function(aResponse) {
+  gClient.request({ to: aTabActor, type: "attach" }, function (aResponse) {
     do_check_false("error" in aResponse);
     do_check_eq(aResponse.from, aTabActor);
     do_check_eq(aResponse.type, "tabAttached");
@@ -52,7 +52,7 @@ function test_attach_tab(aTabActor)
 // Attach to |aThreadActor|, check the response, and resume it.
 function test_attach_thread(aThreadActor)
 {
-  gClient.request({ to: aThreadActor, type: "attach" }, function(aResponse) {
+  gClient.request({ to: aThreadActor, type: "attach" }, function (aResponse) {
     do_check_false("error" in aResponse);
     do_check_eq(aResponse.from, aThreadActor);
     do_check_eq(aResponse.type, "paused");
@@ -81,13 +81,13 @@ function test_resume_thread(aThreadActor)
     do_check_true(gDebuggee.b);
   });
 
-  gClient.addListener("paused", function(aName, aPacket) {
+  gClient.addListener("paused", function (aName, aPacket) {
     do_check_eq(aName, "paused");
     do_check_false("error" in aPacket);
     do_check_eq(aPacket.from, aThreadActor);
     do_check_eq(aPacket.type, "paused");
     do_check_true("actor" in aPacket);
-    do_check_true("why" in aPacket)
+    do_check_true("why" in aPacket);
     do_check_eq(aPacket.why.type, "debuggerStatement");
 
     // Reach around the protocol to check that the debuggee is in the state
@@ -104,14 +104,14 @@ function test_resume_thread(aThreadActor)
 
 function cleanup()
 {
-  gClient.addListener("closed", function(aEvent, aResult) {
+  gClient.addListener("closed", function (aEvent, aResult) {
     do_test_finished();
   });
 
   try {
     let xpcInspector = Cc["@mozilla.org/jsinspector;1"].getService(Ci.nsIJSInspector);
     do_check_eq(xpcInspector.eventLoopNestLevel, 0);
-  } catch(e) {
+  } catch (e) {
     dump(e);
   }
 

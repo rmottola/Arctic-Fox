@@ -53,7 +53,7 @@ function getSourceActor(aSources, aURL) {
  * @return nsIDOMWindow
  *         The new window object that holds Scratchpad.
  */
-function *openScratchpadWindow () {
+function* openScratchpadWindow() {
   let { promise: p, resolve } = promise.defer();
   let win = ScratchpadManager.openScratchpad();
 
@@ -100,7 +100,7 @@ function waitForContentMessage(name) {
  * @return {Promise} Resolves to the response data if a response is expected,
  * immediately resolves otherwise
  */
-function executeInContent(name, data={}, objects={}, expectResponse=true) {
+function executeInContent(name, data = {}, objects = {}, expectResponse = true) {
   info("Sending message " + name + " to content");
   let mm = gBrowser.selectedBrowser.messageManager;
 
@@ -120,7 +120,7 @@ function executeInContent(name, data={}, objects={}, expectResponse=true) {
 function synthesizeKeyElement(el) {
   let key = el.getAttribute("key") || el.getAttribute("keycode");
   let mod = {};
-  el.getAttribute("modifiers").split(" ").forEach((m) => mod[m+"Key"] = true);
+  el.getAttribute("modifiers").split(" ").forEach((m) => mod[m + "Key"] = true);
   info(`Synthesizing: key=${key}, mod=${JSON.stringify(mod)}`);
   EventUtils.synthesizeKey(key, mod, el.ownerDocument.defaultView);
 }
@@ -140,7 +140,7 @@ function checkHostType(toolbox, hostType, previousHostType) {
   is(pref, hostType, "host pref is " + hostType);
 
   if (previousHostType) {
-    is (Services.prefs.getCharPref("devtools.toolbox.previousHost"),
+    is(Services.prefs.getCharPref("devtools.toolbox.previousHost"),
       previousHostType, "The previous host is correct");
   }
 }

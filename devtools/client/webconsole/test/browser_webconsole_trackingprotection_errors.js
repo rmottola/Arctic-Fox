@@ -11,7 +11,7 @@ const LEARN_MORE_URI = "https://developer.mozilla.org/Firefox/Privacy/Tracking_P
 const PREF = "privacy.trackingprotection.enabled";
 const {UrlClassifierTestUtils} = Cu.import("resource://testing-common/UrlClassifierTestUtils.jsm", {});
 
-registerCleanupFunction(function() {
+registerCleanupFunction(function () {
   Services.prefs.clearUserPref(PREF);
   UrlClassifierTestUtils.cleanupTestTrackers();
 });

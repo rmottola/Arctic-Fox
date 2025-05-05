@@ -85,7 +85,7 @@ function BuildItem(addon, type) {
       li.setAttribute("addon", type);
       try {
         name.textContent = Strings.GetStringFromName("addons_adapters_label");
-      } catch(e) {
+      } catch (e) {
         // This code (bug 1081093) will be backported to Aurora, which doesn't
         // contain this string.
         name.textContent = "Tools Adapters Add-on";

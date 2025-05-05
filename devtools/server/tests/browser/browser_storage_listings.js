@@ -316,13 +316,13 @@ const IDBValues = {
       ]
     }
   }
-}
+};
 
 function finishTests(client) {
 
   let closeConnection = () => {
 
-  }
+  };
 }
 
 function* testStores(data) {
@@ -590,7 +590,7 @@ let testIDBEntries = Task.async(function*(index, hosts, indexedDBActor) {
   yield testObjectStores(++index, hosts, indexedDBActor);
 });
 
-add_task(function*() {
+add_task(function* () {
   yield openTabAndSetupStorage(MAIN_DOMAIN + "storage-listings.html");
 
   initDebuggerServer();

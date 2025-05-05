@@ -78,7 +78,7 @@ function test() {
       testStatus();
 
       teardown(aMonitor).then(finish);
-    })
+    });
 
     function testStatus() {
       let summary = $("#requests-menu-network-summary-button");

@@ -20,7 +20,7 @@ var gSecondSourceLabel = "code_ugly-7.js";
 var gOriginalPref = Services.prefs.getBoolPref("devtools.debugger.auto-pretty-print");
 Services.prefs.setBoolPref("devtools.debugger.auto-pretty-print", true);
 
-function test(){
+function test() {
   initDebugger(TAB_URL).then(([aTab, aDebuggee, aPanel]) => {
     gTab = aTab;
     gDebuggee = aDebuggee;

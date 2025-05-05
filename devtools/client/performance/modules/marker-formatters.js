@@ -192,5 +192,5 @@ exports.Formatters = {
  * @param string propName
  */
 exports.Formatters.labelForProperty = function (mainLabel, propName) {
-  return (marker={}) => marker[propName] ? `${mainLabel} (${marker[propName]})` : mainLabel;
+  return (marker = {}) => marker[propName] ? `${mainLabel} (${marker[propName]})` : mainLabel;
 };

@@ -18,7 +18,7 @@ loadSubScript("chrome://mochikit/content/tests/SimpleTest/EventUtils.js", EventU
 
 dump("Frame script loaded.\n");
 
-var workers = {}
+var workers = {};
 
 this.call = function (name, args) {
   dump("Calling function with name " + name + ".\n");

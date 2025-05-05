@@ -39,7 +39,7 @@ function* initTab(tabX, startToolbox) {
 }
 
 function* checkCacheStateForAllTabs(states) {
-  for (let i = 0; i < tabs.length; i ++) {
+  for (let i = 0; i < tabs.length; i++) {
     let tab = tabs[i];
     yield checkCacheEnabled(tab, states[i]);
   }

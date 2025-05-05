@@ -104,7 +104,7 @@ add_task(function () {
  * Takes either a string or an object and turns it into an array that
  * parseLocation.apply expects.
  */
-function argify (val) {
+function argify(val) {
   if (typeof val === "string") {
     return [val];
   } else {

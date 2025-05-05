@@ -26,15 +26,15 @@ var test = asyncTest(function*() {
       text: "console.log('foo', 'bar');",
       category: CATEGORY_INPUT,
     },
-    {
-      text: "foo bar",
-      category: CATEGORY_WEBDEV,
-      severity: SEVERITY_LOG,
-    },
-    {
-      text: "undefined",
-      category: CATEGORY_OUTPUT,
-    }]
+      {
+        text: "foo bar",
+        category: CATEGORY_WEBDEV,
+        severity: SEVERITY_LOG,
+      },
+      {
+        text: "undefined",
+        category: CATEGORY_OUTPUT,
+      }]
   });
 
   let fncallNode = [...functionCall.matched][0];
