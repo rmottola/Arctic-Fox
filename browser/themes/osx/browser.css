@@ -898,7 +898,7 @@ toolbar[brighttext] #bookmarks-menu-button.bookmark-item {
 #sync-button {
     -moz-image-region: rect(0, 270px, 18px, 252px);
 }
-#sync-button[status="active"] {
+#sync-button[syncstatus="active"] {
     list-style-image: url("chrome://browser/skin/sync-throbber.png");
     -moz-image-region: rect(0, 18px, 18px, 0);
 }

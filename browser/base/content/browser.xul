@@ -1116,6 +1116,7 @@
 #ifdef MOZ_SERVICES_SYNC
       <toolbarbutton id="sync-button"
                      class="toolbarbutton-1 chromeclass-toolbar-additional"
+                     observes="sync-status"
                      label="&syncToolbarButton.label;"
                      oncommand="gSyncUI.handleToolbarButton()"/>
 #endif
