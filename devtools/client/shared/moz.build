@@ -52,4 +52,5 @@ DevToolsModules(
     'undo.js',
     'view-source.js',
     'webgl-utils.js',
+    'zoom-keys.js',
 )
