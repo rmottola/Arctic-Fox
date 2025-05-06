@@ -279,8 +279,8 @@ function createScreenshotData(document, args) {
     // Bug 961832: GCLI screenshot shows fixed position element in wrong
     // position if we don't scroll to top
     window.scrollTo(0,0);
-    width = window.innerWidth + window.scrollMaxX;
-    height = window.innerHeight + window.scrollMaxY;
+    width = window.innerWidth + window.scrollMaxX - window.scrollMinX;
+    height = window.innerHeight + window.scrollMaxY - window.scrollMinY;
   }
   else if (args.selector) {
     const lh = new LayoutHelpers(window);
@@ -302,9 +302,11 @@ function createScreenshotData(document, args) {
   height -= scrollbarHeight.value;
 
   const canvas = document.createElementNS("http://www.w3.org/1999/xhtml", "canvas");
-  canvas.width = width;
-  canvas.height = height;
   const ctx = canvas.getContext("2d");
+  const ratio = window.devicePixelRatio;
+  canvas.width = width * ratio;
+  canvas.height = height * ratio;
+  ctx.scale(ratio, ratio);
   ctx.drawWindow(window, left, top, width, height, "#fff");
   const data = canvas.toDataURL("image/png", "");
 
