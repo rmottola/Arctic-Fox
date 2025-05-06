@@ -96,18 +96,6 @@ define(function (require, exports, module) {
       return items;
     },
 
-    hasSpecialProperties: function (array) {
-      return false;
-    },
-
-    // Event Handlers
-
-    onToggleProperties: function (event) {
-    },
-
-    onClickBracket: function (event) {
-    },
-
     render: function () {
       let mode = this.props.mode || "short";
       let object = this.props.object;
@@ -122,12 +110,8 @@ define(function (require, exports, module) {
       }
 
       return (
-        ObjectBox({
-          className: "array",
-          onClick: this.onToggleProperties},
-          a({
-            className: "objectLink",
-            onclick: this.onClickBracket},
+        ObjectBox({className: "array"},
+          a({className: "objectLink"},
             span({
               className: "arrayLeftBracket",
               role: "presentation"},
@@ -135,9 +119,7 @@ define(function (require, exports, module) {
             )
           ),
           items,
-          a({
-            className: "objectLink",
-            onclick: this.onClickBracket},
+          a({className: "objectLink"},
             span({
               className: "arrayRightBracket",
               role: "presentation"},
