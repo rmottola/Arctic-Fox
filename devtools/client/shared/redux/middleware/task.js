@@ -15,7 +15,7 @@ const ERROR_TYPE = exports.ERROR_TYPE = "@@redux/middleware/task#error";
  * on the results.
  */
 
-function task ({ dispatch, getState }) {
+function task({ dispatch, getState }) {
   return next => action => {
     if (isGenerator(action)) {
       return Task.spawn(action.bind(null, dispatch, getState))
@@ -32,7 +32,7 @@ function task ({ dispatch, getState }) {
   };
 }
 
-function handleError (dispatch, error) {
+function handleError(dispatch, error) {
   executeSoon(() => {
     reportException(ERROR_TYPE, error);
     dispatch({ type: ERROR_TYPE, error });
