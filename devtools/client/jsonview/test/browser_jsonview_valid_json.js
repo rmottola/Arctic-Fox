@@ -12,13 +12,8 @@ add_task(function* () {
 
   yield addJsonViewTab(TEST_JSON_URL);
 
-  let countBefore = yield getElementCount(".jsonPanelBox .domTable .memberRow");
-  ok(countBefore == 1, "There must be one row");
-
-  yield expandJsonNode(".jsonPanelBox .domTable .memberLabel");
-
-  let countAfter = yield getElementCount(".jsonPanelBox .domTable .memberRow");
-  ok(countAfter == 3, "There must be three rows");
+  let countBefore = yield getElementCount(".jsonPanelBox .treeTable .treeRow");
+  ok(countBefore == 3, "There must be three rows");
 
   let objectCellCount = yield getElementCount(
     ".jsonPanelBox .treeTable .objectCell");
@@ -27,4 +22,10 @@ add_task(function* () {
   let objectCellText = yield getElementText(
     ".jsonPanelBox .treeTable .objectCell");
   ok(objectCellText == "", "The summary is hidden when object is expanded");
+
+  // Collapsed auto-expanded node.
+  yield clickJsonNode(".jsonPanelBox .treeTable .treeLabel");
+
+  let countAfter = yield getElementCount(".jsonPanelBox .treeTable .treeRow");
+  ok(countAfter == 1, "There must be one row");
 });
