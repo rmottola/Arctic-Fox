@@ -6,7 +6,7 @@
 "use strict";
 
 // Make this available to both AMD and CJS environments
-define(function(require, exports, module) {
+define(function (require, exports, module) {
   const React = require("devtools/client/shared/vendor/react");
 
   // Shortcuts
@@ -18,6 +18,8 @@ define(function(require, exports, module) {
    * using <td> element (the row is <tr> and the entire tree is <table>).
    */
   let TreeCell = React.createClass({
+    displayName: "TreeCell",
+
     // See TreeView component for detailed property explanation.
     propTypes: {
       value: PropTypes.any,
@@ -26,8 +28,6 @@ define(function(require, exports, module) {
       member: PropTypes.object.isRequired,
       renderValue: PropTypes.func.isRequired
     },
-
-    displayName: "TreeCell",
 
     /**
      * Optimize cell rendering. Rerender cell content only if

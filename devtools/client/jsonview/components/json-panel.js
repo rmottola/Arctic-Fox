@@ -62,7 +62,7 @@ define(function (require, exports, module) {
       return json.indexOf(this.props.searchFilter) >= 0;
     },
 
-    getExpandedNodes: function(object, path = "", level = 0) {
+    getExpandedNodes: function (object, path = "", level = 0) {
       if (typeof object != "object") {
         return null;
       }
@@ -96,7 +96,7 @@ define(function (require, exports, module) {
       return Rep(props);
     },
 
-    renderTree: function() {
+    renderTree: function () {
       // Append custom column for displaying values. This column
       // Take all available horizontal space.
       let columns = [{
@@ -121,7 +121,7 @@ define(function (require, exports, module) {
       });
     },
 
-    render: function() {
+    render: function () {
       let content;
       let data = this.props.data;
 
