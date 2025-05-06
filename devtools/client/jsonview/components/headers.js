@@ -67,16 +67,16 @@ define(function(require, exports, module) {
 
     displayName: "HeaderList",
 
-    getInitialState: function() {
+    getInitialState: function () {
       return {
         headers: []
       };
     },
 
-    render: function() {
+    render: function () {
       let headers = this.props.headers;
 
-      headers.sort(function(a, b) {
+      headers.sort(function (a, b) {
         return a.name > b.name ? 1 : -1;
       });
 
