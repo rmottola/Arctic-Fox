@@ -23,11 +23,11 @@ define(function(require, exports, module) {
 
     displayName: "Headers",
 
-    getInitialState: function() {
+    getInitialState: function () {
       return {};
     },
 
-    render: function() {
+    render: function () {
       let data = this.props.data;
 
       return (
