@@ -610,6 +610,8 @@ browser/chrome/devtools/skin/images/vview-lock@2x.png
 browser/chrome/devtools/skin/themes/images/vview-lock@2x.png
 browser/chrome/devtools/skin/images/vview-edit@2x.png
 browser/chrome/devtools/skin/themes/images/vview-edit@2x.png
+browser/chrome/devtools/modules/devtools/client/dom/content/components/search.svg
+browser/chrome/devtools/modules/devtools/client/jsonview/css/search.svg
 browser/features/firefox@getpocket.com/chrome/skin/osx/pocket.css
 browser/features/firefox@getpocket.com/chrome/skin/osx/pocket.css.orig
 browser/features/firefox@getpocket.com/chrome/skin/windows/pocket.css
