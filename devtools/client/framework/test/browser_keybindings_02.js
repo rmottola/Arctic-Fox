@@ -10,6 +10,8 @@
 const URL = "data:text/html;charset=utf8,test page";
 
 var {Toolbox} = require("devtools/client/framework/toolbox");
+var strings = Services.strings.createBundle(
+  "chrome://devtools/locale/toolbox.properties");
 
 add_task(function* () {
   info("Create a test tab and open the toolbox");

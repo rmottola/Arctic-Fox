@@ -4,6 +4,8 @@
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 
 var {Toolbox} = require("devtools/client/framework/toolbox");
+var strings = Services.strings.createBundle(
+  "chrome://devtools/locale/toolbox.properties");
 
 var toolbox, toolIDs, idIndex, secondTime = false,
     reverse = false, nextKey = null, prevKey = null;
