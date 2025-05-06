@@ -9,7 +9,7 @@
 const {Cc, Ci, Cu} = require("chrome");
 
 var WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
-var Heritage = require("sdk/core/heritage");
+var { extend } = require("sdk/core/heritage");
 var {TargetFactory} = require("devtools/client/framework/target");
 var {Tools} = require("devtools/client/definitions");
 const { Task } = require("devtools/shared/task");
@@ -637,13 +637,12 @@ function BrowserConsole()
   this._telemetry = new Telemetry();
 }
 
-BrowserConsole.prototype = Heritage.extend(WebConsole.prototype,
-  {
-    _browserConsole: true,
-    _bc_init: null,
-    _bc_destroyer: null,
+BrowserConsole.prototype = extend(WebConsole.prototype, {
+  _browserConsole: true,
+  _bc_init: null,
+  _bc_destroyer: null,
 
-    $init: WebConsole.prototype.init,
+  $init: WebConsole.prototype.init,
 
   /**
    * Initialize the Browser Console instance.
