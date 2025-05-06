@@ -46,6 +46,7 @@ const {scrollIntoViewIfNeeded} = require("devtools/shared/layout/utils");
 const {PrefObserver} = require("devtools/client/styleeditor/utils");
 const {KeyShortcuts} = require("devtools/client/shared/key-shortcuts");
 const {template} = require("devtools/shared/gcli/templater");
+const nodeConstants = require("devtools/shared/dom-node-constants");
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
@@ -206,7 +207,7 @@ MarkupView.prototype = {
 
     let container = target.container;
     if (this._hoveredNode !== container.node) {
-      if (container.node.nodeType !== Ci.nsIDOMNode.TEXT_NODE) {
+      if (container.node.nodeType !== nodeConstants.TEXT_NODE) {
         this._showBoxModel(container.node);
       } else {
         this._hideBoxModel();
@@ -798,7 +799,7 @@ MarkupView.prototype = {
    */
   deleteNode: function (node, moveBackward) {
     if (node.isDocumentElement ||
-        node.nodeType == Ci.nsIDOMNode.DOCUMENT_TYPE_NODE ||
+        node.nodeType == nodeConstants.DOCUMENT_TYPE_NODE ||
         node.isAnonymous) {
       return;
     }
@@ -889,10 +890,10 @@ MarkupView.prototype = {
       container = new RootContainer(this, node);
       this._elt.appendChild(container.elt);
       this._rootNode = node;
-    } else if (nodeType == Ci.nsIDOMNode.ELEMENT_NODE && !isPseudoElement) {
+    } else if (nodeType == nodeConstants.ELEMENT_NODE && !isPseudoElement) {
       container = new MarkupElementContainer(this, node, this._inspector);
-    } else if (nodeType == Ci.nsIDOMNode.COMMENT_NODE ||
-               nodeType == Ci.nsIDOMNode.TEXT_NODE) {
+    } else if (nodeType == nodeConstants.COMMENT_NODE ||
+               nodeType == nodeConstants.TEXT_NODE) {
       container = new MarkupTextContainer(this, node, this._inspector);
     } else {
       container = new MarkupReadOnlyContainer(this, node, this._inspector);
@@ -1768,7 +1769,7 @@ MarkupView.prototype = {
       nextSibling = null;
     }
 
-    if (parent.nodeType !== Ci.nsIDOMNode.ELEMENT_NODE) {
+    if (parent.nodeType !== nodeConstants.ELEMENT_NODE) {
       return null;
     }
 
@@ -2293,9 +2294,9 @@ function MarkupTextContainer(markupView, node) {
   MarkupContainer.prototype.initialize.call(this, markupView, node,
     "textcontainer");
 
-  if (node.nodeType == Ci.nsIDOMNode.TEXT_NODE) {
+  if (node.nodeType == nodeConstants.TEXT_NODE) {
     this.editor = new TextEditor(this, node, "text");
-  } else if (node.nodeType == Ci.nsIDOMNode.COMMENT_NODE) {
+  } else if (node.nodeType == nodeConstants.COMMENT_NODE) {
     this.editor = new TextEditor(this, node, "comment");
   } else {
     throw new Error("Invalid node for MarkupTextContainer");
@@ -2320,7 +2321,7 @@ function MarkupElementContainer(markupView, node) {
   MarkupContainer.prototype.initialize.call(this, markupView, node,
     "elementcontainer");
 
-  if (node.nodeType === Ci.nsIDOMNode.ELEMENT_NODE) {
+  if (node.nodeType === nodeConstants.ELEMENT_NODE) {
     this.editor = new ElementEditor(this, node);
   } else {
     throw new Error("Invalid node for MarkupElementContainer");
@@ -2526,7 +2527,7 @@ function GenericEditor(container, node) {
   if (node.isPseudoElement) {
     this.tag.classList.add("theme-fg-color5");
     this.tag.textContent = node.isBeforePseudoElement ? "::before" : "::after";
-  } else if (node.nodeType == Ci.nsIDOMNode.DOCUMENT_TYPE_NODE) {
+  } else if (node.nodeType == nodeConstants.DOCUMENT_TYPE_NODE) {
     this.elt.classList.add("comment");
     this.tag.textContent = node.doctypeString;
   } else {
