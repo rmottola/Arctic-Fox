@@ -626,6 +626,7 @@ browser/chrome/browser/skin/classic/browser/identity-mixed-passive-loaded.svg
 browser/chrome/devtools/skin/images/security-state-weak.svg
 browser/chrome/browser/skin/classic/browser/identity-secure.svg
 browser/chrome/browser/skin/classic/browser/identity-not-secure.svg
+browser/chrome/devtools/modules/devtools/client/themes/audio/shutter.wav
 
 browser/chrome/browser/defaults/permissions
 browser/defaults/permissions
