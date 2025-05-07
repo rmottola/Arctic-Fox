@@ -37,5 +37,6 @@ DevToolsModules(
     'styles.js',
     'stylesheets.js',
     'timeline.js',
-    'webgl.js'
+    'webgl.js',
+    'worker.js'
 )
