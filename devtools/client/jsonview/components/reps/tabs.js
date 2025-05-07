@@ -55,7 +55,7 @@ define(function (require, exports, module) {
       };
     },
 
-    getInitialState: function ) {
+    getInitialState: function () {
       return {
         tabActive: this.props.tabActive
       };
