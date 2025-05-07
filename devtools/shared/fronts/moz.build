@@ -8,7 +8,10 @@ DevToolsModules(
     'css-properties.js',
     'highlighters.js',
     'inspector.js',
+    'preference.js',
+    'settings.js',
     'storage.js',
     'styles.js',
-    'stylesheets.js'
+    'stylesheets.js',
+    'webgl.js'
 )
