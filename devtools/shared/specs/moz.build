@@ -25,6 +25,7 @@ DevToolsModules(
     'inspector.js',
     'node.js',
     'preference.js',
+    'promises.js',
     'settings.js',
     'storage.js',
     'styles.js',
