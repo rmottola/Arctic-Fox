@@ -99,6 +99,13 @@ function InspectorPanel(iframeWindow, toolbox) {
   this.onPaneToggleButtonClicked = this.onPaneToggleButtonClicked.bind(this);
   this._onMarkupFrameLoad = this._onMarkupFrameLoad.bind(this);
 
+  let doc = this.panelDoc;
+
+  // Handle 'Add Node' toolbar button.
+  this.addNode = this.addNode.bind(this);
+  this.addNodeButton = doc.getElementById("inspector-element-add-button");
+  this.addNodeButton.addEventListener("click", this.addNode);
+
   this._target.on("will-navigate", this._onBeforeNavigate);
 
   EventEmitter.decorate(this);
@@ -652,6 +659,8 @@ InspectorPanel.prototype = {
     this.sidebar.off("select", this._setDefaultSidebar);
     let sidebarDestroyer = this.sidebar.destroy();
     this.sidebar = null;
+
+    this.addNodeButton.removeEventListener("click", this.addNode);
 
     this.nodemenu.removeEventListener("popupshowing", this._setupNodeMenu, true);
     this.nodemenu.removeEventListener("popuphiding", this._resetNodeMenu, true);
