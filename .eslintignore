@@ -106,6 +106,7 @@ devtools/client/webide/**
 devtools/server/**
 !devtools/server/actors/webbrowser.js
 !devtools/server/actors/styles.js
+!devtools/server/actors/string.js
 !devtools/server/actors/csscoverage.js
 devtools/shared/*.js
 !devtools/shared/css-lexer.js
