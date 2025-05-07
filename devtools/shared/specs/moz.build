@@ -19,6 +19,7 @@ DevToolsModules(
     'environment.js',
     'frame.js',
     'framerate.js',
+    'gcli.js',
     'highlighters.js',
     'inspector.js',
     'preference.js',
