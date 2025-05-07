@@ -17,6 +17,7 @@ DevToolsModules(
     'director-manager.js',
     'director-registry.js',
     'environment.js',
+    'frame.js',
     'highlighters.js',
     'inspector.js',
     'preference.js',
