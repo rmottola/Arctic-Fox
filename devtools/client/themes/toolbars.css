@@ -794,10 +794,6 @@
   border-bottom-color: var(--theme-splitter-color);
 }
 
-.theme-dark .devtools-tabbar {
-  box-shadow: 0 -0.5px 0 var(--theme-splitter-color) inset;
-}
-
 #toolbox-tabs {
   margin: 0;
 }
