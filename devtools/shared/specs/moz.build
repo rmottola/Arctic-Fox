@@ -23,6 +23,7 @@ DevToolsModules(
     'heap-snapshot-file.js',
     'highlighters.js',
     'inspector.js',
+    'node.js',
     'preference.js',
     'settings.js',
     'storage.js',
