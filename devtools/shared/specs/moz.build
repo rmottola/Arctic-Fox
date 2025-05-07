@@ -6,6 +6,7 @@
 
 DevToolsModules(
     'addons.js',
+    'animation.js',
     'css-properties.js',
     'device.js',
     'highlighters.js',
