@@ -68,7 +68,7 @@ define(function (require, exports, module) {
       }
     },
 
-    componentWillReceiveProps: function newProps) {
+    componentWillReceiveProps: function (newProps) {
       if (newProps.tabActive) {
         this.setState({tabActive: newProps.tabActive});
       }
