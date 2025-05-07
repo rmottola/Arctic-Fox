@@ -8,6 +8,7 @@ DevToolsModules(
     'actor-registry.js',
     'addons.js',
     'animation.js',
+    'breakpoint.js',
     'call-watcher.js',
     'css-properties.js',
     'device.js',
