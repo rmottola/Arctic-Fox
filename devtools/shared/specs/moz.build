@@ -10,6 +10,7 @@ DevToolsModules(
     'animation.js',
     'breakpoint.js',
     'call-watcher.js',
+    'canvas.js',
     'css-properties.js',
     'device.js',
     'highlighters.js',
