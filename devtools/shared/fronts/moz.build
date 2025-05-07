@@ -29,5 +29,6 @@ DevToolsModules(
     'storage.js',
     'styles.js',
     'stylesheets.js',
+    'timeline.js',
     'webgl.js'
 )
