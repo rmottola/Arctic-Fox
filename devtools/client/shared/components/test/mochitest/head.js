@@ -137,14 +137,14 @@ var TEST_TREE = {
 /**
  * Frame
  */
-function checkFrameString({ frame, file, line, column, source, shouldLink, tooltip }) {
+function checkFrameString({ frame, file, line, column, source, functionName, shouldLink, tooltip }) {
   let el = frame.getDOMNode();
   let $ = selector => el.querySelector(selector);
 
+  let $func = $(".frame-link-function-display-name");
   let $source = $(".frame-link-source");
   let $filename = $(".frame-link-filename");
   let $line = $(".frame-link-line");
-  let $column = $(".frame-link-column");
 
   is($filename.textContent, file, "Correct filename");
   is(el.getAttribute("data-line"), line ? `${line}` : null, "Expected `data-line` found");
@@ -156,14 +156,19 @@ function checkFrameString({ frame, file, line, column, source, shouldLink, toolt
   }
 
   if (line != null) {
-    is(+$line.textContent, +line);
+    let lineText = `:${line}`;
+    if (column != null) {
+      lineText += `:${column}`;
+    }
+
+    is($line.textContent, lineText);
   } else {
     ok(!$line, "Should not have an element for `line`");
   }
 
-  if (column != null) {
-    is(+$column.textContent, +column);
+  if (functionName != null) {
+    is($func.textContent, functionName);
   } else {
-    ok(!$column, "Should not have an element for `column`");
+    ok(!$func, "Should not have an element for `functionName`");
   }
 }
