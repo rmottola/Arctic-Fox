@@ -18,6 +18,7 @@ DevToolsModules(
     'director-registry.js',
     'environment.js',
     'frame.js',
+    'framerate.js',
     'highlighters.js',
     'inspector.js',
     'preference.js',
