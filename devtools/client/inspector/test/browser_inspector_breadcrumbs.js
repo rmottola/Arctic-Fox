@@ -29,7 +29,7 @@ add_task(function*() {
     yield breadcrumbsUpdated;
 
     info("Performing checks for node " + node.selector);
-    let buttonsLabelIds = node.result.split(" ");
+    let buttonsLabelIds = node.ids.split(" ");
 
     // html > body > …
     is(container.childNodes.length, buttonsLabelIds.length + 2,
@@ -40,14 +40,21 @@ add_task(function*() {
       let button = container.childNodes[i];
       let labelId = button.querySelector(".breadcrumbs-widget-item-id");
       is(labelId.textContent, expectedId,
-        "Node #" + node.selector + ": button " + i + " matches");
+        "Node " + node.selector + ": button " + i + " matches");
     }
 
     let checkedButton = container.querySelector("button[checked]");
     let labelId = checkedButton.querySelector(".breadcrumbs-widget-item-id");
     let id = inspector.selection.nodeFront.id;
     is(labelId.textContent, "#" + id,
-      "Node #" + node.selector + ": selection matches");
+      "Node " + node.selector + ": selection matches");
+
+    let labelTag = checkedButton.querySelector(".breadcrumbs-widget-item-tag");
+    is(labelTag.textContent, node.nodeName,
+      "Node " + node.selector + " has the expected tag name");
+
+    is(checkedButton.getAttribute("tooltiptext"), node.title,
+      "Node " + node.selector + " has the expected tooltip");
   }
 
   yield testPseudoElements(inspector, container);

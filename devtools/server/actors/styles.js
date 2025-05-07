@@ -893,7 +893,7 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
     } else if (classes.length > 0) {
       selector = "." + classes.map(c => CSS.escape(c)).join(".");
     } else {
-      selector = rawNode.tagName.toLowerCase();
+      selector = rawNode.localName;
     }
 
     if (pseudoClasses && pseudoClasses.length > 0) {

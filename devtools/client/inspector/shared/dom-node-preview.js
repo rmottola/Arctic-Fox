@@ -277,7 +277,7 @@ DomNodePreview.prototype = {
 
   render: function (nodeFront) {
     this.nodeFront = nodeFront;
-    let {tagName, attributes} = nodeFront;
+    let {displayName, attributes} = nodeFront;
 
     if (nodeFront.isPseudoElement) {
       this.pseudoEl.textContent = nodeFront.isBeforePseudoElement
@@ -286,7 +286,7 @@ DomNodePreview.prototype = {
       this.pseudoEl.style.display = "inline";
       this.tagNameEl.style.display = "none";
     } else {
-      this.tagNameEl.textContent = tagName.toLowerCase();
+      this.tagNameEl.textContent = displayName;
       this.pseudoEl.style.display = "none";
       this.tagNameEl.style.display = "inline";
     }

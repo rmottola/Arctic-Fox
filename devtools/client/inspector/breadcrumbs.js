@@ -144,7 +144,7 @@ HTMLBreadcrumbs.prototype = {
    * @return {String}
    */
   prettyPrintNodeAsText: function (node) {
-    let text = node.tagName.toLowerCase();
+    let text = node.displayName;
     if (node.isPseudoElement) {
       text = node.isBeforePseudoElement ? "::before" : "::after";
     }
@@ -190,7 +190,7 @@ HTMLBreadcrumbs.prototype = {
     let pseudosLabel = this.chromeDoc.createElement("label");
     pseudosLabel.className = "breadcrumbs-widget-item-pseudo-classes plain";
 
-    let tagText = node.tagName.toLowerCase();
+    let tagText = node.displayName;
     if (node.isPseudoElement) {
       tagText = node.isBeforePseudoElement ? "::before" : "::after";
     }
