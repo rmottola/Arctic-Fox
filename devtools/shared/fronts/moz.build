@@ -6,6 +6,7 @@
 
 DevToolsModules(
     'css-properties.js',
+    'device.js',
     'highlighters.js',
     'inspector.js',
     'preference.js',
