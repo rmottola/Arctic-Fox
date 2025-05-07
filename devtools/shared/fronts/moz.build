@@ -21,6 +21,7 @@ DevToolsModules(
     'inspector.js',
     'layout.js',
     'preference.js',
+    'performance.js',
     'promises.js',
     'settings.js',
     'storage.js',
