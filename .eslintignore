@@ -112,6 +112,7 @@ devtools/server/**
 devtools/shared/*.js
 !devtools/shared/css-lexer.js
 !devtools/shared/defer.js
+!devtools/shared/event-emitter.js
 !devtools/shared/task.js
 devtools/shared/*.jsm
 !devtools/shared/Loader.jsm
@@ -134,6 +135,7 @@ devtools/shared/touch/**
 devtools/shared/transport/**
 devtools/shared/webconsole/test/**
 devtools/shared/worker/**
+!devtools/shared/worker/worker.js
 
 # Ignore devtools pre-processed files
 devtools/client/framework/toolbox-process-window.js
