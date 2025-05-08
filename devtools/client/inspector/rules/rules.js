@@ -23,6 +23,7 @@ const {Rule} = require("devtools/client/inspector/rules/models/rule");
 const {RuleEditor} = require("devtools/client/inspector/rules/views/rule-editor");
 const {createChild, promiseWarn} = require("devtools/client/inspector/shared/utils");
 const {gDevTools} = require("devtools/client/framework/devtools");
+const {getCssProperties} = require("devtools/shared/fronts/css-properties");
 
 loader.lazyRequireGetter(this, "overlays",
   "devtools/client/inspector/shared/style-inspector-overlays");
@@ -156,7 +157,9 @@ function CssRuleView(inspector, document, store, pageStyle) {
   this.store = store || {};
   this.pageStyle = pageStyle;
 
-  this._outputParser = new OutputParser(document);
+  this.cssProperties = getCssProperties(inspector.toolbox);
+
+  this._outputParser = new OutputParser(document, this.cssProperties.supportsType);
 
   this._onKeydown = this._onKeydown.bind(this);
   this._onKeypress = this._onKeypress.bind(this);
