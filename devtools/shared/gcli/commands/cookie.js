@@ -22,6 +22,7 @@
 
 const { Ci, Cc } = require("chrome");
 const l10n = require("gcli/l10n");
+const { XPCOMUtils } = require("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "cookieMgr", function() {
   return Cc["@mozilla.org/cookiemanager;1"].getService(Ci.nsICookieManager2);
