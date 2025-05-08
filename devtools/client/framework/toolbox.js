@@ -296,6 +296,13 @@ Toolbox.prototype = {
   },
 
   /**
+   * Shortcut to the window containing the toolbox UI
+   */
+  get win() {
+    return this.doc.defaultView;
+  },
+
+  /**
    * Shortcut to the document containing the toolbox UI
    */
   get doc() {
@@ -653,7 +660,7 @@ Toolbox.prototype = {
       return;
     }
 
-    let doc = this.doc.defaultView.parent.document;
+    let doc = this.win.parent.document;
 
     for (let [id, toolDefinition] of gDevTools.getToolDefinitionMap()) {
       // Prevent multiple entries for the same tool.
@@ -880,7 +887,7 @@ Toolbox.prototype = {
 
     toolbar.addEventListener("keypress", event => {
       let { key, target } = event;
-      let win = this.doc.defaultView;
+      let win = this.win;
       let elm, type;
       if (key === "Tab") {
         // Tabbing when toolbar or its contents are focused should move focus to
@@ -1866,7 +1873,7 @@ Toolbox.prototype = {
     }
 
     if (this.hostType == Toolbox.HostType.WINDOW) {
-      let doc = this.doc.defaultView.parent.document;
+      let doc = this.win.parent.document;
       let key = doc.getElementById("key_" + toolId);
       if (key) {
         key.parentNode.removeChild(key);
@@ -2141,7 +2148,7 @@ Toolbox.prototype = {
    * Enable / disable necessary textbox menu items using globalOverlay.js.
    */
   _updateTextboxMenuItems: function() {
-    let window = this.doc.defaultView;
+    let window = this.win;
     ["cmd_undo", "cmd_delete", "cmd_cut",
      "cmd_copy", "cmd_paste", "cmd_selectAll"].forEach(window.goUpdateCommand);
   },
