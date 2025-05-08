@@ -75,7 +75,7 @@ add_task(function* () {
     let deleteNode = inspector.panelDoc.getElementById("node-menu-delete");
     dispatchCommandEvent(deleteNode);
 
-    let deferred = promise.defer();
+    let deferred = defer();
     executeSoon(deferred.resolve);
     yield deferred.promise;
 

@@ -113,7 +113,7 @@ function* getFirstChildNodeValue(selector, testActor) {
  */
 function waitForChildrenUpdated({markup}) {
   info("Waiting for queued children updates to be handled");
-  let def = promise.defer();
+  let def = defer();
   markup._waitForChildren().then(() => {
     executeSoon(def.resolve);
   });
@@ -278,7 +278,7 @@ function searchUsingSelectorSearch(selector, inspector) {
  * @return A promise that resolves when the time is passed
  */
 function wait(ms) {
-  let def = promise.defer();
+  let def = defer();
   setTimeout(def.resolve, ms);
   return def.promise;
 }
@@ -383,7 +383,7 @@ var reopenMenu = Task.async(function* (menu) {
  * can be used with yield.
  */
 function promiseNextTick() {
-  let deferred = promise.defer();
+  let deferred = defer();
   executeSoon(deferred.resolve);
   return deferred.promise;
 }
@@ -479,7 +479,7 @@ function createTestHTTPServer() {
   let server = new HttpServer();
 
   registerCleanupFunction(function* cleanup() {
-    let destroyed = promise.defer();
+    let destroyed = defer();
     server.stop(() => {
       destroyed.resolve();
     });
