@@ -303,7 +303,9 @@ var DebuggerController = {
       }
     });
 
-    this.Workers.connect();
+    if (this._target.isTabActor) {
+      this.Workers.connect();
+    }
     this.ThreadState.connect();
     this.StackFrames.connect();
 
