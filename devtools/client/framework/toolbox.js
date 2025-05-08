@@ -18,6 +18,7 @@ const { SourceMapService } = require("./source-map-service");
 
 var {Cc, Ci, Cu} = require("chrome");
 var promise = require("promise");
+var defer = require("devtools/shared/defer");
 var Services = require("Services");
 var {Task} = require("devtools/shared/task");
 var {gDevTools} = require("devtools/client/framework/devtools");
@@ -244,7 +245,7 @@ Toolbox.prototype = {
    *          A promise that resolves once the panel is ready.
    */
   getPanelWhenReady: function (id) {
-    let deferred = promise.defer();
+    let deferred = defer();
     let panel = this.getPanel(id);
     if (panel) {
       deferred.resolve(panel);
@@ -367,7 +368,7 @@ Toolbox.prototype = {
   open: function () {
     return Task.spawn(function* () {
       let iframe = yield this._host.create();
-      let domReady = promise.defer();
+      let domReady = defer();
 
       // Prevent reloading the document when the toolbox is opened in a tab
       let location = iframe.contentWindow.location.href;
@@ -1179,7 +1180,7 @@ Toolbox.prototype = {
       });
     }
 
-    let deferred = promise.defer();
+    let deferred = defer();
     let iframe = this.doc.getElementById("toolbox-panel-iframe-" + id);
 
     if (iframe) {
@@ -1247,7 +1248,7 @@ Toolbox.prototype = {
         if (typeof panel.open == "function") {
           built = panel.open();
         } else {
-          let buildDeferred = promise.defer();
+          let buildDeferred = defer();
           buildDeferred.resolve(panel);
           built = buildDeferred.promise;
         }
@@ -2160,7 +2161,7 @@ Toolbox.prototype = {
       return this._performanceFrontConnection.promise;
     }
 
-    this._performanceFrontConnection = promise.defer();
+    this._performanceFrontConnection = defer();
     this._performance = createPerformanceFront(this._target);
     yield this.performance.connect();
 

@@ -9,6 +9,7 @@
 
 const EventEmitter = require("devtools/shared/event-emitter");
 const promise = require("promise");
+const defer = require("devtools/shared/defer");
 const Services = require("Services");
 const {DOMHelpers} = require("resource://devtools/client/shared/DOMHelpers.jsm");
 
@@ -54,7 +55,7 @@ BottomHost.prototype = {
    * Create a box at the bottom of the host tab.
    */
   create: function () {
-    let deferred = promise.defer();
+    let deferred = defer();
 
     let gBrowser = this.hostTab.ownerDocument.defaultView.gBrowser;
     let ownerDocument = gBrowser.ownerDocument;
@@ -195,7 +196,7 @@ SidebarHost.prototype = {
    * Create a box in the sidebar of the host tab.
    */
   create: function () {
-    let deferred = promise.defer();
+    let deferred = defer();
 
     let gBrowser = this.hostTab.ownerDocument.defaultView.gBrowser;
     let ownerDocument = gBrowser.ownerDocument;
@@ -278,7 +279,7 @@ WindowHost.prototype = {
    * Create a new xul window to contain the toolbox.
    */
   create: function () {
-    let deferred = promise.defer();
+    let deferred = defer();
 
     let flags = "chrome,centerscreen,resizable,dialog=no";
     let win = Services.ww.openWindow(null, this.WINDOW_URL, "_blank",

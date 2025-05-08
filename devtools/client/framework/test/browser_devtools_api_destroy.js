@@ -19,7 +19,7 @@ function runTests(aTab) {
     url: "about:blank",
     label: "someLabel",
     build: function (iframeWindow, toolbox) {
-      let deferred = promise.defer();
+      let deferred = defer();
       executeSoon(() => {
         deferred.resolve({
           target: toolbox.target,

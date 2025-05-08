@@ -6,6 +6,7 @@
 
 const { Ci } = require("chrome");
 const promise = require("promise");
+const defer = require("devtools/shared/defer");
 const EventEmitter = require("devtools/shared/event-emitter");
 const Services = require("Services");
 const { XPCOMUtils } = require("resource://gre/modules/XPCOMUtils.jsm");
@@ -184,7 +185,7 @@ TabTarget.prototype = {
                       "remote tabs.");
     }
 
-    let deferred = promise.defer();
+    let deferred = defer();
 
     if (this._protocolDescription &&
         this._protocolDescription.types[actorName]) {
@@ -370,7 +371,7 @@ TabTarget.prototype = {
       return this._remote.promise;
     }
 
-    this._remote = promise.defer();
+    this._remote = defer();
 
     if (this.isLocalTab) {
       // Since a remote protocol connection will be made, let's start the
@@ -544,7 +545,7 @@ TabTarget.prototype = {
       return this._destroyer.promise;
     }
 
-    this._destroyer = promise.defer();
+    this._destroyer = defer();
 
     // Before taking any action, notify listeners that destruction is imminent.
     this.emit("close");
@@ -613,7 +614,7 @@ TabTarget.prototype = {
    * @see TabActor.prototype.onResolveLocation
    */
   resolveLocation(loc) {
-    let deferred = promise.defer();
+    let deferred = defer();
 
     this.client.request(Object.assign({
       to: this._form.actor,
