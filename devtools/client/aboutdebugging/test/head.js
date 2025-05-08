@@ -2,37 +2,35 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
 /* eslint-env browser */
-/* eslint-disable mozilla/no-cpows-in-tests */
 /* exported openAboutDebugging, changeAboutDebuggingHash, closeAboutDebugging,
    installAddon, uninstallAddon, waitForMutation, assertHasTarget,
    getServiceWorkerList, getTabList, openPanel, waitForInitialAddonList,
-   waitForServiceWorkerRegistered, unregisterServiceWorker */
-/* global sendAsyncMessage */
+   waitForServiceWorkerRegistered, unregisterServiceWorker,
+   waitForDelayedStartupFinished */
+/* import-globals-from ../../framework/test/shared-head.js */
 
 "use strict";
 
-var { utils: Cu, classes: Cc, interfaces: Ci } = Components;
+// Load the shared-head file first.
+Services.scriptloader.loadSubScript(
+  "chrome://mochitests/content/browser/devtools/client/framework/test/shared-head.js",
+  this);
 
-const { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const { AddonManager } = Cu.import("resource://gre/modules/AddonManager.jsm", {});
-const Services = require("Services");
-const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 DevToolsUtils.testing = true;
-
-const CHROME_ROOT = gTestPath.substr(0, gTestPath.lastIndexOf("/") + 1);
 
 registerCleanupFunction(() => {
   DevToolsUtils.testing = false;
 });
 
-function* openAboutDebugging(page) {
+function* openAboutDebugging(page, win) {
   info("opening about:debugging");
   let url = "about:debugging";
   if (page) {
     url += "#" + page;
   }
 
-  let tab = yield addTab(url);
+  let tab = yield addTab(url, win);
   let browser = tab.linkedBrowser;
   let document = browser.contentDocument;
 
@@ -64,9 +62,9 @@ function openPanel(document, panelId) {
     document.querySelector(".main-content"), {childList: true});
 }
 
-function closeAboutDebugging(tab) {
+function closeAboutDebugging(tab, win) {
   info("Closing about:debugging");
-  return removeTab(tab);
+  return removeTab(tab, win);
 }
 
 function addTab(url, win, backgroundTab = false) {
@@ -353,5 +351,22 @@ function unregisterServiceWorker(tab) {
       mm.removeMessageListener("sw-unregistered", listener);
       done();
     });
+  });
+}
+
+/**
+ * Waits for the creation of a new window, usually used with create private
+ * browsing window.
+ * Returns a promise that will resolve when the window is successfully created.
+ * @param {window} win
+ */
+function waitForDelayedStartupFinished(win) {
+  return new Promise(function (resolve) {
+    Services.obs.addObserver(function observer(subject, topic) {
+      if (win == subject) {
+        Services.obs.removeObserver(observer, topic);
+        resolve();
+      }
+    }, "browser-delayed-startup-finished", false);
   });
 }
