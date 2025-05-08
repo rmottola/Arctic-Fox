@@ -126,8 +126,7 @@ var closeToolbox = Task.async(function* () {
 function waitForToolboxFrameFocus(toolbox) {
   info("Making sure that the toolbox's frame is focused");
   let def = promise.defer();
-  let win = toolbox.frame.contentWindow;
-  waitForFocus(def.resolve, win);
+  waitForFocus(def.resolve, toolbox.win);
   return def.promise;
 }
 

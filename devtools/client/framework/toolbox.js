@@ -299,7 +299,7 @@ Toolbox.prototype = {
    * Shortcut to the window containing the toolbox UI
    */
   get win() {
-    return this.doc.defaultView;
+    return this.frame.contentWindow;
   },
 
   /**
@@ -1794,7 +1794,7 @@ Toolbox.prototype = {
       // See bug 1022726, most probably because of swapFrameLoaders we need to
       // first focus the window here, and then once again further below to make
       // sure focus actually happens.
-      this.frame.contentWindow.focus();
+      this.win.focus();
 
       this._host.off("window-closed", this.destroy);
       this.destroyHost();
@@ -1812,7 +1812,7 @@ Toolbox.prototype = {
 
       // Focus the contentWindow to make sure keyboard shortcuts work straight
       // away.
-      this.frame.contentWindow.focus();
+      this.win.focus();
 
       this.emit("host-changed");
     });
@@ -2140,8 +2140,7 @@ Toolbox.prototype = {
     if (this.target.chrome) {
       return;
     }
-    let window = this.frame.contentWindow;
-    showDoorhanger({ window, type: "deveditionpromo" });
+    showDoorhanger({ window: this.win, type: "deveditionpromo" });
   },
 
   /**
@@ -2238,7 +2237,7 @@ Toolbox.prototype = {
    * Returns gViewSourceUtils for viewing source.
    */
   get gViewSourceUtils() {
-    return this.frame.contentWindow.gViewSourceUtils;
+    return this.win.gViewSourceUtils;
   },
 
   /**
