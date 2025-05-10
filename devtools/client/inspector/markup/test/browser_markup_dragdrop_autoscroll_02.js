@@ -5,11 +5,14 @@
 "use strict";
 
 // Test that dragging a node near the top or bottom edge of the markup-view
-// auto-scrolls the view.
+// auto-scrolls the view on a small toolbox.
 
-const TEST_URL = URL_ROOT + "doc_markup_dragdrop_autoscroll.html";
+const TEST_URL = URL_ROOT + "doc_markup_dragdrop_autoscroll_02.html";
 
 add_task(function* () {
+  // Set the toolbox to very small in size.
+  yield pushPref("devtools.toolbox.footer.height", 150);
+
   let {inspector} = yield openInspectorForURL(TEST_URL);
   let markup = inspector.markup;
   let viewHeight = markup.doc.documentElement.clientHeight;
@@ -18,7 +21,7 @@ add_task(function* () {
   markup.isDragging = true;
 
   info("Simulate a mousemove on the view, at the bottom, and expect scrolling");
-  let onScrolled = waitForViewScroll(markup);
+  let onScrolled = waitForScrollStop(markup.doc);
 
   markup._onMouseMove({
     preventDefault: () => {},
@@ -30,7 +33,7 @@ add_task(function* () {
   ok(bottomScrollPos > 0, "The view was scrolled down");
 
   info("Simulate a mousemove at the top and expect more scrolling");
-  onScrolled = waitForViewScroll(markup);
+  onScrolled = waitForScrollStop(markup.doc);
 
   markup._onMouseMove({
     preventDefault: () => {},
@@ -45,23 +48,3 @@ add_task(function* () {
   info("Simulate a mouseup to stop dragging");
   markup._onMouseUp();
 });
-
-function waitForViewScroll(markup) {
-  let el = markup.doc.documentElement;
-  let startPos = el.scrollTop;
-
-  return new Promise(resolve => {
-    let isDone = () => {
-      if (el.scrollTop === startPos) {
-        resolve(el.scrollTop);
-      } else {
-        startPos = el.scrollTop;
-        // Continue checking every 50ms.
-        setTimeout(isDone, 50);
-      }
-    };
-
-    // Start checking if the view scrolled after a while.
-    setTimeout(isDone, 50);
-  });
-}
