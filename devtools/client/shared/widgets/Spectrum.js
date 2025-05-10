@@ -95,7 +95,7 @@ Spectrum.hsvToRgb = function (h, s, v, a) {
   let q = v * (1 - f * s);
   let t = v * (1 - (1 - f) * s);
 
-  switch(i % 6) {
+  switch (i % 6) {
     case 0: r = v; g = t; b = p; break;
     case 1: r = q; g = v; b = p; break;
     case 2: r = p; g = v; b = t; break;
@@ -122,7 +122,7 @@ Spectrum.rgbToHsv = function (r, g, b, a) {
     // achromatic
     h = 0;
   } else {
-    switch(max) {
+    switch (max) {
       case r: h = (g - b) / d + (g < b ? 6 : 0); break;
       case g: h = (b - r) / d + 2; break;
       case b: h = (r - g) / d + 4; break;
@@ -225,7 +225,7 @@ Spectrum.prototype = {
       rgb[3] + ")";
   },
 
-  show: function() {
+  show: function () {
     this.element.classList.add("spectrum-show");
 
     this.slideHeight = this.slider.offsetHeight;
@@ -239,34 +239,34 @@ Spectrum.prototype = {
     this.updateUI();
   },
 
-  onElementClick: function(e) {
+  onElementClick: function (e) {
     e.stopPropagation();
   },
 
-  onSliderMove: function(dragX, dragY) {
+  onSliderMove: function (dragX, dragY) {
     this.hsv[0] = (dragY / this.slideHeight);
     this.updateUI();
     this.onChange();
   },
 
-  onDraggerMove: function(dragX, dragY) {
+  onDraggerMove: function (dragX, dragY) {
     this.hsv[1] = dragX / this.dragWidth;
     this.hsv[2] = (this.dragHeight - dragY) / this.dragHeight;
     this.updateUI();
     this.onChange();
   },
 
-  onAlphaSliderMove: function(dragX, dragY) {
+  onAlphaSliderMove: function (dragX, dragY) {
     this.hsv[3] = dragX / this.alphaSliderWidth;
     this.updateUI();
     this.onChange();
   },
 
-  onChange: function() {
+  onChange: function () {
     this.emit("changed", this.rgb, this.rgbCssString);
   },
 
-  updateHelperLocations: function() {
+  updateHelperLocations: function () {
     // If the UI hasn't been shown yet then none of the dimensions will be
     // correct
     if (!this.element.classList.contains("spectrum-show")) {
