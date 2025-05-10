@@ -35,7 +35,7 @@
           addon.on("update", function onUpdate() {
             if (addon.status == status) {
               addon.off("update", onUpdate);
-              deferred.resolve();
+              nextTick().then(() => deferred.resolve());
             }
           });
           return deferred.promise;
@@ -305,6 +305,15 @@
             is(form[param].value, defaults[param], "Default value for device " + param);
           }
 
+          // Force reload the list of simulators.
+
+          Simulators._loadingPromise = null;
+          Simulators._simulators = [];
+          yield Simulators._load();
+          yield nextTick();
+
+          is(findAll(".runtime-panel-item-simulator").length, 2, "Two simulators saved and reloaded " + Simulators._simulators.map(s => s.name).join(','));
+
           // Uninstall the 2.0 addon and watch its Simulator object disappear.
 
           sim20.uninstall();
@@ -322,6 +331,8 @@
           yield nextTick();
 
           is(findAll(".runtime-panel-item-simulator").length, 0, "Last simulator was removed");
+
+          yield asyncStorage.removeItem("simulators");
 
           sim10.uninstall();
 
