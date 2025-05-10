@@ -125,6 +125,11 @@
   display: flex;
 }
 
+.tooltip-hidden {
+  display: flex;
+  visibility: hidden;
+}
+
 /* Tooltip : arrow style */
 
 .tooltip-container[type="arrow"] {
