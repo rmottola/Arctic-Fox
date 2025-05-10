@@ -36,10 +36,20 @@ const MIN_ZOOM = 0.6;
 
 const MS_PER_DAY = 86400000;
 
+[["AppManager", AppManager],
+ ["AppProjects", AppProjects],
+ ["Connection", Connection]].forEach(([key, value]) => {
+   Object.defineProperty(this, key, {
+     value: value,
+     enumerable: true,
+     writable: false
+   });
+ });
+
 // Download remote resources early
-getJSON("devtools.webide.addonsURL", true);
-getJSON("devtools.webide.templatesURL", true);
-getJSON("devtools.devices.url", true);
+getJSON("devtools.webide.addonsURL");
+getJSON("devtools.webide.templatesURL");
+getJSON("devtools.devices.url");
 
 // See bug 989619
 console.log = console.log.bind(console);

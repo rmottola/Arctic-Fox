@@ -114,6 +114,7 @@ var SimulatorEditor = {
 
       // Update the form fields.
       this._form.name.value = simulator.name;
+
       this.updateVersionSelector();
       this.updateProfileSelector();
       this.updateDeviceSelector();
@@ -121,8 +122,13 @@ var SimulatorEditor = {
 
       // Change visibility of 'TV Simulator Menu'.
       let tvSimMenu = document.querySelector("#tv_simulator_menu");
-      tvSimMenu.style.visibility = (this._simulator.type === "television")?
+      tvSimMenu.style.visibility = (this._simulator.type === "television") ?
                                    "visible" : "hidden";
+
+      // Trigger any listener waiting for this update
+      let change = document.createEvent("HTMLEvents");
+      change.initEvent("change", true, true);
+      this._form.dispatchEvent(change);
     });
   },
 

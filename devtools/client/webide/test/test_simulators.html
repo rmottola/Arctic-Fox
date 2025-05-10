@@ -124,6 +124,13 @@
 
           let doc = simulatorPanel.contentWindow.document;
           let form = doc.querySelector("#simulator-editor");
+
+          let formReady = new Promise((resolve, reject) => {
+            form.addEventListener("change", () => {
+              resolve();
+            });
+          });
+
           let change = doc.createEvent("HTMLEvents");
           change.initEvent("change", true, true);
 
@@ -135,6 +142,8 @@
 
           let MockFilePicker = SpecialPowers.MockFilePicker;
           MockFilePicker.init(simulatorPanel.contentWindow);
+
+          yield formReady;
 
           // Test `name`.
 
