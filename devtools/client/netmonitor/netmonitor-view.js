@@ -2381,7 +2381,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
       el.appendChild(frameEl);
     }
 
-    tooltip.setContent(el, REQUESTS_TOOLTIP_STACK_TRACE_WIDTH);
+    tooltip.setContent(el, {width: REQUESTS_TOOLTIP_STACK_TRACE_WIDTH});
 
     return true;
   }),
