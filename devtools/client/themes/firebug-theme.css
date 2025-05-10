@@ -244,3 +244,8 @@
 .theme-firebug .devtools-toolbarbutton {
   min-width: 24px;
 }
+
+
+.theme-firebug #element-picker {
+  min-height: 21px;
+}
