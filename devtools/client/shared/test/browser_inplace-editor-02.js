@@ -21,7 +21,7 @@ add_task(function* () {
 
 function testNonTrimmed(doc) {
   info("Testing the trimOutput=false option");
-  let def = promise.defer();
+  let def = defer();
 
   let initial = "\nMultiple\nLines\n";
   let changed = " \nMultiple\nLines\n with more whitespace ";
@@ -42,7 +42,7 @@ function testNonTrimmed(doc) {
 
 function testTrimmed(doc) {
   info("Testing the trimOutput=true option (default value)");
-  let def = promise.defer();
+  let def = defer();
 
   let initial = "\nMultiple\nLines\n";
   let changed = " \nMultiple\nLines\n with more whitespace ";

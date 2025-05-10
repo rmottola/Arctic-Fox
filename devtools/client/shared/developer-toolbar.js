@@ -6,6 +6,7 @@
 
 const { Cc, Ci, Cu } = require("chrome");
 const promise = require("promise");
+const defer = require("devtools/shared/defer");
 const Services = require("Services");
 const { TargetFactory } = require("devtools/client/framework/target");
 const Telemetry = require("devtools/client/shared/telemetry");
@@ -914,7 +915,7 @@ OutputPanel.prototype._init = function (devtoolbar) {
   this._update = this._update.bind(this);
 
   // Wire up the element from the iframe, and resolve the promise
-  let deferred = promise.defer();
+  let deferred = defer();
   let onload = () => {
     this._frame.removeEventListener("load", onload, true);
 
@@ -1183,7 +1184,7 @@ TooltipPanel.create = function (devtoolbar) {
  * @private See TooltipPanel.create
  */
 TooltipPanel.prototype._init = function (devtoolbar) {
-  let deferred = promise.defer();
+  let deferred = defer();
 
   let chromeDocument = devtoolbar._doc;
   this._devtoolbar = devtoolbar;

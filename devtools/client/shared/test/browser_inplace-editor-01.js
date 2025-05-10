@@ -42,7 +42,7 @@ function testMultipleInitialization(doc) {
 
 function testReturnCommit(doc) {
   info("Testing that pressing return commits the new value");
-  let def = promise.defer();
+  let def = defer();
 
   createInplaceEditorAndClick({
     initial: "explicit initial",
@@ -59,7 +59,7 @@ function testReturnCommit(doc) {
 
 function testBlurCommit(doc) {
   info("Testing that bluring the field commits the new value");
-  let def = promise.defer();
+  let def = defer();
 
   createInplaceEditorAndClick({
     start: function (editor) {
@@ -75,7 +75,7 @@ function testBlurCommit(doc) {
 
 function testAdvanceCharCommit(doc) {
   info("Testing that configured advanceChars commit the new value");
-  let def = promise.defer();
+  let def = defer();
 
   createInplaceEditorAndClick({
     advanceChars: ":",
@@ -91,7 +91,7 @@ function testAdvanceCharCommit(doc) {
 
 function testAdvanceCharsFunction(doc) {
   info("Testing advanceChars as a function");
-  let def = promise.defer();
+  let def = defer();
 
   let firstTime = true;
 
@@ -122,7 +122,7 @@ function testAdvanceCharsFunction(doc) {
 
 function testEscapeCancel(doc) {
   info("Testing that escape cancels the new value");
-  let def = promise.defer();
+  let def = defer();
 
   createInplaceEditorAndClick({
     initial: "initial text",
