@@ -42,7 +42,7 @@ function* testTooltipNotClosingOnInsideClick(doc) {
   info("Test a tooltip is not closed when clicking inside itself");
 
   let tooltip = new HTMLTooltip({doc}, {});
-  yield tooltip.setContent(getTooltipContent(doc), 100, 50);
+  tooltip.setContent(getTooltipContent(doc), 100, 50);
   yield showTooltip(tooltip, doc.getElementById("box1"));
 
   let onTooltipContainerClick = once(tooltip.container, "click");
@@ -58,7 +58,7 @@ function* testConsumeOutsideClicksFalse(doc) {
   let box4 = doc.getElementById("box4");
 
   let tooltip = new HTMLTooltip({doc}, {consumeOutsideClicks: false});
-  yield tooltip.setContent(getTooltipContent(doc), 100, 50);
+  tooltip.setContent(getTooltipContent(doc), 100, 50);
   yield showTooltip(tooltip, doc.getElementById("box1"));
 
   let onBox4Clicked = once(box4, "click");
@@ -81,7 +81,7 @@ function* testConsumeOutsideClicksTrue(doc) {
   box4.addEventListener("click", () => box4clicks++);
 
   let tooltip = new HTMLTooltip({doc}, {consumeOutsideClicks: true});
-  yield tooltip.setContent(getTooltipContent(doc), 100, 50);
+  tooltip.setContent(getTooltipContent(doc), 100, 50);
   yield showTooltip(tooltip, doc.getElementById("box1"));
 
   let onHidden = once(tooltip, "hidden");
@@ -99,7 +99,7 @@ function* testClickInsideIframe(doc) {
   let frame = doc.getElementById("frame");
 
   let tooltip = new HTMLTooltip({doc});
-  yield tooltip.setContent(getTooltipContent(doc), 100, 50);
+  tooltip.setContent(getTooltipContent(doc), 100, 50);
   yield showTooltip(tooltip, doc.getElementById("box1"));
 
   let onHidden = once(tooltip, "hidden");
