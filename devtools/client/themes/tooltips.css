@@ -108,6 +108,17 @@
   overflow: hidden;
 }
 
+.tooltip-xul-wrapper {
+  -moz-appearance: none;
+  background: transparent;
+  overflow: visible;
+  border-style: none;
+}
+
+.tooltip-xul-wrapper .tooltip-container {
+  position: absolute;
+}
+
 .tooltip-top {
   flex-direction: column;
 }
@@ -134,6 +145,11 @@
 
 .tooltip-container[type="arrow"] {
   filter: drop-shadow(0 3px 4px var(--theme-tooltip-shadow));
+}
+
+.tooltip-xul-wrapper .tooltip-container[type="arrow"] {
+  /* When displayed in a XUL panel the drop shadow would be abruptly cut by the panel */
+  filter: none;
 }
 
 .tooltip-container[type="arrow"] > .tooltip-panel {
@@ -260,7 +276,7 @@
 
 .event-tooltip-content-box {
   display: none;
-  height: 54px;
+  height: 100px;
   overflow: hidden;
   margin-inline-end: 0;
   border: 1px solid var(--theme-splitter-color);
