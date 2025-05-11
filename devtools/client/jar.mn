@@ -206,6 +206,8 @@ devtools.jar:
     skin/components-frame.css (themes/components-frame.css)
     skin/components-h-split-box.css (themes/components-h-split-box.css)
     skin/jit-optimizations.css (themes/jit-optimizations.css)
+    skin/images/filter.svg (themes/images/filter.svg)
+    skin/images/search.svg (themes/images/search.svg)
     skin/images/itemToggle.png (themes/images/itemToggle.png)
     skin/images/itemToggle@2x.png (themes/images/itemToggle@2x.png)
     skin/images/itemArrow-dark-rtl.svg (themes/images/itemArrow-dark-rtl.svg)
