@@ -11,8 +11,7 @@
   --searchbox-border-color: #ffbf00;
   --searcbox-no-match-background-color: #ffe5e5;
   --searcbox-no-match-border-color: #e52e2e;
-  --magnifying-glass-image: url(images/magnifying-glass-light.png);
-  --magnifying-glass-image-2x: url(images/magnifying-glass-light@2x.png);
+  --magnifying-glass-image: url(images/search.svg);
   --tool-options-image: url(images/tool-options.svg);
   --close-button-image: url(chrome://devtools/skin/images/close.svg);
   --icon-filter: invert(1);
@@ -42,8 +41,7 @@
   --searchbox-border-color: #d99f2b;
   --searcbox-no-match-background-color: #402325;
   --searcbox-no-match-border-color: #cc3d3d;
-  --magnifying-glass-image: url(images/magnifying-glass.png);
-  --magnifying-glass-image-2x: url(images/magnifying-glass@2x.png);
+  --magnifying-glass-image: url(images/search.svg);
   --tool-options-image: url(images/tool-options.svg);
   --close-button-image: url(chrome://devtools/skin/images/close.svg);
   --icon-filter: none;
@@ -67,8 +65,7 @@
 }
 
 .theme-firebug {
-  --magnifying-glass-image: url(images/firebug/filter.svg);
-  --magnifying-glass-image-2x: url(images/firebug/filter.svg);
+  --magnifying-glass-image: url(images/search.svg);
   --tool-options-image: url(images/firebug/tool-options.svg);
   --close-button-image: url(chrome://devtools/skin/images/firebug/close.svg);
   --icon-filter: invert(1);
