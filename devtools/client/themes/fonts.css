@@ -3,12 +3,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #sidebar-panel-fontinspector {
+  margin: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  margin: 0;
   padding-bottom: 20px;
   width: 100%;
+  height: 100%;
 }
 
 #font-container {

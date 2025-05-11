@@ -34,7 +34,7 @@ loader.lazyRequireGetter(this, "InspectorSearch", "devtools/client/inspector/ins
 loader.lazyRequireGetter(this, "LayoutView", "devtools/client/inspector/layout/layout", true);
 loader.lazyRequireGetter(this, "MarkupView", "devtools/client/inspector/markup/markup", true);
 loader.lazyRequireGetter(this, "RuleViewTool", "devtools/client/inspector/rules/rules", true);
-loader.lazyRequireGetter(this, "ToolSidebar", "devtools/client/framework/sidebar", true);
+loader.lazyRequireGetter(this, "ToolSidebar", "devtools/client/inspector/toolsidebar", true);
 loader.lazyRequireGetter(this, "ViewHelpers", "devtools/client/shared/widgets/view-helpers", true);
 
 loader.lazyGetter(this, "strings", () => {
@@ -404,6 +404,17 @@ InspectorPanel.prototype = {
       defaultTab = "ruleview";
     }
 
+    // Append all side panels
+    this.sidebar.addExistingTab(
+      "ruleview",
+      strings.GetStringFromName("inspector.sidebar.ruleViewTitle"),
+      defaultTab == "ruleview");
+
+    this.sidebar.addExistingTab(
+      "computedview",
+      strings.GetStringFromName("inspector.sidebar.computedViewTitle"),
+      defaultTab == "computedview");
+
     this._setDefaultSidebar = (event, toolId) => {
       Services.prefs.setCharPref("devtools.inspector.activeSidebar", toolId);
     };
@@ -413,27 +424,38 @@ InspectorPanel.prototype = {
     this.ruleview = new RuleViewTool(this, this.panelWin);
     this.computedview = new ComputedViewTool(this, this.panelWin);
 
+    if (this.target.form.animationsActor) {
+      this.sidebar.addFrameTab(
+        "animationinspector",
+        strings.GetStringFromName("inspector.sidebar.animationInspectorTitle"),
+        "chrome://devtools/content/animationinspector/animation-inspector.xhtml",
+        defaultTab == "animationinspector");
+    }
+
     if (Services.prefs.getBoolPref("devtools.fontinspector.enabled") &&
         this.canGetUsedFontFaces) {
+      this.sidebar.addExistingTab(
+        "fontinspector",
+        strings.GetStringFromName("inspector.sidebar.fontInspectorTitle"),
+        defaultTab == "fontinspector");
+
       this.fontInspector = new FontInspector(this, this.panelWin);
       this.panelDoc.getElementById("sidebar-tab-fontinspector").hidden = false;
     }
 
-    this.layoutview = new LayoutView(this, this.panelWin);
-
-    if (this.target.form.animationsActor) {
-      this.sidebar.addTab("animationinspector",
-                          "chrome://devtools/content/animationinspector/animation-inspector.xhtml",
-                          defaultTab == "animationinspector");
-    }
+    this.setupSidebarSize();
 
     this.sidebar.show(defaultTab);
-
-    this.setupSidebarToggle();
   },
 
   /**
-   * Add the expand/collapse behavior for the sidebar panel.
+   * Sidebar size is currently driven by vbox.inspector-sidebar-container
+   * element, which is located at the left/bottom side of the side bar splitter.
+   * Its size is changed by the splitter and stored into preferences.
+   * As soon as bug 1260552 is fixed and new HTML based splitter in place
+   * the size can be driven by div.inspector-sidebar element. This element
+   * represents the ToolSidebar and so, the entire logic related to size
+   * persistence can be done inside the ToolSidebar.
    */
   setupSidebarToggle: function () {
     this._paneToggleButton = this.panelDoc.getElementById("inspector-pane-toggle");
@@ -1141,31 +1163,40 @@ InspectorPanel.prototype = {
   },
 
   /**
-   * When the pane toggle button is clicked, toggle the pane, change the button
+   * When the pane toggle button is clicked or pressed, toggle the pane, change the button
    * state and tooltip.
    */
   onPaneToggleButtonClicked: function (e) {
-    let sidePane = this.panelDoc.querySelector("#inspector-sidebar");
-    let button = this._paneToggleButton;
-    let isVisible = !button.hasAttribute("pane-collapsed");
+    let sidePaneContainer = this.panelDoc.querySelector("#inspector-sidebar-container");
+    let isVisible = !this._sidebarToggle.state.collapsed;
 
     // Make sure the sidebar has width and height attributes before collapsing
     // because ViewHelpers needs it.
     if (isVisible) {
-      let rect = sidePane.getBoundingClientRect();
-      if (!sidePane.hasAttribute("width")) {
-        sidePane.setAttribute("width", rect.width);
+      let rect = sidePaneContainer.getBoundingClientRect();
+      if (!sidePaneContainer.hasAttribute("width")) {
+        sidePaneContainer.setAttribute("width", rect.width);
       }
       // always refresh the height attribute before collapsing, it could have
       // been modified by resizing the container.
-      sidePane.setAttribute("height", rect.height);
+      sidePaneContainer.setAttribute("height", rect.height);
     }
+
+    let onAnimationDone = () => {
+      if (isVisible) {
+        this._sidebarToggle.setState({collapsed: true});
+      } else {
+        this._sidebarToggle.setState({collapsed: false});
+      }
+    };
 
     ViewHelpers.togglePane({
       visible: !isVisible,
       animated: true,
-      delayed: true
-    }, sidePane);
+      delayed: true,
+      callback: onAnimationDone
+    }, sidePaneContainer);
+  },
 
     if (isVisible) {
       button.setAttribute("pane-collapsed", "");
