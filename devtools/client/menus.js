@@ -160,7 +160,7 @@ exports.menuitems = [
       CommandUtils.createRequisition(target, {
         environment: CommandUtils.createEnvironment({target})
       }).then(requisition => {
-        requisition.updateExec("eyedropper");
+        requisition.updateExec("eyedropper --frommenu");
       }, e => console.error(e));
     },
     checkbox: true
