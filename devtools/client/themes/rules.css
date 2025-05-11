@@ -222,7 +222,7 @@
 }
 
 .theme-firebug .ruleview-namecontainer > .ruleview-propertyname,
-.theme-firebug .ruleview-propertycontainer > .ruleview-propertyvalue {
+.theme-firebug .ruleview-propertyvaluecontainer > .ruleview-propertyvalue {
   border-bottom: none;
 }
 
@@ -230,7 +230,7 @@
   color: var(--rule-property-name);
 }
 
-.theme-firebug .ruleview-propertycontainer > .ruleview-propertyvalue {
+.theme-firebug .ruleview-propertyvaluecontainer > .ruleview-propertyvalue {
   color: var(--rule-property-value);
 }
 
@@ -241,8 +241,8 @@
 
 .theme-firebug .ruleview-enableproperty:not([checked]) ~ .ruleview-namecontainer,
 .theme-firebug .ruleview-enableproperty:not([checked]) ~ .ruleview-namecontainer *,
-.theme-firebug .ruleview-enableproperty:not([checked]) ~ .ruleview-propertycontainer,
-.theme-firebug .ruleview-enableproperty:not([checked]) ~ .ruleview-propertycontainer * {
+.theme-firebug .ruleview-enableproperty:not([checked]) ~ .ruleview-propertyvaluecontainer,
+.theme-firebug .ruleview-enableproperty:not([checked]) ~ .ruleview-propertyvaluecontainer * {
   color: #CCCCCC;
 }
 
