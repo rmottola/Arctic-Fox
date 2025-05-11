@@ -457,10 +457,86 @@ InspectorPanel.prototype = {
    * represents the ToolSidebar and so, the entire logic related to size
    * persistence can be done inside the ToolSidebar.
    */
-  setupSidebarToggle: function () {
-    this._paneToggleButton = this.panelDoc.getElementById("inspector-pane-toggle");
-    this._paneToggleButton.addEventListener("mousedown",
-      this.onPaneToggleButtonClicked);
+  setupSidebarSize: function () {
+    let sidePaneContainer = this.panelDoc.querySelector(
+      "#inspector-sidebar-container");
+
+    this.sidebar.on("show", () => {
+      try {
+        sidePaneContainer.width = Services.prefs.getIntPref(
+          "devtools.toolsidebar-width.inspector");
+        sidePaneContainer.height = Services.prefs.getIntPref(
+          "devtools.toolsidebar-height.inspector");
+      } catch (e) {
+        // The default width is the min-width set in CSS
+        // for #inspector-sidebar-container
+        // Set width and height of the sidebar container. Only one
+        // value is really useful at a time depending on the current
+        // toolbox orientation and having both doesn't break anything.
+        sidePaneContainer.width = 450;
+        sidePaneContainer.height = 450;
+      }
+    });
+
+    this.sidebar.on("hide", () => {
+      Services.prefs.setIntPref("devtools.toolsidebar-width.inspector",
+        sidePaneContainer.width);
+      Services.prefs.setIntPref("devtools.toolsidebar-height.inspector",
+        sidePaneContainer.height);
+    });
+
+    this.sidebar.on("destroy", () => {
+      Services.prefs.setIntPref("devtools.toolsidebar-width.inspector",
+        sidePaneContainer.width);
+      Services.prefs.setIntPref("devtools.toolsidebar-height.inspector",
+        sidePaneContainer.height);
+    });
+  },
+
+  setupToolbar: function () {
+    // Setup the sidebar toggle button.
+    let SidebarToggle = this.React.createFactory(this.browserRequire(
+      "devtools/client/shared/components/sidebar-toggle"));
+
+    let sidebarToggle = SidebarToggle({
+      onClick: this.onPaneToggleButtonClicked,
+      collapsed: false,
+      expandPaneTitle: strings.GetStringFromName("inspector.expandPane"),
+      collapsePaneTitle: strings.GetStringFromName("inspector.collapsePane"),
+    });
+
+    let parentBox = this.panelDoc.getElementById("inspector-sidebar-toggle-box");
+    this._sidebarToggle = this.ReactDOM.render(sidebarToggle, parentBox);
+
+    // Setup the add-node button.
+    this.addNode = this.addNode.bind(this);
+    this.addNodeButton = this.panelDoc.getElementById("inspector-element-add-button");
+    this.addNodeButton.addEventListener("click", this.addNode);
+
+    // Setup the eye-dropper icon.
+    this.toolbox.target.actorHasMethod("inspector", "pickColorFromPage").then(value => {
+      if (!value) {
+        return;
+      }
+
+      this.onEyeDropperDone = this.onEyeDropperDone.bind(this);
+      this.onEyeDropperButtonClicked = this.onEyeDropperButtonClicked.bind(this);
+      this.eyeDropperButton = this.panelDoc.getElementById("inspector-eyedropper-toggle");
+      this.eyeDropperButton.style.display = "initial";
+      this.eyeDropperButton.addEventListener("click", this.onEyeDropperButtonClicked);
+    }, e => console.error(e));
+  },
+
+  teardownToolbar: function () {
+    if (this.addNodeButton) {
+      this.addNodeButton.removeEventListener("click", this.addNode);
+      this.addNodeButton = null;
+    }
+
+    if (this.eyeDropperButton) {
+      this.eyeDropperButton.removeEventListener("click", this.onEyeDropperButtonClicked);
+      this.eyeDropperButton = null;
+    }
   },
 
   /**
