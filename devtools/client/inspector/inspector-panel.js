@@ -102,13 +102,6 @@ function InspectorPanel(iframeWindow, toolbox) {
   this.onPaneToggleButtonClicked = this.onPaneToggleButtonClicked.bind(this);
   this._onMarkupFrameLoad = this._onMarkupFrameLoad.bind(this);
 
-  let doc = this.panelDoc;
-
-  // Handle 'Add Node' toolbar button.
-  this.addNode = this.addNode.bind(this);
-  this.addNodeButton = doc.getElementById("inspector-element-add-button");
-  this.addNodeButton.addEventListener("click", this.addNode);
-
   this._target.on("will-navigate", this._onBeforeNavigate);
   this._detectingActorFeatures = this._detectActorFeatures();
 
@@ -248,6 +241,7 @@ InspectorPanel.prototype = {
 
     this.setupSearchBox();
     this.setupSidebar();
+    this.setupToolbar();
 
     return deferred.promise;
   },
@@ -788,7 +782,7 @@ InspectorPanel.prototype = {
     let sidebarDestroyer = this.sidebar.destroy();
     this.sidebar = null;
 
-    this.addNodeButton.removeEventListener("click", this.addNode);
+    this.teardownToolbar();
     this.breadcrumbs.destroy();
     this._paneToggleButton.removeEventListener("mousedown",
       this.onPaneToggleButtonClicked);
@@ -1281,6 +1275,41 @@ InspectorPanel.prototype = {
       button.removeAttribute("pane-collapsed");
       button.setAttribute("tooltiptext", strings.GetStringFromName("inspector.collapsePane"));
     }
+  },
+
+  onEyeDropperButtonClicked: function () {
+    this.eyeDropperButton.hasAttribute("checked")
+      ? this.hideEyeDropper()
+      : this.showEyeDropper();
+  },
+
+  startEyeDropperListeners: function () {
+    this.inspector.once("color-pick-canceled", this.onEyeDropperDone);
+    this.inspector.once("color-picked", this.onEyeDropperDone);
+    this.walker.once("new-root", this.onEyeDropperDone);
+  },
+
+  stopEyeDropperListeners: function () {
+    this.inspector.off("color-pick-canceled", this.onEyeDropperDone);
+    this.inspector.off("color-picked", this.onEyeDropperDone);
+    this.walker.off("new-root", this.onEyeDropperDone);
+  },
+
+  onEyeDropperDone: function () {
+    this.eyeDropperButton.removeAttribute("checked");
+    this.stopEyeDropperListeners();
+  },
+
+  showEyeDropper: function () {
+    this.eyeDropperButton.setAttribute("checked", "true");
+    this.inspector.pickColorFromPage({copyOnSelect: true}).catch(e => console.error(e));
+    this.startEyeDropperListeners();
+  },
+
+  hideEyeDropper: function () {
+    this.eyeDropperButton.removeAttribute("checked");
+    this.inspector.cancelPickColorFromPage().catch(e => console.error(e));
+    this.stopEyeDropperListeners();
   },
 
   /**
