@@ -245,7 +245,7 @@ var NetMonitorView = {
    * @return boolean
    */
   get detailsPaneHidden() {
-    return this._detailsPane.hasAttribute("pane-collapsed");
+    return this._detailsPane.classList.contains("pane-collapsed");
   },
 
   /**
@@ -267,12 +267,12 @@ var NetMonitorView = {
     ViewHelpers.togglePane(flags, pane);
 
     if (flags.visible) {
-      this._body.removeAttribute("pane-collapsed");
-      button.removeAttribute("pane-collapsed");
+      this._body.classList.remove("pane-collapsed");
+      button.classList.remove("pane-collapsed");
       button.setAttribute("tooltiptext", this._collapsePaneString);
     } else {
-      this._body.setAttribute("pane-collapsed", "");
-      button.setAttribute("pane-collapsed", "");
+      this._body.classList.add("pane-collapsed");
+      button.classList.add("pane-collapsed");
       button.setAttribute("tooltiptext", this._expandPaneString);
     }
 

@@ -385,6 +385,18 @@ InspectorPanel.prototype = {
     this.searchResultsLabel.textContent = str;
   },
 
+  get React() {
+    return this._toolbox.React;
+  },
+
+  get ReactDOM() {
+    return this._toolbox.ReactDOM;
+  },
+
+  get browserRequire() {
+    return this._toolbox.browserRequire;
+  },
+
   /**
    * Build the sidebar.
    */
@@ -787,9 +799,6 @@ InspectorPanel.prototype = {
 
     this.teardownToolbar();
     this.breadcrumbs.destroy();
-    this._paneToggleButton.removeEventListener("mousedown",
-      this.onPaneToggleButtonClicked);
-    this._paneToggleButton = null;
     this.selection.off("new-node-front", this.onNewSelection);
     this.selection.off("before-new-node", this.onBeforeNewSelection);
     this.selection.off("before-new-node-front", this.onBeforeNewSelection);
@@ -1272,11 +1281,9 @@ InspectorPanel.prototype = {
   },
 
     if (isVisible) {
-      button.setAttribute("pane-collapsed", "");
-      button.setAttribute("tooltiptext", strings.GetStringFromName("inspector.expandPane"));
+      this._sidebarToggle.setState({collapsed: true});
     } else {
-      button.removeAttribute("pane-collapsed");
-      button.setAttribute("tooltiptext", strings.GetStringFromName("inspector.collapsePane"));
+      this._sidebarToggle.setState({collapsed: false});
     }
   },
 
