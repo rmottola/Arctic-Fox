@@ -502,7 +502,7 @@ CodeMirror.defineMode("clike", function(config, parserConfig) {
     ),
     types: words(
       "AnyVal App Application Array BufferedIterator BigDecimal BigInt Char Console Either " +
-      "Enumeration Equiv Error Exception Fractional Function IndexedSeq Integral Iterable " +
+      "Enumeration Equiv Error Exception Fractional Function IndexedSeq Int Integral Iterable " +
       "Iterator List Map Numeric Nil NotNull Option Ordered Ordering PartialFunction PartialOrdering " +
       "Product Proxy Range Responder Seq Serializable Set Specializable Stream StringBuilder " +
       "StringContext Symbol Throwable Traversable TraversableOnce Tuple Unit Vector " +
@@ -532,6 +532,15 @@ CodeMirror.defineMode("clike", function(config, parserConfig) {
       "'": function(stream) {
         stream.eatWhile(/[\w\$_\xa1-\uffff]/);
         return "atom";
+      },
+      "=": function(stream, state) {
+        var cx = state.context
+        if (cx.type == "}" && cx.align && stream.eat(">")) {
+          state.context = new Context(cx.indented, cx.column, cx.type, cx.info, null, cx.prev)
+          return "operator"
+        } else {
+          return false
+        }
       }
     },
     modeProps: {closeBrackets: {triples: '"'}}
@@ -663,7 +672,7 @@ CodeMirror.defineMode("clike", function(config, parserConfig) {
 
   def("text/x-objectivec", {
     name: "clike",
-    keywords: words(cKeywords + "inline restrict _Bool _Complex _Imaginery BOOL Class bycopy byref id IMP in " +
+    keywords: words(cKeywords + "inline restrict _Bool _Complex _Imaginary BOOL Class bycopy byref id IMP in " +
                     "inout nil oneway out Protocol SEL self super atomic nonatomic retain copy readwrite readonly"),
     types: words(cTypes),
     atoms: words("YES NO NULL NILL ON OFF true false"),

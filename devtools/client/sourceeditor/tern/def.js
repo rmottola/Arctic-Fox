@@ -77,8 +77,7 @@
       }
     },
     word: function(re) {
-      var word = "", ch;
-      re = re || /[\w$]/;
+      var word = "", ch, re = re || /[\w$]/;
       while ((ch = this.spec.charAt(this.pos)) && re.test(ch)) { word += ch; ++this.pos; }
       return word;
     },
@@ -188,7 +187,7 @@
         if (top && this.forceNew) return new infer.Obj(base);
         return infer.getInstance(base);
       } else if (this.eat(":")) {
-        name = this.word(/[\w$\.]/)
+        var name = this.word(/[\w$\.]/)
         return infer.getSymbol(name)
       } else if (comp && this.eat("!")) {
         var arg = this.word(/\d/);
