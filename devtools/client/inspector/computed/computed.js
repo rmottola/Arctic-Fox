@@ -782,7 +782,6 @@ CssComputedView.prototype = {
       this._onIncludeBrowserStyles);
 
     // Nodes used in templating
-    this.root = null;
     this.element = null;
     this.panel = null;
     this.searchField = null;

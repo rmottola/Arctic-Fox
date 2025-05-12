@@ -4,7 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 :root {
-  --tool-options-image: url(images/tool-options.svg);
   --close-button-image: url(chrome://devtools/skin/images/close.svg);
   --dock-bottom-image: url(chrome://devtools/skin/images/dock-bottom.svg);
   --dock-side-image: url(chrome://devtools/skin/images/dock-side.svg);
@@ -18,13 +17,11 @@
   --command-frames-image: url(images/command-frames.svg);
   --command-splitconsole-image: url(images/command-console.svg);
   --command-noautohide-image: url(images/command-noautohide.svg);
-  --command-eyedropper-image: url(images/command-eyedropper.svg);
   --command-rulers-image: url(images/command-rulers.svg);
   --command-measure-image: url(images/command-measure.svg);
 }
 
 .theme-firebug {
-  --tool-options-image: url(images/firebug/tool-options.svg);
   --close-button-image: url(chrome://devtools/skin/images/firebug/close.svg);
   --dock-bottom-image: url(chrome://devtools/skin/images/firebug/dock-bottom.svg);
   --dock-side-image: url(chrome://devtools/skin/images/firebug/dock-side.svg);
@@ -38,7 +35,6 @@
   --command-frames-image: url(images/firebug/command-frames.svg);
   --command-splitconsole-image: url(images/firebug/command-console.svg);
   --command-noautohide-image: url(images/firebug/command-noautohide.svg);
-  --command-eyedropper-image: url(images/firebug/command-eyedropper.svg);
   --command-rulers-image: url(images/firebug/command-rulers.svg);
   --command-measure-image: url(images/firebug/command-measure.svg);
 }
