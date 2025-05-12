@@ -1397,6 +1397,33 @@ StorageActors.createActor({
         });
       }
     }
+
+    let principal = win.document.nodePrincipal;
+    return this.removeDB(host, principal, name);
+  }),
+
+  removeAll: Task.async(function* (host, name) {
+    let [db, store] = JSON.parse(name);
+
+    let win = this.storageActor.getWindowFromHost(host);
+    if (!win) {
+      return;
+    }
+
+    let principal = win.document.nodePrincipal;
+    this.clearDBStore(host, principal, db, store);
+  }),
+
+  removeItem: Task.async(function* (host, name) {
+    let [db, store, id] = JSON.parse(name);
+
+    let win = this.storageActor.getWindowFromHost(host);
+    if (!win) {
+      return;
+    }
+
+    let principal = win.document.nodePrincipal;
+    this.removeDBRecord(host, principal, db, store, id);
   }),
 
   getHostName(location) {
@@ -1559,6 +1586,19 @@ StorageActors.createActor({
     };
   },
 
+  onItemUpdated(action, host, path) {
+    // Database was removed, remove it from stores map
+    if (action === "deleted" && path.length === 1) {
+      if (this.hostVsStores.has(host)) {
+        this.hostVsStores.get(host).delete(path[0]);
+      }
+    }
+
+    this.storageActor.update(action, "indexedDB", {
+      [host]: [ JSON.stringify(path) ]
+    });
+  },
+
   maybeSetupChildProcess() {
     if (!DebuggerServer.isInChildProcess) {
       this.backToChild = (func, rv) => rv;
@@ -1570,6 +1610,8 @@ StorageActors.createActor({
       this.getValuesForHost = indexedDBHelpers.getValuesForHost;
       this.getObjectStoreData = indexedDBHelpers.getObjectStoreData;
       this.removeDB = indexedDBHelpers.removeDB;
+      this.removeDBRecord = indexedDBHelpers.removeDBRecord;
+      this.clearDBStore = indexedDBHelpers.clearDBStore;
       return;
     }
 
@@ -1581,14 +1623,12 @@ StorageActors.createActor({
       setupParent: "setupParentProcessForIndexedDB"
     });
 
-    this.getDBMetaData =
-      callParentProcessAsync.bind(null, "getDBMetaData");
-    this.getDBNamesForHost =
-      callParentProcessAsync.bind(null, "getDBNamesForHost");
-    this.getValuesForHost =
-      callParentProcessAsync.bind(null, "getValuesForHost");
-    this.removeDB =
-      callParentProcessAsync.bind(null, "removeDB");
+    this.getDBMetaData = callParentProcessAsync.bind(null, "getDBMetaData");
+    this.getDBNamesForHost = callParentProcessAsync.bind(null, "getDBNamesForHost");
+    this.getValuesForHost = callParentProcessAsync.bind(null, "getValuesForHost");
+    this.removeDB = callParentProcessAsync.bind(null, "removeDB");
+    this.removeDBRecord = callParentProcessAsync.bind(null, "removeDBRecord");
+    this.clearDBStore = callParentProcessAsync.bind(null, "clearDBStore");
 
     addMessageListener("storage:storage-indexedDB-request-child", msg => {
       switch (msg.json.method) {
@@ -1600,6 +1640,11 @@ StorageActors.createActor({
             deferred.resolve(msg.json.args[0]);
           }
           break;
+        }
+        case "onItemUpdated": {
+          let [action, host, path] = msg.json.args;
+          this.onItemUpdated(action, host, path);
+        }
       }
     });
 
@@ -1630,6 +1675,16 @@ var indexedDBHelpers = {
     });
   },
 
+  onItemUpdated(action, host, path) {
+    let mm = Cc["@mozilla.org/globalmessagemanager;1"]
+               .getService(Ci.nsIMessageListenerManager);
+
+    mm.broadcastAsyncMessage("storage:storage-indexedDB-request-child", {
+      method: "onItemUpdated",
+      args: [ action, host, path ]
+    });
+  },
+
   /**
    * Fetches and stores all the metadata information for the given database
    * `name` for the given `host` with its `principal`. The stored metadata
@@ -1647,9 +1702,9 @@ var indexedDBHelpers = {
 
       success.resolve(this.backToChild("getDBMetaData", dbData));
     };
-    request.onerror = () => {
+    request.onerror = ({target}) => {
       console.error(
-        `Error opening indexeddb database ${name} for host ${host}`);
+        `Error opening indexeddb database ${name} for host ${host}`, target.error);
       success.resolve(this.backToChild("getDBMetaData", null));
     };
     return success.promise;
@@ -1664,27 +1719,92 @@ var indexedDBHelpers = {
   },
 
   removeDB: Task.async(function* (host, principal, name) {
-    let request = require("indexedDB").deleteForPrincipal(principal, name);
-
     let result = new promise(resolve => {
+      let request = require("indexedDB").deleteForPrincipal(principal, name);
+
       request.onsuccess = () => {
         resolve({});
+        this.onItemUpdated("deleted", host, [name]);
       };
 
       request.onblocked = () => {
-        console.error(
-          `Deleting indexedDB database ${name} for host ${host} is blocked`);
-        resolve({ error: "blocked" });
+        console.warn(`Deleting indexedDB database ${name} for host ${host} is blocked`);
+        resolve({ blocked: true });
       };
 
       request.onerror = () => {
-        console.error(
-          `Error deleting indexedDB database ${name} for host ${host}`);
-        resolve({ error: request.error });
+        let { error } = request;
+        console.warn(
+          `Error deleting indexedDB database ${name} for host ${host}: ${error}`);
+        resolve({ error: error.message });
       };
     });
 
     return this.backToChild("removeDB", yield result);
+  }),
+
+  removeDBRecord: Task.async(function* (host, principal, dbName, storeName, id) {
+    let db;
+
+    try {
+      db = yield new promise((resolve, reject) => {
+        let request = this.openWithPrincipal(principal, dbName);
+        request.onsuccess = ev => resolve(ev.target.result);
+        request.onerror = ev => reject(ev.target.error);
+      });
+
+      let transaction = db.transaction(storeName, "readwrite");
+      let store = transaction.objectStore(storeName);
+
+      yield new promise((resolve, reject) => {
+        let request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = ev => reject(ev.target.error);
+      });
+
+      this.onItemUpdated("deleted", host, [dbName, storeName, id]);
+    } catch (error) {
+      let recordPath = [dbName, storeName, id].join("/");
+      console.error(`Failed to delete indexedDB record: ${recordPath}: ${error}`);
+    }
+
+    if (db) {
+      db.close();
+    }
+
+    return this.backToChild("removeDBRecord", null);
+  }),
+
+  clearDBStore: Task.async(function* (host, principal, dbName, storeName) {
+    let db;
+
+    try {
+      db = yield new promise((resolve, reject) => {
+        let request = this.openWithPrincipal(principal, dbName);
+        request.onsuccess = ev => resolve(ev.target.result);
+        request.onerror = ev => reject(ev.target.error);
+      });
+
+      let transaction = db.transaction(storeName, "readwrite");
+      let store = transaction.objectStore(storeName);
+
+      yield new promise((resolve, reject) => {
+        let request = store.clear();
+        request.onsuccess = () => resolve();
+        request.onerror = ev => reject(ev.target.error);
+      });
+
+      this.onItemUpdated("cleared", host, [dbName, storeName]);
+    } catch (error) {
+      let storePath = [dbName, storeName].join("/");
+      console.error(`Failed to clear indexedDB store: ${storePath}: ${error}`);
+    }
+
+    if (db) {
+      db.close();
+    }
+
+    return this.backToChild("clearDBStore", null);
   }),
 
   /**
@@ -1961,6 +2081,14 @@ var indexedDBHelpers = {
       case "removeDB": {
         let [host, principal, name] = args;
         return indexedDBHelpers.removeDB(host, principal, name);
+      }
+      case "removeDBRecord": {
+        let [host, principal, db, store, id] = args;
+        return indexedDBHelpers.removeDBRecord(host, principal, db, store, id);
+      }
+      case "clearDBStore": {
+        let [host, principal, db, store] = args;
+        return indexedDBHelpers.clearDBStore(host, principal, db, store);
       }
       default:
         console.error("ERR_DIRECTOR_PARENT_UNKNOWN_METHOD", msg.json.method);
