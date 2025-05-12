@@ -616,6 +616,8 @@ browser/features/firefox@getpocket.com/chrome/skin/osx/pocket.css
 browser/features/firefox@getpocket.com/chrome/skin/osx/pocket.css.orig
 browser/features/firefox@getpocket.com/chrome/skin/windows/pocket.css
 browser/features/firefox@getpocket.com/chrome/skin/windows/pocket.css.orig
+browser/chrome/devtools/modules/devtools/client/themes/common.css
+browser/chrome/devtools/skin/common.css
 
 browser/chrome/devtools/content/inspector/layout/layout.js
 browser/chrome/devtools/modules/devtools/client/inspector/layout/layout.js
