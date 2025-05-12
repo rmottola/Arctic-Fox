@@ -54,13 +54,12 @@
   margin: auto 10px;
 }
 
-:root[devtoolstheme="light"] #developer-toolbar > toolbarbutton:not([checked=true]) > image,
+:root[devtoolstheme="light"] #developer-toolbar > .developer-toolbar-button:not([checked=true]) > image,
 :root[devtoolstheme="light"] .gclitoolbar-input-node:not([focused=true])::before  {
   filter: invert(1);
 }
 
-.developer-toolbar-button > .toolbarbutton-icon,
-#developer-toolbar-closebutton > .toolbarbutton-icon {
+.developer-toolbar-button > .toolbarbutton-icon {
   width: 16px;
   height: 16px;
 }
