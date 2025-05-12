@@ -84,3 +84,4 @@ StoragePanel.prototype = {
 
     return Promise.resolve(null);
   },
+};
