@@ -978,7 +978,7 @@ Editor.prototype = {
 
     inp.type = "text";
     inp.style.width = "10em";
-    inp.style.MozMarginStart = "1em";
+    inp.style.marginInlineStart = "1em";
 
     div.appendChild(txt);
     div.appendChild(inp);
