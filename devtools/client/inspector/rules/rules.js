@@ -1094,7 +1094,7 @@ CssRuleView.prototype = {
    * @param  {Boolean}  showPseudo
    *         Whether or not pseudo element rules should be displayed
    */
-  _toggleContainerVisibility: function(twisty, container, isPseudo,
+  _toggleContainerVisibility: function (twisty, container, isPseudo,
       showPseudo) {
     let isOpen = twisty.getAttribute("open");
 
@@ -1657,7 +1657,7 @@ RuleViewTool.prototype = {
   },
 
   onPanelSelected: function () {
-    if (this.inspector.selection.nodeFront === this.view.viewedElement) {
+    if (this.inspector.selection.nodeFront === this.view._viewedElement) {
       this.refresh();
     } else {
       this.onSelected();
