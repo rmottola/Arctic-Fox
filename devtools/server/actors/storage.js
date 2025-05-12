@@ -1385,17 +1385,8 @@ StorageActors.createActor({
    */
   removeDatabase: Task.async(function* (host, name) {
     let win = this.storageActor.getWindowFromHost(host);
-    if (win) {
-      let principal = win.document.nodePrincipal;
-      let result = yield this.removeDB(host, principal, name);
-      if (!result.error) {
-        if (this.hostVsStores.has(host)) {
-          this.hostVsStores.get(host).delete(name);
-        }
-        this.storageActor.update("deleted", "indexedDB", {
-          [host]: [ JSON.stringify([name]) ]
-        });
-      }
+    if (!win) {
+      return { error: `Window for host ${host} not found` };
     }
 
     let principal = win.document.nodePrincipal;
@@ -1632,12 +1623,12 @@ StorageActors.createActor({
 
     addMessageListener("storage:storage-indexedDB-request-child", msg => {
       switch (msg.json.method) {
-        case "backToChild":
-          let func = msg.json.args.shift();
+        case "backToChild": {
+          let [func, rv] = msg.json.args;
           let deferred = unresolvedPromises.get(func);
           if (deferred) {
             unresolvedPromises.delete(func);
-            deferred.resolve(msg.json.args[0]);
+            deferred.resolve(rv);
           }
           break;
         }
@@ -1738,6 +1729,11 @@ var indexedDBHelpers = {
           `Error deleting indexedDB database ${name} for host ${host}: ${error}`);
         resolve({ error: error.message });
       };
+
+      // If the database is blocked repeatedly, the onblocked event will not
+      // be fired again. To avoid waiting forever, report as blocked if nothing
+      // else happens after 3 seconds.
+      setTimeout(() => resolve({ blocked: true }), 3000);
     });
 
     return this.backToChild("removeDB", yield result);
