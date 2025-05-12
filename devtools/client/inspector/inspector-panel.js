@@ -95,6 +95,7 @@ function InspectorPanel(iframeWindow, toolbox) {
 
   this.nodeMenuTriggerInfo = null;
 
+  this._handleRejectionIfNotDestroyed = this._handleRejectionIfNotDestroyed.bind(this);
   this._onBeforeNavigate = this._onBeforeNavigate.bind(this);
   this.onNewRoot = this.onNewRoot.bind(this);
   this._onContextMenu = this._onContextMenu.bind(this);
@@ -160,6 +161,18 @@ InspectorPanel.prototype = {
 
   get canPasteInnerOrAdjacentHTML() {
     return this._target.client.traits.pasteHTML;
+  },
+
+  /**
+   * Handle promise rejections for various asynchronous actions, and only log errors if
+   * the inspector panel still exists.
+   * This is useful to silence useless errors that happen when the inspector is closed
+   * while still initializing (and making protocol requests).
+   */
+  _handleRejectionIfNotDestroyed: function (e) {
+    if (!this._panelDestroyer) {
+      console.error(e);
+    }
   },
 
   /**
@@ -260,7 +273,7 @@ InspectorPanel.prototype = {
   _getPageStyle: function () {
     return this._toolbox.inspector.getPageStyle().then(pageStyle => {
       this.pageStyle = pageStyle;
-    });
+    }, this._handleRejectionIfNotDestroyed);
   },
 
   /**
@@ -576,7 +589,8 @@ InspectorPanel.prototype = {
       });
     };
     this._pendingSelection = onNodeSelected;
-    this._getDefaultNodeForSelection().then(onNodeSelected, console.error);
+    this._getDefaultNodeForSelection()
+        .then(onNodeSelected, this._handleRejectionIfNotDestroyed);
   },
 
   _selectionCssSelector: null,
@@ -655,16 +669,7 @@ InspectorPanel.prototype = {
         this.selection.isElementNode()) {
       selection.getUniqueSelector().then(selector => {
         this.selectionCssSelector = selector;
-      }).then(null, e => {
-        // Only log this as an error if the panel hasn't been destroyed in the
-        // meantime.
-        if (!this._panelDestroyer) {
-          console.error(e);
-        } else {
-          console.warn("Could not set the unique selector for the newly " +
-            "selected node, the inspector was destroyed.");
-        }
-      });
+      }, this._handleRejectionIfNotDestroyed);
     }
 
     let selfUpdate = this.updating("inspector-panel");
@@ -1420,7 +1425,7 @@ InspectorPanel.prototype = {
     if (!this.walker) {
       return promise.resolve();
     }
-    return this.walker.clearPseudoClassLocks().then(null, console.error);
+    return this.walker.clearPseudoClassLocks().catch(this._handleRejectionIfNotDestroyed);
   },
 
   /**
