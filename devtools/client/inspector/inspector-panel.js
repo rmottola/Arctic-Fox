@@ -462,7 +462,7 @@ InspectorPanel.prototype = {
         defaultTab == "fontinspector");
 
       this.fontInspector = new FontInspector(this, this.panelWin);
-      this.panelDoc.getElementById("sidebar-tab-fontinspector").hidden = false;
+      this.sidebar.toggleTab(true, "fontinspector");
     }
 
     this.setupSidebarSize();
