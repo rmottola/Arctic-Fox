@@ -1374,7 +1374,7 @@ Scope.prototype = {
       let item = this.addItem(name, descriptor);
 
       if (aOptions.callback) {
-        aOptions.callback(item, descriptor.value);
+        aOptions.callback(item, descriptor && descriptor.value);
       }
     }
   },
