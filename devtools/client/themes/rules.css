@@ -35,35 +35,35 @@
   height: 100%;
 }
 
-#ruleview-container {
-  -moz-user-select: text;
-  overflow: auto;
-  flex: auto;
-  height: 0px;
+/* Rule View Toolbar */
+
+#ruleview-toolbar-container {
+  display: flex;
+  flex-direction: column;
+  height: auto;
 }
 
 #ruleview-toolbar {
   display: flex;
 }
 
-.devtools-sidebar-toolbar {
+#ruleview-toolbar > .devtools-searchbox:first-child {
+  padding-inline-start: 0px;
+}
+
+#ruleview-command-toolbar {
   display: flex;
 }
 
 #pseudo-class-panel {
-  position: relative;
-  margin-top: -1px;
-  margin-bottom: -1px;
-  overflow-y: hidden;
-  max-height: 24px;
-  outline: 0 !important;
-  transition-property: max-height;
-  transition-duration: 150ms;
-  transition-timing-function: ease;
+  display: flex;
+  height: 24px;
+  overflow: hidden;
+  transition: height 150ms ease;
 }
 
 #pseudo-class-panel[hidden] {
-  max-height: 0px;
+  height: 0px;
 }
 
 #pseudo-class-panel > label {

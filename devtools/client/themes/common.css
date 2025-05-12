@@ -167,7 +167,6 @@
   cursor: pointer;
   white-space: nowrap;
   display: flex;
-  align-self: flex-start;
   text-decoration: none;
   font-size: 11px;
   width: 12em; /* probably should be changed for each tool */

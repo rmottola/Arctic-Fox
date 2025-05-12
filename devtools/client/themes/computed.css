@@ -26,6 +26,9 @@
   outline: none;
 }
 
+#computedview-toolbar {
+  display: flex;
+}
 
 #browser-style-checkbox {
   /* Bug 1200073 - extra space before the browser styles checkbox so
@@ -174,11 +177,6 @@
 
 .legendKey {
   margin: 0 5px;
-}
-
-#root .devtools-toolbar {
-  width: 100%;
-  display: flex;
 }
 
 .link {
