@@ -788,10 +788,6 @@ InspectorPanel.prototype = {
       this.fontInspector.destroy();
     }
 
-    if (this.layoutview) {
-      this.layoutview.destroy();
-    }
-
     let cssPropertiesDestroyer = this._cssPropertiesLoaded.then(({front}) => {
       if (front) {
         front.destroy();
@@ -986,7 +982,7 @@ InspectorPanel.prototype = {
     menu.append(new MenuItem({
       id: "node-menu-expand",
       label: strings.GetStringFromName("inspectorExpandNode.label"),
-      disabled: !isNodeWithChildren || markupContainer.expanded,
+      disabled: !isNodeWithChildren,
       click: () => this.expandNode(),
     }));
     menu.append(new MenuItem({
@@ -1285,13 +1281,6 @@ InspectorPanel.prototype = {
     }, sidePaneContainer);
   },
 
-    if (isVisible) {
-      this._sidebarToggle.setState({collapsed: true});
-    } else {
-      this._sidebarToggle.setState({collapsed: false});
-    }
-  },
-
   onEyeDropperButtonClicked: function () {
     this.eyeDropperButton.hasAttribute("checked")
       ? this.hideEyeDropper()
@@ -1342,9 +1331,8 @@ InspectorPanel.prototype = {
    * Create a new node as the last child of the current selection, expand the
    * parent and select the new node.
    */
-  addNode: Task.async(function*() {
-    let root = this.selection.nodeFront;
-    if (!this.canAddHTMLChild(root)) {
+  addNode: Task.async(function* () {
+    if (!this.canAddHTMLChild()) {
       return;
     }
 
@@ -1352,7 +1340,8 @@ InspectorPanel.prototype = {
 
     // Insert the html and expect a childList markup mutation.
     let onMutations = this.once("markupmutation");
-    let {nodes} = yield this.walker.insertAdjacentHTML(root, "beforeEnd", html);
+    let {nodes} = yield this.walker.insertAdjacentHTML(this.selection.nodeFront,
+                                                       "beforeEnd", html);
     yield onMutations;
 
     // Select the new node (this will auto-expand its parent).
