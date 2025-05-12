@@ -161,6 +161,7 @@ function Editor(config) {
     matchBrackets: true,
     extraKeys: {},
     indentWithTabs: useTabs,
+    inputStyle: "textarea",
     styleActiveLine: true,
     autoCloseBrackets: "()[]{}''\"\"``",
     autoCloseEnabled: useAutoClose,
