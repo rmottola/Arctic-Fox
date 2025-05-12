@@ -1606,7 +1606,7 @@ StorageActors.createActor({
       return;
     }
 
-    const { sendSyncMessage, addMessageListener } =
+    const { sendAsyncMessage, addMessageListener } =
       this.conn.parentMessageManager;
 
     this.conn.setupInParent({
@@ -1645,7 +1645,7 @@ StorageActors.createActor({
 
       unresolvedPromises.set(methodName, deferred);
 
-      sendSyncMessage("storage:storage-indexedDB-request-parent", {
+      sendAsyncMessage("storage:storage-indexedDB-request-parent", {
         method: methodName,
         args: args
       });
