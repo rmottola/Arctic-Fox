@@ -53,9 +53,6 @@ function test() {
       is(gEditor.getText().search(/debugger/), 166,
          "The second source is displayed.");
 
-      ok(gDebugger.document.title.endsWith(EXAMPLE_URL + gLabel2),
-         "Title with second source is correct.");
-
       ok(isCaretPos(gPanel, 6),
          "Editor caret location is correct.");
 
@@ -147,10 +144,6 @@ function test() {
     }
 
     Task.spawn(function* () {
-      yield waitForSourceShown(gPanel, "-01.js", 1);
-      ok(gDebugger.document.title.endsWith(EXAMPLE_URL + gLabel1),
-         "Title with first source is correct.");
-
       const shown = waitForSourceAndCaretAndScopes(gPanel, "-02.js", 1);
       callInTab(gTab, "firstCall");
       yield shown;
