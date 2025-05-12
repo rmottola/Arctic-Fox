@@ -3539,7 +3539,7 @@ VariablesView.stringifiers.byObjectClass = {
     return "Date " + new Date(preview.timestamp).toISOString();
   },
 
-  Number: function(aGrip) {
+  Number: function (aGrip) {
     let {preview} = aGrip;
     if (preview === undefined) {
       return null;
