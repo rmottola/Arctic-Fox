@@ -8,7 +8,9 @@
 
 "use strict";
 
+/* eslint-disable mozilla/reject-some-requires */
 const {Cc, Ci} = require("chrome");
+/* eslint-enable mozilla/reject-some-requires */
 
 var Services = require("Services");
 var promise = require("promise");
@@ -32,7 +34,6 @@ loader.lazyRequireGetter(this, "ComputedViewTool", "devtools/client/inspector/co
 loader.lazyRequireGetter(this, "FontInspector", "devtools/client/inspector/fonts/fonts", true);
 loader.lazyRequireGetter(this, "HTMLBreadcrumbs", "devtools/client/inspector/breadcrumbs", true);
 loader.lazyRequireGetter(this, "InspectorSearch", "devtools/client/inspector/inspector-search", true);
-loader.lazyRequireGetter(this, "LayoutView", "devtools/client/inspector/layout/layout", true);
 loader.lazyRequireGetter(this, "MarkupView", "devtools/client/inspector/markup/markup", true);
 loader.lazyRequireGetter(this, "RuleViewTool", "devtools/client/inspector/rules/rules", true);
 loader.lazyRequireGetter(this, "ToolSidebar", "devtools/client/inspector/toolsidebar", true);
@@ -200,11 +201,6 @@ InspectorPanel.prototype = {
     let deferred = defer();
 
     this.walker.on("new-root", this.onNewRoot);
-
-    this.nodemenu = this.panelDoc.getElementById("inspector-node-popup");
-    this.lastNodemenuItem = this.nodemenu.lastChild;
-    this.nodemenu.addEventListener("popupshowing", this._setupNodeMenu, true);
-    this.nodemenu.addEventListener("popuphiding", this._resetNodeMenu, true);
 
     this.selection.on("new-node-front", this.onNewSelection);
     this.selection.on("before-new-node-front", this.onBeforeNewSelection);
@@ -1389,13 +1385,13 @@ InspectorPanel.prototype = {
       let panel = this._toolbox.getPanel("webconsole");
       let jsterm = panel.hud.jsterm;
 
-      let evalString = `let i = 0;
+      let evalString = `{ let i = 0;
         while (window.hasOwnProperty("temp" + i) && i < 1000) {
           i++;
         }
         window["temp" + i] = $0;
         "temp" + i;
-      `;
+      }`;
 
       let options = {
         selectedNodeActor: this.selection.nodeFront.actorID,
