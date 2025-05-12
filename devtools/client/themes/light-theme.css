@@ -324,11 +324,15 @@ div.CodeMirror span.eval-text {
 
 /* Overring panel arrow images to fit with our light and dark themes */
 
-.theme-tooltip-panel .panel-arrow[side="top"] {
-  list-style-image: url("chrome://devtools/skin/tooltip/arrow-vertical-light.png");
-  margin-bottom: -4px;
+.theme-tooltip-panel .panel-arrow {
+  --arrow-margin: -4px;
 }
 
+:root[platform="win"] .theme-tooltip-panel .panel-arrow {
+  --arrow-margin: -7px;
+}
+
+.theme-tooltip-panel .panel-arrow[side="top"],
 .theme-tooltip-panel .panel-arrow[side="bottom"] {
   list-style-image: url("chrome://devtools/skin/tooltip/arrow-vertical-light.png");
   margin-top: -4px;
@@ -336,12 +340,25 @@ div.CodeMirror span.eval-text {
 
 .theme-tooltip-panel .panel-arrow[side="left"] {
   list-style-image: url("chrome://devtools/skin/tooltip/arrow-horizontal-light.png");
-  margin-right: -4px;
+  /* !important is needed to override the popup.css rules in toolkit/themes */
+  width: 16px !important;
+  height: 39px !important;
+}
+
+.theme-tooltip-panel .panel-arrow[side="top"] {
+  margin-bottom: var(--arrow-margin);
+}
+
+.theme-tooltip-panel .panel-arrow[side="bottom"] {
+  margin-top: var(--arrow-margin);
+}
+
+.theme-tooltip-panel .panel-arrow[side="left"] {
+  margin-right: var(--arrow-margin);
 }
 
 .theme-tooltip-panel .panel-arrow[side="right"] {
-  list-style-image: url("chrome://devtools/skin/tooltip/arrow-horizontal-light.png");
-  margin-left: -4px;
+  margin-left: var(--arrow-margin);
 }
 
 @media (min-resolution: 1.1dppx) {
