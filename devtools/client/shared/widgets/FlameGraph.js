@@ -386,7 +386,7 @@ FlameGraph.prototype = {
   /**
    * Focuses this graph's iframe window.
    */
-  focus: function() {
+  focus: function () {
     this._window.focus();
   },
 
@@ -498,7 +498,7 @@ FlameGraph.prototype = {
    * Performs any necessary changes to the graph's state based on the
    * user's input on a keyboard.
    */
-  _keyboardUpdateLoop: function() {
+  _keyboardUpdateLoop: function () {
     const KEY_CODE_UP = 38;
     const KEY_CODE_DOWN = 40;
     const KEY_CODE_LEFT = 37;
@@ -924,10 +924,12 @@ FlameGraph.prototype = {
   /**
    * Listener for the "keydown" event on the graph's container.
    */
-  _onKeyDown: function(e) {
+  _onKeyDown: function (e) {
     ViewHelpers.preventScrolling(e);
 
-    if (!this._keysPressed[e.keyCode]) {
+    const hasModifier = e.ctrlKey || e.shiftKey || e.altKey || e.metaKey;
+
+    if (!hasModifier && !this._keysPressed[e.keyCode]) {
       this._keysPressed[e.keyCode] = true;
       this._userInputStack++;
       this._shouldRedraw = true;
@@ -937,7 +939,7 @@ FlameGraph.prototype = {
   /**
    * Listener for the "keyup" event on the graph's container.
    */
-  _onKeyUp: function(e) {
+  _onKeyUp: function (e) {
     ViewHelpers.preventScrolling(e);
 
     if (this._keysPressed[e.keyCode]) {
@@ -950,14 +952,14 @@ FlameGraph.prototype = {
   /**
    * Listener for the "keypress" event on the graph's container.
    */
-  _onKeyPress: function(e) {
+  _onKeyPress: function (e) {
     ViewHelpers.preventScrolling(e);
   },
 
   /**
    * Listener for the "mousemove" event on the graph's container.
    */
-  _onMouseMove: function(e) {
+  _onMouseMove: function (e) {
     let {mouseX, mouseY} = this._getRelativeEventCoordinates(e);
 
     let canvasWidth = this._width;
