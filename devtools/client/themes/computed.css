@@ -100,7 +100,7 @@
 
 @media (min-resolution: 1.1dppx) {
   .property-value, .other-property-value {
-    background-image: url(arrow-e@2x.png);
+    background-image: url(images/arrow-e@2x.png);
   }
 }
 
