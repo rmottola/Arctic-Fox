@@ -2223,10 +2223,9 @@ let StorageActor = protocol.ActorClassWithSpec(specs.storageSpec, {
    *             <host2>: [<store_names34>...],
    *           }
    *           Where host1, host2 are the host in which this change happened and
-   *           [<store_namesX] is an array of the names of the changed store
-   *           objects. Leave it empty if the host was completely removed.
-   *        When the action is "reloaded" or "cleared", `data` is an array of
-   *        hosts for which the stores were cleared or reloaded.
+   *           [<store_namesX] is an array of the names of the changed store objects.
+   *           Pass an empty array if the host itself was affected: either completely
+   *           removed or cleared.
    */
   update(action, storeType, data) {
     if (action == "cleared" || action == "reloaded") {
