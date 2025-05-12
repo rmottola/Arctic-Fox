@@ -915,6 +915,8 @@ MarkupView.prototype = {
           }
         });
       }, () => {
+        let isValidSibling = nextSibling && !nextSibling.isPseudoElement;
+        nextSibling = isValidSibling ? nextSibling : null;
         this.walker.insertBefore(node, parent, nextSibling);
       });
     }).then(null, console.error);
