@@ -3476,11 +3476,11 @@ VariablesView.stringifiers.byType = {
   object: function (aGrip, aOptions) {
     let {preview} = aGrip;
     let stringifier;
-    if (preview && preview.kind) {
-      stringifier = VariablesView.stringifiers.byObjectKind[preview.kind];
-    }
-    if (!stringifier && aGrip.class) {
+    if (aGrip.class) {
       stringifier = VariablesView.stringifiers.byObjectClass[aGrip.class];
+    }
+    if (!stringifier && preview && preview.kind) {
+      stringifier = VariablesView.stringifiers.byObjectKind[preview.kind];
     }
     if (stringifier) {
       return stringifier(aGrip, aOptions);
@@ -3539,18 +3539,13 @@ VariablesView.stringifiers.byObjectClass = {
     return "Date " + new Date(preview.timestamp).toISOString();
   },
 
-  String: function({displayString}) {
-    if (displayString === undefined) {
-      return null;
-    }
-    return VariablesView.getString(displayString);
-  },
-
-  Number: function({preview}) {
+  Number: function(aGrip) {
+    let {preview} = aGrip;
     if (preview === undefined) {
       return null;
     }
-    return VariablesView.getString(preview.value);
+    return aGrip.class + " { " + VariablesView.getString(preview.wrappedValue) +
+      " }";
   },
 }; // VariablesView.stringifiers.byObjectClass
 
