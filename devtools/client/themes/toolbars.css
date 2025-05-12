@@ -78,6 +78,15 @@
   padding: 0;
 }
 
+.devtools-separator {
+  margin: 0 2px;
+  width: 2px;
+  background-image: linear-gradient(transparent 15%, var(--theme-splitter-color) 15%, var(--theme-splitter-color) 85%, transparent 85%);
+  background-size: 1px 100%;
+  background-repeat: no-repeat;
+  background-position: 0, 1px, 2px;
+}
+
 /* Toolbar buttons */
 
 .devtools-menulist,
@@ -172,11 +181,6 @@
 
 #toolbox-picker-container {
   display: flex;
-}
-
-/* Invert toolbox button icons in Firebug theme. */
-.theme-firebug #toolbox-buttons toolbarbutton image {
-  filter: invert(1);
 }
 
 .devtools-toolbarbutton:not([label]) > .toolbarbutton-text {
