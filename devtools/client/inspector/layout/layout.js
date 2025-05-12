@@ -552,9 +552,6 @@ LayoutView.prototype = {
     }
     this.isActive = isActive;
 
-    let panel = this.doc.getElementById("sidebar-panel-layoutview");
-    panel.classList.toggle("inactive", !isActive);
-
     if (isActive) {
       this.trackReflows();
     } else {
@@ -564,12 +561,14 @@ LayoutView.prototype = {
 
   /**
    * Compute the dimensions of the node and update the values in
-   * the layoutview/view.xhtml document.
+   * the inspector.xul document.
    * @return a promise that will be resolved when complete.
    */
   update: function () {
     let lastRequest = Task.spawn((function* () {
       if (!this.isViewVisibleAndNodeValid()) {
+        this.wrapper.hidden = true;
+        this.inspector.emit("layoutview-updated");
         return null;
       }
 
@@ -593,12 +592,6 @@ LayoutView.prototype = {
 
       if (this.sizeHeadingLabel.textContent != newLabel) {
         this.sizeHeadingLabel.textContent = newLabel;
-      }
-
-      // If the view isn't active, no need to do anything more.
-      if (!this.isActive) {
-        this.inspector.emit("layoutview-updated");
-        return null;
       }
 
       for (let i in this.map) {
@@ -658,8 +651,10 @@ LayoutView.prototype = {
 
       this.elementRules = styleEntries.map(e => e.rule);
 
+      this.wrapper.hidden = false;
+
       this.inspector.emit("layoutview-updated");
-      return undefined;
+      return null;
     }).bind(this)).catch(console.error);
 
     this._lastRequest = lastRequest;

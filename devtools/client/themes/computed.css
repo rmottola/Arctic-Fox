@@ -11,6 +11,10 @@
   height: 100%;
 }
 
+#computedview-container {
+  overflow: auto;
+}
+
 #browser-style-checkbox {
   /* Bug 1200073 - extra space before the browser styles checkbox so
      they aren't squished together in a small window. Put also
@@ -55,7 +59,9 @@
 }
 
 .property-value-container {
-  width: 168px;
+  display: flex;
+  flex: 1 1 168px;
+  overflow: hidden;
 }
 
 .property-name-container > *,

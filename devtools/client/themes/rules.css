@@ -42,10 +42,8 @@
   height: 0px;
 }
 
-#ruleview-container.non-interactive {
-  pointer-events: none;
-  visibility: collapse;
-  transition: visibility 0.25s;
+#ruleview-toolbar {
+  display: flex;
 }
 
 .devtools-sidebar-toolbar {

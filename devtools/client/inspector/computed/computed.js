@@ -33,6 +33,8 @@ loader.lazyRequireGetter(this, "StyleInspectorMenu",
   "devtools/client/inspector/shared/style-inspector-menu");
 loader.lazyRequireGetter(this, "KeyShortcuts",
   "devtools/client/shared/key-shortcuts", true);
+loader.lazyRequireGetter(this, "LayoutView",
+  "devtools/client/inspector/layout/layout", true);
 
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
                                   "resource://gre/modules/PluralForm.jsm");
@@ -173,7 +175,6 @@ function CssComputedView(inspector, document, pageStyle) {
     this._onFilterTextboxContextMenu.bind(this);
 
   let doc = this.styleDocument;
-  this.root = doc.getElementById("root");
   this.element = doc.getElementById("propertyContainer");
   this.searchField = doc.getElementById("computedview-searchbox");
   this.searchClearButton = doc.getElementById("computedview-searchinput-clear");
@@ -1411,8 +1412,9 @@ function ComputedViewTool(inspector, window) {
   this.inspector = inspector;
   this.document = window.document;
 
-  this.view = new CssComputedView(this.inspector, this.document,
+  this.computedView = new CssComputedView(this.inspector, this.document,
     this.inspector.pageStyle);
+  this.layoutView = new LayoutView(this.inspector, this.document);
 
   this.onSelected = this.onSelected.bind(this);
   this.refresh = this.refresh.bind(this);
@@ -1428,14 +1430,14 @@ function ComputedViewTool(inspector, window) {
   this.inspector.walker.on("mutations", this.onMutations);
   this.inspector.walker.on("resize", this.onResized);
 
-  this.view.selectElement(null);
+  this.computedView.selectElement(null);
 
   this.onSelected();
 }
 
 ComputedViewTool.prototype = {
   isSidebarActive: function () {
-    if (!this.view) {
+    if (!this.computedView) {
       return false;
     }
     return this.inspector.sidebar.getCurrentTabID() == "computedview";
@@ -1446,7 +1448,7 @@ ComputedViewTool.prototype = {
     // But only if the current selection isn't null. If it's been set to null,
     // let the update go through as this is needed to empty the view on
     // navigation.
-    if (!this.view) {
+    if (!this.computedView) {
       return;
     }
 
@@ -1456,17 +1458,17 @@ ComputedViewTool.prototype = {
       return;
     }
 
-    this.view.setPageStyle(this.inspector.pageStyle);
+    this.computedView.setPageStyle(this.inspector.pageStyle);
 
     if (!this.inspector.selection.isConnected() ||
         !this.inspector.selection.isElementNode()) {
-      this.view.selectElement(null);
+      this.computedView.selectElement(null);
       return;
     }
 
     if (!event || event == "new-node-front") {
       let done = this.inspector.updating("computed-view");
-      this.view.selectElement(this.inspector.selection.nodeFront).then(() => {
+      this.computedView.selectElement(this.inspector.selection.nodeFront).then(() => {
         done();
       });
     }
@@ -1474,12 +1476,12 @@ ComputedViewTool.prototype = {
 
   refresh: function () {
     if (this.isSidebarActive()) {
-      this.view.refreshPanel();
+      this.computedView.refreshPanel();
     }
   },
 
   onPanelSelected: function () {
-    if (this.inspector.selection.nodeFront === this.view.viewedElement) {
+    if (this.inspector.selection.nodeFront === this.computedView._viewedElement) {
       this.refresh();
     } else {
       this.onSelected();
@@ -1520,9 +1522,10 @@ ComputedViewTool.prototype = {
       this.inspector.pageStyle.off("stylesheet-updated", this.refresh);
     }
 
-    this.view.destroy();
+    this.computedView.destroy();
+    this.layoutView.destroy();
 
-    this.view = this.document = this.inspector = null;
+    this.computedView = this.layoutView = this.document = this.inspector = null;
   }
 };
 
