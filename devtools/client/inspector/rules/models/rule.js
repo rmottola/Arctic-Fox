@@ -440,7 +440,7 @@ Rule.prototype = {
 
     // Starting with FF49, StyleRuleActors provide parsed declarations.
     let props = this.style.declarations;
-    if (!props) {
+    if (!props.length) {
       props = parseDeclarations(this.cssProperties.isKnown,
                                 this.style.authoredText, true);
     }
