@@ -106,11 +106,11 @@
   pointer-events: none;
 }
 
-.ruleview-expandable-container {
+.ruleview-expandable-container[hidden] {
   display: none;
 }
 
-.show-expandable-container + .ruleview-expandable-container {
+.ruleview-expandable-container {
   display: block;
 }
 
@@ -176,6 +176,7 @@
   vertical-align: middle;
   min-height: 1.5em;
   line-height: 1.5em;
+  margin-top: -1px;
 }
 
 .theme-firebug .theme-gutter.ruleview-header {
