@@ -81,7 +81,7 @@ addMessageListener("Test:JsonView:WaitForFilter", function (msg) {
   }
 
   // Wait till the first row has 'hidden' class set.
-  let observer = new content.MutationObserver(function(mutations) {
+  let observer = new content.MutationObserver(function (mutations) {
     for (let i = 0; i < mutations.length; i++) {
       let mutation = mutations[i];
       if (mutation.attributeName == "class") {
