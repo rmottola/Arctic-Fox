@@ -6,7 +6,9 @@
 
 "use strict";
 
+/* eslint-disable mozilla/reject-some-requires */
 const {Ci} = require("chrome");
+/* eslint-enable mozilla/reject-some-requires */
 const Services = require("Services");
 const promise = require("promise");
 const FocusManager = Services.focus;
@@ -738,8 +740,10 @@ HTMLBreadcrumbs.prototype = {
    */
   scroll: function () {
     // FIXME bug 684352: make sure its immediate neighbors are visible too.
-    let element = this.nodeHierarchy[this.currentIndex].button;
-    element.scrollIntoView({ block: "end", behavior: "smooth" });
+    if (!this.isDestroyed) {
+      let element = this.nodeHierarchy[this.currentIndex].button;
+      element.scrollIntoView({ block: "end", behavior: "smooth" });
+    }
   },
 
   /**
