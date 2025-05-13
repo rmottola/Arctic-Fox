@@ -42,7 +42,9 @@ const ResponsiveUIManager = exports.ResponsiveUIManager = {
    */
   toggle(window, tab) {
     let action = this.isActiveForTab(tab) ? "close" : "open";
-    return this[action + "IfNeeded"](window, tab);
+    let completed = this[action + "IfNeeded"](window, tab);
+    completed.catch(console.error);
+    return completed;
   },
 
   /**
@@ -102,7 +104,6 @@ const ResponsiveUIManager = exports.ResponsiveUIManager = {
       this.emit("off", { tab });
       yield setMenuCheckFor(tab, window);
     }
-    return promise.resolve();
   }),
 
   /**
