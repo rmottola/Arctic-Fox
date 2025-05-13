@@ -1133,10 +1133,7 @@ TabActor.prototype = {
       this.threadActor._tabClosed = true;
     }
 
-    if (this._detach()) {
-      this.conn.send({ from: this.actorID,
-                       type: "tabDetached" });
-    }
+    this._detach();
 
     Object.defineProperty(this, "docShell", {
       value: null,
@@ -1534,6 +1531,9 @@ TabActor.prototype = {
     }
 
     this._attached = false;
+
+    this.conn.send({ from: this.actorID,
+                     type: "tabDetached" });
 
     return true;
   },
