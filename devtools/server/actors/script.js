@@ -33,7 +33,7 @@ loader.lazyGetter(this, "Debugger", () => {
 });
 loader.lazyRequireGetter(this, "CssLogic", "devtools/server/css-logic", true);
 loader.lazyRequireGetter(this, "events", "sdk/event/core");
-loader.lazyRequireGetter(this, "mapURIToAddonID", "devtools/server/actors/utils/map-uri-to-addon-id");
+loader.lazyRequireGetter(this, "setTimeout", "sdk/timers", true);
 
 /**
  * A BreakpointActorMap is a map from locations to instances of BreakpointActor.
