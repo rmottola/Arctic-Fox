@@ -163,7 +163,7 @@ function parseLocation(location, fallbackLine, fallbackColumn) {
       let evalLine = line;
       let [, _fileName, , _line] = fileName.match(/(.+)(%20line%20(\d+)%20%3E%20eval)/) || [];
       fileName = `${_fileName} (eval:${evalLine})`;
-      line =  _line;
+      line = _line;
       assert(_fileName !== undefined,
              "Filename could not be found from an eval location site");
       assert(_line !== undefined,
