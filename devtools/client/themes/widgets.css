@@ -1305,7 +1305,7 @@ widgets.css is overwritten. */
 }
 
 .table-widget-column-header:not([sorted]):hover {
-  background-image: linear-gradient(rgba(0,0,0,0.10),rgba(0,0,0,0.10));
+  background-image: linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1));
 }
 
 .table-widget-column-header[sorted] {
@@ -1317,15 +1317,15 @@ widgets.css is overwritten. */
 }
 
 .table-widget-column-header[sorted]:-moz-locale-dir(rtl) {
-  background-position: left 6px center;
+  background-position: 6px center;
 }
 
 .table-widget-column-header[sorted=ascending] {
-  background-image: url("chrome://global/skin/devtools/sort-arrows.svg#ascending");
+  background-image: url("chrome://devtools/skin/images/sort-arrows.svg#ascending");
 }
 
 .table-widget-column-header[sorted=descending] {
-  background-image: url("chrome://global/skin/devtools/sort-arrows.svg#descending");
+  background-image: url("chrome://devtools/skin/images/sort-arrows.svg#descending");
 }
 
 .theme-dark .table-widget-column[readonly] {
