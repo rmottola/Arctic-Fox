@@ -991,9 +991,9 @@ var DebuggerServer = {
    *         established.
    */
   connectToChild(connection, frame, onDestroy) {
-    let deferred = defer();
+    let deferred = SyncPromise.defer();
 
-    let mm = aFrame.QueryInterface(Ci.nsIFrameLoaderOwner).frameLoader
+    let mm = frame.QueryInterface(Ci.nsIFrameLoaderOwner).frameLoader
              .messageManager;
     mm.loadFrameScript("resource://devtools/server/child.js", false);
     this._childMessageManagers.add(mm);
@@ -1553,7 +1553,7 @@ DebuggerServerConnection.prototype = {
   },
 
   _queueResponse: function (from, type, responseOrPromise) {
-    let pendingResponse = this._actorResponses.get(from) || resolve(null);
+    let pendingResponse = this._actorResponses.get(from) || SyncPromise.resolve(null);
     let responsePromise = pendingResponse.then(() => {
       return responseOrPromise;
     }).then(response => {
@@ -1583,7 +1583,7 @@ DebuggerServerConnection.prototype = {
   setAddonOptions(id, options) {
     let addonList = this.rootActor._parameters.addonList;
     if (!addonList) {
-      return resolve();
+      return SyncPromise.resolve();
     }
     return addonList.getList().then((addonActors) => {
       for (let actor of addonActors) {
@@ -1733,7 +1733,7 @@ DebuggerServerConnection.prototype = {
    *                  that is copied.  See stream-utils.js.
    */
   onBulkPacket(packet) {
-    let { actor: actorKey, type, length } = packet;
+    let { actor: actorKey, type } = packet;
 
     let actor = this._getOrCreateActor(actorKey);
     if (!actor) {
@@ -1781,7 +1781,7 @@ DebuggerServerConnection.prototype = {
 
     events.emit(this, "closed", status);
 
-    this._extraPools.map(function (p) { p.destroy(); });
+    this._extraPools.forEach(p => p.destroy());
     this._extraPools = null;
 
     this.rootActor = null;
