@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 
-<meta charset=utf-8 />
+<meta charset="utf-8" />
+<meta name="viewport" />
 <title>test</title>
 
 
@@ -11,18 +12,24 @@
   }
 </style>
 
-<div></div>
+<div data-is-delay="false"></div>
 
 <script>
   var div = document.querySelector("div");
   var initX, initY;
+  var previousEvent = "", touchendTime = 0;
+  var updatePreviousEvent = function(e){
+    previousEvent = e.type;
+  };
 
   div.style.transform = "none";
+  div.style.backgroundColor = "";
 
   div.addEventListener("touchstart", function(evt) {
     var touch = evt.changedTouches[0];
     initX = touch.pageX;
     initY = touch.pageY;
+    updatePreviousEvent(evt);
   }, true);
 
   div.addEventListener("touchmove", function(evt) {

@@ -710,8 +710,8 @@ var NetworkHelper = {
    * @param Number version
    *        One of nsISSLStatus version constants.
    * @return string
-   *         One of TLSv1, TLSv1.1, TLSv1.2, TLSv1.3 if @param version is valid,
-   *         Unknown otherwise.
+   *         One of TLSv1, TLSv1.1, TLSv1.2, TLSv1.3 if @param version
+   *         is valid, Unknown otherwise.
    */
   formatSecurityProtocol: function (version) {
     switch (version) {
