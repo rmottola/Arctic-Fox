@@ -33,5 +33,6 @@ DevToolsModules(
     'styles.js',
     'stylesheets.js',
     'timeline.js',
+    'webaudio.js',
     'webgl.js'
 )
