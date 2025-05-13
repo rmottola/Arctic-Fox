@@ -70,7 +70,10 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
     this.styleElements = new WeakMap();
 
     this.onFrameUnload = this.onFrameUnload.bind(this);
+    this.onStyleSheetAdded = this.onStyleSheetAdded.bind(this);
+
     events.on(this.inspector.tabActor, "will-navigate", this.onFrameUnload);
+    events.on(this.inspector.tabActor, "stylesheet-added", this.onStyleSheetAdded);
 
     this._styleApplied = this._styleApplied.bind(this);
     this._watchedSheets = new Set();
@@ -82,6 +85,7 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
     }
     protocol.Actor.prototype.destroy.call(this);
     events.off(this.inspector.tabActor, "will-navigate", this.onFrameUnload);
+    events.off(this.inspector.tabActor, "stylesheet-added", this.onStyleSheetAdded);
     this.inspector = null;
     this.walker = null;
     this.refMap = null;
@@ -169,10 +173,6 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
   _sheetRef: function (sheet) {
     let tabActor = this.inspector.tabActor;
     let actor = tabActor.createStyleSheetActor(sheet);
-    if (!this._watchedSheets.has(actor)) {
-      this._watchedSheets.add(actor);
-      actor.on("style-applied", this._styleApplied);
-    }
     return actor;
   },
 
@@ -830,6 +830,18 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
    */
   onFrameUnload: function () {
     this.styleElements = new WeakMap();
+  },
+
+  /**
+   * When a stylesheet is added, handle the related StyleSheetActor to listen for changes.
+   * @param  {StyleSheetActor} actor
+   *         The actor for the added stylesheet.
+   */
+  onStyleSheetAdded: function (actor) {
+    if (!this._watchedSheets.has(actor)) {
+      this._watchedSheets.add(actor);
+      actor.on("style-applied", this._styleApplied);
+    }
   },
 
   /**
