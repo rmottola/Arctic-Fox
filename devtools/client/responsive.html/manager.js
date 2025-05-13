@@ -243,8 +243,7 @@ ResponsiveUI.prototype = {
         yield message.request(toolWindow, "init");
         toolWindow.addInitialViewport("about:blank");
         yield message.wait(toolWindow, "browser-mounted");
-        toolViewportContentBrowser =
-          toolWindow.document.querySelector("iframe.browser");
+        toolViewportContentBrowser = ui.getViewportBrowser();
         return toolViewportContentBrowser;
       })
     });
@@ -366,7 +365,10 @@ ResponsiveUI.prototype = {
 
   updateTouchSimulation: Task.async(function* (enabled) {
     if (enabled) {
-      this.touchEventSimulator.start();
+      let reloadNeeded = yield this.touchEventSimulator.start();
+      if (reloadNeeded) {
+        this.getViewportBrowser().reload();
+      }
     } else {
       this.touchEventSimulator.stop();
     }
@@ -388,7 +390,7 @@ ResponsiveUI.prototype = {
   }),
 
   /**
-   * Helper for tests. Assumes a single viewport for now.
+   * Helper for tests/reloading the viewport. Assumes a single viewport for now.
    */
   getViewportBrowser() {
     return this.toolWindow.getViewportBrowser();
