@@ -273,6 +273,7 @@
                         class="requests-menu-header-button requests-menu-waterfall"
                         data-key="waterfall"
                         pack="start"
+                        label="&netmonitorUI.toolbar.waterfall;"
                         flex="1">
                   <image id="requests-menu-waterfall-image"/>
                   <box id="requests-menu-waterfall-label-wrapper">
@@ -299,6 +300,7 @@
               <label value="&netmonitorUI.perfNotice1;"/>
               <button id="requests-menu-perf-notice-button"
                       standalone="true"
+                      label="&netmonitorUI.perfNotice3;"
                       class="devtools-toolbarbutton"/>
               <label value="&netmonitorUI.perfNotice2;"/>
             </hbox>
