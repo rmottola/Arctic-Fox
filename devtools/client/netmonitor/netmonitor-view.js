@@ -3761,10 +3761,6 @@ PerformanceStatisticsView.prototype = {
       let string = L10N.numberWithDecimals(value / 1024, CONTENT_SIZE_DECIMALS);
       return L10N.getFormatStr("charts.sizeKB", string);
     },
-    transferredSize: value => {
-      let string = L10N.numberWithDecimals(value / 1024, CONTENT_SIZE_DECIMALS);
-      return L10N.getFormatStr("charts.transferredSizeKB", string);
-    },
     time: value => {
       let string = L10N.numberWithDecimals(value / 1000, REQUEST_TIME_DECIMALS);
       return L10N.getFormatStr("charts.totalS", string);
