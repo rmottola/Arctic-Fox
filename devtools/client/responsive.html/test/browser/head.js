@@ -7,6 +7,7 @@
 /* import-globals-from ../../../framework/test/shared-head.js */
 /* import-globals-from ../../../framework/test/shared-redux-head.js */
 /* import-globals-from ../../../commandline/test/helpers.js */
+/* import-globals-from ../../../inspector/test/shared-head.js */
 
 Services.scriptloader.loadSubScript(
   "chrome://mochitests/content/browser/devtools/client/framework/test/shared-head.js",
@@ -20,7 +21,22 @@ Services.scriptloader.loadSubScript(
   "chrome://mochitests/content/browser/devtools/client/commandline/test/helpers.js",
   this);
 
+// Import helpers registering the test-actor in remote targets
+Services.scriptloader.loadSubScript(
+  "chrome://mochitests/content/browser/devtools/client/shared/test/test-actor-registry.js",
+  this);
+
+// Import helpers for the inspector that are also shared with others
+Services.scriptloader.loadSubScript(
+  "chrome://mochitests/content/browser/devtools/client/inspector/test/shared-head.js",
+  this);
+
 const TEST_URI_ROOT = "http://example.com/browser/devtools/client/responsive.html/test/browser/";
+const OPEN_DEVICE_MODAL_VALUE = "OPEN_DEVICE_MODAL";
+
+const { _loadPreferredDevices } = require("devtools/client/responsive.html/actions/devices");
+const { getOwnerWindow } = require("sdk/tabs/utils");
+const asyncStorage = require("devtools/shared/async-storage");
 
 SimpleTest.requestCompleteLog();
 SimpleTest.waitForExplicitFinish();

@@ -492,3 +492,8 @@ function lookupPath(obj, path) {
   let segments = path.split(".");
   return segments.reduce((prev, current) => prev[current], obj);
 }
+
+var closeToolbox = Task.async(function* () {
+  let target = TargetFactory.forTab(gBrowser.selectedTab);
+  yield gDevTools.closeToolbox(target);
+});

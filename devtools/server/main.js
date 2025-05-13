@@ -993,8 +993,9 @@ var DebuggerServer = {
   connectToChild(connection, frame, onDestroy) {
     let deferred = SyncPromise.defer();
 
-    let mm = frame.QueryInterface(Ci.nsIFrameLoaderOwner).frameLoader
-             .messageManager;
+    // Get messageManager from XUL browser (which might be a specialized tunnel for RDM)
+    // or else fallback to asking the frameLoader itself.
+    let mm = frame.messageManager || frame.frameLoader.messageManager;
     mm.loadFrameScript("resource://devtools/server/child.js", false);
     this._childMessageManagers.add(mm);
 
