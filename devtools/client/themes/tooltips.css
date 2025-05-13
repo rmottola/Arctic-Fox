@@ -214,8 +214,16 @@
   height: 16px;
   width: 32px;
   overflow: hidden;
-  pointer-events: all;
   flex-shrink: 0;
+}
+
+/* In RTL locales, only use RTL on the tooltip content, keep LTR for positioning */
+.tooltip-container:-moz-locale-dir(rtl) {
+  direction: ltr;
+}
+
+.tooltip-panel:-moz-locale-dir(rtl) {
+  direction: rtl;
 }
 
 .tooltip-top .tooltip-arrow {
@@ -238,6 +246,7 @@
   border-style: solid;
   border-width: 0px 3px 3px 0px;
   border-radius: 3px;
+  pointer-events: all;
 }
 
 .tooltip-bottom .tooltip-arrow:before {
