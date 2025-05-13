@@ -950,17 +950,17 @@ widgets.css is overwritten. */
   top: 0;
   left: 0;
   pointer-events: none;
-  -moz-border-end: 1px solid;
+  border-inline-end: 1px solid;
 }
 
 .theme-light .line-graph-widget-gutter {
   background: rgba(255,255,255,0.75);
-  -moz-border-end-color: rgba(255,255,255,0.25);
+  border-inline-end-color: rgba(255,255,255,0.25);
 }
 
 .theme-dark .line-graph-widget-gutter {
   background: rgba(0,0,0,0.5);
-  -moz-border-end-color: rgba(0,0,0,0.25);
+  border-inline-end-color: rgba(0,0,0,0.25);
 }
 
 .line-graph-widget-gutter-line {
@@ -988,7 +988,7 @@ widgets.css is overwritten. */
   padding-inline-start: 6px;
   padding-inline-end: 6px;
   transform: translateY(-50%);
-  font-size: 80%;
+  font-size: 0.8rem !important;
   z-index: 1;
   pointer-events: none;
 }
