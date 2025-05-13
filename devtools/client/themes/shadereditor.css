@@ -24,10 +24,6 @@
   min-width: 150px;
 }
 
-#shaders-pane + .devtools-side-splitter {
-  border-color: transparent;
-}
-
 .program-item {
   padding: 2px 0px;
 }
