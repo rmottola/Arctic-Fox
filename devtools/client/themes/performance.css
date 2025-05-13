@@ -117,8 +117,12 @@
 
 /* Sidebar & recording items */
 
-#recordings-list {
+#recordings-pane {
   border-inline-end: 1px solid var(--theme-splitter-color);
+}
+
+#recordings-list {
+  max-width: 300px;
 }
 
 .recording-item {
