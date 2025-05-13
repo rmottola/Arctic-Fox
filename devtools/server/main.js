@@ -1,5 +1,3 @@
-/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
-/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -19,8 +17,8 @@ var { LocalDebuggerTransport, ChildDebuggerTransport, WorkerDebuggerTransport } 
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 var { dumpn, dumpv } = DevToolsUtils;
 var EventEmitter = require("devtools/shared/event-emitter");
-var Debugger = require("Debugger");
 var Promise = require("promise");
+var SyncPromise = require("devtools/shared/deprecated-sync-thenables");
 
 DevToolsUtils.defineLazyGetter(this, "DebuggerSocket", () => {
   let { DebuggerSocket } = require("devtools/shared/security/socket");
@@ -30,7 +28,8 @@ DevToolsUtils.defineLazyGetter(this, "Authentication", () => {
   return require("devtools/shared/security/auth");
 });
 DevToolsUtils.defineLazyGetter(this, "generateUUID", () => {
-  let { generateUUID } = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
+  let { generateUUID } = Cc["@mozilla.org/uuid-generator;1"]
+                           .getService(Ci.nsIUUIDGenerator);
   return generateUUID;
 });
 
@@ -85,12 +84,6 @@ function loadSubScript(url) {
 }
 
 loader.lazyRequireGetter(this, "events", "sdk/event/core");
-
-var {defer, resolve, reject, all} = require("devtools/shared/deprecated-sync-thenables");
-this.defer = defer;
-this.resolve = resolve;
-this.reject = reject;
-this.all = all;
 
 var gRegisteredModules = Object.create(null);
 
@@ -230,7 +223,7 @@ var DebuggerServer = {
   /**
    * Raises an exception if the server has not been properly initialized.
    */
-  _checkInit: function DS_checkInit() {
+  _checkInit() {
     if (!this._initialized) {
       throw new Error("DebuggerServer has not been initialized.");
     }
@@ -508,11 +501,6 @@ var DebuggerServer = {
       constructor: "MemoryActor",
       type: { tab: true }
     });
-    this.registerModule("devtools/server/actors/memprof", {
-      prefix: "memprof",
-      constructor: "MemprofActor",
-      type: { global: true, tab: true }
-    });
     this.registerModule("devtools/server/actors/framerate", {
       prefix: "framerate",
       constructor: "FramerateActor",
@@ -593,7 +581,7 @@ var DebuggerServer = {
    */
   setAddonOptions(id, options) {
     if (!this._initialized) {
-      return;
+      return Promise.resolve();
     }
 
     let promises = [];
@@ -603,7 +591,7 @@ var DebuggerServer = {
       promises.push(this._connections[connID].setAddonOptions(id, options));
     }
 
-    return all(promises);
+    return SyncPromise.all(promises);
   },
 
   get listeningSockets() {
@@ -727,7 +715,7 @@ var DebuggerServer = {
   },
 
   connectToContent(connection, mm) {
-    let deferred = defer();
+    let deferred = SyncPromise.defer();
 
     let prefix = connection.allocID("content-process");
     let actor, childTransport;
@@ -887,7 +875,7 @@ var DebuggerServer = {
               // Ensure that any packets received from the server on the worker
               // thread are forwarded to the client on the main thread, as if
               // they had been sent by the server on the main thread.
-              aConnection.send(packet);
+              connection.send(packet);
             }
           };
 
@@ -965,9 +953,8 @@ var DebuggerServer = {
 
     if (waitForEval) {
       return deferred.promise;
-    } else {
-      return Promise.resolve();
     }
+    return Promise.resolve();
   },
 
   /**
