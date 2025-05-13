@@ -29,6 +29,7 @@ DevToolsModules(
     'promises.js',
     'settings.js',
     'storage.js',
+    'string.js',
     'styles.js',
     'stylesheets.js',
     'timeline.js',

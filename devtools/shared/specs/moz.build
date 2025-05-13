@@ -36,6 +36,7 @@ DevToolsModules(
     'settings.js',
     'source.js',
     'storage.js',
+    'string.js',
     'styleeditor.js',
     'styles.js',
     'stylesheets.js',
