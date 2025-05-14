@@ -55,7 +55,7 @@ let App = createClass({
   },
 
   onDeviceListUpdate(devices) {
-    updateDeviceList(devices);
+    updatePreferredDevices(devices);
   },
 
   onExit() {

@@ -4,6 +4,19 @@ http://creativecommons.org/publicdomain/zero/1.0/ */
 "use strict";
 
 // Test submitting display device changes on the device modal
+const { GetDevices, AddDevice } = require("devtools/client/shared/devices");
+
+const addedDevice = {
+  "name": "Fake Phone RDM Test",
+  "width": 320,
+  "height": 570,
+  "pixelRatio": 1.5,
+  "userAgent": "Mozilla/5.0 (Mobile; rv:39.0) Gecko/39.0 Firefox/39.0",
+  "touch": true,
+  "firefoxOS": false,
+  "os": "custom",
+  "featured": true,
+};
 
 const TEST_URL = "data:text/html;charset=utf-8,";
 const Types = require("devtools/client/responsive.html/types");

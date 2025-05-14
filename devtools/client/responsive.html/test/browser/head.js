@@ -53,7 +53,7 @@ registerCleanupFunction(() => {
   Services.prefs.clearUserPref("devtools.responsive.html.enabled");
 });
 const { ResponsiveUIManager } = require("resource://devtools/client/responsivedesign/responsivedesign.jsm");
-const { loadDeviceList } = require("devtools/client/responsive.html/devices");
+const { loadPreferredDevices } = require("devtools/client/responsive.html/devices");
 const { getOwnerWindow } = require("sdk/tabs/utils");
 
 /**
