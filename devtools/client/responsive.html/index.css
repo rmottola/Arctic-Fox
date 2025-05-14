@@ -31,22 +31,19 @@
 
 #root,
 html, body {
-  margin: 0;
   height: 100%;
-}
-
-body {
-  /* Only allow horizontal scrolling when more viewports are added */
-  overflow-y: hidden;
+  margin: 0;
 }
 
 #app {
-  height: 100%;
   /* Center the viewports container */
   display: flex;
-  justify-content: center;
   align-items: center;
   flex-direction: column;
+  padding-top: 15px;
+  padding-bottom: 1%;
+  position: relative;
+  height: 100%;
 }
 
 /**
@@ -80,7 +77,7 @@ body {
   color: var(--theme-body-color-alt);
   border-radius: 2px;
   box-shadow: var(--rdm-box-shadow);
-  margin: 30px 0;
+  margin: 0 0 15px 0;
   padding: 4px 5px;
   display: inline-flex;
   -moz-user-select: none;
@@ -324,9 +321,33 @@ body {
  * Device Modal
  */
 
+@keyframes fade-in-and-up {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+
+@keyframes fade-down-and-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(5px);
+    visibility: hidden;
+  }
+}
+
 .device-modal {
   border-radius: 2px;
   box-shadow: var(--rdm-box-shadow);
+  display: none;
   position: absolute;
   margin: auto;
   top: 0;
@@ -335,10 +356,31 @@ body {
   right: 0;
   width: 642px;
   height: 612px;
+  z-index: 1;
 }
 
-.device-modal.hidden {
-  display: none;
+/* Handles the opening/closing of the modal */
+#device-modal-wrapper.opened .device-modal {
+  animation: fade-in-and-up 0.3s ease;
+  animation-fill-mode: forwards;
+  display: block;
+}
+
+#device-modal-wrapper.closed .device-modal {
+  animation: fade-down-and-out 0.3s ease;
+  animation-fill-mode: forwards;
+  display: block;
+}
+
+#device-modal-wrapper.opened .modal-overlay {
+  background-color: var(--theme-splitter-color);
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+  opacity: 0.5;
 }
 
 .device-modal-content {
