@@ -215,6 +215,9 @@ pref("devtools.webaudioeditor.enabled", false);
 // Enable Scratchpad
 pref("devtools.scratchpad.enabled", false);
 
+// Make sure the DOM panel is hidden by default
+pref("devtools.dom.enabled", false);
+
 // Web Audio Editor Inspector Width should be a preference
 pref("devtools.webaudioeditor.inspectorWidth", 300);
 
@@ -242,7 +245,7 @@ pref("devtools.webconsole.filter.info", true);
 pref("devtools.webconsole.filter.log", true);
 pref("devtools.webconsole.filter.secerror", true);
 pref("devtools.webconsole.filter.secwarn", true);
-pref("devtools.webconsole.filter.serviceworkers", false);
+pref("devtools.webconsole.filter.serviceworkers", true);
 pref("devtools.webconsole.filter.sharedworkers", false);
 pref("devtools.webconsole.filter.windowlessworkers", false);
 pref("devtools.webconsole.filter.servererror", false);
@@ -335,11 +338,12 @@ pref("devtools.fontinspector.enabled", true);
 // version for each user.
 pref("devtools.telemetry.tools.opened.version", "{}");
 
-// Enable the JSON View tool (an inspector for application/json documents)
-#ifdef MOZ_DEV_EDITION
-  pref("devtools.jsonview.enabled", true);
+// Enable the JSON View tool (an inspector for application/json documents) on
+// Nightly and Dev. Edition.
+#ifdef RELEASE_BUILD
+pref("devtools.jsonview.enabled", false);
 #else
-  pref("devtools.jsonview.enabled", false);
+pref("devtools.jsonview.enabled", true);
 #endif
 
 // Disable the HTML responsive design tool by default.  Currently disabled until
