@@ -90,6 +90,12 @@ module.exports = createClass({
       modalClass += " hidden";
     }
 
+    const sortedDevices = {};
+    for (let type of devices.types) {
+      sortedDevices[type] = Object.assign([], devices[type])
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
     return dom.div(
       {
         className: modalClass,
@@ -115,7 +121,7 @@ module.exports = createClass({
               },
               type
             ),
-            devices[type].map(device => {
+            sortedDevices[type].map(device => {
               return dom.label(
                 {
                   className: "device-label",
