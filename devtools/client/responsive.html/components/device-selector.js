@@ -113,6 +113,7 @@ module.exports = createClass({
       {
         className: selectClass,
         value: selectedDevice,
+        title: selectedDevice,
         onChange: this.onSelectChange,
         disabled: (state !== Types.deviceListState.LOADED),
       },
