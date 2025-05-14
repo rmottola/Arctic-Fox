@@ -3,7 +3,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-/* globals DOMHelpers, Services */
 
 "use strict";
 
@@ -63,6 +62,8 @@ BottomHost.prototype = {
 
     this._splitter = ownerDocument.createElement("splitter");
     this._splitter.setAttribute("class", "devtools-horizontal-splitter");
+    // Avoid resizing notification containers
+    this._splitter.setAttribute("resizebefore", "flex");
 
     this.frame = ownerDocument.createElement("iframe");
     this.frame.className = "devtools-toolbox-bottom-iframe";
