@@ -1,9 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-/* globals gDevTools, DOMHelpers, toolboxStrings, InspectorFront, Selection,
-   CommandUtils, DevToolsUtils, Hosts, osString, showDoorhanger,
-   getHighlighterUtils, createPerformanceFront */
 
 "use strict";
 
@@ -387,16 +384,9 @@ Toolbox.prototype = {
         useOnlyShared: true
       }).require;
 
-      this.React = this.browserRequire(
-        "devtools/client/shared/vendor/react");
-      this.ReactDOM = this.browserRequire(
-        "devtools/client/shared/vendor/react-dom");
-
       iframe.setAttribute("aria-label", toolboxStrings("toolbox.label"));
       let domHelper = new DOMHelpers(iframe.contentWindow);
       domHelper.onceDOMReady(() => {
-        // Build the Notification box as soon as the DOM is ready.
-        this._buildNotificationBox();
         domReady.resolve();
       }, this._URL);
 
@@ -490,6 +480,18 @@ Toolbox.prototype = {
 
       this.emit("ready");
     }.bind(this)).then(null, console.error.bind(console));
+  },
+
+  /**
+   * loading React modules when needed (to avoid performance penalties
+   * during Firefox start up time).
+   */
+  get React() {
+    return this.browserRequire("devtools/client/shared/vendor/react");
+  },
+
+  get ReactDOM() {
+    return this.browserRequire("devtools/client/shared/vendor/react-dom");
   },
 
   _pingTelemetry: function () {
@@ -718,19 +720,23 @@ Toolbox.prototype = {
   },
 
   /**
-   * Build the notification box. Called every time the host changes.
+   * Build the notification box as soon as needed.
    */
-  _buildNotificationBox: function() {
-    let { NotificationBox, PriorityLevels } =
-      this.browserRequire("devtools/client/shared/components/notification-box");
+  get notificationBox() {
+    if (!this._notificationBox) {
+      let { NotificationBox, PriorityLevels } =
+        this.browserRequire(
+          "devtools/client/shared/components/notification-box");
 
-    NotificationBox = this.React.createFactory(NotificationBox);
+      NotificationBox = this.React.createFactory(NotificationBox);
 
-    // Render NotificationBox and assign priority levels to it.
-    let box = this.doc.getElementById("toolbox-notificationbox");
-    this.notificationBox = Object.assign(
-      this.ReactDOM.render(NotificationBox({}), box),
-      PriorityLevels);
+      // Render NotificationBox and assign priority levels to it.
+      let box = this.doc.getElementById("toolbox-notificationbox");
+      this._notificationBox = Object.assign(
+        this.ReactDOM.render(NotificationBox({}), box),
+        PriorityLevels);
+    }
+    return this._notificationBox;
   },
 
   /**
@@ -1312,7 +1318,7 @@ Toolbox.prototype = {
    * @param {string} id
    *        The Id of the item within the collection to select
    */
-  selectSingleNode: function(collection, id) {
+  selectSingleNode: function (collection, id) {
     [...collection].forEach(node => {
       if (node.id === id) {
         node.setAttribute("selected", "true");
@@ -2040,7 +2046,7 @@ Toolbox.prototype = {
       }
     }
 
-    this.React = this.ReactDOM = this.browserRequire = null;
+    this.browserRequire = null;
 
     // Now that we are closing the toolbox we can re-enable the cache settings
     // and disable the service workers testing settings for the current tab.
@@ -2152,7 +2158,7 @@ Toolbox.prototype = {
   /**
    * Enable / disable necessary textbox menu items using globalOverlay.js.
    */
-  _updateTextboxMenuItems: function() {
+  _updateTextboxMenuItems: function () {
     let window = this.win;
     ["cmd_undo", "cmd_delete", "cmd_cut",
      "cmd_copy", "cmd_paste", "cmd_selectAll"].forEach(window.goUpdateCommand);
