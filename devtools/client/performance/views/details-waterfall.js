@@ -82,6 +82,9 @@ var WaterfallView = Heritage.extend(DetailsSubview, {
    */
   render: function (interval = {}) {
     let recording = PerformanceController.getCurrentRecording();
+    if (recording.isRecording()) {
+      return;
+    }
     let startTime = interval.startTime || 0;
     let endTime = interval.endTime || recording.getDuration();
     let markers = recording.getMarkers();
@@ -135,7 +138,7 @@ var WaterfallView = Heritage.extend(DetailsSubview, {
    * Called when MarkerDetails view emits an event to view source.
    */
   _onViewSource: function (_, data) {
-    gToolbox.viewSourceInDebugger(data.file, data.line);
+    gToolbox.viewSourceInDebugger(data.url, data.line);
   },
 
   /**
