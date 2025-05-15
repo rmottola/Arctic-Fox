@@ -512,7 +512,11 @@ OutputParser.prototype = {
 
       let href = url;
       if (options.baseURI) {
-        href = new URL(url, options.baseURI).href;
+        try {
+          href = new URL(url, options.baseURI).href;
+        } catch (e) {
+          // Ignore.
+        }
       }
 
       this._appendNode("a", {
