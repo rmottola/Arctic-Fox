@@ -1205,10 +1205,12 @@ Messages.Extended.prototype = extend(Messages.Simple.prototype, {
    *        grip. This is typically set to true when the object needs to be
    *        displayed in an array preview, or as a property value in object
    *        previews, etc.
+   *        - shorten - boolean that tells the renderer to display a truncated
+   *        grip.
    * @return DOMElement
    *         The DOM element that displays the given grip.
    */
-  _renderValueGrip: function(grip, options = {})
+  _renderValueGrip: function (grip, options = {})
   {
     let isPrimitive = VariablesView.isPrimitive({ value: grip });
     let isActorGrip = WebConsoleUtils.isActorGrip(grip);
@@ -1229,10 +1231,15 @@ Messages.Extended.prototype = extend(Messages.Simple.prototype, {
       }
     }
 
+    let unshortenedGrip = grip;
+    if (options.shorten) {
+      grip = this.shortenValueGrip(grip);
+    }
+
     let result = this.document.createElementNS(XHTML_NS, "span");
     if (isPrimitive) {
       if (Widgets.URLString.prototype.containsURL.call(Widgets.URLString.prototype, grip)) {
-        let widget = new Widgets.URLString(this, grip, options).render();
+        let widget = new Widgets.URLString(this, grip, unshortenedGrip).render();
         return widget.element;
       }
 
@@ -2132,11 +2139,14 @@ Widgets.MessageTimestamp.prototype = extend(Widgets.BaseWidget.prototype, {
  *        The owning message.
  * @param string str
  *        The string, which contains at least one valid URL.
+ * @param string unshortenedStr
+ *        The unshortened form of the string, if it was shortened.
  */
-Widgets.URLString = function(message, str)
+Widgets.URLString = function (message, str, unshortenedStr)
 {
   Widgets.BaseWidget.call(this, message);
   this.str = str;
+  this.unshortenedStr = unshortenedStr;
 };
 
 Widgets.URLString.prototype = Heritage.extend(Widgets.BaseWidget.prototype,
@@ -2147,7 +2157,7 @@ Widgets.URLString.prototype = Heritage.extend(Widgets.BaseWidget.prototype,
    */
   str: "",
 
-  render: function()
+  render: function ()
   {
     if (this.element) {
       return this;
@@ -2161,16 +2171,23 @@ Widgets.URLString.prototype = Heritage.extend(Widgets.BaseWidget.prototype,
     this.element.appendChild(this._renderText("\""));
 
     // As we walk through the tokens of the source string, we make sure to preserve
-    // the original whitespace that seperated the tokens.
+    // the original whitespace that separated the tokens.
     let tokens = this.str.split(/\s+/);
     let textStart = 0;
     let tokenStart;
-    for (let token of tokens) {
+    for (let i = 0; i < tokens.length; i++) {
+      let token = tokens[i];
+      let unshortenedToken;
       tokenStart = this.str.indexOf(token, textStart);
       if (this._isURL(token)) {
+        // The last URL in the string might be shortened.  If so, get the
+        // real URL so the rendered link can point to it.
+        if (i === tokens.length - 1 && this.unshortenedStr) {
+          unshortenedToken = this.unshortenedStr.slice(tokenStart).split(/\s+/, 1)[0];
+        }
         this.element.appendChild(this._renderText(this.str.slice(textStart, tokenStart)));
         textStart = tokenStart + token.length;
-        this.element.appendChild(this._renderURL(token));
+        this.element.appendChild(this._renderURL(token, unshortenedToken));
       }
     }
 
@@ -2224,22 +2241,25 @@ Widgets.URLString.prototype = Heritage.extend(Widgets.BaseWidget.prototype,
    *
    * @param string url
    *        The string to be rendered as a url.
+   * @param string fullUrl
+   *        The unshortened form of the URL, if it was shortened.
    * @return DOMElement
    *         An element containing the rendered string.
    */
-  _renderURL: function(url)
+  _renderURL: function (url, fullUrl)
   {
+    let unshortened = fullUrl || url;
     let result = this.el("a", {
       class: "url",
-      title: url,
-      href: url,
+      title: unshortened,
+      href: unshortened,
       draggable: false
     }, url);
     this.message._addLinkCallback(result);
     return result;
   },
 
-  _renderText: function(text) {
+  _renderText: function (text) {
     return this.el("span", text);
   },
 }); // Widgets.URLString.prototype
@@ -2336,7 +2356,7 @@ Widgets.JSObject.prototype = extend(Widgets.BaseWidget.prototype, {
    *        Add the value as is, don't treat it as a grip and pass it to
    *        `_renderValueGrip`.
    */
-  _renderObjectProperty: function(key, value, container, needsComma, valueIsText = false)
+  _renderObjectProperty: function (key, value, container, needsComma, valueIsText = false)
   {
     if (needsComma) {
       this._text(", ");
@@ -2348,8 +2368,7 @@ Widgets.JSObject.prototype = extend(Widgets.BaseWidget.prototype, {
     if (valueIsText) {
       this._text(value);
     } else {
-      let shortVal = this.message.shortenValueGrip(value);
-      let valueElem = this.message._renderValueGrip(shortVal, { concise: true });
+      let valueElem = this.message._renderValueGrip(value, { concise: true, shorten: true });
       container.appendChild(valueElem);
     }
   },
@@ -2742,8 +2761,7 @@ Widgets.ObjectRenderers.add({
           emptySlots = 0;
         }
 
-        let shortVal = this.message.shortenValueGrip(item);
-        let elem = this.message._renderValueGrip(shortVal, { concise: true });
+        let elem = this.message._renderValueGrip(item, { concise: true, shorten: true });
         this.element.appendChild(elem);
       }
     }
