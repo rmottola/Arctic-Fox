@@ -311,7 +311,8 @@ DeveloperToolbar.prototype.createToolbar = function () {
   close.setAttribute("id", "developer-toolbar-closebutton");
   close.setAttribute("class", "close-icon");
   close.setAttribute("oncommand", "DeveloperToolbar.hide();");
-  close.setAttribute("tooltiptext", "developerToolbarCloseButton.tooltiptext");
+  let closeTooltip = toolboxStrings.GetStringFromName("toolbar.closeButton.tooltip");
+  close.setAttribute("tooltiptext", closeTooltip);
 
   let stack = this._doc.createElement("stack");
   stack.setAttribute("flex", "1");
@@ -328,11 +329,14 @@ DeveloperToolbar.prototype.createToolbar = function () {
   let toolboxBtn = this._doc.createElement("toolbarbutton");
   toolboxBtn.setAttribute("id", "developer-toolbar-toolbox-button");
   toolboxBtn.setAttribute("class", "developer-toolbar-button");
-  toolboxBtn.setAttribute("tooltiptext", "devToolbarToolsButton.tooltip");
+  let toolboxTooltip = toolboxStrings.GetStringFromName("toolbar.toolsButton.tooltip");
+  toolboxBtn.setAttribute("tooltiptext", toolboxTooltip);
   toolboxBtn.addEventListener("command", function (event) {
     let window = event.target.ownerDocument.defaultView;
     gDevToolsBrowser.toggleToolboxCommand(window.gBrowser);
   });
+  this._errorCounterButton = toolboxBtn;
+  this._errorCounterButton._defaultTooltipText = toolboxTooltip;
 
   // On Mac, the close button is on the left,
   // while it is on the right on every other platforms.
@@ -355,9 +359,6 @@ DeveloperToolbar.prototype.createToolbar = function () {
     if (statusBar)
       statusBar.parentNode.insertBefore(this._element, statusBar);
   }
-  this._errorCounterButton = toolboxBtn
-  this._errorCounterButton._defaultTooltipText =
-      this._errorCounterButton.getAttribute("tooltiptext");
 };
 
 /**
