@@ -66,6 +66,11 @@ function updatePreferredDevices(devices) {
 
 module.exports = {
 
+  // This function is only exported for testing purposes
+  _loadPreferredDevices: loadPreferredDevices,
+
+  updatePreferredDevices: updatePreferredDevices,
+
   addDevice(device, deviceType) {
     return {
       type: ADD_DEVICE,
@@ -87,6 +92,39 @@ module.exports = {
       device,
       deviceType,
       displayed,
+    };
+  },
+
+  loadDevices() {
+    return function* (dispatch, getState) {
+      yield dispatch({ type: LOAD_DEVICE_LIST_START });
+      let preferredDevices = loadPreferredDevices();
+      let devices;
+
+      try {
+        devices = yield GetDevices();
+      } catch (e) {
+        console.error("Could not load device list: " + e);
+        dispatch({ type: LOAD_DEVICE_LIST_ERROR });
+        return;
+      }
+
+      for (let type of devices.TYPES) {
+        dispatch(module.exports.addDeviceType(type));
+        for (let device of devices[type]) {
+          if (device.os == "fxos") {
+            continue;
+          }
+
+          let newDevice = Object.assign({}, device, {
+            displayed: preferredDevices.added.has(device.name) ||
+              (device.featured && !(preferredDevices.removed.has(device.name))),
+          });
+
+          dispatch(module.exports.addDevice(newDevice, type));
+        }
+      }
+      dispatch({ type: LOAD_DEVICE_LIST_END });
     };
   },
 
