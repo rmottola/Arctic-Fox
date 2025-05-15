@@ -100,7 +100,7 @@ exports.items = [
 
       let cookies = [];
       while (enm.hasMoreElements()) {
-        let cookie = enm.getNext().QueryInterface(Ci.nsICookie2);
+        let cookie = enm.getNext().QueryInterface(Ci.nsICookie);
         if (isCookieAtHost(cookie, host)) {
           cookies.push({
             host: cookie.host,
@@ -108,10 +108,9 @@ exports.items = [
             value: cookie.value,
             path: cookie.path,
             expires: cookie.expires,
-            isDomain: cookie.isDomain,
-            isHttpOnly: cookie.isHttpOnly,
-            isSecure: cookie.isSecure,
-            isSession: cookie.isSession,
+            secure: cookie.secure,
+            httpOnly: cookie.httpOnly,
+            sameDomain: cookie.sameDomain
           });
         }
       }
@@ -170,14 +169,11 @@ exports.items = [
       for (let cookie of cookies) {
         cookie.expires = translateExpires(cookie.expires);
 
-        let noAttrs = !cookie.isDomain && !cookie.isHttpOnly &&
-            !cookie.isSecure && !cookie.isSession;
-        cookie.attrs = ((cookie.isDomain ? "isDomain " : "") +
-                       (cookie.isHttpOnly ? "isHttpOnly " : "") +
-                       (cookie.isSecure ? "isSecure " : "") +
-                       (cookie.isSession ? "isSession " : "") +
-                       (noAttrs ? l10n.lookup("cookieListOutNone") : ""))
-                       .trim();
+        let noAttrs = !cookie.secure && !cookie.httpOnly && !cookie.sameDomain;
+        cookie.attrs = (cookie.secure ? "secure" : " ") +
+                       (cookie.httpOnly ? "httpOnly" : " ") +
+                       (cookie.sameDomain ? "sameDomain" : " ") +
+                       (noAttrs ? l10n.lookup("cookieListOutNone") : " ");
       }
 
       return context.createView({
