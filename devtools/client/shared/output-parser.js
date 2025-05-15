@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* globals DOMUtils */
-
 "use strict";
 
 const {Cc, Ci} = require("chrome");
@@ -32,8 +30,6 @@ loader.lazyGetter(this, "DOMUtils", function () {
  * border radius, cubic-bezier etc.).
  *
  * Usage:
- *   const {require} =
- *      Cu.import("resource://devtools/shared/Loader.jsm", {});
  *   const {OutputParser} = require("devtools/client/shared/output-parser");
  *
  *   let parser = new OutputParser(document, supportsType);
