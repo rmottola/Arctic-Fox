@@ -142,57 +142,79 @@ define(function (require, exports, module) {
         }
       }
 
-      let newState = {
-        tabActive: index
-      };
+      let created = [...this.state.created];
+      created[index] = true;
+
+      let newState = Object.assign({}, this.state, {
+        tabActive: index,
+        created: created
+      });
 
       this.setState(newState, () => {
+        // Properly set focus on selected tab.
+        let node = findDOMNode(this);
+        let selectedTab = node.querySelector(".is-active > a");
+        if (selectedTab) {
+          selectedTab.focus();
+        }
+
         if (onAfterChange) {
           onAfterChange(index);
         }
       });
-
-      e.preventDefault();
     },
 
-    getMenuItems: function () {
+    // Rendering
+
+    renderMenuItems: function () {
       if (!this.props.children) {
-        throw new Error("Tabs must contain at least one Panel");
+        throw new Error("There must be at least one Tab");
       }
 
       if (!Array.isArray(this.props.children)) {
         this.props.children = [this.props.children];
       }
 
-      let menuItems = this.props.children
-        .map(function(panel) {
-          return typeof panel === "function" ? panel() : panel;
-        }).filter(function(panel) {
-          return panel;
-        }).map(function(panel, index) {
-          let ref = ("tab-menu-" + (index + 1));
-          let title = panel.props.title;
-          let tabClassName = panel.props.className;
+      let tabs = this.props.children
+        .map(tab => {
+          return typeof tab === "function" ? tab() : tab;
+        }).filter(tab => {
+          return tab;
+        }).map((tab, index) => {
+          let ref = ("tab-menu-" + index);
+          let title = tab.props.title;
+          let tabClassName = tab.props.className;
 
           let classes = [
             "tabs-menu-item",
             tabClassName,
-            this.state.tabActive === (index + 1) && "is-active"
+            this.state.tabActive === index ? "is-active" : ""
           ].join(" ");
 
+          // Set tabindex to -1 (except the selected tab) so, it's focusable,
+          // but not reachable via sequential tab-key navigation.
+          // Changing selected tab (and so, moving focus) is done through
+          // left and right arrow keys.
+          // See also `onKeyDown()` event handler.
           return (
-            DOM.li({ref: ref, key: index, className: classes},
-              DOM.a({href: "#", onClick: this.setActive.bind(this, index + 1)},
+            DOM.li({
+              ref: ref,
+              key: index,
+              className: classes},
+              DOM.a({
+                href: "#",
+                tabIndex: this.state.tabActive === index ? 0 : -1,
+                onClick: this.onClickTab.bind(this, index)},
                 title
               )
             )
           );
-        }.bind(this));
+        });
 
       return (
         DOM.nav({className: "tabs-navigation"},
           DOM.ul({className: "tabs-menu"},
-            menuItems
+            tabs
           )
         )
       );
