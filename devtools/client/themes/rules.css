@@ -295,6 +295,15 @@
   }
 }
 
+.ruleview-overridden-rule-filter {
+  background-image: var(--rule-filter-icon);
+  background-size: 11px 11px;
+  margin-inline-start: 5px;
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+}
+
 .ruleview-ruleopen {
   padding-inline-end: 5px;
 }
