@@ -2149,8 +2149,7 @@ Widgets.URLString = function (message, str, unshortenedStr)
   this.unshortenedStr = unshortenedStr;
 };
 
-Widgets.URLString.prototype = Heritage.extend(Widgets.BaseWidget.prototype,
-{
+Widgets.URLString.prototype = extend(Widgets.BaseWidget.prototype, {
   /**
    * The string to format, which contains at least one valid URL.
    * @type string
@@ -2711,7 +2710,7 @@ Widgets.ObjectRenderers.add({
 
   _onClick: function () {
     let location = this.objectActor.location;
-    if (location) {
+    if (location && IGNORED_SOURCE_URLS.indexOf(location.url) === -1) {
       this.output.openLocationInDebugger(location);
     }
     else {
