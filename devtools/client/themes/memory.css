@@ -523,7 +523,9 @@ html, body, #app, #memory-tool {
 .heap-tree-item-individuals > button {
   height: 10px;
   width: 32px;
-  margin: 0 auto;
+
+  /* Override default styles for toolbar buttons to fix entire row height. */
+  margin: 0 auto !important;
   padding: 0;
 }
 
