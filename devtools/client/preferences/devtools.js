@@ -104,7 +104,7 @@ pref("devtools.debugger.ui.variables-only-enum-visible", false);
 pref("devtools.debugger.ui.variables-searchbox-visible", false);
 
 // Enable the Memory tools
-pref("devtools.memory.enabled", false);
+pref("devtools.memory.enabled", true);
 
 pref("devtools.memory.custom-census-displays", "{}");
 pref("devtools.memory.custom-label-displays", "{}");
