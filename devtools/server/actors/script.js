@@ -1976,14 +1976,11 @@ const ThreadActor = ActorClassWithSpec(threadSpec, {
         } else {
           promises.push(this.sources.getAllGeneratedLocations(actor.originalLocation)
                                     .then((generatedLocations) => {
-                                      if (generatedLocations.length > 0 &&
+            if (generatedLocations.length > 0 &&
                 generatedLocations[0].generatedSourceActor.actorID === sourceActor.actorID) {
-                                        sourceActor._setBreakpointAtAllGeneratedLocations(
-                actor,
-                generatedLocations
-              );
-                                      }
-                                    }));
+              sourceActor._setBreakpointAtAllGeneratedLocations(actor, generatedLocations);
+            }
+          }));
         }
       }
 
@@ -2004,7 +2001,13 @@ const ThreadActor = ActorClassWithSpec(threadSpec, {
       // debugger, and carefully avoid the use of unsafeSynchronize in this
       // function when source maps are disabled.
       for (let actor of bpActors) {
-        actor.originalLocation.originalSourceActor._setBreakpoint(actor);
+        if (actor.isPending) {
+          actor.originalLocation.originalSourceActor._setBreakpoint(actor);
+        } else {
+          actor.originalLocation.originalSourceActor._setBreakpointAtGeneratedLocation(
+            actor, GeneratedLocation.fromOriginalLocation(actor.originalLocation)
+          );
+        }
       }
     }
 
