@@ -1093,19 +1093,19 @@ function enumWeakSetEntries(objectActor) {
  * information for the debugger object, or true otherwise.
  */
 DebuggerServer.ObjectActorPreviewers = {
-  String: [function(objectActor, grip) {
+  String: [function (objectActor, grip) {
     return wrappedPrimitivePreviewer("String", String, objectActor, grip);
   }],
 
-  Boolean: [function(objectActor, grip) {
+  Boolean: [function (objectActor, grip) {
     return wrappedPrimitivePreviewer("Boolean", Boolean, objectActor, grip);
   }],
 
-  Number: [function(objectActor, grip) {
+  Number: [function (objectActor, grip) {
     return wrappedPrimitivePreviewer("Number", Number, objectActor, grip);
   }],
 
-  Function: [function({obj, hooks}, grip) {
+  Function: [function ({obj, hooks}, grip) {
     if (obj.name) {
       grip.name = obj.name;
     }
