@@ -129,13 +129,15 @@ function doOK() {
   }
 
   // Create subfolder with fs-friendly name of project
-  let subfolder = projectName.replace(/[\\/:*?"<>|]/g, '').toLowerCase();
+  let subfolder = projectName.replace(/[\\/:*?"<>|]/g, "").toLowerCase();
+  let win = Services.wm.getMostRecentWindow("devtools:webide");
   folder.append(subfolder);
 
   try {
     folder.create(Ci.nsIFile.DIRECTORY_TYPE, FileUtils.PERMS_DIRECTORY);
-  } catch(e) {
-    console.error(e);
+  } catch (e) {
+    win.UI.reportError("error_folderCreationFailed");
+    window.close();
     return false;
   }
 
