@@ -274,7 +274,7 @@ let SourceActor = ActorClassWithSpec(sourceSpec, {
 
       if (!file) {
         const error = new Error("Could not find the root of the add-on for " + this.url);
-        DevToolsUtils.reportException("SourceActor.prototype._mapSourceToAddon", error)
+        DevToolsUtils.reportException("SourceActor.prototype._mapSourceToAddon", error);
         return;
       }
 
