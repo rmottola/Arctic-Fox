@@ -234,8 +234,6 @@ const DebuggerClient = exports.DebuggerClient = function (aTransport)
  * @param aPacketSkeleton
  *        The form of the packet to send. Can specify fields to be filled from
  *        the parameters by using the |args| function.
- * @param telemetry
- *        The unique suffix of the telemetry histogram id.
  * @param before
  *        The function to call before sending the packet. Is passed the packet,
  *        and the return value is used as the new packet. The |this| context is
@@ -250,18 +248,8 @@ const DebuggerClient = exports.DebuggerClient = function (aTransport)
  *         we receive the response. (See request method for more details)
  */
 DebuggerClient.requester = function (aPacketSkeleton, config = {}) {
-  let { telemetry, before, after } = config;
+  let { before, after } = config;
   return DevToolsUtils.makeInfallible(function (...args) {
-    let histogram, startTime;
-    if (telemetry) {
-      let transportType = this._transport.onOutputStreamReady === undefined
-        ? "LOCAL_"
-        : "REMOTE_";
-      let histogramId = "DEVTOOLS_DEBUGGER_RDP_"
-        + transportType + telemetry + "_MS";
-      histogram = Services.telemetry.getHistogramById(histogramId);
-      startTime = +new Date;
-    }
     let outgoingPacket = {
       to: aPacketSkeleton.to || this.actor
     };
@@ -294,10 +282,6 @@ DebuggerClient.requester = function (aPacketSkeleton, config = {}) {
       let thisCallback = args[maxPosition + 1];
       if (thisCallback) {
         thisCallback(aResponse);
-      }
-
-      if (histogram) {
-        histogram.add(+new Date - startTime);
       }
     }, "DebuggerClient.requester request callback"));
   }, "DebuggerClient.requester");
@@ -649,8 +633,6 @@ DebuggerClient.prototype = {
   release: DebuggerClient.requester({
     to: args(0),
     type: "release"
-  }, {
-    telemetry: "RELEASE"
   }),
 
   /**
@@ -1345,7 +1327,6 @@ TabClient.prototype = {
       this.client.unregisterClient(this);
       return aResponse;
     },
-    telemetry: "TABDETACH"
   }),
 
   /**
@@ -1368,8 +1349,6 @@ TabClient.prototype = {
   _reload: DebuggerClient.requester({
     type: "reload",
     options: args(0)
-  }, {
-    telemetry: "RELOAD"
   }),
 
   /**
@@ -1381,8 +1360,6 @@ TabClient.prototype = {
   navigateTo: DebuggerClient.requester({
     type: "navigateTo",
     url: args(0)
-  }, {
-    telemetry: "NAVIGATETO"
   }),
 
   /**
@@ -1396,14 +1373,10 @@ TabClient.prototype = {
   reconfigure: DebuggerClient.requester({
     type: "reconfigure",
     options: args(0)
-  }, {
-    telemetry: "RECONFIGURETAB"
   }),
 
   listWorkers: DebuggerClient.requester({
     type: "listWorkers"
-  }, {
-    telemetry: "LISTWORKERS"
   }),
 
   attachWorker: function (aWorkerActor, aOnResponse) {
@@ -1468,8 +1441,6 @@ WorkerClient.prototype = {
       this.client.unregisterClient(this);
       return aResponse;
     },
-
-    telemetry: "WORKERDETACH"
   }),
 
   attachThread: function (aOptions = {}, aOnResponse = noop) {
@@ -1559,7 +1530,6 @@ AddonClient.prototype = {
       this._client.unregisterClient(this);
       return aResponse;
     },
-    telemetry: "ADDONDETACH"
   })
 };
 
@@ -1600,8 +1570,7 @@ RootClient.prototype = {
    * @param function aOnResponse
    *        Called with the response packet.
    */
-  listTabs: DebuggerClient.requester({ type: "listTabs" },
-                                     { telemetry: "LISTTABS" }),
+  listTabs: DebuggerClient.requester({ type: "listTabs" }),
 
   /**
    * List the installed addons.
@@ -1609,8 +1578,7 @@ RootClient.prototype = {
    * @param function aOnResponse
    *        Called with the response packet.
    */
-  listAddons: DebuggerClient.requester({ type: "listAddons" },
-                                       { telemetry: "LISTADDONS" }),
+  listAddons: DebuggerClient.requester({ type: "listAddons" }),
 
   /**
    * List the registered workers.
@@ -1618,8 +1586,7 @@ RootClient.prototype = {
    * @param function aOnResponse
    *        Called with the response packet.
    */
-  listWorkers: DebuggerClient.requester({ type: "listWorkers" },
-                                        { telemetry: "LISTWORKERS" }),
+  listWorkers: DebuggerClient.requester({ type: "listWorkers" }),
 
   /**
    * List the registered service workers.
@@ -1627,8 +1594,9 @@ RootClient.prototype = {
    * @param function aOnResponse
    *        Called with the response packet.
    */
-  listServiceWorkerRegistrations: DebuggerClient.requester({ type: "listServiceWorkerRegistrations" },
-                                                           { telemetry: "LISTSERVICEWORKERREGISTRATIONS" }),
+  listServiceWorkerRegistrations: DebuggerClient.requester({
+    type: "listServiceWorkerRegistrations"
+  }),
 
   /**
    * List the running processes.
@@ -1636,8 +1604,7 @@ RootClient.prototype = {
    * @param function aOnResponse
    *        Called with the response packet.
    */
-  listProcesses: DebuggerClient.requester({ type: "listProcesses" },
-                                          { telemetry: "LISTPROCESSES" }),
+  listProcesses: DebuggerClient.requester({ type: "listProcesses" }),
 
   /**
    * Fetch the TabActor for the currently selected tab, or for a specific
@@ -1693,8 +1660,7 @@ RootClient.prototype = {
    * @param function aOnResponse
    *        Called with the response packet.
    */
-  protocolDescription: DebuggerClient.requester({ type: "protocolDescription" },
-                                                 { telemetry: "PROTOCOLDESCRIPTION" }),
+  protocolDescription: DebuggerClient.requester({ type: "protocolDescription" }),
 
   /*
    * Methods constructed by DebuggerClient.requester require these forwards
@@ -1786,7 +1752,6 @@ ThreadClient.prototype = {
       }
       return aResponse;
     },
-    telemetry: "RESUME"
   }),
 
   /**
@@ -1800,8 +1765,6 @@ ThreadClient.prototype = {
   reconfigure: DebuggerClient.requester({
     type: "reconfigure",
     options: args(0)
-  }, {
-    telemetry: "RECONFIGURETHREAD"
   }),
 
   /**
@@ -1880,8 +1843,6 @@ ThreadClient.prototype = {
   _doInterrupt: DebuggerClient.requester({
     type: "interrupt",
     when: args(0)
-  }, {
-    telemetry: "INTERRUPT"
   }),
 
   /**
@@ -1976,7 +1937,6 @@ ThreadClient.prototype = {
       }
       return aResponse;
     },
-    telemetry: "CLIENTEVALUATE"
   }),
 
   /**
@@ -1993,7 +1953,6 @@ ThreadClient.prototype = {
       this._parent.thread = null;
       return aResponse;
     },
-    telemetry: "THREADDETACH"
   }),
 
   /**
@@ -2007,8 +1966,6 @@ ThreadClient.prototype = {
   releaseMany: DebuggerClient.requester({
     type: "releaseMany",
     actors: args(0),
-  }, {
-    telemetry: "RELEASEMANY"
   }),
 
   /**
@@ -2020,8 +1977,6 @@ ThreadClient.prototype = {
   threadGrips: DebuggerClient.requester({
     type: "threadGrips",
     actors: args(0)
-  }, {
-    telemetry: "THREADGRIPS"
   }),
 
   /**
@@ -2032,8 +1987,6 @@ ThreadClient.prototype = {
    */
   eventListeners: DebuggerClient.requester({
     type: "eventListeners"
-  }, {
-    telemetry: "EVENTLISTENERS"
   }),
 
   /**
@@ -2044,8 +1997,6 @@ ThreadClient.prototype = {
    */
   getSources: DebuggerClient.requester({
     type: "sources"
-  }, {
-    telemetry: "SOURCES"
   }),
 
   /**
@@ -2075,8 +2026,6 @@ ThreadClient.prototype = {
     type: "frames",
     start: args(0),
     count: args(1)
-  }, {
-    telemetry: "FRAMES"
   }),
 
   /**
@@ -2293,8 +2242,6 @@ ThreadClient.prototype = {
   getPrototypesAndProperties: DebuggerClient.requester({
     type: "prototypesAndProperties",
     actors: args(0)
-  }, {
-    telemetry: "PROTOTYPESANDPROPERTIES"
   }),
 
   events: ["newSource"]
@@ -2339,7 +2286,6 @@ TraceClient.prototype = {
       this._client.unregisterClient(this);
       return aResponse;
     },
-    telemetry: "TRACERDETACH"
   }),
 
   /**
@@ -2372,7 +2318,6 @@ TraceClient.prototype = {
 
       return aResponse;
     },
-    telemetry: "STARTTRACE"
   }),
 
   /**
@@ -2398,7 +2343,6 @@ TraceClient.prototype = {
 
       return aResponse;
     },
-    telemetry: "STOPTRACE"
   })
 };
 
@@ -2462,7 +2406,6 @@ ObjectClient.prototype = {
       }
       return aPacket;
     },
-    telemetry: "PARAMETERNAMES"
   }),
 
   /**
@@ -2473,8 +2416,6 @@ ObjectClient.prototype = {
    */
   getOwnPropertyNames: DebuggerClient.requester({
     type: "ownPropertyNames"
-  }, {
-    telemetry: "OWNPROPERTYNAMES"
   }),
 
   /**
@@ -2484,8 +2425,6 @@ ObjectClient.prototype = {
    */
   getPrototypeAndProperties: DebuggerClient.requester({
     type: "prototypeAndProperties"
-  }, {
-    telemetry: "PROTOTYPEANDPROPERTIES"
   }),
 
   /**
@@ -2516,7 +2455,6 @@ ObjectClient.prototype = {
       }
       return aResponse;
     },
-    telemetry: "ENUMPROPERTIES"
   }),
 
   /**
@@ -2553,8 +2491,6 @@ ObjectClient.prototype = {
   getProperty: DebuggerClient.requester({
     type: "property",
     name: args(0)
-  }, {
-    telemetry: "PROPERTY"
   }),
 
   /**
@@ -2564,8 +2500,6 @@ ObjectClient.prototype = {
    */
   getPrototype: DebuggerClient.requester({
     type: "prototype"
-  }, {
-    telemetry: "PROTOTYPE"
   }),
 
   /**
@@ -2575,8 +2509,6 @@ ObjectClient.prototype = {
    */
   getDisplayString: DebuggerClient.requester({
     type: "displayString"
-  }, {
-    telemetry: "DISPLAYSTRING"
   }),
 
   /**
@@ -2593,7 +2525,6 @@ ObjectClient.prototype = {
       }
       return aPacket;
     },
-    telemetry: "SCOPE"
   }),
 
   /**
@@ -2762,8 +2693,6 @@ LongStringClient.prototype = {
     type: "substring",
     start: args(0),
     end: args(1)
-  }, {
-    telemetry: "SUBSTRING"
   }),
 };
 
@@ -2812,7 +2741,6 @@ SourceClient.prototype = {
   blackBox: DebuggerClient.requester({
     type: "blackbox"
   }, {
-    telemetry: "BLACKBOX",
     after: function (aResponse) {
       if (!aResponse.error) {
         this._isBlackBoxed = true;
@@ -2833,7 +2761,6 @@ SourceClient.prototype = {
   unblackBox: DebuggerClient.requester({
     type: "unblackbox"
   }, {
-    telemetry: "UNBLACKBOX",
     after: function (aResponse) {
       if (!aResponse.error) {
         this._isBlackBoxed = false;
@@ -3057,8 +2984,6 @@ BreakpointClient.prototype = {
    */
   remove: DebuggerClient.requester({
     type: "delete"
-  }, {
-    telemetry: "DELETE"
   }),
 
   /**
@@ -3165,8 +3090,6 @@ EnvironmentClient.prototype = {
    */
   getBindings: DebuggerClient.requester({
     type: "bindings"
-  }, {
-    telemetry: "BINDINGS"
   }),
 
   /**
@@ -3177,8 +3100,6 @@ EnvironmentClient.prototype = {
     type: "assign",
     name: args(0),
     value: args(1)
-  }, {
-    telemetry: "ASSIGN"
   })
 };
 
