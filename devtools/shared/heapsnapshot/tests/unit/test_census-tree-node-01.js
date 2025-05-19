@@ -56,11 +56,13 @@ const EXPECTED = {
       totalCount: 1,
       children: undefined,
       id: 4,
-      parent: 1
+      parent: 1,
+      reportLeafIndex: 3,
     },
   ],
   id: 1,
   parent: undefined,
+  reportLeafIndex: undefined,
 };
 
 function run_test() {
