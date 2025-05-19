@@ -215,6 +215,7 @@ defineLazyGetter(exports.modules, "indexedDB", () => {
   } catch (e) {
     return {};
   }
+
 });
 
 defineLazyGetter(exports.modules, "CSS", () => {
