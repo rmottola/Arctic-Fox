@@ -17,7 +17,7 @@
 }(this, function () {
   "use strict";
 
-  var acorn = this.acorn || require("acorn/dist/acorn");
+  var acorn = this.acorn || require("acorn/acorn");
   var sourceMap = this.sourceMap || require("source-map");
   var SourceNode = sourceMap.SourceNode;
 
@@ -441,8 +441,8 @@
     function ensureNewline() {
       if (!newlineAdded) {
         write("\n",
-            lastToken.loc.start.line,
-            lastToken.loc.start.column);
+              lastToken.loc.start.line,
+              lastToken.loc.start.column);
         newlineAdded = true;
       }
     }
@@ -467,8 +467,8 @@
       }
     } else if (needsSpaceAfter(token, lastToken)) {
       write(" ",
-              lastToken.loc.start.line,
-              lastToken.loc.start.column);
+            lastToken.loc.start.line,
+            lastToken.loc.start.column);
     }
   }
 
