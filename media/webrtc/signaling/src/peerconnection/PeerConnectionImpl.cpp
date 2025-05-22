@@ -884,7 +884,8 @@ class ConfigureCodec {
       mH264MaxMbps(0), // Unlimited
       mVP8MaxFs(0),
       mVP8MaxFr(0),
-      mUseTmmbr(false)
+      mUseTmmbr(false),
+      mUseRemb(false)
     {
 #ifdef MOZ_WEBRTC_OMX
       // Check to see if what HW codecs are available (not in use) at this moment.
@@ -950,6 +951,9 @@ class ConfigureCodec {
 
       // TMMBR is enabled from a pref in about:config
       branch->GetBoolPref("media.navigator.video.use_tmmbr", &mUseTmmbr);
+
+      // REMB is enabled by default, but can be disabled from about:config
+      branch->GetBoolPref("media.navigator.video.use_remb", &mUseRemb);
     }
 
     void operator()(JsepCodecDescription* codec) const
@@ -996,6 +1000,9 @@ class ConfigureCodec {
             if (mUseTmmbr) {
               videoCodec.EnableTmmbr();
             }
+            if (mUseRemb) {
+              videoCodec.EnableRemb();
+            }
           }
           break;
         case SdpMediaSection::kText:
@@ -1017,6 +1024,7 @@ class ConfigureCodec {
     int32_t mVP8MaxFs;
     int32_t mVP8MaxFr;
     bool mUseTmmbr;
+    bool mUseRemb;
 };
 
 nsresult
