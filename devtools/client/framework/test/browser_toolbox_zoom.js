@@ -46,10 +46,9 @@ function testZoomLevel(type, times, expected) {
      "saved zoom level is correct after zoom " + type);
 }
 
-function sendZoomKey(id, times) {
-  let key = toolbox.doc.getElementById(id).getAttribute("key");
+function sendZoomKey(shortcut, times) {
   for (let i = 0; i < times; i++) {
-    EventUtils.synthesizeKey(key, modifiers, toolbox.win);
+    synthesizeKeyShortcut(strings.GetStringFromName(shortcut));
   }
 }
 

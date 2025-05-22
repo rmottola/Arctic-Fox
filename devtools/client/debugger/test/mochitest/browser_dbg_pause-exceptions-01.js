@@ -14,7 +14,11 @@ var gFrames, gVariables, gPrefs, gOptions;
 
 function test() {
   requestLongerTimeout(2);
-  initDebugger(TAB_URL).then(([aTab,, aPanel]) => {
+  let options = {
+    source: TAB_URL,
+    line: 1
+  };
+  initDebugger(TAB_URL, options).then(([aTab,, aPanel]) => {
     gTab = aTab;
     gPanel = aPanel;
     gDebugger = gPanel.panelWin;
@@ -55,8 +59,8 @@ function testPauseOnExceptionsDisabled() {
 
     is(gFrames.itemCount, 1,
       "Should have one frame.");
-    is(gVariables._store.length, 3,
-      "Should have three scopes.");
+    is(gVariables._store.length, 4,
+      "Should have four scopes.");
 
     is(innerNodes[0].querySelector(".name").getAttribute("value"), "this",
       "Should have the right property name for 'this'.");
@@ -98,8 +102,8 @@ function testPauseOnExceptionsEnabled() {
 
     is(gFrames.itemCount, 1,
       "Should have one frame.");
-    is(gVariables._store.length, 3,
-      "Should have three scopes.");
+    is(gVariables._store.length, 4,
+      "Should have four scopes.");
 
     is(innerNodes[0].querySelector(".name").getAttribute("value"), "<exception>",
       "Should have the right property name for <exception>.");
@@ -119,8 +123,8 @@ function testPauseOnExceptionsEnabled() {
 
       is(gFrames.itemCount, 1,
         "Should have one frame.");
-      is(gVariables._store.length, 3,
-        "Should have three scopes.");
+      is(gVariables._store.length, 4,
+        "Should have four scopes.");
 
       is(innerNodes[0].querySelector(".name").getAttribute("value"), "this",
         "Should have the right property name for 'this'.");

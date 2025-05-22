@@ -10,7 +10,11 @@
 const TAB_URL = EXAMPLE_URL + "doc_script-switching-01.html";
 
 function test() {
-  initDebugger(TAB_URL).then(([aTab,, aPanel]) => {
+  let options = {
+    source: EXAMPLE_URL + "code_script-switching-01.js",
+    line: 1
+  };
+  initDebugger(TAB_URL, options).then(([aTab,, aPanel]) => {
     const gPanel = aPanel;
     const gTab = aTab;
     const gDebugger = gPanel.panelWin;
@@ -23,7 +27,6 @@ function test() {
     let gBreakpointLocation;
 
     Task.spawn(function* () {
-      yield waitForSourceShown(gPanel, "-01.js");
       gBreakpointLocation = { actor: getSourceActor(gSources, EXAMPLE_URL + "code_script-switching-01.js"),
                               line: 5 };
 
@@ -79,7 +82,7 @@ function test() {
         yield verifyView({ disabled: false });
 
         executeSoon(() => gDebugger.gThreadClient.resume());
-        yield waitForSourceAndCaretAndScopes(gPanel, "-02.js", 1);
+        yield waitForSourceAndCaretAndScopes(gPanel, "-02.js", 6);
         yield verifyView({ disabled: false });
       });
     }
@@ -94,7 +97,7 @@ function test() {
         yield verifyView({ disabled: false });
 
         executeSoon(() => gDebugger.gThreadClient.resume());
-        yield waitForSourceAndCaretAndScopes(gPanel, "-02.js", 1);
+        yield waitForSourceAndCaretAndScopes(gPanel, "-02.js", 6);
         yield verifyView({ disabled: false });
       });
     }

@@ -15,6 +15,20 @@
  */
 const MS_PER_SEC = 1000;
 
+/* The recommended minimum precision to use for time values[1].
+ *
+ * [1] https://w3c.github.io/web-animations/#precision-of-time-values
+ */
+var TIME_PRECISION = 0.0005; // ms
+
+/*
+ * Allow implementations to substitute an alternative method for comparing
+ * times based on their precision requirements.
+ */
+function assert_times_equal(actual, expected, description) {
+  assert_approx_equals(actual, expected, TIME_PRECISION, description);
+}
+
 /**
  * Appends a div to the document body and creates an animation on the div.
  * NOTE: This function asserts when trying to create animations with durations
@@ -48,12 +62,24 @@ function addDivAndAnimate(t, attrs, frames, options) {
  * @param t  The testharness.js Test object. If provided, this will be used
  *           to register a cleanup callback to remove the div when the test
  *           finishes.
+ *
+ * @param attrs  A dictionary object with attribute names and values to set on
+ *               the div.
  */
-function addDiv(t) {
+function addDiv(t, attrs) {
   var div = document.createElement('div');
+  if (attrs) {
+    for (var attrName in attrs) {
+      div.setAttribute(attrName, attrs[attrName]);
+    }
+  }
   document.body.appendChild(div);
   if (t && typeof t.add_cleanup === 'function') {
-    t.add_cleanup(function() { div.remove(); });
+    t.add_cleanup(function() {
+      if (div.parentNode) {
+        div.parentNode.removeChild(div);
+      }
+    });
   }
   return div;
 }

@@ -10,14 +10,23 @@
 const TAB_URL = EXAMPLE_URL + "doc_step-many-statements.html";
 
 function test() {
+  // This does the same assertions over a series of sub-tests, and it
+  // can timeout in linux e10s.  No sense in breaking it up into multiple
+  // tests, so request extra time.
+  requestLongerTimeout(2);
+
   let gDebugger, gToolbox, gThreadClient, gTab, gPanel;
-  initDebugger(TAB_URL).then(([aTab, debuggeeWin, aPanel]) => {
+  let options = {
+    source: TAB_URL,
+    line: 1
+  };
+  initDebugger(TAB_URL, options).then(([aTab, debuggeeWin, aPanel]) => {
     gPanel = aPanel;
     gDebugger = aPanel.panelWin;
     gToolbox = gDevTools.getToolbox(aPanel.target);
     gTab = aTab;
     gThreadClient = gDebugger.DebuggerController.activeThread;
-    waitForSourceShown(aPanel, TAB_URL).then(testConsole);
+    testConsole();
   });
   let testConsole = Task.async(function* () {
     // We need to open the split console (with an ESC keypress),

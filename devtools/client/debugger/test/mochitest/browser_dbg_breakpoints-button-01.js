@@ -10,7 +10,11 @@
 const TAB_URL = EXAMPLE_URL + "doc_script-switching-01.html";
 
 function test() {
-  initDebugger(TAB_URL).then(([aTab,, aPanel]) => {
+  let options = {
+    source: EXAMPLE_URL + "code_script-switching-01.js",
+    line: 1
+  };
+  initDebugger(TAB_URL, options).then(([aTab,, aPanel]) => {
     const gTab = aTab;
     const gPanel = aPanel;
     const gDebugger = gPanel.panelWin;
@@ -28,8 +32,6 @@ function test() {
     }
 
     Task.spawn(function* () {
-      yield waitForSourceShown(gPanel, "-01.js");
-
       yield actions.addBreakpoint({ actor: gSources.values[0], line: 5 });
       yield actions.addBreakpoint({ actor: gSources.values[1], line: 6 });
       yield actions.addBreakpoint({ actor: gSources.values[1], line: 7 });
@@ -44,8 +46,10 @@ function test() {
       yield waitForDispatch(gPanel, gDebugger.constants.ADD_BREAKPOINT, 3);
       checkBreakpointsDisabled(false);
 
-      yield ensureThreadClientState(gPanel, "resumed");
-      closeDebuggerAndFinish(gPanel)
+      if (gDebugger.gThreadClient.state !== "attached") {
+        yield waitForThreadEvents(gPanel, "resumed");
+      }
+      closeDebuggerAndFinish(gPanel);
     });
   });
 }

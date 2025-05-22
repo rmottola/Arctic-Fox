@@ -28,15 +28,15 @@ function test() {
     visibilityswitch: "devtools.fakeTool4242.enabled",
     url: toolURL,
     label: "FAKE TOOL!!!",
-    isTargetSupported: function() true,
-    build: function(iframeWindow, toolbox) {
-      let deferred = promise.defer();
+    isTargetSupported: () => true,
+    build: function (iframeWindow, toolbox) {
+      let deferred = defer();
       executeSoon(() => {
         deferred.resolve({
           target: toolbox.target,
           toolbox: toolbox,
           isReady: true,
-          destroy: function(){},
+          destroy: function () {},
           panelDoc: iframeWindow.document,
         });
       });

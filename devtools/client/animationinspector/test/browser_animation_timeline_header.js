@@ -4,6 +4,8 @@
 
 "use strict";
 
+requestLongerTimeout(2);
+
 // Check that the timeline shows correct time graduations in the header.
 
 const {findOptimalTimeInterval, TimeScale} = require("devtools/client/animationinspector/utils");

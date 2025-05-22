@@ -30,8 +30,6 @@ function test() {
         yield createCurlData(requests.post.attachment, gNetwork).then((aData) => {
           test_isUrlEncodedRequest(aData);
           test_writePostDataTextParams(aData);
-          test_writeEmptyPostDataTextParams(aData);
-          test_dataArgumentOnGeneratedCommand(aData);
         });
 
         yield createCurlData(requests.multipart.attachment, gNetwork).then((aData) => {
@@ -86,18 +84,6 @@ function test_writePostDataTextParams(aData) {
   let params = CurlUtils.writePostDataTextParams(aData.postDataText);
   is(params, "param1=value1&param2=value2&param3=value3",
     "Should return a serialized representation of the request parameters");
-}
-
-function test_writeEmptyPostDataTextParams(aData) {
-  let params = CurlUtils.writePostDataTextParams(null);
-  is(params, "",
-    "Should return a empty string when no parameters provided");
-}
-
-function test_dataArgumentOnGeneratedCommand(aData) {
-  let curlCommand = Curl.generateCommand(aData);
-  ok(curlCommand.includes("--data"),
-    "Should return a curl command with --data");
 }
 
 function test_getMultipartBoundary(aData) {

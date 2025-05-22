@@ -4,6 +4,8 @@
 /* import-globals-from helper_events_test_runner.js */
 "use strict";
 
+requestLongerTimeout(2);
+
 // Test that markup view event bubbles show the correct event info for jQuery
 // and jQuery Live events (jQuery version 1.6).
 

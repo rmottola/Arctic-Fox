@@ -1,7 +1,7 @@
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
-const { loadSubScript } = Cc['@mozilla.org/moz/jssubscript-loader;1'].
+var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
+const { loadSubScript } = Cc["@mozilla.org/moz/jssubscript-loader;1"].
                           getService(Ci.mozIJSSubScriptLoader);
 
 // Set up a dummy environment so that EventUtils works. We need to be careful to

@@ -17,13 +17,17 @@ function test() {
   // Debug test slaves are a bit slow at this test.
   requestLongerTimeout(2);
 
-  initDebugger(TAB_URL).then(([aTab,, aPanel]) => {
+  let options = {
+    source: TAB_URL,
+    line: 1
+  };
+  initDebugger(TAB_URL, options).then(([aTab,, aPanel]) => {
     gTab = aTab;
     gPanel = aPanel;
     gDebugger = gPanel.panelWin;
     gVariables = gDebugger.DebuggerView.Variables;
 
-    waitForSourceAndCaretAndScopes(gPanel, ".html", 24)
+    waitForCaretAndScopes(gPanel, 24)
       .then(expandGlobalScope)
       .then(testGlobalScope)
       .then(expandWindowVariable)
@@ -40,7 +44,7 @@ function test() {
 function expandGlobalScope() {
   let deferred = promise.defer();
 
-  let globalScope = gVariables.getScopeAtIndex(1);
+  let globalScope = gVariables.getScopeAtIndex(2);
   is(globalScope.expanded, false,
     "The global scope should not be expanded by default.");
 
@@ -54,7 +58,7 @@ function expandGlobalScope() {
 }
 
 function testGlobalScope() {
-  let globalScope = gVariables.getScopeAtIndex(1);
+  let globalScope = gVariables.getScopeAtIndex(2);
   is(globalScope.expanded, true,
     "The global scope should now be expanded.");
 
@@ -94,7 +98,7 @@ function testGlobalScope() {
 function expandWindowVariable() {
   let deferred = promise.defer();
 
-  let windowVar = gVariables.getScopeAtIndex(1).get("window");
+  let windowVar = gVariables.getScopeAtIndex(2).get("window");
   is(windowVar.expanded, false,
     "The window variable should not be expanded by default.");
 
@@ -108,7 +112,7 @@ function expandWindowVariable() {
 }
 
 function testWindowVariable() {
-  let windowVar = gVariables.getScopeAtIndex(1).get("window");
+  let windowVar = gVariables.getScopeAtIndex(2).get("window");
   is(windowVar.expanded, true,
     "The window variable should now be expanded.");
 

@@ -217,42 +217,6 @@ var waitForSuccess = Task.async(function* (validatorFn, desc = "untitled") {
 });
 
 /**
- * Create a new style tag containing the given style text and append it to the
- * document's head node
- *
- * @param {Document} doc
- * @param {String} style
- * @return {DOMNode} The newly created style node
- */
-function addStyle(doc, style) {
-  info("Adding a new style tag to the document with style content: " +
-    style.substring(0, 50));
-  let node = doc.createElement("style");
-  node.setAttribute("type", "text/css");
-  node.textContent = style;
-  doc.getElementsByTagName("head")[0].appendChild(node);
-  return node;
-}
-
-/**
- * Get the dataURL for the font family tooltip.
- *
- * @param {String} font
- *        The font family value.
- * @param {object} nodeFront
- *        The NodeActor that will used to retrieve the dataURL for the
- *        font family tooltip contents.
- */
-var getFontFamilyDataURL = Task.async(function* (font, nodeFront) {
-  let fillStyle = (Services.prefs.getCharPref("devtools.theme") === "light") ?
-      "black" : "white";
-
-  let {data} = yield nodeFront.getFontFamilyDataURL(font, fillStyle);
-  let dataURL = yield data.string();
-  return dataURL;
-});
-
-/**
  * Get the DOMNode for a css rule in the rule-view that corresponds to the given
  * selector
  *
@@ -740,6 +704,7 @@ function* reloadPage(inspector, testActor) {
 
 /**
  * Create a new rule by clicking on the "add rule" button.
+ * This will leave the selector inplace-editor active.
  *
  * @param {InspectorPanel} inspector
  *        The instance of InspectorPanel currently loaded in the toolbox
@@ -753,6 +718,36 @@ function* addNewRule(inspector, view) {
 
   info("Waiting for rule view to change");
   yield view.once("ruleview-changed");
+}
+
+/**
+ * Create a new rule by clicking on the "add rule" button, dismiss the editor field and
+ * verify that the selector is correct.
+ *
+ * @param {InspectorPanel} inspector
+ *        The instance of InspectorPanel currently loaded in the toolbox
+ * @param {CssRuleView} view
+ *        The instance of the rule-view panel
+ * @param {String} expectedSelector
+ *        The value we expect the selector to have
+ * @param {Number} expectedIndex
+ *        The index we expect the rule to have in the rule-view
+ * @return a promise that resolves after the rule has been added
+ */
+function* addNewRuleAndDismissEditor(inspector, view, expectedSelector, expectedIndex) {
+  yield addNewRule(inspector, view);
+
+  info("Getting the new rule at index " + expectedIndex);
+  let ruleEditor = getRuleViewRuleEditor(view, expectedIndex);
+  let editor = ruleEditor.selectorText.ownerDocument.activeElement;
+  is(editor.value, expectedSelector,
+     "The editor for the new selector has the correct value: " + expectedSelector);
+
+  info("Pressing escape to leave the editor");
+  EventUtils.synthesizeKey("VK_ESCAPE", {});
+
+  is(ruleEditor.selectorText.textContent, expectedSelector,
+     "The new selector has the correct text: " + expectedSelector);
 }
 
 /**

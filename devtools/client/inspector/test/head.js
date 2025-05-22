@@ -206,103 +206,6 @@ var clickOnInspectMenuItem = Task.async(function* (testActor, selector) {
 });
 
 /**
- * Open the toolbox, with the inspector tool visible, and the one of the sidebar
- * tabs selected.
- *
- * @param {String} id
- *        The ID of the sidebar tab to be opened
- * @return a promise that resolves when the inspector is ready and the tab is
- * visible and ready
- */
-var openInspectorSidebarTab = Task.async(function* (id) {
-  let {toolbox, inspector, testActor} = yield openInspector();
-
-  info("Selecting the " + id + " sidebar");
-  inspector.sidebar.select(id);
-
-  return {
-    toolbox,
-    inspector,
-    testActor
-  };
-});
-
-/**
- * Open the toolbox, with the inspector tool visible, and the rule-view
- * sidebar tab selected.
- *
- * @return a promise that resolves when the inspector is ready and the rule view
- * is visible and ready
- */
-function openRuleView() {
-  return openInspectorSidebarTab("ruleview").then(data => {
-    return {
-      toolbox: data.toolbox,
-      inspector: data.inspector,
-      testActor: data.testActor,
-      view: data.inspector.ruleview.view
-    };
-  });
-}
-
-/**
- * Open the toolbox, with the inspector tool visible, and the computed-view
- * sidebar tab selected.
- *
- * @return a promise that resolves when the inspector is ready and the computed
- * view is visible and ready
- */
-function openComputedView() {
-  return openInspectorSidebarTab("computedview").then(data => {
-    return {
-      toolbox: data.toolbox,
-      inspector: data.inspector,
-      testActor: data.testActor,
-      view: data.inspector.computedview.view
-    };
-  });
-}
-
-/**
- * Select the rule view sidebar tab on an already opened inspector panel.
- *
- * @param {InspectorPanel} inspector
- *        The opened inspector panel
- * @return {CssRuleView} the rule view
- */
-function selectRuleView(inspector) {
-  inspector.sidebar.select("ruleview");
-  return inspector.ruleview.view;
-}
-
-/**
- * Select the computed view sidebar tab on an already opened inspector panel.
- *
- * @param {InspectorPanel} inspector
- *        The opened inspector panel
- * @return {CssComputedView} the computed view
- */
-function selectComputedView(inspector) {
-  inspector.sidebar.select("computedview");
-  return inspector.computedview.view;
-}
-
-/**
- * Get the NodeFront for a node that matches a given css selector, via the
- * protocol.
- * @param {String|NodeFront} selector
- * @param {InspectorPanel} inspector The instance of InspectorPanel currently
- * loaded in the toolbox
- * @return {Promise} Resolves to the NodeFront instance
- */
-function getNodeFront(selector, {walker}) {
-  if (selector._form) {
-    return selector;
-  }
-  return walker.querySelector(walker.rootNode, selector);
-}
-
-/**
  * Get the NodeFront for a node that matches a given css selector inside a
  * given iframe.
  * @param {String|NodeFront} selector
@@ -509,36 +412,88 @@ const getHighlighterHelperFor = (type) => Task.async(
 
     let prefix = "";
 
+    // Internals for mouse events
+    let prevX, prevY;
+
+    // Highlighted node
+    let highlightedNode = null;
+
     return {
       set prefix(value) {
         prefix = value;
       },
 
-      show: function*(selector = ":root") {
-        let node = yield getNodeFront(selector, inspector);
-        yield highlighter.show(node);
+      get highlightedNode() {
+        if (!highlightedNode) {
+          return null;
+        }
+
+        return {
+          getComputedStyle: function* (options = {}) {
+            return yield inspector.pageStyle.getComputed(
+              highlightedNode, options);
+          }
+        };
       },
 
-      isElementHidden: function*(id) {
+      show: function* (selector = ":root", options) {
+        highlightedNode = yield getNodeFront(selector, inspector);
+        return yield highlighter.show(highlightedNode, options);
+      },
+
+      hide: function* () {
+        yield highlighter.hide();
+      },
+
+      isElementHidden: function* (id) {
         return (yield testActor.getHighlighterNodeAttribute(
           prefix + id, "hidden", highlighter)) === "true";
       },
 
-      getElementTextContent: function*(id) {
+      getElementTextContent: function* (id) {
         return yield testActor.getHighlighterNodeTextContent(
           prefix + id, highlighter);
       },
 
-      getElementAttribute: function*(id, name) {
+      getElementAttribute: function* (id, name) {
         return yield testActor.getHighlighterNodeAttribute(
           prefix + id, name, highlighter);
       },
 
-      synthesizeMouse: function*(options) {
+      synthesizeMouse: function* (options) {
+        options = Object.assign({selector: ":root"}, options);
         yield testActor.synthesizeMouse(options);
       },
 
-      finalize: function*() {
+      synthesizeKey: function* (options) {
+        yield testActor.synthesizeKey(options);
+      },
+
+      // This object will synthesize any "mouse" prefixed event to the
+      // `testActor`, using the name of method called as suffix for the
+      // event's name.
+      // If no x, y coords are given, the previous ones are used.
+      //
+      // For example:
+      //   mouse.down(10, 20); // synthesize "mousedown" at 10,20
+      //   mouse.move(20, 30); // synthesize "mousemove" at 20,30
+      //   mouse.up();         // synthesize "mouseup" at 20,30
+      mouse: new Proxy({}, {
+        get: (target, name) =>
+          function* (x = prevX, y = prevY) {
+            prevX = x;
+            prevY = y;
+            yield testActor.synthesizeMouse({
+              selector: ":root", x, y, options: {type: "mouse" + name}});
+          }
+      }),
+
+      reflow: function* () {
+        yield testActor.reflow();
+      },
+
+      finalize: function* () {
+        highlightedNode = null;
         yield highlighter.finalize();
       }
     };

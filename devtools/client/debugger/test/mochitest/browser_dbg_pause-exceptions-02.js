@@ -13,7 +13,11 @@ var gTab, gPanel, gDebugger;
 var gFrames, gVariables, gPrefs, gOptions;
 
 function test() {
-  initDebugger(TAB_URL).then(([aTab,, aPanel]) => {
+  let options = {
+    source: TAB_URL,
+    line: 1
+  };
+  initDebugger(TAB_URL, options).then(([aTab,, aPanel]) => {
     gTab = aTab;
     gPanel = aPanel;
     gDebugger = gPanel.panelWin;
@@ -27,8 +31,7 @@ function test() {
     isnot(gOptions._pauseOnExceptionsItem.getAttribute("checked"), "true",
       "The pause-on-exceptions menu item should not be checked.");
 
-    waitForSourceShown(aPanel, ".html")
-      .then(enablePauseOnExceptions)
+    enablePauseOnExceptions()
       .then(disableIgnoreCaughtExceptions)
       .then(() => reloadActiveTab(gPanel, gDebugger.EVENTS.SOURCE_SHOWN))
       .then(() => {
@@ -58,8 +61,8 @@ function testPauseOnExceptionsAfterReload() {
 
     is(gFrames.itemCount, 1,
       "Should have one frame.");
-    is(gVariables._store.length, 3,
-      "Should have three scopes.");
+    is(gVariables._store.length, 4,
+      "Should have four scopes.");
 
     is(innerNodes[0].querySelector(".name").getAttribute("value"), "<exception>",
       "Should have the right property name for <exception>.");
@@ -79,8 +82,8 @@ function testPauseOnExceptionsAfterReload() {
 
       is(gFrames.itemCount, 1,
         "Should have one frame.");
-      is(gVariables._store.length, 3,
-        "Should have three scopes.");
+      is(gVariables._store.length, 4,
+        "Should have four scopes.");
 
       is(innerNodes[0].querySelector(".name").getAttribute("value"), "this",
         "Should have the right property name for 'this'.");

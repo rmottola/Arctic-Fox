@@ -28,7 +28,7 @@ function test() {
 function runTests1(aTab) {
   let toolDefinition = {
     id: toolId1,
-    isTargetSupported: function() true,
+    isTargetSupported: () => true,
     visibilityswitch: "devtools.test-tool.enabled",
     url: "about:blank",
     label: "someLabel",
@@ -89,7 +89,7 @@ function runTests1(aTab) {
 function runTests2() {
   let toolDefinition = {
     id: toolId2,
-    isTargetSupported: function() true,
+    isTargetSupported: () => true,
     visibilityswitch: "devtools.test-tool.enabled",
     url: "about:blank",
     label: "someLabel",
@@ -149,7 +149,7 @@ function runTests2() {
   });
 }
 
-var continueTests = Task.async(function*(toolbox, panel) {
+var continueTests = Task.async(function* (toolbox, panel) {
   ok(toolbox.getCurrentPanel(), "panel value is correct");
   is(toolbox.currentToolId, toolId2, "toolbox _currentToolId is correct");
 
@@ -168,7 +168,7 @@ var continueTests = Task.async(function*(toolbox, panel) {
   info("Testing toolbox tool-unregistered event");
   let toolSelected = toolbox.once("select");
   let unregisteredTool = yield new Promise(resolve => {
-    toolbox.once("tool-unregistered", (e,id) => resolve(id));
+    toolbox.once("tool-unregistered", (e, id) => resolve(id));
     gDevTools.unregisterTool(toolId2);
   });
   yield toolSelected;
@@ -181,7 +181,7 @@ var continueTests = Task.async(function*(toolbox, panel) {
 
   info("Testing toolbox tool-registered event");
   let registeredTool = yield new Promise(resolve => {
-    toolbox.once("tool-registered", (e,id) => resolve(id));
+    toolbox.once("tool-registered", (e, id) => resolve(id));
     gDevTools.registerTool(toolDefinition);
   });
 
@@ -191,14 +191,14 @@ var continueTests = Task.async(function*(toolbox, panel) {
   ok(gDevTools.getToolDefinitionMap().has(toolId2),
     "The tool is registered");
 
-  info("Unregistering tool")
+  info("Unregistering tool");
   gDevTools.unregisterTool(toolId2);
 
   destroyToolbox(toolbox);
 });
 
 function destroyToolbox(toolbox) {
-  toolbox.destroy().then(function() {
+  toolbox.destroy().then(function () {
     let target = TargetFactory.forTab(gBrowser.selectedTab);
     ok(gDevTools._toolboxes.get(target) == null, "gDevTools doesn't know about target");
     ok(toolbox._target == null, "toolbox doesn't know about target.");
@@ -245,11 +245,17 @@ DevToolPanel.prototype = {
     return deferred.promise;
   },
 
-  get target() this._toolbox.target,
+  get target() {
+    return this._toolbox.target;
+  },
 
-  get toolbox() this._toolbox,
+  get toolbox() {
+    return this._toolbox;
+  },
 
-  get isReady() this._isReady,
+  get isReady() {
+    return this._isReady;
+  },
 
   _isReady: false,
 

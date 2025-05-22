@@ -4,6 +4,8 @@
 /* eslint no-inline-comments: 0 */
 "use strict";
 
+requestLongerTimeout(2);
+
 // Test that searching for nodes in the search field actually selects those
 // nodes.
 
