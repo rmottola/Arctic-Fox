@@ -1,25 +1,29 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
+"use strict";
 
 /**
  * Tests if the abstract tree base class for the profiler's tree view
  * is keyboard accessible.
  */
 
-var { AbstractTreeItem } = Cu.import("resource://devtools/client/shared/widgets/AbstractTreeItem.jsm", {});
-var { Heritage } = Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm", {});
+const { appendAndWaitForPaint } = require("devtools/client/performance/test/helpers/dom-utils");
+const { synthesizeCustomTreeClass } = require("devtools/client/performance/test/helpers/synth-utils");
+const { once } = require("devtools/client/performance/test/helpers/event-utils");
 
-function* spawnTest() {
+add_task(function* () {
+  let { MyCustomTreeItem, myDataSrc } = synthesizeCustomTreeClass();
+
   let container = document.createElement("vbox");
-  gBrowser.selectedBrowser.parentNode.appendChild(container);
+  yield appendAndWaitForPaint(gBrowser.selectedBrowser.parentNode, container);
 
   // Populate the tree by pressing RIGHT...
 
-  let treeRoot = new MyCustomTreeItem(gDataSrc, { parent: null });
+  let treeRoot = new MyCustomTreeItem(myDataSrc, { parent: null });
   treeRoot.attachTo(container);
   treeRoot.focus();
 
-  EventUtils.sendKey("RIGHT");
+  key("VK_RIGHT");
   ok(treeRoot.expanded,
     "The root node is now expanded.");
   is(document.commandDispatcher.focusedElement, treeRoot.target,

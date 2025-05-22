@@ -1,36 +1,33 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
+"use strict";
 
 /**
  * Tests if the waterfall is properly built after finishing a recording.
  */
 
-function* spawnTest() {
-  let { target, panel } = yield initPerformance(SIMPLE_URL);
-  let { $, $$, EVENTS, PerformanceController, OverviewView, WaterfallView, DetailsView } = panel.panelWin;
-  let { WATERFALL_MARKER_SIDEBAR_SAFE_BOUNDS } = require("devtools/client/performance/modules/widgets/marker-view");
+const { WATERFALL_MARKER_SIDEBAR_SAFE_BOUNDS } = require("devtools/client/performance/modules/widgets/marker-view");
+const { SIMPLE_URL } = require("devtools/client/performance/test/helpers/urls");
+const { initPerformanceInNewTab, teardownToolboxAndRemoveTab } = require("devtools/client/performance/test/helpers/panel-utils");
+const { startRecording, stopRecording, waitForOverviewRenderedWithMarkers } = require("devtools/client/performance/test/helpers/actions");
+const { once } = require("devtools/client/performance/test/helpers/event-utils");
+
+add_task(function* () {
+  let { panel } = yield initPerformanceInNewTab({
+    url: SIMPLE_URL,
+    win: window
+  });
+
+  let { $, $$, EVENTS, WaterfallView } = panel.panelWin;
 
   yield startRecording(panel);
   ok(true, "Recording has started.");
 
-  let updated = 0;
-  OverviewView.on(EVENTS.OVERVIEW_RENDERED, () => updated++);
-
-  ok((yield waitUntil(() => updated > 0)),
-    "The overview graphs were updated a bunch of times.");
-  ok((yield waitUntil(() => PerformanceController.getCurrentRecording().getMarkers().length > 0)),
-    "There are some markers available.");
-
-  let rendered = Promise.all([
-    DetailsView.selectView("waterfall"),
-    once(WaterfallView, EVENTS.WATERFALL_RENDERED)
-  ]);
+  // Ensure overview is rendering and some markers were received.
+  yield waitForOverviewRenderedWithMarkers(panel);
 
   yield stopRecording(panel);
   ok(true, "Recording has ended.");
-
-  yield rendered;
-  ok(true, "Recording has rendered.");
 
   // Test the header container.
 

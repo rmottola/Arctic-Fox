@@ -1,21 +1,25 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
+"use strict";
 
 /**
  * Tests if the abstract tree base class for the profiler's tree view
  * has a functional public API.
  */
 
-var { AbstractTreeItem } = Cu.import("resource://devtools/client/shared/widgets/AbstractTreeItem.jsm", {});
-var { Heritage } = Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm", {});
+const { appendAndWaitForPaint } = require("devtools/client/performance/test/helpers/dom-utils");
+const { synthesizeCustomTreeClass } = require("devtools/client/performance/test/helpers/synth-utils");
+const { once } = require("devtools/client/performance/test/helpers/event-utils");
 
-function* spawnTest() {
+add_task(function* () {
+  let { MyCustomTreeItem, myDataSrc } = synthesizeCustomTreeClass();
+
   let container = document.createElement("vbox");
-  gBrowser.selectedBrowser.parentNode.appendChild(container);
+  yield appendAndWaitForPaint(gBrowser.selectedBrowser.parentNode, container);
 
-  // Populate the tree and test `expand`, `collapse` and `getChild`...
+  // Populate the tree and test the root item...
 
-  let treeRoot = new MyCustomTreeItem(gDataSrc, { parent: null });
+  let treeRoot = new MyCustomTreeItem(myDataSrc, { parent: null });
   treeRoot.autoExpandDepth = 1;
   treeRoot.attachTo(container);
 
