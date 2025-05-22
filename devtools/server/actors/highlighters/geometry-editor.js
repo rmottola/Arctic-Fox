@@ -25,7 +25,7 @@ const _dragging = Symbol("geometry/dragging");
  * Element geometry properties helper that gives names of position and size
  * properties.
  */
-let GeoProp = {
+var GeoProp = {
   SIDES: ["top", "right", "bottom", "left"],
   SIZES: ["width", "height"],
 
