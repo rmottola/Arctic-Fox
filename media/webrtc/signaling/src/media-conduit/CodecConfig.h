@@ -83,6 +83,9 @@ public:
   std::vector<std::string> mAckFbTypes;
   std::vector<std::string> mNackFbTypes;
   std::vector<std::string> mCcmFbTypes;
+  // Don't pass mOtherFbTypes from JsepVideoCodecDescription because we'd have
+  // to drag SdpRtcpFbAttributeList::Feedback along too.
+  bool mRembFbSet;
 
   EncodingConstraints mEncodingConstraints;
   struct SimulcastEncoding {
@@ -149,6 +152,9 @@ public:
     }
     return false;
   }
+
+  bool RtcpFbRembIsSet() const { return mRembFbSet; }
+
 };
 }
 #endif
