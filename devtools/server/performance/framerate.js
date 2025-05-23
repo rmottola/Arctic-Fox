@@ -11,7 +11,7 @@ const { Class } = require("sdk/core/heritage");
  * and monitors framerate over time. The actor wrapper around this
  * can be found at devtools/server/actors/framerate.js
  */
-let Framerate = exports.Framerate = Class({
+var Framerate = exports.Framerate = Class({
   initialize: function (tabActor) {
     this.tabActor = tabActor;
     this._contentWin = tabActor.window;
@@ -92,6 +92,7 @@ let Framerate = exports.Framerate = Class({
    */
   _onGlobalCreated: function (win) {
     if (this._recording) {
+      this._contentWin.cancelAnimationFrame(this._rafID);
       this._rafID = this._contentWin.requestAnimationFrame(this._onRefreshDriverTick);
     }
   }
