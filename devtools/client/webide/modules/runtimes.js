@@ -56,9 +56,13 @@ const Strings = Services.strings.createBundle("chrome://devtools/locale/webide.p
  *
  * Each |Runtime| must support the following API:
  *
+ * |type| field
+ *   The |type| must be one of the values from the |RuntimeTypes| object.  This
+ *   is used for Telemetry and to support displaying sets of |Runtime|s
+ *   categorized by type.
  * |id| field
- *   An identifier that is unique in the set of all runtimes.
- *   WebIDE tries to save the last used runtime via type + id, and
+ *   An identifier that is unique in the set of all runtimes with the same
+ *   |type|.  WebIDE tries to save the last used runtime via type + id, and
  *   tries to locate it again in the next session, so this value should attempt
  *   to be stable across Firefox sessions.
  * |name| field
@@ -82,7 +86,7 @@ const Strings = Services.strings.createBundle("chrome://devtools/locale/webide.p
 
 /* SCANNER REGISTRY */
 
-let RuntimeScanners = {
+var RuntimeScanners = {
 
   _enabledCount: 0,
   _scanners: new Set(),
@@ -191,7 +195,7 @@ exports.RuntimeScanners = RuntimeScanners;
 
 /* SCANNERS */
 
-let SimulatorScanner = {
+var SimulatorScanner = {
 
   _runtimes: [],
 
@@ -240,7 +244,7 @@ RuntimeScanners.add(SimulatorScanner);
  * not actually connect (since the |DeprecatedUSBRuntime| assumes a Firefox OS
  * device).
  */
-let DeprecatedAdbScanner = {
+var DeprecatedAdbScanner = {
 
   _runtimes: [],
 
@@ -290,7 +294,36 @@ RuntimeScanners.add(DeprecatedAdbScanner);
 // ADB Helper 0.7.0 and later will replace this scanner on startup
 exports.DeprecatedAdbScanner = DeprecatedAdbScanner;
 
-let WiFiScanner = {
+/**
+ * This is a lazy ADB scanner shim which only tells the ADB Helper to start and
+ * stop as needed.  The real scanner that lists devices lives in ADB Helper.
+ * ADB Helper 0.8.0 and later wait until these signals are received before
+ * starting ADB polling.  For earlier versions, they have no effect.
+ */
+var LazyAdbScanner = {
+
+  enable() {
+    Devices.emit("adb-start-polling");
+  },
+
+  disable() {
+    Devices.emit("adb-stop-polling");
+  },
+
+  scan() {
+    return promise.resolve();
+  },
+
+  listRuntimes: function () {
+    return [];
+  }
+
+};
+
+EventEmitter.decorate(LazyAdbScanner);
+RuntimeScanners.add(LazyAdbScanner);
+
+var WiFiScanner = {
 
   _runtimes: [],
 
@@ -363,7 +396,7 @@ WiFiScanner.init();
 
 exports.WiFiScanner = WiFiScanner;
 
-let StaticScanner = {
+var StaticScanner = {
   enable() {},
   disable() {},
   scan() { return promise.resolve(); },
@@ -569,7 +602,7 @@ SimulatorRuntime.prototype = {
 // For testing use only
 exports._SimulatorRuntime = SimulatorRuntime;
 
-let gLocalRuntime = {
+var gLocalRuntime = {
   type: RuntimeTypes.LOCAL,
   connect: function (connection) {
     if (!DebuggerServer.initialized) {
@@ -593,7 +626,7 @@ let gLocalRuntime = {
 // For testing use only
 exports._gLocalRuntime = gLocalRuntime;
 
-let gRemoteRuntime = {
+var gRemoteRuntime = {
   type: RuntimeTypes.REMOTE,
   connect: function (connection) {
     let win = Services.wm.getMostRecentWindow("devtools:webide");
