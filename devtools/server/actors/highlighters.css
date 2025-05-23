@@ -13,6 +13,17 @@
   element.
 */
 
+:-moz-native-anonymous {
+  /*
+  Content CSS applying to the html element impact the highlighters.
+  To avoid that, possible cases have been set to initial.
+  */
+  text-transform: initial;
+  text-indent: initial;
+  letter-spacing: initial;
+  word-spacing: initial;
+}
+
 :-moz-native-anonymous .highlighter-container {
   --highlighter-guide-color: #08c;
   --highlighter-content-color: #87ceeb;
@@ -109,6 +120,8 @@
 
   color: var(--highlighter-bubble-text-color);
   text-shadow: none;
+
+  border: 1px solid var(--highlighter-bubble-border-color);
 }
 
 :-moz-native-anonymous .box-model-nodeinfobar-container[hide-arrow] > .box-model-nodeinfobar {
@@ -118,26 +131,35 @@
 /* Arrows */
 
 :-moz-native-anonymous .box-model-nodeinfobar-container > .box-model-nodeinfobar:before {
+  left: calc(50% - 8px);
+  border: 8px solid var(--highlighter-bubble-border-color);
+}
+
+:-moz-native-anonymous .box-model-nodeinfobar-container > .box-model-nodeinfobar:after {
+  left: calc(50% - 7px);
+  border: 7px solid var(--highlighter-bubble-background-color);
+}
+
+:-moz-native-anonymous .box-model-nodeinfobar-container > .box-model-nodeinfobar:before,
+:-moz-native-anonymous .box-model-nodeinfobar-container > .box-model-nodeinfobar:after {
   content: "";
   display: none;
-
   position: absolute;
-  left: calc(50% - 8px);
-
   height: 0;
   width: 0;
-  border: 8px solid hsl(214,13%,24%);
   border-left-color: transparent;
   border-right-color: transparent;
 }
 
-:-moz-native-anonymous .box-model-nodeinfobar-container[position="top"]:not([hide-arrow]) > .box-model-nodeinfobar:before {
+:-moz-native-anonymous .box-model-nodeinfobar-container[position="top"]:not([hide-arrow]) > .box-model-nodeinfobar:before,
+:-moz-native-anonymous .box-model-nodeinfobar-container[position="top"]:not([hide-arrow]) > .box-model-nodeinfobar:after {
   border-bottom: 0;
   top: 100%;
   display: block;
 }
 
-:-moz-native-anonymous .box-model-nodeinfobar-container[position="bottom"]:not([hide-arrow]) > .box-model-nodeinfobar:before {
+:-moz-native-anonymous .box-model-nodeinfobar-container[position="bottom"]:not([hide-arrow]) > .box-model-nodeinfobar:before,
+:-moz-native-anonymous .box-model-nodeinfobar-container[position="bottom"]:not([hide-arrow]) > .box-model-nodeinfobar:after {
   border-top: 0;
   bottom: 100%;
   display: block;
@@ -149,8 +171,8 @@
   overflow: hidden;
   white-space: nowrap;
   direction: ltr;
-  text-align: center;
   padding-bottom: 1px;
+  display: flex;
 }
 
 :-moz-native-anonymous .box-model-nodeinfobar-tagname {
@@ -158,12 +180,16 @@
 }
 
 :-moz-native-anonymous .box-model-nodeinfobar-id {
-  color: hsl(103,46%,54%);
+  color: hsl(103, 46%, 54%);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 :-moz-native-anonymous .box-model-nodeinfobar-classes,
 :-moz-native-anonymous .box-model-nodeinfobar-pseudo-classes {
-  color: hsl(200,74%,57%);
+  color: hsl(200, 74%, 57%);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 :-moz-native-anonymous .box-model-nodeinfobar-dimensions {
@@ -271,7 +297,7 @@
   dominant-baseline: middle;
 }
 
-/* Rules highlighter */
+/* Rulers highlighter */
 
 :-moz-native-anonymous .rulers-highlighter-elements {
   shape-rendering: crispEdges;
@@ -307,7 +333,7 @@
 }
 
 :-moz-native-anonymous .rulers-highlighter-horizontal-labels > text {
-  text-anchor: left;
+  text-anchor: start;
 }
 
 :-moz-native-anonymous .rulers-highlighter-vertical-labels > text {
