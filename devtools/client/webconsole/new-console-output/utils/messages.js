@@ -93,6 +93,22 @@ function transformPacket(packet) {
         severity: level,
       });
     }
+
+    case "evaluationResult":
+    default: {
+      let { result } = packet;
+
+      return new ConsoleMessage({
+        source: MESSAGE_SOURCE.JAVASCRIPT,
+        type: MESSAGE_TYPE.RESULT,
+        level: MESSAGE_LEVEL.LOG,
+        parameters: result,
+        repeatId: getRepeatId(result),
+        category: CATEGORY_OUTPUT,
+        severity: SEVERITY_LOG,
+      });
+    }
+  }
 }
 
 // Helpers
