@@ -7,14 +7,14 @@
 "use strict";
 
 const {
-  CATEGORY_CLASS_FRAGMENTS,
+  MESSAGE_SOURCE,
+  MESSAGE_TYPE,
+  MESSAGE_LEVEL,
+  // Legacy
   CATEGORY_JS,
-  CATEGORY_WEBDEV,
   CATEGORY_OUTPUT,
+  CATEGORY_WEBDEV,
   LEVELS,
-  SEVERITY_CLASS_FRAGMENTS,
-  SEVERITY_ERROR,
-  SEVERITY_WARNING,
   SEVERITY_LOG,
 } = require("../constants");
 const WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
@@ -23,10 +23,18 @@ const l10n = new WebConsoleUtils.L10n(STRINGS_URI);
 const { ConsoleMessage } = require("../types");
 
 function prepareMessage(packet) {
+  // This packet is already in the expected packet structure. Simply return.
   if (packet.source) {
     return packet;
   }
 
+  return transformPacket(packet);
+}
+
+/**
+ * Transforms a packet from Firefox RDP structure to Chrome RDP structure.
+ */
+function transformPacket(packet) {
   if (packet._type) {
     packet = convertCachedPacket(packet);
   }
@@ -35,11 +43,24 @@ function prepareMessage(packet) {
     case "consoleAPICall": {
       let { message } = packet;
 
-      severity = SEVERITY_CLASS_FRAGMENTS[SEVERITY_ERROR];
-      if (data.warning || data.strict) {
-        severity = SEVERITY_CLASS_FRAGMENTS[SEVERITY_WARNING];
-      } else if (data.info) {
-        severity = SEVERITY_CLASS_FRAGMENTS[SEVERITY_LOG];
+      let parameters = message.arguments;
+      let type = message.level;
+      let level = LEVELS[type] || MESSAGE_TYPE.LOG;
+      let messageText = null;
+
+      // Special per-type conversion.
+      switch (type) {
+        case "clear":
+          // We show a message to users when calls console.clear() is called.
+          parameters = [l10n.getStr("consoleCleared")];
+          break;
+        case "count":
+          // Chrome RDP doesn't have a special type for count.
+          type = MESSAGE_TYPE.LOG;
+          level = MESSAGE_LEVEL.DEBUG;
+          messageText = `${message.counter.label}: ${message.counter.count}`;
+          parameters = null;
+          break;
       }
 
       return new ConsoleMessage({
