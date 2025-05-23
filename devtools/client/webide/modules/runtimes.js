@@ -414,6 +414,17 @@ RuntimeScanners.add(StaticScanner);
 
 /* RUNTIMES */
 
+// These type strings are used for logging events to Telemetry.
+// You must update Histograms.json if new types are added.
+var RuntimeTypes = exports.RuntimeTypes = {
+  USB: "USB",
+  WIFI: "WIFI",
+  SIMULATOR: "SIMULATOR",
+  REMOTE: "REMOTE",
+  LOCAL: "LOCAL",
+  OTHER: "OTHER"
+};
+
 /**
  * TODO: Remove this comaptibility layer in the future (bug 1085393)
  * This runtime exists to support the ADB Helper add-on below version 0.7.0.
@@ -425,6 +436,7 @@ function DeprecatedUSBRuntime(id) {
 }
 
 DeprecatedUSBRuntime.prototype = {
+  type: RuntimeTypes.USB,
   get device() {
     return Devices.getByName(this._id);
   },
