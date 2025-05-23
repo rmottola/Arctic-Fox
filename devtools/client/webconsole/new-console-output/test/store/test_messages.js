@@ -4,6 +4,7 @@
 
 const actions = require("devtools/client/webconsole/new-console-output/actions/messages");
 const packet = testPackets.get("console.log");
+const clearPacket = testPackets.get("console.clear");
 const {
   getRepeatId,
   prepareMessage
@@ -57,6 +58,25 @@ add_task(function* () {
   message2 = message2.set("parameters", ["new args"]);
   notEqual(getRepeatId(message1), getRepeatId(message2),
     "getRepeatId() returns different repeat ids for different values");
+});
+
+/**
+ * Test adding a console.clear message to the store.
+ */
+add_task(function*() {
+  const { getState, dispatch } = storeFactory();
+
+  dispatch(actions.messageAdd(packet));
+
+  let messages = getAllMessages(getState());
+  equal(messages.size, 1,
+    "MESSAGE_ADD action adds a message");
+
+  dispatch(actions.messageAdd(clearPacket));
+
+  messages = getAllMessages(getState());
+  deepEqual(messages.first(), prepareMessage(clearPacket),
+    "console.clear clears existing messages and add a new one");
 });
 
 /**
