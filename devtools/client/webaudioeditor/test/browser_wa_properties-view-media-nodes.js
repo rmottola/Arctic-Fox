@@ -6,7 +6,7 @@
  * correctly, with default values and correct types.
  */
 
-let MEDIA_PERMISSION = "media.navigator.permission.disabled";
+var MEDIA_PERMISSION = "media.navigator.permission.disabled";
 
 function waitForDeviceClosed() {
   info("Checking that getUserMedia streams are no longer in use.");
@@ -44,23 +44,27 @@ add_task(function* () {
   let mediaPermissionPref = Services.prefs.getBoolPref(MEDIA_PERMISSION);
   Services.prefs.setBoolPref(MEDIA_PERMISSION, true);
 
-  reload(target);
+  yield loadFrameScripts();
 
-  let [actors] = yield Promise.all([
+  let events = Promise.all([
     getN(gFront, "create-node", 4),
     waitForGraphRendered(panelWin, 4, 0)
   ]);
-
+  reload(target);
+  let [actors] = yield events;
   let nodeIds = actors.map(actor => actor.actorID);
+
   let types = [
     "AudioDestinationNode", "MediaElementAudioSourceNode",
     "MediaStreamAudioSourceNode", "MediaStreamAudioDestinationNode"
   ];
 
+  let defaults = yield Promise.all(types.map(type => nodeDefaultValues(type)));
+
   for (let i = 0; i < types.length; i++) {
     click(panelWin, findGraphNode(panelWin, nodeIds[i]));
     yield waitForInspectorRender(panelWin, EVENTS);
-    checkVariableView(gVars, 0, NODE_DEFAULT_VALUES[types[i]], types[i]);
+    checkVariableView(gVars, 0, defaults[i], types[i]);
   }
 
   // Reset permissions on getUserMedia
