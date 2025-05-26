@@ -31,19 +31,11 @@ waitForExplicitFinish();
  *         and Promises cannot be resolved with CPOWs (see bug 1233497).
  */
 var addTab = Task.async(function* (url) {
-  info("Adding a new tab with URL: '" + url + "'");
-  let tab = gBrowser.selectedTab = gBrowser.addTab();
-  let loaded = once(gBrowser.selectedBrowser, "load", true);
+  info(`Adding a new tab with URL: ${url}`);
+  let tab = gBrowser.selectedTab = gBrowser.addTab(url);
+  yield once(gBrowser.selectedBrowser, "load", true);
 
-  content.location = url;
-  yield loaded;
-
-  info("URL '" + url + "' loading complete");
-
-  yield new Promise(resolve => {
-    let isBlank = url == "about:blank";
-    waitForFocus(resolve, content, isBlank);
-  });
+  info(`Tab added and URL ${url} loaded`);
 
   return tab.linkedBrowser;
 });
@@ -69,7 +61,9 @@ function initDebuggerServer() {
     // Sometimes debugger server does not get destroyed correctly by previous
     // tests.
     DebuggerServer.destroy();
-  } catch (ex) { }
+  } catch (e) {
+    info(`DebuggerServer destroy error: ${e}\n${e.stack}`);
+  }
   DebuggerServer.init();
   DebuggerServer.addBrowserActors();
 }
@@ -186,4 +180,33 @@ function waitUntil(predicate, interval = 10) {
   });
 }
 
-// EventUtils just doesn't work!
+function waitForMarkerType(front, types, predicate,
+  unpackFun = (name, data) => data.markers,
+  eventName = "timeline-data")
+{
+  types = [].concat(types);
+  predicate = predicate || function () { return true; };
+  let filteredMarkers = [];
+  let { promise, resolve } = defer();
+
+  info("Waiting for markers of type: " + types);
+
+  function handler(name, data) {
+    if (typeof name === "string" && name !== "markers") {
+      return;
+    }
+
+    let markers = unpackFun(name, data);
+    info("Got markers: " + JSON.stringify(markers, null, 2));
+
+    filteredMarkers = filteredMarkers.concat(markers.filter(m => types.indexOf(m.name) !== -1));
+
+    if (types.every(t => filteredMarkers.some(m => m.name === t)) && predicate(filteredMarkers)) {
+      front.off(eventName, handler);
+      resolve(filteredMarkers);
+    }
+  }
+  front.on(eventName, handler);
+
+  return promise;
+}

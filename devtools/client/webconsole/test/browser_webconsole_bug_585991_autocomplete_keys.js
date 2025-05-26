@@ -1,7 +1,7 @@
-/* vim:set ts=2 sw=2 sts=2 et: */
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
+/* Any copyright is dedicated to the Public Domain.
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
 "use strict";
 
@@ -30,9 +30,9 @@ add_task(function* () {
   Services.prefs.setBoolPref(PREF_AUTO_MULTILINE, true);
 });
 
-var consoleOpened = Task.async(function* (aHud) {
+var consoleOpened = Task.async(function* (hud) {
   let deferred = promise.defer();
-  HUD = aHud;
+  HUD = hud;
   info("web console opened");
 
   jsterm = HUD.jsterm;
@@ -51,9 +51,7 @@ var consoleOpened = Task.async(function* (aHud) {
 
   ok(!popup.isOpen, "popup is not open");
 
-  popup._panel.addEventListener("popupshown", function onShown() {
-    popup._panel.removeEventListener("popupshown", onShown, false);
-
+  popup.once("popup-opened", () => {
     ok(popup.isOpen, "popup is open");
 
     // 4 values, and the following properties:
@@ -65,6 +63,7 @@ var consoleOpened = Task.async(function* (aHud) {
     let sameItems = popup.getItems().reverse().map(function (e) {
       return e.label;
     });
+
     ok(sameItems.every(function (prop, index) {
       return [
         "__defineGetter__",
@@ -134,14 +133,12 @@ var consoleOpened = Task.async(function* (aHud) {
     is(popup.selectedIndex, 0, "index is first after Home");
 
     info("press Tab and wait for popup to hide");
-    popup._panel.addEventListener("popuphidden", function popupHidden() {
-      popup._panel.removeEventListener("popuphidden", popupHidden, false);
+    popup.once("popup-closed", () => {
       deferred.resolve();
-    }, false);
+    });
     EventUtils.synthesizeKey("VK_TAB", {});
-  }, false);
+  });
 
-  info("wait for completion: window.foobarBug585991.");
   jsterm.setInputValue("window.foobarBug585991");
   EventUtils.synthesizeKey(".", {});
 
@@ -159,9 +156,7 @@ function popupHideAfterTab() {
 
   ok(!completeNode.value, "completeNode is empty");
 
-  popup._panel.addEventListener("popupshown", function onShown() {
-    popup._panel.removeEventListener("popupshown", onShown, false);
-
+  popup.once("popup-opened", function onShown() {
     ok(popup.isOpen, "popup is open");
 
     is(popup.itemCount, 19, "popup.itemCount is correct");
@@ -176,9 +171,7 @@ function popupHideAfterTab() {
     is(completeNode.value, prefix + "watch",
         "completeNode.value holds watch");
 
-    popup._panel.addEventListener("popuphidden", function onHidden() {
-      popup._panel.removeEventListener("popuphidden", onHidden, false);
-
+    popup.once("popup-closed", function onHidden() {
       ok(!popup.isOpen, "popup is not open after VK_ESCAPE");
 
       is(jsterm.getInputValue(), "window.foobarBug585991.",
@@ -207,9 +200,7 @@ function popupHideAfterTab() {
 function testReturnKey() {
   let deferred = promise.defer();
 
-  popup._panel.addEventListener("popupshown", function onShown() {
-    popup._panel.removeEventListener("popupshown", onShown, false);
-
+  popup.once("popup-opened", function onShown() {
     ok(popup.isOpen, "popup is open");
 
     is(popup.itemCount, 19, "popup.itemCount is correct");
@@ -231,9 +222,7 @@ function testReturnKey() {
     is(completeNode.value, prefix + "valueOf",
        "completeNode.value holds valueOf");
 
-    popup._panel.addEventListener("popuphidden", function onHidden() {
-      popup._panel.removeEventListener("popuphidden", onHidden, false);
-
+    popup.once("popup-closed", function onHidden() {
       ok(!popup.isOpen, "popup is not open after VK_RETURN");
 
       is(jsterm.getInputValue(), "window.foobarBug585991.valueOf",
@@ -260,18 +249,18 @@ function testReturnKey() {
   return deferred.promise;
 }
 
-function dontShowArrayNumbers() {
+function* dontShowArrayNumbers() {
   let deferred = promise.defer();
 
   info("dontShowArrayNumbers");
-  content.wrappedJSObject.foobarBug585991 = ["Sherlock Holmes"];
+  yield ContentTask.spawn(gBrowser.selectedBrowser, {}, function* () {
+    content.wrappedJSObject.foobarBug585991 = ["Sherlock Holmes"];
+  });
 
   jsterm = HUD.jsterm;
   popup = jsterm.autocompletePopup;
 
-  popup._panel.addEventListener("popupshown", function onShown() {
-    popup._panel.removeEventListener("popupshown", onShown, false);
-
+  popup.once("popup-opened", function onShown() {
     let sameItems = popup.getItems().map(function (e) {
       return e.label;
     });
@@ -279,8 +268,7 @@ function dontShowArrayNumbers() {
       prop === "0";
     }), "Completing on an array doesn't show numbers.");
 
-    popup._panel.addEventListener("popuphidden", function popupHidden() {
-      popup._panel.removeEventListener("popuphidden", popupHidden, false);
+    popup.once("popup-closed", function popupHidden() {
       deferred.resolve();
     }, false);
 
@@ -302,16 +290,13 @@ function testReturnWithNoSelection() {
 
   info("test pressing return with open popup, but no selection, see bug 873250");
 
-  popup._panel.addEventListener("popupshown", function onShown() {
-    popup._panel.removeEventListener("popupshown", onShown);
-
+  popup.once("popup-opened", function onShown() {
     ok(popup.isOpen, "popup is open");
     is(popup.itemCount, 2, "popup.itemCount is correct");
     isnot(popup.selectedIndex, -1, "popup.selectedIndex is correct");
 
     info("press Return and wait for popup to hide");
-    popup._panel.addEventListener("popuphidden", function popupHidden() {
-      popup._panel.removeEventListener("popuphidden", popupHidden);
+    popup.once("popup-closed", function popupHidden() {
       deferred.resolve();
     });
     executeSoon(() => EventUtils.synthesizeKey("VK_RETURN", {}));
@@ -342,9 +327,7 @@ function testCompletionInText() {
 
   let deferred = promise.defer();
 
-  popup._panel.addEventListener("popupshown", function onShown() {
-    popup._panel.removeEventListener("popupshown", onShown);
-
+  popup.once("popup-opened", function onShown() {
     ok(popup.isOpen, "popup is open");
     is(popup.itemCount, 2, "popup.itemCount is correct");
 
@@ -358,8 +341,7 @@ function testCompletionInText() {
     ok(sameItems, "getItems returns the items we expect");
 
     info("press Tab and wait for popup to hide");
-    popup._panel.addEventListener("popuphidden", function popupHidden() {
-      popup._panel.removeEventListener("popuphidden", popupHidden);
+    popup.once("popup-closed", function popupHidden() {
       deferred.resolve();
     });
     EventUtils.synthesizeKey("VK_TAB", {});

@@ -382,13 +382,9 @@ function testLocalStorage(localStorageActor) {
 var testLocalStorageObjects = Task.async(function* (index, hosts, localStorageActor) {
   let host = Object.keys(hosts)[index];
   let matchItems = data => {
-    is(data.total - domStorageProperties.length, storeMap.localStorage[host].length,
+    is(data.total, storeMap.localStorage[host].length,
        "Number of local storage items in host " + host + " matches");
     for (let item of data.data) {
-      if (domStorageProperties.indexOf(item.name) != -1) {
-        continue;
-      }
-
       let found = false;
       for (let toMatch of storeMap.localStorage[host]) {
         if (item.name == toMatch.name) {
@@ -420,13 +416,9 @@ function testSessionStorage(sessionStorageActor) {
 var testSessionStorageObjects = Task.async(function* (index, hosts, sessionStorageActor) {
   let host = Object.keys(hosts)[index];
   let matchItems = data => {
-    is(data.total - domStorageProperties.length, storeMap.sessionStorage[host].length,
+    is(data.total, storeMap.sessionStorage[host].length,
        "Number of session storage items in host " + host + " matches");
     for (let item of data.data) {
-      if (domStorageProperties.indexOf(item.name) != -1) {
-        continue;
-      }
-
       let found = false;
       for (let toMatch of storeMap.sessionStorage[host]) {
         if (item.name == toMatch.name) {
@@ -552,7 +544,7 @@ var testObjectStores = Task.async(function* (index, hosts, indexedDBActor) {
   yield testObjectStores(++index, hosts, indexedDBActor);
 });
 
-let testIDBEntries = Task.async(function*(index, hosts, indexedDBActor) {
+var testIDBEntries = Task.async(function* (index, hosts, indexedDBActor) {
   let host = Object.keys(hosts)[index];
   let matchItems = (data, obj) => {
     is(data.total, IDBValues.entries[host][obj].length,

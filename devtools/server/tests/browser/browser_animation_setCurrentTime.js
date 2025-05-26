@@ -27,8 +27,18 @@ function* testSetCurrentTime(walker, animations) {
 
   ok(player.setCurrentTime, "Player has the setCurrentTime method");
 
+  info("Check that the setCurrentTime method can be called");
+  // Note that we don't check that it sets the animation to the right time here,
+  // this is too prone to intermittent failures, we'll do this later after
+  // pausing the animation. Here we merely test that the method doesn't fail.
+  yield player.setCurrentTime(player.initialState.currentTime + 1000);
+
+  info("Pause the animation so we can really test if setCurrentTime works");
+  yield player.pause();
+  let pausedState = yield player.getCurrentState();
+
   info("Set the current time to currentTime + 5s");
-  yield player.setCurrentTime(player.initialState.currentTime + 5000);
+  yield player.setCurrentTime(pausedState.currentTime + 5000);
 
   let updatedState1 = yield player.getCurrentState();
   is(Math.round(updatedState1.currentTime - pausedState.currentTime), 5000,

@@ -1,7 +1,10 @@
- /* Any copyright is dedicated to the Public Domain.
-  * http://creativecommons.org/publicdomain/zero/1.0/ */
-/* Tests that errors about invalid HPKP security headers are logged
- *  to the web console */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
+/* Any copyright is dedicated to the Public Domain.
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
+
+// Tests that errors about invalid HPKP security headers are logged to the web
+// console.
 
 "use strict";
 
@@ -14,7 +17,7 @@ const LEARN_MORE_URI = "https://developer.mozilla.org/docs/Web/Security/" +
 const NON_BUILTIN_ROOT_PREF = "security.cert_pinning.process_headers_from_" +
                               "non_builtin_roots";
 
-var test = asyncTest(function* () {
+add_task(function* () {
   registerCleanupFunction(() => {
     Services.prefs.clearUserPref(NON_BUILTIN_ROOT_PREF);
   });
@@ -97,7 +100,7 @@ var test = asyncTest(function* () {
 function* checkForMessage(curTest, hud) {
   hud.jsterm.clearOutput();
 
-  content.location = curTest.url;
+  BrowserTestUtils.loadURI(gBrowser.selectedBrowser, curTest.url);
 
   let results = yield waitForMessages({
     webconsole: hud,

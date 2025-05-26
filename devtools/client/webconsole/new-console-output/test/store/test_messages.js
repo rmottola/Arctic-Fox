@@ -25,7 +25,8 @@ add_task(function* () {
 
   const expectedMessage = prepareMessage(packet);
 
-  deepEqual(getAllMessages(getState()), [expectedMessage],
+  let messages = getAllMessages(getState());
+  deepEqual(messages.toArray(), [expectedMessage],
     "MESSAGE_ADD action adds a message");
 });
 
@@ -39,11 +40,17 @@ add_task(function* () {
   dispatch(actions.messageAdd(packet));
   dispatch(actions.messageAdd(packet));
 
-  const expectedMessage = prepareMessage(packet);
-  expectedMessage.repeat = 3;
+  const messages = getAllMessages(getState());
+  equal(messages.size, 1,
+    "Repeated messages don't increase message list size");
+  equal(messages.first().repeat, 3, "Repeated message is updated as expected");
 
-  deepEqual(getAllMessages(getState()), [expectedMessage],
-    "Adding same message to the store twice results in repeated message");
+  let newPacket = Object.assign({}, packet);
+  newPacket.message.arguments = ["funny"];
+  dispatch(actions.messageAdd(newPacket));
+
+  equal(getAllMessages(getState()).size, 2,
+    "Non-repeated messages aren't clobbered");
 });
 
 /**

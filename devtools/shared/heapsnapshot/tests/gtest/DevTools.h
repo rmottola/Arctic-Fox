@@ -254,6 +254,12 @@ MATCHER(UniqueIsNull, "") {
   return arg.get() == nullptr;
 }
 
+// Matches an edge whose referent is the node with the given id.
+MATCHER_P(EdgeTo, id, "") {
+  return Matcher<const DeserializedEdge&>(Field(&DeserializedEdge::referent, id))
+    .MatchAndExplain(arg, result_listener);
+}
+
 } // namespace testing
 
 

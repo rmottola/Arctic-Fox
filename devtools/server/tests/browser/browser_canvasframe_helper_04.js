@@ -70,9 +70,6 @@ add_task(function* () {
   yield loaded;
   doc = gBrowser.selectedBrowser.contentWindow.document;
 
-  info("And faking the 'navigate' event on the tabActor");
-  events.emit(tabActor, "navigate", tabActor);
-
   info("Try to access the element again");
   is(el.getAttribute("class"), "child-element",
     "The attribute is correct after navigation");

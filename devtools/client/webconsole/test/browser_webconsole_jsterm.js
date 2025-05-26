@@ -1,7 +1,7 @@
-/* vim:set ts=2 sw=2 sts=2 et: */
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
+/* Any copyright is dedicated to the Public Domain.
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
 "use strict";
 
@@ -10,7 +10,7 @@ const TEST_URI = "http://example.com/browser/devtools/client/webconsole/" +
 
 var jsterm;
 
-var test = asyncTest(function* () {
+add_task(function* () {
   yield loadTab(TEST_URI);
   let hud = yield openConsole();
   jsterm = hud.jsterm;
@@ -149,21 +149,21 @@ function* testJSTerm(hud) {
   jsterm.clearOutput();
   yield jsterm.execute("throw '';");
   yield checkResult((node) => {
-    return node.parentNode.getAttribute("severity") === "error" &&
+    return node.closest(".message").getAttribute("severity") === "error" &&
       node.textContent === new Error("").toString();
   }, "thrown empty string generates error message");
 
   jsterm.clearOutput();
   yield jsterm.execute("throw 'tomatoes';");
   yield checkResult((node) => {
-    return node.parentNode.getAttribute("severity") === "error" &&
+    return node.closest(".message").getAttribute("severity") === "error" &&
       node.textContent === new Error("tomatoes").toString();
   }, "thrown non-empty string generates error message");
 
   jsterm.clearOutput();
   yield jsterm.execute("throw { foo: 'bar' };");
   yield checkResult((node) => {
-    return node.parentNode.getAttribute("severity") === "error" &&
+    return node.closest(".message").getAttribute("severity") === "error" &&
       node.textContent === Object.prototype.toString();
   }, "thrown object generates error message");
 
@@ -188,4 +188,8 @@ function* testJSTerm(hud) {
       return node.parentNode.getElementsByTagName("a")[0].title == title;
     }, `error links to ${title}`);
   }
+
+  // Ensure that dom errors, with error numbers outside of the range
+  // of valid js.msg errors, don't cause crashes (bug 1270721).
+  yield jsterm.execute("new Request('',{redirect:'foo'})");
 }

@@ -1,8 +1,9 @@
-/* vim:set ts=2 sw=2 sts=2 et: */
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
+/* Any copyright is dedicated to the Public Domain.
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
+/* import-globals-from ../../framework/test/shared-head.js */
 "use strict";
 
 // shared-head.js handles imports, constants, and utility functions
@@ -45,12 +46,6 @@ const DOCS_GA_PARAMS = "?utm_source=mozilla" +
                        "&utm_campaign=default";
 
 DevToolsUtils.testing = true;
-
-function asyncTest(generator) {
-  return () => {
-    Task.spawn(generator).then(finishTest);
-  };
-}
 
 function loadTab(url) {
   let deferred = promise.defer();
@@ -335,8 +330,12 @@ registerCleanupFunction(function* () {
 
   dumpConsoles();
 
-  if (HUDService.getBrowserConsole()) {
-    HUDService.toggleBrowserConsole();
+  let browserConsole = HUDService.getBrowserConsole();
+  if (browserConsole) {
+    if (browserConsole.jsterm) {
+      browserConsole.jsterm.clearOutput(true);
+    }
+    yield HUDService.toggleBrowserConsole();
   }
 
   let target = TargetFactory.forTab(gBrowser.selectedTab);
@@ -1037,7 +1036,7 @@ function waitForMessages(options) {
       return false;
     }
 
-    if ("line" in rule.source && location.line === rule.source.line) {
+    if ("line" in rule.source && location.line != rule.source.line) {
       return false;
     }
 
@@ -1055,7 +1054,7 @@ function waitForMessages(options) {
 
   function checkStacktrace(rule, element) {
     let stack = rule.stacktrace;
-    let frames = element.querySelectorAll(".stacktrace > li");
+    let frames = element.querySelectorAll(".stacktrace > .stack-trace > .frame-link");
     if (!frames.length) {
       return false;
     }
@@ -1069,7 +1068,7 @@ function waitForMessages(options) {
       }
 
       if (expected.file) {
-        let url = getRenderedSource(frame).url;
+        let url = frame.getAttribute("data-url");
         if (!checkText(expected.file, url)) {
           ok(false, "frame #" + i + " does not match file name: " +
                     expected.file + " != " + url);
@@ -1079,7 +1078,7 @@ function waitForMessages(options) {
       }
 
       if (expected.fn) {
-        let fn = frame.querySelector(".function").textContent;
+        let fn = frame.querySelector(".frame-link-function-display-name").textContent;
         if (!checkText(expected.fn, fn)) {
           ok(false, "frame #" + i + " does not match the function name: " +
                     expected.fn + " != " + fn);
@@ -1089,7 +1088,7 @@ function waitForMessages(options) {
       }
 
       if (expected.line) {
-        let line = getRenderedSource(frame).line;
+        let line = frame.getAttribute("data-line");
         if (!checkText(expected.line, line)) {
           ok(false, "frame #" + i + " does not match the line number: " +
                     expected.line + " != " + line);
@@ -1435,7 +1434,7 @@ function checkOutputForInputs(hud, inputTests) {
   }
 
   function* checkConsoleLog(entry) {
-    info("Logging: " + entry.input);
+    info("Logging");
     hud.jsterm.clearOutput();
     hud.jsterm.execute("console.log(" + entry.input + ")");
 
@@ -1459,13 +1458,13 @@ function checkOutputForInputs(hud, inputTests) {
     }
 
     if (typeof entry.inspectorIcon == "boolean") {
-      info("Checking Inspector Link: " + entry.input);
+      info("Checking Inspector Link");
       yield checkLinkToInspector(entry.inspectorIcon, msg);
     }
   }
 
   function checkPrintOutput(entry) {
-    info("Printing: " + entry.input);
+    info("Printing");
     hud.jsterm.clearOutput();
     hud.jsterm.execute("print(" + entry.input + ")");
 
@@ -1482,7 +1481,7 @@ function checkOutputForInputs(hud, inputTests) {
   }
 
   function* checkJSEval(entry) {
-    info("Evaluating: " + entry.input);
+    info("Evaluating");
     hud.jsterm.clearOutput();
     hud.jsterm.execute(entry.input);
 
@@ -1508,7 +1507,7 @@ function checkOutputForInputs(hud, inputTests) {
   }
 
   function* checkObjectClick(entry, msg) {
-    info("Clicking: " + entry.input);
+    info("Clicking");
     let body;
     if (entry.getClickableNode) {
       body = entry.getClickableNode(msg);
@@ -1553,7 +1552,7 @@ function checkOutputForInputs(hud, inputTests) {
   }
 
   function onVariablesViewOpen(entry, {resolve, reject}, event, view, options) {
-    info("Variables view opened: " + entry.input);
+    info("Variables view opened");
     let label = entry.variablesViewLabel || entry.output;
     if (typeof label == "string" && options.label != label) {
       return;
@@ -1572,34 +1571,159 @@ function checkOutputForInputs(hud, inputTests) {
   function onTabOpen(entry, {resolve, reject}, event) {
     container.removeEventListener("TabOpen", entry._onTabOpen, true);
     entry._onTabOpen = null;
-
     let tab = event.target;
     let browser = gBrowser.getBrowserForTab(tab);
-    loadBrowser(browser).then(() => {
-      let uri = content.location.href;
+
+    Task.spawn(function* () {
+      yield loadBrowser(browser);
+      let uri = yield ContentTask.spawn(browser, {}, function* () {
+        return content.location.href;
+      });
       ok(entry.expectedTab && entry.expectedTab == uri,
          "opened tab '" + uri + "', expected tab '" + entry.expectedTab + "'");
-      return closeTab(tab);
+      yield closeTab(tab);
     }).then(resolve, reject);
   }
 
   return Task.spawn(runner);
 }
 
+/**
+ * Check the web console DOM element output for the given inputs.
+ * Each input is checked for the expected JS eval result. The JS eval result is
+ * also checked if it opens the inspector with the correct node selected on
+ * inspector icon click
+ *
+ * @param object hud
+ *        The web console instance to work with.
+ * @param array inputTests
+ *        An array of input tests. An input test element is an object. Each
+ *        object has the following properties:
+ *        - input: string, JS input value to execute.
+ *
+ *        - output: string, expected JS eval result.
+ *
+ *        - displayName: string, expected NodeFront's displayName.
+ *
+ *        - attr: Array, expected NodeFront's attributes
+ */
+function checkDomElementHighlightingForInputs(hud, inputs) {
+  function* runner() {
+    let toolbox = gDevTools.getToolbox(hud.target);
+
+    // Loading the inspector panel at first, to make it possible to listen for
+    // new node selections
+    yield toolbox.selectTool("inspector");
+    let inspector = toolbox.getCurrentPanel();
+    yield toolbox.selectTool("webconsole");
+
+    info("Iterating over the test data");
+    for (let data of inputs) {
+      let [result] = yield jsEval(data.input, {text: data.output});
+      let {msg} = yield checkWidgetAndMessage(result);
+      yield checkNodeHighlight(toolbox, inspector, msg, data);
+    }
+  }
+
+  function jsEval(input, message) {
+    info("Executing '" + input + "' in the web console");
+
+    hud.jsterm.clearOutput();
+    hud.jsterm.execute(input);
+
+    return waitForMessages({
+      webconsole: hud,
+      messages: [message]
+    });
+  }
+
+  function* checkWidgetAndMessage(result) {
+    info("Getting the output ElementNode widget");
+
+    let msg = [...result.matched][0];
+    let widget = [...msg._messageObject.widgets][0];
+    ok(widget, "ElementNode widget found in the output");
+
+    info("Waiting for the ElementNode widget to be linked to the inspector");
+    yield widget.linkToInspector();
+
+    return {widget, msg};
+  }
+
+  function* checkNodeHighlight(toolbox, inspector, msg, testData) {
+    let inspectorIcon = msg.querySelector(".open-inspector");
+    ok(inspectorIcon, "Inspector icon found in the ElementNode widget");
+
+    info("Clicking on the inspector icon and waiting for the " +
+         "inspector to be selected");
+    let onInspectorSelected = toolbox.once("inspector-selected");
+    let onInspectorUpdated = inspector.once("inspector-updated");
+    let onNewNode = toolbox.selection.once("new-node-front");
+    let onNodeHighlight = toolbox.once("node-highlight");
+
+    EventUtils.synthesizeMouseAtCenter(inspectorIcon, {},
+      inspectorIcon.ownerDocument.defaultView);
+    yield onInspectorSelected;
+    yield onInspectorUpdated;
+    yield onNodeHighlight;
+    let nodeFront = yield onNewNode;
+
+    ok(true, "Inspector selected and new node got selected");
+
+    is(nodeFront.displayName, testData.displayName,
+      "The correct node was highlighted");
+
+    if (testData.attrs) {
+      let attrs = nodeFront.attributes;
+      for (let i in testData.attrs) {
+        is(attrs[i].name, testData.attrs[i].name,
+           "Expected attribute's name is present");
+        is(attrs[i].value, testData.attrs[i].value,
+           "Expected attribute's value is present");
+      }
+    }
+
+    info("Unhighlight the node by moving away from the markup view");
+    let onNodeUnhighlight = toolbox.once("node-unhighlight");
+    let btn = inspector.toolbox.doc.querySelector(".toolbox-dock-button");
+    EventUtils.synthesizeMouseAtCenter(btn, {type: "mousemove"},
+      inspector.toolbox.win);
+    yield onNodeUnhighlight;
+
+    info("Switching back to the console");
+    yield toolbox.selectTool("webconsole");
+  }
+
+  return Task.spawn(runner);
+}
 
 /**
  * Finish the request and resolve with the request object.
  *
+ * @param {Function} predicate A predicate function that takes the request
+ * object as an argument and returns true if the request was the expected one,
+ * false otherwise. The returned promise is resolved ONLY if the predicate
+ * matches a request. Defaults to accepting any request.
  * @return promise
  * @resolves The request object.
  */
-function waitForFinishedRequest() {
-  registerCleanupFunction(function() {
+function waitForFinishedRequest(predicate = () => true) {
+  registerCleanupFunction(function () {
     HUDService.lastFinishedRequest.callback = null;
   });
 
   return new Promise(resolve => {
-    HUDService.lastFinishedRequest.callback = request => { resolve(request) };
+    HUDService.lastFinishedRequest.callback = request => {
+      // Check if this is the expected request
+      if (predicate(request)) {
+        // Match found. Clear the listener.
+        HUDService.lastFinishedRequest.callback = null;
+
+        resolve(request);
+      } else {
+        info(`Ignoring unexpected request ${JSON.stringify(request, null, 2)}`);
+      }
+    };
   });
 }
 

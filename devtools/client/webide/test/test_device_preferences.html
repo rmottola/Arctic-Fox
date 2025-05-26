@@ -27,12 +27,13 @@
           let win = yield openWebIDE();
 
           let prefIframe = win.document.querySelector("#deck-panel-devicepreferences");
+          let docRuntime = getRuntimeDocument(win);
 
           win.AppManager.update("runtime-list");
 
           yield connectToLocalRuntime(win);
 
-          let prefs = win.document.querySelector("#cmd_showDevicePrefs");
+          let prefs = docRuntime.querySelector("#runtime-preferences");
 
           ok(!prefs.hasAttribute("disabled"), "device prefs cmd enabled");
 
