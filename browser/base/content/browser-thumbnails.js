@@ -96,8 +96,14 @@ var gBrowserThumbnails = {
   },
 
   _capture: function Thumbnails_capture(aBrowser) {
-    if (this._shouldCapture(aBrowser))
-      PageThumbs.captureAndStore(aBrowser);
+    // Only capture about:newtab top sites.
+    if (this._topSiteURLs.indexOf(aBrowser.currentURI.spec) == -1)
+      return;
+    this._shouldCapture(aBrowser, function (aResult) {
+      if (aResult) {
+        PageThumbs.captureAndStoreIfStale(aBrowser);
+      }
+    });
   },
 
   _delayedCapture: function Thumbnails_delayedCapture(aBrowser) {
@@ -117,10 +123,6 @@ var gBrowserThumbnails = {
   _shouldCapture: function Thumbnails_shouldCapture(aBrowser) {
     // Capture only if it's the currently selected tab.
     if (aBrowser != gBrowser.selectedBrowser)
-      return false;
-
-    // Only capture about:newtab top sites.
-    if (this._topSiteURLs.indexOf(aBrowser.currentURI.spec) < 0)
       return false;
 
     // Don't capture in per-window private browsing mode.
