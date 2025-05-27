@@ -18,8 +18,6 @@ body {
   -moz-box-orient: vertical;
   width: 100%;
   height: 100%;
-  background-image: url(chrome://browser/content/abouthome/noise.png),
-                    linear-gradient(hsla(0,0%,100%,.7), hsla(0,0%,100%,.4));
 }
 
 input,
@@ -242,7 +240,7 @@ body[narrow] #launcher[session] {
   white-space: normal;
   background: transparent padding-box;
   border: 1px solid transparent;
-  border-radius: 2.5px;
+  border-radius: 2px;
   color: #525c66;
   font-size: 75%;
   cursor: pointer;
