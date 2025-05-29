@@ -62,7 +62,7 @@ var Pocket = {
   },
 
   onPanelViewHiding(event) {
-    let window = event.target.ownerDocument.defaultView;
+    let window = event.target.ownerGlobal;
     window.pktUI.pocketPanelDidHide(event);
   },
 

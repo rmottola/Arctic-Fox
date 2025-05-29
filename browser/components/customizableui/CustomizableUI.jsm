@@ -809,7 +809,7 @@ var CustomizableUIInternal = {
   addPanelCloseListeners: function(aPanel) {
     gELS.addSystemEventListener(aPanel, "click", this, false);
     gELS.addSystemEventListener(aPanel, "keypress", this, false);
-    let win = aPanel.ownerDocument.defaultView;
+    let win = aPanel.ownerGlobal;
     if (!gPanelsForWindow.has(win)) {
       gPanelsForWindow.set(win, new Set());
     }
@@ -819,7 +819,7 @@ var CustomizableUIInternal = {
   removePanelCloseListeners: function(aPanel) {
     gELS.removeSystemEventListener(aPanel, "click", this, false);
     gELS.removeSystemEventListener(aPanel, "keypress", this, false);
-    let win = aPanel.ownerDocument.defaultView;
+    let win = aPanel.ownerGlobal;
     let panels = gPanelsForWindow.get(win);
     if (panels) {
       panels.delete(this._getPanelForNode(aPanel));
@@ -950,7 +950,7 @@ var CustomizableUIInternal = {
                               : true;
 
     for (let areaNode of areaNodes) {
-      let window = areaNode.ownerDocument.defaultView;
+      let window = areaNode.ownerGlobal;
       if (!showInPrivateBrowsing &&
           PrivateBrowsingUtils.isWindowPrivate(window)) {
         continue;
@@ -1010,7 +1010,7 @@ var CustomizableUIInternal = {
   registerBuildArea: function(aArea, aNode) {
     // We ensure that the window is registered to have its customization data
     // cleaned up when unloading.
-    let window = aNode.ownerDocument.defaultView;
+    let window = aNode.ownerGlobal;
     if (window.closed) {
       return;
     }
@@ -1128,7 +1128,7 @@ var CustomizableUIInternal = {
   },
 
   insertNodeInWindow: function(aWidgetId, aAreaNode, isNew) {
-    let window = aAreaNode.ownerDocument.defaultView;
+    let window = aAreaNode.ownerGlobal;
     let showInPrivateBrowsing = gPalette.has(aWidgetId)
                               ? gPalette.get(aWidgetId).showInPrivateBrowsing
                               : true;
@@ -1488,7 +1488,7 @@ var CustomizableUIInternal = {
                                      aWidget.id);
       }
     } else if (aWidget.type == "view") {
-      let ownerWindow = aNode.ownerDocument.defaultView;
+      let ownerWindow = aNode.ownerGlobal;
       let area = this.getPlacementOfWidget(aNode.id).area;
       let anchor = aNode;
       if (area != CustomizableUI.AREA_PANEL) {
@@ -1708,7 +1708,7 @@ var CustomizableUIInternal = {
   },
 
   getUnusedWidgets: function(aWindowPalette) {
-    let window = aWindowPalette.ownerDocument.defaultView;
+    let window = aWindowPalette.ownerGlobal;
     let isWindowPrivate = PrivateBrowsingUtils.isWindowPrivate(window);
     // We use a Set because there can be overlap between the widgets in
     // gPalette and the items in the palette, especially after the first
@@ -2488,7 +2488,7 @@ var CustomizableUIInternal = {
     }
 
     for (let node of buildAreaNodes) {
-      if (node.ownerDocument.defaultView === aWindow) {
+      if (node.ownerGlobal == aWindow) {
         return node.customizationTarget ? node.customizationTarget : node;
       }
     }
@@ -2572,7 +2572,7 @@ var CustomizableUIInternal = {
         let area = gAreas.get(areaId);
         if (area.get("type") == CustomizableUI.TYPE_TOOLBAR) {
           let defaultCollapsed = area.get("defaultCollapsed");
-          let win = areaNode.ownerDocument.defaultView;
+          let win = areaNode.ownerGlobal;
           if (defaultCollapsed !== null) {
             win.setToolbarVisibility(areaNode, !defaultCollapsed, isFirstChangedToolbar);
           }
@@ -2696,7 +2696,7 @@ var CustomizableUIInternal = {
     if (!areaNodes) {
       return false;
     }
-    let container = [...areaNodes].filter((n) => n.ownerDocument.defaultView == aWindow);
+    let container = [...areaNodes].filter((n) => n.ownerGlobal == aWindow);
     if (!container.length) {
       return false;
     }
@@ -3793,7 +3793,7 @@ function WidgetGroupWrapper(aWidget) {
     if (!buildAreas) {
       return [];
     }
-    return Array.from(buildAreas, (node) => this.forWindow(node.ownerDocument.defaultView));
+    return Array.from(buildAreas, (node) => this.forWindow(node.ownerGlobal));
   });
 
   this.__defineGetter__("areaType", function() {
@@ -3937,7 +3937,7 @@ function XULWidgetSingleWrapper(aWidgetId, aNode, aDocument) {
         return aNode;
       }
       // ... or the toolbox
-      let toolbox = aNode.ownerDocument.defaultView.gNavToolbox;
+      let toolbox = aNode.ownerGlobal.gNavToolbox;
       if (toolbox && toolbox.palette && aNode.parentNode == toolbox.palette) {
         return aNode;
       }
@@ -3998,7 +3998,7 @@ function OverflowableToolbar(aToolbarNode) {
   this._list.toolbox = this._toolbar.toolbox;
   this._list.customizationTarget = this._list;
 
-  let window = this._toolbar.ownerDocument.defaultView;
+  let window = this._toolbar.ownerGlobal;
   if (window.gBrowserInit.delayedStartupFinished) {
     this.init();
   } else {
@@ -4012,7 +4012,7 @@ OverflowableToolbar.prototype = {
 
   observe: function(aSubject, aTopic, aData) {
     if (aTopic == "browser-delayed-startup-finished" &&
-        aSubject == this._toolbar.ownerDocument.defaultView) {
+        aSubject == this._toolbar.ownerGlobal) {
       Services.obs.removeObserver(this, "browser-delayed-startup-finished");
       this.init();
     }
@@ -4059,7 +4059,7 @@ OverflowableToolbar.prototype = {
 
     this._disable();
 
-    let window = this._toolbar.ownerDocument.defaultView;
+    let window = this._toolbar.ownerGlobal;
     window.removeEventListener("resize", this);
     window.gNavToolbox.removeEventListener("customizationstarting", this);
     window.gNavToolbox.removeEventListener("aftercustomization", this);
@@ -4170,7 +4170,7 @@ OverflowableToolbar.prototype = {
       child = prevChild;
     }
 
-    let win = this._target.ownerDocument.defaultView;
+    let win = this._target.ownerGlobal;
     win.UpdateUrlbarSearchSplitterState();
   },
 
@@ -4219,7 +4219,7 @@ OverflowableToolbar.prototype = {
       CustomizableUIInternal.notifyListeners("onWidgetUnderflow", child, this._target);
     }
 
-    let win = this._target.ownerDocument.defaultView;
+    let win = this._target.ownerGlobal;
     win.UpdateUrlbarSearchSplitterState();
 
     if (!this._collapsed.size) {
@@ -4378,7 +4378,7 @@ OverflowableToolbar.prototype = {
   _hideTimeoutId: null,
   _showWithTimeout: function() {
     this.show().then(function () {
-      let window = this._toolbar.ownerDocument.defaultView;
+      let window = this._toolbar.ownerGlobal;
       if (this._hideTimeoutId) {
         window.clearTimeout(this._hideTimeoutId);
       }

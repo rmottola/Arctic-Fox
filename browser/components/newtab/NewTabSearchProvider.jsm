@@ -80,7 +80,7 @@ SearchProvider.prototype = {
   },
 
   manageEngines(browser) {
-    const browserWin = browser.ownerDocument.defaultView;
+    const browserWin = browser.ownerGlobal;
     browserWin.openPreferences("paneSearch");
   },
 

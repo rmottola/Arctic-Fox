@@ -79,7 +79,7 @@ var ReaderParent = {
   },
 
   updateReaderButton: function(browser) {
-    let win = browser.ownerDocument.defaultView;
+    let win = browser.ownerGlobal;
     if (browser != win.gBrowser.selectedBrowser) {
       return;
     }
@@ -105,7 +105,7 @@ var ReaderParent = {
   },
 
   toggleReaderMode: function(event) {
-    let win = event.target.ownerDocument.defaultView;
+    let win = event.target.ownerGlobal;
     let browser = win.gBrowser.selectedBrowser;
     browser.messageManager.sendAsyncMessage("Reader:ToggleReaderMode");
   },

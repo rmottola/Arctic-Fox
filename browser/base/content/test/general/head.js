@@ -740,7 +740,7 @@ function makeActionURI(action, params) {
 }
 
 function is_hidden(element) {
-  var style = element.ownerDocument.defaultView.getComputedStyle(element, "");
+  var style = element.ownerGlobal.getComputedStyle(element);
   if (style.display == "none")
     return true;
   if (style.visibility != "visible")
@@ -756,7 +756,7 @@ function is_hidden(element) {
 }
 
 function is_visible(element) {
-  var style = element.ownerDocument.defaultView.getComputedStyle(element, "");
+  var style = element.ownerGlobal.getComputedStyle(element);
   if (style.display == "none")
     return false;
   if (style.visibility != "visible")
