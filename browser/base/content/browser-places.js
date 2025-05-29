@@ -1214,10 +1214,9 @@ var BookmarkingUI = {
   BOOKMARK_BUTTON_ID: "bookmarks-menu-button",
   BOOKMARK_BUTTON_SHORTCUT: "addBookmarkAsKb",
   get button() {
-    if (!this._button) {
-      this._button = document.getElementById("bookmarks-menu-button");
-    }
-    return this._button;
+    delete this.button;
+    let widgetGroup = CustomizableUI.getWidget(this.BOOKMARK_BUTTON_ID);
+    return this.button = widgetGroup.forWindow(window).node;
   },
 
   get star() {
@@ -1853,7 +1852,7 @@ var BookmarkingUI = {
   _starButtonOverflowedLabel: null,
   onWidgetOverflow: function(aNode, aContainer) {
     let win = aNode.ownerDocument.defaultView;
-    if (aNode.id != "bookmarks-menu-button" || win != window)
+    if (aNode.id != this.BOOKMARK_BUTTON_ID || win != window)
       return;
 
     if (!this._starButtonOverflowedLabel) {
@@ -1873,7 +1872,7 @@ var BookmarkingUI = {
 
   onWidgetUnderflow: function(aNode, aContainer) {
     let win = aNode.ownerDocument.defaultView;
-    if (aNode.id != "bookmarks-menu-button" || win != window)
+    if (aNode.id != this.BOOKMARK_BUTTON_ID || win != window)
       return;
 
     // If the button hasn't been in the overflow panel before, we may ignore
