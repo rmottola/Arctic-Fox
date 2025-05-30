@@ -1172,6 +1172,8 @@ CustomizeMode.prototype = {
 
       CustomizableUI.reset();
 
+      this.swatchForTheme(this.document);
+
       yield this._wrapToolbarItems();
       this.populatePalette();
 
@@ -1197,6 +1199,8 @@ CustomizeMode.prototype = {
       yield this._unwrapToolbarItems();
 
       CustomizableUI.undoReset();
+
+      this.swatchForTheme(this.document);
 
       yield this._wrapToolbarItems();
       this.populatePalette();
@@ -1457,6 +1461,10 @@ CustomizeMode.prototype = {
       }
     }
     target.removeAttribute("height");
+
+    if (LightweightThemeManager.currentTheme) {
+      this._onUIChange();
+    }
   },
 
   _onUIChange: function() {
