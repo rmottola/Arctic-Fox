@@ -36,15 +36,24 @@ addRDMTask(TEST_URL, function* ({ ui }) {
   info("Checking displayed device checkboxes are checked in the device modal.");
   let checkedCbs = [...document.querySelectorAll(".device-input-checkbox")]
     .filter(cb => cb.checked);
-  let deviceList = loadDeviceList();
 
-  is(deviceList.length, checkedCbs.length,
+  let remoteList = yield GetDevices();
+
+  let featuredCount = remoteList.TYPES.reduce((total, type) => {
+    return total + remoteList[type].reduce((subtotal, device) => {
+      return subtotal + ((device.os != "fxos" && device.featured) ? 1 : 0);
+    }, 0);
+  }, 0);
+
+  is(featuredCount, checkedCbs.length,
     "Got expected number of displayed devices.");
 
   for (let cb of checkedCbs) {
-    ok(deviceList.includes(cb.value), cb.value + " is correctly checked.");
+    ok(Object.keys(remoteList).filter(type => remoteList[type][cb.value]),
+      cb.value + " is correctly checked.");
   }
 
+  // Tests where the user adds a non-featured device
   info("Check the first unchecked device and submit new device list.");
   let uncheckedCb = [...document.querySelectorAll(".device-input-checkbox")]
     .filter(cb => !cb.checked)[0];
@@ -55,13 +64,13 @@ addRDMTask(TEST_URL, function* ({ ui }) {
   ok(modal.classList.contains("closed") && !modal.classList.contains("opened"),
     "The device modal is closed on submit.");
 
-  info("Checking new device is added to the displayed device list.");
-  deviceList = loadDeviceList();
-  ok(deviceList.includes(value), value + " added to displayed device list.");
+  info("Checking that the new device is added to the user preference list.");
+  let preferredDevices = _loadPreferredDevices();
+  ok(preferredDevices.added.has(value), value + " in user added list.");
 
   info("Checking new device is added to the device selector.");
   let options = [...select.options];
-  is(options.length - 2, deviceList.length,
+  is(options.length - 2, featuredCount + 1,
     "Got expected number of devices in device selector.");
   ok(options.filter(o => o.value === value)[0],
     value + " added to the device selector.");

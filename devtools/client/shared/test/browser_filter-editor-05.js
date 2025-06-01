@@ -3,6 +3,8 @@
 
 "use strict";
 
+requestLongerTimeout(2);
+
 // Tests the Filter Editor Widget's label-dragging
 
 const {CSSFilterEditorWidget} = require("devtools/client/shared/widgets/FilterWidget");

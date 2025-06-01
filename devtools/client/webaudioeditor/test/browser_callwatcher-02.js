@@ -26,8 +26,8 @@ add_task(function* () {
   is(error.name, "TypeError", "error has correct name");
   is(error.message, "Argument 1 is not valid for any of the 2-argument overloads of AudioNode.connect.", "error has correct message");
   is(error.stringified, "TypeError: Argument 1 is not valid for any of the 2-argument overloads of AudioNode.connect.", "error is stringified correctly");
-  ise(error.instanceof, true, "error is correctly an instanceof TypeError");
-  is(error.fileName, "http://example.com/browser/browser/devtools/webaudioeditor/test/doc_bug_1112378.html", "error has correct fileName");
+  is(error.instanceof, true, "error is correctly an instanceof TypeError");
+  is(error.fileName, "http://example.com/browser/devtools/client/webaudioeditor/test/doc_bug_1112378.html", "error has correct fileName");
 
   error = yield evalInDebuggee("throwDOMException()");
   is(error.lineNumber, 37, "exception has correct lineNumber");
@@ -37,8 +37,8 @@ add_task(function* () {
   is(error.name, "NotSupportedError", "exception has correct name");
   is(error.message, "Operation is not supported", "exception has correct message");
   is(error.stringified, "NotSupportedError: Operation is not supported", "exception is stringified correctly");
-  ise(error.instanceof, true, "exception is correctly an instance of DOMException");
-  is(error.filename, "http://example.com/browser/browser/devtools/webaudioeditor/test/doc_bug_1112378.html", "exception has correct filename");
+  is(error.instanceof, true, "exception is correctly an instance of DOMException");
+  is(error.filename, "http://example.com/browser/devtools/client/webaudioeditor/test/doc_bug_1112378.html", "exception has correct filename");
 
   yield teardown(target);
 });

@@ -118,22 +118,22 @@ function runTests()
     });
   };
 
-  let firstShow = function() {
-    ok(cutItem.hasAttribute("disabled"), "cut menuitem is disabled");
+  let firstShow = function () {
+    ok(!cutItem.hasAttribute("disabled"), "cut menuitem is enabled");
     closeMenu(firstHide);
   };
 
-  let firstHide = function() {
+  let firstHide = function () {
     sp.editor.setSelection({ line: 0, ch: 0 }, { line: 0, ch: 10 });
     openMenu(11, 11, showAfterSelect);
   };
 
-  let showAfterSelect = function() {
+  let showAfterSelect = function () {
     ok(!cutItem.hasAttribute("disabled"), "cut menuitem is enabled after select");
     closeMenu(hideAfterSelect);
   };
 
-  let hideAfterSelect = function() {
+  let hideAfterSelect = function () {
     sp.editor.on("change", onCut);
     waitForFocus(function () {
       let selectedText = sp.editor.getSelection();
@@ -143,36 +143,36 @@ function runTests()
     }, gScratchpadWindow);
   };
 
-  let onCut = function() {
+  let onCut = function () {
     sp.editor.off("change", onCut);
     openMenu(12, 12, showAfterCut);
   };
 
-  let showAfterCut = function() {
-    ok(cutItem.hasAttribute("disabled"), "cut menuitem is disabled after cut");
+  let showAfterCut = function () {
+    ok(!cutItem.hasAttribute("disabled"), "cut menuitem is enabled after cut");
     ok(!pasteItem.hasAttribute("disabled"), "paste menuitem is enabled after cut");
     closeMenu(hideAfterCut);
   };
 
-  let hideAfterCut = function() {
+  let hideAfterCut = function () {
     waitForFocus(function () {
       sp.editor.on("change", onPaste);
       EventUtils.synthesizeKey("v", {accelKey: true}, gScratchpadWindow);
     }, gScratchpadWindow);
   };
 
-  let onPaste = function() {
+  let onPaste = function () {
     sp.editor.off("change", onPaste);
     openMenu(13, 13, showAfterPaste);
   };
 
-  let showAfterPaste = function() {
-    ok(cutItem.hasAttribute("disabled"), "cut menuitem is disabled after paste");
+  let showAfterPaste = function () {
+    ok(!cutItem.hasAttribute("disabled"), "cut menuitem is enabled after paste");
     ok(!pasteItem.hasAttribute("disabled"), "paste menuitem is enabled after paste");
     closeMenu(hideAfterPaste);
   };
 
-  let hideAfterPaste = function() {
+  let hideAfterPaste = function () {
     if (pass == 0) {
       pass++;
       testContextMenu();

@@ -49,12 +49,14 @@ Services.prefs.setBoolPref("devtools.responsive.html.enabled", true);
 
 registerCleanupFunction(() => {
   DevToolsUtils.testing = false;
-  Services.pref.clearUserPref("devtools.devices.url");
+  Services.prefs.clearUserPref("devtools.devices.url");
   Services.prefs.clearUserPref("devtools.responsive.html.enabled");
+  Services.prefs.clearUserPref("devtools.responsive.html.displayedDeviceList");
+  asyncStorage.removeItem("devtools.devices.url_cache");
 });
+
+// This depends on the "devtools.responsive.html.enabled" pref
 const { ResponsiveUIManager } = require("resource://devtools/client/responsivedesign/responsivedesign.jsm");
-const { loadPreferredDevices } = require("devtools/client/responsive.html/devices");
-const { getOwnerWindow } = require("sdk/tabs/utils");
 
 /**
  * Open responsive design mode for the given tab.

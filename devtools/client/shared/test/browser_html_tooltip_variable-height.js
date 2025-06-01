@@ -66,9 +66,10 @@ add_task(function* () {
   yield onPanelClick;
   is(tooltip.isVisible(), true, "Tooltip is still visible");
 
-  info("Click below the tooltip container, the tooltip should be closed.");
+  info("Click above the tooltip container, the tooltip should be closed.");
   onHidden = once(tooltip, "hidden");
-  EventUtils.synthesizeMouse(tooltip.container, 100, CONTAINER_HEIGHT + 10,
-    {}, doc.defaultView);
+  EventUtils.synthesizeMouse(tooltip.container, 100, -10, {}, doc.defaultView);
   yield onHidden;
-}
+
+  tooltip.destroy();
+});

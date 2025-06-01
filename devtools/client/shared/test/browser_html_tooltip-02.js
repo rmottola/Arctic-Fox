@@ -153,7 +153,7 @@ function* testClickInInnerIframe(doc) {
   let iframe = doc.createElementNS(HTML_NS, "iframe");
   iframe.style.width = "100px";
   iframe.style.height = "50px";
-  yield tooltip.setContent(iframe, 100, 50);
+  tooltip.setContent(iframe, {width: 100, height: 50});
   yield showTooltip(tooltip, doc.getElementById("box1"));
 
   let onTooltipContainerClick = once(tooltip.container, "click");

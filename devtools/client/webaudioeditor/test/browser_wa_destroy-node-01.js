@@ -10,26 +10,18 @@
  */
 
 add_task(function* () {
-  // Use a longer timeout as garbage collection event
-  // can be unpredictable.
-  requestLongerTimeout(2);
-
   let { target, panel } = yield initWebAudioEditor(DESTROY_NODES_URL);
   let { panelWin } = panel;
   let { gFront, $, $$, gAudioNodes } = panelWin;
 
   let started = once(gFront, "start-context");
 
-  reload(target);
-
-  let destroyed = getN(gAudioNodes, "remove", 10);
-
-  forceCC();
-
-  let [created] = yield Promise.all([
+  let events = Promise.all([
     getNSpread(gAudioNodes, "add", 13),
     waitForGraphRendered(panelWin, 13, 2)
   ]);
+  reload(target);
+  let [created] = yield events;
 
   // Flatten arrays of event arguments and take the first (AudioNodeModel)
   // and get its ID.
@@ -38,7 +30,10 @@ add_task(function* () {
   // Click a soon-to-be dead buffer node
   yield clickGraphNode(panelWin, actorIDs[5]);
 
-  forceCC();
+  let destroyed = getN(gAudioNodes, "remove", 10);
+
+  // Force a CC in the child process to collect the orphaned nodes.
+  forceNodeCollection();
 
   // Wait for destruction and graph to re-render
   yield Promise.all([destroyed, waitForGraphRendered(panelWin, 3, 2)]);

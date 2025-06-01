@@ -90,6 +90,21 @@ var TestActor = exports.TestActor = protocol.ActorClass({
     }
     return node;
   },
+  /**
+   * Helper to get the number of elements matching a selector
+   * @param {string} CSS selector.
+   */
+  getNumberOfElementMatches: protocol.method(function (selector,
+                                                       root = this.content.document) {
+    return root.querySelectorAll(selector).length;
+  }, {
+    request: {
+      selector: Arg(0, "string"),
+    },
+    response: {
+      value: RetVal("number")
+    }
+  }),
 
   /**
    * Get a value for a given attribute name, on one of the elements of the box
@@ -311,9 +326,10 @@ var TestActor = exports.TestActor = protocol.ActorClass({
   }),
 
   /**
-   * Synthesize a mouse event on an element. This handler doesn't send a message
-   * back. Consumers should listen to specific events on the inspector/highlighter
-   * to know when the event got synthesized.
+   * Synthesize a mouse event on an element, after ensuring that it is visible
+   * in the viewport. This handler doesn't send a message back. Consumers
+   * should listen to specific events on the inspector/highlighter to know when
+   * the event got synthesized.
    * @param {String} selector The node selector to get the node target for the event
    * @param {Number} x
    * @param {Number} y
@@ -323,7 +339,7 @@ var TestActor = exports.TestActor = protocol.ActorClass({
    */
   synthesizeMouse: protocol.method(function ({ selector, x, y, center, options }) {
     let node = this._querySelector(selector);
-
+    node.scrollIntoView();
     if (center) {
       EventUtils.synthesizeMouseAtCenter(node, options, node.ownerDocument.defaultView);
     } else {
@@ -605,6 +621,17 @@ var TestActor = exports.TestActor = protocol.ActorClass({
     }
   }),
 
+  /**
+   * Forces the reflow and waits for the next repaint.
+   */
+  reflow: protocol.method(function () {
+    let deferred = defer();
+    this.content.document.documentElement.offsetWidth;
+    this.content.requestAnimationFrame(deferred.resolve);
+
+    return deferred.promise;
+  }),
+
   getNodeRect: protocol.method(Task.async(function* (selector) {
     let node = this._querySelector(selector);
     return getRect(this.content, node, this.content);
@@ -659,8 +686,8 @@ var TestActor = exports.TestActor = protocol.ActorClass({
   })
 });
 
-const TestActorFront = exports.TestActorFront = protocol.FrontClass(TestActor, {
-  initialize: function(client, { testActor }, toolbox) {
+var TestActorFront = exports.TestActorFront = protocol.FrontClass(TestActor, {
+  initialize: function (client, { testActor }, toolbox) {
     protocol.Front.prototype.initialize.call(this, client, { actor: testActor });
     this.manage(this);
     this.toolbox = toolbox;

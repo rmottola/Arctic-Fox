@@ -24,6 +24,10 @@ var { require: browserRequire } = BrowserLoader({
   window: this
 });
 
+let ReactDOM = browserRequire("devtools/client/shared/vendor/react-dom");
+let React = browserRequire("devtools/client/shared/vendor/react");
+var TestUtils = React.addons.TestUtils;
+
 var EXAMPLE_URL = "http://example.com/browser/browser/devtools/shared/test/";
 
 function forceRender(comp) {
@@ -171,4 +175,36 @@ function checkFrameString({ frame, file, line, column, source, functionName, sho
   } else {
     ok(!$func, "Should not have an element for `functionName`");
   }
+}
+
+function renderComponent(component, props) {
+  const el = React.createElement(component, props, {});
+  // By default, renderIntoDocument() won't work for stateless components, but
+  // it will work if the stateless component is wrapped in a stateful one.
+  // See https://github.com/facebook/react/issues/4839
+  const wrappedEl = React.DOM.span({}, [el]);
+  const renderedComponent = TestUtils.renderIntoDocument(wrappedEl);
+  return ReactDOM.findDOMNode(renderedComponent).children[0];
+}
+
+function shallowRenderComponent(component, props) {
+  const el = React.createElement(component, props);
+  const renderer = TestUtils.createRenderer();
+  renderer.render(el, {});
+  return renderer.getRenderOutput();
+}
+
+/**
+ * Test that a rep renders correctly across different modes.
+ */
+function testRepRenderModes(modeTests, testName, componentUnderTest, gripStub) {
+  modeTests.forEach(({mode, expectedOutput, message}) => {
+    const modeString = typeof mode === "undefined" ? "no mode" : mode;
+    if (!message) {
+      message = `${testName}: ${modeString} renders correctly.`;
+    }
+
+    const rendered = renderComponent(componentUnderTest.rep, { object: gripStub, mode });
+    is(rendered.textContent, expectedOutput, message);
+  });
 }
