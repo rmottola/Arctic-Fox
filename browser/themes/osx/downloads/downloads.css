@@ -43,12 +43,17 @@
 
 /*** Highlighted list items ***/
 
-#downloadsPanel:not([keyfocus]) > #downloadsListBox > richlistitem[type="download"][state="1"][exists]:hover {
+@keyfocus@ @itemFocused@,
+@notKeyfocus@ @itemFinished@[exists]:hover,
+@item@[showingsubview] {
   border-radius: 3px;
   border-top: 1px solid hsla(0,0%,100%,.2);
-  border-bottom: 1px solid hsla(0,0%,0%,.2);
+  border-bottom: 1px solid hsla(0,0%,0%,.4);
   background-color: Highlight;
   color: HighlightText;
+}
+
+@notKeyfocus@ @itemFinished@[exists]:hover {
   cursor: pointer;
 }
 

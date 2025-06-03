@@ -51,7 +51,12 @@
 
 /*** Highlighted list items ***/
 
-#downloadsPanel:not([keyfocus]) > #downloadsListBox > richlistitem[type="download"][state="1"][exists]:hover {
+@keyfocus@ @itemFocused@ {
+  outline: 1px -moz-dialogtext dotted;
+  outline-offset: -1px;
+}
+
+@notKeyfocus@ @itemFinished@[exists]:hover {
   border-radius: 3px;
   border-top: 1px solid hsla(0,0%,100%,.3);
   border-bottom: 1px solid hsla(0,0%,0%,.2);
