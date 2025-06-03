@@ -42,10 +42,6 @@
   list-style-image: url("chrome://global/skin/icons/Error.png");
 }
 
-.downloadButton > .button-box {
-  padding: 0;
-}
-
 .downloadButton:focus > .button-box {
   outline: 1px -moz-dialogtext dotted;
 }
