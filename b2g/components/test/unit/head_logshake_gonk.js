@@ -14,9 +14,9 @@
 
 "use strict";
 
-const Cu = Components.utils;
-const Ci = Components.interfaces;
-const Cc = Components.classes;
+var Cu = Components.utils;
+var Ci = Components.interfaces;
+var Cc = Components.classes;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/osfile.jsm");
@@ -25,7 +25,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "volumeService",
                                    "@mozilla.org/telephony/volume-service;1",
                                    "nsIVolumeService");
 
-let sdcard;
+var sdcard;
 
 function setup_logshake_mocks() {
   do_get_profile();
