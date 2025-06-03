@@ -6,30 +6,24 @@
 
 /*** Panel and outer controls ***/
 
-#downloadsHistory {
-  background: transparent;
-  color: -moz-nativehyperlinktext;
-  cursor: pointer;
-}
-
 #downloadsPanel[keyfocus] > #downloadsFooter > #downloadsHistory:focus {
   outline: 1px -moz-dialogtext dotted;
   outline-offset: -1px;
 }
 
-#downloadsHistory > .button-box {
-  border: none;
-  margin: 1em;
+#downloadsHistory {
+  color: -moz-nativehyperlinktext;
 }
 
-@media (-moz-mac-lion-theme) {
-  #downloadsFooter {
-    background-color: hsla(216,45%,88%,.98);
-    box-shadow: 0px 1px 2px rgb(204,214,234) inset;
-    border-bottom-left-radius: 3px;
-    border-bottom-right-radius: 3px;
-  }
+@keyfocus@ #downloadsSummary:focus,
+@keyfocus@ #downloadsHistory:focus > .button-box {
+  outline: 1px -moz-dialogtext dotted;
 }
+
+@keyfocus@ #downloadsSummary:focus {
+  outline-offset: -5px;
+}
+
 
 /*** Downloads Summary and List items ***/
 
