@@ -66,6 +66,10 @@
         <xul:button class="downloadButton downloadUnblock downloadIconShow"
                     tooltiptext="&cmd.unblock.label;"
                     oncommand="DownloadsView.onDownloadCommand(event, 'downloadsCmd_unblock');"/>
+
+        <xul:button class="downloadButton downloadShowBlockedInfo"
+                    tooltiptext="&cmd.chooseUnblock.label;"
+                    oncommand="DownloadsView.onDownloadCommand(event, 'downloadsCmd_showBlockedInfo');"/>
       </xul:stack>
     </content>
   </binding>

@@ -35,6 +35,7 @@
   skin/classic/browser/customizableui/subView-arrow-back-inverted-rtl@2x.png  (../shared/customizableui/subView-arrow-back-inverted-rtl@2x.png)
   skin/classic/browser/customizableui/whimsy.png               (../shared/customizableui/whimsy.png)
   skin/classic/browser/customizableui/whimsy@2x.png            (../shared/customizableui/whimsy@2x.png)
+  skin/classic/browser/downloads/download-blocked.svg          (../shared/downloads/download-blocked.svg)
   skin/classic/browser/fullscreen/insecure.svg                 (../shared/fullscreen/insecure.svg)
   skin/classic/browser/fullscreen/secure.svg                   (../shared/fullscreen/secure.svg)
   skin/classic/browser/identity-icon.svg                       (../shared/identity-block/identity-icon.svg)

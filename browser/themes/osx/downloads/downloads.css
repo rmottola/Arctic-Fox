@@ -6,22 +6,47 @@
 
 /*** Panel and outer controls ***/
 
-#downloadsFooter {
-  border-top: 1px solid ThreeDShadow;
-  background-image: linear-gradient(hsla(0,0%,0%,.15), hsla(0,0%,0%,.08) 6px);
+#downloadsPanel {
+  margin-top: -1px;
 }
 
-#downloadsHistory {
-  color: -moz-nativehyperlinktext;
+#downloadsFooter,
+#downloadsPanel-blockedSubview-buttons {
+  background: #e5e5e5;
+  border-top: 1px solid hsla(0,0%,0%,.1);
+  box-shadow: 0 -1px hsla(0,0%,100%,.5) inset, 0 1px 1px hsla(0,0%,0%,.03) inset;
+}
+
+#downloadsFooter,
+#downloadsPanel-multiView .panel-subviews {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+#downloadsHistory,
+#downloadsPanel-blockedSubview-buttons > button {
+  color: #808080;
 }
 
 @keyfocus@ #downloadsSummary:focus,
-@keyfocus@ #downloadsHistory:focus > .button-box {
-  outline: 1px -moz-dialogtext dotted;
+@keyfocus@ #downloadsHistory:focus,
+@keyfocus@ #downloadsPanel-blockedSubview-buttons > button:focus {
+  outline: 2px -moz-mac-focusring solid;
+  outline-offset: -2px;
 }
 
-@keyfocus@ #downloadsSummary:focus {
-  outline-offset: -5px;
+@keyfocus@ #downloadsSummary:focus,
+@keyfocus@ #downloadsHistory:focus {
+  -moz-outline-radius-bottomleft: 4px;
+  -moz-outline-radius-bottomright: 4px;
+}
+
+@keyfocus@ #downloadsPanel-blockedSubview-deleteButton:-moz-locale-dir(ltr):focus {
+  -moz-outline-radius-bottomright: 4px;
+}
+
+@keyfocus@ #downloadsPanel-blockedSubview-deleteButton:-moz-locale-dir(rtl):focus {
+  -moz-outline-radius-bottomleft: 4px;
 }
 
 /*** List items and similar elements in the summary ***/
@@ -67,6 +92,18 @@
   border-bottom: 1px solid hsla(0,0%,0%,.4);
   background-color: Highlight;
   color: HighlightText;
+}
+
+@item@[showingsubview] {
+  transition: background-color var(--panelui-subview-transition-duration),
+              color var(--panelui-subview-transition-duration);
+}
+
+@keyfocus@ @itemFocused@[verdict="Malware"],
+@notKeyfocus@ @itemFinished@[exists][verdict="Malware"]:hover,
+@item@[showingsubview][verdict="Malware"] {
+  background-color: hsl(4, 82%, 47%);
+  color: white;
 }
 
 @notKeyfocus@ @itemFinished@[exists]:hover {

@@ -6,12 +6,14 @@
 
 /*** Panel and outer controls ***/
 
-#downloadsFooter {
+#downloadsFooter,
+#downloadsPanel-blockedSubview-buttons {
   border-top: 1px solid ThreeDShadow;
   background-image: linear-gradient(hsla(0,0%,0%,.15), hsla(0,0%,0%,.08) 6px);
 }
 
-#downloadsHistory {
+#downloadsHistory,
+#downloadsPanel-blockedSubview-openButton {
   color: -moz-nativehyperlinktext;
 }
 
@@ -55,7 +57,8 @@
   outline-offset: -1px;
 }
 
-@notKeyfocus@ @itemFinished@[exists]:hover {
+@notKeyfocus@ @itemFinished@[exists]:hover,
+@item@[showingsubview] {
   border-radius: 3px;
   border-top: 1px solid hsla(0,0%,100%,.3);
   border-bottom: 1px solid hsla(0,0%,0%,.2);
@@ -63,6 +66,12 @@
   background-image: linear-gradient(hsla(0,0%,100%,.1), hsla(0,0%,100%,0));
   color: HighlightText;
   cursor: pointer;
+}
+
+@notKeyfocus@ @itemFinished@[exists][verdict="Malware"]:hover,
+@item@[showingsubview][verdict="Malware"] {
+  background-color: hsl(4, 82%, 47%);
+  color: white;
 }
 
 /*** Button icons ***/
