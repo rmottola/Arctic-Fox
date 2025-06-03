@@ -4,48 +4,42 @@
 
 %include ../../shared/downloads/allDownloadsViewOverlay.inc.css
 
-#downloadsRichListBox {
-  /** The default listbox appearance comes with an unwanted margin. **/
-  -moz-appearance: none;
-  margin: 0;
+/*** List items ***/
+
+:root {
+  --downloads-item-height: 6em;
 }
 
-#downloadsRichListBox > richlistitem.download {
-  height: 6em;
-}
+/*** Highlighted list items ***/
 
-.downloadTypeIcon {
-  margin-inline-start: 8px;
-  margin-inline-end: 8px;
-  /* explicitly size the icon, so size doesn't vary on hidpi systems */
-  height: 32px;
-  width: 32px;
-}
+@media not all and (-moz-os-version: windows-xp) {
+  @media (-moz-windows-default-theme) {
+    /*
+    -moz-appearance: menuitem is almost right, but the hover effect is not
+    transparent and is lighter than desired.
 
-.blockedIcon {
-  list-style-image: url("chrome://global/skin/icons/Error.png");
-}
+    Copied from the autocomplete richlistbox styling in
+    toolkit/themes/windows/global/autocomplete.css
 
-.downloadTarget {
-  margin-bottom: 3px;
-  cursor: inherit;
-}
-
-.downloadDetails {
-  opacity: 0.7;
-  font-size: 95%;
-  cursor: inherit;
-}
-
-.downloadButton {
-  -moz-appearance: none;
-  background: transparent;
-  min-width: 0;
-  min-height: 0;
-  margin: 3px;
-  border: none;
-  padding: 5px;
-  list-style-image: url("chrome://browser/skin/downloads/buttons.png");
+    This styling should be kept in sync with the style from the above file.
+    */
+    @itemFocused@ {
+      color: inherit;
+      background-color: transparent;
+      /* four gradients for the bevel highlights on each edge, one for blue background */
+      background-image:
+        linear-gradient(to bottom, rgba(255,255,255,0.9) 3px, transparent 3px),
+        linear-gradient(to right, rgba(255,255,255,0.5) 3px, transparent 3px),
+        linear-gradient(to left, rgba(255,255,255,0.5) 3px, transparent 3px),
+        linear-gradient(to top, rgba(255,255,255,0.4) 3px, transparent 3px),
+        linear-gradient(to bottom, rgba(163,196,247,0.3), rgba(122,180,246,0.3));
+      background-clip: content-box;
+      border-radius: 6px;
+      outline: 1px solid rgb(124,163,206);
+      -moz-outline-radius: 3px;
+      outline-offset: -2px;
+    }
+  }
 }
 
 /*** Button icons ***/
