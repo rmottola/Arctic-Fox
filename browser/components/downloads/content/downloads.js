@@ -1094,12 +1094,7 @@ DownloadsViewItem.prototype = {
 
   downloadsCmd_unblock() {
     DownloadsPanel.hidePanel();
-    let verdict = this.download.error.reputationCheckVerdict;
-    DownloadsCommon.confirmUnblockDownload(verdict, window).then(confirmed => {
-      if (confirmed) {
-        return this.download.unblock();
-      }
-    }).catch(Cu.reportError);
+    this.confirmUnblock(window);
   },
 
   downloadsCmd_open() {
