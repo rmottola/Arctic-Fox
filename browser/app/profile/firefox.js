@@ -95,7 +95,7 @@ pref("browser.dictionaries.download.url", "http://repository.binaryoutcast.com/d
 pref("browser.getdevtools.url","https://addons.palemoon.org/extensions/web-development/");
 
 // Feedback URL
-pref("browser.feedback.url", "https://forums.macrumors.com/threads/arctic-fox-web-browser-for-10-6-64bit.2133051/");
+pref("browser.feedback.url", "https://github.com/rmottola/Arctic-Fox/discussions");
 
 // Whether to escape to a content-less page if a user presses "Get me out of here"
 // on a network error page (e.g. cert error)
