@@ -752,6 +752,13 @@ const CustomizableWidgets = [
           updateZoomResetButton();
         }.bind(this),
 
+        onWidgetUndoMove: function(aWidgetNode) {
+          if (aWidgetNode != node)
+            return;
+          updateCombinedWidgetStyle(node, this.currentArea, true);
+          updateZoomResetButton();
+        }.bind(this),
+
         onWidgetMoved: function(aWidgetId, aArea) {
           if (aWidgetId != this.id)
             return;
