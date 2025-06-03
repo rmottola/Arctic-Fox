@@ -24,103 +24,21 @@
   outline-offset: -5px;
 }
 
+/*** List items and similar elements in the summary ***/
 
-/*** Downloads Summary and List items ***/
-
-#downloadsSummary,
-richlistitem[type="download"] {
-  height: 7em;
-  padding-inline-end: 0;
-  color: inherit;
+:root {
+  --downloads-item-height: 7em;
+  --downloads-item-border-top-color: hsla(0,0%,100%,.07);
+  --downloads-item-border-bottom-color: hsla(0,0%,0%,.2);
+  --downloads-item-font-size-factor: 0.95;
+  --downloads-item-target-margin-bottom: 6px;
+  --downloads-item-details-margin-top: 0;
+  --downloads-item-details-opacity: 0.7;
 }
 
-richlistitem[type="download"] {
-  margin: 0;
-  border-top: 1px solid hsla(0,0%,100%,.3);
-  border-bottom: 1px solid hsla(220,18%,51%,.25);
-  background: transparent;
-  padding: 8px;
-}
-
-richlistitem[type="download"]:first-child {
-  border-top: 1px solid transparent;
-}
-
-@media (-moz-mac-lion-theme) {
-  richlistitem[type="download"]:last-child {
-    border-bottom: 1px solid transparent;
-  }
-}
-
-#downloadsPanel[keyfocus] > #downloadsListBox:focus > richlistitem[type="download"][selected] {
-  outline: 1px -moz-dialogtext dotted;
-  outline-offset: -1px;
-}
-
-.downloadTypeIcon {
-  margin-inline-end: 8px;
-  /* Prevent flickering when changing states. */
-  height: 32px;
-  width: 32px;
-}
-
-.blockedIcon {
-  list-style-image: url("chrome://global/skin/icons/Error.png");
-}
-
-/* We hold .downloadDisplayName, .downloadProgress and .downloadDetails
-   inside of a vbox with class .downloadContainer. We set the font-size of
-   the entire container to 90% because:
-
-   1) This is the size that we want .downloadDetails to be
-   2) The container's width is set by localizers by &downloadDetails.width;,
-      which is a ch unit. Since this is the value that should control the
-      panel width, we apply it to the outer container to constrain
-      .downloadDisplayName and .downloadProgress.
-
-   Finally, since we want .downloadDisplayName's font-size to be at 100% of
-   the font-size of .downloadContainer's parent, we use calc to go from the
-   smaller font-size back to the original font-size.
- */
-#downloadsSummaryDetails,
-.downloadContainer {
-  font-size: 90%;
-}
-
-#downloadsSummaryDescription,
-.downloadDisplayName {
-  margin-bottom: 6px;
-  cursor: inherit;
-}
-
-.downloadDisplayName {
-  font-size: calc(100%/0.9);
-}
-
-#downloadsSummaryDetails,
-.downloadDetails {
-  opacity: 0.6;
-  cursor: inherit;
-}
-
-.downloadButton {
-  -moz-appearance: none;
-  min-width: 0;
-  min-height: 0;
-  margin: 3px;
-  border: none;
-  background: transparent;
-  padding: 5px;
-  list-style-image: url("chrome://browser/skin/downloads/buttons.png");
-}
-
-.downloadButton > .button-box {
-  border: 1px solid transparent;
-  padding: 0;
-}
-
-#downloadsPanel[keyfocus] .downloadButton:focus > .button-box {
-  border: 1px dotted ThreeDDarkShadow;
+.downloadButton:focus > .button-box {
+  outline: 2px -moz-mac-focusring solid;
+  outline-offset: -2px;
 }
 
 /*** Highlighted list items ***/
