@@ -66,6 +66,10 @@
 # endif
 #endif
 
+#ifdef FUZZING
+#include "MessageManagerFuzzer.h"
+#endif
+
 using namespace mozilla;
 using namespace mozilla::dom;
 using namespace mozilla::dom::ipc;
@@ -760,6 +764,16 @@ nsFrameMessageManager::SendMessage(const nsAString& aMessageName,
     return NS_ERROR_DOM_DATA_CLONE_ERR;
   }
 
+#ifdef FUZZING
+  if (data.DataLength() > 0) {
+    MessageManagerFuzzer::TryMutate(
+      aCx,
+      aMessageName,
+      &data,
+      JS::UndefinedHandleValue);
+  }
+#endif
+
   if (!AllowMessage(data.DataLength(), aMessageName)) {
     return NS_ERROR_FAILURE;
   }
@@ -844,6 +858,12 @@ nsFrameMessageManager::DispatchAsyncMessage(const nsAString& aMessageName,
   if (aArgc >= 2 && !GetParamsForMessage(aCx, aJSON, aTransfers, data)) {
     return NS_ERROR_DOM_DATA_CLONE_ERR;
   }
+
+#ifdef FUZZING
+  if (data.DataLength()) {
+    MessageManagerFuzzer::TryMutate(aCx, aMessageName, &data, aTransfers);
+  }
+#endif
 
   if (!AllowMessage(data.DataLength(), aMessageName)) {
     return NS_ERROR_FAILURE;
