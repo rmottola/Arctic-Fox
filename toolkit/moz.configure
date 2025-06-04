@@ -478,3 +478,15 @@ def check_places_and_android_history(places, android_history):
 check_prog('TAR', ('gnutar', 'gtar', 'tar'))
 check_prog('UNZIP', ('unzip',))
 check_prog('ZIP', ('zip',))
+
+# Support various fuzzing options
+# ==============================================================
+option('--enable-libfuzzer', help='Enable libfuzzer support')
+
+@depends('--enable-libfuzzer')
+def enable_libfuzzer(value):
+    if value:
+        return True
+
+set_config('LIBFUZZER', enable_libfuzzer)
+set_define('LIBFUZZER', enable_libfuzzer)
