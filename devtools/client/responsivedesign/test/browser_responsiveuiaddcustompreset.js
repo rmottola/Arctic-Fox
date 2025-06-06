@@ -69,15 +69,13 @@ add_task(function* () {
   yield setPresetIndex(rdm, manager, customPresetIndex);
 
   let browser = gBrowser.selectedBrowser;
-  let props = yield ContentTask.spawn(browser, {}, function*() {
+  yield ContentTask.spawn(browser, null, function* () {
     let {innerWidth, innerHeight} = content;
-    return {innerWidth, innerHeight};
+    Assert.equal(innerWidth, 456, "Selecting preset should change the width");
+    Assert.equal(innerHeight, 123, "Selecting preset should change the height");
   });
 
-  is(props.innerWidth, 456, "Selecting preset should change the width");
-  is(props.innerHeight, 123, "Selecting preset should change the height");
-
-  info(`menulist count: ${rdm.menulist.itemCount}`)
+  info(`menulist count: ${rdm.menulist.itemCount}`);
 
   rdm.removebutton.doCommand();
 
