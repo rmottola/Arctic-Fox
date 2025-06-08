@@ -5485,9 +5485,6 @@ pref("dom.presentation.discoverable", false);
 pref("dom.presentation.session_transport.data_channel.enable", false);
 
 #ifdef XP_MACOSX
-// Use raw ICU instead of CoreServices API in Unicode collation
-pref("intl.collation.mac.use_icu", true);
-
 #if !defined(RELEASE_BUILD) || defined(DEBUG)
 // In non-release builds we crash by default on insecure text input (when a
 // password editor has focus but secure event input isn't enabled).  The
