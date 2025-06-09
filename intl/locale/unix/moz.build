@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -18,15 +18,14 @@ else:
     SOURCES += [
         'nsUNIXCharset.cpp',
     ]
+    GENERATED_FILES = [
+        'unixcharset.properties.h',
+    ]
+    unixcharset = GENERATED_FILES['unixcharset.properties.h']
+    unixcharset.script = '../props2arrays.py'
+    unixcharset.inputs = ['unixcharset.properties']
 
 FINAL_LIBRARY = 'xul'
-
-GENERATED_FILES = [
-    'unixcharset.properties.h',
-]
-unixcharset = GENERATED_FILES['unixcharset.properties.h']
-unixcharset.script = '../props2arrays.py'
-unixcharset.inputs = ['unixcharset.properties']
 
 LOCAL_INCLUDES += [
     '..',
@@ -37,5 +36,3 @@ LOCAL_INCLUDES += [
 # nl_langinfo(CODESET) to compile on these systems.
 if CONFIG['OS_ARCH'] == 'Linux':
     DEFINES['_XOPEN_SOURCE'] = 500
-
-DEFINES['OSTYPE'] = '"%s"' % CONFIG['OS_CONFIG']

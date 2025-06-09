@@ -1,5 +1,3 @@
-/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
-/* vim: set ft= javascript ts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -9,10 +7,10 @@
 const {Cc, Ci, Cu} = require("chrome");
 
 var WebConsoleUtils = require("devtools/shared/webconsole/utils").Utils;
-var Heritage = require("sdk/core/heritage");
+var { extend } = require("sdk/core/heritage");
 var {TargetFactory} = require("devtools/client/framework/target");
 var {Tools} = require("devtools/client/definitions");
-const { Task } = require("resource://gre/modules/Task.jsm");
+const { Task } = require("devtools/shared/task");
 var promise = require("promise");
 var Services = require("Services");
 
@@ -34,8 +32,7 @@ const BROWSER_CONSOLE_FILTER_PREFS_PREFIX = "devtools.browserconsole.filter.";
 
 var gHudId = 0;
 
-///////////////////////////////////////////////////////////////////////////
-//// The HUD service
+// The HUD service
 
 function HUD_SERVICE()
 {
@@ -66,12 +63,12 @@ HUD_SERVICE.prototype =
   lastFinishedRequest: null,
 
   /**
-   * Firefox-specific current tab getter
+   * Get the current context, which is the main application window.
    *
    * @returns nsIDOMWindow
    */
   currentContext: function HS_currentContext() {
-    return Services.wm.getMostRecentWindow("navigator:browser");
+    return Services.wm.getMostRecentWindow(gDevTools.chromeWindowType);
   },
 
   /**
@@ -234,7 +231,7 @@ HUD_SERVICE.prototype =
         .then((aBrowserConsole) => {
           this._browserConsoleDefer.resolve(aBrowserConsole);
           this._browserConsoleDefer = null;
-        })
+        });
     }, console.error.bind(console));
 
     return this._browserConsoleDefer.promise;
@@ -296,7 +293,7 @@ function WebConsole(aTarget, aIframeWindow, aChromeWindow)
   this.browserWindow = this.chromeWindow.top;
 
   let element = this.browserWindow.document.documentElement;
-  if (element.getAttribute("windowtype") != "navigator:browser") {
+  if (element.getAttribute("windowtype") != gDevTools.chromeWindowType) {
     this.browserWindow = HUDService.currentContext();
   }
 
@@ -439,7 +436,7 @@ WebConsole.prototype = {
   viewSource: function WC_viewSource(aSourceURL, aSourceLine) {
     // Attempt to access view source via a browser first, which may display it in
     // a tab, if enabled.
-    let browserWin = Services.wm.getMostRecentWindow("navigator:browser");
+    let browserWin = Services.wm.getMostRecentWindow(gDevTools.chromeWindowType);
     if (browserWin && browserWin.BrowserViewSourceOfDocument) {
       return browserWin.BrowserViewSourceOfDocument({
         URL: aSourceURL,
@@ -490,7 +487,7 @@ WebConsole.prototype = {
     }
     toolbox.viewSourceInDebugger(aSourceURL, aSourceLine).then(() => {
       this.ui.emit("source-in-debugger-opened");
-    })
+    });
   },
 
   /**
@@ -588,7 +585,7 @@ WebConsole.prototype = {
       }
     }
 
-    let onDestroy = Task.async(function*() {
+    let onDestroy = Task.async(function* () {
       if (!this._browserConsole) {
         try {
           yield this.target.activeTab.focus();
@@ -638,8 +635,7 @@ function BrowserConsole()
   this._telemetry = new Telemetry();
 }
 
-BrowserConsole.prototype = Heritage.extend(WebConsole.prototype,
-{
+BrowserConsole.prototype = extend(WebConsole.prototype, {
   _browserConsole: true,
   _bc_init: null,
   _bc_destroyer: null,

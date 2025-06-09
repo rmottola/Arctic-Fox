@@ -9,7 +9,8 @@
 // This is more of a unit test than a mochitest-browser test, but can't be
 // tested with an xpcshell test as the output-parser requires the DOM to work.
 
-var {OutputParser} = require("devtools/client/shared/output-parser");
+const {OutputParser} = require("devtools/client/shared/output-parser");
+const {initCssProperties, getCssProperties} = require("devtools/shared/fronts/css-properties");
 
 const COLOR_CLASS = "color-class";
 const URL_CLASS = "url-class";
@@ -145,7 +146,9 @@ const TEST_DATA = [
   },
   {
     name: "background",
-    value: "linear-gradient(to right, rgba(183,222,237,1) 0%, rgba(33,180,226,1) 30%, rgba(31,170,217,.5) 44%, #F06 75%, red 100%)",
+    value: "linear-gradient(to right, rgba(183,222,237,1) 0%, " +
+           "rgba(33,180,226,1) 30%, rgba(31,170,217,.5) 44%, " +
+           "#F06 75%, red 100%)",
     test: fragment => {
       is(countAll(fragment), 10);
       let allSwatches = fragment.querySelectorAll("." + COLOR_CLASS);
@@ -159,7 +162,8 @@ const TEST_DATA = [
   },
   {
     name: "background",
-    value: "-moz-radial-gradient(center 45deg, circle closest-side, orange 0%, red 100%)",
+    value: "-moz-radial-gradient(center 45deg, circle closest-side, " +
+           "orange 0%, red 100%)",
     test: fragment => {
       is(countAll(fragment), 6);
       let colorSwatches = fragment.querySelectorAll("." + COLOR_CLASS);
@@ -207,10 +211,12 @@ const TEST_DATA = [
   },
   {
     name: "background-image",
-    value: "url(../../../look/at/this/folder/structure/../../red.blue.green.svg   )",
+    value: "url(../../../look/at/this/folder/structure/../" +
+           "../red.blue.green.svg   )",
     test: fragment => {
       is(countAll(fragment), 1);
-      is(getUrl(fragment), "../../../look/at/this/folder/structure/../../red.blue.green.svg");
+      is(getUrl(fragment), "../../../look/at/this/folder/structure/../" +
+                           "../red.blue.green.svg");
     }
   },
   {
@@ -290,8 +296,13 @@ const TEST_DATA = [
   }
 ];
 
-add_task(function*() {
-  let parser = new OutputParser(document);
+add_task(function* () {
+  // Mock the toolbox that initCssProperties expect so we get the fallback css properties.
+  let toolbox = {target: {client: {}, hasActor: () => false}};
+  yield initCssProperties(toolbox);
+  let cssProperties = getCssProperties(toolbox);
+
+  let parser = new OutputParser(document, cssProperties.supportsType);
   for (let i = 0; i < TEST_DATA.length; i++) {
     let data = TEST_DATA[i];
     info("Output-parser test data " + i + ". {" + data.name + " : " +

@@ -9,6 +9,9 @@ Cu.import('resource://gre/modules/XPCOMUtils.jsm');
 Cu.import('resource://gre/modules/Services.jsm');
 Cu.import('resource://gre/modules/Timer.jsm');
 
+const uuidGenerator = Cc["@mozilla.org/uuid-generator;1"]
+                      .getService(Ci.nsIUUIDGenerator);
+
 function registerMockedFactory(contractId, mockedClassId, mockedFactory) {
   var originalClassId, originalFactory;
 
@@ -42,7 +45,7 @@ function registerOriginalFactory(contractId, mockedClassId, mockedFactory, origi
   }
 }
 
-const sessionId = 'test-session-id';
+var sessionId = 'test-session-id-' + uuidGenerator.generateUUID().toString();
 
 const address = Cc["@mozilla.org/supports-cstring;1"]
                   .createInstance(Ci.nsISupportsCString);
@@ -139,6 +142,10 @@ const mockedControlChannel = {
     return isValid;
   },
   launch: function(presentationId, url) {
+    sessionId = presentationId;
+  },
+  terminate: function(presentationId) {
+    sendAsyncMessage('sender-terminate', presentationId);
   },
   disconnect: function(reason) {
     sendAsyncMessage('control-channel-closed', reason);
@@ -326,8 +333,6 @@ const mockedRequestUIGlue = {
 };
 
 // Register mocked factories.
-const uuidGenerator = Cc["@mozilla.org/uuid-generator;1"]
-                      .getService(Ci.nsIUUIDGenerator);
 const originalFactoryData = [];
 originalFactoryData.push(registerMockedFactory("@mozilla.org/presentation-device/prompt;1",
                                                uuidGenerator.generateUUID(),
@@ -389,6 +394,13 @@ addMessageListener('trigger-incoming-session-request', function(url) {
                       .getService(Ci.nsIPresentationDeviceManager);
   deviceManager.QueryInterface(Ci.nsIPresentationDeviceListener)
 	       .onSessionRequest(mockedDevice, url, sessionId, mockedControlChannel);
+});
+
+addMessageListener('trigger-incoming-terminate-request', function() {
+  var deviceManager = Cc['@mozilla.org/presentation-device/manager;1']
+                      .getService(Ci.nsIPresentationDeviceManager);
+  deviceManager.QueryInterface(Ci.nsIPresentationDeviceListener)
+	       .onTerminateRequest(mockedDevice, sessionId, mockedControlChannel, true);
 });
 
 addMessageListener('trigger-incoming-offer', function() {

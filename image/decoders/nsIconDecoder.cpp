@@ -17,7 +17,8 @@ static const uint32_t ICON_HEADER_SIZE = 2;
 
 nsIconDecoder::nsIconDecoder(RasterImage* aImage)
  : Decoder(aImage)
- , mLexer(Transition::To(State::HEADER, ICON_HEADER_SIZE))
+ , mLexer(Transition::To(State::HEADER, ICON_HEADER_SIZE),
+          Transition::TerminateSuccess())
  , mBytesPerRow()   // set by ReadHeader()
 {
   // Nothing to do
@@ -26,14 +27,12 @@ nsIconDecoder::nsIconDecoder(RasterImage* aImage)
 nsIconDecoder::~nsIconDecoder()
 { }
 
-Maybe<TerminalState>
-nsIconDecoder::DoDecode(SourceBufferIterator& aIterator)
+LexerResult
+nsIconDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
-  MOZ_ASSERT(aIterator.Data());
-  MOZ_ASSERT(aIterator.Length() > 0);
 
-  return mLexer.Lex(aIterator.Data(), aIterator.Length(),
+  return mLexer.Lex(aIterator, aOnResume,
                     [=](State aState, const char* aData, size_t aLength) {
     switch (aState) {
       case State::HEADER:

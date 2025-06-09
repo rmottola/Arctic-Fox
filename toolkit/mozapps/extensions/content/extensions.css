@@ -282,6 +282,6 @@ richlistitem:not([selected]) * {
 
 /* Translators for Language Pack details */
 .translators > label {
-  -moz-margin-start: 0px;
-  -moz-margin-end: 0px;
+  margin-inline-start: 0px;
+  margin-inline-end: 0px;
 }

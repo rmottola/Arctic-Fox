@@ -80,7 +80,7 @@ extensions.on("shutdown", (type, extension) => {
 
 var nextId = 0;
 
-extensions.registerSchemaAPI("notifications", "notifications", (extension, context) => {
+extensions.registerSchemaAPI("notifications", (extension, context) => {
   return {
     notifications: {
       create: function(notificationId, options) {
@@ -111,7 +111,10 @@ extensions.registerSchemaAPI("notifications", "notifications", (extension, conte
       },
 
       getAll: function() {
-        let result = Array.from(notificationsMap.get(extension).keys());
+        let result = {};
+        notificationsMap.get(extension).forEach((value, key) => {
+          result[key] = value.options;
+        });
         return Promise.resolve(result);
       },
 

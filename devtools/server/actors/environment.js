@@ -5,8 +5,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const { ActorClass, Arg, RetVal, method } = require("devtools/shared/protocol");
+const { ActorClassWithSpec } = require("devtools/shared/protocol");
 const { createValueGrip } = require("devtools/server/actors/object");
+const { environmentSpec } = require("devtools/shared/specs/environment");
 
 /**
  * Creates an EnvironmentActor. EnvironmentActors are responsible for listing
@@ -18,9 +19,7 @@ const { createValueGrip } = require("devtools/server/actors/object");
  * @param ThreadActor aThreadActor
  *        The parent thread actor that contains this environment.
  */
-let EnvironmentActor = ActorClass({
-  typeName: "environment",
-
+let EnvironmentActor = ActorClassWithSpec(environmentSpec, {
   initialize: function (environment, threadActor) {
     this.obj = environment;
     this.threadActor = threadActor;
@@ -76,10 +75,10 @@ let EnvironmentActor = ActorClass({
    * @param any value
    *        The value to be assigned.
    */
-  assign: method(function (name, value) {
+  assign: function (name, value) {
     // TODO: enable the commented-out part when getVariableDescriptor lands
     // (bug 725815).
-    /*let desc = this.obj.getVariableDescriptor(name);
+    /* let desc = this.obj.getVariableDescriptor(name);
 
     if (!desc.writable) {
       return { error: "immutableBinding",
@@ -100,24 +99,19 @@ let EnvironmentActor = ActorClass({
       }
     }
     return { from: this.actorID };
-  }, {
-    request: {
-      name: Arg(1),
-      value: Arg(2)
-    }
-  }),
+  },
 
   /**
    * Handle a protocol request to fully enumerate the bindings introduced by the
    * lexical environment.
    */
-  bindings: method(function () {
+  bindings: function () {
     let bindings = { arguments: [], variables: {} };
 
     // TODO: this part should be removed in favor of the commented-out part
     // below when getVariableDescriptor lands (bug 725815).
     if (typeof this.obj.getVariable != "function") {
-    //if (typeof this.obj.getVariableDescriptor != "function") {
+    // if (typeof this.obj.getVariableDescriptor != "function") {
       return bindings;
     }
 
@@ -161,8 +155,8 @@ let EnvironmentActor = ActorClass({
 
     for (let name of this.obj.names()) {
       if (bindings.arguments.some(function exists(element) {
-                                    return !!element[name];
-                                  })) {
+        return !!element[name];
+      })) {
         continue;
       }
 
@@ -180,7 +174,7 @@ let EnvironmentActor = ActorClass({
         enumerable: true
       };
 
-      //let desc = this.obj.getVariableDescriptor(name);
+      // let desc = this.obj.getVariableDescriptor(name);
       let descForm = {
         enumerable: true,
         configurable: desc.configurable
@@ -199,12 +193,7 @@ let EnvironmentActor = ActorClass({
     }
 
     return bindings;
-  }, {
-    request: {},
-    response: {
-      bindings: RetVal("json")
-    }
-  })
+  }
 });
 
 exports.EnvironmentActor = EnvironmentActor;

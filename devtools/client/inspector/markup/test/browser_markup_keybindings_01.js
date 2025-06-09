@@ -4,6 +4,8 @@
 
 "use strict";
 
+requestLongerTimeout(2);
+
 // Tests tabbing through attributes on a node
 
 const TEST_URL = "data:text/html;charset=utf8,<div id='test' a b c d e></div>";
@@ -12,7 +14,7 @@ add_task(function* () {
   let {inspector} = yield openInspectorForURL(TEST_URL);
 
   info("Focusing the tag editor of the test element");
-  let {editor} = yield getContainerForSelector("div", inspector);
+  let {editor} = yield focusNode("div", inspector);
   editor.tag.focus();
 
   info("Pressing tab and expecting to focus the ID attribute, always first");

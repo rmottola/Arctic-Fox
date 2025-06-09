@@ -6,9 +6,9 @@
  * objects.
  */
 
-const { PerformanceFront } = require("devtools/server/actors/performance");
+const { PerformanceFront } = require("devtools/shared/fronts/performance");
 
-add_task(function*() {
+add_task(function* () {
   // This test runs very slowly on linux32 debug EC2 instances.
   requestLongerTimeout(2);
 

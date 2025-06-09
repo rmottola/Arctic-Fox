@@ -13,8 +13,12 @@ requestLongerTimeout(2);
 const TAB_URL = EXAMPLE_URL + "doc_recursion-stack.html";
 
 function test() {
-  Task.spawn(function*() {
-    let [tab,, panel] = yield initDebugger(TAB_URL);
+  Task.spawn(function* () {
+    let options = {
+      source: TAB_URL,
+      line: 1
+    };
+    let [tab,, panel] = yield initDebugger(TAB_URL, options);
     let win = panel.panelWin;
     let events = win.EVENTS;
     let editor = win.DebuggerView.editor;
@@ -46,7 +50,7 @@ function test() {
     }
 
     function expandGlobalScope() {
-      let globalScope = variables.getScopeAtIndex(1);
+      let globalScope = variables.getScopeAtIndex(2);
       is(globalScope.expanded, false,
         "The globalScope should not be expanded yet.");
 
@@ -55,8 +59,10 @@ function test() {
       return finished;
     }
 
+    let onCaretAndScopes = waitForCaretAndScopes(panel, 26);
     callInTab(tab, "recurse");
-    yield waitForSourceAndCaretAndScopes(panel, ".html", 26);
+    yield onCaretAndScopes;
+
     yield checkView(0, 26);
 
     yield expandGlobalScope();

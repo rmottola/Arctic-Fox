@@ -3,28 +3,22 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 /* Bug 684546 */
 
-let tempScope = {};
-Cu.import("resource://gre/modules/NetUtil.jsm", tempScope);
-Cu.import("resource://gre/modules/FileUtils.jsm", tempScope);
-let NetUtil = tempScope.NetUtil;
-let FileUtils = tempScope.FileUtils;
-
 // Reference to the Scratchpad chrome window object.
-let gScratchpadWindow;
+var gScratchpadWindow;
 
 // Reference to the Scratchpad object.
-let gScratchpad;
+var gScratchpad;
 
 // Reference to the temporary nsIFile we will work with.
-let gFileA;
-let gFileB;
+var gFileA;
+var gFileB;
 
 // The temporary file content.
-let gFileAContent = "// File A ** Hello World!";
-let gFileBContent = "// File B ** Goodbye All";
+var gFileAContent = "// File A ** Hello World!";
+var gFileBContent = "// File B ** Goodbye All";
 
 // Help track if one or both files are saved
-let gFirstFileSaved = false;
+var gFirstFileSaved = false;
 
 function test()
 {
@@ -87,7 +81,7 @@ function tempFileSaved(aStatus)
   {
     ok((gFirstFileSaved && success), "Both files loaded");
     // Import the file A into Scratchpad.
-    gScratchpad.importFromFile(gFileA.QueryInterface(Ci.nsILocalFile),  true,
+    gScratchpad.importFromFile(gFileA.QueryInterface(Ci.nsILocalFile), true,
                               fileAImported);
   }
   gFirstFileSaved = success;
@@ -112,7 +106,7 @@ function fileAImported(aStatus, aFileContent)
   is(gScratchpad.getText(), gFileAContent + "new text", "redo works");
 
   // Import the file B into Scratchpad.
-  gScratchpad.importFromFile(gFileB.QueryInterface(Ci.nsILocalFile),  true,
+  gScratchpad.importFromFile(gFileB.QueryInterface(Ci.nsILocalFile), true,
                             fileBImported);
 }
 
@@ -146,7 +140,7 @@ function fileBImported(aStatus, aFileContent)
   finish();
 }
 
-registerCleanupFunction(function() {
+registerCleanupFunction(function () {
   if (gFileA && gFileA.exists())
   {
     gFileA.remove(false);

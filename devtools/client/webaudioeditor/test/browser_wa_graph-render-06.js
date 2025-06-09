@@ -7,17 +7,17 @@
 
 const BUG_1141261_URL = EXAMPLE_URL + "doc_bug_1141261.html";
 
-add_task(function*() {
+add_task(function* () {
   let { target, panel } = yield initWebAudioEditor(BUG_1141261_URL);
   let { panelWin } = panel;
   let { gFront, $, $$, EVENTS } = panelWin;
 
-  reload(target);
-
-  let [actors] = yield Promise.all([
+  let events = Promise.all([
     getN(gFront, "create-node", 3),
     waitForGraphRendered(panelWin, 3, 1, 0)
   ]);
+  reload(target);
+  yield events;
 
   ok(true, "Graph correctly shows gain node as disconnected");
 

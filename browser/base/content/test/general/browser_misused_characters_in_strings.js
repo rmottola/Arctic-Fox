@@ -48,10 +48,6 @@ let gWhitelist = [{
     file: "phishing-afterload-warning-message.dtd",
     key: "safeb.blocked.phishingPage.shortDesc2",
     type: "single-quote"
-  }, {
-    file: "phishing-afterload-warning-message.dtd",
-    key: "safeb.blocked.forbiddenPage.shortDesc2",
-    type: "single-quote"
   }
 ];
 

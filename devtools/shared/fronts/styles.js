@@ -9,17 +9,17 @@ const {
   FrontClassWithSpec,
   custom,
   preEvent
-} = require("devtools/shared/protocol.js");
+} = require("devtools/shared/protocol");
 const {
   pageStyleSpec,
   styleRuleSpec
-} = require("devtools/shared/specs/styles.js");
+} = require("devtools/shared/specs/styles");
 const promise = require("promise");
-const { Task } = require("resource://gre/modules/Task.jsm");
+const { Task } = require("devtools/shared/task");
 const { Class } = require("sdk/core/heritage");
 
 loader.lazyGetter(this, "RuleRewriter", () => {
-  return require("devtools/client/shared/css-parsing-utils").RuleRewriter;
+  return require("devtools/shared/css-parsing-utils").RuleRewriter;
 });
 
 /**
@@ -128,10 +128,14 @@ const StyleRuleFront = FrontClassWithSpec(styleRuleSpec, {
    * A RuleRewriter will be returned when the rule's canSetRuleText
    * trait is true; otherwise a RuleModificationList will be
    * returned.
+   *
+   * @param {CssPropertiesFront} cssProperties
+   *                             This is needed by the RuleRewriter.
+   * @return {RuleModificationList}
    */
-  startModifyingProperties: function () {
+  startModifyingProperties: function (cssProperties) {
     if (this.canSetRuleText) {
-      return new RuleRewriter(this, this.authoredText);
+      return new RuleRewriter(cssProperties.isKnown, this, this.authoredText);
     }
     return new RuleModificationList(this);
   },
@@ -416,4 +420,3 @@ var RuleModificationList = Class({
     // Nothing.
   },
 });
-

@@ -4,6 +4,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+Components.utils.import("resource://gre/modules/ContextualIdentityService.jsm");
 Components.utils.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
 Components.utils.import("resource://gre/modules/InlineSpellChecker.jsm");
 Components.utils.import("resource://gre/modules/LoginManagerContextMenu.jsm");
@@ -143,12 +144,27 @@ nsContextMenu.prototype = {
       this.onPlainTextLink = true;
     }
 
+    var inContainer = false;
+    var userContextId = this.browser.contentPrincipal.originAttributes.userContextId;
+    if (userContextId) {
+      inContainer = true;
+      var item = document.getElementById("context-openlinkincontainertab");
+
+      item.setAttribute("usercontextid", userContextId);
+
+      var label = ContextualIdentityService.getUserContextLabel(userContextId);
+      item.setAttribute("label",
+         gBrowserBundle.formatStringFromName("userContextOpenLink.label",
+                                             [label], 1));
+    }
+
     var shouldShow = this.onSaveableLink || isMailtoInternal || this.onPlainTextLink;
     var isWindowPrivate = PrivateBrowsingUtils.isWindowPrivate(window);
     var showContainers = Services.prefs.getBoolPref("privacy.userContext.enabled");
     this.showItem("context-openlink", shouldShow && !isWindowPrivate);
     this.showItem("context-openlinkprivate", shouldShow);
-    this.showItem("context-openlinkintab", shouldShow);
+    this.showItem("context-openlinkintab", shouldShow && !inContainer);
+    this.showItem("context-openlinkincontainertab", shouldShow && inContainer);
     this.showItem("context-openlinkinusercontext-menu", shouldShow && !isWindowPrivate && showContainers);
     this.showItem("context-openlinkincurrent", this.onPlainTextLink);
     this.showItem("context-sep-open", shouldShow);
@@ -532,7 +548,7 @@ nsContextMenu.prototype = {
 
   inspectNode: function() {
     let {devtools} = Cu.import("resource://devtools/shared/Loader.jsm", {});
-    let gBrowser = this.browser.ownerDocument.defaultView.gBrowser;
+    let gBrowser = this.browser.ownerGlobal.gBrowser;
     let target = devtools.TargetFactory.forTab(gBrowser.selectedTab);
 
     return gDevTools.showToolbox(target, "inspector").then(toolbox => {
@@ -542,14 +558,10 @@ nsContextMenu.prototype = {
       // browser is remote or not.
       let onNewNode = inspector.selection.once("new-node-front");
 
-      if (this.isRemote) {
-        this.browser.messageManager.sendAsyncMessage("debug:inspect", {}, {node: this.target});
-        inspector.walker.findInspectingNode().then(nodeFront => {
-          inspector.selection.setNodeFront(nodeFront, "browser-context-menu");
-        });
-      } else {
-        inspector.selection.setNode(this.target, "browser-context-menu");
-      }
+      this.browser.messageManager.sendAsyncMessage("debug:inspect", {}, {node: this.target});
+      inspector.walker.findInspectingNode().then(nodeFront => {
+        inspector.selection.setNodeFront(nodeFront, "browser-context-menu");
+      });
 
       return onNewNode.then(() => {
         // Now that the node has been selected, wait until the inspector is
@@ -1795,5 +1807,10 @@ nsContextMenu.prototype = {
     this._telemetryPageContext = this._getTelemetryPageContextInfo();
     this._telemetryHadCustomItems = this.hasPageMenu;
     this._getTelemetryClickInfo(aXulMenu);
+  },
+
+  createContainerMenu: function(aEvent) {
+    var userContextId = this.browser.contentPrincipal.originAttributes.userContextId;
+    return createUserContextMenu(aEvent, false, userContextId);
   },
 };

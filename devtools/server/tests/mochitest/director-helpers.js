@@ -8,19 +8,19 @@ const Services = require("Services");
 Services.prefs.setBoolPref("devtools.debugger.log", true);
 Services.prefs.setBoolPref("dom.mozBrowserFramesEnabled", true);
 
-SimpleTest.registerCleanupFunction(function() {
+SimpleTest.registerCleanupFunction(function () {
   Services.prefs.clearUserPref("devtools.debugger.log");
   Services.prefs.clearUserPref("dom.mozBrowserFramesEnabled");
 });
 
-const { DirectorRegistry,
-        DirectorRegistryFront } = require("devtools/server/actors/director-registry");
+const { DirectorRegistry } = require("devtools/server/actors/director-registry");
+const { DirectorRegistryFront } = require("devtools/shared/fronts/director-registry");
 
-const { DirectorManagerFront } = require("devtools/server/actors/director-manager");
+const { DirectorManagerFront } = require("devtools/shared/fronts/director-manager");
 
-const {Task} = require("resource://gre/modules/Task.jsm");
+const { Task } = require("devtools/shared/task");
 
-/***********************************
+/** *********************************
  *  director helpers functions
  **********************************/
 

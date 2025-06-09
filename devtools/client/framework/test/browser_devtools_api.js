@@ -3,7 +3,7 @@
 /* Any copyright is dedicated to the Public Domain.
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 
-///////////////////
+// /////////////////
 //
 // Whitelisting this test.
 // As part of bug 1077403, the leaking uncaught rejections should be fixed.
@@ -18,9 +18,7 @@ thisTestLeaksUncaughtRejectionsAndShouldBeFixed("TypeError: this.doc is undefine
 const toolId1 = "test-tool-1";
 const toolId2 = "test-tool-2";
 
-var tempScope = {};
-Cu.import("resource://devtools/shared/event-emitter.js", tempScope);
-var EventEmitter = tempScope.EventEmitter;
+var EventEmitter = require("devtools/shared/event-emitter");
 
 function test() {
   addTab("about:blank").then(runTests1);
@@ -30,22 +28,22 @@ function test() {
 function runTests1(aTab) {
   let toolDefinition = {
     id: toolId1,
-    isTargetSupported: function() true,
+    isTargetSupported: () => true,
     visibilityswitch: "devtools.test-tool.enabled",
     url: "about:blank",
     label: "someLabel",
-    build: function(iframeWindow, toolbox) {
+    build: function (iframeWindow, toolbox) {
       let panel = new DevToolPanel(iframeWindow, toolbox);
       return panel.open();
     },
   };
 
   ok(gDevTools, "gDevTools exists");
-  is(gDevTools.getToolDefinitionMap().has(toolId1), false,
+  ok(!gDevTools.getToolDefinitionMap().has(toolId1),
     "The tool is not registered");
 
   gDevTools.registerTool(toolDefinition);
-  is(gDevTools.getToolDefinitionMap().has(toolId1), true,
+  ok(gDevTools.getToolDefinitionMap().has(toolId1),
     "The tool is registered");
 
   let target = TargetFactory.forTab(gBrowser.selectedTab);
@@ -91,20 +89,20 @@ function runTests1(aTab) {
 function runTests2() {
   let toolDefinition = {
     id: toolId2,
-    isTargetSupported: function() true,
+    isTargetSupported: () => true,
     visibilityswitch: "devtools.test-tool.enabled",
     url: "about:blank",
     label: "someLabel",
-    build: function(iframeWindow, toolbox) {
+    build: function (iframeWindow, toolbox) {
       return new DevToolPanel(iframeWindow, toolbox);
     },
   };
 
-  is(gDevTools.getToolDefinitionMap().has(toolId2), false,
+  ok(!gDevTools.getToolDefinitionMap().has(toolId2),
     "The tool is not registered");
 
   gDevTools.registerTool(toolDefinition);
-  is(gDevTools.getToolDefinitionMap().has(toolId2), true,
+  ok(gDevTools.getToolDefinitionMap().has(toolId2),
     "The tool is registered");
 
   let target = TargetFactory.forTab(gBrowser.selectedTab);
@@ -151,7 +149,7 @@ function runTests2() {
   });
 }
 
-function continueTests(toolbox, panel) {
+var continueTests = Task.async(function* (toolbox, panel) {
   ok(toolbox.getCurrentPanel(), "panel value is correct");
   is(toolbox.currentToolId, toolId2, "toolbox _currentToolId is correct");
 
@@ -162,27 +160,45 @@ function continueTests(toolbox, panel) {
     "The builtin tool tabs do have the invertable attribute");
 
   let toolDefinitions = gDevTools.getToolDefinitionMap();
-  is(toolDefinitions.has(toolId2), true, "The tool is in gDevTools");
+  ok(toolDefinitions.has(toolId2), "The tool is in gDevTools");
 
   let toolDefinition = toolDefinitions.get(toolId2);
   is(toolDefinition.id, toolId2, "toolDefinition id is correct");
 
-  gDevTools.unregisterTool(toolId2);
-  is(gDevTools.getToolDefinitionMap().has(toolId2), false,
+  info("Testing toolbox tool-unregistered event");
+  let toolSelected = toolbox.once("select");
+  let unregisteredTool = yield new Promise(resolve => {
+    toolbox.once("tool-unregistered", (e, id) => resolve(id));
+    gDevTools.unregisterTool(toolId2);
+  });
+  yield toolSelected;
+
+  is(unregisteredTool, toolId2, "Event returns correct id");
+  ok(!toolbox.isToolRegistered(toolId2),
+    "Toolbox: The tool is not registered");
+  ok(!gDevTools.getToolDefinitionMap().has(toolId2),
     "The tool is no longer registered");
 
-  // Wait for unregisterTool to select the next tool before
-  // attempting to destroy.
-  toolbox.on("select", function selectListener (_, id) {
-    if (id !== "test-tool") {
-      toolbox.off("select", selectListener);
-      destroyToolbox(toolbox);
-    }
+  info("Testing toolbox tool-registered event");
+  let registeredTool = yield new Promise(resolve => {
+    toolbox.once("tool-registered", (e, id) => resolve(id));
+    gDevTools.registerTool(toolDefinition);
   });
-}
+
+  is(registeredTool, toolId2, "Event returns correct id");
+  ok(toolbox.isToolRegistered(toolId2),
+    "Toolbox: The tool is registered");
+  ok(gDevTools.getToolDefinitionMap().has(toolId2),
+    "The tool is registered");
+
+  info("Unregistering tool");
+  gDevTools.unregisterTool(toolId2);
+
+  destroyToolbox(toolbox);
+});
 
 function destroyToolbox(toolbox) {
-  toolbox.destroy().then(function() {
+  toolbox.destroy().then(function () {
     let target = TargetFactory.forTab(gBrowser.selectedTab);
     ok(gDevTools._toolboxes.get(target) == null, "gDevTools doesn't know about target");
     ok(toolbox._target == null, "toolbox doesn't know about target.");
@@ -191,7 +207,6 @@ function destroyToolbox(toolbox) {
 }
 
 function finishUp() {
-  tempScope = null;
   gBrowser.removeCurrentTab();
   finish();
 }
@@ -209,7 +224,7 @@ function DevToolPanel(iframeWindow, toolbox) {
 
   this._toolbox = toolbox;
 
-  /*let doc = iframeWindow.document
+  /* let doc = iframeWindow.document
   let label = doc.createElement("label");
   let textNode = doc.createTextNode("Some Tool");
 
@@ -218,8 +233,8 @@ function DevToolPanel(iframeWindow, toolbox) {
 }
 
 DevToolPanel.prototype = {
-  open: function() {
-    let deferred = promise.defer();
+  open: function () {
+    let deferred = defer();
 
     executeSoon(() => {
       this._isReady = true;
@@ -230,15 +245,21 @@ DevToolPanel.prototype = {
     return deferred.promise;
   },
 
-  get target() this._toolbox.target,
+  get target() {
+    return this._toolbox.target;
+  },
 
-  get toolbox() this._toolbox,
+  get toolbox() {
+    return this._toolbox;
+  },
 
-  get isReady() this._isReady,
+  get isReady() {
+    return this._isReady;
+  },
 
   _isReady: false,
 
   destroy: function DTI_destroy() {
-    return promise.defer(null);
+    return defer(null);
   },
 };

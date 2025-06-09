@@ -611,8 +611,9 @@ static void GetColorsForProperty(const uint32_t aParserVariant,
     MOZ_ASSERT(aArray.Length() == 0);
     size_t size;
     const char * const *allColorNames = NS_AllColorNames(&size);
+    nsString* utf16Names = aArray.AppendElements(size);
     for (size_t i = 0; i < size; i++) {
-      CopyASCIItoUTF16(allColorNames[i], *aArray.AppendElement());
+      CopyASCIItoUTF16(allColorNames[i], utf16Names[i]);
     }
     InsertNoDuplicates(aArray, NS_LITERAL_STRING("currentColor"));
   }
@@ -1215,9 +1216,10 @@ GetStatesForPseudoClass(const nsAString& aStatePseudo)
   CSSPseudoClassType type = nsCSSPseudoClasses::
     GetPseudoType(atom, CSSEnabledState::eIgnoreEnabledState);
 
-  // Ignore :moz-any-link so we don't give the element simultaneous
+  // Ignore :any-link so we don't give the element simultaneous
   // visited and unvisited style state
-  if (type == CSSPseudoClassType::mozAnyLink) {
+  if (type == CSSPseudoClassType::anyLink ||
+      type == CSSPseudoClassType::mozAnyLink) {
     return EventStates();
   }
   // Our array above is long enough that indexing into it with

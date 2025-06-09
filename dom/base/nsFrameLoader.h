@@ -357,7 +357,6 @@ private:
   // Note: this variable must be modified only by ResetPermissionManagerStatus()
   uint32_t mAppIdSentToPermissionManager;
 
-private:
   // Stores the root frame of the subdocument while the subdocument is being
   // reframed. Used to restore the presentation after reframing.
   nsWeakFrame mDetachedSubdocFrame;

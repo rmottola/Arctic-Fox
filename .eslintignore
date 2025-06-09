@@ -38,11 +38,8 @@ parser/**
 probes/**
 python/**
 rdf/**
-services/**
 startupcache/**
 testing/**
-!tools/lint/eslint/eslint-plugin-mozilla/
-tools/lint/eslint/eslint-plugin-mozilla/node_modules/**
 tools/**
 uriloader/**
 view/**
@@ -63,43 +60,28 @@ browser/base/content/nsContextMenu.js
 browser/base/content/sanitizeDialog.js
 browser/base/content/test/**
 browser/base/content/newtab/**
-browser/components/customizableui/**
 browser/components/downloads/**
 browser/components/feeds/**
-browser/components/*.js
-browser/components/pocket/**
 browser/components/preferences/**
 browser/components/privatebrowsing/**
 browser/components/sessionstore/**
 browser/components/shell/**
 browser/components/tabview/**
 browser/components/translation/**
-browser/components/uitour/**
 browser/extensions/pdfjs/**
 browser/extensions/pocket/content/panels/js/vendor/**
-browser/extensions/shumway/**
-browser/fuel/**
 browser/locales/**
 
 # Ignore all of loop since it is imported from github and checked at source.
 browser/extensions/loop/**
 
 # devtools/ exclusions
-devtools/*.js
 devtools/client/canvasdebugger/**
 devtools/client/commandline/**
 devtools/client/debugger/**
 devtools/client/eyedropper/**
 devtools/client/framework/**
-# devtools/client/inspector/shared/*.js files are eslint-clean, so they aren't
-# included in the ignore list.
-devtools/client/inspector/computed/**
-devtools/client/inspector/fonts/**
-devtools/client/inspector/markup/test/**
-devtools/client/inspector/shared/test/**
-devtools/client/inspector/test/**
-devtools/client/inspector/*.js
-devtools/client/jsonview/**
+devtools/client/jsonview/lib/**
 devtools/client/memory/**
 devtools/client/netmonitor/test/**
 devtools/client/netmonitor/har/test/**
@@ -109,34 +91,43 @@ devtools/client/promisedebugger/**
 devtools/client/responsivedesign/**
 devtools/client/scratchpad/**
 devtools/client/shadereditor/**
-devtools/client/shared/*.js
 devtools/client/shared/*.jsm
-!devtools/client/shared/css-color.js
-!devtools/client/shared/css-color-db.js
-!devtools/client/shared/css-parsing-utils.js
-devtools/client/shared/components/**
-devtools/client/shared/redux/**
+devtools/client/shared/developer-toolbar.js
+devtools/client/shared/components/test/**
+devtools/client/shared/redux/middleware/test/**
 devtools/client/shared/test/**
-devtools/client/shared/vendor/**
-devtools/client/shared/widgets/**
+devtools/client/shared/widgets/*.jsm
 devtools/client/sourceeditor/**
 devtools/client/webaudioeditor/**
 devtools/client/webconsole/**
 !devtools/client/webconsole/panel.js
 !devtools/client/webconsole/jsterm.js
+!devtools/client/webconsole/console-commands.js
 devtools/client/webide/**
+!devtools/client/webide/components/webideCli.js
 devtools/server/**
+!devtools/server/child.js
+!devtools/server/css-logic.js
+!devtools/server/main.js
+!devtools/server/actors/inspector.js
+!devtools/server/actors/highlighters/eye-dropper.js
 !devtools/server/actors/webbrowser.js
 !devtools/server/actors/styles.js
+!devtools/server/actors/string.js
+!devtools/server/actors/csscoverage.js
 devtools/shared/*.js
 !devtools/shared/css-lexer.js
+!devtools/shared/defer.js
+!devtools/shared/event-emitter.js
+!devtools/shared/task.js
 devtools/shared/*.jsm
+!devtools/shared/Loader.jsm
 devtools/shared/apps/**
 devtools/shared/client/**
 devtools/shared/discovery/**
 devtools/shared/gcli/**
+!devtools/shared/gcli/templater.js
 devtools/shared/heapsnapshot/**
-devtools/shared/inspector/**
 devtools/shared/layout/**
 devtools/shared/locales/**
 devtools/shared/performance/**
@@ -147,8 +138,10 @@ devtools/shared/tests/**
 !devtools/shared/tests/unit/test_csslexer.js
 devtools/shared/touch/**
 devtools/shared/transport/**
+!devtools/shared/transport/transport.js
 devtools/shared/webconsole/test/**
 devtools/shared/worker/**
+!devtools/shared/worker/worker.js
 
 # Ignore devtools pre-processed files
 devtools/client/framework/toolbox-process-window.js
@@ -191,15 +184,16 @@ mobile/android/locales/
 # Pretty sure we're disabling this one anyway
 mobile/android/modules/ContactService.jsm
 
-# es7 proposed: array comprehensions
-#   https://github.com/eslint/espree/issues/125
-mobile/android/modules/WebappManager.jsm
-
 # Non-standard `(catch ex if ...)`
 mobile/android/components/Snippets.js
 
 # Bug 1178739: Ignore this file as a quick fix for "Illegal yield expression"
 mobile/android/modules/HomeProvider.jsm
+
+# services/ exclusions
+
+# Uses `#filter substitution`
+services/sync/modules/constants.js
 
 # toolkit/ exclusions
 
@@ -214,19 +208,25 @@ toolkit/modules/tests/xpcshell/test_task.js
 
 # Not yet updated
 toolkit/components/osfile/**
-toolkit/components/passwordmgr/**
-toolkit/mozapps/extensions/**
+
+# External code:
+toolkit/components/microformats/test/**
+toolkit/components/reader/Readability.js
+toolkit/components/reader/JSDOMParser.js
 
 # Uses preprocessing
 toolkit/content/widgets/videocontrols.xml
+toolkit/content/widgets/wizard.xml
 toolkit/components/jsdownloads/src/DownloadIntegration.jsm
 toolkit/components/search/nsSearchService.js
 toolkit/components/url-classifier/**
 toolkit/components/urlformatter/nsURLFormatter.js
 toolkit/identity/FirefoxAccounts.jsm
 toolkit/modules/AppConstants.jsm
-toolkit/modules/SessionRecorder.jsm
 toolkit/mozapps/downloads/nsHelperAppDlg.js
 toolkit/mozapps/extensions/internal/AddonConstants.jsm
 toolkit/mozapps/update/tests/data/xpcshellConstantsPP.js
 toolkit/webapps/**
+
+# Third party
+toolkit/modules/third_party/**

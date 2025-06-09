@@ -6,8 +6,6 @@ var Cc = Components.classes;
 var Cu = Components.utils;
 var Ci = Components.interfaces;
 
-Cu.import("resource://gre/modules/Task.jsm");
-
 const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const {gDevTools} = require("devtools/client/framework/devtools");
 const {gDevToolsBrowser} = require("devtools/client/framework/devtools-browser");
@@ -26,6 +24,7 @@ const Telemetry = require("devtools/client/shared/telemetry");
 const {RuntimeScanners} = require("devtools/client/webide/modules/runtimes");
 const {showDoorhanger} = require("devtools/client/shared/doorhanger");
 const {Simulators} = require("devtools/client/webide/modules/simulators");
+const {Task} = require("devtools/shared/task");
 
 const Strings = Services.strings.createBundle("chrome://devtools/locale/webide.properties");
 
@@ -37,10 +36,20 @@ const MIN_ZOOM = 0.6;
 
 const MS_PER_DAY = 86400000;
 
+[["AppManager", AppManager],
+ ["AppProjects", AppProjects],
+ ["Connection", Connection]].forEach(([key, value]) => {
+   Object.defineProperty(this, key, {
+     value: value,
+     enumerable: true,
+     writable: false
+   });
+ });
+
 // Download remote resources early
-getJSON("devtools.webide.addonsURL", true);
-getJSON("devtools.webide.templatesURL", true);
-getJSON("devtools.devices.url", true);
+getJSON("devtools.webide.addonsURL");
+getJSON("devtools.webide.templatesURL");
+getJSON("devtools.devices.url");
 
 // See bug 989619
 console.log = console.log.bind(console);
@@ -58,7 +67,7 @@ window.addEventListener("unload", function onUnload() {
 });
 
 var UI = {
-  init: function() {
+  init: function () {
     this._telemetry = new Telemetry();
     this._telemetry.toolOpened("webide");
 
@@ -119,7 +128,7 @@ var UI = {
     Simulators.on("configure", this.configureSimulator);
   },
 
-  destroy: function() {
+  destroy: function () {
     window.removeEventListener("focus", this.onfocus, true);
     AppManager.off("app-manager-update", this.appManagerUpdate);
     AppManager.destroy();
@@ -130,14 +139,14 @@ var UI = {
     this._telemetry.destroy();
   },
 
-  canCloseProject: function() {
+  canCloseProject: function () {
     if (this.projecteditor) {
       return this.projecteditor.confirmUnsaved();
     }
     return true;
   },
 
-  onfocus: function() {
+  onfocus: function () {
     // Because we can't track the activity in the folder project,
     // we need to validate the project regularly. Let's assume that
     // if a modification happened, it happened when the window was
@@ -155,7 +164,7 @@ var UI = {
     showDoorhanger({ window, type: "deveditionpromo", anchor: document.querySelector("#deck") });
   },
 
-  appManagerUpdate: function(event, what, details) {
+  appManagerUpdate: function (event, what, details) {
     // Got a message from app-manager.js
     // See AppManager.update() for descriptions of what these events mean.
     switch (what) {
@@ -168,12 +177,12 @@ var UI = {
         this.updateConnectionTelemetry();
         break;
       case "before-project":
-        if (!this.canCloseProject())  {
+        if (!this.canCloseProject()) {
           details.cancel();
         }
         break;
       case "project":
-        this._updatePromise = Task.spawn(function*() {
+        this._updatePromise = Task.spawn(function* () {
           UI.updateTitle();
           yield UI.destroyToolbox();
           UI.updateCommands();
@@ -219,27 +228,26 @@ var UI = {
       case "pre-package":
         this.prePackageLog(details);
         break;
-    };
+    }
     this._updatePromise = promise.resolve();
   },
 
-  configureSimulator: function(event, simulator) {
+  configureSimulator: function (event, simulator) {
     UI.selectDeckPanel("simulator");
   },
 
-  openInBrowser: function(url) {
+  openInBrowser: function (url) {
     // Open a URL in a Firefox window
-    let browserWin = Services.wm.getMostRecentWindow("navigator:browser");
-    if (browserWin) {
-      let gBrowser = browserWin.gBrowser;
-      gBrowser.selectedTab = gBrowser.addTab(url);
-      browserWin.focus();
+    let mainWindow = Services.wm.getMostRecentWindow(gDevTools.chromeWindowType);
+    if (mainWindow) {
+      mainWindow.openUILinkIn(url, "tab");
+      mainWindow.focus()
     } else {
       window.open(url);
     }
   },
 
-  updateTitle: function() {
+  updateTitle: function () {
     let project = AppManager.selectedProject;
     if (project) {
       window.document.title = Strings.formatStringFromName("title_app", [project.name], 1);
@@ -248,20 +256,20 @@ var UI = {
     }
   },
 
-  /********** BUSY UI **********/
+  /** ******** BUSY UI **********/
 
   _busyTimeout: null,
   _busyOperationDescription: null,
   _busyPromise: null,
 
-  updateProgress: function(percent) {
+  updateProgress: function (percent) {
     let progress = document.querySelector("#action-busy-determined");
     progress.mode = "determined";
     progress.value = percent;
     this.setupBusyTimeout();
   },
 
-  busy: function() {
+  busy: function () {
     let win = document.querySelector("window");
     win.classList.add("busy");
     win.classList.add("busy-undetermined");
@@ -269,7 +277,7 @@ var UI = {
     this.update("busy");
   },
 
-  unbusy: function() {
+  unbusy: function () {
     let win = document.querySelector("window");
     win.classList.remove("busy");
     win.classList.remove("busy-determined");
@@ -279,7 +287,7 @@ var UI = {
     this._busyPromise = null;
   },
 
-  setupBusyTimeout: function() {
+  setupBusyTimeout: function () {
     this.cancelBusyTimeout();
     this._busyTimeout = setTimeout(() => {
       this.unbusy();
@@ -287,11 +295,11 @@ var UI = {
     }, Services.prefs.getIntPref("devtools.webide.busyTimeout"));
   },
 
-  cancelBusyTimeout: function() {
+  cancelBusyTimeout: function () {
     clearTimeout(this._busyTimeout);
   },
 
-  busyWithProgressUntil: function(promise, operationDescription) {
+  busyWithProgressUntil: function (promise, operationDescription) {
     let busy = this.busyUntil(promise, operationDescription);
     let win = document.querySelector("window");
     let progress = document.querySelector("#action-busy-determined");
@@ -301,7 +309,7 @@ var UI = {
     return busy;
   },
 
-  busyUntil: function(promise, operationDescription) {
+  busyUntil: function (promise, operationDescription) {
     // Freeze the UI until the promise is resolved. A timeout will unfreeze the
     // UI, just in case the promise never gets resolved.
     this._busyPromise = promise;
@@ -333,7 +341,7 @@ var UI = {
     return promise;
   },
 
-  reportError: function(l10nProperty, ...l10nArgs) {
+  reportError: function (l10nProperty, ...l10nArgs) {
     let text;
 
     if (l10nArgs.length > 0) {
@@ -358,12 +366,12 @@ var UI = {
                             nbox.PRIORITY_WARNING_LOW, buttons);
   },
 
-  dismissErrorNotification: function() {
+  dismissErrorNotification: function () {
     let nbox = document.querySelector("#notificationbox");
     nbox.removeAllNotifications(true);
   },
 
-  /********** COMMANDS **********/
+  /** ******** COMMANDS **********/
 
   /**
    * This module emits various events when state changes occur.
@@ -374,16 +382,16 @@ var UI = {
    *   unbusy:
    *     The window is not busy and certain UI functions may be re-enabled.
    */
-  update: function(what, details) {
+  update: function (what, details) {
     this.emit("webide-update", what, details);
   },
 
-  updateCommands: function() {
+  updateCommands: function () {
     // Action commands
     let playCmd = document.querySelector("#cmd_play");
     let stopCmd = document.querySelector("#cmd_stop");
     let debugCmd = document.querySelector("#cmd_toggleToolbox");
-    let playButton = document.querySelector('#action-button-play');
+    let playButton = document.querySelector("#action-button-play");
     let projectPanelCmd = document.querySelector("#cmd_showProjectPanel");
 
     if (document.querySelector("window").classList.contains("busy")) {
@@ -475,7 +483,7 @@ var UI = {
     projectPanelCmd.removeAttribute("disabled");
   },
 
-  updateRemoveProjectButton: function() {
+  updateRemoveProjectButton: function () {
     // Remove command
     let removeCmdNode = document.querySelector("#cmd_removeProject");
     if (AppManager.selectedProject) {
@@ -485,7 +493,7 @@ var UI = {
     }
   },
 
-  /********** RUNTIME **********/
+  /** ******** RUNTIME **********/
 
   get lastConnectedRuntime() {
     return Services.prefs.getCharPref("devtools.webide.lastConnectedRuntime");
@@ -527,7 +535,7 @@ var UI = {
     }
   },
 
-  connectToRuntime: function(runtime) {
+  connectToRuntime: function (runtime) {
     let name = runtime.name;
     let promise = AppManager.connectToRuntime(runtime);
     promise.then(() => this.initConnectionTelemetry())
@@ -545,7 +553,7 @@ var UI = {
     return promise;
   },
 
-  updateRuntimeButton: function() {
+  updateRuntimeButton: function () {
     let labelNode = document.querySelector("#runtime-panel-button > .panel-button-label");
     if (!AppManager.selectedRuntime) {
       labelNode.setAttribute("value", Strings.GetStringFromName("runtimeButton_label"));
@@ -565,7 +573,7 @@ var UI = {
     }
   },
 
-  /********** ACTIONS **********/
+  /** ******** ACTIONS **********/
 
   _actionsToLog: new Set(),
 
@@ -574,7 +582,7 @@ var UI = {
    * one value is collected for each button, even if they are used multiple
    * times during a connection.
    */
-  initConnectionTelemetry: function() {
+  initConnectionTelemetry: function () {
     this._actionsToLog.add("play");
     this._actionsToLog.add("debug");
   },
@@ -583,7 +591,7 @@ var UI = {
    * Action occurred.  Log that it happened, and remove it from the loggable
    * set.
    */
-  onAction: function(action) {
+  onAction: function (action) {
     if (!this._actionsToLog.has(action)) {
       return;
     }
@@ -595,24 +603,24 @@ var UI = {
    * Connection status changed or we are shutting down.  Record any loggable
    * actions as having not occurred.
    */
-  updateConnectionTelemetry: function() {
+  updateConnectionTelemetry: function () {
     for (let action of this._actionsToLog.values()) {
       this.logActionState(action, false);
     }
     this._actionsToLog.clear();
   },
 
-  logActionState: function(action, state) {
+  logActionState: function (action, state) {
     let histogramId = "DEVTOOLS_WEBIDE_CONNECTION_" +
                       action.toUpperCase() + "_USED";
     this._telemetry.log(histogramId, state);
   },
 
-  /********** PROJECTS **********/
+  /** ******** PROJECTS **********/
 
   // ProjectEditor & details screen
 
-  destroyProjectEditor: function() {
+  destroyProjectEditor: function () {
     if (this.projecteditor) {
       this.projecteditor.destroy();
       this.projecteditor = null;
@@ -622,7 +630,7 @@ var UI = {
   /**
    * Called when selecting or deselecting the project editor panel.
    */
-  onChangeProjectEditorSelected: function() {
+  onChangeProjectEditorSelected: function () {
     if (this.projecteditor) {
       let panel = document.querySelector("#deck").selectedPanel;
       if (panel && panel.id == "deck-panel-projecteditor") {
@@ -635,7 +643,7 @@ var UI = {
     }
   },
 
-  getProjectEditor: function() {
+  getProjectEditor: function () {
     if (this.projecteditor) {
       return this.projecteditor.loaded;
     }
@@ -652,7 +660,7 @@ var UI = {
     return this.projecteditor.loaded;
   },
 
-  updateProjectEditorHeader: function() {
+  updateProjectEditorHeader: function () {
     let project = AppManager.selectedProject;
     if (!project || !this.projecteditor) {
       return;
@@ -671,11 +679,11 @@ var UI = {
     }, console.error);
   },
 
-  isProjectEditorEnabled: function() {
+  isProjectEditorEnabled: function () {
     return Services.prefs.getBoolPref("devtools.webide.showProjectEditor");
   },
 
-  openProject: function() {
+  openProject: function () {
     let project = AppManager.selectedProject;
 
     // Nothing to show
@@ -710,7 +718,7 @@ var UI = {
     this.selectDeckPanel("projecteditor");
   },
 
-  autoStartProject: Task.async(function*() {
+  autoStartProject: Task.async(function* () {
     let project = AppManager.selectedProject;
 
     if (!project) {
@@ -729,7 +737,7 @@ var UI = {
     }
   }),
 
-  autoOpenToolbox: Task.async(function*() {
+  autoOpenToolbox: Task.async(function* () {
     let project = AppManager.selectedProject;
 
     if (!project) {
@@ -766,7 +774,7 @@ var UI = {
   }),
 
   // Remember the last selected project on the runtime
-  saveLastSelectedProject: function() {
+  saveLastSelectedProject: function () {
     let shouldRestore = Services.prefs.getBoolPref("devtools.webide.restoreLastProject");
     if (!shouldRestore) {
       return;
@@ -799,7 +807,7 @@ var UI = {
     }
   },
 
-  autoSelectProject: function() {
+  autoSelectProject: function () {
     if (AppManager.selectedProject) {
       return;
     }
@@ -834,7 +842,7 @@ var UI = {
         type: "mainProcess",
         name: Strings.GetStringFromName("mainProcess_label"),
         icon: AppManager.DEFAULT_PROJECT_ICON
-      }
+      };
     } else if (type == "runtimeApp") {
       let app = AppManager.apps.get(project);
       if (app) {
@@ -848,20 +856,20 @@ var UI = {
     }
   },
 
-  /********** DECK **********/
+  /** ******** DECK **********/
 
-  setupDeck: function() {
+  setupDeck: function () {
     let iframes = document.querySelectorAll("#deck > iframe");
     for (let iframe of iframes) {
       iframe.tooltip = "aHTMLTooltip";
     }
   },
 
-  resetFocus: function() {
+  resetFocus: function () {
     document.commandDispatcher.focusedElement = document.documentElement;
   },
 
-  selectDeckPanel: function(id) {
+  selectDeckPanel: function (id) {
     let deck = document.querySelector("#deck");
     if (deck.selectedPanel && deck.selectedPanel.id === "deck-panel-" + id) {
       // This panel is already displayed.
@@ -878,7 +886,7 @@ var UI = {
     this.onChangeProjectEditorSelected();
   },
 
-  resetDeck: function() {
+  resetDeck: function () {
     this.resetFocus();
     let deck = document.querySelector("#deck");
     deck.selectedPanel = null;
@@ -910,7 +918,7 @@ var UI = {
     }
   }),
 
-  /********** TOOLBOX **********/
+  /** ******** TOOLBOX **********/
 
   /**
    * There are many ways to close a toolbox:
@@ -923,7 +931,7 @@ var UI = {
    * |toolboxPromise| since someone must be destroying it to reach here,
    * and call our own close method.
    */
-  _onToolboxClosed: function(promise, iframe) {
+  _onToolboxClosed: function (promise, iframe) {
     // Only save toolbox size, disable wrench button, workaround focus issue...
     // if we are closing the last toolbox:
     //  - toolboxPromise is nullified by destroyToolbox and is still null here
@@ -944,7 +952,7 @@ var UI = {
     iframe.remove();
   },
 
-  destroyToolbox: function() {
+  destroyToolbox: function () {
     // Only have a live toolbox if |this.toolboxPromise| exists
     if (this.toolboxPromise) {
       let toolboxPromise = this.toolboxPromise;
@@ -954,7 +962,7 @@ var UI = {
     return promise.resolve();
   },
 
-  createToolbox: function() {
+  createToolbox: function () {
     // If |this.toolboxPromise| exists, there is already a live toolbox
     if (this.toolboxPromise) {
       return this.toolboxPromise;
@@ -982,7 +990,7 @@ var UI = {
     return this.busyUntil(this.toolboxPromise, "opening toolbox");
   },
 
-  _showToolbox: function(target, iframe) {
+  _showToolbox: function (target, iframe) {
     let splitter = document.querySelector(".devtools-horizontal-splitter");
     splitter.removeAttribute("hidden");
 
@@ -1005,53 +1013,63 @@ var UI = {
 EventEmitter.decorate(UI);
 
 var Cmds = {
-  quit: function() {
+  quit: function () {
     if (UI.canCloseProject()) {
       window.close();
     }
   },
 
-  showProjectPanel: function() {
+  showProjectPanel: function () {
     ProjectPanel.toggleSidebar();
     return promise.resolve();
   },
 
-  showRuntimePanel: function() {
+  showRuntimePanel: function () {
     RuntimeScanners.scan();
     RuntimePanel.toggleSidebar();
   },
 
-  disconnectRuntime: function() {
-    let disconnecting = Task.spawn(function*() {
+  disconnectRuntime: function () {
+    let disconnecting = Task.spawn(function* () {
       yield UI.destroyToolbox();
       yield AppManager.disconnectRuntime();
     });
     return UI.busyUntil(disconnecting, "disconnecting from runtime");
   },
 
-  showPermissionsTable: function() {
+  takeScreenshot: function () {
+    let url = AppManager.deviceFront.screenshotToDataURL();
+    return UI.busyUntil(url.then(longstr => {
+      return longstr.string().then(dataURL => {
+        longstr.release().then(null, console.error);
+        UI.openInBrowser(dataURL);
+      });
+    }), "taking screenshot");
+  },
+
+  showPermissionsTable: function () {
     UI.selectDeckPanel("permissionstable");
   },
 
-  showRuntimeDetails: function() {
+  showRuntimeDetails: function () {
     UI.selectDeckPanel("runtimedetails");
   },
 
-  showDevicePrefs: function() {
+  showDevicePrefs: function () {
     UI.selectDeckPanel("devicepreferences");
   },
 
-  showSettings: function() {
+  showSettings: function () {
     UI.selectDeckPanel("devicesettings");
   },
 
-  showMonitor: function() {
+  showMonitor: function () {
     UI.selectDeckPanel("monitor");
   },
 
-  play: Task.async(function*() {
+  play: Task.async(function* () {
     let busy;
-    switch(AppManager.selectedProject.type) {
+    switch (AppManager.selectedProject.type) {
       case "packaged":
         let autosave =
           Services.prefs.getBoolPref("devtools.webide.autosaveFiles");
@@ -1079,11 +1097,11 @@ var Cmds = {
     return busy;
   }),
 
-  stop: function() {
+  stop: function () {
     return UI.busyUntil(AppManager.stopRunningApp(), "stopping app");
   },
 
-  toggleToolbox: function() {
+  toggleToolbox: function () {
     UI.onAction("debug");
     if (UI.toolboxPromise) {
       UI.destroyToolbox();
@@ -1093,11 +1111,11 @@ var Cmds = {
     }
   },
 
-  removeProject: function() {
+  removeProject: function () {
     AppManager.removeSelectedProject();
   },
 
-  toggleEditors: function() {
+  toggleEditors: function () {
     let isNowEnabled = !UI.isProjectEditorEnabled();
     Services.prefs.setBoolPref("devtools.webide.showProjectEditor", isNowEnabled);
     if (!isNowEnabled) {
@@ -1106,33 +1124,33 @@ var Cmds = {
     UI.openProject();
   },
 
-  showTroubleShooting: function() {
+  showTroubleShooting: function () {
     UI.openInBrowser(HELP_URL);
   },
 
-  showAddons: function() {
+  showAddons: function () {
     UI.selectDeckPanel("addons");
   },
 
-  showPrefs: function() {
+  showPrefs: function () {
     UI.selectDeckPanel("prefs");
   },
 
-  zoomIn: function() {
+  zoomIn: function () {
     if (UI.contentViewer.fullZoom < MAX_ZOOM) {
       UI.contentViewer.fullZoom += 0.1;
       Services.prefs.setCharPref("devtools.webide.zoom", UI.contentViewer.fullZoom);
     }
   },
 
-  zoomOut: function() {
+  zoomOut: function () {
     if (UI.contentViewer.fullZoom > MIN_ZOOM) {
       UI.contentViewer.fullZoom -= 0.1;
       Services.prefs.setCharPref("devtools.webide.zoom", UI.contentViewer.fullZoom);
     }
   },
 
-  resetZoom: function() {
+  resetZoom: function () {
     UI.contentViewer.fullZoom = 1;
     Services.prefs.setCharPref("devtools.webide.zoom", 1);
   }

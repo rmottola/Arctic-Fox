@@ -20,25 +20,31 @@ var PerformanceView = {
   states: {
     "unavailable": [
       { sel: "#performance-view", opt: "selectedPanel", val: () => $("#unavailable-notice") },
+      { sel: "#performance-view-content", opt: "hidden", val: () => true },
     ],
     "empty": [
-      { sel: "#performance-view", opt: "selectedPanel", val: () => $("#empty-notice") }
+      { sel: "#performance-view", opt: "selectedPanel", val: () => $("#empty-notice") },
+      { sel: "#performance-view-content", opt: "hidden", val: () => true },
     ],
     "recording": [
       { sel: "#performance-view", opt: "selectedPanel", val: () => $("#performance-view-content") },
-      { sel: "#details-pane-container", opt: "selectedPanel", val: () => $("#recording-notice") }
+      { sel: "#performance-view-content", opt: "hidden", val: () => false },
+      { sel: "#details-pane-container", opt: "selectedPanel", val: () => $("#recording-notice") },
     ],
     "console-recording": [
       { sel: "#performance-view", opt: "selectedPanel", val: () => $("#performance-view-content") },
-      { sel: "#details-pane-container", opt: "selectedPanel", val: () => $("#console-recording-notice") }
+      { sel: "#performance-view-content", opt: "hidden", val: () => false },
+      { sel: "#details-pane-container", opt: "selectedPanel", val: () => $("#console-recording-notice") },
     ],
     "recorded": [
       { sel: "#performance-view", opt: "selectedPanel", val: () => $("#performance-view-content") },
-      { sel: "#details-pane-container", opt: "selectedPanel", val: () => $("#details-pane") }
+      { sel: "#performance-view-content", opt: "hidden", val: () => false },
+      { sel: "#details-pane-container", opt: "selectedPanel", val: () => $("#details-pane") },
     ],
     "loading": [
       { sel: "#performance-view", opt: "selectedPanel", val: () => $("#performance-view-content") },
-      { sel: "#details-pane-container", opt: "selectedPanel", val: () => $("#loading-notice") }
+      { sel: "#performance-view-content", opt: "hidden", val: () => false },
+      { sel: "#details-pane-container", opt: "selectedPanel", val: () => $("#loading-notice") },
     ]
   },
 
@@ -112,6 +118,14 @@ var PerformanceView = {
    * "empty", "recording", "console-recording", "recorded".
    */
   setState: function (state) {
+    // Make sure that the focus isn't captured on a hidden iframe. This fixes a
+    // XUL bug where shortcuts stop working.
+    const iframes = window.document.querySelectorAll('iframe');
+    for (let iframe of iframes) {
+      iframe.blur();
+    }
+    window.focus();
+
     let viewConfig = this.states[state];
     if (!viewConfig) {
       throw new Error(`Invalid state for PerformanceView: ${state}`);
@@ -268,7 +282,7 @@ var PerformanceView = {
   /**
    * Handler for clicking the import button.
    */
-  _onImportButtonClick: function(e) {
+  _onImportButtonClick: function (e) {
     let fp = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
     fp.init(window, L10N.getStr("recordingsList.importDialogTitle"), Ci.nsIFilePicker.modeOpen);
     fp.appendFilter(L10N.getStr("recordingsList.saveDialogJSONFilter"), "*.json");

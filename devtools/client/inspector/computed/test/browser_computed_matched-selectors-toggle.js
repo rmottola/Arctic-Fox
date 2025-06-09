@@ -15,7 +15,7 @@ const TEST_URI = `
   <h1>Some header text</h1>
 `;
 
-add_task(function*() {
+add_task(function* () {
   yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
   let {inspector, view} = yield openComputedView();
   yield selectNode("h1", inspector);
@@ -30,7 +30,7 @@ function* testExpandOnTwistyClick({styleDocument, styleWindow}, inspector) {
   info("Testing that a property expands on twisty click");
 
   info("Getting twisty element");
-  let twisty = styleDocument.querySelector(".expandable");
+  let twisty = styleDocument.querySelector("#propertyContainer .expandable");
   ok(twisty, "Twisty found");
 
   let onExpand = inspector.once("computed-view-property-expanded");
@@ -49,7 +49,7 @@ function* testCollapseOnTwistyClick({styleDocument, styleWindow}, inspector) {
   info("Testing that a property collapses on twisty click");
 
   info("Getting twisty element");
-  let twisty = styleDocument.querySelector(".expandable");
+  let twisty = styleDocument.querySelector("#propertyContainer .expandable");
   ok(twisty, "Twisty found");
 
   let onCollapse = inspector.once("computed-view-property-collapsed");
@@ -70,6 +70,8 @@ function* testExpandOnDblClick({styleDocument, styleWindow}, inspector) {
   info("Getting computed property container");
   let container = styleDocument.querySelector(".property-view");
   ok(container, "Container found");
+
+  container.scrollIntoView();
 
   let onExpand = inspector.once("computed-view-property-expanded");
   info("Dbl-clicking on the container");

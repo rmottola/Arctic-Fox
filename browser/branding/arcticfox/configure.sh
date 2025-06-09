@@ -3,4 +3,3 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 MOZ_APP_DISPLAYNAME="Arctic Fox"
-# MOZ_UA_BUILDID=20100101

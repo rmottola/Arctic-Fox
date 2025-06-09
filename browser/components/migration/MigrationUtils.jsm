@@ -138,6 +138,20 @@ this.MigratorPrototype = {
   },
 
   /**
+   * OVERRIDE in order to provide an estimate of when the last time was
+   * that somebody used the browser. It is OK that this is somewhat fuzzy -
+   * history may not be available (or be wiped or not present due to e.g.
+   * incognito mode).
+   *
+   * @return a Promise that resolves to the last used date.
+   *
+   * @note If not overridden, the promise will resolve to the unix epoch.
+   */
+  getLastUsedDate() {
+    return Promise.resolve(new Date(0));
+  },
+
+  /**
    * OVERRIDE IF AND ONLY IF the migrator is a startup-only migrator (For now,
    * that is just the Firefox migrator, see bug 737381).  Default: false.
    *
@@ -704,7 +718,8 @@ this.MigrationUtils = Object.freeze({
     if (!isRefresh &&
         Services.prefs.getBoolPref("browser.migration.automigrate")) {
       try {
-        return AutoMigrate.migrate(aProfileStartup, aMigratorKey, aProfileToMigrate);
+        AutoMigrate.migrate(aProfileStartup, aMigratorKey, aProfileToMigrate);
+        return;
       } catch (ex) {
         // If automigration failed, continue and show the dialog.
         Cu.reportError(ex);

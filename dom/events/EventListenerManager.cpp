@@ -26,6 +26,7 @@
 #include "mozilla/dom/Element.h"
 #include "mozilla/dom/Event.h"
 #include "mozilla/dom/EventTargetBinding.h"
+#include "mozilla/dom/TouchEvent.h"
 #include "mozilla/TimelineConsumers.h"
 #include "mozilla/EventTimelineMarker.h"
 
@@ -1153,45 +1154,6 @@ EventListenerManager::GetLegacyEventMessage(EventMessage aEventMessage) const
   }
 }
 
-nsIDocShell*
-EventListenerManager::GetDocShellForTarget()
-{
-  nsCOMPtr<nsINode> node(do_QueryInterface(mTarget));
-  nsIDocument* doc = nullptr;
-  nsIDocShell* docShell = nullptr;
-
-  if (node) {
-    doc = node->OwnerDoc();
-    if (!doc->GetDocShell()) {
-      bool ignore;
-      nsCOMPtr<nsPIDOMWindowInner> window =
-        do_QueryInterface(doc->GetScriptHandlingObject(ignore));
-      if (window) {
-        doc = window->GetExtantDoc();
-      }
-    }
-  } else {
-    if (nsCOMPtr<nsPIDOMWindowInner> window = GetTargetAsInnerWindow()) {
-      doc = window->GetExtantDoc();
-    }
-  }
-
-  if (!doc) {
-    nsCOMPtr<DOMEventTargetHelper> helper(do_QueryInterface(mTarget));
-    if (helper) {
-      if (nsPIDOMWindowInner* window = helper->GetOwner()) {
-        doc = window->GetExtantDoc();
-      }
-    }
-  }
-
-  if (doc) {
-    docShell = doc->GetDocShell();
-  }
-
-  return docShell;
-}
-
 /**
 * Causes a check for event listeners and processing by them if they exist.
 * @param an event listener
@@ -1268,7 +1230,7 @@ EventListenerManager::HandleEventInternal(nsPresContext* aPresContext,
 
             if (mIsMainThreadELM &&
                 listener->mListenerType != Listener::eNativeListener) {
-              docShell = GetDocShellForTarget();
+              docShell = nsContentUtils::GetDocShellForEventTarget(mTarget);
               if (docShell) {
                 if (timelines && timelines->HasConsumer(docShell)) {
                   needsEndEventMarker = true;
@@ -1337,19 +1299,6 @@ EventListenerManager::Disconnect()
   RemoveAllListeners();
 }
 
-static EventListenerFlags
-GetEventListenerFlagsFromOptions(const EventListenerOptions& aOptions)
-{
-  EventListenerFlags flags;
-  flags.mCapture = aOptions.mCapture;
-  if (aOptions.mMozSystemGroup) {
-    JSContext* cx = nsContentUtils::GetCurrentJSContext();
-    MOZ_ASSERT(cx, "Not being called from JS?");
-    flags.mInSystemGroup = IsChromeOrXBL(cx, nullptr);
-  }
-  return flags;
-}
-
 void
 EventListenerManager::AddEventListener(
                         const nsAString& aType,
@@ -1375,7 +1324,8 @@ EventListenerManager::AddEventListener(
     flags.mCapture = aOptions.GetAsBoolean();
   } else {
     const auto& options = aOptions.GetAsAddEventListenerOptions();
-    flags = GetEventListenerFlagsFromOptions(options);
+    flags.mCapture = options.mCapture;
+    flags.mInSystemGroup = options.mMozSystemGroup;
     flags.mPassive = options.mPassive;
   }
   flags.mAllowUntrustedEvents = aWantsUntrusted;
@@ -1404,7 +1354,8 @@ EventListenerManager::RemoveEventListener(
     flags.mCapture = aOptions.GetAsBoolean();
   } else {
     const auto& options = aOptions.GetAsEventListenerOptions();
-    flags = GetEventListenerFlagsFromOptions(options);
+    flags.mCapture = options.mCapture;
+    flags.mInSystemGroup = options.mMozSystemGroup;
   }
   RemoveEventListenerByType(aListenerHolder, aType, flags);
 }
@@ -1731,12 +1682,24 @@ EventListenerManager::IsApzAwareListener(Listener* aListener)
 bool
 EventListenerManager::IsApzAwareEvent(nsIAtom* aEvent)
 {
-  return aEvent == nsGkAtoms::ontouchstart ||
-         aEvent == nsGkAtoms::ontouchmove ||
-         aEvent == nsGkAtoms::onwheel ||
-         aEvent == nsGkAtoms::onDOMMouseScroll ||
-         aEvent == nsHtml5Atoms::onmousewheel ||
-         aEvent == nsGkAtoms::onMozMousePixelScroll;
+  if (aEvent == nsGkAtoms::onwheel ||
+      aEvent == nsGkAtoms::onDOMMouseScroll ||
+      aEvent == nsHtml5Atoms::onmousewheel ||
+      aEvent == nsGkAtoms::onMozMousePixelScroll) {
+    return true;
+  }
+  // In theory we should schedule a repaint if the touch event pref changes,
+  // because the event regions might be out of date. In practice that seems like
+  // overkill because users generally shouldn't be flipping this pref, much
+  // less expecting touch listeners on the page to immediately start preventing
+  // scrolling without so much as a repaint. Tests that we write can work
+  // around this constraint easily enough.
+  if (aEvent == nsGkAtoms::ontouchstart ||
+      aEvent == nsGkAtoms::ontouchmove) {
+    return TouchEvent::PrefEnabled(
+        nsContentUtils::GetDocShellForEventTarget(mTarget));
+  }
+  return false;
 }
 
 already_AddRefed<nsIScriptGlobalObject>

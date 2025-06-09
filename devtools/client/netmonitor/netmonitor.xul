@@ -95,7 +95,7 @@
       <hbox id="netmonitor-toolbar" class="devtools-toolbar">
         <toolbarbutton id="requests-menu-clear-button"
                        class="devtools-toolbarbutton devtools-clear-icon"
-                       tooltip="&netmonitorUI.footer.clear;"/>
+                       tooltiptext="&netmonitorUI.footer.clear;"/>
         <hbox id="requests-menu-filter-buttons">
           <button id="requests-menu-filter-all-button"
                   class="requests-menu-filter-button"
@@ -160,7 +160,7 @@
                        class="devtools-toolbarbutton icon-and-text"
                        tooltiptext="&netmonitorUI.footer.perf;"/>
         <textbox id="requests-menu-filter-freetext-text"
-                 class="devtools-searchinput"
+                 class="devtools-filterinput"
                  type="search"
                  required="true"
                  placeholder="&netmonitorUI.footer.filterFreetext.label;"/>
@@ -273,6 +273,7 @@
                         class="requests-menu-header-button requests-menu-waterfall"
                         data-key="waterfall"
                         pack="start"
+                        label="&netmonitorUI.toolbar.waterfall;"
                         flex="1">
                   <image id="requests-menu-waterfall-image"/>
                   <box id="requests-menu-waterfall-label-wrapper">
@@ -299,6 +300,7 @@
               <label value="&netmonitorUI.perfNotice1;"/>
               <button id="requests-menu-perf-notice-button"
                       standalone="true"
+                      label="&netmonitorUI.perfNotice3;"
                       class="devtools-toolbarbutton"/>
               <label value="&netmonitorUI.perfNotice2;"/>
             </hbox>

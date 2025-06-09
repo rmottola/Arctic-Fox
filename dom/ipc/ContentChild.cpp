@@ -8,10 +8,6 @@
 #include <gtk/gtk.h>
 #endif
 
-#ifdef MOZ_WIDGET_QT
-#include "nsQAppInstance.h"
-#endif
-
 #include "ContentChild.h"
 
 #include "BlobChild.h"
@@ -36,6 +32,7 @@
 #include "mozilla/dom/PCrashReporterChild.h"
 #include "mozilla/dom/ProcessGlobal.h"
 #include "mozilla/dom/Promise.h"
+#include "mozilla/dom/workers/ServiceWorkerManager.h"
 #include "mozilla/dom/nsIContentChild.h"
 #include "mozilla/psm/PSMContentListener.h"
 #include "mozilla/hal_sandbox/PHalChild.h"
@@ -222,6 +219,7 @@ using namespace mozilla::dom::mobileconnection;
 using namespace mozilla::dom::mobilemessage;
 using namespace mozilla::dom::telephony;
 using namespace mozilla::dom::voicemail;
+using namespace mozilla::dom::workers;
 using namespace mozilla::media;
 using namespace mozilla::embedding;
 using namespace mozilla::gmp;
@@ -617,18 +615,9 @@ ContentChild::Init(MessageLoop* aIOLoop,
   }
 #endif
 
-#ifdef MOZ_WIDGET_QT
-  // sigh, seriously
-  nsQAppInstance::AddRef();
-#endif
-
 #ifdef MOZ_X11
   // Do this after initializing GDK, or GDK will install its own handler.
   XRE_InstallX11ErrorHandler();
-#endif
-
-#ifdef MOZ_NUWA_PROCESS
-  SetTransport(aChannel);
 #endif
 
   NS_ASSERTION(!sSingleton, "only one ContentChild per child");
@@ -927,7 +916,7 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
   }
 
   if (!urlToLoad.IsEmpty()) {
-    newChild->RecvLoadURL(urlToLoad, BrowserConfiguration(), showInfo);
+    newChild->RecvLoadURL(urlToLoad, showInfo);
   }
 
   nsCOMPtr<mozIDOMWindowProxy> win = do_GetInterface(newChild->WebNavigation());
@@ -1251,11 +1240,22 @@ ContentChild::DeallocPAPZChild(PAPZChild* aActor)
   return true;
 }
 
-PCompositorBridgeChild*
-ContentChild::AllocPCompositorBridgeChild(mozilla::ipc::Transport* aTransport,
-                                          base::ProcessId aOtherProcess)
+bool
+ContentChild::RecvInitCompositor(Endpoint<PCompositorBridgeChild>&& aEndpoint)
 {
-  return CompositorBridgeChild::Create(aTransport, aOtherProcess);
+  return CompositorBridgeChild::InitForContent(Move(aEndpoint));
+}
+
+bool
+ContentChild::RecvInitImageBridge(Endpoint<PImageBridgeChild>&& aEndpoint)
+{
+  return ImageBridgeChild::InitForContent(Move(aEndpoint));
+}
+
+bool
+ContentChild::RecvInitVRManager(Endpoint<PVRManagerChild>&& aEndpoint)
+{
+  return gfx::VRManagerChild::InitForContent(Move(aEndpoint));
 }
 
 PSharedBufferManagerChild*
@@ -1263,20 +1263,6 @@ ContentChild::AllocPSharedBufferManagerChild(mozilla::ipc::Transport* aTransport
                                               base::ProcessId aOtherProcess)
 {
   return SharedBufferManagerChild::StartUpInChildProcess(aTransport, aOtherProcess);
-}
-
-PImageBridgeChild*
-ContentChild::AllocPImageBridgeChild(mozilla::ipc::Transport* aTransport,
-                                     base::ProcessId aOtherProcess)
-{
-  return ImageBridgeChild::StartUpInChildProcess(aTransport, aOtherProcess);
-}
-
-gfx::PVRManagerChild*
-ContentChild::AllocPVRManagerChild(Transport* aTransport,
-                                   ProcessId aOtherProcess)
-{
-  return gfx::VRManagerChild::StartUpInChildProcess(aTransport, aOtherProcess);
 }
 
 PBackgroundChild*
@@ -1434,7 +1420,8 @@ ContentChild::RecvSetProcessSandbox(const MaybeFileDesc& aBroker)
 #endif
   int brokerFd = -1;
   if (aBroker.type() == MaybeFileDesc::TFileDescriptor) {
-      brokerFd = aBroker.get_FileDescriptor().PlatformHandle();
+      auto fd = aBroker.get_FileDescriptor().ClonePlatformHandle();
+      brokerFd = fd.release();
       // brokerFd < 0 means to allow direct filesystem access, so
       // make absolutely sure that doesn't happen if the parent
       // didn't intend it.
@@ -1695,6 +1682,9 @@ bool
 ContentChild::RecvNotifyGMPsChanged()
 {
   GMPDecoderModule::UpdateUsableCodecs();
+  MOZ_ASSERT(NS_IsMainThread());
+  nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+  obs->NotifyObservers(nullptr, "gmp-changed", nullptr);
   return true;
 }
 
@@ -2633,6 +2623,15 @@ ContentChild::RecvAppInit()
   }
 #endif
 
+  return true;
+}
+
+bool
+ContentChild::RecvInitServiceWorkers(const ServiceWorkerConfiguration& aConfig)
+{
+  RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
+  MOZ_ASSERT(swm);
+  swm->LoadRegistrations(aConfig.serviceWorkerRegistrations());
   return true;
 }
 

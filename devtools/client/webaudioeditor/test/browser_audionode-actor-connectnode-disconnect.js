@@ -6,18 +6,17 @@
  * Uses the editor front as the actors do not retain connect state.
  */
 
-add_task(function*() {
+add_task(function* () {
   let { target, panel } = yield initWebAudioEditor(SIMPLE_CONTEXT_URL);
   let { panelWin } = panel;
   let { gFront, $, $$, EVENTS, gAudioNodes } = panelWin;
 
-  reload(target);
-
-  let [actors] = yield Promise.all([
+  let events = Promise.all([
     get3(gFront, "create-node"),
     waitForGraphRendered(panelWin, 3, 2)
   ]);
-
+  reload(target);
+  let [actors] = yield events;
   let [dest, osc, gain] = actors;
 
   info("Disconnecting oscillator...");

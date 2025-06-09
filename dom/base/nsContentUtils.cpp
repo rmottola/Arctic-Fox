@@ -686,12 +686,12 @@ nsContentUtils::InitializeModifierStrings()
   nsXPIDLString modifierSeparator;
   if (bundle) {
     //macs use symbols for each modifier key, so fetch each from the bundle, which also covers i18n
-    bundle->GetStringFromName(MOZ_UTF16("VK_SHIFT"), getter_Copies(shiftModifier));
-    bundle->GetStringFromName(MOZ_UTF16("VK_META"), getter_Copies(metaModifier));
-    bundle->GetStringFromName(MOZ_UTF16("VK_WIN"), getter_Copies(osModifier));
-    bundle->GetStringFromName(MOZ_UTF16("VK_ALT"), getter_Copies(altModifier));
-    bundle->GetStringFromName(MOZ_UTF16("VK_CONTROL"), getter_Copies(controlModifier));
-    bundle->GetStringFromName(MOZ_UTF16("MODIFIER_SEPARATOR"), getter_Copies(modifierSeparator));
+    bundle->GetStringFromName(u"VK_SHIFT", getter_Copies(shiftModifier));
+    bundle->GetStringFromName(u"VK_META", getter_Copies(metaModifier));
+    bundle->GetStringFromName(u"VK_WIN", getter_Copies(osModifier));
+    bundle->GetStringFromName(u"VK_ALT", getter_Copies(altModifier));
+    bundle->GetStringFromName(u"VK_CONTROL", getter_Copies(controlModifier));
+    bundle->GetStringFromName(u"MODIFIER_SEPARATOR", getter_Copies(modifierSeparator));
   }
   //if any of these don't exist, we get  an empty string
   sShiftText = new nsString(shiftModifier);
@@ -1070,9 +1070,9 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
     return 0;
   }
 
-  bool negate = false;
+  int sign = 1;
   if (*iter == char16_t('-')) {
-    negate = true;
+    sign = -1;
     ++iter;
   } else if (*iter == char16_t('+')) {
     result |= eParseHTMLInteger_NonStandard;
@@ -1096,7 +1096,7 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
 
   while (iter != end) {
     if (*iter >= char16_t('0') && *iter <= char16_t('9')) {
-      value = (value * 10) + (*iter - char16_t('0'));
+      value = (value * 10) + (*iter - char16_t('0')) * sign;
       ++iter;
       if (!value.isValid()) {
         result |= eParseHTMLInteger_Error | eParseHTMLInteger_ErrorOverflow;
@@ -1117,16 +1117,9 @@ nsContentUtils::ParseHTMLInteger(const nsAString& aValue,
     result |= eParseHTMLInteger_Error | eParseHTMLInteger_ErrorNoValue;
   }
 
-  if (value.isValid() && negate) {
-    value = -value;
-    // Checking the special case of -0.
-    if (value == 0) {
-      result |= eParseHTMLInteger_NonStandard;
-    }
-  }
-
   if (value.isValid() &&
-      (leadingZeros > 1 || (leadingZeros == 1 && !(value == 0)))) {
+       ((leadingZeros > 1 || (leadingZeros == 1 && !(value == 0))) ||
+       (sign == -1 && value == 0))) {
     result |= eParseHTMLInteger_NonStandard;
   }
 
@@ -1810,9 +1803,12 @@ nsContentUtils::IsControlledByServiceWorker(nsIDocument* aDocument)
 
   ErrorResult rv;
   bool controlled = swm->IsControlled(aDocument, rv);
-  NS_WARN_IF(rv.Failed());
+  if (NS_WARN_IF(rv.Failed())) {
+    rv.SuppressException();
+    return false;
+  }
 
-  return !rv.Failed() && controlled;
+  return controlled;
 }
 
 /* static */
@@ -3631,6 +3627,20 @@ nsContentUtils::IsChildOfSameType(nsIDocument* aDoc)
   return sameTypeParent != nullptr;
 }
 
+bool 
+nsContentUtils::IsScriptType(const nsACString& aContentType)
+{
+  // NOTE: if you add a type here, add it to the CONTENTDLF_CATEGORIES
+  // define in nsContentDLF.h as well. 
+  return aContentType.EqualsLiteral(APPLICATION_JAVASCRIPT) ||
+         aContentType.EqualsLiteral(APPLICATION_XJAVASCRIPT) ||
+         aContentType.EqualsLiteral(TEXT_ECMASCRIPT) ||
+         aContentType.EqualsLiteral(APPLICATION_ECMASCRIPT) ||
+         aContentType.EqualsLiteral(TEXT_JAVASCRIPT) ||
+         aContentType.EqualsLiteral(APPLICATION_JSON) ||
+         aContentType.EqualsLiteral(TEXT_JSON);
+}
+
 bool
 nsContentUtils::IsPlainTextType(const nsACString& aContentType)
 {
@@ -3639,14 +3649,8 @@ nsContentUtils::IsPlainTextType(const nsACString& aContentType)
   return aContentType.EqualsLiteral(TEXT_PLAIN) ||
          aContentType.EqualsLiteral(TEXT_CSS) ||
          aContentType.EqualsLiteral(TEXT_CACHE_MANIFEST) ||
-         aContentType.EqualsLiteral(APPLICATION_JAVASCRIPT) ||
-         aContentType.EqualsLiteral(APPLICATION_XJAVASCRIPT) ||
-         aContentType.EqualsLiteral(TEXT_ECMASCRIPT) ||
-         aContentType.EqualsLiteral(APPLICATION_ECMASCRIPT) ||
-         aContentType.EqualsLiteral(TEXT_JAVASCRIPT) ||
-         aContentType.EqualsLiteral(APPLICATION_JSON) ||
-         aContentType.EqualsLiteral(TEXT_JSON) ||
-         aContentType.EqualsLiteral(TEXT_VTT);
+         aContentType.EqualsLiteral(TEXT_VTT) ||
+         IsScriptType(aContentType);
 }
 
 bool
@@ -5121,7 +5125,7 @@ nsContentUtils::GetMostRecentNonPBWindow()
   nsCOMPtr<nsIWindowMediator_44> wm = do_QueryInterface(windowMediator);
 
   nsCOMPtr<mozIDOMWindowProxy> window;
-  wm->GetMostRecentNonPBWindow(MOZ_UTF16("navigator:browser"),
+  wm->GetMostRecentNonPBWindow(u"navigator:browser",
                                getter_AddRefs(window));
   nsCOMPtr<nsPIDOMWindowOuter> pwindow;
   pwindow = do_QueryInterface(window);
@@ -5374,11 +5378,10 @@ nsContentUtils::SetDataTransferInEvent(WidgetDragEvent* aDragEvent)
     return NS_OK;
   }
 
-  // For draggesture and dragstart events, the data transfer object is
+  // For dragstart events, the data transfer object is
   // created before the event fires, so it should already be set. For other
   // drag events, get the object from the drag session.
-  NS_ASSERTION(aDragEvent->mMessage != eLegacyDragGesture &&
-               aDragEvent->mMessage != eDragStart,
+  NS_ASSERTION(aDragEvent->mMessage != eDragStart,
                "draggesture event created without a dataTransfer");
 
   nsCOMPtr<nsIDragSession> dragSession = GetDragSession();
@@ -5405,8 +5408,7 @@ nsContentUtils::SetDataTransferInEvent(WidgetDragEvent* aDragEvent)
   }
 
   bool isCrossDomainSubFrameDrop = false;
-  if (aDragEvent->mMessage == eDrop ||
-      aDragEvent->mMessage == eLegacyDragDrop) {
+  if (aDragEvent->mMessage == eDrop) {
     isCrossDomainSubFrameDrop = CheckForSubFrameDrop(dragSession, aDragEvent);
   }
 
@@ -5430,7 +5432,6 @@ nsContentUtils::SetDataTransferInEvent(WidgetDragEvent* aDragEvent)
                                  FilterDropEffect(action, effectAllowed));
   }
   else if (aDragEvent->mMessage == eDrop ||
-           aDragEvent->mMessage == eLegacyDragDrop ||
            aDragEvent->mMessage == eDragEnd) {
     // For the drop and dragend events, set the drop effect based on the
     // last value that the dropEffect had. This will have been set in
@@ -6393,16 +6394,12 @@ nsContentUtils::PlatformToDOMLineBreaks(nsString& aString, const fallible_t& aFa
 {
   if (aString.FindChar(char16_t('\r')) != -1) {
     // Windows linebreaks: Map CRLF to LF:
-    if (!aString.ReplaceSubstring(MOZ_UTF16("\r\n"),
-                                  MOZ_UTF16("\n"),
-                                  aFallible)) {
+    if (!aString.ReplaceSubstring(u"\r\n", u"\n", aFallible)) {
       return false;
     }
 
     // Mac linebreaks: Map any remaining CR to LF:
-    if (!aString.ReplaceSubstring(MOZ_UTF16("\r"),
-                                  MOZ_UTF16("\n"),
-                                  aFallible)) {
+    if (!aString.ReplaceSubstring(u"\r", u"\n", aFallible)) {
       return false;
     }
   }
@@ -8357,6 +8354,25 @@ nsContentUtils::SetFetchReferrerURIWithPolicy(nsIPrincipal* aPrincipal,
 }
 
 // static
+net::ReferrerPolicy
+nsContentUtils::GetReferrerPolicyFromHeader(const nsAString& aHeader)
+{
+  // Multiple headers could be concatenated into one comma-separated
+  // list of policies. Need to tokenize the multiple headers.
+  nsCharSeparatedTokenizer tokenizer(aHeader, ',');
+  nsAutoString token;
+  net::ReferrerPolicy referrerPolicy = mozilla::net::RP_Unset;
+  while (tokenizer.hasMoreTokens()) {
+    token = tokenizer.nextToken();
+    net::ReferrerPolicy policy = net::ReferrerPolicyFromString(token);
+    if (policy != net::RP_Unset) {
+      referrerPolicy = policy;
+    }
+  }
+  return referrerPolicy;
+}
+
+// static
 bool
 nsContentUtils::PushEnabled(JSContext* aCx, JSObject* aObj)
 {
@@ -9216,6 +9232,34 @@ nsContentUtils::GetPresentationURL(nsIDocShell* aDocShell, nsAString& aPresentat
   nsCOMPtr<nsILoadContext> loadContext(do_QueryInterface(aDocShell));
   nsCOMPtr<nsIDOMElement> topFrameElement;
   loadContext->GetTopFrameElement(getter_AddRefs(topFrameElement));
+  if (!topFrameElement) {
+    return;
+  }
 
   topFrameElement->GetAttribute(NS_LITERAL_STRING("mozpresentation"), aPresentationUrl);
+}
+
+/* static */ nsIDocShell*
+nsContentUtils::GetDocShellForEventTarget(EventTarget* aTarget)
+{
+  nsCOMPtr<nsPIDOMWindowInner> innerWindow;
+
+  if (nsCOMPtr<nsINode> node = do_QueryInterface(aTarget)) {
+    bool ignore;
+    innerWindow =
+      do_QueryInterface(node->OwnerDoc()->GetScriptHandlingObject(ignore));
+  } else if ((innerWindow = do_QueryInterface(aTarget))) {
+    // Nothing else to do
+  } else {
+    nsCOMPtr<DOMEventTargetHelper> helper = do_QueryInterface(aTarget);
+    if (helper) {
+      innerWindow = helper->GetOwner();
+    }
+  }
+
+  if (innerWindow) {
+    return innerWindow->GetDocShell();
+  }
+
+  return nullptr;
 }

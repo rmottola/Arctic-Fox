@@ -44,6 +44,19 @@ namespace jit {
 class BaselineInspector;
 class Range;
 
+template <typename T>
+struct ResultWithOOM {
+    T value;
+    bool oom;
+
+    static ResultWithOOM<T> ok(T val) {
+        return { val, false };
+    }
+    static ResultWithOOM<T> fail() {
+        return { T(), true };
+    }
+};
+
 static inline
 MIRType MIRTypeFromValue(const js::Value& vp)
 {
@@ -3281,12 +3294,51 @@ class MNewArrayDynamicLength
     }
 };
 
+class MNewTypedArray : public MNullaryInstruction
+{
+    CompilerGCPointer<TypedArrayObject*> templateObject_;
+    gc::InitialHeap initialHeap_;
+
+    MNewTypedArray(CompilerConstraintList* constraints, TypedArrayObject* templateObject,
+                   gc::InitialHeap initialHeap)
+      : templateObject_(templateObject),
+        initialHeap_(initialHeap)
+    {
+        MOZ_ASSERT(!templateObject->isSingleton());
+        setResultType(MIRType::Object);
+        setResultTypeSet(MakeSingletonTypeSet(constraints, templateObject));
+    }
+
+  public:
+    INSTRUCTION_HEADER(NewTypedArray)
+
+    static MNewTypedArray* New(TempAllocator& alloc,
+                               CompilerConstraintList* constraints,
+                               TypedArrayObject* templateObject,
+                               gc::InitialHeap initialHeap)
+    {
+        return new(alloc) MNewTypedArray(constraints, templateObject, initialHeap);
+    }
+
+    TypedArrayObject* templateObject() const {
+        return templateObject_;
+    }
+
+    gc::InitialHeap initialHeap() const {
+        return initialHeap_;
+    }
+
+    virtual AliasSet getAliasSet() const override {
+        return AliasSet::None();
+    }
+};
+
 class MNewObject
   : public MUnaryInstruction,
     public NoTypePolicy::Data
 {
   public:
-    enum Mode { ObjectLiteral, ObjectCreate, TypedArray };
+    enum Mode { ObjectLiteral, ObjectCreate };
 
   private:
     gc::InitialHeap initialHeap_;
@@ -13005,9 +13057,12 @@ class MWasmBoundsCheck
     public MWasmMemoryAccess,
     public NoTypePolicy::Data
 {
+    bool redundant_;
+
     explicit MWasmBoundsCheck(MDefinition* index, const MWasmMemoryAccess& access)
       : MUnaryInstruction(index),
-        MWasmMemoryAccess(access)
+        MWasmMemoryAccess(access),
+        redundant_(false)
     {
         setMovable();
         setGuard(); // Effectful: throws for OOB.
@@ -13028,6 +13083,14 @@ class MWasmBoundsCheck
 
     AliasSet getAliasSet() const override {
         return AliasSet::None();
+    }
+
+    bool isRedundant() const {
+        return redundant_;
+    }
+
+    void setRedundant(bool val) {
+        redundant_ = val;
     }
 };
 
@@ -13229,9 +13292,9 @@ class MAsmJSAtomicBinopHeap
     }
 };
 
-class MAsmJSLoadGlobalVar : public MNullaryInstruction
+class MWasmLoadGlobalVar : public MNullaryInstruction
 {
-    MAsmJSLoadGlobalVar(MIRType type, unsigned globalDataOffset, bool isConstant)
+    MWasmLoadGlobalVar(MIRType type, unsigned globalDataOffset, bool isConstant)
       : globalDataOffset_(globalDataOffset), isConstant_(isConstant)
     {
         MOZ_ASSERT(IsNumberType(type) || IsSimdType(type));
@@ -13243,7 +13306,7 @@ class MAsmJSLoadGlobalVar : public MNullaryInstruction
     bool isConstant_;
 
   public:
-    INSTRUCTION_HEADER(AsmJSLoadGlobalVar)
+    INSTRUCTION_HEADER(WasmLoadGlobalVar)
     TRIVIAL_NEW_WRAPPERS
 
     unsigned globalDataOffset() const { return globalDataOffset_; }
@@ -13259,18 +13322,18 @@ class MAsmJSLoadGlobalVar : public MNullaryInstruction
     AliasType mightAlias(const MDefinition* def) const override;
 };
 
-class MAsmJSStoreGlobalVar
+class MWasmStoreGlobalVar
   : public MUnaryInstruction,
     public NoTypePolicy::Data
 {
-    MAsmJSStoreGlobalVar(unsigned globalDataOffset, MDefinition* v)
+    MWasmStoreGlobalVar(unsigned globalDataOffset, MDefinition* v)
       : MUnaryInstruction(v), globalDataOffset_(globalDataOffset)
     {}
 
     unsigned globalDataOffset_;
 
   public:
-    INSTRUCTION_HEADER(AsmJSStoreGlobalVar)
+    INSTRUCTION_HEADER(WasmStoreGlobalVar)
     TRIVIAL_NEW_WRAPPERS
 
     unsigned globalDataOffset() const { return globalDataOffset_; }
@@ -13412,14 +13475,14 @@ class MAsmJSCall final
     class Callee {
       public:
         enum Which { Internal, Dynamic, Builtin };
-        static const uint32_t NoSigIndex = UINT32_MAX;
       private:
         Which which_;
-        union {
+        union U {
+            U() {}
             uint32_t internal_;
             struct {
                 MDefinition* callee_;
-                uint32_t sigIndex_;
+                wasm::SigIdDesc sigId_;
             } dynamic;
             wasm::SymbolicAddress builtin_;
         } u;
@@ -13428,9 +13491,11 @@ class MAsmJSCall final
         explicit Callee(uint32_t callee) : which_(Internal) {
             u.internal_ = callee;
         }
-        explicit Callee(MDefinition* callee, uint32_t sigIndex = NoSigIndex) : which_(Dynamic) {
+        explicit Callee(MDefinition* callee, wasm::SigIdDesc sigId = wasm::SigIdDesc())
+          : which_(Dynamic)
+        {
             u.dynamic.callee_ = callee;
-            u.dynamic.sigIndex_ = sigIndex;
+            u.dynamic.sigId_ = sigId;
         }
         explicit Callee(wasm::SymbolicAddress callee) : which_(Builtin) {
             u.builtin_ = callee;
@@ -13446,13 +13511,9 @@ class MAsmJSCall final
             MOZ_ASSERT(which_ == Dynamic);
             return u.dynamic.callee_;
         }
-        bool dynamicHasSigIndex() const {
+        wasm::SigIdDesc dynamicSigId() const {
             MOZ_ASSERT(which_ == Dynamic);
-            return u.dynamic.sigIndex_ != NoSigIndex;
-        }
-        uint32_t dynamicSigIndex() const {
-            MOZ_ASSERT(dynamicHasSigIndex());
-            return u.dynamic.sigIndex_;
+            return u.dynamic.sigId_;
         }
         wasm::SymbolicAddress builtin() const {
             MOZ_ASSERT(which_ == Builtin);

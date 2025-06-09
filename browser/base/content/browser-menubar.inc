@@ -11,7 +11,8 @@
                 style="border:0px;padding:0px;margin:0px;-moz-appearance:none">
             <menu id="file-menu" label="&fileMenu.label;"
                   accesskey="&fileMenu.accesskey;">
-              <menupopup id="menu_FilePopup">
+              <menupopup id="menu_FilePopup"
+                         onpopupshowing="updateUserContextUIVisibility();">
                 <menuitem id="menu_newNavigatorTab"
                           label="&tabCmd.label;"
                           command="cmd_newNavigatorTab"
@@ -72,7 +73,7 @@
                           accesskey="&emailPageCmd.accesskey;"
                           command="Browser:SendLink"/>
                 <menuseparator/>
-#if !defined(MOZ_WIDGET_GTK) && !defined(MOZ_WIDGET_QT)
+#if !defined(MOZ_WIDGET_GTK)
                 <menuitem id="menu_printSetup"
                           label="&printSetupCmd.label;"
                           accesskey="&printSetupCmd.accesskey;"
@@ -320,6 +321,9 @@
                           type="checkbox"
                           observes="View:FullScreen"/>
 #endif
+                <menuitem id="menu_readerModeItem"
+                          observes="View:ReaderView"
+                          hidden="true"/>
                 <menuitem id="menu_showAllTabs"
                           hidden="true"
                           accesskey="&showAllTabsCmd.accesskey;"
@@ -509,7 +513,7 @@
 #ifndef XP_MACOSX
                 class="menuitem-iconic"
 #endif
-                label="&unsortedBookmarksCmd.label;"
+                label="&otherBookmarksCmd.label;"
                 oncommand="PlacesCommandHook.showPlacesOrganizer('UnfiledBookmarks');"/>
     </menupopup>
   </menu>

@@ -111,13 +111,17 @@ ProcessGlobal.prototype = {
     lines.forEach((line) => {
       log(line);
       let params = line.split(" ");
-      if (params[0] == "wipe") {
-        this.wipeDir(params[1]);
-      } else if (params[0] == "root") {
-        log("unrestrict devtools");
-        Services.prefs.setBoolPref("devtools.debugger.forbid-certified-apps", false);
-        let lock = settings.createLock();
-        lock.set("developer.menu.enabled", true, null);
+      switch (params[0]) {
+        case "root":
+          log("unrestrict devtools");
+          toggleUnrestrictedDevtools(true);
+          break;
+        case "wipe":
+          this.wipeDir(params[1]);
+        case "normal":
+          log("restrict devtools");
+          toggleUnrestrictedDevtools(false);
+          break;
       }
     });
   },
@@ -176,7 +180,8 @@ ProcessGlobal.prototype = {
       let args = message.arguments;
       let stackTrace = '';
 
-      if (message.level == 'assert' || message.level == 'error' || message.level == 'trace') {
+      if (message.stacktrace &&
+          (message.level == 'assert' || message.level == 'error' || message.level == 'trace')) {
         stackTrace = Array.map(message.stacktrace, formatStackFrame).join('\n');
       } else {
         stackTrace = formatStackFrame(message);

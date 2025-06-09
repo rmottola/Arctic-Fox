@@ -3,11 +3,6 @@
 /* Any copyright is dedicated to the Public Domain.
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 
-// Whitelisting this test.
-// As part of bug 1077403, the leaking uncaught rejections should be fixed.
-thisTestLeaksUncaughtRejectionsAndShouldBeFixed(
-  "Error: Assertion failure: Should have an event loop.");
-
 /**
  * Tests the behavior of the debugger statement.
  */
@@ -32,7 +27,7 @@ function test() {
     addTab(TAB_URL)
       .then((aTab) => {
         gTab = aTab;
-        return attachTabActorForUrl(gClient, TAB_URL)
+        return attachTabActorForUrl(gClient, TAB_URL);
       })
       .then(testEarlyDebuggerStatement)
       .then(testDebuggerStatement)
@@ -47,7 +42,7 @@ function test() {
 function testEarlyDebuggerStatement([aGrip, aResponse]) {
   let deferred = promise.defer();
 
-  let onPaused = function(aEvent, aPacket) {
+  let onPaused = function (aEvent, aPacket) {
     ok(false, "Pause shouldn't be called before we've attached!");
     deferred.reject();
   };
@@ -83,6 +78,8 @@ function testDebuggerStatement([aGrip, aResponse]) {
 
   // Reach around the debugging protocol and execute the debugger statement.
   callInTab(gTab, "runDebuggerStatement");
+
+  return deferred.promise;
 }
 
 function closeConnection() {
@@ -91,6 +88,6 @@ function closeConnection() {
   return deferred.promise;
 }
 
-registerCleanupFunction(function() {
+registerCleanupFunction(function () {
   gClient = null;
 });

@@ -17,10 +17,6 @@
 #include <unistd.h>
 #endif
 
-#ifdef XP_MACOSX
-#include "MacQuirks.h"
-#endif
-
 #include <stdio.h>
 #include <stdarg.h>
 #include <time.h>
@@ -36,9 +32,6 @@
 #define XRE_DONT_SUPPORT_XPSP2
 #endif
 #define XRE_WANT_ENVIRON
-#if defined(_MSC_VER) && (_MSC_VER < 1900)
-#define snprintf _snprintf
-#endif
 #define strcasecmp _stricmp
 #ifdef MOZ_SANDBOX
 #include "mozilla/sandboxing/SandboxInitialization.h"
@@ -136,6 +129,10 @@ XRE_GetProcessTypeType XRE_GetProcessType;
 XRE_SetProcessTypeType XRE_SetProcessType;
 XRE_InitChildProcessType XRE_InitChildProcess;
 XRE_EnableSameExecutableForContentProcType XRE_EnableSameExecutableForContentProc;
+#ifdef LIBFUZZER
+XRE_LibFuzzerSetMainType XRE_LibFuzzerSetMain;
+XRE_LibFuzzerGetFuncsType XRE_LibFuzzerGetFuncs;
+#endif
 
 static const nsDynamicFunctionLoad kXULFuncs[] = {
     { "XRE_GetFileFromPath", (NSFuncPtr*) &XRE_GetFileFromPath },
@@ -150,8 +147,23 @@ static const nsDynamicFunctionLoad kXULFuncs[] = {
     { "XRE_SetProcessType", (NSFuncPtr*) &XRE_SetProcessType },
     { "XRE_InitChildProcess", (NSFuncPtr*) &XRE_InitChildProcess },
     { "XRE_EnableSameExecutableForContentProc", (NSFuncPtr*) &XRE_EnableSameExecutableForContentProc },
+#ifdef LIBFUZZER
+    { "XRE_LibFuzzerSetMain", (NSFuncPtr*) &XRE_LibFuzzerSetMain },
+    { "XRE_LibFuzzerGetFuncs", (NSFuncPtr*) &XRE_LibFuzzerGetFuncs },
+#endif
     { nullptr, nullptr }
 };
+
+#ifdef LIBFUZZER
+int libfuzzer_main(int argc, char **argv);
+
+/* This wrapper is used by the libFuzzer main to call into libxul */
+
+void libFuzzerGetFuncs(const char* moduleName, LibFuzzerInitFunc* initFunc,
+                       LibFuzzerTestingFunc* testingFunc) {
+  return XRE_LibFuzzerGetFuncs(moduleName, initFunc, testingFunc);
+}
+#endif
 
 static int do_main(int argc, char* argv[], char* envp[], nsIFile *xreDirectory)
 {
@@ -251,6 +263,11 @@ static int do_main(int argc, char* argv[], char* envp[], nsIFile *xreDirectory)
   appData.sandboxBrokerServices = brokerServices;
 #endif
 
+#ifdef LIBFUZZER
+  if (getenv("LIBFUZZER"))
+    XRE_LibFuzzerSetMain(argc, argv, libfuzzer_main);
+#endif
+
   return XRE_main(argc, argv, &appData, mainFlags);
 }
 
@@ -329,6 +346,20 @@ sizeof(XPCOM_DLL) - 1))
 
 int main(int argc, char* argv[], char* envp[])
 {
+  mozilla::TimeStamp start = mozilla::TimeStamp::Now();
+
+#ifdef HAS_DLL_BLOCKLIST
+  DllBlocklist_Initialize();
+
+#ifdef DEBUG
+  // In order to be effective against AppInit DLLs, the blocklist must be
+  // initialized before user32.dll is loaded into the process (bug 932100).
+  if (GetModuleHandleA("user32.dll")) {
+    fprintf(stderr, "DLL blocklist was unable to intercept AppInit DLLs.\n");
+  }
+#endif
+#endif
+
 #ifdef MOZ_BROWSER_CAN_BE_CONTENTPROC
   // We are launching as a content process, delegate to the appropriate
   // main
@@ -356,25 +387,8 @@ int main(int argc, char* argv[], char* envp[])
   }
 #endif
 
-  mozilla::TimeStamp start = mozilla::TimeStamp::Now();
-
-#ifdef XP_MACOSX
-  TriggerQuirks();
-#endif
 
   nsIFile *xreDirectory;
-
-#ifdef HAS_DLL_BLOCKLIST
-  DllBlocklist_Initialize();
-
-#ifdef DEBUG
-  // In order to be effective against AppInit DLLs, the blocklist must be
-  // initialized before user32.dll is loaded into the process (bug 932100).
-  if (GetModuleHandleA("user32.dll")) {
-    fprintf(stderr, "DLL blocklist was unable to intercept AppInit DLLs.\n");
-  }
-#endif
-#endif
 
   nsresult rv = InitXPCOMGlue(argv[0], &xreDirectory);
   if (NS_FAILED(rv)) {

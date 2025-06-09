@@ -1768,6 +1768,10 @@ nsWindow::GetNativeData(uint32_t aDataType)
         }
         return mIMContext.get();
     }
+#ifdef MOZ_X11
+    case NS_NATIVE_COMPOSITOR_DISPLAY:
+        return gfxPlatformGtk::GetPlatform()->GetCompositorDisplay();
+#endif // MOZ_X11
     default:
         NS_WARNING("nsWindow::GetNativeData called with bad value");
         return nullptr;
@@ -3525,11 +3529,11 @@ GetBrandName(nsXPIDLString& brandName)
 
     if (bundle)
         bundle->GetStringFromName(
-            MOZ_UTF16("brandShortName"),
+            u"brandShortName",
             getter_Copies(brandName));
 
     if (brandName.IsEmpty())
-        brandName.AssignLiteral(MOZ_UTF16("Mozilla"));
+        brandName.AssignLiteral(u"Mozilla");
 }
 
 static GdkWindow *

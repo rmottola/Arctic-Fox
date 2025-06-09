@@ -16,7 +16,6 @@
 #include "mozilla/Mutex.h"
 #include <stdint.h>
 #include <algorithm>
-#include <list>
 
 using namespace mozilla::media;
 
@@ -81,7 +80,7 @@ public:
     if (!sInstance) {
       sInstance = new ReaderQueue;
       sInstance->MaxNumActive(MediaPrefs::MediaDecoderLimit());
-      ClearOnShutdown(&sInstance);
+      ClearOnShutdown(&sInstance, ShutdownPhase::Shutdown);
     }
     MOZ_ASSERT(sInstance);
     return *sInstance;

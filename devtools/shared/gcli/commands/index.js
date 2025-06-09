@@ -5,7 +5,7 @@
 "use strict";
 
 const { createSystem, connectFront, disconnectFront } = require("gcli/system");
-const { GcliFront } = require("devtools/server/actors/gcli");
+const { GcliFront } = require("devtools/shared/fronts/gcli");
 
 /**
  * This is the basic list of modules that should be loaded into each
@@ -65,10 +65,12 @@ exports.devtoolsModules = [
   "devtools/shared/gcli/commands/inject",
   "devtools/shared/gcli/commands/jsb",
   "devtools/shared/gcli/commands/listen",
+  "devtools/shared/gcli/commands/mdn",
   "devtools/shared/gcli/commands/measure",
   "devtools/shared/gcli/commands/media",
   "devtools/shared/gcli/commands/pagemod",
   "devtools/shared/gcli/commands/paintflashing",
+  "devtools/shared/gcli/commands/qsa",
   "devtools/shared/gcli/commands/restart",
   "devtools/shared/gcli/commands/rulers",
   "devtools/shared/gcli/commands/screenshot",

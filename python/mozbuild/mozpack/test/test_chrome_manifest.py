@@ -51,7 +51,7 @@ class TestManifest(unittest.TestCase):
             'binary-component bar.so',
             'category command-line-handler m-browser' +
             ' @mozilla.org/browser/clh;1' +
-            ' application={8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}',
+            ' application={ec8030f7-c20a-464f-9b0e-13a3a9e97384}',
             'style chrome://global/content/customizeToolbar.xul' +
             ' chrome://browser/skin/',
             'overlay chrome://global/content/viewSource.xul' +
@@ -82,7 +82,7 @@ class TestManifest(unittest.TestCase):
             ManifestBinaryComponent('', 'bar.so'),
             ManifestCategory('', 'command-line-handler', 'm-browser',
                              '@mozilla.org/browser/clh;1', 'application=' +
-                             '{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}'),
+                             '{ec8030f7-c20a-464f-9b0e-13a3a9e97384}'),
             ManifestStyle('', 'chrome://global/content/customizeToolbar.xul',
                           'chrome://browser/skin/'),
             ManifestOverlay('', 'chrome://global/content/viewSource.xul',

@@ -9,6 +9,9 @@
 #include "MP4Demuxer.h"
 #include "mozilla/Preferences.h"
 #include "nsCharSeparatedTokenizer.h"
+#ifdef MOZ_EME
+#include "mozilla/CDMProxy.h"
+#endif
 #include "mozilla/Logging.h"
 #include "nsMimeTypes.h"
 #include "nsContentTypeParser.h"
@@ -20,7 +23,6 @@
 #endif
 #ifdef MOZ_WIDGET_ANDROID
 #include "nsIGfxInfo.h"
-#include "AndroidBridge.h"
 #endif
 #ifdef MOZ_APPLEMEDIA
 #include "AppleDecoderModule.h"
@@ -95,7 +97,8 @@ MP4Decoder::CanHandleMediaType(const nsACString& aMIMETypeExcludingCodecs,
   // the web, as opposed to what we use internally (i.e. what our demuxers
   // etc output).
   const bool isMP4Audio = aMIMETypeExcludingCodecs.EqualsASCII("audio/mp4") ||
-                          aMIMETypeExcludingCodecs.EqualsASCII("audio/x-m4a");
+                          aMIMETypeExcludingCodecs.EqualsASCII("audio/x-m4a") ||
+                          aMIMETypeExcludingCodecs.EqualsASCII("audio/opus");
   const bool isMP4Video =
   // On B2G, treat 3GPP as MP4 when Gonk PDM is available.
 #ifdef MOZ_GONK_MEDIACODEC

@@ -6,7 +6,7 @@
  * the inspector panel as intended.
  */
 
-add_task(function*() {
+add_task(function* () {
   let { target, panel } = yield initWebAudioEditor(SIMPLE_CONTEXT_URL);
   let { panelWin } = panel;
   let { gFront, $, $$, EVENTS, InspectorView } = panelWin;
@@ -14,12 +14,12 @@ add_task(function*() {
 
   let started = once(gFront, "start-context");
 
-  reload(target);
-
-  let [actors] = yield Promise.all([
+  let events = Promise.all([
     get3(gFront, "create-node"),
     waitForGraphRendered(panelWin, 3, 2)
   ]);
+  reload(target);
+  let [actors] = yield events;
   let nodeIds = actors.map(actor => actor.actorID);
 
   ok(!InspectorView.isVisible(), "InspectorView hidden on start.");

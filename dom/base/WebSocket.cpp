@@ -552,11 +552,11 @@ WebSocketImpl::ConsoleError()
 
   if (mWebSocket->ReadyState() < WebSocket::OPEN) {
     PrintErrorOnConsole("chrome://global/locale/appstrings.properties",
-                        MOZ_UTF16("connectionFailure"),
+                        u"connectionFailure",
                         formatStrings, ArrayLength(formatStrings));
   } else {
     PrintErrorOnConsole("chrome://global/locale/appstrings.properties",
-                        MOZ_UTF16("netInterrupt"),
+                        u"netInterrupt",
                         formatStrings, ArrayLength(formatStrings));
   }
   /// todo some specific errors - like for message too large
@@ -1601,8 +1601,8 @@ WebSocketImpl::Init(JSContext* aCx,
     }
     mSecure = true;
 
-    const char16_t* params[] = { reportSpec.get(), MOZ_UTF16("wss") };
-    CSP_LogLocalizedStr(MOZ_UTF16("upgradeInsecureRequest"),
+    const char16_t* params[] = { reportSpec.get(), u"wss" };
+    CSP_LogLocalizedStr(u"upgradeInsecureRequest",
                         params, ArrayLength(params),
                         EmptyString(), // aSourceFile
                         EmptyString(), // aScriptSample
@@ -1847,6 +1847,12 @@ WebSocketImpl::InitializeConnection(nsIPrincipal* aPrincipal)
   // mOriginDocument has to be release on main-thread because WeakReferences
   // are not thread-safe.
   mOriginDocument = nullptr;
+
+
+  // The TriggeringPrincipal for websockets must always be a script.
+  // Let's make sure that the doc's principal (if a doc exists)
+  // and aPrincipal are same origin.
+  MOZ_ASSERT(!doc || doc->NodePrincipal()->Equals(aPrincipal));
 
   wsChannel->InitLoadInfo(doc ? doc->AsDOMNode() : nullptr,
                           doc ? doc->NodePrincipal() : aPrincipal,
@@ -2636,14 +2642,7 @@ public:
   bool WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
   {
     aWorkerPrivate->AssertIsOnWorkerThread();
-    aWorkerPrivate->ModifyBusyCountFromWorker(true);
     return !NS_FAILED(mImpl->CancelInternal());
-  }
-
-  void PostRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
-               bool aRunResult) override
-  {
-    aWorkerPrivate->ModifyBusyCountFromWorker(false);
   }
 
 private:
@@ -2785,7 +2784,6 @@ public:
   bool WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
   {
     aWorkerPrivate->AssertIsOnWorkerThread();
-    aWorkerPrivate->ModifyBusyCountFromWorker(true);
 
     // No messages when disconnected.
     if (mWebSocketImpl->mDisconnectingOrDisconnected) {
@@ -2799,7 +2797,6 @@ public:
   void PostRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
                bool aRunResult) override
   {
-    aWorkerPrivate->ModifyBusyCountFromWorker(false);
   }
 
   bool
@@ -2825,7 +2822,7 @@ private:
   nsCOMPtr<nsIRunnable> mEvent;
 };
 
-} // anonymous namespace
+} // namespace
 
 NS_IMETHODIMP
 WebSocketImpl::DispatchFromScript(nsIRunnable* aEvent, uint32_t aFlags)

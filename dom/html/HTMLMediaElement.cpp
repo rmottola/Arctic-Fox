@@ -76,6 +76,7 @@
 #include "AudioStreamTrack.h"
 #include "VideoStreamTrack.h"
 #include "MediaTrackList.h"
+#include "MediaStreamError.h"
 
 #include "AudioChannelService.h"
 
@@ -2116,13 +2117,15 @@ public:
     return mElement->GetCORSMode();
   }
 
-  already_AddRefed<Promise>
+  already_AddRefed<PledgeVoid>
   ApplyConstraints(nsPIDOMWindowInner* aWindow,
-                   const dom::MediaTrackConstraints& aConstraints,
-                   ErrorResult &aRv) override
+                   const dom::MediaTrackConstraints& aConstraints) override
   {
-    NS_ERROR("ApplyConstraints not implemented for media element capture");
-    return nullptr;
+    RefPtr<PledgeVoid> p = new PledgeVoid();
+    p->Reject(new dom::MediaStreamError(aWindow,
+                                        NS_LITERAL_STRING("OverconstrainedError"),
+                                        NS_LITERAL_STRING("")));
+    return p.forget();
   }
 
   void Stop() override

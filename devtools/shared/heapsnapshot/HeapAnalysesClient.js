@@ -32,6 +32,7 @@ const HeapAnalysesClient = module.exports = function () {
  */
 HeapAnalysesClient.prototype.destroy = function () {
   this._worker.destroy();
+  this._worker = null;
 };
 
 /**
@@ -76,7 +77,7 @@ HeapAnalysesClient.prototype.getCreationTime = function (snapshotFilePath) {
   return this._worker.performTask("getCreationTime", snapshotFilePath);
 };
 
-/*** Censuses *****************************************************************/
+/** * Censuses *****************************************************************/
 
 /**
  * Ask the worker to perform a census analysis on the heap snapshot with the
@@ -115,7 +116,7 @@ HeapAnalysesClient.prototype.getCreationTime = function (snapshotFilePath) {
  */
 HeapAnalysesClient.prototype.takeCensus = function (snapshotFilePath,
                                                     censusOptions,
-                                                    requestOptions={}) {
+                                                    requestOptions = {}) {
   return this._worker.performTask("takeCensus", {
     snapshotFilePath,
     censusOptions,
@@ -148,7 +149,7 @@ HeapAnalysesClient.prototype.takeCensus = function (snapshotFilePath,
  *            retained size.
  *
  */
-HeapAnalysesClient.prototype.getCensusIndividuals = function(opts) {
+HeapAnalysesClient.prototype.getCensusIndividuals = function (opts) {
   return this._worker.performTask("getCensusIndividuals", opts);
 };
 
@@ -201,7 +202,7 @@ HeapAnalysesClient.prototype.takeCensusDiff = function (firstSnapshotFilePath,
   });
 };
 
-/*** Dominator Trees **********************************************************/
+/** * Dominator Trees **********************************************************/
 
 /**
  * Compute the dominator tree of the heap snapshot loaded from the given file

@@ -85,7 +85,7 @@ class StructuredCloneData;
 class LayerTreeUpdateObserver : public layers::CompositorUpdateObserver
 {
 public:
-  LayerTreeUpdateObserver(TabParent* aTabParent)
+  explicit LayerTreeUpdateObserver(TabParent* aTabParent)
     : mTabParent(aTabParent)
   {
     MOZ_ASSERT(NS_IsMainThread());
@@ -652,9 +652,6 @@ protected:
 
   virtual bool RecvAudioChannelActivityNotification(const uint32_t& aAudioChannel,
                                                     const bool& aActive) override;
-
-  bool InitBrowserConfiguration(const nsCString& aURI,
-                                BrowserConfiguration& aConfiguration);
 
   ContentCacheInParent mContentCache;
 

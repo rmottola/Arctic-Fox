@@ -76,7 +76,29 @@
                 'linux/video_capture_linux.h',
               ],
             }],  # linux
-            ['OS=="mac"', {
+            ['OS=="mac" and use_avfoundation==1', {
+              'sources': [
+                'mac/avfoundation/video_capture_avfoundation.h',
+                'mac/avfoundation/video_capture_avfoundation.mm',
+                'mac/avfoundation/video_capture_avfoundation_info.h',
+                'mac/avfoundation/video_capture_avfoundation_info.mm',
+                'mac/avfoundation/video_capture_avfoundation_info_objc.h',
+                'mac/avfoundation/video_capture_avfoundation_info_objc.mm',
+                'mac/avfoundation/video_capture_avfoundation_objc.h',
+                'mac/avfoundation/video_capture_avfoundation_objc.mm',
+                'mac/avfoundation/video_capture_avfoundation_utility.h',
+                'mac/video_capture_mac.mm',
+              ],
+              'link_settings': {
+                'xcode_settings': {
+                  'OTHER_LDFLAGS': [
+                    '-framework Cocoa',
+                    '-framework CoreVideo',
+                  ],
+                },
+              },
+            }],  # mac
+            ['OS=="mac" and use_qtkit==1', {
               'sources': [
                 'mac/qtkit/video_capture_qtkit.h',
                 'mac/qtkit/video_capture_qtkit.mm',

@@ -120,8 +120,6 @@ struct AnimationPropertySegment
   StyleAnimationValue mFromValue, mToValue;
   Maybe<ComputedTimingFunction> mTimingFunction;
 
-  nsChangeHint mChangeHint;
-
   bool operator==(const AnimationPropertySegment& aOther) const {
     return mFromKey == aOther.mFromKey &&
            mToKey == aOther.mToKey &&
@@ -347,7 +345,7 @@ public:
 
   // Cumulative change hint on each segment for each property.
   // This is used for deciding the animation is paint-only.
-  void CalculateCumulativeChangeHint();
+  void CalculateCumulativeChangeHint(nsStyleContext* aStyleContext);
 
   // Returns true if all of animation properties' change hints
   // can ignore painting if the animation is not visible.
@@ -400,9 +398,8 @@ protected:
   // context. That's because calling GetStyleContextForElement when we are in
   // the process of building a style context may trigger various forms of
   // infinite recursion.
-  // If aDoc is nullptr, we will use the owner doc of the target element.
   already_AddRefed<nsStyleContext>
-  GetTargetStyleContext(nsIDocument* aDoc = nullptr);
+  GetTargetStyleContext();
 
   Maybe<OwningAnimationTarget> mTarget;
   RefPtr<Animation> mAnimation;

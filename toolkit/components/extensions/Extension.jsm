@@ -25,9 +25,8 @@ Cu.importGlobalProperties(["TextEncoder"]);
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/ExtensionContent.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "EventEmitter",
-                                  "resource://devtools/shared/event-emitter.js");
 XPCOMUtils.defineLazyModuleGetter(this, "Locale",
                                   "resource://gre/modules/Locale.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Log",
@@ -88,12 +87,14 @@ ExtensionManagement.registerSchema("chrome://extensions/content/schemas/notifica
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/runtime.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/storage.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/test.json");
+ExtensionManagement.registerSchema("chrome://extensions/content/schemas/events.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/web_navigation.json");
 ExtensionManagement.registerSchema("chrome://extensions/content/schemas/web_request.json");
 
 Cu.import("resource://gre/modules/ExtensionUtils.jsm");
 var {
   BaseContext,
+  EventEmitter,
   LocaleData,
   Messenger,
   injectAPI,
@@ -178,8 +179,8 @@ var Management = {
     this.apis.push({api, permission});
   },
 
-  registerSchemaAPI(namespace, permission, api) {
-    this.schemaApis.push({namespace, permission, api});
+  registerSchemaAPI(namespace, api) {
+    this.schemaApis.push({namespace, api});
   },
 
   // Mash together into a single object all the APIs registered by the
@@ -226,7 +227,7 @@ var Management = {
 
   // Ask to run all the callbacks that are registered for a given hook.
   emit(hook, ...args) {
-    this.emitter.emit(hook, ...args);
+    return this.emitter.emit(hook, ...args);
   },
 
   off(hook, callback) {
@@ -478,8 +479,13 @@ ParentAPIManager.init();
 // For extensions that have called setUninstallURL(), send an event
 // so the browser can display the URL.
 let UninstallObserver = {
+  initialized: false,
+
   init: function() {
-    AddonManager.addAddonListener(this);
+    if (!this.initialized) {
+      AddonManager.addAddonListener(this);
+      this.initialized = true;
+    }
   },
 
   onUninstalling: function(addon) {
@@ -492,47 +498,29 @@ let UninstallObserver = {
 
 // Responsible for loading extension APIs into the right globals.
 GlobalManager = {
-  // Number of extensions currently enabled.
-  count: 0,
-
-  // Map[docShell -> {extension, context}] where context is an ExtensionContext.
-  docShells: new Map(),
-
   // Map[extension ID -> Extension]. Determines which extension is
   // responsible for content under a particular extension ID.
   extensionMap: new Map(),
 
   init(extension) {
-    if (this.count == 0) {
+    if (this.extensionMap.size == 0) {
       Services.obs.addObserver(this, "content-document-global-created", false);
       UninstallObserver.init();
     }
-    this.count++;
 
     this.extensionMap.set(extension.id, extension);
   },
 
   uninit(extension) {
-    this.count--;
-    if (this.count == 0) {
+    this.extensionMap.delete(extension.id);
+
+    if (this.extensionMap.size == 0) {
       Services.obs.removeObserver(this, "content-document-global-created");
     }
-
-    for (let [docShell, data] of this.docShells) {
-      if (extension == data.extension) {
-        this.docShells.delete(docShell);
-      }
-    }
-
-    this.extensionMap.delete(extension.id);
   },
 
   getExtension(extensionId) {
     return this.extensionMap.get(extensionId);
-  },
-
-  injectInDocShell(docShell, extension, context) {
-    this.docShells.set(docShell, {extension, context});
   },
 
   injectInObject(extension, context, defaultCallback, dest, namespaces = null) {
@@ -546,8 +534,16 @@ GlobalManager = {
     schemaApi.extensionTypes = {};
 
     let schemaWrapper = {
+      get principal() {
+        return context.principal;
+      },
+
       get cloneScope() {
         return context.cloneScope;
+      },
+
+      hasPermission(permission) {
+        return extension.hasPermission(permission);
       },
 
       callFunction(path, name, args) {
@@ -577,7 +573,7 @@ GlobalManager = {
       },
 
       shouldInject(namespace, name) {
-        if (namespaces && namespaces.indexOf(namespace) == -1) {
+        if (namespaces && !namespaces.includes(namespace)) {
           return false;
         }
         return findPathInObject(schemaApi, [namespace]) != null;
@@ -633,40 +629,40 @@ GlobalManager = {
       return;
     }
 
-    let docShell = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
-                                .getInterface(Ci.nsIWebNavigation)
-                                .QueryInterface(Ci.nsIDocShellTreeItem)
-                                .sameTypeRootTreeItem
-                                .QueryInterface(Ci.nsIDocShell);
 
-    if (this.docShells.has(docShell)) {
-      let {extension, context} = this.docShells.get(docShell);
-      if (context && extension.id == id) {
-        inject(extension, context);
-      }
-      return;
+    let docShell = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
+                                .getInterface(Ci.nsIDocShell);
+
+    let parentDocument = docShell.parent.QueryInterface(Ci.nsIDocShell)
+                                 .contentViewer.DOMDocument;
+
+    let browser = docShell.chromeEventHandler;
+    // If this is a sub-frame of the add-on manager, use that <browser>
+    // element rather than the top-level chrome event handler.
+    if (contentWindow.frameElement && parentDocument.documentURI == "about:addons") {
+      browser = contentWindow.frameElement;
     }
+
+    let type = "tab";
+    if (browser.hasAttribute("webextension-view-type")) {
+      type = browser.getAttribute("webextension-view-type");
+    } else if (browser.classList.contains("inline-options-browser")) {
+      // Options pages are currently displayed inline, but in Chrome
+      // and in our UI mock-ups for a later milestone, they're
+      // pop-ups.
+      type = "popup";
+    }
+
 
     let extension = this.extensionMap.get(id);
     let uri = contentWindow.document.documentURIObject;
     let incognito = PrivateBrowsingUtils.isContentWindowPrivate(contentWindow);
 
-    let browser = docShell.chromeEventHandler;
-
-    let type = "tab";
-    if (browser instanceof Ci.nsIDOMElement) {
-      if (browser.hasAttribute("webextension-view-type")) {
-        type = browser.getAttribute("webextension-view-type");
-      } else if (browser.classList.contains("inline-options-browser")) {
-        // Options pages are currently displayed inline, but in Chrome
-        // and in our UI mock-ups for a later milestone, they're
-        // pop-ups.
-        type = "popup";
-      }
-    }
-
     let context = new ExtensionContext(extension, {type, contentWindow, uri, docShell, incognito});
     inject(extension, context);
+    if (type == "background") {
+      this._initializeBackgroundPage(contentWindow);
+    }
 
     let eventHandler = docShell.chromeEventHandler;
     let listener = event => {
@@ -677,6 +673,29 @@ GlobalManager = {
       context.unload();
     };
     eventHandler.addEventListener("unload", listener, true);
+  },
+
+  _initializeBackgroundPage(contentWindow) {
+    // Override the `alert()` method inside background windows;
+    // we alias it to console.log().
+    // See: https://bugzilla.mozilla.org/show_bug.cgi?id=1203394
+    let alertDisplayedWarning = false;
+    let alertOverwrite = text => {
+      if (!alertDisplayedWarning) {
+        let {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
+        require("devtools/client/framework/devtools-browser");
+
+        let hudservice = require("devtools/client/webconsole/hudservice");
+        hudservice.openBrowserConsoleOrFocus();
+
+        contentWindow.console.warn("alert() is not supported in background windows; please use console.log instead.");
+
+        alertDisplayedWarning = true;
+      }
+
+      contentWindow.console.log(text);
+    };
+    Cu.exportFunction(alertOverwrite, contentWindow, {defineAs: "alert"});
   },
 };
 
@@ -898,7 +917,10 @@ ExtensionData.prototype = {
       }
 
       try {
-        this.id = this.manifest.applications.gecko.id;
+        // Do not override the add-on id that has been already assigned.
+        if (!this.id && this.manifest.applications.gecko.id) {
+          this.id = this.manifest.applications.gecko.id;
+        }
       } catch (e) {
         // Errors are handled by the type checks above.
       }
@@ -1090,6 +1112,10 @@ this.Extension = function(addonData) {
  *
  * The generated extension is stored in the system temporary directory,
  * and an nsIFile object pointing to it is returned.
+ *
+ * @param {string} id
+ * @param {object} data
+ * @returns {nsIFile}
  */
 this.Extension.generateXPI = function(id, data) {
   let manifest = data.manifest;
@@ -1183,24 +1209,31 @@ this.Extension.generateXPI = function(id, data) {
  * A skeleton Extension-like object, used for testing, which installs an
  * add-on via the add-on manager when startup() is called, and
  * uninstalles it on shutdown().
+ *
+ * @param {string} id
+ * @param {nsIFile} file
+ * @param {nsIURI} rootURI
  */
 function MockExtension(id, file, rootURI) {
   this.id = id;
   this.file = file;
   this.rootURI = rootURI;
 
-  this._extension = null;
-  this._extensionPromise = new Promise(resolve => {
+  let promiseEvent = eventName => new Promise(resolve => {
     let onstartup = (msg, extension) => {
       if (extension.id == this.id) {
-        Management.off("startup", onstartup);
+        Management.off(eventName, onstartup);
 
         this._extension = extension;
         resolve(extension);
       }
     };
-    Management.on("startup", onstartup);
+    Management.on(eventName, onstartup);
   });
+
+  this._extension = null;
+  this._extensionPromise = promiseEvent("startup");
+  this._readyPromise = promiseEvent("ready");
 }
 
 MockExtension.prototype = {
@@ -1223,7 +1256,7 @@ MockExtension.prototype = {
   startup() {
     return AddonManager.installTemporaryAddon(this.file).then(addon => {
       this.addon = addon;
-      return this._extensionPromise;
+      return this._readyPromise;
     });
   },
 
@@ -1241,6 +1274,10 @@ MockExtension.prototype = {
 /**
  * Generates a new extension using |Extension.generateXPI|, and initializes a
  * new |Extension| instance which will execute it.
+ *
+ * @param {string} id
+ * @param {object} data
+ * @returns {Extension}
  */
 this.Extension.generate = function(id, data) {
   let file = this.generateXPI(id, data);
@@ -1306,6 +1343,7 @@ Extension.prototype = extend(Object.create(ExtensionData.prototype), {
       webAccessibleResources: this.webAccessibleResources.serialize(),
       whiteListedHosts: this.whiteListedHosts.serialize(),
       localeData: this.localeData.serialize(),
+      permissions: this.permissions,
     };
   },
 
@@ -1347,9 +1385,10 @@ Extension.prototype = extend(Object.create(ExtensionData.prototype), {
 
     this.webAccessibleResources = new MatchGlobs(strippedWebAccessibleResources);
 
+    let promises = [];
     for (let directive in manifest) {
       if (manifest[directive] !== null) {
-        Management.emit("manifest_" + directive, directive, this, manifest);
+        promises.push(Management.emit(`manifest_${directive}`, directive, this, manifest));
       }
     }
 
@@ -1360,7 +1399,9 @@ Extension.prototype = extend(Object.create(ExtensionData.prototype), {
     let serial = this.serialize();
     data["Extension:Extensions"].push(serial);
 
-    return this.broadcast("Extension:Startup", serial);
+    return this.broadcast("Extension:Startup", serial).then(() => {
+      return Promise.all(promises);
+    });
   },
 
   callOnClose(obj) {
@@ -1422,6 +1463,8 @@ Extension.prototype = extend(Object.create(ExtensionData.prototype), {
       Management.emit("startup", this);
 
       return this.runManifest(this.manifest);
+    }).then(() => {
+      Management.emit("ready", this);
     }).catch(e => {
       dump(`Extension error: ${e.message} ${e.filename || e.fileName}:${e.lineNumber} :: ${e.stack || new Error().stack}\n`);
       Cu.reportError(e);

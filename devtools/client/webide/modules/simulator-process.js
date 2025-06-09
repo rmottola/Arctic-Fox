@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-'use strict';
+"use strict";
 
 const { Cc, Ci, Cu } = require("chrome");
 
@@ -67,8 +67,13 @@ SimulatorProcess.prototype = {
       }
     });
 
-    this.on("stdout", (e, data) => this.log(e, data.trim()));
-    this.on("stderr", (e, data) => this.log(e, data.trim()));
+    let logHandler = (e, data) => this.log(e, data.trim());
+    this.on("stdout", logHandler);
+    this.on("stderr", logHandler);
+    this.once("exit", () => {
+      this.off("stdout", logHandler);
+      this.off("stderr", logHandler);
+    });
 
     let environment;
     if (OS.indexOf("linux") > -1) {
@@ -149,6 +154,13 @@ SimulatorProcess.prototype = {
     // Ignore eventual zombie instances of b2g that are left over.
     args.push("-no-remote");
 
+    // If we are running a simulator based on Mulet,
+    // we have to override the default chrome URL
+    // in order to prevent the Browser UI to appear.
+    if (this.b2gBinary.leafName.includes("firefox")) {
+      args.push("-chrome", "chrome://b2g/content/shell.html");
+    }
+
     return args;
   },
 };
@@ -164,8 +176,8 @@ var CSPp = CustomSimulatorProcess.prototype = Object.create(SimulatorProcess.pro
 
 // Compute B2G binary file handle.
 Object.defineProperty(CSPp, "b2gBinary", {
-  get: function() {
-    let file = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsILocalFile);
+  get: function () {
+    let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsILocalFile);
     file.initWithPath(this.options.b2gBinary);
     return file;
   }
@@ -173,8 +185,8 @@ Object.defineProperty(CSPp, "b2gBinary", {
 
 // Compute Gaia profile file handle.
 Object.defineProperty(CSPp, "gaiaProfile", {
-  get: function() {
-    let file = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsILocalFile);
+  get: function () {
+    let file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsILocalFile);
     file.initWithPath(this.options.gaiaProfile);
     return file;
   }
@@ -192,12 +204,12 @@ var ASPp = AddonSimulatorProcess.prototype = Object.create(SimulatorProcess.prot
 
 // Compute B2G binary file handle.
 Object.defineProperty(ASPp, "b2gBinary", {
-  get: function() {
+  get: function () {
     let file;
     try {
       let pref = "extensions." + this.addon.id + ".customRuntime";
       file = Services.prefs.getComplexValue(pref, Ci.nsIFile);
-    } catch(e) {}
+    } catch (e) {}
 
     if (!file) {
       file = this.addon.getResourceURI().QueryInterface(Ci.nsIFileURL).file;
@@ -210,18 +222,31 @@ Object.defineProperty(ASPp, "b2gBinary", {
       };
       binaries[OS].split("/").forEach(node => file.append(node));
     }
+    // If the binary doesn't exists, it may be because of a simulator
+    // based on mulet, which has a different binary name.
+    if (!file.exists()) {
+      file = this.addon.getResourceURI().QueryInterface(Ci.nsIFileURL).file;
+      file.append("firefox");
+      let binaries = {
+        win32: "firefox.exe",
+        mac64: "FirefoxNightly.app/Contents/MacOS/firefox-bin",
+        linux32: "firefox-bin",
+        linux64: "firefox-bin",
+      };
+      binaries[OS].split("/").forEach(node => file.append(node));
+    }
     return file;
   }
 });
 
 // Compute Gaia profile file handle.
 Object.defineProperty(ASPp, "gaiaProfile", {
-  get: function() {
+  get: function () {
     let file;
 
     // Custom profile from simulator configuration.
     if (this.options.gaiaProfile) {
-      file = Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsILocalFile);
+      file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsILocalFile);
       file.initWithPath(this.options.gaiaProfile);
       return file;
     }
@@ -231,7 +256,7 @@ Object.defineProperty(ASPp, "gaiaProfile", {
       let pref = "extensions." + this.addon.id + ".gaiaProfile";
       file = Services.prefs.getComplexValue(pref, Ci.nsIFile);
       return file;
-    } catch(e) {}
+    } catch (e) {}
 
     // Default profile from addon.
     file = this.addon.getResourceURI().QueryInterface(Ci.nsIFileURL).file;
@@ -252,12 +277,12 @@ var OASPp = OldAddonSimulatorProcess.prototype = Object.create(AddonSimulatorPro
 
 // Compute B2G binary file handle.
 Object.defineProperty(OASPp, "b2gBinary", {
-  get: function() {
+  get: function () {
     let file;
     try {
       let pref = "extensions." + this.addon.id + ".customRuntime";
       file = Services.prefs.getComplexValue(pref, Ci.nsIFile);
-    } catch(e) {}
+    } catch (e) {}
 
     if (!file) {
       file = this.addon.getResourceURI().QueryInterface(Ci.nsIFileURL).file;
@@ -280,7 +305,7 @@ Object.defineProperty(OASPp, "b2gBinary", {
 
 // Compute B2G CLI arguments.
 Object.defineProperty(OASPp, "args", {
-  get: function() {
+  get: function () {
     let args = [];
 
     // Gaia profile.

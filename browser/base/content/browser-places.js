@@ -25,7 +25,7 @@ var StarUI = {
     element.hidden = false;
     element.addEventListener("keypress", this, false);
     element.addEventListener("mouseout", this, false);
-    element.addEventListener("mouseover", this, false);
+    element.addEventListener("mousemove", this, false);
     element.addEventListener("popuphidden", this, false);
     element.addEventListener("popupshown", this, false);
     return this.panel = element;
@@ -63,7 +63,7 @@ var StarUI = {
   // nsIDOMEventListener
   handleEvent(aEvent) {
     switch (aEvent.type) {
-      case "mouseover":
+      case "mousemove":
         clearTimeout(this._autoCloseTimer);
         break;
       case "popuphidden":
@@ -130,14 +130,13 @@ var StarUI = {
             break;
         }
         break;
-      case "mouseout": {
+      case "mouseout":
+        // Explicit fall-through
+      case "popupshown":
         // Don't handle events for descendent elements.
         if (aEvent.target != aEvent.currentTarget) {
           break;
         }
-        // Explicit fall-through
-      }
-      case "popupshown":
         // auto-close if new and not interacted with
         if (this._isNewBookmark) {
           // 3500ms matches the timeout that Pocket uses in
@@ -146,7 +145,9 @@ var StarUI = {
           if (this._closePanelQuickForTesting) {
             delay /= 10;
           }
-          this._autoCloseTimer = setTimeout(() => this.panel.hidePopup(), delay, this);
+          this._autoCloseTimer = setTimeout(() => {
+            this.panel.hidePopup();
+          }, delay);
         }
         break;
     }
@@ -388,8 +389,7 @@ var PlacesCommandHook = {
     }
 
     // Revert the contents of the location bar
-    if (gURLBar)
-      gURLBar.handleRevert();
+    gURLBar.handleRevert();
 
     // If it was not requested to open directly in "edit" mode, we are done.
     if (!aShowEditUI)
@@ -463,8 +463,7 @@ var PlacesCommandHook = {
     }
 
     // Revert the contents of the location bar
-    if (gURLBar)
-      gURLBar.handleRevert();
+    gURLBar.handleRevert();
 
     // If it was not requested to open directly in "edit" mode, we are done.
     if (!aShowEditUI)
@@ -555,11 +554,15 @@ var PlacesCommandHook = {
   get uniqueCurrentPages() {
     let uniquePages = {};
     let URIs = [];
-    gBrowser.visibleTabs.forEach(function (tab) {
-      let spec = tab.linkedBrowser.currentURI.spec;
+
+    gBrowser.visibleTabs.forEach(tab => {
+      let browser = tab.linkedBrowser;
+      let uri = browser.currentURI;
+      let title = browser.contentTitle || tab.label;
+      let spec = uri.spec;
       if (!tab.pinned && !(spec in uniquePages)) {
         uniquePages[spec] = null;
-        URIs.push(tab.linkedBrowser.currentURI);
+        URIs.push({ uri, title });
       }
     });
     return URIs;
@@ -1168,7 +1171,7 @@ var PlacesToolbarHelper = {
   onWidgetUnderflow: function(aNode, aContainer) {
     // The view gets broken by being removed and reinserted by the overflowable
     // toolbar, so we have to force an uninit and reinit.
-    let win = aNode.ownerDocument.defaultView;
+    let win = aNode.ownerGlobal;
     if (aNode.id == "personal-bookmarks" && win == window) {
       this._resetView();
     }
@@ -1211,10 +1214,9 @@ var BookmarkingUI = {
   BOOKMARK_BUTTON_ID: "bookmarks-menu-button",
   BOOKMARK_BUTTON_SHORTCUT: "addBookmarkAsKb",
   get button() {
-    if (!this._button) {
-      this._button = document.getElementById("bookmarks-menu-button");
-    }
-    return this._button;
+    delete this.button;
+    let widgetGroup = CustomizableUI.getWidget(this.BOOKMARK_BUTTON_ID);
+    return this.button = widgetGroup.forWindow(window).node;
   },
 
   get star() {
@@ -1517,11 +1519,13 @@ var BookmarkingUI = {
   },
 
   init: function() {
+    CustomizableUI.addListener(this);
   },
 
   _hasBookmarksObserver: false,
   _itemIds: [],
   uninit: function BUI_uninit() {
+    CustomizableUI.removeListener(this);
     this._uninitView();
 
     if (this._hasBookmarksObserver) {
@@ -1842,6 +1846,44 @@ var BookmarkingUI = {
   onBeforeItemRemoved: function () {},
   onItemVisited: function () {},
   onItemMoved: function () {},
+
+  // CustomizableUI events:
+  _starButtonLabel: null,
+  _starButtonOverflowedLabel: null,
+  onWidgetOverflow: function(aNode, aContainer) {
+    let win = aNode.ownerGlobal;
+    if (aNode.id != this.BOOKMARK_BUTTON_ID || win != window)
+      return;
+
+    if (!this._starButtonOverflowedLabel) {
+      let browserBundle = Services.strings.createBundle(
+                          "chrome://browser/locale/browser.properties");
+      this._starButtonOverflowedLabel = browserBundle.GetStringFromName(
+                                        "starButtonOverflowed.label");
+    }
+
+    let button = this.button;
+    if (!this._starButtonLabel)
+      this._starButtonLabel = button.label;
+
+    if (button && button.label == this._starButtonLabel)
+      button.setAttribute("label", this._starButtonOverflowedLabel);
+  },
+
+  onWidgetUnderflow: function(aNode, aContainer) {
+    let win = aNode.ownerGlobal;
+    if (aNode.id != this.BOOKMARK_BUTTON_ID || win != window)
+      return;
+
+    // If the button hasn't been in the overflow panel before, we may ignore
+    // this event.
+    if (!this._starButtonOverflowedLabel || !this._starButtonLabel)
+      return;
+
+    let button = this.button;
+    if (button && button.label == this._starButtonOverflowedLabel)
+      button.setAttribute("label", this._starButtonLabel);
+  },
 
   QueryInterface: XPCOMUtils.generateQI([
     Ci.nsINavBookmarkObserver

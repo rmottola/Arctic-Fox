@@ -274,6 +274,58 @@ LIRGeneratorMIPSShared::visitAsmJSNeg(MAsmJSNeg* ins)
 }
 
 void
+LIRGeneratorMIPSShared::visitWasmBoundsCheck(MWasmBoundsCheck* ins)
+{
+    if (!gen->needsBoundsCheckBranch(ins))
+        return;
+
+    MDefinition* index = ins->input();
+    auto* lir = new(alloc()) LWasmBoundsCheck(useRegisterAtStart(index));
+    add(lir, ins);
+}
+
+void
+LIRGeneratorMIPSShared::visitWasmLoad(MWasmLoad* ins)
+{
+    MDefinition* base = ins->base();
+    MOZ_ASSERT(base->type() == MIRType::Int32);
+
+#ifdef JS_CODEGEN_MIPS64
+    if (ins->type() == MIRType::Int64) {
+        auto* lir = new(alloc()) LWasmLoadI64(useRegisterAtStart(base));
+        if (ins->offset())
+            lir->setTemp(0, tempCopy(base, 0));
+
+        defineInt64(lir, ins);
+        return;
+    }
+#endif
+
+    auto* lir = new(alloc()) LWasmLoad(useRegisterAtStart(base));
+    if (ins->offset())
+        lir->setTemp(0, tempCopy(base, 0));
+
+    define(lir, ins);
+}
+
+void
+LIRGeneratorMIPSShared::visitWasmStore(MWasmStore* ins)
+{
+    MDefinition* base = ins->base();
+    MOZ_ASSERT(base->type() == MIRType::Int32);
+
+    MDefinition* value = ins->value();
+    LAllocation valueAlloc = useRegisterAtStart(value);
+    LAllocation baseAlloc = useRegisterAtStart(base);
+    auto* lir = new(alloc()) LWasmStore(baseAlloc, valueAlloc);
+
+    if (ins->offset())
+        lir->setTemp(0, tempCopy(base, 0));
+
+    add(lir, ins);
+}
+
+void
 LIRGeneratorMIPSShared::visitAsmSelect(MAsmSelect* ins)
 {
     if (ins->type() == MIRType::Int64) {
@@ -377,12 +429,6 @@ LIRGeneratorMIPSShared::visitAsmJSStoreHeap(MAsmJSStoreHeap* ins)
         baseAlloc = useRegisterAtStart(base);
 
     add(new(alloc()) LAsmJSStoreHeap(baseAlloc, useRegisterAtStart(ins->value())), ins);
-}
-
-void
-LIRGeneratorMIPSShared::visitAsmJSLoadFuncPtr(MAsmJSLoadFuncPtr* ins)
-{
-    define(new(alloc()) LAsmJSLoadFuncPtr(useRegister(ins->index())), ins);
 }
 
 void

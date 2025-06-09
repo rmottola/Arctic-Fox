@@ -6,13 +6,13 @@
 "use strict";
 
 // Make this available to both AMD and CJS environments
-define(function(require, exports, module) {
+define(function (require, exports, module) {
   // ReactJS
   const React = require("devtools/client/shared/vendor/react");
 
   // Reps
   const { createFactories, isGrip } = require("./rep-utils");
-  const { ObjectLink } = createFactories(require("./object-link"));
+  const { ObjectBox } = createFactories(require("./object-box"));
 
   // Shortcuts
   const { span } = React.DOM;
@@ -21,31 +21,26 @@ define(function(require, exports, module) {
    * Renders a grip object with regular expression.
    */
   let RegExp = React.createClass({
+    displayName: "regexp",
+
     propTypes: {
       object: React.PropTypes.object.isRequired,
     },
 
-    displayName: "regexp",
-
-    getTitle: function(grip) {
-      return grip.class;
-    },
-
-    getSource: function(grip) {
+    getSource: function (grip) {
       return grip.displayString;
     },
 
-    render: function() {
+    render: function () {
       let grip = this.props.object;
+      let objectLink = this.props.objectLink || span;
+
       return (
-        ObjectLink({className: "regexp"},
-          span({className: "objectTitle"},
-            this.getTitle(grip)
-          ),
-          span(" "),
-          span({className: "regexpSource"},
-            this.getSource(grip)
-          )
+        ObjectBox({className: "regexp"},
+          objectLink({
+            object: grip,
+            className: "regexpSource"
+          }, this.getSource(grip))
         )
       );
     },

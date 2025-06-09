@@ -47,6 +47,7 @@ var ecmaGlobals =
     "NaN",
     "Number",
     "Object",
+    "Promise",
     "Proxy",
     "RangeError",
     "ReferenceError",
@@ -166,8 +167,6 @@ var interfaceNamesInGlobalScope =
     "PerformanceMark",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "PerformanceMeasure",
-// IMPORTANT: Do not change this list without review from a DOM peer!
-    "Promise",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     { name: "PushEvent", b2g: false, android: false},
 // IMPORTANT: Do not change this list without review from a DOM peer!

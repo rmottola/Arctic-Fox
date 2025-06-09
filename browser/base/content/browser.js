@@ -8,6 +8,7 @@ var Cu = Components.utils;
 var Cc = Components.classes;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+Cu.import("resource://gre/modules/ContextualIdentityService.jsm");
 Cu.import("resource://gre/modules/NotificationDB.jsm");
 Cu.import("resource:///modules/RecentWindow.jsm");
 
@@ -50,8 +51,6 @@ XPCOMUtils.defineLazyServiceGetter(this, "gDNSService",
                                    "nsIDNSService");
 XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
                                   "resource://gre/modules/LightweightThemeManager.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "ContextualIdentityService",
-                                  "resource:///modules/ContextualIdentityService.jsm");
 XPCOMUtils.defineLazyServiceGetter(this, "gAboutNewTabService",
                                    "@mozilla.org/browser/aboutnewtab-service;1",
                                    "nsIAboutNewTabService");
@@ -397,10 +396,8 @@ const gSessionHistoryObserver = {
     // Hide session restore button on about:home
     window.messageManager.broadcastAsyncMessage("Browser:HideSessionRestoreButton");
 
-    if (gURLBar) {
-      // Clear undo history of the URL bar
-      gURLBar.editor.transactionManager.clear()
-    }
+    // Clear undo history of the URL bar
+    gURLBar.editor.transactionManager.clear()
   }
 };
 
@@ -493,13 +490,13 @@ var gPopupBlockerObserver = {
     if (aEvent.originalTarget != gBrowser.selectedBrowser)
       return;
 
-    if (!this._reportButton && gURLBar)
+    if (!this._reportButton)
       this._reportButton = document.getElementById("page-report-button");
 
-    if (!gBrowser.selectedBrowser.blockedPopups) {
+    if (!gBrowser.selectedBrowser.blockedPopups ||
+        gBrowser.selectedBrowser.blockedPopups.count == 0) {
       // Hide the icon in the location bar (if the location bar exists)
-      if (gURLBar)
-        this._reportButton.hidden = true;
+      this._reportButton.hidden = true;
 
       // Hide the notification box (if it's visible).
       let notificationBox = gBrowser.getNotificationBox();
@@ -510,8 +507,7 @@ var gPopupBlockerObserver = {
       return;
     }
 
-    if (gURLBar)
-      this._reportButton.hidden = false;
+    this._reportButton.hidden = false;
 
     // Only show the notification again if we've not already shown it. Since
     // notifications are per-browser, we don't need to worry about re-adding
@@ -953,6 +949,30 @@ function RedirectLoad({ target: browser, data }) {
   }
 }
 
+addEventListener("DOMContentLoaded", function onDCL() {
+  removeEventListener("DOMContentLoaded", onDCL);
+
+  // There are some windows, like macBrowserOverlay.xul, that
+  // load browser.js, but never load tabbrowser.xml. We can ignore
+  // those cases.
+  if (!gBrowser || !gBrowser.updateBrowserRemoteness) {
+    return;
+  }
+
+  window.QueryInterface(Ci.nsIInterfaceRequestor)
+        .getInterface(nsIWebNavigation)
+        .QueryInterface(Ci.nsIDocShellTreeItem).treeOwner
+        .QueryInterface(Ci.nsIInterfaceRequestor)
+        .getInterface(Ci.nsIXULWindow)
+        .XULBrowserWindow = window.XULBrowserWindow;
+  window.QueryInterface(Ci.nsIDOMChromeWindow).browserDOMWindow =
+    new nsBrowserAccess();
+
+  let initBrowser =
+    document.getAnonymousElementByAttribute(gBrowser, "anonid", "initialBrowser");
+  gBrowser.updateBrowserRemoteness(initBrowser, gMultiProcessBrowser);
+});
+
 var gBrowserInit = {
   delayedStartupFinished: false,
 
@@ -980,19 +1000,11 @@ var gBrowserInit = {
     mm.loadFrameScript("chrome://browser/content/content.js", true);
     mm.loadFrameScript("chrome://global/content/manifestMessages.js", true);
 
-    window.messageManager.addMessageListener("Browser:LoadURI", RedirectLoad);
-
     // initialize observers and listeners
     // and give C++ access to gBrowser
     XULBrowserWindow.init();
-    window.QueryInterface(Ci.nsIInterfaceRequestor)
-          .getInterface(nsIWebNavigation)
-          .QueryInterface(Ci.nsIDocShellTreeItem).treeOwner
-          .QueryInterface(Ci.nsIInterfaceRequestor)
-          .getInterface(Ci.nsIXULWindow)
-          .XULBrowserWindow = window.XULBrowserWindow;
-    window.QueryInterface(Ci.nsIDOMChromeWindow).browserDOMWindow =
-      new nsBrowserAccess();
+
+    window.messageManager.addMessageListener("Browser:LoadURI", RedirectLoad);
 
     // set default character set if provided
     // window.arguments[1]: character set (string)
@@ -1073,10 +1085,8 @@ var gBrowserInit = {
 
     if (!window.toolbar.visible) {
       // adjust browser UI for popups
-      if (gURLBar) {
-        gURLBar.setAttribute("readonly", "true");
-        gURLBar.setAttribute("enablehistory", "false");
-      }
+      gURLBar.setAttribute("readonly", "true");
+      gURLBar.setAttribute("enablehistory", "false");
       goSetCommandEnabled("cmd_newNavigatorTab", false);
     }
 
@@ -1188,6 +1198,13 @@ var gBrowserInit = {
         // make sure it has a docshell
         gBrowser.docShell;
 
+        // We must set usercontextid before updateBrowserRemoteness()
+        // so that the newly created remote tab child has correct usercontextid
+        if (tabToOpen.hasAttribute("usercontextid")) {
+          let usercontextid = tabToOpen.getAttribute("usercontextid");
+          gBrowser.selectedBrowser.setAttribute("usercontextid", usercontextid);
+        }
+
         // If the browser that we're swapping in was remote, then we'd better
         // be able to support remote browsers, and then make our selectedTab
         // remote.
@@ -1197,14 +1214,12 @@ var gBrowserInit = {
               throw new Error("Cannot drag a remote browser into a window " +
                               "without the remote tabs load context.");
             }
-
-            // We must set usercontextid before updateBrowserRemoteness()
-            // so that the newly created remote tab child has correct usercontextid
-            if (tabToOpen.hasAttribute("usercontextid")) {
-              let usercontextid = tabToOpen.getAttribute("usercontextid");
-              gBrowser.selectedBrowser.setAttribute("usercontextid", usercontextid);
-            }
             gBrowser.updateBrowserRemoteness(gBrowser.selectedBrowser, true);
+          } else if (gBrowser.selectedBrowser.isRemoteBrowser) {
+            // If the browser is remote, then it's implied that
+            // gMultiProcessBrowser is true. We need to flip the remoteness
+            // of this tab to false in order for the tab drag to work.
+            gBrowser.updateBrowserRemoteness(gBrowser.selectedBrowser, false);
           }
           gBrowser.swapBrowsersAndCloseOther(gBrowser.selectedTab, tabToOpen);
         } catch(e) {
@@ -1393,7 +1408,9 @@ var gBrowserInit = {
     if (Win7Features)
       Win7Features.onOpenWindow();
 
+    PointerlockFsWarning.init();
     FullScreen.init();
+    PointerLock.init();
 
     // initialize the sync UI
     gSyncUI.init();
@@ -1456,8 +1473,6 @@ var gBrowserInit = {
         appMenuOpening = null;
       }, false);
     }
-
-    UserContextStyleManager.init();
 
     window.addEventListener("mousemove", MousePosTracker, false);
     window.addEventListener("dragover", MousePosTracker, false);
@@ -2899,12 +2914,6 @@ var BrowserOnClick = {
           this.ignoreWarningButton(reason);
         }
         break;
-
-      case "whyForbiddenButton":
-        // This is the "Why is this site blocked" button for family friendly browsing
-        // for Fennec. There's no desktop focused support page yet.
-        gBrowser.loadURI("https://support.mozilla.org/kb/controlledaccess");
-        break;
     }
   },
 
@@ -2971,8 +2980,6 @@ var BrowserOnClick = {
       title = gNavigatorBundle.getString("safebrowsing.reportedUnwantedSite");
       // There is no button for reporting errors since Google doesn't currently
       // provide a URL endpoint for these reports.
-    } else {
-      return; // no notifications for forbidden sites
     }
 
     let notificationBox = gBrowser.getNotificationBox();
@@ -3027,6 +3034,7 @@ function goBackFromErrorPage() {
     BrowserBack();
   }
 }
+
 /**
  * Return the default start page for the cases when the user's own homepage is
  * infected, so we can get them somewhere safe.
@@ -3351,6 +3359,9 @@ var homeButtonObserver = {
 
   onDragOver: function (aEvent)
     {
+      if (gPrefService.prefIsLocked("browser.startup.homepage")) {
+        return;
+      }
       browserDragAndDrop.dragOver(aEvent);
       aEvent.dropEffect = "link";
     },
@@ -3499,9 +3510,6 @@ const DOMLinkHandler = {
 
 const BrowserSearch = {
   addEngine: function(browser, engine, uri) {
-    if (!this.searchBar)
-      return;
-
     // Check to see whether we've already added an engine with this title
     if (browser.engines) {
       if (browser.engines.some(e => e.title == engine.title))
@@ -4358,8 +4366,13 @@ var XULBrowserWindow = {
   forceInitialBrowserRemote: function() {
     let initBrowser =
       document.getAnonymousElementByAttribute(gBrowser, "anonid", "initialBrowser");
-    gBrowser.updateBrowserRemoteness(initBrowser, true);
     return initBrowser.frameLoader.tabParent;
+  },
+
+  forceInitialBrowserNonRemote: function() {
+    let initBrowser =
+      document.getAnonymousElementByAttribute(gBrowser, "anonid", "initialBrowser");
+    gBrowser.updateBrowserRemoteness(initBrowser, false);
   },
 
   setDefaultStatus: function (status) {
@@ -4577,7 +4590,7 @@ var XULBrowserWindow = {
         pageTooltip.hidePopup();
       }
       else {
-        for (let tooltipWindow = tooltipNode.ownerDocument.defaultView;
+        for (let tooltipWindow = tooltipNode.ownerGlobal;
              tooltipWindow != tooltipWindow.parent;
              tooltipWindow = tooltipWindow.parent) {
           if (tooltipWindow == aWebProgress.DOMWindow) {
@@ -4614,13 +4627,11 @@ var XULBrowserWindow = {
         this.reloadCommand.removeAttribute("disabled");
       }
 
-      if (gURLBar) {
-        URLBarSetURI(aLocationURI);
+      URLBarSetURI(aLocationURI);
 
-        // Update starring UI
-        BookmarkingUI.updateStarState();
-        gTabletModePageCounter.inc();
-      }
+      // Update starring UI
+      BookmarkingUI.updateStarState();
+      gTabletModePageCounter.inc();
 
       // Show or hide browser chrome for apps
       let ss = Cc["@mozilla.org/browser/sessionstore;1"].getService(Ci.nsISessionStore);
@@ -6297,7 +6308,7 @@ var IndexedDBPromptHelper = {
     var requestor = subject.QueryInterface(Ci.nsIInterfaceRequestor);
 
     var browser = requestor.getInterface(Ci.nsIDOMNode);
-    if (browser.ownerDocument.defaultView != window) {
+    if (browser.ownerGlobal != window) {
       // Only listen for notifications for browsers in our chrome window.
       return;
     }
@@ -6787,6 +6798,8 @@ var gIdentityHandler = {
   _lastUri : null,
   _mode : "unknownIdentity",
 
+
+
   /**
    * Whether this._uri refers to an internally implemented browser page.
    *
@@ -6900,13 +6913,17 @@ var gIdentityHandler = {
     delete this._identityIcon;
     return this._identityIcon = document.getElementById("identity-icon");
   },
-  get _permissionsContainer () {
-    delete this._permissionsContainer;
-    return this._permissionsContainer = document.getElementById("identity-popup-permissions");
-  },
   get _permissionList () {
     delete this._permissionList;
     return this._permissionList = document.getElementById("identity-popup-permission-list");
+  },
+  get _permissionAnchors () {
+    delete this._permissionAnchors;
+    let permissionAnchors = {};
+    for (let anchor of document.getElementById("blocked-permissions-container").children) {
+      permissionAnchors[anchor.getAttribute("data-permission-id")] = anchor;
+    }
+    return this._permissionAnchors = permissionAnchors;
   },
 
   /**
@@ -7080,6 +7097,22 @@ var gIdentityHandler = {
   },
 
   /**
+   * Return the CSS class name to set on the "fullscreen-warning" element to
+   * display information about connection security in the notification shown
+   * when a site enters the fullscreen mode.
+   */
+  get pointerlockFsWarningClassName() {
+    // Note that the fullscreen warning does not handle _isSecureInternalUI.
+    if (this._uriHasHost && this._isEV) {
+      return "verifiedIdentity";
+    }
+    if (this._uriHasHost && this._isSecure) {
+      return "verifiedDomain";
+    }
+    return "unknownIdentity";
+  },
+
+  /**
    * Update the UI to reflect the specified mode, which should be one of the
    * IDENTITY_MODE_* constants.
    */
@@ -7200,11 +7233,40 @@ var gIdentityHandler = {
           icon_label = rawHost;
         }
       }
+    }
     if (this._isCertUserOverridden) {
       this._identityBox.classList.add("certUserOverridden");
       // Cert is trusted because of a security exception, verifier is a special string.
       tooltip = gNavigatorBundle.getString("identity.identified.verified_by_you");
     }
+
+    let permissionAnchors = this._permissionAnchors;
+
+    // hide all permission icons
+    for (let icon of Object.values(permissionAnchors)) {
+      icon.removeAttribute("showing");
+    }
+
+    // keeps track if we should show an indicator that there are active permissions
+    let hasGrantedPermissions = false;
+
+    // show permission icons
+    for (let permission of SitePermissions.getAllByURI(this._lastUri)) {
+      if (permission.state === SitePermissions.BLOCK) {
+
+        let icon = permissionAnchors[permission.id];
+        if (icon) {
+          icon.setAttribute("showing", "true");
+        }
+
+      } else if (permission.state === SitePermissions.ALLOW ||
+                 permission.state === SitePermissions.SESSION) {
+        hasGrantedPermissions = true;
+      }
+    }
+
+    if (hasGrantedPermissions) {
+      this._identityBox.classList.add("grantedPermissions");
     }
 
     // Push the appropriate strings out to the UI
@@ -7419,12 +7481,10 @@ var gIdentityHandler = {
 
     let uri = gBrowser.currentURI;
 
-    for (let permission of SitePermissions.getPermissionsByURI(uri)) {
+    for (let permission of SitePermissions.getPermissionDetailsByURI(uri)) {
       let item = this._createPermissionItem(permission);
       this._permissionList.appendChild(item);
     }
-
-    this._permissionsContainer.hidden = !this._permissionList.hasChildNodes();
   },
 
   setPermission: function (aPermission, aState) {
@@ -7534,19 +7594,17 @@ var gPrivateBrowsingUI = {
       }
     }
 
-    if (gURLBar) {
-      let value = gURLBar.getAttribute("autocompletesearchparam") || "";
-      if (!PrivateBrowsingUtils.permanentPrivateBrowsing &&
-          !value.includes("disable-private-actions")) {
-        // Disable switch to tab autocompletion for private windows.
-        // We leave it enabled for permanent private browsing mode though.
-        value += " disable-private-actions";
-      }
-      if (!value.includes("private-window")) {
-        value += " private-window";
-      }
-      gURLBar.setAttribute("autocompletesearchparam", value);
+    let urlBarSearchParam = gURLBar.getAttribute("autocompletesearchparam") || "";
+    if (!PrivateBrowsingUtils.permanentPrivateBrowsing &&
+        !urlBarSearchParam.includes("disable-private-actions")) {
+      // Disable switch to tab autocompletion for private windows.
+      // We leave it enabled for permanent private browsing mode though.
+      urlBarSearchParam += " disable-private-actions";
     }
+    if (!urlBarSearchParam.includes("private-window")) {
+      urlBarSearchParam += " private-window";
+    }
+    gURLBar.setAttribute("autocompletesearchparam", urlBarSearchParam);
   }
 };
 
@@ -7905,21 +7963,6 @@ XPCOMUtils.defineLazyGetter(ResponsiveUI, "ResponsiveUIManager", function() {
   return tmp.ResponsiveUIManager;
 });
 
-function openEyedropper() {
-  var eyedropper = new this.Eyedropper(this, { context: "menu",
-                                               copyOnSelect: true });
-  eyedropper.open();
-}
-
-Object.defineProperty(this, "Eyedropper", {
-  get: function() {
-    let devtools = Cu.import("resource://devtools/shared/Loader.jsm", {}).devtools;
-    return devtools.require("devtools/client/eyedropper/eyedropper").Eyedropper;
-  },
-  configurable: true,
-  enumerable: true
-});
-
 XPCOMUtils.defineLazyGetter(window, "gShowPageResizers", function () {
   // Only show resizers on Windows 2000 and XP
   return AppConstants.isPlatformAndVersionAtMost("win", "5.9");
@@ -8122,6 +8165,17 @@ var AboutPrivateBrowsingListener = {
       msg => {
         OpenBrowserWindow({private: true});
     });
+    window.messageManager.addMessageListener(
+      "AboutPrivateBrowsing:ToggleTrackingProtection",
+      msg => {
+        const PREF = "privacy.trackingprotection.pbmode.enabled";
+        Services.prefs.setBoolPref(PREF, !Services.prefs.getBoolPref(PREF));
+    });
+    window.messageManager.addMessageListener(
+      "AboutPrivateBrowsing:DontShowIntroPanelAgain",
+      msg => {
+        TrackingProtection.dontShowIntroPanelAgain();
+    });
   }
 };
 
@@ -8213,34 +8267,5 @@ TabModalPromptBox.prototype = {
       throw "Stale promptbox! The associated browser is gone.";
     }
     return browser;
-  },
-};
-
-let UserContextStyleManager = {
-  init() {
-    for (let styleId in document.styleSheets) {
-      let styleSheet = document.styleSheets[styleId];
-      if (styleSheet.href != "chrome://browser/content/usercontext/usercontext.css") {
-        continue;
-      }
-
-      if (ContextualIdentityService.needsCssRule()) {
-        for (let ruleId in styleSheet.cssRules) {
-          let cssRule = styleSheet.cssRules[ruleId];
-          if (cssRule.selectorText != ":root") {
-            continue;
-          }
-
-          ContextualIdentityService.storeCssRule(cssRule.cssText);
-          break;
-        }
-      }
-
-      ContextualIdentityService.cssRules().forEach(rule => {
-        styleSheet.insertRule(rule, styleSheet.cssRules.length);
-      });
-
-      break;
-    }
   },
 };

@@ -48,8 +48,8 @@
 /* miscellaneous form elements */
 
 fieldset > legend {
-  -moz-padding-start: 2px;
-  -moz-padding-end: 2px;
+  padding-inline-start: 2px;
+  padding-inline-end: 2px;
   inline-size: -moz-fit-content;
 }
 
@@ -59,13 +59,13 @@ legend {
 
 fieldset {
   display: block;
-  -moz-margin-start: 2px;
-  -moz-margin-end: 2px;
+  margin-inline-start: 2px;
+  margin-inline-end: 2px;
   padding-block-start: 0.35em;
   padding-block-end: 0.75em;
-  -moz-padding-start: 0.625em;
-  -moz-padding-end: 0.625em;
-  border: 2px groove ThreeDFace;
+  padding-inline-start: 0.625em;
+  padding-inline-end: 0.625em;
+  border: 2px groove ThreeDLightShadow;
 }
 
 label {
@@ -83,7 +83,7 @@ input {
      must be the same here, for buttons, and for <select> (including its
      internal padding magic) */
   padding: 1px;
-  border: 2px inset ThreeDFace;
+  border: 2px inset ThreeDLightShadow;
   background-color: -moz-Field;
   color: -moz-FieldText;
   font: -moz-field;
@@ -125,10 +125,10 @@ input::-moz-placeholder {
 textarea {
   margin-block-start: 1px;
   margin-block-end: 1px;
-  border: 2px inset ThreeDFace;
+  border: 2px inset ThreeDLightShadow;
   /* The 1px inline padding is for parity with Win/IE */
-  -moz-padding-start: 1px;
-  -moz-padding-end: 1px;
+  padding-inline-start: 1px;
+  padding-inline-end: 1px;
   background-color: -moz-Field;
   color: -moz-FieldText;
   font: medium -moz-fixed;
@@ -219,7 +219,7 @@ textarea:-moz-read-write {
 
 select {
   margin: 0;
-  border-color: ThreeDFace;
+  border-color: ThreeDLightShadow;
   background-color: -moz-Combobox;
   color: -moz-ComboboxText;
   font: -moz-list;
@@ -260,8 +260,8 @@ select[size][multiple] {
   vertical-align: text-bottom;
   padding-block-start: 1px;
   padding-block-end: 1px;
-  -moz-padding-start: 0;
-  -moz-padding-end: 0;
+  padding-inline-start: 0;
+  padding-inline-end: 0;
   -moz-appearance: listbox;
 }
 
@@ -326,8 +326,8 @@ select:empty {
      add up to the block-start/end borderpadding of text inputs and buttons */
   padding-block-start: 1px;
   padding-block-end: 1px;
-  -moz-padding-start: 4px;
-  -moz-padding-end: 0;
+  padding-inline-start: 4px;
+  padding-inline-end: 0;
   color: inherit;
   white-space: nowrap;
   text-align: inherit;
@@ -354,8 +354,8 @@ option {
 select > option {
   padding-block-start : 0;
   padding-block-end: 0;
-  -moz-padding-start: 3px;
-  -moz-padding-end: 5px;
+  padding-inline-start: 3px;
+  padding-inline-end: 5px;
 }
 
 option:checked {
@@ -385,7 +385,7 @@ optgroup {
 }
 
 optgroup > option {
-  -moz-padding-start: 20px;
+  padding-inline-start: 20px;
   font-style: normal;
   font-weight: normal;
 }
@@ -410,7 +410,7 @@ optgroup:before {
    * with the dropmarker.  So set our inline-start border to 2px.
    */
   border: 1px outset black !important;
-  -moz-border-start-width: 2px ! important;
+  border-inline-start-width: 2px ! important;
 }
 
 input:disabled,
@@ -422,7 +422,7 @@ select:disabled:disabled /* Need the pseudo-class twice to have the specificity
 {
   -moz-user-input: disabled;
   color: GrayText;
-  background-color: ThreeDFace;
+  background-color: ThreeDLightShadow;
   cursor: inherit;
 }
 
@@ -488,7 +488,7 @@ input[type="file"] {
 
 input[type="file"] > xul|label {
   min-inline-size: 12em;
-  -moz-padding-start: 5px;
+  padding-inline-start: 5px;
   text-align: match-parent;
 
   color: inherit;
@@ -516,8 +516,8 @@ input[type="color"]:-moz-system-metric(color-picker-available)::-moz-color-swatc
   height: 100%;
   min-width: 3px;
   min-height: 3px;
-  -moz-margin-start: auto;
-  -moz-margin-end: auto;
+  margin-inline-start: auto;
+  margin-inline-end: auto;
   box-sizing: border-box;
   border: 1px solid grey;
   display: block;
@@ -526,9 +526,9 @@ input[type="color"]:-moz-system-metric(color-picker-available)::-moz-color-swatc
 /* Try to make RTL <input type='file'> look nicer. */
 /* TODO: find a better solution than forcing direction: ltr on all file
    input labels and remove this override -- bug 1161482 */
-input[type="file"]:-moz-dir(rtl) > xul|label {
-  -moz-padding-start: 0px;
-  -moz-padding-end: 5px;
+input[type="file"]:dir(rtl) > xul|label {
+  padding-inline-start: 0px;
+  padding-inline-end: 5px;
 }
 
 /* radio buttons */
@@ -536,8 +536,8 @@ input[type="radio"] {
   -moz-appearance: radio;
   margin-block-start: 3px;
   margin-block-end: 0px;
-  -moz-margin-start: 5px;
-  -moz-margin-end: 3px;
+  margin-inline-start: 5px;
+  margin-inline-end: 3px;
   border-radius: 100% !important;
 }
 
@@ -546,8 +546,8 @@ input[type="checkbox"] {
   -moz-appearance: checkbox;
   margin-block-start: 3px;
   margin-block-end: 3px;
-  -moz-margin-start: 4px;
-  -moz-margin-end: 3px;
+  margin-inline-start: 4px;
+  margin-inline-end: 3px;
   border-radius: 0 !important;
 }
 
@@ -569,7 +569,7 @@ input[type="checkbox"] {
   /* same colors as |input| rule, but |!important| this time. */
   background-color: -moz-Field ! important;
   color: -moz-FieldText ! important;
-  border: 2px inset ThreeDFace ! important;
+  border: 2px inset ThreeDLightShadow ! important;
 }
 
 input[type="radio"]:disabled,
@@ -599,6 +599,10 @@ input[type="radio"]:hover:active {
   border-style: inset !important;
 }
 
+input[type="search"] {
+  box-sizing: border-box;
+}
+
 /* buttons */
 
 /* Note: Values in nsNativeTheme IsWidgetStyled function
@@ -616,10 +620,10 @@ input[type="submit"] {
      must be the same here, for text inputs, and for <select>.  For
      buttons, make sure to include the -moz-focus-inner border/padding. */
   padding-block-start: 0px;
-  -moz-padding-end: 6px;
+  padding-inline-end: 6px;
   padding-block-end: 0px;
-  -moz-padding-start: 6px;
-  border: 2px outset ButtonFace;
+  padding-inline-start: 6px;
+  border: 2px outset ThreeDLightShadow;
   background-color: ButtonFace;
   cursor: default;
   box-sizing: border-box;
@@ -696,9 +700,9 @@ input[type="button"]:active:hover,
 input[type="submit"]:active:hover {
 %ifndef XP_MACOSX
   padding-block-start: 0px;
-  -moz-padding-end: 5px;
+  padding-inline-end: 5px;
   padding-block-end: 0px;
-  -moz-padding-start: 7px;
+  padding-inline-start: 7px;
 %endif
   border-style: inset;
   background-color: ButtonFace;
@@ -718,9 +722,9 @@ input[type="button"]::-moz-focus-inner,
 input[type="submit"]::-moz-focus-inner,
 input[type="file"] > button[type="button"]::-moz-focus-inner {
   padding-block-start: 0px;
-  -moz-padding-end: 2px;
+  padding-inline-end: 2px;
   padding-block-end: 0px;
-  -moz-padding-start: 2px;
+  padding-inline-start: 2px;
   border: 1px dotted transparent;
 }
 
@@ -747,10 +751,10 @@ input[type="submit"]:disabled {
   /* The sum of border and padding on block-start and block-end
      must be the same here and for text inputs */
   padding-block-start: 0px;
-  -moz-padding-end: 6px;
+  padding-inline-end: 6px;
   padding-block-end: 0px;
-  -moz-padding-start: 6px;
-  border: 2px outset ButtonFace;
+  padding-inline-start: 6px;
+  border: 2px outset ThreeDLightShadow;
   cursor: inherit;
 }
 
@@ -1027,6 +1031,9 @@ input[type=number]::-moz-number-wrapper {
 }
 
 input[type=number]::-moz-number-text {
+  display: block; /* Flex items must be block-level. Normally we do fixup in
+                     the style system to ensure this, but that fixup is disabled
+                     inside of form controls. So, we hardcode display here. */
   -moz-appearance: none;
   /* work around autofocus bug 939248 on initial load */
   -moz-user-modify: read-write;

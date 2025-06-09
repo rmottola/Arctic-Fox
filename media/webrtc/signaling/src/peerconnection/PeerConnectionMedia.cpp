@@ -57,6 +57,7 @@
 #include "mozilla/dom/RTCStatsReportBinding.h"
 #include "MediaStreamTrack.h"
 #include "VideoStreamTrack.h"
+#include "MediaStreamError.h"
 #endif
 
 
@@ -1405,25 +1406,22 @@ LocalSourceStreamInfo::TakePipelineFrom(RefPtr<LocalSourceStreamInfo>& info,
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
 /**
- * Tells you if any local streams is isolated to a specific peer identity.
- * Obviously, we want all the streams to be isolated equally so that they can
+ * Tells you if any local track is isolated to a specific peer identity.
+ * Obviously, we want all the tracks to be isolated equally so that they can
  * all be sent or not.  We check once when we are setting a local description
  * and that determines if we flip the "privacy requested" bit on.  Once the bit
  * is on, all media originating from this peer connection is isolated.
  *
- * @returns true if any stream has a peerIdentity set on it
+ * @returns true if any track has a peerIdentity set on it
  */
 bool
-PeerConnectionMedia::AnyLocalStreamHasPeerIdentity() const
+PeerConnectionMedia::AnyLocalTrackHasPeerIdentity() const
 {
   ASSERT_ON_THREAD(mMainThread);
 
   for (uint32_t u = 0; u < mLocalSourceStreams.Length(); u++) {
-    DOMMediaStream* stream = mLocalSourceStreams[u]->GetMediaStream();
-    nsTArray<RefPtr<MediaStreamTrack>> tracks;
-    stream->GetTracks(tracks);
-    for (const RefPtr<MediaStreamTrack>& track : tracks) {
-      if (track->GetPeerIdentity() != nullptr) {
+    for (auto pair : mLocalSourceStreams[u]->GetMediaStreamTracks()) {
+      if (pair.second->GetPeerIdentity() != nullptr) {
         return true;
       }
     }
@@ -1634,5 +1632,19 @@ LocalSourceStreamInfo::ForgetPipelineByTrackId_m(const std::string& trackId)
 
   return nullptr;
 }
+
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
+auto
+RemoteTrackSource::ApplyConstraints(
+    nsPIDOMWindowInner* aWindow,
+    const dom::MediaTrackConstraints& aConstraints) -> already_AddRefed<PledgeVoid>
+{
+  RefPtr<PledgeVoid> p = new PledgeVoid();
+  p->Reject(new dom::MediaStreamError(aWindow,
+                                      NS_LITERAL_STRING("OverconstrainedError"),
+                                      NS_LITERAL_STRING("")));
+  return p.forget();
+}
+#endif
 
 } // namespace mozilla

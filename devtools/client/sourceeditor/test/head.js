@@ -4,9 +4,8 @@
 
 "use strict";
 
-Cu.import("resource://gre/modules/NetUtil.jsm");
-
 const { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+const { NetUtil } = require("resource://gre/modules/NetUtil.jsm");
 const Editor = require("devtools/client/sourceeditor/editor");
 const promise = require("promise");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
@@ -47,7 +46,7 @@ function promiseWaitForFocus() {
 }
 
 function setup(cb, additionalOpts = {}) {
-  cb = cb || function() {};
+  cb = cb || function () {};
   let def = promise.defer();
   const opt = "chrome,titlebar,toolbar,centerscreen,resizable,dialog=no";
   const url = "data:application/vnd.mozilla.xul+xml;charset=UTF-8," +
@@ -71,7 +70,7 @@ function setup(cb, additionalOpts = {}) {
   win.addEventListener("load", function onLoad() {
     win.removeEventListener("load", onLoad, false);
 
-    waitForFocus(function() {
+    waitForFocus(function () {
       let box = win.document.querySelector("box");
       let editor = new Editor(opts);
 

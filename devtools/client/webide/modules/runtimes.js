@@ -2,9 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const {Cu, Ci} = require("chrome");
+"use strict";
+
+const {Ci} = require("chrome");
 const Services = require("Services");
-const {Devices} = Cu.import("resource://devtools/shared/apps/Devices.jsm");
+const {Devices} = require("resource://devtools/shared/apps/Devices.jsm");
 const {Connection} = require("devtools/shared/client/connection-manager");
 const {DebuggerServer} = require("devtools/server/main");
 const {Simulators} = require("devtools/client/webide/modules/simulators");
@@ -54,9 +56,13 @@ const Strings = Services.strings.createBundle("chrome://devtools/locale/webide.p
  *
  * Each |Runtime| must support the following API:
  *
+ * |type| field
+ *   The |type| must be one of the values from the |RuntimeTypes| object.  This
+ *   is used for Telemetry and to support displaying sets of |Runtime|s
+ *   categorized by type.
  * |id| field
- *   An identifier that is unique in the set of all runtimes.
- *   WebIDE tries to save the last used runtime via type + id, and
+ *   An identifier that is unique in the set of all runtimes with the same
+ *   |type|.  WebIDE tries to save the last used runtime via type + id, and
  *   tries to locate it again in the next session, so this value should attempt
  *   to be stable across Firefox sessions.
  * |name| field
@@ -80,7 +86,7 @@ const Strings = Services.strings.createBundle("chrome://devtools/locale/webide.p
 
 /* SCANNER REGISTRY */
 
-let RuntimeScanners = {
+var RuntimeScanners = {
 
   _enabledCount: 0,
   _scanners: new Set(),
@@ -138,7 +144,7 @@ let RuntimeScanners = {
     return this._scanPromise;
   },
 
-  listRuntimes: function*() {
+  listRuntimes: function* () {
     for (let scanner of this._scanners) {
       for (let runtime of scanner.listRuntimes()) {
         yield runtime;
@@ -189,7 +195,7 @@ exports.RuntimeScanners = RuntimeScanners;
 
 /* SCANNERS */
 
-let SimulatorScanner = {
+var SimulatorScanner = {
 
   _runtimes: [],
 
@@ -221,7 +227,7 @@ let SimulatorScanner = {
     return promise.resolve();
   },
 
-  listRuntimes: function() {
+  listRuntimes: function () {
     return this._runtimes;
   }
 
@@ -238,7 +244,7 @@ RuntimeScanners.add(SimulatorScanner);
  * not actually connect (since the |DeprecatedUSBRuntime| assumes a Firefox OS
  * device).
  */
-let DeprecatedAdbScanner = {
+var DeprecatedAdbScanner = {
 
   _runtimes: [],
 
@@ -276,7 +282,7 @@ let DeprecatedAdbScanner = {
     return promise.resolve();
   },
 
-  listRuntimes: function() {
+  listRuntimes: function () {
     return this._runtimes;
   }
 
@@ -288,7 +294,36 @@ RuntimeScanners.add(DeprecatedAdbScanner);
 // ADB Helper 0.7.0 and later will replace this scanner on startup
 exports.DeprecatedAdbScanner = DeprecatedAdbScanner;
 
-let WiFiScanner = {
+/**
+ * This is a lazy ADB scanner shim which only tells the ADB Helper to start and
+ * stop as needed.  The real scanner that lists devices lives in ADB Helper.
+ * ADB Helper 0.8.0 and later wait until these signals are received before
+ * starting ADB polling.  For earlier versions, they have no effect.
+ */
+var LazyAdbScanner = {
+
+  enable() {
+    Devices.emit("adb-start-polling");
+  },
+
+  disable() {
+    Devices.emit("adb-stop-polling");
+  },
+
+  scan() {
+    return promise.resolve();
+  },
+
+  listRuntimes: function () {
+    return [];
+  }
+
+};
+
+EventEmitter.decorate(LazyAdbScanner);
+RuntimeScanners.add(LazyAdbScanner);
+
+var WiFiScanner = {
 
   _runtimes: [],
 
@@ -328,7 +363,7 @@ let WiFiScanner = {
     return promise.resolve();
   },
 
-  listRuntimes: function() {
+  listRuntimes: function () {
     return this._runtimes;
   },
 
@@ -361,7 +396,7 @@ WiFiScanner.init();
 
 exports.WiFiScanner = WiFiScanner;
 
-let StaticScanner = {
+var StaticScanner = {
   enable() {},
   disable() {},
   scan() { return promise.resolve(); },
@@ -379,6 +414,17 @@ RuntimeScanners.add(StaticScanner);
 
 /* RUNTIMES */
 
+// These type strings are used for logging events to Telemetry.
+// You must update Histograms.json if new types are added.
+var RuntimeTypes = exports.RuntimeTypes = {
+  USB: "USB",
+  WIFI: "WIFI",
+  SIMULATOR: "SIMULATOR",
+  REMOTE: "REMOTE",
+  LOCAL: "LOCAL",
+  OTHER: "OTHER"
+};
+
 /**
  * TODO: Remove this comaptibility layer in the future (bug 1085393)
  * This runtime exists to support the ADB Helper add-on below version 0.7.0.
@@ -390,10 +436,11 @@ function DeprecatedUSBRuntime(id) {
 }
 
 DeprecatedUSBRuntime.prototype = {
+  type: RuntimeTypes.USB,
   get device() {
     return Devices.getByName(this._id);
   },
-  connect: function(connection) {
+  connect: function (connection) {
     if (!this.device) {
       return promise.reject(new Error("Can't find device: " + this.name));
     }
@@ -409,7 +456,7 @@ DeprecatedUSBRuntime.prototype = {
   get name() {
     return this._productModel || this._id;
   },
-  updateNameFromADB: function() {
+  updateNameFromADB: function () {
     if (this._productModel) {
       return promise.reject();
     }
@@ -438,7 +485,7 @@ WiFiRuntime.prototype = {
   type: RuntimeTypes.WIFI,
   // Mark runtime as taking a long time to connect
   prolongedConnection: true,
-  connect: function(connection) {
+  connect: function (connection) {
     let service = discovery.getRemoteService("devtools", this.deviceName);
     if (!service) {
       return promise.reject(new Error("Can't find device: " + this.name));
@@ -515,9 +562,12 @@ WiFiRuntime.prototype = {
 
     // |openDialog| is typically a blocking API, so |executeSoon| to get around this
     DevToolsUtils.executeSoon(() => {
+      // Height determines the size of the QR code.  Force a minimum size to
+      // improve scanability.
+      const MIN_HEIGHT = 600;
       let win = Services.wm.getMostRecentWindow("devtools:webide");
       let width = win.outerWidth * 0.8;
-      let height = win.outerHeight * 0.5;
+      let height = Math.max(win.outerHeight * 0.5, MIN_HEIGHT);
       win.openDialog("chrome://webide/content/wifi-auth.xhtml",
                      WINDOW_ID,
                      "modal=yes,width=" + width + ",height=" + height, session);
@@ -544,7 +594,7 @@ function SimulatorRuntime(simulator) {
 
 SimulatorRuntime.prototype = {
   type: RuntimeTypes.SIMULATOR,
-  connect: function(connection) {
+  connect: function (connection) {
     return this.simulator.launch().then(port => {
       connection.host = "localhost";
       connection.port = port;
@@ -567,9 +617,9 @@ SimulatorRuntime.prototype = {
 // For testing use only
 exports._SimulatorRuntime = SimulatorRuntime;
 
-let gLocalRuntime = {
+var gLocalRuntime = {
   type: RuntimeTypes.LOCAL,
-  connect: function(connection) {
+  connect: function (connection) {
     if (!DebuggerServer.initialized) {
       DebuggerServer.init();
       DebuggerServer.addBrowserActors();
@@ -591,9 +641,9 @@ let gLocalRuntime = {
 // For testing use only
 exports._gLocalRuntime = gLocalRuntime;
 
-let gRemoteRuntime = {
+var gRemoteRuntime = {
   type: RuntimeTypes.REMOTE,
-  connect: function(connection) {
+  connect: function (connection) {
     let win = Services.wm.getMostRecentWindow("devtools:webide");
     if (!win) {
       return promise.reject(new Error("No WebIDE window found"));
@@ -602,7 +652,7 @@ let gRemoteRuntime = {
     let title = Strings.GetStringFromName("remote_runtime_promptTitle");
     let message = Strings.GetStringFromName("remote_runtime_promptMessage");
     let ok = Services.prompt.prompt(win, title, message, ret, null, {});
-    let [host,port] = ret.value.split(":");
+    let [host, port] = ret.value.split(":");
     if (!ok) {
       return promise.reject({canceled: true});
     }

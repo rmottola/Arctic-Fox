@@ -6,12 +6,12 @@
 "use strict";
 
 const { Cu } = require("chrome");
-const { defer } = require("sdk/core/promise");
+const defer = require("devtools/shared/defer");
 const { ObjectClient } = require("devtools/shared/client/main");
 
 const promise = require("promise");
 const EventEmitter = require("devtools/shared/event-emitter");
-const { Task } = require("resource://gre/modules/Task.jsm");
+const { Task } = require("devtools/shared/task");
 
 /**
  * This object represents DOM panel. It's responsibility is to

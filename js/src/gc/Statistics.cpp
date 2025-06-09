@@ -384,10 +384,11 @@ Statistics::formatCompactSummaryMessage() const
         return UniqueChars(nullptr);
 
     JS_snprintf(buffer, sizeof(buffer),
-                "Zones: %d of %d; Compartments: %d of %d; HeapSize: %.3f MiB; "\
+                "Zones: %d of %d (-%d); Compartments: %d of %d (-%d); HeapSize: %.3f MiB; "\
                 "HeapChange (abs): %+d (%d); ",
-                zoneStats.collectedZoneCount, zoneStats.zoneCount,
+                zoneStats.collectedZoneCount, zoneStats.zoneCount, zoneStats.sweptZoneCount,
                 zoneStats.collectedCompartmentCount, zoneStats.compartmentCount,
+                zoneStats.sweptCompartmentCount,
                 double(preBytes) / bytesPerMiB,
                 counts[STAT_NEW_CHUNK] - counts[STAT_DESTROY_CHUNK],
                 counts[STAT_NEW_CHUNK] + counts[STAT_DESTROY_CHUNK]);
@@ -479,8 +480,8 @@ Statistics::formatDetailedDescription()
   Invocation Kind: %s\n\
   Reason: %s\n\
   Incremental: %s%s\n\
-  Zones Collected: %d of %d\n\
-  Compartments Collected: %d of %d\n\
+  Zones Collected: %d of %d (-%d)\n\
+  Compartments Collected: %d of %d (-%d)\n\
   MinorGCs since last GC: %d\n\
   Store Buffer Overflows: %d\n\
   MMU 20ms:%.1f%%; 50ms:%.1f%%\n\
@@ -496,8 +497,9 @@ Statistics::formatDetailedDescription()
                 ExplainReason(slices[0].reason),
                 nonincrementalReason_ ? "no - " : "yes",
                                                   nonincrementalReason_ ? nonincrementalReason_ : "",
-                zoneStats.collectedZoneCount, zoneStats.zoneCount,
+                zoneStats.collectedZoneCount, zoneStats.zoneCount, zoneStats.sweptZoneCount,
                 zoneStats.collectedCompartmentCount, zoneStats.compartmentCount,
+                zoneStats.sweptCompartmentCount,
                 counts[STAT_MINOR_GC],
                 counts[STAT_STOREBUFFER_OVERFLOW],
                 mmu20 * 100., mmu50 * 100.,
@@ -973,6 +975,27 @@ Statistics::endGC()
 }
 
 void
+Statistics::beginNurseryCollection(JS::gcreason::Reason reason)
+{
+    count(STAT_MINOR_GC);
+    if (nurseryCollectionCallback) {
+        (*nurseryCollectionCallback)(runtime->contextFromMainThread(),
+                                     JS::GCNurseryProgress::GC_NURSERY_COLLECTION_START,
+                                     reason);
+    }
+}
+
+void
+Statistics::endNurseryCollection(JS::gcreason::Reason reason)
+{
+    if (nurseryCollectionCallback) {
+        (*nurseryCollectionCallback)(runtime->contextFromMainThread(),
+                                     JS::GCNurseryProgress::GC_NURSERY_COLLECTION_END,
+                                     reason);
+    }
+}
+
+void
 Statistics::beginSlice(const ZoneGCStats& zoneStats, JSGCInvocationKind gckind,
                        SliceBudget budget, JS::gcreason::Reason reason)
 {
@@ -997,7 +1020,8 @@ Statistics::beginSlice(const ZoneGCStats& zoneStats, JSGCInvocationKind gckind,
     if (gcDepth == 1) {
         bool wasFullGC = zoneStats.isCollectingAllZones();
         if (sliceCallback)
-            (*sliceCallback)(runtime, first ? JS::GC_CYCLE_BEGIN : JS::GC_SLICE_BEGIN,
+            (*sliceCallback)(runtime->contextFromMainThread(),
+                             first ? JS::GC_CYCLE_BEGIN : JS::GC_SLICE_BEGIN,
                              JS::GCDescription(!wasFullGC, gckind, reason));
     }
 }
@@ -1037,7 +1061,8 @@ Statistics::endSlice()
     if (gcDepth == 1 && !aborted) {
         bool wasFullGC = zoneStats.isCollectingAllZones();
         if (sliceCallback)
-            (*sliceCallback)(runtime, last ? JS::GC_CYCLE_END : JS::GC_SLICE_END,
+            (*sliceCallback)(runtime->contextFromMainThread(),
+                             last ? JS::GC_CYCLE_END : JS::GC_SLICE_END,
                              JS::GCDescription(!wasFullGC, gckind, slices.back().reason));
     }
 

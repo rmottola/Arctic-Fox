@@ -50,7 +50,7 @@ var JsCallTreeView = Heritage.extend(DetailsSubview, {
    * @param object interval [optional]
    *        The { startTime, endTime }, in milliseconds.
    */
-  render: function (interval={}) {
+  render: function (interval = {}) {
     let recording = PerformanceController.getCurrentRecording();
     let profile = recording.getProfile();
     let showOptimizations = PerformanceController.getOption("show-jit-optimizations");
@@ -64,11 +64,9 @@ var JsCallTreeView = Heritage.extend(DetailsSubview, {
     let threadNode = this.threadNode = this._prepareCallTree(profile, interval, options);
     this._populateCallTree(threadNode, options);
 
-    if (showOptimizations) {
-      this.showOptimizations();
-    } else {
-      this.hideOptimizations();
-    }
+    // For better or worse, re-rendering loses frame selection,
+    // so we should always hide opts on rerender
+    this.hideOptimizations();
 
     this.emit(EVENTS.UI_JS_CALL_TREE_RENDERED);
   },
@@ -82,19 +80,22 @@ var JsCallTreeView = Heritage.extend(DetailsSubview, {
   },
 
   _onFocus: function (_, treeItem) {
+    let showOptimizations = PerformanceController.getOption("show-jit-optimizations");
     let recording = PerformanceController.getCurrentRecording();
     let frameNode = treeItem.frame;
-
-    if (!frameNode) {
-      console.warn("No frame found!");
-      return;
-    }
-
-    let frameData = frameNode.getInfo();
-    let optimizationSites = frameNode.hasOptimizations()
+    let optimizationSites = frameNode && frameNode.hasOptimizations()
                             ? frameNode.getOptimizations().optimizationSites
                             : [];
 
+    if (!showOptimizations || !frameNode || optimizationSites.length === 0) {
+      this.hideOptimizations();
+      this.emit("focus", treeItem);
+      return;
+    }
+
+    this.showOptimizations();
+
+    let frameData = frameNode.getInfo();
     let optimizations = JITOptimizationsView({
       frameData,
       optimizationSites,
@@ -151,7 +152,7 @@ var JsCallTreeView = Heritage.extend(DetailsSubview, {
   /**
    * Renders the call tree.
    */
-  _populateCallTree: function (frameNode, options={}) {
+  _populateCallTree: function (frameNode, options = {}) {
     // If we have an empty profile (no samples), then don't invert the tree, as
     // it would hide the root node and a completely blank call tree space can be
     // mis-interpreted as an error.

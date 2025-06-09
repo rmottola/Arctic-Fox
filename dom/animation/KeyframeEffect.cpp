@@ -456,19 +456,13 @@ KeyframeEffectReadOnly::SetKeyframes(JSContext* aContext,
                                      JS::Handle<JSObject*> aKeyframes,
                                      ErrorResult& aRv)
 {
-  nsIDocument* doc = AnimationUtils::GetCurrentRealmDocument(aContext);
-  if (!doc) {
-    aRv.Throw(NS_ERROR_FAILURE);
-    return;
-  }
-
   nsTArray<Keyframe> keyframes =
-    KeyframeUtils::GetKeyframesFromObject(aContext, aKeyframes, aRv);
+    KeyframeUtils::GetKeyframesFromObject(aContext, mDocument, aKeyframes, aRv);
   if (aRv.Failed()) {
     return;
   }
 
-  RefPtr<nsStyleContext> styleContext = GetTargetStyleContext(doc);
+  RefPtr<nsStyleContext> styleContext = GetTargetStyleContext();
   SetKeyframes(Move(keyframes), styleContext);
 }
 
@@ -615,7 +609,7 @@ KeyframeEffectReadOnly::UpdateProperties(nsStyleContext* aStyleContext)
       runningOnCompositorProperties.HasProperty(property.mProperty);
   }
 
-  CalculateCumulativeChangeHint();
+  CalculateCumulativeChangeHint(aStyleContext);
 
   if (mTarget) {
     EffectSet* effectSet = EffectSet::GetEffectSet(mTarget->mElement,
@@ -713,6 +707,7 @@ KeyframeEffectReadOnly::ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
                                          positionInSegment,
                                          computedTiming.mBeforeFlag);
 
+    MOZ_ASSERT(IsFinite(valuePosition), "Position value should be finite");
     StyleAnimationValue val;
     if (StyleAnimationValue::Interpolate(prop.mProperty,
                                          segment->mFromValue,
@@ -943,25 +938,21 @@ KeyframeEffectReadOnly::RequestRestyle(
 }
 
 already_AddRefed<nsStyleContext>
-KeyframeEffectReadOnly::GetTargetStyleContext(nsIDocument* aDoc)
+KeyframeEffectReadOnly::GetTargetStyleContext()
 {
-  if (!mTarget) {
+  nsIPresShell* shell = GetPresShell();
+  if (!shell) {
     return nullptr;
   }
 
-  if (!aDoc) {
-    aDoc = mTarget->mElement->OwnerDoc();
-    if (!aDoc) {
-      return nullptr;
-    }
-  }
+  MOZ_ASSERT(mTarget,
+             "Should only have a presshell when we have a target element");
 
   nsIAtom* pseudo = mTarget->mPseudoType < CSSPseudoElementType::Count
                     ? nsCSSPseudoElements::GetPseudoAtom(mTarget->mPseudoType)
                     : nullptr;
   return nsComputedDOMStyle::GetStyleContextForElement(mTarget->mElement,
-                                                       pseudo,
-                                                       aDoc->GetShell());
+                                                       pseudo, shell);
 }
 
 #ifdef DEBUG
@@ -1480,14 +1471,61 @@ KeyframeEffectReadOnly::SetPerformanceWarning(
   }
 }
 
+static already_AddRefed<nsStyleContext>
+CreateStyleContextForAnimationValue(nsCSSProperty aProperty,
+                                    StyleAnimationValue aValue,
+                                    nsStyleContext* aBaseStyleContext)
+{
+  MOZ_ASSERT(aBaseStyleContext,
+             "CreateStyleContextForAnimationValue needs to be called "
+             "with a valid nsStyleContext");
+
+  RefPtr<AnimValuesStyleRule> styleRule = new AnimValuesStyleRule();
+  styleRule->AddValue(aProperty, aValue);
+
+  nsCOMArray<nsIStyleRule> rules;
+  rules.AppendObject(styleRule);
+
+  MOZ_ASSERT(aBaseStyleContext->PresContext()->StyleSet()->IsGecko(),
+             "ServoStyleSet should not use StyleAnimationValue for animations");
+  nsStyleSet* styleSet =
+    aBaseStyleContext->PresContext()->StyleSet()->AsGecko();
+
+  RefPtr<nsStyleContext> styleContext =
+    styleSet->ResolveStyleByAddingRules(aBaseStyleContext, rules);
+
+  // We need to call StyleData to generate cached data for the style context.
+  // Otherwise CalcStyleDifference returns no meaningful result.
+  styleContext->StyleData(nsCSSProps::kSIDTable[aProperty]);
+
+  return styleContext.forget();
+}
+
 void
-KeyframeEffectReadOnly::CalculateCumulativeChangeHint()
+KeyframeEffectReadOnly::CalculateCumulativeChangeHint(
+  nsStyleContext *aStyleContext)
 {
   mCumulativeChangeHint = nsChangeHint(0);
 
   for (const AnimationProperty& property : mProperties) {
     for (const AnimationPropertySegment& segment : property.mSegments) {
-      mCumulativeChangeHint |= segment.mChangeHint;
+      RefPtr<nsStyleContext> fromContext =
+        CreateStyleContextForAnimationValue(property.mProperty,
+                                            segment.mFromValue, aStyleContext);
+
+      RefPtr<nsStyleContext> toContext =
+        CreateStyleContextForAnimationValue(property.mProperty,
+                                            segment.mToValue, aStyleContext);
+
+      uint32_t equalStructs = 0;
+      uint32_t samePointerStructs = 0;
+      nsChangeHint changeHint =
+        fromContext->CalcStyleDifference(toContext,
+                                         nsChangeHint(0),
+                                         &equalStructs,
+                                         &samePointerStructs);
+
+      mCumulativeChangeHint |= changeHint;
     }
   }
 }

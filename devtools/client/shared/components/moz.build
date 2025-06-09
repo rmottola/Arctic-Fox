@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -6,13 +6,20 @@
 
 DIRS += [
     'reps',
+    'tabs',
     'tree'
 ]
 
 DevToolsModules(
     'frame.js',
     'h-split-box.js',
+    'notification-box.css',
+    'notification-box.js',
+    'sidebar-toggle.css',
+    'sidebar-toggle.js',
+    'stack-trace.js',
     'tree.js',
 )
 
 MOCHITEST_CHROME_MANIFESTS += ['test/mochitest/chrome.ini']
+BROWSER_CHROME_MANIFESTS += ['test/browser/browser.ini']

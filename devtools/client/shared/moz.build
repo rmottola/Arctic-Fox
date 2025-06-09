@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -10,6 +10,7 @@ XPCSHELL_TESTS_MANIFESTS += ['test/unit/xpcshell.ini']
 DIRS += [
     'components',
     'redux',
+    'shim',
     'vendor',
     'widgets',
 ]
@@ -19,9 +20,6 @@ DevToolsModules(
     'autocomplete-popup.js',
     'browser-loader.js',
     'css-angle.js',
-    'css-color-db.js',
-    'css-color.js',
-    'css-parsing-utils.js',
     'css-reload.js',
     'Curl.jsm',
     'demangle.js',
@@ -52,4 +50,5 @@ DevToolsModules(
     'undo.js',
     'view-source.js',
     'webgl-utils.js',
+    'zoom-keys.js',
 )

@@ -92,6 +92,7 @@ public:
 
   void DispatchTimeMarchesOn();
   void TimeMarchesOn();
+  void DispatchUpdateCueDisplay();
 
   void NotifyShutdown()
   {
@@ -128,6 +129,7 @@ private:
   double mLastTimeMarchesOnCalled;
 
   bool mTimeMarchesOnDispatched;
+  bool mUpdateCueDisplayDispatched;
 
   static StaticRefPtr<nsIWebVTTParserWrapper> sParserWrapper;
 
@@ -145,6 +147,13 @@ private:
   void GetTextTracksOfKind(TextTrackKind aTextTrackKind,
                            nsTArray<TextTrack*>& aTextTracks);
   bool TrackIsDefault(TextTrack* aTextTrack);
+
+  void ReportTelemetryForTrack(TextTrack* aTextTrack) const;
+  void ReportTelemetryForCue();
+
+  // If there is at least one cue has been added to the cue list once, we would
+  // report the usage of cue to Telemetry.
+  bool mCueTelemetryReported;
 
   class ShutdownObserverProxy final : public nsIObserver
   {

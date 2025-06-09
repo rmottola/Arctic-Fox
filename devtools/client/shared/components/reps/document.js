@@ -6,14 +6,13 @@
 "use strict";
 
 // Make this available to both AMD and CJS environments
-define(function(require, exports, module) {
+define(function (require, exports, module) {
   // ReactJS
   const React = require("devtools/client/shared/vendor/react");
 
   // Reps
-  const { createFactories, isGrip } = require("./rep-utils");
+  const { createFactories, isGrip, getFileName } = require("./rep-utils");
   const { ObjectBox } = createFactories(require("./object-box"));
-  const { getFileName } = require("./url");
 
   // Shortcuts
   const { span } = React.DOM;
@@ -22,30 +21,38 @@ define(function(require, exports, module) {
    * Renders DOM document object.
    */
   let Document = React.createClass({
+    displayName: "Document",
+
     propTypes: {
       object: React.PropTypes.object.isRequired
     },
 
-    displayName: "Document",
-
-    getLocation: function(grip) {
+    getLocation: function (grip) {
       let location = grip.preview.location;
       return location ? getFileName(location) : "";
     },
 
-    getTitle: function(win, context) {
-      return "document";
+    getTitle: function (grip) {
+      if (this.props.objectLink) {
+        return ObjectBox({},
+          this.props.objectLink({
+            object: grip
+          }, grip.class)
+        );
+      }
+      return "";
     },
 
-    getTooltip: function(doc) {
+    getTooltip: function (doc) {
       return doc.location.href;
     },
 
-    render: function() {
+    render: function () {
       let grip = this.props.object;
 
       return (
         ObjectBox({className: "object"},
+          this.getTitle(grip),
           span({className: "objectPropValue"},
             this.getLocation(grip)
           )

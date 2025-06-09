@@ -30,10 +30,6 @@ function test() {
       totals: {
         label1: value => "Hello " + L10N.numberWithDecimals(value, 2),
         label2: value => "World " + L10N.numberWithDecimals(value, 2)
-      },
-      header: {
-        label1: "label1header",
-        label2: "label2header",
       }
     });
 
@@ -53,49 +49,40 @@ function test() {
     is(title.getAttribute("value"), "Table title",
       "The title node displays the correct text.");
 
-    is(rows.length, 4,
-      "There should be 3 table chart rows and a header created.");
+    is(rows.length, 3,
+      "There should be 3 table chart rows created.");
 
+    ok(rows[0].querySelector(".table-chart-row-box.chart-colored-blob"),
+      "A colored blob exists for the firt row.");
     is(rows[0].querySelectorAll("label")[0].getAttribute("name"), "label1",
-      "The first column of the header exists.");
+      "The first column of the first row exists.");
     is(rows[0].querySelectorAll("label")[1].getAttribute("name"), "label2",
-      "The second column of the header exists.");
-    is(rows[0].querySelectorAll("label")[0].getAttribute("value"), "label1header",
-      "The first column of the header displays the correct text.");
-    is(rows[0].querySelectorAll("label")[1].getAttribute("value"), "label2header",
-      "The second column of the header displays the correct text.");
+      "The second column of the first row exists.");
+    is(rows[0].querySelectorAll("label")[0].getAttribute("value"), "1",
+      "The first column of the first row displays the correct text.");
+    is(rows[0].querySelectorAll("label")[1].getAttribute("value"), "11.1foo",
+      "The second column of the first row displays the correct text.");
 
     ok(rows[1].querySelector(".table-chart-row-box.chart-colored-blob"),
-      "A colored blob exists for the firt row.");
+      "A colored blob exists for the second row.");
     is(rows[1].querySelectorAll("label")[0].getAttribute("name"), "label1",
-      "The first column of the first row exists.");
+      "The first column of the second row exists.");
     is(rows[1].querySelectorAll("label")[1].getAttribute("name"), "label2",
-      "The second column of the first row exists.");
-    is(rows[1].querySelectorAll("label")[0].getAttribute("value"), "1",
-      "The first column of the first row displays the correct text.");
-    is(rows[1].querySelectorAll("label")[1].getAttribute("value"), "11.1foo",
+      "The second column of the second row exists.");
+    is(rows[1].querySelectorAll("label")[0].getAttribute("value"), "2",
+      "The first column of the second row displays the correct text.");
+    is(rows[1].querySelectorAll("label")[1].getAttribute("value"), "12.2bar",
       "The second column of the first row displays the correct text.");
 
     ok(rows[2].querySelector(".table-chart-row-box.chart-colored-blob"),
-      "A colored blob exists for the second row.");
-    is(rows[2].querySelectorAll("label")[0].getAttribute("name"), "label1",
-      "The first column of the second row exists.");
-    is(rows[2].querySelectorAll("label")[1].getAttribute("name"), "label2",
-      "The second column of the second row exists.");
-    is(rows[2].querySelectorAll("label")[0].getAttribute("value"), "2",
-      "The first column of the second row displays the correct text.");
-    is(rows[2].querySelectorAll("label")[1].getAttribute("value"), "12.2bar",
-      "The second column of the first row displays the correct text.");
-
-    ok(rows[3].querySelector(".table-chart-row-box.chart-colored-blob"),
       "A colored blob exists for the third row.");
-    is(rows[3].querySelectorAll("label")[0].getAttribute("name"), "label1",
+    is(rows[2].querySelectorAll("label")[0].getAttribute("name"), "label1",
       "The first column of the third row exists.");
-    is(rows[3].querySelectorAll("label")[1].getAttribute("name"), "label2",
+    is(rows[2].querySelectorAll("label")[1].getAttribute("name"), "label2",
       "The second column of the third row exists.");
-    is(rows[3].querySelectorAll("label")[0].getAttribute("value"), "3",
+    is(rows[2].querySelectorAll("label")[0].getAttribute("value"), "3",
       "The first column of the third row displays the correct text.");
-    is(rows[3].querySelectorAll("label")[1].getAttribute("value"), "13.3baz",
+    is(rows[2].querySelectorAll("label")[1].getAttribute("value"), "13.3baz",
       "The second column of the third row displays the correct text.");
 
     is(sums.length, 2,

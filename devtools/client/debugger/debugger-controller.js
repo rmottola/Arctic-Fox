@@ -96,20 +96,19 @@ const FRAME_TYPE = {
   PUBLIC_CLIENT_EVAL: 3
 };
 
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://devtools/shared/event-emitter.js");
-Cu.import("resource://devtools/client/shared/widgets/SimpleListWidget.jsm");
-Cu.import("resource://devtools/client/shared/widgets/BreadcrumbsWidget.jsm");
-Cu.import("resource://devtools/client/shared/widgets/SideMenuWidget.jsm");
-Cu.import("resource://devtools/client/shared/widgets/VariablesView.jsm");
-Cu.import("resource://devtools/client/shared/widgets/VariablesViewController.jsm");
-
-Cu.import("resource://devtools/client/shared/browser-loader.js");
+const { BrowserLoader } = Cu.import("resource://devtools/client/shared/browser-loader.js", {});
 const { require } = BrowserLoader({
   baseURI: "resource://devtools/client/debugger/",
   window,
 });
+const { XPCOMUtils } = require("resource://gre/modules/XPCOMUtils.jsm");
 XPCOMUtils.defineConstant(this, "require", require);
+const { SimpleListWidget } = require("resource://devtools/client/shared/widgets/SimpleListWidget.jsm");
+const { BreadcrumbsWidget } = require("resource://devtools/client/shared/widgets/BreadcrumbsWidget.jsm");
+const { SideMenuWidget } = require("resource://devtools/client/shared/widgets/SideMenuWidget.jsm");
+const { VariablesView } = require("resource://devtools/client/shared/widgets/VariablesView.jsm");
+const { VariablesViewController, StackFrameUtils } = require("resource://devtools/client/shared/widgets/VariablesViewController.jsm");
+const EventEmitter = require("devtools/shared/event-emitter");
 const { gDevTools } = require("devtools/client/framework/devtools");
 const { ViewHelpers, Heritage, WidgetMethods, setNamedTimeout,
         clearNamedTimeout } = require("devtools/client/shared/widgets/view-helpers");
@@ -129,7 +128,7 @@ const {
   enhanceStoreWithBroadcaster,
   combineBroadcastingReducers
 } = require("devtools/client/shared/redux/non-react-subscriber");
-const { bindActionCreators } = require('devtools/client/shared/vendor/redux');
+const { bindActionCreators } = require("devtools/client/shared/vendor/redux");
 const reducers = require("./content/reducers/index");
 const { onReducerEvents } = require("./content/utils");
 
@@ -149,11 +148,9 @@ var {Tooltip} = require("devtools/client/shared/widgets/Tooltip");
 var FastListWidget = require("devtools/client/shared/widgets/FastListWidget");
 var {LocalizationHelper} = require("devtools/client/shared/l10n");
 var {PrefsHelper} = require("devtools/client/shared/prefs");
+var {Task} = require("devtools/shared/task");
 
 XPCOMUtils.defineConstant(this, "EVENTS", EVENTS);
-
-XPCOMUtils.defineLazyModuleGetter(this, "Task",
-  "resource://gre/modules/Task.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Parser",
   "resource://devtools/shared/Parser.jsm");
@@ -165,7 +162,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "clipboardHelper",
   "@mozilla.org/widget/clipboardhelper;1", "nsIClipboardHelper");
 
 Object.defineProperty(this, "NetworkHelper", {
-  get: function() {
+  get: function () {
     return require("devtools/shared/webconsole/network-helper");
   },
   configurable: true,
@@ -184,7 +181,7 @@ var DebuggerController = {
   /**
    * Initializes the debugger controller.
    */
-  initialize: function() {
+  initialize: function () {
     dumpn("Initializing the DebuggerController");
 
     this.startupDebugger = this.startupDebugger.bind(this);
@@ -208,7 +205,7 @@ var DebuggerController = {
     // a current request, and ignore it if not.
     let store = createStore((state, action) => {
       if (action.seqId &&
-         (action.status === 'done' || action.status === 'error') &&
+         (action.status === "done" || action.status === "error") &&
          state && state.asyncRequests.indexOf(action.seqId) === -1) {
         return state;
       }
@@ -229,12 +226,12 @@ var DebuggerController = {
    * @return object
    *         A promise that is resolved when the debugger finishes startup.
    */
-  startupDebugger: Task.async(function*() {
+  startupDebugger: Task.async(function* () {
     if (this._startup) {
       return;
     }
 
-    yield DebuggerView.initialize();
+    yield DebuggerView.initialize(this._target.isWorkerTarget);
     this._startup = true;
   }),
 
@@ -244,7 +241,7 @@ var DebuggerController = {
    * @return object
    *         A promise that is resolved when the debugger finishes shutdown.
    */
-  shutdownDebugger: Task.async(function*() {
+  shutdownDebugger: Task.async(function* () {
     if (this._shutdown) {
       return;
     }
@@ -268,7 +265,7 @@ var DebuggerController = {
    * @return object
    *         A promise that is resolved when the debugger finishes connecting.
    */
-  connect: Task.async(function*() {
+  connect: Task.async(function* () {
     let target = this._target;
 
     let { client } = target;
@@ -290,7 +287,7 @@ var DebuggerController = {
     this._hideUnsupportedFeatures();
   }),
 
-  connectThread: function() {
+  connectThread: function () {
     const { newSource, fetchEventListeners } = bindActionCreators(actions, this.dispatch);
 
     // TODO: bug 806775, update the globals list using aPacket.hostAnnotations
@@ -306,7 +303,9 @@ var DebuggerController = {
       }
     });
 
-    this.Workers.connect();
+    if (this._target.isTabActor) {
+      this.Workers.connect();
+    }
     this.ThreadState.connect();
     this.StackFrames.connect();
 
@@ -333,7 +332,7 @@ var DebuggerController = {
   /**
    * Disconnects the debugger client and removes event handlers as necessary.
    */
-  disconnect: function() {
+  disconnect: function () {
     // Return early if the client didn't even have a chance to instantiate.
     if (!this.client) {
       return;
@@ -348,7 +347,7 @@ var DebuggerController = {
     this.activeThread = null;
   },
 
-  _hideUnsupportedFeatures: function() {
+  _hideUnsupportedFeatures: function () {
     if (this.client.mainRoot.traits.noPrettyPrinting) {
       DebuggerView.Sources.hidePrettyPrinting();
     }
@@ -358,7 +357,7 @@ var DebuggerController = {
     }
   },
 
-  _onWillNavigate: function(opts={}) {
+  _onWillNavigate: function (opts = {}) {
     // Reset UI.
     DebuggerView.handleTabNavigation();
     if (!opts.noUnload) {
@@ -378,7 +377,7 @@ var DebuggerController = {
     clearNamedTimeout("event-listeners-fetch");
   },
 
-  _onNavigate: function() {
+  _onNavigate: function () {
     this.ThreadState.handleTabNavigation();
     this.StackFrames.handleTabNavigation();
   },
@@ -386,14 +385,14 @@ var DebuggerController = {
   /**
    * Called when the debugged tab is closed.
    */
-  _onTabDetached: function() {
+  _onTabDetached: function () {
     this.shutdownDebugger();
   },
 
   /**
    * Warn if resuming execution produced a wrongOrder error.
    */
-  _ensureResumptionOrder: function(aResponse) {
+  _ensureResumptionOrder: function (aResponse) {
     if (aResponse.error == "wrongOrder") {
       DebuggerView.Toolbar.showResumeWarning(aResponse.lastPausedUrl);
     }
@@ -403,7 +402,7 @@ var DebuggerController = {
    * Detach and reattach to the thread actor with useSourceMaps true, blow
    * away old sources and get them again.
    */
-  reconfigureThread: function(opts) {
+  reconfigureThread: function (opts) {
     const deferred = promise.defer();
     this.activeThread.reconfigure(
       opts,
@@ -413,7 +412,7 @@ var DebuggerController = {
           return;
         }
 
-        if (('useSourceMaps' in opts) || ('autoBlackBox' in opts)) {
+        if (("useSourceMaps" in opts) || ("autoBlackBox" in opts)) {
           // Reset the view and fetch all the sources again.
           DebuggerView.handleTabNavigation();
           this.dispatch(actions.unload());
@@ -432,7 +431,7 @@ var DebuggerController = {
     return deferred.promise;
   },
 
-  waitForSourcesLoaded: function() {
+  waitForSourcesLoaded: function () {
     const deferred = promise.defer();
     this.dispatch({
       type: services.WAIT_UNTIL,
@@ -443,7 +442,7 @@ var DebuggerController = {
     return deferred.promise;
   },
 
-  waitForSourceShown: function(name) {
+  waitForSourceShown: function (name) {
     const deferred = promise.defer();
     window.on(EVENTS.SOURCE_SHOWN, function onShown(_, source) {
       if (source.url.includes(name)) {
@@ -543,7 +542,7 @@ ThreadState.prototype = {
   /**
    * Connect to the current thread client.
    */
-  connect: function() {
+  connect: function () {
     dumpn("ThreadState is connecting...");
     this.activeThread.addListener("paused", this._update);
     this.activeThread.addListener("resumed", this._update);
@@ -552,7 +551,7 @@ ThreadState.prototype = {
   /**
    * Disconnect from the client.
    */
-  disconnect: function() {
+  disconnect: function () {
     if (!this.activeThread) {
       return;
     }
@@ -564,7 +563,7 @@ ThreadState.prototype = {
   /**
    * Handles any initialization on a tab navigation event issued by the client.
    */
-  handleTabNavigation: function() {
+  handleTabNavigation: function () {
     if (!this.activeThread) {
       return;
     }
@@ -575,7 +574,7 @@ ThreadState.prototype = {
   /**
    * Update the UI after a thread state change.
    */
-  _update: function(aEvent, aPacket) {
+  _update: function (aEvent, aPacket) {
     if (aEvent == "paused") {
       if (aPacket.why.type == "interrupted" &&
           this.interruptedByResumeButton) {
@@ -636,7 +635,7 @@ StackFrames.prototype = {
   /**
    * Connect to the current thread client.
    */
-  connect: function() {
+  connect: function () {
     dumpn("StackFrames is connecting...");
     this.activeThread.addListener("paused", this._onPaused);
     this.activeThread.addListener("resumed", this._onResumed);
@@ -650,7 +649,7 @@ StackFrames.prototype = {
   /**
    * Disconnect from the client.
    */
-  disconnect: function() {
+  disconnect: function () {
     if (!this.activeThread) {
       return;
     }
@@ -667,7 +666,7 @@ StackFrames.prototype = {
   /**
    * Handles any initialization on a tab navigation event issued by the client.
    */
-  handleTabNavigation: function() {
+  handleTabNavigation: function () {
     dumpn("Handling tab navigation in the StackFrames");
     // Nothing to do here yet.
   },
@@ -680,7 +679,7 @@ StackFrames.prototype = {
    * @param object aPacket
    *        The response packet.
    */
-  _onPaused: function(aEvent, aPacket) {
+  _onPaused: function (aEvent, aPacket) {
     switch (aPacket.why.type) {
       // If paused by a breakpoint, store the breakpoint location.
       case "breakpoint":
@@ -729,7 +728,7 @@ StackFrames.prototype = {
   /**
    * Handler for the thread client's resumed notification.
    */
-  _onResumed: function() {
+  _onResumed: function () {
     // Prepare the watch expression evaluation string for the next pause.
     if (this._currentFrameDescription != FRAME_TYPE.WATCH_EXPRESSIONS_EVAL) {
       this._currentWatchExpressions = this._syncedWatchExpressions;
@@ -739,7 +738,7 @@ StackFrames.prototype = {
   /**
    * Handler for the thread client's framesadded notification.
    */
-  _onFrames: Task.async(function*() {
+  _onFrames: Task.async(function* () {
     // Ignore useless notifications.
     if (!this.activeThread || !this.activeThread.cachedFrames.length) {
       return;
@@ -769,7 +768,7 @@ StackFrames.prototype = {
    * Fill the StackFrames view with the frames we have in the cache, compressing
    * frames which have black boxed sources into single frames.
    */
-  _refillFrames: function() {
+  _refillFrames: function () {
     // Make sure all the previous stackframes are removed before re-adding them.
     DebuggerView.StackFrames.empty();
 
@@ -791,7 +790,7 @@ StackFrames.prototype = {
   /**
    * Handler for the thread client's framescleared notification.
    */
-  _onFramesCleared: function() {
+  _onFramesCleared: function () {
     switch (this._currentFrameDescription) {
       case FRAME_TYPE.NORMAL:
         this._currentEvaluation = null;
@@ -816,7 +815,7 @@ StackFrames.prototype = {
   /**
    * Handler for the debugger's blackboxchange notification.
    */
-  _onBlackBoxChange: function() {
+  _onBlackBoxChange: function () {
     if (this.activeThread.state == "paused") {
       // Hack to avoid selecting the topmost frame after blackboxing a source.
       this.currentFrameDepth = NaN;
@@ -827,7 +826,7 @@ StackFrames.prototype = {
   /**
    * Handler for the debugger's prettyprintchange notification.
    */
-  _onPrettyPrintChange: function() {
+  _onPrettyPrintChange: function () {
     if (this.activeThread.state != "paused") {
       return;
     }
@@ -843,7 +842,7 @@ StackFrames.prototype = {
   /**
    * Called soon after the thread client's framescleared notification.
    */
-  _afterFramesCleared: function() {
+  _afterFramesCleared: function () {
     // Ignore useless notifications.
     if (this.activeThread.cachedFrames.length) {
       return;
@@ -864,7 +863,7 @@ StackFrames.prototype = {
    * @param number aDepth
    *        The depth of the frame in the stack.
    */
-  selectFrame: function(aDepth) {
+  selectFrame: function (aDepth) {
     // Make sure the frame at the specified depth exists first.
     let frame = this.activeThread.cachedFrames[this.currentFrameDepth = aDepth];
     if (!frame) {
@@ -904,7 +903,8 @@ StackFrames.prototype = {
     // to contain all the values.
     if (this._syncedWatchExpressions && aDepth == 0) {
       let label = L10N.getStr("watchExpressionsScopeLabel");
-      let scope = DebuggerView.Variables.addScope(label);
+      let scope = DebuggerView.Variables.addScope(label,
+        "variables-view-watch-expressions");
 
       // Customize the scope for holding watch expressions evaluations.
       scope.descriptorTooltip = false;
@@ -951,7 +951,7 @@ StackFrames.prototype = {
   /**
    * Loads more stack frames from the debugger server cache.
    */
-  addMoreFrames: function() {
+  addMoreFrames: function () {
     this.activeThread.fillFrames(
       this.activeThread.cachedFrames.length + CALL_STACK_PAGE_SIZE);
   },
@@ -970,7 +970,7 @@ StackFrames.prototype = {
    *         or rejected if there was no stack frame available or some
    *         other error occurred.
    */
-  evaluate: function(aExpression, aOptions = {}) {
+  evaluate: function (aExpression, aOptions = {}) {
     let depth = "depth" in aOptions ? aOptions.depth : this.currentFrameDepth;
     let frame = this.activeThread.cachedFrames[depth];
     if (frame == null) {
@@ -1003,7 +1003,7 @@ StackFrames.prototype = {
    * @param object aFrame
    *        The frame to get some references from.
    */
-  _insertScopeFrameReferences: function(aScope, aFrame) {
+  _insertScopeFrameReferences: function (aScope, aFrame) {
     // Add any thrown exception.
     if (this._currentException) {
       let excRef = aScope.addItem("<exception>", { value: this._currentException },
@@ -1038,7 +1038,7 @@ StackFrames.prototype = {
    *         conditional expression is evaluated. If there's no breakpoint
    *         where the debugger is paused, the promise is resolved immediately.
    */
-  _handleConditionalBreakpoint: Task.async(function*() {
+  _handleConditionalBreakpoint: Task.async(function* () {
     if (gClient.mainRoot.traits.conditionalBreakpoints) {
       return;
     }
@@ -1080,7 +1080,7 @@ StackFrames.prototype = {
    *         are evaluated. If there are no watch expressions where the debugger
    *         is paused, the promise is resolved immediately.
    */
-  _handleWatchExpressions: Task.async(function*() {
+  _handleWatchExpressions: Task.async(function* () {
     // Ignore useless notifications.
     if (!this.activeThread || !this.activeThread.cachedFrames.length) {
       return;
@@ -1115,7 +1115,7 @@ StackFrames.prototype = {
    * @param object aExp
    *        The grip of the evaluation results.
    */
-  _fetchWatchExpressions: function(aScope, aExp) {
+  _fetchWatchExpressions: function (aScope, aExp) {
     // Fetch the expressions only once.
     if (aScope._fetched) {
       return;
@@ -1150,7 +1150,7 @@ StackFrames.prototype = {
    * Updates a list of watch expressions to evaluate on each pause.
    * TODO: handle all of this server-side: Bug 832470, comment 14.
    */
-  syncWatchExpressions: function() {
+  syncWatchExpressions: function () {
     let list = DebuggerView.WatchExpressions.getAllStrings();
 
     // Sanity check all watch expressions before syncing them. To avoid
@@ -1233,31 +1233,31 @@ DebuggerController.StackFrames = new StackFrames();
  */
 Object.defineProperties(window, {
   "gTarget": {
-    get: function() {
+    get: function () {
       return DebuggerController._target;
     },
     configurable: true
   },
   "gHostType": {
-    get: function() {
+    get: function () {
       return DebuggerView._hostType;
     },
     configurable: true
   },
   "gClient": {
-    get: function() {
+    get: function () {
       return DebuggerController.client;
     },
     configurable: true
   },
   "gThreadClient": {
-    get: function() {
+    get: function () {
       return DebuggerController.activeThread;
     },
     configurable: true
   },
   "gCallStackPageSize": {
-    get: function() {
+    get: function () {
       return CALL_STACK_PAGE_SIZE;
     },
     configurable: true

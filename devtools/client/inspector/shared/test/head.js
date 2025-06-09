@@ -1,8 +1,8 @@
 /* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 /* Any copyright is dedicated to the Public Domain.
  http://creativecommons.org/publicdomain/zero/1.0/ */
+/* eslint no-unused-vars: [2, {"vars": "local"}] */
 /* import-globals-from ../../test/head.js */
-
 "use strict";
 
 // Import the inspector's head.js first (which itself imports shared-head.js).
@@ -11,9 +11,9 @@ Services.scriptloader.loadSubScript(
   this);
 
 var {CssRuleView} = require("devtools/client/inspector/rules/rules");
-var {CssLogic, CssSelector} = require("devtools/shared/inspector/css-logic");
 var {getInplaceEditorForSpan: inplaceEditor} =
   require("devtools/client/shared/inplace-editor");
+const {getColor: getThemeColor} = require("devtools/client/shared/theme");
 
 const TEST_URL_ROOT =
   "http://example.com/browser/devtools/client/inspector/shared/test/";
@@ -21,6 +21,8 @@ const TEST_URL_ROOT_SSL =
   "https://example.com/browser/devtools/client/inspector/shared/test/";
 const ROOT_TEST_DIR = getRootDirectory(gTestPath);
 const FRAME_SCRIPT_URL = ROOT_TEST_DIR + "doc_frame_script.js";
+const _STRINGS = Services.strings.createBundle(
+  "chrome://devtools-shared/locale/styleinspector.properties");
 
 // Clean-up all prefs that might have been changed during a test run
 // (safer here because if the test fails, then the pref is never reverted)
@@ -77,7 +79,7 @@ registerCleanupFunction(() => {
  * script, so they can run on remote targets too.
  */
 var _addTab = addTab;
-addTab = function(url) {
+addTab = function (url) {
   return _addTab(url).then(tab => {
     info("Loading the helper frame script " + FRAME_SCRIPT_URL);
     let browser = tab.linkedBrowser;
@@ -100,7 +102,7 @@ function waitForContentMessage(name) {
 
   let mm = gBrowser.selectedBrowser.messageManager;
 
-  let def = promise.defer();
+  let def = defer();
   mm.addMessageListener(name, function onMessage(msg) {
     mm.removeMessageListener(name, onMessage);
     def.resolve(msg.data);
@@ -125,7 +127,8 @@ function waitForContentMessage(name) {
  * @return {Promise} Resolves to the response data if a response is expected,
  * immediately resolves otherwise
  */
-function executeInContent(name, data={}, objects={}, expectResponse=true) {
+function executeInContent(name, data = {}, objects = {},
+                          expectResponse = true) {
   info("Sending message " + name + " to content");
   let mm = gBrowser.selectedBrowser.messageManager;
 
@@ -184,8 +187,8 @@ function* waitForComputedStyleProperty(selector, pseudo, name, expected) {
  *
  * @return a promise that resolves to the inplace-editor element when ready
  */
-var focusEditableField = Task.async(function*(ruleView, editable, xOffset=1,
-    yOffset=1, options={}) {
+var focusEditableField = Task.async(function* (ruleView, editable, xOffset = 1,
+                                               yOffset = 1, options = {}) {
   let onFocus = once(editable.parentNode, "focus", true);
   info("Clicking on editable field to turn to edit mode");
   EventUtils.synthesizeMouse(editable, xOffset, yOffset, options,
@@ -211,8 +214,8 @@ var focusEditableField = Task.async(function*(ruleView, editable, xOffset=1,
  * @return a promise that resolves when the function returned true or rejects
  * if the timeout is reached
  */
-function waitForSuccess(validatorFn, name="untitled") {
-  let def = promise.defer();
+function waitForSuccess(validatorFn, name = "untitled") {
+  let def = defer();
 
   function wait(validator) {
     if (validator()) {
@@ -236,9 +239,8 @@ function waitForSuccess(validatorFn, name="untitled") {
  *        The NodeActor that will used to retrieve the dataURL for the
  *        font family tooltip contents.
  */
-var getFontFamilyDataURL = Task.async(function*(font, nodeFront) {
-  let fillStyle = (Services.prefs.getCharPref("devtools.theme") === "light") ?
-      "black" : "white";
+var getFontFamilyDataURL = Task.async(function* (font, nodeFront) {
+  let fillStyle = getThemeColor("body-color");
 
   let {data} = yield nodeFront.getFontFamilyDataURL(font, fillStyle);
   let dataURL = yield data.string();
@@ -341,6 +343,21 @@ function getRuleViewSelector(view, selectorText) {
 }
 
 /**
+ * Get a reference to the selectorhighlighter icon DOM element corresponding to
+ * a given selector in the rule-view
+ *
+ * @param {CssRuleView} view
+ *        The instance of the rule-view panel
+ * @param {String} selectorText
+ *        The selector in the rule-view to look for
+ * @return {DOMNode} The selectorhighlighter icon DOM element
+ */
+function getRuleViewSelectorHighlighterIcon(view, selectorText) {
+  let rule = getRuleViewRule(view, selectorText);
+  return rule.querySelector(".ruleview-selectorhighlighter");
+}
+
+/**
  * Simulate a color change in a given color picker tooltip, and optionally wait
  * for a given element in the page to have its style changed as a result
  *
@@ -357,7 +374,7 @@ function getRuleViewSelector(view, selectorText) {
  *          - {String} value The expected style value
  * The style will be checked like so: getComputedStyle(element)[name] === value
  */
-var simulateColorPickerChange = Task.async(function*(ruleView, colorPicker,
+var simulateColorPickerChange = Task.async(function* (ruleView, colorPicker,
     newRgba, expectedChange) {
   let onRuleViewChanged = ruleView.once("ruleview-changed");
   info("Getting the spectrum colorpicker object");
@@ -408,23 +425,6 @@ function getRuleViewLinkTextByIndex(view, index) {
 }
 
 /**
- * Get the rule editor from the rule-view given its index
- *
- * @param {CssRuleView} view
- *        The instance of the rule-view panel
- * @param {Number} childrenIndex
- *        The children index of the element to get
- * @param {Number} nodeIndex
- *        The child node index of the element to get
- * @return {DOMNode} The rule editor if any at this index
- */
-function getRuleViewRuleEditor(view, childrenIndex, nodeIndex) {
-  return nodeIndex !== undefined ?
-    view.element.children[childrenIndex].childNodes[nodeIndex]._ruleEditor :
-    view.element.children[childrenIndex]._ruleEditor;
-}
-
-/**
  * Click on a rule-view's close brace to focus a new property name editor
  *
  * @param {RuleEditor} ruleEditor
@@ -432,7 +432,7 @@ function getRuleViewRuleEditor(view, childrenIndex, nodeIndex) {
  * @return a promise that resolves to the newly created editor when ready and
  * focused
  */
-var focusNewRuleViewProperty = Task.async(function*(ruleEditor) {
+var focusNewRuleViewProperty = Task.async(function* (ruleEditor) {
   info("Clicking on a close ruleEditor brace to start editing a new property");
   ruleEditor.closeBrace.scrollIntoView();
   let editor = yield focusEditableField(ruleEditor.ruleView,
@@ -457,7 +457,7 @@ var focusNewRuleViewProperty = Task.async(function*(ruleEditor) {
  * @return a promise that resolves when the new property name has been entered
  * and once the value field is focused
  */
-var createNewRuleViewProperty = Task.async(function*(ruleEditor, inputValue) {
+var createNewRuleViewProperty = Task.async(function* (ruleEditor, inputValue) {
   info("Creating a new property editor");
   let editor = yield focusNewRuleViewProperty(ruleEditor);
 
@@ -481,7 +481,7 @@ var createNewRuleViewProperty = Task.async(function*(ruleEditor, inputValue) {
  * @return a promise that resolves when the rule-view is filtered for the
  * search term
  */
-var setSearchFilter = Task.async(function*(view, searchValue) {
+var setSearchFilter = Task.async(function* (view, searchValue) {
   info("Setting filter text to \"" + searchValue + "\"");
   let win = view.styleWindow;
   let searchField = view.searchField;
@@ -534,4 +534,24 @@ function getComputedViewProperty(view, name) {
 function getComputedViewPropertyValue(view, name, propertyName) {
   return getComputedViewProperty(view, name, propertyName)
     .valueSpan.textContent;
+}
+
+/**
+ * Open the style editor context menu and return all of it's items in a flat array
+ * @param {CssRuleView} view
+ *        The instance of the rule-view panel
+ * @return An array of MenuItems
+ */
+function openStyleContextMenuAndGetAllItems(view, target) {
+  let menu = view._contextmenu._openMenu({target: target});
+
+  // Flatten all menu items into a single array to make searching through it easier
+  let allItems = [].concat.apply([], menu.items.map(function addItem(item) {
+    if (item.submenu) {
+      return addItem(item.submenu.items);
+    }
+    return item;
+  }));
+
+  return allItems;
 }

@@ -19,13 +19,17 @@ var { DebuggerServer } = require("devtools/server/main");
 var { DebuggerClient, ObjectClient } = require("devtools/shared/client/main");
 var { AddonManager } = Cu.import("resource://gre/modules/AddonManager.jsm", {});
 var EventEmitter = require("devtools/shared/event-emitter");
-var { Toolbox } = require("devtools/client/framework/toolbox")
+var { Toolbox } = require("devtools/client/framework/toolbox");
+
+const chromeRegistry = Cc["@mozilla.org/chrome/chrome-registry;1"].getService(Ci.nsIChromeRegistry);
 
 // Override promise with deprecated-sync-thenables
 promise = Cu.import("resource://devtools/shared/deprecated-sync-thenables.js", {}).Promise;
 
 const EXAMPLE_URL = "http://example.com/browser/devtools/client/debugger/test/mochitest/";
 const FRAME_SCRIPT_URL = getRootDirectory(gTestPath) + "code_frame-script.js";
+const CHROME_URL = "chrome://mochitests/content/browser/devtools/client/debugger/test/mochitest/";
+const CHROME_URI = Services.io.newURI(CHROME_URL, null, null);
 
 registerCleanupFunction(function* () {
   info("finish() was called, cleaning up...");
@@ -50,7 +54,7 @@ registerCleanupFunction(function* () {
 
 // Import the GCLI test helper
 var testDir = gTestPath.substr(0, gTestPath.lastIndexOf("/"));
-testDir = testDir.replace(/\/\//g, '/');
+testDir = testDir.replace(/\/\//g, "/");
 testDir = testDir.replace("chrome:/mochitest", "chrome://mochitest");
 var helpersjs = testDir + "/../../../commandline/test/helpers.js";
 Services.scriptloader.loadSubScript(helpersjs, this);
@@ -90,7 +94,7 @@ this.addTab = function addTab(aUrl, aWindow) {
   }, true);
 
   return deferred.promise;
-}
+};
 
 this.removeTab = function removeTab(aTab, aWindow) {
   info("Removing tab.");
@@ -102,35 +106,29 @@ this.removeTab = function removeTab(aTab, aWindow) {
 
   tabContainer.addEventListener("TabClose", function onClose(aEvent) {
     tabContainer.removeEventListener("TabClose", onClose, false);
+
     info("Tab removed and finished closing.");
     deferred.resolve();
   }, false);
 
   targetBrowser.removeTab(aTab);
   return deferred.promise;
+};
+
+function getAddonURIFromPath(aPath) {
+  let chromeURI = Services.io.newURI(aPath, null, CHROME_URI);
+  return chromeRegistry.convertChromeURL(chromeURI).QueryInterface(Ci.nsIFileURL);
 }
 
-function addAddon(aUrl) {
-  info("Installing addon: " + aUrl);
+function getTemporaryAddonURLFromPath(aPath) {
+  return getAddonURIFromPath(aPath).spec;
+}
 
-  let deferred = promise.defer();
+function addTemporaryAddon(aPath) {
+  let addonFile = getAddonURIFromPath(aPath).file;
+  info("Installing addon: " + addonFile.path);
 
-  AddonManager.getInstallForURL(aUrl, aInstaller => {
-    aInstaller.install();
-    let listener = {
-      onInstallEnded: function(aAddon, aAddonInstall) {
-        aInstaller.removeListener(listener);
-
-        // Wait for add-on's startup scripts to execute. See bug 997408
-        executeSoon(function() {
-          deferred.resolve(aAddonInstall);
-        });
-      }
-    };
-    aInstaller.addListener(listener);
-  }, "application/x-xpinstall");
-
-  return deferred.promise;
+  return AddonManager.installTemporaryAddon(addonFile);
 }
 
 function removeAddon(aAddon) {
@@ -139,7 +137,7 @@ function removeAddon(aAddon) {
   let deferred = promise.defer();
 
   let listener = {
-    onUninstalled: function(aUninstalledAddon) {
+    onUninstalled: function (aUninstalledAddon) {
       if (aUninstalledAddon != aAddon) {
         return;
       }
@@ -164,13 +162,13 @@ function getTabActorForUrl(aClient, aUrl) {
   return deferred.promise;
 }
 
-function getAddonActorForUrl(aClient, aUrl) {
-  info("Get addon actor for URL: " + aUrl);
+function getAddonActorForId(aClient, aAddonId) {
+  info("Get addon actor for ID: " + aAddonId);
   let deferred = promise.defer();
 
   aClient.listAddons(aResponse => {
-    let addonActor = aResponse.addons.filter(aGrip => aGrip.url == aUrl).pop();
-    info("got addon actor for URL: " + addonActor.actor);
+    let addonActor = aResponse.addons.filter(aGrip => aGrip.id == aAddonId).pop();
+    info("got addon actor for ID: " + aAddonId);
     deferred.resolve(addonActor);
   });
 
@@ -235,6 +233,24 @@ function waitForTime(aDelay) {
   let deferred = promise.defer();
   setTimeout(deferred.resolve, aDelay);
   return deferred.promise;
+}
+
+function waitForSourceLoaded(aPanel, aUrl) {
+  let { Sources } = aPanel.panelWin.DebuggerView;
+  let isLoaded = Sources.items.some(item =>
+    item.attachment.source.url === aUrl);
+  if (isLoaded) {
+    info("The correct source has been loaded.");
+    return promise.resolve(null);
+  } else {
+    return waitForDebuggerEvents(aPanel, aPanel.panelWin.EVENTS.NEW_SOURCE).then(() => {
+      // Wait for it to be loaded in the UI and appear into Sources.items.
+      return waitForTick();
+    }).then(() => {
+      return waitForSourceLoaded(aPanel, aUrl);
+    });
+  }
+
 }
 
 function waitForSourceShown(aPanel, aUrl) {
@@ -512,35 +528,92 @@ function getSources(aClient) {
   return deferred.promise;
 }
 
-function initDebugger(aTarget, aWindow) {
+/**
+ * Optionaly open a new tab and then open the debugger panel.
+ * The returned promise resolves only one the panel is fully set.
+
+ * @param {String|xul:tab} urlOrTab
+ *   If a string, consider it as the url of the tab to open before opening the
+ *   debugger panel.
+ *   Otherwise, if a <xul:tab>, do nothing, but open the debugger panel against
+ *   the given tab.
+ * @param {Object} options
+ *   Set of optional arguments:
+ *   - {String} source
+ *     If given, assert the default loaded source once the debugger is loaded.
+ *     This string can be partial to only match a part of the source name.
+ *     If null, do not expect any source and skip SOURCE_SHOWN wait.
+ *   - {Number} line
+ *     If given, wait for the caret to be set on a precise line
+ *
+ * @return {Promise}
+ *   Resolves once debugger panel is fully set according to the given options.
+ */
+let initDebugger = Task.async(function*(urlOrTab, options) {
+  let { window, source, line } = options || {};
   info("Initializing a debugger panel.");
 
-  return getTab(aTarget, aWindow).then(aTab => {
-    info("Debugee tab added successfully: " + aTarget);
+  let tab, url;
+  if (urlOrTab instanceof XULElement) {
+    // `urlOrTab` Is a Tab.
+    tab = urlOrTab;
+  } else {
+    // `urlOrTab` is an url. Open an empty tab first in order to load the page
+    // only once the panel is ready. That to be able to safely catch the
+    // SOURCE_SHOWN event.
+    tab = yield addTab("about:blank", window);
+    url = urlOrTab;
+  }
+  info("Debugee tab added successfully: " + urlOrTab);
 
-    let deferred = promise.defer();
-    let debuggee = aTab.linkedBrowser.contentWindow.wrappedJSObject;
-    let target = TargetFactory.forTab(aTab);
+  let debuggee = tab.linkedBrowser.contentWindow.wrappedJSObject;
+  let target = TargetFactory.forTab(tab);
 
-    gDevTools.showToolbox(target, "jsdebugger").then(aToolbox => {
-      info("Debugger panel shown successfully.");
+  let toolbox = yield gDevTools.showToolbox(target, "jsdebugger");
+  info("Debugger panel shown successfully.");
 
-      let debuggerPanel = aToolbox.getCurrentPanel();
-      let panelWin = debuggerPanel.panelWin;
+  let debuggerPanel = toolbox.getCurrentPanel();
+  let panelWin = debuggerPanel.panelWin;
+  let { Sources } = panelWin.DebuggerView;
 
-      prepareDebugger(debuggerPanel);
-      deferred.resolve([aTab, debuggee, debuggerPanel, aWindow]);
-    });
+  prepareDebugger(debuggerPanel);
 
-    return deferred.promise;
-  });
-}
+  if (url && url != "about:blank") {
+    let onCaretUpdated;
+    if (line) {
+      onCaretUpdated = waitForCaretUpdated(debuggerPanel, line);
+    }
+    if (source === null) {
+      // When there is no source in the document, we shouldn't wait for
+      // SOURCE_SHOWN event
+      yield reload(debuggerPanel, url);
+    } else {
+      yield navigateActiveTabTo(debuggerPanel,
+                                url,
+                                panelWin.EVENTS.SOURCE_SHOWN);
+    }
+    if (source) {
+      let isSelected = Sources.selectedItem.attachment.source.url === source;
+      if (!isSelected) {
+        // Ensure that the source is loaded first before trying to select it
+        yield waitForSourceLoaded(debuggerPanel, source);
+        // Select the js file.
+        let onSource = waitForSourceAndCaret(debuggerPanel, source, line ? line : 1);
+        Sources.selectedValue = getSourceActor(Sources, source);
+        yield onSource;
+      }
+    }
+    yield onCaretUpdated;
+  }
+
+  return [tab, debuggee, debuggerPanel, window];
+});
 
 // Creates an add-on debugger for a given add-on. The returned AddonDebugger
 // object must be destroyed before finishing the test
-function initAddonDebugger(aUrl) {
+function initAddonDebugger(aAddonId) {
   let addonDebugger = new AddonDebugger();
-  return addonDebugger.init(aUrl).then(() => addonDebugger);
+  return addonDebugger.init(aAddonId).then(() => addonDebugger);
 }
 
 function AddonDebugger() {
@@ -550,7 +623,7 @@ function AddonDebugger() {
 }
 
 AddonDebugger.prototype = {
-  init: Task.async(function*(aUrl) {
+  init: Task.async(function* (aAddonId) {
     info("Initializing an addon debugger panel.");
 
     if (!DebuggerServer.initialized) {
@@ -569,7 +642,7 @@ AddonDebugger.prototype = {
 
     yield this.client.connect();
 
-    let addonActor = yield getAddonActorForUrl(this.client, aUrl);
+    let addonActor = yield getAddonActorForId(this.client, aAddonId);
 
     let targetOptions = {
       form: addonActor,
@@ -588,13 +661,13 @@ AddonDebugger.prototype = {
     info("Addon debugger panel shown successfully.");
 
     this.debuggerPanel = toolbox.getCurrentPanel();
-    yield waitForSourceShown(this.debuggerPanel, '');
+    yield waitForSourceShown(this.debuggerPanel, "");
 
     prepareDebugger(this.debuggerPanel);
     yield this._attachConsole();
   }),
 
-  destroy: Task.async(function*() {
+  destroy: Task.async(function* () {
     let deferred = promise.defer();
     this.client.close(deferred.resolve);
     yield deferred.promise;
@@ -603,7 +676,7 @@ AddonDebugger.prototype = {
     window.removeEventListener("message", this._onMessage);
   }),
 
-  _attachConsole: function() {
+  _attachConsole: function () {
     let deferred = promise.defer();
     this.client.attachConsole(this.target.form.consoleActor, ["ConsoleAPI"], (aResponse, aWebConsoleClient) => {
       if (aResponse.error) {
@@ -618,7 +691,7 @@ AddonDebugger.prototype = {
     return deferred.promise;
   },
 
-  _onConsoleAPICall: function(aType, aPacket) {
+  _onConsoleAPICall: function (aType, aPacket) {
     if (aPacket.from != this.webConsole.actor)
       return;
     this.emit("console", aPacket.message);
@@ -630,7 +703,7 @@ AddonDebugger.prototype = {
    * sources property contains an array with objects for each source for that
    * group with properties label and url.
    */
-  getSourceGroups: Task.async(function*() {
+  getSourceGroups: Task.async(function* () {
     let debuggerWin = this.debuggerPanel.panelWin;
     let sources = yield getSources(debuggerWin.gThreadClient);
     ok(sources.length, "retrieved sources");
@@ -681,7 +754,7 @@ AddonDebugger.prototype = {
     return groups;
   }),
 
-  _onMessage: function(event) {
+  _onMessage: function (event) {
     let json = JSON.parse(event.data);
     switch (json.name) {
       case "toolbox-title":
@@ -689,7 +762,7 @@ AddonDebugger.prototype = {
         break;
     }
   }
-}
+};
 
 function initChromeDebugger(aOnClose) {
   info("Initializing a chrome debugger process.");
@@ -761,7 +834,7 @@ function getBlackBoxButton(aPanel) {
  * Returns the node that has the black-boxed class applied to it.
  */
 function getSelectedSourceElement(aPanel) {
-    return aPanel.panelWin.DebuggerView.Sources.selectedItem.prebuiltNode;
+  return aPanel.panelWin.DebuggerView.Sources.selectedItem.prebuiltNode;
 }
 
 function toggleBlackBoxing(aPanel, aSourceActor = null) {
@@ -775,7 +848,7 @@ function toggleBlackBoxing(aPanel, aSourceActor = null) {
   ).then(() => {
     return aSourceActor ?
       getSource(aPanel, aSourceActor) :
-      getSelectedSource(aPanel)
+      getSelectedSource(aPanel);
   });
 
   if (aSourceActor) {
@@ -839,8 +912,8 @@ function intendOpenVarPopup(aPanel, aPosition, aButtonPushed) {
 
   const deferred = promise.defer();
   window.setTimeout(
-    function() {
-      if(tooltip.isEmpty()) {
+    function () {
+      if (tooltip.isEmpty()) {
         deferred.resolve(false);
       } else {
         deferred.resolve(true);
@@ -875,10 +948,10 @@ function reopenVarPopup(...aArgs) {
   return hideVarPopup.apply(this, aArgs).then(() => openVarPopup.apply(this, aArgs));
 }
 
-function attachAddonActorForUrl(aClient, aUrl) {
+function attachAddonActorForId(aClient, aAddonId) {
   let deferred = promise.defer();
 
-  getAddonActorForUrl(aClient, aUrl).then(aGrip => {
+  getAddonActorForId(aClient, aAddonId).then(aGrip => {
     aClient.attachAddon(aGrip.actor, aResponse => {
       deferred.resolve([aGrip, aResponse]);
     });
@@ -960,7 +1033,7 @@ function jsonrpc(tab, method, params) {
 
       messageManager.removeMessageListener("jsonrpc", listener);
       if (error != null) {
-         reject(error);
+        reject(error);
       }
 
       resolve(result);
@@ -1063,7 +1136,7 @@ function findWorker(workers, url) {
 
 function attachWorker(tabClient, worker) {
   info("Attaching to worker with url '" + worker.url + "'.");
-  return new Promise(function(resolve, reject) {
+  return new Promise(function (resolve, reject) {
     tabClient.attachWorker(worker.actor, function (response, workerClient) {
       resolve([response, workerClient]);
     });
@@ -1082,7 +1155,7 @@ function waitForWorkerListChanged(tabClient) {
 
 function attachThread(workerClient, options) {
   info("Attaching to thread.");
-  return new Promise(function(resolve, reject) {
+  return new Promise(function (resolve, reject) {
     workerClient.attachThread(options, function (response, threadClient) {
       resolve([response, threadClient]);
     });
@@ -1158,7 +1231,7 @@ function getSplitConsole(toolbox, win) {
   });
 
   if (!win) {
-    win = toolbox.doc.defaultView;
+    win = toolbox.win;
   }
 
   if (!toolbox.splitConsole) {
@@ -1179,7 +1252,7 @@ function getSplitConsole(toolbox, win) {
 function waitForNavigation(gPanel) {
   const target = gPanel.panelWin.gTarget;
   const deferred = promise.defer();
-  target.once('navigate', () => {
+  target.once("navigate", () => {
     deferred.resolve();
   });
   info("Waiting for navigation...");
@@ -1191,7 +1264,7 @@ function waitForNavigation(gPanel) {
 function bindActionCreators(panel) {
   const win = panel.panelWin;
   const dispatch = win.DebuggerController.dispatch;
-  const { bindActionCreators } = win.require('devtools/client/shared/vendor/redux');
+  const { bindActionCreators } = win.require("devtools/client/shared/vendor/redux");
   return bindActionCreators(win.actions, dispatch);
 }
 
@@ -1227,7 +1300,7 @@ function _afterDispatchDone(store, type) {
         if (action.type === type) {
           return action.status ?
             (action.status === "done" || action.status === "error") :
-            true
+            true;
         }
       },
       run: (dispatch, getState, action) => {
@@ -1242,9 +1315,9 @@ function waitForDispatch(panel, type, eventRepeat = 1) {
   const actionType = panel.panelWin.constants[type];
   let count = 0;
 
-  return Task.spawn(function*() {
+  return Task.spawn(function* () {
     info("Waiting for " + type + " to dispatch " + eventRepeat + " time(s)");
-    while(count < eventRepeat) {
+    while (count < eventRepeat) {
       yield _afterDispatchDone(controller, actionType);
       count++;
       info(type + " dispatched " + count + " time(s)");

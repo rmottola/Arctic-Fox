@@ -16,11 +16,10 @@ MOZ_ARG_WITH_BOOL(system-icu,
 
 if test -n "$MOZ_SYSTEM_ICU"; then
     PKG_CHECK_MODULES(MOZ_ICU, icu-i18n >= 50.1)
-else
-    MOZ_ICU_INCLUDES="/intl/icu/source/common /intl/icu/source/i18n"
+    CFLAGS="$CFLAGS $MOZ_ICU_CFLAGS"
+    CXXFLAGS="$CXXFLAGS $MOZ_ICU_CFLAGS"
 fi
 
-AC_SUBST_LIST(MOZ_ICU_INCLUDES)
 AC_SUBST(MOZ_SYSTEM_ICU)
 
 MOZ_ARG_WITH_STRING(intl-api,
@@ -83,7 +82,10 @@ if test -n "$USE_ICU"; then
 
     dnl We won't build ICU data as a separate file when building
     dnl JS standalone so that embedders don't have to deal with it.
-    if test -z "$JS_STANDALONE" -a -z "$MOZ_SYSTEM_ICU"; then
+    dnl We also don't do it on Windows because sometimes the file goes
+    dnl missing -- possibly due to overzealous antivirus software? --
+    dnl which prevents the browser from starting up :(
+    if test -z "$JS_STANDALONE" -a -z "$MOZ_SYSTEM_ICU" -a "$OS_TARGET" != WINNT; then
         MOZ_ICU_DATA_ARCHIVE=1
     else
         MOZ_ICU_DATA_ARCHIVE=

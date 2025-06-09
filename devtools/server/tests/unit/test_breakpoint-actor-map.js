@@ -2,15 +2,13 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
+"use strict";
+
 // Test the functionality of the BreakpointActorMap object.
 
-const { BreakpointActorMap, ThreadActor } = require("devtools/server/actors/script");
+const { BreakpointActorMap } = require("devtools/server/actors/script");
 
-function run_test()
-{
-  Cu.import("resource://gre/modules/jsdebugger.jsm");
-  addDebuggerToGlobal(this);
-
+function run_test() {
   test_get_actor();
   test_set_actor();
   test_delete_actor();
@@ -21,11 +19,11 @@ function run_test()
 function test_get_actor() {
   let bpStore = new BreakpointActorMap();
   let location = {
-    originalSourceActor: { actor: 'actor1' },
+    originalSourceActor: { actor: "actor1" },
     originalLine: 3
   };
   let columnLocation = {
-    originalSourceActor: { actor: 'actor2' },
+    originalSourceActor: { actor: "actor2" },
     originalLine: 5,
     originalColumn: 15
   };
@@ -59,7 +57,7 @@ function test_set_actor() {
   // Breakpoint with column
   let bpStore = new BreakpointActorMap();
   let location = {
-    originalSourceActor: { actor: 'actor1' },
+    originalSourceActor: { actor: "actor1" },
     originalLine: 10,
     originalColumn: 9
   };
@@ -69,7 +67,7 @@ function test_set_actor() {
 
   // Breakpoint without column (whole line breakpoint)
   location = {
-    originalSourceActor: { actor: 'actor2' },
+    originalSourceActor: { actor: "actor2" },
     originalLine: 103
   };
   bpStore.setActor(location, {});
@@ -81,7 +79,7 @@ function test_delete_actor() {
   // Breakpoint with column
   let bpStore = new BreakpointActorMap();
   let location = {
-    originalSourceActor: { actor: 'actor1' },
+    originalSourceActor: { actor: "actor1" },
     originalLine: 10,
     originalColumn: 9
   };
@@ -92,7 +90,7 @@ function test_delete_actor() {
 
   // Breakpoint without column (whole line breakpoint)
   location = {
-    originalSourceActor: { actor: 'actor2' },
+    originalSourceActor: { actor: "actor2" },
     originalLine: 103
   };
   bpStore.setActor(location, {});
@@ -130,7 +128,7 @@ function test_find_actors() {
 
   // Breakpoints by URL
 
-  bpSet = new Set(bps.filter(bp => { return bp.originalSourceActor.actorID === "actor1" }));
+  bpSet = new Set(bps.filter(bp => { return bp.originalSourceActor.actorID === "actor1"; }));
   for (let bp of bpStore.findActors({ originalSourceActor: { actorID: "actor1" } })) {
     bpSet.delete(bp);
   }

@@ -3,11 +3,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const Services = require("Services");
-const { Ci } = require("chrome");
 require("devtools/shared/fronts/styles");
 require("devtools/shared/fronts/highlighters");
-const { ShortLongString } = require("devtools/server/actors/string");
+const { SimpleStringFront } = require("devtools/shared/fronts/string");
 const {
   Front,
   FrontClassWithSpec,
@@ -15,7 +13,6 @@ const {
   preEvent,
   types
 } = require("devtools/shared/protocol.js");
-const { makeInfallible } = require("devtools/shared/DevToolsUtils");
 const {
   inspectorSpec,
   nodeSpec,
@@ -23,10 +20,12 @@ const {
   walkerSpec
 } = require("devtools/shared/specs/inspector");
 const promise = require("promise");
-const { Task } = require("resource://gre/modules/Task.jsm");
+const defer = require("devtools/shared/defer");
+const { Task } = require("devtools/shared/task");
 const { Class } = require("sdk/core/heritage");
 const events = require("sdk/event/core");
 const object = require("sdk/util/object");
+const nodeConstants = require("devtools/shared/dom-node-constants.js");
 
 const HIDDEN_CLASS = "__fx-devtools-hide-shortcut__";
 
@@ -71,15 +70,6 @@ const AttributeModificationList = Class({
   }
 });
 
-// A resolve that hits the main loop first.
-function delayedResolve(value) {
-  let deferred = promise.defer();
-  Services.tm.mainThread.dispatch(makeInfallible(() => {
-    deferred.resolve(value);
-  }), 0);
-  return deferred.promise;
-}
-
 /**
  * Client side of the node actor.
  *
@@ -122,6 +112,14 @@ const NodeFront = FrontClassWithSpec(nodeSpec, {
       this.actorID = form;
       return;
     }
+
+    // backward-compatibility: shortValue indicates we are connected to old server
+    if (form.shortValue) {
+      // If the value is not complete, set nodeValue to null, it will be fetched
+      // when calling getNodeValue()
+      form.nodeValue = form.incompleteValue ? null : form.shortValue;
+    }
+
     // Shallow copy of the form.  We could just store a reference, but
     // eventually we'll want to update some of the data.
     this._form = object.merge(form);
@@ -135,11 +133,11 @@ const NodeFront = FrontClassWithSpec(nodeSpec, {
       this.reparent(parentNodeFront);
     }
 
-    if (form.singleTextChild) {
-      this.singleTextChild =
-        types.getType("domnode").read(form.singleTextChild, ctx);
+    if (form.inlineTextChild) {
+      this.inlineTextChild =
+        types.getType("domnode").read(form.inlineTextChild, ctx);
     } else {
-      this.singleTextChild = undefined;
+      this.inlineTextChild = undefined;
     }
   },
 
@@ -186,8 +184,7 @@ const NodeFront = FrontClassWithSpec(nodeSpec, {
         });
       }
     } else if (change.type === "characterData") {
-      this._form.shortValue = change.newValue;
-      this._form.incompleteValue = change.incompleteValue;
+      this._form.nodeValue = change.newValue;
     } else if (change.type === "pseudoClassLock") {
       this._form.pseudoClassLocks = change.pseudoClassLocks;
     } else if (change.type === "events") {
@@ -209,6 +206,12 @@ const NodeFront = FrontClassWithSpec(nodeSpec, {
   },
   get nodeName() {
     return this._form.nodeName;
+  },
+  get displayName() {
+    let {displayName, nodeName} = this._form;
+
+    // Keep `nodeName.toLowerCase()` for backward compatibility
+    return displayName || nodeName.toLowerCase();
   },
   get doctypeString() {
     return "<!DOCTYPE " + this._form.name +
@@ -251,13 +254,7 @@ const NodeFront = FrontClassWithSpec(nodeSpec, {
     return this._form.isInHTMLDocument;
   },
   get tagName() {
-    return this.nodeType === Ci.nsIDOMNode.ELEMENT_NODE ? this.nodeName : null;
-  },
-  get shortValue() {
-    return this._form.shortValue;
-  },
-  get incompleteValue() {
-    return !!this._form.incompleteValue;
+    return this.nodeType === nodeConstants.ELEMENT_NODE ? this.nodeName : null;
   },
 
   get isDocumentElement() {
@@ -318,11 +315,14 @@ const NodeFront = FrontClassWithSpec(nodeSpec, {
   },
 
   getNodeValue: custom(function () {
-    if (!this.incompleteValue) {
-      return delayedResolve(new ShortLongString(this.shortValue));
+    // backward-compatibility: if nodevalue is null and shortValue is defined, the actual
+    // value of the node needs to be fetched on the server.
+    if (this._form.nodeValue === null && this._form.shortValue) {
+      return this._getNodeValue();
     }
 
-    return this._getNodeValue();
+    let str = this._form.nodeValue || "";
+    return promise.resolve(new SimpleStringFront(str));
   }, {
     impl: "_getNodeValue"
   }),
@@ -424,11 +424,12 @@ const NodeFront = FrontClassWithSpec(nodeSpec, {
    * protocol.  If you depend on this you're likely to break soon.
    */
   rawNode: function (rawNode) {
-    if (!this.conn._transport._serverConnection) {
+    if (!this.isLocalToBeDeprecated()) {
       console.warn("Tried to use rawNode on a remote connection.");
       return null;
     }
-    let actor = this.conn._transport._serverConnection.getActor(this.actorID);
+    const { DebuggerServer } = require("devtools/server/main");
+    let actor = DebuggerServer._searchAllConnectionsForActor(this.actorID);
     if (!actor) {
       // Can happen if we try to get the raw node for an already-expired
       // actor.
@@ -532,7 +533,7 @@ const WalkerFront = FrontClassWithSpec(walkerSpec, {
    * on resolution.
    */
   _createRootNodePromise: function () {
-    this._rootNodeDeferred = promise.defer();
+    this._rootNodeDeferred = defer();
     this._rootNodeDeferred.promise.then(() => {
       events.emit(this, "new-root");
     });
@@ -800,13 +801,6 @@ const WalkerFront = FrontClassWithSpec(walkerSpec, {
             addedFronts.push(addedFront);
           }
 
-          if (change.singleTextChild) {
-            targetFront.singleTextChild =
-              types.getType("domnode").read(change.singleTextChild, this);
-          } else {
-            targetFront.singleTextChild = undefined;
-          }
-
           // Before passing to users, replace the added and removed actor
           // ids with front in the mutation record.
           emittedMutation.added = addedFronts;
@@ -823,7 +817,7 @@ const WalkerFront = FrontClassWithSpec(walkerSpec, {
           // document children, because we should have gotten a documentUnload
           // first.
           for (let child of targetFront.treeChildren()) {
-            if (child.nodeType === Ci.nsIDOMNode.DOCUMENT_NODE) {
+            if (child.nodeType === nodeConstants.DOCUMENT_NODE) {
               console.trace("Got an unexpected frameLoad in the inspector, " +
                 "please file a bug on bugzilla.mozilla.org!");
             }
@@ -850,6 +844,19 @@ const WalkerFront = FrontClassWithSpec(walkerSpec, {
           }
         } else {
           targetFront.updateMutation(change);
+        }
+
+        // Update the inlineTextChild property of the target for a selected list of
+        // mutation types.
+        if (change.type === "inlineTextChild" ||
+            change.type === "childList" ||
+            change.type === "nativeAnonymousChildList") {
+          if (change.inlineTextChild) {
+            targetFront.inlineTextChild =
+              types.getType("domnode").read(change.inlineTextChild, this);
+          } else {
+            targetFront.inlineTextChild = undefined;
+          }
         }
 
         emitMutations.push(emittedMutation);
@@ -889,8 +896,8 @@ const WalkerFront = FrontClassWithSpec(walkerSpec, {
       console.warn("Tried to use frontForRawNode on a remote connection.");
       return null;
     }
-    let walkerActor = this.conn._transport._serverConnection
-      .getActor(this.actorID);
+    const { DebuggerServer } = require("devtools/server/main");
+    let walkerActor = DebuggerServer._searchAllConnectionsForActor(this.actorID);
     if (!walkerActor) {
       throw Error("Could not find client side for actor " + this.actorID);
     }
@@ -910,7 +917,7 @@ const WalkerFront = FrontClassWithSpec(walkerSpec, {
       // Imported an already-orphaned node.
       this._orphaned.add(top);
       walkerActor._orphaned
-        .add(this.conn._transport._serverConnection.getActor(top.actorID));
+        .add(DebuggerServer._searchAllConnectionsForActor(top.actorID));
     }
     return returnNode;
   },

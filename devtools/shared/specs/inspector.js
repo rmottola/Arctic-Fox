@@ -10,62 +10,9 @@ const {
   generateActorSpec,
   types
 } = require("devtools/shared/protocol");
+const { nodeSpec } = require("devtools/shared/specs/node");
 require("devtools/shared/specs/styles");
 require("devtools/shared/specs/highlighters");
-
-types.addDictType("imageData", {
-  // The image data
-  data: "nullable:longstring",
-  // The original image dimensions
-  size: "json"
-});
-
-const nodeSpec = generateActorSpec({
-  typeName: "domnode",
-
-  methods: {
-    getNodeValue: {
-      request: {},
-      response: {
-        value: RetVal("longstring")
-      }
-    },
-    setNodeValue: {
-      request: { value: Arg(0) },
-      response: {}
-    },
-    getUniqueSelector: {
-      request: {},
-      response: {
-        value: RetVal("string")
-      }
-    },
-    scrollIntoView: {
-      request: {},
-      response: {}
-    },
-    getImageData: {
-      request: {maxDim: Arg(0, "nullable:number")},
-      response: RetVal("imageData")
-    },
-    getEventListenerInfo: {
-      request: {},
-      response: {
-        events: RetVal("json")
-      }
-    },
-    modifyAttributes: {
-      request: {
-        modifications: Arg(0, "array:json")
-      },
-      response: {}
-    },
-    getFontFamilyDataURL: {
-      request: {font: Arg(0, "string"), fillStyle: Arg(1, "nullable:string")},
-      response: RetVal("imageData")
-    }
-  }
-});
 
 exports.nodeSpec = nodeSpec;
 
@@ -424,6 +371,16 @@ exports.walkerSpec = walkerSpec;
 const inspectorSpec = generateActorSpec({
   typeName: "inspector",
 
+  events: {
+    "color-picked": {
+      type: "colorPicked",
+      color: Arg(0, "string")
+    },
+    "color-pick-canceled": {
+      type: "colorPickCanceled"
+    }
+  },
+
   methods: {
     getWalker: {
       request: {
@@ -462,6 +419,14 @@ const inspectorSpec = generateActorSpec({
     resolveRelativeURL: {
       request: {url: Arg(0, "string"), node: Arg(1, "nullable:domnode")},
       response: {value: RetVal("string")}
+    },
+    pickColorFromPage: {
+      request: {options: Arg(0, "nullable:json")},
+      response: {}
+    },
+    cancelPickColorFromPage: {
+      request: {},
+      response: {}
     }
   }
 });

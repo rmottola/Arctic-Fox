@@ -1004,7 +1004,8 @@ public:
 
   virtual already_AddRefed<Element> CreateElem(const nsAString& aName,
                                                nsIAtom* aPrefix,
-                                               int32_t aNamespaceID) override;
+                                               int32_t aNamespaceID,
+                                               nsAString* aIs = nullptr) override;
 
   virtual void Sanitize() override;
 
@@ -1268,8 +1269,6 @@ public:
   Element* GetFullscreenElement() override;
 
   void RequestPointerLock(Element* aElement) override;
-  bool ShouldLockPointer(Element* aElement, Element* aCurrentLock,
-                         bool aNoFocusCheck = false);
   bool SetPointerLock(Element* aElement, int aCursorStyle);
   static void UnlockPointer(nsIDocument* aDoc = nullptr);
 
@@ -1334,14 +1333,12 @@ public:
   virtual void GetLastStyleSheetSet(nsString& aSheetSet) override;
   virtual mozilla::dom::DOMStringList* StyleSheetSets() override;
   virtual void EnableStyleSheetsForSet(const nsAString& aSheetSet) override;
-  using nsIDocument::CreateElement;
-  using nsIDocument::CreateElementNS;
   virtual already_AddRefed<Element> CreateElement(const nsAString& aTagName,
-                                                  const nsAString& aTypeExtension,
-                                                  mozilla::ErrorResult& rv) override;
+                                                  const mozilla::dom::ElementCreationOptions& aOptions,
+                                                  ErrorResult& rv) override;
   virtual already_AddRefed<Element> CreateElementNS(const nsAString& aNamespaceURI,
                                                     const nsAString& aQualifiedName,
-                                                    const nsAString& aTypeExtension,
+                                                    const mozilla::dom::ElementCreationOptions& aOptions,
                                                     mozilla::ErrorResult& rv) override;
   virtual void UseRegistryFromDocument(nsIDocument* aDocument) override;
 
@@ -1485,6 +1482,10 @@ public:
 
   js::ExpandoAndGeneration mExpandoAndGeneration;
 
+#ifdef MOZ_EME
+  bool ContainsEMEContent();
+#endif
+
   bool ContainsMSEContent();
 
 protected:
@@ -1584,6 +1585,27 @@ private:
 
   static bool CustomElementConstructor(JSContext* aCx, unsigned aArgc, JS::Value* aVp);
 
+  /**
+   * Looking up a custom element definition.
+   * https://html.spec.whatwg.org/#look-up-a-custom-element-definition
+   */
+  mozilla::dom::CustomElementDefinition* LookupCustomElementDefinition(
+    const nsAString& aLocalName, uint32_t aNameSpaceID, const nsAString* aIs);
+
+  /**
+   * Check if the passed custom element name, aOptions.mIs, is a registered
+   * custom element type or not, then return the custom element name for future
+   * usage.
+   *
+   * If there is no existing custom element definition for this name, throw a
+   * NotFoundError.
+   */
+  nsString* CheckCustomElementName(
+    const mozilla::dom::ElementCreationOptions& aOptions,
+    const nsAString& aLocalName,
+    uint32_t aNamespaceID,
+    ErrorResult& rv);
+
 public:
   // Enqueue created callback or register upgrade candidate for
   // newly created custom elements, possibly extending an existing type.
@@ -1647,11 +1669,7 @@ public:
   // terminated instead of letting it finish at its own pace.
   bool mParserAborted:1;
 
-  friend class nsPointerLockPermissionRequest;
   friend class nsCallRequestFullScreen;
-  // When set, trying to lock the pointer doesn't require permission from the
-  // user.
-  bool mAllowRelocking:1;
 
   // ScreenOrientation "pending promise" as described by
   // http://www.w3.org/TR/screen-orientation/
@@ -1669,10 +1687,6 @@ public:
   // Keeps track of whether we have a pending
   // 'style-sheet-applicable-state-changed' notification.
   bool mSSApplicableStateNotificationPending:1;
-
-  // The number of pointer lock requests which are cancelled by the user.
-  // The value is saturated to kPointerLockRequestLimit+1 = 3.
-  uint8_t mCancelledPointerLockRequests:2;
 
   // Whether we have reported use counters for this document with Telemetry yet.
   // Normally this is only done at document destruction time, but for image

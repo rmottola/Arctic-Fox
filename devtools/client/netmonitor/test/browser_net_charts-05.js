@@ -30,10 +30,6 @@ function test() {
       totals: {
         size: value => "Hello " + L10N.numberWithDecimals(value, 2),
         label: value => "World " + L10N.numberWithDecimals(value, 2)
-      },
-      header: {
-        label1: "",
-        label2: ""
       }
     });
 
@@ -55,12 +51,12 @@ function test() {
     ok(node.querySelector(".table-chart-container"),
       "A table chart was created successfully.");
 
-    is(rows.length, 4,
-      "There should be 3 pie chart slices and 1 header created.");
-    is(rows.length, 4,
-      "There should be 3 table chart rows and 1 header created.");
+    is(rows.length, 3,
+      "There should be 3 pie chart slices created.");
+    is(rows.length, 3,
+      "There should be 3 table chart rows created.");
     is(sums.length, 2,
-      "There should be 2 total summaries and 1 header created.");
+      "There should be 2 total summaries created.");
 
     teardown(aMonitor).then(finish);
   });

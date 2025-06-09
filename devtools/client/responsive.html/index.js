@@ -13,7 +13,7 @@ const { require } = BrowserLoader({
   baseURI: "resource://devtools/client/responsive.html/",
   window: this
 });
-const { GetDevices } = require("devtools/client/shared/devices");
+const { Task } = require("devtools/shared/task");
 const Telemetry = require("devtools/client/shared/telemetry");
 const { loadSheet } = require("sdk/stylesheet/utils");
 
@@ -22,11 +22,12 @@ const { createFactory, createElement } =
 const ReactDOM = require("devtools/client/shared/vendor/react-dom");
 const { Provider } = require("devtools/client/shared/vendor/react-redux");
 
+const message = require("./utils/message");
 const App = createFactory(require("./app"));
 const Store = require("./store");
-const { addDevice, addDeviceType } = require("./actions/devices");
 const { changeLocation } = require("./actions/location");
 const { addViewport, resizeViewport } = require("./actions/viewports");
+const { loadDevices } = require("./actions/devices");
 
 let bootstrap = {
 
@@ -34,7 +35,7 @@ let bootstrap = {
 
   store: null,
 
-  init() {
+  init: Task.async(function* () {
     // Load a special UA stylesheet to reset certain styles such as dropdown
     // lists.
     loadSheet(window,
@@ -42,11 +43,11 @@ let bootstrap = {
               "agent");
     this.telemetry.toolOpened("responsive");
     let store = this.store = Store();
+    this.dispatch(loadDevices());
     let provider = createElement(Provider, { store }, App());
     ReactDOM.render(provider, document.querySelector("#root"));
-    this.initDevices();
-    window.postMessage({ type: "init" }, "*");
-  },
+    message.post(window, "init:done");
+  }),
 
   destroy() {
     this.store = null;
@@ -69,25 +70,10 @@ let bootstrap = {
     this.store.dispatch(action);
   },
 
-  initDevices() {
-    GetDevices().then(devices => {
-      for (let type of devices.TYPES) {
-        this.dispatch(addDeviceType(type));
-        for (let device of devices[type]) {
-          if (device.os != "fxos") {
-            this.dispatch(addDevice(device, type));
-          }
-        }
-      }
-    });
-  },
-
 };
 
-window.addEventListener("load", function onLoad() {
-  window.removeEventListener("load", onLoad);
-  bootstrap.init();
-});
+// manager.js sends a message to signal init
+message.wait(window, "init").then(() => bootstrap.init());
 
 window.addEventListener("unload", function onUnload() {
   window.removeEventListener("unload", onUnload);
@@ -135,11 +121,21 @@ window.setViewportSize = (width, height) => {
 };
 
 /**
- * Called by manager.js when tests want to use the viewport's message manager.
- * It is packed into an object because this is the format most easily usable
- * with ContentTask.spawn().
+ * Called by manager.js to access the viewport's browser, either for testing
+ * purposes or to reload it when touch simulation is enabled.
+ * A messageManager getter is added on the object to provide an easy access
+ * to the message manager without pulling the frame loader.
  */
-window.getViewportMessageManager = () => {
-  let { messageManager } = document.querySelector("iframe.browser").frameLoader;
-  return { messageManager };
+window.getViewportBrowser = () => {
+  let browser = document.querySelector("iframe.browser");
+  if (!browser.messageManager) {
+    Object.defineProperty(browser, "messageManager", {
+      get() {
+        return this.frameLoader.messageManager;
+      },
+      configurable: true,
+      enumerable: true,
+    });
+  }
+  return browser;
 };

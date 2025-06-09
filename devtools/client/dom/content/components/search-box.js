@@ -21,11 +21,11 @@ const PropTypes = React.PropTypes;
  * top right corner of the application.
  */
 var SearchBox = React.createClass({
+  displayName: "SearchBox",
+
   propTypes: {
     onSearch: PropTypes.func,
   },
-
-  displayName: "SearchBox",
 
   componentWillUnmount: function () {
     // Clean up an existing timeout.
@@ -53,7 +53,7 @@ var SearchBox = React.createClass({
   render: function () {
     return (
       input({
-        className: "searchBox",
+        className: "dom-searchbox devtools-filterinput",
         placeholder: l10n.getStr("dom.filterDOMPanel"),
         onChange: this.onSearch
       })

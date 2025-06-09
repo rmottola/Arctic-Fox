@@ -91,8 +91,8 @@ td {
   float: right;
   margin-top: 2em;
   margin-bottom: 20px;
-  -moz-margin-start: 20px;
-  -moz-margin-end: 0;
+  margin-inline-start: 20px;
+  margin-inline-end: 0;
   padding: 16px;
   width: 30%;
 }
@@ -107,7 +107,7 @@ td {
   display: none;
 }
 
-#action-box:-moz-dir(rtl) {
+#action-box:dir(rtl) {
   float: left;
 }
 

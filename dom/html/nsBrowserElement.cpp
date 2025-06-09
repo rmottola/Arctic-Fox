@@ -261,11 +261,15 @@ nsBrowserElement::Download(const nsAString& aUrl,
   nsCOMPtr<nsIXPConnectWrappedJS> wrappedObj = do_QueryInterface(mBrowserElementAPI);
   MOZ_ASSERT(wrappedObj, "Failed to get wrapped JS from XPCOM component.");
   AutoJSAPI jsapi;
-  jsapi.Init(wrappedObj->GetJSObject());
+  if (!jsapi.Init(wrappedObj->GetJSObject())) {
+    aRv.Throw(NS_ERROR_UNEXPECTED);
+    return nullptr;
+  }
   JSContext* cx = jsapi.cx();
   JS::Rooted<JS::Value> options(cx);
+  aRv.MightThrowJSException();
   if (!ToJSValue(cx, aOptions, &options)) {
-    aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    aRv.StealExceptionFromJSContext(cx);
     return nullptr;
   }
   nsresult rv = mBrowserElementAPI->Download(aUrl, options, getter_AddRefs(req));
@@ -713,11 +717,15 @@ nsBrowserElement::ExecuteScript(const nsAString& aScript,
   nsCOMPtr<nsIXPConnectWrappedJS> wrappedObj = do_QueryInterface(mBrowserElementAPI);
   MOZ_ASSERT(wrappedObj, "Failed to get wrapped JS from XPCOM component.");
   AutoJSAPI jsapi;
-  jsapi.Init(wrappedObj->GetJSObject());
+  if (!jsapi.Init(wrappedObj->GetJSObject())) {
+    aRv.Throw(NS_ERROR_UNEXPECTED);
+    return nullptr;
+  }
   JSContext* cx = jsapi.cx();
   JS::Rooted<JS::Value> options(cx);
+  aRv.MightThrowJSException();
   if (!ToJSValue(cx, aOptions, &options)) {
-    aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
+    aRv.StealExceptionFromJSContext(cx);
     return nullptr;
   }
 

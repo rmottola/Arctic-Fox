@@ -9,30 +9,22 @@ const promise = require("promise");
 const protocol = require("devtools/shared/protocol");
 const {LongStringActor} = require("devtools/server/actors/string");
 const {getDefinedGeometryProperties} = require("devtools/server/actors/highlighters/geometry-editor");
-const {parseDeclarations} = require("devtools/client/shared/css-parsing-utils");
-const {Task} = require("resource://gre/modules/Task.jsm");
+const {parseDeclarations} = require("devtools/shared/css-parsing-utils");
+const {isCssPropertyKnown} = require("devtools/server/actors/css-properties");
+const {Task} = require("devtools/shared/task");
 const events = require("sdk/event/core");
 
 // This will also add the "stylesheet" actor type for protocol.js to recognize
 const {UPDATE_PRESERVING_RULES, UPDATE_GENERAL} = require("devtools/server/actors/stylesheets");
-const {pageStyleSpec, styleRuleSpec} = require("devtools/shared/specs/styles");
+const {pageStyleSpec, styleRuleSpec, ELEMENT_STYLE} = require("devtools/shared/specs/styles");
 
 loader.lazyRequireGetter(this, "CSS", "CSS");
-loader.lazyGetter(this, "CssLogic", () => require("devtools/shared/inspector/css-logic").CssLogic);
+loader.lazyGetter(this, "CssLogic", () => require("devtools/server/css-logic").CssLogic);
+loader.lazyGetter(this, "SharedCssLogic", () => require("devtools/shared/inspector/css-logic"));
 loader.lazyGetter(this, "DOMUtils", () => Cc["@mozilla.org/inspector/dom-utils;1"].getService(Ci.inIDOMUtils));
 
-// The PageStyle actor flattens the DOM CSS objects a little bit, merging
-// Rules and their Styles into one actor.  For elements (which have a style
-// but no associated rule) we fake a rule with the following style id.
-const ELEMENT_STYLE = 100;
-exports.ELEMENT_STYLE = ELEMENT_STYLE;
-
-// When gathering rules to read for pseudo elements, we will skip
-// :before and :after, which are handled as a special case.
-loader.lazyGetter(this, "PSEUDO_ELEMENTS_TO_READ", () => {
-  return DOMUtils.getCSSPseudoElementNames().filter(pseudo => {
-    return pseudo !== ":before" && pseudo !== ":after";
-  });
+loader.lazyGetter(this, "PSEUDO_ELEMENTS", () => {
+  return DOMUtils.getCSSPseudoElementNames();
 });
 
 const XHTML_NS = "http://www.w3.org/1999/xhtml";
@@ -65,7 +57,7 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
                    "creating a PageStyleActor.");
     }
     this.walker = inspector.walker;
-    this.cssLogic = new CssLogic();
+    this.cssLogic = new CssLogic(DOMUtils.isInheritedProperty);
 
     // Stores the association of DOM objects -> actors
     this.refMap = new Map();
@@ -74,7 +66,10 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
     this.styleElements = new WeakMap();
 
     this.onFrameUnload = this.onFrameUnload.bind(this);
+    this.onStyleSheetAdded = this.onStyleSheetAdded.bind(this);
+
     events.on(this.inspector.tabActor, "will-navigate", this.onFrameUnload);
+    events.on(this.inspector.tabActor, "stylesheet-added", this.onStyleSheetAdded);
 
     this._styleApplied = this._styleApplied.bind(this);
     this._watchedSheets = new Set();
@@ -86,6 +81,7 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
     }
     protocol.Actor.prototype.destroy.call(this);
     events.off(this.inspector.tabActor, "will-navigate", this.onFrameUnload);
+    events.off(this.inspector.tabActor, "stylesheet-added", this.onStyleSheetAdded);
     this.inspector = null;
     this.walker = null;
     this.refMap = null;
@@ -173,10 +169,6 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
   _sheetRef: function (sheet) {
     let tabActor = this.inspector.tabActor;
     let actor = tabActor.createStyleSheetActor(sheet);
-    if (!this._watchedSheets.has(actor)) {
-      this._watchedSheets.add(actor);
-      actor.on("style-applied", this._styleApplied);
-    }
     return actor;
   },
 
@@ -207,7 +199,7 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
   getComputed: function (node, options) {
     let ret = Object.create(null);
 
-    this.cssLogic.sourceFilter = options.filter || CssLogic.FILTER.UA;
+    this.cssLogic.sourceFilter = options.filter || SharedCssLogic.FILTER.UA;
     this.cssLogic.highlight(node.rawNode);
     let computed = this.cssLogic.computedStyle || [];
 
@@ -385,7 +377,7 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
    *  }
    */
   getMatchedSelectors: function (node, property, options) {
-    this.cssLogic.sourceFilter = options.filter || CssLogic.FILTER.UA;
+    this.cssLogic.sourceFilter = options.filter || SharedCssLogic.FILTER.UA;
     this.cssLogic.highlight(node.rawNode);
 
     let rules = new Set();
@@ -545,10 +537,9 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
           rules.push(oneRule);
         });
 
-    // Now any pseudos (except for ::before / ::after, which was handled as
-    // a 'normal rule' above.
+    // Now any pseudos.
     if (showElementStyles) {
-      for (let readPseudo of PSEUDO_ELEMENTS_TO_READ) {
+      for (let readPseudo of PSEUDO_ELEMENTS) {
         this._getElementRules(bindingElement, readPseudo, inherited, options)
             .forEach(oneRule => {
               rules.push(oneRule);
@@ -582,9 +573,9 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
     for (let i = domRules.Count() - 1; i >= 0; i--) {
       let domRule = domRules.GetElementAt(i);
 
-      let isSystem = !CssLogic.isContentStylesheet(domRule.parentStyleSheet);
+      let isSystem = !SharedCssLogic.isContentStylesheet(domRule.parentStyleSheet);
 
-      if (isSystem && options.filter != CssLogic.FILTER.UA) {
+      if (isSystem && options.filter != SharedCssLogic.FILTER.UA) {
         continue;
       }
 
@@ -837,6 +828,18 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
   },
 
   /**
+   * When a stylesheet is added, handle the related StyleSheetActor to listen for changes.
+   * @param  {StyleSheetActor} actor
+   *         The actor for the added stylesheet.
+   */
+  onStyleSheetAdded: function (actor) {
+    if (!this._watchedSheets.has(actor)) {
+      this._watchedSheets.add(actor);
+      actor.on("style-applied", this._styleApplied);
+    }
+  },
+
+  /**
    * Helper function to addNewRule to get or create a style tag in the provided
    * document.
    *
@@ -892,7 +895,7 @@ var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
     } else if (classes.length > 0) {
       selector = "." + classes.map(c => CSS.escape(c)).join(".");
     } else {
-      selector = rawNode.tagName.toLowerCase();
+      selector = rawNode.localName;
     }
 
     if (pseudoClasses && pseudoClasses.length > 0) {
@@ -1093,8 +1096,9 @@ var StyleRuleActor = protocol.ActorClassWithSpec(styleRuleSpec, {
     // and so that we can safely determine if a declaration is valid rather than
     // have the client guess it.
     if (form.authoredText || form.cssText) {
-      let declarations = parseDeclarations(form.authoredText ||
-                                           form.cssText, true);
+      let declarations = parseDeclarations(isCssPropertyKnown,
+                                           form.authoredText || form.cssText,
+                                           true);
       form.declarations = declarations.map(decl => {
         decl.isValid = DOMUtils.cssPropertyIsValid(decl.name, decl.value);
         return decl;
@@ -1465,13 +1469,15 @@ var StyleRuleActor = protocol.ActorClassWithSpec(styleRuleSpec, {
       if (newCssRule) {
         let ruleEntry = this.pageStyle.findEntryMatchingRule(node, newCssRule);
         if (ruleEntry.length === 1) {
-          isMatching = true;
           ruleProps =
             this.pageStyle.getAppliedProps(node, ruleEntry,
                                            { matchedSelectors: true });
         } else {
           ruleProps = this.pageStyle.getNewAppliedProps(node, newCssRule);
         }
+
+        isMatching = ruleProps.entries.some((ruleProp) =>
+          ruleProp.matchedSelectors.length > 0);
       }
 
       return { ruleProps, isMatching };
@@ -1601,6 +1607,13 @@ function getRuleText(initialText, line, column) {
   if (startOffset === undefined) {
     return {offset: 0, text: ""};
   }
+  // If the input didn't have any tokens between the braces (e.g.,
+  // "div {}"), then the endOffset won't have been set yet; so account
+  // for that here.
+  if (endOffset === undefined) {
+    endOffset = startOffset;
+  }
+
   // Note that this approach will preserve comments, despite the fact
   // that cssTokenizer skips them.
   return {offset: textOffset + startOffset,

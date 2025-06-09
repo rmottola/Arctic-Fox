@@ -8,13 +8,18 @@ html {
   font-weight: 400;
 }
 
-.panel-item, label, #project-panel-projects, #runtime-panel-projects {
+label,
+.panel-item,
+#project-panel-projects,
+#runtime-panel-projects {
   display: block;
   float: left;
-  width: auto;
+  width: 100%;
+  text-align: left;
 }
 
-.project-image, .panel-item span {
+.project-image,
+.panel-item span {
   display: inline-block;
   float: left;
   line-height: 20px;
@@ -29,9 +34,8 @@ html {
   color: #ACACAC;
   text-transform: uppercase;
   line-height: 200%;
-  margin: 5px 0;
-  font-size: 100%;
-  font-weight: bold;
+  margin: 5px 5px 0 5px;
+  font-weight: 700;
   width: 100%;
 }
 

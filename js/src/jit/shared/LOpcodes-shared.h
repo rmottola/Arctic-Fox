@@ -67,6 +67,7 @@
     _(NewArray)                     \
     _(NewArrayCopyOnWrite)          \
     _(NewArrayDynamicLength)        \
+    _(NewTypedArray)                \
     _(ArraySplice)                  \
     _(NewObject)                    \
     _(NewTypedObject)               \
@@ -388,11 +389,11 @@
     _(WasmLoadI64)                  \
     _(WasmStore)                    \
     _(WasmBoundsCheck)              \
+    _(WasmLoadGlobalVar)            \
+    _(WasmStoreGlobalVar)           \
     _(AsmJSLoadHeap)                \
     _(AsmJSStoreHeap)               \
     _(AsmJSLoadFuncPtr)             \
-    _(AsmJSLoadGlobalVar)           \
-    _(AsmJSStoreGlobalVar)          \
     _(AsmJSLoadFFIFunc)             \
     _(AsmJSParameter)               \
     _(AsmJSReturn)                  \

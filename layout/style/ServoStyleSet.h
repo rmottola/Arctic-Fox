@@ -11,11 +11,12 @@
 #include "mozilla/EventStates.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/ServoBindingHelpers.h"
+#include "mozilla/ServoElementSnapshot.h"
 #include "mozilla/ServoStyleSheet.h"
 #include "mozilla/SheetType.h"
 #include "mozilla/UniquePtr.h"
-#include "nsChangeHint.h"
 #include "nsCSSPseudoElements.h"
+#include "nsChangeHint.h"
 #include "nsIAtom.h"
 #include "nsTArray.h"
 
@@ -24,6 +25,7 @@ namespace dom {
 class Element;
 } // namespace dom
 class CSSStyleSheet;
+class ServoRestyleManager;
 class ServoStyleSheet;
 } // namespace mozilla
 class nsIDocument;
@@ -39,6 +41,7 @@ namespace mozilla {
  */
 class ServoStyleSet
 {
+  friend class ServoRestyleManager;
 public:
   ServoStyleSet();
 
@@ -111,12 +114,23 @@ public:
   // Test if style is dependent on content state
   nsRestyleHint HasStateDependentStyle(dom::Element* aElement,
                                        EventStates aStateMask);
-  nsRestyleHint HasStateDependentStyle(dom::Element* aElement,
-                                       mozilla::CSSPseudoElementType aPseudoType,
-                                       dom::Element* aPseudoElement,
-                                       EventStates aStateMask);
+  nsRestyleHint HasStateDependentStyle(
+    dom::Element* aElement, mozilla::CSSPseudoElementType aPseudoType,
+    dom::Element* aPseudoElement, EventStates aStateMask);
 
-  void RestyleSubtree(nsINode* aNode);
+  /**
+   * Computes a restyle hint given a element and a previous element snapshot.
+   */
+  nsRestyleHint ComputeRestyleHint(dom::Element* aElement,
+                                   ServoElementSnapshot* aSnapshot);
+
+  /**
+   * Restyles a whole subtree of nodes.
+   *
+   * The aForce parameter propagates the dirty bits down the subtree, and when
+   * used aNode needs to be nsIContent.
+   */
+  void RestyleSubtree(nsINode* aNode, bool aForce);
 
 private:
   already_AddRefed<nsStyleContext> GetContext(already_AddRefed<ServoComputedValues>,

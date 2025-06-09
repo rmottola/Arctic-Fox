@@ -2,9 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 const Ci = Components.interfaces;
 const Cu = Components.utils;
-Cu.import("resource://gre/modules/Services.jsm");
+const { Services } = Cu.import("resource://gre/modules/Services.jsm", {});
+const { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+const nodeFilterConstants = require("devtools/shared/dom-node-filter-constants");
 
 this.EXPORTED_SYMBOLS = ["DOMHelpers"];
 
@@ -101,7 +105,7 @@ DOMHelpers.prototype = {
 
   getFirstChild: function Helpers_getFirstChild(node)
   {
-    let SHOW_ALL = Components.interfaces.nsIDOMNodeFilter.SHOW_ALL;
+    let SHOW_ALL = nodeFilterConstants.SHOW_ALL;
     this.treeWalker = node.ownerDocument.createTreeWalker(node,
       SHOW_ALL, null);
     return this.treeWalker.firstChild();
@@ -142,7 +146,7 @@ DOMHelpers.prototype = {
     let docShell = window.QueryInterface(Ci.nsIInterfaceRequestor)
                          .getInterface(Ci.nsIWebNavigation)
                          .QueryInterface(Ci.nsIDocShell);
-    let onReady = function(event) {
+    let onReady = function (event) {
       if (event.target == window.document) {
         docShell.chromeEventHandler.removeEventListener("DOMContentLoaded", onReady, false);
         // If in `callback` the URL of the window is changed and a listener to DOMContentLoaded
@@ -150,7 +154,7 @@ DOMHelpers.prototype = {
         // We want to avoid that so we execute the callback in the next queue.
         Services.tm.mainThread.dispatch(callback, 0);
       }
-    }
+    };
     if ((window.document.readyState == "complete" ||
          window.document.readyState == "interactive") &&
          window.location.href == targetURL) {

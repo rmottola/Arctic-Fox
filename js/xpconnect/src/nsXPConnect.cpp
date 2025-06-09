@@ -31,8 +31,8 @@
 #include "nsIObjectInputStream.h"
 #include "nsIObjectOutputStream.h"
 #include "nsScriptSecurityManager.h"
+#include "nsIPermissionManager.h"
 #include "nsContentUtils.h"
-
 #include "jsfriendapi.h"
 
 using namespace mozilla;
@@ -437,20 +437,16 @@ InitGlobalObjectOptions(JS::CompartmentOptions& aOptions,
     if (isSystem) {
         // Make sure [SecureContext] APIs are visible:
         aOptions.creationOptions().setSecureContext(true);
-    }
 
-    short status = aPrincipal->GetAppStatus();
-
-    // Enable the ECMA-402 experimental formatToParts in certified apps.
-    if (status == nsIPrincipal::APP_STATUS_CERTIFIED) {
+#if 0 // TODO: Reenable in Bug 1288653
+        // Enable the ECMA-402 experimental formatToParts in any chrome page
         aOptions.creationOptions()
                 .setExperimentalDateTimeFormatFormatToPartsEnabled(true);
+#endif
     }
 
     if (shouldDiscardSystemSource) {
-        bool discardSource = isSystem ||
-                             (status == nsIPrincipal::APP_STATUS_PRIVILEGED ||
-                              status == nsIPrincipal::APP_STATUS_CERTIFIED);
+        bool discardSource = isSystem;
 
         aOptions.behaviors().setDiscardSource(discardSource);
     }
@@ -1274,7 +1270,8 @@ SetAddonInterposition(const nsACString& addonIdStr, nsIAddonInterposition* inter
     // We enter the junk scope just to allocate a string, which actually will go
     // in the system zone.
     AutoJSAPI jsapi;
-    jsapi.Init(xpc::PrivilegedJunkScope());
+    if (!jsapi.Init(xpc::PrivilegedJunkScope()))
+        return false;
     addonId = NewAddonId(jsapi.cx(), addonIdStr);
     if (!addonId)
         return false;
@@ -1288,7 +1285,8 @@ AllowCPOWsInAddon(const nsACString& addonIdStr, bool allow)
     // We enter the junk scope just to allocate a string, which actually will go
     // in the system zone.
     AutoJSAPI jsapi;
-    jsapi.Init(xpc::PrivilegedJunkScope());
+    if (!jsapi.Init(xpc::PrivilegedJunkScope()))
+        return false;
     addonId = NewAddonId(jsapi.cx(), addonIdStr);
     if (!addonId)
         return false;
@@ -1313,6 +1311,19 @@ IsChromeOrXBL(JSContext* cx, JSObject* /* unused */)
     // and instead rely on the fact that AllowContentXBLScope() only returns false in
     // remote XUL situations.
     return AccessCheck::isChrome(c) || IsContentXBLScope(c) || !AllowContentXBLScope(c);
+}
+
+namespace workers {
+extern bool IsCurrentThreadRunningChromeWorker();
+} // namespace workers
+
+bool
+ThreadSafeIsChromeOrXBL(JSContext* cx, JSObject* obj)
+{
+    if (NS_IsMainThread()) {
+        return IsChromeOrXBL(cx, obj);
+    }
+    return workers::IsCurrentThreadRunningChromeWorker();
 }
 
 } // namespace dom

@@ -12,6 +12,7 @@ const {
 const ReactDOM = require("devtools/client/shared/vendor/react-dom");
 const { connect } = require("devtools/client/shared/vendor/react-redux");
 
+const { getAllMessages } = require("devtools/client/webconsole/new-console-output/selectors/messages");
 const MessageContainer = createFactory(require("devtools/client/webconsole/new-console-output/components/message-container").MessageContainer);
 
 const ConsoleOutput = createClass({
@@ -41,7 +42,7 @@ const ConsoleOutput = createClass({
   },
 
   render() {
-    let messageNodes = this.props.messages.map(function(message) {
+    let messageNodes = this.props.messages.map(function (message) {
       return (
         MessageContainer({ message })
       );
@@ -61,7 +62,7 @@ function isScrolledToBottom(outputNode, scrollNode) {
 
 function mapStateToProps(state) {
   return {
-    messages: state.messages
+    messages: getAllMessages(state)
   };
 }
 

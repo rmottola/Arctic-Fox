@@ -215,12 +215,6 @@ case "$target" in
         AC_DEFINE(_USE_MATH_DEFINES) # Otherwise MSVC's math.h doesn't #define M_PI.
 
         case "$CC_VERSION" in
-        18*)
-            _CC_SUITE=12
-            MSVS_VERSION=2013
-            MSVC_C_RUNTIME_DLL=msvcr120.dll
-            MSVC_CXX_RUNTIME_DLL=msvcp120.dll
-            ;;
         19*)
             _CC_SUITE=14
             MSVS_VERSION=2015
@@ -247,7 +241,8 @@ case "$target" in
 
         dnl Ensure that mt.exe is 'Microsoft (R) Manifest Tool',
         dnl not something else like "magnetic tape manipulation utility".
-        MSMT_TOOL=`${MT-mt} 2>&1|grep 'Microsoft (R) Manifest Tool'`
+        MT=${MT-mt.exe}
+        MSMT_TOOL=`${MT} 2>&1|grep 'Microsoft (R) Manifest Tool'`
         if test -z "$MSMT_TOOL"; then
           AC_MSG_ERROR([Microsoft (R) Manifest Tool must be in your \$PATH.])
         fi
@@ -262,6 +257,7 @@ case "$target" in
 
         MSMANIFEST_TOOL=1
         unset MSMT_TOOL
+        AC_SUBST(MT)
 
         # Check linker version
         _LD_FULL_VERSION=`"${LD}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
@@ -445,7 +441,7 @@ fi
 
 case "$host_os" in
 mingw*)
-    MOZ_PATH_PROGS(GMAKE, $GMAKE $NOT_PYMAKE make gmake, :)
+    MOZ_PATH_PROGS(GMAKE, $GMAKE mingw32-make $NOT_PYMAKE make gmake, :)
     ;;
 *)
     MOZ_PATH_PROGS(GMAKE, $GMAKE $NOT_PYMAKE gmake make, :)
@@ -599,61 +595,7 @@ if test -n "${CLANG_CXX}${CLANG_CL}"; then
     _WARNINGS_CXXFLAGS="-Qunused-arguments ${_WARNINGS_CXXFLAGS}"
 fi
 
-dnl ========================================================
-dnl = Use Address Sanitizer
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(address-sanitizer,
-[  --enable-address-sanitizer       Enable Address Sanitizer (default=no)],
-    MOZ_ASAN=1,
-    MOZ_ASAN= )
-if test -n "$MOZ_ASAN"; then
-    MOZ_LLVM_HACKS=1
-    AC_DEFINE(MOZ_ASAN)
-    MOZ_PATH_PROG(LLVM_SYMBOLIZER, llvm-symbolizer)
-fi
-AC_SUBST(MOZ_ASAN)
-
-dnl ========================================================
-dnl = Use Memory Sanitizer
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(memory-sanitizer,
-[  --enable-memory-sanitizer       Enable Memory Sanitizer (default=no)],
-    MOZ_MSAN=1,
-    MOZ_MSAN= )
-if test -n "$MOZ_MSAN"; then
-    MOZ_LLVM_HACKS=1
-    AC_DEFINE(MOZ_MSAN)
-    MOZ_PATH_PROG(LLVM_SYMBOLIZER, llvm-symbolizer)
-fi
-AC_SUBST(MOZ_MSAN)
-
-dnl ========================================================
-dnl = Use Thread Sanitizer
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(thread-sanitizer,
-[  --enable-thread-sanitizer       Enable Thread Sanitizer (default=no)],
-   MOZ_TSAN=1,
-   MOZ_TSAN= )
-if test -n "$MOZ_TSAN"; then
-    MOZ_LLVM_HACKS=1
-    AC_DEFINE(MOZ_TSAN)
-    MOZ_PATH_PROG(LLVM_SYMBOLIZER, llvm-symbolizer)
-fi
-AC_SUBST(MOZ_TSAN)
-
-# The LLVM symbolizer is used by all sanitizers
-AC_SUBST(LLVM_SYMBOLIZER)
-
-dnl ========================================================
-dnl = Enable hacks required for LLVM instrumentations
-dnl ========================================================
-MOZ_ARG_ENABLE_BOOL(llvm-hacks,
-[  --enable-llvm-hacks       Enable workarounds required for several LLVM instrumentations (default=no)],
-    MOZ_LLVM_HACKS=1,
-    MOZ_LLVM_HACKS= )
-if test -n "$MOZ_LLVM_HACKS"; then
-    MOZ_NO_WLZDEFS=1
-fi
+MOZ_CONFIG_SANITIZE
 
 dnl ========================================================
 dnl = Enable treating compiler warnings as errors
@@ -960,12 +902,18 @@ case "$target" in
         _USE_CPP_INCLUDE_FLAG=1
         _DEFINES_CFLAGS='-FI $(topobjdir)/js/src/js-confdefs.h -DMOZILLA_CLIENT'
         _DEFINES_CXXFLAGS='-FI $(topobjdir)/js/src/js-confdefs.h -DMOZILLA_CLIENT'
-        CFLAGS="$CFLAGS -W3 -Gy"
-        CXXFLAGS="$CXXFLAGS -W3 -Gy"
-        if test "$CPU_ARCH" = "x86"; then
-            dnl VS2012+ defaults to -arch:SSE2.
-            CFLAGS="$CFLAGS -arch:IA32"
-            CXXFLAGS="$CXXFLAGS -arch:IA32"
+        CFLAGS="$CFLAGS -W3 -Gy -Zc:inline"
+        CXXFLAGS="$CXXFLAGS -W3 -Gy -Zc:inline"
+        if test "$CPU_ARCH" = "x86";then
+          dnl VS2012+ defaults to -arch:SSE2. We want to target nothing
+          dnl more recent, so set that explicitly here unless another
+          dnl target arch has already been set.
+          if test -z `echo $CFLAGS | grep -i [-/]arch:` ; then
+            CFLAGS="$CFLAGS -arch:SSE2"
+            fi
+          if test -z `echo $CXXFLAGS | grep -i [-/]arch:` ; then
+            CXXFLAGS="$CXXFLAGS -arch:SSE2"
+          fi
         fi
         dnl VS2013+ requires -FS when parallel building by make -jN.
         dnl If nothing, compiler sometimes causes C1041 error.
@@ -1911,7 +1859,6 @@ if test "$MOZ_MEMORY"; then
     ;;
   esac
 fi
-AC_SUBST(MOZ_CRT)
 AC_SUBST(MOZ_GLUE_IN_PROGRAM)
 AC_SUBST_LIST(MOZ_GLUE_WRAP_LDFLAGS)
 
@@ -2036,7 +1983,7 @@ elif test "$CPU_ARCH" = "arm"; then
         JS_DISASM_ARM=1
     fi
 
-    dnl ARM platforms may trap on unalinged accesses; catch the signal and
+    dnl ARM platforms may trap on unaligned accesses; catch the signal and
     dnl recover.
     AC_DEFINE(ASMJS_MAY_USE_SIGNAL_HANDLERS)
     AC_DEFINE(ASMJS_MAY_USE_SIGNAL_HANDLERS_FOR_UNALIGNED)

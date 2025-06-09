@@ -47,6 +47,9 @@
 #include "mozilla/dom/File.h"
 #include "mozilla/dom/ExternalHelperAppParent.h"
 #include "mozilla/dom/GeolocationBinding.h"
+#ifdef MOZ_EME
+#include "mozilla/dom/MediaKeySystemAccess.h"
+#endif
 #include "mozilla/dom/Notification.h"
 #include "mozilla/dom/NuwaParent.h"
 #include "mozilla/dom/PContentBridgeParent.h"
@@ -269,8 +272,6 @@ using namespace mozilla::system;
 #ifdef MOZ_CRASHREPORTER
 #include "nsThread.h"
 #endif
-
-#include "VRManagerParent.h"            // for VRManagerParent
 
 // For VP9Benchmark::sBenchmarkFpsPref
 #include "Benchmark.h"
@@ -1163,7 +1164,7 @@ ContentParent::CreateBrowserOrApp(const TabContext& aContext,
       }
       tabId = AllocateTabId(openerTabId,
                             aContext.AsIPCTabContext(),
-                           constructorSender->ChildID());
+                            constructorSender->ChildID());
     }
     if (constructorSender) {
       nsCOMPtr<nsIDocShellTreeOwner> treeOwner;
@@ -2315,7 +2316,6 @@ ContentParent::ContentParent(ContentParent* aTemplate,
   mSubprocess->LaunchAndWaitForProcessHandle();
 
   // Clone actors routed by aTemplate for this instance.
-  IToplevelProtocol::SetTransport(mSubprocess->GetChannel());
   ProtocolCloneContext cloneContext;
   cloneContext.SetContentParent(this);
   CloneManagees(aTemplate, &cloneContext);
@@ -2419,14 +2419,31 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
     // on demand.)
     bool useOffMainThreadCompositing = !!CompositorThreadHolder::Loop();
     if (useOffMainThreadCompositing) {
-      DebugOnly<bool> opened = PCompositorBridge::Open(this);
-      MOZ_ASSERT(opened);
+      GPUProcessManager* gpm = GPUProcessManager::Get();
 
-      opened = PImageBridge::Open(this);
-      MOZ_ASSERT(opened);
+      {
+        Endpoint<PCompositorBridgeChild> endpoint;
+        DebugOnly<bool> opened =
+          gpm->CreateContentCompositorBridge(OtherPid(), &endpoint);
+        MOZ_ASSERT(opened);
+        Unused << SendInitCompositor(Move(endpoint));
+      }
 
-      opened = gfx::PVRManager::Open(this);
-      MOZ_ASSERT(opened);
+      {
+        Endpoint<PImageBridgeChild> endpoint;
+        DebugOnly<bool> opened =
+          gpm->CreateContentImageBridge(OtherPid(), &endpoint);
+        MOZ_ASSERT(opened);
+        Unused << SendInitImageBridge(Move(endpoint));
+      }
+
+      {
+        Endpoint<PVRManagerChild> endpoint;
+        DebugOnly<bool> opened =
+          gpm->CreateContentVRManager(OtherPid(), &endpoint);
+        MOZ_ASSERT(opened);
+        Unused << SendInitVRManager(Move(endpoint));
+      }
     }
 #ifdef MOZ_WIDGET_GONK
     DebugOnly<bool> opened = PSharedBufferManager::Open(this);
@@ -2472,6 +2489,14 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
 #endif
   MaybeFileDesc brokerFd = void_t();
 #ifdef XP_LINUX
+  // XXX: Checking the pref here makes it possible to enable/disable sandboxing
+  // during an active session. Currently the pref is only used for testing
+  // purpose. If the decision is made to permanently rely on the pref, this
+  // should be changed so that it is required to restart firefox for the change
+  // of value to take effect.
+  shouldSandbox = (Preferences::GetInt("security.sandbox.content.level") > 0) &&
+    !PR_GetEnv("MOZ_DISABLE_CONTENT_SANDBOX");
+
   if (shouldSandbox) {
     MOZ_ASSERT(!mSandboxBroker);
     UniquePtr<SandboxBroker::Policy> policy =
@@ -2501,6 +2526,14 @@ ContentParent::InitInternal(ProcessPriority aInitialPriority,
     Unused << SendSetAudioSessionData(id, sessionName, iconPath);
   }
 #endif
+
+  RefPtr<ServiceWorkerRegistrar> swr = ServiceWorkerRegistrar::Get();
+  MOZ_ASSERT(swr);
+
+  nsTArray<ServiceWorkerRegistrationData> registrations;
+  swr->GetRegistrations(registrations);
+
+  Unused << SendInitServiceWorkers(ServiceWorkerConfiguration(registrations));
 }
 
 bool
@@ -2787,7 +2820,7 @@ ContentParent::RecvGetShowPasswordSetting(bool* showPassword)
 #ifdef MOZ_WIDGET_ANDROID
   NS_ASSERTION(AndroidBridge::Bridge() != nullptr, "AndroidBridge is not available");
 
-  *showPassword = mozilla::widget::GeckoAppShell::GetShowPasswordSetting();
+  *showPassword = java::GeckoAppShell::GetShowPasswordSetting();
 #endif
   return true;
 }
@@ -3191,28 +3224,6 @@ ContentParent::DeallocPAPZParent(PAPZParent* aActor)
   return true;
 }
 
-PCompositorBridgeParent*
-ContentParent::AllocPCompositorBridgeParent(mozilla::ipc::Transport* aTransport,
-                                            base::ProcessId aOtherProcess)
-{
-  return GPUProcessManager::Get()->CreateTabCompositorBridge(
-    aTransport, aOtherProcess);
-}
-
-gfx::PVRManagerParent*
-ContentParent::AllocPVRManagerParent(Transport* aTransport,
-                                     ProcessId aOtherProcess)
-{
-  return gfx::VRManagerParent::CreateCrossProcess(aTransport, aOtherProcess);
-}
-
-PImageBridgeParent*
-ContentParent::AllocPImageBridgeParent(mozilla::ipc::Transport* aTransport,
-                                       base::ProcessId aOtherProcess)
-{
-  return ImageBridgeParent::Create(aTransport, aOtherProcess);
-}
-
 PBackgroundParent*
 ContentParent::AllocPBackgroundParent(Transport* aTransport,
                                       ProcessId aOtherProcess)
@@ -3306,6 +3317,7 @@ ContentParent::RecvGetXPCOMProcessAttributes(bool* aIsOffline,
     ErrorResult rv;
     aInitialData->Write(jsapi.cx(), init, rv);
     if (NS_WARN_IF(rv.Failed())) {
+      rv.SuppressException();
       return false;
     }
   }
@@ -4322,14 +4334,6 @@ ContentParent::RecvExtProtocolChannelConnectParent(const uint32_t& registrarId)
 bool
 ContentParent::HasNotificationPermission(const IPC::Principal& aPrincipal)
 {
-#ifdef MOZ_CHILD_PERMISSIONS
-  uint32_t permission = mozilla::CheckPermission(this, aPrincipal,
-                                                 "desktop-notification");
-  if (permission != nsIPermissionManager::ALLOW_ACTION) {
-    return false;
-  }
-#endif /* MOZ_CHILD_PERMISSIONS */
-
   return true;
 }
 
@@ -4464,16 +4468,6 @@ bool
 ContentParent::RecvAddGeolocationListener(const IPC::Principal& aPrincipal,
                                           const bool& aHighAccuracy)
 {
-#ifdef MOZ_CHILD_PERMISSIONS
-  if (!ContentParent::IgnoreIPCPrincipal()) {
-    uint32_t permission = mozilla::CheckPermission(this, aPrincipal,
-                                                   "geolocation");
-    if (permission != nsIPermissionManager::ALLOW_ACTION) {
-      return true;
-    }
-  }
-#endif /* MOZ_CHILD_PERMISSIONS */
-
   // To ensure no geolocation updates are skipped, we always force the
   // creation of a new listener.
   RecvRemoveGeolocationListener();
@@ -4910,9 +4904,9 @@ ContentParent::RecvBackUpXResources(const FileDescriptor& aXSocketFd)
 #else
   MOZ_ASSERT(0 > mChildXSocketFdDup.get(),
              "Already backed up X resources??");
-  mChildXSocketFdDup.forget();
   if (aXSocketFd.IsValid()) {
-    mChildXSocketFdDup.reset(aXSocketFd.PlatformHandle());
+    auto rawFD = aXSocketFd.ClonePlatformHandle();
+    mChildXSocketFdDup.reset(rawFD.release());
   }
 #endif
   return true;
@@ -5306,13 +5300,6 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
     return false;
   }
 
-  nsCOMPtr<nsPIWindowWatcher> pwwatch =
-    do_GetService(NS_WINDOWWATCHER_CONTRACTID, aResult);
-
-  if (NS_WARN_IF(NS_FAILED(*aResult))) {
-    return true;
-  }
-
   TabParent* newTab = TabParent::GetFrom(aNewTab);
   MOZ_ASSERT(newTab);
 
@@ -5406,43 +5393,22 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
   nsCOMPtr<mozIDOMWindowProxy> window;
   TabParent::AutoUseNewTab aunt(newTab, aWindowIsNew, aURLToLoad);
 
-  const char* features = aFeatures.IsVoid() ? nullptr : aFeatures.get();
+  nsCOMPtr<nsPIWindowWatcher> pwwatch =
+    do_GetService(NS_WINDOWWATCHER_CONTRACTID, aResult);
 
-  *aResult = pwwatch->OpenWindow2(parent, nullptr,
-                                  aName.IsVoid() ?
-                                    nullptr :
-                                    NS_ConvertUTF16toUTF8(aName).get(),
-                                  features, aCalledFromJS,
-                                  false, false, thisTabParent, nullptr, nullptr,
-                                  aFullZoom, 1, getter_AddRefs(window));
-
-  if (NS_WARN_IF(!window)) {
-    return true;
-  }
-
-  *aResult = NS_ERROR_FAILURE;
-  auto* pwindow = nsPIDOMWindowOuter::From(window);
-  nsCOMPtr<nsIDocShell> windowDocShell = pwindow->GetDocShell();
-  if (NS_WARN_IF(!windowDocShell)) {
-    return true;
-  }
-
-  nsCOMPtr<nsIDocShellTreeOwner> treeOwner;
-  windowDocShell->GetTreeOwner(getter_AddRefs(treeOwner));
-
-  nsCOMPtr<nsIXULWindow> xulWin = do_GetInterface(treeOwner);
-  if (NS_WARN_IF(!xulWin)) {
-    return true;
-  }
-
-  nsCOMPtr<nsIXULBrowserWindow> xulBrowserWin;
-  xulWin->GetXULBrowserWindow(getter_AddRefs(xulBrowserWin));
-  if (NS_WARN_IF(!xulBrowserWin)) {
+  if (NS_WARN_IF(NS_FAILED(*aResult))) {
     return true;
   }
 
   nsCOMPtr<nsITabParent> newRemoteTab;
-  *aResult = xulBrowserWin->ForceInitialBrowserRemote(getter_AddRefs(newRemoteTab));
+  if (!thisTabParent) {
+    // Because we weren't passed an opener tab, the content process has asked us
+    // to open a new window that is unrelated to a pre-existing tab.
+    *aResult = pwwatch->OpenWindowWithoutParent(getter_AddRefs(newRemoteTab));
+  } else {
+    *aResult = pwwatch->OpenWindowWithTabParent(thisTabParent, aFeatures, aCalledFromJS,
+                                                aFullZoom, getter_AddRefs(newRemoteTab));
+  }
 
   if (NS_WARN_IF(NS_FAILED(*aResult))) {
     return true;
@@ -5491,28 +5457,6 @@ ContentParent::PermissionManagerRelease(const ContentParentId& aCpId,
     return true;
   }
   return false;
-}
-
-bool
-ContentParent::RecvGetBrowserConfiguration(const nsCString& aURI, BrowserConfiguration* aConfig)
-{
-  MOZ_ASSERT(XRE_IsParentProcess());
-
-  return GetBrowserConfiguration(aURI, *aConfig);;
-}
-
-/*static*/ bool
-ContentParent::GetBrowserConfiguration(const nsCString& aURI, BrowserConfiguration& aConfig)
-{
-  if (XRE_IsParentProcess()) {
-    RefPtr<ServiceWorkerRegistrar> swr = ServiceWorkerRegistrar::Get();
-    MOZ_ASSERT(swr);
-
-    swr->GetRegistrations(aConfig.serviceWorkerRegistrations());
-    return true;
-  }
-
-  return ContentChild::GetSingleton()->SendGetBrowserConfiguration(aURI, &aConfig);
 }
 
 bool

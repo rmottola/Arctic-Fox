@@ -5,7 +5,7 @@
  * Tests that properties are not updated when modifying the VariablesView.
  */
 
-add_task(function*() {
+add_task(function* () {
   let { target, panel } = yield initWebAudioEditor(COMPLEX_CONTEXT_URL);
   let { panelWin } = panel;
   let { gFront, $, $$, EVENTS, PropertiesView } = panelWin;
@@ -13,12 +13,12 @@ add_task(function*() {
 
   let started = once(gFront, "start-context");
 
-  reload(target);
-
-  let [actors] = yield Promise.all([
+  let events = Promise.all([
     getN(gFront, "create-node", 8),
     waitForGraphRendered(panelWin, 8, 8)
   ]);
+  reload(target);
+  let [actors] = yield events;
   let nodeIds = actors.map(actor => actor.actorID);
 
   click(panelWin, findGraphNode(panelWin, nodeIds[3]));
@@ -32,7 +32,7 @@ add_task(function*() {
 
   try {
     yield modifyVariableView(panelWin, gVars, 0, "bufferSize", 2048);
-  } catch(e) {
+  } catch (e) {
     // we except modifyVariableView to fail here, because bufferSize is not writable
   }
 

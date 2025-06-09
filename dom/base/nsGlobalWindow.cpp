@@ -468,8 +468,6 @@ nsGlobalWindow::DOMMinTimeoutValue() const {
 // CIDs
 static NS_DEFINE_CID(kXULControllersCID, NS_XULCONTROLLERS_CID);
 
-static const char sPopStatePrefStr[] = "browser.history.allowPopState";
-
 #define NETWORK_UPLOAD_EVENT_NAME     NS_LITERAL_STRING("moznetworkupload")
 #define NETWORK_DOWNLOAD_EVENT_NAME   NS_LITERAL_STRING("moznetworkdownload")
 
@@ -2392,6 +2390,10 @@ static bool HttpsStateIsModern(nsIDocument* aDocument)
 {
   nsCOMPtr<nsIPrincipal> principal = aDocument->NodePrincipal();
 
+  if (principal->GetIsSystemPrincipal()) {
+    return true;
+  }
+
   // If aDocument is sandboxed, try and get the principal that it would have
   // been given had it not been sandboxed:
   if (principal->GetIsNullPrincipal() &&
@@ -2404,6 +2406,18 @@ static bool HttpsStateIsModern(nsIDocument* aDocument)
         ssm->GetChannelResultPrincipalIfNotSandboxed(channel,
                                                      getter_AddRefs(principal));
       if (NS_FAILED(rv)) {
+        return false;
+      }
+      if (principal->GetIsSystemPrincipal()) {
+        // If a document with the system principal is sandboxing a subdocument
+        // that would normally inherit the embedding element's principal (e.g.
+        // a srcdoc document) then the embedding document does not trust the
+        // content that is written to the embedded document.  Unlike when the
+        // embedding document is https, in this case we have no indication as
+        // to whether the embedded document's contents are delivered securely
+        // or not, and the sandboxing would possibly indicate that they were
+        // not.  To play it safe we return false here.  (See bug 1162772
+        // comment 73-80.)
         return false;
       }
     }
@@ -3692,6 +3706,38 @@ nsPIDOMWindow<T>::MaybeCreateDoc()
   }
 }
 
+void
+nsPIDOMWindowOuter::SetInitialKeyboardIndicators(
+  UIStateChangeType aShowAccelerators, UIStateChangeType aShowFocusRings)
+{
+  MOZ_ASSERT(IsOuterWindow());
+  MOZ_ASSERT(!GetCurrentInnerWindow());
+
+  nsPIDOMWindowOuter* piWin = GetPrivateRoot();
+  if (!piWin) {
+    return;
+  }
+
+  MOZ_ASSERT(piWin == AsOuter());
+
+  // only change the flags that have been modified
+  nsCOMPtr<nsPIWindowRoot> windowRoot = do_QueryInterface(mChromeEventHandler);
+  if (!windowRoot) {
+    return;
+  }
+
+  if (aShowAccelerators != UIStateChangeType_NoChange) {
+    windowRoot->SetShowAccelerators(aShowAccelerators == UIStateChangeType_Set);
+  }
+  if (aShowFocusRings != UIStateChangeType_NoChange) {
+    windowRoot->SetShowFocusRings(aShowFocusRings == UIStateChangeType_Set);
+  }
+
+  nsContentUtils::SetKeyboardIndicatorsOnRemoteChildren(GetOuterWindow(),
+                                                        aShowAccelerators,
+                                                        aShowFocusRings);
+}
+
 Element*
 nsPIDOMWindowOuter::GetFrameElementInternal() const
 {
@@ -3999,6 +4045,9 @@ nsPIDOMWindowOuter::GetServiceWorkersTestingEnabled()
   // Automatically get this setting from the top level window so that nested
   // iframes get the correct devtools setting.
   nsCOMPtr<nsPIDOMWindowOuter> topWindow = GetScriptableTop();
+  if (!topWindow) {
+    return false;
+  }
   return topWindow->mServiceWorkersTestingEnabled;
 }
 
@@ -6241,6 +6290,7 @@ private:
   nsCOMPtr<nsITimer> mTimer;
   nsCOMPtr<nsISupports> mTransitionData;
 
+  TimeStamp mFullscreenChangeStartTime;
   FullscreenTransitionDuration mDuration;
   Stage mStage;
   bool mFullscreen;
@@ -6267,6 +6317,7 @@ FullscreenTransitionTask::Run()
                                          this);
   } else if (stage == eToggleFullscreen) {
     PROFILER_MARKER("Fullscreen toggle start");
+    mFullscreenChangeStartTime = TimeStamp::Now();
     if (MOZ_UNLIKELY(mWindow->mFullScreen != mFullscreen)) {
       // This could happen in theory if several fullscreen requests in
       // different direction happen continuously in a short time. We
@@ -6300,9 +6351,11 @@ FullscreenTransitionTask::Run()
     // more than exposing an intermediate state.
     mTimer = do_CreateInstance(NS_TIMER_CONTRACTID);
     uint32_t timeout =
-      Preferences::GetUint("full-screen-api.transition.timeout", 500);
+      Preferences::GetUint("full-screen-api.transition.timeout", 1000);
     mTimer->Init(observer, timeout, nsITimer::TYPE_ONE_SHOT);
   } else if (stage == eAfterToggle) {
+    Telemetry::AccumulateTimeDelta(Telemetry::FULLSCREEN_TRANSITION_BLACK_MS,
+                                   mFullscreenChangeStartTime);
     mWidget->PerformFullscreenTransition(nsIWidget::eAfterFullscreenToggle,
                                          mDuration.mFadeOut, mTransitionData,
                                          this);
@@ -7961,7 +8014,6 @@ nsGlobalWindow::FirePopupBlockedEvent(nsIDocument* aDoc,
   aDoc->DispatchEvent(event, &defaultActionEnabled);
 }
 
-
 // static
 bool
 nsGlobalWindow::CanSetProperty(const char *aPrefName)
@@ -9499,7 +9551,7 @@ nsGlobalWindow::FindOuter(const nsAString& aString, bool aCaseSensitive,
     nsCOMPtr<mozIDOMWindowProxy> findDialog;
 
     if (windowMediator) {
-      windowMediator->GetMostRecentWindow(MOZ_UTF16("findInPage"),
+      windowMediator->GetMostRecentWindow(u"findInPage",
                                           getter_AddRefs(findDialog));
     }
 
@@ -10251,11 +10303,6 @@ nsGlobalWindow::DispatchSyncPopState()
   MOZ_RELEASE_ASSERT(IsInnerWindow());
   NS_ASSERTION(nsContentUtils::IsSafeToRunScript(),
                "Must be safe to run script here.");
-
-  // Check that PopState hasn't been pref'ed off.
-  if (!Preferences::GetBool(sPopStatePrefStr, false)) {
-    return NS_OK;
-  }
 
   nsresult rv = NS_OK;
 
@@ -11138,7 +11185,7 @@ nsGlobalWindow::ShowSlowScriptDialog()
       }
 
       // Insert U+2026 HORIZONTAL ELLIPSIS
-      filenameUTF16.Replace(cutStart, cutLength, NS_LITERAL_STRING("\x2026"));
+      filenameUTF16.Replace(cutStart, cutLength, NS_LITERAL_STRING(u"\x2026"));
     }
     const char16_t *formatParams[] = { filenameUTF16.get() };
     rv = nsContentUtils::FormatLocalizedString(nsContentUtils::eDOM_PROPERTIES,
@@ -11556,7 +11603,7 @@ nsGlobalWindow::Observe(nsISupports* aSubject, const char* aTopic,
 #endif // MOZ_B2G
 
   if (!nsCRT::strcmp(aTopic, NS_PREFBRANCH_PREFCHANGE_TOPIC_ID)) {
-    MOZ_ASSERT(!NS_strcmp(aData, MOZ_UTF16("intl.accept_languages")));
+    MOZ_ASSERT(!NS_strcmp(aData, u"intl.accept_languages"));
     MOZ_ASSERT(IsInnerWindow());
 
     // The user preferred languages have changed, we need to fire an event on
@@ -11870,7 +11917,7 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
       // !aCalledNoScript.
       rv = pwwatch->OpenWindow2(AsOuter(), url.get(), name_ptr,
                                 options_ptr, /* aCalledFromScript = */ true,
-                                aDialog, aNavigate, nullptr, argv,
+                                aDialog, aNavigate, argv,
 				aLoadInfo,
                                 1.0f, 0, getter_AddRefs(domReturn));
     } else {
@@ -11891,7 +11938,7 @@ nsGlobalWindow::OpenInternal(const nsAString& aUrl, const nsAString& aName,
 
       rv = pwwatch->OpenWindow2(AsOuter(), url.get(), name_ptr,
                                 options_ptr, /* aCalledFromScript = */ false,
-                                aDialog, aNavigate, nullptr, aExtraArgument,
+                                aDialog, aNavigate, aExtraArgument,
 				aLoadInfo,
                                 1.0f, 0, getter_AddRefs(domReturn));
 
@@ -13110,13 +13157,6 @@ nsGlobalWindow::ResumeTimeouts(bool aThawChildren, bool aThawWorkers)
       RefPtr<Promise> d = mAudioContexts[i]->Resume(dummy);
     }
 
-    // Thaw or resume all of the workers for this window.
-    if (aThawWorkers) {
-      mozilla::dom::workers::ThawWorkersForWindow(AsInner());
-    } else {
-      mozilla::dom::workers::ResumeWorkersForWindow(AsInner());
-    }
-
     // Restore all of the timeouts, using the stored time remaining
     // (stored in timeout->mTimeRemaining).
 
@@ -13160,6 +13200,15 @@ nsGlobalWindow::ResumeTimeouts(bool aThawChildren, bool aThawWorkers)
 
       // Add a reference for the new timer's closure.
       t->AddRef();
+    }
+
+    // Thaw or resume all of the workers for this window.  We must do this
+    // after timeouts since workers may have queued events that can trigger
+    // a setTimeout().
+    if (aThawWorkers) {
+      mozilla::dom::workers::ThawWorkersForWindow(AsInner());
+    } else {
+      mozilla::dom::workers::ResumeWorkersForWindow(AsInner());
     }
   }
 

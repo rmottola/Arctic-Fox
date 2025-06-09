@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* global content */
+/* exported startup, shutdown, install, uninstall */
+
 "use strict";
 
 const Cu = Components.utils;
@@ -10,7 +13,7 @@ const {Services} = Cu.import("resource://gre/modules/Services.jsm", {});
 
 function actionOccurred(id) {
   let {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
-  let Telemetry = require("devtools/client/shared/telemetry");;
+  let Telemetry = require("devtools/client/shared/telemetry");
   let telemetry = new Telemetry();
   telemetry.actionOccurred(id);
 }
@@ -59,7 +62,7 @@ function MultiWindowKeyListener({ keyCode, ctrlKey, altKey, callback }) {
       }
     }
   };
-};
+}
 
 let getTopLevelWindow = function (window) {
   return window.QueryInterface(Ci.nsIInterfaceRequestor)
@@ -73,18 +76,35 @@ let getTopLevelWindow = function (window) {
 function reload(event) {
   // We automatically reload the toolbox if we are on a browser tab
   // with a toolbox already opened
-  let top = getTopLevelWindow(event.view)
-  let isBrowser = top.location.href.includes("/browser.xul") && top.gDevToolsBrowser;
+  let top = getTopLevelWindow(event.view);
+  let isBrowser = top.location.href.includes("/browser.xul");
   let reloadToolbox = false;
-  if (isBrowser && top.gDevToolsBrowser.hasToolboxOpened) {
-    reloadToolbox = top.gDevToolsBrowser.hasToolboxOpened(top);
+  if (isBrowser && top.gBrowser) {
+    // We do not use any devtools code before the call to Loader.jsm reload as
+    // any attempt to use Loader.jsm to load a module will instanciate a new
+    // Loader.
+    let nbox = top.gBrowser.getNotificationBox();
+    reloadToolbox =
+      top.document.getAnonymousElementByAttribute(nbox, "class",
+        "devtools-toolbox-bottom-iframe") ||
+      top.document.getAnonymousElementByAttribute(nbox, "class",
+        "devtools-toolbox-side-iframe") ||
+      Services.wm.getMostRecentWindow("devtools:toolbox");
   }
-  dump("Reload DevTools.  (reload-toolbox:"+reloadToolbox+")\n");
+  let browserConsole = Services.wm.getMostRecentWindow("devtools:webconsole");
+  let reopenBrowserConsole = false;
+  if (browserConsole) {
+    browserConsole.close();
+    reopenBrowserConsole = true;
+  }
+
+  dump("Reload DevTools.  (reload-toolbox:" + reloadToolbox + ")\n");
 
   // Invalidate xul cache in order to see changes made to chrome:// files
   Services.obs.notifyObservers(null, "startupcache-invalidate", null);
 
-  // This frame script is going to be executed in all processes: parent and childs
+  // This frame script is going to be executed in all processes:
+  // parent and child
   Services.ppmm.loadProcessScript("data:,new " + function () {
     /* Flush message manager cached frame scripts as well as chrome locales */
     let obs = Components.classes["@mozilla.org/observer-service;1"]
@@ -125,7 +145,8 @@ function reload(event) {
         }
         // We have to use a frame script to query "baseURI"
         mm.loadFrameScript("data:text/javascript,new " + function () {
-          let isJSONView = content.document.baseURI.startsWith("resource://devtools/");
+          let isJSONView =
+            content.document.baseURI.startsWith("resource://devtools/");
           if (isJSONView) {
             content.location.reload();
           }
@@ -133,21 +154,12 @@ function reload(event) {
       }
     } else if (windowtype === "devtools:webide") {
       window.location.reload();
-    } else if (windowtype === "devtools:webconsole") {
-      // Browser console document can't just be reloaded.
-      // HUDService is going to close it on unload.
-      // Instead we have to manually toggle it.
-      let HUDService = devtools.require("devtools/client/webconsole/hudservice");
-      HUDService.toggleBrowserConsole()
-        .then(() => {
-          HUDService.toggleBrowserConsole();
-        });
     }
   }
 
   if (reloadToolbox) {
-    // Reopen the toolbox automatically if we are reloading from toolbox shortcut
-    // and are on a browser window.
+    // Reopen the toolbox automatically if we are reloading from toolbox
+    // shortcut and are on a browser window.
     // Wait for a second before opening the toolbox to avoid races
     // between the old and the new one.
     let {setTimeout} = Cu.import("resource://gre/modules/Timer.jsm", {});
@@ -159,8 +171,27 @@ function reload(event) {
     }, 1000);
   }
 
+  // Browser console document can't just be reloaded.
+  // HUDService is going to close it on unload.
+  // Instead we have to manually toggle it.
+  if (reopenBrowserConsole) {
+    let HUDService = devtools.require("devtools/client/webconsole/hudservice");
+    HUDService.toggleBrowserConsole();
+  }
+
   actionOccurred("reloadAddonReload");
 }
+
+let prefs = {
+  // Enable dump as some errors are only printed on the stdout
+  "browser.dom.window.dump.enabled": true,
+  // Enable the browser toolbox and various chrome-only features
+  "devtools.chrome.enabled": true,
+  "devtools.debugger.remote-enabled": true,
+  // Disable the prompt to ease usage of the browser toolbox
+  "devtools.debugger.prompt-connection": false,
+};
+let originalPrefValues = {};
 
 let listener;
 function startup() {
@@ -170,10 +201,31 @@ function startup() {
     callback: reload
   });
   listener.start();
+
+  // Toggle development prefs and save original values
+  originalPrefValues = {};
+  for (let name in prefs) {
+    let value = prefs[name];
+    let userValue = Services.prefs.getBoolPref(name);
+    // Only toggle if the pref isn't already set to the right value
+    if (userValue != value) {
+      Services.prefs.setBoolPref(name, value);
+      originalPrefValues[name] = userValue;
+    }
+  }
 }
 function shutdown() {
   listener.stop();
   listener = null;
+
+  // Restore preferences that used to be before the addon was installed
+  for (let name in originalPrefValues) {
+    let userValue = Services.prefs.getBoolPref(name);
+    // Only reset the pref if it hasn't changed
+    if (userValue == prefs[name]) {
+      Services.prefs.setBoolPref(name, originalPrefValues[name]);
+    }
+  }
 }
 function install() {
   actionOccurred("reloadAddonInstalled");

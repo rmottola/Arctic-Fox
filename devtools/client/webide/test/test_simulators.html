@@ -35,9 +35,24 @@
           addon.on("update", function onUpdate() {
             if (addon.status == status) {
               addon.off("update", onUpdate);
-              deferred.resolve();
+              nextTick().then(() => deferred.resolve());
             }
           });
+          return deferred.promise;
+        }
+
+        function waitForUpdate(length) {
+          info(`Wait for update with length ${length}`);
+          let deferred = promise.defer();
+          let handler = (_, data) => {
+            if (data.length != length) {
+              return;
+            }
+            info(`Got update with length ${length}`);
+            Simulators.off("updated", handler);
+            deferred.resolve();
+          };
+          Simulators.on("updated", handler);
           return deferred.promise;
         }
 
@@ -83,7 +98,11 @@
 
           sim10.install();
 
+          let updated = waitForUpdate(1);
           yield addonStatus(sim10, "installed");
+          yield updated;
+          // Wait for next tick to ensure UI elements are updated
+          yield nextTick();
 
           is(findAll(".runtime-panel-item-simulator").length, 1, "One simulator in runtime panel");
 
@@ -93,7 +112,11 @@
 
           sim20.install();
 
+          updated = waitForUpdate(2);
           yield addonStatus(sim20, "installed");
+          yield updated;
+          // Wait for next tick to ensure UI elements are updated
+          yield nextTick();
 
           is(findAll(".runtime-panel-item-simulator").length, 2, "Two simulators in runtime panel");
 
@@ -101,18 +124,19 @@
 
           let params = yield runSimulator(0);
 
-          ok(params.path.contains(sim10.addonID) && params.path.contains("b2g-bin"), "Simulator binary path looks right");
+          ok(params.path.includes(sim10.addonID) && params.path.includes("b2g-bin"), "Simulator binary path looks right");
 
           let pid = params.args.indexOf("-profile");
           ok(pid > -1, "Simulator process arguments have --profile");
 
           let profilePath = params.args[pid + 1];
-          ok(profilePath.contains(sim10.addonID) && profilePath.contains("profile"), "Simulator profile path looks right");
+          ok(profilePath.includes(sim10.addonID) && profilePath.includes("profile"), "Simulator profile path looks right");
 
           ok(params.args.indexOf("-dbgport") > -1 || params.args.indexOf("-start-debugger-server") > -1, "Simulator process arguments have a debugger port");
 
           ok(params.args.indexOf("-no-remote") > -1, "Simulator process arguments have --no-remote");
 
+          // Wait for next tick to ensure UI elements are updated
           yield nextTick();
 
           // Configure the fake 1.0 simulator.
@@ -124,6 +148,13 @@
 
           let doc = simulatorPanel.contentWindow.document;
           let form = doc.querySelector("#simulator-editor");
+
+          let formReady = new Promise((resolve, reject) => {
+            form.addEventListener("change", () => {
+              resolve();
+            });
+          });
+
           let change = doc.createEvent("HTMLEvents");
           change.initEvent("change", true, true);
 
@@ -135,6 +166,8 @@
 
           let MockFilePicker = SpecialPowers.MockFilePicker;
           MockFilePicker.init(simulatorPanel.contentWindow);
+
+          yield formReady;
 
           // Test `name`.
 
@@ -234,8 +267,8 @@
 
           let defaults = Simulator.prototype._defaults;
 
-          for (let param in defaults) {
-            is(form[param].value, defaults[param], "Default value for device " + param);
+          for (let param in defaults.phone) {
+            is(form[param].value, String(defaults.phone[param]), "Default phone value for device " + param);
           }
 
           let width = 5000, height = 4000;
@@ -248,13 +281,14 @@
 
           let sid = params.args.indexOf("-screen");
           ok(sid > -1, "Simulator process arguments have --screen");
-          ok(params.args[sid + 1].contains(width + "x" + height), "Simulator screen resolution looks right");
+          ok(params.args[sid + 1].includes(width + "x" + height), "Simulator screen resolution looks right");
 
           yield set(form.version, sim10.addonID);
 
           // Configure the fake 2.0 simulator.
 
           simulatorList.querySelectorAll(".configure-button")[1].click();
+          // Wait for next tick to ensure UI elements are updated
           yield nextTick();
 
           // Test `name`.
@@ -277,8 +311,8 @@
 
           // Test `device`.
 
-          for (let param in defaults) {
-            is(form[param].value, defaults[param], "Default value for device " + param);
+          for (let param in defaults.phone) {
+            is(form[param].value, String(defaults.phone[param]), "Default phone value for device " + param);
           }
 
           let devices = yield GetDevices();
@@ -288,24 +322,69 @@
           yield set(form.device, device.name);
 
           is(form.device.value, device.name, "Device selector was changed");
-          is(form.width.value, device.width, "New device width is correct");
-          is(form.height.value, device.height, "New device height is correct");
+          is(form.width.value, String(device.width), "New device width is correct");
+          is(form.height.value, String(device.height), "New device height is correct");
 
           params = yield runSimulator(1);
 
           sid = params.args.indexOf("-screen");
-          ok(params.args[sid + 1].contains(device.width + "x" + device.height), "Simulator screen resolution looks right");
+          ok(params.args[sid + 1].includes(device.width + "x" + device.height), "Simulator screen resolution looks right");
+
+          // Test Simulator Menu.
+          is(doc.querySelector("#tv_simulator_menu").style.visibility, "hidden", "OpenTVDummyDirectory Button is not hidden");
 
           // Restore default simulator options.
 
           doc.querySelector("#reset").click();
+          // Wait for next tick to ensure UI elements are updated
           yield nextTick();
 
-          for (let param in defaults) {
-            is(form[param].value, defaults[param], "Default value for device " + param);
+          for (let param in defaults.phone) {
+            is(form[param].value, String(defaults.phone[param]), "Default phone value for device " + param);
           }
 
-          // Uninstall the 2.0 addon and watch its Simulator object disappear.
+          // Install and configure the fake "Firefox OS 3.0 TV" simulator addon.
+
+          let sim30tv = addons.simulators.filter(a => a.version == "3.0_tv")[0];
+
+          sim30tv.install();
+
+          updated = waitForUpdate(3);
+          yield addonStatus(sim30tv, "installed");
+          yield updated;
+          // Wait for next tick to ensure UI elements are updated
+          yield nextTick();
+
+          is(findAll(".runtime-panel-item-simulator").length, 3, "Three simulators in runtime panel");
+
+          simulatorList.querySelectorAll(".configure-button")[2].click();
+          // Wait for next tick to ensure UI elements are updated
+          yield nextTick();
+
+          for (let param in defaults.television) {
+            is(form[param].value, String(defaults.television[param]), "Default TV value for device " + param);
+          }
+
+          // Test Simulator Menu
+          is(doc.querySelector("#tv_simulator_menu").style.visibility, "visible", "OpenTVDummyDirectory Button is not visible");
+
+          // Force reload the list of simulators.
+
+          Simulators._loadingPromise = null;
+          Simulators._simulators = [];
+          yield Simulators._load();
+          // Wait for next tick to ensure UI elements are updated
+          yield nextTick();
+
+          is(findAll(".runtime-panel-item-simulator").length, 3, "Three simulators saved and reloaded " + Simulators._simulators.map(s => s.name).join(','));
+
+          // Uninstall the 3.0 TV and 2.0 addons, and watch their Simulator objects disappear.
+
+          sim30tv.uninstall();
+
+          yield addonStatus(sim30tv, "uninstalled");
+
+          is(findAll(".runtime-panel-item-simulator").length, 2, "Two simulators left in runtime panel");
 
           sim20.uninstall();
 
@@ -316,12 +395,16 @@
           // Remove 1.0 simulator.
 
           simulatorList.querySelectorAll(".configure-button")[0].click();
+          // Wait for next tick to ensure UI elements are updated
           yield nextTick();
 
           doc.querySelector("#remove").click();
+          // Wait for next tick to ensure UI elements are updated
           yield nextTick();
 
           is(findAll(".runtime-panel-item-simulator").length, 0, "Last simulator was removed");
+
+          yield asyncStorage.removeItem("simulators");
 
           sim10.uninstall();
 

@@ -158,7 +158,7 @@ class Concrete<FakeNode> : public Base
     return concreteTypeName;
   }
 
-  js::UniquePtr<EdgeRange> edges(JSRuntime*, bool) const override {
+  js::UniquePtr<EdgeRange> edges(JSContext*, bool) const override {
     return js::UniquePtr<EdgeRange>(js_new<PreComputedEdgeRange>(get().edges));
   }
 
@@ -185,7 +185,7 @@ public:
   }
 };
 
-const char16_t Concrete<FakeNode>::concreteTypeName[] = MOZ_UTF16("FakeNode");
+const char16_t Concrete<FakeNode>::concreteTypeName[] = u"FakeNode";
 
 } // namespace ubi
 } // namespace JS
@@ -209,8 +209,8 @@ void AddEdge(FakeNode& node, FakeNode& referent, const char16_t* edgeName = null
 namespace testing {
 
 // Ensure that given node has the expected number of edges.
-MATCHER_P2(EdgesLength, rt, expectedLength, "") {
-  auto edges = arg.edges(rt);
+MATCHER_P2(EdgesLength, cx, expectedLength, "") {
+  auto edges = arg.edges(cx);
   if (!edges)
     return false;
 
@@ -223,8 +223,8 @@ MATCHER_P2(EdgesLength, rt, expectedLength, "") {
 }
 
 // Get the nth edge and match it with the given matcher.
-MATCHER_P3(Edge, rt, n, matcher, "") {
-  auto edges = arg.edges(rt);
+MATCHER_P3(Edge, cx, n, matcher, "") {
+  auto edges = arg.edges(cx);
   if (!edges)
     return false;
 
@@ -252,6 +252,12 @@ MATCHER_P(UniqueUTF16StrEq, str, "") {
 
 MATCHER(UniqueIsNull, "") {
   return arg.get() == nullptr;
+}
+
+// Matches an edge whose referent is the node with the given id.
+MATCHER_P(EdgeTo, id, "") {
+  return Matcher<const DeserializedEdge&>(Field(&DeserializedEdge::referent, id))
+    .MatchAndExplain(arg, result_listener);
 }
 
 } // namespace testing

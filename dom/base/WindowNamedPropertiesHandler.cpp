@@ -100,7 +100,7 @@ WindowNamedPropertiesHandler::getOwnPropDescriptor(JSContext* aCx,
     return false;
   }
 
-  if (str.IsEmpty()) {
+  if(str.IsEmpty()) {
     return true;
   }
 

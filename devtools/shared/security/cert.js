@@ -8,6 +8,7 @@
 
 var { Ci, Cc } = require("chrome");
 var promise = require("promise");
+var defer = require("devtools/shared/defer");
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 DevToolsUtils.defineLazyGetter(this, "localCertService", () => {
   // Ensure PSM is initialized to support TLS sockets
@@ -31,9 +32,9 @@ exports.local = {
    * @return promise
    */
   getOrCreate() {
-    let deferred = promise.defer();
+    let deferred = defer();
     localCertService.getOrCreateCert(localCertName, {
-      handleCert: function(cert, rv) {
+      handleCert: function (cert, rv) {
         if (rv) {
           deferred.reject(rv);
           return;
@@ -50,9 +51,9 @@ exports.local = {
    * @return promise
    */
   remove() {
-    let deferred = promise.defer();
+    let deferred = defer();
     localCertService.removeCert(localCertName, {
-      handleCert: function(rv) {
+      handleCert: function (rv) {
         if (rv) {
           deferred.reject(rv);
           return;

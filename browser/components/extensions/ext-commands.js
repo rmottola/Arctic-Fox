@@ -15,10 +15,17 @@ const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 // WeakMap[Extension -> CommandList]
 var commandsMap = new WeakMap();
 
-function CommandList(commandsObj, extensionID) {
-  this.commands = this.loadCommandsFromManifest(commandsObj);
-  this.keysetID = `ext-keyset-id-${makeWidgetId(extensionID)}`;
+function CommandList(manifest, extension) {
+  this.extension = extension;
+  this.id = makeWidgetId(extension.id);
   this.windowOpenListener = null;
+
+  // Map[{String} commandName -> {Object} commandProperties]
+  this.commands = this.loadCommandsFromManifest(manifest);
+
+  // WeakMap[Window -> <xul:keyset>]
+  this.keysetsMap = new WeakMap();
+
   this.register();
   EventEmitter.decorate(this);
 }
@@ -30,11 +37,13 @@ CommandList.prototype = {
    */
   register() {
     for (let window of WindowListManager.browserWindows()) {
-      this.registerKeysToDocument(window.document);
+      this.registerKeysToDocument(window);
     }
 
     this.windowOpenListener = (window) => {
-      this.registerKeysToDocument(window.document);
+      if (!this.keysetsMap.has(window)) {
+        this.registerKeysToDocument(window);
+      }
     };
 
     WindowListManager.addOpenListener(this.windowOpenListener);
@@ -46,9 +55,8 @@ CommandList.prototype = {
    */
   unregister() {
     for (let window of WindowListManager.browserWindows()) {
-      let keyset = window.document.getElementById(this.keysetID);
-      if (keyset) {
-        keyset.remove();
+      if (this.keysetsMap.has(window)) {
+        this.keysetsMap.get(window).remove();
       }
     }
 
@@ -57,18 +65,21 @@ CommandList.prototype = {
 
   /**
    * Creates a Map from commands for each command in the manifest.commands object.
-   * @param {Object} commandsObj The manifest.commands JSON object.
+   *
+   * @param {Object} manifest The manifest JSON object.
+   * @returns {Map<string, object>}
    */
-  loadCommandsFromManifest(commandsObj) {
+  loadCommandsFromManifest(manifest) {
     let commands = new Map();
     // For Windows, chrome.runtime expects 'win' while chrome.commands
     // expects 'windows'.  We can special case this for now.
     let os = PlatformInfo.os == "win" ? "windows" : PlatformInfo.os;
-    for (let name of Object.keys(commandsObj)) {
-      let command = commandsObj[name];
+    for (let name of Object.keys(manifest.commands)) {
+      let command = manifest.commands[name];
+      let shortcut = command.suggested_key[os] || command.suggested_key.default;
       commands.set(name, {
         description: command.description,
-        shortcut: command.suggested_key[os] || command.suggested_key.default,
+        shortcut: shortcut.replace(/\s+/g, ""),
       });
     }
     return commands;
@@ -76,16 +87,18 @@ CommandList.prototype = {
 
   /**
    * Registers the commands to a document.
-   * @param {Document} doc The XUL document to insert the Keyset.
+   * @param {ChromeWindow} window The XUL window to insert the Keyset.
    */
-  registerKeysToDocument(doc) {
+  registerKeysToDocument(window) {
+    let doc = window.document;
     let keyset = doc.createElementNS(XUL_NS, "keyset");
-    keyset.id = this.keysetID;
+    keyset.id = `ext-keyset-id-${this.id}`;
     this.commands.forEach((command, name) => {
       let keyElement = this.buildKey(doc, name, command.shortcut);
       keyset.appendChild(keyElement);
     });
     doc.documentElement.appendChild(keyset);
+    this.keysetsMap.set(window, keyset);
   },
 
   /**
@@ -93,8 +106,8 @@ CommandList.prototype = {
    * emits a command event with the provided name when fired.
    *
    * @param {Document} doc The XUL document.
-   * @param {String} name The name of the command.
-   * @param {String} shortcut The shortcut provided in the manifest.
+   * @param {string} name The name of the command.
+   * @param {string} shortcut The shortcut provided in the manifest.
    * @see https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XUL/key
    *
    * @returns {Document} The newly created Key element.
@@ -110,7 +123,12 @@ CommandList.prototype = {
     // We remove all references to the key elements when the extension is shutdown,
     // therefore the listeners for these elements will be garbage collected.
     keyElement.addEventListener("command", (event) => {
-      this.emit("command", name);
+      if (name == "_execute_page_action") {
+        let win = event.target.ownerGlobal;
+        pageActionFor(this.extension).triggerAction(win);
+      } else {
+        this.emit("command", name);
+      }
     });
     /* eslint-enable mozilla/balanced-listeners */
 
@@ -121,8 +139,7 @@ CommandList.prototype = {
    * Builds a XUL Key element from the provided shortcut.
    *
    * @param {Document} doc The XUL document.
-   * @param {String} name The name of the command.
-   * @param {String} shortcut The shortcut provided in the manifest.
+   * @param {string} shortcut The shortcut provided in the manifest.
    *
    * @see https://developer.mozilla.org/en-US/docs/Mozilla/Tech/XUL/key
    * @returns {Document} The newly created Key element.
@@ -158,8 +175,8 @@ CommandList.prototype = {
    *    "PageUP"  |  "VK_PAGE_UP"
    *    "Delete"  |  "VK_DELETE"
    *
-   * @param {String} key The chrome key (e.g. "PageUp", "Space", ...)
-   * @return The constructed value for the Key's 'keycode' attribute.
+   * @param {string} chromeKey The chrome key (e.g. "PageUp", "Space", ...)
+   * @returns {string} The constructed value for the Key's 'keycode' attribute.
    */
   getKeycodeAttribute(chromeKey) {
     return `VK${chromeKey.replace(/([A-Z])/g, "_$&").toUpperCase()}`;
@@ -176,7 +193,7 @@ CommandList.prototype = {
    *    ["MacCtrl"]       |   "control"
    *
    * @param {Array} chromeModifiers The array of chrome modifiers.
-   * @return The constructed value for the Key's 'modifiers' attribute.
+   * @returns {string} The constructed value for the Key's 'modifiers' attribute.
    */
   getModifiersAttribute(chromeModifiers) {
     let modifiersMap = {
@@ -195,7 +212,7 @@ CommandList.prototype = {
 
 /* eslint-disable mozilla/balanced-listeners */
 extensions.on("manifest_commands", (type, directive, extension, manifest) => {
-  commandsMap.set(extension, new CommandList(manifest.commands, extension.id));
+  commandsMap.set(extension, new CommandList(manifest, extension));
 });
 
 extensions.on("shutdown", (type, extension) => {
@@ -207,7 +224,7 @@ extensions.on("shutdown", (type, extension) => {
 });
 /* eslint-enable mozilla/balanced-listeners */
 
-extensions.registerSchemaAPI("commands", null, (extension, context) => {
+extensions.registerSchemaAPI("commands", (extension, context) => {
   return {
     commands: {
       getAll() {

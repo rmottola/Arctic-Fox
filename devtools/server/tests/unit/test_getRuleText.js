@@ -5,7 +5,7 @@
 
 "use strict";
 
-const {getRuleText} = devtools.require("devtools/server/actors/styles");
+const {getRuleText} = require("devtools/server/actors/styles");
 
 const TEST_DATA = [
   {
@@ -69,8 +69,8 @@ const TEST_DATA = [
     desc: "Multi-lines CSS and multi-line rule",
     input: [
       "/* ",
-       "* some comments",
-       "*/",
+      "* some comments",
+      "*/",
       "",
       "body {",
       "    margin: 0;",
@@ -99,6 +99,13 @@ const TEST_DATA = [
     line: 1,
     column: 4,
     expected: {offset: 7, text: "border:1px solid red;content: '}';color:red;"}
+  },
+  {
+    desc: "Rule contains no tokens",
+    input: "div{}",
+    line: 1,
+    column: 1,
+    expected: {offset: 4, text: ""}
   },
 ];
 

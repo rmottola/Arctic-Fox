@@ -44,6 +44,7 @@
     <command id="View:PageSource" oncommand="BrowserViewSource(window.gBrowser.selectedBrowser);" observes="canViewSource"/>
     <command id="View:PageInfo" oncommand="BrowserPageInfo();"/>
     <command id="View:FullScreen" oncommand="BrowserFullScreen();"/>
+    <command id="View:ReaderView" oncommand="ReaderParent.toggleReaderMode(event);"/>
     <command id="cmd_find"
              oncommand="gFindBar.onFindCommand();"
              observes="isImage"/>
@@ -169,6 +170,14 @@
     <broadcaster id="isFrameImage"/>
     <broadcaster id="singleFeedMenuitemState" disabled="true"/>
     <broadcaster id="multipleFeedsMenuState" hidden="true"/>
+
+    <!-- Sync broadcasters -->
+    <!-- A broadcaster of a number of attributes suitable for "sync now" UI -
+        A 'syncstatus' attribute is set while actively syncing, and the label
+        attribute which changes from "sync now" to "syncing" etc. -->
+    <broadcaster id="sync-status"/>
+    <!-- broadcasters of the "hidden" attribute to reflect setup state for
+         menus -->
     <broadcaster id="sync-setup-state"/>
     <broadcaster id="sync-syncnow-state" hidden="true"/>
     <broadcaster id="sync-reauth-state" hidden="true"/>

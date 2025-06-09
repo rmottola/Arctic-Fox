@@ -7,7 +7,8 @@
 
 var Cu = Components.utils;
 const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
-const {parseSingleValue} = require("devtools/client/shared/css-parsing-utils");
+const {parseSingleValue} = require("devtools/shared/css-parsing-utils");
+const {isCssPropertyKnown} = require("devtools/server/actors/css-properties");
 
 const TEST_DATA = [
   {input: null, throws: true},
@@ -18,10 +19,16 @@ const TEST_DATA = [
   {input: "blue !important", expected: {value: "blue", priority: "important"}},
   {input: "blue!important", expected: {value: "blue", priority: "important"}},
   {input: "blue ! important", expected: {value: "blue", priority: "important"}},
-  {input: "blue !  important", expected: {value: "blue", priority: "important"}},
+  {
+    input: "blue !  important",
+    expected: {value: "blue", priority: "important"}
+  },
   {input: "blue !", expected: {value: "blue", priority: ""}},
   {input: "blue !mportant", expected: {value: "blue !mportant", priority: ""}},
-  {input: "  blue   !important ", expected: {value: "blue", priority: "important"}},
+  {
+    input: "  blue   !important ",
+    expected: {value: "blue", priority: "important"}
+  },
   {
     input: "url(\"http://url.com/whyWouldYouDoThat!important.png\") !important",
     expected: {
@@ -63,10 +70,11 @@ function run_test() {
   for (let test of TEST_DATA) {
     do_print("Test input value " + test.input);
     try {
-      let output = parseSingleValue(test.input);
+      let output = parseSingleValue(isCssPropertyKnown, test.input);
       assertOutput(output, test.expected);
     } catch (e) {
-      do_print("parseSingleValue threw an exception with the given input value");
+      do_print("parseSingleValue threw an exception with the given input " +
+        "value");
       if (test.throws) {
         do_print("Exception expected");
         do_check_true(true);

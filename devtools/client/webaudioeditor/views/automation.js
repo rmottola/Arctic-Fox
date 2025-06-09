@@ -7,7 +7,7 @@
  * Functions handling the audio node inspector UI.
  */
 
-let AutomationView = {
+var AutomationView = {
 
   /**
    * Initialization function called when the tool starts up.
@@ -63,7 +63,7 @@ let AutomationView = {
    * the parameter view is changed, or when new param data events
    * are fired for the currently specified param.
    */
-  render: Task.async(function *() {
+  render: Task.async(function* () {
     let node = this._currentNode;
     let paramName = this._selectedParamName;
     // Escape if either node or parameter name does not exist.

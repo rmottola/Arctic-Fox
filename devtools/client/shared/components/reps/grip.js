@@ -6,83 +6,80 @@
 "use strict";
 
 // Make this available to both AMD and CJS environments
-define(function(require, exports, module) {
+define(function (require, exports, module) {
   // ReactJS
   const React = require("devtools/client/shared/vendor/react");
-
   // Dependencies
   const { createFactories, isGrip } = require("./rep-utils");
   const { ObjectBox } = createFactories(require("./object-box"));
   const { Caption } = createFactories(require("./caption"));
-
+  const { PropRep } = createFactories(require("./prop-rep"));
   // Shortcuts
   const { span } = React.DOM;
 
   /**
-   * @template TODO docs
+   * Renders generic grip. Grip is client representation
+   * of remote JS object and is used as an input object
+   * for this rep component.
    */
   const Grip = React.createClass({
+    displayName: "Grip",
+
     propTypes: {
       object: React.PropTypes.object.isRequired,
       mode: React.PropTypes.string,
     },
 
-    displayName: "Grip",
-
-    getTitle: function() {
-      return "";
+    getTitle: function (object) {
+      if (this.props.objectLink) {
+        return this.props.objectLink({
+          object: object
+        }, object.class);
+      }
+      return object.class || "Object";
     },
 
-    longPropIterator: function(object) {
+    safePropIterator: function (object, max) {
+      max = (typeof max === "undefined") ? 3 : max;
       try {
-        return this.propIterator(object, 100);
+        return this.propIterator(object, max);
       } catch (err) {
         console.error(err);
       }
       return [];
     },
 
-    shortPropIterator: function(object) {
-      try {
-        return this.propIterator(object, 3);
-      } catch (err) {
-        console.error(err);
-      }
-      return [];
-    },
-
-    propIterator: function(object, max) {
+    propIterator: function (object, max) {
       // Property filter. Show only interesting properties to the user.
       let isInterestingProp = (type, value) => {
         return (
           type == "boolean" ||
           type == "number" ||
-          type == "string" ||
-          type == "object"
+          (type == "string" && value.length != 0)
         );
       };
 
-      // Object members with non-empty values are preferred since it gives the
-      // user a better overview of the object.
-      let props = this.getProps(object, max, isInterestingProp);
-
-      if (props.length <= max) {
-        // There are not enough props yet (or at least, not enough props to
-        // be able to know whether we should print "more..." or not).
-        // Let's display also empty members and functions.
-        props = props.concat(this.getProps(object, max, (t, value) => {
-          return !isInterestingProp(t, value);
-        }));
+      let ownProperties = object.preview ? object.preview.ownProperties : [];
+      let indexes = this.getPropIndexes(ownProperties, max, isInterestingProp);
+      if (indexes.length < max && indexes.length < object.ownPropertyLength) {
+        // There are not enough props yet. Then add uninteresting props to display them.
+        indexes = indexes.concat(
+          this.getPropIndexes(ownProperties, max - indexes.length, (t, value) => {
+            return !isInterestingProp(t, value);
+          })
+        );
       }
 
-      // getProps() can return max+1 properties (it can't return more)
-      // to indicate that there is more props than allowed. Remove the last
-      // one and append 'more...' postfix in such case.
-      if (props.length > max) {
-        props.pop();
+      let props = this.getProps(ownProperties, indexes);
+      if (props.length < object.ownPropertyLength) {
+        // There are some undisplayed props. Then display "more...".
+        let objectLink = this.props.objectLink || span;
+
         props.push(Caption({
           key: "more",
-          object: "more...",
+          object: objectLink({
+            object: object
+          }, "more…")
         }));
       } else if (props.length > 0) {
         // Remove the last comma.
@@ -97,115 +94,118 @@ define(function(require, exports, module) {
       return props;
     },
 
-    getProps: function(object, max, filter) {
+    /**
+     * Get props ordered by index.
+     *
+     * @param {Object} ownProperties Props object.
+     * @param {Array} indexes Indexes of props.
+     * @return {Array} Props.
+     */
+    getProps: function (ownProperties, indexes) {
       let props = [];
 
-      max = max || 3;
-      if (!object) {
-        return props;
-      }
+      // Make indexes ordered by ascending.
+      indexes.sort(function (a, b) {
+        return a - b;
+      });
+
+      indexes.forEach((i) => {
+        let name = Object.keys(ownProperties)[i];
+        let value = ownProperties[name].value;
+        props.push(PropRep(Object.assign({}, this.props, {
+          key: name,
+          mode: "tiny",
+          name: name,
+          object: value,
+          equal: ": ",
+          delim: ", ",
+        })));
+      });
+
+      return props;
+    },
+
+    /**
+     * Get the indexes of props in the object.
+     *
+     * @param {Object} ownProperties Props object.
+     * @param {Number} max The maximum length of indexes array.
+     * @param {Function} filter Filter the props you want.
+     * @return {Array} Indexes of interesting props in the object.
+     */
+    getPropIndexes: function (ownProperties, max, filter) {
+      let indexes = [];
 
       try {
-        let ownProperties = object.preview ? object.preview.ownProperties : [];
+        let i = 0;
         for (let name in ownProperties) {
-          if (props.length > max) {
-            return props;
+          if (indexes.length >= max) {
+            return indexes;
           }
 
           let prop = ownProperties[name];
-          let value = prop.value || {};
+          let value = prop.value;
 
           // Type is specified in grip's "class" field and for primitive
           // values use typeof.
           let type = (value.class || typeof value);
           type = type.toLowerCase();
 
-          // Show only interesting properties.
           if (filter(type, value)) {
-            props.push(PropRep(Object.assign({}, this.props, {
-              key: name,
-              mode: "tiny",
-              name: name,
-              object: value,
-              equal: ": ",
-              delim: ", ",
-            })));
+            indexes.push(i);
           }
+          i++;
         }
       } catch (err) {
         console.error(err);
       }
 
-      return props;
+      return indexes;
     },
 
-    render: function() {
+    render: function () {
       let object = this.props.object;
-      let props = this.shortPropIterator(object);
+      let props = this.safePropIterator(object,
+        (this.props.mode == "long") ? 100 : 3);
 
+      let objectLink = this.props.objectLink || span;
       if (this.props.mode == "tiny" || !props.length) {
         return (
           ObjectBox({className: "object"},
-            span({className: "objectTitle"}, this.getTitle(object)),
-            span({className: "objectLeftBrace", role: "presentation"}, "{}")
+            this.getTitle(object),
+            objectLink({
+              className: "objectLeftBrace",
+              role: "presentation",
+              object: object
+            }, "")
           )
         );
       }
 
       return (
         ObjectBox({className: "object"},
-          span({className: "objectTitle"}, this.getTitle(object)),
-          span({className: "objectLeftBrace", role: "presentation"}, "{"),
+          this.getTitle(object),
+          objectLink({
+            className: "objectLeftBrace",
+            role: "presentation",
+            object: object
+          }, " {"),
           props,
-          span({className: "objectRightBrace"}, "}")
+          objectLink({
+            className: "objectRightBrace",
+            role: "presentation",
+            object: object
+          }, "}")
         )
       );
     },
   });
 
-  /**
-   * Property for a grip object.
-   */
-  let PropRep = React.createFactory(React.createClass({
-    propTypes: {
-      name: React.PropTypes.string,
-      equal: React.PropTypes.string,
-      delim: React.PropTypes.string,
-    },
-
-    displayName: "PropRep",
-
-    render: function() {
-      let { Rep } = createFactories(require("./rep"));
-
-      return (
-        span({},
-          span({
-            "className": "nodeName"},
-            this.props.name),
-          span({
-            "className": "objectEqual",
-            role: "presentation"},
-            this.props.equal
-          ),
-          Rep(this.props),
-          span({
-            "className": "objectComma",
-            role: "presentation"},
-            this.props.delim
-          )
-        )
-      );
-    }
-  }));
-
   // Registration
-
   function supportsObject(object, type) {
     if (!isGrip(object)) {
       return false;
     }
-
     return (object.preview && object.preview.ownProperties);
   }
 

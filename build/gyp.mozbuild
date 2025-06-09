@@ -1,4 +1,4 @@
-# -*- Mode: python; c-basic-offset: 4; indent-tabs-mode: nil; tab-width: 40 -*-
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
 # vim: set filetype=python:
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -39,6 +39,8 @@ gyp_vars = {
 
     'use_x11': 1 if CONFIG['MOZ_X11'] else 0,
     'use_glib': 1 if CONFIG['GLIB_LIBS'] else 0,
+    'use_avfoundation': 1 if CONFIG['MOZ_AVFOUNDATION'] else 0,
+    'use_qtkit': 1 if CONFIG['MOZ_QTKIT'] else 0,
 
      # turn off mandatory use of NEON and instead use NEON detection
     'arm_neon': 0,

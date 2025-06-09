@@ -186,7 +186,7 @@ let InternalFaviconLoader = {
 
   loadFavicon(browser, principal, uri) {
     this.ensureInitialized();
-    let win = browser.ownerDocument.defaultView;
+    let win = browser.ownerGlobal;
     if (!gFaviconLoadDataMap.has(win)) {
       gFaviconLoadDataMap.set(win, []);
       let unloadHandler = event => {
@@ -1122,7 +1122,7 @@ this.PlacesUIUtils = {
           concreteId: PlacesUtils.bookmarksMenuFolderId },
       "UnfiledBookmarks":
         { title: null,
-          concreteTitle: PlacesUtils.getString("UnsortedBookmarksFolderTitle"),
+          concreteTitle: PlacesUtils.getString("OtherBookmarksFolderTitle"),
           concreteId: PlacesUtils.unfiledBookmarksFolderId },
     };
     // All queries but PlacesRoot.

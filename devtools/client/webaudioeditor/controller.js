@@ -69,12 +69,18 @@ var WebAudioEditorController = {
     } else {
       AUDIO_NODE_DEFINITION = require("devtools/server/actors/utils/audionodes.json");
     }
+
+    // Make sure the backend is prepared to handle audio contexts.
+    // Since actors are created lazily on the first request to them, we need to send an
+    // early request to ensure the CallWatcherActor is running and watching for new window
+    // globals.
+    gFront.setup({ reload: false });
   }),
 
   /**
    * Remove events emitted by the current tab target.
    */
-  destroy: function() {
+  destroy: function () {
     gTarget.off("will-navigate", this._onTabNavigated);
     gTarget.off("navigate", this._onTabNavigated);
     gFront.off("start-context", this._onStartContext);
@@ -107,7 +113,7 @@ var WebAudioEditorController = {
 
     if (!node) {
       let { resolve, promise } = defer();
-      gAudioNodes.on("add", function createNodeListener (createdNode) {
+      gAudioNodes.on("add", function createNodeListener(createdNode) {
         if (createdNode.id === id) {
           gAudioNodes.off("add", createNodeListener);
           resolve(createdNode);
@@ -133,11 +139,6 @@ var WebAudioEditorController = {
   _onTabNavigated: Task.async(function* (event, {isFrameSwitching}) {
     switch (event) {
       case "will-navigate": {
-        // Make sure the backend is prepared to handle audio contexts.
-        if (!isFrameSwitching) {
-          yield gFront.setup({ reload: false });
-        }
-
         // Clear out current UI.
         this.reset();
 
@@ -172,7 +173,7 @@ var WebAudioEditorController = {
    * Called after the first audio node is created in an audio context,
    * signaling that the audio context is being used.
    */
-  _onStartContext: function() {
+  _onStartContext: function () {
     $("#reload-notice").hidden = true;
     $("#waiting-notice").hidden = true;
     $("#content").hidden = false;

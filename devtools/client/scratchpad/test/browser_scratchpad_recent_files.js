@@ -3,20 +3,14 @@
    http://creativecommons.org/publicdomain/zero/1.0/ */
 /* Bug 651942 */
 
-let tempScope = {};
-Cu.import("resource://gre/modules/NetUtil.jsm", tempScope);
-Cu.import("resource://gre/modules/FileUtils.jsm", tempScope);
-let NetUtil = tempScope.NetUtil;
-let FileUtils = tempScope.FileUtils;
-
 // Reference to the Scratchpad object.
-let gScratchpad;
+var gScratchpad;
 
 // References to the temporary nsIFiles.
-let gFile01;
-let gFile02;
-let gFile03;
-let gFile04;
+var gFile01;
+var gFile02;
+var gFile03;
+var gFile04;
 
 // lists of recent files.
 var lists = {
@@ -27,17 +21,17 @@ var lists = {
 };
 
 // Temporary file names.
-let gFileName01 = "file01_ForBug651942.tmp"
-let gFileName02 = "☕" // See bug 783858 for more information
-let gFileName03 = "file03_ForBug651942.tmp"
-let gFileName04 = "file04_ForBug651942.tmp"
+var gFileName01 = "file01_ForBug651942.tmp";
+var gFileName02 = "☕"; // See bug 783858 for more information
+var gFileName03 = "file03_ForBug651942.tmp";
+var gFileName04 = "file04_ForBug651942.tmp";
 
 // Content for the temporary files.
-let gFileContent;
-let gFileContent01 = "hello.world.01('bug651942');";
-let gFileContent02 = "hello.world.02('bug651942');";
-let gFileContent03 = "hello.world.03('bug651942');";
-let gFileContent04 = "hello.world.04('bug651942');";
+var gFileContent;
+var gFileContent01 = "hello.world.01('bug651942');";
+var gFileContent02 = "hello.world.02('bug651942');";
+var gFileContent03 = "hello.world.03('bug651942');";
+var gFileContent04 = "hello.world.04('bug651942');";
 
 function startTest()
 {
@@ -202,7 +196,7 @@ function createAndLoadTemporaryFile(aFile, aFileName, aFileContent)
             0o644, fout.DEFER_OPEN);
 
   gScratchpad.setFilename(aFile.path);
-  gScratchpad.importFromFile(aFile.QueryInterface(Ci.nsILocalFile),  true,
+  gScratchpad.importFromFile(aFile.QueryInterface(Ci.nsILocalFile), true,
                             fileImported);
   gScratchpad.saveFile(fileSaved);
 
@@ -308,7 +302,7 @@ var PreferenceObserver = {
     }
   },
 
-  uninit: function PO_uninit () {
+  uninit: function PO_uninit() {
     this.branch.removeObserver("", this);
   }
 };

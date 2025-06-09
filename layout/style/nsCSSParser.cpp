@@ -13,8 +13,10 @@
 #include "mozilla/TypedEnumBits.h"
 
 #include <algorithm> // for std::stable_sort
+#include <limits> // for std::numeric_limits
 
 #include "nsCSSParser.h"
+#include "nsAlgorithm.h"
 #include "nsCSSProps.h"
 #include "nsCSSKeywords.h"
 #include "nsCSSScanner.h"
@@ -1067,7 +1069,7 @@ protected:
   bool ParseTransitionTimingFunctionValues(nsCSSValue& aValue);
   bool ParseTransitionTimingFunctionValueComponent(float& aComponent,
                                                      char aStop,
-                                                     bool aCheckRange);
+                                                     bool aIsXPoint);
   bool ParseTransitionStepTimingFunctionValues(nsCSSValue& aValue);
   enum ParseAnimationOrTransitionShorthandResult {
     eParseAnimationOrTransitionShorthand_Values,
@@ -15421,6 +15423,16 @@ CSSParserImpl::ParseFunctionInternals(const uint32_t aVariantMask[],
       break;
     }
 
+    if (nsCSSValue::IsFloatUnit(newValue.GetUnit())) {
+      // Clamp infinity or -infinity values to max float or -max float to avoid
+      // calculations with infinity.
+      newValue.SetFloatValue(
+        mozilla::clamped(newValue.GetFloatValue(),
+                         -std::numeric_limits<float>::max(),
+                          std::numeric_limits<float>::max()),
+        newValue.GetUnit());
+    }
+
     aOutput.AppendElement(newValue);
 
     if (ExpectSymbol(',', true)) {
@@ -16387,7 +16399,7 @@ CSSParserImpl::ParseTransitionTimingFunctionValues(nsCSSValue& aValue)
 bool
 CSSParserImpl::ParseTransitionTimingFunctionValueComponent(float& aComponent,
                                                            char aStop,
-                                                           bool aCheckRange)
+                                                           bool aIsXPoint)
 {
   if (!GetToken(true)) {
     return false;
@@ -16395,7 +16407,14 @@ CSSParserImpl::ParseTransitionTimingFunctionValueComponent(float& aComponent,
   nsCSSToken* tk = &mToken;
   if (tk->mType == eCSSToken_Number) {
     float num = tk->mNumber;
-    if (aCheckRange && (num < 0.0 || num > 1.0)) {
+
+    // Clamp infinity or -infinity values to max float or -max float to avoid
+    // calculations with infinity.
+    num = mozilla::clamped(num, -std::numeric_limits<float>::max(),
+                                 std::numeric_limits<float>::max());
+
+    // X control point should be inside [0, 1] range.
+    if (aIsXPoint && (num < 0.0 || num > 1.0)) {
       return false;
     }
     aComponent = num;

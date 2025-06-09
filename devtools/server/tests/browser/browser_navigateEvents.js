@@ -16,7 +16,7 @@ SpecialPowers.pushPrefEnv({"set": [["dom.require_user_interaction_for_beforeunlo
 var i = 0;
 function assertEvent(event, data) {
   let x = 0;
-  switch(i++) {
+  switch (i++) {
     case x++:
       is(event, "request", "Get first page load");
       is(data, URL1);
@@ -32,13 +32,14 @@ function assertEvent(event, data) {
       is(data.newURI, URL2, "newURI property is correct");
       break;
     case x++:
-      is(event, "tabNavigated", "Right after will-navigate, the client receive tabNavigated");
-      is(data.state, "start", "state is start");
-      is(data.url, URL2, "url property is correct");
+      is(event, "request", "RDP is async with messageManager, the request happens after will-navigate");
+      is(data, URL2);
       break;
     case x++:
-      is(event, "request", "Given that locally, the Debugger protocol is sync, the request happens after tabNavigated");
-      is(data, URL2);
+      is(event, "tabNavigated", "After the request, the client receive tabNavigated");
+      is(data.state, "start", "state is start");
+      is(data.url, URL2, "url property is correct");
+      is(data.nativeConsoleAPI, true, "nativeConsoleAPI is correct");
       break;
     case x++:
       is(event, "DOMContentLoaded");
@@ -56,6 +57,7 @@ function assertEvent(event, data) {
       is(event, "tabNavigated", "Finally, the receive the client event");
       is(data.state, "stop", "state is stop");
       is(data.url, URL2, "url property is correct");
+      is(data.nativeConsoleAPI, true, "nativeConsoleAPI is correct");
 
       // End of test!
       cleanup();
@@ -102,10 +104,9 @@ function getServerTabActor(callback) {
   client = new DebuggerClient(transport);
   connectDebuggerClient(client).then(form => {
     let actorID = form.actor;
-    client.attachTab(actorID, function(aResponse, aTabClient) {
+    client.attachTab(actorID, function (aResponse, aTabClient) {
       // !Hack! Retrieve a server side object, the BrowserTabActor instance
-      let conn = transport._serverConnection;
-      let tabActor = conn.getActor(actorID);
+      let tabActor = DebuggerServer._searchAllConnectionsForActor(actorID);
       callback(tabActor);
     });
   });
@@ -117,7 +118,7 @@ function getServerTabActor(callback) {
 
 function test() {
   // Open a test tab
-  addTab(URL1).then(function(browser) {
+  addTab(URL1).then(function (browser) {
     let doc = browser.contentDocument;
     getServerTabActor(function (tabActor) {
       // In order to listen to internal will-navigate/navigate events

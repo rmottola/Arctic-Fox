@@ -8,7 +8,7 @@ const React = require("devtools/client/shared/vendor/react");
 const ReactDOM = require("devtools/client/shared/vendor/react-dom");
 
 // Reps
-const { parseURLParams } = require("devtools/client/shared/components/reps/url");
+const { parseURLParams } = require("devtools/client/shared/components/reps/rep-utils");
 
 // Network
 const { cancelEvent, isLeftClick } = require("./utils/events");
@@ -38,8 +38,9 @@ function NetRequest(log) {
 }
 
 NetRequest.prototype = {
-  initialize: function(log) {
-    this.client = log.client;
+  initialize: function (log) {
+    this.client = log.consoleFrame.webConsoleClient;
+    this.owner = log.consoleFrame.owner;
 
     // 'this.file' field is following HAR spec.
     // http://www.softwareishard.com/blog/har-12-spec/
@@ -65,7 +66,7 @@ NetRequest.prototype = {
     this.addClickListener();
   },
 
-  addClickListener: function() {
+  addClickListener: function () {
     // Add an event listener to toggle the expanded state when clicked.
     // The event bubbling is canceled if the user clicks on the log
     // itself (not on the expanded body), so opening of the default
@@ -91,7 +92,7 @@ NetRequest.prototype = {
     }, true);
   },
 
-  onToggleBody: function(event) {
+  onToggleBody: function (event) {
     let target = event.currentTarget;
     let logRow = target.closest(".netRequest");
     logRow.classList.toggle("opened");
@@ -114,7 +115,7 @@ NetRequest.prototype = {
   /**
    * Executed when 'networkEventUpdate' is received from the backend.
    */
-  updateBody: function(response) {
+  updateBody: function (response) {
     // 'networkEventUpdate' event indicates that there are new data
     // available on the backend. The following logic checks the response
     // cache and if this data has been already requested before they
@@ -130,14 +131,14 @@ NetRequest.prototype = {
   /**
    * Close network inline preview body.
    */
-  closeBody: function() {
+  closeBody: function () {
     this.netInfoBodyBox.parentNode.removeChild(this.netInfoBodyBox);
   },
 
   /**
    * Render network inline preview body.
    */
-  renderBody: function() {
+  renderBody: function () {
     let messageBody = this.parentNode.querySelector(".message-body-wrapper");
 
     // Create box for all markup rendered by ReactJS. Since we are
@@ -163,7 +164,7 @@ NetRequest.prototype = {
   /**
    * Render top level ReactJS component.
    */
-  refresh: function() {
+  refresh: function () {
     if (!this.netInfoBodyBox) {
       return;
     }
@@ -179,7 +180,7 @@ NetRequest.prototype = {
 
   // Communication with the backend
 
-  requestData: function(method) {
+  requestData: function (method) {
     // If the response has already been received bail out.
     let response = this.cachedResponses.get(method);
     if (response) {
@@ -211,7 +212,7 @@ NetRequest.prototype = {
     });
   },
 
-  onRequestData: function(method, response) {
+  onRequestData: function (method, response) {
     // TODO: This code will be part of a reducer.
     let result;
     switch (method) {
@@ -240,19 +241,19 @@ NetRequest.prototype = {
     });
   },
 
-  onRequestHeaders: function(response) {
+  onRequestHeaders: function (response) {
     this.file.request.headers = response.headers;
 
     return this.resolveHeaders(this.file.request.headers);
   },
 
-  onResponseHeaders: function(response) {
+  onResponseHeaders: function (response) {
     this.file.response.headers = response.headers;
 
     return this.resolveHeaders(this.file.response.headers);
   },
 
-  onResponseContent: function(response) {
+  onResponseContent: function (response) {
     let content = response.content;
 
     for (let p in content) {
@@ -262,22 +263,26 @@ NetRequest.prototype = {
     return Promise.resolve();
   },
 
-  onRequestPostData: function(response) {
+  onRequestPostData: function (response) {
     this.file.request.postData = response.postData;
     return Promise.resolve();
   },
 
-  onRequestCookies: function(response) {
+  onRequestCookies: function (response) {
     this.file.request.cookies = response.cookies;
     return this.resolveHeaders(this.file.request.cookies);
   },
 
-  onResponseCookies: function(response) {
+  onResponseCookies: function (response) {
     this.file.response.cookies = response.cookies;
     return this.resolveHeaders(this.file.response.cookies);
   },
 
-  resolveHeaders: function(headers) {
+  onViewSourceInDebugger: function (frame) {
+    this.owner.viewSourceInDebugger(frame.source, frame.line);
+  },
+
+  resolveHeaders: function (headers) {
     let promises = [];
 
     for (let header of headers) {
@@ -291,7 +296,7 @@ NetRequest.prototype = {
     return Promise.all(promises);
   },
 
-  resolveString: function(object, propName) {
+  resolveString: function (object, propName) {
     let stringGrip = object[propName];
     if (typeof stringGrip == "object") {
       DataProvider.resolveString(this.client, stringGrip).then(args => {

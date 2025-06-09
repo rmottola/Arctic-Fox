@@ -7,6 +7,7 @@
 /* import-globals-from ../../../framework/test/shared-head.js */
 /* import-globals-from ../../../framework/test/shared-redux-head.js */
 /* import-globals-from ../../../commandline/test/helpers.js */
+/* import-globals-from ../../../inspector/test/shared-head.js */
 
 Services.scriptloader.loadSubScript(
   "chrome://mochitests/content/browser/devtools/client/framework/test/shared-head.js",
@@ -20,22 +21,42 @@ Services.scriptloader.loadSubScript(
   "chrome://mochitests/content/browser/devtools/client/commandline/test/helpers.js",
   this);
 
+// Import helpers registering the test-actor in remote targets
+Services.scriptloader.loadSubScript(
+  "chrome://mochitests/content/browser/devtools/client/shared/test/test-actor-registry.js",
+  this);
+
+// Import helpers for the inspector that are also shared with others
+Services.scriptloader.loadSubScript(
+  "chrome://mochitests/content/browser/devtools/client/inspector/test/shared-head.js",
+  this);
+
 const TEST_URI_ROOT = "http://example.com/browser/devtools/client/responsive.html/test/browser/";
+const OPEN_DEVICE_MODAL_VALUE = "OPEN_DEVICE_MODAL";
+
+const { _loadPreferredDevices } = require("devtools/client/responsive.html/actions/devices");
+const { getOwnerWindow } = require("sdk/tabs/utils");
+const asyncStorage = require("devtools/shared/async-storage");
 
 SimpleTest.requestCompleteLog();
 SimpleTest.waitForExplicitFinish();
 
 DevToolsUtils.testing = true;
+Services.prefs.clearUserPref("devtools.responsive.html.displayedDeviceList");
 Services.prefs.setCharPref("devtools.devices.url",
   TEST_URI_ROOT + "devices.json");
 Services.prefs.setBoolPref("devtools.responsive.html.enabled", true);
 
 registerCleanupFunction(() => {
   DevToolsUtils.testing = false;
-  Services.pref.clearUserPref("devtools.devices.url");
+  Services.prefs.clearUserPref("devtools.devices.url");
   Services.prefs.clearUserPref("devtools.responsive.html.enabled");
+  Services.prefs.clearUserPref("devtools.responsive.html.displayedDeviceList");
+  asyncStorage.removeItem("devtools.devices.url_cache");
 });
-const { ResponsiveUIManager } = Cu.import("resource://devtools/client/responsivedesign/responsivedesign.jsm", {});
+
+// This depends on the "devtools.responsive.html.enabled" pref
+const { ResponsiveUIManager } = require("resource://devtools/client/responsivedesign/responsivedesign.jsm");
 
 /**
  * Open responsive design mode for the given tab.
@@ -43,7 +64,7 @@ const { ResponsiveUIManager } = Cu.import("resource://devtools/client/responsive
 var openRDM = Task.async(function* (tab) {
   info("Opening responsive design mode");
   let manager = ResponsiveUIManager;
-  let ui = yield manager.openIfNeeded(window, tab);
+  let ui = yield manager.openIfNeeded(getOwnerWindow(tab), tab);
   info("Responsive design mode opened");
   return { ui, manager };
 });
@@ -51,10 +72,10 @@ var openRDM = Task.async(function* (tab) {
 /**
  * Close responsive design mode for the given tab.
  */
-var closeRDM = Task.async(function* (tab) {
+var closeRDM = Task.async(function* (tab, options) {
   info("Closing responsive design mode");
   let manager = ResponsiveUIManager;
-  yield manager.closeIfNeeded(window, tab);
+  yield manager.closeIfNeeded(getOwnerWindow(tab), tab, options);
   info("Responsive design mode closed");
 });
 
@@ -86,7 +107,7 @@ function addRDMTask(url, generator) {
 }
 
 function spawnViewportTask(ui, args, task) {
-  return ContentTask.spawn(ui.getViewportMessageManager(), args, task);
+  return ContentTask.spawn(ui.getViewportBrowser(), args, task);
 }
 
 function waitForFrameLoad(ui, targetURL) {
@@ -125,3 +146,81 @@ var setViewportSize = Task.async(function* (ui, manager, width, height) {
     yield resized;
   }
 });
+
+function openDeviceModal(ui) {
+  let { document } = ui.toolWindow;
+  let select = document.querySelector(".viewport-device-selector");
+  let modal = document.querySelector("#device-modal-wrapper");
+  let editDeviceOption = [...select.options].filter(o => {
+    return o.value === OPEN_DEVICE_MODAL_VALUE;
+  })[0];
+
+  info("Checking initial device modal state");
+  ok(modal.classList.contains("closed") && !modal.classList.contains("opened"),
+    "The device modal is closed by default.");
+
+  info("Opening device modal through device selector.");
+  EventUtils.synthesizeMouseAtCenter(select, {type: "mousedown"},
+    ui.toolWindow);
+  EventUtils.synthesizeMouseAtCenter(editDeviceOption, {type: "mouseup"},
+    ui.toolWindow);
+
+  ok(modal.classList.contains("opened") && !modal.classList.contains("closed"),
+    "The device modal is displayed.");
+}
+
+function getSessionHistory(browser) {
+  return ContentTask.spawn(browser, {}, function* () {
+    /* eslint-disable no-undef */
+    let { interfaces: Ci } = Components;
+    let webNav = docShell.QueryInterface(Ci.nsIWebNavigation);
+    let sessionHistory = webNav.sessionHistory;
+    let result = {
+      index: sessionHistory.index,
+      entries: []
+    };
+
+    for (let i = 0; i < sessionHistory.count; i++) {
+      let entry = sessionHistory.getEntryAtIndex(i, false);
+      result.entries.push({
+        uri: entry.URI.spec,
+        title: entry.title
+      });
+    }
+
+    return result;
+    /* eslint-enable no-undef */
+  });
+}
+
+function waitForPageShow(browser) {
+  let mm = browser.messageManager;
+  return new Promise(resolve => {
+    let onShow = message => {
+      if (message.target != browser) {
+        return;
+      }
+      mm.removeMessageListener("PageVisibility:Show", onShow);
+      resolve();
+    };
+    mm.addMessageListener("PageVisibility:Show", onShow);
+  });
+}
+
+function load(browser, url) {
+  let loaded = BrowserTestUtils.browserLoaded(browser, false, url);
+  browser.loadURI(url, null, null);
+  return loaded;
+}
+
+function back(browser) {
+  let shown = waitForPageShow(browser);
+  browser.goBack();
+  return shown;
+}
+
+function forward(browser) {
+  let shown = waitForPageShow(browser);
+  browser.goForward();
+  return shown;
+}

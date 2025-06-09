@@ -37,20 +37,12 @@ const Services = require("Services");
 const isMac = Services.appinfo.OS === "Darwin";
 
 loader.lazyRequireGetter(this, "gDevToolsBrowser", "devtools/client/framework/devtools-browser", true);
-loader.lazyRequireGetter(this, "Eyedropper", "devtools/client/eyedropper/eyedropper", true);
+loader.lazyRequireGetter(this, "CommandUtils", "devtools/client/shared/developer-toolbar", true);
+loader.lazyRequireGetter(this, "TargetFactory", "devtools/client/framework/target", true);
 
 loader.lazyImporter(this, "BrowserToolboxProcess", "resource://devtools/client/framework/ToolboxProcess.jsm");
 loader.lazyImporter(this, "ResponsiveUIManager", "resource://devtools/client/responsivedesign/responsivedesign.jsm");
 loader.lazyImporter(this, "ScratchpadManager", "resource://devtools/client/scratchpad/scratchpad-manager.jsm");
-
-/**
- * Detect the presence of a Firebug.
- */
-function isFirebugInstalled() {
-  let bootstrappedAddons = Services.prefs
-    .getCharPref("extensions.bootstrappedAddons");
-  return bootstrappedAddons.indexOf("firebug@software.joehewitt.com") != -1;
-}
 
 exports.menuitems = [
   { id: "menu_devToolbox",
@@ -66,11 +58,10 @@ exports.menuitems = [
       // and needs to be translated differently
       keytext: true,
     },
-    // This key conflicts with firebug, only enable it when it's not installed.
-    additionalKeys: !isFirebugInstalled() ? [{
+    additionalKeys: [{
       id: "devToolboxMenuItemF12",
       l10nKey: "devToolsCmd",
-    }] : null,
+    }],
     checkbox: true
   },
   { id: "menu_devtools_separator",
@@ -154,9 +145,13 @@ exports.menuitems = [
     l10nKey: "eyedropper",
     oncommand(event) {
       let window = event.target.ownerDocument.defaultView;
-      let eyedropper = new Eyedropper(window, { context: "menu",
-                                                copyOnSelect: true });
-      eyedropper.open();
+      let target = TargetFactory.forTab(window.gBrowser.selectedTab);
+
+      CommandUtils.createRequisition(target, {
+        environment: CommandUtils.createEnvironment({target})
+      }).then(requisition => {
+        requisition.updateExec("eyedropper --frommenu");
+      }, e => console.error(e));
     },
     checkbox: true
   },

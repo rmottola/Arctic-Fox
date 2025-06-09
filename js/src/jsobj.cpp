@@ -3686,6 +3686,8 @@ JSObject::allocKindForTenure(const js::Nursery& nursery) const
      */
     if (is<TypedArrayObject>() && !as<TypedArrayObject>().hasBuffer()) {
         size_t nbytes = as<TypedArrayObject>().byteLength();
+        if (nbytes >= TypedArrayObject::INLINE_BUFFER_LIMIT)
+            return GetGCObjectKind(getClass());
         return GetBackgroundAllocKind(TypedArrayObject::AllocKindForLazyBuffer(nbytes));
     }
 
@@ -3831,7 +3833,7 @@ JS::ubi::Concrete<JSObject>::size(mozilla::MallocSizeOf mallocSizeOf) const
     return obj.tenuredSizeOfThis() + info.sizeOfAllThings();
 }
 
-const char16_t JS::ubi::Concrete<JSObject>::concreteTypeName[] = MOZ_UTF16("JSObject");
+const char16_t JS::ubi::Concrete<JSObject>::concreteTypeName[] = u"JSObject";
 
 void
 JSObject::traceChildren(JSTracer* trc)

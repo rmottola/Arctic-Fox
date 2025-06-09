@@ -66,7 +66,6 @@ if CONFIG['MOZ_WIDGET_TOOLKIT'] in {
     'gtk3',
     'uikit',
     'gonk',
-    'qt',
   }:
     DEFINES['SK_FONTHOST_DOES_NOT_USE_FONTMGR'] = 1
 
@@ -116,6 +115,9 @@ DEFINES['SKIA_IMPLEMENTATION'] = 1
 if not CONFIG['MOZ_ENABLE_SKIA_GPU']:
     DEFINES['SK_SUPPORT_GPU'] = 0
 
+if CONFIG['MOZ_TREE_FREETYPE']:
+    DEFINES['SK_CAN_USE_DLOPEN'] = 0
+
 # Suppress warnings in third-party code.
 if CONFIG['GNU_CXX'] or CONFIG['CLANG_CL']:
     CXXFLAGS += [
@@ -138,11 +140,11 @@ if CONFIG['CLANG_CXX'] or CONFIG['CLANG_CL']:
         '-Wno-unused-private-field',
     ]
 
-if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3', 'android', 'gonk', 'qt'):
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3', 'android', 'gonk'):
     CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
     CXXFLAGS += CONFIG['CAIRO_FT_CFLAGS']
 
-if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3', 'qt'):
+if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3'):
     CXXFLAGS += CONFIG['MOZ_PANGO_CFLAGS']
 """
 
@@ -417,9 +419,6 @@ def write_mozbuild(sources):
   write_sources(f, sources['mac'], 4)
 
   f.write("if 'gtk' in CONFIG['MOZ_WIDGET_TOOLKIT']:\n")
-  write_sources(f, sources['linux'], 4)
-
-  f.write("if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'qt':\n")
   write_sources(f, sources['linux'], 4)
 
   f.write("if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':\n")

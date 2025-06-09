@@ -50,7 +50,7 @@
 #include "mozilla/unused.h"
 #include "mozilla/IMEStateManager.h"
 #include "mozilla/VsyncDispatcher.h"
-#include "mozilla/layers/APZCTreeManager.h"
+#include "mozilla/layers/IAPZCTreeManager.h"
 #include "mozilla/layers/APZEventState.h"
 #include "mozilla/layers/APZThreadUtils.h"
 #include "mozilla/layers/ChromeProcessController.h"
@@ -522,6 +522,11 @@ NS_METHOD nsBaseWidget::Destroy()
     parent->RemoveChild(this);
   }
 
+#if defined(XP_WIN)
+  // Allow our scroll capture container to be cleaned up, if we have one.
+  mScrollCaptureContainer = nullptr;
+#endif
+
   return NS_OK;
 }
 
@@ -989,7 +994,7 @@ void nsBaseWidget::ConfigureAPZCTreeManager()
 
   mAPZC->SetDPI(GetDPI());
 
-  RefPtr<APZCTreeManager> treeManager = mAPZC;  // for capture by the lambdas
+  RefPtr<IAPZCTreeManager> treeManager = mAPZC;  // for capture by the lambdas
 
   ContentReceivedInputBlockCallback callback(
       [treeManager](const ScrollableLayerGuid& aGuid,
@@ -999,7 +1004,7 @@ void nsBaseWidget::ConfigureAPZCTreeManager()
         MOZ_ASSERT(NS_IsMainThread());
         APZThreadUtils::RunOnControllerThread(NewRunnableMethod
                                               <uint64_t, bool>(treeManager,
-                                                               &APZCTreeManager::ContentReceivedInputBlock,
+                                                               &IAPZCTreeManager::ContentReceivedInputBlock,
                                                                aInputBlockId,
                                                                aPreventDefault));
       });
@@ -1012,7 +1017,7 @@ void nsBaseWidget::ConfigureAPZCTreeManager()
     APZThreadUtils::RunOnControllerThread(NewRunnableMethod
       <uint64_t,
        StoreCopyPassByLRef<nsTArray<TouchBehaviorFlags>>>(treeManager,
-                                                          &APZCTreeManager::SetAllowedTouchBehavior,
+                                                          &IAPZCTreeManager::SetAllowedTouchBehavior,
                                                           aInputBlockId, aFlags));
   };
 
@@ -1041,8 +1046,8 @@ nsBaseWidget::SetConfirmedTargetAPZC(uint64_t aInputBlockId,
                                      const nsTArray<ScrollableLayerGuid>& aTargets) const
 {
   // Need to specifically bind this since it's overloaded.
-  void (APZCTreeManager::*setTargetApzcFunc)(uint64_t, const nsTArray<ScrollableLayerGuid>&)
-          = &APZCTreeManager::SetTargetAPZC;
+  void (IAPZCTreeManager::*setTargetApzcFunc)(uint64_t, const nsTArray<ScrollableLayerGuid>&)
+          = &IAPZCTreeManager::SetTargetAPZC;
   APZThreadUtils::RunOnControllerThread(NewRunnableMethod
     <uint64_t, StoreCopyPassByRRef<nsTArray<ScrollableLayerGuid>>>(mAPZC,
                                                                    setTargetApzcFunc,
@@ -1178,7 +1183,7 @@ class DispatchWheelInputOnControllerThread : public Runnable
 {
 public:
   DispatchWheelInputOnControllerThread(const WidgetWheelEvent& aWheelEvent,
-                                       APZCTreeManager* aAPZC,
+                                       IAPZCTreeManager* aAPZC,
                                        nsBaseWidget* aWidget)
     : mMainMessageLoop(MessageLoop::current())
     , mWheelInput(aWheelEvent)
@@ -1202,7 +1207,7 @@ public:
 private:
   MessageLoop* mMainMessageLoop;
   ScrollWheelInput mWheelInput;
-  RefPtr<APZCTreeManager> mAPZC;
+  RefPtr<IAPZCTreeManager> mAPZC;
   nsBaseWidget* mWidget;
   nsEventStatus mAPZResult;
   uint64_t mInputBlockId;
@@ -1306,20 +1311,24 @@ void nsBaseWidget::CreateCompositor(int aWidth, int aHeight)
 
   RefPtr<ClientLayerManager> lm = new ClientLayerManager(this);
 
+  bool useAPZ = UseAPZ();
+
   gfx::GPUProcessManager* gpu = gfx::GPUProcessManager::Get();
   mCompositorSession = gpu->CreateTopLevelCompositor(
     this,
     lm,
     GetDefaultScale(),
-    UseAPZ(),
+    useAPZ,
     UseExternalCompositingSurface(),
     gfx::IntSize(aWidth, aHeight));
   mCompositorBridgeChild = mCompositorSession->GetCompositorBridgeChild();
   mCompositorWidgetDelegate = mCompositorSession->GetCompositorWidgetDelegate();
 
-  mAPZC = mCompositorSession->GetAPZCTreeManager();
-  if (mAPZC) {
+  if (useAPZ) {
+    mAPZC = mCompositorSession->GetAPZCTreeManager();
     ConfigureAPZCTreeManager();
+  } else {
+    mAPZC = nullptr;
   }
 
   if (mInitialZoomConstraints) {
@@ -1934,7 +1943,7 @@ nsBaseWidget::StartAsyncScrollbarDrag(const AsyncDragMetrics& aDragMetrics)
 
   APZThreadUtils::RunOnControllerThread(NewRunnableMethod
     <ScrollableLayerGuid, AsyncDragMetrics>(mAPZC,
-                                            &APZCTreeManager::StartScrollbarDrag,
+                                            &IAPZCTreeManager::StartScrollbarDrag,
                                             guid, aDragMetrics));
 }
 
@@ -2143,6 +2152,81 @@ nsIWidget::UpdateRegisteredPluginWindowVisibility(uintptr_t aOwnerWidget,
   }
 #endif
 }
+
+#if defined(XP_WIN)
+// static
+void
+nsIWidget::CaptureRegisteredPlugins(uintptr_t aOwnerWidget)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(sPluginWidgetList);
+
+  // Our visible list is associated with a compositor which is associated with
+  // a specific top level window. We use the parent widget during iteration
+  // to skip the plugin widgets owned by other top level windows.
+  for (auto iter = sPluginWidgetList->Iter(); !iter.Done(); iter.Next()) {
+    const void* windowId = iter.Key();
+    nsIWidget* widget = iter.UserData();
+
+    MOZ_ASSERT(windowId);
+    MOZ_ASSERT(widget);
+
+    if (!widget->Destroyed() && widget->IsVisible()) {
+      if ((uintptr_t)widget->GetParent() == aOwnerWidget) {
+        widget->UpdateScrollCapture();
+      }
+    }
+  }
+}
+
+uint64_t
+nsBaseWidget::CreateScrollCaptureContainer()
+{
+  mScrollCaptureContainer =
+    LayerManager::CreateImageContainer(ImageContainer::ASYNCHRONOUS);
+  if (!mScrollCaptureContainer) {
+    NS_WARNING("Failed to create ImageContainer for widget image capture.");
+    return ImageContainer::sInvalidAsyncContainerId;
+  }
+
+  return mScrollCaptureContainer->GetAsyncContainerID();
+}
+
+void
+nsBaseWidget::UpdateScrollCapture()
+{
+  // Don't capture if no container or no size.
+  if (!mScrollCaptureContainer || mBounds.width <= 0 || mBounds.height <= 0) {
+    return;
+  }
+
+  // If the derived class cannot take a snapshot, for example due to clipping,
+  // then it is responsible for creating a fallback. If null is returned, this
+  // means that we want to keep the existing snapshot.
+  RefPtr<gfx::SourceSurface> snapshot = CreateScrollSnapshot();
+  if (!snapshot) {
+    return;
+  }
+
+  ImageContainer::NonOwningImage holder(new SourceSurfaceImage(snapshot));
+
+  AutoTArray<ImageContainer::NonOwningImage, 1> imageList;
+  imageList.AppendElement(holder);
+
+  mScrollCaptureContainer->SetCurrentImages(imageList);
+}
+
+void
+nsBaseWidget::DefaultFillScrollCapture(DrawTarget* aSnapshotDrawTarget)
+{
+  gfx::IntSize dtSize = aSnapshotDrawTarget->GetSize();
+  aSnapshotDrawTarget->FillRect(
+    gfx::Rect(0, 0, dtSize.width, dtSize.height),
+    gfx::ColorPattern(gfx::Color::FromABGR(kScrollCaptureFillColor)),
+    gfx::DrawOptions(1.f, gfx::CompositionOp::OP_SOURCE));
+  aSnapshotDrawTarget->Flush();
+}
+#endif
 
 NS_IMETHODIMP_(nsIWidget::NativeIMEContext)
 nsIWidget::GetNativeIMEContext()
@@ -2915,7 +2999,6 @@ case _value: eventName.AssignLiteral(_name) ; break
   switch(aGuiEvent->mMessage)
   {
     _ASSIGN_eventName(eBlur,"eBlur");
-    _ASSIGN_eventName(eLegacyDragGesture,"eLegacyDragGesture");
     _ASSIGN_eventName(eDrop,"eDrop");
     _ASSIGN_eventName(eDragEnter,"eDragEnter");
     _ASSIGN_eventName(eDragExit,"eDragExit");

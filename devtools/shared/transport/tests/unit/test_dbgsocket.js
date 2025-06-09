@@ -26,7 +26,7 @@ function* test_socket_conn()
   };
   let listener = DebuggerServer.createListener();
   do_check_true(listener);
-  listener.portOrPath = -1 /* any available port */;
+  listener.portOrPath = -1;
   listener.authenticator = authenticator;
   listener.open();
   do_check_eq(DebuggerServer.listeningSockets, 1);
@@ -45,13 +45,13 @@ function* test_socket_conn()
     host: "127.0.0.1",
     port: gPort
   });
-  let closedDeferred = promise.defer();
+  let closedDeferred = defer();
   transport.hooks = {
-    onPacket: function(aPacket) {
-      this.onPacket = function(aPacket) {
+    onPacket: function (aPacket) {
+      this.onPacket = function (aPacket) {
         do_check_eq(aPacket.unicode, unicodeString);
         transport.close();
-      }
+      };
       // Verify that things work correctly when bigger than the output
       // transport buffers and when transporting unicode...
       transport.send({to: "root",
@@ -60,7 +60,7 @@ function* test_socket_conn()
                       unicode: unicodeString});
       do_check_eq(aPacket.from, "root");
     },
-    onClosed: function(aStatus) {
+    onClosed: function (aStatus) {
       closedDeferred.resolve();
     },
   };
@@ -105,11 +105,11 @@ function test_pipe_conn()
 {
   let transport = DebuggerServer.connectPipe();
   transport.hooks = {
-    onPacket: function(aPacket) {
+    onPacket: function (aPacket) {
       do_check_eq(aPacket.from, "root");
       transport.close();
     },
-    onClosed: function(aStatus) {
+    onClosed: function (aStatus) {
       run_next_test();
     }
   };

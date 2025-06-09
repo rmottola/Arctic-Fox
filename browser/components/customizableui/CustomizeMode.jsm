@@ -1172,6 +1172,8 @@ CustomizeMode.prototype = {
 
       CustomizableUI.reset();
 
+      this.swatchForTheme(this.document);
+
       yield this._wrapToolbarItems();
       this.populatePalette();
 
@@ -1197,6 +1199,8 @@ CustomizeMode.prototype = {
       yield this._unwrapToolbarItems();
 
       CustomizableUI.undoReset();
+
+      this.swatchForTheme(this.document);
 
       yield this._wrapToolbarItems();
       this.populatePalette();
@@ -1234,7 +1238,7 @@ CustomizeMode.prototype = {
   },
 
   onWidgetBeforeDOMChange: function(aNodeToChange, aSecondaryNode, aContainer) {
-    if (aContainer.ownerDocument.defaultView != this.window || this.resetting) {
+    if (aContainer.ownerGlobal != this.window || this.resetting) {
       return;
     }
     if (aContainer.id == CustomizableUI.AREA_PANEL) {
@@ -1251,7 +1255,7 @@ CustomizeMode.prototype = {
   },
 
   onWidgetAfterDOMChange: function(aNodeToChange, aSecondaryNode, aContainer) {
-    if (aContainer.ownerDocument.defaultView != this.window || this.resetting) {
+    if (aContainer.ownerGlobal != this.window || this.resetting) {
       return;
     }
     // If the node is still attached to the container, wrap it again:
@@ -1337,6 +1341,8 @@ CustomizeMode.prototype = {
   onLWThemesMenuShowing: function(aEvent) {
     const DEFAULT_THEME_ID = "{972ce4c6-7e08-4474-a285-3208198ce6fd}";
     const RECENT_LWT_COUNT = 5;
+
+    this.resetLWThemesMenu(aEvent.target);
 
     function previewTheme(aEvent) {
       LightweightThemeManager.previewTheme(aEvent.target.theme.id != DEFAULT_THEME_ID ?
@@ -1443,8 +1449,8 @@ CustomizeMode.prototype = {
     }.bind(this));
   },
 
-  onLWThemesMenuHidden: function(aEvent) {
-    let doc = aEvent.target.ownerDocument;
+  resetLWThemesMenu: function(target) {
+    let doc = target.ownerDocument;
     let footer = doc.getElementById("customization-lwtheme-menu-footer");
     let recommendedLabel = doc.getElementById("customization-lwtheme-menu-recommended");
     this.swatchForTheme(doc);
@@ -1454,7 +1460,11 @@ CustomizeMode.prototype = {
         element.previousSibling.remove();
       }
     }
-    aEvent.target.removeAttribute("height");
+    target.removeAttribute("height");
+
+    if (LightweightThemeManager.currentTheme) {
+      this._onUIChange();
+    }
   },
 
   _onUIChange: function() {
@@ -1693,7 +1703,7 @@ CustomizeMode.prototype = {
           dragValue = "before";
         } else {
           // Check if the aDraggedItem is hovered past the first half of dragOverItem
-          let window = dragOverItem.ownerDocument.defaultView;
+          let window = dragOverItem.ownerGlobal;
           let direction = window.getComputedStyle(dragOverItem, null).direction;
           let itemRect = dragOverItem.getBoundingClientRect();
           let dropTargetCenter = itemRect.left + (itemRect.width / 2);
@@ -1982,7 +1992,7 @@ CustomizeMode.prototype = {
     // mozSourceNode is null in the dragStart event handler or if
     // the drag event originated in an external application.
     return !mozSourceNode ||
-           mozSourceNode.ownerDocument.defaultView != this.window;
+           mozSourceNode.ownerGlobal != this.window;
   },
 
   _setDragActive: function(aItem, aValue, aDraggedItemId, aInToolbar) {
@@ -1993,7 +2003,7 @@ CustomizeMode.prototype = {
     if (aItem.getAttribute("dragover") != aValue) {
       aItem.setAttribute("dragover", aValue);
 
-      let window = aItem.ownerDocument.defaultView;
+      let window = aItem.ownerGlobal;
       let draggedItem = window.document.getElementById(aDraggedItemId);
       if (!aInToolbar) {
         this._setGridDragActive(aItem, draggedItem, aValue);
@@ -2034,7 +2044,7 @@ CustomizeMode.prototype = {
     }
   },
   _cancelDragActive: function(aItem, aNextItem, aNoTransition) {
-    this._updateToolbarCustomizationOutline(aItem.ownerDocument.defaultView);
+    this._updateToolbarCustomizationOutline(aItem.ownerGlobal);
     let currentArea = this._getCustomizableParent(aItem);
     if (!currentArea) {
       return;

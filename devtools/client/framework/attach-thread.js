@@ -6,7 +6,7 @@
 
 const {Cc, Ci, Cu} = require("chrome");
 const Services = require("Services");
-const promise = require("promise");
+const defer = require("devtools/shared/defer");
 
 function l10n(name) {
   const bundle = Services.strings.createBundle("chrome://devtools/locale/toolbox.properties");
@@ -30,9 +30,9 @@ function handleThreadState(toolbox, event, packet) {
   if (event === "paused") {
     toolbox.highlightTool("jsdebugger");
 
-    if (packet.why.type === 'debuggerStatement' ||
-       packet.why.type === 'breakpoint' ||
-       packet.why.type === 'exception') {
+    if (packet.why.type === "debuggerStatement" ||
+       packet.why.type === "breakpoint" ||
+       packet.why.type === "exception") {
       toolbox.raise();
       toolbox.selectTool("jsdebugger");
     }
@@ -42,7 +42,7 @@ function handleThreadState(toolbox, event, packet) {
 }
 
 function attachThread(toolbox) {
-  let deferred = promise.defer();
+  let deferred = defer();
 
   let target = toolbox.target;
   let { form: { chromeDebugger, actor } } = target;
@@ -85,9 +85,9 @@ function attachThread(toolbox) {
         );
       }
 
-      deferred.resolve(threadClient)
+      deferred.resolve(threadClient);
     });
-  }
+  };
 
   if (target.isAddon) {
     // Attaching an addon

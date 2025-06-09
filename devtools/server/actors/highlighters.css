@@ -13,8 +13,27 @@
   element.
 */
 
+:-moz-native-anonymous {
+  /*
+  Content CSS applying to the html element impact the highlighters.
+  To avoid that, possible cases have been set to initial.
+  */
+  text-transform: initial;
+  text-indent: initial;
+  letter-spacing: initial;
+  word-spacing: initial;
+}
+
 :-moz-native-anonymous .highlighter-container {
-  position: absolute;
+  --highlighter-guide-color: #08c;
+  --highlighter-content-color: #87ceeb;
+  --highlighter-bubble-text-color: hsl(216, 33%, 97%);
+  --highlighter-bubble-background-color: hsl(214, 13%, 24%);
+  --highlighter-bubble-border-color: rgba(255, 255, 255, 0.2);
+}
+
+:-moz-native-anonymous .highlighter-container {
+  position: fixed;
   width: 100%;
   height: 100%;
   /* The container for all highlighters doesn't react to pointer-events by
@@ -46,7 +65,7 @@
 }
 
 :-moz-native-anonymous .box-model-content {
-  fill: #87ceeb;
+  fill: var(--highlighter-content-color);
 }
 
 :-moz-native-anonymous .box-model-padding {
@@ -72,7 +91,7 @@
 :-moz-native-anonymous .box-model-guide-right,
 :-moz-native-anonymous .box-model-guide-bottom,
 :-moz-native-anonymous .box-model-guide-left {
-  stroke: #08c;
+  stroke: var(--highlighter-guide-color);
   stroke-dasharray: 5 3;
   shape-rendering: crispEdges;
 }
@@ -97,10 +116,12 @@
   min-width: 75px;
 
   border-radius: 3px;
-  background: hsl(214,13%,24%) no-repeat padding-box;
+  background: var(--highlighter-bubble-background-color) no-repeat padding-box;
 
-  color: hsl(216,33%,97%);
+  color: var(--highlighter-bubble-text-color);
   text-shadow: none;
+
+  border: 1px solid var(--highlighter-bubble-border-color);
 }
 
 :-moz-native-anonymous .box-model-nodeinfobar-container[hide-arrow] > .box-model-nodeinfobar {
@@ -110,26 +131,35 @@
 /* Arrows */
 
 :-moz-native-anonymous .box-model-nodeinfobar-container > .box-model-nodeinfobar:before {
+  left: calc(50% - 8px);
+  border: 8px solid var(--highlighter-bubble-border-color);
+}
+
+:-moz-native-anonymous .box-model-nodeinfobar-container > .box-model-nodeinfobar:after {
+  left: calc(50% - 7px);
+  border: 7px solid var(--highlighter-bubble-background-color);
+}
+
+:-moz-native-anonymous .box-model-nodeinfobar-container > .box-model-nodeinfobar:before,
+:-moz-native-anonymous .box-model-nodeinfobar-container > .box-model-nodeinfobar:after {
   content: "";
   display: none;
-
   position: absolute;
-  left: calc(50% - 8px);
-
   height: 0;
   width: 0;
-  border: 8px solid hsl(214,13%,24%);
   border-left-color: transparent;
   border-right-color: transparent;
 }
 
-:-moz-native-anonymous .box-model-nodeinfobar-container[position="top"]:not([hide-arrow]) > .box-model-nodeinfobar:before {
+:-moz-native-anonymous .box-model-nodeinfobar-container[position="top"]:not([hide-arrow]) > .box-model-nodeinfobar:before,
+:-moz-native-anonymous .box-model-nodeinfobar-container[position="top"]:not([hide-arrow]) > .box-model-nodeinfobar:after {
   border-bottom: 0;
   top: 100%;
   display: block;
 }
 
-:-moz-native-anonymous .box-model-nodeinfobar-container[position="bottom"]:not([hide-arrow]) > .box-model-nodeinfobar:before {
+:-moz-native-anonymous .box-model-nodeinfobar-container[position="bottom"]:not([hide-arrow]) > .box-model-nodeinfobar:before,
+:-moz-native-anonymous .box-model-nodeinfobar-container[position="bottom"]:not([hide-arrow]) > .box-model-nodeinfobar:after {
   border-top: 0;
   bottom: 100%;
   display: block;
@@ -141,35 +171,38 @@
   overflow: hidden;
   white-space: nowrap;
   direction: ltr;
-  text-align: center;
   padding-bottom: 1px;
+  display: flex;
 }
 
 :-moz-native-anonymous .box-model-nodeinfobar-tagname {
-  color: hsl(285,100%,75%);
-  text-transform: lowercase;
+  color: hsl(285,100%, 75%);
 }
 
 :-moz-native-anonymous .box-model-nodeinfobar-id {
-  color: hsl(103,46%,54%);
+  color: hsl(103, 46%, 54%);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 :-moz-native-anonymous .box-model-nodeinfobar-classes,
 :-moz-native-anonymous .box-model-nodeinfobar-pseudo-classes {
-  color: hsl(200,74%,57%);
+  color: hsl(200, 74%, 57%);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 :-moz-native-anonymous .box-model-nodeinfobar-dimensions {
-  color: hsl(210,30%,85%);
-  -moz-border-start: 1px solid #5a6169;
-  -moz-margin-start: 6px;
-  -moz-padding-start: 6px;
+  color: hsl(210, 30%, 85%);
+  border-inline-start: 1px solid #5a6169;
+  margin-inline-start: 6px;
+  padding-inline-start: 6px;
 }
 
 /* Css transform highlighter */
 
 :-moz-native-anonymous .css-transform-transformed {
-  fill: #80d4ff;
+  fill: var(--highlighter-content-color);
   opacity: 0.8;
 }
 
@@ -181,7 +214,7 @@
 :-moz-native-anonymous .css-transform-transformed,
 :-moz-native-anonymous .css-transform-untransformed,
 :-moz-native-anonymous .css-transform-line {
-  stroke: #08c;
+  stroke: var(--highlighter-guide-color);
   stroke-dasharray: 5 3;
   stroke-width: 2;
 }
@@ -190,7 +223,7 @@
 
 :-moz-native-anonymous .highlighted-rect {
   position: absolute;
-  background: #80d4ff;
+  background: var(--highlighter-content-color);
   opacity: 0.8;
 }
 
@@ -204,27 +237,27 @@
 }
 
 :-moz-native-anonymous .geometry-editor-offset-parent {
-  stroke: #08c;
+  stroke: var(--highlighter-guide-color);
   shape-rendering: crispEdges;
   stroke-dasharray: 5 3;
   fill: transparent;
 }
 
 :-moz-native-anonymous .geometry-editor-current-node {
-  stroke: #08c;
+  stroke: var(--highlighter-guide-color);
+  fill: var(--highlighter-content-color);
   shape-rendering: crispEdges;
-  fill: #87ceeb;
   opacity: 0.6;
 }
 
 :-moz-native-anonymous .geometry-editor-arrow {
-  stroke: #08c;
+  stroke: var(--highlighter-guide-color);
   shape-rendering: crispEdges;
 }
 
 :-moz-native-anonymous .geometry-editor-root circle {
-  stroke: #08c;
-  fill: #87ceeb;
+  stroke: var(--highlighter-guide-color);
+  fill: var(--highlighter-content-color);
 }
 
 :-moz-native-anonymous .geometry-editor-handler-top,
@@ -248,23 +281,23 @@
 :-moz-native-anonymous .geometry-editor-handler-right.dragging,
 :-moz-native-anonymous .geometry-editor-handler-bottom.dragging,
 :-moz-native-anonymous .geometry-editor-handler-left.dragging {
-  fill: #08c;
+  fill: var(--highlighter-guide-color);
 }
 
 :-moz-native-anonymous .geometry-editor-label-bubble {
-  fill: hsl(214,13%,24%);
+  fill: var(--highlighter-bubble-background-color);
   shape-rendering: crispEdges;
 }
 
 :-moz-native-anonymous .geometry-editor-label-text {
-  fill: hsl(216,33%,97%);
+  fill: var(--highlighter-bubble-text-color);
   font: message-box;
   font-size: 10px;
   text-anchor: middle;
   dominant-baseline: middle;
 }
 
-/* Rules highlighter */
+/* Rulers highlighter */
 
 :-moz-native-anonymous .rulers-highlighter-elements {
   shape-rendering: crispEdges;
@@ -300,7 +333,7 @@
 }
 
 :-moz-native-anonymous .rulers-highlighter-horizontal-labels > text {
-  text-anchor: left;
+  text-anchor: start;
 }
 
 :-moz-native-anonymous .rulers-highlighter-vertical-labels > text {
@@ -321,13 +354,13 @@
 :-moz-native-anonymous .measuring-tool-highlighter-root path {
   shape-rendering: crispEdges;
   fill: rgba(135, 206, 235, 0.6);
-  stroke: #08c;
+  stroke: var(--highlighter-guide-color);
   pointer-events: none;
 }
 
 :-moz-native-anonymous .dragging path {
   fill: rgba(135, 206, 235, 0.6);
-  stroke: #08c;
+  stroke: var(--highlighter-guide-color);
   opacity: 0.45;
 }
 
@@ -353,8 +386,9 @@
 }
 
 :-moz-native-anonymous .measuring-tool-highlighter-label-size {
-  color: hsl(216, 33%, 97%);
-  background: hsl(214, 13%, 24%);
+  color: var(--highlighter-bubble-text-color);
+  background: var(--highlighter-bubble-background-color);
+  border: 1px solid var(--highlighter-bubble-border-color);
   line-height: 1.5em;
 }
 
@@ -362,7 +396,71 @@
 :-moz-native-anonymous .measuring-tool-highlighter-guide-right,
 :-moz-native-anonymous .measuring-tool-highlighter-guide-bottom,
 :-moz-native-anonymous .measuring-tool-highlighter-guide-left {
-  stroke: #08c;
+  stroke: var(--highlighter-guide-color);
   stroke-dasharray: 5 3;
   shape-rendering: crispEdges;
+}
+
+/* Eye dropper */
+
+:-moz-native-anonymous .eye-dropper-root {
+  --magnifier-width: 96px;
+  --magnifier-height: 96px;
+  /* Width accounts for all color formats (hsl being the longest) */
+  --label-width: 160px;
+  --color: #e0e0e0;
+
+  position: absolute;
+  /* Tool start position. This should match the X/Y defines in JS */
+  top: 100px;
+  left: 100px;
+
+  /* Prevent interacting with the page when hovering and clicking */
+  pointer-events: auto;
+
+  /* Offset the UI so it is centered around the pointer */
+  transform: translate(
+    calc(var(--magnifier-width) / -2), calc(var(--magnifier-height) / -2));
+
+  filter: drop-shadow(0 0 1px rgba(0,0,0,.4));
+
+  /* We don't need the UI to be reversed in RTL locales, otherwise the # would appear
+     to the right of the hex code. Force LTR */
+  direction: ltr;
+}
+
+:-moz-native-anonymous .eye-dropper-canvas {
+  image-rendering: -moz-crisp-edges;
+  cursor: none;
+  width: var(--magnifier-width);
+  height: var(--magnifier-height);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--color);
+  display: block;
+}
+
+:-moz-native-anonymous .eye-dropper-color-container {
+  background-color: var(--color);
+  border-radius: 2px;
+  width: var(--label-width);
+  transform: translateX(calc((var(--magnifier-width) - var(--label-width)) / 2));
+  position: relative;
+}
+
+:-moz-native-anonymous .eye-dropper-color-preview {
+  width: 16px;
+  height: 16px;
+  position: absolute;
+  offset-inline-start: 3px;
+  offset-block-start: 3px;
+  box-shadow: 0px 0px 0px black;
+  border: solid 1px #fff;
+}
+
+:-moz-native-anonymous .eye-dropper-color-value {
+  text-shadow: 1px 1px 1px #fff;
+  font: message-box;
+  font-size: 11px;
+  text-align: center;
+  padding: 4px 0;
 }

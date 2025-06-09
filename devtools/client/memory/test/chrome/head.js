@@ -4,19 +4,18 @@
 
 var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
-Cu.import("resource://testing-common/Assert.jsm");
-
-Cu.import("resource://devtools/client/shared/browser-loader.js");
+var { BrowserLoader } = Cu.import("resource://devtools/client/shared/browser-loader.js", {});
 var { require } = BrowserLoader({
   baseURI: "resource://devtools/client/memory/",
   window: this
 });
+var { Assert } = require("resource://testing-common/Assert.jsm");
 var Services = require("Services");
-var { Task } = require("resource://gre/modules/Task.jsm");
+var { Task } = require("devtools/shared/task");
 
 var EXPECTED_DTU_ASSERT_FAILURE_COUNT = 0;
 
-SimpleTest.registerCleanupFunction(function() {
+SimpleTest.registerCleanupFunction(function () {
   if (DevToolsUtils.assertionFailureCount !== EXPECTED_DTU_ASSERT_FAILURE_COUNT) {
     ok(false, "Should have had the expected number of DevToolsUtils.assert() failures. Expected " +
        EXPECTED_DTU_ASSERT_FAILURE_COUNT + ", got " + DevToolsUtils.assertionFailureCount);

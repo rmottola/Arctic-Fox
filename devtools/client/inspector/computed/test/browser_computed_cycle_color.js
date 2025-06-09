@@ -15,7 +15,7 @@ const TEST_URI = `
   <span id="matches" class="matches">Some styled text</span>
 `;
 
-add_task(function*() {
+add_task(function* () {
   yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
   let {inspector, view} = yield openComputedView();
   yield selectNode("#matches", inspector);
@@ -59,6 +59,7 @@ function* checkColorCycling(container, view) {
 function* checkSwatchShiftClick(container, win, expectedValue, comment) {
   let swatch = container.querySelector(".computedview-colorswatch");
   let valueNode = container.querySelector(".computedview-color");
+  swatch.scrollIntoView();
 
   let onUnitChange = swatch.once("unit-change");
   EventUtils.synthesizeMouseAtCenter(swatch, {

@@ -5,17 +5,16 @@
 
 // Tests the Filter Editor Widget add, removeAt, updateAt, getValueAt methods
 
-const BASE_URI = "chrome://devtools/content/shared/widgets/";
-const TEST_URI = BASE_URI + "filter-frame.xhtml";
 const {CSSFilterEditorWidget} = require("devtools/client/shared/widgets/FilterWidget");
 const GRAYSCALE_MAX = 100;
 const INVERT_MIN = 0;
 
-add_task(function*() {
-  yield addTab("about:blank");
+const TEST_URI = `data:text/html,<div id="filter-container" />`;
+
+add_task(function* () {
   let [host, win, doc] = yield createHost("bottom", TEST_URI);
 
-  const container = doc.querySelector("#container");
+  const container = doc.querySelector("#filter-container");
   let widget = new CSSFilterEditorWidget(container, "none");
 
   info("Test add method");
@@ -24,19 +23,19 @@ add_task(function*() {
      "Should add filters");
 
   const url = widget.add("url", "test.svg");
-  is(widget.getCssValue(), `blur(10.2px) url(test.svg)`,
+  is(widget.getCssValue(), "blur(10.2px) url(test.svg)",
      "Should add filters in order");
 
   info("Test updateValueAt method");
   widget.updateValueAt(url, "test2.svg");
   widget.updateValueAt(blur, 5);
-  is(widget.getCssValue(), `blur(5px) url(test2.svg)`,
+  is(widget.getCssValue(), "blur(5px) url(test2.svg)",
      "Should update values correctly");
 
   info("Test getValueAt method");
   is(widget.getValueAt(blur), "5px",
      "Should return value + unit");
-  is(widget.getValueAt(url), `test2.svg`,
+  is(widget.getValueAt(url), "test2.svg",
      "Should return value for string-type filters");
 
   info("Test removeAt method");

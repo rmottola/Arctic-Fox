@@ -4,9 +4,9 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include <stdint.h>
-#include <assert.h>
 #include <math.h>
 #include "../AudioPacketizer.h"
+#include <mozilla/Assertions.h>
 
 using namespace mozilla;
 
@@ -42,10 +42,10 @@ void IsSequence(int16_t* aBuffer, uint32_t aSize, uint32_t aStart = 0)
   for (uint32_t i = 0; i < aSize; i++) {
     if (aBuffer[i] != static_cast<int64_t>(aStart + i)) {
       fprintf(stderr, "Buffer is not a sequence at offset %u\n", i);
-      assert(false);
+      MOZ_CRASH("Buffer is not a sequence");
     }
   }
-  assert("Buffer is a sequence.");
+  // Buffer is a sequence.
 }
 
 void Zero(int16_t* aBuffer, uint32_t aSize)
@@ -53,7 +53,7 @@ void Zero(int16_t* aBuffer, uint32_t aSize)
   for (uint32_t i = 0; i < aSize; i++) {
     if (aBuffer[i] != 0) {
       fprintf(stderr, "Buffer is not null at offset %u\n", i);
-      assert(false);
+      MOZ_CRASH("Buffer is not null");
     }
   }
 }
@@ -70,7 +70,7 @@ int main() {
       for (int16_t i = 0; i < 10; i++) {
         int16_t* out = ap.Output();
         Zero(out, 441);
-        delete out;
+        delete[] out;
       }
     }
     // Simple test, with input/output buffer size aligned on the packet size,
@@ -85,7 +85,7 @@ int main() {
         ap.Input(b.Get(), 441);
         int16_t* out = ap.Output();
         IsSequence(out, 441 * channels, prevEnd);
-        delete out;
+        delete[] out;
       }
     }
     // Simple test, with input/output buffer size aligned on the packet size,
@@ -106,8 +106,8 @@ int main() {
         int16_t* out2 = ap.Output();
         IsSequence(out, 441 * channels, prevEnd0);
         IsSequence(out2, 441 * channels, prevEnd1);
-        delete out;
-        delete out2;
+        delete[] out;
+        delete[] out2;
       }
     }
     // Input/output buffer size not aligned on the packet size,
@@ -129,8 +129,8 @@ int main() {
         prevEnd += 441 * channels;
         IsSequence(out2, 441 * channels, prevEnd);
         prevEnd += 441 * channels;
-        delete out;
-        delete out2;
+        delete[] out;
+        delete[] out2;
       }
       printf("Available: %d\n", ap.PacketsAvailable());
     }
@@ -157,8 +157,8 @@ int main() {
           int16_t* packet = ap.Output();
           for (uint32_t k = 0; k < ap.PacketSize(); k++) {
             for (int32_t c = 0; c < channels; c++) {
-              assert(packet[k * channels + c] ==
-                     static_cast<int16_t>(((2 << 14) * sine(outPhase))));
+              MOZ_RELEASE_ASSERT(packet[k * channels + c] ==
+                                 static_cast<int16_t>(((2 << 14) * sine(outPhase))));
             }
             outPhase++;
           }

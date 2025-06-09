@@ -8,6 +8,8 @@ const l10n = require("gcli/l10n");
 
 exports.items = [
   {
+    item: "command",
+    runAt: "server",
     name: "qsa",
     description: l10n.lookup("qsaDesc"),
     params: [{

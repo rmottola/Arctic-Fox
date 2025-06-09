@@ -34,9 +34,11 @@
 #include "nsHashKeys.h"
 #include "nsIFile.h"
 #include "nsISimpleEnumerator.h"
+#include "nsThreadUtils.h"
 
 #include "mozilla/dom/PluginCrashedEvent.h"
 #include "mozilla/EventDispatcher.h"
+#include "mozilla/Attributes.h"
 
 namespace mozilla {
 
@@ -152,122 +154,6 @@ GeckoMediaPluginService::GeckoMediaPluginService()
 
 GeckoMediaPluginService::~GeckoMediaPluginService()
 {
-}
-
-void
-GeckoMediaPluginService::RemoveObsoletePluginCrashCallbacks()
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  for (size_t i = mPluginCrashCallbacks.Length(); i != 0; --i) {
-    RefPtr<GMPCrashCallback>& callback = mPluginCrashCallbacks[i - 1];
-    if (!callback->IsStillValid()) {
-      LOGD(("%s::%s - Removing obsolete callback for pluginId %i",
-            __CLASS__, __FUNCTION__, callback->GetPluginId()));
-      mPluginCrashCallbacks.RemoveElementAt(i - 1);
-    }
-  }
-}
-
-GeckoMediaPluginService::GMPCrashCallback::GMPCrashCallback(const uint32_t aPluginId,
-                                                            nsPIDOMWindowInner* aParentWindow,
-                                                            nsIDocument* aDocument)
-  : mPluginId(aPluginId)
-  , mParentWindowWeakPtr(do_GetWeakReference(aParentWindow))
-  , mDocumentWeakPtr(do_GetWeakReference(aDocument))
-{
-  MOZ_ASSERT(NS_IsMainThread());
-}
-
-void
-GeckoMediaPluginService::GMPCrashCallback::Run(const nsACString& aPluginName)
-{
-  dom::PluginCrashedEventInit init;
-  init.mPluginID = mPluginId;
-  init.mBubbles = true;
-  init.mCancelable = true;
-  init.mGmpPlugin = true;
-  CopyUTF8toUTF16(aPluginName, init.mPluginName);
-  init.mSubmittedCrashReport = false;
-
-  // The following PluginCrashedEvent fields stay empty:
-  // init.mBrowserDumpID
-  // init.mPluginFilename
-  // TODO: Can/should we fill them?
-
-  nsCOMPtr<nsPIDOMWindowInner> parentWindow;
-  nsCOMPtr<nsIDocument> document;
-  if (!GetParentWindowAndDocumentIfValid(parentWindow, document)) {
-    return;
-  }
-
-  RefPtr<dom::PluginCrashedEvent> event =
-    dom::PluginCrashedEvent::Constructor(document, NS_LITERAL_STRING("PluginCrashed"), init);
-  event->SetTrusted(true);
-  event->WidgetEventPtr()->mFlags.mOnlyChromeDispatch = true;
-
-  EventDispatcher::DispatchDOMEvent(parentWindow, nullptr, event, nullptr, nullptr);
-}
-
-bool
-GeckoMediaPluginService::GMPCrashCallback::IsStillValid()
-{
-  nsCOMPtr<nsPIDOMWindowInner> parentWindow;
-  nsCOMPtr<nsIDocument> document;
-  return GetParentWindowAndDocumentIfValid(parentWindow, document);
-}
-
-bool
-GeckoMediaPluginService::GMPCrashCallback::GetParentWindowAndDocumentIfValid(
-  nsCOMPtr<nsPIDOMWindowInner>& parentWindow,
-  nsCOMPtr<nsIDocument>& document)
-{
-  parentWindow = do_QueryReferent(mParentWindowWeakPtr);
-  if (!parentWindow) {
-    return false;
-  }
-  document = do_QueryReferent(mDocumentWeakPtr);
-  if (!document) {
-    return false;
-  }
-  nsCOMPtr<nsIDocument> parentWindowDocument = parentWindow->GetExtantDoc();
-  if (!parentWindowDocument || document.get() != parentWindowDocument.get()) {
-    return false;
-  }
-  return true;
-}
-
-void
-GeckoMediaPluginService::AddPluginCrashedEventTarget(const uint32_t aPluginId,
-                                                     nsPIDOMWindowInner* aParentWindow)
-{
-  LOGD(("%s::%s(%i)", __CLASS__, __FUNCTION__, aPluginId));
-
-  if (NS_WARN_IF(!aParentWindow)) {
-    return;
-  }
-  nsCOMPtr<nsIDocument> doc = aParentWindow->GetExtantDoc();
-  if (NS_WARN_IF(!doc)) {
-    return;
-  }
-  RefPtr<GMPCrashCallback> callback(new GMPCrashCallback(aPluginId, aParentWindow, doc));
-  RemoveObsoletePluginCrashCallbacks();
-
-  // If the plugin with that ID has already crashed without being handled,
-  // just run the handler now.
-  for (size_t i = mPluginCrashes.Length(); i != 0; --i) {
-    size_t index = i - 1;
-    const PluginCrash& crash = mPluginCrashes[index];
-    if (crash.mPluginId == aPluginId) {
-      LOGD(("%s::%s(%i) - added crash handler for crashed plugin, running handler #%u",
-        __CLASS__, __FUNCTION__, aPluginId, index));
-      callback->Run(crash.mPluginName);
-      mPluginCrashes.RemoveElementAt(index);
-    }
-  }
-
-  // Remember crash, so if a handler is added for it later, we report the
-  // crash to that window too.
-  mPluginCrashCallbacks.AppendElement(callback);
 }
 
 NS_IMETHODIMP
@@ -411,22 +297,25 @@ GeckoMediaPluginService::GetAbstractGMPThread()
 class GetGMPContentParentForAudioDecoderDone : public GetGMPContentParentCallback
 {
 public:
-  explicit GetGMPContentParentForAudioDecoderDone(UniquePtr<GetGMPAudioDecoderCallback>&& aCallback)
+  explicit GetGMPContentParentForAudioDecoderDone(UniquePtr<GetGMPAudioDecoderCallback>&& aCallback,
+                                                  GMPCrashHelper* aHelper)
    : mCallback(Move(aCallback))
+   , mHelper(aHelper)
   {
   }
 
   void Done(GMPContentParent* aGMPParent) override
   {
     GMPAudioDecoderParent* gmpADP = nullptr;
-    if (aGMPParent) {
-      aGMPParent->GetGMPAudioDecoder(&gmpADP);
+    if (aGMPParent && NS_SUCCEEDED(aGMPParent->GetGMPAudioDecoder(&gmpADP))) {
+      gmpADP->SetCrashHelper(mHelper);
     }
     mCallback->Done(gmpADP);
   }
 
 private:
   UniquePtr<GetGMPAudioDecoderCallback> mCallback;
+  RefPtr<GMPCrashHelper> mHelper;
 };
 
 NS_IMETHODIMP
@@ -444,7 +333,7 @@ GeckoMediaPluginService::GetGMPAudioDecoder(GMPCrashHelper* aHelper,
   }
 
   UniquePtr<GetGMPContentParentCallback> callback(
-    new GetGMPContentParentForAudioDecoderDone(Move(aCallback)));
+    new GetGMPContentParentForAudioDecoderDone(Move(aCallback), aHelper));
   if (!GetContentParentFrom(aHelper,
                             aNodeId,
                             NS_LITERAL_CSTRING(GMP_API_AUDIO_DECODER),
@@ -459,8 +348,10 @@ GeckoMediaPluginService::GetGMPAudioDecoder(GMPCrashHelper* aHelper,
 class GetGMPContentParentForVideoDecoderDone : public GetGMPContentParentCallback
 {
 public:
-  explicit GetGMPContentParentForVideoDecoderDone(UniquePtr<GetGMPVideoDecoderCallback>&& aCallback)
+  explicit GetGMPContentParentForVideoDecoderDone(UniquePtr<GetGMPVideoDecoderCallback>&& aCallback,
+                                                  GMPCrashHelper* aHelper)
    : mCallback(Move(aCallback))
+   , mHelper(aHelper)
   {
   }
 
@@ -470,12 +361,14 @@ public:
     GMPVideoHostImpl* videoHost = nullptr;
     if (aGMPParent && NS_SUCCEEDED(aGMPParent->GetGMPVideoDecoder(&gmpVDP))) {
       videoHost = &gmpVDP->Host();
+      gmpVDP->SetCrashHelper(mHelper);
     }
     mCallback->Done(gmpVDP, videoHost);
   }
 
 private:
   UniquePtr<GetGMPVideoDecoderCallback> mCallback;
+  RefPtr<GMPCrashHelper> mHelper;
 };
 
 NS_IMETHODIMP
@@ -493,7 +386,7 @@ GeckoMediaPluginService::GetGMPVideoDecoder(GMPCrashHelper* aHelper,
   }
 
   UniquePtr<GetGMPContentParentCallback> callback(
-    new GetGMPContentParentForVideoDecoderDone(Move(aCallback)));
+    new GetGMPContentParentForVideoDecoderDone(Move(aCallback), aHelper));
   if (!GetContentParentFrom(aHelper,
                             aNodeId,
                             NS_LITERAL_CSTRING(GMP_API_VIDEO_DECODER),
@@ -508,8 +401,10 @@ GeckoMediaPluginService::GetGMPVideoDecoder(GMPCrashHelper* aHelper,
 class GetGMPContentParentForVideoEncoderDone : public GetGMPContentParentCallback
 {
 public:
-  explicit GetGMPContentParentForVideoEncoderDone(UniquePtr<GetGMPVideoEncoderCallback>&& aCallback)
+  explicit GetGMPContentParentForVideoEncoderDone(UniquePtr<GetGMPVideoEncoderCallback>&& aCallback,
+                                                  GMPCrashHelper* aHelper)
    : mCallback(Move(aCallback))
+   , mHelper(aHelper)
   {
   }
 
@@ -519,12 +414,14 @@ public:
     GMPVideoHostImpl* videoHost = nullptr;
     if (aGMPParent && NS_SUCCEEDED(aGMPParent->GetGMPVideoEncoder(&gmpVEP))) {
       videoHost = &gmpVEP->Host();
+      gmpVEP->SetCrashHelper(mHelper);
     }
     mCallback->Done(gmpVEP, videoHost);
   }
 
 private:
   UniquePtr<GetGMPVideoEncoderCallback> mCallback;
+  RefPtr<GMPCrashHelper> mHelper;
 };
 
 NS_IMETHODIMP
@@ -542,7 +439,7 @@ GeckoMediaPluginService::GetGMPVideoEncoder(GMPCrashHelper* aHelper,
   }
 
   UniquePtr<GetGMPContentParentCallback> callback(
-    new GetGMPContentParentForVideoEncoderDone(Move(aCallback)));
+    new GetGMPContentParentForVideoEncoderDone(Move(aCallback), aHelper));
   if (!GetContentParentFrom(aHelper,
                             aNodeId,
                             NS_LITERAL_CSTRING(GMP_API_VIDEO_ENCODER),
@@ -557,22 +454,25 @@ GeckoMediaPluginService::GetGMPVideoEncoder(GMPCrashHelper* aHelper,
 class GetGMPContentParentForDecryptorDone : public GetGMPContentParentCallback
 {
 public:
-  explicit GetGMPContentParentForDecryptorDone(UniquePtr<GetGMPDecryptorCallback>&& aCallback)
+  explicit GetGMPContentParentForDecryptorDone(UniquePtr<GetGMPDecryptorCallback>&& aCallback,
+                                               GMPCrashHelper* aHelper)
    : mCallback(Move(aCallback))
+   , mHelper(aHelper)
   {
   }
 
   void Done(GMPContentParent* aGMPParent) override
   {
     GMPDecryptorParent* ksp = nullptr;
-    if (aGMPParent) {
-      aGMPParent->GetGMPDecryptor(&ksp);
+    if (aGMPParent && NS_SUCCEEDED(aGMPParent->GetGMPDecryptor(&ksp))) {
+      ksp->SetCrashHelper(mHelper);
     }
     mCallback->Done(ksp);
   }
 
 private:
   UniquePtr<GetGMPDecryptorCallback> mCallback;
+  RefPtr<GMPCrashHelper> mHelper;
 };
 
 NS_IMETHODIMP
@@ -598,7 +498,7 @@ GeckoMediaPluginService::GetGMPDecryptor(GMPCrashHelper* aHelper,
   }
 
   UniquePtr<GetGMPContentParentCallback> callback(
-    new GetGMPContentParentForDecryptorDone(Move(aCallback)));
+    new GetGMPContentParentForDecryptorDone(Move(aCallback), aHelper));
   if (!GetContentParentFrom(aHelper,
                             aNodeId,
                             NS_LITERAL_CSTRING(GMP_API_DECRYPTOR),
@@ -657,3 +557,17 @@ void GeckoMediaPluginService::DisconnectCrashHelper(GMPCrashHelper* aHelper)
 
 } // namespace gmp
 } // namespace mozilla
+
+NS_IMPL_ADDREF(GMPCrashHelper)
+NS_IMPL_RELEASE_WITH_DESTROY(GMPCrashHelper, Destroy())
+
+void
+GMPCrashHelper::Destroy()
+{
+  if (NS_IsMainThread()) {
+    delete this;
+  } else {
+    // Don't addref, as then we'd end up releasing after the detele runs!
+    NS_DispatchToMainThread(mozilla::NewNonOwningRunnableMethod(this, &GMPCrashHelper::Destroy));
+  }
+}

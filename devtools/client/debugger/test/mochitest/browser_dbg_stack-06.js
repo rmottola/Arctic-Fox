@@ -14,7 +14,11 @@ var gTab, gPanel, gDebugger;
 var gEditor, gSources, gFrames, gClassicFrames;
 
 function test() {
-  initDebugger(TAB_URL).then(([aTab,, aPanel]) => {
+  let options = {
+    source: EXAMPLE_URL + "code_script-switching-01.js",
+    line: 1
+  };
+  initDebugger(TAB_URL, options).then(([aTab,, aPanel]) => {
     gTab = aTab;
     gPanel = aPanel;
     gDebugger = gPanel.panelWin;
@@ -40,7 +44,7 @@ function performTest() {
   is(gEditor.getText().search(/debugger/), 166,
     "The second source is displayed.");
 
-  waitForSourceAndCaret(gPanel, "-01.js", 1).then(waitForTick).then(() => {
+  waitForSourceAndCaret(gPanel, "-01.js", 5).then(waitForTick).then(() => {
     is(gFrames.selectedIndex, 0,
       "Oldest frame should be selected after click.");
     is(gClassicFrames.selectedIndex, 1,
@@ -52,7 +56,7 @@ function performTest() {
     is(gEditor.getText().search(/debugger/), -1,
       "The second source is not displayed.");
 
-    waitForSourceAndCaret(gPanel, "-02.js", 1).then(waitForTick).then(() => {
+    waitForSourceAndCaret(gPanel, "-02.js", 6).then(waitForTick).then(() => {
       is(gFrames.selectedIndex, 1,
         "Newest frame should be selected again after click.");
       is(gClassicFrames.selectedIndex, 0,
@@ -77,7 +81,7 @@ function performTest() {
     gDebugger);
 }
 
-registerCleanupFunction(function() {
+registerCleanupFunction(function () {
   gTab = null;
   gPanel = null;
   gDebugger = null;

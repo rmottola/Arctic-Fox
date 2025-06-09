@@ -362,13 +362,17 @@ AudioStream::OpenCubeb(cubeb_stream_params& aParams,
   }
 
   cubeb_stream* stream = nullptr;
+  /* Convert from milliseconds to frames. */
+  uint32_t latency_frames = CubebUtils::GetCubebLatency() * aParams.rate / 1000;
   if (cubeb_stream_init(cubebContext, &stream, "AudioStream",
                         nullptr, nullptr, nullptr, &aParams,
-                        CubebUtils::GetCubebLatency(),
+                        latency_frames,
                         DataCallback_S, StateCallback_S, this) == CUBEB_OK) {
     mCubebStream.reset(stream);
+    CubebUtils::ReportCubebBackendUsed();
   } else {
     NS_WARNING(nsPrintfCString("AudioStream::OpenCubeb() %p failed to init cubeb", this).get());
+    CubebUtils::ReportCubebStreamInitFailure(aIsFirst);
     return NS_ERROR_FAILURE;
   }
 

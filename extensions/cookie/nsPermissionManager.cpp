@@ -1695,7 +1695,7 @@ nsPermissionManager::AddInternal(nsIPrincipal* aPrincipal,
                                       aPermission,
                                       aExpireType,
                                       aExpireTime,
-                                      MOZ_UTF16("added"));
+                                      u"added");
       }
 
       break;
@@ -1719,7 +1719,7 @@ nsPermissionManager::AddInternal(nsIPrincipal* aPrincipal,
                                       oldPermissionEntry.mPermission,
                                       oldPermissionEntry.mExpireType,
                                       oldPermissionEntry.mExpireTime,
-                                      MOZ_UTF16("deleted"));
+                                      u"deleted");
       }
 
       // If there are no more permissions stored for that entry, clear it.
@@ -1765,7 +1765,7 @@ nsPermissionManager::AddInternal(nsIPrincipal* aPrincipal,
                                       aPermission,
                                       aExpireType,
                                       aExpireTime,
-                                      MOZ_UTF16("changed"));
+                                      u"changed");
       }
 
       break;
@@ -1813,7 +1813,7 @@ nsPermissionManager::AddInternal(nsIPrincipal* aPrincipal,
                                       aPermission,
                                       aExpireType,
                                       aExpireTime,
-                                      MOZ_UTF16("changed"));
+                                      u"changed");
       }
 
     }
@@ -1924,7 +1924,7 @@ nsPermissionManager::RemoveAllInternal(bool aNotifyObservers)
   ImportDefaults();
 
   if (aNotifyObservers) {
-    NotifyObservers(nullptr, MOZ_UTF16("cleared"));
+    NotifyObservers(nullptr, u"cleared");
   }
 
   // clear the db
@@ -2245,6 +2245,36 @@ NS_IMETHODIMP nsPermissionManager::GetEnumerator(nsISimpleEnumerator **aEnum)
   return NS_NewArrayEnumerator(aEnum, array);
 }
 
+NS_IMETHODIMP nsPermissionManager::GetAllForURI(nsIURI* aURI, nsISimpleEnumerator **aEnum)
+{
+  nsCOMArray<nsIPermission> array;
+
+  nsCOMPtr<nsIPrincipal> principal;
+  nsresult rv = GetPrincipal(aURI, getter_AddRefs(principal));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  RefPtr<PermissionKey> key = new PermissionKey(principal);
+  PermissionHashKey* entry = mPermissionTable.GetEntry(key);
+
+  if (entry) {
+    for (const auto& permEntry : entry->GetPermissions()) {
+      // Only return custom permissions
+      if (permEntry.mPermission == nsIPermissionManager::UNKNOWN_ACTION) {
+        continue;
+      }
+
+      array.AppendObject(
+        new nsPermission(principal,
+                         mTypeArray.ElementAt(permEntry.mType),
+                         permEntry.mPermission,
+                         permEntry.mExpireType,
+                         permEntry.mExpireTime));
+    }
+  }
+
+  return NS_NewArrayEnumerator(aEnum, array);
+}
+
 NS_IMETHODIMP nsPermissionManager::Observe(nsISupports *aSubject, const char *aTopic, const char16_t *someData)
 {
   ENSURE_NOT_CHILD_PROCESS;
@@ -2423,7 +2453,7 @@ nsPermissionManager::RemoveExpiredPermissionsForApp(uint32_t aAppId)
                                       oldPermEntry.mPermission,
                                       oldPermEntry.mExpireType,
                                       oldPermEntry.mExpireTime,
-                                      MOZ_UTF16("deleted"));
+                                      u"deleted");
 
         --i;
         continue;
@@ -2438,7 +2468,7 @@ nsPermissionManager::RemoveExpiredPermissionsForApp(uint32_t aAppId)
                                     permEntry.mPermission,
                                     permEntry.mExpireType,
                                     permEntry.mExpireTime,
-                                    MOZ_UTF16("changed"));
+                                    u"changed");
     }
   }
 

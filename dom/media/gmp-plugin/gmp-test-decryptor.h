@@ -11,7 +11,7 @@
 #include <string>
 #include "mozilla/Attributes.h"
 
-class FakeDecryptor : public GMPDecryptor {
+class FakeDecryptor : public GMPDecryptor7 {
 public:
 
   explicit FakeDecryptor(GMPDecryptorHost* aHost);
@@ -72,10 +72,15 @@ public:
   void ProcessRecordNames(GMPRecordIterator* aRecordIterator,
                           GMPErr aStatus);
 
+  static void SetNodeId(const char* aNodeId, uint32_t aLength) {
+    sNodeId = std::string(aNodeId, aNodeId + aLength);
+  }
+
 private:
 
   virtual ~FakeDecryptor() {}
   static FakeDecryptor* sInstance;
+  static std::string sNodeId;
 
   void TestStorage();
 

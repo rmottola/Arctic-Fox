@@ -74,6 +74,7 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitNewArray(MNewArray* ins);
     void visitNewArrayCopyOnWrite(MNewArrayCopyOnWrite* ins);
     void visitNewArrayDynamicLength(MNewArrayDynamicLength* ins);
+    void visitNewTypedArray(MNewTypedArray* ins);
     void visitNewObject(MNewObject* ins);
     void visitNewTypedObject(MNewTypedObject* ins);
     void visitNewDeclEnvObject(MNewDeclEnvObject* ins);
@@ -280,8 +281,8 @@ class LIRGenerator : public LIRGeneratorSpecific
     void visitIsConstructor(MIsConstructor* ins);
     void visitIsObject(MIsObject* ins);
     void visitHasClass(MHasClass* ins);
-    void visitAsmJSLoadGlobalVar(MAsmJSLoadGlobalVar* ins);
-    void visitAsmJSStoreGlobalVar(MAsmJSStoreGlobalVar* ins);
+    void visitWasmLoadGlobalVar(MWasmLoadGlobalVar* ins);
+    void visitWasmStoreGlobalVar(MWasmStoreGlobalVar* ins);
     void visitAsmJSLoadFuncPtr(MAsmJSLoadFuncPtr* ins);
     void visitAsmJSLoadFFIFunc(MAsmJSLoadFFIFunc* ins);
     void visitAsmJSParameter(MAsmJSParameter* ins);

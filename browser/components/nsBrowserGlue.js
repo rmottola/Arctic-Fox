@@ -122,6 +122,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "TabCrashHandler",
 if (AppConstants.MOZ_CRASHREPORTER) {
   XPCOMUtils.defineLazyModuleGetter(this, "PluginCrashReporter",
                                     "resource:///modules/ContentCrashHandlers.jsm");
+  XPCOMUtils.defineLazyModuleGetter(this, "CrashSubmit",
+                                    "resource://gre/modules/CrashSubmit.jsm");
+  XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
+                                    "resource://gre/modules/PluralForm.jsm");
+
 }
 
 XPCOMUtils.defineLazyGetter(this, "gBrandBundle", function() {
@@ -767,6 +772,61 @@ BrowserGlue.prototype = {
     }
   },
 
+  checkForPendingCrashReports: function() {
+    // We don't process crash reports older than 28 days, so don't bother submitting them
+    const PENDING_CRASH_REPORT_DAYS = 28;
+    if (AppConstants.MOZ_CRASHREPORTER) {
+      let dateLimit = new Date();
+      dateLimit.setDate(dateLimit.getDate() - PENDING_CRASH_REPORT_DAYS);
+      CrashSubmit.pendingIDsAsync(dateLimit).then(
+        function onSuccess(ids) {
+          let count = ids.length;
+          if (count) {
+            let win = RecentWindow.getMostRecentBrowserWindow();
+            let nb =  win.document.getElementById("global-notificationbox");
+            let notification = nb.getNotificationWithValue("pending-crash-reports");
+            if (notification) {
+              return;
+            }
+            let buttons = [
+              {
+                label: win.gNavigatorBundle.getString("pendingCrashReports.submitAll"),
+                callback: function() {
+                  ids.forEach(function(id) {
+                    CrashSubmit.submit(id, {extraExtraKeyVals: {"SubmittedFromInfobar": true}});
+                  });
+                }
+              },
+              {
+                label: win.gNavigatorBundle.getString("pendingCrashReports.ignoreAll"),
+                callback: function() {
+                  ids.forEach(function(id) {
+                    CrashSubmit.ignore(id);
+                  });
+                }
+              },
+              {
+                label: win.gNavigatorBundle.getString("pendingCrashReports.viewAll"),
+                callback: function() {
+                  win.openUILinkIn("about:crashes", "tab");
+                  return true;
+                }
+              }
+            ];
+            nb.appendNotification(PluralForm.get(count,
+                                                 win.gNavigatorBundle.getString("pendingCrashReports.label")).replace("#1", count),
+                                  "pending-crash-reports",
+                                  "chrome://browser/skin/tab-crashed.svg",
+                                  nb.PRIORITY_INFO_HIGH, buttons);
+          }
+        },
+        function onError(err) {
+          Cu.reportError(err);
+        }
+      );
+    }
+  },
+
   _onSafeModeRestart: function BG_onSafeModeRestart() {
     // prompt the user to confirm
     let strings = gBrowserBundle;
@@ -1000,6 +1060,10 @@ BrowserGlue.prototype = {
       }
     }
 
+    if ("release" != AppConstants.MOZ_UPDATE_CHANNEL) {
+      this.checkForPendingCrashReports();
+    }
+
     this._firstWindowTelemetry(aWindow);
     this._firstWindowLoaded();
   },
@@ -1045,7 +1109,6 @@ BrowserGlue.prototype = {
         Cu.import("resource://gre/modules/RokuApp.jsm");
         return new RokuApp(aService);
       },
-      mirror: true,
       types: ["video/mp4"],
       extensions: ["mp4"]
     };
@@ -2166,7 +2229,7 @@ BrowserGlue.prototype = {
     // be set to the version it has been added in.  We will compare its value
     // to users' smartBookmarksVersion and add new smart bookmarks without
     // recreating old deleted ones.
-    const SMART_BOOKMARKS_VERSION = 7;
+    const SMART_BOOKMARKS_VERSION = 8;
     const SMART_BOOKMARKS_ANNO = "Places/SmartBookmark";
     const SMART_BOOKMARKS_PREF = "browser.places.smartBookmarksVersion";
 
@@ -2197,18 +2260,6 @@ BrowserGlue.prototype = {
           url: "place:sort=" + queryOptions.SORT_BY_VISITCOUNT_DESCENDING +
                     "&maxResults=" + MAX_RESULTS,
           parentGuid: PlacesUtils.bookmarks.toolbarGuid,
-          newInVersion: 1
-        },
-        RecentlyBookmarked: {
-          title: bundle.GetStringFromName("recentlyBookmarkedTitle"),
-          url: "place:folder=BOOKMARKS_MENU" +
-                    "&folder=UNFILED_BOOKMARKS" +
-                    "&folder=TOOLBAR" +
-                    "&queryType=" + queryOptions.QUERY_TYPE_BOOKMARKS +
-                    "&sort=" + queryOptions.SORT_BY_DATEADDED_DESCENDING +
-                    "&maxResults=" + MAX_RESULTS +
-                    "&excludeQueries=1",
-          parentGuid: PlacesUtils.bookmarks.menuGuid,
           newInVersion: 1
         },
         RecentTags: {
@@ -2426,7 +2477,7 @@ ContentPermissionPrompt.prototype = {
   _showPrompt: function CPP_showPrompt(aRequest, aMessage, aPermission, aActions,
                                        aNotificationId, aAnchorId, aOptions) {
     var browser = this._getBrowserForRequest(aRequest);
-    var chromeWin = browser.ownerDocument.defaultView;
+    var chromeWin = browser.ownerGlobal;
     var requestPrincipal = aRequest.principal;
 
     // Transform the prompt actions into PopupNotification actions.
@@ -2590,62 +2641,6 @@ ContentPermissionPrompt.prototype = {
                      "web-notifications-notification-icon", options);
   },
 
-  _promptPointerLock: function CPP_promtPointerLock(aRequest, autoAllow) {
-    let message = gBrowserBundle.GetStringFromName(autoAllow ?
-                                  "pointerLock.autoLock.title3" : "pointerLock.title3");
-
-    // If this is an autoAllow info prompt, offer no actions.
-    // _showPrompt() will allow the request when it's dismissed.
-    let actions = [];
-    if (!autoAllow) {
-      actions = [
-        {
-          stringId: "pointerLock.allow2",
-          action: null,
-          expireType: null,
-          callback: function() {},
-        },
-        {
-          stringId: "pointerLock.alwaysAllow",
-          action: Ci.nsIPermissionManager.ALLOW_ACTION,
-          expireType: null,
-          callback: function() {},
-        },
-        {
-          stringId: "pointerLock.neverAllow",
-          action: Ci.nsIPermissionManager.DENY_ACTION,
-          expireType: null,
-          callback: function() {},
-        },
-      ];
-    }
-
-    function onFullScreen() {
-      notification.remove();
-    }
-
-    let options = {};
-    options.removeOnDismissal = autoAllow;
-    options.eventCallback = type => {
-      if (type == "removed") {
-        notification.browser.removeEventListener("fullscreenchange", onFullScreen, true);
-        if (autoAllow) {
-          aRequest.allow();
-        }
-      }
-    }
-
-    let notification =
-      this._showPrompt(aRequest, message, "pointerLock", actions, "pointerLock",
-                       "pointerLock-notification-icon", options);
-
-    // pointerLock is automatically allowed in fullscreen mode (and revoked
-    // upon exit), so if the page enters fullscreen mode after requesting
-    // pointerLock (but before the user has granted permission), we should
-    // remove the now-impotent notification.
-    notification.browser.addEventListener("fullscreenchange", onFullScreen, true);
-  },
-
   prompt: function CPP_prompt(request) {
     // Only allow exactly one permission request here.
     let types = request.types.QueryInterface(Ci.nsIArray);
@@ -2656,8 +2651,7 @@ ContentPermissionPrompt.prototype = {
     let perm = types.queryElementAt(0, Ci.nsIContentPermissionType);
 
     const kFeatureKeys = { "geolocation" : "geo",
-                           "desktop-notification" : "desktop-notification",
-                           "pointerLock" : "pointerLock",
+                           "desktop-notification" : "desktop-notification"
                          };
 
     // Make sure that we support the request.
@@ -2683,15 +2677,10 @@ ContentPermissionPrompt.prototype = {
 
     if (result == Ci.nsIPermissionManager.ALLOW_ACTION) {
       autoAllow = true;
-      // For pointerLock, we still want to show a warning prompt.
-      if (perm.type != "pointerLock") {
-        request.allow();
-        return;
-      }
     }
 
     var browser = this._getBrowserForRequest(request);
-    var chromeWin = browser.ownerDocument.defaultView;
+    var chromeWin = browser.ownerGlobal;
     if (!chromeWin.PopupNotifications)
       // Ignore requests from browsers hosted in windows that don't support
       // PopupNotifications.
@@ -2704,9 +2693,6 @@ ContentPermissionPrompt.prototype = {
       break;
     case "desktop-notification":
       this._promptWebNotifications(request);
-      break;
-    case "pointerLock":
-      this._promptPointerLock(request, autoAllow);
       break;
     }
   },

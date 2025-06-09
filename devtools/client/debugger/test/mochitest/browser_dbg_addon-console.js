@@ -5,7 +5,8 @@
 
 // Test that the we can see console messages from the add-on
 
-const ADDON_URL = EXAMPLE_URL + "addon4.xpi";
+const ADDON_ID = "browser_dbg_addon4@tests.mozilla.org";
+const ADDON_PATH = "addon4.xpi";
 
 function getCachedMessages(webConsole) {
   let deferred = promise.defer();
@@ -20,9 +21,9 @@ function getCachedMessages(webConsole) {
 }
 
 function test() {
-  Task.spawn(function*() {
-    let addon = yield addAddon(ADDON_URL);
-    let addonDebugger = yield initAddonDebugger(ADDON_URL);
+  Task.spawn(function* () {
+    let addon = yield addTemporaryAddon(ADDON_PATH);
+    let addonDebugger = yield initAddonDebugger(ADDON_ID);
 
     let webConsole = addonDebugger.webConsole;
     let messages = yield getCachedMessages(webConsole);

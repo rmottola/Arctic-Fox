@@ -8,6 +8,8 @@
 // central list of constants makes it easy to see all possible action names at
 // a glance.  Please add a comment with each new action type.
 
+const { createEnum } = require("../utils/enum");
+
 createEnum([
 
   // Add a new device.
@@ -38,16 +40,22 @@ createEnum([
   // Indicates when the screenshot action ends.
   "TAKE_SCREENSHOT_END",
 
-], module.exports);
+  // Update the device display state in the device selector.
+  "UPDATE_DEVICE_DISPLAYED",
 
-/**
- * Create a simple enum-like object with keys mirrored to values from an array.
- * This makes comparison to a specfic value simpler without having to repeat and
- * mis-type the value.
- */
-function createEnum(array, target) {
-  for (let key of array) {
-    target[key] = key;
-  }
-  return target;
-}
+  // Indicates that the device list is being loaded
+  "LOAD_DEVICE_LIST_START",
+
+  // Indicates that the device list loading action threw an error
+  "LOAD_DEVICE_LIST_ERROR",
+
+  // Indicates that the device list has been loaded successfully
+  "LOAD_DEVICE_LIST_END",
+
+  // Update the device modal open state.
+  "UPDATE_DEVICE_MODAL_OPEN",
+
+  // Update the touch simulation enabled state.
+  "UPDATE_TOUCH_SIMULATION_ENABLED",
+
+], module.exports);

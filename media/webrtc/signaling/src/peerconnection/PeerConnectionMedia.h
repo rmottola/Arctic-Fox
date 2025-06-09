@@ -168,14 +168,9 @@ public:
     return dom::MediaSourceEnum::Other;
   }
 
-  already_AddRefed<dom::Promise>
+  already_AddRefed<PledgeVoid>
   ApplyConstraints(nsPIDOMWindowInner* aWindow,
-                   const dom::MediaTrackConstraints& aConstraints,
-                   ErrorResult &aRv) override
-  {
-    NS_ERROR("Can't ApplyConstraints() a remote source!");
-    return nullptr;
-  }
+                   const dom::MediaTrackConstraints& aConstraints) override;
 
   void Stop() override { NS_ERROR("Can't stop a remote source!"); }
 
@@ -349,8 +344,8 @@ class PeerConnectionMedia : public sigslot::has_slots<> {
   void UpdateSinkIdentity_m(dom::MediaStreamTrack* aTrack,
                             nsIPrincipal* aPrincipal,
                             const PeerIdentity* aSinkIdentity);
-  // this determines if any stream is peerIdentity constrained
-  bool AnyLocalStreamHasPeerIdentity() const;
+  // this determines if any track is peerIdentity constrained
+  bool AnyLocalTrackHasPeerIdentity() const;
   // When we finally learn who is on the other end, we need to change the ownership
   // on streams
   void UpdateRemoteStreamPrincipals_m(nsIPrincipal* aPrincipal);

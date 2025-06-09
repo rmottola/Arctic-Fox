@@ -3,15 +3,16 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* globals JsonViewUtils*/
 
 "use strict";
 
-const {Cu, Ci, Cc} = require("chrome");
+const { Cu } = require("chrome");
 const Services = require("Services");
 
-const {XPCOMUtils} = Cu.import("resource://gre/modules/XPCOMUtils.jsm", {});
+const { XPCOMUtils } = Cu.import("resource://gre/modules/XPCOMUtils.jsm", {});
 
-XPCOMUtils.defineLazyGetter(this, "JsonViewService", function () {
+XPCOMUtils.defineLazyGetter(this, "JsonViewUtils", function () {
   return require("devtools/client/jsonview/utils");
 });
 
@@ -27,7 +28,7 @@ var JsonView = {
     // them into a simple web-app that allows easy inspection
     // of the JSON data.
     Services.ppmm.loadProcessScript(
-      "resource:///modules/devtools/client/jsonview/converter-observer.js",
+      "resource://devtools/client/jsonview/converter-observer.js",
       true);
 
     this.onSaveListener = this.onSave.bind(this);

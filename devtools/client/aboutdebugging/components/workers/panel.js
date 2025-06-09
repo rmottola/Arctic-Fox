@@ -1,8 +1,11 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-
+/* globals window */
 "use strict";
+
+loader.lazyImporter(this, "PrivateBrowsingUtils",
+  "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
 const { Ci } = require("chrome");
 const { createClass, createFactory, DOM: dom } =
@@ -19,6 +22,7 @@ const Strings = Services.strings.createBundle(
   "chrome://devtools/locale/aboutdebugging.properties");
 
 const WorkerIcon = "chrome://devtools/skin/images/debugging-workers.svg";
+const MORE_INFO_URL = "https://developer.mozilla.org/en-US/docs/Tools/about%3Adebugging";
 
 module.exports = createClass({
   displayName: "WorkersPanel",
@@ -103,21 +107,38 @@ module.exports = createClass({
     let { client, id } = this.props;
     let { workers } = this.state;
 
+    let isWindowPrivate = PrivateBrowsingUtils.isContentWindowPrivate(window);
+    let isPrivateBrowsingMode = PrivateBrowsingUtils.permanentPrivateBrowsing;
+    let isServiceWorkerDisabled = !Services.prefs
+                                    .getBoolPref("dom.serviceWorkers.enabled");
+    let errorMsg = isWindowPrivate || isPrivateBrowsingMode ||
+           isServiceWorkerDisabled ?
+      dom.p({ className: "service-worker-disabled" },
+        dom.div({ className: "warning" }),
+        Strings.GetStringFromName("configurationIsNotCompatible"),
+        " (",
+        dom.a({ href: MORE_INFO_URL, target: "_blank" },
+          Strings.GetStringFromName("moreInfo")),
+        ")"
+      ) : "";
+
     return dom.div({
-      id,
+      id: id + "-panel",
       className: "panel",
       role: "tabpanel",
-      "aria-labelledby": "panel-workers-header-name"
+      "aria-labelledby": id + "-header"
     },
     PanelHeader({
-      id: "workers-panel-header-name",
+      id: id + "-header",
       name: Strings.GetStringFromName("workers")
     }),
     dom.div({ id: "workers", className: "inverted-icons" },
       TargetList({
         client,
+        error: errorMsg,
         id: "service-workers",
         name: Strings.GetStringFromName("serviceWorkers"),
+        sort: true,
         targetClass: ServiceWorkerTarget,
         targets: workers.service
       }),
@@ -125,6 +146,7 @@ module.exports = createClass({
         client,
         id: "shared-workers",
         name: Strings.GetStringFromName("sharedWorkers"),
+        sort: true,
         targetClass: WorkerTarget,
         targets: workers.shared
       }),
@@ -132,6 +154,7 @@ module.exports = createClass({
         client,
         id: "other-workers",
         name: Strings.GetStringFromName("otherWorkers"),
+        sort: true,
         targetClass: WorkerTarget,
         targets: workers.other
       })

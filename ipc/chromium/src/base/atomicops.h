@@ -5,7 +5,6 @@
 // found in the LICENSE file.
 
 // For atomic operations on reference counts, see atomic_refcount.h.
-// For atomic operations on sequence numbers, see atomic_sequence_num.h.
 
 // The routines exported by this module are subtle.  If you use them, even if
 // you get the code right, it will depend on careful reasoning about atomicity
@@ -98,6 +97,20 @@ Atomic32 Release_CompareAndSwap(volatile Atomic32* ptr,
                                 Atomic32 old_value,
                                 Atomic32 new_value);
 
+// On AArch64 Windows, MemoryBarrier is defined as:
+//
+// #define MemoryBarrier()             __dmb(_ARM_BARRIER_SY)
+//
+// which wreaks havoc with the declaration below.  Capture the definition
+// before undefining the macro.
+#if defined(_M_ARM64) && defined(MemoryBarrier)
+static inline void
+MemoryBarrierARM64()
+{
+  MemoryBarrier();
+}
+#undef MemoryBarrier
+#endif
 void MemoryBarrier();
 void NoBarrier_Store(volatile Atomic32* ptr, Atomic32 value);
 void Acquire_Store(volatile Atomic32* ptr, Atomic32 value);
@@ -135,6 +148,9 @@ Atomic64 Release_Load(volatile const Atomic64* ptr);
 
 // Include our platform specific implementation.
 #if defined(OS_WIN) && defined(ARCH_CPU_X86_FAMILY)
+#include "base/atomicops_internals_x86_msvc.h"
+#elif defined(OS_WIN) && defined(ARCH_CPU_ARM64)
+// Works just fine, separate case in case we need to change things.
 #include "base/atomicops_internals_x86_msvc.h"
 #elif defined(OS_MACOSX) && defined(ARCH_CPU_X86_FAMILY)
 #include "base/atomicops_internals_x86_macosx.h"

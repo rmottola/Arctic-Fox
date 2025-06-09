@@ -7862,7 +7862,9 @@ IonBuilder::newOsrPreheader(MBasicBlock* predecessor, jsbytecode* loopEntry, jsb
         uint32_t slot = info().localSlot(i);
         ptrdiff_t offset = BaselineFrame::reverseOffsetOfLocal(i);
 
-        MOsrValue* osrv = MOsrValue::New(alloc(), entry, offset);
+        MOsrValue* osrv = MOsrValue::New(alloc().fallible(), entry, offset);
+        if (!osrv)
+            return nullptr;
         osrBlock->add(osrv);
         osrBlock->initSlot(slot, osrv);
     }
@@ -7873,7 +7875,9 @@ IonBuilder::newOsrPreheader(MBasicBlock* predecessor, jsbytecode* loopEntry, jsb
         uint32_t slot = info().stackSlot(i);
         ptrdiff_t offset = BaselineFrame::reverseOffsetOfLocal(info().nlocals() + i);
 
-        MOsrValue* osrv = MOsrValue::New(alloc(), entry, offset);
+        MOsrValue* osrv = MOsrValue::New(alloc().fallible(), entry, offset);
+        if (!osrv)
+            return nullptr;
         osrBlock->add(osrv);
         osrBlock->initSlot(slot, osrv);
     }
@@ -8274,12 +8278,12 @@ IonBuilder::testSingletonPropertyTypes(MDefinition* obj, jsid id)
     return nullptr;
 }
 
-bool
+ResultWithOOM<bool>
 IonBuilder::testNotDefinedProperty(MDefinition* obj, jsid id)
 {
     TemporaryTypeSet* types = obj->resultTypeSet();
     if (!types || types->unknownObject() || types->getKnownMIRType() != MIRType::Object)
-        return false;
+        return ResultWithOOM<bool>::ok(false);
 
     for (unsigned i = 0, count = types->getObjectCount(); i < count; i++) {
         TypeSet::ObjectKey* key = types->getObject(i);
@@ -8287,12 +8291,15 @@ IonBuilder::testNotDefinedProperty(MDefinition* obj, jsid id)
             continue;
 
         while (true) {
+            if (!alloc().ensureBallast())
+                return ResultWithOOM<bool>::fail();
+
             if (!key->hasStableClassAndProto(constraints()) || key->unknownProperties())
-                return false;
+                return ResultWithOOM<bool>::ok(false);
 
             const Class* clasp = key->clasp();
             if (!ClassHasEffectlessLookup(clasp) || ObjectHasExtraOwnProperty(compartment, key, id))
-                return false;
+                return ResultWithOOM<bool>::ok(false);
 
             // If the object is a singleton, we can do a lookup now to avoid
             // unnecessary invalidations later on, in case the property types
@@ -8301,12 +8308,12 @@ IonBuilder::testNotDefinedProperty(MDefinition* obj, jsid id)
                 key->singleton()->is<NativeObject>() &&
                 key->singleton()->as<NativeObject>().lookupPure(id))
             {
-                return false;
+                return ResultWithOOM<bool>::ok(false);
             }
 
             HeapTypeSetKey property = key->property(id);
             if (property.isOwnProperty(constraints()))
-                return false;
+                return ResultWithOOM<bool>::ok(false);
 
             JSObject* proto = checkNurseryObject(key->proto().toObjectOrNull());
             if (!proto)
@@ -8315,7 +8322,7 @@ IonBuilder::testNotDefinedProperty(MDefinition* obj, jsid id)
         }
     }
 
-    return true;
+    return ResultWithOOM<bool>::ok(true);
 }
 
 bool
@@ -11664,7 +11671,10 @@ IonBuilder::getPropTryNotDefined(bool* emitted, MDefinition* obj, jsid id, Tempo
         return true;
     }
 
-    if (!testNotDefinedProperty(obj, id)) {
+    ResultWithOOM<bool> res = testNotDefinedProperty(obj, id);
+    if (res.oom)
+        return false;
+    if (!res.value) {
         trackOptimizationOutcome(TrackedOutcome::GenericFailure);
         return true;
     }
@@ -13781,7 +13791,10 @@ IonBuilder::inTryFold(bool* emitted, MDefinition* obj, MDefinition* id)
     if (propId != IdToTypeId(propId))
         return true;
 
-    if (!testNotDefinedProperty(obj, propId))
+    ResultWithOOM<bool> res = testNotDefinedProperty(obj, propId);
+    if (res.oom)
+        return false;
+    if (!res.value)
         return true;
 
     *emitted = true;

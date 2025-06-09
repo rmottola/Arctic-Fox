@@ -148,6 +148,9 @@ function testAddIframe(front) {
         // empty because indexed db creation happens after the page load, so at
         // the time of window-ready, there was no indexed db present.
         "https://sectest1.example.org": []
+      },
+      Cache: {
+        "https://sectest1.example.org":[]
       }
     };
 
@@ -210,6 +213,12 @@ function testRemoveIframe(front) {
       },
       sessionStorage: {
         "http://sectest1.example.org": []
+      },
+      Cache: {
+        "http://sectest1.example.org": []
+      },
+      indexedDB: {
+        "http://sectest1.example.org": []
       }
     };
 
@@ -264,7 +273,7 @@ function testRemoveIframe(front) {
   });
 }
 
-add_task(function*() {
+add_task(function* () {
   yield openTabAndSetupStorage(MAIN_DOMAIN + "storage-dynamic-windows.html");
 
   initDebuggerServer();

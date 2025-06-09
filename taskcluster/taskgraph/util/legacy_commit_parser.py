@@ -307,10 +307,12 @@ def parse_commit(message, jobs):
 
     # Argument parser based on try flag flags
     parser = argparse.ArgumentParser()
-    parser.add_argument('-b', dest='build_types')
-    parser.add_argument('-p', nargs='?', dest='platforms', const='all', default='all')
-    parser.add_argument('-u', nargs='?', dest='tests', const='all', default='all')
-    parser.add_argument('-i', '--interactive', dest='interactive', action='store_true', default=False)
+    parser.add_argument('-b', '--build', dest='build_types')
+    parser.add_argument('-p', '--platform', nargs='?',
+                        dest='platforms', const='all', default='all')
+    parser.add_argument('-u', '--unittests', nargs='?', dest='tests', const='all', default='all')
+    parser.add_argument('-i', '--interactive',
+                        dest='interactive', action='store_true', default=False)
     parser.add_argument('-j', '--job', dest='jobs', action='append')
     # In order to run test jobs multiple times
     parser.add_argument('--trigger-tests', dest='trigger_tests', type=int, default=1)

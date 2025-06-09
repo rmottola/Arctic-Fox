@@ -3674,13 +3674,13 @@ UpgradeSchemaFrom18_0To19_0(mozIStorageConnection* aConnection)
 
 #if !defined(MOZ_B2G)
 
-class NormalJSRuntime;
+class NormalJSContext;
 
 class UpgradeFileIdsFunction final
   : public mozIStorageFunction
 {
   RefPtr<FileManager> mFileManager;
-  nsAutoPtr<NormalJSRuntime> mRuntime;
+  nsAutoPtr<NormalJSContext> mContext;
 
 public:
   UpgradeFileIdsFunction()
@@ -7838,7 +7838,7 @@ class CreateIndexOp final
 {
   friend class VersionChangeTransaction;
 
-  class ThreadLocalJSRuntime;
+  class ThreadLocalJSContext;
   class UpdateIndexDataValuesFunction;
 
   static const unsigned int kBadThreadLocalIndex =
@@ -7874,19 +7874,18 @@ private:
   DoDatabaseWork(DatabaseConnection* aConnection) override;
 };
 
-class NormalJSRuntime
+class NormalJSContext
 {
-  friend class nsAutoPtr<NormalJSRuntime>;
+  friend class nsAutoPtr<NormalJSContext>;
 
   static const JSClass sGlobalClass;
-  static const uint32_t kRuntimeHeapSize = 768 * 1024;
+  static const uint32_t kContextHeapSize = 768 * 1024;
 
-  JSRuntime* mRuntime;
   JSContext* mContext;
   JSObject* mGlobal;
 
 public:
-  static NormalJSRuntime*
+  static NormalJSContext*
   Create();
 
   JSContext*
@@ -7902,20 +7901,19 @@ public:
   }
 
 protected:
-  NormalJSRuntime()
-    : mRuntime(nullptr)
-    , mContext(nullptr)
+  NormalJSContext()
+    : mContext(nullptr)
     , mGlobal(nullptr)
   {
-    MOZ_COUNT_CTOR(NormalJSRuntime);
+    MOZ_COUNT_CTOR(NormalJSContext);
   }
 
-  ~NormalJSRuntime()
+  ~NormalJSContext()
   {
-    MOZ_COUNT_DTOR(NormalJSRuntime);
+    MOZ_COUNT_DTOR(NormalJSContext);
 
-    if (mRuntime) {
-      JS_DestroyRuntime(mRuntime);
+    if (mContext) {
+      JS_DestroyContext(mContext);
     }
   }
 
@@ -7923,25 +7921,25 @@ protected:
   Init();
 };
 
-class CreateIndexOp::ThreadLocalJSRuntime final
-  : public NormalJSRuntime
+class CreateIndexOp::ThreadLocalJSContext final
+  : public NormalJSContext
 {
   friend class CreateIndexOp;
-  friend class nsAutoPtr<ThreadLocalJSRuntime>;
+  friend class nsAutoPtr<ThreadLocalJSContext>;
 
 public:
-  static ThreadLocalJSRuntime*
+  static ThreadLocalJSContext*
   GetOrCreate();
 
 private:
-  ThreadLocalJSRuntime()
+  ThreadLocalJSContext()
   {
-    MOZ_COUNT_CTOR(CreateIndexOp::ThreadLocalJSRuntime);
+    MOZ_COUNT_CTOR(CreateIndexOp::ThreadLocalJSContext);
   }
 
-  ~ThreadLocalJSRuntime()
+  ~ThreadLocalJSContext()
   {
-    MOZ_COUNT_DTOR(CreateIndexOp::ThreadLocalJSRuntime);
+    MOZ_COUNT_DTOR(CreateIndexOp::ThreadLocalJSContext);
   }
 };
 
@@ -9000,6 +8998,12 @@ public:
 
   virtual void
   ShutdownWorkThreads() override;
+
+  virtual void
+  DidInitialize(QuotaManager* aQuotaManager) override;
+
+  virtual void
+  WillShutdown() override;
 
 private:
   ~QuotaClient();
@@ -13824,6 +13828,14 @@ Database::ConnectionClosedCallback()
   mDirectoryLock = nullptr;
 
   CleanupMetadata();
+
+  if (IsInvalidated() && IsActorAlive()) {
+    // Step 3 and 4 of "5.2 Closing a Database":
+    // 1. Wait for all transactions to complete.
+    // 2. Fire a close event if forced flag is set, i.e., IsInvalidated() in our
+    //    implementation.
+    Unused << SendCloseAfterInvalidationComplete();
+  }
 }
 
 void
@@ -14950,7 +14962,7 @@ TransactionBase::Invalidate()
     mInvalidated = true;
     mInvalidatedOnAnyThread = true;
 
-    Abort(NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR, /* aForce */ true);
+    Abort(NS_ERROR_DOM_INDEXEDDB_ABORT_ERR, /* aForce */ false);
   }
 }
 
@@ -16195,10 +16207,6 @@ Cursor::Start(const OpenCursorParams& aParams)
       aParams.get_IndexOpenCursorParams().optionalKeyRange() :
       aParams.get_IndexOpenKeyCursorParams().optionalKeyRange();
 
-  if (mTransaction->IsInvalidated()) {
-    return true;
-  }
-
   RefPtr<OpenOp> openOp = new OpenOp(this, optionalKeyRange);
 
   if (NS_WARN_IF(!openOp->Init(mTransaction))) {
@@ -16356,10 +16364,6 @@ Cursor::RecvContinue(const CursorRequestParams& aParams, const Key& aKey)
   if (NS_WARN_IF(mTransaction->mCommitOrAbortReceived)) {
     ASSERT_UNLESS_FUZZING();
     return false;
-  }
-
-  if (mTransaction->IsInvalidated()) {
-    return true;
   }
 
   RefPtr<ContinueOp> continueOp = new ContinueOp(this, aParams, aKey);
@@ -17419,6 +17423,26 @@ QuotaClient::ShutdownWorkThreads()
     fileHandleThreadPool->Shutdown();
 
     gFileHandleThreadPool = nullptr;
+  }
+}
+
+void
+QuotaClient::DidInitialize(QuotaManager* aQuotaManager)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (IndexedDatabaseManager* mgr = IndexedDatabaseManager::Get()) {
+    mgr->NoteLiveQuotaManager(aQuotaManager);
+  }
+}
+
+void
+QuotaClient::WillShutdown()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+
+  if (IndexedDatabaseManager* mgr = IndexedDatabaseManager::Get()) {
+    mgr->NoteShuttingDownQuotaManager();
   }
 }
 
@@ -18734,13 +18758,13 @@ UpgradeFileIdsFunction::Init(nsIFile* aFMDirectory,
     return rv;
   }
 
-  nsAutoPtr<NormalJSRuntime> runtime(NormalJSRuntime::Create());
-  if (NS_WARN_IF(!runtime)) {
+  nsAutoPtr<NormalJSContext> context(NormalJSContext::Create());
+  if (NS_WARN_IF(!context)) {
     return NS_ERROR_FAILURE;
   }
 
   mFileManager.swap(fileManager);
-  mRuntime = runtime;
+  mContext = context;
   return NS_OK;
 }
 
@@ -18753,7 +18777,7 @@ UpgradeFileIdsFunction::OnFunctionCall(mozIStorageValueArray* aArguments,
   MOZ_ASSERT(aArguments);
   MOZ_ASSERT(aResult);
   MOZ_ASSERT(mFileManager);
-  MOZ_ASSERT(mRuntime);
+  MOZ_ASSERT(mContext);
 
   PROFILER_LABEL("IndexedDB",
                  "UpgradeFileIdsFunction::OnFunctionCall",
@@ -18777,9 +18801,9 @@ UpgradeFileIdsFunction::OnFunctionCall(mozIStorageValueArray* aArguments,
                                                                   mFileManager,
                                                                   &cloneInfo);
 
-  JSContext* cx = mRuntime->Context();
+  JSContext* cx = mContext->Context();
   JSAutoRequest ar(cx);
-  JSAutoCompartment ac(cx, mRuntime->Global());
+  JSAutoCompartment ac(cx, mContext->Global());
 
   JS::Rooted<JS::Value> clone(cx);
   if (NS_WARN_IF(!IDBObjectStore::DeserializeUpgradeValue(cx, cloneInfo,
@@ -19939,13 +19963,11 @@ FactoryOp::Open()
   {
     // These services have to be started on the main thread currently.
 
-    IndexedDatabaseManager* mgr = IndexedDatabaseManager::GetOrCreate();
-    if (NS_WARN_IF(!mgr)) {
+    IndexedDatabaseManager* mgr;
+    if (NS_WARN_IF(!(mgr = IndexedDatabaseManager::GetOrCreate()))) {
       IDB_REPORT_INTERNAL_ERR();
       return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
     }
-
-    mgr->NoteBackgroundThread(mOwningThread);
 
     nsCOMPtr<mozIStorageService> ss;
     if (NS_WARN_IF(!(ss = do_GetService(MOZ_STORAGE_SERVICE_CONTRACTID)))) {
@@ -20292,25 +20314,9 @@ FactoryOp::CheckPermission(ContentParent* aContentParent,
   PermissionRequestBase::PermissionValue permission;
 
   if (QuotaManager::IsFirstPromptRequired(persistenceType, origin, isApp)) {
-#ifdef MOZ_CHILD_PERMISSIONS
-    if (aContentParent) {
-      if (NS_WARN_IF(!AssertAppPrincipal(aContentParent, principal))) {
-        IDB_REPORT_INTERNAL_ERR();
-        return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-      }
-
-      uint32_t intPermission =
-        mozilla::CheckPermission(aContentParent, principal, IDB_PREFIX);
-
-      permission =
-        PermissionRequestBase::PermissionValueForIntPermission(intPermission);
-    } else
-#endif // MOZ_CHILD_PERMISSIONS
-    {
-      rv = PermissionRequestBase::GetCurrentPermission(principal, &permission);
-      if (NS_WARN_IF(NS_FAILED(rv))) {
-        return rv;
-      }
+    rv = PermissionRequestBase::GetCurrentPermission(principal, &permission);
+    if (NS_WARN_IF(NS_FAILED(rv))) {
+      return rv;
     }
   } else {
     permission = PermissionRequestBase::kPermissionAllowed;
@@ -20389,65 +20395,7 @@ FactoryOp::CheckAtLeastOneAppHasPermission(ContentParent* aContentParent,
   MOZ_ASSERT(aContentParent);
   MOZ_ASSERT(!aPermissionString.IsEmpty());
 
-#ifdef MOZ_CHILD_PERMISSIONS
-  const ManagedContainer<PBrowserParent>& browsers =
-    aContentParent->ManagedPBrowserParent();
-
-  if (!browsers.IsEmpty()) {
-    nsCOMPtr<nsIAppsService> appsService =
-      do_GetService(APPS_SERVICE_CONTRACTID);
-    if (NS_WARN_IF(!appsService)) {
-      return false;
-    }
-
-    nsCOMPtr<nsIIOService> ioService = do_GetIOService();
-    if (NS_WARN_IF(!ioService)) {
-      return false;
-    }
-
-    nsCOMPtr<nsIPermissionManager> permMan =
-      mozilla::services::GetPermissionManager();
-    if (NS_WARN_IF(!permMan)) {
-      return false;
-    }
-
-    const nsPromiseFlatCString permissionString =
-      PromiseFlatCString(aPermissionString);
-
-    for (auto iter = browsers.ConstIter(); !iter.Done(); iter.Next()) {
-      uint32_t appId =
-        TabParent::GetFrom(iter.Get()->GetKey())->OwnOrContainingAppId();
-      MOZ_ASSERT(appId != nsIScriptSecurityManager::UNKNOWN_APP_ID &&
-                 appId != nsIScriptSecurityManager::NO_APP_ID);
-
-      nsCOMPtr<mozIApplication> app;
-      nsresult rv = appsService->GetAppByLocalId(appId, getter_AddRefs(app));
-      if (NS_WARN_IF(NS_FAILED(rv))) {
-        return false;
-      }
-
-      nsCOMPtr<nsIPrincipal> principal;
-      app->GetPrincipal(getter_AddRefs(principal));
-      NS_ENSURE_TRUE(principal, false);
-
-      uint32_t permission;
-      rv = permMan->TestExactPermissionFromPrincipal(principal,
-                                                     permissionString.get(),
-                                                     &permission);
-      if (NS_WARN_IF(NS_FAILED(rv))) {
-        return false;
-      }
-
-      if (permission == nsIPermissionManager::ALLOW_ACTION) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-#else
   return true;
-#endif // MOZ_CHILD_PERMISSIONS
 }
 
 nsresult
@@ -22753,12 +22701,9 @@ TransactionDatabaseOperationBase::RunOnConnectionThread()
 
   // There are several cases where we don't actually have to to any work here.
 
-  if (mTransactionIsAborted) {
-    // This transaction is already set to be aborted.
+  if (mTransactionIsAborted || mTransaction->IsInvalidatedOnAnyThread()) {
+    // This transaction is already set to be aborted or invalidated.
     mResultCode = NS_ERROR_DOM_INDEXEDDB_ABORT_ERR;
-  } else if (mTransaction->IsInvalidatedOnAnyThread()) {
-    // This transaction is being invalidated.
-    mResultCode = NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
   } else if (!OperationMayProceed()) {
     // The operation was canceled in some way, likely because the child process
     // has crashed.
@@ -22829,9 +22774,7 @@ TransactionDatabaseOperationBase::RunOnOwningThread()
       mResultCode = NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
     }
   } else {
-    if (mTransaction->IsInvalidated()) {
-      mResultCode = NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
-    } else if (mTransaction->IsAborted()) {
+    if (mTransaction->IsInvalidated() || mTransaction->IsAborted()) {
       // Aborted transactions always see their requests fail with ABORT_ERR,
       // even if the request succeeded or failed with another error.
       mResultCode = NS_ERROR_DOM_INDEXEDDB_ABORT_ERR;
@@ -23890,15 +23833,15 @@ CreateIndexOp::InsertDataFromObjectStore(DatabaseConnection* aConnection)
     aConnection->GetStorageConnection();
   MOZ_ASSERT(storageConnection);
 
-  ThreadLocalJSRuntime* runtime = ThreadLocalJSRuntime::GetOrCreate();
-  if (NS_WARN_IF(!runtime)) {
+  ThreadLocalJSContext* context = ThreadLocalJSContext::GetOrCreate();
+  if (NS_WARN_IF(!context)) {
     IDB_REPORT_INTERNAL_ERR();
     return NS_ERROR_DOM_INDEXEDDB_UNKNOWN_ERR;
   }
 
-  JSContext* cx = runtime->Context();
+  JSContext* cx = context->Context();
   JSAutoRequest ar(cx);
-  JSAutoCompartment ac(cx, runtime->Global());
+  JSAutoCompartment ac(cx, context->Global());
 
   RefPtr<UpdateIndexDataValuesFunction> updateFunction =
     new UpdateIndexDataValuesFunction(this, aConnection, cx);
@@ -23973,7 +23916,7 @@ CreateIndexOp::Init(TransactionBase* aTransaction)
     static void
     Destroy(void* aThreadLocal)
     {
-      delete static_cast<ThreadLocalJSRuntime*>(aThreadLocal);
+      delete static_cast<ThreadLocalJSContext*>(aThreadLocal);
     }
   };
 
@@ -24133,7 +24076,7 @@ CreateIndexOp::DoDatabaseWork(DatabaseConnection* aConnection)
   return NS_OK;
 }
 
-static const JSClassOps sNormalJSRuntimeGlobalClassOps = {
+static const JSClassOps sNormalJSContextGlobalClassOps = {
   /* addProperty */ nullptr,
   /* delProperty */ nullptr,
   /* getProperty */ nullptr,
@@ -24148,23 +24091,21 @@ static const JSClassOps sNormalJSRuntimeGlobalClassOps = {
   /* trace */ JS_GlobalObjectTraceHook
 };
 
-const JSClass NormalJSRuntime::sGlobalClass = {
+const JSClass NormalJSContext::sGlobalClass = {
   "IndexedDBTransactionThreadGlobal",
   JSCLASS_GLOBAL_FLAGS,
-  &sNormalJSRuntimeGlobalClassOps
+  &sNormalJSContextGlobalClassOps
 };
 
 bool
-NormalJSRuntime::Init()
+NormalJSContext::Init()
 {
   MOZ_ASSERT(!IsOnBackgroundThread());
 
-  mRuntime = JS_NewRuntime(kRuntimeHeapSize);
-  if (NS_WARN_IF(!mRuntime)) {
+  mContext = JS_NewContext(kContextHeapSize);
+  if (NS_WARN_IF(!mContext)) {
     return false;
   }
-
-  mContext = JS_GetContext(mRuntime);
 
   // Not setting this will cause JS_CHECK_RECURSION to report false positives.
   JS_SetNativeStackQuota(mContext, 128 * sizeof(size_t) * 1024);
@@ -24186,46 +24127,46 @@ NormalJSRuntime::Init()
 }
 
 // static
-NormalJSRuntime*
-NormalJSRuntime::Create()
+NormalJSContext*
+NormalJSContext::Create()
 {
   MOZ_ASSERT(!IsOnBackgroundThread());
 
-  nsAutoPtr<NormalJSRuntime> newRuntime(new NormalJSRuntime());
+  nsAutoPtr<NormalJSContext> newContext(new NormalJSContext());
 
-  if (NS_WARN_IF(!newRuntime->Init())) {
+  if (NS_WARN_IF(!newContext->Init())) {
     return nullptr;
   }
 
-  return newRuntime.forget();
+  return newContext.forget();
 }
 
 // static
 auto
 CreateIndexOp::
-ThreadLocalJSRuntime::GetOrCreate() -> ThreadLocalJSRuntime*
+ThreadLocalJSContext::GetOrCreate() -> ThreadLocalJSContext*
 {
   MOZ_ASSERT(!IsOnBackgroundThread());
   MOZ_ASSERT(CreateIndexOp::kBadThreadLocalIndex !=
              CreateIndexOp::sThreadLocalIndex);
 
-  auto* runtime = static_cast<ThreadLocalJSRuntime*>(
+  auto* context = static_cast<ThreadLocalJSContext*>(
     PR_GetThreadPrivate(CreateIndexOp::sThreadLocalIndex));
-  if (runtime) {
-    return runtime;
+  if (context) {
+    return context;
   }
 
-  nsAutoPtr<ThreadLocalJSRuntime> newRuntime(new ThreadLocalJSRuntime());
+  nsAutoPtr<ThreadLocalJSContext> newContext(new ThreadLocalJSContext());
 
-  if (NS_WARN_IF(!newRuntime->Init())) {
+  if (NS_WARN_IF(!newContext->Init())) {
     return nullptr;
   }
 
   DebugOnly<PRStatus> status =
-    PR_SetThreadPrivate(CreateIndexOp::sThreadLocalIndex, newRuntime);
+    PR_SetThreadPrivate(CreateIndexOp::sThreadLocalIndex, newContext);
   MOZ_ASSERT(status == PR_SUCCESS);
 
-  return newRuntime.forget();
+  return newContext.forget();
 }
 
 NS_IMPL_ISUPPORTS(CreateIndexOp::UpdateIndexDataValuesFunction,
@@ -26749,6 +26690,14 @@ CursorOpBase::SendFailureResult(nsresult aResultCode)
 
   if (!IsActorDestroyed()) {
     mResponse = ClampResultCode(aResultCode);
+
+    // This is an expected race when the transaction is invalidated after
+    // data is retrieved from database. We clear the retrieved files to prevent
+    // the assertion failure in SendResponseInternal when mResponse.type() is
+    // CursorResponse::Tnsresult.
+    if (Transaction()->IsInvalidated() && !mFiles.IsEmpty()) {
+      mFiles.Clear();
+    }
 
     mCursor->SendResponseInternal(mResponse, mFiles);
   }

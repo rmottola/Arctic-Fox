@@ -19,7 +19,6 @@
 #include "mozilla/BrowserElementParent.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/EventListenerManager.h"
-#include "mozilla/dom/workers/ServiceWorkerManager.h"
 #include "mozilla/dom/indexedDB/PIndexedDBPermissionRequestChild.h"
 #include "mozilla/plugins/PluginWidgetChild.h"
 #include "mozilla/IMEStateManager.h"
@@ -112,6 +111,7 @@
 #include "nsIScriptError.h"
 #include "mozilla/EventForwards.h"
 #include "nsDeviceContext.h"
+#include "nsSandboxFlags.h"
 #include "FrameLayerBuilder.h"
 
 #ifdef NS_PRINTING
@@ -147,19 +147,6 @@ static const char BEFORE_FIRST_PAINT[] = "before-first-paint";
 
 typedef nsDataHashtable<nsUint64HashKey, TabChild*> TabChildMap;
 static TabChildMap* sTabChildren;
-
-static bool
-UsingCompositorLRU()
-{
-  static bool sHavePrefs = false;
-  static uint32_t sCompositorLRUSize = 0;
-  if (!sHavePrefs) {
-    sHavePrefs = true;
-    Preferences::AddUintVarCache(&sCompositorLRUSize,
-                                 "layers.compositor-lru-size", 0);
-  }
-  return sCompositorLRUSize != 0;
-}
 
 TabChildBase::TabChildBase()
   : mTabChildGlobal(nullptr)
@@ -233,6 +220,7 @@ TabChildBase::DispatchMessageManagerMessage(const nsAString& aMessageName,
         ErrorResult rv;
         data.Write(cx, json, rv);
         if (NS_WARN_IF(rv.Failed())) {
+            rv.SuppressException();
             return;
         }
     }
@@ -856,7 +844,7 @@ TabChild::Init()
     do_QueryInterface(window->GetChromeEventHandler());
   docShell->SetChromeEventHandler(chromeHandler);
 
-  window->SetKeyboardIndicators(ShowAccelerators(), ShowFocusRings());
+  window->SetInitialKeyboardIndicators(ShowAccelerators(), ShowFocusRings());
 
   // Set prerender flag if necessary.
   if (mIsPrerendered) {
@@ -893,6 +881,11 @@ TabChild::NotifyTabContextUpdated()
 
   UpdateFrameType();
   nsDocShell::Cast(docShell)->SetOriginAttributes(OriginAttributesRef());
+
+  // Set SANDBOXED_AUXILIARY_NAVIGATION flag if this is a receiver page.
+  if (!PresentationURL().IsEmpty()) {
+    docShell->SetSandboxFlags(SANDBOXED_AUXILIARY_NAVIGATION);
+  }
 }
 
 void
@@ -1332,7 +1325,6 @@ TabChild::SetProcessNameToAppName()
 
 bool
 TabChild::RecvLoadURL(const nsCString& aURI,
-                      const BrowserConfiguration& aConfiguration,
                       const ShowInfo& aInfo)
 {
   if (!mDidLoadURLInit) {
@@ -1344,10 +1336,6 @@ TabChild::RecvLoadURL(const nsCString& aURI,
     ApplyShowInfo(aInfo);
 
     SetProcessNameToAppName();
-
-    RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
-    MOZ_ASSERT(swm);
-    swm->LoadRegistrations(aConfiguration.serviceWorkerRegistrations());
   }
 
   nsresult rv =
@@ -2872,11 +2860,6 @@ TabChild::NotifyPainted()
 void
 TabChild::MakeVisible()
 {
-  CompositorBridgeChild* compositor = CompositorBridgeChild::Get();
-  if (UsingCompositorLRU()) {
-    compositor->SendNotifyVisible(mLayersId);
-  }
-
   if (mPuppetWidget) {
     mPuppetWidget->Show(true);
   }
@@ -2886,14 +2869,10 @@ void
 TabChild::MakeHidden()
 {
   CompositorBridgeChild* compositor = CompositorBridgeChild::Get();
-  if (UsingCompositorLRU()) {
-    compositor->SendNotifyHidden(mLayersId);
-  } else {
-    // Clear cached resources directly. This avoids one extra IPC
-    // round-trip from CompositorBridgeChild to CompositorBridgeParent when
-    // CompositorLRU is not used.
-    compositor->RecvClearCachedResources(mLayersId);
-  }
+
+  // Clear cached resources directly. This avoids one extra IPC
+  // round-trip from CompositorBridgeChild to CompositorBridgeParent.
+  compositor->RecvClearCachedResources(mLayersId);
 
   if (mPuppetWidget) {
     mPuppetWidget->Show(false);

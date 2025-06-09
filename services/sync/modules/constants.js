@@ -172,7 +172,7 @@ kSyncBackoffNotMet:                    "Trying to sync before the server said it
 kFirstSyncChoiceNotMade:               "User has not selected an action for first sync",
 
 // Application IDs
-FIREFOX_ID:                            "{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}",
+FIREFOX_ID:                            "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}",
 FENNEC_ID:                             "{a23983c0-fd0e-11dc-95ff-0800200c9a66}",
 SEAMONKEY_ID:                          "{92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}",
 TEST_HARNESS_ID:                       "xuth@mozilla.org",

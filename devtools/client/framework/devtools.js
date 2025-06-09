@@ -6,6 +6,7 @@
 
 const Services = require("Services");
 const promise = require("promise");
+const defer = require("devtools/shared/defer");
 
 // Load gDevToolsBrowser toolbox lazily as they need gDevTools to be fully initialized
 loader.lazyRequireGetter(this, "Toolbox", "devtools/client/framework/toolbox", true);
@@ -49,6 +50,10 @@ this.DevTools = function DevTools() {
 };
 
 DevTools.prototype = {
+  // The windowtype of the main window, used in various tools. This may be set
+  // to something different by other gecko apps.
+  chromeWindowType: "navigator:browser",
+
   registerDefaults() {
     // Ensure registering items in the sorted order (getDefault* functions
     // return sorted lists)
@@ -392,8 +397,8 @@ DevTools.prototype = {
    * @return {Toolbox} toolbox
    *        The toolbox that was opened
    */
-  showToolbox: function(target, toolId, hostType, hostOptions) {
-    let deferred = promise.defer();
+  showToolbox: function (target, toolId, hostType, hostOptions) {
+    let deferred = defer();
 
     let toolbox = this._toolboxes.get(target);
     if (toolbox) {
@@ -403,12 +408,12 @@ DevTools.prototype = {
           promise.resolve(null);
 
       if (toolId != null && toolbox.currentToolId != toolId) {
-        hostPromise = hostPromise.then(function() {
+        hostPromise = hostPromise.then(function () {
           return toolbox.selectTool(toolId);
         });
       }
 
-      return hostPromise.then(function() {
+      return hostPromise.then(function () {
         toolbox.raise();
         return toolbox;
       });
@@ -483,7 +488,7 @@ DevTools.prototype = {
   /**
    * All browser windows have been closed, tidy up remaining objects.
    */
-  destroy: function() {
+  destroy: function () {
     Services.obs.removeObserver(this.destroy, "quit-application");
 
     for (let [key, tool] of this.getToolDefinitionMap()) {
@@ -502,7 +507,7 @@ DevTools.prototype = {
   /**
    * Iterator that yields each of the toolboxes.
    */
-  *[Symbol.iterator]() {
+  *[Symbol.iterator ]() {
     for (let toolbox of this._toolboxes) {
       yield toolbox;
     }

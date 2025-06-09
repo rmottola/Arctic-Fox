@@ -387,7 +387,7 @@ gfxFontEntry::TryGetSVGData(gfxFont* aFont)
         mSVGGlyphs = MakeUnique<gfxSVGGlyphs>(svgTable, this);
     }
 
-    if (!mFontsUsingSVGGlyphs.Contains(aFont)) {
+    if (mSVGGlyphs && !mFontsUsingSVGGlyphs.Contains(aFont)) {
         mFontsUsingSVGGlyphs.AppendElement(aFont);
     }
 

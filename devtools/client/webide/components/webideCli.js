@@ -2,10 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 const Ci = Components.interfaces;
 const Cu = Components.utils;
 
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+const { XPCOMUtils } = Cu.import("resource://gre/modules/XPCOMUtils.jsm", {});
 
 XPCOMUtils.defineLazyModuleGetter(this, "Services", "resource://gre/modules/Services.jsm");
 
@@ -16,9 +18,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "Services", "resource://gre/modules/Serv
 function webideCli() { }
 
 webideCli.prototype = {
-  handle: function(cmdLine) {
-    let param;
-
+  handle: function (cmdLine) {
     if (!cmdLine.handleFlag("webide", false)) {
       return;
     }
@@ -49,8 +49,7 @@ webideCli.prototype = {
     }
   },
 
-
-  helpInfo : "",
+  helpInfo: "",
 
   classID: Components.ID("{79b7b44e-de5e-4e4c-b7a2-044003c615d9}"),
   QueryInterface: XPCOMUtils.generateQI([Ci.nsICommandLineHandler]),

@@ -322,12 +322,13 @@ nsHttpHandler::Init()
     nsHttpChannelAuthProvider::InitializePrefs();
 
     if (mCompatFirefoxEnabled) {
+      mAppName.AssignLiteral("Firefox");
       mMisc.AssignLiteral("rv:" MOZILLA_COMPATVERSION);
     } else {
+      mAppName.AssignLiteral(MOZ_APP_UA_NAME);
       mMisc.AssignLiteral("rv:" MOZILLA_UAVERSION);
     }
 
-    mCompatGecko.AssignLiteral("Gecko/20100101");
     mCompatFirefox.AssignLiteral("Firefox/" MOZILLA_COMPATVERSION);
 
     nsCOMPtr<nsIXULAppInfo> appInfo =
@@ -367,13 +368,9 @@ nsHttpHandler::Init()
     if (mCompatFirefoxEnabled) {
       mProductSub.AssignLiteral(MOZILLA_UAVERSION);
     } else {
-      mProductSub.AssignLiteral(MOZ_UA_BUILDID);
+      mProductSub.AssignLiteral("20100101");
     }
 #endif
-    if (mProductSub.IsEmpty() && appInfo)
-        appInfo->GetPlatformBuildID(mProductSub);
-    if (mProductSub.Length() > 8)
-        mProductSub.SetLength(8);
 
 #if DEBUG
     // dump user agent prefs
@@ -387,7 +384,6 @@ nsHttpHandler::Init()
     LOG(("> app-name = %s\n", mAppName.get()));
     LOG(("> app-version = %s\n", mAppVersion.get()));
     LOG(("> compat-firefox = %s\n", mCompatFirefox.get()));
-    LOG(("> compat-gecko = %s\n", mCompatGecko.get()));
     LOG(("> user-agent = %s\n", UserAgent().get()));
 #endif
 
@@ -696,11 +692,10 @@ nsHttpHandler::BuildUserAgent()
                            mProductSub.Length() +
                            mAppName.Length() +
                            mAppVersion.Length() +
-                           mCompatGecko.Length() +
                            mCompatFirefox.Length() +
                            mCompatDevice.Length() +
                            mDeviceModelId.Length() +
-                           14);
+                           13);
 
     // Application portion
     mUserAgent.Assign(mLegacyAppName);
@@ -731,28 +726,26 @@ nsHttpHandler::BuildUserAgent()
     mUserAgent += mMisc;
     mUserAgent += ')';
 
-    if (mCompatGeckoEnabled) {
-        // Provide frozen Gecko/20100101 (compatibility) slice
-        mUserAgent += ' ';
-        mUserAgent += mCompatGecko;
-    }
-
     // Product portion
     mUserAgent += ' ';
     mUserAgent += mProduct;
     mUserAgent += '/';
     mUserAgent += mProductSub;
 
-    if (mCompatFirefoxEnabled) {
-        // Provide "Firefox/x.y" (compatibility) app token
+    bool isFirefox = mAppName.EqualsLiteral("Firefox");
+    if (isFirefox || mCompatFirefoxEnabled || mCompatFirefoxStrict) {
+        // "Firefox/x.y" (compatibility) app token
         mUserAgent += ' ';
         mUserAgent += mCompatFirefox;
     }
-    // App portion
-    mUserAgent += ' ';
-    mUserAgent += mAppName;
-    mUserAgent += '/';
-    mUserAgent += mAppVersion;
+    // If not "strict Firefox", advertise an app name.
+    if (!isFirefox && !mCompatFirefoxStrict) {
+        // App portion
+        mUserAgent += ' ';
+        mUserAgent += mAppName;
+        mUserAgent += '/';
+        mUserAgent += mAppVersion;
+    }
 }
 
 #ifdef XP_WIN
@@ -993,30 +986,27 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
         rv = prefs->GetIntPref(UA_PREF("compatMode"), &val);
         if (NS_SUCCEEDED(rv)) {
           switch(val) {
-            case 1: // Generic Gecko
-                    mCompatGeckoEnabled = true;
-                    mCompatFirefoxEnabled = false;
-                    break;
-            case 2: // Firefox Compatibility
-                    mCompatGeckoEnabled = true;
+            case 1: // Generic Firefox
                     mCompatFirefoxEnabled = true;
+                    mCompatFirefoxStrict = false;
+                    break;
+            case 2: // Strict Compatibility
+                    mCompatFirefoxEnabled = true;
+                    mCompatFirefoxStrict = true;
                     break;
             default: // Native
-                     mCompatGeckoEnabled = false;
                      mCompatFirefoxEnabled = false;
+                     mCompatFirefoxStrict = false;
                      break;
           }
         }
         // Update UA components as-needed for this change:
-        // Compatmode on ->  rv:{FF-appversion}  Gecko/{Gecko-version}
-        // Compatmode off -> rv:{Gecko-version} Gecko/{BuildID}
         if (mCompatFirefoxEnabled) {
           mMisc.AssignLiteral("rv:" MOZILLA_COMPATVERSION);
-          mProductSub.AssignLiteral(MOZILLA_UAVERSION);          
         } else {
           mMisc.AssignLiteral("rv:" MOZILLA_UAVERSION);
-          mProductSub.AssignLiteral(MOZ_UA_BUILDID);
         }
+        mProductSub.AssignLiteral("20100101");
         nsCOMPtr<nsIXULAppInfo> appInfo = 
             do_GetService("@mozilla.org/xre/app-info;1");
         if (mProductSub.IsEmpty() && appInfo)
@@ -1132,7 +1122,7 @@ nsHttpHandler::PrefsChanged(nsIPrefBranch *prefs, const char *pref)
     if (PREF_CHANGED(HTTP_PREF("referer.trimmingPolicy"))) {
         rv = prefs->GetIntPref(HTTP_PREF("referer.trimmingPolicy"), &val);
         if (NS_SUCCEEDED(rv))
-            mReferrerTrimmingPolicy = (uint8_t) clamped(val, 0, 0xff);
+            mReferrerTrimmingPolicy = (uint8_t) clamped(val, 0, 2);
     }
 
     if (PREF_CHANGED(HTTP_PREF("referer.XOriginPolicy"))) {

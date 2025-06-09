@@ -55,20 +55,18 @@ class JSAPITest
     static JSAPITest* list;
     JSAPITest* next;
 
-    JSRuntime* rt;
     JSContext* cx;
     JS::PersistentRootedObject global;
     bool knownFail;
     JSAPITestString msgs;
     JSCompartment* oldCompartment;
 
-    JSAPITest() : rt(nullptr), cx(nullptr), knownFail(false), oldCompartment(nullptr) {
+    JSAPITest() : cx(nullptr), knownFail(false), oldCompartment(nullptr) {
         next = list;
         list = this;
     }
 
     virtual ~JSAPITest() {
-        MOZ_RELEASE_ASSERT(!rt);
         MOZ_RELEASE_ASSERT(!cx);
         MOZ_RELEASE_ASSERT(!global);
     }
@@ -146,6 +144,9 @@ class JSAPITest
         return JSAPITestString(JS_VersionToString(v));
     }
 
+    // Note that in some still-supported GCC versions (we think anything before
+    // GCC 4.6), this template does not work when the second argument is
+    // nullptr. It infers type U = long int. Use CHECK_NULL instead.
     template <typename T, typename U>
     bool checkEqual(const T& actual, const U& expected,
                     const char* actualExpr, const char* expectedExpr,
@@ -282,20 +283,19 @@ class JSAPITest
         JS_SetNativeStackQuota(cx, MAX_STACK_SIZE);
     }
 
-    virtual JSRuntime * createRuntime() {
-        JSRuntime* rt = JS_NewRuntime(8L * 1024 * 1024);
-        if (!rt)
+    virtual JSContext* createContext() {
+        JSContext* cx = JS_NewContext(8L * 1024 * 1024);
+        if (!cx)
             return nullptr;
-        JS::SetWarningReporter(JS_GetContext(rt), &reportWarning);
-        setNativeStackQuota(JS_GetContext(rt));
-        return rt;
+        JS::SetWarningReporter(cx, &reportWarning);
+        setNativeStackQuota(cx);
+        return cx;
     }
 
-    virtual void destroyRuntime() {
-        MOZ_RELEASE_ASSERT(!cx);
-        MOZ_RELEASE_ASSERT(rt);
-        JS_DestroyRuntime(rt);
-        rt = nullptr;
+    virtual void destroyContext() {
+        MOZ_RELEASE_ASSERT(cx);
+        JS_DestroyContext(cx);
+        cx = nullptr;
     }
 
     static void reportWarning(JSContext* cx, const char* message, JSErrorReport* report) {

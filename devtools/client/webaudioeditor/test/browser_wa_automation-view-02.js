@@ -6,21 +6,20 @@
  * switching between AudioParam rerenders the graph.
  */
 
-add_task(function*() {
+add_task(function* () {
   let { target, panel } = yield initWebAudioEditor(AUTOMATION_URL);
   let { panelWin } = panel;
   let { gFront, $, $$, EVENTS, AutomationView } = panelWin;
 
   let started = once(gFront, "start-context");
 
-  reload(target);
-
-  let [actors] = yield Promise.all([
+  let events = Promise.all([
     get3(gFront, "create-node"),
     waitForGraphRendered(panelWin, 3, 2)
   ]);
+  reload(target);
+  let [actors] = yield events;
   let nodeIds = actors.map(actor => actor.actorID);
-
 
   // Oscillator node
   click(panelWin, findGraphNode(panelWin, nodeIds[1]));

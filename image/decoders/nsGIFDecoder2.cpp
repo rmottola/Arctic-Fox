@@ -81,7 +81,8 @@ static const uint8_t PACKED_FIELDS_TABLE_DEPTH_MASK = 0x07;
 
 nsGIFDecoder2::nsGIFDecoder2(RasterImage* aImage)
   : Decoder(aImage)
-  , mLexer(Transition::To(State::GIF_HEADER, GIF_HEADER_LEN))
+  , mLexer(Transition::To(State::GIF_HEADER, GIF_HEADER_LEN),
+           Transition::TerminateSuccess())
   , mOldColor(0)
   , mCurrentFrameIndex(-1)
   , mColorTablePos(0)
@@ -100,7 +101,7 @@ nsGIFDecoder2::~nsGIFDecoder2()
   free(mGIFStruct.local_colormap);
 }
 
-void
+nsresult
 nsGIFDecoder2::FinishInternal()
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call FinishInternal after error!");
@@ -113,6 +114,8 @@ nsGIFDecoder2::FinishInternal()
     PostDecodeDone(mGIFStruct.loop_count - 1);
     mGIFOpen = false;
   }
+
+  return NS_OK;
 }
 
 void
@@ -253,7 +256,7 @@ nsGIFDecoder2::EndImageFrame()
   // Tell the superclass we finished a frame
   PostFrameStop(opacity,
                 DisposalMethod(mGIFStruct.disposal_method),
-                mGIFStruct.delay_time);
+                FrameTimeout::FromRawMilliseconds(mGIFStruct.delay_time));
 
   // Reset the transparent pixel
   if (mOldColor) {
@@ -454,14 +457,12 @@ ConvertColormap(uint32_t* aColormap, uint32_t aColors)
   }
 }
 
-Maybe<TerminalState>
-nsGIFDecoder2::DoDecode(SourceBufferIterator& aIterator)
+LexerResult
+nsGIFDecoder2::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
-  MOZ_ASSERT(aIterator.Data());
-  MOZ_ASSERT(aIterator.Length() > 0);
 
-  return mLexer.Lex(aIterator.Data(), aIterator.Length(),
+  return mLexer.Lex(aIterator, aOnResume,
                     [=](State aState, const char* aData, size_t aLength) {
     switch(aState) {
       case State::GIF_HEADER:
@@ -474,6 +475,8 @@ nsGIFDecoder2::DoDecode(SourceBufferIterator& aIterator)
         return FinishedGlobalColorTable();
       case State::BLOCK_HEADER:
         return ReadBlockHeader(aData);
+      case State::BLOCK_HEADER_AFTER_YIELD:
+        return Transition::To(State::BLOCK_HEADER, BLOCK_HEADER_LEN);
       case State::EXTENSION_HEADER:
         return ReadExtensionHeader(aData);
       case State::GRAPHIC_CONTROL_EXTENSION:
@@ -692,7 +695,7 @@ nsGIFDecoder2::ReadGraphicControlExtension(const char* aData)
 
   mGIFStruct.delay_time = LittleEndian::readUint16(aData + 1) * 10;
   if (mGIFStruct.delay_time > 0) {
-    PostIsAnimated(mGIFStruct.delay_time);
+    PostIsAnimated(FrameTimeout::FromRawMilliseconds(mGIFStruct.delay_time));
   }
 
   return Transition::To(State::SKIP_SUB_BLOCKS, SUB_BLOCK_HEADER_LEN);
@@ -762,7 +765,7 @@ nsGIFDecoder2::ReadImageDescriptor(const char* aData)
       // animated image with a first frame timeout of zero. Signal that we're
       // animated now, before the first-frame decode early exit below, so that
       // RasterImage can detect that this happened.
-      PostIsAnimated(0);
+      PostIsAnimated(FrameTimeout::FromRawMilliseconds(0));
     }
 
     if (IsFirstFrameDecode()) {
@@ -974,7 +977,7 @@ nsGIFDecoder2::ReadImageDataSubBlock(const char* aData)
   if (subBlockLength == 0) {
     // We hit the block terminator.
     EndImageFrame();
-    return Transition::To(State::BLOCK_HEADER, BLOCK_HEADER_LEN);
+    return Transition::ToAfterYield(State::BLOCK_HEADER_AFTER_YIELD);
   }
 
   if (mGIFStruct.pixels_remaining == 0) {

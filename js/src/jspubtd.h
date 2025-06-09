@@ -118,8 +118,8 @@ typedef JSConstScalarSpec<double> JSConstDoubleSpec;
 typedef JSConstScalarSpec<int32_t> JSConstIntegerSpec;
 
 /*
- * Generic trace operation that calls JS_CallTracer on each traceable thing
- * stored in data.
+ * Generic trace operation that calls JS::TraceEdge on each traceable thing's
+ * location reachable from data.
  */
 typedef void
 (* JSTraceDataOp)(JSTracer* trc, void* data);
@@ -435,5 +435,12 @@ struct PerThreadDataFriendFields
 };
 
 } /* namespace js */
+
+MOZ_BEGIN_EXTERN_C
+
+// Defined in NSPR prio.h.
+typedef struct PRFileDesc PRFileDesc;
+
+MOZ_END_EXTERN_C
 
 #endif /* jspubtd_h */

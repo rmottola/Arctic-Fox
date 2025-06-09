@@ -935,16 +935,16 @@ const KTableEntry nsCSSProps::kImageLayerRepeatKTable[] = {
   { eCSSKeyword_repeat,     NS_STYLE_IMAGELAYER_REPEAT_REPEAT },
   { eCSSKeyword_repeat_x,   NS_STYLE_IMAGELAYER_REPEAT_REPEAT_X },
   { eCSSKeyword_repeat_y,   NS_STYLE_IMAGELAYER_REPEAT_REPEAT_Y },
-  { eCSSKeyword_round,      NS_STYLE_IMAGELAYER_REPEAT_ROUND },
-  { eCSSKeyword_space,      NS_STYLE_IMAGELAYER_REPEAT_SPACE },
+  { eCSSKeyword_round,      NS_STYLE_IMAGELAYER_REPEAT_ROUND},
+  { eCSSKeyword_space,      NS_STYLE_IMAGELAYER_REPEAT_SPACE},
   { eCSSKeyword_UNKNOWN, -1 }
 };
 
 const KTableEntry nsCSSProps::kImageLayerRepeatPartKTable[] = {
   { eCSSKeyword_no_repeat,  NS_STYLE_IMAGELAYER_REPEAT_NO_REPEAT },
   { eCSSKeyword_repeat,     NS_STYLE_IMAGELAYER_REPEAT_REPEAT },
-  { eCSSKeyword_round,      NS_STYLE_IMAGELAYER_REPEAT_ROUND },
-  { eCSSKeyword_space,      NS_STYLE_IMAGELAYER_REPEAT_SPACE },
+  { eCSSKeyword_round,      NS_STYLE_IMAGELAYER_REPEAT_ROUND},
+  { eCSSKeyword_space,      NS_STYLE_IMAGELAYER_REPEAT_SPACE},
   { eCSSKeyword_UNKNOWN, -1 }
 };
 
@@ -1040,7 +1040,7 @@ const KTableEntry nsCSSProps::kBoxDecorationBreakKTable[] = {
 };
 
 const KTableEntry nsCSSProps::kBoxShadowTypeKTable[] = {
-  { eCSSKeyword_inset, NS_STYLE_BOX_SHADOW_INSET },
+  { eCSSKeyword_inset, uint8_t(StyleBoxShadowType::Inset) },
   { eCSSKeyword_UNKNOWN, -1 }
 };
 
@@ -1493,8 +1493,8 @@ KTableEntry nsCSSProps::kFloatKTable[] = {
 };
 
 const KTableEntry nsCSSProps::kFloatEdgeKTable[] = {
-  { eCSSKeyword_content_box, NS_STYLE_FLOAT_EDGE_CONTENT_BOX },
-  { eCSSKeyword_margin_box, NS_STYLE_FLOAT_EDGE_MARGIN_BOX },
+  { eCSSKeyword_content_box, uint8_t(StyleFloatEdge::ContentBox) },
+  { eCSSKeyword_margin_box, uint8_t(StyleFloatEdge::MarginBox) },
   { eCSSKeyword_UNKNOWN, -1 }
 };
 
@@ -2122,14 +2122,14 @@ const KTableEntry nsCSSProps::kUnicodeBidiKTable[] = {
 };
 
 const KTableEntry nsCSSProps::kUserFocusKTable[] = {
-  { eCSSKeyword_none,           NS_STYLE_USER_FOCUS_NONE },
-  { eCSSKeyword_normal,         NS_STYLE_USER_FOCUS_NORMAL },
-  { eCSSKeyword_ignore,         NS_STYLE_USER_FOCUS_IGNORE },
-  { eCSSKeyword_select_all,     NS_STYLE_USER_FOCUS_SELECT_ALL },
-  { eCSSKeyword_select_before,  NS_STYLE_USER_FOCUS_SELECT_BEFORE },
-  { eCSSKeyword_select_after,   NS_STYLE_USER_FOCUS_SELECT_AFTER },
-  { eCSSKeyword_select_same,    NS_STYLE_USER_FOCUS_SELECT_SAME },
-  { eCSSKeyword_select_menu,    NS_STYLE_USER_FOCUS_SELECT_MENU },
+  { eCSSKeyword_none,           uint8_t(StyleUserFocus::None_) },
+  { eCSSKeyword_normal,         uint8_t(StyleUserFocus::Normal) },
+  { eCSSKeyword_ignore,         uint8_t(StyleUserFocus::Ignore) },
+  { eCSSKeyword_select_all,     uint8_t(StyleUserFocus::SelectAll) },
+  { eCSSKeyword_select_before,  uint8_t(StyleUserFocus::SelectBefore) },
+  { eCSSKeyword_select_after,   uint8_t(StyleUserFocus::SelectAfter) },
+  { eCSSKeyword_select_same,    uint8_t(StyleUserFocus::SelectSame) },
+  { eCSSKeyword_select_menu,    uint8_t(StyleUserFocus::SelectMenu) },
   { eCSSKeyword_UNKNOWN,        -1 }
 };
 
@@ -2302,13 +2302,13 @@ const KTableEntry nsCSSProps::kFillRuleKTable[] = {
 };
 
 const KTableEntry nsCSSProps::kClipShapeSizingKTable[] = {
-  { eCSSKeyword_content_box,   NS_STYLE_CLIP_SHAPE_SIZING_CONTENT },
-  { eCSSKeyword_padding_box,   NS_STYLE_CLIP_SHAPE_SIZING_PADDING },
-  { eCSSKeyword_border_box,    NS_STYLE_CLIP_SHAPE_SIZING_BORDER },
-  { eCSSKeyword_margin_box,    NS_STYLE_CLIP_SHAPE_SIZING_MARGIN },
-  { eCSSKeyword_fill_box,      NS_STYLE_CLIP_SHAPE_SIZING_FILL },
-  { eCSSKeyword_stroke_box,    NS_STYLE_CLIP_SHAPE_SIZING_STROKE },
-  { eCSSKeyword_view_box,      NS_STYLE_CLIP_SHAPE_SIZING_VIEW },
+  { eCSSKeyword_content_box,   uint8_t(StyleClipShapeSizing::Content) },
+  { eCSSKeyword_padding_box,   uint8_t(StyleClipShapeSizing::Padding) },
+  { eCSSKeyword_border_box,    uint8_t(StyleClipShapeSizing::Border) },
+  { eCSSKeyword_margin_box,    uint8_t(StyleClipShapeSizing::Margin) },
+  { eCSSKeyword_fill_box,      uint8_t(StyleClipShapeSizing::Fill) },
+  { eCSSKeyword_stroke_box,    uint8_t(StyleClipShapeSizing::Stroke) },
+  { eCSSKeyword_view_box,      uint8_t(StyleClipShapeSizing::View) },
   { eCSSKeyword_UNKNOWN,       -1 }
 };
 

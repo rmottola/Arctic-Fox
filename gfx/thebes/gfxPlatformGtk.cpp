@@ -99,6 +99,15 @@ gfxPlatformGtk::gfxPlatformGtk()
     uint32_t contentMask = BackendTypeBit(BackendType::CAIRO) | BackendTypeBit(BackendType::SKIA);
     InitBackendPrefs(canvasMask, BackendType::CAIRO,
                      contentMask, BackendType::CAIRO);
+
+#ifdef MOZ_X11
+    if (GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
+      mCompositorDisplay = XOpenDisplay(nullptr);
+      MOZ_ASSERT(mCompositorDisplay, "Failed to create compositor display!");
+    } else {
+      mCompositorDisplay = nullptr;
+    }
+#endif // MOZ_X11
 }
 
 gfxPlatformGtk::~gfxPlatformGtk()
@@ -108,6 +117,12 @@ gfxPlatformGtk::~gfxPlatformGtk()
         sFontconfigUtils = nullptr;
         gfxPangoFontGroup::Shutdown();
     }
+
+#ifdef MOZ_X11
+    if (mCompositorDisplay) {
+      XCloseDisplay(mCompositorDisplay);
+    }
+#endif // MOZ_X11
 }
 
 void
@@ -610,7 +625,20 @@ gfxPlatformGtk::GetGdkDrawable(cairo_surface_t *target)
 already_AddRefed<ScaledFont>
 gfxPlatformGtk::GetScaledFontForFont(DrawTarget* aTarget, gfxFont *aFont)
 {
-    return GetScaledFontForFontWithCairoSkia(aTarget, aFont);
+    switch (aTarget->GetBackendType()) {
+    case BackendType::CAIRO:
+    case BackendType::SKIA:
+        if (aFont->GetType() == gfxFont::FONT_TYPE_FONTCONFIG) {
+            gfxFontconfigFontBase* fcFont = static_cast<gfxFontconfigFontBase*>(aFont);
+            return Factory::CreateScaledFontForFontconfigFont(
+                    fcFont->GetCairoScaledFont(),
+                    fcFont->GetPattern(),
+                    fcFont->GetAdjustedSize());
+        }
+        MOZ_FALLTHROUGH;
+    default:
+        return GetScaledFontForFontWithCairoSkia(aTarget, aFont);
+    }
 }
 
 #ifdef GL_PROVIDER_GLX

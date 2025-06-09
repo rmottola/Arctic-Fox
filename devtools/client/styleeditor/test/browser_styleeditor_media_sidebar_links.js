@@ -89,6 +89,21 @@ function doFinalChecks(editor) {
 }
 
 /* Helpers */
+function waitForResizeTo(manager, type, value) {
+  return new Promise(resolve => {
+    let onResize = (_, data) => {
+      if (data[type] != value) {
+        return;
+      }
+      manager.off("contentResize", onResize);
+      info(`Got contentResize to a ${type} of ${value}`);
+      resolve();
+    };
+    info(`Waiting for contentResize to a ${type} of ${value}`);
+    manager.on("contentResize", onResize);
+  });
+}
+
 function* getSizing() {
   let browser = gBrowser.selectedBrowser;
   let sizing = yield ContentTask.spawn(browser, {}, function* () {

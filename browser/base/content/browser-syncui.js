@@ -350,8 +350,8 @@ var gSyncUI = {
   },
 
 
-  /* Update the tooltip for the Sync Toolbar button and the Sync spinner in the
-     FxA hamburger area.
+  /* Update the tooltip for the sync-status broadcaster (which will update the
+     Sync Toolbar button and the Sync spinner in the FxA hamburger area.)
      If Sync is configured, the tooltip is when the last sync occurred,
      otherwise the tooltip reflects the fact that Sync needs to be
      (re-)configured.
@@ -401,16 +401,13 @@ var gSyncUI = {
     // sure it hasn't been torn down since we started.
     if (!gBrowser)
       return;
-    let syncButton = document.getElementById("sync-button");
-    let statusButton = document.getElementById("PanelUI-fxa-icon");
 
-    for (let button of [syncButton, statusButton]) {
-      if (button) {
-        if (tooltiptext) {
-          button.setAttribute("tooltiptext", tooltiptext);
-        } else {
-          button.removeAttribute("tooltiptext");
-        }
+    let broadcaster = document.getElementById("sync-status");
+    if (broadcaster) {
+      if (tooltiptext) {
+        broadcaster.setAttribute("tooltiptext", tooltiptext);
+      } else {
+        broadcaster.removeAttribute("tooltiptext");
       }
     }
   }),

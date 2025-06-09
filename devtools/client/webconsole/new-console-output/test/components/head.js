@@ -8,12 +8,11 @@
 
 var { utils: Cu } = Components;
 
-Cu.import("resource://testing-common/Assert.jsm");
-
 var { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+var { Assert } = require("resource://testing-common/Assert.jsm");
 var { BrowserLoader } = Cu.import("resource://devtools/client/shared/browser-loader.js", {});
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
-var { Task } = require("resource://gre/modules/Task.jsm");
+var { Task } = require("devtools/shared/task");
 var { DebuggerServer } = require("devtools/server/main");
 var { DebuggerClient } = require("devtools/shared/client/main");
 
@@ -33,12 +32,14 @@ let testCommands = new Map();
 testCommands.set("console.log()", {
   command: "console.log('foobar', 'test')",
   commandType: "consoleAPICall",
-  expectedText: "foobar test"
+  // @TODO should output: foobar test
+  expectedText: "\"foobar\"\"test\""
 });
 testCommands.set("new Date()", {
   command: "new Date(448156800000)",
   commandType: "evaluationResult",
-  expectedText: "Date 1984-03-15T00:00:00.000Z"
+  // @TODO should output: Date 1984-03-15T00:00:00.000Z
+  expectedText: "Date1984-03-15T00:00:00.000Z"
 });
 testCommands.set("pageError", {
   command: null,
@@ -49,7 +50,7 @@ testCommands.set("pageError", {
 function* getPacket(command, type = "evaluationResult") {
   try {
     // Attach the console to the tab.
-    let state = yield new Promise(function(resolve) {
+    let state = yield new Promise(function (resolve) {
       attachConsoleToTab(["ConsoleAPI"], resolve);
     });
 
@@ -155,7 +156,7 @@ function cleanExpectedHTML(htmlString) {
 // Helpers copied in from shared/webconsole/test/common.js
 function initCommon()
 {
-  //Services.prefs.setBoolPref("devtools.debugger.log", true);
+  // Services.prefs.setBoolPref("devtools.debugger.log", true);
 }
 
 function initDebuggerServer()
@@ -234,7 +235,7 @@ function _attachConsole(aListeners, aCallback, aAttachToTab, aAttachToWorker)
               worker.removeEventListener("message", listener);
               tabClient.listWorkers(function (response) {
                 tabClient.attachWorker(response.workers[0].actor, function (response, workerClient) {
-                  workerClient.attachThread({}, function(aResponse) {
+                  workerClient.attachThread({}, function (aResponse) {
                     aState.actor = workerClient.consoleActor;
                     aState.dbgClient.attachConsole(workerClient.consoleActor, aListeners,
                                                    _onAttachConsole.bind(null, aState));

@@ -7,7 +7,7 @@
 "use strict";
 
 // Make this available to both AMD and CJS environments
-define(function(require, exports, module) {
+define(function (require, exports, module) {
   // Dependencies
   const React = require("devtools/client/shared/vendor/react");
 
@@ -27,7 +27,6 @@ define(function(require, exports, module) {
   const { Document } = require("./document");
   const { Event } = require("./event");
   const { Func } = require("./function");
-  const { NamedNodeMap } = require("./named-node-map");
   const { RegExp } = require("./regexp");
   const { StyleSheet } = require("./stylesheet");
   const { TextNode } = require("./text-node");
@@ -46,7 +45,6 @@ define(function(require, exports, module) {
     Event,
     DateTime,
     TextNode,
-    NamedNodeMap,
     Attribute,
     Func,
     ArrayRep,
@@ -69,14 +67,14 @@ define(function(require, exports, module) {
    * property.
    */
   const Rep = React.createClass({
+    displayName: "Rep",
+
     propTypes: {
       object: React.PropTypes.any,
       defaultRep: React.PropTypes.object,
     },
 
-    displayName: "Rep",
-
-    render: function() {
+    render: function () {
       let rep = getRep(this.props.object, this.props.defaultRep);
       return rep(this.props);
     },

@@ -11,6 +11,9 @@ const Types = require("../types");
 const Viewport = createFactory(require("./viewport"));
 
 module.exports = createClass({
+
+  displayName: "Viewports",
+
   propTypes: {
     devices: PropTypes.shape(Types.devices).isRequired,
     location: Types.location.isRequired,
@@ -21,9 +24,8 @@ module.exports = createClass({
     onContentResize: PropTypes.func.isRequired,
     onResizeViewport: PropTypes.func.isRequired,
     onRotateViewport: PropTypes.func.isRequired,
+    onUpdateDeviceModalOpen: PropTypes.func.isRequired,
   },
-
-  displayName: "Viewports",
 
   render() {
     let {
@@ -36,24 +38,27 @@ module.exports = createClass({
       onContentResize,
       onResizeViewport,
       onRotateViewport,
+      onUpdateDeviceModalOpen,
     } = this.props;
 
     return dom.div(
       {
         id: "viewports",
       },
-      viewports.map(viewport => {
+      viewports.map((viewport, i) => {
         return Viewport({
           key: viewport.id,
           devices,
           location,
           screenshot,
+          swapAfterMount: i == 0,
           viewport,
           onBrowserMounted,
           onChangeViewportDevice,
           onContentResize,
           onResizeViewport,
           onRotateViewport,
+          onUpdateDeviceModalOpen,
         });
       })
     );

@@ -11,13 +11,12 @@ Services.scriptloader.loadSubScript("chrome://mochitests/content/browser/devtool
 
 const {DOMHelpers} = Cu.import("resource://devtools/client/shared/DOMHelpers.jsm", {});
 const {Hosts} = require("devtools/client/framework/toolbox-hosts");
-const {defer} = require("promise");
 
 const TEST_URI_ROOT = "http://example.com/browser/devtools/client/shared/test/";
 const OPTIONS_VIEW_URL = TEST_URI_ROOT + "doc_options-view.xul";
 
 function catchFail(func) {
-  return function() {
+  return function () {
     try {
       return func.apply(null, arguments);
     } catch (ex) {
@@ -94,7 +93,7 @@ function waitForValue(options) {
 
 function oneTimeObserve(name, callback) {
   return new Promise((resolve) => {
-    let func = function() {
+    let func = function () {
       Services.obs.removeObserver(func, name);
       if (callback) {
         callback();
@@ -106,7 +105,7 @@ function oneTimeObserve(name, callback) {
 }
 
 let createHost =
-Task.async(function*(type = "bottom", src = "data:text/html;charset=utf-8,") {
+Task.async(function* (type = "bottom", src = "data:text/html;charset=utf-8,") {
   let host = new Hosts[type](gBrowser.selectedTab);
   let iframe = yield host.create();
 
@@ -131,7 +130,7 @@ function loadTelemetryAndRecordLogs() {
   let Telemetry = require("devtools/client/shared/telemetry");
   Telemetry.prototype.telemetryInfo = {};
   Telemetry.prototype._oldlog = Telemetry.prototype.log;
-  Telemetry.prototype.log = function(histogramId, value) {
+  Telemetry.prototype.log = function (histogramId, value) {
     if (!this.telemetryInfo) {
       // Can be removed when Bug 992911 lands (see Bug 1011652 Comment 10)
       return;
@@ -173,7 +172,7 @@ function checkTelemetryResults(Telemetry) {
     } else if (histId.endsWith("OPENED_COUNT")) {
       ok(value.length > 1, histId + " has more than one entry");
 
-      let okay = value.every(function(element) {
+      let okay = value.every(function (element) {
         return element === true;
       });
 
@@ -181,7 +180,7 @@ function checkTelemetryResults(Telemetry) {
     } else if (histId.endsWith("TIME_ACTIVE_SECONDS")) {
       ok(value.length > 1, histId + " has more than one entry");
 
-      let okay = value.every(function(element) {
+      let okay = value.every(function (element) {
         return element > 0;
       });
 
@@ -242,7 +241,7 @@ function waitUntil(predicate, interval = 10) {
     return Promise.resolve(true);
   }
   return new Promise(resolve => {
-    setTimeout(function() {
+    setTimeout(function () {
       waitUntil(predicate).then(() => resolve(true));
     }, interval);
   });
@@ -267,7 +266,7 @@ function showFilterPopupPresets(widget) {
  * @return {Promise}
  */
 let showFilterPopupPresetsAndCreatePreset =
-Task.async(function*(widget, name, value) {
+Task.async(function* (widget, name, value) {
   yield showFilterPopupPresets(widget);
 
   let onRender = widget.once("render");

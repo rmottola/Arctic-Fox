@@ -736,10 +736,6 @@ protected:
 
   RenderingMode mRenderingMode;
 
-  // Texture informations for fast video rendering
-  unsigned int mVideoTexture;
-  nsIntSize mCurrentVideoSize;
-
   // Member vars
   int32_t mWidth, mHeight;
 
@@ -949,7 +945,7 @@ protected:
                      fillRule(mozilla::gfx::FillRule::FILL_WINDING),
                      lineCap(mozilla::gfx::CapStyle::BUTT),
                      lineJoin(mozilla::gfx::JoinStyle::MITER_OR_BEVEL),
-                     filterString(MOZ_UTF16("none")),
+                     filterString(u"none"),
                      updateFilterOnWriteOnly(false),
                      imageSmoothingEnabled(true),
                      fontExplicitLanguage(false)

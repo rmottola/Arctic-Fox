@@ -10,7 +10,7 @@ const {PropertyView} =
       require("devtools/client/inspector/computed/computed");
 const TEST_URI = URL_ROOT + "doc_matched_selectors.html";
 
-add_task(function*() {
+add_task(function* () {
   yield addTab(TEST_URI);
   let {inspector, view} = yield openComputedView();
 
@@ -22,7 +22,7 @@ function* testMatchedSelectors(view, inspector) {
   info("checking selector counts, matched rules and titles");
 
   let nodeFront = yield getNodeFront("#test", inspector);
-  is(nodeFront, view.viewedElement,
+  is(nodeFront, view._viewedElement,
     "style inspector node matches the selected node");
 
   let propertyView = new PropertyView(view, "color");

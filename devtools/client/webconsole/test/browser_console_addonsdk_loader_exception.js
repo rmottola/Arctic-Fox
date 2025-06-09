@@ -11,8 +11,7 @@
 
 const TEST_URI = "data:text/html;charset=utf8,<p>hello world from bug 866950";
 
-function test()
-{
+function test() {
   requestLongerTimeout(2);
 
   let webconsole, browserconsole;
@@ -30,7 +29,8 @@ function test()
     // Cause an exception in a script loaded with the addon-sdk loader.
     let toolbox = gDevTools.getToolbox(webconsole.target);
     let oldPanels = toolbox._toolPanels;
-    toolbox._toolPanels = {}; // non-iterable
+    // non-iterable
+    toolbox._toolPanels = {};
 
     function fixToolbox() {
       toolbox._toolPanels = oldPanels;
@@ -57,19 +57,20 @@ function test()
 
     let msg = [...result.matched][0];
     ok(msg, "message element found");
-    let locationNode = msg.querySelector(".message-location");
+    let locationNode = msg
+      .querySelector(".message .message-location > .frame-link");
     ok(locationNode, "message location element found");
 
-    let title = locationNode.getAttribute("title");
-    info("location node title: " + title);
-    isnot(title.indexOf(" -> "), -1, "error comes from a subscript");
+    let url = locationNode.getAttribute("data-url");
+    info("location node url: " + url);
+    ok(url.indexOf("resource://") === 0, "error comes from a subscript");
 
     let viewSource = browserconsole.viewSource;
     let URL = null;
     let clickPromise = promise.defer();
-    browserconsole.viewSourceInDebugger = (aURL) => {
-      info("browserconsole.viewSourceInDebugger() was invoked: " + aURL);
-      URL = aURL;
+    browserconsole.viewSourceInDebugger = (sourceURL) => {
+      info("browserconsole.viewSourceInDebugger() was invoked: " + sourceURL);
+      URL = sourceURL;
       clickPromise.resolve(null);
     };
 
@@ -78,11 +79,12 @@ function test()
                                browserconsole.iframeWindow);
 
     info("wait for click on locationNode");
-    yield clickPromise;
+    yield clickPromise.promise;
 
     info("view-source url: " + URL);
     ok(URL, "we have some source URL after the click");
-    isnot(URL.indexOf("toolbox.js"), -1, "we have the expected view source URL");
+    isnot(URL.indexOf("toolbox.js"), -1,
+      "we have the expected view source URL");
     is(URL.indexOf("->"), -1, "no -> in the URL given to view-source");
 
     browserconsole.viewSourceInDebugger = viewSource;

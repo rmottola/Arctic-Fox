@@ -7,22 +7,21 @@
 
 var connectCount = 0;
 
-add_task(function*() {
+add_task(function* () {
   let { target, panel } = yield initWebAudioEditor(SIMPLE_CONTEXT_URL);
   let { panelWin } = panel;
   let { gFront, $, $$, EVENTS, gAudioNodes } = panelWin;
 
   let started = once(gFront, "start-context");
 
-  reload(target);
-
   gAudioNodes.on("connect", onConnectNode);
 
-  let [actors] = yield Promise.all([
+  let events = Promise.all([
     get3(gFront, "create-node"),
     waitForGraphRendered(panelWin, 3, 2)
   ]);
-
+  reload(target);
+  let [actors] = yield events;
   let [destId, oscId, gainId] = actors.map(actor => actor.actorID);
 
   ok(findGraphNode(panelWin, oscId).classList.contains("type-OscillatorNode"), "found OscillatorNode with class");
@@ -40,6 +39,6 @@ add_task(function*() {
   yield teardown(target);
 });
 
-function onConnectNode () {
+function onConnectNode() {
   ++connectCount;
 }

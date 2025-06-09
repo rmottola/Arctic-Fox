@@ -34,7 +34,7 @@
   color: #fff;
   border: 1px solid #111;
   border-radius: 2px;
-  padding: 5px;
+  padding: 0 5px;
   width: 200px;
   margin: 0;
 }
@@ -137,7 +137,7 @@
   -moz-appearance: none;
   color: inherit;
   border-width: 0;
-  -moz-border-end: 1px solid hsla(210,8%,5%,.45);
+  border-inline-end: 1px solid hsla(210,8%,5%,.45);
   box-shadow: -1px 0 0 hsla(210,16%,76%,.15) inset, 1px 0 0 hsla(210,16%,76%,.15);
 }
 

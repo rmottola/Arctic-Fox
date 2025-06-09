@@ -8,14 +8,13 @@
 
 const { ActorPool } = require("devtools/server/actors/common");
 const { createValueGrip } = require("devtools/server/actors/object");
-const { ActorClass } = require("devtools/shared/protocol");
+const { ActorClassWithSpec } = require("devtools/shared/protocol");
+const { frameSpec } = require("devtools/shared/specs/frame");
 
 /**
  * An actor for a specified stack frame.
  */
-let FrameActor = ActorClass({
-  typeName: "frame",
-
+let FrameActor = ActorClassWithSpec(frameSpec, {
   /**
    * Creates the Frame actor.
    *
@@ -24,7 +23,7 @@ let FrameActor = ActorClass({
    * @param threadActor ThreadActor
    *        The parent thread actor for this frame.
    */
-  initialize: function(frame, threadActor) {
+  initialize: function (frame, threadActor) {
     this.frame = frame;
     this.threadActor = threadActor;
   },
@@ -45,7 +44,7 @@ let FrameActor = ActorClass({
    * Finalization handler that is called when the actor is being evicted from
    * the pool.
    */
-  disconnect: function() {
+  disconnect: function () {
     this.conn.removeActorPool(this._frameLifetimePool);
     this._frameLifetimePool = null;
   },
@@ -53,7 +52,7 @@ let FrameActor = ActorClass({
   /**
    * Returns a frame form for use in a protocol message.
    */
-  form: function() {
+  form: function () {
     let threadActor = this.threadActor;
     let form = { actor: this.actorID,
                  type: this.frame.type };
@@ -88,7 +87,7 @@ let FrameActor = ActorClass({
     return form;
   },
 
-  _args: function() {
+  _args: function () {
     if (!this.frame.arguments) {
       return [];
     }

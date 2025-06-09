@@ -1,10 +1,10 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-///////////////////
+// /////////////////
 //
 // Whitelisting this test.
-// As part of bug 1077403, the leaking uncaught rejection should be fixed. 
+// As part of bug 1077403, the leaking uncaught rejection should be fixed.
 //
 thisTestLeaksUncaughtRejectionsAndShouldBeFixed("Error: Connection closed");
 
@@ -13,7 +13,7 @@ thisTestLeaksUncaughtRejectionsAndShouldBeFixed("Error: Connection closed");
  * event and reshow the tools after reloading.
  */
 
-add_task(function*() {
+add_task(function* () {
   let { target, panel } = yield initWebAudioEditor(SIMPLE_CONTEXT_URL);
   let { gFront, $ } = panel.panelWin;
 
@@ -53,6 +53,7 @@ add_task(function*() {
   reload(target);
 
   yield Promise.all([navigating, started]);
+  let rendered = waitForGraphRendered(panel.panelWin, 3, 2);
 
   is($("#reload-notice").hidden, true,
     "The 'reload this page' notice should be hidden after context found after reload.");
@@ -60,6 +61,8 @@ add_task(function*() {
     "The 'waiting for an audio context' notice should be hidden after context found after reload.");
   is($("#content").hidden, false,
     "The tool's content should reappear without closing and reopening the toolbox.");
+
+  yield rendered;
 
   yield teardown(target);
 });

@@ -370,7 +370,7 @@ var ScrollPositionListener = {
   },
 
   handleEvent: function (event) {
-    let frame = event.target && event.target.defaultView;
+    let frame = event.target.defaultView;
 
     // Don't collect scroll data for frames created at or after the load event
     // as SessionStore can't restore scroll data for those.
@@ -418,8 +418,7 @@ var FormDataListener = {
 
   handleEvent: function (event) {
     let frame = event.target &&
-                event.target.ownerDocument &&
-                event.target.ownerDocument.defaultView;
+                event.target.ownerGlobal;
 
     // Don't collect form data for frames created at or after the load event
     // as SessionStore can't restore form data for those.

@@ -13,7 +13,7 @@ function openContextMenuFor(element, shiftkey, waitForSpellCheck) {
     function actuallyOpenContextMenuFor() {
       lastElement = element;
       var eventDetails = { type : "contextmenu", button : 2, shiftKey : shiftkey };
-      synthesizeMouse(element, 2, 2, eventDetails, element.ownerDocument.defaultView);
+      synthesizeMouse(element, 2, 2, eventDetails, element.ownerGlobal);
     }
 
     if (waitForSpellCheck) {
@@ -41,27 +41,29 @@ function getVisibleMenuItems(aMenu, aData) {
         if (key)
             key = key.toLowerCase();
 
-        var isGenerated = item.hasAttribute("generateditemid");
+        var isPageMenuItem = item.hasAttribute("generateditemid");
 
         if (item.nodeName == "menuitem") {
-            var isSpellSuggestion = item.className == "spell-suggestion";
-            if (isSpellSuggestion) {
-              is(item.id, "", "child menuitem #" + i + " is a spelling suggestion");
-            } else if (isGenerated) {
-              is(item.id, "", "child menuitem #" + i + " is a generated item");
+            var isGenerated = item.className == "spell-suggestion"
+                              || item.className == "sendtab-target";
+            if (isGenerated) {
+              is(item.id, "", "child menuitem #" + i + " is generated");
+            } else if (isPageMenuItem) {
+              is(item.id, "", "child menuitem #" + i + " is a generated page menu item");
             } else {
               ok(item.id, "child menuitem #" + i + " has an ID");
             }
             var label = item.getAttribute("label");
             ok(label.length, "menuitem " + item.id + " has a label");
-            if (isSpellSuggestion) {
-              is(key, "", "Spell suggestions shouldn't have an access key");
+            if (isGenerated) {
+              is(key, "", "Generated items shouldn't have an access key");
               items.push("*" + label);
-            } else if (isGenerated) {
+            } else if (isPageMenuItem) {
               items.push("+" + label);
             } else if (item.id.indexOf("spell-check-dictionary-") != 0 &&
                        item.id != "spell-no-suggestions" &&
                        item.id != "spell-add-dictionaries-main" &&
+                       item.id != "context-savelinktopocket" &&
                        item.id != "fill-login-saved-passwords" &&
                        item.id != "fill-login-no-logins") {
               ok(key, "menuitem " + item.id + " has an access key");
@@ -70,10 +72,10 @@ function getVisibleMenuItems(aMenu, aData) {
               else
                   accessKeys[key] = item.id;
             }
-            if (!isSpellSuggestion && !isGenerated) {
+            if (!isGenerated && !isPageMenuItem) {
               items.push(item.id);
             }
-            if (isGenerated) {
+            if (isPageMenuItem) {
               var p = {};
               p.type = item.getAttribute("type");
               p.icon = item.getAttribute("image");
@@ -88,11 +90,11 @@ function getVisibleMenuItems(aMenu, aData) {
             items.push("---");
             items.push(null);
         } else if (item.nodeName == "menu") {
-            if (isGenerated) {
+            if (isPageMenuItem) {
                 item.id = "generated-submenu-" + aData.generatedSubmenuId++;
             }
             ok(item.id, "child menu #" + i + " has an ID");
-            if (!isGenerated) {
+            if (!isPageMenuItem) {
                 ok(key, "menu has an access key");
                 if (accessKeys[key])
                     ok(false, "menu " + item.id + " has same accesskey as " + accessKeys[key]);
@@ -241,6 +243,7 @@ let lastElementSelector = null;
  *        waitForSpellCheck: wait until spellcheck is initialized before
  *                           starting test
  *        preCheckContextMenuFn: callback to run before opening menu
+ *        onContextMenuShown: callback to run when the context menu is shown
  *        postCheckContextMenuFn: callback to run after opening menu
  * @return {Promise} resolved after the test finishes
  */
@@ -293,6 +296,11 @@ function* test_contextmenu(selector, menuItems, options={}) {
     gBrowser.selectedBrowser);
   yield awaitPopupShown;
   info("Popup Shown");
+
+  if (options.onContextMenuShown) {
+    yield options.onContextMenuShown();
+    info("Completed onContextMenuShown");
+  }
 
   if (menuItems) {
     if (Services.prefs.getBoolPref("devtools.inspector.enabled")) {

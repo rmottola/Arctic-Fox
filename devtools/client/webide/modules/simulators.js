@@ -2,9 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const { Cu } = require("chrome");
-const { AddonManager } = Cu.import("resource://gre/modules/AddonManager.jsm");
-const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
+"use strict";
+
+const { AddonManager } = require("resource://gre/modules/AddonManager.jsm");
+const { Task } = require("devtools/shared/task");
 loader.lazyRequireGetter(this, "ConnectionManager", "devtools/shared/client/connection-manager", true);
 loader.lazyRequireGetter(this, "AddonSimulatorProcess", "devtools/client/webide/modules/simulator-process", true);
 loader.lazyRequireGetter(this, "OldAddonSimulatorProcess", "devtools/client/webide/modules/simulator-process", true);
@@ -24,29 +25,103 @@ var Simulators = {
   // The list of simulator configurations.
   _simulators: [],
 
-  // List all available simulators.
-  findSimulators() {
-    if (this._loaded) {
-      return promise.resolve(this._simulators);
+  /**
+   * Load a previously saved list of configurations (only once).
+   *
+   * @return Promise.
+   */
+  _load() {
+    if (this._loadingPromise) {
+      return this._loadingPromise;
     }
 
-    // TODO (Bug 1146519) Load a persistent list of configured simulators first.
+    this._loadingPromise = Task.spawn(function* () {
+      let jobs = [];
 
-    // Add default simulators to the list for each new (unused) addon.
-    return this.findSimulatorAddons().then(addons => {
-      this._loaded = true;
-      addons.forEach(this.addIfUnusedAddon.bind(this));
-      return this._simulators;
+      let value = yield asyncStorage.getItem("simulators");
+      if (Array.isArray(value)) {
+        value.forEach(options => {
+          let simulator = new Simulator(options);
+          Simulators.add(simulator, true);
+
+          // If the simulator had a reference to an addon, fix it.
+          if (options.addonID) {
+            let deferred = promise.defer();
+            AddonManager.getAddonByID(options.addonID, addon => {
+              simulator.addon = addon;
+              delete simulator.options.addonID;
+              deferred.resolve();
+            });
+            jobs.push(deferred.promise);
+          }
+        });
+      }
+
+      yield promise.all(jobs);
+      yield Simulators._addUnusedAddons();
+      Simulators.emitUpdated();
+      return Simulators._simulators;
     });
+
+    return this._loadingPromise;
   },
 
-  // List all installed simulator addons.
+  /**
+   * Add default simulators to the list for each new (unused) addon.
+   *
+   * @return Promise.
+   */
+  _addUnusedAddons: Task.async(function* () {
+    let jobs = [];
+
+    let addons = yield Simulators.findSimulatorAddons();
+    addons.forEach(addon => {
+      jobs.push(Simulators.addIfUnusedAddon(addon, true));
+    });
+
+    yield promise.all(jobs);
+  }),
+
+  /**
+   * Save the current list of configurations.
+   *
+   * @return Promise.
+   */
+  _save: Task.async(function* () {
+    yield this._load();
+
+    let value = Simulators._simulators.map(simulator => {
+      let options = JSON.parse(JSON.stringify(simulator.options));
+      if (simulator.addon != null) {
+        options.addonID = simulator.addon.id;
+      }
+      return options;
+    });
+
+    yield asyncStorage.setItem("simulators", value);
+  }),
+
+  /**
+   * List all available simulators.
+   *
+   * @return Promised simulator list.
+   */
+  findSimulators: Task.async(function* () {
+    yield this._load();
+    return Simulators._simulators;
+  }),
+
+  /**
+   * List all installed simulator addons.
+   *
+   * @return Promised addon list.
+   */
   findSimulatorAddons() {
     let deferred = promise.defer();
     AddonManager.getAllAddons(all => {
       let addons = [];
       for (let addon of all) {
-        if (this.isSimulatorAddon(addon)) {
+        if (Simulators.isSimulatorAddon(addon)) {
           addons.push(addon);
         }
       }
@@ -57,12 +132,68 @@ var Simulators = {
     return deferred.promise;
   },
 
-  // Detect simulator addons, including "unofficial" ones
-  isSimulatorAddon(addon) {
-    return SimulatorRegExp.exec(addon.id);
+  /**
+   * Add a new simulator for `addon` if no other simulator uses it.
+   */
+  addIfUnusedAddon(addon, silently = false) {
+    let simulators = this._simulators;
+    let matching = simulators.filter(s => s.addon && s.addon.id == addon.id);
+    if (matching.length > 0) {
+      return promise.resolve();
+    }
+    let options = {};
+    options.name = addon.name.replace(" Simulator", "");
+    // Some addons specify a simulator type at the end of their version string,
+    // e.g. "2_5_tv".
+    let type = this.simulatorAddonVersion(addon).split("_")[2];
+    if (type) {
+      // "tv" is shorthand for type "television".
+      options.type = (type === "tv" ? "television" : type);
+    }
+    return this.add(new Simulator(options, addon), silently);
   },
 
-  // Get a unique name for a simulator (may add a suffix, e.g. "MyName (1)").
+  // TODO (Bug 1146521) Maybe find a better way to deal with removed addons?
+  removeIfUsingAddon(addon) {
+    let simulators = this._simulators;
+    let remaining = simulators.filter(s => !s.addon || s.addon.id != addon.id);
+    this._simulators = remaining;
+    if (remaining.length !== simulators.length) {
+      this.emitUpdated();
+    }
+  },
+
+  /**
+   * Add a new simulator to the list. Caution: `simulator.name` may be modified.
+   *
+   * @return Promise to added simulator.
+   */
+  add(simulator, silently = false) {
+    let simulators = this._simulators;
+    let uniqueName = this.uniqueName(simulator.options.name);
+    simulator.options.name = uniqueName;
+    simulators.push(simulator);
+    if (!silently) {
+      this.emitUpdated();
+    }
+    return promise.resolve(simulator);
+  },
+
+  /**
+   * Remove a simulator from the list.
+   */
+  remove(simulator) {
+    let simulators = this._simulators;
+    let remaining = simulators.filter(s => s !== simulator);
+    this._simulators = remaining;
+    if (remaining.length !== simulators.length) {
+      this.emitUpdated();
+    }
+  },
+
+  /**
+   * Get a unique name for a simulator (may add a suffix, e.g. "MyName (1)").
+   */
   uniqueName(name) {
     let simulators = this._simulators;
 
@@ -78,50 +209,34 @@ var Simulators = {
     return unique;
   },
 
-  // Add a new simulator to the list. Caution: `simulator.name` may be modified.
-  // @return Promise to added simulator.
-  add(simulator) {
-    let simulators = this._simulators;
-    let uniqueName = this.uniqueName(simulator.options.name);
-    simulator.options.name = uniqueName;
-    simulators.push(simulator);
-    this.emitUpdated();
-    return promise.resolve(simulator);
+  /**
+   * Compare an addon's ID against the expected form of a simulator addon ID,
+   * and try to extract its version if there is a match.
+   *
+   * Note: If a simulator addon is recognized, but no version can be extracted
+   * (e.g. custom RegExp pref value), we return "Unknown" to keep the returned
+   * value 'truthy'.
+   */
+  simulatorAddonVersion(addon) {
+    let match = SimulatorRegExp.exec(addon.id);
+    if (!match) {
+      return null;
+    }
+    let version = match[1];
+    return version || "Unknown";
   },
 
-  remove(simulator) {
-    let simulators = this._simulators;
-    let remaining = simulators.filter(s => s !== simulator);
-    this._simulators = remaining;
-    if (remaining.length !== simulators.length) {
-      this.emitUpdated();
-    }
-  },
-
-  // Add a new default simulator for `addon` if no other simulator uses it.
-  addIfUnusedAddon(addon) {
-    let simulators = this._simulators;
-    let matching = simulators.filter(s => s.addon && s.addon.id == addon.id);
-    if (matching.length > 0) {
-      return promise.resolve();
-    }
-    let name = addon.name.replace(" Simulator", "");
-    return this.add(new Simulator({name}, addon));
-  },
-
-  // TODO (Bug 1146521) Maybe find a better way to deal with removed addons?
-  removeIfUsingAddon(addon) {
-    let simulators = this._simulators;
-    let remaining = simulators.filter(s => !s.addon || s.addon.id != addon.id);
-    this._simulators = remaining;
-    if (remaining.length !== simulators.length) {
-      this.emitUpdated();
-    }
+  /**
+   * Detect simulator addons, including "unofficial" ones.
+   */
+  isSimulatorAddon(addon) {
+    return !!this.simulatorAddonVersion(addon);
   },
 
   emitUpdated() {
+    this.emit("updated", { length: this._simulators.length });
     this._simulators.sort(LocaleCompare);
-    this.emit("updated");
+    this._save();
   },
 
   onConfigure(e, simulator) {
@@ -162,7 +277,7 @@ function Simulator(options = {}, addon = null) {
   this.options = options;
 
   // Fill `this.options` with default values where needed.
-  let defaults = this._defaults;
+  let defaults = this.defaults;
   for (let option in defaults) {
     if (this.options[option] == null) {
       this.options[option] = defaults[option];
@@ -171,16 +286,26 @@ function Simulator(options = {}, addon = null) {
 }
 Simulator.prototype = {
 
-  // Default simulation options, based on the Firefox OS Flame.
+  // Default simulation options.
   _defaults: {
-    width: 320,
-    height: 570,
-    pixelRatio: 1.5
+    // Based on the Firefox OS Flame.
+    phone: {
+      width: 320,
+      height: 570,
+      pixelRatio: 1.5
+    },
+    // Based on a 720p HD TV.
+    television: {
+      width: 1280,
+      height: 720,
+      pixelRatio: 1,
+    }
   },
+  _defaultType: "phone",
 
   restoreDefaults() {
+    let defaults = this.defaults;
     let options = this.options;
-    let defaults = this._defaults;
     for (let option in defaults) {
       options[option] = defaults[option];
     }
@@ -219,12 +344,21 @@ Simulator.prototype = {
     return process.kill();
   },
 
+  get defaults() {
+    let defaults = this._defaults;
+    return defaults[this.type] || defaults[this._defaultType];
+  },
+
   get id() {
     return this.name;
   },
 
   get name() {
     return this.options.name;
+  },
+
+  get type() {
+    return this.options.type || this._defaultType;
   },
 
   get version() {

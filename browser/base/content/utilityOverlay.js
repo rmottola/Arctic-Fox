@@ -5,6 +5,7 @@
 
 // Services = object with smart getters for common XPCOM services
 Components.utils.import("resource://gre/modules/AppConstants.jsm");
+Components.utils.import("resource://gre/modules/ContextualIdentityService.jsm");
 Components.utils.import("resource://gre/modules/Services.jsm");
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 Components.utils.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
@@ -12,9 +13,6 @@ Components.utils.import("resource:///modules/RecentWindow.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "ShellService",
                                   "resource:///modules/ShellService.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "ContextualIdentityService",
-                                  "resource:///modules/ContextualIdentityService.jsm");
 
 XPCOMUtils.defineLazyServiceGetter(this, "aboutNewTabService",
                                    "@mozilla.org/browser/aboutnewtab-service;1",
@@ -146,11 +144,8 @@ function whereToOpenLink( e, ignoreButton, ignoreAlt )
 
   // Don't do anything special with right-mouse clicks.  They're probably clicks on context menu items.
 
-#ifdef XP_MACOSX
-  if (meta || (middle && middleUsesTabs))
-#else
-  if (ctrl || (middle && middleUsesTabs))
-#endif
+  var metaKey = AppConstants.platform == "macosx" ? meta : ctrl;
+  if (metaKey || (middle && middleUsesTabs))
     return shift ? "tabshifted" : "tab";
 
   if (alt && getBoolPref("browser.altClickSave", false))
@@ -184,6 +179,7 @@ function whereToOpenLink( e, ignoreButton, ignoreAlt )
  *   skipTabAnimation     (boolean)
  *   allowPinnedTabHostChange (boolean)
  *   allowPopups          (boolean)
+ *   userContextId        (unsigned int)
  */
 function openUILinkIn(url, where, aAllowThirdPartyFixup, aPostData, aReferrerURI) {
   var params;
@@ -427,7 +423,7 @@ function checkForMiddleClick(node, event) {
 // Populate a menu with user-context menu items. This method should be called
 // by onpopupshowing passing the event as first argument. addCommandAttribute
 // param is used to set the 'command' attribute in the new menuitem elements.
-function createUserContextMenu(event, addCommandAttribute = true) {
+function createUserContextMenu(event, addCommandAttribute = true, excludeUserContextId = 0) {
   while (event.target.hasChildNodes()) {
     event.target.removeChild(event.target.firstChild);
   }
@@ -435,17 +431,43 @@ function createUserContextMenu(event, addCommandAttribute = true) {
   let bundle = document.getElementById("bundle_browser");
   let docfrag = document.createDocumentFragment();
 
+  // If we are excluding a userContextId, we want to add a 'no-container' item.
+  if (excludeUserContextId) {
+    let menuitem = document.createElement("menuitem");
+    menuitem.setAttribute("usercontextid", "0");
+    menuitem.setAttribute("label", bundle.getString("userContextNone.label"));
+    menuitem.setAttribute("accesskey", bundle.getString("userContextNone.accesskey"));
+
+    // We don't set an oncommand/command attribute attribute because if we have
+    // to exclude a userContextId we are generating the contextMenu and
+    // addCommandAttribute will be false.
+
+    docfrag.appendChild(menuitem);
+
+    let menuseparator = document.createElement("menuseparator");
+    docfrag.appendChild(menuseparator);
+  }
+
   ContextualIdentityService.getIdentities().forEach(identity => {
+    if (identity.userContextId == excludeUserContextId) {
+      return;
+    }
+
     let menuitem = document.createElement("menuitem");
     menuitem.setAttribute("usercontextid", identity.userContextId);
-    menuitem.setAttribute("label", bundle.getString(identity.label));
-    menuitem.setAttribute("accesskey", bundle.getString(identity.accessKey));
+    menuitem.setAttribute("label", ContextualIdentityService.getUserContextLabel(identity.userContextId));
+
+    if (identity.accessKey) {
+      menuitem.setAttribute("accesskey", bundle.getString(identity.accessKey));
+    }
+
+    menuitem.classList.add("menuitem-iconic");
 
     if (addCommandAttribute) {
       menuitem.setAttribute("command", "Browser:NewUserContextTab");
     }
 
-    menuitem.style.listStyleImage = "url(" + identity.icon + ")";
+    menuitem.setAttribute("image", identity.icon);
 
     docfrag.appendChild(menuitem);
   });
@@ -560,13 +582,15 @@ function openAboutDialog() {
     return;
   }
 
-#ifdef XP_WIN
-  var features = "chrome,centerscreen,dependent";
-#elifdef XP_MACOSX
-  var features = "chrome,resizable=no,minimizable=no";
-#else
-  var features = "chrome,centerscreen,dependent,dialog=no";
-#endif
+  var features = "chrome,";
+  if (AppConstants.platform == "win") {
+    features += "centerscreen,dependent";
+  } else if (AppConstants.platform == "macosx") {
+    features += "resizable=no,minimizable=no";
+  } else {
+    features += "centerscreen,dependent,dialog=no";
+  }
+
   window.openDialog("chrome://browser/content/aboutDialog.xul", "", features);
 }
 
@@ -607,6 +631,15 @@ function openAdvancedPreferences(tabID)
 function openTroubleshootingPage()
 {
   openUILinkIn("about:support", "tab");
+}
+
+/**
+ * Opens the troubleshooting information (about:support) page for this version
+ * of the application.
+ */
+function openHealthReport()
+{
+  openUILinkIn("about:healthreport", "tab");
 }
 
 /**
@@ -703,13 +736,16 @@ function openNewWindowWith(aURL, aDocument, aPostData, aAllowThirdPartyFixup,
 }
 
 // aCalledFromModal is optional
-function openHelpLink(aHelpTopic, aCalledFromModal) {
+function openHelpLink(aHelpTopic, aCalledFromModal, aWhere) {
   var url = Components.classes["@mozilla.org/toolkit/URLFormatterService;1"]
                       .getService(Components.interfaces.nsIURLFormatter)
                       .formatURLPref("app.support.baseURL");
   url += aHelpTopic;
 
-  var where = aCalledFromModal ? "window" : "tab";
+  var where = aWhere;
+  if (!aWhere)
+    where = aCalledFromModal ? "window" : "tab";
+
   openUILinkIn(url, where);
 }
 

@@ -5,10 +5,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
+const { interfaces: Ci, utils: Cu } = Components;
 
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 const { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+const { XPCOMUtils } = require("resource://gre/modules/XPCOMUtils.jsm");
 const { ViewHelpers } = require("devtools/client/shared/widgets/view-helpers");
 
 XPCOMUtils.defineLazyModuleGetter(this, "EventEmitter",
@@ -50,7 +50,7 @@ this.EXPORTED_SYMBOLS = ["AbstractTreeItem"];
  *     ...
  *     // Use `this.itemDataSrc` to customize the tree item and
  *     // `this.level` to calculate the indentation.
- *     node.MozMarginStart = (this.level * 10) + "px";
+ *     node.style.marginInlineStart = (this.level * 10) + "px";
  *     node.appendChild(document.createTextNode(this.itemDataSrc.label));
  *     ...
  *     return node;
@@ -154,7 +154,7 @@ AbstractTreeItem.prototype = {
    * @param nsIDOMNode arrowNode
    * @return nsIDOMNode
    */
-  _displaySelf: function(document, arrowNode) {
+  _displaySelf: function (document, arrowNode) {
     throw new Error(
       "The `_displaySelf` method needs to be implemented by inheriting classes.");
   },
@@ -167,7 +167,7 @@ AbstractTreeItem.prototype = {
    *
    * @param array:AbstractTreeItem children
    */
-  _populateSelf: function(children) {
+  _populateSelf: function (children) {
     throw new Error(
       "The `_populateSelf` method needs to be implemented by inheriting classes.");
   },
@@ -257,7 +257,7 @@ AbstractTreeItem.prototype = {
    * @param nsIDOMNode beforeNode [optional]
    *        An optional child element which should succeed this tree item.
    */
-  attachTo: function(containerNode, fragmentNode = containerNode, beforeNode = null) {
+  attachTo: function (containerNode, fragmentNode = containerNode, beforeNode = null) {
     this._containerNode = containerNode;
     this._constructTargetNode();
 
@@ -276,7 +276,7 @@ AbstractTreeItem.prototype = {
    * Permanently removes this tree item (and all subsequent children) from the
    * parent container.
    */
-  remove: function() {
+  remove: function () {
     this._targetNode.remove();
     this._hideChildren();
     this._childTreeItems.length = 0;
@@ -285,14 +285,14 @@ AbstractTreeItem.prototype = {
   /**
    * Focuses this item in the tree.
    */
-  focus: function() {
+  focus: function () {
     this._targetNode.focus();
   },
 
   /**
    * Expands this item in the tree.
    */
-  expand: function() {
+  expand: function () {
     if (this._expanded) {
       return;
     }
@@ -306,7 +306,7 @@ AbstractTreeItem.prototype = {
   /**
    * Collapses this item in the tree.
    */
-  collapse: function() {
+  collapse: function () {
     if (!this._expanded) {
       return;
     }
@@ -323,7 +323,7 @@ AbstractTreeItem.prototype = {
    * @param number index
    * @return AbstractTreeItem
    */
-  getChild: function(index = 0) {
+  getChild: function (index = 0) {
     return this._childTreeItems[index];
   },
 
@@ -332,7 +332,7 @@ AbstractTreeItem.prototype = {
    * If this item was never expanded, then no descendents exist yet.
    * @param function cb
    */
-  traverse: function(cb) {
+  traverse: function (cb) {
     for (let child of this._childTreeItems) {
       cb(child);
       child.bfs();
@@ -345,7 +345,7 @@ AbstractTreeItem.prototype = {
    * @param function predicate
    * @return AbstractTreeItem
    */
-  find: function(predicate) {
+  find: function (predicate) {
     for (let child of this._childTreeItems) {
       if (predicate(child) || child.find(predicate)) {
         return child;
@@ -361,7 +361,7 @@ AbstractTreeItem.prototype = {
    * @param boolean visible
    *        True if the children should be visible, false otherwise.
    */
-  _toggleChildren: function(visible) {
+  _toggleChildren: function (visible) {
     if (visible) {
       if (!this._populated) {
         this._populateSelf(this._childTreeItems);
@@ -376,7 +376,7 @@ AbstractTreeItem.prototype = {
   /**
    * Shows all children of this item in the tree.
    */
-  _showChildren: function() {
+  _showChildren: function () {
     // If this is the root item and we're not expanding any child nodes,
     // it is safe to append everything at once.
     if (this == this._rootItem && this.autoExpandDepth == 0) {
@@ -393,7 +393,7 @@ AbstractTreeItem.prototype = {
   /**
    * Hides all children of this item in the tree.
    */
-  _hideChildren: function() {
+  _hideChildren: function () {
     for (let item of this._childTreeItems) {
       item._targetNode.remove();
       item._hideChildren();
@@ -404,7 +404,7 @@ AbstractTreeItem.prototype = {
    * Appends all children in a single batch.
    * This only works properly for root nodes when no child nodes will expand.
    */
-  _appendChildrenBatch: function() {
+  _appendChildrenBatch: function () {
     if (this._fragment === undefined) {
       this._fragment = this.document.createDocumentFragment();
     }
@@ -421,7 +421,7 @@ AbstractTreeItem.prototype = {
   /**
    * Appends all children successively.
    */
-  _appendChildrenSuccessive: function() {
+  _appendChildrenSuccessive: function () {
     let childTreeItems = this._childTreeItems;
     let expandedChildTreeItems = childTreeItems.filter(e => e._expanded);
     let nextNode = this._getSiblingAtDelta(1);
@@ -437,7 +437,7 @@ AbstractTreeItem.prototype = {
   /**
    * Constructs and stores the target node displaying this tree item.
    */
-  _constructTargetNode: function() {
+  _constructTargetNode: function () {
     if (this._constructed) {
       return;
     }
@@ -475,16 +475,57 @@ AbstractTreeItem.prototype = {
    * @return nsIDOMNode
    *         The element displaying the target item at the specified offset.
    */
-  _getSiblingAtDelta: function(delta) {
+  _getSiblingAtDelta: function (delta) {
     let childNodes = this._containerNode.childNodes;
     let indexOfSelf = Array.indexOf(childNodes, this._targetNode);
-    return childNodes[indexOfSelf + delta];
+    if (indexOfSelf + delta >= 0) {
+      return childNodes[indexOfSelf + delta];
+    }
+    return undefined;
+  },
+
+  _getNodesPerPageSize: function() {
+    let childNodes = this._containerNode.childNodes;
+    let nodeHeight = this._getHeight(childNodes[childNodes.length - 1]);
+    let containerHeight = this.bounds.height;
+    return Math.ceil(containerHeight / nodeHeight);
+  },
+
+  _getHeight: function(elem) {
+    let win = this.document.defaultView;
+    let utils = win.QueryInterface(Ci.nsIInterfaceRequestor)
+                   .getInterface(Ci.nsIDOMWindowUtils);
+    return utils.getBoundsWithoutFlushing(elem).height;
+  },
+
+  /**
+   * Focuses the first item in this tree.
+   */
+  _focusFirstNode: function () {
+    let childNodes = this._containerNode.childNodes;
+    // The root node of the tree may be hidden in practice, so uses for-loop
+    // here to find the next visible node.
+    for (let i = 0; i < childNodes.length; i++) {
+      // The height will be 0 if an element is invisible.
+      if (this._getHeight(childNodes[i])) {
+        childNodes[i].focus();
+        return;
+      }
+    }
+  },
+
+  /**
+   * Focuses the last item in this tree.
+   */
+  _focusLastNode: function () {
+    let childNodes = this._containerNode.childNodes;
+    childNodes[childNodes.length - 1].focus();
   },
 
   /**
    * Focuses the next item in this tree.
    */
-  _focusNextNode: function() {
+  _focusNextNode: function () {
     let nextElement = this._getSiblingAtDelta(1);
     if (nextElement) nextElement.focus(); // nsIDOMNode
   },
@@ -492,7 +533,7 @@ AbstractTreeItem.prototype = {
   /**
    * Focuses the previous item in this tree.
    */
-  _focusPrevNode: function() {
+  _focusPrevNode: function () {
     let prevElement = this._getSiblingAtDelta(-1);
     if (prevElement) prevElement.focus(); // nsIDOMNode
   },
@@ -503,7 +544,7 @@ AbstractTreeItem.prototype = {
    * The parent item is not always the previous item, because any tree item
    * may have multiple children.
    */
-  _focusParentNode: function() {
+  _focusParentNode: function () {
     let parentItem = this._parentItem;
     if (parentItem) parentItem.focus(); // AbstractTreeItem
   },
@@ -511,7 +552,7 @@ AbstractTreeItem.prototype = {
   /**
    * Handler for the "click" event on the arrow node of this tree item.
    */
-  _onArrowClick: function(e) {
+  _onArrowClick: function (e) {
     if (!this._expanded) {
       this.expand();
     } else {
@@ -522,7 +563,7 @@ AbstractTreeItem.prototype = {
   /**
    * Handler for the "click" event on the element displaying this tree item.
    */
-  _onClick: function(e) {
+  _onClick: function (e) {
     e.stopPropagation();
     this.focus();
   },
@@ -530,7 +571,7 @@ AbstractTreeItem.prototype = {
   /**
    * Handler for the "dblclick" event on the element displaying this tree item.
    */
-  _onDoubleClick: function(e) {
+  _onDoubleClick: function (e) {
     // Ignore dblclick on the arrow as it has already recived and handled two
     // click events.
     if (!e.target.classList.contains("arrow")) {
@@ -542,7 +583,7 @@ AbstractTreeItem.prototype = {
   /**
    * Handler for the "keypress" event on the element displaying this tree item.
    */
-  _onKeyPress: function(e) {
+  _onKeyPress: function (e) {
     // Prevent scrolling when pressing navigation keys.
     ViewHelpers.preventScrolling(e);
 
@@ -570,20 +611,50 @@ AbstractTreeItem.prototype = {
           this._focusNextNode();
         }
         return;
+
+      case e.DOM_VK_PAGE_UP:
+        let pageUpElement =
+          this._getSiblingAtDelta(-this._getNodesPerPageSize());
+        // There's a chance that the root node is hidden. In this case, its
+        // height will be 0.
+        if (pageUpElement && this._getHeight(pageUpElement)) {
+          pageUpElement.focus();
+        } else {
+          this._focusFirstNode();
+        }
+        return;
+
+      case e.DOM_VK_PAGE_DOWN:
+        let pageDownElement =
+          this._getSiblingAtDelta(this._getNodesPerPageSize());
+        if (pageDownElement) {
+          pageDownElement.focus();
+        } else {
+          this._focusLastNode();
+        }
+        return;
+
+      case e.DOM_VK_HOME:
+        this._focusFirstNode();
+        return;
+
+      case e.DOM_VK_END:
+        this._focusLastNode();
+        return;
     }
   },
 
   /**
    * Handler for the "focus" event on the element displaying this tree item.
    */
-  _onFocus: function(e) {
+  _onFocus: function (e) {
     this._rootItem.emit("focus", this);
   },
 
   /**
    * Handler for the "blur" event on the element displaying this tree item.
    */
-  _onBlur: function(e) {
+  _onBlur: function (e) {
     this._rootItem.emit("blur", this);
   }
 };

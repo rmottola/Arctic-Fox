@@ -3,12 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#if defined(MOZ_WIDGET_QT)
-#include <QGuiApplication>
-#include <QStringList>
-#include "nsQAppInstance.h"
-#endif // MOZ_WIDGET_QT
-
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/ContentChild.h"
 #include "mozilla/ipc/GeckoChildProcessHost.h"
@@ -103,6 +97,7 @@
 #include <math.h>
 #include "cairo/cairo-features.h"
 #include "mozilla/WindowsVersion.h"
+#include "mozilla/mscom/MainThreadRuntime.h"
 #include "mozilla/widget/AudioSession.h"
 
 #ifndef PROCESS_DEP_ENABLE
@@ -208,7 +203,7 @@
 #endif
 
 #ifdef MOZ_WIDGET_ANDROID
-#include "AndroidBridge.h"
+#include "GeneratedJNIWrappers.h"
 #endif
 
 #if defined(MOZ_SANDBOX)
@@ -240,11 +235,6 @@ bool gIsGtest = false;
 
 nsString gAbsoluteArgv0Path;
 
-#ifdef MOZ_WIDGET_QT
-static int    gQtOnlyArgc;
-static char **gQtOnlyArgv;
-#endif
-
 #if defined(MOZ_WIDGET_GTK)
 #include <glib.h>
 #if defined(DEBUG) || defined(NS_BUILD_REFCNT_LOGGING)
@@ -269,6 +259,18 @@ static char **gQtOnlyArgv;
 
 #ifdef MOZ_LINKER
 extern "C" MFBT_API bool IsSignalHandlingBroken();
+#endif
+
+#ifdef LIBFUZZER
+#include "LibFuzzerRunner.h"
+
+namespace mozilla {
+LibFuzzerRunner* libFuzzerRunner = 0;
+} // namespace mozilla
+
+extern "C" MOZ_EXPORT void XRE_LibFuzzerSetMain(int argc, char** argv, LibFuzzerMain main) {
+  mozilla::libFuzzerRunner->setParams(argc, argv, main);
+}
 #endif
 
 namespace mozilla {
@@ -1727,20 +1729,14 @@ static nsresult LaunchChild(nsINativeAppSupport* aNative,
 #endif
 
   if (aBlankCommandLine) {
-#if defined(MOZ_WIDGET_QT)
-    // Remove only arguments not given to Qt
-    gRestartArgc = gQtOnlyArgc;
-    gRestartArgv = gQtOnlyArgv;
-#else
     gRestartArgc = 1;
     gRestartArgv[gRestartArgc] = nullptr;
-#endif
   }
 
   SaveToEnv("MOZ_LAUNCHED_CHILD=1");
 
 #if defined(MOZ_WIDGET_ANDROID)
-  mozilla::widget::GeckoAppShell::ScheduleRestart();
+  java::GeckoAppShell::ScheduleRestart();
 #else
 #if defined(XP_MACOSX)
   CommandLineServiceMac::SetupMacCommandLine(gRestartArgc, gRestartArgv, true);
@@ -1855,17 +1851,17 @@ ProfileLockedDialog(nsIFile* aProfileDir, nsIFile* aProfileLocalDir,
 
     nsXPIDLString killMessage;
 #ifndef XP_MACOSX
-    sb->FormatStringFromName(aUnlocker ? MOZ_UTF16("restartMessageUnlocker")
-                                       : MOZ_UTF16("restartMessageNoUnlocker"),
+    sb->FormatStringFromName(aUnlocker ? u"restartMessageUnlocker"
+                                       : u"restartMessageNoUnlocker",
                              params, 2, getter_Copies(killMessage));
 #else
-    sb->FormatStringFromName(aUnlocker ? MOZ_UTF16("restartMessageUnlockerMac")
-                                       : MOZ_UTF16("restartMessageNoUnlockerMac"),
+    sb->FormatStringFromName(aUnlocker ? u"restartMessageUnlockerMac"
+                                       : u"restartMessageNoUnlockerMac",
                              params, 2, getter_Copies(killMessage));
 #endif
 
     nsXPIDLString killTitle;
-    sb->FormatStringFromName(MOZ_UTF16("restartTitle"),
+    sb->FormatStringFromName(u"restartTitle",
                              params, 1, getter_Copies(killTitle));
 
     if (!killMessage || !killTitle)
@@ -1878,7 +1874,7 @@ ProfileLockedDialog(nsIFile* aProfileDir, nsIFile* aProfileLocalDir,
     if (aUnlocker) {
       int32_t button;
 #ifdef MOZ_WIDGET_ANDROID
-      mozilla::widget::GeckoAppShell::KillAnyZombies();
+      java::GeckoAppShell::KillAnyZombies();
       button = 0;
 #else
       const uint32_t flags =
@@ -1907,7 +1903,7 @@ ProfileLockedDialog(nsIFile* aProfileDir, nsIFile* aProfileLocalDir,
       }
     } else {
 #ifdef MOZ_WIDGET_ANDROID
-      if (mozilla::widget::GeckoAppShell::UnlockProfile()) {
+      if (java::GeckoAppShell::UnlockProfile()) {
         return NS_LockProfilePath(aProfileDir, aProfileLocalDir,
                                   nullptr, aResult);
       }
@@ -1948,10 +1944,10 @@ ProfileMissingDialog(nsINativeAppSupport* aNative)
     nsXPIDLString missingMessage;
 
     // profileMissing
-    sb->FormatStringFromName(MOZ_UTF16("profileMissing"), params, 2, getter_Copies(missingMessage));
+    sb->FormatStringFromName(u"profileMissing", params, 2, getter_Copies(missingMessage));
 
     nsXPIDLString missingTitle;
-    sb->FormatStringFromName(MOZ_UTF16("profileMissingTitle"),
+    sb->FormatStringFromName(u"profileMissingTitle",
                              params, 1, getter_Copies(missingTitle));
 
     if (missingMessage && missingTitle) {
@@ -3589,25 +3585,6 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
   }
 #endif
 
-#if defined(MOZ_WIDGET_QT)
-  nsQAppInstance::AddRef(gArgc, gArgv, true);
-
-  QStringList nonQtArguments = qApp->arguments();
-  gQtOnlyArgc = 1;
-  gQtOnlyArgv = (char**) malloc(sizeof(char*)
-                * (gRestartArgc - nonQtArguments.size() + 2));
-
-  // copy binary path
-  gQtOnlyArgv[0] = gRestartArgv[0];
-
-  for (int i = 1; i < gRestartArgc; ++i) {
-    if (!nonQtArguments.contains(gRestartArgv[i])) {
-      // copy arguments used by Qt for later
-      gQtOnlyArgv[gQtOnlyArgc++] = gRestartArgv[i];
-    }
-  }
-  gQtOnlyArgv[gQtOnlyArgc] = nullptr;
-#endif
 #if defined(MOZ_WIDGET_GTK)
   // setup for private colormap.  Ideally we'd like to do this
   // in nsAppShell::Create, but we need to get in before gtk
@@ -3640,6 +3617,13 @@ XREMain::XRE_mainStartup(bool* aExitFlag)
   if (!gtk_parse_args(&gArgc, &gArgv))
     return 1;
 #endif /* MOZ_WIDGET_GTK */
+
+#ifdef LIBFUZZER
+  if (PR_GetEnv("LIBFUZZER")) {
+    *aExitFlag = true;
+    return mozilla::libFuzzerRunner->Run();
+  }
+#endif
 
   if (PR_GetEnv("MOZ_RUN_GTEST")) {
     int result;
@@ -4356,6 +4340,14 @@ XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
 
   mozilla::IOInterposerInit ioInterposerGuard;
 
+#if defined(XP_WIN)
+  // Some COM settings are global to the process and must be set before any non-
+  // trivial COM is run in the application. Since these settings may affect
+  // stability, we should instantiate COM ASAP so that we can ensure that these
+  // global settings are configured before anything can interfere.
+  mozilla::mscom::MainThreadRuntime msCOMRuntime;
+#endif
+
 #if MOZ_WIDGET_GTK == 2
   XRE_GlibInit();
 #endif
@@ -4418,10 +4410,6 @@ XREMain::XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
   // has gone out of scope.  see bug #386739 for more details
   mProfileLock->Unlock();
   gProfileLock = nullptr;
-
-#if defined(MOZ_WIDGET_QT)
-  nsQAppInstance::Release();
-#endif
 
   // Restart the app after XPCOM has been shut down cleanly.
   if (appInitiatedRestart) {
@@ -4764,7 +4752,8 @@ mozilla::BrowserTabsRemoteAutostart()
 
   // Uber override pref for emergency blocking
   if (gBrowserTabsRemoteAutostart &&
-      Preferences::GetBool(kForceDisableE10sPref, false)) {
+      (Preferences::GetBool(kForceDisableE10sPref, false) ||
+       EnvHasValue("MOZ_FORCE_DISABLE_E10S"))) {
     gBrowserTabsRemoteAutostart = false;
     status = kE10sForceDisabled;
   }

@@ -14,7 +14,11 @@ function test() {
   let gTab, gPanel, gDebugger;
   let gSources, gBreakpoints, gTarget, gResumeButton, gResumeKey, gThreadClient;
 
-  initDebugger(TAB_URL).then(([aTab,, aPanel]) => {
+  let options = {
+    source: EXAMPLE_URL + "code_script-eval.js",
+    line: 1
+  };
+  initDebugger(TAB_URL, options).then(([aTab,, aPanel]) => {
     gTab = aTab;
     gPanel = aPanel;
     gDebugger = gPanel.panelWin;
@@ -24,12 +28,11 @@ function test() {
     gResumeButton = gDebugger.document.getElementById("resume");
     gResumeKey = gDebugger.document.getElementById("resumeKey");
 
-    waitForSourceShown(gPanel, "-eval.js")
-      .then(testConsole)
+    testConsole()
       .then(() => closeDebuggerAndFinish(gPanel));
   });
 
-  let testConsole = Task.async(function*() {
+  let testConsole = Task.async(function* () {
     info("Starting testConsole");
 
     let oncePaused = gTarget.once("thread-paused");
@@ -41,11 +44,13 @@ function test() {
     let updatedFrame = yield waitForDebuggerEvents(gPanel, gDebugger.EVENTS.FETCHED_SCOPES);
     let variables = gDebugger.DebuggerView.Variables;
 
-    is(variables._store.length, 2, "Correct number of scopes available");
+    is(variables._store.length, 3, "Correct number of scopes available");
     is(variables.getScopeAtIndex(0).name, "With scope [Object]",
         "Paused with correct scope (0)");
-    is(variables.getScopeAtIndex(1).name, "Global scope [Window]",
+    is(variables.getScopeAtIndex(1).name, "Block scope",
         "Paused with correct scope (1)");
+    is(variables.getScopeAtIndex(2).name, "Global scope [Window]",
+        "Paused with correct scope (2)");
 
     let onceResumed = gTarget.once("thread-resumed");
     EventUtils.sendMouseEvent({ type: "mousedown" }, gResumeButton, gDebugger);

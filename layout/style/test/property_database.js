@@ -2140,10 +2140,11 @@ var gCSSProperties = {
     domProp: "background",
     inherited: false,
     type: CSS_TYPE_TRUE_SHORTHAND,
-    subproperties: [ "background-attachment", "background-color", "background-image", "background-position", "background-repeat", "background-clip", "background-origin", "background-size" ],
+    subproperties: [ "background-attachment", "background-color", "background-image", "background-position-x", "background-position-y", "background-repeat", "background-clip", "background-origin", "background-size" ],
     initial_values: [ "transparent", "none", "repeat", "scroll", "0% 0%", "top left", "left top", "0% 0% / auto", "top left / auto", "left top / auto", "0% 0% / auto auto",
       "transparent none", "top left none", "left top none", "none left top", "none top left", "none 0% 0%", "left top / auto none", "left top / auto auto none",
-      "transparent none repeat scroll top left", "left top repeat none scroll transparent", "transparent none repeat scroll top left / auto", "left top / auto repeat none scroll transparent", "none repeat scroll 0% 0% / auto auto transparent" ],
+      "transparent none repeat scroll top left", "left top repeat none scroll transparent", "transparent none repeat scroll top left / auto", "left top / auto repeat none scroll transparent", "none repeat scroll 0% 0% / auto auto transparent",
+      "padding-box border-box" ],
     other_values: [
         /* without multiple backgrounds */
       "green",
@@ -6797,10 +6798,11 @@ if (SupportsMaskShorthand()) {
     inherited: false,
     type: CSS_TYPE_SHORTHAND_AND_LONGHAND,
     /* FIXME: All mask-border-* should be added when we implement them. */
-    subproperties: ["mask-clip", "mask-image", "mask-mode", "mask-origin", "mask-position", "mask-repeat", "mask-size" , "mask-composite"],
+    subproperties: ["mask-clip", "mask-image", "mask-mode", "mask-origin", "mask-position-x", "mask-position-y", "mask-repeat", "mask-size" , "mask-composite"],
     initial_values: [ "match-source", "none", "repeat", "add", "0% 0%", "top left", "left top", "0% 0% / auto", "top left / auto", "left top / auto", "0% 0% / auto auto",
       "top left none", "left top none", "none left top", "none top left", "none 0% 0%", "left top / auto none", "left top / auto auto none",
-      "match-source none repeat add top left", "left top repeat none add", "none repeat add top left / auto", "left top / auto repeat none add match-source", "none repeat add 0% 0% / auto auto match-source" ],
+      "match-source none repeat add top left", "left top repeat none add", "none repeat add top left / auto", "left top / auto repeat none add match-source", "none repeat add 0% 0% / auto auto match-source",
+      "border-box", "border-box border-box" ],
     other_values: [
       "none alpha repeat add left top",
       "url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAKElEQVR42u3NQQ0AAAgEoNP+nTWFDzcoQE1udQQCgUAgEAgEAsGTYAGjxAE/G/Q2tQAAAABJRU5ErkJggg==)",

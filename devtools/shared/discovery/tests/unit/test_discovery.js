@@ -9,6 +9,7 @@ const { require } =
   Cu.import("resource://devtools/shared/Loader.jsm", {});
 const Services = require("Services");
 const promise = require("promise");
+const defer = require("devtools/shared/defer");
 const EventEmitter = require("devtools/shared/event-emitter");
 const discovery = require("devtools/shared/discovery/discovery");
 const { setTimeout, clearTimeout } = require("sdk/timers");
@@ -38,7 +39,7 @@ function TestTransport(port) {
 
 TestTransport.prototype = {
 
-  send: function(object, port) {
+  send: function (object, port) {
     log("Send to " + port + ":\n" + JSON.stringify(object, null, 2));
     if (!gTestTransports[port]) {
       log("No listener on port " + port);
@@ -48,20 +49,20 @@ TestTransport.prototype = {
     gTestTransports[port].onPacketReceived(null, message);
   },
 
-  destroy: function() {
+  destroy: function () {
     delete gTestTransports[this.port];
   },
 
   // nsIUDPSocketListener
 
-  onPacketReceived: function(socket, message) {
+  onPacketReceived: function (socket, message) {
     let object = JSON.parse(message);
     object.from = "localhost";
     log("Recv on " + this.port + ":\n" + JSON.stringify(object, null, 2));
     this.emit("message", object);
   },
 
-  onStopListening: function(socket, status) {}
+  onStopListening: function (socket, status) {}
 
 };
 
@@ -70,7 +71,7 @@ discovery._factories.Transport = TestTransport;
 
 // Ignore name generation on b2g and force a fixed value
 Object.defineProperty(discovery.device, "name", {
-  get: function() {
+  get: function () {
     return "test-device";
   }
 });
@@ -79,7 +80,7 @@ function run_test() {
   run_next_test();
 }
 
-add_task(function*() {
+add_task(function* () {
   // At startup, no remote devices are known
   deepEqual(discovery.getRemoteDevicesWithService("devtools"), []);
   deepEqual(discovery.getRemoteDevicesWithService("penguins"), []);
@@ -112,7 +113,7 @@ add_task(function*() {
   deepEqual(discovery.getRemoteService("devtools", "test-device"),
             { port: 1234, host: "localhost" });
   deepEqual(discovery.getRemoteService("penguins", "test-device"),
-            { tux: true,  host: "localhost" });
+            { tux: true, host: "localhost" });
 
   discovery.removeService("devtools");
   yield scanForChange("devtools", "removed");
@@ -132,7 +133,7 @@ add_task(function*() {
 });
 
 function scanForChange(service, changeType) {
-  let deferred = promise.defer();
+  let deferred = defer();
   let timer = setTimeout(() => {
     deferred.reject(new Error("Reply never arrived"));
   }, discovery.replyTimeout + 500);
@@ -146,7 +147,7 @@ function scanForChange(service, changeType) {
 }
 
 function scanForNoChange(service, changeType) {
-  let deferred = promise.defer();
+  let deferred = defer();
   let timer = setTimeout(() => {
     deferred.resolve();
   }, discovery.replyTimeout + 500);

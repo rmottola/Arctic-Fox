@@ -221,7 +221,7 @@ toolbar[printpreview="true"] {
 }
 %endif
 
-%if !defined(MOZ_WIDGET_GTK) && !defined(MOZ_WIDGET_QT)
+%if !defined(MOZ_WIDGET_GTK)
 #TabsToolbar > .private-browsing-indicator {
   -moz-box-ordinal-group: 1000;
 }
@@ -288,6 +288,35 @@ toolbar[mode="icons"] > #reload-button[displaystop] {
   background-position: top right;
 }
 
+media not all and (min-resolution: 1.1dppx) {
+  .webextension-browser-action {
+    list-style-image: var(--webextension-toolbar-image);
+  }
+
+  .webextension-browser-action[cui-areatype="menu-panel"],
+  toolbarpaletteitem[place="palette"] > .webextension-browser-action {
+    list-style-image: var(--webextension-menupanel-image);
+  }
+
+  .webextension-page-action {
+    list-style-image: var(--webextension-urlbar-image);
+  }
+}
+
+@media (min-resolution: 1.1dppx) {
+  .webextension-browser-action {
+    list-style-image: var(--webextension-toolbar-image-2x);
+  }
+
+  .webextension-browser-action[cui-areatype="menu-panel"],
+  toolbarpaletteitem[place="palette"] > .webextension-browser-action {
+    list-style-image: var(--webextension-menupanel-image-2x);
+  }
+
+  .webextension-page-action {
+    list-style-image: var(--webextension-urlbar-image-2x);
+  }
+}
 %ifdef XP_MACOSX
 #main-window[inFullscreen="true"] {
   padding-top: 0; /* override drawintitlebar="true" */
@@ -540,7 +569,7 @@ panel[noactions] > richlistbox > richlistitem[type~="action"] > .ac-url-box > .a
 }
 
 #identity-box.verifiedIdentity > #identity-icon-labels > #identity-icon-label {
-  -moz-margin-end: 0.25em !important;
+  margin-inline-end: 0.25em !important;
 }
 
 #wrapper-search-container > #search-container > #searchbar > .searchbar-textbox > .autocomplete-textbox-container > .textbox-input-box > html|*.textbox-input {
@@ -649,7 +678,7 @@ window[chromehidden~="toolbar"] toolbar:not(.toolbar-primary):not(#nav-bar):not(
   background: black;
 }
 
-#fullscreen-warning {
+html|*.pointerlockfswarning {
   position: fixed;
   z-index: 2147483647 !important;
   visibility: visible;
@@ -658,18 +687,18 @@ window[chromehidden~="toolbar"] toolbar:not(.toolbar-primary):not(#nav-bar):not(
      we use left: 50% with translateX(-50%). */
   top: 0; left: 50%;
   transform: translate(-50%, -100%);
-  /* We must specify a max-width, otherwise word-wrap:break-word doesn't
-     work in descendant <description> and <label> elements. Bug 630864. */
+  box-sizing: border-box;
+  width: -moz-max-content;
   max-width: 95%;
   pointer-events: none;
 }
-#fullscreen-warning:not([hidden]) {
+html|*.pointerlockfswarning:not([hidden]) {
   display: flex;
 }
-#fullscreen-warning[onscreen] {
+html|*.pointerlockfswarning[onscreen] {
   transform: translate(-50%, 50px);
 }
-#fullscreen-warning[ontop] {
+html|*.pointerlockfswarning[ontop] {
   /* Use -10px to hide the border and border-radius on the top */
   transform: translate(-50%, -10px);
 }
@@ -677,17 +706,17 @@ window[chromehidden~="toolbar"] toolbar:not(.toolbar-primary):not(#nav-bar):not(
   transform: translate(-50%, 80px);
 }
 
-#fullscreen-domain-text,
-#fullscreen-generic-text {
+html|*.pointerlockfswarning-domain-text,
+html|*.pointerlockfswarning-generic-text {
   word-wrap: break-word;
   /* We must specify a min-width, otherwise word-wrap:break-word doesn't work. Bug 630864. */
   min-width: 1px
 }
-#fullscreen-domain-text:not([hidden]) + #fullscreen-generic-text {
+html|*.pointerlockfswarning-domain-text:not([hidden]) + html|*.pointerlockfswarning-generic-text {
   display: none;
 }
 
-#fullscreen-exit-button {
+html|*#fullscreen-exit-button {
   pointer-events: auto;
 }
 
@@ -999,7 +1028,7 @@ toolbarbutton[pmkit-button="true"] > .toolbarbutton-badge-container > .toolbarbu
 
 /* Indent options in optgroups */
 .contentSelectDropdown-ingroup .menu-iconic-text {
-  -moz-padding-start: 2em;
+  padding-inline-start: 2em;
 }
 
 /* Give this menupopup an arrow panel styling */

@@ -11,43 +11,70 @@
 #include "ARIAMap.h"
 #include "nsCoreUtils.h"
 
+#ifdef A11Y_LOG
+#include "Logging.h"
+#endif
+
 namespace mozilla {
 namespace a11y {
 
 inline mozilla::a11y::role
 Accessible::Role()
 {
-  if (!mRoleMapEntry || mRoleMapEntry->roleRule != kUseMapRole)
+  const nsRoleMapEntry* roleMapEntry = ARIARoleMap();
+  if (!roleMapEntry || roleMapEntry->roleRule != kUseMapRole)
     return ARIATransformRole(NativeRole());
 
-  return ARIATransformRole(mRoleMapEntry->role);
+  return ARIATransformRole(roleMapEntry->role);
+}
+
+inline bool
+Accessible::HasARIARole() const
+{
+  return mRoleMapEntryIndex != aria::NO_ROLE_MAP_ENTRY_INDEX;
 }
 
 inline bool
 Accessible::IsARIARole(nsIAtom* aARIARole) const
 {
-  return mRoleMapEntry && mRoleMapEntry->Is(aARIARole);
+  const nsRoleMapEntry* roleMapEntry = ARIARoleMap();
+  return roleMapEntry && roleMapEntry->Is(aARIARole);
 }
 
 inline bool
 Accessible::HasStrongARIARole() const
 {
-  return mRoleMapEntry && mRoleMapEntry->roleRule == kUseMapRole;
+  const nsRoleMapEntry* roleMapEntry = ARIARoleMap();
+  return roleMapEntry && roleMapEntry->roleRule == kUseMapRole;
+}
+
+inline const nsRoleMapEntry*
+Accessible::ARIARoleMap() const
+{
+  return aria::GetRoleMapFromIndex(mRoleMapEntryIndex);
 }
 
 inline mozilla::a11y::role
 Accessible::ARIARole()
 {
-  if (!mRoleMapEntry || mRoleMapEntry->roleRule != kUseMapRole)
+  const nsRoleMapEntry* roleMapEntry = ARIARoleMap();
+  if (!roleMapEntry || roleMapEntry->roleRule != kUseMapRole)
     return mozilla::a11y::roles::NOTHING;
 
-  return ARIATransformRole(mRoleMapEntry->role);
+  return ARIATransformRole(roleMapEntry->role);
+}
+
+inline void
+Accessible::SetRoleMapEntry(const nsRoleMapEntry* aRoleMapEntry)
+{
+  mRoleMapEntryIndex = aria::GetIndexFromRoleMap(aRoleMapEntry);
 }
 
 inline bool
 Accessible::IsSearchbox() const
 {
-  return (mRoleMapEntry && mRoleMapEntry->Is(nsGkAtoms::searchbox)) ||
+  const nsRoleMapEntry* roleMapEntry = ARIARoleMap();
+  return (roleMapEntry && roleMapEntry->Is(nsGkAtoms::searchbox)) ||
     (mContent->IsHTMLElement(nsGkAtoms::input) &&
      mContent->AttrValueIs(kNameSpaceID_None, nsGkAtoms::type,
                            nsGkAtoms::textInputType, eCaseMatters));
@@ -56,8 +83,9 @@ Accessible::IsSearchbox() const
 inline bool
 Accessible::HasGenericType(AccGenericType aType) const
 {
+  const nsRoleMapEntry* roleMapEntry = ARIARoleMap();
   return (mGenericTypes & aType) ||
-    (mRoleMapEntry && mRoleMapEntry->IsOfType(aType));
+    (roleMapEntry && roleMapEntry->IsOfType(aType));
 }
 
 inline bool
@@ -66,7 +94,8 @@ Accessible::HasNumericValue() const
   if (mStateFlags & eHasNumericValue)
     return true;
 
-  return mRoleMapEntry && mRoleMapEntry->valueRule != eNoValue;
+  const nsRoleMapEntry* roleMapEntry = ARIARoleMap();
+  return roleMapEntry && roleMapEntry->valueRule != eNoValue;
 }
 
 inline void
@@ -74,6 +103,30 @@ Accessible::ScrollTo(uint32_t aHow) const
 {
   if (mContent)
     nsCoreUtils::ScrollTo(mDoc->PresShell(), mContent, aHow);
+}
+
+inline bool
+Accessible::InsertAfter(Accessible* aNewChild, Accessible* aRefChild)
+{
+  MOZ_ASSERT(aNewChild, "No new child to insert");
+
+  if (aRefChild && aRefChild->Parent() != this) {
+#ifdef A11Y_LOG
+    logging::TreeInfo("broken accessible tree", 0,
+                      "parent", this, "prev sibling parent",
+                      aRefChild->Parent(), "child", aNewChild, nullptr);
+    if (logging::IsEnabled(logging::eVerbose)) {
+      logging::Tree("TREE", "Document tree", mDoc);
+      logging::DOMTree("TREE", "DOM document tree", mDoc);
+    }
+#endif
+    MOZ_ASSERT_UNREACHABLE("Broken accessible tree");
+    mDoc->UnbindFromDocument(aNewChild);
+    return false;
+  }
+
+  return InsertChildAt(aRefChild ? aRefChild->IndexInParent() + 1 : 0,
+                       aNewChild);
 }
 
 } // namespace a11y

@@ -220,6 +220,7 @@ public:
   }
 
 protected:
+  friend struct CanvasBidiProcessor;
   friend class CanvasGeneralPattern;
 
   // Beginning of linear gradient.
@@ -1056,9 +1057,6 @@ DrawTarget* CanvasRenderingContext2D::sErrorTarget = nullptr;
 
 CanvasRenderingContext2D::CanvasRenderingContext2D()
   : mRenderingMode(RenderingMode::OpenGLBackendMode)
-#ifdef USE_SKIA_GPU
-  , mVideoTexture(0)
-#endif
   // these are the default values from the Canvas spec
   , mWidth(0), mHeight(0)
   , mZero(false), mOpaque(false)
@@ -1100,15 +1098,6 @@ CanvasRenderingContext2D::~CanvasRenderingContext2D()
   if (!sNumLivingContexts) {
     NS_IF_RELEASE(sErrorTarget);
   }
-#ifdef USE_SKIA_GPU
-  if (mVideoTexture) {
-    SkiaGLGlue* glue = gfxPlatform::GetPlatform()->GetSkiaGLGlue();
-    MOZ_ASSERT(glue);
-    glue->GetGLContext()->MakeCurrent();
-    glue->GetGLContext()->fDeleteTextures(1, &mVideoTexture);
-  }
-#endif
-
   RemoveDemotableContext(this);
 }
 
@@ -1345,15 +1334,6 @@ bool CanvasRenderingContext2D::SwitchRenderingMode(RenderingMode aRenderingMode)
       !gfxPlatform::GetPlatform()->UseAcceleratedCanvas()) {
       return false;
   }
-
-  if (mRenderingMode == RenderingMode::OpenGLBackendMode) {
-    if (mVideoTexture) {
-      gfxPlatform::GetPlatform()->GetSkiaGLGlue()->GetGLContext()->MakeCurrent();
-      gfxPlatform::GetPlatform()->GetSkiaGLGlue()->GetGLContext()->fDeleteTextures(1, &mVideoTexture);
-    }
-    mCurrentVideoSize.width = 0;
-    mCurrentVideoSize.height = 0;
-  }
 #endif
 
   RefPtr<SourceSurface> snapshot;
@@ -1563,8 +1543,8 @@ CanvasRenderingContext2D::EnsureTarget(const gfx::Rect* aCoveredRect,
 
     if (mTarget) {
       // Restore clip and transform.
-      mTarget->SetTransform(CurrentState().transform);
       for (uint32_t i = 0; i < mStyleStack.Length(); i++) {
+        mTarget->SetTransform(mStyleStack[i].transform);
         for (uint32_t c = 0; c < mStyleStack[i].clipsPushed.Length(); c++) {
           mTarget->PushClip(mStyleStack[i].clipsPushed[c]);
         }
@@ -3665,6 +3645,8 @@ CanvasRenderingContext2D::GetHitRegionRect(Element* aElement, nsRect& aRect)
  */
 struct MOZ_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcessor
 {
+  typedef CanvasRenderingContext2D::Style Style;
+
   CanvasBidiProcessor()
     : nsBidiPresUtils::BidiProcessor()
   {
@@ -3717,12 +3699,71 @@ struct MOZ_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcess
     return NSToCoordRound(textRunMetrics.mAdvanceWidth);
   }
 
+  already_AddRefed<gfxPattern> GetGradientFor(Style aStyle)
+  {
+    RefPtr<gfxPattern> pattern;
+    CanvasGradient* gradient = mState->gradientStyles[aStyle];
+    CanvasGradient::Type type = gradient->GetType();
+
+    switch (type) {
+    case CanvasGradient::Type::RADIAL: {
+      CanvasRadialGradient* radial =
+        static_cast<CanvasRadialGradient*>(gradient);
+      pattern = new gfxPattern(radial->mCenter1.x, radial->mCenter1.y,
+                               radial->mRadius1, radial->mCenter2.x,
+                               radial->mCenter2.y, radial->mRadius2);
+      break;
+    }
+    case CanvasGradient::Type::LINEAR: {
+      CanvasLinearGradient* linear =
+        static_cast<CanvasLinearGradient*>(gradient);
+      pattern = new gfxPattern(linear->mBegin.x, linear->mBegin.y,
+                               linear->mEnd.x, linear->mEnd.y);
+      break;
+    }
+    default:
+      MOZ_ASSERT(false, "Should be linear or radial gradient.");
+      return nullptr;
+    }
+
+    for (auto stop : gradient->mRawStops) {
+      pattern->AddColorStop(stop.offset, stop.color);
+    }
+
+    return pattern.forget();
+  }
+
+  gfx::ExtendMode CvtCanvasRepeatToGfxRepeat(
+    CanvasPattern::RepeatMode aRepeatMode)
+  {
+    switch (aRepeatMode) {
+    case CanvasPattern::RepeatMode::REPEAT:
+      return gfx::ExtendMode::REPEAT;
+    case CanvasPattern::RepeatMode::REPEATX:
+      return gfx::ExtendMode::REPEAT_X;
+    case CanvasPattern::RepeatMode::REPEATY:
+      return gfx::ExtendMode::REPEAT_Y;
+    case CanvasPattern::RepeatMode::NOREPEAT:
+      return gfx::ExtendMode::CLAMP;
+    default:
+      return gfx::ExtendMode::CLAMP;
+    }
+  }
+
+  already_AddRefed<gfxPattern> GetPatternFor(Style aStyle)
+  {
+    const CanvasPattern* pat = mState->patternStyles[aStyle];
+    RefPtr<gfxPattern> pattern = new gfxPattern(pat->mSurface, Matrix());
+    pattern->SetExtend(CvtCanvasRepeatToGfxRepeat(pat->mRepeat));
+    return pattern.forget();
+  }
+
   virtual void DrawText(nscoord aXOffset, nscoord aWidth)
   {
     gfxPoint point = mPt;
     bool rtl = mTextRun->IsRightToLeft();
     bool verticalRun = mTextRun->IsVertical();
-    bool centerBaseline = mTextRun->UseCenterBaseline();
+    RefPtr<gfxPattern> pattern;
 
     gfxFloat& inlineCoord = verticalRun ? point.y : point.x;
     inlineCoord += aXOffset;
@@ -3748,205 +3789,62 @@ struct MOZ_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcess
 
     mCtx->EnsureTarget();
 
-    // If the operation is 'fill' with a simple color, we defer to gfxTextRun
-    // which will handle color/svg-in-ot fonts appropriately. Such fonts will
-    // not render well via the code below.
-    if (mOp == CanvasRenderingContext2D::TextDrawOperation::FILL &&
-        mState->StyleIsColor(CanvasRenderingContext2D::Style::FILL)) {
-      // TODO: determine if mCtx->mTarget is guaranteed to be non-null and valid
-      // here. If it's not, thebes will be null and we'll crash.
-      RefPtr<gfxContext> thebes =
-        gfxContext::CreatePreservingTransformOrNull(mCtx->mTarget);
-      nscolor fill = mState->colorStyles[CanvasRenderingContext2D::Style::FILL];
-      thebes->SetColor(Color::FromABGR(fill));
-      gfxTextRun::DrawParams params(thebes);
-      mTextRun->Draw(gfxTextRun::Range(mTextRun.get()), point, params);
-      return;
-    }
+    // Defer the tasks to gfxTextRun which will handle color/svg-in-ot fonts
+    // appropriately.
+    StrokeOptions strokeOpts;
+    DrawOptions drawOpts;
+    Style style = (mOp == CanvasRenderingContext2D::TextDrawOperation::FILL)
+                    ? Style::FILL
+                    : Style::STROKE;
+    RefPtr<gfxContext> thebes =
+      gfxContext::CreatePreservingTransformOrNull(mCtx->mTarget);
+    gfxTextRun::DrawParams params(thebes);
 
-    uint32_t numRuns;
-    const gfxTextRun::GlyphRun *runs = mTextRun->GetGlyphRuns(&numRuns);
-    const int32_t appUnitsPerDevUnit = mAppUnitsPerDevPixel;
-    const double devUnitsPerAppUnit = 1.0/double(appUnitsPerDevUnit);
-    Point baselineOrigin =
-      Point(point.x * devUnitsPerAppUnit, point.y * devUnitsPerAppUnit);
-
-    float advanceSum = 0;
-
-    for (uint32_t c = 0; c < numRuns; c++) {
-      gfxFont *font = runs[c].mFont;
-
-      bool verticalFont =
-        runs[c].mOrientation == gfxTextRunFactory::TEXT_ORIENT_VERTICAL_UPRIGHT;
-
-      const float& baselineOriginInline =
-        verticalFont ? baselineOrigin.y : baselineOrigin.x;
-      const float& baselineOriginBlock =
-        verticalFont ? baselineOrigin.x : baselineOrigin.y;
-
-      uint32_t endRun = 0;
-      if (c + 1 < numRuns) {
-        endRun = runs[c + 1].mCharacterOffset;
+    if (mState->StyleIsColor(style)) { // Color
+      nscolor fontColor = mState->colorStyles[style];
+      if (style == Style::FILL) {
+        params.context->SetColor(Color::FromABGR(fontColor));
       } else {
-        endRun = mTextRun->GetLength();
+        params.textStrokeColor = fontColor;
       }
-
-      const gfxTextRun::CompressedGlyph *glyphs = mTextRun->GetCharacterGlyphs();
-
-      RefPtr<ScaledFont> scaledFont =
-        gfxPlatform::GetPlatform()->GetScaledFontForFont(mCtx->mTarget, font);
-
-      if (!scaledFont) {
-        // This can occur when something switched DirectWrite off.
+    } else {
+      if (mState->gradientStyles[style]) { // Gradient
+        pattern = GetGradientFor(style);
+      } else if (mState->patternStyles[style]) { // Pattern
+        pattern = GetPatternFor(style);
+      } else {
+        MOZ_ASSERT(false, "Should never reach here.");
         return;
       }
+      MOZ_ASSERT(pattern, "No valid pattern.");
 
-      AutoRestoreTransform sidewaysRestore;
-      if (runs[c].mOrientation ==
-          gfxTextRunFactory::TEXT_ORIENT_VERTICAL_SIDEWAYS_RIGHT) {
-        sidewaysRestore.Init(mCtx->mTarget);
-        const gfxFont::Metrics& metrics = mTextRun->GetFontGroup()->
-          GetFirstValidFont()->GetMetrics(gfxFont::eHorizontal);
-
-        gfx::Matrix mat = mCtx->mTarget->GetTransform().Copy().
-          PreTranslate(baselineOrigin).      // translate origin for rotation
-          PreRotate(gfx::Float(M_PI / 2.0)). // turn 90deg clockwise
-          PreTranslate(-baselineOrigin);     // undo the translation
-
-        if (centerBaseline) {
-          // TODO: The baseline adjustment here is kinda ad hoc; eventually
-          // perhaps we should check for horizontal and vertical baseline data
-          // in the font, and adjust accordingly.
-          // (The same will be true for HTML text layout.)
-          float offset = (metrics.emAscent - metrics.emDescent) / 2;
-          mat = mat.PreTranslate(Point(0, offset));
-                              // offset the (alphabetic) baseline of the
-                              // horizontally-shaped text from the (centered)
-                              // default baseline used for vertical
-        }
-
-        mCtx->mTarget->SetTransform(mat);
-      }
-
-      RefPtr<GlyphRenderingOptions> renderingOptions = font->GetGlyphRenderingOptions();
-
-      GlyphBuffer buffer;
-
-      std::vector<Glyph> glyphBuf;
-
-      // TODO:
-      // This more-or-less duplicates the code found in gfxTextRun::Draw
-      // and the gfxFont methods that uses (Draw, DrawGlyphs, DrawOneGlyph);
-      // it would be nice to refactor and share that code.
-      for (uint32_t i = runs[c].mCharacterOffset; i < endRun; i++) {
-        Glyph newGlyph;
-
-        float& inlinePos =
-          verticalFont ? newGlyph.mPosition.y : newGlyph.mPosition.x;
-        float& blockPos =
-          verticalFont ? newGlyph.mPosition.x : newGlyph.mPosition.y;
-
-        if (glyphs[i].IsSimpleGlyph()) {
-          newGlyph.mIndex = glyphs[i].GetSimpleGlyph();
-          if (rtl) {
-            inlinePos = baselineOriginInline - advanceSum -
-              glyphs[i].GetSimpleAdvance() * devUnitsPerAppUnit;
-          } else {
-            inlinePos = baselineOriginInline + advanceSum;
-          }
-          blockPos = baselineOriginBlock;
-          advanceSum += glyphs[i].GetSimpleAdvance() * devUnitsPerAppUnit;
-          glyphBuf.push_back(newGlyph);
-          continue;
-        }
-
-        if (!glyphs[i].GetGlyphCount()) {
-          continue;
-        }
-
-        const gfxTextRun::DetailedGlyph *d = mTextRun->GetDetailedGlyphs(i);
-
-        if (glyphs[i].IsMissing()) {
-          if (d->mAdvance > 0) {
-            // Perhaps we should render a hexbox here, but for now
-            // we just draw the font's .notdef glyph. (See bug 808288.)
-            newGlyph.mIndex = 0;
-            if (rtl) {
-              inlinePos = baselineOriginInline - advanceSum -
-                d->mAdvance * devUnitsPerAppUnit;
-            } else {
-              inlinePos = baselineOriginInline + advanceSum;
-            }
-            blockPos = baselineOriginBlock;
-            advanceSum += d->mAdvance * devUnitsPerAppUnit;
-            glyphBuf.push_back(newGlyph);
-          }
-          continue;
-        }
-
-        for (uint32_t c = 0; c < glyphs[i].GetGlyphCount(); c++, d++) {
-          newGlyph.mIndex = d->mGlyphID;
-          if (rtl) {
-            inlinePos = baselineOriginInline - advanceSum -
-              d->mAdvance * devUnitsPerAppUnit;
-          } else {
-            inlinePos = baselineOriginInline + advanceSum;
-          }
-          inlinePos += d->mXOffset * devUnitsPerAppUnit;
-          blockPos = baselineOriginBlock + d->mYOffset * devUnitsPerAppUnit;
-          glyphBuf.push_back(newGlyph);
-          advanceSum += d->mAdvance * devUnitsPerAppUnit;
-        }
-      }
-
-      if (!glyphBuf.size()) {
-        // This may happen for glyph runs for a 0 size font.
-        continue;
-      }
-
-      buffer.mGlyphs = &glyphBuf.front();
-      buffer.mNumGlyphs = glyphBuf.size();
-
-      Rect bounds = mCtx->mTarget->GetTransform().
-        TransformBounds(Rect(mBoundingBox.x, mBoundingBox.y,
-                             mBoundingBox.width, mBoundingBox.height));
-      if (mOp == CanvasRenderingContext2D::TextDrawOperation::FILL) {
-        AdjustedTarget(mCtx, &bounds)->
-          FillGlyphs(scaledFont, buffer,
-                     CanvasGeneralPattern().
-                       ForStyle(mCtx, CanvasRenderingContext2D::Style::FILL, mCtx->mTarget),
-                     DrawOptions(mState->globalAlpha, mCtx->UsedOperation()),
-                     renderingOptions);
-      } else if (mOp == CanvasRenderingContext2D::TextDrawOperation::STROKE) {
-        // stroke glyphs one at a time to avoid poor CoreGraphics performance
-        // when stroking a path with a very large number of points
-        buffer.mGlyphs = &glyphBuf.front();
-        buffer.mNumGlyphs = 1;
-        const ContextState& state = *mState;
-
-        const StrokeOptions strokeOpts(state.lineWidth, state.lineJoin,
-                                       state.lineCap, state.miterLimit,
-                                       state.dash.Length(),
-                                       state.dash.Elements(),
-                                       state.dashOffset);
-
-        // We need to adjust the bounds for the adjusted target
-        bounds.Inflate(MaxStrokeExtents(strokeOpts, mCtx->mTarget->GetTransform()));
-
-        AdjustedTarget target(mCtx, &bounds);
-
-        CanvasGeneralPattern cgp;
-        const Pattern& patForStyle
-          (cgp.ForStyle(mCtx, CanvasRenderingContext2D::Style::STROKE, mCtx->mTarget));
-        const DrawOptions drawOpts(state.globalAlpha, mCtx->UsedOperation());
-
-        for (unsigned i = glyphBuf.size(); i > 0; --i) {
-          RefPtr<Path> path = scaledFont->GetPathForGlyphs(buffer, mCtx->mTarget);
-          target->Stroke(path, patForStyle, strokeOpts, drawOpts);
-          buffer.mGlyphs++;
-        }
+      if (style == Style::FILL) {
+        params.context->SetPattern(pattern);
+      } else {
+        params.textStrokePattern = pattern;
       }
     }
+
+    if (style == Style::STROKE) {
+      const ContextState& state = *mState;
+      drawOpts.mAlpha = state.globalAlpha;
+      drawOpts.mCompositionOp = mCtx->UsedOperation();
+
+      strokeOpts.mLineWidth = state.lineWidth;
+      strokeOpts.mLineJoin = state.lineJoin;
+      strokeOpts.mLineCap = state.lineCap;
+      strokeOpts.mMiterLimit = state.miterLimit;
+      strokeOpts.mDashLength = state.dash.Length();
+      strokeOpts.mDashPattern =
+        (strokeOpts.mDashLength > 0) ? state.dash.Elements() : 0;
+      strokeOpts.mDashOffset = state.dashOffset;
+
+      params.drawMode = DrawMode::GLYPH_STROKE;
+      params.strokeOpts = &strokeOpts;
+      params.drawOpts = &drawOpts;
+    }
+
+    mTextRun->Draw(gfxTextRun::Range(mTextRun.get()), point, params);
   }
 
   // current text run
@@ -3997,13 +3895,6 @@ CanvasRenderingContext2D::DrawOrMeasureText(const nsAString& aRawText,
 {
   nsresult rv;
 
-  // spec isn't clear on what should happen if aMaxWidth <= 0, so
-  // treat it as an invalid argument
-  // technically, 0 should be an invalid value as well, but 0 is the default
-  // arg, and there is no way to tell if the default was used
-  if (aMaxWidth.WasPassed() && aMaxWidth.Value() < 0)
-    return NS_ERROR_INVALID_ARG;
-
   if (!mCanvasElement && !mDocShell) {
     NS_WARNING("Canvas element must be non-null or a docshell must be provided");
     return NS_ERROR_FAILURE;
@@ -4018,6 +3909,12 @@ CanvasRenderingContext2D::DrawOrMeasureText(const nsAString& aRawText,
   // replace all the whitespace characters with U+0020 SPACE
   nsAutoString textToDraw(aRawText);
   TextReplaceWhitespaceCharacters(textToDraw);
+
+  // According to spec, the API should return an empty array if maxWidth was provided
+  // but is less than or equal to zero or equal to NaN.
+  if (aMaxWidth.WasPassed() && (aMaxWidth.Value() <= 0 || IsNaN(aMaxWidth.Value()))) {
+    textToDraw.Truncate();
+  }
 
   // for now, default to ltr if not in doc
   bool isRTL = false;
@@ -4731,46 +4628,44 @@ CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
     }
 
     gl->MakeCurrent();
-    if (!mVideoTexture) {
-      gl->fGenTextures(1, &mVideoTexture);
-    }
+    GLuint videoTexture = 0;
+    gl->fGenTextures(1, &videoTexture);
     // skiaGL expect upload on drawing, and uses texture 0 for texturing,
     // so we must active texture 0 and bind the texture for it.
     gl->fActiveTexture(LOCAL_GL_TEXTURE0);
-    gl->fBindTexture(LOCAL_GL_TEXTURE_2D, mVideoTexture);
+    gl->fBindTexture(LOCAL_GL_TEXTURE_2D, videoTexture);
 
-    bool dimensionsMatch = mCurrentVideoSize.width == srcImage->GetSize().width &&
-                           mCurrentVideoSize.height == srcImage->GetSize().height;
-    if (!dimensionsMatch) {
-      // we need to allocation
-      mCurrentVideoSize.width = srcImage->GetSize().width;
-      mCurrentVideoSize.height = srcImage->GetSize().height;
-      gl->fTexImage2D(LOCAL_GL_TEXTURE_2D, 0, LOCAL_GL_RGB, srcImage->GetSize().width, srcImage->GetSize().height, 0, LOCAL_GL_RGB, LOCAL_GL_UNSIGNED_SHORT_5_6_5, nullptr);
-      gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_WRAP_S, LOCAL_GL_CLAMP_TO_EDGE);
-      gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_WRAP_T, LOCAL_GL_CLAMP_TO_EDGE);
-      gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_MAG_FILTER, LOCAL_GL_LINEAR);
-      gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_MIN_FILTER, LOCAL_GL_LINEAR);
-    }
+    gl->fTexImage2D(LOCAL_GL_TEXTURE_2D, 0, LOCAL_GL_RGB, srcImage->GetSize().width, srcImage->GetSize().height, 0, LOCAL_GL_RGB, LOCAL_GL_UNSIGNED_SHORT_5_6_5, nullptr);
+    gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_WRAP_S, LOCAL_GL_CLAMP_TO_EDGE);
+    gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_WRAP_T, LOCAL_GL_CLAMP_TO_EDGE);
+    gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_MAG_FILTER, LOCAL_GL_LINEAR);
+    gl->fTexParameteri(LOCAL_GL_TEXTURE_2D, LOCAL_GL_TEXTURE_MIN_FILTER, LOCAL_GL_LINEAR);
+
     const gl::OriginPos destOrigin = gl::OriginPos::TopLeft;
     bool ok = gl->BlitHelper()->BlitImageToTexture(srcImage, srcImage->GetSize(),
-                                                   mVideoTexture, LOCAL_GL_TEXTURE_2D,
+                                                   videoTexture, LOCAL_GL_TEXTURE_2D,
                                                    destOrigin);
     if (ok) {
       NativeSurface texSurf;
       texSurf.mType = NativeSurfaceType::OPENGL_TEXTURE;
       texSurf.mFormat = SurfaceFormat::R5G6B5_UINT16;
-      texSurf.mSize.width = mCurrentVideoSize.width;
-      texSurf.mSize.height = mCurrentVideoSize.height;
-      texSurf.mSurface = (void*)((uintptr_t)mVideoTexture);
+      texSurf.mSize.width = srcImage->GetSize().width;
+      texSurf.mSize.height = srcImage->GetSize().height;
+      texSurf.mSurface = (void*)((uintptr_t)videoTexture);
 
       srcSurf = mTarget->CreateSourceSurfaceFromNativeSurface(texSurf);
-      imgSize.width = mCurrentVideoSize.width;
-      imgSize.height = mCurrentVideoSize.height;
+      if (!srcSurf) {
+        gl->fDeleteTextures(1, &videoTexture);
+      }
+      imgSize.width = srcImage->GetSize().width;
+      imgSize.height = srcImage->GetSize().height;
 
       int32_t displayWidth = video->VideoWidth();
       int32_t displayHeight = video->VideoHeight();
       aSw *= (double)imgSize.width / (double)displayWidth;
       aSh *= (double)imgSize.height / (double)displayHeight;
+    } else {
+      gl->fDeleteTextures(1, &videoTexture);
     }
     srcImage = nullptr;
 

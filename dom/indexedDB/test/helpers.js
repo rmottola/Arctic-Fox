@@ -146,6 +146,12 @@ function testHarnessSteps() {
           nextTestHarnessStep();
           break;
 
+        case "clearAllDatabases":
+          clearAllDatabases(function(){
+            worker.postMessage({ op: "clearAllDatabasesDone" });
+          });
+          break;
+
         default:
           ok(false,
              "Received a bad message from worker: " + JSON.stringify(message));
@@ -379,7 +385,9 @@ function workerScript() {
   };
 
   self.executeSoon = function(_fun_) {
-    setTimeout(_fun_, 0);
+    var channel = new MessageChannel();
+    channel.port1.postMessage("");
+    channel.port2.onmessage = function(event) { _fun_(); };
   };
 
   self.finishTest = function() {
@@ -478,6 +486,12 @@ function workerScript() {
     return buffer;
   };
 
+  self._clearAllDatabasesCallback = undefined;
+  self.clearAllDatabases = function(_callback_) {
+    self._clearAllDatabasesCallback = _callback_;
+    self.postMessage({ op: "clearAllDatabases" });
+  }
+
   self.onerror = function(_message_, _file_, _line_) {
     ok(false,
        "Worker: uncaught exception [" + _file_ + ":" + _line_ + "]: '" +
@@ -501,6 +515,13 @@ function workerScript() {
           info("Worker: starting tests");
           testGenerator.next();
         });
+        break;
+
+      case "clearAllDatabasesDone":
+        info("Worker: all databases are cleared");
+        if (self._clearAllDatabasesCallback) {
+          self._clearAllDatabasesCallback();
+        }
         break;
 
       default:

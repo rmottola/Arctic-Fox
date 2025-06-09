@@ -1,8 +1,9 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
-const { console, ConsoleAPI } = Cu.import("resource://gre/modules/Console.jsm");
+"use strict";
 
+const { console, ConsoleAPI } = require("resource://gre/modules/Console.jsm");
 const { ConsoleAPIListener } = require("devtools/shared/webconsole/utils");
 const Services = require("Services");
 
@@ -10,12 +11,12 @@ var seenMessages = 0;
 var seenTypes = 0;
 
 var callback = {
-  onConsoleAPICall: function(aMessage) {
+  onConsoleAPICall: function (aMessage) {
     if (aMessage.consoleID && aMessage.consoleID == "addon/foo") {
       do_check_eq(aMessage.level, "warn");
       do_check_eq(aMessage.arguments[0], "Warning from foo");
       seenTypes |= 1;
-    } else if(aMessage.originAttributes &&
+    } else if (aMessage.originAttributes &&
               aMessage.originAttributes.addonId == "bar") {
       do_check_eq(aMessage.level, "error");
       do_check_eq(aMessage.arguments[0], "Error from bar");

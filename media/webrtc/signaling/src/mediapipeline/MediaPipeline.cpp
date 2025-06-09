@@ -2048,7 +2048,8 @@ public:
       monitor_("Video PipelineListener")
   {
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
-    image_container_ = LayerManager::CreateImageContainer();
+    image_container_ =
+      LayerManager::CreateImageContainer(ImageContainer::ASYNCHRONOUS);
 #endif
   }
 

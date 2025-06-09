@@ -28,10 +28,8 @@
   <script type="text/javascript" src="debugger-view.js"/>
   <script type="text/javascript" src="utils.js"/>
   <script type="text/javascript" src="views/workers-view.js"/>
-  <script type="text/javascript" src="views/sources-view.js"/>
   <script type="text/javascript" src="views/variable-bubble-view.js"/>
   <script type="text/javascript" src="views/watch-expressions-view.js"/>
-  <script type="text/javascript" src="views/event-listeners-view.js"/>
   <script type="text/javascript" src="views/global-search-view.js"/>
   <script type="text/javascript" src="views/toolbar-view.js"/>
   <script type="text/javascript" src="views/options-view.js"/>
@@ -314,7 +312,9 @@
                 flex="0"
                 hidden="true">
           <tabs>
-            <tab id="workers-tab" label="&debuggerUI.tabs.workers;"/>
+            <tab id="workers-tab"
+                 crop="end"
+                 label="&debuggerUI.tabs.workers;"/>
           </tabs>
           <tabpanels flex="1">
             <tabpanel>
@@ -327,8 +327,12 @@
                 class="devtools-sidebar-tabs"
                 flex="1">
           <tabs>
-            <tab id="sources-tab" label="&debuggerUI.tabs.sources;"/>
-            <tab id="callstack-tab" label="&debuggerUI.tabs.callstack;"/>
+            <tab id="sources-tab"
+                 crop="end"
+                 label="&debuggerUI.tabs.sources;"/>
+            <tab id="callstack-tab"
+                 crop="end"
+                 label="&debuggerUI.tabs.callstack;"/>
           </tabs>
           <tabpanels flex="1">
             <tabpanel id="sources-tabpanel">
@@ -394,8 +398,12 @@
                   class="devtools-sidebar-tabs"
                   hidden="true">
             <tabs>
-              <tab id="variables-tab" label="&debuggerUI.tabs.variables;"/>
-              <tab id="events-tab" label="&debuggerUI.tabs.events;"/>
+              <tab id="variables-tab"
+                   crop="end"
+                   label="&debuggerUI.tabs.variables;"/>
+              <tab id="events-tab"
+                   crop="end"
+                   label="&debuggerUI.tabs.events;"/>
             </tabs>
             <tabpanels flex="1">
               <tabpanel id="variables-tabpanel">
@@ -488,7 +496,4 @@
       <textbox id="conditional-breakpoint-panel-textbox"/>
     </vbox>
   </panel>
-
-  <script type="text/javascript" src="resource://gre/browser/modules/devtools/debugger/mocks.js"/>
-  <script type="text/javascript" src="resource://gre/browser/modules/devtools/debugger/mock-init.js"/>
 </window>

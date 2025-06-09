@@ -138,7 +138,15 @@ static const char* logTag = "PeerConnectionImpl";
 
 // Getting exceptions back down from PCObserver is generally not harmful.
 namespace {
-class JSErrorResult : public ErrorResult
+// This is a terrible hack.  The problem is that SuppressException is not
+// inline, and we link this file without libxul in some cases (e.g. for our test
+// setup).  So we can't use ErrorResult or IgnoredErrorResult because those call
+// SuppressException...  And we can't use FastErrorResult because we can't
+// include BindingUtils.h, because our linking is completely fucked up.  Use
+// BaseErrorResult directly.  Please do not let me see _anyone_ doing this
+// without really careful review from someone who knows what they are doing.
+class JSErrorResult :
+    public binding_danger::TErrorResult<binding_danger::JustAssertCleanupPolicy>
 {
 public:
   ~JSErrorResult()
@@ -169,6 +177,7 @@ public:
     }
   }
   operator JSErrorResult &() { return mRv; }
+  operator ErrorResult &() { return mRv; }
 private:
   JSErrorResult mRv;
   bool isCopy;
@@ -875,7 +884,9 @@ class ConfigureCodec {
       mH264MaxMbps(0), // Unlimited
       mVP8MaxFs(0),
       mVP8MaxFr(0),
-      mUseTmmbr(false)
+      mUseTmmbr(false),
+      mUseRemb(false),
+      mUseAudioFec(false)
     {
 #ifdef MOZ_WEBRTC_OMX
       // Check to see if what HW codecs are available (not in use) at this moment.
@@ -941,13 +952,24 @@ class ConfigureCodec {
 
       // TMMBR is enabled from a pref in about:config
       branch->GetBoolPref("media.navigator.video.use_tmmbr", &mUseTmmbr);
+
+      // REMB is enabled by default, but can be disabled from about:config
+      branch->GetBoolPref("media.navigator.video.use_remb", &mUseRemb);
+
+      branch->GetBoolPref("media.navigator.audio.use_fec", &mUseAudioFec);
     }
 
     void operator()(JsepCodecDescription* codec) const
     {
       switch (codec->mType) {
         case SdpMediaSection::kAudio:
-          // Nothing to configure here, for now.
+          {
+            JsepAudioCodecDescription& audioCodec =
+              static_cast<JsepAudioCodecDescription&>(*codec);
+            if (audioCodec.mName == "opus") {
+              audioCodec.mFECEnabled = mUseAudioFec;
+            }
+          }
           break;
         case SdpMediaSection::kVideo:
           {
@@ -987,6 +1009,9 @@ class ConfigureCodec {
             if (mUseTmmbr) {
               videoCodec.EnableTmmbr();
             }
+            if (mUseRemb) {
+              videoCodec.EnableRemb();
+            }
           }
           break;
         case SdpMediaSection::kText:
@@ -1008,6 +1033,8 @@ class ConfigureCodec {
     int32_t mVP8MaxFs;
     int32_t mVP8MaxFr;
     bool mUseTmmbr;
+    bool mUseRemb;
+    bool mUseAudioFec;
 };
 
 nsresult
@@ -1674,7 +1701,7 @@ PeerConnectionImpl::SetLocalDescription(int32_t aAction, const char* aSDP)
   STAMP_TIMECARD(mTimeCard, "Set Local Description");
 
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
-  bool isolated = mMedia->AnyLocalStreamHasPeerIdentity();
+  bool isolated = mMedia->AnyLocalTrackHasPeerIdentity();
   mPrivacyRequested = mPrivacyRequested || isolated;
 #endif
 
@@ -2517,6 +2544,11 @@ PeerConnectionImpl::ReplaceTrack(MediaStreamTrack& aThisTrack,
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
   PrincipalChanged(&aWithTrack);
 #endif
+
+  // We update the media pipelines here so we can apply different codec
+  // settings for different sources (e.g. screensharing as opposed to camera.)
+  // TODO: We should probably only do this if the source has in fact changed.
+  mMedia->UpdateMediaPipelines(*mJsepSession);
 
   pco->OnReplaceTrackSuccess(jrv);
   if (jrv.Failed()) {
@@ -3401,35 +3433,16 @@ PeerConnectionImpl::BuildStatsQuery_m(
   }
 
   for (int i = 0, len = mMedia->LocalStreamsLength(); i < len; i++) {
-    auto& pipelines = mMedia->GetLocalStreamByIndex(i)->GetPipelines();
-    if (aSelector) {
-      if (mMedia->GetLocalStreamByIndex(i)->GetMediaStream()->
-          HasTrack(*aSelector)) {
-        auto it = pipelines.find(trackId);
-        if (it != pipelines.end()) {
-          query->pipelines.AppendElement(it->second);
-        }
-      }
-    } else {
-      for (auto it = pipelines.begin(); it != pipelines.end(); ++it) {
-        query->pipelines.AppendElement(it->second);
+    for (auto pipeline : mMedia->GetLocalStreamByIndex(i)->GetPipelines()) {
+      if (!aSelector || pipeline.second->trackid() == trackId) {
+        query->pipelines.AppendElement(pipeline.second);
       }
     }
   }
-
-  for (size_t i = 0, len = mMedia->RemoteStreamsLength(); i < len; i++) {
-    auto& pipelines = mMedia->GetRemoteStreamByIndex(i)->GetPipelines();
-    if (aSelector) {
-      if (mMedia->GetRemoteStreamByIndex(i)->
-          GetMediaStream()->HasTrack(*aSelector)) {
-        auto it = pipelines.find(trackId);
-        if (it != pipelines.end()) {
-          query->pipelines.AppendElement(it->second);
-        }
-      }
-    } else {
-      for (auto it = pipelines.begin(); it != pipelines.end(); ++it) {
-        query->pipelines.AppendElement(it->second);
+  for (int i = 0, len = mMedia->RemoteStreamsLength(); i < len; i++) {
+    for (auto pipeline : mMedia->GetRemoteStreamByIndex(i)->GetPipelines()) {
+      if (!aSelector || pipeline.second->trackid() == trackId) {
+        query->pipelines.AppendElement(pipeline.second);
       }
     }
   }

@@ -114,8 +114,8 @@ toolbarbutton.bookmark-item:hover:active,
 toolbarbutton.bookmark-item[open="true"] {
   padding-top: 3px;
   padding-bottom: 1px;
-  -moz-padding-start: 4px;
-  -moz-padding-end: 2px;
+  padding-inline-start: 4px;
+  padding-inline-end: 2px;
 }
 
 .bookmark-item > .toolbarbutton-icon {
@@ -220,7 +220,7 @@ menuitem.bookmark-item {
 }
 
 .bookmark-item > .menu-iconic-left > .menu-iconic-icon {
-  -moz-padding-start: 0px;
+  padding-inline-start: 0px;
 }
 
 /* Bookmark drag and drop styles */
@@ -240,7 +240,7 @@ menuitem.bookmark-item {
 .menupopup-drop-indicator {
   list-style-image: none;
   height: 2px;
-  -moz-margin-end: -4em;
+  margin-inline-end: -4em;
   background-color: Highlight;
 }
 
@@ -321,6 +321,7 @@ menuitem:not([type]):not(.menuitem-tooltip):not(.menuitem-iconic-tooltip) {
 #placesContext_openContainer\:tabs,
 #menu_newNavigatorTab,
 #context-openlinkintab,
+#context-openlinkincontainertab,
 #context-openframeintab {
   list-style-image: url("chrome://browser/skin/Toolbar-small.png");
   -moz-image-region: rect(0px 64px 16px 48px);
@@ -642,7 +643,7 @@ menuitem:not([type]):not(.menuitem-tooltip):not(.menuitem-iconic-tooltip) {
 }
 
 .toolbarbutton-1 > .toolbarbutton-icon {
-  -moz-margin-end: 0;
+  margin-inline-end: 0;
 }
 
 toolbar[mode="full"] .toolbarbutton-1:not([type="menu-button"]),
@@ -971,7 +972,7 @@ toolbar[iconsize="small"] #feed-button {
 /* Fullscreen window controls */
 #window-controls {
   -moz-box-align: start;
-  -moz-margin-start: 10px;
+  margin-inline-start: 10px;
 }
 
 #minimize-button {
@@ -997,7 +998,7 @@ toolbar[iconsize="small"] #feed-button {
 }
 
 .urlbar-input-box {
-  -moz-margin-start: 0;
+  margin-inline-start: 0;
 }
 
 .urlbar-history-dropmarker {
@@ -1033,25 +1034,25 @@ toolbar[iconsize="small"] #feed-button {
 #urlbar-search-splitter {
   -moz-appearance: none;
   width: 8px;
-  -moz-margin-start: -4px;
+  margin-inline-start: -4px;
 }
 
 #urlbar-search-splitter + #urlbar-container > #urlbar ,
 #urlbar-search-splitter + #search-container > #searchbar > .searchbar-textbox {
-  -moz-margin-start: 0;
+  margin-inline-start: 0;
 }
 
 #urlbar-display-box {
   margin-top: -1px;
   margin-bottom: -1px;
-  -moz-border-end: 1px solid #AAA;
-  -moz-margin-end: 3px;
+  border-inline-end: 1px solid #AAA;
+  margin-inline-end: 3px;
 }
 
 .urlbar-display {
   margin-top: 0;
   margin-bottom: 0;
-  -moz-margin-start: 0;
+  margin-inline-start: 0;
   color: GrayText;
 }
 
@@ -1060,8 +1061,8 @@ toolbar[iconsize="small"] #feed-button {
 #page-proxy-favicon {
   margin-top: 2px;
   margin-bottom: 2px;
-  -moz-margin-start: 4px;
-  -moz-margin-end: 3px;
+  margin-inline-start: 4px;
+  margin-inline-end: 3px;
 }
 
 %include ../shared/urlbarSearchSuggestionsNotification.inc.css
@@ -1070,7 +1071,7 @@ toolbar[iconsize="small"] #feed-button {
 #identity-box {
   padding: 1px;
   margin: -1px;
-  -moz-margin-end: 0;
+  margin-inline-end: 0;
   font-size: .9em;
 }
 
@@ -1090,20 +1091,20 @@ toolbar[iconsize="small"] #feed-button {
 }
 
 #identity-icon-labels {
-  -moz-padding-start: 2px;
-  -moz-padding-end: 5px;
+  padding-inline-start: 2px;
+  padding-inline-end: 5px;
 }
 
 
 #urlbar[pageproxystate="valid"] > #identity-box.chromeUI,
 #urlbar[pageproxystate="valid"] > #identity-box.verifiedIdentity {
   background-color: #fff;
-  -moz-margin-end: 4px;
+  margin-inline-end: 4px;
 }
 
 #urlbar[pageproxystate="valid"] > #identity-box.verifiedDomain {
   color: rgb(51,87,137);
-  -moz-margin-end: 4px;
+  margin-inline-end: 4px;
   background-image: linear-gradient(rgba(220,231,245,1),
                                     rgba(207,221,242,1));
   background-position: right;
@@ -1153,8 +1154,8 @@ toolbar[iconsize="small"] #feed-button {
 
 .popup-progress-label,
 .popup-progress-meter {
-  -moz-margin-start: 0;
-  -moz-margin-end: 0;
+  margin-inline-start: 0;
+  margin-inline-end: 0;
 }
 
 .popup-progress-cancel {
@@ -1163,7 +1164,7 @@ toolbar[iconsize="small"] #feed-button {
   border: none;
   padding: 0;
   margin: 0;
-  -moz-margin-start: 5px;
+  margin-inline-start: 5px;
   min-height: 0;
   min-width: 0;
   list-style-image: url("moz-icon://stock/gtk-cancel?size=menu");
@@ -1401,23 +1402,18 @@ richlistitem[type~="action"][actiontype$="tab"] > .ac-url-box > .ac-action-icon 
 /* Reader mode button */
 
 #reader-mode-button {
-  -moz-appearance: none;
-  padding: 0;
-  list-style-image: url("chrome://browser/skin/reader-mode-16.png");
+  list-style-image: url("chrome://browser/skin/readerMode.svg");
   -moz-image-region: rect(0, 16px, 16px, 0);
 }
 
-#reader-mode-button > .toolbarbutton-icon {
-  width: 16px;
-}
-
-#reader-mode-button:focus {
-  outline: 1px dotted;
+#reader-mode-button:hover,
+#reader-mode-button[readeractive]:hover {
+  -moz-image-region: rect(0, 32px, 16px, 16px);
 }
 
 #reader-mode-button:hover:active,
 #reader-mode-button[readeractive] {
-   -moz-image-region: rect(0, 32px, 16px, 16px);
+  -moz-image-region: rect(0, 48px, 16px, 32px);
 }
 
 /* Star button */
@@ -1495,7 +1491,7 @@ richlistitem[type~="action"][actiontype$="tab"] > .ac-url-box > .ac-action-icon 
 
 .panel-promo-icon {
   list-style-image: url("chrome://browser/skin/sync-notification-24.png");
-  -moz-margin-end: 10px;
+  margin-inline-end: 10px;
   vertical-align: middle;
 }
 
@@ -1647,7 +1643,7 @@ richlistitem[type~="action"][actiontype$="tab"] > .ac-url-box > .ac-action-icon 
 .tab-icon-image {
   width: 16px;
   height: 16px;
-  -moz-margin-end: 3px;
+  margin-inline-end: 3px;
   list-style-image: url("chrome://mozapps/skin/places/defaultFavicon.png");
 }
 
@@ -1662,8 +1658,8 @@ richlistitem[type~="action"][actiontype$="tab"] > .ac-url-box > .ac-action-icon 
 .tab-throbber[pinned],
 .tab-icon-image[pinned],
 .tabs-newtab-button > .toolbarbutton-icon {
-  -moz-margin-start: 2px;
-  -moz-margin-end: 2px;
+  margin-inline-start: 2px;
+  margin-inline-end: 2px;
 }
 
 #context_reloadTab {
@@ -1717,7 +1713,7 @@ richlistitem[type~="action"][actiontype$="tab"] > .ac-url-box > .ac-action-icon 
   padding: 0;
   margin-top: -1px;
   margin-bottom: -1px;
-  -moz-margin-end: -1px;
+  margin-inline-end: -1px;
 }
 
 /* Tabstrip new tab button */
@@ -1736,13 +1732,13 @@ richlistitem[type~="action"][actiontype$="tab"] > .ac-url-box > .ac-action-icon 
 }
 
 .tabbrowser-arrowscrollbox > .scrollbutton-up {
-  -moz-border-start: 0;
-  -moz-border-end: 2px solid transparent;
+  border-inline-start: 0;
+  border-inline-end: 2px solid transparent;
 }
 
 .tabbrowser-arrowscrollbox > .scrollbutton-down {
-  -moz-border-start: 2px solid transparent;
-  -moz-border-end: 0;
+  border-inline-start: 2px solid transparent;
+  border-inline-end: 0;
   transition: 1s box-shadow ease-out;
   border-radius: 4px;
 }
@@ -1815,7 +1811,7 @@ richlistitem[type~="action"][actiontype$="tab"] > .ac-url-box > .ac-action-icon 
 /* Sidebar */
 #sidebar-throbber[loading="true"] {
   list-style-image: url("chrome://global/skin/icons/loading_16.png");
-  -moz-margin-end: 4px;
+  margin-inline-end: 4px;
 }
 
 toolbarbutton.chevron {
@@ -1903,8 +1899,8 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
 }
 
 #allTabs-filter {
-  -moz-margin-start: 36px;
-  -moz-margin-end: 0;
+  margin-inline-start: 36px;
+  margin-inline-end: 0;
 }
 
 .allTabs-preview-label {
@@ -1914,7 +1910,7 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
 /* Application button menu */
 
 .splitmenu-menuitem {
-  -moz-margin-end: 1px;
+  margin-inline-end: 1px;
 }
 
 #appmenu-toolbar-button:not(:hover):not([open]):not(:-moz-lwtheme) {
@@ -1927,7 +1923,7 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
   margin-bottom: -2px !important;
 }
 #appmenuSecondaryPane {
-  -moz-border-start: 1px solid ThreeDShadow;
+  border-inline-start: 1px solid ThreeDShadow;
 }
 #appmenuSecondaryPane-spacer {
   min-height: 1em;
@@ -2001,7 +1997,7 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
   text-shadow: none;
   background-image: linear-gradient(#B4211B, #8A1915);
   border-radius: 1px;
-  -moz-margin-end: 2px;
+  margin-inline-end: 2px;
 }
 
 .toolbarbutton-badge-container {
@@ -2037,10 +2033,14 @@ toolbar[iconsize="small"] .toolbarbutton-badge-container {
 #context-navigation > .menuitem-iconic > .menu-iconic-left {
   visibility: visible;
   /* override toolkit/themes/linux/global/menu.css */
-  -moz-padding-end: 0 !important;
-  -moz-margin-end: 0 !important;
+  padding-inline-end: 0 !important;
+  margin-inline-end: 0 !important;
 }
 
 .browser-extension-panel > .panel-arrowcontainer > .panel-arrowcontent {
   padding: 0;
+}
+
+.menuitem-iconic[command="Browser:NewUserContextTab"] > .menu-iconic-left > .menu-iconic-icon {
+  visibility: visible;
 }

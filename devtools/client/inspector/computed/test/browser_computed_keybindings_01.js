@@ -15,7 +15,7 @@ const TEST_URI = `
   <span class="matches">Some styled text</span>
 `;
 
-add_task(function*() {
+add_task(function* () {
   yield addTab("data:text/html;charset=utf-8," + encodeURIComponent(TEST_URI));
   let {inspector, view} = yield openComputedView();
   yield selectNode(".matches", inspector);
@@ -25,6 +25,7 @@ add_task(function*() {
   let matchedExpander = propView.element;
 
   info("Focusing the property");
+  matchedExpander.scrollIntoView();
   let onMatchedExpanderFocus = once(matchedExpander, "focus", true);
   EventUtils.synthesizeMouseAtCenter(matchedExpander, {}, view.styleWindow);
   yield onMatchedExpanderFocus;
@@ -69,10 +70,10 @@ function* checkToggleKeyBinding(win, key, rulesTable, inspector) {
 
 function checkHelpLinkKeybinding(view) {
   info("Check that MDN link is opened on \"F1\"");
-  let def = promise.defer();
+  let def = defer();
 
   let propView = getFirstVisiblePropertyView(view);
-  propView.mdnLinkClick = function() {
+  propView.mdnLinkClick = function () {
     ok(true, "Pressing F1 opened the MDN link");
     def.resolve();
   };

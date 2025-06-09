@@ -16,7 +16,7 @@ body {
 ul, ol {
   margin: 0;
   padding: 0;
-  -moz-margin-start: 1em;
+  margin-inline-start: 1em;
 }
 
 ul > li, ol > li {
@@ -35,8 +35,8 @@ ul {
 #errorTitle {
   background: url("info.svg") left 0 no-repeat;
   background-size: 3em 3em;
-  -moz-margin-start: -5em;
-  -moz-padding-start: 5em;
+  margin-inline-start: -5em;
+  padding-inline-start: 5em;
 }
 
 #errorTitle:-moz-locale-dir(rtl) {
@@ -55,8 +55,8 @@ ul {
   #errorTitle {
     padding-top: 0;
     background-image: none;
-    -moz-padding-start: 0;
-    -moz-margin-start: 0;
+    padding-inline-start: 0;
+    margin-inline-start: 0;
   }
 }
 
