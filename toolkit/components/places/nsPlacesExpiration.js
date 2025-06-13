@@ -57,7 +57,6 @@ const PREF_BRANCH = "places.history.expiration.";
 // a limit based on current hardware.
 const PREF_MAX_URIS = "max_pages";
 const PREF_MAX_URIS_NOTSET = -1; // Use our internally calculated limit.
-const PREF_MAX_URIS_FLOOR = 10000; // Never go below this value.
 
 // We save the current unique URIs limit to this pref, to make it available to
 // other components without having to duplicate the full logic.
@@ -862,14 +861,20 @@ nsPlacesExpiration.prototype = {
         DATABASE_MAX_SIZE
       );
 
-      // Calculate the optimal number of entries for our hardware, but keep
-      // a sane minimum PREF_MAX_URIS_FLOOR for non-standard environments where
-      // available process memory or free disk space would otherwise expire
-      // too recent entries.
-      this._urisLimit = Math.max(
-        PREF_MAX_URIS_FLOOR,
-        Math.ceil(optimalDatabaseSize / URIENTRY_AVG_SIZE)
-      );
+      // Calculate avg size of a URI in the database.
+      let db = yield PlacesUtils.promiseDBConnection();
+      let pageSize = (yield db.execute(`PRAGMA page_size`))[0].getResultByIndex(0);
+      let pageCount = (yield db.execute(`PRAGMA page_count`))[0].getResultByIndex(0);
+      let freelistCount = (yield db.execute(`PRAGMA freelist_count`))[0].getResultByIndex(0);
+      let dbSize = (pageCount - freelistCount) * pageSize;
+      let uriCount = (yield db.execute(`SELECT count(*) FROM moz_places`))[0].getResultByIndex(0);
+      let avgURISize = Math.ceil(dbSize / uriCount);
+      // For new profiles this value may be too large, due to the Sqlite header,
+      // or Infinity when there are no pages.  Thus we must limit it.
+      if (avgURISize > (URIENTRY_AVG_SIZE * 3)) {
+        avgURISize = URIENTRY_AVG_SIZE;
+      }
+      this._urisLimit = Math.ceil(optimalDatabaseSize / avgURISize);
     }
 
     // Expose the calculated limit to other components.
@@ -1106,5 +1111,5 @@ nsPlacesExpiration.prototype = {
 ////////////////////////////////////////////////////////////////////////////////
 //// Module Registration
 
-let components = [nsPlacesExpiration];
+var components = [nsPlacesExpiration];
 this.NSGetFactory = XPCOMUtils.generateNSGetFactory(components);
