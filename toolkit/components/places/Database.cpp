@@ -28,6 +28,7 @@
 #include "nsPrintfCString.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Services.h"
+#include "mozilla/unused.h"
 #include "prtime.h"
 
 #include "nsXULAppAPI.h"
@@ -45,6 +46,18 @@
 
 // Set to specify the size of the places database growth increments in kibibytes
 #define PREF_GROWTH_INCREMENT_KIB "places.database.growthIncrementKiB"
+
+// The maximum url length we can store in history.
+// We do not add to history URLs longer than this value.
+#define PREF_HISTORY_MAXURLLEN "places.history.maxUrlLength"
+// This number is mostly a guess based on various facts:
+// * IE didn't support urls longer than 2083 chars
+// * Sitemaps protocol used to support a maximum of 2048 chars
+// * Various SEO guides suggest to not go over 2000 chars
+// * Various apps/services are known to have issues over 2000 chars
+// * RFC 2616 - HTTP/1.1 suggests being cautious about depending
+//   on URI lengths above 255 bytes
+#define PREF_HISTORY_MAXURLLEN_DEFAULT 2000
 
 // Maximum size for the WAL file.  It should be small enough since in case of
 // crashes we could lose all the transactions in the file.  But a too small
@@ -296,6 +309,7 @@ Database::Database()
   , mClosed(false)
   , mClientsShutdown(new ClientsShutdownBlocker())
   , mConnectionShutdown(new ConnectionShutdownBlocker(this))
+  , mMaxUrlLength(0)
 {
   MOZ_ASSERT(!XRE_IsContentProcess(),
              "Cannot instantiate Places in the content process");
@@ -806,6 +820,20 @@ Database::InitSchema(bool* aDatabaseMigrated)
 
       // Firefox 48 uses schema version 31.
 
+      if (currentSchemaVersion < 32) {
+        rv = MigrateV32Up();
+        NS_ENSURE_SUCCESS(rv, rv);
+      }
+
+      // Firefox 49 uses schema version 32.
+
+      if (currentSchemaVersion < 33) {
+        rv = MigrateV33Up();
+        NS_ENSURE_SUCCESS(rv, rv);
+      }
+
+      // Firefox 50 uses schema version 33.
+
       // Schema Upgrades must add migration code here.
 
       rv = UpdateBookmarkRootTitles();
@@ -820,7 +848,7 @@ Database::InitSchema(bool* aDatabaseMigrated)
     // moz_places.
     rv = mMainConn->ExecuteSimpleSQL(CREATE_MOZ_PLACES);
     NS_ENSURE_SUCCESS(rv, rv);
-    rv = mMainConn->ExecuteSimpleSQL(CREATE_IDX_MOZ_PLACES_URL);
+    rv = mMainConn->ExecuteSimpleSQL(CREATE_IDX_MOZ_PLACES_URL_HASH);
     NS_ENSURE_SUCCESS(rv, rv);
     rv = mMainConn->ExecuteSimpleSQL(CREATE_IDX_MOZ_PLACES_FAVICON);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -995,6 +1023,10 @@ Database::InitFunctions()
   rv = FixupURLFunction::create(mMainConn);
   NS_ENSURE_SUCCESS(rv, rv);
   rv = FrecencyNotificationFunction::create(mMainConn);
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = StoreLastInsertedIdFunction::create(mMainConn);
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = HashFunction::create(mMainConn);
   NS_ENSURE_SUCCESS(rv, rv);
 
   return NS_OK;
@@ -1631,6 +1663,136 @@ Database::MigrateV31Up() {
   return NS_OK;
 }
 
+nsresult
+Database::MigrateV32Up() {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  // Remove some old and no more used Places preferences that may be confusing
+  // for the user.
+  mozilla::Unused << Preferences::ClearUser("places.history.expiration.transient_optimal_database_size");
+  mozilla::Unused << Preferences::ClearUser("places.last_vacuum");
+  mozilla::Unused << Preferences::ClearUser("browser.history_expire_sites");
+  mozilla::Unused << Preferences::ClearUser("browser.history_expire_days.mirror");
+  mozilla::Unused << Preferences::ClearUser("browser.history_expire_days_min");
+
+  // For performance reasons we want to remove too long urls from history.
+  // We cannot use the moz_places triggers here, cause they are defined only
+  // after the schema migration.  Thus we need to collect the hosts that need to
+  // be updated first.
+  nsresult rv = mMainConn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+    "CREATE TEMP TABLE moz_migrate_v32_temp ("
+      "host TEXT PRIMARY KEY "
+    ") WITHOUT ROWID "
+  ));
+  NS_ENSURE_SUCCESS(rv, rv);
+  {
+    nsCOMPtr<mozIStorageStatement> stmt;
+    rv = mMainConn->CreateStatement(NS_LITERAL_CSTRING(
+      "INSERT OR IGNORE INTO moz_migrate_v32_temp (host) "
+        "SELECT fixup_url(get_unreversed_host(rev_host)) "
+        "FROM moz_places WHERE LENGTH(url) > :maxlen AND foreign_count = 0"
+    ), getter_AddRefs(stmt));
+    NS_ENSURE_SUCCESS(rv, rv);
+    mozStorageStatementScoper scoper(stmt);
+    rv = stmt->BindInt32ByName(NS_LITERAL_CSTRING("maxlen"), MaxUrlLength());
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = stmt->Execute();
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+  // Now remove the pages with a long url.
+  {
+    nsCOMPtr<mozIStorageStatement> stmt;
+    rv = mMainConn->CreateStatement(NS_LITERAL_CSTRING(
+      "DELETE FROM moz_places WHERE LENGTH(url) > :maxlen AND foreign_count = 0"
+    ), getter_AddRefs(stmt));
+    NS_ENSURE_SUCCESS(rv, rv);
+    mozStorageStatementScoper scoper(stmt);
+    rv = stmt->BindInt32ByName(NS_LITERAL_CSTRING("maxlen"), MaxUrlLength());
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = stmt->Execute();
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  // Expire orphan visits and update moz_hosts.
+  // These may be a bit more expensive and are not critical for the DB
+  // functionality, so we execute them asynchronously.
+  nsCOMPtr<mozIStorageAsyncStatement> expireOrphansStmt;
+  rv = mMainConn->CreateAsyncStatement(NS_LITERAL_CSTRING(
+    "DELETE FROM moz_historyvisits "
+    "WHERE NOT EXISTS (SELECT 1 FROM moz_places WHERE id = place_id)"
+  ), getter_AddRefs(expireOrphansStmt));
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<mozIStorageAsyncStatement> deleteHostsStmt;
+  rv = mMainConn->CreateAsyncStatement(NS_LITERAL_CSTRING(
+    "DELETE FROM moz_hosts "
+    "WHERE host IN (SELECT host FROM moz_migrate_v32_temp) "
+      "AND NOT EXISTS("
+        "SELECT 1 FROM moz_places "
+          "WHERE rev_host = get_unreversed_host(host || '.') || '.' "
+             "OR rev_host = get_unreversed_host(host || '.') || '.www.' "
+      "); "
+  ), getter_AddRefs(deleteHostsStmt));
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<mozIStorageAsyncStatement> updateHostsStmt;
+  rv = mMainConn->CreateAsyncStatement(NS_LITERAL_CSTRING(
+    "UPDATE moz_hosts "
+    "SET prefix = (" HOSTS_PREFIX_PRIORITY_FRAGMENT ") "
+    "WHERE host IN (SELECT host FROM moz_migrate_v32_temp) "
+  ), getter_AddRefs(updateHostsStmt));
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<mozIStorageAsyncStatement> dropTableStmt;
+  rv = mMainConn->CreateAsyncStatement(NS_LITERAL_CSTRING(
+    "DROP TABLE IF EXISTS moz_migrate_v32_temp"
+  ), getter_AddRefs(dropTableStmt));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  mozIStorageBaseStatement *stmts[] = {
+    expireOrphansStmt,
+    deleteHostsStmt,
+    updateHostsStmt,
+    dropTableStmt
+  };
+  nsCOMPtr<mozIStoragePendingStatement> ps;
+  rv = mMainConn->ExecuteAsync(stmts, ArrayLength(stmts), nullptr,
+                               getter_AddRefs(ps));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  return NS_OK;
+}
+
+nsresult
+Database::MigrateV33Up() {
+  MOZ_ASSERT(NS_IsMainThread());
+
+  nsresult rv = mMainConn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+    "DROP INDEX IF EXISTS moz_places_url_uniqueindex"
+  ));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // Add an url_hash column to moz_places.
+  nsCOMPtr<mozIStorageStatement> stmt;
+  rv = mMainConn->CreateStatement(NS_LITERAL_CSTRING(
+    "SELECT url_hash FROM moz_places"
+  ), getter_AddRefs(stmt));
+  if (NS_FAILED(rv)) {
+    rv = mMainConn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+      "ALTER TABLE moz_places ADD COLUMN url_hash INTEGER DEFAULT 0 NOT NULL"
+    ));
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  rv = mMainConn->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
+    "UPDATE moz_places SET url_hash = hash(url) WHERE url_hash = 0"
+  ));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  // Create an index on url_hash.
+  rv = mMainConn->ExecuteSimpleSQL(CREATE_IDX_MOZ_PLACES_URL_HASH);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  return NS_OK;
+}
+
 void
 Database::Shutdown()
 {
@@ -1662,7 +1824,7 @@ Database::Shutdown()
     MOZ_ASSERT(NS_SUCCEEDED(rv));
     rv = stmt->ExecuteStep(&haveNullGuids);
     MOZ_ASSERT(NS_SUCCEEDED(rv));
-    MOZ_ASSERT(!haveNullGuids && "Found a page without a GUID!");
+    MOZ_ASSERT(!haveNullGuids, "Found a page without a GUID!");
 
     rv = mMainConn->CreateStatement(NS_LITERAL_CSTRING(
       "SELECT 1 "
@@ -1672,7 +1834,7 @@ Database::Shutdown()
     MOZ_ASSERT(NS_SUCCEEDED(rv));
     rv = stmt->ExecuteStep(&haveNullGuids);
     MOZ_ASSERT(NS_SUCCEEDED(rv));
-    MOZ_ASSERT(!haveNullGuids && "Found a bookmark without a GUID!");
+    MOZ_ASSERT(!haveNullGuids, "Found a bookmark without a GUID!");
   }
 
   { // Sanity check for unrounded dateAdded and lastModified values (bug
@@ -1688,7 +1850,31 @@ Database::Shutdown()
     MOZ_ASSERT(NS_SUCCEEDED(rv));
     rv = stmt->ExecuteStep(&hasUnroundedDates);
     MOZ_ASSERT(NS_SUCCEEDED(rv));
-    MOZ_ASSERT(!hasUnroundedDates && "Found unrounded dates!");
+    MOZ_ASSERT(!hasUnroundedDates, "Found unrounded dates!");
+  }
+
+  { // Sanity check url_hash
+    bool hasNullHash = false;
+    nsCOMPtr<mozIStorageStatement> stmt;
+    nsresult rv = mMainConn->CreateStatement(NS_LITERAL_CSTRING(
+      "SELECT 1 FROM moz_places WHERE url_hash = 0"
+    ), getter_AddRefs(stmt));
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
+    rv = stmt->ExecuteStep(&hasNullHash);
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
+    MOZ_ASSERT(!hasNullHash, "Found a place without a hash!");
+  }
+
+  { // Sanity check unique urls
+    bool hasDupeUrls = false;
+    nsCOMPtr<mozIStorageStatement> stmt;
+    nsresult rv = mMainConn->CreateStatement(NS_LITERAL_CSTRING(
+      "SELECT 1 FROM moz_places GROUP BY url HAVING count(*) > 1 "
+    ), getter_AddRefs(stmt));
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
+    rv = stmt->ExecuteStep(&hasDupeUrls);
+    MOZ_ASSERT(NS_SUCCEEDED(rv));
+    MOZ_ASSERT(!hasDupeUrls, "Found a duplicate url!");
   }
 #endif
 
@@ -1781,6 +1967,19 @@ Database::Observe(nsISupports *aSubject,
     }
   }
   return NS_OK;
+}
+
+uint32_t
+Database::MaxUrlLength() {
+  MOZ_ASSERT(NS_IsMainThread());
+  if (!mMaxUrlLength) {
+    mMaxUrlLength = Preferences::GetInt(PREF_HISTORY_MAXURLLEN,
+                                        PREF_HISTORY_MAXURLLEN_DEFAULT);
+    if (mMaxUrlLength < 255 || mMaxUrlLength > INT32_MAX) {
+      mMaxUrlLength = PREF_HISTORY_MAXURLLEN_DEFAULT;
+    }
+  }
+  return mMaxUrlLength;
 }
 
 

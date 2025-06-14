@@ -165,7 +165,7 @@ function stripPrefix(aURIString)
 }
 
 /**
- * safePrefGetter get the pref with typo safety.
+ * safePrefGetter get the pref with type safety.
  * This will return the default value provided if no pref is set.
  *
  * @param aPrefBranch
@@ -187,7 +187,11 @@ function safePrefGetter(aPrefBranch, aName, aDefault) {
   if (!type) {
     throw "Unknown type!";
   }
+
   // If the pref isn't set, we want to use the default.
+  if (aPrefBranch.getPrefType(aName) == Ci.nsIPrefBranch.PREF_INVALID) {
+    return aDefault;
+  }
   try {
     return aPrefBranch["get" + type + "Pref"](aName);
   }
@@ -380,7 +384,7 @@ function nsPlacesAutoComplete()
       `SELECT t.url, t.url, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
               :query_type, t.open_count, NULL
        FROM moz_openpages_temp t
-       LEFT JOIN moz_places h ON h.url = t.url
+       LEFT JOIN moz_places h ON h.url_hash = hash(t.url) AND h.url = t.url
        WHERE h.id IS NULL
          AND AUTOCOMPLETE_MATCH(:searchString, t.url, t.url, NULL,
                                 NULL, NULL, NULL, t.open_count,
