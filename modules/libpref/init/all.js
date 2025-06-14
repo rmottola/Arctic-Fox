@@ -5382,6 +5382,8 @@ pref("browser.safebrowsing.phishing.enabled", true);
 pref("browser.safebrowsing.blockedURIs.enabled", false);
 pref("urlclassifier.blockedTable", "test-block-simple,mozplugin-block-digest256");
 
+// The protocol version we communicate with mozilla server.
+pref("browser.safebrowsing.provider.mozilla.pver", "2.2");
 pref("browser.safebrowsing.provider.mozilla.lists", "mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256,mozplugin-block-digest256,mozplugin2-block-digest256");
 pref("browser.safebrowsing.provider.mozilla.updateURL", "https://shavar.services.mozilla.com/downloads?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
 pref("browser.safebrowsing.provider.mozilla.gethashURL", "https://shavar.services.mozilla.com/gethash?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
