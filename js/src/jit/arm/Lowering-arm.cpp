@@ -883,3 +883,9 @@ LIRGeneratorARM::visitCopySign(MCopySign* ins)
 
     lowerForFPU(lir, ins, lhs, rhs);
 }
+
+void
+LIRGeneratorARM::visitExtendInt32ToInt64(MExtendInt32ToInt64* ins)
+{
+    MOZ_CRASH("NYI");
+}
