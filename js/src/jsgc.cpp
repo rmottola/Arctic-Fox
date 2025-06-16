@@ -1423,9 +1423,8 @@ GCRuntime::removeFinalizeCallback(JSFinalizeCallback callback)
 void
 GCRuntime::callFinalizeCallbacks(FreeOp* fop, JSFinalizeStatus status) const
 {
-    for (auto& p : finalizeCallbacks) {
+    for (auto& p : finalizeCallbacks)
         p.op(fop, status, !isFull, p.data);
-    }
 }
 
 bool
@@ -1449,9 +1448,8 @@ GCRuntime::removeWeakPointerZoneGroupCallback(JSWeakPointerZoneGroupCallback cal
 void
 GCRuntime::callWeakPointerZoneGroupCallbacks() const
 {
-    for (auto const& p : updateWeakPointerZoneGroupCallbacks) {
+    for (auto const& p : updateWeakPointerZoneGroupCallbacks)
         p.op(rt->contextFromMainThread(), p.data);
-    }
 }
 
 bool
@@ -1475,9 +1473,8 @@ GCRuntime::removeWeakPointerCompartmentCallback(JSWeakPointerCompartmentCallback
 void
 GCRuntime::callWeakPointerCompartmentCallbacks(JSCompartment* comp) const
 {
-    for (auto const& p : updateWeakPointerCompartmentCallbacks) {
+    for (auto const& p : updateWeakPointerCompartmentCallbacks)
         p.op(rt->contextFromMainThread(), comp, p.data);
-    }
 }
 
 JS::GCSliceCallback
@@ -2051,9 +2048,8 @@ ArenaLists::relocateArenas(Zone* zone, Arena*& relocatedListOut, JS::gcreason::R
         size_t relocCount = 0;
         AllAllocKindArray<Arena**> toRelocate;
 
-        for (auto kind : AllocKindsToRelocate) {
+        for (auto kind : AllocKindsToRelocate)
             toRelocate[kind] = arenaLists[kind].pickArenasToRelocate(arenaCount, relocCount);
-        }
 
         if (!ShouldRelocateZone(arenaCount, relocCount, reason))
             return false;
@@ -2821,9 +2817,8 @@ ArenaLists::queueForegroundObjectsForSweep(FreeOp* fop)
     gcstats::AutoPhase ap(fop->runtime()->gc.stats, gcstats::PHASE_SWEEP_OBJECT);
 
 #ifdef DEBUG
-    for (auto i : ObjectAllocKinds()) { // Braces needed to appease MSVC 2013.
+    for (auto i : ObjectAllocKinds())
         MOZ_ASSERT(savedObjectArenas[i].isEmpty());
-    }
     MOZ_ASSERT(savedEmptyObjectArenas == nullptr);
 #endif
 
@@ -3782,9 +3777,8 @@ GCRuntime::beginMarkPhase(JS::gcreason::Reason reason, AutoLockForExclusiveAcces
         MOZ_ASSERT(!zone->isCollecting());
         MOZ_ASSERT(!zone->compartments.empty());
 #ifdef DEBUG
-        for (auto i : AllAllocKinds()) { // Braces needed to appease MSVC 2013.
+        for (auto i : AllAllocKinds())
             MOZ_ASSERT(!zone->arenas.arenaListsToSweep[i]);
-        }
 #endif
 
         /* Set up which zones will be collected. */
