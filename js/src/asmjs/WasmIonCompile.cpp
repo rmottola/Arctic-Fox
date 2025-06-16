@@ -789,6 +789,7 @@ class FunctionCompiler
         MAsmJSCall::Args regArgs_;
         Vector<MAsmJSPassStackArg*, 0, SystemAllocPolicy> stackArgs_;
         bool childClobbers_;
+        bool preservesTlsReg_;
 
         friend class FunctionCompiler;
 
@@ -797,7 +798,8 @@ class FunctionCompiler
           : lineOrBytecode_(lineOrBytecode),
             maxChildStackBytes_(0),
             spIncrement_(0),
-            childClobbers_(false)
+            childClobbers_(false),
+            preservesTlsReg_(false)
         { }
     };
 
@@ -822,11 +824,13 @@ class FunctionCompiler
         return args->stackArgs_.append(mir);
     }
 
-    // Add the hidden TLS pointer argument to CallArgs.
+    // Add the hidden TLS pointer argument to CallArgs, and assume that it will
+    // be preserved by the call.
     bool passTlsPointer(CallArgs* args)
     {
         if (inDeadCode())
             return true;
+        args->preservesTlsReg_ = true;
         return args->regArgs_.append(MAsmJSCall::Arg(AnyRegister(WasmTlsReg), tlsPointer_));
     }
 
@@ -884,8 +888,9 @@ class FunctionCompiler
           case MAsmJSCall::Callee::Builtin:  kind = CallSiteDesc::Register; break;
         }
 
-        MAsmJSCall* ins = MAsmJSCall::New(alloc(), CallSiteDesc(args.lineOrBytecode_, kind),
-                                          callee, args.regArgs_, ToMIRType(ret), args.spIncrement_);
+        MAsmJSCall* ins =
+          MAsmJSCall::New(alloc(), CallSiteDesc(args.lineOrBytecode_, kind), callee, args.regArgs_,
+                          ToMIRType(ret), args.spIncrement_, args.preservesTlsReg_);
         if (!ins)
             return false;
 
