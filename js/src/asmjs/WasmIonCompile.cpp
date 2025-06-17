@@ -2868,9 +2868,9 @@ EmitExpr(FunctionCompiler& f)
         return EmitGetLocal(f);
       case Expr::SetLocal:
         return EmitSetLocal(f);
-      case Expr::LoadGlobal:
+      case Expr::GetGlobal:
         return EmitGetGlobal(f);
-      case Expr::StoreGlobal:
+      case Expr::SetGlobal:
         return EmitSetGlobal(f);
 
       // Select
