@@ -1358,7 +1358,8 @@ class MacroAssembler : public MacroAssemblerSpecific
         loadPtr(AbsoluteAddress(GetJitContext()->runtime->addressOfActivation()), dest);
     }
     void loadWasmActivation(Register dest) {
-        loadWasmGlobalPtr(wasm::ActivationGlobalDataOffset, dest);
+        loadWasmGlobalPtr(wasm::ContextPtrGlobalDataOffset, dest);
+        loadPtr(Address(dest, JSContext::offsetOfWasmActivation()), dest);
     }
 
     template<typename T>
