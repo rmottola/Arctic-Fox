@@ -1293,7 +1293,6 @@ DecodeFunctionBody(Decoder& d, ModuleGenerator& mg, uint32_t funcIndex)
 static bool
 DecodeStartSection(Decoder& d, ModuleGenerator& mg)
 {
-
     uint32_t sectionStart, sectionSize;
     if (!d.startSection(StartSectionId, &sectionStart, &sectionSize))
         return Fail(d, "failed to start section");
@@ -1367,7 +1366,7 @@ DecodeElemSection(Decoder& d, bool newFormat, Uint32Vector&& oldElems, ModuleGen
             return true;
         }
 
-        return mg.addElemSegment(ElemSegment(0, 0, Move(oldElems)));
+        return mg.addElemSegment(ElemSegment(0, InitExpr(Val(uint32_t(0))), Move(oldElems)));
     }
 
     uint32_t sectionStart, sectionSize;
@@ -1391,17 +1390,10 @@ DecodeElemSection(Decoder& d, bool newFormat, Uint32Vector&& oldElems, ModuleGen
         if (seg.tableIndex >= mg.tables().length())
             return Fail(d, "table index out of range");
 
-        Expr expr;
-        if (!d.readExpr(&expr))
-            return Fail(d, "failed to read initializer expression");
+        if (!DecodeInitializerExpression(d, mg.globals(), ValType::I32, &seg.offset))
+            return false;
 
-        if (expr != Expr::I32Const)
-            return Fail(d, "expected i32.const initializer expression");
-
-        if (!d.readVarU32(&seg.offset))
-            return Fail(d, "expected elem segment destination offset");
-
-        if (seg.offset < prevEnd)
+        if (seg.offset.isVal() && seg.offset.val().i32() < prevEnd)
             return Fail(d, "elem segments must be disjoint and ordered");
 
         uint32_t numElems;
@@ -1409,8 +1401,11 @@ DecodeElemSection(Decoder& d, bool newFormat, Uint32Vector&& oldElems, ModuleGen
             return Fail(d, "expected segment size");
 
         uint32_t tableLength = mg.tables()[seg.tableIndex].initial;
-        if (seg.offset > tableLength || tableLength - seg.offset < numElems)
-            return Fail(d, "element segment does not fit");
+        if (seg.offset.isVal()) {
+            uint32_t offset = seg.offset.val().i32();
+            if (offset > tableLength || tableLength - offset < numElems)
+                return Fail(d, "element segment does not fit");
+        }
 
         if (!seg.elems.resize(numElems))
             return false;
@@ -1422,7 +1417,8 @@ DecodeElemSection(Decoder& d, bool newFormat, Uint32Vector&& oldElems, ModuleGen
                 return Fail(d, "table element out of range");
         }
 
-        prevEnd = seg.offset + seg.elems.length();
+        if (seg.offset.isVal())
+            prevEnd = seg.offset.val().i32() + seg.elems.length();
 
         if (!mg.addElemSegment(Move(seg)))
             return false;
