@@ -72,7 +72,7 @@ class Instance
 
   public:
     Instance(JSContext* cx,
-             Handle<WasmInstanceObject*> object,
+             HandleWasmInstanceObject object,
              UniqueCode code,
              HandleWasmMemoryObject memory,
              SharedTableVector&& tables,
