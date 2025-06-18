@@ -1109,7 +1109,8 @@ WasmTableObject::setImpl(JSContext* cx, const CallArgs& args)
 
         Instance& instance = instanceObj->instance();
         const FuncExport& funcExport = instance.metadata().lookupFuncExport(funcIndex);
-        table.array()[index] = instance.codeSegment().base() + funcExport.tableEntryOffset();
+        const CodeRange& codeRange = instance.metadata().codeRanges[funcExport.codeRangeIndex()];
+        table.array()[index] = instance.codeSegment().base() + codeRange.funcTableEntry();
     } else {
         table.array()[index] = instanceVector[index]->instance().codeSegment().badIndirectCallCode();
     }
