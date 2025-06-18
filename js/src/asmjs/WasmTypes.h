@@ -1040,18 +1040,6 @@ enum ModuleKind
     AsmJS
 };
 
-// FuncImportExit describes the region of wasm global memory allocated for a
-// function import. This is accessed directly from JIT code and mutated by
-// Instance as exits become optimized and deoptimized.
-
-struct FuncImportExit
-{
-    void* code;
-    jit::BaselineScript* baselineScript;
-    GCPtrFunction fun;
-    static_assert(sizeof(GCPtrFunction) == sizeof(void*), "for JIT access");
-};
-
 // ExportArg holds the unboxed operands to the wasm entry trampoline which can
 // be called through an ExportFuncPtr.
 
@@ -1072,7 +1060,7 @@ struct ExportArg
 // to pass the TLS pointer appropriate for the callee module.
 //
 // After the TlsData struct follows the module's declared TLS variables.
-//
+
 struct TlsData
 {
     // Pointer to the JSContext that contains this TLS data.
@@ -1094,6 +1082,19 @@ struct TlsData
 };
 
 typedef int32_t (*ExportFuncPtr)(ExportArg* args, TlsData* tls);
+
+// FuncImportTls describes the region of wasm global memory allocated in the
+// instance's thread-local storage for a function import. This is accessed
+// directly from JIT code and mutated by Instance as exits become optimized and
+// deoptimized.
+
+struct FuncImportTls
+{
+    void* code;
+    jit::BaselineScript* baselineScript;
+    GCPtrFunction fun;
+    static_assert(sizeof(GCPtrFunction) == sizeof(void*), "for JIT access");
+};
 
 // Constants:
 
