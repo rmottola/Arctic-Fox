@@ -934,7 +934,7 @@ class FunctionCompiler
 
         CallSiteDesc desc(call.lineOrBytecode_, CallSiteDesc::Relative);
         MIRType ret = ToMIRType(sig.ret());
-        auto callee = MWasmCall::Callee::internal(funcIndex);
+        auto callee = CalleeDesc::internal(funcIndex);
         auto* ins = MWasmCall::New(alloc(), desc, callee, call.regArgs_, ret, call.spIncrement_);
         if (!ins)
             return false;
@@ -954,7 +954,7 @@ class FunctionCompiler
 
         const SigWithId& sig = mg_.sigs[sigIndex];
 
-        MWasmCall::Callee callee;
+        CalleeDesc callee;
         if (mg_.isAsmJS()) {
             const TableDesc& table = mg_.tables[mg_.asmJSSigToTableIndex[sigIndex]];
             MOZ_ASSERT(sig.id.kind() == SigIdDesc::Kind::None);
@@ -966,13 +966,13 @@ class FunctionCompiler
             curBlock_->add(maskedIndex);
 
             index = maskedIndex;
-            callee = MWasmCall::Callee::asmJSTable(table.globalDataOffset);
+            callee = CalleeDesc::asmJSTable(table);
         } else {
             const TableDesc& table = mg_.tables[0];
             MOZ_ASSERT(sig.id.kind() != SigIdDesc::Kind::None);
             MOZ_ASSERT(mg_.tables.length() == 1);
 
-            callee = MWasmCall::Callee::wasmTable(table.globalDataOffset, table.initial, sig.id);
+            callee = CalleeDesc::wasmTable(table, sig.id);
         }
 
         CallSiteDesc desc(call.lineOrBytecode_, CallSiteDesc::Register);
@@ -999,7 +999,7 @@ class FunctionCompiler
 
         CallSiteDesc desc(call.lineOrBytecode_, CallSiteDesc::Register);
         MIRType ret = ToMIRType(exprRet);
-        auto callee = MWasmCall::Callee::import(globalDataOffset, call.tlsStackOffset_);
+        auto callee = CalleeDesc::import(globalDataOffset, call.tlsStackOffset_);
         auto* ins = MWasmCall::New(alloc(), desc, callee, call.regArgs_, ret, call.spIncrement_);
         if (!ins)
             return false;
@@ -1019,7 +1019,7 @@ class FunctionCompiler
 
         CallSiteDesc desc(call.lineOrBytecode_, CallSiteDesc::Register);
         MIRType ret = ToMIRType(valRet);
-        auto callee = MWasmCall::Callee(builtin);
+        auto callee = CalleeDesc::builtin(builtin);
         auto* ins = MWasmCall::New(alloc(), desc, callee, call.regArgs_, ret, call.spIncrement_);
         if (!ins)
             return false;
