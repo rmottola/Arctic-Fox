@@ -925,8 +925,8 @@ class FunctionCompiler
     }
 
   private:
-    bool callPrivate(MWasmCall::Callee callee, MWasmCall::PreservesTlsReg preservesTlsReg,
-                     const CallCompileState& call, ExprType ret, MDefinition** def)
+    bool callPrivate(MWasmCall::Callee callee, const CallCompileState& call, ExprType ret,
+                     MDefinition** def)
     {
         MOZ_ASSERT(!inDeadCode());
 
@@ -938,9 +938,8 @@ class FunctionCompiler
           case MWasmCall::Callee::Builtin:  kind = CallSiteDesc::Register; break;
         }
 
-        MWasmCall* ins =
-          MWasmCall::New(alloc(), CallSiteDesc(call.lineOrBytecode_, kind), callee, call.regArgs_,
-                          ToMIRType(ret), call.spIncrement_, preservesTlsReg);
+        auto* ins = MWasmCall::New(alloc(), CallSiteDesc(call.lineOrBytecode_, kind), callee,
+                                   call.regArgs_, ToMIRType(ret), call.spIncrement_);
         if (!ins)
             return false;
 
@@ -959,7 +958,7 @@ class FunctionCompiler
         }
 
         auto callee = MWasmCall::Callee::internal(funcIndex);
-        return callPrivate(callee, MWasmCall::PreservesTlsReg::True, call, sig.ret(), def);
+        return callPrivate(callee, call, sig.ret(), def);
     }
 
     bool funcPtrCall(uint32_t sigIndex, uint32_t length, uint32_t globalDataOffset,
@@ -987,8 +986,7 @@ class FunctionCompiler
             callee = MWasmCall::Callee(ptrFun, mg_.sigs[sigIndex].id);
         }
 
-        return callPrivate(callee, MWasmCall::PreservesTlsReg::True, call,
-                           mg_.sigs[sigIndex].ret(), def);
+        return callPrivate(callee, call, mg_.sigs[sigIndex].ret(), def);
     }
 
     bool callImport(unsigned globalDataOffset, const CallCompileState& call, ExprType ret,
@@ -1002,7 +1000,7 @@ class FunctionCompiler
         MOZ_ASSERT(call.tlsStackOffset_ != UINT32_MAX);
 
         auto callee = MWasmCall::Callee::import(globalDataOffset, call.tlsStackOffset_);
-        return callPrivate(callee, MWasmCall::PreservesTlsReg::False, call, ret, def);
+        return callPrivate(callee, call, ret, def);
     }
 
     bool builtinCall(SymbolicAddress builtin, const CallCompileState& call, ValType type,
@@ -1013,8 +1011,7 @@ class FunctionCompiler
             return true;
         }
 
-        return callPrivate(MWasmCall::Callee(builtin), MWasmCall::PreservesTlsReg::False,
-                           call, ToExprType(type), def);
+        return callPrivate(MWasmCall::Callee(builtin), call, ToExprType(type), def);
     }
 
     /*********************************************** Control flow generation */
