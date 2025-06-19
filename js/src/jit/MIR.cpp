@@ -2425,18 +2425,17 @@ MPhi::congruentTo(const MDefinition* ins) const
 }
 
 static inline TemporaryTypeSet*
-MakeMIRTypeSet(MIRType type)
+MakeMIRTypeSet(TempAllocator& alloc, MIRType type)
 {
     MOZ_ASSERT(type != MIRType::Value);
     TypeSet::Type ntype = type == MIRType::Object
                           ? TypeSet::AnyObjectType()
                           : TypeSet::PrimitiveType(ValueTypeFromMIRType(type));
-    LifoAlloc* alloc = GetJitContext()->temp->lifoAlloc();
-    return alloc->new_<TemporaryTypeSet>(alloc, ntype);
+    return alloc.lifoAlloc()->new_<TemporaryTypeSet>(alloc.lifoAlloc(), ntype);
 }
 
 bool
-jit::MergeTypes(MIRType* ptype, TemporaryTypeSet** ptypeSet,
+jit::MergeTypes(TempAllocator& alloc, MIRType* ptype, TemporaryTypeSet** ptypeSet,
                 MIRType newType, TemporaryTypeSet* newTypeSet)
 {
     if (newTypeSet && newTypeSet->empty())
@@ -2446,7 +2445,7 @@ jit::MergeTypes(MIRType* ptype, TemporaryTypeSet** ptypeSet,
             *ptype = MIRType::Double;
         } else if (*ptype != MIRType::Value) {
             if (!*ptypeSet) {
-                *ptypeSet = MakeMIRTypeSet(*ptype);
+                *ptypeSet = MakeMIRTypeSet(alloc, *ptype);
                 if (!*ptypeSet)
                     return false;
             }
@@ -2456,15 +2455,14 @@ jit::MergeTypes(MIRType* ptype, TemporaryTypeSet** ptypeSet,
         }
     }
     if (*ptypeSet) {
-        LifoAlloc* alloc = GetJitContext()->temp->lifoAlloc();
         if (!newTypeSet && newType != MIRType::Value) {
-            newTypeSet = MakeMIRTypeSet(newType);
+            newTypeSet = MakeMIRTypeSet(alloc, newType);
             if (!newTypeSet)
                 return false;
         }
         if (newTypeSet) {
             if (!newTypeSet->isSubset(*ptypeSet)) {
-                *ptypeSet = TypeSet::unionSets(*ptypeSet, newTypeSet, alloc);
+                *ptypeSet = TypeSet::unionSets(*ptypeSet, newTypeSet, alloc.lifoAlloc());
                 if (!*ptypeSet)
                     return false;
             }
@@ -2565,7 +2563,7 @@ CanStoreUnboxedType(TempAllocator& alloc, JSValueType unboxedType, MDefinition* 
 }
 
 bool
-MPhi::specializeType()
+MPhi::specializeType(TempAllocator& alloc)
 {
 #ifdef DEBUG
     MOZ_ASSERT(!specialized_);
@@ -2590,7 +2588,7 @@ MPhi::specializeType()
 
     for (size_t i = start; i < inputs_.length(); i++) {
         MDefinition* def = getOperand(i);
-        if (!MergeTypes(&resultType, &resultTypeSet, def->type(), def->resultTypeSet()))
+        if (!MergeTypes(alloc, &resultType, &resultTypeSet, def->type(), def->resultTypeSet()))
             return false;
     }
 
@@ -2600,7 +2598,7 @@ MPhi::specializeType()
 }
 
 bool
-MPhi::addBackedgeType(MIRType type, TemporaryTypeSet* typeSet)
+MPhi::addBackedgeType(TempAllocator& alloc, MIRType type, TemporaryTypeSet* typeSet)
 {
     MOZ_ASSERT(!specialized_);
 
@@ -2608,7 +2606,7 @@ MPhi::addBackedgeType(MIRType type, TemporaryTypeSet* typeSet)
         MIRType resultType = this->type();
         TemporaryTypeSet* resultTypeSet = this->resultTypeSet();
 
-        if (!MergeTypes(&resultType, &resultTypeSet, type, typeSet))
+        if (!MergeTypes(alloc, &resultType, &resultTypeSet, type, typeSet))
             return false;
 
         setResultType(resultType);
@@ -2645,12 +2643,12 @@ MPhi::typeIncludes(MDefinition* def)
 }
 
 bool
-MPhi::checkForTypeChange(MDefinition* ins, bool* ptypeChange)
+MPhi::checkForTypeChange(TempAllocator& alloc, MDefinition* ins, bool* ptypeChange)
 {
     MIRType resultType = this->type();
     TemporaryTypeSet* resultTypeSet = this->resultTypeSet();
 
-    if (!MergeTypes(&resultType, &resultTypeSet, ins->type(), ins->resultTypeSet()))
+    if (!MergeTypes(alloc, &resultType, &resultTypeSet, ins->type(), ins->resultTypeSet()))
         return false;
 
     if (resultType != this->type() || resultTypeSet != this->resultTypeSet()) {
