@@ -103,7 +103,7 @@ class CallCompileState
       : lineOrBytecode_(lineOrBytecode),
         maxChildStackBytes_(0),
         spIncrement_(0),
-        tlsStackOffset_(UINT32_MAX),
+        tlsStackOffset_(MWasmCall::DontSaveTls),
         childClobbers_(false)
     { }
 };
@@ -935,7 +935,8 @@ class FunctionCompiler
         CallSiteDesc desc(call.lineOrBytecode_, CallSiteDesc::Relative);
         MIRType ret = ToMIRType(sig.ret());
         auto callee = CalleeDesc::internal(funcIndex);
-        auto* ins = MWasmCall::New(alloc(), desc, callee, call.regArgs_, ret, call.spIncrement_);
+        auto* ins = MWasmCall::New(alloc(), desc, callee, call.regArgs_, ret,
+                                   call.spIncrement_, MWasmCall::DontSaveTls);
         if (!ins)
             return false;
 
@@ -956,8 +957,8 @@ class FunctionCompiler
 
         CalleeDesc callee;
         if (mg_.isAsmJS()) {
-            const TableDesc& table = mg_.tables[mg_.asmJSSigToTableIndex[sigIndex]];
             MOZ_ASSERT(sig.id.kind() == SigIdDesc::Kind::None);
+            const TableDesc& table = mg_.tables[mg_.asmJSSigToTableIndex[sigIndex]];
             MOZ_ASSERT(IsPowerOfTwo(table.initial));
 
             MConstant* mask = MConstant::New(alloc(), Int32Value(table.initial - 1));
@@ -968,16 +969,16 @@ class FunctionCompiler
             index = maskedIndex;
             callee = CalleeDesc::asmJSTable(table);
         } else {
-            const TableDesc& table = mg_.tables[0];
             MOZ_ASSERT(sig.id.kind() != SigIdDesc::Kind::None);
             MOZ_ASSERT(mg_.tables.length() == 1);
+            const TableDesc& table = mg_.tables[0];
 
             callee = CalleeDesc::wasmTable(table, sig.id);
         }
 
         CallSiteDesc desc(call.lineOrBytecode_, CallSiteDesc::Register);
-        MIRType ret = ToMIRType(sig.ret());
-        auto* ins = MWasmCall::New(alloc(), desc, callee, call.regArgs_, ret, call.spIncrement_, index);
+        auto* ins = MWasmCall::New(alloc(), desc, callee, call.regArgs_, ToMIRType(sig.ret()),
+                                   call.spIncrement_, MWasmCall::DontSaveTls, index);
         if (!ins)
             return false;
 
@@ -986,7 +987,7 @@ class FunctionCompiler
         return true;
     }
 
-    bool callImport(unsigned globalDataOffset, const CallCompileState& call, ExprType exprRet,
+    bool callImport(unsigned globalDataOffset, const CallCompileState& call, ExprType ret,
                     MDefinition** def)
     {
         if (inDeadCode()) {
@@ -994,13 +995,12 @@ class FunctionCompiler
             return true;
         }
 
-        MOZ_ASSERT(call.tlsStackOffset_ != UINT32_MAX);
-
+        MOZ_ASSERT(call.tlsStackOffset_ != MWasmCall::DontSaveTls);
 
         CallSiteDesc desc(call.lineOrBytecode_, CallSiteDesc::Register);
-        MIRType ret = ToMIRType(exprRet);
-        auto callee = CalleeDesc::import(globalDataOffset, call.tlsStackOffset_);
-        auto* ins = MWasmCall::New(alloc(), desc, callee, call.regArgs_, ret, call.spIncrement_);
+        auto callee = CalleeDesc::import(globalDataOffset);
+        auto* ins = MWasmCall::New(alloc(), desc, callee, call.regArgs_, ToMIRType(ret),
+                                   call.spIncrement_, call.tlsStackOffset_);
         if (!ins)
             return false;
 
@@ -1009,7 +1009,7 @@ class FunctionCompiler
         return true;
     }
 
-    bool builtinCall(SymbolicAddress builtin, const CallCompileState& call, ValType valRet,
+    bool builtinCall(SymbolicAddress builtin, const CallCompileState& call, ValType ret,
                      MDefinition** def)
     {
         if (inDeadCode()) {
@@ -1018,9 +1018,9 @@ class FunctionCompiler
         }
 
         CallSiteDesc desc(call.lineOrBytecode_, CallSiteDesc::Register);
-        MIRType ret = ToMIRType(valRet);
         auto callee = CalleeDesc::builtin(builtin);
-        auto* ins = MWasmCall::New(alloc(), desc, callee, call.regArgs_, ret, call.spIncrement_);
+        auto* ins = MWasmCall::New(alloc(), desc, callee, call.regArgs_, ToMIRType(ret),
+                                   call.spIncrement_, MWasmCall::DontSaveTls);
         if (!ins)
             return false;
 
