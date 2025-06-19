@@ -11248,23 +11248,6 @@ CodeGenerator::visitAsmJSVoidReturn(LAsmJSVoidReturn* lir)
 }
 
 void
-CodeGenerator::visitAsmJSLoadFuncPtr(LAsmJSLoadFuncPtr* ins)
-{
-    const MAsmJSLoadFuncPtr* mir = ins->mir();
-
-    Register index = ToRegister(ins->index());
-    Register out = ToRegister(ins->output());
-
-    if (mir->hasLimit()) {
-        masm.branch32(Assembler::Condition::AboveOrEqual, index, Imm32(mir->limit()),
-                      wasm::JumpTarget::OutOfBounds);
-    }
-
-    masm.loadWasmGlobalPtr(mir->globalDataOffset(), out);
-    masm.loadPtr(BaseIndex(out, index, ScalePointer), out);
-}
-
-void
 CodeGenerator::emitAssertRangeI(const Range* r, Register input)
 {
     // Check the lower bound.
