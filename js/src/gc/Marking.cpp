@@ -357,8 +357,8 @@ static void
 AssertRootMarkingPhase(JSTracer* trc)
 {
     MOZ_ASSERT_IF(trc->isMarkingTracer(),
-                  trc->runtime()->gc.state() == NO_INCREMENTAL ||
-                  trc->runtime()->gc.state() == MARK_ROOTS);
+                  trc->runtime()->gc.state() == State::NotActive ||
+                  trc->runtime()->gc.state() == State::MarkRoots);
 }
 
 
@@ -1964,7 +1964,7 @@ bool
 GCMarker::markDelayedChildren(SliceBudget& budget)
 {
     GCRuntime& gc = runtime()->gc;
-    gcstats::AutoPhase ap(gc.stats, gc.state() == MARK, gcstats::PHASE_MARK_DELAYED);
+    gcstats::AutoPhase ap(gc.stats, gc.state() == State::Mark, gcstats::PHASE_MARK_DELAYED);
 
     MOZ_ASSERT(unmarkedArenaStackTop);
     do {
@@ -2458,7 +2458,7 @@ CheckIsMarkedThing(T* thingp)
     JSRuntime* rt = (*thingp)->runtimeFromAnyThread();
     MOZ_ASSERT_IF(!ThingIsPermanentAtomOrWellKnownSymbol(*thingp),
                   CurrentThreadCanAccessRuntime(rt) ||
-                  (rt->isHeapCollecting() && rt->gc.state() == SWEEP));
+                  (rt->isHeapCollecting() && rt->gc.state() == State::Sweep));
 #endif
 }
 
