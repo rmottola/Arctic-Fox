@@ -1393,6 +1393,7 @@ var BookmarkingUI = {
                                  "menuitem");
       item.setAttribute("label", title || uri);
       item.setAttribute("targetURI", uri);
+      item.setAttribute("simulated-places-node", true);
       item.setAttribute("class", "menuitem-iconic menuitem-with-favicon bookmark-item " +
                                  extraCSSClass);
       item.addEventListener("command", onItemCommand);
@@ -1400,6 +1401,7 @@ var BookmarkingUI = {
         let iconURL = "moz-anno:favicon:" + icon;
         item.setAttribute("image", iconURL);
       }
+      item._placesNode = node;
       fragment.appendChild(item);
     }
     root.containerOpen = false;
