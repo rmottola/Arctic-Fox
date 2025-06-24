@@ -160,8 +160,8 @@ nsURLFormatterService.prototype = {
 
   trimSensitiveURLs: function uf_trimSensitiveURLs(aMsg) {
     // Only the google API key is sensitive for now.
-    return "@MOZ_GOOGLE_API_KEY@" ? aMsg.replace("@MOZ_GOOGLE_API_KEY@",
-                                                 "[trimmed-google-api-key]", "g")
+    return "@MOZ_GOOGLE_API_KEY@" ? aMsg.replace(/@MOZ_GOOGLE_API_KEY@/g,
+                                                 "[trimmed-google-api-key]")
                                   : aMsg;
   }
 };
