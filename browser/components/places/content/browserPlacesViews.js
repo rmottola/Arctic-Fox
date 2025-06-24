@@ -1621,6 +1621,7 @@ PlacesToolbar.prototype = {
       // Dragging over a normal toolbarbutton,
       // show indicator bar and move it to the appropriate drop point.
       let ind = this._dropIndicator;
+      ind.parentNode.collapsed = false;
       let halfInd = ind.clientWidth / 2;
       let translateX;
       if (this.isRTL) {
@@ -1650,7 +1651,7 @@ PlacesToolbar.prototype = {
       }
 
       ind.style.transform = "translate(" + Math.round(translateX) + "px)";
-      ind.style.MozMarginStart = (-ind.clientWidth) + "px";
+      ind.style.marginInlineStart = (-ind.clientWidth) + "px";
       ind.collapsed = false;
 
       // Clear out old folder information.

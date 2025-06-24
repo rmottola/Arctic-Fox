@@ -907,7 +907,7 @@
                          mousethrough="never"
                          label="&bookmarksToolbarItem.label;"/>
           <hbox flex="1">
-            <hbox align="center">
+            <hbox id="PlacesToolbarDropIndicatorHolder" align="center" collapsed="true">
               <image id="PlacesToolbarDropIndicator"
                      mousethrough="always"
                      collapsed="true"/>
