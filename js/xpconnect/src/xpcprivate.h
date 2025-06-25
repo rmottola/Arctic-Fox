@@ -1307,6 +1307,8 @@ public:
     XPCNativeInterface* GetAddition() const {return mAddition;}
     uint16_t GetPosition() const {return mPosition;}
 
+    PLDHashNumber Hash() const;
+
     // Allow shallow copy
 
 private:
