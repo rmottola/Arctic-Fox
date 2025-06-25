@@ -750,8 +750,8 @@ public:
 private:
 
     // no copy ctor or assignment allowed
-    XPCCallContext(const XPCCallContext& r); // not implemented
-    XPCCallContext& operator= (const XPCCallContext& r); // not implemented
+    XPCCallContext(const XPCCallContext& r) = delete;
+    XPCCallContext& operator= (const XPCCallContext& r) = delete;
 
 private:
     // posible values for mState
@@ -1040,7 +1040,7 @@ public:
 protected:
     virtual ~XPCWrappedNativeScope();
 
-    XPCWrappedNativeScope(); // not implemented
+    XPCWrappedNativeScope() = delete;
 
 private:
     class ClearInterpositionsObserver final : public nsIObserver {
@@ -1268,7 +1268,7 @@ class XPCNativeInterface final
   protected:
     static XPCNativeInterface* NewInstance(nsIInterfaceInfo* aInfo);
 
-    XPCNativeInterface();   // not implemented
+    XPCNativeInterface() = delete;
     XPCNativeInterface(nsIInterfaceInfo* aInfo, jsid aName)
       : mInfo(aInfo), mName(aName), mMemberCount(0), mMarked(0)
     {
@@ -1280,8 +1280,8 @@ class XPCNativeInterface final
 
     void* operator new(size_t, void* p) CPP_THROW_NEW {return p;}
 
-    XPCNativeInterface(const XPCNativeInterface& r); // not implemented
-    XPCNativeInterface& operator= (const XPCNativeInterface& r); // not implemented
+    XPCNativeInterface(const XPCNativeInterface& r) = delete;
+    XPCNativeInterface& operator= (const XPCNativeInterface& r) = delete;
 
 private:
     nsCOMPtr<nsIInterfaceInfo> mInfo;
@@ -1609,8 +1609,8 @@ public:
 private:
 
     // disable copy ctor and assignment
-    XPCNativeScriptableInfo(const XPCNativeScriptableInfo& r); // not implemented
-    XPCNativeScriptableInfo& operator= (const XPCNativeScriptableInfo& r); // not implemented
+    XPCNativeScriptableInfo(const XPCNativeScriptableInfo& r) = delete;
+    XPCNativeScriptableInfo& operator= (const XPCNativeScriptableInfo& r) = delete;
 
 private:
     nsCOMPtr<nsIXPCScriptable>  mCallback;
@@ -1756,8 +1756,8 @@ public:
 
 protected:
     // disable copy ctor and assignment
-    XPCWrappedNativeProto(const XPCWrappedNativeProto& r); // not implemented
-    XPCWrappedNativeProto& operator= (const XPCWrappedNativeProto& r); // not implemented
+    XPCWrappedNativeProto(const XPCWrappedNativeProto& r) = delete;
+    XPCWrappedNativeProto& operator= (const XPCWrappedNativeProto& r) = delete;
 
     // hide ctor
     XPCWrappedNativeProto(XPCWrappedNativeScope* Scope,
@@ -2068,7 +2068,7 @@ public:
 
     // Make ctor and dtor protected (rather than private) to placate nsCOMPtr.
 protected:
-    XPCWrappedNative(); // not implemented
+    XPCWrappedNative() = delete;
 
     // This ctor is used if this object will have a proto.
     XPCWrappedNative(already_AddRefed<nsISupports>&& aIdentity,
@@ -2198,7 +2198,7 @@ private:
                                       nsIException* aSyntheticException = nullptr);
     virtual ~nsXPCWrappedJSClass();
 
-    nsXPCWrappedJSClass();   // not implemented
+    nsXPCWrappedJSClass() = delete;
     nsXPCWrappedJSClass(JSContext* cx, REFNSIID aIID,
                         nsIInterfaceInfo* aInfo);
 
@@ -2379,7 +2379,7 @@ public:
 private:
     virtual ~XPCJSObjectHolder();
 
-    XPCJSObjectHolder(); // not implemented
+    XPCJSObjectHolder() = delete;
 
     JS::Heap<JSObject*> mJSObj;
 };
@@ -2522,7 +2522,7 @@ public:
                                        JS::Value* jsExceptionPtr);
 
 private:
-    XPCConvert(); // not implemented
+    XPCConvert() = delete;
 
 };
 
@@ -2629,7 +2629,7 @@ public:
     static already_AddRefed<nsJSIID> NewID(nsIInterfaceInfo* aInfo);
 
     explicit nsJSIID(nsIInterfaceInfo* aInfo);
-    nsJSIID(); // not implemented
+    nsJSIID() = delete;
 
 private:
     virtual ~nsJSIID();
