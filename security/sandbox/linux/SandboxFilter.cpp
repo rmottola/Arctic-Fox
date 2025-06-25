@@ -559,6 +559,7 @@ public:
     case __NR_writev:
     case __NR_pread64:
 #ifdef DESKTOP
+    case __NR_pwrite64:
     case __NR_readahead:
 #endif
       return Allow();
