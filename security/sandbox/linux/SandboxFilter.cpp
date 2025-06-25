@@ -450,6 +450,7 @@ public:
     case SYS_SEND:
     case SYS_SOCKET: // DANGEROUS
     case SYS_CONNECT: // DANGEROUS
+    case SYS_ACCEPT:
     case SYS_SETSOCKOPT:
     case SYS_GETSOCKNAME:
     case SYS_GETPEERNAME:
