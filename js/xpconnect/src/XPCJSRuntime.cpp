@@ -1461,7 +1461,7 @@ XPCJSRuntime::InterruptCallback(JSContext* cx)
     // Show the prompt to the user, and kill if requested.
     nsGlobalWindow::SlowScriptResponse response = win->ShowSlowScriptDialog();
     if (response == nsGlobalWindow::KillSlowScript) {
-        if (Preferences::GetBool("dom.global_stop_unresponsive_script", true))
+        if (Preferences::GetBool("dom.global_stop_script", true))
             xpc::Scriptability::Get(global).Block();
         return false;
     }
