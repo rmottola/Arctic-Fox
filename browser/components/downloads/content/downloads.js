@@ -1013,6 +1013,8 @@ const DownloadsView = {
   },
 }
 
+XPCOMUtils.defineConstant(this, "DownloadsView", DownloadsView);
+
 ////////////////////////////////////////////////////////////////////////////////
 //// DownloadsViewItem
 
