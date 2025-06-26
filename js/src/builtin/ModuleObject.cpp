@@ -1167,15 +1167,6 @@ ModuleBuilder::processExport(frontend::ParseNode* pn)
         }
         break;
 
-      case PNK_FUNCTION: {
-          RootedFunction func(cx_, kid->pn_funbox->function());
-          RootedAtom localName(cx_, func->name());
-          RootedAtom exportName(cx_, isDefault ? cx_->names().default_ : localName.get());
-          if (!appendExportEntry(exportName, localName))
-              return false;
-          break;
-      }
-
       case PNK_CLASS: {
           const ClassNode& cls = kid->as<ClassNode>();
           MOZ_ASSERT(cls.names());
@@ -1201,6 +1192,20 @@ ModuleBuilder::processExport(frontend::ParseNode* pn)
           }
           break;
       }
+
+      case PNK_FUNCTION: {
+          RootedFunction func(cx_, kid->pn_funbox->function());
+          if (!func->isArrow()) {
+              RootedAtom localName(cx_, func->name());
+              RootedAtom exportName(cx_, isDefault ? cx_->names().default_ : localName.get());
+              MOZ_ASSERT_IF(isDefault, localName);
+              if (!appendExportEntry(exportName, localName))
+                  return false;
+              break;
+          }
+      }
+
+      MOZ_FALLTHROUGH; // Arrow functions are handled below.
 
       default:
         MOZ_ASSERT(isDefault);
