@@ -2830,11 +2830,11 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
             constructorProto = "nullptr"
 
         isGlobal = self.descriptor.isGlobal() is not None
-        if not isGlobal and self.properties.hasNonChromeOnly():
+        if self.properties.hasNonChromeOnly():
             properties = "sNativeProperties.Upcast()"
         else:
             properties = "nullptr"
-        if not isGlobal and self.properties.hasChromeOnly():
+        if self.properties.hasChromeOnly():
             chromeProperties = "nsContentUtils::ThreadsafeIsCallerChrome() ? sChromeOnlyNativeProperties.Upcast() : nullptr"
         else:
             chromeProperties = "nullptr"
@@ -2850,7 +2850,8 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
                                         ${properties},
                                         ${chromeProperties},
                                         ${name}, aDefineOnGlobal,
-                                        ${unscopableNames});
+                                        ${unscopableNames},
+                                        ${isGlobal});
             """,
             protoClass=protoClass,
             parentProto=parentProto,
@@ -2864,7 +2865,8 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
             properties=properties,
             chromeProperties=chromeProperties,
             name='"' + self.descriptor.interface.identifier.name + '"' if needInterfaceObject else "nullptr",
-            unscopableNames="unscopableNames" if self.haveUnscopables else "nullptr")
+            unscopableNames="unscopableNames" if self.haveUnscopables else "nullptr",
+            isGlobal=toStringBool(isGlobal))
 
         # If we fail after here, we must clear interface and prototype caches
         # using this code: intermediate failure must not expose the interface in
