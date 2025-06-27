@@ -1497,11 +1497,9 @@ Simulator::exclusiveMonitorClear()
 }
 
 int
-Simulator::readW(int32_t addr, SimInstruction* instr)
+Simulator::readW(int32_t addr, SimInstruction* instr, UnalignedPolicy f)
 {
-    // The regexp engine emits unaligned loads, so we don't check for them here
-    // like most of the other methods do.
-    if ((addr & 3) == 0 || !HasAlignmentFault()) {
+    if ((addr & 3) == 0 || (f == AllowUnaligned && !HasAlignmentFault())) {
         intptr_t* ptr = reinterpret_cast<intptr_t*>(addr);
         return *ptr;
     }
@@ -1522,9 +1520,9 @@ Simulator::readW(int32_t addr, SimInstruction* instr)
 }
 
 void
-Simulator::writeW(int32_t addr, int value, SimInstruction* instr)
+Simulator::writeW(int32_t addr, int value, SimInstruction* instr, UnalignedPolicy f)
 {
-    if ((addr & 3) == 0 || !HasAlignmentFault()) {
+    if ((addr & 3) == 0 || (f == AllowUnaligned && !HasAlignmentFault())) {
         intptr_t* ptr = reinterpret_cast<intptr_t*>(addr);
         *ptr = value;
         return;
@@ -1587,10 +1585,10 @@ Simulator::writeExW(int32_t addr, int value, SimInstruction* instr)
             return 1;
         int32_t old = compareExchangeRelaxed(ptr, expected, int32_t(value));
         return old != expected;
-    } else {
-        printf("Unaligned write at 0x%08x, pc=%p\n", addr, instr);
-        MOZ_CRASH();
     }
+
+    printf("Unaligned write at 0x%08x, pc=%p\n", addr, instr);
+    MOZ_CRASH();
 }
 
 uint16_t
@@ -1602,6 +1600,15 @@ Simulator::readHU(int32_t addr, SimInstruction* instr)
         uint16_t* ptr = reinterpret_cast<uint16_t*>(addr);
         return *ptr;
     }
+
+    // See comments in readW.
+    if (wasm::IsPCInWasmCode(reinterpret_cast<void *>(get_pc()))) {
+        char* ptr = reinterpret_cast<char*>(addr);
+        uint16_t value;
+        memcpy(&value, ptr, sizeof(value));
+        return value;
+    }
+
     printf("Unaligned unsigned halfword read at 0x%08x, pc=%p\n", addr, instr);
     MOZ_CRASH();
     return 0;
@@ -1614,6 +1621,15 @@ Simulator::readH(int32_t addr, SimInstruction* instr)
         int16_t* ptr = reinterpret_cast<int16_t*>(addr);
         return *ptr;
     }
+
+    // See comments in readW.
+    if (wasm::IsPCInWasmCode(reinterpret_cast<void *>(get_pc()))) {
+        char* ptr = reinterpret_cast<char*>(addr);
+        int16_t value;
+        memcpy(&value, ptr, sizeof(value));
+        return value;
+    }
+
     printf("Unaligned signed halfword read at 0x%08x\n", addr);
     MOZ_CRASH();
     return 0;
@@ -1625,10 +1641,18 @@ Simulator::writeH(int32_t addr, uint16_t value, SimInstruction* instr)
     if ((addr & 1) == 0 || !HasAlignmentFault()) {
         uint16_t* ptr = reinterpret_cast<uint16_t*>(addr);
         *ptr = value;
-    } else {
-        printf("Unaligned unsigned halfword write at 0x%08x, pc=%p\n", addr, instr);
-        MOZ_CRASH();
+        return;
     }
+
+    // See the comments above in readW.
+    if (wasm::IsPCInWasmCode(reinterpret_cast<void *>(get_pc()))) {
+        char* ptr = reinterpret_cast<char*>(addr);
+        memcpy(ptr, &value, sizeof(value));
+        return;
+    }
+
+    printf("Unaligned unsigned halfword write at 0x%08x, pc=%p\n", addr, instr);
+    MOZ_CRASH();
 }
 
 void
@@ -1637,10 +1661,18 @@ Simulator::writeH(int32_t addr, int16_t value, SimInstruction* instr)
     if ((addr & 1) == 0 || !HasAlignmentFault()) {
         int16_t* ptr = reinterpret_cast<int16_t*>(addr);
         *ptr = value;
-    } else {
-        printf("Unaligned halfword write at 0x%08x, pc=%p\n", addr, instr);
-        MOZ_CRASH();
+        return;
     }
+
+    // See the comments above in readW.
+    if (wasm::IsPCInWasmCode(reinterpret_cast<void *>(get_pc()))) {
+        char* ptr = reinterpret_cast<char*>(addr);
+        memcpy(ptr, &value, sizeof(value));
+        return;
+    }
+
+    printf("Unaligned halfword write at 0x%08x, pc=%p\n", addr, instr);
+    MOZ_CRASH();
 }
 
 uint16_t
@@ -3227,9 +3259,9 @@ Simulator::decodeType2(SimInstruction* instr)
         }
     } else {
         if (instr->hasL())
-            set_register(rd, readW(addr, instr));
+            set_register(rd, readW(addr, instr, AllowUnaligned));
         else
-            writeW(addr, get_register(rd), instr);
+            writeW(addr, get_register(rd), instr, AllowUnaligned);
     }
 }
 
@@ -3494,9 +3526,9 @@ Simulator::decodeType3(SimInstruction* instr)
         }
     } else {
         if (instr->hasL())
-            set_register(rd, readW(addr, instr));
+            set_register(rd, readW(addr, instr, AllowUnaligned));
         else
-            writeW(addr, get_register(rd), instr);
+            writeW(addr, get_register(rd), instr, AllowUnaligned);
     }
 }
 
@@ -4378,8 +4410,10 @@ Simulator::decodeSpecialCondition(SimInstruction* instr)
             while (r < regs) {
                 uint32_t data[2];
                 get_d_register(Vd + r, data);
-                writeW(address, data[0], instr);
-                writeW(address + 4, data[1], instr);
+                // TODO: We should AllowUnaligned here only if the alignment attribute of
+                // the instruction calls for default alignment.
+                writeW(address, data[0], instr, AllowUnaligned);
+                writeW(address + 4, data[1], instr, AllowUnaligned);
                 address += 8;
                 r++;
             }
@@ -4417,8 +4451,10 @@ Simulator::decodeSpecialCondition(SimInstruction* instr)
             int r = 0;
             while (r < regs) {
                 uint32_t data[2];
-                data[0] = readW(address, instr);
-                data[1] = readW(address + 4, instr);
+                // TODO: We should AllowUnaligned here only if the alignment attribute of
+                // the instruction calls for default alignment.
+                data[0] = readW(address, instr, AllowUnaligned);
+                data[1] = readW(address + 4, instr, AllowUnaligned);
                 set_d_register(Vd + r, data);
                 address += 8;
                 r++;
