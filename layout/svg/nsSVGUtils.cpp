@@ -1334,7 +1334,7 @@ SetupInheritablePaint(const DrawTarget* aDrawTarget,
 {
   const nsStyleSVG *style = aFrame->StyleSVG();
   nsSVGPaintServerFrame *ps =
-    nsSVGEffects::GetPaintServer(aFrame, &(style->*aFillOrStroke), aProperty);
+    nsSVGEffects::GetPaintServer(aFrame, aFillOrStroke, aProperty);
 
   if (ps) {
     RefPtr<gfxPattern> pattern =
@@ -1445,7 +1445,7 @@ nsSVGUtils::MakeFillPatternFor(nsIFrame* aFrame,
   const DrawTarget* dt = aContext->GetDrawTarget();
 
   nsSVGPaintServerFrame *ps =
-    nsSVGEffects::GetPaintServer(aFrame, &style->mFill,
+    nsSVGEffects::GetPaintServer(aFrame, &nsStyleSVG::mFill,
                                  nsSVGEffects::FillProperty());
   if (ps) {
     RefPtr<gfxPattern> pattern =
@@ -1513,7 +1513,7 @@ nsSVGUtils::MakeStrokePatternFor(nsIFrame* aFrame,
   const DrawTarget* dt = aContext->GetDrawTarget();
 
   nsSVGPaintServerFrame *ps =
-    nsSVGEffects::GetPaintServer(aFrame, &style->mStroke,
+    nsSVGEffects::GetPaintServer(aFrame, &nsStyleSVG::mStroke,
                                  nsSVGEffects::StrokeProperty());
   if (ps) {
     RefPtr<gfxPattern> pattern =

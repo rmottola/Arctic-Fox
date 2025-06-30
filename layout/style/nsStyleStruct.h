@@ -3277,7 +3277,7 @@ struct nsStyleSVGPaint
 {
   union {
     nscolor mColor;
-    nsIURI *mPaintServer;
+    FragmentOrURL* mPaintServer;
   } mPaint;
   nsStyleSVGPaintType mType;
   nscolor mFallbackColor;
