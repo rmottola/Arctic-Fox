@@ -472,6 +472,7 @@ Factory::DoesBackendSupportDataDrawtarget(BackendType aType)
   case BackendType::RECORDING:
   case BackendType::NONE:
   case BackendType::COREGRAPHICS_ACCELERATED:
+  case BackendType::BACKEND_LAST:
     return false;
   case BackendType::CAIRO:
   case BackendType::COREGRAPHICS:
