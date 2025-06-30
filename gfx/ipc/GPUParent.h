@@ -34,6 +34,7 @@ public:
   bool RecvNewWidgetCompositor(
     Endpoint<PCompositorBridgeParent>&& aEndpoint,
     const CSSToLayoutDeviceScale& aScale,
+    const TimeDuration& aVsyncRate,
     const bool& aUseExternalSurface,
     const IntSize& aSurfaceSize) override;
   bool RecvNewContentCompositorBridge(Endpoint<PCompositorBridgeParent>&& aEndpoint) override;
