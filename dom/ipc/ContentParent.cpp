@@ -73,6 +73,7 @@
 #include "mozilla/dom/time/DateCacheCleaner.h"
 #include "mozilla/dom/voicemail/VoicemailParent.h"
 #include "mozilla/embedding/printingui/PrintingParent.h"
+#include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/hal_sandbox/PHalParent.h"
 #include "mozilla/ipc/BackgroundChild.h"
@@ -1848,6 +1849,7 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
 
   // remove the global remote preferences observers
   Preferences::RemoveObserver(this, "");
+  gfxVars::RemoveReceiver(this);
 
   RecvRemoveGeolocationListener();
 
@@ -2378,6 +2380,29 @@ ContentParent::RecvReadPrefsArray(InfallibleTArray<PrefSetting>* aPrefs)
 {
   Preferences::GetPreferences(aPrefs);
   return true;
+}
+
+bool
+ContentParent::RecvGetGfxVars(InfallibleTArray<GfxVarUpdate>* aVars)
+{
+  // Ensure gfxVars is initialized (for xpcshell tests).
+  gfxVars::Initialize();
+
+  *aVars = gfxVars::FetchNonDefaultVars();
+
+  // Now that content has initialized gfxVars, we can start listening for
+  // updates.
+  gfxVars::AddReceiver(this);
+  return true;
+}
+
+void
+ContentParent::OnVarChanged(const GfxVarUpdate& aVar)
+{
+  if (!mIPCOpen) {
+    return;
+  }
+  Unused << SendVarUpdate(aVar);
 }
 
 bool
