@@ -1120,7 +1120,7 @@ nsStyleClipPath::nsStyleClipPath(const nsStyleClipPath& aSource)
   , mSizingBox(StyleClipShapeSizing::NoBox)
 {
   if (aSource.mType == StyleClipPathType::URL) {
-    SetURL(aSource.mURL);
+    CopyURL(aSource);
   } else if (aSource.mType == StyleClipPathType::Shape) {
     SetBasicShape(aSource.mBasicShape, aSource.mSizingBox);
   } else if (aSource.mType == StyleClipPathType::Box) {
@@ -1141,7 +1141,7 @@ nsStyleClipPath::operator=(const nsStyleClipPath& aOther)
   }
 
   if (aOther.mType == StyleClipPathType::URL) {
-    SetURL(aOther.mURL);
+    CopyURL(aOther);
   } else if (aOther.mType == StyleClipPathType::Shape) {
     SetBasicShape(aOther.mBasicShape, aOther.mSizingBox);
   } else if (aOther.mType == StyleClipPathType::Box) {
@@ -1181,7 +1181,7 @@ nsStyleClipPath::ReleaseRef()
     mBasicShape->Release();
   } else if (mType == StyleClipPathType::URL) {
     NS_ASSERTION(mURL, "expected pointer");
-    mURL->Release();
+    delete mURL;
   }
   // mBasicShap, mURL, etc. are all pointers in a union of pointers. Nulling
   // one of them nulls all of them:
@@ -1189,13 +1189,27 @@ nsStyleClipPath::ReleaseRef()
 }
 
 void
-nsStyleClipPath::SetURL(nsIURI* aURL)
+nsStyleClipPath::CopyURL(const nsStyleClipPath& aOther)
 {
-  NS_ASSERTION(aURL, "expected pointer");
   ReleaseRef();
-  mURL = aURL;
-  mURL->AddRef();
+
+  mURL = new FragmentOrURL(*aOther.mURL);
   mType = StyleClipPathType::URL;
+}
+
+bool
+nsStyleClipPath::SetURL(const nsCSSValue* aValue)
+{
+  if (!aValue->GetURLValue()) {
+    return false;
+  }
+
+  ReleaseRef();
+
+  mURL = new FragmentOrURL();
+  mURL->SetValue(aValue);
+  mType = StyleClipPathType::URL;
+  return true;
 }
 
 void
