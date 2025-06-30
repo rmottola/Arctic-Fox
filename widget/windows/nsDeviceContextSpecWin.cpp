@@ -251,7 +251,7 @@ already_AddRefed<PrintTarget> nsDeviceContextSpecWin::MakePrintTarget()
       return nullptr;
     }
 
-    return PrintTargetPDF::CreateOrNull(stream, IntSize(width, height));
+    return PrintTargetPDF::CreateOrNull(stream, IntSize::Truncate(width, height));
   }
 
   if (mDevMode) {
