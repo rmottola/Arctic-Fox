@@ -20,7 +20,7 @@ namespace image {
 ///////////////////////////////////////////////////////////////////////////////
 
 static void
-NotifyProgress(NotNull<Decoder*> aDecoder)
+NotifyProgress(NotNull<RasterImage*> aImage, NotNull<Decoder*> aDecoder)
 {
   MOZ_ASSERT(aDecoder->HasProgress() && !aDecoder->IsMetadataDecode());
 
@@ -32,33 +32,34 @@ NotifyProgress(NotNull<Decoder*> aDecoder)
   // Synchronously notify if we can.
   if (NS_IsMainThread() &&
       !(aDecoder->GetDecoderFlags() & DecoderFlags::ASYNC_NOTIFY)) {
-    aDecoder->GetImage()->NotifyProgress(progress, invalidRect,
-                                         frameCount, surfaceFlags);
+    aImage->NotifyProgress(progress, invalidRect,
+                           frameCount, surfaceFlags);
     return;
   }
 
   // We're forced to notify asynchronously.
-  NotNull<RefPtr<Decoder>> decoder = aDecoder;
+  NotNull<RefPtr<RasterImage>> image = aImage;
   NS_DispatchToMainThread(NS_NewRunnableFunction([=]() -> void {
-    decoder->GetImage()->NotifyProgress(progress, invalidRect,
-                                        frameCount, surfaceFlags);
+    image->NotifyProgress(progress, invalidRect,
+                          frameCount, surfaceFlags);
   }));
 }
 
 static void
-NotifyDecodeComplete(NotNull<Decoder*> aDecoder)
+NotifyDecodeComplete(NotNull<RasterImage*> aImage, NotNull<Decoder*> aDecoder)
 {
   // Synchronously notify if we can.
   if (NS_IsMainThread() &&
       !(aDecoder->GetDecoderFlags() & DecoderFlags::ASYNC_NOTIFY)) {
-    aDecoder->GetImage()->FinalizeDecoder(aDecoder);
+    aImage->FinalizeDecoder(aDecoder);
     return;
   }
 
   // We're forced to notify asynchronously.
+  NotNull<RefPtr<RasterImage>> image = aImage;
   NotNull<RefPtr<Decoder>> decoder = aDecoder;
   NS_DispatchToMainThread(NS_NewRunnableFunction([=]() -> void {
-    decoder->GetImage()->FinalizeDecoder(decoder.get());
+    image->FinalizeDecoder(decoder.get());
   }));
 }
 
@@ -94,7 +95,7 @@ DecodingTask::Run()
     LexerResult result = mDecoder->Decode(WrapNotNull(this));
 
     if (result.is<TerminalState>()) {
-      NotifyDecodeComplete(mDecoder);
+      NotifyDecodeComplete(mDecoder->GetImage(), mDecoder);
       return;  // We're done.
     }
 
@@ -102,7 +103,7 @@ DecodingTask::Run()
 
     // Notify for the progress we've made so far.
     if (mDecoder->HasProgress()) {
-      NotifyProgress(mDecoder);
+      NotifyProgress(mDecoder->GetImage(), mDecoder);
     }
 
     if (result == LexerResult(Yield::NEED_MORE_DATA)) {
@@ -144,7 +145,7 @@ AnimationDecodingTask::Run()
     LexerResult result = mDecoder->Decode(WrapNotNull(this));
 
     if (result.is<TerminalState>()) {
-      NotifyDecodeComplete(mDecoder);
+      NotifyDecodeComplete(mDecoder->GetImage(), mDecoder);
       return;  // We're done.
     }
 
@@ -152,7 +153,7 @@ AnimationDecodingTask::Run()
 
     // Notify for the progress we've made so far.
     if (mDecoder->HasProgress()) {
-      NotifyProgress(mDecoder);
+      NotifyProgress(mDecoder->GetImage(), mDecoder);
     }
 
     if (result == LexerResult(Yield::NEED_MORE_DATA)) {
@@ -191,7 +192,7 @@ MetadataDecodingTask::Run()
   LexerResult result = mDecoder->Decode(WrapNotNull(this));
 
   if (result.is<TerminalState>()) {
-    NotifyDecodeComplete(mDecoder);
+    NotifyDecodeComplete(mDecoder->GetImage(), mDecoder);
     return;  // We're done.
   }
 
