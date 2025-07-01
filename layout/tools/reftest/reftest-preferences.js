@@ -28,10 +28,6 @@ user_pref("extensions.blocklist.enabled", false);
 user_pref("urlclassifier.updateinterval", 172800);
 // Disable downscale-during-decode, since it makes reftests more difficult.
 user_pref("image.downscale-during-decode.enabled", false);
-// Disable the single-color optimization, since it can cause intermittent
-// oranges and it causes many of our tests to test a different code path
-// than the one that normal images on the web use.
-user_pref("image.single-color-optimization.enabled", false);
 // Checking whether two files are the same is slow on Windows.
 // Setting this pref makes tests run much faster there.
 user_pref("security.fileuri.strict_origin_policy", false);
@@ -116,3 +112,8 @@ user_pref("media.gmp-manager.url.override", "http://localhost/dummy-gmp-manager.
 
 // A fake bool pref for "@supports -moz-bool-pref" sanify test.
 user_pref("testing.supports.moz-bool-pref", true);
+
+// Reftests load a lot of URLs very quickly. This puts avoidable and
+// unnecessary I/O pressure on the Places DB (measured to be in the
+// gigabytes).
+user_pref("places.history.enabled", false);
