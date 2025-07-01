@@ -28,6 +28,7 @@ struct DeviceInitData
 union GfxVarValue
 {
   BackendType;
+  bool;
   IntSize;
 };
 
