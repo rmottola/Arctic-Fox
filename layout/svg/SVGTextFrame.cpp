@@ -3639,7 +3639,8 @@ SVGTextFrame::PaintSVG(gfxContext& aContext,
   TextRenderedRunIterator it(this, TextRenderedRunIterator::eVisibleFrames);
   TextRenderedRun run = it.Current();
 
-  SVGContextPaint* outerContextPaint = nsSVGUtils::GetContextPaint(mContent);
+  SVGContextPaint* outerContextPaint =
+    SVGContextPaint::GetContextPaint(mContent);
 
   nsRenderingContext rendCtx(&aContext);
 
@@ -3655,9 +3656,9 @@ SVGTextFrame::PaintSVG(gfxContext& aContext,
     aContext.SetMatrix(initialMatrix);
 
     SVGContextPaintImpl contextPaint;
-    DrawMode drawMode =
-      nsSVGUtils::SetupContextPaint(&aDrawTarget, aContext.CurrentMatrix(),
-                                    frame, outerContextPaint, &contextPaint);
+    DrawMode drawMode = contextPaint.Init(&aDrawTarget,
+                                          aContext.CurrentMatrix(),
+                                          frame, outerContextPaint);
 
     if (drawMode & DrawMode::GLYPH_STROKE) {
       // This may change the gfxContext's transform (for non-scaling stroke),
