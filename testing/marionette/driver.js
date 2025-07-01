@@ -2702,6 +2702,7 @@ GeckoDriver.prototype.setWindowSize = function(cmd, resp) {
   }
 
   win.resizeTo(width, height);
+  this.getWindowSize(cmd, resp);
 };
 
 /**
