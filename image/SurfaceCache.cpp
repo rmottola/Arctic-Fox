@@ -70,6 +70,8 @@ typedef size_t Cost;
 
 // Placeholders do not have surfaces, but need to be given a trivial cost for
 // our invariants to hold.
+// XXX(seth): This is only true of old-style placeholders inserted via
+// InsertPlaceholder().
 static const Cost sPlaceholderCost = 1;
 
 static Cost
@@ -140,8 +142,8 @@ public:
     , mImageKey(aImageKey)
     , mSurfaceKey(aSurfaceKey)
   {
-    MOZ_ASSERT(!IsPlaceholder() || mCost == sPlaceholderCost,
-               "Placeholder should have trivial cost");
+    MOZ_ASSERT(aProvider || mCost == sPlaceholderCost,
+               "Old-style placeholders should have trivial cost");
     MOZ_ASSERT(mImageKey, "Must have a valid image key");
   }
 
@@ -167,7 +169,11 @@ public:
     mProvider->SetLocked(aLocked);
   }
 
-  bool IsPlaceholder() const { return !mProvider || mProvider->IsPlaceholder(); }
+  bool IsPlaceholder() const
+  {
+    return !mProvider || mProvider->Availability().IsPlaceholder();
+  }
+
   bool IsLocked() const { return !IsPlaceholder() && mProvider->IsLocked(); }
 
   ImageKey GetImageKey() const { return mImageKey; }
@@ -448,7 +454,8 @@ public:
   InsertOutcome Insert(ISurfaceProvider* aProvider,
                        const Cost        aCost,
                        const ImageKey    aImageKey,
-                       const SurfaceKey& aSurfaceKey)
+                       const SurfaceKey& aSurfaceKey,
+                       bool              aSetAvailable)
   {
     // If this is a duplicate surface, refuse to replace the original.
     // XXX(seth): Calling Lookup() and then RemoveEntry() does the lookup
@@ -487,6 +494,11 @@ public:
     if (!cache) {
       cache = new ImageSurfaceCache;
       mImageCaches.Put(aImageKey, cache);
+    }
+
+    // If we were asked to mark the cache entry available, do so.
+    if (aSetAvailable) {
+      aProvider->Availability().SetAvailable();
     }
 
     RefPtr<CachedSurface> surface =
@@ -664,6 +676,25 @@ public:
   size_t MaximumCapacity() const
   {
     return size_t(mMaxCost);
+  }
+
+  void SurfaceAvailable(NotNull<ISurfaceProvider*> aProvider,
+                        const ImageKey             aImageKey,
+                        const SurfaceKey&          aSurfaceKey)
+  {
+    if (!aProvider->Availability().IsPlaceholder()) {
+      MOZ_ASSERT_UNREACHABLE("Calling SurfaceAvailable on non-placeholder");
+      return;
+    }
+
+    // Reinsert the provider, requesting that Insert() mark it available. This
+    // may or may not succeed, depending on whether some other decoder has
+    // beaten us to the punch and inserted a non-placeholder version of this
+    // surface first, but it's fine either way.
+    // XXX(seth): This could be implemented more efficiently; we should be able
+    // to just update our data structures without reinserting.
+    Cost cost = aProvider->LogicalSizeInBytes();
+    Insert(aProvider, cost, aImageKey, aSurfaceKey, /* aSetAvailable = */ true);
   }
 
   void LockImage(const ImageKey aImageKey)
@@ -1038,7 +1069,8 @@ SurfaceCache::Insert(NotNull<ISurfaceProvider*> aProvider,
 
   MutexAutoLock lock(sInstance->GetMutex());
   Cost cost = aProvider->LogicalSizeInBytes();
-  return sInstance->Insert(aProvider.get(), cost, aImageKey, aSurfaceKey);
+  return sInstance->Insert(aProvider.get(), cost, aImageKey, aSurfaceKey,
+                           /* aSetAvailable = */ false);
 }
 
 /* static */ InsertOutcome
@@ -1050,7 +1082,8 @@ SurfaceCache::InsertPlaceholder(const ImageKey    aImageKey,
   }
 
   MutexAutoLock lock(sInstance->GetMutex());
-  return sInstance->Insert(nullptr, sPlaceholderCost, aImageKey, aSurfaceKey);
+  return sInstance->Insert(nullptr, sPlaceholderCost, aImageKey, aSurfaceKey,
+                           /* aSetAvailable = */ false);
 }
 
 /* static */ bool
@@ -1072,6 +1105,19 @@ SurfaceCache::CanHold(size_t aSize)
   }
 
   return sInstance->CanHold(aSize);
+}
+
+/* static */ void
+SurfaceCache::SurfaceAvailable(NotNull<ISurfaceProvider*> aProvider,
+                               const ImageKey             aImageKey,
+                               const SurfaceKey&          aSurfaceKey)
+{
+  if (!sInstance) {
+    return;
+  }
+
+  MutexAutoLock lock(sInstance->GetMutex());
+  sInstance->SurfaceAvailable(aProvider, aImageKey, aSurfaceKey);
 }
 
 /* static */ void
