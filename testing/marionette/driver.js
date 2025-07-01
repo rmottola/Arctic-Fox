@@ -2716,8 +2716,7 @@ GeckoDriver.prototype.maximizeWindow = function(cmd, resp) {
   }
 
   let win = this.getCurrentWindow();
-  win.moveTo(0,0);
-  win.resizeTo(win.screen.availWidth, win.screen.availHeight);
+  win.maximize()
 };
 
 /**
