@@ -2067,7 +2067,6 @@ gfxPlatform::OptimalFormatForContent(gfxContentType aContent)
 static mozilla::Atomic<bool> sLayersSupportsHardwareVideoDecoding(false);
 static bool sLayersHardwareVideoDecodingFailed = false;
 static bool sBufferRotationCheckPref = true;
-static bool sPrefBrowserTabsRemoteAutostart = false;
 
 static mozilla::Atomic<bool> sLayersAccelerationPrefsInitialized(false);
 
@@ -2087,7 +2086,10 @@ gfxPlatform::InitAcceleration()
   MOZ_ASSERT(NS_IsMainThread(), "can only initialize prefs on the main thread");
 
   gfxPrefs::GetSingleton();
-  sPrefBrowserTabsRemoteAutostart = BrowserTabsRemoteAutostart();
+
+  if (XRE_IsParentProcess()) {
+    gfxVars::SetBrowserTabsRemoteAutostart(BrowserTabsRemoteAutostart());
+  }
 
   nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
   nsCString discardFailureId;
@@ -2229,7 +2231,7 @@ gfxPlatform::UsesOffMainThreadCompositing()
   if (firstTime) {
     MOZ_ASSERT(sLayersAccelerationPrefsInitialized);
     result =
-      sPrefBrowserTabsRemoteAutostart ||
+      gfxVars::BrowserTabsRemoteAutostart() ||
       !gfxPrefs::LayersOffMainThreadCompositionForceDisabled();
 #if defined(MOZ_WIDGET_GTK)
     // Linux users who chose OpenGL are being grandfathered in to OMTC
