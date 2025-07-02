@@ -113,6 +113,7 @@ class ConfigureTestSandbox(ConfigureSandbox):
                 CalledProcessError=subprocess.CalledProcessError,
                 check_output=self.check_output,
                 PIPE=subprocess.PIPE,
+                STDOUT=subprocess.STDOUT,
                 Popen=self.Popen,
             )
 
@@ -147,8 +148,8 @@ class ConfigureTestSandbox(ConfigureSandbox):
 
         return Process()
 
-    def check_output(self, args):
-        proc = self.Popen(args)
+    def check_output(self, args, **kwargs):
+        proc = self.Popen(args, **kwargs)
         stdout, stderr = proc.communicate()
         retcode = proc.wait()
         if retcode:
