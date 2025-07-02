@@ -334,21 +334,14 @@ case "$target" in
         esac
         AC_SUBST(MSVS_VERSION)
         AC_SUBST(MSVC_HAS_DIA_SDK)
-        AC_SUBST(MSVC_REDIST_CRT_DIR)
         AC_SUBST(MSVC_C_RUNTIME_DLL)
         AC_SUBST(MSVC_CXX_RUNTIME_DLL)
-        AC_SUBST(MSVC_REDIST_OPENMP_DIR)
-        AC_SUBST(MSVC_OPENMP_DLL)
 
         AC_DEFINE(HAVE_SEH_EXCEPTIONS)
 
         if test -n "$WIN32_REDIST_DIR"; then
           if test ! -d "$WIN32_REDIST_DIR"; then
             AC_MSG_ERROR([Invalid Win32 Redist directory: ${WIN32_REDIST_DIR}])
-          fi
-          
-          if test -f "$WIN32_REDIST_DIR/$MSVC_C_RUNTIME_DLL"; then
-            AC_MSG_ERROR([The Win32 Redist directory must be set to the directory above Microsoft.VCXX0.CRT])
           fi
           WIN32_REDIST_DIR=`cd "$WIN32_REDIST_DIR" && pwd -W`
         fi
@@ -1389,14 +1382,6 @@ case "$target" in
     AC_DEFINE(NOMINMAX)
     BIN_SUFFIX='.exe'
     MOZ_USER_DIR="Mozilla"
-
-    case "$host" in
-    *-mingw*)
-        if test -n "$L10NBASEDIR"; then
-            L10NBASEDIR=`cd $L10NBASEDIR && pwd -W`
-        fi
-        ;;
-    esac
 
     case "$host_os" in
     cygwin*|msvc*|mks*)
@@ -2596,8 +2581,6 @@ MOZ_CONTENT_SANDBOX=
 MOZ_GMP_SANDBOX=
 MOZ_SANDBOX=
 MOZ_BINARY_EXTENSIONS=
-MOZ_ADDON_SIGNING=
-MOZ_REQUIRE_SIGNING=
 MOZ_DEVTOOLS=server
 
 case "$target_os" in
@@ -2662,6 +2645,29 @@ if test -z "$MOZ_BING_API_CLIENTID"; then
 fi
 AC_SUBST(MOZ_BING_API_CLIENTID)
 AC_SUBST(MOZ_BING_API_KEY)
+
+# Allow specifying an Adjust SDK key file that contains the app token used for
+# Adjust SDK requests.
+MOZ_ARG_WITH_STRING(adjust-sdk-keyfile,
+[  --with-adjust-sdk-keyfile=file   Use the app token contained in the given keyfile for Adjust SDK requests],
+  MOZ_INSTALL_TRACKING_ADJUST_SDK_APP_TOKEN=`cat $withval`)
+AC_SUBST(MOZ_INSTALL_TRACKING_ADJUST_SDK_APP_TOKEN)
+
+# Optional Firefox for Android partner distribution directory.
+MOZ_ARG_WITH_STRING(android-distribution-directory,
+[  --with-android-distribution-directory=dir
+                          Optional Firefox for Android partner distribution directory.],
+  MOZ_ANDROID_DISTRIBUTION_DIRECTORY=$withval)
+
+if test -n "$MOZ_ANDROID_DISTRIBUTION_DIRECTORY"; then
+  # A distribution directory must have an assets/distribution directory.
+  # See https://wiki.mozilla.org/Mobile/Distribution_Files.
+  if test ! -d "$MOZ_ANDROID_DISTRIBUTION_DIRECTORY/assets/distribution" ; then
+    AC_MSG_ERROR([--with-android-distribution-directory does not contain assets/distribution;
+                  (looked for ${MOZ_ANDROID_DISTRIBUTION_DIRECTORY}/assets/distribution).])
+  fi
+fi
+AC_SUBST(MOZ_ANDROID_DISTRIBUTION_DIRECTORY)
 
 dnl ========================================================
 dnl = Trademarked Branding
@@ -2757,6 +2763,19 @@ AC_SUBST(MOZ_MULET)
 AC_SUBST(MOZ_B2G_VERSION)
 
 dnl ========================================================
+dnl Ensure Android SDK and build-tools versions depending on
+dnl mobile target.
+dnl ========================================================
+
+if test -z "$gonkdir" ; then
+    case "$MOZ_BUILD_APP" in
+    mobile/android)
+        MOZ_ANDROID_SDK(23, 23.0.3)
+        ;;
+    esac
+fi
+
+dnl ========================================================
 dnl =
 dnl = Toolkit Options
 dnl =
@@ -2789,11 +2808,6 @@ uikit)
     CXXFLAGS="$CXXFLAGS $TK_CFLAGS"
     MOZ_USER_DIR="Mozilla"
     MOZ_FS_LAYOUT=bundle
-    ;;
-
-gonk)
-    AC_DEFINE(MOZ_TOUCH)
-    MOZ_TOUCH=1
     ;;
 
 esac
@@ -3162,7 +3176,9 @@ dnl ========================================================
 dnl = Include install tracking on Android
 dnl ========================================================
 if test -n "$MOZ_INSTALL_TRACKING"; then
-    AC_DEFINE(MOZ_INSTALL_TRACKING)
+    if test -z "$MOZ_INSTALL_TRACKING_ADJUST_SDK_APP_TOKEN"; then
+        AC_MSG_ERROR([Must specify --with-adjust-sdk-keyfile when MOZ_INSTALL_TRACKING is defined!])
+    fi
 fi
 
 dnl ========================================================
@@ -6228,6 +6244,18 @@ if test -z "$MOZ_APP_VERSION_DISPLAY"; then
    MOZ_APP_VERSION_DISPLAY=$MOZ_APP_VERSION
 fi
 
+if test -z "$ANDROID_PACKAGE_NAME" ; then
+   ANDROID_PACKAGE_NAME="org.mozilla.$MOZ_APP_NAME"
+fi
+
+# Mozilla released Firefox for Android {Release,Beta} and {Aurora,Nightly} to
+# the public with specific common shared IDs and we need to keep them
+# consistent forever.  The specific common values are set by per-channel
+# branding; all other channels use a generic sharedID, set below.
+if test -z "$MOZ_ANDROID_SHARED_ID" ; then
+   MOZ_ANDROID_SHARED_ID="${ANDROID_PACKAGE_NAME}.sharedID"
+fi
+
 # For extensions and langpacks, we require a max version that is compatible
 # across security releases. MOZ_APP_MAXVERSION is our method for doing that.
 # 24.0a1 and 24.0a2 aren't affected
@@ -6257,6 +6285,9 @@ AC_SUBST(MOZ_APP_BASENAME)
 AC_SUBST(MOZ_APP_VENDOR)
 AC_SUBST(MOZ_APP_PROFILE)
 AC_SUBST(MOZ_APP_ID)
+AC_SUBST(MOZ_APP_ANDROID_VERSION_CODE)
+AC_SUBST(MOZ_ANDROID_SHARED_ID)
+AC_SUBST(MOZ_ANDROID_GCM_SENDERID)
 AC_SUBST(MAR_CHANNEL_ID)
 AC_SUBST(ACCEPTED_MAR_CHANNEL_IDS)
 AC_SUBST(MOZ_PROFILE_MIGRATOR)
