@@ -140,6 +140,11 @@ PrefObserver.register({
  * and provides shared methods for all the instances of the user interface.
  */
 this.DownloadsCommon = {
+  ATTENTION_NONE: "",
+  ATTENTION_SUCCESS: "success",
+  ATTENTION_WARNING: "warning",
+  ATTENTION_SEVERE: "severe",
+
   /**
    * Returns an object whose keys are the string names from the downloads string
    * bundle, and whose values are either the translated strings or functions
@@ -462,7 +467,7 @@ this.DownloadsCommon = {
       if (!shouldLaunch) {
         return;
       }
-  
+
       // Actually open the file.
       try {
         if (aMimeInfo && aMimeInfo.preferredAction == aMimeInfo.useHelperApp) {
@@ -470,7 +475,7 @@ this.DownloadsCommon = {
           return;
         }
       } catch (ex) { }
-  
+
       // If either we don't have the mime info, or the preferred action failed,
       // attempt to launch the file directly.
       try {
@@ -690,7 +695,7 @@ DownloadsDataCtor.prototype = {
                .then(null, Cu.reportError);
     let indicatorData = this._isPrivate ? PrivateDownloadsIndicatorData
                                         : DownloadsIndicatorData;
-    indicatorData.attention = false;
+    indicatorData.attention = DownloadsCommon.ATTENTION_NONE;
   },
 
   //////////////////////////////////////////////////////////////////////////////
@@ -1121,8 +1126,29 @@ DownloadsIndicatorDataCtor.prototype = {
   },
 
   onDownloadStateChanged(download) {
-    if (download.succeeded || download.error) {
-      this.attention = true;
+    if (!download.succeeded && download.error && download.error.reputationCheckVerdict) {
+      switch (download.error.reputationCheckVerdict) {
+        case Downloads.Error.BLOCK_VERDICT_UNCOMMON: // fall-through
+        case Downloads.Error.BLOCK_VERDICT_POTENTIALLY_UNWANTED:
+          // Existing higher level attention indication trumps ATTENTION_WARNING.
+          if (this._attention != DownloadsCommon.ATTENTION_SEVERE) {
+            this.attention = DownloadsCommon.ATTENTION_WARNING;
+          }
+          break;
+        case Downloads.Error.BLOCK_VERDICT_MALWARE:
+          this.attention = DownloadsCommon.ATTENTION_SEVERE;
+          break;
+        default:
+          this.attention = DownloadsCommon.ATTENTION_SEVERE;
+          Cu.reportError("Unknown reputation verdict: " +
+                         download.error.reputationCheckVerdict);
+      }
+    } else if (download.succeeded || download.error) {
+      // Existing higher level attention indication trumps ATTENTION_SUCCESS.
+      if (this._attention != DownloadsCommon.ATTENTION_SEVERE &&
+          this._attention != DownloadsCommon.ATTENTION_WARNING) {
+        this.attention = DownloadsCommon.ATTENTION_SUCCESS;
+      }
     }
 
     // Since the state of a download changed, reset the estimated time left.
@@ -1157,7 +1183,7 @@ DownloadsIndicatorDataCtor.prototype = {
     this._updateViews();
     return aValue;
   },
-  _attention: false,
+  _attention: DownloadsCommon.ATTENTION_NONE,
 
   /**
    * Indicates whether the user is interacting with downloads, thus the
@@ -1165,7 +1191,7 @@ DownloadsIndicatorDataCtor.prototype = {
    */
   set attentionSuppressed(aValue) {
     this._attentionSuppressed = aValue;
-    this._attention = false;
+    this._attention = DownloadsCommon.ATTENTION_NONE;
     this._updateViews();
     return aValue;
   },
@@ -1195,7 +1221,8 @@ DownloadsIndicatorDataCtor.prototype = {
     aView.counter = this._counter;
     aView.percentComplete = this._percentComplete;
     aView.paused = this._paused;
-    aView.attention = this._attention && !this._attentionSuppressed;
+    aView.attention = this._attentionSuppressed ? DownloadsCommon.ATTENTION_NONE
+                                                : this._attention;
   },
 
   //////////////////////////////////////////////////////////////////////////////

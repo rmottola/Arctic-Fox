@@ -48,8 +48,41 @@ toolbar[brighttext] #downloads-button:not([attention="success"]) > #downloads-in
   background-image: var(--downloads-indicator-icon-inverted);
 }
 
-#downloads-button[attention] > #downloads-indicator-anchor > #downloads-indicator-icon {
-  background-image: url("chrome://browser/skin/downloads/download-glow.png");
+#downloads-button[attention="warning"] > .toolbarbutton-badge-stack > .toolbarbutton-badge,
+#downloads-button[attention="severe"] > .toolbarbutton-badge-stack > .toolbarbutton-badge {
+  display: -moz-box;
+  height: 13px;
+  width: 13px;
+  background-size: contain;
+  border: none;
+  box-shadow: none;
+  filter: drop-shadow(0 1px 0 hsla(206, 50%, 10%, .15));
+}
+
+#downloads-button[attention="severe"] > .toolbarbutton-badge-stack > .toolbarbutton-badge {
+  background: #D90000 url(chrome://browser/skin/update-badge-failed.svg) no-repeat center;
+}
+
+#downloads-button[attention="warning"] > .toolbarbutton-badge-stack > .toolbarbutton-badge {
+  background: #FFBF00 url(chrome://browser/skin/update-badge-failed.svg) no-repeat center;
+}
+
+#downloads-button[attention="severe"] > .toolbarbutton-badge-stack > .toolbarbutton-badge:-moz-window-inactive,
+#downloads-button[attention="warning"] > .toolbarbutton-badge-stack > .toolbarbutton-badge:-moz-window-inactive {
+  filter: none;
+}
+
+#downloads-button[attention="success"] > #downloads-indicator-anchor > #downloads-indicator-icon {
+  background-image: var(--downloads-indicator-icon-attention);
+}
+
+toolbar[brighttext] #downloads-button[attention="success"] > #downloads-indicator-anchor > #downloads-indicator-icon {
+  background-image: var(--downloads-indicator-icon-attention-inverted);
+}
+
+#downloads-button[cui-areatype="menu-panel"][attention="success"] {
+  list-style-image: url("chrome://browser/skin/downloads/download-glow-menuPanel.png");
+  -moz-image-region: auto;
 }
 
 /* In the next few rules, we use :not([counter]) as a shortcut that is
@@ -129,7 +162,14 @@ toolbar[brighttext] #downloads-button:not([counter])[attention="success"] > #dow
   text-align: center;
 }
 
-#downloads-indicator-counter:-moz-lwtheme-brighttext {
+@media not all and (-moz-os-version: windows-xp) {
+  #downloads-indicator-counter {
+    /* Bug 812345 added this... */
+    margin-bottom: -1px;
+  }
+}
+
+toolbar[brighttext] #downloads-indicator-counter {
   color: white;
   text-shadow: 0 0 1px rgba(0,0,0,.7),
                0 1px 1.5px rgba(0,0,0,.5);

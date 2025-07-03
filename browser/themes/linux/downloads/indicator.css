@@ -42,22 +42,30 @@ toolbar[brighttext] #downloads-button[cui-areatype="toolbar"]:not([attention="su
   filter: drop-shadow(0 1px 0 hsla(206, 50%, 10%, .15));
 }
 
-toolbar[iconsize="small"] > #downloads-button > #downloads-indicator-anchor > #downloads-indicator-icon {
-  background: -moz-image-rect(url("chrome://browser/skin/Toolbar-small.png"),
-                              0, 16, 16, 0) center no-repeat;
+#downloads-button[cui-areatype="toolbar"][attention="severe"] > .toolbarbutton-badge-stack > .toolbarbutton-badge {
+  background: #D90000 url(chrome://browser/skin/update-badge-failed.svg) no-repeat center;
 }
 
-toolbar[iconsize="large"] > #downloads-button > #downloads-indicator-anchor > #downloads-indicator-icon {
-  background: -moz-image-rect(url("chrome://browser/skin/Toolbar.png"),
-                              0, 24, 24, 0) center no-repeat;
+#downloads-button[cui-areatype="toolbar"][attention="warning"] > .toolbarbutton-badge-stack > .toolbarbutton-badge {
+  background: #FFBF00 url(chrome://browser/skin/update-badge-failed.svg) no-repeat center;
 }
 
-toolbar[iconsize="small"] > #downloads-button[attention] > #downloads-indicator-anchor > #downloads-indicator-icon {
-  background-image: url("chrome://browser/skin/downloads/download-glow-small.png");
+#downloads-button[cui-areatype="toolbar"][attention="severe"] > .toolbarbutton-badge-stack > .toolbarbutton-badge:-moz-window-inactive,
+#downloads-button[cui-areatype="toolbar"][attention="warning"] > .toolbarbutton-badge-stack > .toolbarbutton-badge:-moz-window-inactive {
+  filter: none;
 }
 
-toolbar[iconsize="large"] > #downloads-button[attention] > #downloads-indicator-anchor > #downloads-indicator-icon {
-  background-image: url("chrome://browser/skin/downloads/download-glow.png");
+#downloads-button[cui-areatype="toolbar"][attention="success"] > #downloads-indicator-anchor > #downloads-indicator-icon {
+  background-image: -moz-image-rect(url("chrome://browser/skin/Toolbar.png"), 18, 198, 36, 180);
+}
+
+toolbar[brighttext] #downloads-button[cui-areatype="toolbar"][attention="success"] > #downloads-indicator-anchor > #downloads-indicator-icon {
+  background-image: -moz-image-rect(url("chrome://browser/skin/Toolbar-inverted.png"), 18, 198, 36, 180);
+}
+
+#downloads-button[cui-areatype="menu-panel"][attention="success"] {
+  list-style-image: url("chrome://browser/skin/downloads/download-glow-menuPanel.png");
+  -moz-image-region: auto;
 }
 
 /* In the next few rules, we use :not([counter]) as a shortcut that is
