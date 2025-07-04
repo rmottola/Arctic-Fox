@@ -106,10 +106,12 @@ const DownloadsButton = {
 
     indicator.open = this._anchorRequested;
 
-    // Determine if we're located on an invisible toolbar.
-    if (!isElementVisible(indicator.parentNode)) {
-      return null;
-    }
+    let widget = CustomizableUI.getWidget("downloads-button")
+                               .forWindow(window);
+     // Determine if the indicator is located on an invisible toolbar.
+     if (!isElementVisible(indicator.parentNode) && !widget.overflowed) {
+       return null;
+     }
 
     return DownloadsIndicatorView.indicatorAnchor;
   },
@@ -178,6 +180,12 @@ const DownloadsButton = {
     return this._navBar = document.getElementById("nav-bar");
   }
 };
+
+Object.defineProperty(this, "DownloadsButton", {
+  value: DownloadsButton,
+  enumerable: true,
+  writable: false
+});
 
 ////////////////////////////////////////////////////////////////////////////////
 //// DownloadsIndicatorView
@@ -309,10 +317,22 @@ const DownloadsIndicatorView = {
       return;
     }
 
-    // If the anchor is not there or its container is hidden, don't show
-    // a notification
     let anchor = DownloadsButton._placeholder;
+    let widgetGroup = CustomizableUI.getWidget("downloads-button");
+    let widget = widgetGroup.forWindow(window);
+    if (widget.overflowed || widgetGroup.areaType == CustomizableUI.TYPE_MENU_PANEL) {
+      if (anchor && this._isAncestorPanelOpen(anchor)) {
+        // If the containing panel is open, don't do anything, because the
+        // notification would appear under the open panel. See
+        // https://bugzilla.mozilla.org/show_bug.cgi?id=984023
+        return;
+      }
+
+      // Otherwise, try to use the anchor of the panel:
+      anchor = widget.anchor;
+    }
     if (!anchor || !isElementVisible(anchor.parentNode)) {
+      // Our container isn't visible, so can't show the animation:
       return;
     }
 
