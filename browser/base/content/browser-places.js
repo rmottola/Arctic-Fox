@@ -1408,27 +1408,6 @@ var BookmarkingUI = {
     aHeaderItem.parentNode.insertBefore(fragment, aHeaderItem.nextSibling);
   },
 
-  /**
-   * Handles star styling based on page proxy state changes.
-   */
-  onPageProxyStateChanged: function BUI_onPageProxyStateChanged(aState) {
-    if (!this.star) {
-      return;
-    }
-
-    if (aState == "invalid") {
-      this.star.setAttribute("disabled", "true");
-      this.broadcaster.setAttribute("stardisabled", "true");
-      this.broadcaster.removeAttribute("starred");
-      this.broadcaster.setAttribute("buttontooltiptext", "");
-    }
-    else {
-      this.star.removeAttribute("disabled");
-      this.broadcaster.removeAttribute("stardisabled");
-      this._updateStar();
-    }
-  },
-
   _updateToolbarStyle: function BUI__updateToolbarStyle() {
     if (!this.button) {
       return;
@@ -1549,11 +1528,6 @@ var BookmarkingUI = {
     if (this._pendingStmt) {
       this._pendingStmt.cancel();
       delete this._pendingStmt;
-    }
-
-    // We can load about:blank before the actual page, but there is no point in handling that page.
-    if (isBlankPageURL(this._uri.spec)) {
-      return;
     }
 
     this._pendingStmt = PlacesUtils.asyncGetBookmarkIds(this._uri, (aItemIds, aURI) => {
