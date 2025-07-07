@@ -1360,9 +1360,6 @@ pref("browser.defaultbrowser.notificationbar", false);
 // Determines if Telemetry pings can be archived locally.
 pref("toolkit.telemetry.archive.enabled", true);
 
-//Arctic Fox standalone image background color
-pref("browser.display.standalone_images.background_color", "#2E3B41");
-
 // Disable reader mode by default.
 pref("reader.parse-on-load.enabled", false);
 
