@@ -753,7 +753,7 @@ nsDOMWindowUtils::SendPointerEventCommon(const nsAString& aType,
   event.pressure = aPressure;
   event.inputSource = aInputSourceArg;
   event.pointerId = aPointerId;
-  event.width = aWidth;
+  event.mWidth = aWidth;
   event.height = aHeight;
   event.tiltX = aTiltX;
   event.tiltY = aTiltY;
