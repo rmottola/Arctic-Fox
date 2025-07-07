@@ -53,6 +53,7 @@ nsLookAndFeel::nsLookAndFeel()
       mDefaultFontCached(false), mButtonFontCached(false),
       mFieldFontCached(false), mMenuFontCached(false)
 {
+    FcInit();
     Init();    
 }
 
