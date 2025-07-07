@@ -7192,7 +7192,7 @@ DispatchPointerFromMouseOrTouch(PresShell* aShell,
       event.mRefPoint = touch->mRefPoint;
       event.mModifiers = touchEvent->mModifiers;
       event.mWidth = touch->RadiusX();
-      event.height = touch->RadiusY();
+      event.mHeight = touch->RadiusY();
       event.tiltX = touch->tiltX;
       event.tiltY = touch->tiltY;
       event.mTime = touchEvent->mTime;
