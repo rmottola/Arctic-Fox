@@ -360,7 +360,7 @@ ImageDocument::ShrinkToFit()
   }
 
   // Keep image content alive while changing the attributes.
-  nsCOMPtr<nsIContent> imageContent = mImageContent;
+  nsCOMPtr<Element> imageContent = mImageContent;
   nsCOMPtr<nsIDOMHTMLImageElement> image = do_QueryInterface(mImageContent);
   image->SetWidth(std::max(1, NSToCoordFloor(GetRatio() * mImageWidth)));
   image->SetHeight(std::max(1, NSToCoordFloor(GetRatio() * mImageHeight)));
@@ -428,7 +428,7 @@ ImageDocument::RestoreImage()
     return;
   }
   // Keep image content alive while changing the attributes.
-  nsCOMPtr<nsIContent> imageContent = mImageContent;
+  nsCOMPtr<Element> imageContent = mImageContent;
   imageContent->UnsetAttr(kNameSpaceID_None, nsGkAtoms::width, true);
   imageContent->UnsetAttr(kNameSpaceID_None, nsGkAtoms::height, true);
   
@@ -512,7 +512,7 @@ ImageDocument::OnHasTransparency()
     return;
   }
 
-  nsDOMTokenList* classList = mImageContent->AsElement()->ClassList();
+  nsDOMTokenList* classList = mImageContent->ClassList();
   mozilla::ErrorResult rv;
   classList->Add(NS_LITERAL_STRING("transparent"), rv);
 }
@@ -520,7 +520,7 @@ ImageDocument::OnHasTransparency()
 void
 ImageDocument::SetModeClass(eModeClasses mode)
 {
-  nsDOMTokenList* classList = mImageContent->AsElement()->ClassList();
+  nsDOMTokenList* classList = mImageContent->ClassList();
   ErrorResult rv;
 
   if (mode == eShrinkToFit) {
@@ -625,12 +625,11 @@ ImageDocument::UpdateSizeFromLayout()
 {
   // Pull an updated size from the content frame to account for any size
   // change due to CSS properties like |image-orientation|.
-  Element* contentElement = mImageContent->AsElement();
-  if (!contentElement) {
+  if (!mImageContent) {
     return;
   }
 
-  nsIFrame* contentFrame = contentElement->GetPrimaryFrame(Flush_Frames);
+  nsIFrame* contentFrame = mImageContent->GetPrimaryFrame(Flush_Frames);
   if (!contentFrame) {
     return;
   }
