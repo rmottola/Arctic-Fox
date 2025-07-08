@@ -1210,8 +1210,9 @@ nsresult nsChildView::SynthesizeNativeTouchPoint(uint32_t aPointerId,
 
   LayoutDeviceIntPoint pointInWindow = aPoint - WidgetToScreenOffset();
   MultiTouchInput inputToDispatch = UpdateSynthesizedTouchState(
-      mSynthesizedTouchInput.get(), aPointerId, aPointerState,
-      pointInWindow, aPointerPressure, aPointerOrientation);
+      mSynthesizedTouchInput.get(), PR_IntervalNow(), TimeStamp::Now(),
+      aPointerId, aPointerState, pointInWindow, aPointerPressure,
+      aPointerOrientation);
 
   if (mAPZC) {
     uint64_t inputBlockId = 0;
