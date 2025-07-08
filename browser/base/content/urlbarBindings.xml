@@ -1535,9 +1535,11 @@ file, You can obtain one at http://mozilla.org/MPL/2.0/.
         document.getElementById("addon-progress-notification-progresstext");
       </field>
       <field name="DownloadUtils" readonly="true">
-        let utils = {};
-        Components.utils.import("resource://gre/modules/DownloadUtils.jsm", utils);
-        utils.DownloadUtils;
+        {
+          let utils = {};
+          Components.utils.import("resource://gre/modules/DownloadUtils.jsm", utils);
+          utils.DownloadUtils;
+        }
       </field>
 
       <method name="destroy">
