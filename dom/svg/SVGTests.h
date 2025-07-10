@@ -96,6 +96,8 @@ public:
   already_AddRefed<DOMSVGStringList> SystemLanguage();
   bool HasExtension(const nsAString& aExtension);
 
+  virtual bool IsInChromeDoc() const = 0;
+
 protected:
   virtual ~SVGTests() {}
 
