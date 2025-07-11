@@ -225,6 +225,9 @@ const SNAPSHOT_SCHEMA = {
         supportsHardwareH264: {
           type: "string",
         },
+        currentAudioBackend: {
+          type: "string",
+        },
         numAcceleratedWindowsMessage: {
           type: "array",
         },
