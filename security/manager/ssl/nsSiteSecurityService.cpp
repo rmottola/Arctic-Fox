@@ -238,6 +238,10 @@ nsSiteSecurityService::Init()
     "network.stricttransportsecurity.preloadlist", true);
   mozilla::Preferences::AddStrongObserver(this,
     "network.stricttransportsecurity.preloadlist");
+  mProcessPKPHeadersFromNonBuiltInRoots = mozilla::Preferences::GetBool(
+    "security.cert_pinning.process_headers_from_non_builtin_roots", false);
+  mozilla::Preferences::AddStrongObserver(this,
+    "security.cert_pinning.process_headers_from_non_builtin_roots");
   mPreloadListTimeOffset = mozilla::Preferences::GetInt(
     "test.currentTimeOffsetSeconds", 0);
   mozilla::Preferences::AddStrongObserver(this,
@@ -705,12 +709,20 @@ nsSiteSecurityService::ProcessPKPHeader(nsIURI* aSourceURI,
   UniqueCERTCertList certList;
   RefPtr<SharedCertVerifier> certVerifier(GetDefaultCertVerifier());
   NS_ENSURE_TRUE(certVerifier, NS_ERROR_UNEXPECTED);
+  // We don't want this verification to cause any network traffic that would
+  // block execution. Also, since we don't have access to the original stapled
+  // OCSP response, we can't enforce this aspect of the TLS Feature extension.
+  // This is ok, because it will have been enforced when we originally connected
+  // to the site (or it's disabled, in which case we wouldn't want to enforce it
+  // anyway).
+  CertVerifier::Flags flags = CertVerifier::FLAG_LOCAL_ONLY |
+                              CertVerifier::FLAG_TLS_IGNORE_STATUS_REQUEST;
   if (certVerifier->VerifySSLServerCert(nssCert, nullptr, // stapled ocsp
                                         now, nullptr, // pinarg
                                         host.get(), // hostname
                                         certList,
                                         false, // don't store intermediates
-                                        CertVerifier::FLAG_LOCAL_ONLY)
+                                        flags)
       != SECSuccess) {
     return NS_ERROR_FAILURE;
   }
