@@ -43,9 +43,6 @@
 
       <!-- Security Protocols -->
       
-      <preference id="network.stricttransportsecurity.enabled"
-                  name="network.stricttransportsecurity.enabled"
-                  type="bool"/>
       <preference id="security.cert_pinning.enforcement_level"
                   name="security.cert_pinning.enforcement_level"
                   type="int"/>
@@ -134,10 +131,6 @@
       <caption label="&SecProto.label;"/>
     
       <vbox id="SecProtoBox" align="start" flex="1">
-        <checkbox id="enableHSTS"
-                  label="&enableHSTS.label;"
-                  accesskey="&enableHSTS.accesskey;"
-                  preference="network.stricttransportsecurity.enabled" />
         <checkbox id="enableHPKP"
                   label="&enableHPKP.label;"
                   accesskey="&enableHPKP.accesskey;"

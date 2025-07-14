@@ -206,7 +206,6 @@ SiteHPKPState::ToString(nsCString& aString)
 
 nsSiteSecurityService::nsSiteSecurityService()
   : mUsePreloadList(true)
-  , mUseStsService(true)
   , mPreloadListTimeOffset(0)
 {
 }
@@ -232,10 +231,6 @@ nsSiteSecurityService::Init()
     "network.stricttransportsecurity.preloadlist", true);
   mozilla::Preferences::AddStrongObserver(this,
     "network.stricttransportsecurity.preloadlist");
-  mUseStsService = mozilla::Preferences::GetBool(
-    "network.stricttransportsecurity.enabled", true);
-  mozilla::Preferences::AddStrongObserver(this,
-    "network.stricttransportsecurity.enabled");
   mPreloadListTimeOffset = mozilla::Preferences::GetInt(
     "test.currentTimeOffsetSeconds", 0);
   mozilla::Preferences::AddStrongObserver(this,
@@ -316,12 +311,6 @@ nsSiteSecurityService::SetHSTSState(uint32_t aType,
     return RemoveState(aType, aSourceURI, flags);
   }
 
-  // If HSTS has been user-disabled, don't bother checking or writing 
-  // the security state; exit early without doing any work.
-  if (!mUseStsService) {
-    return NS_OK;
-  }
-  
   int64_t expiretime = ExpireTimeFromMaxAge(maxage);
   SiteHSTSState siteState(expiretime, SecurityPropertySet, includeSubdomains);
   nsAutoCString stateString;
@@ -893,13 +882,6 @@ nsSiteSecurityService::IsSecureURI(uint32_t aType, nsIURI* aURI,
   nsAutoCString hostname;
   nsresult rv = GetHost(aURI, hostname);
   NS_ENSURE_SUCCESS(rv, rv);
-  
-  // Exit early if STS not enabled
-  if (!mUseStsService) {
-    *aResult = false;
-    return NS_OK;
-  }
-
   /* An IP address never qualifies as a secure URI. */
   if (HostIsIPAddress(hostname.get())) {
     *aResult = false;
@@ -953,11 +935,6 @@ nsSiteSecurityService::IsSecureHost(uint32_t aType, const char* aHost,
 
   // set default in case if we can't find any STS information
   *aResult = false;
-  
-  // Exit early if STS not enabled
-  if (!mUseStsService) {
-    return NS_OK;
-  }
 
   /* An IP address never qualifies as a secure URI. */
   if (HostIsIPAddress(aHost)) {
