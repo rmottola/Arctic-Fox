@@ -5,13 +5,10 @@
 
 // Tests the weak crypto override
 
-const TLS_DHE_RSA_WITH_AES_128_CBC_SHA     = 0x0033;
-const TLS_DHE_RSA_WITH_AES_256_CBC_SHA     = 0x0039;
-
-const fallback_cipher_prefs = [
-  "security.ssl3.dhe_rsa_aes_128_sha",
-  "security.ssl3.dhe_rsa_aes_256_sha"
-];
+const TLS_RSA_WITH_RC4_128_MD5         = 0x0004;
+const TLS_RSA_WITH_RC4_128_SHA         = 0x0005;
+const TLS_ECDHE_ECDSA_WITH_RC4_128_SHA = 0xC007;
+const TLS_ECDHE_RSA_WITH_RC4_128_SHA   = 0xC011;
 
 // Need profile dir to store the key / cert
 do_get_profile();
@@ -28,13 +25,9 @@ const socketTransportService =
   Cc["@mozilla.org/network/socket-transport-service;1"]
   .getService(Ci.nsISocketTransportService);
 
-function getCert(keyType = Ci.nsILocalCertService.KEY_TYPE_EC) {
+function getCert() {
   let deferred = Promise.defer();
-  let nickname = "tls-test";
-  if (keyType == Ci.nsILocalCertService.KEY_TYPE_RSA) {
-    nickname = "tls-test-rsa";
-  }
-  certService.getOrCreateCert(nickname, {
+  certService.getOrCreateCert("tls-test", {
     handleCert: function(c, rv) {
       if (rv) {
         deferred.reject(rv);
@@ -42,11 +35,11 @@ function getCert(keyType = Ci.nsILocalCertService.KEY_TYPE_EC) {
       }
       deferred.resolve(c);
     }
-  }, keyType);
+  });
   return deferred.promise;
 }
 
-function startServer(cert, fallbackOnly) {
+function startServer(cert, rc4only) {
   let tlsServer = Cc["@mozilla.org/network/tls-server-socket;1"]
                   .createInstance(Ci.nsITLSServerSocket);
   tlsServer.init(-1, true, -1);
@@ -68,12 +61,12 @@ function startServer(cert, fallbackOnly) {
 
       equal(status.tlsVersionUsed, Ci.nsITLSClientStatus.TLS_VERSION_1_2,
             "Using TLS 1.2");
-      let expectedCipher = fallbackOnly ? "TLS_DHE_RSA_WITH_AES_128_CBC_SHA"
-                                        : "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256";
+      let expectedCipher = rc4only ? "TLS_ECDHE_ECDSA_WITH_RC4_128_SHA"
+                                   : "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256";
       equal(status.cipherName, expectedCipher,
             "Using expected cipher");
       equal(status.keyLength, 128, "Using 128-bit key");
-      equal(status.macLength, fallbackOnly ? 160 : 128, "Using MAC of expected length");
+      equal(status.macLength, rc4only ? 160 : 128, "Using MAC of expected length");
 
       input.asyncWait({
         onInputStreamReady: function(input) {
@@ -87,10 +80,12 @@ function startServer(cert, fallbackOnly) {
   tlsServer.setSessionCache(false);
   tlsServer.setSessionTickets(false);
   tlsServer.setRequestClientCertificate(Ci.nsITLSServerSocket.REQUEST_NEVER);
-  if (fallbackOnly) {
+  if (rc4only) {
     let cipherSuites = [
-      TLS_DHE_RSA_WITH_AES_128_CBC_SHA,
-      TLS_DHE_RSA_WITH_AES_256_CBC_SHA
+      TLS_ECDHE_RSA_WITH_RC4_128_SHA,
+      TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
+      TLS_RSA_WITH_RC4_128_SHA,
+      TLS_RSA_WITH_RC4_128_MD5
     ];
     tlsServer.setCipherSuites(cipherSuites, cipherSuites.length);
   }
@@ -107,7 +102,7 @@ function storeCertOverride(port, cert) {
                                                overrideBits, true);
 }
 
-function startClient(name, port, expectedResult, options = {}) {
+function startClient(port, expectedResult, options = {}) {
   let transport =
     socketTransportService.createTransport(["ssl"], 1, "127.0.0.1", port, null);
   if (options.isPrivate) {
@@ -129,13 +124,17 @@ function startClient(name, port, expectedResult, options = {}) {
     onInputStreamReady: function(input) {
       try {
         let data = NetUtil.readInputStreamToString(input, input.available());
+        equal(Cr.NS_OK, expectedResult, "Connection should succeed");
         equal(data, "HELLO", "Echoed data received");
-        input.close();
-        output.close();
-        deferred.resolve();
       } catch (e) {
-        deferred.reject(e);
+        if (!((e.result == Cr.NS_ERROR_NET_RESET) && options.allowReset) &&
+            (e.result != expectedResult)) {
+          deferred.reject(e);
+        }
       }
+      input.close();
+      output.close();
+      deferred.resolve();
     },
 
     onOutputStreamReady: function(output) {
@@ -147,13 +146,15 @@ function startClient(name, port, expectedResult, options = {}) {
             output.asyncWait(handler, 0, 0, Services.tm.currentThread);
             return;
           }
-          equal(e.result, expectedResult,
-                "Actual and expected connection result should match");
-          output.close();
-          deferred.resolve();
-          return;
+          if (e.result != Cr.NS_OK) {
+            ok((e.result === expectedResult) ||
+               (options.allowReset && (e.result === Cr.NS_ERROR_NET_RESET)),
+               "Actual and expected connection result should match");
+            output.close();
+            deferred.resolve();
+            return;
+          }
         }
-        equal(Cr.NS_OK, expectedResult, "Connection should succeed");
         do_print("Output to server written");
         input = transport.openInputStream(0, 0, 0);
         input.asyncWait(handler, 0, 0, Services.tm.currentThread);
@@ -203,7 +204,8 @@ add_task(function* () {
   // The auto-retry on connection reset is implemented in our HTTP layer.
   // So we will see the crafted NS_ERROR_NET_RESET when we use
   // nsISocketTransport directly.
-  yield startClient(port, Cr.NS_ERROR_NET_RESET, {isPrivate: true});
+  yield startClient(port, getXPCOMStatusFromNSS(SSL_ERROR_NO_CYPHER_OVERLAP),
+                    {isPrivate: true, allowReset: true});
   // retry manually to simulate the HTTP layer
   yield startClient(port, Cr.NS_OK, {isPrivate: true});
 
@@ -218,7 +220,8 @@ add_task(function* () {
   // temporary override should not change the pref.
   equal(Services.prefs.getCharPref("security.tls.insecure_fallback_hosts"),
         "");
-  yield startClient(port, Cr.NS_ERROR_NET_RESET);
+  yield startClient(port, getXPCOMStatusFromNSS(SSL_ERROR_NO_CYPHER_OVERLAP),
+                    {allowReset: true});
   yield startClient(port, Cr.NS_OK);
   yield startClient(port, getXPCOMStatusFromNSS(SSL_ERROR_NO_CYPHER_OVERLAP),
                     {isPrivate: true});
@@ -234,7 +237,8 @@ add_task(function* () {
   // permanent override should change the pref.
   equal(Services.prefs.getCharPref("security.tls.insecure_fallback_hosts"),
         "127.0.0.1");
-  yield startClient(port, Cr.NS_ERROR_NET_RESET);
+  yield startClient(port, getXPCOMStatusFromNSS(SSL_ERROR_NO_CYPHER_OVERLAP),
+                    {allowReset: true});
   yield startClient(port, Cr.NS_OK);
   yield startClient(port, getXPCOMStatusFromNSS(SSL_ERROR_NO_CYPHER_OVERLAP),
                     {isPrivate: true});
@@ -248,7 +252,8 @@ add_task(function* () {
 
   // add a host to the pref to prepare the next test
   weakCryptoOverride.addWeakCryptoOverride("127.0.0.1", false);
-  yield startClient(port, Cr.NS_ERROR_NET_RESET);
+  yield startClient(port, getXPCOMStatusFromNSS(SSL_ERROR_NO_CYPHER_OVERLAP),
+                    {allowReset: true});
   yield startClient(port, Cr.NS_OK);
   equal(Services.prefs.getCharPref("security.tls.insecure_fallback_hosts"),
         "127.0.0.1");

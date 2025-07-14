@@ -1249,7 +1249,7 @@ typedef struct {
   const char* pref;
   long id;
   bool enabledByDefault;
-  bool fallback;
+  bool weak;
 } CipherPref;
 
 // Update the switch statement in AccumulateCipherSuite in nsNSSCallbacks.cpp
@@ -1281,12 +1281,12 @@ static const CipherPref sCipherPrefs[] = {
    TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, true },
 
  { "security.ssl3.dhe_rsa_aes_128_sha",
-   TLS_DHE_RSA_WITH_AES_128_CBC_SHA, true, true },
+   TLS_DHE_RSA_WITH_AES_128_CBC_SHA, true },
  { "security.ssl3.dhe_rsa_camellia_128_sha", 
    TLS_DHE_RSA_WITH_CAMELLIA_128_CBC_SHA, true },
 
  { "security.ssl3.dhe_rsa_aes_256_sha",
-   TLS_DHE_RSA_WITH_AES_256_CBC_SHA, true, true },
+   TLS_DHE_RSA_WITH_AES_256_CBC_SHA, true },
  { "security.ssl3.dhe_rsa_camellia_256_sha", 
    TLS_DHE_RSA_WITH_CAMELLIA_256_CBC_SHA, true}, 
 
@@ -1316,26 +1316,26 @@ static const CipherPref sCipherPrefs[] = {
  { nullptr, 0 } // end marker
 };
 
-// Bit flags indicating what fallback ciphers are enabled.
+// Bit flags indicating what weak ciphers are enabled.
 // The bit index will correspond to the index in sCipherPrefs.
 // Wrtten by the main thread, read from any threads.
-static uint64_t sEnabledFallbackCiphers;
+static uint64_t sEnabledWeakCiphers;
 static_assert(MOZ_ARRAY_LENGTH(sCipherPrefs) - 1 <= sizeof(uint64_t) * CHAR_BIT,
               "too many cipher suites");
 
 /*static*/ bool
-nsNSSComponent::AreAnyFallbackCiphersEnabled()
+nsNSSComponent::AreAnyWeakCiphersEnabled()
 {
-  return !!sEnabledFallbackCiphers;
+  return !!sEnabledWeakCiphers;
 }
 
 /*static*/ void
-nsNSSComponent::UseFallbackCiphersOnSocket(PRFileDesc* fd)
+nsNSSComponent::UseWeakCiphersOnSocket(PRFileDesc* fd)
 {
-  const uint64_t enabledFallbackCiphers = sEnabledFallbackCiphers;
+  const uint64_t enabledWeakCiphers = sEnabledWeakCiphers;
   const CipherPref* const cp = sCipherPrefs;
   for (size_t i = 0; cp[i].pref; ++i) {
-    if (enabledFallbackCiphers & ((uint64_t)1 << i)) {
+    if (enabledWeakCiphers & ((uint64_t)1 << i)) {
       SSL_CipherPrefSet(fd, cp[i].id, true);
     }
   }
@@ -1449,18 +1449,18 @@ CipherSuiteChangeObserver::Observe(nsISupports* aSubject,
       if (prefName.Equals(cp[i].pref)) {
         bool cipherEnabled = Preferences::GetBool(cp[i].pref,
                                                   cp[i].enabledByDefault);
-        if (cp[i].fallback) {
-          // Fallback ciphers will not be used by default even if they
+        if (cp[i].weak) {
+          // Weak ciphers will not be used by default even if they
           // are enabled in prefs. They are only used on specific
           // sockets as a part of a fallback mechanism.
-          // Only the main thread will change sEnabledFallbackCiphers.
-          uint32_t enabledFallbackCiphers = sEnabledFallbackCiphers;
+          // Only the main thread will change sEnabledWeakCiphers.
+          uint32_t enabledWeakCiphers = sEnabledWeakCiphers;
           if (cipherEnabled) {
-            enabledFallbackCiphers |= ((uint64_t)1 << i);
+            enabledWeakCiphers |= ((uint64_t)1 << i);
           } else {
-            enabledFallbackCiphers &= ~((uint64_t)1 << i);
+            enabledWeakCiphers &= ~((uint64_t)1 << i);
           }
-          sEnabledFallbackCiphers = enabledFallbackCiphers;
+          sEnabledWeakCiphers = enabledWeakCiphers;
         } else {
           SSL_CipherPrefSetDefault(cp[i].id, cipherEnabled);
           SSL_ClearSessionCache();
@@ -2312,22 +2312,22 @@ InitializeCipherSuite()
   }
 
   // Now only set SSL/TLS ciphers we knew about at compile time
-  uint64_t enabledFallbackCiphers = 0;
+  uint64_t enabledWeakCiphers = 0;
   const CipherPref* const cp = sCipherPrefs;
   for (size_t i = 0; cp[i].pref; ++i) {
     bool cipherEnabled = Preferences::GetBool(cp[i].pref,
                                               cp[i].enabledByDefault);
-    if (cp[i].fallback) {
-      // Fallback ciphers are not used by default. See the comment
+    if (cp[i].weak) {
+      // Weak ciphers are not used by default. See the comment
       // in CipherSuiteChangeObserver::Observe for details.
       if (cipherEnabled) {
-        enabledFallbackCiphers |= ((uint64_t)1 << i);
+        enabledWeakCiphers |= ((uint64_t)1 << i);
       }
     } else {
       SSL_CipherPrefSetDefault(cp[i].id, cipherEnabled);
     }
   }
-  sEnabledFallbackCiphers = enabledFallbackCiphers;
+  sEnabledWeakCiphers = enabledWeakCiphers;
 
   // Enable ciphers for PKCS#12
   SEC_PKCS12EnableCipher(PKCS12_RC4_40, 1);
