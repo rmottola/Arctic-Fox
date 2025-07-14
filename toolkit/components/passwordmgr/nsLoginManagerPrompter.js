@@ -536,7 +536,7 @@ LoginManagerPrompter.prototype = {
 
       // Looks for existing logins to prefill the prompt with.
       var foundLogins = this._pwmgr.findLogins({},
-                                  hostname, null, httpRealm);
+                                               hostname, null, httpRealm);
       this.log("found " + foundLogins.length + " matching logins.");
 
       // XXX Can't select from multiple accounts yet. (bug 227632)
@@ -723,6 +723,7 @@ LoginManagerPrompter.prototype = {
    *
    */
   promptToSavePassword : function (aLogin) {
+    this.log("promptToSavePassword");
     var notifyObj = this._getPopupNote() || this._getNotifyBox();
     if (notifyObj)
       this._showSaveLoginNotification(notifyObj, aLogin);
@@ -1145,6 +1146,7 @@ LoginManagerPrompter.prototype = {
    *                       The new login from the page form.
    */
   promptToChangePassword(aOldLogin, aNewLogin) {
+    this.log("promptToChangePassword");
     let notifyObj = this._getPopupNote() || this._getNotifyBox();
 
     if (notifyObj) {
@@ -1274,6 +1276,7 @@ LoginManagerPrompter.prototype = {
    * Note; XPCOM stupidity: |count| is just |logins.length|.
    */
   promptToChangePasswordWithUsernames : function (logins, count, aNewLogin) {
+    this.log("promptToChangePasswordWithUsernames with count:", count);
     const buttonFlags = Ci.nsIPrompt.STD_YES_NO_BUTTONS;
 
     var usernames = logins.map(l => l.username);

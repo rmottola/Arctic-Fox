@@ -276,7 +276,7 @@ function promiseFormsProcessed(expectedCount = 1) {
       processedCount++;
       if (processedCount == expectedCount) {
         SpecialPowers.removeObserver(onProcessedForm, "passwordmgr-processed-form");
-        resolve(subject, data);
+        resolve(SpecialPowers.Cu.waiveXrays(subject), data);
       }
     }
     SpecialPowers.addObserver(onProcessedForm, "passwordmgr-processed-form", false);
@@ -313,5 +313,34 @@ if (this.addMessageListener) {
   // Code to only run in the mochitest pages (not in the chrome script).
   SimpleTest.registerCleanupFunction(() => {
     getRecipeParent().then(recipeParent => recipeParent.reset());
+  });
+
+
+  let { LoginHelper } = SpecialPowers.Cu.import("resource://gre/modules/LoginHelper.jsm", {});
+  /**
+   * Proxy for Services.logins (nsILoginManager).
+   * Only supports arguments which support structured clone plus {nsILoginInfo}
+   * Assumes properties are methods.
+   */
+  this.LoginManager = new Proxy({}, {
+    get(target, prop, receiver) {
+      return (...args) => {
+        let loginInfoIndices = [];
+        let cloneableArgs = args.map((val, index) => {
+          if (SpecialPowers.call_Instanceof(val, SpecialPowers.Ci.nsILoginInfo)) {
+            loginInfoIndices.push(index);
+            return LoginHelper.loginToVanillaObject(val);
+          }
+
+          return val;
+        });
+
+        return chromeScript.sendSyncMessage("proxyLoginManager", {
+          args: cloneableArgs,
+          loginInfoIndices,
+          methodName: prop,
+        })[0][0];
+      };
+    },
   });
 }
