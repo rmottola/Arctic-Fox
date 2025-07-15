@@ -1517,3 +1517,5 @@ pref("browser.migration.automigrate", false);
 
 // Enable browser frames for use on desktop.  Only exposed to chrome callers.
 pref("dom.mozBrowserFramesEnabled", true);
+
+pref("signon.schemeUpgrades", true);
