@@ -496,6 +496,7 @@ child:
     async SystemMemoryAvailable(uint64_t getterId, uint32_t memoryAvailable);
 
     async PreferenceUpdate(PrefSetting pref);
+    async VarUpdate(GfxVarUpdate var);
 
     async DataStoragePut(nsString aFilename, DataStorageItem aItem);
     async DataStorageRemove(nsString aFilename, nsCString aKey, DataStorageType aType);
@@ -844,6 +845,7 @@ parent:
 
     // PrefService message
     sync ReadPrefsArray() returns (PrefSetting[] prefs) verify;
+    sync GetGfxVars() returns (GfxVarUpdate[] vars);
 
     sync ReadFontList() returns (FontListEntry[] retValue);
 
@@ -895,6 +897,7 @@ parent:
     // Places the items within dataTransfer on the clipboard.
     async SetClipboard(IPCDataTransfer aDataTransfer,
                        bool aIsPrivateData,
+                       Principal aRequestingPrincipal,
                        int32_t aWhichClipboard);
 
     // Given a list of supported types, returns the clipboard data for the

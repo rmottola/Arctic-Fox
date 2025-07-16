@@ -2892,7 +2892,8 @@ nsContentUtils::SplitQName(const nsIContent* aNamespaceResolver,
                                                         nameSpace);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    *aNamespace = NameSpaceManager()->GetNameSpaceID(nameSpace);
+    *aNamespace = NameSpaceManager()->GetNameSpaceID(nameSpace,
+                                                     nsContentUtils::IsChromeDoc(aNamespaceResolver->OwnerDoc()));
     if (*aNamespace == kNameSpaceID_Unknown)
       return NS_ERROR_FAILURE;
 
@@ -3627,11 +3628,11 @@ nsContentUtils::IsChildOfSameType(nsIDocument* aDoc)
   return sameTypeParent != nullptr;
 }
 
-bool 
+bool
 nsContentUtils::IsScriptType(const nsACString& aContentType)
 {
   // NOTE: if you add a type here, add it to the CONTENTDLF_CATEGORIES
-  // define in nsContentDLF.h as well. 
+  // define in nsContentDLF.h as well.
   return aContentType.EqualsLiteral(APPLICATION_JAVASCRIPT) ||
          aContentType.EqualsLiteral(APPLICATION_XJAVASCRIPT) ||
          aContentType.EqualsLiteral(TEXT_ECMASCRIPT) ||
@@ -4445,9 +4446,10 @@ nsContentUtils::CreateContextualFragment(nsINode* aContextNode,
       uint32_t index;
 
       for (index = 0; index < count; index++) {
-        const nsAttrName* name = content->GetAttrNameAt(index);
+        const BorrowedAttrInfo info = content->GetAttrInfoAt(index);
+        const nsAttrName* name = info.mName;
         if (name->NamespaceEquals(kNameSpaceID_XMLNS)) {
-          content->GetAttr(kNameSpaceID_XMLNS, name->LocalName(), uriStr);
+          info.mValue->ToString(uriStr);
 
           // really want something like nsXMLContentSerializer::SerializeAttr
           tagName.AppendLiteral(" xmlns"); // space important
@@ -7070,9 +7072,8 @@ nsContentUtils::IsForbiddenSystemRequestHeader(const nsACString& aHeader)
   static const char *kInvalidHeaders[] = {
     "accept-charset", "accept-encoding", "access-control-request-headers",
     "access-control-request-method", "connection", "content-length",
-    "cookie", "cookie2", "content-transfer-encoding", "date", "dnt",
-    "expect", "host", "keep-alive", "origin", "referer", "te", "trailer",
-    "transfer-encoding", "upgrade", "via"
+    "cookie", "cookie2", "date", "dnt", "expect", "host", "keep-alive",
+    "origin", "referer", "te", "trailer", "transfer-encoding", "upgrade", "via"
   };
   for (uint32_t i = 0; i < ArrayLength(kInvalidHeaders); ++i) {
     if (aHeader.LowerCaseEqualsASCII(kInvalidHeaders[i])) {
@@ -8088,7 +8089,8 @@ nsContentUtils::SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
                                unsigned short aInputSourceArg,
                                bool aToWindow,
                                bool *aPreventDefault,
-                               bool aIsSynthesized)
+                               bool aIsDOMEventSynthesized,
+                               bool aIsWidgetEventSynthesized)
 {
   nsPoint offset;
   nsCOMPtr<nsIWidget> widget = GetWidget(aPresShell, &offset);
@@ -8122,7 +8124,10 @@ nsContentUtils::SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
     aInputSourceArg = nsIDOMMouseEvent::MOZ_SOURCE_MOUSE;
   }
 
-  WidgetMouseEvent event(true, msg, widget, WidgetMouseEvent::eReal,
+  WidgetMouseEvent event(true, msg, widget,
+                         aIsWidgetEventSynthesized ?
+                           WidgetMouseEvent::eSynthesized :
+                           WidgetMouseEvent::eReal,
                          contextMenuKey ? WidgetMouseEvent::eContextMenuKey :
                                           WidgetMouseEvent::eNormal);
   event.mModifiers = GetWidgetModifiers(aModifiers);
@@ -8132,7 +8137,7 @@ nsContentUtils::SendMouseEvent(nsCOMPtr<nsIPresShell> aPresShell,
   event.inputSource = aInputSourceArg;
   event.mClickCount = aClickCount;
   event.mTime = PR_IntervalNow();
-  event.mFlags.mIsSynthesizedForTests = aIsSynthesized;
+  event.mFlags.mIsSynthesizedForTests = aIsDOMEventSynthesized;
 
   nsPresContext* presContext = aPresShell->GetPresContext();
   if (!presContext)

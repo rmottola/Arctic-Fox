@@ -28,7 +28,6 @@
 #include "nsIDOMDocumentFragment.h"
 #include "nsIDOMHTMLElement.h"
 #include "nsIDOMHTMLMenuElement.h"
-#include "nsIDOMElementCSSInlineStyle.h"
 #include "nsIDOMWindow.h"
 #include "nsIDOMDocument.h"
 #include "nsMappedAttributes.h"
@@ -167,43 +166,6 @@ private:
   RefPtr<nsGenericHTMLElement> mElement;
 };
 
-class nsGenericHTMLElementTearoff : public nsIDOMElementCSSInlineStyle
-{
-  virtual ~nsGenericHTMLElementTearoff()
-  {
-  }
-
-  NS_DECL_CYCLE_COLLECTING_ISUPPORTS
-
-  explicit nsGenericHTMLElementTearoff(nsGenericHTMLElement* aElement)
-    : mElement(aElement)
-  {
-  }
-
-  NS_IMETHOD GetStyle(nsIDOMCSSStyleDeclaration** aStyle) override
-  {
-    NS_ADDREF(*aStyle = mElement->Style());
-    return NS_OK;
-  }
-
-  NS_DECL_CYCLE_COLLECTION_CLASS_AMBIGUOUS(nsGenericHTMLElementTearoff,
-                                           nsIDOMElementCSSInlineStyle)
-
-private:
-  RefPtr<nsGenericHTMLElement> mElement;
-};
-
-NS_IMPL_CYCLE_COLLECTION(nsGenericHTMLElementTearoff, mElement)
-
-NS_IMPL_CYCLE_COLLECTING_ADDREF(nsGenericHTMLElementTearoff)
-NS_IMPL_CYCLE_COLLECTING_RELEASE(nsGenericHTMLElementTearoff)
-
-NS_INTERFACE_TABLE_HEAD(nsGenericHTMLElementTearoff)
-  NS_INTERFACE_TABLE_INHERITED(nsGenericHTMLElementTearoff,
-                               nsIDOMElementCSSInlineStyle)
-  NS_INTERFACE_TABLE_TO_MAP_SEGUE_CYCLE_COLLECTION(nsGenericHTMLElementTearoff)
-NS_INTERFACE_MAP_END_AGGREGATED(mElement)
-
 NS_IMPL_ADDREF_INHERITED(nsGenericHTMLElement, nsGenericHTMLElementBase)
 NS_IMPL_RELEASE_INHERITED(nsGenericHTMLElement, nsGenericHTMLElementBase)
 
@@ -211,8 +173,6 @@ NS_INTERFACE_MAP_BEGIN(nsGenericHTMLElement)
   NS_INTERFACE_MAP_ENTRY(nsIDOMHTMLElement)
   NS_INTERFACE_MAP_ENTRY(nsIDOMElement)
   NS_INTERFACE_MAP_ENTRY(nsIDOMNode)
-  NS_INTERFACE_MAP_ENTRY_TEAROFF(nsIDOMElementCSSInlineStyle,
-                                 new nsGenericHTMLElementTearoff(this))
 NS_INTERFACE_MAP_END_INHERITING(nsGenericHTMLElementBase)
 
 nsresult
@@ -2621,34 +2581,6 @@ nsGenericHTMLFormElement::IsLabelable() const
 }
 
 //----------------------------------------------------------------------
-
-void
-nsGenericHTMLElement::Blur(mozilla::ErrorResult& aError)
-{
-  if (!ShouldBlur(this)) {
-    return;
-  }
-
-  nsIDocument* doc = GetComposedDoc();
-  if (!doc) {
-    return;
-  }
-
-  nsPIDOMWindowOuter* win = doc->GetWindow();
-  nsIFocusManager* fm = nsFocusManager::GetFocusManager();
-  if (win && fm) {
-    aError = fm->ClearFocus(win);
-  }
-}
-
-void
-nsGenericHTMLElement::Focus(ErrorResult& aError)
-{
-  nsIFocusManager* fm = nsFocusManager::GetFocusManager();
-  if (fm) {
-    aError = fm->SetFocus(this, 0);
-  }
-}
 
 void
 nsGenericHTMLElement::Click()

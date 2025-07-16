@@ -469,21 +469,6 @@ CustomElementCallback::CustomElementCallback(Element* aThisObject,
 {
 }
 
-CustomElementDefinition::CustomElementDefinition(JSObject* aPrototype,
-                                                 nsIAtom* aType,
-                                                 nsIAtom* aLocalName,
-                                                 LifecycleCallbacks* aCallbacks,
-                                                 uint32_t aNamespaceID,
-                                                 uint32_t aDocOrder)
-  : mPrototype(aPrototype),
-    mType(aType),
-    mLocalName(aLocalName),
-    mCallbacks(aCallbacks),
-    mNamespaceID(aNamespaceID),
-    mDocOrder(aDocOrder)
-{
-}
-
 CustomElementData::CustomElementData(nsIAtom* aType)
   : mType(aType),
     mCurrentCallback(-1),
@@ -2442,7 +2427,8 @@ nsDocument::FillStyleSet(StyleSetHandle aStyleSet)
       }
     }
   } else {
-    NS_ERROR("stylo: nsStyleSheetService doesn't handle ServoStyleSheets yet");
+    NS_WARNING("stylo: Not yet checking nsStyleSheetService for Servo-backed "
+               "documents. See bug 1290224");
   }
 
   AppendSheetsToStyleSet(aStyleSet, mAdditionalSheets[eAgentSheet],
@@ -4776,7 +4762,8 @@ nsDocument::SetScriptGlobalObject(nsIScriptGlobalObject *aScriptGlobalObject)
     }
 
     MaybeRescheduleAnimationFrameNotifications();
-    if (Preferences::GetBool("dom.webcomponents.enabled")) {
+    if (Preferences::GetBool("dom.webcomponents.enabled") ||
+        Preferences::GetBool("dom.webcomponents.customelements.enabled")) {
       mRegistry = new Registry();
     }
   }
@@ -7054,8 +7041,8 @@ nsDocument::CreateNodeIterator(nsIDOMNode *aRoot,
   NS_ENSURE_TRUE(root, NS_ERROR_UNEXPECTED);
 
   ErrorResult rv;
-  NodeFilterHolder holder(aFilter);
-  *_retval = nsIDocument::CreateNodeIterator(*root, aWhatToShow, holder,
+  *_retval = nsIDocument::CreateNodeIterator(*root, aWhatToShow,
+                                             NodeFilterHolder(aFilter),
                                              rv).take();
   return rv.StealNSResult();
 }
@@ -7065,18 +7052,17 @@ nsIDocument::CreateNodeIterator(nsINode& aRoot, uint32_t aWhatToShow,
                                 NodeFilter* aFilter,
                                 ErrorResult& rv) const
 {
-  NodeFilterHolder holder(aFilter);
-  return CreateNodeIterator(aRoot, aWhatToShow, holder, rv);
+  return CreateNodeIterator(aRoot, aWhatToShow, NodeFilterHolder(aFilter), rv);
 }
 
 already_AddRefed<NodeIterator>
 nsIDocument::CreateNodeIterator(nsINode& aRoot, uint32_t aWhatToShow,
-                                const NodeFilterHolder& aFilter,
+                                NodeFilterHolder aFilter,
                                 ErrorResult& rv) const
 {
   nsINode* root = &aRoot;
   RefPtr<NodeIterator> iterator = new NodeIterator(root, aWhatToShow,
-                                                     aFilter);
+                                                   Move(aFilter));
   return iterator.forget();
 }
 
@@ -7097,8 +7083,8 @@ nsDocument::CreateTreeWalker(nsIDOMNode *aRoot,
   NS_ENSURE_TRUE(root, NS_ERROR_DOM_NOT_SUPPORTED_ERR);
 
   ErrorResult rv;
-  NodeFilterHolder holder(aFilter);
-  *_retval = nsIDocument::CreateTreeWalker(*root, aWhatToShow, holder,
+  *_retval = nsIDocument::CreateTreeWalker(*root, aWhatToShow,
+                                           NodeFilterHolder(aFilter),
                                            rv).take();
   return rv.StealNSResult();
 }
@@ -7108,17 +7094,15 @@ nsIDocument::CreateTreeWalker(nsINode& aRoot, uint32_t aWhatToShow,
                               NodeFilter* aFilter,
                               ErrorResult& rv) const
 {
-  NodeFilterHolder holder(aFilter);
-  return CreateTreeWalker(aRoot, aWhatToShow, holder, rv);
+  return CreateTreeWalker(aRoot, aWhatToShow, NodeFilterHolder(aFilter), rv);
 }
 
 already_AddRefed<TreeWalker>
 nsIDocument::CreateTreeWalker(nsINode& aRoot, uint32_t aWhatToShow,
-                              const NodeFilterHolder& aFilter,
-                              ErrorResult& rv) const
+                              NodeFilterHolder aFilter, ErrorResult& rv) const
 {
   nsINode* root = &aRoot;
-  RefPtr<TreeWalker> walker = new TreeWalker(root, aWhatToShow, aFilter);
+  RefPtr<TreeWalker> walker = new TreeWalker(root, aWhatToShow, Move(aFilter));
   return walker.forget();
 }
 
@@ -9435,7 +9419,7 @@ nsDocument::OnPageHide(bool aPersisted,
     SetImagesNeedAnimating(false);
   }
 
-  MozExitPointerLock();
+  ExitPointerLock();
 
   // Now send out a PageHide event.
   nsCOMPtr<EventTarget> target = aDispatchStartTarget;
@@ -12272,7 +12256,7 @@ DispatchPointerLockChange(nsIDocument* aTarget)
 
   RefPtr<AsyncEventDispatcher> asyncDispatcher =
     new AsyncEventDispatcher(aTarget,
-                             NS_LITERAL_STRING("mozpointerlockchange"),
+                             NS_LITERAL_STRING("pointerlockchange"),
                              true,
                              false);
   asyncDispatcher->PostDOMEvent();
@@ -12287,7 +12271,7 @@ DispatchPointerLockError(nsIDocument* aTarget, const char* aMessage)
 
   RefPtr<AsyncEventDispatcher> asyncDispatcher =
     new AsyncEventDispatcher(aTarget,
-                             NS_LITERAL_STRING("mozpointerlockerror"),
+                             NS_LITERAL_STRING("pointerlockerror"),
                              true,
                              false);
   asyncDispatcher->PostDOMEvent();
@@ -12553,21 +12537,21 @@ nsIDocument::UnlockPointer(nsIDocument* aDoc)
 NS_IMETHODIMP
 nsDocument::MozExitPointerLock()
 {
-  nsIDocument::MozExitPointerLock();
+  nsIDocument::ExitPointerLock();
   return NS_OK;
 }
 
 NS_IMETHODIMP
 nsDocument::GetMozPointerLockElement(nsIDOMElement** aPointerLockedElement)
 {
-  Element* el = nsIDocument::GetMozPointerLockElement();
+  Element* el = nsIDocument::GetPointerLockElement();
   nsCOMPtr<nsIDOMElement> retval = do_QueryInterface(el);
   retval.forget(aPointerLockedElement);
   return NS_OK;
 }
 
 Element*
-nsIDocument::GetMozPointerLockElement()
+nsIDocument::GetPointerLockElement()
 {
   nsCOMPtr<Element> pointerLockedElement =
     do_QueryReferent(EventStateManager::sPointerLockedElement);

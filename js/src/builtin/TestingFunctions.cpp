@@ -6,7 +6,9 @@
 
 #include "builtin/TestingFunctions.h"
 
+#include "mozilla/FloatingPoint.h"
 #include "mozilla/Move.h"
+#include "mozilla/Snprintf.h"
 #include "mozilla/unused.h"
 
 #include <cmath>
@@ -317,8 +319,8 @@ GC(JSContext* cx, unsigned argc, Value* vp)
 
     char buf[256] = { '\0' };
 #ifndef JS_MORE_DETERMINISTIC
-    JS_snprintf(buf, sizeof(buf), "before %" PRIuSIZE ", after %" PRIuSIZE "\n",
-                preBytes, cx->runtime()->gc.usage.gcBytes());
+    snprintf_literal(buf, "before %" PRIuSIZE ", after %" PRIuSIZE "\n",
+                     preBytes, cx->runtime()->gc.usage.gcBytes());
 #endif
     JSString* str = JS_NewStringCopyZ(cx, buf);
     if (!str)
@@ -531,6 +533,14 @@ SuppressSignalHandlers(JSContext* cx, unsigned argc, Value* vp)
     wasm::SuppressSignalHandlersForTesting(ToBoolean(args[0]));
 
     args.rval().setUndefined();
+    return true;
+}
+
+static bool
+WasmInt64IsSupported(JSContext* cx, unsigned argc, Value* vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    args.rval().setBoolean(wasm::IsI64Implemented());
     return true;
 }
 
@@ -863,23 +873,7 @@ GCState(JSContext* cx, unsigned argc, Value* vp)
         return false;
     }
 
-    const char* state;
-    gc::State globalState = cx->runtime()->gc.state();
-    if (globalState == gc::NO_INCREMENTAL)
-        state = "none";
-    else if (globalState == gc::MARK)
-        state = "mark";
-    else if (globalState == gc::SWEEP)
-        state = "sweep";
-    else if (globalState == gc::FINALIZE)
-        state = "finalize";
-    else if (globalState == gc::COMPACT)
-        state = "compact";
-    else if (globalState == gc::DECOMMIT)
-        state = "decommit";
-    else
-        MOZ_CRASH("Unobserveable global GC state");
-
+    const char* state = StateName(cx->runtime()->gc.state());
     JSString* str = JS_NewStringCopyZ(cx, state);
     if (!str)
         return false;
@@ -1105,17 +1099,18 @@ SaveStack(JSContext* cx, unsigned argc, Value* vp)
 
     JS::StackCapture capture((JS::AllFrames()));
     if (args.length() >= 1) {
-        double d;
-        if (!ToNumber(cx, args[0], &d))
+        double maxDouble;
+        if (!ToNumber(cx, args[0], &maxDouble))
             return false;
-        if (d < 0) {
+        if (mozilla::IsNaN(maxDouble) || maxDouble < 0 || maxDouble > UINT32_MAX) {
             ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
                                   JSDVG_SEARCH_STACK, args[0], nullptr,
                                   "not a valid maximum frame count", NULL);
             return false;
         }
-        if (d > 0)
-            capture = JS::StackCapture(JS::MaxFrames(d));
+        uint32_t max = uint32_t(maxDouble);
+        if (max > 0)
+            capture = JS::StackCapture(JS::MaxFrames(max));
     }
 
     JSCompartment* targetCompartment = cx->compartment();
@@ -2407,7 +2402,7 @@ ObjectAddress(JSContext* cx, unsigned argc, Value* vp)
 #else
     void* ptr = js::UncheckedUnwrap(&args[0].toObject(), true);
     char buffer[64];
-    JS_snprintf(buffer, sizeof(buffer), "%p", ptr);
+    snprintf_literal(buffer, "%p", ptr);
 
     JSString* str = JS_NewStringCopyZ(cx, buffer);
     if (!str)
@@ -2448,8 +2443,8 @@ SharedAddress(JSContext* cx, unsigned argc, Value* vp)
     }
     char buffer[64];
     uint32_t nchar =
-        JS_snprintf(buffer, sizeof(buffer), "%p",
-                    obj->as<SharedArrayBufferObject>().dataPointerShared().unwrap(/*safeish*/));
+        snprintf_literal(buffer, "%p",
+                         obj->as<SharedArrayBufferObject>().dataPointerShared().unwrap(/*safeish*/));
 
     JSString* str = JS_NewStringCopyN(cx, buffer, nchar);
     if (!str)
@@ -3866,6 +3861,10 @@ gc::ZealModeHelpText),
 "suppressSignalHandlers(suppress)",
 "  This function allows artificially suppressing signal handler support, even if the underlying "
 "  platform supports it."),
+
+    JS_FN_HELP("wasmInt64IsSupported", WasmInt64IsSupported, 0, 0,
+"wasmInt64IsSupported()",
+"  Returns a boolean indicating whether WebAssembly has 64bit integer support on the current device."),
 
     JS_FN_HELP("wasmTextToBinary", WasmTextToBinary, 1, 0,
 "wasmTextToBinary(str)",

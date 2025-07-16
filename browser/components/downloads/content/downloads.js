@@ -1013,6 +1013,8 @@ const DownloadsView = {
   },
 }
 
+XPCOMUtils.defineConstant(this, "DownloadsView", DownloadsView);
+
 ////////////////////////////////////////////////////////////////////////////////
 //// DownloadsViewItem
 
@@ -1105,7 +1107,17 @@ DownloadsViewItem.prototype = {
 
   downloadsCmd_unblock() {
     DownloadsPanel.hidePanel();
-    this.confirmUnblock(window);
+    this.confirmUnblock(window, "unblock");
+  },
+
+  downloadsCmd_chooseUnblock() {
+    DownloadsPanel.hidePanel();
+    this.confirmUnblock(window, "chooseUnblock");
+  },
+
+  downloadsCmd_chooseOpen() {
+    DownloadsPanel.hidePanel();
+    this.confirmUnblock(window, "chooseOpen");
   },
 
   downloadsCmd_open() {
@@ -1186,7 +1198,17 @@ const DownloadsViewController = {
         !(aCommand in DownloadsViewItem.prototype)) {
       return false;
     }
-    // Secondly, determine if focus is on a control in the downloads list.
+    // The currently supported commands depend on whether the blocked subview is
+    // showing.  If it is, then take the following path.
+    if (DownloadsBlockedSubview.view.showingSubView) {
+      let blockedSubviewCmds = [
+        "downloadsCmd_chooseOpen",
+        "cmd_delete",
+      ];
+      return blockedSubviewCmds.indexOf(aCommand) >= 0;
+    }
+    // If the blocked subview is not showing, then determine if focus is on a
+    // control in the downloads list.
     let element = document.commandDispatcher.focusedElement;
     while (element && element != DownloadsView.richListBox) {
       element = element.parentNode;
@@ -1596,6 +1618,9 @@ const DownloadsBlockedSubview = {
    */
   hide() {
     this.view.showMainView();
+    // The point of this is to focus the proper element in the panel now that
+    // the main view is showing again.  showPanel handles that.
+    DownloadsPanel.showPanel();
   },
 
   /**

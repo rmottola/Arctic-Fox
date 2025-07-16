@@ -1358,7 +1358,7 @@ var BookmarkingUI = {
     });
   },
 
-  _updateRecentBookmarks: function(container, extraCSSClass = "") {
+  _updateRecentBookmarks: function(aHeaderItem, extraCSSClass = "") {
     const kMaxResults = 5;
 
     let options = PlacesUtils.history.getNewQueryOptions();
@@ -1368,69 +1368,44 @@ var BookmarkingUI = {
     options.maxResults = kMaxResults;
     let query = PlacesUtils.history.getNewQuery();
 
-    while (container.firstChild) {
-      container.firstChild.remove();
+    while (aHeaderItem.nextSibling &&
+           aHeaderItem.nextSibling.localName == "menuitem") {
+      aHeaderItem.nextSibling.remove();
     }
 
-    PlacesUtils.history.QueryInterface(Ci.nsPIPlacesDatabase)
-                       .asyncExecuteLegacyQueries([query], 1, options, {
-      handleResult: function (aResultSet) {
-        let onItemClick = function (aEvent) {
-          let item = aEvent.target;
-          openUILink(item.getAttribute("targetURI"), aEvent);
-          CustomizableUI.hidePanelForNode(item);
-        };
+    let onItemCommand = function (aEvent) {
+      let item = aEvent.target;
+      openUILink(item.getAttribute("targetURI"), aEvent);
+      CustomizableUI.hidePanelForNode(item);
+    };
 
-        let fragment = document.createDocumentFragment();
-        let row;
-        while ((row = aResultSet.getNextRow())) {
-          let uri = row.getResultByIndex(1);
-          let title = row.getResultByIndex(2);
-          let icon = row.getResultByIndex(6);
+    let fragment = document.createDocumentFragment();
+    let root = PlacesUtils.history.executeQuery(query, options).root;
+    root.containerOpen = true;
+    for (let i = 0; i < root.childCount; i++) {
+      let node = root.getChild(i);
+      let uri = node.uri;
+      let title = node.title;
+      let icon = node.icon;
 
-          let item =
-            document.createElementNS("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
-                                     "menuitem");
-          item.setAttribute("label", title || uri);
-          item.setAttribute("targetURI", uri);
-          item.setAttribute("class", "menuitem-iconic menuitem-with-favicon bookmark-item " +
-                                     extraCSSClass);
-          item.addEventListener("click", onItemClick);
-          if (icon) {
-            let iconURL = "moz-anno:favicon:" + icon;
-            item.setAttribute("image", iconURL);
-          }
-          fragment.appendChild(item);
-        }
-        container.appendChild(fragment);
-      },
-      handleError: function (aError) {
-        Cu.reportError("Error while attempting to show recent bookmarks: " + aError);
-      },
-      handleCompletion: function (aReason) {
-      },
-    });
-  },
-
-  /**
-   * Handles star styling based on page proxy state changes.
-   */
-  onPageProxyStateChanged: function BUI_onPageProxyStateChanged(aState) {
-    if (!this.star) {
-      return;
+      let item =
+        document.createElementNS("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul",
+                                 "menuitem");
+      item.setAttribute("label", title || uri);
+      item.setAttribute("targetURI", uri);
+      item.setAttribute("simulated-places-node", true);
+      item.setAttribute("class", "menuitem-iconic menuitem-with-favicon bookmark-item " +
+                                 extraCSSClass);
+      item.addEventListener("command", onItemCommand);
+      if (icon) {
+        let iconURL = "moz-anno:favicon:" + icon;
+        item.setAttribute("image", iconURL);
+      }
+      item._placesNode = node;
+      fragment.appendChild(item);
     }
-
-    if (aState == "invalid") {
-      this.star.setAttribute("disabled", "true");
-      this.broadcaster.setAttribute("stardisabled", "true");
-      this.broadcaster.removeAttribute("starred");
-      this.broadcaster.setAttribute("buttontooltiptext", "");
-    }
-    else {
-      this.star.removeAttribute("disabled");
-      this.broadcaster.removeAttribute("stardisabled");
-      this._updateStar();
-    }
+    root.containerOpen = false;
+    aHeaderItem.parentNode.insertBefore(fragment, aHeaderItem.nextSibling);
   },
 
   _updateToolbarStyle: function BUI__updateToolbarStyle() {
@@ -1553,11 +1528,6 @@ var BookmarkingUI = {
     if (this._pendingStmt) {
       this._pendingStmt.cancel();
       delete this._pendingStmt;
-    }
-
-    // We can load about:blank before the actual page, but there is no point in handling that page.
-    if (isBlankPageURL(this._uri.spec)) {
-      return;
     }
 
     this._pendingStmt = PlacesUtils.asyncGetBookmarkIds(this._uri, (aItemIds, aURI) => {

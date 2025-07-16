@@ -723,7 +723,7 @@ toolbar[mode="full"] .toolbarbutton-1 > .toolbarbutton-menubutton-button {
 }
 
 #downloads-button {
-  -moz-image-region: rect(0px 24px 24px 0px);
+  -moz-image-region: rect(0px 198px 18px 180px);
 }
 
 #history-button,

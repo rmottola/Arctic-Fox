@@ -321,7 +321,6 @@ public:
   IntSize GetImageSize() const { return mImageSize; }
   IntRect GetRect() const { return mFrameRect; }
   IntSize GetSize() const { return mFrameRect.Size(); }
-  bool NeedsPadding() const { return mFrameRect.TopLeft() != IntPoint(0, 0); }
   void GetImageData(uint8_t** aData, uint32_t* length) const;
   uint8_t* GetImageData() const;
 
@@ -337,10 +336,7 @@ public:
 
   void SetOptimizable();
 
-  Color SinglePixelColor() const;
-  bool IsSinglePixel() const;
-
-  already_AddRefed<SourceSurface> GetSurface();
+  already_AddRefed<SourceSurface> GetSourceSurface();
 
   void AddSizeOfExcludingThis(MallocSizeOf aMallocSizeOf, size_t& aHeapSizeOut,
                               size_t& aNonHeapSizeOut) const;
@@ -361,7 +357,7 @@ private: // methods
   void GetImageDataInternal(uint8_t** aData, uint32_t* length) const;
   uint32_t GetImageBytesPerRow() const;
   uint32_t GetImageDataLength() const;
-  already_AddRefed<SourceSurface> GetSurfaceInternal();
+  already_AddRefed<SourceSurface> GetSourceSurfaceInternal();
 
   uint32_t PaletteDataLength() const
   {
@@ -379,12 +375,8 @@ private: // methods
     bool IsValid() { return !!mDrawable; }
   };
 
-  SurfaceWithFormat SurfaceForDrawing(bool               aDoPadding,
-                                      bool               aDoPartialDecode,
+  SurfaceWithFormat SurfaceForDrawing(bool               aDoPartialDecode,
                                       bool               aDoTile,
-                                      gfxContext*        aContext,
-                                      const nsIntMargin& aPadding,
-                                      gfxRect&           aImageRect,
                                       ImageRegion&       aRegion,
                                       SourceSurface*     aSurface);
 
@@ -445,17 +437,13 @@ private: // data
   // Main-thread-only mutable data.
   //////////////////////////////////////////////////////////////////////////////
 
-  // Note that the data stored in gfx::Color is *non-alpha-premultiplied*.
-  Color        mSinglePixelColor;
-
-  bool mSinglePixel;
   bool mCompositingFailed;
 };
 
 /**
  * A reference to an imgFrame that holds the imgFrame's surface in memory,
  * allowing drawing. If you have a DrawableFrameRef |ref| and |if (ref)| returns
- * true, then calls to Draw() and GetSurface() are guaranteed to succeed.
+ * true, then calls to Draw() and GetSourceSurface() are guaranteed to succeed.
  */
 class DrawableFrameRef final
 {

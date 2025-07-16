@@ -6,6 +6,7 @@
 
 #include "ImageDocument.h"
 #include "mozilla/dom/ImageDocumentBinding.h"
+#include "mozilla/dom/HTMLImageElement.h"
 #include "nsRect.h"
 #include "nsIImageLoadingContent.h"
 #include "nsGenericHTMLElement.h"
@@ -39,14 +40,12 @@
 #include "nsThreadUtils.h"
 #include "nsIScrollableFrame.h"
 #include "nsContentUtils.h"
-#include "nsCSSParser.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/Preferences.h"
 #include <algorithm>
 
 #define AUTOMATIC_IMAGE_RESIZING_PREF "browser.enable_automatic_image_resizing"
 #define CLICK_IMAGE_RESIZING_PREF "browser.enable_click_image_resizing"
-#define STANDALONE_IMAGE_BACKGROUND_COLOR_PREF "browser.display.standalone_images.background_color"
 //XXX A hack needed for Firefox's site specific zoom.
 #define SITE_SPECIFIC_ZOOM "browser.zoom.siteSpecific"
 
@@ -169,7 +168,6 @@ ImageDocument::Init()
 
   mResizeImageByDefault = Preferences::GetBool(AUTOMATIC_IMAGE_RESIZING_PREF);
   mClickResizingEnabled = Preferences::GetBool(CLICK_IMAGE_RESIZING_PREF);
-  mBackgroundColor = Preferences::GetString(STANDALONE_IMAGE_BACKGROUND_COLOR_PREF);
   mShouldResize = mResizeImageByDefault;
   mFirstResize = true;
 
@@ -286,6 +284,9 @@ ImageDocument::OnPageShow(bool aPersisted,
     mOriginalZoomLevel =
       Preferences::GetBool(SITE_SPECIFIC_ZOOM, false) ? 1.0 : GetZoomLevel();
   }
+  RefPtr<ImageDocument> kungFuDeathGrip(this);
+  UpdateSizeFromLayout();
+
   MediaDocument::OnPageShow(aPersisted, aDispatchStartTarget);
 }
 
@@ -338,11 +339,28 @@ ImageDocument::ShrinkToFit()
   }
   if (GetZoomLevel() != mOriginalZoomLevel && mImageIsResized &&
       !nsContentUtils::IsChildOfSameType(this)) {
+    // If we're zoomed, so that we don't maintain the invariant that
+    // mImageIsResized if and only if its displayed width/height fit in
+    // mVisibleWidth/mVisibleHeight, then we may need to switch to/from the
+    // overflowingVertical class here, because our viewport size may have
+    // changed and we don't plan to adjust the image size to compensate.  Since
+    // mImageIsResized it has a "height" attribute set, and we can just get the
+    // displayed image height by getting .height on the HTMLImageElement.
+    HTMLImageElement* img = HTMLImageElement::FromContent(mImageContent);
+    uint32_t imageHeight = img->Height();
+    nsDOMTokenList* classList = img->ClassList();
+    ErrorResult ignored;
+    if (imageHeight > mVisibleHeight) {
+      classList->Add(NS_LITERAL_STRING("overflowingVertical"), ignored);
+    } else {
+      classList->Remove(NS_LITERAL_STRING("overflowingVertical"), ignored);
+    }
+    ignored.SuppressException();
     return;
   }
 
   // Keep image content alive while changing the attributes.
-  nsCOMPtr<nsIContent> imageContent = mImageContent;
+  nsCOMPtr<Element> imageContent = mImageContent;
   nsCOMPtr<nsIDOMHTMLImageElement> image = do_QueryInterface(mImageContent);
   image->SetWidth(std::max(1, NSToCoordFloor(GetRatio() * mImageWidth)));
   image->SetHeight(std::max(1, NSToCoordFloor(GetRatio() * mImageHeight)));
@@ -410,7 +428,7 @@ ImageDocument::RestoreImage()
     return;
   }
   // Keep image content alive while changing the attributes.
-  nsCOMPtr<nsIContent> imageContent = mImageContent;
+  nsCOMPtr<Element> imageContent = mImageContent;
   imageContent->UnsetAttr(kNameSpaceID_None, nsGkAtoms::width, true);
   imageContent->UnsetAttr(kNameSpaceID_None, nsGkAtoms::height, true);
   
@@ -494,7 +512,7 @@ ImageDocument::OnHasTransparency()
     return;
   }
 
-  nsDOMTokenList* classList = mImageContent->AsElement()->ClassList();
+  nsDOMTokenList* classList = mImageContent->ClassList();
   mozilla::ErrorResult rv;
   classList->Add(NS_LITERAL_STRING("transparent"), rv);
 }
@@ -502,8 +520,8 @@ ImageDocument::OnHasTransparency()
 void
 ImageDocument::SetModeClass(eModeClasses mode)
 {
-  nsDOMTokenList* classList = mImageContent->AsElement()->ClassList();
-  mozilla::ErrorResult rv;
+  nsDOMTokenList* classList = mImageContent->ClassList();
+  ErrorResult rv;
 
   if (mode == eShrinkToFit) {
     classList->Add(NS_LITERAL_STRING("shrinkToFit"), rv);
@@ -522,6 +540,8 @@ ImageDocument::SetModeClass(eModeClasses mode)
   } else {
     classList->Remove(NS_LITERAL_STRING("overflowingHorizontalOnly"), rv);
   }
+
+  rv.SuppressException();
 }
 
 nsresult
@@ -605,12 +625,11 @@ ImageDocument::UpdateSizeFromLayout()
 {
   // Pull an updated size from the content frame to account for any size
   // change due to CSS properties like |image-orientation|.
-  Element* contentElement = mImageContent->AsElement();
-  if (!contentElement) {
+  if (!mImageContent) {
     return;
   }
 
-  nsIFrame* contentFrame = contentElement->GetPrimaryFrame(Flush_Frames);
+  nsIFrame* contentFrame = mImageContent->GetPrimaryFrame(Flush_Frames);
   if (!contentFrame) {
     return;
   }
@@ -666,23 +685,9 @@ ImageDocument::CreateSyntheticDocument()
   mImageContent->SetAttr(kNameSpaceID_None, nsGkAtoms::src, srcString, false);
   mImageContent->SetAttr(kNameSpaceID_None, nsGkAtoms::alt, srcString, false);
 
-  //Pale Moon: implement mechanism for custom background color.
-
-  if (!mBackgroundColor.IsEmpty()) {
-    nsCSSValue color;
-    nsCSSParser parser;
-    if (parser.ParseColorString(mBackgroundColor, nullptr, 0, color)) {
-      nsAutoString styleAttr(NS_LITERAL_STRING("background-color: "));
-      styleAttr.Append(mBackgroundColor);
-      body->SetAttr(kNameSpaceID_None, nsGkAtoms::style, styleAttr, false);
-    }
-  }
-
   body->AppendChildTo(mImageContent, false);
   imageLoader->SetLoadingEnabled(true);
 
-  UpdateTitleAndCharset();
-  
   return NS_OK;
 }
 

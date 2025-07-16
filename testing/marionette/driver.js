@@ -2697,11 +2697,12 @@ GeckoDriver.prototype.setWindowSize = function(cmd, resp) {
   let height = parseInt(cmd.parameters.height);
 
   let win = this.getCurrentWindow();
-  if (width >= win.screen.availWidth && height >= win.screen.availHeight) {
-    throw new UnsupportedOperationError("Invalid requested size, cannot maximize");
+  if (width >= win.screen.availWidth || height >= win.screen.availHeight) {
+    throw new UnsupportedOperationError("Requested size exceeds screen size")
   }
 
   win.resizeTo(width, height);
+  this.getWindowSize(cmd, resp);
 };
 
 /**
@@ -2716,8 +2717,7 @@ GeckoDriver.prototype.maximizeWindow = function(cmd, resp) {
   }
 
   let win = this.getCurrentWindow();
-  win.moveTo(0,0);
-  win.resizeTo(win.screen.availWidth, win.screen.availHeight);
+  win.maximize()
 };
 
 /**

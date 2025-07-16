@@ -2181,12 +2181,13 @@ intrinsic_InstantiateModuleFunctionDeclarations(JSContext* cx, unsigned argc, Va
 }
 
 static bool
-intrinsic_SetModuleEvaluated(JSContext* cx, unsigned argc, Value* vp)
+intrinsic_SetModuleState(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    MOZ_ASSERT(args.length() == 1);
+    MOZ_ASSERT(args.length() == 2);
     RootedModuleObject module(cx, &args[0].toObject().as<ModuleObject>());
-    module->setEvaluated();
+    ModuleState newState = args[1].toInt32();
+    module->setState(newState);
     args.rval().setUndefined();
     return true;
 }
@@ -2368,6 +2369,7 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_INLINABLE_FN("IsCallable",    intrinsic_IsCallable,              1,0, IntrinsicIsCallable),
     JS_INLINABLE_FN("IsConstructor", intrinsic_IsConstructor,           1,0,
                     IntrinsicIsConstructor),
+    JS_FN("IsFunctionObject",intrinsic_IsInstanceOfBuiltin<JSFunction>, 1,0),
     JS_FN("GetBuiltinConstructorImpl", intrinsic_GetBuiltinConstructor, 1,0),
     JS_FN("MakeConstructible",       intrinsic_MakeConstructible,       2,0),
     JS_FN("_ConstructFunction",      intrinsic_ConstructFunction,       2,0),
@@ -2628,7 +2630,7 @@ static const JSFunctionSpec intrinsic_functions[] = {
     JS_FN("CreateNamespaceBinding", intrinsic_CreateNamespaceBinding, 3, 0),
     JS_FN("InstantiateModuleFunctionDeclarations",
           intrinsic_InstantiateModuleFunctionDeclarations, 1, 0),
-    JS_FN("SetModuleEvaluated", intrinsic_SetModuleEvaluated, 1, 0),
+    JS_FN("SetModuleState", intrinsic_SetModuleState, 1, 0),
     JS_FN("EvaluateModule", intrinsic_EvaluateModule, 1, 0),
     JS_FN("IsModuleNamespace", intrinsic_IsInstanceOfBuiltin<ModuleNamespaceObject>, 1, 0),
     JS_FN("NewModuleNamespace", intrinsic_NewModuleNamespace, 2, 0),
@@ -2761,13 +2763,6 @@ class MOZ_STACK_CLASS AutoSelfHostingErrorReporter
     }
 };
 
-
-
-// This function is miscompiled by LTCG with MSVC, and results in a crash
-// when running xpcshell during the build.  See bug 915735.
-#ifdef _MSC_VER
-#pragma optimize("", off)
-#endif
 bool
 JSRuntime::initSelfHosting(JSContext* cx)
 {
@@ -2805,30 +2800,22 @@ JSRuntime::initSelfHosting(JSContext* cx)
 
     RootedValue rv(cx);
 
-    char* filename = getenv("MOZ_SELFHOSTEDJS");
-    if (filename) {
-        if (!Evaluate(cx, options, filename, &rv))
-            return false;
-    } else {
-        uint32_t srcLen = GetRawScriptsSize();
+    uint32_t srcLen = GetRawScriptsSize();
 
-        const unsigned char* compressed = compressedSources;
-        uint32_t compressedLen = GetCompressedSize();
-        ScopedJSFreePtr<char> src(selfHostingGlobal_->zone()->pod_malloc<char>(srcLen));
-        if (!src || !DecompressString(compressed, compressedLen,
-                                      reinterpret_cast<unsigned char*>(src.get()), srcLen))
-        {
-            return false;
-        }
-
-        if (!Evaluate(cx, options, src, srcLen, &rv))
-            return false;
+    const unsigned char* compressed = compressedSources;
+    uint32_t compressedLen = GetCompressedSize();
+    ScopedJSFreePtr<char> src(selfHostingGlobal_->zone()->pod_malloc<char>(srcLen));
+    if (!src || !DecompressString(compressed, compressedLen,
+                                  reinterpret_cast<unsigned char*>(src.get()), srcLen))
+    {
+        return false;
     }
+
+    if (!Evaluate(cx, options, src, srcLen, &rv))
+        return false;
+
     return true;
 }
-#ifdef _MSC_VER
-#pragma optimize("", on)
-#endif
 
 void
 JSRuntime::finishSelfHosting()

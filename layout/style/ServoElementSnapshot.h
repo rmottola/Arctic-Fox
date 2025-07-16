@@ -9,6 +9,7 @@
 
 #include "mozilla/EventStates.h"
 #include "mozilla/TypedEnumBits.h"
+#include "mozilla/dom/BorrowedAttrInfo.h"
 #include "nsAttrName.h"
 #include "nsAttrValue.h"
 #include "nsChangeHint.h"
@@ -45,8 +46,7 @@ enum class ServoElementSnapshotFlags : uint8_t
 {
   State = 1 << 0,
   Attributes = 1 << 1,
-  HTMLElementInHTMLDocument = 1 << 2,
-  All = State | Attributes | HTMLElementInHTMLDocument
+  All = State | Attributes
 };
 
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(ServoElementSnapshotFlags)
@@ -60,23 +60,14 @@ MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(ServoElementSnapshotFlags)
  */
 class ServoElementSnapshot
 {
+  typedef dom::BorrowedAttrInfo BorrowedAttrInfo;
   typedef dom::Element Element;
   typedef EventStates::ServoType ServoStateType;
 
 public:
   typedef ServoElementSnapshotFlags Flags;
 
-  /**
-   * Empty snapshot, with no data at all.
-   */
-  ServoElementSnapshot()
-    : mContains(Flags(0))
-    , mState(0)
-    , mExplicitRestyleHint(nsRestyleHint(0))
-    , mExplicitChangeHint(nsChangeHint(0))
-    , mIsHTMLElementInHTMLDocument(false)
-  {
-  }
+  explicit ServoElementSnapshot(Element* aElement);
 
   bool HasAttrs() { return HasAny(Flags::Attributes); }
 
@@ -115,12 +106,12 @@ public:
   /**
    * Needed methods for attribute matching.
    */
-  const nsAttrName* GetAttrNameAt(uint32_t aIndex) const
+  BorrowedAttrInfo GetAttrInfoAt(uint32_t aIndex) const
   {
     if (aIndex >= mAttrs.Length()) {
-      return nullptr;
+      return BorrowedAttrInfo(nullptr, nullptr);
     }
-    return &mAttrs[aIndex].mName;
+    return BorrowedAttrInfo(&mAttrs[aIndex].mName, &mAttrs[aIndex].mValue);
   }
 
   const nsAttrValue* GetParsedAttr(nsIAtom* aLocalName) const
@@ -152,12 +143,9 @@ public:
     return nullptr;
   }
 
-  void SetIsHTMLElementInHTMLDocument(bool aIs)
+  bool IsInChromeDocument()
   {
-    MOZ_ASSERT(!HasAny(Flags::HTMLElementInHTMLDocument),
-               "Only expected to be set once!");
-    mContains |= Flags::HTMLElementInHTMLDocument;
-    mIsHTMLElementInHTMLDocument = aIs;
+    return mIsInChromeDocument;
   }
 
   bool HasAny(Flags aFlags) { return bool(mContains & aFlags); }
@@ -173,6 +161,7 @@ private:
   nsRestyleHint mExplicitRestyleHint;
   nsChangeHint mExplicitChangeHint;
   bool mIsHTMLElementInHTMLDocument;
+  bool mIsInChromeDocument;
 };
 
 } // namespace mozilla

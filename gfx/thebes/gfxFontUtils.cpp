@@ -1771,3 +1771,8 @@ gfxFontUtils::IsCffFont(const uint8_t* aFontData)
 
 #endif
 
+#undef acceptablePlatform
+#undef isSymbol
+#undef isUVSEncoding
+#undef LOG
+#undef LOG_ENABLED

@@ -18,10 +18,12 @@
     <content orient="horizontal"
              align="center"
              onclick="DownloadsView.onDownloadClick(event);">
-      <xul:image class="downloadTypeIcon"
-                 validate="always"
-                 xbl:inherits="src=image"/>
-      <xul:image class="downloadTypeIcon blockedIcon"/>
+      <xul:stack class="downloadStackIcon">
+        <xul:image class="downloadTypeIcon"
+                   validate="always"
+                   xbl:inherits="src=image"/>
+        <xul:image class="downloadTypeIcon blockedIcon" />
+      </xul:stack>
       <xul:vbox pack="center"
                 flex="1"
                 class="downloadContainer"
@@ -63,10 +65,12 @@
         <xul:button class="downloadButton downloadConfirmBlock downloadIconCancel"
                     tooltiptext="&cmd.removeFile.label;"
                     oncommand="DownloadsView.onDownloadCommand(event, 'downloadsCmd_confirmBlock');"/>
-        <xul:button class="downloadButton downloadUnblock downloadIconShow"
-                    tooltiptext="&cmd.unblock.label;"
-                    oncommand="DownloadsView.onDownloadCommand(event, 'downloadsCmd_unblock');"/>
-
+        <xul:button class="downloadButton downloadChooseUnblock downloadIconShow"
+                    tooltiptext="&cmd.chooseUnblock.label;"
+                    oncommand="DownloadsView.onDownloadCommand(event, 'downloadsCmd_chooseUnblock');"/>
+        <xul:button class="downloadButton downloadChooseOpen downloadIconShow"
+                    tooltiptext="&cmd.chooseOpen.label;"
+                    oncommand="DownloadsView.onDownloadCommand(event, 'downloadsCmd_chooseOpen');"/>
         <xul:button class="downloadButton downloadShowBlockedInfo"
                     tooltiptext="&cmd.chooseUnblock.label;"
                     oncommand="DownloadsView.onDownloadCommand(event, 'downloadsCmd_showBlockedInfo');"/>
@@ -75,10 +79,13 @@
   </binding>
 
   <binding id="download-toolbarbutton"
-           extends="chrome://global/content/bindings/toolbarbutton.xml#toolbarbutton">
+           extends="chrome://global/content/bindings/toolbarbutton.xml#toolbarbutton-badged">
     <content>
-      <children />
-      <xul:image class="toolbarbutton-icon" xbl:inherits="validate,src=image,label"/>
+      <xul:stack class="toolbarbutton-badge-stack">
+        <children />
+        <xul:image class="toolbarbutton-icon" xbl:inherits="validate,src=image,label,consumeanchor"/>
+        <xul:label class="toolbarbutton-badge" xbl:inherits="value=badge" top="0" end="0" crop="none"/>
+      </xul:stack>
       <xul:label class="toolbarbutton-text" crop="right" flex="1"
                  xbl:inherits="value=label,accesskey,crop,wrap"/>
       <xul:label class="toolbarbutton-multiline-text" flex="1"

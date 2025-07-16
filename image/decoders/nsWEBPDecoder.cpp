@@ -149,7 +149,7 @@ nsWEBPDecoder::ReadWEBPData(const char* aData, size_t aLength)
 
   if (!mImageData) {
     MOZ_ASSERT(HasSize(), "Didn't fetch metadata?");
-    nsresult rv_ = AllocateBasicFrame();
+    nsresult rv_ = AllocateFrame(0, Size(), FullFrame(), gfx::SurfaceFormat::B8G8R8A8);
     if (NS_FAILED(rv_)) {
       return Transition::TerminateFailure();
     }

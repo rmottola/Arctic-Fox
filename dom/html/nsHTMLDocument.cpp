@@ -2252,8 +2252,6 @@ nsHTMLDocument::NamedGetter(JSContext* cx, const nsAString& aName, bool& aFound,
   }
 
   JS::Rooted<JS::Value> val(cx);
-  // XXXbz Should we call the (slightly misnamed, really) WrapNativeParent
-  // here?
   if (!dom::WrapObject(cx, supp, cache, nullptr, &val)) {
     rv.Throw(NS_ERROR_OUT_OF_MEMORY);
     return;

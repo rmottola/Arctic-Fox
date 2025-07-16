@@ -62,7 +62,7 @@ using safe_browsing::ClientDownloadRequest_Resource;
 using safe_browsing::ClientDownloadRequest_SignatureInfo;
 
 // Preferences that we need to initialize the query.
-#define PREF_SB_APP_REP_URL "browser.safebrowsing.appRepURL"
+#define PREF_SB_APP_REP_URL "browser.safebrowsing.downloads.remote.url"
 #define PREF_SB_MALWARE_ENABLED "browser.safebrowsing.malware.enabled"
 #define PREF_SB_DOWNLOADS_ENABLED "browser.safebrowsing.downloads.enabled"
 #define PREF_SB_DOWNLOADS_REMOTE_ENABLED "browser.safebrowsing.downloads.remote.enabled"
@@ -1028,6 +1028,8 @@ PendingLookup::Notify(nsITimer* aTimer)
 {
   LOG(("Remote lookup timed out [this = %p]", this));
   MOZ_ASSERT(aTimer == mTimeoutTimer);
+  Accumulate(mozilla::Telemetry::APPLICATION_REPUTATION_REMOTE_LOOKUP_TIMEOUT,
+    true);
   mChannel->Cancel(NS_ERROR_NET_TIMEOUT);
   mTimeoutTimer->Cancel();
   return NS_OK;
@@ -1072,6 +1074,9 @@ PendingLookup::OnStopRequest(nsIRequest *aRequest,
 
   bool shouldBlock = false;
   uint32_t verdict = nsIApplicationReputationService::VERDICT_SAFE;
+  Accumulate(mozilla::Telemetry::APPLICATION_REPUTATION_REMOTE_LOOKUP_TIMEOUT,
+    false);
+
   nsresult rv = OnStopRequestInternal(aRequest, aContext, aResult,
                                       &shouldBlock, &verdict);
   OnComplete(shouldBlock, rv, verdict);

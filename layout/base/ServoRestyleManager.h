@@ -25,6 +25,7 @@ class nsAttrValue;
 class nsIAtom;
 class nsIContent;
 class nsIFrame;
+class nsStyleChangeList;
 
 namespace mozilla {
 
@@ -62,12 +63,17 @@ public:
                            nsIAtom* aAttribute,
                            int32_t aModType,
                            const nsAttrValue* aNewValue);
+
+  // XXXbholley: We should assert that the element is already snapshotted.
   void AttributeChanged(dom::Element* aElement, int32_t aNameSpaceID,
                         nsIAtom* aAttribute, int32_t aModType,
-                        const nsAttrValue* aOldValue);
-  nsresult ReparentStyleContext(nsIFrame* aFrame);
+                        const nsAttrValue* aOldValue) {}
 
-  bool HasPendingRestyles() { return mModifiedElements.Count() != 0; }
+  nsresult ReparentStyleContext(nsIFrame* aFrame);
+  nsresult ProcessRestyledFrames(nsStyleChangeList& aChangeList);
+  void FlushOverflowChangedTracker();
+
+  bool HasPendingRestyles() { return !mModifiedElements.IsEmpty(); }
 
 protected:
   ~ServoRestyleManager() {}
@@ -92,12 +98,6 @@ private:
   static void RecreateStyleContexts(nsIContent* aContent,
                                     nsStyleContext* aParentContext,
                                     ServoStyleSet* aStyleSet);
-
-  /**
-   * Propagates the IS_DIRTY flag down to the tree, setting
-   * HAS_DIRTY_DESCENDANTS appropriately.
-   */
-  static void DirtyTree(nsIContent* aContent, bool aIncludingRoot = true);
 
   /**
    * Marks the tree with the appropriate dirty flags for the given restyle hint.

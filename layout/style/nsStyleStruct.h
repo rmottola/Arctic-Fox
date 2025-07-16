@@ -15,6 +15,7 @@
 #include "mozilla/ArenaObjectID.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/CSSVariableValues.h"
+#include "mozilla/Maybe.h"
 #include "mozilla/SheetType.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/StyleStructContext.h"
@@ -246,6 +247,24 @@ enum nsStyleImageType {
   eStyleImageType_Element
 };
 
+struct CachedBorderImageData
+{
+  // Caller are expected to ensure that the value of aSVGViewportSize is
+  // different from the cached one since the method won't do the check.
+  void SetCachedSVGViewportSize(const mozilla::Maybe<nsSize>& aSVGViewportSize);
+  const mozilla::Maybe<nsSize>& GetCachedSVGViewportSize();
+  void PurgeCachedImages();
+  void SetSubImage(uint8_t aIndex, imgIContainer* aSubImage);
+  imgIContainer* GetSubImage(uint8_t aIndex);
+
+private:
+  // If this is a SVG border-image, we save the size of the SVG viewport that
+  // we used when rasterizing any cached border-image subimages. (The viewport
+  // size matters for percent-valued sizes & positions in inner SVG doc).
+  mozilla::Maybe<nsSize> mCachedSVGViewportSize;
+  nsCOMArray<imgIContainer> mSubImages;
+};
+
 /**
  * Represents a paintable image of one of the following types.
  * (1) A real image loaded from an external source.
@@ -358,12 +377,17 @@ struct nsStyleImage
   // during a border-image paint operation
   inline void SetSubImage(uint8_t aIndex, imgIContainer* aSubImage) const;
   inline imgIContainer* GetSubImage(uint8_t aIndex) const;
+  void PurgeCacheForViewportChange(
+    const mozilla::Maybe<nsSize>& aSVGViewportSize,
+    const bool aHasIntrinsicRatio) const;
 
 private:
   void DoCopy(const nsStyleImage& aOther);
+  void EnsureCachedBIData() const;
 
-  // Cache for border-image painting.
-  nsCOMArray<imgIContainer> mSubImages;
+  // This variable keeps some cache data for border image and is lazily
+  // allocated since it is only used in border image case.
+  mozilla::UniquePtr<CachedBorderImageData> mCachedBIData;
 
   nsStyleImageType mType;
   union {
@@ -2267,13 +2291,6 @@ struct nsTimingFunction
     CubicBezier,  // cubic-bezier()
   };
 
-  enum class StepSyntax {
-    Keyword,                     // step-start and step-end
-    FunctionalWithoutKeyword,    // steps(...)
-    FunctionalWithStartKeyword,  // steps(..., start)
-    FunctionalWithEndKeyword,    // steps(..., end)
-  };
-
   // Whether the timing function type is represented by a spline,
   // and thus will have mFunc filled in.
   static bool IsSplineType(Type aType)
@@ -2298,21 +2315,12 @@ struct nsTimingFunction
 
   enum class Keyword { Implicit, Explicit };
 
-  nsTimingFunction(Type aType, uint32_t aSteps, Keyword aKeyword)
+  nsTimingFunction(Type aType, uint32_t aSteps)
     : mType(aType)
   {
     MOZ_ASSERT(mType == Type::StepStart || mType == Type::StepEnd,
                "wrong type");
     mSteps = aSteps;
-    if (mType == Type::StepStart) {
-      MOZ_ASSERT(aKeyword == Keyword::Explicit,
-                 "only StepEnd can have an implicit keyword");
-      mStepSyntax = StepSyntax::FunctionalWithStartKeyword;
-    } else {
-      mStepSyntax = aKeyword == Keyword::Explicit ?
-                      StepSyntax::FunctionalWithEndKeyword :
-                      StepSyntax::FunctionalWithoutKeyword;
-    }
   }
 
   nsTimingFunction(const nsTimingFunction& aOther)
@@ -2329,7 +2337,6 @@ struct nsTimingFunction
       float mY2;
     } mFunc;
     struct {
-      StepSyntax mStepSyntax;
       uint32_t mSteps;
     };
   };
@@ -2350,7 +2357,6 @@ struct nsTimingFunction
       mFunc.mY2 = aOther.mFunc.mY2;
     } else {
       mSteps = aOther.mSteps;
-      mStepSyntax = aOther.mStepSyntax;
     }
 
     return *this;
@@ -2365,8 +2371,7 @@ struct nsTimingFunction
       return mFunc.mX1 == aOther.mFunc.mX1 && mFunc.mY1 == aOther.mFunc.mY1 &&
              mFunc.mX2 == aOther.mFunc.mX2 && mFunc.mY2 == aOther.mFunc.mY2;
     }
-    return mSteps == aOther.mSteps &&
-           mStepSyntax == aOther.mStepSyntax;
+    return mSteps == aOther.mSteps;
   }
 
   bool operator!=(const nsTimingFunction& aOther) const
@@ -3226,6 +3231,39 @@ protected:
   nscoord mTwipsPerPixel;
 };
 
+struct FragmentOrURL
+{
+  FragmentOrURL() : mIsLocalRef(false) {}
+  FragmentOrURL(const FragmentOrURL& aSource)
+    : mIsLocalRef(false)
+  { *this = aSource; }
+
+  void SetValue(const nsCSSValue* aValue);
+  void SetNull();
+
+  FragmentOrURL& operator=(const FragmentOrURL& aOther);
+  bool operator==(const FragmentOrURL& aOther) const;
+  bool operator!=(const FragmentOrURL& aOther) const {
+    return !(*this == aOther);
+  }
+
+  bool EqualsExceptRef(nsIURI* aURI) const;
+
+  nsIURI* GetSourceURL() const { return mURL; }
+  void GetSourceString(nsString& aRef) const;
+
+  // When matching a url with mIsLocalRef set, resolve it against aURI;
+  // Otherwise, ignore aURL and return mURL directly.
+  already_AddRefed<nsIURI> Resolve(nsIURI* aURI) const;
+  already_AddRefed<nsIURI> Resolve(nsIContent* aContent) const;
+
+  bool IsLocalRef() const { return mIsLocalRef; }
+
+private:
+  nsCOMPtr<nsIURI> mURL;
+  bool    mIsLocalRef;
+};
+
 enum nsStyleSVGPaintType {
   eStyleSVGPaintType_None = 1,
   eStyleSVGPaintType_Color,
@@ -3244,7 +3282,7 @@ struct nsStyleSVGPaint
 {
   union {
     nscolor mColor;
-    nsIURI *mPaintServer;
+    FragmentOrURL* mPaintServer;
   } mPaint;
   nsStyleSVGPaintType mType;
   nscolor mFallbackColor;
@@ -3295,9 +3333,9 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleSVG
 
   nsStyleSVGPaint  mFill;             // [inherited]
   nsStyleSVGPaint  mStroke;           // [inherited]
-  nsCOMPtr<nsIURI> mMarkerEnd;        // [inherited]
-  nsCOMPtr<nsIURI> mMarkerMid;        // [inherited]
-  nsCOMPtr<nsIURI> mMarkerStart;      // [inherited]
+  FragmentOrURL    mMarkerEnd;        // [inherited]
+  FragmentOrURL    mMarkerMid;        // [inherited]
+  FragmentOrURL    mMarkerStart;      // [inherited]
   nsTArray<nsStyleCoord> mStrokeDasharray;  // [inherited] coord, percent, factor
 
   nsStyleCoord     mStrokeDashoffset; // [inherited] coord, percent, factor
@@ -3359,7 +3397,8 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleSVG
   }
 
   bool HasMarker() const {
-    return mMarkerStart || mMarkerMid || mMarkerEnd;
+    return mMarkerStart.GetSourceURL() || mMarkerMid.GetSourceURL() ||
+           mMarkerEnd.GetSourceURL();
   }
 
   /**
@@ -3510,11 +3549,11 @@ struct nsStyleClipPath
     return mType;
   }
 
-  nsIURI* GetURL() const {
+  FragmentOrURL* GetURL() const {
     NS_ASSERTION(mType == mozilla::StyleClipPathType::URL, "wrong clip-path type");
     return mURL;
   }
-  void SetURL(nsIURI* aURL);
+  bool SetURL(const nsCSSValue* aValue);
 
   nsStyleBasicShape* GetBasicShape() const {
     NS_ASSERTION(mType == mozilla::StyleClipPathType::Shape, "wrong clip-path type");
@@ -3530,11 +3569,13 @@ struct nsStyleClipPath
 
 private:
   void ReleaseRef();
+  void CopyURL(const nsStyleClipPath& aOther);
+
   void* operator new(size_t) = delete;
 
   union {
     nsStyleBasicShape* mBasicShape;
-    nsIURI* mURL;
+    FragmentOrURL* mURL;
   };
   mozilla::StyleClipPathType    mType;
   mozilla::StyleClipShapeSizing mSizingBox;
@@ -3566,11 +3607,12 @@ struct nsStyleFilter
   void SetFilterParameter(const nsStyleCoord& aFilterParameter,
                           int32_t aType);
 
-  nsIURI* GetURL() const {
+  FragmentOrURL* GetURL() const {
     NS_ASSERTION(mType == NS_STYLE_FILTER_URL, "wrong filter type");
     return mURL;
   }
-  void SetURL(nsIURI* aURL);
+
+  bool SetURL(const nsCSSValue* aValue);
 
   nsCSSShadowArray* GetDropShadow() const {
     NS_ASSERTION(mType == NS_STYLE_FILTER_DROP_SHADOW, "wrong filter type");
@@ -3580,11 +3622,12 @@ struct nsStyleFilter
 
 private:
   void ReleaseRef();
+  void CopyURL(const nsStyleFilter& aOther);
 
   int32_t mType; // see NS_STYLE_FILTER_* constants in nsStyleConsts.h
   nsStyleCoord mFilterParameter; // coord, percent, factor, angle
   union {
-    nsIURI* mURL;
+    FragmentOrURL* mURL;
     nsCSSShadowArray* mDropShadow;
   };
 };

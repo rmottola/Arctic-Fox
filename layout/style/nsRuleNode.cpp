@@ -5297,10 +5297,7 @@ nsRuleNode::ComputeTimingFunction(const nsCSSValue& aValue,
             NS_STYLE_TRANSITION_TIMING_FUNCTION_STEP_START) ?
               nsTimingFunction::Type::StepStart :
               nsTimingFunction::Type::StepEnd;
-        aResult = nsTimingFunction(type, array->Item(0).GetIntValue(),
-                                   array->Item(1).GetIntValue() == -1 ?
-                                     nsTimingFunction::Keyword::Implicit :
-                                     nsTimingFunction::Keyword::Explicit);
+        aResult = nsTimingFunction(type, array->Item(0).GetIntValue());
       }
       break;
     default:
@@ -9223,8 +9220,8 @@ SetSVGPaint(const nsCSSValue& aValue, const nsStyleSVGPaint& parentPaint,
 
     if (pair.mXValue.GetUnit() == eCSSUnit_URL) {
       aResult.SetType(eStyleSVGPaintType_Server);
-      aResult.mPaint.mPaintServer = pair.mXValue.GetURLValue();
-      NS_IF_ADDREF(aResult.mPaint.mPaintServer);
+      aResult.mPaint.mPaintServer = new FragmentOrURL();
+      aResult.mPaint.mPaintServer->SetValue(&pair.mXValue);
     } else if (pair.mXValue.GetUnit() == eCSSUnit_Enumerated) {
 
       switch (pair.mXValue.GetIntValue()) {
@@ -9341,10 +9338,10 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
   // marker-end: url, none, inherit
   const nsCSSValue* markerEndValue = aRuleData->ValueForMarkerEnd();
   if (eCSSUnit_URL == markerEndValue->GetUnit()) {
-    svg->mMarkerEnd = markerEndValue->GetURLValue();
+    svg->mMarkerEnd.SetValue(markerEndValue);
   } else if (eCSSUnit_None == markerEndValue->GetUnit() ||
              eCSSUnit_Initial == markerEndValue->GetUnit()) {
-    svg->mMarkerEnd = nullptr;
+    svg->mMarkerEnd.SetNull();
   } else if (eCSSUnit_Inherit == markerEndValue->GetUnit() ||
              eCSSUnit_Unset == markerEndValue->GetUnit()) {
     conditions.SetUncacheable();
@@ -9354,10 +9351,10 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
   // marker-mid: url, none, inherit
   const nsCSSValue* markerMidValue = aRuleData->ValueForMarkerMid();
   if (eCSSUnit_URL == markerMidValue->GetUnit()) {
-    svg->mMarkerMid = markerMidValue->GetURLValue();
+    svg->mMarkerMid.SetValue(markerMidValue);
   } else if (eCSSUnit_None == markerMidValue->GetUnit() ||
              eCSSUnit_Initial == markerMidValue->GetUnit()) {
-    svg->mMarkerMid = nullptr;
+    svg->mMarkerMid.SetNull();
   } else if (eCSSUnit_Inherit == markerMidValue->GetUnit() ||
              eCSSUnit_Unset == markerMidValue->GetUnit()) {
     conditions.SetUncacheable();
@@ -9367,10 +9364,10 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
   // marker-start: url, none, inherit
   const nsCSSValue* markerStartValue = aRuleData->ValueForMarkerStart();
   if (eCSSUnit_URL == markerStartValue->GetUnit()) {
-    svg->mMarkerStart = markerStartValue->GetURLValue();
+    svg->mMarkerStart.SetValue(markerStartValue);
   } else if (eCSSUnit_None == markerStartValue->GetUnit() ||
              eCSSUnit_Initial == markerStartValue->GetUnit()) {
-    svg->mMarkerStart = nullptr;
+    svg->mMarkerStart.SetNull();
   } else if (eCSSUnit_Inherit == markerStartValue->GetUnit() ||
              eCSSUnit_Unset == markerStartValue->GetUnit()) {
     conditions.SetUncacheable();
@@ -9749,11 +9746,7 @@ SetStyleFilterToCSSValue(nsStyleFilter* aStyleFilter,
 {
   nsCSSUnit unit = aValue.GetUnit();
   if (unit == eCSSUnit_URL) {
-    nsIURI* url = aValue.GetURLValue();
-    if (!url)
-      return false;
-    aStyleFilter->SetURL(url);
-    return true;
+    return aStyleFilter->SetURL(&aValue);
   }
 
   MOZ_ASSERT(unit == eCSSUnit_Function, "expected a filter function");
@@ -9859,10 +9852,7 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
       break;
     case eCSSUnit_URL: {
       svgReset->mClipPath = nsStyleClipPath();
-      nsIURI* url = clipPathValue->GetURLValue();
-      if (url) {
-        svgReset->mClipPath.SetURL(url);
-      }
+      svgReset->mClipPath.SetURL(clipPathValue);
       break;
     }
     case eCSSUnit_Array: {

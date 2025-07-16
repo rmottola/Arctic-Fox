@@ -58,6 +58,30 @@ struct js::Nursery::FreeMallocedBuffersTask : public GCParallelTask
     virtual void run() override;
 };
 
+struct js::Nursery::SweepAction
+{
+    SweepAction(SweepThunk thunk, void* data, SweepAction* next)
+      : thunk(thunk), data(data), next(next)
+    {}
+
+    SweepThunk thunk;
+    void* data;
+    SweepAction* next;
+
+#if JS_BITS_PER_WORD == 32
+  protected:
+    uint32_t padding;
+#endif
+};
+
+#ifdef JS_GC_ZEAL
+struct js::Nursery::Canary
+{
+    uintptr_t magicValue;
+    Canary* next;
+};
+#endif
+
 js::Nursery::Nursery(JSRuntime* rt)
   : runtime_(rt)
   , position_(0)
@@ -73,6 +97,7 @@ js::Nursery::Nursery(JSRuntime* rt)
   , enableProfiling_(false)
   , minorGcCount_(0)
   , freeMallocedBuffersTask(nullptr)
+  , sweepActions_(nullptr)
 #ifdef JS_GC_ZEAL
   , lastCanary_(nullptr)
 #endif
@@ -236,6 +261,8 @@ js::Nursery::allocate(size_t size)
     MOZ_ASSERT(isEnabled());
     MOZ_ASSERT(!runtime()->isHeapBusy());
     MOZ_ASSERT(position() >= currentStart_);
+    MOZ_ASSERT(position() % gc::CellSize == 0);
+    MOZ_ASSERT(size % gc::CellSize == 0);
 
 #ifdef JS_GC_ZEAL
     static const size_t CanarySize = (sizeof(Nursery::Canary) + CellSize - 1) & ~CellMask;
@@ -645,6 +672,7 @@ js::Nursery::collect(JSRuntime* rt, JS::gcreason::Reason reason, ObjectGroupList
     rt->addTelemetry(JS_TELEMETRY_GC_MINOR_REASON, reason);
     if (totalTime > 1000)
         rt->addTelemetry(JS_TELEMETRY_GC_MINOR_REASON_LONG, reason);
+    rt->addTelemetry(JS_TELEMETRY_GC_NURSERY_BYTES, sizeOfHeapCommitted());
 
     rt->gc.stats.endNurseryCollection(reason);
     TraceMinorGCEnd();
@@ -694,7 +722,7 @@ js::Nursery::freeMallocedBuffers()
         AutoLockHelperThreadState lock;
         freeMallocedBuffersTask->joinWithLockHeld(lock);
         freeMallocedBuffersTask->transferBuffersToFree(mallocedBuffers, lock);
-        started = freeMallocedBuffersTask->startWithLockHeld();
+        started = freeMallocedBuffersTask->startWithLockHeld(lock);
     }
 
     if (!started)
@@ -722,6 +750,8 @@ js::Nursery::sweep()
             MOZ_ASSERT(Forwarded(obj)->zone()->hasUniqueId(Forwarded(obj)));
     }
     cellsWithUid_.clear();
+
+    runSweepActions();
 
 #ifdef JS_GC_ZEAL
     /* Poison the nursery contents so touching a freed object will crash. */
@@ -792,4 +822,38 @@ js::Nursery::updateNumActiveChunks(int newCount)
         MarkPagesUnused((void*)decommitStart, decommitSize);
     }
 #endif // !defined(JS_GC_ZEAL)
+}
+
+void
+js::Nursery::queueSweepAction(SweepThunk thunk, void* data)
+{
+    static_assert(sizeof(SweepAction) % CellSize == 0,
+                  "SweepAction size must be a multiple of cell size");
+    MOZ_ASSERT(!runtime()->mainThread.suppressGC);
+
+    SweepAction* action = nullptr;
+    if (isEnabled() && !js::oom::ShouldFailWithOOM())
+        action = reinterpret_cast<SweepAction*>(allocate(sizeof(SweepAction)));
+
+    if (!action) {
+        runtime()->gc.evictNursery();
+        AutoSetThreadIsSweeping threadIsSweeping;
+        thunk(data);
+        return;
+    }
+
+    new (action) SweepAction(thunk, data, sweepActions_);
+    sweepActions_ = action;
+}
+
+void
+js::Nursery::runSweepActions()
+{
+    // The hazard analysis doesn't know whether the thunks can GC.
+    JS::AutoSuppressGCAnalysis nogc;
+
+    AutoSetThreadIsSweeping threadIsSweeping;
+    for (auto action = sweepActions_; action; action = action->next)
+        action->thunk(action->data);
+    sweepActions_ = nullptr;
 }

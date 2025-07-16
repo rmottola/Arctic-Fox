@@ -10,7 +10,7 @@ function $_(formNum, name) {
     return null;
   }
 
-  var element = form.elements.namedItem(name);
+  var element = form.children.namedItem(name);
   if (!element) {
     logWarning("$_ couldn't find requested element " + name);
     return null;
@@ -45,7 +45,7 @@ function checkForm(formNum, val1, val2, val3) {
     ok(form, "Locating form " + formNum);
 
     var numToCheck = arguments.length - 1;
-    
+
     if (!numToCheck--)
         return;
     e = form.elements[0];
@@ -266,6 +266,26 @@ function getRecipeParent() {
   });
 }
 
+function loadRecipes(recipes) {
+  return new Promise(resolve => {
+    chromeScript.addMessageListener("loadedRecipes", function loaded() {
+      chromeScript.removeMessageListener("loadedRecipes", loaded);
+      resolve(recipes);
+    });
+    chromeScript.sendAsyncMessage("loadRecipes", recipes);
+  });
+}
+
+function resetRecipes() {
+  return new Promise(resolve => {
+    chromeScript.addMessageListener("recipesReset", function reset() {
+      chromeScript.removeMessageListener("recipesReset", reset);
+      resolve();
+    });
+    chromeScript.sendAsyncMessage("resetRecipes");
+  });
+}
+
 /**
  * Resolves when a specified number of forms have been processed.
  */
@@ -276,7 +296,7 @@ function promiseFormsProcessed(expectedCount = 1) {
       processedCount++;
       if (processedCount == expectedCount) {
         SpecialPowers.removeObserver(onProcessedForm, "passwordmgr-processed-form");
-        resolve(subject, data);
+        resolve(SpecialPowers.Cu.waiveXrays(subject), data);
       }
     }
     SpecialPowers.addObserver(onProcessedForm, "passwordmgr-processed-form", false);
@@ -305,6 +325,13 @@ if (this.addMessageListener) {
     sendAsyncMessage("loadedRecipes", recipes);
   }));
 
+  addMessageListener("resetRecipes", Task.async(function* resetRecipes() {
+    let { LoginManagerParent } = Cu.import("resource://gre/modules/LoginManagerParent.jsm", {});
+    let recipeParent = yield LoginManagerParent.recipeParentPromise;
+    yield recipeParent.reset();
+    sendAsyncMessage("recipesReset");
+  }));
+
   var globalMM = Cc["@mozilla.org/globalmessagemanager;1"].getService(Ci.nsIMessageListenerManager);
   globalMM.addMessageListener("RemoteLogins:onFormSubmit", function onFormSubmit(message) {
     sendAsyncMessage("formSubmissionProcessed", message.data, message.objects);
@@ -313,5 +340,34 @@ if (this.addMessageListener) {
   // Code to only run in the mochitest pages (not in the chrome script).
   SimpleTest.registerCleanupFunction(() => {
     getRecipeParent().then(recipeParent => recipeParent.reset());
+  });
+
+
+  let { LoginHelper } = SpecialPowers.Cu.import("resource://gre/modules/LoginHelper.jsm", {});
+  /**
+   * Proxy for Services.logins (nsILoginManager).
+   * Only supports arguments which support structured clone plus {nsILoginInfo}
+   * Assumes properties are methods.
+   */
+  this.LoginManager = new Proxy({}, {
+    get(target, prop, receiver) {
+      return (...args) => {
+        let loginInfoIndices = [];
+        let cloneableArgs = args.map((val, index) => {
+          if (SpecialPowers.call_Instanceof(val, SpecialPowers.Ci.nsILoginInfo)) {
+            loginInfoIndices.push(index);
+            return LoginHelper.loginToVanillaObject(val);
+          }
+
+          return val;
+        });
+
+        return chromeScript.sendSyncMessage("proxyLoginManager", {
+          args: cloneableArgs,
+          loginInfoIndices,
+          methodName: prop,
+        })[0][0];
+      };
+    },
   });
 }

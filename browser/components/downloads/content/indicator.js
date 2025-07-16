@@ -106,10 +106,12 @@ const DownloadsButton = {
 
     indicator.open = this._anchorRequested;
 
-    // Determine if we're located on an invisible toolbar.
-    if (!isElementVisible(indicator.parentNode)) {
-      return null;
-    }
+    let widget = CustomizableUI.getWidget("downloads-button")
+                               .forWindow(window);
+     // Determine if the indicator is located on an invisible toolbar.
+     if (!isElementVisible(indicator.parentNode) && !widget.overflowed) {
+       return null;
+     }
 
     return DownloadsIndicatorView.indicatorAnchor;
   },
@@ -179,6 +181,12 @@ const DownloadsButton = {
   }
 };
 
+Object.defineProperty(this, "DownloadsButton", {
+  value: DownloadsButton,
+  enumerable: true,
+  writable: false
+});
+
 ////////////////////////////////////////////////////////////////////////////////
 //// DownloadsIndicatorView
 
@@ -230,7 +238,7 @@ const DownloadsIndicatorView = {
     this.counter = "";
     this.percentComplete = 0;
     this.paused = false;
-    this.attention = false;
+    this.attention = DownloadsCommon.ATTENTION_NONE;
   },
 
   /**
@@ -309,10 +317,22 @@ const DownloadsIndicatorView = {
       return;
     }
 
-    // If the anchor is not there or its container is hidden, don't show
-    // a notification
     let anchor = DownloadsButton._placeholder;
+    let widgetGroup = CustomizableUI.getWidget("downloads-button");
+    let widget = widgetGroup.forWindow(window);
+    if (widget.overflowed || widgetGroup.areaType == CustomizableUI.TYPE_MENU_PANEL) {
+      if (anchor && this._isAncestorPanelOpen(anchor)) {
+        // If the containing panel is open, don't do anything, because the
+        // notification would appear under the open panel. See
+        // https://bugzilla.mozilla.org/show_bug.cgi?id=984023
+        return;
+      }
+
+      // Otherwise, try to use the anchor of the panel:
+      anchor = widget.anchor;
+    }
     if (!anchor || !isElementVisible(anchor.parentNode)) {
+      // Our container isn't visible, so can't show the animation:
       return;
     }
 
@@ -446,15 +466,28 @@ const DownloadsIndicatorView = {
 
     if (this._attention != aValue) {
       this._attention = aValue;
-      if (aValue) {
-        this.indicator.setAttribute("attention", "true");
-      } else {
+
+      // Check if the downloads button is in the menu panel, to determine which
+      // button needs to get a badge.
+      let widgetGroup = CustomizableUI.getWidget("downloads-button");
+      let inMenu = widgetGroup.areaType == CustomizableUI.TYPE_MENU_PANEL;
+
+      if (aValue == DownloadsCommon.ATTENTION_NONE) {
         this.indicator.removeAttribute("attention");
+        if (inMenu) {
+          gMenuButtonBadgeManager.removeBadge(gMenuButtonBadgeManager.BADGEID_DOWNLOAD);
+        }
+      } else {
+        this.indicator.setAttribute("attention", aValue);
+        if (inMenu) {
+          let badgeClass = "download-" + aValue;
+          gMenuButtonBadgeManager.addBadge(gMenuButtonBadgeManager.BADGEID_DOWNLOAD, badgeClass);
+        }
       }
     }
     return aValue;
   },
-  _attention: false,
+  _attention: DownloadsCommon.ATTENTION_NONE,
 
   //////////////////////////////////////////////////////////////////////////////
   //// User interface event functions

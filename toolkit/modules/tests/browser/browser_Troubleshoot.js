@@ -225,6 +225,9 @@ const SNAPSHOT_SCHEMA = {
         supportsHardwareH264: {
           type: "string",
         },
+        currentAudioBackend: {
+          type: "string",
+        },
         numAcceleratedWindowsMessage: {
           type: "array",
         },
@@ -294,6 +297,9 @@ const SNAPSHOT_SCHEMA = {
         webglRenderer: {
           type: "string",
         },
+        webgl2Renderer: {
+          type: "string",
+        },
         info: {
           type: "object",
         },
@@ -310,9 +316,6 @@ const SNAPSHOT_SCHEMA = {
           type: "array",
         },
         direct2DEnabledMessage: {
-          type: "array",
-        },
-        webglRendererMessage: {
           type: "array",
         },
       },

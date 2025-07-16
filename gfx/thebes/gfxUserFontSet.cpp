@@ -1429,3 +1429,6 @@ gfxUserFontSet::UserFontCache::Dump()
 }
 
 #endif
+
+#undef LOG
+#undef LOG_ENABLED

@@ -98,6 +98,7 @@
 #include "nsIDOMWindowUtils.h"
 #include "Units.h"
 #include "UnitTransforms.h"
+#include "mozilla/UniquePtrExtensions.h"
 
 using namespace mozilla;
 using namespace mozilla::layers;
@@ -1187,6 +1188,37 @@ nsresult nsChildView::SynthesizeNativeMouseScrollEvent(mozilla::LayoutDeviceIntP
   NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
 }
 
+nsresult nsChildView::SynthesizeNativeTouchPoint(uint32_t aPointerId,
+                                                 TouchPointerState aPointerState,
+                                                 mozilla::LayoutDeviceIntPoint aPoint,
+                                                 double aPointerPressure,
+                                                 uint32_t aPointerOrientation,
+                                                 nsIObserver* aObserver)
+{
+  NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
+
+  AutoObserverNotifier notifier(aObserver, "touchpoint");
+
+  MOZ_ASSERT(NS_IsMainThread());
+  if (aPointerState == TOUCH_HOVER) {
+    return NS_ERROR_UNEXPECTED;
+  }
+
+  if (!mSynthesizedTouchInput) {
+    mSynthesizedTouchInput = MakeUnique<MultiTouchInput>();
+  }
+
+  LayoutDeviceIntPoint pointInWindow = aPoint - WidgetToScreenOffset();
+  MultiTouchInput inputToDispatch = UpdateSynthesizedTouchState(
+      mSynthesizedTouchInput.get(), PR_IntervalNow(), TimeStamp::Now(),
+      aPointerId, aPointerState, pointInWindow, aPointerPressure,
+      aPointerOrientation);
+  DispatchTouchInput(inputToDispatch);
+  return NS_OK;
+
+  NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
+}
+
 // First argument has to be an NSMenu representing the application's top-level
 // menu bar. The returned item is *not* retained.
 static NSMenuItem* NativeMenuItemWithLocation(NSMenu* menubar, NSString* locationString)
@@ -1471,6 +1503,71 @@ bool nsChildView::PaintWindow(LayoutDeviceIntRegion aRegion)
 
   mIsDispatchPaint = oldDispatchPaint;
   return returnValue;
+}
+
+bool
+nsChildView::PaintWindowInContext(CGContextRef aContext, const LayoutDeviceIntRegion& aRegion, gfx::IntSize aSurfaceSize)
+{
+  if (!mBackingSurface || mBackingSurface->GetSize() != aSurfaceSize) {
+    mBackingSurface =
+      gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(aSurfaceSize,
+                                                                   gfx::SurfaceFormat::B8G8R8A8);
+    if (!mBackingSurface) {
+      return false;
+    }
+  }
+
+  RefPtr<gfxContext> targetContext = gfxContext::CreateOrNull(mBackingSurface);
+  MOZ_ASSERT(targetContext); // already checked the draw target above
+
+  // Set up the clip region and clear existing contents in the backing surface.
+  targetContext->NewPath();
+  for (auto iter = aRegion.RectIter(); !iter.Done(); iter.Next()) {
+    const LayoutDeviceIntRect& r = iter.Get();
+    targetContext->Rectangle(gfxRect(r.x, r.y, r.width, r.height));
+    mBackingSurface->ClearRect(gfx::Rect(r.ToUnknownRect()));
+  }
+  targetContext->Clip();
+
+  nsAutoRetainCocoaObject kungFuDeathGrip(mView);
+  bool painted = false;
+  if (GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_BASIC) {
+    nsBaseWidget::AutoLayerManagerSetup
+      setupLayerManager(this, targetContext, BufferMode::BUFFER_NONE);
+    painted = PaintWindow(aRegion);
+  } else if (GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_CLIENT) {
+    // We only need this so that we actually get DidPaintWindow fired
+    painted = PaintWindow(aRegion);
+  }
+
+  uint8_t* data;
+  gfx::IntSize size;
+  int32_t stride;
+  gfx::SurfaceFormat format;
+
+  if (!mBackingSurface->LockBits(&data, &size, &stride, &format)) {
+    return false;
+  }
+
+  // Draw the backing surface onto the window.
+  CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, data, stride * size.height, NULL);
+  NSColorSpace* colorSpace = [[mView window] colorSpace];
+  CGImageRef image = CGImageCreate(size.width, size.height, 8, 32, stride,
+                                   [colorSpace CGColorSpace],
+                                   kCGBitmapByteOrder32Host | kCGImageAlphaPremultipliedFirst,
+                                   provider, NULL, false, kCGRenderingIntentDefault);
+  CGContextSaveGState(aContext);
+  CGContextTranslateCTM(aContext, 0, size.height);
+  CGContextScaleCTM(aContext, 1, -1);
+  CGContextSetBlendMode(aContext, kCGBlendModeCopy);
+  CGContextDrawImage(aContext, CGRectMake(0, 0, size.width, size.height), image);
+  CGImageRelease(image);
+  CGDataProviderRelease(provider);
+  CGContextRestoreGState(aContext);
+
+  mBackingSurface->ReleaseBits(data);
+
+  return painted;
 }
 
 #pragma mark -
@@ -1899,22 +1996,26 @@ nsChildView::PrepareWindowEffects()
 {
   NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
-  MutexAutoLock lock(mEffectsLock);
-  mShowsResizeIndicator = ShowsResizeIndicator(&mResizeIndicatorRect);
-  mHasRoundedBottomCorners = [(ChildView*)mView hasRoundedBottomCorners];
-  CGFloat cornerRadius = [(ChildView*)mView cornerRadius];
-  mDevPixelCornerRadius = cornerRadius * BackingScaleFactor();
-  mIsCoveringTitlebar = [(ChildView*)mView isCoveringTitlebar];
-  NSInteger styleMask = [[mView window] styleMask];
-  bool isFullscreen = (styleMask & NSFullScreenWindowMask) || !(styleMask & NSTitledWindowMask);
+  bool isFullscreen;
+  {
+    MutexAutoLock lock(mEffectsLock);
+    mShowsResizeIndicator = ShowsResizeIndicator(&mResizeIndicatorRect);
+    mHasRoundedBottomCorners = [(ChildView*)mView hasRoundedBottomCorners];
+    CGFloat cornerRadius = [(ChildView*)mView cornerRadius];
+    mDevPixelCornerRadius = cornerRadius * BackingScaleFactor();
+    mIsCoveringTitlebar = [(ChildView*)mView isCoveringTitlebar];
+    NSInteger styleMask = [[mView window] styleMask];
+    isFullscreen = (styleMask & NSFullScreenWindowMask) || !(styleMask & NSTitledWindowMask);
+    if (mIsCoveringTitlebar) {
+      mTitlebarRect = RectContainingTitlebarControls();
+      UpdateTitlebarCGContext();
+    }
+  }
+
   // If we've just transitioned into or out of full screen then update the opacity on our GLContext.
   if (isFullscreen != mIsFullscreen) {
     mIsFullscreen = isFullscreen;
     [(ChildView*)mView setFullscreen:isFullscreen];
-  }
-  if (mIsCoveringTitlebar) {
-    mTitlebarRect = RectContainingTitlebarControls();
-    UpdateTitlebarCGContext();
   }
 
   NS_OBJC_END_TRY_ABORT_BLOCK;
@@ -2103,8 +2204,8 @@ CreateCGContext(const LayoutDeviceIntSize& aSize)
 LayoutDeviceIntSize
 TextureSizeForSize(const LayoutDeviceIntSize& aSize)
 {
-  return LayoutDeviceIntSize(gfx::NextPowerOfTwo(aSize.width),
-                             gfx::NextPowerOfTwo(aSize.height));
+  return LayoutDeviceIntSize(RoundUpPow2(aSize.width),
+                             RoundUpPow2(aSize.height));
 }
 
 // When this method is entered, mEffectsLock is already being held.
@@ -3645,51 +3746,10 @@ NSEvent* gLastDragMouseDownEvent = nil;
   CGContextScaleCTM(aContext, 1.0 / scale, 1.0 / scale);
 
   NSSize viewSize = [self bounds].size;
-  nsIntSize backingSize(viewSize.width * scale, viewSize.height * scale);
-
-  CGContextSaveGState(aContext);
-
+  gfx::IntSize backingSize = gfx::IntSize::Truncate(viewSize.width * scale, viewSize.height * scale);
   LayoutDeviceIntRegion region = [self nativeDirtyRegionWithBoundingRect:aRect];
 
-  // Create Cairo objects.
-  RefPtr<gfxQuartzSurface> targetSurface;
-
-  RefPtr<gfx::DrawTarget> dt =
-    gfx::Factory::CreateDrawTargetForCairoCGContext(aContext,
-                                                    gfx::IntSize(backingSize.width,
-                                                                 backingSize.height));
-  if (!dt || !dt->IsValid()) {
-    // This used to be an assertion, so keep crashing in nightly+aurora
-    gfxDevCrash(mozilla::gfx::LogReason::InvalidContext) << "Cannot create target with CreateDrawTargetForCairoCGContext " << backingSize;
-    return;
-  }
-  dt->AddUserData(&gfxContext::sDontUseAsSourceKey, dt, nullptr);
-  RefPtr<gfxContext> targetContext = gfxContext::CreateOrNull(dt);
-  MOZ_ASSERT(targetContext); // already checked the draw target above
-
-  // Set up the clip region.
-  targetContext->NewPath();
-  for (auto iter = region.RectIter(); !iter.Done(); iter.Next()) {
-    const LayoutDeviceIntRect& r = iter.Get();
-    targetContext->Rectangle(gfxRect(r.x, r.y, r.width, r.height));
-  }
-  targetContext->Clip();
-
-  nsAutoRetainCocoaObject kungFuDeathGrCreateOrNullip(self);
-  bool painted = false;
-  if (mGeckoChild->GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_BASIC) {
-    nsBaseWidget::AutoLayerManagerSetup
-      setupLayerManager(mGeckoChild, targetContext, BufferMode::BUFFER_NONE);
-    painted = mGeckoChild->PaintWindow(region);
-  } else if (mGeckoChild->GetLayerManager()->GetBackendType() == LayersBackend::LAYERS_CLIENT) {
-    // We only need this so that we actually get DidPaintWindow fired
-    painted = mGeckoChild->PaintWindow(region);
-  }
-
-  targetContext = nullptr;
-  targetSurface = nullptr;
-
-  CGContextRestoreGState(aContext);
+  bool painted = mGeckoChild->PaintWindowInContext(aContext, region, backingSize);
 
   // Undo the scale transform so that from now on the context is in
   // CocoaPoints again.
@@ -4076,7 +4136,7 @@ NSEvent* gLastDragMouseDownEvent = nil;
         if ([theEvent type] == NSLeftMouseDown) {
           NSPoint point = [NSEvent mouseLocation];
           FlipCocoaScreenCoordinate(point);
-          nsIntPoint pos(point.x, point.y);
+          gfx::IntPoint pos = gfx::IntPoint::Truncate(point.x, point.y);
           consumeEvent = (BOOL)rollupListener->Rollup(popupsToRollup, true, &pos, nullptr);
         }
         else {
@@ -5750,7 +5810,7 @@ PanGestureTypeForEvent(NSEvent* aEvent)
     nsDragService* dragService = static_cast<nsDragService *>(mDragService);
     NSPoint pnt = [NSEvent mouseLocation];
     FlipCocoaScreenCoordinate(pnt);
-    dragService->SetDragEndPoint(nsIntPoint(NSToIntRound(pnt.x), NSToIntRound(pnt.y)));
+    dragService->SetDragEndPoint(gfx::IntPoint::Round(pnt.x, pnt.y));
 
     // XXX: dropEffect should be updated per |operation|.
     // As things stand though, |operation| isn't well handled within "our"

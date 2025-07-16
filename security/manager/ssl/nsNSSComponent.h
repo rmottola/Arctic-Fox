@@ -105,7 +105,6 @@ public:
 NS_DEFINE_STATIC_IID_ACCESSOR(nsINSSComponent, NS_INSSCOMPONENT_IID)
 
 class nsNSSShutDownList;
-class nsCertVerificationThread;
 
 // Implementation of the PSM component interface.
 class nsNSSComponent final : public nsINSSComponent
@@ -160,8 +159,8 @@ public:
     GetDefaultCertVerifier() override;
 
   // The following two methods are thread-safe.
-  static bool AreAnyFallbackCiphersEnabled();
-  static void UseFallbackCiphersOnSocket(PRFileDesc* fd);
+  static bool AreAnyWeakCiphersEnabled();
+  static void UseWeakCiphersOnSocket(PRFileDesc* fd);
 
   static void FillTLSVersionRange(SSLVersionRange& rangeOut,
                                   uint32_t minFromPrefs,
@@ -214,10 +213,6 @@ private:
   nsAutoString mTestBuiltInRootHash;
 #endif
   nsString mContentSigningRootHash;
-
-  void deleteBackgroundThreads();
-  void createBackgroundThreads();
-  nsCertVerificationThread* mCertVerificationThread;
 
   nsNSSHttpInterface mHttpForNSS;
   RefPtr<mozilla::psm::SharedCertVerifier> mDefaultCertVerifier;

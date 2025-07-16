@@ -789,6 +789,21 @@
         </menupopup>
       </toolbarbutton>
 
+        <!-- This is a placeholder for the Downloads Indicator.  It is visible
+             during the customization of the toolbar, in the palette, and before
+             the Downloads Indicator overlay is loaded. -->
+        <toolbarbutton id="downloads-button"
+                       class="toolbarbutton-1 chromeclass-toolbar-additional badged-button"
+                       key="key_openDownloads"
+                       oncommand="DownloadsIndicatorView.onCommand(event);"
+                       ondrop="DownloadsIndicatorView.onDrop(event);"
+                       ondragover="DownloadsIndicatorView.onDragOver(event);"
+                       ondragenter="DownloadsIndicatorView.onDragOver(event);"
+                       label="&downloads.label;"
+                       removable="true"
+                       cui-areatype="toolbar"
+                       tooltip="dynamic-shortcut-tooltip"/>
+
       <toolbarbutton id="history-menu-button"
                      class="toolbarbutton-1 chromeclass-toolbar-additional"
                      persist="class"
@@ -907,7 +922,7 @@
                          mousethrough="never"
                          label="&bookmarksToolbarItem.label;"/>
           <hbox flex="1">
-            <hbox align="center">
+            <hbox id="PlacesToolbarDropIndicatorHolder" align="center" collapsed="true">
               <image id="PlacesToolbarDropIndicator"
                      mousethrough="always"
                      collapsed="true"/>

@@ -22,7 +22,6 @@
 #include "mozilla/Tuple.h"
 #include "nsIMemoryReporter.h"
 #include "gfx2DGlue.h"
-#include "gfxPattern.h"  // Workaround for flaw in bug 921753 part 2.
 #include "gfxPlatform.h"
 #include "gfxPrefs.h"
 #include "imgFrame.h"
@@ -70,6 +69,8 @@ typedef size_t Cost;
 
 // Placeholders do not have surfaces, but need to be given a trivial cost for
 // our invariants to hold.
+// XXX(seth): This is only true of old-style placeholders inserted via
+// InsertPlaceholder().
 static const Cost sPlaceholderCost = 1;
 
 static Cost
@@ -140,19 +141,19 @@ public:
     , mImageKey(aImageKey)
     , mSurfaceKey(aSurfaceKey)
   {
-    MOZ_ASSERT(!IsPlaceholder() || mCost == sPlaceholderCost,
-               "Placeholder should have trivial cost");
+    MOZ_ASSERT(aProvider || mCost == sPlaceholderCost,
+               "Old-style placeholders should have trivial cost");
     MOZ_ASSERT(mImageKey, "Must have a valid image key");
   }
 
-  DrawableFrameRef DrawableRef() const
+  DrawableSurface GetDrawableSurface() const
   {
     if (MOZ_UNLIKELY(IsPlaceholder())) {
-      MOZ_ASSERT_UNREACHABLE("Shouldn't call DrawableRef() on a placeholder");
-      return DrawableFrameRef();
+      MOZ_ASSERT_UNREACHABLE("Called GetDrawableSurface() on a placeholder");
+      return DrawableSurface();
     }
 
-    return mProvider->DrawableRef();
+    return mProvider->Surface();
   }
 
   void SetLocked(bool aLocked)
@@ -164,7 +165,11 @@ public:
     mProvider->SetLocked(aLocked);
   }
 
-  bool IsPlaceholder() const { return !mProvider || mProvider->IsPlaceholder(); }
+  bool IsPlaceholder() const
+  {
+    return !mProvider || mProvider->Availability().IsPlaceholder();
+  }
+
   bool IsLocked() const { return !IsPlaceholder() && mProvider->IsLocked(); }
 
   ImageKey GetImageKey() const { return mImageKey; }
@@ -194,12 +199,12 @@ public:
                                    aCachedSurface->IsLocked());
 
       if (!aCachedSurface->IsPlaceholder()) {
-        DrawableFrameRef surfaceRef = aCachedSurface->DrawableRef();
-        if (surfaceRef) {
-          counter.SubframeSize() = Some(surfaceRef->GetSize());
+        DrawableSurface drawableSurface = aCachedSurface->GetDrawableSurface();
+        if (drawableSurface) {
+          counter.SubframeSize() = Some(drawableSurface->GetSize());
 
           size_t heap = 0, nonHeap = 0;
-          surfaceRef->AddSizeOfExcludingThis(mMallocSizeOf, heap, nonHeap);
+          drawableSurface->AddSizeOfExcludingThis(mMallocSizeOf, heap, nonHeap);
           counter.Values().SetDecodedHeap(heap);
           counter.Values().SetDecodedNonHeap(nonHeap);
         }
@@ -216,7 +221,6 @@ public:
 private:
   nsExpirationState  mExpirationState;
   RefPtr<ISurfaceProvider> mProvider;
-  DrawableFrameRef   mDrawableRef;
   const Cost         mCost;
   const ImageKey     mImageKey;
   const SurfaceKey   mSurfaceKey;
@@ -434,7 +438,8 @@ public:
   InsertOutcome Insert(ISurfaceProvider* aProvider,
                        const Cost        aCost,
                        const ImageKey    aImageKey,
-                       const SurfaceKey& aSurfaceKey)
+                       const SurfaceKey& aSurfaceKey,
+                       bool              aSetAvailable)
   {
     // If this is a duplicate surface, refuse to replace the original.
     // XXX(seth): Calling Lookup() and then RemoveEntry() does the lookup
@@ -473,6 +478,11 @@ public:
     if (!cache) {
       cache = new ImageSurfaceCache;
       mImageCaches.Put(aImageKey, cache);
+    }
+
+    // If we were asked to mark the cache entry available, do so.
+    if (aSetAvailable) {
+      aProvider->Availability().SetAvailable();
     }
 
     RefPtr<CachedSurface> surface =
@@ -588,8 +598,8 @@ public:
       return LookupResult(MatchType::PENDING);
     }
 
-    DrawableFrameRef ref = surface->DrawableRef();
-    if (!ref) {
+    DrawableSurface drawableSurface = surface->GetDrawableSurface();
+    if (!drawableSurface) {
       // The surface was released by the operating system. Remove the cache
       // entry as well.
       Remove(surface);
@@ -602,7 +612,7 @@ public:
 
     MOZ_ASSERT(surface->GetSurfaceKey() == aSurfaceKey,
                "Lookup() not returning an exact match?");
-    return LookupResult(Move(ref), MatchType::EXACT);
+    return LookupResult(Move(drawableSurface), MatchType::EXACT);
   }
 
   LookupResult LookupBestMatch(const ImageKey         aImageKey,
@@ -621,7 +631,7 @@ public:
     // encounter a performance problem here we can revisit this.
 
     RefPtr<CachedSurface> surface;
-    DrawableFrameRef ref;
+    DrawableSurface drawableSurface;
     MatchType matchType = MatchType::NOT_FOUND;
     while (true) {
       Tie(surface, matchType) = cache->LookupBestMatch(aSurfaceKey);
@@ -630,8 +640,8 @@ public:
         return LookupResult(matchType);  // Lookup in the per-image cache missed.
       }
 
-      ref = surface->DrawableRef();
-      if (ref) {
+      drawableSurface = surface->GetDrawableSurface();
+      if (drawableSurface) {
         break;
       }
 
@@ -652,7 +662,7 @@ public:
       MarkUsed(surface, cache);
     }
 
-    return LookupResult(Move(ref), matchType);
+    return LookupResult(Move(drawableSurface), matchType);
   }
 
   bool CanHold(const Cost aCost) const
@@ -663,6 +673,25 @@ public:
   size_t MaximumCapacity() const
   {
     return size_t(mMaxCost);
+  }
+
+  void SurfaceAvailable(NotNull<ISurfaceProvider*> aProvider,
+                        const ImageKey             aImageKey,
+                        const SurfaceKey&          aSurfaceKey)
+  {
+    if (!aProvider->Availability().IsPlaceholder()) {
+      MOZ_ASSERT_UNREACHABLE("Calling SurfaceAvailable on non-placeholder");
+      return;
+    }
+
+    // Reinsert the provider, requesting that Insert() mark it available. This
+    // may or may not succeed, depending on whether some other decoder has
+    // beaten us to the punch and inserted a non-placeholder version of this
+    // surface first, but it's fine either way.
+    // XXX(seth): This could be implemented more efficiently; we should be able
+    // to just update our data structures without reinserting.
+    Cost cost = aProvider->LogicalSizeInBytes();
+    Insert(aProvider, cost, aImageKey, aSurfaceKey, /* aSetAvailable = */ true);
   }
 
   void LockImage(const ImageKey aImageKey)
@@ -1037,7 +1066,8 @@ SurfaceCache::Insert(NotNull<ISurfaceProvider*> aProvider,
 
   MutexAutoLock lock(sInstance->GetMutex());
   Cost cost = aProvider->LogicalSizeInBytes();
-  return sInstance->Insert(aProvider.get(), cost, aImageKey, aSurfaceKey);
+  return sInstance->Insert(aProvider.get(), cost, aImageKey, aSurfaceKey,
+                           /* aSetAvailable = */ false);
 }
 
 /* static */ InsertOutcome
@@ -1049,7 +1079,8 @@ SurfaceCache::InsertPlaceholder(const ImageKey    aImageKey,
   }
 
   MutexAutoLock lock(sInstance->GetMutex());
-  return sInstance->Insert(nullptr, sPlaceholderCost, aImageKey, aSurfaceKey);
+  return sInstance->Insert(nullptr, sPlaceholderCost, aImageKey, aSurfaceKey,
+                           /* aSetAvailable = */ false);
 }
 
 /* static */ bool
@@ -1071,6 +1102,19 @@ SurfaceCache::CanHold(size_t aSize)
   }
 
   return sInstance->CanHold(aSize);
+}
+
+/* static */ void
+SurfaceCache::SurfaceAvailable(NotNull<ISurfaceProvider*> aProvider,
+                               const ImageKey             aImageKey,
+                               const SurfaceKey&          aSurfaceKey)
+{
+  if (!sInstance) {
+    return;
+  }
+
+  MutexAutoLock lock(sInstance->GetMutex());
+  sInstance->SurfaceAvailable(aProvider, aImageKey, aSurfaceKey);
 }
 
 /* static */ void

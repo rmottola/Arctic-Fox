@@ -16,33 +16,6 @@ ServoRestyleManager::ServoRestyleManager(nsPresContext* aPresContext)
 {
 }
 
-/* static */ void
-ServoRestyleManager::DirtyTree(nsIContent* aContent, bool aIncludingRoot)
-{
-  if (aIncludingRoot) {
-    // XXX: This can in theory leave nodes not dirty, but in practice this is not
-    // a problem, at least for now, since right now element dirty implies
-    // descendants dirty. Remove this early return if this ever changes.
-    if (aContent->IsDirtyForServo()) {
-      return;
-    }
-
-    aContent->SetIsDirtyForServo();
-  }
-
-  FlattenedChildIterator it(aContent);
-
-  nsIContent* n = it.GetNextChild();
-  bool hadChildren = bool(n);
-  for (; n; n = it.GetNextChild()) {
-    DirtyTree(n, true);
-  }
-
-  if (hadChildren) {
-    aContent->SetHasDirtyDescendantsForServo();
-  }
-}
-
 void
 ServoRestyleManager::PostRestyleEvent(Element* aElement,
                                       nsRestyleHint aRestyleHint,
@@ -77,14 +50,14 @@ ServoRestyleManager::PostRestyleEvent(Element* aElement,
 void
 ServoRestyleManager::PostRestyleEventForLazyConstruction()
 {
-  NS_ERROR("stylo: ServoRestyleManager::PostRestyleEventForLazyConstruction not implemented");
+  NS_WARNING("stylo: ServoRestyleManager::PostRestyleEventForLazyConstruction not implemented");
 }
 
 void
 ServoRestyleManager::RebuildAllStyleData(nsChangeHint aExtraHint,
                                          nsRestyleHint aRestyleHint)
 {
-  NS_ERROR("stylo: ServoRestyleManager::RebuildAllStyleData not implemented");
+  NS_WARNING("stylo: ServoRestyleManager::RebuildAllStyleData not implemented");
 }
 
 void
@@ -151,19 +124,34 @@ MarkParentsAsHavingDirtyDescendants(Element* aElement)
   }
 }
 
+static void
+MarkChildrenAsDirtyForServo(nsIContent* aContent)
+{
+  FlattenedChildIterator it(aContent);
+
+  nsIContent* n = it.GetNextChild();
+  bool hadChildren = bool(n);
+  for (; n; n = it.GetNextChild()) {
+    n->SetIsDirtyForServo();
+  }
+
+  if (hadChildren) {
+    aContent->SetHasDirtyDescendantsForServo();
+  }
+}
+
 void
 ServoRestyleManager::NoteRestyleHint(Element* aElement, nsRestyleHint aHint)
 {
   if (aHint & eRestyle_Self) {
     aElement->SetIsDirtyForServo();
     MarkParentsAsHavingDirtyDescendants(aElement);
-    // NB: Using Servo's style system marking the subtree as dirty is necessary
-    // so we inherit correctly the style structs.
-    aHint |= eRestyle_Subtree;
-  }
-
-  if (aHint & eRestyle_Subtree) {
-    DirtyTree(aElement, /* aIncludingRoot = */ false);
+    // NB: For Servo, at least for now, restyling and running selector-matching
+    // against the subtree is necessary as part of restyling the element, so
+    // processing eRestyle_Self will perform at least as much work as
+    // eRestyle_Subtree.
+  } else if (aHint & eRestyle_Subtree) {
+    MarkChildrenAsDirtyForServo(aElement);
     MarkParentsAsHavingDirtyDescendants(aElement);
   }
 
@@ -171,14 +159,15 @@ ServoRestyleManager::NoteRestyleHint(Element* aElement, nsRestyleHint aHint)
     for (nsINode* cur = aElement->GetNextSibling(); cur;
          cur = cur->GetNextSibling()) {
       if (cur->IsContent()) {
-        DirtyTree(cur->AsContent(), /* aIncludingRoot = */ true);
+        cur->SetIsDirtyForServo();
       }
     }
   }
 
   // TODO: Handle all other nsRestyleHint values.
   if (aHint & ~(eRestyle_Self | eRestyle_Subtree | eRestyle_LaterSiblings)) {
-    NS_ERROR("stylo: Unhandled restyle hint");
+    NS_WARNING(nsPrintfCString("stylo: Unhandled restyle hint %s",
+                             RestyleManagerBase::RestyleHintToString(aHint).get()).get());
   }
 }
 
@@ -189,6 +178,12 @@ ServoRestyleManager::ProcessPendingRestyles()
     return;
   }
   ServoStyleSet* styleSet = StyleSet();
+
+  if (!styleSet->StylingStarted()) {
+    // If something caused us to restyle, and we haven't started styling yet,
+    // do nothing. Everything is dirty, and we'll style it all later.
+    return;
+  }
 
   nsIDocument* doc = PresContext()->Document();
 
@@ -208,8 +203,10 @@ ServoRestyleManager::ProcessPendingRestyles()
       }
     }
 
-    styleSet->RestyleSubtree(root, /* aForce = */ false);
-    RecreateStyleContexts(root, nullptr, styleSet);
+    if (root->IsDirtyForServo() || root->HasDirtyDescendantsForServo()) {
+      styleSet->RestyleSubtree(root);
+      RecreateStyleContexts(root, nullptr, styleSet);
+    }
   }
 
   mModifiedElements.Clear();
@@ -229,14 +226,14 @@ void
 ServoRestyleManager::RestyleForInsertOrChange(Element* aContainer,
                                               nsIContent* aChild)
 {
-  NS_ERROR("stylo: ServoRestyleManager::RestyleForInsertOrChange not implemented");
+  NS_WARNING("stylo: ServoRestyleManager::RestyleForInsertOrChange not implemented");
 }
 
 void
 ServoRestyleManager::RestyleForAppend(Element* aContainer,
                                       nsIContent* aFirstNewContent)
 {
-  NS_ERROR("stylo: ServoRestyleManager::RestyleForAppend not implemented");
+  NS_WARNING("stylo: ServoRestyleManager::RestyleForAppend not implemented");
 }
 
 void
@@ -244,7 +241,7 @@ ServoRestyleManager::RestyleForRemove(Element* aContainer,
                                       nsIContent* aOldChild,
                                       nsIContent* aFollowingSibling)
 {
-  NS_ERROR("stylo: ServoRestyleManager::RestyleForRemove not implemented");
+  NS_WARNING("stylo: ServoRestyleManager::RestyleForRemove not implemented");
 }
 
 nsresult
@@ -295,33 +292,37 @@ ServoRestyleManager::AttributeWillChange(Element* aElement,
                                          nsIAtom* aAttribute, int32_t aModType,
                                          const nsAttrValue* aNewValue)
 {
-  NS_ERROR("stylo: ServoRestyleManager::AttributeWillChange not implemented");
-}
-
-void
-ServoRestyleManager::AttributeChanged(Element* aElement, int32_t aNameSpaceID,
-                                      nsIAtom* aAttribute, int32_t aModType,
-                                      const nsAttrValue* aOldValue)
-{
-  NS_ERROR("stylo: ServoRestyleManager::AttributeChanged not implemented");
+  ServoElementSnapshot* snapshot = SnapshotForElement(aElement);
+  snapshot->AddAttrs(aElement);
 }
 
 nsresult
 ServoRestyleManager::ReparentStyleContext(nsIFrame* aFrame)
 {
-  MOZ_CRASH("stylo: ServoRestyleManager::ReparentStyleContext not implemented");
+  NS_WARNING("stylo: ServoRestyleManager::ReparentStyleContext not implemented");
+  return NS_OK;
 }
 
 ServoElementSnapshot*
 ServoRestyleManager::SnapshotForElement(Element* aElement)
 {
-  ServoElementSnapshot* snapshot = mModifiedElements.LookupOrAdd(aElement);
-  if (!snapshot->HasAny(
-        ServoElementSnapshot::Flags::HTMLElementInHTMLDocument)) {
-    snapshot->SetIsHTMLElementInHTMLDocument(
-      aElement->IsHTMLElement() && aElement->OwnerDoc()->IsHTMLDocument());
-  }
-  return snapshot;
+  // NB: aElement is the argument for the construction of the snapshot in the
+  // not found case.
+  return mModifiedElements.LookupOrAdd(aElement, aElement);
+}
+
+nsresult
+ServoRestyleManager::ProcessRestyledFrames(nsStyleChangeList& aChangeList)
+{
+  MOZ_CRASH("stylo: ServoRestyleManager::ProcessRestyledFrames not implemented "
+            "for Servo-backed style system");
+}
+
+void
+ServoRestyleManager::FlushOverflowChangedTracker()
+{
+  MOZ_CRASH("stylo: ServoRestyleManager::FlushOverflowChangedTracker "
+            "not implemented for Servo-backed style system");
 }
 
 } // namespace mozilla

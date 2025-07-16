@@ -481,6 +481,12 @@ public:
                                                     uint32_t aModifierFlags,
                                                     uint32_t aAdditionalFlags,
                                                     nsIObserver* aObserver) override;
+  virtual nsresult SynthesizeNativeTouchPoint(uint32_t aPointerId,
+                                              TouchPointerState aPointerState,
+                                              LayoutDeviceIntPoint aPoint,
+                                              double aPointerPressure,
+                                              uint32_t aPointerOrientation,
+                                              nsIObserver* aObserver) override;
 
   // Mac specific methods
 
@@ -488,6 +494,8 @@ public:
 
   void WillPaintWindow();
   bool PaintWindow(LayoutDeviceIntRegion aRegion);
+  bool PaintWindowInContext(CGContextRef aContext, const LayoutDeviceIntRegion& aRegion,
+                            mozilla::gfx::IntSize aSurfaceSize);
 
 #ifdef ACCESSIBILITY
   already_AddRefed<mozilla::a11y::Accessible> GetDocumentAccessible();
@@ -692,6 +700,9 @@ protected:
   RefPtr<mozilla::SwipeTracker> mSwipeTracker;
   mozilla::UniquePtr<mozilla::SwipeEventQueue> mSwipeEventQueue;
 
+  // Only used for drawRect-based painting in popups.
+  RefPtr<mozilla::gfx::DrawTarget> mBackingSurface;
+
   // This flag is only used when APZ is off. It indicates that the current pan
   // gesture was processed as a swipe. Sometimes the swipe animation can finish
   // before momentum events of the pan gesture have stopped firing, so this
@@ -703,6 +714,10 @@ protected:
   static uint32_t sLastInputEventCount;
 
   void ReleaseTitlebarCGContext();
+
+  // This is used by SynthesizeNativeTouchPoint to maintain state between
+  // multiple synthesized points
+  mozilla::UniquePtr<mozilla::MultiTouchInput> mSynthesizedTouchInput;
 };
 
 #endif // nsChildView_h_

@@ -114,11 +114,15 @@ using namespace mozilla::widget;
 #include "mozilla/gfx/2D.h"
 #include "mozilla/gfx/HelpersCairo.h"
 #include "mozilla/layers/CompositorBridgeParent.h"
+#include "mozilla/layers/CompositorThread.h"
 
 #ifdef MOZ_X11
 #include "gfxXlibSurface.h"
-#endif
-  
+#include "WindowSurfaceX11Image.h"
+#include "WindowSurfaceX11SHM.h"
+#include "WindowSurfaceXRender.h"
+#endif // MOZ_X11
+
 #include "nsShmImage.h"
 
 #include "nsIDOMWheelEvent.h"
@@ -476,8 +480,6 @@ nsWindow::nsWindow()
 #if GTK_CHECK_VERSION(3,4,0)
     mLastScrollEventTime = GDK_CURRENT_TIME;
 #endif
-
-    mFallbackSurface = nullptr;
     mPendingConfigures = 0;
 }
 
@@ -589,13 +591,13 @@ nsWindow::OnDestroy(void)
         return;
 
     mOnDestroyCalled = true;
-    
+
     // Prevent deletion.
     nsCOMPtr<nsIWidget> kungFuDeathGrip = this;
 
     // release references to children, device context, toolkit + app shell
-    nsBaseWidget::OnDestroy(); 
-    
+    nsBaseWidget::OnDestroy();
+
     // Remove association between this object and its parent and siblings.
     nsBaseWidget::Destroy();
     mParent = nullptr;
@@ -717,9 +719,9 @@ nsWindow::Destroy(void)
     }
     mLayerManager = nullptr;
 
-    // It is safe to call DestroyeCompositor several times (here and 
+    // It is safe to call DestroyeCompositor several times (here and
     // in the parent class) since it will take effect only once.
-    // The reason we call it here is because on gtk platforms we need 
+    // The reason we call it here is because on gtk platforms we need
     // to destroy the compositor before we destroy the gdk window (which
     // destroys the the gl context attached to it).
     DestroyCompositor();
@@ -799,11 +801,6 @@ nsWindow::Destroy(void)
          mRootAccessible = nullptr;
      }
 #endif
-
-    if (mFallbackSurface) {
-        cairo_surface_destroy(mFallbackSurface);
-        mFallbackSurface = nullptr;
-    }
 
     // Save until last because OnDestroy() may cause us to be deleted.
     OnDestroy();
@@ -892,7 +889,7 @@ nsWindow::ReparentNativeWidget(nsIWidget* aNewParent)
     }
     MOZ_ASSERT(!gdk_window_is_destroyed(mGdkWindow),
                "destroyed GdkWindow with widget");
-    
+
     nsWindow* newParent = static_cast<nsWindow*>(aNewParent);
     GdkWindow* newParentWindow = newParent->mGdkWindow;
     GtkWidget* newContainer = newParent->GetMozContainerWidget();
@@ -978,14 +975,14 @@ nsWindow::RegisterTouchWindow()
 NS_IMETHODIMP
 nsWindow::ConstrainPosition(bool aAllowSlop, int32_t *aX, int32_t *aY)
 {
-    if (!mIsTopLevel || !mShell)  
+    if (!mIsTopLevel || !mShell)
       return NS_OK;
 
     double dpiScale = GetDefaultScale().scale;
 
     // we need to use the window size in logical screen pixels
     int32_t logWidth = std::max(NSToIntRound(mBounds.width / dpiScale), 1);
-    int32_t logHeight = std::max(NSToIntRound(mBounds.height / dpiScale), 1);  
+    int32_t logHeight = std::max(NSToIntRound(mBounds.height / dpiScale), 1);
 
     /* get our playing field. use the current screen, or failing that
       for any reason, use device caps for the default screen. */
@@ -1021,7 +1018,7 @@ nsWindow::ConstrainPosition(bool aAllowSlop, int32_t *aX, int32_t *aY)
           *aY = screenRect.y - logHeight + kWindowPositionSlop;
       else if (*aY >= screenRect.YMost() - kWindowPositionSlop)
           *aY = screenRect.YMost() - kWindowPositionSlop;
-    } else {  
+    } else {
       if (*aX < screenRect.x)
           *aX = screenRect.x;
       else if (*aX >= screenRect.XMost() - logWidth)
@@ -1352,7 +1349,7 @@ SetUserTimeAndStartupIDForActivatedWindow(GtkWidget* aWindow)
 
 #if defined(MOZ_ENABLE_STARTUP_NOTIFICATION)
     // TODO - Implement for non-X11 Gtk backends (Bug 726479)
-    if (mIsX11Display) {
+    if (GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
         GdkWindow* gdkWindow = gtk_widget_get_window(aWindow);
 
         GdkScreen* screen = gdk_window_get_screen(gdkWindow);
@@ -1401,7 +1398,7 @@ nsWindow::GetLastUserInputTime()
     if (sLastUserInputTime != GDK_CURRENT_TIME &&
         TimestampIsNewerThan(sLastUserInputTime, timestamp)) {
         return sLastUserInputTime;
-    }       
+    }
 
     return timestamp;
 }
@@ -1817,7 +1814,7 @@ nsWindow::SetIcon(const nsAString& aIconSpec)
         return NS_OK;
 
     nsAutoCString iconName;
-    
+
     if (aIconSpec.EqualsLiteral("default")) {
         nsXPIDLString brandName;
         GetBrandName(brandName);
@@ -1826,7 +1823,7 @@ nsWindow::SetIcon(const nsAString& aIconSpec)
     } else {
         AppendUTF16toUTF8(aIconSpec, iconName);
     }
-    
+
     nsCOMPtr<nsIFile> iconFile;
     nsAutoCString path;
 
@@ -3227,7 +3224,7 @@ nsWindow::OnScrollEvent(GdkEventScroll *aEvent)
     // check for duplicate legacy scroll event, see GNOME bug 726878
     if (aEvent->direction != GDK_SCROLL_SMOOTH &&
         mLastScrollEventTime == aEvent->time)
-        return; 
+        return;
 #endif
     WidgetWheelEvent wheelEvent(true, eWheel, this);
     wheelEvent.mDeltaMode = nsIDOMWheelEvent::DOM_DELTA_LINE;
@@ -3243,8 +3240,8 @@ nsWindow::OnScrollEvent(GdkEventScroll *aEvent)
         wheelEvent.mDeltaX = aEvent->delta_x * 3;
         wheelEvent.mDeltaY = aEvent->delta_y * 3;
         wheelEvent.mIsNoLineOrPageDelta = true;
-        // This next step manually unsets smooth scrolling for touch devices 
-        // that trigger GDK_SCROLL_SMOOTH. We use the slave device, which 
+        // This next step manually unsets smooth scrolling for touch devices
+        // that trigger GDK_SCROLL_SMOOTH. We use the slave device, which
         // represents the actual input.
         GdkDevice *device = gdk_event_get_source_device((GdkEvent*)aEvent);
         GdkInputSource source = gdk_device_get_source(device);
@@ -3666,7 +3663,7 @@ nsWindow::Create(nsIWidget* aParent,
 
         if (mWindowType == eWindowType_dialog) {
             SetDefaultIcon();
-            gtk_window_set_wmclass(GTK_WINDOW(mShell), "Dialog", 
+            gtk_window_set_wmclass(GTK_WINDOW(mShell), "Dialog",
                                    gdk_get_program_class());
             gtk_window_set_type_hint(GTK_WINDOW(mShell),
                                      GDK_WINDOW_TYPE_HINT_DIALOG);
@@ -3722,7 +3719,7 @@ nsWindow::Create(nsIWidget* aParent,
                 // WM_TAKE_FOCUS, focus is requested on the parent window.
                 gtk_widget_realize(mShell);
                 gdk_window_add_filter(gtk_widget_get_window(mShell),
-                                      popup_take_focus_filter, nullptr); 
+                                      popup_take_focus_filter, nullptr);
 #endif
             }
 
@@ -3753,7 +3750,7 @@ nsWindow::Create(nsIWidget* aParent,
         }
         else { // must be eWindowType_toplevel
             SetDefaultIcon();
-            gtk_window_set_wmclass(GTK_WINDOW(mShell), "Toplevel", 
+            gtk_window_set_wmclass(GTK_WINDOW(mShell), "Toplevel",
                                    gdk_get_program_class());
 
             // each toplevel window gets its own window group
@@ -4034,7 +4031,7 @@ nsWindow::SetWindowClass(const nsAString &xulWinType)
   const char *res_class = gdk_get_program_class();
   if (!res_class)
     return NS_ERROR_FAILURE;
-  
+
   char *res_name = ToNewCString(xulWinType);
   if (!res_name)
     return NS_ERROR_OUT_OF_MEMORY;
@@ -4581,9 +4578,9 @@ nsWindow::ApplyTransparencyBitmap()
     g_object_unref(maskBitmap);
 #else
     cairo_surface_t *maskBitmap;
-    maskBitmap = cairo_image_surface_create_for_data((unsigned char*)mTransparencyBitmap, 
-                                                     CAIRO_FORMAT_A1, 
-                                                     mTransparencyBitmapWidth, 
+    maskBitmap = cairo_image_surface_create_for_data((unsigned char*)mTransparencyBitmap,
+                                                     CAIRO_FORMAT_A1,
+                                                     mTransparencyBitmapWidth,
                                                      mTransparencyBitmapHeight,
                                                      GetBitmapStride(mTransparencyBitmapWidth));
     if (!maskBitmap)
@@ -4769,7 +4766,7 @@ nsWindow::SetUrgencyHint(GtkWidget *top_window, bool state)
 {
     if (!top_window)
         return;
-        
+
     gdk_window_set_urgency_hint(gtk_widget_get_window(top_window), state);
 }
 
@@ -4783,12 +4780,12 @@ nsWindow::SetupPluginPort(void)
         return nullptr;
 
     Window window = gdk_x11_window_get_xid(mGdkWindow);
-    
+
     // we have to flush the X queue here so that any plugins that
     // might be running on separate X connections will be able to use
     // this window in case it was just created
 #ifdef MOZ_X11
-    XWindowAttributes xattrs;    
+    XWindowAttributes xattrs;
     Display *display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
     XGetWindowAttributes(display, window, &xattrs);
     XSelectInput (display, window,
@@ -4799,7 +4796,7 @@ nsWindow::SetupPluginPort(void)
 
     XSync(display, False);
 #endif /* MOZ_X11 */
-    
+
     return (void *)window;
 }
 
@@ -4832,7 +4829,7 @@ nsWindow::SetNonXEmbedPluginFocus()
 
     Window curFocusWindow;
     int focusState;
-    
+
     GdkDisplay *gdkDisplay = gdk_window_get_display(mGdkWindow);
     XGetInputFocus(gdk_x11_display_get_xdisplay(gdkDisplay),
                    &curFocusWindow,
@@ -5213,7 +5210,7 @@ nsWindow::CheckForRollup(gdouble aMouseX, gdouble aMouseY,
 
         // if we've determined that we should still rollup, do it.
         bool usePoint = !aIsWheel && !aAlwaysRollup;
-        nsIntPoint point(aMouseX, aMouseY);
+        IntPoint point = IntPoint::Truncate(aMouseX, aMouseY);
         if (rollup && rollupListener->Rollup(popupsToRollup, true, usePoint ? &point : nullptr, nullptr)) {
             retVal = true;
         }
@@ -5316,7 +5313,7 @@ get_gtk_cursor(nsCursor aCursor)
     if ((gdkcursor = gCursorCache[aCursor])) {
         return gdkcursor;
     }
-    
+
     GdkDisplay *defaultDisplay = gdk_display_get_default();
 
     // The strategy here is to use standard GDK cursors, and, if not available,
@@ -5490,15 +5487,15 @@ get_gtk_cursor(nsCursor aCursor)
         GdkPixbuf * cursor_pixbuf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, TRUE, 8, 32, 32);
         if (!cursor_pixbuf)
             return nullptr;
-      
+
         guchar *data = gdk_pixbuf_get_pixels(cursor_pixbuf);
-        
+
         // Read data from GtkCursors and compose RGBA surface from 1bit bitmap and mask
         // GtkCursors bits and mask are 32x32 monochrome bitmaps (1 bit for each pixel)
         // so it's 128 byte array (4 bytes for are one bitmap row and there are 32 rows here).
         const unsigned char *bits = GtkCursors[newType].bits;
         const unsigned char *mask_bits = GtkCursors[newType].mask_bits;
-        
+
         for (int i = 0; i < 128; i++) {
             char bit = *bits++;
             char mask = *mask_bits++;
@@ -5510,11 +5507,11 @@ get_gtk_cursor(nsCursor aCursor)
                 *data++ = (((mask >> j) & 0x01) * 0xff);
             }
         }
-      
+
         gdkcursor = gdk_cursor_new_from_pixbuf(gdk_display_get_default(), cursor_pixbuf,
                                                GtkCursors[newType].hot_x,
                                                GtkCursors[newType].hot_y);
-        
+
         g_object_unref(cursor_pixbuf);
     }
 
@@ -5545,16 +5542,16 @@ draw_window_of_widget(GtkWidget *widget, GdkWindow *aWindow, cairo_t *cr)
         if (!window) {
             NS_WARNING("Cannot get nsWindow from GtkWidget");
         }
-        else {      
-            cairo_save(cr);      
-            gtk_cairo_transform_to_window(cr, widget, aWindow);  
+        else {
+            cairo_save(cr);
+            gtk_cairo_transform_to_window(cr, widget, aWindow);
             // TODO - window->OnExposeEvent() can destroy this or other windows,
             // do we need to handle it somehow?
             window->OnExposeEvent(cr);
             cairo_restore(cr);
         }
     }
-    
+
     GList *children = gdk_window_get_children(aWindow);
     GList *child = children;
     while (child) {
@@ -5565,7 +5562,7 @@ draw_window_of_widget(GtkWidget *widget, GdkWindow *aWindow, cairo_t *cr)
             draw_window_of_widget(widget, window, cr);
         }
         child = g_list_next(child);
-    }  
+    }
     g_list_free(children);
 }
 
@@ -5849,7 +5846,7 @@ plugin_window_filter_func(GdkXEvent *gdk_xevent, GdkEvent *event, gpointer data)
 #else
             plugin_window = gdk_x11_window_lookup_for_display(
                                   gdk_x11_lookup_xdisplay(xevent->xcreatewindow.display), xeventWindow);
-#endif        
+#endif
             if (plugin_window) {
                 GtkWidget *widget =
                     get_gtk_widget_for_gdk_window(plugin_window);
@@ -5860,7 +5857,7 @@ plugin_window_filter_func(GdkXEvent *gdk_xevent, GdkEvent *event, gpointer data)
                     nswindow->SetPluginType(nsWindow::PluginType_NONXEMBED);
                     break;
                 }
-                else 
+                else
 #endif
                 if(GTK_IS_SOCKET(widget)) {
                     if (!g_object_get_data(G_OBJECT(widget), "enable-xt-focus")) {
@@ -6565,133 +6562,36 @@ nsWindow::GetDrawTargetForGdkDrawable(GdkDrawable* aDrawable,
 #endif
 
 already_AddRefed<DrawTarget>
-nsWindow::GetDrawTarget(const LayoutDeviceIntRegion& aRegion, BufferMode* aBufferMode)
-{
-  if (!mGdkWindow || aRegion.IsEmpty()) {
-    return nullptr;
-  }
-
-  RefPtr<DrawTarget> dt;
-
-#ifdef MOZ_X11
-  bool useXRender = false;
-#ifdef MOZ_WIDGET_GTK
-  useXRender = gfxPlatformGtk::GetPlatform()->UseXRender();
-#endif
-
-  if (useXRender) {
-    LayoutDeviceIntRect bounds = aRegion.GetBounds();
-    LayoutDeviceIntSize size(bounds.XMost(), bounds.YMost());
-    RefPtr<gfxXlibSurface> surf = new gfxXlibSurface(mXDisplay, mXWindow, mXVisual, size.ToUnknownSize());
-    if (!surf->CairoStatus()) {
-      dt = gfxPlatform::GetPlatform()->CreateDrawTargetForSurface(surf.get(), surf->GetSize());
-      *aBufferMode = BufferMode::BUFFERED;
-    }
-  }
-
-#  ifdef MOZ_HAVE_SHMIMAGE
-  if (!dt && mIsX11Display && nsShmImage::UseShm()) {
-    mBackShmImage.swap(mFrontShmImage);
-    if (!mBackShmImage) {
-      mBackShmImage = new nsShmImage(mXDisplay, mXWindow, mXVisual, mXDepth);
-    }
-    dt = mBackShmImage->CreateDrawTarget(aRegion);
-    *aBufferMode = BufferMode::BUFFER_NONE;
-    if (!dt) {
-      mBackShmImage = nullptr;
-    }
-  }
-#  endif  // MOZ_HAVE_SHMIMAGE
-#endif // MOZ_X11
-
-  // If MIT-SHM and XRender are unavailable, buffer to an image surface.
-  if (!dt) {
-    IntRect bounds = aRegion.GetBounds().ToUnknownRect();
-    IntSize size(bounds.XMost(), bounds.YMost());
-
-    // Recreate the fallback surface if there is unsufficient space to render.
-    if (!mFallbackSurface ||
-        cairo_image_surface_get_width(mFallbackSurface) < size.width ||
-        cairo_image_surface_get_height(mFallbackSurface) < size.height)
-    {
-      if (mFallbackSurface)
-        cairo_surface_destroy(mFallbackSurface);
-
-      GdkScreen* screen = gdk_screen_get_default();
-      bool argb = gdk_window_get_visual(mGdkWindow) ==
-                  gdk_screen_get_rgba_visual(screen);
-      cairo_format_t cairo_format = argb ? CAIRO_FORMAT_ARGB32
-                                         : CAIRO_FORMAT_RGB24;
-      mFallbackSurface = cairo_image_surface_create(cairo_format,
-                                                    bounds.XMost(),
-                                                    bounds.YMost());
-
-      // Set the appropriate device scale so that our surface can be used
-      // as a source without transforming to the GDK window's scale.
-      static auto sCairoSurfaceSetDeviceScale =
-          (void (*)(cairo_surface_t*, double, double))
-          dlsym(RTLD_DEFAULT, "cairo_surface_set_device_scale");
-      if (sCairoSurfaceSetDeviceScale) {
-        gint scale = GdkScaleFactor();
-        sCairoSurfaceSetDeviceScale(mFallbackSurface, scale, scale);
-      }
-
-      cairo_surface_flush(mFallbackSurface);
-    }
-
-    SurfaceFormat format = CairoFormatToGfxFormat(
-            cairo_image_surface_get_format(mFallbackSurface));
-    dt = gfxPlatform::GetPlatform()->CreateDrawTargetForData(
-            cairo_image_surface_get_data(mFallbackSurface)
-            + bounds.x * BytesPerPixel(format)
-            + bounds.y * cairo_image_surface_get_stride(mFallbackSurface),
-            bounds.Size(),
-            cairo_image_surface_get_stride(mFallbackSurface),
-            format);
-    *aBufferMode = BufferMode::BUFFER_NONE;
-  }
-
-  return dt.forget();
-}
-
-already_AddRefed<DrawTarget>
 nsWindow::StartRemoteDrawingInRegion(LayoutDeviceIntRegion& aInvalidRegion, BufferMode* aBufferMode)
 {
-  return GetDrawTarget(aInvalidRegion, aBufferMode);
+  if (aInvalidRegion.IsEmpty())
+    return nullptr;
+
+  if (!mWindowSurface) {
+    mWindowSurface = CreateWindowSurface();
+    if (!mWindowSurface)
+      return nullptr;
+  }
+
+  *aBufferMode = BufferMode::BUFFER_NONE;
+  RefPtr<DrawTarget> dt = nullptr;
+  if (!(dt = mWindowSurface->Lock(aInvalidRegion))) {
+#ifdef MOZ_X11
+    if (mIsX11Display) {
+      gfxWarningOnce() << "Failed to lock WindowSurface, falling back to XPutImage backend.";
+      mWindowSurface = MakeUnique<WindowSurfaceX11Image>(mXDisplay, mXWindow, mXVisual, mXDepth);
+    }
+#endif // MOZ_X11
+  }
+  return dt.forget();
 }
 
 void
 nsWindow::EndRemoteDrawingInRegion(DrawTarget* aDrawTarget,
                                    LayoutDeviceIntRegion& aInvalidRegion)
 {
-#ifdef MOZ_X11
-#  ifdef MOZ_HAVE_SHMIMAGE
-  if (!mGdkWindow) {
-    return;
-  }
-
-  if (mBackShmImage) {
-    mBackShmImage->Put(aInvalidRegion);
-  }
-#  endif // MOZ_HAVE_SHMIMAGE
-#endif // MOZ_X11
-
-  if (mFallbackSurface) {
-    cairo_t* cr = gdk_cairo_create(mGdkWindow);
-    cairo_surface_mark_dirty(mFallbackSurface);
-    cairo_set_source_surface(cr, mFallbackSurface, 0, 0);
-
-    for (auto iter = aInvalidRegion.RectIter(); !iter.Done(); iter.Next()) {
-      // Transform our path into the window's coordinate system.
-      const IntRectTyped<LayoutDevicePixel> & r = iter.Get();
-      cairo_rectangle(cr, DevicePixelsToGdkCoordRoundDown(r.x),
-                          DevicePixelsToGdkCoordRoundDown(r.y),
-                          DevicePixelsToGdkCoordRoundUp(r.width),
-                          DevicePixelsToGdkCoordRoundUp(r.height));
-    }
-    cairo_fill(cr);
-    cairo_destroy(cr);
-  }
+  if (mWindowSurface)
+    mWindowSurface->Commit(aInvalidRegion);
 }
 
 // Code shared begin BeginMoveDrag and BeginResizeDrag
@@ -6911,7 +6811,7 @@ LayoutDeviceIntPoint
 nsWindow::GdkEventCoordsToDevicePixels(gdouble x, gdouble y)
 {
     gint scale = GdkScaleFactor();
-    return LayoutDeviceIntPoint(floor(x * scale + 0.5), floor(y * scale + 0.5));
+    return LayoutDeviceIntPoint::Round(x * scale, y * scale);
 }
 
 LayoutDeviceIntPoint
@@ -7126,4 +7026,47 @@ int32_t
 nsWindow::RoundsWidgetCoordinatesTo()
 {
     return GdkScaleFactor();
+}
+
+UniquePtr<WindowSurface>
+nsWindow::CreateWindowSurface()
+{
+  if (!mGdkWindow)
+    return nullptr;
+
+  // TODO: Add path for Wayland. We can't use gdk_cairo_create as it's not
+  //       threadsafe.
+  if (!mIsX11Display)
+    return nullptr;
+
+#ifdef MOZ_X11
+  // Blit to the window with the following priority:
+  // 1. XRender (iff XRender is enabled)
+  // 2. MIT-SHM
+  // 3. XPutImage
+
+#ifdef MOZ_WIDGET_GTK
+  if (gfxVars::UseXRender()) {
+    LOGDRAW(("Drawing to nsWindow %p using XRender\n", (void*)this));
+    return MakeUnique<WindowSurfaceXRender>(mXDisplay, mXWindow, mXVisual, mXDepth);
+  }
+#endif // MOZ_WIDGET_GTK
+
+  Display* display;
+  if (CompositorThreadHolder::IsInCompositorThread()) {
+    display = gfxPlatformGtk::GetPlatform()->GetCompositorDisplay();
+  } else {
+    display = mXDisplay;
+  }
+
+#ifdef MOZ_HAVE_SHMIMAGE
+  if (nsShmImage::UseShm()) {
+    LOGDRAW(("Drawing to nsWindow %p using MIT-SHM\n", (void*)this));
+    return MakeUnique<WindowSurfaceX11SHM>(display, mXWindow, mXVisual, mXDepth);
+  }
+#endif // MOZ_HAVE_SHMIMAGE
+
+  LOGDRAW(("Drawing to nsWindow %p using XPutImage\n", (void*)this));
+  return MakeUnique<WindowSurfaceX11Image>(display, mXWindow, mXVisual, mXDepth);
+#endif // MOZ_X11
 }

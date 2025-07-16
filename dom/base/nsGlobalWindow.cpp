@@ -1073,7 +1073,7 @@ nsOuterWindowProxy::GetSubframeWindow(JSContext *cx,
   if (MOZ_UNLIKELY(!obj)) {
     return xpc::Throw(cx, NS_ERROR_FAILURE);
   }
-
+  JS::ExposeObjectToActiveJS(obj);
   vp.setObject(*obj);
   return JS_WrapValue(cx, vp);
 }
@@ -1566,6 +1566,7 @@ nsGlobalWindow::CleanUp()
   mScrollbars = nullptr;
   mLocation = nullptr;
   mHistory = nullptr;
+  mCustomElements = nullptr;
   mFrames = nullptr;
   mWindowUtils = nullptr;
   mApplicationCache = nullptr;
@@ -1696,6 +1697,7 @@ nsGlobalWindow::FreeInnerObjects(bool aForDocumentOpen)
 
   mLocation = nullptr;
   mHistory = nullptr;
+  mCustomElements = nullptr;
 
   if (mNavigator) {
     mNavigator->OnNavigation();
@@ -1880,6 +1882,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsGlobalWindow)
 
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mLocation)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mHistory)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCustomElements)
 
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mLocalStorage)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mSessionStorage)
@@ -1953,6 +1956,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsGlobalWindow)
   }
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mLocation)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mHistory)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mCustomElements)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mLocalStorage)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mSessionStorage)
   if (tmp->mApplicationCache) {
@@ -3868,6 +3872,17 @@ nsGlobalWindow::GetHistory(ErrorResult& aError)
   }
 
   return mHistory;
+}
+
+CustomElementsRegistry*
+nsGlobalWindow::CustomElements()
+{
+  MOZ_RELEASE_ASSERT(IsInnerWindow());
+  if (!mCustomElements) {
+      mCustomElements = CustomElementsRegistry::Create(AsInner());
+  }
+
+  return mCustomElements;
 }
 
 Performance*
@@ -7747,8 +7762,8 @@ void
 nsGlobalWindow::Scroll(double aXScroll, double aYScroll)
 {
   // Convert -Inf, Inf, and NaN to 0; otherwise, convert by C-style cast.
-  CSSIntPoint scrollPos(mozilla::ToZeroIfNonfinite(aXScroll),
-                        mozilla::ToZeroIfNonfinite(aYScroll));
+  auto scrollPos = CSSIntPoint::Truncate(mozilla::ToZeroIfNonfinite(aXScroll),
+                                         mozilla::ToZeroIfNonfinite(aYScroll));
   ScrollTo(scrollPos, ScrollOptions());
 }
 
@@ -7756,8 +7771,8 @@ void
 nsGlobalWindow::ScrollTo(double aXScroll, double aYScroll)
 {
   // Convert -Inf, Inf, and NaN to 0; otherwise, convert by C-style cast.
-  CSSIntPoint scrollPos(mozilla::ToZeroIfNonfinite(aXScroll),
-                        mozilla::ToZeroIfNonfinite(aYScroll));
+  auto scrollPos = CSSIntPoint::Truncate(mozilla::ToZeroIfNonfinite(aXScroll),
+                                         mozilla::ToZeroIfNonfinite(aYScroll));
   ScrollTo(scrollPos, ScrollOptions());
 }
 
@@ -7826,8 +7841,8 @@ nsGlobalWindow::ScrollBy(double aXScrollDif, double aYScrollDif)
 
   if (sf) {
     // Convert -Inf, Inf, and NaN to 0; otherwise, convert by C-style cast.
-    CSSIntPoint scrollDif(mozilla::ToZeroIfNonfinite(aXScrollDif),
-                          mozilla::ToZeroIfNonfinite(aYScrollDif));
+    auto scrollDif = CSSIntPoint::Truncate(mozilla::ToZeroIfNonfinite(aXScrollDif),
+                                           mozilla::ToZeroIfNonfinite(aYScrollDif));
     // It seems like it would make more sense for ScrollBy to use
     // SMOOTH mode, but tests seem to depend on the synchronous behaviour.
     // Perhaps Web content does too.

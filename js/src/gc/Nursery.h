@@ -170,6 +170,9 @@ class Nursery
     /* Free an object buffer. */
     void freeBuffer(void* buffer);
 
+    /* The maximum number of bytes allowed to reside in nursery buffers. */
+    static const size_t MaxNurseryBufferSize = 1024;
+
     typedef Vector<ObjectGroup*, 0, SystemAllocPolicy> ObjectGroupList;
 
     /*
@@ -207,6 +210,9 @@ class Nursery
         MOZ_ASSERT(!cellsWithUid_.has(cell));
         return cellsWithUid_.put(cell);
     }
+
+    using SweepThunk = void (*)(void *data);
+    void queueSweepAction(SweepThunk thunk, void* data);
 
     size_t sizeOfHeapCommitted() const {
         return numActiveChunks_ * gc::ChunkSize;
@@ -335,18 +341,13 @@ class Nursery
     using CellsWithUniqueIdSet = HashSet<gc::Cell*, PointerHasher<gc::Cell*, 3>, SystemAllocPolicy>;
     CellsWithUniqueIdSet cellsWithUid_;
 
-#ifdef JS_GC_ZEAL
-    struct Canary
-    {
-        uintptr_t magicValue;
-        Canary* next;
-    };
+    struct SweepAction;
+    SweepAction* sweepActions_;
 
+#ifdef JS_GC_ZEAL
+    struct Canary;
     Canary* lastCanary_;
 #endif
-
-    /* The maximum number of bytes allowed to reside in nursery buffers. */
-    static const size_t MaxNurseryBufferSize = 1024;
 
     /* The amount of space in the mapped nursery available to allocations. */
     static const size_t NurseryChunkUsableSize = gc::ChunkSize - sizeof(gc::ChunkTrailer);
@@ -428,6 +429,8 @@ class Nursery
      * collection.
      */
     void sweep();
+
+    void runSweepActions();
 
     /* Change the allocable space provided by the nursery. */
     void growAllocableSpace();

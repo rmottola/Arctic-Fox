@@ -237,7 +237,7 @@ nsPrefetchNode::OnStopRequest(nsIRequest *aRequest,
 {
     LOG(("done prefetching [status=%x]\n", aStatus));
 
-    if (mBytesRead == 0 && aStatus == NS_OK) {
+    if (mBytesRead == 0 && aStatus == NS_OK && mChannel) {
         // we didn't need to read (because LOAD_ONLY_IF_MODIFIED was
         // specified), but the object should report loadedSize as if it
         // did.
@@ -832,7 +832,8 @@ nsPrefetchService::Observe(nsISupports     *aSubject,
         mDisabled = true;
     }
     else if (!strcmp(aTopic, NS_PREFBRANCH_PREFCHANGE_TOPIC_ID)) {
-        const char *pref = NS_ConvertUTF16toUTF8(aData).get();
+        const nsCString converted = NS_ConvertUTF16toUTF8(aData);
+        const char* pref = converted.get();
         if (!strcmp(pref, PREFETCH_PREF)) {
             if (Preferences::GetBool(PREFETCH_PREF, false)) {
                 if (mDisabled) {

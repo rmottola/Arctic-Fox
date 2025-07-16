@@ -31,6 +31,7 @@
 #endif
 
 #ifdef MOZ_WIDGET_COCOA
+#include "BorrowedContext.h"
 #include <ApplicationServices/ApplicationServices.h>
 #include "mozilla/Vector.h"
 #include "ScaledFontMac.h"
@@ -102,6 +103,98 @@ ReleaseTemporarySurface(void* aPixels, void* aContext)
   }
 }
 
+static void
+WriteRGBXFormat(uint8_t* aData, const IntSize &aSize,
+                const int32_t aStride, SurfaceFormat aFormat)
+{
+  if (aFormat != SurfaceFormat::B8G8R8X8 || aSize.IsEmpty()) {
+    return;
+  }
+
+  int height = aSize.height;
+  int width = aSize.width * 4;
+
+  for (int row = 0; row < height; ++row) {
+    for (int column = 0; column < width; column += 4) {
+#ifdef IS_BIG_ENDIAN
+      aData[column] = 0xFF;
+#else
+      aData[column + 3] = 0xFF;
+#endif
+    }
+    aData += aStride;
+  }
+
+  return;
+}
+
+#ifdef DEBUG
+static bool
+VerifyRGBXFormat(uint8_t* aData, const IntSize &aSize, const int32_t aStride, SurfaceFormat aFormat)
+{
+  if (aFormat != SurfaceFormat::B8G8R8X8 || aSize.IsEmpty()) {
+    return true;
+  }
+  // We should've initialized the data to be opaque already
+  // On debug builds, verify that this is actually true.
+  int height = aSize.height;
+  int width = aSize.width * 4;
+
+  for (int row = 0; row < height; ++row) {
+    for (int column = 0; column < width; column += 4) {
+#ifdef IS_BIG_ENDIAN
+      MOZ_ASSERT(aData[column] == 0xFF);
+#else
+      MOZ_ASSERT(aData[column + 3] == 0xFF);
+#endif
+    }
+    aData += aStride;
+  }
+
+  return true;
+}
+
+// Since checking every pixel is expensive, this only checks the four corners and center
+// of a surface that their alpha value is 0xFF.
+static bool
+VerifyRGBXCorners(uint8_t* aData, const IntSize &aSize, const int32_t aStride, SurfaceFormat aFormat)
+{
+  if (aFormat != SurfaceFormat::B8G8R8X8 || aSize.IsEmpty()) {
+    return true;
+  }
+
+  int height = aSize.height;
+  int width = aSize.width;
+  const int pixelSize = 4;
+  const int strideDiff = aStride - (width * pixelSize);
+  MOZ_ASSERT(width * pixelSize <= aStride);
+
+#ifdef IS_BIG_ENDIAN
+  const int alphaOffset = 0;
+#else
+  const int alphaOffset = 3;
+#endif
+
+  const int topLeft = alphaOffset;
+  const int topRight = width * pixelSize + alphaOffset - pixelSize;
+  const int bottomRight = aStride * height - strideDiff + alphaOffset - pixelSize;
+  const int bottomLeft = aStride * height - aStride + alphaOffset;
+
+  // Lastly the center pixel
+  int middleRowHeight = height / 2;
+  int middleRowWidth = (width / 2) * pixelSize;
+  const int middle = aStride * middleRowHeight + middleRowWidth + alphaOffset;
+
+  MOZ_ASSERT(aData[topLeft] == 0xFF);
+  MOZ_ASSERT(aData[topRight] == 0xFF);
+  MOZ_ASSERT(aData[bottomRight] == 0xFF);
+  MOZ_ASSERT(aData[bottomLeft] == 0xFF);
+  MOZ_ASSERT(aData[middle] == 0xFF);
+
+  return true;
+}
+#endif
+
 static SkBitmap
 GetBitmapForSurface(SourceSurface* aSurface)
 {
@@ -129,6 +222,9 @@ GetBitmapForSurface(SourceSurface* aSurface)
     gfxDebug() << "Failed installing pixels on Skia bitmap for temporary surface";
   }
 
+  // Skia doesn't support RGBX surfaces so ensure that the alpha value is opaque white.
+  MOZ_ASSERT(VerifyRGBXCorners(surf->GetData(), surf->GetSize(),
+                               surf->Stride(), surf->GetFormat()));
   return bitmap;
 }
 
@@ -202,7 +298,7 @@ DrawTargetSkia::LockBits(uint8_t** aData, IntSize* aSize,
   *aData = reinterpret_cast<uint8_t*>(pixels);
   *aSize = IntSize(info.width(), info.height());
   *aStride = int32_t(rowBytes);
-  *aFormat = SkiaColorTypeToGfxFormat(info.colorType());
+  *aFormat = SkiaColorTypeToGfxFormat(info.colorType(), info.alphaType());
   if (aOrigin) {
     *aOrigin = IntPoint(origin.x(), origin.y());
   }
@@ -468,7 +564,7 @@ DrawTargetSkia::DrawSurfaceWithShadow(SourceSurface *aSurface,
   SkPaint shadowPaint;
   shadowPaint.setXfermodeMode(GfxOpToSkiaOp(aOperator));
 
-  IntPoint shadowDest = RoundedToInt(aDest + aOffset);
+  auto shadowDest = IntPoint::Round(aDest + aOffset);
 
   SkBitmap blurMask;
   if (!UsingSkiaGPU() &&
@@ -499,7 +595,7 @@ DrawTargetSkia::DrawSurfaceWithShadow(SourceSurface *aSurface,
   }
 
   // Composite the original image after the shadow
-  IntPoint dest = RoundedToInt(aDest);
+  auto dest = IntPoint::Round(aDest);
   mCanvas->drawBitmap(bitmap, dest.x, dest.y, &paint);
 
   mCanvas->restore();
@@ -851,7 +947,8 @@ DrawTargetSkia::BorrowCGContext(const DrawOptions &aOptions)
   }
 
   if (!mColorSpace) {
-    mColorSpace = CGColorSpaceCreateDeviceRGB();
+    mColorSpace = (format == SurfaceFormat::A8) ?
+                  CGColorSpaceCreateDeviceGray() : CGColorSpaceCreateDeviceRGB();
   }
 
   if (mCG) {
@@ -862,13 +959,17 @@ DrawTargetSkia::BorrowCGContext(const DrawOptions &aOptions)
   mCanvasData = aSurfaceData;
   mCGSize = size;
 
+  uint32_t bitmapInfo = (format == SurfaceFormat::A8) ?
+                        kCGImageAlphaOnly :
+                        kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Host;
+
   mCG = CGBitmapContextCreateWithData(mCanvasData,
                                       mCGSize.width,
                                       mCGSize.height,
                                       8, /* bits per component */
                                       stride,
                                       mColorSpace,
-                                      kCGBitmapByteOrder32Host | kCGImageAlphaPremultipliedFirst,
+                                      bitmapInfo,
                                       NULL, /* Callback when released */
                                       NULL);
   if (!mCG) {
@@ -892,6 +993,22 @@ DrawTargetSkia::ReturnCGContext(CGContextRef aCGContext)
   MOZ_ASSERT(aCGContext == mCG);
   ReleaseBits(mCanvasData);
   CGContextRestoreGState(aCGContext);
+}
+
+CGContextRef
+BorrowedCGContext::BorrowCGContextFromDrawTarget(DrawTarget *aDT)
+{
+  MOZ_ASSERT(aDT->GetBackendType() == BackendType::SKIA);
+  DrawTargetSkia* skiaDT = static_cast<DrawTargetSkia*>(aDT);
+  return skiaDT->BorrowCGContext(DrawOptions());
+}
+
+void
+BorrowedCGContext::ReturnCGContextToDrawTarget(DrawTarget *aDT, CGContextRef cg)
+{
+  MOZ_ASSERT(aDT->GetBackendType() == BackendType::SKIA);
+  DrawTargetSkia* skiaDT = static_cast<DrawTargetSkia*>(aDT);
+  skiaDT->ReturnCGContext(cg);
 }
 
 static void
@@ -1285,43 +1402,76 @@ DrawTargetSkia::UsingSkiaGPU() const
 #endif
 }
 
+#ifdef USE_SKIA_GPU
+already_AddRefed<SourceSurface>
+DrawTargetSkia::OptimizeGPUSourceSurface(SourceSurface *aSurface) const
+{
+  // Check if the underlying SkBitmap already has an associated GrTexture.
+  if (aSurface->GetType() == SurfaceType::SKIA &&
+      static_cast<SourceSurfaceSkia*>(aSurface)->GetBitmap().getTexture()) {
+    RefPtr<SourceSurface> surface(aSurface);
+    return surface.forget();
+  }
+
+  SkBitmap bitmap = GetBitmapForSurface(aSurface);
+
+  // Upload the SkBitmap to a GrTexture otherwise.
+  SkAutoTUnref<GrTexture> texture(
+      GrRefCachedBitmapTexture(mGrContext.get(), bitmap, GrTextureParams::ClampBilerp()));
+
+  if (texture) {
+    // Create a new SourceSurfaceSkia whose SkBitmap contains the GrTexture.
+    RefPtr<SourceSurfaceSkia> surface = new SourceSurfaceSkia();
+    if (surface->InitFromGrTexture(texture, aSurface->GetSize(), aSurface->GetFormat())) {
+      return surface.forget();
+    }
+  }
+
+  // The data was too big to fit in a GrTexture.
+  if (aSurface->GetType() == SurfaceType::SKIA) {
+    // It is already a Skia source surface, so just reuse it as-is.
+    RefPtr<SourceSurface> surface(aSurface);
+    return surface.forget();
+  }
+
+  // Wrap it in a Skia source surface so that can do tiled uploads on-demand.
+  RefPtr<SourceSurfaceSkia> surface = new SourceSurfaceSkia();
+  surface->InitFromBitmap(bitmap);
+  return surface.forget();
+}
+#endif
+
+already_AddRefed<SourceSurface>
+DrawTargetSkia::OptimizeSourceSurfaceForUnknownAlpha(SourceSurface *aSurface) const
+{
+#ifdef USE_SKIA_GPU
+  if (UsingSkiaGPU()) {
+    return OptimizeGPUSourceSurface(aSurface);
+  }
+#endif
+
+  if (aSurface->GetType() == SurfaceType::SKIA) {
+    RefPtr<SourceSurface> surface(aSurface);
+    return surface.forget();
+  }
+
+  RefPtr<DataSourceSurface> dataSurface = aSurface->GetDataSurface();
+
+  // For plugins, GDI can sometimes just write 0 to the alpha channel
+  // even for RGBX formats. In this case, we have to manually write
+  // the alpha channel to make Skia happy with RGBX and in case GDI
+  // writes some bad data. Luckily, this only happens on plugins.
+  WriteRGBXFormat(dataSurface->GetData(), dataSurface->GetSize(),
+                  dataSurface->Stride(), dataSurface->GetFormat());
+  return dataSurface.forget();
+}
+
 already_AddRefed<SourceSurface>
 DrawTargetSkia::OptimizeSourceSurface(SourceSurface *aSurface) const
 {
 #ifdef USE_SKIA_GPU
   if (UsingSkiaGPU()) {
-    // Check if the underlying SkBitmap already has an associated GrTexture.
-    if (aSurface->GetType() == SurfaceType::SKIA &&
-        static_cast<SourceSurfaceSkia*>(aSurface)->GetBitmap().getTexture()) {
-      RefPtr<SourceSurface> surface(aSurface);
-      return surface.forget();
-    }
-
-    SkBitmap bitmap = GetBitmapForSurface(aSurface);
-
-    // Upload the SkBitmap to a GrTexture otherwise.
-    SkAutoTUnref<GrTexture> texture(
-      GrRefCachedBitmapTexture(mGrContext.get(), bitmap, GrTextureParams::ClampBilerp()));
-
-    if (texture) {
-      // Create a new SourceSurfaceSkia whose SkBitmap contains the GrTexture.
-      RefPtr<SourceSurfaceSkia> surface = new SourceSurfaceSkia();
-      if (surface->InitFromGrTexture(texture, aSurface->GetSize(), aSurface->GetFormat())) {
-        return surface.forget();
-      }
-    }
-
-    // The data was too big to fit in a GrTexture.
-    if (aSurface->GetType() == SurfaceType::SKIA) {
-      // It is already a Skia source surface, so just reuse it as-is.
-      RefPtr<SourceSurface> surface(aSurface);
-      return surface.forget();
-    }
-
-    // Wrap it in a Skia source surface so that can do tiled uploads on-demand.
-    RefPtr<SourceSurfaceSkia> surface = new SourceSurfaceSkia();
-    surface->InitFromBitmap(bitmap);
-    return surface.forget();
+    return OptimizeGPUSourceSurface(aSurface);
   }
 #endif
 
@@ -1334,7 +1484,10 @@ DrawTargetSkia::OptimizeSourceSurface(SourceSurface *aSurface) const
   // uploading, so any data surface is fine. Call GetDataSurface
   // to trigger any required readback so that it only happens
   // once.
-  return aSurface->GetDataSurface();
+  RefPtr<DataSourceSurface> dataSurface = aSurface->GetDataSurface();
+  MOZ_ASSERT(VerifyRGBXFormat(dataSurface->GetData(), dataSurface->GetSize(),
+                              dataSurface->Stride(), dataSurface->GetFormat()));
+  return dataSurface.forget();
 }
 
 already_AddRefed<SourceSurface>
@@ -1415,7 +1568,8 @@ DrawTargetSkia::Init(const IntSize &aSize, SurfaceFormat aFormat)
     return false;
   }
 
-  bitmap.eraseColor(SK_ColorTRANSPARENT);
+  SkColor clearColor = (aFormat == SurfaceFormat::B8G8R8X8) ? SK_ColorBLACK : SK_ColorTRANSPARENT;
+  bitmap.eraseColor(clearColor);
 
   mCanvas.adopt(new SkCanvas(bitmap));
   mSize = aSize;
@@ -1477,30 +1631,6 @@ DrawTargetSkia::InitWithGrContext(GrContext* aGrContext,
 
 #endif
 
-#ifdef DEBUG
-bool
-VerifyRGBXFormat(uint8_t* aData, const IntSize &aSize, const int32_t aStride, SurfaceFormat aFormat)
-{
-  // We should've initialized the data to be opaque already
-  // On debug builds, verify that this is actually true.
-  int height = aSize.height;
-  int width = aSize.width;
-
-  for (int row = 0; row < height; ++row) {
-    for (int column = 0; column < width; column += 4) {
-#ifdef IS_BIG_ENDIAN
-      MOZ_ASSERT(aData[column] == 0xFF);
-#else
-      MOZ_ASSERT(aData[column + 3] == 0xFF);
-#endif
-    }
-    aData += aStride;
-  }
-
-  return true;
-}
-#endif
-
 void
 DrawTargetSkia::Init(unsigned char* aData, const IntSize &aSize, int32_t aStride, SurfaceFormat aFormat, bool aUninitialized)
 {
@@ -1558,7 +1688,8 @@ DrawTargetSkia::ClearRect(const Rect &aRect)
   MarkChanged();
   mCanvas->save();
   mCanvas->clipRect(RectToSkRect(aRect), SkRegion::kIntersect_Op, true);
-  mCanvas->clear(SK_ColorTRANSPARENT);
+  SkColor clearColor = (mFormat == SurfaceFormat::B8G8R8X8) ? SK_ColorBLACK : SK_ColorTRANSPARENT;
+  mCanvas->clear(clearColor);
   mCanvas->restore();
 }
 

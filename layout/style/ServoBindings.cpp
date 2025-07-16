@@ -207,20 +207,19 @@ static bool
 DoMatch(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName, MatchFn aMatch)
 {
   if (aNS) {
-    int32_t ns = nsContentUtils::NameSpaceManager()->GetNameSpaceID(aNS);
+    int32_t ns = nsContentUtils::NameSpaceManager()->GetNameSpaceID(aNS,
+                                                                    aElement->IsInChromeDocument());
     NS_ENSURE_TRUE(ns != kNameSpaceID_Unknown, false);
     const nsAttrValue* value = aElement->GetParsedAttr(aName, ns);
     return value && aMatch(value);
   }
   // No namespace means any namespace - we have to check them all. :-(
-  const nsAttrName* attrName;
-  for (uint32_t i = 0; (attrName = aElement->GetAttrNameAt(i)); ++i) {
-    if (attrName->LocalName() != aName) {
+  BorrowedAttrInfo attrInfo;
+  for (uint32_t i = 0; (attrInfo = aElement->GetAttrInfoAt(i)); ++i) {
+    if (attrInfo.mName->LocalName() != aName) {
       continue;
     }
-    const nsAttrValue* value =
-      aElement->GetParsedAttr(attrName->LocalName(), attrName->NamespaceID());
-    if (aMatch(value)) {
+    if (aMatch(attrInfo.mValue)) {
       return true;
     }
   }

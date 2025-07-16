@@ -7,6 +7,7 @@
 
 #include "prenv.h"
 #include "nsXULAppAPI.h"
+#include "nsExceptionHandler.h"
 #include "nsDebug.h"
 
 #include "mozilla/X11Util.h"

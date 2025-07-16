@@ -130,6 +130,7 @@ namespace jit {
     _(NewArrayCopyOnWrite)                                                  \
     _(NewArrayDynamicLength)                                                \
     _(NewTypedArray)                                                        \
+    _(NewTypedArrayDynamicLength)                                           \
     _(NewObject)                                                            \
     _(NewTypedObject)                                                       \
     _(NewDeclEnvObject)                                                     \
@@ -280,13 +281,11 @@ namespace jit {
     _(AsmJSStoreHeap)                                                       \
     _(WasmLoadGlobalVar)                                                    \
     _(WasmStoreGlobalVar)                                                   \
-    _(AsmJSLoadFuncPtr)                                                     \
-    _(AsmJSLoadFFIFunc)                                                     \
     _(AsmJSReturn)                                                          \
     _(AsmJSParameter)                                                       \
     _(AsmJSVoidReturn)                                                      \
     _(AsmJSPassStackArg)                                                    \
-    _(AsmJSCall)                                                            \
+    _(WasmCall)                                                             \
     _(AsmSelect)                                                            \
     _(AsmReinterpret)                                                       \
     _(Rotate)                                                               \

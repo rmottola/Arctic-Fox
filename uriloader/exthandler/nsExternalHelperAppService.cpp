@@ -420,12 +420,12 @@ static nsresult GetDownloadDirectory(nsIFile **_directory,
     const char* userName = PR_GetEnv("USERNAME");
     if (!userName || !*userName) {
       userName = PR_GetEnv("USER");
-      if (!userName || !*userName) {
-        userName = PR_GetEnv("LOGNAME");
-      }
-      else {
-        userName = "mozillaUser";
-      }
+    }
+    if (!userName || !*userName) {
+      userName = PR_GetEnv("LOGNAME");
+    }
+    if (!userName || !*userName) {
+      userName = "mozillaUser";
     }
 
     nsAutoString userDir;
@@ -451,7 +451,12 @@ static nsresult GetDownloadDirectory(nsIFile **_directory,
         rv = finalPath->GetPermissions(&permissions);
         NS_ENSURE_SUCCESS(rv, rv);
 
-        if (permissions == PR_IRWXU) {
+        // Ensuring the path is writable by the current user.
+        bool isWritable;
+        rv = finalPath->IsWritable(&isWritable);
+        NS_ENSURE_SUCCESS(rv, rv);
+
+        if (permissions == PR_IRWXU && isWritable) {
           dir = finalPath;
           break;
         }
@@ -492,7 +497,7 @@ struct nsDefaultMimeTypeEntry {
  * Default extension->mimetype mappings. These are not overridable.
  * If you add types here, make sure they are lowercase, or you'll regret it.
  */
-static nsDefaultMimeTypeEntry defaultMimeEntries [] = 
+static const nsDefaultMimeTypeEntry defaultMimeEntries[] =
 {
   // The following are those extensions that we're asked about during startup,
   // sorted by order used
@@ -518,6 +523,7 @@ static nsDefaultMimeTypeEntry defaultMimeEntries [] =
   { APPLICATION_OGG, "ogg" },
   { AUDIO_OGG, "oga" },
   { AUDIO_OGG, "opus" },
+  { APPLICATION_PDF, "pdf" },
   { VIDEO_WEBM, "webm" },
   { AUDIO_WEBM, "webm" },
 #if defined(MOZ_WMF)
@@ -553,7 +559,7 @@ struct nsExtraMimeTypeEntry {
  * overridden by user helper app prefs.
  * If you add types here, make sure they are lowercase, or you'll regret it.
  */
-static nsExtraMimeTypeEntry extraMimeEntries [] =
+static const nsExtraMimeTypeEntry extraMimeEntries[] =
 {
 #if defined(XP_MACOSX) // don't define .bin on the mac...use internet config to look that up...
   { APPLICATION_OCTET_STREAM, "exe,com", "Binary File" },
@@ -631,7 +637,7 @@ static nsExtraMimeTypeEntry extraMimeEntries [] =
  * File extensions for which decoding should be disabled.
  * NOTE: These MUST be lower-case and ASCII.
  */
-static nsDefaultMimeTypeEntry nonDecodableExtensions [] = {
+static const nsDefaultMimeTypeEntry nonDecodableExtensions[] = {
   { APPLICATION_GZIP, "gz" }, 
   { APPLICATION_GZIP, "tgz" },
   { APPLICATION_ZIP, "zip" },
@@ -1864,7 +1870,7 @@ void nsExternalAppHandler::SendStatusChange(ErrorType type, nsresult rv, nsIRequ
           break;
         }
 #endif
-        // fall through
+        MOZ_FALLTHROUGH;
 
     default:
         // Generic read/write/launch error message.
@@ -1881,9 +1887,11 @@ void nsExternalAppHandler::SendStatusChange(ErrorType type, nsresult rv, nsIRequ
         }
         break;
     }
+
     MOZ_LOG(nsExternalHelperAppService::mLog, LogLevel::Error,
         ("Error: %s, type=%i, listener=0x%p, transfer=0x%p, rv=0x%08X\n",
          NS_LossyConvertUTF16toASCII(msgId).get(), type, mDialogProgressListener.get(), mTransfer.get(), rv));
+
     MOZ_LOG(nsExternalHelperAppService::mLog, LogLevel::Error,
         ("       path='%s'\n", NS_ConvertUTF16toUTF8(path).get()));
 
@@ -2183,13 +2191,10 @@ nsresult nsExternalAppHandler::CreateTransfer()
   // Now let's add the download to history
   nsCOMPtr<nsIDownloadHistory> dh(do_GetService(NS_DOWNLOADHISTORY_CONTRACTID));
   if (dh) {
-    nsCOMPtr<nsIURI> referrer;
-    nsCOMPtr<nsIChannel> channel = do_QueryInterface(mRequest);
-    if (channel) {
-      NS_GetReferrerFromChannel(channel, getter_AddRefs(referrer));
-    }
-
     if (channel && !NS_UsePrivateBrowsing(channel)) {
+      nsCOMPtr<nsIURI> referrer;
+      NS_GetReferrerFromChannel(channel, getter_AddRefs(referrer));
+
       dh->AddDownload(mSourceUrl, referrer, mTimeDownloadStarted, target);
     }
   }

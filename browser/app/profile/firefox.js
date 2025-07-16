@@ -1023,7 +1023,7 @@ pref("dom.ipc.plugins.sandbox-level.flash", 0);
 #if defined(NIGHTLY_BUILD)
 pref("security.sandbox.content.level", 2);
 #else
-pref("security.sandbox.content.level", 0);
+pref("security.sandbox.content.level", 1);
 #endif
 
 #if defined(MOZ_STACKWALKING)
@@ -1360,9 +1360,6 @@ pref("browser.defaultbrowser.notificationbar", false);
 // Determines if Telemetry pings can be archived locally.
 pref("toolkit.telemetry.archive.enabled", true);
 
-//Arctic Fox standalone image background color
-pref("browser.display.standalone_images.background_color", "#2E3B41");
-
 // Disable reader mode by default.
 pref("reader.parse-on-load.enabled", false);
 
@@ -1520,3 +1517,5 @@ pref("browser.migration.automigrate", false);
 
 // Enable browser frames for use on desktop.  Only exposed to chrome callers.
 pref("dom.mozBrowserFramesEnabled", true);
+
+pref("signon.schemeUpgrades", true);
