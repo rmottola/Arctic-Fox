@@ -280,10 +280,6 @@ nsIAtom** const kURLAttributesHTML[] = {
 
 nsIAtom** const kElementsSVG[] = {
   &nsGkAtoms::a, // a
-  &nsGkAtoms::animate, // animate
-  &nsGkAtoms::animateColor, // animateColor
-  &nsGkAtoms::animateMotion, // animateMotion
-  &nsGkAtoms::animateTransform, // animateTransform
   &nsGkAtoms::circle, // circle
   &nsGkAtoms::clipPath, // clipPath
   &nsGkAtoms::colorProfile, // color-profile
@@ -347,7 +343,6 @@ nsIAtom** const kElementsSVG[] = {
   &nsGkAtoms::polyline, // polyline
   &nsGkAtoms::radialGradient, // radialGradient
   &nsGkAtoms::rect, // rect
-  &nsGkAtoms::set, // set
   &nsGkAtoms::stop, // stop
   &nsGkAtoms::svg, // svg
   &nsGkAtoms::svgSwitch, // switch
