@@ -13344,7 +13344,8 @@ nsIDocument::FlushUserFontSet()
             return;
           }
         } else {
-          NS_ERROR("stylo: ServoStyleSets cannot handle @font-face rules yet");
+          NS_WARNING("stylo: ServoStyleSets cannot handle @font-face rules yet. "
+                     "See bug 1290237.");
         }
       }
 
