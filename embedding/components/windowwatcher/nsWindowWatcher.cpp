@@ -1192,7 +1192,7 @@ nsWindowWatcher::OpenWindowInternal(mozIDOMWindowProxy* aParent,
     NS_ENSURE_TRUE(loadInfo, NS_ERROR_FAILURE);
 
     if (subjectPrincipal) {
-      loadInfo->SetOwner(subjectPrincipal);
+      loadInfo->SetTriggeringPrincipal(subjectPrincipal);
     }
 
     /* use the URL from the *extant* document, if any. The usual accessor
