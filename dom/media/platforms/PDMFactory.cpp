@@ -78,6 +78,7 @@ PDMFactory::PDMFactory()
 {
   EnsureInit();
   CreatePDMs();
+  CreateBlankPDM();
 }
 
 PDMFactory::~PDMFactory()
@@ -103,6 +104,11 @@ PDMFactory::EnsureInit() const
 already_AddRefed<MediaDataDecoder>
 PDMFactory::CreateDecoder(const CreateDecoderParams& aParams)
 {
+  if (aParams.mUseBlankDecoder) {
+    MOZ_ASSERT(mBlankPDM);
+    return CreateDecoderWithPDM(mBlankPDM, aParams);
+  }
+
   const TrackInfo& config = aParams.mConfig;
   bool isEncrypted = mEMEPDM && config.mCrypto.mValid;
 
@@ -268,6 +274,13 @@ PDMFactory::CreatePDMs()
   } else {
     mGMPPDMFailedToStartup = false;
   }
+}
+
+void
+PDMFactory::CreateBlankPDM()
+{
+  mBlankPDM = CreateBlankDecoderModule();
+  MOZ_ASSERT(mBlankPDM && NS_SUCCEEDED(mBlankPDM->Startup()));
 }
 
 bool
