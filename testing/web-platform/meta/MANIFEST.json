@@ -12772,6 +12772,10 @@
         "url": "/XMLHttpRequest/event-timeout.htm"
       },
       {
+        "path": "XMLHttpRequest/event-timeout-order.htm",
+        "url": "/XMLHttpRequest/event-timeout-order.htm"
+      },
+      {
         "path": "XMLHttpRequest/event-upload-progress-crossorigin.sub.htm",
         "url": "/XMLHttpRequest/event-upload-progress-crossorigin.sub.htm"
       },
