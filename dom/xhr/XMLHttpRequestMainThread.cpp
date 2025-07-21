@@ -2873,7 +2873,12 @@ XMLHttpRequestMainThread::SendInternal(const RequestBodyBase* aBody)
     mChannel->SetNotificationCallbacks(mNotificationCallbacks);
     mChannel = nullptr;
 
-    return rv;
+    mErrorLoad = true;
+
+    // Per spec, we throw on sync errors, but not async.
+    if (mFlagSynchronous) {
+      return rv;
+    }
   }
 
   mWaitingForOnStopRequest = true;
@@ -2941,7 +2946,18 @@ XMLHttpRequestMainThread::SendInternal(const RequestBodyBase* aBody)
   }
 
   if (!mChannel) {
-    return NS_ERROR_FAILURE;
+    // Per spec, silently fail on async request failures; throw for sync.
+    if (mFlagSynchronous) {
+      return NS_ERROR_FAILURE;
+    } else {
+      // Defer the actual sending of async events just in case listeners
+      // are attached after the send() method is called.
+      NS_DispatchToCurrentThread(
+        NewRunnableMethod<ProgressEventType>(this,
+          &XMLHttpRequestMainThread::CloseRequestWithError,
+          ProgressEventType::error));
+      return NS_OK;
+    }
   }
 
   return rv;
