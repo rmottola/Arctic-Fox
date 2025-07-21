@@ -12,6 +12,7 @@
 #include "MediaPrefs.h"
 #include "mozIGeckoMediaPluginService.h"
 #include "nsServiceManagerUtils.h"
+#include "mozilla/EMEUtils.h"
 #include "mozilla/StaticMutex.h"
 #include "mozilla/SyncRunnable.h"
 #include "gmp-audio-decode.h"
@@ -104,7 +105,7 @@ HasGMPFor(const nsACString& aAPI,
 #ifdef XP_WIN
   // gmp-clearkey uses WMF for decoding, so if we're using clearkey we must
   // verify that WMF works before continuing.
-  if (aGMP.EqualsLiteral("org.w3.clearkey")) {
+  if (aGMP.Equals(kEMEKeySystemClearkey)) {
     RefPtr<WMFDecoderModule> pdm(new WMFDecoderModule());
     if (aCodec.EqualsLiteral("aac") &&
         !pdm->SupportsMimeType(NS_LITERAL_CSTRING("audio/mp4a-latm"),
@@ -144,8 +145,9 @@ struct GMPCodecs {
 };
 
 static GMPCodecs sGMPCodecs[] = {
-  { "org.w3.clearkey", false, false },
-  { "com.adobe.primetime", false, false },
+  { kEMEKeySystemClearkey, false, false },
+  { kEMEKeySystemWidevine, false, false },
+  { kEMEKeySystemPrimetime, false, false },
 };
 
 void
@@ -188,8 +190,8 @@ GMPDecoderModule::PreferredGMP(const nsACString& aMimeType)
   Maybe<nsCString> rv;
   if (aMimeType.EqualsLiteral("audio/mp4a-latm")) {
     switch (MediaPrefs::GMPAACPreferred()) {
-      case 1: rv.emplace(NS_LITERAL_CSTRING("org.w3.clearkey")); break;
-      case 2: rv.emplace(NS_LITERAL_CSTRING("com.adobe.primetime")); break;
+      case 1: rv.emplace(nsCString(kEMEKeySystemClearkey)); break;
+      case 2: rv.emplace(nsCString(kEMEKeySystemPrimetime)); break;
       default: break;
     }
   }
@@ -197,8 +199,8 @@ GMPDecoderModule::PreferredGMP(const nsACString& aMimeType)
   if (aMimeType.EqualsLiteral("video/avc") ||
       aMimeType.EqualsLiteral("video/mp4")) {
     switch (MediaPrefs::GMPH264Preferred()) {
-      case 1: rv.emplace(NS_LITERAL_CSTRING("org.w3.clearkey")); break;
-      case 2: rv.emplace(NS_LITERAL_CSTRING("com.adobe.primetime")); break;
+      case 1: rv.emplace(nsCString(kEMEKeySystemClearkey)); break;
+      case 2: rv.emplace(nsCString(kEMEKeySystemPrimetime)); break;
       default: break;
     }
   }
