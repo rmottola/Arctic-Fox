@@ -518,6 +518,7 @@ OggDemuxer::SetupMediaTracksInfo(const nsTArray<uint32_t>& aSerials)
 
       mInfo.mAudio.mRate = vorbisState->mInfo.rate;
       mInfo.mAudio.mChannels = vorbisState->mInfo.channels;
+      FillTags(&mInfo.mAudio, vorbisState->GetTags());
     } else if (codecState->GetType() == OggCodecState::TYPE_OPUS) {
       OpusState* opusState = static_cast<OpusState*>(codecState);
       if (!(mOpusState && mOpusState->mSerial == opusState->mSerial)) {
@@ -532,7 +533,20 @@ OggDemuxer::SetupMediaTracksInfo(const nsTArray<uint32_t>& aSerials)
 
       mInfo.mAudio.mRate = opusState->mRate;
       mInfo.mAudio.mChannels = opusState->mChannels;
+      FillTags(&mInfo.mAudio, opusState->GetTags());
     }
+  }
+}
+
+void
+OggDemuxer::FillTags(TrackInfo* aInfo, MetadataTags* aTags)
+{
+  if (!aTags) {
+    return;
+  }
+  nsAutoPtr<MetadataTags> tags(aTags);
+  for (auto iter = aTags->Iter(); !iter.Done(); iter.Next()) {
+    aInfo->mTags.AppendElement(MetadataTag(iter.Key(), iter.Data()));
   }
 }
 
