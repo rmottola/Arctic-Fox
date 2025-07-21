@@ -1226,6 +1226,7 @@ WebGLTexture::TexStorage(const char* funcName, TexTarget target, GLsizei levels,
     PopulateMipChain(0, levels-1);
 
     mImmutable = true;
+    mImmutableLevelCount = levels;
 }
 
 ////////////////////////////////////////
