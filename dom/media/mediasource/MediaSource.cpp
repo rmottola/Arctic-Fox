@@ -131,6 +131,7 @@ MediaSource::IsTypeSupported(const nsAString& aType, DecoderDoctorDiagnostics* a
       }
     }
   }
+
   return NS_ERROR_DOM_NOT_SUPPORTED_ERR;
 }
 
