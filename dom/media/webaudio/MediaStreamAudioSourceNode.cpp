@@ -212,7 +212,9 @@ MediaStreamAudioSourceNode::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) cons
   // Future:
   // - mInputStream
   size_t amount = AudioNode::SizeOfExcludingThis(aMallocSizeOf);
-  amount += mInputPort->SizeOfIncludingThis(aMallocSizeOf);
+  if (mInputPort) {
+    amount += mInputPort->SizeOfIncludingThis(aMallocSizeOf);
+  }
   return amount;
 }
 
