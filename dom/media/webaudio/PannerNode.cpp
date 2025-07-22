@@ -711,7 +711,7 @@ PannerNode::ComputeDopplerShift()
       listenerProjection = -listenerProjection;
       sourceProjection = -sourceProjection;
 
-      double scaledSpeedOfSound = listener->DopplerFactor() / listener->DopplerFactor();
+      double scaledSpeedOfSound = listener->SpeedOfSound() / listener->DopplerFactor();
       listenerProjection = min(listenerProjection, scaledSpeedOfSound);
       sourceProjection = min(sourceProjection, scaledSpeedOfSound);
 
