@@ -503,7 +503,7 @@ PannerNodeEngine::ComputeDistanceGain()
 {
   ThreeDPoint distanceVec = mPosition - mListenerPosition;
   float distance = sqrt(distanceVec.DotProduct(distanceVec));
-  return (this->*mDistanceModelFunction)(distance);
+  return std::max(0.0f, (this->*mDistanceModelFunction)(distance));
 }
 
 float
