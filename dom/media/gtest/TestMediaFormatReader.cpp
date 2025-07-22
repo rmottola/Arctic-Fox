@@ -135,7 +135,9 @@ public:
   }
 private:
   ~MediaFormatReaderBinding()
-  {}
+  {
+    mDecoder->Shutdown();
+  }
 };
 
 
