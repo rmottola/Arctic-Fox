@@ -189,6 +189,37 @@ public:
     SendDoubleParameterToStream(CONE_OUTER_GAIN, mConeOuterGain);
   }
 
+  AudioParam* PositionX()
+  {
+    return mPositionX;
+  }
+
+  AudioParam* PositionY()
+  {
+    return mPositionY;
+  }
+
+  AudioParam* PositionZ()
+  {
+    return mPositionZ;
+  }
+
+  AudioParam* OrientationX()
+  {
+    return mOrientationX;
+  }
+
+  AudioParam* OrientationY()
+  {
+    return mOrientationY;
+  }
+
+  AudioParam* OrientationZ()
+  {
+    return mOrientationZ;
+  }
+
+
   float ComputeDopplerShift();
   void SendDopplerToSourcesIfNeeded();
   void FindConnectedSources();
@@ -234,6 +265,13 @@ private:
   ThreeDPoint mPosition;
   ThreeDPoint mOrientation;
   ThreeDPoint mVelocity;
+  RefPtr<AudioParam> mPositionX;
+  RefPtr<AudioParam> mPositionY;
+  RefPtr<AudioParam> mPositionZ;
+  RefPtr<AudioParam> mOrientationX;
+  RefPtr<AudioParam> mOrientationY;
+  RefPtr<AudioParam> mOrientationZ;
+
   double mRefDistance;
   double mMaxDistance;
   double mRolloffFactor;
