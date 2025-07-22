@@ -1325,9 +1325,7 @@ void
 MediaDecoder::SeekingStarted(MediaDecoderEventVisibility aEventVisibility)
 {
   MOZ_ASSERT(NS_IsMainThread());
-  if (IsShutdown())
-    return;
-
+  MOZ_ASSERT(!IsShutdown());
   if (aEventVisibility != MediaDecoderEventVisibility::Suppressed) {
     mOwner->SeekStarted();
   }
