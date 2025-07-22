@@ -45,6 +45,7 @@ function createHighpassFilter(freq, q, gain) {
     var b0;
     var b1;
     var b2;
+    var a0;
     var a1;
     var a2;
 
