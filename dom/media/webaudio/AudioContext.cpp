@@ -355,6 +355,12 @@ AudioContext::CreateMediaElementSource(HTMLMediaElement& aMediaElement,
     aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
     return nullptr;
   }
+#ifdef MOZ_EME
+  if (aMediaElement.ContainsRestrictedContent()) {
+    aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
+    return nullptr;
+  }
+#endif
 
   if (CheckClosed(aRv)) {
     return nullptr;
@@ -836,8 +842,9 @@ AudioContext::OnStateChanged(void* aPromise, AudioContextState aNewState)
   }
 
 #ifndef WIN32 // Bug 1170547
-
+#ifndef XP_MACOSX
 #ifdef DEBUG
+
   if (!((mAudioContextState == AudioContextState::Suspended &&
        aNewState == AudioContextState::Running)   ||
       (mAudioContextState == AudioContextState::Running   &&
@@ -854,6 +861,7 @@ AudioContext::OnStateChanged(void* aPromise, AudioContextState aNewState)
   }
 
 #endif // DEBUG
+#endif // XP_MACOSX
 #endif // WIN32
 
   MOZ_ASSERT(
