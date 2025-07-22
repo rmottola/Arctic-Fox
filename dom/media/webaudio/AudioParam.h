@@ -221,7 +221,11 @@ private:
     AudioEventTimeline::InsertEvent<double>(event);
 
     SendEventToEngine(event);
+
+    CleanupOldEvents();
   }
+
+  void CleanupOldEvents();
 
   void SendEventToEngine(const AudioTimelineEvent& aEvent);
 
