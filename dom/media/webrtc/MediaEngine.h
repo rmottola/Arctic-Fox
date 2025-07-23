@@ -268,10 +268,6 @@ public:
   /* It is an error to call Start() before an Allocate(), and Stop() before
    * a Start(). Only Allocate() may be called after a Deallocate(). */
 
-  void SetHasFakeTracks(bool aHasFakeTracks) {
-    mHasFakeTracks = aHasFakeTracks;
-  }
-
   /* This call reserves but does not start the device. */
   virtual nsresult Allocate(const dom::MediaTrackConstraints &aConstraints,
                             const MediaEnginePrefs &aPrefs,
@@ -297,7 +293,6 @@ protected:
 #ifdef DEBUG
     , mOwningThread(PR_GetCurrentThread())
 #endif
-    , mHasFakeTracks(false)
   {}
 
   void AssertIsOnOwningThread()
@@ -309,7 +304,6 @@ protected:
 #ifdef DEBUG
   PRThread* mOwningThread;
 #endif
-  bool mHasFakeTracks;
   // Main-thread only:
   dom::MediaTrackSettings mSettings;
 };
