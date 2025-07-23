@@ -500,9 +500,8 @@ private:
   void UpdateReadyState()
   {
     MOZ_ASSERT(NS_IsMainThread());
-    if (!IsShutdown()) {
-      mOwner->UpdateReadyState();
-    }
+    MOZ_ASSERT(!IsShutdown());
+    mOwner->UpdateReadyState();
   }
 
   virtual MediaDecoderOwner::NextFrameStatus NextFrameStatus() { return mNextFrameStatus; }
