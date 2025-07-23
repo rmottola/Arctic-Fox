@@ -1057,7 +1057,7 @@ MediaDecoder::DecodeError()
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!IsShutdown());
   mOwner->DecodeError();
-  Shutdown();
+  MOZ_ASSERT(IsShutdown());
 }
 
 void
