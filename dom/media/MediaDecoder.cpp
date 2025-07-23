@@ -1048,7 +1048,7 @@ MediaDecoder::NetworkError()
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!IsShutdown());
   mOwner->NetworkError();
-  Shutdown();
+  MOZ_ASSERT(IsShutdown());
 }
 
 void
