@@ -91,7 +91,7 @@ let InternalFaviconLoader = {
    */
   observe(subject, topic, data) {
     let innerWindowID = subject.QueryInterface(Ci.nsISupportsPRUint64).data;
-    this.onInnerDestroyed(innerWindowID);
+    this.removeRequestsForInner(innerWindowID);
   },
 
   /**
@@ -113,12 +113,12 @@ let InternalFaviconLoader = {
   /**
    * Called for every inner that gets destroyed, only in the parent process.
    */
-  onInnerDestroyed(innerID) {
+  removeRequestsForInner(innerID) {
     for (let [window, loadDataForWindow] of gFaviconLoadDataMap) {
       let newLoadDataForWindow = loadDataForWindow.filter(loadData => {
         let innerWasDestroyed = loadData.innerWindowID == innerID;
         if (innerWasDestroyed) {
-          this._cancelRequest(loadData, "the inner window was destroyed");
+          this._cancelRequest(loadData, "the inner window was destroyed or a new favicon was loaded for it");
         }
         // Keep the items whose inner is still alive.
         return !innerWasDestroyed;
@@ -180,19 +180,19 @@ let InternalFaviconLoader = {
 
     Services.obs.addObserver(this, "inner-window-destroyed", false);
     Services.ppmm.addMessageListener("Toolkit:inner-window-destroyed", msg => {
-      this.onInnerDestroyed(msg.data);
+      this.removeRequestsForInner(msg.data);
     });
   },
 
   loadFavicon(browser, principal, uri) {
     this.ensureInitialized();
-    let win = browser.ownerDocument.defaultView;
+    let win = browser.ownerGlobal;
     if (!gFaviconLoadDataMap.has(win)) {
       gFaviconLoadDataMap.set(win, []);
       let unloadHandler = event => {
         let doc = event.target;
-        let eventWin = doc.defaultview;
-        if (win == win.top && doc.documentURI != "about:blank") {
+        let eventWin = doc.defaultView;
+        if (eventWin == win) {
           win.removeEventListener("unload", unloadHandler);
           this.onUnload(win);
         }
@@ -200,8 +200,12 @@ let InternalFaviconLoader = {
       win.addEventListener("unload", unloadHandler, true);
     }
 
-    // First we do the actual setAndFetch call:
     let {innerWindowID, currentURI} = browser;
+
+    // Immediately cancel any earlier requests
+    this.removeRequestsForInner(innerWindowID);
+
+    // First we do the actual setAndFetch call:
     let loadType = PrivateBrowsingUtils.isWindowPrivate(win)
       ? PlacesUtils.favicons.FAVICON_LOAD_PRIVATE
       : PlacesUtils.favicons.FAVICON_LOAD_NON_PRIVATE;
@@ -774,8 +778,10 @@ this.PlacesUIUtils = {
    */
   canUserRemove: function (aNode) {
     let parentNode = aNode.parent;
-    if (!parentNode)
-      throw new Error("canUserRemove doesn't accept root nodes");
+    if (!parentNode) {
+      // canUserRemove doesn't accept root nodes.
+      return false;
+    }
 
     // If it's not a bookmark, we can remove it unless it's a child of a
     // livemark.

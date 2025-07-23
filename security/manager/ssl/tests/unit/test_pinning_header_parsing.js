@@ -24,23 +24,21 @@ function loadCert(cert_name, trust_string) {
 
 function checkFailParseInvalidPin(pinValue) {
   let sslStatus = new FakeSSLStatus(
-                        certFromFile('cn-a.pinning2.example.com-pinningroot'));
+                        certFromFile('a.pinning2.example.com-pinningroot'));
   let uri = Services.io.newURI("https://a.pinning2.example.com", null, null);
-  try {
+  throws(() => {
     gSSService.processHeader(Ci.nsISiteSecurityService.HEADER_HPKP, uri,
                              pinValue, sslStatus, 0);
-    do_check_true(false); // this should not run
-  } catch (e) {
-    do_check_true(true);
-  }
+  }, /NS_ERROR_FAILURE/, `Invalid pin "${pinValue}" should be rejected`);
 }
 
-function checkPassValidPin(pinValue, settingPin) {
+function checkPassValidPin(pinValue, settingPin, expectedMaxAge) {
   let sslStatus = new FakeSSLStatus(
-                        certFromFile('cn-a.pinning2.example.com-pinningroot.der'));
+                        certFromFile('a.pinning2.example.com-pinningroot'));
   let uri = Services.io.newURI("https://a.pinning2.example.com", null, null);
+  let maxAge = {};
 
-  // setup preconditions for the test, if setting ensure there is no previors
+  // setup preconditions for the test, if setting ensure there is no previous
   // state, if removing ensure there is a valid pin in place.
   if (settingPin) {
     gSSService.removeState(Ci.nsISiteSecurityService.HEADER_HPKP, uri, 0);
@@ -52,30 +50,39 @@ function checkPassValidPin(pinValue, settingPin) {
   }
   try {
     gSSService.processHeader(Ci.nsISiteSecurityService.HEADER_HPKP, uri,
-                             pinValue, sslStatus, 0);
-    do_check_true(true);
+                             pinValue, sslStatus, 0, maxAge);
+    ok(true, "Valid pin should be accepted");
   } catch (e) {
-    do_check_true(false);
+    ok(false, "Valid pin should have been accepted");
   }
+
+  // check that maxAge was processed correctly
+  if (settingPin && expectedMaxAge) {
+    ok(maxAge.value == expectedMaxAge, `max-age value should be ${expectedMaxAge}`);
+  }
+
   // after processing ensure that the postconditions are true, if setting
   // the host must be pinned, if removing the host must not be pinned
   let hostIsPinned = gSSService.isSecureHost(Ci.nsISiteSecurityService.HEADER_HPKP,
                                              "a.pinning2.example.com", 0);
   if (settingPin) {
-    do_check_true(hostIsPinned);
+    ok(hostIsPinned, "Host should be considered pinned");
   } else {
-    do_check_true(!hostIsPinned);
+    ok(!hostIsPinned, "Host should not be considered pinned");
   }
 }
 
-function checkPassSettingPin(pinValue) {
-  return checkPassValidPin(pinValue, true);
+function checkPassSettingPin(pinValue, expectedMaxAge) {
+  return checkPassValidPin(pinValue, true, expectedMaxAge);
 }
 
 function checkPassRemovingPin(pinValue) {
   return checkPassValidPin(pinValue, false);
 }
 
+const MAX_MAX_AGE_SECONDS = 100000;
+const GOOD_MAX_AGE_SECONDS = 69403;
+const LONG_MAX_AGE_SECONDS = 2 * MAX_MAX_AGE_SECONDS;
 const NON_ISSUED_KEY_HASH1 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 const NON_ISSUED_KEY_HASH2 = "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ=";
 const PINNING_ROOT_KEY_HASH = "VCIlmPM9NkgFQtrs4Oa5TeFcDu6MWRTKSNdePEhOgD8=";
@@ -84,13 +91,15 @@ const VALID_PIN1 = `pin-sha256="${PINNING_ROOT_KEY_HASH}";`;
 const BACKUP_PIN1 = `pin-sha256="${NON_ISSUED_KEY_HASH1}";`;
 const BACKUP_PIN2 = `pin-sha256="${NON_ISSUED_KEY_HASH2}";`;
 const BROKEN_PIN1 = "pin-sha256=\"jdjsjsjs\";";
-const GOOD_MAX_AGE = "max-age=69403;";
+const GOOD_MAX_AGE = `max-age=${GOOD_MAX_AGE_SECONDS};`;
+const LONG_MAX_AGE = `max-age=${LONG_MAX_AGE_SECONDS};`;
 const INCLUDE_SUBDOMAINS = "includeSubdomains;";
 const REPORT_URI = "report-uri=\"https://www.example.com/report/\";";
 const UNRECOGNIZED_DIRECTIVE = "unreconized-dir=12343;";
 
 function run_test() {
   Services.prefs.setIntPref("security.cert_pinning.enforcement_level", 2);
+  Services.prefs.setIntPref("security.cert_pinning.max_max_age_seconds", MAX_MAX_AGE_SECONDS);
   Services.prefs.setBoolPref("security.cert_pinning.process_headers_from_non_builtin_roots", true);
 
   loadCert("pinningroot", "CTu,CTu,CTu");
@@ -117,6 +126,9 @@ function run_test() {
   checkPassRemovingPin("max-age=0"); //test removal without terminating ';'
   checkPassRemovingPin(MAX_AGE_ZERO);
   checkPassRemovingPin(MAX_AGE_ZERO + VALID_PIN1);
+
+  checkPassSettingPin(GOOD_MAX_AGE + VALID_PIN1 + BACKUP_PIN1, GOOD_MAX_AGE_SECONDS);
+  checkPassSettingPin(LONG_MAX_AGE + VALID_PIN1 + BACKUP_PIN1, MAX_MAX_AGE_SECONDS);
 
   checkPassRemovingPin(VALID_PIN1 + MAX_AGE_ZERO + VALID_PIN1);
   checkPassSettingPin(GOOD_MAX_AGE + VALID_PIN1 + BACKUP_PIN1);

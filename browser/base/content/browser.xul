@@ -81,6 +81,8 @@
 
 <script type="application/javascript" src="chrome://global/content/contentAreaUtils.js"/>
 
+<script type="application/javascript" src="chrome://browser/content/downloads/downloads.js"/>
+<script type="application/javascript" src="chrome://browser/content/downloads/indicator.js"/>
 <script type="application/javascript" src="chrome://browser/content/places/editBookmarkOverlay.js"/>
 
 # All sets except for popupsets (commands, keys, stringbundles and broadcasters) *must* go into the
@@ -353,6 +355,9 @@
 
 #include popup-notifications.inc
 
+#include ../../components/customizableui/content/panelUI.inc.xul
+#include ../../components/controlcenter/content/panel.inc.xul
+
     <hbox id="downloads-animation-container" mousethrough="always">
       <vbox id="downloads-notification-anchor">
         <vbox id="downloads-indicator-notification"/>
@@ -560,12 +565,66 @@
                 <image id="identity-icon"
                        consumeanchor="identity-box"
                        onclick="PageProxyClickHandler(event);"/>
+                <box id="blocked-permissions-container" align="center">
+                  <image data-permission-id="geo" class="notification-anchor-icon geo-icon blocked" role="button"
+                         aria-label="&urlbar.geolocationNotificationAnchor.label;"/>
+                  <image data-permission-id="desktop-notification" class="notification-anchor-icon desktop-notification-icon blocked" role="button"
+                         aria-label="&urlbar.webNotsNotificationAnchor3.label;"/>
+                  <image data-permission-id="camera" class="notification-anchor-icon camera-icon blocked" role="button"
+                         aria-label="&urlbar.webRTCShareDevicesNotificationAnchor.label;"/>
+                  <image data-permission-id="indexedDB" class="notification-anchor-icon indexedDB-icon blocked" role="button"
+                         aria-label="&urlbar.indexedDBNotificationAnchor.label;"/>
+                  <image data-permission-id="microphone" class="notification-anchor-icon microphone-icon blocked" role="button"
+                         aria-label="&urlbar.webRTCShareMicrophoneNotificationAnchor.label;"/>
+                  <image data-permission-id="screen" class="notification-anchor-icon screen-icon blocked" role="button"
+                         aria-label="&urlbar.webRTCShareScreenNotificationAnchor.label;"/>
+                  <image data-permission-id="pointerLock" class="notification-anchor-icon pointerLock-icon blocked" role="button"
+                         aria-label="&urlbar.pointerLockNotificationAnchor.label;"/>
+                </box>
                 <box id="notification-popup-box"
                      hidden="true"
                      tooltiptext=""
                      onmouseover="document.getElementById('identity-icon').classList.add('no-hover');"
                      onmouseout="document.getElementById('identity-icon').classList.remove('no-hover');"
                      align="center">
+                  <image id="default-notification-icon" class="notification-anchor-icon" role="button"
+                         aria-label="&urlbar.defaultNotificationAnchor.label;"/>
+                  <image id="geo-notification-icon" class="notification-anchor-icon geo-icon" role="button"
+                         aria-label="&urlbar.geolocationNotificationAnchor.label;"/>
+                  <image id="addons-notification-icon" class="notification-anchor-icon install-icon" role="button"
+                         aria-label="&urlbar.addonsNotificationAnchor.label;"/>
+                  <image id="indexedDB-notification-icon" class="notification-anchor-icon indexedDB-icon" role="button"
+                         aria-label="&urlbar.indexedDBNotificationAnchor.label;"/>
+                  <image id="login-fill-notification-icon" class="notification-anchor-icon login-icon" role="button"
+                         aria-label="&urlbar.loginFillNotificationAnchor.label;"/>
+                  <image id="password-notification-icon" class="notification-anchor-icon login-icon" role="button"
+                         aria-label="&urlbar.passwordNotificationAnchor.label;"/>
+                  <image id="plugins-notification-icon" class="notification-anchor-icon plugin-icon" role="button"
+                         aria-label="&urlbar.pluginsNotificationAnchor.label;"/>
+                  <image id="web-notifications-notification-icon" class="notification-anchor-icon desktop-notification-icon" role="button"
+                         aria-label="&urlbar.webNotsNotificationAnchor3.label;"/>
+                  <image id="webRTC-shareDevices-notification-icon" class="notification-anchor-icon camera-icon" role="button"
+                         aria-label="&urlbar.webRTCShareDevicesNotificationAnchor.label;"/>
+                  <image id="webRTC-sharingDevices-notification-icon" class="notification-anchor-icon camera-icon in-use" role="button"
+                         aria-label="&urlbar.webRTCSharingDevicesNotificationAnchor.label;"/>
+                  <image id="webRTC-shareMicrophone-notification-icon" class="notification-anchor-icon microphone-icon" role="button"
+                         aria-label="&urlbar.webRTCShareMicrophoneNotificationAnchor.label;"/>
+                  <image id="webRTC-sharingMicrophone-notification-icon" class="notification-anchor-icon microphone-icon in-use" role="button"
+                         aria-label="&urlbar.webRTCSharingMicrophoneNotificationAnchor.label;"/>
+                  <image id="webRTC-shareScreen-notification-icon" class="notification-anchor-icon screen-icon" role="button"
+                         aria-label="&urlbar.webRTCShareScreenNotificationAnchor.label;"/>
+                  <image id="webRTC-sharingScreen-notification-icon" class="notification-anchor-icon screen-icon in-use" role="button"
+                         aria-label="&urlbar.webRTCSharingScreenNotificationAnchor.label;"/>
+                  <image id="pointerLock-notification-icon" class="notification-anchor-icon pointerLock-icon" role="button"
+                         aria-label="&urlbar.pointerLockNotificationAnchor.label;"/>
+                  <image id="servicesInstall-notification-icon" class="notification-anchor-icon service-icon" role="button"
+                         aria-label="&urlbar.servicesNotificationAnchor.label;"/>
+                  <image id="translate-notification-icon" class="notification-anchor-icon translation-icon" role="button"
+                         aria-label="&urlbar.translateNotificationAnchor.label;"/>
+                  <image id="translated-notification-icon" class="notification-anchor-icon translation-icon in-use" role="button"
+                         aria-label="&urlbar.translatedNotificationAnchor.label;"/>
+                  <image id="eme-notification-icon" class="notification-anchor-icon drm-icon" role="button"
+                         aria-label="&urlbar.emeNotificationAnchor.label;"/>
                 </box>
                 <image id="tracking-protection-icon"/>
                 <image id="connection-icon"/>
@@ -574,15 +633,15 @@
                   <label id="identity-icon-country-label" class="plain"/>
                 </hbox>
               </box>
-          <box id="urlbar-display-box" align="center">
-             <label class="urlbar-display urlbar-display-switchtab" value="&urlbar.switchToTab.label;"/>
-          </box>
-          <hbox id="urlbar-icons">
-            <image id="page-report-button"
-                   class="urlbar-icon"
-                   hidden="true"
-                   tooltiptext="&pageReportIcon.tooltip;"
-                   onclick="gPopupBlockerObserver.onReportButtonClick(event);"/>
+              <box id="urlbar-display-box" align="center">
+                <label class="urlbar-display urlbar-display-switchtab" value="&urlbar.switchToTab.label;"/>
+              </box>
+              <hbox id="urlbar-icons">
+                <image id="page-report-button"
+                       class="urlbar-icon"
+                       hidden="true"
+                       tooltiptext="&pageReportIcon.tooltip;"
+                       onclick="gPopupBlockerObserver.onReportButtonClick(event);"/>
             <button type="menu"
                     style="-moz-user-focus: none"
                     class="plain urlbar-icon"
@@ -603,30 +662,29 @@
                    class="urlbar-icon"
                    tooltiptext="&goEndCap.tooltip;"
                    onclick="gURLBar.handleCommand(event);"/>
-                <toolbarbutton id="reader-mode-button"
-                               class="tabbable"
-                               hidden="true"
-                               onclick="ReaderParent.handleReaderButtonEvent(event);"
-                               onkeypress="ReaderParent.handleReaderButtonEvent(event);"/>
-          </hbox>
+                <image id="reader-mode-button"
+                       class="urlbar-icon"
+                       hidden="true"
+                       onclick="ReaderParent.buttonClick(event);"/>
+              </hbox>
               <hbox id="userContext-icons" hidden="true">
                 <label id="userContext-label"/>
                 <image id="userContext-indicator"/>
               </hbox>
-          <toolbarbutton id="urlbar-go-button"
-                         class="chromeclass-toolbar-additional"
-                         onclick="gURLBar.handleCommand(event);"
-                         tooltiptext="&goEndCap.tooltip;"/>
-          <toolbarbutton id="urlbar-reload-button"
-                         class="chromeclass-toolbar-additional"
-                         command="Browser:ReloadOrDuplicate"
-                         onclick="checkForMiddleClick(this, event);"
-                         tooltiptext="&reloadButton.tooltip;"/>
-          <toolbarbutton id="urlbar-stop-button"
-                         class="chromeclass-toolbar-additional"
-                         command="Browser:Stop"
-                         tooltiptext="&stopButton.tooltip;"/>
-        </textbox>
+              <toolbarbutton id="urlbar-go-button"
+                             class="chromeclass-toolbar-additional"
+                             onclick="gURLBar.handleCommand(event);"
+                             tooltiptext="&goEndCap.tooltip;"/>
+              <toolbarbutton id="urlbar-reload-button"
+                             class="chromeclass-toolbar-additional"
+                             command="Browser:ReloadOrDuplicate"
+                             onclick="checkForMiddleClick(this, event);"
+                             tooltiptext="&reloadButton.tooltip;"/>
+              <toolbarbutton id="urlbar-stop-button"
+                             class="chromeclass-toolbar-additional"
+                             command="Browser:Stop"
+                             tooltiptext="&stopButton.tooltip;"/>
+            </textbox>
         </toolbaritem>
 
       <toolbaritem id="search-container" title="&searchItem.title;"
@@ -730,6 +788,21 @@
                     oncommand="PlacesCommandHook.showPlacesOrganizer('UnfiledBookmarks');"/>
         </menupopup>
       </toolbarbutton>
+
+        <!-- This is a placeholder for the Downloads Indicator.  It is visible
+             during the customization of the toolbar, in the palette, and before
+             the Downloads Indicator overlay is loaded. -->
+        <toolbarbutton id="downloads-button"
+                       class="toolbarbutton-1 chromeclass-toolbar-additional badged-button"
+                       key="key_openDownloads"
+                       oncommand="DownloadsIndicatorView.onCommand(event);"
+                       ondrop="DownloadsIndicatorView.onDrop(event);"
+                       ondragover="DownloadsIndicatorView.onDragOver(event);"
+                       ondragenter="DownloadsIndicatorView.onDragOver(event);"
+                       label="&downloads.label;"
+                       removable="true"
+                       cui-areatype="toolbar"
+                       tooltip="dynamic-shortcut-tooltip"/>
 
       <toolbarbutton id="history-menu-button"
                      class="toolbarbutton-1 chromeclass-toolbar-additional"
@@ -849,7 +922,7 @@
                          mousethrough="never"
                          label="&bookmarksToolbarItem.label;"/>
           <hbox flex="1">
-            <hbox align="center">
+            <hbox id="PlacesToolbarDropIndicatorHolder" align="center" collapsed="true">
               <image id="PlacesToolbarDropIndicator"
                      mousethrough="always"
                      collapsed="true"/>
@@ -954,8 +1027,6 @@
       <hbox class="titlebar-placeholder" type="caption-buttons" ordinal="1000"/>
 #endif
     </toolbar>
-
-#include ../../components/controlcenter/content/panel.inc.xul
 
     <hbox id="downloads-animation-container" mousethrough="always">
       <vbox id="downloads-notification-anchor">
@@ -1062,6 +1133,7 @@
 #ifdef MOZ_SERVICES_SYNC
       <toolbarbutton id="sync-button"
                      class="toolbarbutton-1 chromeclass-toolbar-additional"
+                     observes="sync-status"
                      label="&syncToolbarButton.label;"
                      oncommand="gSyncUI.handleToolbarButton()"/>
 #endif
@@ -1101,13 +1173,13 @@
     <vbox id="browser-border-end" hidden="true" layer="true"/>
   </hbox>
 
-  <html:div id="fullscreen-warning" hidden="true">
-    <html:div id="fullscreen-domain-text">
+  <html:div id="fullscreen-warning" class="pointerlockfswarning" hidden="true">
+    <html:div class="pointerlockfswarning-domain-text">
       &fullscreenWarning.beforeDomain.label;
-      <html:span id="fullscreen-domain"/>
+      <html:span class="pointerlockfswarning-domain"/>
       &fullscreenWarning.afterDomain.label;
     </html:div>
-    <html:div id="fullscreen-generic-text">
+    <html:div class="pointerlockfswarning-generic-text">
       &fullscreenWarning.generic.label;
     </html:div>
     <html:button id="fullscreen-exit-button"
@@ -1118,6 +1190,17 @@
             &exitDOMFullscreen.button;
 #endif
     </html:button>
+  </html:div>
+
+  <html:div id="pointerlock-warning" class="pointerlockfswarning" hidden="true">
+    <html:div class="pointerlockfswarning-domain-text">
+      &pointerlockWarning.beforeDomain.label;
+      <html:span class="pointerlockfswarning-domain"/>
+      &pointerlockWarning.afterDomain.label;
+    </html:div>
+    <html:div class="pointerlockfswarning-generic-text">
+      &pointerlockWarning.generic.label;
+    </html:div>
   </html:div>
 
   <vbox id="browser-bottombox" layer="true">

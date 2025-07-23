@@ -1,11 +1,15 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 "use strict";
 
-const actions = require('../actions/event-listeners');
-const { bindActionCreators } = require('devtools/client/shared/vendor/redux');
+/* import-globals-from ../../debugger-controller.js */
+
+const actions = require("../actions/event-listeners");
+const { bindActionCreators } = require("devtools/client/shared/vendor/redux");
 const { Heritage, WidgetMethods } = require("devtools/client/shared/widgets/view-helpers");
+const { SideMenuWidget } = require("resource://devtools/client/shared/widgets/SideMenuWidget.jsm");
 
 /**
  * Functions handling the event listeners UI.
@@ -26,7 +30,7 @@ EventListenersView.prototype = Heritage.extend(WidgetMethods, {
   /**
    * Initialization function, called when the debugger is started.
    */
-  initialize: function() {
+  initialize: function () {
     dumpn("Initializing the EventListenersView");
 
     this.widget = new SideMenuWidget(document.getElementById("event-listeners"), {
@@ -47,14 +51,14 @@ EventListenersView.prototype = Heritage.extend(WidgetMethods, {
   /**
    * Destruction function, called when the debugger is closed.
    */
-  destroy: function() {
+  destroy: function () {
     dumpn("Destroying the EventListenersView");
 
     this.widget.removeEventListener("check", this._onCheck, false);
     this.widget.removeEventListener("click", this._onClick, false);
   },
 
-  renderListeners: function(listeners) {
+  renderListeners: function (listeners) {
     listeners.forEach(listener => {
       this.addListener(listener, { staged: true });
     });
@@ -72,7 +76,7 @@ EventListenersView.prototype = Heritage.extend(WidgetMethods, {
    *        Additional options for adding the source. Supported options:
    *        - staged: true to stage the item to be appended later
    */
-  addListener: function(aListener, aOptions = {}) {
+  addListener: function (aListener, aOptions = {}) {
     let { node: { selector }, function: { url }, type } = aListener;
     if (!type) return;
 
@@ -186,7 +190,7 @@ EventListenersView.prototype = Heritage.extend(WidgetMethods, {
    * @return array
    *         List of event types, for example ["load", "click"...]
    */
-  getAllEvents: function() {
+  getAllEvents: function () {
     return this.attachments.map(e => e.type);
   },
 
@@ -196,7 +200,7 @@ EventListenersView.prototype = Heritage.extend(WidgetMethods, {
    * @return array
    *         List of event types, for example ["load", "click"...]
    */
-  getCheckedEvents: function() {
+  getCheckedEvents: function () {
     return this.attachments.filter(e => e.checkboxState).map(e => e.type);
   },
 
@@ -212,7 +216,7 @@ EventListenersView.prototype = Heritage.extend(WidgetMethods, {
    * @return object
    *         An object containing the event listener view nodes.
    */
-  _createItemView: function(aType, aSelector, aUrl) {
+  _createItemView: function (aType, aSelector, aUrl) {
     let container = document.createElement("hbox");
     container.className = "dbg-event-listener";
 
@@ -254,7 +258,7 @@ EventListenersView.prototype = Heritage.extend(WidgetMethods, {
   /**
    * The check listener for the event listeners container.
    */
-  _onCheck: function({ detail: { description, checked }, target }) {
+  _onCheck: function ({ detail: { description, checked }, target }) {
     if (description == "item") {
       this.getItemForElement(target).attachment.checkboxState = checked;
 
@@ -271,7 +275,7 @@ EventListenersView.prototype = Heritage.extend(WidgetMethods, {
   /**
    * The select listener for the event listeners container.
    */
-  _onClick: function({ target }) {
+  _onClick: function ({ target }) {
     // Changing the checkbox state is handled by the _onCheck event. Avoid
     // handling that again in this click event, so pass in "noSiblings"
     // when retrieving the target's item, to ignore the checkbox.

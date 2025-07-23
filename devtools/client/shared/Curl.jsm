@@ -59,7 +59,7 @@ this.Curl = {
    * @return string
    *         A cURL command.
    */
-  generateCommand: function(aData) {
+  generateCommand: function (aData) {
     let utils = CurlUtils;
 
     let command = ["curl"];
@@ -169,7 +169,7 @@ this.CurlUtils = {
    * @return boolean
    *         True if the request is URL encoded, false otherwise.
    */
-  isUrlEncodedRequest: function(aData) {
+  isUrlEncodedRequest: function (aData) {
     let postDataText = aData.postDataText;
     if (!postDataText) {
       return false;
@@ -194,7 +194,7 @@ this.CurlUtils = {
    * @return boolean
    *         True if the request is multipart reqeust, false otherwise.
    */
-  isMultipartRequest: function(aData) {
+  isMultipartRequest: function (aData) {
     let postDataText = aData.postDataText;
     if (!postDataText) {
       return false;
@@ -237,7 +237,7 @@ this.CurlUtils = {
    * @return string
    *         The found header value or null if not found.
    */
-  findHeader: function(aHeaders, aName) {
+  findHeader: function (aHeaders, aName) {
     if (!aHeaders) {
       return null;
     }
@@ -260,7 +260,7 @@ this.CurlUtils = {
    * @return string
    *         The boundary string for the request.
    */
-  getMultipartBoundary: function(aData) {
+  getMultipartBoundary: function (aData) {
     let boundaryRe = /\bboundary=(-{3,}\w+)/i;
 
     // Get the boundary string from the Content-Type request header.
@@ -289,7 +289,7 @@ this.CurlUtils = {
    * @return string
    *         The mulitpart text without the binary data.
    */
-  removeBinaryDataFromMultipartText: function(aMultipartText, aBoundary) {
+  removeBinaryDataFromMultipartText: function (aMultipartText, aBoundary) {
     let result = "";
     let boundary = "--" + aBoundary;
     let parts = aMultipartText.split(boundary);
@@ -325,7 +325,7 @@ this.CurlUtils = {
    * @return array
    *         An array of header objects {name:x, value:x}
    */
-  getHeadersFromMultipartText: function(aMultipartText) {
+  getHeadersFromMultipartText: function (aMultipartText) {
     let headers = [];
     if (!aMultipartText || aMultipartText.startsWith("---")) {
       return headers;
@@ -371,7 +371,7 @@ this.CurlUtils = {
    * Escape util function for POSIX oriented operating systems.
    * Credit: Google DevTools
    */
-  escapeStringPosix: function(str) {
+  escapeStringPosix: function (str) {
     function escapeCharacter(x) {
       let code = x.charCodeAt(0);
       if (code < 256) {
@@ -399,7 +399,7 @@ this.CurlUtils = {
    * Escape util function for Windows systems.
    * Credit: Google DevTools
    */
-  escapeStringWin: function(str) {
+  escapeStringWin: function (str) {
     /* Replace quote by double quote (but not by \") because it is
        recognized by both cmd.exe and MS Crt arguments parser.
 

@@ -55,14 +55,14 @@ CheckDecoderState(const ImageTestCase& aTestCase, Decoder* aDecoder)
             bool(progress & FLAG_IS_ANIMATED));
 
   // The decoder should get the correct size.
-  IntSize size = aDecoder->GetSize();
+  IntSize size = aDecoder->Size();
   EXPECT_EQ(aTestCase.mSize.width, size.width);
   EXPECT_EQ(aTestCase.mSize.height, size.height);
 
   // Get the current frame, which is always the first frame of the image
   // because CreateAnonymousDecoder() forces a first-frame-only decode.
   RawAccessFrameRef currentFrame = aDecoder->GetCurrentFrameRef();
-  RefPtr<SourceSurface> surface = currentFrame->GetSurface();
+  RefPtr<SourceSurface> surface = currentFrame->GetSourceSurface();
 
   // Verify that the resulting surfaces matches our expectations.
   EXPECT_EQ(SurfaceType::DATA, surface->GetType());
@@ -338,6 +338,16 @@ TEST_F(ImageDecoders, CorruptSingleChunk)
 TEST_F(ImageDecoders, CorruptMultiChunk)
 {
   CheckDecoderMultiChunk(CorruptTestCase());
+}
+
+TEST_F(ImageDecoders, CorruptBMPWithTruncatedHeaderSingleChunk)
+{
+  CheckDecoderSingleChunk(CorruptBMPWithTruncatedHeader());
+}
+
+TEST_F(ImageDecoders, CorruptBMPWithTruncatedHeaderMultiChunk)
+{
+  CheckDecoderMultiChunk(CorruptBMPWithTruncatedHeader());
 }
 
 TEST_F(ImageDecoders, CorruptICOWithBadBMPWidthSingleChunk)

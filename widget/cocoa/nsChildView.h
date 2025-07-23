@@ -13,7 +13,6 @@
 #include "mozAccessibleProtocol.h"
 #endif
 
-#include "nsAutoPtr.h"
 #include "nsISupports.h"
 #include "nsBaseWidget.h"
 #include "nsWeakPtr.h"
@@ -28,6 +27,7 @@
 
 #include "nsString.h"
 #include "nsIDragService.h"
+#include "ViewRegion.h"
 
 #import <Carbon/Carbon.h>
 #import <Cocoa/Cocoa.h>
@@ -479,6 +479,12 @@ public:
                                                     uint32_t aModifierFlags,
                                                     uint32_t aAdditionalFlags,
                                                     nsIObserver* aObserver) override;
+  virtual nsresult SynthesizeNativeTouchPoint(uint32_t aPointerId,
+                                              TouchPointerState aPointerState,
+                                              LayoutDeviceIntPoint aPoint,
+                                              double aPointerPressure,
+                                              uint32_t aPointerOrientation,
+                                              nsIObserver* aObserver) override;
 
   // Mac specific methods
 
@@ -486,6 +492,8 @@ public:
 
   void WillPaintWindow();
   bool PaintWindow(LayoutDeviceIntRegion aRegion);
+  bool PaintWindowInContext(CGContextRef aContext, const LayoutDeviceIntRegion& aRegion,
+                            mozilla::gfx::IntSize aSurfaceSize);
 
 #ifdef ACCESSIBILITY
   already_AddRefed<mozilla::a11y::Accessible> GetDocumentAccessible();
@@ -502,7 +510,7 @@ public:
   virtual void UpdateThemeGeometries(const nsTArray<ThemeGeometry>& aThemeGeometries) override;
 
   virtual void UpdateWindowDraggingRegion(const LayoutDeviceIntRegion& aRegion) override;
-  const LayoutDeviceIntRegion& GetDraggableRegion() { return mDraggableRegion; }
+  LayoutDeviceIntRegion GetNonDraggableRegion() { return mNonDraggableRegion.Region(); }
 
   virtual void ReportSwipeStarted(uint64_t aInputBlockId, bool aStartSwipe) override;
 
@@ -668,7 +676,7 @@ protected:
   // uploaded to to mTitlebarImage. Main thread only.
   nsIntRegion           mDirtyTitlebarRegion;
 
-  LayoutDeviceIntRegion mDraggableRegion;
+  mozilla::ViewRegion   mNonDraggableRegion;
 
   // Cached value of [mView backingScaleFactor], to avoid sending two obj-c
   // messages (respondsToSelector, backingScaleFactor) every time we need to
@@ -684,11 +692,14 @@ protected:
 
   // Used in OMTC BasicLayers mode. Presents the BasicCompositor result
   // surface to the screen using an OpenGL context.
-  nsAutoPtr<GLPresenter> mGLPresenter;
+  mozilla::UniquePtr<GLPresenter> mGLPresenter;
 
   mozilla::UniquePtr<mozilla::VibrancyManager> mVibrancyManager;
   RefPtr<mozilla::SwipeTracker> mSwipeTracker;
   mozilla::UniquePtr<mozilla::SwipeEventQueue> mSwipeEventQueue;
+
+  // Only used for drawRect-based painting in popups.
+  RefPtr<mozilla::gfx::DrawTarget> mBackingSurface;
 
   // This flag is only used when APZ is off. It indicates that the current pan
   // gesture was processed as a swipe. Sometimes the swipe animation can finish
@@ -701,6 +712,10 @@ protected:
   static uint32_t sLastInputEventCount;
 
   void ReleaseTitlebarCGContext();
+
+  // This is used by SynthesizeNativeTouchPoint to maintain state between
+  // multiple synthesized points
+  mozilla::UniquePtr<mozilla::MultiTouchInput> mSynthesizedTouchInput;
 };
 
 #endif // nsChildView_h_

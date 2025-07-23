@@ -7,15 +7,17 @@
 "use strict";
 
 const { Cc, Ci } = require("chrome");
+const Services = require("Services");
 const { BreakpointActor, setBreakpointAtEntryPoints } = require("devtools/server/actors/breakpoint");
 const { OriginalLocation, GeneratedLocation } = require("devtools/server/actors/common");
 const { createValueGrip } = require("devtools/server/actors/object");
-const { ActorClass, Arg, RetVal, method } = require("devtools/shared/protocol");
+const { ActorClassWithSpec, Arg, RetVal, method } = require("devtools/shared/protocol");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const { assert, fetch } = DevToolsUtils;
 const { joinURI } = require("devtools/shared/path");
 const promise = require("promise");
 const { defer, resolve, reject, all } = promise;
+const { sourceSpec } = require("devtools/shared/specs/source");
 
 loader.lazyRequireGetter(this, "SourceMapConsumer", "source-map", true);
 loader.lazyRequireGetter(this, "SourceMapGenerator", "source-map", true);
@@ -25,11 +27,11 @@ function isEvalSource(source) {
   let introType = source.introductionType;
   // These are all the sources that are essentially eval-ed (either
   // by calling eval or passing a string to one of these functions).
-  return (introType === 'eval' ||
-          introType === 'Function' ||
-          introType === 'eventHandler' ||
-          introType === 'setTimeout' ||
-          introType === 'setInterval');
+  return (introType === "eval" ||
+          introType === "Function" ||
+          introType === "eventHandler" ||
+          introType === "setTimeout" ||
+          introType === "setInterval");
 }
 
 exports.isEvalSource = isEvalSource;
@@ -43,7 +45,7 @@ function getSourceURL(source, window) {
     if (source.displayURL && source.introductionScript &&
        !isEvalSource(source.introductionScript.source)) {
 
-      if (source.introductionScript.source.url === 'debugger eval code') {
+      if (source.introductionScript.source.url === "debugger eval code") {
         if (window) {
           // If this is a named eval script created from the console, make it
           // relative to the current page. window is only available
@@ -58,7 +60,7 @@ function getSourceURL(source, window) {
 
     return source.displayURL;
   }
-  else if (source.url === 'debugger eval code') {
+  else if (source.url === "debugger eval code") {
     // Treat code evaluated by the console as unnamed eval scripts
     return null;
   }
@@ -139,7 +141,7 @@ function resolveURIToLocalPath(aURI) {
  * @param String contentType
  *        Optional. The content type of this source, if immediately available.
  */
-let SourceActor = ActorClass({
+let SourceActor = ActorClassWithSpec(sourceSpec, {
   typeName: "source",
 
   initialize: function ({ source, thread, originalUrl, generatedSource,
@@ -183,7 +185,6 @@ let SourceActor = ActorClass({
   get threadActor() { return this._threadActor; },
   get sources() { return this._threadActor.sources; },
   get dbg() { return this.threadActor.dbg; },
-  get scripts() { return this.threadActor.scripts; },
   get source() { return this._source; },
   get generatedSource() { return this._generatedSource; },
   get breakpointActorMap() { return this.threadActor.breakpointActorMap; },
@@ -219,6 +220,7 @@ let SourceActor = ActorClass({
       isBlackBoxed: this.threadActor.sources.isBlackBoxed(this.url),
       isPrettyPrinted: this.threadActor.sources.isPrettyPrinted(this.url),
       isSourceMapped: this.isSourceMapped,
+      sourceMapURL: source ? source.sourceMapURL : null,
       introductionUrl: introductionUrl ? introductionUrl.split(" -> ").pop() : null,
       introductionType: source ? source.introductionType : null
     };
@@ -230,7 +232,7 @@ let SourceActor = ActorClass({
     }
   },
 
-  _mapSourceToAddon: function() {
+  _mapSourceToAddon: function () {
     try {
       var nsuri = Services.io.newURI(this.url.split(" -> ").pop(), null, null);
     }
@@ -240,43 +242,47 @@ let SourceActor = ActorClass({
     }
 
     let localURI = resolveURIToLocalPath(nsuri);
+    if (!localURI) {
+      return;
+    }
 
-    let id = {};
-    if (localURI && mapURIToAddonID(localURI, id)) {
-      this._addonID = id.value;
+    let id = mapURIToAddonID(localURI);
+    if (!id) {
+      return;
+    }
+    this._addonID = id;
 
-      if (localURI instanceof Ci.nsIJARURI) {
-        // The path in the add-on is easy for jar: uris
-        this._addonPath = localURI.JAREntry;
+    if (localURI instanceof Ci.nsIJARURI) {
+      // The path in the add-on is easy for jar: uris
+      this._addonPath = localURI.JAREntry;
+    }
+    else if (localURI instanceof Ci.nsIFileURL) {
+      // For file: uris walk up to find the last directory that is part of the
+      // add-on
+      let target = localURI.file;
+      let path = target.leafName;
+
+      // We can assume that the directory containing the source file is part
+      // of the add-on
+      let root = target.parent;
+      let file = root.parent;
+      while (file && mapURIToAddonID(Services.io.newFileURI(file))) {
+        path = root.leafName + "/" + path;
+        root = file;
+        file = file.parent;
       }
-      else if (localURI instanceof Ci.nsIFileURL) {
-        // For file: uris walk up to find the last directory that is part of the
-        // add-on
-        let target = localURI.file;
-        let path = target.leafName;
 
-        // We can assume that the directory containing the source file is part
-        // of the add-on
-        let root = target.parent;
-        let file = root.parent;
-        while (file && mapURIToAddonID(Services.io.newFileURI(file), {})) {
-          path = root.leafName + "/" + path;
-          root = file;
-          file = file.parent;
-        }
-
-        if (!file) {
-          const error = new Error("Could not find the root of the add-on for " + this.url);
-          DevToolsUtils.reportException("SourceActor.prototype._mapSourceToAddon", error)
-          return;
-        }
-
-        this._addonPath = path;
+      if (!file) {
+        const error = new Error("Could not find the root of the add-on for " + this.url);
+        DevToolsUtils.reportException("SourceActor.prototype._mapSourceToAddon", error);
+        return;
       }
+
+      this._addonPath = path;
     }
   },
 
-  _reportLoadSourceError: function (error, map=null) {
+  _reportLoadSourceError: function (error, map = null) {
     try {
       DevToolsUtils.reportException("SourceActor", error);
 
@@ -394,7 +400,7 @@ let SourceActor = ActorClass({
    * Get all executable lines from the current source
    * @return Array - Executable lines of the current script
    **/
-  getExecutableLines: method(function () {
+  getExecutableLines: function () {
     function sortLines(lines) {
       // Converting the Set into an array
       lines = [...lines];
@@ -427,7 +433,7 @@ let SourceActor = ActorClass({
 
     let lines = this.getExecutableOffsets(this.source, true);
     return sortLines(lines);
-  }, { response: { lines: RetVal("json") } }),
+  },
 
   /**
    * Extract all executable offsets from the given script
@@ -435,9 +441,9 @@ let SourceActor = ActorClass({
    * @param Boolean onlyLine - will return only the line number
    * @return Set - Executable offsets/lines of the script
    **/
-  getExecutableOffsets: function  (source, onlyLine) {
+  getExecutableOffsets: function (source, onlyLine) {
     let offsets = new Set();
-    for (let s of this.threadActor.scripts.getScriptsBySource(source)) {
+    for (let s of this.dbg.findScripts({ source })) {
       for (let offset of s.getAllColumnOffsets()) {
         offsets.add(onlyLine ? offset.lineNumber : offset);
       }
@@ -449,7 +455,7 @@ let SourceActor = ActorClass({
   /**
    * Handler for the "source" packet.
    */
-  onSource: method(function () {
+  onSource: function () {
     return resolve(this._init)
       .then(this._getSourceText)
       .then(({ content, contentType }) => {
@@ -464,15 +470,12 @@ let SourceActor = ActorClass({
         throw new Error("Could not load the source for " + this.url + ".\n" +
                         DevToolsUtils.safeErrorString(aError));
       });
-  }, {
-    request: { type: "source" },
-    response: RetVal("json")
-  }),
+  },
 
   /**
    * Handler for the "prettyPrint" packet.
    */
-  prettyPrint: method(function (indent) {
+  prettyPrint: function (indent) {
     this.threadActor.sources.prettyPrint(this.url, indent);
     return this._getSourceText()
       .then(this._sendToPrettyPrintWorker(indent))
@@ -489,10 +492,7 @@ let SourceActor = ActorClass({
         this.disablePrettyPrint();
         throw new Error(DevToolsUtils.safeErrorString(error));
       });
-  }, {
-    request: { indent: Arg(0, "number") },
-    response: RetVal("json")
-  }),
+  },
 
   /**
    * Return a function that sends a request to the pretty print worker, waits on
@@ -512,7 +512,7 @@ let SourceActor = ActorClass({
         url: this.url,
         indent: aIndent,
         source: content
-      })
+      });
     };
   },
 
@@ -559,7 +559,7 @@ let SourceActor = ActorClass({
    * pretty printing a source mapped source, we need to compose the existing
    * source map with our new one.
    */
-  _encodeAndSetSourceMapURL: function  ({ map: sm }) {
+  _encodeAndSetSourceMapURL: function ({ map: sm }) {
     let source = this.generatedSource || this.source;
     let sources = this.threadActor.sources;
 
@@ -585,7 +585,7 @@ let SourceActor = ActorClass({
   /**
    * Handler for the "disablePrettyPrint" packet.
    */
-  disablePrettyPrint: method(function () {
+  disablePrettyPrint: function () {
     let source = this.generatedSource || this.source;
     let sources = this.threadActor.sources;
     let sm = sources.getSourceMap(source);
@@ -596,19 +596,17 @@ let SourceActor = ActorClass({
       sources.setSourceMapHard(source,
                                this._oldSourceMapping.url,
                                this._oldSourceMapping.map);
-       this._oldSourceMapping = null;
+      this._oldSourceMapping = null;
     }
 
     this.threadActor.sources.disablePrettyPrint(this.url);
     return this.onSource();
-  }, {
-    response: RetVal("json")
-  }),
+  },
 
   /**
    * Handler for the "blackbox" packet.
    */
-  blackbox: method(function () {
+  blackbox: function () {
     this.threadActor.sources.blackBox(this.url);
     if (this.threadActor.state == "paused"
         && this.threadActor.youngestFrame
@@ -616,14 +614,14 @@ let SourceActor = ActorClass({
       return true;
     }
     return false;
-  }, { response: { pausedInSource: RetVal("boolean") } }),
+  },
 
   /**
    * Handler for the "unblackbox" packet.
    */
-  unblackbox: method(function () {
+  unblackbox: function () {
     this.threadActor.sources.unblackBox(this.url);
-  }),
+  },
 
   /**
    * Handle a request to set a breakpoint.
@@ -635,7 +633,7 @@ let SourceActor = ActorClass({
    *          A promise that resolves to a JSON object representing the
    *          response.
    */
-  setBreakpoint: method(function (line, column, condition) {
+  setBreakpoint: function (line, column, condition) {
     if (this.threadActor.state !== "paused") {
       throw {
         error: "wrongState",
@@ -660,16 +658,7 @@ let SourceActor = ActorClass({
 
       return response;
     });
-  }, {
-    request: {
-      location: {
-        line: Arg(0, "number"),
-        column: Arg(1, "nullable:number")
-      },
-      condition: Arg(2, "nullable:string")
-    },
-    response: RetVal("json")
-  }),
+  },
 
   /**
    * Get or create a BreakpointActor for the given location in the original
@@ -728,10 +717,17 @@ let SourceActor = ActorClass({
         actor,
         GeneratedLocation.fromOriginalLocation(originalLocation)
       )) {
-        const scripts = this.scripts.getScriptsBySourceActorAndLine(
-          this,
-          originalLine
-        );
+        const query = { line: originalLine };
+        // For most cases, we have a real source to query for. The
+        // only time we don't is for HTML pages. In that case we want
+        // to query for scripts in an HTML page based on its URL, as
+        // there could be several sources within an HTML page.
+        if (this.source) {
+          query.source = this.source;
+        } else {
+          query.url = this.url;
+        }
+        const scripts = this.dbg.findScripts(query);
 
         // Never do breakpoint sliding for column breakpoints.
         // Additionally, never do breakpoint sliding if no scripts
@@ -846,11 +842,15 @@ let SourceActor = ActorClass({
       generatedLastColumn
     } = generatedLocation;
 
-    // Find all scripts that match the given source actor and line number.
-    let scripts = this.scripts.getScriptsBySourceActorAndLine(
-      generatedSourceActor,
-      generatedLine
-    );
+    // Find all scripts that match the given source actor and line
+    // number.
+    const query = { line: generatedLine };
+    if (generatedSourceActor.source) {
+      query.source = generatedSourceActor.source;
+    } else {
+      query.url = generatedSourceActor.url;
+    }
+    let scripts = this.dbg.findScripts(query);
 
     scripts = scripts.filter((script) => !actor.hasScript(script));
 
@@ -871,8 +871,8 @@ let SourceActor = ActorClass({
       for (let script of scripts) {
         let columnToOffsetMap = script.getAllColumnOffsets()
                                       .filter(({ lineNumber }) => {
-          return lineNumber === generatedLine;
-        });
+                                        return lineNumber === generatedLine;
+                                      });
         for (let { columnNumber: column, offset } of columnToOffsetMap) {
           if (column >= generatedColumn && column <= generatedLastColumn) {
             entryPoints.push({ script, offsets: [offset] });

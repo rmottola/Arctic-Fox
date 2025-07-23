@@ -18,8 +18,6 @@ body {
   -moz-box-orient: vertical;
   width: 100%;
   height: 100%;
-  background-image: url(chrome://browser/content/abouthome/noise.png),
-                    linear-gradient(hsla(0,0%,100%,.7), hsla(0,0%,100%,.4));
 }
 
 input,
@@ -77,8 +75,8 @@ a {
   -moz-box-flex: 1;
   padding-top: 6px;
   padding-bottom: 6px;
-  padding-left: 34px;
-  padding-right: 8px;
+  padding-inline-start: 34px;
+  padding-inline-end: 8px;
   background: hsla(0,0%,100%,.9) padding-box;
   border: 1px solid;
   border-radius: 2px 0 0 2px;
@@ -89,7 +87,7 @@ a {
   color: inherit;
 }
 
-#searchText:-moz-dir(rtl) {
+#searchText:dir(rtl) {
   border-radius: 0 2px 2px 0;
 }
 
@@ -97,7 +95,7 @@ a {
   border-radius: 2px 0 0 0;
 }
 
-#searchText[aria-expanded="true"]:-moz-dir(rtl) {
+#searchText[aria-expanded="true"]:dir(rtl) {
   border-radius: 0 2px 0 0;
 }
 
@@ -124,8 +122,9 @@ a {
   width: 50px;
 }
 
-#searchSubmit:-moz-dir(rtl) {
+#searchSubmit:dir(rtl) {
   border-radius: 2px 0 0 2px;
+  background-image: url("chrome://browser/skin/search-arrow-go.svg#search-arrow-go-rtl"), linear-gradient(hsla(0,0%,100%,.8), hsla(0,0%,100%,.1));
 }
 
 #searchText:focus + #searchSubmit,
@@ -139,18 +138,28 @@ a {
 #searchText:focus + #searchSubmit,
 #searchText[keepfocus] + #searchSubmit,
 #searchText[autofocus] + #searchSubmit {
-  background: url("chrome://browser/skin/search-arrow-go.svg#search-arrow-go-inverted") center center no-repeat, linear-gradient(#4cb1ff, #1793e5);
+  background-image: url("chrome://browser/skin/search-arrow-go.svg#search-arrow-go-inverted"), linear-gradient(#4cb1ff, #1793e5);
   box-shadow: 0 1px 0 hsla(0,0%,100%,.2) inset,
               0 0 0 1px hsla(0,0%,100%,.1) inset,
               0 1px 0 hsla(210,54%,20%,.03);
 }
 
+#searchText:focus + #searchSubmit:dir(rtl),
+#searchText[keepfocus] + #searchSubmit:dir(rtl),
+#searchText[autofocus] + #searchSubmit:dir(rtl) {
+  background-image: url("chrome://browser/skin/search-arrow-go.svg#search-arrow-go-rtl-inverted"), linear-gradient(#4cb1ff, #1793e5);
+}
+
 #searchText + #searchSubmit:hover {
-  background: url("chrome://browser/skin/search-arrow-go.svg#search-arrow-go-inverted") center center no-repeat, linear-gradient(#66bdff, #0d9eff);
+  background-image: url("chrome://browser/skin/search-arrow-go.svg#search-arrow-go-inverted"), linear-gradient(#66bdff, #0d9eff);
   box-shadow: 0 1px 0 hsla(0,0%,100%,.2) inset,
               0 0 0 1px hsla(0,0%,100%,.1) inset,
               0 1px 0 hsla(210,54%,20%,.03),
               0 0 4px hsla(206,100%,20%,.2);
+}
+
+#searchText + #searchSubmit:dir(rtl):hover {
+  background-image: url("chrome://browser/skin/search-arrow-go.svg#search-arrow-go-rtl-inverted"), linear-gradient(#66bdff, #0d9eff);
 }
 
 #searchText + #searchSubmit:hover:active {
@@ -173,9 +182,9 @@ a {
   display: none;
 }
 
-#defaultSnippet1:-moz-dir(rtl),
-#defaultSnippet2:-moz-dir(rtl),
-#rightsSnippet:-moz-dir(rtl) {
+#defaultSnippet1:dir(rtl),
+#defaultSnippet2:dir(rtl),
+#rightsSnippet:dir(rtl) {
   background-position: right 0 center;
 }
 
@@ -231,7 +240,7 @@ body[narrow] #launcher[session] {
   white-space: normal;
   background: transparent padding-box;
   border: 1px solid transparent;
-  border-radius: 2.5px;
+  border-radius: 2px;
   color: #525c66;
   font-size: 75%;
   cursor: pointer;
@@ -335,7 +344,7 @@ body[narrow] #restorePreviousSession {
   margin-inline-end: 8px;
 }
 
-#restorePreviousSession:-moz-dir(rtl)::before {
+#restorePreviousSession:dir(rtl)::before {
   transform: scaleX(-1);
 }
 
@@ -368,9 +377,15 @@ body[narrow] #restorePreviousSession::before {
     background-image: url("chrome://browser/content/abouthome/snippet2@2x.png");
   }
 
-  .launchButton::before {
+  .launchButton::before,
+  #aboutMozilla::before {
     transform: scale(.5);
     transform-origin: 0 0;
+  }
+
+  .launchButton:dir(rtl)::before,
+  #aboutMozilla:dir(rtl)::before {
+    transform: scale(.5) translateX(32px);
   }
 
   #downloads::before {
@@ -405,7 +420,7 @@ body[narrow] #restorePreviousSession::before {
     content: url("chrome://browser/content/abouthome/restore@2x.png");
   }
 
-  #restorePreviousSession:-moz-dir(rtl)::before {
+  #restorePreviousSession:dir(rtl)::before {
     transform: scale(-0.5, 0.5) translateX(24px);
     transform-origin: top center;
   }

@@ -3,7 +3,7 @@
 
 "use strict";
 
-const {utils: Cu} = Components;
+var {utils: Cu} = Components;
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
@@ -22,7 +22,7 @@ const ORIGINAL_SENDERROR = AboutServiceWorkers.sendError;
 
 do_get_profile();
 
-let mockSendResult = (aId, aResult) => {
+var mockSendResult = (aId, aResult) => {
   let msg = {
     id: aId,
     result: aResult
@@ -30,7 +30,7 @@ let mockSendResult = (aId, aResult) => {
   Services.obs.notifyObservers({wrappedJSObject: msg}, CHROME_MSG, null);
 };
 
-let mockSendError = (aId, aError) => {
+var mockSendError = (aId, aError) => {
   let msg = {
     id: aId,
     result: aError

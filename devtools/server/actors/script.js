@@ -15,15 +15,14 @@ const { FrameActor } = require("devtools/server/actors/frame");
 const { ObjectActor, createValueGrip, longStringGrip } = require("devtools/server/actors/object");
 const { SourceActor, getSourceURL } = require("devtools/server/actors/source");
 const { DebuggerServer } = require("devtools/server/main");
-const { ActorClass } = require("devtools/shared/protocol");
+const { ActorClassWithSpec } = require("devtools/shared/protocol");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const { assert, dumpn, update, fetch } = DevToolsUtils;
 const promise = require("promise");
-const PromiseDebugging = require("PromiseDebugging");
 const xpcInspector = require("xpcInspector");
-const ScriptStore = require("./utils/ScriptStore");
 const { DevToolsWorker } = require("devtools/shared/worker/worker");
 const object = require("sdk/util/object");
+const { threadSpec } = require("devtools/shared/specs/script");
 
 const { defer, resolve, reject, all } = promise;
 
@@ -32,7 +31,7 @@ loader.lazyGetter(this, "Debugger", () => {
   hackDebugger(Debugger);
   return Debugger;
 });
-loader.lazyRequireGetter(this, "CssLogic", "devtools/shared/inspector/css-logic", true);
+loader.lazyRequireGetter(this, "CssLogic", "devtools/server/css-logic", true);
 loader.lazyRequireGetter(this, "events", "sdk/event/core");
 loader.lazyRequireGetter(this, "mapURIToAddonID", "devtools/server/actors/utils/map-uri-to-addon-id");
 
@@ -100,11 +99,11 @@ BreakpointActorMap.prototype = {
     }
 
     for (let sourceActorID of findKeys(this._actors, query.sourceActorID))
-    for (let line of findKeys(this._actors[sourceActorID], query.line))
-    for (let beginColumn of findKeys(this._actors[sourceActorID][line], query.beginColumn))
-    for (let endColumn of findKeys(this._actors[sourceActorID][line][beginColumn], query.endColumn)) {
-      yield this._actors[sourceActorID][line][beginColumn][endColumn];
-    }
+      for (let line of findKeys(this._actors[sourceActorID], query.line))
+        for (let beginColumn of findKeys(this._actors[sourceActorID][line], query.beginColumn))
+          for (let endColumn of findKeys(this._actors[sourceActorID][line][beginColumn], query.endColumn)) {
+            yield this._actors[sourceActorID][line][beginColumn][endColumn];
+          }
   },
 
   /**
@@ -209,7 +208,7 @@ SourceActorStore.prototype = {
   /**
    * Lookup an existing actor id that represents this source, if available.
    */
-  getReusableActorId: function(aSource, aOriginalUrl) {
+  getReusableActorId: function (aSource, aOriginalUrl) {
     let url = this.getUniqueKey(aSource, aOriginalUrl);
     if (url && url in this._sourceActorIds) {
       return this._sourceActorIds[url];
@@ -220,7 +219,7 @@ SourceActorStore.prototype = {
   /**
    * Update a source with an actorID.
    */
-  setReusableActorId: function(aSource, aOriginalUrl, actorID) {
+  setReusableActorId: function (aSource, aOriginalUrl, actorID) {
     let url = this.getUniqueKey(aSource, aOriginalUrl);
     if (url) {
       this._sourceActorIds[url] = actorID;
@@ -230,7 +229,7 @@ SourceActorStore.prototype = {
   /**
    * Make a unique URL from a source that identifies it across reloads.
    */
-  getUniqueKey: function(aSource, aOriginalUrl) {
+  getUniqueKey: function (aSource, aOriginalUrl) {
     if (aOriginalUrl) {
       // Original source from a sourcemap.
       return aOriginalUrl;
@@ -279,7 +278,7 @@ EventLoopStack.prototype = {
     let url = null;
     if (this.size > 0) {
       try {
-        url = xpcInspector.lastNestRequestor.url
+        url = xpcInspector.lastNestRequestor.url;
       } catch (e) {
         // The tab's URL getter may throw if the tab is destroyed by the time
         // this code runs, but we don't really care at this point.
@@ -408,9 +407,7 @@ EventLoop.prototype = {
  *        An optional (for content debugging only) reference to the content
  *        window.
  */
-const ThreadActor = ActorClass({
-  typeName: "context",
-
+const ThreadActor = ActorClassWithSpec(threadSpec, {
   initialize: function (aParent, aGlobal) {
     this._state = "detached";
     this._frameActors = [];
@@ -493,14 +490,6 @@ const ThreadActor = ActorClass({
       this._threadLifetimePool.objectActors = new WeakMap();
     }
     return this._threadLifetimePool;
-  },
-
-  get scripts() {
-    if (!this._scripts) {
-      this._scripts = new ScriptStore();
-      this._scripts.addScripts(this.dbg.findScripts());
-    }
-    return this._scripts;
   },
 
   get sources() {
@@ -621,7 +610,7 @@ const ThreadActor = ActorClass({
     }
 
     this._state = "attached";
-    this._debuggerSourcesSeen = new Set();
+    this._debuggerSourcesSeen = new WeakSet();
 
     Object.assign(this._options, aRequest.options || {});
     this.sources.setOptions(this._options);
@@ -645,8 +634,6 @@ const ThreadActor = ActorClass({
         return { error: "notAttached" };
       }
       packet.why = { type: "attached" };
-
-      this._restoreBreakpoints();
 
       // Send the response to the attach request now (rather than
       // returning it), because we're going to start a nested event loop
@@ -682,7 +669,7 @@ const ThreadActor = ActorClass({
     }
     const options = aRequest.options || {};
 
-    if ('observeAsmJS' in options) {
+    if ("observeAsmJS" in options) {
       this.dbg.allowUnobservedAsmJS = !options.observeAsmJS;
     }
 
@@ -706,7 +693,7 @@ const ThreadActor = ActorClass({
    *        Hook to modify the packet before it is sent. Feel free to return a
    *        promise.
    */
-  _pauseAndRespond: function (aFrame, aReason, onPacket=function (k) { return k; }) {
+  _pauseAndRespond: function (aFrame, aReason, onPacket = function (k) { return k; }) {
     try {
       let packet = this._paused(aFrame);
       if (!packet) {
@@ -717,26 +704,26 @@ const ThreadActor = ActorClass({
       let generatedLocation = this.sources.getFrameLocation(aFrame);
       this.sources.getOriginalLocation(generatedLocation)
                   .then((originalLocation) => {
-        if (!originalLocation.originalSourceActor) {
+                    if (!originalLocation.originalSourceActor) {
           // The only time the source actor will be null is if there
           // was a sourcemap and it tried to look up the original
           // location but there was no original URL. This is a strange
           // scenario so we simply don't pause.
-          DevToolsUtils.reportException(
-            'ThreadActor',
-            new Error('Attempted to pause in a script with a sourcemap but ' +
-                      'could not find original location.')
+                      DevToolsUtils.reportException(
+            "ThreadActor",
+            new Error("Attempted to pause in a script with a sourcemap but " +
+                      "could not find original location.")
           );
 
-          return undefined;
-        }
+                      return undefined;
+                    }
 
-        packet.frame.where = {
-          source: originalLocation.originalSourceActor.form(),
-          line: originalLocation.originalLine,
-          column: originalLocation.originalColumn
-        };
-        resolve(onPacket(packet))
+                    packet.frame.where = {
+                      source: originalLocation.originalSourceActor.form(),
+                      line: originalLocation.originalLine,
+                      column: originalLocation.originalColumn
+                    };
+                    resolve(onPacket(packet))
           .then(null, error => {
             reportError(error);
             return {
@@ -747,10 +734,10 @@ const ThreadActor = ActorClass({
           .then(packet => {
             this.conn.send(packet);
           });
-      });
+                  });
 
       this._pushThreadPause();
-    } catch(e) {
+    } catch (e) {
       reportError(e, "Got an exception during TA__pauseAndRespond: ");
     }
 
@@ -758,22 +745,6 @@ const ThreadActor = ActorClass({
     // instead of continuing. Executing JS after the content window is gone is
     // a bad idea.
     return this._tabClosed ? null : undefined;
-  },
-
-  /**
-   * Handle resume requests that include a forceCompletion request.
-   *
-   * @param Object aRequest
-   *        The request packet received over the RDP.
-   * @returns A response packet.
-   */
-  _forceCompletion: function (aRequest) {
-    // TODO: remove this when Debugger.Frame.prototype.pop is implemented in
-    // bug 736733.
-    return {
-      error: "notImplemented",
-      message: "forced completion is not yet implemented."
-    };
   },
 
   _makeOnEnterFrame: function ({ pauseAndRespond }) {
@@ -893,7 +864,7 @@ const ThreadActor = ActorClass({
     // binding in each _makeOnX method, just do it once here and pass it
     // in to each function.
     const steppingHookState = {
-      pauseAndRespond: (aFrame, onPacket=k=>k) => {
+      pauseAndRespond: (aFrame, onPacket = k=>k) => {
         return this._pauseAndRespond(aFrame, { type: "resumeLimit" }, onPacket);
       },
       createValueGrip: v => createValueGrip(v, this._pausePool,
@@ -944,7 +915,7 @@ const ThreadActor = ActorClass({
             case "break":
             case "next":
               if (stepFrame.script) {
-                  stepFrame.onStep = onStep;
+                stepFrame.onStep = onStep;
               }
               stepFrame.onPop = onPop;
               break;
@@ -1028,13 +999,9 @@ const ThreadActor = ActorClass({
       };
     }
 
-    if (aRequest && aRequest.forceCompletion) {
-      return this._forceCompletion(aRequest);
-    }
-
     let resumeLimitHandled;
     if (aRequest && aRequest.resumeLimit) {
-      resumeLimitHandled = this._handleResumeLimit(aRequest)
+      resumeLimitHandled = this._handleResumeLimit(aRequest);
     } else {
       this._clearSteppingHooks(this.youngestFrame);
       resumeLimitHandled = resolve(true);
@@ -1077,7 +1044,7 @@ const ThreadActor = ActorClass({
    *        The promise we want to resolve.
    * @returns The promise's resolution.
    */
-  unsafeSynchronize: function(aPromise) {
+  unsafeSynchronize: function (aPromise) {
     let needNest = true;
     let eventLoop;
     let returnVal;
@@ -1107,7 +1074,7 @@ const ThreadActor = ActorClass({
   /**
    * Set the debugging hook to pause on exceptions if configured to do so.
    */
-  maybePauseOnExceptions: function() {
+  maybePauseOnExceptions: function () {
     if (this._options.pauseOnExceptions) {
       this.dbg.onExceptionUnwind = this.onExceptionUnwind.bind(this);
     }
@@ -1122,7 +1089,7 @@ const ThreadActor = ActorClass({
    * @param Event event
    *        The event that was fired.
    */
-  _allEventsListener: function(event) {
+  _allEventsListener: function (event) {
     if (this._pauseOnDOMEvents == "*" ||
         this._pauseOnDOMEvents.indexOf(event.type) != -1) {
       for (let listener of this._getAllEventListeners(event.target)) {
@@ -1141,7 +1108,7 @@ const ThreadActor = ActorClass({
    *        The target the event was dispatched on.
    * @returns Array
    */
-  _getAllEventListeners: function(eventTarget) {
+  _getAllEventListeners: function (eventTarget) {
     let els = Cc["@mozilla.org/eventlistenerservice;1"]
                 .getService(Ci.nsIEventListenerService);
 
@@ -1197,7 +1164,7 @@ const ThreadActor = ActorClass({
    * Set a breakpoint on the first line of the given script that has an entry
    * point.
    */
-  _breakOnEnter: function(script) {
+  _breakOnEnter: function (script) {
     let offsets = script.getAllOffsets();
     for (let line = 0, n = offsets.length; line < n; line++) {
       if (offsets[line]) {
@@ -1205,7 +1172,8 @@ const ThreadActor = ActorClass({
         // stored in the breakpoint actor map.
         let actor = new BreakpointActor(this);
         this.threadLifetimePool.addActor(actor);
-        let scripts = this.scripts.getScriptsBySourceAndLine(script.source, line);
+
+        let scripts = this.dbg.findScripts({ source: script.source, line: line });
         let entryPoints = findEntryPointsForLine(scripts, line);
         setBreakpointAtEntryPoints(actor, entryPoints);
         this._hiddenBreakpoints.set(actor.actorID, actor);
@@ -1281,7 +1249,7 @@ const ThreadActor = ActorClass({
     // Return request.count frames, or all remaining
     // frames if count is not defined.
     let promises = [];
-    for (; frame && (!count || i < (start + count)); i++, frame=frame.older) {
+    for (; frame && (!count || i < (start + count)); i++, frame = frame.older) {
       let form = this._createFrameActor(frame).form();
       form.depth = i;
 
@@ -1339,7 +1307,8 @@ const ThreadActor = ActorClass({
   _discoverSources: function () {
     // Only get one script per Debugger.Source.
     const sourcesToScripts = new Map();
-    const scripts = this.scripts.getAllScripts();
+    const scripts = this.dbg.findScripts();
+
     for (let i = 0, len = scripts.length; i < len; i++) {
       let s = scripts[i];
       if (s.source) {
@@ -1555,7 +1524,7 @@ const ThreadActor = ActorClass({
       let els = Cc["@mozilla.org/eventlistenerservice;1"]
                 .getService(Ci.nsIEventListenerService);
       els.removeListenerForAllEvents(this.global, this._allEventsListener, true);
-      for (let [,bp] of this._hiddenBreakpoints) {
+      for (let [, bp] of this._hiddenBreakpoints) {
         bp.delete();
       }
       this._hiddenBreakpoints.clear();
@@ -1899,7 +1868,7 @@ const ThreadActor = ActorClass({
       this.conn.send(packet);
 
       this._pushThreadPause();
-    } catch(e) {
+    } catch (e) {
       reportError(e, "Got an exception during TA_onExceptionUnwind: ");
     }
 
@@ -1945,19 +1914,6 @@ const ThreadActor = ActorClass({
   },
 
   /**
-   * Restore any pre-existing breakpoints to the sources that we have access to.
-   */
-  _restoreBreakpoints: function () {
-    if (this.breakpointActorMap.size === 0) {
-      return;
-    }
-
-    for (let s of this.scripts.getSources()) {
-      this._addSource(s);
-    }
-  },
-
-  /**
    * Add the provided source to the server cache.
    *
    * @param aSource Debugger.Source
@@ -1968,12 +1924,6 @@ const ThreadActor = ActorClass({
     if (!this.sources.allowSource(aSource) || this._debuggerSourcesSeen.has(aSource)) {
       return false;
     }
-
-    // The scripts must be added to the ScriptStore before restoring
-    // breakpoints. If we try to add them to the ScriptStore any later, we can
-    // accidentally set a breakpoint in a top level script as a "closest match"
-    // because we wouldn't have added the child scripts to the ScriptStore yet.
-    this.scripts.addScripts(this.dbg.findScripts({ source: aSource }));
 
     let sourceActor = this.sources.createNonSourceMappedActor(aSource);
     let bpActors = [...this.breakpointActorMap.findActors()];
@@ -2008,10 +1958,7 @@ const ThreadActor = ActorClass({
                                     .then((generatedLocations) => {
             if (generatedLocations.length > 0 &&
                 generatedLocations[0].generatedSourceActor.actorID === sourceActor.actorID) {
-              sourceActor._setBreakpointAtAllGeneratedLocations(
-                actor,
-                generatedLocations
-              );
+              sourceActor._setBreakpointAtAllGeneratedLocations(actor, generatedLocations);
             }
           }));
         }
@@ -2034,7 +1981,13 @@ const ThreadActor = ActorClass({
       // debugger, and carefully avoid the use of unsafeSynchronize in this
       // function when source maps are disabled.
       for (let actor of bpActors) {
-        actor.originalLocation.originalSourceActor._setBreakpoint(actor);
+        if (actor.isPending) {
+          actor.originalLocation.originalSourceActor._setBreakpoint(actor);
+        } else {
+          actor.originalLocation.originalSourceActor._setBreakpointAtGeneratedLocation(
+            actor, GeneratedLocation.fromOriginalLocation(actor.originalLocation)
+          );
+        }
       }
     }
 
@@ -2233,7 +2186,7 @@ function hackDebugger(Debugger) {
    * Override the toString method in order to get more meaningful script output
    * for debugging the debugger.
    */
-  Debugger.Script.prototype.toString = function() {
+  Debugger.Script.prototype.toString = function () {
     let output = "";
     if (this.url) {
       output += this.url;
@@ -2265,7 +2218,7 @@ function hackDebugger(Debugger) {
    */
   Object.defineProperty(Debugger.Frame.prototype, "line", {
     configurable: true,
-    get: function() {
+    get: function () {
       if (this.script) {
         return this.script.getOffsetLocation(this.offset).lineNumber;
       } else {
@@ -2344,12 +2297,12 @@ exports.AddonThreadActor = AddonThreadActor;
  *        An optional prefix for the reported error message.
  */
 var oldReportError = reportError;
-reportError = function(aError, aPrefix="") {
+reportError = function (aError, aPrefix = "") {
   assert(aError instanceof Error, "Must pass Error objects to reportError");
   let msg = aPrefix + aError.message + ":\n" + aError.stack;
   oldReportError(msg);
   dumpn(msg);
-}
+};
 
 /**
  * Find the scripts which contain offsets that are an entry point to the given

@@ -9,6 +9,7 @@
 var { Ci, Cu, Cc, components } = require("chrome");
 var Services = require("Services");
 var promise = require("promise");
+var defer = require("devtools/shared/defer");
 
 loader.lazyRequireGetter(this, "FileUtils",
                          "resource://gre/modules/FileUtils.jsm", true);
@@ -50,7 +51,7 @@ exports.executeSoon = function executeSoon(aFn) {
  *         A promise that is resolved after the next tick in the event loop.
  */
 exports.waitForTick = function waitForTick() {
-  let deferred = promise.defer();
+  let deferred = defer();
   exports.executeSoon(deferred.resolve);
   return deferred.promise;
 };
@@ -64,7 +65,7 @@ exports.waitForTick = function waitForTick() {
  *         A promise that is resolved after the specified amount of time passes.
  */
 exports.waitForTime = function waitForTime(aDelay) {
-  let deferred = promise.defer();
+  let deferred = defer();
   setTimeout(deferred.resolve, aDelay);
   return deferred.promise;
 };
@@ -85,7 +86,7 @@ exports.waitForTime = function waitForTime(aDelay) {
  *          over, and all promises returned by the aFn callback are resolved.
  */
 exports.yieldingEach = function yieldingEach(aArray, aFn) {
-  const deferred = promise.defer();
+  const deferred = defer();
 
   let i = 0;
   let len = aArray.length;
@@ -135,7 +136,7 @@ exports.defineLazyPrototypeGetter =
 function defineLazyPrototypeGetter(aObject, aKey, aCallback) {
   Object.defineProperty(aObject, aKey, {
     configurable: true,
-    get: function() {
+    get: function () {
       const value = aCallback.call(this);
 
       Object.defineProperty(this, aKey, {
@@ -147,7 +148,7 @@ function defineLazyPrototypeGetter(aObject, aKey, aCallback) {
       return value;
     }
   });
-}
+};
 
 /**
  * Safely get the property value from a Debugger.Object for a given key. Walks
@@ -194,7 +195,7 @@ exports.hasSafeGetter = function hasSafeGetter(aDesc) {
   try {
     let fn = aDesc.get.unwrap();
     return fn && fn.callable && fn.class == "Function" && fn.script === undefined;
-  } catch(e) {
+  } catch (e) {
     // Avoid exception 'Object in compartment marked as invisible to Debugger'
     return false;
   }
@@ -245,7 +246,7 @@ exports.dumpn.wantLogging = false;
 /**
  * A verbose logger for low-level tracing.
  */
-exports.dumpv = function(msg) {
+exports.dumpv = function (msg) {
   if (exports.dumpv.wantVerbose) {
     exports.dumpn(msg);
   }
@@ -400,7 +401,7 @@ exports.defineLazyGetter(this, "NetworkHelper", () => {
  * without relying on caching when we can (not for eval, etc.):
  * http://www.softwareishard.com/blog/firebug/nsitraceablechannel-intercept-http-traffic/
  */
-function mainThreadFetch(aURL, aOptions={ loadFromCache: true,
+function mainThreadFetch(aURL, aOptions = { loadFromCache: true,
                                           policy: Ci.nsIContentPolicy.TYPE_OTHER,
                                           window: null,
                                           charset: null,
@@ -435,7 +436,7 @@ function mainThreadFetch(aURL, aOptions={ loadFromCache: true,
                           .loadGroup;
   }
 
-  let deferred = promise.defer();
+  let deferred = defer();
   let onResponse = (stream, status, request) => {
     if (!components.isSuccessCode(status)) {
       deferred.reject(new Error(`Failed to fetch ${url}. Code ${status}.`));
@@ -529,18 +530,21 @@ function newChannelForURL(url, { policy, window, principal }) {
               securityFlags |= Ci.nsILoadInfo.SEC_FORCE_PRIVATE_BROWSING;
             }
           }
-        } catch(ex) {}
+        } catch (ex) {}
       }
     }
   }
 
   let channelOptions = {
     contentPolicyType: policy,
-    loadUsingSystemPrincipal: true,
     securityFlags: securityFlags,
     uri: url
   };
   if (principal) {
+    // contentPolicyType is required when loading with a custom principal
+    if (!channelOptions.contentPolicyType) {
+      channelOptions.contentPolicyType = Ci.nsIContentPolicy.TYPE_OTHER;
+    }
     channelOptions.loadingPrincipal = principal;
   } else {
     channelOptions.loadUsingSystemPrincipal = true;
@@ -590,11 +594,11 @@ if (!this.isWorker) {
  *         promise in the list of given promises to be rejected.
  */
 exports.settleAll = values => {
-  if (values === null || typeof(values[Symbol.iterator]) != "function") {
+  if (values === null || typeof (values[Symbol.iterator]) != "function") {
     throw new Error("settleAll() expects an iterable.");
   }
 
-  let deferred = promise.defer();
+  let deferred = defer();
 
   values = Array.isArray(values) ? values : [...values];
   let countdown = values.length;
@@ -633,7 +637,7 @@ exports.settleAll = values => {
       checkForCompletion();
     };
 
-    if (value && typeof(value.then) == "function") {
+    if (value && typeof (value.then) == "function") {
       value.then(resolver, rejecter);
     } else {
       // Given value is not a promise, forward it as a resolution value.
@@ -650,10 +654,10 @@ exports.settleAll = values => {
  */
 var testing = false;
 Object.defineProperty(exports, "testing", {
-  get: function() {
+  get: function () {
     return testing;
   },
-  set: function(state) {
+  set: function (state) {
     testing = state;
   }
 });

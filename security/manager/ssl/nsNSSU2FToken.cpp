@@ -17,7 +17,7 @@
 using namespace mozilla;
 using mozilla::dom::CreateECParamsForCurve;
 
-NS_IMPL_ISUPPORTS(nsNSSU2FToken, nsINSSU2FToken)
+NS_IMPL_ISUPPORTS(nsNSSU2FToken, nsIU2FToken, nsINSSU2FToken)
 
 // Not named "security.webauth.u2f_softtoken_counter" because setting that
 // name causes the window.u2f object to disappear until preferences get
@@ -84,9 +84,18 @@ nsNSSU2FToken::destructorSafeDestroyNSSReference()
   mWrappingKey = nullptr;
 }
 
+/**
+ * Gets the first key with the given nickname from the given slot. Any other
+ * keys found are not returned.
+ * PK11_GetNextSymKey() should not be called on the returned key.
+ *
+ * @param aSlot Slot to search.
+ * @param aNickname Nickname the key should have.
+ * @return The first key found. nullptr if no key could be found.
+ */
 static UniquePK11SymKey
 GetSymKeyByNickname(const UniquePK11SlotInfo& aSlot,
-                    nsCString aNickname,
+                    const nsCString& aNickname,
                     const nsNSSShutDownPreventionLock&)
 {
   MOZ_ASSERT(aSlot);
@@ -97,25 +106,27 @@ GetSymKeyByNickname(const UniquePK11SlotInfo& aSlot,
   MOZ_LOG(gNSSTokenLog, LogLevel::Debug,
           ("Searching for a symmetric key named %s", aNickname.get()));
 
-  PK11SymKey* keyList;
-  keyList = PK11_ListFixedKeysInSlot(aSlot.get(),
-                                     const_cast<char*>(aNickname.get()),
-                                     /* wincx */ nullptr);
-  while (keyList) {
-    UniquePK11SymKey freeKey(keyList);
-
-    UniquePORTString freeKeyName(PK11_GetSymKeyNickname(freeKey.get()));
-
-    if (aNickname == freeKeyName.get()) {
-      MOZ_LOG(gNSSTokenLog, LogLevel::Debug, ("Symmetric key found!"));
-      return freeKey;
-    }
-
-    keyList = PK11_GetNextSymKey(keyList);
+  UniquePK11SymKey keyListHead(
+    PK11_ListFixedKeysInSlot(aSlot.get(), const_cast<char*>(aNickname.get()),
+                             /* wincx */ nullptr));
+  if (!keyListHead) {
+    MOZ_LOG(gNSSTokenLog, LogLevel::Debug, ("Symmetric key not found."));
+    return nullptr;
   }
 
-  MOZ_LOG(gNSSTokenLog, LogLevel::Debug, ("Symmetric key not found."));
-  return nullptr;
+  // Sanity check PK11_ListFixedKeysInSlot() only returns keys with the correct
+  // nickname.
+  MOZ_ASSERT(aNickname ==
+               UniquePORTString(PK11_GetSymKeyNickname(keyListHead.get())).get());
+  MOZ_LOG(gNSSTokenLog, LogLevel::Debug, ("Symmetric key found!"));
+
+  // Free any remaining keys in the key list.
+  UniquePK11SymKey freeKey(PK11_GetNextSymKey(keyListHead.get()));
+  while (freeKey) {
+    freeKey = UniquePK11SymKey(PK11_GetNextSymKey(freeKey.get()));
+  }
+
+  return keyListHead;
 }
 
 static nsresult
@@ -592,13 +603,8 @@ nsNSSU2FToken::Register(uint8_t* aApplication,
   signedDataBuf.AppendSECItem(keyHandleItem.get());
   signedDataBuf.AppendSECItem(pubKey->u.ec.publicValue);
 
-  UniqueSECItem signatureItem(::SECITEM_AllocItem(/* default arena */ nullptr,
-                                                  /* no buffer */ nullptr, 0));
-  if (!signatureItem) {
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
-
-  SECStatus srv = SEC_SignData(signatureItem.get(), signedDataBuf.Elements(),
+  ScopedAutoSECItem signatureItem;
+  SECStatus srv = SEC_SignData(&signatureItem, signedDataBuf.Elements(),
                                signedDataBuf.Length(), attestPrivKey.get(),
                                SEC_OID_ANSIX962_ECDSA_SHA256_SIGNATURE);
   if (srv != SECSuccess) {
@@ -611,7 +617,7 @@ nsNSSU2FToken::Register(uint8_t* aApplication,
   mozilla::dom::CryptoBuffer registrationBuf;
   if (!registrationBuf.SetCapacity(1 + kPublicKeyLen + 1 + keyHandleItem->len +
                                    attestCert.get()->derCert.len +
-                                   signatureItem->len, mozilla::fallible)) {
+                                   signatureItem.len, mozilla::fallible)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
   registrationBuf.AppendElement(0x05, mozilla::fallible);
@@ -619,7 +625,7 @@ nsNSSU2FToken::Register(uint8_t* aApplication,
   registrationBuf.AppendElement(keyHandleItem->len, mozilla::fallible);
   registrationBuf.AppendSECItem(keyHandleItem.get());
   registrationBuf.AppendSECItem(attestCert.get()->derCert);
-  registrationBuf.AppendSECItem(signatureItem.get());
+  registrationBuf.AppendSECItem(signatureItem);
   if (!registrationBuf.ToNewUnsignedBuffer(aRegistration, aRegistrationLen)) {
     return NS_ERROR_FAILURE;
   }
@@ -716,13 +722,8 @@ nsNSSU2FToken::Sign(uint8_t* aApplication, uint32_t aApplicationLen,
   signedDataBuf.AppendSECItem(counterItem);
   signedDataBuf.AppendElements(aChallenge, aChallengeLen, mozilla::fallible);
 
-  UniqueSECItem signatureItem(::SECITEM_AllocItem(/* default arena */ nullptr,
-                                                  /* no buffer */ nullptr, 0));
-  if (!signatureItem) {
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
-
-  SECStatus srv = SEC_SignData(signatureItem.get(), signedDataBuf.Elements(),
+  ScopedAutoSECItem signatureItem;
+  SECStatus srv = SEC_SignData(&signatureItem, signedDataBuf.Elements(),
                                signedDataBuf.Length(), privKey.get(),
                                SEC_OID_ANSIX962_ECDSA_SHA256_SIGNATURE);
   if (srv != SECSuccess) {
@@ -733,7 +734,7 @@ nsNSSU2FToken::Sign(uint8_t* aApplication, uint32_t aApplicationLen,
 
   // Assemble the signature data into a buffer for return
   mozilla::dom::CryptoBuffer signatureBuf;
-  if (!signatureBuf.SetCapacity(1 + counterItem.len + signatureItem->len,
+  if (!signatureBuf.SetCapacity(1 + counterItem.len + signatureItem.len,
                                 mozilla::fallible)) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -742,7 +743,7 @@ nsNSSU2FToken::Sign(uint8_t* aApplication, uint32_t aApplicationLen,
   // pre-allocated space
   signatureBuf.AppendElement(0x01, mozilla::fallible);
   signatureBuf.AppendSECItem(counterItem);
-  signatureBuf.AppendSECItem(signatureItem.get());
+  signatureBuf.AppendSECItem(signatureItem);
 
   if (!signatureBuf.ToNewUnsignedBuffer(aSignature, aSignatureLen)) {
     return NS_ERROR_FAILURE;

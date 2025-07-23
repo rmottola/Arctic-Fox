@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import copy
 import errno
 import os
 import subprocess
@@ -81,6 +82,7 @@ class ConfigureTestSandbox(ConfigureSandbox):
             environ['CONFIG_SHELL'] = mozpath.abspath('/bin/sh')
             self._subprocess_paths[environ['CONFIG_SHELL']] = self.shell
             paths.append(environ['CONFIG_SHELL'])
+        self._environ = copy.copy(environ)
 
         vfs = ConfigureTestVFS(paths)
 
@@ -111,10 +113,50 @@ class ConfigureTestSandbox(ConfigureSandbox):
                 CalledProcessError=subprocess.CalledProcessError,
                 check_output=self.check_output,
                 PIPE=subprocess.PIPE,
+                STDOUT=subprocess.STDOUT,
                 Popen=self.Popen,
             )
 
+        if what == 'os.environ':
+            return self._environ
+
+        if what == 'ctypes.wintypes':
+            return ReadOnlyNamespace(
+                LPCWSTR=0,
+                LPWSTR=1,
+                DWORD=2,
+            )
+
+        if what == 'ctypes':
+            class CTypesFunc(object):
+                def __init__(self, func):
+                    self._func = func
+
+                def __call__(self, *args, **kwargs):
+                    return self._func(*args, **kwargs)
+
+
+            return ReadOnlyNamespace(
+                create_unicode_buffer=self.create_unicode_buffer,
+                windll=ReadOnlyNamespace(
+                    kernel32=ReadOnlyNamespace(
+                        GetShortPathNameW=CTypesFunc(self.GetShortPathNameW),
+                    )
+                ),
+            )
+
         return super(ConfigureTestSandbox, self)._get_one_import(what)
+
+    def create_unicode_buffer(self, *args, **kwargs):
+        class Buffer(object):
+            def __init__(self):
+                self.value = ''
+
+        return Buffer()
+
+    def GetShortPathNameW(self, path_in, path_out, length):
+        path_out.value = path_in
+        return length
 
     def which(self, command, path=None):
         for parent in (path or self._search_path):
@@ -142,8 +184,8 @@ class ConfigureTestSandbox(ConfigureSandbox):
 
         return Process()
 
-    def check_output(self, args):
-        proc = self.Popen(args)
+    def check_output(self, args, **kwargs):
+        proc = self.Popen(args, **kwargs)
         stdout, stderr = proc.communicate()
         retcode = proc.wait()
         if retcode:

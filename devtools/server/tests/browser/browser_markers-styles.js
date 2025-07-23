@@ -5,10 +5,10 @@
  * Test that we get "Styles" markers with correct meta.
  */
 
-const { PerformanceFront } = require("devtools/server/actors/performance");
+const { PerformanceFront } = require("devtools/shared/fronts/performance");
 const MARKER_NAME = "Styles";
 
-add_task(function*() {
+add_task(function* () {
   let browser = yield addTab(MAIN_DOMAIN + "doc_perf.html");
   let doc = browser.contentDocument;
 

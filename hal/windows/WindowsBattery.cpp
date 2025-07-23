@@ -11,6 +11,7 @@
 #include "nsComponentManagerUtils.h"
 
 #include <windows.h>
+#include "mozilla/WindowsVersion.h"
 
 using namespace mozilla::dom::battery;
 
@@ -25,6 +26,23 @@ static decltype(UnregisterPowerSettingNotification)* sUnregisterPowerSettingNoti
 static HPOWERNOTIFY sPowerHandle = nullptr;
 static HPOWERNOTIFY sCapacityHandle = nullptr;
 static HWND sHWnd = nullptr;
+
+static void
+UpdateHandler(nsITimer* aTimer, void* aClosure) {
+  NS_ASSERTION(!IsVistaOrLater(),
+               "We shouldn't call this function for Vista or later version!");
+
+  static hal::BatteryInformation sLastInfo;
+  hal::BatteryInformation currentInfo;
+
+  hal_impl::GetCurrentBatteryInformation(&currentInfo);
+  if (sLastInfo.level() != currentInfo.level() ||
+      sLastInfo.charging() != currentInfo.charging() ||
+      sLastInfo.remainingTime() != currentInfo.remainingTime()) {
+    hal::NotifyBatteryChange(currentInfo);
+    sLastInfo = currentInfo;
+  }
+}
 
 static
 LRESULT CALLBACK
@@ -45,71 +63,94 @@ BatteryWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 void
 EnableBatteryNotifications()
 {
-  HMODULE hUser32 = GetModuleHandleW(L"USER32.DLL");
-  if (!sRegisterPowerSettingNotification)
-    sRegisterPowerSettingNotification = (decltype(RegisterPowerSettingNotification)*)
-      GetProcAddress(hUser32, "RegisterPowerSettingNotification");
-  if (!sUnregisterPowerSettingNotification)
-    sUnregisterPowerSettingNotification = (decltype(UnregisterPowerSettingNotification)*)
-      GetProcAddress(hUser32, "UnregisterPowerSettingNotification");
+  if (IsVistaOrLater()) {
+    // RegisterPowerSettingNotification is from Vista or later.
+    // Use this API if available.
+    HMODULE hUser32 = GetModuleHandleW(L"USER32.DLL");
+    if (!sRegisterPowerSettingNotification)
+      sRegisterPowerSettingNotification = (decltype(RegisterPowerSettingNotification)*)
+        GetProcAddress(hUser32, "RegisterPowerSettingNotification");
+    if (!sUnregisterPowerSettingNotification)
+      sUnregisterPowerSettingNotification = (decltype(UnregisterPowerSettingNotification)*)
+        GetProcAddress(hUser32, "UnregisterPowerSettingNotification");
 
-  if (!sRegisterPowerSettingNotification ||
-      !sUnregisterPowerSettingNotification) {
-    NS_ASSERTION(false, "Canot find PowerSettingNotification functions.");
-    return;
-  }
-
-  // Create custom window to watch battery event
-  // If we can get Gecko's window handle, this is unnecessary.
-
-  if (sHWnd == nullptr) {
-    WNDCLASSW wc;
-    HMODULE hSelf = GetModuleHandle(nullptr);
-
-    if (!GetClassInfoW(hSelf, L"MozillaBatteryClass", &wc)) {
-      ZeroMemory(&wc, sizeof(WNDCLASSW));
-      wc.hInstance = hSelf;
-      wc.lpfnWndProc = BatteryWindowProc;
-      wc.lpszClassName = L"MozillaBatteryClass";
-      RegisterClassW(&wc);
+    if (!sRegisterPowerSettingNotification ||
+        !sUnregisterPowerSettingNotification) {
+      NS_ASSERTION(false, "Canot find PowerSettingNotification functions.");
+      return;
     }
 
-    sHWnd = CreateWindowW(L"MozillaBatteryClass", L"Battery Watcher",
-                          0, 0, 0, 0, 0,
-                          nullptr, nullptr, hSelf, nullptr);
-  }
+    // Create custom window to watch battery event
+    // If we can get Gecko's window handle, this is unnecessary.
 
-  if (sHWnd == nullptr) {
-    // Couldn't get window; bail.
-    return;
-  }
+    if (sHWnd == nullptr) {
+      WNDCLASSW wc;
+      HMODULE hSelf = GetModuleHandle(nullptr);
 
-  sPowerHandle =
-    sRegisterPowerSettingNotification(sHWnd,
-                                      &GUID_ACDC_POWER_SOURCE,
-                                      DEVICE_NOTIFY_WINDOW_HANDLE);
-  sCapacityHandle =
-    sRegisterPowerSettingNotification(sHWnd,
-                                      &GUID_BATTERY_PERCENTAGE_REMAINING,
-                                      DEVICE_NOTIFY_WINDOW_HANDLE);
+      if (!GetClassInfoW(hSelf, L"MozillaBatteryClass", &wc)) {
+        ZeroMemory(&wc, sizeof(WNDCLASSW));
+        wc.hInstance = hSelf;
+        wc.lpfnWndProc = BatteryWindowProc;
+        wc.lpszClassName = L"MozillaBatteryClass";
+        RegisterClassW(&wc);
+      }
+
+      sHWnd = CreateWindowW(L"MozillaBatteryClass", L"Battery Watcher",
+                            0, 0, 0, 0, 0,
+                            nullptr, nullptr, hSelf, nullptr);
+    }
+
+    if (sHWnd == nullptr) {
+      return;
+    }
+
+    sPowerHandle =
+      sRegisterPowerSettingNotification(sHWnd,
+                                        &GUID_ACDC_POWER_SOURCE,
+                                        DEVICE_NOTIFY_WINDOW_HANDLE);
+    sCapacityHandle =
+      sRegisterPowerSettingNotification(sHWnd,
+                                        &GUID_BATTERY_PERCENTAGE_REMAINING,
+                                        DEVICE_NOTIFY_WINDOW_HANDLE);
+  } else
+  {
+    // for Windows XP.  If we remove Windows XP support,
+    // we should remove timer-based power notification
+    sUpdateTimer = do_CreateInstance(NS_TIMER_CONTRACTID);
+    if (sUpdateTimer) {
+      sUpdateTimer->InitWithFuncCallback(UpdateHandler,
+                                         nullptr,
+                                         Preferences::GetInt("dom.battery.timer",
+                                                             30000 /* 30s */),
+                                         nsITimer::TYPE_REPEATING_SLACK);
+    } 
+  }
 }
 
 void
 DisableBatteryNotifications()
 {
-  if (sPowerHandle) {
-    sUnregisterPowerSettingNotification(sPowerHandle);
-    sPowerHandle = nullptr;
-  }
+  if (IsVistaOrLater()) {
+    if (sPowerHandle) {
+      sUnregisterPowerSettingNotification(sPowerHandle);
+      sPowerHandle = nullptr;
+    }
 
-  if (sCapacityHandle) {
-    sUnregisterPowerSettingNotification(sCapacityHandle);
-    sCapacityHandle = nullptr;
-  }
+    if (sCapacityHandle) {
+      sUnregisterPowerSettingNotification(sCapacityHandle);
+      sCapacityHandle = nullptr;
+    }
 
-  if (sHWnd) {
-    DestroyWindow(sHWnd);
-    sHWnd = nullptr;
+    if (sHWnd) {
+      DestroyWindow(sHWnd);
+      sHWnd = nullptr;
+    }
+  } else
+  {
+    if (sUpdateTimer) {
+      sUpdateTimer->Cancel();
+      sUpdateTimer = nullptr;
+    }
   }
 }
 

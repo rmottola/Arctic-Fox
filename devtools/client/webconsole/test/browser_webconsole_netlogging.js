@@ -1,11 +1,14 @@
-/* vim:set ts=2 sw=2 sts=2 et: */
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
+/* Any copyright is dedicated to the Public Domain.
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
 // Tests response logging for different request types.
 
 "use strict";
+
+// This test runs very slowly on linux32 debug - bug 1269977
+requestLongerTimeout(2);
 
 const TEST_NETWORK_REQUEST_URI =
   "http://example.com/browser/devtools/client/webconsole/test/" +
@@ -13,6 +16,12 @@ const TEST_NETWORK_REQUEST_URI =
 
 const TEST_DATA_JSON_CONTENT =
   '{ id: "test JSON data", myArray: [ "foo", "bar", "baz", "biff" ] }';
+
+const PAGE_REQUEST_PREDICATE =
+  ({ request }) => request.url.endsWith("test-network-request.html");
+
+const TEST_DATA_REQUEST_PREDICATE =
+  ({ request }) => request.url.endsWith("test-data.json");
 
 add_task(function* testPageLoad() {
   // Enable logging in the UI.  Not needed to pass test but makes it easier
@@ -49,7 +58,7 @@ add_task(function* testPageLoad() {
 add_task(function* testXhrGet() {
   let hud = yield loadPageAndGetHud(TEST_NETWORK_REQUEST_URI);
 
-  let finishedRequest = waitForFinishedRequest();
+  let finishedRequest = waitForFinishedRequest(TEST_DATA_REQUEST_PREDICATE);
   content.wrappedJSObject.testXhrGet();
   let request = yield finishedRequest;
 
@@ -73,7 +82,7 @@ add_task(function* testXhrGet() {
 add_task(function* testXhrPost() {
   let hud = yield loadPageAndGetHud(TEST_NETWORK_REQUEST_URI);
 
-  let finishedRequest = waitForFinishedRequest();
+  let finishedRequest = waitForFinishedRequest(TEST_DATA_REQUEST_PREDICATE);
   content.wrappedJSObject.testXhrPost();
   let request = yield finishedRequest;
 
@@ -93,9 +102,14 @@ add_task(function* testXhrPost() {
 });
 
 add_task(function* testFormSubmission() {
+  let pageLoadRequestFinished = waitForFinishedRequest(PAGE_REQUEST_PREDICATE);
   let hud = yield loadPageAndGetHud(TEST_NETWORK_REQUEST_URI);
 
-  let finishedRequest = waitForFinishedRequest();
+  info("Waiting for the page load to be finished.");
+  yield pageLoadRequestFinished;
+
+  // The form POSTs to the page URL but over https (page over http).
+  let finishedRequest = waitForFinishedRequest(PAGE_REQUEST_PREDICATE);
   ContentTask.spawn(gBrowser.selectedBrowser, { }, `function()
   {
     let form = content.document.querySelector("form");

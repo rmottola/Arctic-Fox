@@ -104,6 +104,7 @@ nsURLFormatterService.prototype = {
     NAME:             function() { return this.appInfo.name; },
     ID:               function() { return this.appInfo.ID; },
     VERSION:          function() { return this.appInfo.version; },
+    MAJOR_VERSION:    function() { return this.appInfo.version.replace(/^([^\.]+\.[0-9]+[a-z]*).*/gi, "$1"); },
     APPBUILDID:       function() { return this.appInfo.appBuildID; },
     PLATFORMVERSION:  function() { return this.appInfo.platformVersion; },
     PLATFORMBUILDID:  function() { return this.appInfo.platformBuildID; },
@@ -160,8 +161,8 @@ nsURLFormatterService.prototype = {
 
   trimSensitiveURLs: function uf_trimSensitiveURLs(aMsg) {
     // Only the google API key is sensitive for now.
-    return "@MOZ_GOOGLE_API_KEY@" ? aMsg.replace("@MOZ_GOOGLE_API_KEY@",
-                                                 "[trimmed-google-api-key]", "g")
+    return "@MOZ_GOOGLE_API_KEY@" ? aMsg.replace(/@MOZ_GOOGLE_API_KEY@/g,
+                                                 "[trimmed-google-api-key]")
                                   : aMsg;
   }
 };

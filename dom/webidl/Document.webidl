@@ -253,15 +253,25 @@ partial interface Document {
   attribute EventHandler onfullscreenerror;
 };
 
-// http://dvcs.w3.org/hg/pointerlock/raw-file/default/index.html#extensions-to-the-document-interface
+// https://w3c.github.io/pointerlock/#extensions-to-the-document-interface
+// https://w3c.github.io/pointerlock/#extensions-to-the-documentorshadowroot-mixin
 partial interface Document {
-    readonly attribute Element? mozPointerLockElement;
-    void mozExitPointerLock ();
+  readonly attribute Element? pointerLockElement;
+  [BinaryName="pointerLockElement", Pref="pointer-lock-api.prefixed.enabled"]
+  readonly attribute Element? mozPointerLockElement;
+  void exitPointerLock();
+  [BinaryName="exitPointerLock", Pref="pointer-lock-api.prefixed.enabled"]
+  void mozExitPointerLock();
+
+  // Event handlers
+  attribute EventHandler onpointerlockchange;
+  attribute EventHandler onpointerlockerror;
 };
 
 //http://dvcs.w3.org/hg/webcomponents/raw-file/tip/spec/custom/index.html#dfn-document-register
 partial interface Document {
-    [Throws, Func="nsDocument::IsWebComponentsEnabled"]
+    // this is deprecated from CustomElements v0
+    [Throws, Func="CustomElementsRegistry::IsCustomElementsEnabled"]
     object registerElement(DOMString name, optional ElementRegistrationOptions options);
 };
 

@@ -4,20 +4,26 @@
 
 "use strict";
 
-var {Cu, Cc, Ci} = require("chrome");
+var { Cu, Cc, Ci } = require("chrome");
 
-Cu.import("resource://gre/modules/NetUtil.jsm");
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/osfile.jsm");
-Cu.import("resource://gre/modules/FileUtils.jsm");
-Cu.import("resource://gre/modules/UserCustomizations.jsm");
-Cu.importGlobalProperties(["FileReader"]);
+var { NetUtil } = require("resource://gre/modules/NetUtil.jsm");
+var { OS } = require("resource://gre/modules/osfile.jsm");
+var { FileUtils } = require("resource://gre/modules/FileUtils.jsm");
 
 var promise = require("promise");
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 var { ActorPool } = require("devtools/server/actors/common");
 var { DebuggerServer } = require("devtools/server/main");
 var Services = require("Services");
+var FileReader = require("FileReader");
+
+// Load actor dependencies lazily as this actor require extra environnement
+// preparation to work (like have a profile setup in xpcshell tests)
+loader.lazyRequireGetter(this, "DOMApplicationRegistry", "resource://gre/modules/Webapps.jsm", true);
+loader.lazyRequireGetter(this, "AppsUtils", "resource://gre/modules/AppsUtils.jsm", true);
+loader.lazyRequireGetter(this, "ManifestHelper", "resource://gre/modules/AppsUtils.jsm", true);
+loader.lazyRequireGetter(this, "MessageBroadcaster", "resource://gre/modules/MessageBroadcaster.jsm", true);
+loader.lazyRequireGetter(this, "UserCustomizations", "resource://gre/modules/UserCustomizations.jsm", true);
 
 // Comma separated list of permissions that a sideloaded app can't ask for
 const UNSAFE_PERMISSIONS = Services.prefs.getCharPref("devtools.apps.forbidden-permissions");
@@ -35,7 +41,7 @@ DevToolsUtils.defineLazyGetter(this, "Frames", () => {
   }
   try {
     return Cu.import("resource://gre/modules/Frames.jsm", {}).Frames;
-  } catch(e) {}
+  } catch (e) {}
   return null;
 });
 
@@ -52,7 +58,7 @@ function PackageUploadActor(file) {
   this._path = file.path;
 }
 
-PackageUploadActor.fromRequest = function(request, file) {
+PackageUploadActor.fromRequest = function (request, file) {
   if (request.bulk) {
     return new PackageUploadBulkActor(file);
   }
@@ -90,10 +96,10 @@ PackageUploadActor.prototype = {
   _cleanupFile: function () {
     try {
       this._closeFile();
-    } catch(e) {}
+    } catch (e) {}
     try {
       OS.File.remove(this._path);
-    } catch(e) {}
+    } catch (e) {}
   }
 
 };
@@ -111,11 +117,11 @@ PackageUploadJSONActor.prototype = Object.create(PackageUploadActor.prototype);
 
 PackageUploadJSONActor.prototype.actorPrefix = "packageUploadJSONActor";
 
-PackageUploadJSONActor.prototype._openFile = function() {
+PackageUploadJSONActor.prototype._openFile = function () {
   return OS.File.open(this._path, { write: true, truncate: true });
 };
 
-PackageUploadJSONActor.prototype._closeFile = function() {
+PackageUploadJSONActor.prototype._closeFile = function () {
   this.openedFile.then(file => file.close());
 };
 
@@ -123,7 +129,7 @@ PackageUploadJSONActor.prototype._closeFile = function() {
  * This method allows you to upload a piece of file.
  * It expects a chunk argument that is the a string to write to the file.
  */
-PackageUploadJSONActor.prototype.chunk = function(aRequest) {
+PackageUploadJSONActor.prototype.chunk = function (aRequest) {
   let chunk = aRequest.chunk;
   if (!chunk || chunk.length <= 0) {
     return {error: "parameterError",
@@ -132,7 +138,7 @@ PackageUploadJSONActor.prototype.chunk = function(aRequest) {
   // Translate the string used to transfer the chunk over JSON
   // back to a typed array
   let data = new Uint8Array(chunk.length);
-  for (let i = 0, l = chunk.length; i < l ; i++) {
+  for (let i = 0, l = chunk.length; i < l; i++) {
     data[i] = chunk.charCodeAt(i);
   }
   return this.openedFile
@@ -152,7 +158,7 @@ PackageUploadJSONActor.prototype.chunk = function(aRequest) {
  * Otherwise, the file may be partially written
  * and also be locked.
  */
-PackageUploadJSONActor.prototype.done = function() {
+PackageUploadJSONActor.prototype.done = function () {
   this._closeFile();
   return {};
 };
@@ -178,15 +184,15 @@ PackageUploadBulkActor.prototype = Object.create(PackageUploadActor.prototype);
 
 PackageUploadBulkActor.prototype.actorPrefix = "packageUploadBulkActor";
 
-PackageUploadBulkActor.prototype._openFile = function() {
+PackageUploadBulkActor.prototype._openFile = function () {
   return FileUtils.openSafeFileOutputStream(this._file);
 };
 
-PackageUploadBulkActor.prototype._closeFile = function() {
+PackageUploadBulkActor.prototype._closeFile = function () {
   FileUtils.closeSafeFileOutputStream(this.openedFile);
 };
 
-PackageUploadBulkActor.prototype.stream = function({copyTo}) {
+PackageUploadBulkActor.prototype.stream = function ({copyTo}) {
   return copyTo(this.openedFile).then(() => {
     this._closeFile();
     return {};
@@ -207,14 +213,6 @@ PackageUploadBulkActor.prototype.requestTypes = {
  */
 function WebappsActor(aConnection) {
   debug("init");
-  // Load actor dependencies lazily as this actor require extra environnement
-  // preparation to work (like have a profile setup in xpcshell tests)
-
-  Cu.import("resource://gre/modules/Webapps.jsm");
-  Cu.import("resource://gre/modules/AppsUtils.jsm");
-  Cu.import("resource://gre/modules/FileUtils.jsm");
-  Cu.import("resource://gre/modules/MessageBroadcaster.jsm");
-
   this.appsChild = {};
   Cu.import("resource://gre/modules/AppsServiceChild.jsm", this.appsChild);
 
@@ -240,7 +238,7 @@ WebappsActor.prototype = {
   disconnect: function () {
     try {
       this.unwatchApps();
-    } catch(e) {}
+    } catch (e) {}
 
     // When we stop using this actor, we should ensure removing all files.
     for (let upload of this._uploads) {
@@ -357,7 +355,7 @@ WebappsActor.prototype = {
     return type;
   },
 
-  _createTmpPackage: function() {
+  _createTmpPackage: function () {
     let tmpDir = FileUtils.getDir("TmpD", ["file-upload"], true, false);
     if (!tmpDir.exists() || !tmpDir.isDirectory()) {
       return {
@@ -429,10 +427,10 @@ WebappsActor.prototype = {
       let metaFile = OS.Path.join(aDir.path, "metadata.json");
       return AppsUtils.loadJSONAsync(metaFile).then((aMetadata) => {
         if (!aMetadata) {
-          throw("Error parsing metadata.json.");
+          throw ("Error parsing metadata.json.");
         }
         if (!aMetadata.origin) {
-          throw("Missing 'origin' property in metadata.json.");
+          throw ("Missing 'origin' property in metadata.json.");
         }
         return { metadata: aMetadata, appType: aAppType };
       });
@@ -462,12 +460,12 @@ WebappsActor.prototype = {
             }, function (error) {
               self._sendError(deferred, error, aId);
             });
-        } catch(e) {
+        } catch (e) {
           // If anything goes wrong, just send it back.
           self._sendError(deferred, e.toString(), aId);
         }
       }
-    }
+    };
 
     Services.tm.currentThread.dispatch(runnable,
                                        Ci.nsIThread.DISPATCH_NORMAL);
@@ -513,7 +511,7 @@ WebappsActor.prototype = {
           let manifest;
           try {
             manifest = JSON.parse(jsonString);
-          } catch(e) {
+          } catch (e) {
             self._sendError(deferred, "Error Parsing " + manifestName + ": " + e, aId);
             return;
           }
@@ -548,7 +546,7 @@ WebappsActor.prototype = {
             let uri;
             try {
               uri = Services.io.newURI(manifest.origin, null, null);
-            } catch(e) {
+            } catch (e) {
               self._sendError(deferred, "Invalid origin in webapp's manifest", aId);
             }
 
@@ -615,16 +613,16 @@ WebappsActor.prototype = {
                 appStatus: appType,
                 receipts: aReceipts,
                 kind: DOMApplicationRegistry.kPackaged,
-              }
+              };
 
               self._registerApp(deferred, app, id, aDir);
             });
-        } catch(e) {
+        } catch (e) {
           // If anything goes wrong, just send it back.
           self._sendError(deferred, e.toString(), aId);
         }
       }
-    }
+    };
 
     Services.tm.currentThread.dispatch(runnable,
                                        Ci.nsIThread.DISPATCH_NORMAL);
@@ -693,7 +691,7 @@ WebappsActor.prototype = {
     let manifest, metadata;
     let missing =
       ["manifest.webapp", "metadata.json"]
-      .some(function(aName) {
+      .some(function (aName) {
         testFile = appDir.clone();
         testFile.append(aName);
         return !testFile.exists();
@@ -706,7 +704,7 @@ WebappsActor.prototype = {
       } else {
         try {
           appDir.remove(true);
-        } catch(e) {}
+        } catch (e) {}
         return { error: "badParameterType",
                  message: "hosted app file and manifest/metadata fields " +
                           "are missing"
@@ -753,12 +751,12 @@ WebappsActor.prototype = {
     });
   },
 
-  _isUnrestrictedAccessAllowed: function() {
+  _isUnrestrictedAccessAllowed: function () {
     let pref = "devtools.debugger.forbid-certified-apps";
     return !Services.prefs.getBoolPref(pref);
   },
 
-  _isAppAllowed: function(aApp) {
+  _isAppAllowed: function (aApp) {
     if (this._isUnrestrictedAccessAllowed()) {
       return true;
     }
@@ -836,14 +834,14 @@ WebappsActor.prototype = {
       // Download the URL as a blob
       // bug 899177: there is a bug with xhr and app:// and jar:// uris
       // that ends up forcing the content type to application/xml.
-      let req = Cc['@mozilla.org/xmlextras/xmlhttprequest;1']
+      let req = Cc["@mozilla.org/xmlextras/xmlhttprequest;1"]
                   .createInstance(Ci.nsIXMLHttpRequest);
       req.open("GET", iconURL, false);
       req.responseType = "blob";
 
       try {
         req.send(null);
-      } catch(e) {
+      } catch (e) {
         deferred.resolve({
           error: "noIcon",
           message: "The icon file '" + iconURL + "' doesn't exist"
@@ -925,7 +923,7 @@ WebappsActor.prototype = {
     // Try to filter on b2g and mulet
     if (Frames) {
       return Frames.list().filter(frame => {
-        return frame.getAttribute('mozapp');
+        return frame.getAttribute("mozapp");
       });
     } else {
       return [];
@@ -1042,7 +1040,7 @@ WebappsActor.prototype = {
   },
 
   onFrameCreated: function (frame, isFirstAppFrame) {
-    let mozapp = frame.getAttribute('mozapp');
+    let mozapp = frame.getAttribute("mozapp");
     if (!mozapp || !isFirstAppFrame) {
       return;
     }
@@ -1062,7 +1060,7 @@ WebappsActor.prototype = {
   },
 
   onFrameDestroyed: function (frame, isLastAppFrame) {
-    let mozapp = frame.getAttribute('mozapp');
+    let mozapp = frame.getAttribute("mozapp");
     if (!mozapp || !isLastAppFrame) {
       return;
     }

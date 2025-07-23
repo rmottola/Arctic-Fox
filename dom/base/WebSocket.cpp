@@ -992,6 +992,18 @@ WebSocket::Constructor(const GlobalObject& aGlobal,
                                       EmptyCString(), aRv);
 }
 
+already_AddRefed<WebSocket>
+WebSocket::CreateServerWebSocket(const GlobalObject& aGlobal,
+                                 const nsAString& aUrl,
+                                 const Sequence<nsString>& aProtocols,
+                                 nsITransportProvider* aTransportProvider,
+                                 const nsAString& aNegotiatedExtensions,
+                                 ErrorResult& aRv)
+{
+  return WebSocket::ConstructorCommon(aGlobal, aUrl, aProtocols, aTransportProvider,
+                                      NS_ConvertUTF16toUTF8(aNegotiatedExtensions), aRv);
+}
+
 namespace {
 
 // This class is used to clear any exception.
@@ -1848,6 +1860,12 @@ WebSocketImpl::InitializeConnection(nsIPrincipal* aPrincipal)
   // are not thread-safe.
   mOriginDocument = nullptr;
 
+
+  // The TriggeringPrincipal for websockets must always be a script.
+  // Let's make sure that the doc's principal (if a doc exists)
+  // and aPrincipal are same origin.
+  MOZ_ASSERT(!doc || doc->NodePrincipal()->Equals(aPrincipal));
+
   wsChannel->InitLoadInfo(doc ? doc->AsDOMNode() : nullptr,
                           doc ? doc->NodePrincipal() : aPrincipal,
                           aPrincipal,
@@ -2636,14 +2654,7 @@ public:
   bool WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
   {
     aWorkerPrivate->AssertIsOnWorkerThread();
-    aWorkerPrivate->ModifyBusyCountFromWorker(true);
     return !NS_FAILED(mImpl->CancelInternal());
-  }
-
-  void PostRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
-               bool aRunResult) override
-  {
-    aWorkerPrivate->ModifyBusyCountFromWorker(false);
   }
 
 private:
@@ -2785,7 +2796,6 @@ public:
   bool WorkerRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate) override
   {
     aWorkerPrivate->AssertIsOnWorkerThread();
-    aWorkerPrivate->ModifyBusyCountFromWorker(true);
 
     // No messages when disconnected.
     if (mWebSocketImpl->mDisconnectingOrDisconnected) {
@@ -2799,7 +2809,6 @@ public:
   void PostRun(JSContext* aCx, WorkerPrivate* aWorkerPrivate,
                bool aRunResult) override
   {
-    aWorkerPrivate->ModifyBusyCountFromWorker(false);
   }
 
   bool
@@ -2825,7 +2834,7 @@ private:
   nsCOMPtr<nsIRunnable> mEvent;
 };
 
-} // anonymous namespace
+} // namespace
 
 NS_IMETHODIMP
 WebSocketImpl::DispatchFromScript(nsIRunnable* aEvent, uint32_t aFlags)

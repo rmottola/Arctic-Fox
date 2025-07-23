@@ -74,8 +74,6 @@ DBUS_VERSION=0.60
 SQLITE_VERSION=3.21.0
 FONTCONFIG_VERSION=2.7.0
 
-MSMANIFEST_TOOL=
-
 dnl Set various checks
 dnl ========================================================
 MISSING_X=
@@ -172,8 +170,6 @@ if test -n "$gonkdir"; then
 
     CPPFLAGS="-I$gonkdir/system -I$gonkdir/system/core/include -I$gonkdir/hardware/libhardware/include -I$gonkdir/external/valgrind/fxos-include $CPPFLAGS"
     LDFLAGS="-L$gonkdir/out/target/product/$GONK_PRODUCT/obj/lib -Wl,-rpath-link=$gonkdir/out/target/product/$GONK_PRODUCT/obj/lib $LDFLAGS"
-    dnl Add -llog by default, since we use it all over the place.
-    LIBS="$LIBS -llog"
 
     AC_DEFINE(ANDROID)
     AC_DEFINE_UNQUOTED(ANDROID_VERSION, $android_version)
@@ -258,26 +254,7 @@ dnl ========================================================
 dnl Special win32 checks
 dnl ========================================================
 
-# Target the Windows 8.1 SDK by default
-WINSDK_TARGETVER=603
 WINVER=502
-
-MOZ_ARG_WITH_STRING(windows-version,
-[  --with-windows-version=WINSDK_TARGETVER
-                          Windows SDK version to target. Win8.1 (603) is
-                          currently the minimum supported version.],
-  WINSDK_TARGETVER=$withval)
-
-# Currently only version 603 is allowed
-case "$WINSDK_TARGETVER" in
-603)
-    MOZ_WINSDK_TARGETVER=0${WINSDK_TARGETVER}0000
-    ;;
-
-*)
-    AC_MSG_ERROR([Invalid value for --with-windows-version ($WINSDK_TARGETVER)]);
-    ;;
-esac
 
 case "$target" in
 *-mingw*)
@@ -357,11 +334,8 @@ case "$target" in
         esac
         AC_SUBST(MSVS_VERSION)
         AC_SUBST(MSVC_HAS_DIA_SDK)
-        AC_SUBST(MSVC_REDIST_CRT_DIR)
         AC_SUBST(MSVC_C_RUNTIME_DLL)
         AC_SUBST(MSVC_CXX_RUNTIME_DLL)
-        AC_SUBST(MSVC_REDIST_OPENMP_DIR)
-        AC_SUBST(MSVC_OPENMP_DLL)
 
         AC_DEFINE(HAVE_SEH_EXCEPTIONS)
 
@@ -369,32 +343,8 @@ case "$target" in
           if test ! -d "$WIN32_REDIST_DIR"; then
             AC_MSG_ERROR([Invalid Win32 Redist directory: ${WIN32_REDIST_DIR}])
           fi
-          
-          if test -f "$WIN32_REDIST_DIR/$MSVC_C_RUNTIME_DLL"; then
-            AC_MSG_ERROR([The Win32 Redist directory must be set to the directory above Microsoft.VCXX0.CRT])
-          fi
           WIN32_REDIST_DIR=`cd "$WIN32_REDIST_DIR" && pwd -W`
         fi
-
-        dnl Ensure that mt.exe is 'Microsoft (R) Manifest Tool',
-        dnl not something else like "magnetic tape manipulation utility".
-        MT=${MT-mt.exe}
-        MSMT_TOOL=`${MT} 2>&1|grep 'Microsoft (R) Manifest Tool'`
-        if test -z "$MSMT_TOOL"; then
-          AC_MSG_ERROR([Microsoft (R) Manifest Tool must be in your \$PATH.])
-        fi
-
-        changequote(,)
-        _MSMT_VER_FILTER='s|.*[^!-~]\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*|\1|p'
-        changequote([,])
-        MSMANIFEST_TOOL_VERSION=`echo ${MSMT_TOOL}|sed -ne "$_MSMT_VER_FILTER"`
-        if test -z "$MSMANIFEST_TOOL_VERSION"; then
-          AC_MSG_WARN([Unknown version of the Microsoft (R) Manifest Tool.])
-        fi
-
-        MSMANIFEST_TOOL=1
-        unset MSMT_TOOL
-        AC_SUBST(MT)
 
         # Check linker version
         _LD_FULL_VERSION=`"${LD}" -v 2>&1 | sed -nre "$_MSVC_VER_FILTER"`
@@ -501,27 +451,11 @@ case "$target" in
         AC_DEFINE(STRSAFE_NO_DEPRECATE)
     fi # !GNU_CC
 
-    MOZ_FIND_WINSDK_VERSION
     AC_DEFINE_UNQUOTED(WINVER,0x$WINVER)
     AC_DEFINE_UNQUOTED(_WIN32_WINNT,0x$WINVER)
     # Require OS features provided by IE 6.0 SP2 (XP SP2)
     AC_DEFINE_UNQUOTED(_WIN32_IE,0x0603)
 
-    # If the maximum version supported by this SDK is lower than the target
-    # version, error out
-    AC_MSG_CHECKING([for Windows SDK being recent enough])
-    if $PERL -e "exit(0x$MOZ_WINSDK_TARGETVER > $MOZ_WINSDK_MAXVER)"; then
-        AC_MSG_RESULT("yes")
-    else
-        AC_MSG_RESULT("no")
-        AC_MSG_ERROR([You are targeting Windows version 0x$MOZ_WINSDK_TARGETVER, but your SDK only supports up to version $MOZ_WINSDK_MAXVER. Install and use an updated SDK, or target a lower version using --with-windows-version. Alternatively, try running the Windows SDK Configuration Tool and selecting a newer SDK. See https://developer.mozilla.org/En/Windows_SDK_versions for more details on fixing this.])
-    fi
-
-    AC_DEFINE_UNQUOTED(MOZ_WINSDK_TARGETVER,0x$MOZ_WINSDK_TARGETVER)
-    # Definitions matching sdkddkver.h
-    AC_DEFINE_UNQUOTED(MOZ_NTDDI_WIN7, 0x06010000)
-    AC_DEFINE_UNQUOTED(MOZ_WINSDK_MAXVER,$MOZ_WINSDK_MAXVER)
-    AC_SUBST(MOZ_WINSDK_MAXVER)
     ;;
 esac
 
@@ -553,11 +487,6 @@ AC_SUBST(MOZ_MSVC_STL_WRAP_RAISE)
 dnl ========================================================
 dnl Checks for programs.
 dnl ========================================================
-if test -z "$COMPILE_ENVIRONMENT"; then
-    NSINSTALL_BIN='$(PYTHON) $(MOZILLA_DIR)/config/nsinstall.py'
-fi
-AC_SUBST(NSINSTALL_BIN)
-
 if test "$COMPILE_ENVIRONMENT"; then
 
 dnl ========================================================
@@ -644,33 +573,6 @@ tools are selected during the Xcode/Developer Tools installation.])
     AC_MSG_ERROR([The selected compiler and Mac OS X SDK are incompatible.])
   fi
 fi
-
-fi # COMPILE_ENVIRONMENT
-
-if test -n "$MAKE"; then
-  if test `echo $MAKE | grep -c make.py` != 1; then
-     NOT_PYMAKE=$MAKE
-  fi
-fi
-
-case "$host_os" in
-mingw*)
-    MOZ_PATH_PROGS(GMAKE, $GMAKE mingw32-make $NOT_PYMAKE make gmake, :)
-    ;;
-*)
-    MOZ_PATH_PROGS(GMAKE, $GMAKE $NOT_PYMAKE gmake make, :)
-    ;;
-esac
-if test "$GMAKE" = ":"; then
-   AC_MSG_ERROR([GNU make not found])
-fi
-AC_SUBST(GMAKE)
-
-if test -z "$MAKE"; then
-  MAKE=$GMAKE
-fi
-
-if test "$COMPILE_ENVIRONMENT"; then
 
 AC_PATH_XTRA
 
@@ -772,7 +674,9 @@ if test -n "${CLANG_CXX}${CLANG_CL}"; then
     _WARNINGS_CXXFLAGS="-Qunused-arguments ${_WARNINGS_CXXFLAGS}"
 fi
 
-MOZ_CONFIG_SANITIZE
+if test -n "$COMPILE_ENVIRONMENT"; then
+   MOZ_CONFIG_SANITIZE
+fi
 
 dnl ========================================================
 dnl = Enable treating compiler warnings as errors
@@ -1479,14 +1383,6 @@ case "$target" in
     BIN_SUFFIX='.exe'
     MOZ_USER_DIR="Mozilla"
 
-    case "$host" in
-    *-mingw*)
-        if test -n "$L10NBASEDIR"; then
-            L10NBASEDIR=`cd $L10NBASEDIR && pwd -W`
-        fi
-        ;;
-    esac
-
     case "$host_os" in
     cygwin*|msvc*|mks*)
         AC_MSG_ERROR([Using a Cygwin build environment is unsupported. Configure cannot check for presence of necessary headers. Please upgrade to MozillaBuild; see https://developer.mozilla.org/en/Windows_Build_Prerequisites.])
@@ -1495,10 +1391,6 @@ case "$target" in
 
     case "$target" in
     i*86-*)
-        if test "$HAVE_64BIT_BUILD" -a -n "$COMPILE_ENVIRONMENT"; then
-            AC_MSG_ERROR([You are targeting i386 but using the 64-bit compiler.])
-        fi
-
         if test -n "$GNU_CC"; then
             CFLAGS="$CFLAGS -mstackrealign -fno-keep-inline-dllexport"
             CXXFLAGS="$CXXFLAGS -mstackrealign -fno-keep-inline-dllexport"
@@ -1511,9 +1403,6 @@ case "$target" in
         AC_DEFINE(_X86_)
         ;;
     x86_64-*)
-        if test -z "$HAVE_64BIT_BUILD" -a -n "$COMPILE_ENVIRONMENT"; then
-            AC_MSG_ERROR([You are targeting 64-bit but using the 32-bit compiler.])
-        fi
         if test -n "$_WIN32_MSVC"; then
             DSO_LDOPTS="$DSO_LDOPTS -MACHINE:X64"
         fi
@@ -1658,25 +1547,11 @@ dnl Checks for header files.
 dnl ========================================================
 AC_HEADER_DIRENT
 case "$target_os" in
-freebsd*|openbsd*)
+bitrig*|dragonfly*|freebsd*|openbsd*)
 # for stuff like -lXshm
     CPPFLAGS="${CPPFLAGS} ${X_CFLAGS}"
     ;;
 esac
-MOZ_CHECK_COMMON_HEADERS
-
-dnl These are all the places some variant of statfs can be hiding.
-MOZ_CHECK_HEADERS(sys/statvfs.h sys/statfs.h sys/vfs.h sys/mount.h)
-
-dnl Quota support
-MOZ_CHECK_HEADERS(sys/quota.h sys/sysmacros.h)
-MOZ_CHECK_HEADERS([linux/quota.h],,,[#include <sys/socket.h>])
-
-dnl SCTP support - needs various network include headers
-MOZ_CHECK_HEADERS([linux/if_addr.h linux/rtnetlink.h],,,[#include <sys/socket.h>])
-MOZ_CHECK_HEADERS(sys/queue.h)
-
-MOZ_CHECK_HEADERS(sys/types.h netinet/in.h byteswap.h)
 
 dnl Check for sin_len and sin6_len - used by SCTP; only appears in Mac/*BSD generally
 AC_CACHE_CHECK(for sockaddr_in.sin_len,
@@ -1782,8 +1657,9 @@ dnl Xt is dependent upon SM as of X11R6
 dnl ========================================================
 if test -n "$MOZ_X11"; then
     AC_DEFINE_UNQUOTED(FUNCPROTO,15)
-    XLIBS="-lX11 $XLIBS"
+    XLIBS="-lX11-xcb -lX11 -lxcb-shm -lxcb $XLIBS"
     _SAVE_LDFLAGS="$LDFLAGS"
+    _SAVE_LIBS="$LIBS"
     LDFLAGS="$XLDFLAGS $LDFLAGS"
     AC_CHECK_LIB(X11, XDrawLines, [X11_LIBS="-lX11"],
         [MISSING_X="$MISSING_X -lX11"], $XLIBS)
@@ -1799,10 +1675,11 @@ if test -n "$MOZ_X11"; then
         ])
 
     dnl ========================================================
-    dnl = Check for XShm
+    dnl = Check for xcb
     dnl ========================================================
-    AC_CHECK_LIB(Xext, XShmCreateImage, _HAVE_XSHM_XEXT=1,,
-        $XLIBS $XEXT_LIBS)
+    AC_CHECK_LIB(X11-xcb, XGetXCBConnection,, [MISSING_X="$MISSING_X -lX11-xcb"], $XLIBS)
+    AC_CHECK_LIB(xcb-shm, xcb_shm_query_version,, [MISSING_X="$MISSING_X -lxcb-shm"], $XLIBS)
+    AC_CHECK_LIB(xcb, xcb_connect,, [MISSING_X="$MISSING_X -lxcb"], $XLIBS)
 
     dnl ========================================================
     dnl = Check for Xss
@@ -1813,6 +1690,7 @@ if test -n "$MOZ_X11"; then
              AC_DEFINE(HAVE_LIBXSS)],, $XEXT_LIBS $XLIBS))
 
     LDFLAGS="$_SAVE_LDFLAGS"
+    LIBS="$_SAVE_LIBS"
 fi # $MOZ_X11
 
 AC_SUBST_LIST(XCFLAGS)
@@ -2670,7 +2548,6 @@ MOZ_PERMISSIONS=1
 MOZ_PREF_EXTENSIONS=1
 MOZ_REFLOW_PERF=
 MOZ_SAFE_BROWSING=
-MOZ_HELP_VIEWER=
 MOZ_SPELLCHECK=1
 MOZ_TOOLKIT_SEARCH=1
 MOZ_UI_LOCALE=en-US
@@ -2704,8 +2581,6 @@ MOZ_CONTENT_SANDBOX=
 MOZ_GMP_SANDBOX=
 MOZ_SANDBOX=
 MOZ_BINARY_EXTENSIONS=
-MOZ_ADDON_SIGNING=
-MOZ_REQUIRE_SIGNING=
 MOZ_DEVTOOLS=server
 
 case "$target_os" in
@@ -2770,6 +2645,29 @@ if test -z "$MOZ_BING_API_CLIENTID"; then
 fi
 AC_SUBST(MOZ_BING_API_CLIENTID)
 AC_SUBST(MOZ_BING_API_KEY)
+
+# Allow specifying an Adjust SDK key file that contains the app token used for
+# Adjust SDK requests.
+MOZ_ARG_WITH_STRING(adjust-sdk-keyfile,
+[  --with-adjust-sdk-keyfile=file   Use the app token contained in the given keyfile for Adjust SDK requests],
+  MOZ_INSTALL_TRACKING_ADJUST_SDK_APP_TOKEN=`cat $withval`)
+AC_SUBST(MOZ_INSTALL_TRACKING_ADJUST_SDK_APP_TOKEN)
+
+# Optional Firefox for Android partner distribution directory.
+MOZ_ARG_WITH_STRING(android-distribution-directory,
+[  --with-android-distribution-directory=dir
+                          Optional Firefox for Android partner distribution directory.],
+  MOZ_ANDROID_DISTRIBUTION_DIRECTORY=$withval)
+
+if test -n "$MOZ_ANDROID_DISTRIBUTION_DIRECTORY"; then
+  # A distribution directory must have an assets/distribution directory.
+  # See https://wiki.mozilla.org/Mobile/Distribution_Files.
+  if test ! -d "$MOZ_ANDROID_DISTRIBUTION_DIRECTORY/assets/distribution" ; then
+    AC_MSG_ERROR([--with-android-distribution-directory does not contain assets/distribution;
+                  (looked for ${MOZ_ANDROID_DISTRIBUTION_DIRECTORY}/assets/distribution).])
+  fi
+fi
+AC_SUBST(MOZ_ANDROID_DISTRIBUTION_DIRECTORY)
 
 dnl ========================================================
 dnl = Trademarked Branding
@@ -2865,6 +2763,19 @@ AC_SUBST(MOZ_MULET)
 AC_SUBST(MOZ_B2G_VERSION)
 
 dnl ========================================================
+dnl Ensure Android SDK and build-tools versions depending on
+dnl mobile target.
+dnl ========================================================
+
+if test -z "$gonkdir" ; then
+    case "$MOZ_BUILD_APP" in
+    mobile/android)
+        MOZ_ANDROID_SDK(23, 23.0.3)
+        ;;
+    esac
+fi
+
+dnl ========================================================
 dnl =
 dnl = Toolkit Options
 dnl =
@@ -2897,11 +2808,6 @@ uikit)
     CXXFLAGS="$CXXFLAGS $TK_CFLAGS"
     MOZ_USER_DIR="Mozilla"
     MOZ_FS_LAYOUT=bundle
-    ;;
-
-gonk)
-    AC_DEFINE(MOZ_TOUCH)
-    MOZ_TOUCH=1
     ;;
 
 esac
@@ -3270,7 +3176,9 @@ dnl ========================================================
 dnl = Include install tracking on Android
 dnl ========================================================
 if test -n "$MOZ_INSTALL_TRACKING"; then
-    AC_DEFINE(MOZ_INSTALL_TRACKING)
+    if test -z "$MOZ_INSTALL_TRACKING_ADJUST_SDK_APP_TOKEN"; then
+        AC_MSG_ERROR([Must specify --with-adjust-sdk-keyfile when MOZ_INSTALL_TRACKING is defined!])
+    fi
 fi
 
 dnl ========================================================
@@ -4436,58 +4344,6 @@ if test -n "$MOZ_TREE_FREETYPE"; then
    AC_SUBST_LIST(CAIRO_FT_CFLAGS)
 fi
 
-dnl ========================================================
-dnl Installer
-dnl ========================================================
-dnl Abort Windows build if the required major version and
-dnl minimum minor version of Unicode NSIS isn't in the path
-dnl (unless in case of cross compiling, for which Unicode
-dnl is not yet sufficient).
-if test "$OS_ARCH" = "WINNT"; then
-    MIN_NSIS_MAJOR_VER=2
-    MIN_NSIS_MINOR_VER=46
-    MOZ_PATH_PROGS(MAKENSISU, $MAKENSISU makensis-3.0b1.exe makensisu-3.0a2.exe makensisu-2.46.exe makensis)
-    if test -n "$MAKENSISU" -a "$MAKENSISU" != ":"; then
-      AC_MSG_RESULT([yes])
-      MAKENSISU_VER=`"$MAKENSISU" -version 2>/dev/null`
-      changequote(,)
-      MAKENSISU_PARSED_VER=`echo "$MAKENSISU_VER" | sed -e '/-Unicode/!s/.*//g' -e 's/^v\([0-9]\+\.[0-9]\+\).*\-Unicode$/\1/g'`
-      changequote([,])
-      if test "$MAKENSISU_PARSED_VER" = ""; then
-          changequote(,)
-          MAKENSISU_PARSED_VER=`echo "$MAKENSISU_VER" | sed -e 's/^v\([0-9]\+\.[0-9]\+\).*$/\1/g'`
-          changequote([,])
-      fi
-      MAKENSISU_MAJOR_VER=0
-      MAKENSISU_MINOR_VER=0
-      if test ! "$MAKENSISU_PARSED_VER" = ""; then
-          MAKENSISU_MAJOR_VER=`echo $MAKENSISU_PARSED_VER | $AWK -F\. '{ print $1 }'`
-          MAKENSISU_MINOR_VER=`echo $MAKENSISU_PARSED_VER | $AWK -F\. '{ print $2 }'`
-      fi
-      AC_MSG_CHECKING([for Unicode NSIS version $MIN_NSIS_MAJOR_VER.$MIN_NSIS_MINOR_VER or greater])
-      if test "$MAKENSISU_MAJOR_VER" -eq $MIN_NSIS_MAJOR_VER -a \
-              "$MAKENSISU_MINOR_VER" -ge $MIN_NSIS_MINOR_VER ||
-         test "$MAKENSISU_MAJOR_VER" -gt $MIN_NSIS_MAJOR_VER; then
-          AC_MSG_RESULT([yes])
-      else
-          AC_MSG_RESULT([no])
-          if test -z "$CROSS_COMPILE"; then
-            AC_MSG_ERROR([To build the installer you must have the latest MozillaBuild or Unicode NSIS version $MIN_NSIS_MAJOR_VER.$MIN_NSIS_MINOR_VER or greater in your path.])
-          else
-            MAKENSISU=
-          fi
-      fi
-    elif test -z "$CROSS_COMPILE"; then
-      AC_MSG_ERROR([To build the installer you must have the latest MozillaBuild or Unicode NSIS version $MIN_NSIS_MAJOR_VER.$MIN_NSIS_MINOR_VER or greater in your path.])
-    else
-      MAKENSISU=
-    fi
-fi
-
-dnl ========================================================
-dnl GNU tar and wget
-dnl ========================================================
-
 AC_CHECK_PROGS(WGET, wget, "")
 AC_SUBST(WGET)
 
@@ -4597,8 +4453,9 @@ AC_SUBST(MOZ_NO_EV_CERTS)
 dnl ========================================================
 dnl = Sandboxing support
 dnl ========================================================
-if test -n "$MOZ_TSAN"; then
+if test -n "$MOZ_TSAN" -o -n "$MOZ_ASAN"; then
     # Bug 1182565: TSan conflicts with sandboxing on Linux.
+    # Bug 1287971: LSan also conflicts with sandboxing on Linux.
     case $OS_TARGET in
     Linux|Android)
         MOZ_SANDBOX=
@@ -4618,7 +4475,7 @@ if test -n "$gonkdir"; then
 fi
 
 case "$OS_TARGET:$NIGHTLY_BUILD" in
-WINNT:1)
+WINNT:*)
     MOZ_CONTENT_SANDBOX=$MOZ_SANDBOX
     ;;
 Darwin:1)
@@ -4871,14 +4728,6 @@ if test -n "$MOZ_SYSTEM_SQLITE"; then
     AC_DEFINE(MOZ_SYSTEM_SQLITE)
 fi
 AC_SUBST(MOZ_SYSTEM_SQLITE)
-
-dnl ========================================================
-dnl = Enable help viewer (off by default)
-dnl ========================================================
-if test -n "$MOZ_HELP_VIEWER"; then
-     dnl Do this if defined in confvars.sh
-     AC_DEFINE(MOZ_HELP_VIEWER)
-fi
 
 dnl ========================================================
 dnl = Disable zipwriter
@@ -5188,15 +5037,6 @@ if test -f "${srcdir}/${MOZ_BUILD_APP}/configure.in" ; then
      "${srcdir}/${MOZ_BUILD_APP}/configure.in" > $tmpscript
   . $tmpscript
   rm -f $tmpscript
-fi
-
-dnl We need to wrap dlopen and related functions on Android because we use
-dnl our own linker.
-dnl This configuration will only work on Android SDK 11 and above: Bug 1220184.
-if test "$OS_TARGET" = Android; then
-    if test "$MOZ_WIDGET_TOOLKIT" = gonk -a -n "$MOZ_NUWA_PROCESS"; then
-        MOZ_GLUE_WRAP_LDFLAGS="${MOZ_GLUE_WRAP_LDFLAGS} -Wl,--wrap=pthread_create,--wrap=epoll_wait,--wrap=poll,--wrap=pthread_cond_timedwait,--wrap=pthread_cond_wait,--wrap=epoll_create,--wrap=epoll_ctl,--wrap=close,--wrap=pthread_key_create,--wrap=pthread_key_delete,--wrap=socketpair,--wrap=pthread_self,--wrap=pthread_mutex_lock,--wrap=pthread_mutex_trylock,--wrap=pthread_join,--wrap=pipe,--wrap=pipe2"
-    fi
 fi
 
 AC_SUBST_LIST(MOZ_GLUE_WRAP_LDFLAGS)
@@ -5609,9 +5449,13 @@ MOZ_ARG_WITH_STRING(servo,
   SERVO_TARGET_DIR=$withval,
   SERVO_TARGET_DIR=)
 if test -n "$SERVO_TARGET_DIR"; then
-   MOZ_SERVO_LIBS="-L${SERVO_TARGET_DIR} -lgeckoservo"
-   AC_DEFINE(MOZ_STYLO)
-   AC_SUBST_LIST(MOZ_SERVO_LIBS)
+    if test -n "$_WIN32_MSVC"; then
+        MOZ_SERVO_LIBS="${SERVO_TARGET_DIR}/geckoservo"
+    else
+        MOZ_SERVO_LIBS="-L${SERVO_TARGET_DIR} -lgeckoservo"
+    fi
+    AC_DEFINE(MOZ_STYLO)
+    AC_SUBST_LIST(MOZ_SERVO_LIBS)
 fi
 
 dnl ========================================================
@@ -5943,17 +5787,6 @@ else
     PKG_CHECK_MODULES(MOZ_PIXMAN, pixman-1 >= 0.19.2)
 fi
 
-# Check for headers defining standard int types.
-if test -n "$COMPILE_ENVIRONMENT"; then
-    MOZ_CHECK_HEADERS(stdint.h inttypes.h)
-
-    if test "${ac_cv_header_inttypes_h}" = "yes"; then
-        HAVE_INTTYPES_H=1
-    fi
-fi
-
-AC_SUBST(HAVE_INTTYPES_H)
-
 if test "$MOZ_TREE_CAIRO"; then
     MOZ_CAIRO_CFLAGS="-I${DIST}/include/cairo"
     AC_DEFINE(MOZ_TREE_CAIRO)
@@ -6257,7 +6090,6 @@ AC_SUBST(LIBICONV)
 AC_SUBST(MOZ_TOOLKIT_SEARCH)
 AC_SUBST(MOZ_FEEDS)
 AC_SUBST(NS_PRINTING)
-AC_SUBST(MOZ_HELP_VIEWER)
 
 AC_SUBST(MOZ_UNIVERSALCHARDET)
 AC_SUBST(ACCESSIBILITY)
@@ -6412,6 +6244,18 @@ if test -z "$MOZ_APP_VERSION_DISPLAY"; then
    MOZ_APP_VERSION_DISPLAY=$MOZ_APP_VERSION
 fi
 
+if test -z "$ANDROID_PACKAGE_NAME" ; then
+   ANDROID_PACKAGE_NAME="org.mozilla.$MOZ_APP_NAME"
+fi
+
+# Mozilla released Firefox for Android {Release,Beta} and {Aurora,Nightly} to
+# the public with specific common shared IDs and we need to keep them
+# consistent forever.  The specific common values are set by per-channel
+# branding; all other channels use a generic sharedID, set below.
+if test -z "$MOZ_ANDROID_SHARED_ID" ; then
+   MOZ_ANDROID_SHARED_ID="${ANDROID_PACKAGE_NAME}.sharedID"
+fi
+
 # For extensions and langpacks, we require a max version that is compatible
 # across security releases. MOZ_APP_MAXVERSION is our method for doing that.
 # 24.0a1 and 24.0a2 aren't affected
@@ -6441,6 +6285,9 @@ AC_SUBST(MOZ_APP_BASENAME)
 AC_SUBST(MOZ_APP_VENDOR)
 AC_SUBST(MOZ_APP_PROFILE)
 AC_SUBST(MOZ_APP_ID)
+AC_SUBST(MOZ_APP_ANDROID_VERSION_CODE)
+AC_SUBST(MOZ_ANDROID_SHARED_ID)
+AC_SUBST(MOZ_ANDROID_GCM_SENDERID)
 AC_SUBST(MAR_CHANNEL_ID)
 AC_SUBST(ACCEPTED_MAR_CHANNEL_IDS)
 AC_SUBST(MOZ_PROFILE_MIGRATOR)
@@ -6499,7 +6346,6 @@ fi
 dnl win32 options
 AC_SUBST(WIN32_REDIST_DIR)
 AC_SUBST(WIN_UCRT_REDIST_DIR)
-AC_SUBST(MAKENSISU)
 
 dnl Echo the CFLAGS to remove extra whitespace.
 CFLAGS=`echo \
@@ -6535,20 +6381,6 @@ AC_SUBST_LIST(MOZ_BZ2_CFLAGS)
 AC_SUBST_LIST(MOZ_BZ2_LIBS)
 AC_SUBST_LIST(MOZ_PNG_CFLAGS)
 AC_SUBST_LIST(MOZ_PNG_LIBS)
-
-if test "$MOZ_WIDGET_TOOLKIT" = gonk -a -n "$MOZ_NUWA_PROCESS"; then
-    export MOZ_NUWA_PROCESS
-    AC_DEFINE(MOZ_NUWA_PROCESS)
-fi
-AC_SUBST(MOZ_NUWA_PROCESS)
-if test "$MOZ_WIDGET_TOOLKIT" = gonk -a -n "$MOZ_B2G_LOADER"; then
-    if test -z "$MOZ_NUWA_PROCESS"; then
-       AC_MSG_ERROR([B2G loader works with Nuwa]);
-    fi
-    export MOZ_B2G_LOADER
-    AC_DEFINE(MOZ_B2G_LOADER)
-fi
-AC_SUBST(MOZ_B2G_LOADER)
 
 AC_SUBST(MOZ_SYSTEM_NSPR)
 
@@ -6621,7 +6453,6 @@ AC_SUBST(BIN_SUFFIX)
 AC_SUBST(IMPORT_LIB_SUFFIX)
 AC_SUBST(USE_N32)
 AC_SUBST(CC_VERSION)
-AC_SUBST(MSMANIFEST_TOOL)
 AC_SUBST(NS_ENABLE_TSF)
 AC_SUBST(WIN32_CONSOLE_EXE_LDFLAGS)
 AC_SUBST(WIN32_GUI_EXE_LDFLAGS)
@@ -6736,37 +6567,6 @@ fi
 
 AC_SUBST(MOZILLA_VERSION)
 
-dnl ========================================================
-dnl Directive 4
-dnl ========================================================
-
-DIRECTIVE4_LIST="MOZ_OFFICIAL_BRANDING=$MOZ_OFFICIAL_BRANDING
-MOZ_BRANDING_DIRECTORY=$MOZ_BRANDING_DIRECTORY
-MOZ_PHOENIX=$MOZ_PHOENIX
-MOZ_SANDBOX=$MOZ_SANDBOX
-MOZ_SYSTEM_LIBEVENT=$MOZ_SYSTEM_LIBEVENT
-MOZ_SYSTEM_NSS=$MOZ_SYSTEM_NSS
-MOZ_SYSTEM_NSPR=$MOZ_SYSTEM_NSPR
-MOZ_SYSTEM_JPEG=$MOZ_SYSTEM_JPEG
-MOZ_SYSTEM_ZLIB=$MOZ_SYSTEM_ZLIB
-MOZ_SYSTEM_BZ2=$MOZ_SYSTEM_BZ2
-MOZ_SYSTEM_PNG=$MOZ_SYSTEM_PNG
-MOZ_SYSTEM_LIBVPX=$MOZ_SYSTEM_LIBVPX
-MOZ_SYSTEM_SQLITE=$MOZ_SYSTEM_SQLITE
-MOZ_SYSTEM_JEMALLOC=$MOZ_SYSTEM_JEMALLOC"
-
-DIRECTIVE4=`$PYTHON $_topsrcdir/build/directive4.py $DIRECTIVE4_LIST`
-
-if test -n "$DIRECTIVE4"; then
-    if test -n "$MC_PRIVATE_BUILD"; then
-        AC_MSG_WARN([Private Build - The configuration you have chosen to use with official branding deviates from official build configuration. Your build is thus for personal and private use only and must not be (re)distributed - Please see: http://www.palemoon.org/redist.shtml])
-    else
-        AC_MSG_ERROR([Branding Violation - Please see: http://www.palemoon.org/redist.shtml])
-    fi
-fi
-
-AC_SUBST(DIRECTIVE4)
-
 dnl Spit out some output
 dnl ========================================================
 
@@ -6834,6 +6634,10 @@ AC_SUBST(MOZ_ENABLE_MASK_AS_SHORTHAND)
 
 # Avoid using obsolete NSPR features
 AC_DEFINE(NO_NSPR_10_SUPPORT)
+
+# Don't build NSS libpkix
+NSS_DISABLE_LIBPKIX=1
+AC_SUBST(NSS_DISABLE_LIBPKIX)
 
 MOZ_CREATE_CONFIG_STATUS()
 
@@ -6957,7 +6761,6 @@ export RUSTC
 export MOZILLA_CENTRAL_PATH=$_topsrcdir
 export STLPORT_CPPFLAGS
 export STLPORT_LIBS
-export JS_STANDALONE=
 unset MOZ_BUILD_APP
 export DIST
 export MOZ_LINKER
@@ -6985,6 +6788,7 @@ if ! test -e js; then
     mkdir js
 fi
 
+ac_configure_args="$ac_configure_args JS_STANDALONE="
 AC_OUTPUT_SUBDIRS(js/src,$cache_file)
 ac_configure_args="$_SUBDIR_CONFIG_ARGS"
 

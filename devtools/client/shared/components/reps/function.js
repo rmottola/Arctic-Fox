@@ -6,35 +6,44 @@
 "use strict";
 
 // Make this available to both AMD and CJS environments
-define(function(require, exports, module) {
+define(function (require, exports, module) {
   // ReactJS
   const React = require("devtools/client/shared/vendor/react");
 
   // Reps
-  const { createFactories, isGrip } = require("./rep-utils");
-  const { ObjectLink } = createFactories(require("./object-link"));
-  const { cropString } = require("./string");
+  const { createFactories, isGrip, cropString } = require("./rep-utils");
+  const { ObjectBox } = createFactories(require("./object-box"));
 
   /**
    * This component represents a template for Function objects.
    */
   let Func = React.createClass({
+    displayName: "Func",
+
     propTypes: {
       object: React.PropTypes.object.isRequired
     },
 
-    displayName: "Func",
+    getTitle: function (grip) {
+      if (this.props.objectLink) {
+        return this.props.objectLink({
+          object: grip
+        }, "function");
+      }
+      return "";
+    },
 
-    summarizeFunction: function(grip) {
-      let name = grip.displayName || grip.name || "function";
+    summarizeFunction: function (grip) {
+      let name = grip.userDisplayName || grip.displayName || grip.name || "function";
       return cropString(name + "()", 100);
     },
 
-    render: function() {
+    render: function () {
       let grip = this.props.object;
 
       return (
-        ObjectLink({className: "function"},
+        ObjectBox({className: "function"},
+          this.getTitle(grip),
           this.summarizeFunction(grip)
         )
       );

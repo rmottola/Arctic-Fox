@@ -24,7 +24,8 @@ nsWEBPDecoder::nsWEBPDecoder(RasterImage* aImage)
  : Decoder(aImage)
  , mLexer(Transition::ToUnbuffered(State::FINISHED_WEBP_DATA,
                                    State::WEBP_DATA,
-                                   SIZE_MAX))
+                                   SIZE_MAX),
+          Transition::TerminateSuccess())
  , mDecoder(nullptr)
  , mData(nullptr)
  , mPreviousLastLine(0)
@@ -45,7 +46,7 @@ nsWEBPDecoder::~nsWEBPDecoder()
 }
 
 
-void
+nsresult
 nsWEBPDecoder::InitInternal()
 {
 #if MOZ_BIG_ENDIAN
@@ -55,12 +56,13 @@ nsWEBPDecoder::InitInternal()
 #endif
 
   if (!mDecoder) {
-    PostDecoderError(NS_ERROR_FAILURE);
-    return;
+    return NS_ERROR_FAILURE;
   }
+
+  return NS_OK;
 }
 
-void
+nsresult
 nsWEBPDecoder::FinishInternal()
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call FinishInternal after error!");
@@ -73,16 +75,16 @@ nsWEBPDecoder::FinishInternal()
     PostFrameStop();
     PostDecodeDone();
   }
+
+  return NS_OK;
 }
 
-Maybe<TerminalState>
-nsWEBPDecoder::DoDecode(SourceBufferIterator& aIterator)
+LexerResult
+nsWEBPDecoder::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call WriteInternal after error!");
-  MOZ_ASSERT(aIterator.Data());
-  MOZ_ASSERT(aIterator.Length() > 0);
 
-  return mLexer.Lex(aIterator.Data(), aIterator.Length(),
+  return mLexer.Lex(aIterator, aOnResume,
                     [=](State aState, const char* aData, size_t aLength) {
     switch (aState) {
       case State::WEBP_DATA:
@@ -101,21 +103,17 @@ nsWEBPDecoder::ReadWEBPData(const char* aData, size_t aLength)
 
   VP8StatusCode rv = WebPIAppend(mDecoder, buf, aLength);
   if (rv == VP8_STATUS_OUT_OF_MEMORY) {
-    PostDecoderError(NS_ERROR_OUT_OF_MEMORY);
     return Transition::TerminateFailure();
   } else if (rv == VP8_STATUS_INVALID_PARAM ||
              rv == VP8_STATUS_BITSTREAM_ERROR) {
-    PostDataError();
     return Transition::TerminateFailure();
   } else if (rv == VP8_STATUS_UNSUPPORTED_FEATURE ||
              rv == VP8_STATUS_USER_ABORT) {
-    PostDecoderError(NS_ERROR_FAILURE);
     return Transition::TerminateFailure();
   }
 
   // Catch any remaining erroneous return value.
   if (rv != VP8_STATUS_OK && rv != VP8_STATUS_SUSPENDED) {
-    PostDecoderError(NS_ERROR_FAILURE);
     return Transition::TerminateFailure();
   }
 
@@ -130,7 +128,6 @@ nsWEBPDecoder::ReadWEBPData(const char* aData, size_t aLength)
     return Transition::TerminateFailure();
 
   if (width <= 0 || height <= 0) {
-    PostDataError();
     return Transition::TerminateFailure();
   }
 
@@ -152,7 +149,7 @@ nsWEBPDecoder::ReadWEBPData(const char* aData, size_t aLength)
 
   if (!mImageData) {
     MOZ_ASSERT(HasSize(), "Didn't fetch metadata?");
-    nsresult rv_ = AllocateBasicFrame();
+    nsresult rv_ = AllocateFrame(0, Size(), FullFrame(), gfx::SurfaceFormat::B8G8R8A8);
     if (NS_FAILED(rv_)) {
       return Transition::TerminateFailure();
     }

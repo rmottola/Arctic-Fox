@@ -17,10 +17,6 @@ function test() {
       totals: {
         label1: value => "Hello " + L10N.numberWithDecimals(value, 2),
         label2: value => "World " + L10N.numberWithDecimals(value, 2)
-      },
-      header: {
-        label1: "",
-        label2: ""
       }
     });
 
@@ -30,18 +26,18 @@ function test() {
     let rows = grid.querySelectorAll(".table-chart-row");
     let sums = node.querySelectorAll(".table-chart-summary-label");
 
-    is(rows.length, 2,
-      "There should be 1 table chart row and 1 header created.");
+    is(rows.length, 1,
+      "There should be 1 table chart row created.");
 
-    ok(rows[1].querySelector(".table-chart-row-box.chart-colored-blob"),
+    ok(rows[0].querySelector(".table-chart-row-box.chart-colored-blob"),
       "A colored blob exists for the firt row.");
-    is(rows[1].querySelectorAll("label")[0].getAttribute("name"), "size",
+    is(rows[0].querySelectorAll("label")[0].getAttribute("name"), "size",
       "The first column of the first row exists.");
-    is(rows[1].querySelectorAll("label")[1].getAttribute("name"), "label",
+    is(rows[0].querySelectorAll("label")[1].getAttribute("name"), "label",
       "The second column of the first row exists.");
-    is(rows[1].querySelectorAll("label")[0].getAttribute("value"), "",
+    is(rows[0].querySelectorAll("label")[0].getAttribute("value"), "",
       "The first column of the first row displays the correct text.");
-    is(rows[1].querySelectorAll("label")[1].getAttribute("value"), L10N.getStr("tableChart.unavailable"),
+    is(rows[0].querySelectorAll("label")[1].getAttribute("value"), L10N.getStr("tableChart.unavailable"),
       "The second column of the first row displays the correct text.");
 
     is(sums.length, 2,

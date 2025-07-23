@@ -9,16 +9,18 @@ const { DOM: dom, createClass, PropTypes, addons } =
   require("devtools/client/shared/vendor/react");
 
 const Types = require("../types");
+const OPEN_DEVICE_MODAL_VALUE = "OPEN_DEVICE_MODAL";
 
 module.exports = createClass({
+  displayName: "DeviceSelector",
+
   propTypes: {
     devices: PropTypes.shape(Types.devices).isRequired,
     selectedDevice: PropTypes.string.isRequired,
     onChangeViewportDevice: PropTypes.func.isRequired,
     onResizeViewport: PropTypes.func.isRequired,
+    onUpdateDeviceModalOpen: PropTypes.func.isRequired,
   },
-
-  displayName: "DeviceSelector",
 
   mixins: [ addons.PureRenderMixin ],
 
@@ -27,7 +29,13 @@ module.exports = createClass({
       devices,
       onChangeViewportDevice,
       onResizeViewport,
+      onUpdateDeviceModalOpen,
     } = this.props;
+
+    if (target.value === OPEN_DEVICE_MODAL_VALUE) {
+      onUpdateDeviceModalOpen(true);
+      return;
+    }
 
     for (let type of devices.types) {
       for (let device of devices[type]) {
@@ -50,32 +58,66 @@ module.exports = createClass({
     let options = [];
     for (let type of devices.types) {
       for (let device of devices[type]) {
-        options.push(device);
+        if (device.displayed) {
+          options.push(device);
+        }
       }
     }
+
+    options.sort(function (a, b) {
+      return a.name.localeCompare(b.name);
+    });
 
     let selectClass = "viewport-device-selector";
     if (selectedDevice) {
       selectClass += " selected";
     }
 
+    let state = devices.listState;
+    let listContent;
+
+    if (state == Types.deviceListState.LOADED) {
+      listContent = [dom.option({
+        value: "",
+        title: "",
+        disabled: true,
+        hidden: true,
+      }, getStr("responsive.noDeviceSelected")),
+        options.map(device => {
+          return dom.option({
+            key: device.name,
+            value: device.name,
+            title: "",
+          }, device.name);
+        }),
+        dom.option({
+          value: OPEN_DEVICE_MODAL_VALUE,
+          title: "",
+        }, getStr("responsive.editDeviceList"))];
+    } else if (state == Types.deviceListState.LOADING
+      || state == Types.deviceListState.INITIALIZED) {
+      listContent = [dom.option({
+        value: "",
+        title: "",
+        disabled: true,
+      }, getStr("responsive.deviceListLoading"))];
+    } else if (state == Types.deviceListState.ERROR) {
+      listContent = [dom.option({
+        value: "",
+        title: "",
+        disabled: true,
+      }, getStr("responsive.deviceListError"))];
+    }
+
     return dom.select(
       {
         className: selectClass,
         value: selectedDevice,
+        title: selectedDevice,
         onChange: this.onSelectChange,
+        disabled: (state !== Types.deviceListState.LOADED),
       },
-      dom.option({
-        value: "",
-        disabled: true,
-        hidden: true,
-      }, getStr("responsive.noDeviceSelected")),
-      options.map(device => {
-        return dom.option({
-          key: device.name,
-          value: device.name,
-        }, device.name);
-      })
+      ...listContent
     );
   },
 

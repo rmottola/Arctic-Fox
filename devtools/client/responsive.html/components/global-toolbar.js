@@ -10,33 +10,47 @@ const { DOM: dom, createClass, PropTypes, addons } =
 const Types = require("../types");
 
 module.exports = createClass({
+  displayName: "GlobalToolbar",
+
   propTypes: {
+    screenshot: PropTypes.shape(Types.screenshot).isRequired,
+    touchSimulation: PropTypes.shape(Types.touchSimulation).isRequired,
     onExit: PropTypes.func.isRequired,
     onScreenshot: PropTypes.func.isRequired,
-    screenshot: PropTypes.shape(Types.screenshot).isRequired,
+    onUpdateTouchSimulation: PropTypes.func.isRequired,
   },
-
-  displayName: "GlobalToolbar",
 
   mixins: [ addons.PureRenderMixin ],
 
   render() {
     let {
+      screenshot,
+      touchSimulation,
       onExit,
       onScreenshot,
-      screenshot,
+      onUpdateTouchSimulation
     } = this.props;
+
+    let touchButtonClass = "toolbar-button devtools-button";
+    if (touchSimulation.enabled) {
+      touchButtonClass += " active";
+    }
 
     return dom.header(
       {
         id: "global-toolbar",
-        className: "toolbar",
+        className: "container",
       },
       dom.span(
         {
           className: "title",
         },
         getStr("responsive.title")),
+      dom.button({
+        id: "global-touch-simulation-button",
+        className: touchButtonClass,
+        onClick: () => onUpdateTouchSimulation(!touchSimulation.enabled),
+      }),
       dom.button({
         id: "global-screenshot-button",
         className: "toolbar-button devtools-button",

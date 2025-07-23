@@ -6,7 +6,7 @@
 /**
  * Basic tests for exporting Network panel content into HAR format.
  */
-add_task(function*() {
+add_task(function* () {
   // The first 'tab' isn't necessary so, don't create a var for it
   // to avoid eslint warning.
   let [ , debuggee, monitor ] = yield initNetMonitor(SIMPLE_URL);
@@ -36,7 +36,7 @@ add_task(function*() {
   let entry = har.log.entries[0];
   is(entry.request.method, "GET", "Check the method");
   is(entry.request.url, SIMPLE_URL, "Check the URL");
-  is(entry.request.headers.length, 8, "Check number of request headers");
+  is(entry.request.headers.length, 9, "Check number of request headers");
   is(entry.response.status, 200, "Check response status");
   is(entry.response.statusText, "OK", "Check response status text");
   is(entry.response.headers.length, 6, "Check number of response headers");

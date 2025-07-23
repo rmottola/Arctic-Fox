@@ -1,13 +1,14 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
 
+"use strict";
+
 var { FileUtils } = Cu.import("resource://gre/modules/FileUtils.jsm", {});
-var { NetUtil } = Cu.import("resource://gre/modules/NetUtil.jsm", {});
 
 function run_test() {
   initTestDebuggerServer();
 
-  add_task(function*() {
+  add_task(function* () {
     yield test_bulk_transfer_transport(socket_transport);
     yield test_bulk_transfer_transport(local_transport);
     DebuggerServer.destroy();
@@ -16,16 +17,16 @@ function run_test() {
   run_next_test();
 }
 
-/*** Tests ***/
+/** * Tests ***/
 
 /**
  * This tests a one-way bulk transfer at the transport layer.
  */
-var test_bulk_transfer_transport = Task.async(function*(transportFactory) {
+var test_bulk_transfer_transport = Task.async(function* (transportFactory) {
   do_print("Starting bulk transfer test at " + new Date().toTimeString());
 
-  let clientDeferred = promise.defer();
-  let serverDeferred = promise.defer();
+  let clientDeferred = defer();
+  let serverDeferred = defer();
 
   // Ensure test files are not present from a failed run
   cleanup_files();
@@ -41,11 +42,11 @@ var test_bulk_transfer_transport = Task.async(function*(transportFactory) {
     NetUtil.asyncFetch({
       uri: NetUtil.newURI(getTestTempFile("bulk-input")),
       loadUsingSystemPrincipal: true
-    }, function(input, status) {
-        copyFrom(input).then(() => {
-          input.close();
-        });
+    }, function (input, status) {
+      copyFrom(input).then(() => {
+        input.close();
       });
+    });
   }
 
   // Receiving on server from client
@@ -73,7 +74,7 @@ var test_bulk_transfer_transport = Task.async(function*(transportFactory) {
 
   // Client
   transport.hooks = {
-    onPacket: function(aPacket) {
+    onPacket: function (aPacket) {
       // We've received the initial start up packet
       do_check_eq(aPacket.from, "root");
 
@@ -91,13 +92,13 @@ var test_bulk_transfer_transport = Task.async(function*(transportFactory) {
       });
 
       transport.startBulkSend({
-         actor: "root",
-         type: "file-stream",
-         length: reallyLong.length
+        actor: "root",
+        type: "file-stream",
+        length: reallyLong.length
       }).then(write_data);
     },
 
-    onClosed: function() {
+    onClosed: function () {
       do_throw("Transport closed before we expected");
     }
   };
@@ -107,7 +108,7 @@ var test_bulk_transfer_transport = Task.async(function*(transportFactory) {
   return promise.all([clientDeferred.promise, serverDeferred.promise]);
 });
 
-/*** Test Utils ***/
+/** * Test Utils ***/
 
 function verify() {
   let reallyLong = really_long();
@@ -119,17 +120,17 @@ function verify() {
   do_check_eq(outputFile.fileSize, reallyLong.length);
 
   // Ensure output file contents actually match
-  let compareDeferred = promise.defer();
+  let compareDeferred = defer();
   NetUtil.asyncFetch({
     uri: NetUtil.newURI(getTestTempFile("bulk-output")),
     loadUsingSystemPrincipal: true
   }, input => {
-      let outputData = NetUtil.readInputStreamToString(input, reallyLong.length);
+    let outputData = NetUtil.readInputStreamToString(input, reallyLong.length);
       // Avoid do_check_eq here so we don't log the contents
-      do_check_true(outputData === reallyLong);
-      input.close();
-      compareDeferred.resolve();
-    });
+    do_check_true(outputData === reallyLong);
+    input.close();
+    compareDeferred.resolve();
+  });
 
   return compareDeferred.promise.then(cleanup_files);
 }

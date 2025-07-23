@@ -1,21 +1,25 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
+"use strict";
 
 /**
  * Tests if the abstract tree base class for the profiler's tree view
  * works as advertised.
  */
 
-var { AbstractTreeItem } = Cu.import("resource://devtools/client/shared/widgets/AbstractTreeItem.jsm", {});
-var { Heritage } = Cu.import("resource://devtools/client/shared/widgets/ViewHelpers.jsm", {});
+const { appendAndWaitForPaint } = require("devtools/client/performance/test/helpers/dom-utils");
+const { synthesizeCustomTreeClass } = require("devtools/client/performance/test/helpers/synth-utils");
+const { once } = require("devtools/client/performance/test/helpers/event-utils");
 
-function* spawnTest() {
+add_task(function* () {
+  let { MyCustomTreeItem, myDataSrc } = synthesizeCustomTreeClass();
+
   let container = document.createElement("vbox");
-  gBrowser.selectedBrowser.parentNode.appendChild(container);
+  yield appendAndWaitForPaint(gBrowser.selectedBrowser.parentNode, container);
 
   // Populate the tree and test the root item...
 
-  let treeRoot = new MyCustomTreeItem(gDataSrc, { parent: null });
+  let treeRoot = new MyCustomTreeItem(myDataSrc, { parent: null });
   treeRoot.attachTo(container);
 
   ok(!treeRoot.expanded,
@@ -34,7 +38,7 @@ function* spawnTest() {
     "The root node has the correct parent.");
   is(treeRoot.level, 0,
     "The root node has the correct level.");
-  is(treeRoot.target.MozMarginStart, "0px",
+  is(treeRoot.target.style.marginInlineStart, "0px",
     "The root node's indentation is correct.");
   is(treeRoot.target.textContent, "root",
     "The root node's text contents are correct.");
@@ -43,12 +47,15 @@ function* spawnTest() {
 
   // Expand the root and test the child items...
 
-  let receivedExpandEvent = treeRoot.once("expand");
-  EventUtils.sendMouseEvent({ type: "mousedown" }, treeRoot.target.querySelector(".arrow"));
+  let receivedExpandEvent = once(treeRoot, "expand", { spreadArgs: true });
+  let receivedFocusEvent = once(treeRoot, "focus");
+  mousedown(treeRoot.target.querySelector(".arrow"));
 
-  let eventItem = yield receivedExpandEvent;
+  let [_, eventItem] = yield receivedExpandEvent;
   is(eventItem, treeRoot,
-    "The 'expand' event target is correct.");
+    "The 'expand' event target is correct (1).");
+
+  yield receivedFocusEvent;
   is(document.commandDispatcher.focusedElement, treeRoot.target,
     "The root node is now focused.");
 
@@ -70,7 +77,7 @@ function* spawnTest() {
     "The 'foo' node has the correct parent.");
   is(fooItem.level, 1,
     "The 'foo' node has the correct level.");
-  is(fooItem.target.MozMarginStart, "10px",
+  is(fooItem.target.style.marginInlineStart, "10px",
     "The 'foo' node's indentation is correct.");
   is(fooItem.target.textContent, "foo",
     "The 'foo' node's text contents are correct.");
@@ -83,7 +90,7 @@ function* spawnTest() {
     "The 'bar' node has the correct parent.");
   is(barItem.level, 1,
     "The 'bar' node has the correct level.");
-  is(barItem.target.MozMarginStart, "10px",
+  is(barItem.target.style.marginInlineStart, "10px",
     "The 'bar' node's indentation is correct.");
   is(barItem.target.textContent, "bar",
     "The 'bar' node's text contents are correct.");
@@ -136,7 +143,7 @@ function* spawnTest() {
     "The 'baz' node has the correct parent.");
   is(bazItem.level, 2,
     "The 'baz' node has the correct level.");
-  is(bazItem.target.MozMarginStart, "20px",
+  is(bazItem.target.style.marginInlineStart, "20px",
     "The 'baz' node's indentation is correct.");
   is(bazItem.target.textContent, "baz",
     "The 'baz' node's text contents are correct.");

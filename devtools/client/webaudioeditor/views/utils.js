@@ -9,7 +9,7 @@
  * returns null.
  */
 
-function findGraphNodeParent (el) {
+function findGraphNodeParent(el) {
   // Some targets may not contain `classList` property
   if (!el.classList)
     return null;
@@ -37,7 +37,7 @@ function findGraphNodeParent (el) {
  * - `_animated`
  * - `_delayed`
  */
-let ToggleMixin = {
+var ToggleMixin = {
 
   bindToggle: function () {
     this._onToggle = this._onToggle.bind(this);
@@ -65,7 +65,7 @@ let ToggleMixin = {
    * is currently being shown.
    */
   isVisible: function () {
-    return !this.el.hasAttribute("pane-collapsed");
+    return !this.el.classList.contains("pane-collapsed");
   },
 
   /**
@@ -88,11 +88,11 @@ let ToggleMixin = {
     ViewHelpers.togglePane(flags, this.el);
 
     if (flags.visible) {
-      this.button.removeAttribute("pane-collapsed");
+      this.button.classList.remove("pane-collapsed");
       this.button.setAttribute("tooltiptext", this._collapseString);
     }
     else {
-      this.button.setAttribute("pane-collapsed", "");
+      this.button.classList.add("pane-collapsed");
       this.button.setAttribute("tooltiptext", this._expandString);
     }
   },
@@ -100,4 +100,4 @@ let ToggleMixin = {
   _onToggle: function () {
     this._viewController({ visible: !this.isVisible() });
   }
-}
+};

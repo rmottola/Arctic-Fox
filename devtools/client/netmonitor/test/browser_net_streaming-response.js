@@ -7,7 +7,7 @@
  */
 
 function test() {
-  Task.spawn(function*() {
+  Task.spawn(function* () {
     let [tab, debuggee, monitor] = yield initNetMonitor(CUSTOM_GET_URL);
 
     info("Starting test... ");
@@ -48,6 +48,7 @@ function test() {
 
     RequestsMenu.selectedIndex = 1;
     yield panelWin.once(panelWin.EVENTS.TAB_UPDATED);
+    yield panelWin.once(panelWin.EVENTS.RESPONSE_BODY_DISPLAYED);
 
     testEditorContent(editor, REQUESTS[1]); // the mpeg-dash part
 

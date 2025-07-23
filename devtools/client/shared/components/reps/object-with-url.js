@@ -6,13 +6,13 @@
 "use strict";
 
 // Make this available to both AMD and CJS environments
-define(function(require, exports, module) {
+define(function (require, exports, module) {
   // ReactJS
   const React = require("devtools/client/shared/vendor/react");
 
   // Reps
   const { createFactories, isGrip } = require("./rep-utils");
-  const { ObjectLink } = createFactories(require("./object-link"));
+  const { ObjectBox } = createFactories(require("./object-box"));
 
   // Shortcuts
   const { span } = React.DOM;
@@ -21,24 +21,36 @@ define(function(require, exports, module) {
    * Renders a grip object with URL data.
    */
   let ObjectWithURL = React.createClass({
+    displayName: "ObjectWithURL",
+
     propTypes: {
       object: React.PropTypes.object.isRequired,
     },
 
-    displayName: "ObjectWithURL",
+    getTitle: function (grip) {
+      if (this.props.objectLink) {
+        return ObjectBox({},
+          this.props.objectLink({
+            object: grip
+          }, this.getType(grip))
+        );
+      }
+      return "";
+    },
 
-    getType: function(grip) {
+    getType: function (grip) {
       return grip.class;
     },
 
-    getDescription: function(grip) {
-      return (grip.preview.kind == "ObjectWithURL") ? grip.preview.url : "";
+    getDescription: function (grip) {
+      return grip.preview.url;
     },
 
-    render: function() {
+    render: function () {
       let grip = this.props.object;
       return (
-        ObjectLink({className: this.getType(grip)},
+        ObjectBox({className: this.getType(grip)},
+          this.getTitle(grip),
           span({className: "objectPropValue"},
             this.getDescription(grip)
           )

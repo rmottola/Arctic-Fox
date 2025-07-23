@@ -24,9 +24,12 @@ class nsGIFDecoder2 : public Decoder
 public:
   ~nsGIFDecoder2();
 
-  Maybe<TerminalState> DoDecode(SourceBufferIterator& aIterator) override;
-  virtual void FinishInternal() override;
-  virtual Telemetry::ID SpeedHistogram() override;
+protected:
+  LexerResult DoDecode(SourceBufferIterator& aIterator,
+                       IResumable* aOnResume) override;
+  nsresult FinishInternal() override;
+
+  Maybe<Telemetry::ID> SpeedHistogram() const override;
 
 private:
   friend class DecoderFactory;
@@ -85,6 +88,7 @@ private:
     NETSCAPE_EXTENSION_SUB_BLOCK,
     NETSCAPE_EXTENSION_DATA,
     IMAGE_DESCRIPTOR,
+    FINISH_IMAGE_DESCRIPTOR,
     LOCAL_COLOR_TABLE,
     FINISHED_LOCAL_COLOR_TABLE,
     IMAGE_DATA_BLOCK,
@@ -108,6 +112,7 @@ private:
   LexerTransition<State> ReadNetscapeExtensionSubBlock(const char* aData);
   LexerTransition<State> ReadNetscapeExtensionData(const char* aData);
   LexerTransition<State> ReadImageDescriptor(const char* aData);
+  LexerTransition<State> FinishImageDescriptor(const char* aData);
   LexerTransition<State> ReadLocalColorTable(const char* aData, size_t aLength);
   LexerTransition<State> FinishedLocalColorTable();
   LexerTransition<State> ReadImageDataBlock(const char* aData);

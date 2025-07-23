@@ -198,7 +198,8 @@ class CodeGeneratorARM64 : public CodeGeneratorShared
     void visitStoreTypedArrayElementStatic(LStoreTypedArrayElementStatic* ins);
     void visitCompareExchangeTypedArrayElement(LCompareExchangeTypedArrayElement* lir);
     void visitAtomicExchangeTypedArrayElement(LAtomicExchangeTypedArrayElement* lir);
-    void visitAsmJSCall(LAsmJSCall* ins);
+    void visitWasmCall(LWasmCall* ins);
+    void visitWasmCallI64(LWasmCallI64* ins);
     void visitAsmJSLoadHeap(LAsmJSLoadHeap* ins);
     void visitAsmJSStoreHeap(LAsmJSStoreHeap* ins);
     void visitAsmJSCompareExchangeHeap(LAsmJSCompareExchangeHeap* ins);
@@ -213,8 +214,8 @@ class CodeGeneratorARM64 : public CodeGeneratorShared
     void setReturnDoubleRegs(LiveRegisterSet* regs);
 
   protected:
-    void postAsmJSCall(LAsmJSCall* lir) {
-        MOZ_CRASH("postAsmJSCall");
+    void postWasmCall(LWasmCall* lir) {
+        MOZ_CRASH("postWasmCall");
     }
 
     void visitEffectiveAddress(LEffectiveAddress* ins);

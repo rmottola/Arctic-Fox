@@ -43,7 +43,10 @@ var ReaderParent = {
           }
         }, e => {
           if (e && e.newURL) {
-            message.target.loadURI("about:reader?url=" + encodeURIComponent(e.newURL));
+            // Make sure the target browser is still alive before trying to send data back.
+            if (message.target.messageManager) {
+              message.target.messageManager.sendAsyncMessage("Reader:ArticleData", { newURL: e.newURL });
+            }
           }
         });
         break;
@@ -76,46 +79,35 @@ var ReaderParent = {
   },
 
   updateReaderButton: function(browser) {
-    let win = browser.ownerDocument.defaultView;
+    let win = browser.ownerGlobal;
     if (browser != win.gBrowser.selectedBrowser) {
       return;
     }
 
     let button = win.document.getElementById("reader-mode-button");
+    let command = win.document.getElementById("View:ReaderView");
     if (browser.currentURI.spec.startsWith("about:reader")) {
       button.setAttribute("readeractive", true);
       button.hidden = false;
-      button.setAttribute("tooltiptext", gStringBundle.GetStringFromName("readerView.close"));
+      let closeText = gStringBundle.GetStringFromName("readerView.close");
+      button.setAttribute("tooltiptext", closeText);
+      command.setAttribute("label", closeText);
+      command.setAttribute("hidden", false);
     } else {
       button.removeAttribute("readeractive");
-      button.setAttribute("tooltiptext", gStringBundle.GetStringFromName("readerView.enter"));
       button.hidden = !browser.isArticle;
+      let enterText = gStringBundle.GetStringFromName("readerView.enter");
+      button.setAttribute("tooltiptext", enterText);
+      command.setAttribute("label", enterText);
+      command.setAttribute("hidden", !browser.isArticle);
     }
+    command.setAttribute("accesskey", gStringBundle.GetStringFromName("readerView.accesskey"));
   },
 
-  handleReaderButtonEvent: function(event) {
-    event.stopPropagation();
-
-    if ((event.type == "click" && event.button != 0) ||
-        (event.type == "keypress" && event.charCode != Ci.nsIDOMKeyEvent.DOM_VK_SPACE &&
-         event.keyCode != Ci.nsIDOMKeyEvent.DOM_VK_RETURN)) {
-      return; // Left click, space or enter only
-    }
-
-    let win = event.target.ownerDocument.defaultView;
+  toggleReaderMode: function(event) {
+    let win = event.target.ownerGlobal;
     let browser = win.gBrowser.selectedBrowser;
-    let url = browser.currentURI.spec;
-
-    if (url.startsWith("about:reader")) {
-      let originalURL = ReaderMode.getOriginalUrl(url);
-      if (!originalURL) {
-        Cu.reportError("Error finding original URL for about:reader URL: " + url);
-      } else {
-        win.openUILinkIn(originalURL, "current", {"allowPinnedTabHostChange": true});
-      }
-    } else {
-      browser.messageManager.sendAsyncMessage("Reader:ParseDocument", { url: url });
-    }
+    browser.messageManager.sendAsyncMessage("Reader:ToggleReaderMode");
   },
 
   /**

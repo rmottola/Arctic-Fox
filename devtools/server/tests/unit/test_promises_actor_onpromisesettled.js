@@ -10,11 +10,11 @@
 
 Cu.import("resource://testing-common/PromiseTestUtils.jsm", this);
 
-const { PromisesFront } = require("devtools/server/actors/promises");
+const { PromisesFront } = require("devtools/shared/fronts/promises");
 
 var events = require("sdk/event/core");
 
-add_task(function*() {
+add_task(function* () {
   let client = yield startTestDebuggerServer("promises-actor-test");
   let chromeActors = yield getChromeActors(client);
 

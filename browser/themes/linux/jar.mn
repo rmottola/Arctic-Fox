@@ -32,8 +32,6 @@ browser.jar:
   skin/classic/browser/identity-mixed-passive-loaded.svg    (../shared/identity-block/identity-mixed-passive-loaded.svg)
   skin/classic/browser/identity-mixed-active-loaded.svg     (../shared/identity-block/identity-mixed-active-loaded.svg)
   skin/classic/browser/Info.png
-  skin/classic/browser/mask.png                             (../shared/mask.png)
-  skin/classic/browser/mask@2x.png                          (../shared/mask@2x.png)
   skin/classic/browser/KUI-close.png
   skin/classic/browser/bad-content-blocked-16.png
   skin/classic/browser/bad-content-blocked-64.png
@@ -53,12 +51,15 @@ browser.jar:
   skin/classic/browser/setDesktopBackground.css
   skin/classic/browser/slowStartup-16.png
   skin/classic/browser/Toolbar.png
+  skin/classic/browser/Toolbar@2x.png
+  skin/classic/browser/Toolbar-inverted.png
+  skin/classic/browser/Toolbar-inverted@2x.png
   skin/classic/browser/Toolbar-small.png
   skin/classic/browser/urlbar-arrow.png
   skin/classic/browser/urlbar-arrow@2x.png
 * skin/classic/browser/controlcenter/panel.css        (controlcenter/panel.css)
 * skin/classic/browser/customizableui/panelUIOverlay.css (customizableui/panelUIOverlay.css)
-  skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
+* skin/classic/browser/downloads/allDownloadsViewOverlay.css   (downloads/allDownloadsViewOverlay.css)
   skin/classic/browser/downloads/buttons.png          (downloads/buttons.png)
   skin/classic/browser/downloads/contentAreaDownloadsView.css  (downloads/contentAreaDownloadsView.css)
   skin/classic/browser/downloads/download-glow.png    (downloads/download-glow.png)
@@ -66,7 +67,7 @@ browser.jar:
   skin/classic/browser/downloads/download-notification-finish.png (downloads/download-notification-finish.png)
   skin/classic/browser/downloads/download-notification-start.png (downloads/download-notification-start.png)
   skin/classic/browser/downloads/download-summary.png (downloads/download-summary.png)
-  skin/classic/browser/downloads/downloads.css        (downloads/downloads.css)
+* skin/classic/browser/downloads/downloads.css        (downloads/downloads.css)
   skin/classic/browser/feeds/feedIcon.png             (feeds/feedIcon.png)
   skin/classic/browser/feeds/feedIcon16.png           (feeds/feedIcon16.png)
   skin/classic/browser/feeds/subscribe.css            (feeds/subscribe.css)
@@ -98,6 +99,13 @@ browser.jar:
   skin/classic/browser/preferences/preferences.css    (preferences/preferences.css)
   skin/classic/browser/preferences/applications.css   (preferences/applications.css)
   skin/classic/browser/preferences/aboutPermissions.css (preferences/aboutPermissions.css)
+  skin/classic/browser/privatebrowsing/attention.png          (../shared/privatebrowsing/attention.png)
+  skin/classic/browser/privatebrowsing/attention@2x.png       (../shared/privatebrowsing/attention@2x.png)
+  skin/classic/browser/privatebrowsing/check.png              (../shared/privatebrowsing/check.png)
+  skin/classic/browser/privatebrowsing/check@2x.png           (../shared/privatebrowsing/check@2x.png)
+  skin/classic/browser/privatebrowsing/mask.svg               (../shared/privatebrowsing/mask.svg)
+  skin/classic/browser/privatebrowsing/shield-page.png        (../shared/privatebrowsing/shield-page.png)
+  skin/classic/browser/privatebrowsing/shield-page@2x.png     (../shared/privatebrowsing/shield-page@2x.png)
   skin/classic/browser/statusbar/dynamic.css                   (../shared/statusbar/dynamic.css)
 * skin/classic/browser/statusbar/overlay.css                   (statusbar/overlay.css)
 * skin/classic/browser/statusbar/prefs.css                     (statusbar/prefs.css)

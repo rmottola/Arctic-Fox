@@ -121,7 +121,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     id="{B1FC07E1-E05B-4567-8891-E63FBE545BA8}">
       <prefs />
       <versionRange minVersion="0" maxVersion="*" severity="3">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="39.0a1" />
         </targetApplication>
@@ -165,7 +165,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     <emItem blockID="i238" id="/^pink@.*\.info$/">
       <prefs />
       <versionRange minVersion="0" maxVersion="*" severity="3">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="18.0" />
         </targetApplication>
@@ -402,7 +402,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     id="{0153E448-190B-4987-BDE1-F256CADA672F}">
       <prefs />
       <versionRange minVersion="0" maxVersion="*" severity="3">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="39.0a1" />
         </targetApplication>
@@ -453,7 +453,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <prefs />
       <versionRange minVersion="0"
       maxVersion="2.1.9.1-signed.1-signed" severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="47" />
         </targetApplication>
@@ -714,7 +714,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <prefs />
       <versionRange minVersion="0" maxVersion="7.5.0.9082"
       severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="43.0a1" />
         </targetApplication>
@@ -940,7 +940,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <prefs />
       <versionRange minVersion="0.1" maxVersion="7.6.1"
       severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="8.0a1" />
         </targetApplication>
@@ -1100,7 +1100,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       severity="1" />
       <versionRange minVersion="1.0" maxVersion="1.3.1"
       severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="3.0a1" />
         </targetApplication>
@@ -1133,7 +1133,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     id="mozilla_cc@internetdownloadmanager.com">
       <prefs />
       <versionRange minVersion="0" maxVersion="6.9.8" severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="3.7a1pre" />
         </targetApplication>
@@ -1168,7 +1168,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <prefs />
       <versionRange minVersion="0.1" maxVersion="1.3.328.4"
       severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="3.7a1pre" />
         </targetApplication>
@@ -1183,7 +1183,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     id="{C3949AC2-4B17-43ee-B4F1-D26B9D42404D}" os="WINNT">
       <prefs />
       <versionRange minVersion="0" maxVersion="*" severity="3">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="39.0a1" />
         </targetApplication>
@@ -1354,7 +1354,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     id="{97E22097-9A2F-45b1-8DAF-36AD648C7EF4}">
       <prefs />
       <versionRange minVersion="0" maxVersion="*" severity="3">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="39.0a1" />
         </targetApplication>
@@ -1490,7 +1490,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <prefs />
       <versionRange minVersion="1.9.0" maxVersion="1.9.0"
       severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="9.*" minVersion="9.0a1" />
         </targetApplication>
@@ -1576,7 +1576,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     id="{4B3803EA-5230-4DC3-A7FC-33638F3D3542}">
       <prefs />
       <versionRange minVersion="1.2" maxVersion="1.2" severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="3.0a1" />
         </targetApplication>
@@ -1590,7 +1590,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <prefs />
       <versionRange minVersion="2.0.5" maxVersion="2.0.5"
       severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="3.5.7" />
         </targetApplication>
@@ -1648,7 +1648,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <versionRange minVersion="0" maxVersion="*" severity="1" />
     </emItem>
     <emItem blockID="i115"
-    id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+    id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
       <prefs />
       <versionRange minVersion="0" maxVersion="*" severity="3" />
     </emItem>
@@ -1719,7 +1719,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     id="{841468a1-d7f4-4bd3-84e6-bb0f13a06c64}">
       <prefs />
       <versionRange minVersion="0.1" maxVersion="*" severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="9.0" minVersion="9.0a1" />
         </targetApplication>
@@ -1774,7 +1774,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     <emItem blockID="i23" id="firefox@bandoo.com">
       <prefs />
       <versionRange minVersion="5.0" maxVersion="5.0" severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="3.7a1pre" />
         </targetApplication>
@@ -1789,7 +1789,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     id="{DAC3F861-B30D-40dd-9166-F4E75327FAC7}">
       <prefs />
       <versionRange minVersion="0" maxVersion="*" severity="3">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="39.0a1" />
         </targetApplication>
@@ -1885,7 +1885,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <prefs />
       <versionRange minVersion="0" maxVersion="1.0.0.2"
       severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="23.0a1" />
         </targetApplication>
@@ -1896,13 +1896,13 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <prefs />
       <versionRange minVersion="0.1" maxVersion="3.3.0.*"
       severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="3.7a1" />
         </targetApplication>
       </versionRange>
       <versionRange minVersion="3.3.1" maxVersion="*" severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="5.0a1" />
         </targetApplication>
@@ -1938,7 +1938,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <prefs />
       <versionRange minVersion="0" maxVersion="7.7.34"
       severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="34.0a1" />
         </targetApplication>
@@ -2085,7 +2085,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     id="{34712C68-7391-4c47-94F3-8F88D49AD632}">
       <prefs />
       <versionRange minVersion="0" maxVersion="*" severity="3">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="39.0a1" />
         </targetApplication>
@@ -2158,7 +2158,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     <emItem blockID="i15" id="personas@christopher.beard">
       <prefs />
       <versionRange minVersion="1.6" maxVersion="1.6" severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="3.6.*" minVersion="3.6" />
         </targetApplication>
@@ -2254,7 +2254,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     id="{FCE04E1F-9378-4f39-96F6-5689A9159E45}">
       <prefs />
       <versionRange minVersion="0" maxVersion="*" severity="3">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange maxVersion="*" minVersion="39.0a1" />
         </targetApplication>
@@ -2485,7 +2485,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     </emItem>
     <emItem blockID="pm106" id="tabutils@angrydroid.com">
       <versionRange minVersion="0" maxVersion="1.9" severity="3">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
           <versionRange minVersion="27.0.0a1" maxVersion="*" />
         </targetApplication>      
       </versionRange>
@@ -2498,7 +2498,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     </emItem>   
     <emItem blockID="pm109" id="{05b2e82d-b047-4d00-a9dd-9ddae0602172}">
       <versionRange minVersion="0" maxVersion="1.2.3.1" severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
           <versionRange minVersion="27.0.0a1" maxVersion="*" />
         </targetApplication>      
       </versionRange>
@@ -2527,7 +2527,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="^Yahoo Application State Plugin$" />
       <match name="filename" exp="npYState.dll" />
       <versionRange>
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="3.0a1" maxVersion="3.*" />
         </targetApplication>
@@ -2537,7 +2537,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <match name="name" exp="QuickTime Plug-in 7[.]1[.]" />
       <match name="filename" exp="npqtplugin.?[.]dll" />
       <versionRange>
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="3.0a1" maxVersion="3.*" />
         </targetApplication>
@@ -2552,7 +2552,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     <pluginItem blockID="p32">
       <match name="filename" exp="npViewpoint.dll" />
       <versionRange>
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="3.0" maxVersion="*" />
         </targetApplication>
@@ -2567,7 +2567,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <match name="filename"
       exp="[Nn][Pp][Jj][Pp][Ii]1[56]0_[0-9]+\.[Dd][Ll][Ll]" />
       <versionRange>
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="3.6a1pre" maxVersion="*" />
         </targetApplication>
@@ -2594,7 +2594,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <match name="filename" exp="Flash\ Player\.plugin" />
       <versionRange minVersion="0" maxVersion="10.2.159.1"
       severity="0">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="0.1" maxVersion="17.0.1" />
         </targetApplication>
@@ -2615,7 +2615,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Plug-in 1\.(6\.0_(\d|[0-2]\d?|3[0-2])|7\.0(_0?([1-4]))?)([^\d\._]|$)" />
       <match name="filename" exp="libnpjp2\.so" />
       <versionRange severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="0.1" maxVersion="17.*" />
         </targetApplication>
@@ -2625,7 +2625,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <match name="filename" exp="JavaPlugin2_NPAPI\.plugin" />
       <versionRange minVersion="0" maxVersion="14.2.0"
       severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="0.1" maxVersion="17.*" />
         </targetApplication>
@@ -2636,7 +2636,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Platform SE ((6( U(\d|([0-2]\d)|3[0-2]))?)|(7(\sU[0-4])?))(\s[^\d\._U]|$)" />
       <match name="filename" exp="npjp2\.dll" />
       <versionRange severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="0.1" maxVersion="17.*" />
         </targetApplication>
@@ -2652,7 +2652,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Plug-in 1\.7\.0(_0?([5-6]))?([^\d\._]|$)" />
       <match name="filename" exp="libnpjp2\.so" />
       <versionRange severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="0.1" maxVersion="17.*" />
         </targetApplication>
@@ -2663,7 +2663,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Platform SE 7 U[5-6](\s[^\d\._U]|$)" />
       <match name="filename" exp="npjp2\.dll" />
       <versionRange severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="0.1" maxVersion="17.*" />
         </targetApplication>
@@ -2673,7 +2673,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <match name="filename" exp="JavaAppletPlugin\.plugin" />
       <versionRange minVersion="Java 7 Update 01"
       maxVersion="Java 7 Update 06" severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="0.1" maxVersion="17.*" />
         </targetApplication>
@@ -2703,7 +2703,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <match name="filename" exp="NPSWF32\.dll" />
       <versionRange minVersion="0" maxVersion="10.2.9999"
       severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="4.0" maxVersion="16.*" />
         </targetApplication>
@@ -2715,7 +2715,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="(NPSWF32\.dll)|(Flash\ Player\.plugin)" />
       <versionRange minVersion="10.3" maxVersion="10.3.183.18.999"
       severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="19.0a1" maxVersion="*" />
         </targetApplication>
@@ -2727,7 +2727,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="(NPSWF32\.dll)|(Flash\ Player\.plugin)" />
       <versionRange minVersion="10.3" maxVersion="10.3.183.18.999"
       severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0.4" maxVersion="17.0.*" />
         </targetApplication>
@@ -2739,7 +2739,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="(NPSWF[0-9_]*\.dll)|(Flash\ Player\.plugin)" />
       <versionRange minVersion="11.0" maxVersion="11.7.700.169"
       severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="19.0a1" maxVersion="*" />
         </targetApplication>
@@ -2751,7 +2751,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="(NPSWF[0-9_]*\.dll)|(Flash\ Player\.plugin)" />
       <versionRange minVersion="11.0" maxVersion="11.7.700.169"
       severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0.4" maxVersion="17.0.*" />
         </targetApplication>
@@ -2763,7 +2763,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <versionRange minVersion="Java 7 Update 0"
       maxVersion="Java 7 Update 11" severity="0"
       vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -2774,7 +2774,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Platform SE 7 U([0-9]|(1[0-1]))(\s[^\d\._U]|$)" />
       <match name="filename" exp="npjp2\.dll" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -2785,7 +2785,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Plug-in 1\.7\.0(_0?([0-9]|(1[0-1]))?)?([^\d\._]|$)" />
       <match name="filename" exp="libnpjp2\.so" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -2796,7 +2796,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Platform SE 6 U3[1-8](\s[^\d\._U]|$)" />
       <match name="filename" exp="npjp2\.dll" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -2807,7 +2807,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <versionRange minVersion="Java 6 Update 0"
       maxVersion="Java 6 Update 38" severity="0"
       vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -2818,7 +2818,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Plug-in 1\.6\.0_3[1-8]([^\d\._]|$)" />
       <match name="filename" exp="libnpjp2\.so" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -2829,7 +2829,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Plug-in 1\.7\.0(_0?7)?([^\d\._]|$)" />
       <match name="filename" exp="libnpjp2\.so" />
       <versionRange severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="0.1" maxVersion="17.*" />
         </targetApplication>
@@ -2839,7 +2839,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <match name="filename" exp="JavaAppletPlugin\.plugin" />
       <versionRange minVersion="Java 7 Update 07"
       maxVersion="Java 7 Update 07" severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="0.1" maxVersion="17.*" />
         </targetApplication>
@@ -2850,7 +2850,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Platform SE 7 U7(\s[^\d\._U]|$)" />
       <match name="filename" exp="npjp2\.dll" />
       <versionRange severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="0.1" maxVersion="17.*" />
         </targetApplication>
@@ -2865,7 +2865,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <match name="description" exp="Flip4Mac" />
       <versionRange minVersion="0" maxVersion="2.4.3.999"
       severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="18.0a1" maxVersion="*" />
         </targetApplication>
@@ -2889,7 +2889,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
     <pluginItem blockID="p254">
       <match name="filename" exp="PDF Browser Plugin\.plugin" />
       <versionRange minVersion="0" maxVersion="2.4.2" severity="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="18.0a1" maxVersion="*" />
         </targetApplication>
@@ -2900,7 +2900,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="(NPSWF32\.dll)|(Flash\ Player\.plugin)" />
       <versionRange minVersion="0" maxVersion="10.2.9999"
       severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="18.0a1" maxVersion="*" />
         </targetApplication>
@@ -2912,7 +2912,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="(NPSWF32\.dll)|(Flash\ Player\.plugin)" />
       <versionRange minVersion="0" maxVersion="10.2.9999"
       severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0.4" maxVersion="17.0.*" />
         </targetApplication>
@@ -2925,7 +2925,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <versionRange minVersion="10.3.183.19"
       maxVersion="10.3.183.66" severity="0"
       vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="19.0a1" maxVersion="*" />
         </targetApplication>
@@ -2938,7 +2938,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <versionRange minVersion="10.3.183.19"
       maxVersion="10.3.183.66" severity="0"
       vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0.4" maxVersion="17.0.*" />
         </targetApplication>
@@ -2950,7 +2950,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <versionRange minVersion="Java 7 Update 12"
       maxVersion="Java 7 Update 15" severity="0"
       vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -2961,7 +2961,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Platform SE 7 U1[2-5](\s[^\d\._U]|$)" />
       <match name="filename" exp="npjp2\.dll" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -2972,7 +2972,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Plug-in 1\.7\.0_1[2-5]([^\d\._]|$)" />
       <match name="filename" exp="libnpjp2\.so" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -2983,7 +2983,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <versionRange minVersion="Java 6 Update 39"
       maxVersion="Java 6 Update 41" severity="0"
       vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -2994,7 +2994,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Platform SE 6 U(39|40|41)(\s[^\d\._U]|$)" />
       <match name="filename" exp="npjp2\.dll" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -3005,7 +3005,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Plug-in 1\.6\.0_(39|40|41)([^\d\._]|$)" />
       <match name="filename" exp="libnpjp2\.so" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -3015,7 +3015,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <match name="filename" exp="Silverlight\.plugin" />
       <versionRange minVersion="5.1" maxVersion="5.1.20124.9999"
       severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="19.0a1" maxVersion="*" />
         </targetApplication>
@@ -3025,7 +3025,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <match name="filename" exp="Silverlight\.plugin" />
       <versionRange minVersion="5.1" maxVersion="5.1.20124.9999"
       severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0.4" maxVersion="17.0.*" />
         </targetApplication>
@@ -3036,7 +3036,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="^Shockwave Flash (([1-9]\.[0-9]+)|(10\.([0-2]|(3 r(([0-9][0-9]?)|1(([0-7][0-9])|8[0-2]))))))( |$)" />
       <match name="filename" exp="libflashplayer\.so" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="19.0a1" maxVersion="*" />
         </targetApplication>
@@ -3048,7 +3048,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="^Shockwave Flash (([1-9]\.[0-9]+)|(10\.([0-2]|(3 r(([0-9][0-9]?)|1(([0-7][0-9])|8[0-2]))))))( |$)" />
       <match name="filename" exp="libflashplayer\.so" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0.4" maxVersion="17.0.*" />
         </targetApplication>
@@ -3060,7 +3060,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="^Shockwave Flash 11.(0|1) r[0-9]{1,3}$" />
       <match name="filename" exp="libflashplayer\.so" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="19.0a1" maxVersion="*" />
         </targetApplication>
@@ -3072,7 +3072,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="^Shockwave Flash 11.(0|1) r[0-9]{1,3}$" />
       <match name="filename" exp="libflashplayer\.so" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0.4" maxVersion="17.0.*" />
         </targetApplication>
@@ -3099,7 +3099,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Plug-in 1\.6\.0_4[2-5]([^\d\._]|$)" />
       <match name="filename" exp="libnpjp2\.so" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -3110,7 +3110,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Platform SE 6 U4[2-5](\s[^\d\._U]|$)" />
       <match name="filename" exp="npjp2\.dll" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -3121,7 +3121,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <versionRange minVersion="Java 6 Update 42"
       maxVersion="Java 6 Update 45" severity="0"
       vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -3132,7 +3132,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Plug-in 1\.7\.0_(1[6-9]|2[0-4])([^\d\._]|$)" />
       <match name="filename" exp="libnpjp2\.so" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -3143,7 +3143,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Platform SE 7 U(1[6-9]|2[0-4])(\s[^\d\._U]|$)" />
       <match name="filename" exp="npjp2\.dll" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -3154,7 +3154,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <versionRange minVersion="Java 7 Update 16"
       maxVersion="Java 7 Update 24" severity="0"
       vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -3175,7 +3175,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java(\(TM\))? Plug-in ((1\.7\.0_(2[5-9]|3\d|4[0-4]))|(10\.4[0-4](\.[0-9]+)?))([^\d\._]|$)" />
       <match name="filename" exp="libnpjp2\.so" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -3186,7 +3186,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       exp="Java\(TM\) Platform SE 7 U(2[5-9]|3\d|4[0-4])(\s[^\d\._U]|$)" />
       <match name="filename" exp="npjp2\.dll" />
       <versionRange severity="0" vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>
@@ -3197,7 +3197,7 @@ xmlns="http://www.mozilla.org/2006/addons-blocklist">
       <versionRange minVersion="Java 7 Update 25"
       maxVersion="Java 7 Update 44" severity="0"
       vulnerabilitystatus="1">
-        <targetApplication id="{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}">
+        <targetApplication id="{ec8030f7-c20a-464f-9b0e-13a3a9e97384}">
 
           <versionRange minVersion="17.0" maxVersion="*" />
         </targetApplication>

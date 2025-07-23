@@ -21,7 +21,7 @@ var callee = i => `(func $f${i} (type $v2i) (result i32) (i32.const ${i}))`;
 // should not hold their originating table alive. Live exported functions should
 // hold instances alive. Nothing should hold the export object alive.
 resetFinalizeCount();
-var i = evalText(`(module (table (resizable 2)) (export "tbl" table) (elem 0 $f0) ${callee(0)} ${caller})`);
+var i = evalText(`(module (table (resizable 2)) (export "tbl" table) (elem (i32.const 0) $f0) ${callee(0)} ${caller})`);
 var e = i.exports;
 var t = e.tbl;
 var f = t.get(0);
@@ -59,7 +59,7 @@ assertEq(finalizeCount(), 5);
 
 // A table should hold the instance of any of its elements alive.
 resetFinalizeCount();
-var i = evalText(`(module (table (resizable 1)) (export "tbl" table) (elem 0 $f0) ${callee(0)} ${caller})`);
+var i = evalText(`(module (table (resizable 1)) (export "tbl" table) (elem (i32.const 0) $f0) ${callee(0)} ${caller})`);
 var e = i.exports;
 var t = e.tbl;
 var f = t.get(0);
@@ -108,7 +108,7 @@ assertEq(finalizeCount(), 3);
 // Before initialization, a table is not bound to any instance.
 resetFinalizeCount();
 var i = evalText(`(module (func $f0 (result i32) (i32.const 0)) (export "f0" $f0))`);
-var t = new Table({initial:4});
+var t = new Table({initial:4, element:"anyfunc"});
 i.edge = makeFinalizeObserver();
 t.edge = makeFinalizeObserver();
 gc();
@@ -125,7 +125,7 @@ assertEq(finalizeCount(), 2);
 resetFinalizeCount();
 var i = evalText(`(module (func $f (result i32) (i32.const 42)) (export "f" $f))`);
 var f = i.exports.f;
-var t = new Table({initial:1});
+var t = new Table({initial:1, element:"anyfunc"});
 i.edge = makeFinalizeObserver();
 f.edge = makeFinalizeObserver();
 t.edge = makeFinalizeObserver();
@@ -152,3 +152,79 @@ assertEq(finalizeCount(), 2);
 t = null;
 gc();
 assertEq(finalizeCount(), 4);
+
+// Once all of an instance's elements in a Table (including the
+// bad-indirect-call stub) have been clobbered, the Instance should not be
+// rooted.
+resetFinalizeCount();
+var i1 = evalText(`(module (func $f1 (result i32) (i32.const 13)) (export "f1" $f1))`);
+var i2 = evalText(`(module (func $f2 (result i32) (i32.const 42)) (export "f2" $f2))`);
+var f1 = i1.exports.f1;
+var f2 = i2.exports.f2;
+var t = new Table({initial:2, element:"anyfunc"});
+i1.edge = makeFinalizeObserver();
+i2.edge = makeFinalizeObserver();
+f1.edge = makeFinalizeObserver();
+f2.edge = makeFinalizeObserver();
+t.edge = makeFinalizeObserver();
+t.set(0, f1);
+t.set(1, f2);
+gc();
+assertEq(finalizeCount(), 0);
+f1 = f2 = null;
+i1.exports = null;
+i2.exports = null;
+gc();
+assertEq(finalizeCount(), 2);
+i1 = null;
+i2 = null;
+gc();
+assertEq(finalizeCount(), 2);
+t.set(0, t.get(1));
+gc();
+assertEq(finalizeCount(), 3);
+t = null;
+gc();
+assertEq(finalizeCount(), 5);
+
+// Ensure that an instance that is only live on the stack cannot be GC even if
+// there are no outstanding references.
+resetFinalizeCount();
+const N = 10;
+var tbl = new Table({initial:N, element:"anyfunc"});
+tbl.edge = makeFinalizeObserver();
+function runTest() {
+    tbl = null;
+    gc();
+    assertEq(finalizeCount(), 1);
+    return 100;
+}
+var i = evalText(
+    `(module
+        (import "a" "b" (result i32))
+        (func $f (param i32) (result i32) (call_import 0))
+        (export "f" $f)
+    )`,
+    {a:{b:runTest}}
+);
+i.edge = makeFinalizeObserver();
+tbl.set(0, i.exports.f);
+var m = new Module(textToBinary(`(module
+    (import "a" "b" (table ${N}))
+    (type $i2i (func (param i32) (result i32)))
+    (func $f (param $i i32) (result i32)
+        (set_local $i (i32.sub (get_local $i) (i32.const 1)))
+        (i32.add
+            (i32.const 1)
+            (call_indirect $i2i (get_local $i) (get_local $i))))
+    (export "f" $f)
+)`));
+for (var i = 1; i < N; i++) {
+    var inst = new Instance(m, {a:{b:tbl}});
+    inst.edge = makeFinalizeObserver();
+    tbl.set(i, inst.exports.f);
+}
+inst = null;
+assertEq(tbl.get(N - 1)(N - 1), 109);
+gc();
+assertEq(finalizeCount(), N + 1);

@@ -122,7 +122,7 @@ JS::CallArgs::requireAtLeast(JSContext* cx, const char* fnname, unsigned require
 {
     if (length() < required) {
         char numArgsStr[40];
-        JS_snprintf(numArgsStr, sizeof numArgsStr, "%u", required - 1);
+        snprintf(numArgsStr, sizeof(numArgsStr), "%u", required - 1);
         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
                              fnname, numArgsStr, required == 2 ? "" : "s");
         return false;
@@ -708,6 +708,7 @@ JS_EnterCompartment(JSContext* cx, JSObject* target)
 {
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
+    MOZ_ASSERT(!JS::ObjectIsMarkedGray(target));
 
     JSCompartment* oldCompartment = cx->compartment();
     cx->enterCompartment(target->compartment());
@@ -729,6 +730,7 @@ JSAutoCompartment::JSAutoCompartment(JSContext* cx, JSObject* target
 {
     AssertHeapIsIdleOrIterating(cx_);
     MOZ_GUARD_OBJECT_NOTIFIER_INIT;
+    MOZ_ASSERT(!JS::ObjectIsMarkedGray(target));
     cx_->enterCompartment(target->compartment());
 }
 
@@ -739,9 +741,9 @@ JSAutoCompartment::JSAutoCompartment(JSContext* cx, JSScript* target
 {
     AssertHeapIsIdleOrIterating(cx_);
     MOZ_GUARD_OBJECT_NOTIFIER_INIT;
+    MOZ_ASSERT(!JS::ScriptIsMarkedGray(target));
     cx_->enterCompartment(target->compartment());
 }
-
 
 JSAutoCompartment::~JSAutoCompartment()
 {
@@ -757,6 +759,7 @@ JSAutoNullableCompartment::JSAutoNullableCompartment(JSContext* cx,
     AssertHeapIsIdleOrIterating(cx_);
     MOZ_GUARD_OBJECT_NOTIFIER_INIT;
     if (targetOrNull) {
+        MOZ_ASSERT(!JS::ObjectIsMarkedGray(targetOrNull));
         cx_->enterCompartment(targetOrNull->compartment());
     } else {
         cx_->enterNullCompartment();

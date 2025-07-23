@@ -95,7 +95,7 @@ pref("browser.dictionaries.download.url", "http://repository.binaryoutcast.com/d
 pref("browser.getdevtools.url","https://addons.palemoon.org/extensions/web-development/");
 
 // Feedback URL
-pref("browser.feedback.url", "https://forums.macrumors.com/threads/arctic-fox-web-browser-for-10-6-64bit.2133051/");
+pref("browser.feedback.url", "https://github.com/rmottola/Arctic-Fox/discussions");
 
 // Whether to escape to a content-less page if a user presses "Get me out of here"
 // on a network error page (e.g. cert error)
@@ -394,10 +394,6 @@ pref("browser.search.openintab", false);
 
 // context menu searches open in the foreground
 pref("browser.search.context.loadInBackground", false);
-
-// if no result, add the search term so that the panel of the new UI is shown anyway
-pref("browser.search.showOneOffButtons", true);
-
 
 // comma seperated list of of engines to hide in the search panel.
 pref("browser.search.hiddenOneOffs", "");
@@ -928,6 +924,7 @@ pref("places.frecency.bookmarkVisitBonus", 75);
 pref("places.frecency.downloadVisitBonus", 0);
 pref("places.frecency.permRedirectVisitBonus", 0);
 pref("places.frecency.tempRedirectVisitBonus", 0);
+pref("places.frecency.reloadVisitBonus", 0);
 pref("places.frecency.defaultVisitBonus", 0);
 
 // bonus (in percent) for place types for frecency calculations
@@ -1026,7 +1023,7 @@ pref("dom.ipc.plugins.sandbox-level.flash", 0);
 #if defined(NIGHTLY_BUILD)
 pref("security.sandbox.content.level", 2);
 #else
-pref("security.sandbox.content.level", 0);
+pref("security.sandbox.content.level", 1);
 #endif
 
 #if defined(MOZ_STACKWALKING)
@@ -1136,6 +1133,7 @@ pref("services.sync.prefs.sync.browser.newtabpage.enabled", true);
 pref("services.sync.prefs.sync.browser.newtabpage.enhanced", true);
 pref("services.sync.prefs.sync.browser.newtabpage.pinned", true);
 pref("services.sync.prefs.sync.browser.offline-apps.notify", true);
+pref("services.sync.prefs.sync.browser.safebrowsing.phishing.enabled", true);
 pref("services.sync.prefs.sync.browser.search.selectedEngine", true);
 pref("services.sync.prefs.sync.browser.search.update", true);
 pref("services.sync.prefs.sync.browser.sessionstore.restore_on_demand", true);
@@ -1362,9 +1360,6 @@ pref("browser.defaultbrowser.notificationbar", false);
 // Determines if Telemetry pings can be archived locally.
 pref("toolkit.telemetry.archive.enabled", true);
 
-//Arctic Fox standalone image background color
-pref("browser.display.standalone_images.background_color", "#2E3B41");
-
 // Disable reader mode by default.
 pref("reader.parse-on-load.enabled", false);
 
@@ -1522,3 +1517,5 @@ pref("browser.migration.automigrate", false);
 
 // Enable browser frames for use on desktop.  Only exposed to chrome callers.
 pref("dom.mozBrowserFramesEnabled", true);
+
+pref("signon.schemeUpgrades", true);

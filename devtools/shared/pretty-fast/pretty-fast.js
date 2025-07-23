@@ -441,8 +441,8 @@
     function ensureNewline() {
       if (!newlineAdded) {
         write("\n",
-            lastToken.loc.start.line,
-            lastToken.loc.start.column);
+              lastToken.loc.start.line,
+              lastToken.loc.start.column);
         newlineAdded = true;
       }
     }
@@ -467,8 +467,8 @@
       }
     } else if (needsSpaceAfter(token, lastToken)) {
       write(" ",
-              lastToken.loc.start.line,
-              lastToken.loc.start.column);
+            lastToken.loc.start.line,
+            lastToken.loc.start.column);
     }
   }
 

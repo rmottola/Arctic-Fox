@@ -1,3 +1,9 @@
+%if 0
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+%endif
+
 #identity-popup-content-box:not(.verifiedIdentity) > #identity-popup-content-owner,
 #identity-popup-content-box:not(.verifiedIdentity):not(.verifiedDomain) > #identity-popup-content-verifier,
 #identity-popup-securityView:not(.unknownIdentity):not(.verifiedIdentity):not(.mixedContent):not(.weakCipher) > #identity-popup-content-supplemental,
@@ -112,4 +118,3 @@
   margin-inline-start: 0;
   word-wrap: break-word;
 }
-

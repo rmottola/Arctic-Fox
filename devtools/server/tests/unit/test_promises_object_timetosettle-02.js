@@ -7,12 +7,12 @@
 
 "use strict";
 
-const { PromisesFront } = require("devtools/server/actors/promises");
+const { PromisesFront } = require("devtools/shared/fronts/promises");
 const { setTimeout } = require("sdk/timers");
 
 var events = require("sdk/event/core");
 
-add_task(function*() {
+add_task(function* () {
   let client = yield startTestDebuggerServer("test-promises-timetosettle");
   let chromeActors = yield getChromeActors(client);
   yield attachTab(client, chromeActors);

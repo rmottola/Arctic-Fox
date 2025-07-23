@@ -8,6 +8,8 @@
        onpopupshown="gIdentityHandler.onPopupShown(event);"
        onpopuphidden="gIdentityHandler.onPopupHidden(event);"
        orient="vertical">
+
+
   <hbox id="identity-popup-container" align="top">
     <image id="identity-popup-icon"/>
     <vbox id="identity-popup-content-box">
@@ -26,10 +28,11 @@
                    class="identity-popup-description"/>
       <description id="identity-popup-content-verifier"
                    class="identity-popup-description"/>
-      <vbox id="identity-popup-permissions">
+      <vbox class="identity-popup-section">
         <label class="identity-popup-label header"
                value="&identity.permissions;"/>
         <vbox id="identity-popup-permission-list" class="indent"/>
+        <description>&identity.permissionsEmpty;</description>
       </vbox>
     </vbox>
   </hbox>

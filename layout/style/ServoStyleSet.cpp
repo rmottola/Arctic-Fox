@@ -20,6 +20,7 @@ ServoStyleSet::ServoStyleSet()
   : mPresContext(nullptr)
   , mRawSet(Servo_InitStyleSet())
   , mBatching(0)
+  , mStylingStarted(false)
 {
 }
 
@@ -68,6 +69,16 @@ ServoStyleSet::EndUpdate()
 
   // ... do something ...
   return NS_OK;
+}
+
+void
+ServoStyleSet::StartStyling(nsPresContext* aPresContext)
+{
+  Element* root = aPresContext->Document()->GetRootElement();
+  if (root) {
+    RestyleSubtree(root);
+  }
+  mStylingStarted = true;
 }
 
 already_AddRefed<nsStyleContext>
@@ -367,7 +378,7 @@ nsRestyleHint
 ServoStyleSet::HasStateDependentStyle(dom::Element* aElement,
                                       EventStates aStateMask)
 {
-  NS_ERROR("stylo: HasStateDependentStyle not implemented");
+  NS_WARNING("stylo: HasStateDependentStyle always returns zero!");
   return nsRestyleHint(0);
 }
 
@@ -377,17 +388,20 @@ ServoStyleSet::HasStateDependentStyle(dom::Element* aElement,
                                      dom::Element* aPseudoElement,
                                      EventStates aStateMask)
 {
-  NS_ERROR("stylo: HasStateDependentStyle not implemented");
+  NS_WARNING("stylo: HasStateDependentStyle always returns zero!");
   return nsRestyleHint(0);
 }
 
-void
-ServoStyleSet::RestyleSubtree(nsINode* aNode, bool aForce)
+nsRestyleHint
+ServoStyleSet::ComputeRestyleHint(dom::Element* aElement,
+                                  ServoElementSnapshot* aSnapshot)
 {
-  if (aForce) {
-    MOZ_ASSERT(aNode->IsContent());
-    ServoRestyleManager::DirtyTree(aNode->AsContent());
-  }
+  return Servo_ComputeRestyleHint(aElement, aSnapshot, mRawSet.get());
+}
 
+void
+ServoStyleSet::RestyleSubtree(nsINode* aNode)
+{
+  MOZ_ASSERT(aNode->IsDirtyForServo() || aNode->HasDirtyDescendantsForServo());
   Servo_RestyleSubtree(aNode, mRawSet.get());
 }

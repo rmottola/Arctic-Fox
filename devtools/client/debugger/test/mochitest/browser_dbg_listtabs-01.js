@@ -80,7 +80,8 @@ function testAttachRemovedTab() {
     });
 
     gClient.request({ to: gTab2Actor, type: "attach" }, aResponse => {
-      is(aResponse.type, "exited", "Tab should consider itself exited.");
+      is(aResponse.error, "connectionClosed",
+         "Connection is gone since the tab was removed.");
       deferred.resolve();
     });
 
@@ -94,7 +95,7 @@ function closeConnection() {
   return deferred.promise;
 }
 
-registerCleanupFunction(function() {
+registerCleanupFunction(function () {
   gTab1 = null;
   gTab1Actor = null;
   gTab2 = null;

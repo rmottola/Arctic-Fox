@@ -1,42 +1,51 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
+"use strict";
 
 /**
- * Tests that disables the frontend when in private browsing mode.
+ * Tests that the frontend is disabled when in private browsing mode.
  */
+
+const { SIMPLE_URL } = require("devtools/client/performance/test/helpers/urls");
+const { addWindow } = require("devtools/client/performance/test/helpers/tab-utils");
+const { initPerformanceInNewTab, teardownToolboxAndRemoveTab } = require("devtools/client/performance/test/helpers/panel-utils");
+const { startRecording, stopRecording } = require("devtools/client/performance/test/helpers/actions");
+const { once } = require("devtools/client/performance/test/helpers/event-utils");
 
 let gPanelWinTuples = [];
 
-function* spawnTest() {
+add_task(function* () {
   yield testNormalWindow();
   yield testPrivateWindow();
   yield testRecordingFailingInWindow(0);
   yield testRecordingFailingInWindow(1);
-  yield teardownPerfInWindow(1);
+  yield teardownPerfInWindow(1, { shouldCloseWindow: true, dontWaitForTabClose: true });
   yield testRecordingSucceedingInWindow(0);
-  yield teardownPerfInWindow(0);
+  yield teardownPerfInWindow(0, { shouldCloseWindow: false });
 
   gPanelWinTuples = null;
-  finish();
+});
+
+function* createPanelInNewWindow(options) {
+  let win = yield addWindow(options);
+  return yield createPanelInWindow(options, win);
 }
 
-function* createPanelInWindow(options) {
-  let win = yield addWindow(options);
-  let tab = yield addTab(SIMPLE_URL, win);
-  let target = TargetFactory.forTab(tab);
-  yield target.makeRemote();
+function* createPanelInWindow(options, win = window) {
+  let { panel } = yield initPerformanceInNewTab({
+    url: SIMPLE_URL,
+    win: win
+  }, options);
 
-  let toolbox = yield gDevTools.showToolbox(target, "performance");
-  yield toolbox.initPerformance();
-
-  let panel = yield toolbox.getCurrentPanel().open();
   gPanelWinTuples.push({ panel, win });
-
   return { panel, win };
 }
 
 function* testNormalWindow() {
-  let { panel } = yield createPanelInWindow({ private: false });
+  let { panel } = yield createPanelInWindow({
+    private: false
+  });
+
   let { PerformanceView } = panel.panelWin;
 
   is(PerformanceView.getState(), "empty",

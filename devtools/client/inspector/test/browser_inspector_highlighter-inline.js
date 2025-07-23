@@ -4,6 +4,8 @@
 
 "use strict";
 
+requestLongerTimeout(2);
+
 // Test that highlighting various inline boxes displays the right number of
 // polygons in the page.
 
@@ -19,9 +21,9 @@ const TEST_DATA = [
   "[dir=rtl] > span"
 ];
 
-add_task(function*() {
+add_task(function* () {
   info("Loading the test document and opening the inspector");
-  let {toolbox, inspector, testActor} = yield openInspectorForURL(TEST_URL);
+  let {inspector, testActor} = yield openInspectorForURL(TEST_URL);
 
   for (let selector of TEST_DATA) {
     info("Selecting and highlighting node " + selector);
@@ -30,14 +32,16 @@ add_task(function*() {
     info("Get all quads for this node");
     let data = yield testActor.getAllAdjustedQuads(selector);
 
-    info("Iterate over the box-model regions and verify that the highlighter is correct");
+    info("Iterate over the box-model regions and verify that the highlighter " +
+         "is correct");
     for (let region of ["margin", "border", "padding", "content"]) {
       let {points} = yield testActor.getHighlighterRegionPath(region);
-      is(points.length, data[region].length,
-        "The highlighter's " + region + " path defines the correct number of boxes");
+      is(points.length, data[region].length, "The highlighter's " + region +
+         " path defines the correct number of boxes");
     }
 
-    info("Verify that the guides define a rectangle that contains all content boxes");
+    info("Verify that the guides define a rectangle that contains all " +
+         "content boxes");
 
     let expectedContentRect = {
       p1: {x: Infinity, y: Infinity},

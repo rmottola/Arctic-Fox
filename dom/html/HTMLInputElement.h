@@ -708,14 +708,14 @@ public:
                     ErrorResult& aRv, int32_t aSelectionStart = -1,
                     int32_t aSelectionEnd = -1);
 
-  bool DirectoryAttr() const
+  bool Allowdirs() const
   {
-    return HasAttr(kNameSpaceID_None, nsGkAtoms::directory);
+    return HasAttr(kNameSpaceID_None, nsGkAtoms::allowdirs);
   }
 
-  void SetDirectoryAttr(bool aValue, ErrorResult& aRv)
+  void SetAllowdirs(bool aValue, ErrorResult& aRv)
   {
-    SetHTMLBoolAttr(nsGkAtoms::directory, aValue, aRv);
+    SetHTMLBoolAttr(nsGkAtoms::allowdirs, aValue, aRv);
   }
 
   bool WebkitDirectoryAttr() const
@@ -805,6 +805,8 @@ public:
    * it will return a Decimal for which Decimal::isFinite() will return false.
    */
   static Decimal StringToDecimal(const nsAString& aValue);
+
+  void UpdateEntries(const nsTArray<OwningFileOrDirectory>& aFilesOrDirectories);
 
 protected:
   virtual ~HTMLInputElement();
@@ -965,8 +967,6 @@ protected:
    * Update mFileList with the currently selected file.
    */
   void UpdateFileList();
-
-  void UpdateEntries(const nsTArray<OwningFileOrDirectory>& aFilesOrDirectories);
 
   /**
    * Called after calling one of the SetFilesOrDirectories() functions.

@@ -1,240 +1,380 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this file,
- * You can obtain one at http://mozilla.org/MPL/2.0/. */
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+%include ../../shared/downloads/downloads.inc.css
 
 /*** Panel and outer controls ***/
 
-#downloadsPanel > .panel-arrowcontainer > .panel-arrowcontent {
-  padding: 0;
+#downloadsPanel {
+  margin-top: -1px;
 }
 
-#downloadsListBox {
-  background-color: transparent;
-  padding: 4px;
-  color: inherit;
+#downloadsFooter,
+#downloadsPanel-blockedSubview-buttons {
+  background: #e5e5e5;
+  border-top: 1px solid hsla(0,0%,0%,.1);
+  box-shadow: 0 -1px hsla(0,0%,100%,.5) inset, 0 1px 1px hsla(0,0%,0%,.03) inset;
 }
 
-#downloadsPanel:not([hasdownloads]) > #downloadsListBox {
-  display: none;
+#downloadsFooter,
+#downloadsPanel-multiView .panel-subviews {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
 }
 
-#downloadsPanel[hasdownloads] > #emptyDownloads {
-  display: none;
+#downloadsHistory,
+#downloadsPanel-blockedSubview-buttons > button {
+  color: #808080;
 }
 
-#emptyDownloads {
-  padding: 10px 20px;
-  max-width: 40ch;
+@keyfocus@ #downloadsSummary:focus,
+@keyfocus@ #downloadsHistory:focus,
+@keyfocus@ #downloadsPanel-blockedSubview-buttons > button:focus {
+  outline: 2px -moz-mac-focusring solid;
+  outline-offset: -2px;
 }
 
-#downloadsHistory {
-  background: transparent;
-  color: -moz-nativehyperlinktext;
-  cursor: pointer;
+@keyfocus@ #downloadsSummary:focus,
+@keyfocus@ #downloadsHistory:focus {
+  -moz-outline-radius-bottomleft: 4px;
+  -moz-outline-radius-bottomright: 4px;
 }
 
-#downloadsPanel[keyfocus] > #downloadsFooter > #downloadsHistory:focus {
-  outline: 1px -moz-dialogtext dotted;
-  outline-offset: -1px;
+@keyfocus@ #downloadsPanel-blockedSubview-deleteButton:-moz-locale-dir(ltr):focus {
+  -moz-outline-radius-bottomright: 4px;
 }
 
-#downloadsHistory > .button-box {
-  border: none;
-  margin: 1em;
+@keyfocus@ #downloadsPanel-blockedSubview-deleteButton:-moz-locale-dir(rtl):focus {
+  -moz-outline-radius-bottomleft: 4px;
 }
 
-@media (-moz-mac-lion-theme) {
-  #downloadsFooter {
-    background-color: hsla(216,45%,88%,.98);
-    box-shadow: 0px 1px 2px rgb(204,214,234) inset;
-    border-bottom-left-radius: 3px;
-    border-bottom-right-radius: 3px;
-  }
-}
+/*** List items and similar elements in the summary ***/
 
-/*** Downloads Summary and List items ***/
-
-#downloadsSummary,
-richlistitem[type="download"] {
-  height: 7em;
-  padding-inline-end: 0;
-  color: inherit;
-}
-
-#downloadsSummary {
-  padding: 8px 38px 8px 12px;
-  cursor: pointer;
-  -moz-user-focus: normal;
-}
-
-#downloadsPanel[keyfocus] > #downloadsFooter > #downloadsSummary:focus {
-  outline: 1px -moz-dialogtext dotted;
-  outline-offset: -5px;
-}
-
-#downloadsSummary > .downloadTypeIcon {
-  list-style-image: url("chrome://browser/skin/downloads/download-summary.png");
-}
-
-#downloadsSummaryDescription {
-  color: -moz-nativehyperlinktext;
-}
-
-richlistitem[type="download"] {
-  margin: 0;
-  border-top: 1px solid hsla(0,0%,100%,.3);
-  border-bottom: 1px solid hsla(220,18%,51%,.25);
-  background: transparent;
-  padding: 8px;
-}
-
-richlistitem[type="download"]:first-child {
-  border-top: 1px solid transparent;
-}
-
-@media (-moz-mac-lion-theme) {
-  richlistitem[type="download"]:last-child {
-    border-bottom: 1px solid transparent;
-  }
-}
-
-#downloadsPanel[keyfocus] > #downloadsListBox:focus > richlistitem[type="download"][selected] {
-  outline: 1px -moz-dialogtext dotted;
-  outline-offset: -1px;
-}
-
-.downloadTypeIcon {
-  margin-inline-end: 8px;
-  /* Prevent flickering when changing states. */
-  height: 32px;
-  width: 32px;
+:root {
+  --downloads-item-height: 7em;
+  --downloads-item-border-top-color: hsla(0,0%,100%,.07);
+  --downloads-item-border-bottom-color: hsla(0,0%,0%,.2);
+  --downloads-item-font-size-factor: 0.95;
+  --downloads-item-target-margin-bottom: 6px;
+  --downloads-item-details-margin-top: 0;
+  --downloads-item-details-opacity: 0.7;
 }
 
 .blockedIcon {
-  list-style-image: url("chrome://global/skin/icons/Error.png");
+  list-style-image: url("moz-icon://stock/gtk-dialog-error?size=32");
 }
 
-/* We hold .downloadDisplayName, .downloadProgress and .downloadDetails
-   inside of a vbox with class .downloadContainer. We set the font-size of
-   the entire container to 90% because:
-
-   1) This is the size that we want .downloadDetails to be
-   2) The container's width is set by localizers by &downloadDetails.width;,
-      which is a ch unit. Since this is the value that should control the
-      panel width, we apply it to the outer container to constrain
-      .downloadDisplayName and .downloadProgress.
-
-   Finally, since we want .downloadDisplayName's font-size to be at 100% of
-   the font-size of .downloadContainer's parent, we use calc to go from the
-   smaller font-size back to the original font-size.
- */
-#downloadsSummaryDetails,
-.downloadContainer {
-  font-size: 90%;
-}
-
-#downloadsSummaryDescription,
-.downloadDisplayName {
-  margin-bottom: 6px;
-  cursor: inherit;
-}
-
-.downloadDisplayName {
-  font-size: calc(100%/0.9);
-}
-
-#downloadsSummaryDetails,
-.downloadDetails {
-  opacity: 0.6;
-  cursor: inherit;
-}
-
-.downloadButton {
-  -moz-appearance: none;
-  min-width: 0;
-  min-height: 0;
-  margin: 3px;
-  border: none;
-  background: transparent;
-  padding: 5px;
-  list-style-image: url("chrome://browser/skin/downloads/buttons.png");
-}
-
-.downloadButton > .button-box {
-  border: 1px solid transparent;
-  padding: 0;
-}
-
-#downloadsPanel[keyfocus] .downloadButton:focus > .button-box {
-  border: 1px dotted ThreeDDarkShadow;
+.downloadButton:focus > .button-box {
+  outline: 2px -moz-mac-focusring solid;
+  outline-offset: -2px;
 }
 
 /*** Highlighted list items ***/
 
-#downloadsPanel:not([keyfocus]) > #downloadsListBox > richlistitem[type="download"][state="1"][exists]:hover {
+@keyfocus@ @itemFocused@,
+@notKeyfocus@ @itemFinished@[exists]:hover,
+@item@[showingsubview] {
   border-radius: 3px;
   border-top: 1px solid hsla(0,0%,100%,.2);
-  border-bottom: 1px solid hsla(0,0%,0%,.2);
+  border-bottom: 1px solid hsla(0,0%,0%,.4);
   background-color: Highlight;
   color: HighlightText;
+}
+
+@item@[showingsubview] {
+  transition: background-color var(--panelui-subview-transition-duration),
+              color var(--panelui-subview-transition-duration);
+}
+
+@keyfocus@ @itemFocused@[verdict="Malware"],
+@notKeyfocus@ @itemFinished@[exists][verdict="Malware"]:hover,
+@item@[showingsubview][verdict="Malware"] {
+  background-color: hsl(4, 82%, 47%);
+  color: white;
+}
+
+@notKeyfocus@ @itemFinished@[exists]:hover {
   cursor: pointer;
 }
 
 /*** Button icons ***/
 
-.downloadButton.downloadCancel {
+.downloadButton.downloadIconCancel {
   -moz-image-region: rect(0px, 16px, 16px, 0px);
 }
-richlistitem[type="download"]:hover > stack > .downloadButton.downloadCancel {
+@item@:hover .downloadButton.downloadIconCancel {
   -moz-image-region: rect(0px, 32px, 16px, 16px);
 }
-richlistitem[type="download"]:hover > stack > .downloadButton.downloadCancel:hover {
+@item@:hover .downloadButton.downloadIconCancel:hover {
   -moz-image-region: rect(0px, 48px, 16px, 32px);
 }
-richlistitem[type="download"]:hover > stack > .downloadButton.downloadCancel:active {
+@item@:hover .downloadButton.downloadIconCancel:active {
   -moz-image-region: rect(0px, 64px, 16px, 48px);
 }
+@keyfocus@ @itemFocused@ .downloadButton.downloadIconCancel {
+  -moz-image-region: rect(0px, 80px, 16px, 64px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadIconCancel {
+  -moz-image-region: rect(0px, 96px, 16px, 80px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadIconCancel:hover {
+  -moz-image-region: rect(0px, 112px, 16px, 96px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadIconCancel:active {
+  -moz-image-region: rect(0px, 128px, 16px, 112px);
+}
 
-.downloadButton.downloadShow {
+.downloadButton.downloadIconShow {
   -moz-image-region: rect(16px, 16px, 32px, 0px);
 }
-richlistitem[type="download"]:hover > stack > .downloadButton.downloadShow {
+@notKeyfocus@ @itemNotFinished@:hover .downloadButton.downloadIconShow,
+@keyfocus@ @itemFinished@:hover:not([selected]) .downloadButton.downloadIconShow {
   -moz-image-region: rect(16px, 32px, 32px, 16px);
 }
-richlistitem[type="download"]:hover > stack > .downloadButton.downloadShow:hover {
+@notKeyfocus@ @itemNotFinished@:hover .downloadButton.downloadIconShow:hover,
+@keyfocus@ @itemFinished@:hover:not([selected]) .downloadButton.downloadIconShow:hover {
   -moz-image-region: rect(16px, 48px, 32px, 32px);
 }
-richlistitem[type="download"]:hover > stack > .downloadButton.downloadShow:active {
+@notKeyfocus@ @itemNotFinished@:hover .downloadButton.downloadIconShow:active,
+@keyfocus@ @itemFinished@:hover:not([selected]) .downloadButton.downloadIconShow:active {
   -moz-image-region: rect(16px, 64px, 32px, 48px);
 }
-#downloadsPanel[keyfocus] > #downloadsListBox > richlistitem[type="download"][state="1"]:hover > stack > .downloadButton.downloadShow {
-  -moz-image-region: rect(16px, 32px, 32px, 16px);
+@keyfocus@ @itemFocused@ .downloadButton.downloadIconShow {
+  -moz-image-region: rect(16px, 80px, 32px, 64px);
 }
-#downloadsPanel[keyfocus] > #downloadsListBox > richlistitem[type="download"][state="1"]:hover > stack > .downloadButton.downloadShow:hover {
-  -moz-image-region: rect(16px, 48px, 32px, 32px);
-}
-#downloadsPanel[keyfocus] > #downloadsListBox > richlistitem[type="download"][state="1"]:hover > stack > .downloadButton.downloadShow:active {
-  -moz-image-region: rect(16px, 64px, 32px, 48px);
-}
-#downloadsPanel:not([keyfocus]) > #downloadsListBox > richlistitem[type="download"][state="1"]:hover > stack > .downloadButton.downloadShow {
+@notKeyfocus@ @itemFinished@:hover .downloadButton.downloadIconShow,
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadIconShow {
   -moz-image-region: rect(16px, 96px, 32px, 80px);
 }
-#downloadsPanel:not([keyfocus]) > #downloadsListBox > richlistitem[type="download"][state="1"]:hover > stack > .downloadButton.downloadShow:hover {
+@notKeyfocus@ @itemFinished@:hover .downloadButton.downloadIconShow:hover,
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadIconShow:hover {
   -moz-image-region: rect(16px, 112px, 32px, 96px);
 }
-#downloadsPanel:not([keyfocus]) > #downloadsListBox > richlistitem[type="download"][state="1"]:hover > stack > .downloadButton.downloadShow:active {
+@notKeyfocus@ @itemFinished@:hover .downloadButton.downloadIconShow:active,
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadIconShow:active {
   -moz-image-region: rect(16px, 128px, 32px, 112px);
 }
 
-.downloadButton.downloadRetry {
+.downloadButton.downloadIconRetry {
   -moz-image-region: rect(32px, 16px, 48px, 0px);
 }
-richlistitem[type="download"]:hover > stack > .downloadButton.downloadRetry {
+@item@:hover .downloadButton.downloadIconRetry {
   -moz-image-region: rect(32px, 32px, 48px, 16px);
 }
-richlistitem[type="download"]:hover > stack > .downloadButton.downloadRetry:hover {
+@item@:hover .downloadButton.downloadIconRetry:hover {
   -moz-image-region: rect(32px, 48px, 48px, 32px);
 }
-richlistitem[type="download"]:hover > stack > .downloadButton.downloadRetry:active {
+@item@:hover .downloadButton.downloadIconRetry:active {
   -moz-image-region: rect(32px, 64px, 48px, 48px);
+}
+@keyfocus@ @itemFocused@ .downloadButton.downloadIconRetry {
+  -moz-image-region: rect(32px, 80px, 48px, 64px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadIconRetry {
+  -moz-image-region: rect(32px, 96px, 48px, 80px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadIconRetry:hover {
+  -moz-image-region: rect(32px, 112px, 48px, 96px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadIconRetry:active {
+  -moz-image-region: rect(32px, 128px, 48px, 112px);
+}
+
+.downloadButton.downloadShowBlockedInfo {
+  -moz-image-region: rect(48px, 16px, 64px, 0px);
+}
+@item@:hover .downloadButton.downloadShowBlockedInfo {
+  -moz-image-region: rect(48px, 32px, 64px, 16px);
+}
+@item@:hover .downloadButton.downloadShowBlockedInfo:hover {
+  -moz-image-region: rect(48px, 48px, 64px, 32px);
+}
+@item@:hover .downloadButton.downloadShowBlockedInfo:active {
+  -moz-image-region: rect(48px, 64px, 64px, 48px);
+}
+@keyfocus@ @itemFocused@ .downloadButton.downloadShowBlockedInfo {
+  -moz-image-region: rect(48px, 80px, 64px, 64px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo {
+  -moz-image-region: rect(48px, 96px, 64px, 80px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo:hover {
+  -moz-image-region: rect(48px, 112px, 64px, 96px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo:active {
+  -moz-image-region: rect(48px, 128px, 64px, 112px);
+}
+
+.downloadButton.downloadShowBlockedInfo:-moz-locale-dir(rtl) {
+  -moz-image-region: rect(64px, 16px, 80px, 0px);
+}
+@item@:hover .downloadButton.downloadShowBlockedInfo:-moz-locale-dir(rtl) {
+  -moz-image-region: rect(64px, 32px, 80px, 16px);
+}
+@item@:hover .downloadButton.downloadShowBlockedInfo:hover:-moz-locale-dir(rtl) {
+  -moz-image-region: rect(64px, 48px, 80px, 32px);
+}
+@item@:hover .downloadButton.downloadShowBlockedInfo:active:-moz-locale-dir(rtl) {
+  -moz-image-region: rect(64px, 64px, 80px, 48px);
+}
+@keyfocus@ @itemFocused@ .downloadButton.downloadShowBlockedInfo:-moz-locale-dir(rtl) {
+  -moz-image-region: rect(64px, 80px, 80px, 64px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo:-moz-locale-dir(rtl) {
+  -moz-image-region: rect(64px, 96px, 80px, 80px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo:hover:-moz-locale-dir(rtl) {
+  -moz-image-region: rect(64px, 112px, 80px, 96px);
+}
+@keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo:active:-moz-locale-dir(rtl) {
+  -moz-image-region: rect(64px, 128px, 80px, 112px);
+}
+
+@media (min-resolution: 2dppx) {
+  .downloadButton {
+    list-style-image: url("chrome://browser/skin/downloads/buttons@2x.png");
+  }
+  .downloadButton > .button-box > .button-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .downloadButton.downloadIconCancel {
+    -moz-image-region: rect(0px, 32px, 32px, 0px);
+  }
+  @item@:hover .downloadButton.downloadIconCancel {
+    -moz-image-region: rect(0px, 64px, 32px, 32px);
+  }
+  @item@:hover .downloadButton.downloadIconCancel:hover {
+    -moz-image-region: rect(0px, 96px, 32px, 64px);
+  }
+  @item@:hover .downloadButton.downloadIconCancel:active {
+    -moz-image-region: rect(0px, 128px, 32px, 96px);
+  }
+  @keyfocus@ @itemFocused@ .downloadButton.downloadIconCancel {
+    -moz-image-region: rect(0px, 160px, 32px, 128px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadIconCancel {
+    -moz-image-region: rect(0px, 192px, 32px, 160px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadIconCancel:hover {
+    -moz-image-region: rect(0px, 224px, 32px, 192px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadIconCancel:active {
+    -moz-image-region: rect(0px, 256px, 32px, 224px);
+  }
+
+  .downloadButton.downloadIconShow {
+    -moz-image-region: rect(32px, 32px, 64px, 0px);
+  }
+  @notKeyfocus@ @itemNotFinished@:hover .downloadButton.downloadIconShow,
+  @keyfocus@ @itemFinished@:hover:not([selected]) .downloadButton.downloadIconShow {
+    -moz-image-region: rect(32px, 64px, 64px, 32px);
+  }
+  @notKeyfocus@ @itemNotFinished@:hover .downloadButton.downloadIconShow:hover,
+  @keyfocus@ @itemFinished@:hover:not([selected]) .downloadButton.downloadIconShow:hover {
+    -moz-image-region: rect(32px, 96px, 64px, 64px);
+  }
+  @notKeyfocus@ @itemNotFinished@:hover .downloadButton.downloadIconShow:active,
+  @keyfocus@ @itemFinished@:hover:not([selected]) .downloadButton.downloadIconShow:active {
+    -moz-image-region: rect(32px, 128px, 64px, 96px);
+  }
+  @keyfocus@ @itemFocused@ .downloadButton.downloadIconShow {
+    -moz-image-region: rect(32px, 160px, 64px, 128px);
+  }
+  @notKeyfocus@ @itemFinished@:hover .downloadButton.downloadIconShow,
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadIconShow {
+    -moz-image-region: rect(32px, 192px, 64px, 160px);
+  }
+  @notKeyfocus@ @itemFinished@:hover .downloadButton.downloadIconShow:hover,
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadIconShow:hover {
+    -moz-image-region: rect(32px, 224px, 64px, 192px);
+  }
+  @notKeyfocus@ @itemFinished@:hover .downloadButton.downloadIconShow:active,
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadIconShow:active {
+    -moz-image-region: rect(32px, 256px, 64px, 224px);
+  }
+
+  .downloadButton.downloadIconRetry {
+    -moz-image-region: rect(64px, 32px, 96px, 0px);
+  }
+  @item@:hover .downloadButton.downloadIconRetry {
+    -moz-image-region: rect(64px, 64px, 96px, 32px);
+  }
+  @item@:hover .downloadButton.downloadIconRetry:hover {
+    -moz-image-region: rect(64px, 96px, 96px, 64px);
+  }
+  @item@:hover .downloadButton.downloadIconRetry:active {
+    -moz-image-region: rect(64px, 128px, 96px, 96px);
+  }
+  @keyfocus@ @itemFocused@ .downloadButton.downloadIconRetry {
+    -moz-image-region: rect(64px, 160px, 96px, 128px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadIconRetry {
+    -moz-image-region: rect(64px, 192px, 96px, 160px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadIconRetry:hover {
+    -moz-image-region: rect(64px, 224px, 96px, 192px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadIconRetry:active {
+    -moz-image-region: rect(64px, 256px, 96px, 224px);
+  }
+
+  .downloadButton.downloadShowBlockedInfo {
+    -moz-image-region: rect(96px, 32px, 128px, 0px);
+  }
+  @item@:hover .downloadButton.downloadShowBlockedInfo {
+    -moz-image-region: rect(96px, 64px, 128px, 32px);
+  }
+  @item@:hover .downloadButton.downloadShowBlockedInfo:hover {
+    -moz-image-region: rect(96px, 96px, 128px, 64px);
+  }
+  @item@:hover .downloadButton.downloadShowBlockedInfo:active {
+    -moz-image-region: rect(96px, 128px, 128px, 96px);
+  }
+  @keyfocus@ @itemFocused@ .downloadButton.downloadShowBlockedInfo {
+    -moz-image-region: rect(96px, 160px, 128px, 128px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo {
+    -moz-image-region: rect(96px, 192px, 128px, 160px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo:hover {
+    -moz-image-region: rect(96px, 224px, 128px, 192px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo:active {
+    -moz-image-region: rect(96px, 256px, 128px, 224px);
+  }
+
+  .downloadButton.downloadShowBlockedInfo:-moz-locale-dir(rtl) {
+    -moz-image-region: rect(128px, 32px, 160px, 0px);
+  }
+  @item@:hover .downloadButton.downloadShowBlockedInfo:-moz-locale-dir(rtl) {
+    -moz-image-region: rect(128px, 64px, 160px, 32px);
+  }
+  @item@:hover .downloadButton.downloadShowBlockedInfo:hover:-moz-locale-dir(rtl) {
+    -moz-image-region: rect(128px, 96px, 160px, 64px);
+  }
+  @item@:hover .downloadButton.downloadShowBlockedInfo:active:-moz-locale-dir(rtl) {
+    -moz-image-region: rect(128px, 128px, 160px, 96px);
+  }
+  @keyfocus@ @itemFocused@ .downloadButton.downloadShowBlockedInfo:-moz-locale-dir(rtl) {
+    -moz-image-region: rect(128px, 160px, 160px, 128px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo:-moz-locale-dir(rtl) {
+    -moz-image-region: rect(128px, 192px, 160px, 160px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo:hover:-moz-locale-dir(rtl) {
+    -moz-image-region: rect(128px, 224px, 160px, 192px);
+  }
+  @keyfocus@ @itemFocused@:hover .downloadButton.downloadShowBlockedInfo:active:-moz-locale-dir(rtl) {
+    -moz-image-region: rect(128px, 256px, 160px, 224px);
+  }
+
+  #downloadsPanel-multiView > .panel-viewcontainer > .panel-viewstack[viewtype="subview"] .download-state[showingsubview] .downloadButton {
+    list-style-image: url("chrome://browser/skin/customizableui/subView-arrow-back-inverted@2x.png");
+  }
+  #downloadsPanel-multiView > .panel-viewcontainer > .panel-viewstack[viewtype="subview"] .download-state[showingsubview] .downloadButton:-moz-locale-dir(rtl) {
+    list-style-image: url("chrome://browser/skin/customizableui/subView-arrow-back-inverted-rtl@2x.png");
+  }
 }

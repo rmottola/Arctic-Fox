@@ -10,8 +10,9 @@ DevToolsModules(
     'automation-timeline.js',
     'make-debugger.js',
     'map-uri-to-addon-id.js',
-    'ScriptStore.js',
     'stack.js',
     'TabSources.js',
-    'walker-search.js'
+    'walker-search.js',
+    'webconsole-utils.js',
+    'webconsole-worker-utils.js',
 )

@@ -5,7 +5,7 @@ const FIXTURE = [
     "id": "7cqCr77ptzX3",
     "type": "client",
     "name": "zcarter's Nightly on MacBook-Pro-25",
-    "icon": "chrome://browser/skin/sync-desktopIcon.png",
+    "isMobile": false,
     "tabs": [
       {
         "type": "tab",
@@ -21,7 +21,7 @@ const FIXTURE = [
     "id": "2xU5h-4bkWqA",
     "type": "client",
     "name": "laptop",
-    "icon": "chrome://browser/skin/sync-desktopIcon.png",
+    "isMobile": false,
     "tabs": [
       {
         "type": "tab",
@@ -54,7 +54,7 @@ const FIXTURE = [
     "id": "OL3EJCsdb2JD",
     "type": "client",
     "name": "desktop",
-    "icon": "chrome://browser/skin/sync-desktopIcon.png",
+    "isMobile": false,
     "tabs": []
   }
 ];
@@ -368,7 +368,7 @@ function* testContextMenu(syncedTabsDeckComponent, contextSelector, triggerSelec
 
   let promisePopupShown = BrowserTestUtils.waitForEvent(contextMenu, "popupshown");
 
-  let chromeWindow = triggerElement.ownerDocument.defaultView.top;
+  let chromeWindow = triggerElement.ownerGlobal.top;
   let rect = triggerElement.getBoundingClientRect();
   let contentRect = chromeWindow.SidebarUI.browser.getBoundingClientRect();
   // The offsets in `rect` are relative to the content window, but

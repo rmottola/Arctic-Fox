@@ -1956,6 +1956,14 @@ nsDocumentViewer::SetBoundsWithFlags(const nsIntRect& aBounds, uint32_t aFlags)
                     aBounds.width, aBounds.height,
                     false);
   } else if (mPresContext && mViewManager) {
+    // Ensure presContext's deviceContext is up to date, as we sometimes get
+    // here before a resolution-change notification has been fully handled
+    // during display configuration changes, especially when there are lots
+    // of windows/widgets competing to handle the notifications.
+    // (See bug 1154125.)
+    if (mPresContext->DeviceContext()->CheckDPIChange()) {
+      mPresContext->UIResolutionChanged();
+    }
     int32_t p2a = mPresContext->AppUnitsPerDevPixel();
     mViewManager->SetWindowDimensions(NSIntPixelsToAppUnits(mBounds.width, p2a),
                                       NSIntPixelsToAppUnits(mBounds.height, p2a),
@@ -2381,7 +2389,8 @@ nsDocumentViewer::CreateStyleSet(nsIDocument* aDocument)
       }
     }
   } else {
-    NS_ERROR("stylo: nsStyleSheetService doesn't handle ServoStyleSheets yet");
+    NS_WARNING("stylo: Not yet checking nsStyleSheetService for Servo-backed "
+               "documents. See bug 1290224");
   }
 
   // Caller will handle calling EndUpdate, per contract.
@@ -3763,6 +3772,9 @@ nsDocumentViewer::PrintPreview(nsIPrintSettings* aPrintSettings,
   nsAutoPtr<nsPrintEventDispatcher> beforeAndAfterPrint(
     new nsPrintEventDispatcher(doc));
   NS_ENSURE_STATE(!GetIsPrinting());
+  // beforeprint event may have caused ContentViewer to be shutdown.
+  NS_ENSURE_STATE(mContainer);
+  NS_ENSURE_STATE(mDeviceContext);
   if (!mPrintEngine) {
     mPrintEngine = new nsPrintEngine();
 

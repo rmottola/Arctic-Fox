@@ -150,9 +150,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "AddonWatcher",
 XPCOMUtils.defineLazyModuleGetter(this, "LightweightThemeManager",
                                   "resource://gre/modules/LightweightThemeManager.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "ExtensionManagement",
-                                  "resource://gre/modules/ExtensionManagement.jsm");
-
 XPCOMUtils.defineLazyModuleGetter(this, "ShellService",
                                   "resource:///modules/ShellService.jsm");
 
@@ -533,27 +530,6 @@ BrowserGlue.prototype = {
     if (AppConstants.NIGHTLY_BUILD) {
       os.addObserver(this, AddonWatcher.TOPIC_SLOW_ADDON_DETECTED, false);
     }
-
-    ExtensionManagement.registerScript("chrome://browser/content/ext-bookmarks.js");
-    ExtensionManagement.registerScript("chrome://browser/content/ext-browserAction.js");
-    ExtensionManagement.registerScript("chrome://browser/content/ext-commands.js");
-    ExtensionManagement.registerScript("chrome://browser/content/ext-contextMenus.js");
-    ExtensionManagement.registerScript("chrome://browser/content/ext-desktop-runtime.js");
-    ExtensionManagement.registerScript("chrome://browser/content/ext-history.js");
-    ExtensionManagement.registerScript("chrome://browser/content/ext-pageAction.js");
-    ExtensionManagement.registerScript("chrome://browser/content/ext-tabs.js");
-    ExtensionManagement.registerScript("chrome://browser/content/ext-utils.js");
-    ExtensionManagement.registerScript("chrome://browser/content/ext-windows.js");
-
-    ExtensionManagement.registerSchema("chrome://browser/content/schemas/bookmarks.json");
-    ExtensionManagement.registerSchema("chrome://browser/content/schemas/browser_action.json");
-    ExtensionManagement.registerSchema("chrome://browser/content/schemas/commands.json");
-    ExtensionManagement.registerSchema("chrome://browser/content/schemas/context_menus.json");
-    ExtensionManagement.registerSchema("chrome://browser/content/schemas/context_menus_internal.json");
-    ExtensionManagement.registerSchema("chrome://browser/content/schemas/history.json");
-    ExtensionManagement.registerSchema("chrome://browser/content/schemas/page_action.json");
-    ExtensionManagement.registerSchema("chrome://browser/content/schemas/tabs.json");
-    ExtensionManagement.registerSchema("chrome://browser/content/schemas/windows.json");
 
     this._flashHangCount = 0;
     this._firstWindowReady = new Promise(resolve => this._firstWindowLoaded = resolve);
@@ -1109,7 +1085,6 @@ BrowserGlue.prototype = {
         Cu.import("resource://gre/modules/RokuApp.jsm");
         return new RokuApp(aService);
       },
-      mirror: true,
       types: ["video/mp4"],
       extensions: ["mp4"]
     };
@@ -2478,7 +2453,7 @@ ContentPermissionPrompt.prototype = {
   _showPrompt: function CPP_showPrompt(aRequest, aMessage, aPermission, aActions,
                                        aNotificationId, aAnchorId, aOptions) {
     var browser = this._getBrowserForRequest(aRequest);
-    var chromeWin = browser.ownerDocument.defaultView;
+    var chromeWin = browser.ownerGlobal;
     var requestPrincipal = aRequest.principal;
 
     // Transform the prompt actions into PopupNotification actions.
@@ -2642,62 +2617,6 @@ ContentPermissionPrompt.prototype = {
                      "web-notifications-notification-icon", options);
   },
 
-  _promptPointerLock: function CPP_promtPointerLock(aRequest, autoAllow) {
-    let message = gBrowserBundle.GetStringFromName(autoAllow ?
-                                  "pointerLock.autoLock.title3" : "pointerLock.title3");
-
-    // If this is an autoAllow info prompt, offer no actions.
-    // _showPrompt() will allow the request when it's dismissed.
-    let actions = [];
-    if (!autoAllow) {
-      actions = [
-        {
-          stringId: "pointerLock.allow2",
-          action: null,
-          expireType: null,
-          callback: function() {},
-        },
-        {
-          stringId: "pointerLock.alwaysAllow",
-          action: Ci.nsIPermissionManager.ALLOW_ACTION,
-          expireType: null,
-          callback: function() {},
-        },
-        {
-          stringId: "pointerLock.neverAllow",
-          action: Ci.nsIPermissionManager.DENY_ACTION,
-          expireType: null,
-          callback: function() {},
-        },
-      ];
-    }
-
-    function onFullScreen() {
-      notification.remove();
-    }
-
-    let options = {};
-    options.removeOnDismissal = autoAllow;
-    options.eventCallback = type => {
-      if (type == "removed") {
-        notification.browser.removeEventListener("fullscreenchange", onFullScreen, true);
-        if (autoAllow) {
-          aRequest.allow();
-        }
-      }
-    }
-
-    let notification =
-      this._showPrompt(aRequest, message, "pointerLock", actions, "pointerLock",
-                       "pointerLock-notification-icon", options);
-
-    // pointerLock is automatically allowed in fullscreen mode (and revoked
-    // upon exit), so if the page enters fullscreen mode after requesting
-    // pointerLock (but before the user has granted permission), we should
-    // remove the now-impotent notification.
-    notification.browser.addEventListener("fullscreenchange", onFullScreen, true);
-  },
-
   prompt: function CPP_prompt(request) {
     // Only allow exactly one permission request here.
     let types = request.types.QueryInterface(Ci.nsIArray);
@@ -2708,8 +2627,7 @@ ContentPermissionPrompt.prototype = {
     let perm = types.queryElementAt(0, Ci.nsIContentPermissionType);
 
     const kFeatureKeys = { "geolocation" : "geo",
-                           "desktop-notification" : "desktop-notification",
-                           "pointerLock" : "pointerLock",
+                           "desktop-notification" : "desktop-notification"
                          };
 
     // Make sure that we support the request.
@@ -2735,15 +2653,10 @@ ContentPermissionPrompt.prototype = {
 
     if (result == Ci.nsIPermissionManager.ALLOW_ACTION) {
       autoAllow = true;
-      // For pointerLock, we still want to show a warning prompt.
-      if (perm.type != "pointerLock") {
-        request.allow();
-        return;
-      }
     }
 
     var browser = this._getBrowserForRequest(request);
-    var chromeWin = browser.ownerDocument.defaultView;
+    var chromeWin = browser.ownerGlobal;
     if (!chromeWin.PopupNotifications)
       // Ignore requests from browsers hosted in windows that don't support
       // PopupNotifications.
@@ -2756,9 +2669,6 @@ ContentPermissionPrompt.prototype = {
       break;
     case "desktop-notification":
       this._promptWebNotifications(request);
-      break;
-    case "pointerLock":
-      this._promptPointerLock(request, autoAllow);
       break;
     }
   },

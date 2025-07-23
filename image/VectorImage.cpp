@@ -872,10 +872,10 @@ VectorImage::Draw(gfxContext* aContext,
 
   // Draw.
   if (result) {
-    RefPtr<SourceSurface> surface = result.DrawableRef()->GetSurface();
-    if (surface) {
+    RefPtr<SourceSurface> sourceSurface = result.Surface()->GetSourceSurface();
+    if (sourceSurface) {
       RefPtr<gfxDrawable> svgDrawable =
-        new gfxSurfaceDrawable(surface, result.DrawableRef()->GetSize());
+        new gfxSurfaceDrawable(sourceSurface, result.Surface()->GetSize());
       Show(svgDrawable, params);
       return DrawResult::SUCCESS;
     }
@@ -939,7 +939,7 @@ VectorImage::CreateSurfaceAndShow(const SVGDrawingParameters& aParams)
 
   // Take a strong reference to the frame's surface and make sure it hasn't
   // already been purged by the operating system.
-  RefPtr<SourceSurface> surface = frame->GetSurface();
+  RefPtr<SourceSurface> surface = frame->GetSourceSurface();
   if (!surface) {
     return Show(svgDrawable, aParams);
   }
@@ -1302,7 +1302,7 @@ VectorImage::OptimalImageSizeForDest(const gfxSize& aDest,
              "Unexpected destination size");
 
   // We can rescale SVGs freely, so just return the provided destination size.
-  return nsIntSize(ceil(aDest.width), ceil(aDest.height));
+  return nsIntSize::Ceil(aDest.width, aDest.height);
 }
 
 already_AddRefed<imgIContainer>

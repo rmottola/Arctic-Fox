@@ -1,6 +1,7 @@
- /* vim: set ft=javascript ts=2 et sw=2 tw=80: */
- /* Any copyright is dedicated to the Public Domain.
-  http://creativecommons.org/publicdomain/zero/1.0/ */
+/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*- */
+/* vim: set ft=javascript ts=2 et sw=2 tw=80: */
+/* Any copyright is dedicated to the Public Domain.
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
 // Tests that console.table() works as intended.
 
@@ -124,8 +125,8 @@ const TEST_DATA = [
   {
     command: "console.table(weakset)",
     data: [
-      { _value: "String[7]" },
-      { _value: "String[7]" },
+      { _value: "String" },
+      { _value: "String" },
     ],
     columns: { _index: "(iteration index)", _value: "Values" },
     couldBeOutOfOrder: true,
@@ -133,15 +134,15 @@ const TEST_DATA = [
   {
     command: "console.table(weakmap)",
     data: [
-      { _key: "String[7]", _value: "\"oh no\"" },
-      { _key: "String[7]", _value: "23" },
+      { _key: "String", _value: "\"oh no\"" },
+      { _key: "String", _value: "23" },
     ],
     columns: { _index: "(iteration index)", _key: "Key", _value: "Values" },
     couldBeOutOfOrder: true,
   },
 ];
 
-add_task(function*() {
+add_task(function* () {
   const {tab} = yield loadTab(TEST_URI);
   let hud = yield openConsole(tab);
 

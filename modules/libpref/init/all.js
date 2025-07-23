@@ -245,9 +245,6 @@ pref("browser.display.show_image_placeholders", true);
 pref("browser.display.show_loading_image_placeholder", false);
 // min font device pixel size at which to turn on high quality
 pref("browser.display.auto_quality_min_font_size", 20);
-// Background color for standalone images; leave empty to use default
-// all CSS colors available: named colors, rgb(..), #rrggbb, ...
-pref("browser.display.standalone_images.background_color", "");
 pref("browser.anchor_color",                "#0000EE");
 pref("browser.active_color",                "#EE0000");
 pref("browser.visited_color",               "#551A8B");
@@ -292,6 +289,9 @@ pref("print.shrink-to-fit.scale-limit-percent", 20);
 
 // Whether we should display simplify page checkbox on print preview UI
 pref("print.use_simplify_page", false);
+
+// Disable support for MathML
+pref("mathml.disabled",    false);
 
 // Enable scale transform for stretchy MathML operators. See bug 414277.
 pref("mathml.scale_stretchy_operators.enabled", true);
@@ -412,6 +412,9 @@ pref("media.navigator.load_adapt.high_load","0.90");
 pref("media.navigator.load_adapt.low_load","0.40");
 pref("media.navigator.video.default_fps",30);
 pref("media.navigator.video.default_minfps",10);
+pref("media.navigator.video.use_remb", true);
+pref("media.navigator.video.use_tmmbr", false);
+pref("media.navigator.audio.use_fec", true);
 
 pref("media.webrtc.debug.trace_mask", 0);
 pref("media.webrtc.debug.multi_log", false);
@@ -761,8 +764,8 @@ pref("gfx.canvas.azure.backends", "direct2d1.1,skia,cairo");
 pref("gfx.content.azure.backends", "direct2d1.1,cairo");
 #else
 #ifdef XP_MACOSX
-pref("gfx.content.azure.backends", "cg");
-pref("gfx.canvas.azure.backends", "skia,cg");
+pref("gfx.content.azure.backends", "skia,cg");
+pref("gfx.canvas.azure.backends", "skia");
 // Accelerated cg canvas where available (10.7+)
 pref("gfx.canvas.azure.accelerated", false);
 #else
@@ -1363,7 +1366,7 @@ pref("print.print_edge_right", 0);
 pref("print.print_edge_bottom", 0);
 
 // Print via the parent process. This is only used when e10s is enabled.
-#if defined(XP_WIN) && defined(NIGHTLY_BUILD)
+#if defined(XP_WIN)
 pref("print.print_via_parent", true);
 #else
 pref("print.print_via_parent", false);
@@ -1475,6 +1478,7 @@ pref("dom.event.highrestimestamp.enabled",  false);
 #endif
 
 pref("dom.webcomponents.enabled",           false);
+pref("dom.webcomponents.customelements.enabled", false);
 
 pref("javascript.enabled",                  true);
 pref("javascript.options.strict",           false);
@@ -2244,8 +2248,6 @@ pref("network.proxy.autoconfig_url", "");
 pref("network.proxy.autoconfig_retry_interval_min", 5);    // 5 seconds
 pref("network.proxy.autoconfig_retry_interval_max", 300);  // 5 minutes
 
-// Master switch for HSTS usage (security <-> privacy tradeoff)
-pref("network.stricttransportsecurity.enabled", true);
 // Use the HSTS preload list by default
 pref("network.stricttransportsecurity.preloadlist", true);
 
@@ -2399,6 +2401,10 @@ pref("security.ssl.enable_ocsp_must_staple", true);
 
 // Enable pinning checks by default.
 pref("security.cert_pinning.enforcement_level", 2);
+// Do not process hpkp headers rooted by not built in roots by default.
+// This is to prevent accidental pinning from MITM devices and is used
+// for tests.
+pref("security.cert_pinning.process_headers_from_non_builtin_roots", false);
 
 // Controls whether signing should be enforced on signature-capable blocklist
 // collections.
@@ -2942,9 +2948,8 @@ pref("dom.use_watchdog", true);
 pref("dom.max_chrome_script_run_time", 20);
 pref("dom.max_script_run_time", 10);
 
-// Stop all scripts in a compartment when the "Stop script" button on the
-// "Unresponsive script" dialog is used.
-pref("dom.global_stop_unresponsive_script", true);
+// Stop all scripts in a compartment when the "stop script" dialog is used.
+pref("dom.global_stop_script", true);
 
 // If true, ArchiveReader will be enabled
 pref("dom.archivereader.enabled", false);
@@ -4543,12 +4548,15 @@ pref("font.name.monospace.x-unicode", "dt-interface user-ucs2.cjk_japan-0");
 
 // Login Manager prefs
 pref("signon.rememberSignons",              true);
+pref("signon.rememberSignons.visibilityToggle", true);
 pref("signon.autofillForms",                false);
 pref("signon.autologin.proxy",              false);
+pref("signon.formlessCapture.enabled",      true);
 pref("signon.storeWhenAutocompleteOff",     true);
 pref("signon.ui.experimental",              false);
 pref("signon.debug",                        false);
 pref("signon.recipes.path",                 "chrome://passwordmgr/content/recipes.json");
+pref("signon.schemeUpgrades",               false);
 
 // Satchel (Form Manager) prefs
 pref("browser.formfill.debug",            false);
@@ -4625,9 +4633,6 @@ pref("image.http.accept", "*/*");
 // special "animation mode" which is designed to eliminate flicker. Set to 0 to
 // disable.
 pref("image.infer-src-animation.threshold-ms", 2000);
-
-// Should we optimize away the surfaces of single-color images?
-pref("image.single-color-optimization.enabled", true);
 
 //
 // Image memory management prefs
@@ -4978,6 +4983,11 @@ pref("full-screen-api.transition.timeout", 1000);
 pref("full-screen-api.warning.timeout", 3000);
 // delay for the warning box to show when pointer stays on the top, unit: ms
 pref("full-screen-api.warning.delay", 500);
+
+// DOM pointerlock API
+pref("pointer-lock-api.prefixed.enabled", false);
+// time for the warning box stays on the screen before sliding out, unit: ms
+pref("pointer-lock-api.warning.timeout", 3000);
 
 // DOM idle observers API
 pref("dom.idle-observers-api.enabled", true);
@@ -5349,8 +5359,14 @@ pref("dom.mapped_arraybuffer.enabled", true);
 
 // The tables used for Safebrowsing phishing and malware checks.
 pref("urlclassifier.malwareTable", "goog-malware-shavar,goog-unwanted-shavar,test-malware-simple,test-unwanted-simple");
+
+#ifdef MOZILLA_OFFICIAL
+// In the official build, we are allowed to use google's private
+// phishing list "goog-phish-shavar". See Bug 1288840.
 pref("urlclassifier.phishTable", "goog-phish-shavar,test-phish-simple");
-pref("urlclassifier.downloadBlockTable", "");
+#else
+pref("urlclassifier.phishTable", "googpub-phish-shavar,test-phish-simple");
+#endif
 
 #ifdef XP_WIN
  // Only download the whitelist on Windows, since the whitelist is
@@ -5361,21 +5377,41 @@ pref("urlclassifier.downloadAllowTable", "goog-downloadwhite-digest256");
 pref("urlclassifier.downloadAllowTable", "");
 #endif
 
-pref("urlclassifier.disallow_completions", "test-malware-simple,test-phish-simple,test-unwanted-simple,test-track-simple,test-trackwhite-simple,test-forbid-simple,goog-downloadwhite-digest256,mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256,test-block-simple,mozplugin-block-digest256,mozplugin2-block-digest256");
+pref("urlclassifier.disallow_completions", "test-malware-simple,test-phish-simple,test-unwanted-simple,test-track-simple,test-trackwhite-simple,test-block-simple,goog-downloadwhite-digest256,mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256,mozplugin-block-digest256,mozplugin2-block-digest256");
 
 // The table and update/gethash URLs for Safebrowsing phishing and malware
 // checks.
 pref("urlclassifier.trackingTable", "test-track-simple,mozpub-track-digest256");
 pref("urlclassifier.trackingWhitelistTable", "test-trackwhite-simple,mozpub-trackwhite-digest256");
 
-// The table and global pref for blocking access to sites forbidden by policy
-pref("browser.safebrowsing.forbiddenURIs.enabled", false);
-pref("urlclassifier.forbiddenTable", "test-forbid-simple");
+// Enable phishing protection
+pref("browser.safebrowsing.phishing.enabled", true);
+
+pref("browser.safebrowsing.downloads.enabled", false);
+pref("browser.safebrowsing.downloads.remote.enabled", false);
+pref("browser.safebrowsing.downloads.remote.timeout_ms", 10000);
+pref("browser.safebrowsing.downloads.remote.url", "https://sb-ssl.google.com/safebrowsing/clientreport/download?key=%GOOGLE_API_KEY%");
+pref("browser.safebrowsing.downloads.remote.block_dangerous",            true);
+pref("browser.safebrowsing.downloads.remote.block_dangerous_host",       true);
+pref("browser.safebrowsing.downloads.remote.block_potentially_unwanted", true);
+pref("browser.safebrowsing.downloads.remote.block_uncommon",             true);
+pref("browser.safebrowsing.debug", false);
+
+pref("browser.safebrowsing.provider.google.lists", "goog-badbinurl-shavar,goog-downloadwhite-digest256,goog-phish-shavar,goog-malware-shavar,goog-unwanted-shavar");
+pref("browser.safebrowsing.provider.google.updateURL", "https://safebrowsing.google.com/safebrowsing/downloads?client=SAFEBROWSING_ID&appver=%MAJOR_VERSION%&pver=2.2&key=%GOOGLE_API_KEY%");
+pref("browser.safebrowsing.provider.google.gethashURL", "https://safebrowsing.google.com/safebrowsing/gethash?client=SAFEBROWSING_ID&appver=%MAJOR_VERSION%&pver=2.2");
+pref("browser.safebrowsing.provider.google.reportURL", "https://safebrowsing.google.com/safebrowsing/diagnostic?client=%NAME%&hl=%LOCALE%&site=");
+
+pref("browser.safebrowsing.provider.mozilla.lists", "mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256,mozplugin-block-digest256,mozplugin2-block-digest256");
+pref("browser.safebrowsing.provider.mozilla.updateURL", "https://shavar.services.mozilla.com/downloads?client=SAFEBROWSING_ID&appver=%MAJOR_VERSION%&pver=2.2");
+pref("browser.safebrowsing.provider.mozilla.gethashURL", "https://shavar.services.mozilla.com/gethash?client=SAFEBROWSING_ID&appver=%MAJOR_VERSION%&pver=2.2");
 
 // The table and global pref for blocking plugin content
 pref("browser.safebrowsing.blockedURIs.enabled", false);
 pref("urlclassifier.blockedTable", "test-block-simple,mozplugin-block-digest256");
 
+// The protocol version we communicate with mozilla server.
+pref("browser.safebrowsing.provider.mozilla.pver", "2.2");
 pref("browser.safebrowsing.provider.mozilla.lists", "mozstd-track-digest256,mozstd-trackwhite-digest256,mozfull-track-digest256,mozplugin-block-digest256,mozplugin2-block-digest256");
 pref("browser.safebrowsing.provider.mozilla.updateURL", "https://shavar.services.mozilla.com/downloads?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
 pref("browser.safebrowsing.provider.mozilla.gethashURL", "https://shavar.services.mozilla.com/gethash?client=SAFEBROWSING_ID&appver=%VERSION%&pver=2.2");
@@ -5479,9 +5515,6 @@ pref("dom.presentation.discoverable", false);
 pref("dom.presentation.session_transport.data_channel.enable", false);
 
 #ifdef XP_MACOSX
-// Use raw ICU instead of CoreServices API in Unicode collation
-pref("intl.collation.mac.use_icu", true);
-
 #if !defined(RELEASE_BUILD) || defined(DEBUG)
 // In non-release builds we crash by default on insecure text input (when a
 // password editor has focus but secure event input isn't enabled).  The

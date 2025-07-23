@@ -7,16 +7,16 @@
 
 // Tests the integration between CubicBezierWidget and CubicBezierPresets
 
-const TEST_URI = "chrome://devtools/content/shared/widgets/cubic-bezier-frame.xhtml";
 const {CubicBezierWidget} =
   require("devtools/client/shared/widgets/CubicBezierWidget");
 const {PRESETS} = require("devtools/client/shared/widgets/CubicBezierPresets");
 
-add_task(function*() {
-  yield addTab("about:blank");
+const TEST_URI = `data:text/html,<div id="cubic-bezier-container" />`;
+
+add_task(function* () {
   let [host, win, doc] = yield createHost("bottom", TEST_URI);
 
-  let container = doc.querySelector("#container");
+  let container = doc.querySelector("#cubic-bezier-container");
   let w = new CubicBezierWidget(container,
               PRESETS["ease-in"]["ease-in-sine"]);
   w.presets.refreshMenu(PRESETS["ease-in"]["ease-in-sine"]);
@@ -29,7 +29,6 @@ add_task(function*() {
 
   w.destroy();
   host.destroy();
-  gBrowser.removeCurrentTab();
 });
 
 function* adjustingBezierUpdatesPreset(widget, win, doc, rect) {
@@ -54,7 +53,7 @@ function* adjustingBezierUpdatesPreset(widget, win, doc, rect) {
 
   is(widget.presets._activePreset, null,
      "There is no active preset");
- }
+}
 
 function* selectingPresetUpdatesBezier(widget, win, doc, rect) {
   info("Checking that selecting a preset updates bezier curve");

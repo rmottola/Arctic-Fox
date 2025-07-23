@@ -140,7 +140,7 @@ function String_replace(searchValue, replaceValue) {
         searchValue !== undefined && searchValue !== null)
     {
         // Step 2.a.
-        var replacer = searchValue[std_replace];
+        var replacer = GetMethod(searchValue, std_replace);
 
         // Step 2.b.
         if (replacer !== undefined)
@@ -223,7 +223,7 @@ function String_search(regexp) {
     var isPatternString = (typeof regexp === "string");
     if (!(isPatternString && StringProtoHasNoSearch()) && regexp !== undefined && regexp !== null) {
         // Step 2.a.
-        var searcher = regexp[std_search];
+        var searcher = GetMethod(regexp, std_search);
 
         // Step 2.b.
         if (searcher !== undefined)
@@ -285,7 +285,7 @@ function String_split(separator, limit) {
         separator !== undefined && separator !== null)
     {
         // Step 2.a.
-        var splitter = separator[std_split];
+        var splitter = GetMethod(separator, std_split);
 
         // Step 2.b.
         if (splitter !== undefined)
@@ -295,12 +295,13 @@ function String_split(separator, limit) {
     // Step 3.
     var S = ToString(this);
 
-    // Step 9 (reordered).
-    var R = ToString(separator);
-
     // Step 6.
+    var R;
     if (limit !== undefined) {
         var lim = limit >>> 0;
+
+        // Step 9.
+        R = ToString(separator);
 
         // Step 10.
         if (lim === 0)
@@ -313,6 +314,9 @@ function String_split(separator, limit) {
         // Steps 4, 8, 12-18.
         return StringSplitStringLimit(S, R, lim);
     }
+
+    // Step 9.
+    R = ToString(separator);
 
     // Step 11.
     if (separator === undefined)
@@ -588,45 +592,6 @@ function String_localeCompare(that) {
 
     // Step 7.
     return intl_CompareStrings(collator, S, That);
-}
-
-// ES6 draft rev27 (2014/08/24) 21.1.2.2 String.fromCodePoint(...codePoints)
-function String_static_fromCodePoint(codePoints) {
-    // Step 1. is not relevant
-    // Step 2.
-    var length = arguments.length;
-
-    // Step 3.
-    var elements = new List();
-
-    // Step 4-5., 5g.
-    for (var nextIndex = 0; nextIndex < length; nextIndex++) {
-        // Step 5a.
-        var next = arguments[nextIndex];
-        // Step 5b-c.
-        var nextCP = ToNumber(next);
-
-        // Step 5d.
-        if (nextCP !== ToInteger(nextCP) || Number_isNaN(nextCP))
-            ThrowRangeError(JSMSG_NOT_A_CODEPOINT, ToString(nextCP));
-
-        // Step 5e.
-        if (nextCP < 0 || nextCP > 0x10FFFF)
-            ThrowRangeError(JSMSG_NOT_A_CODEPOINT, ToString(nextCP));
-
-        // Step 5f.
-        // Inlined UTF-16 Encoding
-        if (nextCP <= 0xFFFF) {
-            callFunction(std_Array_push, elements, nextCP);
-            continue;
-        }
-
-        callFunction(std_Array_push, elements, (((nextCP - 0x10000) / 0x400) | 0) + 0xD800);
-        callFunction(std_Array_push, elements, (nextCP - 0x10000) % 0x400 + 0xDC00);
-    }
-
-    // Step 6.
-    return callFunction(std_Function_apply, std_String_fromCharCode, null, elements);
 }
 
 /* ES6 Draft May 22, 2014 21.1.2.4 */

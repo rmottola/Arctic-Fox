@@ -53,46 +53,49 @@
  * The collector proceeds through the following states, the current state being
  * held in JSRuntime::gcIncrementalState:
  *
- *  - MARK_ROOTS - marks the stack and other roots
- *  - MARK       - incrementally marks reachable things
- *  - SWEEP      - sweeps zones in groups and continues marking unswept zones
+ *  - MarkRoots  - marks the stack and other roots
+ *  - Mark       - incrementally marks reachable things
+ *  - Sweep      - sweeps zones in groups and continues marking unswept zones
+ *  - Finalize   - performs background finalization, concurrent with mutator
+ *  - Compact    - incrementally compacts by zone
+ *  - Decommit   - performs background decommit and chunk removal
  *
- * The MARK_ROOTS activity always takes place in the first slice. The next two
+ * The MarkRoots activity always takes place in the first slice. The next two
  * states can take place over one or more slices.
  *
  * In other words an incremental collection proceeds like this:
  *
- * Slice 1:   MARK_ROOTS: Roots pushed onto the mark stack.
- *            MARK:       The mark stack is processed by popping an element,
+ * Slice 1:   MarkRoots:  Roots pushed onto the mark stack.
+ *            Mark:       The mark stack is processed by popping an element,
  *                        marking it, and pushing its children.
  *
  *          ... JS code runs ...
  *
- * Slice 2:   MARK:       More mark stack processing.
+ * Slice 2:   Mark:       More mark stack processing.
  *
  *          ... JS code runs ...
  *
- * Slice n-1: MARK:       More mark stack processing.
+ * Slice n-1: Mark:       More mark stack processing.
  *
  *          ... JS code runs ...
  *
- * Slice n:   MARK:       Mark stack is completely drained.
- *            SWEEP:      Select first group of zones to sweep and sweep them.
+ * Slice n:   Mark:       Mark stack is completely drained.
+ *            Sweep:      Select first group of zones to sweep and sweep them.
  *
  *          ... JS code runs ...
  *
- * Slice n+1: SWEEP:      Mark objects in unswept zones that were newly
+ * Slice n+1: Sweep:      Mark objects in unswept zones that were newly
  *                        identified as alive (see below). Then sweep more zone
  *                        groups.
  *
  *          ... JS code runs ...
  *
- * Slice n+2: SWEEP:      Mark objects in unswept zones that were newly
+ * Slice n+2: Sweep:      Mark objects in unswept zones that were newly
  *                        identified as alive. Then sweep more zone groups.
  *
  *          ... JS code runs ...
  *
- * Slice m:   SWEEP:      Sweeping is finished, and background sweeping
+ * Slice m:   Sweep:      Sweeping is finished, and background sweeping
  *                        started on the helper thread.
  *
  *          ... JS code runs, remaining sweeping done on background thread ...
@@ -141,7 +144,7 @@
  *
  * The order of sweeping is restricted by cross compartment pointers - for
  * example say that object |a| from zone A points to object |b| in zone B and
- * neither object was marked when we transitioned to the SWEEP phase. Imagine we
+ * neither object was marked when we transitioned to the Sweep phase. Imagine we
  * sweep B first and then return to the mutator. It's possible that the mutator
  * could cause |a| to become alive through a read barrier (perhaps it was a
  * shape that was accessed via a shape table). Then we would need to mark |b|,
@@ -822,7 +825,7 @@ GCRuntime::GCRuntime(JSRuntime* rt) :
 #ifdef DEBUG
     disableStrictProxyCheckingCount(0),
 #endif
-    incrementalState(gc::NO_INCREMENTAL),
+    incrementalState(gc::State::NotActive),
     lastMarkSlice(false),
     sweepOnBackgroundThread(false),
     foundBlackGrayEdges(false),
@@ -1423,9 +1426,8 @@ GCRuntime::removeFinalizeCallback(JSFinalizeCallback callback)
 void
 GCRuntime::callFinalizeCallbacks(FreeOp* fop, JSFinalizeStatus status) const
 {
-    for (auto& p : finalizeCallbacks) {
+    for (auto& p : finalizeCallbacks)
         p.op(fop, status, !isFull, p.data);
-    }
 }
 
 bool
@@ -1449,9 +1451,8 @@ GCRuntime::removeWeakPointerZoneGroupCallback(JSWeakPointerZoneGroupCallback cal
 void
 GCRuntime::callWeakPointerZoneGroupCallbacks() const
 {
-    for (auto const& p : updateWeakPointerZoneGroupCallbacks) {
+    for (auto const& p : updateWeakPointerZoneGroupCallbacks)
         p.op(rt->contextFromMainThread(), p.data);
-    }
 }
 
 bool
@@ -1475,9 +1476,8 @@ GCRuntime::removeWeakPointerCompartmentCallback(JSWeakPointerCompartmentCallback
 void
 GCRuntime::callWeakPointerCompartmentCallbacks(JSCompartment* comp) const
 {
-    for (auto const& p : updateWeakPointerCompartmentCallbacks) {
+    for (auto const& p : updateWeakPointerCompartmentCallbacks)
         p.op(rt->contextFromMainThread(), comp, p.data);
-    }
 }
 
 JS::GCSliceCallback
@@ -2051,9 +2051,8 @@ ArenaLists::relocateArenas(Zone* zone, Arena*& relocatedListOut, JS::gcreason::R
         size_t relocCount = 0;
         AllAllocKindArray<Arena**> toRelocate;
 
-        for (auto kind : AllocKindsToRelocate) {
+        for (auto kind : AllocKindsToRelocate)
             toRelocate[kind] = arenaLists[kind].pickArenasToRelocate(arenaCount, relocCount);
-        }
 
         if (!ShouldRelocateZone(arenaCount, relocCount, reason))
             return false;
@@ -2821,9 +2820,8 @@ ArenaLists::queueForegroundObjectsForSweep(FreeOp* fop)
     gcstats::AutoPhase ap(fop->runtime()->gc.stats, gcstats::PHASE_SWEEP_OBJECT);
 
 #ifdef DEBUG
-    for (auto i : ObjectAllocKinds()) { // Braces needed to appease MSVC 2013.
+    for (auto i : ObjectAllocKinds())
         MOZ_ASSERT(savedObjectArenas[i].isEmpty());
-    }
     MOZ_ASSERT(savedEmptyObjectArenas == nullptr);
 #endif
 
@@ -2916,11 +2914,11 @@ int
 SliceBudget::describe(char* buffer, size_t maxlen) const
 {
     if (isUnlimited())
-        return JS_snprintf(buffer, maxlen, "unlimited");
+        return snprintf(buffer, maxlen, "unlimited");
     else if (isWorkBudget())
-        return JS_snprintf(buffer, maxlen, "work(%" PRId64 ")", workBudget.budget);
+        return snprintf(buffer, maxlen, "work(%" PRId64 ")", workBudget.budget);
     else
-        return JS_snprintf(buffer, maxlen, "%" PRId64 "ms", timeBudget.budget);
+        return snprintf(buffer, maxlen, "%" PRId64 "ms", timeBudget.budget);
 }
 
 bool
@@ -3279,46 +3277,37 @@ GCHelperState::finish()
 }
 
 GCHelperState::State
-GCHelperState::state()
+GCHelperState::state(const AutoLockGC&)
 {
-    MOZ_ASSERT(rt->gc.currentThreadOwnsGCLock());
     return state_;
 }
 
 void
-GCHelperState::setState(State state)
+GCHelperState::setState(State state, const AutoLockGC&)
 {
-    MOZ_ASSERT(rt->gc.currentThreadOwnsGCLock());
     state_ = state;
 }
 
 void
-GCHelperState::startBackgroundThread(State newState)
+GCHelperState::startBackgroundThread(State newState, const AutoLockGC& lock,
+                                     const AutoLockHelperThreadState& helperLock)
 {
-    MOZ_ASSERT(!thread && state() == IDLE && newState != IDLE);
-    setState(newState);
+    MOZ_ASSERT(!thread && state(lock) == IDLE && newState != IDLE);
+    setState(newState, lock);
 
     {
         AutoEnterOOMUnsafeRegion noOOM;
-        if (!HelperThreadState().gcHelperWorklist().append(this))
+        if (!HelperThreadState().gcHelperWorklist(helperLock).append(this))
             noOOM.crash("Could not add to pending GC helpers list");
     }
 
-    HelperThreadState().notifyAll(GlobalHelperThreadState::PRODUCER);
+    HelperThreadState().notifyAll(GlobalHelperThreadState::PRODUCER, helperLock);
 }
 
 void
 GCHelperState::waitForBackgroundThread(js::AutoLockGC& lock)
 {
-    MOZ_ASSERT(CurrentThreadCanAccessRuntime(rt));
-
-#ifdef DEBUG
-    rt->gc.lockOwner = nullptr;
-#endif
     done.wait(lock.guard());
-#ifdef DEBUG
-    rt->gc.lockOwner = PR_GetCurrentThread();
-#endif
 }
 
 void
@@ -3328,12 +3317,12 @@ GCHelperState::work()
 
     AutoLockGC lock(rt);
 
-    MOZ_ASSERT(!thread);
-    thread = PR_GetCurrentThread();
+    MOZ_ASSERT(thread.isNothing());
+    thread = mozilla::Some(ThisThread::GetId());
 
     TraceLoggerThread* logger = TraceLoggerForCurrentThread();
 
-    switch (state()) {
+    switch (state(lock)) {
 
       case IDLE:
         MOZ_CRASH("GC helper triggered on idle state");
@@ -3342,14 +3331,14 @@ GCHelperState::work()
       case SWEEPING: {
         AutoTraceLog logSweeping(logger, TraceLogger_GCSweeping);
         doSweep(lock);
-        MOZ_ASSERT(state() == SWEEPING);
+        MOZ_ASSERT(state(lock) == SWEEPING);
         break;
       }
 
     }
 
-    setState(IDLE);
-    thread = nullptr;
+    setState(IDLE, lock);
+    thread.reset();
 
     done.notify_all();
 }
@@ -3360,7 +3349,7 @@ GCRuntime::queueZonesForBackgroundSweep(ZoneList& zones)
     AutoLockHelperThreadState helperLock;
     AutoLockGC lock(rt);
     backgroundSweepZones.transferFrom(zones);
-    helperState.maybeStartBackgroundSweep(lock);
+    helperState.maybeStartBackgroundSweep(lock, helperLock);
 }
 
 void
@@ -3387,19 +3376,20 @@ GCRuntime::freeAllLifoBlocksAfterMinorGC(LifoAlloc* lifo)
 }
 
 void
-GCHelperState::maybeStartBackgroundSweep(const AutoLockGC& lock)
+GCHelperState::maybeStartBackgroundSweep(const AutoLockGC& lock,
+                                         const AutoLockHelperThreadState& helperLock)
 {
     MOZ_ASSERT(CanUseExtraThreads());
 
-    if (state() == IDLE)
-        startBackgroundThread(SWEEPING);
+    if (state(lock) == IDLE)
+        startBackgroundThread(SWEEPING, lock, helperLock);
 }
 
 void
 GCHelperState::waitBackgroundSweepEnd()
 {
     AutoLockGC lock(rt);
-    while (state() == SWEEPING)
+    while (state(lock) == SWEEPING)
         waitForBackgroundThread(lock);
     if (!rt->gc.isIncrementalGCInProgress())
         rt->gc.assertBackgroundSweepingFinished();
@@ -3429,7 +3419,7 @@ GCHelperState::doSweep(AutoLockGC& lock)
 bool
 GCHelperState::onBackgroundThread()
 {
-    return PR_GetCurrentThread() == thread;
+    return thread.isSome() && *thread == ThisThread::GetId();
 }
 
 bool
@@ -3782,9 +3772,8 @@ GCRuntime::beginMarkPhase(JS::gcreason::Reason reason, AutoLockForExclusiveAcces
         MOZ_ASSERT(!zone->isCollecting());
         MOZ_ASSERT(!zone->compartments.empty());
 #ifdef DEBUG
-        for (auto i : AllAllocKinds()) { // Braces needed to appease MSVC 2013.
+        for (auto i : AllAllocKinds())
             MOZ_ASSERT(!zone->arenas.arenaListsToSweep[i]);
-        }
 #endif
 
         /* Set up which zones will be collected. */
@@ -3904,9 +3893,6 @@ GCRuntime::beginMarkPhase(JS::gcreason::Reason reason, AutoLockForExclusiveAcces
             /* Unmark all weak maps in the zones being collected. */
             WeakMapBase::unmarkZone(zone);
         }
-
-        if (isFull)
-            UnmarkScriptData(rt, lock);
     }
 
     markRuntime(gcmarker, MarkRuntime, lock);
@@ -4176,7 +4162,7 @@ js::gc::MarkingValidator::nonIncrementalMark(AutoLockForExclusiveAccess& lock)
 
     /* Re-do all the marking, but non-incrementally. */
     js::gc::State state = gc->incrementalState;
-    gc->incrementalState = MARK_ROOTS;
+    gc->incrementalState = State::MarkRoots;
 
     {
         gcstats::AutoPhase ap(gc->stats, gcstats::PHASE_MARK);
@@ -4196,12 +4182,12 @@ js::gc::MarkingValidator::nonIncrementalMark(AutoLockForExclusiveAccess& lock)
 
         gc->markRuntime(gcmarker, GCRuntime::MarkRuntime, lock);
 
-        gc->incrementalState = MARK;
+        gc->incrementalState = State::Mark;
         auto unlimited = SliceBudget::unlimited();
         MOZ_RELEASE_ASSERT(gc->marker.drainMarkStack(unlimited));
     }
 
-    gc->incrementalState = SWEEP;
+    gc->incrementalState = State::Sweep;
     {
         gcstats::AutoPhase ap1(gc->stats, gcstats::PHASE_SWEEP);
         gcstats::AutoPhase ap2(gc->stats, gcstats::PHASE_SWEEP_MARK);
@@ -4898,8 +4884,7 @@ SweepMiscTask::run()
 void
 GCRuntime::startTask(GCParallelTask& task, gcstats::Phase phase, AutoLockHelperThreadState& locked)
 {
-    MOZ_ASSERT(HelperThreadState().isLocked());
-    if (!task.startWithLockHeld()) {
+    if (!task.startWithLockHeld(locked)) {
         AutoUnlockHelperThreadState unlock(locked);
         gcstats::AutoPhase ap(stats, phase);
         task.runFromMainThread(rt);
@@ -5435,8 +5420,7 @@ GCRuntime::endSweepPhase(bool destroyingRuntime, AutoLockForExclusiveAccess& loc
          * script and calls rt->destroyScriptHook, the hook can still access the
          * script's filename. See bug 323267.
          */
-        if (isFull)
-            SweepScriptData(rt, lock);
+        SweepScriptData(rt, lock);
 
         /* Clear out any small pools that we're hanging on to. */
         if (jit::JitRuntime* jitRuntime = rt->jitRuntime()) {
@@ -5613,7 +5597,7 @@ AutoTraceSession::~AutoTraceSession()
         runtime->heapState_ = prevState;
 
         // Notify any helper threads waiting for the trace session to end.
-        HelperThreadState().notifyAll(GlobalHelperThreadState::PRODUCER);
+        HelperThreadState().notifyAll(GlobalHelperThreadState::PRODUCER, lock);
     } else {
         runtime->heapState_ = prevState;
     }
@@ -5623,10 +5607,14 @@ void
 GCRuntime::resetIncrementalGC(const char* reason, AutoLockForExclusiveAccess& lock)
 {
     switch (incrementalState) {
-      case NO_INCREMENTAL:
+      case State::NotActive:
         return;
 
-      case MARK: {
+      case State::MarkRoots:
+        MOZ_CRASH("resetIncrementalGC did not expect MarkRoots state");
+        break;
+
+      case State::Mark: {
         /* Cancel any ongoing marking. */
         marker.reset();
         marker.stop();
@@ -5643,14 +5631,14 @@ GCRuntime::resetIncrementalGC(const char* reason, AutoLockForExclusiveAccess& lo
 
         blocksToFreeAfterSweeping.freeAll();
 
-        incrementalState = NO_INCREMENTAL;
+        incrementalState = State::NotActive;
 
         MOZ_ASSERT(!marker.shouldCheckCompartments());
 
         break;
       }
 
-      case SWEEP: {
+      case State::Sweep: {
         marker.reset();
 
         for (CompartmentsIter c(rt, SkipAtoms); !c.done(); c.next())
@@ -5675,7 +5663,7 @@ GCRuntime::resetIncrementalGC(const char* reason, AutoLockForExclusiveAccess& lo
         break;
       }
 
-      case FINALIZE: {
+      case State::Finalize: {
         {
             gcstats::AutoPhase ap(stats, gcstats::PHASE_WAIT_BACKGROUND_THREAD);
             rt->gc.waitBackgroundSweepOrAllocEnd();
@@ -5692,7 +5680,7 @@ GCRuntime::resetIncrementalGC(const char* reason, AutoLockForExclusiveAccess& lo
         break;
       }
 
-      case COMPACT: {
+      case State::Compact: {
         bool wasCompacting = isCompacting;
 
         isCompacting = true;
@@ -5706,14 +5694,11 @@ GCRuntime::resetIncrementalGC(const char* reason, AutoLockForExclusiveAccess& lo
         break;
       }
 
-      case DECOMMIT: {
+      case State::Decommit: {
         auto unlimited = SliceBudget::unlimited();
         incrementalCollectSlice(unlimited, JS::gcreason::RESET, lock);
         break;
       }
-
-      default:
-        MOZ_CRASH("Invalid incremental GC state");
     }
 
     stats.reset(reason);
@@ -5726,7 +5711,7 @@ GCRuntime::resetIncrementalGC(const char* reason, AutoLockForExclusiveAccess& lo
         MOZ_ASSERT(!zone->isOnList());
     }
     MOZ_ASSERT(zonesToMaybeCompact.isEmpty());
-    MOZ_ASSERT(incrementalState == NO_INCREMENTAL);
+    MOZ_ASSERT(incrementalState == State::NotActive);
 #endif
 }
 
@@ -5845,33 +5830,33 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
     }
 
     switch (incrementalState) {
-      case NO_INCREMENTAL:
+      case State::NotActive:
         initialReason = reason;
         cleanUpEverything = ShouldCleanUpEverything(reason, invocationKind);
         isCompacting = shouldCompact();
         lastMarkSlice = false;
 
-        incrementalState = MARK_ROOTS;
+        incrementalState = State::MarkRoots;
 
         MOZ_FALLTHROUGH;
 
-      case MARK_ROOTS:
+      case State::MarkRoots:
         if (!beginMarkPhase(reason, lock)) {
-            incrementalState = NO_INCREMENTAL;
+            incrementalState = State::NotActive;
             return;
         }
 
         if (!destroyingRuntime)
             pushZealSelectedObjects();
 
-        incrementalState = MARK;
+        incrementalState = State::Mark;
 
         if (isIncremental && useZeal && hasZealMode(ZealMode::IncrementalRootsThenFinish))
             break;
 
         MOZ_FALLTHROUGH;
 
-      case MARK:
+      case State::Mark:
         AutoGCRooter::traceAllWrappers(&marker);
 
         /* If we needed delayed marking for gray roots, then collect until done. */
@@ -5886,19 +5871,19 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         MOZ_ASSERT(marker.isDrained());
 
         if (!lastMarkSlice && isIncremental && useZeal &&
-            ((initialState == MARK && !hasZealMode(ZealMode::IncrementalRootsThenFinish)) ||
+            ((initialState == State::Mark && !hasZealMode(ZealMode::IncrementalRootsThenFinish)) ||
              hasZealMode(ZealMode::IncrementalMarkAllThenFinish)))
         {
             /*
              * Yield with the aim of starting the sweep in the next
              * slice.  We will need to mark anything new on the stack
-             * when we resume, so we stay in MARK state.
+             * when we resume, so we stay in Mark state.
              */
             lastMarkSlice = true;
             break;
         }
 
-        incrementalState = SWEEP;
+        incrementalState = State::Sweep;
 
         /*
          * This runs to completion, but we don't continue if the budget is
@@ -5917,7 +5902,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
 
         MOZ_FALLTHROUGH;
 
-      case SWEEP:
+      case State::Sweep:
         AutoGCRooter::traceAllWrappers(&marker);
 
         if (sweepPhase(budget, lock) == NotFinished)
@@ -5925,7 +5910,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
 
         endSweepPhase(destroyingRuntime, lock);
 
-        incrementalState = FINALIZE;
+        incrementalState = State::Finalize;
 
         /* Yield before compacting since it is not incremental. */
         if (isCompacting && isIncremental)
@@ -5933,7 +5918,7 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
 
         MOZ_FALLTHROUGH;
 
-      case FINALIZE:
+      case State::Finalize:
         {
             gcstats::AutoPhase ap(stats, gcstats::PHASE_WAIT_BACKGROUND_THREAD);
 
@@ -5959,11 +5944,11 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         }
 
         MOZ_ASSERT(!startedCompacting);
-        incrementalState = COMPACT;
+        incrementalState = State::Compact;
 
         MOZ_FALLTHROUGH;
 
-      case COMPACT:
+      case State::Compact:
         if (isCompacting) {
             if (!startedCompacting)
                 beginCompactPhase();
@@ -5975,11 +5960,11 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         }
 
         startDecommit();
-        incrementalState = DECOMMIT;
+        incrementalState = State::Decommit;
 
         MOZ_FALLTHROUGH;
 
-      case DECOMMIT:
+      case State::Decommit:
         {
             gcstats::AutoPhase ap(stats, gcstats::PHASE_WAIT_BACKGROUND_THREAD);
 
@@ -5991,11 +5976,8 @@ GCRuntime::incrementalCollectSlice(SliceBudget& budget, JS::gcreason::Reason rea
         }
 
         finishCollection(reason);
-        incrementalState = NO_INCREMENTAL;
+        incrementalState = State::NotActive;
         break;
-
-      default:
-        MOZ_CRASH("unexpected GC incrementalState");
     }
 }
 
@@ -6158,7 +6140,7 @@ GCRuntime::gcCycle(bool nonincrementalByAPI, SliceBudget& budget, JS::gcreason::
     }
 
     /* The GC was reset, so we need a do-over. */
-    if (prevState != NO_INCREMENTAL && !isIncrementalGCInProgress())
+    if (prevState != State::NotActive && !isIncrementalGCInProgress())
         return true;
 
     TraceMajorGCStart();
@@ -6365,7 +6347,7 @@ GCRuntime::finishGC(JS::gcreason::Reason reason)
     // compacting phase if we need to finish an ongoing incremental GC
     // non-incrementally to avoid janking the browser.
     if (!IsOOMReason(initialReason)) {
-        if (incrementalState == COMPACT) {
+        if (incrementalState == State::Compact) {
             abortGC();
             return;
         }
@@ -6803,8 +6785,8 @@ GCRuntime::runDebugGC()
          * or compact phases.
          */
         if (hasZealMode(ZealMode::IncrementalMultipleSlices)) {
-            if ((initialState == MARK && incrementalState == SWEEP) ||
-                (initialState == SWEEP && incrementalState == COMPACT))
+            if ((initialState == State::Mark && incrementalState == State::Sweep) ||
+                (initialState == State::Sweep && incrementalState == State::Compact))
             {
                 incrementalLimit = zealFrequency / 2;
             }
@@ -7321,7 +7303,7 @@ JS::IsIncrementalBarrierNeeded(JSContext* cx)
         return false;
 
     auto state = cx->gc.state();
-    return state != gc::NO_INCREMENTAL && state <= gc::SWEEP;
+    return state != gc::State::NotActive && state <= gc::State::Sweep;
 }
 
 struct IncrementalReferenceBarrierFunctor {
@@ -7604,17 +7586,12 @@ NewMemoryInfoObject(JSContext* cx)
 const char*
 StateName(State state)
 {
-    static const char* names[] = {
-        "None",
-        "MarkRoots",
-        "Mark",
-        "Sweep",
-        "Finalize",
-        "Compact"
-    };
-    MOZ_ASSERT(ArrayLength(names) == NUM_STATES);
-    MOZ_ASSERT(state < NUM_STATES);
-    return names[state];
+    switch(state) {
+#define MAKE_CASE(name) case State::name: return #name;
+      GCSTATES(MAKE_CASE)
+#undef MAKE_CASE
+    }
+    MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE("invalide gc::State enum value");
 }
 
 void

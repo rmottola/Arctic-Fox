@@ -8,21 +8,31 @@
 import re
 import datetime
 
-PATTERN=re.compile(
-    '((?:\d+)?\.?\d+) *([a-z])'
+PATTERN = re.compile(
+    '((?:\d+)?\.?\d+) *([a-z]+)'
 )
+
 
 def seconds(value):
     return datetime.timedelta(seconds=int(value))
 
+
 def minutes(value):
     return datetime.timedelta(minutes=int(value))
+
 
 def hours(value):
     return datetime.timedelta(hours=int(value))
 
-def days (value):
+
+def days(value):
     return datetime.timedelta(days=int(value))
+
+
+def months(value):
+    # See warning in years(), below
+    return datetime.timedelta(days=int(value) * 30)
+
 
 def years(value):
     # Warning here "years" are vague don't use this for really sensitive date
@@ -32,9 +42,10 @@ def years(value):
 
 ALIASES = {}
 ALIASES['seconds'] = ALIASES['second'] = ALIASES['s'] = seconds
-ALIASES['minutes'] = ALIASES['minute'] = ALIASES['m'] = minutes
+ALIASES['minutes'] = ALIASES['minute'] = ALIASES['min'] = minutes
 ALIASES['hours'] = ALIASES['hour'] = ALIASES['h'] = hours
 ALIASES['days'] = ALIASES['day'] = ALIASES['d'] = days
+ALIASES['months'] = ALIASES['month'] = ALIASES['mo'] = months
 ALIASES['years'] = ALIASES['year'] = ALIASES['y'] = years
 
 
@@ -71,10 +82,11 @@ def value_of(input_str):
     return ALIASES[unit](value)
 
 
-def json_time_from_now(input_str, now=None):
+def json_time_from_now(input_str, now=None, datetime_format=False):
     '''
     :param str input_str: Input string (see value of)
     :param datetime now: Optionally set the definition of `now`
+    :param boolean datetime_format: Set `True` to get a `datetime` output
     :returns: JSON string representation of time in future.
     '''
 
@@ -83,14 +95,20 @@ def json_time_from_now(input_str, now=None):
 
     time = now + value_of(input_str)
 
-    # Sorta a big hack but the json schema validator for date does not like the
-    # ISO dates until 'Z' (for timezone) is added...
-    return time.isoformat() + 'Z'
+    if datetime_format is True:
+        return time
+    else:
+        # Sorta a big hack but the json schema validator for date does not like the
+        # ISO dates until 'Z' (for timezone) is added...
+        return time.isoformat() + 'Z'
 
 
-def current_json_time():
+def current_json_time(datetime_format=False):
     '''
+    :param boolean datetime_format: Set `True` to get a `datetime` output
     :returns: JSON string representation of the current time.
     '''
-
-    return datetime.datetime.utcnow().isoformat() + 'Z'
+    if datetime_format is True:
+        return datetime.datetime.utcnow()
+    else:
+        return datetime.datetime.utcnow().isoformat() + 'Z'

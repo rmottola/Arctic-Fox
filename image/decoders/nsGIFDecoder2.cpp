@@ -81,7 +81,8 @@ static const uint8_t PACKED_FIELDS_TABLE_DEPTH_MASK = 0x07;
 
 nsGIFDecoder2::nsGIFDecoder2(RasterImage* aImage)
   : Decoder(aImage)
-  , mLexer(Transition::To(State::GIF_HEADER, GIF_HEADER_LEN))
+  , mLexer(Transition::To(State::GIF_HEADER, GIF_HEADER_LEN),
+           Transition::TerminateSuccess())
   , mOldColor(0)
   , mCurrentFrameIndex(-1)
   , mColorTablePos(0)
@@ -100,7 +101,7 @@ nsGIFDecoder2::~nsGIFDecoder2()
   free(mGIFStruct.local_colormap);
 }
 
-void
+nsresult
 nsGIFDecoder2::FinishInternal()
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call FinishInternal after error!");
@@ -113,6 +114,8 @@ nsGIFDecoder2::FinishInternal()
     PostDecodeDone(mGIFStruct.loop_count - 1);
     mGIFOpen = false;
   }
+
+  return NS_OK;
 }
 
 void
@@ -182,7 +185,7 @@ nsGIFDecoder2::BeginImageFrame(const IntRect& aFrameRect,
                                               : SurfaceFormat::B8G8R8X8;
 
   // Make sure there's no animation if we're downscaling.
-  MOZ_ASSERT_IF(mDownscaler, !GetImageMetadata().HasAnimation());
+  MOZ_ASSERT_IF(Size() != OutputSize(), !GetImageMetadata().HasAnimation());
 
   SurfacePipeFlags pipeFlags = aIsInterlaced
                              ? SurfacePipeFlags::DEINTERLACE
@@ -190,26 +193,21 @@ nsGIFDecoder2::BeginImageFrame(const IntRect& aFrameRect,
 
   Maybe<SurfacePipe> pipe;
   if (mGIFStruct.images_decoded == 0) {
-    // This is the first frame. We may be downscaling, so compute the target
-    // size.
-    IntSize targetSize = mDownscaler ? mDownscaler->TargetSize()
-                                     : GetSize();
-
     // The first frame may be displayed progressively.
     pipeFlags |= SurfacePipeFlags::PROGRESSIVE_DISPLAY;
 
     // The first frame is always decoded into an RGB surface.
     pipe =
       SurfacePipeFactory::CreateSurfacePipe(this, mGIFStruct.images_decoded,
-                                            GetSize(), targetSize,
+                                            Size(), OutputSize(),
                                             aFrameRect, format, pipeFlags);
   } else {
     // This is an animation frame (and not the first). To minimize the memory
     // usage of animations, the image data is stored in paletted form.
-    MOZ_ASSERT(!mDownscaler);
+    MOZ_ASSERT(Size() == OutputSize());
     pipe =
       SurfacePipeFactory::CreatePalettedSurfacePipe(this, mGIFStruct.images_decoded,
-                                                    GetSize(), aFrameRect, format,
+                                                    Size(), aFrameRect, format,
                                                     aDepth, pipeFlags);
   }
 
@@ -253,7 +251,7 @@ nsGIFDecoder2::EndImageFrame()
   // Tell the superclass we finished a frame
   PostFrameStop(opacity,
                 DisposalMethod(mGIFStruct.disposal_method),
-                mGIFStruct.delay_time);
+                FrameTimeout::FromRawMilliseconds(mGIFStruct.delay_time));
 
   // Reset the transparent pixel
   if (mOldColor) {
@@ -454,14 +452,12 @@ ConvertColormap(uint32_t* aColormap, uint32_t aColors)
   }
 }
 
-Maybe<TerminalState>
-nsGIFDecoder2::DoDecode(SourceBufferIterator& aIterator)
+LexerResult
+nsGIFDecoder2::DoDecode(SourceBufferIterator& aIterator, IResumable* aOnResume)
 {
   MOZ_ASSERT(!HasError(), "Shouldn't call DoDecode after error!");
-  MOZ_ASSERT(aIterator.Data());
-  MOZ_ASSERT(aIterator.Length() > 0);
 
-  return mLexer.Lex(aIterator.Data(), aIterator.Length(),
+  return mLexer.Lex(aIterator, aOnResume,
                     [=](State aState, const char* aData, size_t aLength) {
     switch(aState) {
       case State::GIF_HEADER:
@@ -486,6 +482,8 @@ nsGIFDecoder2::DoDecode(SourceBufferIterator& aIterator)
         return ReadNetscapeExtensionData(aData);
       case State::IMAGE_DESCRIPTOR:
         return ReadImageDescriptor(aData);
+      case State::FINISH_IMAGE_DESCRIPTOR:
+        return FinishImageDescriptor(aData);
       case State::LOCAL_COLOR_TABLE:
         return ReadLocalColorTable(aData, aLength);
       case State::FINISHED_LOCAL_COLOR_TABLE:
@@ -692,7 +690,7 @@ nsGIFDecoder2::ReadGraphicControlExtension(const char* aData)
 
   mGIFStruct.delay_time = LittleEndian::readUint16(aData + 1) * 10;
   if (mGIFStruct.delay_time > 0) {
-    PostIsAnimated(mGIFStruct.delay_time);
+    PostIsAnimated(FrameTimeout::FromRawMilliseconds(mGIFStruct.delay_time));
   }
 
   return Transition::To(State::SKIP_SUB_BLOCKS, SUB_BLOCK_HEADER_LEN);
@@ -756,29 +754,36 @@ nsGIFDecoder2::ReadNetscapeExtensionData(const char* aData)
 LexerTransition<nsGIFDecoder2::State>
 nsGIFDecoder2::ReadImageDescriptor(const char* aData)
 {
-  if (mGIFStruct.images_decoded == 1) {
-    if (!HasAnimation()) {
-      // We should've already called PostIsAnimated(); this must be a corrupt
-      // animated image with a first frame timeout of zero. Signal that we're
-      // animated now, before the first-frame decode early exit below, so that
-      // RasterImage can detect that this happened.
-      PostIsAnimated(0);
-    }
-
-    if (IsFirstFrameDecode()) {
-      // We're about to get a second frame, but we only want the first. Stop
-      // decoding now.
-      FinishInternal();
-      return Transition::TerminateSuccess();
-    }
-
-    if (mDownscaler) {
-      MOZ_ASSERT_UNREACHABLE("Doing downscale-during-decode for an animated "
-                             "image?");
-      mDownscaler.reset();
-    }
+  // On the first frame, we don't need to yield, and none of the other checks
+  // below apply, so we can just jump right into FinishImageDescriptor().
+  if (mGIFStruct.images_decoded == 0) {
+    return FinishImageDescriptor(aData);
   }
 
+  if (!HasAnimation()) {
+    // We should've already called PostIsAnimated(); this must be a corrupt
+    // animated image with a first frame timeout of zero. Signal that we're
+    // animated now, before the first-frame decode early exit below, so that
+    // RasterImage can detect that this happened.
+    PostIsAnimated(FrameTimeout::FromRawMilliseconds(0));
+  }
+
+  if (IsFirstFrameDecode()) {
+    // We're about to get a second frame, but we only want the first. Stop
+    // decoding now.
+    FinishInternal();
+    return Transition::TerminateSuccess();
+  }
+
+  MOZ_ASSERT(Size() == OutputSize(), "Downscaling an animated image?");
+
+  // Yield to allow access to the previous frame before we start a new one.
+  return Transition::ToAfterYield(State::FINISH_IMAGE_DESCRIPTOR);
+}
+
+LexerTransition<nsGIFDecoder2::State>
+nsGIFDecoder2::FinishImageDescriptor(const char* aData)
+{
   IntRect frameRect;
 
   // Get image offsets with respect to the screen origin.
@@ -1068,10 +1073,10 @@ nsGIFDecoder2::SkipSubBlocks(const char* aData)
                                   nextSubBlockLength);
 }
 
-Telemetry::ID
-nsGIFDecoder2::SpeedHistogram()
+Maybe<Telemetry::ID>
+nsGIFDecoder2::SpeedHistogram() const
 {
-  return Telemetry::IMAGE_DECODE_SPEED_GIF;
+  return Some(Telemetry::IMAGE_DECODE_SPEED_GIF);
 }
 
 } // namespace image

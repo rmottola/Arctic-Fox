@@ -1302,7 +1302,7 @@ struct SetEnumValueHelper
 
   DEFINE_ENUM_CLASS_SETTER(StyleBoxSizing, Content, Border)
   DEFINE_ENUM_CLASS_SETTER(StyleFloatEdge, ContentBox, MarginBox)
-  DEFINE_ENUM_CLASS_SETTER(StyleUserFocus, None, SelectMenu)
+  DEFINE_ENUM_CLASS_SETTER(StyleUserFocus, None_, SelectMenu)
 
 #undef DEF_SET_ENUMERATED_VALUE
 };
@@ -2429,7 +2429,13 @@ nsRuleNode::WalkRuleTree(const nsStyleStructID aSID,
     // the context by our caller) as not being owned by the context.
     if (!isReset) {
       aContext->AddStyleBit(nsCachedStyleData::GetBitForSID(aSID));
+    } else if (HasAnimationData()) {
+      // If we have animation data, the struct should be cached on the style
+      // context so that we can peek the struct.
+      // See comment in AnimValuesStyleRule::MapRuleInfoInto.
+      StoreStyleOnContext(aContext, aSID, startStruct);
     }
+
     return startStruct;
   }
   if ((!startStruct && !isReset &&
@@ -2832,6 +2838,12 @@ nsRuleNode::SetDefaultOnRoot(const nsStyleStructID aSID, nsStyleContext* aContex
       SetStyleData(eStyleStruct_##type_, data_);                              \
     /* Propagate the bit down. */                                             \
     PropagateDependentBit(eStyleStruct_##type_, aHighestNode, data_);         \
+    if (HasAnimationData()) {                                                 \
+      /* If we have animation data, the struct should be cached on the */     \
+      /* style context so that we can peek the struct. */                     \
+      /* See comment in AnimValuesStyleRule::MapRuleInfoInto. */              \
+      StoreStyleOnContext(aContext, eStyleStruct_##type_, data_);             \
+    }                                                                         \
   } else if (conditions.Cacheable()) {                                        \
     if (!mStyleData.mResetData) {                                             \
       mStyleData.mResetData = new (mPresContext) nsConditionalResetStyleData; \
@@ -4172,13 +4184,12 @@ inline uint32_t ListLength(const T* aList)
   return len;
 }
 
-
-
-already_AddRefed<nsCSSShadowArray>
-nsRuleNode::GetShadowData(const nsCSSValueList* aList,
-                          nsStyleContext* aContext,
-                          bool aIsBoxShadow,
-                          RuleNodeCacheConditions& aConditions)
+static already_AddRefed<nsCSSShadowArray>
+GetShadowData(const nsCSSValueList* aList,
+              nsStyleContext* aContext,
+              bool aIsBoxShadow,
+              nsPresContext* aPresContext,
+              RuleNodeCacheConditions& aConditions)
 {
   uint32_t arrayLength = ListLength(aList);
 
@@ -4201,13 +4212,13 @@ nsRuleNode::GetShadowData(const nsCSSValueList* aList,
     // OK to pass bad aParentCoord since we're not passing SETCOORD_INHERIT
     unitOK = SetCoord(arr->Item(0), tempCoord, nsStyleCoord(),
                       SETCOORD_LENGTH | SETCOORD_CALC_LENGTH_ONLY,
-                      aContext, mPresContext, aConditions);
+                      aContext, aPresContext, aConditions);
     NS_ASSERTION(unitOK, "unexpected unit");
     item->mXOffset = tempCoord.GetCoordValue();
 
     unitOK = SetCoord(arr->Item(1), tempCoord, nsStyleCoord(),
                       SETCOORD_LENGTH | SETCOORD_CALC_LENGTH_ONLY,
-                      aContext, mPresContext, aConditions);
+                      aContext, aPresContext, aConditions);
     NS_ASSERTION(unitOK, "unexpected unit");
     item->mYOffset = tempCoord.GetCoordValue();
 
@@ -4216,7 +4227,7 @@ nsRuleNode::GetShadowData(const nsCSSValueList* aList,
       unitOK = SetCoord(arr->Item(2), tempCoord, nsStyleCoord(),
                         SETCOORD_LENGTH | SETCOORD_CALC_LENGTH_ONLY |
                           SETCOORD_CALC_CLAMP_NONNEGATIVE,
-                        aContext, mPresContext, aConditions);
+                        aContext, aPresContext, aConditions);
       NS_ASSERTION(unitOK, "unexpected unit");
       item->mRadius = tempCoord.GetCoordValue();
     } else {
@@ -4227,7 +4238,7 @@ nsRuleNode::GetShadowData(const nsCSSValueList* aList,
     if (aIsBoxShadow && arr->Item(3).GetUnit() != eCSSUnit_Null) {
       unitOK = SetCoord(arr->Item(3), tempCoord, nsStyleCoord(),
                         SETCOORD_LENGTH | SETCOORD_CALC_LENGTH_ONLY,
-                        aContext, mPresContext, aConditions);
+                        aContext, aPresContext, aConditions);
       NS_ASSERTION(unitOK, "unexpected unit");
       item->mSpread = tempCoord.GetCoordValue();
     } else {
@@ -4237,7 +4248,7 @@ nsRuleNode::GetShadowData(const nsCSSValueList* aList,
     if (arr->Item(4).GetUnit() != eCSSUnit_Null) {
       item->mHasColor = true;
       // 2nd argument can be bogus since inherit is not a valid color
-      unitOK = SetColor(arr->Item(4), 0, mPresContext, aContext, item->mColor,
+      unitOK = SetColor(arr->Item(4), 0, aPresContext, aContext, item->mColor,
                         aConditions);
       NS_ASSERTION(unitOK, "unexpected unit");
     }
@@ -4440,7 +4451,7 @@ nsRuleNode::ComputeTextData(void* aStartStruct,
                textShadowValue->GetUnit() == eCSSUnit_ListDep) {
       // List of arrays
       text->mTextShadow = GetShadowData(textShadowValue->GetListValue(),
-                                        aContext, false, conditions);
+                                        aContext, false, mPresContext, conditions);
     }
   }
 
@@ -5286,10 +5297,7 @@ nsRuleNode::ComputeTimingFunction(const nsCSSValue& aValue,
             NS_STYLE_TRANSITION_TIMING_FUNCTION_STEP_START) ?
               nsTimingFunction::Type::StepStart :
               nsTimingFunction::Type::StepEnd;
-        aResult = nsTimingFunction(type, array->Item(0).GetIntValue(),
-                                   array->Item(1).GetIntValue() == -1 ?
-                                     nsTimingFunction::Keyword::Implicit :
-                                     nsTimingFunction::Keyword::Explicit);
+        aResult = nsTimingFunction(type, array->Item(0).GetIntValue());
       }
       break;
     default:
@@ -9212,8 +9220,8 @@ SetSVGPaint(const nsCSSValue& aValue, const nsStyleSVGPaint& parentPaint,
 
     if (pair.mXValue.GetUnit() == eCSSUnit_URL) {
       aResult.SetType(eStyleSVGPaintType_Server);
-      aResult.mPaint.mPaintServer = pair.mXValue.GetURLValue();
-      NS_IF_ADDREF(aResult.mPaint.mPaintServer);
+      aResult.mPaint.mPaintServer = new FragmentOrURL();
+      aResult.mPaint.mPaintServer->SetValue(&pair.mXValue);
     } else if (pair.mXValue.GetUnit() == eCSSUnit_Enumerated) {
 
       switch (pair.mXValue.GetIntValue()) {
@@ -9330,10 +9338,10 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
   // marker-end: url, none, inherit
   const nsCSSValue* markerEndValue = aRuleData->ValueForMarkerEnd();
   if (eCSSUnit_URL == markerEndValue->GetUnit()) {
-    svg->mMarkerEnd = markerEndValue->GetURLValue();
+    svg->mMarkerEnd.SetValue(markerEndValue);
   } else if (eCSSUnit_None == markerEndValue->GetUnit() ||
              eCSSUnit_Initial == markerEndValue->GetUnit()) {
-    svg->mMarkerEnd = nullptr;
+    svg->mMarkerEnd.SetNull();
   } else if (eCSSUnit_Inherit == markerEndValue->GetUnit() ||
              eCSSUnit_Unset == markerEndValue->GetUnit()) {
     conditions.SetUncacheable();
@@ -9343,10 +9351,10 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
   // marker-mid: url, none, inherit
   const nsCSSValue* markerMidValue = aRuleData->ValueForMarkerMid();
   if (eCSSUnit_URL == markerMidValue->GetUnit()) {
-    svg->mMarkerMid = markerMidValue->GetURLValue();
+    svg->mMarkerMid.SetValue(markerMidValue);
   } else if (eCSSUnit_None == markerMidValue->GetUnit() ||
              eCSSUnit_Initial == markerMidValue->GetUnit()) {
-    svg->mMarkerMid = nullptr;
+    svg->mMarkerMid.SetNull();
   } else if (eCSSUnit_Inherit == markerMidValue->GetUnit() ||
              eCSSUnit_Unset == markerMidValue->GetUnit()) {
     conditions.SetUncacheable();
@@ -9356,10 +9364,10 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
   // marker-start: url, none, inherit
   const nsCSSValue* markerStartValue = aRuleData->ValueForMarkerStart();
   if (eCSSUnit_URL == markerStartValue->GetUnit()) {
-    svg->mMarkerStart = markerStartValue->GetURLValue();
+    svg->mMarkerStart.SetValue(markerStartValue);
   } else if (eCSSUnit_None == markerStartValue->GetUnit() ||
              eCSSUnit_Initial == markerStartValue->GetUnit()) {
-    svg->mMarkerStart = nullptr;
+    svg->mMarkerStart.SetNull();
   } else if (eCSSUnit_Inherit == markerStartValue->GetUnit() ||
              eCSSUnit_Unset == markerStartValue->GetUnit()) {
     conditions.SetUncacheable();
@@ -9538,11 +9546,11 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
   COMPUTE_END_INHERITED(SVG, svg)
 }
 
-already_AddRefed<nsStyleBasicShape>
-nsRuleNode::GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
-                                           nsStyleContext* aStyleContext,
-                                           nsPresContext* aPresContext,
-                                           RuleNodeCacheConditions& aConditions)
+static already_AddRefed<nsStyleBasicShape>
+GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
+                               nsStyleContext* aStyleContext,
+                               nsPresContext* aPresContext,
+                               RuleNodeCacheConditions& aConditions)
 {
   RefPtr<nsStyleBasicShape> basicShape;
 
@@ -9687,12 +9695,12 @@ nsRuleNode::GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
   return basicShape.forget();
 }
 
-void
-nsRuleNode::SetStyleClipPathToCSSValue(nsStyleClipPath* aStyleClipPath,
-                                       const nsCSSValue* aValue,
-                                       nsStyleContext* aStyleContext,
-                                       nsPresContext* aPresContext,
-                                       RuleNodeCacheConditions& aConditions)
+static void
+SetStyleClipPathToCSSValue(nsStyleClipPath* aStyleClipPath,
+                           const nsCSSValue* aValue,
+                           nsStyleContext* aStyleContext,
+                           nsPresContext* aPresContext,
+                           RuleNodeCacheConditions& aConditions)
 {
   MOZ_ASSERT(aValue->GetUnit() == eCSSUnit_Array,
              "expected a basic shape or reference box");
@@ -9729,20 +9737,16 @@ nsRuleNode::SetStyleClipPathToCSSValue(nsStyleClipPath* aStyleClipPath,
 }
 
 // Returns true if the nsStyleFilter was successfully set using the nsCSSValue.
-bool
-nsRuleNode::SetStyleFilterToCSSValue(nsStyleFilter* aStyleFilter,
-                                     const nsCSSValue& aValue,
-                                     nsStyleContext* aStyleContext,
-                                     nsPresContext* aPresContext,
-                                     RuleNodeCacheConditions& aConditions)
+static bool
+SetStyleFilterToCSSValue(nsStyleFilter* aStyleFilter,
+                         const nsCSSValue& aValue,
+                         nsStyleContext* aStyleContext,
+                         nsPresContext* aPresContext,
+                         RuleNodeCacheConditions& aConditions)
 {
   nsCSSUnit unit = aValue.GetUnit();
   if (unit == eCSSUnit_URL) {
-    nsIURI* url = aValue.GetURLValue();
-    if (!url)
-      return false;
-    aStyleFilter->SetURL(url);
-    return true;
+    return aStyleFilter->SetURL(&aValue);
   }
 
   MOZ_ASSERT(unit == eCSSUnit_Function, "expected a filter function");
@@ -9762,6 +9766,7 @@ nsRuleNode::SetStyleFilterToCSSValue(nsStyleFilter* aStyleFilter,
       filterFunction->Item(1).GetListValue(),
       aStyleContext,
       false,
+      aPresContext,
       aConditions);
     aStyleFilter->SetDropShadow(shadowArray);
     return true;
@@ -9847,10 +9852,7 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
       break;
     case eCSSUnit_URL: {
       svgReset->mClipPath = nsStyleClipPath();
-      nsIURI* url = clipPathValue->GetURLValue();
-      if (url) {
-        svgReset->mClipPath.SetURL(url);
-      }
+      svgReset->mClipPath.SetURL(clipPathValue);
       break;
     }
     case eCSSUnit_Array: {
@@ -10150,7 +10152,7 @@ nsRuleNode::ComputeEffectsData(void* aStartStruct,
   case eCSSUnit_List:
   case eCSSUnit_ListDep:
     effects->mBoxShadow = GetShadowData(boxShadowValue->GetListValue(),
-                                        aContext, true, conditions);
+                                        aContext, true, mPresContext, conditions);
     break;
 
   default:
@@ -10268,7 +10270,13 @@ nsRuleNode::GetStyleData(nsStyleStructID aSID,
       // the context by our caller) as not being owned by the context.
       if (!nsCachedStyleData::IsReset(aSID)) {
         aContext->AddStyleBit(nsCachedStyleData::GetBitForSID(aSID));
+      } else if (HasAnimationData()) {
+        // If we have animation data, the struct should be cached on the style
+        // context so that we can peek the struct.
+        // See comment in AnimValuesStyleRule::MapRuleInfoInto.
+        StoreStyleOnContext(aContext, aSID, const_cast<void*>(data));
       }
+
       return data; // We have a fully specified struct. Just return it.
     }
   }
@@ -10625,6 +10633,15 @@ nsRuleNode::ParentHasPseudoElementData(nsStyleContext* aContext)
 {
   nsStyleContext* parent = aContext->GetParent();
   return parent && parent->HasPseudoElementData();
+}
+
+/* static */ void
+nsRuleNode::StoreStyleOnContext(nsStyleContext* aContext,
+                                nsStyleStructID aSID,
+                                void* aStruct)
+{
+  aContext->AddStyleBit(nsCachedStyleData::GetBitForSID(aSID));
+  aContext->SetStyle(aSID, aStruct);
 }
 
 #ifdef DEBUG

@@ -5,19 +5,19 @@
 
 // Tests the Filter Editor Widget's drag-drop re-ordering
 
-const TEST_URI = "chrome://devtools/content/shared/widgets/filter-frame.xhtml";
 const {CSSFilterEditorWidget} = require("devtools/client/shared/widgets/FilterWidget");
 const LIST_ITEM_HEIGHT = 32;
 
-add_task(function*() {
-  yield addTab("about:blank");
+const TEST_URI = `data:text/html,<div id="filter-container" />`;
+
+add_task(function* () {
   let [host, win, doc] = yield createHost("bottom", TEST_URI);
 
-  const container = doc.querySelector("#container");
+  const container = doc.querySelector("#filter-container");
   const initialValue = "blur(2px) contrast(200%) brightness(200%)";
   let widget = new CSSFilterEditorWidget(container, initialValue);
 
-  const filters = widget.el.querySelector(".filters");
+  const filters = widget.el.querySelector("#filters");
   function first() {
     return filters.children[0];
   }
@@ -27,6 +27,7 @@ add_task(function*() {
   function last() {
     return filters.children[2];
   }
+
 
   info("Test re-ordering neighbour filters");
   widget._mouseDown({
@@ -67,7 +68,7 @@ add_task(function*() {
     pageY: 0
   });
   widget._mouseMove({ pageY: -LIST_ITEM_HEIGHT * 5 });
-  ok(first().offsetTop >= boundaries.top,
+  ok(first().getBoundingClientRect().top >= boundaries.top,
      "First filter should not move outside filter list");
 
   widget._mouseUp();
@@ -78,7 +79,7 @@ add_task(function*() {
     pageY: 0
   });
   widget._mouseMove({ pageY: -LIST_ITEM_HEIGHT * 5 });
-  ok(last().offsetTop <= boundaries.bottom,
+  ok(last().getBoundingClientRect().bottom <= boundaries.bottom,
      "Last filter should not move outside filter list");
 
   widget._mouseUp();

@@ -5,18 +5,17 @@
  * Tests to ensure that param connections trigger graph redraws
  */
 
-add_task(function*() {
+add_task(function* () {
   let { target, panel } = yield initWebAudioEditor(SIMPLE_CONTEXT_URL);
   let { panelWin } = panel;
   let { gFront, $, $$, EVENTS } = panelWin;
 
-  reload(target);
-
-  let [actors] = yield Promise.all([
+  let events = Promise.all([
     getN(gFront, "create-node", 3),
     waitForGraphRendered(panelWin, 3, 2, 0)
   ]);
-
+  reload(target);
+  let [actors] = yield events;
   let [dest, osc, gain] = actors;
 
   yield osc.disconnect();

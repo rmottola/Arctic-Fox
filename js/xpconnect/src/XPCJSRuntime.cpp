@@ -842,7 +842,7 @@ XPCJSRuntime::FinalizeCallback(JSFreeOp* fop,
                 }
             }
 
-            if (!isCompartmentGC) {
+            if (doSweep) {
                 for (auto i = self->mClassInfo2NativeSetMap->Iter(); !i.Done(); i.Next()) {
                     auto entry = static_cast<ClassInfo2NativeSetMap::Entry*>(i.Get());
                     if (!entry->value->IsMarked())
@@ -1121,10 +1121,6 @@ class Watchdog
     mozilla::Atomic<int32_t> mMinScriptRunTimeSeconds;
 };
 
-#ifdef MOZ_NUWA_PROCESS
-#include "ipc/Nuwa.h"
-#endif
-
 #define PREF_MAX_SCRIPT_RUN_TIME_CONTENT "dom.max_script_run_time"
 #define PREF_MAX_SCRIPT_RUN_TIME_CHROME "dom.max_chrome_script_run_time"
 
@@ -1281,13 +1277,6 @@ static void
 WatchdogMain(void* arg)
 {
     PR_SetCurrentThreadName("JS Watchdog");
-
-#ifdef MOZ_NUWA_PROCESS
-    if (IsNuwaProcess()) {
-        NuwaMarkCurrentThread(nullptr, nullptr);
-        NuwaFreezeCurrentThread();
-    }
-#endif
 
     Watchdog* self = static_cast<Watchdog*>(arg);
     WatchdogManager* manager = self->Manager();
@@ -1472,7 +1461,7 @@ XPCJSRuntime::InterruptCallback(JSContext* cx)
     // Show the prompt to the user, and kill if requested.
     nsGlobalWindow::SlowScriptResponse response = win->ShowSlowScriptDialog();
     if (response == nsGlobalWindow::KillSlowScript) {
-        if (Preferences::GetBool("dom.global_stop_unresponsive_script", true))
+        if (Preferences::GetBool("dom.global_stop_script", true))
             xpc::Scriptability::Get(global).Block();
         return false;
     }
@@ -3223,6 +3212,9 @@ AccumulateTelemetryCallback(int id, uint32_t sample, const char* key)
       case JS_TELEMETRY_GC_MINOR_US:
         Telemetry::Accumulate(Telemetry::GC_MINOR_US, sample);
         break;
+      case JS_TELEMETRY_GC_NURSERY_BYTES:
+        Telemetry::Accumulate(Telemetry::GC_NURSERY_BYTES, sample);
+        break;
       case JS_TELEMETRY_DEPRECATED_LANGUAGE_EXTENSIONS_IN_CONTENT:
         Telemetry::Accumulate(Telemetry::JS_DEPRECATED_LANGUAGE_EXTENSIONS_IN_CONTENT, sample);
         break;
@@ -3686,8 +3678,7 @@ XPCJSRuntime::DescribeCustomObjects(JSObject* obj, const js::Class* clasp,
         return false;
     }
 
-    JS_snprintf(name, sizeof(name), "JS Object (%s - %s)",
-                clasp->name, si->GetJSClass()->name);
+    snprintf(name, sizeof(name), "JS Object (%s - %s)", clasp->name, si->GetJSClass()->name);
     return true;
 }
 

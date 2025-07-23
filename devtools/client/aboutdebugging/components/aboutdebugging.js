@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /* eslint-env browser */
-/* globals AddonsPanel, WorkersPanel */
 
 "use strict";
 
@@ -15,6 +14,8 @@ const PanelMenu = createFactory(require("./panel-menu"));
 
 loader.lazyGetter(this, "AddonsPanel",
   () => createFactory(require("./addons/panel")));
+loader.lazyGetter(this, "TabsPanel",
+  () => createFactory(require("./tabs/panel")));
 loader.lazyGetter(this, "WorkersPanel",
   () => createFactory(require("./workers/panel")));
 
@@ -23,13 +24,16 @@ const Strings = Services.strings.createBundle(
 
 const panels = [{
   id: "addons",
-  panelId: "addons-panel",
   name: Strings.GetStringFromName("addons"),
   icon: "chrome://devtools/skin/images/debugging-addons.svg",
   component: AddonsPanel
 }, {
+  id: "tabs",
+  name: Strings.GetStringFromName("tabs"),
+  icon: "chrome://devtools/skin/images/debugging-tabs.svg",
+  component: TabsPanel
+}, {
   id: "workers",
-  panelId: "workers-panel",
   name: Strings.GetStringFromName("workers"),
   icon: "chrome://devtools/skin/images/debugging-workers.svg",
   component: WorkersPanel
@@ -59,18 +63,9 @@ module.exports = createClass({
   },
 
   onHashChange() {
-    let hash = window.location.hash;
-    // Default to defaultTabId if no hash is provided.
-    let panelId = hash ? hash.substr(1) : defaultPanelId;
-
-    let isValid = panels.some(p => p.id == panelId);
-    if (isValid) {
-      this.setState({ selectedPanelId: panelId });
-    } else {
-      // If the current hash matches no valid category, navigate to the default
-      // panel.
-      this.selectPanel(defaultPanelId);
-    }
+    this.setState({
+      selectedPanelId: window.location.hash.substr(1) || defaultPanelId
+    });
   },
 
   selectPanel(panelId) {
@@ -81,14 +76,26 @@ module.exports = createClass({
     let { client } = this.props;
     let { selectedPanelId } = this.state;
     let selectPanel = this.selectPanel;
-
     let selectedPanel = panels.find(p => p.id == selectedPanelId);
+    let panel;
+
+    if (selectedPanel) {
+      panel = selectedPanel.component({ client, id: selectedPanel.id });
+    } else {
+      panel = (
+        dom.div({ className: "error-page" },
+          dom.h1({ className: "header-name" },
+            Strings.GetStringFromName("pageNotFound")
+          ),
+          dom.h4({ className: "error-page-details" },
+            Strings.formatStringFromName("doesNotExist", [selectedPanelId], 1))
+        )
+      );
+    }
 
     return dom.div({ className: "app" },
       PanelMenu({ panels, selectedPanelId, selectPanel }),
-      dom.div({ className: "main-content" },
-        selectedPanel.component({ client, id: selectedPanel.panelId })
-      )
+      dom.div({ className: "main-content" }, panel)
     );
   }
 });

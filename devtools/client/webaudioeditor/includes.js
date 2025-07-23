@@ -5,13 +5,10 @@
 
 var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-
 const { loader, require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
-
-var { EventTarget } = require("sdk/event/target");
-
-const { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
+const { XPCOMUtils } = require("resource://gre/modules/XPCOMUtils.jsm");
+const { EventTarget } = require("sdk/event/target");
+const { Task } = require("devtools/shared/task");
 const { Class } = require("sdk/core/heritage");
 const EventEmitter = require("devtools/shared/event-emitter");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
@@ -20,7 +17,7 @@ const { gDevTools } = require("devtools/client/framework/devtools");
 const { LocalizationHelper } = require("devtools/client/shared/l10n");
 const { ViewHelpers } = require("devtools/client/shared/widgets/view-helpers");
 
-const STRINGS_URI = "chrome://devtools/locale/webaudioeditor.properties"
+const STRINGS_URI = "chrome://devtools/locale/webaudioeditor.properties";
 const L10N = new LocalizationHelper(STRINGS_URI);
 
 loader.lazyRequireGetter(this, "LineGraphWidget",
@@ -73,6 +70,7 @@ const EVENTS = {
   // Called when the inspector splitter is moved and resized.
   UI_INSPECTOR_RESIZE: "WebAudioEditor:UIInspectorResize"
 };
+XPCOMUtils.defineConstant(this, "EVENTS", EVENTS);
 
 /**
  * The current target and the Web Audio Editor front, set by this tool's host.
@@ -96,7 +94,7 @@ function $$(selector, target = document) { return target.querySelectorAll(select
  * From Backbone.Collection#findWhere
  * http://backbonejs.org/#Collection-findWhere
  */
-function findWhere (collection, attrs) {
+function findWhere(collection, attrs) {
   let keys = Object.keys(attrs);
   for (let model of collection) {
     if (keys.every(key => model[key] === attrs[key])) {
@@ -106,7 +104,7 @@ function findWhere (collection, attrs) {
   return void 0;
 }
 
-function mixin (source, ...args) {
+function mixin(source, ...args) {
   args.forEach(obj => Object.keys(obj).forEach(prop => source[prop] = obj[prop]));
   return source;
 }

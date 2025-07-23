@@ -3,8 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-var { Ci } = require("chrome");
 var promise = require("promise");
+var defer = require("devtools/shared/defer");
 var Services = require("Services");
 
 const FRAME_SCRIPT =
@@ -25,12 +25,7 @@ function TouchEventSimulator(browser) {
     return simulator;
   }
 
-  let mm = browser.messageManager;
-  if (!mm) {
-    // Maybe browser is an iframe
-    mm = browser.QueryInterface(Ci.nsIFrameLoaderOwner)
-                .frameLoader.messageManager;
-  }
+  let mm = browser.frameLoader.messageManager;
   mm.loadFrameScript(FRAME_SCRIPT, true);
 
   simulator = {
@@ -42,7 +37,7 @@ function TouchEventSimulator(browser) {
       }
       this.enabled = true;
 
-      let deferred = promise.defer();
+      let deferred = defer();
       let isReloadNeeded =
         Services.prefs.getIntPref("dom.w3c_touch_events.enabled") != 1;
       Services.prefs.setIntPref("dom.w3c_touch_events.enabled", 1);
@@ -61,7 +56,7 @@ function TouchEventSimulator(browser) {
       }
       this.enabled = false;
 
-      let deferred = promise.defer();
+      let deferred = defer();
       Services.prefs.setIntPref("dom.w3c_touch_events.enabled",
                                 savedTouchEventsEnabled);
       let onStopped = () => {

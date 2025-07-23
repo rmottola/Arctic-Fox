@@ -2741,8 +2741,7 @@ HTMLInputElement::GetDisplayFileName(nsAString& aValue) const
   nsXPIDLString value;
 
   if (mFilesOrDirectories.IsEmpty()) {
-    if ((Preferences::GetBool("dom.input.dirpicker", false) &&
-         HasAttr(kNameSpaceID_None, nsGkAtoms::directory)) ||
+    if ((Preferences::GetBool("dom.input.dirpicker", false) && Allowdirs()) ||
         (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
          HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory))) {
       nsContentUtils::GetLocalizedString(nsContentUtils::eFORMS_PROPERTIES,
@@ -2772,6 +2771,11 @@ HTMLInputElement::SetFilesOrDirectories(const nsTArray<OwningFileOrDirectory>& a
 {
   ClearGetFilesHelpers();
 
+  if (Preferences::GetBool("dom.webkitBlink.filesystem.enabled", false)) {
+    HTMLInputElementBinding::ClearCachedWebkitEntriesValue(this);
+    mEntries.Clear();
+  }
+
   mFilesOrDirectories.Clear();
   mFilesOrDirectories.AppendElements(aFilesOrDirectories);
 
@@ -2785,6 +2789,11 @@ HTMLInputElement::SetFiles(nsIDOMFileList* aFiles,
   RefPtr<FileList> files = static_cast<FileList*>(aFiles);
   mFilesOrDirectories.Clear();
   ClearGetFilesHelpers();
+
+  if (Preferences::GetBool("dom.webkitBlink.filesystem.enabled", false)) {
+    HTMLInputElementBinding::ClearCachedWebkitEntriesValue(this);
+    mEntries.Clear();
+  }
 
   if (aFiles) {
     uint32_t listLength;
@@ -2802,11 +2811,11 @@ HTMLInputElement::SetFiles(nsIDOMFileList* aFiles,
 void
 HTMLInputElement::MozSetDndFilesAndDirectories(const nsTArray<OwningFileOrDirectory>& aFilesOrDirectories)
 {
+  SetFilesOrDirectories(aFilesOrDirectories, true);
+
   if (Preferences::GetBool("dom.webkitBlink.filesystem.enabled", false)) {
     UpdateEntries(aFilesOrDirectories);
   }
-
-  SetFilesOrDirectories(aFilesOrDirectories, true);
 
   RefPtr<DispatchChangeEventCallback> dispatchChangeEventCallback =
     new DispatchChangeEventCallback(this);
@@ -2889,8 +2898,7 @@ HTMLInputElement::GetFiles()
     return nullptr;
   }
 
-  if (Preferences::GetBool("dom.input.dirpicker", false) &&
-      HasAttr(kNameSpaceID_None, nsGkAtoms::directory) &&
+  if (Preferences::GetBool("dom.input.dirpicker", false) && Allowdirs() &&
       (!Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) ||
        !HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory))) {
     return nullptr;
@@ -3999,8 +4007,7 @@ HTMLInputElement::MaybeInitPickers(EventChainPostVisitor& aVisitor)
     if (target &&
         target->GetParent() == this &&
         target->IsRootOfNativeAnonymousSubtree() &&
-        ((Preferences::GetBool("dom.input.dirpicker", false) &&
-          HasAttr(kNameSpaceID_None, nsGkAtoms::directory)) ||
+        ((Preferences::GetBool("dom.input.dirpicker", false) && Allowdirs()) ||
          (Preferences::GetBool("dom.webkitBlink.dirPicker.enabled", false) &&
           HasAttr(kNameSpaceID_None, nsGkAtoms::webkitdirectory)))) {
       type = FILE_PICKER_DIRECTORY;
@@ -5246,7 +5253,7 @@ HTMLInputElement::GetAttributeChangeHint(const nsIAtom* aAttribute,
   if (aAttribute == nsGkAtoms::type ||
       // The presence or absence of the 'directory' attribute determines what
       // buttons we show for type=file.
-      aAttribute == nsGkAtoms::directory ||
+      aAttribute == nsGkAtoms::allowdirs ||
       aAttribute == nsGkAtoms::webkitdirectory) {
     retval |= nsChangeHint_ReconstructFrame;
   } else if (mType == NS_FORM_INPUT_IMAGE &&
@@ -7985,7 +7992,7 @@ HTMLInputElement::GetOrCreateGetFilesHelper(bool aRecursiveFlag,
 void
 HTMLInputElement::UpdateEntries(const nsTArray<OwningFileOrDirectory>& aFilesOrDirectories)
 {
-  mEntries.Clear();
+  MOZ_ASSERT(mEntries.IsEmpty());
 
   nsCOMPtr<nsIGlobalObject> global = OwnerDoc()->GetScopeObject();
   MOZ_ASSERT(global);

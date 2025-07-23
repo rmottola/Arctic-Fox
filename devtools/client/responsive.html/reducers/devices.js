@@ -7,10 +7,19 @@
 const {
   ADD_DEVICE,
   ADD_DEVICE_TYPE,
+  LOAD_DEVICE_LIST_START,
+  LOAD_DEVICE_LIST_ERROR,
+  LOAD_DEVICE_LIST_END,
+  UPDATE_DEVICE_DISPLAYED,
+  UPDATE_DEVICE_MODAL_OPEN,
 } = require("../actions/index");
+
+const Types = require("../types");
 
 const INITIAL_DEVICES = {
   types: [],
+  isModalOpen: false,
+  listState: Types.deviceListState.INITIALIZED,
 };
 
 let reducers = {
@@ -25,6 +34,44 @@ let reducers = {
     return Object.assign({}, devices, {
       types: [...devices.types, deviceType],
       [deviceType]: [],
+    });
+  },
+
+  [UPDATE_DEVICE_DISPLAYED](devices, { device, deviceType, displayed }) {
+    let newDevices = devices[deviceType].map(d => {
+      if (d == device) {
+        d.displayed = displayed;
+      }
+
+      return d;
+    });
+
+    return Object.assign({}, devices, {
+      [deviceType]: newDevices,
+    });
+  },
+
+  [LOAD_DEVICE_LIST_START](devices, action) {
+    return Object.assign({}, devices, {
+      listState: Types.deviceListState.LOADING,
+    });
+  },
+
+  [LOAD_DEVICE_LIST_ERROR](devices, action) {
+    return Object.assign({}, devices, {
+      listState: Types.deviceListState.ERROR,
+    });
+  },
+
+  [LOAD_DEVICE_LIST_END](devices, action) {
+    return Object.assign({}, devices, {
+      listState: Types.deviceListState.LOADED,
+    });
+  },
+
+  [UPDATE_DEVICE_MODAL_OPEN](devices, { isOpen }) {
+    return Object.assign({}, devices, {
+      isModalOpen: isOpen,
     });
   },
 

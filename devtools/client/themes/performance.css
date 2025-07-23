@@ -8,11 +8,19 @@
   --cell-border-color: rgba(255,255,255,0.15);
   --cell-border-color-light: rgba(255,255,255,0.1);
   --focus-cell-border-color: rgba(255,255,255,0.5);
-  --row-alt-background-color: rgba(29,79,115,0.15);
-  --row-hover-background-color: rgba(29,79,115,0.25);
+  --row-alt-background-color: rgba(86, 117, 185, 0.15);
+  --row-hover-background-color: rgba(86, 117, 185, 0.25);
 }
 
 .theme-light {
+  --cell-border-color: rgba(0,0,0,0.15);
+  --cell-border-color-light: rgba(0,0,0,0.1);
+  --focus-cell-border-color: rgba(0,0,0,0.3);
+  --row-alt-background-color: rgba(76,158,217,0.1);
+  --row-hover-background-color: rgba(76,158,217,0.2);
+}
+
+.theme-firebug {
   --cell-border-color: rgba(0,0,0,0.15);
   --cell-border-color-light: rgba(0,0,0,0.1);
   --focus-cell-border-color: rgba(0,0,0,0.3);
@@ -42,10 +50,10 @@
 }
 
 #filter-button {
-  list-style-image: url(images/timeline-filter.svg);
+  list-style-image: url(images/filter.svg);
 }
 
-#performance-filter-menupopup > menuitem:before {
+#performance-filter-menupopup > menuitem .menu-iconic-left::after {
   content: "";
   display: block;
   width: 8px;
@@ -80,11 +88,15 @@
   list-style-image: url(images/profiler-stopwatch.svg);
 }
 
-#main-record-button .button-icon {
+#import-button {
+  list-style-image: url(images/import.svg);
+}
+
+#main-record-button .button-icon, #import-button .button-icon {
   margin: 0;
 }
 
-#main-record-button .button-text {
+#main-record-button .button-text, #import-button .button-text {
   display: none;
 }
 
@@ -105,8 +117,12 @@
 
 /* Sidebar & recording items */
 
-#recordings-list {
+#recordings-pane {
   border-inline-end: 1px solid var(--theme-splitter-color);
+}
+
+#recordings-list {
+  max-width: 300px;
 }
 
 .recording-item {
@@ -146,6 +162,15 @@
   padding-bottom: 20vh;
 }
 
+.tool-disabled-message {
+  text-align: center;
+}
+
+.console-profile-recording-notice,
+.console-profile-stop-notice {
+  overflow: hidden;
+}
+
 .console-profile-command {
   font-family: monospace;
   margin: 3px 2px;
@@ -154,19 +179,11 @@
 .realtime-disabled-message,
 .realtime-disabled-on-e10s-message {
   display: none;
-  /* This label does not want to wrap naturally (based on some combination of
-     it's parents and flex).  Quick and dirty way to force it to wrap -> don't
-     let it get bigger than half the screen size */
-  max-width: 60vw;
 }
 
-#performance-view[e10s="disabled"] .realtime-disabled-on-e10s-message {
-  display: auto;
-  opacity: 0.5;
-
-}
+#performance-view[e10s="disabled"] .realtime-disabled-on-e10s-message,
 #performance-view[e10s="unsupported"] .realtime-disabled-message {
-  display: auto;
+  display: initial;
   opacity: 0.5;
 }
 
@@ -176,19 +193,19 @@
 }
 
 #details-pane-container[buffer-status="in-progress"] .buffer-status-message {
-  display: auto;
+  display: initial;
   opacity: 0.5;
 }
 
 #details-pane-container[buffer-status="full"] .buffer-status-message {
-  display: auto;
+  display: initial;
   color: var(--theme-highlight-red);
   font-weight: bold;
   opacity: 1;
 }
 
 #details-pane-container[buffer-status="full"] .buffer-status-message-full {
-  display: auto;
+  display: initial;
 }
 
 /* Profile call tree */
@@ -567,53 +584,53 @@
  * Marker colors
  */
 
-menuitem.marker-color-graphs-full-red:before,
+menuitem.marker-color-graphs-full-red .menu-iconic-left::after,
 .marker-color-graphs-full-red {
   background-color: var(--theme-graphs-full-red);
   border-color: var(--theme-graphs-full-red);
 }
-menuitem.marker-color-graphs-full-blue:before,
+menuitem.marker-color-graphs-full-blue .menu-iconic-left::after,
 .marker-color-graphs-full-blue {
   background-color: var(--theme-graphs-full-blue);
   border-color: var(--theme-graphs-full-blue);
 }
 
-menuitem.marker-color-graphs-green:before,
+menuitem.marker-color-graphs-green .menu-iconic-left::after,
 .marker-color-graphs-green {
   background-color: var(--theme-graphs-green);
   border-color: var(--theme-graphs-green);
 }
-menuitem.marker-color-graphs-blue:before,
+menuitem.marker-color-graphs-blue .menu-iconic-left::after,
 .marker-color-graphs-blue {
   background-color: var(--theme-graphs-blue);
   border-color: var(--theme-graphs-blue);
 }
-menuitem.marker-color-graphs-bluegrey:before,
+menuitem.marker-color-graphs-bluegrey .menu-iconic-left::after,
 .marker-color-graphs-bluegrey {
   background-color: var(--theme-graphs-bluegrey);
   border-color: var(--theme-graphs-bluegrey);
 }
-menuitem.marker-color-graphs-purple:before,
+menuitem.marker-color-graphs-purple .menu-iconic-left::after,
 .marker-color-graphs-purple {
   background-color: var(--theme-graphs-purple);
   border-color: var(--theme-graphs-purple);
 }
-menuitem.marker-color-graphs-yellow:before,
+menuitem.marker-color-graphs-yellow .menu-iconic-left::after,
 .marker-color-graphs-yellow {
   background-color: var(--theme-graphs-yellow);
   border-color: var(--theme-graphs-yellow);
 }
-menuitem.marker-color-graphs-orange:before,
+menuitem.marker-color-graphs-orange .menu-iconic-left::after,
 .marker-color-graphs-orange {
   background-color: var(--theme-graphs-orange);
   border-color: var(--theme-graphs-orange);
 }
-menuitem.marker-color-graphs-red:before,
+menuitem.marker-color-graphs-red .menu-iconic-left::after,
 .marker-color-graphs-red {
   background-color: var(--theme-graphs-red);
   border-color: var(--theme-graphs-red);
 }
-menuitem.marker-color-graphs-grey:before,
+menuitem.marker-color-graphs-grey .menu-iconic-left::after,
 .marker-color-graphs-grey{
   background-color: var(--theme-graphs-grey);
   border-color: var(--theme-graphs-grey);
@@ -649,27 +666,6 @@ menuitem.experimental-option::before {
 #performance-options-menupopup:not(.experimental-enabled) .experimental-option,
 #performance-options-menupopup:not(.experimental-enabled) .experimental-option::before {
   display: none;
-}
-
-.opt-icon::before {
-  content: "";
-  background-image: url(chrome://devtools/skin/images/webconsole.svg);
-  background-repeat: no-repeat;
-  background-size: 72px 60px;
-  /* show grey "i" bubble by default */
-  background-position: -36px -36px;
-  width: 10px;
-  height: 10px;
-  display: inline-block;
-
-  max-height: 12px;
-}
-
-.theme-light .opt-icon::before {
-  background-image: url(chrome://devtools/skin/images/webconsole.svg#light-icons);
-}
-.opt-icon.warning::before {
-  background-position: -24px -24px;
 }
 
 /* for call tree */

@@ -7,12 +7,20 @@
 # a copy of the MPL was not distributed with this file, You can obtain one
 # at http://mozilla.org/MPL/2.0/.
 #
-# Creates an Adobe Access signed voucher for any executable
+# Creates an Adobe Access signed voucher for x32/x64 windows executables
 #   Notes: This is currently python2.7 due to mozilla build system requirements
 
-import argparse, bitstring, pprint, hashlib, os, subprocess, sys, tempfile
+from __future__ import print_function
+
+import argparse, bitstring, pprint, hashlib, os, subprocess, sys, tempfile, macholib, macholib.MachO
 from pyasn1.codec.der import encoder as der_encoder
 from pyasn1.type import univ, namedtype, namedval, constraint
+
+
+# Defined in WinNT.h from the Windows SDK
+IMAGE_SCN_MEM_EXECUTE = 0x20000000
+IMAGE_REL_BASED_HIGHLOW = 3
+IMAGE_REL_BASED_DIR64 = 10
 
 
 # CodeSectionDigest ::= SEQUENCE {
@@ -28,8 +36,8 @@ class CodeSectionDigest(univ.Sequence):
 
 
 # CodeSegmentDigest ::= SEQUENCE {
-#	 offset				INTEGER -- TEXT segment's file offset in the signed binary
-#	 codeSectionDigests			SET OF CodeSectionDigests
+#    offset				INTEGER -- TEXT segment's file offset in the signed binary
+#    codeSectionDigests			SET OF CodeSectionDigests
 # }
 
 class SetOfCodeSectionDigest(univ.SetOf):
@@ -54,18 +62,22 @@ class SetOfCodeSegmentDigest(univ.SetOf):
 class CPUType(univ.Enumerated):
 	namedValues = namedval.NamedValues(
 		('IMAGE_FILE_MACHINE_I386', 0x14c),
-		('IMAGE_FILE_MACHINE_AMD64',0x8664 )
+		('IMAGE_FILE_MACHINE_AMD64',0x8664 ),
+		('MACHO_CPU_TYPE_I386',0x7 ),
+		('MACHO_CPU_TYPE_X86_64',0x1000007 ),
 	)
 	subtypeSpec = univ.Enumerated.subtypeSpec + \
-				  constraint.SingleValueConstraint(0x14c, 0x8664)
+				  constraint.SingleValueConstraint(0x14c, 0x8664, 0x7, 0x1000007)
 
 
 class CPUSubType(univ.Enumerated):
 	namedValues = namedval.NamedValues(
 		('IMAGE_UNUSED', 0x0),
+		('CPU_SUBTYPE_X86_ALL', 0x3),
+		('CPU_SUBTYPE_X86_64_ALL', 0x80000003)
 	)
 	subtypeSpec = univ.Enumerated.subtypeSpec + \
-				  constraint.SingleValueConstraint(0)
+				  constraint.SingleValueConstraint(0, 0x3, 0x80000003)
 
 
 class ArchitectureDigest(univ.Sequence):
@@ -99,6 +111,7 @@ def meets_requirements(items, requirements):
 
 
 # return total number of bytes read from items_in excluding leaves
+# TODO: research replacing this with the python built-in struct module
 def parse_items(stream, items_in, items_out):
 	bits_read = 0
 	total_bits_read = 0
@@ -142,6 +155,22 @@ def parse_items(stream, items_in, items_out):
 			raise Exception("unrecognized item" + pprint.pformat(item))
 
 	return bits_read, total_bits_read
+
+
+# macho stuff
+# Constant for the magic field of the mach_header (32-bit architectures)
+MH_MAGIC =0xfeedface	# the mach magic number
+MH_CIGAM =0xcefaedfe	# NXSwapInt(MH_MAGIC)
+
+MH_MAGIC_64 =0xfeedfacf	# the the 64-bit mach magic number
+MH_CIGAM_64 =0xcffaedfe	# NXSwapInt(MH_MAGIC_64)
+
+FAT_CIGAM = 0xbebafeca
+FAT_MAGIC =	0xcafebabe
+
+LC_SEGMENT = 0x1
+LC_SEGMENT_64	= 0x19	# 64-bit segment of this file to be
+
 
 
 # TODO: perhaps switch to pefile module when it officially supports python3
@@ -315,17 +344,18 @@ class COFFFileHeader:
 
 				if offset == 0 and i > 0: continue
 
-				assert(typ == 3)
+				assert(typ == IMAGE_REL_BASED_HIGHLOW or typ == IMAGE_REL_BASED_DIR64)
 
 				cur_pos = stream.bitpos
 				sh, value_bytepos = self.get_rva_section(page_rva + offset)
 				stream.bytepos = value_bytepos
-				value = stream.read('uintle:32')
+				value = stream.read('uintle:32' if typ == IMAGE_REL_BASED_HIGHLOW else 'uintle:64')
 
 				# remove BaseAddress
 				value -= self.OptionalHeader.items['ImageBase']
 
-				stream.overwrite(bitstring.BitArray(uint=value, length=4 * 8), pos=value_bytepos * 8)
+				bit_size = (4 if typ == IMAGE_REL_BASED_HIGHLOW else 8) * 8
+				stream.overwrite(bitstring.BitArray(uint=value, length=bit_size), pos=value_bytepos * 8)
 				stream.pos = cur_pos
 
 		stream.bitpos = orig_pos
@@ -345,21 +375,124 @@ def create_temp_file(suffix=""):
 	fd, path = tempfile.mkstemp(suffix=suffix)
 	os.close(fd)
 	return path
-	
-# TIPS:
-#  How to convert PFX to PEM: openssl pkcs12 -in build/certificates/testPKI/IV.pfx -out build/certificates/testPKI/IV.cert.pem
-def main():
-	parser = argparse.ArgumentParser(description='PE/COFF Signer')
-	parser.add_argument('-input', required=True, help="File to parse.")
-	parser.add_argument('-output', required=True, help="File to write to.")
-	parser.add_argument('-openssl_path',help="Path to OpenSSL to create signed voucher")
-	parser.add_argument('-signer_cert',help="Path to certificate to use to sign voucher.  Must be PEM encoded.")
-	parser.add_argument('-verbose', action='store_true', help="Verbose output.")
-	app_args = parser.parse_args()
 
-	# to simplify relocation handling we use a mutable BitStream so we can remove
-	# the BaseAddress from each relocation
-	stream = bitstring.BitStream(filename=app_args.input)
+
+class ExpandPath(argparse.Action):
+	def __call__(self, parser, namespace, values, option_string=None):
+		setattr(namespace, self.dest, os.path.abspath(os.path.expanduser(values)))
+
+
+# this does a naming trick since windows doesn't allow multiple usernames for the same server
+def get_password(service_name, user_name):
+	try:
+		import keyring
+
+		# windows doesn't allow multiple usernames for the same server, argh
+		if sys.platform == "win32":
+			password = keyring.get_password(service_name + "-" + user_name, user_name)
+		else:
+			password = keyring.get_password(service_name, user_name)
+
+		return password
+	except:
+	    # This allows for manual testing where you do not wish to cache the password on the system
+		print("Missing keyring module...getting password manually")
+
+	return None
+
+
+def openssl_cmd(app_args, args, password_in, password_out):
+	password = get_password(app_args.password_service, app_args.password_user) if (password_in or password_out) else None
+	env = None
+	args = [app_args.openssl_path] + args
+
+	if password is not None:
+		env = os.environ.copy()
+		env["COFF_PW"] = password
+
+		if password_in: args += ["-passin", "env:COFF_PW"]
+		if password_out: args += ["-passout", "env:COFF_PW", "-password", "env:COFF_PW"]
+
+	subprocess.check_call(args, env=env)
+
+
+def processMachoBinary(filename):
+
+	outDict = dict()
+	outDict['result'] = False
+
+	setOfArchDigests = SetOfArchitectureDigest()
+	archDigestIdx = 0
+
+	parsedMacho = macholib.MachO.MachO(filename)
+
+	for header in parsedMacho.headers :
+		arch_digest = ArchitectureDigest()
+		lc_segment = LC_SEGMENT
+
+		arch_digest.setComponentByName('cpuType', CPUType(header.header.cputype))
+		arch_digest.setComponentByName('cpuSubType', CPUSubType(header.header.cpusubtype))
+
+		if header.header.cputype == 0x1000007:
+			lc_segment = LC_SEGMENT_64
+
+
+
+		segment_commands = list(filter(lambda x: x[0].cmd == lc_segment, header.commands))
+		text_segment_commands = list(filter(lambda x: x[1].segname.decode("utf-8").startswith("__TEXT"), segment_commands))
+
+
+		code_segment_digests = SetOfCodeSegmentDigest()
+		code_segment_idx = 0
+
+		for text_command in text_segment_commands:
+
+			codeSegmentDigest = CodeSegmentDigest()
+			codeSegmentDigest.setComponentByName('offset', text_command[1].fileoff)
+
+			sectionDigestIdx = 0
+			set_of_digest = SetOfCodeSectionDigest()
+			for section in text_command[2]:
+				digester = hashlib.sha256()
+				digester.update(section.section_data)
+				digest = digester.digest()
+
+				code_section_digest = CodeSectionDigest()
+				code_section_digest.setComponentByName('offset', section.offset)
+				code_section_digest.setComponentByName('digestAlgorithm', univ.ObjectIdentifier('2.16.840.1.101.3.4.2.1'))
+				code_section_digest.setComponentByName('digest', univ.OctetString(digest))
+
+				set_of_digest.setComponentByPosition(sectionDigestIdx, code_section_digest)
+				sectionDigestIdx += 1
+
+
+			codeSegmentDigest.setComponentByName('codeSectionDigests', set_of_digest)
+
+			code_segment_digests.setComponentByPosition(code_segment_idx, codeSegmentDigest)
+
+			code_segment_idx += 1
+
+		arch_digest.setComponentByName('CodeSegmentDigests', code_segment_digests)
+		setOfArchDigests.setComponentByPosition(archDigestIdx, arch_digest)
+		archDigestIdx += 1
+
+		outDict['result'] = True
+
+	if outDict['result']:
+		appDigest = ApplicationDigest()
+		appDigest.setComponentByName('version', 1)
+		appDigest.setComponentByName('digests', setOfArchDigests)
+		outDict['digest'] = appDigest
+
+
+	return outDict
+
+
+
+def processCOFFBinary(stream):
+
+	outDict = dict()
+	outDict['result'] = False
 
 	# find the COFF header.
 	# skip forward past the MSDOS stub header to 0x3c.
@@ -372,7 +505,7 @@ def main():
 	# read 4 bytes, make sure it's a PE signature.
 	signature = stream.read('uintle:32')
 	if signature != 0x00004550:
-		raise Exception("Invalid File")
+		return outDict
 
 	# after signature is the actual COFF file header.
 	coff_header = COFFFileHeader(stream)
@@ -385,7 +518,7 @@ def main():
 
 	arch_digest.setComponentByName('cpuSubType', CPUSubType('IMAGE_UNUSED'))
 
-	text_section_headers = list(filter(lambda x: (x.items['Characteristics'] & 0x20000000) == 0x20000000, coff_header.section_headers))
+	text_section_headers = list(filter(lambda x: (x.items['Characteristics'] & IMAGE_SCN_MEM_EXECUTE) == IMAGE_SCN_MEM_EXECUTE, coff_header.section_headers))
 
 	code_segment_digests = SetOfCodeSegmentDigest()
 	code_segment_idx = 0
@@ -425,30 +558,76 @@ def main():
 	appDigest.setComponentByName('version', 1)
 	appDigest.setComponentByName('digests', setOfArchDigests)
 
-	binaryDigest = der_encoder.encode(appDigest)
+	outDict['result'] = True
+	outDict['digest'] = appDigest
+
+	return outDict
+
+def main():
+	parser = argparse.ArgumentParser(description='PE/COFF Signer')
+	parser.add_argument('-input', action=ExpandPath, required=True, help="File to parse.")
+	parser.add_argument('-output', action=ExpandPath, required=True, help="File to write to.")
+	parser.add_argument('-openssl_path', action=ExpandPath, help="Path to OpenSSL to create signed voucher")
+	parser.add_argument('-signer_pfx', action=ExpandPath, help="Path to certificate to use to sign voucher.  Must contain full certificate chain.")
+	parser.add_argument('-password_service', help="Name of Keyring/Wallet service/host")
+	parser.add_argument('-password_user', help="Name of Keyring/Wallet user name")
+	parser.add_argument('-verbose', action='store_true', help="Verbose output.")
+	app_args = parser.parse_args()
+
+	# to simplify relocation handling we use a mutable BitStream so we can remove
+	# the BaseAddress from each relocation
+	stream = bitstring.BitStream(filename=app_args.input)
+
+
+	dict = processCOFFBinary(stream)
+
+	if dict['result'] == False:
+		dict = processMachoBinary(app_args.input)
+
+
+
+	if dict['result'] == False:
+		raise Exception("Invalid File")
+
+	binaryDigest = der_encoder.encode(dict['digest'])
 
 	with open(app_args.output, 'wb') as f:
 		f.write(binaryDigest)
 
 	# sign with openssl if specified
 	if app_args.openssl_path is not None:
-		assert app_args.signer_cert is not None
-		
+		assert app_args.signer_pfx is not None
+
 		out_base, out_ext = os.path.splitext(app_args.output)
 		signed_path = out_base + ".signed" + out_ext
-		
+
 		# http://stackoverflow.com/questions/12507277/how-to-fix-unable-to-write-random-state-in-openssl
-		temp_file = None
+		temp_files = []
 		if sys.platform == "win32" and "RANDFILE" not in os.environ:
 			temp_file = create_temp_file()
+			temp_files += [temp_file]
 			os.environ["RANDFILE"] = temp_file
-			
+
 		try:
-			subprocess.check_call([app_args.openssl_path, "cms", "-sign", "-nodetach", "-md", "sha256", "-binary", "-in", app_args.output, "-outform", "der", "-out", signed_path, "-signer", app_args.signer_cert], )
+			# create PEM from PFX
+			pfx_pem_path = create_temp_file(".pem")
+			temp_files += [pfx_pem_path]
+			print("Extracting PEM from PFX to:" + pfx_pem_path)
+			openssl_cmd(app_args, ["pkcs12", "-in", app_args.signer_pfx, "-out", pfx_pem_path], True, True)
+
+			# extract CA certs
+			pfx_cert_path = create_temp_file(".cert")
+			temp_files += [pfx_cert_path]
+			print("Extracting cert from PFX to:" + pfx_cert_path)
+			openssl_cmd(app_args, ["pkcs12", "-in", app_args.signer_pfx, "-cacerts", "-nokeys", "-out", pfx_cert_path], True, False)
+
+			# we embed the public keychain for client validation
+			openssl_cmd(app_args, ["cms", "-sign", "-nodetach", "-md", "sha256", "-binary", "-in", app_args.output, "-outform", "der", "-out", signed_path, "-signer", pfx_pem_path, "-certfile", pfx_cert_path], True, False)
 		finally:
-			if temp_file is not None: 
-				del os.environ["RANDFILE"]
-				os.unlink(temp_file)
+			for t in temp_files:
+				if "RANDFILE" in os.environ and t == os.environ["RANDFILE"]:
+					del os.environ["RANDFILE"]
+				os.unlink(t)
 
 if __name__ == '__main__':
 	main()

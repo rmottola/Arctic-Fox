@@ -52,6 +52,11 @@ this.webrtcUI = {
     mm.removeMessageListener("webrtc:Request", this);
     mm.removeMessageListener("webrtc:CancelRequest", this);
     mm.removeMessageListener("webrtc:UpdateBrowserIndicators", this);
+
+    if (gIndicatorWindow) {
+      gIndicatorWindow.close();
+      gIndicatorWindow = null;
+    }
   },
 
   processIndicators: new Map(),
@@ -109,7 +114,7 @@ this.webrtcUI = {
       let types = {camera: state.camera, microphone: state.microphone,
                    screen: state.screen};
       let browser = aStream.browser;
-      let browserWindow = browser.ownerDocument.defaultView;
+      let browserWindow = browser.ownerGlobal;
       let tab = browserWindow.gBrowser &&
                 browserWindow.gBrowser.getTabForBrowser(browser);
       return {uri: state.documentURI, tab: tab, browser: browser, types: types};
@@ -124,7 +129,7 @@ this.webrtcUI = {
   },
 
   showSharingDoorhanger: function(aActiveStream, aType) {
-    let browserWindow = aActiveStream.browser.ownerDocument.defaultView;
+    let browserWindow = aActiveStream.browser.ownerGlobal;
     if (aActiveStream.tab) {
       browserWindow.gBrowser.selectedTab = aActiveStream.tab;
     } else {
@@ -220,7 +225,18 @@ this.webrtcUI = {
         updateIndicators(aMessage.data, aMessage.target);
         break;
       case "webrtc:UpdateBrowserIndicators":
-        webrtcUI._streams.push({browser: aMessage.target, state: aMessage.data});
+        let id = aMessage.data.windowId;
+        let index;
+        for (index = 0; index < webrtcUI._streams.length; ++index) {
+          if (webrtcUI._streams[index].state.windowId == id)
+            break;
+        }
+        // If there's no documentURI, the update is actually a removal of the
+        // stream, triggered by the recording-window-ended notification.
+        if (!aMessage.data.documentURI && index < webrtcUI._streams.length)
+          webrtcUI._streams.splice(index, 1);
+        else
+          webrtcUI._streams[index] = {browser: aMessage.target, state: aMessage.data};
         updateBrowserSpecificIndicator(aMessage.target, aMessage.data);
         break;
       case "child-process-shutdown":
@@ -352,14 +368,14 @@ function prompt(aBrowser, aRequest) {
       let chromeDoc = this.browser.ownerDocument;
 
       if (aTopic == "shown") {
-        let PopupNotifications = chromeDoc.defaultView.PopupNotifications;
         let popupId = "Devices";
         if (requestTypes.length == 1 && (requestTypes[0] == "Microphone" ||
                                          requestTypes[0] == "AudioCapture"))
           popupId = "Microphone";
         if (requestTypes.indexOf("Screen") != -1)
           popupId = "Screen";
-        PopupNotifications.panel.firstChild.setAttribute("popupid", "webRTC-share" + popupId);
+        chromeDoc.getElementById("webRTC-shareDevices-notification")
+                 .setAttribute("popupid", "webRTC-share" + popupId);
       }
 
       if (aTopic != "showing")
@@ -585,7 +601,7 @@ function prompt(aBrowser, aRequest) {
 }
 
 function removePrompt(aBrowser, aCallId) {
-  let chromeWin = aBrowser.ownerDocument.defaultView;
+  let chromeWin = aBrowser.ownerGlobal;
   let notification =
     chromeWin.PopupNotifications.getNotification("webRTC-shareDevices", aBrowser);
   if (notification && notification.callID == aCallId)
@@ -867,6 +883,21 @@ function updateIndicators(data, target) {
 }
 
 function updateBrowserSpecificIndicator(aBrowser, aState) {
+  let chromeWin = aBrowser.ownerGlobal;
+  let tabbrowser = chromeWin.gBrowser;
+  if (tabbrowser) {
+    let sharing;
+    if (aState.screen) {
+      sharing = "screen";
+    } else if (aState.camera) {
+      sharing = "camera";
+    } else if (aState.microphone) {
+      sharing = "microphone";
+    }
+
+    tabbrowser.setBrowserSharing(aBrowser, sharing);
+  }
+
   let captureState;
   if (aState.camera && aState.microphone) {
     captureState = "CameraAndMicrophone";
@@ -876,7 +907,6 @@ function updateBrowserSpecificIndicator(aBrowser, aState) {
     captureState = "Microphone";
   }
 
-  let chromeWin = aBrowser.ownerDocument.defaultView;
   let stringBundle = chromeWin.gNavigatorBundle;
 
   let windowId = aState.windowId;
@@ -911,9 +941,10 @@ function updateBrowserSpecificIndicator(aBrowser, aState) {
     dismissed: true,
     eventCallback: function(aTopic, aNewBrowser) {
       if (aTopic == "shown") {
-        let PopupNotifications = this.browser.ownerDocument.defaultView.PopupNotifications;
         let popupId = captureState == "Microphone" ? "Microphone" : "Devices";
-        PopupNotifications.panel.firstChild.setAttribute("popupid", "webRTC-sharing" + popupId);
+        this.browser.ownerDocument
+            .getElementById("webRTC-sharingDevices-notification")
+            .setAttribute("popupid", "webRTC-sharing" + popupId);
       }
 
       if (aTopic == "swapping") {
@@ -950,8 +981,9 @@ function updateBrowserSpecificIndicator(aBrowser, aState) {
     dismissed: true,
     eventCallback: function(aTopic, aNewBrowser) {
       if (aTopic == "shown") {
-        let PopupNotifications = this.browser.ownerDocument.defaultView.PopupNotifications;
-        PopupNotifications.panel.firstChild.setAttribute("popupid", "webRTC-sharingScreen");
+        this.browser.ownerDocument
+            .getElementById("webRTC-sharingScreen-notification")
+            .setAttribute("popupid", "webRTC-sharingScreen");
       }
 
       if (aTopic == "swapping") {
@@ -985,7 +1017,7 @@ function updateBrowserSpecificIndicator(aBrowser, aState) {
 }
 
 function removeBrowserNotification(aBrowser, aNotificationId) {
-  let win = aBrowser.ownerDocument.defaultView;
+  let win = aBrowser.ownerGlobal;
   let notification =
     win.PopupNotifications.getNotification(aNotificationId, aBrowser);
   if (notification)

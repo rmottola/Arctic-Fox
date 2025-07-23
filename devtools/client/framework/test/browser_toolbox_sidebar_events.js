@@ -23,15 +23,15 @@ function test() {
     visibilityswitch: "devtools.testTool1072208.enabled",
     url: toolURL,
     label: "Test tool",
-    isTargetSupported: function() true,
-    build: function(iframeWindow, toolbox) {
-      let deferred = promise.defer();
+    isTargetSupported: () => true,
+    build: function (iframeWindow, toolbox) {
+      let deferred = defer();
       executeSoon(() => {
         deferred.resolve({
           target: toolbox.target,
           toolbox: toolbox,
           isReady: true,
-          destroy: function(){},
+          destroy: function () {},
           panelDoc: iframeWindow.document,
         });
       });
@@ -41,33 +41,33 @@ function test() {
 
   gDevTools.registerTool(toolDefinition);
 
-  addTab("about:blank").then(function(aTab) {
+  addTab("about:blank").then(function (aTab) {
     let target = TargetFactory.forTab(aTab);
-    gDevTools.showToolbox(target, toolDefinition.id).then(function(toolbox) {
+    gDevTools.showToolbox(target, toolDefinition.id).then(function (toolbox) {
       let panel = toolbox.getPanel(toolDefinition.id);
       ok(true, "Tool open");
 
-      panel.once("sidebar-created", function(event, id) {
+      panel.once("sidebar-created", function (event, id) {
         collectedEvents.push(event);
       });
 
-      panel.once("sidebar-destroyed", function(event, id) {
+      panel.once("sidebar-destroyed", function (event, id) {
         collectedEvents.push(event);
       });
 
       let tabbox = panel.panelDoc.getElementById("sidebar");
       panel.sidebar = new ToolSidebar(tabbox, panel, "testbug1072208", true);
 
-      panel.sidebar.once("show", function(event, id) {
+      panel.sidebar.once("show", function (event, id) {
         collectedEvents.push(event);
       });
 
-      panel.sidebar.once("hide", function(event, id) {
+      panel.sidebar.once("hide", function (event, id) {
         collectedEvents.push(event);
       });
 
       panel.sidebar.once("tab1-selected", () => finishUp(panel));
-      panel.sidebar.addTab("tab1", tab1URL, true);
+      panel.sidebar.addTab("tab1", tab1URL, {selected: true});
       panel.sidebar.show();
     }).then(null, console.error);
   });
@@ -83,7 +83,7 @@ function test() {
     gDevTools.unregisterTool(toolDefinition.id);
     gBrowser.removeCurrentTab();
 
-    executeSoon(function() {
+    executeSoon(function () {
       finish();
     });
   }

@@ -13,6 +13,7 @@
 #include "mozilla/EffectSet.h"
 #include "mozilla/EventDispatcher.h"
 #include "mozilla/FloatingPoint.h"
+#include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/PathHelpers.h"
 #include "mozilla/layers/PAPZ.h"
 #include "mozilla/Likely.h"
@@ -491,20 +492,6 @@ nsLayoutUtils::HasCurrentTransitions(const nsIFrame* aFrame)
       // Since |aEffect| is current, it must have an associated Animation
       // so we don't need to null-check the result of GetAnimation().
       return aEffect.IsCurrent() && aEffect.GetAnimation()->AsCSSTransition();
-    }
-  );
-}
-
-bool
-nsLayoutUtils::HasCurrentAnimationsForProperties(const nsIFrame* aFrame,
-                                                 const nsCSSProperty* aProperties,
-                                                 size_t aPropertyCount)
-{
-  return HasMatchingAnimations(aFrame,
-    [&aProperties, &aPropertyCount](KeyframeEffectReadOnly& aEffect)
-    {
-      return aEffect.IsCurrent() &&
-        aEffect.HasAnimationOfProperties(aProperties, aPropertyCount);
     }
   );
 }
@@ -1053,8 +1040,8 @@ GetDisplayPortFromMarginsData(nsIContent* aContent,
     // Don't align to tiles if they are too large, because we could expand
     // the displayport by a lot which can take more paint time. It's a tradeoff
     // though because if we don't align to tiles we have more waste on upload.
-    alignment = ScreenSize(std::min(256, gfxPlatform::GetPlatform()->GetTileWidth()),
-                           std::min(256, gfxPlatform::GetPlatform()->GetTileHeight()));
+    IntSize tileSize = gfxVars::TileSize();
+    alignment = ScreenSize(std::min(256, tileSize.width), std::min(256, tileSize.height));
   } else {
     // If we're not drawing with tiles then we need to be careful about not
     // hitting the max texture size and we only need 1 draw call per layer
@@ -6570,7 +6557,7 @@ ComputeSnappedImageDrawingParameters(gfxContext*     aCtx,
   // XXX(seth): May be buggy; see bug 1151016.
   CSSIntSize svgViewportSize = currentMatrix.IsIdentity()
     ? CSSIntSize(intImageSize.width, intImageSize.height)
-    : CSSIntSize(devPixelDest.width, devPixelDest.height);
+    : CSSIntSize::Truncate(devPixelDest.width, devPixelDest.height);
 
   // Compute the set of pixels that would be sampled by an ideal rendering
   gfxPoint subimageTopLeft =

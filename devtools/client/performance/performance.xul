@@ -29,7 +29,7 @@
   <script type="application/javascript" src="views/recordings.js"/>
 
   <popupset id="performance-options-popupset">
-    <menupopup id="performance-filter-menupopup"/>
+    <menupopup id="performance-filter-menupopup" position="before_start"/>
     <menupopup id="performance-options-menupopup" position="before_end">
       <menuitem id="option-show-platform-data"
                 type="checkbox"
@@ -49,7 +49,6 @@
                 label="&performanceUI.enableMemory;"
                 tooltiptext="&performanceUI.enableMemory.tooltiptext;"/>
       <menuitem id="option-enable-allocations"
-                class="experimental-option"
                 type="checkbox"
                 data-pref="enable-allocations"
                 label="&performanceUI.enableAllocations;"
@@ -93,7 +92,7 @@
                          tooltiptext="&performanceUI.recordButton.tooltip;"/>
           <toolbarbutton id="import-button"
                          class="devtools-toolbarbutton"
-                         label="&performanceUI.importButton;"/>
+                         tooltiptext="&performanceUI.importButton;"/>
         </hbox>
       </toolbar>
       <vbox id="recordings-list" class="theme-sidebar" flex="1"/>
@@ -177,8 +176,9 @@
                            label="&performanceUI.startRecording;"
                            standalone="true"/>
           </hbox>
-          <label class="tool-disabled-message"
-                 value="&performanceUI.unavailableNoticePB;"/>
+          <description class="tool-disabled-message">
+            &performanceUI.unavailableNoticePB;
+          </description>
         </vbox>
 
         <!-- "Empty" notice, shown when there's no recordings available -->

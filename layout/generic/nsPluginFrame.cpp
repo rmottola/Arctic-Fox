@@ -651,6 +651,8 @@ nsPluginFrame::CallSetWindow(bool aCheckIsHidden)
   window->width = intBounds.width / intScaleFactor;
   window->height = intBounds.height / intScaleFactor;
 
+  mInstanceOwner->ResolutionMayHaveChanged();
+
   // This will call pi->SetWindow and take care of window subclassing
   // if needed, see bug 132759. Calling SetWindow can destroy this frame
   // so check for that before doing anything else with this frame's memory.
@@ -1123,6 +1125,10 @@ nsPluginFrame::IsOpaque() const
   // We don't know, so just assume transparent
   return false;
 #else
+
+  if (mInstanceOwner && mInstanceOwner->UseAsyncRendering()) {
+    return false;
+  }
   return !IsTransparentMode();
 #endif
 }

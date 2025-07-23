@@ -8,8 +8,6 @@
 <script type="application/javascript" src="chrome://browser/content/places/browserPlacesViews.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser.js"/>
 <script type="application/javascript" src="chrome://browser/content/customizableui/panelUI.js"/>
-<script type="application/javascript" src="chrome://browser/content/downloads/downloads.js"/>
-<script type="application/javascript" src="chrome://browser/content/downloads/indicator.js"/>
 <script type="application/javascript" src="chrome://global/content/inlineSpellCheckUI.js"/>
 <script type="application/javascript" src="chrome://global/content/viewSourceUtils.js"/>
 
@@ -18,7 +16,7 @@
 <script type="application/javascript" src="chrome://browser/content/browser-customization.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-devedition.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-feeds.js"/>
-<script type="application/javascript" src="chrome://browser/content/browser-fullScreen.js"/>
+<script type="application/javascript" src="chrome://browser/content/browser-fullScreenAndPointerLock.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-fullZoom.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-gestureSupport.js"/>
 <script type="application/javascript" src="chrome://browser/content/browser-media.js"/>

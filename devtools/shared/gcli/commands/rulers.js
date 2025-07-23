@@ -8,6 +8,8 @@
 const EventEmitter = require("devtools/shared/event-emitter");
 const eventEmitter = new EventEmitter();
 const events = require("sdk/event/core");
+loader.lazyRequireGetter(this, "getOuterId", "sdk/window/utils", true);
+loader.lazyRequireGetter(this, "getBrowserForTab", "sdk/tabs/utils", true);
 
 const l10n = require("gcli/l10n");
 require("devtools/server/actors/inspector");
@@ -15,7 +17,10 @@ const { RulersHighlighter, HighlighterEnvironment } =
   require("devtools/server/actors/highlighters");
 
 const highlighters = new WeakMap();
-let isRulersVisible = false;
+const visibleHighlighters = new Set();
+
+const isCheckedFor = (tab) =>
+  tab ? visibleHighlighters.has(getBrowserForTab(tab).outerWindowID) : false;
 
 exports.items = [
   // The client rulers command is used to maintain the toolbar button state only
@@ -23,6 +28,7 @@ exports.items = [
   // rulers_server below).
   {
     name: "rulers",
+    runAt: "client",
     description: l10n.lookup("rulersDesc"),
     manual: l10n.lookup("rulersManual"),
     buttonId: "command-button-rulers",
@@ -67,14 +73,15 @@ exports.items = [
     returnType: "highlighterVisibility",
     exec: function(args, context) {
       let env = context.environment;
+      let { document } = env;
+      let id = getOuterId(env.window);
 
       // Calling the command again after the rulers have been shown once hides
       // them.
-      if (highlighters.has(env.document)) {
-        let { highlighter, environment } = highlighters.get(env.document);
+      if (highlighters.has(document)) {
+        let { highlighter } = highlighters.get(document);
         highlighter.destroy();
-        environment.destroy();
-        return false;
+        return {visible: false, id};
       }
 
       // Otherwise, display the rulers.
@@ -89,16 +96,15 @@ exports.items = [
       // Listen to the highlighter's destroy event which may happen if the
       // window is refreshed or closed with the rulers shown.
       events.once(highlighter, "destroy", () => {
-        if (highlighters.has(env.document)) {
-
-          let { environment } = highlighters.get(env.document);
+        if (highlighters.has(document)) {
+          let { environment } = highlighters.get(document);
           environment.destroy();
-          highlighters.delete(env.document);
+          highlighters.delete(document);
         }
       });
 
       highlighter.show();
-      return true;
+      return {visible: true, id};
     }
   }
 ];

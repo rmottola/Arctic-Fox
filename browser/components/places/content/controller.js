@@ -457,8 +457,6 @@ PlacesController.prototype = {
           uri = NetUtil.newURI(node.uri);
           if (PlacesUtils.nodeIsBookmark(node)) {
             nodeData["bookmark"] = true;
-            PlacesUtils.nodeIsTagQuery(node.parent)
-
             var parentNode = node.parent;
             if (parentNode) {
               if (PlacesUtils.nodeIsTagQuery(parentNode))
@@ -1591,7 +1589,7 @@ var PlacesControllerDragHelper = {
         unwrapped = PlacesUtils.unwrapNodes(data, flavor)[0];
       }
       else if (data instanceof XULElement && data.localName == "tab" &&
-               data.ownerDocument.defaultView instanceof ChromeWindow) {
+               data.ownerGlobal instanceof ChromeWindow) {
         let uri = data.linkedBrowser.currentURI;
         let spec = uri ? uri.spec : "about:blank";
         let title = data.label;

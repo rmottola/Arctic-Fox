@@ -4,18 +4,11 @@
 
 #eyedropper-button {
   margin-inline-start: 5px;
+  display: block;
 }
 
 #eyedropper-button::before {
-  background-image: url("chrome://devtools/skin/images/command-eyedropper.png");
-  background-size: 64px 16px;
-  background-position: 0 center;
-}
-
-@media (min-resolution: 1.1dppx) {
-  #eyedropper-button::before {
-    background-image: url("chrome://devtools/skin/images/command-eyedropper@2x.png");
-  }
+  background-image: url(chrome://devtools/skin/images/command-eyedropper.svg);
 }
 
 /* Mix-in classes */
@@ -30,16 +23,23 @@
 
 .spectrum-slider-control {
   cursor: pointer;
-  border: 1px solid black;
-  background: white;
-  opacity: .7;
+  box-shadow: 0 0 2px rgba(0,0,0,.6);
+  background: #fff;
+  border-radius: 10px;
+  opacity: .8;
 }
 
 .spectrum-box {
-  border: solid 1px #333;
+  border: 1px solid rgba(0,0,0,0.2);
+  border-radius: 2px;
+  background-clip: content-box;
 }
 
 /* Elements */
+
+#spectrum-tooltip {
+  padding: 4px;
+}
 
 .spectrum-container {
   position: relative;
@@ -143,7 +143,7 @@ http://www.briangrinstead.com/blog/keep-aspect-ratio-with-html-and-css */
   height: 8px;
   width: 8px;
   border: 1px solid white;
-  background: black;
+  box-shadow: 0 0 2px rgba(0,0,0,.6);
 }
 
 .spectrum-slider {

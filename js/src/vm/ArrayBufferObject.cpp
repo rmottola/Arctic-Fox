@@ -256,7 +256,7 @@ NoteViewBufferWasDetached(ArrayBufferViewObject* view,
                           ArrayBufferObject::BufferContents newContents,
                           JSContext* cx)
 {
-    view->notifyBufferDetached(newContents.data());
+    view->notifyBufferDetached(cx, newContents.data());
 
     // Notify compiled jit code that the base pointer has moved.
     MarkObjectStateChange(cx, view);
@@ -1082,7 +1082,7 @@ JSObject::is<js::ArrayBufferObjectMaybeShared>() const
 }
 
 void
-ArrayBufferViewObject::notifyBufferDetached(void* newData)
+ArrayBufferViewObject::notifyBufferDetached(JSContext* cx, void* newData)
 {
     MOZ_ASSERT(newData != nullptr);
     if (is<DataViewObject>()) {
@@ -1090,7 +1090,7 @@ ArrayBufferViewObject::notifyBufferDetached(void* newData)
     } else if (is<TypedArrayObject>()) {
         if (as<TypedArrayObject>().isSharedMemory())
             return;
-        as<TypedArrayObject>().notifyBufferDetached(newData);
+        as<TypedArrayObject>().notifyBufferDetached(cx, newData);
     } else {
         as<OutlineTypedObject>().notifyBufferDetached(newData);
     }

@@ -97,7 +97,6 @@ public:
 
   JSObject* WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto) override;
 
-private:
 protected:
   virtual ~ServiceWorkerClient()
   { }

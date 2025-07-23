@@ -54,6 +54,8 @@ def GCC_BASE(version):
         '__GNUC_MINOR__': version.minor,
         '__GNUC_PATCHLEVEL__': version.patch,
         '__STDC__': 1,
+        '__ORDER_LITTLE_ENDIAN__': 1234,
+        '__ORDER_BIG_ENDIAN__': 4321,
     })
 
 
@@ -74,7 +76,15 @@ GXX_4_9 = GXX('4.9.3')
 GCC_5 = GCC('5.2.1') + DEFAULT_C11
 GXX_5 = GXX('5.2.1')
 
-GCC_PLATFORM_X86 = {
+GCC_PLATFORM_LITTLE_ENDIAN = {
+    '__BYTE_ORDER__': 1234,
+}
+
+GCC_PLATFORM_BIG_ENDIAN = {
+    '__BYTE_ORDER__': 4321,
+}
+
+GCC_PLATFORM_X86 = FakeCompiler(GCC_PLATFORM_LITTLE_ENDIAN) + {
     None: {
         '__i386__': 1,
     },
@@ -84,7 +94,7 @@ GCC_PLATFORM_X86 = {
     },
 }
 
-GCC_PLATFORM_X86_64 = {
+GCC_PLATFORM_X86_64 = FakeCompiler(GCC_PLATFORM_LITTLE_ENDIAN) + {
     None: {
         '__x86_64__': 1,
     },
@@ -94,7 +104,7 @@ GCC_PLATFORM_X86_64 = {
     },
 }
 
-GCC_PLATFORM_ARM = {
+GCC_PLATFORM_ARM = FakeCompiler(GCC_PLATFORM_LITTLE_ENDIAN) + {
     '__arm__': 1,
 }
 
@@ -884,6 +894,19 @@ class CrossCompileToolchainTest(BaseToolchainTest):
             'host_c_compiler': self.GCC_4_9_RESULT,
             'host_cxx_compiler': self.GXX_4_9_RESULT,
         }, args=['--target=arm-unknown-linux-gnu'])
+
+    def test_cannot_cross(self):
+        self.TARGET = 'mipsel-unknown-linux-gnu'
+
+        paths = {
+            '/usr/bin/gcc': GCC_4_9 + self.PLATFORMS['mips-unknown-linux-gnu'],
+            '/usr/bin/g++': GXX_4_9 + self.PLATFORMS['mips-unknown-linux-gnu'],
+        }
+        self.do_toolchain_test(paths, {
+            'c_compiler': ('Target C compiler target endianness (big) '
+                           'does not match --target endianness (little)'),
+        })
+        self.TARGET = LinuxCrossCompileToolchainTest.TARGET
 
     def test_overridden_cross_gcc(self):
         self.do_toolchain_test(self.PATHS, {

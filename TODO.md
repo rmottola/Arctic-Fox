@@ -27,7 +27,6 @@
 - 1342849 - Don't do any notifications for newly added background t
 - 1324406 - Treat 'data:' documents as unique, opaque origins
 - 1300118 P1 Make TaskQueue deliver runnables to nsIEventTarget
-- Add d3d11/d2d and compositor information to telemetry. (bug 1179051
 - Bug 1379957 - 2017-07-12  - Only fire the debugger's onGarbageCollection hook when
 - Bug 1362167 - 2017-05-04 - Use strongly-typed enum classes instead of generic uint
 - Bug 1352528 - 2017-04-03 - Hoist call to GetRoundOffsetsToPixels out of the inner 
@@ -51,9 +50,6 @@ impacting download and shutdown:
 Bug 875648 - Use Downloads.jsm functions to get download directories
 
 
-# Mac Specific
-Bug 1180725 - use AVFoundation for camera capture on OSX. r=jib
-
 
 ## Enhancing JS
  Bug 1316079 - Mark JS::PropertyDescriptor as JS_PUBLIC_API to fix lin¿
@@ -71,13 +67,11 @@ Bug 1180725 - use AVFoundation for camera capture on OSX. r=jib
 - update nsNullPrincipal (and nsDocShell Fixme's)
 - add PrincipalToInherit to LoadInfo
 - LoadFrame needs TriggerPrincipal & OriginalSrc
-- move SharedThreadPool from domi/media to xpcom/threads
 - complete 1487964 port
-- check bugs: bug 1275755, bug 1352874, bug 1440824 as prerequisites for Bug 529808
+- check bugs: bug 1352874, bug 1440824 as prerequisites for Bug 529808
 
 
 ### Further Further ToDo:
-- Check for STLPort removal: https://bugzilla.mozilla.org/show_bug.cgi?id=1276927
 - import PPC JIT from TenFourFox
 - see if window.requestIdleCallback can be backported
 

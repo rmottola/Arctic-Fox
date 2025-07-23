@@ -21,6 +21,8 @@ const { Services } = jsmScope;
 // Steal various globals only available in JSM scope (and not Sandbox one)
 const { PromiseDebugging, ChromeUtils, ThreadSafeChromeUtils, HeapSnapshot,
         atob, btoa, Iterator } = jsmScope;
+const { URL } = Cu.Sandbox(CC("@mozilla.org/systemprincipal;1", "nsIPrincipal")(),
+                           {wantGlobalProperties: ["URL"]});
 
 /**
  * Defines a getter on a specified object that will be created upon first use.
@@ -107,7 +109,7 @@ function defineLazyModuleGetter(aObject, aName, aResource, aSymbol,
 {
   let proxy = aProxy || {};
 
-  if (typeof(aPreLambda) === "function") {
+  if (typeof (aPreLambda) === "function") {
     aPreLambda.apply(proxy);
   }
 
@@ -116,7 +118,7 @@ function defineLazyModuleGetter(aObject, aName, aResource, aSymbol,
     try {
       Cu.import(aResource, temp);
 
-      if (typeof(aPostLambda) === "function") {
+      if (typeof (aPostLambda) === "function") {
         aPostLambda.apply(proxy);
       }
     } catch (ex) {
@@ -180,7 +182,7 @@ defineLazyGetter(exports.modules, "Debugger", () => {
   // addDebuggerToGlobal only allows adding the Debugger object to a global. The
   // this object is not guaranteed to be a global (in particular on B2G, due to
   // compartment sharing), so add the Debugger object to a sandbox instead.
-  let sandbox = Cu.Sandbox(CC('@mozilla.org/systemprincipal;1', 'nsIPrincipal')());
+  let sandbox = Cu.Sandbox(CC("@mozilla.org/systemprincipal;1", "nsIPrincipal")());
   Cu.evalInSandbox(
     "Components.utils.import('resource://gre/modules/jsdebugger.jsm');" +
     "addDebuggerToGlobal(this);",
@@ -206,27 +208,27 @@ defineLazyGetter(exports.modules, "indexedDB", () => {
   // On xpcshell, we can't instantiate indexedDB without crashing
   try {
     let sandbox
-      = Cu.Sandbox(CC('@mozilla.org/systemprincipal;1', 'nsIPrincipal')(),
+      = Cu.Sandbox(CC("@mozilla.org/systemprincipal;1", "nsIPrincipal")(),
                    {wantGlobalProperties: ["indexedDB"]});
     return sandbox.indexedDB;
 
-  } catch(e) {
+  } catch (e) {
     return {};
   }
 });
 
 defineLazyGetter(exports.modules, "CSS", () => {
   let sandbox
-    = Cu.Sandbox(CC('@mozilla.org/systemprincipal;1', 'nsIPrincipal')(),
+    = Cu.Sandbox(CC("@mozilla.org/systemprincipal;1", "nsIPrincipal")(),
                  {wantGlobalProperties: ["CSS"]});
   return sandbox.CSS;
 });
 
-defineLazyGetter(exports.modules, "URL", () => {
+defineLazyGetter(exports.modules, "FileReader", () => {
   let sandbox
-    = Cu.Sandbox(CC('@mozilla.org/systemprincipal;1', 'nsIPrincipal')(),
-                 {wantGlobalProperties: ["URL"]});
-  return sandbox.URL;
+    = Cu.Sandbox(CC("@mozilla.org/systemprincipal;1", "nsIPrincipal")(),
+                 {wantGlobalProperties: ["FileReader"]});
+  return sandbox.FileReader;
 });
 
 // List of all custom globals exposed to devtools modules.
@@ -236,6 +238,7 @@ const globals = exports.globals = {
   reportError: Cu.reportError,
   atob: atob,
   btoa: btoa,
+  URL,
   _Iterator: Iterator,
   loader: {
     lazyGetter: defineLazyGetter,
@@ -274,7 +277,6 @@ const globals = exports.globals = {
 defineLazyGetter(globals, "console", () => {
   return Cu.import("resource://gre/modules/Console.jsm", {}).console;
 });
-
 defineLazyGetter(globals, "clearTimeout", () => {
   return Cu.import("resource://gre/modules/Timer.jsm", {}).clearTimeout;
 });
@@ -286,4 +288,8 @@ defineLazyGetter(globals, "clearInterval", () => {
 });
 defineLazyGetter(globals, "setInterval", () => {
   return Cu.import("resource://gre/modules/Timer.jsm", {}).setInterval;
+});
+defineLazyGetter(globals, "CSSRule", () => Ci.nsIDOMCSSRule);
+defineLazyGetter(globals, "DOMParser", () => {
+  return CC("@mozilla.org/xmlextras/domparser;1", "nsIDOMParser");
 });

@@ -8,13 +8,13 @@
  */
 
 const Profiler = Cc["@mozilla.org/tools/profiler;1"].getService(Ci.nsIProfiler);
-const { ProfilerFront } = require("devtools/server/actors/profiler");
+const { ProfilerFront } = require("devtools/shared/fronts/profiler");
 
 function run_test() {
   run_next_test();
 }
 
-add_task(function *() {
+add_task(function* () {
   let [client, form] = yield getChromeActors();
   let front = new ProfilerFront(client, form);
 
@@ -55,7 +55,7 @@ add_task(function *() {
   do_check_true(ret.registered.length === 3);
 });
 
-function getChromeActors () {
+function getChromeActors() {
   let deferred = promise.defer();
   get_chrome_actors((client, form) => deferred.resolve([client, form]));
   return deferred.promise;

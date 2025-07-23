@@ -22,12 +22,15 @@ class nsPNGDecoder : public Decoder
 public:
   virtual ~nsPNGDecoder();
 
-  virtual void InitInternal() override;
-  Maybe<TerminalState> DoDecode(SourceBufferIterator& aIterator) override;
-  virtual Telemetry::ID SpeedHistogram() override;
-
   /// @return true if this PNG is a valid ICO resource.
   bool IsValidICO() const;
+
+protected:
+  nsresult InitInternal() override;
+  LexerResult DoDecode(SourceBufferIterator& aIterator,
+                       IResumable* aOnResume) override;
+
+  Maybe<Telemetry::ID> SpeedHistogram() const override;
 
 private:
   friend class DecoderFactory;
@@ -35,9 +38,15 @@ private:
   // Decoders should only be instantiated via DecoderFactory.
   explicit nsPNGDecoder(RasterImage* aImage);
 
-  nsresult CreateFrame(gfx::SurfaceFormat aFormat,
-                       const gfx::IntRect& aFrameRect,
-                       bool aIsInterlaced);
+  /// The information necessary to create a frame.
+  struct FrameInfo
+  {
+    gfx::SurfaceFormat mFormat;
+    gfx::IntRect mFrameRect;
+    bool mIsInterlaced;
+  };
+
+  nsresult CreateFrame(const FrameInfo& aFrameInfo);
   void EndImageFrame();
 
   enum class TransparencyType
@@ -55,6 +64,11 @@ private:
 
   void WriteRow(uint8_t* aRow);
 
+  // Convenience methods to make interacting with StreamingLexer from inside
+  // a libpng callback easier.
+  void DoTerminate(png_structp aPNGStruct, TerminalState aState);
+  void DoYield(png_structp aPNGStruct);
+
   enum class State
   {
     PNG_DATA,
@@ -65,6 +79,20 @@ private:
   LexerTransition<State> FinishedPNGData();
 
   StreamingLexer<State> mLexer;
+
+  // The next lexer state transition. We need to store it here because we can't
+  // directly return arbitrary values from libpng callbacks.
+  LexerTransition<State> mNextTransition;
+
+  // We yield to the caller every time we finish decoding a frame. When this
+  // happens, we need to allocate the next frame after returning from the yield.
+  // |mNextFrameInfo| is used to store the information needed to allocate the
+  // next frame.
+  Maybe<FrameInfo> mNextFrameInfo;
+
+  // The length of the last chunk of data passed to ReadPNGData(). We use this
+  // to arrange to arrive back at the correct spot in the data after yielding.
+  size_t mLastChunkLength;
 
 public:
   png_structp mPNG;

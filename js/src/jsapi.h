@@ -466,6 +466,8 @@ class MOZ_RAII JS_PUBLIC_API(CustomAutoRooter) : private AutoGCRooter
     friend void AutoGCRooter::trace(JSTracer* trc);
 
   protected:
+    virtual ~CustomAutoRooter() {}
+
     /** Supplied by derived class to trace roots. */
     virtual void trace(JSTracer* trc) = 0;
 
@@ -2090,6 +2092,17 @@ JS_InstanceOf(JSContext* cx, JS::Handle<JSObject*> obj, const JSClass* clasp, JS
 
 extern JS_PUBLIC_API(bool)
 JS_HasInstance(JSContext* cx, JS::Handle<JSObject*> obj, JS::Handle<JS::Value> v, bool* bp);
+
+namespace JS {
+
+// Implementation of
+// http://www.ecma-international.org/ecma-262/6.0/#sec-ordinaryhasinstance.  If
+// you're looking for the equivalent of "instanceof", you want JS_HasInstance,
+// not this function.
+extern JS_PUBLIC_API(bool)
+OrdinaryHasInstance(JSContext* cx, HandleObject objArg, HandleValue v, bool* bp);
+
+} // namespace JS
 
 extern JS_PUBLIC_API(void*)
 JS_GetPrivate(JSObject* obj);
@@ -5168,7 +5181,7 @@ class JSErrorReport
       : linebuf_(nullptr), linebufLength_(0), tokenOffset_(0),
         filename(nullptr), lineno(0), column(0), isMuted(false),
         flags(0), errorNumber(0), ucmessage(nullptr),
-        messageArgs(nullptr), exnType(0)
+        exnType(0)
     {}
 
     const char*     filename;      /* source file name, URL, etc., or null */
@@ -5178,7 +5191,6 @@ class JSErrorReport
     unsigned        flags;          /* error/warning, etc. */
     unsigned        errorNumber;    /* the error number, e.g. see js.msg */
     const char16_t* ucmessage;     /* the (default) error message */
-    const char16_t** messageArgs;  /* arguments for the error message */
     int16_t         exnType;        /* One of the JSExnType constants */
 
     const char16_t* linebuf() const {
@@ -5200,6 +5212,8 @@ class JSErrorReport
 #define JSREPORT_WARNING    0x1     /* reported via JS_ReportWarning */
 #define JSREPORT_EXCEPTION  0x2     /* exception was thrown */
 #define JSREPORT_STRICT     0x4     /* error or warning due to strict option */
+
+#define JSREPORT_USER_1     0x8     /* user-defined flag */
 
 /*
  * If JSREPORT_EXCEPTION is set, then a JavaScript-catchable exception
@@ -5903,9 +5917,9 @@ struct AllFrames { };
  */
 struct MaxFrames
 {
-    unsigned maxFrames;
+    uint32_t maxFrames;
 
-    explicit MaxFrames(unsigned max)
+    explicit MaxFrames(uint32_t max)
       : maxFrames(max)
     {
         MOZ_ASSERT(max > 0);
@@ -5933,7 +5947,8 @@ struct FirstSubsumedFrame
       , principals(p)
       , ignoreSelfHosted(ignoreSelfHostedFrames)
     {
-        JS_HoldPrincipals(principals);
+        if (principals)
+            JS_HoldPrincipals(principals);
     }
 
     // No copying because we want to avoid holding and dropping principals

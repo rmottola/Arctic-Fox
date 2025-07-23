@@ -68,6 +68,7 @@
 #include "jsfriendapi.h"
 #include "ImportManager.h"
 #include "mozilla/LinkedList.h"
+#include "CustomElementsRegistry.h"
 
 #define XML_DECLARATION_BITS_DECLARATION_EXISTS   (1 << 0)
 #define XML_DECLARATION_BITS_ENCODING_EXISTS      (1 << 1)
@@ -263,48 +264,6 @@ private:
 
 namespace mozilla {
 namespace dom {
-
-class CustomElementHashKey : public PLDHashEntryHdr
-{
-public:
-  typedef CustomElementHashKey *KeyType;
-  typedef const CustomElementHashKey *KeyTypePointer;
-
-  CustomElementHashKey(int32_t aNamespaceID, nsIAtom *aAtom)
-    : mNamespaceID(aNamespaceID),
-      mAtom(aAtom)
-  {}
-  explicit CustomElementHashKey(const CustomElementHashKey* aKey)
-    : mNamespaceID(aKey->mNamespaceID),
-      mAtom(aKey->mAtom)
-  {}
-  ~CustomElementHashKey()
-  {}
-
-  KeyType GetKey() const { return const_cast<KeyType>(this); }
-  bool KeyEquals(const KeyTypePointer aKey) const
-  {
-    MOZ_ASSERT(mNamespaceID != kNameSpaceID_Unknown,
-               "This equals method is not transitive, nor symmetric. "
-               "A key with a namespace of kNamespaceID_Unknown should "
-               "not be stored in a hashtable.");
-    return (kNameSpaceID_Unknown == aKey->mNamespaceID ||
-            mNamespaceID == aKey->mNamespaceID) &&
-           aKey->mAtom == mAtom;
-  }
-
-  static KeyTypePointer KeyToPointer(KeyType aKey) { return aKey; }
-  static PLDHashNumber HashKey(const KeyTypePointer aKey)
-  {
-    return aKey->mAtom->hash();
-  }
-  enum { ALLOW_MEMMOVE = true };
-
-private:
-  int32_t mNamespaceID;
-  nsCOMPtr<nsIAtom> mAtom;
-};
-
 struct LifecycleCallbackArgs
 {
   nsString name;
@@ -374,40 +333,6 @@ struct CustomElementData
 
 private:
   virtual ~CustomElementData() {}
-};
-
-// The required information for a custom element as defined in:
-// https://dvcs.w3.org/hg/webcomponents/raw-file/tip/spec/custom/index.html
-struct CustomElementDefinition
-{
-  CustomElementDefinition(JSObject* aPrototype,
-                          nsIAtom* aType,
-                          nsIAtom* aLocalName,
-                          mozilla::dom::LifecycleCallbacks* aCallbacks,
-                          uint32_t aNamespaceID,
-                          uint32_t aDocOrder);
-
-  // The prototype to use for new custom elements of this type.
-  JS::Heap<JSObject *> mPrototype;
-
-  // The type (name) for this custom element.
-  nsCOMPtr<nsIAtom> mType;
-
-  // The localname to (e.g. <button is=type> -- this would be button).
-  nsCOMPtr<nsIAtom> mLocalName;
-
-  // The lifecycle callbacks to call for this custom element.
-  nsAutoPtr<mozilla::dom::LifecycleCallbacks> mCallbacks;
-
-  // Whether we're currently calling the created callback for a custom element
-  // of this type.
-  bool mElementIsBeingCreated;
-
-  // Element namespace.
-  int32_t mNamespaceID;
-
-  // The document custom element order.
-  uint32_t mDocOrder;
 };
 
 class Registry : public nsISupports
@@ -1269,8 +1194,6 @@ public:
   Element* GetFullscreenElement() override;
 
   void RequestPointerLock(Element* aElement) override;
-  bool ShouldLockPointer(Element* aElement, Element* aCurrentLock,
-                         bool aNoFocusCheck = false);
   bool SetPointerLock(Element* aElement, int aCursorStyle);
   static void UnlockPointer(nsIDocument* aDoc = nullptr);
 
@@ -1484,6 +1407,10 @@ public:
 
   js::ExpandoAndGeneration mExpandoAndGeneration;
 
+#ifdef MOZ_EME
+  bool ContainsEMEContent();
+#endif
+
   bool ContainsMSEContent();
 
 protected:
@@ -1667,11 +1594,7 @@ public:
   // terminated instead of letting it finish at its own pace.
   bool mParserAborted:1;
 
-  friend class nsPointerLockPermissionRequest;
   friend class nsCallRequestFullScreen;
-  // When set, trying to lock the pointer doesn't require permission from the
-  // user.
-  bool mAllowRelocking:1;
 
   // ScreenOrientation "pending promise" as described by
   // http://www.w3.org/TR/screen-orientation/
@@ -1689,10 +1612,6 @@ public:
   // Keeps track of whether we have a pending
   // 'style-sheet-applicable-state-changed' notification.
   bool mSSApplicableStateNotificationPending:1;
-
-  // The number of pointer lock requests which are cancelled by the user.
-  // The value is saturated to kPointerLockRequestLimit+1 = 3.
-  uint8_t mCancelledPointerLockRequests:2;
 
   // Whether we have reported use counters for this document with Telemetry yet.
   // Normally this is only done at document destruction time, but for image

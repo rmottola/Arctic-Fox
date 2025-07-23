@@ -30,10 +30,7 @@ add_task(function* () {
 
   info("Press arrowUp to focus <body> " +
        "(which works if the node was focused properly)");
-  onNodeHighlighted = toolbox.once("node-highlight");
-  EventUtils.synthesizeKey("VK_UP", {});
-  yield waitForChildrenUpdated(inspector);
-  yield onNodeHighlighted;
+  yield selectPreviousNodeWithArrowUp(inspector);
   assertNodeSelected(inspector, "body");
 });
 

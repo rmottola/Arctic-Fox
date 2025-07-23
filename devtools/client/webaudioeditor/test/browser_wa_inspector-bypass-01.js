@@ -5,17 +5,17 @@
  * Tests that nodes are correctly bypassed when bypassing.
  */
 
-add_task(function*() {
+add_task(function* () {
   let { target, panel } = yield initWebAudioEditor(SIMPLE_CONTEXT_URL);
   let { panelWin } = panel;
   let { gFront, $, $$, EVENTS, gAudioNodes } = panelWin;
 
-  reload(target);
-
-  let [actors] = yield Promise.all([
+  let events = Promise.all([
     get3(gFront, "create-node"),
     waitForGraphRendered(panelWin, 3, 2)
   ]);
+  reload(target);
+  let [actors] = yield events;
   let nodeIds = actors.map(actor => actor.actorID);
 
   // Wait for the node to be set as well as the inspector to come fully into the view
@@ -23,14 +23,14 @@ add_task(function*() {
 
   let $bypass = $("toolbarbutton.bypass");
 
-  is((yield actors[1].isBypassed()), false, "AudioNodeActor is not bypassed by default.")
+  is((yield actors[1].isBypassed()), false, "AudioNodeActor is not bypassed by default.");
   is($bypass.checked, true, "Button is 'on' for normal nodes");
   is($bypass.disabled, false, "Bypass button is not disabled for normal nodes");
 
   command($bypass);
   yield once(gAudioNodes, "bypass");
 
-  is((yield actors[1].isBypassed()), true, "AudioNodeActor is bypassed.")
+  is((yield actors[1].isBypassed()), true, "AudioNodeActor is bypassed.");
   is($bypass.checked, false, "Button is 'off' when clicked");
   is($bypass.disabled, false, "Bypass button is not disabled after click");
   ok(findGraphNode(panelWin, nodeIds[1]).classList.contains("bypassed"),
@@ -39,7 +39,7 @@ add_task(function*() {
   command($bypass);
   yield once(gAudioNodes, "bypass");
 
-  is((yield actors[1].isBypassed()), false, "AudioNodeActor is no longer bypassed.")
+  is((yield actors[1].isBypassed()), false, "AudioNodeActor is no longer bypassed.");
   is($bypass.checked, true, "Button is back on when clicked");
   is($bypass.disabled, false, "Bypass button is not disabled after click");
   ok(!findGraphNode(panelWin, nodeIds[1]).classList.contains("bypassed"),

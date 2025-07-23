@@ -4,10 +4,11 @@
 "use strict";
 
 const { Cc, Ci, Cu } = require("chrome");
-const { Task } = require("resource://gre/modules/Task.jsm");
+const { Task } = require("devtools/shared/task");
 
 loader.lazyRequireGetter(this, "Services");
 loader.lazyRequireGetter(this, "promise");
+loader.lazyRequireGetter(this, "defer", "devtools/shared/defer");
 loader.lazyRequireGetter(this, "OS", "resource://gre/modules/commonjs/node/os.js");
 loader.lazyRequireGetter(this, "DebuggerServer", "devtools/server/main", true);
 loader.lazyRequireGetter(this, "AppConstants",
@@ -21,7 +22,7 @@ loader.lazyGetter(this, "oscpu", () => {
 });
 
 const APP_MAP = {
-  "{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}": "firefox",
+  "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}": "firefox",
   "{3550f703-e582-4d05-9a08-453d09bdfdc6}": "thunderbird",
   "{92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}": "seamonkey",
   "{718e30fb-e89b-41dd-9da7-e25a45638b28}": "sunbird",
@@ -32,7 +33,7 @@ const APP_MAP = {
 
 var CACHED_INFO = null;
 
-function *getSystemInfo() {
+function* getSystemInfo() {
   if (CACHED_INFO) {
     return CACHED_INFO;
   }
@@ -40,7 +41,14 @@ function *getSystemInfo() {
   let appInfo = Services.appinfo;
   let win = Services.wm.getMostRecentWindow(DebuggerServer.chromeWindowType);
   let [processor, compiler] = appInfo.XPCOMABI.split("-");
-  let dpi, useragent, width, height, os, brandName;
+  let dpi,
+    useragent,
+    width,
+    height,
+    physicalWidth,
+    physicalHeight,
+    os,
+    brandName;
   let appid = appInfo.ID;
   let apptype = APP_MAP[appid];
   let geckoVersion = appInfo.platformVersion;
@@ -77,6 +85,8 @@ function *getSystemInfo() {
     useragent = win.navigator.userAgent;
     width = win.screen.width;
     height = win.screen.height;
+    physicalWidth = win.screen.width * win.devicePixelRatio;
+    physicalHeight = win.screen.height * win.devicePixelRatio;
   }
 
   let info = {
@@ -163,6 +173,8 @@ function *getSystemInfo() {
     useragent,
     width,
     height,
+    physicalWidth,
+    physicalHeight,
     brandName,
   };
 
@@ -170,7 +182,7 @@ function *getSystemInfo() {
   return info;
 }
 
-function getProfileLocation () {
+function getProfileLocation() {
   // In child processes, we cannot access the profile location.
   try {
     let profd = Services.dirsvc.get("ProfD", Ci.nsILocalFile);
@@ -296,7 +308,7 @@ function getOSCPU() {
 }
 
 function getSetting(name) {
-  let deferred = promise.defer();
+  let deferred = defer();
 
   if ("@mozilla.org/settingsService;1" in Cc) {
     let settingsService;
@@ -319,7 +331,6 @@ function getSetting(name) {
   return deferred.promise;
 }
 
-exports.is64Bit = Cc["@mozilla.org/xre/app-info;1"].getService(Ci.nsIXULAppInfo).is64Bit;
 exports.getSystemInfo = Task.async(getSystemInfo);
 exports.getAppIniString = getAppIniString;
 exports.getSetting = getSetting;

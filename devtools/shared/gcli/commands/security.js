@@ -27,6 +27,7 @@ const POLICY_REPORT_ONLY = "report-only"
 
 // special handling of directives
 const DIR_UPGRADE_INSECURE = "upgrade-insecure-requests";
+const DIR_BLOCK_ALL_MIXED_CONTENT = "block-all-mixed-content";
 
 // special handling of sources
 const SRC_UNSAFE_INLINE = "'unsafe-inline'";
@@ -41,7 +42,7 @@ const CONTENT_SECURITY_POLICY_REPORT_ONLY_MSG = l10n.lookup("securityCSPROHeader
 const NEXT_URI_HEADER = l10n.lookup("securityReferrerNextURI");
 const CALCULATED_REFERRER_HEADER = l10n.lookup("securityReferrerCalculatedReferrer");
 /* The official names from the W3C Referrer Policy Draft http://www.w3.org/TR/referrer-policy/ */
-const REFERRER_POLICY_NAMES = [ "None When Downgrade", "None", "Origin Only", "Origin When Cross-Origin", "Unsafe URL" ];
+const REFERRER_POLICY_NAMES = [ "None When Downgrade (default)", "None", "Origin Only", "Origin When Cross-Origin", "Unsafe URL" ];
 
 exports.items = [
   {
@@ -89,13 +90,15 @@ exports.items = [
           // loop over all the directive-sources within that directive
           var outSrcs = [];
 
-          // special case handling for upgrade-insecure-requests
-          // which does not have any srcs
-          if (dir === DIR_UPGRADE_INSECURE) {
+          // special case handling for the directives
+          // upgrade-insecure-requests and block-all-mixed-content
+          // which do not include any srcs
+          if (dir === DIR_UPGRADE_INSECURE ||
+              dir === DIR_BLOCK_ALL_MIXED_CONTENT) {
             outSrcs.push({
               icon: GOOD_IMG_SRC,
-              src: "", // no src for upgrade-insecure-requests
-              desc: "" // no description for upgrade-insecure-requests
+              src: "", // no src
+              desc: "" // no description
             });
           }
 
@@ -140,7 +143,7 @@ exports.items = [
     from: "securityCSPInfo",
     to: "view",
     exec: function(cspInfo, context) {
-      var uri = context.environment.document.documentURI;
+      var url = context.environment.target.url;
 
       if (cspInfo.length == 0) {
         return context.createView({
@@ -148,7 +151,7 @@ exports.items = [
             "<table class='gcli-csp-detail' cellspacing='10' valign='top'>" +
             "  <tr>" +
             "    <td> <img src='chrome://browser/content/gcli_sec_bad.svg' width='20px' /> </td> " +
-            "    <td>" + NO_CSP_ON_PAGE_MSG + " <b>" + uri + "</b></td>" +
+            "    <td>" + NO_CSP_ON_PAGE_MSG + " <b>" + url + "</b></td>" +
             "  </tr>" +
             "</table>"});
       }
@@ -158,7 +161,7 @@ exports.items = [
           "<table class='gcli-csp-detail' cellspacing='10' valign='top'>" +
           // iterate all policies
           "  <tr foreach='csp in ${cspinfo}' >" +
-          "    <td> ${csp.header} <b>" + uri + "</b><br/><br/>" +
+          "    <td> ${csp.header} <b>" + url + "</b><br/><br/>" +
           "      <table class='gcli-csp-dir-detail' valign='top'>" +
           // >> iterate all directives
           "        <tr foreach='dir in ${csp.directives}' >" +
@@ -201,35 +204,54 @@ exports.items = [
       var sameDomainReferrer = "";
       var otherDomainReferrer = "";
       var downgradeReferrer = "";
+      var otherDowngradeReferrer = "";
       var origin = pageURI.prePath;
 
       switch (referrerPolicy) {
         case Ci.nsIHttpChannel.REFERRER_POLICY_NO_REFERRER:
           // sends no referrer
-          sameDomainReferrer = otherDomainReferrer = downgradeReferrer = "(no referrer)";
+          sameDomainReferrer
+            = otherDomainReferrer
+            = downgradeReferrer
+            = otherDowngradeReferrer
+            = "(no referrer)";
           break;
         case Ci.nsIHttpChannel.REFERRER_POLICY_ORIGIN:
           // only sends the origin of the referring URL
-          sameDomainReferrer = otherDomainReferrer = downgradeReferrer = origin;
+          sameDomainReferrer
+            = otherDomainReferrer
+            = downgradeReferrer
+            = otherDowngradeReferrer
+            = origin;
           break;
         case Ci.nsIHttpChannel.REFERRER_POLICY_ORIGIN_WHEN_XORIGIN:
           // same as default, but reduced to ORIGIN when cross-origin.
           sameDomainReferrer = pageURI.spec;
-          otherDomainReferrer = origin;
-          downgradeReferrer = "(no referrer)";
+          otherDomainReferrer
+            = downgradeReferrer
+            = otherDowngradeReferrer
+            = origin;
           break;
         case Ci.nsIHttpChannel.REFERRER_POLICY_UNSAFE_URL:
           // always sends the referrer, even on downgrade.
-          sameDomainReferrer = otherDomainReferrer = downgradeReferrer = pageURI.spec;
+          sameDomainReferrer
+            = otherDomainReferrer
+            = downgradeReferrer
+            = otherDowngradeReferrer
+            = pageURI.spec;
           break;
         case Ci.nsIHttpChannel.REFERRER_POLICY_NO_REFERRER_WHEN_DOWNGRADE:
           // default state, doesn't send referrer from https->http
           sameDomainReferrer = otherDomainReferrer = pageURI.spec;
-          downgradeReferrer = "(no referrer)";
+          downgradeReferrer = otherDowngradeReferrer = "(no referrer)";
           break;
         default:
           // this is a new referrer policy which we do not know about
-          sameDomainReferrer = otherDomainReferrer = downgradeReferrer = "(unknown Referrer Policy)";
+          sameDomainReferrer
+            = otherDomainReferrer
+            = downgradeReferrer
+            = otherDowngradeReferrer
+            = "(unknown Referrer Policy)";
           break;
       }
 
@@ -237,17 +259,39 @@ exports.items = [
 
       var referrerUrls = [
         // add the referrer uri 'referrer' we would send when visiting 'uri'
-        {uri: 'http://example.com/', referrer: otherDomainReferrer},
-        {uri: sameDomainUri, referrer: sameDomainReferrer}
+        {
+          uri: pageURI.scheme+'://example.com/',
+          referrer: otherDomainReferrer,
+          description: l10n.lookup('securityReferrerPolicyOtherDomain')},
+        {
+          uri: sameDomainUri,
+          referrer: sameDomainReferrer,
+          description: l10n.lookup('securityReferrerPolicySameDomain')}
       ];
 
       if (pageURI.schemeIs('https')) {
         // add the referrer we would send on downgrading http->https
-        referrerUrls.push({uri: "http://"+pageURI.hostPort+"/*", referrer: downgradeReferrer});
+        if (sameDomainReferrer != downgradeReferrer) {
+          referrerUrls.push({
+            uri: "http://"+pageURI.hostPort+"/*",
+            referrer: downgradeReferrer,
+            description:
+              l10n.lookup('securityReferrerPolicySameDomainDowngrade')
+          });
+        }
+        if (otherDomainReferrer != otherDowngradeReferrer) {
+          referrerUrls.push({
+            uri: "http://example.com/",
+            referrer: otherDowngradeReferrer,
+            description:
+              l10n.lookup('securityReferrerPolicyOtherDomainDowngrade')
+          });
+        }
       }
 
       return {
-        header: l10n.lookupFormat("securityReferrerPolicyReportHeader", [pageURI.spec]),
+        header: l10n.lookupFormat("securityReferrerPolicyReportHeader",
+                                  [pageURI.spec]),
         policyName: REFERRER_POLICY_NAMES[referrerPolicy],
         urls: referrerUrls
       }
@@ -264,10 +308,13 @@ exports.items = [
           "  <strong> ${rpi.header} </strong> <br />" +
           "  ${rpi.policyName} <br />" +
           "  <table class='gcli-referrer-policy-detail' cellspacing='10' >" +
-          "    <tr><th> " + NEXT_URI_HEADER + " </th><th> " + CALCULATED_REFERRER_HEADER + " </th></tr>" +
+          "    <tr>" +
+          "      <th> " + NEXT_URI_HEADER + " </th>" +
+          "      <th> " + CALCULATED_REFERRER_HEADER + " </th>" +
+          "    </tr>" +
           // iterate all policies
           "    <tr foreach='nextURI in ${rpi.urls}' >" +
-          "      <td> ${nextURI.uri} </td>" +
+          "      <td> ${nextURI.description} (e.g., ${nextURI.uri}) </td>" +
           "      <td> ${nextURI.referrer} </td>" +
           "    </tr>" +
           "  </table>" +

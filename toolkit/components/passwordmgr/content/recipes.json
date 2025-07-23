@@ -14,6 +14,18 @@
       "description": "An ephemeral password-shim field is incorrectly selected as the username field.",
       "hosts": ["www.discover.com"],
       "usernameSelector": "#login-account"
+    },
+    {
+      "description": "Tibia uses type=password for its username field and puts the email address before the password field during registration",
+      "hosts": ["secure.tibia.com"],
+      "usernameSelector": "#accountname, input[name='loginname']",
+      "passwordSelector": "#password1, input[name='loginpassword']",
+      "pathRegex": "^\/account\/"
+    },
+    {
+      "description": "Username field will be incorrectly captured in the change password form (bug 1243722)",
+      "hosts": ["www.facebook.com"],
+      "notUsernameSelector": "#password_strength"
     }
   ]
 }

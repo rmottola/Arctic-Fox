@@ -1673,6 +1673,10 @@ PresShell::Initialize(nscoord aWidth, nscoord aHeight)
 
   mPresContext->SetVisibleArea(nsRect(0, 0, aWidth, aHeight));
 
+  if (mStyleSet->IsServo()) {
+    mStyleSet->AsServo()->StartStyling(GetPresContext());
+  }
+
   // Get the root frame from the frame manager
   // XXXbz it would be nice to move this somewhere else... like frame manager
   // Init(), say.  But we need to make sure our views are all set up by the
@@ -2892,12 +2896,8 @@ PresShell::RecreateFramesFor(nsIContent* aContent)
   // Mark ourselves as not safe to flush while we're doing frame construction.
   ++mChangeNestCount;
   RestyleManagerHandle restyleManager = mPresContext->RestyleManager();
-  if (restyleManager->IsServo()) {
-    MOZ_CRASH("stylo: PresShell::RecreateFramesFor not implemented for Servo-"
-              "backed style system");
-  }
-  nsresult rv = restyleManager->AsGecko()->ProcessRestyledFrames(changeList);
-  restyleManager->AsGecko()->FlushOverflowChangedTracker();
+  nsresult rv = restyleManager->ProcessRestyledFrames(changeList);
+  restyleManager->FlushOverflowChangedTracker();
   --mChangeNestCount;
 
   return rv;
@@ -6824,14 +6824,16 @@ PresShell::UpdateActivePointerState(WidgetGUIEvent* aEvent)
     // In this case we have to know information about available mouse pointers
     if (WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent()) {
       gActivePointersIds->Put(mouseEvent->pointerId,
-                              new PointerInfo(false, mouseEvent->inputSource, true));
+                              new PointerInfo(false, mouseEvent->inputSource,
+                                              true));
     }
     break;
   case ePointerDown:
     // In this case we switch pointer to active state
     if (WidgetPointerEvent* pointerEvent = aEvent->AsPointerEvent()) {
       gActivePointersIds->Put(pointerEvent->pointerId,
-                              new PointerInfo(true, pointerEvent->inputSource, pointerEvent->isPrimary));
+                              new PointerInfo(true, pointerEvent->inputSource,
+                                              pointerEvent->mIsPrimary));
     }
     break;
   case ePointerUp:
@@ -6839,14 +6841,17 @@ PresShell::UpdateActivePointerState(WidgetGUIEvent* aEvent)
     if (WidgetPointerEvent* pointerEvent = aEvent->AsPointerEvent()) {
       if(pointerEvent->inputSource != nsIDOMMouseEvent::MOZ_SOURCE_TOUCH) {
         gActivePointersIds->Put(pointerEvent->pointerId,
-                                new PointerInfo(false, pointerEvent->inputSource, pointerEvent->isPrimary));
+                                new PointerInfo(false,
+                                                pointerEvent->inputSource,
+                                                pointerEvent->mIsPrimary));
       } else {
         gActivePointersIds->Remove(pointerEvent->pointerId);
       }
     }
     break;
   case eMouseExitFromWidget:
-    // In this case we have to remove information about disappeared mouse pointers
+    // In this case we have to remove information about disappeared mouse
+    // pointers
     if (WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent()) {
       gActivePointersIds->Remove(mouseEvent->pointerId);
     }
@@ -7128,8 +7133,11 @@ DispatchPointerFromMouseOrTouch(PresShell* aShell,
   EventMessage pointerMessage = eVoidEvent;
   if (aEvent->mClass == eMouseEventClass) {
     WidgetMouseEvent* mouseEvent = aEvent->AsMouseEvent();
-    // if it is not mouse then it is likely will come as touch event
-    if (!mouseEvent->convertToPointer) {
+    // 1. If it is not mouse then it is likely will come as touch event
+    // 2. We don't synthesize pointer events for those events that are not
+    //    dispatched to DOM.
+    if (!mouseEvent->convertToPointer ||
+        !aEvent->IsAllowedToDispatchDOMEvent()) {
       return NS_OK;
     }
     int16_t button = mouseEvent->button;
@@ -7187,12 +7195,12 @@ DispatchPointerFromMouseOrTouch(PresShell* aShell,
 
       WidgetPointerEvent event(touchEvent->IsTrusted(), pointerMessage,
                                touchEvent->mWidget);
-      event.isPrimary = i == 0;
+      event.mIsPrimary = i == 0;
       event.pointerId = touch->Identifier();
       event.mRefPoint = touch->mRefPoint;
       event.mModifiers = touchEvent->mModifiers;
-      event.width = touch->RadiusX();
-      event.height = touch->RadiusY();
+      event.mWidth = touch->RadiusX();
+      event.mHeight = touch->RadiusY();
       event.tiltX = touch->tiltX;
       event.tiltY = touch->tiltY;
       event.mTime = touchEvent->mTime;

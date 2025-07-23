@@ -234,7 +234,7 @@ TEST_F(ImageDeinterlacingFilter, WritePixelsNonProgressiveOutput51_52)
     // Check that the generated image is correct. As mentioned above, we expect
     // even rows to be green and odd rows to be red.
     RawAccessFrameRef currentFrame = aDecoder->GetCurrentFrameRef();
-    RefPtr<SourceSurface> surface = currentFrame->GetSurface();
+    RefPtr<SourceSurface> surface = currentFrame->GetSourceSurface();
 
     for (uint32_t row = 0; row < 52; ++row) {
       EXPECT_TRUE(RowsAreSolidColor(surface, row, 1,
@@ -308,7 +308,7 @@ TEST_F(ImageDeinterlacingFilter, WritePixelsOutput20_20)
     // Check that the generated image is correct. As mentioned above, we expect
     // even rows to be green and odd rows to be red.
     RawAccessFrameRef currentFrame = aDecoder->GetCurrentFrameRef();
-    RefPtr<SourceSurface> surface = currentFrame->GetSurface();
+    RefPtr<SourceSurface> surface = currentFrame->GetSourceSurface();
 
     for (uint32_t row = 0; row < 20; ++row) {
       EXPECT_TRUE(RowsAreSolidColor(surface, row, 1,
@@ -369,7 +369,7 @@ TEST_F(ImageDeinterlacingFilter, WritePixelsOutput7_7)
     // Check that the generated image is correct. As mentioned above, we expect
     // two green rows, followed by two red rows, then two green rows, etc.
     RawAccessFrameRef currentFrame = aDecoder->GetCurrentFrameRef();
-    RefPtr<SourceSurface> surface = currentFrame->GetSurface();
+    RefPtr<SourceSurface> surface = currentFrame->GetSourceSurface();
 
     for (uint32_t row = 0; row < 7; ++row) {
       BGRAColor color = row == 0 || row == 1 || row == 4 || row == 5
@@ -423,7 +423,7 @@ TEST_F(ImageDeinterlacingFilter, WritePixelsOutput3_3)
     // Check that the generated image is correct. As mentioned above, we expect
     // green, red, green in that order.
     RawAccessFrameRef currentFrame = aDecoder->GetCurrentFrameRef();
-    RefPtr<SourceSurface> surface = currentFrame->GetSurface();
+    RefPtr<SourceSurface> surface = currentFrame->GetSourceSurface();
 
     for (uint32_t row = 0; row < 3; ++row) {
       EXPECT_TRUE(RowsAreSolidColor(surface, row, 1,
@@ -453,7 +453,7 @@ TEST_F(ImageDeinterlacingFilter, WritePixelsOutput1_1)
     // Check that the generated image is correct. As mentioned above, we expect
     // a single red row.
     RawAccessFrameRef currentFrame = aDecoder->GetCurrentFrameRef();
-    RefPtr<SourceSurface> surface = currentFrame->GetSurface();
+    RefPtr<SourceSurface> surface = currentFrame->GetSourceSurface();
 
     EXPECT_TRUE(RowsAreSolidColor(surface, 0, 1, BGRAColor::Red()));
   });
@@ -494,7 +494,7 @@ WriteRowAndCheckInterlacerOutput(Decoder* aDecoder,
   // may involve copying previously-written rows in the buffer to the output
   // even though they don't change in this pass.
   RawAccessFrameRef currentFrame = aDecoder->GetCurrentFrameRef();
-  RefPtr<SourceSurface> surface = currentFrame->GetSurface();
+  RefPtr<SourceSurface> surface = currentFrame->GetSourceSurface();
 
   for (uint32_t row = aFirstHaeberliRow; row <= aLastHaeberliRow; ++row) {
     EXPECT_TRUE(RowsAreSolidColor(surface, row, 1, aColor));
@@ -571,7 +571,7 @@ TEST_F(ImageDeinterlacingFilter, WritePixelsIntermediateOutput7_7)
     // Check that the generated image is correct. As mentioned above, we expect
     // two green rows, followed by two red rows, then two green rows, etc.
     RawAccessFrameRef currentFrame = aDecoder->GetCurrentFrameRef();
-    RefPtr<SourceSurface> surface = currentFrame->GetSurface();
+    RefPtr<SourceSurface> surface = currentFrame->GetSourceSurface();
 
     for (uint32_t row = 0; row < 7; ++row) {
       BGRAColor color = row == 0 || row == 1 || row == 4 || row == 5
@@ -652,7 +652,7 @@ TEST_F(ImageDeinterlacingFilter, WritePixelsNonProgressiveIntermediateOutput7_7)
     // Check that the generated image is correct. As mentioned above, we expect
     // two green rows, followed by two red rows, then two green rows, etc.
     RawAccessFrameRef currentFrame = aDecoder->GetCurrentFrameRef();
-    RefPtr<SourceSurface> surface = currentFrame->GetSurface();
+    RefPtr<SourceSurface> surface = currentFrame->GetSourceSurface();
 
     for (uint32_t row = 0; row < 7; ++row) {
       BGRAColor color = row == 0 || row == 1 || row == 4 || row == 5

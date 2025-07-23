@@ -171,6 +171,12 @@ types.addDictType("idbstoreobject", {
   data: "array:nullable:idbobject"
 });
 
+// Result of Indexed DB delete operation: can block or throw error
+types.addDictType("idbdeleteresult", {
+  blocked: "nullable:boolean",
+  error: "nullable:string"
+});
+
 createStorageSpec({
   typeName: "indexedDB",
   storeObjectType: "idbstoreobject",
@@ -180,8 +186,22 @@ createStorageSpec({
         host: Arg(0, "string"),
         name: Arg(1, "string"),
       },
+      response: RetVal("idbdeleteresult")
+    },
+    removeAll: {
+      request: {
+        host: Arg(0, "string"),
+        name: Arg(1, "string"),
+      },
       response: {}
-    }
+    },
+    removeItem: {
+      request: {
+        host: Arg(0, "string"),
+        name: Arg(1, "string"),
+      },
+      response: {}
+    },
   }
 });
 

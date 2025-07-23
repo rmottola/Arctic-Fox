@@ -3,20 +3,21 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
-var { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
 var promise = require("promise");
+var defer = require("devtools/shared/defer");
 
 DevToolsUtils.testing = true;
 
-function waitUntilState (store, predicate) {
-  let deferred = promise.defer();
+function waitUntilState(store, predicate) {
+  let deferred = defer();
   let unsubscribe = store.subscribe(check);
 
-  function check () {
+  function check() {
     if (predicate(store.getState())) {
       unsubscribe();
-      deferred.resolve()
+      deferred.resolve();
     }
   }
 

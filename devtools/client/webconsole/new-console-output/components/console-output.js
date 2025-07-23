@@ -12,6 +12,7 @@ const {
 const ReactDOM = require("devtools/client/shared/vendor/react-dom");
 const { connect } = require("devtools/client/shared/vendor/react-redux");
 
+const { getAllMessages } = require("devtools/client/webconsole/new-console-output/selectors/messages");
 const MessageContainer = createFactory(require("devtools/client/webconsole/new-console-output/components/message-container").MessageContainer);
 
 const ConsoleOutput = createClass({
@@ -26,8 +27,7 @@ const ConsoleOutput = createClass({
   displayName: "ConsoleOutput",
 
   componentWillUpdate() {
-    // @TODO Move this to a parent component.
-    let node = ReactDOM.findDOMNode(this).parentNode.parentNode.parentNode;
+    let node = ReactDOM.findDOMNode(this);
     if (node.lastChild) {
       this.shouldScrollBottom = isScrolledToBottom(node.lastChild, node);
     }
@@ -35,19 +35,19 @@ const ConsoleOutput = createClass({
 
   componentDidUpdate() {
     if (this.shouldScrollBottom) {
-      let node = ReactDOM.findDOMNode(this).parentNode.parentNode.parentNode;
+      let node = ReactDOM.findDOMNode(this);
       node.scrollTop = node.scrollHeight;
     }
   },
 
   render() {
-    let messageNodes = this.props.messages.map(function(message) {
+    let messageNodes = this.props.messages.map(function (message) {
       return (
         MessageContainer({ message })
       );
     });
     return (
-      dom.div({}, messageNodes)
+      dom.div({className: "webconsole-output"}, messageNodes)
     );
   }
 });
@@ -61,7 +61,7 @@ function isScrolledToBottom(outputNode, scrollNode) {
 
 function mapStateToProps(state) {
   return {
-    messages: state.messages
+    messages: getAllMessages(state)
   };
 }
 

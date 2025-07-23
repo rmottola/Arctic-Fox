@@ -97,7 +97,7 @@
     cursor: n-resize;
   }
 
-  .devtools-responsive-container > .devtools-sidebar-tabs:not([pane-collapsed]) {
+  .devtools-responsive-container > .devtools-sidebar-tabs:not(.pane-collapsed) {
     /* When the panel is collapsed min/max height should not be applied because
        collapsing relies on negative margins, which implies constant height. */
     min-height: 35vh;
@@ -249,6 +249,15 @@
   color: hsl(210,30%,85%);
 }
 
+.breadcrumbs-widget-item:-moz-focusring {
+  outline: none;
+}
+
+.breadcrumbs-widget-item[checked]:-moz-focusring > .button-box {
+  outline: var(--theme-focus-outline);
+  outline-offset: -1px;
+}
+
 .breadcrumbs-widget-item > .button-box {
   border: none;
   padding-top: 0;
@@ -342,6 +351,7 @@
 .theme-firebug .breadcrumbs-widget-item {
   margin-inline-start: 10px;
   margin-inline-end: 1px;
+  background-image: none;
   border: 1px solid transparent;
   color: #141414;
   border-radius: 2px;
@@ -353,9 +363,9 @@
 
 .theme-firebug .breadcrumbs-widget-item:hover {
   border-color: rgba(0, 0, 0, 0.2);
-  background-image: transparent linear-gradient(
-                    rgba(255, 255, 255, 0.4),
-                    rgba(255, 255, 255, 0.2)) no-repeat;
+  background: transparent linear-gradient(
+              rgba(255, 255, 255, 0.4),
+              rgba(255, 255, 255, 0.2)) no-repeat;
   box-shadow: 1px 1px 1px rgba(255, 255, 255, 0.6) inset,
               0 0 1px rgba(255, 255, 255, 0.6) inset,
               0 0 2px rgba(0, 0, 0, 0.05);
@@ -616,6 +626,12 @@ widgets.css is overwritten. */
   border-top-width: 1px;
   border-top-style: solid;
   margin-top: -1px;
+}
+
+/* Custom scope stylings */
+
+.variables-view-watch-expressions .title > .name  {
+  max-width: 14em;
 }
 
 .theme-firebug .variables-view-scope > .title {
@@ -929,13 +945,22 @@ widgets.css is overwritten. */
 
 .line-graph-widget-gutter {
   position: absolute;
-  background: rgba(255,255,255,0.75);
   width: 10px;
   height: 100%;
   top: 0;
   left: 0;
-  border-right: 1px solid rgba(255,255,255,0.25);
   pointer-events: none;
+  border-inline-end: 1px solid;
+}
+
+.theme-light .line-graph-widget-gutter {
+  background: rgba(255,255,255,0.75);
+  border-inline-end-color: rgba(255,255,255,0.25);
+}
+
+.theme-dark .line-graph-widget-gutter {
+  background: rgba(0,0,0,0.5);
+  border-inline-end-color: rgba(0,0,0,0.25);
 }
 
 .line-graph-widget-gutter-line {
@@ -958,15 +983,22 @@ widgets.css is overwritten. */
 
 .line-graph-widget-tooltip {
   position: absolute;
-  background: rgba(255,255,255,0.9);
   border-radius: 2px;
   line-height: 15px;
   padding-inline-start: 6px;
   padding-inline-end: 6px;
   transform: translateY(-50%);
-  font-size: 80%;
+  font-size: 0.8rem !important;
   z-index: 1;
   pointer-events: none;
+}
+
+.theme-light .line-graph-widget-tooltip {
+  background: rgba(255,255,255,0.75);
+}
+
+.theme-dark .line-graph-widget-tooltip {
+  background: rgba(0,0,0,0.5);
 }
 
 .line-graph-widget-tooltip[with-arrows=true]::before {
@@ -978,13 +1010,29 @@ widgets.css is overwritten. */
 }
 
 .line-graph-widget-tooltip[arrow=start][with-arrows=true]::before {
-  border-inline-end: 3px solid rgba(255,255,255,0.75);
+  border-inline-end: 3px solid;
   left: -3px;
 }
 
 .line-graph-widget-tooltip[arrow=end][with-arrows=true]::before {
-  border-inline-start: 3px solid rgba(255,255,255,0.75);
+  border-inline-start: 3px solid;
   right: -3px;
+}
+
+.theme-light .line-graph-widget-tooltip[arrow=start][with-arrows=true]::before {
+  border-inline-end-color: rgba(255,255,255,0.75);
+}
+
+.theme-dark .line-graph-widget-tooltip[arrow=start][with-arrows=true]::before {
+  border-inline-end-color: rgba(0,0,0,0.5);
+}
+
+.theme-light .line-graph-widget-tooltip[arrow=end][with-arrows=true]::before {
+  border-inline-start-color: rgba(255,255,255,0.75);
+}
+
+.theme-dark .line-graph-widget-tooltip[arrow=end][with-arrows=true]::before {
+  border-inline-start-color: rgba(0,0,0,0.5);
 }
 
 .line-graph-widget-tooltip[type=maximum] {
@@ -1000,7 +1048,7 @@ widgets.css is overwritten. */
 }
 
 .line-graph-widget-tooltip > [text=info] {
-  color: #18191a;
+  color: var(--theme-content-color1);
 }
 
 .line-graph-widget-tooltip > [text=value] {
@@ -1009,27 +1057,35 @@ widgets.css is overwritten. */
 
 .line-graph-widget-tooltip > [text=metric] {
   margin-inline-start: 1px;
-  color: #667380;
+  color: var(--theme-content-color3);
 }
 
-.line-graph-widget-tooltip > [text=value],
-.line-graph-widget-tooltip > [text=metric] {
-  text-shadow: 1px  0px rgba(255,255,255,0.6),
-              -1px  0px rgba(255,255,255,0.6),
-               0px -1px rgba(255,255,255,0.6),
-               0px  1px rgba(255,255,255,0.6);
+.theme-light .line-graph-widget-tooltip > [text=value],
+.theme-light .line-graph-widget-tooltip > [text=metric] {
+  text-shadow: 1px  0px rgba(255,255,255,0.5),
+              -1px  0px rgba(255,255,255,0.5),
+               0px -1px rgba(255,255,255,0.5),
+               0px  1px rgba(255,255,255,0.5);
+}
+
+.theme-dark .line-graph-widget-tooltip > [text=value],
+.theme-dark .line-graph-widget-tooltip > [text=metric] {
+  text-shadow: 1px  0px rgba(0,0,0,0.5),
+              -1px  0px rgba(0,0,0,0.5),
+               0px -1px rgba(0,0,0,0.5),
+               0px  1px rgba(0,0,0,0.5);
 }
 
 .line-graph-widget-tooltip[type=maximum] > [text=value] {
-  color: #2cbb0f;
+  color: var(--theme-highlight-green);
 }
 
 .line-graph-widget-tooltip[type=minimum] > [text=value] {
-  color: #ed2655;
+  color: var(--theme-highlight-red);
 }
 
 .line-graph-widget-tooltip[type=average] > [text=value] {
-  color: #d97e00;
+  color: var(--theme-highlight-orange);
 }
 
 /* Bar graph widget */
@@ -1249,7 +1305,7 @@ widgets.css is overwritten. */
 }
 
 .table-widget-column-header:not([sorted]):hover {
-  background-image: linear-gradient(rgba(0,0,0,0.10),rgba(0,0,0,0.10));
+  background-image: linear-gradient(rgba(0,0,0,0.1),rgba(0,0,0,0.1));
 }
 
 .table-widget-column-header[sorted] {
@@ -1261,15 +1317,15 @@ widgets.css is overwritten. */
 }
 
 .table-widget-column-header[sorted]:-moz-locale-dir(rtl) {
-  background-position: left 6px center;
+  background-position: 6px center;
 }
 
 .table-widget-column-header[sorted=ascending] {
-  background-image: url("chrome://global/skin/devtools/sort-arrows.svg#ascending");
+  background-image: url("chrome://devtools/skin/images/sort-arrows.svg#ascending");
 }
 
 .table-widget-column-header[sorted=descending] {
-  background-image: url("chrome://global/skin/devtools/sort-arrows.svg#descending");
+  background-image: url("chrome://devtools/skin/images/sort-arrows.svg#descending");
 }
 
 .theme-dark .table-widget-column[readonly] {
@@ -1278,6 +1334,45 @@ widgets.css is overwritten. */
 
 .theme-light .table-widget-column[readonly] {
   background-color: rgba(0,0,0,0.1);
+}
+
+.table-widget-body .devtools-side-splitter:last-of-type {
+  display: none;
+}
+
+/* Firebug theme support for table widget */
+
+.theme-firebug .devtools-toolbar.table-widget-column-header {
+  font-family: var(--proportional-font-family);
+  color: var(--theme-body-color);
+
+  /* Make sure to override the default Firebug devtools-toolbar height */
+  height: 19px !important;
+
+  /* Make sure to override the dafault .table-widget-column-header font-weight and background */
+  font-weight: bold !important;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.05));
+  background-color: #C8D2DC !important;
+
+  /* Vertically center header label */
+  padding-top: 2px !important;
+}
+
+.theme-firebug .devtools-toolbar.table-widget-column-header[sorted] {
+  background-color: #AAC3DC !important;
+}
+
+.theme-firebug .devtools-toolbar.table-widget-column-header:hover:active {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.1),
+                                    transparent);
+}
+
+.theme-firebug .devtools-toolbar.table-widget-column-header[sorted=descending]:not(:active) {
+  background-image: url(chrome://devtools/skin/images/firebug/arrow-down.svg);
+}
+
+.theme-firebug .devtools-toolbar.table-widget-column-header[sorted=ascending]:not(:active) {
+  background-image: url(chrome://devtools/skin/images/firebug/arrow-up.svg);
 }
 
 /* Cells */

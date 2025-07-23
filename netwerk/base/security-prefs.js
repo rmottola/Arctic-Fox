@@ -32,8 +32,6 @@ pref("security.ssl3.dhe_rsa_camellia_128_sha", true); //FS Camellia
 pref("security.ssl3.dhe_rsa_camellia_256_sha", true); //FS Camellia
 pref("security.ssl3.rsa_aes_256_gcm_sha384", true);
 pref("security.ssl3.rsa_aes_256_sha256", true);
-pref("security.ssl3.rsa_aes_128_gcm_sha256", false);
-pref("security.ssl3.rsa_aes_128_sha256", false);
 pref("security.ssl3.rsa_aes_128_sha", true);
 pref("security.ssl3.rsa_camellia_128_sha", true);
 pref("security.ssl3.rsa_aes_256_sha", true);
@@ -41,7 +39,6 @@ pref("security.ssl3.rsa_camellia_256_sha", true);
 
 // Cipher suites disabled by default                   //Reason:
 pref("security.ssl3.ecdhe_rsa_des_ede3_sha", false);   //3DES
-pref("security.ssl3.rsa_fips_des_ede3_sha", false);    //FIPS,3DES
 pref("security.ssl3.dhe_rsa_des_ede3_sha", false);     //3DES
 pref("security.ssl3.dhe_dss_camellia_256_sha", false); //DHE+DSS
 pref("security.ssl3.dhe_dss_camellia_128_sha", false); //DHE+DSS
@@ -49,15 +46,6 @@ pref("security.ssl3.dhe_dss_aes_128_sha", false);      //DHE+DSS
 pref("security.ssl3.dhe_dss_aes_256_sha", false);      //DHE+DSS
 pref("security.ssl3.dhe_rsa_aes_128_sha", false);      //DHE+RSA
 pref("security.ssl3.dhe_rsa_aes_256_sha", false);      //DHE+RSA
-pref("security.ssl3.ecdh_ecdsa_aes_256_sha", false);   //Non-ephemeral
-pref("security.ssl3.ecdh_ecdsa_aes_128_sha", false);   //Non-ephemeral
-pref("security.ssl3.ecdh_ecdsa_des_ede3_sha", false);  //Non-ephemeral,3DES
-pref("security.ssl3.ecdh_ecdsa_rc4_128_sha", false);   //Non-ephemeral,RC4
-pref("security.ssl3.ecdh_rsa_aes_256_sha", false);     //Non-ephemeral
-pref("security.ssl3.ecdh_rsa_aes_128_sha", false);     //Non-ephemeral
-pref("security.ssl3.ecdh_rsa_des_ede3_sha", false);    //Non-ephemeral,3DES
-pref("security.ssl3.ecdh_rsa_rc4_128_sha", false);     //Non-ephemeral,RC4
-pref("security.ssl3.rsa_seed_sha", false);             //In disuse
 pref("security.ssl3.rsa_des_ede3_sha", false);         //3DES
 
 pref("security.default_personal_cert",   "Ask Every Time");
@@ -110,3 +98,8 @@ pref("security.webauth.u2f_enable_usbtoken", false);
 pref("security.ssl.errorReporting.enabled", false);
 pref("security.ssl.errorReporting.url", "https://data.mozilla.com/submit/sslreports");
 pref("security.ssl.errorReporting.automatic", false);
+
+// Impose a maximum age on HPKP headers, to avoid sites getting permanently
+// blacking themselves out by setting a bad pin.  (60 days by default)
+// https://tools.ietf.org/html/rfc7469#section-4.1
+pref("security.cert_pinning.max_max_age_seconds", 5184000);

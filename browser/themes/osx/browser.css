@@ -898,7 +898,7 @@ toolbar[brighttext] #bookmarks-menu-button.bookmark-item {
 #sync-button {
     -moz-image-region: rect(0, 270px, 18px, 252px);
 }
-#sync-button[status="active"] {
+#sync-button[syncstatus="active"] {
     list-style-image: url("chrome://browser/skin/sync-throbber.png");
     -moz-image-region: rect(0, 18px, 18px, 0);
 }
@@ -1390,37 +1390,17 @@ richlistitem[type~="action"][actiontype="searchengine"][selected="true"] > .ac-t
 /* Reader mode button */
 
 #reader-mode-button {
-  -moz-appearance: none;
-  padding: 0;
-  list-style-image: url("chrome://browser/skin/reader-mode-16.png");
+  list-style-image: url("chrome://browser/skin/readerMode.svg");
   -moz-image-region: rect(0, 16px, 16px, 0);
 }
 
-#reader-mode-button > .toolbarbutton-icon {
-  width: 16px;
+#reader-mode-button:hover:active {
+  -moz-image-region: rect(0, 32px, 16px, 16px);
 }
 
-#reader-mode-button:focus {
-  @hudButtonFocused@
-}
-
-#reader-mode-button:hover:active,
 #reader-mode-button[readeractive] {
-   -moz-image-region: rect(0, 32px, 16px, 16px);
+  -moz-image-region: rect(0, 48px, 16px, 32px);
 }
-
-@media (min-resolution: 2dppx) {
-  #reader-mode-button {
-    list-style-image: url("chrome://browser/skin/reader-mode-16@2x.png");
-    -moz-image-region: rect(0, 32px, 32px, 0);
-  }
-
-  #reader-mode-button:hover:active,
-  #reader-mode-button[readeractive] {
-    -moz-image-region: rect(0, 64px, 32px, 32px);
-  }
-}
-
 
 /* star button */
 
@@ -2269,13 +2249,6 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
 
 .gclitoolbar-input-node > .textbox-input-box > html|*.textbox-input::-moz-selection {
   color: hsl(210,11%,16%);
-}
-
-/* Developer Toolbar */
-
-#developer-toolbar-closebutton {
-  margin-left: 8px;
-  margin-right: 8px;
 }
 
 /* Error counter */

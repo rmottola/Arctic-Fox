@@ -80,15 +80,15 @@ GripProvider.prototype = {
     return object;
   },
 
-  getLabel: function(object) {
+  getLabel: function (object) {
     return (object instanceof Property) ? object.name : null;
   },
 
-  getKey: function(object) {
+  getKey: function (object) {
     return (object instanceof Property) ? object.key : null;
   },
 
-  getType: function(object) {
+  getType: function (object) {
     return object.class ? object.class : "";
   },
 };

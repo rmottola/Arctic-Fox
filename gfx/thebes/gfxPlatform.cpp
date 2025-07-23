@@ -8,6 +8,7 @@
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/SharedBufferManagerChild.h"
 #include "mozilla/layers/ISurfaceAllocator.h"     // for GfxMemoryImageReporter
+#include "mozilla/gfx/gfxVars.h"
 #include "mozilla/gfx/GPUProcessManager.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/Telemetry.h"
@@ -484,9 +485,7 @@ MemoryPressureObserver::Observe(nsISupports *aSubject,
 }
 
 gfxPlatform::gfxPlatform()
-  : mTileWidth(-1)
-  , mTileHeight(-1)
-  , mAzureCanvasBackendCollector(this, &gfxPlatform::GetAzureBackendInfo)
+  : mAzureCanvasBackendCollector(this, &gfxPlatform::GetAzureBackendInfo)
   , mApzSupportCollector(this, &gfxPlatform::GetApzSupportInfo)
   , mTilesInfoCollector(this, &gfxPlatform::GetTilesSupportInfo)
   , mCompositorBackend(layers::LayersBackend::LAYERS_NONE)
@@ -594,6 +593,7 @@ gfxPlatform::Init()
     // Initialize the preferences by creating the singleton.
     gfxPrefs::GetSingleton();
     MediaPrefs::GetSingleton();
+    gfxVars::Initialize();
 
     gfxConfig::Init();
 
@@ -873,6 +873,7 @@ gfxPlatform::Shutdown()
 
     delete gGfxPlatformPrefsLock;
 
+    gfxVars::Shutdown();
     gfxPrefs::DestroySingleton();
     gfxFont::DestroySingletons();
 
@@ -1006,7 +1007,9 @@ gfxPlatform::ClearSourceSurfaceForSurface(gfxASurface *aSurface)
 }
 
 /* static */ already_AddRefed<SourceSurface>
-gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurface)
+gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget,
+                                        gfxASurface *aSurface,
+                                        bool aIsPlugin)
 {
   if (!aSurface->CairoSurface() || aSurface->CairoStatus()) {
     return nullptr;
@@ -1064,7 +1067,9 @@ gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurfa
     // the same data, then optimize it for aTarget:
     RefPtr<DataSourceSurface> surf = GetWrappedDataSourceSurface(aSurface);
     if (surf) {
-      srcBuffer = aTarget->OptimizeSourceSurface(surf);
+      srcBuffer = aIsPlugin ? aTarget->OptimizeSourceSurfaceForUnknownAlpha(surf)
+                            : aTarget->OptimizeSourceSurface(surf);
+
       if (srcBuffer == surf) {
         // GetWrappedDataSourceSurface returns a SourceSurface that holds a
         // strong reference to aSurface since it wraps aSurface's data and
@@ -1159,32 +1164,6 @@ gfxPlatform::GetScaledFontForFont(DrawTarget* aTarget, gfxFont *aFont)
                                                 aFont->GetAdjustedSize());
 }
 
-int
-gfxPlatform::GetTileWidth()
-{
-  MOZ_ASSERT(mTileWidth != -1);
-  return mTileWidth;
-}
-
-int
-gfxPlatform::GetTileHeight()
-{
-  MOZ_ASSERT(mTileHeight != -1);
-  return mTileHeight;
-}
-
-void
-gfxPlatform::SetTileSize(int aWidth, int aHeight)
-{
-  // Don't allow changing the tile size after we've set it.
-  // Right now the code assumes that the tile size doesn't change.
-  MOZ_ASSERT((mTileWidth == -1 && mTileHeight == -1) ||
-    (mTileWidth == aWidth && mTileHeight == aHeight));
-
-  mTileWidth = aWidth;
-  mTileHeight = aHeight;
-}
-
 void
 gfxPlatform::ComputeTileSize()
 {
@@ -1203,7 +1182,7 @@ gfxPlatform::ComputeTileSize()
       // Choose a size so that there are between 2 and 4 tiles per screen width.
       // FIXME: we should probably make sure this is within the max texture size,
       // but I think everything should at least support 1024
-      w = h = clamped(NextPowerOfTwo(screenSize.width) / 4, 256, 1024);
+      w = h = clamped(int32_t(RoundUpPow2(screenSize.width)) / 4, 256, 1024);
     }
 
 #ifdef MOZ_WIDGET_GONK
@@ -1219,7 +1198,12 @@ gfxPlatform::ComputeTileSize()
 #endif
   }
 
-  SetTileSize(w, h);
+  // Don't allow changing the tile size after we've set it.
+  // Right now the code assumes that the tile size doesn't change.
+  MOZ_ASSERT(gfxVars::TileSize().width == -1 &&
+             gfxVars::TileSize().height == -1);
+
+  gfxVars::SetTileSize(IntSize(w, h));
 }
 
 void
@@ -1425,6 +1409,22 @@ gfxPlatform::CreateOffscreenContentDrawTarget(const IntSize& aSize, SurfaceForma
 {
   NS_ASSERTION(mPreferredCanvasBackend != BackendType::NONE, "No backend.");
   return CreateDrawTargetForBackend(mContentBackend, aSize, aFormat);
+}
+
+already_AddRefed<DrawTarget>
+gfxPlatform::CreateSimilarSoftwareDrawTarget(DrawTarget* aDT,
+                                             const IntSize& aSize,
+                                             SurfaceFormat aFormat)
+{
+  RefPtr<DrawTarget> dt;
+
+  if (Factory::DoesBackendSupportDataDrawtarget(aDT->GetBackendType())) {
+    dt = aDT->CreateSimilarDrawTarget(aSize, aFormat);
+  } else {
+    dt = Factory::CreateDrawTarget(BackendType::SKIA, aSize, aFormat);
+  }
+
+  return dt.forget();
 }
 
 already_AddRefed<DrawTarget>
@@ -1636,6 +1636,10 @@ gfxPlatform::InitBackendPrefs(uint32_t aCanvasBitmask, BackendType aCanvasDefaul
         // backends so we need to add the default if we are using it and
         // overriding the prefs.
         mContentBackendBitmask |= BackendTypeBit(aContentDefault);
+    }
+
+    if (XRE_IsParentProcess()) {
+        gfxVars::SetContentBackend(mContentBackend);
     }
 }
 
@@ -2083,7 +2087,6 @@ gfxPlatform::OptimalFormatForContent(gfxContentType aContent)
 static mozilla::Atomic<bool> sLayersSupportsHardwareVideoDecoding(false);
 static bool sLayersHardwareVideoDecodingFailed = false;
 static bool sBufferRotationCheckPref = true;
-static bool sPrefBrowserTabsRemoteAutostart = false;
 
 static mozilla::Atomic<bool> sLayersAccelerationPrefsInitialized(false);
 
@@ -2103,7 +2106,10 @@ gfxPlatform::InitAcceleration()
   MOZ_ASSERT(NS_IsMainThread(), "can only initialize prefs on the main thread");
 
   gfxPrefs::GetSingleton();
-  sPrefBrowserTabsRemoteAutostart = BrowserTabsRemoteAutostart();
+
+  if (XRE_IsParentProcess()) {
+    gfxVars::SetBrowserTabsRemoteAutostart(BrowserTabsRemoteAutostart());
+  }
 
   nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
   nsCString discardFailureId;
@@ -2245,7 +2251,7 @@ gfxPlatform::UsesOffMainThreadCompositing()
   if (firstTime) {
     MOZ_ASSERT(sLayersAccelerationPrefsInitialized);
     result =
-      sPrefBrowserTabsRemoteAutostart ||
+      gfxVars::BrowserTabsRemoteAutostart() ||
       !gfxPrefs::LayersOffMainThreadCompositionForceDisabled();
 #if defined(MOZ_WIDGET_GTK)
     // Linux users who chose OpenGL are being grandfathered in to OMTC
@@ -2268,7 +2274,6 @@ gfxPlatform::UsesOffMainThreadCompositing()
 already_AddRefed<mozilla::gfx::VsyncSource>
 gfxPlatform::CreateHardwareVsyncSource()
 {
-  NS_WARNING("Hardware Vsync support not yet implemented. Falling back to software timers");
   RefPtr<mozilla::gfx::VsyncSource> softwareVsync = new SoftwareVsyncSource();
   return softwareVsync.forget();
 }
@@ -2306,34 +2311,6 @@ gfxPlatform::GetDefaultFrameRate()
   return 60;
 }
 
-static nsString
-DetectBadApzWheelInputPrefs()
-{
-  static const char *sBadMultiplierPrefs[] = {
-    "mousewheel.default.delta_multiplier_x",
-    "mousewheel.with_alt.delta_multiplier_x",
-    "mousewheel.with_control.delta_multiplier_x",
-    "mousewheel.with_meta.delta_multiplier_x",
-    "mousewheel.with_shift.delta_multiplier_x",
-    "mousewheel.with_win.delta_multiplier_x",
-    "mousewheel.with_alt.delta_multiplier_y",
-    "mousewheel.with_control.delta_multiplier_y",
-    "mousewheel.with_meta.delta_multiplier_y",
-    "mousewheel.with_shift.delta_multiplier_y",
-    "mousewheel.with_win.delta_multiplier_y",
-  };
-
-  nsString badPref;
-  for (size_t i = 0; i < MOZ_ARRAY_LENGTH(sBadMultiplierPrefs); i++) {
-    if (Preferences::GetInt(sBadMultiplierPrefs[i], 100) != 100) {
-      badPref.AssignASCII(sBadMultiplierPrefs[i]);
-      break;
-    }
-  }
-
-  return badPref;
-}
-
 void
 gfxPlatform::GetApzSupportInfo(mozilla::widget::InfoObject& aObj)
 {
@@ -2342,12 +2319,7 @@ gfxPlatform::GetApzSupportInfo(mozilla::widget::InfoObject& aObj)
   }
 
   if (SupportsApzWheelInput()) {
-    nsString badPref = DetectBadApzWheelInputPrefs();
-
     aObj.DefineProperty("ApzWheelInput", 1);
-    if (badPref.Length()) {
-      aObj.DefineProperty("ApzWheelInputWarning", badPref);
-    }
   }
 
   if (SupportsApzTouchInput()) {
@@ -2366,8 +2338,9 @@ gfxPlatform::GetTilesSupportInfo(mozilla::widget::InfoObject& aObj)
     return;
   }
 
-  aObj.DefineProperty("TileHeight", mTileHeight);
-  aObj.DefineProperty("TileWidth", mTileWidth);
+  IntSize tileSize = gfxVars::TileSize();
+  aObj.DefineProperty("TileHeight", tileSize.height);
+  aObj.DefineProperty("TileWidth", tileSize.width);
 }
 
 /*static*/ bool
@@ -2527,6 +2500,12 @@ gfxPlatform::InitOpenGLConfig()
   if (!IsGfxInfoStatusOkay(nsIGfxInfo::FEATURE_OPENGL_LAYERS, &message, failureId)) {
     openGLFeature.Disable(FeatureStatus::Blacklisted, message.get(), failureId);
   }
+
+  // Ensure that an accelerated compositor backend is available when layers
+  // acceleration is force-enabled.
+  if (gfxPrefs::LayersAccelerationForceEnabledDoNotUseDirectly()) {
+    openGLFeature.UserForceEnable("Force-enabled by pref");
+  }
 }
 
 bool
@@ -2537,7 +2516,7 @@ gfxPlatform::IsGfxInfoStatusOkay(int32_t aFeature, nsCString* aOutMessage, nsCSt
     return true;
   }
 
-  int32_t status;    
+  int32_t status;
   if (NS_SUCCEEDED(gfxInfo->GetFeatureStatus(aFeature, aFailureId, &status)) &&
       status != nsIGfxInfo::FEATURE_STATUS_OK)
   {

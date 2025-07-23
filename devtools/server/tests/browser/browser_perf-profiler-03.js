@@ -8,10 +8,10 @@
  * addon was installed and automatically activated the profiler module).
  */
 
-const { PerformanceFront } = require("devtools/server/actors/performance");
+const { PerformanceFront } = require("devtools/shared/fronts/performance");
 const { PMM_isProfilerActive, PMM_startProfiler, PMM_stopProfiler, PMM_loadFrameScripts, PMM_clearFrameScripts } = require("devtools/client/performance/test/helpers/profiler-mm-utils");
 
-add_task(function*() {
+add_task(function* () {
   // Ensure the profiler is already running when the test starts.
   PMM_loadFrameScripts(gBrowser);
   let entries = 1000000;

@@ -24,9 +24,6 @@
 #include "mozilla/IMEStateManager.h"
 #include "mozilla/ipc/DocumentRendererChild.h"
 #include "mozilla/ipc/URIUtils.h"
-#ifdef MOZ_NUWA_PROCESS
-#include "ipc/Nuwa.h"
-#endif
 #include "mozilla/ipc/FileDescriptorUtils.h"
 #include "mozilla/layers/APZChild.h"
 #include "mozilla/layers/APZCCallbackHelper.h"
@@ -111,6 +108,7 @@
 #include "nsIScriptError.h"
 #include "mozilla/EventForwards.h"
 #include "nsDeviceContext.h"
+#include "nsSandboxFlags.h"
 #include "FrameLayerBuilder.h"
 
 #ifdef NS_PRINTING
@@ -455,41 +453,6 @@ PreloadSlowThingsPostFork(void* aUnused)
 
 }
 
-#ifdef MOZ_NUWA_PROCESS
-class MessageChannelAutoBlock MOZ_STACK_CLASS
-{
-public:
-    MessageChannelAutoBlock()
-    {
-        SetMessageChannelBlocked(true);
-    }
-
-    ~MessageChannelAutoBlock()
-    {
-        SetMessageChannelBlocked(false);
-    }
-
-private:
-    void SetMessageChannelBlocked(bool aBlock)
-    {
-        if (!IsNuwaProcess()) {
-            return;
-        }
-
-        mozilla::dom::ContentChild* content =
-            mozilla::dom::ContentChild::GetSingleton();
-        if (aBlock) {
-            content->GetIPCChannel()->Block();
-        } else {
-            content->GetIPCChannel()->Unblock();
-        }
-
-        // Other IPC channels do not perform the checks through Block() and
-        // Unblock().
-    }
-};
-#endif
-
 static bool sPreloaded = false;
 
 /*static*/ void
@@ -512,12 +475,6 @@ TabChild::PreloadSlowThings()
         return;
     }
 
-#ifdef MOZ_NUWA_PROCESS
-    // Temporarily block the IPC channels to the chrome process when we are
-    // preloading.
-    MessageChannelAutoBlock autoblock;
-#endif
-
     // Just load and compile these scripts, but don't run them.
     tab->TryCacheLoadAndCompileScript(BROWSER_ELEMENT_CHILD_SCRIPT, true);
     // Load, compile, and run these scripts.
@@ -528,15 +485,7 @@ TabChild::PreloadSlowThings()
     sPreallocatedTab = tab;
     ClearOnShutdown(&sPreallocatedTab);
 
-#ifdef MOZ_NUWA_PROCESS
-    if (IsNuwaProcess()) {
-        NuwaAddFinalConstructor(PreloadSlowThingsPostFork, nullptr);
-    } else {
-        PreloadSlowThingsPostFork(nullptr);
-    }
-#else
     PreloadSlowThingsPostFork(nullptr);
-#endif
 }
 
 /*static*/ already_AddRefed<TabChild>
@@ -880,6 +829,11 @@ TabChild::NotifyTabContextUpdated()
 
   UpdateFrameType();
   nsDocShell::Cast(docShell)->SetOriginAttributes(OriginAttributesRef());
+
+  // Set SANDBOXED_AUXILIARY_NAVIGATION flag if this is a receiver page.
+  if (!PresentationURL().IsEmpty()) {
+    docShell->SetSandboxFlags(SANDBOXED_AUXILIARY_NAVIGATION);
+  }
 }
 
 void
@@ -1743,9 +1697,8 @@ TabChild::HandleDoubleTap(const CSSPoint& aPoint, const Modifiers& aModifiers,
 
   // Note: there is nothing to do with the modifiers here, as we are not
   // synthesizing any sort of mouse event.
-  CSSPoint point = APZCCallbackHelper::ApplyCallbackTransform(aPoint, aGuid);
   nsCOMPtr<nsIDocument> document = GetDocument();
-  CSSRect zoomToRect = CalculateRectToZoomTo(document, point);
+  CSSRect zoomToRect = CalculateRectToZoomTo(document, aPoint);
   // The double-tap can be dispatched by any scroll frame (so |aGuid| could be
   // the guid of any scroll frame), but the zoom-to-rect operation must be
   // performed by the root content scroll frame, so query its identifiers
@@ -1762,25 +1715,35 @@ TabChild::HandleDoubleTap(const CSSPoint& aPoint, const Modifiers& aModifiers,
 
 void
 TabChild::HandleTap(GeckoContentController::TapType aType,
-                    const CSSPoint& aPoint, const Modifiers& aModifiers,
+                    const LayoutDevicePoint& aPoint, const Modifiers& aModifiers,
                     const ScrollableLayerGuid& aGuid, const uint64_t& aInputBlockId,
                     bool aCallTakeFocusForClickFromTap)
 {
+  nsCOMPtr<nsIPresShell> presShell = GetPresShell();
+  if (!presShell) {
+    return;
+  }
+  if (!presShell->GetPresContext()) {
+    return;
+  }
+  CSSToLayoutDeviceScale scale(presShell->GetPresContext()->CSSToDevPixelScale());
+  CSSPoint point = APZCCallbackHelper::ApplyCallbackTransform(aPoint / scale, aGuid);
+
   switch (aType) {
   case GeckoContentController::TapType::eSingleTap:
     if (aCallTakeFocusForClickFromTap && mRemoteFrame) {
       mRemoteFrame->SendTakeFocusForClickFromTap();
     }
     if (mGlobal && mTabChildGlobal) {
-      mAPZEventState->ProcessSingleTap(aPoint, aModifiers, aGuid);
+      mAPZEventState->ProcessSingleTap(point, scale, aModifiers, aGuid);
     }
     break;
   case GeckoContentController::TapType::eDoubleTap:
-    HandleDoubleTap(aPoint, aModifiers, aGuid);
+    HandleDoubleTap(point, aModifiers, aGuid);
     break;
   case GeckoContentController::TapType::eLongTap:
     if (mGlobal && mTabChildGlobal) {
-      mAPZEventState->ProcessLongTap(GetPresShell(), aPoint, aModifiers, aGuid,
+      mAPZEventState->ProcessLongTap(presShell, point, scale, aModifiers, aGuid,
           aInputBlockId);
     }
     break;

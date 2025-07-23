@@ -12,6 +12,7 @@
 
 var { executeSoon } = require("devtools/shared/DevToolsUtils");
 var promise = require("promise");
+var defer = require("devtools/shared/defer");
 var Services = require("Services");
 
 var asyncStackEnabled =
@@ -22,7 +23,7 @@ do_register_cleanup(() => {
                              asyncStackEnabled);
 });
 
-add_task(function*() {
+add_task(function* () {
   Services.prefs.setBoolPref("javascript.options.asyncstack", true);
 
   yield waitForTick();
@@ -41,7 +42,7 @@ add_task(function*() {
 });
 
 function waitForTick() {
-  let deferred = promise.defer();
+  let deferred = defer();
   executeSoon(deferred.resolve);
   return deferred.promise;
 }

@@ -610,10 +610,14 @@ browser/chrome/devtools/skin/images/vview-lock@2x.png
 browser/chrome/devtools/skin/themes/images/vview-lock@2x.png
 browser/chrome/devtools/skin/images/vview-edit@2x.png
 browser/chrome/devtools/skin/themes/images/vview-edit@2x.png
+browser/chrome/devtools/modules/devtools/client/dom/content/components/search.svg
+browser/chrome/devtools/modules/devtools/client/jsonview/css/search.svg
 browser/features/firefox@getpocket.com/chrome/skin/osx/pocket.css
 browser/features/firefox@getpocket.com/chrome/skin/osx/pocket.css.orig
 browser/features/firefox@getpocket.com/chrome/skin/windows/pocket.css
 browser/features/firefox@getpocket.com/chrome/skin/windows/pocket.css.orig
+browser/chrome/devtools/modules/devtools/client/themes/common.css
+browser/chrome/devtools/skin/common.css
 
 browser/chrome/devtools/content/inspector/layout/layout.js
 browser/chrome/devtools/modules/devtools/client/inspector/layout/layout.js
@@ -624,6 +628,10 @@ browser/chrome/browser/skin/classic/browser/identity-mixed-passive-loaded.svg
 browser/chrome/devtools/skin/images/security-state-weak.svg
 browser/chrome/browser/skin/classic/browser/identity-secure.svg
 browser/chrome/browser/skin/classic/browser/identity-not-secure.svg
+browser/chrome/devtools/modules/devtools/client/themes/audio/shutter.wav
+browser/chrome/devtools/modules/devtools/client/webconsole/utils.js
+browser/chrome/devtools/modules/devtools/server/actors/utils/webconsole-utils.js
+
 
 browser/chrome/browser/defaults/permissions
 browser/defaults/permissions

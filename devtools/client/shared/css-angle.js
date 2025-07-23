@@ -4,19 +4,18 @@
 
 "use strict";
 
-const {Cc, Ci} = require("chrome");
-
 const SPECIALVALUES = new Set([
   "initial",
   "inherit",
   "unset"
 ]);
 
+const {getCSSLexer} = require("devtools/shared/css-lexer");
+
 /**
  * This module is used to convert between various angle units.
  *
  * Usage:
- *   let {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
  *   let {angleUtils} = require("devtools/client/shared/css-angle");
  *   let angle = new angleUtils.CssAngle("180deg");
  *
@@ -68,7 +67,12 @@ CssAngle.prototype = {
   },
 
   get valid() {
-    return /^-?\d+\.?\d*(deg|rad|grad|turn)$/gi.test(this.authored);
+    let token = getCSSLexer(this.authored).nextToken();
+    if (!token) {
+      return false;
+    }
+    return (token.tokenType === "dimension"
+      && token.text.toLowerCase() in CssAngle.ANGLEUNIT);
   },
 
   get specialValue() {
@@ -226,7 +230,7 @@ CssAngle.prototype = {
    *         - If the angle is a regular angle e.g. 90deg so we return false
    *           to indicate that the angle is neither invalid nor special.
    */
-  _getInvalidOrSpecialValue: function() {
+  _getInvalidOrSpecialValue: function () {
     if (this.specialValue) {
       return this.specialValue;
     }
@@ -242,7 +246,7 @@ CssAngle.prototype = {
    * @param  {String} angle
    *         Any valid angle value + unit string
    */
-  newAngle: function(angle) {
+  newAngle: function (angle) {
     // Store a lower-cased version of the angle to help with format
     // testing.  The original text is kept as well so it can be
     // returned when needed.
@@ -259,7 +263,7 @@ CssAngle.prototype = {
     return this;
   },
 
-  nextAngleUnit: function() {
+  nextAngleUnit: function () {
     // Get a reordered array from the formats object
     // to have the current format at the front so we can cycle through.
     let formats = Object.keys(CssAngle.ANGLEUNIT);
@@ -279,7 +283,7 @@ CssAngle.prototype = {
   /**
    * Return a string representing a angle
    */
-  toString: function() {
+  toString: function () {
     let angle;
 
     switch (this.angleUnit) {
@@ -309,7 +313,7 @@ CssAngle.prototype = {
   /**
    * This method allows comparison of CssAngle objects using ===.
    */
-  valueOf: function() {
+  valueOf: function () {
     return this.deg;
   },
 };

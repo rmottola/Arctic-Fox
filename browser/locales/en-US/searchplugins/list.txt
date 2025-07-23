@@ -1,4 +1,4 @@
-duckduckgo-palemoon
+duckduckgo-arcticfox
 bing
 ecosia
 google

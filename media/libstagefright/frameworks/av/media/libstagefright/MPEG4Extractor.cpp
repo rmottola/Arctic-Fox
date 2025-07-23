@@ -37,7 +37,6 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
-#include <utils/String8.h>
 
 static const uint32_t kMAX_ALLOCATION =
     (SIZE_MAX < INT32_MAX ? SIZE_MAX : INT32_MAX) - 128;
@@ -885,6 +884,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 } else {
                     nonEmptyCount = true;
                 }
+
                 if (!mLastTrack) {
                   return ERROR_MALFORMED;
                 }
@@ -1754,14 +1754,11 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_IO;
             }
 
-            uint64_t creationTime;
             if (header[0] == 1) {
-                creationTime = U64_AT(&header[4]);
                 mHeaderTimescale = U32_AT(&header[20]);
             } else if (header[0] != 0) {
                 return ERROR_MALFORMED;
             } else {
-                creationTime = U32_AT(&header[4]);
                 mHeaderTimescale = U32_AT(&header[12]);
             }
 
@@ -1971,7 +1968,6 @@ void MPEG4Extractor::storeEditList()
   uint64_t segment_duration = (mLastTrack->segment_duration * 1000000) / mHeaderTimescale;
   // media_time is measured in media time scale units.
   int64_t media_time = (mLastTrack->media_time * 1000000) / mLastTrack->timescale;
-
   // empty_duration is in the Movie Header Box's timescale.
   int64_t empty_duration = (mLastTrack->empty_duration * 1000000) / mHeaderTimescale;
   media_time -= empty_duration;

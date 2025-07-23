@@ -2,21 +2,21 @@
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const {Cu} = require("chrome");
+"use strict";
 
 const Services = require("Services");
 const {AppManager} = require("devtools/client/webide/modules/app-manager");
 const EventEmitter = require("devtools/shared/event-emitter");
 const {RuntimeScanners, WiFiScanner} = require("devtools/client/webide/modules/runtimes");
-const {Devices} = Cu.import("resource://devtools/shared/apps/Devices.jsm");
-const {Task} = Cu.import("resource://gre/modules/Task.jsm", {});
+const {Devices} = require("resource://devtools/shared/apps/Devices.jsm");
+const {Task} = require("devtools/shared/task");
 const utils = require("devtools/client/webide/modules/utils");
 
 const Strings = Services.strings.createBundle("chrome://devtools/locale/webide.properties");
 
 var RuntimeList;
 
-module.exports = RuntimeList = function(window, parentWindow) {
+module.exports = RuntimeList = function (window, parentWindow) {
   EventEmitter.decorate(this);
   this._doc = window.document;
   this._UI = parentWindow.UI;
@@ -38,7 +38,7 @@ RuntimeList.prototype = {
     return this._doc;
   },
 
-  appManagerUpdate: function(event, what, details) {
+  appManagerUpdate: function (event, what, details) {
     // Got a message from app-manager.js
     // See AppManager.update() for descriptions of what these events mean.
     switch (what) {
@@ -49,48 +49,48 @@ RuntimeList.prototype = {
       case "runtime-global-actors":
         this.updateCommands();
         break;
-    };
+    }
   },
 
-  onWebIDEUpdate: function(event, what, details) {
+  onWebIDEUpdate: function (event, what, details) {
     if (what == "busy" || what == "unbusy") {
       this.updateCommands();
     }
   },
 
-  takeScreenshot: function() {
+  takeScreenshot: function () {
     this._Cmds.takeScreenshot();
   },
 
-  showRuntimeDetails: function() {
+  showRuntimeDetails: function () {
     this._Cmds.showRuntimeDetails();
   },
 
-  showPermissionsTable: function() {
+  showPermissionsTable: function () {
     this._Cmds.showPermissionsTable();
   },
 
-  showDevicePreferences: function() {
+  showDevicePreferences: function () {
     this._Cmds.showDevicePrefs();
   },
 
-  showSettings: function() {
+  showSettings: function () {
     this._Cmds.showSettings();
   },
 
-  showTroubleShooting: function() {
+  showTroubleShooting: function () {
     this._Cmds.showTroubleShooting();
   },
 
-  showAddons: function() {
+  showAddons: function () {
     this._Cmds.showAddons();
   },
 
-  refreshScanners: function() {
+  refreshScanners: function () {
     RuntimeScanners.scan();
   },
 
-  updateCommands: function() {
+  updateCommands: function () {
     let doc = this._doc;
 
     // Runtime commands
@@ -124,7 +124,7 @@ RuntimeList.prototype = {
     }
   },
 
-  update: function() {
+  update: function () {
     let doc = this._doc;
     let wifiHeaderNode = doc.querySelector("#runtime-header-wifi");
 
@@ -183,7 +183,7 @@ RuntimeList.prototype = {
         }, true);
         panelItemNode.appendChild(connectButton);
 
-        if (r.configure && this._UI.isRuntimeConfigurationEnabled()) {
+        if (r.configure) {
           let configButton = doc.createElement(this._panelNodeEl);
           configButton.className = "configure-button";
           configButton.addEventListener("click", r.configure.bind(r), true);
@@ -195,7 +195,7 @@ RuntimeList.prototype = {
     }
   },
 
-  destroy: function() {
+  destroy: function () {
     this._doc = null;
     AppManager.off("app-manager-update", this.appManagerUpdate);
     this._UI.off("webide-update", this.onWebIDEUpdate);

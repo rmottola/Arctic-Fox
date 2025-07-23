@@ -30,6 +30,7 @@
 #ifdef MOZ_FMP4
 #include "MP4Decoder.h"
 #endif
+#include "CubebUtils.h"
 
 #include "nsIScrollableFrame.h"
 
@@ -123,6 +124,51 @@ using namespace mozilla::gfx;
 
 class gfxContext;
 
+class OldWindowSize : public LinkedListElement<OldWindowSize>
+{
+public:
+  static void Set(nsIWeakReference* aWindowRef, const nsSize& aSize)
+  {
+    OldWindowSize* item = GetItem(aWindowRef);
+    if (item) {
+      item->mSize = aSize;
+    } else {
+      item = new OldWindowSize(aWindowRef, aSize);
+      sList.insertBack(item);
+    }
+  }
+
+  static nsSize GetAndRemove(nsIWeakReference* aWindowRef)
+  {
+    nsSize result;
+    if (OldWindowSize* item = GetItem(aWindowRef)) {
+      result = item->mSize;
+      delete item;
+    }
+    return result;
+  }
+
+private:
+  explicit OldWindowSize(nsIWeakReference* aWindowRef, const nsSize& aSize)
+    : mWindowRef(aWindowRef), mSize(aSize) { }
+  ~OldWindowSize() { };
+
+  static OldWindowSize* GetItem(nsIWeakReference* aWindowRef)
+  {
+    OldWindowSize* item = sList.getFirst();
+    while (item && item->mWindowRef != aWindowRef) {
+      item = item->getNext();
+    }
+    return item;
+  }
+
+  static LinkedList<OldWindowSize> sList;
+  nsWeakPtr mWindowRef;
+  nsSize mSize;
+};
+
+LinkedList<OldWindowSize> OldWindowSize::sList;
+
 NS_INTERFACE_MAP_BEGIN(nsDOMWindowUtils)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMWindowUtils)
   NS_INTERFACE_MAP_ENTRY(nsIDOMWindowUtils)
@@ -141,6 +187,7 @@ nsDOMWindowUtils::nsDOMWindowUtils(nsGlobalWindow *aWindow)
 
 nsDOMWindowUtils::~nsDOMWindowUtils()
 {
+  OldWindowSize::GetAndRemove(mWindow);
 }
 
 nsIPresShell*
@@ -601,14 +648,18 @@ nsDOMWindowUtils::SendMouseEvent(const nsAString& aType,
                                  bool aIgnoreRootScrollFrame,
                                  float aPressure,
                                  unsigned short aInputSourceArg,
-                                 bool aIsSynthesized,
+                                 bool aIsDOMEventSynthesized,
+                                 bool aIsWidgetEventSynthesized,
                                  uint8_t aOptionalArgCount,
                                  bool *aPreventDefault)
 {
   return SendMouseEventCommon(aType, aX, aY, aButton, aClickCount, aModifiers,
                               aIgnoreRootScrollFrame, aPressure,
                               aInputSourceArg, false, aPreventDefault,
-                              aOptionalArgCount >= 4 ? aIsSynthesized : true);
+                              aOptionalArgCount >= 4 ?
+                                aIsDOMEventSynthesized : true,
+                              aOptionalArgCount >= 5 ?
+                                aIsWidgetEventSynthesized : false);
 }
 
 NS_IMETHODIMP
@@ -621,7 +672,8 @@ nsDOMWindowUtils::SendMouseEventToWindow(const nsAString& aType,
                                          bool aIgnoreRootScrollFrame,
                                          float aPressure,
                                          unsigned short aInputSourceArg,
-                                         bool aIsSynthesized,
+                                         bool aIsDOMEventSynthesized,
+                                         bool aIsWidgetEventSynthesized,
                                          uint8_t aOptionalArgCount)
 {
   PROFILER_LABEL("nsDOMWindowUtils", "SendMouseEventToWindow",
@@ -630,7 +682,10 @@ nsDOMWindowUtils::SendMouseEventToWindow(const nsAString& aType,
   return SendMouseEventCommon(aType, aX, aY, aButton, aClickCount, aModifiers,
                               aIgnoreRootScrollFrame, aPressure,
                               aInputSourceArg, true, nullptr,
-                              aOptionalArgCount >= 4 ? aIsSynthesized : true);
+                              aOptionalArgCount >= 4 ?
+                                aIsDOMEventSynthesized : true,
+                              aOptionalArgCount >= 5 ?
+                                aIsWidgetEventSynthesized : false);
 }
 
 NS_IMETHODIMP
@@ -645,12 +700,14 @@ nsDOMWindowUtils::SendMouseEventCommon(const nsAString& aType,
                                        unsigned short aInputSourceArg,
                                        bool aToWindow,
                                        bool *aPreventDefault,
-                                       bool aIsSynthesized)
+                                       bool aIsDOMEventSynthesized,
+                                       bool aIsWidgetEventSynthesized)
 {
   nsCOMPtr<nsIPresShell> presShell = GetPresShell();
   return nsContentUtils::SendMouseEvent(presShell, aType, aX, aY, aButton,
       aClickCount, aModifiers, aIgnoreRootScrollFrame, aPressure,
-      aInputSourceArg, aToWindow, aPreventDefault, aIsSynthesized);
+      aInputSourceArg, aToWindow, aPreventDefault, aIsDOMEventSynthesized,
+      aIsWidgetEventSynthesized);
 }
 
 NS_IMETHODIMP
@@ -707,11 +764,12 @@ nsDOMWindowUtils::SendPointerEventCommon(const nsAString& aType,
   event.pressure = aPressure;
   event.inputSource = aInputSourceArg;
   event.pointerId = aPointerId;
-  event.width = aWidth;
-  event.height = aHeight;
+  event.mWidth = aWidth;
+  event.mHeight = aHeight;
   event.tiltX = aTiltX;
   event.tiltY = aTiltY;
-  event.isPrimary = (nsIDOMMouseEvent::MOZ_SOURCE_MOUSE == aInputSourceArg) ? true : aIsPrimary;
+  event.mIsPrimary =
+    (nsIDOMMouseEvent::MOZ_SOURCE_MOUSE == aInputSourceArg) ? true : aIsPrimary;
   event.mClickCount = aClickCount;
   event.mTime = PR_IntervalNow();
   event.mFlags.mIsSynthesizedForTests = aOptionalArgCount >= 10 ? aIsSynthesized : true;
@@ -2274,9 +2332,16 @@ nsDOMWindowUtils::GetSupportsHardwareH264Decoding(JS::MutableHandle<JS::Value> a
   if (rv.Failed()) {
     return rv.StealNSResult();
   }
-  promise.MaybeResolve(NS_LITERAL_STRING("No; Compiled without MP4 support."));
+  promise->MaybeResolve(NS_LITERAL_STRING("No; Compiled without MP4 support."));
   aPromise.setObject(*promise->PromiseObj());
 #endif
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::GetCurrentAudioBackend(nsAString& aBackend)
+{
+  CubebUtils::GetCurrentBackend(aBackend);
   return NS_OK;
 }
 
@@ -2754,7 +2819,7 @@ CheckLeafLayers(Layer* aLayer, const nsIntPoint& aOffset, nsIntRegion* aCoveredR
       transform.HasNonIntegerTranslation())
     return false;
   transform.NudgeToIntegers();
-  nsIntPoint offset = aOffset + nsIntPoint(transform._31, transform._32);
+  IntPoint offset = aOffset + IntPoint::Truncate(transform._31, transform._32);
 
   Layer* child = aLayer->GetFirstChild();
   if (child) {
@@ -3184,6 +3249,10 @@ PrepareForFullscreenChange(nsIPresShell* aPresShell, const nsSize& aSize,
   }
   if (nsRefreshDriver* rd = aPresShell->GetRefreshDriver()) {
     rd->SetIsResizeSuppressed();
+    // Since we are suppressing the resize reflow which would originally
+    // be triggered by view manager, we need to ensure that the refresh
+    // driver actually schedules a flush, otherwise it may get stuck.
+    rd->ScheduleViewManagerFlush();
   }
   if (!aSize.IsEmpty()) {
     if (nsViewManager* viewManager = aPresShell->GetViewManager()) {
@@ -3194,62 +3263,6 @@ PrepareForFullscreenChange(nsIPresShell* aPresShell, const nsSize& aSize,
     }
   }
 }
-
-class OldWindowSize : public LinkedListElement<OldWindowSize>
-{
-public:
-  static void Set(nsPIDOMWindowOuter* aWindow, const nsSize& aSize)
-  {
-    OldWindowSize* item = GetItem(aWindow);
-    if (item) {
-      item->mSize = aSize;
-    } else if (aWindow) {
-      item = new OldWindowSize(do_GetWeakReference(aWindow), aSize);
-      sList.insertBack(item);
-    }
-  }
-
-  static nsSize GetAndRemove(nsPIDOMWindowOuter* aWindow)
-  {
-    nsSize result;
-    if (OldWindowSize* item = GetItem(aWindow)) {
-      result = item->mSize;
-      delete item;
-    }
-    return result;
-  }
-
-private:
-  explicit OldWindowSize(already_AddRefed<nsIWeakReference>&& aWindow,
-                         const nsSize& aSize)
-    : mWindow(Move(aWindow)), mSize(aSize) { }
-  ~OldWindowSize() { };
-
-  static OldWindowSize* GetItem(nsPIDOMWindowOuter* aWindow)
-  {
-    OldWindowSize* item = sList.getFirst();
-    while (item) {
-      nsCOMPtr<nsPIDOMWindowOuter> window = do_QueryReferent(item->mWindow);
-      if (!window) {
-        OldWindowSize* thisItem = item;
-        item = thisItem->getNext();
-        delete thisItem;
-        continue;
-      }
-      if (window == aWindow) {
-        break;
-      }
-      item = item->getNext();
-    }
-    return item;
-  }
-
-  static LinkedList<OldWindowSize> sList;
-  nsWeakPtr mWindow;
-  nsSize mSize;
-};
-
-LinkedList<OldWindowSize> OldWindowSize::sList;
 
 NS_IMETHODIMP
 nsDOMWindowUtils::HandleFullscreenRequests(bool* aRetVal)
@@ -3268,7 +3281,7 @@ nsDOMWindowUtils::HandleFullscreenRequests(bool* aRetVal)
   }
   nsSize oldSize;
   PrepareForFullscreenChange(GetPresShell(), screenRect.Size(), &oldSize);
-  OldWindowSize::Set(doc->GetWindow(), oldSize);
+  OldWindowSize::Set(mWindow, oldSize);
 
   *aRetVal = nsIDocument::HandlePendingFullscreenRequests(doc);
   return NS_OK;
@@ -3283,7 +3296,7 @@ nsDOMWindowUtils::ExitFullscreen()
 
   // Although we would not use the old size if we have already exited
   // fullscreen, we still want to cleanup in case we haven't.
-  nsSize oldSize = OldWindowSize::GetAndRemove(doc->GetWindow());
+  nsSize oldSize = OldWindowSize::GetAndRemove(mWindow);
   if (!doc->GetFullscreenElement()) {
     return NS_OK;
   }

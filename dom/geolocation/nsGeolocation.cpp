@@ -78,8 +78,8 @@ class nsGeolocationRequest final
   NS_DECL_CYCLE_COLLECTION_CLASS_AMBIGUOUS(nsGeolocationRequest, nsIContentPermissionRequest)
 
   nsGeolocationRequest(Geolocation* aLocator,
-                       const GeoPositionCallback& aCallback,
-                       const GeoPositionErrorCallback& aErrorCallback,
+                       GeoPositionCallback aCallback,
+                       GeoPositionErrorCallback aErrorCallback,
                        PositionOptions* aOptions,
                        uint8_t aProtocolType,
                        bool aWatchPositionRequest = false,
@@ -295,15 +295,15 @@ PositionError::NotifyCallback(const GeoPositionErrorCallback& aCallback)
 ////////////////////////////////////////////////////
 
 nsGeolocationRequest::nsGeolocationRequest(Geolocation* aLocator,
-                                           const GeoPositionCallback& aCallback,
-                                           const GeoPositionErrorCallback& aErrorCallback,
+                                           GeoPositionCallback aCallback,
+                                           GeoPositionErrorCallback aErrorCallback,
                                            PositionOptions* aOptions,
                                            uint8_t aProtocolType,
                                            bool aWatchPositionRequest,
                                            int32_t aWatchId)
   : mIsWatchPositionRequest(aWatchPositionRequest),
-    mCallback(aCallback),
-    mErrorCallback(aErrorCallback),
+    mCallback(Move(aCallback)),
+    mErrorCallback(Move(aErrorCallback)),
     mOptions(aOptions),
     mLocator(aLocator),
     mWatchId(aWatchId),
@@ -1297,10 +1297,8 @@ Geolocation::GetCurrentPosition(PositionCallback& aCallback,
                                 const PositionOptions& aOptions,
                                 ErrorResult& aRv)
 {
-  GeoPositionCallback successCallback(&aCallback);
-  GeoPositionErrorCallback errorCallback(aErrorCallback);
-
-  nsresult rv = GetCurrentPosition(successCallback, errorCallback,
+  nsresult rv = GetCurrentPosition(GeoPositionCallback(&aCallback),
+                                   GeoPositionErrorCallback(aErrorCallback),
                                    CreatePositionOptionsCopy(aOptions));
 
   if (NS_FAILED(rv)) {
@@ -1317,15 +1315,13 @@ Geolocation::GetCurrentPosition(nsIDOMGeoPositionCallback* aCallback,
 {
   NS_ENSURE_ARG_POINTER(aCallback);
 
-  GeoPositionCallback successCallback(aCallback);
-  GeoPositionErrorCallback errorCallback(aErrorCallback);
-
-  return GetCurrentPosition(successCallback, errorCallback, aOptions);
+  return GetCurrentPosition(GeoPositionCallback(aCallback),
+                            GeoPositionErrorCallback(aErrorCallback), aOptions);
 }
 
 nsresult
-Geolocation::GetCurrentPosition(GeoPositionCallback& callback,
-                                GeoPositionErrorCallback& errorCallback,
+Geolocation::GetCurrentPosition(GeoPositionCallback callback,
+                                GeoPositionErrorCallback errorCallback,
                                 PositionOptions *options)
 {
   if (mPendingCallbacks.Length() > MAX_GEO_REQUESTS_PER_WINDOW) {
@@ -1337,7 +1333,7 @@ Geolocation::GetCurrentPosition(GeoPositionCallback& callback,
                         static_cast<uint8_t>(mProtocolType));
 
   RefPtr<nsGeolocationRequest> request =
-    new nsGeolocationRequest(this, callback, errorCallback, options,
+    new nsGeolocationRequest(this, Move(callback), Move(errorCallback), options,
                              static_cast<uint8_t>(mProtocolType), false);
 
   if (!sGeoEnabled) {
@@ -1381,10 +1377,8 @@ Geolocation::WatchPosition(PositionCallback& aCallback,
                            ErrorResult& aRv)
 {
   int32_t ret = 0;
-  GeoPositionCallback successCallback(&aCallback);
-  GeoPositionErrorCallback errorCallback(aErrorCallback);
-
-  nsresult rv = WatchPosition(successCallback, errorCallback,
+  nsresult rv = WatchPosition(GeoPositionCallback(&aCallback),
+                              GeoPositionErrorCallback(aErrorCallback),
                               CreatePositionOptionsCopy(aOptions), &ret);
 
   if (NS_FAILED(rv)) {
@@ -1402,15 +1396,14 @@ Geolocation::WatchPosition(nsIDOMGeoPositionCallback *aCallback,
 {
   NS_ENSURE_ARG_POINTER(aCallback);
 
-  GeoPositionCallback successCallback(aCallback);
-  GeoPositionErrorCallback errorCallback(aErrorCallback);
-
-  return WatchPosition(successCallback, errorCallback, aOptions, aRv);
+  return WatchPosition(GeoPositionCallback(aCallback),
+                       GeoPositionErrorCallback(aErrorCallback),
+                       aOptions, aRv);
 }
 
 nsresult
-Geolocation::WatchPosition(GeoPositionCallback& aCallback,
-                           GeoPositionErrorCallback& aErrorCallback,
+Geolocation::WatchPosition(GeoPositionCallback aCallback,
+                           GeoPositionErrorCallback aErrorCallback,
                            PositionOptions* aOptions,
                            int32_t* aRv)
 {
@@ -1426,8 +1419,9 @@ Geolocation::WatchPosition(GeoPositionCallback& aCallback,
   *aRv = mLastWatchId++;
 
   RefPtr<nsGeolocationRequest> request =
-    new nsGeolocationRequest(this, aCallback, aErrorCallback, aOptions,
-                             static_cast<uint8_t>(mProtocolType), true, *aRv);
+    new nsGeolocationRequest(this, Move(aCallback), Move(aErrorCallback),
+                             aOptions, static_cast<uint8_t>(mProtocolType),
+                             true, *aRv);
 
   if (!sGeoEnabled) {
     nsCOMPtr<nsIRunnable> ev = new RequestAllowEvent(false, request);

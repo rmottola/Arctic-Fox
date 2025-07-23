@@ -18,7 +18,7 @@ var { Toolbox } = require("devtools/client/framework/toolbox");
 var Services = require("Services");
 var { DebuggerClient } = require("devtools/shared/client/main");
 var { PrefsHelper } = require("devtools/client/shared/prefs");
-var { Task } = Cu.import("resource://gre/modules/Task.jsm", {});
+var { Task } = require("devtools/shared/task");
 
 /**
  * Shortcuts for accessing various debugger preferences.
@@ -62,6 +62,8 @@ function setPrefDefaults() {
   Services.prefs.setBoolPref("browser.dom.window.dump.enabled", true);
   Services.prefs.setBoolPref("devtools.command-button-noautohide.enabled", true);
   Services.prefs.setBoolPref("devtools.scratchpad.enabled", true);
+  // Bug 1225160 - Using source maps with browser debugging can lead to a crash
+  Services.prefs.setBoolPref("devtools.debugger.source-maps-enabled", false);
 }
 
 window.addEventListener("load", function() {

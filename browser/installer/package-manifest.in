@@ -104,7 +104,7 @@
 @BINPATH@/ucrtbase.dll
 #endif
 #endif
-#ifndef MOZ_SYSTEM_ICU
+#ifdef MOZ_ICU_DATA_ARCHIVE
 @RESPATH@/@ICU_DATA_FILE@
 #endif
 #ifdef MOZ_GTK3
@@ -448,6 +448,7 @@
 @RESPATH@/components/nsTaggingService.js
 @RESPATH@/components/UnifiedComplete.js
 @RESPATH@/components/nsPlacesExpiration.js
+@RESPATH@/components/PageIconProtocolHandler.js
 @RESPATH@/components/PlacesCategoriesStarter.js
 @RESPATH@/components/ColorAnalyzer.js
 @RESPATH@/components/PageThumbsProtocol.js

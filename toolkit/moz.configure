@@ -69,6 +69,19 @@ imply_option('--enable-profiling', dmd)
 imply_option('--enable-jemalloc', dmd)
 imply_option('--enable-replace-malloc', dmd)
 
+# JACK cubeb backend
+# ==============================================================
+option('--enable-jack', env='MOZ_JACK',
+       help='Enable JACK audio backend.')
+
+@depends('--enable-jack')
+def jack(value):
+    if value:
+        return True
+
+set_config('MOZ_JACK', jack)
+set_define('MOZ_JACK', jack)
+
 # Javascript engine
 # ==============================================================
 include('../js/moz.configure')
@@ -265,7 +278,7 @@ add_old_configure_assignment('USE_FC_FREETYPE', fc_freetype)
 
 # Apple platform decoder support
 # ==============================================================
-# We should perhaos use configure test on CoreMedia.h
+# We should perhaps use configure test on CoreMedia.h
 option('--disable-applemedia',
        help='Disable support Apple Media')
 
@@ -336,6 +349,35 @@ def fmp4(value, target, wmf, applemedia):
 set_config('MOZ_FMP4', fmp4)
 set_define('MOZ_FMP4', fmp4)
 add_old_configure_assignment('MOZ_FMP4', fmp4)
+
+# Apple AVFoundation and QT support
+# ==============================================================
+option('--enable-avfoundation',
+       help='Enable support for Apple AVFoundation')
+
+@depends('--enable-avfoundation', toolkit)
+def avfoundation(value, toolkit):
+    enabled = bool(value)
+    if value.origin == 'default':
+        enabled = toolkit in ('cocoa', 'uikit')
+    if enabled:
+        return True
+
+set_config('MOZ_AVFOUNDATION', avfoundation)
+set_define('MOZ_AVFOUNDATION', avfoundation)
+
+option('--enable-qtkit',
+       help='Enable support for legacy Apple QTKit')
+@depends('--enable-qtkit', avfoundation)
+def qtkit(value, avfoundation):
+    enabled = bool(value)
+    if value.origin == 'default':
+        enabled = False
+    if enabled:
+        return True
+
+set_config('MOZ_QTKIT', qtkit)
+set_define('MOZ_QTKIT', qtkit)
 
 # EME Support
 # ==============================================================
@@ -436,3 +478,15 @@ def check_places_and_android_history(places, android_history):
 check_prog('TAR', ('gnutar', 'gtar', 'tar'))
 check_prog('UNZIP', ('unzip',))
 check_prog('ZIP', ('zip',))
+
+# Support various fuzzing options
+# ==============================================================
+option('--enable-libfuzzer', help='Enable libfuzzer support')
+
+@depends('--enable-libfuzzer')
+def enable_libfuzzer(value):
+    if value:
+        return True
+
+set_config('LIBFUZZER', enable_libfuzzer)
+set_define('LIBFUZZER', enable_libfuzzer)

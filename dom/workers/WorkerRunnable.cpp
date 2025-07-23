@@ -260,6 +260,10 @@ WorkerRunnable::Run()
 
     MOZ_ASSERT(IsCanceled(), "Subclass Cancel() didn't set IsCanceled()!");
 
+    if (mBehavior == WorkerThreadModifyBusyCount) {
+      mWorkerPrivate->ModifyBusyCountFromWorker(false);
+    }
+
     return NS_OK;
   }
 
@@ -728,7 +732,8 @@ WorkerProxyToMainThreadRunnable::PostDispatchOnMainThread()
 
       mRunnable->RunBackOnWorkerThread();
 
-      aWorkerPrivate->ModifyBusyCountFromWorker(true);
+      // Let's release the worker thread.
+      aWorkerPrivate->ModifyBusyCountFromWorker(false);
       return true;
     }
 

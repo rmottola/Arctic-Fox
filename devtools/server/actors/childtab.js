@@ -4,6 +4,7 @@
 
 "use strict";
 
+var { Cr } = require("chrome");
 var { TabActor } = require("devtools/server/actors/webbrowser");
 
 /**
@@ -45,25 +46,37 @@ ContentActor.prototype = Object.create(TabActor.prototype);
 ContentActor.prototype.constructor = ContentActor;
 
 Object.defineProperty(ContentActor.prototype, "title", {
-  get: function() {
+  get: function () {
     return this.window.document.title;
   },
   enumerable: true,
   configurable: true
 });
 
-ContentActor.prototype.exit = function() {
+ContentActor.prototype.exit = function () {
   if (this._sendForm) {
-    this._chromeGlobal.removeMessageListener("debug:form", this._sendForm);
+    try {
+      this._chromeGlobal.removeMessageListener("debug:form", this._sendForm);
+    } catch (e) {
+      if (e.result != Cr.NS_ERROR_NULL_POINTER) {
+        throw e;
+      }
+      // In some cases, especially when using messageManagers in non-e10s mode, we reach
+      // this point with a dead messageManager which only throws errors but does not
+      // seem to indicate in any other way that it is dead.
+    }
     this._sendForm = null;
   }
-  return TabActor.prototype.exit.call(this);
+
+  TabActor.prototype.exit.call(this);
+
+  this._chromeGlobal = null;
 };
 
 /**
  * On navigation events, our URL and/or title may change, so we update our
  * counterpart in the parent process that participates in the tab list.
  */
-ContentActor.prototype._sendForm = function() {
+ContentActor.prototype._sendForm = function () {
   this._chromeGlobal.sendAsyncMessage("debug:form", this.form());
 };

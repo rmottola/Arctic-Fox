@@ -24,7 +24,12 @@
 
 <!ENTITY abouthome.bookmarksButton.label "Bookmarks">
 <!ENTITY abouthome.historyButton.label   "History">
-<!ENTITY abouthome.settingsButton.label  "Preferences">
+<!-- LOCALIZATION NOTE (abouthome.preferencesButtonWin.label): The label for the
+     preferences/options item on about:home on Windows -->
+<!ENTITY abouthome.preferencesButtonWin.label  "Options">
+<!-- LOCALIZATION NOTE (abouthome.preferencesButtonUnix.label): The label for the
+     preferences/options item on about:home on Linux and OS X -->
+<!ENTITY abouthome.preferencesButtonUnix.label  "Preferences">
 <!ENTITY abouthome.addonsButton.label    "Add-ons">
 <!ENTITY abouthome.downloadsButton.label "Downloads">
 <!ENTITY abouthome.syncButton.label      "&syncBrand.shortName.label;">

@@ -13,7 +13,6 @@
 #include "nsBaseHashtable.h"
 #include "nsClassHashtable.h"
 #include "nsITelemetry.h"
-#include "nsVersionComparator.h"
 
 #include "mozilla/dom/ToJSValue.h"
 #include "mozilla/StartupTimeline.h"
@@ -96,6 +95,11 @@ using mozilla::StaticMutexAutoLock;
 
 namespace {
 
+using mozilla::Telemetry::Common::AutoHashtable;
+using mozilla::Telemetry::Common::IsExpiredVersion;
+using mozilla::Telemetry::Common::CanRecordDataset;
+using mozilla::Telemetry::Common::IsInDataset;
+
 class KeyedHistogram;
 
 typedef nsBaseHashtableET<nsDepCharHashKey, mozilla::Telemetry::ID>
@@ -115,10 +119,13 @@ struct HistogramInfo {
   uint32_t id_offset;
   uint32_t expiration_offset;
   uint32_t dataset;
+  uint32_t label_index;
+  uint32_t label_count;
   bool keyed;
 
   const char *id() const;
   const char *expiration() const;
+  nsresult label_id(const char* label, uint32_t* labelId) const;
 };
 
 struct AddonHistogramInfo {
@@ -140,7 +147,8 @@ typedef StatisticsRecorder::Histograms::iterator HistogramIterator;
 typedef nsBaseHashtableET<nsCStringHashKey, AddonHistogramInfo>
           AddonHistogramEntryType;
 
-typedef AutoHashtable<AddonHistogramEntryType> AddonHistogramMapType;
+typedef AutoHashtable<AddonHistogramEntryType>
+          AddonHistogramMapType;
 
 typedef nsBaseHashtableET<nsCStringHashKey, AddonHistogramMapType *>
           AddonEntryType;
@@ -224,54 +232,6 @@ internal_IsHistogramEnumId(mozilla::Telemetry::ID aID)
 }
 
 bool
-internal_IsExpired(const char *expiration)
-{
-  static mozilla::Version current_version = mozilla::Version(MOZ_APP_VERSION);
-  MOZ_ASSERT(expiration);
-  return strcmp(expiration, "never") && strcmp(expiration, "default") &&
-    (mozilla::Version(expiration) <= current_version);
-}
-
-bool
-internal_IsInDataset(uint32_t dataset, uint32_t containingDataset)
-{
-  if (dataset == containingDataset) {
-    return true;
-  }
-
-  // The "optin on release channel" dataset is a superset of the
-  // "optout on release channel one".
-  if (containingDataset == nsITelemetry::DATASET_RELEASE_CHANNEL_OPTIN
-      && dataset == nsITelemetry::DATASET_RELEASE_CHANNEL_OPTOUT) {
-    return true;
-  }
-
-  return false;
-}
-
-bool
-internal_CanRecordDataset(uint32_t dataset)
-{
-  // If we are extended telemetry is enabled, we are allowed to record
-  // regardless of the dataset.
-  if (internal_CanRecordExtended()) {
-    return true;
-  }
-
-  // If base telemetry data is enabled and we're trying to record base
-  // telemetry, allow it.
-  if (internal_CanRecordBase() &&
-      internal_IsInDataset(dataset,
-                           nsITelemetry::DATASET_RELEASE_CHANNEL_OPTOUT)) {
-      return true;
-  }
-
-  // We're not recording extended telemetry or this is not the base
-  // dataset. Bail out.
-  return false;
-}
-
-bool
 internal_IsValidHistogramName(const nsACString& name)
 {
   return !FindInReadable(NS_LITERAL_CSTRING(KEYED_HISTOGRAM_NAME_SEPARATOR), name);
@@ -300,8 +260,9 @@ internal_GetRegisteredHistogramIds(bool keyed, uint32_t dataset,
 
   for (size_t i = 0; i < mozilla::ArrayLength(gHistograms); ++i) {
     const HistogramInfo& h = gHistograms[i];
-    if (internal_IsExpired(h.expiration()) || h.keyed != keyed ||
-        !internal_IsInDataset(h.dataset, dataset)) {
+    if (IsExpiredVersion(h.expiration()) ||
+        h.keyed != keyed ||
+        !IsInDataset(h.dataset, dataset)) {
       continue;
     }
 
@@ -329,6 +290,31 @@ const char *
 HistogramInfo::expiration() const
 {
   return &gHistogramStringTable[this->expiration_offset];
+}
+
+nsresult
+HistogramInfo::label_id(const char* label, uint32_t* labelId) const
+{
+  MOZ_ASSERT(label);
+  MOZ_ASSERT(this->histogramType == nsITelemetry::HISTOGRAM_CATEGORICAL);
+  if (this->histogramType != nsITelemetry::HISTOGRAM_CATEGORICAL) {
+    return NS_ERROR_FAILURE;
+  }
+
+  for (uint32_t i = 0; i < this->label_count; ++i) {
+    // gHistogramLabelTable contains the indices of the label strings in the
+    // gHistogramStringTable.
+    // They are stored in-order and consecutively, from the offset label_index
+    // to (label_index + label_count).
+    uint32_t string_offset = gHistogramLabelTable[this->label_index + i];
+    const char* const str = &gHistogramStringTable[string_offset];
+    if (::strcmp(label, str) == 0) {
+      *labelId = i;
+      return NS_OK;
+    }
+  }
+
+  return NS_ERROR_FAILURE;
 }
 
 } // namespace
@@ -383,7 +369,7 @@ internal_HistogramGet(const char *name, const char *expiration,
     return rv;
   }
 
-  if (internal_IsExpired(expiration)) {
+  if (IsExpiredVersion(expiration)) {
     name = EXPIRED_ID;
     min = 1;
     max = 2;
@@ -396,6 +382,7 @@ internal_HistogramGet(const char *name, const char *expiration,
     *result = Histogram::FactoryGet(name, min, max, bucketCount, Histogram::kUmaTargetedHistogramFlag);
     break;
   case nsITelemetry::HISTOGRAM_LINEAR:
+  case nsITelemetry::HISTOGRAM_CATEGORICAL:
     *result = LinearHistogram::FactoryGet(name, min, max, bucketCount, Histogram::kUmaTargetedHistogramFlag);
     break;
   case nsITelemetry::HISTOGRAM_BOOLEAN:
@@ -453,7 +440,7 @@ internal_GetHistogramByEnumId(mozilla::Telemetry::ID id, Histogram **ret)
 #ifdef DEBUG
   // Check that the C++ Histogram code computes the same ranges as the
   // Python histogram code.
-  if (!internal_IsExpired(p.expiration())) {
+  if (!IsExpiredVersion(p.expiration())) {
     const struct bounds &b = gBucketLowerBoundIndex[id];
     if (b.length != 0) {
       MOZ_ASSERT(size_t(b.length) == h->bucket_count(),
@@ -569,7 +556,10 @@ nsresult
 internal_HistogramAdd(Histogram& histogram, int32_t value, uint32_t dataset)
 {
   // Check if we are allowed to record the data.
-  if (!internal_CanRecordDataset(dataset) || !histogram.IsRecordingEnabled()) {
+  bool canRecordDataset = CanRecordDataset(dataset,
+                                           internal_CanRecordBase(),
+                                           internal_CanRecordExtended());
+  if (!canRecordDataset || !histogram.IsRecordingEnabled()) {
     return NS_OK;
   }
 
@@ -605,6 +595,23 @@ internal_HistogramAdd(Histogram& histogram, int32_t value)
   }
 
   return internal_HistogramAdd(histogram, value, dataset);
+}
+
+nsresult
+internal_HistogramAddCategorical(mozilla::Telemetry::ID id, const nsCString& label)
+{
+  uint32_t labelId = 0;
+  if (NS_FAILED(gHistograms[id].label_id(label.get(), &labelId))) {
+    return NS_ERROR_ILLEGAL_VALUE;
+  }
+
+  Histogram* h = nullptr;
+  nsresult rv = internal_GetHistogramByEnumId(id, &h);
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  return internal_HistogramAdd(*h, labelId);
 }
 
 void
@@ -913,7 +920,10 @@ KeyedHistogram::GetDataset(uint32_t* dataset) const
 nsresult
 KeyedHistogram::Add(const nsCString& key, uint32_t sample)
 {
-  if (!internal_CanRecordDataset(mDataset)) {
+  bool canRecordDataset = CanRecordDataset(mDataset,
+                                           internal_CanRecordBase(),
+                                           internal_CanRecordExtended());
+  if (!canRecordDataset) {
     return NS_OK;
   }
 
@@ -1083,6 +1093,7 @@ bool
 internal_JSHistogram_Add(JSContext *cx, unsigned argc, JS::Value *vp)
 {
   JSObject *obj = JS_THIS_OBJECT(cx, vp);
+  MOZ_ASSERT(obj);
   if (!obj) {
     return false;
   }
@@ -1093,29 +1104,56 @@ internal_JSHistogram_Add(JSContext *cx, unsigned argc, JS::Value *vp)
 
   JS::CallArgs args = CallArgsFromVp(argc, vp);
 
+  if (!internal_CanRecordBase()) {
+    return true;
+  }
+
   // If we don't have an argument for the count histogram, assume an increment of 1.
   // Otherwise, make sure to run some sanity checks on the argument.
-  int32_t value = 1;
-  if ((type != base::CountHistogram::COUNT_HISTOGRAM) || args.length()) {
-    if (!args.length()) {
-      JS_ReportError(cx, "Expected one argument");
-      return false;
-    }
-
-    if (!(args[0].isNumber() || args[0].isBoolean())) {
-      JS_ReportError(cx, "Not a number");
-      return false;
-    }
-
-    if (!JS::ToInt32(cx, args[0], &value)) {
-      return false;
-    }
+  if ((type == base::CountHistogram::COUNT_HISTOGRAM) && (args.length() == 0)) {
+    internal_HistogramAdd(*h, 1);
+    return true;
   }
 
-  if (internal_CanRecordBase()) {
-    internal_HistogramAdd(*h, value);
+  // For categorical histograms we allow passing a string argument that specifies the label.
+  mozilla::Telemetry::ID id;
+  if (type == base::LinearHistogram::LINEAR_HISTOGRAM &&
+      (args.length() > 0) && args[0].isString() &&
+      NS_SUCCEEDED(internal_GetHistogramEnumId(h->histogram_name().c_str(), &id)) &&
+      gHistograms[id].histogramType == nsITelemetry::HISTOGRAM_CATEGORICAL) {
+    nsAutoJSString label;
+    if (!label.init(cx, args[0])) {
+      JS_ReportError(cx, "Invalid string parameter");
+      return false;
+    }
+
+    nsresult rv = internal_HistogramAddCategorical(id, NS_ConvertUTF16toUTF8(label));
+    if (NS_FAILED(rv)) {
+      JS_ReportError(cx, "Unknown label for categorical histogram");
+      return false;
+    }
+
+    return true;
   }
 
+  // All other accumulations expect one numerical argument.
+  int32_t value = 0;
+  if (!args.length()) {
+    JS_ReportError(cx, "Expected one argument");
+    return false;
+  }
+
+  if (!(args[0].isNumber() || args[0].isBoolean())) {
+    JS_ReportError(cx, "Not a number");
+    return false;
+  }
+
+  if (!JS::ToInt32(cx, args[0], &value)) {
+    JS_ReportError(cx, "Failed to convert argument");
+    return false;
+  }
+
+  internal_HistogramAdd(*h, value);
   return true;
 }
 
@@ -1910,6 +1948,14 @@ TelemetryHistogram::Accumulate(const char* name,
   if (NS_SUCCEEDED(rv)) {
     internal_Accumulate(id, key, sample);
   }
+}
+
+void
+TelemetryHistogram::AccumulateCategorical(mozilla::Telemetry::ID aId,
+                                          const nsCString& label)
+{
+  StaticMutexAutoLock locker(gTelemetryHistogramMutex);
+  internal_HistogramAddCategorical(aId, label);
 }
 
 void

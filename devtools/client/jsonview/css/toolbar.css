@@ -8,9 +8,8 @@
 
 .toolbar {
   line-height: 20px;
-  font-size: 12px;
   height: 22px;
-  font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+  font: message-box;
   padding: 4px 0 3px 0;
 }
 
@@ -79,7 +78,7 @@
   margin: 1px 2px 1px 2px;
   border: none;
   border-radius: 0;
-  background-color: rgba(170, 170, 170, .2); /* Splitter */
+  background-color: rgba(170, 170, 170, .2); /* --toolbar-tab-hover */
   transition: background 0.05s ease-in-out;
 }
 
@@ -90,5 +89,5 @@
 
 .theme-dark .toolbar .btn:not([disabled]):hover:active,
 .theme-light .toolbar .btn:not([disabled]):hover:active {
-  background: rgba(170, 170, 170, .4); /* Splitters */
+  background: rgba(170, 170, 170, .4); /* --toolbar-tab-hover-active */
 }

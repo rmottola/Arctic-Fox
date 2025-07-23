@@ -6,49 +6,59 @@
 
 // Tests that context menu items exapnd all and collapse are shown properly.
 
-const TEST_URL = "data:text/html;charset=utf-8,<div id='parent-node'><div id='child-node'></div></div>";
+const TEST_URL = "data:text/html;charset=utf-8," +
+                 "<div id='parent-node'><div id='child-node'></div></div>";
 
 add_task(function* () {
+  // Test is often exceeding time-out threshold, similar to Bug 1137765
+  requestLongerTimeout(2);
 
-    // Test is often exceeding time-out threshold, similar to Bug 1137765
-    requestLongerTimeout(2);
+  let {inspector} = yield openInspectorForURL(TEST_URL);
 
-    let {inspector, testActor} = yield openInspectorForURL(TEST_URL);
+  info("Selecting the parent node");
 
-    let nodeMenuCollapseElement = inspector.panelDoc.getElementById("node-menu-collapse");
-    let nodeMenuExpandElement = inspector.panelDoc.getElementById("node-menu-expand");
+  let front = yield getNodeFrontForSelector("#parent-node", inspector);
 
-    info("Selecting the parent node");
+  yield selectNode(front, inspector);
 
-    let front = yield getNodeFrontForSelector("#parent-node", inspector);
+  info("Simulating context menu click on the selected node container.");
+  let allMenuItems = openContextMenuAndGetAllItems(inspector, {
+    target: getContainerForNodeFront(front, inspector).tagLine,
+  });
+  let nodeMenuCollapseElement =
+    allMenuItems.find(item => item.id === "node-menu-collapse");
+  let nodeMenuExpandElement =
+    allMenuItems.find(item => item.id === "node-menu-expand");
 
-    yield selectNode(front, inspector);
+  ok(nodeMenuCollapseElement.disabled, "Collapse option is disabled");
+  ok(!nodeMenuExpandElement.disabled, "ExpandAll option is enabled");
 
-    info("Simulating context menu click on the selected node container.");
-    contextMenuClick(getContainerForNodeFront(front, inspector).tagLine);
+  info("Testing whether expansion works properly");
+  nodeMenuExpandElement.click();
 
-    ok(nodeMenuCollapseElement.hasAttribute("disabled"), "Collapse option is disabled");
+  info("Waiting for expansion to occur");
+  yield waitForMultipleChildrenUpdates(inspector);
+  let markUpContainer = getContainerForNodeFront(front, inspector);
+  ok(markUpContainer.expanded, "node has been successfully expanded");
 
-    ok(!nodeMenuExpandElement.hasAttribute("disabled"), "ExpandAll option is enabled");
+  // reselecting node after expansion
+  yield selectNode(front, inspector);
 
-    info("Testing whether expansion works properly");
-    dispatchCommandEvent(nodeMenuExpandElement);
-    info("Waiting for expansion to occur");
-    yield waitForMultipleChildrenUpdates(inspector);
-    let markUpContainer = getContainerForNodeFront(front, inspector);
-    ok(markUpContainer.expanded, "node has been successfully expanded");
+  info("Testing whether collapse works properly");
+  info("Simulating context menu click on the selected node container.");
+  allMenuItems = openContextMenuAndGetAllItems(inspector, {
+    target: getContainerForNodeFront(front, inspector).tagLine,
+  });
+  nodeMenuCollapseElement =
+    allMenuItems.find(item => item.id === "node-menu-collapse");
+  nodeMenuExpandElement =
+    allMenuItems.find(item => item.id === "node-menu-expand");
 
-    //reslecting node after expansion
-    yield selectNode(front, inspector);
+  ok(!nodeMenuCollapseElement.disabled, "Collapse option is enabled");
+  ok(!nodeMenuExpandElement.disabled, "ExpandAll option is enabled");
+  nodeMenuCollapseElement.click();
 
-    info("Testing whether collapse works properly");
-    info("Simulating context menu click on the selected node container.");
-    contextMenuClick(getContainerForNodeFront(front, inspector).tagLine);
-
-    ok(!nodeMenuCollapseElement.hasAttribute("disabled"), "Collapse option is enabled");
-
-    dispatchCommandEvent(nodeMenuCollapseElement);
-    info("Waiting for collapse to occur");
-    yield waitForMultipleChildrenUpdates(inspector);
-    ok(!markUpContainer.expanded, "node has been successfully collapsed");
+  info("Waiting for collapse to occur");
+  yield waitForMultipleChildrenUpdates(inspector);
+  ok(!markUpContainer.expanded, "node has been successfully collapsed");
 });

@@ -17,7 +17,7 @@ add_task(function* test_initialize() {
   Services.prefs.setBoolPref("signon.autofillForms", false);
   registerCleanupFunction(() => {
     Services.prefs.clearUserPref("signon.autofillForms");
-    Services.logins.removeAllLogins();
+    Services.prefs.clearUserPref("signon.schemeUpgrades");
   });
   for (let login of loginList()) {
     Services.logins.addLogin(login);
@@ -40,7 +40,7 @@ add_task(function* test_context_menu_populate() {
 
     // Check the content of the password manager popup
     let popupMenu = document.getElementById("fill-login-popup");
-    checkMenu(popupMenu);
+    checkMenu(popupMenu, 3);
 
     let contextMenu = document.getElementById("contentAreaContextMenu");
     contextMenu.hidePopup();
@@ -141,6 +141,7 @@ add_task(function* test_context_menu_password_fill() {
  * Check if the password field is correctly filled when it's in an iframe.
  */
 add_task(function* test_context_menu_iframe_fill() {
+  Services.prefs.setBoolPref("signon.schemeUpgrades", true);
   yield BrowserTestUtils.withNewTab({
     gBrowser,
     url: TEST_HOSTNAME + "/browser/toolkit/components/" +
@@ -216,12 +217,19 @@ function* openPasswordContextMenu(browser, passwordInput) {
 
 /**
  * Check if every login that matches the page hostname are available at the context menu.
+ * @param {Element} contextMenu
+ * @param {Number} expectedCount - Number of logins expected in the context menu. Used to ensure
+*                                  we continue testing something useful.
  */
-function checkMenu(contextMenu) {
-  let logins = loginList().filter(login => login.hostname == TEST_HOSTNAME);
+function checkMenu(contextMenu, expectedCount) {
+  let logins = loginList().filter(login => {
+    return LoginHelper.isOriginMatching(login.hostname, TEST_HOSTNAME, {
+      schemeUpgrades: Services.prefs.getBoolPref("signon.schemeUpgrades"),
+    });
+  });
   // Make an array of menuitems for easier comparison.
   let menuitems = [...contextMenu.getElementsByClassName("context-login-item")];
-  Assert.equal(menuitems.length, logins.length, "Same amount of menu items and expected logins.");
+  Assert.equal(menuitems.length, expectedCount, "Expected number of menu items");
   Assert.ok(logins.every(l => menuitems.some(m => l.username == m.label)), "Every login have an item at the menu.");
 }
 
@@ -238,13 +246,21 @@ function getLoginFromUsername(username) {
  * List of logins used for the test.
  *
  * We should only use unique usernames in this test,
- * because we need to search logins by username.
+ * because we need to search logins by username. There is one duplicate u+p combo
+ * in order to test de-duping in the menu.
  */
 function loginList() {
   return [
     LoginTestUtils.testData.formLogin({
       hostname: "https://example.com",
       formSubmitURL: "https://example.com",
+      username: "username",
+      password: "password",
+    }),
+    // Same as above but HTTP in order to test de-duping.
+    LoginTestUtils.testData.formLogin({
+      hostname: "http://example.com",
+      formSubmitURL: "http://example.com",
       username: "username",
       password: "password",
     }),
@@ -261,8 +277,8 @@ function loginList() {
       password: "password2",
     }),
     LoginTestUtils.testData.formLogin({
-      hostname: "https://example.org",
-      formSubmitURL: "https://example.org",
+      hostname: "http://example.org",
+      formSubmitURL: "http://example.org",
       username: "username-cross-origin",
       password: "password-cross-origin",
     }),

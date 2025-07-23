@@ -1,9 +1,3 @@
-/* -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
- * vim: sw=2 ts=2 et lcs=trail\:.,tab\:>~ :
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-
 /**
  * What this is aimed to test:
  *
@@ -89,32 +83,21 @@ let tests = [
 
 let currentTest;
 
-function run_test() {
+add_task(function* test() {
   // The pref should not exist by default.
-  try {
-    getInterval();
-    do_throw("interval pref should not exist by default");
-  }
-  catch (ex) {}
-
-  // Use our own mock timer implementation.
-  replace_timer_factory();
+  Assert.throws(() => getInterval());
 
   // Force the component, so it will start observing preferences.
   force_expiration_start();
 
-  runNextTest();
-  do_test_pending();
-}
-
-function runNextTest() {
-  if (tests.length) {
-    currentTest = tests.shift();
+  for (let currentTest of tests) {
     print(currentTest.desc);
+    let promise = promiseTopicObserved("test-interval-changed");
     setInterval(currentTest.interval);
+    let [, data] = yield promise;
+    Assert.equal(data, currentTest.expectedTimerDelay * EXPIRE_AGGRESSIVITY_MULTIPLIER);
   }
-  else {
-    clearInterval();
-    do_test_finished();
-  }
-}
+
+  clearInterval();
+});
+

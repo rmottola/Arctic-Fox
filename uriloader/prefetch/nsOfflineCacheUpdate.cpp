@@ -362,8 +362,7 @@ nsOfflineCacheUpdateItem::OpenChannel(nsOfflineCacheUpdate *aUpdate)
     NS_ENSURE_SUCCESS(rv, rv);
 
     uint32_t flags = nsIRequest::LOAD_BACKGROUND |
-                     nsICachingChannel::LOAD_ONLY_IF_MODIFIED |
-                     nsICachingChannel::LOAD_CHECK_OFFLINE_CACHE;
+                     nsICachingChannel::LOAD_ONLY_IF_MODIFIED;
 
     if (mApplicationCache == mPreviousApplicationCache) {
         // Same app cache to read from and to write to is used during
@@ -499,7 +498,6 @@ nsOfflineCacheUpdateItem::OnStopRequest(nsIRequest *aRequest,
 
     return NS_OK;
 }
-
 
 //-----------------------------------------------------------------------------
 // nsOfflineCacheUpdateItem::nsIRunnable
@@ -754,7 +752,7 @@ nsOfflineManifestItem::ReadManifest(nsIInputStream *aInputStream,
 
     for (iter = begin; iter != end; iter++) {
         if (*iter == '\r' || *iter == '\n') {
-            nsresult rv = manifest->HandleManifestLine(begin, iter);
+            rv = manifest->HandleManifestLine(begin, iter);
 
             if (NS_FAILED(rv)) {
                 LOG(("HandleManifestLine failed with 0x%08x", rv));
@@ -925,7 +923,6 @@ nsOfflineManifestItem::HandleManifestLine(const nsCString::const_iterator &aBegi
         rv = namespaceURI->GetAsciiSpec(namespaceSpec);
         if (NS_FAILED(rv))
             break;
-
 
         nsCOMPtr<nsIURI> fallbackURI;
         rv = NS_NewURI(getter_AddRefs(fallbackURI), fallbackSpec, nullptr, mURI);

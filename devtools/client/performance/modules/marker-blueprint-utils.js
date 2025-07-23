@@ -18,7 +18,7 @@ exports.MarkerBlueprintUtils = {
    * @param object marker
    * @return boolean
    */
-  shouldDisplayMarker: function(marker, hiddenMarkerNames) {
+  shouldDisplayMarker: function (marker, hiddenMarkerNames) {
     if (!hiddenMarkerNames || hiddenMarkerNames.length == 0) {
       return true;
     }
@@ -40,7 +40,7 @@ exports.MarkerBlueprintUtils = {
    * @param object marker
    * @return object
    */
-  getBlueprintFor: function(marker) {
+  getBlueprintFor: function (marker) {
     return TIMELINE_BLUEPRINT[marker.name] || TIMELINE_BLUEPRINT.UNKNOWN;
   },
 
@@ -50,9 +50,10 @@ exports.MarkerBlueprintUtils = {
    * @param object marker
    * @return string
    */
-  getMarkerLabel: function(marker) {
+  getMarkerLabel: function (marker) {
     let blueprint = this.getBlueprintFor(marker);
-    let label = typeof blueprint.label === "function" ? blueprint.label(marker) : blueprint.label;
+    let dynamic = typeof blueprint.label === "function";
+    let label = dynamic ? blueprint.label(marker) : blueprint.label;
     return label;
   },
 
@@ -63,9 +64,10 @@ exports.MarkerBlueprintUtils = {
    * @param string type
    * @return string
    */
-  getMarkerGenericName: function(markerName) {
+  getMarkerGenericName: function (markerName) {
     let blueprint = this.getBlueprintFor({ name: markerName });
-    let generic = typeof blueprint.label === "function" ? blueprint.label() : blueprint.label;
+    let dynamic = typeof blueprint.label === "function";
+    let generic = dynamic ? blueprint.label() : blueprint.label;
 
     // If no class name found, attempt to throw a descriptive error as to
     // how the marker implementor can fix this.
@@ -89,24 +91,13 @@ exports.MarkerBlueprintUtils = {
    * @param object marker
    * @return array<object>
    */
-  getMarkerFields: function(marker) {
+  getMarkerFields: function (marker) {
     let blueprint = this.getBlueprintFor(marker);
+    let dynamic = typeof blueprint.fields === "function";
+    let fields = dynamic ? blueprint.fields(marker) : blueprint.fields;
 
-    // If blueprint.fields is a function, use that.
-    if (typeof blueprint.fields === "function") {
-      let fields = blueprint.fields(marker) || {};
-      return Object.keys(fields).map(label => ({ label, value: fields[label] }));
-    }
-
-    // Otherwise, iterate over the array.
-    return (blueprint.fields || []).reduce((fields, field) => {
-      // Ensure this marker has this field present.
-      if (field.property in marker) {
-        let label = field.label;
-        let value = marker[field.property];
-        fields.push({ label, value });
-      }
-      return fields;
-    }, []);
+    return Object.entries(fields || {})
+      .filter(([_, value]) => dynamic ? true : value in marker)
+      .map(([label, value]) => ({ label, value: dynamic ? value : marker[value] }));
   },
 };

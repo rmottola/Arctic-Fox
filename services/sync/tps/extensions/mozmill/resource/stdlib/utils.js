@@ -19,7 +19,7 @@ Cu.import("resource://gre/modules/NetUtil.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 
 const applicationIdMap = {
-  '{8de7fcbb-c55c-4fbe-bfc5-fc555c87dbc4}': 'Firefox'
+  '{ec8030f7-c20a-464f-9b0e-13a3a9e97384}': 'Firefox'
 }
 const applicationName = applicationIdMap[Services.appinfo.ID] || Services.appinfo.name;
 

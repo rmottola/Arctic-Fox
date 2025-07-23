@@ -4,13 +4,13 @@
 "use strict";
 
 const uuidgen = require("sdk/util/uuid").uuid;
-const promise = require("promise");
+const defer = require("devtools/shared/defer");
 const {
-  entries, toObject, reportException, executeSoon
+  entries, toObject, executeSoon
 } = require("devtools/shared/DevToolsUtils");
 const PROMISE = exports.PROMISE = "@@dispatch/promise";
 
-function promiseMiddleware ({ dispatch, getState }) {
+function promiseMiddleware({ dispatch, getState }) {
   return next => action => {
     if (!(PROMISE in action)) {
       return next(action);
@@ -29,7 +29,7 @@ function promiseMiddleware ({ dispatch, getState }) {
 
     // Return the promise so action creators can still compose if they
     // want to.
-    const deferred = promise.defer();
+    const deferred = defer();
     promiseInst.then(value => {
       executeSoon(() => {
         dispatch(Object.assign({}, action, {

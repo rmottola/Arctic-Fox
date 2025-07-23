@@ -7,25 +7,23 @@
 "use strict";
 
 const Cu = Components.utils;
-const Cc = Components.classes;
-const Ci = Components.interfaces;
 
 const {XPCOMUtils} = Cu.import("resource://gre/modules/XPCOMUtils.jsm", {});
 const {Services} = Cu.import("resource://gre/modules/Services.jsm", {});
 
 // Load devtools module lazily.
-XPCOMUtils.defineLazyGetter(this, "devtools", function() {
-  const {devtools} = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+XPCOMUtils.defineLazyGetter(this, "devtools", function () {
+  const {devtools} = Cu.import("resource://devtools/shared/Loader.jsm", {});
   return devtools;
 });
 
 // Load JsonView services lazily.
-XPCOMUtils.defineLazyGetter(this, "JsonViewService", function() {
+XPCOMUtils.defineLazyGetter(this, "JsonViewService", function () {
   const {JsonViewService} = devtools.require("devtools/client/jsonview/converter-child");
   return JsonViewService;
 });
 
-XPCOMUtils.defineLazyGetter(this, "JsonViewSniffer", function() {
+XPCOMUtils.defineLazyGetter(this, "JsonViewSniffer", function () {
   const {JsonViewSniffer} = devtools.require("devtools/client/jsonview/converter-sniffer");
   return JsonViewSniffer;
 });
@@ -61,7 +59,7 @@ ConverterObserver.prototype = {
       case "nsPref:changed":
         this.onPrefChanged();
         break;
-    };
+    }
   },
 
   onShutdown: function () {

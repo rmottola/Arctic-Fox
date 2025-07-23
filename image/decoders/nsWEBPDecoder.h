@@ -25,9 +25,10 @@ class nsWEBPDecoder : public Decoder
 public:
   virtual ~nsWEBPDecoder();
 
-  void InitInternal() override;
-  Maybe<TerminalState> DoDecode(SourceBufferIterator& aIterator) override;
-  void FinishInternal() override;
+  nsresult InitInternal() override;
+  LexerResult DoDecode(SourceBufferIterator& aIterator,
+                       IResumable* aOnResume) override;
+  nsresult FinishInternal() override;
 private:
   friend class DecoderFactory;
 

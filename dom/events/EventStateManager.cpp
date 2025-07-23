@@ -3834,10 +3834,10 @@ CreateMouseOrPointerWidgetEvent(WidgetMouseEvent* aMouseEvent,
     newPointerEvent =
       new WidgetPointerEvent(aMouseEvent->IsTrusted(), aMessage,
                              aMouseEvent->mWidget);
-    newPointerEvent->isPrimary = sourcePointer->isPrimary;
+    newPointerEvent->mIsPrimary = sourcePointer->mIsPrimary;
     newPointerEvent->pointerId = sourcePointer->pointerId;
-    newPointerEvent->width = sourcePointer->width;
-    newPointerEvent->height = sourcePointer->height;
+    newPointerEvent->mWidth = sourcePointer->mWidth;
+    newPointerEvent->mHeight = sourcePointer->mHeight;
     newPointerEvent->inputSource = sourcePointer->inputSource;
     newPointerEvent->relatedTarget =
       nsIPresShell::GetPointerCapturingContent(sourcePointer->pointerId)
@@ -4347,9 +4347,6 @@ EventStateManager::SetPointerLock(nsIWidget* aWidget,
     aWidget->SynthesizeNativeMouseMove(
       sLastRefPoint + aWidget->WidgetToScreenOffset(), nullptr);
 
-    // Retarget all events to this element via capture.
-    nsIPresShell::SetCapturingContent(aElement, CAPTURE_POINTERLOCK);
-
     // Suppress DnD
     if (dragService) {
       dragService->Suppress();
@@ -4367,9 +4364,6 @@ EventStateManager::SetPointerLock(nsIWidget* aWidget,
       aWidget->SynthesizeNativeMouseMove(
         mPreLockPoint + aWidget->WidgetToScreenOffset(), nullptr);
     }
-
-    // Don't retarget events to this element any more.
-    nsIPresShell::SetCapturingContent(nullptr, CAPTURE_POINTERLOCK);
 
     // Unsuppress DnD
     if (dragService) {

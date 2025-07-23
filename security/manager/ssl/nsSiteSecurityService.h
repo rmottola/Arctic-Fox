@@ -145,8 +145,8 @@ private:
 
   const nsSTSPreload *GetPreloadListEntry(const char *aHost);
 
+  uint64_t mMaxMaxAge;
   bool mUsePreloadList;
-  bool mUseStsService;
   int64_t mPreloadListTimeOffset;
   bool mProcessPKPHeadersFromNonBuiltInRoots;
   RefPtr<mozilla::DataStorage> mSiteStateStorage;

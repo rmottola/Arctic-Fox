@@ -4,14 +4,20 @@
 
 "use strict";
 
-const { Cc, Ci, Cu } = require("chrome");
+const { Cc, Ci, Cr, Cu } = require("chrome");
 const l10n = require("gcli/l10n");
 const Services = require("Services");
+const { NetUtil } = require("resource://gre/modules/NetUtil.jsm");
 const { getRect } = require("devtools/shared/layout/utils");
+const promise = require("promise");
+const defer = require("devtools/shared/defer");
+const { Task } = require("devtools/shared/task");
 
 loader.lazyImporter(this, "Downloads", "resource://gre/modules/Downloads.jsm");
-loader.lazyImporter(this, "Task", "resource://gre/modules/Task.jsm");
 loader.lazyImporter(this, "OS", "resource://gre/modules/osfile.jsm");
+loader.lazyImporter(this, "FileUtils", "resource://gre/modules/FileUtils.jsm");
+loader.lazyImporter(this, "PrivateBrowsingUtils",
+                          "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
 const BRAND_SHORT_NAME = Cc["@mozilla.org/intl/stringbundle;1"]
                            .getService(Ci.nsIStringBundleService)
@@ -27,7 +33,7 @@ const FILENAME_DEFAULT_VALUE = " ";
  * identical except that one runs on the client and one in the server.
  *
  * The server command is hidden, and is designed to be called from the client
- * command when the --chrome flag is *not* used.
+ * command.
  */
 
 /**
@@ -35,7 +41,11 @@ const FILENAME_DEFAULT_VALUE = " ";
  */
 const filenameParam = {
   name: "filename",
-  type: "string",
+  type: {
+    name: "file",
+    filetype: "file",
+    existing: "maybe",
+  },
   defaultValue: FILENAME_DEFAULT_VALUE,
   description: l10n.lookup("screenshotFilenameDesc"),
   manual: l10n.lookup("screenshotFilenameManual")
@@ -55,7 +65,6 @@ const standardParams = {
     },
     {
       name: "imgur",
-      hidden: true, // Hidden because it fails with "Could not reach imgur API"
       type: "boolean",
       description: l10n.lookup("screenshotImgurDesc"),
       manual: l10n.lookup("screenshotImgurManual")
@@ -66,6 +75,13 @@ const standardParams = {
       defaultValue: 0,
       description: l10n.lookup("screenshotDelayDesc"),
       manual: l10n.lookup("screenshotDelayManual")
+    },
+    {
+      name: "dpr",
+      type: { name: "number", min: 0, allowFloat: true },
+      defaultValue: 0,
+      description: l10n.lookup("screenshotDPRDesc"),
+      manual: l10n.lookup("screenshotDPRManual")
     },
     {
       name: "fullpage",
@@ -133,10 +149,13 @@ exports.items = [
       }
 
       // Click handler
-      if (imageSummary.filename) {
+      if (imageSummary.href || imageSummary.filename) {
         root.style.cursor = "pointer";
         root.addEventListener("click", () => {
-          if (imageSummary.filename) {
+          if (imageSummary.href) {
+            let mainWindow = context.environment.chromeWindow;
+            mainWindow.openUILinkIn(imageSummary.href, "tab");
+          } else if (imageSummary.filename) {
             const file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsILocalFile);
             file.initWithPath(imageSummary.filename);
             file.reveal();
@@ -156,52 +175,20 @@ exports.items = [
     returnType: "imageSummary",
     buttonId: "command-button-screenshot",
     buttonClass: "command-button command-button-invertable",
-    tooltipText: l10n.lookup("screenshotTooltip"),
+    tooltipText: l10n.lookup("screenshotTooltipPage"),
     params: [
       filenameParam,
       standardParams,
-      {
-        group: l10n.lookup("screenshotAdvancedOptions"),
-        params: [
-          {
-            name: "chrome",
-            type: "boolean",
-            description: l10n.lookupFormat("screenshotChromeDesc2", [BRAND_SHORT_NAME]),
-            manual: l10n.lookupFormat("screenshotChromeManual2", [BRAND_SHORT_NAME])
-          },
-          {
-            name: "dpr",
-            type: { name: "number", min: 0, allowFloat: true },
-            defaultValue: 0,
-            description: l10n.lookup("screenshotDPRDesc"),
-            manual: l10n.lookup("screenshotDPRManual")
-          },
-          {
-            name: "fullpage",
-            type: "boolean",
-            description: l10n.lookup("screenshotFullPageDesc"),
-            manual: l10n.lookup("screenshotFullPageManual")
-          },
-        ]
-      }
     ],
-    exec: function(args, context) {
-      if (args.chrome && args.selector) {
-        // Node screenshot with chrome option does not work as intended
-        // Refer https://bugzilla.mozilla.org/show_bug.cgi?id=659268#c7
-        // throwing for now.
-        throw new Error(l10n.lookup("screenshotSelectorChromeConflict"));
-      }
+    exec: function (args, context) {
+      // Re-execute the command on the server
+      const command = context.typed.replace(/^screenshot/, "screenshot_server");
+      let capture = context.updateExec(command).then(output => {
+        return output.error ? Promise.reject(output.data) : output.data;
+      });
 
-      if (!args.chrome) {
-        // Re-execute the command on the server
-        const command = context.typed.replace(/^screenshot/, "screenshot_server");
-        return context.updateExec(command).then(output => {
-          return output.error ? Promise.reject(output.data) : output.data;
-        });
-      }
-
-      return processScreenshot(args, context.environment.chromeDocument);
+      simulateCameraEffect(context.environment.chromeDocument, "shutter");
+      return capture.then(saveScreenshot.bind(null, args, context));
     },
   },
   {
@@ -211,54 +198,61 @@ exports.items = [
     hidden: true,
     returnType: "imageSummary",
     params: [ filenameParam, standardParams ],
-    exec: function(args, context) {
-      return processScreenshot(args, context.environment.document);
+    exec: function (args, context) {
+      return captureScreenshot(args, context.environment.document);
     },
   }
 ];
 
 /**
- * This function simply handles the --delay argument before calling
- * processScreenshotNow
+ * This function is called to simulate camera effects
  */
-function processScreenshot(args, document) {
+function simulateCameraEffect(document, effect) {
+  let window = document.defaultView;
+  if (effect === "shutter") {
+    const audioCamera = new window.Audio("resource://devtools/client/themes/audio/shutter.wav");
+    audioCamera.play();
+  }
+  if (effect == "flash") {
+    const frames = Cu.cloneInto({ opacity: [ 0, 1 ] }, window);
+    document.documentElement.animate(frames, 500);
+  }
+}
+
+/**
+ * This function simply handles the --delay argument before calling
+ * createScreenshotData
+ */
+function captureScreenshot(args, document) {
   if (args.delay > 0) {
     return new Promise((resolve, reject) => {
       document.defaultView.setTimeout(() => {
-        processScreenshotNow(args, document).then(resolve, reject);
+        createScreenshotData(document, args).then(resolve, reject);
       }, args.delay * 1000);
     });
   }
   else {
-    return processScreenshotNow(args, document);
+    return createScreenshotData(document, args);
   }
 }
 
 /**
  * There are several possible destinations for the screenshot, SKIP is used
- * in processScreenshotNow() whenever one of them is not used
+ * in saveScreenshot() whenever one of them is not used
  */
 const SKIP = Promise.resolve();
 
 /**
- * This is just like exec, except the 'delay' has been handled already so
- * this is where we do that actual work of process the screenshot
+ * Save the captured screenshot to one of several destinations.
  */
-function processScreenshotNow(args, document) {
-  const reply = createScreenshotData(document, args);
-
-  const loadContext = document.defaultView
-                            .QueryInterface(Ci.nsIInterfaceRequestor)
-                            .getInterface(Ci.nsIWebNavigation)
-                            .QueryInterface(Ci.nsILoadContext);
-
+function saveScreenshot(args, context, reply) {
   const fileNeeded = args.filename != FILENAME_DEFAULT_VALUE ||
                       (!args.imgur && !args.clipboard);
 
   return Promise.all([
-    args.clipboard ? saveToClipboard(loadContext, reply) : SKIP,
-    args.imgur     ? uploadToImgur(reply)                : SKIP,
-    fileNeeded     ? saveToFile(loadContext, reply)      : SKIP,
+    args.clipboard ? saveToClipboard(context, reply) : SKIP,
+    args.imgur     ? uploadToImgur(reply)            : SKIP,
+    fileNeeded     ? saveToFile(context, reply)      : SKIP,
   ]).then(() => reply);
 }
 
@@ -275,16 +269,18 @@ function createScreenshotData(document, args) {
   const currentX = window.scrollX;
   const currentY = window.scrollY;
 
+  let filename = getFilename(args.filename);
+
   if (args.fullpage) {
     // Bug 961832: GCLI screenshot shows fixed position element in wrong
     // position if we don't scroll to top
     window.scrollTo(0,0);
-    width = window.innerWidth + window.scrollMaxX;
-    height = window.innerHeight + window.scrollMaxY;
+    width = window.innerWidth + window.scrollMaxX - window.scrollMinX;
+    height = window.innerHeight + window.scrollMaxY - window.scrollMinY;
+    filename = filename.replace(".png", "-fullpage.png");
   }
   else if (args.selector) {
-    const lh = new LayoutHelpers(window);
-    ({ top, left, width, height } = lh.getRect(args.selector, window));
+    ({ top, left, width, height } = getRect(window, args.selector, window));
   }
   else {
     left = window.scrollX;
@@ -293,18 +289,23 @@ function createScreenshotData(document, args) {
     height = window.innerHeight;
   }
 
-  const winUtils = window.QueryInterface(Ci.nsIInterfaceRequestor)
-                       .getInterface(Ci.nsIDOMWindowUtils);
-  const scrollbarHeight = {};
-  const scrollbarWidth = {};
-  winUtils.getScrollbarSize(false, scrollbarWidth, scrollbarHeight);
-  width -= scrollbarWidth.value;
-  height -= scrollbarHeight.value;
+  // Only adjust for scrollbars when considering the full window
+  if (!args.selector) {
+    const winUtils = window.QueryInterface(Ci.nsIInterfaceRequestor)
+                         .getInterface(Ci.nsIDOMWindowUtils);
+    const scrollbarHeight = {};
+    const scrollbarWidth = {};
+    winUtils.getScrollbarSize(false, scrollbarWidth, scrollbarHeight);
+    width -= scrollbarWidth.value;
+    height -= scrollbarHeight.value;
+  }
 
   const canvas = document.createElementNS("http://www.w3.org/1999/xhtml", "canvas");
-  canvas.width = width;
-  canvas.height = height;
   const ctx = canvas.getContext("2d");
+  const ratio = args.dpr ? args.dpr : window.devicePixelRatio;
+  canvas.width = width * ratio;
+  canvas.height = height * ratio;
+  ctx.scale(ratio, ratio);
   ctx.drawWindow(window, left, top, width, height, "#fff");
   const data = canvas.toDataURL("image/png", "");
 
@@ -313,13 +314,15 @@ function createScreenshotData(document, args) {
     window.scrollTo(currentX, currentY);
   }
 
-  return {
+  simulateCameraEffect(document, "flash");
+
+  return Promise.resolve({
     destinations: [],
     data: data,
     height: height,
     width: width,
-    filename: getFilename(args.filename),
-  };
+    filename: filename,
+  });
 }
 
 /**
@@ -352,17 +355,20 @@ function getFilename(defaultName) {
  * be treated exactly like imgur / file processing, but it's really sync
  * for now.
  */
-function saveToClipboard(loadContext, reply) {
+function saveToClipboard(context, reply) {
   try {
-    const io = Cc["@mozilla.org/network/io-service;1"]
-                  .getService(Ci.nsIIOService);
-    const channel = io.newChannel2(reply.data, null, null,
-                                   null,      // aLoadingNode
-                                   Services.scriptSecurityManager.getSystemPrincipal(),
-                                   null,      // aTriggeringPrincipal
-                                   Ci.nsILoadInfo.SEC_NORMAL,
-                                   Ci.nsIContentPolicy.TYPE_INTERNAL_IMAGE);
-    const input = channel.open();
+    const channel = NetUtil.newChannel({
+      uri: reply.data,
+      loadUsingSystemPrincipal: true,
+      contentPolicyType: Ci.nsIContentPolicy.TYPE_INTERNAL_IMAGE
+    });
+    const input = channel.open2();
+
+    const loadContext = context.environment.chromeWindow
+                               .QueryInterface(Ci.nsIInterfaceRequestor)
+                               .getInterface(Ci.nsIWebNavigation)
+                               .QueryInterface(Ci.nsILoadContext);
+
     const imgTools = Cc["@mozilla.org/image/tools;1"]
                         .getService(Ci.imgITools);
 
@@ -418,60 +424,156 @@ function uploadToImgur(reply) {
       if (xhr.readyState == 4) {
         if (xhr.status == 200) {
           reply.href = xhr.response.data.link;
-          reply.destinations.push(l10n.lookupFormat("screenshotImgurError",
+          reply.destinations.push(l10n.lookupFormat("screenshotImgurUploaded",
                                                     [ reply.href ]));
-        }
-        else {
+        } else {
           reply.destinations.push(l10n.lookup("screenshotImgurError"));
         }
 
         resolve();
       }
-    }
+    };
   });
 }
 
 /**
- * Save the screenshot data to disk, returning a promise which
- * is resolved on completion
+ * Progress listener that forwards calls to a transfer object.
+ *
+ * This is used below in saveToFile to forward progress updates from the
+ * nsIWebBrowserPersist object that does the actual saving to the nsITransfer
+ * which just represents the operation for the Download Manager.  This keeps the
+ * Download Manager updated on saving progress and completion, so that it gives
+ * visual feedback from the downloads toolbar button when the save is done.
+ *
+ * It also allows the browser window to show auth prompts if needed (should not
+ * be needed for saving screenshots).
+ *
+ * This code is borrowed directly from contentAreaUtils.js.
  */
-function saveToFile(loadContext, reply) {
-  return Task.spawn(function*() {
-    try {
-      let filename = reply.filename;
-      // Check there is a .png extension to filename
-      if (!filename.match(/.png$/i)) {
-        filename += ".png";
-      }
+function DownloadListener(win, transfer) {
+  this.window = win;
+  this.transfer = transfer;
 
-      // If the filename is relative, tack it onto the download directory
-      if (!filename.match(/[\\\/]/)) {
-        const preferredDir = yield Downloads.getPreferredDownloadsDirectory();
-        filename = OS.Path.join(preferredDir, filename);
-        reply.filename = filename;
-      }
-
-      const file = Cc["@mozilla.org/file/local;1"].createInstance(Ci.nsILocalFile);
-      file.initWithPath(filename);
-
-      const ioService = Cc["@mozilla.org/network/io-service;1"]
-                        .getService(Ci.nsIIOService);
-
-      const Persist = Ci.nsIWebBrowserPersist;
-      const persist = Cc["@mozilla.org/embedding/browser/nsWebBrowserPersist;1"]
-                      .createInstance(Persist);
-      persist.persistFlags = Persist.PERSIST_FLAGS_REPLACE_EXISTING_FILES |
-                             Persist.PERSIST_FLAGS_AUTODETECT_APPLY_CONVERSION;
-
-      // TODO: UTF8? For an image?
-      const source = ioService.newURI(reply.data, "UTF8", null);
-      persist.saveURI(source, null, null, 0, null, null, file, loadContext);
-
-      reply.destinations.push(l10n.lookup("screenshotSavedToFile") + " \"" + filename + "\"");
+  // For most method calls, forward to the transfer object.
+  for (let name in transfer) {
+    if (name != "QueryInterface" &&
+        name != "onStateChange") {
+      this[name] = (...args) => transfer[name].apply(transfer, args);
     }
-    catch (ex) {
-      console.error(ex);
-      reply.destinations.push(l10n.lookup("screenshotErrorSavingToFile") + " " + filename);
-    }
-  });
+  }
+
+  // Allow saveToFile to await completion for error handling
+  this._completedDeferred = defer();
+  this.completed = this._completedDeferred.promise;
 }
+
+DownloadListener.prototype = {
+  QueryInterface: function(iid) {
+    if (iid.equals(Ci.nsIInterfaceRequestor) ||
+        iid.equals(Ci.nsIWebProgressListener) ||
+        iid.equals(Ci.nsIWebProgressListener2) ||
+        iid.equals(Ci.nsISupports)) {
+      return this;
+    }
+    throw Cr.NS_ERROR_NO_INTERFACE;
+  },
+
+  getInterface: function(iid) {
+    if (iid.equals(Ci.nsIAuthPrompt) ||
+        iid.equals(Ci.nsIAuthPrompt2)) {
+      let ww = Cc["@mozilla.org/embedcomp/window-watcher;1"]
+                 .getService(Ci.nsIPromptFactory);
+      return ww.getPrompt(this.window, iid);
+    }
+
+    throw Cr.NS_ERROR_NO_INTERFACE;
+  },
+
+  onStateChange: function(webProgress, request, state, status) {
+    // Check if the download has completed
+    if ((state & Ci.nsIWebProgressListener.STATE_STOP) &&
+        (state & Ci.nsIWebProgressListener.STATE_IS_NETWORK)) {
+      if (status == Cr.NS_OK) {
+        this._completedDeferred.resolve();
+      } else {
+        this._completedDeferred.reject();
+      }
+    }
+
+    this.transfer.onStateChange.apply(this.transfer, arguments);
+  }
+};
+
+/**
+ * Save the screenshot data to disk, returning a promise which is resolved on
+ * completion.
+ */
+var saveToFile = Task.async(function*(context, reply) {
+  let document = context.environment.chromeDocument;
+  let window = context.environment.chromeWindow;
+
+  // Check there is a .png extension to filename
+  if (!reply.filename.match(/.png$/i)) {
+    reply.filename += ".png";
+  }
+
+  let downloadsDir = yield Downloads.getPreferredDownloadsDirectory();
+  let downloadsDirExists = yield OS.File.exists(downloadsDir);
+  if (downloadsDirExists) {
+    // If filename is absolute, it will override the downloads directory and
+    // still be applied as expected.
+    reply.filename = OS.Path.join(downloadsDir, reply.filename);
+  }
+
+  let sourceURI = Services.io.newURI(reply.data, null, null);
+  let targetFile = new FileUtils.File(reply.filename);
+  let targetFileURI = Services.io.newFileURI(targetFile);
+
+  // Create download and track its progress.
+  // This is adapted from saveURL in contentAreaUtils.js, but simplified greatly
+  // and modified to allow saving to arbitrary paths on disk.  Using these
+  // objects as opposed to just writing with OS.File allows us to tie into the
+  // download manager to record a download entry and to get visual feedback from
+  // the downloads toolbar button when the save is done.
+  const nsIWBP = Ci.nsIWebBrowserPersist;
+  const flags = nsIWBP.PERSIST_FLAGS_REPLACE_EXISTING_FILES |
+                nsIWBP.PERSIST_FLAGS_FORCE_ALLOW_COOKIES |
+                nsIWBP.PERSIST_FLAGS_BYPASS_CACHE |
+                nsIWBP.PERSIST_FLAGS_AUTODETECT_APPLY_CONVERSION;
+  let isPrivate =
+    PrivateBrowsingUtils.isContentWindowPrivate(document.defaultView);
+  let persist = Cc["@mozilla.org/embedding/browser/nsWebBrowserPersist;1"]
+                  .createInstance(Ci.nsIWebBrowserPersist);
+  persist.persistFlags = flags;
+  let tr = Cc["@mozilla.org/transfer;1"].createInstance(Ci.nsITransfer);
+  tr.init(sourceURI,
+          targetFileURI,
+          "",
+          null,
+          null,
+          null,
+          persist,
+          isPrivate);
+  let listener = new DownloadListener(window, tr);
+  persist.progressListener = listener;
+  persist.savePrivacyAwareURI(sourceURI,
+                              null,
+                              document.documentURIObject,
+                              Ci.nsIHttpChannel
+                                .REFERRER_POLICY_NO_REFERRER_WHEN_DOWNGRADE,
+                              null,
+                              null,
+                              targetFileURI,
+                              isPrivate);
+
+  try {
+    // Await successful completion of the save via the listener
+    yield listener.completed;
+    reply.destinations.push(l10n.lookup("screenshotSavedToFile") +
+                            ` "${reply.filename}"`);
+  } catch (ex) {
+    console.error(ex);
+    reply.destinations.push(l10n.lookup("screenshotErrorSavingToFile") + " " +
+                            reply.filename);
+  }
+});

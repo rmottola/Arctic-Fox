@@ -13,10 +13,14 @@ module.exports = createClass({
 
   render() {
     let { panels, selectedPanelId, selectPanel } = this.props;
-    let panelLinks = panels.map(({ id, panelId, name, icon }) => {
+    let panelLinks = panels.map(({ id, name, icon }) => {
       let selected = id == selectedPanelId;
       return PanelMenuEntry({
-        id, panelId, name, icon, selected, selectTab
+        id,
+        name,
+        icon,
+        selected,
+        selectPanel
       });
     });
 

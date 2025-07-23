@@ -5,12 +5,11 @@
 
 // Tests that the Filter Editor Widget parses filter values correctly (setCssValue)
 
-const TEST_URI = "chrome://devtools/content/shared/widgets/filter-frame.xhtml";
-const {CSSFilterEditorWidget} =
-      require("devtools/client/shared/widgets/FilterWidget");
-const {cssTokenizer} = require("devtools/client/shared/css-parsing-utils");
+const {CSSFilterEditorWidget} = require("devtools/client/shared/widgets/FilterWidget");
 const DOMUtils =
       Cc["@mozilla.org/inspector/dom-utils;1"].getService(Ci.inIDOMUtils);
+
+const TEST_URI = `data:text/html,<div id="filter-container" />`;
 
 // Verify that the given string consists of a valid CSS URL token.
 // Return true on success, false on error.
@@ -25,11 +24,10 @@ function verifyURL(string) {
   return lexer.nextToken() === null;
 }
 
-add_task(function *() {
-  yield addTab("about:blank");
+add_task(function* () {
   let [host, win, doc] = yield createHost("bottom", TEST_URI);
 
-  const container = doc.querySelector("#container");
+  const container = doc.querySelector("#filter-container");
   let widget = new CSSFilterEditorWidget(container, "none");
 
   info("Test parsing of a valid CSS Filter value");

@@ -5,14 +5,18 @@
 var Cu = Components.utils;
 const {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const Services = require("Services");
+const {gDevTools} = require("devtools/client/framework/devtools");
 const {GetAvailableAddons, ForgetAddonsList} = require("devtools/client/webide/modules/addons");
 const Strings = Services.strings.createBundle("chrome://devtools/locale/webide.properties");
 
 window.addEventListener("load", function onLoad() {
   window.removeEventListener("load", onLoad);
-  document.querySelector("#aboutaddons").onclick = function() {
-    window.parent.UI.openInBrowser("about:addons");
-  }
+  document.querySelector("#aboutaddons").onclick = function () {
+    let browserWin = Services.wm.getMostRecentWindow(gDevTools.chromeWindowType);
+    if (browserWin && browserWin.BrowserOpenAddonsMgr) {
+      browserWin.BrowserOpenAddonsMgr("addons://list/extension");
+    }
+  };
   document.querySelector("#close").onclick = CloseUI;
   GetAvailableAddons().then(BuildUI, (e) => {
     console.error(e);
@@ -85,7 +89,7 @@ function BuildItem(addon, type) {
       li.setAttribute("addon", type);
       try {
         name.textContent = Strings.GetStringFromName("addons_adapters_label");
-      } catch(e) {
+      } catch (e) {
         // This code (bug 1081093) will be backported to Aurora, which doesn't
         // contain this string.
         name.textContent = "Tools Adapters Add-on";

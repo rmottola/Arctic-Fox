@@ -80,9 +80,6 @@ SOURCES += [
 ]
 
 if CONFIG['MOZ_RUST']:
-    SOURCES += [
-        'binding/mp4parse/src/lib.rs',
-    ]
     EXPORTS += [
         'binding/include/mp4parse.h',
     ]
@@ -169,4 +166,5 @@ elif CONFIG['GNU_CXX']:
             '-Wno-mismatched-tags',
             '-Wno-tautological-constant-out-of-range-compare',
             '-Wno-unreachable-code-return',
+            '-Wno-implicit-fallthrough',
         ]

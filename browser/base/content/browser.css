@@ -678,7 +678,7 @@ window[chromehidden~="toolbar"] toolbar:not(.toolbar-primary):not(#nav-bar):not(
   background: black;
 }
 
-html|*#fullscreen-warning {
+html|*.pointerlockfswarning {
   position: fixed;
   z-index: 2147483647 !important;
   visibility: visible;
@@ -692,13 +692,13 @@ html|*#fullscreen-warning {
   max-width: 95%;
   pointer-events: none;
 }
-html|*#fullscreen-warning:not([hidden]) {
+html|*.pointerlockfswarning:not([hidden]) {
   display: flex;
 }
-html|*#fullscreen-warning[onscreen] {
+html|*.pointerlockfswarning[onscreen] {
   transform: translate(-50%, 50px);
 }
-html|*#fullscreen-warning[ontop] {
+html|*.pointerlockfswarning[ontop] {
   /* Use -10px to hide the border and border-radius on the top */
   transform: translate(-50%, -10px);
 }
@@ -706,13 +706,13 @@ html|*#fullscreen-warning[ontop] {
   transform: translate(-50%, 80px);
 }
 
-html|*#fullscreen-domain-text,
-html|*#fullscreen-generic-text {
+html|*.pointerlockfswarning-domain-text,
+html|*.pointerlockfswarning-generic-text {
   word-wrap: break-word;
   /* We must specify a min-width, otherwise word-wrap:break-word doesn't work. Bug 630864. */
   min-width: 1px
 }
-#fullscreen-domain-text:not([hidden]) + #fullscreen-generic-text {
+html|*.pointerlockfswarning-domain-text:not([hidden]) + html|*.pointerlockfswarning-generic-text {
   display: none;
 }
 
@@ -961,15 +961,19 @@ notification[value="translation"] {
 
 /*** Visibility of downloads indicator controls ***/
 
-#downloads-button[indicator] > image.toolbarbutton-icon {
+/* Bug 924050: If we've loaded the indicator, for now we hide it in the menu panel,
+   and just show the icon. This is a hack to side-step very weird layout bugs that
+   seem to be caused by the indicator stack interacting with the menu panel. */
+#downloads-button[indicator]:not([cui-areatype="menu-panel"]) > .toolbarbutton-badge-stack > image.toolbarbutton-icon,
+#downloads-button[indicator][cui-areatype="menu-panel"] > #downloads-indicator-anchor {
   display: none;
 }
 
-toolbarpaletteitem[place="palette"] > #downloads-button[indicator] > image.toolbarbutton-icon {
+toolbarpaletteitem[place="palette"] > #downloads-button[indicator] > .toolbarbutton-badge-stack > image.toolbarbutton-icon {
   display: -moz-box;
 }
 
-toolbarpaletteitem[place="palette"] > #downloads-button[indicator] > stack.toolbarbutton-icon {
+toolbarpaletteitem[place="palette"] > #downloads-button[indicator] > #downloads-indicator-anchor {
   display: none;
 }
 
@@ -992,7 +996,7 @@ toolbar[mode="text"] > #downloads-button > .toolbarbutton-text {
   -moz-box-ordinal-group: 1;
 }
 
-toolbar[mode="text"] > #downloads-button > .toolbarbutton-icon {
+toolbar[mode="text"] > #downloads-button > .toolbarbutton-badge-stack > .toolbarbutton-icon {
   display: -moz-box;
   -moz-box-ordinal-group: 2;
   visibility: collapse;

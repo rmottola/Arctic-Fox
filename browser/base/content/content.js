@@ -24,6 +24,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "ContentLinkHandler",
   "resource:///modules/ContentLinkHandler.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerContent",
   "resource://gre/modules/LoginManagerContent.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "FormLikeFactory",
+  "resource://gre/modules/LoginManagerContent.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "InsecurePasswordUtils",
   "resource://gre/modules/InsecurePasswordUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PluginContent",
@@ -61,10 +63,13 @@ addMessageListener("RemoteLogins:fillForm", function(message) {
 });
 addEventListener("DOMFormHasPassword", function(event) {
   LoginManagerContent.onDOMFormHasPassword(event, content);
-  InsecurePasswordUtils.checkForInsecurePasswords(event.target);
+  let formLike = FormLikeFactory.createFromForm(event.target);
+  InsecurePasswordUtils.checkForInsecurePasswords(formLike);
 });
 addEventListener("DOMInputPasswordAdded", function(event) {
   LoginManagerContent.onDOMInputPasswordAdded(event, content);
+  let formLike = FormLikeFactory.createFromField(event.target);
+  InsecurePasswordUtils.checkForInsecurePasswords(formLike);
 });
 addEventListener("pageshow", function(event) {
   LoginManagerContent.onPageShow(event, content);
@@ -200,7 +205,7 @@ var handleContentContextMenu = function (event) {
     // commands on the context menu.
     docShell.contentViewer.QueryInterface(Ci.nsIContentViewerEdit)
             .setCommandNode(event.target);
-    event.target.ownerDocument.defaultView.updateCommands("contentcontextmenu");
+    event.target.ownerGlobal.updateCommands("contentcontextmenu");
 
     let customMenuItems = PageMenuChild.build(event.target);
     let principal = doc.nodePrincipal;
@@ -215,7 +220,7 @@ var handleContentContextMenu = function (event) {
   else {
     // Break out to the parent window and pass the add-on info along
     let browser = docShell.chromeEventHandler;
-    let mainWin = browser.ownerDocument.defaultView;
+    let mainWin = browser.ownerGlobal;
     mainWin.gContextMenuContentData = {
       isRemote: false,
       event: event,
@@ -559,8 +564,6 @@ var ClickEventHandler = {
       reason = 'malware';
     } else if (/e=unwantedBlocked/.test(ownerDoc.documentURI)) {
       reason = 'unwanted';
-    } else if (/e=forbiddenBlocked/.test(ownerDoc.documentURI)) {
-      reason = 'forbidden';
     }
     sendAsyncMessage("Browser:SiteBlockedError", {
       location: ownerDoc.location.href,
@@ -878,7 +881,7 @@ var LightWeightThemeWebInstallListener = {
           baseURI: event.target.baseURI,
           themeData: event.target.getAttribute("data-browsertheme"),
         });
-        this._previewWindow = event.target.ownerDocument.defaultView;
+        this._previewWindow = event.target.ownerGlobal;
         this._previewWindow.addEventListener("pagehide", this, true);
         break;
       }
@@ -1133,7 +1136,7 @@ var PageInfoListener = {
   getMediaItems: function(document, strings, elem)
   {
     // Check for images defined in CSS (e.g. background, borders)
-    let computedStyle = elem.ownerDocument.defaultView.getComputedStyle(elem, "");
+    let computedStyle = elem.ownerGlobal.getComputedStyle(elem);
     // A node can have multiple media items associated with it - for example,
     // multiple background images.
     let mediaItems = [];

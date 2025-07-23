@@ -7,9 +7,10 @@
 "use strict";
 
 const protocol = require("devtools/shared/protocol");
-const { method, Arg, Option, RetVal } = protocol;
 
 const {DebuggerServer} = require("devtools/server/main");
+
+const {directorRegistrySpec} = require("devtools/shared/specs/director-registry");
 
 /**
  * Error Messages
@@ -41,7 +42,7 @@ const DirectorRegistry = exports.DirectorRegistry = {
    */
   install: function (id, scriptDef) {
     if (id in gDirectorScripts) {
-      console.error(ERR_DIRECTOR_INSTALL_TWICE,id);
+      console.error(ERR_DIRECTOR_INSTALL_TWICE, id);
       return false;
     }
 
@@ -60,7 +61,7 @@ const DirectorRegistry = exports.DirectorRegistry = {
    * @param id string
    *    The ID of a director script.
    */
-  uninstall: function(id) {
+  uninstall: function (id) {
     if (id in gDirectorScripts) {
       delete gDirectorScripts[id];
 
@@ -86,22 +87,22 @@ const DirectorRegistry = exports.DirectorRegistry = {
    * @param id string
    *    The ID of a director script.
    */
-  get: function(id) {
+  get: function (id) {
     return gDirectorScripts[id];
   },
 
   /**
    * Returns an array of registered director script ids.
    */
-  list: function() {
+  list: function () {
     return Object.keys(gDirectorScripts);
   },
 
   /**
    * Removes all the registered director scripts.
    */
-  clear: function() {
-   gDirectorScripts = Object.create(null);
+  clear: function () {
+    gDirectorScripts = Object.create(null);
   }
 };
 
@@ -139,83 +140,80 @@ exports.setupParentProcess = function setupParentProcess({mm, prefix}) {
 
   function handleChildRequest(msg) {
     switch (msg.json.method) {
-    case "get":
-      return DirectorRegistry.get(msg.json.args[0]);
-    case "list":
-      return DirectorRegistry.list();
-    default:
-      console.error(ERR_DIRECTOR_PARENT_UNKNOWN_METHOD, msg.json.method);
-      throw new Error(ERR_DIRECTOR_PARENT_UNKNOWN_METHOD);
+      case "get":
+        return DirectorRegistry.get(msg.json.args[0]);
+      case "list":
+        return DirectorRegistry.list();
+      default:
+        console.error(ERR_DIRECTOR_PARENT_UNKNOWN_METHOD, msg.json.method);
+        throw new Error(ERR_DIRECTOR_PARENT_UNKNOWN_METHOD);
     }
   }
-};
-
-// skip child setup if this actor module is not running in a child process
-if (DebuggerServer.isInChildProcess) {
-  setupChildProcess();
-}
-
-function setupChildProcess() {
-  const { sendSyncMessage } = DebuggerServer.parentMessageManager;
-
-  DebuggerServer.setupInParent({
-    module: "devtools/server/actors/director-registry",
-    setupParent: "setupParentProcess"
-  });
-
-  DirectorRegistry.install = notImplemented.bind(null, "install");
-  DirectorRegistry.uninstall = notImplemented.bind(null, "uninstall");
-  DirectorRegistry.clear = notImplemented.bind(null, "clear");
-
-  DirectorRegistry.get = callParentProcess.bind(null, "get");
-  DirectorRegistry.list = callParentProcess.bind(null, "list");
-
-  /* child process helpers */
-
-  function notImplemented(method) {
-    console.error(ERR_DIRECTOR_CHILD_NOTIMPLEMENTED_METHOD, method);
-    throw Error(ERR_DIRECTOR_CHILD_NOTIMPLEMENTED_METHOD);
-  }
-
-  function callParentProcess(method, ...args) {
-    var reply = sendSyncMessage("debug:director-registry-request", {
-      method: method,
-      args: args
-    });
-
-    if (reply.length === 0) {
-      console.error(ERR_DIRECTOR_CHILD_NO_REPLY);
-      throw Error(ERR_DIRECTOR_CHILD_NO_REPLY);
-    } else if (reply.length > 1) {
-      console.error(ERR_DIRECTOR_CHILD_MULTIPLE_REPLIES);
-      throw Error(ERR_DIRECTOR_CHILD_MULTIPLE_REPLIES);
-    }
-
-    return reply[0];
-  };
 };
 
 /**
  * The DirectorRegistry Actor is a global actor which manages install/uninstall of
  * director scripts definitions.
  */
-const DirectorRegistryActor = exports.DirectorRegistryActor = protocol.ActorClass({
-  typeName: "director-registry",
-
+const DirectorRegistryActor = exports.DirectorRegistryActor = protocol.ActorClassWithSpec(directorRegistrySpec, {
   /* init & destroy methods */
-  initialize: function(conn, parentActor) {
+  initialize: function (conn, parentActor) {
     protocol.Actor.prototype.initialize.call(this, conn);
+    this.maybeSetupChildProcess(conn);
   },
-  destroy: function(conn) {
+  destroy: function (conn) {
     protocol.Actor.prototype.destroy.call(this, conn);
     this.finalize();
   },
 
-  finalize: method(function() {
+  finalize: function () {
     // nothing to cleanup
-  }, {
-    oneway: true
-  }),
+  },
+
+  maybeSetupChildProcess(conn) {
+    // skip child setup if this actor module is not running in a child process
+    if (!DebuggerServer.isInChildProcess) {
+      return;
+    }
+
+    const { sendSyncMessage } = conn.parentMessageManager;
+
+    conn.setupInParent({
+      module: "devtools/server/actors/director-registry",
+      setupParent: "setupParentProcess"
+    });
+
+    DirectorRegistry.install = notImplemented.bind(null, "install");
+    DirectorRegistry.uninstall = notImplemented.bind(null, "uninstall");
+    DirectorRegistry.clear = notImplemented.bind(null, "clear");
+
+    DirectorRegistry.get = callParentProcess.bind(null, "get");
+    DirectorRegistry.list = callParentProcess.bind(null, "list");
+
+    /* child process helpers */
+
+    function notImplemented(method) {
+      console.error(ERR_DIRECTOR_CHILD_NOTIMPLEMENTED_METHOD, method);
+      throw Error(ERR_DIRECTOR_CHILD_NOTIMPLEMENTED_METHOD);
+    }
+
+    function callParentProcess(method, ...args) {
+      var reply = sendSyncMessage("debug:director-registry-request", {
+        method: method,
+        args: args
+      });
+
+      if (reply.length === 0) {
+        console.error(ERR_DIRECTOR_CHILD_NO_REPLY);
+        throw Error(ERR_DIRECTOR_CHILD_NO_REPLY);
+      } else if (reply.length > 1) {
+        console.error(ERR_DIRECTOR_CHILD_MULTIPLE_REPLIES);
+        throw Error(ERR_DIRECTOR_CHILD_MULTIPLE_REPLIES);
+      }
+
+      return reply[0];
+    }
+  },
 
   /**
    * Install a new director-script definition.
@@ -227,7 +225,7 @@ const DirectorRegistryActor = exports.DirectorRegistryActor = protocol.ActorClas
    * @param Object scriptOptions
    *        The director-script option object.
    */
-  install: method(function(id, { scriptCode, scriptOptions }) {
+  install: function (id, { scriptCode, scriptOptions }) {
     // TODO: add more checks on id format?
     if (!id || id.length === 0) {
       throw Error("director-script id is mandatory");
@@ -242,16 +240,7 @@ const DirectorRegistryActor = exports.DirectorRegistryActor = protocol.ActorClas
       scriptCode: scriptCode,
       scriptOptions: scriptOptions
     });
-  }, {
-    request: {
-      scriptId: Arg(0, "string"),
-      scriptCode: Option(1, "string"),
-      scriptOptions: Option(1, "nullable:json")
-    },
-    response: {
-      success: RetVal("boolean")
-    }
-  }),
+  },
 
   /**
    * Uninstall a director-script definition.
@@ -259,37 +248,14 @@ const DirectorRegistryActor = exports.DirectorRegistryActor = protocol.ActorClas
    * @param String id
    *        The identifier of the director-script definition to be removed
    */
-  uninstall: method(function (id) {
+  uninstall: function (id) {
     return DirectorRegistry.uninstall(id);
-  }, {
-    request: {
-      scritpId: Arg(0, "string")
-    },
-    response: {
-      success: RetVal("boolean")
-    }
-  }),
+  },
 
   /**
    * Retrieves the list of installed director-scripts.
    */
-  list: method(function () {
+  list: function () {
     return DirectorRegistry.list();
-  }, {
-    response: {
-      directorScripts: RetVal("array:string")
-    }
-  })
-});
-
-/**
- * The corresponding Front object for the DirectorRegistryActor.
- */
-exports.DirectorRegistryFront = protocol.FrontClass(DirectorRegistryActor, {
-  initialize: function(client, { directorRegistryActor }) {
-    protocol.Front.prototype.initialize.call(this, client, {
-      actor: directorRegistryActor
-    });
-    this.manage(this);
   }
 });

@@ -41,7 +41,7 @@ function doSearch(ctx, rev, query) {
     return;
   }
 
-  cm.operation(function() {
+  cm.operation(function () {
     if (state.query) {
       return;
     }
@@ -57,7 +57,7 @@ function doSearch(ctx, rev, query) {
  */
 function searchNext(ctx, rev) {
   let { cm, ed } = ctx;
-  cm.operation(function() {
+  cm.operation(function () {
     let state = getSearchState(cm);
     let cursor = getSearchCursor(cm, state.query,
                                  rev ? state.posFrom : state.posTo);
@@ -119,7 +119,7 @@ function hasBreakpoint(ctx, line) {
   let markers = cm.lineInfo(line).wrapClass;
 
   return markers != null &&
-         markers.contains("breakpoint");
+         markers.includes("breakpoint");
 }
 
 /**
@@ -190,7 +190,15 @@ function removeBreakpoints(ctx) {
     meta.breakpoints = {};
   }
 
-  cm.doc.iter((line) => { removeBreakpoint(ctx, line) });
+  cm.doc.iter((line) => {
+    // The hasBreakpoint is a slow operation: checks the line type, whether cm
+    // is initialized and creates several new objects. Inlining the line's
+    // wrapClass property check directly.
+    if (line.wrapClass == null || !line.wrapClass.includes("breakpoint")) {
+      return;
+    }
+    removeBreakpoint(ctx, line);
+  });
 }
 
 /**

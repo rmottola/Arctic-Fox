@@ -5,12 +5,12 @@
 
 var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
 
-Cu.import("resource://testing-common/Assert.jsm");
-var { Promise: promise } = Cu.import("resource://gre/modules/Promise.jsm", {});
 var { require } = Cu.import("resource://gre/modules/devtools/shared/Loader.jsm", {});
+var { Assert } = require("resource://testing-common/Assert.jsm");
 var { BrowserLoader } = Cu.import("resource://devtools/client/shared/browser-loader.js", {});
+var defer = require("devtools/shared/defer");
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
-var { Task } = require("resource://gre/modules/Task.jsm");
+var { Task } = require("devtools/shared/task");
 var { TargetFactory } = require("devtools/client/framework/target");
 var { Toolbox } = require("devtools/client/framework/toolbox");
 
@@ -20,8 +20,8 @@ var { require: browserRequire } = BrowserLoader({
   window: this
 });
 
-var $ = (selector, scope=document) => scope.querySelector(selector);
-var $$ = (selector, scope=document) => scope.querySelectorAll(selector);
+var $ = (selector, scope = document) => scope.querySelector(selector);
+var $$ = (selector, scope = document) => scope.querySelectorAll(selector);
 
 function forceRender(comp) {
   return setState(comp, {})
@@ -38,13 +38,13 @@ function onNextAnimationFrame(fn) {
 }
 
 function setState(component, newState) {
-  var deferred = promise.defer();
+  var deferred = defer();
   component.setState(newState, onNextAnimationFrame(deferred.resolve));
   return deferred.promise;
 }
 
 function setProps(component, newState) {
-  var deferred = promise.defer();
+  var deferred = defer();
   component.setProps(newState, onNextAnimationFrame(deferred.resolve));
   return deferred.promise;
 }
@@ -123,16 +123,16 @@ OPTS_DATA_GENERAL.forEach(site => {
 });
 
 
-function checkOptimizationHeader (name, file, line) {
+function checkOptimizationHeader(name, file, line) {
   is($(".optimization-header .header-function-name").textContent, name,
     "correct optimization header function name");
   is($(".optimization-header .frame-link-filename").textContent, file,
     "correct optimization header file name");
-  is($(".optimization-header .frame-link-line").textContent, line,
+  is($(".optimization-header .frame-link-line").textContent, `:${line}`,
     "correct optimization header line");
 }
 
-function checkOptimizationTree (rowData) {
+function checkOptimizationTree(rowData) {
   let rows = $$(".tree .tree-node");
 
   for (let i = 0; i < rowData.length; i++) {

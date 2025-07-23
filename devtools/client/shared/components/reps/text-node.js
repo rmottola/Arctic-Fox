@@ -6,14 +6,13 @@
 "use strict";
 
 // Make this available to both AMD and CJS environments
-define(function(require, exports, module) {
+define(function (require, exports, module) {
   // ReactJS
   const React = require("devtools/client/shared/vendor/react");
 
   // Reps
-  const { createFactories, isGrip } = require("./rep-utils");
-  const { ObjectLink } = createFactories(require("./object-link"));
-  const { cropMultipleLines } = require("./string");
+  const { createFactories, isGrip, cropMultipleLines } = require("./rep-utils");
+  const { ObjectBox } = createFactories(require("./object-box"));
 
   // Shortcuts
   const DOM = React.DOM;
@@ -22,43 +21,55 @@ define(function(require, exports, module) {
    * Renders DOM #text node.
    */
   let TextNode = React.createClass({
+    displayName: "TextNode",
+
     propTypes: {
       object: React.PropTypes.object.isRequired,
       mode: React.PropTypes.string,
     },
 
-    displayName: "TextNode",
-
-    getTextContent: function(grip) {
+    getTextContent: function (grip) {
       return cropMultipleLines(grip.preview.textContent);
     },
 
-    getTitle: function(win, context) {
-      return "textNode";
+    getTitle: function (grip) {
+      if (this.props.objectLink) {
+        return this.props.objectLink({
+          object: grip
+        }, "#text");
+      }
+      return "";
     },
 
-    render: function() {
+    render: function () {
       let grip = this.props.object;
       let mode = this.props.mode || "short";
 
       if (mode == "short" || mode == "tiny") {
         return (
-          ObjectLink({className: "textNode"},
+          ObjectBox({className: "textNode"},
+            this.getTitle(grip),
             "\"" + this.getTextContent(grip) + "\""
           )
         );
       }
 
+      let objectLink = this.props.objectLink || DOM.span;
       return (
-        ObjectLink({className: "textNode"},
-          "<",
+        ObjectBox({className: "textNode"},
+          this.getTitle(grip),
+          objectLink({
+            object: grip
+          }, "<"),
           DOM.span({className: "nodeTag"}, "TextNode"),
           " textContent=\"",
           DOM.span({className: "nodeValue"},
             this.getTextContent(grip)
           ),
           "\"",
-          ">;"
+          objectLink({
+            object: grip
+          }, ">;")
         )
       );
     },

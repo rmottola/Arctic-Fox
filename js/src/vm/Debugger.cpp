@@ -348,7 +348,7 @@ class MOZ_RAII js::EnterDebuggeeNoExecute
                 }
                 const char* filename = script->filename() ? script->filename() : "(none)";
                 char linenoStr[15];
-                JS_snprintf(linenoStr, sizeof(linenoStr), "%" PRIuSIZE, script->lineno());
+                snprintf(linenoStr, sizeof(linenoStr), "%" PRIuSIZE, script->lineno());
                 unsigned flags = warning ? JSREPORT_WARNING : JSREPORT_ERROR;
                 return JS_ReportErrorFlagsAndNumber(cx, flags, GetErrorMessage, nullptr,
                                                     JSMSG_DEBUGGEE_WOULD_RUN,
@@ -647,7 +647,6 @@ Debugger::Debugger(JSContext* cx, NativeObject* dbg)
 {
     assertSameCompartment(cx, dbg);
 
-    cx->runtime()->debuggerList.insertBack(this);
     JS_INIT_CLIST(&breakpoints);
     JS_INIT_CLIST(&onNewGlobalObjectWatchersLink);
 }
@@ -670,19 +669,23 @@ Debugger::~Debugger()
 bool
 Debugger::init(JSContext* cx)
 {
-    bool ok = debuggees.init() &&
-              debuggeeZones.init() &&
-              frames.init() &&
-              scripts.init() &&
-              sources.init() &&
-              objects.init() &&
-              observedGCs.init() &&
-              environments.init() &&
-              wasmInstanceScripts.init() &&
-              wasmInstanceSources.init();
-    if (!ok)
+    if (!debuggees.init() ||
+        !debuggeeZones.init() ||
+        !frames.init() ||
+        !scripts.init() ||
+        !sources.init() ||
+        !objects.init() ||
+        !observedGCs.init() ||
+        !environments.init() ||
+        !wasmInstanceScripts.init() ||
+        !wasmInstanceSources.init())
+    {
         ReportOutOfMemory(cx);
-    return ok;
+        return false;
+    }
+
+    cx->runtime()->debuggerList.insertBack(this);
+    return true;
 }
 
 JS_STATIC_ASSERT(unsigned(JSSLOT_DEBUGFRAME_OWNER) == unsigned(JSSLOT_DEBUGSCRIPT_OWNER));
@@ -2829,12 +2832,12 @@ Debugger::markIncomingCrossCompartmentEdges(JSTracer* trc)
 {
     JSRuntime* rt = trc->runtime();
     gc::State state = rt->gc.state();
-    MOZ_ASSERT(state == gc::MARK_ROOTS || state == gc::COMPACT);
+    MOZ_ASSERT(state == gc::State::MarkRoots || state == gc::State::Compact);
 
     for (Debugger* dbg : rt->debuggerList) {
         Zone* zone = MaybeForwarded(dbg->object.get())->zone();
-        if ((state == gc::MARK_ROOTS && !zone->isCollecting()) ||
-            (state == gc::COMPACT && !zone->isGCCompacting()))
+        if ((state == gc::State::MarkRoots && !zone->isCollecting()) ||
+            (state == gc::State::Compact && !zone->isGCCompacting()))
         {
             dbg->markCrossCompartmentEdges(trc);
         }
@@ -3688,7 +3691,7 @@ Debugger::construct(JSContext* cx, unsigned argc, Value* vp)
     Debugger* debugger;
     {
         /* Construct the underlying C++ object. */
-        AutoInitGCManagedObject<Debugger> dbg(cx->make_unique<Debugger>(cx, obj.get()));
+        auto dbg = cx->make_unique<Debugger>(cx, obj.get());
         if (!dbg || !dbg->init(cx))
             return false;
 
@@ -4164,11 +4167,8 @@ class MOZ_STACK_CLASS Debugger::ScriptQuery
         // TODOshu: Until such time that wasm modules are real ES6 modules,
         // unconditionally consider all wasm toplevel instance scripts.
         for (WeakGlobalObjectSet::Range r = debugger->allDebuggees(); !r.empty(); r.popFront()) {
-            auto& wasmInstances = r.front()->compartment()->wasmInstances;
-            if (!wasmInstances.initialized())
-                continue;
-            for (auto i = wasmInstances.all(); !i.empty(); i.popFront())
-                consider(i.front());
+            for (wasm::Instance* instance : r.front()->compartment()->wasm.instances())
+                consider(instance->object());
         }
 
         return true;
@@ -6054,7 +6054,7 @@ class DebuggerScriptGetLineOffsetsMatcher
             return false;
 
         Vector<uint32_t> offsets(cx_);
-        if (!instance->instance().getLineOffsets(lineno_, offsets))
+        if (!instance->instance().code().getLineOffsets(lineno_, offsets))
             return false;
         for (uint32_t i = 0; i < offsets.length(); i++) {
             if (!NewbornArrayPush(cx_, result_, NumberValue(offsets[i])))
@@ -6703,7 +6703,7 @@ class DebuggerSourceGetTextMatcher
     }
 
     ReturnType match(Handle<WasmInstanceObject*> wasmInstance) {
-        return wasmInstance->instance().createText(cx_);
+        return wasmInstance->instance().code().createText(cx_);
     }
 };
 

@@ -8,7 +8,7 @@
  */
 
 var protocol = require("devtools/shared/protocol");
-var {method, Arg, Option, RetVal} = protocol;
+var {Arg, Option, RetVal} = protocol;
 var events = require("sdk/event/core");
 
 function simpleHello() {
@@ -16,12 +16,31 @@ function simpleHello() {
     from: "root",
     applicationType: "xpcshell-tests",
     traits: [],
-  }
+  };
 }
 
-var RootActor = protocol.ActorClass({
+const rootSpec = protocol.generateActorSpec({
   typeName: "root",
-  initialize: function(conn) {
+
+  methods: {
+    simpleReturn: {
+      response: { value: RetVal() },
+    },
+    promiseReturn: {
+      request: { toWait: Arg(0, "number") },
+      response: { value: RetVal("number") },
+    },
+    simpleThrow: {
+      response: { value: RetVal("number") }
+    },
+    promiseThrow: {
+      response: { value: RetVal("number") },
+    }
+  }
+});
+
+var RootActor = protocol.ActorClassWithSpec(rootSpec, {
+  initialize: function (conn) {
     protocol.Actor.prototype.initialize.call(this, conn);
     // Root actor owns itself.
     this.manage(this);
@@ -31,13 +50,11 @@ var RootActor = protocol.ActorClass({
 
   sayHello: simpleHello,
 
-  simpleReturn: method(function() {
+  simpleReturn: function () {
     return this.sequence++;
-  }, {
-    response: { value: RetVal() },
-  }),
+  },
 
-  promiseReturn: method(function(toWait) {
+  promiseReturn: function (toWait) {
     // Guarantee that this resolves after simpleReturn returns.
     let deferred = promise.defer();
     let sequence = this.sequence++;
@@ -50,22 +67,17 @@ var RootActor = protocol.ActorClass({
         return;
       }
       deferred.resolve(sequence);
-    }
+    };
     do_execute_soon(check);
 
     return deferred.promise;
-  }, {
-    request: { toWait: Arg(0, "number") },
-    response: { value: RetVal("number") },
-  }),
+  },
 
-  simpleThrow: method(function() {
+  simpleThrow: function () {
     throw new Error(this.sequence++);
-  }, {
-    response: { value: RetVal("number") }
-  }),
+  },
 
-  promiseThrow: method(function() {
+  promiseThrow: function () {
     // Guarantee that this resolves after simpleReturn returns.
     let deferred = promise.defer();
     let sequence = this.sequence++;
@@ -74,13 +86,11 @@ var RootActor = protocol.ActorClass({
       deferred.reject(sequence++);
     });
     return deferred.promise;
-  }, {
-    response: { value: RetVal("number") },
-  })
+  }
 });
 
-var RootFront = protocol.FrontClass(RootActor, {
-  initialize: function(client) {
+var RootFront = protocol.FrontClassWithSpec(rootSpec, {
+  initialize: function (client) {
     this.actorID = "root";
     protocol.Front.prototype.initialize.call(this, client);
     // Root owns itself.
@@ -97,7 +107,7 @@ function run_test()
   let client = new DebuggerClient(trace);
   let rootClient;
 
-  client.connect().then([applicationType, traits]) => {
+  client.connect().then(([applicationType, traits]) => {
     rootClient = RootFront(client);
 
     let calls = [];
@@ -168,7 +178,7 @@ function run_test()
       client.close(() => {
         do_test_finished();
       });
-    })
+    });
   });
   do_test_pending();
 }

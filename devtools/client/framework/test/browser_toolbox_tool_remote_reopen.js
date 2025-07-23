@@ -42,7 +42,7 @@ const { DebuggerClient } = require("devtools/shared/client/main");
  */
 
 function runTools(target) {
-  return Task.spawn(function*() {
+  return Task.spawn(function* () {
     let toolIds = gDevTools.getToolDefinitionArray()
                            .filter(def => def.isTargetSupported(target))
                            .map(def => def.id);
@@ -65,7 +65,7 @@ function runTools(target) {
 }
 
 function getClient() {
-  let deferred = promise.defer();
+  let deferred = defer();
 
   if (!DebuggerServer.initialized) {
     DebuggerServer.init();
@@ -79,7 +79,7 @@ function getClient() {
 }
 
 function getTarget(client) {
-  let deferred = promise.defer();
+  let deferred = defer();
 
   client.listTabs(tabList => {
     let target = TargetFactory.forRemoteTab({
@@ -94,7 +94,7 @@ function getTarget(client) {
 }
 
 function test() {
-  Task.spawn(function*() {
+  Task.spawn(function* () {
     toggleAllTools(true);
     yield addTab("about:blank");
 

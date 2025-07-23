@@ -2,6 +2,7 @@
 /* vim: set ft=javascript ts=2 et sw=2 tw=80: */
 /* Any copyright is dedicated to the Public Domain.
  * http://creativecommons.org/publicdomain/zero/1.0/ */
+/* eslint no-unused-vars: [2, {"vars": "local"}] */
 
 "use strict";
 
@@ -26,8 +27,9 @@ const {gDevTools} = require("devtools/client/framework/devtools");
 const {TargetFactory} = require("devtools/client/framework/target");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 let promise = require("promise");
+let defer = require("devtools/shared/defer");
 const Services = require("Services");
-const {Task} = require("resource://gre/modules/Task.jsm");
+const {Task} = require("devtools/shared/task");
 const {KeyShortcuts} = require("devtools/client/shared/key-shortcuts");
 
 const TEST_DIR = gTestPath.substr(0, gTestPath.lastIndexOf("/"));
@@ -42,7 +44,7 @@ waitForExplicitFinish();
 
 var EXPECTED_DTU_ASSERT_FAILURE_COUNT = 0;
 
-registerCleanupFunction(function() {
+registerCleanupFunction(function () {
   if (DevToolsUtils.assertionFailureCount !==
       EXPECTED_DTU_ASSERT_FAILURE_COUNT) {
     ok(false,
@@ -61,7 +63,7 @@ registerCleanupFunction(function() {
 const ConsoleObserver = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver]),
 
-  observe: function(subject, topic, data) {
+  observe: function (subject, topic, data) {
     let message = subject.wrappedJSObject.arguments[0];
 
     if (/Failed propType/.test(message)) {
@@ -96,11 +98,8 @@ registerCleanupFunction(() => {
 });
 
 registerCleanupFunction(function* cleanup() {
-  let target = TargetFactory.forTab(gBrowser.selectedTab);
-  yield gDevTools.closeToolbox(target);
-
   while (gBrowser.tabs.length > 1) {
-    gBrowser.removeCurrentTab();
+    yield closeTabAndToolbox(gBrowser.selectedTab);
   }
 });
 
@@ -133,6 +132,19 @@ var removeTab = Task.async(function* (tab) {
   yield onClose;
 
   info("Tab removed and finished closing");
+});
+
+/**
+ * Refresh the given tab.
+ * @param {Object} tab The tab to be refreshed.
+ * @return Promise<undefined> resolved when the tab is successfully refreshed.
+ */
+var refreshTab = Task.async(function*(tab) {
+  info("Refreshing tab.");
+  const finished = once(gBrowser.selectedBrowser, "load", true);
+  gBrowser.reloadTab(gBrowser.selectedTab);
+  yield finished;
+  info("Tab finished refreshing.");
 });
 
 /**
@@ -171,8 +183,10 @@ function synthesizeKeyFromKeyTag(key) {
  * https://github.com/electron/electron/blob/master/docs/api/accelerator.md
  *
  * @param {String} key
+ * @param {DOMWindow} target
+ *        Optional window where to fire the key event
  */
-function synthesizeKeyShortcut(key) {
+function synthesizeKeyShortcut(key, target) {
   // parseElectronKey requires any window, just to access `KeyboardEvent`
   let window = Services.appShell.hiddenDOMWindow;
   let shortcut = KeyShortcuts.parseElectronKey(window, key);
@@ -184,7 +198,7 @@ function synthesizeKeyShortcut(key) {
     ctrlKey: shortcut.ctrl,
     metaKey: shortcut.meta,
     shiftKey: shortcut.shift
-  });
+  }, target);
 }
 
 /**
@@ -203,7 +217,7 @@ function synthesizeKeyShortcut(key) {
 function waitForNEvents(target, eventName, numTimes, useCapture = false) {
   info("Waiting for event: '" + eventName + "' on " + target + ".");
 
-  let deferred = promise.defer();
+  let deferred = defer();
   let count = 0;
 
   for (let [add, remove] of [
@@ -262,7 +276,7 @@ function loadHelperScript(filePath) {
  * @return {Promise}
  */
 function waitForTick() {
-  let deferred = promise.defer();
+  let deferred = defer();
   executeSoon(deferred.resolve);
   return deferred.promise;
 }
@@ -276,7 +290,7 @@ function waitForTick() {
  * @return A promise that resolves when the time is passed
  */
 function wait(ms) {
-  let def = promise.defer();
+  let def = defer();
   content.setTimeout(def.resolve, ms);
   return def.promise;
 }
@@ -308,8 +322,7 @@ var openToolboxForTab = Task.async(function* (tab, toolId, hostType) {
   toolbox = yield gDevTools.showToolbox(target, toolId, hostType);
 
   // Make sure that the toolbox frame is focused.
-  yield new Promise(resolve => waitForFocus(resolve,
-    toolbox.frame.contentWindow));
+  yield new Promise(resolve => waitForFocus(resolve, toolbox.win));
 
   info("Toolbox opened and focused");
 
@@ -335,7 +348,7 @@ var openNewTabAndToolbox = Task.async(function* (url, toolId, hostType) {
  * @return {Promise} Resolves when the toolbox and tab have been destroyed and
  * closed.
  */
-var closeTabAndToolbox = Task.async(function*(tab = gBrowser.selectedTab) {
+var closeTabAndToolbox = Task.async(function* (tab = gBrowser.selectedTab) {
   let target = TargetFactory.forTab(gBrowser.selectedTab);
   if (target) {
     yield gDevTools.closeToolbox(target);
@@ -350,7 +363,7 @@ var closeTabAndToolbox = Task.async(function*(tab = gBrowser.selectedTab) {
  * @return {Promise} Resolves when the toolbox and tab have been destroyed and
  * closed.
  */
-var closeToolboxAndTab = Task.async(function*(toolbox) {
+var closeToolboxAndTab = Task.async(function* (toolbox) {
   yield toolbox.destroy();
   yield removeTab(gBrowser.selectedTab);
 });
@@ -368,7 +381,7 @@ function waitUntil(predicate, interval = 10) {
     return Promise.resolve(true);
   }
   return new Promise(resolve => {
-    setTimeout(function() {
+    setTimeout(function () {
       waitUntil(predicate, interval).then(() => resolve(true));
     }, interval);
   });
@@ -380,7 +393,7 @@ function waitUntil(predicate, interval = 10) {
  */
 let MM_INC_ID = 0;
 function evalInDebuggee(mm, script) {
-  return new Promise(function(resolve, reject) {
+  return new Promise(function (resolve, reject) {
     let id = MM_INC_ID++;
     mm.sendAsyncMessage("devtools:test:eval", { script, id });
     mm.addMessageListener("devtools:test:eval:response", handler);
@@ -414,7 +427,7 @@ function evalInDebuggee(mm, script) {
  *         callback is invoked.
  */
 function waitForContextMenu(popup, button, onShown, onHidden) {
-  let deferred = promise.defer();
+  let deferred = defer();
 
   function onPopupShown() {
     info("onPopupShown");
@@ -444,3 +457,40 @@ function waitForContextMenu(popup, button, onShown, onHidden) {
                              button.ownerDocument.defaultView);
   return deferred.promise;
 }
+
+/**
+ * Simple helper to push a temporary preference. Wrapper on SpecialPowers
+ * pushPrefEnv that returns a promise resolving when the preferences have been
+ * updated.
+ *
+ * @param {String} preferenceName
+ *        The name of the preference to updated
+ * @param {} value
+ *        The preference value, type can vary
+ * @return {Promise} resolves when the preferences have been updated
+ */
+function pushPref(preferenceName, value) {
+  return new Promise(resolve => {
+    let options = {"set": [[preferenceName, value]]};
+    SpecialPowers.pushPrefEnv(options, resolve);
+  });
+}
+
+/**
+ * Lookup the provided dotted path ("prop1.subprop2.myProp") in the provided object.
+ *
+ * @param {Object} obj
+ *        Object to expand.
+ * @param {String} path
+ *        Dotted path to use to expand the object.
+ * @return {?} anything that is found at the provided path in the object.
+ */
+function lookupPath(obj, path) {
+  let segments = path.split(".");
+  return segments.reduce((prev, current) => prev[current], obj);
+}
+
+var closeToolbox = Task.async(function* () {
+  let target = TargetFactory.forTab(gBrowser.selectedTab);
+  yield gDevTools.closeToolbox(target);
+});

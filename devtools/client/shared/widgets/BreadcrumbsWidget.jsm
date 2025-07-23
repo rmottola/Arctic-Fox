@@ -5,14 +5,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 "use strict";
 
-const Ci = Components.interfaces;
 const Cu = Components.utils;
 
 const ENSURE_SELECTION_VISIBLE_DELAY = 50; // ms
 
 const { require } = Cu.import("resource://devtools/shared/Loader.jsm", {});
 const { ViewHelpers, setNamedTimeout } = require("devtools/client/shared/widgets/view-helpers");
-Cu.import("resource://devtools/shared/event-emitter.js");
+const EventEmitter = require("devtools/shared/event-emitter");
 
 this.EXPORTED_SYMBOLS = ["BreadcrumbsWidget"];
 
@@ -27,7 +26,7 @@ this.EXPORTED_SYMBOLS = ["BreadcrumbsWidget"];
  * @param Object aOptions
  *        - smoothScroll: specifies if smooth scrolling on selection is enabled.
  */
-this.BreadcrumbsWidget = function BreadcrumbsWidget(aNode, aOptions={}) {
+this.BreadcrumbsWidget = function BreadcrumbsWidget(aNode, aOptions = {}) {
   this.document = aNode.ownerDocument;
   this.window = this.document.defaultView;
   this._parent = aNode;
@@ -80,7 +79,7 @@ BreadcrumbsWidget.prototype = {
    * @return nsIDOMNode
    *         The element associated with the displayed item.
    */
-  insertItemAt: function(aIndex, aContents) {
+  insertItemAt: function (aIndex, aContents) {
     let list = this._list;
     let breadcrumb = new Breadcrumb(this, aContents);
     return list.insertBefore(breadcrumb._target, list.childNodes[aIndex]);
@@ -94,7 +93,7 @@ BreadcrumbsWidget.prototype = {
    * @return nsIDOMNode
    *         The element associated with the displayed item.
    */
-  getItemAtIndex: function(aIndex) {
+  getItemAtIndex: function (aIndex) {
     return this._list.childNodes[aIndex];
   },
 
@@ -104,7 +103,7 @@ BreadcrumbsWidget.prototype = {
    * @param nsIDOMNode aChild
    *        The element associated with the displayed item.
    */
-  removeChild: function(aChild) {
+  removeChild: function (aChild) {
     this._list.removeChild(aChild);
 
     if (this._selectedItem == aChild) {
@@ -115,7 +114,7 @@ BreadcrumbsWidget.prototype = {
   /**
    * Removes all of the child nodes from this container.
    */
-  removeAllItems: function() {
+  removeAllItems: function () {
     let list = this._list;
 
     while (list.hasChildNodes()) {
@@ -161,7 +160,7 @@ BreadcrumbsWidget.prototype = {
    * @return string
    *         The current attribute value.
    */
-  getAttribute: function(aName) {
+  getAttribute: function (aName) {
     if (aName == "scrollPosition") return this._list.scrollPosition;
     if (aName == "scrollWidth") return this._list.scrollWidth;
     return this._parent.getAttribute(aName);
@@ -173,7 +172,7 @@ BreadcrumbsWidget.prototype = {
    * @param nsIDOMNode aElement
    *        The element to make visible.
    */
-  ensureElementIsVisible: function(aElement) {
+  ensureElementIsVisible: function (aElement) {
     if (!aElement) {
       return;
     }
@@ -190,7 +189,7 @@ BreadcrumbsWidget.prototype = {
   /**
    * The underflow and overflow listener for the arrowscrollbox container.
    */
-  _onUnderflow: function({ target }) {
+  _onUnderflow: function ({ target }) {
     if (target != this._list) {
       return;
     }
@@ -202,7 +201,7 @@ BreadcrumbsWidget.prototype = {
   /**
    * The underflow and overflow listener for the arrowscrollbox container.
    */
-  _onOverflow: function({ target }) {
+  _onOverflow: function ({ target }) {
     if (target != this._list) {
       return;
     }

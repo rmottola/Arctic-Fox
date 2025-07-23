@@ -4,11 +4,11 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 @import "resource://devtools/client/shared/components/reps/reps.css";
+@import "resource://devtools/client/shared/components/tree/tree-view.css";
+@import "resource://devtools/client/shared/components/tabs/tabs.css";
 
 @import "general.css";
-@import "dom-tree.css";
 @import "search-box.css";
-@import "tabs.css";
 @import "toolbar.css";
 @import "json-panel.css";
 @import "text-panel.css";
@@ -20,6 +20,19 @@
 
 .panelContent {
   overflow-y: auto;
+  font-size: 11px;
+  font-family: var(--monospace-font-family);
+  padding-right: 5px;
+}
+
+/* The tree takes the entire horizontal space within the panel content. */
+.panelContent .treeTable {
+  width: 100%;
+}
+
+/* Make sure there is a little space between label and value columns. */
+.panelContent .treeTable .treeLabelCell {
+  padding-right: 17px;
 }
 
 /******************************************************************************/
@@ -27,6 +40,12 @@
 
 .theme-firebug .panelContent {
   height: calc(100% - 30px);
+}
+
+/* JSON View is using bigger font-size for the main tabs so,
+  let's overwrite the default value. */
+.theme-firebug .tabs .tabs-navigation {
+  font-size: 14px;
 }
 
 /******************************************************************************/

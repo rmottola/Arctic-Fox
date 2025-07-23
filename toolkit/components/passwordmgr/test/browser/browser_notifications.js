@@ -53,10 +53,11 @@ add_task(function* test_save_change() {
         });
       yield promiseShown;
 
+      let notificationElement = PopupNotifications.panel.childNodes[0];
       // Check the actual content of the popup notification.
-      Assert.equal(document.getElementById("password-notification-username")
+      Assert.equal(notificationElement.querySelector("#password-notification-username")
                            .getAttribute("value"), username);
-      Assert.equal(document.getElementById("password-notification-password")
+      Assert.equal(notificationElement.querySelector("#password-notification-password")
                            .getAttribute("value"), password);
 
       // Simulate the action on the notification to request the login to be
@@ -65,7 +66,6 @@ add_task(function* test_save_change() {
       let expectedNotification = oldPassword ? "modifyLogin" : "addLogin";
       let promiseLogin = TestUtils.topicObserved("passwordmgr-storage-changed",
                          (_, data) => data == expectedNotification);
-      let notificationElement = PopupNotifications.panel.childNodes[0];
       notificationElement.button.doCommand();
       let [result] = yield promiseLogin;
 
@@ -135,6 +135,7 @@ add_task(function* test_edit_username() {
         password: "old password",
       }));
     }
+
     if (testCase.usernameChangedToExists) {
       Services.logins.addLogin(LoginTestUtils.testData.formLogin({
         hostname: "https://example.com",
@@ -162,9 +163,10 @@ add_task(function* test_edit_username() {
         });
       yield promiseShown;
 
+      let notificationElement = PopupNotifications.panel.childNodes[0];
       // Modify the username in the dialog if requested.
       if (testCase.usernameChangedTo) {
-        document.getElementById("password-notification-username")
+        notificationElement.querySelector("#password-notification-username")
                 .setAttribute("value", testCase.usernameChangedTo);
       }
 
@@ -180,7 +182,6 @@ add_task(function* test_edit_username() {
       let expectedNotification = expectModifyLogin ? "modifyLogin" : "addLogin";
       let promiseLogin = TestUtils.topicObserved("passwordmgr-storage-changed",
                          (_, data) => data == expectedNotification);
-      let notificationElement = PopupNotifications.panel.childNodes[0];
       notificationElement.button.doCommand();
       let [result] = yield promiseLogin;
 
@@ -251,6 +252,7 @@ add_task(function* test_edit_username() {
         password: "old password",
       }));
     }
+
     if (testCase.usernameChangedToExists) {
       Services.logins.addLogin(LoginTestUtils.testData.formLogin({
         hostname: "https://example.com",
@@ -296,7 +298,6 @@ add_task(function* test_edit_username() {
       let expectedNotification = expectModifyLogin ? "modifyLogin" : "addLogin";
       let promiseLogin = TestUtils.topicObserved("passwordmgr-storage-changed",
                          (_, data) => data == expectedNotification);
-      let notificationElement = PopupNotifications.panel.childNodes[0];
       notificationElement.button.doCommand();
       let [result] = yield promiseLogin;
 
