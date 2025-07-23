@@ -314,9 +314,11 @@ PathCG::StrokeContainsPoint(const StrokeOptions &aStrokeOptions,
   CGContextReplacePathWithStrokedPath(cg);
   CGContextRestoreGState(cg);
 
-  CGPathRef sPath = CGContextCopyPath(cg);
-  bool inStroke = CGPathContainsPoint(sPath, nullptr, point, false);
-  CGPathRelease(sPath);
+//  FIXME removed because even with trick doesn't link on 10.5
+//  CGPathRef sPath = CGContextCopyPath(cg);
+//  bool inStroke = CGPathContainsPoint(sPath, nullptr, point, false);
+//  CGPathRelease(sPath);
+    bool inStroke = false;
 
   return inStroke;
 }
