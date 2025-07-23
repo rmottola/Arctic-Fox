@@ -229,6 +229,12 @@ HTMLVideoElement::NotifyOwnerDocumentActivityChangedInternal()
   return pauseElement;
 }
 
+FrameStatistics*
+HTMLVideoElement::GetFrameStatistics()
+{
+  return mDecoder ? &(mDecoder->GetFrameStatistics()) : nullptr;
+}
+
 already_AddRefed<VideoPlaybackQuality>
 HTMLVideoElement::GetVideoPlaybackQuality()
 {
