@@ -5461,9 +5461,6 @@ HTMLMediaElement::WindowSuspendChanged(SuspendTypes aSuspend)
               "Error : unknown suspended type!\n", this));
   }
 
-  NotifyAudioPlaybackChanged(
-    AudioChannelService::AudibleChangedReasons::ePauseStateChanged);
-
   return NS_OK;
 }
 
@@ -5548,6 +5545,9 @@ HTMLMediaElement::SetAudioChannelSuspended(SuspendTypes aSuspend)
   MOZ_LOG(AudioChannelService::GetAudioChannelLog(), LogLevel::Debug,
          ("HTMLMediaElement, SetAudioChannelSuspended, this = %p, "
           "aSuspend = %d\n", this, aSuspend));
+
+  NotifyAudioPlaybackChanged(
+    AudioChannelService::AudibleChangedReasons::ePauseStateChanged);
 }
 
 bool
