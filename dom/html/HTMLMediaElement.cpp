@@ -3601,8 +3601,8 @@ void HTMLMediaElement::UpdateSrcMediaStreamPlaying(uint32_t aFlags)
     SetVolumeInternal();
 
     VideoFrameContainer* container = GetVideoFrameContainer();
-    if (container) {
-      stream->AddVideoOutput(container);
+    if (mSelectedVideoStreamTrack && container) {
+      mSelectedVideoStreamTrack->AddVideoOutput(container);
     }
     VideoTrack* videoTrack = VideoTracks()->GetSelectedTrack();
     if (videoTrack) {
@@ -3619,8 +3619,8 @@ void HTMLMediaElement::UpdateSrcMediaStreamPlaying(uint32_t aFlags)
 
       stream->RemoveAudioOutput(this);
       VideoFrameContainer* container = GetVideoFrameContainer();
-      if (container) {
-        stream->RemoveVideoOutput(container);
+      if (mSelectedVideoStreamTrack && container) {
+        mSelectedVideoStreamTrack->RemoveVideoOutput(container);
       }
       VideoTrack* videoTrack = VideoTracks()->GetSelectedTrack();
       if (videoTrack) {
@@ -3765,6 +3765,9 @@ void HTMLMediaElement::ConstructMediaTracks()
     mMediaStreamSizeListener = new StreamSizeListener(this);
     streamTrack->AddDirectListener(mMediaStreamSizeListener);
     mSelectedVideoStreamTrack = streamTrack;
+    if (GetVideoFrameContainer()) {
+      mSelectedVideoStreamTrack->AddVideoOutput(GetVideoFrameContainer());
+    }
   }
 }
 
@@ -3797,6 +3800,10 @@ HTMLMediaElement::NotifyMediaStreamTrackAdded(const RefPtr<MediaStreamTrack>& aT
       mMediaStreamSizeListener = new StreamSizeListener(this);
       t->AddDirectListener(mMediaStreamSizeListener);
       mSelectedVideoStreamTrack = t;
+      VideoFrameContainer* container = GetVideoFrameContainer();
+      if (mSrcStreamIsPlaying && container) {
+        mSelectedVideoStreamTrack->AddVideoOutput(container);
+      }
     }
 
   }
@@ -3826,6 +3833,10 @@ HTMLMediaElement::NotifyMediaStreamTrackRemoved(const RefPtr<MediaStreamTrack>& 
       if (mMediaStreamSizeListener) {
         mSelectedVideoStreamTrack->RemoveDirectListener(mMediaStreamSizeListener);
       }
+      VideoFrameContainer* container = GetVideoFrameContainer();
+      if (mSrcStreamIsPlaying && container) {
+        mSelectedVideoStreamTrack->RemoveVideoOutput(container);
+      }
       mSelectedVideoStreamTrack = nullptr;
       MOZ_ASSERT(mSrcStream);
       nsTArray<RefPtr<VideoStreamTrack>> tracks;
@@ -3849,6 +3860,9 @@ HTMLMediaElement::NotifyMediaStreamTrackRemoved(const RefPtr<MediaStreamTrack>& 
           track->AddDirectListener(mMediaStreamSizeListener);
         }
         mSelectedVideoStreamTrack = track;
+        if (container) {
+          mSelectedVideoStreamTrack->AddVideoOutput(container);
+        }
         return;
       }
 
