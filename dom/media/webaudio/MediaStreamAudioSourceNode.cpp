@@ -18,10 +18,7 @@ namespace dom {
 NS_IMPL_CYCLE_COLLECTION_CLASS(MediaStreamAudioSourceNode)
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(MediaStreamAudioSourceNode)
-  if (tmp->mInputStream) {
-    tmp->mInputStream->UnregisterTrackListener(tmp);
-  }
-  tmp->DetachFromTrack();
+  tmp->Destroy();
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mInputStream)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mInputTrack)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END_INHERITED(AudioNode)
@@ -80,7 +77,20 @@ MediaStreamAudioSourceNode::Init(DOMMediaStream* aMediaStream, ErrorResult& aRv)
   AttachToFirstTrack(mInputStream);
 }
 
-MediaStreamAudioSourceNode::~MediaStreamAudioSourceNode() {}
+void
+MediaStreamAudioSourceNode::Destroy()
+{
+  if (mInputStream) {
+    mInputStream->UnregisterTrackListener(this);
+    mInputStream = nullptr;
+  }
+  DetachFromTrack();
+}
+
+MediaStreamAudioSourceNode::~MediaStreamAudioSourceNode()
+{
+  Destroy();
+}
 
 void
 MediaStreamAudioSourceNode::AttachToTrack(const RefPtr<MediaStreamTrack>& aTrack)
@@ -117,11 +127,18 @@ MediaStreamAudioSourceNode::AttachToFirstTrack(const RefPtr<DOMMediaStream>& aMe
   nsTArray<RefPtr<AudioStreamTrack>> tracks;
   aMediaStream->GetAudioTracks(tracks);
 
-  if (tracks.IsEmpty()) {
+  for (const RefPtr<AudioStreamTrack>& track : tracks) {
+    if (track->Ended()) {
+      continue;
+    }
+
+    AttachToTrack(track);
+    MarkActive();
     return;
   }
 
-  AttachToTrack(tracks[0]);
+  // There was no track available. We'll allow the node to be garbage collected.
+  MarkInactive();
 }
 
 void
@@ -165,8 +182,9 @@ MediaStreamAudioSourceNode::PrincipalChanged(MediaStreamTrack* aMediaStreamTrack
   MOZ_ASSERT(aMediaStreamTrack == mInputTrack);
 
   bool subsumes = false;
+  nsIDocument* doc = nullptr;
   if (nsPIDOMWindowInner* parent = Context()->GetParentObject()) {
-    nsIDocument* doc = parent->GetExtantDoc();
+    doc = parent->GetExtantDoc();
     if (doc) {
       nsIPrincipal* docPrincipal = doc->NodePrincipal();
       nsIPrincipal* trackPrincipal = aMediaStreamTrack->GetPrincipal();
@@ -176,8 +194,16 @@ MediaStreamAudioSourceNode::PrincipalChanged(MediaStreamTrack* aMediaStreamTrack
     }
   }
   auto stream = static_cast<AudioNodeExternalInputStream*>(mStream.get());
-  stream->SetInt32Parameter(MediaStreamAudioSourceNodeEngine::ENABLE,
-                            subsumes || aMediaStreamTrack->GetCORSMode() != CORS_NONE);
+  bool enabled = subsumes || aMediaStreamTrack->GetCORSMode() != CORS_NONE;
+  stream->SetInt32Parameter(MediaStreamAudioSourceNodeEngine::ENABLE, enabled);
+
+  if (!enabled && doc) {
+    nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
+                                    NS_LITERAL_CSTRING("Web Audio"),
+                                    doc,
+                                    nsContentUtils::eDOM_PROPERTIES,
+                                    CrossOriginErrorString());
+  }
 }
 
 size_t
@@ -186,7 +212,9 @@ MediaStreamAudioSourceNode::SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) cons
   // Future:
   // - mInputStream
   size_t amount = AudioNode::SizeOfExcludingThis(aMallocSizeOf);
-  amount += mInputPort->SizeOfIncludingThis(aMallocSizeOf);
+  if (mInputPort) {
+    amount += mInputPort->SizeOfIncludingThis(aMallocSizeOf);
+  }
   return amount;
 }
 

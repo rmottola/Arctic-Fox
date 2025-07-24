@@ -84,9 +84,9 @@ public:
   virtual VideoFrameContainer* GetVideoFrameContainer() = 0;
   virtual mozilla::layers::ImageContainer* GetImageContainer() = 0;
 
-  // Returns the owner of this media decoder. The owner should only be used
-  // on the main thread.
-  virtual MediaDecoderOwner* GetOwner() = 0;
+  // Returns the owner of this decoder or null when the decoder is shutting
+  // down. The owner should only be used on the main thread.
+  virtual MediaDecoderOwner* GetOwner() const = 0;
 
   // Set by Reader if the current audio track can be offloaded
   virtual void SetPlatformCanOffloadAudio(bool aCanOffloadAudio) {}

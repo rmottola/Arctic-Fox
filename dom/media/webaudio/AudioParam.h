@@ -158,11 +158,6 @@ public:
     return mDefaultValue;
   }
 
-  AudioNode* Node() const
-  {
-    return mNode;
-  }
-
   const nsTArray<AudioNode::InputNode>& InputNodes() const
   {
     return mInputNodes;
@@ -221,7 +216,11 @@ private:
     AudioEventTimeline::InsertEvent<double>(event);
 
     SendEventToEngine(event);
+
+    CleanupOldEvents();
   }
+
+  void CleanupOldEvents();
 
   void SendEventToEngine(const AudioTimelineEvent& aEvent);
 

@@ -44,6 +44,7 @@ void WebMBufferedParser::Append(const unsigned char* aBuffer, uint32_t aLength,
   static const uint32_t CLUSTER_ID = 0x1f43b675;
   static const uint32_t TIMECODESCALE_ID = 0x2ad7b1;
   static const unsigned char TIMECODE_ID = 0xe7;
+  static const unsigned char BLOCKGROUP_ID = 0xa0;
   static const unsigned char BLOCK_ID = 0xa1;
   static const unsigned char SIMPLEBLOCK_ID = 0xa3;
   static const uint32_t BLOCK_TIMECODE_LENGTH = 2;
@@ -112,6 +113,9 @@ void WebMBufferedParser::Append(const unsigned char* aBuffer, uint32_t aLength,
         } else {
           mClusterEndOffset = -1;
         }
+        mState = READ_ELEMENT_ID;
+        break;
+      case BLOCKGROUP_ID:
         mState = READ_ELEMENT_ID;
         break;
       case SIMPLEBLOCK_ID:
@@ -436,9 +440,16 @@ void WebMBufferedState::UpdateIndex(const MediaByteRangeSet& aRanges, MediaResou
         }
       }
     }
-    RefPtr<MediaByteBuffer> bytes = aResource->MediaReadAt(offset, length);
-    if(bytes) {
+    while (length > 0) {
+      static const uint32_t BLOCK_SIZE = 1048576;
+      uint32_t block = std::min(length, BLOCK_SIZE);
+      RefPtr<MediaByteBuffer> bytes = aResource->MediaReadAt(offset, block);
+      if (!bytes) {
+        break;
+      }
       NotifyDataArrived(bytes->Elements(), bytes->Length(), offset);
+      length -= bytes->Length();
+      offset += bytes->Length();
     }
   }
 }
