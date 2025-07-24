@@ -1969,11 +1969,11 @@ TabChild::RecvRealTouchEvent(const WidgetTouchEvent& aEvent,
       mPuppetWidget->GetDefaultScale());
 
   if (localEvent.mMessage == eTouchStart && AsyncPanZoomEnabled()) {
+    nsCOMPtr<nsIDocument> document = GetDocument();
     if (gfxPrefs::TouchActionEnabled()) {
       APZCCallbackHelper::SendSetAllowedTouchBehaviorNotification(mPuppetWidget,
-          localEvent, aInputBlockId, mSetAllowedTouchBehaviorCallback);
+          document, localEvent, aInputBlockId, mSetAllowedTouchBehaviorCallback);
     }
-    nsCOMPtr<nsIDocument> document = GetDocument();
     APZCCallbackHelper::SendSetTargetAPZCNotification(mPuppetWidget, document,
         localEvent, aGuid, aInputBlockId);
   }
