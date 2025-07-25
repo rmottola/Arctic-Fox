@@ -1707,9 +1707,10 @@ IDBObjectStore::IndexNames()
 }
 
 already_AddRefed<IDBRequest>
-IDBObjectStore::Get(JSContext* aCx,
-                    JS::Handle<JS::Value> aKey,
-                    ErrorResult& aRv)
+IDBObjectStore::GetInternal(bool aKeyOnly,
+                            JSContext* aCx,
+                            JS::Handle<JS::Value> aKey,
+                            ErrorResult& aRv)
 {
   AssertIsOnOwningThread();
 
@@ -1735,9 +1736,17 @@ IDBObjectStore::Get(JSContext* aCx,
     return nullptr;
   }
 
-  ObjectStoreGetParams params;
-  params.objectStoreId() = Id();
-  keyRange->ToSerialized(params.keyRange());
+  const int64_t id = Id();
+
+  SerializedKeyRange serializedKeyRange;
+  keyRange->ToSerialized(serializedKeyRange);
+
+  RequestParams params;
+  if (aKeyOnly) {
+    params = ObjectStoreGetKeyParams(id, serializedKeyRange);
+  } else {
+    params = ObjectStoreGetParams(id, serializedKeyRange);
+  }
 
   RefPtr<IDBRequest> request = GenerateRequest(aCx, this);
   MOZ_ASSERT(request);
