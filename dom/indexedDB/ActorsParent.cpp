@@ -8491,7 +8491,7 @@ private:
   RecvDeleteMe() override;
 
   virtual bool
-  RecvContinue(const CursorRequestParams& aParams, const Key& key) override;
+  RecvContinue(const CursorRequestParams& aParams) override;
 
   bool
   IsLocaleAware() const {
@@ -8586,16 +8586,13 @@ class Cursor::ContinueOp final
   friend class Cursor;
 
   const CursorRequestParams mParams;
-  const Key mKey;
 
 private:
   // Only created by Cursor.
   ContinueOp(Cursor* aCursor,
-             const CursorRequestParams& aParams,
-             const Key& aKey)
+             const CursorRequestParams& aParams)
     : CursorOpBase(aCursor)
     , mParams(aParams)
-    , mKey(aKey)
   {
     MOZ_ASSERT(aParams.type() != CursorRequestParams::T__None);
   }
@@ -16382,7 +16379,7 @@ Cursor::RecvDeleteMe()
 }
 
 bool
-Cursor::RecvContinue(const CursorRequestParams& aParams, const Key& aKey)
+Cursor::RecvContinue(const CursorRequestParams& aParams)
 {
   AssertIsOnBackgroundThread();
   MOZ_ASSERT(aParams.type() != CursorRequestParams::T__None);
@@ -16416,7 +16413,7 @@ Cursor::RecvContinue(const CursorRequestParams& aParams, const Key& aKey)
     return false;
   }
 
-  RefPtr<ContinueOp> continueOp = new ContinueOp(this, aParams, aKey);
+  RefPtr<ContinueOp> continueOp = new ContinueOp(this, aParams);
   if (NS_WARN_IF(!continueOp->Init(mTransaction))) {
     continueOp->Cleanup();
     return false;
@@ -27983,23 +27980,6 @@ ContinueOp::DoDatabaseWork(DatabaseConnection* aConnection)
   rv = PopulateResponseFromStatement(stmt, true);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return rv;
-  }
-
-  uint32_t extraCount = 1;
-  for (uint32_t i = 0; i < extraCount; i++) {
-    rv = stmt->ExecuteStep(&hasResult);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
-
-    if (!hasResult) {
-      break;
-    }
-
-    rv = PopulateResponseFromStatement(stmt, false);
-    if (NS_WARN_IF(NS_FAILED(rv))) {
-      return rv;
-    }
   }
 
   return NS_OK;
