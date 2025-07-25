@@ -7,13 +7,13 @@
 #ifndef mozilla_RestyleManagerBase_h
 #define mozilla_RestyleManagerBase_h
 
+#include "mozilla/OverflowChangedTracker.h"
 #include "nsChangeHint.h"
 
 class nsStyleChangeList;
 
 namespace mozilla {
 
-class OverflowChangedTracker;
 class ServoRestyleManager;
 class RestyleManager;
 
@@ -53,6 +53,23 @@ public:
    */
   static void DebugVerifyStyleTree(nsIFrame* aFrame);
 #endif
+
+  void FlushOverflowChangedTracker() {
+    mOverflowChangedTracker.Flush();
+  }
+
+  // Should be called when a frame is going to be destroyed and
+  // WillDestroyFrameTree hasn't been called yet.
+  void NotifyDestroyingFrame(nsIFrame* aFrame) {
+    mOverflowChangedTracker.RemoveFrame(aFrame);
+  }
+
+  // Note: It's the caller's responsibility to make sure to wrap a
+  // ProcessRestyledFrames call in a view update batch and a script blocker.
+  // This function does not call ProcessAttachedQueue() on the binding manager.
+  // If the caller wants that to happen synchronously, it needs to handle that
+  // itself.
+  nsresult ProcessRestyledFrames(nsStyleChangeList& aChangeList);
 
 protected:
   void ContentStateChangedInternal(Element* aElement,
@@ -103,21 +120,18 @@ private:
   // True if we're already waiting for a refresh notification.
   bool mObservingRefreshDriver;
 
+protected:
+  OverflowChangedTracker mOverflowChangedTracker;
+
   /**
    * These are protected static methods that help with the change hint
    * processing bits of the restyle managers.
    */
-protected:
   static nsIFrame*
   GetNearestAncestorFrame(nsIContent* aContent);
 
   static nsIFrame*
   GetNextBlockInInlineSibling(FramePropertyTable* aPropTable, nsIFrame* aFrame);
-
-  static nsresult
-  ProcessRestyledFrames(nsStyleChangeList& aChangeList,
-                        nsPresContext& aPresContext,
-                        OverflowChangedTracker& aOverflowChangedTracker);
 
   /**
    * Get the next continuation or similar ib-split sibling (assuming
