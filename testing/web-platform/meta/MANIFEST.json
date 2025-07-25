@@ -14713,6 +14713,10 @@
         "url": "/eventsource/eventsource-onopen.htm"
       },
       {
+        "path": "dom/nodes/Node-isConnected.html",
+        "url": "/dom/nodes/Node-isConnected.html"
+      },
+      {
         "url": "/eventsource/eventsource-prototype.htm"
       },
       {
