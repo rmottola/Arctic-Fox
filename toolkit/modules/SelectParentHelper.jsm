@@ -11,6 +11,7 @@ this.EXPORTED_SYMBOLS = [
 var currentBrowser = null;
 var currentMenulist = null;
 var currentZoom = 1;
+var closedWithEnter = false;
 
 this.SelectParentHelper = {
   populate: function(menulist, items, selectedIndex, zoom) {
@@ -24,6 +25,7 @@ this.SelectParentHelper = {
   open: function(browser, menulist, rect) {
     menulist.hidden = false;
     currentBrowser = browser;
+    closedWithEnter = false;
     this._registerListeners(browser, menulist.menupopup);
 
     let win = browser.ownerDocument.defaultView;
@@ -52,10 +54,19 @@ this.SelectParentHelper = {
         currentBrowser.messageManager.sendAsyncMessage("Forms:MouseOut", {});
         break;
 
+      case "keydown":
+        if (event.keyCode == event.DOM_VK_RETURN) {
+          closedWithEnter = true;
+        }
+        break;
+
       case "command":
         if (event.target.hasAttribute("value")) {
+          let win = currentBrowser.ownerDocument.defaultView;
+
           currentBrowser.messageManager.sendAsyncMessage("Forms:SelectDropDownItem", {
-            value: event.target.value
+            value: event.target.value,
+            closedWithEnter: closedWithEnter
           });
         }
         break;
@@ -91,6 +102,7 @@ this.SelectParentHelper = {
     popup.addEventListener("popuphidden", this);
     popup.addEventListener("mouseover", this);
     popup.addEventListener("mouseout", this);
+    browser.ownerDocument.defaultView.addEventListener("keydown", this, true);
     browser.messageManager.addMessageListener("Forms:UpdateDropDown", this);
   },
 
@@ -99,6 +111,7 @@ this.SelectParentHelper = {
     popup.removeEventListener("popuphidden", this);
     popup.removeEventListener("mouseover", this);
     popup.removeEventListener("mouseout", this);
+    browser.ownerDocument.defaultView.removeEventListener("keydown", this, true);
     browser.messageManager.removeMessageListener("Forms:UpdateDropDown", this);
   },
 
