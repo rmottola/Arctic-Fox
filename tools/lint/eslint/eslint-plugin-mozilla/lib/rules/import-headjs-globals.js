@@ -46,13 +46,18 @@ module.exports = function(context) {
 
       var currentFilePath = helpers.getAbsoluteFilePath(context);
       var dirName = path.dirname(currentFilePath);
-      var fullHeadjsPath = path.resolve(dirName, "head.js");
-      if (!fs.existsSync(fullHeadjsPath)) {
+      importHead(path.resolve(dirName, "head.js"), node);
+
+      if (!helpers.getIsXpcshellTest(this)) {
         return;
       }
 
-      let newGlobals = globals.getGlobalsForFile(fullHeadjsPath);
-      helpers.addGlobals(newGlobals, context.getScope());
+      let names = fs.readdirSync(dirName);
+      for (let name of names) {
+        if (name.startsWith("head_") && name.endsWith(".js")) {
+          importHead(path.resolve(dirName, name), node);
+        }
+      }
     }
   };
 };
