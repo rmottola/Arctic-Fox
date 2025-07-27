@@ -23828,6 +23828,14 @@
             "url": "/web-animations/timing-model/animations/current-time.html"
           }
         ]
+      },
+      "testharness": {
+        "html/semantics/forms/the-form-element/form-submission-sandbox.html": [
+          {
+            "path": "html/semantics/forms/the-form-element/form-submission-sandbox.html",
+            "url": "/html/semantics/forms/the-form-element/form-submission-sandbox.html"
+          }
+        ]
       }
     },
     "reftest_nodes": {
