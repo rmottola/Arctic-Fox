@@ -1211,11 +1211,13 @@ this.Extension.generateXPI = function(id, data) {
  * @param {string} id
  * @param {nsIFile} file
  * @param {nsIURI} rootURI
+ * @param {string} installType
  */
-function MockExtension(id, file, rootURI) {
+function MockExtension(id, file, rootURI, installType) {
   this.id = id;
   this.file = file;
   this.rootURI = rootURI;
+  this.installType = installType;
 
   let promiseEvent = eventName => new Promise(resolve => {
     let onstartup = (msg, extension) => {
@@ -1252,10 +1254,29 @@ MockExtension.prototype = {
   },
 
   startup() {
-    return AddonManager.installTemporaryAddon(this.file).then(addon => {
-      this.addon = addon;
-      return this._readyPromise;
-    });
+    if (this.installType == "temporary") {
+      return AddonManager.installTemporaryAddon(this.file).then(addon => {
+        this.addon = addon;
+        return this._readyPromise;
+      });
+    } else if (this.installType == "permanent") {
+      return new Promise((resolve, reject) => {
+        AddonManager.getInstallForFile(this.file, install => {
+          let listener = {
+            onInstallFailed: reject,
+            onInstallEnded: (install, newAddon) => {
+              this.addon = newAddon;
+              resolve(this._readyPromise);
+            },
+          };
+
+          install.addListener(listener);
+          install.install();
+        });
+      });
+    } else {
+      throw Error("installType must be one of: temporary, permanent");
+    }
   },
 
   shutdown() {
@@ -1286,8 +1307,9 @@ this.Extension.generate = function(id, data) {
   let fileURI = Services.io.newFileURI(file);
   let jarURI = Services.io.newURI("jar:" + fileURI.spec + "!/", null, null);
 
+  // This may be "temporary" or "permanent".
   if (data.useAddonManager) {
-    return new MockExtension(id, file, jarURI);
+    return new MockExtension(id, file, jarURI, data.useAddonManager);
   }
 
   return new Extension({
