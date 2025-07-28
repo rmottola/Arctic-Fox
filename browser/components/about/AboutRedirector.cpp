@@ -49,13 +49,15 @@ static RedirEntry kRedirMap[] = {
     nsIAboutModule::URI_CAN_LOAD_IN_CHILD |
     nsIAboutModule::ALLOW_SCRIPT |
     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
+  { "providerdirectory", "chrome://browser/content/aboutProviderDirectory.xhtml",
+    nsIAboutModule::ALLOW_SCRIPT |
+    nsIAboutModule::HIDE_FROM_ABOUTABOUT },
   { "tabcrashed", "chrome://browser/content/aboutTabCrashed.xhtml",
     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
     nsIAboutModule::ALLOW_SCRIPT |
     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
   { "feeds", "chrome://browser/content/feeds/subscribe.xhtml",
     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
-    nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
     nsIAboutModule::ALLOW_SCRIPT |
     nsIAboutModule::HIDE_FROM_ABOUTABOUT },
   { "privatebrowsing", "chrome://browser/content/aboutPrivateBrowsing.xhtml",
@@ -87,8 +89,9 @@ static RedirEntry kRedirMap[] = {
   // Linkable because of indexeddb use (bug 1228118)
   { "home", "chrome://browser/content/abouthome/aboutHome.xhtml",
     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
-    nsIAboutModule::MAKE_LINKABLE |
+    nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
     nsIAboutModule::ALLOW_SCRIPT |
+    nsIAboutModule::MAKE_LINKABLE |
     nsIAboutModule::ENABLE_INDEXED_DB },
   // the newtab's actual URL will be determined when the channel is created
   { "newtab", "about:blank",
