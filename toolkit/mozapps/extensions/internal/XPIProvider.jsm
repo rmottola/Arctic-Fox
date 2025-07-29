@@ -1470,8 +1470,7 @@ var loadManifestFromZipFile = Task.async(function*(aXPIFile, aInstallLocation) {
 function loadManifestFromFile(aFile, aInstallLocation) {
   if (aFile.isFile())
     return loadManifestFromZipFile(aFile, aInstallLocation);
-  else
-    return loadManifestFromDir(aFile, aInstallLocation);
+  return loadManifestFromDir(aFile, aInstallLocation);
 }
 
 /**
@@ -2870,10 +2869,8 @@ this.XPIProvider = {
       );
       return done;
     }
-    else {
-      logger.debug("Notifying XPI shutdown observers");
-      Services.obs.notifyObservers(null, "xpi-provider-shutdown", null);
-    }
+    logger.debug("Notifying XPI shutdown observers");
+    Services.obs.notifyObservers(null, "xpi-provider-shutdown", null);
     return undefined;
   },
 

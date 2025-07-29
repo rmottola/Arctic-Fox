@@ -163,9 +163,8 @@ var SidebarUI = {
     if (this.isOpen && commandID == this.currentID) {
       this.hide();
       return Promise.resolve();
-    } else {
-      return this.show(commandID);
     }
+    return this.show(commandID);
   },
 
   /**
