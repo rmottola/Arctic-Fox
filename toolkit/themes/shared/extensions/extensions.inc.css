@@ -6,8 +6,7 @@
 @import url("chrome://global/skin/in-content/common.css");
 
 .main-content {
-  padding-top: 0;
-  padding-inline-end: 0;
+  padding: 0;
 }
 
 #nav-header {
@@ -16,7 +15,8 @@
 }
 
 .view-pane > .list > scrollbox {
-  padding-inline-end: 48px;
+  padding-right: 48px;
+  padding-left: 48px;
 }
 
 
@@ -103,7 +103,8 @@
 
 .alert-container {
   -moz-box-align: center;
-  margin-inline-end: 48px;
+  margin-right: 48px;
+  margin-left: 48px;
 }
 
 .alert-spacer-before {
@@ -226,7 +227,8 @@
 #header {
   margin-top: 20px;
   margin-bottom: 20px;
-  margin-inline-end: 48px;
+  margin-right: 48px;
+  margin-left: 48px;
 }
 
 @media (max-width: 600px) {
@@ -236,8 +238,7 @@
 }
 
 .view-header {
-  margin: 0;
-  margin-inline-end: 48px;
+  margin: 0 48px;
   border-bottom: 1px solid #c1c1c1;
 }
 
@@ -611,7 +612,8 @@
 
 #search-filter {
   padding: 5px 20px;
-  margin-inline-end: 48px;
+  margin-right: 48px;
+  margin-left: 48px;
   font-size: 120%;
   border-bottom: 1px solid #c1c1c1;
   overflow-x: hidden;
@@ -631,8 +633,9 @@
 
 /*** detail view ***/
 
-#detail-view {
-  margin-inline-end: 48px;
+#detail-view > .box-inherit {
+  margin-right: 48px;
+  margin-left: 48px;
 }
 
 #detail-view .loading {
