@@ -2882,6 +2882,7 @@ var gDetailView = {
       version.hidden = true;
     }
 
+    var screenshotbox = document.getElementById("detail-screenshot-box");
     var screenshot = document.getElementById("detail-screenshot");
     if (aAddon.screenshots && aAddon.screenshots.length > 0) {
       if (aAddon.screenshots[0].thumbnailURL) {
@@ -2894,9 +2895,9 @@ var gDetailView = {
         screenshot.height = aAddon.screenshots[0].height;
       }
       screenshot.setAttribute("loading", "true");
-      screenshot.hidden = false;
+      screenshotbox.hidden = false;
     } else {
-      screenshot.hidden = true;
+      screenshotbox.hidden = true;
     }
 
     var desc = document.getElementById("detail-desc");
