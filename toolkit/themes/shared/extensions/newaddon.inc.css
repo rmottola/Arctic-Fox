@@ -37,10 +37,10 @@
 
 #icon {
   margin-top: 8px;
-  -moz-margin-end: 10px;
+  margin-inline-end: 10px;
   max-width: 64px;
   max-height: 64px;
-  list-style-image: url("chrome://mozapps/skin/extensions/extensionGeneric.png");
+  list-style-image: url("chrome://mozapps/skin/extensions/extensionGeneric.svg");
 }
 
 .addon-info[type="theme"] #icon {
@@ -77,15 +77,15 @@
 }
 
 #warning-icon {
-  list-style-image: url("chrome://mozapps/skin/extensions/alerticon-warning.png");
+  list-style-image: url("chrome://mozapps/skin/extensions/alerticon-warning.svg");
   width: 16px;
-  height: 15px;
+  height: 16px;
   margin-top: 5px;
-  -moz-margin-end: 5px;
+  margin-inline-end: 5px;
 }
 
 #allow {
-  -moz-margin-start: 84px;
+  margin-inline-start: 84px;
   margin-bottom: 20px;
 }
 
