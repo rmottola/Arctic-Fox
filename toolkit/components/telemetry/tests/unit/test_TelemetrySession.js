@@ -1818,7 +1818,7 @@ add_task(function* test_userIdleAndSchedlerTick() {
   yield TelemetrySession.shutdown();
 });
 
-add_task(function* stopServer(){
+add_task(function* stopServer() {
   yield PingServer.stop();
   do_test_finished();
 });

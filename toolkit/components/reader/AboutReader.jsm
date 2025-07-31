@@ -708,7 +708,7 @@ AboutReader.prototype = {
     }
   },
 
-  _maybeSetTextDirection: function Read_maybeSetTextDirection(article){
+  _maybeSetTextDirection: function Read_maybeSetTextDirection(article) {
     if(!article.dir)
       return;
 
