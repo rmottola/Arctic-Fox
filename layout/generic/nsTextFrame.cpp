@@ -551,7 +551,7 @@ GlyphObserver::NotifyGlyphsChanged()
       auto svgTextFrame = static_cast<SVGTextFrame*>(
                             nsLayoutUtils::GetClosestFrameOfType(f,
                             nsGkAtoms::svgTextFrame));
-      svgTextFrame->ScheduleReflowSVGNonDisplayText();
+      svgTextFrame->ScheduleReflowSVGNonDisplayText(nsIPresShell::eResize);
     } else {
       // Theoretically we could just update overflow areas, perhaps using
       // OverflowChangedTracker, but that would do a bunch of work eagerly that
