@@ -6694,8 +6694,8 @@ nsDisplaySVGEffects::BuildLayer(nsDisplayListBuilder* aBuilder,
     }
   }
 
-  float opacity = mFrame->StyleEffects()->mOpacity;
-  if (opacity == 0.0f)
+  if (mFrame->StyleEffects()->mOpacity == 0.0f &&
+      !mOpacityItemCreated)
     return nullptr;
 
   nsIFrame* firstFrame =
