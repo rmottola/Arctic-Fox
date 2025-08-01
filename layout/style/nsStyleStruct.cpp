@@ -1105,16 +1105,16 @@ FragmentOrURL::Resolve(nsIContent* aContent) const
 }
 
 // --------------------
-// nsStyleClipPath
+// StyleClipPath
 //
-nsStyleClipPath::nsStyleClipPath()
+StyleClipPath::StyleClipPath()
   : mURL(nullptr)
   , mType(StyleClipPathType::None_)
   , mSizingBox(StyleClipShapeSizing::NoBox)
 {
 }
 
-nsStyleClipPath::nsStyleClipPath(const nsStyleClipPath& aSource)
+StyleClipPath::StyleClipPath(const StyleClipPath& aSource)
   : mURL(nullptr)
   , mType(StyleClipPathType::None_)
   , mSizingBox(StyleClipShapeSizing::NoBox)
@@ -1128,13 +1128,13 @@ nsStyleClipPath::nsStyleClipPath(const nsStyleClipPath& aSource)
   }
 }
 
-nsStyleClipPath::~nsStyleClipPath()
+StyleClipPath::~StyleClipPath()
 {
   ReleaseRef();
 }
 
-nsStyleClipPath&
-nsStyleClipPath::operator=(const nsStyleClipPath& aOther)
+StyleClipPath&
+StyleClipPath::operator=(const StyleClipPath& aOther)
 {
   if (this == &aOther) {
     return *this;
@@ -1155,7 +1155,7 @@ nsStyleClipPath::operator=(const nsStyleClipPath& aOther)
 }
 
 bool
-nsStyleClipPath::operator==(const nsStyleClipPath& aOther) const
+StyleClipPath::operator==(const StyleClipPath& aOther) const
 {
   if (mType != aOther.mType) {
     return false;
@@ -1174,7 +1174,7 @@ nsStyleClipPath::operator==(const nsStyleClipPath& aOther) const
 }
 
 void
-nsStyleClipPath::ReleaseRef()
+StyleClipPath::ReleaseRef()
 {
   if (mType == StyleClipPathType::Shape) {
     NS_ASSERTION(mBasicShape, "expected pointer");
@@ -1189,7 +1189,7 @@ nsStyleClipPath::ReleaseRef()
 }
 
 void
-nsStyleClipPath::CopyURL(const nsStyleClipPath& aOther)
+StyleClipPath::CopyURL(const StyleClipPath& aOther)
 {
   ReleaseRef();
 
@@ -1198,7 +1198,7 @@ nsStyleClipPath::CopyURL(const nsStyleClipPath& aOther)
 }
 
 bool
-nsStyleClipPath::SetURL(const nsCSSValue* aValue)
+StyleClipPath::SetURL(const nsCSSValue* aValue)
 {
   if (!aValue->GetURLValue()) {
     return false;
@@ -1213,8 +1213,8 @@ nsStyleClipPath::SetURL(const nsCSSValue* aValue)
 }
 
 void
-nsStyleClipPath::SetBasicShape(StyleBasicShape* aBasicShape,
-                               StyleClipShapeSizing aSizingBox)
+StyleClipPath::SetBasicShape(StyleBasicShape* aBasicShape,
+                             StyleClipShapeSizing aSizingBox)
 {
   NS_ASSERTION(aBasicShape, "expected pointer");
   ReleaseRef();
@@ -1225,7 +1225,7 @@ nsStyleClipPath::SetBasicShape(StyleBasicShape* aBasicShape,
 }
 
 void
-nsStyleClipPath::SetSizingBox(StyleClipShapeSizing aSizingBox)
+StyleClipPath::SetSizingBox(StyleClipShapeSizing aSizingBox)
 {
   ReleaseRef();
   mSizingBox = aSizingBox;
