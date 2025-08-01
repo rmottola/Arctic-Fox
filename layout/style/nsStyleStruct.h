@@ -3436,10 +3436,10 @@ private:
 
 namespace mozilla {
 
-class nsStyleBasicShape final
+class StyleBasicShape final
 {
 public:
-  explicit nsStyleBasicShape(StyleBasicShapeType type)
+  explicit StyleBasicShape(StyleBasicShapeType type)
     : mType(type),
       mFillRule(NS_STYLE_FILL_RULE_NONZERO)
   {
@@ -3502,7 +3502,7 @@ public:
     return mCoordinates;
   }
 
-  bool operator==(const nsStyleBasicShape& aOther) const
+  bool operator==(const StyleBasicShape& aOther) const
   {
     return mType == aOther.mType &&
            mFillRule == aOther.mFillRule &&
@@ -3510,14 +3510,14 @@ public:
            mPosition == aOther.mPosition &&
            mRadius == aOther.mRadius;
   }
-  bool operator!=(const nsStyleBasicShape& aOther) const {
+  bool operator!=(const StyleBasicShape& aOther) const {
     return !(*this == aOther);
   }
 
-  NS_INLINE_DECL_REFCOUNTING(nsStyleBasicShape);
+  NS_INLINE_DECL_REFCOUNTING(StyleBasicShape);
 
 private:
-  ~nsStyleBasicShape() {}
+  ~StyleBasicShape() {}
 
   StyleBasicShapeType mType;
   int32_t mFillRule;
@@ -3552,12 +3552,12 @@ struct nsStyleClipPath
   }
   bool SetURL(const nsCSSValue* aValue);
 
-  nsStyleBasicShape* GetBasicShape() const {
+  StyleBasicShape* GetBasicShape() const {
     NS_ASSERTION(mType == StyleClipPathType::Shape, "wrong clip-path type");
     return mBasicShape;
   }
 
-  void SetBasicShape(nsStyleBasicShape* mBasicShape,
+  void SetBasicShape(StyleBasicShape* mBasicShape,
                      StyleClipShapeSizing aSizingBox =
                      StyleClipShapeSizing::NoBox);
 
@@ -3571,7 +3571,7 @@ private:
   void* operator new(size_t) = delete;
 
   union {
-    nsStyleBasicShape* mBasicShape;
+    StyleBasicShape* mBasicShape;
     FragmentOrURL* mURL;
   };
   StyleClipPathType    mType;

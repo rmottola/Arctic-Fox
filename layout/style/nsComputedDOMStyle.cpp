@@ -5898,7 +5898,7 @@ nsComputedDOMStyle::BasicShapeRadiiToString(nsAString& aCssText,
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::CreatePrimitiveValueForBasicShape(
-  const nsStyleBasicShape* aStyleBasicShape)
+  const StyleBasicShape* aStyleBasicShape)
 {
   MOZ_ASSERT(aStyleBasicShape, "Expect a valid basic shape pointer!");
 
@@ -5978,7 +5978,7 @@ nsComputedDOMStyle::CreatePrimitiveValueForBasicShape(
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::CreatePrimitiveValueForClipPath(
-  const nsStyleBasicShape* aStyleBasicShape,
+  const StyleBasicShape* aStyleBasicShape,
   StyleClipShapeSizing aSizingBox)
 {
   RefPtr<nsDOMCSSValueList> valueList = GetROCSSValueList(false);
