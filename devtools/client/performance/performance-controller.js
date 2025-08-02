@@ -29,6 +29,7 @@ var Services = require("Services");
 var promise = require("promise");
 var EventEmitter = require("devtools/shared/event-emitter");
 var DevToolsUtils = require("devtools/shared/DevToolsUtils");
+var flags = require("devtools/shared/flags");
 var system = require("devtools/shared/system");
 
 // Logic modules
@@ -504,7 +505,7 @@ var PerformanceController = {
     // have realtime rendering tests in non-e10s. This function is
     // overridden wholesale in tests when we want to test multiprocess support
     // specifically.
-    if (DevToolsUtils.testing) {
+    if (flags.testing) {
       return { supported: true, enabled: true };
     }
     let supported = system.constants.E10S_TESTING_ONLY;
