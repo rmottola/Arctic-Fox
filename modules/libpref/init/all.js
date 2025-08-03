@@ -954,6 +954,7 @@ sticky_pref("devtools.debugger.remote-enabled", true);
 sticky_pref("devtools.debugger.remote-enabled", false);
 #endif
 pref("devtools.debugger.remote-port", 6000);
+pref("devtools.debugger.remote-websocket", false);
 // Force debugger server binding on the loopback interface
 pref("devtools.debugger.force-local", true);
 // Display a prompt when a new connection starts to accept/reject it
