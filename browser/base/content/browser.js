@@ -43,6 +43,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
                                   "resource://gre/modules/AppConstants.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "UpdateUtils",
                                   "resource://gre/modules/UpdateUtils.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Color",
+                                  "resource://gre/modules/Color.jsm");
 XPCOMUtils.defineLazyServiceGetter(this, "Favicons",
                                    "@mozilla.org/browser/favicon-service;1",
                                    "mozIAsyncFavicons");
@@ -1099,23 +1101,15 @@ var gBrowserInit = {
     gPrivateBrowsingUI.init();
     retrieveToolbarIconsizesFromTheme();
 
-#ifdef XP_WIN
     if (window.matchMedia("(-moz-os-version: windows-win8)").matches &&
         window.matchMedia("(-moz-windows-default-theme)").matches) {
-      let windows8WindowFrameColor = Cu.import("resource:///modules/Windows8WindowFrameColor.jsm", {}).Windows8WindowFrameColor;
-      
-      var windowFrameColor;
-      windowFrameColor = windows8WindowFrameColor.get_win8();
-
-      // Formula from Microsoft's UWP guideline.
-      let backgroundLuminance = (windowFrameColor[0] * 2 +
-                                 windowFrameColor[1] * 5 +
-                                 windowFrameColor[2]) / 8;
-      if (backgroundLuminance <= 128) {
+      let windowFrameColor = new Color(...Cu.import("resource:///modules/Windows8WindowFrameColor.jsm", {})
+                                            .Windows8WindowFrameColor.get());
+      // Default to black for foreground text.
+      if (!windowFrameColor.isContrastRatioAcceptable(new Color(0, 0, 0))) {
         document.documentElement.setAttribute("darkwindowframe", "true");
       }
     }
-#endif
 
     ToolbarIconColor.init();
 
