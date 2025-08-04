@@ -1519,3 +1519,10 @@ pref("browser.migration.automigrate", false);
 pref("dom.mozBrowserFramesEnabled", true);
 
 pref("signon.schemeUpgrades", true);
+
+// Enable the "Simplify Page" feature in Print Preview
+pref("print.use_simplify_page", true);
+
+// Space separated list of URLS that are allowed to send objects (instead of
+// only strings) through webchannels. This list is duplicated in mobile/android/app/mobile.js
+pref("webchannel.allowObject.urlWhitelist", "https://accounts.firefox.com https://content.cdn.mozilla.net https://input.mozilla.org https://support.mozilla.org https://install.mozilla.org");

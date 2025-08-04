@@ -41,8 +41,8 @@ let gTests = [
         let channel = new WebChannel("twoway", Services.io.newURI(HTTP_PATH, null, null));
 
         channel.listen(function (id, message, sender) {
-          is(id, "twoway");
-          ok(message.command);
+          is(id, "twoway", "bad id");
+          ok(message.command, "command not ok");
 
           if (message.command === "one") {
             channel.send({ data: { nested: true } }, sender);
