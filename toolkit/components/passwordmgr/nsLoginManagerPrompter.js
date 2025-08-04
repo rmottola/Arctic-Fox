@@ -1007,8 +1007,6 @@ LoginManagerPrompter.prototype = {
           this._getLocalizedString("notifyBarRememberPasswordButtonText");
     var rememberButtonAccessKey =
           this._getLocalizedString("notifyBarRememberPasswordButtonAccessKey");
-    var usernamePlaceholder =
-          this._getLocalizedString("noUsernamePlaceholder");
 
     var displayHost = this._getShortDisplayHost(aLogin.hostname);
     var notificationText = this._getLocalizedString(
@@ -1019,7 +1017,6 @@ LoginManagerPrompter.prototype = {
     // in scope here; set one to |this._pwmgr| so we can get back to pwmgr
     // without a getService() call.
     var pwmgr = this._pwmgr;
-    let promptHistogram = Services.telemetry.getHistogramById("PWMGR_PROMPT_REMEMBER_ACTION");
 
     // Notification is a PopupNotification
     if (aNotifyObj == this._getPopupNote()) {
@@ -1185,8 +1182,6 @@ LoginManagerPrompter.prototype = {
           this._getLocalizedString("notifyBarUpdateButtonText");
     var changeButtonAccessKey =
           this._getLocalizedString("notifyBarUpdateButtonAccessKey");
-    var usernamePlaceholder =
-          this._getLocalizedString("noUsernamePlaceholder");
 
     // We reuse the existing message, even if it expects a username, until we
     // switch to the final terminology in bug 1144856.
