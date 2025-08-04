@@ -745,7 +745,7 @@ function saveMedia()
       if (aDirectory) {
         var saveAnImage = function(aURIString, aChosenData, aBaseURI) {
           internalSave(aURIString, null, null, null, null, false, "SaveImageTitle",
-                       aChosenData, aBaseURI, null, gDocInfo.isContentWindowPrivate);
+                       aChosenData, aBaseURI, null, false, null, gDocInfo.isContentWindowPrivate);
         };
 
         for (var i = 0; i < rowArray.length; i++) {
