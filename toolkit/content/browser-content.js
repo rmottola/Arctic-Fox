@@ -266,6 +266,7 @@ var PopupBlocking = {
     addEventListener("pagehide", this, true);
 
     addMessageListener("PopupBlocking:UnblockPopup", this);
+    addMessageListener("PopupBlocking:GetBlockedPopupList", this);
   },
 
   receiveMessage: function(msg) {
@@ -283,6 +284,15 @@ var PopupBlocking = {
             dwi.open(data.popupWindowURI, data.popupWindowName, data.popupWindowFeatures);
           }
         }
+        break;
+      }
+
+      case "PopupBlocking:GetBlockedPopupList": {
+        sendAsyncMessage("PopupBlocking:ReplyGetBlockedPopupList",
+                          // Limit 15 popup URLs to be reopened
+                         { popupData: this.popupData ?
+                                      this.popupData.slice(0, 15) :
+                                      [] });
         break;
       }
     }
@@ -354,7 +364,10 @@ var PopupBlocking = {
 
   updateBlockedPopups: function(freshPopup) {
     sendAsyncMessage("PopupBlocking:UpdateBlockedPopups",
-                     {blockedPopups: this.popupData, freshPopup: freshPopup});
+      {
+        count: this.popupData ? this.popupData.length : 0,
+        freshPopup
+      });
   },
 };
 PopupBlocking.init();
