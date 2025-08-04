@@ -31,8 +31,8 @@ pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/2001
 pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @AF_SLICE@");
 
 // Google fonts serves physically different fonts to later Firefox versions that render incorrectly unless on Gecko
-pref("@GUAO_PREF@.fonts.googleapis.com", "Mozilla/5.0 (%OS_SLICE% rv:52.0) Gecko/20100101 Firefox/52.0 @AF_SLICE@"");
-pref("@GUAO_PREF@.fonts-api.wp.com", "Mozilla/5.0 (%OS_SLICE% rv:52.0) Gecko/20100101 Firefox/52.0 @AF_SLICE@"");
+pref("@GUAO_PREF@.fonts.googleapis.com", "Mozilla/5.0 (%OS_SLICE% rv:52.0) Gecko/20100101 Firefox/52.0 @AF_SLICE@");
+pref("@GUAO_PREF@.fonts-api.wp.com", "Mozilla/5.0 (%OS_SLICE% rv:52.0) Gecko/20100101 Firefox/52.0 @AF_SLICE@");
 
 // Trick these sites in to thinking we are using IE11
 pref("@GUAO_PREF@.dropbox.com","Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko");
