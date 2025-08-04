@@ -794,7 +794,7 @@ var FindBar = {
     let fakeEvent = {};
     for (let k in event) {
       if (typeof event[k] != "object" && typeof event[k] != "function" &&
-          !(k in KeyboardEvent)) {
+          !(k in content.KeyboardEvent)) {
         fakeEvent[k] = event[k];
       }
     }
