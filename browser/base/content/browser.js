@@ -4432,7 +4432,7 @@ function updateUserContextUIIndicator()
   }
 
   let label = document.getElementById("userContext-label");
-  label.value = ContextualIdentityService.getUserContextLabel(userContextId);
+  label.setAttribute('value', ContextualIdentityService.getUserContextLabel(userContextId));
   label.style.color = identity.color;
 
   let indicator = document.getElementById("userContext-indicator");
