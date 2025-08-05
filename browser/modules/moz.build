@@ -40,7 +40,6 @@ EXTRA_JS_MODULES += [
     'RecentWindow.jsm',
     'RemotePrompt.jsm',
     'Sanitizer.jsm',
-    'SharedFrame.jsm',
     'SitePermissions.jsm',
     'TabGroupsMigrator.jsm',
     'TransientPrefs.jsm',
