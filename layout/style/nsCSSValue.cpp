@@ -1365,7 +1365,7 @@ nsCSSValue::AppendToString(nsCSSProperty aProperty, nsAString& aResult,
 
     case eCSSProperty_clip_path:
       AppendASCIItoUTF16(nsCSSProps::ValueToKeyword(intValue,
-                            nsCSSProps::kClipShapeSizingKTable),
+                            nsCSSProps::kClipPathGeometryBoxKTable),
                          aResult);
       break;
 

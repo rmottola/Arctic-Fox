@@ -16064,7 +16064,7 @@ bool CSSParserImpl::ParseClipPath()
     }
 
     nsCSSValue referenceBox;
-    bool hasBox = ParseEnum(referenceBox, nsCSSProps::kClipShapeSizingKTable);
+    bool hasBox = ParseEnum(referenceBox, nsCSSProps::kClipPathGeometryBoxKTable);
 
     const bool boxCameFirst = hasBox;
 
@@ -16080,7 +16080,7 @@ bool CSSParserImpl::ParseClipPath()
 
     // Check if the second argument is a reference box if the first wasn't.
     if (!hasBox) {
-      hasBox = ParseEnum(referenceBox, nsCSSProps::kClipShapeSizingKTable);
+      hasBox = ParseEnum(referenceBox, nsCSSProps::kClipPathGeometryBoxKTable);
     }
 
     RefPtr<nsCSSValue::Array> fullValue =

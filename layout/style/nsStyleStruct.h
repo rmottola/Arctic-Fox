@@ -3686,7 +3686,7 @@ private:
   ReferenceBox mReferenceBox = ReferenceBox::NoBox;
 };
 
-using StyleClipPath = StyleShapeSource<StyleClipShapeSizing>;
+using StyleClipPath = StyleShapeSource<StyleClipPathGeometryBox>;
 
 } // namespace mozilla
 
