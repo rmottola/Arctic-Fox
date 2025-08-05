@@ -111,6 +111,15 @@ nsConditionalResetStyleData::GetConditionalStyleData(nsStyleStructID aSID,
     NS_SET_IMAGE_REQUEST(method_, context_, requestgetter_(doc))              \
   }
 
+
+template<typename ReferenceBox>
+static void
+SetStyleShapeSourceToCSSValue(StyleShapeSource<ReferenceBox>* aShapeSource,
+                              const nsCSSValue* aValue,
+                              nsStyleContext* aStyleContext,
+                              nsPresContext* aPresContext,
+                              RuleNodeCacheConditions& aConditions);
+
 /* Helper function to convert a CSS <position> specified value into its
  * computed-style form. */
 static void
@@ -6748,14 +6757,6 @@ ComputePositionCoord(nsStyleContext* aStyleContext,
     NS_ASSERTION(eCSSUnit_Null == aEdge.GetUnit(), "unexpected unit");
   }
 }
-
-template<typename ReferenceBox>
-static void
-SetStyleShapeSourceToCSSValue(StyleShapeSource<ReferenceBox>* aShapeSource,
-                              const nsCSSValue* aValue,
-                              nsStyleContext* aStyleContext,
-                              nsPresContext* aPresContext,
-                              RuleNodeCacheConditions& aConditions);
 
 /* Helper function to convert a CSS <position> specified value into its
  * computed-style form. */
