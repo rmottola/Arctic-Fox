@@ -99,6 +99,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
                                   "resource:///modules/sessionstore/SessionStore.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "BrowserUsageTelemetry",
+                                  "resource:///modules/BrowserUsageTelemetry.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserUITelemetry",
                                   "resource:///modules/BrowserUITelemetry.jsm");
 
@@ -690,6 +693,7 @@ BrowserGlue.prototype = {
     NewTabMessages.init();
 
     SessionStore.init();
+    BrowserUsageTelemetry.init();
     BrowserUITelemetry.init();
     ContentSearch.init();
     FormValidationHandler.init();
@@ -1063,7 +1067,7 @@ BrowserGlue.prototype = {
     }
 
     UserAgentOverrides.uninit();
-
+    BrowserUsageTelemetry.uninit();
     NewTabMessages.uninit();
 
     AboutNewTab.uninit();
