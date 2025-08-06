@@ -286,15 +286,6 @@ DoMatch(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName, MatchFn aMatch)
   return false;
 }
 
-// Work around our overly-restrictive static analysis. This can be removed once
-// bug 1281935 lands.
-template<typename T>
-struct FakeRef {
-  MOZ_IMPLICIT FakeRef(T* aPtr) : mPtr(aPtr) {}
-  operator T*() const { return mPtr; }
-  T* mPtr;
-};
-
 template <typename Implementor>
 static bool
 HasAttr(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName)
@@ -305,10 +296,9 @@ HasAttr(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName)
 
 template <typename Implementor>
 static bool
-AttrEquals(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName, nsIAtom* aStr_,
+AttrEquals(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName, nsIAtom* aStr,
            bool aIgnoreCase)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr, aIgnoreCase](const nsAttrValue* aValue) {
     return aValue->Equals(aStr, aIgnoreCase ? eIgnoreCase : eCaseMatters);
   };
@@ -318,9 +308,8 @@ AttrEquals(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName, nsIAtom* aStr_,
 template <typename Implementor>
 static bool
 AttrDashEquals(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
-               nsIAtom* aStr_)
+               nsIAtom* aStr)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr](const nsAttrValue* aValue) {
     nsAutoString str;
     aValue->ToString(str);
@@ -333,9 +322,8 @@ AttrDashEquals(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
 template <typename Implementor>
 static bool
 AttrIncludes(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
-             nsIAtom* aStr_)
+             nsIAtom* aStr)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr](const nsAttrValue* aValue) {
     nsAutoString str;
     aValue->ToString(str);
@@ -348,9 +336,8 @@ AttrIncludes(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
 template <typename Implementor>
 static bool
 AttrHasSubstring(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
-                 nsIAtom* aStr_)
+                 nsIAtom* aStr)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr](const nsAttrValue* aValue) {
     nsAutoString str;
     aValue->ToString(str);
@@ -362,9 +349,8 @@ AttrHasSubstring(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
 template <typename Implementor>
 static bool
 AttrHasPrefix(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
-              nsIAtom* aStr_)
+              nsIAtom* aStr)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr](const nsAttrValue* aValue) {
     nsAutoString str;
     aValue->ToString(str);
@@ -376,9 +362,8 @@ AttrHasPrefix(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
 template <typename Implementor>
 static bool
 AttrHasSuffix(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
-              nsIAtom* aStr_)
+              nsIAtom* aStr)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr](const nsAttrValue* aValue) {
     nsAutoString str;
     aValue->ToString(str);
