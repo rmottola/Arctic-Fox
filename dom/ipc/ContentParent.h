@@ -1216,6 +1216,8 @@ private:
 #ifdef NS_PRINTING
   RefPtr<embedding::PrintingParent> mPrintingParent;
 #endif
+
+  nsTArray<nsCString> mBlobURLs;
 };
 
 } // namespace dom
