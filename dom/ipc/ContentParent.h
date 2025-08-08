@@ -358,8 +358,6 @@ public:
     return mSubprocess;
   }
 
-  int32_t Pid() const;
-
   ContentParent* Opener() const
   {
     return mOpener;
@@ -561,6 +559,8 @@ public:
 
   virtual bool
   RecvUnstoreAndBroadcastBlobURLUnregistration(const nsCString& aURI) override;
+
+  virtual int32_t Pid() const override;
 
 protected:
   void OnChannelConnected(int32_t pid) override;
