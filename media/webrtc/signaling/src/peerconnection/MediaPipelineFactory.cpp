@@ -951,9 +951,8 @@ MediaPipelineFactory::EnsureExternalCodec(VideoSessionConduit& aConduit,
                encoder = MediaCodecVideoCodec::CreateEncoder(MediaCodecVideoCodec::CodecType::CODEC_VP8);
                if (encoder) {
                  return aConduit.SetExternalSendCodec(aConfig, encoder);
-               } else {
-                 return kMediaConduitNoError;
                }
+               return kMediaConduitNoError;
              }
            }
          }
@@ -977,9 +976,8 @@ MediaPipelineFactory::EnsureExternalCodec(VideoSessionConduit& aConduit,
                decoder = MediaCodecVideoCodec::CreateDecoder(MediaCodecVideoCodec::CodecType::CODEC_VP8);
                if (decoder) {
                  return aConduit.SetExternalRecvCodec(aConfig, decoder);
-               } else {
-                 return kMediaConduitNoError;
                }
+               return kMediaConduitNoError;
              }
            }
          }
@@ -1004,9 +1002,8 @@ MediaPipelineFactory::EnsureExternalCodec(VideoSessionConduit& aConduit,
 #endif
       if (encoder) {
         return aConduit.SetExternalSendCodec(aConfig, encoder);
-      } else {
-        return kMediaConduitInvalidSendCodec;
       }
+      return kMediaConduitInvalidSendCodec;
     } else {
       VideoDecoder* decoder = nullptr;
 #ifdef MOZ_WEBRTC_OMX
@@ -1017,9 +1014,8 @@ MediaPipelineFactory::EnsureExternalCodec(VideoSessionConduit& aConduit,
 #endif
       if (decoder) {
         return aConduit.SetExternalRecvCodec(aConfig, decoder);
-      } else {
-        return kMediaConduitInvalidReceiveCodec;
       }
+      return kMediaConduitInvalidReceiveCodec;
     }
     NS_NOTREACHED("Shouldn't get here!");
   } else {
