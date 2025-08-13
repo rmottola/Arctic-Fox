@@ -12856,6 +12856,10 @@
         "url": "/XMLHttpRequest/getresponseheader-unsent-opened-state.htm"
       },
       {
+        "path": "XMLHttpRequest/headers-normalize-response.htm",
+        "url": "/XMLHttpRequest/headers-normalize-response.htm"
+      },
+      {
         "path": "XMLHttpRequest/interfaces.html",
         "url": "/XMLHttpRequest/interfaces.html"
       },
