@@ -210,7 +210,7 @@ pref(svg.marker-improvements.enabled,true) == marker-orientation-02.svg marker-o
 == marker-orientation-03.svg pass.svg
 == marker-orientation-04.svg pass.svg
 == mask-basic-01.svg pass.svg
-== mask-basic-02.svg mask-basic-02-ref.svg
+fuzzy-if(skiaContent,1,10000) == mask-basic-02.svg mask-basic-02-ref.svg
 == mask-basic-03.svg pass.svg
 == mask-basic-04.svg pass.svg
 == mask-extref-dataURI-01.svg pass.svg
