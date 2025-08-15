@@ -5774,3 +5774,8 @@ pref("media.seekToNextFrame.enabled", true);
 #if !defined(RELEASE_BUILD)
 pref("osfile.reset_worker_delay", 30000);
 #endif
+
+#ifdef MOZ_STYLO
+// Is the Servo-backed style system enabled?
+pref("layout.css.servo.enabled", true);
+#endif
