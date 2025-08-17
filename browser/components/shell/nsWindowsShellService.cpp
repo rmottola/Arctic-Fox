@@ -948,6 +948,15 @@ nsWindowsShellService::LaunchModernSettingsDialogDefaultApps()
            L"windows.immersivecontrolpanel_cw5n1h2txyewy"
            L"!microsoft.windows.immersivecontrolpanel",
            L"page=SettingsPageAppsDefaults", AO_NONE, &pid);
+    if (SUCCEEDED(hr)) {
+      // Do not check error because we could at least open
+      // the "Default apps" setting.
+      pActivator->ActivateApplication(
+             L"windows.immersivecontrolpanel_cw5n1h2txyewy"
+             L"!microsoft.windows.immersivecontrolpanel",
+             L"page=SettingsPageAppsDefaults"
+             L"&target=SystemSettings_DefaultApps_Browser", AO_NONE, &pid);
+    }
     pActivator->Release();
     return SUCCEEDED(hr) ? NS_OK : NS_ERROR_FAILURE;
   }
@@ -1224,24 +1233,24 @@ nsWindowsShellService::SetDesktopBackground(nsIDOMElement* aElement,
     nsAutoString style;
     switch (aPosition) {
       case BACKGROUND_TILE:
-        style.AssignLiteral("0");
-        tile.AssignLiteral("1");
+        style.Assign('0');
+        tile.Assign('1');
         break;
       case BACKGROUND_CENTER:
-        style.AssignLiteral("0");
-        tile.AssignLiteral("0");
+        style.Assign('0');
+        tile.Assign('0');
         break;
       case BACKGROUND_STRETCH:
-        style.AssignLiteral("2");
-        tile.AssignLiteral("0");
+        style.Assign('2');
+        tile.Assign('0');
         break;
       case BACKGROUND_FILL:
         style.AssignLiteral("10");
-        tile.AssignLiteral("0");
+        tile.Assign('0');
         break;
       case BACKGROUND_FIT:
-        style.AssignLiteral("6");
-        tile.AssignLiteral("0");
+        style.Assign('6');
+        tile.Assign('0');
         break;
     }
 
@@ -1299,7 +1308,7 @@ nsWindowsShellService::OpenApplication(int32_t aApplication)
   ::RegCloseKey(theKey);
 
   // Find the "open" command
-  application.AppendLiteral("\\");
+  application.Append('\\');
   application.Append(buf);
   application.AppendLiteral("\\shell\\open\\command");
 
