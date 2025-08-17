@@ -21,6 +21,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
 XPCOMUtils.defineLazyModuleGetter(this, "AboutNewTab",
                                   "resource:///modules/AboutNewTab.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "CaptivePortalWatcher",
+                                  "resource:///modules/CaptivePortalWatcher.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "DirectoryLinksProvider",
                                   "resource:///modules/DirectoryLinksProvider.jsm");
 
@@ -1047,6 +1050,8 @@ BrowserGlue.prototype = {
       this.checkForPendingCrashReports();
     }
 
+    CaptivePortalWatcher.init();
+
     this._firstWindowTelemetry(aWindow);
     this._firstWindowLoaded();
   },
@@ -1072,6 +1077,8 @@ BrowserGlue.prototype = {
     UserAgentOverrides.uninit();
     BrowserUsageTelemetry.uninit();
     NewTabMessages.uninit();
+
+    CaptivePortalWatcher.uninit();
 
     AboutNewTab.uninit();
     webrtcUI.uninit();
