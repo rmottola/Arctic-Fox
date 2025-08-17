@@ -54,7 +54,7 @@ function resetStorage() {
 
 function gc() {
   return new Promise(function(resolve, reject) {
-    SpecialPowers.exactGC(window, resolve);
+    SpecialPowers.exactGC(resolve);
   });
 }
 
@@ -95,6 +95,13 @@ SpecialPowers.pushPrefEnv({
     return caches.delete(name);
   }).then(function(deleted) {
     ok(deleted, 'cache should be deleted');
+
+    // This is a bit superfluous, but its necessary to make sure the Cache is
+    // fully deleted before we proceed.  The deletion actually takes place in
+    // two async steps.  We don't want to resetStorage() until the second step
+    // has taken place.  This extra Cache operation ensure that all the
+    // runnables have been flushed through the threads, etc.
+    return caches.has(name);
   })
 
   // Now measure initial disk usage
@@ -156,6 +163,22 @@ SpecialPowers.pushPrefEnv({
          ", end:" + endUsage + "\n");
     ok(endUsage < fullUsage, 'disk usage should have shrank');
     is(endUsage, initialUsage, 'disk usage should return to original');
+  })
+
+  // Verify that the stale, orphaned response cannot be put back into
+  // the cache.
+  .then(function() {
+    ok(!response.bodyUsed, 'response body should not be considered used');
+    return cache.put(url, response).then(function() {
+        ok(false, 'Should not be able to store stale orphaned body.');
+      }).catch(function(e) {
+        is(e.name, 'TypeError', 'storing a stale orphaned body should throw TypeError');
+      });
+  }).then(function() {
+    ok(response.bodyUsed, 'attempting to store response should mark body used');
+  })
+
+  .then(function() {
     SimpleTest.finish();
   });
 });
