@@ -184,6 +184,66 @@ Gecko_UnsetNodeFlags(RawGeckoNode* aNode, uint32_t aFlags)
   aNode->UnsetFlags(aFlags);
 }
 
+nsStyleContext*
+Gecko_GetStyleContext(RawGeckoNode* aNode)
+{
+  MOZ_ASSERT(aNode->IsContent());
+  nsIFrame* primaryFrame = aNode->AsContent()->GetPrimaryFrame();
+  if (!primaryFrame) {
+    return nullptr;
+  }
+
+  return primaryFrame->StyleContext();
+}
+
+nsChangeHint
+Gecko_CalcStyleDifference(nsStyleContext* aOldStyleContext,
+                          ServoComputedValues* aComputedValues)
+{
+  MOZ_ASSERT(aOldStyleContext);
+  MOZ_ASSERT(aComputedValues);
+
+  // Pass the safe thing, which causes us to miss a potential optimization. See
+  // bug 1289863.
+  nsChangeHint forDescendants = nsChangeHint_Hints_NotHandledForDescendants;
+
+  // Eventually, we should compute things out of these flags like
+  // ElementRestyler::RestyleSelf does and pass the result to the caller to
+  // potentially halt traversal. See bug 1289868.
+  uint32_t equalStructs, samePointerStructs;
+  nsChangeHint result =
+    aOldStyleContext->CalcStyleDifference(aComputedValues,
+                                          forDescendants,
+                                          &equalStructs,
+                                          &samePointerStructs);
+
+  return result;
+}
+
+void
+Gecko_StoreStyleDifference(RawGeckoNode* aNode, nsChangeHint aChangeHintToStore)
+{
+#ifdef MOZ_STYLO
+  // XXXEmilio probably storing it in the nearest content parent is a sane thing
+  // to do if this case can ever happen?
+  MOZ_ASSERT(aNode->IsContent());
+
+  nsIContent* aContent = aNode->AsContent();
+  nsIFrame* primaryFrame = aContent->GetPrimaryFrame();
+  if (!primaryFrame) {
+    // TODO: Pick the undisplayed content map from the frame-constructor, and
+    // stick it there. For now we're generating ReconstructFrame
+    // unconditionally, which is suboptimal.
+    return;
+  }
+
+  primaryFrame->StyleContext()->StoreChangeHint(aChangeHintToStore);
+#else
+  MOZ_CRASH("stylo: Shouldn't call Gecko_StoreStyleDifference in "
+            "non-stylo build");
+#endif
+}
+
 ServoDeclarationBlock*
 Gecko_GetServoDeclarationBlock(RawGeckoElement* aElement)
 {
@@ -226,15 +286,6 @@ DoMatch(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName, MatchFn aMatch)
   return false;
 }
 
-// Work around our overly-restrictive static analysis. This can be removed once
-// bug 1281935 lands.
-template<typename T>
-struct FakeRef {
-  MOZ_IMPLICIT FakeRef(T* aPtr) : mPtr(aPtr) {}
-  operator T*() const { return mPtr; }
-  T* mPtr;
-};
-
 template <typename Implementor>
 static bool
 HasAttr(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName)
@@ -245,10 +296,9 @@ HasAttr(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName)
 
 template <typename Implementor>
 static bool
-AttrEquals(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName, nsIAtom* aStr_,
+AttrEquals(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName, nsIAtom* aStr,
            bool aIgnoreCase)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr, aIgnoreCase](const nsAttrValue* aValue) {
     return aValue->Equals(aStr, aIgnoreCase ? eIgnoreCase : eCaseMatters);
   };
@@ -258,9 +308,8 @@ AttrEquals(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName, nsIAtom* aStr_,
 template <typename Implementor>
 static bool
 AttrDashEquals(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
-               nsIAtom* aStr_)
+               nsIAtom* aStr)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr](const nsAttrValue* aValue) {
     nsAutoString str;
     aValue->ToString(str);
@@ -273,9 +322,8 @@ AttrDashEquals(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
 template <typename Implementor>
 static bool
 AttrIncludes(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
-             nsIAtom* aStr_)
+             nsIAtom* aStr)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr](const nsAttrValue* aValue) {
     nsAutoString str;
     aValue->ToString(str);
@@ -288,9 +336,8 @@ AttrIncludes(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
 template <typename Implementor>
 static bool
 AttrHasSubstring(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
-                 nsIAtom* aStr_)
+                 nsIAtom* aStr)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr](const nsAttrValue* aValue) {
     nsAutoString str;
     aValue->ToString(str);
@@ -302,9 +349,8 @@ AttrHasSubstring(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
 template <typename Implementor>
 static bool
 AttrHasPrefix(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
-              nsIAtom* aStr_)
+              nsIAtom* aStr)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr](const nsAttrValue* aValue) {
     nsAutoString str;
     aValue->ToString(str);
@@ -316,9 +362,8 @@ AttrHasPrefix(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
 template <typename Implementor>
 static bool
 AttrHasSuffix(Implementor* aElement, nsIAtom* aNS, nsIAtom* aName,
-              nsIAtom* aStr_)
+              nsIAtom* aStr)
 {
-  FakeRef<nsIAtom> aStr(aStr_);
   auto match = [aStr](const nsAttrValue* aValue) {
     nsAutoString str;
     aValue->ToString(str);
@@ -447,13 +492,14 @@ SERVO_IMPL_ELEMENT_ATTR_MATCHING_FUNCTIONS(Gecko_Snapshot, ServoElementSnapshot)
 ServoNodeData*
 Gecko_GetNodeData(RawGeckoNode* aNode)
 {
-  return aNode->GetServoNodeData();
+  return aNode->ServoData().get();
 }
 
 void
 Gecko_SetNodeData(RawGeckoNode* aNode, ServoNodeData* aData)
 {
-  aNode->SetServoNodeData(aData);
+  MOZ_ASSERT(!aNode->ServoData());
+  aNode->ServoData().reset(aData);
 }
 
 nsIAtom*
@@ -716,6 +762,7 @@ Servo_DropNodeData(ServoNodeData* data)
 RawServoStyleSheet*
 Servo_StylesheetFromUTF8Bytes(const uint8_t* bytes, uint32_t length,
                               mozilla::css::SheetParsingMode mode,
+                              const uint8_t* base_bytes, uint32_t base_length,
                               ThreadSafeURIHolder* base,
                               ThreadSafeURIHolder* referrer,
                               ThreadSafePrincipalHolder* principal)
@@ -883,6 +930,13 @@ void
 Servo_Initialize()
 {
   MOZ_CRASH("stylo: shouldn't be calling Servo_Initialize in a "
+            "non-MOZ_STYLO build");
+}
+
+void
+Servo_Shutdown()
+{
+  MOZ_CRASH("stylo: shouldn't be calling Servo_Shutdown in a "
             "non-MOZ_STYLO build");
 }
 

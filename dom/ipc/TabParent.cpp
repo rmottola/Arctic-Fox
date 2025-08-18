@@ -2121,6 +2121,9 @@ TabParent::RecvReplyKeyEvent(const WidgetKeyboardEvent& event)
   nsPresContext* presContext = presShell->GetPresContext();
   NS_ENSURE_TRUE(presContext, true);
 
+  AutoHandlingUserInputStatePusher userInpStatePusher(localEvent.IsTrusted(),
+                                                      &localEvent, doc);
+
   EventDispatcher::Dispatch(mFrameElement, presContext, &localEvent);
   return true;
 }
@@ -2940,6 +2943,13 @@ NS_IMETHODIMP
 TabParent::GetTabId(uint64_t* aId)
 {
   *aId = GetTabId();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+TabParent::GetOsPid(int32_t* aId)
+{
+  *aId = Manager()->Pid();
   return NS_OK;
 }
 

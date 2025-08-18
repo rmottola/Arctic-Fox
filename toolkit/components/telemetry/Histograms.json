@@ -5650,6 +5650,23 @@
     "n_buckets": 50,
     "description": "(Bug 1207089) Time in ms between displaying a popup notification and dismissing it without an action the first time, keyed by ID"
   },
+  "PRINT_PREVIEW_SIMPLIFY_PAGE_UNAVAILABLE_COUNT": {
+     "alert_emails": ["carnold@mozilla.org"],
+     "bug_numbers": [1287587],
+     "expires_in_version": "56",
+     "kind": "count",
+     "releaseChannelCollection": "opt-out",
+     "description": "A counter incremented every time the simplified mode is unavailable on print preview."
+   },
+  "PRINT_COUNT": {
+     "alert_emails": ["carnold@mozilla.org"],
+     "bug_numbers": [1287587],
+     "expires_in_version": "56",
+     "kind": "count",
+     "keyed": true,
+     "releaseChannelCollection": "opt-out",
+     "description": "A counter incremented every time the user prints a document."
+   },
   "DEVTOOLS_DEBUGGER_DISPLAY_SOURCE_LOCAL_MS": {
     "expires_in_version": "never",
     "kind": "exponential",
@@ -8227,6 +8244,45 @@
     "high": 7200000,
     "n_buckets": 100,
     "bug_numbers": [1261955, 1127646]
+  },
+  "VIDEO_HIDDEN_PLAY_TIME_MS" : {
+    "alert_emails": ["ajones@mozilla.com", "gsquelart@mozilla.com"],
+    "expires_in_version": "55",
+    "description": "Total time spent playing video while element is hidden, in milliseconds. This reports the total hidden play time for an HTML Media Element whenever it is suspended or resumed, such as when the page is unloaded, or when the mute status changes when the AudioChannelAPI pref is set.",
+    "kind": "exponential",
+    "high": 7200000,
+    "n_buckets": 100,
+    "bug_numbers": [1285419]
+  },
+  "VIDEO_HIDDEN_PLAY_TIME_PERCENTAGE" : {
+    "alert_emails": ["ajones@mozilla.com", "gsquelart@mozilla.com"],
+    "expires_in_version": "55",
+    "description": "Percentage of total time spent playing video while element is hidden. Keyed by audio presence and by height ranges (boundaries: 240. 480, 576, 720, 1080, 2160), e.g.: 'V,0<h<=240', 'AV,h>2180'; and 'All' will accumulate all percentages. This is reported whenever an HTML Media Element is suspended or resumed, such as when the page is unloaded.",
+    "keyed": true,
+    "kind": "linear",
+    "high": 100,
+    "n_buckets": 50,
+    "bug_numbers": [1287987]
+  },
+  "VIDEO_INTER_KEYFRAME_AVERAGE_MS" : {
+    "alert_emails": ["ajones@mozilla.com", "gsquelart@mozilla.com"],
+    "expires_in_version": "55",
+    "description": "Average interval between video keyframes in played videos, in milliseconds. Keyed by audio presence and by height ranges (boundaries: 240. 480, 576, 720, 1080, 2160), e.g.: 'V,0<h<=240', 'AV,h>2180'; and 'All' will accumulate all percentages. This is reported whenever an HTML Media Element is suspended or resumed, such as when the page is unloaded.",
+    "keyed": true,
+    "kind": "exponential",
+    "high": 60000,
+    "n_buckets": 100,
+    "bug_numbers": [1289668]
+  },
+  "VIDEO_INTER_KEYFRAME_MAX_MS" : {
+    "alert_emails": ["ajones@mozilla.com", "gsquelart@mozilla.com"],
+    "expires_in_version": "55",
+    "description": "Maximum interval between video keyframes in played videos, in milliseconds. Keyed by audio presence and by height ranges (boundaries: 240. 480, 576, 720, 1080, 2160), e.g.: 'V,0<h<=240', 'AV,h>2180'; and 'All' will accumulate all percentages. This is reported whenever an HTML Media Element is suspended or resumed, such as when the page is unloaded.",
+    "keyed": true,
+    "kind": "exponential",
+    "high": 60000,
+    "n_buckets": 100,
+    "bug_numbers": [1289668]
   },
   "VIDEO_UNLOAD_STATE": {
     "alert_emails": ["ajones@mozilla.com"],

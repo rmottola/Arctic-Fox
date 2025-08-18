@@ -355,6 +355,12 @@ AudioContext::CreateMediaElementSource(HTMLMediaElement& aMediaElement,
     aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
     return nullptr;
   }
+#ifdef MOZ_EME
+  if (aMediaElement.ContainsRestrictedContent()) {
+    aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
+    return nullptr;
+  }
+#endif
 
   if (CheckClosed(aRv)) {
     return nullptr;
@@ -836,18 +842,26 @@ AudioContext::OnStateChanged(void* aPromise, AudioContextState aNewState)
   }
 
 #ifndef WIN32 // Bug 1170547
+#ifndef XP_MACOSX
+#ifdef DEBUG
 
-  MOZ_ASSERT((mAudioContextState == AudioContextState::Suspended &&
-              aNewState == AudioContextState::Running)   ||
-             (mAudioContextState == AudioContextState::Running   &&
-              aNewState == AudioContextState::Suspended) ||
-             (mAudioContextState == AudioContextState::Running   &&
-              aNewState == AudioContextState::Closed)    ||
-             (mAudioContextState == AudioContextState::Suspended &&
-              aNewState == AudioContextState::Closed)    ||
-             (mAudioContextState == aNewState),
-             "Invalid AudioContextState transition");
+  if (!((mAudioContextState == AudioContextState::Suspended &&
+       aNewState == AudioContextState::Running)   ||
+      (mAudioContextState == AudioContextState::Running   &&
+       aNewState == AudioContextState::Suspended) ||
+      (mAudioContextState == AudioContextState::Running   &&
+       aNewState == AudioContextState::Closed)    ||
+      (mAudioContextState == AudioContextState::Suspended &&
+       aNewState == AudioContextState::Closed)    ||
+      (mAudioContextState == aNewState))) {
+    fprintf(stderr,
+            "Invalid transition: mAudioContextState: %d -> aNewState %d\n",
+            static_cast<int>(mAudioContextState), static_cast<int>(aNewState));
+    MOZ_ASSERT(false);
+  }
 
+#endif // DEBUG
+#endif // XP_MACOSX
 #endif // WIN32
 
   MOZ_ASSERT(
@@ -904,11 +918,6 @@ AudioContext::Suspend(ErrorResult& aRv)
     return promise.forget();
   }
 
-  if (mAudioContextState == AudioContextState::Suspended) {
-    promise->MaybeResolve(JS::UndefinedHandleValue);
-    return promise.forget();
-  }
-
   Destination()->Suspend();
 
   mPromiseGripArray.AppendElement(promise);
@@ -948,11 +957,6 @@ AudioContext::Resume(ErrorResult& aRv)
   if (mAudioContextState == AudioContextState::Closed ||
       mCloseCalled) {
     promise->MaybeReject(NS_ERROR_DOM_INVALID_STATE_ERR);
-    return promise.forget();
-  }
-
-  if (mAudioContextState == AudioContextState::Running) {
-    promise->MaybeResolve(JS::UndefinedHandleValue);
     return promise.forget();
   }
 

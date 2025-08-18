@@ -28,8 +28,8 @@ factory((root.pdfjsDistBuildPdf = {}));
   // Use strict in our context only - users might not want it
   'use strict';
 
-var pdfjsVersion = '1.4.213';
-var pdfjsBuild = '1c253e6';
+var pdfjsVersion = '1.5.365';
+var pdfjsBuild = '19105f0';
 
   var pdfjsFilePath =
     typeof document !== 'undefined' && document.currentScript ?
@@ -316,15 +316,6 @@ var UNSUPPORTED_FEATURES = {
   font: 'font'
 };
 
-// Combines two URLs. The baseUrl shall be absolute URL. If the url is an
-// absolute URL, it will be returned as is.
-function combineUrl(baseUrl, url) {
-  if (!url) {
-    return baseUrl;
-  }
-  return new URL(url, baseUrl).href;
-}
-
 // Checks if URLs have the same origin. For non-HTTP based URLs, returns false.
 function isSameOrigin(baseUrl, otherUrl) {
   try {
@@ -342,7 +333,7 @@ function isSameOrigin(baseUrl, otherUrl) {
 
 // Validates if URL is safe and allowed, e.g. to avoid XSS.
 function isValidUrl(url, allowRelative) {
-  if (!url) {
+  if (!url || typeof url !== 'string') {
     return false;
   }
   // RFC 3986 (http://tools.ietf.org/html/rfc3986#section-3.1)
@@ -1079,12 +1070,17 @@ function isArrayBuffer(v) {
   return typeof v === 'object' && v !== null && v.byteLength !== undefined;
 }
 
+// Checks if ch is one of the following characters: SPACE, TAB, CR or LF.
+function isSpace(ch) {
+  return (ch === 0x20 || ch === 0x09 || ch === 0x0D || ch === 0x0A);
+}
+
 /**
  * Promise Capability object.
  *
  * @typedef {Object} PromiseCapability
  * @property {Promise} promise - A promise object.
- * @property {function} resolve - Fullfills the promise.
+ * @property {function} resolve - Fulfills the promise.
  * @property {function} reject - Rejects the promise.
  */
 
@@ -1107,8 +1103,8 @@ function createPromiseCapability() {
 /**
  * Polyfill for Promises:
  * The following promise implementation tries to generally implement the
- * Promise/A+ spec. Some notable differences from other promise libaries are:
- * - There currently isn't a seperate deferred and promise object.
+ * Promise/A+ spec. Some notable differences from other promise libraries are:
+ * - There currently isn't a separate deferred and promise object.
  * - Unhandled rejections eventually show an error if they aren't handled.
  *
  * Based off of the work in:
@@ -1226,10 +1222,7 @@ var createBlob = function createBlob(data, contentType) {
   if (typeof Blob !== 'undefined') {
     return new Blob([data], { type: contentType });
   }
-  // Blob builder is deprecated in FF14 and removed in FF18.
-  var bb = new MozBlobBuilder();
-  bb.append(data);
-  return bb.getBlob(contentType);
+  warn('The "Blob" constructor is not supported.');
 };
 
 var createObjectURL = (function createObjectURLClosure() {
@@ -1434,7 +1427,6 @@ exports.arrayByteLength = arrayByteLength;
 exports.arraysToBytes = arraysToBytes;
 exports.assert = assert;
 exports.bytesToString = bytesToString;
-exports.combineUrl = combineUrl;
 exports.createBlob = createBlob;
 exports.createPromiseCapability = createPromiseCapability;
 exports.createObjectURL = createObjectURL;
@@ -1451,6 +1443,7 @@ exports.isEmptyObj = isEmptyObj;
 exports.isInt = isInt;
 exports.isNum = isNum;
 exports.isString = isString;
+exports.isSpace = isSpace;
 exports.isSameOrigin = isSameOrigin;
 exports.isValidUrl = isValidUrl;
 exports.isLittleEndian = isLittleEndian;
@@ -1556,15 +1549,15 @@ var LinkTargetStringMap = [
 /**
  * @typedef ExternalLinkParameters
  * @typedef {Object} ExternalLinkParameters
- * @property {string} url
- * @property {LinkTarget} target
- * @property {string} rel
+ * @property {string} url - An absolute URL.
+ * @property {LinkTarget} target - The link target.
+ * @property {string} rel - The link relationship.
  */
 
 /**
  * Adds various attributes (href, title, target, rel) to hyperlinks.
  * @param {HTMLLinkElement} link - The link element.
- * @param {ExternalLinkParameters} params - An object with the properties.
+ * @param {ExternalLinkParameters} params
  */
 function addLinkAttributes(link, params) {
   var url = params && params.url;
@@ -1576,7 +1569,7 @@ function addLinkAttributes(link, params) {
       target = getDefaultSetting('externalLinkTarget');
     }
     link.target = LinkTargetStringMap[target];
-    // Strip referrer from the URL.
+
     var rel = params.rel;
     if (typeof rel === 'undefined') {
       rel = getDefaultSetting('externalLinkRel');
@@ -1931,6 +1924,7 @@ var AnnotationBorderStyleType = sharedUtil.AnnotationBorderStyleType;
 var AnnotationType = sharedUtil.AnnotationType;
 var Util = sharedUtil.Util;
 var addLinkAttributes = displayDOMUtils.addLinkAttributes;
+var LinkTarget = displayDOMUtils.LinkTarget;
 var getFilenameFromUrl = displayDOMUtils.getFilenameFromUrl;
 var warn = sharedUtil.warn;
 var CustomStyle = displayDOMUtils.CustomStyle;
@@ -2178,13 +2172,16 @@ var LinkAnnotationElement = (function LinkAnnotationElementClosure() {
       this.container.className = 'linkAnnotation';
 
       var link = document.createElement('a');
-      addLinkAttributes(link, { url: this.data.url });
+      addLinkAttributes(link, {
+        url: this.data.url,
+        target: (this.data.newWindow ? LinkTarget.BLANK : undefined),
+      });
 
       if (!this.data.url) {
         if (this.data.action) {
           this._bindNamedAction(link, this.data.action);
         } else {
-          this._bindLink(link, ('dest' in this.data) ? this.data.dest : null);
+          this._bindLink(link, (this.data.dest || null));
         }
       }
 
@@ -2818,7 +2815,6 @@ var Util = sharedUtil.Util;
 var createPromiseCapability = sharedUtil.createPromiseCapability;
 var CustomStyle = displayDOMUtils.CustomStyle;
 var getDefaultSetting = displayDOMUtils.getDefaultSetting;
-var PageViewport = sharedUtil.PageViewport;
 
 /**
  * Text layer render parameters.
@@ -2941,23 +2937,21 @@ var renderTextLayer = (function renderTextLayerClosure() {
       }
 
       var width = ctx.measureText(textDiv.textContent).width;
-      if (width > 0) {
-        textLayerFrag.appendChild(textDiv);
-        var transform;
-        if (textDiv.dataset.canvasWidth !== undefined) {
-          // Dataset values come of type string.
-          var textScale = textDiv.dataset.canvasWidth / width;
-          transform = 'scaleX(' + textScale + ')';
-        } else {
-          transform = '';
-        }
-        var rotation = textDiv.dataset.angle;
-        if (rotation) {
-          transform = 'rotate(' + rotation + 'deg) ' + transform;
-        }
-        if (transform) {
-          CustomStyle.setProp('transform' , textDiv, transform);
-        }
+      textLayerFrag.appendChild(textDiv);
+      var transform;
+      if (textDiv.dataset.canvasWidth !== undefined && width > 0) {
+        // Dataset values come of type string.
+        var textScale = textDiv.dataset.canvasWidth / width;
+        transform = 'scaleX(' + textScale + ')';
+      } else {
+        transform = '';
+      }
+      var rotation = textDiv.dataset.angle;
+      if (rotation) {
+        transform = 'rotate(' + rotation + 'deg) ' + transform;
+      }
+      if (transform) {
+        CustomStyle.setProp('transform' , textDiv, transform);
       }
     }
     capability.resolve();
@@ -3620,6 +3614,9 @@ var createMeshCanvas = (function createMeshCanvasClosure() {
     var EXPECTED_SCALE = 1.1;
     // MAX_PATTERN_SIZE is used to avoid OOM situation.
     var MAX_PATTERN_SIZE = 3000; // 10in @ 300dpi shall be enough
+    // We need to keep transparent border around our pattern for fill():
+    // createPattern with 'no-repeat' will bleed edges across entire area.
+    var BORDER_SIZE = 2;
 
     var offsetX = Math.floor(bounds[0]);
     var offsetY = Math.floor(bounds[1]);
@@ -3642,17 +3639,22 @@ var createMeshCanvas = (function createMeshCanvasClosure() {
       scaleY: 1 / scaleY
     };
 
+    var paddedWidth = width + BORDER_SIZE * 2;
+    var paddedHeight = height + BORDER_SIZE * 2;
+
     var canvas, tmpCanvas, i, ii;
     if (WebGLUtils.isEnabled) {
       canvas = WebGLUtils.drawFigures(width, height, backgroundColor,
                                       figures, context);
 
       // https://bugzilla.mozilla.org/show_bug.cgi?id=972126
-      tmpCanvas = cachedCanvases.getCanvas('mesh', width, height, false);
-      tmpCanvas.context.drawImage(canvas, 0, 0);
+      tmpCanvas = cachedCanvases.getCanvas('mesh', paddedWidth, paddedHeight,
+                                           false);
+      tmpCanvas.context.drawImage(canvas, BORDER_SIZE, BORDER_SIZE);
       canvas = tmpCanvas.canvas;
     } else {
-      tmpCanvas = cachedCanvases.getCanvas('mesh', width, height, false);
+      tmpCanvas = cachedCanvases.getCanvas('mesh', paddedWidth, paddedHeight,
+                                           false);
       var tmpCtx = tmpCanvas.context;
 
       var data = tmpCtx.createImageData(width, height);
@@ -3668,11 +3670,13 @@ var createMeshCanvas = (function createMeshCanvasClosure() {
       for (i = 0; i < figures.length; i++) {
         drawFigure(data, figures[i], context);
       }
-      tmpCtx.putImageData(data, 0, 0);
+      tmpCtx.putImageData(data, BORDER_SIZE, BORDER_SIZE);
       canvas = tmpCanvas.canvas;
     }
 
-    return {canvas: canvas, offsetX: offsetX, offsetY: offsetY,
+    return {canvas: canvas,
+            offsetX: offsetX - BORDER_SIZE * scaleX,
+            offsetY: offsetY - BORDER_SIZE * scaleY,
             scaleX: scaleX, scaleY: scaleY};
   }
   return createMeshCanvas;
@@ -4303,7 +4307,8 @@ var CanvasExtraState = (function CanvasExtraStateClosure() {
     this.fillAlpha = 1;
     this.strokeAlpha = 1;
     this.lineWidth = 1;
-    this.activeSMask = null; // nonclonable field (see the save method below)
+    this.activeSMask = null;
+    this.resumeSMaskCtx = null; // nonclonable field (see the save method below)
 
     this.old = old;
   }
@@ -4740,6 +4745,11 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
     },
 
     endDrawing: function CanvasGraphics_endDrawing() {
+      // Finishing all opened operations such as SMask group painting.
+      if (this.current.activeSMask !== null) {
+        this.endSMaskGroup();
+      }
+
       this.ctx.restore();
 
       if (this.transparentCanvas) {
@@ -4848,7 +4858,16 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
             break;
           case 'SMask':
             if (this.current.activeSMask) {
-              this.endSMaskGroup();
+              // If SMask is currrenly used, it needs to be suspended or
+              // finished. Suspend only makes sense when at least one save()
+              // was performed and state needs to be reverted on restore().
+              if (this.stateStack.length > 0 &&
+                  (this.stateStack[this.stateStack.length - 1].activeSMask ===
+                   this.current.activeSMask)) {
+                this.suspendSMaskGroup();
+              } else {
+                this.endSMaskGroup();
+              }
             }
             this.current.activeSMask = value ? this.tempSMask : null;
             if (this.current.activeSMask) {
@@ -4877,6 +4896,8 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
       groupCtx.translate(-activeSMask.offsetX, -activeSMask.offsetY);
       groupCtx.transform.apply(groupCtx, currentTransform);
 
+      activeSMask.startTransformInverse = groupCtx.mozCurrentTransformInverse;
+
       copyCtxState(currentCtx, groupCtx);
       this.ctx = groupCtx;
       this.setGState([
@@ -4884,6 +4905,43 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
         ['ca', 1],
         ['CA', 1]
       ]);
+      this.groupStack.push(currentCtx);
+      this.groupLevel++;
+    },
+    suspendSMaskGroup: function CanvasGraphics_endSMaskGroup() {
+      // Similar to endSMaskGroup, the intermediate canvas has to be composed
+      // and future ctx state restored.
+      var groupCtx = this.ctx;
+      this.groupLevel--;
+      this.ctx = this.groupStack.pop();
+
+      composeSMask(this.ctx, this.current.activeSMask, groupCtx);
+      this.ctx.restore();
+      this.ctx.save(); // save is needed since SMask will be resumed.
+      copyCtxState(groupCtx, this.ctx);
+
+      // Saving state for resuming.
+      this.current.resumeSMaskCtx = groupCtx;
+      // Transform was changed in the SMask canvas, reflecting this change on
+      // this.ctx.
+      var deltaTransform = Util.transform(
+        this.current.activeSMask.startTransformInverse,
+        groupCtx.mozCurrentTransform);
+      this.ctx.transform.apply(this.ctx, deltaTransform);
+
+      // SMask was composed, the results at the groupCtx can be cleared.
+      groupCtx.save();
+      groupCtx.setTransform(1, 0, 0, 1, 0, 0);
+      groupCtx.clearRect(0, 0, groupCtx.canvas.width, groupCtx.canvas.height);
+      groupCtx.restore();
+    },
+    resumeSMaskGroup: function CanvasGraphics_endSMaskGroup() {
+      // Resuming state saved by suspendSMaskGroup. We don't need to restore
+      // any groupCtx state since restore() command (the only caller) will do
+      // that for us. See also beginSMaskGroup.
+      var groupCtx = this.current.resumeSMaskCtx;
+      var currentCtx = this.ctx;
+      this.ctx = groupCtx;
       this.groupStack.push(currentCtx);
       this.groupLevel++;
     },
@@ -4895,20 +4953,34 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
       composeSMask(this.ctx, this.current.activeSMask, groupCtx);
       this.ctx.restore();
       copyCtxState(groupCtx, this.ctx);
+      // Transform was changed in the SMask canvas, reflecting this change on
+      // this.ctx.
+      var deltaTransform = Util.transform(
+        this.current.activeSMask.startTransformInverse,
+        groupCtx.mozCurrentTransform);
+      this.ctx.transform.apply(this.ctx, deltaTransform);
     },
     save: function CanvasGraphics_save() {
       this.ctx.save();
       var old = this.current;
       this.stateStack.push(old);
       this.current = old.clone();
-      this.current.activeSMask = null;
+      this.current.resumeSMaskCtx = null;
     },
     restore: function CanvasGraphics_restore() {
-      if (this.stateStack.length !== 0) {
-        if (this.current.activeSMask !== null) {
-          this.endSMaskGroup();
-        }
+      // SMask was suspended, we just need to resume it.
+      if (this.current.resumeSMaskCtx) {
+        this.resumeSMaskGroup();
+      }
+      // SMask has to be finished once there is no states that are using the
+      // same SMask.
+      if (this.current.activeSMask !== null && (this.stateStack.length === 0 ||
+          this.stateStack[this.stateStack.length - 1].activeSMask !==
+          this.current.activeSMask)) {
+        this.endSMaskGroup();
+      }
 
+      if (this.stateStack.length !== 0) {
         this.current = this.stateStack.pop();
         this.ctx.restore();
 
@@ -5616,7 +5688,7 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
       var currentCtx = this.ctx;
       // TODO non-isolated groups - according to Rik at adobe non-isolated
       // group results aren't usually that different and they even have tools
-      // that ignore this setting. Notes from Rik on implmenting:
+      // that ignore this setting. Notes from Rik on implementing:
       // - When you encounter an transparency group, create a new canvas with
       // the dimensions of the bbox
       // - copy the content from the previous canvas to the new canvas
@@ -5696,7 +5768,8 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
           scaleY: scaleY,
           subtype: group.smask.subtype,
           backdrop: group.smask.backdrop,
-          transferMap: group.smask.transferMap || null
+          transferMap: group.smask.transferMap || null,
+          startTransformInverse: null, // used during suspend operation
         });
       } else {
         // Setup the current ctx so when the group is popped we draw it at the
@@ -5716,6 +5789,9 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
       ]);
       this.groupStack.push(currentCtx);
       this.groupLevel++;
+
+      // Reseting mask state, masks will be applied on restore of the group.
+      this.current.activeSMask = null;
     },
 
     endGroup: function CanvasGraphics_endGroup(group) {
@@ -6146,7 +6222,6 @@ var UnexpectedResponseException = sharedUtil.UnexpectedResponseException;
 var UnknownErrorException = sharedUtil.UnknownErrorException;
 var Util = sharedUtil.Util;
 var createPromiseCapability = sharedUtil.createPromiseCapability;
-var combineUrl = sharedUtil.combineUrl;
 var error = sharedUtil.error;
 var deprecated = sharedUtil.deprecated;
 var getVerbosityLevel = sharedUtil.getVerbosityLevel;
@@ -6281,7 +6356,7 @@ function getDocument(src, pdfDataRangeTransport,
   for (var key in source) {
     if (key === 'url' && typeof window !== 'undefined') {
       // The full path is required in the 'url' field.
-      params[key] = combineUrl(window.location.href, source[key]);
+      params[key] = new URL(source[key], window.location).href;
       continue;
     } else if (key === 'range') {
       rangeTransport = source[key];
@@ -6696,6 +6771,8 @@ var PDFDocumentProxy = (function PDFDocumentProxyClosure() {
  * @typedef {Object} getTextContentParameters
  * @param {boolean} normalizeWhitespace - replaces all occurrences of
  *   whitespace with standard spaces (0x20). The default value is `false`.
+ * @param {boolean} disableCombineTextItems - do not attempt to combine
+ *   same line {@link TextItem}'s. The default value is `false`.
  */
 
 /**
@@ -6906,7 +6983,7 @@ var PDFPageProxy = (function PDFPageProxyClosure() {
             return;
           }
           stats.time('Rendering');
-          internalRenderTask.initalizeGraphics(transparency);
+          internalRenderTask.initializeGraphics(transparency);
           internalRenderTask.operatorListChanged();
         },
         function pageDisplayReadPromiseError(reason) {
@@ -6987,11 +7064,12 @@ var PDFPageProxy = (function PDFPageProxyClosure() {
      * object that represent the page text content.
      */
     getTextContent: function PDFPageProxy_getTextContent(params) {
-      var normalizeWhitespace = (params && params.normalizeWhitespace) || false;
-
       return this.transport.messageHandler.sendWithPromise('GetTextContent', {
         pageIndex: this.pageNumber - 1,
-        normalizeWhitespace: normalizeWhitespace,
+        normalizeWhitespace: (params && params.normalizeWhitespace === true ?
+                              true : /* Default */ false),
+        combineTextItems: (params && params.disableCombineTextItems === true ?
+                           false : /* Default */ true),
       });
     },
 
@@ -7546,28 +7624,26 @@ var WorkerTransport = (function WorkerTransportClosure() {
           case 'Font':
             var exportedData = data[2];
 
-            var font;
             if ('error' in exportedData) {
-              var error = exportedData.error;
-              warn('Error during font loading: ' + error);
-              this.commonObjs.resolve(id, error);
+              var exportedError = exportedData.error;
+              warn('Error during font loading: ' + exportedError);
+              this.commonObjs.resolve(id, exportedError);
               break;
-            } else {
-              var fontRegistry = null;
-              if (getDefaultSetting('pdfBug') && globalScope.FontInspector &&
-                  globalScope['FontInspector'].enabled) {
-                fontRegistry = {
-                  registerFont: function (font, url) {
-                    globalScope['FontInspector'].fontAdded(font, url);
-                  }
-                };
-              }
-              font = new FontFaceObject(exportedData, {
-                isEvalSuported: getDefaultSetting('isEvalSupported'),
-                disableFontFace: getDefaultSetting('disableFontFace'),
-                fontRegistry: fontRegistry
-              });
             }
+            var fontRegistry = null;
+            if (getDefaultSetting('pdfBug') && globalScope.FontInspector &&
+                globalScope['FontInspector'].enabled) {
+              fontRegistry = {
+                registerFont: function (font, url) {
+                  globalScope['FontInspector'].fontAdded(font, url);
+                }
+              };
+            }
+            var font = new FontFaceObject(exportedData, {
+              isEvalSuported: getDefaultSetting('isEvalSupported'),
+              disableFontFace: getDefaultSetting('disableFontFace'),
+              fontRegistry: fontRegistry
+            });
 
             this.fontLoader.bind(
               [font],
@@ -7745,7 +7821,12 @@ var WorkerTransport = (function WorkerTransportClosure() {
     },
 
     getPageIndex: function WorkerTransport_getPageIndexByRef(ref) {
-      return this.messageHandler.sendWithPromise('GetPageIndex', { ref: ref });
+      return this.messageHandler.sendWithPromise('GetPageIndex', { ref: ref }).
+        then(function (pageIndex) {
+          return pageIndex;
+        }, function (reason) {
+          return Promise.reject(new Error(reason));
+        });
     },
 
     getAnnotations: function WorkerTransport_getAnnotations(pageIndex, intent) {
@@ -7999,8 +8080,8 @@ var InternalRenderTask = (function InternalRenderTaskClosure() {
 
   InternalRenderTask.prototype = {
 
-    initalizeGraphics:
-        function InternalRenderTask_initalizeGraphics(transparency) {
+    initializeGraphics:
+        function InternalRenderTask_initializeGraphics(transparency) {
 
       if (this.cancelled) {
         return;
@@ -8375,8 +8456,6 @@ exports._UnsupportedManager = _UnsupportedManager;
   exports.isWorker = isWorker;
   exports.PDFJS = globalScope.PDFJS;
 }));
-
-
   }).call(pdfjsLibs);
 
   exports.PDFJS = pdfjsLibs.pdfjsDisplayGlobal.PDFJS;
@@ -8407,5 +8486,4 @@ exports._UnsupportedManager = _UnsupportedManager;
     pdfjsLibs.pdfjsDisplayDOMUtils.getFilenameFromUrl;
   exports.addLinkAttributes = pdfjsLibs.pdfjsDisplayDOMUtils.addLinkAttributes;
 }));
-
 

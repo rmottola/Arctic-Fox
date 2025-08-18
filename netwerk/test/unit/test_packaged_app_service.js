@@ -41,7 +41,7 @@ Cu.import("resource://testing-common/httpd.js");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/NetUtil.jsm");
 
-let gPrefs = Cc["@mozilla.org/preferences-service;1"]
+var gPrefs = Cc["@mozilla.org/preferences-service;1"]
                .getService(Components.interfaces.nsIPrefBranch);
 
 // The number of times this package has been requested
@@ -77,6 +77,7 @@ function getChannelForURL(url, notificationCallbacks) {
     NetUtil.newChannel({
       uri: url,
       loadingPrincipal: principal,
+      securityFlags: Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
       contentPolicyType: Ci.nsIContentPolicy.TYPE_OTHER
     });
 
@@ -576,7 +577,7 @@ function test_worse_package_5() {
 //-----------------------------------------------------------------------------
 
 // Used as a stub when the cache listener is not important.
-let dummyCacheListener = {
+var dummyCacheListener = {
   QueryInterface: function (iid) {
     if (iid.equals(Ci.nsICacheEntryOpenCallback) ||
         iid.equals(Ci.nsISupports))

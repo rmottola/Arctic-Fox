@@ -12,7 +12,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* globals pdfjsLib */
 
 'use strict';
 
@@ -65,7 +64,7 @@ var FontInspector = (function FontInspectorClosure() {
     name: 'Font Inspector',
     panel: null,
     manager: null,
-    init: function init() {
+    init: function init(pdfjsLib) {
       var panel = this.panel;
       panel.setAttribute('style', 'padding: 5px;');
       var tmp = document.createElement('button');
@@ -159,6 +158,8 @@ var FontInspector = (function FontInspectorClosure() {
   };
 })();
 
+var opMap;
+
 // Manages all the page steppers.
 var StepperManager = (function StepperManagerClosure() {
   var steppers = [];
@@ -172,7 +173,7 @@ var StepperManager = (function StepperManagerClosure() {
     name: 'Stepper',
     panel: null,
     manager: null,
-    init: function init() {
+    init: function init(pdfjsLib) {
       var self = this;
       this.panel.setAttribute('style', 'padding: 5px;');
       stepperControls = document.createElement('div');
@@ -186,6 +187,11 @@ var StepperManager = (function StepperManagerClosure() {
       this.panel.appendChild(stepperDiv);
       if (sessionStorage.getItem('pdfjsBreakPoints')) {
         breakPoints = JSON.parse(sessionStorage.getItem('pdfjsBreakPoints'));
+      }
+
+      opMap = Object.create(null);
+      for (var key in pdfjsLib.OPS) {
+        opMap[pdfjsLib.OPS[key]] = key;
       }
     },
     cleanup: function cleanup() {
@@ -252,8 +258,6 @@ var Stepper = (function StepperClosure() {
     return d;
   }
 
-  var opMap = null;
-
   function simplifyArgs(args) {
     if (typeof args === 'string') {
       var MAX_STRING_LENGTH = 75;
@@ -291,7 +295,7 @@ var Stepper = (function StepperClosure() {
     this.operatorListIdx = 0;
   }
   Stepper.prototype = {
-    init: function init() {
+    init: function init(operatorList) {
       var panel = this.panel;
       var content = c('div', 'c=continue, s=step');
       var table = c('table');
@@ -305,12 +309,7 @@ var Stepper = (function StepperClosure() {
       headerRow.appendChild(c('th', 'args'));
       panel.appendChild(content);
       this.table = table;
-      if (!opMap) {
-        opMap = Object.create(null);
-        for (var key in pdfjsLib.OPS) {
-          opMap[pdfjsLib.OPS[key]] = key;
-        }
-      }
+      this.updateOperatorList(operatorList);
     },
     updateOperatorList: function updateOperatorList(operatorList) {
       var self = this;
@@ -458,7 +457,7 @@ var Stats = (function Stats() {
     name: 'Stats',
     panel: null,
     manager: null,
-    init: function init() {
+    init: function init(pdfjsLib) {
       this.panel.setAttribute('style', 'padding: 5px;');
       pdfjsLib.PDFJS.enableStats = true;
     },
@@ -532,7 +531,7 @@ var PDFBug = (function PDFBugClosure() {
         });
       }
     },
-    init: function init() {
+    init: function init(pdfjsLib, container) {
       /*
        * Basic Layout:
        * PDFBug
@@ -553,7 +552,6 @@ var PDFBug = (function PDFBugClosure() {
       panels.setAttribute('class', 'panels');
       ui.appendChild(panels);
 
-      var container = document.getElementById('viewerContainer');
       container.appendChild(ui);
       container.style.right = panelWidth + 'px';
 
@@ -576,11 +574,11 @@ var PDFBug = (function PDFBugClosure() {
         tool.panel = panel;
         tool.manager = this;
         if (tool.enabled) {
-          tool.init();
+          tool.init(pdfjsLib);
         } else {
           panel.textContent = tool.name + ' is disabled. To enable add ' +
                               ' "' + tool.id + '" to the pdfBug parameter ' +
-                              'and refresh (seperate multiple by commas).';
+                              'and refresh (separate multiple by commas).';
         }
         buttons.push(panelButton);
       }

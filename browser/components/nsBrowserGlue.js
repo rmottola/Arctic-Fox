@@ -21,6 +21,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "AboutHome",
 XPCOMUtils.defineLazyModuleGetter(this, "AboutNewTab",
                                   "resource:///modules/AboutNewTab.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "CaptivePortalWatcher",
+                                  "resource:///modules/CaptivePortalWatcher.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "DirectoryLinksProvider",
                                   "resource:///modules/DirectoryLinksProvider.jsm");
 
@@ -98,6 +101,9 @@ XPCOMUtils.defineLazyModuleGetter(this, "LoginManagerParent",
 
 XPCOMUtils.defineLazyModuleGetter(this, "SessionStore",
                                   "resource:///modules/sessionstore/SessionStore.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "BrowserUsageTelemetry",
+                                  "resource:///modules/BrowserUsageTelemetry.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserUITelemetry",
                                   "resource:///modules/BrowserUITelemetry.jsm");
@@ -661,7 +667,7 @@ BrowserGlue.prototype = {
       let currentUIVersion = 0;
       try {
         currentUIVersion = Services.prefs.getIntPref("browser.migration.version");
-      } catch(ex) {}
+      } catch (ex) {}
       if (currentUIVersion < 35) {
         this._maybeMigrateTabGroups();
       }
@@ -690,6 +696,7 @@ BrowserGlue.prototype = {
     NewTabMessages.init();
 
     SessionStore.init();
+    BrowserUsageTelemetry.init();
     BrowserUITelemetry.init();
     ContentSearch.init();
     FormValidationHandler.init();
@@ -710,6 +717,9 @@ BrowserGlue.prototype = {
 
     LoginManagerParent.init();
     ReaderParent.init();
+
+    // Ensure we keep track of places/pw-mananager undo by init'ing this early.
+    Cu.import("resource:///modules/AutoMigrate.jsm");
 
     if (!AppConstants.RELEASE_BUILD) {
       let themeName = gBrowserBundle.GetStringFromName("deveditionTheme.name");
@@ -1010,7 +1020,7 @@ BrowserGlue.prototype = {
     let disableResetPrompt = false;
     try {
       disableResetPrompt = Services.prefs.getBoolPref("browser.disableResetPrompt");
-    } catch(e) {}
+    } catch (e) {}
 
     if (!disableResetPrompt && lastUse &&
         Date.now() - lastUse >= OFFER_PROFILE_RESET_INTERVAL_MS) {
@@ -1040,6 +1050,8 @@ BrowserGlue.prototype = {
       this.checkForPendingCrashReports();
     }
 
+    CaptivePortalWatcher.init();
+
     this._firstWindowTelemetry(aWindow);
     this._firstWindowLoaded();
   },
@@ -1063,8 +1075,10 @@ BrowserGlue.prototype = {
     }
 
     UserAgentOverrides.uninit();
-
+    BrowserUsageTelemetry.uninit();
     NewTabMessages.uninit();
+
+    CaptivePortalWatcher.uninit();
 
     AboutNewTab.uninit();
     webrtcUI.uninit();
@@ -1518,7 +1532,7 @@ BrowserGlue.prototype = {
         Services.prefs.getBoolPref("browser.places.importBookmarksHTML");
       if (importBookmarksHTML)
         importBookmarks = true;
-    } catch(ex) {}
+    } catch (ex) {}
 
     // Support legacy bookmarks.html format for apps that depend on that format.
     let autoExportHTML = false;
@@ -1545,7 +1559,7 @@ BrowserGlue.prototype = {
           yield this._backupBookmarks();
           importBookmarks = true;
         }
-      } catch(ex) {}
+      } catch (ex) {}
 
       // This may be reused later, check for "=== undefined" to see if it has
       // been populated already.
@@ -1593,7 +1607,7 @@ BrowserGlue.prototype = {
         let smartBookmarksVersion = 0;
         try {
           smartBookmarksVersion = Services.prefs.getIntPref("browser.places.smartBookmarksVersion");
-        } catch(ex) {}
+        } catch (ex) {}
         if (!autoExportHTML && smartBookmarksVersion != -1)
           Services.prefs.setIntPref("browser.places.smartBookmarksVersion", 0);
 
@@ -1762,7 +1776,7 @@ BrowserGlue.prototype = {
   },
 
   _migrateUI: function BG__migrateUI() {
-    const UI_VERSION = 39;
+    const UI_VERSION = 40;
     const BROWSER_DOCURL = "chrome://browser/content/browser.xul";
 
     let currentUIVersion;
@@ -2086,12 +2100,12 @@ BrowserGlue.prototype = {
       try {
         lightweightThemeSelected = Services.prefs.prefHasUserValue("lightweightThemes.selectedThemeID");
         selectedThemeID = Services.prefs.getCharPref("lightweightThemes.selectedThemeID");
-      } catch(e) {}
+      } catch (e) {}
 
       let defaultThemeSelected = false;
       try {
          defaultThemeSelected = Services.prefs.getCharPref("general.skins.selectedSkin") == "classic/1.0";
-      } catch(e) {}
+      } catch (e) {}
 
       // If we are on the devedition channel, the devedition theme is on by
       // default.  But we need to handle the case where they didn't want it
@@ -2143,6 +2157,21 @@ BrowserGlue.prototype = {
         xulStore.removeValue(BROWSER_DOCURL, toolbarId, "defaultset");
       }
     }
+
+    if (currentUIVersion < 40) {
+      const kOldSafeBrowsingPref = "browser.safebrowsing.enabled";
+      // Default value is set to true, a user pref means that the pref was
+      // set to false.
+      if (Services.prefs.prefHasUserValue(kOldSafeBrowsingPref) &&
+          !Services.prefs.getBoolPref(kOldSafeBrowsingPref)) {
+        Services.prefs.setBoolPref("browser.safebrowsing.phishing.enabled",
+                                   false);
+        // Should just remove support for the pref entirely, even if it's
+        // only in about:config
+        Services.prefs.clearUserPref(kOldSafeBrowsingPref);
+      }
+    }
+
     // Update the migration version.
     Services.prefs.setIntPref("browser.migration.version", UI_VERSION);
   },
@@ -2216,7 +2245,7 @@ BrowserGlue.prototype = {
     let smartBookmarksCurrentVersion = 0;
     try {
       smartBookmarksCurrentVersion = Services.prefs.getIntPref(SMART_BOOKMARKS_PREF);
-    } catch(ex) {}
+    } catch (ex) {}
 
     // If version is current, or smart bookmarks are disabled, bail out.
     if (smartBookmarksCurrentVersion == -1 ||
@@ -2321,7 +2350,7 @@ BrowserGlue.prototype = {
                                                index: menuIndex });
         }
       }
-    } catch(ex) {
+    } catch (ex) {
       Cu.reportError(ex);
     } finally {
       Services.prefs.setIntPref(SMART_BOOKMARKS_PREF, SMART_BOOKMARKS_VERSION);

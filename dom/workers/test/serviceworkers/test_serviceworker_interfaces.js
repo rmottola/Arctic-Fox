@@ -90,6 +90,8 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Clients",
 // IMPORTANT: Do not change this list without review from a DOM peer!
+    "Crypto",
+// IMPORTANT: Do not change this list without review from a DOM peer!
     "CustomEvent",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Directory",
@@ -119,6 +121,8 @@ var interfaceNamesInGlobalScope =
     "FileReader",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "FileReaderSync",
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    "FormData",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Headers",
 // IMPORTANT: Do not change this list without review from a DOM peer!
@@ -156,9 +160,9 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "MessagePort",
 // IMPORTANT: Do not change this list without review from a DOM peer!
-    { name: "Notification", release: false },
+    { name: "Notification", nonReleaseB2G: true, b2g: false },
 // IMPORTANT: Do not change this list without review from a DOM peer!
-    { name: "NotificationEvent", release: false },
+    { name: "NotificationEvent", nonReleaseB2G: true, b2g: false },
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Performance",
 // IMPORTANT: Do not change this list without review from a DOM peer!
@@ -168,13 +172,19 @@ var interfaceNamesInGlobalScope =
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "PerformanceMeasure",
 // IMPORTANT: Do not change this list without review from a DOM peer!
-    { name: "PushEvent", b2g: false, android: false},
+    { name: "PerformanceObserver", nightly: true },
 // IMPORTANT: Do not change this list without review from a DOM peer!
-    { name: "PushManager", b2g: false, android: false},
+    { name: "PerformanceObserverEntryList", nightly: true },
 // IMPORTANT: Do not change this list without review from a DOM peer!
-    { name: "PushMessageData", b2g: false, android: false},
+    { name: "PushEvent", b2g: false },
 // IMPORTANT: Do not change this list without review from a DOM peer!
-    { name: "PushSubscription", b2g: false, android: false},
+    { name: "PushManager", b2g: false },
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    { name: "PushMessageData", b2g: false },
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    { name: "PushSubscription", b2g: false },
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    { name: "PushSubscriptionOptions", b2g: false },
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "Request",
 // IMPORTANT: Do not change this list without review from a DOM peer!
@@ -185,6 +195,8 @@ var interfaceNamesInGlobalScope =
     "ServiceWorkerGlobalScope",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "ServiceWorkerRegistration",
+// IMPORTANT: Do not change this list without review from a DOM peer!
+    "SubtleCrypto",
 // IMPORTANT: Do not change this list without review from a DOM peer!
     "TextDecoder",
 // IMPORTANT: Do not change this list without review from a DOM peer!
@@ -223,9 +235,12 @@ function createInterfaceMap(permissionMap, version, userAgent, isB2G) {
       } else {
         ok(!("pref" in entry), "Bogus pref annotation for " + entry.name);
         if ((entry.nightly === !isNightly) ||
+            (entry.nightlyAndroid === !(isAndroid && isNightly) && isAndroid) ||
+            (entry.nonReleaseB2G === !(isB2G && !isRelease) && isB2G) ||
+            (entry.nonReleaseAndroid === !(isAndroid && !isRelease) && isAndroid) ||
             (entry.desktop === !isDesktop) ||
-            (entry.android === !isAndroid) ||
-            (entry.b2g === !isB2G) ||
+            (entry.android === !isAndroid && !entry.nonReleaseAndroid && !entry.nightlyAndroid) ||
+            (entry.b2g === !isB2G && !entry.nonReleaseB2G) ||
             (entry.release === !isRelease) ||
             (entry.permission && !permissionMap[entry.permission])) {
           interfaceMap[entry.name] = false;

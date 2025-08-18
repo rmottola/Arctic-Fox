@@ -25,7 +25,9 @@
 #include "DOMMediaStream.h"
 #include "MediaStreamTrack.h"
 #include "MediaStreamListener.h"
+#include "MediaStreamVideoSink.h"
 #include "VideoUtils.h"
+#include "VideoStreamTrack.h"
 #ifdef WEBRTC_GONK
 #include "GrallocImages.h"
 #include "mozilla/layers/GrallocTextureClient.h"
@@ -356,44 +358,23 @@ protected:
         uint8_t *y = data->mYChannel;
         uint8_t *cb = data->mCbChannel;
         uint8_t *cr = data->mCrChannel;
+        int32_t yStride = data->mYStride;
+        int32_t cbCrStride = data->mCbCrStride;
         uint32_t width = yuv->GetSize().width;
         uint32_t height = yuv->GetSize().height;
-        uint32_t length = yuv->GetDataSize();
-        // NOTE: length may be rounded up or include 'other' data (see
-        // YCbCrImageDataDeserializerBase::ComputeMinBufferSize())
 
-        // XXX Consider modifying these checks if we ever implement
-        // any subclasses of PlanarYCbCrImage that allow disjoint buffers such
-        // that y+3(width*height)/2 might go outside the allocation or there are
-        // pads between y, cr and cb.
-        // GrallocImage can have wider strides, and so in some cases
-        // would encode as garbage.  If we need to encode it we'll either want to
-        // modify SendVideoFrame or copy/move the data in the buffer.
-        if (cb == (y + YSIZE(width, height)) &&
-            cr == (cb + CRSIZE(width, height)) &&
-            length >= I420SIZE(width, height)) {
-          MOZ_MTLOG(ML_DEBUG, "Sending an I420 video frame");
-          VideoFrameConverted(y, I420SIZE(width, height), width, height, mozilla::kVideoI420, 0);
+        webrtc::I420VideoFrame i420_frame;
+        int rv = i420_frame.CreateFrame(y, cb, cr, width, height,
+                                        yStride, cbCrStride, cbCrStride,
+                                        webrtc::kVideoRotation_0);
+        if (rv != 0) {
+          NS_ERROR("Creating an I420 frame failed");
           return;
-        } else {
-          MOZ_MTLOG(ML_ERROR, "Unsupported PlanarYCbCrImage format: "
-                              "width=" << width << ", height=" << height << ", y=" << y
-                              << "\n  Expected: cb=y+" << YSIZE(width, height)
-                                          << ", cr=y+" << YSIZE(width, height)
-                                                        + CRSIZE(width, height)
-                              << "\n  Observed: cb=y+" << cb - y
-                                          << ", cr=y+" << cr - y
-                              << "\n            ystride=" << data->mYStride
-                                          << ", yskip=" << data->mYSkip
-                              << "\n            cbcrstride=" << data->mCbCrStride
-                                          << ", cbskip=" << data->mCbSkip
-                                          << ", crskip=" << data->mCrSkip
-                              << "\n            ywidth=" << data->mYSize.width
-                                          << ", yheight=" << data->mYSize.height
-                              << "\n            cbcrwidth=" << data->mCbCrSize.width
-                                          << ", cbcrheight=" << data->mCbCrSize.height);
-          NS_ASSERTION(false, "Unsupported PlanarYCbCrImage format");
         }
+
+        MOZ_MTLOG(ML_DEBUG, "Sending an I420 video frame");
+        VideoFrameConverted(i420_frame);
+        return;
       }
     }
 
@@ -584,6 +565,9 @@ MediaPipeline::AttachTransport_s()
       return res;
     }
   }
+
+  transport_->Attach(this);
+
   return NS_OK;
 }
 
@@ -1016,6 +1000,16 @@ void MediaPipeline::RtcpPacketReceived(TransportLayer *layer,
     return;
   }
 
+  // We do not filter RTCP for send pipelines, since the webrtc.org code for
+  // senders already has logic to ignore RRs that do not apply.
+  // TODO bug 1279153: remove SR check for reduced size RTCP
+  if (filter_ && direction_ == RECEIVE) {
+    if (!filter_->FilterSenderReport(data, len)) {
+      MOZ_MTLOG(ML_NOTICE, "Dropping incoming RTCP packet; filtered out");
+      return;
+    }
+  }
+
   // Make a copy rather than cast away constness
   auto inner_data = MakeUnique<unsigned char[]>(len);
   memcpy(inner_data.get(), data, len);
@@ -1028,15 +1022,6 @@ void MediaPipeline::RtcpPacketReceived(TransportLayer *layer,
 
   if (!NS_SUCCEEDED(res))
     return;
-
-  // We do not filter RTCP for send pipelines, since the webrtc.org code for
-  // senders already has logic to ignore RRs that do not apply.
-  if (filter_ && direction_ == RECEIVE) {
-    if (!filter_->FilterSenderReport(inner_data.get(), out_len)) {
-      MOZ_MTLOG(ML_NOTICE, "Dropping rtcp packet");
-      return;
-    }
-  }
 
   MOZ_MTLOG(ML_DEBUG, description_ << " received RTCP packet.");
   increment_rtcp_packets_received();
@@ -1278,6 +1263,34 @@ protected:
 };
 #endif
 
+class MediaPipelineTransmit::PipelineVideoSink :
+  public MediaStreamVideoSink
+{
+public:
+  explicit PipelineVideoSink(const RefPtr<MediaSessionConduit>& conduit,
+                             MediaPipelineTransmit::PipelineListener* listener)
+    : conduit_(conduit)
+    , pipelineListener_(listener)
+  {
+  }
+
+  virtual void SetCurrentFrames(const VideoSegment& aSegment) override;
+  virtual void ClearFrames() override {}
+
+private:
+  ~PipelineVideoSink() {
+    // release conduit on mainthread.  Must use forget()!
+    nsresult rv = NS_DispatchToMainThread(new
+      ConduitDeleteEvent(conduit_.forget()));
+    MOZ_ASSERT(!NS_FAILED(rv),"Could not dispatch conduit shutdown to main");
+    if (NS_FAILED(rv)) {
+      MOZ_CRASH();
+    }
+  }
+  RefPtr<MediaSessionConduit> conduit_;
+  MediaPipelineTransmit::PipelineListener* pipelineListener_;
+};
+
 MediaPipelineTransmit::MediaPipelineTransmit(
     const std::string& pc,
     nsCOMPtr<nsIEventTarget> main_thread,
@@ -1292,6 +1305,7 @@ MediaPipelineTransmit::MediaPipelineTransmit(
   MediaPipeline(pc, TRANSMIT, main_thread, sts_thread, track_id, level,
                 conduit, rtp_transport, rtcp_transport, filter),
   listener_(new PipelineListener(conduit)),
+  video_sink_(new PipelineVideoSink(conduit, listener_)),
   domtrack_(domtrack)
 {
 #if !defined(MOZILLA_EXTERNAL_LINKAGE)
@@ -1345,6 +1359,10 @@ void MediaPipelineTransmit::AttachToTrack(const std::string& track_id) {
   domtrack_->AddDirectListener(listener_);
   domtrack_->AddListener(listener_);
 
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
+  domtrack_->AddDirectListener(video_sink_);
+#endif
+
 #ifndef MOZILLA_INTERNAL_API
   // this enables the unit tests that can't fiddle with principals and the like
   listener_->SetEnabled(true);
@@ -1393,6 +1411,7 @@ MediaPipelineTransmit::DetachMedia()
   if (domtrack_) {
     domtrack_->RemoveDirectListener(listener_);
     domtrack_->RemoveListener(listener_);
+    domtrack_->RemoveDirectListener(video_sink_);
     domtrack_ = nullptr;
   }
   // Let the listener be destroyed with the pipeline (or later).
@@ -1663,17 +1682,6 @@ NewData(MediaStreamGraph* graph,
                         rate, *iter);
       iter.Next();
     }
-  } else if (media.GetType() == MediaSegment::VIDEO) {
-#if !defined(MOZILLA_EXTERNAL_LINKAGE)
-    VideoSegment* video = const_cast<VideoSegment *>(
-        static_cast<const VideoSegment *>(&media));
-
-    VideoSegment::ChunkIterator iter(*video);
-    while(!iter.IsEnded()) {
-      converter_->QueueVideoChunk(*iter, !enabled_);
-      iter.Next();
-    }
-#endif
   } else {
     // Ignore
   }
@@ -1745,6 +1753,32 @@ void MediaPipelineTransmit::PipelineListener::ProcessAudioChunk(
                             samplesPerPacket,
                             rate, 0);
   }
+}
+
+void MediaPipelineTransmit::PipelineVideoSink::
+SetCurrentFrames(const VideoSegment& aSegment)
+{
+  MOZ_ASSERT(pipelineListener_);
+
+  if (!pipelineListener_->active_) {
+    MOZ_MTLOG(ML_DEBUG, "Discarding packets because transport not ready");
+    return;
+  }
+
+  if (conduit_->type() != MediaSessionConduit::VIDEO) {
+    // Ignore data of wrong kind in case we have a muxed stream
+    return;
+  }
+
+#if !defined(MOZILLA_EXTERNAL_LINKAGE)
+    VideoSegment* video = const_cast<VideoSegment *>(&aSegment);
+
+    VideoSegment::ChunkIterator iter(*video);
+    while(!iter.IsEnded()) {
+      pipelineListener_->converter_->QueueVideoChunk(*iter, !pipelineListener_->enabled_);
+      iter.Next();
+    }
+#endif
 }
 
 class TrackAddedCallback {

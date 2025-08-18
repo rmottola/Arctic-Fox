@@ -655,9 +655,8 @@ var TelemetryStorageImpl = {
       if (data.timestampCreated > creationDate.getTime()) {
         this._log.error("saveArchivedPing - trying to overwrite newer ping with the same id");
         return Promise.reject(new Error("trying to overwrite newer ping with the same id"));
-      } else {
-        this._log.warn("saveArchivedPing - overwriting older ping with the same id");
       }
+      this._log.warn("saveArchivedPing - overwriting older ping with the same id");
     }
 
     // Get the archived ping path and append the lz4 suffix to it (so we have 'jsonlz4').
@@ -735,7 +734,7 @@ var TelemetryStorageImpl = {
     let filePath = OS.Path.join(gDataReportingDir, SESSION_STATE_FILE_NAME);
     try {
       yield CommonUtils.writeJSON(sessionData, filePath);
-    } catch(e) {
+    } catch (e) {
       this._log.error("_saveSessionData - Failed to write session data to " + filePath, e);
       Telemetry.getHistogramById("TELEMETRY_SESSIONDATA_FAILED_SAVE").add(1);
     }
@@ -1255,7 +1254,7 @@ var TelemetryStorageImpl = {
         options.compression = "lz4";
       }
       yield OS.File.writeAtomic(filePath, pingString, options);
-    } catch(e) {
+    } catch (e) {
       if (!e.becauseExists) {
         throw e;
       }
@@ -1343,7 +1342,7 @@ var TelemetryStorageImpl = {
     let ping;
     try {
       ping = yield this.loadPingFile(info.path, false);
-    } catch(e) {
+    } catch (e) {
       // If we failed to load the ping, check what happened and update the histogram.
       if (e instanceof PingReadError) {
         Telemetry.getHistogramById("TELEMETRY_PENDING_LOAD_FAILURE_READ").add();
@@ -1579,7 +1578,7 @@ var TelemetryStorageImpl = {
     let array;
     try {
       array = yield OS.File.read(aFilePath, options);
-    } catch(e) {
+    } catch (e) {
       this._log.trace("loadPingfile - unreadable ping " + aFilePath, e);
       throw new PingReadError(e.message, e.becauseNoSuchFile);
     }

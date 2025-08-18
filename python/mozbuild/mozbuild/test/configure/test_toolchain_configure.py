@@ -862,6 +862,7 @@ class WindowsToolchainTest(BaseToolchainTest):
 
 
 class CrossCompileToolchainTest(BaseToolchainTest):
+    TARGET = 'arm-unknown-linux-gnu'
     PATHS = {
         '/usr/bin/arm-linux-gnu-gcc': GCC_4_9,
         '/usr/bin/arm-linux-gnu-g++': GXX_4_9,
@@ -893,7 +894,7 @@ class CrossCompileToolchainTest(BaseToolchainTest):
             },
             'host_c_compiler': self.GCC_4_9_RESULT,
             'host_cxx_compiler': self.GXX_4_9_RESULT,
-        }, args=['--target=arm-unknown-linux-gnu'])
+        })
 
     def test_cannot_cross(self):
         self.TARGET = 'mipsel-unknown-linux-gnu'
@@ -914,7 +915,7 @@ class CrossCompileToolchainTest(BaseToolchainTest):
             'cxx_compiler': self.ARM_GXX_5_RESULT,
             'host_c_compiler': self.GCC_4_9_RESULT,
             'host_cxx_compiler': self.GXX_4_9_RESULT,
-        }, args=['--target=arm-unknown-linux-gnu'], environ={
+        }, environ={
             'CC': 'arm-linux-gnu-gcc-5',
             'CXX': 'arm-linux-gnu-g++-5',
         })
@@ -922,7 +923,7 @@ class CrossCompileToolchainTest(BaseToolchainTest):
     def test_overridden_unsupported_cross_gcc(self):
         self.do_toolchain_test(self.PATHS, {
             'c_compiler': self.ARM_GCC_4_7_RESULT,
-        }, args=['--target=arm-unknown-linux-gnu'], environ={
+        }, environ={
             'CC': 'arm-linux-gnu-gcc-4.7',
             'CXX': 'arm-linux-gnu-g++-4.7',
         })
@@ -934,7 +935,7 @@ class CrossCompileToolchainTest(BaseToolchainTest):
             'cxx_compiler': self.ARM_GXX_5_RESULT,
             'host_c_compiler': self.GCC_4_9_RESULT,
             'host_cxx_compiler': self.GXX_4_9_RESULT,
-        }, args=['--target=arm-unknown-linux-gnu'], environ={
+        }, environ={
             'CC': 'arm-linux-gnu-gcc-5',
         })
 
@@ -943,7 +944,7 @@ class CrossCompileToolchainTest(BaseToolchainTest):
             'cxx_compiler': self.ARM_GXX_5_RESULT,
             'host_c_compiler': self.CLANG_3_6_RESULT,
             'host_cxx_compiler': self.CLANGXX_3_6_RESULT,
-        }, args=['--target=arm-unknown-linux-gnu'], environ={
+        }, environ={
             'CC': 'arm-linux-gnu-gcc-5',
             'HOST_CC': 'clang',
         })
@@ -953,7 +954,7 @@ class CrossCompileToolchainTest(BaseToolchainTest):
             'cxx_compiler': self.ARM_GXX_5_RESULT,
             'host_c_compiler': self.CLANG_3_6_RESULT,
             'host_cxx_compiler': self.CLANGXX_3_6_RESULT,
-        }, args=['--target=arm-unknown-linux-gnu'], environ={
+        }, environ={
             'CC': 'arm-linux-gnu-gcc-5',
             'CXX': 'arm-linux-gnu-g++-5',
             'HOST_CC': 'clang',

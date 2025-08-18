@@ -947,7 +947,7 @@ class XPCShellTests(object):
 
     def trySetupNode(self):
         """
-          Run node for SPDY tests, if available, and updates mozinfo as appropriate.
+          Run node for HTTP/2 tests, if available, and updates mozinfo as appropriate.
         """
         nodeMozInfo = {'hasNode': False} # Assume the worst
         nodeBin = None
@@ -963,10 +963,10 @@ class XPCShellTests(object):
 
             def startServer(name, serverJs):
                 if os.path.exists(serverJs):
-                    # OK, we found our SPDY server, let's try to get it running
+                    # OK, we found our server, let's try to get it running
                     self.log.info('Found %s at %s' % (name, serverJs))
                     try:
-                        # We pipe stdin to node because the spdy server will exit when its
+                        # We pipe stdin to node because the server will exit when its
                         # stdin reaches EOF
                         process = Popen([nodeBin, serverJs], stdin=PIPE, stdout=PIPE,
                                 stderr=PIPE, env=self.env, cwd=os.getcwd())
@@ -977,9 +977,6 @@ class XPCShellTests(object):
                         msg = process.stdout.readline()
                         if 'server listening' in msg:
                             nodeMozInfo['hasNode'] = True
-                            searchObj = re.search( r'SPDY server listening on port (.*)', msg, 0)
-                            if searchObj:
-                              self.env["MOZSPDY_PORT"] = searchObj.group(1)
                             searchObj = re.search( r'HTTP2 server listening on port (.*)', msg, 0)
                             if searchObj:
                               self.env["MOZHTTP2_PORT"] = searchObj.group(1)
@@ -988,7 +985,6 @@ class XPCShellTests(object):
                         self.log.error('Could not run %s server: %s' % (name, str(e)))
 
             myDir = os.path.split(os.path.abspath(__file__))[0]
-            startServer('moz-spdy', os.path.join(myDir, 'moz-spdy', 'moz-spdy.js'))
             startServer('moz-http2', os.path.join(myDir, 'moz-http2', 'moz-http2.js'))
         elif os.getenv('MOZ_ASSUME_NODE_RUNNING', None):
             self.log.info('Assuming required node servers are already running')
@@ -1197,7 +1193,7 @@ class XPCShellTests(object):
             appDirKey = self.mozInfo["appname"] + "-appdir"
 
         # We have to do this before we build the test list so we know whether or
-        # not to run tests that depend on having the node spdy server
+        # not to run tests that depend on having the node http/2 server
         self.trySetupNode()
 
         pStdout, pStderr = self.getPipes()

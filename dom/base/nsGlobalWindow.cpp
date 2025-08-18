@@ -305,17 +305,10 @@ static int32_t gMinTimeoutValue;
 static int32_t gMinBackgroundTimeoutValue;
 inline int32_t
 nsGlobalWindow::DOMMinTimeoutValue() const {
-  bool isBackground = !mOuterWindow || mOuterWindow->IsBackground();
-  if (isBackground) {
-    // Don't use the background timeout value when there are audio contexts with
-    // active nodes, so that background audio can keep running smoothly.
-    for (const AudioContext* ctx : mAudioContexts) {
-      if (ctx->ActiveNodeCount() > 0) {
-        isBackground = false;
-        break;
-      }
-    }
-  }
+  // Don't use the background timeout value when there are audio contexts
+  // present, so that baackground audio can keep running smoothly. (bug 1181073)
+  bool isBackground = mAudioContexts.IsEmpty() &&
+    (!mOuterWindow || mOuterWindow->IsBackground());
   return
     std::max(isBackground ? gMinBackgroundTimeoutValue : gMinTimeoutValue, 0);
 }
@@ -8402,11 +8395,8 @@ nsGlobalWindow::PostMessageMozOuter(JSContext* aCx, JS::Handle<JS::Value> aMessa
   nsCOMPtr<nsIPrincipal> providedPrincipal;
 
   if (aTargetOrigin.EqualsASCII("/")) {
-    providedPrincipal = GetEntryGlobal()->PrincipalOrNull();
-    if (NS_WARN_IF(!providedPrincipal))
-      return;
+    providedPrincipal = callerPrin;
   }
-
   // "*" indicates no specific origin is required.
   else if (!aTargetOrigin.EqualsASCII("*")) {
     nsCOMPtr<nsIURI> originURI;

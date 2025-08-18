@@ -26,11 +26,9 @@ const SIGNING_REQUIRED = CONSTANTS.REQUIRE_SIGNING ?
 
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
                                   "resource://gre/modules/PluralForm.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
+                                  "resource://gre/modules/Preferences.jsm");
 
-XPCOMUtils.defineLazyGetter(this, "BrowserToolboxProcess", function() {
-  return Cu.import("resource://devtools/client/framework/ToolboxProcess.jsm", {}).
-         BrowserToolboxProcess;
-});
 XPCOMUtils.defineLazyModuleGetter(this, "Experiments",
   "resource:///modules/experiments/Experiments.jsm");
 
@@ -42,8 +40,6 @@ const PREF_GETADDONS_CACHE_ENABLED = "extensions.getAddons.cache.enabled";
 const PREF_GETADDONS_CACHE_ID_ENABLED = "extensions.%ID%.getAddons.cache.enabled";
 const PREF_UI_TYPE_HIDDEN = "extensions.ui.%TYPE%.hidden";
 const PREF_UI_LASTCATEGORY = "extensions.ui.lastCategory";
-const PREF_ADDON_DEBUGGING_ENABLED = "devtools.chrome.enabled";
-const PREF_REMOTE_DEBUGGING_ENABLED = "devtools.debugger.remote-enabled";
 
 const LOADING_MSG_DELAY = 100;
 
@@ -167,9 +163,6 @@ function initialize(event) {
   }
 
   gViewController.loadInitialView(view);
-
-  Services.prefs.addObserver(PREF_ADDON_DEBUGGING_ENABLED, debuggingPrefChanged, false);
-  Services.prefs.addObserver(PREF_REMOTE_DEBUGGING_ENABLED, debuggingPrefChanged, false);
 }
 
 function notifyInitialized() {
@@ -190,8 +183,6 @@ function shutdown() {
   gEventManager.shutdown();
   gViewController.shutdown();
   Services.obs.removeObserver(sendEMPong, "EM-ping");
-  Services.prefs.removeObserver(PREF_ADDON_DEBUGGING_ENABLED, debuggingPrefChanged);
-  Services.prefs.removeObserver(PREF_REMOTE_DEBUGGING_ENABLED, debuggingPrefChanged);
 }
 
 function sendEMPong(aSubject, aTopic, aData) {
@@ -290,9 +281,8 @@ function getMainWindowWithPreferencesPane() {
   let mainWindow = getMainWindow();
   if (mainWindow && "openAdvancedPreferences" in mainWindow) {
     return mainWindow;
-  } else {
-    return null;
   }
+  return null;
 }
 
 /**
@@ -555,7 +545,7 @@ var gEventManager = {
         continue;
       try {
         listener[aEvent].apply(listener, aParams);
-      } catch(e) {
+      } catch (e) {
         // this shouldn't be fatal
         Cu.reportError(e);
       }
@@ -574,7 +564,7 @@ var gEventManager = {
         continue;
       try {
         listener[aEvent].apply(listener, aParams);
-      } catch(e) {
+      } catch (e) {
         // this shouldn't be fatal
         Cu.reportError(e);
       }
@@ -642,6 +632,8 @@ var gViewController = {
 
   initialize: function() {
     this.viewPort = document.getElementById("view-port");
+    this.headeredViews = document.getElementById("headered-views");
+    this.headeredViewsDeck = document.getElementById("headered-views-content");
 
     this.viewObjects["search"] = gSearchView;
     this.viewObjects["discover"] = gDiscoverView;
@@ -672,7 +664,7 @@ var gViewController = {
       if ("shutdown" in view) {
         try {
           view.shutdown();
-        } catch(e) {
+        } catch (e) {
           // this shouldn't be fatal
           Cu.reportError(e);
         }
@@ -762,6 +754,23 @@ var gViewController = {
     notifyInitialized();
   },
 
+  get displayedView() {
+    if (this.viewPort.selectedPanel == this.headeredViews) {
+      return this.headeredViewsDeck.selectedPanel;
+    }
+    return this.viewPort.selectedPanel;
+  },
+
+  set displayedView(view) {
+    let node = view.node;
+    if (node.parentNode == this.headeredViewsDeck) {
+      this.headeredViewsDeck.selectedPanel = node;
+      this.viewPort.selectedPanel = this.headeredViews;
+    } else {
+      this.viewPort.selectedPanel = node;
+    }
+  },
+
   loadViewInternal: function(aViewId, aPreviousView, aState) {
     var view = this.parseViewId(aViewId);
 
@@ -777,7 +786,7 @@ var gViewController = {
         let canHide = this.currentViewObj.hide();
         if (canHide === false)
           return;
-        this.viewPort.selectedPanel.removeAttribute("loading");
+        this.displayedView.removeAttribute("loading");
       } catch (e) {
         // this shouldn't be fatal
         Cu.reportError(e);
@@ -789,8 +798,8 @@ var gViewController = {
     this.currentViewId = aViewId;
     this.currentViewObj = viewObj;
 
-    this.viewPort.selectedPanel = this.currentViewObj.node;
-    this.viewPort.selectedPanel.setAttribute("loading", "true");
+    this.displayedView = this.currentViewObj;
+    this.currentViewObj.node.setAttribute("loading", "true");
     this.currentViewObj.node.focus();
 
     if (aViewId == aPreviousView)
@@ -806,7 +815,7 @@ var gViewController = {
   },
 
   notifyViewChanged: function() {
-    this.viewPort.selectedPanel.removeAttribute("loading");
+    this.displayedView.removeAttribute("loading");
 
     if (this.viewChangeCallback) {
       this.viewChangeCallback();
@@ -1075,20 +1084,6 @@ var gViewController = {
       }
     },
 
-    cmd_debugItem: {
-      doCommand: function(aAddon) {
-        BrowserToolboxProcess.init({ addonID: aAddon.id });
-      },
-
-      isEnabled: function(aAddon) {
-        let debuggerEnabled = Services.prefs.
-                              getBoolPref(PREF_ADDON_DEBUGGING_ENABLED);
-        let remoteEnabled = Services.prefs.
-                            getBoolPref(PREF_REMOTE_DEBUGGING_ENABLED);
-        return aAddon && aAddon.isDebuggable && debuggerEnabled && remoteEnabled;
-      }
-    },
-
     cmd_showItemPreferences: {
       isEnabled: function(aAddon) {
         if (!aAddon ||
@@ -1302,6 +1297,18 @@ var gViewController = {
 
         buildNextInstall();
       }
+    },
+
+    cmd_debugAddons: {
+      isEnabled: function() {
+        return true;
+      },
+      doCommand: function() {
+        let mainWindow = getMainWindow();
+        if ("switchToTabHavingURI" in mainWindow) {
+          mainWindow.switchToTabHavingURI("about:debugging#addons", true);
+        }
+      },
     },
 
     cmd_cancelOperation: {
@@ -1636,8 +1643,7 @@ function sortElements(aElements, aSortBy, aAscending) {
       if (addonType && (addonType.flags & AddonManager.TYPE_SUPPORTS_ASK_TO_ACTIVATE) &&
           addon.userDisabled == AddonManager.STATE_ASK_TO_ACTIVATE)
         return "askToActivate";
-      else
-        return "enabled";
+      return "enabled";
     }
 
     return addon[aKey];
@@ -2058,6 +2064,7 @@ var gDiscoverView = {
   _error: null,
   homepageURL: null,
   _loadListeners: [],
+  hideHeader: true,
 
   initialize: function() {
     this.enabled = isDiscoverEnabled();
@@ -2259,7 +2266,7 @@ var gDiscoverView = {
                         Ci.nsIWebProgressListener.STATE_IS_REQUEST |
                         Ci.nsIWebProgressListener.STATE_TRANSFERRING;
     // Once transferring begins show the content
-    if (aStateFlags & transferStart)
+    if ((aStateFlags & transferStart) === transferStart)
       this.node.selectedPanel = this._browser;
 
     // Only care about the network events
@@ -2435,7 +2442,7 @@ var gSearchView = {
     var maxRemoteResults = 0;
     try {
       maxRemoteResults = Services.prefs.getIntPref(PREF_MAXRESULTS);
-    } catch(e) {}
+    } catch (e) {}
 
     if (maxRemoteResults <= 0) {
       finishSearch(0);
@@ -2903,6 +2910,7 @@ var gDetailView = {
       version.hidden = true;
     }
 
+    var screenshotbox = document.getElementById("detail-screenshot-box");
     var screenshot = document.getElementById("detail-screenshot");
     if (aAddon.screenshots && aAddon.screenshots.length > 0) {
       if (aAddon.screenshots[0].thumbnailURL) {
@@ -2915,9 +2923,9 @@ var gDetailView = {
         screenshot.height = aAddon.screenshots[0].height;
       }
       screenshot.setAttribute("loading", "true");
-      screenshot.hidden = false;
+      screenshotbox.hidden = false;
     } else {
-      screenshot.hidden = true;
+      screenshotbox.hidden = true;
     }
 
     var desc = document.getElementById("detail-desc");
@@ -3323,7 +3331,7 @@ var gDetailView = {
     // relies on us finishing before the ViewChanged event bubbles up to its
     // listeners, and promises resolve asynchronously.
     let whenViewLoaded = callback => {
-      if (gViewController.viewPort.selectedPanel.hasAttribute("loading")) {
+      if (gViewController.displayedView.hasAttribute("loading")) {
         gDetailView.node.addEventListener("ViewChanged", function viewChangedEventListener() {
           gDetailView.node.removeEventListener("ViewChanged", viewChangedEventListener);
           callback();
@@ -3429,7 +3437,7 @@ var gDetailView = {
         };
         xhr.send();
       }
-    } catch(e) {
+    } catch (e) {
       Cu.reportError(e);
       if (aCallback)
         aCallback();
@@ -3472,6 +3480,10 @@ var gDetailView = {
       timeout = null;
 
       let doc = browser.contentDocument;
+      if (!doc) {
+        return;
+      }
+
       let body = doc.body || doc.documentElement;
 
       let docHeight = doc.documentElement.getBoundingClientRect().height;
@@ -3816,12 +3828,6 @@ var gUpdatesView = {
       this.updateAvailableCount();
   }
 };
-
-function debuggingPrefChanged() {
-  gViewController.updateState();
-  gViewController.updateCommands();
-  gViewController.notifyViewChanged();
-}
 
 var gDragDrop = {
   onDragOver: function(aEvent) {

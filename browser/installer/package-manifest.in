@@ -148,6 +148,7 @@
 #ifdef ACCESSIBILITY
 #ifdef XP_WIN32
 @BINPATH@/AccessibleMarshal.dll
+@BINPATH@/IA2Marshal.dll
 #endif
 @RESPATH@/components/accessibility.xpt
 #endif
@@ -586,6 +587,10 @@
 @RESPATH@/components/PACGenerator.js
 @RESPATH@/components/PACGenerator.manifest
 
+; [Extensions]
+@RESPATH@/components/extensions-toolkit.manifest
+@RESPATH@/browser/components/extensions-browser.manifest
+
 ; Modules
 @RESPATH@/browser/modules/*
 @RESPATH@/modules/*
@@ -683,9 +688,6 @@
 @RESPATH@/defaults/pref/channel-prefs.js
 
 ; Services (gre) prefs
-#ifdef MOZ_SERVICES_NOTIFICATIONS
-@RESPATH@/defaults/pref/services-notifications.js
-#endif
 @RESPATH@/defaults/pref/services-sync.js
 
 ; [Layout Engine Resources]

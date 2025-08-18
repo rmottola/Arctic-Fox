@@ -174,7 +174,6 @@
 #include "nsSMILAnimationController.h"
 #include "imgIContainer.h"
 #include "nsSVGUtils.h"
-#include "SVGElementFactory.h"
 
 #include "nsRefreshDriver.h"
 
@@ -192,7 +191,6 @@
 #include "nsTextNode.h"
 #include "mozilla/dom/Link.h"
 #include "mozilla/dom/HTMLElementBinding.h"
-#include "mozilla/dom/SVGElementBinding.h"
 #include "nsXULAppAPI.h"
 #include "mozilla/dom/Touch.h"
 #include "mozilla/dom/TouchEvent.h"
@@ -2621,33 +2619,6 @@ nsDocument::SendToConsole(nsCOMArray<nsISecurityConsoleMessage>& aMessages)
   }
 }
 
-bool
-nsDocument::IsLoopDocument(nsIChannel *aChannel)
-{
-  nsCOMPtr<nsIURI> chanURI;
-  nsresult rv = aChannel->GetOriginalURI(getter_AddRefs(chanURI));
-  NS_ENSURE_SUCCESS(rv, false);
-
-  bool isAbout = false;
-  bool isLoop = false;
-  rv = chanURI->SchemeIs("about", &isAbout);
-  NS_ENSURE_SUCCESS(rv, false);
-  if (isAbout) {
-    nsCOMPtr<nsIURI> loopURI;
-    rv = NS_NewURI(getter_AddRefs(loopURI), "about:loopconversation");
-    NS_ENSURE_SUCCESS(rv, false);
-    rv = chanURI->EqualsExceptRef(loopURI, &isLoop);
-    NS_ENSURE_SUCCESS(rv, false);
-    if (!isLoop) {
-      rv = NS_NewURI(getter_AddRefs(loopURI), "about:looppanel");
-      NS_ENSURE_SUCCESS(rv, false);
-      rv = chanURI->EqualsExceptRef(loopURI, &isLoop);
-      NS_ENSURE_SUCCESS(rv, false);
-    }
-  }
-  return isLoop;
-}
-
 void
 nsDocument::ApplySettingsFromCSP(bool aSpeculative)
 {
@@ -2772,9 +2743,6 @@ nsDocument::InitCSP(nsIChannel* aChannel)
   principal->GetAddonId(addonId);
   bool applyAddonCSP = !addonId.IsEmpty();
 
-  // Check if this is part of the Loop/Hello service
-  bool applyLoopCSP = IsLoopDocument(aChannel);
-
   // Check if this is a signed content to apply default CSP.
   bool applySignedContentCSP = false;
   nsCOMPtr<nsILoadInfo> loadInfo = aChannel->GetLoadInfo();
@@ -2786,7 +2754,6 @@ nsDocument::InitCSP(nsIChannel* aChannel)
   if (!applyAppDefaultCSP &&
       !applyAppManifestCSP &&
       !applyAddonCSP &&
-      !applyLoopCSP &&
       !applySignedContentCSP &&
       cspHeaderValue.IsEmpty() &&
       cspROHeaderValue.IsEmpty()) {
@@ -2868,17 +2835,6 @@ nsDocument::InitCSP(nsIChannel* aChannel)
     nsAdoptingString signedContentCSP =
       Preferences::GetString("security.signed_content.CSP.default");
     csp->AppendPolicy(signedContentCSP, false, false);
-  }
-
-  // ----- if the doc is part of Loop, apply the loop CSP
-  if (applyLoopCSP) {
-    nsAdoptingString loopCSP;
-    loopCSP = Preferences::GetString("loop.CSP");
-    NS_ASSERTION(loopCSP, "Missing loop.CSP preference");
-    // If the pref has been removed, we continue without setting a CSP
-    if (loopCSP) {
-      csp->AppendPolicy(loopCSP, false, false);
-    }
   }
 
   // ----- if there's a full-strength CSP header, apply it.
@@ -6266,18 +6222,11 @@ nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
   JS::Rooted<JSObject*> protoObject(aCx);
   {
     JS::Rooted<JSObject*> htmlProto(aCx);
-    JS::Rooted<JSObject*> svgProto(aCx);
     {
       JSAutoCompartment ac(aCx, global);
 
       htmlProto = HTMLElementBinding::GetProtoObjectHandle(aCx);
       if (!htmlProto) {
-        rv.Throw(NS_ERROR_OUT_OF_MEMORY);
-        return;
-      }
-
-      svgProto = SVGElementBinding::GetProtoObjectHandle(aCx);
-      if (!svgProto) {
         rv.Throw(NS_ERROR_OUT_OF_MEMORY);
         return;
       }
@@ -6332,20 +6281,13 @@ nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
 
       JS::Rooted<JSObject*> protoProto(aCx, protoObject);
 
-      if (!JS_WrapObject(aCx, &htmlProto) || !JS_WrapObject(aCx, &svgProto)) {
+      if (!JS_WrapObject(aCx, &htmlProto)) {
         rv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
         return;
       }
 
-      // If PROTOTYPE's interface inherits from SVGElement, set NAMESPACE to SVG
-      // Namespace.
       while (protoProto) {
         if (protoProto == htmlProto) {
-          break;
-        }
-
-        if (protoProto == svgProto) {
-          namespaceID = kNameSpaceID_SVG;
           break;
         }
 
@@ -6359,20 +6301,15 @@ nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
     // If name was provided and not null...
     if (!lcName.IsEmpty()) {
       // Let BASE be the element interface for NAME and NAMESPACE.
-      bool known = false;
       nameAtom = NS_Atomize(lcName);
-      if (namespaceID == kNameSpaceID_XHTML) {
-        nsIParserService* ps = nsContentUtils::GetParserService();
-        if (!ps) {
-          rv.Throw(NS_ERROR_UNEXPECTED);
-          return;
-        }
-
-        known =
-          ps->HTMLCaseSensitiveAtomTagToId(nameAtom) != eHTMLTag_userdefined;
-      } else {
-        known = SVGElementFactory::Exists(nameAtom);
+      nsIParserService* ps = nsContentUtils::GetParserService();
+      if (!ps) {
+        rv.Throw(NS_ERROR_UNEXPECTED);
+        return;
       }
+
+      bool known =
+        ps->HTMLCaseSensitiveAtomTagToId(nameAtom) != eHTMLTag_userdefined;
 
       // If BASE does not exist or is an interface for a custom element, set ERROR
       // to InvalidName and stop.
@@ -6382,12 +6319,6 @@ nsDocument::RegisterElement(JSContext* aCx, const nsAString& aType,
         return;
       }
     } else {
-      // If NAMESPACE is SVG Namespace, set ERROR to InvalidName and stop.
-      if (namespaceID == kNameSpaceID_SVG) {
-        rv.Throw(NS_ERROR_UNEXPECTED);
-        return;
-      }
-
       nameAtom = typeAtom;
     }
   } // Leaving the document's compartment for the LifecycleCallbacks init
@@ -13386,7 +13317,8 @@ nsIDocument::FlushUserFontSet()
             return;
           }
         } else {
-          NS_ERROR("stylo: ServoStyleSets cannot handle @font-face rules yet");
+          NS_WARNING("stylo: ServoStyleSets cannot handle @font-face rules yet. "
+                     "See bug 1290237.");
         }
       }
 
@@ -13475,6 +13407,10 @@ nsIDocument::UpdateStyleBackendType()
 {
   MOZ_ASSERT(mStyleBackendType == StyleBackendType(0),
              "no need to call UpdateStyleBackendType now");
+
+  // Assume Gecko by default.
+  mStyleBackendType = StyleBackendType::Gecko;
+
 #ifdef MOZ_STYLO
   // XXX For now we use a Servo-backed style set only for (X)HTML documents
   // in content docshells.  This should let us avoid implementing XUL-specific
@@ -13483,15 +13419,11 @@ nsIDocument::UpdateStyleBackendType()
   // document before we have a pres shell (i.e. before we make the decision
   // here about whether to use a Gecko- or Servo-backed style system), so
   // we avoid Servo-backed style sets for SVG documents.
-  NS_ASSERTION(mDocumentContainer, "stylo: calling UpdateStyleBackendType "
-                                   "before we have a docshell");
-  mStyleBackendType =
-    nsLayoutUtils::SupportsServoStyleBackend(this) &&
-    mDocumentContainer ?
-      StyleBackendType::Servo :
-      StyleBackendType::Gecko;
-#else
-  mStyleBackendType = StyleBackendType::Gecko;
+  if (!mDocumentContainer) {
+    NS_WARNING("stylo: No docshell yet, assuming Gecko style system");
+  } else if (nsLayoutUtils::SupportsServoStyleBackend(this)) {
+    mStyleBackendType = StyleBackendType::Servo;
+  }
 #endif
 }
 

@@ -58,11 +58,8 @@ pageInfoTreeView.prototype = {
 
   addRows: function(rows)
   {
-    this.data = this.data.concat(rows);
-    this.rowCountChanged(this.rows, rows.length);
-    this.rows = this.data.length;
-    if (this.selection.count == 0 && this.rowCount && !gImageElement) {
-      this.selection.select(0);
+    for (let row of rows) {
+      this.addRow(row);
     }
   },
 
@@ -191,10 +188,9 @@ gImageView.getCellText = function(row, column) {
   if (column.index == COL_IMAGE_SIZE) {
     if (value == -1) {
       return gStrings.unknown;
-    } else {
-      var kbSize = Number(Math.round(value / 1024 * 100) / 100);
-      return gBundle.getFormattedString("mediaFileSize", [kbSize]);
     }
+    var kbSize = Number(Math.round(value / 1024 * 100) / 100);
+    return gBundle.getFormattedString("mediaFileSize", [kbSize]);
   }
   return value || "";
 };
@@ -266,7 +262,7 @@ const CERTIFICATEDIALOGS_CONTRACTID = "@mozilla.org/nsCertificateDialogs;1"
 function getClipboardHelper() {
     try {
         return Components.classes["@mozilla.org/widget/clipboardhelper;1"].getService(Components.interfaces.nsIClipboardHelper);
-    } catch(e) {
+    } catch (e) {
         // do nothing, later code will handle the error
         return null;
     }
@@ -348,15 +344,12 @@ function onLoadPageInfo()
   Components.classes["@mozilla.org/observer-service;1"]
             .getService(Components.interfaces.nsIObserverService)
             .notifyObservers(window, "page-info-dialog-loaded", null);
-  
-  // Make sure the page info window gets focus even if a doorhanger might
-  // otherwise (async) steal it.
-  window.focus();
 }
 
-function loadPageInfo(frameOuterWindowID, imageElement)
+function loadPageInfo(frameOuterWindowID, imageElement, browser)
 {
-  let mm = window.opener.gBrowser.selectedBrowser.messageManager;
+  browser = browser || window.opener.gBrowser.selectedBrowser;
+  let mm = browser.messageManager;
 
   gStrings["application/rss+xml"]  = gBundle.getString("feedRss");
   gStrings["application/atom+xml"] = gBundle.getString("feedAtom");
@@ -490,11 +483,11 @@ function loadTab(args)
   // If the "View Image Info" context menu item was used, the related image
   // element is provided as an argument. This can't be a background image.
   let imageElement = args && args.imageElement;
-
   let frameOuterWindowID = args && args.frameOuterWindowID;
+  let browser = args && args.browser;
 
   /* Load the page info */
-  loadPageInfo(frameOuterWindowID, imageElement);
+  loadPageInfo(frameOuterWindowID, imageElement, browser);
 
   var initialTab = (args && args.initialTab) || "generalTab";
   var radioGroup = document.getElementById("viewGroup");
@@ -751,8 +744,9 @@ function saveMedia()
     selectSaveFolder(function(aDirectory) {
       if (aDirectory) {
         var saveAnImage = function(aURIString, aChosenData, aBaseURI) {
+          uniqueFile(aChosenData.file);
           internalSave(aURIString, null, null, null, null, false, "SaveImageTitle",
-                       aChosenData, aBaseURI, null, gDocInfo.isContentWindowPrivate);
+                       aChosenData, aBaseURI, null, false, null, gDocInfo.isContentWindowPrivate);
         };
 
         for (var i = 0; i < rowArray.length; i++) {
@@ -765,8 +759,11 @@ function saveMedia()
           try {
             uri.QueryInterface(Components.interfaces.nsIURL);
             dir.append(decodeURIComponent(uri.fileName));
-          } catch(ex) {
-            /* data: uris */
+          } catch (ex) {
+            // data:/blob: uris
+            // Supply a dummy filename, otherwise Download Manager
+            // will try to delete the base directory on failure.
+            dir.append(gImageView.data[v][COL_IMAGE_TYPE]);
           }
 
           if (i == 0) {
@@ -1099,6 +1096,14 @@ function doCopy()
     }
     gClipboardHelper.copyString(text.join("\n"));
   }
+}
+
+function doSelectAllMedia()
+{
+  var tree = document.getElementById("imagetree");
+
+  if (tree)
+    tree.view.selection.selectAll();
 }
 
 function doSelectAll()

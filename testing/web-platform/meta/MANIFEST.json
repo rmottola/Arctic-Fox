@@ -11708,6 +11708,14 @@
         "url": "/IndexedDB/idbcursor-continue.htm"
       },
       {
+        "path": "IndexedDB/idbcursor-continuePrimaryKey.htm",
+        "url": "/IndexedDB/idbcursor-continuePrimaryKey.htm"
+      },
+      {
+        "path": "IndexedDB/idbcursor-continuePrimaryKey-exception-order.htm",
+        "url": "/IndexedDB/idbcursor-continuePrimaryKey-exception-order.htm"
+      },
+      {
         "path": "IndexedDB/idbcursor-direction-index-keyrange.htm",
         "url": "/IndexedDB/idbcursor-direction-index-keyrange.htm"
       },
@@ -11944,6 +11952,10 @@
         "url": "/IndexedDB/idbcursor_update_index7.htm"
       },
       {
+        "path": "IndexedDB/idbcursor_update_index8.htm",
+        "url": "/IndexedDB/idbcursor_update_index8.htm"
+      },
+      {
         "path": "IndexedDB/idbcursor_update_objectstore.htm",
         "url": "/IndexedDB/idbcursor_update_objectstore.htm"
       },
@@ -11974,6 +11986,10 @@
       {
         "path": "IndexedDB/idbcursor_update_objectstore8.htm",
         "url": "/IndexedDB/idbcursor_update_objectstore8.htm"
+      },
+      {
+        "path": "IndexedDB/idbcursor_update_objectstore9.htm",
+        "url": "/IndexedDB/idbcursor_update_objectstore9.htm"
       },
       {
         "path": "IndexedDB/idbdatabase_close.htm",
@@ -12198,6 +12214,14 @@
         "url": "/IndexedDB/idbindex_getKey.htm"
       },
       {
+        "path": "IndexedDB/idbobjectstore_getKey.htm",
+        "url": "/IndexedDB/idbobjectstore_getKey.htm"
+      },
+      {
+        "path": "IndexedDB/idbobjectstore_getKey_exception_order.htm",
+        "url": "/IndexedDB/idbobjectstore_getKey_exception_order.htm"
+      },
+      {
         "path": "IndexedDB/idbindex_getKey2.htm",
         "url": "/IndexedDB/idbindex_getKey2.htm"
       },
@@ -12372,6 +12396,10 @@
       {
         "path": "IndexedDB/idbobjectstore_createIndex13.htm",
         "url": "/IndexedDB/idbobjectstore_createIndex13.htm"
+      },
+      {
+        "path": "IndexedDB/idbobjectstore_createIndex14-exception_order.htm",
+        "url": "IndexedDB/idbobjectstore_createIndex14-exception_order.htm"
       },
       {
         "path": "IndexedDB/idbobjectstore_createIndex2.htm",
@@ -12772,6 +12800,10 @@
         "url": "/XMLHttpRequest/event-timeout.htm"
       },
       {
+        "path": "XMLHttpRequest/event-timeout-order.htm",
+        "url": "/XMLHttpRequest/event-timeout-order.htm"
+      },
+      {
         "path": "XMLHttpRequest/event-upload-progress-crossorigin.sub.htm",
         "url": "/XMLHttpRequest/event-upload-progress-crossorigin.sub.htm"
       },
@@ -12822,6 +12854,10 @@
       {
         "path": "XMLHttpRequest/getresponseheader-unsent-opened-state.htm",
         "url": "/XMLHttpRequest/getresponseheader-unsent-opened-state.htm"
+      },
+      {
+        "path": "XMLHttpRequest/headers-normalize-response.htm",
+        "url": "/XMLHttpRequest/headers-normalize-response.htm"
       },
       {
         "path": "XMLHttpRequest/interfaces.html",
@@ -14679,6 +14715,10 @@
       },
       {
         "url": "/eventsource/eventsource-onopen.htm"
+      },
+      {
+        "path": "dom/nodes/Node-isConnected.html",
+        "url": "/dom/nodes/Node-isConnected.html"
       },
       {
         "url": "/eventsource/eventsource-prototype.htm"
@@ -23790,6 +23830,14 @@
           {
             "path": "web-animations/timing-model/animations/current-time.html",
             "url": "/web-animations/timing-model/animations/current-time.html"
+          }
+        ]
+      },
+      "testharness": {
+        "html/semantics/forms/the-form-element/form-submission-sandbox.html": [
+          {
+            "path": "html/semantics/forms/the-form-element/form-submission-sandbox.html",
+            "url": "/html/semantics/forms/the-form-element/form-submission-sandbox.html"
           }
         ]
       }

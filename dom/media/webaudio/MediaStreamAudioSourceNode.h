@@ -62,6 +62,11 @@ public:
     return "MediaStreamAudioSourceNode";
   }
 
+  virtual const char* CrossOriginErrorString() const
+  {
+    return "MediaStreamAudioSourceNodeCrossOrigin";
+  }
+
   size_t SizeOfExcludingThis(MallocSizeOf aMallocSizeOf) const override;
   size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const override;
 
@@ -84,6 +89,7 @@ public:
 protected:
   explicit MediaStreamAudioSourceNode(AudioContext* aContext);
   void Init(DOMMediaStream* aMediaStream, ErrorResult& aRv);
+  void Destroy();
   virtual ~MediaStreamAudioSourceNode();
 
 private:

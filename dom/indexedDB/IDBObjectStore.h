@@ -30,6 +30,7 @@ class DOMStringList;
 class IDBCursor;
 class IDBRequest;
 class IDBTransaction;
+class StringOrStringSequence;
 template <typename> class Sequence;
 
 namespace indexedDB {
@@ -202,20 +203,31 @@ public:
   }
 
   already_AddRefed<IDBRequest>
-  Get(JSContext* aCx, JS::Handle<JS::Value> aKey, ErrorResult& aRv);
+  Get(JSContext* aCx,
+      JS::Handle<JS::Value> aKey,
+      ErrorResult& aRv)
+  {
+    AssertIsOnOwningThread();
+
+    return GetInternal(/* aKeyOnly */ false, aCx, aKey, aRv);
+  }
+
+  already_AddRefed<IDBRequest>
+  GetKey(JSContext* aCx,
+         JS::Handle<JS::Value> aKey,
+         ErrorResult& aRv)
+  {
+    AssertIsOnOwningThread();
+
+    return GetInternal(/* aKeyOnly */ true, aCx, aKey, aRv);
+  }
 
   already_AddRefed<IDBRequest>
   Clear(JSContext* aCx, ErrorResult& aRv);
 
   already_AddRefed<IDBIndex>
   CreateIndex(const nsAString& aName,
-              const nsAString& aKeyPath,
-              const IDBIndexParameters& aOptionalParameters,
-              ErrorResult& aRv);
-
-  already_AddRefed<IDBIndex>
-  CreateIndex(const nsAString& aName,
-              const Sequence<nsString>& aKeyPath,
+              const StringOrStringSequence& aKeyPath,
               const IDBIndexParameters& aOptionalParameters,
               ErrorResult& aRv);
 
@@ -339,17 +351,17 @@ private:
                  ErrorResult& aRv);
 
   already_AddRefed<IDBRequest>
+  GetInternal(bool aKeyOnly,
+              JSContext* aCx,
+              JS::Handle<JS::Value> aKey,
+              ErrorResult& aRv);
+
+  already_AddRefed<IDBRequest>
   GetAllInternal(bool aKeysOnly,
                  JSContext* aCx,
                  JS::Handle<JS::Value> aKey,
                  const Optional<uint32_t>& aLimit,
                  ErrorResult& aRv);
-
-  already_AddRefed<IDBIndex>
-  CreateIndexInternal(const nsAString& aName,
-                      const KeyPath& aKeyPath,
-                      const IDBIndexParameters& aOptionalParameters,
-                      ErrorResult& aRv);
 
   already_AddRefed<IDBRequest>
   OpenCursorInternal(bool aKeysOnly,

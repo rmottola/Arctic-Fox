@@ -907,7 +907,7 @@ public:
     if (!context || !context->mTarget)
       return;
 
-    context->ReturnTarget();
+    context->OnStableState();
   }
 
   static void DidTransactionCallback(void* aData)
@@ -1339,6 +1339,8 @@ bool CanvasRenderingContext2D::SwitchRenderingMode(RenderingMode aRenderingMode)
   RefPtr<SourceSurface> snapshot;
   Matrix transform;
   RefPtr<PersistentBufferProvider> oldBufferProvider = mBufferProvider;
+  RefPtr<DrawTarget> oldTarget = mTarget;
+
   AutoReturnSnapshot autoReturn(nullptr);
 
   if (mTarget) {
@@ -1353,14 +1355,19 @@ bool CanvasRenderingContext2D::SwitchRenderingMode(RenderingMode aRenderingMode)
     autoReturn.mBufferProvider = mBufferProvider;
     autoReturn.mSnapshot = &snapshot;
   }
+
   mTarget = nullptr;
   mBufferProvider = nullptr;
   mResetLayer = true;
 
   // Recreate target using the new rendering mode
   RenderingMode attemptedMode = EnsureTarget(nullptr, aRenderingMode);
-  if (!IsTargetValid())
+  if (!IsTargetValid()) {
+    if (oldBufferProvider && oldTarget) {
+      oldBufferProvider->ReturnDrawTarget(oldTarget.forget());
+    }
     return false;
+  }
 
   // We succeeded, so update mRenderingMode to reflect reality
   mRenderingMode = attemptedMode;
@@ -1375,6 +1382,10 @@ bool CanvasRenderingContext2D::SwitchRenderingMode(RenderingMode aRenderingMode)
   }
 
   mTarget->SetTransform(transform);
+
+  if (oldBufferProvider && oldTarget) {
+    oldBufferProvider->ReturnDrawTarget(oldTarget.forget());
+  }
 
   return true;
 }
@@ -1506,6 +1517,10 @@ CanvasRenderingContext2D::ScheduleStableStateCallback()
 void
 CanvasRenderingContext2D::OnStableState()
 {
+  if (!mHasPendingStableStateCallback) {
+    return;
+  }
+
   ReturnTarget();
 
   mHasPendingStableStateCallback = false;
@@ -1531,6 +1546,8 @@ CanvasRenderingContext2D::EnsureTarget(const gfx::Rect* aCoveredRect,
     return mRenderingMode;
   }
 
+  ScheduleStableStateCallback();
+
   if (mBufferProvider && mode == mRenderingMode) {
     gfx::Rect rect(0, 0, mWidth, mHeight);
     if (aCoveredRect && CurrentState().transform.TransformBounds(*aCoveredRect).Contains(rect)) {
@@ -1538,8 +1555,6 @@ CanvasRenderingContext2D::EnsureTarget(const gfx::Rect* aCoveredRect,
     } else {
       mTarget = mBufferProvider->BorrowDrawTarget(IntRect(0, 0, mWidth, mHeight));
     }
-
-    ScheduleStableStateCallback();
 
     if (mTarget) {
       // Restore clip and transform.
@@ -1737,7 +1752,7 @@ CanvasRenderingContext2D::ClearTarget(int32_t aWidth, int32_t aHeight)
 void
 CanvasRenderingContext2D::ReturnTarget()
 {
-  if (mTarget && mBufferProvider) {
+  if (mTarget && mBufferProvider && mTarget != sErrorTarget) {
     CurrentState().transform = mTarget->GetTransform();
     for (uint32_t i = 0; i < mStyleStack.Length(); i++) {
       for (uint32_t c = 0; c < mStyleStack[i].clipsPushed.Length(); c++) {
@@ -5694,7 +5709,7 @@ CanvasRenderingContext2D::GetBufferProvider(LayerManager* aManager)
     return mBufferProvider;
   }
 
-  if (aManager) {
+  if (aManager && !mIsSkiaGL) {
     mBufferProvider = aManager->CreatePersistentBufferProvider(gfx::IntSize(mWidth, mHeight),
                                                                GetSurfaceFormat());
   }

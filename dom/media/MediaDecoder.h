@@ -27,7 +27,6 @@
 #include "nsITimer.h"
 
 #include "AbstractMediaDecoder.h"
-#include "FrameStatistics.h"
 #include "MediaDecoderOwner.h"
 #include "MediaEventSource.h"
 #include "MediaMetadataManager.h"
@@ -71,6 +70,10 @@ public:
   // Used to register with MediaResource to receive notifications which will
   // be forwarded to MediaDecoder.
   class ResourceCallback : public MediaResourceCallback {
+    // Throttle calls to MediaDecoder::NotifyDataArrived()
+    // to be at most once per 500ms.
+    static const uint32_t sDelay = 500;
+
   public:
     // Start to receive notifications from ResourceCallback.
     void Connect(MediaDecoder* aDecoder);
@@ -93,8 +96,12 @@ public:
     void NotifySuspendedStatusChanged() override;
     void NotifyBytesConsumed(int64_t aBytes, int64_t aOffset) override;
 
+    static void TimerCallback(nsITimer* aTimer, void* aClosure);
+
     // The decoder to send notifications. Main-thread only.
     MediaDecoder* mDecoder = nullptr;
+    nsCOMPtr<nsITimer> mTimer;
+    bool mTimerArmed = false;
   };
 
   typedef MozPromise<SeekResolveValue, bool /* aIgnored */, /* IsExclusive = */ true> SeekPromise;
@@ -240,7 +247,7 @@ public:
   bool IsEndedOrShutdown() const;
 
   // Return true if the MediaDecoderOwner's error attribute is not null.
-  // If the MediaDecoder is shutting down, OwnerHasError will return true.
+  // Must be called before Shutdown().
   bool OwnerHasError() const;
 
   already_AddRefed<GMPCrashHelper> GetCrashHelper() override;
@@ -417,6 +424,7 @@ private:
   void UpdateLogicalPosition()
   {
     MOZ_ASSERT(NS_IsMainThread());
+    MOZ_ASSERT(!IsShutdown());
     // Per spec, offical position remains stable during pause and seek.
     if (mPlayState == PLAY_STATE_PAUSED || IsSeeking()) {
       return;
@@ -434,7 +442,7 @@ private:
   // Indicate whether the media is same-origin with the element.
   void UpdateSameOriginStatus(bool aSameOrigin);
 
-  MediaDecoderOwner* GetOwner() override;
+  MediaDecoderOwner* GetOwner() const override;
 
 #ifdef MOZ_EME
   typedef MozPromise<RefPtr<CDMProxy>, bool /* aIgnored */, /* IsExclusive = */ true> CDMProxyPromise;
@@ -484,18 +492,16 @@ private:
 
   // Increments the parsed and decoded frame counters by the passed in counts.
   // Can be called on any thread.
-  virtual void NotifyDecodedFrames(uint32_t aParsed, uint32_t aDecoded,
-                                   uint32_t aDropped) override
+  virtual void NotifyDecodedFrames(const FrameStatisticsData& aStats) override
   {
-    GetFrameStatistics().NotifyDecodedFrames(aParsed, aDecoded, aDropped);
+    GetFrameStatistics().NotifyDecodedFrames(aStats);
   }
 
   void UpdateReadyState()
   {
     MOZ_ASSERT(NS_IsMainThread());
-    if (!IsShutdown()) {
-      mOwner->UpdateReadyState();
-    }
+    MOZ_ASSERT(!IsShutdown());
+    mOwner->UpdateReadyState();
   }
 
   virtual MediaDecoderOwner::NextFrameStatus NextFrameStatus() { return mNextFrameStatus; }
@@ -544,6 +550,7 @@ protected:
 
   void SetExplicitDuration(double aValue)
   {
+    MOZ_ASSERT(!IsShutdown());
     mExplicitDuration.Set(Some(aValue));
 
     // We Invoke DurationChanged explicitly, rather than using a watcher, so

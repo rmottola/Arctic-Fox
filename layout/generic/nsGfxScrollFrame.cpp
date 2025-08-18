@@ -215,15 +215,19 @@ struct MOZ_STACK_CLASS ScrollReflowInput {
 
   // === Filled in by ReflowScrolledFrame ===
   nsOverflowAreas mContentsOverflowAreas;
+  MOZ_INIT_OUTSIDE_CTOR
   bool mReflowedContentsWithHScrollbar;
+  MOZ_INIT_OUTSIDE_CTOR
   bool mReflowedContentsWithVScrollbar;
 
   // === Filled in when TryLayout succeeds ===
   // The size of the inside-border area
   nsSize mInsideBorderSize;
   // Whether we decided to show the horizontal scrollbar
+  MOZ_INIT_OUTSIDE_CTOR
   bool mShowHScrollbar;
   // Whether we decided to show the vertical scrollbar
+  MOZ_INIT_OUTSIDE_CTOR
   bool mShowVScrollbar;
 
   ScrollReflowInput(nsIScrollableFrame* aFrame,
@@ -386,8 +390,8 @@ nsHTMLScrollFrame::TryLayout(ScrollReflowInput* aState,
 
   if (!aForce) {
     nsRect scrolledRect =
-      mHelper.GetScrolledRectInternal(aState->mContentsOverflowAreas.ScrollableOverflow(),
-                                     scrollPortSize);
+      mHelper.GetUnsnappedScrolledRectInternal(aState->mContentsOverflowAreas.ScrollableOverflow(),
+                                               scrollPortSize);
     nscoord oneDevPixel = aState->mBoxState.PresContext()->DevPixelsToAppUnits(1);
 
     // If the style is HIDDEN then we already know that aAssumeHScroll is false
@@ -682,8 +686,8 @@ nsHTMLScrollFrame::ReflowContents(ScrollReflowInput* aState,
       ComputeInsideBorderSize(aState,
                               nsSize(kidDesiredSize.Width(), kidDesiredSize.Height()));
     nsRect scrolledRect =
-      mHelper.GetScrolledRectInternal(kidDesiredSize.ScrollableOverflow(),
-                                     insideBorderSize);
+      mHelper.GetUnsnappedScrolledRectInternal(kidDesiredSize.ScrollableOverflow(),
+                                               insideBorderSize);
     if (nsRect(nsPoint(0, 0), insideBorderSize).Contains(scrolledRect)) {
       // Let's pretend we had no scrollbars coming in here
       ReflowScrolledFrame(aState, false, false, &kidDesiredSize, false);
@@ -734,8 +738,8 @@ nsHTMLScrollFrame::PlaceScrollArea(const ScrollReflowInput& aState,
   // Preserve the width or height of empty rects
   nsSize portSize = mHelper.mScrollPort.Size();
   nsRect scrolledRect =
-    mHelper.GetScrolledRectInternal(aState.mContentsOverflowAreas.ScrollableOverflow(),
-                                   portSize);
+    mHelper.GetUnsnappedScrolledRectInternal(aState.mContentsOverflowAreas.ScrollableOverflow(),
+                                             portSize);
   scrolledArea.UnionRectEdges(scrolledRect,
                               nsRect(nsPoint(0,0), portSize));
 
@@ -2022,69 +2026,14 @@ ScrollFrameHelper::CompleteAsyncScroll(const nsRect &aRange, nsIAtom* aOrigin)
   mDestination = GetScrollPosition();
 }
 
-#if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
-struct PluginSearchCtx {
-  nsIFrame* outer;
-  bool value;
-};
-static void
-HasPluginFramesCallback(nsISupports* aSupports, void* aCtx)
-{
-  // Stop searching once we've found a plugin.
-  PluginSearchCtx* pCtx = static_cast<PluginSearchCtx*>(aCtx);
-  if (pCtx->value) {
-    return;
-  }
-
-  nsCOMPtr<nsIContent> content = do_QueryInterface(aSupports);
-  if (content) {
-    nsIFrame* frame = content->GetPrimaryFrame();
-    if (frame) {
-      nsPluginFrame* plugin = do_QueryFrame(frame);
-      if (plugin) {
-        // Check to be sure this plugin is contained within a subframe of
-        // the nsGfxScrollFrame that initiated this callback.
-        if (nsLayoutUtils::IsAncestorFrameCrossDoc(pCtx->outer, plugin, nullptr)) {
-          pCtx->value = true;
-        }
-      }
-    }
-  }
-}
-
-static bool
-HasPluginSubframesCallback(nsIDocument* aDocument, void* aCtx)
-{
-  aDocument->EnumerateActivityObservers(HasPluginFramesCallback, aCtx);
-
-  // Stop the enumeration if we've found a plugin.
-  return !static_cast<PluginSearchCtx*>(aCtx)->value;
-}
-#endif
-
 bool
 ScrollFrameHelper::HasPluginFrames()
 {
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
   if (XRE_IsContentProcess()) {
     nsPresContext* presContext = mOuter->PresContext();
-
-    // Don't search if we don't have any plugins registered.
     nsRootPresContext* rootPresContext = presContext->GetRootPresContext();
-    if (rootPresContext &&
-        !rootPresContext->NeedToComputePluginGeometryUpdates()) {
-      return false;
-    }
-
-    PluginSearchCtx ctx = { mOuter, false };
-    presContext->Document()->EnumerateActivityObservers(HasPluginFramesCallback,
-                                                        (void*)&ctx);
-    if (ctx.value) {
-      return true;
-    }
-    presContext->Document()->EnumerateSubDocuments(HasPluginSubframesCallback,
-                                                   (void*)&ctx);
-    if (ctx.value) {
+    if (!rootPresContext || rootPresContext->NeedToComputePluginGeometryUpdates()) {
       return true;
     }
   }
@@ -2761,15 +2710,6 @@ ScrollFrameHelper::ScrollToImpl(nsPoint aPt, const nsRect& aRange, nsIAtom* aOri
       if (!apzDisabled && !HasPluginFrames()) {
         if (LastScrollOrigin() == nsGkAtoms::apz) {
           schedulePaint = false;
-
-          // If we have any windowed plugins at all then schedule an empty
-          // transaction because the parent will be waiting for an update.
-          if (!gfxPrefs::HidePluginsForScroll()) {
-            nsRootPresContext* root = presContext->GetRootPresContext();
-            if (root && root->NeedToComputePluginGeometryUpdates()) {
-              mOuter->SchedulePaint(nsIFrame::PAINT_COMPOSITE_ONLY);
-            }
-          }          
           PAINT_SKIP_LOG("Skipping due to APZ scroll\n");
         } else if (mScrollableByAPZ) {
           nsIWidget* widget = presContext->GetNearestWidget();
@@ -3366,7 +3306,13 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
         MOZ_ASSERT(!inactiveScrollClip->mIsAsyncScrollable);
       }
 
-      DisplayListClipState::AutoSaveRestore displayPortClipState(aBuilder);
+      // Clip our contents to the unsnapped scrolled rect. This makes sure that
+      // we don't have display items over the subpixel seam at the edge of the
+      // scrolled area.
+      DisplayListClipState::AutoSaveRestore scrolledRectClipState(aBuilder);
+      nsRect scrolledRectClip =
+        GetUnsnappedScrolledRectInternal(mScrolledFrame->GetScrollableOverflowRect(),
+                                         mScrollPort.Size()) + mScrolledFrame->GetPosition();
       if (usingDisplayPort) {
         // Clip the contents to the display port.
         // The dirty rect already acts kind of like a clip, in that
@@ -3384,8 +3330,10 @@ ScrollFrameHelper::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
         // pixels.
         // If there is no display port, we don't need this because the clip
         // from the scroll port is still applied.
-        displayPortClipState.ClipContainingBlockDescendants(dirtyRect + aBuilder->ToReferenceFrame(mOuter));
+        scrolledRectClip = scrolledRectClip.Intersect(dirtyRect);
       }
+      scrolledRectClipState.ClipContainingBlockDescendants(
+        scrolledRectClip + aBuilder->ToReferenceFrame(mOuter));
 
       mOuter->BuildDisplayListForChild(aBuilder, mScrolledFrame, dirtyRect, scrolledContent);
     }
@@ -5637,8 +5585,8 @@ nsRect
 ScrollFrameHelper::GetScrolledRect() const
 {
   nsRect result =
-    GetScrolledRectInternal(mScrolledFrame->GetScrollableOverflowRect(),
-                            mScrollPort.Size());
+    GetUnsnappedScrolledRectInternal(mScrolledFrame->GetScrollableOverflowRect(),
+                                     mScrollPort.Size());
 
   if (result.width < mScrollPort.width) {
     NS_WARNING("Scrolled rect smaller than scrollport?");
@@ -5716,8 +5664,8 @@ ScrollFrameHelper::GetScrolledFrameDir() const
 }
 
 nsRect
-ScrollFrameHelper::GetScrolledRectInternal(const nsRect& aScrolledFrameOverflowArea,
-                                               const nsSize& aScrollPortSize) const
+ScrollFrameHelper::GetUnsnappedScrolledRectInternal(const nsRect& aScrolledFrameOverflowArea,
+                                                    const nsSize& aScrollPortSize) const
 {
   return nsLayoutUtils::GetScrolledRect(mScrolledFrame,
                                         aScrolledFrameOverflowArea,

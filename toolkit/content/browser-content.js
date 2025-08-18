@@ -210,6 +210,9 @@ var ClickEventHandler = {
       this._scrollErrorX = (desiredScrollX - actualScrollX);
     }
 
+    const kAutoscroll = 15;  // defined in mozilla/layers/ScrollInputMethods.h
+    Services.telemetry.getHistogramById("SCROLL_INPUT_METHODS").add(kAutoscroll);
+
     if (this._scrollable instanceof content.Window) {
       this._scrollable.scrollBy(actualScrollX, actualScrollY);
     } else { // an element with overflow
@@ -263,6 +266,7 @@ var PopupBlocking = {
     addEventListener("pagehide", this, true);
 
     addMessageListener("PopupBlocking:UnblockPopup", this);
+    addMessageListener("PopupBlocking:GetBlockedPopupList", this);
   },
 
   receiveMessage: function(msg) {
@@ -277,9 +281,34 @@ var PopupBlocking = {
           // If we have a requesting window and the requesting document is
           // still the current document, open the popup.
           if (dwi && dwi.document == internals.requestingDocument) {
-            dwi.open(data.popupWindowURI, data.popupWindowName, data.popupWindowFeatures);
+            dwi.open(data.popupWindowURIspec, data.popupWindowName, data.popupWindowFeatures);
           }
         }
+        break;
+      }
+
+      case "PopupBlocking:GetBlockedPopupList": {
+        let popupData = [];
+        let length = this.popupData ? this.popupData.length : 0;
+
+        // Limit 15 popup URLs to be reported through the UI
+        length = Math.min(length, 15);
+
+        for (let i = 0; i < length; i++) {
+          let popupWindowURIspec = this.popupData[i].popupWindowURIspec;
+
+          if (popupWindowURIspec == global.content.location.href) {
+            popupWindowURIspec = "<self>";
+          } else {
+            // Limit 500 chars to be sent because the URI will be cropped
+            // by the UI anyway, and data: URIs can be significantly larger.
+            popupWindowURIspec = popupWindowURIspec.substring(0, 500)
+          }
+
+          popupData.push({popupWindowURIspec});
+        }
+
+        sendAsyncMessage("PopupBlocking:ReplyGetBlockedPopupList", {popupData});
         break;
       }
     }
@@ -304,7 +333,7 @@ var PopupBlocking = {
     }
 
     let obj = {
-      popupWindowURI: ev.popupWindowURI.spec,
+      popupWindowURIspec: ev.popupWindowURI ? ev.popupWindowURI.spec : "about:blank",
       popupWindowFeatures: ev.popupWindowFeatures,
       popupWindowName: ev.popupWindowName
     };
@@ -351,7 +380,10 @@ var PopupBlocking = {
 
   updateBlockedPopups: function(freshPopup) {
     sendAsyncMessage("PopupBlocking:UpdateBlockedPopups",
-                     {blockedPopups: this.popupData, freshPopup: freshPopup});
+      {
+        count: this.popupData ? this.popupData.length : 0,
+        freshPopup
+      });
   },
 };
 PopupBlocking.init();
@@ -407,7 +439,7 @@ var Printing = {
   receiveMessage(message) {
     let objects = message.objects;
     let data = message.data;
-    switch(message.name) {
+    switch (message.name) {
       case "Printing:Preview:Enter": {
         this.enterPrintPreview(Services.wm.getOuterWindowWithId(data.windowID), data.simplifiedMode);
         break;
@@ -434,7 +466,7 @@ var Printing = {
       }
 
       case "Printing:Print": {
-        this.print(Services.wm.getOuterWindowWithId(data.windowID));
+        this.print(Services.wm.getOuterWindowWithId(data.windowID), data.simplifiedMode);
         break;
       }
     }
@@ -457,7 +489,7 @@ var Printing = {
                                        printSettings.kInitSaveAll);
 
       return printSettings;
-    } catch(e) {
+    } catch (e) {
       Components.utils.reportError(e);
     }
 
@@ -587,7 +619,7 @@ var Printing = {
         printSettings.docURL = contentWindow.document.baseURI;
 
       docShell.printPreview.printPreview(printSettings, contentWindow, this);
-    } catch(error) {
+    } catch (error) {
       // This might fail if we, for example, attempt to print a XUL document.
       // In that case, we inform the parent to bail out of print preview.
       Components.utils.reportError(error);
@@ -599,14 +631,33 @@ var Printing = {
     docShell.printPreview.exitPrintPreview();
   },
 
-  print(contentWindow) {
+  print(contentWindow, simplifiedMode) {
     let printSettings = this.getPrintSettings();
     let rv = Cr.NS_OK;
+
+    // If we happen to be on simplified mode, we need to set docURL in order
+    // to generate header/footer content correctly, since simplified tab has
+    // "about:blank" as its URI.
+    if (printSettings && simplifiedMode) {
+      printSettings.docURL = contentWindow.document.baseURI;
+    }
+
     try {
       let print = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
                                .getInterface(Ci.nsIWebBrowserPrint);
       print.print(printSettings, null);
-    } catch(e) {
+
+      let histogram = Services.telemetry.getKeyedHistogramById("PRINT_COUNT");
+      if (print.doingPrintPreview) {
+        if (simplifiedMode) {
+          histogram.add("SIMPLIFIED");
+        } else {
+          histogram.add("WITH_PREVIEW");
+        }
+      } else {
+        histogram.add("WITHOUT_PREVIEW");
+      }
+    } catch (e) {
       // Pressing cancel is expressed as an NS_ERROR_ABORT return value,
       // causing an exception to be thrown which we catch here.
       if (e.result != Cr.NS_ERROR_ABORT) {
@@ -750,7 +801,8 @@ var FindBar = {
 
     let fakeEvent = {};
     for (let k in event) {
-      if (typeof event[k] != "object" && typeof event[k] != "function") {
+      if (typeof event[k] != "object" && typeof event[k] != "function" &&
+          !(k in content.KeyboardEvent)) {
         fakeEvent[k] = event[k];
       }
     }
@@ -773,17 +825,56 @@ var FindBar = {
 };
 FindBar.init();
 
-// An event listener for custom "WebChannelMessageToChrome" events on pages.
-addEventListener("WebChannelMessageToChrome", function (e) {
-  // If target is window then we want the document principal, otherwise fallback to target itself.
-  let principal = e.target.nodePrincipal ? e.target.nodePrincipal : e.target.document.nodePrincipal;
+let WebChannelMessageToChromeListener = {
+  // Preference containing the list (space separated) of origins that are
+  // allowed to send non-string values through a WebChannel, mainly for
+  // backwards compatability. See bug 1238128 for more information.
+  URL_WHITELIST_PREF: "webchannel.allowObject.urlWhitelist",
 
-  if (e.detail) {
-    sendAsyncMessage("WebChannelMessageToChrome", e.detail, { eventTarget: e.target }, principal);
-  } else  {
-    Cu.reportError("WebChannel message failed. No message detail.");
+  // Cached list of whitelisted principals, we avoid constructing this if the
+  // value in `_lastWhitelistValue` hasn't changed since we constructed it last.
+  _cachedWhitelist: [],
+  _lastWhitelistValue: "",
+
+  init() {
+    addEventListener("WebChannelMessageToChrome", e => {
+      this._onMessageToChrome(e);
+    }, true, true);
+  },
+
+  _getWhitelistedPrincipals() {
+    let whitelist = Services.prefs.getCharPref(this.URL_WHITELIST_PREF);
+    if (whitelist != this._lastWhitelistValue) {
+      let urls = whitelist.split(/\s+/);
+      this._cachedWhitelist = urls.map(origin =>
+        Services.scriptSecurityManager.createCodebasePrincipalFromOrigin(origin));
+    }
+    return this._cachedWhitelist;
+  },
+
+  _onMessageToChrome(e) {
+    // If target is window then we want the document principal, otherwise fallback to target itself.
+    let principal = e.target.nodePrincipal ? e.target.nodePrincipal : e.target.document.nodePrincipal;
+
+    if (e.detail) {
+      if (typeof e.detail != 'string') {
+        // Check if the principal is one of the ones that's allowed to send
+        // non-string values for e.detail.
+        let objectsAllowed = this._getWhitelistedPrincipals().some(whitelisted =>
+          principal.originNoSuffix == whitelisted.originNoSuffix);
+        if (!objectsAllowed) {
+          Cu.reportError("WebChannelMessageToChrome sent with an object from a non-whitelisted principal");
+          return;
+        }
+      }
+      sendAsyncMessage("WebChannelMessageToChrome", e.detail, { eventTarget: e.target }, principal);
+    } else  {
+      Cu.reportError("WebChannel message failed. No message detail.");
+    }
   }
-}, true, true);
+};
+
+WebChannelMessageToChromeListener.init();
 
 // This should be kept in sync with /browser/base/content.js.
 // Add message listener for "WebChannelMessageToContent" messages from chrome scripts.
@@ -1261,7 +1352,7 @@ var ViewSelectionSource = {
       try {
         this._entityConverter = Cc["@mozilla.org/intl/entityconverter;1"]
                                   .createInstance(Ci.nsIEntityConverter);
-      } catch(e) { }
+      } catch (e) { }
     }
 
     const entityVersion = Ci.nsIEntityConverter.entityW3C;

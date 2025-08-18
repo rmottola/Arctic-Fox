@@ -3,6 +3,7 @@
  */
 
 // Tests various aspects of the details view
+Components.utils.import("resource://gre/modules/Preferences.jsm");
 
 var gManagerWindow;
 var gCategoryUtilities;
@@ -271,6 +272,10 @@ add_test(function() {
     try {
       ok(!settings[6].hasAttribute("first-row"), "Not the first row");
       var button = gManagerWindow.document.getAnonymousElementByAttribute(settings[6], "anonid", "button");
+
+      // Workaround for bug 1155324 - we need to ensure that the button is scrolled into view.
+      button.scrollIntoView();
+
       input = gManagerWindow.document.getAnonymousElementByAttribute(settings[6], "anonid", "input");
       is(input.value, "", "Label value should be empty");
       is(input.tooltipText, "", "Label tooltip should be empty");
@@ -372,7 +377,7 @@ add_test(function() {
     EventUtils.synthesizeMouseAtCenter(radios[0], { clickCount: 1 }, gManagerWindow);
     is(Services.prefs.getCharPref("extensions.inlinesettings3.radioString"), "india", "Radio pref should have been updated");
     EventUtils.synthesizeMouseAtCenter(radios[2], { clickCount: 1 }, gManagerWindow);
-    is(Services.prefs.getCharPref("extensions.inlinesettings3.radioString"), "kilo", "Radio pref should have been updated");
+    is(Preferences.get("extensions.inlinesettings3.radioString", "wrong"), "kilo \u338F", "Radio pref should have been updated");
 
     ok(!settings[3].hasAttribute("first-row"), "Not the first row");
     Services.prefs.setIntPref("extensions.inlinesettings3.menulist", 8);

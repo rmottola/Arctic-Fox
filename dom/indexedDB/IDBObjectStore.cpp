@@ -1707,9 +1707,10 @@ IDBObjectStore::IndexNames()
 }
 
 already_AddRefed<IDBRequest>
-IDBObjectStore::Get(JSContext* aCx,
-                    JS::Handle<JS::Value> aKey,
-                    ErrorResult& aRv)
+IDBObjectStore::GetInternal(bool aKeyOnly,
+                            JSContext* aCx,
+                            JS::Handle<JS::Value> aKey,
+                            ErrorResult& aRv)
 {
   AssertIsOnOwningThread();
 
@@ -1735,9 +1736,17 @@ IDBObjectStore::Get(JSContext* aCx,
     return nullptr;
   }
 
-  ObjectStoreGetParams params;
-  params.objectStoreId() = Id();
-  keyRange->ToSerialized(params.keyRange());
+  const int64_t id = Id();
+
+  SerializedKeyRange serializedKeyRange;
+  keyRange->ToSerialized(serializedKeyRange);
+
+  RequestParams params;
+  if (aKeyOnly) {
+    params = ObjectStoreGetKeyParams(id, serializedKeyRange);
+  } else {
+    params = ObjectStoreGetParams(id, serializedKeyRange);
+  }
 
   RefPtr<IDBRequest> request = GenerateRequest(aCx, this);
   MOZ_ASSERT(request);
@@ -1820,47 +1829,9 @@ IDBObjectStore::DeleteInternal(JSContext* aCx,
 
 already_AddRefed<IDBIndex>
 IDBObjectStore::CreateIndex(const nsAString& aName,
-                            const nsAString& aKeyPath,
+                            const StringOrStringSequence& aKeyPath,
                             const IDBIndexParameters& aOptionalParameters,
                             ErrorResult& aRv)
-{
-  AssertIsOnOwningThread();
-
-  KeyPath keyPath(0);
-  if (NS_FAILED(KeyPath::Parse(aKeyPath, &keyPath)) ||
-      !keyPath.IsValid()) {
-    aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
-    return nullptr;
-  }
-
-  return CreateIndexInternal(aName, keyPath, aOptionalParameters, aRv);
-}
-
-already_AddRefed<IDBIndex>
-IDBObjectStore::CreateIndex(const nsAString& aName,
-                            const Sequence<nsString >& aKeyPath,
-                            const IDBIndexParameters& aOptionalParameters,
-                            ErrorResult& aRv)
-{
-  AssertIsOnOwningThread();
-
-  KeyPath keyPath(0);
-  if (aKeyPath.IsEmpty() ||
-      NS_FAILED(KeyPath::Parse(aKeyPath, &keyPath)) ||
-      !keyPath.IsValid()) {
-    aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
-    return nullptr;
-  }
-
-  return CreateIndexInternal(aName, keyPath, aOptionalParameters, aRv);
-}
-
-already_AddRefed<IDBIndex>
-IDBObjectStore::CreateIndexInternal(
-                                  const nsAString& aName,
-                                  const KeyPath& aKeyPath,
-                                  const IDBIndexParameters& aOptionalParameters,
-                                  ErrorResult& aRv)
 {
   AssertIsOnOwningThread();
 
@@ -1888,7 +1859,24 @@ IDBObjectStore::CreateIndexInternal(
     }
   }
 
-  if (aOptionalParameters.mMultiEntry && aKeyPath.IsArray()) {
+  KeyPath keyPath(0);
+  if (aKeyPath.IsString()) {
+    if (NS_FAILED(KeyPath::Parse(aKeyPath.GetAsString(), &keyPath)) ||
+        !keyPath.IsValid()) {
+      aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
+      return nullptr;
+    }
+  } else {
+    MOZ_ASSERT(aKeyPath.IsStringSequence());
+    if (aKeyPath.GetAsStringSequence().IsEmpty() ||
+        NS_FAILED(KeyPath::Parse(aKeyPath.GetAsStringSequence(), &keyPath)) ||
+        !keyPath.IsValid()) {
+      aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
+      return nullptr;
+    }
+  }
+
+  if (aOptionalParameters.mMultiEntry && keyPath.IsArray()) {
     aRv.Throw(NS_ERROR_DOM_INVALID_ACCESS_ERR);
     return nullptr;
   }
@@ -1917,7 +1905,7 @@ IDBObjectStore::CreateIndexInternal(
 #endif
 
   IndexMetadata* metadata = indexes.AppendElement(
-    IndexMetadata(transaction->NextIndexId(), nsString(aName), aKeyPath,
+    IndexMetadata(transaction->NextIndexId(), nsString(aName), keyPath,
                   locale,
                   aOptionalParameters.mUnique,
                   aOptionalParameters.mMultiEntry,

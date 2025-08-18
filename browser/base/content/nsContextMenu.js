@@ -225,8 +225,9 @@ nsContextMenu.prototype = {
     this.showItem("context-sendvideo", this.onVideo);
     this.showItem("context-castvideo", this.onVideo);
     this.showItem("context-sendaudio", this.onAudio);
-    this.setItemAttr("context-sendvideo", "disabled", !this.mediaURL);
-    this.setItemAttr("context-sendaudio", "disabled", !this.mediaURL);
+    let mediaIsBlob = this.mediaURL.startsWith("blob:");
+    this.setItemAttr("context-sendvideo", "disabled", !this.mediaURL || mediaIsBlob);
+    this.setItemAttr("context-sendaudio", "disabled", !this.mediaURL || mediaIsBlob);
     let shouldShowCast = Services.prefs.getBoolPref("browser.casting.enabled");
     // getServicesForVideo alone would be sufficient here (it depends on
     // SimpleServiceDiscovery.services), but SimpleServiceDiscovery is guaranteed
@@ -1062,14 +1063,12 @@ nsContextMenu.prototype = {
   },
 
   viewInfo: function() {
-    BrowserPageInfo();
+    BrowserPageInfo(gContextMenuContentData.docLocation, null, null, null, this.browser);
   },
 
   viewImageInfo: function() {
-    // Don't need to pass in ownerDocument.defaultView.top.document here;
-    // window.gBrowser.selectedBrowser.currentURI.spec does the job without
-    // using CPOWs
-    BrowserPageInfo(null, "mediaTab", this.target);
+    BrowserPageInfo(gContextMenuContentData.docLocation, "mediaTab",
+                    this.target, null, this.browser);
   },
 
   viewImageDesc: function(e) {
@@ -1082,7 +1081,7 @@ nsContextMenu.prototype = {
 
   viewFrameInfo: function() {
     BrowserPageInfo(gContextMenuContentData.docLocation, null, null,
-                    this.frameOuterWindowID);
+                    this.frameOuterWindowID, this.browser);
   },
 
   reloadImage: function() {
@@ -1094,16 +1093,16 @@ nsContextMenu.prototype = {
                                                  null, { target: this.target });
   },
 
-  _canvasToDataURL: function(target) {
+  _canvasToBlobURL: function(target) {
     let mm = this.browser.messageManager;
     return new Promise(function(resolve) {
-      mm.sendAsyncMessage("ContextMenu:Canvas:ToDataURL", {}, { target });
+      mm.sendAsyncMessage("ContextMenu:Canvas:ToBlobURL", {}, { target });
 
       let onMessage = (message) => {
-        mm.removeMessageListener("ContextMenu:Canvas:ToDataURL:Result", onMessage);
-        resolve(message.data.dataURL);
+        mm.removeMessageListener("ContextMenu:Canvas:ToBlobURL:Result", onMessage);
+        resolve(message.data.blobURL);
       };
-      mm.addMessageListener("ContextMenu:Canvas:ToDataURL:Result", onMessage);
+      mm.addMessageListener("ContextMenu:Canvas:ToBlobURL:Result", onMessage);
     });
   },
 
@@ -1111,8 +1110,8 @@ nsContextMenu.prototype = {
   viewMedia: function(e) {
     let referrerURI = gContextMenuContentData.documentURIObject;
     if (this.onCanvas) {
-      this._canvasToDataURL(this.target).then(function(dataURL) {
-        openUILink(dataURL, e, { disallowInheritPrincipal: true,
+      this._canvasToBlobURL(this.target).then(function(blobURL) {
+        openUILink(blobURL, e, { disallowInheritPrincipal: true,
                                  referrerURI: referrerURI });
       }, Cu.reportError);
     }
@@ -1394,8 +1393,8 @@ nsContextMenu.prototype = {
     let isPrivate = PrivateBrowsingUtils.isBrowserPrivate(this.browser);
     if (this.onCanvas) {
       // Bypass cache, since it's a data: URL.
-      this._canvasToDataURL(this.target).then(function(dataURL) {
-        saveImageURL(dataURL, "canvas.png", "SaveImageTitle",
+      this._canvasToBlobURL(this.target).then(function(blobURL) {
+        saveImageURL(blobURL, "canvas.png", "SaveImageTitle",
                      true, false, referrerURI, null, null, null,
                      isPrivate);
       }, Cu.reportError);
@@ -1600,7 +1599,10 @@ nsContextMenu.prototype = {
   },
 
   isMediaURLReusable: function(aURL) {
-    return !/^(?:blob|mediasource):/.test(aURL);
+    if (aURL.startsWith("blob:")) {
+      return URL.isValidURL(aURL);
+    }
+    return true;
   },
 
   toString: function () {

@@ -40,6 +40,8 @@ python/**
 rdf/**
 startupcache/**
 testing/**
+!tools/lint/eslint/eslint-plugin-mozilla/
+tools/lint/eslint/eslint-plugin-mozilla/node_modules/**
 tools/**
 uriloader/**
 view/**
@@ -71,9 +73,6 @@ browser/components/translation/**
 browser/extensions/pdfjs/**
 browser/extensions/pocket/content/panels/js/vendor/**
 browser/locales/**
-
-# Ignore all of loop since it is imported from github and checked at source.
-browser/extensions/loop/**
 
 # devtools/ exclusions
 devtools/client/canvasdebugger/**
@@ -112,6 +111,7 @@ devtools/server/**
 !devtools/server/actors/inspector.js
 !devtools/server/actors/highlighters/eye-dropper.js
 !devtools/server/actors/webbrowser.js
+!devtools/server/actors/webextension.js
 !devtools/server/actors/styles.js
 !devtools/server/actors/string.js
 !devtools/server/actors/csscoverage.js
@@ -119,6 +119,7 @@ devtools/shared/*.js
 !devtools/shared/css-lexer.js
 !devtools/shared/defer.js
 !devtools/shared/event-emitter.js
+!devtools/shared/loader-plugin-raw.jsm
 !devtools/shared/task.js
 devtools/shared/*.jsm
 !devtools/shared/Loader.jsm
@@ -139,6 +140,7 @@ devtools/shared/tests/**
 devtools/shared/touch/**
 devtools/shared/transport/**
 !devtools/shared/transport/transport.js
+!devtools/shared/transport/websocket-transport.js
 devtools/shared/webconsole/test/**
 devtools/shared/worker/**
 !devtools/shared/worker/worker.js

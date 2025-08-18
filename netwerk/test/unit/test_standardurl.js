@@ -301,36 +301,11 @@ add_test(function test_hugeStringThrows()
   run_next_test();
 });
 
-add_test(function test_pathPercentEncodedDot()
-{
-  var url = stringToURL("http://example.com/%2eX/X%2e/%2eX");
-  do_check_eq(url.spec, "http://example.com/.X/X./.X");
-
-  url = stringToURL("http://example.com/hello/%2e%2E/%2e");
-  do_check_eq(url.spec, "http://example.com/");
-
-  url = stringToURL("http://example.com/hello/%2e%2E/%");
-  do_check_eq(url.spec, "http://example.com/%");
-
-  url = stringToURL("http://example.com/hello/%2e%2E/%2");
-  do_check_eq(url.spec, "http://example.com/%2");
-
-  url = stringToURL("http://example.com/hello/%2e%2E/%#");
-  do_check_eq(url.spec, "http://example.com/%#");
-
-  url = stringToURL("http://example.com/hello/%2e%2E/%2?");
-  do_check_eq(url.spec, "http://example.com/%2?");
-
-  url = stringToURL("http://example.com/hello/%2e/");
-  do_check_eq(url.spec, "http://example.com/hello/");
-
-  run_next_test();
-});
-
 add_test(function test_filterWhitespace()
 {
   var url = stringToURL(" \r\n\th\nt\rt\tp://ex\r\n\tample.com/path\r\n\t/\r\n\tto the/fil\r\n\te.e\r\n\txt?que\r\n\try#ha\r\n\tsh \r\n\t ");
   do_check_eq(url.spec, "http://example.com/path/to%20the/file.ext?query#hash");
+  run_next_test();
 });
 
 add_test(function test_backslashReplacement()
@@ -342,6 +317,14 @@ add_test(function test_backslashReplacement()
   do_check_eq(url.spec, "http://test.com/example.org/path/to/file");
   do_check_eq(url.host, "test.com");
   do_check_eq(url.path, "/example.org/path/to/file");
+
+  run_next_test();
+});
+
+add_test(function test_authority_host()
+{
+  Assert.throws(() => { stringToURL("http:"); }, "TYPE_AUTHORITY should have host");
+  Assert.throws(() => { stringToURL("http:///"); }, "TYPE_AUTHORITY should have host");
 
   run_next_test();
 });

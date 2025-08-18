@@ -48,7 +48,7 @@ var tests = [
      body: [0x0B, 0x02, 0x80, 0x74, 0x65, 0x73, 0x74, 0x0A, 0x03],
 
      datalen: 9
-    },	
+    },
 ];
 
 function setupChannel(url) {
@@ -69,13 +69,13 @@ function startIter() {
 
 function completeIter(request, data, ctx) {
     if (!(tests[index].flags & CL_EXPECT_FAILURE)) {
-	    do_check_eq(data.length, tests[index].datalen);
+	do_check_eq(data.length, tests[index].datalen);
     }
     if (++index < tests.length) {
 	startIter();
     } else {
         httpserver.stop(do_test_finished);
-        prefs.setCharPref("network.http.accept-encoding", cePref);
+	prefs.setCharPref("network.http.accept-encoding", cePref);
     }
 }
 

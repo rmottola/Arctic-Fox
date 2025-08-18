@@ -170,6 +170,9 @@ typedef nsStyleTransformMatrix::TransformReferenceBox TransformReferenceBox;
 /* static */ bool nsLayoutUtils::sInterruptibleReflowEnabled;
 /* static */ bool nsLayoutUtils::sSVGTransformBoxEnabled;
 /* static */ bool nsLayoutUtils::sTextCombineUprightDigitsEnabled;
+#ifdef MOZ_STYLO
+/* static */ bool nsLayoutUtils::sStyloEnabled;
+#endif
 
 static ViewID sScrollIdCounter = FrameMetrics::START_SCROLL_ID;
 
@@ -7526,6 +7529,12 @@ nsLayoutUtils::SurfaceFromElement(HTMLVideoElement* aElement,
 
   NS_WARN_IF_FALSE((aSurfaceFlags & SFE_PREFER_NO_PREMULTIPLY_ALPHA) == 0, "We can't support non-premultiplied alpha for video!");
 
+#ifdef MOZ_EME
+  if (aElement->ContainsRestrictedContent()) {
+    return result;
+  }
+#endif
+
   uint16_t readyState;
   if (NS_SUCCEEDED(aElement->GetReadyState(&readyState)) &&
       (readyState == nsIDOMHTMLMediaElement::HAVE_NOTHING ||
@@ -7866,6 +7875,10 @@ nsLayoutUtils::Initialize()
                                "svg.transform-box.enabled");
   Preferences::AddBoolVarCache(&sTextCombineUprightDigitsEnabled,
                                "layout.css.text-combine-upright-digits.enabled");
+#ifdef MOZ_STYLO
+  Preferences::AddBoolVarCache(&sStyloEnabled,
+                               "layout.css.servo.enabled");
+#endif
 
   for (auto& callback : kPrefCallbacks) {
     Preferences::RegisterCallbackAndCall(callback.func, callback.name);
@@ -9363,7 +9376,7 @@ nsLayoutUtils::GetCumulativeApzCallbackTransform(nsIFrame* aFrame)
 /* static */ bool
 nsLayoutUtils::SupportsServoStyleBackend(nsIDocument* aDocument)
 {
-  return nsPresContext::StyloEnabled() &&
+  return StyloEnabled() &&
          aDocument->IsHTMLOrXHTML() &&
          static_cast<nsDocument*>(aDocument)->IsContentDocument();
 }

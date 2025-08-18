@@ -139,7 +139,7 @@ XPCOMUtils.defineLazyGetter(UpdateUtils, "Locale", function() {
     try {
       let inputStream = channel.open2();
       locale = NetUtil.readInputStreamToString(inputStream, inputStream.available());
-    } catch(e) {}
+    } catch (e) {}
     if (locale)
       return locale.trim();
   }
@@ -312,7 +312,7 @@ XPCOMUtils.defineLazyGetter(UpdateUtils, "OSVersion", function() {
             let winVer = OSVERSIONINFOEXW();
             winVer.dwOSVersionInfoSize = OSVERSIONINFOEXW.size;
 
-            if(0 !== GetVersionEx(winVer.address())) {
+            if (0 !== GetVersionEx(winVer.address())) {
               osVersion += "." + winVer.wServicePackMajor +
                            "." + winVer.wServicePackMinor;
             } else {

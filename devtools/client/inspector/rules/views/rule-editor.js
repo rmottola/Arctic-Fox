@@ -152,6 +152,7 @@ RuleEditor.prototype = {
       editableField({
         element: this.selectorText,
         done: this._onSelectorDone,
+        cssProperties: this.rule.cssProperties
       });
     }
 
@@ -452,7 +453,8 @@ RuleEditor.prototype = {
       destroy: this._newPropertyDestroy,
       advanceChars: ":",
       contentType: InplaceEditor.CONTENT_TYPES.CSS_PROPERTY,
-      popup: this.ruleView.popup
+      popup: this.ruleView.popup,
+      cssProperties: this.rule.cssProperties
     });
 
     // Auto-close the input if multiple rules get pasted into new property.

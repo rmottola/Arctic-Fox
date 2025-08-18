@@ -639,6 +639,11 @@ pref("mousewheel.with_win.action", 1);
 pref("browser.xul.error_pages.enabled", true);
 pref("browser.xul.error_pages.expert_bad_cert", false);
 
+// Enable captive portal detection.
+#ifdef NIGHTLY_BUILD
+pref("network.captive-portal-service.enabled", true);
+#endif
+
 // If true, network link events will change the value of navigator.onLine
 pref("network.manage-offline-status", false);
 
@@ -1371,12 +1376,12 @@ pref("identity.sync.tokenserver.uri", "https://token.services.mozilla.com/1.0/sy
 // AMO needs "Firefox", obviously - pass on the OS (determined at build time)
 #ifdef XP_UNIX
 #ifdef XP_MACOSX
-pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:27.0) Gecko/20100101 Firefox/27.0");
+pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:52.0) Gecko/20100101 Firefox/52.0");
 #else
-pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Linux; X11; rv:27.0) Gecko/20100101 Firefox/27.0");
+pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Linux; X11; rv:52.0) Gecko/20100101 Firefox/52.0");
 #endif
 #else
-pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Windows NT 6.1; WOW64; rv:27.0) Gecko/20100101 Firefox/27.0");
+pref("general.useragent.override.addons.mozilla.org","Mozilla/5.0 (Windows NT 6.1; WOW64; rv:52.0) Gecko/20100101 Firefox/52.0");
 #endif
 
 
@@ -1513,9 +1518,16 @@ pref("browser.esedbreader.loglevel", "Error");
 
 pref("browser.laterrun.enabled", false);
 
-pref("browser.migration.automigrate", false);
+pref("browser.migrate.automigrate.enabled", false);
 
 // Enable browser frames for use on desktop.  Only exposed to chrome callers.
 pref("dom.mozBrowserFramesEnabled", true);
 
 pref("signon.schemeUpgrades", true);
+
+// Enable the "Simplify Page" feature in Print Preview
+pref("print.use_simplify_page", true);
+
+// Space separated list of URLS that are allowed to send objects (instead of
+// only strings) through webchannels. This list is duplicated in mobile/android/app/mobile.js
+pref("webchannel.allowObject.urlWhitelist", "https://accounts.firefox.com https://content.cdn.mozilla.net https://input.mozilla.org https://support.mozilla.org https://install.mozilla.org");

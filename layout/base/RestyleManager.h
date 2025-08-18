@@ -57,10 +57,6 @@ private:
 public:
   NS_INLINE_DECL_REFCOUNTING(mozilla::RestyleManager)
 
-  // Should be called when a frame is going to be destroyed and
-  // WillDestroyFrameTree hasn't been called yet.
-  void NotifyDestroyingFrame(nsIFrame* aFrame);
-
   // Forwarded nsIDocumentObserver method, to handle restyling (and
   // passing the notification to the frame).
   nsresult ContentStateChanged(nsIContent*   aContent,
@@ -139,17 +135,6 @@ private:
                                     const RestyleHintData& aRestyleHintData);
 
 public:
-
-  // Note: It's the caller's responsibility to make sure to wrap a
-  // ProcessRestyledFrames call in a view update batch and a script blocker.
-  // This function does not call ProcessAttachedQueue() on the binding manager.
-  // If the caller wants that to happen synchronously, it needs to handle that
-  // itself.
-  nsresult ProcessRestyledFrames(nsStyleChangeList& aChangeList) {
-    return base_type::ProcessRestyledFrames(aChangeList,
-                                            *PresContext(),
-                                            mOverflowChangedTracker);
-  }
 
   /**
    * In order to start CSS transitions on elements that are being
@@ -395,11 +380,6 @@ public:
     PostRestyleEventInternal(true);
   }
 
-  void FlushOverflowChangedTracker()
-  {
-    mOverflowChangedTracker.Flush();
-  }
-
 #ifdef DEBUG
   static nsCString ChangeHintToString(nsChangeHint aHint);
 #endif
@@ -518,8 +498,6 @@ private:
 
   nsChangeHint mRebuildAllExtraHint;
   nsRestyleHint mRebuildAllRestyleHint;
-
-  OverflowChangedTracker mOverflowChangedTracker;
 
   // The total number of animation flushes by this frame constructor.
   // Used to keep the layer and animation manager in sync.

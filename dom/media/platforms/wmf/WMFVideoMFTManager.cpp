@@ -5,6 +5,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include <algorithm>
+#include <winsdkver.h>
 #include "WMFVideoMFTManager.h"
 #include "MediaDecoderReader.h"
 #include "MediaPrefs.h"
@@ -29,6 +30,8 @@
 #include "nsPrintfCString.h"
 #include "MediaTelemetryConstants.h"
 #include "GMPUtils.h" // For SplitAt. TODO: Move SplitAt to a central place.
+#include "MP4Decoder.h"
+#include "VPXDecoder.h"
 
 #define LOG(...) MOZ_LOG(sPDMLog, mozilla::LogLevel::Debug, (__VA_ARGS__))
 
@@ -37,7 +40,7 @@ using mozilla::layers::IMFYCbCrImage;
 using mozilla::layers::LayerManager;
 using mozilla::layers::LayersBackend;
 
-#if MOZ_WINSDK_MAXVER < 0x0A000000
+#if WINVER_MAXVER < 0x0A00
 // Windows 10+ SDK has VP80 and VP90 defines
 const GUID MFVideoFormat_VP80 =
 {
@@ -94,12 +97,11 @@ WMFVideoMFTManager::WMFVideoMFTManager(
   MOZ_COUNT_CTOR(WMFVideoMFTManager);
 
   // Need additional checks/params to check vp8/vp9
-  if (aConfig.mMimeType.EqualsLiteral("video/mp4") ||
-      aConfig.mMimeType.EqualsLiteral("video/avc")) {
+  if (MP4Decoder::IsH264(aConfig.mMimeType)) {
     mStreamType = H264;
-  } else if (aConfig.mMimeType.EqualsLiteral("video/webm; codecs=vp8")) {
+  } else if (VPXDecoder::IsVP8(aConfig.mMimeType)) {
     mStreamType = VP8;
-  } else if (aConfig.mMimeType.EqualsLiteral("video/webm; codecs=vp9")) {
+  } else if (VPXDecoder::IsVP9(aConfig.mMimeType)) {
     mStreamType = VP9;
   } else {
     mStreamType = Unknown;
@@ -153,46 +155,47 @@ WMFVideoMFTManager::GetMediaSubtypeGUID()
   };
 }
 
-struct D3D11BlacklistingCache
+struct D3DDLLBlacklistingCache
 {
-  // D3D11-blacklist pref last seen.
+  // Blacklist pref value last seen.
   nsCString mBlacklistPref;
-  // Non-empty if a D3D11-blacklisted DLL was found.
+  // Non-empty if a blacklisted DLL was found.
   nsCString mBlacklistedDLL;
 };
-StaticAutoPtr<D3D11BlacklistingCache> sD3D11BlacklistingCache;
+StaticAutoPtr<D3DDLLBlacklistingCache> sD3D11BlacklistingCache;
+StaticAutoPtr<D3DDLLBlacklistingCache> sD3D9BlacklistingCache;
 
 // If a blacklisted DLL is found, return its information, otherwise "".
 static const nsACString&
-FindD3D11BlacklistedDLL()
+FindDXVABlacklistedDLL(StaticAutoPtr<D3DDLLBlacklistingCache>& aDLLBlacklistingCache,
+                       const char* aDLLBlacklistPrefName)
 {
   NS_ASSERTION(NS_IsMainThread(), "Must be on main thread.");
 
-  if (!sD3D11BlacklistingCache) {
+  if (!aDLLBlacklistingCache) {
     // First time here, create persistent data that will be reused in all
     // D3D11-blacklisting checks.
-    sD3D11BlacklistingCache = new D3D11BlacklistingCache();
-    ClearOnShutdown(&sD3D11BlacklistingCache);
+    aDLLBlacklistingCache = new D3DDLLBlacklistingCache();
+    ClearOnShutdown(&aDLLBlacklistingCache);
   }
 
-  nsAdoptingCString blacklist =
-    Preferences::GetCString("media.wmf.disable-d3d11-for-dlls");
+  nsAdoptingCString blacklist = Preferences::GetCString(aDLLBlacklistPrefName);
   if (blacklist.IsEmpty()) {
     // Empty blacklist -> No blacklisting.
-    sD3D11BlacklistingCache->mBlacklistPref.SetLength(0);
-    sD3D11BlacklistingCache->mBlacklistedDLL.SetLength(0);
-    return sD3D11BlacklistingCache->mBlacklistedDLL;
+    aDLLBlacklistingCache->mBlacklistPref.SetLength(0);
+    aDLLBlacklistingCache->mBlacklistedDLL.SetLength(0);
+    return aDLLBlacklistingCache->mBlacklistedDLL;
   }
 
   // Detect changes in pref.
-  if (sD3D11BlacklistingCache->mBlacklistPref.Equals(blacklist)) {
+  if (aDLLBlacklistingCache->mBlacklistPref.Equals(blacklist)) {
     // Same blacklist -> Return same result (i.e., don't check DLLs again).
-    return sD3D11BlacklistingCache->mBlacklistedDLL;
+    return aDLLBlacklistingCache->mBlacklistedDLL;
   }
   // Adopt new pref now, so we don't work on it again.
-  sD3D11BlacklistingCache->mBlacklistPref = blacklist;
+  aDLLBlacklistingCache->mBlacklistPref = blacklist;
 
-  // media.wmf.disable-d3d11-for-dlls format: (whitespace is trimmed)
+  // media.wmf.disable-d3d*-for-dlls format: (whitespace is trimmed)
   // "dll1.dll: 1.2.3.4[, more versions...][; more dlls...]"
   nsTArray<nsCString> dlls;
   SplitAt(";", blacklist, dlls);
@@ -200,7 +203,8 @@ FindD3D11BlacklistedDLL()
     nsTArray<nsCString> nameAndVersions;
     SplitAt(":", dll, nameAndVersions);
     if (nameAndVersions.Length() != 2) {
-      NS_WARNING("Skipping incorrect 'media.wmf.disable-d3d11-for-dlls' dll:versions format");
+      NS_WARNING(nsPrintfCString("Skipping incorrect '%s' dll:versions format",
+                                 aDLLBlacklistPrefName).get());
       continue;
     }
 
@@ -235,7 +239,8 @@ FindD3D11BlacklistedDLL()
       nsTArray<nsCString> numberStrings;
       SplitAt(".", version, numberStrings);
       if (numberStrings.Length() != 4) {
-        NS_WARNING("Skipping incorrect 'media.wmf.disable-d3d11-for-dlls' a.b.c.d version format");
+        NS_WARNING(nsPrintfCString("Skipping incorrect '%s' a.b.c.d version format",
+                                   aDLLBlacklistPrefName).get());
         continue;
       }
       DWORD numbers[4];
@@ -253,25 +258,38 @@ FindD3D11BlacklistedDLL()
       }
 
       if (NS_FAILED(errorCode)) {
-        NS_WARNING("Skipping incorrect 'media.wmf.disable-d3d11-for-dlls' a.b.c.d version format");
+        NS_WARNING(nsPrintfCString("Skipping incorrect '%s' a.b.c.d version format",
+                                   aDLLBlacklistPrefName).get());
         continue;
       }
 
       if (vInfo->dwFileVersionMS == ((numbers[0] << 16) | numbers[1])
           && vInfo->dwFileVersionLS == ((numbers[2] << 16) | numbers[3])) {
         // Blacklisted! Record bad DLL.
-        sD3D11BlacklistingCache->mBlacklistedDLL.SetLength(0);
-        sD3D11BlacklistingCache->mBlacklistedDLL.AppendPrintf(
+        aDLLBlacklistingCache->mBlacklistedDLL.SetLength(0);
+        aDLLBlacklistingCache->mBlacklistedDLL.AppendPrintf(
           "%s (%lu.%lu.%lu.%lu)",
           nameAndVersions[0].get(), numbers[0], numbers[1], numbers[2], numbers[3]);
-        return sD3D11BlacklistingCache->mBlacklistedDLL;
+        return aDLLBlacklistingCache->mBlacklistedDLL;
       }
     }
   }
 
   // No blacklisted DLL.
-  sD3D11BlacklistingCache->mBlacklistedDLL.SetLength(0);
-  return sD3D11BlacklistingCache->mBlacklistedDLL;
+  aDLLBlacklistingCache->mBlacklistedDLL.SetLength(0);
+  return aDLLBlacklistingCache->mBlacklistedDLL;
+}
+
+static const nsACString&
+FindD3D11BlacklistedDLL() {
+  return FindDXVABlacklistedDLL(sD3D11BlacklistingCache,
+                                "media.wmf.disable-d3d11-for-dlls");
+}
+
+static const nsACString&
+FindD3D9BlacklistedDLL() {
+  return FindDXVABlacklistedDLL(sD3D9BlacklistingCache,
+                                "media.wmf.disable-d3d9-for-dlls");
 }
 
 class CreateDXVAManagerEvent : public Runnable {
@@ -302,9 +320,16 @@ public:
       failureReason = &secondFailureReason;
       mFailureReason.Append(NS_LITERAL_CSTRING("; "));
     }
-    mDXVA2Manager = DXVA2Manager::CreateD3D9DXVA(*failureReason);
-    // Make sure we include the messages from both attempts (if applicable).
-    mFailureReason.Append(secondFailureReason);
+
+    const nsACString& blacklistedDLL = FindD3D9BlacklistedDLL();
+    if (!blacklistedDLL.IsEmpty()) {
+      mFailureReason.AppendPrintf("D3D9 blacklisted with DLL %s",
+                                  blacklistedDLL);
+    } else {
+      mDXVA2Manager = DXVA2Manager::CreateD3D9DXVA(*failureReason);
+      // Make sure we include the messages from both attempts (if applicable).
+      mFailureReason.Append(secondFailureReason);
+    }
     return NS_OK;
   }
   nsAutoPtr<DXVA2Manager> mDXVA2Manager;
@@ -476,6 +501,26 @@ WMFVideoMFTManager::Input(MediaRawData* aSample)
   return mDecoder->Input(mLastInput);
 }
 
+class SupportsConfigEvent : public Runnable {
+public:
+  SupportsConfigEvent(DXVA2Manager* aDXVA2Manager, IMFMediaType* aMediaType, float aFramerate)
+    : mDXVA2Manager(aDXVA2Manager)
+    , mMediaType(aMediaType)
+    , mFramerate(aFramerate)
+    , mSupportsConfig(false)
+  {}
+
+  NS_IMETHOD Run() {
+    MOZ_ASSERT(NS_IsMainThread(), "Must be on main thread.");
+    mSupportsConfig = mDXVA2Manager->SupportsConfig(mMediaType, mFramerate);
+    return NS_OK;
+  }
+  DXVA2Manager* mDXVA2Manager;
+  IMFMediaType* mMediaType;
+  float mFramerate;
+  bool mSupportsConfig;
+};
+
 // The MFTransform we use for decoding h264 video will silently fall
 // back to software decoding (even if we've negotiated DXVA) if the GPU
 // doesn't support decoding the given resolution. It will then upload
@@ -487,6 +532,10 @@ WMFVideoMFTManager::Input(MediaRawData* aSample)
 //
 // This code tests if the given resolution can be supported directly on the GPU,
 // and makes sure we only ask the MFT for DXVA if it can be supported properly.
+//
+// Ideally we'd know the framerate during initialization and would also ensure
+// that new decoders are created if the resolution changes. Then we could move
+// this check into Init and consolidate the main thread blocking code.
 bool
 WMFVideoMFTManager::CanUseDXVA(IMFMediaType* aType)
 {
@@ -500,7 +549,18 @@ WMFVideoMFTManager::CanUseDXVA(IMFMediaType* aType)
   // entire video.
   float framerate = 1000000.0 / mLastDuration;
 
-  return mDXVA2Manager->SupportsConfig(aType, framerate);
+  // The supports config check must be done on the main thread since we have
+  // a crash guard protecting it.
+  RefPtr<SupportsConfigEvent> event =
+    new SupportsConfigEvent(mDXVA2Manager, aType, framerate);
+
+  if (NS_IsMainThread()) {
+    event->Run();
+  } else {
+    NS_DispatchToMainThread(event, NS_DISPATCH_SYNC);
+  }
+
+  return event->mSupportsConfig;
 }
 
 HRESULT
@@ -647,11 +707,32 @@ WMFVideoMFTManager::CreateBasicVideoFrame(IMFSample* aSample,
   NS_ENSURE_TRUE(pts.IsValid(), E_FAIL);
   media::TimeUnit duration = GetSampleDuration(aSample);
   NS_ENSURE_TRUE(duration.IsValid(), E_FAIL);
+  nsIntRect pictureRegion = mVideoInfo.ScaledImageRect(videoWidth, videoHeight);
+
+  if (mLayersBackend != LayersBackend::LAYERS_D3D9 &&
+      mLayersBackend != LayersBackend::LAYERS_D3D11) {
+    RefPtr<VideoData> v =
+      VideoData::CreateAndCopyData(mVideoInfo,
+                                   mImageContainer,
+                                   aStreamOffset,
+                                   pts.ToMicroseconds(),
+                                   duration.ToMicroseconds(),
+                                   b,
+                                   false,
+                                   -1,
+                                   pictureRegion);
+    if (twoDBuffer) {
+      twoDBuffer->Unlock2D();
+    } else {
+      buffer->Unlock();
+    }
+    v.forget(aOutVideoData);
+    return S_OK;
+  }
 
   RefPtr<layers::PlanarYCbCrImage> image =
     new IMFYCbCrImage(buffer, twoDBuffer);
 
-  nsIntRect pictureRegion = mVideoInfo.ScaledImageRect(videoWidth, videoHeight);
   VideoData::SetVideoDataToImage(image,
                                  mVideoInfo,
                                  b,
@@ -660,7 +741,6 @@ WMFVideoMFTManager::CreateBasicVideoFrame(IMFSample* aSample,
 
   RefPtr<VideoData> v =
     VideoData::CreateFromImage(mVideoInfo,
-                               mImageContainer,
                                aStreamOffset,
                                pts.ToMicroseconds(),
                                duration.ToMicroseconds(),
@@ -691,7 +771,6 @@ WMFVideoMFTManager::CreateD3DVideoFrame(IMFSample* aSample,
   RefPtr<Image> image;
   hr = mDXVA2Manager->CopyToImage(aSample,
                                   pictureRegion,
-                                  mImageContainer,
                                   getter_AddRefs(image));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
   NS_ENSURE_TRUE(image, E_FAIL);
@@ -701,7 +780,6 @@ WMFVideoMFTManager::CreateD3DVideoFrame(IMFSample* aSample,
   media::TimeUnit duration = GetSampleDuration(aSample);
   NS_ENSURE_TRUE(duration.IsValid(), E_FAIL);
   RefPtr<VideoData> v = VideoData::CreateFromImage(mVideoInfo,
-                                                   mImageContainer,
                                                    aStreamOffset,
                                                    pts.ToMicroseconds(),
                                                    duration.ToMicroseconds(),
@@ -765,6 +843,21 @@ WMFVideoMFTManager::Output(int64_t aStreamOffset,
           return E_FAIL;
         }
         continue;
+      }
+      if (mSeekTargetThreshold.isSome()) {
+        media::TimeUnit pts = GetSampleTime(sample);
+		media::TimeUnit duration = GetSampleDuration(sample);
+        if (!pts.IsValid() || !duration.IsValid()) {
+          return E_FAIL;
+        }
+        if ((pts + duration) < mSeekTargetThreshold.ref()) {
+          LOG("Dropping video frame which pts is smaller than seek target.");
+          // It is necessary to clear the pointer to release the previous output
+          // buffer.
+          sample = nullptr;
+          continue;
+        }
+        mSeekTargetThreshold.reset();
       }
       break;
     }

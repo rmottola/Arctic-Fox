@@ -536,11 +536,11 @@ class nsObjectLoadingContent : public nsImageLoadingContent
     nsPluginFrame* GetExistingFrame();
 
     /**
-     * Used to try to rewrite a youtube flash embed to HTML5 player
+     * Used for identifying whether we can rewrite a youtube flash embed to
+     * possibly use HTML5 instead.
      *
-     * aRewrittenURI is filled with the result of rewriting
-     * if plugin.rewrite_youtube_embeds pref is true and
-     * the element this nsObjectLoadingContent instance represents:
+     * Returns true if plugin.rewrite_youtube_embeds pref is true and the
+     * element this nsObjectLoadingContent instance represents:
      *
      * - is an embed or object node
      * - has a URL pointing at the youtube.com domain, using "/v/" style video

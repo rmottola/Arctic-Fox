@@ -35,11 +35,6 @@ Tests of DOM Worker Navigator
       return;
     }
 
-    if (args.name === "taintEnabled") {
-      is(navigator[args.name](), args.value, args.name + "() returns false.");
-      return;
-    }
-
     if (args.name === "languages") {
       is(navigator.languages.toString(), args.value.toString(), "languages matches");
       return;

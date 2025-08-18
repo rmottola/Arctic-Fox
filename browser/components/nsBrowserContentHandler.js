@@ -736,7 +736,7 @@ nsDefaultCommandLineHandler.prototype = {
           this._haveProfile = true;
         }
         catch (e) {
-          while ((ar = cmdLine.handleFlagWithParam("url", false))) { }
+          while ((ar = cmdLine.handleFlagWithParam("url", false)));
           cmdLine.preventDefault = true;
         }
       }
@@ -760,7 +760,7 @@ nsDefaultCommandLineHandler.prototype = {
           uriScheme = uri.scheme;
           uriHost = uri.host;
           uriPath = uri.path;
-        } catch(e) {
+        } catch (e) {
         }
 
         // Most Windows searches are "https://www.bing.com/search...", but bug

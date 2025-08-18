@@ -134,6 +134,9 @@ random-if(/^Windows\x20NT\x205\.1/.test(http.oscpu)) fuzzy-if(/^Windows\x20NT\x2
 random == dynamic-use-nested-01a.svg dynamic-use-nested-01-ref.svg
 random == dynamic-use-nested-01b.svg dynamic-use-nested-01-ref.svg
 == dynamic-use-remove-width.svg dynamic-use-remove-width-ref.svg
+== dynamic-viewBox-change-01.svg pass.svg
+== dynamic-viewBox-change-02.svg pass.svg
+== dynamic-viewBox-change-03.svg pass.svg
 == fragmentIdentifier-01.xhtml pass.svg
 == linked-filter-01.svg pass.svg
 == linked-pattern-01.svg pass.svg
@@ -207,7 +210,7 @@ pref(svg.marker-improvements.enabled,true) == marker-orientation-02.svg marker-o
 == marker-orientation-03.svg pass.svg
 == marker-orientation-04.svg pass.svg
 == mask-basic-01.svg pass.svg
-== mask-basic-02.svg mask-basic-02-ref.svg
+fuzzy-if(skiaContent,1,10000) == mask-basic-02.svg mask-basic-02-ref.svg
 == mask-basic-03.svg pass.svg
 == mask-basic-04.svg pass.svg
 == mask-extref-dataURI-01.svg pass.svg
@@ -240,8 +243,9 @@ random-if(gtkWidget) == objectBoundingBox-and-fePointLight-02.svg objectBounding
 == opacity-and-gradient-01.svg pass.svg
 skip-if(d2d) fuzzy-if(cocoaWidget,1,99974) == opacity-and-gradient-02.svg opacity-and-gradient-02-ref.svg
 == opacity-and-pattern-01.svg pass.svg
-== opacity-and-transform-01.svg opacity-and-transform-01-ref.svg
-fuzzy-if(Android&&AndroidVersion>=15,8,200) random-if((B2G&&browserIsRemote)||Mulet) == outer-svg-border-and-padding-01.svg outer-svg-border-and-padding-01-ref.svg # Initial mulet triage: parity with B2G/B2G Desktop
+fuzzy-if(skiaContent,1,10000) == opacity-and-transform-01.svg opacity-and-transform-01-ref.svg
+fuzzy-if(Android,8,200) random-if((B2G&&browserIsRemote)||Mulet) == outer-svg-border-and-padding-01.svg outer-svg-border-and-padding-01-ref.svg # Initial mulet triage: parity with B2G/B2G Desktop
+== outline.html outline-ref.html
 == overflow-on-outer-svg-01.svg overflow-on-outer-svg-01-ref.svg
 == overflow-on-outer-svg-02a.xhtml overflow-on-outer-svg-02-ref.xhtml
 == overflow-on-outer-svg-02b.xhtml overflow-on-outer-svg-02-ref.xhtml
@@ -395,6 +399,7 @@ random-if(/^Windows\x20NT\x205\.1/.test(http.oscpu)) == tspan-rotate-06.svg tspa
 == viewBox-and-pattern-03.svg pass.svg
 == viewBox-and-pattern-04.svg pass.svg
 == viewBox-invalid-01.svg pass.svg
+== viewBox-invalid-02.svg pass.svg
 == viewBox-valid-01.svg pass.svg
 == viewBox-valid-02.xhtml pass.svg
 == viewport-percent-graphic-user-01.svg pass.svg

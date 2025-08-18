@@ -81,11 +81,10 @@ var gGestureSupport = {
         break;
       case "MozMagnifyGestureStart":
         aEvent.preventDefault();
-#ifdef XP_WIN
-        this._setupGesture(aEvent, "pinch", def(25, 0), "out", "in");
-#else
-        this._setupGesture(aEvent, "pinch", def(150, 1), "out", "in");
-#endif
+        let pinchPref = AppConstants.platform == "win"
+                        ? def(25, 0)
+                        : def(150, 1);
+        this._setupGesture(aEvent, "pinch", pinchPref, "out", "in");
         break;
       case "MozRotateGestureStart":
         aEvent.preventDefault();
@@ -649,20 +648,25 @@ var gHistorySwipeAnimation = {
         this._canGoForward = this.canGoForward();
         this._handleFastSwiping();
       }
+      this.updateAnimation(0);
     }
     else {
-      this._startingIndex = gBrowser.webNavigation.sessionHistory.index;
-      this._historyIndex = this._startingIndex;
-      this._canGoBack = this.canGoBack();
-      this._canGoForward = this.canGoForward();
-      if (this.active) {
-        this._addBoxes();
-        this._takeSnapshot();
-        this._installPrevAndNextSnapshots();
-        this._lastSwipeDir = "";
+      // Get the session history from SessionStore.
+      let updateSessionHistory = sessionHistory => {
+        this._startingIndex = sessionHistory.index;
+        this._historyIndex = this._startingIndex;
+        this._canGoBack = this.canGoBack();
+        this._canGoForward = this.canGoForward();
+        if (this.active) {
+          this._addBoxes();
+          this._takeSnapshot();
+          this._installPrevAndNextSnapshots();
+          this._lastSwipeDir = "";
+        }
+        this.updateAnimation(0);
       }
+      SessionStore.getSessionHistory(gBrowser.selectedTab, updateSessionHistory);
     }
-    this.updateAnimation(0);
   },
 
   /**
@@ -670,7 +674,7 @@ var gHistorySwipeAnimation = {
    */
   stopAnimation: function HSA_stopAnimation() {
     gHistorySwipeAnimation._removeBoxes();
-    this._historyIndex = gBrowser.webNavigation.sessionHistory.index;
+    this._historyIndex = this._getCurrentHistoryIndex();
   },
 
   /**
@@ -727,6 +731,10 @@ var gHistorySwipeAnimation = {
         this._positionBox(this._curBox, aVal / dampValue);
       }
     }
+  },
+
+  _getCurrentHistoryIndex: function() {
+    return SessionStore.getSessionHistory(gBrowser.selectedTab).index;
   },
 
   /**
@@ -824,10 +832,14 @@ var gHistorySwipeAnimation = {
    * any. This will also result in the animation overlay to be torn down.
    */
   swipeEndEventReceived: function HSA_swipeEndEventReceived() {
-    if (this._lastSwipeDir != "" && this._historyIndex != this._startingIndex)
-      this._navigateToHistoryIndex();
-    else
-      this.stopAnimation();
+    // Update the session history before continuing.
+    let updateSessionHistory = sessionHistory => {
+      if (this._lastSwipeDir != "" && this._historyIndex != this._startingIndex)
+        this._navigateToHistoryIndex();
+      else
+        this.stopAnimation();
+    }
+    SessionStore.getSessionHistory(gBrowser.selectedTab, updateSessionHistory);
   },
 
   /**
@@ -839,9 +851,9 @@ var gHistorySwipeAnimation = {
    */
   _doesIndexExistInHistory: function HSA__doesIndexExistInHistory(aIndex) {
     try {
-      gBrowser.webNavigation.sessionHistory.getEntryAtIndex(aIndex, false);
+      return SessionStore.getSessionHistory(gBrowser.selectedTab).entries[aIndex] != null;
     }
-    catch(ex) {
+    catch (ex) {
       return false;
     }
     return true;
@@ -962,11 +974,7 @@ var gHistorySwipeAnimation = {
    * @return true if we're ready to take snapshots, false otherwise.
    */
   _readyToTakeSnapshots: function HSA__readyToTakeSnapshots() {
-    if ((this._maxSnapshots < 1) ||
-        (gBrowser.webNavigation.sessionHistory.index < 0)) {
-      return false;
-    }
-    return true;
+    return (this._maxSnapshots >= 1 && this._getCurrentHistoryIndex() >= 0);
   },
 
   /**
@@ -979,25 +987,22 @@ var gHistorySwipeAnimation = {
 
     let canvas = null;
 
-    try {
-      let browser = gBrowser.selectedBrowser;
-      let r = browser.getBoundingClientRect();
-      canvas = document.createElementNS("http://www.w3.org/1999/xhtml",
-                                        "canvas");
-      canvas.mozOpaque = true;
-      let scale = window.devicePixelRatio;
-      canvas.width = r.width * scale;
-      canvas.height = r.height * scale;
-      let ctx = canvas.getContext("2d");
-      let zoom = browser.markupDocumentViewer.fullZoom * scale;
-      ctx.scale(zoom, zoom);
-      ctx.drawWindow(browser.contentWindow,
-                     0, 0, canvas.width / zoom, canvas.height / zoom, "white",
-                     ctx.DRAWWINDOW_DO_NOT_FLUSH | ctx.DRAWWINDOW_DRAW_VIEW |
-                     ctx.DRAWWINDOW_ASYNC_DECODE_IMAGES |
-                     ctx.DRAWWINDOW_USE_WIDGET_LAYERS);
-    } finally {
-    }
+    let browser = gBrowser.selectedBrowser;
+    let r = browser.getBoundingClientRect();
+    canvas = document.createElementNS("http://www.w3.org/1999/xhtml",
+                                      "canvas");
+    canvas.mozOpaque = true;
+    let scale = window.devicePixelRatio;
+    canvas.width = r.width * scale;
+    canvas.height = r.height * scale;
+    let ctx = canvas.getContext("2d");
+    let zoom = browser.markupDocumentViewer.fullZoom * scale;
+    ctx.scale(zoom, zoom);
+    ctx.drawWindow(browser.contentWindow,
+                   0, 0, canvas.width / zoom, canvas.height / zoom, "white",
+                   ctx.DRAWWINDOW_DO_NOT_FLUSH | ctx.DRAWWINDOW_DRAW_VIEW |
+                   ctx.DRAWWINDOW_ASYNC_DECODE_IMAGES |
+                   ctx.DRAWWINDOW_USE_WIDGET_LAYERS);
 
     TelemetryStopwatch.start("FX_GESTURE_INSTALL_SNAPSHOT_OF_PAGE");
     try {
@@ -1027,7 +1032,7 @@ var gHistorySwipeAnimation = {
   _assignSnapshotToCurrentBrowser:
   function HSA__assignSnapshotToCurrentBrowser(aCanvas) {
     let browser = gBrowser.selectedBrowser;
-    let currIndex = browser.webNavigation.sessionHistory.index;
+    let currIndex = this._getCurrentHistoryIndex();
 
     this._removeTrackedSnapshot(currIndex, browser);
     this._addSnapshotRefToArray(currIndex, browser);
@@ -1060,7 +1065,7 @@ var gHistorySwipeAnimation = {
     try {
       let browser = gBrowser.selectedBrowser;
       let snapshots = browser.snapshots;
-      let currIndex = browser.webNavigation.sessionHistory.index;
+      let currIndex = _getCurrentHistoryIndex();
 
       // Kick off snapshot compression.
       let canvas = snapshots[currIndex].image;

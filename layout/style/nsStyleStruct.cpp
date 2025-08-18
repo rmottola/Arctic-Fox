@@ -20,6 +20,8 @@
 #include "nsCRTGlue.h"
 #include "nsCSSParser.h"
 #include "nsCSSProps.h"
+#include "nsDeviceContext.h"
+#include "nsStyleUtil.h"
 
 #include "nsCOMPtr.h"
 
@@ -988,19 +990,19 @@ nsStyleSVG::CalcDifference(const nsStyleSVG& aNewData) const
 }
 
 // --------------------
-// nsStyleBasicShape
+// StyleBasicShape
 
 nsCSSKeyword
-nsStyleBasicShape::GetShapeTypeName() const
+StyleBasicShape::GetShapeTypeName() const
 {
   switch (mType) {
-    case nsStyleBasicShape::Type::ePolygon:
+    case StyleBasicShapeType::Polygon:
       return eCSSKeyword_polygon;
-    case nsStyleBasicShape::Type::eCircle:
+    case StyleBasicShapeType::Circle:
       return eCSSKeyword_circle;
-    case nsStyleBasicShape::Type::eEllipse:
+    case StyleBasicShapeType::Ellipse:
       return eCSSKeyword_ellipse;
-    case nsStyleBasicShape::Type::eInset:
+    case StyleBasicShapeType::Inset:
       return eCSSKeyword_inset;
   }
   NS_NOTREACHED("unexpected type");
@@ -1102,134 +1104,6 @@ FragmentOrURL::Resolve(nsIContent* aContent) const
 {
   nsCOMPtr<nsIURI> url = aContent->GetBaseURI();
   return Resolve(url);
-}
-
-// --------------------
-// nsStyleClipPath
-//
-nsStyleClipPath::nsStyleClipPath()
-  : mURL(nullptr)
-  , mType(StyleClipPathType::None_)
-  , mSizingBox(StyleClipShapeSizing::NoBox)
-{
-}
-
-nsStyleClipPath::nsStyleClipPath(const nsStyleClipPath& aSource)
-  : mURL(nullptr)
-  , mType(StyleClipPathType::None_)
-  , mSizingBox(StyleClipShapeSizing::NoBox)
-{
-  if (aSource.mType == StyleClipPathType::URL) {
-    CopyURL(aSource);
-  } else if (aSource.mType == StyleClipPathType::Shape) {
-    SetBasicShape(aSource.mBasicShape, aSource.mSizingBox);
-  } else if (aSource.mType == StyleClipPathType::Box) {
-    SetSizingBox(aSource.mSizingBox);
-  }
-}
-
-nsStyleClipPath::~nsStyleClipPath()
-{
-  ReleaseRef();
-}
-
-nsStyleClipPath&
-nsStyleClipPath::operator=(const nsStyleClipPath& aOther)
-{
-  if (this == &aOther) {
-    return *this;
-  }
-
-  if (aOther.mType == StyleClipPathType::URL) {
-    CopyURL(aOther);
-  } else if (aOther.mType == StyleClipPathType::Shape) {
-    SetBasicShape(aOther.mBasicShape, aOther.mSizingBox);
-  } else if (aOther.mType == StyleClipPathType::Box) {
-    SetSizingBox(aOther.mSizingBox);
-  } else {
-    ReleaseRef();
-    mSizingBox = StyleClipShapeSizing::NoBox;
-    mType = StyleClipPathType::None_;
-  }
-  return *this;
-}
-
-bool
-nsStyleClipPath::operator==(const nsStyleClipPath& aOther) const
-{
-  if (mType != aOther.mType) {
-    return false;
-  }
-
-  if (mType == StyleClipPathType::URL) {
-    return EqualURIs(mURL, aOther.mURL);
-  } else if (mType == StyleClipPathType::Shape) {
-    return *mBasicShape == *aOther.mBasicShape &&
-           mSizingBox == aOther.mSizingBox;
-  } else if (mType == StyleClipPathType::Box) {
-    return mSizingBox == aOther.mSizingBox;
-  }
-
-  return true;
-}
-
-void
-nsStyleClipPath::ReleaseRef()
-{
-  if (mType == StyleClipPathType::Shape) {
-    NS_ASSERTION(mBasicShape, "expected pointer");
-    mBasicShape->Release();
-  } else if (mType == StyleClipPathType::URL) {
-    NS_ASSERTION(mURL, "expected pointer");
-    delete mURL;
-  }
-  // mBasicShap, mURL, etc. are all pointers in a union of pointers. Nulling
-  // one of them nulls all of them:
-  mURL = nullptr;
-}
-
-void
-nsStyleClipPath::CopyURL(const nsStyleClipPath& aOther)
-{
-  ReleaseRef();
-
-  mURL = new FragmentOrURL(*aOther.mURL);
-  mType = StyleClipPathType::URL;
-}
-
-bool
-nsStyleClipPath::SetURL(const nsCSSValue* aValue)
-{
-  if (!aValue->GetURLValue()) {
-    return false;
-  }
-
-  ReleaseRef();
-
-  mURL = new FragmentOrURL();
-  mURL->SetValue(aValue);
-  mType = StyleClipPathType::URL;
-  return true;
-}
-
-void
-nsStyleClipPath::SetBasicShape(nsStyleBasicShape* aBasicShape,
-                               StyleClipShapeSizing aSizingBox)
-{
-  NS_ASSERTION(aBasicShape, "expected pointer");
-  ReleaseRef();
-  mBasicShape = aBasicShape;
-  mBasicShape->AddRef();
-  mSizingBox = aSizingBox;
-  mType = StyleClipPathType::Shape;
-}
-
-void
-nsStyleClipPath::SetSizingBox(StyleClipShapeSizing aSizingBox)
-{
-  ReleaseRef();
-  mSizingBox = aSizingBox;
-  mType = StyleClipPathType::Box;
 }
 
 // --------------------
@@ -2133,7 +2007,11 @@ nsStyleImage::DoCopy(const nsStyleImage& aOther)
     SetElementId(aOther.mElementId);
   }
 
-  SetCropRect(aOther.mCropRect);
+  UniquePtr<nsStyleSides> cropRectCopy;
+  if (aOther.mCropRect) {
+    cropRectCopy = MakeUnique<nsStyleSides>(*aOther.mCropRect.get());
+  }
+  SetCropRect(Move(cropRectCopy));
 }
 
 void
@@ -2246,14 +2124,9 @@ nsStyleImage::SetElementId(const char16_t* aElementId)
 }
 
 void
-nsStyleImage::SetCropRect(nsStyleSides* aCropRect)
+nsStyleImage::SetCropRect(UniquePtr<nsStyleSides> aCropRect)
 {
-  if (aCropRect) {
-    mCropRect = new nsStyleSides(*aCropRect);
-    // There is really not much we can do if 'new' fails
-  } else {
-    mCropRect = nullptr;
-  }
+    mCropRect = Move(aCropRect);
 }
 
 static int32_t
@@ -2405,7 +2278,7 @@ nsStyleImage::IsLoaded() const
 }
 
 static inline bool
-EqualRects(const nsStyleSides* aRect1, const nsStyleSides* aRect2)
+EqualRects(const UniquePtr<nsStyleSides>& aRect1, const UniquePtr<nsStyleSides>& aRect2)
 {
   return aRect1 == aRect2 || /* handles null== null, and optimize */
          (aRect1 && aRect2 && *aRect1 == *aRect2);
@@ -3203,6 +3076,7 @@ nsStyleDisplay::nsStyleDisplay(const nsStyleDisplay& aSource)
   , mAnimationFillModeCount(aSource.mAnimationFillModeCount)
   , mAnimationPlayStateCount(aSource.mAnimationPlayStateCount)
   , mAnimationIterationCountCount(aSource.mAnimationIterationCountCount)
+  , mShapeOutside(aSource.mShapeOutside)
 {
   MOZ_COUNT_CTOR(nsStyleDisplay);
 
@@ -3427,7 +3301,8 @@ nsStyleDisplay::CalcDifference(const nsStyleDisplay& aNewData) const
        mAnimationFillModeCount != aNewData.mAnimationFillModeCount ||
        mAnimationPlayStateCount != aNewData.mAnimationPlayStateCount ||
        mAnimationIterationCountCount != aNewData.mAnimationIterationCountCount ||
-       mScrollSnapCoordinate != aNewData.mScrollSnapCoordinate)) {
+       mScrollSnapCoordinate != aNewData.mScrollSnapCoordinate ||
+       mShapeOutside != aNewData.mShapeOutside)) {
     hint |= nsChangeHint_NeutralChange;
   }
 
@@ -3764,6 +3639,8 @@ nsStyleContent::AllocateContents(uint32_t aCount)
 nsStyleTextReset::nsStyleTextReset(StyleStructContext aContext)
   : mTextDecorationLine(NS_STYLE_TEXT_DECORATION_LINE_NONE)
   , mUnicodeBidi(NS_STYLE_UNICODE_BIDI_NORMAL)
+  , mInitialLetterSink(0)
+  , mInitialLetterSize(0.0f)
   , mTextDecorationStyle(NS_STYLE_TEXT_DECORATION_STYLE_SOLID | BORDER_COLOR_FOREGROUND)
   , mTextDecorationColor(NS_RGB(0, 0, 0))
 {
@@ -3784,7 +3661,9 @@ nsStyleTextReset::~nsStyleTextReset()
 nsChangeHint
 nsStyleTextReset::CalcDifference(const nsStyleTextReset& aNewData) const
 {
-  if (mUnicodeBidi != aNewData.mUnicodeBidi) {
+  if (mUnicodeBidi != aNewData.mUnicodeBidi ||
+      mInitialLetterSink != aNewData.mInitialLetterSink ||
+      mInitialLetterSize != aNewData.mInitialLetterSize) {
     return NS_STYLE_HINT_REFLOW;
   }
 

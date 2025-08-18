@@ -94,13 +94,13 @@ add_task(function* test_bookmarks() {
   try {
     let id = bs.getFolderIdForItem(0);
     do_throw("getFolderIdForItem accepted bad input");
-  } catch(ex) {}
+  } catch (ex) {}
 
   // test getFolderIdForItem() with bogus item id will throw
   try {
     let id = bs.getFolderIdForItem(-1);
     do_throw("getFolderIdForItem accepted bad input");
-  } catch(ex) {}
+  } catch (ex) {}
 
   // test root parentage
   do_check_eq(bs.getFolderIdForItem(bs.bookmarksMenuFolder), bs.placesRoot);
@@ -187,7 +187,7 @@ add_task(function* test_bookmarks() {
   try {
     let title = bs.getItemTitle(-3);
     do_throw("getItemTitle accepted bad input");
-  } catch(ex) {}
+  } catch (ex) {}
 
   // get the folder that the bookmark is in
   let folderId = bs.getFolderIdForItem(newId);
@@ -369,7 +369,7 @@ add_task(function* test_bookmarks() {
     rootNode.containerOpen = true;
     do_check_eq(rootNode.childCount, 3);
     rootNode.containerOpen = false;
-  } catch(ex) {
+  } catch (ex) {
     do_throw("test removeFolderChildren() - querying for children failed: " + ex);
   }
   // 3) remove all children
@@ -381,7 +381,7 @@ add_task(function* test_bookmarks() {
     rootNode.containerOpen = true;
     do_check_eq(rootNode.childCount, 0);
     rootNode.containerOpen = false;
-  } catch(ex) {
+  } catch (ex) {
     do_throw("removeFolderChildren(): " + ex);
   }
 
@@ -412,7 +412,7 @@ add_task(function* test_bookmarks() {
     }
     rootNode.containerOpen = false;
   }
-  catch(ex) {
+  catch (ex) {
     do_throw("bookmarks query: " + ex);
   }
 
@@ -440,7 +440,7 @@ add_task(function* test_bookmarks() {
     do_check_eq(rootNode.getChild(1).title, "title 2");
     rootNode.containerOpen = false;
   }
-  catch(ex) {
+  catch (ex) {
     do_throw("bookmarks query: " + ex);
   }
 
@@ -485,7 +485,7 @@ add_task(function* test_bookmarks() {
   try {
     bs.getBookmarkURI(testRoot);
     do_throw("getBookmarkURI() should throw for non-bookmark items!");
-  } catch(ex) {}
+  } catch (ex) {}
 
   // test getItemIndex
   let newId12 = bs.insertBookmark(testRoot, uri("http://foo11.com/"), 1, "");
@@ -533,7 +533,7 @@ add_task(function* test_bookmarks() {
     do_check_true(node.itemId > 0);
     rootNode.containerOpen = false;
   }
-  catch(ex) {
+  catch (ex) {
     do_throw("bookmarks query: " + ex);
   }
 
@@ -560,7 +560,7 @@ add_task(function* test_bookmarks() {
 
     rootNode.containerOpen = false;
   }
-  catch(ex) {
+  catch (ex) {
     do_throw("bookmarks query: " + ex);
   }
 
@@ -589,7 +589,7 @@ add_task(function* test_bookmarks() {
     }
     rootNode.containerOpen = false;
   }
-  catch(ex) {
+  catch (ex) {
     do_throw("bookmarks query: " + ex);
   }
 
@@ -730,7 +730,7 @@ function getChildCount(aFolderId) {
     rootNode.containerOpen = true;
     cc = rootNode.childCount;
     rootNode.containerOpen = false;
-  } catch(ex) {
+  } catch (ex) {
     do_throw("getChildCount failed: " + ex);
   }
   return cc;

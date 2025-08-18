@@ -14,6 +14,7 @@
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/DebugOnly.h"
+#include "mozilla/Function.h"
 #include "mozilla/dom/AnimationEffectReadOnlyBinding.h" // for PlaybackDirection
 #include "mozilla/Likely.h"
 #include "mozilla/LookAndFeel.h"
@@ -97,19 +98,34 @@ nsConditionalResetStyleData::GetConditionalStyleData(nsStyleStructID aSID,
   return nullptr;
 }
 
-#define NS_SET_IMAGE_REQUEST(method_, context_, request_)                     \
-  if ((context_)->PresContext()->IsDynamic()) {                               \
-    method_(request_);                                                        \
-  } else {                                                                    \
-    RefPtr<imgRequestProxy> req = nsContentUtils::GetStaticRequest(request_); \
-    method_(req);                                                             \
+// Creates an imgRequestProxy based on the specified value in
+// aValue and calls aCallback with it.  If the nsPresContext
+// is static (e.g. for printing), then a static request (i.e.
+// showing the first frame, without animation) will be created.
+// (The expectation is then that aCallback will set the resulting
+// imgRequestProxy in a style struct somewhere.)
+static void
+SetImageRequest(function<void(imgRequestProxy*)> aCallback,
+                nsPresContext* aPresContext,
+                const nsCSSValue& aValue)
+{
+  nsIDocument* doc = aPresContext->Document();
+  imgRequestProxy* req = aValue.GetImageValue(doc);
+  if (aPresContext->IsDynamic()) {
+    aCallback(req);
+  } else {
+    RefPtr<imgRequestProxy> staticReq = nsContentUtils::GetStaticRequest(req);
+    aCallback(staticReq);
   }
+}
 
-#define NS_SET_IMAGE_REQUEST_WITH_DOC(method_, context_, requestgetter_)      \
-  {                                                                           \
-    nsIDocument* doc = (context_)->PresContext()->Document();                 \
-    NS_SET_IMAGE_REQUEST(method_, context_, requestgetter_(doc))              \
-  }
+template<typename ReferenceBox>
+static void
+SetStyleShapeSourceToCSSValue(StyleShapeSource<ReferenceBox>* aShapeSource,
+                              const nsCSSValue* aValue,
+                              nsStyleContext* aStyleContext,
+                              nsPresContext* aPresContext,
+                              RuleNodeCacheConditions& aConditions);
 
 /* Helper function to convert a CSS <position> specified value into its
  * computed-style form. */
@@ -1196,9 +1212,9 @@ static void SetStyleImageToImageRect(nsStyleContext* aStyleContext,
 
   // <uri>
   if (arr->Item(1).GetUnit() == eCSSUnit_Image) {
-    NS_SET_IMAGE_REQUEST_WITH_DOC(aResult.SetImageData,
-                                  aStyleContext,
-                                  arr->Item(1).GetImageValue)
+    SetImageRequest([&](imgRequestProxy* req) {
+      aResult.SetImageData(req);
+    }, aStyleContext->PresContext(), arr->Item(1));
   } else {
     NS_WARNING("nsCSSValue::Image::Image() failed?");
   }
@@ -1216,7 +1232,7 @@ static void SetStyleImageToImageRect(nsStyleContext* aStyleContext,
     MOZ_ASSERT(unitOk, "Incorrect data structure created by CSS parser");
     cropRect.Set(side, coord);
   }
-  aResult.SetCropRect(&cropRect);
+  aResult.SetCropRect(MakeUnique<nsStyleSides>(cropRect));
 }
 
 static void SetStyleImage(nsStyleContext* aStyleContext,
@@ -1232,9 +1248,9 @@ static void SetStyleImage(nsStyleContext* aStyleContext,
 
   switch (aValue.GetUnit()) {
     case eCSSUnit_Image:
-      NS_SET_IMAGE_REQUEST_WITH_DOC(aResult.SetImageData,
-                                    aStyleContext,
-                                    aValue.GetImageValue)
+      SetImageRequest([&](imgRequestProxy* req) {
+        aResult.SetImageData(req);
+      }, aStyleContext->PresContext(), aValue);
       break;
     case eCSSUnit_Function:
       if (aValue.EqualsFunction(eCSSKeyword__moz_image_rect)) {
@@ -4978,6 +4994,36 @@ nsRuleNode::ComputeTextResetData(void* aStartStruct,
            parentText->mUnicodeBidi,
            NS_STYLE_UNICODE_BIDI_NORMAL);
 
+  // initial-letter: normal, number, array(number, integer?), initial
+  const nsCSSValue* initialLetterValue = aRuleData->ValueForInitialLetter();
+  if (initialLetterValue->GetUnit() == eCSSUnit_Null) {
+    // We don't want to change anything in this case.
+  } else if (initialLetterValue->GetUnit() == eCSSUnit_Inherit) {
+    conditions.SetUncacheable();
+    text->mInitialLetterSink = parentText->mInitialLetterSink;
+    text->mInitialLetterSize = parentText->mInitialLetterSize;
+  } else if (initialLetterValue->GetUnit() == eCSSUnit_Initial ||
+             initialLetterValue->GetUnit() == eCSSUnit_Unset ||
+             initialLetterValue->GetUnit() == eCSSUnit_Normal) {
+    // Use invalid values in initial-letter property to mean normal. So we can
+    // determine whether it is normal by checking mInitialLetterSink == 0.
+    text->mInitialLetterSink = 0;
+    text->mInitialLetterSize = 0.0f;
+  } else if (initialLetterValue->GetUnit() == eCSSUnit_Array) {
+    const nsCSSValue& firstValue = initialLetterValue->GetArrayValue()->Item(0);
+    const nsCSSValue& secondValue = initialLetterValue->GetArrayValue()->Item(1);
+    MOZ_ASSERT(firstValue.GetUnit() == eCSSUnit_Number &&
+               secondValue.GetUnit() == eCSSUnit_Integer,
+               "unexpected value unit");
+    text->mInitialLetterSize = firstValue.GetFloatValue();
+    text->mInitialLetterSink = secondValue.GetIntValue();
+  } else if (initialLetterValue->GetUnit() == eCSSUnit_Number) {
+    text->mInitialLetterSize = initialLetterValue->GetFloatValue();
+    text->mInitialLetterSink = NSToCoordFloorClamped(text->mInitialLetterSize);
+  } else {
+    MOZ_ASSERT_UNREACHABLE("unknown unit for initial-letter");
+  }
+
   COMPUTE_END_RESET(TextReset, text)
 }
 
@@ -6396,6 +6442,35 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
            SETVAL_ENUMERATED | SETVAL_UNSET_INITIAL,
            parentDisplay->mOrient,
            NS_STYLE_ORIENT_INLINE);
+
+  // shape-outside: none | [ <basic-shape> || <shape-box> ] | <image>
+  const nsCSSValue* shapeOutsideValue = aRuleData->ValueForShapeOutside();
+  switch (shapeOutsideValue->GetUnit()) {
+    case eCSSUnit_Null:
+      break;
+    case eCSSUnit_None:
+    case eCSSUnit_Initial:
+    case eCSSUnit_Unset:
+      display->mShapeOutside = StyleShapeOutside();
+      break;
+    case eCSSUnit_Inherit:
+      conditions.SetUncacheable();
+      display->mShapeOutside = parentDisplay->mShapeOutside;
+      break;
+    case eCSSUnit_URL: {
+      display->mShapeOutside = StyleShapeOutside();
+      display->mShapeOutside.SetURL(shapeOutsideValue);
+      break;
+    }
+    case eCSSUnit_Array: {
+      display->mShapeOutside = StyleShapeOutside();
+      SetStyleShapeSourceToCSSValue(&display->mShapeOutside, shapeOutsideValue,
+                                    aContext, mPresContext, conditions);
+      break;
+    }
+    default:
+      MOZ_ASSERT_UNREACHABLE("Unrecognized shape-outside unit!");
+  }
 
   COMPUTE_END_RESET(Display, display)
 }
@@ -7923,9 +7998,9 @@ nsRuleNode::ComputeListData(void* aStartStruct,
   // list-style-image: url, none, inherit
   const nsCSSValue* imageValue = aRuleData->ValueForListStyleImage();
   if (eCSSUnit_Image == imageValue->GetUnit()) {
-    NS_SET_IMAGE_REQUEST_WITH_DOC(list->SetListStyleImage,
-                                  aContext,
-                                  imageValue->GetImageValue)
+    SetImageRequest([&](imgRequestProxy* req) {
+      list->SetListStyleImage(req);
+    }, mPresContext, *imageValue);
   }
   else if (eCSSUnit_None == imageValue->GetUnit() ||
            eCSSUnit_Initial == imageValue->GetUnit()) {
@@ -7934,9 +8009,7 @@ nsRuleNode::ComputeListData(void* aStartStruct,
   else if (eCSSUnit_Inherit == imageValue->GetUnit() ||
            eCSSUnit_Unset == imageValue->GetUnit()) {
     conditions.SetUncacheable();
-    NS_SET_IMAGE_REQUEST(list->SetListStyleImage,
-                         aContext,
-                         parentList->GetListStyleImage())
+    list->SetListStyleImage(parentList->GetListStyleImage());
   }
 
   // list-style-position: enum, inherit, initial
@@ -8848,9 +8921,9 @@ nsRuleNode::ComputeContentData(void* aStartStruct,
           }
           data.mType = type;
           if (type == eStyleContentType_Image) {
-            NS_SET_IMAGE_REQUEST_WITH_DOC(data.SetImage,
-                                          aContext,
-                                          value.GetImageValue);
+            SetImageRequest([&](imgRequestProxy* req) {
+              data.SetImage(req);
+            }, mPresContext, value);
           }
           else if (type <= eStyleContentType_Attr) {
             value.GetStringValue(buffer);
@@ -9546,13 +9619,13 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
   COMPUTE_END_INHERITED(SVG, svg)
 }
 
-static already_AddRefed<nsStyleBasicShape>
+static already_AddRefed<StyleBasicShape>
 GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
                                nsStyleContext* aStyleContext,
                                nsPresContext* aPresContext,
                                RuleNodeCacheConditions& aConditions)
 {
-  RefPtr<nsStyleBasicShape> basicShape;
+  RefPtr<StyleBasicShape> basicShape;
 
   nsCSSValue::Array* shapeFunction = aValue.GetArrayValue();
   nsCSSKeyword functionName =
@@ -9560,7 +9633,7 @@ GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
 
   if (functionName == eCSSKeyword_polygon) {
     MOZ_ASSERT(!basicShape, "did not expect value");
-    basicShape = new nsStyleBasicShape(nsStyleBasicShape::ePolygon);
+    basicShape = new StyleBasicShape(StyleBasicShapeType::Polygon);
     MOZ_ASSERT(shapeFunction->Count() > 1,
                "polygon has wrong number of arguments");
     size_t j = 1;
@@ -9591,17 +9664,17 @@ GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
     }
   } else if (functionName == eCSSKeyword_circle ||
              functionName == eCSSKeyword_ellipse) {
-    nsStyleBasicShape::Type type = functionName == eCSSKeyword_circle ?
-      nsStyleBasicShape::eCircle :
-      nsStyleBasicShape::eEllipse;
+    StyleBasicShapeType type = functionName == eCSSKeyword_circle ?
+      StyleBasicShapeType::Circle :
+      StyleBasicShapeType::Ellipse;
     MOZ_ASSERT(!basicShape, "did not expect value");
-    basicShape = new nsStyleBasicShape(type);
+    basicShape = new StyleBasicShape(type);
     const int32_t mask = SETCOORD_PERCENT | SETCOORD_LENGTH |
       SETCOORD_STORE_CALC | SETCOORD_ENUMERATED;
-    size_t count = type == nsStyleBasicShape::eCircle ? 2 : 3;
+    size_t count = type == StyleBasicShapeType::Circle ? 2 : 3;
     MOZ_ASSERT(shapeFunction->Count() == count + 1,
                "unexpected arguments count");
-    MOZ_ASSERT(type == nsStyleBasicShape::eCircle ||
+    MOZ_ASSERT(type == StyleBasicShapeType::Circle ||
                (shapeFunction->Item(1).GetUnit() == eCSSUnit_Null) ==
                (shapeFunction->Item(2).GetUnit() == eCSSUnit_Null),
                "ellipse should have two radii or none");
@@ -9631,7 +9704,7 @@ GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
     }
   } else if (functionName == eCSSKeyword_inset) {
     MOZ_ASSERT(!basicShape, "did not expect value");
-    basicShape = new nsStyleBasicShape(nsStyleBasicShape::eInset);
+    basicShape = new StyleBasicShape(StyleBasicShapeType::Inset);
     MOZ_ASSERT(shapeFunction->Count() == 6,
                "inset function has wrong number of arguments");
     MOZ_ASSERT(shapeFunction->Item(1).GetUnit() != eCSSUnit_Null,
@@ -9695,44 +9768,42 @@ GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
   return basicShape.forget();
 }
 
+template<typename ReferenceBox>
 static void
-SetStyleClipPathToCSSValue(nsStyleClipPath* aStyleClipPath,
-                           const nsCSSValue* aValue,
-                           nsStyleContext* aStyleContext,
-                           nsPresContext* aPresContext,
-                           RuleNodeCacheConditions& aConditions)
+SetStyleShapeSourceToCSSValue(
+  StyleShapeSource<ReferenceBox>* aShapeSource,
+  const nsCSSValue* aValue,
+  nsStyleContext* aStyleContext,
+  nsPresContext* aPresContext,
+  RuleNodeCacheConditions& aConditions)
 {
   MOZ_ASSERT(aValue->GetUnit() == eCSSUnit_Array,
              "expected a basic shape or reference box");
 
   const nsCSSValue::Array* array = aValue->GetArrayValue();
   MOZ_ASSERT(array->Count() == 1 || array->Count() == 2,
-             "Expect one or both of a shape function and geometry-box");
+             "Expect one or both of a shape function and a reference box");
 
-  StyleClipShapeSizing sizingBox = StyleClipShapeSizing::NoBox;
-  RefPtr<nsStyleBasicShape> basicShape;
+  ReferenceBox referenceBox = ReferenceBox::NoBox;
+  RefPtr<StyleBasicShape> basicShape;
+
   for (size_t i = 0; i < array->Count(); ++i) {
-    if (array->Item(i).GetUnit() == eCSSUnit_Enumerated) {
-      int32_t type = array->Item(i).GetIntValue();
-      if (type > uint8_t(StyleClipShapeSizing::View) ||
-          type < uint8_t(StyleClipShapeSizing::NoBox)) {
-        NS_NOTREACHED("unexpected reference box");
-        return;
-      }
-      sizingBox = static_cast<StyleClipShapeSizing>(type);
-    } else if (array->Item(i).GetUnit() == eCSSUnit_Function) {
-      basicShape = GetStyleBasicShapeFromCSSValue(array->Item(i), aStyleContext,
+    const nsCSSValue& item = array->Item(i);
+    if (item.GetUnit() == eCSSUnit_Enumerated) {
+      referenceBox = static_cast<ReferenceBox>(item.GetIntValue());
+    } else if (item.GetUnit() == eCSSUnit_Function) {
+      basicShape = GetStyleBasicShapeFromCSSValue(item, aStyleContext,
                                                   aPresContext, aConditions);
     } else {
-      NS_NOTREACHED("unexpected value");
+      MOZ_ASSERT_UNREACHABLE("Unexpected unit!");
       return;
     }
   }
 
   if (basicShape) {
-    aStyleClipPath->SetBasicShape(basicShape, sizingBox);
+    aShapeSource->SetBasicShape(basicShape, referenceBox);
   } else {
-    aStyleClipPath->SetSizingBox(sizingBox);
+    aShapeSource->SetReferenceBox(referenceBox);
   }
 }
 
@@ -9844,21 +9915,21 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
     case eCSSUnit_None:
     case eCSSUnit_Initial:
     case eCSSUnit_Unset:
-      svgReset->mClipPath = nsStyleClipPath();
+      svgReset->mClipPath = StyleClipPath();
       break;
     case eCSSUnit_Inherit:
       conditions.SetUncacheable();
       svgReset->mClipPath = parentSVGReset->mClipPath;
       break;
     case eCSSUnit_URL: {
-      svgReset->mClipPath = nsStyleClipPath();
+      svgReset->mClipPath = StyleClipPath();
       svgReset->mClipPath.SetURL(clipPathValue);
       break;
     }
     case eCSSUnit_Array: {
-      svgReset->mClipPath = nsStyleClipPath();
-      SetStyleClipPathToCSSValue(&svgReset->mClipPath, clipPathValue, aContext,
-                                 mPresContext, conditions);
+      svgReset->mClipPath = StyleClipPath();
+      SetStyleShapeSourceToCSSValue(&svgReset->mClipPath, clipPathValue, aContext,
+                                    mPresContext, conditions);
       break;
     }
     default:

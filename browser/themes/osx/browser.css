@@ -1503,7 +1503,7 @@ richlistitem[type~="action"][actiontype="searchengine"][selected="true"] > .ac-t
 }
 
 #navigator-throbber[busy="true"] {
-    list-style-image: url("chrome://global/skin/icons/loading_16.png");
+    list-style-image: url("chrome://global/skin/icons/loading.png");
 }
 
 #navigator-throbber,
@@ -1849,12 +1849,22 @@ toolbar[brighttext] #alltabs-button[type="menu"] {
     list-style-image: url("chrome://mozapps/skin/places/defaultFavicon.png");
 }
 
+.alltabs-item[busy] > .menu-iconic-left > .menu-iconic-icon {
+  list-style-image: url("chrome://global/skin/icons/loading.png") !important;
+}
+
 .alltabs-item[selected="true"] {
     font-weight: bold; 
 }
 
-.alltabs-item[busy] > .menu-iconic-left > .menu-iconic-icon {
-    list-style-image: url("chrome://global/skin/icons/loading_16.png");
+@media (min-resolution: 2dppx) {
+  .alltabs-item > .menu-iconic-left > .menu-iconic-icon {
+    list-style-image: url("chrome://mozapps/skin/places/defaultFavicon@2x.png");
+  }
+
+  .alltabs-item[busy] > .menu-iconic-left > .menu-iconic-icon {
+    list-style-image: url("chrome://global/skin/icons/loading@2x.png") !important;
+  }
 }
 
 .alltabs-item[tabIsVisible] {
@@ -1878,10 +1888,19 @@ toolbar[brighttext] .tabs-closebutton {
     padding-inline-start: 2px !important;
 }
 
+.sidebar-throbber[loading="true"],
 #sidebar-throbber[loading="true"] {
-    list-style-image: url("chrome://global/skin/icons/loading_16.png");
-    margin-inline-end: 4px;
+  list-style-image: url("chrome://global/skin/icons/loading.png");
 }
+
+@media (min-resolution: 2dppx) {
+  .sidebar-throbber[loading="true"],
+  #sidebar-throbber[loading="true"] {
+    list-style-image: url("chrome://global/skin/icons/loading@2x.png");
+    width: 16px;
+  }
+}
+
 
 .popup-notification-icon[popupid="xpinstall-disabled"],
 .popup-notification-icon[popupid="addon-progress"],

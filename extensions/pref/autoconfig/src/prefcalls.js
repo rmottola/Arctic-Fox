@@ -114,6 +114,12 @@ function getPref(prefName) {
         switch (prefBranch.getPrefType(prefName)) {
             
         case prefBranch.PREF_STRING:
+            if (gIsUTF8) {
+                const nsISupportsString = Components.interfaces.nsISupportsString;
+                let string = Components.classes["@mozilla.org/supports-string;1"]
+                                       .createInstance(nsISupportsString);
+                return prefBranch.getComplexValue(prefName, nsISupportsString).data;
+            }
             return prefBranch.getCharPref(prefName);
             
         case prefBranch.PREF_INT:
@@ -146,10 +152,10 @@ function setLDAPVersion(version) {
 }
 
 
-function getLDAPAttributes(host, base, filter, attribs) {
+function getLDAPAttributes(host, base, filter, attribs, isSecure) {
     
     try {
-        var urlSpec = "ldap://" + host + "/" + base + "?" + attribs + "?sub?" +
+        var urlSpec = "ldap" + (isSecure ? "s" : "") + "://" + host + (isSecure ? ":636" : "") + "/" + base + "?" + attribs + "?sub?" +
                       filter;
 
         var url = Components.classes["@mozilla.org/network/io-service;1"]

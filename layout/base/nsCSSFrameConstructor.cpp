@@ -1611,11 +1611,7 @@ nsCSSFrameConstructor::NotifyDestroyingFrame(nsIFrame* aFrame)
     CountersDirty();
   }
 
-  // stylo: ServoRestyleManager does not need to be notified of frames being
-  // destroyed.
-  if (mozilla::RestyleManager* geckoRM = RestyleManager()->GetAsGecko()) {
-    geckoRM->NotifyDestroyingFrame(aFrame);
-  }
+  RestyleManager()->NotifyDestroyingFrame(aFrame);
 
   nsFrameManager::NotifyDestroyingFrame(aFrame);
 }
@@ -10591,7 +10587,7 @@ nsCSSFrameConstructor::AddFCItemsForAnonymousContent(
                  "ProcessChildren() codepath for this frame");
 #endif
     // Anything restyled by servo should already have the style data.
-    MOZ_ASSERT_IF(content->IsStyledByServo(), !!content->GetServoNodeData());
+    MOZ_ASSERT_IF(content->IsStyledByServo(), !!content->ServoData());
     // Gecko-styled nodes should have no pending restyle flags.
     MOZ_ASSERT_IF(!content->IsStyledByServo(),
                   !content->IsElement() ||

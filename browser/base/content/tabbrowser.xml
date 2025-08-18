@@ -1441,7 +1441,7 @@
               if (browser.currentURI.spec) {
                 try {
                   title = this.mURIFixup.createExposableURI(browser.currentURI).spec;
-                } catch(ex) {
+                } catch (ex) {
                   title = browser.currentURI.spec;
                 }
               }
@@ -1455,7 +1455,7 @@
                   const textToSubURI = Components.classes["@mozilla.org/intl/texttosuburi;1"]
                                                  .getService(Components.interfaces.nsITextToSubURI);
                   title = textToSubURI.unEscapeNonAsciiURI(characterSet, title);
-                } catch(ex) { /* Do nothing. */ }
+                } catch (ex) { /* Do nothing. */ }
 
                 crop = "center";
 
@@ -3949,9 +3949,8 @@
             tinfo: function(tab) {
               if (tab) {
                 return tab._tPos + "(" + tab.linkedBrowser.currentURI.spec + ")";
-              } else {
-                return "null";
               }
+              return "null";
             },
 
             log: function(s) {
@@ -4544,7 +4543,7 @@
         <parameter name="aData"/>
         <body><![CDATA[
           let browser;
-          switch(aTopic) {
+          switch (aTopic) {
             case "live-resize-start":
               browser = this.mCurrentTab.linkedBrowser;
               let fl = browser.QueryInterface(Ci.nsIFrameLoaderOwner).frameLoader;
@@ -6218,7 +6217,7 @@
               this.tabbrowser.getBrowserForTab(tab).loadURIWithFlags(url, flags);
               if (!bgLoad)
                 this.selectedItem = tab;
-            } catch(ex) {
+            } catch (ex) {
               // Just ignore invalid urls
             }
           }

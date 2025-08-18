@@ -4,6 +4,8 @@
 
 // Tests various aspects of the details view
 
+const { REQUIRE_SIGNING } = Components.utils.import("resource://gre/modules/addons/AddonConstants.jsm", {});
+
 const PREF_AUTOUPDATE_DEFAULT = "extensions.update.autoUpdateDefault";
 const PREF_GETADDONS_GETSEARCHRESULTS = "extensions.getAddons.search.url";
 const SEARCH_URL = TESTROOT + "browser_details.xml";
@@ -191,7 +193,7 @@ add_test(function() {
     is(get("detail-version").value, "2.1", "Version should be correct");
     is(get("detail-icon").src, "chrome://foo/skin/icon64.png", "Icon should be correct");
     is_element_hidden(get("detail-creator"), "Creator should be hidden");
-    is_element_hidden(get("detail-screenshot"), "Screenshot should be hidden");
+    is_element_hidden(get("detail-screenshot-box"), "Screenshot should be hidden");
     is(get("detail-screenshot").width, "", "Screenshot dimensions should not be set");
     is(get("detail-screenshot").height, "", "Screenshot dimensions should not be set");
     is(get("detail-desc").textContent, "Short description", "Description should be correct");
@@ -298,7 +300,7 @@ add_test(function() {
     is(get("detail-creator")._creatorName.value, "Mozilla", "Creator should be correct");
     is_element_hidden(get("detail-creator")._creatorLink, "Creator link should be hidden");
 
-    is_element_visible(get("detail-screenshot"), "Screenshot should be visible");
+    is_element_visible(get("detail-screenshot-box"), "Screenshot should be visible");
     is(get("detail-screenshot").src, "chrome://branding/content/about.png", "Should be showing the full sized screenshot");
     is(get("detail-screenshot").width, 200, "Screenshot dimensions should be set");
     is(get("detail-screenshot").height, 150, "Screenshot dimensions should be set");
@@ -355,7 +357,7 @@ add_test(function() {
     is(get("detail-creator")._creatorLink.value, "Mozilla", "Creator link should be correct");
     is(get("detail-creator")._creatorLink.href, "http://www.mozilla.org", "Creator link href should be correct");
 
-    is_element_visible(get("detail-screenshot"), "Screenshot should be visible");
+    is_element_visible(get("detail-screenshot-box"), "Screenshot should be visible");
     is(get("detail-screenshot").src, "chrome://branding/content/icon64.png", "Should be showing the thumbnail");
     is(get("detail-screenshot").width, 160, "Screenshot dimensions should be set");
     is(get("detail-screenshot").height, 120, "Screenshot dimensions should be set");
@@ -706,28 +708,31 @@ add_test(function() {
   });
 });
 
-// Opens and tests the details view for add-on 9
-add_test(function() {
-  open_details("addon9@tests.mozilla.org", "extension", function() {
-    is(get("detail-name").textContent, "Test add-on 9", "Name should be correct");
+// These tests are only appropriate when signing can be turned off
+if (!REQUIRE_SIGNING) {
+  // Opens and tests the details view for add-on 9
+  add_test(function() {
+    open_details("addon9@tests.mozilla.org", "extension", function() {
+      is(get("detail-name").textContent, "Test add-on 9", "Name should be correct");
 
-    is_element_hidden(get("detail-prefs-btn"), "Preferences button should be hidden");
-    is_element_hidden(get("detail-enable-btn"), "Enable button should be hidden");
-    is_element_visible(get("detail-disable-btn"), "Disable button should be visible");
-    is_element_visible(get("detail-uninstall-btn"), "Remove button should be visible");
+      is_element_hidden(get("detail-prefs-btn"), "Preferences button should be hidden");
+      is_element_hidden(get("detail-enable-btn"), "Enable button should be hidden");
+      is_element_visible(get("detail-disable-btn"), "Disable button should be visible");
+      is_element_visible(get("detail-uninstall-btn"), "Remove button should be visible");
 
-    is_element_hidden(get("detail-error"), "Error message should be hidden");
-    is_element_hidden(get("detail-error-link"), "Error link should be hidden");
-    is_element_visible(get("detail-warning"), "Error message should be visible");
-    is(get("detail-warning").textContent, "Test add-on 9 could not be verified for use in " + gApp + ". Proceed with caution.", "Warning message should be correct");
-    is_element_visible(get("detail-warning-link"), "Warning link should be visible");
-    is(get("detail-warning-link").value, "More Information", "Warning link text should be correct");
-    is(get("detail-warning-link").href, infoURL, "Warning link should be correct");
-    is_element_hidden(get("detail-pending"), "Pending message should be hidden");
+      is_element_hidden(get("detail-error"), "Error message should be hidden");
+      is_element_hidden(get("detail-error-link"), "Error link should be hidden");
+      is_element_visible(get("detail-warning"), "Error message should be visible");
+      is(get("detail-warning").textContent, "Test add-on 9 could not be verified for use in " + gApp + ". Proceed with caution.", "Warning message should be correct");
+      is_element_visible(get("detail-warning-link"), "Warning link should be visible");
+      is(get("detail-warning-link").value, "More Information", "Warning link text should be correct");
+      is(get("detail-warning-link").href, infoURL, "Warning link should be correct");
+      is_element_hidden(get("detail-pending"), "Pending message should be hidden");
 
-    run_next_test();
+      run_next_test();
+    });
   });
-});
+}
 
 // Opens and tests the details view for add-on 9 with signing required
 add_test(function() {
@@ -767,26 +772,29 @@ add_test(function() {
   });
 });
 
-// Opens and tests the details view for add-on 10
-add_test(function() {
-  open_details("addon10@tests.mozilla.org", "extension", function() {
-    is(get("detail-name").textContent, "Test add-on 10", "Name should be correct");
+// These tests are only appropriate when signing can be turned off
+if (!REQUIRE_SIGNING) {
+  // Opens and tests the details view for add-on 10
+  add_test(function() {
+    open_details("addon10@tests.mozilla.org", "extension", function() {
+      is(get("detail-name").textContent, "Test add-on 10", "Name should be correct");
 
-    is_element_hidden(get("detail-prefs-btn"), "Preferences button should be hidden");
-    is_element_hidden(get("detail-enable-btn"), "Enable button should be hidden");
-    is_element_hidden(get("detail-disable-btn"), "Disable button should be hidden");
-    is_element_visible(get("detail-uninstall-btn"), "Remove button should be visible");
+      is_element_hidden(get("detail-prefs-btn"), "Preferences button should be hidden");
+      is_element_hidden(get("detail-enable-btn"), "Enable button should be hidden");
+      is_element_hidden(get("detail-disable-btn"), "Disable button should be hidden");
+      is_element_visible(get("detail-uninstall-btn"), "Remove button should be visible");
 
-    is_element_visible(get("detail-warning"), "Warning message should be visible");
-    is(get("detail-warning").textContent, "Test add-on 10 is incompatible with " + gApp + " " + gVersion + ".", "Warning message should be correct");
-    is_element_hidden(get("detail-warning-link"), "Warning link should be hidden");
-    is_element_hidden(get("detail-error"), "Error message should be hidden");
-    is_element_hidden(get("detail-error-link"), "Error link should be hidden");
-    is_element_hidden(get("detail-pending"), "Pending message should be hidden");
+      is_element_visible(get("detail-warning"), "Warning message should be visible");
+      is(get("detail-warning").textContent, "Test add-on 10 is incompatible with " + gApp + " " + gVersion + ".", "Warning message should be correct");
+      is_element_hidden(get("detail-warning-link"), "Warning link should be hidden");
+      is_element_hidden(get("detail-error"), "Error message should be hidden");
+      is_element_hidden(get("detail-error-link"), "Error link should be hidden");
+      is_element_hidden(get("detail-pending"), "Pending message should be hidden");
 
-    run_next_test();
+      run_next_test();
+    });
   });
-});
+}
 
 // Opens and tests the details view for add-on 10 with signing required
 add_test(function() {

@@ -1140,6 +1140,7 @@ HTMLInputElement::HTMLInputElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
   , mAutocompleteAttrState(nsContentUtils::eAutocompleteAttrState_Unknown)
   , mDisabledChanged(false)
   , mValueChanged(false)
+  , mLastValueChangeWasInteractive(false)
   , mCheckedChanged(false)
   , mChecked(false)
   , mHandlingSelectEvent(false)
@@ -1321,6 +1322,7 @@ HTMLInputElement::Clone(mozilla::dom::NodeInfo* aNodeInfo, nsINode** aResult) co
       break;
   }
 
+  it->mLastValueChangeWasInteractive = mLastValueChangeWasInteractive;
   it.forget(aResult);
   return NS_OK;
 }
@@ -3001,7 +3003,8 @@ HTMLInputElement::SetValueInternal(const nsAString& aValue, uint32_t aFlags)
           }
         }
         if (!mParserCreating) {
-          OnValueChanged(true);
+          OnValueChanged(/* aNotify = */ true,
+                         /* aWasInteractiveUserChange = */ false);
         }
         // else DoneCreatingElement calls us again once mParserCreating is false
       }
@@ -3233,8 +3236,7 @@ HTMLInputElement::MaybeSubmitForm(nsPresContext* aPresContext)
     nsEventStatus status = nsEventStatus_eIgnore;
     shell->HandleDOMEventWithTarget(submitContent, &event, &status);
   } else if (!mForm->ImplicitSubmissionIsDisabled() &&
-             (mForm->HasAttr(kNameSpaceID_None, nsGkAtoms::novalidate) ||
-              mForm->CheckValidFormSubmission())) {
+             mForm->SubmissionCanProceed(nullptr)) {
     // TODO: removing this code and have the submit event sent by the form,
     // bug 592124.
     // If there's only one text control, just submit the form
@@ -4468,7 +4470,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
           if (mForm) {
             InternalFormEvent event(true,
               (mType == NS_FORM_INPUT_RESET) ? eFormReset : eFormSubmit);
-            event.originator      = this;
+            event.mOriginator = this;
             nsEventStatus status  = nsEventStatus_eIgnore;
 
             nsCOMPtr<nsIPresShell> presShell =
@@ -4480,11 +4482,7 @@ HTMLInputElement::PostHandleEvent(EventChainPostVisitor& aVisitor)
             // TODO: removing this code and have the submit event sent by the
             // form, see bug 592124.
             if (presShell && (event.mMessage != eFormSubmit ||
-                              mForm->HasAttr(kNameSpaceID_None, nsGkAtoms::novalidate) ||
-                              // We know the element is a submit control, if this check is moved,
-                              // make sure formnovalidate is used only if it's a submit control.
-                              HasAttr(kNameSpaceID_None, nsGkAtoms::formnovalidate) ||
-                              mForm->CheckValidFormSubmission())) {
+                              mForm->SubmissionCanProceed(this))) {
               // Hold a strong ref while dispatching
               RefPtr<mozilla::dom::HTMLFormElement> form(mForm);
               presShell->HandleDOMEventWithTarget(mForm, &event, &status);
@@ -5534,8 +5532,8 @@ HTMLInputElement::SetRangeText(const nsAString& aReplacement, ErrorResult& aRv)
   if (aRv.Failed()) {
     nsTextEditorState* state = GetEditorState();
     if (state && state->IsSelectionCached()) {
-      start = state->GetSelectionProperties().mStart;
-      end = state->GetSelectionProperties().mEnd;
+      start = state->GetSelectionProperties().GetStart();
+      end = state->GetSelectionProperties().GetEnd();
       aRv = NS_OK;
     }
   }
@@ -5577,8 +5575,8 @@ HTMLInputElement::SetRangeText(const nsAString& aReplacement, uint32_t aStart,
     if (aRv.Failed()) {
       nsTextEditorState* state = GetEditorState();
       if (state && state->IsSelectionCached()) {
-        aSelectionStart = state->GetSelectionProperties().mStart;
-        aSelectionEnd = state->GetSelectionProperties().mEnd;
+        aSelectionStart = state->GetSelectionProperties().GetStart();
+        aSelectionEnd = state->GetSelectionProperties().GetEnd();
         aRv = NS_OK;
       }
     }
@@ -5647,7 +5645,7 @@ HTMLInputElement::GetSelectionStart(ErrorResult& aRv)
     nsTextEditorState* state = GetEditorState();
     if (state && state->IsSelectionCached()) {
       aRv = NS_OK;
-      return state->GetSelectionProperties().mStart;
+      return state->GetSelectionProperties().GetStart();
     }
   }
 
@@ -5669,7 +5667,7 @@ HTMLInputElement::SetSelectionStart(int32_t aSelectionStart, ErrorResult& aRv)
 {
   nsTextEditorState* state = GetEditorState();
   if (state && state->IsSelectionCached()) {
-    state->GetSelectionProperties().mStart = aSelectionStart;
+    state->GetSelectionProperties().SetStart(aSelectionStart);
     return;
   }
 
@@ -5711,7 +5709,7 @@ HTMLInputElement::GetSelectionEnd(ErrorResult& aRv)
     nsTextEditorState* state = GetEditorState();
     if (state && state->IsSelectionCached()) {
       aRv = NS_OK;
-      return state->GetSelectionProperties().mEnd;
+      return state->GetSelectionProperties().GetEnd();
     }
   }
 
@@ -5733,7 +5731,7 @@ HTMLInputElement::SetSelectionEnd(int32_t aSelectionEnd, ErrorResult& aRv)
 {
   nsTextEditorState* state = GetEditorState();
   if (state && state->IsSelectionCached()) {
-    state->GetSelectionProperties().mEnd = aSelectionEnd;
+    state->GetSelectionProperties().SetEnd(aSelectionEnd);
     return;
   }
 
@@ -5817,7 +5815,7 @@ HTMLInputElement::GetSelectionDirection(nsAString& aDirection, ErrorResult& aRv)
   if (NS_FAILED(rv)) {
     nsTextEditorState* state = GetEditorState();
     if (state && state->IsSelectionCached()) {
-      DirectionToName(state->GetSelectionProperties().mDirection, aDirection);
+      DirectionToName(state->GetSelectionProperties().GetDirection(), aDirection);
       return;
     }
   }
@@ -5846,7 +5844,7 @@ HTMLInputElement::SetSelectionDirection(const nsAString& aDirection, ErrorResult
     } else if (aDirection.EqualsLiteral("backward")) {
       dir = nsITextControlFrame::eBackward;
     }
-    state->GetSelectionProperties().mDirection = dir;
+    state->GetSelectionProperties().SetDirection(dir);
     return;
   }
 
@@ -5942,6 +5940,7 @@ HTMLInputElement::Reset()
   // We should be able to reset all dirty flags regardless of the type.
   SetCheckedChanged(false);
   SetValueChanged(false);
+  mLastValueChangeWasInteractive = false;
 
   switch (GetValueMode()) {
     case VALUE_MODE_VALUE:
@@ -6789,9 +6788,10 @@ HTMLInputElement::SetCustomValidity(const nsAString& aError)
 bool
 HTMLInputElement::IsTooLong()
 {
-  if (!MaxLengthApplies() ||
-      !HasAttr(kNameSpaceID_None, nsGkAtoms::maxlength) ||
-      !mValueChanged) {
+  if (!mValueChanged ||
+      !mLastValueChangeWasInteractive ||
+      !MaxLengthApplies() ||
+      !HasAttr(kNameSpaceID_None, nsGkAtoms::maxlength)) {
     return false;
   }
 
@@ -7066,10 +7066,7 @@ HTMLInputElement::HasBadInput() const
 void
 HTMLInputElement::UpdateTooLongValidityState()
 {
-  // TODO: this code will be re-enabled with bug 613016 and bug 613019.
-#if 0
   SetValidityState(VALIDITY_STATE_TOO_LONG, IsTooLong());
-#endif
 }
 
 void
@@ -7619,8 +7616,10 @@ HTMLInputElement::InitializeKeyboardEventListeners()
 }
 
 NS_IMETHODIMP_(void)
-HTMLInputElement::OnValueChanged(bool aNotify)
+HTMLInputElement::OnValueChanged(bool aNotify, bool aWasInteractiveUserChange)
 {
+  mLastValueChangeWasInteractive = aWasInteractiveUserChange;
+
   UpdateAllValidityStates(aNotify);
 
   if (HasDirAuto()) {

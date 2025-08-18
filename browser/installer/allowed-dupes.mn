@@ -631,7 +631,8 @@ browser/chrome/browser/skin/classic/browser/identity-not-secure.svg
 browser/chrome/devtools/modules/devtools/client/themes/audio/shutter.wav
 browser/chrome/devtools/modules/devtools/client/webconsole/utils.js
 browser/chrome/devtools/modules/devtools/server/actors/utils/webconsole-utils.js
-
+browser/chrome/devtools/content/debugger/new/images/breakpoint.svg
+browser/chrome/devtools/content/debugger/new/images/settings.svg
 
 browser/chrome/browser/defaults/permissions
 browser/defaults/permissions

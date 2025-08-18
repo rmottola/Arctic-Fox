@@ -259,14 +259,13 @@ LoginManagerPrompter.prototype = {
   get _inPrivateBrowsing() {
     if (this._window) {
       return PrivateBrowsingUtils.isContentWindowPrivate(this._window);
-    } else {
-      // If we don't that we're in private browsing mode if the caller did
-      // not provide a window.  The callers which really care about this
-      // will indeed pass down a window to us, and for those who don't,
-      // we can just assume that we don't want to save the entered login
-      // information.
-      return true;
     }
+    // If we don't that we're in private browsing mode if the caller did
+    // not provide a window.  The callers which really care about this
+    // will indeed pass down a window to us, and for those who don't,
+    // we can just assume that we don't want to save the entered login
+    // information.
+    return true;
   },
 
 
@@ -1008,8 +1007,6 @@ LoginManagerPrompter.prototype = {
           this._getLocalizedString("notifyBarRememberPasswordButtonText");
     var rememberButtonAccessKey =
           this._getLocalizedString("notifyBarRememberPasswordButtonAccessKey");
-    var usernamePlaceholder =
-          this._getLocalizedString("noUsernamePlaceholder");
 
     var displayHost = this._getShortDisplayHost(aLogin.hostname);
     var notificationText = this._getLocalizedString(
@@ -1020,7 +1017,6 @@ LoginManagerPrompter.prototype = {
     // in scope here; set one to |this._pwmgr| so we can get back to pwmgr
     // without a getService() call.
     var pwmgr = this._pwmgr;
-    let promptHistogram = Services.telemetry.getHistogramById("PWMGR_PROMPT_REMEMBER_ACTION");
 
     // Notification is a PopupNotification
     if (aNotifyObj == this._getPopupNote()) {
@@ -1186,8 +1182,6 @@ LoginManagerPrompter.prototype = {
           this._getLocalizedString("notifyBarUpdateButtonText");
     var changeButtonAccessKey =
           this._getLocalizedString("notifyBarUpdateButtonAccessKey");
-    var usernamePlaceholder =
-          this._getLocalizedString("noUsernamePlaceholder");
 
     // We reuse the existing message, even if it expects a username, until we
     // switch to the final terminology in bug 1144856.
@@ -1492,8 +1486,7 @@ LoginManagerPrompter.prototype = {
     if (formatArgs)
       return this._strBundle.formatStringFromName(
                                   key, formatArgs, formatArgs.length);
-    else
-      return this._strBundle.GetStringFromName(key);
+    return this._strBundle.GetStringFromName(key);
   },
 
 

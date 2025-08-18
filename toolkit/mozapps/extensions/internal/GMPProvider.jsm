@@ -378,7 +378,7 @@ GMPWrapper.prototype = {
     let parsedData;
     try {
       parsedData = JSON.parse(data);
-    } catch(ex) {
+    } catch (ex) {
       this._log.error("Malformed EME video message with data: " + data);
       return;
     }
@@ -523,7 +523,6 @@ var GMPProvider = {
     configureLogging();
     this._log = Log.repository.getLoggerWithMessagePrefix("Toolkit.GMP",
                                                           "GMPProvider.");
-    let telemetry = {};
     this.buildPluginList();
     this.ensureProperCDMInstallState();
 
@@ -564,33 +563,20 @@ var GMPProvider = {
                          e.name + " - sandboxing not available?", e);
         }
       }
-
-      if (this.isEnabled) {
-        telemetry[id] = {
-          userDisabled: wrapper.userDisabled,
-          version: wrapper.version,
-          applyBackgroundUpdates: wrapper.applyBackgroundUpdates,
-        };
-      }
     }
 
-    var emeEnabled = Preferences.get(GMPPrefs.KEY_EME_ENABLED, false);
-    if (emeEnabled) {
-      try {
-        let greDir = Services.dirsvc.get(NS_GRE_DIR,
-                                         Ci.nsILocalFile);
-        let clearkeyPath = OS.Path.join(greDir.path,
-                                        CLEARKEY_PLUGIN_ID,
-                                        CLEARKEY_VERSION);
-        this._log.info("startup - adding clearkey CDM directory " +
-                       clearkeyPath);
-        gmpService.addPluginDirectory(clearkeyPath);
-      } catch (e) {
-        this._log.warn("startup - adding clearkey CDM failed", e);
-      }
+    try {
+      let greDir = Services.dirsvc.get(NS_GRE_DIR,
+                                       Ci.nsILocalFile);
+      let clearkeyPath = OS.Path.join(greDir.path,
+                                      CLEARKEY_PLUGIN_ID,
+                                      CLEARKEY_VERSION);
+      this._log.info("startup - adding clearkey CDM directory " +
+                     clearkeyPath);
+      gmpService.addPluginDirectory(clearkeyPath);
+    } catch (e) {
+      this._log.warn("startup - adding clearkey CDM failed", e);
     }
-
-    AddonManagerPrivate.setTelemetryDetails("GMP", telemetry);
   },
 
   shutdown: function() {

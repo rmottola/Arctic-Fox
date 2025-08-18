@@ -1150,7 +1150,7 @@ this.PlacesUIUtils = {
         // This will throw if the annotation is an orphan.
         bs.removeItem(aItemId);
       }
-      catch(e) { /* orphan anno */ }
+      catch (e) { /* orphan anno */ }
     }
 
     // Returns true if item really exists, false otherwise.
@@ -1159,7 +1159,7 @@ this.PlacesUIUtils = {
         bs.getItemIndex(aItemId);
         return true;
       }
-      catch(e) {
+      catch (e) {
         return false;
       }
     }
@@ -1463,7 +1463,7 @@ this.PlacesUIUtils = {
         try {
           uri = PlacesUtils.bookmarks.getBookmarkURI(itemId);
         }
-        catch(ex) { }
+        catch (ex) { }
         return uri ? uri.spec : "";
       });
     }
@@ -1570,7 +1570,7 @@ XPCOMUtils.defineLazyGetter(PlacesUIUtils, "useAsyncTransactions", function() {
   try {
     return Services.prefs.getBoolPref("browser.places.useAsyncTransactions");
   }
-  catch(ex) { }
+  catch (ex) { }
   return false;
 });
 

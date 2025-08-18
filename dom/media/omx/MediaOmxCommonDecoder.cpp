@@ -165,6 +165,7 @@ void
 MediaOmxCommonDecoder::AudioOffloadTearDown()
 {
   MOZ_ASSERT(NS_IsMainThread());
+  MOZ_ASSERT(!IsShutdown());
   DECODER_LOG(LogLevel::Debug, ("%s", __PRETTY_FUNCTION__));
 
   // mAudioOffloadPlayer can be null here if ResumeStateMachine was called
@@ -223,14 +224,15 @@ MediaOmxCommonDecoder::ChangeState(PlayState aState)
 }
 
 void
-MediaOmxCommonDecoder::CallSeek(const SeekTarget& aTarget)
+MediaOmxCommonDecoder::CallSeek(const SeekTarget& aTarget, dom::Promise* aPromise)
 {
   if (!mAudioOffloadPlayer) {
-    MediaDecoder::CallSeek(aTarget);
+    MediaDecoder::CallSeek(aTarget, aPromise);
     return;
   }
 
-  mSeekRequest.DisconnectIfExists();
+  DiscardOngoingSeekIfExists();
+  mSeekDOMPromise = aPromise;
   mSeekRequest.Begin(mAudioOffloadPlayer->Seek(aTarget)
     ->Then(AbstractThread::MainThread(), __func__, static_cast<MediaDecoder*>(this),
            &MediaDecoder::OnSeekResolved, &MediaDecoder::OnSeekRejected));
@@ -283,6 +285,13 @@ MediaOmxCommonDecoder::CreateStateMachine()
     mReader->SetAudioChannel(GetAudioChannel());
   }
   return CreateStateMachineFromReader(mReader);
+}
+
+void
+MediaOmxCommonDecoder::Shutdown()
+{
+  mAudioOffloadPlayer = nullptr;
+  MediaDecoder::Shutdown();
 }
 
 } // namespace mozilla

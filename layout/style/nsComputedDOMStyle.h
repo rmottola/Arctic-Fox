@@ -404,6 +404,7 @@ private:
   already_AddRefed<CSSValue> DoGetImageRegion();
 
   /* Text Properties */
+  already_AddRefed<CSSValue> DoGetInitialLetter();
   already_AddRefed<CSSValue> DoGetLineHeight();
   already_AddRefed<CSSValue> DoGetRubyAlign();
   already_AddRefed<CSSValue> DoGetRubyPosition();
@@ -480,6 +481,7 @@ private:
   already_AddRefed<CSSValue> DoGetScrollSnapPointsY();
   already_AddRefed<CSSValue> DoGetScrollSnapDestination();
   already_AddRefed<CSSValue> DoGetScrollSnapCoordinate();
+  already_AddRefed<CSSValue> DoGetShapeOutside();
 
   /* User interface properties */
   already_AddRefed<CSSValue> DoGetCursor();
@@ -642,13 +644,21 @@ private:
   already_AddRefed<CSSValue> CreatePrimitiveValueForStyleFilter(
     const nsStyleFilter& aStyleFilter);
 
-  already_AddRefed<CSSValue> CreatePrimitiveValueForClipPath(
-    const nsStyleBasicShape* aStyleBasicShape,
-    mozilla::StyleClipShapeSizing aSizingBox);
+  template<typename ReferenceBox>
+  already_AddRefed<CSSValue>
+  GetShapeSource(const mozilla::StyleShapeSource<ReferenceBox>& aShapeSource,
+                 const KTableEntry aBoxKeywordTable[]);
+
+  template<typename ReferenceBox>
+  already_AddRefed<CSSValue>
+  CreatePrimitiveValueForShapeSource(
+    const mozilla::StyleBasicShape* aStyleBasicShape,
+    ReferenceBox aReferenceBox,
+    const KTableEntry aBoxKeywordTable[]);
 
   // Helper function for computing basic shape styles.
   already_AddRefed<CSSValue> CreatePrimitiveValueForBasicShape(
-    const nsStyleBasicShape* aStyleBasicShape);
+    const mozilla::StyleBasicShape* aStyleBasicShape);
   void BoxValuesToString(nsAString& aString,
                          const nsTArray<nsStyleCoord>& aBoxValues);
   void BasicShapeRadiiToString(nsAString& aCssText,

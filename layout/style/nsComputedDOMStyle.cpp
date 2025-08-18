@@ -2088,7 +2088,7 @@ nsComputedDOMStyle::SetValueToStyleImage(const nsStyleImage& aStyleImage,
       nsCOMPtr<nsIURI> uri;
       req->GetURI(getter_AddRefs(uri));
 
-      const nsStyleSides* cropRect = aStyleImage.GetCropRect();
+      const UniquePtr<nsStyleSides>& cropRect = aStyleImage.GetCropRect();
       if (cropRect) {
         nsAutoString imageRectString;
         GetImageRectString(uri, *cropRect, imageRectString);
@@ -3544,6 +3544,25 @@ nsComputedDOMStyle::DoGetImageRegion()
 }
 
 already_AddRefed<CSSValue>
+nsComputedDOMStyle::DoGetInitialLetter()
+{
+  const nsStyleTextReset* textReset = StyleTextReset();
+  RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
+  if (textReset->mInitialLetterSink == 0) {
+    val->SetIdent(eCSSKeyword_normal);
+    return val.forget();
+  } else {
+    RefPtr<nsDOMCSSValueList> valueList = GetROCSSValueList(false);
+    val->SetNumber(textReset->mInitialLetterSize);
+    valueList->AppendCSSValue(val.forget());
+    RefPtr<nsROCSSPrimitiveValue> second = new nsROCSSPrimitiveValue;
+    second->SetNumber(textReset->mInitialLetterSink);
+    valueList->AppendCSSValue(second.forget());
+    return valueList.forget();
+  }
+}
+
+already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetLineHeight()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
@@ -4156,7 +4175,7 @@ nsComputedDOMStyle::DoGetBoxSizing()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
   val->SetIdent(
-    nsCSSProps::ValueToKeywordEnum(uint8_t(StylePosition()->mBoxSizing),
+    nsCSSProps::ValueToKeywordEnum(StylePosition()->mBoxSizing,
                                    nsCSSProps::kBoxSizingKTable));
   return val.forget();
 }
@@ -5898,11 +5917,11 @@ nsComputedDOMStyle::BasicShapeRadiiToString(nsAString& aCssText,
 
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::CreatePrimitiveValueForBasicShape(
-  const nsStyleBasicShape* aStyleBasicShape)
+  const StyleBasicShape* aStyleBasicShape)
 {
   MOZ_ASSERT(aStyleBasicShape, "Expect a valid basic shape pointer!");
 
-  nsStyleBasicShape::Type type = aStyleBasicShape->GetShapeType();
+  StyleBasicShapeType type = aStyleBasicShape->GetShapeType();
   // Shape function name and opening parenthesis.
   nsAutoString shapeFunctionString;
   AppendASCIItoUTF16(nsCSSKeywords::GetStringValue(
@@ -5910,7 +5929,7 @@ nsComputedDOMStyle::CreatePrimitiveValueForBasicShape(
                      shapeFunctionString);
   shapeFunctionString.Append('(');
   switch (type) {
-    case nsStyleBasicShape::Type::ePolygon: {
+    case StyleBasicShapeType::Polygon: {
       bool hasEvenOdd = aStyleBasicShape->GetFillRule() ==
         NS_STYLE_FILL_RULE_EVENODD;
       if (hasEvenOdd) {
@@ -5932,11 +5951,11 @@ nsComputedDOMStyle::CreatePrimitiveValueForBasicShape(
       }
       break;
     }
-    case nsStyleBasicShape::Type::eCircle:
-    case nsStyleBasicShape::Type::eEllipse: {
+    case StyleBasicShapeType::Circle:
+    case StyleBasicShapeType::Ellipse: {
       const nsTArray<nsStyleCoord>& radii = aStyleBasicShape->Coordinates();
       MOZ_ASSERT(radii.Length() ==
-                 (type == nsStyleBasicShape::Type::eCircle ? 1 : 2),
+                 (type == StyleBasicShapeType::Circle ? 1 : 2),
                  "wrong number of radii");
       for (size_t i = 0; i < radii.Length(); ++i) {
         nsAutoString radius;
@@ -5957,7 +5976,7 @@ nsComputedDOMStyle::CreatePrimitiveValueForBasicShape(
       shapeFunctionString.Append(positionString);
       break;
     }
-    case nsStyleBasicShape::Type::eInset: {
+    case StyleBasicShapeType::Inset: {
       BoxValuesToString(shapeFunctionString, aStyleBasicShape->Coordinates());
       if (aStyleBasicShape->HasRadius()) {
         shapeFunctionString.AppendLiteral(" round ");
@@ -5976,10 +5995,12 @@ nsComputedDOMStyle::CreatePrimitiveValueForBasicShape(
   return functionValue.forget();
 }
 
+template<typename ReferenceBox>
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::CreatePrimitiveValueForClipPath(
-  const nsStyleBasicShape* aStyleBasicShape,
-  StyleClipShapeSizing aSizingBox)
+nsComputedDOMStyle::CreatePrimitiveValueForShapeSource(
+  const StyleBasicShape* aStyleBasicShape,
+  ReferenceBox aReferenceBox,
+  const KTableEntry aBoxKeywordTable[])
 {
   RefPtr<nsDOMCSSValueList> valueList = GetROCSSValueList(false);
   if (aStyleBasicShape) {
@@ -5987,41 +6008,40 @@ nsComputedDOMStyle::CreatePrimitiveValueForClipPath(
       CreatePrimitiveValueForBasicShape(aStyleBasicShape));
   }
 
-  if (aSizingBox == StyleClipShapeSizing::NoBox) {
+  if (aReferenceBox == ReferenceBox::NoBox) {
     return valueList.forget();
   }
 
-  nsAutoString boxString;
-  AppendASCIItoUTF16(
-    nsCSSProps::ValueToKeyword(uint8_t(aSizingBox),
-                               nsCSSProps::kClipShapeSizingKTable),
-                               boxString);
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  val->SetString(boxString);
+  val->SetIdent(nsCSSProps::ValueToKeywordEnum(aReferenceBox, aBoxKeywordTable));
   valueList->AppendCSSValue(val.forget());
 
   return valueList.forget();
 }
 
+template<typename ReferenceBox>
 already_AddRefed<CSSValue>
-nsComputedDOMStyle::DoGetClipPath()
+nsComputedDOMStyle::GetShapeSource(
+  const StyleShapeSource<ReferenceBox>& aShapeSource,
+  const KTableEntry aBoxKeywordTable[])
 {
-  const nsStyleSVGReset* svg = StyleSVGReset();
-  switch (svg->mClipPath.GetType()) {
-    case StyleClipPathType::Shape:
-      return CreatePrimitiveValueForClipPath(svg->mClipPath.GetBasicShape(),
-                                             svg->mClipPath.GetSizingBox());
-    case StyleClipPathType::Box:
-      return CreatePrimitiveValueForClipPath(nullptr,
-                                             svg->mClipPath.GetSizingBox());
-    case StyleClipPathType::URL: {
+  switch (aShapeSource.GetType()) {
+    case StyleShapeSourceType::Shape:
+      return CreatePrimitiveValueForShapeSource(aShapeSource.GetBasicShape(),
+                                                aShapeSource.GetReferenceBox(),
+                                                aBoxKeywordTable);
+    case StyleShapeSourceType::Box:
+      return CreatePrimitiveValueForShapeSource(nullptr,
+                                                aShapeSource.GetReferenceBox(),
+                                                aBoxKeywordTable);
+    case StyleShapeSourceType::URL: {
       // Bug 1288812 - we should only serialize fragment for local-ref URL.
-      nsCOMPtr<nsIURI> pathURI = svg->mClipPath.GetURL()->GetSourceURL();
+      nsCOMPtr<nsIURI> pathURI = aShapeSource.GetURL()->GetSourceURL();
       RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
       val->SetURI(pathURI);
       return val.forget();
     }
-    case StyleClipPathType::None_: {
+    case StyleShapeSourceType::None_: {
       RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
       val->SetIdent(eCSSKeyword_none);
       return val.forget();
@@ -6030,6 +6050,20 @@ nsComputedDOMStyle::DoGetClipPath()
       NS_NOTREACHED("unexpected type");
   }
   return nullptr;
+}
+
+already_AddRefed<CSSValue>
+nsComputedDOMStyle::DoGetClipPath()
+{
+  return GetShapeSource(StyleSVGReset()->mClipPath,
+                        nsCSSProps::kClipPathGeometryBoxKTable);
+}
+
+already_AddRefed<CSSValue>
+nsComputedDOMStyle::DoGetShapeOutside()
+{
+  return GetShapeSource(StyleDisplay()->mShapeOutside,
+                        nsCSSProps::kShapeOutsideShapeBoxKTable);
 }
 
 void

@@ -20,18 +20,56 @@ XPCOMUtils.defineLazyServiceGetter(
 const bundle = Services.strings.createBundle(
   'chrome://global/locale/aboutProfiles.properties');
 
+// nsIToolkitProfileService.selectProfile can be used only during the selection
+// of the profile in the ProfileManager. If we are showing about:profiles in a
+// tab, the selectedProfile returns the default profile.
+// In this function we use the ProfD to find the current profile.
+function findCurrentProfile() {
+  let cpd;
+  try {
+    cpd = Cc["@mozilla.org/file/directory_service;1"]
+            .getService(Ci.nsIProperties)
+            .get("ProfD", Ci.nsIFile);
+  } catch (e) {}
+
+  if (cpd) {
+    let itr = ProfileService.profiles;
+    while (itr.hasMoreElements()) {
+      let profile = itr.getNext().QueryInterface(Ci.nsIToolkitProfile);
+      if (profile.rootDir.path == cpd.path) {
+        return profile;
+      }
+    }
+  }
+
+  // selectedProfile can trow if nothing is selected or if the selected profile
+  // has been deleted.
+  try {
+    return ProfileService.selectedProfile;
+  } catch (e) {
+    return null;
+  }
+}
+
 function refreshUI() {
   let parent = document.getElementById('profiles');
   while (parent.firstChild) {
     parent.removeChild(parent.firstChild);
   }
 
+  let defaultProfile;
+  try {
+    defaultProfile = ProfileService.defaultProfile;
+  } catch (e) {}
+
+  let currentProfile = findCurrentProfile() || defaultProfile;
+
   let iter = ProfileService.profiles;
   while (iter.hasMoreElements()) {
     let profile = iter.getNext().QueryInterface(Ci.nsIToolkitProfile);
     display({ profile: profile,
-              isDefault: profile == ProfileService.defaultProfile,
-              isCurrentProfile: profile == ProfileService.selectedProfile });
+              isDefault: profile == defaultProfile,
+              isCurrentProfile: profile == currentProfile });
   }
 
   let createButton = document.getElementById('create-button');
@@ -181,7 +219,7 @@ function renameProfile(profile) {
 
     try {
       profile.name = newName;
-    } catch(e) {
+    } catch (e) {
       let title = bundle.GetStringFromName('invalidProfileNameTitle');
       let msg = bundle.formatStringFromName('invalidProfileName', [newName], 1);
       Services.prompt.alert(window, title, msg);

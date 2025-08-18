@@ -721,7 +721,7 @@ DataTransfer::SetDataAtInternal(const nsAString& aFormat, nsIVariant* aData,
     return NS_ERROR_TYPE_ERR;
   }
 
-  // Don't allow non-chrome to add non-string or file data. We block file
+  // Don't allow non-chrome to add non-string or file data. We'll block file
   // promises as well which are used internally for drags to the desktop.
   if (!nsContentUtils::IsSystemPrincipal(aSubjectPrincipal)) {
     if (aFormat.EqualsLiteral(kFilePromiseMime) ||

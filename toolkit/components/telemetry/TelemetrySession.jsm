@@ -214,7 +214,7 @@ var processInfo = {
     return null;
   },
   getCounters_Windows: function() {
-    if (!this._initialized){
+    if (!this._initialized) {
       Cu.import("resource://gre/modules/ctypes.jsm");
       this._IO_COUNTERS = new ctypes.StructType("IO_COUNTERS", [
         {'readOps': ctypes.unsigned_long_long},
@@ -239,7 +239,7 @@ var processInfo = {
       }
     }
     let io = new this._IO_COUNTERS();
-    if(!this._GetProcessIoCounters(this._GetCurrentProcess(), io.address()))
+    if (!this._GetProcessIoCounters(this._GetCurrentProcess(), io.address()))
       return null;
     return [parseInt(io.readBytes), parseInt(io.writeBytes)];
   }
@@ -397,7 +397,7 @@ var TelemetryScheduler = {
    */
   observe: function(aSubject, aTopic, aData) {
     this._log.trace("observe - aTopic: " + aTopic);
-    switch(aTopic) {
+    switch (aTopic) {
       case "idle":
         // If the user is idle, increase the tick interval.
         this._isUserIdle = true;
@@ -1319,6 +1319,10 @@ var Impl = {
         // Persist session data to disk (don't wait until it completes).
         let sessionData = this._getSessionDataObject();
         TelemetryStorage.saveSessionData(sessionData);
+
+        // Notify that there was a subsession split in the parent process. This is an
+        // internal topic and is only meant for internal Telemetry usage.
+        Services.obs.notifyObservers(null, "internal-telemetry-after-subsession-split", null);
       }
     }
 

@@ -142,11 +142,18 @@ function noaudio() {
 }
 
 function audio() {
+  info("Test : audio");
   var iframe = document.createElement('iframe');
   iframe.setAttribute('mozbrowser', 'true');
   iframe.src = 'chrome://mochitests/content/chrome/dom/browser-element/mochitest/iframe_file_audio.html';
 
   function audio_loadend() {
+    ok("mute" in iframe, "iframe.mute exists");
+    ok("unmute" in iframe, "iframe.unmute exists");
+    ok("getMuted" in iframe, "iframe.getMuted exists");
+    ok("getVolume" in iframe, "iframe.getVolume exists");
+    ok("setVolume" in iframe, "iframe.setVolume exists");
+
     ok("allowedAudioChannels" in iframe, "allowedAudioChannels exist");
     var channels = iframe.allowedAudioChannels;
     is(channels.length, 9, "9 audio channel by default");
@@ -163,6 +170,7 @@ function audio() {
     ac.onactivestatechanged = function() {
       ok(true, "activestatechanged event received.");
       ac.onactivestatechanged = null;
+      document.body.removeChild(iframe);
       runTests();
     }
   }
@@ -183,11 +191,9 @@ function runTests() {
   test();
 }
 
-
 addEventListener('testready', function() {
   SpecialPowers.pushPrefEnv({'set': [["b2g.system_startup_url", window.location.href]]},
                             function() {
     SimpleTest.executeSoon(runTests);
   });
 });
-

@@ -361,10 +361,11 @@ DeallocateTextureClient(TextureDeallocParams params)
 
 void TextureClient::Destroy(bool aForceSync)
 {
-  if (mActor) {
+  if (mActor && !mIsLocked) {
     mActor->Lock();
   }
 
+  mBorrowedDrawTarget = nullptr;
   mReadLock = nullptr;
 
   CancelWaitFenceHandleOnImageBridge();
@@ -520,7 +521,9 @@ TextureClient::Unlock()
     mUpdated = true;
   }
 
-  mData->Unlock();
+  if (mData) {
+    mData->Unlock();
+  }
   mIsLocked = false;
   mOpenMode = OpenMode::OPEN_NONE;
 

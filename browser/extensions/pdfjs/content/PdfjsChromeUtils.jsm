@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 /* jshint esnext:true */
-/* globals Components, Services, XPCOMUtils, DEFAULT_PREFERENCES */
+/* globals Components, Services, XPCOMUtils */
 
 'use strict';
 
@@ -35,23 +35,22 @@ XPCOMUtils.defineLazyServiceGetter(Svc, 'mime',
                                    '@mozilla.org/mime;1',
                                    'nsIMIMEService');
 
-
-var DEFAULT_PREFERENCES = {
-  showPreviousViewOnLoad: true,
-  defaultZoomValue: '',
-  sidebarViewOnLoad: 0,
-  enableHandToolOnLoad: false,
-  enableWebGL: false,
-  pdfBugEnabled: false,
-  disableRange: false,
-  disableStream: false,
-  disableAutoFetch: false,
-  disableFontFace: false,
-  disableTextLayer: false,
-  useOnlyCssZoom: false,
-  externalLinkTarget: 0,
-};
-
+var DEFAULT_PREFERENCES =
+{
+  "showPreviousViewOnLoad": true,
+  "defaultZoomValue": "",
+  "sidebarViewOnLoad": 0,
+  "enableHandToolOnLoad": false,
+  "enableWebGL": false,
+  "pdfBugEnabled": false,
+  "disableRange": false,
+  "disableStream": false,
+  "disableAutoFetch": false,
+  "disableFontFace": false,
+  "disableTextLayer": false,
+  "useOnlyCssZoom": false,
+  "externalLinkTarget": 0
+}
 
 var PdfjsChromeUtils = {
   // For security purposes when running remote, we restrict preferences
@@ -182,8 +181,7 @@ var PdfjsChromeUtils = {
   _findbarFromMessage: function(aMsg) {
     let browser = aMsg.target;
     let tabbrowser = browser.getTabBrowser();
-    let tab;
-    tab = tabbrowser.getTabForBrowser(browser);
+    let tab = tabbrowser.getTabForBrowser(browser);
     return tabbrowser.getFindBar(tab);
   },
 

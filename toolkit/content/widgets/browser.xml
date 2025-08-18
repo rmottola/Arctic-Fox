@@ -23,7 +23,7 @@
             try {
               enabled = this.mPrefs.getBoolPref("general.autoScroll");
             }
-            catch(ex) {
+            catch (ex) {
             }
 
             return enabled;
@@ -698,6 +698,24 @@
         </body>
       </method>
 
+      <method name="retrieveListOfBlockedPopups">
+        <body>
+          <![CDATA[
+          this.messageManager.sendAsyncMessage("PopupBlocking:GetBlockedPopupList", null);
+          return new Promise(resolve => {
+            let self = this;
+            this.messageManager.addMessageListener("PopupBlocking:ReplyGetBlockedPopupList",
+              function replyReceived(msg) {
+                self.messageManager.removeMessageListener("PopupBlocking:ReplyGetBlockedPopupList",
+                                                          replyReceived);
+                resolve(msg.data.popupData);
+              }
+            );
+          });
+          ]]>
+        </body>
+      </method>
+
       <method name="unblockPopup">
         <parameter name="aPopupIndex"/>
         <body><![CDATA[
@@ -915,7 +933,7 @@
               if (!this.hasAttribute("disableglobalhistory") && !this.isRemoteBrowser) {
                 try {
                   this.docShell.useGlobalHistory = true;
-                } catch(ex) {
+                } catch (ex) {
                   // This can occur if the Places database is locked
                   Components.utils.reportError("Error enabling browser global history: " + ex);
                 }
@@ -1010,17 +1028,11 @@
           let data = aMessage.data;
           switch (aMessage.name) {
             case "PopupBlocking:UpdateBlockedPopups": {
-              this.blockedPopups = data.blockedPopups;
-              if (this.blockedPopups) {
-                for (let i = 0; i < this.blockedPopups.length; i++) {
-                  let scope = Components.utils.import("resource://gre/modules/BrowserUtils.jsm", {});
-                  let uri = scope.BrowserUtils.makeURI(this.blockedPopups[i].popupWindowURI);
-                  this.blockedPopups[i].popupWindowURI = uri;
-                }
-                if (data.freshPopup) {
-                  this.blockedPopups.reported = false;
-                }
-              }
+              this.blockedPopups = {
+                length: data.count,
+                reported: !data.freshPopup,
+              };
+
               this.updateBlockedPopups();
               break;
             }
@@ -1167,7 +1179,7 @@
         <body>
         <![CDATA[
           if (this._scrolling) {
-            switch(aEvent.type) {
+            switch (aEvent.type) {
               case "mousemove": {
                 var x = aEvent.screenX - this._startX;
                 var y = aEvent.screenY - this._startY;
@@ -1310,7 +1322,7 @@
           try {
             this.QueryInterface(Components.interfaces.nsIFrameLoaderOwner)
                 .swapFrameLoaders(aOtherBrowser);
-          } catch(ex) {
+          } catch (ex) {
             // This may not be implemented for browser elements that are not
             // attached to a BrowserDOMWindow.
           }

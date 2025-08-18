@@ -25,8 +25,9 @@ Cu.importGlobalProperties(["TextEncoder"]);
 
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/ExtensionContent.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "ExtensionStorage",
+                                  "resource://gre/modules/ExtensionStorage.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Locale",
                                   "resource://gre/modules/Locale.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Log",
@@ -75,6 +76,9 @@ var {
 } = ExtensionUtils;
 
 const LOGGER_ID_BASE = "addons.webextension.";
+const UUID_MAP_PREF = "extensions.webextensions.uuids";
+const LEAVE_STORAGE_PREF = "extensions.webextensions.keepStorageOnUninstall";
+const LEAVE_UUID_PREF = "extensions.webextensions.keepUuidOnUninstall";
 
 const COMMENT_REGEXP = new RegExp(String.raw`
     ^
@@ -449,22 +453,108 @@ let ParentAPIManager = {
 
 ParentAPIManager.init();
 
+// All moz-extension URIs use a machine-specific UUID rather than the
+// extension's own ID in the host component. This makes it more
+// difficult for web pages to detect whether a user has a given add-on
+// installed (by trying to load a moz-extension URI referring to a
+// web_accessible_resource from the extension). UUIDMap.get()
+// returns the UUID for a given add-on ID.
+var UUIDMap = {
+  _read() {
+    let pref = Preferences.get(UUID_MAP_PREF, "{}");
+    try {
+      return JSON.parse(pref);
+    } catch (e) {
+      Cu.reportError(`Error parsing ${UUID_MAP_PREF}.`);
+      return {};
+    }
+  },
+
+  _write(map) {
+    Preferences.set(UUID_MAP_PREF, JSON.stringify(map));
+  },
+
+  get(id, create = true) {
+    let map = this._read();
+
+    if (id in map) {
+      return map[id];
+    }
+
+    let uuid = null;
+    if (create) {
+      let uuidGenerator = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
+      uuid = uuidGenerator.generateUUID().number;
+      uuid = uuid.slice(1, -1); // Strip { and } off the UUID.
+
+      map[id] = uuid;
+      this._write(map);
+    }
+    return uuid;
+  },
+
+  remove(id) {
+    let map = this._read();
+    delete map[id];
+    this._write(map);
+  },
+};
+
+// This is the old interface that UUIDMap replaced, to be removed when
+// the references listed in bug 1291399 are updated.
+/* exported getExtensionUUID */
+function getExtensionUUID(id) {
+  return UUIDMap.get(id, true);
+}
+
 // For extensions that have called setUninstallURL(), send an event
 // so the browser can display the URL.
-let UninstallObserver = {
+var UninstallObserver = {
   initialized: false,
 
-  init: function() {
+  init() {
     if (!this.initialized) {
       AddonManager.addAddonListener(this);
+      XPCOMUtils.defineLazyPreferenceGetter(this, "leaveStorage", LEAVE_STORAGE_PREF, false);
+      XPCOMUtils.defineLazyPreferenceGetter(this, "leaveUuid", LEAVE_UUID_PREF, false);
       this.initialized = true;
     }
   },
 
-  onUninstalling: function(addon) {
+  onUninstalling(addon) {
     let extension = GlobalManager.extensionMap.get(addon.id);
     if (extension) {
+      // Let any other interested listeners respond
+      // (e.g., display the uninstall URL)
       Management.emit("uninstall", extension);
+    }
+  },
+
+  onUninstalled(addon) {
+    let uuid = UUIDMap.get(addon.id, false);
+    if (!uuid) {
+      return;
+    }
+
+    if (!this.leaveStorage) {
+      // Clear browser.local.storage
+      ExtensionStorage.clear(addon.id);
+
+      // Clear any IndexedDB storage created by the extension
+      let baseURI = NetUtil.newURI(`moz-extension://${uuid}/`);
+      let principal = Services.scriptSecurityManager.createCodebasePrincipal(
+        baseURI, {addonId: addon.id}
+      );
+      Services.qms.clearStoragesForPrincipal(principal);
+
+      // Clear localStorage created by the extension
+      let attrs = JSON.stringify({addonId: addon.id});
+      Services.obs.notifyObservers(null, "clear-origin-data", attrs);
+    }
+
+    if (!this.leaveUuid) {
+      // Clear the entry in the UUID map
+      UUIDMap.remove(addon.id);
     }
   },
 };
@@ -474,11 +564,13 @@ GlobalManager = {
   // Map[extension ID -> Extension]. Determines which extension is
   // responsible for content under a particular extension ID.
   extensionMap: new Map(),
+  initialized: false,
 
   init(extension) {
     if (this.extensionMap.size == 0) {
       Services.obs.addObserver(this, "content-document-global-created", false);
       UninstallObserver.init();
+      this.initialized = true;
     }
 
     this.extensionMap.set(extension.id, extension);
@@ -487,8 +579,9 @@ GlobalManager = {
   uninit(extension) {
     this.extensionMap.delete(extension.id);
 
-    if (this.extensionMap.size == 0) {
+    if (this.extensionMap.size == 0 && this.initialized) {
       Services.obs.removeObserver(this, "content-document-global-created");
+      this.initialized = false;
     }
   },
 
@@ -672,36 +765,6 @@ GlobalManager = {
   },
 };
 
-// All moz-extension URIs use a machine-specific UUID rather than the
-// extension's own ID in the host component. This makes it more
-// difficult for web pages to detect whether a user has a given add-on
-// installed (by trying to load a moz-extension URI referring to a
-// web_accessible_resource from the extension). getExtensionUUID
-// returns the UUID for a given add-on ID.
-function getExtensionUUID(id) {
-  const PREF_NAME = "extensions.webextensions.uuids";
-
-  let pref = Preferences.get(PREF_NAME, "{}");
-  let map = {};
-  try {
-    map = JSON.parse(pref);
-  } catch (e) {
-    Cu.reportError(`Error parsing ${PREF_NAME}.`);
-  }
-
-  if (id in map) {
-    return map[id];
-  }
-
-  let uuidGenerator = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
-  let uuid = uuidGenerator.generateUUID().number;
-  uuid = uuid.slice(1, -1); // Strip { and } off the UUID.
-
-  map[id] = uuid;
-  Preferences.set(PREF_NAME, JSON.stringify(map));
-  return uuid;
-}
-
 // Represents the data contained in an extension, contained either
 // in a directory or a zip file, which may or may not be installed.
 // This class implements the functionality of the Extension class,
@@ -756,7 +819,7 @@ ExtensionData.prototype = {
       throw new Error("getURL may not be called before an `id` or `uuid` has been set");
     }
     if (!this.uuid) {
-      this.uuid = getExtensionUUID(this.id);
+      this.uuid = UUIDMap.get(this.id);
     }
     return `moz-extension://${this.uuid}/${path}`;
   },
@@ -1032,7 +1095,7 @@ ExtensionData.prototype = {
 this.Extension = function(addonData) {
   ExtensionData.call(this, addonData.resourceURI);
 
-  this.uuid = getExtensionUUID(addonData.id);
+  this.uuid = UUIDMap.get(addonData.id);
 
   if (addonData.cleanupFile) {
     Services.obs.addObserver(this, "xpcom-shutdown", false);
@@ -1186,11 +1249,13 @@ this.Extension.generateXPI = function(id, data) {
  * @param {string} id
  * @param {nsIFile} file
  * @param {nsIURI} rootURI
+ * @param {string} installType
  */
-function MockExtension(id, file, rootURI) {
+function MockExtension(id, file, rootURI, installType) {
   this.id = id;
   this.file = file;
   this.rootURI = rootURI;
+  this.installType = installType;
 
   let promiseEvent = eventName => new Promise(resolve => {
     let onstartup = (msg, extension) => {
@@ -1227,10 +1292,28 @@ MockExtension.prototype = {
   },
 
   startup() {
-    return AddonManager.installTemporaryAddon(this.file).then(addon => {
-      this.addon = addon;
-      return this._readyPromise;
-    });
+    if (this.installType == "temporary") {
+      return AddonManager.installTemporaryAddon(this.file).then(addon => {
+        this.addon = addon;
+        return this._readyPromise;
+      });
+    } else if (this.installType == "permanent") {
+      return new Promise((resolve, reject) => {
+        AddonManager.getInstallForFile(this.file, install => {
+          let listener = {
+            onInstallFailed: reject,
+            onInstallEnded: (install, newAddon) => {
+              this.addon = newAddon;
+              resolve(this._readyPromise);
+            },
+          };
+
+          install.addListener(listener);
+          install.install();
+        });
+      });
+    }
+    throw new Error("installType must be one of: temporary, permanent");
   },
 
   shutdown() {
@@ -1261,8 +1344,9 @@ this.Extension.generate = function(id, data) {
   let fileURI = Services.io.newFileURI(file);
   let jarURI = Services.io.newURI("jar:" + fileURI.spec + "!/", null, null);
 
+  // This may be "temporary" or "permanent".
   if (data.useAddonManager) {
-    return new MockExtension(id, file, jarURI);
+    return new MockExtension(id, file, jarURI, data.useAddonManager);
   }
 
   return new Extension({

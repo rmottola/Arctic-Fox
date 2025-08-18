@@ -364,6 +364,9 @@ public:
     if (mVideoDevice) {
       mVideoDevice->GetSource()->GetSettings(aOutSettings);
     }
+    if (mAudioDevice) {
+      mAudioDevice->GetSource()->GetSettings(aOutSettings);
+    }
   }
 
   // implement in .cpp to avoid circular dependency with MediaOperationTask
@@ -1621,7 +1624,7 @@ already_AddRefed<MediaManager::PledgeSourceSet>
 MediaManager::EnumerateRawDevices(uint64_t aWindowId,
                                   MediaSourceEnum aVideoType,
                                   MediaSourceEnum aAudioType,
-                                  bool aFake, bool aFakeTracks)
+                                  bool aFake)
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aVideoType != MediaSourceEnum::Other ||
@@ -1642,15 +1645,9 @@ MediaManager::EnumerateRawDevices(uint64_t aWindowId,
     }
   }
 
-  if (!aFake) {
-    // Fake tracks only make sense when we have a fake stream.
-    aFakeTracks = false;
-  }
-
   MediaManager::PostTask(NewTaskFrom([id, aWindowId, audioLoopDev,
                                       videoLoopDev, aVideoType,
-                                      aAudioType, aFake,
-                                      aFakeTracks]() mutable {
+                                      aAudioType, aFake]() mutable {
     // Only enumerate what's asked for, and only fake cams and mics.
     bool hasVideo = aVideoType != MediaSourceEnum::Other;
     bool hasAudio = aAudioType != MediaSourceEnum::Other;
@@ -1659,7 +1656,7 @@ MediaManager::EnumerateRawDevices(uint64_t aWindowId,
 
     RefPtr<MediaEngine> fakeBackend, realBackend;
     if (fakeCams || fakeMics) {
-      fakeBackend = new MediaEngineDefault(aFakeTracks);
+      fakeBackend = new MediaEngineDefault();
     }
     if ((!fakeCams && hasVideo) || (!fakeMics && hasAudio)) {
       RefPtr<MediaManager> manager = MediaManager_GetInstance();
@@ -2081,7 +2078,7 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
     return NS_ERROR_UNEXPECTED;
   }
   bool loop = IsLoop(docURI);
-  bool privileged = loop || IsPrivileged();
+  bool privileged = IsPrivileged();
   bool isHTTPS = false;
   docURI->SchemeIs("https", &isHTTPS);
   nsCString host;
@@ -2182,7 +2179,7 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
               ) ||
 #endif
             (!privileged && !HostIsHttps(*docURI)) ||
-            !(loop || HostHasPermission(*docURI))) {
+            !HostHasPermission(*docURI)) {
           RefPtr<MediaStreamError> error =
               new MediaStreamError(aWindow,
                                    NS_LITERAL_STRING("NotAllowedError"));
@@ -2226,16 +2223,6 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
           }
         }
       }
-    }
-
-    // For all but tab sharing, Loop needs to prompt as we are using the
-    // permission menu for selection of the device currently. For tab sharing,
-    // Loop has implicit permissions within Firefox, as it is built-in,
-    // and will manage the active tab and provide appropriate UI.
-    if (loop && (videoType == MediaSourceEnum::Window ||
-                 videoType == MediaSourceEnum::Application ||
-                 videoType == MediaSourceEnum::Screen)) {
-       privileged = false;
     }
   } else if (IsOn(c.mVideo)) {
     videoType = MediaSourceEnum::Camera;
@@ -2356,14 +2343,11 @@ MediaManager::GetUserMedia(nsPIDOMWindowInner* aWindow,
   bool fake = c.mFake.WasPassed()? c.mFake.Value() :
       Preferences::GetBool("media.navigator.streams.fake");
 
-  bool fakeTracks = c.mFakeTracks.WasPassed()? c.mFakeTracks.Value() : false;
-
   bool askPermission = !privileged &&
       (!fake || Preferences::GetBool("media.navigator.permission.fake"));
 
   RefPtr<PledgeSourceSet> p = EnumerateDevicesImpl(windowID, videoType,
-                                                   audioType, fake,
-                                                   fakeTracks);
+                                                   audioType, fake);
   p->Then([this, onSuccess, onFailure, windowID, c, listener, askPermission,
            prefs, isHTTPS, callID, origin](SourceSet*& aDevices) mutable {
 
@@ -2550,7 +2534,7 @@ already_AddRefed<MediaManager::PledgeSourceSet>
 MediaManager::EnumerateDevicesImpl(uint64_t aWindowId,
                                    MediaSourceEnum aVideoType,
                                    MediaSourceEnum aAudioType,
-                                   bool aFake, bool aFakeTracks)
+                                   bool aFake)
 {
   MOZ_ASSERT(NS_IsMainThread());
   nsPIDOMWindowInner* window =
@@ -2579,13 +2563,12 @@ MediaManager::EnumerateDevicesImpl(uint64_t aWindowId,
   RefPtr<Pledge<nsCString>> p = media::GetOriginKey(origin, privateBrowsing,
                                                       persist);
   p->Then([id, aWindowId, aVideoType, aAudioType,
-           aFake, aFakeTracks](const nsCString& aOriginKey) mutable {
+           aFake](const nsCString& aOriginKey) mutable {
     MOZ_ASSERT(NS_IsMainThread());
     RefPtr<MediaManager> mgr = MediaManager_GetInstance();
 
-    RefPtr<PledgeSourceSet> p = mgr->EnumerateRawDevices(aWindowId,
-                                                         aVideoType, aAudioType,
-                                                         aFake, aFakeTracks);
+    RefPtr<PledgeSourceSet> p = mgr->EnumerateRawDevices(aWindowId, aVideoType,
+                                                         aAudioType, aFake);
     p->Then([id, aWindowId, aOriginKey](SourceSet*& aDevices) mutable {
       UniquePtr<SourceSet> devices(aDevices); // secondary result
 

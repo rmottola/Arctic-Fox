@@ -288,7 +288,7 @@ toolbar[mode="icons"] > #reload-button[displaystop] {
   background-position: top right;
 }
 
-media not all and (min-resolution: 1.1dppx) {
+@media not all and (min-resolution: 1.1dppx) {
   .webextension-browser-action {
     list-style-image: var(--webextension-toolbar-image);
   }
@@ -1037,7 +1037,8 @@ toolbarbutton[pmkit-button="true"] > .toolbarbutton-badge-container > .toolbarbu
 
 /* Give this menupopup an arrow panel styling */
 /* disable because Mac has transparency issues otherwise
-menuitems are really transparent against white background.
+menuitems are really transparent against white background. */
+%if 0
 #BMB_bookmarksPopup {
   -moz-appearance: none;
   -moz-binding: url("chrome://browser/content/places/menu.xml#places-popup-arrow");
@@ -1045,7 +1046,49 @@ menuitems are really transparent against white background.
   border: none;
   /* The popup inherits -moz-image-region from the button, must reset it */
   -moz-image-region: auto;
-} */
+}
+#endif
+
+%ifndef MOZ_WIDGET_GTK
+
+#BMB_bookmarksPopup {
+  transform: scale(.4);
+  opacity: 0;
+  transition-property: transform, opacity;
+  transition-duration: 0.15s;
+  transition-timing-function: ease-out;
+}
+
+#BMB_bookmarksPopup[animate="open"] {
+  transform: none;
+  opacity: 1.0;
+}
+
+#BMB_bookmarksPopup[animate="cancel"] {
+  transform: none;
+}
+
+#BMB_bookmarksPopup[arrowposition="after_start"]:-moz-locale-dir(ltr),
+#BMB_bookmarksPopup[arrowposition="after_end"]:-moz-locale-dir(rtl) {
+  transform-origin: 20px top;
+}
+
+#BMB_bookmarksPopup[arrowposition="after_end"]:-moz-locale-dir(ltr),
+#BMB_bookmarksPopup[arrowposition="after_start"]:-moz-locale-dir(rtl) {
+  transform-origin: calc(100% - 20px) top;
+}
+
+#BMB_bookmarksPopup[arrowposition="before_start"]:-moz-locale-dir(ltr),
+#BMB_bookmarksPopup[arrowposition="before_end"]:-moz-locale-dir(rtl) {
+  transform-origin: 20px bottom;
+}
+
+#BMB_bookmarksPopup[arrowposition="before_end"]:-moz-locale-dir(ltr),
+#BMB_bookmarksPopup[arrowposition="before_start"]:-moz-locale-dir(rtl) {
+  transform-origin: calc(100% - 20px) bottom;
+}
+
+%endif
 
 .popup-notification-invalid-input {
   box-shadow: 0 0 1.5px 1px red;

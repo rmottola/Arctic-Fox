@@ -84,7 +84,42 @@ function debug(str) {
   dump(' -*- Shell.js: ' + str + '\n');
 }
 
-function debugCrashReport(aStr) {}
+const once = event => {
+  let target = shell.contentBrowser;
+  return new Promise((resolve, reject) => {
+    target.addEventListener(event, function gotEvent(evt) {
+      target.removeEventListener(event, gotEvent, false);
+      resolve(evt);
+    }, false);
+  });
+}
+
+function clearCache() {
+  let cache = Cc["@mozilla.org/netwerk/cache-storage-service;1"]
+                .getService(Ci.nsICacheStorageService);
+  cache.clear();
+}
+
+function clearCacheAndReload() {
+  // Reload the main frame with a cleared cache.
+  debug('Reloading ' + shell.contentBrowser.contentWindow.location);
+  clearCache();
+  shell.contentBrowser.contentWindow.location.reload(true);
+  once('mozbrowserlocationchange').then(
+    evt => {
+      shell.sendEvent(window, "ContentStart");
+    });
+}
+
+function restart() {
+  let appStartup = Cc['@mozilla.org/toolkit/app-startup;1']
+                     .getService(Ci.nsIAppStartup);
+  appStartup.quit(Ci.nsIAppStartup.eForceQuit | Ci.nsIAppStartup.eRestart);
+}
+
+function debugCrashReport(aStr) {
+  AppConstants.MOZ_CRASHREPORTER && dump('Crash reporter : ' + aStr);
+}
 
 var shell = {
 
@@ -359,14 +394,12 @@ var shell = {
 
     let audioChannels = systemAppFrame.allowedAudioChannels;
     audioChannels && audioChannels.forEach(function(audioChannel) {
-      this.allowedAudioChannels.set(audioChannel.name, audioChannel);
-      audioChannel.addEventListener('activestatechanged', this);
       // Set all audio channels as unmuted by default
       // because some audio in System app will be played
       // before AudioChannelService[1] is Gaia is loaded.
       // [1]: https://github.com/mozilla-b2g/gaia/blob/master/apps/system/js/audio_channel_service.js
       audioChannel.setMuted(false);
-    }.bind(this));
+    });
 
     // On firefox mulet, shell.html is loaded in a tab
     // and we have to listen on the chrome event handler
@@ -604,7 +637,7 @@ var shell = {
           let manifestURI = Services.io.newURI(manifest, null, documentURI);
           let updateService = Cc['@mozilla.org/offlinecacheupdate-service;1']
                               .getService(Ci.nsIOfflineCacheUpdateService);
-          updateService.scheduleUpdate(manifestURI, documentURI, window);
+          updateService.scheduleUpdate(manifestURI, documentURI, principal, window);
         } catch (e) {
           dump('Error while creating offline cache: ' + e + '\n');
         }
@@ -620,18 +653,6 @@ var shell = {
         break;
       case 'unload':
         this.stop();
-        break;
-      case 'activestatechanged':
-        var channel = evt.target;
-        // TODO: We should get the `isActive` state from evt.isActive.
-        // Then we don't need to do `channel.isActive()` here.
-        channel.isActive().onsuccess = function(evt) {
-          SystemAppProxy._sendCustomEvent('mozSystemWindowChromeEvent', {
-            type: 'system-audiochannel-state-changed',
-            name: channel.name,
-            isActive: evt.target.result
-          });
-        }.bind(this);
         break;
     }
   },

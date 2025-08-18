@@ -357,6 +357,13 @@ struct AndroidSystemInfo
     bool     isTablet;
 };
 
+struct BlobURLRegistrationData
+{
+    nsCString url;
+    PBlob blob;
+    Principal principal;
+};
+
 prio(normal upto urgent) sync protocol PContent
 {
     parent spawns PPluginModule;
@@ -534,6 +541,11 @@ child:
      */
     async InitServiceWorkers(ServiceWorkerConfiguration aConfig);
 
+    /**
+     * Send BlobURLRegistrationData to child process.
+     */
+    async InitBlobURLs(BlobURLRegistrationData[] registrations);
+
     // Notify child that last-pb-context-exited notification was observed
     async LastPrivateDocShellDestroyed();
 
@@ -660,6 +672,12 @@ child:
     async SetAudioSessionData(nsID aID,
                               nsString aDisplayName,
                               nsString aIconPath);
+
+    async BlobURLRegistration(nsCString aURI, PBlob aBlob,
+                              Principal aPrincipal);
+
+    async BlobURLUnregistration(nsCString aURI);
+
 parent:
     /**
      * Tell the content process some attributes of itself.  This is
@@ -1170,6 +1188,11 @@ parent:
      * sent with a crash report from the content process.
      */
      async NotifyLowMemory();
+
+     async StoreAndBroadcastBlobURLRegistration(nsCString url, PBlob blob,
+                                                Principal principal);
+
+     async UnstoreAndBroadcastBlobURLUnregistration(nsCString url);
 
 both:
      async AsyncMessage(nsString aMessage, CpowEntry[] aCpows,
