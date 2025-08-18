@@ -160,7 +160,7 @@ function display(profileData) {
   };
   div.appendChild(renameButton);
 
-  if (gManage || !profileData.isCurrentProfile) {
+  if (!profileData.isCurrentProfile) {
     let removeButton = document.createElement('button');
     removeButton.appendChild(document.createTextNode(bundle.GetStringFromName('remove')));
     removeButton.onclick = function() {
