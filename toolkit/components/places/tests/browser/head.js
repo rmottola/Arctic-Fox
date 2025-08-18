@@ -157,7 +157,7 @@ function addVisits(aPlaceInfo, aWindow, aCallback, aStack) {
     places,
     {
       handleError: function AAV_handleError() {
-        throw("Unexpected error in adding visit.");
+        throw ("Unexpected error in adding visit.");
       },
       handleResult: function () {},
       handleCompletion: function UP_handleCompletion() {

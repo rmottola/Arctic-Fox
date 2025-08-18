@@ -1437,7 +1437,7 @@ var CustomizableUIInternal = {
           aFormatArgs.length) || def;
       }
       return gWidgetsBundle.GetStringFromName(name) || def;
-    } catch(ex) {
+    } catch (ex) {
       // If an empty string was explicitly passed, treat it as an actual
       // value rather than a missing property.
       if (!def && (name != "" || kReqStringProps.includes(aProp))) {
@@ -1508,7 +1508,7 @@ var CustomizableUIInternal = {
     if (aWidget.onClick) {
       try {
         aWidget.onClick.call(null, aEvent);
-      } catch(e) {
+      } catch (e) {
         Cu.reportError(e);
       }
     } else {
@@ -1942,7 +1942,7 @@ var CustomizableUIInternal = {
       if (typeof gSavedState != "object" || gSavedState === null) {
         throw "Invalid saved state";
       }
-    } catch(e) {
+    } catch (e) {
       Services.prefs.clearUserPref(kPrefCustomizationState);
       gSavedState = {};
       log.debug("Error loading saved UI customization state, falling back to defaults.");
@@ -2522,7 +2522,7 @@ var CustomizableUIInternal = {
       gUIStateBeforeReset.drawInTitlebar = Services.prefs.getBoolPref(kPrefDrawInTitlebar);
       gUIStateBeforeReset.uiCustomizationState = Services.prefs.getCharPref(kPrefCustomizationState);
       gUIStateBeforeReset.currentTheme = LightweightThemeManager.currentTheme;
-    } catch(e) { }
+    } catch (e) { }
 
     this._resetExtraToolbars();
 
@@ -2784,7 +2784,7 @@ var CustomizableUIInternal = {
       return false;
     }
 
-    if(LightweightThemeManager.currentTheme) {
+    if (LightweightThemeManager.currentTheme) {
       log.debug(LightweightThemeManager.currentTheme + " theme is non-default");
       return false;
     }
@@ -4083,7 +4083,7 @@ OverflowableToolbar.prototype = {
   },
 
   handleEvent: function(aEvent) {
-    switch(aEvent.type) {
+    switch (aEvent.type) {
       case "aftercustomization":
         this._enable();
         break;

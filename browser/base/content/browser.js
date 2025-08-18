@@ -1214,7 +1214,7 @@ var gBrowserInit = {
             gBrowser.updateBrowserRemoteness(gBrowser.selectedBrowser, false);
           }
           gBrowser.swapBrowsersAndCloseOther(gBrowser.selectedTab, tabToOpen);
-        } catch(e) {
+        } catch (e) {
           Cu.reportError(e);
         }
       }
@@ -1829,7 +1829,7 @@ function gotoHistoryIndex(aEvent) {
     try {
       gBrowser.gotoIndex(index);
     }
-    catch(ex) {
+    catch (ex) {
       return false;
     }
     return true;
@@ -1848,7 +1848,7 @@ function BrowserForward(aEvent) {
     try {
       gBrowser.goForward();
     }
-    catch(ex) {
+    catch (ex) {
     }
   }
   else {
@@ -1863,7 +1863,7 @@ function BrowserBack(aEvent) {
     try {
       gBrowser.goBack();
     }
-    catch(ex) {
+    catch (ex) {
     }
   }
   else {
@@ -2070,7 +2070,7 @@ var gLastOpenDirectory = {
         if (!this._lastDir.exists())
           this._lastDir = null;
       }
-      catch(e) {}
+      catch (e) {}
     }
     return this._lastDir;
   },
@@ -2078,7 +2078,7 @@ var gLastOpenDirectory = {
     try {
       if (!val || !val.isDirectory())
         return;
-    } catch(e) {
+    } catch (e) {
       return;
     }
     this._lastDir = val.clone();
@@ -3233,7 +3233,7 @@ function getDefaultHomePage() {
     // If url is a pipe-delimited set of pages, just take the first one.
     if (url.includes("|"))
       url = url.split("|")[0];
-  } catch(e) {
+  } catch (e) {
     Components.utils.reportError("Couldn't get homepage pref: " + e);
   }
   return url;
@@ -5886,7 +5886,7 @@ function contentAreaClick(event, isPanelClick)
       try {
         urlSecurityCheck(href, linkNode.ownerDocument.nodePrincipal);
       }
-      catch(ex) {
+      catch (ex) {
         // Prevent loading unsecure destinations.
         event.preventDefault();
         return;
@@ -6810,7 +6810,7 @@ function convertFromUnicode(charset, str)
     unicodeConverter.charset = charset;
     str = unicodeConverter.ConvertFromUnicode(str);
     return str + unicodeConverter.Finish();
-  } catch(ex) {
+  } catch (ex) {
     return null;
   }
 }

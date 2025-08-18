@@ -1493,7 +1493,7 @@ CustomizeMode.prototype = {
   },
 
   handleEvent: function(aEvent) {
-    switch(aEvent.type) {
+    switch (aEvent.type) {
       case "toolbarvisibilitychange":
         this._onToolbarVisibilityChange(aEvent);
         break;

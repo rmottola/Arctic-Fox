@@ -30,11 +30,11 @@ function findCurrentProfile() {
     cpd = Cc["@mozilla.org/file/directory_service;1"]
             .getService(Ci.nsIProperties)
             .get("ProfD", Ci.nsIFile);
-  } catch(e) {}
+  } catch (e) {}
 
   if (cpd) {
     let itr = ProfileService.profiles;
-    while(itr.hasMoreElements()) {
+    while (itr.hasMoreElements()) {
       let profile = itr.getNext().QueryInterface(Ci.nsIToolkitProfile);
       if (profile.rootDir.path == cpd.path) {
         return profile;
@@ -46,7 +46,7 @@ function findCurrentProfile() {
   // has been deleted.
   try {
     return ProfileService.selectedProfile;
-  } catch(e) {
+  } catch (e) {
     return null;
   }
 }
@@ -56,6 +56,11 @@ function refreshUI() {
   while (parent.firstChild) {
     parent.removeChild(parent.firstChild);
   }
+
+  let defaultProfile;
+  try {
+    defaultProfile = ProfileService.defaultProfile;
+  } catch (e) {}
 
   let currentProfile = findCurrentProfile() || defaultProfile;
 
@@ -94,7 +99,7 @@ function display(profileData) {
   name.appendChild(document.createTextNode(nameStr));
   div.appendChild(name);
 
-  if (!gManage && profileData.isCurrentProfile) {
+  if (profileData.isCurrentProfile) {
     let currentProfile = document.createElement('h3');
     let currentProfileStr = bundle.GetStringFromName('currentProfile');
     currentProfile.appendChild(document.createTextNode(currentProfileStr));
@@ -214,7 +219,7 @@ function renameProfile(profile) {
 
     try {
       profile.name = newName;
-    } catch(e) {
+    } catch (e) {
       let title = bundle.GetStringFromName('invalidProfileNameTitle');
       let msg = bundle.formatStringFromName('invalidProfileName', [newName], 1);
       Services.prompt.alert(window, title, msg);

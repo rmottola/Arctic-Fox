@@ -188,7 +188,7 @@ this.BrowserUITelemetry = {
   },
 
   observe: function(aSubject, aTopic, aData) {
-    switch(aTopic) {
+    switch (aTopic) {
       case "sessionstore-windows-restored":
         this._gatherFirstWindowMeasurements();
         break;
@@ -348,7 +348,7 @@ this.BrowserUITelemetry = {
   },
 
   handleEvent: function(aEvent) {
-    switch(aEvent.type) {
+    switch (aEvent.type) {
       case "unload":
         this._unregisterWindow(aEvent.currentTarget);
         break;

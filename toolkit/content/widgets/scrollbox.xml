@@ -562,7 +562,7 @@
           if (childNodes && childNodes.length)
             this.ensureElementIsVisible(childNodes[0], false);
         }
-        catch(e) {
+        catch (e) {
           this.removeAttribute("notoverflowing");
         }
       ]]></handler>
@@ -596,7 +596,7 @@
           // as the whole overflow event should not be happening in that case.
           this._updateScrollButtonsDisabledState();
         }
-        catch(e) {
+        catch (e) {
           this.setAttribute("notoverflowing", "true");
         }
       ]]></handler>

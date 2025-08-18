@@ -487,7 +487,7 @@ function cleanUpdatesDir(aDir) {
         } catch (e) {
           logTestInfo("cleanUpdatesDir: unable to remove directory. Path: " +
                       entry.path + ", Exception: " + e);
-          throw(e);
+          throw (e);
         }
       }
     } else {
@@ -497,7 +497,7 @@ function cleanUpdatesDir(aDir) {
       } catch (e) {
        logTestInfo("cleanUpdatesDir: unable to remove file. Path: " +
                    entry.path + ", Exception: " + e);
-        throw(e);
+        throw (e);
       }
     }
   }
@@ -537,7 +537,7 @@ function removeDirRecursive(aDir) {
         entry.remove(false);
       } catch (e) {
         logTestInfo("error removing file. Exception: " + e);
-        throw(e);
+        throw (e);
       }
     }
   }
@@ -548,7 +548,7 @@ function removeDirRecursive(aDir) {
     aDir.remove(true);
   } catch (e) {
     logTestInfo("error removing directory. Exception: " + e);
-    throw(e);
+    throw (e);
   }
 }
 
