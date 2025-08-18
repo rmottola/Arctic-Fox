@@ -736,7 +736,7 @@ nsDefaultCommandLineHandler.prototype = {
           this._haveProfile = true;
         }
         catch (e) {
-          while ((ar = cmdLine.handleFlagWithParam("url", false))) { }
+          while ((ar = cmdLine.handleFlagWithParam("url", false)));
           cmdLine.preventDefault = true;
         }
       }
