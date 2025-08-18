@@ -552,10 +552,10 @@
             <image id="servicesInstall-notification-icon" class="notification-anchor-icon" role="button"/>
 	    <image id="translate-notification-icon" class="notification-anchor-icon" role="button"/>
           </box>
-          <!-- Use onclick instead of normal popup= syntax since the popup
-               code fires onmousedown, and hence eats our favicon drag events.
-               We only add the identity-box button to the tab order when the location bar
-               has focus, otherwise pressing F6 focuses it instead of the location bar -->
+              <!-- Use onclick instead of normal popup= syntax since the popup
+                   code fires onmousedown, and hence eats our favicon drag events.
+                   We only add the identity-box button to the tab order when the location bar
+                   has focus, otherwise pressing F6 focuses it instead of the location bar -->
               <box id="identity-box" role="button"
                    align="center"
                    aria-label="&urlbar.viewSiteInfo.label;"
@@ -736,6 +736,7 @@
                     key="manBookmarkKb"/>
           <menuseparator/>
             <menuitem label="&recentBookmarks.label;"
+                      id="BMB_recentBookmarks"
                       disabled="true"
                       class="subviewbutton"/>
             <vbox id="BMB_recentBookmarks"/>
@@ -1028,12 +1029,6 @@
 #endif
     </toolbar>
 
-    <hbox id="downloads-animation-container" mousethrough="always">
-      <vbox id="downloads-notification-anchor">
-        <vbox id="downloads-indicator-notification"/>
-      </vbox>
-    </hbox>
-
     <toolbarpalette id="BrowserToolbarPalette">
 
 # Update primaryToolbarButtons in browser/themes/shared/browser.inc when adding
@@ -1042,25 +1037,6 @@
       <toolbarbutton id="print-button" class="toolbarbutton-1 chromeclass-toolbar-additional"
                      label="&printButton.label;" command="cmd_print"
                      tooltiptext="&printButton.tooltip;"/>
-
-      <!-- This is a placeholder for the Downloads Indicator.  It is visible
-           during the customization of the toolbar, in the palette, and before
-           the Downloads Indicator overlay is loaded. -->
-      <toolbarbutton id="downloads-button" class="toolbarbutton-1 chromeclass-toolbar-additional"
-                     oncommand="DownloadsIndicatorView.onCommand(event);"
-                     ondrop="DownloadsIndicatorView.onDrop(event);"
-                     ondragover="DownloadsIndicatorView.onDragOver(event);"
-                     ondragenter="DownloadsIndicatorView.onDragOver(event);"
-                     xmlns:xbl="http://www.mozilla.org/xbl"
-                     label="&downloads.label;"
-                     tooltiptext="&downloads.tooltip;">
-        <!-- We need a different binding for the notification and progress bar, which means
-             we don't get these for free. Adding them in our binding loses them when dragging
-             to the customize window, so we add them in here as 'real' children -->
-        <image class="toolbarbutton-icon" xbl:inherits="validate,src=image,label"/>
-        <label class="toolbarbutton-text" crop="right" flex="1"
-               xbl:inherits="value=label,accesskey,crop"/>
-      </toolbarbutton>
 
       <toolbarbutton id="history-button" class="toolbarbutton-1 chromeclass-toolbar-additional"
                      observes="viewHistorySidebar" label="&historyButton.label;"
