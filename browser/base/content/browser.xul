@@ -463,7 +463,7 @@
              toolbarname="&navbarCmd.label;" accesskey="&navbarCmd.accesskey;"
              fullscreentoolbar="true" mode="icons" customizable="true"
              iconsize="large"
-             defaultset="unified-back-forward-button,reload-button,stop-button,home-button,urlbar-container,search-container,bookmarks-menu-button,history-menu-button,downloads-button,window-controls"
+             defaultset="unified-back-forward-button,reload-button,stop-button,home-button,urlbar-container,search-container,bookmarks-menu-button,history-menu-button,window-controls"
              context="toolbar-context-menu">
 
       <toolbaritem id="unified-back-forward-button" class="chromeclass-toolbar-additional"
