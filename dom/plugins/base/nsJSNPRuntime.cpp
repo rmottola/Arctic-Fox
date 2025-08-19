@@ -337,7 +337,7 @@ RegisterGCCallbacks()
   }
 
   // Register a callback to trace wrapped JSObjects.
-  JSContext* cx = JS_GetContext(xpc::GetJSRuntime());
+  JSContext* cx = dom::danger::GetJSContext();
   if (!JS_AddExtraGCRootsTracer(cx, TraceJSObjWrappers, nullptr)) {
     return false;
   }
@@ -357,7 +357,7 @@ UnregisterGCCallbacks()
   MOZ_ASSERT(sCallbackIsRegistered);
 
   // Remove tracing callback.
-  JSContext* cx = JS_GetContext(xpc::GetJSRuntime());
+  JSContext* cx = dom::danger::GetJSContext();
   JS_RemoveExtraGCRootsTracer(cx, TraceJSObjWrappers, nullptr);
 
   // Remove delayed destruction callback.
