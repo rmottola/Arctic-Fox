@@ -2149,7 +2149,7 @@ public:
         : mTrans(trans)
     {}
 
-    NS_IMETHOD Run()
+    NS_IMETHOD Run() override
     {
         delete mTrans;
         return NS_OK;

@@ -675,8 +675,8 @@ public:
     mOnFailure.swap(aOnFailure);
   }
 
-  NS_IMETHODIMP
-  Run()
+  NS_IMETHOD
+  Run() override
   {
     MOZ_ASSERT(NS_IsMainThread());
 
@@ -719,7 +719,7 @@ public:
     , mListener(aListener) {}
 
   NS_IMETHOD
-  Run()
+  Run() override
   {
     MOZ_ASSERT(NS_IsMainThread());
     RefPtr<MediaManager> manager(MediaManager::GetInstance());
@@ -1072,7 +1072,7 @@ public:
   };
 
   NS_IMETHOD
-  Run()
+  Run() override
   {
     MOZ_ASSERT(NS_IsMainThread());
     auto* globalWindow = nsGlobalWindow::GetInnerWindowWithId(mWindowID);
