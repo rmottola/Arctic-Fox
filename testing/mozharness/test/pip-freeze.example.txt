@@ -15,5 +15,5 @@ nose==1.1.2
 pyflakes==0.5.0
 pylint==0.25.1
 -e hg+https://hg.mozilla.org/build/talos@ee5c0b090d808e81a8fc5ba5f96b012797b3e785#egg=talos-dev
-virtualenv==1.7.1.2
+virtualenv==20.26.6
 wsgiref==0.1.2
