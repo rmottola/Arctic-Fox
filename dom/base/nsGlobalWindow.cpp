@@ -2265,7 +2265,7 @@ NS_DEFINE_STATIC_IID_ACCESSOR(WindowStateHolder, WINDOWSTATEHOLDER_IID)
 
 WindowStateHolder::WindowStateHolder(nsGlobalWindow* aWindow)
   : mInnerWindow(aWindow),
-    mInnerWindowReflector(nsContentUtils::RootingCx(), aWindow->GetWrapper())
+    mInnerWindowReflector(RootingCx(), aWindow->GetWrapper())
 {
   NS_PRECONDITION(aWindow, "null window");
   NS_PRECONDITION(aWindow->IsInnerWindow(), "Saving an outer window");
@@ -3635,8 +3635,7 @@ nsGlobalWindow::DefineArgumentsProperty(nsIArray *aArguments)
   nsIScriptContext *ctx = GetOuterWindowInternal()->mContext;
   NS_ENSURE_TRUE(aArguments && ctx, NS_ERROR_NOT_INITIALIZED);
 
-  JS::Rooted<JSObject*> obj(nsContentUtils::RootingCx(),
-                            GetWrapperPreserveColor());
+  JS::Rooted<JSObject*> obj(RootingCx(), GetWrapperPreserveColor());
   return ctx->SetProperty(obj, "arguments", aArguments);
 }
 
@@ -9066,7 +9065,7 @@ nsGlobalWindow::NotifyDOMWindowThawed(nsGlobalWindow* aWindow) {
 JSObject*
 nsGlobalWindow::GetCachedXBLPrototypeHandler(nsXBLPrototypeHandler* aKey)
 {
-  JS::Rooted<JSObject*> handler(nsContentUtils::RootingCx());
+  JS::Rooted<JSObject*> handler(RootingCx());
   if (mCachedXBLPrototypeHandlers) {
     mCachedXBLPrototypeHandlers->Get(aKey, handler.address());
   }

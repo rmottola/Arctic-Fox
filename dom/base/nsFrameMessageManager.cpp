@@ -1865,7 +1865,7 @@ nsMessageManagerScriptExecutor::TryCacheLoadAndCompileScript(
   const nsAString& aURL,
   bool aRunInGlobalScope)
 {
-  JS::Rooted<JSScript*> script(nsContentUtils::RootingCx());
+  JS::Rooted<JSScript*> script(RootingCx());
   TryCacheLoadAndCompileScript(aURL, aRunInGlobalScope, true, &script);
 }
 
