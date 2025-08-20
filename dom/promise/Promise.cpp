@@ -999,7 +999,7 @@ Promise::PerformMicroTaskCheckpoint()
     return false;
   }
 
-  AutoSafeJSContext cx;
+  AutoSlowOperation aso;
 
   do {
     nsCOMPtr<nsIRunnable> runnable = microtaskQueue.front().forget();
@@ -1011,7 +1011,7 @@ Promise::PerformMicroTaskCheckpoint()
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return false;
     }
-    JS_CheckForInterrupt(cx);
+    aso.CheckForInterrupt();
     runtime->AfterProcessMicrotask();
   } while (!microtaskQueue.empty());
 
