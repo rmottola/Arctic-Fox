@@ -163,7 +163,7 @@
 #endif
 
 #ifdef ACCESSIBILITY
-#include "nsIAccessibilityService.h"
+#include "nsAccessibilityService.h"
 #endif
 
 #ifndef MOZ_SIMPLEPUSH
@@ -2465,8 +2465,7 @@ ContentChild::RecvActivateA11y()
 #ifdef ACCESSIBILITY
   // Start accessibility in content process if it's running in chrome
   // process.
-  nsCOMPtr<nsIAccessibilityService> accService =
-    services::GetAccessibilityService();
+  GetOrCreateAccService();
 #endif
   return true;
 }
