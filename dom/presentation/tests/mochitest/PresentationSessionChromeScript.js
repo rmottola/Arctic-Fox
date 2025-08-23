@@ -201,8 +201,8 @@ const mockedDevicePrompt = {
   simulateSelect: function() {
     this._request.select(mockedDevice);
   },
-  simulateCancel: function() {
-    this._request.cancel();
+  simulateCancel: function(result) {
+    this._request.cancel(result);
   }
 };
 
@@ -385,8 +385,8 @@ addMessageListener('trigger-device-prompt-select', function() {
   mockedDevicePrompt.simulateSelect();
 });
 
-addMessageListener('trigger-device-prompt-cancel', function() {
-  mockedDevicePrompt.simulateCancel();
+addMessageListener('trigger-device-prompt-cancel', function(result) {
+  mockedDevicePrompt.simulateCancel(result);
 });
 
 addMessageListener('trigger-incoming-session-request', function(url) {
