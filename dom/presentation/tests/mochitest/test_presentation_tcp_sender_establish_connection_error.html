@@ -126,9 +126,9 @@ function testStartConnectionUnexpectedControlChannelCloseBeforeDataTransportInit
     request.start().then(
       function(aConnection) {
         is(aConnection.state, "connecting", "The initial state should be connecting.");
-        aConnection.onterminate = function() {
-          aConnection.onterminate = null;
-          is(aConnection.state, "terminated", "Connection should be terminated.");
+        aConnection.onclose = function() {
+          aConnection.onclose = null;
+          is(aConnection.state, "closed", "Connection should be closed.");
           aResolve();
         };
       },
@@ -174,9 +174,9 @@ function testStartConnectionUnexpectedControlChannelCloseNoReasonBeforeDataTrans
     request.start().then(
       function(aConnection) {
         is(aConnection.state, "connecting", "The initial state should be connecting.");
-        aConnection.onterminate = function() {
-          aConnection.onterminate = null;
-          is(aConnection.state, "terminated", "Connection should be terminated.");
+        aConnection.onclose = function() {
+          aConnection.onclose = null;
+          is(aConnection.state, "closed", "Connection should be closed.");
           aResolve();
         };
       },
@@ -233,9 +233,9 @@ function testStartConnectionUnexpectedControlChannelCloseBeforeDataTransportRead
     request.start().then(
       function(aConnection) {
         is(aConnection.state, "connecting", "The initial state should be connecting.");
-        aConnection.onterminate = function() {
-          aConnection.onterminate = null;
-          is(aConnection.state, "terminated", "Connection should be terminated.");
+        aConnection.onclose = function() {
+          aConnection.onclose = null;
+          is(aConnection.state, "closed", "Connection should be closed.");
           aResolve();
         };
       },
@@ -292,9 +292,9 @@ function testStartConnectionUnexpectedControlChannelCloseNoReasonBeforeDataTrans
     request.start().then(
       function(aConnection) {
         is(aConnection.state, "connecting", "The initial state should be connecting.");
-        aConnection.onterminate = function() {
-          aConnection.onterminate = null;
-          is(aConnection.state, "terminated", "Connection should be terminated.");
+        aConnection.onclose = function() {
+          aConnection.onclose = null;
+          is(aConnection.state, "closed", "Connection should be closed.");
           aResolve();
         };
       },
@@ -351,9 +351,9 @@ function testStartConnectionUnexpectedDataTransportClose() {
     request.start().then(
       function(aConnection) {
         is(aConnection.state, "connecting", "The initial state should be connecting.");
-        aConnection.onterminate = function() {
-          aConnection.onterminate = null;
-          is(aConnection.state, "terminated", "Connection should be terminated.");
+        aConnection.onclose = function() {
+          aConnection.onclose = null;
+          is(aConnection.state, "closed", "Connection should be closed.");
           aResolve();
         };
       },
