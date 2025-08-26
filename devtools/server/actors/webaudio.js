@@ -451,6 +451,9 @@ var WebAudioActor = exports.WebAudioActor = protocol.ActorClass(webAudioSpec, {
     this._nativeToActorID.clear();
 
     if (this._initialized) {
+      if (reload) {
+        this.tabActor.window.location.reload();
+      }
       return;
     }
 
