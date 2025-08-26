@@ -17,7 +17,7 @@
 }
 
 .tabs .tabs-menu-item {
-  float: inline-start;
+  display: inline-block;
 }
 
 .tabs .tabs-menu-item a {
