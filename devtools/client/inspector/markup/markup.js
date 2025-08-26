@@ -3420,9 +3420,9 @@ ElementEditor.prototype = {
           let newAttributeIndex;
           if (isDeletedAttribute) {
             newAttributeIndex = attributeIndex;
-          } else if (direction == Ci.nsIFocusManager.MOVEFOCUS_FORWARD) {
+          } else if (direction == Services.focus.MOVEFOCUS_FORWARD) {
             newAttributeIndex = attributeIndex + 1;
-          } else if (direction == Ci.nsIFocusManager.MOVEFOCUS_BACKWARD) {
+          } else if (direction == Services.focus.MOVEFOCUS_BACKWARD) {
             newAttributeIndex = attributeIndex - 1;
           }
 
