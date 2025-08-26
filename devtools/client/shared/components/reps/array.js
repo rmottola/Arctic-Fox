@@ -31,7 +31,7 @@ define(function (require, exports, module) {
       let items = [];
       let delim;
 
-      for (let i = 0; i < array.length && i <= max; i++) {
+      for (let i = 0; i < array.length && i < max; i++) {
         try {
           let value = array[i];
 
@@ -60,14 +60,12 @@ define(function (require, exports, module) {
       }
 
       if (array.length > max) {
-        items.pop();
-
         let objectLink = this.props.objectLink || DOM.span;
         items.push(Caption({
           key: "more",
           object: objectLink({
             object: this.props.object
-          }, "more…")
+          }, (array.length - max) + " more…")
         }));
       }
 

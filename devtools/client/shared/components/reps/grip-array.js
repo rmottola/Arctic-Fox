@@ -58,7 +58,7 @@ define(function (require, exports, module) {
       let delim;
       let provider = this.props.provider;
 
-      for (let i = 0; i < array.length && i <= max; i++) {
+      for (let i = 0; i < array.length && i < max; i++) {
         try {
           let itemGrip = array[i];
           let value = provider ? provider.getValue(itemGrip) : itemGrip;
@@ -88,13 +88,12 @@ define(function (require, exports, module) {
       }
 
       if (array.length > max) {
-        items.pop();
         let objectLink = this.props.objectLink || span;
         items.push(Caption({
           key: "more",
           object: objectLink({
             object: this.props.object
-          }, "more…")
+          }, (grip.preview.length - max) + " more…")
         }));
       }
 
