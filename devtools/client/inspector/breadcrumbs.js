@@ -480,7 +480,7 @@ HTMLBreadcrumbs.prototype = {
     } else if (event.type == "mouseover") {
       this.handleMouseOver(event);
     } else if (event.type == "mouseout") {
-      this.handleMouseLeave(event);
+      this.handleMouseOut(event);
     } else if (event.type == "focus") {
       this.handleFocus(event);
     }
