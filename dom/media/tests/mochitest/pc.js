@@ -125,9 +125,6 @@ function timerGuard(p, time, message) {
 
 /**
  * Closes the peer connection if it is active
- *
- * @param {Function} onSuccess
- *        Callback to execute when the peer connection has been closed successfully
  */
 PeerConnectionTest.prototype.closePC = function() {
   info("Closing peer connections");
@@ -137,13 +134,29 @@ PeerConnectionTest.prototype.closePC = function() {
       return Promise.resolve();
     }
 
-    return new Promise(resolve => {
-      pc.onsignalingstatechange = e => {
-        is(e.target.signalingState, "closed", "signalingState is closed");
-        resolve();
-      };
-      pc.close();
-    });
+    var promise = Promise.all([
+      new Promise(resolve => {
+        pc.onsignalingstatechange = e => {
+          is(e.target.signalingState, "closed", "signalingState is closed");
+          resolve();
+        };
+      }),
+      Promise.all(pc._pc.getReceivers()
+        .filter(receiver => receiver.track.readyState == "live")
+        .map(receiver => {
+          info("Waiting for track " + receiver.track.id + " (" +
+               receiver.track.kind + ") to end.");
+          return haveEvent(receiver.track, "ended", wait(50000))
+            .then(event => {
+              is(event.target, receiver.track, "Event target should be the correct track");
+              info("ended fired for track " + receiver.track.id);
+            }, e => e ? Promise.reject(e)
+                      : ok(false, "ended never fired for track " +
+                                    receiver.track.id));
+        }))
+    ]);
+    pc.close();
+    return promise;
   };
 
   return timerGuard(Promise.all([
@@ -228,11 +241,21 @@ PeerConnectionTest.prototype.send = function(data, options) {
            this.pcLocal.dataChannels[this.pcLocal.dataChannels.length - 1];
   var target = options.targetChannel ||
            this.pcRemote.dataChannels[this.pcRemote.dataChannels.length - 1];
+  var bufferedamount = options.bufferedAmountLowThreshold || 0;
+  var bufferlow_fired = true; // to make testing later easier
+  if (bufferedamount != 0) {
+    source.bufferedAmountLowThreshold = bufferedamount;
+    bufferlow_fired = false;
+    source.onbufferedamountlow = function() {
+      bufferlow_fired = true;
+    };
+  }
 
   return new Promise(resolve => {
     // Register event handler for the target channel
-    target.onmessage = e => {
-      resolve({ channel: target, data: e.data });
+      target.onmessage = e => {
+        ok(bufferlow_fired, "bufferedamountlow event fired");
+	resolve({ channel: target, data: e.data });
     };
 
     source.send(data);
@@ -402,6 +425,7 @@ function(peer, desc, stateExpected) {
 
   var stateChanged = peer.setRemoteDescription(desc).then(() => {
     peer.setRemoteDescDate = new Date();
+    peer.checkMediaTracks();
   });
 
   return Promise.all([eventFired, stateChanged]);
@@ -442,19 +466,22 @@ PeerConnectionTest.prototype.run = function() {
   /* We have to modify the chain here to allow tests which modify the default
    * test chain instantiating a PeerConnectionTest() */
   this.updateChainSteps();
+  var finished = () => {
+    if (window.SimpleTest) {
+      networkTestFinished();
+    } else {
+      finish();
+    }
+  };
   return this.chain.execute()
     .then(() => this.close())
-    .then(() => {
-      if (window.SimpleTest) {
-        networkTestFinished();
-      } else {
-        finish();
-      }
-    })
     .catch(e =>
-           ok(false, 'Error in test execution: ' + e +
-              ((typeof e.stack === 'string') ?
-               (' ' + e.stack.split('\n').join(' ... ')) : '')));
+      ok(false, 'Error in test execution: ' + e +
+         ((typeof e.stack === 'string') ?
+          (' ' + e.stack.split('\n').join(' ... ')) : '')))
+    .then(() => finished())
+    .catch(e =>
+      ok(false, "Error in finished()"));
 };
 
 /**
@@ -577,6 +604,7 @@ function DataChannelWrapper(dataChannel, peerConnectionWrapper) {
   createOneShotEventWrapper(this, this._channel, 'close');
   createOneShotEventWrapper(this, this._channel, 'error');
   createOneShotEventWrapper(this, this._channel, 'message');
+  createOneShotEventWrapper(this, this._channel, 'bufferedamountlow');
 
   this.opened = timerGuard(new Promise(resolve => {
     this._channel.onopen = () => {
@@ -652,6 +680,16 @@ DataChannelWrapper.prototype = {
    */
   get readyState() {
     return this._channel.readyState;
+  },
+
+  /**
+   * Sets the bufferlowthreshold of the channel
+   *
+   * @param {integer} amoutn
+   *        The new threshold for the chanel
+   */
+  set bufferedAmountLowThreshold(amount) {
+    this._channel.bufferedAmountLowThreshold = amount;
   },
 
   /**
@@ -859,7 +897,10 @@ PeerConnectionWrapper.prototype = {
       streamId: stream.id,
     };
 
-    this.ensureMediaElement(track, stream, "local");
+    // This will create one media element per track, which might not be how
+    // we set up things with the RTCPeerConnection. It's the only way
+    // we can ensure all sent tracks are flowing however.
+    this.ensureMediaElement(track, new MediaStream([track]), "local");
 
     return this.observedNegotiationNeeded;
   },
@@ -986,9 +1027,6 @@ PeerConnectionWrapper.prototype = {
 
   /**
    * Creates an offer and automatically handles the failure case.
-   *
-   * @param {function} onSuccess
-   *        Callback to execute if the offer was created successfully
    */
   createOffer : function() {
     return this._pc.createOffer(this.offerOptions).then(offer => {
@@ -1114,28 +1152,22 @@ PeerConnectionWrapper.prototype = {
     observedTrackInfoById[track.id] = expectedTrackInfoById[track.id];
   },
 
+  isTrackOnPC: function(track) {
+    return this._pc.getRemoteStreams().some(s => !!s.getTrackById(track.id));
+  },
+
   allExpectedTracksAreObserved: function(expected, observed) {
     return Object.keys(expected).every(trackId => observed[trackId]);
   },
 
   setupTrackEventHandler: function() {
-    var resolveAllTrackEventsDone;
-
-    // checkMediaTracks waits on this promise later on in the test.
-    this.allTrackEventsDonePromise =
-      new Promise(resolve => resolveAllTrackEventsDone = resolve);
-
     this._pc.addEventListener('track', event => {
       info(this + ": 'ontrack' event fired for " + JSON.stringify(event.track));
 
       this.checkTrackIsExpected(event.track,
                                 this.expectedRemoteTrackInfoById,
                                 this.observedRemoteTrackInfoById);
-
-      if (this.allExpectedTracksAreObserved(this.expectedRemoteTrackInfoById,
-                                            this.observedRemoteTrackInfoById)) {
-        resolveAllTrackEventsDone();
-      }
+      ok(this.isTrackOnPC(event.track), "Found track " + event.track.id);
 
       this.ensureMediaElement(event.track, event.streams[0], 'remote');
     });
@@ -1317,9 +1349,6 @@ PeerConnectionWrapper.prototype = {
 
   /**
    * Checks that we are getting the media tracks we expect.
-   *
-   * @param {object} constraints
-   *        The media constraints of the remote peer connection object
    */
   checkMediaTracks : function() {
     this.checkLocalMediaTracks();
@@ -1327,13 +1356,11 @@ PeerConnectionWrapper.prototype = {
     info(this + " Checking remote tracks " +
          JSON.stringify(this.expectedRemoteTrackInfoById));
 
-    // No tracks are expected
-    if (this.allExpectedTracksAreObserved(this.expectedRemoteTrackInfoById,
-                                          this.observedRemoteTrackInfoById)) {
-      return;
-    }
-
-    return timerGuard(this.allTrackEventsDonePromise, 60000, "The expected ontrack events never fired");
+    ok(this.allExpectedTracksAreObserved(this.expectedRemoteTrackInfoById,
+                                         this.observedRemoteTrackInfoById),
+       "All expected tracks have been observed"
+       + "\nexpected: " + JSON.stringify(this.expectedRemoteTrackInfoById)
+       + "\nobserved: " + JSON.stringify(this.observedRemoteTrackInfoById));
   },
 
   checkMsids: function() {
@@ -1359,7 +1386,11 @@ PeerConnectionWrapper.prototype = {
 
   rollbackRemoteTracksIfNotNegotiated: function() {
     Object.keys(this.observedRemoteTrackInfoById).forEach(
-        id => delete this.observedRemoteTrackInfoById[id]);
+        id => {
+          if (!this.observedRemoteTrackInfoById[id].negotiated) {
+            delete this.observedRemoteTrackInfoById[id];
+          }
+        });
   },
 
   /**
@@ -1429,10 +1460,10 @@ PeerConnectionWrapper.prototype = {
 
     info("Checking RTP packet flow for track " + track.id);
 
-    var retry = () => this._pc.getStats(track)
+    var retry = (delay) => this._pc.getStats(track)
       .then(stats => hasFlow(stats)? ok(true, "RTP flowing for track " + track.id) :
-                                     wait(200).then(retry));
-    return retry();
+            wait(delay).then(retry(1000)));
+    return retry(200);
   },
 
   /**
@@ -1467,7 +1498,7 @@ PeerConnectionWrapper.prototype = {
     // As input we use the stream of |from|'s first available audio sender.
     var inputSenderTracks = from._pc.getSenders().map(sn => sn.track);
     var inputAudioStream = from._pc.getLocalStreams()
-      .find(s => s.getAudioTracks().some(t => inputSenderTracks.some(t2 => t == t2)));
+      .find(s => inputSenderTracks.some(t => t.kind == "audio" && s.getTrackById(t.id)));
     var inputAnalyser = new AudioStreamAnalyser(audiocontext, inputAudioStream);
 
     // It would have been nice to have a working getReceivers() here, but until
