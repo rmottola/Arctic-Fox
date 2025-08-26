@@ -117,6 +117,7 @@ devtools/server/**
 !devtools/server/actors/string.js
 !devtools/server/actors/csscoverage.js
 devtools/shared/*.js
+!devtools/shared/async-storage.js
 !devtools/shared/css-lexer.js
 !devtools/shared/defer.js
 !devtools/shared/event-emitter.js
