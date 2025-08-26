@@ -21,7 +21,7 @@ function getFrameNodePath(root, path) {
     if (!node) {
       break;
     }
-    calls = node.calls;
+    calls = foundNode.calls;
   }
   return node;
 }
