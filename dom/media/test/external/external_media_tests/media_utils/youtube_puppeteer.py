@@ -6,6 +6,7 @@ from time import sleep
 import re
 from json import loads
 
+from marionette import Marionette
 from marionette_driver import By, expected, Wait
 from marionette_driver.errors import TimeoutException, NoSuchElementException
 from video_puppeteer import VideoPuppeteer, VideoException
@@ -14,9 +15,11 @@ from external_media_tests.utils import verbose_until
 
 class YouTubePuppeteer(VideoPuppeteer):
     """
-    Wrapper around a YouTube #movie_player element
+    Wrapper around a YouTube #movie_player element.
 
-    Partial reference: https://developers.google.com/youtube/js_api_reference
+    Partial reference: https://developers.google.com/youtube/js_api_reference.
+    This reference is useful for site-specific features such as interacting
+    with ads, or accessing YouTube's debug data.
     """
 
     _yt_player_state = {
@@ -37,7 +40,7 @@ class YouTubePuppeteer(VideoPuppeteer):
                              video_selector='#movie_player video',
                              **kwargs)
         wait = Wait(self.marionette, timeout=30)
-        with self.marionette.using_context('content'):
+        with self.marionette.using_context(Marionette.CONTEXT_CONTENT):
             verbose_until(wait, self,
                           expected.element_present(By.ID, 'movie_player'))
             self.player = self.marionette.find_element(By.ID, 'movie_player')
@@ -55,35 +58,47 @@ class YouTubePuppeteer(VideoPuppeteer):
         self.update_expected_duration()
 
     def player_play(self):
-        """ Play via YouTube API. """
+        """
+        Play via YouTube API.
+        """
         self.execute_yt_script('arguments[1].wrappedJSObject.playVideo();')
 
     def player_pause(self):
-        """ Pause via YouTube API. """
+        """
+        Pause via YouTube API.
+        """
         self.execute_yt_script('arguments[1].wrappedJSObject.pauseVideo();')
 
     @property
     def player_duration(self):
-        """ Duration in seconds via YouTube API.
+        """
+
+        :return: Duration in seconds via YouTube API.
         """
         return self.execute_yt_script('return arguments[1].'
                                       'wrappedJSObject.getDuration();')
 
     @property
     def player_current_time(self):
-        """ Current time in seconds via YouTube API.
+        """
+
+        :return: Current time in seconds via YouTube API.
         """
         return self.execute_yt_script('return arguments[1].'
                                       'wrappedJSObject.getCurrentTime();')
 
     @property
     def player_remaining_time(self):
-        """ Remaining time in seconds via YouTube API.
+        """
+
+        :return: Remaining time in seconds via YouTube API.
         """
         return self.expected_duration - self.player_current_time
 
     def player_measure_progress(self):
-        """ Playback progress in seconds via YouTube API.
+        """
+
+        :return: Playback progress in seconds via YouTube API.
         """
         initial = self.player_current_time
         sleep(1)
@@ -100,31 +115,46 @@ class YouTubePuppeteer(VideoPuppeteer):
                                     level='DEBUG')
 
     def execute_yt_script(self, script):
-        """ Execute JS script in 'content' context with access to video element and
+        """
+        Execute JS script in content context with access to video element and
         YouTube #movie_player element.
+
         :param script: script to be executed.
-        `arguments[0]` in script refers to video element, `arguments[1]` refers
-        to #movie_player element (YouTube).
+
         :return: value returned by script
         """
-        with self.marionette.using_context('content'):
+        with self.marionette.using_context(Marionette.CONTEXT_CONTENT):
             return self.marionette.execute_script(script,
                                                   script_args=[self.video,
                                                                self.player])
 
     @property
     def playback_quality(self):
+        """
+        Please see https://developers.google.com/youtube/js_api_reference#Playback_quality
+        for valid values.
+
+        :return: A string with a valid value returned via YouTube.
+        """
         return self.execute_yt_script('return arguments[1].'
                                       'wrappedJSObject.getPlaybackQuality();')
 
     @property
     def movie_id(self):
+        """
+
+        :return: The string that is the YouTube identifier.
+        """
         return self.execute_yt_script('return arguments[1].'
                                       'wrappedJSObject.'
                                       'getVideoData()["video_id"];')
 
     @property
     def movie_title(self):
+        """
+
+        :return: The title of the movie.
+        """
         title = self.execute_yt_script('return arguments[1].'
                                        'wrappedJSObject.'
                                        'getVideoData()["title"];')
@@ -134,41 +164,86 @@ class YouTubePuppeteer(VideoPuppeteer):
 
     @property
     def player_url(self):
+        """
+
+        :return: The YouTube URL for the currently playing video.
+        """
         return self.execute_yt_script('return arguments[1].'
                                       'wrappedJSObject.getVideoUrl();')
 
     @property
     def player_state(self):
+        """
+
+        :return: The YouTube state of the video. See
+         https://developers.google.com/youtube/js_api_reference#getPlayerState
+         for valid values.
+        """
         state = self.execute_yt_script('return arguments[1].'
                                        'wrappedJSObject.getPlayerState();')
         return state
 
     @property
     def player_unstarted(self):
+        """
+        This and the following properties are based on the
+        player.getPlayerState() call
+        (https://developers.google.com/youtube/js_api_reference#Playback_status)
+
+        :return: True if the video has not yet started.
+        """
         return self.player_state == self._yt_player_state['UNSTARTED']
 
     @property
     def player_ended(self):
+        """
+
+        :return: True if the video playback has ended.
+        """
         return self.player_state == self._yt_player_state['ENDED']
 
     @property
     def player_playing(self):
+        """
+
+        :return: True if the video is playing.
+        """
         return self.player_state == self._yt_player_state['PLAYING']
 
     @property
     def player_paused(self):
+        """
+
+        :return: True if the video is paused.
+        """
         return self.player_state == self._yt_player_state['PAUSED']
 
     @property
     def player_buffering(self):
+        """
+
+        :return: True if the video is currently buffering.
+        """
         return self.player_state == self._yt_player_state['BUFFERING']
 
     @property
     def player_cued(self):
+        """
+
+        :return: True if the video is cued.
+        """
         return self.player_state == self._yt_player_state['CUED']
 
     @property
     def ad_state(self):
+        """
+        Get state of current ad.
+
+        :return: Returns one of the constants listed in
+         https://developers.google.com/youtube/js_api_reference#Playback_status
+         for an ad.
+
+        """
         # Note: ad_state is sometimes not accurate, due to some sort of lag?
         return self.execute_yt_script('return arguments[1].'
                                       'wrappedJSObject.getAdState();')
@@ -183,7 +258,7 @@ class YouTubePuppeteer(VideoPuppeteer):
         state = self.get_ad_displaystate()
         ad_format = False
         if state:
-            with self.marionette.using_context('content'):
+            with self.marionette.using_context(Marionette.CONTEXT_CONTENT):
                 ad_format = self.marionette.execute_script("""
                     return arguments[0].adFormat;""",
                     script_args=[state])
@@ -191,10 +266,14 @@ class YouTubePuppeteer(VideoPuppeteer):
 
     @property
     def ad_skippable(self):
+        """
+
+        :return: True if the current ad is skippable.
+        """
         state = self.get_ad_displaystate()
         skippable = False
         if state:
-            with self.marionette.using_context('content'):
+            with self.marionette.using_context(Marionette.CONTEXT_CONTENT):
                 skippable = self.marionette.execute_script("""
                     return arguments[0].skippable;""",
                     script_args=[state])
@@ -209,7 +288,8 @@ class YouTubePuppeteer(VideoPuppeteer):
     @property
     def breaks_count(self):
         """
-        Number of upcoming ad breaks.
+
+        :return: Number of upcoming ad breaks.
         """
         breaks = self.execute_yt_script('return arguments[1].'
                                         'wrappedJSObject.'
@@ -219,18 +299,33 @@ class YouTubePuppeteer(VideoPuppeteer):
 
     @property
     def ad_inactive(self):
+        """
+
+        :return: True if the current ad is inactive.
+        """
         return (self.ad_ended or
                 self.ad_state == self._yt_player_state['UNSTARTED'])
 
     @property
     def ad_playing(self):
+        """
+
+        :return: True if an ad is playing.
+        """
         return self.ad_state == self._yt_player_state['PLAYING']
 
     @property
     def ad_ended(self):
+        """
+
+        :return: True if the current ad has ended.
+        """
         return self.ad_state == self._yt_player_state['ENDED']
 
     def process_ad(self):
+        """
+        Try to skip this ad. If not, wait for this ad to finish.
+        """
         if self.attempt_ad_skip() or self.ad_inactive:
             return
         ad_timeout = (self.search_ad_duration() or 30) + 5
@@ -245,9 +340,9 @@ class YouTubePuppeteer(VideoPuppeteer):
     def attempt_ad_skip(self):
         """
         Attempt to skip ad by clicking on skip-add button.
-        Return True if clicking of ad-skip button occurred.
+
+        :return: True if clicking of ad-skip button occurred.
         """
-        # Wait for ad to load and become skippable
         if self.ad_playing:
             self.marionette.log('Waiting while ad plays')
             sleep(10)
@@ -258,7 +353,7 @@ class YouTubePuppeteer(VideoPuppeteer):
             selector = '#movie_player .videoAdUiSkipContainer'
             wait = Wait(self.marionette, timeout=30)
             try:
-                with self.marionette.using_context('content'):
+                with self.marionette.using_context(Marionette.CONTEXT_CONTENT):
                     wait.until(expected.element_displayed(By.CSS_SELECTOR,
                                                           selector))
                     ad_button = self.marionette.find_element(By.CSS_SELECTOR,
@@ -274,6 +369,7 @@ class YouTubePuppeteer(VideoPuppeteer):
 
     def search_ad_duration(self):
         """
+
         :return: ad duration in seconds, if currently displayed in player
         """
         if not (self.ad_playing or self.player_measure_progress() == 0):
@@ -285,7 +381,7 @@ class YouTubePuppeteer(VideoPuppeteer):
         selector = '#movie_player .videoAdUiAttribution'
         wait = Wait(self.marionette, timeout=5)
         try:
-            with self.marionette.using_context('content'):
+            with self.marionette.using_context(Marionette.CONTEXT_CONTENT):
                 wait.until(expected.element_present(By.CSS_SELECTOR,
                                                     selector))
                 countdown = self.marionette.find_element(By.CSS_SELECTOR,
@@ -304,12 +400,12 @@ class YouTubePuppeteer(VideoPuppeteer):
     @property
     def player_stalled(self):
         """
-        :return True if playback is not making progress for 4-9 seconds. This
-        excludes ad breaks.
 
-        Note that the player might just be busy with buffering due to a slow
-        network.
+        :return: True if playback is not making progress for 4-9 seconds. This
+         excludes ad breaks. Note that the player might just be busy with
+         buffering due to a slow network.
         """
+
         # `current_time` stands still while ad is playing
         def condition():
             # no ad is playing and current_time stands still
@@ -328,7 +424,9 @@ class YouTubePuppeteer(VideoPuppeteer):
 
     def deactivate_autoplay(self):
         """
-        Attempt to turn off autoplay. Return True if successful.
+        Attempt to turn off autoplay.
+
+        :return: True if successful.
         """
         element_id = 'autoplay-checkbox'
         mn = self.marionette
@@ -339,7 +437,7 @@ class YouTubePuppeteer(VideoPuppeteer):
             return mn.execute_script(script, script_args=[el])
 
         try:
-            with mn.using_context('content'):
+            with mn.using_context(Marionette.CONTEXT_CONTENT):
                 # the width, height of the element are 0, so it's not visible
                 wait.until(expected.element_present(By.ID, element_id))
                 checkbox = mn.find_element(By.ID, element_id)
@@ -384,6 +482,7 @@ class YouTubePuppeteer(VideoPuppeteer):
 def playback_started(yt):
     """
     Check whether playback has started.
+
     :param yt: YouTubePuppeteer
     """
     # usually, ad is playing during initial buffering
@@ -399,6 +498,7 @@ def playback_started(yt):
 def playback_done(yt):
     """
     Check whether playback is done, skipping ads if possible.
+
     :param yt: YouTubePuppeteer
     """
     # in case ad plays at end of video

@@ -23,11 +23,9 @@ loader.lazyRequireGetter(this, "HeapSnapshotFileUtils",
  * because child processes are sandboxed and do not have access to the file
  * system.
  */
-exports.HeapSnapshotFileActor = protocol.ActorClassWithSpec(heapSnapshotFileSpec, {
+exports.HeapSnapshotFileActor = protocol.ActorClass(heapSnapshotFileSpec, {
   initialize: function (conn, parent) {
-    if (Services.appInfo &&
-        (Services.appInfo.processType !==
-         Services.appInfo.PROCESS_TYPE_DEFAULT)) {
+    if (Services.appinfo.processType !== Services.appinfo.PROCESS_TYPE_DEFAULT) {
       const err = new Error("Attempt to create a HeapSnapshotFileActor in a " +
                             "child process! The HeapSnapshotFileActor *MUST* " +
                             "be in the parent process!");

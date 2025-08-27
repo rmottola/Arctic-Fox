@@ -444,6 +444,9 @@ TextureClient::Lock(OpenMode aMode)
 {
   MOZ_ASSERT(IsValid());
   MOZ_ASSERT(!mIsLocked);
+  if (!IsValid()) {
+    return false;
+  }
   if (mIsLocked) {
     return mOpenMode == aMode;
   }
@@ -493,7 +496,7 @@ TextureClient::Unlock()
 {
   MOZ_ASSERT(IsValid());
   MOZ_ASSERT(mIsLocked);
-  if (!mIsLocked) {
+  if (!IsValid() || !mIsLocked) {
     return;
   }
 
@@ -622,7 +625,7 @@ TextureClient::BorrowDrawTarget()
   // but we should have a way to get a SourceSurface directly instead.
   //MOZ_ASSERT(mOpenMode & OpenMode::OPEN_WRITE);
 
-  if (!mIsLocked) {
+  if (!IsValid() || !mIsLocked) {
     return nullptr;
   }
 
@@ -1099,6 +1102,11 @@ TextureClient::CreateForDrawing(TextureForwarder* aAllocator,
 
   if (data) {
     return MakeAndAddRef<TextureClient>(data, aTextureFlags, aAllocator);
+  }
+
+  if (moz2DBackend == BackendType::SKIA && aFormat == SurfaceFormat::B8G8R8X8) {
+    // Skia doesn't support RGBX, so ensure we clear the buffer for the proper alpha values.
+    aAllocFlags = TextureAllocationFlags(aAllocFlags | ALLOC_CLEAR_BUFFER);
   }
 
   // Can't do any better than a buffer texture client.

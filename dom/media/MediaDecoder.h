@@ -416,9 +416,8 @@ private:
     mIgnoreProgressData = mLogicallySeeking;
   }
 
-  // Seeking has started. Inform the element on the main
-  // thread.
-  void SeekingStarted(MediaDecoderEventVisibility aEventVisibility = MediaDecoderEventVisibility::Observable);
+  // Seeking has started. Inform the element on the main thread.
+  void SeekingStarted();
 
   void UpdateLogicalPositionInternal(MediaDecoderEventVisibility aEventVisibility);
   void UpdateLogicalPosition()
@@ -737,7 +736,6 @@ protected:
   MediaEventListener mFirstFrameLoadedListener;
 
   MediaEventListener mOnPlaybackEvent;
-  MediaEventListener mOnSeekingStart;
   MediaEventListener mOnMediaNotSeekable;
 
 protected:

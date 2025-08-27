@@ -56,7 +56,7 @@ using namespace mozilla;
 #include <string.h>
 #include <stdlib.h>
 
-static nsresult
+static MOZ_MUST_USE nsresult
 GetProcSelfStatmField(int aField, int64_t* aN)
 {
   // There are more than two fields, but we're only interested in the first
@@ -76,7 +76,7 @@ GetProcSelfStatmField(int aField, int64_t* aN)
   return NS_ERROR_FAILURE;
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 GetProcSelfSmapsPrivate(int64_t* aN)
 {
   // You might be tempted to calculate USS by subtracting the "shared" value
@@ -131,26 +131,26 @@ GetProcSelfSmapsPrivate(int64_t* aN)
 }
 
 #define HAVE_VSIZE_AND_RESIDENT_REPORTERS 1
-static nsresult
+static MOZ_MUST_USE nsresult
 VsizeDistinguishedAmount(int64_t* aN)
 {
   return GetProcSelfStatmField(0, aN);
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentDistinguishedAmount(int64_t* aN)
 {
   return GetProcSelfStatmField(1, aN);
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentFastDistinguishedAmount(int64_t* aN)
 {
   return ResidentDistinguishedAmount(aN);
 }
 
 #define HAVE_RESIDENT_UNIQUE_REPORTER 1
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentUniqueDistinguishedAmount(int64_t* aN)
 {
   return GetProcSelfSmapsPrivate(aN);
@@ -158,7 +158,7 @@ ResidentUniqueDistinguishedAmount(int64_t* aN)
 
 #ifdef HAVE_MALLINFO
 #define HAVE_SYSTEM_HEAP_REPORTER 1
-nsresult
+static MOZ_MUST_USE nsresult
 SystemHeapSize(int64_t* aSizeOut)
 {
     struct mallinfo info = mallinfo();
@@ -213,7 +213,7 @@ SystemHeapSize(int64_t* aSizeOut)
 #define KP_RSS(kp) (kp.p_vm_rssize * getpagesize())
 #endif
 
-static nsresult
+static MOZ_MUST_USE nsresult
 GetKinfoProcSelf(KINFO_PROC* aProc)
 {
   int mib[] = {
@@ -235,7 +235,7 @@ GetKinfoProcSelf(KINFO_PROC* aProc)
 }
 
 #define HAVE_VSIZE_AND_RESIDENT_REPORTERS 1
-static nsresult
+static MOZ_MUST_USE nsresult
 VsizeDistinguishedAmount(int64_t* aN)
 {
   KINFO_PROC proc;
@@ -246,7 +246,7 @@ VsizeDistinguishedAmount(int64_t* aN)
   return rv;
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentDistinguishedAmount(int64_t* aN)
 {
   KINFO_PROC proc;
@@ -257,7 +257,7 @@ ResidentDistinguishedAmount(int64_t* aN)
   return rv;
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentFastDistinguishedAmount(int64_t* aN)
 {
   return ResidentDistinguishedAmount(aN);
@@ -267,7 +267,7 @@ ResidentFastDistinguishedAmount(int64_t* aN)
 #include <libutil.h>
 #include <algorithm>
 
-static nsresult
+static MOZ_MUST_USE nsresult
 GetKinfoVmentrySelf(int64_t* aPrss, uint64_t* aMaxreg)
 {
   int cnt;
@@ -298,7 +298,7 @@ GetKinfoVmentrySelf(int64_t* aPrss, uint64_t* aMaxreg)
 }
 
 #define HAVE_PRIVATE_REPORTER 1
-static nsresult
+static MOZ_MUST_USE nsresult
 PrivateDistinguishedAmount(int64_t* aN)
 {
   int64_t priv;
@@ -309,7 +309,7 @@ PrivateDistinguishedAmount(int64_t* aN)
 }
 
 #define HAVE_VSIZE_MAX_CONTIGUOUS_REPORTER 1
-static nsresult
+static MOZ_MUST_USE nsresult
 VsizeMaxContiguousDistinguishedAmount(int64_t* aN)
 {
   uint64_t biggestRegion;
@@ -327,7 +327,8 @@ VsizeMaxContiguousDistinguishedAmount(int64_t* aN)
 #include <fcntl.h>
 #include <unistd.h>
 
-static void XMappingIter(int64_t& aVsize, int64_t& aResident)
+static void
+XMappingIter(int64_t& aVsize, int64_t& aResident)
 {
   aVsize = -1;
   aResident = -1;
@@ -369,7 +370,7 @@ static void XMappingIter(int64_t& aVsize, int64_t& aResident)
 }
 
 #define HAVE_VSIZE_AND_RESIDENT_REPORTERS 1
-static nsresult
+static MOZ_MUST_USE nsresult
 VsizeDistinguishedAmount(int64_t* aN)
 {
   int64_t vsize, resident;
@@ -381,7 +382,7 @@ VsizeDistinguishedAmount(int64_t* aN)
   return NS_OK;
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentDistinguishedAmount(int64_t* aN)
 {
   int64_t vsize, resident;
@@ -393,7 +394,7 @@ ResidentDistinguishedAmount(int64_t* aN)
   return NS_OK;
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentFastDistinguishedAmount(int64_t* aN)
 {
   return ResidentDistinguishedAmount(aN);
@@ -407,7 +408,7 @@ ResidentFastDistinguishedAmount(int64_t* aN)
 #include <mach/task.h>
 #include <sys/sysctl.h>
 
-static bool
+static MOZ_MUST_USE bool
 GetTaskBasicInfo(struct task_basic_info* aTi)
 {
   mach_msg_type_number_t count = TASK_BASIC_INFO_COUNT;
@@ -420,7 +421,7 @@ GetTaskBasicInfo(struct task_basic_info* aTi)
 // absurdly high, eg. 2GB+ even at start-up.  But both 'top' and 'ps' report
 // it, so we might as well too.
 #define HAVE_VSIZE_AND_RESIDENT_REPORTERS 1
-static nsresult
+static MOZ_MUST_USE nsresult
 VsizeDistinguishedAmount(int64_t* aN)
 {
   task_basic_info ti;
@@ -438,7 +439,7 @@ VsizeDistinguishedAmount(int64_t* aN)
 //
 // Purging these pages can take a long time for some users (see bug 789975),
 // so we provide the option to get the RSS without purging first.
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentDistinguishedAmountHelper(int64_t* aN, bool aDoPurge)
 {
 #ifdef HAVE_JEMALLOC_STATS
@@ -458,13 +459,13 @@ ResidentDistinguishedAmountHelper(int64_t* aN, bool aDoPurge)
   return NS_OK;
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentFastDistinguishedAmount(int64_t* aN)
 {
   return ResidentDistinguishedAmountHelper(aN, /* doPurge = */ false);
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentDistinguishedAmount(int64_t* aN)
 {
   return ResidentDistinguishedAmountHelper(aN, /* doPurge = */ true);
@@ -498,7 +499,7 @@ InSharedRegion(mach_vm_address_t aAddr, cpu_type_t aType)
   return base <= aAddr && aAddr < (base + size);
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentUniqueDistinguishedAmount(int64_t* aN)
 {
   if (!aN) {
@@ -571,7 +572,7 @@ ResidentUniqueDistinguishedAmount(int64_t* aN)
 #include <algorithm>
 
 #define HAVE_VSIZE_AND_RESIDENT_REPORTERS 1
-static nsresult
+static MOZ_MUST_USE nsresult
 VsizeDistinguishedAmount(int64_t* aN)
 {
   MEMORYSTATUSEX s;
@@ -585,7 +586,7 @@ VsizeDistinguishedAmount(int64_t* aN)
   return NS_OK;
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentDistinguishedAmount(int64_t* aN)
 {
   PROCESS_MEMORY_COUNTERS pmc;
@@ -599,7 +600,7 @@ ResidentDistinguishedAmount(int64_t* aN)
   return NS_OK;
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentFastDistinguishedAmount(int64_t* aN)
 {
   return ResidentDistinguishedAmount(aN);
@@ -607,7 +608,7 @@ ResidentFastDistinguishedAmount(int64_t* aN)
 
 #define HAVE_RESIDENT_UNIQUE_REPORTER 1
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentUniqueDistinguishedAmount(int64_t* aN)
 {
   // Determine how many entries we need.
@@ -655,7 +656,7 @@ ResidentUniqueDistinguishedAmount(int64_t* aN)
 }
 
 #define HAVE_VSIZE_MAX_CONTIGUOUS_REPORTER 1
-static nsresult
+static MOZ_MUST_USE nsresult
 VsizeMaxContiguousDistinguishedAmount(int64_t* aN)
 {
   SIZE_T biggestRegion = 0;
@@ -684,7 +685,7 @@ VsizeMaxContiguousDistinguishedAmount(int64_t* aN)
 }
 
 #define HAVE_PRIVATE_REPORTER 1
-static nsresult
+static MOZ_MUST_USE nsresult
 PrivateDistinguishedAmount(int64_t* aN)
 {
   PROCESS_MEMORY_COUNTERS_EX pmcex;
@@ -703,7 +704,7 @@ PrivateDistinguishedAmount(int64_t* aN)
 // Windows can have multiple separate heaps. During testing there were multiple
 // heaps present but the non-default ones had sizes no more than a few 10s of
 // KiBs. So we combine their sizes into a single measurement.
-nsresult
+static MOZ_MUST_USE nsresult
 SystemHeapSize(int64_t* aSizeOut)
 {
   // Get the number of heaps.
@@ -808,8 +809,8 @@ class WindowsAddressSpaceReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     // First iterate over all the segments and record how many of each kind
     // there were and their aggregate sizes. We use a hash table for this
@@ -991,8 +992,8 @@ class VsizeMaxContiguousReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     int64_t amount;
     nsresult rv = VsizeMaxContiguousDistinguishedAmount(&amount);
@@ -1014,8 +1015,8 @@ class PrivateReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     int64_t amount;
     nsresult rv = PrivateDistinguishedAmount(&amount);
@@ -1038,8 +1039,8 @@ class VsizeReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     int64_t amount;
     nsresult rv = VsizeDistinguishedAmount(&amount);
@@ -1065,8 +1066,8 @@ class ResidentReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     int64_t amount;
     nsresult rv = ResidentDistinguishedAmount(&amount);
@@ -1094,8 +1095,8 @@ class ResidentUniqueReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     int64_t amount = 0;
     nsresult rv = ResidentUniqueDistinguishedAmount(&amount);
@@ -1122,8 +1123,8 @@ class SystemHeapReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     int64_t amount;
     nsresult rv = SystemHeapSize(&amount);
@@ -1147,7 +1148,7 @@ NS_IMPL_ISUPPORTS(SystemHeapReporter, nsIMemoryReporter)
 
 #define HAVE_RESIDENT_PEAK_REPORTER 1
 
-static nsresult
+static MOZ_MUST_USE nsresult
 ResidentPeakDistinguishedAmount(int64_t* aN)
 {
   struct rusage usage;
@@ -1178,8 +1179,8 @@ class ResidentPeakReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     int64_t amount = 0;
     nsresult rv = ResidentPeakDistinguishedAmount(&amount);
@@ -1201,8 +1202,8 @@ class PageFaultsSoftReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     struct rusage usage;
     int err = getrusage(RUSAGE_SELF, &usage);
@@ -1226,7 +1227,7 @@ public:
 };
 NS_IMPL_ISUPPORTS(PageFaultsSoftReporter, nsIMemoryReporter)
 
-static nsresult
+static MOZ_MUST_USE nsresult
 PageFaultsHardDistinguishedAmount(int64_t* aAmount)
 {
   struct rusage usage;
@@ -1245,8 +1246,8 @@ class PageFaultsHardReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     int64_t amount = 0;
     nsresult rv = PageFaultsHardDistinguishedAmount(&amount);
@@ -1302,8 +1303,8 @@ class JemallocHeapReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     jemalloc_stats_t stats;
     jemalloc_stats(&stats);
@@ -1396,8 +1397,8 @@ class AtomTablesReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     size_t Main, Static;
     NS_SizeOfAtomTablesIncludingThis(MallocSizeOf, &Main, &Static);
@@ -1433,8 +1434,8 @@ class DeadlockDetectorReporter final : public nsIMemoryReporter
 public:
   NS_DECL_ISUPPORTS
 
-  NS_METHOD CollectReports(nsIHandleReportCallback* aHandleReport,
-                           nsISupports* aData, bool aAnonymize) override
+  NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
+                            nsISupports* aData, bool aAnonymize) override
   {
     return MOZ_COLLECT_REPORT(
       "explicit/deadlock-detector", KIND_HEAP, UNITS_BYTES,
@@ -2395,7 +2396,7 @@ nsMemoryReporterManager::GetHeapOverheadFraction(int64_t* aAmount)
 #endif
 }
 
-static nsresult
+static MOZ_MUST_USE nsresult
 GetInfallibleAmount(InfallibleAmountFn aAmountFn, int64_t* aAmount)
 {
   if (aAmountFn) {
@@ -2528,7 +2529,7 @@ public:
   {
   }
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     nsCOMPtr<nsIObserverService> os = services::GetObserverService();
     if (!os) {
@@ -2629,7 +2630,7 @@ nsMemoryReporterManager::SizeOfTab(mozIDOMWindowProxy* aTopWindow,
 namespace mozilla {
 
 #define GET_MEMORY_REPORTER_MANAGER(mgr)                                      \
-  RefPtr<nsMemoryReporterManager> mgr =                                     \
+  RefPtr<nsMemoryReporterManager> mgr =                                       \
     nsMemoryReporterManager::GetOrCreate();                                   \
   if (!mgr) {                                                                 \
     return NS_ERROR_FAILURE;                                                  \
@@ -2694,6 +2695,8 @@ UnregisterWeakMemoryReporter(nsIMemoryReporter* aReporter)
     return NS_OK;                                                             \
   }
 
+// Macro for generating functions that unregister distinguished amount
+// functions with the memory reporter manager.
 #define DEFINE_UNREGISTER_DISTINGUISHED_AMOUNT(name)                          \
   nsresult                                                                    \
   Unregister##name##DistinguishedAmount()                                     \

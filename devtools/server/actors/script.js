@@ -15,7 +15,7 @@ const { FrameActor } = require("devtools/server/actors/frame");
 const { ObjectActor, createValueGrip, longStringGrip } = require("devtools/server/actors/object");
 const { SourceActor, getSourceURL } = require("devtools/server/actors/source");
 const { DebuggerServer } = require("devtools/server/main");
-const { ActorClassWithSpec } = require("devtools/shared/protocol");
+const { ActorClass } = require("devtools/shared/protocol");
 const DevToolsUtils = require("devtools/shared/DevToolsUtils");
 const flags = require("devtools/shared/flags");
 const { assert, dumpn, update, fetch } = DevToolsUtils;
@@ -408,7 +408,7 @@ EventLoop.prototype = {
  *        An optional (for content debugging only) reference to the content
  *        window.
  */
-const ThreadActor = ActorClassWithSpec(threadSpec, {
+const ThreadActor = ActorClass(threadSpec, {
   initialize: function (aParent, aGlobal) {
     this._state = "detached";
     this._frameActors = [];
@@ -1129,8 +1129,8 @@ const ThreadActor = ActorClassWithSpec(threadSpec, {
         l.type = handler.type;
         let listener = handler.listenerObject;
         let listenerDO = this.globalDebugObject.makeDebuggeeValue(listener);
-        // If the listener is an object with a 'handleEvent' method, use that.
-        if (listenerDO.class == "Object" || listenerDO.class == "XULElement") {
+        // If the listener is not callable, assume it is an event handler object.
+        if (!listenerDO.callable) {
           // For some events we don't have permission to access the
           // 'handleEvent' property when running in content scope.
           if (!listenerDO.unwrap()) {

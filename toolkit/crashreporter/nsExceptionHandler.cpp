@@ -2126,7 +2126,7 @@ public:
     , mAppendAppNotes(true)
     {}
 
-  NS_METHOD Run() override;
+  NS_IMETHOD Run() override;
 
 private:
   nsCString mKey;
@@ -3291,7 +3291,7 @@ OOPInit()
   class ProxyToMainThread : public Runnable
   {
   public:
-    NS_IMETHOD Run() {
+    NS_IMETHOD Run() override {
       OOPInit();
       return NS_OK;
     }

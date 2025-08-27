@@ -150,7 +150,7 @@ private:
 
     // This shouldn't be called directly except by the event loop. Use Dispatch
     // to start the sequence.
-    NS_IMETHOD Run()
+    NS_IMETHOD Run() override
     {
         if (NS_IsMainThread()) {
             SendResponse();
@@ -1419,9 +1419,9 @@ public:
     MOZ_ASSERT(mTabParent);
   }
 
-  NS_IMETHODIMP Observe(nsISupports* aSubject,
-                        const char* aTopic,
-                        const char16_t* aData) override
+  NS_IMETHOD Observe(nsISupports* aSubject,
+                     const char* aTopic,
+                     const char16_t* aData) override
   {
     if (!mTabParent) {
       // We already sent the notification
@@ -2987,7 +2987,7 @@ public:
   }
 
 private:
-  NS_IMETHOD Run() {
+  NS_IMETHOD Run() override {
     MOZ_ASSERT(NS_IsMainThread());
     if (RefPtr<TabParent> tabParent = mUpdateObserver->GetTabParent()) {
       tabParent->LayerTreeUpdate(mActive);

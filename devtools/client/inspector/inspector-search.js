@@ -4,15 +4,12 @@
 
 "use strict";
 
-/* eslint-disable mozilla/reject-some-requires */
-const {Ci} = require("chrome");
-/* eslint-enable mozilla/reject-some-requires */
 const promise = require("promise");
 const {Task} = require("devtools/shared/task");
 
-loader.lazyGetter(this, "system", () => require("devtools/shared/system"));
-loader.lazyGetter(this, "EventEmitter", () => require("devtools/shared/event-emitter"));
-loader.lazyGetter(this, "AutocompletePopup", () => require("devtools/client/shared/autocomplete-popup").AutocompletePopup);
+const system = require("devtools/shared/system");
+const EventEmitter = require("devtools/shared/event-emitter");
+const {AutocompletePopup} = require("devtools/client/shared/autocomplete-popup");
 
 // Maximum number of selector suggestions shown in the panel.
 const MAX_SUGGESTIONS = 15;
@@ -20,24 +17,33 @@ const MAX_SUGGESTIONS = 15;
 /**
  * Converts any input field into a document search box.
  *
- * @param {InspectorPanel} inspector The InspectorPanel whose `walker` attribute
- * should be used for document traversal.
- * @param {DOMNode} input The input element to which the panel will be attached
- * and from where search input will be taken.
+ * @param {InspectorPanel} inspector
+ *        The InspectorPanel whose `walker` attribute should be used for
+ *        document traversal.
+ * @param {DOMNode} input
+ *        The input element to which the panel will be attached and from where
+ *        search input will be taken.
+ * @param {DOMNode} clearBtn
+ *        The clear button in the input field that will clear the input value.
  *
  * Emits the following events:
  * - search-cleared: when the search box is emptied
  * - search-result: when a search is made and a result is selected
  */
-function InspectorSearch(inspector, input) {
+function InspectorSearch(inspector, input, clearBtn) {
   this.inspector = inspector;
   this.searchBox = input;
+  this.searchClearButton = clearBtn;
   this._lastSearched = null;
 
+  this.searchClearButton.hidden = true;
+
   this._onKeyDown = this._onKeyDown.bind(this);
-  this._onCommand = this._onCommand.bind(this);
+  this._onInput = this._onInput.bind(this);
+  this._onClearSearch = this._onClearSearch.bind(this);
   this.searchBox.addEventListener("keydown", this._onKeyDown, true);
-  this.searchBox.addEventListener("command", this._onCommand, true);
+  this.searchBox.addEventListener("input", this._onInput, true);
+  this.searchClearButton.addEventListener("click", this._onClearSearch);
 
   // For testing, we need to be able to wait for the most recent node request
   // to finish.  Tests can watch this promise for that.
@@ -56,8 +62,10 @@ InspectorSearch.prototype = {
 
   destroy: function () {
     this.searchBox.removeEventListener("keydown", this._onKeyDown, true);
-    this.searchBox.removeEventListener("command", this._onCommand, true);
+    this.searchBox.removeEventListener("input", this._onInput, true);
+    this.searchClearButton.removeEventListener("click", this._onClearSearch);
     this.searchBox = null;
+    this.searchClearButton = null;
     this.autocompleter.destroy();
   },
 
@@ -97,7 +105,7 @@ InspectorSearch.prototype = {
     }
   }),
 
-  _onCommand: function () {
+  _onInput: function () {
     if (this.searchBox.value.length === 0) {
       this._onSearch();
     }
@@ -105,8 +113,10 @@ InspectorSearch.prototype = {
 
   _onKeyDown: function (event) {
     if (this.searchBox.value.length === 0) {
+      this.searchClearButton.hidden = true;
       this.searchBox.removeAttribute("filled");
     } else {
+      this.searchClearButton.hidden = false;
       this.searchBox.setAttribute("filled", true);
     }
     if (event.keyCode === event.DOM_VK_RETURN) {
@@ -115,10 +125,15 @@ InspectorSearch.prototype = {
 
     const modifierKey = system.constants.platform === "macosx"
                         ? event.metaKey : event.ctrlKey;
-    if (event.keyCode === Ci.nsIDOMKeyEvent.DOM_VK_G && modifierKey) {
+    if (event.keyCode === event.DOM_VK_G && modifierKey) {
       this._onSearch(event.shiftKey);
       event.preventDefault();
     }
+  },
+
+  _onClearSearch: function () {
+    this.searchBox.value = "";
+    this.searchClearButton.hidden = true;
   }
 };
 
@@ -441,8 +456,11 @@ SelectorAutocompleter.prototype = {
 
     if (total > 0) {
       let onPopupOpened = this.searchPopup.once("popup-opened");
-      this.searchPopup.setItems(items);
-      this.searchPopup.openPopup(this.searchBox);
+      this.searchPopup.once("popup-closed", () => {
+        this.searchPopup.setItems(items);
+        this.searchPopup.openPopup(this.searchBox);
+      });
+      this.searchPopup.hidePopup();
       return onPopupOpened;
     }
 

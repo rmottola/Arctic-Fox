@@ -860,7 +860,7 @@ nsDOMMutationObserver::HandleMutation()
 class AsyncMutationHandler : public mozilla::Runnable
 {
 public:
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     nsDOMMutationObserver::HandleMutations();
     return NS_OK;
@@ -885,10 +885,7 @@ nsDOMMutationObserver::HandleMutationsInternal()
     return;
   }
 
-  // We need the AutoSafeJSContext to ensure the slow script dialog is
-  // triggered. AutoSafeJSContext does that by pushing JSAutoRequest to stack.
-  // This needs to be outside the while loop.
-  AutoSafeJSContext cx;
+  AutoSlowOperation aso;
 
   nsTArray<RefPtr<nsDOMMutationObserver> >* suppressedObservers = nullptr;
 
@@ -910,7 +907,7 @@ nsDOMMutationObserver::HandleMutationsInternal()
       }
     }
     delete observers;
-    JS_CheckForInterrupt(cx);
+    aso.CheckForInterrupt();
   }
 
   if (suppressedObservers) {

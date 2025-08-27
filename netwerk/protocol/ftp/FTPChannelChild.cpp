@@ -526,7 +526,7 @@ protected:
     MOZ_COUNT_DTOR(nsFtpChildAsyncAlert);
   }
 public:
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     if (mPrompter) {
       mPrompter->Alert(nullptr, mResponseMsg.get());

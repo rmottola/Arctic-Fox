@@ -31,14 +31,15 @@ try {
  *                 A MediaStream object whose audio track we shall analyse.
  */
 function AudioStreamAnalyser(ac, stream) {
-  if (stream.getAudioTracks().length === 0) {
-    throw new Error("No audio track in stream");
-  }
   this.audioContext = ac;
   this.stream = stream;
-  this.sourceNode = this.audioContext.createMediaStreamSource(this.stream);
+  this.sourceNodes = this.stream.getAudioTracks().map(
+    t => this.audioContext.createMediaStreamSource(new MediaStream([t])));
   this.analyser = this.audioContext.createAnalyser();
-  this.sourceNode.connect(this.analyser);
+  // Setting values lower than default for speedier testing on emulators
+  this.analyser.smoothingTimeConstant = 0.2;
+  this.analyser.fftSize = 1024;
+  this.sourceNodes.forEach(n => n.connect(this.analyser));
   this.data = new Uint8Array(this.analyser.frequencyBinCount);
 }
 
@@ -58,26 +59,42 @@ AudioStreamAnalyser.prototype = {
    * Useful to debug tests.
    */
   enableDebugCanvas: function() {
-    var cvs = document.createElement("canvas");
+    var cvs = this.debugCanvas = document.createElement("canvas");
     document.getElementById("content").appendChild(cvs);
 
     // Easy: 1px per bin
     cvs.width = this.analyser.frequencyBinCount;
-    cvs.height = 256;
+    cvs.height = 128;
     cvs.style.border = "1px solid red";
 
     var c = cvs.getContext('2d');
+    c.fillStyle = 'black';
 
     var self = this;
     function render() {
       c.clearRect(0, 0, cvs.width, cvs.height);
       var array = self.getByteFrequencyData();
       for (var i = 0; i < array.length; i++) {
-        c.fillRect(i, (256 - (array[i])), 1, 256);
+        c.fillRect(i, (cvs.height - (array[i])), 1, cvs.height);
       }
-      requestAnimationFrame(render);
+      if (!cvs.stopDrawing) {
+        requestAnimationFrame(render);
+      }
     }
     requestAnimationFrame(render);
+  },
+
+  /**
+   * Stop drawing of and remove the debug canvas from the DOM if it was
+   * previously added.
+   */
+  disableDebugCanvas: function() {
+    if (!this.debugCanvas || !this.debugCanvas.parentElement) {
+      return;
+    }
+
+    this.debugCanvas.stopDrawing = true;
+    this.debugCanvas.parentElement.removeChild(this.debugCanvas);
   },
 
   /**
@@ -141,6 +158,26 @@ AudioStreamAnalyser.prototype = {
            this.analyser.fftSize;
   }
 };
+
+/**
+ * Creates a MediaStream with an audio track containing a sine tone at the
+ * given frequency.
+ *
+ * @param {AudioContext} ac
+ *        AudioContext in which to create the OscillatorNode backing the stream
+ * @param {double} frequency
+ *        The frequency in Hz of the generated sine tone
+ * @returns {MediaStream} the MediaStream containing sine tone audio track
+ */
+function createOscillatorStream(ac, frequency) {
+  var osc = ac.createOscillator();
+  osc.frequency.value = frequency;
+
+  var oscDest = ac.createMediaStreamDestination();
+  osc.connect(oscDest);
+  osc.start();
+  return oscDest.stream;
+}
 
 /**
  * Create the necessary HTML elements for head and body as used by Mochitests
@@ -253,14 +290,11 @@ function setupEnvironment() {
     return;
   }
 
-  // Running as a Mochitest.
-  SimpleTest.requestFlakyTimeout("WebRTC inherently depends on timeouts");
-  window.finish = () => SimpleTest.finish();
-  SpecialPowers.pushPrefEnv({
+  var defaultMochitestPrefs = {
     'set': [
       ['media.peerconnection.enabled', true],
       ['media.peerconnection.identity.enabled', true],
-      ['media.peerconnection.identity.timeout', 12000],
+      ['media.peerconnection.identity.timeout', 120000],
       ['media.peerconnection.ice.stun_client_maximum_transmits', 14],
       ['media.peerconnection.ice.trickle_grace_period', 30000],
       ['media.navigator.permission.disabled', true],
@@ -270,23 +304,39 @@ function setupEnvironment() {
       ['media.getusermedia.audiocapture.enabled', true],
       ['media.recorder.audio_node.enabled', true]
     ]
-  }, setTestOptions);
+  };
+
+  const isAndroid = !!navigator.userAgent.includes("Android");
+
+  if (isAndroid) {
+    defaultMochitestPrefs.set.push(
+      ["media.navigator.video.default_width", 320],
+      ["media.navigator.video.default_height", 240],
+      ["media.navigator.video.max_fr", 10],
+      ["media.autoplay.enabled", true]
+    );
+  }
+
+  // Running as a Mochitest.
+  SimpleTest.requestFlakyTimeout("WebRTC inherently depends on timeouts");
+  window.finish = () => SimpleTest.finish();
+  SpecialPowers.pushPrefEnv(defaultMochitestPrefs, setTestOptions);
 
   // We don't care about waiting for this to complete, we just want to ensure
   // that we don't build up a huge backlog of GC work.
-  SpecialPowers.exactGC(window);
+  SpecialPowers.exactGC();
 }
 
 // This is called by steeplechase; which provides the test configuration options
 // directly to the test through this function.  If we're not on steeplechase,
 // the test is configured directly and immediately.
-function run_test(is_initiator) {
+function run_test(is_initiator,timeout) {
   var options = { is_local: is_initiator,
                   is_remote: !is_initiator };
 
   setTimeout(() => {
-    unexpectedEventArrived(new Error("PeerConnectionTest timed out after 30s"));
-  }, 30000);
+    unexpectedEventArrived(new Error("PeerConnectionTest timed out after "+timeout+"s"));
+  }, timeout);
 
   // Also load the steeplechase test code.
   var s = document.createElement("script");
@@ -345,6 +395,22 @@ function checkMediaStreamTracks(constraints, mediaStream) {
     mediaStream.getVideoTracks());
 }
 
+/**
+ * Check that a media stream contains exactly a set of media stream tracks.
+ *
+ * @param {MediaStream} mediaStream the media stream being checked
+ * @param {Array} tracks the tracks that should exist in mediaStream
+ * @param {String} [message] an optional message to pass to asserts
+ */
+function checkMediaStreamContains(mediaStream, tracks, message) {
+  message = message ? (message + ": ") : "";
+  tracks.forEach(t => ok(mediaStream.getTrackById(t.id),
+                         message + "MediaStream " + mediaStream.id +
+                         " contains track " + t.id));
+  is(mediaStream.getTracks().length, tracks.length,
+     message + "MediaStream " + mediaStream.id + " contains no extra tracks");
+}
+
 function checkMediaStreamCloneAgainstOriginal(clone, original) {
   isnot(clone.id.length, 0, "Stream clone should have an id string");
   isnot(clone, original,
@@ -356,7 +422,7 @@ function checkMediaStreamCloneAgainstOriginal(clone, original) {
   is(clone.getVideoTracks().length, original.getVideoTracks().length,
      "All video tracks should get cloned");
   original.getTracks()
-          .forEach(t => ok(!clone.getTracks().includes(t),
+          .forEach(t => ok(!clone.getTrackById(t.id),
                            "The clone's tracks should be originals"));
 }
 
@@ -376,8 +442,8 @@ function checkMediaStreamTrackCloneAgainstOriginal(clone, original) {
 /*** Utility methods */
 
 /** The dreadful setTimeout, use sparingly */
-function wait(time) {
-  return new Promise(r => setTimeout(r, time));
+function wait(time, message) {
+  return new Promise(r => setTimeout(() => r(message), time));
 }
 
 /** The even more dreadful setInterval, use even more sparingly */
@@ -417,14 +483,25 @@ var addFinallyToPromise = promise => {
 /** Use event listener to call passed-in function on fire until it returns true */
 var listenUntil = (target, eventName, onFire) => {
   return new Promise(resolve => target.addEventListener(eventName,
-                                                        function callback() {
-    var result = onFire();
+                                                        function callback(event) {
+    var result = onFire(event);
     if (result) {
       target.removeEventListener(eventName, callback, false);
       resolve(result);
     }
   }, false));
 };
+
+/* Test that a function throws the right error */
+function mustThrowWith(msg, reason, f) {
+  try {
+    f();
+    ok(false, msg + " must throw");
+  } catch (e) {
+    is(e.name, reason, msg + " must throw: " + e.message);
+  }
+};
+
 
 /*** Test control flow methods */
 
@@ -514,6 +591,27 @@ function createOneShotEventWrapper(wrapper, obj, event) {
   };
 }
 
+/**
+ * Returns a promise that resolves when `target` has raised an event with the
+ * given name. Cancel the returned promise by passing in a `cancelPromise` and
+ * resolve it.
+ *
+ * @param {object} target
+ *        The target on which the event should occur.
+ * @param {string} name
+ *        The name of the event that should occur.
+ * @param {promise} cancelPromise
+ *        A promise that on resolving rejects the returned promise,
+ *        so we can avoid logging results after a test has finished.
+ */
+function haveEvent(target, name, cancelPromise) {
+  var listener;
+  var p = Promise.race([
+    (cancelPromise || new Promise()).then(e => Promise.reject(e)),
+    new Promise(resolve => target.addEventListener(name, listener = resolve))
+  ]);
+  return p.then(event => (target.removeEventListener(name, listener), event));
+};
 
 /**
  * This class executes a series of functions in a continuous sequence.
@@ -688,9 +786,12 @@ function AudioStreamHelper() {
 
 AudioStreamHelper.prototype = {
   checkAudio: function(stream, analyser, fun) {
+    /*
     analyser.enableDebugCanvas();
     return analyser.waitForAnalysisSuccess(fun)
       .then(() => analyser.disableDebugCanvas());
+    */
+    return analyser.waitForAnalysisSuccess(fun);
   },
 
   checkAudioFlowing: function(stream) {
@@ -737,6 +838,7 @@ VideoStreamHelper.prototype = {
 
   waitForFrames: function(canvas, timeout_value) {
     var intervalId = this.startCapturingFrames();
+    timeout_value = timeout_value || 8000;
 
     return addFinallyToPromise(timeout(
       Promise.all([
@@ -745,7 +847,7 @@ VideoStreamHelper.prototype = {
         this._helper.waitForPixelColor(canvas, this._helper.red, 128,
                                        canvas.id + " should become red")
       ]),
-      2000,
+      timeout_value,
       "Timed out waiting for frames")).finally(() => clearInterval(intervalId));
   },
 

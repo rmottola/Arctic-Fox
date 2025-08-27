@@ -598,7 +598,7 @@ public:
     aWorkerPrivate->AssertIsOnWorkerThread();
 
     RefPtr<Promise> promise = mPromiseProxy->WorkerPromise();
-    promise->MaybeResolve(JS::UndefinedHandleValue);
+    promise->MaybeResolveWithUndefined();
 
     // Release the reference on the worker thread.
     mPromiseProxy->CleanUp();
@@ -621,7 +621,7 @@ public:
     MOZ_ASSERT(aPromiseProxy);
   }
 
-  NS_IMETHODIMP
+  NS_IMETHOD
   Run() override
   {
     AssertIsOnMainThread();
@@ -663,7 +663,7 @@ ServiceWorkerGlobalScope::SkipWaiting(ErrorResult& aRv)
   RefPtr<PromiseWorkerProxy> promiseProxy =
     PromiseWorkerProxy::Create(mWorkerPrivate, promise);
   if (!promiseProxy) {
-    promise->MaybeResolve(JS::UndefinedHandleValue);
+    promise->MaybeResolveWithUndefined();
     return promise.forget();
   }
 

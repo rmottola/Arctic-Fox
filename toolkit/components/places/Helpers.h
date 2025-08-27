@@ -192,7 +192,7 @@ public:
   {
   }
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     mStatementCache.FinalizeStatements();
     // Release the owner back on the calling thread.

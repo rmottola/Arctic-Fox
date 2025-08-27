@@ -5,7 +5,8 @@
 "use strict";
 
 const { DOM: dom, createClass, PropTypes } = require("devtools/client/shared/vendor/react");
-const { getSourceNames, parseURL, isScratchpadScheme } = require("devtools/client/shared/source-utils");
+const { getSourceNames, parseURL,
+        isScratchpadScheme, getSourceMappedFile } = require("devtools/client/shared/source-utils");
 const { LocalizationHelper } = require("devtools/client/shared/l10n");
 
 const l10n = new LocalizationHelper("chrome://devtools/locale/components.properties");
@@ -181,15 +182,8 @@ module.exports = createClass({
     }
 
     let displaySource = showFullSourceUrl ? long : short;
-    // SourceMapped locations might not be parsed properly by parseURL.
-    // Eg: sourcemapped location could be /folder/file.coffee instead of a url
-    // and so the url parser would not parse non-url locations properly
-    // Check for "/" in displaySource. If "/" is in displaySource,
-    // take everything after last "/".
     if (isSourceMapped) {
-      displaySource = displaySource.lastIndexOf("/") < 0 ?
-        displaySource :
-        displaySource.slice(displaySource.lastIndexOf("/") + 1);
+      displaySource = getSourceMappedFile(displaySource);
     } else if (showEmptyPathAsHost && (displaySource === "" || displaySource === "/")) {
       displaySource = host;
     }
@@ -214,6 +208,14 @@ module.exports = createClass({
       sourceElements.push(dom.span({ className: "frame-link-line" }, lineInfo));
     }
 
+    // Inner el is useful for achieving ellipsis on the left and correct LTR/RTL
+    // ordering. See CSS styles for frame-link-source-[inner] and bug 1290056.
+    let sourceInnerEl = dom.span({
+      className: "frame-link-source-inner",
+      title: isLinkable ?
+        l10n.getFormatStr("frame.viewsourceindebugger", tooltip) : tooltip,
+    }, sourceElements);
+
     // If source is not a URL (self-hosted, eval, etc.), don't make
     // it an anchor link, as we can't link to it.
     if (isLinkable) {
@@ -225,13 +227,11 @@ module.exports = createClass({
         href: source,
         className: "frame-link-source",
         draggable: false,
-        title: l10n.getFormatStr("frame.viewsourceindebugger", tooltip)
-      }, sourceElements);
+      }, sourceInnerEl);
     } else {
       sourceEl = dom.span({
         className: "frame-link-source",
-        title: tooltip,
-      }, sourceElements);
+      }, sourceInnerEl);
     }
     elements.push(sourceEl);
 

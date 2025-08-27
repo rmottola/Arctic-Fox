@@ -11,7 +11,6 @@ define(function (require, exports, module) {
   const React = require("devtools/client/shared/vendor/react");
   // Dependencies
   const { createFactories, isGrip } = require("./rep-utils");
-  const { ObjectBox } = createFactories(require("./object-box"));
   const { Caption } = createFactories(require("./caption"));
   const { PropRep } = createFactories(require("./prop-rep"));
   // Shortcuts
@@ -22,7 +21,7 @@ define(function (require, exports, module) {
    * of remote JS object and is used as an input object
    * for this rep component.
    */
-  const Grip = React.createClass({
+  const GripRep = React.createClass({
     displayName: "Grip",
 
     propTypes: {
@@ -79,7 +78,7 @@ define(function (require, exports, module) {
           key: "more",
           object: objectLink({
             object: object
-          }, "more…")
+          }, ((object ? object.ownPropertyLength : 0) - max) + " more…")
         }));
       } else if (props.length > 0) {
         // Remove the last comma.
@@ -119,6 +118,7 @@ define(function (require, exports, module) {
           object: value,
           equal: ": ",
           delim: ", ",
+          defaultRep: Grip
         })));
       });
 
@@ -171,7 +171,7 @@ define(function (require, exports, module) {
       let objectLink = this.props.objectLink || span;
       if (this.props.mode == "tiny" || !props.length) {
         return (
-          ObjectBox({className: "object"},
+          span({className: "objectBox objectBox-object"},
             this.getTitle(object),
             objectLink({
               className: "objectLeftBrace",
@@ -183,7 +183,7 @@ define(function (require, exports, module) {
       }
 
       return (
-        ObjectBox({className: "object"},
+        span({className: "objectBox objectBox-object"},
           this.getTitle(object),
           objectLink({
             className: "objectLeftBrace",
@@ -209,9 +209,11 @@ define(function (require, exports, module) {
     return (object.preview && object.preview.ownProperties);
   }
 
-  // Exports from this module
-  exports.Grip = {
-    rep: Grip,
+  let Grip = {
+    rep: GripRep,
     supportsObject: supportsObject
   };
+
+  // Exports from this module
+  exports.Grip = Grip;
 });

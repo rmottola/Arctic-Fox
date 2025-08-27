@@ -926,6 +926,14 @@ Promise::MaybeReject(JSContext* aCx,
 #endif // SPIDERMONKEY_PROMISE
 
 void
+Promise::MaybeResolveWithUndefined()
+{
+  NS_ASSERT_OWNINGTHREAD(Promise);
+
+  MaybeResolve(JS::UndefinedHandleValue);
+}
+
+void
 Promise::MaybeReject(const RefPtr<MediaStreamError>& aArg) {
   NS_ASSERT_OWNINGTHREAD(Promise);
 
@@ -947,7 +955,6 @@ Promise::MaybeRejectWithUndefined()
 
   MaybeSomething(JS::UndefinedHandleValue, &Promise::MaybeReject);
 }
-
 
 #ifdef SPIDERMONKEY_PROMISE
 void
@@ -992,7 +999,7 @@ Promise::PerformMicroTaskCheckpoint()
     return false;
   }
 
-  AutoSafeJSContext cx;
+  AutoSlowOperation aso;
 
   do {
     nsCOMPtr<nsIRunnable> runnable = microtaskQueue.front().forget();
@@ -1004,7 +1011,7 @@ Promise::PerformMicroTaskCheckpoint()
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return false;
     }
-    JS_CheckForInterrupt(cx);
+    aso.CheckForInterrupt();
     runtime->AfterProcessMicrotask();
   } while (!microtaskQueue.empty());
 

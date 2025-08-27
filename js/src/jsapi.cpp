@@ -559,18 +559,6 @@ JS_EndRequest(JSContext* cx)
     StopRequest(cx);
 }
 
-JS_PUBLIC_API(JSRuntime*)
-JS_GetRuntime(JSContext* cx)
-{
-    return cx->runtime();
-}
-
-JS_PUBLIC_API(JSContext*)
-JS_GetContext(JSRuntime* rt)
-{
-    return rt->contextFromMainThread();
-}
-
 JS_PUBLIC_API(JSContext*)
 JS_GetParentContext(JSContext* cx)
 {
@@ -1942,10 +1930,11 @@ JS_IsNative(JSObject* obj)
     return obj->isNative();
 }
 
-JS_PUBLIC_API(JSRuntime*)
-JS_GetObjectRuntime(JSObject* obj)
+JS_PUBLIC_API(void)
+JS::AssertObjectBelongsToCurrentThread(JSObject* obj)
 {
-    return obj->compartment()->runtimeFromMainThread();
+    JSRuntime* rt = obj->compartment()->runtimeFromAnyThread();
+    MOZ_RELEASE_ASSERT(CurrentThreadCanAccessRuntime(rt));
 }
 
 
@@ -6435,15 +6424,10 @@ JS_CallOnce(JSCallOnceType* once, JSInitCallback func)
 }
 
 AutoGCRooter::AutoGCRooter(JSContext* cx, ptrdiff_t tag)
-  : down(ContextFriendFields::get(cx)->roots.autoGCRooters_),
-    tag_(tag),
-    stackTop(&ContextFriendFields::get(cx)->roots.autoGCRooters_)
-{
-    MOZ_ASSERT(this != *stackTop);
-    *stackTop = this;
-}
+  : AutoGCRooter(JS::RootingContext::get(cx), tag)
+{}
 
-AutoGCRooter::AutoGCRooter(ContextFriendFields* cx, ptrdiff_t tag)
+AutoGCRooter::AutoGCRooter(JS::RootingContext* cx, ptrdiff_t tag)
   : down(cx->roots.autoGCRooters_),
     tag_(tag),
     stackTop(&cx->roots.autoGCRooters_)

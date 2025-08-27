@@ -27,14 +27,10 @@ const {XPCOMUtils} = require("resource://gre/modules/XPCOMUtils.jsm");
 /* eslint-enable mozilla/reject-some-requires */
 const {getCssProperties} = require("devtools/shared/fronts/css-properties");
 
-loader.lazyRequireGetter(this, "overlays",
-  "devtools/client/inspector/shared/style-inspector-overlays");
-loader.lazyRequireGetter(this, "StyleInspectorMenu",
-  "devtools/client/inspector/shared/style-inspector-menu");
-loader.lazyRequireGetter(this, "KeyShortcuts",
-  "devtools/client/shared/key-shortcuts", true);
-loader.lazyRequireGetter(this, "LayoutView",
-  "devtools/client/inspector/layout/layout", true);
+const overlays = require("devtools/client/inspector/shared/style-inspector-overlays");
+const StyleInspectorMenu = require("devtools/client/inspector/shared/style-inspector-menu");
+const {KeyShortcuts} = require("devtools/client/shared/key-shortcuts");
+const {LayoutView} = require("devtools/client/inspector/layout/layout");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
                                   "resource://gre/modules/PluralForm.jsm");
@@ -555,8 +551,10 @@ CssComputedView.prototype = {
     this._filterChangedTimeout = setTimeout(() => {
       if (this.searchField.value.length > 0) {
         this.searchField.setAttribute("filled", true);
+        this.inspector.emit("computed-view-filtered", true);
       } else {
         this.searchField.removeAttribute("filled");
+        this.inspector.emit("computed-view-filtered", false);
       }
 
       this.refreshPanel();
@@ -1421,7 +1419,7 @@ function ComputedViewTool(inspector, window) {
   this.onMutations = this.onMutations.bind(this);
   this.onResized = this.onResized.bind(this);
 
-  this.inspector.selection.on("detached", this.onSelected);
+  this.inspector.selection.on("detached-front", this.onSelected);
   this.inspector.selection.on("new-node-front", this.onSelected);
   this.inspector.selection.on("pseudoclass", this.refresh);
   this.inspector.sidebar.on("computedview-selected", this.onPanelSelected);
@@ -1515,7 +1513,7 @@ ComputedViewTool.prototype = {
     this.inspector.sidebar.off("computedview-selected", this.refresh);
     this.inspector.selection.off("pseudoclass", this.refresh);
     this.inspector.selection.off("new-node-front", this.onSelected);
-    this.inspector.selection.off("detached", this.onSelected);
+    this.inspector.selection.off("detached-front", this.onSelected);
     this.inspector.sidebar.off("computedview-selected", this.onPanelSelected);
     if (this.inspector.pageStyle) {
       this.inspector.pageStyle.off("stylesheet-updated", this.refresh);

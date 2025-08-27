@@ -119,7 +119,7 @@ nsScriptLoadRequest::MaybeCancelOffThreadScript()
     return;
   }
 
-  JSContext* cx = JS_GetContext(xpc::GetJSRuntime());
+  JSContext* cx = danger::GetJSContext();
   JS::CancelOffThreadScript(cx, mOffThreadToken);
   mOffThreadToken = nullptr;
 }
@@ -1196,7 +1196,7 @@ public:
     : mLoader(aLoader)
     , mRequest(aRequest)
   {}
-  NS_IMETHODIMP Run()
+  NS_IMETHOD Run() override
   {
     return mLoader->ProcessRequest(mRequest);
   }

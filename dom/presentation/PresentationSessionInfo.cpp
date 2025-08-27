@@ -15,7 +15,7 @@
 #include "nsContentUtils.h"
 #include "nsGlobalWindow.h"
 #include "nsIDocShell.h"
-#include "nsIFrameLoader.h"
+#include "nsFrameLoader.h"
 #include "nsIMutableArray.h"
 #include "nsINetAddr.h"
 #include "nsISocketTransport.h"
@@ -305,13 +305,17 @@ PresentationSessionInfo::Close(nsresult aReason,
       if (!mControlChannel) {
         nsCOMPtr<nsIPresentationControlChannel> ctrlChannel;
         nsresult rv = mDevice->EstablishControlChannel(getter_AddRefs(ctrlChannel));
-        if (NS_SUCCEEDED(rv)) {
-          SetControlChannel(ctrlChannel);
+        if (NS_FAILED(rv)) {
+          Shutdown(rv);
+          return rv;
         }
+
+        SetControlChannel(ctrlChannel);
         return rv;
       }
 
-      return mControlChannel->Terminate(mSessionId);
+      ContinueTermination();
+      return NS_OK;
     }
   }
 
@@ -854,8 +858,10 @@ PresentationControllingInfo::NotifyDisconnected(nsresult aReason)
 
   if (NS_WARN_IF(NS_FAILED(aReason) || !mIsResponderReady)) {
     // The presentation session instance may already exist.
-    // Change the state to TERMINATED since it never succeeds.
-    SetStateWithReason(nsIPresentationSessionListener::STATE_TERMINATED, aReason);
+    // Change the state to CLOSED if it is not terminated.
+    if (nsIPresentationSessionListener::STATE_TERMINATED != mState) {
+      SetStateWithReason(nsIPresentationSessionListener::STATE_CLOSED, aReason);
+    }
 
     // Reply error for an abnormal close.
     return ReplyError(NS_ERROR_DOM_OPERATION_ERR);
@@ -1209,6 +1215,17 @@ PresentationPresentingInfo::NotifyResponderReady()
   return NS_OK;
 }
 
+nsresult
+PresentationPresentingInfo::NotifyResponderFailure()
+{
+  if (mTimer) {
+    mTimer->Cancel();
+    mTimer = nullptr;
+  }
+
+  return ReplyError(NS_ERROR_DOM_OPERATION_ERR);
+}
+
 // nsIPresentationControlChannelListener
 NS_IMETHODIMP
 PresentationPresentingInfo::OnOffer(nsIPresentationChannelDescription* aDescription)
@@ -1349,9 +1366,8 @@ PresentationPresentingInfo::ResolvedCallback(JSContext* aCx,
     return;
   }
 
-  nsCOMPtr<nsIFrameLoader> frameLoader;
-  rv = owner->GetFrameLoader(getter_AddRefs(frameLoader));
-  if (NS_WARN_IF(NS_FAILED(rv))) {
+  nsCOMPtr<nsIFrameLoader> frameLoader = owner->GetFrameLoader();
+  if (NS_WARN_IF(!frameLoader)) {
     ReplyError(NS_ERROR_DOM_OPERATION_ERR);
     return;
   }

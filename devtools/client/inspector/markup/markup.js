@@ -61,10 +61,7 @@ const {XPCOMUtils} = require("resource://gre/modules/XPCOMUtils.jsm");
 /* eslint-enable mozilla/reject-some-requires */
 const {getCssProperties} = require("devtools/shared/fronts/css-properties");
 
-loader.lazyRequireGetter(this, "CSS", "CSS");
-loader.lazyGetter(this, "AutocompletePopup", () => {
-  return require("devtools/client/shared/autocomplete-popup").AutocompletePopup;
-});
+const {AutocompletePopup} = require("devtools/client/shared/autocomplete-popup");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
   "resource://gre/modules/PluralForm.jsm");
@@ -133,7 +130,7 @@ function MarkupView(inspector, frame, controllerWindow) {
   this._onCopy = this._onCopy.bind(this);
   this._onFocus = this._onFocus.bind(this);
   this._onMouseMove = this._onMouseMove.bind(this);
-  this._onMouseLeave = this._onMouseLeave.bind(this);
+  this._onMouseOut = this._onMouseOut.bind(this);
   this._onToolboxPickerHover = this._onToolboxPickerHover.bind(this);
   this._onCollapseAttributesPrefChange =
     this._onCollapseAttributesPrefChange.bind(this);
@@ -145,7 +142,7 @@ function MarkupView(inspector, frame, controllerWindow) {
   // Listening to various events.
   this._elt.addEventListener("click", this._onMouseClick, false);
   this._elt.addEventListener("mousemove", this._onMouseMove, false);
-  this._elt.addEventListener("mouseleave", this._onMouseLeave, false);
+  this._elt.addEventListener("mouseout", this._onMouseOut, false);
   this._elt.addEventListener("blur", this._onBlur, true);
   this.win.addEventListener("mouseup", this._onMouseUp);
   this.win.addEventListener("copy", this._onCopy);
@@ -402,7 +399,12 @@ MarkupView.prototype = {
     this._hoveredNode = nodeFront;
   },
 
-  _onMouseLeave: function () {
+  _onMouseOut: function (event) {
+    // Emulate mouseleave by skipping any relatedTarget inside the markup-view.
+    if (this._elt.contains(event.relatedTarget)) {
+      return;
+    }
+
     if (this._autoScrollAnimationFrame) {
       this.win.cancelAnimationFrame(this._autoScrollAnimationFrame);
     }
@@ -895,9 +897,9 @@ MarkupView.prototype = {
           }
 
           let isNextSiblingText = nextSibling ?
-            nextSibling.nodeType === Ci.nsIDOMNode.TEXT_NODE : false;
+            nextSibling.nodeType === nodeConstants.TEXT_NODE : false;
           let isPrevSiblingText = prevSibling ?
-            prevSibling.nodeType === Ci.nsIDOMNode.TEXT_NODE : false;
+            prevSibling.nodeType === nodeConstants.TEXT_NODE : false;
 
           // If the parent had two children and the next or previous sibling
           // is a text node, then it now has only a single text node, is about
@@ -1742,7 +1744,7 @@ MarkupView.prototype = {
 
     this._elt.removeEventListener("click", this._onMouseClick, false);
     this._elt.removeEventListener("mousemove", this._onMouseMove, false);
-    this._elt.removeEventListener("mouseleave", this._onMouseLeave, false);
+    this._elt.removeEventListener("mouseout", this._onMouseOut, false);
     this._elt.removeEventListener("blur", this._onBlur, true);
     this.win.removeEventListener("mouseup", this._onMouseUp);
     this.win.removeEventListener("copy", this._onCopy);
@@ -2902,11 +2904,7 @@ function TextEditor(container, node, templateId) {
     stopOnReturn: true,
     trigger: "dblclick",
     multiline: true,
-    maxWidth: () => {
-      let elementRect = this.value.getBoundingClientRect();
-      let containerRect = this.container.elt.getBoundingClientRect();
-      return containerRect.right - elementRect.left - 2;
-    },
+    maxWidth: () => getAutocompleteMaxWidth(this.value, this.container.elt),
     trimOutput: false,
     done: (val, commit) => {
       if (!commit) {
@@ -3001,6 +2999,8 @@ function ElementEditor(container, node) {
     this.tag.setAttribute("tabindex", "-1");
     editableField({
       element: this.tag,
+      multiline: true,
+      maxWidth: () => getAutocompleteMaxWidth(this.tag, this.container.elt),
       trigger: "dblclick",
       stopOnReturn: true,
       done: this.onTagEdit.bind(this),
@@ -3011,6 +3011,8 @@ function ElementEditor(container, node) {
   // Make the new attribute space editable.
   this.newAttr.editMode = editableField({
     element: this.newAttr,
+    multiline: true,
+    maxWidth: () => getAutocompleteMaxWidth(this.newAttr, this.container.elt),
     trigger: "dblclick",
     stopOnReturn: true,
     contentType: InplaceEditor.CONTENT_TYPES.CSS_MIXED,
@@ -3231,6 +3233,8 @@ ElementEditor.prototype = {
       stopOnReturn: true,
       selectAll: false,
       initial: initial,
+      multiline: true,
+      maxWidth: () => getAutocompleteMaxWidth(inner, this.container.elt),
       contentType: InplaceEditor.CONTENT_TYPES.CSS_MIXED,
       popup: this.markup.popup,
       start: (editor, event) => {
@@ -3416,9 +3420,9 @@ ElementEditor.prototype = {
           let newAttributeIndex;
           if (isDeletedAttribute) {
             newAttributeIndex = attributeIndex;
-          } else if (direction == Ci.nsIFocusManager.MOVEFOCUS_FORWARD) {
+          } else if (direction == Services.focus.MOVEFOCUS_FORWARD) {
             newAttributeIndex = attributeIndex + 1;
-          } else if (direction == Ci.nsIFocusManager.MOVEFOCUS_BACKWARD) {
+          } else if (direction == Services.focus.MOVEFOCUS_BACKWARD) {
             newAttributeIndex = attributeIndex - 1;
           }
 
@@ -3601,6 +3605,17 @@ function map(value, oldMin, oldMax, newMin, newMax) {
     return value;
   }
   return newMin + (newMax - newMin) * ((value - oldMin) / ratio);
+}
+
+/**
+ * Retrieve the available width between a provided element left edge and a container right
+ * edge. This used can be used as a max-width for inplace-editor (autocomplete) widgets
+ * replacing Editor elements of the the markup-view;
+ */
+function getAutocompleteMaxWidth(element, container) {
+  let elementRect = element.getBoundingClientRect();
+  let containerRect = container.getBoundingClientRect();
+  return containerRect.right - elementRect.left - 2;
 }
 
 loader.lazyGetter(MarkupView.prototype, "strings", () => Services.strings.createBundle(

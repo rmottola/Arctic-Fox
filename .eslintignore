@@ -80,11 +80,11 @@ devtools/client/commandline/**
 devtools/client/debugger/**
 devtools/client/eyedropper/**
 devtools/client/framework/**
+!devtools/client/framework/selection.js
 devtools/client/jsonview/lib/**
 devtools/client/memory/**
 devtools/client/netmonitor/test/**
 devtools/client/netmonitor/har/test/**
-devtools/client/performance/**
 devtools/client/projecteditor/**
 devtools/client/promisedebugger/**
 devtools/client/responsivedesign/**
@@ -96,7 +96,7 @@ devtools/client/shared/components/test/**
 devtools/client/shared/redux/middleware/test/**
 devtools/client/shared/test/**
 devtools/client/shared/widgets/*.jsm
-devtools/client/sourceeditor/**
+devtools/client/sourceeditor/test/*.js
 devtools/client/webaudioeditor/**
 devtools/client/webconsole/**
 !devtools/client/webconsole/panel.js
@@ -116,9 +116,12 @@ devtools/server/**
 !devtools/server/actors/string.js
 !devtools/server/actors/csscoverage.js
 devtools/shared/*.js
+!devtools/shared/async-storage.js
+!devtools/shared/async-utils.js
 !devtools/shared/css-lexer.js
 !devtools/shared/defer.js
 !devtools/shared/event-emitter.js
+!devtools/shared/indentation.js
 !devtools/shared/loader-plugin-raw.jsm
 !devtools/shared/task.js
 devtools/shared/*.jsm

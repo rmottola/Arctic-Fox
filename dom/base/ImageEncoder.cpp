@@ -33,7 +33,7 @@ public:
 
   // It retrieves a SourceSurface reference and convert color format on main
   // thread and passes DataSourceSurface to caller thread.
-  NS_IMETHOD Run() {
+  NS_IMETHOD Run() override {
     // It guarantees the reference will be released on main thread.
     nsCountedRef<nsMainThreadSourceSurfaceRef> surface;
     surface.own(mImage->GetAsSourceSurface().take());
@@ -501,7 +501,7 @@ class EncoderThreadPoolTerminator final : public nsIObserver
   public:
     NS_DECL_ISUPPORTS
 
-    NS_IMETHODIMP Observe(nsISupports *, const char *topic, const char16_t *) override
+    NS_IMETHOD Observe(nsISupports *, const char *topic, const char16_t *) override
     {
       NS_ASSERTION(!strcmp(topic, "xpcom-shutdown-threads"),
                    "Unexpected topic");

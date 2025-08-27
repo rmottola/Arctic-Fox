@@ -17,7 +17,7 @@
 #define ONEDAY_IN_MSEC (24 * 60 * 60 * 1000)
 #define MAX_UPLOAD_ATTEMPTS 20
 
-mozilla::Atomic<bool> WriteStumbleOnThread::sIsUploading(false);
+mozilla::Atomic<bool> WriteStumbleOnThread::sIsFileWaitingForUpload(false);
 mozilla::Atomic<bool> WriteStumbleOnThread::sIsAlreadyRunning(false);
 WriteStumbleOnThread::UploadFreqGuard WriteStumbleOnThread::sUploadFreqGuard = {0};
 
@@ -30,7 +30,7 @@ class DeleteRunnable : public Runnable
   public:
     DeleteRunnable() {}
 
-    NS_IMETHODIMP
+    NS_IMETHOD
     Run() override
     {
       nsCOMPtr<nsIFile> tmpFile;
@@ -42,7 +42,8 @@ class DeleteRunnable : public Runnable
         tmpFile->Remove(true);
       }
       // critically, this sets this flag to false so writing can happen again
-      WriteStumbleOnThread::sIsUploading = false;
+      WriteStumbleOnThread::sIsAlreadyRunning = false;
+      WriteStumbleOnThread::sIsFileWaitingForUpload = false;
       return NS_OK;
     }
 
@@ -50,11 +51,17 @@ class DeleteRunnable : public Runnable
     ~DeleteRunnable() {}
 };
 
+bool
+WriteStumbleOnThread::IsFileWaitingForUpload()
+{
+  return sIsFileWaitingForUpload;
+}
+
 void
 WriteStumbleOnThread::UploadEnded(bool deleteUploadFile)
 {
   if (!deleteUploadFile) {
-    sIsUploading = false;
+    sIsAlreadyRunning = false;
     return;
   }
 
@@ -195,7 +202,9 @@ WriteStumbleOnThread::Run()
 
   if (UploadFileStatus::NoFile != status) {
     if (UploadFileStatus::ExistsAndReadyToUpload == status) {
+      sIsFileWaitingForUpload = true;
       Upload();
+      return NS_OK;
     }
   } else {
     Partition partition = GetWritePosition();
@@ -206,6 +215,7 @@ WriteStumbleOnThread::Run()
     }
   }
 
+  sIsFileWaitingForUpload = false;
   sIsAlreadyRunning = false;
   return NS_OK;
 }
@@ -250,11 +260,6 @@ WriteStumbleOnThread::Upload()
 {
   MOZ_ASSERT(!NS_IsMainThread());
 
-  bool b = sIsUploading.exchange(true);
-  if (b) {
-    return;
-  }
-
   time_t seconds = time(0);
   int day = seconds / (60 * 60 * 24);
 
@@ -266,7 +271,7 @@ WriteStumbleOnThread::Upload()
   sUploadFreqGuard.attempts++;
   if (sUploadFreqGuard.attempts > MAX_UPLOAD_ATTEMPTS) {
     STUMBLER_ERR("Too many upload attempts today");
-    sIsUploading = false;
+    sIsAlreadyRunning = false;
     return;
   }
 
@@ -277,12 +282,12 @@ WriteStumbleOnThread::Upload()
   rv = tmpFile->GetFileSize(&fileSize);
   if (NS_WARN_IF(NS_FAILED(rv))) {
     STUMBLER_ERR("GetFileSize failed");
-    sIsUploading = false;
+    sIsAlreadyRunning = false;
     return;
   }
 
   if (fileSize <= 0) {
-    sIsUploading = false;
+    sIsAlreadyRunning = false;
     return;
   }
 
@@ -290,7 +295,7 @@ WriteStumbleOnThread::Upload()
   nsCOMPtr<nsIInputStream> inStream;
   rv = NS_NewLocalFileInputStream(getter_AddRefs(inStream), tmpFile);
   if (NS_FAILED(rv)) {
-    sIsUploading = false;
+    sIsAlreadyRunning = false;
     return;
   }
 

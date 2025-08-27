@@ -68,7 +68,7 @@ public:
   {
   }
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     nsCOMPtr<nsIMemoryInfoDumper> dumper =
       do_GetService("@mozilla.org/memory-info-dumper;1");
@@ -333,12 +333,12 @@ public:
   {
   }
 
-  NS_IMETHODIMP OnFinish() override
+  NS_IMETHOD OnFinish() override
   {
     return NS_ERROR_UNEXPECTED;
   }
 
-  NS_IMETHODIMP OnDump(nsIFile* aGCLog, nsIFile* aCCLog, bool aIsParent) override
+  NS_IMETHOD OnDump(nsIFile* aGCLog, nsIFile* aCCLog, bool aIsParent) override
   {
     return mCallback->OnDump(aGCLog, aCCLog, aIsParent);
   }

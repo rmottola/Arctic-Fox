@@ -1,5 +1,7 @@
 /* Any copyright is dedicated to the Public Domain.
    http://creativecommons.org/publicdomain/zero/1.0/ */
+/* eslint no-unused-vars: [2, {"vars": "local"}] */
+
 "use strict";
 
 var { classes: Cc, interfaces: Ci, utils: Cu, results: Cr } = Components;
@@ -148,13 +150,14 @@ function checkFrameString({ frame, file, line, column, source, functionName, sho
 
   let $func = $(".frame-link-function-display-name");
   let $source = $(".frame-link-source");
+  let $sourceInner = $(".frame-link-source-inner");
   let $filename = $(".frame-link-filename");
   let $line = $(".frame-link-line");
 
   is($filename.textContent, file, "Correct filename");
   is(el.getAttribute("data-line"), line ? `${line}` : null, "Expected `data-line` found");
   is(el.getAttribute("data-column"), column ? `${column}` : null, "Expected `data-column` found");
-  is($source.getAttribute("title"), tooltip, "Correct tooltip");
+  is($sourceInner.getAttribute("title"), tooltip, "Correct tooltip");
   is($source.tagName, shouldLink ? "A" : "SPAN", "Correct linkable status");
   if (shouldLink) {
     is($source.getAttribute("href"), source, "Correct source");

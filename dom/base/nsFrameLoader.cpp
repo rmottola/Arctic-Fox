@@ -1535,7 +1535,7 @@ public:
   explicit nsFrameLoaderDestroyRunnable(nsFrameLoader* aFrameLoader)
    : mFrameLoader(aFrameLoader), mPhase(eDestroyDocShell) {}
 
-  NS_IMETHODIMP Run() override;
+  NS_IMETHOD Run() override;
 };
 
 void
@@ -2741,7 +2741,7 @@ public:
   {
   }
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     nsInProcessTabChildGlobal* tabChild =
       static_cast<nsInProcessTabChildGlobal*>(mFrameLoader->mChildMessageManager.get());

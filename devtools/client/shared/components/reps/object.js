@@ -10,7 +10,6 @@ define(function (require, exports, module) {
   // Dependencies
   const React = require("devtools/client/shared/vendor/react");
   const { createFactories } = require("./rep-utils");
-  const { ObjectBox } = createFactories(require("./object-box"));
   const { Caption } = createFactories(require("./caption"));
   const { PropRep } = createFactories(require("./prop-rep"));
   // Shortcuts
@@ -78,7 +77,7 @@ define(function (require, exports, module) {
           key: "more",
           object: objectLink({
             object: object
-          }, "more…")
+          }, (Object.keys(object).length - max) + " more…")
         }));
       } else if (props.length > 0) {
         // Remove the last comma.
@@ -138,14 +137,14 @@ define(function (require, exports, module) {
 
       if (this.props.mode == "tiny" || !props.length) {
         return (
-          ObjectBox({className: "object"},
+          span({className: "objectBox objectBox-object"},
             objectLink({className: "objectTitle"}, this.getTitle())
           )
         );
       }
 
       return (
-        ObjectBox({className: "object"},
+        span({className: "objectBox objectBox-object"},
           this.getTitle(object),
           objectLink({
             className: "objectLeftBrace",

@@ -29,14 +29,10 @@ const {createChild, promiseWarn, throttle} = require("devtools/client/inspector/
 const {gDevTools} = require("devtools/client/framework/devtools");
 const {getCssProperties} = require("devtools/shared/fronts/css-properties");
 
-loader.lazyRequireGetter(this, "overlays",
-  "devtools/client/inspector/shared/style-inspector-overlays");
-loader.lazyRequireGetter(this, "EventEmitter",
-  "devtools/shared/event-emitter");
-loader.lazyRequireGetter(this, "StyleInspectorMenu",
-  "devtools/client/inspector/shared/style-inspector-menu");
-loader.lazyRequireGetter(this, "KeyShortcuts",
-  "devtools/client/shared/key-shortcuts", true);
+const overlays = require("devtools/client/inspector/shared/style-inspector-overlays");
+const EventEmitter = require("devtools/shared/event-emitter");
+const StyleInspectorMenu = require("devtools/client/inspector/shared/style-inspector-menu");
+const {KeyShortcuts} = require("devtools/client/shared/key-shortcuts");
 
 XPCOMUtils.defineLazyGetter(this, "clipboardHelper", function () {
   return Cc["@mozilla.org/widget/clipboardhelper;1"]
@@ -48,9 +44,7 @@ XPCOMUtils.defineLazyGetter(this, "_strings", function () {
     "chrome://devtools-shared/locale/styleinspector.properties");
 });
 
-loader.lazyGetter(this, "AutocompletePopup", function () {
-  return require("devtools/client/shared/autocomplete-popup").AutocompletePopup;
-});
+const {AutocompletePopup} = require("devtools/client/shared/autocomplete-popup");
 
 const HTML_NS = "http://www.w3.org/1999/xhtml";
 const PREF_UA_STYLES = "devtools.inspector.showUserAgentStyles";
@@ -1597,7 +1591,7 @@ function RuleViewTool(inspector, window) {
   this.view.on("ruleview-refreshed", this.onViewRefreshed);
   this.view.on("ruleview-linked-clicked", this.onLinkClicked);
 
-  this.inspector.selection.on("detached", this.onSelected);
+  this.inspector.selection.on("detached-front", this.onSelected);
   this.inspector.selection.on("new-node-front", this.onSelected);
   this.inspector.selection.on("pseudoclass", this.refresh);
   this.inspector.target.on("navigate", this.clearUserProperties);
@@ -1728,7 +1722,7 @@ RuleViewTool.prototype = {
   destroy: function () {
     this.inspector.walker.off("mutations", this.onMutations);
     this.inspector.walker.off("resize", this.onResized);
-    this.inspector.selection.off("detached", this.onSelected);
+    this.inspector.selection.off("detached-front", this.onSelected);
     this.inspector.selection.off("pseudoclass", this.refresh);
     this.inspector.selection.off("new-node-front", this.onSelected);
     this.inspector.target.off("navigate", this.clearUserProperties);

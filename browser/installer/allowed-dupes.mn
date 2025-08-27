@@ -633,6 +633,8 @@ browser/chrome/devtools/modules/devtools/client/webconsole/utils.js
 browser/chrome/devtools/modules/devtools/server/actors/utils/webconsole-utils.js
 browser/chrome/devtools/content/debugger/new/images/breakpoint.svg
 browser/chrome/devtools/content/debugger/new/images/settings.svg
+browser/chrome/devtools/modules/devtools/client/responsive.html/images/close.svg
+browser/chrome/devtools/skin/images/close.svg
 
 browser/chrome/browser/defaults/permissions
 browser/defaults/permissions

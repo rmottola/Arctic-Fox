@@ -99,8 +99,8 @@ private:
   virtual ~DataChannelShutdown() {}
 
 public:
-  NS_IMETHODIMP Observe(nsISupports* aSubject, const char* aTopic,
-                        const char16_t* aData) override {
+  NS_IMETHOD Observe(nsISupports* aSubject, const char* aTopic,
+                     const char16_t* aData) override {
     if (strcmp(aTopic, "xpcom-will-shutdown") == 0) {
       LOG(("Shutting down SCTP"));
       if (sctp_initialized) {
@@ -2300,7 +2300,7 @@ public:
     mBlob(aBlob)
   {}
 
-  NS_IMETHODIMP Run() {
+  NS_IMETHOD Run() override {
     // ReadBlob() is responsible to releasing the reference
     DataChannelConnection *self = mConnection;
     self->ReadBlob(mConnection.forget(), mStream, mBlob);
@@ -2353,7 +2353,7 @@ public:
     }
   }
 
-  NS_IMETHODIMP Run()
+  NS_IMETHOD Run() override
   {
     ASSERT_WEBRTC(NS_IsMainThread());
 

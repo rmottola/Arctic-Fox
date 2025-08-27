@@ -42,13 +42,13 @@ class JS_FRIEND_API(OwningCompileOptions);
 class JS_FRIEND_API(TransitiveCompileOptions);
 class JS_PUBLIC_API(CompartmentOptions);
 
+struct RootingContext;
 class Value;
 struct Zone;
 
 } /* namespace JS */
 
 namespace js {
-struct ContextFriendFields;
 class RootLists;
 } // namespace js
 
@@ -184,7 +184,7 @@ class JS_PUBLIC_API(AutoGCRooter)
 {
   public:
     AutoGCRooter(JSContext* cx, ptrdiff_t tag);
-    AutoGCRooter(js::ContextFriendFields* cx, ptrdiff_t tag);
+    AutoGCRooter(JS::RootingContext* cx, ptrdiff_t tag);
 
     ~AutoGCRooter() {
         MOZ_ASSERT(this == *stackTop);
@@ -321,7 +321,29 @@ class RootLists
     void finishPersistentRoots();
 };
 
-struct ContextFriendFields
+} // namespace js
+
+namespace JS {
+
+/*
+ * JS::RootingContext is a base class of ContextFriendFields and JSContext.
+ * This class can be used to let code construct a Rooted<> or PersistentRooted<>
+ * instance, without giving it full access to the JSContext.
+ */
+struct RootingContext
+{
+    js::RootLists roots;
+
+    static RootingContext* get(JSContext* cx) {
+        return reinterpret_cast<RootingContext*>(cx);
+    }
+};
+
+} // namespace JS
+
+namespace js {
+
+struct ContextFriendFields : public JS::RootingContext
 {
   protected:
     JSRuntime* const     runtime_;
@@ -333,9 +355,6 @@ struct ContextFriendFields
     JS::Zone*           zone_;
 
   public:
-    /* Rooting structures. */
-    RootLists           roots;
-
     explicit ContextFriendFields(JSRuntime* rt)
       : runtime_(rt), compartment_(nullptr), zone_(nullptr)
     {}

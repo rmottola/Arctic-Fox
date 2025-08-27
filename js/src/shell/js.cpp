@@ -1224,7 +1224,6 @@ my_LargeAllocFailCallback(void* data)
         return;
 
     MOZ_ASSERT(!rt->isHeapBusy());
-    MOZ_ASSERT(!rt->currentThreadHasExclusiveAccess());
 
     JS::PrepareForFullGC(cx);
     AutoKeepAtoms keepAtoms(cx->perThreadData);
@@ -4515,7 +4514,7 @@ PrintProfilerEvents(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (cx->runtime()->spsProfiler.enabled())
-        js::RegisterRuntimeProfilingEventMarker(cx->runtime(), &PrintProfilerEvents_Callback);
+        js::RegisterContextProfilingEventMarker(cx, &PrintProfilerEvents_Callback);
     args.rval().setUndefined();
     return true;
 }
@@ -4527,10 +4526,10 @@ Vector<StackChars, 0, SystemAllocPolicy> stacks;
 static void
 SingleStepCallback(void* arg, jit::Simulator* sim, void* pc)
 {
-    JSRuntime* rt = reinterpret_cast<JSRuntime*>(arg);
+    JSContext* cx = reinterpret_cast<JSContext*>(arg);
 
     // If profiling is not enabled, don't do anything.
-    if (!rt->spsProfiler.enabled())
+    if (!cx->spsProfiler.enabled())
         return;
 
     JS::ProfilingFrameIterator::RegisterState state;
@@ -4547,7 +4546,7 @@ SingleStepCallback(void* arg, jit::Simulator* sim, void* pc)
     StackChars stack;
     uint32_t frameNo = 0;
     AutoEnterOOMUnsafeRegion oomUnsafe;
-    for (JS::ProfilingFrameIterator i(rt, state); !i.done(); ++i) {
+    for (JS::ProfilingFrameIterator i(cx, state); !i.done(); ++i) {
         MOZ_ASSERT(i.stackAddress() != nullptr);
         MOZ_ASSERT(lastStackAddress <= i.stackAddress());
         lastStackAddress = i.stackAddress();
@@ -4582,7 +4581,7 @@ EnableSingleStepProfiling(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     jit::Simulator* sim = cx->runtime()->simulator();
-    sim->enable_single_stepping(SingleStepCallback, cx->runtime());
+    sim->enable_single_stepping(SingleStepCallback, cx);
 
     args.rval().setUndefined();
     return true;
@@ -4640,13 +4639,13 @@ EnableSPSProfiling(JSContext* cx, unsigned argc, Value* vp)
     ShellContext* sc = GetShellContext(cx);
 
     // Disable before re-enabling; see the assertion in |SPSProfiler::setProfilingStack|.
-    if (cx->runtime()->spsProfiler.installed())
-        cx->runtime()->spsProfiler.enable(false);
+    if (cx->spsProfiler.installed())
+        cx->spsProfiler.enable(false);
 
-    SetRuntimeProfilingStack(cx->runtime(), sc->spsProfilingStack, &sc->spsProfilingStackSize,
+    SetContextProfilingStack(cx, sc->spsProfilingStack, &sc->spsProfilingStackSize,
                              ShellContext::SpsProfilingMaxStackSize);
-    cx->runtime()->spsProfiler.enableSlowAssertions(false);
-    cx->runtime()->spsProfiler.enable(true);
+    cx->spsProfiler.enableSlowAssertions(false);
+    cx->spsProfiler.enable(true);
 
     args.rval().setUndefined();
     return true;
@@ -4660,25 +4659,25 @@ EnableSPSProfilingWithSlowAssertions(JSContext* cx, unsigned argc, Value* vp)
 
     ShellContext* sc = GetShellContext(cx);
 
-    if (cx->runtime()->spsProfiler.enabled()) {
+    if (cx->spsProfiler.enabled()) {
         // If profiling already enabled with slow assertions disabled,
         // this is a no-op.
-        if (cx->runtime()->spsProfiler.slowAssertionsEnabled())
+        if (cx->spsProfiler.slowAssertionsEnabled())
             return true;
 
         // Slow assertions are off.  Disable profiling before re-enabling
         // with slow assertions on.
-        cx->runtime()->spsProfiler.enable(false);
+        cx->spsProfiler.enable(false);
     }
 
     // Disable before re-enabling; see the assertion in |SPSProfiler::setProfilingStack|.
-    if (cx->runtime()->spsProfiler.installed())
-        cx->runtime()->spsProfiler.enable(false);
+    if (cx->spsProfiler.installed())
+        cx->spsProfiler.enable(false);
 
-    SetRuntimeProfilingStack(cx->runtime(), sc->spsProfilingStack, &sc->spsProfilingStackSize,
+    SetContextProfilingStack(cx, sc->spsProfilingStack, &sc->spsProfilingStackSize,
                              ShellContext::SpsProfilingMaxStackSize);
-    cx->runtime()->spsProfiler.enableSlowAssertions(true);
-    cx->runtime()->spsProfiler.enable(true);
+    cx->spsProfiler.enableSlowAssertions(true);
+    cx->spsProfiler.enable(true);
 
     return true;
 }

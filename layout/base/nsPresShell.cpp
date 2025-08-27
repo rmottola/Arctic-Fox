@@ -3644,7 +3644,7 @@ public:
 
   NS_DECL_ISUPPORTS
 
-  NS_IMETHODIMP Notify(nsITimer* aTimer) final
+  NS_IMETHOD Notify(nsITimer* aTimer) final
   {
     mShell->SetNextPaintCompressed();
     mShell->AddInvalidateHiddenPresShellObserver(mShell->GetPresContext()->RefreshDriver());
@@ -6699,7 +6699,7 @@ public:
   explicit AsyncCheckPointerCaptureStateCaller(int32_t aPointerId)
     : mPointerId(aPointerId) {}
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     nsIPresShell::CheckPointerCaptureState(mPointerId);
     return NS_OK;

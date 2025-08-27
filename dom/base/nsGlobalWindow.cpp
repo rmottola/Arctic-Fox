@@ -481,7 +481,7 @@ public:
     return mWindow->Observe(aSubject, aTopic, aData);
   }
   void Forget() { mWindow = nullptr; }
-  NS_IMETHODIMP GetInterface(const nsIID& aIID, void** aResult) override
+  NS_IMETHOD GetInterface(const nsIID& aIID, void** aResult) override
   {
     if (mWindow && aIID.Equals(NS_GET_IID(nsIDOMWindow)) && mWindow) {
       return mWindow->QueryInterface(aIID, aResult);
@@ -2265,7 +2265,7 @@ NS_DEFINE_STATIC_IID_ACCESSOR(WindowStateHolder, WINDOWSTATEHOLDER_IID)
 
 WindowStateHolder::WindowStateHolder(nsGlobalWindow* aWindow)
   : mInnerWindow(aWindow),
-    mInnerWindowReflector(nsContentUtils::RootingCx(), aWindow->GetWrapper())
+    mInnerWindowReflector(RootingCx(), aWindow->GetWrapper())
 {
   NS_PRECONDITION(aWindow, "null window");
   NS_PRECONDITION(aWindow->IsInnerWindow(), "Saving an outer window");
@@ -2343,103 +2343,6 @@ InitializeLegacyNetscapeObject(JSContext* aCx, JS::Handle<JSObject*> aGlobal)
   return JS_DefineFunctions(aCx, obj, EnablePrivilegeSpec);
 }
 
-/**
- * Returns true if the "HTTPS state" of the document should be "modern". See:
- *
- * https://html.spec.whatwg.org/#concept-document-https-state
- * https://fetch.spec.whatwg.org/#concept-response-https-state
- *
- * Note: this function only relates to figuring out HTTPS state, which is an
- * input to the Secure Context algorithm.  We are not actually implementing any
- * part of the Secure Context algorithm itself here.
- *
- * This is a bit of a hack.  Ideally we'd propagate HTTPS state through
- * nsIChannel as described in the Fetch and HTML specs, but making channels
- * know about whether they should inherit HTTPS state, propagating information
- * about who the channel's "client" is, exposing GetHttpsState API on channels
- * and modifying the various cache implementations to store and retrieve HTTPS
- * state involves a huge amount of code (see bug 1220687).  We avoid that for
- * now using this function.
- *
- * This function takes advantage of the observation that we can return true if
- * nsIContentSecurityManager::IsOriginPotentiallyTrustworthy returns true for
- * the document's origin (e.g. the origin has a scheme of 'https' or host
- * 'localhost' etc.).  Since we generally propagate a creator document's origin
- * onto data:, blob:, etc. documents, this works for them too.
- *
- * The scenario where this observation breaks down is sandboxing without the
- * 'allow-same-origin' flag, since in this case a document is given a unique
- * origin (IsOriginPotentiallyTrustworthy would return false).  We handle that
- * by using the origin that the document would have had had it not been
- * sandboxed.
- *
- * DEFICIENCIES: Note that this function uses nsIScriptSecurityManager's
- * getChannelResultPrincipalIfNotSandboxed, and that method's ignoring of
- * sandboxing is limited to the immediate sandbox.  In the case that aDocument
- * should inherit its origin (e.g. data: URI) but its parent has ended up
- * with a unique origin due to sandboxing further up the parent chain we may
- * end up returning false when we would ideally return true (since we will
- * examine the parent's origin for 'https' and not finding it.)  This means
- * that we may restrict the privileges of some pages unnecessarily in this
- * edge case.
- */
-static bool HttpsStateIsModern(nsIDocument* aDocument)
-{
-  nsCOMPtr<nsIPrincipal> principal = aDocument->NodePrincipal();
-
-  if (principal->GetIsSystemPrincipal()) {
-    return true;
-  }
-
-  // If aDocument is sandboxed, try and get the principal that it would have
-  // been given had it not been sandboxed:
-  if (principal->GetIsNullPrincipal() &&
-      (aDocument->GetSandboxFlags() & SANDBOXED_ORIGIN)) {
-    nsIChannel* channel = aDocument->GetChannel();
-    if (channel) {
-      nsCOMPtr<nsIScriptSecurityManager> ssm =
-        nsContentUtils::GetSecurityManager();
-      nsresult rv =
-        ssm->GetChannelResultPrincipalIfNotSandboxed(channel,
-                                                     getter_AddRefs(principal));
-      if (NS_FAILED(rv)) {
-        return false;
-      }
-      if (principal->GetIsSystemPrincipal()) {
-        // If a document with the system principal is sandboxing a subdocument
-        // that would normally inherit the embedding element's principal (e.g.
-        // a srcdoc document) then the embedding document does not trust the
-        // content that is written to the embedded document.  Unlike when the
-        // embedding document is https, in this case we have no indication as
-        // to whether the embedded document's contents are delivered securely
-        // or not, and the sandboxing would possibly indicate that they were
-        // not.  To play it safe we return false here.  (See bug 1162772
-        // comment 73-80.)
-        return false;
-      }
-    }
-  }
-
-  if (principal->GetIsNullPrincipal()) {
-    return false;
-  }
-
-  MOZ_ASSERT(principal->GetIsCodebasePrincipal());
-
-  nsCOMPtr<nsIContentSecurityManager> csm =
-    do_GetService(NS_CONTENTSECURITYMANAGER_CONTRACTID);
-  NS_WARN_IF(!csm);
-  if (csm) {
-    bool isTrustworthyOrigin = false;
-    csm->IsOriginPotentiallyTrustworthy(principal, &isTrustworthyOrigin);
-    if (isTrustworthyOrigin) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 bool
 nsGlobalWindow::ComputeIsSecureContext(nsIDocument* aDocument)
 {
@@ -2485,7 +2388,7 @@ nsGlobalWindow::ComputeIsSecureContext(nsIDocument* aDocument)
     return false;
   }
 
-  if (HttpsStateIsModern(aDocument)) {
+  if (nsContentUtils::HttpsStateIsModern(aDocument)) {
     return true;
   }
 
@@ -3635,8 +3538,7 @@ nsGlobalWindow::DefineArgumentsProperty(nsIArray *aArguments)
   nsIScriptContext *ctx = GetOuterWindowInternal()->mContext;
   NS_ENSURE_TRUE(aArguments && ctx, NS_ERROR_NOT_INITIALIZED);
 
-  JS::Rooted<JSObject*> obj(nsContentUtils::RootingCx(),
-                            GetWrapperPreserveColor());
+  JS::Rooted<JSObject*> obj(RootingCx(), GetWrapperPreserveColor());
   return ctx->SetProperty(obj, "arguments", aArguments);
 }
 
@@ -8504,7 +8406,7 @@ public:
     return rv;
   }
 
-  NS_IMETHOD Run() {
+  NS_IMETHOD Run() override {
     if (mWindow) {
       if (mIndirect) {
         return PostCloseEvent(mWindow, false);
@@ -8812,11 +8714,11 @@ nsGlobalWindow::EnterModalState()
   }
 
   if (topWin->mModalStateDepth == 0) {
-    NS_ASSERTION(!mSuspendedDoc, "Shouldn't have mSuspendedDoc here!");
+    NS_ASSERTION(!topWin->mSuspendedDoc, "Shouldn't have mSuspendedDoc here!");
 
-    mSuspendedDoc = topDoc;
-    if (mSuspendedDoc) {
-      mSuspendedDoc->SuppressEventHandling(nsIDocument::eAnimationsOnly);
+    topWin->mSuspendedDoc = topDoc;
+    if (topDoc) {
+      topDoc->SuppressEventHandling(nsIDocument::eAnimationsOnly);
     }
   }
   topWin->mModalStateDepth++;
@@ -8874,7 +8776,7 @@ public:
     NS_ASSERTION(mWindow, "mWindow is null.");
   }
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     nsGlobalWindow::RunPendingTimeoutsRecursive(mWindow, mWindow);
 
@@ -8904,11 +8806,11 @@ nsGlobalWindow::LeaveModalState()
     if (NS_FAILED(NS_DispatchToCurrentThread(runner)))
       NS_WARNING("failed to dispatch pending timeout runnable");
 
-    if (mSuspendedDoc) {
+    if (topWin->mSuspendedDoc) {
       nsCOMPtr<nsIDocument> currentDoc = topWin->GetExtantDoc();
-      mSuspendedDoc->UnsuppressEventHandlingAndFireEvents(nsIDocument::eAnimationsOnly,
-                                                          currentDoc == mSuspendedDoc);
-      mSuspendedDoc = nullptr;
+      topWin->mSuspendedDoc->UnsuppressEventHandlingAndFireEvents(nsIDocument::eAnimationsOnly,
+                                                                  currentDoc == topWin->mSuspendedDoc);
+      topWin->mSuspendedDoc = nullptr;
     }
   }
 
@@ -8975,7 +8877,7 @@ public:
     mWindow = do_GetWeakReference(aWindow);
   }
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     nsCOMPtr<nsIObserverService> observerService =
       services::GetObserverService();
@@ -9066,7 +8968,7 @@ nsGlobalWindow::NotifyDOMWindowThawed(nsGlobalWindow* aWindow) {
 JSObject*
 nsGlobalWindow::GetCachedXBLPrototypeHandler(nsXBLPrototypeHandler* aKey)
 {
-  JS::Rooted<JSObject*> handler(nsContentUtils::RootingCx());
+  JS::Rooted<JSObject*> handler(RootingCx());
   if (mCachedXBLPrototypeHandlers) {
     mCachedXBLPrototypeHandlers->Get(aKey, handler.address());
   }
@@ -9404,7 +9306,7 @@ public:
                          const nsAString& aAction)
   : mWindow(aWindow), mTabChild(aTabChild), mAction(aAction) {}
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     nsCOMPtr<nsPIWindowRoot> root = mWindow->GetTopWindowRoot();
     if (!root) {
@@ -9433,7 +9335,7 @@ public:
                     const nsAString& aAction)
   : mDispatcher(aDispatcher), mAction(aAction) {}
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     return mDispatcher->UpdateCommands(mAction);
   }
@@ -10225,7 +10127,7 @@ public:
     mNewURL.Assign(aNewURL);
   }
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     NS_PRECONDITION(NS_IsMainThread(), "Should be called on the main thread.");
     return mWindow->FireHashchange(mOldURL, mNewURL);
@@ -10830,7 +10732,7 @@ public:
       mCallOnidle(aCallOnidle)
   { }
 
-  NS_IMETHOD Run()
+  NS_IMETHOD Run() override
   {
     if (mIdleWindow->ContainsIdleObserver(mIdleObserver, mTimeInS)) {
       return mCallOnidle ? mIdleObserver->Onidle() : mIdleObserver->Onactive();
@@ -12347,7 +12249,7 @@ nsGlobalWindow::RunTimeoutHandler(nsTimeout* aTimeout,
     // Hold strong ref to ourselves while we call the callback.
     nsCOMPtr<nsISupports> me(static_cast<nsIDOMWindow *>(this));
     ErrorResult rv;
-    JS::Rooted<JS::Value> ignoredVal(CycleCollectedJSRuntime::Get()->Runtime());
+    JS::Rooted<JS::Value> ignoredVal(RootingCx());
     callback->Call(me, handler->GetArgs(), &ignoredVal, rv, reason);
     if (rv.IsUncatchableException()) {
       abortIntervalHandler = true;

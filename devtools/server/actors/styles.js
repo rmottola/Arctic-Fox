@@ -18,7 +18,6 @@ const events = require("sdk/event/core");
 const {UPDATE_PRESERVING_RULES, UPDATE_GENERAL} = require("devtools/server/actors/stylesheets");
 const {pageStyleSpec, styleRuleSpec, ELEMENT_STYLE} = require("devtools/shared/specs/styles");
 
-loader.lazyRequireGetter(this, "CSS", "CSS");
 loader.lazyGetter(this, "CssLogic", () => require("devtools/server/css-logic").CssLogic);
 loader.lazyGetter(this, "SharedCssLogic", () => require("devtools/shared/inspector/css-logic"));
 loader.lazyGetter(this, "DOMUtils", () => Cc["@mozilla.org/inspector/dom-utils;1"].getService(Ci.inIDOMUtils));
@@ -40,7 +39,7 @@ const FONT_PREVIEW_OFFSET = 4;
  * The PageStyle actor lets the client look at the styles on a page, as
  * they are applied to a given node.
  */
-var PageStyleActor = protocol.ActorClassWithSpec(pageStyleSpec, {
+var PageStyleActor = protocol.ActorClass(pageStyleSpec, {
   /**
    * Create a PageStyleActor.
    *
@@ -926,7 +925,7 @@ exports.PageStyleActor = PageStyleActor;
  * (which have a CSSStyle but no CSSRule) we create a StyleRuleActor
  * with a special rule type (100).
  */
-var StyleRuleActor = protocol.ActorClassWithSpec(styleRuleSpec, {
+var StyleRuleActor = protocol.ActorClass(styleRuleSpec, {
   initialize: function (pageStyle, item) {
     protocol.Actor.prototype.initialize.call(this, null);
     this.pageStyle = pageStyle;

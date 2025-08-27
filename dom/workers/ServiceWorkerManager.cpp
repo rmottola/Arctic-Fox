@@ -201,7 +201,7 @@ public:
     MOZ_ASSERT(mActor);
   }
 
-  NS_IMETHODIMP Run() override
+  NS_IMETHOD Run() override
   {
     MOZ_ASSERT(mActor);
     mActor->SendShutdown();
@@ -654,8 +654,8 @@ public:
     : mWindow(aWindow), mPromise(aPromise)
   {}
 
-  NS_IMETHODIMP
-  Run()
+  NS_IMETHOD
+  Run() override
   {
     RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
 
@@ -772,8 +772,8 @@ public:
     : mWindow(aWindow), mPromise(aPromise), mDocumentURL(aDocumentURL)
   {}
 
-  NS_IMETHODIMP
-  Run()
+  NS_IMETHOD
+  Run() override
   {
     RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
 
@@ -813,7 +813,7 @@ public:
       swm->GetServiceWorkerRegistrationInfo(principal, uri);
 
     if (!registration) {
-      mPromise->MaybeResolve(JS::UndefinedHandleValue);
+      mPromise->MaybeResolveWithUndefined();
       return NS_OK;
     }
 
@@ -872,8 +872,8 @@ public:
     : mWindow(aWindow), mPromise(aPromise)
   {}
 
-  NS_IMETHODIMP
-  Run()
+  NS_IMETHOD
+  Run() override
   {
     RefPtr<ServiceWorkerManager> swm = ServiceWorkerManager::GetInstance();
 

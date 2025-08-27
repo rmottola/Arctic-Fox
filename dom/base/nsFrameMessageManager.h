@@ -320,7 +320,7 @@ private:
 
    class MyAsyncMessage : public nsSameProcessAsyncMessageBase, public Runnable
    {
-     NS_IMETHOD Run() {
+     NS_IMETHOD Run() override {
        ReceiveMessage(..., ...);
        return NS_OK;
      }
@@ -425,9 +425,9 @@ class nsScriptCacheCleaner final : public nsIObserver
     }
   }
 
-  NS_IMETHODIMP Observe(nsISupports *aSubject,
-                        const char *aTopic,
-                        const char16_t *aData) override
+  NS_IMETHOD Observe(nsISupports *aSubject,
+                     const char *aTopic,
+                     const char16_t *aData) override
   {
     if (strcmp("message-manager-flush-caches", aTopic) == 0) {
       nsMessageManagerScriptExecutor::PurgeCache();

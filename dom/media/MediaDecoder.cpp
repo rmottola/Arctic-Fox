@@ -640,7 +640,6 @@ MediaDecoder::Shutdown()
     mMetadataLoadedListener.Disconnect();
     mFirstFrameLoadedListener.Disconnect();
     mOnPlaybackEvent.Disconnect();
-    mOnSeekingStart.Disconnect();
     mOnMediaNotSeekable.Disconnect();
 
     mDecoderStateMachine->BeginShutdown()
@@ -690,6 +689,9 @@ MediaDecoder::OnPlaybackEvent(MediaEventType aEvent)
       break;
     case MediaEventType::PlaybackEnded:
       PlaybackEnded();
+      break;
+    case MediaEventType::SeekStarted:
+      SeekingStarted();
       break;
     case MediaEventType::DecodeError:
       DecodeError();
@@ -773,8 +775,6 @@ MediaDecoder::SetStateMachineParameters()
 
   mOnPlaybackEvent = mDecoderStateMachine->OnPlaybackEvent().Connect(
     AbstractThread::MainThread(), this, &MediaDecoder::OnPlaybackEvent);
-  mOnSeekingStart = mDecoderStateMachine->OnSeekingStart().Connect(
-    AbstractThread::MainThread(), this, &MediaDecoder::SeekingStarted);
   mOnMediaNotSeekable = mDecoderStateMachine->OnMediaNotSeekable().Connect(
     AbstractThread::MainThread(), this, &MediaDecoder::OnMediaNotSeekable);
 }
@@ -846,7 +846,7 @@ MediaDecoder::AsyncResolveSeekDOMPromiseIfExists()
   if (mSeekDOMPromise) {
     RefPtr<dom::Promise> promise = mSeekDOMPromise;
     nsCOMPtr<nsIRunnable> r = NS_NewRunnableFunction([=] () {
-      promise->MaybeResolve(JS::UndefinedHandleValue);
+      promise->MaybeResolveWithUndefined();
     });
     AbstractThread::MainThread()->Dispatch(r.forget());
     mSeekDOMPromise = nullptr;
@@ -1324,13 +1324,11 @@ MediaDecoder::OnSeekRejected()
 }
 
 void
-MediaDecoder::SeekingStarted(MediaDecoderEventVisibility aEventVisibility)
+MediaDecoder::SeekingStarted()
 {
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!IsShutdown());
-  if (aEventVisibility != MediaDecoderEventVisibility::Suppressed) {
-    mOwner->SeekStarted();
-  }
+  mOwner->SeekStarted();
 }
 
 void
@@ -1364,6 +1362,9 @@ MediaDecoder::UpdateLogicalPositionInternal(MediaDecoderEventVisibility aEventVi
   MOZ_ASSERT(!IsShutdown());
 
   double currentPosition = static_cast<double>(CurrentPosition()) / static_cast<double>(USECS_PER_S);
+  if (mPlayState == PLAY_STATE_ENDED) {
+    currentPosition = std::max(currentPosition, mDuration);
+  }
   bool logicalPositionChanged = mLogicalPosition != currentPosition;
   mLogicalPosition = currentPosition;
 

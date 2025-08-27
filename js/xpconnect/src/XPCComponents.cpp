@@ -2614,7 +2614,7 @@ nsXPCComponents_Utils::ClearMaxCCTime()
 NS_IMETHODIMP
 nsXPCComponents_Utils::ForceShrinkingGC()
 {
-    JSContext* cx = nsXPConnect::GetRuntimeInstance()->Context();
+    JSContext* cx = dom::danger::GetJSContext();
     PrepareForFullGC(cx);
     GCForReason(cx, GC_SHRINK, gcreason::COMPONENT_UTILS);
     return NS_OK;
@@ -2626,11 +2626,9 @@ class PreciseGCRunnable : public Runnable
     PreciseGCRunnable(ScheduledGCCallback* aCallback, bool aShrinking)
     : mCallback(aCallback), mShrinking(aShrinking) {}
 
-    NS_IMETHOD Run()
+    NS_IMETHOD Run() override
     {
-        JSRuntime* rt = nsXPConnect::GetRuntimeInstance()->Runtime();
-
-        JSContext* cx = JS_GetContext(rt);
+        JSContext* cx = dom::danger::GetJSContext();
         if (JS_IsRunning(cx))
             return NS_DispatchToMainThread(this);
 
