@@ -6476,8 +6476,7 @@ GCRuntime::minorGC(JS::gcreason::Reason reason, gcstats::Phase phase)
     minorGCTriggerReason = JS::gcreason::NO_REASON;
     TraceLoggerThread* logger = TraceLoggerForMainThread(rt);
     AutoTraceLog logMinorGC(logger, TraceLogger_MinorGC);
-    Nursery::ObjectGroupList pretenureGroups;
-    nursery.collect(rt, reason, &pretenureGroups);
+    nursery.collect(rt, reason);
     MOZ_ASSERT(nursery.isEmpty());
 
     blocksToFreeAfterMinorGC.freeAll();
@@ -6486,15 +6485,6 @@ GCRuntime::minorGC(JS::gcreason::Reason reason, gcstats::Phase phase)
     if (rt->hasZealMode(ZealMode::CheckHeapOnMovingGC))
         CheckHeapAfterMovingGC(rt);
 #endif
-
-    JSContext* cx = rt->contextFromMainThread();
-    for (size_t i = 0; i < pretenureGroups.length(); i++) {
-        ObjectGroup* group = pretenureGroups[i];
-        if (group->canPreTenure()) {
-            AutoCompartment ac(cx, group->compartment());
-            group->setShouldPreTenure(cx);
-        }
-    }
 
     {
         AutoLockGC lock(rt);
