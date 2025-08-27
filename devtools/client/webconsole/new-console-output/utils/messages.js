@@ -30,11 +30,14 @@ function getNextMessageId() {
 
 function prepareMessage(packet) {
   // This packet is already in the expected packet structure. Simply return.
-  if (packet.source) {
-    return packet;
+  if (!packet.source) {
+    packet = transformPacket(packet);
   }
 
-  return transformPacket(packet);
+  if (packet.allowRepeating) {
+    packet = packet.set("repeatId", getRepeatId(packet));
+  }
+  return packet.set("id", getNextMessageId());
 }
 
 /**
@@ -75,10 +78,8 @@ function transformPacket(packet) {
         level,
         parameters,
         messageText,
-        repeatId: getRepeatId(message),
         category: CATEGORY_WEBDEV,
         severity: level,
-        id: getNextMessageId(),
       });
     }
 
@@ -95,10 +96,8 @@ function transformPacket(packet) {
         source: MESSAGE_SOURCE.JAVASCRIPT,
         type: MESSAGE_TYPE.LOG,
         messageText: pageError.errorMessage,
-        repeatId: getRepeatId(pageError),
         category: CATEGORY_JS,
         severity: level,
-        id: getNextMessageId(),
       });
     }
 
@@ -111,10 +110,8 @@ function transformPacket(packet) {
         type: MESSAGE_TYPE.RESULT,
         level: MESSAGE_LEVEL.LOG,
         parameters: result,
-        repeatId: getRepeatId(result),
         category: CATEGORY_OUTPUT,
         severity: SEVERITY_LOG,
-        id: getNextMessageId(),
       });
     }
   }
@@ -122,10 +119,9 @@ function transformPacket(packet) {
 
 // Helpers
 function getRepeatId(message) {
-  let clonedMessage = JSON.parse(JSON.stringify(message));
-  delete clonedMessage.id;
-  delete clonedMessage.timeStamp;
-  return JSON.stringify(clonedMessage);
+  message = message.toJS();
+  delete message.repeat;
+  return JSON.stringify(message);
 }
 
 function convertCachedPacket(packet) {
