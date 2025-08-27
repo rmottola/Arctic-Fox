@@ -1364,6 +1364,9 @@ TenuredCell::isAligned() const
 }
 #endif
 
+static const int32_t ChunkLocationOffsetFromLastByte =
+    int32_t(gc::ChunkLocationOffset) - int32_t(gc::ChunkMask);
+
 } /* namespace gc */
 } /* namespace js */
 
