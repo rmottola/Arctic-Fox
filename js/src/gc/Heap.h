@@ -1003,7 +1003,7 @@ struct Chunk
     void decommitAllArenasWithoutUnlocking(const AutoLockGC& lock);
 
     static Chunk* allocate(JSRuntime* rt);
-    inline void init(JSRuntime* rt);
+    void init(JSRuntime* rt);
 
   private:
     void decommitAllArenas(JSRuntime* rt);
