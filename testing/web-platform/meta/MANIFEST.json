@@ -15341,6 +15341,10 @@
         "url": "/html/dom/documents/dom-tree-accessors/document.title-03.html"
       },
       {
+	"path": "domparsing/innerhtml-02.html",
+	"url": "/domparsing/innerhtml-02.html"
+      },
+      {
         "path": "html/dom/documents/dom-tree-accessors/document.title-04.xhtml",
         "url": "/html/dom/documents/dom-tree-accessors/document.title-04.xhtml"
       },
