@@ -25,8 +25,5 @@ else
   . $topsrcdir/build/win32/mozconfig.vs2010
 fi
 
-# Treat warnings as errors (modulo ALLOW_COMPILER_WARNINGS).
-ac_add_options --enable-warnings-as-errors
-
 # Package js shell.
 export MOZ_PACKAGE_JSSHELL=1
