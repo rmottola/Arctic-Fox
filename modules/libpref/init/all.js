@@ -4904,7 +4904,6 @@ pref("gfx.apitrace.enabled",false);
 pref("gfx.content.use-native-pushlayer", true);
 #ifdef MOZ_WIDGET_GTK
 pref("gfx.xrender.enabled",false);
-pref("widget.allow-gtk-dark-theme", false);
 #endif
 #endif
 
