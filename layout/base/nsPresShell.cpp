@@ -1027,14 +1027,14 @@ LogTextPerfStats(gfxTextPerfMetrics* aTextPerf,
 
   switch (aLogType) {
     case eLog_reflow:
-      snprintf_literal(prefix, "(textperf-reflow) %p time-ms: %7.0f", aPresShell, aTime);
+      SprintfLiteral(prefix, "(textperf-reflow) %p time-ms: %7.0f", aPresShell, aTime);
       break;
     case eLog_loaddone:
-      snprintf_literal(prefix, "(textperf-loaddone) %p time-ms: %7.0f", aPresShell, aTime);
+      SprintfLiteral(prefix, "(textperf-loaddone) %p time-ms: %7.0f", aPresShell, aTime);
       break;
     default:
       MOZ_ASSERT(aLogType == eLog_totals, "unknown textperf log type");
-      snprintf_literal(prefix, "(textperf-totals) %p", aPresShell);
+      SprintfLiteral(prefix, "(textperf-totals) %p", aPresShell);
   }
 
   double hitRatio = 0.0;
@@ -10754,7 +10754,7 @@ void ReflowCountMgr::Add(const char * aName, nsIFrame * aFrame)
       nullptr != mIndiFrameCounts &&
       aFrame != nullptr) {
     char key[KEY_BUF_SIZE_FOR_PTR];
-    snprintf_literal(key, "%p", (void*)aFrame);
+    SprintfLiteral(key, "%p", (void*)aFrame);
     IndiReflowCounter * counter = (IndiReflowCounter *)PL_HashTableLookup(mIndiFrameCounts, key);
     if (counter == nullptr) {
       counter = new IndiReflowCounter(this);
@@ -10782,7 +10782,7 @@ void ReflowCountMgr::PaintCount(const char*     aName,
       nullptr != mIndiFrameCounts &&
       aFrame != nullptr) {
     char key[KEY_BUF_SIZE_FOR_PTR];
-    snprintf_literal(key, "%p", (void*)aFrame);
+    SprintfLiteral(key, "%p", (void*)aFrame);
     IndiReflowCounter * counter =
       (IndiReflowCounter *)PL_HashTableLookup(mIndiFrameCounts, key);
     if (counter != nullptr && counter->mName.EqualsASCII(aName)) {
@@ -10805,7 +10805,7 @@ void ReflowCountMgr::PaintCount(const char*     aName,
         aPresContext->DeviceContext()->GetMetricsFor(font, params);
 
       char buf[16];
-      int len = snprintf_literal(buf, "%d", counter->mCount);
+      int len = SprintfLiteral(buf, "%d", counter->mCount);
       nscoord x = 0, y = fm->MaxAscent();
       nscoord width, height = fm->MaxHeight();
       fm->SetTextRunRTL(false);
@@ -10926,7 +10926,7 @@ static void RecurseIndiTotals(nsPresContext* aPresContext,
   }
 
   char key[KEY_BUF_SIZE_FOR_PTR];
-  snprintf_literal(key, "%p", (void*)aParentFrame);
+  SprintfLiteral(key, "%p", (void*)aParentFrame);
   IndiReflowCounter * counter = (IndiReflowCounter *)PL_HashTableLookup(aHT, key);
   if (counter) {
     counter->mHasBeenOutput = true;
