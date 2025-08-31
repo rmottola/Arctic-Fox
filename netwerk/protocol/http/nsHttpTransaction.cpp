@@ -707,7 +707,7 @@ nsHttpTransaction::Available()
     return size;
 }
 
-NS_METHOD
+nsresult
 nsHttpTransaction::ReadRequestSegment(nsIInputStream *stream,
                                       void *closure,
                                       const char *buf,
@@ -788,7 +788,7 @@ nsHttpTransaction::ReadSegments(nsAHttpSegmentReader *reader,
     return rv;
 }
 
-NS_METHOD
+nsresult
 nsHttpTransaction::WritePipeSegment(nsIOutputStream *stream,
                                     void *closure,
                                     char *buf,

@@ -1559,7 +1559,7 @@ XMLHttpRequestMainThread::PopulateNetworkInterfaceId()
 /*
  * "Copy" from a stream.
  */
-NS_METHOD
+nsresult
 XMLHttpRequestMainThread::StreamReaderFunc(nsIInputStream* in,
                                            void* closure,
                                            const char* fromRawSegment,
