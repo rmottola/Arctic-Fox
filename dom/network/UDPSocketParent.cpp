@@ -79,17 +79,8 @@ UDPSocketParent::OfflineNotification(nsISupports *aSubject)
 uint32_t
 UDPSocketParent::GetAppId()
 {
-  if (!mPrincipal) {
-    return nsIScriptSecurityManager::UNKNOWN_APP_ID;
-  }
-
-  uint32_t appId = nsIScriptSecurityManager::UNKNOWN_APP_ID;
-  nsresult rv = mPrincipal->GetAppId(&appId);
-  if (NS_FAILED(rv)) {
-    appId = nsIScriptSecurityManager::UNKNOWN_APP_ID;
-  }
-
-  return appId;
+  return mPrincipal ? mPrincipal->GetAppId()
+                    : nsIScriptSecurityManager::UNKNOWN_APP_ID;
 }
 
 bool
