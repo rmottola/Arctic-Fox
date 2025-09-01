@@ -333,8 +333,10 @@ ClientEngine.prototype = {
     if (clientId) {
       this._sendCommandToClient(command, args, clientId);
     } else {
-      for (let id in this._store._remoteClients) {
-        this._sendCommandToClient(command, args, id);
+      for (let [id, record] of Object.entries(this._store._remoteClients)) {
+        if (!record.stale) {
+          this._sendCommandToClient(command, args, id);
+        }
       }
     }
   },

@@ -223,7 +223,7 @@ AccountState.prototype = {
   removeCachedToken(token) {
     this._cachePreamble();
     let data = this.oauthTokens;
-    for (let [key, tokenValue] in Iterator(data)) {
+    for (let [key, tokenValue] of Object.entries(data)) {
       if (tokenValue.token == token) {
         delete data[key];
         // And a background save...
@@ -598,7 +598,7 @@ FxAccountsInternal.prototype = {
   _destroyAllOAuthTokens: function(tokenInfos) {
     // let's just destroy them all in parallel...
     let promises = [];
-    for (let [key, tokenInfo] in Iterator(tokenInfos || {})) {
+    for (let [key, tokenInfo] of Object.entries(tokenInfos || {})) {
       promises.push(this._destroyOAuthToken(tokenInfo));
     }
     return Promise.all(promises);
