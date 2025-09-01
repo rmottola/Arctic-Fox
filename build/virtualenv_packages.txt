@@ -14,6 +14,8 @@ optional:psutil.pth:python/psutil
 which.pth:python/which
 ply.pth:other-licenses/ply/
 mock.pth:python/mock-1.0.0
+py.pth:python/py
+pytest.pth:python/pytest
 mozilla.pth:build
 mozilla.pth:config
 mozilla.pth:xpcom/typelib/xpt/tools
