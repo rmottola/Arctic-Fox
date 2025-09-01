@@ -66,6 +66,8 @@ install GConf2-devel.i686
 install GConf2-devel.x86_64
 install GConf2.i686
 install GConf2.x86_64
+install gdk-pixbuf2-devel.i686
+install gdk-pixbuf2-devel.x86_64
 install glib2-devel.i686
 install glib2-devel.x86_64
 install glib2.i686
@@ -328,18 +330,20 @@ EOF
 
 # Git
 cd $BUILD
+# NOTE: rc builds are in https://www.kernel.org/pub/software/scm/git/testing/
 tooltool_fetch <<'EOF'
 [
 {
-    "size": 3740620,
-    "digest": "ef7538c9f5ba5b2ac08962401c30e5fd51323b54b9fb5315d259adccec346e8fae9362815832dc2b5ce63a259b315c40e419bb2385dde04d84b992e62f6789b6",
+    "size": 3938976,
+    "visibility": "public",
+    "digest": "f31cedb6d7c813d5cc9f40daa54ec6b34b046b8ec1b7a09a37598637f747449147a22736e95e4388d1a29fd01d7974b82342114b91d63b9d5df163ea3659fe72",
     "algorithm": "sha512",
-    "unpack": true,
-    "filename": "git-2.5.0.tar.xz"
+    "filename": "git-2.8.0.rc3.tar.xz",
+    "unpack": true
 }
 ]
 EOF
-cd git-2.5.0
+cd git-2.8.0.rc3
 make configure
 ./configure --prefix=/usr --without-tcltk
 make all install
@@ -417,13 +421,32 @@ cat >requirements.txt <<'EOF'
 # sha256: 90pZQ6kAXB6Je8-H9-ivfgDAb6l3e5rWkfafn6VKh9g
 virtualenv==13.1.2
 
-# sha256: tQ9peOfTn-DLKY-j-j6c5B0jVnIdFV5SiPnFfl8T6ac
-mercurial==3.5
+# sha256: wJnELXTi1SC2HdNyzZlrD6dgXAZheDT9exPHm5qaWzA
+mercurial==3.7.3
 EOF
 peep install -r requirements.txt
 
 # TC-VCS
-npm install -g taskcluster-vcs@2.3.12
+npm install -g taskcluster-vcs@2.3.18
+
+# Ninja
+cd $BUILD
+tooltool_fetch <<'EOF'
+[
+{
+    "size": 174501,
+    "digest": "551a9e14b95c2d2ddad6bee0f939a45614cce86719748dc580192dd122f3671e3d95fd6a6fb3facb2d314ba100d61a004af4df77f59df119b1b95c6fe8c38875",
+    "algorithm": "sha512",
+    "filename": "ninja-1.6.0.tar.gz",
+    "unpack": true
+}
+]
+EOF
+cd ninja-1.6.0
+./configure.py --bootstrap
+cp ninja /usr/local/bin/ninja
+# Old versions of Cmake can only find ninja in this location!
+ln -s /usr/local/bin/ninja /usr/local/bin/ninja-build
 
 # note that TC will replace workspace with a cache mount; there's no sense
 # creating anything inside there

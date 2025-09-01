@@ -13,16 +13,11 @@ const BASE_URI = "http://mochi.test:8888/browser/browser/components/"
 
 add_task(function* setup() {
   // make sure userContext is enabled.
-  SpecialPowers.pushPrefEnv({"set": [
-    ["privacy.userContext.enabled", true],
-    ["browser.link.open_newwindow", 3],
-  ]});
-});
-
-add_task(function* cleanup() {
-  // make sure we don't leave any prefs set for the next tests
-  registerCleanupFunction(function() {
-    SpecialPowers.popPrefEnv();
+  yield new Promise(resolve => {
+    SpecialPowers.pushPrefEnv({"set": [
+      ["privacy.userContext.enabled", true],
+      ["browser.link.open_newwindow", 3],
+    ]}, resolve);
   });
 });
 
@@ -46,10 +41,10 @@ add_task(function* test() {
   // Let's try to open a window from tab1 with a name 'tab-2'.
   info("Opening a window from the first tab...");
   yield ContentTask.spawn(browser1, { url: BASE_URI + '?new' }, function(opts) {
-    yield new content.window.wrappedJSObject.Promise(resolve => {
+    yield (new content.window.wrappedJSObject.Promise(resolve => {
       let w = content.window.wrappedJSObject.open(opts.url, 'tab-2');
       w.onload = function() { resolve(); }
-    });
+    }));
   });
 
   is(browser1.contentDocument.title, '?old', "Tab1 title must be 'old'");

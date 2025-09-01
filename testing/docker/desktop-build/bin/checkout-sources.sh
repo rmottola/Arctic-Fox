@@ -4,8 +4,8 @@ set -x -e
 
 # Inputs, with defaults
 
-# mozharness builds use three repositories: gecko (source), mozharness (build
-# scripts) and tools (miscellaneous) for each, specify *_REPOSITORY.  If the
+# mozharness builds use two repositories: gecko (source)
+# and build-tools (miscellaneous) for each, specify *_REPOSITORY.  If the
 # revision is not in the standard repo for the codebase, specify *_BASE_REPO as
 # the canonical repo to clone and *_HEAD_REPO as the repo containing the
 # desired revision.  For Mercurial clones, only *_HEAD_REV is required; for Git
@@ -24,10 +24,6 @@ set -x -e
 : TOOLS_HEAD_REV                ${TOOLS_HEAD_REV:=default}
 : TOOLS_HEAD_REF                ${TOOLS_HEAD_REF:=${TOOLS_HEAD_REV}}
 : TOOLS_DISABLE                 ${TOOLS_DISABLE:=false}
-
-: MH_CUSTOM_BUILD_VARIANT_CFG   ${MH_CUSTOM_BUILD_VARIANT_CFG}
-: MH_BRANCH                     ${MH_BRANCH:=mozilla-central}
-: MH_BUILD_POOL                 ${MH_BUILD_POOL:=staging}
 
 : WORKSPACE                     ${WORKSPACE:=/home/worker/workspace}
 
@@ -55,5 +51,5 @@ for extra_repo in $EXTRA_CHECKOUT_REPOSITORIES; do
     tc-vcs checkout ${!DEST_DIR} ${!BASE_REPO} ${!HEAD_REPO} ${!HEAD_REV} ${!HEAD_REF}
 done
 
-
-tc-vcs checkout $WORKSPACE/build/src $GECKO_BASE_REPOSITORY $GECKO_HEAD_REPOSITORY $GECKO_HEAD_REV $GECKO_HEAD_REF
+export GECKO_DIR=$WORKSPACE/build/src
+tc-vcs checkout $GECKO_DIR $GECKO_BASE_REPOSITORY $GECKO_HEAD_REPOSITORY $GECKO_HEAD_REV $GECKO_HEAD_REF
