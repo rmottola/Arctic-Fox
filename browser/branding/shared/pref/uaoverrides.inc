@@ -27,8 +27,10 @@ pref("@GUAO_PREF@.addons.palemoon.org", "Mozilla/5.0 (@OS_SLICE@ rv:@MOZILLA_UAV
 
 // Required for google to play nice with Arctic Fox "Mozilla/5.0 (@OS_SLICE@ rv:45.3) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/45.3 @AF_SLICE@");
 pref("@GUAO_PREF@.google.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @AF_SLICE@");
-pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @AF_SLICE@");
+pref("@GUAO_PREF@.googlevideos.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ @AF_SLICE@");
 pref("@GUAO_PREF@.gstatic.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@ Firefox/48.0 @AF_SLICE@");
+// youtube however works only if not declaring to be Firefox compatible
+pref("@GUAO_PREF@.youtube.com","Mozilla/5.0 (@OS_SLICE@ rv:48.0) Gecko/20010101 @GRE_VERSION_SLICE@  @AF_SLICE@");
 
 // Google fonts serves physically different fonts to later Firefox versions that render incorrectly unless on Gecko
 pref("@GUAO_PREF@.fonts.googleapis.com", "Mozilla/5.0 (%OS_SLICE% rv:52.0) Gecko/20100101 Firefox/52.0 @AF_SLICE@");
