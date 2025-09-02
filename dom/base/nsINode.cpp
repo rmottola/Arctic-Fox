@@ -108,6 +108,10 @@
 #include "nsIAnimationObserver.h"
 #include "nsChildContentList.h"
 
+#ifdef ACCESSIBILITY
+#include "mozilla/dom/AccessibleNode.h"
+#endif
+
 using namespace mozilla;
 using namespace mozilla::dom;
 
@@ -2578,6 +2582,17 @@ nsINode::GetBoundMutationObservers(nsTArray<RefPtr<nsDOMMutationObserver> >& aRe
       }
     }
   }
+}
+
+already_AddRefed<AccessibleNode>
+nsINode::GetAccessibleNode()
+{
+#ifdef ACCESSIBILITY
+  RefPtr<AccessibleNode> anode = new AccessibleNode(this);
+  return anode.forget();
+#endif
+
+  return nullptr;
 }
 
 size_t
