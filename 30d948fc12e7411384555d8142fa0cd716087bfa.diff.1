@@ -1,0 +1,51 @@
+diff --git a/accessible/ipc/moz.build b/accessible/ipc/moz.build
+index 4f3ebe38721757..9e447d22019906 100644
+--- a/accessible/ipc/moz.build
++++ b/accessible/ipc/moz.build
+@@ -32,8 +32,6 @@ else:
+ if CONFIG['GNU_CXX']:
+     CXXFLAGS += ['-Wno-error=shadow']
+ 
+-# with --disable-accessibility we need to compile PDocAccessible.ipdl, but not
+-# the C++.
+ if CONFIG['ACCESSIBILITY']:
+     EXPORTS.mozilla.a11y += [
+         'DocAccessibleChildBase.h',
+diff --git a/accessible/ipc/other/moz.build b/accessible/ipc/other/moz.build
+index f7661271a73570..65021145c9d12d 100644
+--- a/accessible/ipc/other/moz.build
++++ b/accessible/ipc/other/moz.build
+@@ -4,10 +4,10 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
++# With --disable-accessibility, we need to compile PDocAccessible.ipdl, but
++# not the C++.
+ IPDL_SOURCES += ['PDocAccessible.ipdl']
+ 
+-# with --disable-accessibility we need to compile PDocAccessible.ipdl, but not
+-# the C++.
+ if CONFIG['ACCESSIBILITY']:
+     EXPORTS.mozilla.a11y += [
+         'DocAccessibleChild.h',
+diff --git a/accessible/ipc/win/moz.build b/accessible/ipc/win/moz.build
+index 3a43bd638c260f..82cfa8bf93321b 100644
+--- a/accessible/ipc/win/moz.build
++++ b/accessible/ipc/win/moz.build
+@@ -6,13 +6,13 @@
+ 
+ DIRS += ['typelib']
+ 
++# With --disable-accessibility, we need to compile PDocAccessible.ipdl (which
++# also depends on COMPtrTypes.h), but not the C++.
+ IPDL_SOURCES += ['PDocAccessible.ipdl']
++EXPORTS.mozilla.a11y += ['COMPtrTypes.h']
+ 
+-# with --disable-accessibility we need to compile PDocAccessible.ipdl, but not
+-# the C++.
+ if CONFIG['ACCESSIBILITY']:
+     EXPORTS.mozilla.a11y += [
+-        'COMPtrTypes.h',
+         'DocAccessibleChild.h',
+         'PlatformChild.h',
+         'ProxyAccessible.h'
