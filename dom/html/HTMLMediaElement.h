@@ -645,6 +645,8 @@ public:
   bool ContainsRestrictedContent();
 #endif // MOZ_EME
 
+  void CannotDecryptWaitingForKey();
+
   bool MozAutoplayEnabled() const
   {
     return mAutoplayEnabled;
@@ -1525,6 +1527,14 @@ protected:
 
   // True if the media has encryption information.
   bool mIsEncrypted;
+
+  // True when the CDM cannot decrypt the current block, and the
+  // waitingforkey event has been fired. Back to false when keys have become
+  // available and we can advance the current playback position.
+  bool mWaitingForKey;
+
+  // Listens for waitingForKey events from the owned decoder.
+  MediaEventListener mWaitingForKeyListener;
 
 #ifdef MOZ_EME
   // Init Data that needs to be sent in 'encrypted' events in MetadataLoaded().
