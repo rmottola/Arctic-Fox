@@ -215,7 +215,7 @@ template class JS_PUBLIC_API(JS::WeakMapPtr)<JSObject*, JSObject*>;
     return (result || !src) ? NS_OK : NS_ERROR_OUT_OF_MEMORY
 
 
-#define WRAPPER_FLAGS JSCLASS_HAS_PRIVATE
+#define WRAPPER_FLAGS (JSCLASS_HAS_PRIVATE | JSCLASS_FOREGROUND_FINALIZE)
 
 // If IS_WN_CLASS for the JSClass of an object is true, the object is a
 // wrappednative wrapper, holding the XPCWrappedNative in its private slot.

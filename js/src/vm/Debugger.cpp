@@ -94,7 +94,9 @@ const ClassOps DebuggerFrame::classOps_ = {
 
 const Class DebuggerFrame::class_ = {
     "Frame",
-    JSCLASS_HAS_PRIVATE | JSCLASS_HAS_RESERVED_SLOTS(JSSLOT_DEBUGFRAME_COUNT),
+    JSCLASS_HAS_PRIVATE |
+    JSCLASS_HAS_RESERVED_SLOTS(JSSLOT_DEBUGFRAME_COUNT) |
+    JSCLASS_FOREGROUND_FINALIZE,
     &DebuggerFrame::classOps_
 };
 
@@ -3078,7 +3080,8 @@ const ClassOps Debugger::classOps_ = {
 const Class Debugger::class_ = {
     "Debugger",
     JSCLASS_HAS_PRIVATE |
-    JSCLASS_HAS_RESERVED_SLOTS(JSSLOT_DEBUG_COUNT),
+    JSCLASS_HAS_RESERVED_SLOTS(JSSLOT_DEBUG_COUNT) |
+    JSCLASS_FOREGROUND_FINALIZE,
     &Debugger::classOps_
 };
 
