@@ -80,7 +80,9 @@ struct IDBObjectStore::StructuredCloneWriteInfo
   uint64_t mOffsetToKeyProp;
 
   explicit StructuredCloneWriteInfo(IDBDatabase* aDatabase)
-    : mDatabase(aDatabase)
+    : mCloneBuffer(JS::StructuredCloneScope::SameProcessSameThread, nullptr,
+                   nullptr)
+    , mDatabase(aDatabase)
     , mOffsetToKeyProp(0)
   {
     MOZ_ASSERT(aDatabase);
@@ -1080,6 +1082,7 @@ IDBObjectStore::DeserializeValue(JSContext* aCx,
   // FIXME: Consider to use StructuredCloneHolder here and in other
   //        deserializing methods.
   if (!JS_ReadStructuredClone(aCx, data, dataLen, JS_STRUCTURED_CLONE_VERSION,
+                              JS::StructuredCloneScope::SameProcessSameThread,
                               aValue, &callbacks, &aCloneReadInfo)) {
     return false;
   }
@@ -1118,6 +1121,7 @@ IDBObjectStore::DeserializeIndexValue(JSContext* aCx,
   };
 
   if (!JS_ReadStructuredClone(aCx, data, dataLen, JS_STRUCTURED_CLONE_VERSION,
+                              JS::StructuredCloneScope::SameProcessSameThread,
                               aValue, &callbacks, &aCloneReadInfo)) {
     return false;
   }
@@ -1161,6 +1165,7 @@ IDBObjectStore::DeserializeUpgradeValue(JSContext* aCx,
   };
 
   if (!JS_ReadStructuredClone(aCx, data, dataLen, JS_STRUCTURED_CLONE_VERSION,
+                              JS::StructuredCloneScope::SameProcessSameThread,
                               aValue, &callbacks, &aCloneReadInfo)) {
     return false;
   }
