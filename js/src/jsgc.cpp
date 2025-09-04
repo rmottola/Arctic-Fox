@@ -1120,6 +1120,7 @@ GCRuntime::finish()
     FinishTrace();
 
     nursery.printTotalProfileTimes();
+    stats.printTotalProfileTimes();
 }
 
 bool
