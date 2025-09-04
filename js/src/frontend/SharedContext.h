@@ -130,18 +130,6 @@ class FunctionContextFlags
     bool needsHomeObject:1;
     bool isDerivedClassConstructor:1;
 
-    FunctionContextFlags flagsForNestedGeneratorComprehensionLambda() const {
-        FunctionContextFlags flags;
-        flags.mightAliasLocals = mightAliasLocals;
-        flags.hasExtensibleScope = false;
-        flags.needsDeclEnvObject = false;
-        flags.argumentsHasLocalBinding = false;
-        flags.definitelyNeedsArgsObj = false;
-        flags.needsHomeObject = false;
-        flags.isDerivedClassConstructor = false;
-        return flags;
-    }
-
     // Whether this function has a .this binding. If true, we need to emit
     // JSOP_FUNCTIONTHIS in the prologue to initialize it.
     bool hasThisBinding:1;
@@ -394,10 +382,6 @@ class FunctionBox : public ObjectBox, public SharedContext
                                              funCxFlags.needsHomeObject          = true; }
     void setDerivedClassConstructor()      { MOZ_ASSERT(function()->isClassConstructor());
                                              funCxFlags.isDerivedClassConstructor = true; }
-
-    FunctionContextFlags flagsForNestedGeneratorComprehensionLambda() const {
-        return funCxFlags.flagsForNestedGeneratorComprehensionLambda();
-    }
 
     bool hasDefaults() const {
         return length != function()->nargs() - function()->hasRest();

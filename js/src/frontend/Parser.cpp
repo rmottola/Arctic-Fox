@@ -8377,10 +8377,8 @@ Parser<ParseHandler>::generatorComprehensionLambda(unsigned begin)
      * kid and could be removed from pc->sc.
      */
     genFunbox->anyCxFlags = outerpc->sc->anyCxFlags;
-    if (outerpc->sc->isFunctionBox()) {
-        genFunbox->funCxFlags =
-            outerpc->sc->asFunctionBox()->flagsForNestedGeneratorComprehensionLambda();
-    }
+    if (outerpc->sc->isFunctionBox())
+        genFunbox->funCxFlags = outerpc->sc->asFunctionBox()->funCxFlags;
 
     handler.setBlockId(genfn, genpc.bodyid);
 
