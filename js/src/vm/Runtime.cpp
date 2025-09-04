@@ -199,7 +199,7 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     runningOOMTest(false),
 #endif
     allowRelazificationForTesting(false),
-    defaultFreeOp_(thisFromCtor()),
+    defaultFreeOp_(nullptr),
     debuggerMutations(0),
     securityCallbacks(&NullSecurityCallbacks),
     DOMcallbacks(nullptr),
@@ -286,6 +286,10 @@ JSRuntime::init(uint32_t maxbytes, uint32_t maxNurseryBytes)
         return false;
 
     js::TlsPerThreadData.set(&mainThread);
+
+    defaultFreeOp_ = js_new<js::FreeOp>(this);
+    if (!defaultFreeOp_)
+        return false;
 
     if (!gc.init(maxbytes, maxNurseryBytes))
         return false;
@@ -418,6 +422,8 @@ JSRuntime::destroyRuntime()
 
     gc.finish();
     atomsCompartment_ = nullptr;
+
+    js_delete(defaultFreeOp_);
 
     js_free(defaultLocale);
     js_delete(jitRuntime_);
@@ -670,6 +676,12 @@ JSRuntime::triggerActivityCallback(bool active)
     activityCallback(activityCallbackArg, active);
 }
 
+FreeOp::FreeOp(JSRuntime* maybeRuntime)
+  : JSFreeOp(maybeRuntime)
+{
+    MOZ_ASSERT_IF(maybeRuntime, CurrentThreadCanAccessRuntime(maybeRuntime));
+}
+
 FreeOp::~FreeOp()
 {
     for (size_t i = 0; i < freeLaterList.length(); i++)
@@ -677,6 +689,12 @@ FreeOp::~FreeOp()
 
     if (!jitPoisonRanges.empty())
         jit::ExecutableAllocator::poisonCode(runtime(), jitPoisonRanges);
+}
+
+bool
+FreeOp::isDefaultFreeOp() const
+{
+    return runtime_ && runtime_->defaultFreeOp() == this;
 }
 
 JSObject*
