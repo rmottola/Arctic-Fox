@@ -96,7 +96,7 @@ const Class DebuggerFrame::class_ = {
     "Frame",
     JSCLASS_HAS_PRIVATE |
     JSCLASS_HAS_RESERVED_SLOTS(JSSLOT_DEBUGFRAME_COUNT) |
-    JSCLASS_FOREGROUND_FINALIZE,
+    JSCLASS_BACKGROUND_FINALIZE,
     &DebuggerFrame::classOps_
 };
 
@@ -3060,6 +3060,8 @@ Debugger::findZoneEdges(Zone* zone, js::gc::ZoneComponentFinder& finder)
 /* static */ void
 Debugger::finalize(FreeOp* fop, JSObject* obj)
 {
+    MOZ_ASSERT(fop->onMainThread());
+
     Debugger* dbg = fromJSObject(obj);
     if (!dbg)
         return;
@@ -7518,6 +7520,7 @@ DebuggerFrame_maybeDecrementFrameScriptStepModeCount(FreeOp* fop, AbstractFrameP
 static void
 DebuggerFrame_finalize(FreeOp* fop, JSObject* obj)
 {
+    MOZ_ASSERT(fop->maybeOffMainThread());
     DebuggerFrame_freeScriptFrameIterData(fop, obj);
 }
 
