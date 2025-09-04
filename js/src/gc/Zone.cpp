@@ -67,6 +67,12 @@ Zone::~Zone()
 
     js_delete(debuggers);
     js_delete(jitZone_);
+
+#ifdef DEBUG
+    // Avoid assertion destroying the weak map list if the embedding leaked GC things.
+    if (!rt->gc.shutdownCollectedEverything())
+        gcWeakMapList.clear();
+#endif
 }
 
 bool Zone::init(bool isSystemArg)
