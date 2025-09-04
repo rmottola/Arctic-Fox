@@ -772,6 +772,10 @@ js::Nursery::freeMallocedBuffers()
 void
 js::Nursery::waitBackgroundFreeEnd()
 {
+    // We may finishRoots before nursery init if runtime init fails.
+    if (!isEnabled())
+        return;
+
     MOZ_ASSERT(freeMallocedBuffersTask);
     freeMallocedBuffersTask->join();
 }
