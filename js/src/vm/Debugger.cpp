@@ -909,8 +909,11 @@ Debugger::slowPathOnLeaveFrame(JSContext* cx, AbstractFramePtr frame, jsbytecode
                 Maybe<AutoCompartment> ac;
                 ac.emplace(cx, dbg->object);
 
+                RootedValue wrappedValue(cx, value);
                 RootedValue completion(cx);
-                if (!dbg->newCompletionValue(cx, status, value, &completion)) {
+                if (!dbg->wrapDebuggeeValue(cx, &wrappedValue) ||
+                    !dbg->newCompletionValue(cx, status, wrappedValue, &completion))
+                {
                     status = dbg->handleUncaughtException(ac, false);
                     break;
                 }
@@ -1418,6 +1421,7 @@ Debugger::newCompletionValue(JSContext* cx, JSTrapStatus status, Value value_,
      * to construct the completion value.
      */
     assertSameCompartment(cx, object.get());
+    assertSameCompartment(cx, value_);
 
     RootedId key(cx);
     RootedValue value(cx, value_);
@@ -1442,7 +1446,6 @@ Debugger::newCompletionValue(JSContext* cx, JSTrapStatus status, Value value_,
     /* Common tail for JSTRAP_RETURN and JSTRAP_THROW. */
     RootedPlainObject obj(cx, NewBuiltinClassInstance<PlainObject>(cx));
     if (!obj ||
-        !wrapDebuggeeValue(cx, &value) ||
         !NativeDefineProperty(cx, obj, key, value, nullptr, nullptr, JSPROP_ENUMERATE))
     {
         return false;
@@ -1463,7 +1466,8 @@ Debugger::receiveCompletionValue(Maybe<AutoCompartment>& ac, bool ok,
     RootedValue value(cx);
     resultToCompletion(cx, ok, val, &status, &value);
     ac.reset();
-    return newCompletionValue(cx, status, value, vp);
+    return wrapDebuggeeValue(cx, &value) &&
+           newCompletionValue(cx, status, value, vp);
 }
 
 static bool
@@ -7920,7 +7924,8 @@ EvaluateInEnv(JSContext* cx, Handle<Env*> env, AbstractFramePtr frame,
 
 static bool
 DebuggerGenericEval(JSContext* cx, const mozilla::Range<const char16_t> chars,
-                    HandleObject bindings, const EvalOptions& options, MutableHandleValue vp,
+                    HandleObject bindings, const EvalOptions& options,
+                    JSTrapStatus& status, MutableHandleValue value,
                     Debugger* dbg, HandleObject scope, ScriptFrameIter* iter)
 {
     /* Either we're specifying the frame, or a global. */
@@ -8001,7 +8006,9 @@ DebuggerGenericEval(JSContext* cx, const mozilla::Range<const char16_t> chars,
     bool ok = EvaluateInEnv(cx, env, frame, pc, chars,
                             options.filename() ? options.filename() : "debugger eval code",
                             options.lineno(), &rval);
-    return dbg->receiveCompletionValue(ac, ok, rval, vp);
+    Debugger::resultToCompletion(cx, ok, rval, &status, value);
+    ac.reset();
+    return dbg->wrapDebuggeeValue(cx, value);
 }
 
 static bool
@@ -8022,7 +8029,12 @@ DebuggerFrame_eval(JSContext* cx, unsigned argc, Value* vp)
     if (!ParseEvalOptions(cx, args.get(1), options))
         return false;
 
-    return DebuggerGenericEval(cx, chars, nullptr, options, args.rval(), dbg, nullptr, &iter);
+    JSTrapStatus status;
+    RootedValue value(cx);
+    if (!DebuggerGenericEval(cx, chars, nullptr, options, status, &value, dbg, nullptr, &iter))
+        return false;
+
+    return dbg->newCompletionValue(cx, status, value, args.rval());
 }
 
 static bool
@@ -8050,7 +8062,12 @@ DebuggerFrame_evalWithBindings(JSContext* cx, unsigned argc, Value* vp)
     if (!ParseEvalOptions(cx, args.get(2), options))
         return false;
 
-    return DebuggerGenericEval(cx, chars, bindings, options, args.rval(), dbg, nullptr, &iter);
+    JSTrapStatus status;
+    RootedValue value(cx);
+    if (!DebuggerGenericEval(cx, chars, bindings, options, status, &value, dbg, nullptr, &iter))
+        return false;
+
+    return dbg->newCompletionValue(cx, status, value, args.rval());
 }
 
 /* static */ bool
@@ -9008,7 +9025,12 @@ DebuggerObject::executeInGlobalMethod(JSContext* cx, unsigned argc, Value* vp)
     if (!ParseEvalOptions(cx, args.get(1), options))
         return false;
 
-    return DebuggerObject::executeInGlobal(cx, object, chars, nullptr, options, args.rval());
+    JSTrapStatus status;
+    RootedValue value(cx);
+    if (!DebuggerObject::executeInGlobal(cx, object, chars, nullptr, options, status, &value))
+        return false;
+
+    return object->owner()->newCompletionValue(cx, status, value, args.rval());
 }
 
 /* static */ bool
@@ -9037,7 +9059,12 @@ DebuggerObject::executeInGlobalWithBindingsMethod(JSContext* cx, unsigned argc, 
     if (!ParseEvalOptions(cx, args.get(2), options))
         return false;
 
-    return DebuggerObject::executeInGlobal(cx, object, chars, bindings, options, args.rval());
+    JSTrapStatus status;
+    RootedValue value(cx);
+    if (!DebuggerObject::executeInGlobal(cx, object, chars, bindings, options, status, &value))
+        return false;
+
+    return object->owner()->newCompletionValue(cx, status, value, args.rval());
 }
 
 /* static */ bool
@@ -9776,7 +9803,8 @@ DebuggerObject::forceLexicalInitializationByName(JSContext* cx, HandleDebuggerOb
 /* static */ bool
 DebuggerObject::executeInGlobal(JSContext* cx, HandleDebuggerObject object,
                                 mozilla::Range<const char16_t> chars, HandleObject bindings,
-                                const EvalOptions& options, MutableHandleValue result)
+                                const EvalOptions& options, JSTrapStatus& status,
+                                MutableHandleValue value)
 {
     MOZ_ASSERT(object->isGlobal());
 
@@ -9784,7 +9812,7 @@ DebuggerObject::executeInGlobal(JSContext* cx, HandleDebuggerObject object,
     Debugger* dbg = object->owner();
 
     RootedObject globalLexical(cx, &referent->lexicalScope());
-    return DebuggerGenericEval(cx, chars, bindings, options, result, dbg, globalLexical,
+    return DebuggerGenericEval(cx, chars, bindings, options, status, value, dbg, globalLexical,
                                nullptr);
 }
 
