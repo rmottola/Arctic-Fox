@@ -559,7 +559,7 @@ public:
                                 const JS::GCDescription& desc);
     static void FinalizeCallback(JSFreeOp* fop,
                                  JSFinalizeStatus status,
-                                 bool isCompartmentGC,
+                                 bool isZoneGC,
                                  void* data);
     static void WeakPointerZoneGroupCallback(JSContext* cx, void* data);
     static void WeakPointerCompartmentCallback(JSContext* cx, JSCompartment* comp, void* data);
