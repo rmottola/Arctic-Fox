@@ -3632,6 +3632,8 @@ GCRuntime::purgeRuntime(AutoLockForExclusiveAccess& lock)
 
     if (auto cache = rt->maybeThisRuntimeSharedImmutableStrings())
         cache->purge();
+
+    rt->promiseTasksToDestroy.lock()->clear();
 }
 
 bool
