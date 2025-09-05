@@ -34,8 +34,6 @@
 - 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - Bug 1310721 - 2016-10-15- Remove support for the b2g PAC generator; r=mcmanus
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
-- Bug 1279303 - 2017-07-27 - Implement change to O.getOwnPropertyDescriptors and upd
-- Bug 1287520 - 2026-07-29 - Check IsPackedArray for the result array in Array.proto
 - 1114580 - toStringTag - several diffs still to analyze
 - Bug 1263340 - finish to part 8
 - Bug 1296851 - 2016-10-27 Always allow SetPrototype with the same value as the cu
