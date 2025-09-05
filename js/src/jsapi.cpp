@@ -4639,6 +4639,7 @@ JS::NewPromiseObject(JSContext* cx, HandleObject executor, HandleObject proto /*
     MOZ_ASSERT(IsCallable(executor));
     AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
+    assertSameCompartment(cx, executor, proto);
 
     return PromiseObject::create(cx, executor, proto);
 }
@@ -4720,6 +4721,10 @@ JS::DumpPromiseResolutionSite(JSContext* cx, JS::HandleObject promise)
 JS_PUBLIC_API(JSObject*)
 JS::CallOriginalPromiseResolve(JSContext* cx, JS::HandleValue resolutionValue)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, resolutionValue);
+
     RootedObject promiseCtor(cx, GetPromiseConstructor(cx));
     if (!promiseCtor)
         return nullptr;
@@ -4745,6 +4750,10 @@ JS::CallOriginalPromiseResolve(JSContext* cx, JS::HandleValue resolutionValue)
 JS_PUBLIC_API(JSObject*)
 JS::CallOriginalPromiseReject(JSContext* cx, JS::HandleValue rejectionValue)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, rejectionValue);
+
     RootedObject promiseCtor(cx, GetPromiseConstructor(cx));
     if (!promiseCtor)
         return nullptr;
@@ -4770,6 +4779,10 @@ JS::CallOriginalPromiseReject(JSContext* cx, JS::HandleValue rejectionValue)
 JS_PUBLIC_API(bool)
 JS::ResolvePromise(JSContext* cx, JS::HandleObject promise, JS::HandleValue resolutionValue)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, promise, resolutionValue);
+
     MOZ_ASSERT(promise->is<PromiseObject>());
     return promise->as<PromiseObject>().resolve(cx, resolutionValue);
 }
@@ -4777,6 +4790,10 @@ JS::ResolvePromise(JSContext* cx, JS::HandleObject promise, JS::HandleValue reso
 JS_PUBLIC_API(bool)
 JS::RejectPromise(JSContext* cx, JS::HandleObject promise, JS::HandleValue rejectionValue)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, promise, rejectionValue);
+
     MOZ_ASSERT(promise->is<PromiseObject>());
     return promise->as<PromiseObject>().reject(cx, rejectionValue);
 }
@@ -4785,6 +4802,10 @@ JS_PUBLIC_API(JSObject*)
 JS::CallOriginalPromiseThen(JSContext* cx, JS::HandleObject promise,
                             JS::HandleObject onResolve, JS::HandleObject onReject)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, promise, onResolve, onReject);
+
     MOZ_ASSERT(promise->is<PromiseObject>());
     MOZ_ASSERT(onResolve == nullptr || IsCallable(onResolve));
     MOZ_ASSERT(onReject == nullptr || IsCallable(onReject));
@@ -4812,6 +4833,10 @@ JS_PUBLIC_API(bool)
 JS::AddPromiseReactions(JSContext* cx, JS::HandleObject promise,
                         JS::HandleObject onResolve, JS::HandleObject onReject)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+    assertSameCompartment(cx, promise, onResolve, onReject);
+
     MOZ_ASSERT(promise->is<PromiseObject>());
     MOZ_ASSERT(IsCallable(onResolve));
     MOZ_ASSERT(IsCallable(onReject));
@@ -4831,6 +4856,9 @@ JS::AddPromiseReactions(JSContext* cx, JS::HandleObject promise,
 JS_PUBLIC_API(JSObject*)
 JS::GetWaitForAllPromise(JSContext* cx, const JS::AutoObjectVector& promises)
 {
+    AssertHeapIsIdle(cx);
+    CHECK_REQUEST(cx);
+
     RootedArrayObject arr(cx, NewDenseFullyAllocatedArray(cx, promises.length()));
     if (!arr)
         return nullptr;
@@ -4838,6 +4866,7 @@ JS::GetWaitForAllPromise(JSContext* cx, const JS::AutoObjectVector& promises)
     for (size_t i = 0, len = promises.length(); i < len; i++) {
 #ifdef DEBUG
         JSObject* obj = promises[i];
+        assertSameCompartment(cx, obj);
         if (IsWrapper(obj))
             obj = UncheckedUnwrap(obj);
         MOZ_ASSERT(obj->is<PromiseObject>());
