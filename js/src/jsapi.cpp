@@ -4868,6 +4868,14 @@ JS::GetWaitForAllPromise(JSContext* cx, const JS::AutoObjectVector& promises)
 }
 
 JS_PUBLIC_API(void)
+JS::SetAsyncTaskCallbacks(JSContext* cx, JS::StartAsyncTaskCallback start,
+                          JS::FinishAsyncTaskCallback finish)
+{
+    cx->startAsyncTaskCallback = start;
+    cx->finishAsyncTaskCallback = finish;
+}
+
+JS_PUBLIC_API(void)
 JS_RequestInterruptCallback(JSContext* cx)
 {
     cx->requestInterrupt(JSRuntime::RequestInterruptUrgent);
