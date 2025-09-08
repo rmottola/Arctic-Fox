@@ -5931,7 +5931,7 @@ nsComputedDOMStyle::CreatePrimitiveValueForBasicShape(
   switch (type) {
     case StyleBasicShapeType::Polygon: {
       bool hasEvenOdd = aStyleBasicShape->GetFillRule() ==
-        NS_STYLE_FILL_RULE_EVENODD;
+        StyleFillRule::EvenOdd;
       if (hasEvenOdd) {
         shapeFunctionString.AppendLiteral("evenodd");
       }

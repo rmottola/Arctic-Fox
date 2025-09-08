@@ -1317,6 +1317,7 @@ struct SetEnumValueHelper
   }
 
   DEFINE_ENUM_CLASS_SETTER(StyleBoxSizing, Content, Border)
+  DEFINE_ENUM_CLASS_SETTER(StyleFillRule, NonZero, EvenOdd)
   DEFINE_ENUM_CLASS_SETTER(StyleFloat, None_, InlineEnd)
   DEFINE_ENUM_CLASS_SETTER(StyleFloatEdge, ContentBox, MarginBox)
   DEFINE_ENUM_CLASS_SETTER(StyleUserFocus, None_, SelectMenu)
@@ -9373,7 +9374,7 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
            svg->mClipRule, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INHERIT,
            parentSVG->mClipRule,
-           NS_STYLE_FILL_RULE_NONZERO);
+           StyleFillRule::NonZero);
 
   // color-interpolation: enum, inherit, initial
   SetValue(*aRuleData->ValueForColorInterpolation(),
@@ -9407,7 +9408,7 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
            svg->mFillRule, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INHERIT,
            parentSVG->mFillRule,
-           NS_STYLE_FILL_RULE_NONZERO);
+           StyleFillRule::NonZero);
 
   // marker-end: url, none, inherit
   const nsCSSValue* markerEndValue = aRuleData->ValueForMarkerEnd();
@@ -9639,7 +9640,9 @@ GetStyleBasicShapeFromCSSValue(const nsCSSValue& aValue,
                "polygon has wrong number of arguments");
     size_t j = 1;
     if (shapeFunction->Item(j).GetUnit() == eCSSUnit_Enumerated) {
-      basicShape->SetFillRule(shapeFunction->Item(j).GetIntValue());
+      StyleFillRule rule;
+      SetEnumValueHelper::SetEnumeratedValue(rule, shapeFunction->Item(j));
+      basicShape->SetFillRule(rule);
       ++j;
     }
     const int32_t mask = SETCOORD_PERCENT | SETCOORD_LENGTH |
