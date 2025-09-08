@@ -1477,8 +1477,10 @@ HTMLInputElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
       if (aName == nsGkAtoms::readonly || aName == nsGkAtoms::disabled) {
         UpdateBarredFromConstraintValidation();
       }
-    } else if (MaxLengthApplies() && aName == nsGkAtoms::maxlength) {
+    } else if (MinOrMaxLengthApplies() && aName == nsGkAtoms::maxlength) {
       UpdateTooLongValidityState();
+    } else if (MinOrMaxLengthApplies() && aName == nsGkAtoms::minlength) {
+      UpdateTooShortValidityState();
     } else if (aName == nsGkAtoms::pattern && !mParserCreating) {
       UpdatePatternMismatchValidityState();
     } else if (aName == nsGkAtoms::multiple) {
@@ -1599,6 +1601,7 @@ NS_IMPL_ENUM_ATTR_DEFAULT_VALUE(HTMLInputElement, InputMode, inputmode,
                                 kInputDefaultInputmode->tag)
 NS_IMPL_BOOL_ATTR(HTMLInputElement, Multiple, multiple)
 NS_IMPL_NON_NEGATIVE_INT_ATTR(HTMLInputElement, MaxLength, maxlength)
+NS_IMPL_NON_NEGATIVE_INT_ATTR(HTMLInputElement, MinLength, minlength)
 NS_IMPL_STRING_ATTR(HTMLInputElement, Name, name)
 NS_IMPL_BOOL_ATTR(HTMLInputElement, ReadOnly, readonly)
 NS_IMPL_BOOL_ATTR(HTMLInputElement, Required, required)
@@ -5312,6 +5315,9 @@ HTMLInputElement::ParseAttribute(int32_t aNamespaceID,
     if (aAttribute == nsGkAtoms::maxlength) {
       return aResult.ParseNonNegativeIntValue(aValue);
     }
+    if (aAttribute == nsGkAtoms::minlength) {
+      return aResult.ParseNonNegativeIntValue(aValue);
+    }
     if (aAttribute == nsGkAtoms::size) {
       return aResult.ParsePositiveIntValue(aValue);
     }
@@ -6984,7 +6990,7 @@ HTMLInputElement::IsTooLong()
 {
   if (!mValueChanged ||
       !mLastValueChangeWasInteractive ||
-      !MaxLengthApplies() ||
+      !MinOrMaxLengthApplies() ||
       !HasAttr(kNameSpaceID_None, nsGkAtoms::maxlength)) {
     return false;
   }
@@ -7000,6 +7006,29 @@ HTMLInputElement::IsTooLong()
   GetTextLength(&textLength);
 
   return textLength > maxLength;
+}
+
+bool
+HTMLInputElement::IsTooShort()
+{
+  if (!mValueChanged ||
+      !mLastValueChangeWasInteractive ||
+      !MinOrMaxLengthApplies() ||
+      !HasAttr(kNameSpaceID_None, nsGkAtoms::minlength)) {
+    return false;
+  }
+
+  int32_t minLength = MinLength();
+
+  // Minlength of -1 means parsing error.
+  if (minLength == -1) {
+    return false;
+  }
+
+  int32_t textLength = -1;
+  GetTextLength(&textLength);
+
+  return textLength && textLength < minLength;
 }
 
 bool
@@ -7264,6 +7293,12 @@ HTMLInputElement::UpdateTooLongValidityState()
 }
 
 void
+HTMLInputElement::UpdateTooShortValidityState()
+{
+  SetValidityState(VALIDITY_STATE_TOO_SHORT, IsTooShort());
+}
+
+void
 HTMLInputElement::UpdateValueMissingValidityStateForRadio(bool aIgnoreSelf)
 {
   bool notify = !mParserCreating;
@@ -7363,6 +7398,7 @@ HTMLInputElement::UpdateAllValidityStates(bool aNotify)
 {
   bool validBefore = IsValid();
   UpdateTooLongValidityState();
+  UpdateTooShortValidityState();
   UpdateValueMissingValidityState();
   UpdateTypeMismatchValidityState();
   UpdatePatternMismatchValidityState();
@@ -7417,6 +7453,26 @@ HTMLInputElement::GetValidationMessage(nsAString& aValidationMessage,
       const char16_t* params[] = { strMaxLength.get(), strTextLength.get() };
       rv = nsContentUtils::FormatLocalizedString(nsContentUtils::eDOM_PROPERTIES,
                                                  "FormValidationTextTooLong",
+                                                 params, message);
+      aValidationMessage = message;
+      break;
+    }
+    case VALIDITY_STATE_TOO_SHORT:
+    {
+      nsXPIDLString message;
+      int32_t minLength = MinLength();
+      int32_t textLength = -1;
+      nsAutoString strMinLength;
+      nsAutoString strTextLength;
+
+      GetTextLength(&textLength);
+
+      strMinLength.AppendInt(minLength);
+      strTextLength.AppendInt(textLength);
+
+      const char16_t* params[] = { strMinLength.get(), strTextLength.get() };
+      rv = nsContentUtils::FormatLocalizedString(nsContentUtils::eDOM_PROPERTIES,
+                                                 "FormValidationTextTooShort",
                                                  params, message);
       aValidationMessage = message;
       break;
