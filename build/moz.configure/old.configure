@@ -252,7 +252,6 @@ def old_configure_options(*options):
     '--enable-valgrind',
     '--enable-verify-mar',
     '--enable-webrtc',
-    '--enable-websms-backend',
     '--enable-webspeech',
     '--enable-webspeechtestbackend',
     '--enable-xul',
