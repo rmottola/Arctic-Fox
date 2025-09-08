@@ -2529,7 +2529,7 @@ class StyleBasicShape final
 public:
   explicit StyleBasicShape(StyleBasicShapeType type)
     : mType(type),
-      mFillRule(StyleFillRule::NonZero)
+      mFillRule(StyleFillRule::Nonzero)
   {
     mPosition.SetInitialPercentValues(0.5f);
   }

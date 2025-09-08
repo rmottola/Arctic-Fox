@@ -1317,7 +1317,7 @@ struct SetEnumValueHelper
   }
 
   DEFINE_ENUM_CLASS_SETTER(StyleBoxSizing, Content, Border)
-  DEFINE_ENUM_CLASS_SETTER(StyleFillRule, NonZero, EvenOdd)
+  DEFINE_ENUM_CLASS_SETTER(StyleFillRule, Nonzero, Evenodd)
   DEFINE_ENUM_CLASS_SETTER(StyleFloat, None_, InlineEnd)
   DEFINE_ENUM_CLASS_SETTER(StyleFloatEdge, ContentBox, MarginBox)
   DEFINE_ENUM_CLASS_SETTER(StyleUserFocus, None_, SelectMenu)
@@ -9374,7 +9374,7 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
            svg->mClipRule, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INHERIT,
            parentSVG->mClipRule,
-           StyleFillRule::NonZero);
+           StyleFillRule::Nonzero);
 
   // color-interpolation: enum, inherit, initial
   SetValue(*aRuleData->ValueForColorInterpolation(),
@@ -9408,7 +9408,7 @@ nsRuleNode::ComputeSVGData(void* aStartStruct,
            svg->mFillRule, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INHERIT,
            parentSVG->mFillRule,
-           StyleFillRule::NonZero);
+           StyleFillRule::Nonzero);
 
   // marker-end: url, none, inherit
   const nsCSSValue* markerEndValue = aRuleData->ValueForMarkerEnd();
