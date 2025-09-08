@@ -218,7 +218,6 @@ def old_configure_options(*options):
     '--enable-posix-nspr-emulation',
     '--enable-precompiled-startupcache',
     '--enable-pref-extensions',
-    '--enable-printing',
     '--enable-pulseaudio',
     '--enable-raw',
     '--enable-readline',
