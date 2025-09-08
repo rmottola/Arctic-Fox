@@ -12091,6 +12091,11 @@ CSSParserImpl::ParseImageLayersItem(
                                       eCSSUnit_Enumerated);
   aState.mRepeat->mYValue.Reset();
 
+  RefPtr<nsCSSValue::Array> positionXArr = nsCSSValue::Array::Create(2);
+  RefPtr<nsCSSValue::Array> positionYArr = nsCSSValue::Array::Create(2);
+  aState.mPositionX->mValue.SetArrayValue(positionXArr, eCSSUnit_Array);
+  aState.mPositionY->mValue.SetArrayValue(positionYArr, eCSSUnit_Array);
+
   if (eCSSProperty_mask == aTable[nsStyleImageLayers::shorthand]) {
     aState.mOrigin->mValue.SetIntValue(NS_STYLE_IMAGELAYER_ORIGIN_BORDER,
                                        eCSSUnit_Enumerated);
@@ -12098,13 +12103,9 @@ CSSParserImpl::ParseImageLayersItem(
     aState.mOrigin->mValue.SetIntValue(NS_STYLE_IMAGELAYER_ORIGIN_PADDING,
                                        eCSSUnit_Enumerated);
   }
-
-  RefPtr<nsCSSValue::Array> positionXArr = nsCSSValue::Array::Create(2);
-  RefPtr<nsCSSValue::Array> positionYArr = nsCSSValue::Array::Create(2);
-  aState.mPositionX->mValue.SetArrayValue(positionXArr, eCSSUnit_Array);
-  aState.mPositionY->mValue.SetArrayValue(positionYArr, eCSSUnit_Array);
   positionXArr->Item(1).SetPercentValue(0.0f);
   positionYArr->Item(1).SetPercentValue(0.0f);
+
   aState.mSize->mXValue.SetAutoValue();
   aState.mSize->mYValue.SetAutoValue();
   aState.mComposite->mValue.SetIntValue(NS_STYLE_MASK_COMPOSITE_ADD,
