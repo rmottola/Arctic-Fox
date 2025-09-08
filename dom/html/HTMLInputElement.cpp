@@ -8277,6 +8277,7 @@ HTMLInputElement::UpdateEntries(const nsTArray<OwningFileOrDirectory>& aFilesOrD
 void
 HTMLInputElement::GetWebkitEntries(nsTArray<RefPtr<Entry>>& aSequence)
 {
+  Telemetry::Accumulate(Telemetry::BLINK_FILESYSTEM_USED, true);
   aSequence.AppendElements(mEntries);
 }
 
