@@ -150,6 +150,10 @@ pref("dom.select_events.textcontrols.enabled", true);
 // Whether or not Web Workers are enabled.
 pref("dom.workers.enabled", true);
 
+// The number of workers per domain allowed to run concurrently.
+// We're going for effectively infinite, while preventing abuse.
+pref("dom.workers.maxPerDomain", 512);
+
 pref("dom.serviceWorkers.enabled", false);
 
 // The amount of time (milliseconds) service workers keep running after each event.
@@ -5788,6 +5792,9 @@ pref("dom.node.rootNode.enabled", true);
 pref("media.default_volume", "1.0");
 
 pref("media.seekToNextFrame.enabled", true);
+
+// return the maximum number of cores that navigator.hardwareCurrency returns
+pref("dom.maxHardwareConcurrency", 16);
 
 // Shutdown the osfile worker if its no longer needed.
 #if !defined(RELEASE_BUILD)
