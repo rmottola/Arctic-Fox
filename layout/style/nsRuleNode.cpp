@@ -10376,7 +10376,7 @@ nsRuleNode::GetStyleData(nsStyleStructID aSID,
 }
 
 void
-nsRuleNode::GetDiscretelyAnimatedCSSValue(nsCSSProperty aProperty,
+nsRuleNode::GetDiscretelyAnimatedCSSValue(nsCSSPropertyID aProperty,
                                           nsCSSValue* aValue)
 {
   for (nsRuleNode* node = this; node; node = node->GetParent()) {

@@ -284,7 +284,7 @@ NS_IMPL_CYCLE_COLLECTION_ROOT_NATIVE(nsTransitionManager, AddRef)
 NS_IMPL_CYCLE_COLLECTION_UNROOT_NATIVE(nsTransitionManager, Release)
 
 static inline bool
-ExtractNonDiscreteComputedValue(nsCSSProperty aProperty,
+ExtractNonDiscreteComputedValue(nsCSSPropertyID aProperty,
                                 nsStyleContext* aStyleContext,
                                 StyleAnimationValue& aComputedValue)
 {

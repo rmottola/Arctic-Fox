@@ -36,7 +36,7 @@ ImportantStyleData::MightMapInheritedStyleData()
 }
 
 /* virtual */ bool
-ImportantStyleData::GetDiscretelyAnimatedCSSValue(nsCSSProperty aProperty,
+ImportantStyleData::GetDiscretelyAnimatedCSSValue(nsCSSPropertyID aProperty,
                                                   nsCSSValue* aValue)
 {
   return Declaration()->GetDiscretelyAnimatedCSSValue(aProperty, aValue);
@@ -120,7 +120,7 @@ Declaration::MightMapInheritedStyleData()
 }
 
 /* virtual */ bool
-Declaration::GetDiscretelyAnimatedCSSValue(nsCSSProperty aProperty,
+Declaration::GetDiscretelyAnimatedCSSValue(nsCSSPropertyID aProperty,
                                            nsCSSValue* aValue)
 {
   nsCSSCompressedDataBlock* data = GetValueIsImportant(aProperty)

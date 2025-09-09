@@ -61,7 +61,7 @@ nsHTMLStyleSheet::HTMLColorRule::MightMapInheritedStyleData()
 
 /* virtual */ bool
 nsHTMLStyleSheet::HTMLColorRule::
-GetDiscretelyAnimatedCSSValue(nsCSSProperty aProperty, nsCSSValue* aValue)
+GetDiscretelyAnimatedCSSValue(nsCSSPropertyID aProperty, nsCSSValue* aValue)
 {
   MOZ_ASSERT(false, "GetDiscretelyAnimatedCSSValue is not implemented yet");
   return false;
@@ -114,7 +114,7 @@ nsHTMLStyleSheet::TableTHRule::MightMapInheritedStyleData()
 
 /* virtual */ bool
 nsHTMLStyleSheet::TableTHRule::
-GetDiscretelyAnimatedCSSValue(nsCSSProperty aProperty, nsCSSValue* aValue)
+GetDiscretelyAnimatedCSSValue(nsCSSPropertyID aProperty, nsCSSValue* aValue)
 {
   MOZ_ASSERT(false, "GetDiscretelyAnimatedCSSValue is not implemented yet");
   return false;
@@ -141,7 +141,7 @@ nsHTMLStyleSheet::TableQuirkColorRule::MightMapInheritedStyleData()
 
 /* virtual */ bool
 nsHTMLStyleSheet::TableQuirkColorRule::
-GetDiscretelyAnimatedCSSValue(nsCSSProperty aProperty, nsCSSValue* aValue)
+GetDiscretelyAnimatedCSSValue(nsCSSPropertyID aProperty, nsCSSValue* aValue)
 {
   MOZ_ASSERT(false, "GetDiscretelyAnimatedCSSValue is not implemented yet");
   return false;
@@ -168,7 +168,7 @@ nsHTMLStyleSheet::LangRule::MightMapInheritedStyleData()
 
 /* virtual */ bool
 nsHTMLStyleSheet::LangRule::
-GetDiscretelyAnimatedCSSValue(nsCSSProperty aProperty, nsCSSValue* aValue)
+GetDiscretelyAnimatedCSSValue(nsCSSPropertyID aProperty, nsCSSValue* aValue)
 {
   MOZ_ASSERT(false, "GetDiscretelyAnimatedCSSValue is not implemented yet");
   return false;
