@@ -1651,7 +1651,8 @@ public:
   // an element, the element is removed. aPredicate will be called
   // for each element in order. It is not safe to access the array
   // inside aPredicate.
-  void RemoveElementsBy(mozilla::function<bool(const elem_type&)> aPredicate);
+  template<typename Predicate>
+  void RemoveElementsBy(Predicate aPredicate);
 
   // This helper function combines IndexOf with RemoveElementAt to "search
   // and destroy" the first element that is equal to the given element.
@@ -1958,8 +1959,9 @@ nsTArray_Impl<E, Alloc>::RemoveElementsAt(index_type aStart, size_type aCount)
 }
 
 template<typename E, class Alloc>
+template<typename Predicate>
 void
-nsTArray_Impl<E, Alloc>::RemoveElementsBy(mozilla::function<bool(const elem_type&)> aPredicate)
+nsTArray_Impl<E, Alloc>::RemoveElementsBy(Predicate aPredicate)
 {
   if (base_type::mHdr == EmptyHdr()) {
     return;
