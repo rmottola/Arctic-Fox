@@ -8674,6 +8674,7 @@ void nsFrame::FillCursorInformationFromStyle(const nsStyleUserInterface* ui,
 {
   aCursor.mCursor = ui->mCursor;
   aCursor.mHaveHotspot = false;
+  aCursor.mLoading = false;
   aCursor.mHotspotX = aCursor.mHotspotY = 0.0f;
 
   for (nsCursorImage *item = ui->mCursorArray,
@@ -8681,15 +8682,19 @@ void nsFrame::FillCursorInformationFromStyle(const nsStyleUserInterface* ui,
        item < item_end; ++item) {
     uint32_t status;
     nsresult rv = item->GetImage()->GetImageStatus(&status);
-    if (NS_SUCCEEDED(rv) &&
-        (status & imgIRequest::STATUS_LOAD_COMPLETE) &&
-        !(status & imgIRequest::STATUS_ERROR)) {
-      // This is the one we want
-      item->GetImage()->GetImage(getter_AddRefs(aCursor.mContainer));
-      aCursor.mHaveHotspot = item->mHaveHotspot;
-      aCursor.mHotspotX = item->mHotspotX;
-      aCursor.mHotspotY = item->mHotspotY;
-      break;
+    if (NS_SUCCEEDED(rv)) {
+      if (!(status & imgIRequest::STATUS_LOAD_COMPLETE)) {
+        // If we are falling back because any cursor before is loading,
+        // let the consumer know.
+        aCursor.mLoading = true;
+      } else if (!(status & imgIRequest::STATUS_ERROR)) {
+        // This is the one we want
+        item->GetImage()->GetImage(getter_AddRefs(aCursor.mContainer));
+        aCursor.mHaveHotspot = item->mHaveHotspot;
+        aCursor.mHotspotX = item->mHotspotX;
+        aCursor.mHotspotY = item->mHotspotY;
+        break;
+      }
     }
   }
 }
