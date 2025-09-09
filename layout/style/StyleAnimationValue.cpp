@@ -499,6 +499,7 @@ StyleAnimationValue::ComputeDistance(nsCSSPropertyID aProperty,
     case eUnit_UnparsedString:
     case eUnit_URL:
     case eUnit_CurrentColor:
+    case eUnit_DiscreteCSSValue:
       return false;
 
     case eUnit_Enumerated:
@@ -2266,6 +2267,7 @@ StyleAnimationValue::AddWeighted(nsCSSPropertyID aProperty,
     case eUnit_UnparsedString:
     case eUnit_URL:
     case eUnit_CurrentColor:
+    case eUnit_DiscreteCSSValue:
       return false;
 
     case eUnit_Enumerated:
@@ -3058,14 +3060,16 @@ StyleAnimationValue::UncomputeValue(nsCSSPropertyID aProperty,
       break;
     case eUnit_Calc:
     case eUnit_ObjectPosition:
-    case eUnit_URL: {
+    case eUnit_URL:
+    case eUnit_DiscreteCSSValue: {
       nsCSSValue* val = aComputedValue.GetCSSValueValue();
       // Sanity-check that the underlying unit in the nsCSSValue is what we
       // expect for our StyleAnimationValue::Unit:
       MOZ_ASSERT((unit == eUnit_Calc && val->GetUnit() == eCSSUnit_Calc) ||
                  (unit == eUnit_ObjectPosition &&
                   val->GetUnit() == eCSSUnit_Array) ||
-                 (unit == eUnit_URL && val->GetUnit() == eCSSUnit_URL),
+                 (unit == eUnit_URL && val->GetUnit() == eCSSUnit_URL) ||
+                 unit == eUnit_DiscreteCSSValue,
                  "unexpected unit");
       aSpecifiedValue = *val;
       break;
@@ -3594,8 +3598,11 @@ StyleAnimationValue::ExtractComputedValue(nsCSSPropertyID aProperty,
     aStyleContext->StyleData(nsCSSProps::kSIDTable[aProperty]);
   ptrdiff_t ssOffset = nsCSSProps::kStyleStructOffsetTable[aProperty];
   nsStyleAnimType animType = nsCSSProps::kAnimTypeTable[aProperty];
-  MOZ_ASSERT(0 <= ssOffset || animType == eStyleAnimType_Custom,
-             "must be dealing with animatable property");
+  MOZ_ASSERT(0 <= ssOffset ||
+             animType == eStyleAnimType_Custom ||
+             animType == eStyleAnimType_Discrete,
+             "all animation types other than Custom and Discrete must " \
+             "specify a style struct offset to extract values from");
   switch (animType) {
     case eStyleAnimType_Custom:
       switch (aProperty) {
@@ -4210,6 +4217,14 @@ StyleAnimationValue::ExtractComputedValue(nsCSSPropertyID aProperty,
                                                   eUnit_Shadow);
       return true;
     }
+    case eStyleAnimType_Discrete: {
+      auto cssValue = MakeUnique<nsCSSValue>(eCSSUnit_Unset);
+      aStyleContext->RuleNode()->GetDiscretelyAnimatedCSSValue(aProperty,
+                                                               cssValue.get());
+      aComputedValue.SetAndAdoptCSSValueValue(cssValue.release(),
+                                              eUnit_DiscreteCSSValue);
+      return true;
+    }
     case eStyleAnimType_None:
       NS_NOTREACHED("shouldn't use on non-animatable properties");
   }
@@ -4315,6 +4330,7 @@ StyleAnimationValue::operator=(const StyleAnimationValue& aOther)
     case eUnit_Calc:
     case eUnit_ObjectPosition:
     case eUnit_URL:
+    case eUnit_DiscreteCSSValue:
       MOZ_ASSERT(IsCSSValueUnit(mUnit),
                  "This clause is for handling nsCSSValue-backed units");
       MOZ_ASSERT(aOther.mValue.mCSSValue, "values may not be null");
@@ -4592,6 +4608,7 @@ StyleAnimationValue::operator==(const StyleAnimationValue& aOther) const
     case eUnit_Calc:
     case eUnit_ObjectPosition:
     case eUnit_URL:
+    case eUnit_DiscreteCSSValue:
       MOZ_ASSERT(IsCSSValueUnit(mUnit),
                  "This clause is for handling nsCSSValue-backed units");
       return *mValue.mCSSValue == *aOther.mValue.mCSSValue;
