@@ -23485,6 +23485,10 @@
         "url": "/webstorage/storage_local_setitem_quotaexceedederr.html"
       },
       {
+        "path": "web-animations/animation-model/animation-types/animation-types.html",
+        "url": "/web-animations/animation-model/animation-types/animation-types.html"
+      },
+      {
         "path": "webstorage/storage_session_setitem_quotaexceedederr.html",
         "timeout": "long",
         "url": "/webstorage/storage_session_setitem_quotaexceedederr.html"
