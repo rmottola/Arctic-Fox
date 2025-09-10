@@ -2182,8 +2182,8 @@ public:
   }
 
   NS_IMETHOD
-  CollectReports(nsIMemoryReporterCallback* aCallback,
-                 nsISupports* aClosure, bool aAnonymize) override
+  CollectReports(nsIHandleReportCallback* aHandleReport,
+                 nsISupports* aData, bool aAnonymize) override
   {
     AssertIsOnMainThread();
 
@@ -2226,9 +2226,9 @@ public:
       }
     }
 
-    return xpc::ReportJSRuntimeExplicitTreeStats(rtStats, path,
-                                                 aCallback, aClosure,
-                                                 aAnonymize);
+    xpc::ReportJSRuntimeExplicitTreeStats(rtStats, path, aHandleReport, aData,
+                                          aAnonymize);
+    return NS_OK;
   }
 
 private:
