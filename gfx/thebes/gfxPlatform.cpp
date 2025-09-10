@@ -2240,6 +2240,10 @@ gfxPlatform::GetScaledFontForFontWithCairoSkia(DrawTarget* aTarget, gfxFont* aFo
 /* static */ bool
 gfxPlatform::UsesOffMainThreadCompositing()
 {
+  if (XRE_GetProcessType() == GeckoProcessType_GPU) {
+    return true;
+  }
+
   static bool firstTime = true;
   static bool result = false;
 
