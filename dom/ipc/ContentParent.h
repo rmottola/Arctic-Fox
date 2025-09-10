@@ -1103,7 +1103,7 @@ private:
 
   virtual bool RecvProfile(const nsCString& aProfile) override;
 
-  virtual bool RecvGetGraphicsDeviceInitData(DeviceInitData* aOut) override;
+  virtual bool RecvGetGraphicsDeviceInitData(ContentDeviceData* aOut) override;
 
   void StartProfiler(nsIProfilerStartParams* aParams);
 

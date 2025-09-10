@@ -5164,9 +5164,9 @@ ContentParent::RecvProfile(const nsCString& aProfile)
 }
 
 bool
-ContentParent::RecvGetGraphicsDeviceInitData(DeviceInitData* aOut)
+ContentParent::RecvGetGraphicsDeviceInitData(ContentDeviceData* aOut)
 {
-  gfxPlatform::GetPlatform()->GetDeviceInitData(aOut);
+  gfxPlatform::GetPlatform()->BuildContentDeviceData(aOut);
   return true;
 }
 
