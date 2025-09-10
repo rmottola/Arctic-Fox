@@ -962,6 +962,14 @@ gfxFontUtils::DetermineFontDataType(const uint8_t *aFontData, uint32_t aFontData
     return GFX_USERFONT_UNKNOWN;
 }
 
+static int
+DirEntryCmp(const void* aKey, const void* aItem)
+{
+    int32_t tag = *static_cast<const int32_t*>(aKey);
+    const TableDirEntry* entry = static_cast<const TableDirEntry*>(aItem);
+    return tag - int32_t(entry->tag);
+}
+
 /* static */
 TableDirEntry*
 gfxFontUtils::FindTableDirEntry(const void* aFontData, uint32_t aTableTag)
@@ -975,6 +983,19 @@ gfxFontUtils::FindTableDirEntry(const void* aFontData, uint32_t aTableTag)
                  sizeof(TableDirEntry), DirEntryCmp));
 }
 
+/* static */
+hb_blob_t*
+gfxFontUtils::GetTableFromFontData(const void* aFontData, uint32_t aTableTag)
+{
+    const TableDirEntry* dir = FindTableDirEntry(aFontData, aTableTag);
+    if (dir) {
+        return hb_blob_create(reinterpret_cast<const char*>(aFontData) +
+                                  dir->offset, dir->length,
+                              HB_MEMORY_MODE_READONLY, nullptr, nullptr);
+
+    }
+    return nullptr;
+}
 
 nsresult
 gfxFontUtils::RenameFont(const nsAString& aName, const uint8_t *aFontData, 
@@ -1063,10 +1084,10 @@ gfxFontUtils::RenameFont(const nsAString& aName, const uint8_t *aFontData,
         FindTableDirEntry(newFontData, TRUETYPE_TAG('n','a','m','e'));
     // function only called if font validates, so this should always be true
     MOZ_ASSERT(dirEntry, "attempt to rename font with no name table");
+
+    uint32_t numTables = sfntHeader->numTables;
     
-	uint32_t numTables = sfntHeader->numTables;
-    
-	// note: dirEntry now points to 'name' table record
+    // note: dirEntry now points to 'name' table record
     
     // recalculate name table checksum
     uint32_t checkSum = 0;
@@ -1124,10 +1145,10 @@ gfxFontUtils::GetFullNameFromSFNT(const uint8_t* aFontData, uint32_t aLength,
     aFullName.AssignLiteral("(MISSING NAME)"); // should always get replaced
 
     const TableDirEntry *dirEntry =
-		FindTableDirEntry(aFontData, TRUETYPE_TAG('n', 'a', 'm', 'e'));
-
+        FindTableDirEntry(aFontData, TRUETYPE_TAG('n','a','m','e'));
+    
     // should never fail, as we're only called after font validation succeeded
-	NS_ENSURE_TRUE(dirEntry, NS_ERROR_NOT_AVAILABLE);
+    NS_ENSURE_TRUE(dirEntry, NS_ERROR_NOT_AVAILABLE);
 
     uint32_t len = dirEntry->length;
     NS_ENSURE_TRUE(aLength > len && aLength - len >= dirEntry->offset,
