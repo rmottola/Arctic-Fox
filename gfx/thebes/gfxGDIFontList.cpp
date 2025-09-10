@@ -861,9 +861,9 @@ gfxGDIFontList::MakePlatformFont(const nsAString& aFontName,
             fontRef = AddFontMemResourceEx(fontData, fontLength, 0, &numFonts);
         }
     }
-	if (!fontRef) {
-		return nullptr;
-	}
+    if (!fontRef) {
+        return nullptr;
+    }
 
     // only load fonts with a single face contained in the data
     // AddFontMemResourceEx generates an additional face name for
