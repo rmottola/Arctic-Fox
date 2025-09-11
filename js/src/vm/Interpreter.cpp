@@ -734,8 +734,7 @@ js::InstanceOfOperator(JSContext* cx, HandleObject obj, HandleValue v, bool* bp)
 
         /* Step 3. */
         RootedValue rval(cx);
-        RootedValue vv(cx, v);
-        if (!Call(cx, obj, hasInstance, HandleValueArray(vv), &rval))
+        if (!Call(cx, hasInstance, obj, v, &rval))
             return false;
         *bp = ToBoolean(rval);
         return true;
