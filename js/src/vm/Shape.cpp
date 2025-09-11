@@ -498,6 +498,13 @@ js::NativeObject::toDictionaryMode(ExclusiveContext* cx)
         return false;
     }
 
+    if (IsInsideNursery(self) &&
+        !cx->asJSContext()->gc.nursery.queueDictionaryModeObjectToSweep(self))
+    {
+        ReportOutOfMemory(cx);
+        return false;
+    }
+
     MOZ_ASSERT(root->listp == nullptr);
     root->listp = &self->shape_;
     self->shape_ = root;
