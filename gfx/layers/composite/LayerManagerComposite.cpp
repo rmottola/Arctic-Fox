@@ -1048,17 +1048,15 @@ void
 LayerManagerComposite::RenderToPresentationSurface()
 {
 #ifdef MOZ_WIDGET_ANDROID
-  if (!AndroidBridge::Bridge()) {
-    return;
-  }
-
-  void* window = AndroidBridge::Bridge()->GetPresentationWindow();
+  nsIWidget* const widget = mCompositor->GetWidget()->RealWidget();
+  auto window = static_cast<ANativeWindow*>(
+      widget->GetNativeData(NS_PRESENTATION_WINDOW));
 
   if (!window) {
     return;
   }
 
-  EGLSurface surface = AndroidBridge::Bridge()->GetPresentationSurface();
+  EGLSurface surface = widget->GetNativeData(NS_PRESENTATION_SURFACE);
 
   if (!surface) {
     //create surface;
@@ -1067,7 +1065,8 @@ LayerManagerComposite::RenderToPresentationSurface()
       return;
     }
 
-    AndroidBridge::Bridge()->SetPresentationSurface(surface);
+    widget->SetNativeData(NS_PRESENTATION_SURFACE,
+                          reinterpret_cast<uintptr_t>(surface));
   }
 
   CompositorOGL* compositor = mCompositor->AsCompositorOGL();
