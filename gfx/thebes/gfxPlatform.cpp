@@ -2367,7 +2367,7 @@ gfxPlatform::AsyncPanZoomEnabled()
     return false;
   }
 #endif
-#ifdef MOZ_ANDROID_APZ
+#ifdef MOZ_WIDGET_ANDROID
   return true;
 #else
   return gfxPrefs::AsyncPanZoomEnabledDoNotUseDirectly();
