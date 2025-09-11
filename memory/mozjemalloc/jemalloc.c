@@ -228,7 +228,7 @@
 
 #ifndef NO_TLS
 static unsigned long tlsIndex = 0xffffffff;
-#endif 
+#endif
 
 #define	__thread
 #define	_pthread_self() __threadid()
@@ -2286,7 +2286,7 @@ static void *
 pages_map(void *addr, size_t size)
 {
 	void *ret;
-#if defined(__ia64__)
+#if defined(__ia64__) || (defined(__sparc__) && defined(__arch64__) && defined(__linux__))
         /*
          * The JS engine assumes that all allocated pointers have their high 17 bits clear,
          * which ia64's mmap doesn't support directly. However, we can emulate it by passing
@@ -2294,10 +2294,10 @@ pages_map(void *addr, size_t size)
          * or the nearest available memory above that address, providing a near-guarantee
          * that those bits are clear. If they are not, we return NULL below to indicate
          * out-of-memory.
-         * 
-         * The addr is chosen as 0x0000070000000000, which still allows about 120TB of virtual 
+         *
+         * The addr is chosen as 0x0000070000000000, which still allows about 120TB of virtual
          * address space.
-         * 
+         *
          * See Bug 589735 for more information.
          */
 	bool check_placement = true;
@@ -2307,6 +2307,28 @@ pages_map(void *addr, size_t size)
 	}
 #endif
 
+#if defined(__sparc__) && defined(__arch64__) && defined(__linux__)
+    const uintptr_t start = 0x0000070000000000ULL;
+    const uintptr_t end   = 0x0000800000000000ULL;
+
+    /* Copied from js/src/gc/Memory.cpp and adapted for this source */
+
+    uintptr_t hint;
+    void* region = MAP_FAILED;
+    for (hint = start; region == MAP_FAILED && hint + size <= end; hint += chunksize) {
+           region = mmap((void*)hint, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+           if (region != MAP_FAILED) {
+                   if (((size_t) region + (size - 1)) & 0xffff800000000000) {
+                           if (munmap(region, size)) {
+                                   MOZ_ASSERT(errno == ENOMEM);
+                           }
+                           region = MAP_FAILED;
+                   }
+           }
+    }
+    ret = region;
+#else
+
 	/*
 	 * We don't use MAP_FIXED here, because it can cause the *replacement*
 	 * of existing mappings, and we only want to create new mappings.
@@ -2314,13 +2336,13 @@ pages_map(void *addr, size_t size)
 	ret = mmap(addr, size, PROT_READ | PROT_WRITE,
 		MAP_PRIVATE | MAP_ANON, -1, 0);
 	assert(ret != NULL);
-
+#endif
 	if (ret == MAP_FAILED) {
 		ret = NULL;
 	}
-#if defined(__ia64__)
-        /* 
-         * If the allocated memory doesn't have its upper 17 bits clear, consider it 
+#if defined(__ia64__) || (defined(__sparc__) && defined(__arch64__) && defined(__linux__))
+        /*
+         * If the allocated memory doesn't have its upper 17 bits clear, consider it
          * as out of memory.
         */
         else if ((long long)ret & 0xffff800000000000) {
@@ -2351,7 +2373,7 @@ pages_map(void *addr, size_t size)
 		MozTagAnonymousMemory(ret, size, "jemalloc");
 	}
 
-#if defined(__ia64__)
+#if defined(__ia64__) || (defined(__sparc__) && defined(__arch64__) && defined(__linux__))
 	assert(ret == NULL || (!check_placement && ret != NULL)
 	    || (check_placement && ret == addr));
 #else
@@ -5374,7 +5396,7 @@ malloc_init_hard(void)
 				"", "");
 		abort();
 	}
-#else	
+#else
 	pagesize = (size_t) result;
 	pagesize_mask = (size_t) result - 1;
 	pagesize_2pow = ffs((int)result) - 1;
@@ -6194,7 +6216,7 @@ MOZ_MEMORY_API void
 free_impl(void *ptr)
 {
 	size_t offset;
-	
+
 	DARWIN_ONLY((szone->free)(szone, ptr); return);
 
 	UTRACE(ptr, 0, 0);
@@ -6900,8 +6922,8 @@ MOZ_MEMORY_API void *(*__memalign_hook)(size_t alignment, size_t size) = MEMALIG
  * we need to initialize the heap at the first opportunity we get.
  * DLL_PROCESS_ATTACH in DllMain is that opportunity.
  */
-BOOL APIENTRY DllMain(HINSTANCE hModule, 
-                      DWORD reason, 
+BOOL APIENTRY DllMain(HINSTANCE hModule,
+                      DWORD reason,
                       LPVOID lpReserved)
 {
   switch (reason) {
@@ -6912,7 +6934,7 @@ BOOL APIENTRY DllMain(HINSTANCE hModule,
       /* Initialize the heap */
       malloc_init_hard();
       break;
-    
+
     case DLL_PROCESS_DETACH:
       break;
 
