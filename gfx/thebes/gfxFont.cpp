@@ -3216,7 +3216,7 @@ gfxFont::InitFakeSmallCapsRun(DrawTarget     *aDrawTarget,
                         aDrawTarget, nullptr, nullptr, nullptr, 0,
                         aTextRun->GetAppUnitsPerDevUnit()
                     };
-                    UniquePtr<gfxTextRun> tempRun(
+                    RefPtr<gfxTextRun> tempRun(
                         gfxTextRun::Create(&params, convertedString.Length(),
                                            aTextRun->GetFontGroup(), 0));
                     tempRun->AddGlyphRun(f, aMatchType, 0, true, aOrientation);
@@ -3226,7 +3226,7 @@ gfxFont::InitFakeSmallCapsRun(DrawTarget     *aDrawTarget,
                                                 aScript, vertical)) {
                         ok = false;
                     } else {
-                        UniquePtr<gfxTextRun> mergedRun(
+                        RefPtr<gfxTextRun> mergedRun(
                             gfxTextRun::Create(&params, runLength,
                                                aTextRun->GetFontGroup(), 0));
                         MergeCharactersInTextRun(mergedRun.get(), tempRun.get(),
