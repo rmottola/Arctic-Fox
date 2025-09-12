@@ -3089,7 +3089,7 @@ nsCSSFrameConstructor::ConstructSelectFrame(nsFrameConstructorState& aState,
     // Notify combobox that it should use the listbox as it's popup
     comboBox->SetDropDown(listFrame);
 
-    NS_ASSERTION(!listFrame->IsAbsPosContaininingBlock(),
+    NS_ASSERTION(!listFrame->IsAbsPosContainingBlock(),
                  "Ended up with positioned dropdown list somehow.");
     NS_ASSERTION(!listFrame->IsFloating(),
                  "Ended up with floating dropdown list somehow.");
@@ -3233,7 +3233,7 @@ nsCSSFrameConstructor::ConstructFieldSetFrame(nsFrameConstructorState& aState,
   }
 
   nsContainerFrame* absPosContainer = nullptr;
-  if (fieldsetFrame->IsAbsPosContaininingBlock()) {
+  if (fieldsetFrame->IsAbsPosContainingBlock()) {
     absPosContainer = fieldsetFrame;
   }
 
@@ -6190,7 +6190,7 @@ nsCSSFrameConstructor::GetAbsoluteContainingBlock(nsIFrame* aFrame,
     // the correct containing block (the scrolledframe) in that case.
     // If we're looking for a fixed-pos containing block and the frame is
     // not transformed, skip it.
-    if (!frame->IsAbsPosContaininingBlock() ||
+    if (!frame->IsAbsPosContainingBlock() ||
         (aType == FIXED_POS &&
          !frame->StyleDisplay()->IsFixedPosContainingBlock(frame))) {
       continue;
