@@ -3801,10 +3801,10 @@ FlexLine::PositionItemsInCrossAxis(nscoord aLineStartPosition,
 }
 
 void
-nsFlexContainerFrame::Reflow(nsPresContext*           aPresContext,
-                             ReflowOutput&     aDesiredSize,
+nsFlexContainerFrame::Reflow(nsPresContext* aPresContext,
+                             ReflowOutput& aDesiredSize,
                              const ReflowInput& aReflowInput,
-                             nsReflowStatus&          aStatus)
+                             nsReflowStatus& aStatus)
 {
   MarkInReflow();
   DO_GLOBAL_REFLOW_COUNT("nsFlexContainerFrame");
