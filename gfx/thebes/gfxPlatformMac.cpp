@@ -399,14 +399,6 @@ gfxPlatformMac::ReadAntiAliasingThreshold()
 }
 
 bool
-gfxPlatformMac::UseProgressivePaint()
-{
-  // Progressive painting requires cross-process mutexes, which don't work so
-  // well on OS X 10.6 so we disable there.
-  return nsCocoaFeatures::OnLionOrLater() && gfxPlatform::UseProgressivePaint();
-}
-
-bool
 gfxPlatformMac::AccelerateLayersByDefault()
 {
   return true;
