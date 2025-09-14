@@ -3729,7 +3729,7 @@ WebCryptoTask::~WebCryptoTask()
 
   nsNSSShutDownPreventionLock lock;
   if (!isAlreadyShutDown()) {
-    shutdown(calledFromObject);
+    shutdown(ShutdownCalledFrom::Object);
   }
 
   if (mWorkerHolder) {
