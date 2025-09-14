@@ -957,18 +957,15 @@ private:
 
   nsString mBase; // IsVoid() if we have no base URI string.
   RefPtr<URLProxy> mBaseProxy;
-  ErrorResult& mRv;
 
   RefPtr<URLProxy> mRetval;
 
 public:
   ConstructorRunnable(WorkerPrivate* aWorkerPrivate,
-                      const nsAString& aURL, const Optional<nsAString>& aBase,
-                      ErrorResult& aRv)
+                      const nsAString& aURL, const Optional<nsAString>& aBase)
   : WorkerMainThreadRunnable(aWorkerPrivate,
                              NS_LITERAL_CSTRING("URL :: Constructor"))
   , mURL(aURL)
-  , mRv(aRv)
   {
     if (aBase.WasPassed()) {
       mBase = aBase.Value();
@@ -979,13 +976,11 @@ public:
   }
 
   ConstructorRunnable(WorkerPrivate* aWorkerPrivate,
-                      const nsAString& aURL, URLProxy* aBaseProxy,
-                      ErrorResult& aRv)
+                      const nsAString& aURL, URLProxy* aBaseProxy)
   : WorkerMainThreadRunnable(aWorkerPrivate,
                              NS_LITERAL_CSTRING("URL :: Constructor with BaseURL"))
   , mURL(aURL)
   , mBaseProxy(aBaseProxy)
-  , mRv(aRv)
   {
     mBase.SetIsVoid(true);
     mWorkerPrivate->AssertIsOnWorkerThread();
@@ -996,16 +991,18 @@ public:
   {
     AssertIsOnMainThread();
 
+    ErrorResult rv;
     RefPtr<URLMainThread> url;
     if (mBaseProxy) {
-      url = URLMainThread::Constructor(nullptr, mURL, mBaseProxy->URI(), mRv);
+      url = URLMainThread::Constructor(nullptr, mURL, mBaseProxy->URI(), rv);
     } else if (!mBase.IsVoid()) {
-      url = URLMainThread::Constructor(nullptr, mURL, mBase, mRv);
+      url = URLMainThread::Constructor(nullptr, mURL, mBase, rv);
     } else {
-      url = URLMainThread::Constructor(nullptr, mURL, nullptr, mRv);
+      url = URLMainThread::Constructor(nullptr, mURL, nullptr, rv);
     }
 
-    if (mRv.Failed()) {
+    if (rv.Failed()) {
+      rv.SuppressException();
       return true;
     }
 
@@ -1014,8 +1011,15 @@ public:
   }
 
   URLProxy*
-  GetURLProxy()
+  GetURLProxy(ErrorResult& aRv) const
   {
+    MOZ_ASSERT(mWorkerPrivate);
+    mWorkerPrivate->AssertIsOnWorkerThread();
+
+    if (!mRetval) {
+      aRv.ThrowTypeError<MSG_INVALID_URL>(mURL);
+    }
+
     return mRetval;
   }
 };
@@ -1246,9 +1250,8 @@ FinishConstructor(JSContext* aCx, WorkerPrivate* aPrivate,
     return nullptr;
   }
 
-  RefPtr<URLProxy> proxy = aRunnable->GetURLProxy();
-  if (NS_WARN_IF(!proxy)) {
-    aRv.Throw(NS_ERROR_DOM_SYNTAX_ERR);
+  RefPtr<URLProxy> proxy = aRunnable->GetURLProxy(aRv);
+  if (NS_WARN_IF(aRv.Failed())) {
     return nullptr;
   }
 
@@ -1267,7 +1270,7 @@ URLWorker::Constructor(const GlobalObject& aGlobal, const nsAString& aURL,
 
   URLWorker& base = static_cast<URLWorker&>(aBase);
   RefPtr<ConstructorRunnable> runnable =
-    new ConstructorRunnable(workerPrivate, aURL, base.GetURLProxy(), aRv);
+    new ConstructorRunnable(workerPrivate, aURL, base.GetURLProxy());
 
   return FinishConstructor(cx, workerPrivate, runnable, aRv);
 }
@@ -1280,7 +1283,7 @@ URLWorker::Constructor(const GlobalObject& aGlobal, const nsAString& aURL,
   WorkerPrivate* workerPrivate = GetWorkerPrivateFromContext(cx);
 
   RefPtr<ConstructorRunnable> runnable =
-    new ConstructorRunnable(workerPrivate, aURL, aBase, aRv);
+    new ConstructorRunnable(workerPrivate, aURL, aBase);
 
   return FinishConstructor(cx, workerPrivate, runnable, aRv);
 }
@@ -1296,7 +1299,7 @@ URLWorker::Constructor(const GlobalObject& aGlobal, const nsAString& aURL,
   base = &aBase;
 
   RefPtr<ConstructorRunnable> runnable =
-    new ConstructorRunnable(workerPrivate, aURL, base, aRv);
+    new ConstructorRunnable(workerPrivate, aURL, base);
 
   return FinishConstructor(cx, workerPrivate, runnable, aRv);
 }
