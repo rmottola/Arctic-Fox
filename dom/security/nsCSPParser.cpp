@@ -1208,17 +1208,17 @@ nsCSPParser::directive()
     return;
   }
 
-  // special case handling of the referrer directive (since it doesn't contain
-  // source lists)
-  if (cspDir->equals(nsIContentSecurityPolicy::REFERRER_DIRECTIVE)) {
-    referrerDirectiveValue(cspDir);
-    return;
-  }
-
   // special case handling for require-sri-for, which has directive values that
   // are well-defined tokens but are not sources
   if (cspDir->equals(nsIContentSecurityPolicy::REQUIRE_SRI_FOR)) {
     requireSRIForDirectiveValue(static_cast<nsRequireSRIForDirective*>(cspDir));
+    return;
+  }
+
+  // special case handling of the referrer directive (since it doesn't contain
+  // source lists)
+  if (cspDir->equals(nsIContentSecurityPolicy::REFERRER_DIRECTIVE)) {
+    referrerDirectiveValue(cspDir);
     return;
   }
 
