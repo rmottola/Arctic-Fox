@@ -563,4 +563,4 @@ def main(outputfile):
     p = xpidl.IDLParser(outputdir=cachedir)
 
 if __name__ == '__main__':
-    main()
+    main(None)
