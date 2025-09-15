@@ -1053,9 +1053,6 @@ pref("layout.accessiblecaret.always_show_when_scrolling", false);
 pref("services.sync.fxaccounts.enabled", true);
 pref("identity.fxaccounts.enabled", true);
 
-// Mobile Identity API.
-pref("services.mobileid.server.uri", "https://msisdn.services.mozilla.com");
-
 // Enable mapped array buffer.
 pref("dom.mapped_arraybuffer.enabled", true);
 
