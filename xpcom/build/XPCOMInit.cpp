@@ -147,9 +147,6 @@ extern nsresult nsStringInputStreamConstructor(nsISupports*, REFNSIID, void**);
 #endif
 #include "vpx_mem/vpx_mem.h"
 #endif
-#ifdef MOZ_WEBM
-#include "nestegg/nestegg.h"
-#endif
 
 #include "GeckoProfiler.h"
 
@@ -457,33 +454,6 @@ NS_IMPL_ISUPPORTS(VPXReporter, nsIMemoryReporter)
 /* static */ template<> Atomic<size_t>
 CountingAllocatorBase<VPXReporter>::sAmount(0);
 #endif /* MOZ_VPX */
-
-#ifdef MOZ_WEBM
-class NesteggReporter final
-  : public nsIMemoryReporter
-  , public CountingAllocatorBase<NesteggReporter>
-{
-public:
-  NS_DECL_ISUPPORTS
-
-private:
-  NS_IMETHOD
-  CollectReports(nsIHandleReportCallback* aHandleReport, nsISupports* aData,
-                 bool aAnonymize) override
-  {
-    return MOZ_COLLECT_REPORT(
-      "explicit/media/libnestegg", KIND_HEAP, UNITS_BYTES, MemoryAllocated(),
-      "Memory allocated through libnestegg for WebM media files.");
-  }
-
-  ~NesteggReporter() {}
-};
-
-NS_IMPL_ISUPPORTS(NesteggReporter, nsIMemoryReporter)
-
-/* static */ template<> Atomic<size_t>
-CountingAllocatorBase<NesteggReporter>::sAmount(0);
-#endif /* MOZ_WEBM */
 
 static double
 TimeSinceProcessCreation()
