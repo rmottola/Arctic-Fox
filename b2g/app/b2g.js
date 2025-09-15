@@ -510,9 +510,6 @@ pref("media.realtime_decoder.enabled", true);
 // TCPSocket
 pref("dom.mozTCPSocket.enabled", true);
 
-// WebPayment
-pref("dom.mozPay.enabled", true);
-
 // Handle hardware buttons in the b2g chrome package
 pref("b2g.keys.menu.enabled", true);
 

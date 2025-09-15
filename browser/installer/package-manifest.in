@@ -220,9 +220,6 @@
 @RESPATH@/components/dom_xhr.xpt
 @RESPATH@/components/dom_xpath.xpt
 @RESPATH@/components/dom_xul.xpt
-#ifdef MOZ_PAY
-@RESPATH@/components/dom_payment.xpt
-#endif
 @RESPATH@/components/dom_presentation.xpt
 @RESPATH@/components/downloads.xpt
 @RESPATH@/components/editor.xpt
@@ -544,12 +541,6 @@
 
 @RESPATH@/components/TVSimulatorService.js
 @RESPATH@/components/TVSimulatorService.manifest
-
-#ifdef MOZ_PAY
-@RESPATH@/components/Payment.js
-@RESPATH@/components/PaymentFlowInfo.js
-@RESPATH@/components/Payment.manifest
-#endif
 
 #ifdef MOZ_WEBRTC
 @RESPATH@/components/PeerConnection.js

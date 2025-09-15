@@ -2453,7 +2453,6 @@ MOZ_INSTALL_TRACKING=
 ACCESSIBILITY=
 MOZ_TIME_MANAGER=
 MOZ_SIMPLEPUSH=
-MOZ_PAY=
 MOZ_AUDIO_CHANNEL_MANAGER=
 MOZ_CONTENT_SANDBOX=
 MOZ_GMP_SANDBOX=
@@ -5037,14 +5036,6 @@ if test -n "$MOZ_SIMPLEPUSH"; then
     AC_DEFINE(MOZ_SIMPLEPUSH)
 fi
 AC_SUBST(MOZ_SIMPLEPUSH)
-
-dnl ========================================================
-dnl = Enable Support for Payment API
-dnl ========================================================
-if test -n "$MOZ_PAY"; then
-    AC_DEFINE(MOZ_PAY)
-fi
-AC_SUBST(MOZ_PAY)
 
 dnl ========================================================
 dnl = Enable Support for AudioChannelManager API
