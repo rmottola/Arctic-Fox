@@ -5,16 +5,15 @@
 Components.utils.import("resource://testing-common/MockRegistrar.jsm");
 
 /**
- * Test that nsIUpdatePrompt doesn't display UI for showUpdateInstalled,
- * showUpdateAvailable, and showUpdateError when the app.update.silent
- * preference is true.
+ * Test that nsIUpdatePrompt doesn't display UI for showUpdateAvailable and
+ * showUpdateError when the app.update.silent preference is true.
  */
 
 function run_test() {
   setupTestCommon();
 
-  logTestInfo("testing nsIUpdatePrompt notifications should not be seen " +
-              "when the " + PREF_APP_UPDATE_SILENT + " preference is true");
+  debugDump("testing nsIUpdatePrompt notifications should not be seen " +
+            "when the " + PREF_APP_UPDATE_SILENT + " preference is true");
 
   Services.prefs.setBoolPref(PREF_APP_UPDATE_SILENT, true);
 
@@ -27,17 +26,7 @@ function run_test() {
 
   standardInit();
 
-  logTestInfo("testing showUpdateInstalled should not call openWindow");
-  Services.prefs.setBoolPref(PREF_APP_UPDATE_SHOW_INSTALLED_UI, true);
-
-  gCheckFunc = check_showUpdateInstalled;
-  gUP.showUpdateInstalled();
-  // Report a successful check after the call to showUpdateInstalled since it
-  // didn't throw and otherwise it would report no tests run.
-  Assert.ok(true,
-            "calling showUpdateInstalled should not attempt to open a window");
-
-  logTestInfo("testing showUpdateAvailable should not call openWindow");
+  debugDump("testing showUpdateAvailable should not call openWindow");
   writeUpdatesToXMLFile(getLocalUpdatesXMLString(""), false);
   let patches = getLocalPatchString(null, null, null, null, null, null,
                                     STATE_FAILED);
@@ -54,7 +43,7 @@ function run_test() {
   Assert.ok(true,
             "calling showUpdateAvailable should not attempt to open a window");
 
-  logTestInfo("testing showUpdateError should not call getNewPrompter");
+  debugDump("testing showUpdateError should not call getNewPrompter");
   gCheckFunc = check_showUpdateError;
   update.errorCode = WRITE_ERROR;
   gUP.showUpdateError(update);
@@ -64,10 +53,6 @@ function run_test() {
             "calling showUpdateError should not attempt to open a window");
 
   doTestFinish();
-}
-
-function check_showUpdateInstalled() {
-  do_throw("showUpdateInstalled should not have called openWindow!");
 }
 
 function check_showUpdateAvailable() {
