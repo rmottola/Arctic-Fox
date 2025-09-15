@@ -690,7 +690,9 @@ WalkDescendantsResetAutoDirection(Element* aElement)
     if (child->NodeType() == nsIDOMNode::TEXT_NODE &&
         child->HasTextNodeDirectionalityMap()) {
       nsTextNodeDirectionalityMap::ResetTextNodeDirection(static_cast<nsTextNode*>(child), nullptr);
-      nsTextNodeDirectionalityMap::EnsureMapIsClearFor(child);
+      // Don't call nsTextNodeDirectionalityMap::EnsureMapIsClearFor(child)
+      // since ResetTextNodeDirection may have kept elements in child's
+      // DirectionalityMap.
     }
     child = child->GetNextNode(aElement);
   }
