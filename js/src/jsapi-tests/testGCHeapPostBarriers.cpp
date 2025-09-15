@@ -108,9 +108,9 @@ TestHeapPostBarrierUpdate()
         CHECK(heapPtr);
 
         W& wrapper = *heapPtr;
-        CHECK(Passthrough(wrapper.get() == nullptr));
+        CHECK(wrapper.get() == nullptr);
         wrapper = initialObj;
-        CHECK(Passthrough(wrapper == initialObj));
+        CHECK(wrapper == initialObj);
 
         ptr = heapPtr.release();
     }
@@ -140,9 +140,9 @@ TestHeapPostBarrierInitFailure()
         CHECK(heapPtr);
 
         W& wrapper = *heapPtr;
-        CHECK(Passthrough(wrapper.get() == nullptr));
+        CHECK(wrapper.get() == nullptr);
         wrapper = initialObj;
-        CHECK(Passthrough(wrapper == initialObj));
+        CHECK(wrapper == initialObj);
     }
 
     cx->minorGC(JS::gcreason::API);
