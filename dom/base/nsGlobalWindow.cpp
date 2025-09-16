@@ -13530,20 +13530,19 @@ nsGlobalChromeWindow::Maximize()
 {
   FORWARD_TO_INNER_CHROME(Maximize, (), NS_ERROR_UNEXPECTED);
 
-  ErrorResult rv;
-  Maximize(rv);
-  return rv.StealNSResult();
+  nsGlobalWindow::Maximize();
+  return NS_OK;
 }
 
 void
-nsGlobalWindow::Maximize(ErrorResult& aError)
+nsGlobalWindow::Maximize()
 {
   MOZ_ASSERT(IsInnerWindow());
 
   nsCOMPtr<nsIWidget> widget = GetMainWidget();
 
   if (widget) {
-    aError = widget->SetSizeMode(nsSizeMode_Maximized);
+    widget->SetSizeMode(nsSizeMode_Maximized);
   }
 }
 
@@ -13552,20 +13551,19 @@ nsGlobalChromeWindow::Minimize()
 {
   FORWARD_TO_INNER_CHROME(Minimize, (), NS_ERROR_UNEXPECTED);
 
-  ErrorResult rv;
-  Minimize(rv);
-  return rv.StealNSResult();
+  nsGlobalWindow::Minimize();
+  return NS_OK;
 }
 
 void
-nsGlobalWindow::Minimize(ErrorResult& aError)
+nsGlobalWindow::Minimize()
 {
   MOZ_ASSERT(IsInnerWindow());
 
   nsCOMPtr<nsIWidget> widget = GetMainWidget();
 
   if (widget) {
-    aError = widget->SetSizeMode(nsSizeMode_Minimized);
+    widget->SetSizeMode(nsSizeMode_Minimized);
   }
 }
 
@@ -13574,20 +13572,19 @@ nsGlobalChromeWindow::Restore()
 {
   FORWARD_TO_INNER_CHROME(Restore, (), NS_ERROR_UNEXPECTED);
 
-  ErrorResult rv;
-  Restore(rv);
-  return rv.StealNSResult();
+  nsGlobalWindow::Restore();
+  return NS_OK;
 }
 
 void
-nsGlobalWindow::Restore(ErrorResult& aError)
+nsGlobalWindow::Restore()
 {
   MOZ_ASSERT(IsInnerWindow());
 
   nsCOMPtr<nsIWidget> widget = GetMainWidget();
 
   if (widget) {
-    aError = widget->SetSizeMode(nsSizeMode_Normal);
+    widget->SetSizeMode(nsSizeMode_Normal);
   }
 }
 
