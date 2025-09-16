@@ -3400,7 +3400,6 @@ NS_IMETHODIMP nsPluginInstanceOwner::CreateWidget(void)
       }
     }
 
-
     mWidget->EnableDragDrop(true);
     mWidget->Show(false);
     mWidget->Enable(false);

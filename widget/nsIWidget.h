@@ -1369,10 +1369,9 @@ class nsIWidget : public nsISupports
     virtual bool AsyncPanZoomEnabled() const = 0;
 
     /**
-     * Enables the dropping of files to a widget (XXX this is temporary)
-     *
+     * Enables the dropping of files to a widget.
      */
-    NS_IMETHOD EnableDragDrop(bool aEnable) = 0;
+    virtual void EnableDragDrop(bool aEnable) = 0;
 
     /**
      * Enables/Disables system mouse capture.
