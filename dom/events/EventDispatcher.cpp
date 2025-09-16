@@ -56,7 +56,7 @@
 #include "mozilla/MouseEvents.h"
 #include "mozilla/TextEvents.h"
 #include "mozilla/TouchEvents.h"
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 
 #ifdef MOZ_TASK_TRACER
 #include "GeckoTaskTracer.h"

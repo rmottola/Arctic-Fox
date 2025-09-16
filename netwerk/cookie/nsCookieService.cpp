@@ -7,6 +7,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/Likely.h"
+#include "mozilla/Unused.h"
 
 #include "mozilla/net/CookieServiceChild.h"
 #include "mozilla/net/NeckoCommon.h"

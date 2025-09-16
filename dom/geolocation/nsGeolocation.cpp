@@ -25,7 +25,7 @@
 #include "mozilla/HalWakeLock.h"
 #include "mozilla/Hal.h"
 #include "mozilla/Services.h"
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/ClearOnShutdown.h"
 #include "mozilla/dom/Event.h"

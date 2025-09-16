@@ -7,7 +7,7 @@
 
 #include "MediaEngine.h"
 #include "mozilla/Services.h"
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 #include "nsAutoPtr.h"
 #include "nsIMediaManager.h"
 

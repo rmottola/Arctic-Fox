@@ -75,7 +75,7 @@
 #endif
 #endif
 
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 
 #include "mozInlineSpellChecker.h"
 #include "nsDocShell.h"
