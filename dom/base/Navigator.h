@@ -100,6 +100,7 @@ class InputPortManager;
 class DeviceStorageAreaListener;
 class Presentation;
 class LegacyMozTCPSocket;
+class VRDisplay;
 
 namespace time {
 class TimeManager;
