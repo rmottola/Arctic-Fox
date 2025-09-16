@@ -55,7 +55,7 @@
 #include "nsRegion.h"                   // for nsIntRegion, etc
 #ifdef MOZ_WIDGET_ANDROID
 #include <android/log.h>
-#include "AndroidBridge.h"
+#include <android/native_window.h>
 #endif
 #if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
 #include "opengl/CompositorOGL.h"
@@ -1077,7 +1077,8 @@ LayerManagerComposite::RenderToPresentationSurface()
     return;
   }
 
-  const IntSize windowSize = AndroidBridge::Bridge()->GetNativeWindowSize(window);
+  const IntSize windowSize(ANativeWindow_getWidth(window),
+                           ANativeWindow_getHeight(window));
 
 #elif defined(MOZ_WIDGET_GONK)
   CompositorOGL* compositor = mCompositor->AsCompositorOGL();
