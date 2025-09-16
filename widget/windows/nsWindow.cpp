@@ -735,17 +735,17 @@ nsWindow::Create(nsIWidget* aParent,
 }
 
 // Close this nsWindow
-NS_IMETHODIMP nsWindow::Destroy()
+void nsWindow::Destroy()
 {
   // WM_DESTROY has already fired, avoid calling it twice
   if (mOnDestroyCalled)
-    return NS_OK;
+    return;
 
   // Don't destroy windows that have file pickers open, we'll tear these down
   // later once the picker is closed.
   mDestroyCalled = true;
   if (mPickerDisplayCount)
-    return NS_OK;
+    return;
 
   // During the destruction of all of our children, make sure we don't get deleted.
   nsCOMPtr<nsIWidget> kungFuDeathGrip(this);
@@ -779,8 +779,6 @@ NS_IMETHODIMP nsWindow::Destroy()
     mWindowHook.Notify(mWnd, WM_DESTROY, 0, 0, msgResult);
     OnDestroy();
   }
-
-  return NS_OK;
 }
 
 /**************************************************************
