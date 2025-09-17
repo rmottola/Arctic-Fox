@@ -1329,6 +1329,8 @@ bool CanvasRenderingContext2D::SwitchRenderingMode(RenderingMode aRenderingMode)
     return false;
   }
 
+  MOZ_ASSERT(mBufferProvider);
+
 #ifdef USE_SKIA_GPU
   // Do not attempt to switch into GL mode if the platform doesn't allow it.
   if ((aRenderingMode == RenderingMode::OpenGLBackendMode) &&
@@ -1337,36 +1339,22 @@ bool CanvasRenderingContext2D::SwitchRenderingMode(RenderingMode aRenderingMode)
   }
 #endif
 
-  RefPtr<SourceSurface> snapshot;
-  Matrix transform;
   RefPtr<PersistentBufferProvider> oldBufferProvider = mBufferProvider;
-  RefPtr<DrawTarget> oldTarget = mTarget;
 
-  AutoReturnSnapshot autoReturn(nullptr);
-
-  if (mTarget) {
-    snapshot = mTarget->Snapshot();
-    transform = mTarget->GetTransform();
-  } else {
-    MOZ_ASSERT(mBufferProvider);
-    // When mBufferProvider is true but we have no mTarget, our current state's
-    // transform is always valid. See ReturnTarget().
-    transform = CurrentState().transform;
-    snapshot = mBufferProvider->BorrowSnapshot();
-    autoReturn.mBufferProvider = mBufferProvider;
-    autoReturn.mSnapshot = &snapshot;
-  }
-
+  // Return the old target to the buffer provider.
+  // We need to do this before calling EnsureTarget.
+  ReturnTarget();
   mTarget = nullptr;
   mBufferProvider = nullptr;
   mResetLayer = true;
 
-  // Recreate target using the new rendering mode
+  // Borrowing the snapshot must be done after ReturnTarget.
+  RefPtr<SourceSurface> snapshot = oldBufferProvider->BorrowSnapshot();
+
+  // Recreate mTarget using the new rendering mode
   RenderingMode attemptedMode = EnsureTarget(nullptr, aRenderingMode);
   if (!IsTargetValid()) {
-    if (oldBufferProvider && oldTarget) {
-      oldBufferProvider->ReturnDrawTarget(oldTarget.forget());
-    }
+    oldBufferProvider->ReturnSnapshot(snapshot.forget());
     return false;
   }
 
@@ -1374,20 +1362,9 @@ bool CanvasRenderingContext2D::SwitchRenderingMode(RenderingMode aRenderingMode)
   mRenderingMode = attemptedMode;
 
   // Restore the content from the old DrawTarget
-  gfx::Rect r(0, 0, mWidth, mHeight);
-  mTarget->DrawSurface(snapshot, r, r);
-
-  // Restore the clips and transform
-  for (uint32_t i = 0; i < CurrentState().clipsPushed.Length(); i++) {
-    mTarget->PushClip(CurrentState().clipsPushed[i]);
-  }
-
-  mTarget->SetTransform(transform);
-
-  if (oldBufferProvider && oldTarget) {
-    oldBufferProvider->ReturnDrawTarget(oldTarget.forget());
-  }
-
+  // Clips and transform were already restored in EnsureTarget.
+  mTarget->CopySurface(snapshot, IntRect(0, 0, mWidth, mHeight), IntPoint());
+  oldBufferProvider->ReturnSnapshot(snapshot.forget());
   return true;
 }
 
@@ -1549,6 +1526,10 @@ CanvasRenderingContext2D::EnsureTarget(const gfx::Rect* aCoveredRect,
 
   ScheduleStableStateCallback();
 
+  // we'll do a few extra things at the end of this method if we changed the
+  // buffer provider.
+  RefPtr<PersistentBufferProvider> oldBufferProvider = mBufferProvider;
+
   if (mBufferProvider && mode == mRenderingMode) {
     gfx::Rect rect(0, 0, mWidth, mHeight);
     if (aCoveredRect && CurrentState().transform.TransformBounds(*aCoveredRect).Contains(rect)) {
@@ -1557,25 +1538,15 @@ CanvasRenderingContext2D::EnsureTarget(const gfx::Rect* aCoveredRect,
       mTarget = mBufferProvider->BorrowDrawTarget(IntRect(0, 0, mWidth, mHeight));
     }
 
-    if (mTarget) {
-      // Restore clip and transform.
-      for (uint32_t i = 0; i < mStyleStack.Length(); i++) {
-        mTarget->SetTransform(mStyleStack[i].transform);
-        for (uint32_t c = 0; c < mStyleStack[i].clipsPushed.Length(); c++) {
-          mTarget->PushClip(mStyleStack[i].clipsPushed[c]);
-        }
-      }
-      return mRenderingMode;
-    } else {
-      mBufferProvider = nullptr;
-    }
+    mode = mRenderingMode;
   }
 
   mIsSkiaGL = false;
 
    // Check that the dimensions are sane
   IntSize size(mWidth, mHeight);
-  if (size.width <= gfxPrefs::MaxCanvasSize() &&
+  if (!mTarget &&
+      size.width <= gfxPrefs::MaxCanvasSize() &&
       size.height <= gfxPrefs::MaxCanvasSize() &&
       size.width >= 0 && size.height >= 0) {
     SurfaceFormat format = GetSurfaceFormat();
@@ -1630,19 +1601,34 @@ CanvasRenderingContext2D::EnsureTarget(const gfx::Rect* aCoveredRect,
   }
 
   if (mTarget) {
-    static bool registered = false;
-    if (!registered) {
-      registered = true;
-      RegisterStrongMemoryReporter(new Canvas2dPixelsReporter());
+    // We changed the buffer provider.
+    // XXX - It would make more sense to track the allocation in
+    // PeristentBufferProvider, rather than here.
+    if (mBufferProvider != oldBufferProvider) {
+      static bool registered = false;
+      if (!registered) {
+        registered = true;
+        RegisterStrongMemoryReporter(new Canvas2dPixelsReporter());
+      }
+
+      gCanvasAzureMemoryUsed += mWidth * mHeight * 4;
+      JSContext* context = nsContentUtils::GetCurrentJSContext();
+      if (context) {
+        JS_updateMallocCounter(context, mWidth * mHeight * 4);
+      }
+
+      mTarget->ClearRect(gfx::Rect(Point(0, 0), Size(mWidth, mHeight)));
+
+      // Force a full layer transaction since we didn't have a layer before
+      // and now we might need one.
+      if (mCanvasElement) {
+        mCanvasElement->InvalidateCanvas();
+      }
+      // Calling Redraw() tells our invalidation machinery that the entire
+      // canvas is already invalid, which can speed up future drawing.
+      Redraw();
     }
 
-    gCanvasAzureMemoryUsed += mWidth * mHeight * 4;
-    JSContext* context = nsContentUtils::GetCurrentJSContext();
-    if (context) {
-      JS_updateMallocCounter(context, mWidth * mHeight * 4);
-    }
-
-    mTarget->ClearRect(gfx::Rect(Point(0, 0), Size(mWidth, mHeight)));
     if (mTarget->GetBackendType() == gfx::BackendType::CAIRO) {
       // Cairo doesn't play well with huge clips. When given a very big clip it
       // will try to allocate big mask surface without taking the target
@@ -1652,14 +1638,14 @@ CanvasRenderingContext2D::EnsureTarget(const gfx::Rect* aCoveredRect,
       // invasive changes.
       mTarget->PushClipRect(gfx::Rect(Point(0, 0), Size(mWidth, mHeight)));
     }
-    // Force a full layer transaction since we didn't have a layer before
-    // and now we might need one.
-    if (mCanvasElement) {
-      mCanvasElement->InvalidateCanvas();
+
+    // Restore clip and transform.
+    for (uint32_t i = 0; i < mStyleStack.Length(); i++) {
+      mTarget->SetTransform(mStyleStack[i].transform);
+      for (uint32_t c = 0; c < mStyleStack[i].clipsPushed.Length(); c++) {
+        mTarget->PushClip(mStyleStack[i].clipsPushed[c]);
+      }
     }
-    // Calling Redraw() tells our invalidation machinery that the entire
-    // canvas is already invalid, which can speed up future drawing.
-    Redraw();
   } else {
     EnsureErrorTarget();
     mTarget = sErrorTarget;
@@ -1670,6 +1656,7 @@ CanvasRenderingContext2D::EnsureTarget(const gfx::Rect* aCoveredRect,
   if (mIsSkiaGL && mTarget && mTarget->GetType() == DrawTargetType::HARDWARE_RASTER) {
     gfxWarningOnce() << "Using SkiaGL canvas.";
   }
+
   return mode;
 }
 
@@ -1760,6 +1747,13 @@ CanvasRenderingContext2D::ReturnTarget()
         mTarget->PopClip();
       }
     }
+
+    if (mTarget->GetBackendType() == gfx::BackendType::CAIRO) {
+      // With the cairo backend we pushed an extra clip rect which we have to
+      // balance out here. See the comment in EnsureDrawTarget.
+      mTarget->PopClip();
+    }
+
     mBufferProvider->ReturnDrawTarget(mTarget.forget());
   }
 }
