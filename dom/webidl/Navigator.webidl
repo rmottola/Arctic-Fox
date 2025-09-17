@@ -414,7 +414,7 @@ partial interface Navigator {
 };
 
 partial interface Navigator {
-  [Throws, Pref="dom.presentation.enabled", Func="Navigator::HasPresentationSupport", SameObject]
+  [Throws, Pref="dom.presentation.enabled", SameObject]
   readonly attribute Presentation? presentation;
 };
 

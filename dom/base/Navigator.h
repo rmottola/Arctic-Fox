@@ -308,8 +308,6 @@ public:
   static bool HasUserMediaSupport(JSContext* /* unused */,
                                   JSObject* /* unused */);
 
-  static bool HasPresentationSupport(JSContext* aCx, JSObject* aGlobal);
-
   static bool IsE10sEnabled(JSContext* aCx, JSObject* aGlobal);
 
   nsPIDOMWindowInner* GetParentObject() const
