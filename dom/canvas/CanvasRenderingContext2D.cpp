@@ -4664,6 +4664,13 @@ CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
       return;
     }
 
+#ifdef MOZ_EME
+    if (video->ContainsRestrictedContent()) {
+      aError.Throw(NS_ERROR_NOT_AVAILABLE);
+      return;
+    }
+#endif
+
     uint16_t readyState;
     if (NS_SUCCEEDED(video->GetReadyState(&readyState)) &&
         readyState < nsIDOMHTMLMediaElement::HAVE_CURRENT_DATA) {
@@ -5121,10 +5128,12 @@ CanvasRenderingContext2D::DrawWindow(nsGlobalWindow& aWindow, double aX,
   }
 
   nsCOMPtr<nsIPresShell> shell = presContext->PresShell();
+
   Unused << shell->RenderDocument(r, renderDocFlags, backgroundColor, thebes);
   // If this canvas was contained in the drawn window, the pre-transaction callback
   // may have returned its DT. If so, we must reacquire it here.
   EnsureTarget();
+
   if (drawDT) {
     RefPtr<SourceSurface> snapshot = drawDT->Snapshot();
     if (NS_WARN_IF(!snapshot)) {
@@ -5642,7 +5651,6 @@ CanvasRenderingContext2D::PutImageData_explicit(int32_t aX, int32_t aY, uint32_t
     srcLine += aW * 4;
   }
 
-  EnsureTarget();
   if (!IsTargetValid()) {
     return NS_ERROR_FAILURE;
   }
