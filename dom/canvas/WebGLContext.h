@@ -356,6 +356,11 @@ public:
 
     bool PresentScreenBuffer();
 
+    // Prepare the context for capture before compositing
+    void BeginComposition();
+    // Clean up the context after captured for compositing
+    void EndComposition();
+
     // a number that increments every time we have an event that causes
     // all context resources to be lost.
     uint32_t Generation() { return mGeneration.value(); }
@@ -1518,7 +1523,6 @@ protected:
     bool mNeedsFakeNoDepth;
     bool mNeedsFakeNoStencil;
     bool mNeedsEmulatedLoneDepthStencil;
-    bool mVRPresentationActive;
 
     bool HasTimestampBits() const;
 
