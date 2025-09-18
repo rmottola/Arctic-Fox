@@ -36,6 +36,7 @@ protected:
   // impelement the native clipboard behavior
   NS_IMETHOD SetNativeClipboardData(int32_t aWhichClipboard);
   NS_IMETHOD GetNativeClipboardData(nsITransferable * aTransferable, int32_t aWhichClipboard);
+  void ClearSelectionCache();
   
 private:
   int32_t mCachedClipboard;

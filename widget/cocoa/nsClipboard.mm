@@ -64,6 +64,12 @@ GetDataFromPasteboard(NSPasteboard* aPasteboard, NSString* aType)
   return data;
 }
 
+void
+nsClipboard::ClearSelectionCache()
+{
+  sSelectionCache = nullptr;
+}
+
 NS_IMETHODIMP
 nsClipboard::SetNativeClipboardData(int32_t aWhichClipboard)
 {
