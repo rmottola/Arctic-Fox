@@ -57,6 +57,12 @@ XPCOMUtils.defineLazyModuleGetter(this, "MessageChannel",
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
                                   "resource://gre/modules/AddonManager.jsm");
 
+XPCOMUtils.defineLazyGetter(this, "require", () => {
+  let obj = {};
+  Cu.import("resource://devtools/shared/Loader.jsm", obj);
+  return obj.require;
+});
+
 Cu.import("resource://gre/modules/ExtensionContent.jsm");
 Cu.import("resource://gre/modules/ExtensionManagement.jsm");
 
@@ -123,10 +129,11 @@ var Management = {
 
     for (let [/* name */, value] of XPCOMUtils.enumerateCategoryEntries(CATEGORY_EXTENSION_SCRIPTS)) {
       let scope = {
+        ExtensionContext,
         extensions: this,
         global: scriptScope,
-        ExtensionContext: ExtensionContext,
-        GlobalManager: GlobalManager,
+        GlobalManager,
+        require,
       };
       Services.scriptloader.loadSubScript(value, scope, "UTF-8");
 
@@ -749,7 +756,6 @@ GlobalManager = {
     let alertDisplayedWarning = false;
     let alertOverwrite = text => {
       if (!alertDisplayedWarning) {
-        let {require} = Cu.import("resource://devtools/shared/Loader.jsm", {});
         require("devtools/client/framework/devtools-browser");
 
         let hudservice = require("devtools/client/webconsole/hudservice");
