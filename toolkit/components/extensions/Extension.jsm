@@ -266,6 +266,11 @@ ExtensionContext = class extends BaseContext {
     }
   }
 
+  get docShell() {
+    return this.contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
+               .getInterface(Ci.nsIDocShell);
+  }
+
   get cloneScope() {
     return this.contentWindow;
   }
