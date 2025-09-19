@@ -9,6 +9,7 @@
     "XPCOMUtils": true,
 
     "waitForLoad": true,
+    "promiseConsoleOutput": true,
 
     // Test harness globals
     "add_task": false,
