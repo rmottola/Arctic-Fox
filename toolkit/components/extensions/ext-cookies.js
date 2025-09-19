@@ -332,7 +332,8 @@ extensions.registerSchemaAPI("cookies", context => {
               notify(false, subject, "explicit");
               break;
             case "changed":
-              notify(false, subject, "overwrite");
+              notify(true, subject, "overwrite");
+              notify(false, subject, "explicit");
               break;
             case "batch-deleted":
               subject.QueryInterface(Ci.nsIArray);
