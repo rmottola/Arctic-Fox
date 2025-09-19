@@ -2,6 +2,9 @@
 
 const {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
 
+/* exported createHttpServer, promiseConsoleOutput */
+
+Components.utils.import("resource://gre/modules/Task.jsm");
 Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "Extension",
@@ -18,3 +21,56 @@ XPCOMUtils.defineLazyModuleGetter(this, "Services",
                                   "resource://gre/modules/Services.jsm");
 
 ExtensionTestUtils.init(this);
+
+/**
+ * Creates a new HttpServer for testing, and begins listening on the
+ * specified port. Automatically shuts down the server when the test
+ * unit ends.
+ *
+ * @param {integer} [port]
+ *        The port to listen on. If omitted, listen on a random
+ *        port. The latter is the preferred behavior.
+ *
+ * @returns {HttpServer}
+ */
+function createHttpServer(port = -1) {
+  let server = new HttpServer();
+  server.start(port);
+
+  do_register_cleanup(() => {
+    return new Promise(resolve => {
+      server.stop(resolve);
+    });
+  });
+
+  return server;
+}
+
+var promiseConsoleOutput = Task.async(function* (task) {
+  const DONE = `=== console listener ${Math.random()} done ===`;
+
+  let listener;
+  let messages = [];
+  let awaitListener = new Promise(resolve => {
+    listener = msg => {
+      if (msg == DONE) {
+        resolve();
+      } else {
+        void (msg instanceof Ci.nsIConsoleMessage);
+        messages.push(msg);
+      }
+    };
+  });
+
+  Services.console.registerListener(listener);
+  try {
+    let result = yield task();
+
+    Services.console.logStringMessage(DONE);
+    yield awaitListener;
+
+    return {messages, result};
+  } finally {
+    Services.console.unregisterListener(listener);
+  }
+});
