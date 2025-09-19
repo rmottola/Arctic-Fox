@@ -1125,7 +1125,7 @@ function promiseObserved(topic, test = () => true) {
  * Messaging primitives.
  */
 
-var nextPortId = 1;
+let gNextPortId = 1;
 
 // Abstraction for a Port object in the extension API. Each port has a unique ID.
 function Port(context, messageManager, name, id, sender) {
@@ -1333,7 +1333,8 @@ Messenger.prototype = {
   },
 
   connect(messageManager, name, recipient) {
-    let portId = nextPortId++;
+    // TODO(robwu): Use a process ID instead of the process type. bugzil.la/1287626
+    let portId = `${gNextPortId++}-${Services.appinfo.processType}`;
     let port = new Port(this.context, messageManager, name, portId, null);
     let msg = {name, portId};
     // TODO: Disconnect the port if no response?
