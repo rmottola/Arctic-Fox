@@ -82,6 +82,8 @@ var {
   flushJarCache,
 } = ExtensionUtils;
 
+XPCOMUtils.defineLazyGetter(this, "console", ExtensionUtils.getConsole);
+
 const LOGGER_ID_BASE = "addons.webextension.";
 const UUID_MAP_PREF = "extensions.webextensions.uuids";
 const LEAVE_STORAGE_PREF = "extensions.webextensions.keepStorageOnUninstall";
@@ -129,6 +131,7 @@ var Management = {
 
     for (let [/* name */, value] of XPCOMUtils.enumerateCategoryEntries(CATEGORY_EXTENSION_SCRIPTS)) {
       let scope = {
+        get console() { return console; },
         ExtensionContext,
         extensions: this,
         global: scriptScope,
