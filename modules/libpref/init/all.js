@@ -4393,6 +4393,7 @@ pref("gfx.font_rendering.fontconfig.max_generic_substitutions", 3);
 #endif
 #endif
 #endif
+pref("gl.ignore-dx-interop2-blacklist", false);
 
 #if defined(ANDROID) || defined(MOZ_B2G)
 
