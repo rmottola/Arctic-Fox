@@ -1249,7 +1249,7 @@ this.Extension = class extends ExtensionData {
   constructor(addonData) {
     super(addonData.resourceURI);
 
-    this.uuid = getExtensionUUID(addonData.id);
+    this.uuid = UUIDMap.get(addonData.id);
 
     if (addonData.cleanupFile) {
       Services.obs.addObserver(this, "xpcom-shutdown", false);
