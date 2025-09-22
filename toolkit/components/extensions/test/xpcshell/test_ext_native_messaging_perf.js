@@ -100,9 +100,10 @@ add_task(function* test_round_trip_perf() {
       next();
     },
     manifest: {
+      applications: {gecko: {id: ID}},
       permissions: ["nativeMessaging"],
     },
-  }, ID);
+  });
 
   yield extension.startup();
 
