@@ -1467,12 +1467,13 @@ DocAccessible::DoInitialUpdate()
     ParentDocument()->FireDelayedEvent(reorderEvent);
   }
 
+  TreeMutation mt(this);
   uint32_t childCount = ChildCount();
   for (uint32_t i = 0; i < childCount; i++) {
     Accessible* child = GetChildAt(i);
-    RefPtr<AccShowEvent> event = new AccShowEvent(child);
-  FireDelayedEvent(event);
+    mt.AfterInsertion(child);
   }
+  mt.Done();
 }
 
 void
