@@ -12808,12 +12808,12 @@
         "url": "/XMLHttpRequest/event-readystatechange-loaded.htm"
       },
       {
-        "path": "XMLHttpRequest/event-timeout.htm",
-        "url": "/XMLHttpRequest/event-timeout.htm"
-      },
-      {
         "path": "XMLHttpRequest/event-timeout-order.htm",
         "url": "/XMLHttpRequest/event-timeout-order.htm"
+      },
+      {
+        "path": "XMLHttpRequest/event-timeout.htm",
+        "url": "/XMLHttpRequest/event-timeout.htm"
       },
       {
         "path": "XMLHttpRequest/event-upload-progress-crossorigin.sub.htm",
@@ -15353,8 +15353,8 @@
         "url": "/html/dom/documents/dom-tree-accessors/document.title-03.html"
       },
       {
-	"path": "domparsing/innerhtml-02.html",
-	"url": "/domparsing/innerhtml-02.html"
+        "path": "domparsing/innerhtml-02.html",
+        "url": "/domparsing/innerhtml-02.html"
       },
       {
         "path": "html/dom/documents/dom-tree-accessors/document.title-04.xhtml",
