@@ -234,12 +234,23 @@ add_task(function* setup() {
         yield OS.File.writeAtomic(manifestPath, JSON.stringify(manifest));
 
         registry.setValue(Ci.nsIWindowsRegKey.ROOT_KEY_CURRENT_USER,
-                          REGKEY, script.name, manifestPath);
+                          `${REGKEY}\\${script.name}`, "", manifestPath);
+
+        // Create a version of the manifest with a relative path
+        let relativeName = `relative.${script.name}`;
+        manifest.name = relativeName;
+        manifest.path = `${script.name}.bat`;
+
+        manifestPath = getPath(`${relativeName}.json`);
+        yield OS.File.writeAtomic(manifestPath, JSON.stringify(manifest));
+
+        registry.setValue(Ci.nsIWindowsRegKey.ROOT_KEY_CURRENT_USER,
+                          `${REGKEY}\\${relativeName}`, "", manifestPath);
       }
       break;
 
     default:
-      ok(false, `Native messaging is not supported on ${AppConstants.platform}`);
+      ok(false, `Native messaing is not supported on ${AppConstants.platform}`);
   }
 });
 
@@ -296,15 +307,14 @@ add_task(function* test_happy_path() {
       what: "object with several properties",
     },
 
-    // enable with bug 1274708
-    //{
-    //  data: {
-    //    ignoreme: true,
-    //    _json: {data: "i have a tojson method"},
-    //  },
-    //  expected: {data: "i have a tojson method"},
-    //  what: "object with toJSON() method",
-    //},
+    {
+      data: {
+        ignoreme: true,
+        _json: {data: "i have a tojson method"},
+      },
+      expected: {data: "i have a tojson method"},
+      what: "object with toJSON() method",
+    },
   ];
   for (let test of tests) {
     extension.sendMessage("send", test.data);
@@ -319,6 +329,37 @@ add_task(function* test_happy_path() {
   yield extension.unload();
   yield exitPromise;
 });
+
+if (AppConstants.platform == "win") {
+  // "relative.echo" has a relative path in the host manifest.
+  add_task(function* test_relative_path() {
+    function background() {
+      let port = browser.runtime.connectNative("relative.echo");
+      let MSG = "test relative echo path";
+      port.onMessage.addListener(msg => {
+        browser.test.assertEq(MSG, msg, "Got expected message back");
+        browser.test.sendMessage("done");
+      });
+      port.postMessage(MSG);
+    }
+
+    let extension = ExtensionTestUtils.loadExtension({
+      background: `(${background})()`,
+      manifest: {
+        permissions: ["nativeMessaging"],
+      },
+    }, ID);
+
+    yield extension.startup();
+    yield extension.awaitMessage("done");
+
+    let procCount = yield getSubprocessCount();
+    is(procCount, 1, "subprocess is still running");
+    let exitPromise = waitForSubprocessExit();
+    yield extension.unload();
+    yield exitPromise;
+  });
+}
 
 // Test sendNativeMessage()
 add_task(function* test_sendNativeMessage() {
