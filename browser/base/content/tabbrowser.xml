@@ -1501,6 +1501,7 @@
             var aForceNotRemote;
             var aNoReferrer;
             var aUserContextId;
+            var aRelatedBrowser;
             var aEventDetail;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
@@ -1519,6 +1520,7 @@
               aForceNotRemote       = params.forceNotRemote;
               aNoReferrer           = params.noReferrer;
               aUserContextId        = params.userContextId;
+              aRelatedBrowser       = params.relatedBrowser;
               aEventDetail          = params.eventDetail;
             }
 
@@ -1538,7 +1540,8 @@
                                   allowMixedContent: aAllowMixedContent,
                                   forceNotRemote: aForceNotRemote,
                                   noReferrer: aNoReferrer,
-                                  userContextId: aUserContextId });
+                                  userContextId: aUserContextId,
+                                  relatedBrowser: aRelatedBrowser });
             if (!bgLoad)
               this.selectedTab = tab;
 
@@ -1841,6 +1844,10 @@
 
             b.setAttribute("autoscrollpopup", this._autoScrollPopup.id);
 
+            if (aParams.relatedBrowser) {
+              b.relatedBrowser = aParams.relatedBrowser;
+            }
+
             // Create the browserStack container
             var stack = document.createElementNS(NS_XUL, "stack");
             stack.className = "browserStack";
@@ -1922,7 +1929,8 @@
               // No preloaded browser found, create one.
               browser = this._createBrowser({remote: remote,
                                              uriIsAboutBlank: uriIsAboutBlank,
-                                             userContextId: aUserContextId});
+                                             userContextId: aUserContextId,
+                                             relatedBrowser: aParams.relatedBrowser});
             }
 
             let notificationbox = this.getNotificationBox(browser);
@@ -1995,6 +2003,7 @@
             var aNoReferrer;
             var aUserContextId;
             var aEventDetail;
+            var aRelatedBrowser;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -2013,6 +2022,7 @@
               aNoReferrer           = params.noReferrer;
               aUserContextId        = params.userContextId;
               aEventDetail          = params.eventDetail;
+              aRelatedBrowser       = params.relatedBrowser;
             }
 
             // if we're adding tabs, we're past interrupt mode, ditch the owner
@@ -2081,7 +2091,8 @@
               allowMixedContent    : aAllowMixedContent,
               forceNotRemote       : aForceNotRemote,
               noReferrer           : aNoReferrer,
-              userContextId        : aUserContextId
+              userContextId        : aUserContextId,
+              relatedBrowser       : aRelatedBrowser
             };
 
             // Currently in this incarnation of bug 906076, we are forcing the

@@ -2413,6 +2413,7 @@ function BrowserViewSourceOfDocument(aArgsOrDocument) {
         relatedToCurrent: true,
         inBackground: false,
         forceNotRemote,
+        relatedBrowser: args.browser
       });
       args.viewSourceBrowser = tabBrowser.getBrowserForTab(tab);
       top.gViewSourceUtils.viewSourceInBrowser(args);
@@ -3398,7 +3399,8 @@ var PrintPreviewListener = {
       this._tabBeforePrintPreview = gBrowser.selectedTab;
       this._printPreviewTab = gBrowser.loadOneTab("about:blank",
                                                   { inBackground: false,
-                                                    forceNotRemote });
+                                                    forceNotRemote,
+                                                    relatedBrowser: browser });
       gBrowser.selectedTab = this._printPreviewTab;
     }
     return gBrowser.getBrowserForTab(this._printPreviewTab);
