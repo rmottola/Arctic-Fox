@@ -1805,8 +1805,6 @@ DocAccessible::ProcessContentInserted(Accessible* aContainer,
     UpdateRootElIfNeeded();
   }
 
-  int32_t cnt = 0;
-
   InsertIterator iter(aContainer, aNodes);
   if (!iter.Next()) {
     return;
@@ -1846,7 +1844,6 @@ DocAccessible::ProcessContentInserted(Accessible* aContainer,
 
       mt.AfterInsertion(iter.Child());
       CreateSubtree(iter.Child());
-      cnt++;
       continue;
     }
 
@@ -1860,10 +1857,6 @@ DocAccessible::ProcessContentInserted(Accessible* aContainer,
   logging::TreeInfo("children after insertion", logging::eVerbose,
                     aContainer);
 #endif
-
-  if (cnt > 0) {
-    printf("children count: %d, inserted: %d\n", aContainer->ChildCount(), cnt);
-  }
 
   FireEventsOnInsertion(aContainer);
 }
