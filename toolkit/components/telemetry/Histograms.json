@@ -9334,6 +9334,24 @@
     "keyed": true,
     "description": "Contiguous time spent by an add-on blocking the main loop by performing a blocking cross-process call (microseconds, keyed by add-on ID)."
   },
+  "VIDEO_EME_REQUEST_SUCCESS_LATENCY_MS": {
+    "alert_emails": ["cpearce@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": 60000,
+    "n_buckets": 60,
+    "releaseChannelCollection": "opt-out",
+    "description": "Time spent waiting for a navigator.requestMediaKeySystemAccess call to succeed."
+  },
+  "VIDEO_EME_REQUEST_FAILURE_LATENCY_MS": {
+    "alert_emails": ["cpearce@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": 60000,
+    "n_buckets": 60,
+    "releaseChannelCollection": "opt-out",
+    "description": "Time spent waiting for a navigator.requestMediaKeySystemAccess call to fail."
+  },
   "FXA_CONFIGURED": {
     "alert_emails": ["fx-team@mozilla.com"],
     "bug_numbers": [1236383],
@@ -9359,6 +9377,24 @@
     "keyed": true,
     "releaseChannelCollection": "opt-out",
     "description": "FxA error responses caused by invalid Hawk credentials. Keyed on the FxA auth server endpoint."
+  },
+  "WEAVE_DEVICE_COUNT_DESKTOP": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1232050],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 10,
+    "releaseChannelCollection": "opt-out",
+    "description": "Number of desktop devices (including this device) associated with this Sync account. Recorded each time Sync successfully completes the 'clients' engine."
+  },
+  "WEAVE_DEVICE_COUNT_MOBILE": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1232050],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 10,
+    "releaseChannelCollection": "opt-out",
+    "description": "Number of mobile devices associated with this Sync account. Recorded each time Sync successfully completes the 'clients' engine."
   },
   "WEAVE_ENGINE_APPLY_NEW_FAILURES": {
     "alert_emails": ["fx-team@mozilla.com"],
