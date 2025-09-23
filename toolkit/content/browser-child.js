@@ -610,9 +610,3 @@ var outerWindowID = content.QueryInterface(Ci.nsIInterfaceRequestor)
                            .getInterface(Ci.nsIDOMWindowUtils)
                            .outerWindowID;
 sendAsyncMessage("Browser:Init", {outerWindowID: outerWindowID});
-addMessageListener("Browser:InitReceived", function onInitReceived(msg) {
-  removeMessageListener("Browser:InitReceived", onInitReceived);
-  if (msg.data.initPopup) {
-    AutoCompletePopup.init();
-  }
-});
