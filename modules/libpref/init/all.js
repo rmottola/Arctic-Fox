@@ -5130,6 +5130,9 @@ pref("dom.w3c_pointer_events.enabled", false);
 // W3C draft ImageCapture API
 pref("dom.imagecapture.enabled", false);
 
+// W3C MediaDevices devicechange event
+pref("media.ondevicechange.enabled", false);
+
 // W3C touch-action css property (related to touch and pointer events)
 pref("layout.css.touch_action.enabled", false);
 

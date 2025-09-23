@@ -44,6 +44,7 @@
 #include "mozilla/dom/MediaStreamTrackBinding.h"
 #include "mozilla/dom/GetUserMediaRequestBinding.h"
 #include "mozilla/dom/Promise.h"
+#include "mozilla/dom/MediaDevices.h"
 #include "mozilla/Base64.h"
 #include "mozilla/ipc/BackgroundChild.h"
 #include "mozilla/media/MediaChild.h"
@@ -2000,6 +2001,25 @@ bool MediaManager::IsPrivateBrowsing(nsPIDOMWindowInner* window)
   return loadContext && loadContext->UsePrivateBrowsing();
 }
 
+int MediaManager::AddDeviceChangeCallback(DeviceChangeCallback* aCallback)
+{
+  MediaManager::PostTask(NewTaskFrom([]() {
+    RefPtr<MediaManager> manager = MediaManager_GetInstance();
+    manager->GetBackend(0)->AddDeviceChangeCallback(manager);
+  }));
+
+  return DeviceChangeCallback::AddDeviceChangeCallback(aCallback);
+}
+
+void MediaManager::OnDeviceChange() {
+  RefPtr<MediaManager> self(this);
+  NS_DispatchToMainThread(media::NewRunnableFrom([self,this]() mutable {
+    MOZ_ASSERT(NS_IsMainThread());
+    DeviceChangeCallback::OnDeviceChange();
+    return NS_OK;
+  }));
+}
+
 nsresult MediaManager::GenerateUUID(nsAString& aResult)
 {
   nsresult rv;
@@ -2736,6 +2756,25 @@ MediaManager::OnNavigation(uint64_t aWindowID)
   } else {
     RemoveWindowID(aWindowID);
   }
+
+  RemoveMediaDevicesCallback(aWindowID);
+}
+
+void
+MediaManager::RemoveMediaDevicesCallback(uint64_t aWindowID)
+{
+  for (DeviceChangeCallback* observer : mDeviceChangeCallbackList)
+  {
+    dom::MediaDevices* mediadevices = static_cast<dom::MediaDevices *>(observer);
+    MOZ_ASSERT(mediadevices);
+    if (mediadevices) {
+      nsPIDOMWindowInner* window = mediadevices->GetOwner();
+      MOZ_ASSERT(window);
+      if (window && window->WindowID() == aWindowID)
+        DeviceChangeCallback::RemoveDeviceChangeCallback(observer);
+        return;
+    }
+  }
 }
 
 StreamListeners*
@@ -2916,6 +2955,7 @@ MediaManager::Shutdown()
       {
         if (mManager->mBackend) {
           mManager->mBackend->Shutdown(); // ok to invoke multiple times
+          mManager->mBackend->RemoveDeviceChangeCallback(mManager);
         }
       }
       mozilla::ipc::BackgroundChild::CloseForCurrentThread();
