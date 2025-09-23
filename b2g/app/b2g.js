@@ -1050,6 +1050,9 @@ pref("layout.accessiblecaret.always_show_when_scrolling", false);
 pref("services.sync.fxaccounts.enabled", true);
 pref("identity.fxaccounts.enabled", true);
 
+// Disable Firefox Accounts device registration until bug 1238895 is fixed.
+pref("identity.fxaccounts.skipDeviceRegistration", true);
+
 // Enable mapped array buffer.
 pref("dom.mapped_arraybuffer.enabled", true);
 
