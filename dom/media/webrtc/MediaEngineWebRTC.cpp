@@ -132,6 +132,13 @@ MediaEngineWebRTC::MediaEngineWebRTC(MediaEnginePrefs &aPrefs)
 }
 
 void
+MediaEngineWebRTC::SetFakeDeviceChangeEvents()
+{
+  camera::GetChildAndCall(
+    &camera::CamerasChild::SetFakeDeviceChangeEvents);
+}
+
+void
 MediaEngineWebRTC::EnumerateVideoDevices(dom::MediaSourceEnum aMediaSource,
                                          nsTArray<RefPtr<MediaEngineVideoSource> >* aVSources)
 {

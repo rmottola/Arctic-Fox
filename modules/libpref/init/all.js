@@ -5133,6 +5133,9 @@ pref("dom.imagecapture.enabled", false);
 // W3C MediaDevices devicechange event
 pref("media.ondevicechange.enabled", false);
 
+// W3C MediaDevices devicechange fake event
+pref("media.ondevicechange.fakeDeviceChangeEvent.enabled", false);
+
 // W3C touch-action css property (related to touch and pointer events)
 pref("layout.css.touch_action.enabled", false);
 

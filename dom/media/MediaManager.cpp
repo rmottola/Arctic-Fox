@@ -1725,6 +1725,7 @@ MediaManager::MediaManager()
   mPrefs.mNoiseOn      = false;
   mPrefs.mExtendedFilter = true;
   mPrefs.mDelayAgnostic = true;
+  mPrefs.mFakeDeviceChangeEventOn = false;
 #ifdef MOZ_WEBRTC
   mPrefs.mAec          = webrtc::kEcUnchanged;
   mPrefs.mAgc          = webrtc::kAgcUnchanged;
@@ -1824,6 +1825,7 @@ MediaManager::Get() {
       prefs->AddObserver("media.getusermedia.noise_enabled", sSingleton, false);
       prefs->AddObserver("media.getusermedia.noise", sSingleton, false);
       prefs->AddObserver("media.getusermedia.playout_delay", sSingleton, false);
+      prefs->AddObserver("media.ondevicechange.fakeDeviceChangeEvent.enabled", sSingleton, false);
 #endif
     }
 
@@ -2016,9 +2018,12 @@ bool MediaManager::IsPrivateBrowsing(nsPIDOMWindowInner* window)
 
 int MediaManager::AddDeviceChangeCallback(DeviceChangeCallback* aCallback)
 {
-  MediaManager::PostTask(NewTaskFrom([]() {
+  bool fakeDeviceChangeEventOn = mPrefs.mFakeDeviceChangeEventOn;
+  MediaManager::PostTask(NewTaskFrom([fakeDeviceChangeEventOn]() {
     RefPtr<MediaManager> manager = MediaManager_GetInstance();
     manager->GetBackend(0)->AddDeviceChangeCallback(manager);
+    if (fakeDeviceChangeEventOn)
+      manager->GetBackend(0)->SetFakeDeviceChangeEvents();
   }));
 
   return DeviceChangeCallback::AddDeviceChangeCallback(aCallback);
@@ -2900,6 +2905,7 @@ MediaManager::GetPrefs(nsIPrefBranch *aBranch, const char *aData)
   GetPref(aBranch, "media.getusermedia.playout_delay", aData, &mPrefs.mPlayoutDelay);
   GetPrefBool(aBranch, "media.getusermedia.aec_extended_filter", aData, &mPrefs.mExtendedFilter);
   GetPrefBool(aBranch, "media.getusermedia.aec_aec_delay_agnostic", aData, &mPrefs.mDelayAgnostic);
+  GetPrefBool(aBranch, "media.ondevicechange.fakeDeviceChangeEvent.enabled", aData, &mPrefs.mFakeDeviceChangeEventOn);
 #endif
   GetPrefBool(aBranch, "media.navigator.audio.full_duplex", aData, &mPrefs.mFullDuplex);
 }
@@ -2937,6 +2943,7 @@ MediaManager::Shutdown()
     prefs->RemoveObserver("media.getusermedia.noise_enabled", this);
     prefs->RemoveObserver("media.getusermedia.noise", this);
     prefs->RemoveObserver("media.getusermedia.playout_delay", this);
+    prefs->RemoveObserver("media.ondevicechange.fakeDeviceChangeEvent.enabled", this);
 #endif
     prefs->RemoveObserver("media.navigator.audio.full_duplex", this);
   }
