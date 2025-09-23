@@ -74,7 +74,7 @@
 #define TOUCH_EVENT MESSAGE_TO_EVENT
 #define DOCUMENT_ONLY_EVENT MESSAGE_TO_EVENT
 #define NON_IDL_EVENT MESSAGE_TO_EVENT
-#endif
+#endif /* MESSAGE_TO_EVENT */
 
 #ifdef DEFINED_FORWARDED_EVENT
 #error "Don't define DEFINED_FORWARDED_EVENT"
@@ -709,7 +709,7 @@ NON_IDL_EVENT(DOMFocusOut,
               eLegacyDOMFocusOut,
               EventNameType_HTMLXUL,
               eUIEventClass)
-                                  
+
 NON_IDL_EVENT(DOMMouseScroll,
               eLegacyMouseLineOrPageScroll,
               EventNameType_HTMLXUL,
@@ -718,7 +718,7 @@ NON_IDL_EVENT(MozMousePixelScroll,
               eLegacyMousePixelScroll,
               EventNameType_HTMLXUL,
               eMouseScrollEventClass)
-                                                
+
 NON_IDL_EVENT(open,
               eOpen,
               EventNameType_None,
