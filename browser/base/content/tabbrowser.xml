@@ -301,7 +301,7 @@
 
           this.moveTabTo(aTab, this._numPinnedTabs - 1);
           aTab.removeAttribute("pinned");
-          aTab.style.MozMarginStart = "";
+          aTab.style.marginInlineStart = "";
           this.tabContainer._unlockTabSizing();
           this.tabContainer._positionPinnedTabs();
           this.tabContainer.adjustTabstrip();
@@ -1502,7 +1502,6 @@
             var aNoReferrer;
             var aUserContextId;
             var aRelatedBrowser;
-            var aEventDetail;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -1521,7 +1520,6 @@
               aNoReferrer           = params.noReferrer;
               aUserContextId        = params.userContextId;
               aRelatedBrowser       = params.relatedBrowser;
-              aEventDetail          = params.eventDetail;
             }
 
             var bgLoad = (aLoadInBackground != null) ? aLoadInBackground :
