@@ -243,10 +243,6 @@
         ]]></getter>
       </property>
 
-      <property name="autoCompletePopup"
-                onget="return document.getElementById(this.getAttribute('autocompletepopup'))"
-                readonly="true"/>
-
       <property name="docShellIsActive">
         <getter>
           <![CDATA[
@@ -450,9 +446,6 @@
           switch (aMessage.name) {
             case "Browser:Init":
               this._outerWindowID = data.outerWindowID;
-              this.messageManager.sendAsyncMessage("Browser:InitReceived", {
-                initPopup: this.autoCompletePopup != null,
-              });
               break;
             case "DOMTitleChanged":
               this._contentTitle = data.title;
