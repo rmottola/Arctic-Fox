@@ -286,6 +286,10 @@ EVENT(loadedmetadata,
       eLoadedMetaData,
       EventNameType_HTML,
       eBasicEventClass)
+EVENT(loadend,
+      eLoadEnd,
+      EventNameType_HTML,
+      eBasicEventClass)
 EVENT(loadstart,
       eLoadStart,
       EventNameType_HTML,

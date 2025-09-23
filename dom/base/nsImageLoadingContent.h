@@ -267,7 +267,8 @@ private:
   /**
    * Method to fire an event once we know what's going on with the image load.
    *
-   * @param aEventType "load" or "error" depending on how things went
+   * @param aEventType "loadstart", "loadend", "load", or "error" depending on
+   *                   how things went
    */
   nsresult FireEvent(const nsAString& aEventType);
 
@@ -322,7 +323,7 @@ protected:
 
   /**
    * Cancels and nulls-out the "current" and "pending" requests if they exist.
-   * 
+   *
    * @param aNonvisibleAction An action to take if the image is no longer
    *                          visible as a result; see |UntrackImage|.
    */
