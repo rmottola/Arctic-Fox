@@ -11,8 +11,15 @@ Cu.import("resource://gre/modules/FormHistory.jsm");
 Cu.import("resource://gre/modules/SearchSuggestionController.jsm");
 Cu.import("resource://gre/modules/Timer.jsm");
 
-let httpServer = new HttpServer();
-let getEngine, postEngine, unresolvableEngine;
+// We must make sure the FormHistoryStartup component is
+// initialized in order for it to respond to FormHistory
+// requests from nsFormAutoComplete.js.
+var formHistoryStartup = Cc["@mozilla.org/satchel/form-history-startup;1"].
+                         getService(Ci.nsIObserver);
+formHistoryStartup.observe(null, "profile-after-change", null);
+
+var httpServer = new HttpServer();
+var getEngine, postEngine, unresolvableEngine;
 
 function run_test() {
   Services.prefs.setBoolPref("browser.search.suggest.enabled", true);

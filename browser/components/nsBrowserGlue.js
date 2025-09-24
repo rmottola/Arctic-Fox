@@ -986,6 +986,8 @@ BrowserGlue.prototype = {
 
     CaptivePortalWatcher.init();
 
+    AutoCompletePopup.init();
+
     this._firstWindowTelemetry(aWindow);
     this._firstWindowLoaded();
   },
@@ -1011,12 +1013,11 @@ BrowserGlue.prototype = {
     UserAgentOverrides.uninit();
     BrowserUsageTelemetry.uninit();
     NewTabMessages.uninit();
-
     CaptivePortalWatcher.uninit();
-
     AboutNewTab.uninit();
     webrtcUI.uninit();
     FormValidationHandler.uninit();
+    AutoCompletePopup.uninit();
     if (AppConstants.NIGHTLY_BUILD) {
       AddonWatcher.uninit();
     }
