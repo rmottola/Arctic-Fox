@@ -147,6 +147,9 @@ XPCOMUtils.defineLazyGetter(this, "gBrowserBundle", function() {
 XPCOMUtils.defineLazyModuleGetter(this, "FormValidationHandler",
                                   "resource:///modules/FormValidationHandler.jsm");
 
+XPCOMUtils.defineLazyModuleGetter(this, "WebChannel",
+                                  "resource://gre/modules/WebChannel.jsm");
+
 XPCOMUtils.defineLazyModuleGetter(this, "ReaderParent",
                                   "resource:///modules/ReaderParent.jsm");
 
@@ -513,7 +516,7 @@ BrowserGlue.prototype = {
       os.addObserver(this, "browser-lastwindow-close-granted", false);
     }
     os.addObserver(this, "weave:service:ready", false);
-    os.addObserver(this, "weave:engine:clients:display-uri", false);
+    os.addObserver(this, "weave:engine:clients:display-uris", false);
     os.addObserver(this, "session-save", false);
     os.addObserver(this, "places-init-complete", false);
     this._isPlacesInitObserver = true;
@@ -557,7 +560,7 @@ BrowserGlue.prototype = {
       os.removeObserver(this, "browser-lastwindow-close-granted");
     }
     os.removeObserver(this, "weave:service:ready");
-    os.removeObserver(this, "weave:engine:clients:display-uri");
+    os.removeObserver(this, "weave:engine:clients:display-uris");
     os.removeObserver(this, "session-save");
     if (this._bookmarksBackupIdleTime) {
       this._idleService.removeIdleObserver(this, this._bookmarksBackupIdleTime);
@@ -1011,6 +1014,21 @@ BrowserGlue.prototype = {
     }
 
     ProcessHangMonitor.init();
+
+    // A channel for "remote troubleshooting" code...
+    let channel = new WebChannel("remote-troubleshooting", "remote-troubleshooting");
+    channel.listen((id, data, target) => {
+      if (data.command == "request") {
+        let {Troubleshoot} = Cu.import("resource://gre/modules/Troubleshoot.jsm", {});
+        Troubleshoot.snapshot(data => {
+          // for privacy we remove crash IDs and all preferences (but bug 1091944
+          // exists to expose prefs once we are confident of privacy implications)
+          delete data.crashes;
+          delete data.modifiedPreferences;
+          channel.send(data, target);
+        });
+      }
+    });
 
     this._trackSlowStartup();
 
