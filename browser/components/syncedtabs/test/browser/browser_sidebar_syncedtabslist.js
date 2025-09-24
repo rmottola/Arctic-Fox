@@ -337,6 +337,78 @@ add_task(function* testSyncedTabsSidebarContextMenu() {
 
 add_task(testClean);
 
+add_task(function* testSyncedTabsSidebarContextMenu() {
+  yield SidebarUI.show('viewTabsSidebar');
+  let syncedTabsDeckComponent = window.SidebarUI.browser.contentWindow.syncedTabsDeckComponent;
+  let SyncedTabs = window.SidebarUI.browser.contentWindow.SyncedTabs;
+
+  Assert.ok(syncedTabsDeckComponent, "component exists");
+
+  originalSyncedTabsInternal = SyncedTabs._internal;
+  SyncedTabs._internal = {
+    isConfiguredToSyncTabs: true,
+    hasSyncedThisSession: true,
+    getTabClients() { return Promise.resolve([])},
+    syncTabs() {return Promise.resolve();},
+  };
+
+  sinon.stub(syncedTabsDeckComponent, "_accountStatus", ()=> Promise.resolve(true));
+  sinon.stub(SyncedTabs._internal, "getTabClients", ()=> Promise.resolve(Cu.cloneInto(FIXTURE, {})));
+
+  yield syncedTabsDeckComponent.updatePanel();
+  // This is a hacky way of waiting for the view to render. The view renders
+  // after the following promise (a different instance of which is triggered
+  // in updatePanel) resolves, so we wait for it here as well
+  yield syncedTabsDeckComponent.tabListComponent._store.getData();
+
+  info("Right-clicking the search box should show text-related actions");
+  let filterMenuItems = [
+    "menuitem[cmd=cmd_undo]",
+    "menuseparator",
+    // We don't check whether the commands are enabled due to platform
+    // differences. On OS X and Windows, "cut" and "copy" are always enabled
+    // for HTML inputs; on Linux, they're only enabled if text is selected.
+    "menuitem[cmd=cmd_cut]",
+    "menuitem[cmd=cmd_copy]",
+    "menuitem[cmd=cmd_paste]",
+    "menuitem[cmd=cmd_delete]",
+    "menuseparator",
+    "menuitem[cmd=cmd_selectAll]",
+    "menuseparator",
+    "menuitem#syncedTabsRefreshFilter",
+  ];
+  yield* testContextMenu(syncedTabsDeckComponent,
+                         "#SyncedTabsSidebarTabsFilterContext",
+                         ".tabsFilter",
+                         filterMenuItems);
+
+  info("Right-clicking a tab should show additional actions");
+  let tabMenuItems = [
+    ["menuitem#syncedTabsOpenSelected", { hidden: false }],
+    ["menuitem#syncedTabsBookmarkSelected", { hidden: false }],
+    ["menuseparator", { hidden: false }],
+    ["menuitem#syncedTabsRefresh", { hidden: false }],
+  ];
+  yield* testContextMenu(syncedTabsDeckComponent,
+                         "#SyncedTabsSidebarContext",
+                         "#tab-7cqCr77ptzX3-0",
+                         tabMenuItems);
+
+  info("Right-clicking a client shouldn't show any actions");
+  let sidebarMenuItems = [
+    ["menuitem#syncedTabsOpenSelected", { hidden: true }],
+    ["menuitem#syncedTabsBookmarkSelected", { hidden: true }],
+    ["menuseparator", { hidden: true }],
+    ["menuitem#syncedTabsRefresh", { hidden: false }],
+  ];
+  yield* testContextMenu(syncedTabsDeckComponent,
+                         "#SyncedTabsSidebarContext",
+                         "#item-OL3EJCsdb2JD",
+                         sidebarMenuItems);
+});
+
+add_task(testClean);
+
 function checkItem(node, item) {
   Assert.ok(node.classList.contains("item"),
     "Node should have .item class");
