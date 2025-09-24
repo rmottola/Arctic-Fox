@@ -185,6 +185,7 @@ XMLHttpRequestMainThread::XMLHttpRequestMainThread()
     mIsMappedArrayBuffer(false),
     mXPCOMifier(nullptr)
 {
+  mozilla::HoldJSObjects(this);
 }
 
 XMLHttpRequestMainThread::~XMLHttpRequestMainThread()
@@ -202,12 +203,6 @@ XMLHttpRequestMainThread::~XMLHttpRequestMainThread()
   mResultJSON.setUndefined();
   mResultArrayBuffer = nullptr;
   mozilla::DropJSObjects(this);
-}
-
-void
-XMLHttpRequestMainThread::RootJSResultObjects()
-{
-  mozilla::HoldJSObjects(this);
 }
 
 /**
@@ -638,7 +633,6 @@ XMLHttpRequestMainThread::CreateResponseParsedJSON(JSContext* aCx)
   if (!aCx) {
     return NS_ERROR_FAILURE;
   }
-  RootJSResultObjects();
 
   // The Unicode converter has already zapped the BOM if there was one
   JS::Rooted<JS::Value> value(aCx);
@@ -775,8 +769,6 @@ XMLHttpRequestMainThread::GetResponse(JSContext* aCx,
     }
 
     if (!mResultArrayBuffer) {
-      RootJSResultObjects();
-
       mResultArrayBuffer = mArrayBufferBuilder.getArrayBuffer(aCx);
       if (!mResultArrayBuffer) {
         aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
