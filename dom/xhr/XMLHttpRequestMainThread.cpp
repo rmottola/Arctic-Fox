@@ -436,7 +436,8 @@ XMLHttpRequestMainThread::GetChannel(nsIChannel **aChannel)
   return NS_OK;
 }
 
-static void LogMessage(const char* aWarning, nsPIDOMWindowInner* aWindow)
+static void LogMessage(const char* aWarning, nsPIDOMWindowInner* aWindow,
+                       const char16_t** aParams=nullptr, uint32_t aParamCount=0)
 {
   nsCOMPtr<nsIDocument> doc;
   if (aWindow) {
@@ -445,7 +446,7 @@ static void LogMessage(const char* aWarning, nsPIDOMWindowInner* aWindow)
   nsContentUtils::ReportToConsole(nsIScriptError::warningFlag,
                                   NS_LITERAL_CSTRING("DOM"), doc,
                                   nsContentUtils::eDOM_PROPERTIES,
-                                  aWarning);
+                                  aWarning, aParams, aParamCount);
 }
 
 NS_IMETHODIMP
@@ -2979,7 +2980,8 @@ XMLHttpRequestMainThread::SetRequestHeader(const nsACString& aName,
   bool isPrivilegedCaller = IsSystemXHR();
   bool isForbiddenHeader = nsContentUtils::IsForbiddenRequestHeader(aName);
   if (!isPrivilegedCaller && isForbiddenHeader) {
-    NS_WARNING("refusing to set request header");
+    const char16_t* params[] = { NS_ConvertUTF8toUTF16(aName).get() };
+    LogMessage("ForbiddenHeaderWarning", GetOwner(), params, ArrayLength(params));
     return NS_OK;
   }
 
