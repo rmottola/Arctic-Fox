@@ -265,11 +265,8 @@ TabListView.prototype = {
       return;
     }
 
-    this._selectRow(itemNode);
-  },
-
-  _selectRow(itemNode) {
-    this.props.onSelectRow(this._getSelectionPosition(itemNode), itemNode.dataset.id);
+    let position = this._getSelectionPosition(itemNode);
+    this.props.onSelectRow(position);
   },
 
   /**
@@ -453,7 +450,8 @@ TabListView.prototype = {
     } else {
       let itemNode = this._findParentItemNode(event.target);
       if (itemNode) {
-        this._selectRow(itemNode);
+        let position = this._getSelectionPosition(itemNode);
+        this.props.onSelectRow(position);
       }
       menu = getContextMenu(this._window);
       this.adjustContextMenu(menu);
