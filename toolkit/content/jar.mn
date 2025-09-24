@@ -31,7 +31,7 @@ toolkit.jar:
    content/global/aboutwebrtc/aboutWebrtc.css   (aboutwebrtc/aboutWebrtc.css)
    content/global/aboutwebrtc/aboutWebrtc.js    (aboutwebrtc/aboutWebrtc.js)
    content/global/aboutwebrtc/aboutWebrtc.html (aboutwebrtc/aboutWebrtc.html)
-*  content/global/aboutSupport.js
+   content/global/aboutSupport.js
 *  content/global/aboutSupport.xhtml
    content/global/aboutTelemetry.js
    content/global/aboutTelemetry.xhtml
@@ -45,7 +45,7 @@ toolkit.jar:
    content/global/contentAreaUtils.js
 #ifndef MOZ_FENNEC
    content/global/customizeToolbar.css
-*  content/global/customizeToolbar.js
+   content/global/customizeToolbar.js
    content/global/customizeToolbar.xul
 #endif
    content/global/devicestorage.properties
@@ -57,7 +57,7 @@ toolkit.jar:
    content/global/findUtils.js
 #endif
    content/global/filepicker.properties
-*  content/global/globalOverlay.js
+   content/global/globalOverlay.js
    content/global/logopage.xhtml
    content/global/mozilla.xhtml
    content/global/nsDragAndDrop.js
