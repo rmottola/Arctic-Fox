@@ -3706,7 +3706,7 @@ ContainerState::ComputeOpaqueRect(nsDisplayItem* aItem,
     }
     nsIFrame* scrollFrame = do_QueryFrame(sf);
     displayport += scrollFrame->GetOffsetToCrossDoc(mContainerReferenceFrame);
-    if (opaque.Contains(displayport)) {
+    if (opaquePixels.Contains(ScaleRegionToNearestPixels(displayport))) {
       *aOpaqueForAnimatedGeometryRootParent = true;
     }
   }
