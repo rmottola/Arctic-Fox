@@ -6842,14 +6842,6 @@ nsCSSFrameConstructor::GetInsertionPrevSibling(InsertionPoint* aInsertion,
       // before the AdjustAppendParentForAfterContent call.
       aInsertion->mParentFrame =
         nsLayoutUtils::LastContinuationWithChild(aInsertion->mParentFrame);
-
-      // We should never get here with fieldsets or details, since they have
-      // multiple insertion points.
-      MOZ_ASSERT(aInsertion->mParentFrame->GetType()
-                 != nsGkAtoms::fieldSetFrame &&
-                 aInsertion->mParentFrame->GetType() != nsGkAtoms::detailsFrame,
-                 "Parent frame should not be fieldset or details!");
-
       // Deal with fieldsets
       aInsertion->mParentFrame =
         ::GetAdjustedParentFrame(aInsertion->mParentFrame,
@@ -7393,10 +7385,11 @@ nsCSSFrameConstructor::ContentAppended(nsIContent*     aContainer,
   // before the AdjustAppendParentForAfterContent call.
   parentFrame = nsLayoutUtils::LastContinuationWithChild(parentFrame);
 
-  // We should never get here with fieldsets, since they have multiple
-  // insertion points.
-  NS_ASSERTION(parentFrame->GetType() != nsGkAtoms::fieldSetFrame,
-               "Unexpected parent");
+  // We should never get here with fieldsets or details, since they have
+  // multiple insertion points.
+  MOZ_ASSERT(parentFrame->GetType() != nsGkAtoms::fieldSetFrame &&
+             parentFrame->GetType() != nsGkAtoms::detailsFrame,
+             "Parent frame should not be fieldset or details!");
 
   // Deal with possible :after generated content on the parent
   nsIFrame* parentAfterFrame;
