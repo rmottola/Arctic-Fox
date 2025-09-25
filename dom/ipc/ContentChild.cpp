@@ -2419,7 +2419,8 @@ ContentChild::RecvAddPermission(const IPC::Permission& permission)
   // the permission manager does that internally.
   nsAutoCString originNoSuffix;
   PrincipalOriginAttributes attrs;
-  attrs.PopulateFromOrigin(permission.origin, originNoSuffix);
+  bool success = attrs.PopulateFromOrigin(permission.origin, originNoSuffix);
+  NS_ENSURE_TRUE(success, false);
 
   nsCOMPtr<nsIURI> uri;
   nsresult rv = NS_NewURI(getter_AddRefs(uri), originNoSuffix);
