@@ -6,13 +6,12 @@
 
 "use strict";
 
-const {Ci} = require("chrome");
-
 const {Utils: WebConsoleUtils} =
   require("devtools/client/webconsole/utils");
 const promise = require("promise");
 const Debugger = require("Debugger");
 const Services = require("Services");
+const {KeyCodes} = require("devtools/client/shared/keycodes");
 
 loader.lazyServiceGetter(this, "clipboardHelper",
                          "@mozilla.org/widget/clipboardhelper;1",
@@ -690,7 +689,7 @@ JSTerm.prototype = {
    */
   _onKeypressInVariablesView: function (event) {
     let tag = event.target.nodeName;
-    if (event.keyCode != Ci.nsIDOMKeyEvent.DOM_VK_ESCAPE || event.shiftKey ||
+    if (event.keyCode != KeyCodes.DOM_VK_ESCAPE || event.shiftKey ||
         event.altKey || event.ctrlKey || event.metaKey ||
         ["input", "textarea", "select", "textbox"].indexOf(tag) > -1) {
       return;
@@ -1119,7 +1118,7 @@ JSTerm.prototype = {
           break;
       }
       return;
-    } else if (event.keyCode == Ci.nsIDOMKeyEvent.DOM_VK_RETURN) {
+    } else if (event.keyCode == KeyCodes.DOM_VK_RETURN) {
       let autoMultiline = Services.prefs.getBoolPref(PREF_AUTO_MULTILINE);
       if (event.shiftKey ||
           (!Debugger.isCompilableUnit(inputNode.value) && autoMultiline)) {
@@ -1129,7 +1128,7 @@ JSTerm.prototype = {
     }
 
     switch (event.keyCode) {
-      case Ci.nsIDOMKeyEvent.DOM_VK_ESCAPE:
+      case KeyCodes.DOM_VK_ESCAPE:
         if (this.autocompletePopup.isOpen) {
           this.clearCompletion();
           event.preventDefault();
@@ -1141,7 +1140,7 @@ JSTerm.prototype = {
         }
         break;
 
-      case Ci.nsIDOMKeyEvent.DOM_VK_RETURN:
+      case KeyCodes.DOM_VK_RETURN:
         if (this._autocompletePopupNavigated &&
             this.autocompletePopup.isOpen &&
             this.autocompletePopup.selectedIndex > -1) {
@@ -1153,7 +1152,7 @@ JSTerm.prototype = {
         event.preventDefault();
         break;
 
-      case Ci.nsIDOMKeyEvent.DOM_VK_UP:
+      case KeyCodes.DOM_VK_UP:
         if (this.autocompletePopup.isOpen) {
           inputUpdated = this.complete(this.COMPLETE_BACKWARD);
           if (inputUpdated) {
@@ -1167,7 +1166,7 @@ JSTerm.prototype = {
         }
         break;
 
-      case Ci.nsIDOMKeyEvent.DOM_VK_DOWN:
+      case KeyCodes.DOM_VK_DOWN:
         if (this.autocompletePopup.isOpen) {
           inputUpdated = this.complete(this.COMPLETE_FORWARD);
           if (inputUpdated) {
@@ -1181,7 +1180,7 @@ JSTerm.prototype = {
         }
         break;
 
-      case Ci.nsIDOMKeyEvent.DOM_VK_PAGE_UP:
+      case KeyCodes.DOM_VK_PAGE_UP:
         if (this.autocompletePopup.isOpen) {
           inputUpdated = this.complete(this.COMPLETE_PAGEUP);
           if (inputUpdated) {
@@ -1197,7 +1196,7 @@ JSTerm.prototype = {
         event.preventDefault();
         break;
 
-      case Ci.nsIDOMKeyEvent.DOM_VK_PAGE_DOWN:
+      case KeyCodes.DOM_VK_PAGE_DOWN:
         if (this.autocompletePopup.isOpen) {
           inputUpdated = this.complete(this.COMPLETE_PAGEDOWN);
           if (inputUpdated) {
@@ -1213,7 +1212,7 @@ JSTerm.prototype = {
         event.preventDefault();
         break;
 
-      case Ci.nsIDOMKeyEvent.DOM_VK_HOME:
+      case KeyCodes.DOM_VK_HOME:
         if (this.autocompletePopup.isOpen) {
           this.autocompletePopup.selectedIndex = 0;
           event.preventDefault();
@@ -1223,7 +1222,7 @@ JSTerm.prototype = {
         }
         break;
 
-      case Ci.nsIDOMKeyEvent.DOM_VK_END:
+      case KeyCodes.DOM_VK_END:
         if (this.autocompletePopup.isOpen) {
           this.autocompletePopup.selectedIndex =
             this.autocompletePopup.itemCount - 1;
@@ -1235,13 +1234,13 @@ JSTerm.prototype = {
         }
         break;
 
-      case Ci.nsIDOMKeyEvent.DOM_VK_LEFT:
+      case KeyCodes.DOM_VK_LEFT:
         if (this.autocompletePopup.isOpen || this.lastCompletion.value) {
           this.clearCompletion();
         }
         break;
 
-      case Ci.nsIDOMKeyEvent.DOM_VK_RIGHT:
+      case KeyCodes.DOM_VK_RIGHT:
         let cursorAtTheEnd = this.inputNode.selectionStart ==
                              this.inputNode.selectionEnd &&
                              this.inputNode.selectionStart ==
@@ -1260,7 +1259,7 @@ JSTerm.prototype = {
         }
         break;
 
-      case Ci.nsIDOMKeyEvent.DOM_VK_TAB:
+      case KeyCodes.DOM_VK_TAB:
         // Generate a completion and accept the first proposed value.
         if (this.complete(this.COMPLETE_HINT_ONLY) &&
             this.lastCompletion &&
