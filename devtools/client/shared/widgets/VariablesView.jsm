@@ -116,7 +116,7 @@ VariablesView.prototype = {
   set rawObject(aObject) {
     this.empty();
     this.addScope()
-        .addItem("", { enumerable: true })
+        .addItem(undefined, { enumerable: true })
         .populate(aObject, { sorted: true });
   },
 
@@ -560,7 +560,7 @@ VariablesView.prototype = {
   _doSearch: function (aToken) {
     if (this.controller && this.controller.supportsSearch()) {
       // Retrieve the main Scope in which we add attributes
-      let scope = this._store[0]._store.get("");
+      let scope = this._store[0]._store.get(undefined);
       if (!aToken) {
         // Prune the view from old previous content
         // so that we delete the intermediate search results
@@ -1112,7 +1112,7 @@ VariablesView.simpleValueEvalMacro = function (aItem, aCurrentString, aPrefix = 
  *         The string to be evaluated.
  */
 VariablesView.overrideValueEvalMacro = function (aItem, aCurrentString, aPrefix = "") {
-  let property = "\"" + aItem._nameString + "\"";
+  let property = escapeString(aItem._nameString);
   let parent = aPrefix + aItem.ownerView.symbolicName || "this";
 
   return "Object.defineProperty(" + parent + "," + property + "," +
@@ -1139,7 +1139,7 @@ VariablesView.getterOrSetterEvalMacro = function (aItem, aCurrentString, aPrefix
   let type = aItem._nameString;
   let propertyObject = aItem.ownerView;
   let parentObject = propertyObject.ownerView;
-  let property = "\"" + propertyObject._nameString + "\"";
+  let property = escapeString(propertyObject._nameString);
   let parent = aPrefix + parentObject.symbolicName || "this";
 
   switch (aCurrentString) {
@@ -1324,7 +1324,7 @@ Scope.prototype = {
    * @return Variable
    *         The newly created Variable instance, null if it already exists.
    */
-  addItem: function (aName = "", aDescriptor = {}, aOptions = {}) {
+  addItem: function (aName, aDescriptor = {}, aOptions = {}) {
     let {relaxed} = aOptions;
     if (this._store.has(aName) && !relaxed) {
       return this._store.get(aName);
@@ -1334,7 +1334,7 @@ Scope.prototype = {
     this._store.set(aName, child);
     this._variablesView._itemsByElement.set(child._target, child);
     this._variablesView._currHierarchy.set(child.absoluteName, child);
-    child.header = !!aName;
+    child.header = aName !== undefined;
 
     return child;
   },
@@ -1810,7 +1810,7 @@ Scope.prototype = {
    * @param string aTitleClassName [optional]
    *        A custom class name for this scope's title element.
    */
-  _displayScope: function (aName, aTargetClassName, aTitleClassName = "") {
+  _displayScope: function (aName = "", aTargetClassName, aTitleClassName = "") {
     let document = this.document;
 
     let element = this._target = document.createElement("vbox");
@@ -2359,7 +2359,7 @@ Variable.prototype = Heritage.extend(Scope.prototype, {
    * @return string
    */
   get symbolicName() {
-    return this._nameString;
+    return this._nameString || "";
   },
 
   /**
@@ -2371,7 +2371,7 @@ Variable.prototype = Heritage.extend(Scope.prototype, {
       return this._absoluteName;
     }
 
-    this._absoluteName = this.ownerView._nameString + "[\"" + this._nameString + "\"]";
+    this._absoluteName = this.ownerView._nameString + "[" + escapeString(this._nameString) + "]";
     return this._absoluteName;
   },
 
@@ -2448,7 +2448,7 @@ Variable.prototype = Heritage.extend(Scope.prototype, {
   setGrip: function (aGrip) {
     // Don't allow displaying grip information if there's no name available
     // or the grip is malformed.
-    if (!this._nameString || aGrip === undefined || aGrip === null) {
+    if (this._nameString === undefined || aGrip === undefined || aGrip === null) {
       return;
     }
     // Getters and setters should display grip information in sub-properties.
@@ -3095,7 +3095,7 @@ Property.prototype = Heritage.extend(Variable.prototype, {
       return this._symbolicName;
     }
 
-    this._symbolicName = this.ownerView.symbolicName + "[\"" + this._nameString + "\"]";
+    this._symbolicName = this.ownerView.symbolicName + "[" + escapeString(this._nameString) + "]";
     return this._symbolicName;
   },
 
@@ -3108,7 +3108,7 @@ Property.prototype = Heritage.extend(Variable.prototype, {
       return this._absoluteName;
     }
 
-    this._absoluteName = this.ownerView.absoluteName + "[\"" + this._nameString + "\"]";
+    this._absoluteName = this.ownerView.absoluteName + "[" + escapeString(this._nameString) + "]";
     return this._absoluteName;
   }
 });
@@ -3907,6 +3907,17 @@ var generateId = (function () {
     return aName.toLowerCase().trim().replace(/\s+/g, "-") + (++count);
   };
 })();
+
+/**
+ * Serialize a string to JSON. The result can be inserted in a string evaluated by `eval`.
+ *
+ * @param string aString
+ *       The string to be escaped. If undefined, the function returns the empty string.
+ * @return string
+ */
+function escapeString(aString) {
+  return JSON.stringify(aString) || "";
+}
 
 /**
  * Escape some HTML special characters. We do not need full HTML serialization
