@@ -30,18 +30,12 @@
 - Bug 1379957 - 2017-07-12  - Only fire the debugger's onGarbageCollection hook when
 - Bug 1362167 - 2017-05-04 - Use strongly-typed enum classes instead of generic uint
 - Bug 1352528 - 2017-04-03 - Hoist call to GetRoundOffsetsToPixels out of the inner 
-- 1297276 - Rename mfbt/unused.h to mfbt/Unused.h for consistency
 - 1222516 - 2016-10-20 part 4. Implement support for rel=noopener on links. - apply part3 before
 - Bug 1310721 - 2016-10-15- Remove support for the b2g PAC generator; r=mcmanus
 - 1222516 part 3. Rejigger our rel="noreferrer" - unable to apply because of inherit principal vs inherit owner, furthermore nsNullPtr
-- 1114580 - toStringTag - several diffs still to analyze
 - Bug 1263340 - finish to part 8
 - Bug 1296851 - 2016-10-27 Always allow SetPrototype with the same value as the cu
 - Bug 1295729 - 2016-08-16 - Ensure that properties are array indices when the conso
-
-
-If applied, breaks build:
-Bug 1146738 - Fix race condition between js/src/target and js/src/host. r=mshal
 
 
 impacting download and shutdown:
@@ -61,8 +55,6 @@ Bug 875648 - Use Downloads.jsm functions to get download directories
 - from nsContextMenu.js : remove unremotePrincipal again
 
 - in nsGlobalWindow remove from Open calls aCalleePrincipal and aJSCallerContext
-- inherit principal vs. inherit owner in DocShell see INTERNAL_LOAD_FLAGS_INHERIT_OWNER
-- update nsNullPrincipal (and nsDocShell Fixme's)
 - add PrincipalToInherit to LoadInfo
 - LoadFrame needs TriggerPrincipal & OriginalSrc
 - complete 1487964 port
