@@ -610,6 +610,12 @@ interface nsILoadInfo : nsISupports
 %}
 
   /**
+   * Returns true if this load is for top level document.
+   * Note that the load for a sub-frame's document will return false here.
+   */
+  [infallible] readonly attribute boolean isTopLevelLoad;
+
+  /**
    * This attribute will be true if this is a load triggered by
    * https://html.spec.whatwg.org/multipage/iframe-embed-object.html#process-the-iframe-attributes
    * or https://html.spec.whatwg.org/multipage/obsolete.html#process-the-frame-attributes

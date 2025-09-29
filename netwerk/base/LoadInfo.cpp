@@ -644,20 +644,6 @@ LoadInfo::GetParentOuterWindowID(uint64_t* aResult)
   return NS_OK;
 }
 
-void
-LoadInfo::SetIsFromProcessingFrameAttributes()
-{
-  mIsFromProcessingFrameAttributes = true;
-}
-
-NS_IMETHODIMP
-LoadInfo::GetIsFromProcessingFrameAttributes(bool *aIsFromProcessingFrameAttributes)
-{
-  MOZ_ASSERT(aIsFromProcessingFrameAttributes);
-  *aIsFromProcessingFrameAttributes = mIsFromProcessingFrameAttributes;
-  return NS_OK;
-}
-
 NS_IMETHODIMP
 LoadInfo::GetFrameOuterWindowID(uint64_t* aResult)
 {
@@ -837,6 +823,28 @@ LoadInfo::MaybeIncreaseTainting(uint32_t aTainting)
   if (tainting > mTainting) {
     mTainting = tainting;
   }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetIsTopLevelLoad(bool *aResult)
+{
+  *aResult = mFrameOuterWindowID ? mFrameOuterWindowID == mOuterWindowID
+                                 : mParentOuterWindowID == mOuterWindowID;
+  return NS_OK;
+}
+
+void
+LoadInfo::SetIsFromProcessingFrameAttributes()
+{
+  mIsFromProcessingFrameAttributes = true;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetIsFromProcessingFrameAttributes(bool *aIsFromProcessingFrameAttributes)
+{
+  MOZ_ASSERT(aIsFromProcessingFrameAttributes);
+  *aIsFromProcessingFrameAttributes = mIsFromProcessingFrameAttributes;
   return NS_OK;
 }
 
