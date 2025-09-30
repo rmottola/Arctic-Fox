@@ -292,8 +292,21 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
   if (NS_FAILED(rv))
     return SendFailedAsyncOpen(rv);
 
+  nsCOMPtr<nsILoadInfo> loadInfo;
+  rv = mozilla::ipc::LoadInfoArgsToLoadInfo(aLoadInfoArgs,
+                                            getter_AddRefs(loadInfo));
+  if (NS_FAILED(rv)) {
+    return SendFailedAsyncOpen(rv);
+  }
+
+  NeckoOriginAttributes attrs;
+  rv = loadInfo->GetOriginAttributes(&attrs);
+  if (NS_FAILED(rv)) {
+    return SendFailedAsyncOpen(rv);
+  }
+
   bool appOffline = false;
-  uint32_t appId = GetAppId();
+  uint32_t appId = attrs.mAppId;
   if (appId != NECKO_UNKNOWN_APP_ID &&
       appId != NECKO_NO_APP_ID) {
     gIOService->IsAppOffline(appId, &appOffline);
@@ -304,13 +317,6 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
     loadFlags |= nsICachingChannel::LOAD_ONLY_FROM_CACHE;
     loadFlags |= nsIRequest::LOAD_FROM_CACHE;
     loadFlags |= nsICachingChannel::LOAD_NO_NETWORK_IO;
-  }
-
-  nsCOMPtr<nsILoadInfo> loadInfo;
-  rv = mozilla::ipc::LoadInfoArgsToLoadInfo(aLoadInfoArgs,
-                                            getter_AddRefs(loadInfo));
-  if (NS_FAILED(rv)) {
-    return SendFailedAsyncOpen(rv);
   }
 
   nsCOMPtr<nsIChannel> channel;
@@ -460,16 +466,9 @@ HttpChannelParent::DoAsyncOpen(  const URIParams&           aURI,
     }
 
     if (setChooseApplicationCache) {
-      DocShellOriginAttributes docShellAttrs;
-      if (mLoadContext) {
-        bool result = mLoadContext->GetOriginAttributes(docShellAttrs);
-        if (!result) {
-          return SendFailedAsyncOpen(NS_ERROR_FAILURE);
-        }
-      }
-
       NeckoOriginAttributes neckoAttrs;
-      neckoAttrs.InheritFromDocShellToNecko(docShellAttrs);
+      NS_GetOriginAttributes(mChannel, neckoAttrs);
+
       PrincipalOriginAttributes attrs;
       attrs.InheritFromNecko(neckoAttrs);
       nsCOMPtr<nsIPrincipal> principal =
@@ -1652,8 +1651,11 @@ uint32_t
 HttpChannelParent::GetAppId()
 {
   uint32_t appId = NECKO_UNKNOWN_APP_ID;
-  if (mLoadContext) {
-    mLoadContext->GetAppId(&appId);
+  if (mChannel) {
+    NeckoOriginAttributes attrs;
+    if (NS_GetOriginAttributes(mChannel, attrs)) {
+      appId = attrs.mAppId;
+    }
   }
   return appId;
 }
