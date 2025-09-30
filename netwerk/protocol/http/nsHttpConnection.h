@@ -333,7 +333,7 @@ private:
     // version level in use, 0 if unused
     uint8_t                         mUsingSpdyVersion;
 
-    RefPtr<ASpdySession>          mSpdySession;
+    RefPtr<ASpdySession>            mSpdySession;
     int32_t                         mPriority;
     bool                            mReportedSpdy;
 

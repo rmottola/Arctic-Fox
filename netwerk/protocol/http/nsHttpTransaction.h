@@ -168,7 +168,6 @@ public:
 
     bool Do0RTT() override;
     nsresult Finish0RTT(bool aRestart) override;
-
 private:
     friend class DeleteHttpTransaction;
     virtual ~nsHttpTransaction();
@@ -457,8 +456,6 @@ public:
 private:
     RefPtr<ASpdySession> mTunnelProvider;
 
-    bool                            m0RTTInProgress;
-
     nsresult                        mTransportStatus;
 
 public:
@@ -467,6 +464,8 @@ public:
 private:
     NetAddr                         mSelfAddr;
     NetAddr                         mPeerAddr;
+
+    bool                            m0RTTInProgress;
 };
 
 } // namespace net
