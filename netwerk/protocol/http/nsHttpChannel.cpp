@@ -1711,9 +1711,13 @@ nsHttpChannel::ProcessAltService()
         proxyInfo = do_QueryInterface(mProxyInfo);
     }
 
+    NeckoOriginAttributes originAttributes;
+    NS_GetOriginAttributes(this, originAttributes);
+
     AltSvcMapping::ProcessHeader(altSvc, scheme, originHost, originPort,
                                  mUsername, mPrivateBrowsing, callbacks, proxyInfo,
-                                 mCaps & NS_HTTP_DISALLOW_SPDY);
+                                 mCaps & NS_HTTP_DISALLOW_SPDY,
+                                 originAttributes);
 }
 
 nsresult
@@ -5615,6 +5619,9 @@ nsHttpChannel::BeginConnect()
 
     SetDoNotTrack();
 
+    NeckoOriginAttributes originAttributes;
+    NS_GetOriginAttributes(this, originAttributes);
+
     RefPtr<AltSvcMapping> mapping;
     if (mAllowAltSvc && // per channel
         (scheme.Equals(NS_LITERAL_CSTRING("http")) ||
@@ -5657,12 +5664,14 @@ nsHttpChannel::BeginConnect()
         }
 
         LOG(("nsHttpChannel %p Using connection info from altsvc mapping", this));
-        mapping->GetConnectionInfo(getter_AddRefs(mConnectionInfo), proxyInfo);
+        mapping->GetConnectionInfo(getter_AddRefs(mConnectionInfo), proxyInfo, originAttributes);
         Telemetry::Accumulate(Telemetry::HTTP_TRANSACTION_USE_ALTSVC, true);
         Telemetry::Accumulate(Telemetry::HTTP_TRANSACTION_USE_ALTSVC_OE, !isHttps);
     } else {
         LOG(("nsHttpChannel %p Using default connection info", this));
-        mConnectionInfo = new nsHttpConnectionInfo(host, port, EmptyCString(), mUsername, proxyInfo, isHttps);
+
+        mConnectionInfo = new nsHttpConnectionInfo(host, port, EmptyCString(), mUsername, proxyInfo,
+                                                   originAttributes, isHttps);
         Telemetry::Accumulate(Telemetry::HTTP_TRANSACTION_USE_ALTSVC, false);
     }
 
