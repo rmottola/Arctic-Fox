@@ -627,10 +627,8 @@ BrowserGlue.prototype = {
       Services.prefs.setBoolPref('media.mediasource.webm.enabled', false);
     }
 
-    if (Services.prefs.getBoolPref("browser.tabs.remote")) {
-      ContentClick.init();
-      RemotePrompt.init();
-    }
+    ContentClick.init();
+    RemotePrompt.init();
     Feeds.init();
     ContentPrefServiceParent.init();
 
