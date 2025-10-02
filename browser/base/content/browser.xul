@@ -728,108 +728,108 @@
             </textbox>
         </toolbaritem>
 
-      <toolbaritem id="search-container" title="&searchItem.title;"
-                   align="center" class="chromeclass-toolbar-additional"
-                   flex="100" persist="width" removable="true">
-        <searchbar id="searchbar" flex="1"/>
-      </toolbaritem>
+        <toolbaritem id="search-container" title="&searchItem.title;"
+                     align="center" class="chromeclass-toolbar-additional"
+                     flex="100" persist="width" removable="true">
+          <searchbar id="searchbar" flex="1"/>
+        </toolbaritem>
 
-      <toolbarbutton id="bookmarks-menu-button"
-                     class="toolbarbutton-1 chromeclass-toolbar-additional"
-                     persist="class"
-                     removable="true"
-                     type="menu"
-                     label="&bookmarksMenuButton.label;"
-                     tooltiptext="&bookmarksMenuButton.tooltip;"
-                     onclick="if (event.button == 1)
-                                SidebarUI.toggle('viewBookmarksSidebar');"
-                     ondragenter="PlacesMenuDNDHandler.onDragEnter(event);"
-                     ondragover="PlacesMenuDNDHandler.onDragOver(event);"
-                     ondragleave="PlacesMenuDNDHandler.onDragLeave(event);"
-                     ondrop="PlacesMenuDNDHandler.onDrop(event);">
-        <observes element="bookmarkThisPageBroadcaster" attribute="starred"/>
-        <observes element="bookmarkThisPageBroadcaster" attribute="buttontooltiptext"/>
-        <menupopup id="BMB_bookmarksPopup"
-                   placespopup="true"
-                   context="placesContext"
-                   openInTabs="children"
-                   anonanchorclass="toolbarbutton-menubutton-dropmarker"
-                   oncommand="BookmarksEventHandler.onCommand(event, this.parentNode._placesView);"
-                   onclick="event.stopPropagation();
-                            BookmarksEventHandler.onClick(event, this.parentNode._placesView);"
-                   onpopupshowing="BookmarkingUI.onPopupShowing(event);
-                                   if (!this.parentNode._placesView)
-                                     new PlacesMenu(event, 'place:folder=BOOKMARKS_MENU');"
-                   tooltip="bhTooltip" popupsinherittooltip="true">
-          <menuitem id="BMB_viewBookmarksToolbar"
-                    placesanonid="view-toolbar"
-                    toolbarId="PersonalToolbar"
-                    type="checkbox"
-                    oncommand="onViewToolbarCommand(event)"
-                    label="&viewBookmarksToolbar.label;"/>
-          <menuseparator/>
-          <menuitem id="BMB_bookmarksShowAll"
+        <toolbarbutton id="bookmarks-menu-button"
+                       class="toolbarbutton-1 chromeclass-toolbar-additional"
+                       persist="class"
+                       removable="true"
+                       type="menu"
+                       label="&bookmarksMenuButton.label;"
+                       tooltiptext="&bookmarksMenuButton.tooltip;"
+                       onclick="if (event.button == 1)
+                                  SidebarUI.toggle('viewBookmarksSidebar');"
+                       ondragenter="PlacesMenuDNDHandler.onDragEnter(event);"
+                       ondragover="PlacesMenuDNDHandler.onDragOver(event);"
+                       ondragleave="PlacesMenuDNDHandler.onDragLeave(event);"
+                       ondrop="PlacesMenuDNDHandler.onDrop(event);">
+          <observes element="bookmarkThisPageBroadcaster" attribute="starred"/>
+          <observes element="bookmarkThisPageBroadcaster" attribute="buttontooltiptext"/>
+          <menupopup id="BMB_bookmarksPopup"
+                     placespopup="true"
+                     context="placesContext"
+                     openInTabs="children"
+                     anonanchorclass="toolbarbutton-menubutton-dropmarker"
+                     oncommand="BookmarksEventHandler.onCommand(event, this.parentNode._placesView);"
+                     onclick="event.stopPropagation();
+                              BookmarksEventHandler.onClick(event, this.parentNode._placesView);"
+                     onpopupshowing="BookmarkingUI.onPopupShowing(event);
+                                     if (!this.parentNode._placesView)
+                                       new PlacesMenu(event, 'place:folder=BOOKMARKS_MENU');"
+                     tooltip="bhTooltip" popupsinherittooltip="true">
+            <menuitem id="BMB_viewBookmarksToolbar"
+                      placesanonid="view-toolbar"
+                      toolbarId="PersonalToolbar"
+                      type="checkbox"
+                      oncommand="onViewToolbarCommand(event)"
+                      label="&viewBookmarksToolbar.label;"/>
+            <menuseparator/>
+            <menuitem id="BMB_bookmarksShowAll"
 #ifndef XP_MACOSX
-                    class="menuitem-iconic"
+                      class="menuitem-iconic"
 #endif
-                    label="&organizeBookmarks.label;"
-                    command="Browser:ShowAllBookmarks"
-                    key="manBookmarkKb"/>
-          <menuseparator/>
+                      label="&organizeBookmarks.label;"
+                      command="Browser:ShowAllBookmarks"
+                      key="manBookmarkKb"/>
+            <menuseparator/>
             <menuitem label="&recentBookmarks.label;"
                       id="BMB_recentBookmarks"
                       disabled="true"
                       class="subviewbutton"/>
             <vbox id="BMB_recentBookmarks"/>
             <menuseparator/>
-          <menuitem id="BMB_bookmarkThisPage"
+            <menuitem id="BMB_bookmarkThisPage"
 #ifndef XP_MACOSX
-                    class="menuitem-iconic"
+                      class="menuitem-iconic"
 #endif
-                    label="&bookmarkThisPageCmd.label;"
-                    command="Browser:AddBookmarkAs"
-                    key="addBookmarkAsKb"/>
-          <menuitem id="BMB_subscribeToPageMenuitem"
+                      label="&bookmarkThisPageCmd.label;"
+                      command="Browser:AddBookmarkAs"
+                      key="addBookmarkAsKb"/>
+            <menuitem id="BMB_subscribeToPageMenuitem"
 #ifndef XP_MACOSX
-                    class="menuitem-iconic"
+                      class="menuitem-iconic"
 #endif
-                    label="&subscribeToPageMenuitem.label;"
-                    oncommand="return FeedHandler.subscribeToFeed(null, event);"
-                    onclick="checkForMiddleClick(this, event);"
-                    observes="singleFeedMenuitemState"/>
-          <menu id="BMB_subscribeToPageMenupopup"
+                      label="&subscribeToPageMenuitem.label;"
+                      oncommand="return FeedHandler.subscribeToFeed(null, event);"
+                      onclick="checkForMiddleClick(this, event);"
+                      observes="singleFeedMenuitemState"/>
+            <menu id="BMB_subscribeToPageMenupopup"
 #ifndef XP_MACOSX
-                class="menu-iconic"
+                  class="menu-iconic"
 #endif
-                label="&subscribeToPageMenupopup.label;"
-                observes="multipleFeedsMenuState">
-            <menupopup id="BMB_subscribeToPageSubmenuMenupopup"
-                       onpopupshowing="return FeedHandler.buildFeedList(event.target);"
-                       oncommand="return FeedHandler.subscribeToFeed(null, event);"
-                       onclick="checkForMiddleClick(this, event);"/>
-          </menu>
-          <menuseparator/>
-          <menu id="BMB_bookmarksToolbar"
-                placesanonid="toolbar-autohide"
-                class="menu-iconic bookmark-item"
-                label="&personalbarCmd.label;"
-                container="true">
-            <menupopup id="BMB_bookmarksToolbarPopup"
-                       placespopup="true"
-                       context="placesContext"
-                       onpopupshowing="if (!this.parentNode._placesView)
+                  label="&subscribeToPageMenupopup.label;"
+                  observes="multipleFeedsMenuState">
+              <menupopup id="BMB_subscribeToPageSubmenuMenupopup"
+                         onpopupshowing="return FeedHandler.buildFeedList(event.target);"
+                         oncommand="return FeedHandler.subscribeToFeed(null, event);"
+                         onclick="checkForMiddleClick(this, event);"/>
+            </menu>
+            <menuseparator/>
+            <menu id="BMB_bookmarksToolbar"
+                  placesanonid="toolbar-autohide"
+                  class="menu-iconic bookmark-item"
+                  label="&personalbarCmd.label;"
+                  container="true">
+              <menupopup id="BMB_bookmarksToolbarPopup"
+                         placespopup="true"
+                         context="placesContext"
+                         onpopupshowing="if (!this.parentNode._placesView)
                                          new PlacesMenu(event, 'place:folder=TOOLBAR');"/>
-          </menu>
-          <menuseparator/>
-          <!-- Bookmarks menu items -->
-          <menuseparator builder="end"
-                         class="hide-if-empty-places-result"/>
-          <menuitem id="BMB_unsortedBookmarks"
-                    class="menuitem-iconic"
-                    label="&bookmarksMenuButton.other.label;"
-                    oncommand="PlacesCommandHook.showPlacesOrganizer('UnfiledBookmarks');"/>
-        </menupopup>
-      </toolbarbutton>
+            </menu>
+            <menuseparator/>
+            <!-- Bookmarks menu items -->
+            <menuseparator builder="end"
+                           class="hide-if-empty-places-result"/>
+            <menuitem id="BMB_unsortedBookmarks"
+                      class="menuitem-iconic"
+                      label="&bookmarksMenuButton.other.label;"
+                      oncommand="PlacesCommandHook.showPlacesOrganizer('UnfiledBookmarks');"/>
+          </menupopup>
+        </toolbarbutton>
 
         <!-- This is a placeholder for the Downloads Indicator.  It is visible
              during the customization of the toolbar, in the palette, and before
@@ -846,15 +846,15 @@
                        cui-areatype="toolbar"
                        tooltip="dynamic-shortcut-tooltip"/>
 
-      <toolbarbutton id="history-menu-button"
-                     class="toolbarbutton-1 chromeclass-toolbar-additional"
-                     persist="class"
-                     removable="true"                     
-                     type="menu"
-                     label="&historyButton.label;"
-                     tooltiptext="&historyButton.tooltip;"
-                     onclick="if (event.button == 1)
-                                SidebarUI.toggle('viewHistorySidebar');">
+        <toolbarbutton id="history-menu-button"
+                       class="toolbarbutton-1 chromeclass-toolbar-additional"
+                       persist="class"
+                       removable="true"                     
+                       type="menu"
+                       label="&historyButton.label;"
+                       tooltiptext="&historyButton.tooltip;"
+                       onclick="if (event.button == 1)
+                                  SidebarUI.toggle('viewHistorySidebar');">
         <menupopup id="HMB_historyPopup"
                    placespopup="true"
                    context="placesContext"
