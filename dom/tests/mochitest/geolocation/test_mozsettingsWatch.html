@@ -22,8 +22,6 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=478911
 SimpleTest.waitForExplicitFinish();
 SimpleTest.requestFlakyTimeout("untriaged");
 
-var timeToWaitMs = 1000;
-
 resume_geolocationProvider(function() {
   force_prompt(true, test1);
 });
@@ -39,49 +37,56 @@ function test1() {
   ], test2);
 }
 
+var watchId;
 function test2() {
   ok(navigator.geolocation, "get geolocation object");
 
   toggleGeolocationSetting(false, function() {
       ok(true, "turned off geolocation via mozSettings");
       setTimeout(function() {
-          navigator.geolocation.getCurrentPosition(successCallbackAfterMozsettingOff,
-                                                   failureCallbackAfterMozsettingOff);
-        }, timeToWaitMs); // need to wait a bit for all of these async callbacks to finish
+          watchId = navigator.geolocation.watchPosition(successCallbackAfterMozsettingOff,
+                                                        failureCallbackAfterMozsettingOff);
+      }, 500); // need to wait a bit for all of these async callbacks to finish
   });
 }
 
 function successCallbackAfterMozsettingOff(position) {
   ok(false, "Success callback should not have been called after setting geolocation.enabled to false.");
 
+  navigator.geolocation.clearWatch(watchId);
   toggleGeolocationSetting(true, function() {
       ok(true, "turned on geolocation via mozSettings");
       setTimeout(function() {
-         navigator.geolocation.getCurrentPosition(successCallbackAfterMozsettingOn,
-                                                  failureCallbackAfterMozsettingOn);
-        }, timeToWaitMs); // need to wait a bit for all of these async callbacks to finish
+          watchId = navigator.geolocation.watchPosition(successCallbackAfterMozsettingOn,
+                                                        failureCallbackAfterMozsettingOn);
+        }, 500); // need to wait a bit for all of these async callbacks to finish
     });
 }
 
 function failureCallbackAfterMozsettingOff(error) {
   ok(true, "Geolocation didn't work after setting geolocation.enabled to false.");
 
+  navigator.geolocation.clearWatch(watchId);
   toggleGeolocationSetting(true, function() {
       ok(true, "turned on geolocation via mozSettings");
       setTimeout(function() {
-         navigator.geolocation.getCurrentPosition(successCallbackAfterMozsettingOn,
-                                                  failureCallbackAfterMozsettingOn);
-        }, timeToWaitMs); // need to wait a bit for all of these async callbacks to finish
+          watchId = navigator.geolocation.watchPosition(successCallbackAfterMozsettingOn,
+                                                        failureCallbackAfterMozsettingOn);
+        }, 500); // need to wait a bit for all of these async callbacks to finish
     });
 }
 
 function successCallbackAfterMozsettingOn(position) {
   ok(true, "Geolocation worked after setting geolocation.enabled to true.");
+
+  navigator.geolocation.clearWatch(watchId);
   SimpleTest.finish();
 }
 
 function failureCallbackAfterMozsettingOn(error) {
   ok(false, "Geolocation didn't work after setting geolocation.enabled to true.");
+
+  navigator.geolocation.clearWatch(watchId);
   SimpleTest.finish();
 }
 
