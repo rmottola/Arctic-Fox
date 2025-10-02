@@ -169,7 +169,7 @@ var AboutHome = {
     ss.promiseInitialized.then(function() {
       let data = {
         showRestoreLastSession: ss.canRestoreLastSession,
-        snippetsURL: AboutHomeUtils.snippetsURL,
+//        snippetsURL: AboutHomeUtils.snippetsURL,
         showKnowYourRights: AboutHomeUtils.showKnowYourRights,
         snippetsVersion: AboutHomeUtils.snippetsVersion,
       };
