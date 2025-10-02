@@ -6,7 +6,7 @@
 require("devtools/shared/fronts/stylesheets");
 const {
   Front,
-  FrontClass,
+  FrontClassWithSpec,
   custom,
   preEvent
 } = require("devtools/shared/protocol");
@@ -25,7 +25,7 @@ loader.lazyGetter(this, "RuleRewriter", () => {
 /**
  * PageStyleFront, the front object for the PageStyleActor
  */
-const PageStyleFront = FrontClass(pageStyleSpec, {
+const PageStyleFront = FrontClassWithSpec(pageStyleSpec, {
   initialize: function (conn, form, ctx, detail) {
     Front.prototype.initialize.call(this, conn, form, ctx, detail);
     this.inspector = this.parent();
@@ -93,7 +93,7 @@ exports.PageStyleFront = PageStyleFront;
 /**
  * StyleRuleFront, the front for the StyleRule actor.
  */
-const StyleRuleFront = FrontClass(styleRuleSpec, {
+const StyleRuleFront = FrontClassWithSpec(styleRuleSpec, {
   initialize: function (client, form, ctx, detail) {
     Front.prototype.initialize.call(this, client, form, ctx, detail);
   },
