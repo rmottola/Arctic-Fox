@@ -2641,7 +2641,6 @@ ContentPermissionPrompt.prototype = {
     if (!(requestingURI instanceof Ci.nsIStandardURL))
       return;
 
-    var autoAllow = false;
     var permissionKey = kFeatureKeys[perm.type];
     var result = Services.perms.testExactPermissionFromPrincipal(requestingPrincipal, permissionKey);
 
@@ -2651,7 +2650,8 @@ ContentPermissionPrompt.prototype = {
     }
 
     if (result == Ci.nsIPermissionManager.ALLOW_ACTION) {
-      autoAllow = true;
+      request.allow();
+      return;
     }
 
     var browser = this._getBrowserForRequest(request);
