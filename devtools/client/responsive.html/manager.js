@@ -439,6 +439,10 @@ ResponsiveUI.prototype = {
         let { enabled } = event.data;
         this.updateTouchSimulation(enabled);
         break;
+      case "update-user-agent":
+        let { userAgent } = event.data;
+        this.updateUserAgent(userAgent);
+        break;
     }
   },
 
@@ -454,6 +458,14 @@ ResponsiveUI.prototype = {
       this.emulationFront.clearTouchEventsOverride();
     }
   }),
+
+  updateUserAgent: function (userAgent) {
+    if (userAgent) {
+      this.emulationFront.setUserAgentOverride(userAgent);
+    } else {
+      this.emulationFront.clearUserAgentOverride();
+    }
+  },
 
   /**
    * Helper for tests. Assumes a single viewport for now.
