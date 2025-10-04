@@ -63,18 +63,6 @@ this.Curl = {
     let utils = CurlUtils;
 
     let command = ["curl"];
-    
-       // Make sure to use the following helpers to sanitize arguments before execution.
-    const addParam = value => {
-      const safe = /^[a-zA-Z-]+$/.test(value) ? value : escapeString(value);
-      command.push(safe);
-    };
-
-    const addPostData = value => {
-      const safe = /^[a-zA-Z-]+$/.test(value) ? value : escapeString(value);
-      data.push(safe);
-    };
-    
     let ignoredHeaders = new Set();
 
     // The cURL command is expected to run on the same platform that Firefox runs
@@ -83,25 +71,24 @@ this.Curl = {
                        utils.escapeStringWin : utils.escapeStringPosix;
 
     // Add URL.
-    addParam(aData.url);
+    command.push(escapeString(aData.url));
 
     let postDataText = null;
     let multipartRequest = utils.isMultipartRequest(aData);
 
     // Create post data.
     let data = [];
-    if (utils.isUrlEncodedRequest(aData) ||
-          ["PUT", "POST"].includes(aData.method)) {
+    if (utils.isUrlEncodedRequest(aData) || aData.method == "PUT") {
       postDataText = aData.postDataText;
-      addPostData("--data");
-      addPostData(escapeString(utils.writePostDataTextParams(postDataText)));
+      data.push("--data");
+      data.push(escapeString(utils.writePostDataTextParams(postDataText)));
       ignoredHeaders.add("Content-Length");
     } else if (multipartRequest) {
       postDataText = aData.postDataText;
-      addPostData("--data-binary");
+      data.push("--data-binary");
       let boundary = utils.getMultipartBoundary(aData);
       let text = utils.removeBinaryDataFromMultipartText(postDataText, boundary);
-      addPostData(escapeString(text));
+      data.push(escapeString(text));
       ignoredHeaders.add("Content-Length");
     }
 
@@ -109,26 +96,20 @@ this.Curl = {
     // For GET and POST requests this is not necessary as GET is the
     // default. If --data or --binary is added POST is the default.
     if (!(aData.method == "GET" || aData.method == "POST")) {
-      addParam("-X");
-      addParam(aData.method);
+      command.push("-X");
+      command.push(aData.method);
     }
 
     // Add -I (HEAD)
     // For servers that supports HEAD.
     // This will fetch the header of a document only.
     if (aData.method == "HEAD") {
-      addParam("-I");
+      command.push("-I");
     }
 
     // Add http version.
     if (aData.httpVersion && aData.httpVersion != DEFAULT_HTTP_VERSION) {
-      let version = aData.httpVersion.split("/")[1];
-      // curl accepts --http1.0, --http1.1 and --http2 for HTTP/1.0, HTTP/1.1
-      // and HTTP/2 protocols respectively. But the corresponding values in 
-      // aData.httpVersion are HTTP/1.0, HTTP/1.1 and HTTP/2.0
-      // So in case of HTTP/2.0 (which should ideally be HTTP/2) we are using
-      // only major version, and full version in other cases
-      addParam("--http" + (version == "2.0" ? version.split(".")[0] : version));
+      command.push("--" + aData.httpVersion.split("/")[1]);
     }
 
     // Add request headers.
@@ -139,15 +120,15 @@ this.Curl = {
     }
     for (let i = 0; i < headers.length; i++) {
       let header = headers[i];
-      if (header.name === "Accept-Encoding"){
-        addParam("--compressed");
+      if (header.name === "Accept-Encoding") {
+        command.push("--compressed");
         continue;
       }
       if (ignoredHeaders.has(header.name)) {
         continue;
       }
-      addParam("-H");
-      addParam(escapeString(header.name + ": " + header.value));
+      command.push("-H");
+      command.push(escapeString(header.name + ": " + header.value));
     }
 
     // Add post data.
@@ -220,9 +201,6 @@ this.CurlUtils = {
    *         Post data parameters.
    */
   writePostDataTextParams: function (aPostDataText) {
-    if (!aPostDataText) {
-      return "";
-    }
     let lines = aPostDataText.split("\r\n");
     return lines[lines.length - 1];
   },
@@ -312,7 +290,7 @@ this.CurlUtils = {
         }
       }
     }
-    result += aBoundary + "--\r\n";
+    result += boundary + "--\r\n";
 
     return result;
   },
