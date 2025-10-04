@@ -151,13 +151,13 @@ define(function (require, exports, module) {
             className: "objectLeftBrace",
             role: "presentation",
             object: object
-          }, "{"),
+          }, " { "),
           props,
           objectLink({
             className: "objectRightBrace",
             role: "presentation",
             object: object
-          }, "}")
+          }, " }")
         )
       );
     },
