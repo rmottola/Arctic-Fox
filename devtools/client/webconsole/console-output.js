@@ -3549,13 +3549,6 @@ Widgets.Stacktrace.prototype = extend(Widgets.BaseWidget.prototype, {
    */
   stacktrace: null,
 
-  onViewSourceInDebugger(frame) {
-    this.output.openLocationInDebugger({
-      url: frame.source,
-      line: frame.line
-    });
-  },
-
   render() {
     if (this.element) {
       return this;
@@ -3567,7 +3560,7 @@ Widgets.Stacktrace.prototype = extend(Widgets.BaseWidget.prototype, {
     if (this.stacktrace) {
       this.output.owner.ReactDOM.render(this.output.owner.StackTraceView({
         stacktrace: this.stacktrace,
-        onViewSourceInDebugger: frame => this.onViewSourceInDebugger(frame)
+        onViewSourceInDebugger: frame => this.output.openLocationInDebugger(frame)
       }), result);
     }
 
