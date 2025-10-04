@@ -570,6 +570,8 @@ WebConsoleFrame.prototype = {
     this.jsterm = new JSTerm(this);
     this.jsterm.init();
 
+    let toolbox = gDevTools.getToolbox(this.owner.target);
+
     if (this.NEW_CONSOLE_OUTPUT_ENABLED) {
       // @TODO Remove this once JSTerm is handled with React/Redux.
       this.window.jsterm = this.jsterm;
@@ -582,7 +584,7 @@ WebConsoleFrame.prototype = {
       this.outputNode.parentNode.appendChild(this.experimentalOutputNode);
       // @TODO Once the toolbox has been converted to React, see if passing
       // in JSTerm is still necessary.
-      this.newConsoleOutput = new this.window.NewConsoleOutput(this.experimentalOutputNode, this.jsterm);
+      this.newConsoleOutput = new this.window.NewConsoleOutput(this.experimentalOutputNode, this.jsterm, toolbox);
       console.log("Created newConsoleOutput", this.newConsoleOutput);
 
       let filterToolbar = doc.querySelector(".hud-console-filter-toolbar");
@@ -594,7 +596,6 @@ WebConsoleFrame.prototype = {
     this.jsterm.on("sidebar-opened", this.resize);
     this.jsterm.on("sidebar-closed", this.resize);
 
-    let toolbox = gDevTools.getToolbox(this.owner.target);
     if (toolbox) {
       toolbox.on("webconsole-selected", this._onPanelSelected);
     }
