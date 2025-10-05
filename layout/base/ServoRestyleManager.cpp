@@ -356,7 +356,7 @@ ServoRestyleManager::ProcessPendingRestyles()
 }
 
 void
-ServoRestyleManager::RestyleForInsertOrChange(Element* aContainer,
+ServoRestyleManager::RestyleForInsertOrChange(nsINode* aContainer,
                                               nsIContent* aChild)
 {
   //
@@ -369,7 +369,7 @@ ServoRestyleManager::RestyleForInsertOrChange(Element* aContainer,
 }
 
 void
-ServoRestyleManager::ContentInserted(Element* aContainer, nsIContent* aChild)
+ServoRestyleManager::ContentInserted(nsINode* aContainer, nsIContent* aChild)
 {
   if (!aContainer->ServoData().get()) {
     // This can happen with display:none. Bug 1297249 tracks more investigation
@@ -386,7 +386,7 @@ ServoRestyleManager::ContentInserted(Element* aContainer, nsIContent* aChild)
 }
 
 void
-ServoRestyleManager::RestyleForAppend(Element* aContainer,
+ServoRestyleManager::RestyleForAppend(nsIContent* aContainer,
                                       nsIContent* aFirstNewContent)
 {
   //
@@ -399,7 +399,7 @@ ServoRestyleManager::RestyleForAppend(Element* aContainer,
 }
 
 void
-ServoRestyleManager::ContentAppended(Element* aContainer,
+ServoRestyleManager::ContentAppended(nsIContent* aContainer,
                                      nsIContent* aFirstNewContent)
 {
   if (!aContainer->ServoData().get()) {
@@ -422,7 +422,7 @@ ServoRestyleManager::ContentAppended(Element* aContainer,
 }
 
 void
-ServoRestyleManager::ContentRemoved(Element* aContainer,
+ServoRestyleManager::ContentRemoved(nsINode* aContainer,
                                     nsIContent* aOldChild,
                                     nsIContent* aFollowingSibling)
 {
