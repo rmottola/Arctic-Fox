@@ -2440,7 +2440,8 @@ HTMLMediaElement::SetCapturedOutputStreamsEnabled(bool aEnabled) {
       }
 
       TrackID id = pair.second()->GetDestinationTrackId();
-      outputSource->SetTrackEnabled(id, aEnabled);
+      outputSource->SetTrackEnabled(id, aEnabled ? DisabledTrackMode::ENABLED
+                                                 : DisabledTrackMode::SILENCE_FREEZE);
 
       LOG(LogLevel::Debug,
           ("%s track %d for captured MediaStream %p",
@@ -2513,7 +2514,8 @@ HTMLMediaElement::AddCaptureMediaTrackToOutputStream(MediaTrack* aTrack,
 
   // Track is muted initially, so we don't leak data if it's added while paused
   // and an MSG iteration passes before the mute comes into effect.
-  processedOutputSource->SetTrackEnabled(destinationTrackID, false);
+  processedOutputSource->SetTrackEnabled(destinationTrackID,
+                                         DisabledTrackMode::SILENCE_FREEZE);
   RefPtr<MediaInputPort> port =
     inputTrack->ForwardTrackContentsTo(processedOutputSource,
                                        destinationTrackID);
@@ -2522,7 +2524,8 @@ HTMLMediaElement::AddCaptureMediaTrackToOutputStream(MediaTrack* aTrack,
   aOutputStream.mTrackPorts.AppendElement(Move(p));
 
   if (mSrcStreamIsPlaying) {
-    processedOutputSource->SetTrackEnabled(destinationTrackID, true);
+    processedOutputSource->SetTrackEnabled(destinationTrackID,
+                                           DisabledTrackMode::ENABLED);
   }
 
   LOG(LogLevel::Debug,
