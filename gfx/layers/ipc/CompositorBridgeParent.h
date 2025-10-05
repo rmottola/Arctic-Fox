@@ -48,6 +48,7 @@ class CancelableRunnable;
 namespace gfx {
 class DrawTarget;
 class GPUProcessManager;
+class GPUParent;
 } // namespace gfx
 
 namespace ipc {
@@ -57,6 +58,7 @@ class Shmem;
 namespace layers {
 
 class APZCTreeManager;
+class APZCTreeManagerParent;
 class AsyncCompositionManager;
 class Compositor;
 class CompositorBridgeParent;
@@ -210,6 +212,7 @@ class CompositorBridgeParent final : public PCompositorBridgeParent,
   friend class CompositorThreadHolder;
   friend class InProcessCompositorSession;
   friend class gfx::GPUProcessManager;
+  friend class gfx::GPUParent;
 
 public:
   explicit CompositorBridgeParent(CSSToLayoutDeviceScale aScale,
@@ -372,6 +375,9 @@ public:
       bool aScheduleComposite, uint32_t aPaintSequenceNumber,
       bool aIsRepeatTransaction, bool aHitTestUpdate);
 
+  void UpdatePaintTime(LayerTransactionParent* aLayerTree,
+                       const TimeDuration& aPaintTime) override;
+
   /**
    * Check rotation info and schedule a rendering task if needed.
    * Only can be called from compositor thread.
@@ -424,6 +430,7 @@ public:
     ~LayerTreeState();
     RefPtr<Layer> mRoot;
     RefPtr<GeckoContentController> mController;
+    APZCTreeManagerParent* mApzcTreeManagerParent;
     CompositorBridgeParent* mParent;
     LayerManagerComposite* mLayerManager;
     // Pointer to the CrossProcessCompositorBridgeParent. Used by APZCs to share
@@ -484,6 +491,16 @@ public:
 
   void ForceComposeToTarget(gfx::DrawTarget* aTarget, const gfx::IntRect* aRect = nullptr);
 
+  PAPZCTreeManagerParent* AllocPAPZCTreeManagerParent(const uint64_t& aLayersId) override;
+  bool DeallocPAPZCTreeManagerParent(PAPZCTreeManagerParent* aActor) override;
+
+  PAPZParent* AllocPAPZParent(const uint64_t& aLayersId) override;
+  bool DeallocPAPZParent(PAPZParent* aActor) override;
+
+  bool RecvAsyncPanZoomEnabled(const uint64_t& aLayersId, bool* aHasAPZ) override;
+
+  RefPtr<APZCTreeManager> GetAPZCTreeManager();
+
   bool AsyncPanZoomEnabled() const {
     return !!mApzcTreeManager;
   }
@@ -514,20 +531,6 @@ private:
   static void RequestNotifyLayerTreeCleared(uint64_t aLayersId, CompositorUpdateObserver* aObserver);
   static void SwapLayerTreeObservers(uint64_t aLayer, uint64_t aOtherLayer);
 
-  /**
-   * Creates a new RemoteContentController for aTabId. Should only be called on
-   * the main thread.
-   *
-   * aLayersId The layers id for the browser corresponding to aTabId.
-   * aContentParent The ContentParent for the process that the TabChild for
-   *                aTabId lives in.
-   * aBrowserParent The toplevel TabParent for aTabId.
-   */
-  static bool UpdateRemoteContentController(uint64_t aLayersId,
-                                            dom::ContentParent* aContentParent,
-                                            const dom::TabId& aTabId,
-                                            dom::TabParent* aBrowserParent);
-
 protected:
   // Protected destructor, to discourage deletion outside of Release():
   virtual ~CompositorBridgeParent();
@@ -552,6 +555,8 @@ protected:
   void ForceComposition();
   void CancelCurrentCompositeTask();
   void Invalidate();
+  bool IsPendingComposite();
+  void FinishPendingComposite();
 
   RefPtr<Compositor> NewCompositor(const nsTArray<LayersBackend>& aBackendHints);
   void ResetCompositorTask(const nsTArray<LayersBackend>& aBackendHints,
@@ -629,6 +634,8 @@ protected:
   // confirmation that the channel is closed.
   // mSelfRef is cleared in DeferredDestroy which is scheduled by ActorDestroy.
   RefPtr<CompositorBridgeParent> mSelfRef;
+
+  TimeDuration mPaintTime;
 
 #if defined(XP_WIN) || defined(MOZ_WIDGET_GTK)
   // cached plugin data used to reduce the number of updates we request.

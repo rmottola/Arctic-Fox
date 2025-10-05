@@ -87,7 +87,7 @@ function* runTests(options) {
     background: `(${background})(${options.getTests})`,
   });
 
-  let pageActionId = makeWidgetId(extension.id) + "-page-action";
+  let pageActionId;
   let currentWindow = window;
   let windows = [];
 
@@ -111,6 +111,10 @@ function* runTests(options) {
 
   let awaitFinish = new Promise(resolve => {
     extension.onMessage("nextTest", (expecting, testsRemaining) => {
+      if (!pageActionId) {
+        pageActionId = `${makeWidgetId(extension.id)}-page-action`;
+      }
+
       checkDetails(expecting);
 
       if (testsRemaining) {
@@ -131,11 +135,15 @@ function* runTests(options) {
     });
   });
 
+  yield SpecialPowers.pushPrefEnv({set: [["general.useragent.locale", "es-ES"]]});
+
   yield extension.startup();
 
   yield awaitFinish;
 
   yield extension.unload();
+
+  yield SpecialPowers.popPrefEnv();
 
   let node = document.getElementById(pageActionId);
   is(node, null, "pageAction image removed from document");
@@ -178,6 +186,18 @@ add_task(function* testTabSwitchContext() {
         },
       },
 
+      "_locales/es_ES/messages.json": {
+        "popup": {
+          "message": "default.html",
+          "description": "Popup",
+        },
+
+        "title": {
+          "message": "T\u00edtulo",
+          "description": "Title",
+        },
+      },
+
       "default.png": imageBuffer,
       "1.png": imageBuffer,
       "2.png": imageBuffer,
@@ -187,16 +207,16 @@ add_task(function* testTabSwitchContext() {
       let details = [
         {"icon": browser.runtime.getURL("default.png"),
          "popup": browser.runtime.getURL("default.html"),
-         "title": "Default Title \u263a"},
+         "title": "Default T\u00edtulo \u263a"},
         {"icon": browser.runtime.getURL("1.png"),
          "popup": browser.runtime.getURL("default.html"),
-         "title": "Default Title \u263a"},
+         "title": "Default T\u00edtulo \u263a"},
         {"icon": browser.runtime.getURL("2.png"),
          "popup": browser.runtime.getURL("2.html"),
          "title": "Title 2"},
         {"icon": browser.runtime.getURL("2.png"),
          "popup": browser.runtime.getURL("2.html"),
-         "title": "Default Title \u263a"},
+         "title": "Default T\u00edtulo \u263a"},
       ];
 
       let promiseTabLoad = details => {

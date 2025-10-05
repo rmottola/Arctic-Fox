@@ -328,9 +328,9 @@ PlatformDecoderModule::ConversionRequired
 AndroidDecoderModule::DecoderNeedsConversion(const TrackInfo& aConfig) const
 {
   if (aConfig.IsVideo()) {
-    return kNeedAnnexB;
+    return ConversionRequired::kNeedAnnexB;
   }
-  return kNeedNone;
+  return ConversionRequired::kNeedNone;
 }
 
 MediaCodecDataDecoder::MediaCodecDataDecoder(MediaData::Type aType,

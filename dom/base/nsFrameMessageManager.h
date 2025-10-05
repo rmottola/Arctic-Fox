@@ -109,6 +109,11 @@ public:
     return false;
   }
 
+  virtual nsIMessageSender* GetProcessMessageManager() const
+  {
+    return nullptr;
+  }
+
 protected:
   bool BuildClonedMessageDataForParent(nsIContentParent* aParent,
                                        StructuredCloneData& aData,
@@ -145,8 +150,8 @@ struct nsMessageListenerInfo
 class MOZ_STACK_CLASS SameProcessCpowHolder : public mozilla::jsipc::CpowHolder
 {
 public:
-  SameProcessCpowHolder(JSRuntime *aRuntime, JS::Handle<JSObject*> aObj)
-    : mObj(aRuntime, aObj)
+  SameProcessCpowHolder(JS::RootingContext* aRootingCx, JS::Handle<JSObject*> aObj)
+    : mObj(aRootingCx, aObj)
   {
   }
 
@@ -207,6 +212,7 @@ public:
 
   void InitWithCallback(mozilla::dom::ipc::MessageManagerCallback* aCallback);
   void SetCallback(mozilla::dom::ipc::MessageManagerCallback* aCallback);
+
   mozilla::dom::ipc::MessageManagerCallback* GetCallback()
   {
     return mCallback;
@@ -338,9 +344,9 @@ class nsSameProcessAsyncMessageBase
 public:
   typedef mozilla::dom::ipc::StructuredCloneData StructuredCloneData;
 
-  nsSameProcessAsyncMessageBase(JSContext* aCx, JS::Handle<JSObject*> aCpows);
-  nsresult Init(JSContext* aCx,
-                const nsAString& aMessage,
+  nsSameProcessAsyncMessageBase(JS::RootingContext* aRootingCx,
+                                JS::Handle<JSObject*> aCpows);
+  nsresult Init(const nsAString& aMessage,
                 StructuredCloneData& aData,
                 nsIPrincipal* aPrincipal);
 
@@ -349,11 +355,14 @@ public:
 private:
   nsSameProcessAsyncMessageBase(const nsSameProcessAsyncMessageBase&);
 
-  JSRuntime* mRuntime;
+  JS::RootingContext* mRootingCx;
   nsString mMessage;
   StructuredCloneData mData;
   JS::PersistentRooted<JSObject*> mCpows;
   nsCOMPtr<nsIPrincipal> mPrincipal;
+#ifdef DEBUG
+  bool mCalledInit;
+#endif
 };
 
 class nsScriptCacheCleaner;

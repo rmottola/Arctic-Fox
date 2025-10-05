@@ -283,7 +283,7 @@ private:
                   const mozilla::CSSIntRect& aSrc);
 
   /**
-   * Helper method for creating a gfxDrawable from mPaintServerFrame or 
+   * Helper method for creating a gfxDrawable from mPaintServerFrame or
    * mImageElementSurface.
    * Requires mType is eStyleImageType_Element.
    * Returns null if we cannot create the drawable.

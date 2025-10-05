@@ -8,6 +8,9 @@ this.EXPORTED_SYMBOLS = [
   "SelectParentHelper"
 ];
 
+// Maximum number of rows to display in the select dropdown.
+const MAX_ROWS = 20;
+
 var currentBrowser = null;
 var currentMenulist = null;
 var currentZoom = 1;
@@ -29,13 +32,25 @@ this.SelectParentHelper = {
     this._registerListeners(browser, menulist.menupopup);
 
     let win = browser.ownerDocument.defaultView;
+
+    // Set the maximum height to show exactly MAX_ROWS items.
+    let firstItem = menulist.getItemAtIndex(0);
+    if (firstItem) {
+      let itemHeight = firstItem.getBoundingClientRect().height;
+
+      // Include the padding and border on the popup.
+      let cs = win.getComputedStyle(menulist.menupopup);
+      let bpHeight = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth) +
+                     parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      menulist.menupopup.style.maxHeight = (itemHeight * MAX_ROWS + bpHeight) + "px";
+    }
+
     let constraintRect = browser.getBoundingClientRect();
     constraintRect = new win.DOMRect(constraintRect.left + win.mozInnerScreenX,
                                      constraintRect.top + win.mozInnerScreenY,
                                      constraintRect.width, constraintRect.height);
     menulist.menupopup.setConstraintRect(constraintRect);
     menulist.menupopup.openPopupAtScreenRect("after_start", rect.left, rect.top, rect.width, rect.height, false, false);
-    menulist.selectedItem.scrollIntoView();
   },
 
   hide: function(menulist, browser) {
@@ -71,6 +86,12 @@ this.SelectParentHelper = {
         }
         break;
 
+      case "fullscreen":
+        if (currentMenulist) {
+          currentMenulist.menupopup.hidePopup();
+        }
+        break;
+
       case "popuphidden":
         currentBrowser.messageManager.sendAsyncMessage("Forms:DismissedDropDown", {});
         let popup = event.target;
@@ -103,6 +124,7 @@ this.SelectParentHelper = {
     popup.addEventListener("mouseover", this);
     popup.addEventListener("mouseout", this);
     browser.ownerDocument.defaultView.addEventListener("keydown", this, true);
+    browser.ownerDocument.defaultView.addEventListener("fullscreen", this, true);
     browser.messageManager.addMessageListener("Forms:UpdateDropDown", this);
   },
 
@@ -112,6 +134,7 @@ this.SelectParentHelper = {
     popup.removeEventListener("mouseover", this);
     popup.removeEventListener("mouseout", this);
     browser.ownerDocument.defaultView.removeEventListener("keydown", this, true);
+    browser.ownerDocument.defaultView.removeEventListener("fullscreen", this, true);
     browser.messageManager.removeMessageListener("Forms:UpdateDropDown", this);
   },
 

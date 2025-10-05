@@ -1351,6 +1351,9 @@ var CustomizableUIInternal = {
       }
       node.setAttribute("removable", aWidget.removable);
       node.setAttribute("overflows", aWidget.overflows);
+      if (aWidget.tabSpecific) {
+        node.setAttribute("tabspecific", aWidget.tabSpecific);
+      }
       node.setAttribute("label", this.getLocalizedProperty(aWidget, "label"));
       let additionalTooltipArguments = [];
       if (aWidget.shortcutId) {
@@ -2303,6 +2306,7 @@ var CustomizableUIInternal = {
       overflows: true,
       defaultArea: null,
       shortcutId: null,
+      tabSpecific: false,
       tooltiptext: null,
       showInPrivateBrowsing: true,
       _introducedInVersion: -1,
@@ -2333,7 +2337,7 @@ var CustomizableUIInternal = {
       }
     }
 
-    const kOptBoolProps = ["removable", "showInPrivateBrowsing", "overflows"];
+    const kOptBoolProps = ["removable", "showInPrivateBrowsing", "overflows", "tabSpecific"];
     for (let prop of kOptBoolProps) {
       if (typeof aData[prop] == "boolean") {
         widget[prop] = aData[prop];
@@ -4318,31 +4322,26 @@ OverflowableToolbar.prototype = {
       // fire afterwards; that's ok!
     }
     // If it used to be overflowed...
-    else {
+    else if (!nowOverflowed) {
       // ... and isn't anymore, let's remove our bookkeeping:
-      if (!nowOverflowed) {
-        this._collapsed.delete(aNode.id);
-        aNode.removeAttribute("cui-anchorid");
-        aNode.removeAttribute("overflowedItem");
-        CustomizableUIInternal.notifyListeners("onWidgetUnderflow", aNode, this._target);
+      this._collapsed.delete(aNode.id);
+      aNode.removeAttribute("cui-anchorid");
+      aNode.removeAttribute("overflowedItem");
+      CustomizableUIInternal.notifyListeners("onWidgetUnderflow", aNode, this._target);
 
-        if (!this._collapsed.size) {
-          this._toolbar.removeAttribute("overflowing");
-          CustomizableUI.removeListener(this);
-        }
+      if (!this._collapsed.size) {
+        this._toolbar.removeAttribute("overflowing");
+        CustomizableUI.removeListener(this);
       }
+    } else if (aNode.previousSibling) {
       // but if it still is, it must have changed places. Bookkeep:
-      else {
-        if (aNode.previousSibling) {
-          let prevId = aNode.previousSibling.id;
-          let minSize = this._collapsed.get(prevId);
-          this._collapsed.set(aNode.id, minSize);
-        } else {
-          // If it's now the first item in the overflow list,
-          // maybe we can return it:
-          this._moveItemsBackToTheirOrigin();
-        }
-      }
+      let prevId = aNode.previousSibling.id;
+      let minSize = this._collapsed.get(prevId);
+      this._collapsed.set(aNode.id, minSize);
+    } else {
+      // If it's now the first item in the overflow list,
+      // maybe we can return it:
+      this._moveItemsBackToTheirOrigin();
     }
   },
 

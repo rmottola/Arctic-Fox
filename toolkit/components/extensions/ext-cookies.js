@@ -238,7 +238,8 @@ function* query(detailsIn, props, extension) {
   }
 }
 
-extensions.registerSchemaAPI("cookies", (extension, context) => {
+extensions.registerSchemaAPI("cookies", context => {
+  let {extension} = context;
   let self = {
     cookies: {
       get: function(details) {
@@ -277,7 +278,7 @@ extensions.registerSchemaAPI("cookies", (extension, context) => {
         let secure = details.secure !== null ? details.secure : false;
         let httpOnly = details.httpOnly !== null ? details.httpOnly : false;
         let isSession = details.expirationDate === null;
-        let expiry = isSession ? 0 : details.expirationDate;
+        let expiry = isSession ? Number.MAX_SAFE_INTEGER : details.expirationDate;
         // Ignore storeID.
 
         let cookieAttrs = {host: details.domain, path: path, isSecure: secure};
@@ -331,7 +332,8 @@ extensions.registerSchemaAPI("cookies", (extension, context) => {
               notify(false, subject, "explicit");
               break;
             case "changed":
-              notify(false, subject, "overwrite");
+              notify(true, subject, "overwrite");
+              notify(false, subject, "explicit");
               break;
             case "batch-deleted":
               subject.QueryInterface(Ci.nsIArray);

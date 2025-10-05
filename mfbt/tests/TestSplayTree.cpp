@@ -7,7 +7,7 @@
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/SplayTree.h"
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 
 using mozilla::SplayTree;
 using mozilla::SplayTreeNode;
@@ -111,7 +111,7 @@ struct SplayNoCopy : SplayTreeNode<SplayNoCopy>
   SplayNoCopy(const SplayNoCopy&) = delete;
   SplayNoCopy(SplayNoCopy&&) = delete;
 
-  static int compare(const SplayNoCopy&, const SplayNoCopy&) {}
+  static int compare(const SplayNoCopy&, const SplayNoCopy&) { return 0; }
 };
 
 static SplayTree<SplayNoCopy, SplayNoCopy> testNoCopy;

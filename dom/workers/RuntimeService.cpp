@@ -90,6 +90,15 @@ using mozilla::Preferences;
 // Half the size of the actual C stack, to be safe.
 #define WORKER_CONTEXT_NATIVE_STACK_LIMIT 128 * sizeof(size_t) * 1024
 
+// The maximum number of hardware concurrency, overridable via pref.
+#define MAX_HARDWARE_CONCURRENCY 8
+
+// The maximum number of threads to use for workers, overridable via pref.
+#define MAX_WORKERS_PER_DOMAIN 512
+
+static_assert(MAX_WORKERS_PER_DOMAIN >= 1,
+              "We should allow at least one worker per domain.");
+
 // The default number of seconds that close handlers will be allowed to run for
 // content workers.
 #define MAX_SCRIPT_RUN_TIME_SEC 10
@@ -101,6 +110,8 @@ using mozilla::Preferences;
 #define MAX_IDLE_THREADS 20
 
 #define PREF_WORKERS_PREFIX "dom.workers."
+#define PREF_WORKERS_MAX_PER_DOMAIN PREF_WORKERS_PREFIX "maxPerDomain"
+#define PREF_WORKERS_MAX_HARDWARE_CONCURRENCY "dom.maxHardwareConcurrency"
 
 #define PREF_MAX_SCRIPT_RUN_TIME_CONTENT "dom.max_script_run_time"
 #define PREF_MAX_SCRIPT_RUN_TIME_CHROME "dom.max_chrome_script_run_time"
@@ -136,6 +147,9 @@ using mozilla::Preferences;
 namespace {
 
 const uint32_t kNoIndex = uint32_t(-1);
+
+uint32_t gMaxWorkersPerDomain = MAX_WORKERS_PER_DOMAIN;
+uint32_t gMaxHardwareConcurrency = MAX_HARDWARE_CONCURRENCY;
 
 // Does not hold an owning reference.
 RuntimeService* gRuntimeService = nullptr;
@@ -752,6 +766,18 @@ InitJSContextForWorker(WorkerPrivate* aWorkerPrivate, JSContext* aWorkerCx)
   JSSettings settings;
   aWorkerPrivate->CopyJSSettings(settings);
 
+  {
+    JS::UniqueChars defaultLocale = aWorkerPrivate->AdoptDefaultLocale();
+    MOZ_ASSERT(defaultLocale,
+               "failure of a WorkerPrivate to have a default locale should "
+               "have made the worker fail to spawn");
+
+    if (!JS_SetDefaultLocale(aWorkerCx, defaultLocale.get())) {
+      NS_WARNING("failed to set workerCx's default locale");
+      return false;
+    }
+  }
+
   JS::ContextOptionsRef(aWorkerCx) = settings.contextOptions;
 
   JSSettings::JSGCSettingsArray& gcSettings = settings.gcSettings;
@@ -1345,6 +1371,7 @@ RuntimeService::RegisterWorker(WorkerPrivate* aWorkerPrivate)
 
   const bool isServiceWorker = aWorkerPrivate->IsServiceWorker();
   const bool isSharedWorker = aWorkerPrivate->IsSharedWorker();
+  const bool isDedicatedWorker = aWorkerPrivate->IsDedicatedWorker();
   if (isServiceWorker) {
     AssertIsOnMainThread();
     Telemetry::Accumulate(Telemetry::SERVICE_WORKER_SPAWN_ATTEMPTS, 1);
@@ -1366,6 +1393,13 @@ RuntimeService::RegisterWorker(WorkerPrivate* aWorkerPrivate)
     NS_ASSERTION(!sharedWorkerScriptSpec.IsEmpty(), "Empty spec!");
   }
 
+  bool exemptFromPerDomainMax = false;
+  if (isServiceWorker) {
+    AssertIsOnMainThread();
+    exemptFromPerDomainMax = Preferences::GetBool("dom.serviceWorkers.exemptFromPerDomainMax",
+                                                  false);
+  }
+
   const nsCString& domain = aWorkerPrivate->Domain();
 
   WorkerDomainInfo* domainInfo;
@@ -1381,14 +1415,34 @@ RuntimeService::RegisterWorker(WorkerPrivate* aWorkerPrivate)
       mDomainMap.Put(domain, domainInfo);
     }
 
-    if (parent) {
+    queued = gMaxWorkersPerDomain &&
+             domainInfo->ActiveWorkerCount() >= gMaxWorkersPerDomain &&
+             !domain.IsEmpty() &&
+             !exemptFromPerDomainMax;
+
+    if (queued) {
+      domainInfo->mQueuedWorkers.AppendElement(aWorkerPrivate);
+
+      // Worker spawn gets queued due to hitting max workers per domain
+      // limit so let's log a warning.
+      WorkerPrivate::ReportErrorToConsole("HittingMaxWorkersPerDomain2");
+
+      if (isServiceWorker) {
+        Telemetry::Accumulate(Telemetry::SERVICE_WORKER_SPAWN_GETS_QUEUED, 1);
+      } else if (isSharedWorker) {
+        Telemetry::Accumulate(Telemetry::SHARED_WORKER_SPAWN_GETS_QUEUED, 1);
+      } else if (isDedicatedWorker) {
+        Telemetry::Accumulate(Telemetry::DEDICATED_WORKER_SPAWN_GETS_QUEUED, 1);
+      }
+    }
+    else if (parent) {
       domainInfo->mChildWorkerCount++;
     }
     else if (isServiceWorker) {
-      domainInfo->mServiceWorkers.AppendElement(aWorkerPrivate);
+      domainInfo->mActiveServiceWorkers.AppendElement(aWorkerPrivate);
     }
     else {
-      domainInfo->mWorkers.AppendElement(aWorkerPrivate);
+      domainInfo->mActiveWorkers.AppendElement(aWorkerPrivate);
     }
 
     if (isSharedWorker) {
@@ -1502,26 +1556,50 @@ RuntimeService::UnregisterWorker(WorkerPrivate* aWorkerPrivate)
       NS_ERROR("Don't have an entry for this domain!");
     }
 
-    if (parent) {
+    // Remove old worker from everywhere.
+    uint32_t index = domainInfo->mQueuedWorkers.IndexOf(aWorkerPrivate);
+    if (index != kNoIndex) {
+      // Was queued, remove from the list.
+      domainInfo->mQueuedWorkers.RemoveElementAt(index);
+    }
+    else if (parent) {
       MOZ_ASSERT(domainInfo->mChildWorkerCount, "Must be non-zero!");
       domainInfo->mChildWorkerCount--;
     }
     else if (aWorkerPrivate->IsServiceWorker()) {
-      MOZ_ASSERT(domainInfo->mServiceWorkers.Contains(aWorkerPrivate),
+      MOZ_ASSERT(domainInfo->mActiveServiceWorkers.Contains(aWorkerPrivate),
                  "Don't know about this worker!");
-      domainInfo->mServiceWorkers.RemoveElement(aWorkerPrivate);
+      domainInfo->mActiveServiceWorkers.RemoveElement(aWorkerPrivate);
     }
     else {
-      MOZ_ASSERT(domainInfo->mWorkers.Contains(aWorkerPrivate),
+      MOZ_ASSERT(domainInfo->mActiveWorkers.Contains(aWorkerPrivate),
                  "Don't know about this worker!");
-      domainInfo->mWorkers.RemoveElement(aWorkerPrivate);
+      domainInfo->mActiveWorkers.RemoveElement(aWorkerPrivate);
     }
 
     if (aWorkerPrivate->IsSharedWorker()) {
       RemoveSharedWorker(domainInfo, aWorkerPrivate);
     }
 
+    // See if there's a queued worker we can schedule.
+    if (domainInfo->ActiveWorkerCount() < gMaxWorkersPerDomain &&
+        !domainInfo->mQueuedWorkers.IsEmpty()) {
+      queuedWorker = domainInfo->mQueuedWorkers[0];
+      domainInfo->mQueuedWorkers.RemoveElementAt(0);
+
+      if (queuedWorker->GetParent()) {
+        domainInfo->mChildWorkerCount++;
+      }
+      else if (queuedWorker->IsServiceWorker()) {
+        domainInfo->mActiveServiceWorkers.AppendElement(queuedWorker);
+      }
+      else {
+        domainInfo->mActiveWorkers.AppendElement(queuedWorker);
+      }
+    }
+
     if (domainInfo->HasNoWorkers()) {
+      MOZ_ASSERT(domainInfo->mQueuedWorkers.IsEmpty());
       mDomainMap.Remove(domain);
     }
   }
@@ -1802,6 +1880,15 @@ RuntimeService::Init()
     NS_WARNING("Failed to register timeout cache!");
   }
 
+  int32_t maxPerDomain = Preferences::GetInt(PREF_WORKERS_MAX_PER_DOMAIN,
+                                             MAX_WORKERS_PER_DOMAIN);
+  gMaxWorkersPerDomain = std::max(0, maxPerDomain);
+
+  int32_t maxHardwareConcurrency =
+    Preferences::GetInt(PREF_WORKERS_MAX_HARDWARE_CONCURRENCY,
+                        MAX_HARDWARE_CONCURRENCY);
+  gMaxHardwareConcurrency = std::max(0, maxHardwareConcurrency);
+
   rv = InitOSFileConstants();
   if (NS_FAILED(rv)) {
     return rv;
@@ -1993,18 +2080,26 @@ RuntimeService::AddAllTopLevelWorkersToArray(nsTArray<WorkerPrivate*>& aWorkers)
     WorkerDomainInfo* aData = iter.UserData();
 
 #ifdef DEBUG
-    for (uint32_t index = 0; index < aData->mWorkers.Length(); index++) {
-      MOZ_ASSERT(!aData->mWorkers[index]->GetParent(),
+    for (uint32_t index = 0; index < aData->mActiveWorkers.Length(); index++) {
+      MOZ_ASSERT(!aData->mActiveWorkers[index]->GetParent(),
                  "Shouldn't have a parent in this list!");
     }
-    for (uint32_t index = 0; index < aData->mServiceWorkers.Length(); index++) {
-      MOZ_ASSERT(!aData->mServiceWorkers[index]->GetParent(),
+    for (uint32_t index = 0; index < aData->mActiveServiceWorkers.Length(); index++) {
+      MOZ_ASSERT(!aData->mActiveServiceWorkers[index]->GetParent(),
                  "Shouldn't have a parent in this list!");
     }
 #endif
 
-    aWorkers.AppendElements(aData->mWorkers);
-    aWorkers.AppendElements(aData->mServiceWorkers);
+    aWorkers.AppendElements(aData->mActiveWorkers);
+    aWorkers.AppendElements(aData->mActiveServiceWorkers);
+
+    // These might not be top-level workers...
+    for (uint32_t index = 0; index < aData->mQueuedWorkers.Length(); index++) {
+      WorkerPrivate* worker = aData->mQueuedWorkers[index];
+      if (!worker->GetParent()) {
+        aWorkers.AppendElement(worker);
+      }
+    }
   }
 }
 
@@ -2370,7 +2465,9 @@ RuntimeService::ClampedHardwareConcurrency() const
     if (numberOfProcessors <= 0) {
       numberOfProcessors = 1; // Must be one there somewhere
     }
-    clampedHardwareConcurrency = numberOfProcessors;
+    uint32_t clampedValue = std::min(uint32_t(numberOfProcessors),
+                                     gMaxHardwareConcurrency);
+    clampedHardwareConcurrency.compareExchange(0, clampedValue);
   }
 
   return clampedHardwareConcurrency;

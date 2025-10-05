@@ -510,9 +510,6 @@ pref("media.realtime_decoder.enabled", true);
 // TCPSocket
 pref("dom.mozTCPSocket.enabled", true);
 
-// WebPayment
-pref("dom.mozPay.enabled", true);
-
 // Handle hardware buttons in the b2g chrome package
 pref("b2g.keys.menu.enabled", true);
 
@@ -1053,8 +1050,8 @@ pref("layout.accessiblecaret.always_show_when_scrolling", false);
 pref("services.sync.fxaccounts.enabled", true);
 pref("identity.fxaccounts.enabled", true);
 
-// Mobile Identity API.
-pref("services.mobileid.server.uri", "https://msisdn.services.mozilla.com");
+// Disable Firefox Accounts device registration until bug 1238895 is fixed.
+pref("identity.fxaccounts.skipDeviceRegistration", true);
 
 // Enable mapped array buffer.
 pref("dom.mapped_arraybuffer.enabled", true);
@@ -1097,9 +1094,6 @@ pref("dom.push.enabled", false);
 
 // Retain at most 10 processes' layers buffers
 pref("layers.compositor-lru-size", 10);
-
-// Enable Cardboard VR on mobile, assuming VR at all is enabled
-pref("dom.vr.cardboard.enabled", true);
 
 // In B2G by deafult any AudioChannelAgent is muted when created.
 pref("dom.audiochannel.mutedByDefault", true);

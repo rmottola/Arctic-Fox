@@ -8,10 +8,6 @@
 
 "use strict";
 
-/* eslint-disable mozilla/reject-some-requires */
-const {Cc, Ci} = require("chrome");
-/* eslint-enable mozilla/reject-some-requires */
-
 const ToolDefinitions = require("devtools/client/definitions").Tools;
 const CssLogic = require("devtools/shared/inspector/css-logic");
 const {ELEMENT_STYLE} = require("devtools/shared/specs/styles");
@@ -31,6 +27,7 @@ const overlays = require("devtools/client/inspector/shared/style-inspector-overl
 const StyleInspectorMenu = require("devtools/client/inspector/shared/style-inspector-menu");
 const {KeyShortcuts} = require("devtools/client/shared/key-shortcuts");
 const {LayoutView} = require("devtools/client/inspector/layout/layout");
+const clipboardHelper = require("devtools/shared/platform/clipboard");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
                                   "resource://gre/modules/PluralForm.jsm");
@@ -38,11 +35,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
 XPCOMUtils.defineLazyGetter(CssComputedView, "_strings", function () {
   return Services.strings.createBundle(
     "chrome://devtools-shared/locale/styleinspector.properties");
-});
-
-XPCOMUtils.defineLazyGetter(this, "clipboardHelper", function () {
-  return Cc["@mozilla.org/widget/clipboardhelper;1"]
-         .getService(Ci.nsIClipboardHelper);
 });
 
 const FILTER_CHANGED_TIMEOUT = 150;
@@ -154,10 +146,6 @@ function CssComputedView(inspector, document, pageStyle) {
 
   let cssProperties = getCssProperties(inspector.toolbox);
   this._outputParser = new OutputParser(document, cssProperties.supportsType);
-
-  let chromeReg = Cc["@mozilla.org/chrome/chrome-registry;1"]
-    .getService(Ci.nsIXULChromeRegistry);
-  this.getRTLAttr = chromeReg.isLocaleRTL("global") ? "rtl" : "ltr";
 
   // Create bound methods.
   this.focusWindow = this.focusWindow.bind(this);
@@ -482,6 +470,9 @@ CssComputedView.prototype = {
         this.styleWindow, this.propertyViews, {
           onItem: (propView) => {
             propView.refresh();
+          },
+          onCancel: () => {
+            deferred.reject("_refreshProcess of computed view cancelled");
           },
           onDone: () => {
             this._refreshProcess = null;
@@ -827,7 +818,6 @@ PropertyInfo.prototype = {
 function PropertyView(tree, name) {
   this.tree = tree;
   this.name = name;
-  this.getRTLAttr = tree.getRTLAttr;
 
   this.link = "https://developer.mozilla.org/CSS/" + name;
 

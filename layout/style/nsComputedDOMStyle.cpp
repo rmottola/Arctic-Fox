@@ -87,7 +87,7 @@ struct nsComputedStyleMap
     // Create a pointer-to-member-function type.
     typedef already_AddRefed<CSSValue> (nsComputedDOMStyle::*ComputeMethod)();
 
-    nsCSSProperty mProperty;
+    nsCSSPropertyID mProperty;
     ComputeMethod mGetter;
 
     bool IsLayoutFlushNeeded() const
@@ -128,7 +128,7 @@ struct nsComputedStyleMap
    * that should be exposed on an nsComputedDOMStyle, excluding any
    * disabled properties.
    */
-  nsCSSProperty PropertyAt(uint32_t aIndex)
+  nsCSSPropertyID PropertyAt(uint32_t aIndex)
   {
     Update();
     return kEntries[EntryIndex(aIndex)].mProperty;
@@ -139,7 +139,7 @@ struct nsComputedStyleMap
    * property, or nullptr if the property is not exposed on nsComputedDOMStyle
    * or is currently disabled.
    */
-  const Entry* FindEntryForProperty(nsCSSProperty aPropID)
+  const Entry* FindEntryForProperty(nsCSSPropertyID aPropID)
   {
     Update();
     for (uint32_t i = 0; i < mExposedPropertyCount; i++) {
@@ -308,7 +308,7 @@ NS_IMPL_CYCLE_COLLECTING_ADDREF(nsComputedDOMStyle)
 NS_IMPL_CYCLE_COLLECTING_RELEASE(nsComputedDOMStyle)
 
 NS_IMETHODIMP
-nsComputedDOMStyle::GetPropertyValue(const nsCSSProperty aPropID,
+nsComputedDOMStyle::GetPropertyValue(const nsCSSPropertyID aPropID,
                                      nsAString& aValue)
 {
   // This is mostly to avoid code duplication with GetPropertyCSSValue(); if
@@ -320,7 +320,7 @@ nsComputedDOMStyle::GetPropertyValue(const nsCSSProperty aPropID,
 }
 
 NS_IMETHODIMP
-nsComputedDOMStyle::SetPropertyValue(const nsCSSProperty aPropID,
+nsComputedDOMStyle::SetPropertyValue(const nsCSSPropertyID aPropID,
                                      const nsAString& aValue)
 {
   return NS_ERROR_DOM_NO_MODIFICATION_ALLOWED_ERR;
@@ -753,7 +753,7 @@ nsComputedDOMStyle::ClearCurrentStyleSources()
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::GetPropertyCSSValue(const nsAString& aPropertyName, ErrorResult& aRv)
 {
-  nsCSSProperty prop =
+  nsCSSPropertyID prop =
     nsCSSProps::LookupProperty(aPropertyName, CSSEnabledState::eForAllContent);
 
   bool needsLayoutFlush;
@@ -770,7 +770,7 @@ nsComputedDOMStyle::GetPropertyCSSValue(const nsAString& aPropertyName, ErrorRes
     // GetQueryablePropertyMap.
     if (prop != eCSSProperty_UNKNOWN &&
         nsCSSProps::PropHasFlags(prop, CSS_PROPERTY_IS_ALIAS)) {
-      const nsCSSProperty* subprops = nsCSSProps::SubpropertyEntryFor(prop);
+      const nsCSSPropertyID* subprops = nsCSSProps::SubpropertyEntryFor(prop);
       MOZ_ASSERT(subprops[1] == eCSSProperty_UNKNOWN,
                  "must have list of length 1");
       prop = subprops[0];
@@ -1197,11 +1197,11 @@ nsComputedDOMStyle::DoGetCounterIncrement()
     RefPtr<nsROCSSPrimitiveValue> name = new nsROCSSPrimitiveValue;
     RefPtr<nsROCSSPrimitiveValue> value = new nsROCSSPrimitiveValue;
 
-    const nsStyleCounterData *data = content->GetCounterIncrementAt(i);
+    const nsStyleCounterData& data = content->CounterIncrementAt(i);
     nsAutoString escaped;
-    nsStyleUtil::AppendEscapedCSSIdent(data->mCounter, escaped);
+    nsStyleUtil::AppendEscapedCSSIdent(data.mCounter, escaped);
     name->SetString(escaped);
-    value->SetNumber(data->mValue); // XXX This should really be integer
+    value->SetNumber(data.mValue); // XXX This should really be integer
 
     valueList->AppendCSSValue(name.forget());
     valueList->AppendCSSValue(value.forget());
@@ -1441,11 +1441,11 @@ nsComputedDOMStyle::DoGetCounterReset()
     RefPtr<nsROCSSPrimitiveValue> name = new nsROCSSPrimitiveValue;
     RefPtr<nsROCSSPrimitiveValue> value = new nsROCSSPrimitiveValue;
 
-    const nsStyleCounterData *data = content->GetCounterResetAt(i);
+    const nsStyleCounterData& data = content->CounterResetAt(i);
     nsAutoString escaped;
-    nsStyleUtil::AppendEscapedCSSIdent(data->mCounter, escaped);
+    nsStyleUtil::AppendEscapedCSSIdent(data.mCounter, escaped);
     name->SetString(escaped);
-    value->SetNumber(data->mValue); // XXX This should really be integer
+    value->SetNumber(data.mValue); // XXX This should really be integer
 
     valueList->AppendCSSValue(name.forget());
     valueList->AppendCSSValue(value.forget());
@@ -2145,12 +2145,10 @@ nsComputedDOMStyle::DoGetImageLayerImage(const nsStyleImageLayers& aLayers)
     //    Instead, we store the local URI in one place -- on Layer::mSourceURI.
     //    Hence, we must serialize using mSourceURI (instead of
     //    SetValueToStyleImage()/mImage) in this case.
-    bool isLocalURI = image.GetType() == eStyleImageType_Null &&
-                      aLayers.mLayers[i].mSourceURI;
-    if (isLocalURI) {
+    if (aLayers.mLayers[i].mSourceURI.IsLocalRef()) {
       // This is how we represent a 'mask-image' reference for a local URI,
       // such as 'mask-image:url(#mymask)' or 'mask:url(#mymask)'
-      val->SetURI(aLayers.mLayers[i].mSourceURI);
+      SetValueToFragmentOrURL(&aLayers.mLayers[i].mSourceURI, val);
     } else {
       SetValueToStyleImage(image, val);
     }
@@ -2387,6 +2385,28 @@ nsComputedDOMStyle::SetValueToPosition(
   RefPtr<nsROCSSPrimitiveValue> valY = new nsROCSSPrimitiveValue;
   SetValueToPositionCoord(aPosition.mYPosition, valY);
   aValueList->AppendCSSValue(valY.forget());
+}
+
+
+void
+nsComputedDOMStyle::SetValueToFragmentOrURL(
+    const FragmentOrURL* aFragmentOrURL,
+    nsROCSSPrimitiveValue* aValue)
+{
+  if (aFragmentOrURL->IsLocalRef()) {
+    nsString fragment;
+    aFragmentOrURL->GetSourceString(fragment);
+    fragment.Insert(u"url(\"", 0);
+    fragment.Append(u"\")");
+    aValue->SetString(fragment);
+  } else {
+    nsCOMPtr<nsIURI> url = aFragmentOrURL->GetSourceURL();
+    if (url) {
+      aValue->SetURI(url);
+    } else {
+      aValue->SetIdent(eCSSKeyword_none);
+    }
+  }
 }
 
 already_AddRefed<CSSValue>
@@ -5562,12 +5582,9 @@ nsComputedDOMStyle::GetSVGPaintFor(bool aFill)
     }
     case eStyleSVGPaintType_Server:
     {
-      // Bug 1288812 - we should only serialize fragment for local-ref URL.
       RefPtr<nsDOMCSSValueList> valueList = GetROCSSValueList(false);
       RefPtr<nsROCSSPrimitiveValue> fallback = new nsROCSSPrimitiveValue;
-      nsCOMPtr<nsIURI> paintServerURI =
-        paint->mPaint.mPaintServer->GetSourceURL();
-      val->SetURI(paintServerURI);
+      SetValueToFragmentOrURL(paint->mPaint.mPaintServer, val);
       SetToRGBAColor(fallback, paint->mFallbackColor);
 
       valueList->AppendCSSValue(val.forget());
@@ -5605,13 +5622,7 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetMarkerEnd()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  // Bug 1288812 - we should only serialize fragment for local-ref URL.
-  nsCOMPtr<nsIURI> markerURI = StyleSVG()->mMarkerEnd.GetSourceURL();
-
-  if (markerURI)
-    val->SetURI(markerURI);
-  else
-    val->SetIdent(eCSSKeyword_none);
+  SetValueToFragmentOrURL(&StyleSVG()->mMarkerEnd, val);
 
   return val.forget();
 }
@@ -5620,13 +5631,7 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetMarkerMid()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  // Bug 1288812 - we should only serialize fragment for local-ref URL.
-  nsCOMPtr<nsIURI> markerURI = StyleSVG()->mMarkerMid.GetSourceURL();
-
-  if (markerURI)
-    val->SetURI(markerURI);
-  else
-    val->SetIdent(eCSSKeyword_none);
+  SetValueToFragmentOrURL(&StyleSVG()->mMarkerMid, val);
 
   return val.forget();
 }
@@ -5635,13 +5640,7 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetMarkerStart()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  // Bug 1288812 - we should only serialize fragment for local-ref URL.
-  nsCOMPtr<nsIURI> markerURI = StyleSVG()->mMarkerStart.GetSourceURL();
-
-  if (markerURI)
-    val->SetURI(markerURI);
-  else
-    val->SetIdent(eCSSKeyword_none);
+  SetValueToFragmentOrURL(&StyleSVG()->mMarkerStart, val);
 
   return val.forget();
 }
@@ -5931,7 +5930,7 @@ nsComputedDOMStyle::CreatePrimitiveValueForBasicShape(
   switch (type) {
     case StyleBasicShapeType::Polygon: {
       bool hasEvenOdd = aStyleBasicShape->GetFillRule() ==
-        NS_STYLE_FILL_RULE_EVENODD;
+        StyleFillRule::Evenodd;
       if (hasEvenOdd) {
         shapeFunctionString.AppendLiteral("evenodd");
       }
@@ -6035,10 +6034,8 @@ nsComputedDOMStyle::GetShapeSource(
                                                 aShapeSource.GetReferenceBox(),
                                                 aBoxKeywordTable);
     case StyleShapeSourceType::URL: {
-      // Bug 1288812 - we should only serialize fragment for local-ref URL.
-      nsCOMPtr<nsIURI> pathURI = aShapeSource.GetURL()->GetSourceURL();
       RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-      val->SetURI(pathURI);
+      SetValueToFragmentOrURL(aShapeSource.GetURL(), val);
       return val.forget();
     }
     case StyleShapeSourceType::None_: {
@@ -6083,9 +6080,8 @@ nsComputedDOMStyle::CreatePrimitiveValueForStyleFilter(
   RefPtr<nsROCSSPrimitiveValue> value = new nsROCSSPrimitiveValue;
   // Handle url().
   if (aStyleFilter.GetType() == NS_STYLE_FILTER_URL) {
-    // Bug 1288812 - we should only serialize fragment for local-ref URL.
-    nsCOMPtr<nsIURI> filterURI = aStyleFilter.GetURL()->GetSourceURL();
-    value->SetURI(filterURI);
+    MOZ_ASSERT(aStyleFilter.GetURL()->GetSourceURL());
+    SetValueToFragmentOrURL(aStyleFilter.GetURL(), value);
     return value.forget();
   }
 
@@ -6152,7 +6148,7 @@ nsComputedDOMStyle::DoGetMask()
       firstLayer.mOrigin != NS_STYLE_IMAGELAYER_ORIGIN_BORDER ||
       firstLayer.mComposite != NS_STYLE_MASK_COMPOSITE_ADD ||
       firstLayer.mMaskMode != NS_STYLE_MASK_MODE_MATCH_SOURCE ||
-      !firstLayer.mPosition.IsInitialValue() ||
+      !firstLayer.mPosition.IsInitialValue(nsStyleImageLayers::LayerType::Mask) ||
       !firstLayer.mRepeat.IsInitialValue(nsStyleImageLayers::LayerType::Mask) ||
       !firstLayer.mSize.IsInitialValue() ||
       !(firstLayer.mImage.GetType() == eStyleImageType_Null ||
@@ -6162,8 +6158,8 @@ nsComputedDOMStyle::DoGetMask()
 
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
 
-  if (firstLayer.mSourceURI) {
-    val->SetURI(firstLayer.mSourceURI);
+  if (firstLayer.mSourceURI.GetSourceURL()) {
+    SetValueToFragmentOrURL(&firstLayer.mSourceURI, val);
   } else {
     val->SetIdent(eCSSKeyword_none);
   }
@@ -6326,7 +6322,7 @@ nsComputedDOMStyle::DoGetTransitionProperty()
   do {
     const StyleTransition *transition = &display->mTransitions[i];
     RefPtr<nsROCSSPrimitiveValue> property = new nsROCSSPrimitiveValue;
-    nsCSSProperty cssprop = transition->GetProperty();
+    nsCSSPropertyID cssprop = transition->GetProperty();
     if (cssprop == eCSSPropertyExtra_all_properties)
       property->SetIdent(eCSSKeyword_all);
     else if (cssprop == eCSSPropertyExtra_no_properties)

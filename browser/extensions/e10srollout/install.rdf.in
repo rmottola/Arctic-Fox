@@ -13,14 +13,15 @@
     <em:version>1.0</em:version>
     <em:type>2</em:type>
     <em:bootstrap>true</em:bootstrap>
+    <em:multiprocessCompatible>true</em:multiprocessCompatible>
 
     <!-- Target Application this theme can install into,
         with minimum and maximum supported versions. -->
     <em:targetApplication>
       <Description>
         <em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id>
-        <em:minVersion>@FIREFOX_VERSION@</em:minVersion>
-        <em:maxVersion>@FIREFOX_VERSION@</em:maxVersion>
+        <em:minVersion>@MOZ_APP_VERSION@</em:minVersion>
+        <em:maxVersion>@MOZ_APP_MAXVERSION@</em:maxVersion>
       </Description>
     </em:targetApplication>
 

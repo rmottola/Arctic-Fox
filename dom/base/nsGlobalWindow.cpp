@@ -60,8 +60,8 @@
 #include "ScriptSettings.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Likely.h"
-#include "mozilla/Snprintf.h"
-#include "mozilla/unused.h"
+#include "mozilla/Sprintf.h"
+#include "mozilla/Unused.h"
 
 // Other Classes
 #include "mozilla/dom/BarProps.h"
@@ -193,7 +193,8 @@
 #include "mozilla/dom/GamepadManager.h"
 #endif
 
-#include "mozilla/dom/VRDevice.h"
+#include "mozilla/dom/VRDisplay.h"
+#include "mozilla/dom/VREventObserver.h"
 
 #include "nsRefreshDriver.h"
 #include "Layers.h"
@@ -1201,6 +1202,7 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mShowFocusRingForContent(false),
     mFocusByKeyOccurred(false),
     mHasGamepad(false),
+    mHasVREvents(false),
 #ifdef MOZ_GAMEPAD
     mHasSeenGamepadInput(false),
 #endif
@@ -1600,11 +1602,14 @@ nsGlobalWindow::CleanUp()
   if (IsInnerWindow()) {
     DisableGamepadUpdates();
     mHasGamepad = false;
+    DisableVRUpdates();
+    mHasVREvents = false;
 #ifdef MOZ_B2G
     DisableTimeChangeNotifications();
 #endif
   } else {
     MOZ_ASSERT(!mHasGamepad);
+    MOZ_ASSERT(!mHasVREvents);
   }
 
   if (mCleanMessageManager) {
@@ -1746,6 +1751,9 @@ nsGlobalWindow::FreeInnerObjects(bool aForDocumentOpen)
   mHasGamepad = false;
   mGamepads.Clear();
 #endif
+  DisableVRUpdates();
+  mHasVREvents = false;
+  mVRDisplays.Clear();
 }
 
 //*****************************************************************************
@@ -1840,8 +1848,8 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsGlobalWindow)
     if (tmp->mDoc && tmp->mDoc->GetDocumentURI()) {
       tmp->mDoc->GetDocumentURI()->GetSpec(uri);
     }
-    snprintf_literal(name, "nsGlobalWindow # %" PRIu64 " %s %s", tmp->mWindowID,
-                     tmp->IsInnerWindow() ? "inner" : "outer", uri.get());
+    SprintfLiteral(name, "nsGlobalWindow # %" PRIu64 " %s %s", tmp->mWindowID,
+                   tmp->IsInnerWindow() ? "inner" : "outer", uri.get());
     cb.DescribeRefCountedNode(tmp->mRefCnt.get(), name);
   } else {
     NS_IMPL_CYCLE_COLLECTION_DESCRIBE(nsGlobalWindow, tmp->mRefCnt.get())
@@ -1894,7 +1902,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(nsGlobalWindow)
 #endif
 
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCacheStorage)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVRDevices)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVRDisplays)
 
   // Traverse stuff from nsPIDOMWindow
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mChromeEventHandler)
@@ -1970,7 +1978,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsGlobalWindow)
 #endif
 
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mCacheStorage)
-  NS_IMPL_CYCLE_COLLECTION_UNLINK(mVRDevices)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mVRDisplays)
 
   // Unlink stuff from nsPIDOMWindow
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mChromeEventHandler)
@@ -6314,8 +6322,8 @@ FullscreenTransitionTask::Observer::Observe(nsISupports* aSubject,
 }
 
 static bool
-MakeWidgetFullscreen(nsGlobalWindow* aWindow, gfx::VRDeviceProxy* aHMD,
-                     FullscreenReason aReason, bool aFullscreen)
+MakeWidgetFullscreen(nsGlobalWindow* aWindow, FullscreenReason aReason,
+                     bool aFullscreen)
 {
   nsCOMPtr<nsIWidget> widget = aWindow->GetMainWidget();
   if (!widget) {
@@ -6332,13 +6340,16 @@ MakeWidgetFullscreen(nsGlobalWindow* aWindow, gfx::VRDeviceProxy* aHMD,
         PrepareForFullscreenTransition(getter_AddRefs(transitionData));
     }
   }
-  nsCOMPtr<nsIScreen> screen = aHMD ? aHMD->GetScreen() : nullptr;
+  // We pass nullptr as the screen to SetWidgetFullscreen
+  // and FullscreenTransitionTask, as we do not wish to override
+  // the default screen selection behavior.  The screen containing
+  // most of the widget will be selected.
   if (!performTransition) {
-    return aWindow->SetWidgetFullscreen(aReason, aFullscreen, widget, screen);
+    return aWindow->SetWidgetFullscreen(aReason, aFullscreen, widget, nullptr);
   } else {
     nsCOMPtr<nsIRunnable> task =
       new FullscreenTransitionTask(duration, aWindow, aFullscreen,
-                                   widget, screen, transitionData);
+                                   widget, nullptr, transitionData);
     task->Run();
     return true;
   }
@@ -6346,8 +6357,7 @@ MakeWidgetFullscreen(nsGlobalWindow* aWindow, gfx::VRDeviceProxy* aHMD,
 
 nsresult
 nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
-                                      bool aFullScreen,
-                                      gfx::VRDeviceProxy* aHMD)
+                                      bool aFullScreen)
 {
   MOZ_ASSERT(IsOuterWindow());
   MOZ_ASSERT(nsContentUtils::IsSafeToRunScript(),
@@ -6376,7 +6386,7 @@ nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
   if (!window)
     return NS_ERROR_FAILURE;
   if (rootItem != mDocShell)
-    return window->SetFullscreenInternal(aReason, aFullScreen, aHMD);
+    return window->SetFullscreenInternal(aReason, aFullScreen);
 
   // make sure we don't try to set full screen on a non-chrome window,
   // which might happen in embedding world
@@ -6427,7 +6437,7 @@ nsGlobalWindow::SetFullscreenInternal(FullscreenReason aReason,
   // dimensions to appear to increase when entering fullscreen mode; we just
   // want the content to fill the entire client area of the emulator window.
   if (!Preferences::GetBool("full-screen-api.ignore-widgets", false)) {
-    if (MakeWidgetFullscreen(this, aHMD, aReason, aFullScreen)) {
+    if (MakeWidgetFullscreen(this, aReason, aFullScreen)) {
       // The rest of code for switching fullscreen is in nsGlobalWindow::
       // FinishFullscreenChange() which will be called after sizemodechange
       // event is dispatched.
@@ -9907,6 +9917,24 @@ nsGlobalWindow::DisableGamepadUpdates()
 }
 
 void
+nsGlobalWindow::EnableVRUpdates()
+{
+  MOZ_ASSERT(IsInnerWindow());
+
+  if (mHasVREvents && !mVREventObserver) {
+    mVREventObserver = new VREventObserver(this);
+  }
+}
+
+void
+nsGlobalWindow::DisableVRUpdates()
+{
+  MOZ_ASSERT(IsInnerWindow());
+
+  mVREventObserver = nullptr;
+}
+
+void
 nsGlobalWindow::SetChromeEventHandler(EventTarget* aChromeEventHandler)
 {
   MOZ_ASSERT(IsOuterWindow());
@@ -10469,7 +10497,6 @@ nsGlobalWindow::GetSessionStorage(ErrorResult& aError)
 
     nsCOMPtr<nsIDOMStorage> storage;
     aError = storageManager->CreateStorage(AsInner(), principal, documentURI,
-                                           IsPrivateBrowsing(),
                                            getter_AddRefs(storage));
     if (aError.Failed()) {
       return nullptr;
@@ -10530,7 +10557,6 @@ nsGlobalWindow::GetLocalStorage(ErrorResult& aError)
 
     nsCOMPtr<nsIDOMStorage> storage;
     aError = storageManager->CreateStorage(AsInner(), principal, documentURI,
-                                           IsPrivateBrowsing(),
                                            getter_AddRefs(storage));
     if (aError.Failed()) {
       return nullptr;
@@ -11383,7 +11409,14 @@ nsGlobalWindow::Observe(nsISupports* aSubject, const char* aTopic,
       return NS_OK;
     }
 
-    if (changingStorage->IsPrivate() != IsPrivateBrowsing()) {
+    uint32_t privateBrowsingId = 0;
+    nsIPrincipal *storagePrincipal = changingStorage->GetPrincipal();
+    rv = storagePrincipal->GetPrivateBrowsingId(&privateBrowsingId);
+    if (NS_FAILED(rv)) {
+      return rv;
+    }
+
+    if ((privateBrowsingId > 0) != IsPrivateBrowsing()) {
       return NS_OK;
     }
 
@@ -12224,8 +12257,8 @@ nsGlobalWindow::RunTimeoutHandler(nsTimeout* aTimeout,
   RefPtr<Function> callback = handler->GetCallback();
   if (!callback) {
     // Evaluate the timeout expression.
-    const char16_t* script = handler->GetHandlerText();
-    NS_ASSERTION(script, "timeout has no script nor handler text!");
+    nsAutoString script;
+    handler->GetHandlerText(script);
 
     const char* filename = nullptr;
     uint32_t lineNo = 0, dummyColumn = 0;
@@ -12239,9 +12272,7 @@ nsGlobalWindow::RunTimeoutHandler(nsTimeout* aTimeout,
     options.setFileAndLine(filename, lineNo)
            .setVersion(JSVERSION_DEFAULT);
     JS::Rooted<JSObject*> global(aes.cx(), FastGetGlobalJSObject());
-    nsresult rv =
-      nsJSUtils::EvaluateString(aes.cx(), nsDependentString(script),
-                                global, options);
+    nsresult rv = nsJSUtils::EvaluateString(aes.cx(), script, global, options);
     if (rv == NS_SUCCESS_DOM_SCRIPT_EVALUATION_THREW_UNCATCHABLE) {
       abortIntervalHandler = true;
     }
@@ -12971,6 +13002,7 @@ nsGlobalWindow::SuspendTimeouts(uint32_t aIncrease,
         ac->RemoveWindowListener(mEnabledSensors[i], this);
     }
     DisableGamepadUpdates();
+    DisableVRUpdates();
 
     // Freeze or suspend all of the workers for this window.
     if (aFreezeWorkers) {
@@ -13057,6 +13089,7 @@ nsGlobalWindow::ResumeTimeouts(bool aThawChildren, bool aThawWorkers)
         ac->AddWindowListener(mEnabledSensors[i], this);
     }
     EnableGamepadUpdates();
+    EnableVRUpdates();
 
     // Resume all of the AudioContexts for this window
     for (uint32_t i = 0; i < mAudioContexts.Length(); ++i) {
@@ -13247,6 +13280,25 @@ nsGlobalWindow::SetHasGamepadEventListener(bool aHasGamepad/* = true*/)
   }
 }
 
+
+void
+nsGlobalWindow::EventListenerAdded(nsIAtom* aType)
+{
+  if (aType == nsGkAtoms::onvrdisplayconnect ||
+      aType == nsGkAtoms::onvrdisplaydisconnect ||
+      aType == nsGkAtoms::onvrdisplaypresentchange) {
+    NotifyVREventListenerAdded();
+  }
+}
+
+void
+nsGlobalWindow::NotifyVREventListenerAdded()
+{
+  MOZ_ASSERT(IsInnerWindow());
+  mHasVREvents = true;
+  EnableVRUpdates();
+}
+
 void
 nsGlobalWindow::EnableTimeChangeNotifications()
 {
@@ -13390,14 +13442,25 @@ nsGlobalWindow::SyncGamepadState()
 #endif // MOZ_GAMEPAD
 
 bool
-nsGlobalWindow::UpdateVRDevices(nsTArray<RefPtr<mozilla::dom::VRDevice>>& aDevices)
+nsGlobalWindow::UpdateVRDisplays(nsTArray<RefPtr<mozilla::dom::VRDisplay>>& aDevices)
 {
-  FORWARD_TO_INNER(UpdateVRDevices, (aDevices), false);
+  FORWARD_TO_INNER(UpdateVRDisplays, (aDevices), false);
 
-  VRDevice::UpdateVRDevices(mVRDevices, ToSupports(this));
-  aDevices = mVRDevices;
+  VRDisplay::UpdateVRDisplays(mVRDisplays, AsInner());
+  aDevices = mVRDisplays;
   return true;
 }
+
+void
+nsGlobalWindow::NotifyActiveVRDisplaysChanged()
+{
+  MOZ_ASSERT(IsInnerWindow());
+
+  if (mNavigator) {
+    mNavigator->NotifyActiveVRDisplaysChanged();
+  }
+}
+
 
 // nsGlobalChromeWindow implementation
 
@@ -13478,20 +13541,19 @@ nsGlobalChromeWindow::Maximize()
 {
   FORWARD_TO_INNER_CHROME(Maximize, (), NS_ERROR_UNEXPECTED);
 
-  ErrorResult rv;
-  Maximize(rv);
-  return rv.StealNSResult();
+  nsGlobalWindow::Maximize();
+  return NS_OK;
 }
 
 void
-nsGlobalWindow::Maximize(ErrorResult& aError)
+nsGlobalWindow::Maximize()
 {
   MOZ_ASSERT(IsInnerWindow());
 
   nsCOMPtr<nsIWidget> widget = GetMainWidget();
 
   if (widget) {
-    aError = widget->SetSizeMode(nsSizeMode_Maximized);
+    widget->SetSizeMode(nsSizeMode_Maximized);
   }
 }
 
@@ -13500,20 +13562,19 @@ nsGlobalChromeWindow::Minimize()
 {
   FORWARD_TO_INNER_CHROME(Minimize, (), NS_ERROR_UNEXPECTED);
 
-  ErrorResult rv;
-  Minimize(rv);
-  return rv.StealNSResult();
+  nsGlobalWindow::Minimize();
+  return NS_OK;
 }
 
 void
-nsGlobalWindow::Minimize(ErrorResult& aError)
+nsGlobalWindow::Minimize()
 {
   MOZ_ASSERT(IsInnerWindow());
 
   nsCOMPtr<nsIWidget> widget = GetMainWidget();
 
   if (widget) {
-    aError = widget->SetSizeMode(nsSizeMode_Minimized);
+    widget->SetSizeMode(nsSizeMode_Minimized);
   }
 }
 
@@ -13522,20 +13583,19 @@ nsGlobalChromeWindow::Restore()
 {
   FORWARD_TO_INNER_CHROME(Restore, (), NS_ERROR_UNEXPECTED);
 
-  ErrorResult rv;
-  Restore(rv);
-  return rv.StealNSResult();
+  nsGlobalWindow::Restore();
+  return NS_OK;
 }
 
 void
-nsGlobalWindow::Restore(ErrorResult& aError)
+nsGlobalWindow::Restore()
 {
   MOZ_ASSERT(IsInnerWindow());
 
   nsCOMPtr<nsIWidget> widget = GetMainWidget();
 
   if (widget) {
-    aError = widget->SetSizeMode(nsSizeMode_Normal);
+    widget->SetSizeMode(nsSizeMode_Normal);
   }
 }
 
@@ -13819,11 +13879,7 @@ nsGlobalWindow::NotifyDefaultButtonLoaded(Element& aDefaultButton,
     aError.Throw(NS_ERROR_FAILURE);
     return;
   }
-  LayoutDeviceIntRect widgetRect;
-  aError = widget->GetScreenBounds(widgetRect);
-  if (aError.Failed()) {
-    return;
-  }
+  LayoutDeviceIntRect widgetRect = widget->GetScreenBounds();
 
   // Convert the buttonRect coordinates from screen to the widget.
   buttonRect -= widgetRect.TopLeft();

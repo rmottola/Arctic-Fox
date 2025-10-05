@@ -8,7 +8,7 @@
 #define mozilla_dom_KeyframeEffect_h
 
 #include "nsChangeHint.h"
-#include "nsCSSProperty.h"
+#include "nsCSSPropertyID.h"
 #include "nsCSSValue.h"
 #include "nsCycleCollectionParticipant.h"
 #include "nsTArray.h"
@@ -32,7 +32,7 @@
 #include "mozilla/dom/Nullable.h"
 
 struct JSContext;
-class nsCSSPropertySet;
+class nsCSSPropertyIDSet;
 class nsIContent;
 class nsIDocument;
 class nsIFrame;
@@ -59,7 +59,7 @@ struct AnimationPropertyDetails;
  */
 struct PropertyValuePair
 {
-  nsCSSProperty mProperty;
+  nsCSSPropertyID mProperty;
   // The specified value for the property. For shorthand properties or invalid
   // property values, we store the specified property value as a token stream
   // (string).
@@ -134,7 +134,7 @@ struct AnimationPropertySegment
 
 struct AnimationProperty
 {
-  nsCSSProperty mProperty = eCSSProperty_UNKNOWN;
+  nsCSSPropertyID mProperty = eCSSProperty_UNKNOWN;
 
   // Does this property win in the CSS Cascade?
   //
@@ -264,16 +264,13 @@ public:
   // (because it is not currently active and is not filling at this time).
   static ComputedTiming
   GetComputedTimingAt(const Nullable<TimeDuration>& aLocalTime,
-                      const TimingParams& aTiming);
+                      const TimingParams& aTiming,
+                      double aPlaybackRate);
 
   // Shortcut for that gets the computed timing using the current local time as
   // calculated from the timeline time.
   ComputedTiming
-  GetComputedTiming(const TimingParams* aTiming = nullptr) const
-  {
-    return GetComputedTimingAt(GetLocalTime(),
-                               aTiming ? *aTiming : SpecifiedTiming());
-  }
+  GetComputedTiming(const TimingParams* aTiming = nullptr) const;
 
   void
   GetComputedTimingAsDict(ComputedTimingProperties& aRetVal) const override;
@@ -290,8 +287,8 @@ public:
   void SetKeyframes(nsTArray<Keyframe>&& aKeyframes,
                     nsStyleContext* aStyleContext);
   const AnimationProperty*
-  GetAnimationOfProperty(nsCSSProperty aProperty) const;
-  bool HasAnimationOfProperty(nsCSSProperty aProperty) const {
+  GetAnimationOfProperty(nsCSSPropertyID aProperty) const;
+  bool HasAnimationOfProperty(nsCSSPropertyID aProperty) const {
     return GetAnimationOfProperty(aProperty) != nullptr;
   }
   const InfallibleTArray<AnimationProperty>& Properties() const {
@@ -310,10 +307,10 @@ public:
   // contained in |aSetProperties|.
   // Any updated properties are added to |aSetProperties|.
   void ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
-                    nsCSSPropertySet& aSetProperties);
+                    nsCSSPropertyIDSet& aSetProperties);
   // Returns true if at least one property is being animated on compositor.
   bool IsRunningOnCompositor() const;
-  void SetIsRunningOnCompositor(nsCSSProperty aProperty, bool aIsRunning);
+  void SetIsRunningOnCompositor(nsCSSPropertyID aProperty, bool aIsRunning);
   void ResetIsRunningOnCompositor();
 
   // Returns true if this effect, applied to |aFrame|, contains properties
@@ -338,7 +335,7 @@ public:
   // compositor. |aParams| and |aParamsLength| are optional parameters which
   // will be used to generate a localized message for devtools.
   void SetPerformanceWarning(
-    nsCSSProperty aProperty,
+    nsCSSPropertyID aProperty,
     const AnimationPerformanceWarning& aWarning);
 
   // Cumulative change hint on each segment for each property.
@@ -434,7 +431,7 @@ private:
   static bool CanAnimateTransformOnCompositor(
     const nsIFrame* aFrame,
     AnimationPerformanceWarning::Type& aPerformanceWarning);
-  static bool IsGeometricProperty(const nsCSSProperty aProperty);
+  static bool IsGeometricProperty(const nsCSSPropertyID aProperty);
 
   static const TimeDuration OverflowRegionRefreshInterval();
 };

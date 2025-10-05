@@ -181,6 +181,7 @@
             "type": "string",
             "enum": [
               "alarms",
+              "clipboardWrite",
               "idle",
               "notifications",
               "storage"

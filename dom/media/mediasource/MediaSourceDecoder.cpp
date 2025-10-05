@@ -309,6 +309,18 @@ MediaSourceDecoder::CanPlayThrough()
   return GetBuffered().Contains(ClampIntervalToEnd(interval));
 }
 
+void
+MediaSourceDecoder::NotifyWaitingForKey()
+{
+  mWaitingForKeyEvent.Notify();
+}
+
+MediaEventSource<void>*
+MediaSourceDecoder::WaitingForKeyEvent()
+{
+  return &mWaitingForKeyEvent;
+}
+
 TimeInterval
 MediaSourceDecoder::ClampIntervalToEnd(const TimeInterval& aInterval)
 {

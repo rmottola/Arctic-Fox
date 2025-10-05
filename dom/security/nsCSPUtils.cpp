@@ -474,7 +474,7 @@ permitsPort(const nsAString& aEnforcementScheme,
   // By now we know at that either the resourcePort does not use the default
   // port or there is a port restriction to be enforced. A port value of -1
   // corresponds to the protocol's default port (eg. -1 implies port 80 for
-  // HTTP URIs), in such a case we have to query the default port of the
+  // http URIs), in such a case we have to query the default port of the
   // resource to be loaded.
   if (resourcePort == DEFAULT_PORT) {
     nsAutoCString resourceScheme;
@@ -494,7 +494,7 @@ permitsPort(const nsAString& aEnforcementScheme,
   // If there is no port to be enforced, query the default port for the load.
   nsString enforcementPort(aEnforcementPort);
   if (enforcementPort.IsEmpty()) {
-    // For schemeless sources, our parser always generates a scheme
+    // For scheme less sources, our parser always generates a scheme
     // which is the scheme of the protected resource.
     MOZ_ASSERT(!aEnforcementScheme.IsEmpty(),
                "need a scheme to query default port");
@@ -511,8 +511,8 @@ permitsPort(const nsAString& aEnforcementScheme,
 
   // Additional port matching where the regular URL matching algorithm
   // treats insecure ports as matching their secure variants.
-  // default port for HTTP is  :80
-  // default port for HTTPS is :443
+  // default port for http is  :80
+  // default port for https is :443
   if (enforcementPort.EqualsLiteral("80") &&
       resourcePortStr.EqualsLiteral("443")) {
     return true;
@@ -885,6 +885,7 @@ nsCSPReportURI::toString(nsAString& outStr) const
 nsCSPSandboxFlags::nsCSPSandboxFlags(const nsAString& aFlags)
   : mFlags(aFlags)
 {
+  ToLowerCase(mFlags);
 }
 
 nsCSPSandboxFlags::~nsCSPSandboxFlags()

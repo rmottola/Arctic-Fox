@@ -5,7 +5,7 @@
 
 // Process each item in the "constants hash" to add to "global" and give a name
 this.EXPORTED_SYMBOLS = [];
-for (let [key, val] in Iterator({
+for (let [key, val] of Object.entries({
 
 WEAVE_VERSION:                         "@weave_version@",
 
@@ -181,6 +181,9 @@ MIN_PP_LENGTH:                         12,
 MIN_PASS_LENGTH:                       8,
 
 LOG_DATE_FORMAT:                       "%Y-%m-%d %H:%M:%S",
+
+DEVICE_TYPE_DESKTOP:                   "desktop",
+DEVICE_TYPE_MOBILE:                    "mobile",
 
 })) {
   this[key] = val;

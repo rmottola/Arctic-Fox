@@ -56,7 +56,7 @@ class nsDOMMutationObserver;
 // We declare the bare minimum infrastructure here to allow us to have a
 // UniquePtr<ServoNodeData> on nsINode.
 struct ServoNodeData;
-extern "C" void Servo_DropNodeData(ServoNodeData*);
+extern "C" void Servo_NodeData_Drop(ServoNodeData*);
 namespace mozilla {
 template<>
 class DefaultDelete<ServoNodeData>
@@ -64,7 +64,7 @@ class DefaultDelete<ServoNodeData>
 public:
   void operator()(ServoNodeData* aPtr) const
   {
-    Servo_DropNodeData(aPtr);
+    Servo_NodeData_Drop(aPtr);
   }
 };
 } // namespace mozilla
@@ -84,6 +84,7 @@ inline bool IsSpaceCharacter(char aChar) {
   return aChar == ' ' || aChar == '\t' || aChar == '\n' || aChar == '\r' ||
          aChar == '\f';
 }
+class AccessibleNode;
 struct BoxQuadOptions;
 struct ConvertCoordinateOptions;
 class DOMPoint;
@@ -927,6 +928,16 @@ public:
   {
     return mParent;
   }
+
+  /**
+   * Returns the node that is the parent of this node in the flattened
+   * tree. This differs from the normal parent if the node is filtered
+   * into an insertion point, or if the node is a direct child of a
+   * shadow root.
+   *
+   * @return the flattened tree parent
+   */
+  inline nsINode* GetFlattenedTreeParentNode() const;
 
   /**
    * Get the parent nsINode for this node if it is an Element.
@@ -1795,6 +1806,8 @@ public:
   void UnbindObject(nsISupports* aObject);
 
   void GetBoundMutationObservers(nsTArray<RefPtr<nsDOMMutationObserver> >& aResult);
+
+  already_AddRefed<mozilla::dom::AccessibleNode> GetAccessibleNode();
 
   /**
    * Returns the length of this node, as specified at

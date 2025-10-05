@@ -101,7 +101,7 @@ Preferences._get = function(prefName, defaultValue, valueType) {
  */
 Preferences.set = function(prefName, prefValue) {
   if (isObject(prefName)) {
-    for (let [name, value] in Iterator(prefName))
+    for (let [name, value] of Object.entries(prefName))
       this.set(name, value);
     return;
   }
@@ -319,6 +319,8 @@ Preferences.ignore = function(prefName, callback, thisObject) {
   if (observer) {
     Preferences._prefBranch.removeObserver(fullPrefName, observer);
     observers.splice(observers.indexOf(observer), 1);
+  } else {
+    Cu.reportError(`Attempt to stop observing a preference "${prefName}" that's not being observed`);
   }
 };
 

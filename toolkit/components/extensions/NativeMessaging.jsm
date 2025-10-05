@@ -32,6 +32,8 @@ XPCOMUtils.defineLazyModuleGetter(this, "clearTimeout",
                                   "resource://gre/modules/Timer.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "setTimeout",
                                   "resource://gre/modules/Timer.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "WindowsRegistry",
+                                  "resource://gre/modules/WindowsRegistry.jsm");
 
 const HOST_MANIFEST_SCHEMA = "chrome://extensions/content/schemas/native_host_manifest.json";
 const VALID_APPLICATION = /^\w+(\.\w+)*$/;
@@ -56,6 +58,8 @@ const MAX_WRITE = 0xffffffff;
 const PREF_MAX_READ = "webextensions.native-messaging.max-input-message-bytes";
 const PREF_MAX_WRITE = "webextensions.native-messaging.max-output-message-bytes";
 
+const REGPATH = "Software\\Mozilla\\NativeMessagingHosts";
+
 this.HostManifestManager = {
   _initializePromise: null,
   _lookup: null,
@@ -64,7 +68,7 @@ this.HostManifestManager = {
     if (!this._initializePromise) {
       let platform = AppConstants.platform;
       if (platform == "win") {
-        throw new Error("Windows not yet implemented (bug 1270359)");
+        this._lookup = this._winLookup;
       } else if (platform == "macosx" || platform == "linux") {
         let dirs = [
           Services.dirsvc.get("XREUserNativeMessaging", Ci.nsIFile).path,
@@ -77,6 +81,22 @@ this.HostManifestManager = {
       this._initializePromise = Schemas.load(HOST_MANIFEST_SCHEMA);
     }
     return this._initializePromise;
+  },
+
+  _winLookup(application, context) {
+    const REGISTRY = Ci.nsIWindowsRegKey;
+    let regPath = `${REGPATH}\\${application}`;
+    let path = WindowsRegistry.readRegKey(REGISTRY.ROOT_KEY_CURRENT_USER,
+                                          regPath, "", REGISTRY.WOW64_64);
+    if (!path) {
+      path = WindowsRegistry.readRegKey(Ci.nsIWindowsRegKey.ROOT_KEY_LOCAL_MACHINE,
+                                        regPath, "", REGISTRY.WOW64_64);
+    }
+    if (!path) {
+      return null;
+    }
+    return this._tryPath(path, application, context)
+      .then(manifest => manifest ? {path, manifest} : null);
   },
 
   _tryPath(path, application, context) {
@@ -172,10 +192,19 @@ this.NativeApp = class extends EventEmitter {
           throw new Error(`This extension does not have permission to use native application ${application}`);
         }
 
+        let command = hostInfo.manifest.path;
+        if (AppConstants.platform == "win") {
+          // OS.Path.join() ignores anything before the last absolute path
+          // it sees, so if command is already absolute, it remains unchanged
+          // here.  If it is relative, we get the proper absolute path here.
+          command = OS.Path.join(OS.Path.dirname(hostInfo.path), command);
+        }
+
         let subprocessOpts = {
-          command: hostInfo.manifest.path,
+          command: command,
           arguments: [hostInfo.path],
-          workdir: OS.Path.dirname(hostInfo.manifest.path),
+          workdir: OS.Path.dirname(command),
+          stderr: "pipe",
         };
         return Subprocess.call(subprocessOpts);
       }).then(proc => {
@@ -183,9 +212,10 @@ this.NativeApp = class extends EventEmitter {
         this.proc = proc;
         this._startRead();
         this._startWrite();
+        this._startStderrRead();
       }).catch(err => {
         this.startupPromise = null;
-        Cu.reportError(err);
+        Cu.reportError(err instanceof Error ? err : err.message);
         this._cleanup(err);
       });
   }
@@ -213,7 +243,9 @@ this.NativeApp = class extends EventEmitter {
         this.readPromise = null;
         this._startRead();
       }).catch(err => {
-        Cu.reportError(err);
+        if (err.errorCode != Subprocess.ERROR_END_OF_FILE) {
+          Cu.reportError(err instanceof Error ? err : err.message);
+        }
         this._cleanup(err);
       });
   }
@@ -237,8 +269,34 @@ this.NativeApp = class extends EventEmitter {
       this.writePromise = null;
       this._startWrite();
     }).catch(err => {
-      Cu.reportError(err);
+      Cu.reportError(err.message);
       this._cleanup(err);
+    });
+  }
+
+  _startStderrRead() {
+    let proc = this.proc;
+    let app = this.name;
+    Task.spawn(function* () {
+      let partial = "";
+      while (true) {
+        let data = yield proc.stderr.readString();
+        if (data.length == 0) {
+          // We have hit EOF, just stop reading
+          if (partial) {
+            Services.console.logStringMessage(`stderr output from native app ${app}: ${partial}`);
+          }
+          break;
+        }
+
+        let lines = data.split(/\r?\n/);
+        lines[0] = partial + lines[0];
+        partial = lines.pop();
+
+        for (let line of lines) {
+          Services.console.logStringMessage(`stderr output from native app ${app}: ${line}`);
+        }
+      }
     });
   }
 
@@ -249,7 +307,7 @@ this.NativeApp = class extends EventEmitter {
 
     let json;
     try {
-      json = JSON.stringify(msg);
+      json = this.context.jsonStringify(msg);
     } catch (err) {
       throw new this.context.cloneScope.Error(err.message);
     }
@@ -355,5 +413,29 @@ this.NativeApp = class extends EventEmitter {
     };
 
     return Cu.cloneInto(api, this.context.cloneScope, {cloneFunctions: true});
+  }
+
+  sendMessage(msg) {
+    let responsePromise = new Promise((resolve, reject) => {
+      this.on("message", (what, msg) => { resolve(msg); });
+      this.on("disconnect", (what, err) => { reject(err); });
+    });
+
+    let result = this.startupPromise.then(() => {
+      this.send(msg);
+      return responsePromise;
+    });
+
+    result.then(() => {
+      this._cleanup();
+    }, () => {
+      // Prevent the response promise from being reported as an
+      // unchecked rejection if the startup promise fails.
+      responsePromise.catch(() => {});
+
+      this._cleanup();
+    });
+
+    return result;
   }
 };

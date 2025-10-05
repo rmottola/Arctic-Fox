@@ -277,11 +277,11 @@ bool
 nsHttpConnection::EnsureNPNComplete(nsresult &aOut0RTTWriteHandshakeValue,
                                     uint32_t &aOut0RTTBytesWritten)
 {
-    aOut0RTTWriteHandshakeValue = NS_OK;
-    aOut0RTTBytesWritten = 0;
-
     // If for some reason the components to check on NPN aren't available,
     // this function will just return true to continue on and disable SPDY
+
+    aOut0RTTWriteHandshakeValue = NS_OK;
+    aOut0RTTBytesWritten = 0;
 
     MOZ_ASSERT(mSocketTransport);
     if (!mSocketTransport) {
@@ -1629,7 +1629,7 @@ nsHttpConnection::CloseTransaction(nsAHttpTransaction *trans, nsresult reason)
     mIsReused = true;
 }
 
-NS_METHOD
+nsresult
 nsHttpConnection::ReadFromStream(nsIInputStream *input,
                                  void *closure,
                                  const char *buf,

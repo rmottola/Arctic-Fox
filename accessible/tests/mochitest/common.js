@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Interfaces
 
-const nsIAccessibleRetrieval = Components.interfaces.nsIAccessibleRetrieval;
+const nsIAccessibilityService = Components.interfaces.nsIAccessibilityService;
 
 const nsIAccessibleEvent = Components.interfaces.nsIAccessibleEvent;
 const nsIAccessibleStateChangeEvent =
@@ -94,25 +94,25 @@ const MAX_TRIM_LENGTH = 100;
 Components.utils.import('resource://gre/modules/Services.jsm');
 
 /**
- * nsIAccessibleRetrieval service.
+ * nsIAccessibilityService service.
  */
-var gAccRetrieval = Components.classes["@mozilla.org/accessibleRetrieval;1"].
-  getService(nsIAccessibleRetrieval);
+var gAccService = Components.classes["@mozilla.org/accessibilityService;1"].
+  getService(nsIAccessibilityService);
 
 /**
  * Enable/disable logging.
  */
 function enableLogging(aModules)
 {
-  gAccRetrieval.setLogging(aModules);
+  gAccService.setLogging(aModules);
 }
 function disableLogging()
 {
-  gAccRetrieval.setLogging("");
+  gAccService.setLogging("");
 }
 function isLogged(aModule)
 {
-  return gAccRetrieval.isLogged(aModule);
+  return gAccService.isLogged(aModule);
 }
 
 /**
@@ -272,7 +272,7 @@ function getAccessible(aAccOrElmOrID, aInterfaces, aElmObj, aDoNotFailIf)
   var acc = (aAccOrElmOrID instanceof nsIAccessible) ? aAccOrElmOrID : null;
   if (!acc) {
     try {
-      acc = gAccRetrieval.getAccessibleFor(elm);
+      acc = gAccService.getAccessibleFor(elm);
     } catch (e) {
     }
 
@@ -363,7 +363,7 @@ function getTabDocAccessible(aAccOrElmOrID)
  */
 function getApplicationAccessible()
 {
-  return gAccRetrieval.getApplicationAccessible().
+  return gAccService.getApplicationAccessible().
     QueryInterface(nsIAccessibleApplication);
 }
 
@@ -402,14 +402,7 @@ function testAccessibleTree(aAccOrElmOrID, aAccTree, aFlags)
   var accTree = aAccTree;
 
   // Support of simplified accessible tree object.
-  var key = Object.keys(accTree)[0];
-  var roleName = "ROLE_" + key;
-  if (roleName in nsIAccessibleRole) {
-    accTree = {
-      role: nsIAccessibleRole[roleName],
-      children: accTree[key]
-    };
-  }
+  accTree = normalizeAccTreeObj(accTree);
 
   // Test accessible properties.
   for (var prop in accTree) {
@@ -508,15 +501,7 @@ function testAccessibleTree(aAccOrElmOrID, aAccTree, aFlags)
             continue;
           }
 
-          var key = Object.keys(testChild)[0];
-          var roleName = "ROLE_" + key;
-          if (roleName in nsIAccessibleRole) {
-            testChild = {
-              role: nsIAccessibleRole[roleName],
-              children: testChild[key]
-            };
-          }
-
+          testChild = normalizeAccTreeObj(testChild);
           if (accChild.role !== testChild.role) {
             ok(false, prettyName(accTree) + " and " + prettyName(acc) +
               " have different children at index " + i + " : " +
@@ -527,7 +512,8 @@ function testAccessibleTree(aAccOrElmOrID, aAccTree, aFlags)
 
         } catch (e) {
           ok(false, prettyName(accTree) + " is expected to have a child at index " + i +
-             " : " + prettyName(testChild) + ", " + e);
+             " : " + prettyName(testChild) + ", original tested: " +
+             prettyName(aAccOrElmOrID) + ", " + e);
         }
       }
     } else {
@@ -598,7 +584,7 @@ function testAccessibleTree(aAccOrElmOrID, aAccTree, aFlags)
 function isAccessibleInCache(aNodeOrId)
 {
   var node = getNode(aNodeOrId);
-  return gAccRetrieval.getAccessibleFromCache(node) ? true : false;
+  return gAccService.getAccessibleFromCache(node) ? true : false;
 }
 
 /**
@@ -685,7 +671,7 @@ function testDefunctAccessible(aAcc, aNodeOrId)
  */
 function roleToString(aRole)
 {
-  return gAccRetrieval.getStringRole(aRole);
+  return gAccService.getStringRole(aRole);
 }
 
 /**
@@ -693,7 +679,7 @@ function roleToString(aRole)
  */
 function statesToString(aStates, aExtraStates)
 {
-  var list = gAccRetrieval.getStringStates(aStates, aExtraStates);
+  var list = gAccService.getStringStates(aStates, aExtraStates);
 
   var str = "";
   for (var index = 0; index < list.length - 1; index++)
@@ -710,7 +696,7 @@ function statesToString(aStates, aExtraStates)
  */
 function eventTypeToString(aEventType)
 {
-  return gAccRetrieval.getStringEventType(aEventType);
+  return gAccService.getStringEventType(aEventType);
 }
 
 /**
@@ -718,7 +704,7 @@ function eventTypeToString(aEventType)
  */
 function relationTypeToString(aRelationType)
 {
-  return gAccRetrieval.getStringRelationType(aRelationType);
+  return gAccService.getStringRelationType(aRelationType);
 }
 
 function getLoadContext() {
@@ -830,6 +816,23 @@ function prettyName(aIdentifier)
     return "[ " + getNodePrettyName(aIdentifier) + " ]";
 
   if (aIdentifier && typeof aIdentifier === "object" ) {
+    var treeObj = normalizeAccTreeObj(aIdentifier);
+    if ("role" in treeObj) {
+      function stringifyTree(aObj) {
+        var text = roleToString(aObj.role) + ": [ ";
+        if ("children" in aObj) {
+          for (var i = 0; i < aObj.children.length; i++) {
+            var c = normalizeAccTreeObj(aObj.children[i]);
+            text += stringifyTree(c);
+            if (i < aObj.children.length - 1) {
+              text += ", ";
+            }
+          }
+        }
+        return text + "] ";
+      }
+      return `{ ${stringifyTree(treeObj)} }`;
+    }
     return JSON.stringify(aIdentifier);
   }
 
@@ -933,4 +936,17 @@ function getTestPluginTag(aPluginName)
 
   ok(false, "Could not find plugin tag with plugin name '" + name + "'");
   return null;
+}
+
+function normalizeAccTreeObj(aObj)
+{
+  var key = Object.keys(aObj)[0];
+  var roleName = "ROLE_" + key;
+  if (roleName in nsIAccessibleRole) {
+    return {
+      role: nsIAccessibleRole[roleName],
+      children: aObj[key]
+    };
+  }
+  return aObj;
 }

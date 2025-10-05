@@ -23,8 +23,6 @@
 
 #include "chrome/common/process_watcher.h"
 
-#include <set>
-
 #include "mozilla/a11y/PDocAccessible.h"
 #include "AppProcessChecker.h"
 #include "AudioChannelService.h"
@@ -89,6 +87,7 @@
 #include "mozilla/layers/PAPZParent.h"
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/layers/ImageBridgeParent.h"
+#include "mozilla/layers/LayerTreeOwnerTracker.h"
 #include "mozilla/layers/SharedBufferManagerParent.h"
 #include "mozilla/layout/RenderFrameParent.h"
 #include "mozilla/LookAndFeel.h"
@@ -106,7 +105,7 @@
 #include "mozilla/StaticPtr.h"
 #include "mozilla/Telemetry.h"
 #include "mozilla/WebBrowserPersistDocumentParent.h"
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 #include "nsAnonymousTemporaryFile.h"
 #include "nsAppRunner.h"
 #include "nsCDefaultURIFixup.h"
@@ -481,9 +480,10 @@ public:
 NS_IMPL_ISUPPORTS(ContentParentsMemoryReporter, nsIMemoryReporter)
 
 NS_IMETHODIMP
-ContentParentsMemoryReporter::CollectReports(nsIMemoryReporterCallback* cb,
-                                             nsISupports* aClosure,
-                                             bool aAnonymize)
+ContentParentsMemoryReporter::CollectReports(
+  nsIHandleReportCallback* aHandleReport,
+  nsISupports* aData,
+  bool aAnonymize)
 {
   AutoTArray<ContentParent*, 16> cps;
   ContentParent::GetAllEvenIfDead(cps);
@@ -521,15 +521,9 @@ ContentParentsMemoryReporter::CollectReports(nsIMemoryReporterCallback* cb,
       "messages.  Similarly, a ContentParent object for a process that's no "
       "longer running could indicate that we're leaking ContentParents.");
 
-    nsresult rv = cb->Callback(/* process */ EmptyCString(),
-                               path,
-                               KIND_OTHER,
-                               UNITS_COUNT,
-                               numQueuedMessages,
-                               desc,
-                               aClosure);
-
-    NS_ENSURE_SUCCESS(rv, rv);
+    aHandleReport->Callback(/* process */ EmptyCString(), path,
+                            KIND_OTHER, UNITS_COUNT,
+                            numQueuedMessages, desc, aData);
   }
 
   return NS_OK;
@@ -588,6 +582,7 @@ static const char* sObserverTopics[] = {
   "profiler-subprocess",
 #endif
   "gmp-changed",
+  "cacheservice:empty-cache",
 };
 
 // PreallocateAppProcess is called by the PreallocatedProcessManager.
@@ -1005,10 +1000,7 @@ ContentParent::RecvUngrabPointer(const uint32_t& aTime)
   NS_RUNTIMEABORT("This message only makes sense on GTK platforms");
   return false;
 #else
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   gdk_pointer_ungrab(aTime);
-#pragma GCC diagnostic pop
   return true;
 #endif
 }
@@ -1130,9 +1122,7 @@ ContentParent::CreateBrowserOrApp(const TabContext& aContext,
       if (loadContext && loadContext->UsePrivateBrowsing()) {
         chromeFlags |= nsIWebBrowserChrome::CHROME_PRIVATE_WINDOW;
       }
-      bool affectLifetime;
-      docShell->GetAffectPrivateSessionLifetime(&affectLifetime);
-      if (affectLifetime) {
+      if (docShell->GetAffectPrivateSessionLifetime()) {
         chromeFlags |= nsIWebBrowserChrome::CHROME_PRIVATE_LIFETIME;
       }
 
@@ -1693,18 +1683,6 @@ ContentParent::ProcessingError(Result aCode, const char* aReason)
   KillHard(aReason);
 }
 
-typedef std::pair<ContentParent*, std::set<uint64_t> > IDPair;
-
-namespace {
-std::map<ContentParent*, std::set<uint64_t> >&
-NestedBrowserLayerIds()
-{
-  MOZ_ASSERT(NS_IsMainThread());
-  static std::map<ContentParent*, std::set<uint64_t> > sNestedBrowserIds;
-  return sNestedBrowserIds;
-}
-} // namespace
-
 /* static */
 bool
 ContentParent::AllocateLayerTreeId(TabParent* aTabParent, uint64_t* aId)
@@ -1720,7 +1698,9 @@ ContentParent::AllocateLayerTreeId(ContentParent* aContent,
                                    uint64_t* aId)
 {
   GPUProcessManager* gpu = GPUProcessManager::Get();
+
   *aId = gpu->AllocateLayerTreeId();
+  gpu->MapLayerTreeId(*aId, aContent->OtherPid());
 
   if (!gfxPlatform::AsyncPanZoomEnabled()) {
     return true;
@@ -1730,7 +1710,7 @@ ContentParent::AllocateLayerTreeId(ContentParent* aContent,
     return false;
   }
 
-  return gpu->UpdateRemoteContentController(*aId, aContent, aTabId, aTopLevel);
+  return aContent->SendNotifyLayerAllocated(aTabId, *aId);
 }
 
 bool
@@ -1756,33 +1736,22 @@ ContentParent::RecvAllocateLayerTreeId(const ContentParentId& aCpId,
     cpm->GetTopLevelTabParentByProcessAndTabId(aCpId, aTabId);
   MOZ_ASSERT(contentParent && browserParent);
 
-  if (!AllocateLayerTreeId(contentParent, browserParent, aTabId, aId)) {
-    return false;
-  }
-
-  auto iter = NestedBrowserLayerIds().find(this);
-  if (iter == NestedBrowserLayerIds().end()) {
-    std::set<uint64_t> ids;
-    ids.insert(*aId);
-    NestedBrowserLayerIds().insert(IDPair(this, ids));
-  } else {
-    iter->second.insert(*aId);
-  }
-  return true;
+  return AllocateLayerTreeId(contentParent, browserParent, aTabId, aId);
 }
 
 bool
 ContentParent::RecvDeallocateLayerTreeId(const uint64_t& aId)
 {
-  auto iter = NestedBrowserLayerIds().find(this);
-  if (iter != NestedBrowserLayerIds().end() &&
-      iter->second.find(aId) != iter->second.end())
+  GPUProcessManager* gpu = GPUProcessManager::Get();
+
+  if (!gpu->IsLayerTreeIdMapped(aId, this->OtherPid()))
   {
-    GPUProcessManager::Get()->DeallocateLayerTreeId(aId);
-  } else {
     // You can't deallocate layer tree ids that you didn't allocate
     KillHard("DeallocateLayerTreeId");
   }
+
+  gpu->DeallocateLayerTreeId(aId);
+
   return true;
 }
 
@@ -2909,6 +2878,9 @@ ContentParent::Observe(nsISupports* aSubject,
   else if (!strcmp(aTopic, "gmp-changed")) {
     Unused << SendNotifyGMPsChanged();
   }
+  else if (!strcmp(aTopic, "cacheservice:empty-cache")) {
+    Unused << SendNotifyEmptyHTTPCache();
+  }
   return NS_OK;
 }
 
@@ -2917,21 +2889,6 @@ ContentParent::AllocPGMPServiceParent(mozilla::ipc::Transport* aTransport,
                                       base::ProcessId aOtherProcess)
 {
   return GMPServiceParent::Create(aTransport, aOtherProcess);
-}
-
-PAPZParent*
-ContentParent::AllocPAPZParent(const TabId& aTabId)
-{
-  // The PAPZParent should just be created in the main process and then an IPDL
-  // constructor message sent to hook it up.
-  MOZ_CRASH("This shouldn't be called");
-  return nullptr;
-}
-
-bool
-ContentParent::DeallocPAPZParent(PAPZParent* aActor)
-{
-  return true;
 }
 
 PBackgroundParent*
@@ -4966,7 +4923,6 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
                                 const bool& aCalledFromJS,
                                 const bool& aPositionSpecified,
                                 const bool& aSizeSpecified,
-                                const nsString& aName,
                                 const nsCString& aFeatures,
                                 const nsCString& aBaseURI,
                                 const DocShellOriginAttributes& aOpenerOriginAttributes,
@@ -5174,9 +5130,9 @@ ContentParent::RecvProfile(const nsCString& aProfile)
 }
 
 bool
-ContentParent::RecvGetGraphicsDeviceInitData(DeviceInitData* aOut)
+ContentParent::RecvGetGraphicsDeviceInitData(ContentDeviceData* aOut)
 {
-  gfxPlatform::GetPlatform()->GetDeviceInitData(aOut);
+  gfxPlatform::GetPlatform()->BuildContentDeviceData(aOut);
   return true;
 }
 

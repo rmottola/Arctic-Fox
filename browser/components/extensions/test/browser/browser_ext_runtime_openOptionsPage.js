@@ -42,6 +42,7 @@ add_task(function* test_inline_options() {
 
   let extension = yield loadExtension({
     manifest: {
+      applications: {gecko: {id: "inline_options@tests.mozilla.org"}},
       "options_ui": {
         "page": "options.html",
       },
@@ -97,9 +98,9 @@ add_task(function* test_inline_options() {
         browser.test.assertEq("about:addons", tab.url, "Tab contains AddonManager");
 
         browser.test.log("Ping options page.");
-        return new Promise(resolve => browser.tabs.sendMessage(optionsTab, "ping", resolve));
-      }).then(() => {
-        browser.test.log("Got pong.");
+        return browser.runtime.sendMessage("ping");
+      }).then((pong) => {
+        browser.test.assertEq("pong", pong, "Got pong.");
 
         browser.test.log("Remove options tab.");
         return browser.tabs.remove(optionsTab);
@@ -135,6 +136,7 @@ add_task(function* test_tab_options() {
 
   let extension = yield loadExtension({
     manifest: {
+      applications: {gecko: {id: "tab_options@tests.mozilla.org"}},
       "options_ui": {
         "page": "options.html",
         "open_in_tab": true,
@@ -225,4 +227,37 @@ add_task(function* test_tab_options() {
   yield extension.unload();
 
   yield BrowserTestUtils.removeTab(tab);
+});
+
+add_task(function* test_options_no_manifest() {
+  let extension = yield loadExtension({
+    manifest: {
+      applications: {gecko: {id: "no_options@tests.mozilla.org"}},
+    },
+
+    background: function() {
+      browser.test.log("Try to open options page when not specified in the manifest.");
+
+      browser.runtime.openOptionsPage().then(
+        () => {
+          browser.test.fail("Opening options page without one specified in the manifest generated an error");
+          browser.test.notifyFail("options-no-manifest");
+        },
+        error => {
+          let expected = "No `options_ui` declared";
+          browser.test.assertTrue(
+            error.message.includes(expected),
+            `Got expected error (got: '${error.message}', expected: '${expected}'`);
+        }
+      ).then(() => {
+        browser.test.notifyPass("options-no-manifest");
+      }).catch(error => {
+        browser.test.log(`Error: ${error} :: ${error.stack}`);
+        browser.test.notifyFail("options-no-manifest");
+      });
+    },
+  });
+
+  yield extension.awaitFinish("options-no-manifest");
+  yield extension.unload();
 });

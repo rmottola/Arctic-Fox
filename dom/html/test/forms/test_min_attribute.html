@@ -29,9 +29,9 @@ var data = [
   { type: 'password', apply: false },
   { type: 'datetime', apply: true, todo: true },
   { type: 'date', apply: true },
-  // TODO: temporary set to false until bug 888324 is fixed.
-  { type: 'month', apply: false },
-  { type: 'week', apply: true, todo: true },
+  { type: 'month', apply: true },
+  // TODO: temporary set to false until bug 888316 is fixed.
+  { type: 'week', apply: false },
   { type: 'time', apply: true },
   { type: 'datetime-local', apply: true, todo: true },
   { type: 'number', apply: true },
@@ -71,7 +71,8 @@ function checkValidity(aElement, aValidity, aApply, aRangeApply)
   is(aElement.validity.rangeUnderflow, !aValidity,
      "element underflow status should be " + !aValidity);
   var underflowMsg =
-        (aElement.type == "date" || aElement.type == "time") ?
+        (aElement.type == "date" || aElement.type == "time" ||
+         aElement.type == "month") ?
         ("Please select a value that is no earlier than " + aElement.min + ".") :
         ("Please select a value that is no less than " + aElement.min + ".");
   is(aElement.validationMessage,
@@ -143,7 +144,10 @@ for (var test of data) {
       // suffer from overflow.
       break;
     case 'month':
-      // TODO: this is temporary until bug 888324 is fixed.
+      input.min = '2016-06';
+      break;
+    case 'week':
+      // TODO: this is temporary until bug 888316 is fixed.
       break;
     default:
       ok(false, 'please, add a case for this new type (' + input.type + ')');
@@ -340,7 +344,44 @@ for (var test of data) {
       checkValidity(input, true, apply, false);
       break;
     case 'month':
-      // TODO: this is temporary until bug 888324 is fixed.
+      input.value = '2016-07';
+      checkValidity(input, true, apply, apply);
+
+      input.value = '2016-06';
+      checkValidity(input, true, apply, apply);
+
+      input.value = 'foo';
+      checkValidity(input, true, apply, apply);
+
+      input.value = '2016-05';
+      checkValidity(input, false, apply, apply);
+
+      input.min = '2016-01';
+      checkValidity(input, true, apply, apply);
+
+      input.value = '2015-12';
+      checkValidity(input, false, apply, apply);
+
+      input.value = '1000-01';
+      checkValidity(input, false, apply, apply);
+
+      input.value = '10000-01';
+      checkValidity(input, true, apply, apply);
+
+      input.min = '0010-01';
+      checkValidity(input, true, apply, apply);
+
+      input.value = '0001-01';
+      checkValidity(input, false, apply, apply);
+
+      input.min = '';
+      checkValidity(input, true, apply, false);
+
+      input.min = 'foo';
+      checkValidity(input, true, apply, false);
+      break;
+    case 'week':
+      // TODO: this is temporary until bug 888316 is fixed.
       break;
     default:
       ok(false, 'write tests for ' + input.type);

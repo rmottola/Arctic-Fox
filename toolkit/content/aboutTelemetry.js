@@ -881,7 +881,7 @@ var SlowSQL = {
    * @param aSql SQL stats object
    */
   renderTable: function SlowSQL_renderTable(aTable, aSql) {
-    for (let [sql, [hitCount, totalTime]] of Iterator(aSql)) {
+    for (let [sql, [hitCount, totalTime]] of Object.entries(aSql)) {
       let averageTime = totalTime / hitCount;
 
       let sqlRow = document.createElement("tr");
@@ -1477,7 +1477,7 @@ var KeyValueTable = {
    * @param aMeasurements Key/value map
    */
   renderBody: function KeyValueTable_renderBody(aTable, aMeasurements) {
-    for (let [key, value] of Iterator(aMeasurements)) {
+    for (let [key, value] of Object.entries(aMeasurements)) {
       // use .valueOf() to unbox Number, String, etc. objects
       if (value &&
          (typeof value == "object") &&
@@ -1510,7 +1510,7 @@ var KeyedHistogram = {
     divTitle.appendChild(document.createTextNode(id));
     outerDiv.appendChild(divTitle);
 
-    for (let [name, hgram] of Iterator(keyedHistogram)) {
+    for (let [name, hgram] of Object.entries(keyedHistogram)) {
       Histogram.render(outerDiv, name, hgram);
     }
 
@@ -1546,6 +1546,33 @@ var AddonDetails = {
         KeyValueTable.render(addonDetails[provider],
                              this.tableIDTitle, this.tableDetailsTitle));
     }
+  }
+};
+
+var Scalars = {
+  /**
+   * Render the scalar data - if present - from the payload in a simple key-value table.
+   * @param aPayload A payload object to render the data from.
+   */
+  render: function(aPayload) {
+    let scalarsSection = document.getElementById("scalars");
+    removeAllChildNodes(scalarsSection);
+
+    if (!aPayload.processes || !aPayload.processes.parent) {
+      return;
+    }
+
+    let scalars = aPayload.processes.parent.scalars;
+    const hasData = scalars && Object.keys(scalars).length > 0;
+    setHasData("scalars-section", hasData);
+    if (!hasData) {
+      return;
+    }
+
+    const headingName = bundle.GetStringFromName("namesHeader");
+    const headingValue = bundle.GetStringFromName("valuesHeader");
+    const table = KeyValueTable.render(scalars, headingName, headingValue);
+    scalarsSection.appendChild(table);
   }
 };
 
@@ -1894,6 +1921,9 @@ function displayPingData(ping, updatePayloadList = false) {
                                                  keysHeader, valuesHeader));
   }
 
+  // Show scalar data.
+  Scalars.render(payload);
+
   // Show histogram data
   let hgramDiv = document.getElementById("histograms");
   removeAllChildNodes(hgramDiv);
@@ -1903,7 +1933,7 @@ function displayPingData(ping, updatePayloadList = false) {
   setHasData("histograms-section", hasData);
 
   if (hasData) {
-    for (let [name, hgram] of Iterator(histograms)) {
+    for (let [name, hgram] of Object.entries(histograms)) {
       Histogram.render(hgramDiv, name, hgram, {unpacked: true});
     }
 
@@ -1924,7 +1954,7 @@ function displayPingData(ping, updatePayloadList = false) {
   let keyedHistograms = payload.keyedHistograms;
   if (keyedHistograms) {
     let hasData = false;
-    for (let [id, keyed] of Iterator(keyedHistograms)) {
+    for (let [id, keyed] of Object.entries(keyedHistograms)) {
       if (Object.keys(keyed).length > 0) {
         hasData = true;
         KeyedHistogram.render(keyedDiv, id, keyed, {unpacked: true});
@@ -1940,8 +1970,8 @@ function displayPingData(ping, updatePayloadList = false) {
   let addonHistogramsRendered = false;
   let addonData = payload.addonHistograms;
   if (addonData) {
-    for (let [addon, histograms] of Iterator(addonData)) {
-      for (let [name, hgram] of Iterator(histograms)) {
+    for (let [addon, histograms] of Object.entries(addonData)) {
+      for (let [name, hgram] of Object.entries(histograms)) {
         addonHistogramsRendered = true;
         Histogram.render(addonDiv, addon + ": " + name, hgram, {unpacked: true});
       }

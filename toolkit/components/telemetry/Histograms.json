@@ -190,6 +190,307 @@
     "high": 60000,
     "n_buckets": 50
   },
+  "CREATE_EVENT_BEFOREUNLOADEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"beforeunloadevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_COMMANDEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"commandevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_COMMANDEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"commandevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_COMPOSITIONEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"compositionevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_CUSTOMEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"customevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_DATACONTAINEREVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"datacontainerevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_DATACONTAINEREVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"datacontainerevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_DEVICEMOTIONEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"devicemotionevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_DEVICEORIENTATIONEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"deviceorientationevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_DRAGEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"dragevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_DRAGEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"dragevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_EVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"event\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_EVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"events\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_HASHCHANGEEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"hashchangeevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_HTMLEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"htmlevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_KEYBOARDEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"keyboardevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_KEYEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"keyevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_MESSAGEEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"messageevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_MOUSEEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"mouseevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_MOUSEEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"mouseevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_MOUSESCROLLEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"mousescrollevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_MUTATIONEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"mutationevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_MUTATIONEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"mutationevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_NOTIFYPAINTEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"notifypaintevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_PAGETRANSITION" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"pagetransition\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_POPSTATEEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"popstateevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_POPUPEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"popupevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_SCROLLAREAEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"scrollareaevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_SIMPLEGESTUREEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"simplegestureevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_STORAGEEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"storageevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_SVGEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"svgevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_SVGEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"svgevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_SVGZOOMEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"svgzoomevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_SVGZOOMEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"svgzoomevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_TEXTEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"textevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_TEXTEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"textevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_TIMEEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"timeevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_TIMEEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"timeevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_TOUCHEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"touchevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_UIEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"uievent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_UIEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"uievents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_XULCOMMANDEVENT" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"xulcommandevent\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
+  "CREATE_EVENT_XULCOMMANDEVENTS" : {
+    "alert_emails": ["ayg@aryeh.name"],
+    "description": "Was document.createEvent(\"xulcommandevents\") ever called",
+    "expires_in_version": "56",
+    "kind": "count",
+    "bug_numbers": [1295588, 1251198]
+  },
   "CYCLE_COLLECTOR": {
     "alert_emails": ["dev-telemetry-gc-alerts@mozilla.org"],
     "expires_in_version": "never",
@@ -394,7 +695,7 @@
     "alert_emails": ["dev-telemetry-gc-alerts@mozilla.org"],
     "expires_in_version": "never",
     "kind": "boolean",
-    "description": "Is it a compartmental GC?"
+    "description": "Is it a zone GC?"
   },
   "GC_MS": {
     "alert_emails": ["dev-telemetry-gc-alerts@mozilla.org"],
@@ -555,6 +856,15 @@
     "n_buckets": 16,
     "bug_numbers": [1259347],
     "description": "Size of the GC nursery (bytes)"
+  },
+  "GC_PRETENURE_COUNT": {
+    "alert_emails": ["dev-telemetry-gc-alerts@mozilla.org"],
+    "expires_in_version": "never",
+    "kind": "linear",
+    "kind": "enumerated",
+    "n_values": 32,
+    "bug_numbers": [1293262],
+    "description": "How many objects groups were selected for pretenuring by a minor GC"
   },
   "GEOLOCATION_ACCURACY_EXPONENTIAL": {
     "expires_in_version": "default",
@@ -1014,13 +1324,6 @@
     "high": 50000000,
     "n_buckets": 50,
     "description": "PNG image decode speed (Kbytes/sec)"
-  },
-  "IMAGE_OPTIMIZE_TO_565_USED": {
-    "expires_in_version": "54",
-    "kind": "boolean",
-    "description": "Records true each time a decoded image is optimized to R5G6B5 format.",
-    "alert_emails": ["seth@mozilla.com"],
-    "bug_numbers": [1281680]
   },
   "CANVAS_2D_USED": {
     "expires_in_version": "never",
@@ -5163,6 +5466,14 @@
     "n_values": 3,
     "description": "Whether the user is in safe mode (No, Yes, Forced)"
   },
+  "SCRIPT_BLOCK_WRONG_MIME": {
+    "alert_emails": ["ckerschbaumer@mozilla.com"],
+    "bug_numbers": [1288361],
+    "expires_in_version": "56",
+    "kind": "enumerated",
+    "n_values": 10,
+    "description": "Whether the script load has a MIME type of ...?  (0=unknown, 1=js, 2=image, 3=audio, 4=video, 5=text/plain, 6=text/csv, 7=text/xml, 8=application/octet-stream, 9=application/xml)"
+  },
   "NEWTAB_PAGE_ENABLED": {
     "expires_in_version": "default",
     "kind": "boolean",
@@ -8384,6 +8695,27 @@
     "kind": "count",
     "description": "Count ServiceWorkers that really did get a thread created for them. File bugs in Core::DOM in case of a Telemetry regression."
   },
+  "SERVICE_WORKER_SPAWN_GETS_QUEUED": {
+    "alert_emails": ["amarchesini@mozilla.com"],
+    "bug_numbers": [1286895],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Tracking whether a ServiceWorker spawn gets queued due to hitting max workers per domain limit. File bugs in Core::DOM in case of a Telemetry regression."
+  },
+  "SHARED_WORKER_SPAWN_GETS_QUEUED": {
+    "alert_emails": ["amarchesini@mozilla.com"],
+    "bug_numbers": [1286895],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Tracking whether a SharedWorker spawn gets queued due to hitting max workers per domain limit. File bugs in Core::DOM in case of a Telemetry regression."
+  },
+  "DEDICATED_WORKER_SPAWN_GETS_QUEUED": {
+    "alert_emails": ["amarchesini@mozilla.com"],
+    "bug_numbers": [1286895],
+    "expires_in_version": "never",
+    "kind": "count",
+    "description": "Tracking whether a DedicatedWorker spawn gets queued due to hitting max workers per domain limit. File bugs in Core::DOM in case of a Telemetry regression."
+  },
   "SERVICE_WORKER_REGISTRATIONS": {
     "expires_in_version": "50",
     "kind": "count",
@@ -9010,6 +9342,24 @@
     "keyed": true,
     "description": "Contiguous time spent by an add-on blocking the main loop by performing a blocking cross-process call (microseconds, keyed by add-on ID)."
   },
+  "VIDEO_EME_REQUEST_SUCCESS_LATENCY_MS": {
+    "alert_emails": ["cpearce@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": 60000,
+    "n_buckets": 60,
+    "releaseChannelCollection": "opt-out",
+    "description": "Time spent waiting for a navigator.requestMediaKeySystemAccess call to succeed."
+  },
+  "VIDEO_EME_REQUEST_FAILURE_LATENCY_MS": {
+    "alert_emails": ["cpearce@mozilla.com"],
+    "expires_in_version": "55",
+    "kind": "exponential",
+    "high": 60000,
+    "n_buckets": 60,
+    "releaseChannelCollection": "opt-out",
+    "description": "Time spent waiting for a navigator.requestMediaKeySystemAccess call to fail."
+  },
   "FXA_CONFIGURED": {
     "alert_emails": ["fx-team@mozilla.com"],
     "bug_numbers": [1236383],
@@ -9035,6 +9385,24 @@
     "keyed": true,
     "releaseChannelCollection": "opt-out",
     "description": "FxA error responses caused by invalid Hawk credentials. Keyed on the FxA auth server endpoint."
+  },
+  "WEAVE_DEVICE_COUNT_DESKTOP": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1232050],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 10,
+    "releaseChannelCollection": "opt-out",
+    "description": "Number of desktop devices (including this device) associated with this Sync account. Recorded each time Sync successfully completes the 'clients' engine."
+  },
+  "WEAVE_DEVICE_COUNT_MOBILE": {
+    "alert_emails": ["fx-team@mozilla.com"],
+    "bug_numbers": [1232050],
+    "expires_in_version": "never",
+    "kind": "enumerated",
+    "n_values": 10,
+    "releaseChannelCollection": "opt-out",
+    "description": "Number of mobile devices associated with this Sync account. Recorded each time Sync successfully completes the 'clients' engine."
   },
   "WEAVE_ENGINE_APPLY_NEW_FAILURES": {
     "alert_emails": ["fx-team@mozilla.com"],
@@ -9663,6 +10031,22 @@
     "bug_numbers": [1280644],
     "description": "Number of the use of the vtt cues.",
     "releaseChannelCollection": "opt-out"
+  },
+  "BLINK_FILESYSTEM_USED": {
+    "alert_emails": ["amarchesini@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "bug_numbers": [1272501],
+    "releaseChannelCollection": "opt-out",
+    "description": "Webkit/Blink filesystem used"
+  },
+  "WEBKIT_DIRECTORY_USED": {
+    "alert_emails": ["amarchesini@mozilla.com"],
+    "expires_in_version": "never",
+    "kind": "boolean",
+    "bug_numbers": [1272501],
+    "releaseChannelCollection": "opt-out",
+    "description": "HTMLInputElement.webkitdirectory attribute used"
   },
   "CONTAINER_USED": {
     "alert_emails": ["amarchesini@mozilla.com"],

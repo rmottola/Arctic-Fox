@@ -112,7 +112,7 @@
 
 #include "mozAutoDocUpdate.h"
 
-#include "mozilla/Snprintf.h"
+#include "mozilla/Sprintf.h"
 #include "nsDOMMutationObserver.h"
 #include "nsWrapperCacheInlines.h"
 #include "nsCycleCollector.h"
@@ -151,10 +151,15 @@ nsIContent::FindFirstNonChromeOnlyAccessContent() const
   return nullptr;
 }
 
-nsIContent*
-nsIContent::GetFlattenedTreeParent() const
+nsINode*
+nsIContent::GetFlattenedTreeParentNodeInternal() const
 {
-  nsIContent* parent = GetParent();
+  nsINode* parentNode = GetParentNode();
+  if (!parentNode || !parentNode->IsContent()) {
+    MOZ_ASSERT(!parentNode || parentNode == OwnerDoc());
+    return parentNode;
+  }
+  nsIContent* parent = parentNode->AsContent();
 
   if (parent && nsContentUtils::HasDistributedChildren(parent) &&
       nsContentUtils::IsInSameAnonymousTree(parent, this)) {
@@ -1066,16 +1071,6 @@ FragmentOrElement::GetXBLInsertionParent() const
 }
 
 ShadowRoot*
-FragmentOrElement::GetShadowRoot() const
-{
-  nsDOMSlots *slots = GetExistingDOMSlots();
-  if (slots) {
-    return slots->mShadowRoot;
-  }
-  return nullptr;
-}
-
-ShadowRoot*
 FragmentOrElement::GetContainingShadow() const
 {
   nsDOMSlots *slots = GetExistingDOMSlots();
@@ -1894,13 +1889,13 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(FragmentOrElement)
     }
 
     const char* nsuri = nsid < ArrayLength(kNSURIs) ? kNSURIs[nsid] : "";
-    snprintf_literal(name, "FragmentOrElement%s %s%s%s%s %s",
-                     nsuri,
-                     localName.get(),
-                     NS_ConvertUTF16toUTF8(id).get(),
-                     NS_ConvertUTF16toUTF8(classes).get(),
-                     orphan.get(),
-                     uri.get());
+    SprintfLiteral(name, "FragmentOrElement%s %s%s%s%s %s",
+                   nsuri,
+                   localName.get(),
+                   NS_ConvertUTF16toUTF8(id).get(),
+                   NS_ConvertUTF16toUTF8(classes).get(),
+                   orphan.get(),
+                   uri.get());
     cb.DescribeRefCountedNode(tmp->mRefCnt.get(), name);
   }
   else {

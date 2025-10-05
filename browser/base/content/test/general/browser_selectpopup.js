@@ -368,6 +368,7 @@ add_task(function* test_large_popup() {
       select.add(new content.Option("Test" + i));
     }
 
+    select.options[60].selected = true;
     select.focus();
   });
 
@@ -388,6 +389,16 @@ add_task(function* test_large_popup() {
     ok(rect.top >= browserRect.top, "Popup top position in within browser area");
     ok(rect.bottom <= browserRect.bottom, "Popup bottom position in within browser area");
 
+    // Don't check the scroll position for the last step as the popup will be cut off.
+    if (positions.length == 1) {
+      let cs = window.getComputedStyle(selectPopup);
+      let bpBottom = parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth);
+
+      is(selectPopup.childNodes[60].getBoundingClientRect().bottom,
+         selectPopup.getBoundingClientRect().bottom - bpBottom,
+         "Popup scroll at correct position " + bpBottom);
+    }
+
     yield hideSelectPopup(selectPopup, false);
 
     position = positions.shift();
@@ -401,6 +412,45 @@ add_task(function* test_large_popup() {
       select.setAttribute("style", position);
     });
     yield contentPainted;
+  }
+
+  yield BrowserTestUtils.removeTab(tab);
+});
+
+// This test checks that a mousemove event is fired correctly at the menu and
+// not at the browser, ensuring that any mouse capture has been cleared.
+add_task(function* test_mousemove_correcttarget() {
+  const pageUrl = "data:text/html," + escape(PAGECONTENT_SMALL);
+  let tab = yield BrowserTestUtils.openNewForegroundTab(gBrowser, pageUrl);
+
+  let selectPopup = document.getElementById("ContentSelectDropdown").menupopup;
+
+  let popupShownPromise = BrowserTestUtils.waitForEvent(selectPopup, "popupshown");
+  yield BrowserTestUtils.synthesizeMouseAtCenter("#one", { type: "mousedown" }, gBrowser.selectedBrowser);
+  yield popupShownPromise;
+
+  yield new Promise(resolve => {
+    window.addEventListener("mousemove", function checkForMouseMove(event) {
+      window.removeEventListener("mousemove", checkForMouseMove, true);
+      is(event.target.localName.indexOf("menu"), 0, "mouse over menu");
+      resolve();
+    }, true);
+
+    EventUtils.synthesizeMouseAtCenter(selectPopup.firstChild, { type: "mousemove" });
+  });
+
+  yield BrowserTestUtils.synthesizeMouseAtCenter("#one", { type: "mouseup" }, gBrowser.selectedBrowser);
+
+  yield hideSelectPopup(selectPopup);
+
+  // The popup should be closed when fullscreen mode is entered or exited.
+  for (let steps = 0; steps < 2; steps++) {
+    yield openSelectPopup(selectPopup, true);
+    let popupHiddenPromise = BrowserTestUtils.waitForEvent(selectPopup, "popuphidden");
+    let sizeModeChanged = BrowserTestUtils.waitForEvent(window, "sizemodechange");
+    BrowserFullScreen();
+    yield sizeModeChanged;
+    yield popupHiddenPromise;
   }
 
   yield BrowserTestUtils.removeTab(tab);

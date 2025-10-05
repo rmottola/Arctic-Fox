@@ -11,6 +11,7 @@ GENERATED_WEBIDL_FILES = [
 PREPROCESSED_WEBIDL_FILES = [
     'HTMLMediaElement.webidl',
     'Navigator.webidl',
+    'Node.webidl',
     'Promise.webidl',
     'PromiseDebugging.webidl',
     'ServiceWorkerRegistration.webidl',
@@ -128,7 +129,6 @@ WEBIDL_FILES = [
     'DOMCursor.webidl',
     'DOMError.webidl',
     'DOMException.webidl',
-    'DOMFileSystem.webidl',
     'DOMImplementation.webidl',
     'DominatorTree.webidl',
     'DOMMatrix.webidl',
@@ -162,6 +162,11 @@ WEBIDL_FILES = [
     'FileMode.webidl',
     'FileReader.webidl',
     'FileReaderSync.webidl',
+    'FileSystem.webidl',
+    'FileSystemDirectoryEntry.webidl',
+    'FileSystemDirectoryReader.webidl',
+    'FileSystemEntry.webidl',
+    'FileSystemFileEntry.webidl',
     'FlyWebDiscoveryManager.webidl',
     'FlyWebFetchEvent.webidl',
     'FlyWebPublish.webidl',
@@ -346,7 +351,6 @@ WEBIDL_FILES = [
     'NetDashboard.webidl',
     'NetworkInformation.webidl',
     'NetworkOptions.webidl',
-    'Node.webidl',
     'NodeFilter.webidl',
     'NodeIterator.webidl',
     'NodeList.webidl',
@@ -581,7 +585,7 @@ WEBIDL_FILES = [
     'VideoStreamTrack.webidl',
     'VideoTrack.webidl',
     'VideoTrackList.webidl',
-    'VRDevice.webidl',
+    'VRDisplay.webidl',
     'VTTCue.webidl',
     'VTTRegion.webidl',
     'WaveShaperNode.webidl',
@@ -914,11 +918,6 @@ if CONFIG['MOZ_EME']:
         'WidevineCDMManifest.webidl',
     ]
 
-if CONFIG['MOZ_PAY']:
-    WEBIDL_FILES += [
-        'MozPaymentProvider.webidl'
-    ]
-
 if CONFIG['MOZ_B2G']:
     WEBIDL_FILES += [
         'Apps.webidl',
@@ -932,4 +931,9 @@ if CONFIG['MOZ_B2G']:
 if CONFIG['MOZ_WIDGET_TOOLKIT'] != 'android':
     WEBIDL_FILES += [
         'AlarmsManager.webidl',
+    ]
+
+if CONFIG['ACCESSIBILITY']:
+    WEBIDL_FILES += [
+        'AccessibleNode.webidl',
     ]

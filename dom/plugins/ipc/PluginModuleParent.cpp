@@ -25,7 +25,7 @@
 #include "mozilla/ProcessHangMonitor.h"
 #include "mozilla/Services.h"
 #include "mozilla/Telemetry.h"
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 #include "nsAutoPtr.h"
 #include "nsCRT.h"
 #include "nsIFile.h"
@@ -2714,11 +2714,16 @@ PluginModuleParent::NPP_NewInternal(NPMIMEType pluginType, NPP instance,
     if (mIsFlashPlugin) {
         parentInstance->InitMetadata(strPluginType, srcAttribute);
 #ifdef XP_WIN
-        // Force windowless mode (bug 1201904) when sandbox level >= 2 or Win64
+        bool supportsAsyncRender = false;
+        CallModuleSupportsAsyncRender(&supportsAsyncRender);
 #ifdef _WIN64
-        {
+        // For 64-bit builds force windowless if the flash library doesn't support
+        // async rendering regardless of sandbox level.
+        if (!supportsAsyncRender) {
 #else
-        if (mSandboxLevel >= 2) {
+        // For 32-bit builds force windowless if the flash library doesn't support
+        // async rendering and the sandbox level is 2 or greater.
+        if (!supportsAsyncRender && mSandboxLevel >= 2) {
 #endif
            NS_NAMED_LITERAL_CSTRING(wmodeAttributeName, "wmode");
            NS_NAMED_LITERAL_CSTRING(opaqueAttributeValue, "opaque");

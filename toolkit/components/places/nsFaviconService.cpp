@@ -31,6 +31,7 @@
 #include "nsILoadInfo.h"
 #include "nsIContentPolicy.h"
 #include "nsContentUtils.h"
+#include "nsNullPrincipal.h"
 
 // For large favicons optimization.
 #include "imgITools.h"
@@ -233,8 +234,7 @@ nsFaviconService::SetAndFetchFaviconForPage(nsIURI* aPageURI,
   nsCOMPtr<nsIPrincipal> loadingPrincipal = aLoadingPrincipal;
   MOZ_ASSERT(loadingPrincipal, "please provide aLoadingPrincipal for this favicon");
   if (!loadingPrincipal) {
-    // Bug 1227289 : Let's default to the systemPrincipal if no loadingPrincipal is provided
-    // so addons not providing a loadingPrincipal do not break in release builds.
+    // Let's default to the nullPrincipal if no loadingPrincipal is provided.
     const char16_t* params[] = {
       u"nsFaviconService::setAndFetchFaviconForPage()",
       u"nsFaviconService::setAndFetchFaviconForPage(..., [optional aLoadingPrincipal])"
@@ -245,7 +245,7 @@ nsFaviconService::SetAndFetchFaviconForPage(nsIURI* aPageURI,
                                     nsContentUtils::eNECKO_PROPERTIES,
                                     "APIDeprecationWarning",
                                     params, ArrayLength(params));
-    loadingPrincipal = nsContentUtils::GetSystemPrincipal();
+    loadingPrincipal = nsNullPrincipal::Create();
   }
   NS_ENSURE_TRUE(loadingPrincipal, NS_ERROR_FAILURE);
 
@@ -395,8 +395,7 @@ nsFaviconService::ReplaceFaviconDataFromDataURL(nsIURI* aFaviconURI,
   nsCOMPtr<nsIPrincipal> loadingPrincipal = aLoadingPrincipal;
   MOZ_ASSERT(loadingPrincipal, "please provide aLoadingPrincipal for this favicon");
   if (!loadingPrincipal) {
-    // Bug 1227289 : Let's default to the systemPrincipal if no loadingPrincipal is provided
-    // so addons not providing a loadingPrincipal do not break in release builds.
+    // Let's default to the nullPrincipal if no loadingPrincipal is provided.
     const char16_t* params[] = {
       u"nsFaviconService::ReplaceFaviconDataFromDataURL()",
       u"nsFaviconService::ReplaceFaviconDataFromDataURL(..., [optional aLoadingPrincipal])"
@@ -408,7 +407,7 @@ nsFaviconService::ReplaceFaviconDataFromDataURL(nsIURI* aFaviconURI,
                                     "APIDeprecationWarning",
                                     params, ArrayLength(params));
 
-    loadingPrincipal = nsContentUtils::GetSystemPrincipal();
+    loadingPrincipal = nsNullPrincipal::Create();
   }
   NS_ENSURE_TRUE(loadingPrincipal, NS_ERROR_FAILURE);
 

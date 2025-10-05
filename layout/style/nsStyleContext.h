@@ -81,7 +81,7 @@ public:
                  already_AddRefed<ServoComputedValues> aComputedValues,
                  bool aSkipParentDisplayBasedStyleFixup);
 
-  void* operator new(size_t sz, nsPresContext* aPresContext) CPP_THROW_NEW;
+  void* operator new(size_t sz, nsPresContext* aPresContext);
   void Destroy();
 
   // These two methods are for use by ArenaRefPtr.
@@ -174,7 +174,7 @@ public:
   /**
    * Get the color property that should be used to fill text.
    */
-  nsCSSProperty GetTextFillColorProp() {
+  nsCSSPropertyID GetTextFillColorProp() {
     return StyleText()->mWebkitTextFillColorForeground
            ? eCSSProperty_color : eCSSProperty__webkit_text_fill_color;
   }
@@ -426,7 +426,7 @@ public:
    * Note that if aProperty is eCSSProperty_border_*_color, this
    * function handles -moz-use-text-color.
    */
-  nscolor GetVisitedDependentColor(nsCSSProperty aProperty);
+  nscolor GetVisitedDependentColor(nsCSSPropertyID aProperty);
 
   /**
    * aColors should be a two element array of nscolor in which the first
@@ -534,7 +534,7 @@ public:
   void StoreChangeHint(nsChangeHint aHint)
   {
     MOZ_ASSERT(!IsShared());
-    mStoredChangeHint = aHint;
+    mStoredChangeHint |= aHint;
 #ifdef DEBUG
     mConsumedChangeHint = false;
 #endif

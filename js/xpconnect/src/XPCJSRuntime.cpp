@@ -47,7 +47,7 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/ProcessHangMonitor.h"
 #include "mozilla/UniquePtrExtensions.h"
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 #include "AccessCheck.h"
 #include "nsGlobalWindow.h"
 #include "nsAboutProtocolUtils.h"
@@ -731,7 +731,7 @@ XPCJSRuntime::CustomGCCallback(JSGCStatus status)
 /* static */ void
 XPCJSRuntime::FinalizeCallback(JSFreeOp* fop,
                                JSFinalizeStatus status,
-                               bool isCompartmentGC,
+                               bool isZoneGC,
                                void* data)
 {
     XPCJSRuntime* self = nsXPConnect::GetRuntimeInstance();
@@ -804,43 +804,21 @@ XPCJSRuntime::FinalizeCallback(JSFreeOp* fop,
                         if (set)
                             set->Mark();
                     }
-                    if (ccxp->CanGetInterface()) {
-                        XPCNativeInterface* iface = ccxp->GetInterface();
-                        if (iface)
-                            iface->Mark();
-                    }
                     ccxp = ccxp->GetPrevCallContext();
                 }
             }
 
-            // Do the sweeping. During a compartment GC, only
-            // WrappedNativeProtos in collected compartments will be
-            // marked. Therefore, some reachable NativeInterfaces will not be
-            // marked, so it is not safe to sweep them. We still need to unmark
-            // them, since the ones pointed to by WrappedNativeProtos in a
-            // compartment being collected will be marked.
+            // Do the sweeping. During a zone GC, only WrappedNativeProtos in
+            // collected zones will be marked. Therefore, some reachable
+            // NativeInterfaces will not be marked, so it is not safe to sweep
+            // them. We still need to unmark them, since the ones pointed to by
+            // WrappedNativeProtos in a zone being collected will be marked.
             //
-            // Ideally, if NativeInterfaces from different compartments were
-            // kept separate, we could sweep only the ones belonging to
-            // compartments being collected. Currently, though, NativeInterfaces
-            // are shared between compartments. This ought to be fixed.
-            bool doSweep = !isCompartmentGC;
-
-            // We don't want to sweep the JSClasses at shutdown time.
-            // At this point there may be JSObjects using them that have
-            // been removed from the other maps.
-            if (!nsXPConnect::XPConnect()->IsShuttingDown()) {
-                for (auto i = self->mNativeScriptableSharedMap->Iter(); !i.Done(); i.Next()) {
-                    auto entry = static_cast<XPCNativeScriptableSharedMap::Entry*>(i.Get());
-                    XPCNativeScriptableShared* shared = entry->key;
-                    if (shared->IsMarked()) {
-                        shared->Unmark();
-                    } else if (doSweep) {
-                        delete shared;
-                        i.Remove();
-                    }
-                }
-            }
+            // Ideally, if NativeInterfaces from different zones were kept
+            // separate, we could sweep only the ones belonging to zones being
+            // collected. Currently, though, NativeInterfaces are shared between
+            // zones. This ought to be fixed.
+            bool doSweep = !isZoneGC;
 
             if (doSweep) {
                 for (auto i = self->mClassInfo2NativeSetMap->Iter(); !i.Done(); i.Next()) {
@@ -857,17 +835,6 @@ XPCJSRuntime::FinalizeCallback(JSFreeOp* fop,
                     set->Unmark();
                 } else if (doSweep) {
                     XPCNativeSet::DestroyInstance(set);
-                    i.Remove();
-                }
-            }
-
-            for (auto i = self->mIID2NativeInterfaceMap->Iter(); !i.Done(); i.Next()) {
-                auto entry = static_cast<IID2NativeInterfaceMap::Entry*>(i.Get());
-                XPCNativeInterface* iface = entry->value;
-                if (iface->IsMarked()) {
-                    iface->Unmark();
-                } else if (doSweep) {
-                    XPCNativeInterface::DestroyInstance(iface);
                     i.Remove();
                 }
             }
@@ -1841,12 +1808,14 @@ class JSMainRuntimeTemporaryPeakReporter final : public nsIMemoryReporter
     NS_IMETHOD CollectReports(nsIHandleReportCallback* aHandleReport,
                               nsISupports* aData, bool aAnonymize) override
     {
-        return MOZ_COLLECT_REPORT("js-main-runtime-temporary-peak",
-            KIND_OTHER, UNITS_BYTES,
+        MOZ_COLLECT_REPORT(
+            "js-main-runtime-temporary-peak", KIND_OTHER, UNITS_BYTES,
             JSMainRuntimeTemporaryPeakDistinguishedAmount(),
             "Peak transient data size in the main JSRuntime (the current size "
             "of which is reported as "
             "'explicit/js-non-window/runtime/temporary').");
+
+        return NS_OK;
     }
 };
 
@@ -1859,103 +1828,87 @@ NS_IMPL_ISUPPORTS(JSMainRuntimeTemporaryPeakReporter, nsIMemoryReporter)
 
 #define SUNDRIES_THRESHOLD js::MemoryReportingSundriesThreshold()
 
-#define REPORT(_path, _kind, _units, _amount, _desc)                          \
-    do {                                                                      \
-        nsresult rv;                                                          \
-        rv = cb->Callback(EmptyCString(), _path,                              \
-                          nsIMemoryReporter::_kind,                           \
-                          nsIMemoryReporter::_units,                          \
-                          _amount,                                            \
-                          NS_LITERAL_CSTRING(_desc),                          \
-                          closure);                                           \
-        NS_ENSURE_SUCCESS(rv, rv);                                            \
-    } while (0)
+#define REPORT(_path, _kind, _units, _amount, _desc) \
+    handleReport->Callback(EmptyCString(), _path, \
+                           nsIMemoryReporter::_kind, \
+                           nsIMemoryReporter::_units, _amount, \
+                           NS_LITERAL_CSTRING(_desc), data); \
 
-#define REPORT_BYTES(_path, _kind, _amount, _desc)                            \
+#define REPORT_BYTES(_path, _kind, _amount, _desc) \
     REPORT(_path, _kind, UNITS_BYTES, _amount, _desc);
 
-#define REPORT_GC_BYTES(_path, _amount, _desc)                                \
-    do {                                                                      \
-        size_t amount = _amount;  /* evaluate _amount only once */            \
-        nsresult rv;                                                          \
-        rv = cb->Callback(EmptyCString(), _path,                              \
-                          nsIMemoryReporter::KIND_NONHEAP,                    \
-                          nsIMemoryReporter::UNITS_BYTES, amount,             \
-                          NS_LITERAL_CSTRING(_desc), closure);                \
-        NS_ENSURE_SUCCESS(rv, rv);                                            \
-        gcTotal += amount;                                                    \
+#define REPORT_GC_BYTES(_path, _amount, _desc) \
+    do { \
+        size_t amount = _amount;  /* evaluate _amount only once */ \
+        handleReport->Callback(EmptyCString(), _path, \
+                               nsIMemoryReporter::KIND_NONHEAP, \
+                               nsIMemoryReporter::UNITS_BYTES, amount, \
+                               NS_LITERAL_CSTRING(_desc), data); \
+        gcTotal += amount; \
     } while (0)
 
 // Report compartment/zone non-GC (KIND_HEAP) bytes.
-#define ZCREPORT_BYTES(_path, _amount, _desc)                                 \
-    do {                                                                      \
-        /* Assign _descLiteral plus "" into a char* to prove that it's */     \
-        /* actually a literal. */                                             \
-        size_t amount = _amount;  /* evaluate _amount only once */            \
-        if (amount >= SUNDRIES_THRESHOLD) {                                   \
-            nsresult rv;                                                      \
-            rv = cb->Callback(EmptyCString(), _path,                          \
-                              nsIMemoryReporter::KIND_HEAP,                   \
-                              nsIMemoryReporter::UNITS_BYTES, amount,         \
-                              NS_LITERAL_CSTRING(_desc), closure);            \
-            NS_ENSURE_SUCCESS(rv, rv);                                        \
-        } else {                                                              \
-            sundriesMallocHeap += amount;                                     \
-        }                                                                     \
+#define ZCREPORT_BYTES(_path, _amount, _desc) \
+    do { \
+        /* Assign _descLiteral plus "" into a char* to prove that it's */ \
+        /* actually a literal. */ \
+        size_t amount = _amount;  /* evaluate _amount only once */ \
+        if (amount >= SUNDRIES_THRESHOLD) { \
+            handleReport->Callback(EmptyCString(), _path, \
+                                   nsIMemoryReporter::KIND_HEAP, \
+                                   nsIMemoryReporter::UNITS_BYTES, amount, \
+                                   NS_LITERAL_CSTRING(_desc), data); \
+        } else { \
+            sundriesMallocHeap += amount; \
+        } \
     } while (0)
 
 // Report compartment/zone GC bytes.
-#define ZCREPORT_GC_BYTES(_path, _amount, _desc)                              \
-    do {                                                                      \
-        size_t amount = _amount;  /* evaluate _amount only once */            \
-        if (amount >= SUNDRIES_THRESHOLD) {                                   \
-            nsresult rv;                                                      \
-            rv = cb->Callback(EmptyCString(), _path,                          \
-                              nsIMemoryReporter::KIND_NONHEAP,                \
-                              nsIMemoryReporter::UNITS_BYTES, amount,         \
-                              NS_LITERAL_CSTRING(_desc), closure);            \
-            NS_ENSURE_SUCCESS(rv, rv);                                        \
-            gcTotal += amount;                                                \
-        } else {                                                              \
-            sundriesGCHeap += amount;                                         \
-        }                                                                     \
+#define ZCREPORT_GC_BYTES(_path, _amount, _desc) \
+    do { \
+        size_t amount = _amount;  /* evaluate _amount only once */ \
+        if (amount >= SUNDRIES_THRESHOLD) { \
+            handleReport->Callback(EmptyCString(), _path, \
+                                   nsIMemoryReporter::KIND_NONHEAP, \
+                                   nsIMemoryReporter::UNITS_BYTES, amount, \
+                                   NS_LITERAL_CSTRING(_desc), data); \
+            gcTotal += amount; \
+        } else { \
+            sundriesGCHeap += amount; \
+        } \
     } while (0)
 
 // Report runtime bytes.
-#define RREPORT_BYTES(_path, _kind, _amount, _desc)                           \
-    do {                                                                      \
-        size_t amount = _amount;  /* evaluate _amount only once */            \
-        nsresult rv;                                                          \
-        rv = cb->Callback(EmptyCString(), _path,                              \
-                          nsIMemoryReporter::_kind,                           \
-                          nsIMemoryReporter::UNITS_BYTES, amount,             \
-                          NS_LITERAL_CSTRING(_desc), closure);                \
-        NS_ENSURE_SUCCESS(rv, rv);                                            \
-        rtTotal += amount;                                                    \
+#define RREPORT_BYTES(_path, _kind, _amount, _desc) \
+    do { \
+        size_t amount = _amount;  /* evaluate _amount only once */ \
+        handleReport->Callback(EmptyCString(), _path, \
+                               nsIMemoryReporter::_kind, \
+                               nsIMemoryReporter::UNITS_BYTES, amount, \
+                               NS_LITERAL_CSTRING(_desc), data); \
+        rtTotal += amount; \
     } while (0)
 
 // Report GC thing bytes.
-#define MREPORT_BYTES(_path, _kind, _amount, _desc)                           \
-    do {                                                                      \
-        size_t amount = _amount;  /* evaluate _amount only once */            \
-        nsresult rv;                                                          \
-        rv = cb->Callback(EmptyCString(), _path,                              \
-                          nsIMemoryReporter::_kind,                           \
-                          nsIMemoryReporter::UNITS_BYTES, amount,             \
-                          NS_LITERAL_CSTRING(_desc), closure);                \
-        NS_ENSURE_SUCCESS(rv, rv);                                            \
-        gcThingTotal += amount;                                               \
+#define MREPORT_BYTES(_path, _kind, _amount, _desc) \
+    do { \
+        size_t amount = _amount;  /* evaluate _amount only once */ \
+        handleReport->Callback(EmptyCString(), _path, \
+                               nsIMemoryReporter::_kind, \
+                               nsIMemoryReporter::UNITS_BYTES, amount, \
+                               NS_LITERAL_CSTRING(_desc), data); \
+        gcThingTotal += amount; \
     } while (0)
 
 MOZ_DEFINE_MALLOC_SIZE_OF(JSMallocSizeOf)
 
 namespace xpc {
 
-static nsresult
+static void
 ReportZoneStats(const JS::ZoneStats& zStats,
                 const xpc::ZoneStatsExtras& extras,
-                nsIMemoryReporterCallback* cb,
-                nsISupports* closure,
+                nsIHandleReportCallback* handleReport,
+                nsISupports* data,
                 bool anonymize,
                 size_t* gcTotalOut = nullptr)
 {
@@ -1980,13 +1933,17 @@ ReportZoneStats(const JS::ZoneStats& zStats,
         zStats.uniqueIdMap,
         "Address-independent cell identities.");
 
+    ZCREPORT_BYTES(pathPrefix + NS_LITERAL_CSTRING("shape-tables"),
+        zStats.shapeTables,
+        "Tables storing shape information.");
+
     ZCREPORT_GC_BYTES(pathPrefix + NS_LITERAL_CSTRING("lazy-scripts/gc-heap"),
         zStats.lazyScriptsGCHeap,
         "Scripts that haven't executed yet.");
 
     ZCREPORT_BYTES(pathPrefix + NS_LITERAL_CSTRING("lazy-scripts/malloc-heap"),
         zStats.lazyScriptsMallocHeap,
-        "Lazy script tables containing free variables or inner functions.");
+        "Lazy script tables containing closed-over bindings or inner functions.");
 
     ZCREPORT_GC_BYTES(pathPrefix + NS_LITERAL_CSTRING("jit-codes-gc-heap"),
         zStats.jitCodesGCHeap,
@@ -1999,6 +1956,14 @@ ReportZoneStats(const JS::ZoneStats& zStats,
     ZCREPORT_BYTES(pathPrefix + NS_LITERAL_CSTRING("object-groups/malloc-heap"),
         zStats.objectGroupsMallocHeap,
         "Object group addenda.");
+
+    ZCREPORT_GC_BYTES(pathPrefix + NS_LITERAL_CSTRING("scopes/gc-heap"),
+        zStats.scopesGCHeap,
+        "Scope information for scripts.");
+
+    ZCREPORT_BYTES(pathPrefix + NS_LITERAL_CSTRING("scopes/malloc-heap"),
+        zStats.scopesMallocHeap,
+        "Arrays of binding names and other binding-related data.");
 
     ZCREPORT_BYTES(pathPrefix + NS_LITERAL_CSTRING("type-pool"),
         zStats.typePool,
@@ -2134,6 +2099,43 @@ ReportZoneStats(const JS::ZoneStats& zStats,
             "is refreshed.");
     }
 
+    const JS::ShapeInfo& shapeInfo = zStats.shapeInfo;
+    if (shapeInfo.shapesGCHeapTree > 0) {
+        REPORT_GC_BYTES(pathPrefix + NS_LITERAL_CSTRING("shapes/gc-heap/tree"),
+            shapeInfo.shapesGCHeapTree,
+        "Shapes in a property tree.");
+    }
+
+    if (shapeInfo.shapesGCHeapDict > 0) {
+        REPORT_GC_BYTES(pathPrefix + NS_LITERAL_CSTRING("shapes/gc-heap/dict"),
+            shapeInfo.shapesGCHeapDict,
+        "Shapes in dictionary mode.");
+    }
+
+    if (shapeInfo.shapesGCHeapBase > 0) {
+        REPORT_GC_BYTES(pathPrefix + NS_LITERAL_CSTRING("shapes/gc-heap/base"),
+            shapeInfo.shapesGCHeapBase,
+            "Base shapes, which collate data common to many shapes.");
+    }
+
+    if (shapeInfo.shapesMallocHeapTreeTables > 0) {
+        REPORT_BYTES(pathPrefix + NS_LITERAL_CSTRING("shapes/malloc-heap/tree-tables"),
+            KIND_HEAP, shapeInfo.shapesMallocHeapTreeTables,
+            "Property tables of shapes in a property tree.");
+    }
+
+    if (shapeInfo.shapesMallocHeapDictTables > 0) {
+        REPORT_BYTES(pathPrefix + NS_LITERAL_CSTRING("shapes/malloc-heap/dict-tables"),
+            KIND_HEAP, shapeInfo.shapesMallocHeapDictTables,
+            "Property tables of shapes in dictionary mode.");
+    }
+
+    if (shapeInfo.shapesMallocHeapTreeKids > 0) {
+        REPORT_BYTES(pathPrefix + NS_LITERAL_CSTRING("shapes/malloc-heap/tree-kids"),
+            KIND_HEAP, shapeInfo.shapesMallocHeapTreeKids,
+            "Kid hashes of shapes in a property tree.");
+    }
+
     if (sundriesGCHeap > 0) {
         // We deliberately don't use ZCREPORT_GC_BYTES here.
         REPORT_GC_BYTES(pathPrefix + NS_LITERAL_CSTRING("sundries/gc-heap"),
@@ -2153,15 +2155,13 @@ ReportZoneStats(const JS::ZoneStats& zStats,
     if (gcTotalOut)
         *gcTotalOut += gcTotal;
 
-    return NS_OK;
-
 #   undef STRING_LENGTH
 }
 
-static nsresult
+static void
 ReportClassStats(const ClassInfo& classInfo, const nsACString& path,
-                 const nsACString& shapesPath, nsIHandleReportCallback* cb,
-                 nsISupports* closure, size_t& gcTotal)
+                 nsIHandleReportCallback* handleReport,
+                 nsISupports* data, size_t& gcTotal)
 {
     // We deliberately don't use ZCREPORT_BYTES, so that these per-class values
     // don't go into sundries.
@@ -2229,59 +2229,20 @@ ReportClassStats(const ClassInfo& classInfo, const nsACString& path,
             KIND_HEAP, classInfo.objectsMallocHeapMisc,
             "Miscellaneous object data.");
     }
-
-    if (classInfo.shapesGCHeapTree > 0) {
-        REPORT_GC_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/gc-heap/tree"),
-            classInfo.shapesGCHeapTree,
-        "Shapes in a property tree.");
-    }
-
-    if (classInfo.shapesGCHeapDict > 0) {
-        REPORT_GC_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/gc-heap/dict"),
-            classInfo.shapesGCHeapDict,
-        "Shapes in dictionary mode.");
-    }
-
-    if (classInfo.shapesGCHeapBase > 0) {
-        REPORT_GC_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/gc-heap/base"),
-            classInfo.shapesGCHeapBase,
-            "Base shapes, which collate data common to many shapes.");
-    }
-
-    if (classInfo.shapesMallocHeapTreeTables > 0) {
-        REPORT_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/malloc-heap/tree-tables"),
-            KIND_HEAP, classInfo.shapesMallocHeapTreeTables,
-            "Property tables of shapes in a property tree.");
-    }
-
-    if (classInfo.shapesMallocHeapDictTables > 0) {
-        REPORT_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/malloc-heap/dict-tables"),
-            KIND_HEAP, classInfo.shapesMallocHeapDictTables,
-            "Property tables of shapes in dictionary mode.");
-    }
-
-    if (classInfo.shapesMallocHeapTreeKids > 0) {
-        REPORT_BYTES(shapesPath + NS_LITERAL_CSTRING("shapes/malloc-heap/tree-kids"),
-            KIND_HEAP, classInfo.shapesMallocHeapTreeKids,
-            "Kid hashes of shapes in a property tree.");
-    }
-
-    return NS_OK;
 }
 
-static nsresult
+static void
 ReportCompartmentStats(const JS::CompartmentStats& cStats,
                        const xpc::CompartmentStatsExtras& extras,
                        amIAddonManager* addonManager,
-                       nsIMemoryReporterCallback* cb,
-                       nsISupports* closure, size_t* gcTotalOut = nullptr)
+                       nsIHandleReportCallback* handleReport,
+                       nsISupports* data, size_t* gcTotalOut = nullptr)
 {
     static const nsDependentCString addonPrefix("explicit/add-ons/");
 
     size_t gcTotal = 0, sundriesGCHeap = 0, sundriesMallocHeap = 0;
     nsAutoCString cJSPathPrefix(extras.jsPathPrefix);
     nsAutoCString cDOMPathPrefix(extras.domPathPrefix);
-    nsresult rv;
 
     MOZ_ASSERT(!gcTotalOut == cStats.isTotals);
 
@@ -2309,13 +2270,8 @@ ReportCompartmentStats(const JS::CompartmentStats& cStats,
                     ? NS_LITERAL_CSTRING("classes/")
                     : NS_LITERAL_CSTRING("classes/class(<non-notable classes>)/");
 
-    // XXX: shapes need special treatment until bug 1265271 is fixed.
-    nsCString shapesPath = cJSPathPrefix;
-    shapesPath += NS_LITERAL_CSTRING("classes/");
-
-    rv = ReportClassStats(cStats.classInfo, nonNotablePath, shapesPath, cb,
-                          closure, gcTotal);
-    NS_ENSURE_SUCCESS(rv, rv);
+    ReportClassStats(cStats.classInfo, nonNotablePath, handleReport, data,
+                     gcTotal);
 
     for (size_t i = 0; i < cStats.notableClasses.length(); i++) {
         MOZ_ASSERT(!cStats.isTotals);
@@ -2324,9 +2280,7 @@ ReportCompartmentStats(const JS::CompartmentStats& cStats,
         nsCString classPath = cJSPathPrefix +
             nsPrintfCString("classes/class(%s)/", classInfo.className_);
 
-        rv = ReportClassStats(classInfo, classPath, shapesPath, cb, closure,
-                              gcTotal);
-        NS_ENSURE_SUCCESS(rv, rv);
+        ReportClassStats(classInfo, classPath, handleReport, data, gcTotal);
     }
 
     // Note that we use cDOMPathPrefix here.  This is because we measure orphan
@@ -2380,7 +2334,7 @@ ReportCompartmentStats(const JS::CompartmentStats& cStats,
 
     ZCREPORT_BYTES(cJSPathPrefix + NS_LITERAL_CSTRING("compartment-tables"),
         cStats.compartmentTables,
-        "Compartment-wide tables storing shape and type object information.");
+        "Compartment-wide tables storing object group information and wasm instances.");
 
     ZCREPORT_BYTES(cJSPathPrefix + NS_LITERAL_CSTRING("inner-views"),
         cStats.innerViewsTable,
@@ -2437,44 +2391,38 @@ ReportCompartmentStats(const JS::CompartmentStats& cStats,
 
     if (gcTotalOut)
         *gcTotalOut += gcTotal;
-
-    return NS_OK;
 }
 
-static nsresult
+static void
 ReportScriptSourceStats(const ScriptSourceInfo& scriptSourceInfo,
                         const nsACString& path,
-                        nsIHandleReportCallback* cb, nsISupports* closure,
-                        size_t& rtTotal)
+                        nsIHandleReportCallback* handleReport,
+                        nsISupports* data, size_t& rtTotal)
 {
     if (scriptSourceInfo.misc > 0) {
         RREPORT_BYTES(path + NS_LITERAL_CSTRING("misc"),
             KIND_HEAP, scriptSourceInfo.misc,
             "Miscellaneous data relating to JavaScript source code.");
     }
-
-    return NS_OK;
 }
 
-static nsresult
+static void
 ReportJSRuntimeExplicitTreeStats(const JS::RuntimeStats& rtStats,
                                  const nsACString& rtPath,
                                  amIAddonManager* addonManager,
-                                 nsIMemoryReporterCallback* cb,
-                                 nsISupports* closure,
+                                 nsIHandleReportCallback* handleReport,
+                                 nsISupports* data,
                                  bool anonymize,
                                  size_t* rtTotalOut)
 {
-    nsresult rv;
-
     size_t gcTotal = 0;
 
     for (size_t i = 0; i < rtStats.zoneStatsVector.length(); i++) {
         const JS::ZoneStats& zStats = rtStats.zoneStatsVector[i];
         const xpc::ZoneStatsExtras* extras =
           static_cast<const xpc::ZoneStatsExtras*>(zStats.extra);
-        rv = ReportZoneStats(zStats, *extras, cb, closure, anonymize, &gcTotal);
-        NS_ENSURE_SUCCESS(rv, rv);
+        ReportZoneStats(zStats, *extras, handleReport, data, anonymize,
+                        &gcTotal);
     }
 
     for (size_t i = 0; i < rtStats.compartmentStatsVector.length(); i++) {
@@ -2482,9 +2430,8 @@ ReportJSRuntimeExplicitTreeStats(const JS::RuntimeStats& rtStats,
         const xpc::CompartmentStatsExtras* extras =
             static_cast<const xpc::CompartmentStatsExtras*>(cStats.extra);
 
-        rv = ReportCompartmentStats(cStats, *extras, addonManager, cb, closure,
-                                    &gcTotal);
-        NS_ENSURE_SUCCESS(rv, rv);
+        ReportCompartmentStats(cStats, *extras, addonManager, handleReport,
+                               data, &gcTotal);
     }
 
     // Report the rtStats.runtime numbers under "runtime/", and compute their
@@ -2533,9 +2480,8 @@ ReportJSRuntimeExplicitTreeStats(const JS::RuntimeStats& rtStats,
         rtPath + nsPrintfCString("runtime/script-sources/source(scripts=%d, <non-notable files>)/",
                                  rtStats.runtime.scriptSourceInfo.numScripts);
 
-    rv = ReportScriptSourceStats(rtStats.runtime.scriptSourceInfo,
-                                 nonNotablePath, cb, closure, rtTotal);
-    NS_ENSURE_SUCCESS(rv, rv);
+    ReportScriptSourceStats(rtStats.runtime.scriptSourceInfo,
+                            nonNotablePath, handleReport, data, rtTotal);
 
     for (size_t i = 0; i < rtStats.runtime.notableScriptSources.length(); i++) {
         const JS::NotableScriptSourceInfo& scriptSourceInfo =
@@ -2559,9 +2505,8 @@ ReportJSRuntimeExplicitTreeStats(const JS::RuntimeStats& rtStats,
             nsPrintfCString("runtime/script-sources/source(scripts=%d, %s)/",
                             scriptSourceInfo.numScripts, escapedFilename.get());
 
-        rv = ReportScriptSourceStats(scriptSourceInfo, notablePath,
-                                     cb, closure, rtTotal);
-        NS_ENSURE_SUCCESS(rv, rv);
+        ReportScriptSourceStats(scriptSourceInfo, notablePath,
+                                handleReport, data, rtTotal);
     }
 
     RREPORT_BYTES(rtPath + NS_LITERAL_CSTRING("runtime/code/ion"),
@@ -2631,11 +2576,6 @@ ReportJSRuntimeExplicitTreeStats(const JS::RuntimeStats& rtStats,
         "GC arenas in non-empty chunks that is decommitted, i.e. it takes up "
         "address space but no physical memory or swap space.");
 
-    REPORT_BYTES(rtPath2 + NS_LITERAL_CSTRING("runtime/gc/nursery-decommitted"),
-        KIND_NONHEAP, rtStats.runtime.gc.nurseryDecommitted,
-        "Memory allocated to the GC's nursery that is decommitted, i.e. it takes up "
-        "address space but no physical memory or swap space.");
-
     REPORT_GC_BYTES(rtPath + NS_LITERAL_CSTRING("gc-heap/unused-chunks"),
         rtStats.gcHeapUnusedChunks,
         "Empty GC chunks which will soon be released unless claimed for new "
@@ -2652,15 +2592,13 @@ ReportJSRuntimeExplicitTreeStats(const JS::RuntimeStats& rtStats,
     // gcTotal is the sum of everything we've reported for the GC heap.  It
     // should equal rtStats.gcHeapChunkTotal.
     MOZ_ASSERT(gcTotal == rtStats.gcHeapChunkTotal);
-
-    return NS_OK;
 }
 
-nsresult
+void
 ReportJSRuntimeExplicitTreeStats(const JS::RuntimeStats& rtStats,
                                  const nsACString& rtPath,
-                                 nsIMemoryReporterCallback* cb,
-                                 nsISupports* closure,
+                                 nsIHandleReportCallback* handleReport,
+                                 nsISupports* data,
                                  bool anonymize,
                                  size_t* rtTotalOut)
 {
@@ -2669,8 +2607,8 @@ ReportJSRuntimeExplicitTreeStats(const JS::RuntimeStats& rtStats,
         // Only try to access the service from the main process.
         am = do_GetService("@mozilla.org/addons/integration;1");
     }
-    return ReportJSRuntimeExplicitTreeStats(rtStats, rtPath, am.get(),
-                                            cb, closure, anonymize, rtTotalOut);
+    ReportJSRuntimeExplicitTreeStats(rtStats, rtPath, am.get(), handleReport,
+                                     data, anonymize, rtTotalOut);
 }
 
 
@@ -2701,20 +2639,21 @@ class JSMainRuntimeCompartmentsReporter final : public nsIMemoryReporter
         mozilla::Unused << data->paths.append(path);
     }
 
-    NS_IMETHOD CollectReports(nsIMemoryReporterCallback* cb,
-                              nsISupports* closure, bool anonymize) override
+    NS_IMETHOD CollectReports(nsIHandleReportCallback* handleReport,
+                              nsISupports* data, bool anonymize) override
     {
         // First we collect the compartment paths.  Then we report them.  Doing
-        // the two steps interleaved is a bad idea, because calling |cb|
-        // from within CompartmentCallback() leads to all manner of assertions.
+        // the two steps interleaved is a bad idea, because calling
+        // |handleReport| from within CompartmentCallback() leads to all manner
+        // of assertions.
 
-        Data data;
-        data.anonymizeID = anonymize ? 1 : 0;
+        Data d;
+        d.anonymizeID = anonymize ? 1 : 0;
         JS_IterateCompartments(nsXPConnect::GetRuntimeInstance()->Context(),
-                               &data, CompartmentCallback);
+                               &d, CompartmentCallback);
 
-        for (size_t i = 0; i < data.paths.length(); i++)
-            REPORT(nsCString(data.paths[i]), KIND_OTHER, UNITS_COUNT, 1,
+        for (size_t i = 0; i < d.paths.length(); i++)
+            REPORT(nsCString(d.paths[i]), KIND_OTHER, UNITS_COUNT, 1,
                 "A live compartment in the main JSRuntime.");
 
         return NS_OK;
@@ -2911,11 +2850,11 @@ class XPCJSRuntimeStats : public JS::RuntimeStats
     }
 };
 
-nsresult
+void
 JSReporter::CollectReports(WindowPaths* windowPaths,
                            WindowPaths* topWindowPaths,
-                           nsIMemoryReporterCallback* cb,
-                           nsISupports* closure,
+                           nsIHandleReportCallback* handleReport,
+                           nsISupports* data,
                            bool anonymize)
 {
     XPCJSRuntime* xpcrt = nsXPConnect::GetRuntimeInstance();
@@ -2938,7 +2877,7 @@ JSReporter::CollectReports(WindowPaths* windowPaths,
     if (!JS::CollectRuntimeStats(xpcrt->Context(), &rtStats, &orphanReporter,
                                  anonymize))
     {
-        return NS_ERROR_FAILURE;
+        return;
     }
 
     size_t xpcJSRuntimeSize = xpcrt->SizeOfIncludingThis(JSMallocSizeOf);
@@ -2954,26 +2893,23 @@ JSReporter::CollectReports(WindowPaths* windowPaths,
     // This is the second step (see above).  First we report stuff in the
     // "explicit" tree, then we report other stuff.
 
-    nsresult rv;
     size_t rtTotal = 0;
-    rv = xpc::ReportJSRuntimeExplicitTreeStats(rtStats,
-                                               NS_LITERAL_CSTRING("explicit/js-non-window/"),
-                                               addonManager, cb, closure,
-                                               anonymize, &rtTotal);
-    NS_ENSURE_SUCCESS(rv, rv);
+    xpc::ReportJSRuntimeExplicitTreeStats(rtStats,
+                                          NS_LITERAL_CSTRING("explicit/js-non-window/"),
+                                          addonManager, handleReport, data,
+                                          anonymize, &rtTotal);
 
     // Report the sums of the compartment numbers.
     xpc::CompartmentStatsExtras cExtrasTotal;
     cExtrasTotal.jsPathPrefix.AssignLiteral("js-main-runtime/compartments/");
     cExtrasTotal.domPathPrefix.AssignLiteral("window-objects/dom/");
-    rv = ReportCompartmentStats(rtStats.cTotals, cExtrasTotal, addonManager,
-                                cb, closure);
-    NS_ENSURE_SUCCESS(rv, rv);
+    ReportCompartmentStats(rtStats.cTotals, cExtrasTotal, addonManager,
+                           handleReport, data);
 
     xpc::ZoneStatsExtras zExtrasTotal;
     zExtrasTotal.pathPrefix.AssignLiteral("js-main-runtime/zones/");
-    rv = ReportZoneStats(rtStats.zTotals, zExtrasTotal, cb, closure, anonymize);
-    NS_ENSURE_SUCCESS(rv, rv);
+    ReportZoneStats(rtStats.zTotals, zExtrasTotal, handleReport, data,
+                    anonymize);
 
     // Report the sum of the runtime/ numbers.
     REPORT_BYTES(NS_LITERAL_CSTRING("js-main-runtime/runtime"),
@@ -3028,6 +2964,10 @@ JSReporter::CollectReports(WindowPaths* windowPaths,
         KIND_OTHER, rtStats.zTotals.unusedGCThings.objectGroup,
         "Unused object group cells within non-empty arenas.");
 
+    REPORT_BYTES(NS_LITERAL_CSTRING("js-main-runtime-gc-heap-committed/unused/gc-things/scopes"),
+        KIND_OTHER, rtStats.zTotals.unusedGCThings.scope,
+        "Unused scope cells within non-empty arenas.");
+
     REPORT_BYTES(NS_LITERAL_CSTRING("js-main-runtime-gc-heap-committed/unused/gc-things/scripts"),
         KIND_OTHER, rtStats.zTotals.unusedGCThings.script,
         "Unused script cells within non-empty arenas.");
@@ -3064,16 +3004,20 @@ JSReporter::CollectReports(WindowPaths* windowPaths,
 
     MREPORT_BYTES(NS_LITERAL_CSTRING("js-main-runtime-gc-heap-committed/used/gc-things/shapes"),
         KIND_OTHER,
-        rtStats.cTotals.classInfo.shapesGCHeapTree + rtStats.cTotals.classInfo.shapesGCHeapDict,
+        rtStats.zTotals.shapeInfo.shapesGCHeapTree + rtStats.zTotals.shapeInfo.shapesGCHeapDict,
         "Used shape cells.");
 
     MREPORT_BYTES(NS_LITERAL_CSTRING("js-main-runtime-gc-heap-committed/used/gc-things/base-shapes"),
-        KIND_OTHER, rtStats.cTotals.classInfo.shapesGCHeapBase,
+        KIND_OTHER, rtStats.zTotals.shapeInfo.shapesGCHeapBase,
         "Used base shape cells.");
 
     MREPORT_BYTES(NS_LITERAL_CSTRING("js-main-runtime-gc-heap-committed/used/gc-things/object-groups"),
         KIND_OTHER, rtStats.zTotals.objectGroupsGCHeap,
         "Used object group cells.");
+
+    MREPORT_BYTES(NS_LITERAL_CSTRING("js-main-runtime-gc-heap-committed/used/gc-things/scopes"),
+        KIND_OTHER, rtStats.zTotals.scopesGCHeap,
+        "Used scope cells.");
 
     MREPORT_BYTES(NS_LITERAL_CSTRING("js-main-runtime-gc-heap-committed/used/gc-things/scripts"),
         KIND_OTHER, rtStats.cTotals.scriptsGCHeap,
@@ -3110,8 +3054,6 @@ JSReporter::CollectReports(WindowPaths* windowPaths,
     REPORT_BYTES(NS_LITERAL_CSTRING("explicit/xpconnect/js-component-loader"),
         KIND_HEAP, jsComponentLoaderSize,
         "XPConnect's JS component loader.");
-
-    return NS_OK;
 }
 
 static nsresult
@@ -3143,7 +3085,7 @@ AccumulateTelemetryCallback(int id, uint32_t sample, const char* key)
       case JS_TELEMETRY_GC_REASON:
         Telemetry::Accumulate(Telemetry::GC_REASON_2, sample);
         break;
-      case JS_TELEMETRY_GC_IS_COMPARTMENTAL:
+      case JS_TELEMETRY_GC_IS_ZONE_GC:
         Telemetry::Accumulate(Telemetry::GC_IS_COMPARTMENTAL, sample);
         break;
       case JS_TELEMETRY_GC_MS:
@@ -3208,6 +3150,9 @@ AccumulateTelemetryCallback(int id, uint32_t sample, const char* key)
         break;
       case JS_TELEMETRY_GC_NURSERY_BYTES:
         Telemetry::Accumulate(Telemetry::GC_NURSERY_BYTES, sample);
+        break;
+      case JS_TELEMETRY_GC_PRETENURE_COUNT:
+        Telemetry::Accumulate(Telemetry::GC_PRETENURE_COUNT, sample);
         break;
       case JS_TELEMETRY_DEPRECATED_LANGUAGE_EXTENSIONS_IN_CONTENT:
         Telemetry::Accumulate(Telemetry::JS_DEPRECATED_LANGUAGE_EXTENSIONS_IN_CONTENT, sample);

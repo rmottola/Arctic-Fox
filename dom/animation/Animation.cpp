@@ -769,7 +769,7 @@ Animation::HasLowerCompositeOrderThan(const Animation& aOther) const
 
 void
 Animation::ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
-                        nsCSSPropertySet& aSetProperties)
+                        nsCSSPropertyIDSet& aSetProperties)
 {
   if (!mEffect) {
     return;
@@ -1071,6 +1071,9 @@ Animation::UpdateFinishedState(SeekFlag aSeekFlag,
                currentTime.Value().ToMilliseconds() <= 0.0) {
       if (aSeekFlag == SeekFlag::DidSeek) {
         mHoldTime = currentTime;
+      } else if (!mPreviousCurrentTime.IsNull()) {
+        mHoldTime.SetValue(std::min(mPreviousCurrentTime.Value(),
+                                    TimeDuration(0)));
       } else {
         mHoldTime.SetValue(0);
       }

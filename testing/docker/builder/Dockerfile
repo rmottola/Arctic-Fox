@@ -1,11 +1,11 @@
-FROM          quay.io/mozilla/b2g-build:0.2.9
+FROM          quay.io/mozilla/b2g-build:0.2.11
 MAINTAINER    Dustin J. Mitchell <dustin@mozilla.com>
 
 ENV VERSION 1.2
 ENV PYTHONPATH /tools/tools/lib/python:$PYTHONPATH
 ENV TOOLTOOL_CACHE  /home/worker/tools/tooltool-cache
 
-ADD https://raw.githubusercontent.com/taskcluster/buildbot-step/58a16f7370a8b4de7a4458436a4a5fad9905f5d9/buildbot_step.js /home/worker/bin/buildbot_step
+ADD https://raw.githubusercontent.com/taskcluster/buildbot-step/19219c470bd95b390ed0b31d4bf455169bf12fca/buildbot_step.js /home/worker/bin/buildbot_step
 
 # Add utilities and configuration
 RUN mkdir -p /home/worker/bin /home/worker/tools

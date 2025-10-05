@@ -13,13 +13,15 @@ const Cr = Components.results;
 
 const INTEGER = /^[1-9]\d*$/;
 
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "AddonManager",
                                   "resource://gre/modules/AddonManager.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
                                   "resource://gre/modules/AppConstants.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "ConsoleAPI",
+                                  "resource://gre/modules/Console.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "LanguageDetector",
                                   "resource:///modules/translation/LanguageDetector.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Locale",
@@ -30,6 +32,15 @@ XPCOMUtils.defineLazyModuleGetter(this, "Preferences",
                                   "resource://gre/modules/Preferences.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PromiseUtils",
                                   "resource://gre/modules/PromiseUtils.jsm");
+
+function getConsole() {
+  return new ConsoleAPI({
+    maxLogLevelPref: "extensions.webextensions.log.level",
+    prefix: "WebExtensions",
+  });
+}
+
+XPCOMUtils.defineLazyGetter(this, "console", getConsole);
 
 function filterStack(error) {
   return String(error.stack).replace(/(^.*(Task\.jsm|Promise-backend\.js).*\n)+/gm, "<Promise Chain>\n");
@@ -90,6 +101,12 @@ function runSafe(context, f, ...args) {
   return runSafeWithoutClone(f, ...args);
 }
 
+function getInnerWindowID(window) {
+  return window.QueryInterface(Ci.nsIInterfaceRequestor)
+    .getInterface(Ci.nsIDOMWindowUtils)
+    .currentInnerWindowID;
+}
+
 // Return true if the given value is an instance of the given
 // native type.
 function instanceOf(value, type) {
@@ -145,15 +162,59 @@ class SpreadArgs extends Array {
 let gContextId = 0;
 
 class BaseContext {
-  constructor(extensionId) {
+  constructor(extension) {
     this.onClose = new Set();
     this.checkedLastError = false;
     this._lastError = null;
-    this.contextId = ++gContextId;
+    this.contextId = `${++gContextId}-${Services.appinfo.uniqueProcessID}`;
     this.unloaded = false;
-    this.extensionId = extensionId;
+    this.extension = extension;
+    this.extensionId = extension.id;
     this.jsonSandbox = null;
     this.active = true;
+
+    this.docShell = null;
+    this.contentWindow = null;
+    this.innerWindowID = 0;
+  }
+
+  setContentWindow(contentWindow) {
+    let {document} = contentWindow;
+    let docShell = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
+                                .getInterface(Ci.nsIDocShell);
+
+    this.innerWindowID = getInnerWindowID(contentWindow);
+
+    let onPageShow = event => {
+      if (!event || event.target === document) {
+        this.docShell = docShell;
+        this.contentWindow = contentWindow;
+        this.active = true;
+      }
+    };
+    let onPageHide = event => {
+      if (!event || event.target === document) {
+        // Put this off until the next tick.
+        Promise.resolve().then(() => {
+          this.docShell = null;
+          this.contentWindow = null;
+          this.active = false;
+        });
+      }
+    };
+
+    onPageShow();
+    contentWindow.addEventListener("pagehide", onPageHide, true);
+    contentWindow.addEventListener("pageshow", onPageShow, true);
+    this.callOnClose({
+      close: () => {
+        onPageHide();
+        if (this.active) {
+          contentWindow.removeEventListener("pagehide", onPageHide, true);
+          contentWindow.removeEventListener("pageshow", onPageShow, true);
+        }
+      },
+    });
   }
 
   get cloneScope() {
@@ -1065,7 +1126,7 @@ function promiseObserved(topic, test = () => true) {
  * Messaging primitives.
  */
 
-var nextPortId = 1;
+let gNextPortId = 1;
 
 // Abstraction for a Port object in the extension API. Each port has a unique ID.
 function Port(context, messageManager, name, id, sender) {
@@ -1145,16 +1206,20 @@ Port.prototype = {
 
   receiveMessage(msg) {
     if (msg.name == this.disconnectName) {
-      if (this.disconnected) {
-        return;
-      }
-
-      for (let listener of this.disconnectListeners) {
-        listener();
-      }
-
-      this.handleDisconnection();
+      this.disconnectByOtherEnd();
     }
+  },
+
+  disconnectByOtherEnd() {
+    if (this.disconnected) {
+      return;
+    }
+
+    for (let listener of this.disconnectListeners) {
+      listener();
+    }
+
+    this.handleDisconnection();
   },
 
   disconnect() {
@@ -1273,11 +1338,11 @@ Messenger.prototype = {
   },
 
   connect(messageManager, name, recipient) {
-    let portId = nextPortId++;
+    let portId = `${gNextPortId++}-${Services.appinfo.uniqueProcessID}`;
     let port = new Port(this.context, messageManager, name, portId, null);
     let msg = {name, portId};
-    // TODO: Disconnect the port if no response?
-    this._sendMessage(messageManager, "Extension:Connect", msg, recipient);
+    this._sendMessage(messageManager, "Extension:Connect", msg, recipient)
+      .catch(e => port.disconnectByOtherEnd());
     return port.api();
   },
 
@@ -1512,6 +1577,8 @@ this.ExtensionUtils = {
   detectLanguage,
   extend,
   flushJarCache,
+  getConsole,
+  getInnerWindowID,
   ignoreEvent,
   injectAPI,
   instanceOf,

@@ -53,7 +53,7 @@ using namespace mozilla::gfx;
  */
 static
 StyleAnimationValue::Unit
-GetCommonUnit(nsCSSProperty aProperty,
+GetCommonUnit(nsCSSPropertyID aProperty,
               StyleAnimationValue::Unit aFirstUnit,
               StyleAnimationValue::Unit aSecondUnit)
 {
@@ -75,7 +75,7 @@ GetCommonUnit(nsCSSProperty aProperty,
 
 static
 nsCSSUnit
-GetCommonUnit(nsCSSProperty aProperty,
+GetCommonUnit(nsCSSPropertyID aProperty,
               nsCSSUnit aFirstUnit,
               nsCSSUnit aSecondUnit)
 {
@@ -483,7 +483,7 @@ CalcPositionCoordSquareDistance(const nsCSSValue& aPos1,
 // -------------
 
 bool
-StyleAnimationValue::ComputeDistance(nsCSSProperty aProperty,
+StyleAnimationValue::ComputeDistance(nsCSSPropertyID aProperty,
                                      const StyleAnimationValue& aStartValue,
                                      const StyleAnimationValue& aEndValue,
                                      double& aDistance)
@@ -499,6 +499,7 @@ StyleAnimationValue::ComputeDistance(nsCSSProperty aProperty,
     case eUnit_UnparsedString:
     case eUnit_URL:
     case eUnit_CurrentColor:
+    case eUnit_DiscreteCSSValue:
       return false;
 
     case eUnit_Enumerated:
@@ -1017,7 +1018,7 @@ RestrictValue(uint32_t aRestrictions, T aValue)
 
 template <typename T>
 T
-RestrictValue(nsCSSProperty aProperty, T aValue)
+RestrictValue(nsCSSPropertyID aProperty, T aValue)
 {
   return RestrictValue(nsCSSProps::ValueRestrictions(aProperty), aValue);
 }
@@ -1839,7 +1840,7 @@ AddPositions(double aCoeff1, const nsCSSValue& aPos1,
 }
 
 static Maybe<nsCSSValuePair>
-AddCSSValuePair(nsCSSProperty aProperty, uint32_t aRestrictions,
+AddCSSValuePair(nsCSSPropertyID aProperty, uint32_t aRestrictions,
                 double aCoeff1, const nsCSSValuePair* aPair1,
                 double aCoeff2, const nsCSSValuePair* aPair2)
 {
@@ -1878,7 +1879,7 @@ AddCSSValuePair(nsCSSProperty aProperty, uint32_t aRestrictions,
 }
 
 static UniquePtr<nsCSSValuePairList>
-AddCSSValuePairList(nsCSSProperty aProperty,
+AddCSSValuePairList(nsCSSPropertyID aProperty,
                     double aCoeff1, const nsCSSValuePairList* aList1,
                     double aCoeff2, const nsCSSValuePairList* aList2)
 {
@@ -1930,7 +1931,7 @@ AddCSSValuePairList(nsCSSProperty aProperty,
 }
 
 static already_AddRefed<nsCSSValue::Array>
-AddShapeFunction(nsCSSProperty aProperty,
+AddShapeFunction(nsCSSPropertyID aProperty,
                  double aCoeff1, const nsCSSValue::Array* aArray1,
                  double aCoeff2, const nsCSSValue::Array* aArray2)
 {
@@ -2244,7 +2245,7 @@ AddPositionCoords(double aCoeff1, const nsCSSValue& aPos1,
 }
 
 bool
-StyleAnimationValue::AddWeighted(nsCSSProperty aProperty,
+StyleAnimationValue::AddWeighted(nsCSSPropertyID aProperty,
                                  double aCoeff1,
                                  const StyleAnimationValue& aValue1,
                                  double aCoeff2,
@@ -2266,6 +2267,7 @@ StyleAnimationValue::AddWeighted(nsCSSProperty aProperty,
     case eUnit_UnparsedString:
     case eUnit_URL:
     case eUnit_CurrentColor:
+    case eUnit_DiscreteCSSValue:
       return false;
 
     case eUnit_Enumerated:
@@ -2753,7 +2755,7 @@ StyleAnimationValue::AddWeighted(nsCSSProperty aProperty,
 }
 
 already_AddRefed<css::StyleRule>
-BuildStyleRule(nsCSSProperty aProperty,
+BuildStyleRule(nsCSSPropertyID aProperty,
                dom::Element* aTargetElement,
                const nsAString& aSpecifiedValue,
                bool aUseSVGMode)
@@ -2767,7 +2769,7 @@ BuildStyleRule(nsCSSProperty aProperty,
   nsCOMPtr<nsIURI> baseURI = aTargetElement->GetBaseURI();
   nsCSSParser parser(doc->CSSLoader());
 
-  nsCSSProperty propertyToCheck = nsCSSProps::IsShorthand(aProperty) ?
+  nsCSSPropertyID propertyToCheck = nsCSSProps::IsShorthand(aProperty) ?
     nsCSSProps::SubpropertyEntryFor(aProperty)[0] : aProperty;
 
   // Get a parser, parse the property, and check for CSS parsing errors.
@@ -2788,7 +2790,7 @@ BuildStyleRule(nsCSSProperty aProperty,
 }
 
 already_AddRefed<css::StyleRule>
-BuildStyleRule(nsCSSProperty aProperty,
+BuildStyleRule(nsCSSPropertyID aProperty,
                dom::Element* aTargetElement,
                const nsCSSValue& aSpecifiedValue,
                bool aUseSVGMode)
@@ -2817,7 +2819,7 @@ BuildStyleRule(nsCSSProperty aProperty,
 }
 
 static bool
-ComputeValuesFromStyleRule(nsCSSProperty aProperty,
+ComputeValuesFromStyleRule(nsCSSPropertyID aProperty,
                            CSSEnabledState aEnabledState,
                            dom::Element* aTargetElement,
                            nsStyleContext* aStyleContext,
@@ -2905,7 +2907,7 @@ ComputeValuesFromStyleRule(nsCSSProperty aProperty,
 }
 
 /* static */ bool
-StyleAnimationValue::ComputeValue(nsCSSProperty aProperty,
+StyleAnimationValue::ComputeValue(nsCSSPropertyID aProperty,
                                   dom::Element* aTargetElement,
                                   nsStyleContext* aStyleContext,
                                   const nsAString& aSpecifiedValue,
@@ -2956,7 +2958,7 @@ StyleAnimationValue::ComputeValue(nsCSSProperty aProperty,
 template <class T>
 bool
 ComputeValuesFromSpecifiedValue(
-    nsCSSProperty aProperty,
+    nsCSSPropertyID aProperty,
     CSSEnabledState aEnabledState,
     dom::Element* aTargetElement,
     nsStyleContext* aStyleContext,
@@ -2984,7 +2986,7 @@ ComputeValuesFromSpecifiedValue(
 
 /* static */ bool
 StyleAnimationValue::ComputeValues(
-    nsCSSProperty aProperty,
+    nsCSSPropertyID aProperty,
     CSSEnabledState aEnabledState,
     dom::Element* aTargetElement,
     nsStyleContext* aStyleContext,
@@ -3000,7 +3002,7 @@ StyleAnimationValue::ComputeValues(
 
 /* static */ bool
 StyleAnimationValue::ComputeValues(
-    nsCSSProperty aProperty,
+    nsCSSPropertyID aProperty,
     CSSEnabledState aEnabledState,
     dom::Element* aTargetElement,
     nsStyleContext* aStyleContext,
@@ -3015,7 +3017,7 @@ StyleAnimationValue::ComputeValues(
 }
 
 bool
-StyleAnimationValue::UncomputeValue(nsCSSProperty aProperty,
+StyleAnimationValue::UncomputeValue(nsCSSPropertyID aProperty,
                                     const StyleAnimationValue& aComputedValue,
                                     nsCSSValue& aSpecifiedValue)
 {
@@ -3058,14 +3060,16 @@ StyleAnimationValue::UncomputeValue(nsCSSProperty aProperty,
       break;
     case eUnit_Calc:
     case eUnit_ObjectPosition:
-    case eUnit_URL: {
+    case eUnit_URL:
+    case eUnit_DiscreteCSSValue: {
       nsCSSValue* val = aComputedValue.GetCSSValueValue();
       // Sanity-check that the underlying unit in the nsCSSValue is what we
       // expect for our StyleAnimationValue::Unit:
       MOZ_ASSERT((unit == eUnit_Calc && val->GetUnit() == eCSSUnit_Calc) ||
                  (unit == eUnit_ObjectPosition &&
                   val->GetUnit() == eCSSUnit_Array) ||
-                 (unit == eUnit_URL && val->GetUnit() == eCSSUnit_URL),
+                 (unit == eUnit_URL && val->GetUnit() == eCSSUnit_URL) ||
+                 unit == eUnit_DiscreteCSSValue,
                  "unexpected unit");
       aSpecifiedValue = *val;
       break;
@@ -3131,7 +3135,7 @@ StyleAnimationValue::UncomputeValue(nsCSSProperty aProperty,
 }
 
 bool
-StyleAnimationValue::UncomputeValue(nsCSSProperty aProperty,
+StyleAnimationValue::UncomputeValue(nsCSSPropertyID aProperty,
                                     StyleAnimationValue&& aComputedValue,
                                     nsCSSValue& aSpecifiedValue)
 {
@@ -3166,7 +3170,7 @@ StyleAnimationValue::UncomputeValue(nsCSSProperty aProperty,
 }
 
 bool
-StyleAnimationValue::UncomputeValue(nsCSSProperty aProperty,
+StyleAnimationValue::UncomputeValue(nsCSSPropertyID aProperty,
                                     const StyleAnimationValue& aComputedValue,
                                     nsAString& aSpecifiedValue)
 {
@@ -3584,7 +3588,7 @@ StyleClipBasicShapeToCSSArray(const StyleClipPath& aClipPath,
 }
 
 bool
-StyleAnimationValue::ExtractComputedValue(nsCSSProperty aProperty,
+StyleAnimationValue::ExtractComputedValue(nsCSSPropertyID aProperty,
                                           nsStyleContext* aStyleContext,
                                           StyleAnimationValue& aComputedValue)
 {
@@ -3594,8 +3598,11 @@ StyleAnimationValue::ExtractComputedValue(nsCSSProperty aProperty,
     aStyleContext->StyleData(nsCSSProps::kSIDTable[aProperty]);
   ptrdiff_t ssOffset = nsCSSProps::kStyleStructOffsetTable[aProperty];
   nsStyleAnimType animType = nsCSSProps::kAnimTypeTable[aProperty];
-  MOZ_ASSERT(0 <= ssOffset || animType == eStyleAnimType_Custom,
-             "must be dealing with animatable property");
+  MOZ_ASSERT(0 <= ssOffset ||
+             animType == eStyleAnimType_Custom ||
+             animType == eStyleAnimType_Discrete,
+             "all animation types other than Custom and Discrete must " \
+             "specify a style struct offset to extract values from");
   switch (animType) {
     case eStyleAnimType_Custom:
       switch (aProperty) {
@@ -4129,14 +4136,6 @@ StyleAnimationValue::ExtractComputedValue(nsCSSProperty aProperty,
       aComputedValue.SetCoordValue(*static_cast<const nscoord*>(
         StyleDataAtOffset(styleStruct, ssOffset)));
       return true;
-    case eStyleAnimType_EnumU8:
-      aComputedValue.SetIntValue(*static_cast<const uint8_t*>(
-        StyleDataAtOffset(styleStruct, ssOffset)), eUnit_Enumerated);
-      if (aProperty == eCSSProperty_visibility) {
-        aComputedValue.SetIntValue(aComputedValue.GetIntValue(),
-                                   eUnit_Visibility);
-      }
-      return true;
     case eStyleAnimType_float:
       aComputedValue.SetFloatValue(*static_cast<const float*>(
         StyleDataAtOffset(styleStruct, ssOffset)));
@@ -4208,6 +4207,20 @@ StyleAnimationValue::ExtractComputedValue(nsCSSProperty aProperty,
       }
       aComputedValue.SetAndAdoptCSSValueListValue(result.forget(),
                                                   eUnit_Shadow);
+      return true;
+    }
+    case eStyleAnimType_Discrete: {
+      if (aProperty == eCSSProperty_visibility) {
+        aComputedValue.SetIntValue(
+          static_cast<const nsStyleVisibility*>(styleStruct)->mVisible,
+          eUnit_Visibility);
+        return true;
+      }
+      auto cssValue = MakeUnique<nsCSSValue>(eCSSUnit_Unset);
+      aStyleContext->RuleNode()->GetDiscretelyAnimatedCSSValue(aProperty,
+                                                               cssValue.get());
+      aComputedValue.SetAndAdoptCSSValueValue(cssValue.release(),
+                                              eUnit_DiscreteCSSValue);
       return true;
     }
     case eStyleAnimType_None:
@@ -4315,6 +4328,7 @@ StyleAnimationValue::operator=(const StyleAnimationValue& aOther)
     case eUnit_Calc:
     case eUnit_ObjectPosition:
     case eUnit_URL:
+    case eUnit_DiscreteCSSValue:
       MOZ_ASSERT(IsCSSValueUnit(mUnit),
                  "This clause is for handling nsCSSValue-backed units");
       MOZ_ASSERT(aOther.mValue.mCSSValue, "values may not be null");
@@ -4592,6 +4606,7 @@ StyleAnimationValue::operator==(const StyleAnimationValue& aOther) const
     case eUnit_Calc:
     case eUnit_ObjectPosition:
     case eUnit_URL:
+    case eUnit_DiscreteCSSValue:
       MOZ_ASSERT(IsCSSValueUnit(mUnit),
                  "This clause is for handling nsCSSValue-backed units");
       return *mValue.mCSSValue == *aOther.mValue.mCSSValue;

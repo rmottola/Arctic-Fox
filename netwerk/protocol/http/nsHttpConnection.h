@@ -147,8 +147,8 @@ public:
     nsresult ForceSend();
     nsresult ForceRecv();
 
-    static NS_METHOD ReadFromStream(nsIInputStream *, void *, const char *,
-                                    uint32_t, uint32_t, uint32_t *);
+    static nsresult ReadFromStream(nsIInputStream *, void *, const char *,
+                                   uint32_t, uint32_t, uint32_t *);
 
     // When a persistent connection is in the connection manager idle
     // connection pool, the nsHttpConnection still reads errors and hangups
@@ -333,7 +333,7 @@ private:
     // version level in use, 0 if unused
     uint8_t                         mUsingSpdyVersion;
 
-    RefPtr<ASpdySession>          mSpdySession;
+    RefPtr<ASpdySession>            mSpdySession;
     int32_t                         mPriority;
     bool                            mReportedSpdy;
 

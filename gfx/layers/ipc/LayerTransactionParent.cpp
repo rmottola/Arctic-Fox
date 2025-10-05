@@ -31,7 +31,7 @@
 #include "mozilla/layers/PaintedLayerComposite.h"
 #include "mozilla/layers/ShadowLayersManager.h" // for ShadowLayersManager
 #include "mozilla/mozalloc.h"           // for operator delete, etc
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 #include "nsCoord.h"                    // for NSAppUnitsToFloatPixels
 #include "nsDebug.h"                    // for NS_RUNTIMEABORT
 #include "nsDeviceContext.h"            // for AppUnitsPerCSSPixel
@@ -227,6 +227,14 @@ private:
   LayerTransactionParent* mLayerTransaction;
   InfallibleTArray<OpDestroy>* mActorsToDestroy;
 };
+
+bool
+LayerTransactionParent::RecvPaintTime(const uint64_t& aTransactionId,
+                                      const TimeDuration& aPaintTime)
+{
+  mShadowLayersManager->UpdatePaintTime(this, aPaintTime);
+  return true;
+}
 
 bool
 LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
@@ -433,11 +441,6 @@ LayerTransactionParent::RecvUpdate(InfallibleTArray<Edit>&& cset,
         containerLayer->SetScaleToResolution(attrs.scaleToResolution(),
                                              attrs.presShellResolution());
         containerLayer->SetEventRegionsOverride(attrs.eventRegionsOverride());
-        containerLayer->SetInputFrameID(attrs.inputFrameID());
-
-        if (attrs.hmdDeviceID()) {
-          containerLayer->SetVRDeviceID(attrs.hmdDeviceID());
-        }
 
         break;
       }

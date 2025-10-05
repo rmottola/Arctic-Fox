@@ -42,7 +42,7 @@ public:
   size_t LogicalSizeInBytes() const override;
 
 protected:
-  DrawableFrameRef DrawableRef() override;
+  DrawableFrameRef DrawableRef(size_t aFrame) override;
   bool IsLocked() const override { return bool(mLockRef); }
   void SetLocked(bool aLocked) override;
 
@@ -69,6 +69,9 @@ private:
 
   /// The image associated with our decoder. Dropped after decoding.
   RefPtr<RasterImage> mImage;
+
+  /// Mutex protecting access to mDecoder.
+  Mutex mMutex;
 
   /// The decoder that will generate our surface. Dropped after decoding.
   RefPtr<Decoder> mDecoder;

@@ -73,7 +73,7 @@
 #include "nsIDOMWindow.h"
 
 #include "nsNetCID.h"
-#include "mozilla/Snprintf.h"
+#include "mozilla/Sprintf.h"
 #include "nsThreadUtils.h"
 #include "nsIInputStreamTee.h"
 #include "nsQueryObject.h"
@@ -2461,6 +2461,7 @@ nsPluginHost::FindPluginsInContent(bool aCreatePluginList, bool* aPluginsChanged
                                                tag.isJavaPlugin(),
                                                tag.isFlashPlugin(),
                                                tag.supportsAsyncInit(),
+                                               tag.supportsAsyncRender(),
                                                tag.lastModifiedTime(),
                                                tag.isFromExtension(),
                                                tag.sandboxLevel());
@@ -2701,6 +2702,7 @@ nsPluginHost::FindPluginsForContent(uint32_t aPluginEpoch,
                                       tag->mIsJavaPlugin,
                                       tag->mIsFlashPlugin,
                                       tag->mSupportsAsyncInit,
+                                      tag->mSupportsAsyncRender,
                                       tag->FileName(),
                                       tag->Version(),
                                       tag->mLastModifiedTime,

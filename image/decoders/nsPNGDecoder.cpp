@@ -975,7 +975,9 @@ nsPNGDecoder::frame_info_callback(png_structp png_ptr, png_uint_32 frame_num)
   // old frame is done
   decoder->EndImageFrame();
 
-  if (!decoder->mFrameIsHidden && decoder->IsFirstFrameDecode()) {
+  const bool previousFrameWasHidden = decoder->mFrameIsHidden;
+
+  if (!previousFrameWasHidden && decoder->IsFirstFrameDecode()) {
     // We're about to get a second non-hidden frame, but we only want the first.
     // Stop decoding now. (And avoid allocating the unnecessary buffers below.)
     decoder->PostDecodeDone();
@@ -991,14 +993,24 @@ nsPNGDecoder::frame_info_callback(png_structp png_ptr, png_uint_32 frame_num)
                           png_get_next_frame_y_offset(png_ptr, decoder->mInfo),
                           png_get_next_frame_width(png_ptr, decoder->mInfo),
                           png_get_next_frame_height(png_ptr, decoder->mInfo));
-
   const bool isInterlaced = bool(decoder->interlacebuf);
 
-  decoder->mNextFrameInfo = Some(FrameInfo{ decoder->format,
-                                            frameRect,
-                                            isInterlaced });
+  const FrameInfo info { decoder->format, frameRect, isInterlaced };
+
+  // If the previous frame was hidden, skip the yield (which will mislead the
+  // caller, who will think the previous frame was real) and just allocate the
+  // new frame here.
+  if (previousFrameWasHidden) {
+    if (NS_FAILED(decoder->CreateFrame(info))) {
+      return decoder->DoTerminate(png_ptr, TerminalState::FAILURE);
+    }
+
+    MOZ_ASSERT(decoder->mImageData, "Should have a buffer now");
+    return;  // No yield, so we'll just keep decoding.
+  }
 
   // Yield to the caller to notify them that the previous frame is now complete.
+  decoder->mNextFrameInfo = Some(info);
   return decoder->DoYield(png_ptr);
 }
 #endif

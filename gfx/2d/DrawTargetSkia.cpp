@@ -398,11 +398,20 @@ SetPaintPattern(SkPaint& aPaint, const Pattern& aPattern, Float aAlpha = 1.0)
 static inline Rect
 GetClipBounds(SkCanvas *aCanvas)
 {
-  SkRect clipBounds;
-  if (!aCanvas->getClipBounds(&clipBounds)) {
+  // Use a manually transformed getClipDeviceBounds instead of
+  // getClipBounds because getClipBounds inflates the the bounds
+  // by a pixel in each direction to compensate for antialiasing.
+  SkIRect deviceBounds;
+  if (!aCanvas->getClipDeviceBounds(&deviceBounds)) {
     return Rect();
   }
-  return SkRectToRect(clipBounds);
+  SkMatrix inverseCTM;
+  if (!aCanvas->getTotalMatrix().invert(&inverseCTM)) {
+    return Rect();
+  }
+  SkRect localBounds;
+  inverseCTM.mapRect(&localBounds, SkRect::Make(deviceBounds));
+  return SkRectToRect(localBounds);
 }
 
 struct AutoPaintSetup {
@@ -606,6 +615,38 @@ DrawTargetSkia::FillRect(const Rect &aRect,
                          const Pattern &aPattern,
                          const DrawOptions &aOptions)
 {
+  // The sprite blitting path in Skia can be faster than the shader blitter for
+  // operators other than source (or source-over with opaque surface). So, when
+  // possible/beneficial, route to DrawSurface which will use the sprite blitter.
+  if (aPattern.GetType() == PatternType::SURFACE &&
+      aOptions.mCompositionOp != CompositionOp::OP_SOURCE) {
+    const SurfacePattern& pat = static_cast<const SurfacePattern&>(aPattern);
+    // Verify there is a valid surface and a pattern matrix without skew.
+    if (pat.mSurface &&
+        (aOptions.mCompositionOp != CompositionOp::OP_OVER ||
+         GfxFormatToSkiaAlphaType(pat.mSurface->GetFormat()) != kOpaque_SkAlphaType) &&
+        !pat.mMatrix.HasNonAxisAlignedTransform()) {
+      // Bound the sampling to smaller of the bounds or the sampling rect.
+      IntRect srcRect(IntPoint(0, 0), pat.mSurface->GetSize());
+      if (!pat.mSamplingRect.IsEmpty()) {
+        srcRect = srcRect.Intersect(pat.mSamplingRect);
+      }
+      // Transform the destination rectangle by the inverse of the pattern
+      // matrix so that it is in pattern space like the source rectangle.
+      Rect patRect = aRect - pat.mMatrix.GetTranslation();
+      patRect.Scale(1.0f / pat.mMatrix._11, 1.0f / pat.mMatrix._22);
+      // Verify the pattern rectangle will not tile or clamp.
+      if (!patRect.IsEmpty() && srcRect.Contains(RoundedOut(patRect))) {
+        // The pattern is a surface with an axis-aligned source rectangle
+        // fitting entirely in its bounds, so just treat it as a DrawSurface.
+        DrawSurface(pat.mSurface, aRect, patRect,
+                    DrawSurfaceOptions(pat.mSamplingFilter),
+                    aOptions);
+        return;
+      }
+    }
+  }
+
   MarkChanged();
   SkRect rect = RectToSkRect(aRect);
   AutoPaintSetup paint(mCanvas.get(), aOptions, aPattern, &aRect);
@@ -998,17 +1039,47 @@ DrawTargetSkia::ReturnCGContext(CGContextRef aCGContext)
 CGContextRef
 BorrowedCGContext::BorrowCGContextFromDrawTarget(DrawTarget *aDT)
 {
-  MOZ_ASSERT(aDT->GetBackendType() == BackendType::SKIA);
-  DrawTargetSkia* skiaDT = static_cast<DrawTargetSkia*>(aDT);
-  return skiaDT->BorrowCGContext(DrawOptions());
+  if (aDT->GetBackendType() == BackendType::SKIA) {
+    DrawTargetSkia* skiaDT = static_cast<DrawTargetSkia*>(aDT);
+    return skiaDT->BorrowCGContext(DrawOptions());
+  } else if (aDT->GetBackendType() == BackendType::COREGRAPHICS) {
+    DrawTargetCG* cgDT = static_cast<DrawTargetCG*>(aDT);
+    cgDT->Flush();
+    cgDT->MarkChanged();
+
+    // swap out the context
+    CGContextRef cg = cgDT->mCg;
+    if (MOZ2D_ERROR_IF(!cg)) {
+      return nullptr;
+    }
+    cgDT->mCg = nullptr;
+
+    // save the state to make it easier for callers to avoid mucking with things
+    CGContextSaveGState(cg);
+
+    return cg;
+  }
+
+  MOZ_ASSERT(false);
+  return nullptr;
 }
 
 void
 BorrowedCGContext::ReturnCGContextToDrawTarget(DrawTarget *aDT, CGContextRef cg)
 {
-  MOZ_ASSERT(aDT->GetBackendType() == BackendType::SKIA);
-  DrawTargetSkia* skiaDT = static_cast<DrawTargetSkia*>(aDT);
-  skiaDT->ReturnCGContext(cg);
+  if (aDT->GetBackendType() == BackendType::SKIA) {
+    DrawTargetSkia* skiaDT = static_cast<DrawTargetSkia*>(aDT);
+    skiaDT->ReturnCGContext(cg);
+    return;
+  } else if (aDT->GetBackendType() == BackendType::COREGRAPHICS) {
+    DrawTargetCG* cgDT = static_cast<DrawTargetCG*>(aDT);
+
+    CGContextRestoreGState(cg);
+    cgDT->mCg = cg;
+    return;
+  }
+
+  MOZ_ASSERT(false);
 }
 
 static void

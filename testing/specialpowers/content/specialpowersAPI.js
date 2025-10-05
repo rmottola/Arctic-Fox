@@ -1920,11 +1920,12 @@ SpecialPowersAPI.prototype = {
     return this._sendSyncMessage('SPCleanUpSTSData', {origin: origin, flags: flags || 0});
   },
 
-  loadExtension: function(id, ext, handler) {
-    if (!id) {
-      let uuidGenerator = Cc["@mozilla.org/uuid-generator;1"].getService(Ci.nsIUUIDGenerator);
-      id = uuidGenerator.generateUUID().number;
-    }
+  _nextExtensionID: 0,
+  loadExtension: function(ext, handler) {
+    // Note, this is not the addon is as used by the AddonManager etc,
+    // this is just an identifier used for specialpowers messaging
+    // between this content process and the chrome process.
+    let id = this._nextExtensionID++;
 
     let resolveStartup, resolveUnload, rejectStartup;
     let startupPromise = new Promise((resolve, reject) => {
@@ -1943,8 +1944,6 @@ SpecialPowersAPI.prototype = {
     let sp = this;
     let state = "uninitialized";
     let extension = {
-      id,
-
       get state() { return state; },
 
       startup() {
@@ -1971,6 +1970,8 @@ SpecialPowersAPI.prototype = {
         if (msg.data.type == "extensionStarted") {
           state = "running";
           resolveStartup();
+        } else if (msg.data.type == "extensionSetId") {
+          extension.id = msg.data.args[0];
         } else if (msg.data.type == "extensionFailed") {
           state = "failed";
           rejectStartup("startup failed");

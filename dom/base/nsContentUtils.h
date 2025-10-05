@@ -1951,6 +1951,10 @@ public:
   static already_AddRefed<mozilla::layers::LayerManager>
   PersistentLayerManagerForDocument(nsIDocument *aDoc);
 
+  /* static */
+  static bool AppendLFInSerialization()
+    { return sAppendLFInSerialization; }
+
   /**
    * Determine whether a content node is focused or not,
    *
@@ -2056,6 +2060,14 @@ public:
   static bool ResistFingerprinting()
   {
     return sPrivacyResistFingerprinting;
+  }
+
+  /**
+   * Returns true if the browser should show busy cursor when loading page.
+   */
+  static bool UseActivityCursor()
+  {
+    return sUseActivityCursor;
   }
 
   /**
@@ -2776,6 +2788,8 @@ private:
   static bool sGettersDecodeURLHash;
   static bool sPrivacyResistFingerprinting;
   static bool sSendPerformanceTimingNotifications;
+  static bool sAppendLFInSerialization;
+  static bool sUseActivityCursor;
   static uint32_t sCookiesLifetimePolicy;
   static uint32_t sCookiesBehavior;
 

@@ -33,7 +33,7 @@
 #include "nsGkAtoms.h"
 #include "nsGenericHTMLElement.h"
 #include "nsAttrValueInlines.h"
-#include "mozilla/Snprintf.h"
+#include "mozilla/Sprintf.h"
 #include "nsFloatManager.h"
 #include "prenv.h"
 #include "plstr.h"
@@ -1454,9 +1454,9 @@ nsBlockFrame::Reflow(nsPresContext*           aPresContext,
 
     ListTag(stdout);
     char buf[400];
-    snprintf_literal(buf,
-                     ": %" PRId64 " elapsed (%" PRId64 " per line) (%d lines; %d new lines)",
-                     delta, perLineDelta, numLines, ectc - ctc);
+    SprintfLiteral(buf,
+                   ": %" PRId64 " elapsed (%" PRId64 " per line) (%d lines; %d new lines)",
+                   delta, perLineDelta, numLines, ectc - ctc);
     printf("%s\n", buf);
   }
 #endif
@@ -1496,7 +1496,7 @@ nsBlockFrame::ComputeFinalSize(const ReflowInput& aReflowInput,
 #ifdef NOISY_FINAL_SIZE
   ListTag(stdout);
   printf(": mBCoord=%d mIsBEndMarginRoot=%s mPrevBEndMargin=%d bp=%d,%d\n",
-         aState.mBCoord, aState.GetFlag(BRS_ISBENDMARGINROOT) ? "yes" : "no",
+         aState.mBCoord, aState.mFlags.mIsBEndMarginRoot ? "yes" : "no",
          aState.mPrevBEndMargin.get(),
          borderPadding.BStart(wm), borderPadding.BEnd(wm));
 #endif
@@ -1514,7 +1514,7 @@ nsBlockFrame::ComputeFinalSize(const ReflowInput& aReflowInput,
   //NS_ASSERTION(aMetrics.mCarriedOutBEndMargin.IsZero(),
   //             "someone else set the margin");
   nscoord nonCarriedOutBDirMargin = 0;
-  if (!aState.GetFlag(BRS_ISBENDMARGINROOT)) {
+  if (!aState.mFlags.mIsBEndMarginRoot) {
     // Apply rule from CSS 2.1 section 8.3.1. If we have some empty
     // line with clearance and a non-zero block-start margin and all
     // subsequent lines are empty, then we do not allow our children's
@@ -1533,7 +1533,7 @@ nsBlockFrame::ComputeFinalSize(const ReflowInput& aReflowInput,
 
   nscoord blockEndEdgeOfChildren = aState.mBCoord + nonCarriedOutBDirMargin;
   // Shrink wrap our height around our contents.
-  if (aState.GetFlag(BRS_ISBENDMARGINROOT) ||
+  if (aState.mFlags.mIsBEndMarginRoot ||
       NS_UNCONSTRAINEDSIZE != aReflowInput.ComputedBSize()) {
     // When we are a block-end-margin root make sure that our last
     // childs block-end margin is fully applied. We also do this when
@@ -1549,7 +1549,7 @@ nsBlockFrame::ComputeFinalSize(const ReflowInput& aReflowInput,
                aState.mReflowInput.AvailableBSize());
     }
   }
-  if (aState.GetFlag(BRS_FLOAT_MGR)) {
+  if (aState.mFlags.mBlockNeedsFloatManager) {
     // Include the float manager's state to properly account for the
     // block-end margin of any floated elements; e.g., inside a table cell.
     nscoord floatHeight =
@@ -3083,7 +3083,7 @@ nsBlockFrame::ShouldApplyBStartMargin(BlockReflowInput& aState,
                                       nsLineBox* aLine,
                                       nsIFrame* aChildFrame)
 {
-  if (aState.GetFlag(BRS_APPLYBSTARTMARGIN)) {
+  if (aState.mFlags.mShouldApplyBStartMargin) {
     // Apply short-circuit check to avoid searching the line list
     return true;
   }
@@ -3094,26 +3094,26 @@ nsBlockFrame::ShouldApplyBStartMargin(BlockReflowInput& aState,
     // If we aren't at the start block-coordinate then something of non-zero
     // height must have been placed. Therefore the childs block-start margin
     // applies.
-    aState.SetFlag(BRS_APPLYBSTARTMARGIN, true);
+    aState.mFlags.mShouldApplyBStartMargin = true;
     return true;
   }
 
   // Determine if this line is "essentially" the first line
   line_iterator line = begin_lines();
-  if (aState.GetFlag(BRS_HAVELINEADJACENTTOTOP)) {
+  if (aState.mFlags.mHasLineAdjacentToTop) {
     line = aState.mLineAdjacentToTop;
   }
   while (line != aLine) {
     if (!line->CachedIsEmpty() || line->HasClearance()) {
       // A line which precedes aLine is non-empty, or has clearance,
       // so therefore the block-start margin applies.
-      aState.SetFlag(BRS_APPLYBSTARTMARGIN, true);
+      aState.mFlags.mShouldApplyBStartMargin = true;
       return true;
     }
     // No need to apply the block-start margin if the line has floats.  We
     // should collapse anyway (bug 44419)
     ++line;
-    aState.SetFlag(BRS_HAVELINEADJACENTTOTOP, true);
+    aState.mFlags.mHasLineAdjacentToTop = true;
     aState.mLineAdjacentToTop = line;
   }
 
@@ -3848,7 +3848,7 @@ nsBlockFrame::DoReflowInlineFrames(BlockReflowInput& aState,
   nscoord iStart = lineRect.IStart(lineWM);
   nscoord availISize = lineRect.ISize(lineWM);
   nscoord availBSize;
-  if (aState.GetFlag(BRS_UNCONSTRAINEDBSIZE)) {
+  if (aState.mFlags.mHasUnconstrainedBSize) {
     availBSize = NS_UNCONSTRAINEDSIZE;
   }
   else {
@@ -3866,7 +3866,7 @@ nsBlockFrame::DoReflowInlineFrames(BlockReflowInput& aState,
                               false, /*XXX isTopOfPage*/
                               lineWM, aState.mContainerSize);
 
-  aState.SetFlag(BRS_LINE_LAYOUT_EMPTY, false);
+  aState.mFlags.mIsLineLayoutEmpty = false;
 
   // XXX Unfortunately we need to know this before reflowing the first
   // inline frame in the line. FIX ME.
@@ -3945,13 +3945,13 @@ nsBlockFrame::DoReflowInlineFrames(BlockReflowInput& aState,
     }
   }
 
-  aState.SetFlag(BRS_LINE_LAYOUT_EMPTY, aLineLayout.LineIsEmpty());
+  aState.mFlags.mIsLineLayoutEmpty = aLineLayout.LineIsEmpty();
 
   // We only need to backup if the line isn't going to be reflowed again anyway
   bool needsBackup = aLineLayout.NeedsBackup() &&
     (lineReflowStatus == LINE_REFLOW_STOP || lineReflowStatus == LINE_REFLOW_OK);
   if (needsBackup && aLineLayout.HaveForcedBreakPosition()) {
-  	NS_WARNING("We shouldn't be backing up more than once! "
+    NS_WARNING("We shouldn't be backing up more than once! "
                "Someone must have set a break opportunity beyond the available width, "
                "even though there were better break opportunities before it");
     needsBackup = false;
@@ -4545,8 +4545,8 @@ nsBlockFrame::PlaceLine(BlockReflowInput& aState,
     // coordinate (it was applied in ReflowInlineFrames speculatively)
     // since the line is empty.
     // We already called |ShouldApplyBStartMargin|, and if we applied it
-    // then BRS_APPLYBSTARTMARGIN is set.
-    nscoord dy = aState.GetFlag(BRS_APPLYBSTARTMARGIN)
+    // then mShouldApplyBStartMargin is set.
+    nscoord dy = aState.mFlags.mShouldApplyBStartMargin
                    ? -aState.mPrevBEndMargin.get() : 0;
     newBCoord = aState.mBCoord + dy;
   }
@@ -6079,7 +6079,7 @@ nsBlockFrame::AdjustFloatAvailableSpace(BlockReflowInput& aState,
                        : std::max(0, aState.ContentBEnd() - aState.mBCoord);
 
   if (availBSize != NS_UNCONSTRAINEDSIZE &&
-      !aState.GetFlag(BRS_FLOAT_FRAGMENTS_INSIDE_COLUMN_ENABLED) &&
+      !aState.mFlags.mFloatFragmentsInsideColumnEnabled &&
       nsLayoutUtils::GetClosestFrameOfType(this, nsGkAtoms::columnSetFrame)) {
     // Tell the float it has unrestricted block-size, so it won't break.
     // If the float doesn't actually fit in the column it will fail to be
@@ -6632,10 +6632,10 @@ nsBlockFrame::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
 
     ListTag(stdout);
     char buf[400];
-    snprintf_literal(buf,
-                     ": %" PRId64 " elapsed (%" PRId64 " per line) lines=%d drawn=%d skip=%d",
-                     delta, deltaPerLine,
-                     numLines, drawnLines, numLines - drawnLines);
+    SprintfLiteral(buf,
+                   ": %" PRId64 " elapsed (%" PRId64 " per line) lines=%d drawn=%d skip=%d",
+                   delta, deltaPerLine,
+                   numLines, drawnLines, numLines - drawnLines);
     printf("%s\n", buf);
   }
 #endif

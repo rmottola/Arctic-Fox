@@ -350,11 +350,9 @@ JsepTrack::NegotiateCodecs(
   for (auto codec : *codecs) {
     if (codec->mName == "red") {
       red = static_cast<JsepVideoCodecDescription*>(codec);
-      break;
     }
-    if (codec->mName == "ulpfec") {
+    else if (codec->mName == "ulpfec") {
       ulpfec = static_cast<JsepVideoCodecDescription*>(codec);
-      break;
     }
   }
   // if we have a red codec remove redundant encodings that don't exist
@@ -443,10 +441,12 @@ JsepTrack::Negotiate(const SdpMediaSection& answer,
     }
   }
 
-  if ((mDirection == sdp::kRecv) &&
-      remote.GetAttributeList().HasAttribute(SdpAttribute::kSsrcAttribute)) {
-    for (auto& ssrcAttr : remote.GetAttributeList().GetSsrc().mSsrcs) {
-      AddSsrc(ssrcAttr.ssrc);
+  if (mDirection == sdp::kRecv) {
+    mSsrcs.clear();
+    if (remote.GetAttributeList().HasAttribute(SdpAttribute::kSsrcAttribute)) {
+      for (auto& ssrcAttr : remote.GetAttributeList().GetSsrc().mSsrcs) {
+        AddSsrc(ssrcAttr.ssrc);
+      }
     }
   }
 

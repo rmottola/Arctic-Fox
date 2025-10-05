@@ -168,7 +168,6 @@ public:
 
     bool Do0RTT() override;
     nsresult Finish0RTT(bool aRestart) override;
-
 private:
     friend class DeleteHttpTransaction;
     virtual ~nsHttpTransaction();
@@ -189,10 +188,10 @@ private:
     Classifier Classify();
     void       CancelPipeline(uint32_t reason);
 
-    static NS_METHOD ReadRequestSegment(nsIInputStream *, void *, const char *,
-                                        uint32_t, uint32_t, uint32_t *);
-    static NS_METHOD WritePipeSegment(nsIOutputStream *, void *, char *,
-                                      uint32_t, uint32_t, uint32_t *);
+    static nsresult ReadRequestSegment(nsIInputStream *, void *, const char *,
+                                       uint32_t, uint32_t, uint32_t *);
+    static nsresult WritePipeSegment(nsIOutputStream *, void *, char *,
+                                     uint32_t, uint32_t, uint32_t *);
 
     bool TimingEnabled() const { return mCaps & NS_HTTP_TIMING_ENABLED; }
 
@@ -457,8 +456,6 @@ public:
 private:
     RefPtr<ASpdySession> mTunnelProvider;
 
-    bool                            m0RTTInProgress;
-
     nsresult                        mTransportStatus;
 
 public:
@@ -467,6 +464,8 @@ public:
 private:
     NetAddr                         mSelfAddr;
     NetAddr                         mPeerAddr;
+
+    bool                            m0RTTInProgress;
 };
 
 } // namespace net

@@ -445,7 +445,7 @@ public:
   }
   NS_IMETHOD SetDimensions(int32_t aWidth, int32_t aHeight) override;
   NS_IMETHOD InitializeWithDrawTarget(nsIDocShell* aShell,
-                                      gfx::DrawTarget* aTarget) override;
+                                      NotNull<gfx::DrawTarget*> aTarget) override;
 
   NS_IMETHOD GetInputStream(const char* aMimeType,
                             const char16_t* aEncoderOptions,
@@ -584,6 +584,8 @@ protected:
 
   static mozilla::gfx::DrawTarget* sErrorTarget;
 
+  void SetTransformInternal(const mozilla::gfx::Matrix& aTransform);
+
   // Some helpers.  Doesn't modify a color on failure.
   void SetStyleFromUnion(const StringOrCanvasGradientOrCanvasPattern& aValue,
                          Style aWhichStyle);
@@ -676,7 +678,7 @@ protected:
    * Returns the target to the buffer provider. i.e. this will queue a frame for
    * rendering.
    */
-  void ReturnTarget();
+  void ReturnTarget(bool aForceReset = false);
 
   /**
    * Check if the target is valid after calling EnsureTarget.
@@ -930,6 +932,22 @@ protected:
 
   bool CheckSizeForSkiaGL(mozilla::gfx::IntSize aSize);
 
+  // A clip or a transform, recorded and restored in order.
+  struct ClipState {
+    explicit ClipState(mozilla::gfx::Path* aClip)
+      : clip(aClip)
+    {}
+
+    explicit ClipState(const mozilla::gfx::Matrix& aTransform)
+      : transform(aTransform)
+    {}
+
+    bool IsClip() const { return !!clip; }
+
+    RefPtr<mozilla::gfx::Path> clip;
+    mozilla::gfx::Matrix transform;
+  };
+
   // state stack handling
   class ContextState {
   public:
@@ -1022,7 +1040,7 @@ protected:
       return std::min(SIGMA_MAX, shadowBlur / 2.0f);
     }
 
-    nsTArray<RefPtr<mozilla::gfx::Path> > clipsPushed;
+    nsTArray<ClipState> clipsAndTransforms;
 
     RefPtr<gfxFontGroup> fontGroup;
     nsCOMPtr<nsIAtom> fontLanguage;

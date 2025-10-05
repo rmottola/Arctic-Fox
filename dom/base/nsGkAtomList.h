@@ -607,6 +607,7 @@ GK_ATOM(middle, "middle")
 GK_ATOM(min, "min")
 GK_ATOM(minheight, "minheight")
 GK_ATOM(minimum_scale, "minimum-scale")
+GK_ATOM(minlength, "minlength")
 GK_ATOM(minpos, "minpos")
 GK_ATOM(minusSign, "minus-sign")
 GK_ATOM(minwidth, "minwidth")
@@ -949,10 +950,17 @@ GK_ATOM(onversionchange, "onversionchange")
 GK_ATOM(onvisibilitychange, "onvisibilitychange")
 GK_ATOM(onvoicechange, "onvoicechange")
 GK_ATOM(onvoiceschanged, "onvoiceschanged")
+GK_ATOM(onvrdisplayconnect, "onvrdisplayconnect")
+GK_ATOM(onvrdisplaydisconnect, "onvrdisplaydisconnect")
+GK_ATOM(onvrdisplaypresentchange, "onvrdisplaypresentchange")
 GK_ATOM(onwebkitAnimationEnd, "onwebkitAnimationEnd")
 GK_ATOM(onwebkitAnimationIteration, "onwebkitAnimationIteration")
 GK_ATOM(onwebkitAnimationStart, "onwebkitAnimationStart")
 GK_ATOM(onwebkitTransitionEnd, "onwebkitTransitionEnd")
+GK_ATOM(onwebkitanimationend, "onwebkitanimationend")
+GK_ATOM(onwebkitanimationiteration, "onwebkitanimationiteration")
+GK_ATOM(onwebkitanimationstart, "onwebkitanimationstart")
+GK_ATOM(onwebkittransitionend, "onwebkittransitionend")
 GK_ATOM(onwebsocket, "onwebsocket")
 GK_ATOM(onwheel, "onwheel")
 GK_ATOM(open, "open")
@@ -1950,6 +1958,9 @@ GK_ATOM(ondevicelight, "ondevicelight")
 GK_ATOM(onmozinterruptbegin, "onmozinterruptbegin")
 GK_ATOM(onmozinterruptend, "onmozinterruptend")
 
+// MediaDevices device change event
+GK_ATOM(ondevicechange, "ondevicechange")
+
 //---------------------------------------------------------------------------
 // Special atoms
 //---------------------------------------------------------------------------
@@ -2446,8 +2457,6 @@ GK_ATOM(onresume, "onresume")
 GK_ATOM(onmark, "onmark")
 GK_ATOM(onboundary, "onboundary")
 #endif
-
-GK_ATOM(vr_state, "vr-state")
 
 // Contextual Identity / Containers
 GK_ATOM(usercontextid, "usercontextid")

@@ -16,7 +16,7 @@
 #include "Layers.h" // For Layer
 #include "nsComputedDOMStyle.h" // nsComputedDOMStyle::GetStyleContextForElement
 #include "nsContentUtils.h"  // nsContentUtils::ReportToConsole
-#include "nsCSSPropertySet.h"
+#include "nsCSSPropertyIDSet.h"
 #include "nsCSSProps.h" // For nsCSSProps::PropHasFlags
 #include "nsCSSPseudoElements.h" // For CSSPseudoElementType
 #include "nsDOMMutationObserver.h" // For nsAutoAnimationMutationBatch
@@ -221,9 +221,11 @@ void
 KeyframeEffectReadOnly::GetComputedTimingAsDict(
     ComputedTimingProperties& aRetVal) const
 {
+  double playbackRate = mAnimation ? mAnimation->PlaybackRate() : 1;
   const Nullable<TimeDuration> currentTime = GetLocalTime();
   GetComputedTimingDictionary(GetComputedTimingAt(currentTime,
-                                                  SpecifiedTiming()),
+                                                  SpecifiedTiming(),
+                                                  playbackRate),
                               currentTime,
                               SpecifiedTiming(),
                               aRetVal);
@@ -232,7 +234,8 @@ KeyframeEffectReadOnly::GetComputedTimingAsDict(
 ComputedTiming
 KeyframeEffectReadOnly::GetComputedTimingAt(
     const Nullable<TimeDuration>& aLocalTime,
-    const TimingParams& aTiming)
+    const TimingParams& aTiming,
+    double aPlaybackRate)
 {
   const StickyTimeDuration zeroDuration;
 
@@ -271,9 +274,15 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
   // Calculate the time within the active interval.
   // https://w3c.github.io/web-animations/#active-time
   StickyTimeDuration activeTime;
-  if (localTime >=
-        std::min(StickyTimeDuration(aTiming.mDelay + result.mActiveDuration),
-                 result.mEndTime)) {
+
+  StickyTimeDuration beforeActiveBoundary =
+    std::min(StickyTimeDuration(aTiming.mDelay), result.mEndTime);
+  StickyTimeDuration activeAfterBoundary =
+    std::min(StickyTimeDuration(aTiming.mDelay + result.mActiveDuration),
+             result.mEndTime);
+
+  if (localTime > activeAfterBoundary ||
+      (aPlaybackRate >= 0 && localTime == activeAfterBoundary)) {
     result.mPhase = ComputedTiming::AnimationPhase::After;
     if (!result.FillsForwards()) {
       // The animation isn't active or filling at this time.
@@ -282,8 +291,8 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
     activeTime = std::max(std::min(result.mActiveDuration,
                                    result.mActiveDuration + aTiming.mEndDelay),
                           zeroDuration);
-  } else if (localTime <
-               std::min(StickyTimeDuration(aTiming.mDelay), result.mEndTime)) {
+  } else if (localTime < beforeActiveBoundary ||
+             (aPlaybackRate < 0 && localTime == beforeActiveBoundary)) {
     result.mPhase = ComputedTiming::AnimationPhase::Before;
     if (!result.FillsBackwards()) {
       // The animation isn't active or filling at this time.
@@ -391,6 +400,15 @@ KeyframeEffectReadOnly::GetComputedTimingAt(
   return result;
 }
 
+ComputedTiming
+KeyframeEffectReadOnly::GetComputedTiming(const TimingParams* aTiming) const
+{
+  double playbackRate = mAnimation ? mAnimation->PlaybackRate() : 1;
+  return GetComputedTimingAt(GetLocalTime(),
+                             aTiming ? *aTiming : SpecifiedTiming(),
+                             playbackRate);
+}
+
 // https://w3c.github.io/web-animations/#in-play
 bool
 KeyframeEffectReadOnly::IsInPlay() const
@@ -492,7 +510,7 @@ KeyframeEffectReadOnly::SetKeyframes(nsTArray<Keyframe>&& aKeyframes,
 }
 
 const AnimationProperty*
-KeyframeEffectReadOnly::GetAnimationOfProperty(nsCSSProperty aProperty) const
+KeyframeEffectReadOnly::GetAnimationOfProperty(nsCSSPropertyID aProperty) const
 {
   for (size_t propIdx = 0, propEnd = mProperties.Length();
        propIdx != propEnd; ++propIdx) {
@@ -575,8 +593,8 @@ KeyframeEffectReadOnly::UpdateProperties(nsStyleContext* aStyleContext)
   }
 
   // Preserve the state of mWinsInCascade and mIsRunningOnCompositor flags.
-  nsCSSPropertySet winningInCascadeProperties;
-  nsCSSPropertySet runningOnCompositorProperties;
+  nsCSSPropertyIDSet winningInCascadeProperties;
+  nsCSSPropertyIDSet runningOnCompositorProperties;
 
   for (const AnimationProperty& property : mProperties) {
     if (property.mWinsInCascade) {
@@ -611,7 +629,7 @@ KeyframeEffectReadOnly::UpdateProperties(nsStyleContext* aStyleContext)
 
 void
 KeyframeEffectReadOnly::ComposeStyle(RefPtr<AnimValuesStyleRule>& aStyleRule,
-                                     nsCSSPropertySet& aSetProperties)
+                                     nsCSSPropertyIDSet& aSetProperties)
 {
   ComputedTiming computedTiming = GetComputedTiming();
   mProgressOnLastCompose = computedTiming.mProgress;
@@ -725,7 +743,7 @@ KeyframeEffectReadOnly::IsRunningOnCompositor() const
 }
 
 void
-KeyframeEffectReadOnly::SetIsRunningOnCompositor(nsCSSProperty aProperty,
+KeyframeEffectReadOnly::SetIsRunningOnCompositor(nsCSSPropertyID aProperty,
                                                  bool aIsRunning)
 {
   MOZ_ASSERT(nsCSSProps::PropHasFlags(aProperty,
@@ -1005,7 +1023,7 @@ KeyframeEffectReadOnly::GetTarget(
 }
 
 static void
-CreatePropertyValue(nsCSSProperty aProperty,
+CreatePropertyValue(nsCSSPropertyID aProperty,
                     float aOffset,
                     const Maybe<ComputedTimingFunction>& aTimingFunction,
                     const StyleAnimationValue& aValue,
@@ -1132,7 +1150,7 @@ KeyframeEffectReadOnly::GetKeyframes(JSContext*& aCx,
       // nsCSSValue::AppendToString does not accept shorthands properties but
       // works with token stream values if we pass eCSSProperty_UNKNOWN as
       // the property.
-      nsCSSProperty propertyForSerializing =
+      nsCSSPropertyID propertyForSerializing =
         nsCSSProps::IsShorthand(propertyValue.mProperty)
         ? eCSSProperty_UNKNOWN
         : propertyValue.mProperty;
@@ -1352,7 +1370,7 @@ KeyframeEffectReadOnly::GetPresContext() const
 
 /* static */ bool
 KeyframeEffectReadOnly::IsGeometricProperty(
-  const nsCSSProperty aProperty)
+  const nsCSSPropertyID aProperty)
 {
   switch (aProperty) {
     case eCSSProperty_bottom:
@@ -1438,7 +1456,7 @@ KeyframeEffectReadOnly::ShouldBlockAsyncTransformAnimations(
 
 void
 KeyframeEffectReadOnly::SetPerformanceWarning(
-  nsCSSProperty aProperty,
+  nsCSSPropertyID aProperty,
   const AnimationPerformanceWarning& aWarning)
 {
   for (AnimationProperty& property : mProperties) {
@@ -1459,7 +1477,7 @@ KeyframeEffectReadOnly::SetPerformanceWarning(
 }
 
 static already_AddRefed<nsStyleContext>
-CreateStyleContextForAnimationValue(nsCSSProperty aProperty,
+CreateStyleContextForAnimationValue(nsCSSPropertyID aProperty,
                                     StyleAnimationValue aValue,
                                     nsStyleContext* aBaseStyleContext)
 {

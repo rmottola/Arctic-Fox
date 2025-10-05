@@ -11,9 +11,14 @@ const Cc = Components.classes;
 const Cu = Components.utils;
 const Cr = Components.results;
 
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/AppConstants.jsm");
+Cu.import("resource://gre/modules/Services.jsm");
+Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+
+XPCOMUtils.defineLazyModuleGetter(this, "ExtensionUtils",
+                                  "resource://gre/modules/ExtensionUtils.jsm");
+
+XPCOMUtils.defineLazyGetter(this, "console", () => ExtensionUtils.getConsole());
 
 /*
  * This file should be kept short and simple since it's loaded even
@@ -85,6 +90,26 @@ var Frames = {
 };
 Frames.init();
 
+var APIs = {
+  apis: new Map(),
+
+  register(namespace, schema, script) {
+    if (this.apis.has(namespace)) {
+      throw new Error(`API namespace already exists: ${namespace}`);
+    }
+
+    this.apis.set(namespace, {schema, script});
+  },
+
+  unregister(namespace) {
+    if (!this.apis.has(namespace)) {
+      throw new Error(`API namespace does not exist: ${namespace}`);
+    }
+
+    this.apis.delete(namespace);
+  },
+};
+
 // This object manages various platform-level issues related to
 // moz-extension:// URIs. It lives here so that it can be used in both
 // the parent and child processes.
@@ -132,6 +157,7 @@ var Service = {
     handler.setSubstitution(uuid, uri);
 
     this.uuidMap.set(uuid, extension);
+    this.aps.setAddonHasPermissionCallback(extension.id, extension.hasPermission.bind(extension));
     this.aps.setAddonLoadURICallback(extension.id, this.checkAddonMayLoad.bind(this, extension));
     this.aps.setAddonLocalizeCallback(extension.id, extension.localize.bind(extension));
     this.aps.setAddonCSP(extension.id, extension.manifest.content_security_policy);
@@ -142,6 +168,7 @@ var Service = {
   shutdownExtension(uuid) {
     let extension = this.uuidMap.get(uuid);
     this.uuidMap.delete(uuid);
+    this.aps.setAddonHasPermissionCallback(extension.id, null);
     this.aps.setAddonLoadURICallback(extension.id, null);
     this.aps.setAddonLocalizeCallback(extension.id, null);
     this.aps.setAddonCSP(extension.id, null);
@@ -229,17 +256,32 @@ function getAPILevelForWindow(window, addonId) {
     return NO_PRIVILEGES;
   }
 
-  let docShell = window.QueryInterface(Ci.nsIInterfaceRequestor)
-        .getInterface(Ci.nsIDocShell);
-
-  // WebExtension URLs loaded into sub-frame UI have "content script API level privileges".
-  // (see Bug 1214658 for rationale)
-  if (docShell.sameTypeParent) {
+  // Extension pages running in the content process always defaults to
+  // "content script API level privileges".
+  if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
     return CONTENTSCRIPT_PRIVILEGES;
   }
 
-  // Extension pages running in the content process defaults to "content script API level privileges".
-  if (Services.appinfo.processType == Services.appinfo.PROCESS_TYPE_CONTENT) {
+  let docShell = window.QueryInterface(Ci.nsIInterfaceRequestor)
+                       .getInterface(Ci.nsIDocShell);
+
+  // Handling of ExtensionPages running inside sub-frames.
+  if (docShell.sameTypeParent) {
+    let parentWindow = docShell.sameTypeParent.QueryInterface(Ci.nsIInterfaceRequestor)
+                               .getInterface(Ci.nsIDOMWindow);
+
+    // The option page iframe embedded in the about:addons tab should have
+    // full API level privileges. (see Bug 1256282 for rationale)
+    let parentDocument = parentWindow.document;
+    let parentIsSystemPrincipal = Services.scriptSecurityManager
+                                          .isSystemPrincipal(parentDocument.nodePrincipal);
+    if (parentDocument.location.href == "about:addons" && parentIsSystemPrincipal) {
+      return FULL_PRIVILEGES;
+    }
+
+    // In all the other cases, WebExtension URLs loaded into sub-frame UI
+    // will have "content script API level privileges".
+    // (see Bug 1214658 for rationale)
     return CONTENTSCRIPT_PRIVILEGES;
   }
 
@@ -251,6 +293,9 @@ this.ExtensionManagement = {
   startupExtension: Service.startupExtension.bind(Service),
   shutdownExtension: Service.shutdownExtension.bind(Service),
 
+  registerAPI: APIs.register.bind(APIs),
+  unregisterAPI: APIs.unregister.bind(APIs),
+
   getFrameId: Frames.getId.bind(Frames),
   getParentFrameId: Frames.getParentId.bind(Frames),
 
@@ -258,4 +303,6 @@ this.ExtensionManagement = {
   getAddonIdForWindow,
   getAPILevelForWindow,
   API_LEVELS,
+
+  APIs,
 };

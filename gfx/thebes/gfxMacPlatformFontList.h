@@ -33,7 +33,8 @@ public:
     friend class gfxMacPlatformFontList;
 
     MacOSFontEntry(const nsAString& aPostscriptName, int32_t aWeight,
-                   bool aIsStandardFace = false);
+                   bool aIsStandardFace = false,
+                   double aSizeHint = 0.0);
 
     // for use with data fonts
 #if defined(MAC_OS_X_VERSION_10_6) && (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6)
@@ -97,6 +98,9 @@ protected:
     ByteCount mFontTableDirSize; // 10.4Fx
     void TryGlobalFontTableCache();
 #endif
+
+    double mSizeHint;
+
     bool mFontRefInitialized;
     bool mRequiresAAT;
     bool mIsCFF;
@@ -153,7 +157,7 @@ private:
     void InitSingleFaceList();
 
     // initialize system fonts
-    void InitSystemFonts();
+    void InitSystemFontNames();
 
     // helper function to lookup in both hidden system fonts and normal fonts
     gfxFontFamily* FindSystemFontFamily(const nsAString& aFamily);
@@ -212,8 +216,8 @@ private:
     // or Helvetica Neue. For OSX 10.11, Apple uses pair of families
     // for the UI, one for text sizes and another for display sizes
     bool mUseSizeSensitiveSystemFont;
-    RefPtr<gfxFontFamily> mSystemTextFontFamily;
-    RefPtr<gfxFontFamily> mSystemDisplayFontFamily; // only used on OSX 10.11
+    nsString mSystemTextFontFamilyName;
+    nsString mSystemDisplayFontFamilyName; // only used on OSX 10.11
 };
 
 #endif /* gfxMacPlatformFontList_H_ */

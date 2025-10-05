@@ -82,8 +82,39 @@ function getValueBaseType(value) {
   return t;
 }
 
+// Methods of Context that are used by Schemas.normalize. These methods can be
+// overridden at the construction of Context.
+const CONTEXT_FOR_VALIDATION = [
+  "checkLoadURL",
+  "hasPermission",
+  "logError",
+];
+
+// Methods of Context that are used by Schemas.inject.
+// Callers of Schemas.inject should implement all of these methods.
+const CONTEXT_FOR_INJECTION = [
+  ...CONTEXT_FOR_VALIDATION,
+  "callFunction",
+  "callFunctionNoReturn",
+  "callAsyncFunction",
+  "getProperty",
+  "setProperty",
+
+  "addListener",
+  "hasListener",
+  "removeListener",
+];
+
+/**
+ * A context for schema validation and error reporting. This class is only used
+ * internally within Schemas.
+ */
 class Context {
-  constructor(params) {
+  /**
+   * @param {object} params Provides the implementation of this class.
+   * @param {Array<string>} overridableMethods
+   */
+  constructor(params, overridableMethods = CONTEXT_FOR_VALIDATION) {
     this.params = params;
 
     this.path = [];
@@ -96,13 +127,7 @@ class Context {
     this.currentChoices = new Set();
     this.choicePathIndex = 0;
 
-    let methods = ["addListener", "callFunction",
-                   "callFunctionNoReturn", "callAsyncFunction",
-                   "hasPermission",
-                   "hasListener", "removeListener",
-                   "getProperty", "setProperty",
-                   "checkLoadURL", "logError"];
-    for (let method of methods) {
+    for (let method of overridableMethods) {
       if (method in params) {
         this[method] = params[method].bind(params);
       }
@@ -137,6 +162,12 @@ class Context {
     return this.params.principal || Services.scriptSecurityManager.createNullPrincipal({});
   }
 
+  /**
+   * Checks whether `url` may be loaded by the extension in this context.
+   *
+   * @param {string} url The URL that the extension wished to load.
+   * @returns {boolean} Whether the context may load `url`.
+   */
   checkLoadURL(url) {
     let ssm = Services.scriptSecurityManager;
     try {
@@ -295,6 +326,123 @@ class Context {
     } finally {
       this.path.pop();
     }
+  }
+}
+
+/**
+ * Holds methods that run the actual implementation of the extension APIs. These
+ * methods are only called if the extension API invocation matches the signature
+ * as defined in the schema. Otherwise an error is reported to the context.
+ */
+class InjectionContext extends Context {
+  constructor(params) {
+    super(params, CONTEXT_FOR_INJECTION);
+  }
+
+  /**
+   * Calls function `path`.`name` and returns its return value.
+   *
+   * @abstract
+   * @param {Array<string>} path The API path, e.g. `["storage", "local"]`.
+   * @param {string} name The method name, e.g. "get".
+   * @param {Array} args The parameters for the function.
+   * @returns {*} The return value of the invoked function.
+   */
+  callFunction(path, name, args) {
+    throw new Error("Not implemented");
+  }
+
+  /**
+   * Calls function `path`.`name` and ignores its return value.
+   *
+   * @abstract
+   * @param {Array<string>} path The API path, e.g. `["storage", "local"]`.
+   * @param {string} name The method name, e.g. "get".
+   * @param {Array} args The parameters for the function.
+   */
+  callFunctionNoReturn(path, name, args) {
+    throw new Error("Not implemented");
+  }
+
+  /**
+   * Call function `path`.`name` that completes asynchronously.
+   *
+   * @abstract
+   * @param {Array<string>} path The API path, e.g. `["storage", "local"]`.
+   * @param {string} name The method name, e.g. "get".
+   * @param {Array} args The parameters for the function.
+   * @param {function(*)} [callback] The callback to be called when the function
+   *     completes.
+   * @returns {Promise|undefined} Must be void if `callback` is set, and a
+   *     promise otherwise. The promise is resolved when the function completes.
+   */
+  callAsyncFunction(path, name, args, callback) {
+    throw new Error("Not implemented");
+  }
+
+  /**
+   * Retrieves the value of property `path`.`name`.
+   *
+   * @abstract
+   * @param {Array<string>} path The API path, e.g. `["storage", "local"]`.
+   * @param {string} name The property name.
+   * @returns {*} The value of the property.
+   */
+  getProperty(path, name) {
+    throw new Error("Not implemented");
+  }
+
+  /**
+   * Assigns the value of property `path`.`name`.
+   *
+   * @abstract
+   * @param {Array<string>} path The API path, e.g. `["storage", "local"]`.
+   * @param {string} name The property name.
+   * @param {string} value The new value of the property.
+   */
+  setProperty(path, name, value) {
+    throw new Error("Not implemented");
+  }
+
+  /**
+   * Registers `listener` for event `path`.`name`.
+   *
+   * @abstract
+   * @param {Array<string>} path The API path, e.g. `["storage", "local"]`.
+   * @param {string} name The event name, e.g. "onChanged"
+   * @param {function} listener The callback to be called when the event fires.
+   * @param {Array} args Extra parameters for EventManager.addListener.
+   * @see EventManager.addListener
+   */
+  addListener(path, name, listener, args) {
+    throw new Error("Not implemented");
+  }
+
+  /**
+   * Checks whether `listener` is listening to event `path`.`name`.
+   *
+   * @abstract
+   * @param {Array<string>} path The API path, e.g. `["storage", "local"]`.
+   * @param {string} name The event name, e.g. "onChanged"
+   * @param {function} listener The event listener.
+   * @returns {boolean} Whether `listener` was added to event `path`.`name`.
+   * @see EventManager.hasListener
+   */
+  hasListener(path, name, listener) {
+    throw new Error("Not implemented");
+  }
+
+  /**
+   * Unregisters `listener` from event `path`.`name`.
+   *
+   * @abstract
+   * @param {Array<string>} path The API path, e.g. `["storage", "local"]`.
+   * @param {string} name The event name, e.g. "onChanged"
+   * @param {function} listener The event listener.
+   * @see EventManager.removeListener
+   */
+  removeListener(path, name, listener) {
+    throw new Error("Not implemented");
   }
 }
 
@@ -458,11 +606,17 @@ class Entry {
     }
   }
 
-  // Injects JS values for the entry into the extension API
-  // namespace. The default implementation is to do
-  // nothing. |context| is used to call the actual implementation
-  // of a given function or event. It's an object with properties
-  // callFunction, addListener, removeListener, and hasListener.
+  /**
+   * Injects JS values for the entry into the extension API
+   * namespace. The default implementation is to do nothing.
+   * `context` is used to call the actual implementation
+   * of a given function or event.
+   *
+   * @param {Array<string>} path The API path, e.g. `["storage", "local"]`.
+   * @param {string} name The method name, e.g. "get".
+   * @param {object} dest The object where `path`.`name` should be stored.
+   * @param {InjectionContext} context
+   */
   inject(path, name, dest, context) {
   }
 }
@@ -1044,7 +1198,7 @@ class SubModuleProperty extends Entry {
     this.properties = properties;
   }
 
-  inject(path, name, dest, wrapperFuncs) {
+  inject(path, name, dest, context) {
     let obj = Cu.createObjectIn(dest, {defineAs: name});
 
     let ns = Schemas.namespaces.get(this.namespaceName);
@@ -1055,7 +1209,7 @@ class SubModuleProperty extends Entry {
 
     let functions = type.functions;
     for (let fun of functions) {
-      fun.inject(path.concat(name), fun.name, obj, wrapperFuncs);
+      fun.inject(path.concat(name), fun.name, obj, context);
     }
 
     // TODO: Inject this.properties.
@@ -1224,12 +1378,12 @@ class Event extends CallEntry {
     let addStub = (listener, ...args) => {
       listener = this.checkListener(listener, context);
       let actuals = this.checkParameters(args, context);
-      return context.addListener(this.path, name, listener, actuals);
+      context.addListener(this.path, name, listener, actuals);
     };
 
     let removeStub = (listener) => {
       listener = this.checkListener(listener, context);
-      return context.removeListener(this.path, name, listener);
+      context.removeListener(this.path, name, listener);
     };
 
     let hasStub = (listener) => {
@@ -1246,9 +1400,6 @@ class Event extends CallEntry {
 
 this.Schemas = {
   initialized: false,
-
-  // Set of URLs that we have loaded via the load() method.
-  loadedUrls: new Set(),
 
   // Maps a schema URL to the JSON contained in that schema file. This
   // is useful for sending the JSON across processes.
@@ -1546,50 +1697,77 @@ this.Schemas = {
       }
       Services.cpmm.addMessageListener("Schema:Add", this);
     }
+
+    this.flushSchemas();
   },
 
   receiveMessage(msg) {
     switch (msg.name) {
       case "Schema:Add":
         this.schemaJSON.set(msg.data.url, msg.data.schema);
+        this.flushSchemas();
+        break;
+
+      case "Schema:Delete":
+        this.schemaJSON.delete(msg.data.url);
+        this.flushSchemas();
         break;
     }
   },
 
-  load(url) {
-    let loadFromJSON = json => {
-      for (let namespace of json) {
-        let name = namespace.namespace;
+  flushSchemas() {
+    XPCOMUtils.defineLazyGetter(this, "namespaces",
+                                () => this.parseSchemas());
+  },
 
-        let types = namespace.types || [];
-        for (let type of types) {
-          this.loadType(name, type);
-        }
+  parseSchemas() {
+    Object.defineProperty(this, "namespaces", {
+      enumerable: true,
+      configurable: true,
+      value: new Map(),
+    });
 
-        let properties = namespace.properties || {};
-        for (let propertyName of Object.keys(properties)) {
-          this.loadProperty(name, propertyName, properties[propertyName]);
-        }
+    for (let json of this.schemaJSON.values()) {
+      this.parseSchema(json);
+    }
 
-        let functions = namespace.functions || [];
-        for (let fun of functions) {
-          this.loadFunction(name, fun);
-        }
+    return this.namespaces;
+  },
 
-        let events = namespace.events || [];
-        for (let event of events) {
-          this.loadEvent(name, event);
-        }
+  parseSchema(json) {
+    for (let namespace of json) {
+      let name = namespace.namespace;
 
-        if (namespace.permissions) {
-          let ns = this.namespaces.get(name);
-          ns.permissions = namespace.permissions;
-        }
+      let types = namespace.types || [];
+      for (let type of types) {
+        this.loadType(name, type);
       }
-    };
 
+      let properties = namespace.properties || {};
+      for (let propertyName of Object.keys(properties)) {
+        this.loadProperty(name, propertyName, properties[propertyName]);
+      }
+
+      let functions = namespace.functions || [];
+      for (let fun of functions) {
+        this.loadFunction(name, fun);
+      }
+
+      let events = namespace.events || [];
+      for (let event of events) {
+        this.loadEvent(name, event);
+      }
+
+      if (namespace.permissions) {
+        let ns = this.namespaces.get(name);
+        ns.permissions = namespace.permissions;
+      }
+    }
+  },
+
+  load(url) {
     if (Services.appinfo.processType != Services.appinfo.PROCESS_TYPE_CONTENT) {
-      let result = readJSON(url).then(json => {
+      return readJSON(url).then(json => {
         this.schemaJSON.set(url, json);
 
         let data = Services.ppmm.initialProcessData;
@@ -1597,21 +1775,32 @@ this.Schemas = {
 
         Services.ppmm.broadcastAsyncMessage("Schema:Add", {url, schema: json});
 
-        loadFromJSON(json);
+        this.flushSchemas();
       });
-      return result;
     }
-    if (this.loadedUrls.has(url)) {
-      return;
-    }
-    this.loadedUrls.add(url);
-
-    let schema = this.schemaJSON.get(url);
-    loadFromJSON(schema);
   },
 
+  unload(url) {
+    this.schemaJSON.delete(url);
+
+    let data = Services.ppmm.initialProcessData;
+    data["Extension:Schemas"] = this.schemaJSON;
+
+    Services.ppmm.broadcastAsyncMessage("Schema:Delete", {url});
+
+    this.flushSchemas();
+  },
+
+  /**
+   * Inject registered extension APIs into `dest`.
+   *
+   * @param {object} dest The root namespace for the APIs.
+   *     This object is usually exposed to extensions as "chrome" or "browser".
+   * @param {object} wrapperFuncs An implementation of the InjectionContext
+   *     interface, which runs the actual functionality of the generated API.
+   */
   inject(dest, wrapperFuncs) {
-    let context = new Context(wrapperFuncs);
+    let context = new InjectionContext(wrapperFuncs);
 
     for (let [namespace, ns] of this.namespaces) {
       if (ns.permissions && !ns.permissions.some(perm => context.hasPermission(perm))) {
@@ -1625,12 +1814,46 @@ this.Schemas = {
         }
       }
 
+      // Remove the namespace object if it is empty
       if (!Object.keys(obj).length) {
         delete dest[namespace];
+        // process the next namespace.
+        continue;
+      }
+
+      // If the nested namespaced API object (e.g devtools.inspectedWindow) is not empty,
+      // then turn `dest["nested.namespace"]` into `dest["nested"]["namespace"]`.
+      if (namespace.includes(".")) {
+        let apiObj = dest[namespace];
+        delete dest[namespace];
+
+        let nsLevels = namespace.split(".");
+        let currentObj = dest;
+        for (let nsLevel of nsLevels.slice(0, -1)) {
+          if (!currentObj[nsLevel]) {
+            // Create the namespace level if it doesn't exist yet.
+            currentObj = Cu.createObjectIn(currentObj, {defineAs: nsLevel});
+          } else {
+            // Move currentObj to the nested object if it already exists.
+            currentObj = currentObj[nsLevel];
+          }
+        }
+
+        // Copy the apiObj as the final nested level.
+        currentObj[nsLevels.pop()] = apiObj;
       }
     }
   },
 
+  /**
+   * Normalize `obj` according to the loaded schema for `typeName`.
+   *
+   * @param {object} obj The object to normalize against the schema.
+   * @param {string} typeName The name in the format namespace.propertyname
+   * @param {object} context An implementation of Context. Any validation errors
+   *     are reported to the given context.
+   * @returns {object} The normalized object.
+   */
   normalize(obj, typeName, context) {
     let [namespaceName, prop] = typeName.split(".");
     let ns = this.namespaces.get(namespaceName);

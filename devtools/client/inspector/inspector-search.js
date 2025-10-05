@@ -6,10 +6,11 @@
 
 const promise = require("promise");
 const {Task} = require("devtools/shared/task");
+const {KeyCodes} = require("devtools/client/shared/keycodes");
 
-const system = require("devtools/shared/system");
 const EventEmitter = require("devtools/shared/event-emitter");
 const {AutocompletePopup} = require("devtools/client/shared/autocomplete-popup");
+const Services = require("Services");
 
 // Maximum number of selector suggestions shown in the panel.
 const MAX_SUGGESTIONS = 15;
@@ -41,8 +42,12 @@ function InspectorSearch(inspector, input, clearBtn) {
   this._onKeyDown = this._onKeyDown.bind(this);
   this._onInput = this._onInput.bind(this);
   this._onClearSearch = this._onClearSearch.bind(this);
+  this._onFilterTextboxContextMenu =
+    this._onFilterTextboxContextMenu.bind(this);
   this.searchBox.addEventListener("keydown", this._onKeyDown, true);
   this.searchBox.addEventListener("input", this._onInput, true);
+  this.searchBox.addEventListener("contextmenu",
+    this._onFilterTextboxContextMenu);
   this.searchClearButton.addEventListener("click", this._onClearSearch);
 
   // For testing, we need to be able to wait for the most recent node request
@@ -63,6 +68,8 @@ InspectorSearch.prototype = {
   destroy: function () {
     this.searchBox.removeEventListener("keydown", this._onKeyDown, true);
     this.searchBox.removeEventListener("input", this._onInput, true);
+    this.searchBox.removeEventListener("contextmenu",
+      this._onFilterTextboxContextMenu);
     this.searchClearButton.removeEventListener("click", this._onClearSearch);
     this.searchBox = null;
     this.searchClearButton = null;
@@ -119,21 +126,35 @@ InspectorSearch.prototype = {
       this.searchClearButton.hidden = false;
       this.searchBox.setAttribute("filled", true);
     }
-    if (event.keyCode === event.DOM_VK_RETURN) {
+    if (event.keyCode === KeyCodes.DOM_VK_RETURN) {
       this._onSearch(event.shiftKey);
     }
 
-    const modifierKey = system.constants.platform === "macosx"
+    const modifierKey = Services.appinfo.OS === "Darwin"
                         ? event.metaKey : event.ctrlKey;
-    if (event.keyCode === event.DOM_VK_G && modifierKey) {
+    if (event.keyCode === KeyCodes.DOM_VK_G && modifierKey) {
       this._onSearch(event.shiftKey);
       event.preventDefault();
     }
   },
 
+  /**
+   * Context menu handler for filter search box.
+   */
+  _onFilterTextboxContextMenu: function (event) {
+    try {
+      let contextmenu = this.inspector.toolbox.textboxContextMenuPopup;
+      contextmenu.openPopupAtScreen(event.screenX, event.screenY, true);
+    } catch (e) {
+      console.error(e);
+    }
+  },
+
   _onClearSearch: function () {
+    this.searchBox.classList.remove("devtools-style-searchbox-no-match");
     this.searchBox.value = "";
     this.searchClearButton.hidden = true;
+    this.emit("search-cleared");
   }
 };
 
@@ -329,8 +350,8 @@ SelectorAutocompleter.prototype = {
     let popup = this.searchPopup;
 
     switch (event.keyCode) {
-      case event.DOM_VK_RETURN:
-      case event.DOM_VK_TAB:
+      case KeyCodes.DOM_VK_RETURN:
+      case KeyCodes.DOM_VK_TAB:
         if (popup.isOpen) {
           if (popup.selectedItem) {
             this.searchBox.value = popup.selectedItem.label;
@@ -345,7 +366,7 @@ SelectorAutocompleter.prototype = {
         }
         break;
 
-      case event.DOM_VK_UP:
+      case KeyCodes.DOM_VK_UP:
         if (popup.isOpen && popup.itemCount > 0) {
           if (popup.selectedIndex === 0) {
             popup.selectedIndex = popup.itemCount - 1;
@@ -356,7 +377,7 @@ SelectorAutocompleter.prototype = {
         }
         break;
 
-      case event.DOM_VK_DOWN:
+      case KeyCodes.DOM_VK_DOWN:
         if (popup.isOpen && popup.itemCount > 0) {
           if (popup.selectedIndex === popup.itemCount - 1) {
             popup.selectedIndex = 0;
@@ -367,7 +388,7 @@ SelectorAutocompleter.prototype = {
         }
         break;
 
-      case event.DOM_VK_ESCAPE:
+      case KeyCodes.DOM_VK_ESCAPE:
         if (popup.isOpen) {
           this.hidePopup();
         }

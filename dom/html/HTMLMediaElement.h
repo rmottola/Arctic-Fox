@@ -439,10 +439,6 @@ public:
     return mNetworkState;
   }
 
-  // Called by the media decoder object, on the main thread,
-  // when the connection between Rtsp server and client gets lost.
-  virtual void ResetConnectionState() final override;
-
   void NotifyXPCOMShutdown() final override;
 
   // Called by media decoder when the audible state changed or when input is
@@ -645,6 +641,8 @@ public:
   bool ContainsRestrictedContent();
 #endif // MOZ_EME
 
+  void CannotDecryptWaitingForKey();
+
   bool MozAutoplayEnabled() const
   {
     return mAutoplayEnabled;
@@ -716,13 +714,6 @@ public:
 
   // A method to check whether we are currently playing.
   bool IsCurrentlyPlaying() const;
-
-  /**
-   * A public wrapper for FinishDecoderSetup()
-   */
-  nsresult FinishDecoderSetup(MediaDecoder* aDecoder, MediaResource* aStream) {
-    return FinishDecoderSetup(aDecoder, aStream, nullptr);
-  }
 
   // Returns true if the media element is being destroyed. Used in
   // dormancy checks to prevent dormant processing for an element
@@ -1525,6 +1516,14 @@ protected:
 
   // True if the media has encryption information.
   bool mIsEncrypted;
+
+  // True when the CDM cannot decrypt the current block, and the
+  // waitingforkey event has been fired. Back to false when keys have become
+  // available and we can advance the current playback position.
+  bool mWaitingForKey;
+
+  // Listens for waitingForKey events from the owned decoder.
+  MediaEventListener mWaitingForKeyListener;
 
 #ifdef MOZ_EME
   // Init Data that needs to be sent in 'encrypted' events in MetadataLoaded().

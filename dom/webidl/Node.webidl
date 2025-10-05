@@ -107,4 +107,9 @@ interface Node : EventTarget {
   readonly attribute URI? baseURIObject;
   [ChromeOnly]
   sequence<MutationObserver> getBoundMutationObservers();
+
+#ifdef ACCESSIBILITY
+  [Pref="accessibility.AOM.enabled"]
+  readonly attribute AccessibleNode? accessibleNode;
+#endif
 };

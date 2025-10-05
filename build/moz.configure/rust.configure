@@ -32,12 +32,16 @@ def rustc_info(rustc):
 @depends_if(cargo)
 @checking('cargo support for --frozen')
 @imports('subprocess')
+@imports('os')
 def cargo_supports_frozen(cargo):
     try:
         lines = subprocess.check_output(
             [cargo, 'help', 'build']
         ).splitlines()
-        return any('    --frozen' in l for l in lines)
+        supported = any('    --frozen' in l for l in lines)
+        if 'MOZ_AUTOMATION' in os.environ and not supported:
+            die('cargo in automation must support --frozen')
+        return supported
     except subprocess.CalledProcessError as e:
         die('Failed to call cargo: %s', e.message)
 
@@ -92,8 +96,8 @@ def rust_target(rust_compiler, rustc, target, cross_compiling):
         os_or_kernel = target.kernel if target.kernel == 'Linux' and target.os != 'Android' else target.os
         rustc_target = {
             # DragonFly
-            ('x86_64', 'Dragonfly'): 'x86_64-unknown-dragonfly',
-            # FreeBSD, GNU/kFreeBSD
+            ('x86_64', 'DragonFly'): 'x86_64-unknown-dragonfly',
+            # FreeBSD
             ('x86', 'FreeBSD'): 'i686-unknown-freebsd',
             ('x86_64', 'FreeBSD'): 'x86_64-unknown-freebsd',
             # NetBSD

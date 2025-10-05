@@ -665,7 +665,7 @@ nsExpatDriver::HandleEndDoctypeDecl()
   return NS_OK;
 }
 
-static NS_METHOD
+static nsresult
 ExternalDTDStreamReaderFunc(nsIUnicharInputStream* aIn,
                             void* aClosure,
                             const char16_t* aFromSegment,

@@ -215,10 +215,14 @@ const TYPES = {
   experiment: 128,
 };
 
+if (!AppConstants.RELEASE_BUILD)
+  TYPES.apiextension = 256;
+
 // Some add-on types that we track internally are presented as other types
 // externally
 const TYPE_ALIASES = {
   "webextension": "extension",
+  "apiextension": "extension",
 };
 
 const CHROME_TYPES = new Set([
@@ -232,13 +236,22 @@ const RESTARTLESS_TYPES = new Set([
   "dictionary",
   "experiment",
   "locale",
+  "apiextension",
 ]);
 
 const SIGNED_TYPES = new Set([
   "webextension",
   "extension",
   "experiment",
+  "apiextension",
 ]);
+
+// This is a random number array that can be used as "salt" when generating
+// an automatic ID based on the directory path of an add-on. It will prevent
+// someone from creating an ID for a permanent add-on that could be replaced
+// by a temporary add-on (because that would be confusing, I guess).
+const TEMP_INSTALL_ID_GEN_SESSION =
+  new Uint8Array(Float64Array.of(Math.random()).buffer);
 
 // Whether add-on signing is required.
 function mustSign(aType) {
@@ -916,6 +929,7 @@ var loadManifestFromWebManifest = Task.async(function*(aUri) {
   addon.optionsURL = null;
   addon.optionsType = null;
   addon.aboutURL = null;
+  addon.dependencies = Object.freeze(Array.from(extension.dependencies));
 
   if (manifest.options_ui) {
     addon.optionsURL = extension.getURL(manifest.options_ui.page);
@@ -1340,11 +1354,19 @@ var loadManifestFromDir = Task.async(function*(aDir, aInstallLocation) {
     addon = yield loadManifestFromWebManifest(uri);
     if (!addon.id) {
       if (aInstallLocation == TemporaryInstallLocation) {
-        let id = Cc["@mozilla.org/uuid-generator;1"]
-            .getService(Ci.nsIUUIDGenerator)
-            .generateUUID().toString();
-        logger.info(`Generated temporary id ${id} for ${aDir.path}`);
-        addon.id = id;
+        // Generate a unique ID based on the directory path of
+        // this temporary add-on location.
+        const hasher = Cc["@mozilla.org/security/hash;1"]
+          .createInstance(Ci.nsICryptoHash);
+        hasher.init(hasher.SHA1);
+        const data = new TextEncoder().encode(aDir.path);
+        // Make it so this ID cannot be guessed.
+        const sess = TEMP_INSTALL_ID_GEN_SESSION;
+        hasher.update(sess, sess.length);
+        hasher.update(data, data.length);
+        addon.id = `${getHashStringForCrypto(hasher)}@temporary-addon`;
+        logger.info(
+          `Generated temp id ${addon.id} (${sess.join("")}) for ${aDir.path}`);
       } else {
         addon.id = aDir.leafName;
       }
@@ -4610,6 +4632,8 @@ this.XPIProvider = {
       uri = "resource://gre/modules/addons/SpellCheckDictionaryBootstrap.js"
     else if (aType == "webextension")
       uri = "resource://gre/modules/addons/WebExtensionBootstrap.js"
+    else if (aType == "apiextension")
+      uri = "resource://gre/modules/addons/APIExtensionBootstrap.js"
 
     activeAddon.bootstrapScope =
       new Cu.Sandbox(principal, { sandboxName: uri,
@@ -5962,13 +5986,13 @@ AddonInstall.prototype = {
           this.downloadFailed(error, message);
         });
       }
+      else if (aRequest instanceof Ci.nsIHttpChannel) {
+        this.downloadFailed(AddonManager.ERROR_NETWORK_FAILURE,
+                            aRequest.responseStatus + " " +
+                            aRequest.responseStatusText);
+      }
       else {
-        if (aRequest instanceof Ci.nsIHttpChannel)
-          this.downloadFailed(AddonManager.ERROR_NETWORK_FAILURE,
-                              aRequest.responseStatus + " " +
-                              aRequest.responseStatusText);
-        else
-          this.downloadFailed(AddonManager.ERROR_NETWORK_FAILURE, aStatus);
+        this.downloadFailed(AddonManager.ERROR_NETWORK_FAILURE, aStatus);
       }
     }
     else {
@@ -7269,10 +7293,9 @@ AddonWrapper.prototype = {
         XPIProvider.updateAddonDisabledState(addon, undefined, val);
       }
     }
-    else {
+    else if (!addon.userDisabled) {
       // Only set softDisabled if not already disabled
-      if (!addon.userDisabled)
-        addon.softDisabled = val;
+      addon.softDisabled = val;
     }
 
     return val;

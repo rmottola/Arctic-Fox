@@ -1157,9 +1157,11 @@ nsTextEditorState::BindToFrame(nsTextControlFrame* aFrame)
 
   mBoundFrame = aFrame;
 
-  nsIContent *rootNode = GetRootNode();
+  nsresult rv = CreateRootNode();
+  NS_ENSURE_SUCCESS(rv, rv);
 
-  nsresult rv = InitializeRootNode();
+  nsIContent *rootNode = GetRootNode();
+  rv = InitializeRootNode();
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsIPresShell *shell = mBoundFrame->PresContext()->GetPresShell();
@@ -1533,6 +1535,19 @@ nsTextEditorState::GetSelectionProperties()
   return mSelectionProperties;
 }
 
+void
+nsTextEditorState::SetSelectionProperties(nsTextEditorState::SelectionProperties& aProps)
+{
+  if (mBoundFrame) {
+    mBoundFrame->SetSelectionRange(aProps.GetStart(),
+                                   aProps.GetEnd(),
+                                   aProps.GetDirection());
+  } else {
+    mSelectionProperties = aProps;
+  }
+}
+
+
 HTMLInputElement*
 nsTextEditorState::GetParentNumberControl(nsFrame* aFrame) const
 {
@@ -1737,8 +1752,8 @@ nsTextEditorState::UnbindFromFrame(nsTextControlFrame* aFrame)
 nsresult
 nsTextEditorState::CreateRootNode()
 {
-  NS_ENSURE_TRUE(!mRootNode, NS_ERROR_UNEXPECTED);
-  NS_ENSURE_ARG_POINTER(mBoundFrame);
+  MOZ_ASSERT(!mRootNode);
+  MOZ_ASSERT(mBoundFrame);
 
   nsIPresShell *shell = mBoundFrame->PresContext()->GetPresShell();
   NS_ENSURE_TRUE(shell, NS_ERROR_FAILURE);

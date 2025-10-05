@@ -10,7 +10,7 @@
 #include "mozilla/DebugOnly.h"
 #include "nsDumpUtils.h"
 
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 #include "mozilla/dom/ContentParent.h"
 #include "mozilla/dom/ContentChild.h"
 #include "nsIConsoleService.h"
@@ -448,7 +448,9 @@ public:
 
   void Write(const char* aStr)
   {
-    (void)mGZWriter->Write(aStr);
+    // Ignore any failure because JSONWriteFunc doesn't have a mechanism for
+    // handling errors.
+    Unused << mGZWriter->Write(aStr);
   }
 
   nsresult Finish() { return mGZWriter->Finish(); }

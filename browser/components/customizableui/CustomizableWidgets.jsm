@@ -496,6 +496,7 @@ const CustomizableWidgets = [
       item.addEventListener("click", e => {
         doc.defaultView.openUILink(tabInfo.url, e);
         CustomizableUI.hidePanelForNode(item);
+        BrowserUITelemetry.countSyncedTabEvent("open", "toolbarbutton-subview");
       });
       return item;
     },

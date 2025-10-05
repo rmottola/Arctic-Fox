@@ -264,7 +264,7 @@ var testSpec = protocol.generateActorSpec({
   }
 });
 
-var TestActor = exports.TestActor = protocol.ActorClass(testSpec, {
+var TestActor = exports.TestActor = protocol.ActorClassWithSpec(testSpec, {
   initialize: function (conn, tabActor, options) {
     this.conn = conn;
     this.tabActor = tabActor;
@@ -543,7 +543,18 @@ var TestActor = exports.TestActor = protocol.ActorClass(testSpec, {
    */
   getBoundingClientRect: function (selector) {
     let node = this._querySelector(selector);
-    return node.getBoundingClientRect();
+    let rect = node.getBoundingClientRect();
+    // DOMRect can't be stringified directly, so return a simple object instead.
+    return {
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+      left: rect.left
+    };
   },
 
   /**
@@ -717,7 +728,7 @@ var TestActor = exports.TestActor = protocol.ActorClass(testSpec, {
   }
 });
 
-var TestActorFront = exports.TestActorFront = protocol.FrontClass(testSpec, {
+var TestActorFront = exports.TestActorFront = protocol.FrontClassWithSpec(testSpec, {
   initialize: function (client, { testActor }, toolbox) {
     protocol.Front.prototype.initialize.call(this, client, { actor: testActor });
     this.manage(this);

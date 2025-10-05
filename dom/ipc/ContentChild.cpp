@@ -47,6 +47,7 @@
 #include "mozilla/jsipc/CrossProcessObjectWrappers.h"
 #include "mozilla/layers/APZChild.h"
 #include "mozilla/layers/CompositorBridgeChild.h"
+#include "mozilla/layers/ContentProcessController.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/SharedBufferManagerChild.h"
 #include "mozilla/layout/RenderFrameChild.h"
@@ -75,7 +76,7 @@
 #endif
 #endif
 
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 
 #include "mozInlineSpellChecker.h"
 #include "nsDocShell.h"
@@ -523,6 +524,9 @@ ContentChild::ContentChild()
 
 ContentChild::~ContentChild()
 {
+#ifndef NS_FREE_PERMANENT_DATA
+  NS_RUNTIMEABORT("Content Child shouldn't be destroyed.");
+#endif
 }
 
 NS_INTERFACE_MAP_BEGIN(ContentChild)
@@ -788,7 +792,7 @@ ContentChild::ProvideWindowCommon(TabChild* aTabOpener,
     if (!SendCreateWindow(aTabOpener, newChild, renderFrame,
                           aChromeFlags, aCalledFromJS, aPositionSpecified,
                           aSizeSpecified,
-                          name, features,
+                          features,
                           baseURIString,
                           openerDocShell
                             ? openerDocShell->GetOriginAttributes()
@@ -976,12 +980,12 @@ ContentChild::AllocPMemoryReportRequestChild(const uint32_t& aGeneration,
   return actor;
 }
 
-class MemoryReportCallback final : public nsIMemoryReporterCallback
+class HandleReportCallback final : public nsIHandleReportCallback
 {
 public:
   NS_DECL_ISUPPORTS
 
-  explicit MemoryReportCallback(MemoryReportRequestChild* aActor,
+  explicit HandleReportCallback(MemoryReportRequestChild* aActor,
                                 const nsACString& aProcess)
   : mActor(aActor)
   , mProcess(aProcess)
@@ -998,23 +1002,23 @@ public:
     return NS_OK;
   }
 private:
-  ~MemoryReportCallback() {}
+  ~HandleReportCallback() {}
 
   RefPtr<MemoryReportRequestChild> mActor;
   const nsCString mProcess;
 };
 
 NS_IMPL_ISUPPORTS(
-  MemoryReportCallback
-, nsIMemoryReporterCallback
+  HandleReportCallback
+, nsIHandleReportCallback
 )
 
-class MemoryReportFinishedCallback final : public nsIFinishReportingCallback
+class FinishReportingCallback final : public nsIFinishReportingCallback
 {
 public:
   NS_DECL_ISUPPORTS
 
-  explicit MemoryReportFinishedCallback(MemoryReportRequestChild* aActor)
+  explicit FinishReportingCallback(MemoryReportRequestChild* aActor)
   : mActor(aActor)
   {
   }
@@ -1026,13 +1030,13 @@ public:
   }
 
 private:
-  ~MemoryReportFinishedCallback() {}
+  ~FinishReportingCallback() {}
 
   RefPtr<MemoryReportRequestChild> mActor;
 };
 
 NS_IMPL_ISUPPORTS(
-  MemoryReportFinishedCallback
+  FinishReportingCallback
 , nsIFinishReportingCallback
 )
 
@@ -1072,14 +1076,15 @@ NS_IMETHODIMP MemoryReportRequestChild::Run()
 
   // Run the reporters.  The callback will turn each measurement into a
   // MemoryReport.
-  RefPtr<MemoryReportCallback> cb =
-    new MemoryReportCallback(this, process);
-  RefPtr<MemoryReportFinishedCallback> finished =
-    new MemoryReportFinishedCallback(this);
+  RefPtr<HandleReportCallback> handleReport =
+    new HandleReportCallback(this, process);
+  RefPtr<FinishReportingCallback> finishReporting =
+    new FinishReportingCallback(this);
 
-  return mgr->GetReportsForThisProcessExtended(cb, nullptr, mAnonymize,
+  return mgr->GetReportsForThisProcessExtended(handleReport, nullptr,
+                                               mAnonymize,
                                                FileDescriptorToFILE(mDMDFile, "wb"),
-                                               finished, nullptr);
+                                               finishReporting, nullptr);
 }
 
 bool
@@ -1154,19 +1159,6 @@ ContentChild::AllocPGMPServiceChild(mozilla::ipc::Transport* aTransport,
                                     base::ProcessId aOtherProcess)
 {
   return GMPServiceChild::Create(aTransport, aOtherProcess);
-}
-
-PAPZChild*
-ContentChild::AllocPAPZChild(const TabId& aTabId)
-{
-  return APZChild::Create(aTabId);
-}
-
-bool
-ContentChild::DeallocPAPZChild(PAPZChild* aActor)
-{
-  delete aActor;
-  return true;
 }
 
 bool
@@ -1385,6 +1377,13 @@ ContentChild::RecvSetProcessSandbox(const MaybeFileDesc& aBroker)
 #endif /* MOZ_CONTENT_SANDBOX */
 
   return true;
+}
+
+bool
+ContentChild::RecvNotifyLayerAllocated(const dom::TabId& aTabId, const uint64_t& aLayersId)
+{
+  APZChild* apz = ContentProcessController::Create(aTabId);
+  return CompositorBridgeChild::Get()->SendPAPZConstructor(apz, aLayersId);
 }
 
 bool
@@ -1635,6 +1634,15 @@ ContentChild::RecvNotifyGMPsChanged()
   MOZ_ASSERT(NS_IsMainThread());
   nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
   obs->NotifyObservers(nullptr, "gmp-changed", nullptr);
+  return true;
+}
+
+bool
+ContentChild::RecvNotifyEmptyHTTPCache()
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  nsCOMPtr<nsIObserverService> obs = mozilla::services::GetObserverService();
+  obs->NotifyObservers(nullptr, "cacheservice:empty-cache", nullptr);
   return true;
 }
 
@@ -2423,7 +2431,8 @@ ContentChild::RecvAddPermission(const IPC::Permission& permission)
   // the permission manager does that internally.
   nsAutoCString originNoSuffix;
   PrincipalOriginAttributes attrs;
-  attrs.PopulateFromOrigin(permission.origin, originNoSuffix);
+  bool success = attrs.PopulateFromOrigin(permission.origin, originNoSuffix);
+  NS_ENSURE_TRUE(success, false);
 
   nsCOMPtr<nsIURI> uri;
   nsresult rv = NS_NewURI(getter_AddRefs(uri), originNoSuffix);
@@ -2687,7 +2696,7 @@ ContentChild::RecvMinimizeMemoryUsage()
     do_GetService("@mozilla.org/memory-reporter-manager;1");
   NS_ENSURE_TRUE(mgr, true);
 
-  mgr->MinimizeMemoryUsage(/* callback = */ nullptr);
+  Unused << mgr->MinimizeMemoryUsage(/* callback = */ nullptr);
   return true;
 }
 

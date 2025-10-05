@@ -11,7 +11,7 @@
 #include "mozilla/layers/AsyncCanvasRenderer.h"
 #include "mozilla/RefPtr.h"
 #include "mozilla/SyncRunnable.h"
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 #include "gfxUtils.h"
 #include "nsIThreadPool.h"
 #include "nsNetUtil.h"
@@ -440,6 +440,7 @@ ImageEncoder::ExtractDataInternal(const nsAString& aType,
     if (MOZ_UNLIKELY(!requiredBytes.isValid())) {
       return NS_ERROR_INVALID_ARG;
     }
+
 
     // no context, so we have to encode an empty image
     // note that if we didn't have a current context, the spec says we're

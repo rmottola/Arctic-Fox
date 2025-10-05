@@ -1647,11 +1647,7 @@ WebSocketImpl::Init(JSContext* aCx,
       while (true) {
         bool isNullPrincipal = true;
         if (principal) {
-          nsresult rv = principal->GetIsNullPrincipal(&isNullPrincipal);
-          if (NS_WARN_IF(NS_FAILED(rv))) {
-            aRv.Throw(NS_ERROR_DOM_SECURITY_ERR);
-            return;
-          }
+          isNullPrincipal = principal->GetIsNullPrincipal();
         }
 
         if (!isNullPrincipal) {
@@ -2276,7 +2272,7 @@ WebSocketImpl::RegisterWorkerHolder()
   MOZ_ASSERT(!mWorkerHolder);
   mWorkerHolder = new WebSocketWorkerHolder(this);
 
-  if (NS_WARN_IF(!mWorkerHolder->HoldWorker(mWorkerPrivate))) {
+  if (NS_WARN_IF(!mWorkerHolder->HoldWorker(mWorkerPrivate, Canceling))) {
     mWorkerHolder = nullptr;
     return false;
   }

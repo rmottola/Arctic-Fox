@@ -40,9 +40,9 @@ namespace dom {
 class AfterSetFilesOrDirectoriesRunnable;
 class Date;
 class DispatchChangeEventCallback;
-class Entry;
 class File;
 class FileList;
+class FileSystemEntry;
 class GetFilesHelper;
 
 /**
@@ -306,6 +306,7 @@ public:
 
   // nsIConstraintValidation
   bool     IsTooLong();
+  bool     IsTooShort();
   bool     IsValueMissing() const;
   bool     HasTypeMismatch() const;
   bool     HasPatternMismatch() const;
@@ -314,6 +315,7 @@ public:
   bool     HasStepMismatch(bool aUseZeroIfValueNaN = false) const;
   bool     HasBadInput() const;
   void     UpdateTooLongValidityState();
+  void     UpdateTooShortValidityState();
   void     UpdateValueMissingValidityState();
   void     UpdateTypeMismatchValidityState();
   void     UpdatePatternMismatchValidityState();
@@ -534,12 +536,29 @@ public:
 
   void SetMaxLength(int32_t aValue, ErrorResult& aRv)
   {
-    if (aValue < 0) {
+    int32_t minLength = MinLength();
+    if (aValue < 0 || (minLength >= 0 && aValue < minLength)) {
       aRv.Throw(NS_ERROR_DOM_INDEX_SIZE_ERR);
       return;
     }
 
     SetHTMLIntAttr(nsGkAtoms::maxlength, aValue, aRv);
+  }
+
+  int32_t MinLength() const
+  {
+    return GetIntAttr(nsGkAtoms::minlength, -1);
+  }
+
+  void SetMinLength(int32_t aValue, ErrorResult& aRv)
+  {
+    int32_t maxLength = MaxLength();
+    if (aValue < 0 || (maxLength >= 0 && aValue > maxLength)) {
+      aRv.Throw(NS_ERROR_DOM_INDEX_SIZE_ERR);
+      return;
+    }
+
+    SetHTMLIntAttr(nsGkAtoms::minlength, aValue, aRv);
   }
 
   // XPCOM GetMin() is OK
@@ -728,7 +747,7 @@ public:
     SetHTMLBoolAttr(nsGkAtoms::webkitdirectory, aValue, aRv);
   }
 
-  void GetWebkitEntries(nsTArray<RefPtr<Entry>>& aSequence);
+  void GetWebkitEntries(nsTArray<RefPtr<FileSystemEntry>>& aSequence);
 
   bool IsFilesAndDirectoriesSupported() const;
 
@@ -1025,8 +1044,8 @@ protected:
    */
   bool DoesStepApply() const
   {
-    // TODO: this is temporary until bug 888324 is fixed.
-    return DoesMinMaxApply() && mType != NS_FORM_INPUT_MONTH;
+    // TODO: this is temporary until bug 888316 is fixed.
+    return DoesMinMaxApply() && mType != NS_FORM_INPUT_WEEK;
   }
 
   /**
@@ -1039,8 +1058,8 @@ protected:
    */
   bool DoesValueAsNumberApply() const
   {
-    // TODO: this is temporary until bug 888324 is fixed.
-    return DoesMinMaxApply() && mType != NS_FORM_INPUT_MONTH;
+    // TODO: this is temporary until bug 888316 is fixed.
+    return DoesMinMaxApply() && mType != NS_FORM_INPUT_WEEK;
   }
 
   /**
@@ -1049,9 +1068,9 @@ protected:
   bool DoesAutocompleteApply() const;
 
   /**
-   * Returns if the maxlength attribute applies for the current type.
+   * Returns if the minlength or maxlength attributes apply for the current type.
    */
-  bool MaxLengthApplies() const { return IsSingleLineTextControl(false, mType); }
+  bool MinOrMaxLengthApplies() const { return IsSingleLineTextControl(false, mType); }
 
   void FreeData();
   nsTextEditorState *GetEditorState() const;
@@ -1153,6 +1172,14 @@ protected:
   bool IsValidSimpleColor(const nsAString& aValue) const;
 
   /**
+   * Parse a date string of the form yyyy-mm
+   * @param the string to be parsed.
+   * @return whether the string is a valid month.
+   * Note : this function does not consider the empty string as valid.
+   */
+  bool IsValidMonth(const nsAString& aValue) const;
+
+  /**
    * Parse a date string of the form yyyy-mm-dd
    * @param the string to be parsed.
    * @return whether the string is a valid date.
@@ -1161,20 +1188,48 @@ protected:
   bool IsValidDate(const nsAString& aValue) const;
 
   /**
+   * Parse a year string of the form yyyy
+   *
+   * @param the string to be parsed.
+   *
+   * @return the year in aYear.
+   * @return whether the parsing was successful.
+   */
+  bool ParseYear(const nsAString& aValue, uint32_t* aYear) const;
+
+  /**
+   * Parse a month string of the form yyyy-mm
+   *
+   * @param the string to be parsed.
+   * @return the year and month in aYear and aMonth.
+   * @return whether the parsing was successful.
+   */
+  bool ParseMonth(const nsAString& aValue,
+                  uint32_t* aYear,
+                  uint32_t* aMonth) const;
+
+  /**
    * Parse a date string of the form yyyy-mm-dd
+   *
    * @param the string to be parsed.
    * @return the date in aYear, aMonth, aDay.
    * @return whether the parsing was successful.
    */
-  bool GetValueAsDate(const nsAString& aValue,
-                      uint32_t* aYear,
-                      uint32_t* aMonth,
-                      uint32_t* aDay) const;
+  bool ParseDate(const nsAString& aValue,
+                 uint32_t* aYear,
+                 uint32_t* aMonth,
+                 uint32_t* aDay) const;
 
   /**
    * This methods returns the number of days in a given month, for a given year.
    */
   uint32_t NumberOfDaysInMonth(uint32_t aMonth, uint32_t aYear) const;
+
+  /**
+   * This methods returns the number of months between January 1970 and the
+   * given year and month.
+   */
+  int32_t MonthsSinceJan1970(uint32_t aYear, uint32_t aMonth) const;
 
   /**
    * Returns whether aValue is a valid time as described by HTML specifications:
@@ -1365,7 +1420,7 @@ protected:
   nsString mFirstFilePath;
 
   RefPtr<FileList>  mFileList;
-  Sequence<RefPtr<Entry>> mEntries;
+  Sequence<RefPtr<FileSystemEntry>> mEntries;
 
   nsString mStaticDocFileList;
 
@@ -1396,6 +1451,7 @@ protected:
   static const Decimal kStepScaleFactorDate;
   static const Decimal kStepScaleFactorNumberRange;
   static const Decimal kStepScaleFactorTime;
+  static const Decimal kStepScaleFactorMonth;
 
   // Default step base value when a type do not have specific one.
   static const Decimal kDefaultStepBase;
@@ -1406,6 +1462,11 @@ protected:
 
   // Float value returned by GetStep() when the step attribute is set to 'any'.
   static const Decimal kStepAny;
+
+  // Maximum year limited by ECMAScript date object range, year <= 275760.
+  static const double kMaximumYear;
+  // Minimum year limited by HTML standard, year >= 1.
+  static const double kMinimumYear;
 
   /**
    * The type of this input (<input type=...>) as an integer.
@@ -1452,7 +1513,7 @@ private:
   bool SupportsTextSelection() const {
     return mType == NS_FORM_INPUT_TEXT || mType == NS_FORM_INPUT_SEARCH ||
            mType == NS_FORM_INPUT_URL || mType == NS_FORM_INPUT_TEL ||
-           mType == NS_FORM_INPUT_PASSWORD || mType == NS_FORM_INPUT_NUMBER;
+           mType == NS_FORM_INPUT_PASSWORD;
   }
 
   static bool MayFireChangeOnBlur(uint8_t aType) {

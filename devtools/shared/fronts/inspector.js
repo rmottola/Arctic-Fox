@@ -8,7 +8,7 @@ require("devtools/shared/fronts/highlighters");
 const { SimpleStringFront } = require("devtools/shared/fronts/string");
 const {
   Front,
-  FrontClass,
+  FrontClassWithSpec,
   custom,
   preEvent,
   types
@@ -26,6 +26,8 @@ const { Class } = require("sdk/core/heritage");
 const events = require("sdk/event/core");
 const object = require("sdk/util/object");
 const nodeConstants = require("devtools/shared/dom-node-constants.js");
+loader.lazyRequireGetter(this, "CommandUtils",
+  "devtools/client/shared/developer-toolbar", true);
 
 const HIDDEN_CLASS = "__fx-devtools-hide-shortcut__";
 
@@ -84,7 +86,7 @@ const AttributeModificationList = Class({
  * the parent node from clients, but the `children` request should be used
  * to traverse children.
  */
-const NodeFront = FrontClass(nodeSpec, {
+const NodeFront = FrontClassWithSpec(nodeSpec, {
   initialize: function (conn, form, detail, ctx) {
     // The parent node
     this._parent = null;
@@ -444,7 +446,7 @@ exports.NodeFront = NodeFront;
 /**
  * Client side of a node list as returned by querySelectorAll()
  */
-const NodeListFront = FrontClass(nodeListSpec, {
+const NodeListFront = FrontClassWithSpec(nodeListSpec, {
   initialize: function (client, form) {
     Front.prototype.initialize.call(this, client, form);
   },
@@ -484,7 +486,7 @@ exports.NodeListFront = NodeListFront;
 /**
  * Client side of the DOM walker.
  */
-const WalkerFront = FrontClass(walkerSpec, {
+const WalkerFront = FrontClassWithSpec(walkerSpec, {
   // Set to true if cleanup should be requested after every mutation list.
   autoCleanup: true,
 
@@ -940,7 +942,7 @@ exports.WalkerFront = WalkerFront;
  * Client side of the inspector actor, which is used to create
  * inspector-related actors, including the walker.
  */
-var InspectorFront = FrontClass(inspectorSpec, {
+var InspectorFront = FrontClassWithSpec(inspectorSpec, {
   initialize: function (client, tabForm) {
     Front.prototype.initialize.call(this, client);
     this.actorID = tabForm.inspectorActor;
@@ -977,6 +979,22 @@ var InspectorFront = FrontClass(inspectorSpec, {
     });
   }, {
     impl: "_getPageStyle"
+  }),
+
+  pickColorFromPage: custom(Task.async(function* (toolbox, options) {
+    if (toolbox) {
+      // If the eyedropper was already started using the gcli command, hide it so we don't
+      // end up with 2 instances of the eyedropper on the page.
+      let {target} = toolbox;
+      let requisition = yield CommandUtils.createRequisition(target, {
+        environment: CommandUtils.createEnvironment({target})
+      });
+      yield requisition.updateExec("eyedropper --hide");
+    }
+
+    yield this._pickColorFromPage(options);
+  }), {
+    impl: "_pickColorFromPage"
   })
 });
 

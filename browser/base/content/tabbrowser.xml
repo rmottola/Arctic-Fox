@@ -301,7 +301,7 @@
 
           this.moveTabTo(aTab, this._numPinnedTabs - 1);
           aTab.removeAttribute("pinned");
-          aTab.style.MozMarginStart = "";
+          aTab.style.marginInlineStart = "";
           this.tabContainer._unlockTabSizing();
           this.tabContainer._positionPinnedTabs();
           this.tabContainer.adjustTabstrip();
@@ -1152,9 +1152,9 @@
             if (!this._previewMode) {
               this._recordTabAccess(this.mCurrentTab);
 
-              this.mCurrentTab.lastAccessed = Infinity;
+              this.mCurrentTab.updateLastAccessed();
               this.mCurrentTab.removeAttribute("unread");
-              oldTab.lastAccessed = Date.now();
+              oldTab.updateLastAccessed();
 
               let oldFindBar = oldTab._findBar;
               if (oldFindBar &&
@@ -1501,7 +1501,7 @@
             var aForceNotRemote;
             var aNoReferrer;
             var aUserContextId;
-            var aEventDetail;
+            var aRelatedBrowser;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -1519,7 +1519,7 @@
               aForceNotRemote       = params.forceNotRemote;
               aNoReferrer           = params.noReferrer;
               aUserContextId        = params.userContextId;
-              aEventDetail          = params.eventDetail;
+              aRelatedBrowser       = params.relatedBrowser;
             }
 
             var bgLoad = (aLoadInBackground != null) ? aLoadInBackground :
@@ -1538,7 +1538,8 @@
                                   allowMixedContent: aAllowMixedContent,
                                   forceNotRemote: aForceNotRemote,
                                   noReferrer: aNoReferrer,
-                                  userContextId: aUserContextId });
+                                  userContextId: aUserContextId,
+                                  relatedBrowser: aRelatedBrowser });
             if (!bgLoad)
               this.selectedTab = tab;
 
@@ -1749,11 +1750,8 @@
             // Also, we do not need to take care of attaching nsIFormFillControllers
             // in the case that the browser is remote, as remote browsers take
             // care of that themselves.
-            if (browser &&
-                this.hasAttribute("autocompletepopup") &&
-                !browser.isRemoteBrowser) {
+            if (browser && this.hasAttribute("autocompletepopup")) {
               browser.setAttribute("autocompletepopup", this.getAttribute("autocompletepopup"));
-              browser.attachFormFill();
             }
 
             return browser;
@@ -1807,39 +1805,43 @@
         <parameter name="aParams"/>
         <body>
           <![CDATA[
+            // Supported parameters:
+            // userContextId, remote, isPreloadBrowser, uriIsAboutBlank, permanentKey
+
             const NS_XUL = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
-            let remote = aParams && aParams.remote;
-            let uriIsAboutBlank = aParams && aParams.uriIsAboutBlank;
-            let isPreloadBrowser = aParams && aParams.isPreloadBrowser;
-            let userContextId = aParams && aParams.userContextId;
-
             let b = document.createElementNS(NS_XUL, "browser");
-            b.permanentKey = {};
+            b.permanentKey = aParams.permanentKey || {};
             b.setAttribute("type", "content-targetable");
             b.setAttribute("message", "true");
             b.setAttribute("messagemanagergroup", "browsers");
             b.setAttribute("contextmenu", this.getAttribute("contentcontextmenu"));
             b.setAttribute("tooltip", this.getAttribute("contenttooltip"));
 
-            if (userContextId) {
-              b.setAttribute("usercontextid", userContextId);
+            if (aParams.userContextId) {
+              b.setAttribute("usercontextid", aParams.userContextId);
             }
 
-            if (remote)
+            if (aParams.remote) {
               b.setAttribute("remote", "true");
+            }
 
             if (window.gShowPageResizers && window.windowState == window.STATE_NORMAL) {
               b.setAttribute("showresizer", "true");
             }
 
-            if (!isPreloadBrowser && this.hasAttribute("autocompletepopup"))
+            if (!aParams.isPreloadBrowser && this.hasAttribute("autocompletepopup")) {
               b.setAttribute("autocompletepopup", this.getAttribute("autocompletepopup"));
+            }
 
             if (this.hasAttribute("selectmenulist"))
               b.setAttribute("selectmenulist", this.getAttribute("selectmenulist"));
 
             b.setAttribute("autoscrollpopup", this._autoScrollPopup.id);
+
+            if (aParams.relatedBrowser) {
+              b.relatedBrowser = aParams.relatedBrowser;
+            }
 
             // Create the browserStack container
             var stack = document.createElementNS(NS_XUL, "stack");
@@ -1869,7 +1871,7 @@
 
             // Prevent the superfluous initial load of a blank document
             // if we're going to load something other than about:blank.
-            if (!uriIsAboutBlank) {
+            if (!aParams.uriIsAboutBlank) {
               b.setAttribute("nodefaultsrc", "true");
             }
 
@@ -1886,23 +1888,15 @@
           <![CDATA[
             "use strict";
 
-            let aReferrerURI          = aParams.referrerURI;
-            let aReferrerPolicy       = aParams.referrerPolicy;
-            let aCharset              = aParams.charset;
-            let aPostData             = aParams.postData;
-            let aAllowThirdPartyFixup = aParams.allowThirdPartyFixup;
-            let aFromExternal         = aParams.fromExternal;
-            let aAllowMixedContent    = aParams.allowMixedContent;
-            let aForceNotRemote       = aParams.forceNotRemote;
-            let aNoReferrer           = aParams.noReferrer;
-            let aUserContextId        = aParams.userContextId;
+            // Supported parameters:
+            // forceNotRemote, userContextId
 
             let uriIsAboutBlank = !aURI || aURI == "about:blank";
 
             // The new browser should be remote if this is an e10s window and
             // the uri to load can be loaded remotely.
             let remote = gMultiProcessBrowser &&
-                         !aForceNotRemote &&
+                         !aParams.forceNotRemote &&
                          E10SUtils.canLoadURIInProcess(aURI, Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT);
 
             let browser;
@@ -1912,17 +1906,23 @@
             // userContext, check if there is a preloaded browser ready.
             // Private windows are not included because both the label and the
             // icon for the tab would be set incorrectly (see bug 1195981).
-            if (aURI == BROWSER_NEW_TAB_URL && !aUserContextId &&
+            if (aURI == BROWSER_NEW_TAB_URL &&
+                !aParams.userContextId &&
                 !PrivateBrowsingUtils.isWindowPrivate(window)) {
               browser = this._getPreloadedBrowser();
-              usingPreloadedContent = !!browser;
+              if (browser) {
+                usingPreloadedContent = true;
+                aTab.permanentKey = browser.permanentKey;
+              }
             }
 
             if (!browser) {
               // No preloaded browser found, create one.
-              browser = this._createBrowser({remote: remote,
+              browser = this._createBrowser({permanentKey: aTab.permanentKey,
+                                             remote: remote,
                                              uriIsAboutBlank: uriIsAboutBlank,
-                                             userContextId: aUserContextId});
+                                             userContextId: aParams.userContextId,
+                                             relatedBrowser: aParams.relatedBrowser});
             }
 
             let notificationbox = this.getNotificationBox(browser);
@@ -1930,6 +1930,7 @@
             notificationbox.id = uniqueId;
             aTab.linkedPanel = uniqueId;
             aTab.linkedBrowser = browser;
+            aTab.hasBrowser = true;
             this._tabForBrowser.set(browser, aTab);
 
             // Inject the <browser> into the DOM if necessary.
@@ -1995,6 +1996,7 @@
             var aNoReferrer;
             var aUserContextId;
             var aEventDetail;
+            var aRelatedBrowser;
             if (arguments.length == 2 &&
                 typeof arguments[1] == "object" &&
                 !(arguments[1] instanceof Ci.nsIURI)) {
@@ -2013,6 +2015,7 @@
               aNoReferrer           = params.noReferrer;
               aUserContextId        = params.userContextId;
               aEventDetail          = params.eventDetail;
+              aRelatedBrowser       = params.relatedBrowser;
             }
 
             // if we're adding tabs, we're past interrupt mode, ditch the owner
@@ -2066,23 +2069,10 @@
 
             var position = this.tabs.length - 1;
             t._tPos = position;
-            t.lastAccessed = Date.now();
+            t.permanentKey = {};
             this.tabContainer._setPositionalAttributes();
 
             this.tabContainer.updateVisibility();
-
-            let options = {
-              referrerURI          : aReferrerURI,
-              referrerPolicy       : aReferrerPolicy,
-              charset              : aCharset,
-              postData             : aPostData,
-              allowThirdPartyFixup : aAllowThirdPartyFixup,
-              fromExternal         : aFromExternal,
-              allowMixedContent    : aAllowMixedContent,
-              forceNotRemote       : aForceNotRemote,
-              noReferrer           : aNoReferrer,
-              userContextId        : aUserContextId
-            };
 
             // Currently in this incarnation of bug 906076, we are forcing the
             // browser to immediately be linked.  In future incarnations of this
@@ -2091,7 +2081,12 @@
             // now this must occur before "TabOpen" event is fired, as that will
             // trigger SessionStore.jsm to run code that expects the existence
             // of tab.linkedBrowser.
-            let { usingPreloadedContent } = this._linkBrowserToTab(t, aURI, options);
+            let browserParams = {
+              forceNotRemote: aForceNotRemote,
+              userContextId:  aUserContextId,
+              relatedBrowser: aRelatedBrowser
+            };
+            let { usingPreloadedContent } = this._linkBrowserToTab(t, aURI, browserParams);
             let b = t.linkedBrowser;
 
             // Dispatch a new tab notification.  We do this once we're
@@ -2803,6 +2798,13 @@
             let ourPermanentKey = ourBrowser.permanentKey;
             ourBrowser.permanentKey = aOtherBrowser.permanentKey;
             aOtherBrowser.permanentKey = ourPermanentKey;
+            aOurTab.permanentKey = ourBrowser.permanentKey;
+            if (remoteBrowser) {
+              let otherTab = remoteBrowser.getTabForBrowser(aOtherBrowser);
+              if (otherTab) {
+                otherTab.permanentKey = aOtherBrowser.permanentKey;
+              }
+            }
 
             // Restore the progress listener
             tabListener = this.mTabProgressListener(aOurTab, ourBrowser, false, false);
@@ -3100,8 +3102,6 @@
           let wasFocused = (document.activeElement == this.mCurrentTab);
 
           aIndex = aIndex < aTab._tPos ? aIndex: aIndex+1;
-          this.mCurrentTab._logicallySelected = false;
-          this.mCurrentTab._visuallySelected = false;
 
           // invalidate cache
           this._visibleTabs = null;
@@ -3112,11 +3112,25 @@
 
           for (let i = 0; i < this.tabs.length; i++) {
             this.tabs[i]._tPos = i;
-            this.tabs[i]._logicallySelected = false;
-            this.tabs[i]._visuallySelected = false;
+            this.tabs[i]._selected = false;
           }
-          this.mCurrentTab._logicallySelected = true;
-          this.mCurrentTab._visuallySelected = true;
+
+          // If we're in the midst of an async tab switch while calling
+          // moveTabTo, we can get into a case where _visuallySelected
+          // is set to true on two different tabs.
+          //
+          // What we want to do in moveTabTo is to remove logical selection
+          // from all tabs, and then re-add logical selection to mCurrentTab
+          // (and visual selection as well if we're not running with e10s, which
+          // setting _selected will do automatically).
+          //
+          // If we're running with e10s, then the visual selection will not
+          // be changed, which is fine, since if we weren't in the midst of a
+          // tab switch, the previously visually selected tab should still be
+          // correct, and if we are in the midst of a tab switch, then the async
+          // tab switcher will set the visually selected tab once the tab switch
+          // has completed.
+          this.mCurrentTab._selected = true;
 
           if (wasFocused)
             this.mCurrentTab.focus();
@@ -3262,9 +3276,10 @@
 
       <method name="duplicateTab">
         <parameter name="aTab"/><!-- can be from a different window as well -->
+        <parameter name="aRestoreTabImmediately"/><!-- can defer loading of the tab contents -->
         <body>
           <![CDATA[
-            return SessionStore.duplicateTab(window, aTab);
+            return SessionStore.duplicateTab(window, aTab, 0, aRestoreTabImmediately);
           ]]>
         </body>
       </method>
@@ -4108,22 +4123,6 @@
         </body>
       </method>
 
-      <method name="attachFormFill">
-        <body><![CDATA[
-          for (let browser of this.browsers) {
-            browser.attachFormFill();
-          }
-        ]]></body>
-      </method>
-
-      <method name="detachFormFill">
-        <body><![CDATA[
-          for (let browser of this.browsers) {
-            browser.detachFormFill();
-          }
-        ]]></body>
-      </method>
-
       <property name="currentURI"
                 onget="return this.mCurrentBrowser.currentURI;"
                 readonly="true"/>
@@ -4593,11 +4592,12 @@
           var uniqueId = this._generateUniquePanelID();
           this.mPanelContainer.childNodes[0].id = uniqueId;
           this.mCurrentTab.linkedPanel = uniqueId;
+          this.mCurrentTab.permanentKey = this.mCurrentBrowser.permanentKey;
           this.mCurrentTab._tPos = 0;
           this.mCurrentTab._fullyOpen = true;
-          this.mCurrentTab.lastAccessed = Infinity;
           this.mCurrentTab.cachePosition = 0;
           this.mCurrentTab.linkedBrowser = this.mCurrentBrowser;
+          this.mCurrentTab.hasBrowser = true;
           this._tabForBrowser.set(this.mCurrentBrowser, this.mCurrentTab);
 
           // set up the shared autoscroll popup
@@ -4761,8 +4761,8 @@
               return [];
             },
             // Also support adding event listeners (forward to the tab container)
-            addEventListener: function (a,b,c) { this.self.tabContainer.addEventListener(a,b,c); },
-            removeEventListener: function (a,b,c) { this.self.tabContainer.removeEventListener(a,b,c); }
+            addEventListener: function (a, b, c) { this.self.tabContainer.addEventListener(a, b, c); },
+            removeEventListener: function (a, b, c) { this.self.tabContainer.removeEventListener(a, b, c); }
           });
         ]]>
         </getter>
@@ -5036,6 +5036,7 @@
 -->
         <children/>
         <xul:toolbarbutton class="tabs-newtab-button"
+                           anonid="tabs-newtab-button"
                            command="cmd_newNavigatorTab"
                            onclick="checkForMiddleClick(this, event);"
                            onmouseover="document.getBindingParent(this)._enterNewTab();"
@@ -5382,20 +5383,20 @@
             for (let i = numPinned - 1; i >= 0; i--) {
               let tab = this.childNodes[i];
               width += tab.getBoundingClientRect().width;
-              tab.style.MozMarginStart = - (width + scrollButtonWidth + paddingStart) + "px";
+              tab.style.marginInlineStart = - (width + scrollButtonWidth + paddingStart) + "px";
             }
 
-            this.style.MozPaddingStart = width + paddingStart + "px";
+            this.style.paddingInlineStart = width + paddingStart + "px";
 
           } else {
             this.removeAttribute("positionpinnedtabs");
 
             for (let i = 0; i < numPinned; i++) {
               let tab = this.childNodes[i];
-              tab.style.MozMarginStart = "";
+              tab.style.marginInlineStart = "";
             }
 
-            this.style.MozPaddingStart = "";
+            this.style.paddingInlineStart = "";
           }
 
           if (this._lastNumPinned != numPinned) {
@@ -6148,7 +6149,7 @@
           newMargin *= -1;
 
         ind.style.transform = "translate(" + Math.round(newMargin) + "px)";
-        ind.style.MozMarginStart = (-ind.clientWidth) + "px";
+        ind.style.marginInlineStart = (-ind.clientWidth) + "px";
       ]]></handler>
 
       <handler event="drop"><![CDATA[
@@ -6387,6 +6388,11 @@
     </content>
 
     <implementation>
+      <constructor><![CDATA[
+        if (!("_lastAccessed" in this)) {
+          this.updateLastAccessed();
+        }
+      ]]></constructor>
 
       <property name="_visuallySelected">
         <setter>
@@ -6417,26 +6423,16 @@
         </setter>
       </property>
 
-      <property name="_logicallySelected">
-        <setter>
-          <![CDATA[
-          if (val)
-            this.setAttribute("selected", "true");
-          else
-            this.removeAttribute("selected");
-
-          return val;
-          ]]>
-        </setter>
-      </property>
-
       <property name="_selected">
         <setter>
           <![CDATA[
           // in e10s we want to only pseudo-select a tab before its rendering is done, so that
           // the rest of the system knows that the tab is selected, but we don't want to update its
           // visual status to selected until after we receive confirmation that its content has painted.
-          this._logicallySelected = val;
+          if (val)
+            this.setAttribute("selected", "true");
+          else
+            this.removeAttribute("selected");
 
           // If we're non-e10s we should update the visual selection as well at the same time,
           // *or* if we're e10s and the visually selected tab isn't changing, in which case the
@@ -6485,10 +6481,13 @@
         <getter>
           return this._lastAccessed == Infinity ? Date.now() : this._lastAccessed;
         </getter>
-        <setter>
-          this._lastAccessed = val;
-        </setter>
       </property>
+      <method name="updateLastAccessed">
+        <parameter name="aDate"/>
+        <body><![CDATA[
+          this._lastAccessed = this.selected ? Infinity : (aDate || Date.now());
+        ]]></body>
+      </method>
 
       <property name="pinned" readonly="true">
         <getter>
@@ -6808,7 +6807,8 @@
       <handler event="popupshowing">
       <![CDATA[
         if (event.target.getAttribute('id') == "alltabs_containersMenuTab") {
-          return createUserContextMenu(event);
+          createUserContextMenu(event);
+          return;
         }
 
         let containersEnabled = Services.prefs.getBoolPref("privacy.userContext.enabled");

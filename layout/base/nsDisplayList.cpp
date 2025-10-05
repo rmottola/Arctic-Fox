@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include <algorithm>
+#include <limits>
 
 #include "gfxUtils.h"
 #include "mozilla/dom/TabChild.h"
@@ -29,7 +30,6 @@
 #include "nsStyleTransformMatrix.h"
 #include "gfxMatrix.h"
 #include "gfxPrefs.h"
-#include "gfxVR.h"
 #include "nsSVGIntegrationUtils.h"
 #include "nsSVGUtils.h"
 #include "nsLayoutUtils.h"
@@ -57,10 +57,11 @@
 #include "mozilla/EffectCompositor.h"
 #include "mozilla/EventStates.h"
 #include "mozilla/LookAndFeel.h"
+#include "mozilla/OperatorNewExtensions.h"
 #include "mozilla/PendingAnimationTracker.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/UniquePtr.h"
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 #include "ActiveLayerTracker.h"
 #include "nsContentUtils.h"
 #include "nsPrintfCString.h"
@@ -109,7 +110,7 @@ SpammyLayoutWarningsEnabled()
 #endif
 
 void*
-AnimatedGeometryRoot::operator new(size_t aSize, nsDisplayListBuilder* aBuilder) CPP_THROW_NEW
+AnimatedGeometryRoot::operator new(size_t aSize, nsDisplayListBuilder* aBuilder)
 {
   return aBuilder->Allocate(aSize);
 }
@@ -458,7 +459,7 @@ AddAnimationForProperty(nsIFrame* aFrame, const AnimationProperty& aProperty,
 }
 
 static void
-AddAnimationsForProperty(nsIFrame* aFrame, nsCSSProperty aProperty,
+AddAnimationsForProperty(nsIFrame* aFrame, nsCSSPropertyID aProperty,
                          nsTArray<RefPtr<dom::Animation>>& aAnimations,
                          Layer* aLayer, AnimationData& aData,
                          bool aPending)
@@ -599,7 +600,7 @@ nsDisplayListBuilder::AddAnimationsAndTransitionsToLayer(Layer* aLayer,
                                                          nsDisplayListBuilder* aBuilder,
                                                          nsDisplayItem* aItem,
                                                          nsIFrame* aFrame,
-                                                         nsCSSProperty aProperty)
+                                                         nsCSSPropertyID aProperty)
 {
   MOZ_ASSERT(nsCSSProps::PropHasFlags(aProperty,
                                       CSS_PROPERTY_CAN_ANIMATE_ON_COMPOSITOR),
@@ -764,7 +765,8 @@ nsDisplayListBuilder::nsDisplayListBuilder(nsIFrame* aReferenceFrame,
   mFrameToAnimatedGeometryRootMap.Put(aReferenceFrame, &mRootAGR);
 
   nsCSSRendering::BeginFrameTreesLocked();
-  PR_STATIC_ASSERT(nsDisplayItem::TYPE_MAX < (1 << nsDisplayItem::TYPE_BITS));
+  static_assert(nsDisplayItem::TYPE_MAX < (1 << nsDisplayItem::TYPE_BITS),
+                "Check nsDisplayItem::TYPE_MAX should not overflow");
 }
 
 static void MarkFrameForDisplay(nsIFrame* aFrame, nsIFrame* aStopAtFrame) {
@@ -1108,7 +1110,7 @@ nsDisplayListBuilder::AllocateDisplayItemClip(const DisplayItemClip& aOriginal)
     return static_cast<DisplayItemClip*>(p);
   }
 
-  DisplayItemClip* c = new (p) DisplayItemClip(aOriginal);
+  DisplayItemClip* c = new (KnownNotNull, p) DisplayItemClip(aOriginal);
   mDisplayItemClipsToDestroy.AppendElement(c);
   return c;
 }
@@ -1121,7 +1123,8 @@ nsDisplayListBuilder::AllocateDisplayItemScrollClip(const DisplayItemScrollClip*
 {
   void* p = Allocate(sizeof(DisplayItemScrollClip));
   DisplayItemScrollClip* c =
-    new (p) DisplayItemScrollClip(aParent, aScrollableFrame, aClip, aIsAsyncScrollable);
+    new (KnownNotNull, p) DisplayItemScrollClip(aParent, aScrollableFrame,
+                                                aClip, aIsAsyncScrollable);
   mScrollClipsToDestroy.AppendElement(c);
   return c;
 }
@@ -1763,6 +1766,11 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
       layerManager->BeginTransaction();
     }
   }
+
+  if (XRE_IsContentProcess() && gfxPrefs::AlwaysPaint()) {
+    FrameLayerBuilder::InvalidateAllLayers(layerManager);
+  }
+
   if (widgetTransaction) {
     layerBuilder->DidBeginRetainedLayerTransaction(layerManager);
   }
@@ -1841,9 +1849,7 @@ already_AddRefed<LayerManager> nsDisplayList::PaintRoot(nsDisplayListBuilder* aB
     // The only case we don't want to do this is in non-APZ fennec, where
     // we want the root xul document to get a null scroll id so that the root
     // content document gets the first non-null scroll id.
-#if !defined(MOZ_WIDGET_ANDROID) || defined(MOZ_ANDROID_APZ)
     content = document->GetDocumentElement();
-#endif
   }
 
 
@@ -2286,7 +2292,7 @@ nsDisplayItem::ForceActiveLayers()
 
 static int32_t ZIndexForFrame(nsIFrame* aFrame)
 {
-  if (!aFrame->IsAbsPosContaininingBlock() && !aFrame->IsFlexOrGridItem())
+  if (!aFrame->IsAbsPosContainingBlock() && !aFrame->IsFlexOrGridItem())
     return 0;
 
   const nsStylePosition* position = aFrame->StylePosition();
@@ -4436,7 +4442,7 @@ IsItemTooSmallForActiveLayer(nsIFrame* aFrame)
 
 static void
 SetAnimationPerformanceWarningForTooSmallItem(nsIFrame* aFrame,
-                                              nsCSSProperty aProperty)
+                                              nsCSSPropertyID aProperty)
 {
   // We use ToNearestPixels() here since ToOutsidePixels causes some sort of
   // errors. See https://bugzilla.mozilla.org/show_bug.cgi?id=1258904#c19
@@ -5637,7 +5643,7 @@ nsDisplayTransform::ComputePerspectiveMatrix(const nsIFrame* aFrame,
     return false;
   }
   nscoord perspective = cbDisplay->mChildPerspective.GetCoordValue();
-  if (perspective <= 0) {
+  if (perspective < 0) {
     return true;
   }
 
@@ -5690,8 +5696,10 @@ nsDisplayTransform::ComputePerspectiveMatrix(const nsIFrame* aFrame,
    */
   perspectiveOrigin += frameToCbGfxOffset;
 
-  aOutMatrix._34 =
-    -1.0 / NSAppUnitsToFloatPixels(perspective, aAppUnitsPerPixel);
+  Float perspectivePx = std::max(NSAppUnitsToFloatPixels(perspective,
+                                                         aAppUnitsPerPixel),
+                                 std::numeric_limits<Float>::epsilon());
+  aOutMatrix._34 = -1.0 / perspectivePx;
   aOutMatrix.ChangeBasis(perspectiveOrigin);
   return true;
 }
@@ -5909,8 +5917,9 @@ nsDisplayTransform::ShouldPrerenderTransformedContent(nsDisplayListBuilder* aBui
   // for shadows, borders, etc.
   refSize += nsSize(refSize.width / 8, refSize.height / 8);
   gfxSize scale = nsLayoutUtils::GetTransformToAncestorScale(aFrame);
-  nsSize frameSize = aFrame->GetVisualOverflowRectRelativeToSelf().Size() *
-    nsSize(scale.width, scale.height);
+  nsSize frameSize = nsSize(
+    aFrame->GetVisualOverflowRectRelativeToSelf().Size().width * scale.width,
+    aFrame->GetVisualOverflowRectRelativeToSelf().Size().height * scale.height);
   nscoord maxInAppUnits = nscoord_MAX;
   if (frameSize <= refSize) {
     maxInAppUnits = aFrame->PresContext()->DevPixelsToAppUnits(4096);
@@ -6648,31 +6657,6 @@ nsDisplaySVGEffects::~nsDisplaySVGEffects()
 }
 #endif
 
-nsDisplayVR::nsDisplayVR(nsDisplayListBuilder* aBuilder, nsIFrame* aFrame,
-                         nsDisplayList* aList, mozilla::gfx::VRDeviceProxy* aHMD)
-  : nsDisplayOwnLayer(aBuilder, aFrame, aList)
-  , mHMD(aHMD)
-{
-}
-
-already_AddRefed<Layer>
-nsDisplayVR::BuildLayer(nsDisplayListBuilder* aBuilder,
-                        LayerManager* aManager,
-                        const ContainerLayerParameters& aContainerParameters)
-{
-  ContainerLayerParameters newContainerParameters = aContainerParameters;
-  uint32_t flags = FrameLayerBuilder::CONTAINER_ALLOW_PULL_BACKGROUND_COLOR;
-  RefPtr<ContainerLayer> container = aManager->GetLayerBuilder()->
-    BuildContainerLayerFor(aBuilder, aManager, mFrame, this, &mList,
-                           newContainerParameters, nullptr, flags);
-
-  container->SetVRDeviceID(mHMD->GetDeviceInfo().GetDeviceID());
-  container->SetInputFrameID(mHMD->GetSensorState().inputFrameID);
-  container->SetUserData(nsIFrame::LayerIsPrerenderedDataKey(),
-                         /*the value is irrelevant*/nullptr);
-
-  return container.forget();
-}
 nsRegion nsDisplaySVGEffects::GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
                                               bool* aSnap)
 {

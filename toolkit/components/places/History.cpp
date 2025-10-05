@@ -30,7 +30,7 @@
 #include "nsNetUtil.h"
 #include "nsIFileURL.h"
 #include "nsIXPConnect.h"
-#include "mozilla/unused.h"
+#include "mozilla/Unused.h"
 #include "nsContentUtils.h" // for nsAutoScriptBlocker
 #include "nsJSUtils.h"
 #include "mozilla/ipc/URIUtils.h"
@@ -2240,11 +2240,13 @@ NS_IMETHODIMP
 History::CollectReports(nsIHandleReportCallback* aHandleReport,
                         nsISupports* aData, bool aAnonymize)
 {
-  return MOZ_COLLECT_REPORT(
+  MOZ_COLLECT_REPORT(
     "explicit/history-links-hashtable", KIND_HEAP, UNITS_BYTES,
     SizeOfIncludingThis(HistoryMallocSizeOf),
     "Memory used by the hashtable that records changes to the visited state "
     "of links.");
+
+  return NS_OK;
 }
 
 size_t

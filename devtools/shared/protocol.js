@@ -4,14 +4,13 @@
 
 "use strict";
 
-var { Cu, components } = require("chrome");
-var Services = require("Services");
 var promise = require("promise");
 var defer = require("devtools/shared/defer");
 var {Class} = require("sdk/core/heritage");
 var {EventTarget} = require("sdk/event/target");
 var events = require("sdk/event/core");
 var object = require("sdk/util/object");
+var {getStack, callFunctionWithAsyncStack} = require("devtools/shared/platform/stack");
 
 exports.emit = events.emit;
 
@@ -1091,6 +1090,23 @@ var generateRequestHandlers = function (actorSpec, actorProto) {
 };
 
 /**
+ * THIS METHOD IS DEPRECATED, AND PRESERVED ONLY FOR ADD-ONS. IT SHOULD NOT BE
+ * USED INSIDE THE TREE.
+ *
+ * Create an actor class for the given actor prototype.
+ *
+ * @param object actorProto
+ *    The actor prototype.  Must have a 'typeName' property,
+ *    should have method definitions, can have event definitions.
+ */
+exports.ActorClass = function (actorProto) {
+  return ActorClassWithSpec(generateActorSpec(actorProto), actorProto);
+};
+
+/**
+ * THIS METHOD IS DEPRECATED, AND PRESERVED ONLY FOR ADD-ONS. IT SHOULD NOT BE
+ * USED INSIDE THE TREE.
+ *
  * Create an actor class for the given actor specification and prototype.
  *
  * @param object actorSpec
@@ -1099,7 +1115,7 @@ var generateRequestHandlers = function (actorSpec, actorProto) {
  *    The actor prototype. Should have method definitions, can have event
  *    definitions.
  */
-var ActorClass = function (actorSpec, actorProto) {
+var ActorClassWithSpec = function (actorSpec, actorProto) {
   if (!actorSpec.typeName) {
     throw Error("Actor specification must have a typeName member.");
   }
@@ -1109,7 +1125,7 @@ var ActorClass = function (actorSpec, actorProto) {
 
   return cls;
 };
-exports.ActorClass = ActorClass;
+exports.ActorClassWithSpec = ActorClassWithSpec;
 
 /**
  * Base class for client-side actor fronts.
@@ -1206,7 +1222,7 @@ var Front = Class({
       deferred,
       to: to || this.actorID,
       type,
-      stack: components.stack,
+      stack: getStack(),
     });
     this.send(packet);
     return deferred.promise;
@@ -1252,10 +1268,10 @@ var Front = Class({
     }
 
     let { deferred, stack } = this._requests.shift();
-    Cu.callFunctionWithAsyncStack(() => {
+    callFunctionWithAsyncStack(() => {
       if (packet.error) {
         // "Protocol error" is here to avoid TBPL heuristics. See also
-        // https://mxr.mozilla.org/webtools-central/source/tbpl/php/inc/GeneralErrorFilter.php
+        // https://dxr.mozilla.org/webtools-central/source/tbpl/php/inc/GeneralErrorFilter.php
         let message;
         if (packet.error && packet.message) {
           message = "Protocol error (" + packet.error + "): " + packet.message;
@@ -1412,6 +1428,19 @@ var generateRequestMethods = function (actorSpec, frontProto) {
 };
 
 /**
+ * Create a front class for the given actor class and front prototype.
+ *
+ * @param ActorClass actorType
+ *    The actor class you're creating a front for.
+ * @param object frontProto
+ *    The front prototype.  Must have a 'typeName' property,
+ *    should have method definitions, can have event definitions.
+ */
+exports.FrontClass = function (actorType, frontProto) {
+  return FrontClassWithSpec(prototypeOf(actorType)._actorSpec, frontProto);
+};
+
+/**
  * Create a front class for the given actor specification and front prototype.
  *
  * @param object actorSpec
@@ -1420,7 +1449,7 @@ var generateRequestMethods = function (actorSpec, frontProto) {
  *    The object prototype.  Must have a 'typeName' property,
  *    should have method definitions, can have event definitions.
  */
-var FrontClass = function (actorSpec, frontProto) {
+var FrontClassWithSpec = function (actorSpec, frontProto) {
   frontProto.extends = Front;
   let cls = Class(generateRequestMethods(actorSpec, frontProto));
 
@@ -1431,7 +1460,7 @@ var FrontClass = function (actorSpec, frontProto) {
 
   return cls;
 };
-exports.FrontClass = FrontClass;
+exports.FrontClassWithSpec = FrontClassWithSpec;
 
 exports.dumpActorSpec = function (type) {
   let actorSpec = type.actorSpec;

@@ -3501,10 +3501,7 @@ public:
     // having one.
     NS_DECL_ISUPPORTS_INHERITED
     NS_DECL_NSIXPCSCRIPTABLE
-    // The NS_IMETHODIMP isn't really accurate here, but NS_CALLBACK requires
-    // the referent to be declared __stdcall on Windows, and this is the only
-    // macro that does that.
-    static NS_IMETHODIMP Get(nsIXPCScriptable** helper)
+    static nsresult Get(nsIXPCScriptable** helper)
     {
         *helper = &singleton;
         return NS_OK;
