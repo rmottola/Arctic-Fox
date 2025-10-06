@@ -2832,7 +2832,7 @@ bool HTMLMediaElement::ParseAttribute(int32_t aNamespaceID,
     { "none",     HTMLMediaElement::PRELOAD_ATTR_NONE },
     { "metadata", HTMLMediaElement::PRELOAD_ATTR_METADATA },
     { "auto",     HTMLMediaElement::PRELOAD_ATTR_AUTO },
-    { 0 }
+    { nullptr,    0 }
   };
 
   if (aNamespaceID == kNameSpaceID_None) {
