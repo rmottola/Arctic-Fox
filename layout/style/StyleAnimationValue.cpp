@@ -3303,7 +3303,7 @@ StyleCoordToCSSValue(const nsStyleCoord& aCoord, nsCSSValue& aCSSValue)
 }
 
 static void
-SetPositionValue(const nsStyleImageLayers::Position& aPos, nsCSSValue& aCSSValue)
+SetPositionValue(const Position& aPos, nsCSSValue& aCSSValue)
 {
   RefPtr<nsCSSValue::Array> posArray = nsCSSValue::Array::Create(4);
   aCSSValue.SetArrayValue(posArray.get(), eCSSUnit_Array);
@@ -3321,7 +3321,7 @@ SetPositionValue(const nsStyleImageLayers::Position& aPos, nsCSSValue& aCSSValue
 }
 
 static void
-SetPositionCoordValue(const nsStyleImageLayers::Position::PositionCoord& aPosCoord,
+SetPositionCoordValue(const Position::PositionCoord& aPosCoord,
                       nsCSSValue& aCSSValue)
 {
   RefPtr<nsCSSValue::Array> posArray = nsCSSValue::Array::Create(2);
