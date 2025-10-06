@@ -6001,7 +6001,7 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
       "12%",
       "min-content",
       "max-content",
-      "calc(20px + 10%)",
+      "calc(2px - 99%)",
       "minmax(20px, max-content)",
       "minmax(min-content, auto)",
       "minmax(auto, max-content)",
@@ -6043,7 +6043,7 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
       "40px",
       "2.5fr",
       "[normal] 40px [] auto [ ] 12%",
-      "[foo] 40px min-content [ bar ] calc(20px + 10%) max-content",
+      "[foo] 40px min-content [ bar ] calc(2px - 99%) max-content",
       "40px min-content calc(20px + 10%) max-content",
       "minmax(min-content, auto)",
       "minmax(auto, max-content)",
@@ -6066,7 +6066,7 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
       "minmax(calc(1% + 1px),auto) repeat(Auto-fit,[] 1%) minmax(auto,1%)",
       "[a] repeat( auto-fit,[a b] minmax(0,0) )",
       "[a] 40px repeat(auto-fit,[a b] minmax(1px, 0) [])",
-      "[a] calc(1%) [b] repeat(auto-fit,[a b] minmax(1mm, 1%) [c]) [c]",
+      "[a] calc(1px - 99%) [b] repeat(auto-fit,[a b] minmax(1mm, 1%) [c]) [c]",
       "repeat(auto-fill,minmax(1%,auto))",
       "repeat(auto-fill,minmax(1em,min-content)) minmax(min-content,0)",
       "repeat(auto-fill,minmax(1fr,1em)) [a] minmax(0, max-content)",
@@ -6463,7 +6463,7 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "0" ],
     other_values: [ "2px", "2%", "1em", "calc(1px + 1em)", "calc(1%)",
-                    "calc(1% + 1ch)" ],
+                    "calc(1% + 1ch)" , "calc(1px - 99%)" ],
     invalid_values: [ "-1px", "auto", "none", "1px 1px", "-1%" ],
   };
   gCSSProperties["grid-row-gap"] = {
@@ -6472,7 +6472,7 @@ if (IsCSSPropertyPrefEnabled("layout.css.grid.enabled")) {
     type: CSS_TYPE_LONGHAND,
     initial_values: [ "0" ],
     other_values: [ "2px", "2%", "1em", "calc(1px + 1em)", "calc(1%)",
-                    "calc(1% + 1ch)" ],
+                    "calc(1% + 1ch)" , "calc(1px - 99%)" ],
     invalid_values: [ "-1px", "auto", "none", "1px 1px", "-1%" ],
   };
   gCSSProperties["grid-gap"] = {
