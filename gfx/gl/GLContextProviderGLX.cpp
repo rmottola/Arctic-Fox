@@ -11,6 +11,7 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include "X11UndefineNone.h"
 
 #include "mozilla/MathAlgorithms.h"
 #include "mozilla/StaticPtr.h"
@@ -308,13 +309,13 @@ GLXPixmap
 GLXLibrary::CreatePixmap(gfxASurface* aSurface)
 {
     if (!SupportsTextureFromPixmap(aSurface)) {
-        return None;
+        return X11None;
     }
 
     gfxXlibSurface* xs = static_cast<gfxXlibSurface*>(aSurface);
     const XRenderPictFormat* format = xs->XRenderFormat();
     if (!format || format->type != PictTypeDirect) {
-        return None;
+        return X11None;
     }
     const XRenderDirectFormat& direct = format->direct;
     int alphaSize = FloorLog2(direct.alphaMask + 1);
@@ -327,7 +328,7 @@ GLXLibrary::CreatePixmap(gfxASurface* aSurface)
                       (alphaSize ? LOCAL_GLX_BIND_TO_TEXTURE_RGBA_EXT
                        : LOCAL_GLX_BIND_TO_TEXTURE_RGB_EXT), True,
                       LOCAL_GLX_RENDER_TYPE, LOCAL_GLX_RGBA_BIT,
-                      None };
+                      X11None };
 
     int numConfigs = 0;
     Display* display = xs->XDisplay();
@@ -351,7 +352,7 @@ GLXLibrary::CreatePixmap(gfxASurface* aSurface)
         ~(redMask | greenMask | blueMask) != -1UL << format->depth;
 
     for (int i = 0; i < numConfigs; i++) {
-        int id = None;
+        int id = X11None;
         sGLXLibrary.xGetFBConfigAttrib(display, cfgs[i], LOCAL_GLX_VISUAL_ID, &id);
         Visual* visual;
         int depth;
@@ -424,14 +425,14 @@ GLXLibrary::CreatePixmap(gfxASurface* aSurface)
         // caller should deal with this situation.
         NS_WARN_IF_FALSE(format->depth == 8,
                          "[GLX] Couldn't find a FBConfig matching Pixmap format");
-        return None;
+        return X11None;
     }
 
     int pixmapAttribs[] = { LOCAL_GLX_TEXTURE_TARGET_EXT, LOCAL_GLX_TEXTURE_2D_EXT,
                             LOCAL_GLX_TEXTURE_FORMAT_EXT,
                             (alphaSize ? LOCAL_GLX_TEXTURE_FORMAT_RGBA_EXT
                              : LOCAL_GLX_TEXTURE_FORMAT_RGB_EXT),
-                            None};
+                            X11None};
 
     GLXPixmap glxpixmap = xCreatePixmap(display,
                                         cfgs[matchIndex],
@@ -822,69 +823,69 @@ GLContextGLX::CreateGLContext(CreateContextFlags flags, const SurfaceCaps& caps,
 
     ScopedXErrorHandler xErrorHandler;
 
-TRY_AGAIN_NO_SHARING:
+    do {
+        error = false;
 
-    error = false;
-
-    GLXContext glxContext = shareContext ? shareContext->mContext : nullptr;
-    if (glx.HasCreateContextAttribs()) {
-        AutoTArray<int, 11> attrib_list;
-        if (glx.HasRobustness()) {
-            int robust_attribs[] = {
-                LOCAL_GL_CONTEXT_FLAGS_ARB, LOCAL_GL_CONTEXT_ROBUST_ACCESS_BIT_ARB,
-                LOCAL_GL_CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB, LOCAL_GL_LOSE_CONTEXT_ON_RESET_ARB,
+        GLXContext glxContext = shareContext ? shareContext->mContext : nullptr;
+        if (glx.HasCreateContextAttribs()) {
+            AutoTArray<int, 11> attrib_list;
+            if (glx.HasRobustness()) {
+                int robust_attribs[] = {
+                    LOCAL_GL_CONTEXT_FLAGS_ARB, LOCAL_GL_CONTEXT_ROBUST_ACCESS_BIT_ARB,
+                    LOCAL_GL_CONTEXT_RESET_NOTIFICATION_STRATEGY_ARB, LOCAL_GL_LOSE_CONTEXT_ON_RESET_ARB,
+                };
+                attrib_list.AppendElements(robust_attribs, MOZ_ARRAY_LENGTH(robust_attribs));
+            }
+            if (profile == ContextProfile::OpenGLCore) {
+                int core_attribs[] = {
+                    LOCAL_GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
+                    LOCAL_GLX_CONTEXT_MINOR_VERSION_ARB, 2,
+                    LOCAL_GLX_CONTEXT_FLAGS_ARB, LOCAL_GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
+                };
+                attrib_list.AppendElements(core_attribs, MOZ_ARRAY_LENGTH(core_attribs));
             };
-            attrib_list.AppendElements(robust_attribs, MOZ_ARRAY_LENGTH(robust_attribs));
+            attrib_list.AppendElement(0);
+
+            context = glx.xCreateContextAttribs(
+                display,
+                cfg,
+                glxContext,
+                True,
+                attrib_list.Elements());
+        } else {
+            context = glx.xCreateNewContext(
+                display,
+                cfg,
+                LOCAL_GLX_RGBA_TYPE,
+                glxContext,
+                True);
         }
-        if (profile == ContextProfile::OpenGLCore) {
-            int core_attribs[] = {
-                LOCAL_GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
-                LOCAL_GLX_CONTEXT_MINOR_VERSION_ARB, 2,
-                LOCAL_GLX_CONTEXT_FLAGS_ARB, LOCAL_GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
-            };
-            attrib_list.AppendElements(core_attribs, MOZ_ARRAY_LENGTH(core_attribs));
-        };
-        attrib_list.AppendElement(0);
 
-        context = glx.xCreateContextAttribs(
-            display,
-            cfg,
-            glxContext,
-            True,
-            attrib_list.Elements());
-    } else {
-        context = glx.xCreateNewContext(
-            display,
-            cfg,
-            LOCAL_GLX_RGBA_TYPE,
-            glxContext,
-            True);
-    }
-
-    if (context) {
-        glContext = new GLContextGLX(flags, caps, shareContext, isOffscreen, display,
-                                     drawable, context, deleteDrawable, db, pixmap,
-                                     profile);
-        if (!glContext->Init())
+        if (context) {
+            glContext = new GLContextGLX(flags, caps, shareContext, isOffscreen, display,
+                                         drawable, context, deleteDrawable, db, pixmap,
+                                         profile);
+            if (!glContext->Init())
+                error = true;
+        } else {
             error = true;
-    } else {
-        error = true;
-    }
-
-    error |= xErrorHandler.SyncAndGetError(display);
-
-    if (error) {
-        if (shareContext) {
-            shareContext = nullptr;
-            goto TRY_AGAIN_NO_SHARING;
         }
 
-        NS_WARNING("Failed to create GLXContext!");
-        glContext = nullptr; // note: this must be done while the graceful X error handler is set,
-                            // because glxMakeCurrent can give a GLXBadDrawable error
-    }
+        error |= xErrorHandler.SyncAndGetError(display);
 
-    return glContext.forget();
+        if (error) {
+            if (shareContext) {
+                shareContext = nullptr;
+                continue;
+            }
+
+            NS_WARNING("Failed to create GLXContext!");
+            glContext = nullptr; // note: this must be done while the graceful X error handler is set,
+                                // because glxMakeCurrent can give a GLXBadDrawable error
+        }
+
+        return glContext.forget();
+    } while (true);
 }
 
 GLContextGLX::~GLContextGLX()
@@ -900,7 +901,7 @@ GLContextGLX::~GLContextGLX()
 #ifdef DEBUG
     bool success =
 #endif
-    mGLX->xMakeCurrent(mDisplay, None, nullptr);
+    mGLX->xMakeCurrent(mDisplay, X11None, nullptr);
     MOZ_ASSERT(success,
                "glXMakeCurrent failed to release GL context before we call "
                "glXDestroyContext!");
@@ -1242,7 +1243,7 @@ GLContextGLX::FindFBConfigForWindow(Display* display, int screen, Window window,
 #endif
 
     for (int i = 0; i < numConfigs; i++) {
-        int visid = None;
+        int visid = X11None;
         sGLXLibrary.xGetFBConfigAttrib(display, cfgs[i], LOCAL_GLX_VISUAL_ID, &visid);
         if (!visid) {
             continue;
@@ -1296,17 +1297,17 @@ CreateOffscreenPixmapContext(CreateContextFlags flags, const IntSize& size,
 
     ScopedXErrorHandler xErrorHandler;
     bool error = false;
-    // Must be declared before goto:
+
     Drawable drawable;
-    GLXPixmap pixmap;
+    GLXPixmap pixmap = 0;
 
     gfx::IntSize dummySize(16, 16);
     RefPtr<gfxXlibSurface> surface = gfxXlibSurface::Create(DefaultScreenOfDisplay(display),
                                                             visual,
                                                             dummySize);
     if (surface->CairoStatus() != 0) {
-        error = true;
-        goto DONE_CREATING_PIXMAP;
+        mozilla::Unused << xErrorHandler.SyncAndGetError(display);
+        return nullptr;
     }
 
     // Handle slightly different signature between glXCreatePixmap and
@@ -1322,8 +1323,6 @@ CreateOffscreenPixmapContext(CreateContextFlags flags, const IntSize& size,
     if (pixmap == 0) {
         error = true;
     }
-
-DONE_CREATING_PIXMAP:
 
     bool serverError = xErrorHandler.SyncAndGetError(display);
     if (error || serverError)

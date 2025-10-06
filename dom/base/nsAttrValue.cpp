@@ -1707,8 +1707,8 @@ nsAttrValue::LoadImage(nsIDocument* aDocument)
   MiscContainer* cont = GetMiscContainer();
   mozilla::css::URLValue* url = cont->mValue.mURL;
   mozilla::css::ImageValue* image = 
-    new css::ImageValue(url->GetURI(), url->mString, url->mReferrer,
-                        url->mOriginPrincipal, aDocument);
+    new css::ImageValue(url->GetURI(), url->mString, url->mBaseURI,
+                        url->mReferrer, url->mOriginPrincipal, aDocument);
 
   NS_ADDREF(image);
   cont->mValue.mImage = image;

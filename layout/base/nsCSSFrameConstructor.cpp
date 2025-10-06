@@ -4267,9 +4267,13 @@ nsCSSFrameConstructor::GetAnonymousContent(nsIContent* aParent,
   }
 
   if (ServoStyleSet* styleSet = mPresShell->StyleSet()->GetAsServo()) {
-    // Eagerly compute styles for the anonymous content tree.
+    // Eagerly compute styles for the anonymous content tree, but only do so
+    // if the content doesn't have an explicit style context (if it does, we
+    // don't need the normal computed values).
     for (auto& info : aContent) {
-      styleSet->StyleNewSubtree(info.mContent);
+      if (!info.mStyleContext) {
+        styleSet->StyleNewSubtree(info.mContent);
+      }
     }
   }
 
@@ -9218,11 +9222,12 @@ nsCSSFrameConstructor::CaptureStateForFramesOf(nsIContent* aContent,
   }
 }
 
-static bool EqualURIs(mozilla::css::URLValue *aURI1,
-                      mozilla::css::URLValue *aURI2)
+static bool
+DefinitelyEqualURIsAndPrincipal(mozilla::css::URLValue* aURI1,
+                                mozilla::css::URLValue* aURI2)
 {
-  return aURI1 == aURI2 ||    // handle null==null, and optimize
-         (aURI1 && aURI2 && aURI1->URIEquals(*aURI2));
+  return aURI1 == aURI2 ||
+         (aURI1 && aURI2 && aURI1->DefinitelyEqualURIsAndPrincipal(*aURI2));
 }
 
 nsStyleContext*
@@ -9258,7 +9263,8 @@ nsCSSFrameConstructor::MaybeRecreateFramesForElement(Element* aElement)
       return newContext;
     }
     const nsStyleDisplay* oldDisp = oldContext->PeekStyleDisplay();
-    if (oldDisp && EqualURIs(disp->mBinding, oldDisp->mBinding)) {
+    if (oldDisp &&
+        DefinitelyEqualURIsAndPrincipal(disp->mBinding, oldDisp->mBinding)) {
       return newContext;
     }
   }
@@ -10597,8 +10603,6 @@ nsCSSFrameConstructor::AddFCItemsForAnonymousContent(
                  "CreateAnonymousFrames manually and not follow the standard "
                  "ProcessChildren() codepath for this frame");
 #endif
-    // Anything restyled by servo should already have the style data.
-    MOZ_ASSERT_IF(content->IsStyledByServo(), !!content->ServoData());
     // Gecko-styled nodes should have no pending restyle flags.
     MOZ_ASSERT_IF(!content->IsStyledByServo(),
                   !content->IsElement() ||
@@ -10617,8 +10621,19 @@ nsCSSFrameConstructor::AddFCItemsForAnonymousContent(
     TreeMatchContext::AutoParentDisplayBasedStyleFixupSkipper
       parentDisplayBasedStyleFixupSkipper(aState.mTreeMatchContext);
     if (aAnonymousItems[i].mStyleContext) {
+      // If we have an explicit style context, that means that the anonymous
+      // content creator had its own plan for the style, and doesn't need the
+      // computed style obtained by cascading this content as a normal node.
+      // This happens when a native anonymous node is used to implement a
+      // pseudo-element. Allowing Servo to traverse these nodes would be wasted
+      // work, so assert that we didn't do that.
+      MOZ_ASSERT_IF(content->IsStyledByServo(), !content->ServoData());
       styleContext = aAnonymousItems[i].mStyleContext.forget();
     } else {
+      // If we don't have an explicit style context, that means we need the
+      // ordinary computed values. Make sure we eagerly cascaded them when the
+      // anonymous nodes were created.
+      MOZ_ASSERT_IF(content->IsStyledByServo(), !!content->ServoData());
       styleContext = ResolveStyleContext(aFrame, content, &aState);
     }
 
