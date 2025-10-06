@@ -7274,7 +7274,7 @@ nsRuleNode::ComputeBackgroundData(void* aStartStruct,
   // background-position-x/y: enum, length, percent (flags), inherit [list]
   nsStyleImageLayers::Position::PositionCoord initialPositionCoord;
   initialPositionCoord.mPercent =
-    nsStyleImageLayers::Position::GetInitialValue(
+    nsStyleImageLayers::GetInitialPositionForLayerType(
       nsStyleImageLayers::LayerType::Background);
   initialPositionCoord.mLength = 0;
   initialPositionCoord.mHasPercent = true;
@@ -10038,7 +10038,7 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
   // mask-position-x/y: enum, length, percent (flags), inherit [list]
   nsStyleImageLayers::Position::PositionCoord initialPositionCoord;
   initialPositionCoord.mPercent =
-    nsStyleImageLayers::Position::GetInitialValue(
+    nsStyleImageLayers::GetInitialPositionForLayerType(
       nsStyleImageLayers::LayerType::Mask);
   initialPositionCoord.mLength = 0;
   initialPositionCoord.mHasPercent = true;
