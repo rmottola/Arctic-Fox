@@ -3441,7 +3441,7 @@ IsElementVisible(Element* aElement)
     nsComputedDOMStyle::GetStyleContextForElementNoFlush(aElement,
                                                          nullptr, nullptr);
   if (styleContext) {
-    return styleContext->StyleDisplay()->mDisplay != StyleDisplay::None_;
+    return styleContext->StyleDisplay()->mDisplay != StyleDisplay::None;
   }
   return false;
 }

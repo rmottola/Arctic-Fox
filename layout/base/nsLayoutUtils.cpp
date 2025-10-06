@@ -3084,7 +3084,7 @@ nsLayoutUtils::CombineBreakType(StyleClear aOrigBreakType,
         breakType = StyleClear::Both;
       }
       break;
-    case StyleClear::None_:
+    case StyleClear::None:
       if (StyleClear::Left == aNewBreakType ||
           StyleClear::Right == aNewBreakType ||
           StyleClear::Both == aNewBreakType) {
