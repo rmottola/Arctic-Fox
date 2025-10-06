@@ -656,7 +656,7 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
               animation.easingFunction());
 
           ComputedTiming computedTiming =
-            dom::KeyframeEffectReadOnly::GetComputedTimingAt(
+            dom::AnimationEffectReadOnly::GetComputedTimingAt(
               Nullable<TimeDuration>(elapsedDuration), timing,
               animation.playbackRate());
 
