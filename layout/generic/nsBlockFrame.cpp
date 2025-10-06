@@ -681,7 +681,7 @@ nsBlockFrame::GetMinISize(nsRenderingContext *aRenderingContext)
     curFrame->LazyMarkLinesDirty();
   }
 
-  if (RenumberLists(PresContext())) {
+  if (RenumberLists()) {
     AddStateBits(NS_FRAME_HAS_DIRTY_CHILDREN);
   }
   if (GetStateBits() & NS_BLOCK_NEEDS_BIDI_RESOLUTION)
@@ -769,7 +769,7 @@ nsBlockFrame::GetPrefISize(nsRenderingContext *aRenderingContext)
     curFrame->LazyMarkLinesDirty();
   }
 
-  if (RenumberLists(PresContext())) {
+  if (RenumberLists()) {
     AddStateBits(NS_FRAME_HAS_DIRTY_CHILDREN);
   }
   if (GetStateBits() & NS_BLOCK_NEEDS_BIDI_RESOLUTION)
@@ -1136,7 +1136,7 @@ nsBlockFrame::Reflow(nsPresContext*           aPresContext,
   if (GetStateBits() & NS_BLOCK_NEEDS_BIDI_RESOLUTION)
     static_cast<nsBlockFrame*>(FirstContinuation())->ResolveBidi();
 
-  if (RenumberLists(aPresContext)) {
+  if (RenumberLists()) {
     AddStateBits(NS_FRAME_HAS_DIRTY_CHILDREN);
   }
 
@@ -2947,11 +2947,10 @@ nsBlockFrame::AttributeChanged(int32_t         aNameSpaceID,
   if (nsGkAtoms::start == aAttribute ||
       (nsGkAtoms::reversed == aAttribute &&
        mContent->IsHTMLElement(nsGkAtoms::ol))) {
-    nsPresContext* presContext = PresContext();
 
     // XXX Not sure if this is necessary anymore
-    if (RenumberLists(presContext)) {
-      presContext->PresShell()->
+    if (RenumberLists()) {
+      PresContext()->PresShell()->
         FrameNeedsReflow(this, nsIPresShell::eStyleChange,
                          NS_FRAME_HAS_DIRTY_CHILDREN);
     }
@@ -2968,10 +2967,9 @@ nsBlockFrame::AttributeChanged(int32_t         aNameSpaceID,
       // Tell the enclosing block frame to renumber list items within
       // itself
       if (nullptr != blockParent) {
-        nsPresContext* presContext = PresContext();
         // XXX Not sure if this is necessary anymore
-        if (blockParent->RenumberLists(presContext)) {
-          presContext->PresShell()->
+        if (blockParent->RenumberLists()) {
+          PresContext()->PresShell()->
             FrameNeedsReflow(blockParent, nsIPresShell::eStyleChange,
                              NS_FRAME_HAS_DIRTY_CHILDREN);
         }
