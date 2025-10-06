@@ -2940,22 +2940,10 @@ nsBlockFrame::AttributeChanged(int32_t         aNameSpaceID,
 {
   nsresult rv = nsContainerFrame::AttributeChanged(aNameSpaceID,
                                                    aAttribute, aModType);
-
   if (NS_FAILED(rv)) {
     return rv;
   }
-  if (nsGkAtoms::start == aAttribute ||
-      (nsGkAtoms::reversed == aAttribute &&
-       mContent->IsHTMLElement(nsGkAtoms::ol))) {
-
-    // XXX Not sure if this is necessary anymore
-    if (RenumberLists()) {
-      PresContext()->PresShell()->
-        FrameNeedsReflow(this, nsIPresShell::eStyleChange,
-                         NS_FRAME_HAS_DIRTY_CHILDREN);
-    }
-  }
-  else if (nsGkAtoms::value == aAttribute) {
+  if (nsGkAtoms::value == aAttribute) {
     const nsStyleDisplay* styleDisplay = StyleDisplay();
     if (NS_STYLE_DISPLAY_LIST_ITEM == styleDisplay->mDisplay) {
       // Search for the closest ancestor that's a block frame. We
@@ -2976,7 +2964,6 @@ nsBlockFrame::AttributeChanged(int32_t         aNameSpaceID,
       }
     }
   }
-
   return rv;
 }
 
