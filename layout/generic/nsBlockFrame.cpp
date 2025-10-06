@@ -3137,11 +3137,10 @@ nsBlockFrame::ReflowBlockFrame(BlockReflowInput& aState,
   }
 
   // Prepare the block reflow engine
-  const nsStyleDisplay* display = frame->StyleDisplay();
   nsBlockReflowContext brc(aState.mPresContext, aState.mReflowInput);
 
-  uint8_t breakType =
-    display->PhysicalBreakType(aState.mReflowInput.GetWritingMode());
+  uint8_t breakType = frame->StyleDisplay()->
+    PhysicalBreakType(aState.mReflowInput.GetWritingMode());
   if (NS_STYLE_CLEAR_NONE != aState.mFloatBreakType) {
     breakType = nsLayoutUtils::CombineBreakType(breakType,
                                                 aState.mFloatBreakType);
@@ -3322,7 +3321,7 @@ nsBlockFrame::ReflowBlockFrame(BlockReflowInput& aState,
     nsFlowAreaRect floatAvailableSpace = aState.GetFloatAvailableSpace();
     WritingMode wm = aState.mReflowInput.GetWritingMode();
     LogicalRect availSpace(wm);
-    aState.ComputeBlockAvailSpace(frame, display, floatAvailableSpace,
+    aState.ComputeBlockAvailSpace(frame, floatAvailableSpace,
                                   replacedBlock != nullptr, availSpace);
 
     // The check for
@@ -3455,7 +3454,7 @@ nsBlockFrame::ReflowBlockFrame(BlockReflowInput& aState,
       }
 
       LogicalRect oldAvailSpace(availSpace);
-      aState.ComputeBlockAvailSpace(frame, display, floatAvailableSpace,
+      aState.ComputeBlockAvailSpace(frame, floatAvailableSpace,
                                     replacedBlock != nullptr, availSpace);
 
       if (!advanced && availSpace.IsEqualEdges(oldAvailSpace)) {
