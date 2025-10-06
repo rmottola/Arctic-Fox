@@ -38,6 +38,7 @@
 #include "mozilla/StyleSetHandle.h"
 #include "mozilla/UniquePtr.h"
 #include "MobileViewportManager.h"
+#include "Visibility.h"
 #include "ZoomConstraintsClient.h"
 
 class nsIDocShell;
@@ -371,7 +372,7 @@ public:
 
   virtual nscolor ComputeBackstopColor(nsView* aDisplayRoot) override;
 
-  virtual void SetIsActive(bool aIsActive, bool aIsHidden = true) override;
+  virtual nsresult SetIsActive(bool aIsActive, bool aIsHidden = true) override;
 
   virtual bool GetIsViewportOverridden() override {
     return (mMobileViewportManager != nullptr);
@@ -415,7 +416,7 @@ public:
   void RebuildApproximateFrameVisibility(nsRect* aRect = nullptr,
                                          bool aRemoveOnly = false) override;
 
-  void MarkFrameVisible(nsIFrame* aFrame, VisibilityCounter aCounter) override;
+  void MarkFrameVisibleInDisplayPort(nsIFrame* aFrame) override;
   void MarkFrameNonvisible(nsIFrame* aFrame) override;
 
   bool AssumeAllFramesVisible() override;
@@ -593,9 +594,6 @@ protected:
   void AddAuthorSheet(nsISupports* aSheet);
   void RemoveSheet(mozilla::SheetType aType, nsISupports* aSheet);
 
-  /// @return the LayerManager at the root of the view tree.
-  LayerManager* GetRootLayerManager();
-
   // Hide a view if it is a popup
   void HideViewIfPopup(nsView* aView);
 
@@ -688,6 +686,7 @@ protected:
   void ProcessSynthMouseMoveEvent(bool aFromScroll);
 
   void QueryIsActive();
+  nsresult UpdateImageLockingState();
 
   bool InZombieDocument(nsIContent *aContent);
   already_AddRefed<nsIPresShell> GetParentPresShellForEventHandling();
@@ -786,7 +785,10 @@ protected:
   void MarkFramesInSubtreeApproximatelyVisible(nsIFrame* aFrame,
                                                const nsRect& aRect,
                                                bool aRemoveOnly = false);
-  void UpdateFrameVisibilityOnActiveStateChange();
+
+  void DecVisibleCount(const VisibleFrames& aFrames,
+                       VisibilityCounter aCounter,
+                       Maybe<OnNonvisible> aNonvisibleAction = Nothing());
 
   void InitVisibleRegionsIfVisualizationEnabled(VisibilityCounter aForCounter);
   void AddFrameToVisibleRegions(nsIFrame* aFrame, VisibilityCounter aForCounter);
@@ -795,51 +797,15 @@ protected:
   nsRevocableEventPtr<nsRunnableMethod<PresShell>> mUpdateApproximateFrameVisibilityEvent;
   nsRevocableEventPtr<nsRunnableMethod<PresShell>> mNotifyCompositorOfVisibleRegionsChangeEvent;
 
-  struct VisibleFramesContainer
-  {
-    VisibleFramesContainer() : mSuppressingVisibility(false) { }
+  // A set of frames that were visible or could be visible soon at the time
+  // that we last did an approximate frame visibility update.
+  VisibleFrames mApproximatelyVisibleFrames;
 
-    void AddFrame(nsIFrame* aFrame, VisibilityCounter aCounter);
-    void RemoveFrame(nsIFrame* aFrame, VisibilityCounter aCounter);
-
-    bool IsVisibilitySuppressed() const { return mSuppressingVisibility; }
-    void SuppressVisibility();
-    void UnsuppressVisibility();
-
-    VisibleFrames& ForCounter(VisibilityCounter aCounter)
-    {
-      switch (aCounter)
-      {
-        case VisibilityCounter::MAY_BECOME_VISIBLE: return mApproximate;
-        case VisibilityCounter::IN_DISPLAYPORT:     return mInDisplayPort;
-      }
-      MOZ_CRASH();
-    }
-
-    // A set of frames that were visible or could be visible soon at the time
-    // that we last did an approximate frame visibility update.
-    VisibleFrames mApproximate;
-
-    // A set of frames that were visible in the displayport the last time we painted.
-    VisibleFrames mInDisplayPort;
-
-    bool mSuppressingVisibility;
-  };
-
-  VisibleFramesContainer mVisibleFrames;
+  // A set of frames that were visible in the displayport the last time we painted.
+  VisibleFrames mInDisplayPortFrames;
 
   struct VisibleRegionsContainer
   {
-    VisibleRegions& ForCounter(VisibilityCounter aCounter)
-    {
-      switch (aCounter)
-      {
-        case VisibilityCounter::MAY_BECOME_VISIBLE: return mApproximate;
-        case VisibilityCounter::IN_DISPLAYPORT:     return mInDisplayPort;
-      }
-      MOZ_CRASH();
-    }
-
     // The approximately visible regions calculated during the last update to
     // approximate frame visibility.
     VisibleRegions mApproximate;
@@ -852,8 +818,6 @@ protected:
   // minimap visibility visualization was enabled during the last visibility
   // update.
   UniquePtr<VisibleRegionsContainer> mVisibleRegions;
-
-  friend struct AutoUpdateVisibility;
 
 
   //////////////////////////////////////////////////////////////////////////////
