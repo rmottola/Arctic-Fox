@@ -956,7 +956,6 @@
   /* ======================================================================= */
 #define MODULE NS_ERROR_MODULE_DOM_ANIM
   ERROR(NS_ERROR_DOM_ANIM_MISSING_PROPS_ERR,              FAILURE(1)),
-  ERROR(NS_ERROR_DOM_ANIM_NO_EFFECT_ERR,                  FAILURE(2)),
 #undef MODULE
 
   /* ======================================================================= */
