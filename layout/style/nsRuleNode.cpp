@@ -6738,7 +6738,7 @@ static void
 ComputePositionCoord(nsStyleContext* aStyleContext,
                      const nsCSSValue& aEdge,
                      const nsCSSValue& aOffset,
-                     Position::PositionCoord* aResult,
+                     Position::Coord* aResult,
                      RuleNodeCacheConditions& aConditions)
 {
   if (eCSSUnit_Percent == aOffset.GetUnit()) {
@@ -6825,7 +6825,7 @@ ComputePositionValue(nsStyleContext* aStyleContext,
 static void
 ComputePositionCoordValue(nsStyleContext* aStyleContext,
                           const nsCSSValue& aValue,
-                          Position::PositionCoord& aComputedValue,
+                          Position::Coord& aComputedValue,
                           RuleNodeCacheConditions& aConditions)
 {
   NS_ASSERTION(aValue.GetUnit() == eCSSUnit_Array,
@@ -7022,9 +7022,9 @@ SetImageLayerPositionCoordList(
                   const nsCSSValue& aValue,
                   nsStyleAutoArray<nsStyleImageLayers::Layer>& aLayers,
                   const nsStyleAutoArray<nsStyleImageLayers::Layer>& aParentLayers,
-                  Position::PositionCoord
+                  Position::Coord
                       Position::* aResultLocation,
-                  Position::PositionCoord aInitialValue,
+                  Position::Coord aInitialValue,
                   uint32_t aParentItemCount,
                   uint32_t& aItemCount,
                   uint32_t& aMaxItemCount,
@@ -7171,7 +7171,7 @@ FillBackgroundList(
 static void
 FillBackgroundPositionCoordList(
     nsStyleAutoArray<nsStyleImageLayers::Layer>& aLayers,
-    Position::PositionCoord
+    Position::Coord
         Position::* aResultLocation,
     uint32_t aItemCount, uint32_t aFillCount)
 {
@@ -7269,7 +7269,7 @@ nsRuleNode::ComputeBackgroundData(void* aStartStruct,
                     conditions);
 
   // background-position-x/y: enum, length, percent (flags), inherit [list]
-  Position::PositionCoord initialPositionCoord;
+  Position::Coord initialPositionCoord;
   initialPositionCoord.mPercent =
     nsStyleImageLayers::GetInitialPositionForLayerType(
       nsStyleImageLayers::LayerType::Background);
@@ -10033,7 +10033,7 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
                     conditions);
 
   // mask-position-x/y: enum, length, percent (flags), inherit [list]
-  Position::PositionCoord initialPositionCoord;
+  Position::Coord initialPositionCoord;
   initialPositionCoord.mPercent =
     nsStyleImageLayers::GetInitialPositionForLayerType(
       nsStyleImageLayers::LayerType::Mask);
