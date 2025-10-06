@@ -738,6 +738,21 @@ private:
     const FrameConstructionData mData;
   };
 
+  struct FrameConstructionDataByDisplay {
+#ifdef DEBUG
+    const mozilla::StyleDisplay mDisplay;
+#endif
+    const FrameConstructionData mData;
+  };
+
+#ifdef DEBUG
+#define FCDATA_FOR_DISPLAY(_display, _fcdata) \
+  { _display, _fcdata }
+#else
+#define FCDATA_FOR_DISPLAY(_display, _fcdata) \
+  { _fcdata }
+#endif
+
   /* Structure that has a FrameConstructionData and style context pseudo-type
      for a table pseudo-frame */
   struct PseudoParentData {
@@ -1221,7 +1236,7 @@ private:
    * values of the previous and the next elements.
    */
   static inline RubyWhitespaceType ComputeRubyWhitespaceType(
-    uint_fast8_t aPrevDisplay, uint_fast8_t aNextDisplay);
+    mozilla::StyleDisplay aPrevDisplay, mozilla::StyleDisplay aNextDisplay);
 
   /**
    * Function to interpret the type of whitespace between
@@ -1999,7 +2014,7 @@ private:
    */
   nsIFrame* FindFrameForContentSibling(nsIContent* aContent,
                                        nsIContent* aTargetContent,
-                                       uint8_t& aTargetContentDisplay,
+                                       mozilla::StyleDisplay& aTargetContentDisplay,
                                        nsContainerFrame* aParentFrame,
                                        bool aPrevSibling);
 
@@ -2019,7 +2034,7 @@ private:
    */
   nsIFrame* FindPreviousSibling(mozilla::dom::FlattenedChildIterator aIter,
                                 nsIContent* aTargetContent,
-                                uint8_t& aTargetContentDisplay,
+                                mozilla::StyleDisplay& aTargetContentDisplay,
                                 nsContainerFrame* aParentFrame);
 
   /**
@@ -2038,7 +2053,7 @@ private:
    */
   nsIFrame* FindNextSibling(mozilla::dom::FlattenedChildIterator aIter,
                             nsIContent* aTargetContent,
-                            uint8_t& aTargetContentDisplay,
+                            mozilla::StyleDisplay& aTargetContentDisplay,
                             nsContainerFrame* aParentFrame);
 
   // Find the right previous sibling for an insertion.  This also updates the
@@ -2072,8 +2087,8 @@ private:
   // XXXbz this code is generally wrong, since the frame for aContent
   // may be constructed based on tag, not based on aDisplay!
   bool IsValidSibling(nsIFrame*              aSibling,
-                        nsIContent*            aContent,
-                        uint8_t&               aDisplay);
+                      nsIContent*            aContent,
+                      mozilla::StyleDisplay& aDisplay);
 
   void QuotesDirty() {
     NS_PRECONDITION(mUpdateCount != 0, "Instant quote updates are bad news");
