@@ -1671,6 +1671,7 @@ MediaDecoderStateMachine::InitiateSeek(SeekJob aSeekJob)
            &MediaDecoderStateMachine::OnSeekTaskResolved,
            &MediaDecoderStateMachine::OnSeekTaskRejected));
 
+  MOZ_ASSERT(!mQueuedSeek.Exists());
   MOZ_ASSERT(!mCurrentSeek.Exists());
   mCurrentSeek = Move(aSeekJob);
   return mCurrentSeek.mPromise.Ensure(__func__);
