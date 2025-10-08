@@ -3289,7 +3289,7 @@ nsCSSFrameConstructor::ConstructFieldSetFrame(nsFrameConstructorState& aState,
           absPosContainer = columnSetFrame;
         }
       }
-      contentFrame = NS_NewBlockFrame(mPresShell, innerSC);
+      contentFrame = NS_NewBlockFormattingContext(mPresShell, innerSC);
       if (columnSetFrame) {
         InitAndRestoreFrame(aState, content, columnSetFrame, contentFrame);
         SetInitialSingleChild(columnSetFrame, contentFrame);
