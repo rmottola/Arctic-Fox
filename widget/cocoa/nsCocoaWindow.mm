@@ -2121,12 +2121,13 @@ nsCocoaWindow::HasPendingInputEvent()
   return nsChildView::DoHasPendingInputEvent();
 }
 
-NS_IMETHODIMP nsCocoaWindow::SetWindowShadowStyle(int32_t aStyle)
+void
+nsCocoaWindow::SetWindowShadowStyle(int32_t aStyle)
 {
-  NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
+  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
   if (!mWindow)
-    return NS_OK;
+    return;
 
   mShadowStyle = aStyle;
 
@@ -2138,9 +2139,7 @@ NS_IMETHODIMP nsCocoaWindow::SetWindowShadowStyle(int32_t aStyle)
   AdjustWindowShadow();
   SetWindowBackgroundBlur();
 
-  return NS_OK;
-
-  NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
+  NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
 void nsCocoaWindow::SetShowsToolbarButton(bool aShow)
@@ -2225,12 +2224,13 @@ NS_IMETHODIMP nsCocoaWindow::SetNonClientMargins(LayoutDeviceIntMargin &margins)
   NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
 }
 
-NS_IMETHODIMP nsCocoaWindow::SetWindowTitlebarColor(nscolor aColor, bool aActive)
+void
+nsCocoaWindow::SetWindowTitlebarColor(nscolor aColor, bool aActive)
 {
-  NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
+  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
   if (!mWindow)
-    return NS_OK;
+    return;
 
   // If they pass a color with a complete transparent alpha component, use the
   // native titlebar appearance.
@@ -2258,9 +2258,8 @@ NS_IMETHODIMP nsCocoaWindow::SetWindowTitlebarColor(nscolor aColor, bool aActive
                                                     alpha:NS_GET_A(aColor)/255.0]
               forActiveWindow:(BOOL)aActive];
   }
-  return NS_OK;
 
-  NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
+  NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
 void nsCocoaWindow::SetDrawsInTitlebar(bool aState)
