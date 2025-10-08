@@ -6,6 +6,7 @@
 
 #include "MediaQueue.h"
 #include "VideoSink.h"
+#include "MediaPrefs.h"
 
 namespace mozilla {
 
@@ -39,6 +40,7 @@ VideoSink::VideoSink(AbstractThread* aThread,
   , mHasVideo(false)
   , mUpdateScheduler(aThread)
   , mVideoQueueSendToCompositorSize(aVQueueSentToCompositerSize)
+  , mMinVideoQueueSize(MediaPrefs::RuinAvSync() ? 1 : 0)
 {
   MOZ_ASSERT(mAudioSink, "AudioSink should exist.");
 }
@@ -396,7 +398,7 @@ VideoSink::UpdateRenderedVideoFrames()
 
   // Skip frames up to the playback position.
   int64_t lastDisplayedFrameEndTime = 0;
-  while (VideoQueue().GetSize() > 0 &&
+  while (VideoQueue().GetSize() > mMinVideoQueueSize &&
          clockTime > VideoQueue().PeekFront()->GetEndTime()) {
     RefPtr<MediaData> frame = VideoQueue().PopFront();
     if (frame->As<VideoData>()->mSentToCompositor) {
