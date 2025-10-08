@@ -1356,8 +1356,8 @@ toolbar[brighttext] #bookmarks-menu-button.bookmark-item {
   transform: scaleX(-1);
 }
 
-html|*.urlbar-input:-moz-lwtheme::-moz-placeholder,
-.searchbar-textbox:-moz-lwtheme > .autocomplete-textbox-container > .textbox-input-box > html|*.textbox-input::-moz-placeholder {
+html|*.urlbar-input:-moz-lwtheme::placeholder,
+.searchbar-textbox:-moz-lwtheme > .autocomplete-textbox-container > .textbox-input-box > html|*.textbox-input::placeholder {
   opacity: 1.0;
   color: #777;
 }
@@ -3483,8 +3483,8 @@ toolbarbutton.bookmark-item[dragover="true"][open="true"] {
     color: black;
   }
 
-  #navigator-toolbox[tabsontop=false] html|*.urlbar-input:not(:-moz-lwtheme)::-moz-placeholder,
-  #navigator-toolbox[tabsontop=false] .searchbar-textbox > .autocomplete-textbox-container > .textbox-input-box > html|*.textbox-input:not(:-moz-lwtheme)::-moz-placeholder {
+  #navigator-toolbox[tabsontop=false] html|*.urlbar-input:not(:-moz-lwtheme)::placeholder,
+  #navigator-toolbox[tabsontop=false] .searchbar-textbox > .autocomplete-textbox-container > .textbox-input-box > html|*.textbox-input:not(:-moz-lwtheme)::moz-placeholder {
     opacity: 1.0;
     color: #777;
   }
