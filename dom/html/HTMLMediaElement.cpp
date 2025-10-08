@@ -6516,11 +6516,19 @@ HTMLMediaElement::OnVisibilityChange(Visibility aOldVisibility,
         break;
     }
     case Visibility::NONVISIBLE: {
+      if (mPlayTime.IsStarted()) {
+        // Not visible, play time is running -> Start hidden play time if needed.
+        HiddenVideoStart();
+      }
+
       mDecoder->NotifyOwnerActivityChanged(false);
       break;
     }
     case Visibility::MAY_BECOME_VISIBLE: {
       if (aOldVisibility == Visibility::NONVISIBLE) {
+        // Visible -> Just pause hidden play time (no-op if already paused).
+        HiddenVideoStop();
+
         mDecoder->NotifyOwnerActivityChanged(true);
       } else if (aOldVisibility == Visibility::IN_DISPLAYPORT) {
         // Do nothing.
@@ -6528,6 +6536,9 @@ HTMLMediaElement::OnVisibilityChange(Visibility aOldVisibility,
       break;
     }
     case Visibility::IN_DISPLAYPORT: {
+      // Visible -> Just pause hidden play time (no-op if already paused).
+      HiddenVideoStop();
+
       mDecoder->NotifyOwnerActivityChanged(true);
       break;
     }
