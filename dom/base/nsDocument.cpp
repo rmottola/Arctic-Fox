@@ -1498,6 +1498,8 @@ nsDocument::nsDocument(const char* aContentType)
     // Add the base queue sentinel to the processing stack.
     sProcessingStack->AppendElement((CustomElementData*) nullptr);
   }
+
+  mEverInForeground = false;
 }
 
 void
@@ -12611,6 +12613,10 @@ nsDocument::UpdateVisibilityState()
 
     EnumerateActivityObservers(NotifyActivityChanged, nullptr);
   }
+
+  if (mVisibilityState == dom::VisibilityState::Visible) {
+    MaybeActiveMediaComponents();
+  }
 }
 
 VisibilityState
@@ -12644,6 +12650,23 @@ nsDocument::PostVisibilityUpdateEvent()
   nsCOMPtr<nsIRunnable> event =
     NewRunnableMethod(this, &nsDocument::UpdateVisibilityState);
   NS_DispatchToMainThread(event);
+}
+
+void
+nsDocument::MaybeActiveMediaComponents()
+{
+  if (mEverInForeground) {
+    return;
+  }
+
+  if (!mWindow) {
+    return;
+  }
+
+  mEverInForeground = true;
+  if (GetWindow()->GetMediaSuspend() == nsISuspendedTypes::SUSPENDED_BLOCK) {
+    GetWindow()->SetMediaSuspend(nsISuspendedTypes::NONE_SUSPENDED);
+  }
 }
 
 NS_IMETHODIMP
