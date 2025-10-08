@@ -716,11 +716,13 @@ nsWindow::Create(nsIWidget* aParent,
   // before any visible windows, and after the profile has been initialized),
   // do some initialization work.
   if (sTrimOnMinimize == 2 && mWindowType == eWindowType_invisible) {
-    // Our internal trim prevention logic has little to no effect on current
-    // Windows versions. Since this feature has been the source of numerous
-    // bugs over the years, disable it (sTrimOnMinimize=1).
+    // Our internal trim prevention logic is effective on 2K/XP at maintaining
+    // the working set when windows are minimized, but on Vista and up it has
+    // little to no effect. Since this feature has been the source of numerous
+    // bugs over the years, disable it (sTrimOnMinimize=1) on Vista and up.
     sTrimOnMinimize =
-      Preferences::GetBool("config.trim_on_minimize", 1);
+      Preferences::GetBool("config.trim_on_minimize",
+        IsVistaOrLater() ? 1 : 0);
     sSwitchKeyboardLayout =
       Preferences::GetBool("intl.keyboard.per_window_layout", false);
   }
