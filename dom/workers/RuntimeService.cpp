@@ -1914,7 +1914,7 @@ RuntimeService::Shutdown()
   mShuttingDown = true;
 
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
-  NS_WARN_IF_FALSE(obs, "Failed to get observer service?!");
+  NS_WARNING_ASSERTION(obs, "Failed to get observer service?!");
 
   // Tell anyone that cares that they're about to lose worker support.
   if (obs && NS_FAILED(obs->NotifyObservers(nullptr, WORKERS_SHUTDOWN_TOPIC,
@@ -1951,7 +1951,7 @@ RuntimeService::Cleanup()
   AssertIsOnMainThread();
 
   nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
-  NS_WARN_IF_FALSE(obs, "Failed to get observer service?!");
+  NS_WARNING_ASSERTION(obs, "Failed to get observer service?!");
 
   if (mIdleThreadTimer) {
     if (NS_FAILED(mIdleThreadTimer->Cancel())) {

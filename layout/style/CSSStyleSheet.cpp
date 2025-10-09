@@ -1484,8 +1484,8 @@ CSSStyleSheet::AppendStyleRule(css::Rule* aRule)
     nsresult rv =
 #endif
       RegisterNamespaceRule(aRule);
-    NS_WARN_IF_FALSE(NS_SUCCEEDED(rv),
-                     "RegisterNamespaceRule returned error");
+    NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
+                         "RegisterNamespaceRule returned error");
   }
 }
 
