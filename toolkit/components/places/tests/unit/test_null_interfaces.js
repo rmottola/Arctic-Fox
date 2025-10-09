@@ -13,8 +13,7 @@ let Cr = Components.results;
 var testServices = [
   ["browser/nav-history-service;1",
     ["nsINavHistoryService"],
-    ["queryStringToQueries", "removePagesByTimeframe", "removePagesFromHost",
-     "removeVisitsByTimeframe", "getObservers"]
+    ["queryStringToQueries", "removePagesByTimeframe", "removePagesFromHost", "getObservers"]
   ],
   ["browser/nav-bookmarks-service;1",
     ["nsINavBookmarksService", "nsINavHistoryObserver", "nsIAnnotationObserver"],
