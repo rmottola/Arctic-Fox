@@ -1894,7 +1894,7 @@ PresShell::ResizeReflowIgnoreOverride(nscoord aWidth, nscoord aHeight, nscoord a
                                ? aOldWidth != aWidth
                                : aOldHeight != aHeight;
 
-  RefPtr<nsViewManager> viewManagerDeathGrip = mViewManager;
+  RefPtr<nsViewManager> viewManager = mViewManager;
   // Take this ref after viewManager so it'll make sure to go away first.
   nsCOMPtr<nsIPresShell> kungFuDeathGrip(this);
 
@@ -1928,7 +1928,7 @@ PresShell::ResizeReflowIgnoreOverride(nscoord aWidth, nscoord aHeight, nscoord a
 
         // Kick off a top-down reflow
         AUTO_LAYOUT_PHASE_ENTRY_POINT(GetPresContext(), Reflow);
-        nsViewManager::AutoDisableRefresh refreshBlocker(mViewManager);
+        nsViewManager::AutoDisableRefresh refreshBlocker(viewManager);
 
         mDirtyRoots.RemoveElement(rootFrame);
         DoReflow(rootFrame, true);
@@ -4064,10 +4064,10 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
 
   NS_ASSERTION(!isSafeToFlush || mViewManager, "Must have view manager");
   // Make sure the view manager stays alive.
-  RefPtr<nsViewManager> viewManagerDeathGrip = mViewManager;
+  RefPtr<nsViewManager> viewManager = mViewManager;
   bool didStyleFlush = false;
   bool didLayoutFlush = false;
-  if (isSafeToFlush && mViewManager) {
+  if (isSafeToFlush && viewManager) {
     // Processing pending notifications can kill us, and some callers only
     // hold weak refs when calling FlushPendingNotifications().  :(
     nsCOMPtr<nsIPresShell> kungFuDeathGrip(this);
@@ -4096,7 +4096,7 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
     // Process pending restyles, since any flush of the presshell wants
     // up-to-date style data.
     if (!mIsDestroying) {
-      mViewManager->FlushDelayedResize(false);
+      viewManager->FlushDelayedResize(false);
       mPresContext->FlushPendingMediaFeatureValuesChanged();
 
       // Flush any pending update of the user font set, since that could
@@ -4152,7 +4152,7 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
         !mIsDestroying) {
       didLayoutFlush = true;
       mFrameConstructor->RecalcQuotesAndCounters();
-      mViewManager->FlushDelayedResize(true);
+      viewManager->FlushDelayedResize(true);
       if (ProcessReflowCommands(flushType < Flush_Layout) && mContentToScrollTo) {
         // We didn't get interrupted.  Go ahead and scroll to our content
         DoScrollContentIntoView();
@@ -4165,7 +4165,7 @@ PresShell::FlushPendingNotifications(mozilla::ChangesToFlush aFlush)
 
     if (flushType >= Flush_Layout) {
       if (!mIsDestroying) {
-        mViewManager->UpdateWidgetGeometry();
+        viewManager->UpdateWidgetGeometry();
       }
     }
   }
