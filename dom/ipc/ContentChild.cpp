@@ -1061,7 +1061,9 @@ ContentChild::RecvPMemoryReportRequestConstructor(
     rv = actor->Run();
   }
 
-  return !NS_WARN_IF(NS_FAILED(rv));
+  // Bug 1295622: don't kill the process just because this failed.
+  NS_WARN_IF(NS_FAILED(rv));
+  return true;
 }
 
 NS_IMETHODIMP MemoryReportRequestChild::Run()
@@ -1081,10 +1083,12 @@ NS_IMETHODIMP MemoryReportRequestChild::Run()
   RefPtr<FinishReportingCallback> finishReporting =
     new FinishReportingCallback(this);
 
-  return mgr->GetReportsForThisProcessExtended(handleReport, nullptr,
-                                               mAnonymize,
-                                               FileDescriptorToFILE(mDMDFile, "wb"),
-                                               finishReporting, nullptr);
+  nsresult rv =
+    mgr->GetReportsForThisProcessExtended(handleReport, nullptr, mAnonymize,
+                                          FileDescriptorToFILE(mDMDFile, "wb"),
+                                          finishReporting, nullptr);
+  NS_WARN_IF(NS_FAILED(rv));
+  return rv;
 }
 
 bool
