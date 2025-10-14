@@ -14271,8 +14271,7 @@ nsDocShell::SetOriginAttributes(const DocShellOriginAttributes& aAttrs)
       if (!uri) {
         return NS_ERROR_FAILURE;
       }
-      nsAutoCString uriSpec;
-      uri->GetSpec(uriSpec);
+      nsCString uriSpec = uri->GetSpecOrDefault();
       MOZ_ASSERT(uriSpec.EqualsLiteral("about:blank"));
       if (!uriSpec.EqualsLiteral("about:blank")) {
         return NS_ERROR_FAILURE;
@@ -14501,8 +14500,7 @@ nsDocShell::ShouldPrepareForIntercept(nsIURI* aURI, bool aIsNonSubresourceReques
   if (mCurrentURI &&
       nsContentUtils::CookiesBehavior() == nsICookieService::BEHAVIOR_REJECT_FOREIGN) {
     nsAutoCString uriSpec;
-    mCurrentURI->GetSpec(uriSpec);
-    if (!(uriSpec.EqualsLiteral("about:blank"))) {
+    if (!(mCurrentURI->GetSpecOrDefault().EqualsLiteral("about:blank"))) {
       // Reject the interception of third-party iframes if the cookie behaviour
       // is set to reject all third-party cookies (1). In case that this pref
       // is not set or can't be read, we default to allow all cookies (0) as
