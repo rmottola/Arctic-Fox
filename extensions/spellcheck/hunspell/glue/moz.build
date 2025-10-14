@@ -24,6 +24,9 @@ LOCAL_INCLUDES += [
 ]
 
 include('/ipc/chromium/chromium-config.mozbuild')
+include('common.mozbuild')
+
+HunspellIncludes()
 
 IPDL_SOURCES = [
     'PRemoteSpellcheckEngine.ipdl',
@@ -33,7 +36,3 @@ EXPORTS.mozilla += [
      'RemoteSpellCheckEngineChild.h',
      'RemoteSpellCheckEngineParent.h',
 ]
-
-# This variable is referenced in configure.in.  Make sure to change that file
-# too if you need to change this variable.
-DEFINES['HUNSPELL_STATIC'] = True
