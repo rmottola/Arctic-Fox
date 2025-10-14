@@ -4155,10 +4155,6 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
                 ExprSelect(pvar, '->', 'IToplevelProtocol::SetTransport'),
                 args=[ExprMove(tvar)]))
 
-            addopened = StmtExpr(ExprCall(
-                ExprVar('IToplevelProtocol::AddOpenedActor'),
-                args=[pvar]))
-
             case.addstmts([
                 StmtDecl(Decl(_uniqueptr(Type('Transport')), tvar.name)),
                 StmtDecl(Decl(Type(_actorName(actor.ptype.name(), actor.side),
@@ -4166,7 +4162,6 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
                 iffailopen,
                 iffailalloc,
                 settrans,
-                addopened,
                 StmtBreak()
             ])
             label = _messageStartName(actor.ptype)
