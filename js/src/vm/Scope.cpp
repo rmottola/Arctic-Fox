@@ -56,6 +56,7 @@ js::ScopeKindString(ScopeKind kind)
         return "parameter expression var";
       case ScopeKind::Lexical:
         return "lexical";
+      case ScopeKind::SimpleCatch:
       case ScopeKind::Catch:
         return "catch";
       case ScopeKind::NamedLambda:
@@ -338,6 +339,7 @@ Scope::clone(JSContext* cx, HandleScope scope, HandleScope enclosing)
       }
 
       case ScopeKind::Lexical:
+      case ScopeKind::SimpleCatch:
       case ScopeKind::Catch:
       case ScopeKind::NamedLambda:
       case ScopeKind::StrictNamedLambda: {
@@ -408,6 +410,7 @@ LexicalScope::firstFrameSlot() const
 {
     switch (kind()) {
       case ScopeKind::Lexical:
+      case ScopeKind::SimpleCatch:
       case ScopeKind::Catch:
         // For intra-frame scopes, find the enclosing scope's next frame slot.
         return nextFrameSlot(enclosing());
@@ -433,6 +436,7 @@ LexicalScope::nextFrameSlot(Scope* scope)
           case ScopeKind::ParameterExpressionVar:
             return si.scope()->as<VarScope>().nextFrameSlot();
           case ScopeKind::Lexical:
+          case ScopeKind::SimpleCatch:
           case ScopeKind::Catch:
             return si.scope()->as<LexicalScope>().nextFrameSlot();
           case ScopeKind::NamedLambda:
@@ -1155,6 +1159,7 @@ BindingIter::BindingIter(Scope* scope)
 {
     switch (scope->kind()) {
       case ScopeKind::Lexical:
+      case ScopeKind::SimpleCatch:
       case ScopeKind::Catch:
         init(scope->as<LexicalScope>().data(),
              scope->as<LexicalScope>().firstFrameSlot(), 0);
