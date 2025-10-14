@@ -218,10 +218,6 @@ class SyntaxParseHandler
 
     Node newElision() { return NodeGeneric; }
 
-    void markAsSetCall(Node node) {
-        MOZ_ASSERT(node == NodeFunctionCall);
-    }
-
     Node newDelete(uint32_t begin, Node expr) {
         return NodeGeneric;
     }
