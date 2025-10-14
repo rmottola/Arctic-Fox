@@ -4556,12 +4556,6 @@ Parser<SyntaxParseHandler>::importDeclaration()
     return SyntaxParseHandler::NodeFailure;
 }
 
-template <>
-ParseNode*
-Parser<FullParseHandler>::classDefinition(YieldHandling yieldHandling,
-                                          ClassContext classContext,
-                                          DefaultHandling defaultHandling);
-
 template<>
 bool
 Parser<FullParseHandler>::checkExportedName(JSAtom* exportName)
@@ -6200,11 +6194,11 @@ GeneratorKindFromPropertyType(PropertyType propType)
     return propType == PropertyType::GeneratorMethod ? StarGenerator : NotGenerator;
 }
 
-template <>
-ParseNode*
-Parser<FullParseHandler>::classDefinition(YieldHandling yieldHandling,
-                                          ClassContext classContext,
-                                          DefaultHandling defaultHandling)
+template <typename ParseHandler>
+typename ParseHandler::Node
+Parser<ParseHandler>::classDefinition(YieldHandling yieldHandling,
+                                      ClassContext classContext,
+                                      DefaultHandling defaultHandling)
 {
     MOZ_ASSERT(tokenStream.isCurrentTokenType(TOK_CLASS));
 
@@ -6256,7 +6250,7 @@ Parser<FullParseHandler>::classDefinition(YieldHandling yieldHandling,
     // in order to provide it for the nodes created later.
     TokenPos namePos = pos();
 
-    ParseNode* classHeritage = null();
+    Node classHeritage = null();
     bool hasHeritage;
     if (!tokenStream.matchToken(&hasHeritage, TOK_EXTENDS))
         return null();
@@ -6270,7 +6264,7 @@ Parser<FullParseHandler>::classDefinition(YieldHandling yieldHandling,
 
     MUST_MATCH_TOKEN(TOK_LC, JSMSG_CURLY_BEFORE_CLASS);
 
-    ParseNode* classMethods = handler.newClassMethodList(pos().begin);
+    Node classMethods = handler.newClassMethodList(pos().begin);
     if (!classMethods)
         return null();
 
@@ -6310,7 +6304,7 @@ Parser<FullParseHandler>::classDefinition(YieldHandling yieldHandling,
         }
 
         PropertyType propType;
-        ParseNode* propName = propertyName(yieldHandling, classMethods, &propType, &propAtom);
+        Node propName = propertyName(yieldHandling, classMethods, &propType, &propAtom);
         if (!propName)
             return null();
 
@@ -6362,7 +6356,7 @@ Parser<FullParseHandler>::classDefinition(YieldHandling yieldHandling,
             if (!tokenStream.isCurrentTokenType(TOK_RB))
                 funName = propAtom;
         }
-        ParseNode* fn = methodDefinition(yieldHandling, propType, funName);
+        Node fn = methodDefinition(yieldHandling, propType, funName);
         if (!fn)
             return null();
 
@@ -6371,18 +6365,18 @@ Parser<FullParseHandler>::classDefinition(YieldHandling yieldHandling,
             return null();
     }
 
-    ParseNode* nameNode = null();
-    ParseNode* methodsOrBlock = classMethods;
+    Node nameNode = null();
+    Node methodsOrBlock = classMethods;
     if (name) {
         // The inner name is immutable.
         if (!noteDeclaredName(name, DeclarationKind::Const, namePos))
             return null();
 
-        ParseNode* innerName = newName(name, namePos);
+        Node innerName = newName(name, namePos);
         if (!innerName)
             return null();
 
-        ParseNode* classBlock = finishLexicalScope(*classScope, classMethods);
+        Node classBlock = finishLexicalScope(*classScope, classMethods);
         if (!classBlock)
             return null();
 
@@ -6392,7 +6386,7 @@ Parser<FullParseHandler>::classDefinition(YieldHandling yieldHandling,
         classScope.reset();
         classStmt.reset();
 
-        ParseNode* outerName = null();
+        Node outerName = null();
         if (classContext == ClassStatement) {
             // The outer name is mutable.
             if (!noteDeclaredName(name, DeclarationKind::Let, namePos))
@@ -6411,16 +6405,6 @@ Parser<FullParseHandler>::classDefinition(YieldHandling yieldHandling,
     MOZ_ALWAYS_TRUE(setLocalStrictMode(savedStrictness));
 
     return handler.newClass(nameNode, classHeritage, methodsOrBlock);
-}
-
-template <>
-SyntaxParseHandler::Node
-Parser<SyntaxParseHandler>::classDefinition(YieldHandling yieldHandling,
-                                            ClassContext classContext,
-                                            DefaultHandling defaultHandling)
-{
-    MOZ_ALWAYS_FALSE(abortIfSyntaxParser());
-    return SyntaxParseHandler::NodeFailure;
 }
 
 template <class ParseHandler>
@@ -6857,8 +6841,6 @@ Parser<ParseHandler>::statementListItem(YieldHandling yieldHandling,
 
       //   ClassDeclaration[?Yield, ~Default]
       case TOK_CLASS:
-        if (!abortIfSyntaxParser())
-            return null();
         return classDefinition(yieldHandling, ClassStatement, NameRequired);
 
       //   LexicalDeclaration[In, ?Yield]
