@@ -29,6 +29,7 @@
 #include "nsJSPrincipals.h"
 #include "nsContentPolicyUtils.h"
 #include "nsIHttpChannel.h"
+#include "nsIHttpChannelInternal.h"
 #include "nsIClassOfService.h"
 #include "nsITimedChannel.h"
 #include "nsIScriptElement.h"
@@ -1151,6 +1152,11 @@ nsScriptLoader::StartLoad(nsScriptLoadRequest *aRequest, const nsAString &aType,
                                   false);
     httpChannel->SetReferrerWithPolicy(mDocument->GetDocumentURI(),
                                        aRequest->mReferrerPolicy);
+
+    nsCOMPtr<nsIHttpChannelInternal> internalChannel(do_QueryInterface(httpChannel));
+    if (internalChannel) {
+      internalChannel->SetIntegrityMetadata(aRequest->mIntegrity.GetIntegrityString());
+    }
   }
 
   nsCOMPtr<nsILoadContext> loadContext(do_QueryInterface(docshell));
