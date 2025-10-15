@@ -637,6 +637,8 @@ private:
   // Module map
   nsRefPtrHashtable<nsURIHashKey, mozilla::GenericPromise::Private> mFetchingModules;
   nsRefPtrHashtable<nsURIHashKey, nsModuleScript> mFetchedModules;
+
+  nsCOMPtr<nsIConsoleReportCollector> mReporter;
 };
 
 class nsScriptLoadHandler final : public nsIIncrementalStreamLoaderObserver
