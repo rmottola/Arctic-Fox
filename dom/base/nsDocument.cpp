@@ -5383,7 +5383,9 @@ nsDocument::CreateElement(const nsAString& aTagName,
 {
   *aReturn = nullptr;
   ErrorResult rv;
-  ElementCreationOptions options;
+  ElementCreationOptionsOrString options;
+
+  options.SetAsString();
   nsCOMPtr<Element> element = CreateElement(aTagName, options, rv);
   NS_ENSURE_FALSE(rv.Failed(), rv.StealNSResult());
   return CallQueryInterface(element, aReturn);
@@ -5428,7 +5430,7 @@ nsDocument::GetCustomElementsRegistry()
 
 already_AddRefed<Element>
 nsDocument::CreateElement(const nsAString& aTagName,
-                          const ElementCreationOptions& aOptions,
+                          const ElementCreationOptionsOrString& aOptions,
                           ErrorResult& rv)
 {
   rv = nsContentUtils::CheckQName(aTagName, false);
@@ -5442,11 +5444,14 @@ nsDocument::CreateElement(const nsAString& aTagName,
     nsContentUtils::ASCIIToLower(aTagName, lcTagName);
   }
 
-  // Throw NotFoundError if 'is' is not-null and definition is null
-  nsString* is = CheckCustomElementName(
-    aOptions, needsLowercase ? lcTagName : aTagName, mDefaultElementType, rv);
-  if (rv.Failed()) {
-    return nullptr;
+  const nsString* is = nullptr;
+  if (aOptions.IsElementCreationOptions()) {
+    // Throw NotFoundError if 'is' is not-null and definition is null
+    is = CheckCustomElementName(aOptions.GetAsElementCreationOptions(),
+      needsLowercase ? lcTagName : aTagName, mDefaultElementType, rv);
+    if (rv.Failed()) {
+      return nullptr;
+    }
   }
 
   RefPtr<Element> elem = CreateElem(
