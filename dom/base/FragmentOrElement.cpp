@@ -1858,7 +1858,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INTERNAL(FragmentOrElement)
     nsAtomCString localName(tmp->NodeInfo()->NameAtom());
     nsAutoCString uri;
     if (tmp->OwnerDoc()->GetDocumentURI()) {
-      tmp->OwnerDoc()->GetDocumentURI()->GetSpec(uri);
+      uri = tmp->OwnerDoc()->GetDocumentURI()->GetSpecOrDefault();
     }
 
     nsAutoString id;

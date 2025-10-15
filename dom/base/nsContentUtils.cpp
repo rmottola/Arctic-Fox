@@ -3594,7 +3594,7 @@ nsContentUtils::ReportToConsoleNonLocalized(const nsAString& aErrorText,
     }
   }
   if (spec.IsEmpty() && aURI) {
-    aURI->GetSpec(spec);
+    spec = aURI->GetSpecOrDefault();
   }
 
   nsCOMPtr<nsIScriptError> errorObject =
@@ -3676,7 +3676,8 @@ nsContentUtils::GetWrapperSafeScriptFilename(nsIDocument *aDocument,
                                              nsACString& aScriptURI)
 {
   bool scriptFileNameModified = false;
-  aURI->GetSpec(aScriptURI);
+  // XXX: should handle GetSpec() failure properly. See bug 1301251.
+  Unused << aURI->GetSpec(aScriptURI);
 
   if (IsChromeDoc(aDocument)) {
     nsCOMPtr<nsIChromeRegistry> chromeReg =
@@ -3704,7 +3705,8 @@ nsContentUtils::GetWrapperSafeScriptFilename(nsIDocument *aDocument,
       // loading here so that script in that URI gets the same wrapper
       // automation that the chrome document expects.
       nsAutoCString spec;
-      docURI->GetSpec(spec);
+      // XXX: should handle GetSpec() failure properly. See bug 1301251.
+      Unused << docURI->GetSpec(spec);
       spec.AppendLiteral(" -> ");
       spec.Append(aScriptURI);
 
@@ -9188,7 +9190,6 @@ nsContentUtils::IsSpecificAboutPage(JSObject* aGlobal, const char* aUri)
     return false;
   }
 
-  // Make sure that the principal is about:feeds.
   nsCOMPtr<nsIPrincipal> principal = win->GetPrincipal();
   NS_ENSURE_TRUE(principal, false);
   nsCOMPtr<nsIURI> uri;
@@ -9206,7 +9207,7 @@ nsContentUtils::IsSpecificAboutPage(JSObject* aGlobal, const char* aUri)
 
   // Now check the spec itself
   nsAutoCString spec;
-  uri->GetSpec(spec);
+  uri->GetSpecIgnoringRef(spec);
   return spec.EqualsASCII(aUri);
 }
 
