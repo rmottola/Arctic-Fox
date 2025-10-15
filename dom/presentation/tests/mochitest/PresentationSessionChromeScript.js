@@ -185,6 +185,10 @@ const mockedDevice = {
     sendAsyncMessage('control-channel-established');
     return mockedControlChannel;
   },
+  disconnect: function() {},
+  isRequestedUrlSupported: function(requestedUrl) {
+    return true;
+  },
 };
 
 const mockedDevicePrompt = {
@@ -374,7 +378,7 @@ function tearDown() {
   deviceManager.QueryInterface(Ci.nsIPresentationDeviceListener).removeDevice(mockedDevice);
 
   // Register original factories.
-  for (var data in originalFactoryData) {
+  for (var data of originalFactoryData) {
     registerOriginalFactory(data.contractId, data.mockedClassId,
                             data.mockedFactory, data.originalClassId,
                             data.originalFactory);

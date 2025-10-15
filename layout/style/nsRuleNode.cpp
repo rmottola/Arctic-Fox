@@ -131,10 +131,10 @@ SetStyleShapeSourceToCSSValue(StyleShapeSource<ReferenceBox>* aShapeSource,
 /* Helper function to convert a CSS <position> specified value into its
  * computed-style form. */
 static void
-  ComputePositionValue(nsStyleContext* aStyleContext,
-                       const nsCSSValue& aValue,
-                       nsStyleImageLayers::Position& aComputedValue,
-                       RuleNodeCacheConditions& aConditions);
+ComputePositionValue(nsStyleContext* aStyleContext,
+                     const nsCSSValue& aValue,
+                     Position& aComputedValue,
+                     RuleNodeCacheConditions& aConditions);
 
 /*
  * For storage of an |nsRuleNode|'s children in a PLDHashTable.
@@ -194,25 +194,25 @@ nsRuleNode::ChildrenHashOps = {
 //    Reference: http://www.w3.org/TR/CSS21/visuren.html#dis-pos-flo
 /* static */
 void
-nsRuleNode::EnsureBlockDisplay(uint8_t& display,
+nsRuleNode::EnsureBlockDisplay(StyleDisplay& display,
                                bool aConvertListItem /* = false */)
 {
   // see if the display value is already a block
   switch (display) {
-  case NS_STYLE_DISPLAY_LIST_ITEM :
+  case StyleDisplay::ListItem:
     if (aConvertListItem) {
-      display = NS_STYLE_DISPLAY_BLOCK;
+      display = StyleDisplay::Block;
       break;
     } // else, fall through to share the 'break' for non-changing display vals
     MOZ_FALLTHROUGH;
-  case NS_STYLE_DISPLAY_NONE :
-  case NS_STYLE_DISPLAY_CONTENTS :
+  case StyleDisplay::None:
+  case StyleDisplay::Contents:
     // never change display:none or display:contents *ever*
-  case NS_STYLE_DISPLAY_TABLE :
-  case NS_STYLE_DISPLAY_BLOCK :
-  case NS_STYLE_DISPLAY_FLEX :
-  case NS_STYLE_DISPLAY_WEBKIT_BOX :
-  case NS_STYLE_DISPLAY_GRID :
+  case StyleDisplay::Table:
+  case StyleDisplay::Block:
+  case StyleDisplay::Flex:
+  case StyleDisplay::WebkitBox:
+  case StyleDisplay::Grid:
     // do not muck with these at all - already blocks
     // This is equivalent to nsStyleDisplay::IsBlockOutside.  (XXX Maybe we
     // should just call that?)
@@ -220,29 +220,29 @@ nsRuleNode::EnsureBlockDisplay(uint8_t& display,
     // nsCSSFrameConstructor::FindMathMLData for <math>.
     break;
 
-  case NS_STYLE_DISPLAY_INLINE_TABLE :
+  case StyleDisplay::InlineTable:
     // make inline tables into tables
-    display = NS_STYLE_DISPLAY_TABLE;
+    display = StyleDisplay::Table;
     break;
 
-  case NS_STYLE_DISPLAY_INLINE_FLEX:
+  case StyleDisplay::InlineFlex:
     // make inline flex containers into flex containers
-    display = NS_STYLE_DISPLAY_FLEX;
+    display = StyleDisplay::Flex;
     break;
 
-  case NS_STYLE_DISPLAY_WEBKIT_INLINE_BOX:
+  case StyleDisplay::WebkitInlineBox:
     // make -webkit-inline-box containers into -webkit-box containers
-    display = NS_STYLE_DISPLAY_WEBKIT_BOX;
+    display = StyleDisplay::WebkitBox;
     break;
 
-  case NS_STYLE_DISPLAY_INLINE_GRID:
+  case StyleDisplay::InlineGrid:
     // make inline grid containers into grid containers
-    display = NS_STYLE_DISPLAY_GRID;
+    display = StyleDisplay::Grid;
     break;
 
-  default :
+  default:
     // make it a block
-    display = NS_STYLE_DISPLAY_BLOCK;
+    display = StyleDisplay::Block;
   }
 }
 
@@ -251,31 +251,33 @@ nsRuleNode::EnsureBlockDisplay(uint8_t& display,
 //    then we set it to a valid inline display value
 /* static */
 void
-nsRuleNode::EnsureInlineDisplay(uint8_t& display)
+nsRuleNode::EnsureInlineDisplay(StyleDisplay& display)
 {
   // see if the display value is already inline
   switch (display) {
-    case NS_STYLE_DISPLAY_BLOCK :
-      display = NS_STYLE_DISPLAY_INLINE_BLOCK;
+    case StyleDisplay::Block:
+      display = StyleDisplay::InlineBlock;
       break;
-    case NS_STYLE_DISPLAY_TABLE :
-      display = NS_STYLE_DISPLAY_INLINE_TABLE;
+    case StyleDisplay::Table:
+      display = StyleDisplay::InlineTable;
       break;
-    case NS_STYLE_DISPLAY_FLEX :
-      display = NS_STYLE_DISPLAY_INLINE_FLEX;
+    case StyleDisplay::Flex:
+      display = StyleDisplay::InlineFlex;
       break;
-    case NS_STYLE_DISPLAY_WEBKIT_BOX :
-      display = NS_STYLE_DISPLAY_WEBKIT_INLINE_BOX;
+    case StyleDisplay::WebkitBox:
+      display = StyleDisplay::WebkitInlineBox;
       break;
-    case NS_STYLE_DISPLAY_GRID :
-      display = NS_STYLE_DISPLAY_INLINE_GRID;
+    case StyleDisplay::Grid:
+      display = StyleDisplay::InlineGrid;
       break;
-    case NS_STYLE_DISPLAY_BOX:
-      display = NS_STYLE_DISPLAY_INLINE_BOX;
+    case StyleDisplay::Box:
+      display = StyleDisplay::InlineBox;
       break;
-    case NS_STYLE_DISPLAY_STACK:
-      display = NS_STYLE_DISPLAY_INLINE_STACK;
+    case StyleDisplay::Stack:
+      display = StyleDisplay::InlineStack;
       break;
+    default:
+      break; // Do nothing
   }
 }
 
@@ -1334,12 +1336,23 @@ struct SetEnumValueHelper
     aField = static_cast<type_>(value); \
   }
 
+  DEFINE_ENUM_CLASS_SETTER(StyleBoxAlign, Stretch, End)
+  DEFINE_ENUM_CLASS_SETTER(StyleBoxDecorationBreak, Slice, Clone)
+  DEFINE_ENUM_CLASS_SETTER(StyleBoxDirection, Normal, Reverse)
+  DEFINE_ENUM_CLASS_SETTER(StyleBoxOrient, Horizontal, Vertical)
+  DEFINE_ENUM_CLASS_SETTER(StyleBoxPack, Start, Justify)
   DEFINE_ENUM_CLASS_SETTER(StyleBoxSizing, Content, Border)
+  DEFINE_ENUM_CLASS_SETTER(StyleClear, None, Both)
   DEFINE_ENUM_CLASS_SETTER(StyleFillRule, Nonzero, Evenodd)
-  DEFINE_ENUM_CLASS_SETTER(StyleFloat, None_, InlineEnd)
+  DEFINE_ENUM_CLASS_SETTER(StyleFloat, None, InlineEnd)
   DEFINE_ENUM_CLASS_SETTER(StyleFloatEdge, ContentBox, MarginBox)
-  DEFINE_ENUM_CLASS_SETTER(StyleUserFocus, None_, SelectMenu)
-  DEFINE_ENUM_CLASS_SETTER(StyleUserSelect, None_, MozText)
+  DEFINE_ENUM_CLASS_SETTER(StyleUserFocus, None, SelectMenu)
+  DEFINE_ENUM_CLASS_SETTER(StyleUserSelect, None, MozText)
+#ifdef MOZ_XUL
+  DEFINE_ENUM_CLASS_SETTER(StyleDisplay, None, Popup)
+#else
+  DEFINE_ENUM_CLASS_SETTER(StyleDisplay, None, InlineBox)
+#endif
 
 #undef DEF_SET_ENUMERATED_VALUE
 };
@@ -2206,7 +2219,7 @@ GetPseudoRestriction(nsStyleContext *aContext)
       pseudoRestriction = CSS_PROPERTY_APPLIES_TO_FIRST_LETTER;
     } else if (pseudoType == nsCSSPseudoElements::firstLine) {
       pseudoRestriction = CSS_PROPERTY_APPLIES_TO_FIRST_LINE;
-    } else if (pseudoType == nsCSSPseudoElements::mozPlaceholder) {
+    } else if (pseudoType == nsCSSPseudoElements::placeholder) {
       pseudoRestriction = CSS_PROPERTY_APPLIES_TO_PLACEHOLDER;
     }
   }
@@ -5137,7 +5150,7 @@ nsRuleNode::ComputeUserInterfaceData(void* aStartStruct,
            ui->mUserFocus, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INHERIT,
            parentUI->mUserFocus,
-           StyleUserFocus::None_);
+           StyleUserFocus::None);
 
   // pointer-events: enum, inherit, initial
   SetValue(*aRuleData->ValueForPointerEvents(), ui->mPointerEvents,
@@ -5817,7 +5830,7 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
   SetValue(*aRuleData->ValueForDisplay(), display->mDisplay, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INITIAL,
            parentDisplay->mDisplay,
-           NS_STYLE_DISPLAY_INLINE);
+           StyleDisplay::Inline);
 
   // contain: none, enum, inherit, initial
   SetValue(*aRuleData->ValueForContain(), display->mContain, conditions,
@@ -5934,8 +5947,6 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
   }
 
   // scroll-snap-coordinate: none, inherit, initial
-  typedef nsStyleImageLayers::Position Position;
-
   const nsCSSValue& snapCoordinate = *aRuleData->ValueForScrollSnapCoordinate();
   switch (snapCoordinate.GetUnit()) {
     case eCSSUnit_Null:
@@ -6035,7 +6046,7 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
   SetValue(*aRuleData->ValueForClear(), display->mBreakType, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INITIAL,
            parentDisplay->mBreakType,
-           NS_STYLE_CLEAR_NONE);
+           StyleClear::None);
 
   // temp fix for bug 24000
   // Map 'auto' and 'avoid' to false, and 'always', 'left', and
@@ -6094,7 +6105,7 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
            display->mFloat, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INITIAL,
            parentDisplay->mFloat,
-           StyleFloat::None_);
+           StyleFloat::None);
   // Save mFloat in mOriginalFloat in case we need it later
   display->mOriginalFloat = display->mFloat;
 
@@ -6165,13 +6176,13 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
            parentDisplay->mResize,
            NS_STYLE_RESIZE_NONE);
 
-  if (display->mDisplay != NS_STYLE_DISPLAY_NONE) {
+  if (display->mDisplay != StyleDisplay::None) {
     // CSS2 9.7 specifies display type corrections dealing with 'float'
     // and 'position'.  Since generated content can't be floated or
     // positioned, we can deal with it here.
 
     nsIAtom* pseudo = aContext->GetPseudo();
-    if (pseudo && display->mDisplay == NS_STYLE_DISPLAY_CONTENTS) {
+    if (pseudo && display->mDisplay == StyleDisplay::Contents) {
       // We don't want to create frames for anonymous content using a parent
       // frame that is for content above the root of the anon tree.
       // (XXX what we really should check here is not GetPseudo() but if there's
@@ -6181,25 +6192,27 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
       // pseudos (:first-letter etc) in the future, but those have a lot of
       // special handling in frame construction so they are also unsupported
       // for now.
-      display->mOriginalDisplay = display->mDisplay = NS_STYLE_DISPLAY_INLINE;
+      display->mOriginalDisplay = display->mDisplay = StyleDisplay::Inline;
       conditions.SetUncacheable();
     }
 
     // Inherit a <fieldset> grid/flex display type into its anon content frame.
     if (pseudo == nsCSSAnonBoxes::fieldsetContent) {
-      MOZ_ASSERT(display->mDisplay == NS_STYLE_DISPLAY_BLOCK,
+      MOZ_ASSERT(display->mDisplay == StyleDisplay::Block,
                  "forms.css should have set 'display:block'");
       switch (parentDisplay->mDisplay) {
-        case NS_STYLE_DISPLAY_GRID:
-        case NS_STYLE_DISPLAY_INLINE_GRID:
-          display->mDisplay = NS_STYLE_DISPLAY_GRID;
+        case StyleDisplay::Grid:
+        case StyleDisplay::InlineGrid:
+          display->mDisplay = StyleDisplay::Grid;
           conditions.SetUncacheable();
           break;
-        case NS_STYLE_DISPLAY_FLEX:
-        case NS_STYLE_DISPLAY_INLINE_FLEX:
-          display->mDisplay = NS_STYLE_DISPLAY_FLEX;
+        case StyleDisplay::Flex:
+        case StyleDisplay::InlineFlex:
+          display->mDisplay = StyleDisplay::Flex;
           conditions.SetUncacheable();
           break;
+        default:
+          break; // Do nothing
       }
     }
 
@@ -6207,7 +6220,7 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
       // a non-floating first-letter must be inline
       // XXX this fix can go away once bug 103189 is fixed correctly
       // Note that we reset mOriginalDisplay to enforce the invariant that it equals mDisplay if we're not positioned or floating.
-      display->mOriginalDisplay = display->mDisplay = NS_STYLE_DISPLAY_INLINE;
+      display->mOriginalDisplay = display->mDisplay = StyleDisplay::Inline;
 
       // We can't cache the data in the rule tree since if a more specific
       // rule has 'float: left' we'll end up with the wrong 'display'
@@ -6219,7 +6232,7 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
       // 1) if position is 'absolute' or 'fixed' then display must be
       // block-level and float must be 'none'
       EnsureBlockDisplay(display->mDisplay);
-      display->mFloat = StyleFloat::None_;
+      display->mFloat = StyleFloat::None;
 
       // Note that it's OK to cache this struct in the ruletree
       // because it's fine as-is for any style context that points to
@@ -6227,7 +6240,7 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
       // more specific rule sets "position: static") will use
       // mOriginalDisplay and mOriginalFloat, which we have carefully
       // not changed.
-    } else if (display->mFloat != StyleFloat::None_) {
+    } else if (display->mFloat != StyleFloat::None) {
       // 2) if float is not none, and display is not none, then we must
       // set a block-level 'display' type per CSS2.1 section 9.7.
       EnsureBlockDisplay(display->mDisplay);
@@ -6247,8 +6260,8 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
 
       // It's okay to cache this change in the rule tree for the same
       // reasons as floats in the previous condition.
-      if (display->mDisplay == NS_STYLE_DISPLAY_INLINE) {
-          display->mDisplay = NS_STYLE_DISPLAY_INLINE_BLOCK;
+      if (display->mDisplay == StyleDisplay::Inline) {
+        display->mDisplay = StyleDisplay::InlineBlock;
       }
     }
   }
@@ -6736,12 +6749,11 @@ struct BackgroundItemComputer<nsCSSValueList, FragmentOrURL>
  * This function computes a single PositionCoord from two nsCSSValue objects,
  * which represent an edge and an offset from that edge.
  */
-typedef nsStyleImageLayers::Position::PositionCoord PositionCoord;
 static void
 ComputePositionCoord(nsStyleContext* aStyleContext,
                      const nsCSSValue& aEdge,
                      const nsCSSValue& aOffset,
-                     PositionCoord* aResult,
+                     Position::Coord* aResult,
                      RuleNodeCacheConditions& aConditions)
 {
   if (eCSSUnit_Percent == aOffset.GetUnit()) {
@@ -6791,7 +6803,7 @@ ComputePositionCoord(nsStyleContext* aStyleContext,
 static void
 ComputePositionValue(nsStyleContext* aStyleContext,
                      const nsCSSValue& aValue,
-                     nsStyleImageLayers::Position& aComputedValue,
+                     Position& aComputedValue,
                      RuleNodeCacheConditions& aConditions)
 {
   NS_ASSERTION(aValue.GetUnit() == eCSSUnit_Array,
@@ -6828,7 +6840,7 @@ ComputePositionValue(nsStyleContext* aStyleContext,
 static void
 ComputePositionCoordValue(nsStyleContext* aStyleContext,
                           const nsCSSValue& aValue,
-                          nsStyleImageLayers::Position::PositionCoord& aComputedValue,
+                          Position::Coord& aComputedValue,
                           RuleNodeCacheConditions& aConditions)
 {
   NS_ASSERTION(aValue.GetUnit() == eCSSUnit_Array,
@@ -7025,9 +7037,9 @@ SetImageLayerPositionCoordList(
                   const nsCSSValue& aValue,
                   nsStyleAutoArray<nsStyleImageLayers::Layer>& aLayers,
                   const nsStyleAutoArray<nsStyleImageLayers::Layer>& aParentLayers,
-                  nsStyleImageLayers::Position::PositionCoord
-                      nsStyleImageLayers::Position::* aResultLocation,
-                  nsStyleImageLayers::Position::PositionCoord aInitialValue,
+                  Position::Coord
+                      Position::* aResultLocation,
+                  Position::Coord aInitialValue,
                   uint32_t aParentItemCount,
                   uint32_t& aItemCount,
                   uint32_t& aMaxItemCount,
@@ -7174,8 +7186,8 @@ FillBackgroundList(
 static void
 FillBackgroundPositionCoordList(
     nsStyleAutoArray<nsStyleImageLayers::Layer>& aLayers,
-    nsStyleImageLayers::Position::PositionCoord
-        nsStyleImageLayers::Position::* aResultLocation,
+    Position::Coord
+        Position::* aResultLocation,
     uint32_t aItemCount, uint32_t aFillCount)
 {
   NS_PRECONDITION(aFillCount <= aLayers.Length(), "unexpected array length");
@@ -7272,9 +7284,9 @@ nsRuleNode::ComputeBackgroundData(void* aStartStruct,
                     conditions);
 
   // background-position-x/y: enum, length, percent (flags), inherit [list]
-  nsStyleImageLayers::Position::PositionCoord initialPositionCoord;
+  Position::Coord initialPositionCoord;
   initialPositionCoord.mPercent =
-    nsStyleImageLayers::Position::GetInitialValue(
+    nsStyleImageLayers::GetInitialPositionForLayerType(
       nsStyleImageLayers::LayerType::Background);
   initialPositionCoord.mLength = 0;
   initialPositionCoord.mHasPercent = true;
@@ -7283,7 +7295,7 @@ nsRuleNode::ComputeBackgroundData(void* aStartStruct,
                     aContext, *aRuleData->ValueForBackgroundPositionX(),
                     bg->mImage.mLayers,
                     parentBG->mImage.mLayers,
-                    &nsStyleImageLayers::Position::mXPosition,
+                    &Position::mXPosition,
                     initialPositionCoord, parentBG->mImage.mPositionXCount,
                     bg->mImage.mPositionXCount, maxItemCount, rebuild,
                     conditions);
@@ -7291,7 +7303,7 @@ nsRuleNode::ComputeBackgroundData(void* aStartStruct,
                     aContext, *aRuleData->ValueForBackgroundPositionY(),
                     bg->mImage.mLayers,
                     parentBG->mImage.mLayers,
-                    &nsStyleImageLayers::Position::mYPosition,
+                    &Position::mYPosition,
                     initialPositionCoord, parentBG->mImage.mPositionYCount,
                     bg->mImage.mPositionYCount, maxItemCount, rebuild,
                     conditions);
@@ -7332,10 +7344,10 @@ nsRuleNode::ComputeBackgroundData(void* aStartStruct,
                        &nsStyleImageLayers::Layer::mOrigin,
                        bg->mImage.mOriginCount, fillCount);
     FillBackgroundPositionCoordList(bg->mImage.mLayers,
-                                    &nsStyleImageLayers::Position::mXPosition,
+                                    &Position::mXPosition,
                                     bg->mImage.mPositionXCount, fillCount);
     FillBackgroundPositionCoordList(bg->mImage.mLayers,
-                                    &nsStyleImageLayers::Position::mYPosition,
+                                    &Position::mYPosition,
                                     bg->mImage.mPositionYCount, fillCount);
     FillBackgroundList(bg->mImage.mLayers,
                        &nsStyleImageLayers::Layer::mSize,
@@ -7468,7 +7480,7 @@ nsRuleNode::ComputeBorderData(void* aStartStruct,
            border->mBoxDecorationBreak, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INITIAL,
            parentBorder->mBoxDecorationBreak,
-           NS_STYLE_BOX_DECORATION_BREAK_SLICE);
+           StyleBoxDecorationBreak::Slice);
 
   // border-width, border-*-width: length, enum, inherit
   nsStyleCoord coord;
@@ -8109,6 +8121,9 @@ SetGridTrackBreadth(const nsCSSValue& aValue,
     aResult.SetFlexFractionValue(aValue.GetFloatValue());
   } else if (unit == eCSSUnit_Auto) {
     aResult.SetAutoValue();
+  } else if (unit == eCSSUnit_None) {
+    // For fit-content().
+    aResult.SetNoneValue();
   } else {
     MOZ_ASSERT(unit != eCSSUnit_Inherit && unit != eCSSUnit_Unset,
                "Unexpected value that would use dummyParentCoord");
@@ -8130,14 +8145,22 @@ SetGridTrackSize(const nsCSSValue& aValue,
                  RuleNodeCacheConditions& aConditions)
 {
   if (aValue.GetUnit() == eCSSUnit_Function) {
-    // A minmax() function.
     nsCSSValue::Array* func = aValue.GetArrayValue();
-    NS_ASSERTION(func->Item(0).GetKeywordValue() == eCSSKeyword_minmax,
-                 "Expected minmax(), got another function name");
-    SetGridTrackBreadth(func->Item(1), aResultMin,
-                        aStyleContext, aPresContext, aConditions);
-    SetGridTrackBreadth(func->Item(2), aResultMax,
-                        aStyleContext, aPresContext, aConditions);
+    auto funcName = func->Item(0).GetKeywordValue();
+    if (funcName == eCSSKeyword_minmax) {
+      SetGridTrackBreadth(func->Item(1), aResultMin,
+                          aStyleContext, aPresContext, aConditions);
+      SetGridTrackBreadth(func->Item(2), aResultMax,
+                          aStyleContext, aPresContext, aConditions);
+    } else if (funcName == eCSSKeyword_fit_content) {
+      // We represent fit-content(L) as 'none' min-sizing and L max-sizing.
+      SetGridTrackBreadth(nsCSSValue(eCSSUnit_None), aResultMin,
+                          aStyleContext, aPresContext, aConditions);
+      SetGridTrackBreadth(func->Item(1), aResultMax,
+                          aStyleContext, aPresContext, aConditions);
+    } else {
+      NS_ERROR("Expected minmax() or fit-content(), got another function name");
+    }
   } else {
     // A single <track-breadth>,
     // specifies identical min and max sizing functions.
@@ -9094,14 +9117,14 @@ nsRuleNode::ComputeXULData(void* aStartStruct,
            xul->mBoxAlign, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INITIAL,
            parentXUL->mBoxAlign,
-           NS_STYLE_BOX_ALIGN_STRETCH);
+           StyleBoxAlign::Stretch);
 
   // box-direction: enum, inherit, initial
   SetValue(*aRuleData->ValueForBoxDirection(),
            xul->mBoxDirection, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INITIAL,
            parentXUL->mBoxDirection,
-           NS_STYLE_BOX_DIRECTION_NORMAL);
+           StyleBoxDirection::Normal);
 
   // box-flex: factor, inherit
   SetFactor(*aRuleData->ValueForBoxFlex(),
@@ -9114,14 +9137,14 @@ nsRuleNode::ComputeXULData(void* aStartStruct,
            xul->mBoxOrient, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INITIAL,
            parentXUL->mBoxOrient,
-           NS_STYLE_BOX_ORIENT_HORIZONTAL);
+           StyleBoxOrient::Horizontal);
 
   // box-pack: enum, inherit, initial
   SetValue(*aRuleData->ValueForBoxPack(),
            xul->mBoxPack, conditions,
            SETVAL_ENUMERATED | SETVAL_UNSET_INITIAL,
            parentXUL->mBoxPack,
-           NS_STYLE_BOX_PACK_START);
+           StyleBoxPack::Start);
 
   // box-ordinal-group: integer, inherit, initial
   SetValue(*aRuleData->ValueForBoxOrdinalGroup(),
@@ -10036,9 +10059,9 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
                     conditions);
 
   // mask-position-x/y: enum, length, percent (flags), inherit [list]
-  nsStyleImageLayers::Position::PositionCoord initialPositionCoord;
+  Position::Coord initialPositionCoord;
   initialPositionCoord.mPercent =
-    nsStyleImageLayers::Position::GetInitialValue(
+    nsStyleImageLayers::GetInitialPositionForLayerType(
       nsStyleImageLayers::LayerType::Mask);
   initialPositionCoord.mLength = 0;
   initialPositionCoord.mHasPercent = true;
@@ -10047,7 +10070,7 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
                     aContext, *aRuleData->ValueForMaskPositionX(),
                     svgReset->mMask.mLayers,
                     parentSVGReset->mMask.mLayers,
-                    &nsStyleImageLayers::Position::mXPosition,
+                    &Position::mXPosition,
                     initialPositionCoord, parentSVGReset->mMask.mPositionXCount,
                     svgReset->mMask.mPositionXCount, maxItemCount, rebuild,
                     conditions);
@@ -10055,7 +10078,7 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
                     aContext, *aRuleData->ValueForMaskPositionY(),
                     svgReset->mMask.mLayers,
                     parentSVGReset->mMask.mLayers,
-                    &nsStyleImageLayers::Position::mYPosition,
+                    &Position::mYPosition,
                     initialPositionCoord, parentSVGReset->mMask.mPositionYCount,
                     svgReset->mMask.mPositionYCount, maxItemCount, rebuild,
                     conditions);
@@ -10112,10 +10135,10 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
                        &nsStyleImageLayers::Layer::mOrigin,
                        svgReset->mMask.mOriginCount, fillCount);
     FillBackgroundPositionCoordList(svgReset->mMask.mLayers,
-                                    &nsStyleImageLayers::Position::mXPosition,
+                                    &Position::mXPosition,
                                     svgReset->mMask.mPositionXCount, fillCount);
     FillBackgroundPositionCoordList(svgReset->mMask.mLayers,
-                                    &nsStyleImageLayers::Position::mYPosition,
+                                    &Position::mYPosition,
                                     svgReset->mMask.mPositionYCount, fillCount);
     FillBackgroundList(svgReset->mMask.mLayers,
                        &nsStyleImageLayers::Layer::mSize,
@@ -10395,6 +10418,13 @@ nsRuleNode::HasAuthorSpecifiedRules(nsStyleContext* aStyleContext,
                                     uint32_t ruleTypeMask,
                                     bool aAuthorColorsAllowed)
 {
+#ifdef MOZ_STYLO
+  if (aStyleContext->StyleSource().IsServoComputedValues()) {
+    NS_WARNING("stylo: nsRuleNode::HasAuthorSpecifiedRules not implemented");
+    return true;
+  }
+#endif
+
   uint32_t inheritBits = 0;
   if (ruleTypeMask & NS_AUTHOR_SPECIFIED_BACKGROUND)
     inheritBits |= NS_STYLE_INHERIT_BIT(Background);

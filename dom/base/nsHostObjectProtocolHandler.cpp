@@ -220,7 +220,6 @@ class BlobURLsReporter final : public nsIMemoryReporter
           "blob cannot be freed until all URLs for it have been explicitly "
           "invalidated with URL.revokeObjectURL.");
         nsAutoCString path, url, owner, specialDesc;
-        nsCOMPtr<nsIURI> principalURI;
         uint64_t size = 0;
         uint32_t refCount = 1;
         DebugOnly<bool> blobImplWasCounted;
@@ -902,7 +901,8 @@ nsFontTableProtocolHandler::NewURI(const nsACString& aSpec,
     // If aSpec is a relative URI -other- than a bare #ref,
     // this will leave uri empty, and we'll return a failure code below.
     uri = new mozilla::net::nsSimpleURI();
-    uri->SetSpec(aSpec);
+    nsresult rv = uri->SetSpec(aSpec);
+    NS_ENSURE_SUCCESS(rv, rv);
   }
 
   bool schemeIs;

@@ -17,10 +17,6 @@ SOURCES += [
     'suggestmgr.cxx',
 ]
 
-# This variable is referenced in configure.in.  Make sure to change that file
-# too if you need to change this variable.
-DEFINES['HUNSPELL_STATIC'] = True
-
 FINAL_LIBRARY = 'xul'
 
 LOCAL_INCLUDES += [
@@ -31,6 +27,9 @@ LOCAL_INCLUDES += [
 ALLOW_COMPILER_WARNINGS = True
 
 include('/ipc/chromium/chromium-config.mozbuild')
+include('../glue/common.mozbuild')
+
+HunspellIncludes()
 
 if CONFIG['CLANG_CXX'] or CONFIG['CLANG_CL']:
     CXXFLAGS += [

@@ -1604,7 +1604,8 @@ private:
     nsCOMPtr<nsIThread> ioTarget;
     mIOTarget.swap(ioTarget);
 
-    NS_WARN_IF_FALSE(NS_SUCCEEDED(stream->Close()), "Failed to close stream!");
+    DebugOnly<nsresult> rv = stream->Close();
+    NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "Failed to close stream!");
 
     MOZ_ALWAYS_SUCCEEDS(NS_DispatchToMainThread(NewRunnableMethod(ioTarget, &nsIThread::Shutdown)));
 
@@ -1664,7 +1665,7 @@ private:
 
     mClosing = true;
 
-    nsresult rv = mIOTarget->Dispatch(this, NS_DISPATCH_NORMAL);
+    nsresult rv = kungFuDeathGrip->Dispatch(this, NS_DISPATCH_NORMAL);
     NS_ENSURE_SUCCESS(rv, rv);
 
     return NS_OK;

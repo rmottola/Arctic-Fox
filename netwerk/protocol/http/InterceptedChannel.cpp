@@ -70,14 +70,16 @@ InterceptedChannelBase::DoNotifyController()
 
     if (NS_WARN_IF(!mController)) {
       rv = ResetInterception();
-      NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "Failed to resume intercepted network request");
+      NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
+                           "Failed to resume intercepted network request");
       return;
     }
 
     rv = mController->ChannelIntercepted(this);
     if (NS_WARN_IF(NS_FAILED(rv))) {
       rv = ResetInterception();
-      NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "Failed to resume intercepted network request");
+      NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
+                           "Failed to resume intercepted network request");
     }
     mController = nullptr;
 }
@@ -125,6 +127,8 @@ InterceptedChannelBase::SetReleaseHandle(nsISupports* aHandle)
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!mReleaseHandle);
   MOZ_ASSERT(aHandle);
+
+  // We need to keep it and mChannel alive until destructor clear it up.
   mReleaseHandle = aHandle;
   return NS_OK;
 }
@@ -200,9 +204,6 @@ InterceptedChannelChrome::ResetInterception()
 
   mResponseBody->Close();
   mResponseBody = nullptr;
-
-  mReleaseHandle = nullptr;
-  mChannel = nullptr;
   return NS_OK;
 }
 
@@ -300,8 +301,6 @@ InterceptedChannelChrome::FinishSynthesizedResponse(const nsACString& aFinalURLS
       NS_ENSURE_SUCCESS(rv, rv);
     }
   }
-  mReleaseHandle = nullptr;
-  mChannel = nullptr;
   return NS_OK;
 }
 
@@ -320,7 +319,6 @@ InterceptedChannelChrome::Cancel(nsresult aStatus)
   // to cancel which will provide OnStart/OnStopRequest to the channel.
   nsresult rv = mChannel->AsyncAbort(aStatus);
   NS_ENSURE_SUCCESS(rv, rv);
-  mReleaseHandle = nullptr;
   return NS_OK;
 }
 
@@ -395,8 +393,6 @@ InterceptedChannelContent::ResetInterception()
   mSynthesizedInput = nullptr;
 
   mChannel->ResetInterception();
-  mReleaseHandle = nullptr;
-  mChannel = nullptr;
   return NS_OK;
 }
 
@@ -463,8 +459,6 @@ InterceptedChannelContent::FinishSynthesizedResponse(const nsACString& aFinalURL
   }
 
   mResponseBody = nullptr;
-  mReleaseHandle = nullptr;
-  mChannel = nullptr;
   mStreamListener = nullptr;
   return NS_OK;
 }
@@ -484,8 +478,6 @@ InterceptedChannelContent::Cancel(nsresult aStatus)
   // to cancel which will provide OnStart/OnStopRequest to the channel.
   nsresult rv = mChannel->AsyncAbort(aStatus);
   NS_ENSURE_SUCCESS(rv, rv);
-  mReleaseHandle = nullptr;
-  mChannel = nullptr;
   mStreamListener = nullptr;
   return NS_OK;
 }

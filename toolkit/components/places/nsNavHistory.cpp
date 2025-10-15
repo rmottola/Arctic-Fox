@@ -345,7 +345,7 @@ nsNavHistory::GetRecentFlags(nsIURI *aURI)
   uint32_t result = 0;
   nsAutoCString spec;
   nsresult rv = aURI->GetSpec(spec);
-  NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "Unable to get aURI's spec");
+  NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "Unable to get aURI's spec");
 
   if (NS_SUCCEEDED(rv)) {
     if (CheckIsRecentEvent(&mRecentTyped, spec))
@@ -569,7 +569,7 @@ public:
       nsCOMPtr<nsIURI> uri;
       (void)NS_NewURI(getter_AddRefs(uri), mSpec);
       // We cannot assert since some automated tests are checking this path.
-      NS_WARN_IF_FALSE(uri, "Invalid URI in FrecencyNotification");
+      NS_WARNING_ASSERTION(uri, "Invalid URI in FrecencyNotification");
       // Notify a frecency change only if we have a valid uri, otherwise
       // the observer couldn't gather any useful data from the notification.
       if (uri) {
@@ -2313,14 +2313,8 @@ nsNavHistory::GetObservers(uint32_t* _count,
   if (observers.Count() == 0)
     return NS_OK;
 
-  *_observers = static_cast<nsINavHistoryObserver**>
-    (moz_xmalloc(observers.Count() * sizeof(nsINavHistoryObserver*)));
-  NS_ENSURE_TRUE(*_observers, NS_ERROR_OUT_OF_MEMORY);
-
   *_count = observers.Count();
-  for (uint32_t i = 0; i < *_count; ++i) {
-    NS_ADDREF((*_observers)[i] = observers[i]);
-  }
+  observers.Forget(_observers);
 
   return NS_OK;
 }
@@ -2347,7 +2341,8 @@ nsNavHistory::EndUpdateBatch()
   if (--mBatchLevel == 0) {
     if (mBatchDBTransaction) {
       DebugOnly<nsresult> rv = mBatchDBTransaction->Commit();
-      NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "Batch failed to commit transaction");
+      NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
+                           "Batch failed to commit transaction");
       delete mBatchDBTransaction;
       mBatchDBTransaction = nullptr;
     }
@@ -2423,9 +2418,8 @@ nsNavHistory::RemovePagesInternal(const nsCString& aPlaceIdsQueryString)
 /**
  * Performs cleanup on places that just had all their visits removed, including
  * deletion of those places.  This is an internal method used by
- * RemovePagesInternal and RemoveVisitsByTimeframe.  This method does not
- * execute in a transaction, so callers should make sure they begin one if
- * needed.
+ * RemovePagesInternal.  This method does not execute in a transaction, so
+ * callers should make sure they begin one if needed.
  *
  * @param aPlaceIdsQueryString
  *        A comma-separated list of place IDs, each of which just had all its
@@ -2624,12 +2618,6 @@ nsNavHistory::RemovePagesFromHost(const nsACString& aHost, bool aEntireDomain)
   if (!aHost.Equals(localFiles))
     CopyUTF8toUTF16(aHost, host16);
 
-  // nsISupports version of the host string for passing to observers
-  nsCOMPtr<nsISupportsString> hostSupports(do_CreateInstance(NS_SUPPORTS_STRING_CONTRACTID, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
-  rv = hostSupports->SetData(host16);
-  NS_ENSURE_SUCCESS(rv, rv);
-
   // see BindQueryClauseParameters for how this host selection works
   nsAutoString revHostDot;
   GetReversedHostname(host16, revHostDot);
@@ -2736,137 +2724,6 @@ nsNavHistory::RemovePagesByTimeframe(PRTime aBeginTime, PRTime aEndTime)
 
   // Clear the registered embed visits.
   clearEmbedVisits();
-
-  return NS_OK;
-}
-
-
-/**
- * Removes all visits in a given timeframe.  Limits are included:
- * aBeginTime <= timeframe <= aEndTime.  Any place that becomes unvisited
- * as a result will also be deleted.
- *
- * Note that removal is performed in batch, so observers will not be
- * notified of individual places that are deleted.  Instead they will be
- * notified onBeginUpdateBatch and onEndUpdateBatch.
- *
- * @param aBeginTime
- *        The start of the timeframe, inclusive
- * @param aEndTime
- *        The end of the timeframe, inclusive
- */
-NS_IMETHODIMP
-nsNavHistory::RemoveVisitsByTimeframe(PRTime aBeginTime, PRTime aEndTime)
-{
-  PLACES_WARN_DEPRECATED();
-
-  NS_ASSERTION(NS_IsMainThread(), "This can only be called on the main thread");
-
-  nsresult rv;
-
-  // Build a list of place IDs whose visits fall entirely within the timespan.
-  // These places will be deleted by the call to CleanupPlacesOnVisitsDelete
-  // below.
-  nsCString deletePlaceIdsQueryString;
-  {
-    nsCOMPtr<mozIStorageStatement> selectByTime = mDB->GetStatement(
-      "SELECT place_id "
-      "FROM moz_historyvisits "
-      "WHERE :from_date <= visit_date AND visit_date <= :to_date "
-      "EXCEPT "
-      "SELECT place_id "
-      "FROM moz_historyvisits "
-      "WHERE visit_date < :from_date OR :to_date < visit_date"
-    );
-    NS_ENSURE_STATE(selectByTime);
-    mozStorageStatementScoper selectByTimeScoper(selectByTime);
-    rv = selectByTime->BindInt64ByName(NS_LITERAL_CSTRING("from_date"), aBeginTime);
-    NS_ENSURE_SUCCESS(rv, rv);
-    rv = selectByTime->BindInt64ByName(NS_LITERAL_CSTRING("to_date"), aEndTime);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    bool hasMore = false;
-    while (NS_SUCCEEDED(selectByTime->ExecuteStep(&hasMore)) && hasMore) {
-      int64_t placeId;
-      rv = selectByTime->GetInt64(0, &placeId);
-      NS_ENSURE_SUCCESS(rv, rv);
-      // placeId should not be <= 0, but be defensive.
-      if (placeId > 0) {
-        if (!deletePlaceIdsQueryString.IsEmpty())
-          deletePlaceIdsQueryString.Append(',');
-        deletePlaceIdsQueryString.AppendInt(placeId);
-      }
-    }
-  }
-
-  // force a full refresh calling onEndUpdateBatch (will call Refresh())
-  UpdateBatchScoper batch(*this); // sends Begin/EndUpdateBatch to observers
-
-  mozStorageTransaction transaction(mDB->MainConn(), false,
-                                    mozIStorageConnection::TRANSACTION_DEFERRED,
-                                    true);
-
-  // Delete all visits within the timeframe.
-  nsCOMPtr<mozIStorageStatement> deleteVisitsStmt = mDB->GetStatement(
-    "DELETE FROM moz_historyvisits "
-    "WHERE :from_date <= visit_date AND visit_date <= :to_date"
-  );
-  NS_ENSURE_STATE(deleteVisitsStmt);
-  mozStorageStatementScoper deletevisitsScoper(deleteVisitsStmt);
-
-  rv = deleteVisitsStmt->BindInt64ByName(NS_LITERAL_CSTRING("from_date"), aBeginTime);
-  NS_ENSURE_SUCCESS(rv, rv);
-  rv = deleteVisitsStmt->BindInt64ByName(NS_LITERAL_CSTRING("to_date"), aEndTime);
-  NS_ENSURE_SUCCESS(rv, rv);
-  rv = deleteVisitsStmt->Execute();
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = CleanupPlacesOnVisitsDelete(deletePlaceIdsQueryString);
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  rv = transaction.Commit();
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  // Clear the registered embed visits.
-  clearEmbedVisits();
-
-  // Invalidate the cached value for whether there's history or not.
-  mDaysOfHistory = -1;
-
-  return NS_OK;
-}
-
-
-// nsNavHistory::RemoveAllPages
-//
-//    This function is used to clear history.
-
-NS_IMETHODIMP
-nsNavHistory::RemoveAllPages()
-{
-  PLACES_WARN_DEPRECATED();
-
-  NS_ASSERTION(NS_IsMainThread(), "This can only be called on the main thread");
-
-  nsresult rv = mDB->MainConn()->ExecuteSimpleSQL(NS_LITERAL_CSTRING(
-    "DELETE FROM moz_historyvisits"
-  ));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  // Clear the registered embed visits.
-  clearEmbedVisits();
-
-  // Update the cached value for whether there's history or not.
-  mDaysOfHistory = 0;
-
-  // Expiration will take care of orphans.
-  NOTIFY_OBSERVERS(mCanNotify, mCacheObservers, mObservers,
-                   nsINavHistoryObserver, OnClearHistory());
-
-  // Invalidate frecencies for the remaining places.  This must happen
-  // after the notification to ensure it runs enqueued to expiration.
-  rv = invalidateFrecencies(EmptyCString());
-  NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "failed to fix invalid frecencies");
 
   return NS_OK;
 }
@@ -3005,7 +2862,7 @@ nsNavHistory::OnBeginVacuum(bool* _vacuumGranted)
 NS_IMETHODIMP
 nsNavHistory::OnEndVacuum(bool aSucceeded)
 {
-  NS_WARN_IF_FALSE(aSucceeded, "Places.sqlite vacuum failed.");
+  NS_WARNING_ASSERTION(aSucceeded, "Places.sqlite vacuum failed.");
   return NS_OK;
 }
 
@@ -4005,19 +3862,6 @@ nsNavHistory::RowToResult(mozIStorageValueArray* aRow,
     rv = aRow->GetUTF8String(kGetInfoIndex_Guid, resultNode->mPageGuid);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    rv = aRow->GetInt64(kGetInfoIndex_VisitId, &resultNode->mVisitId);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    int64_t fromVisitId;
-    rv = aRow->GetInt64(kGetInfoIndex_FromVisitId, &fromVisitId);
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    if (fromVisitId > 0) {
-      resultNode->mFromVisitId = fromVisitId;
-    }
-
-    resultNode->mTransitionType = aRow->AsInt32(kGetInfoIndex_VisitType);
-
     resultNode.forget(aResult);
     return NS_OK;
   }
@@ -4033,6 +3877,19 @@ nsNavHistory::RowToResult(mozIStorageValueArray* aRow,
 
     rv = aRow->GetUTF8String(kGetInfoIndex_Guid, resultNode->mPageGuid);
     NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = aRow->GetInt64(kGetInfoIndex_VisitId, &resultNode->mVisitId);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    int64_t fromVisitId;
+    rv = aRow->GetInt64(kGetInfoIndex_FromVisitId, &fromVisitId);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    if (fromVisitId > 0) {
+      resultNode->mFromVisitId = fromVisitId;
+    }
+
+    resultNode->mTransitionType = aRow->AsInt32(kGetInfoIndex_VisitType);
 
     resultNode.forget(aResult);
     return NS_OK;

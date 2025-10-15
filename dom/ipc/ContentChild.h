@@ -402,9 +402,6 @@ public:
   // auto remove when alertfinished is received.
   nsresult AddRemoteAlertObserver(const nsString& aData, nsIObserver* aObserver);
 
-  virtual bool RecvSystemMemoryAvailable(const uint64_t& aGetterId,
-                                         const uint32_t& aMemoryAvailable) override;
-
   virtual bool RecvPreferenceUpdate(const PrefSetting& aPref) override;
   virtual bool RecvVarUpdate(const GfxVarUpdate& pref) override;
 
@@ -438,6 +435,7 @@ public:
   virtual bool RecvFlushMemory(const nsString& reason) override;
 
   virtual bool RecvActivateA11y() override;
+  virtual bool RecvShutdownA11y() override;
 
   virtual bool RecvGarbageCollect() override;
   virtual bool RecvCycleCollect() override;

@@ -37,8 +37,10 @@ html|*.textbox-textarea {
 }
 
 @media (-moz-windows-default-theme) {
-  textbox html|*.textbox-input::-moz-placeholder {
-    font-style: italic;
+  @media not all and (-moz-os-version: windows-xp) {
+    textbox html|*.textbox-input::placeholder {
+      font-style: italic;
+    }
   }
 }
 

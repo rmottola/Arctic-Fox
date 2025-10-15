@@ -12,7 +12,7 @@
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/StyleAnimationValue.h"
 #include "mozilla/dom/DocumentTimeline.h"
-#include "mozilla/dom/KeyframeEffect.h"
+#include "mozilla/dom/KeyframeEffectReadOnly.h"
 
 #include "nsPresContext.h"
 #include "nsStyleSet.h"
@@ -336,11 +336,14 @@ UpdateOldAnimationPropertiesWithNew(
   // Update the old from the new so we can keep the original object
   // identity (and any expando properties attached to it).
   if (aOld.GetEffect()) {
-    KeyframeEffectReadOnly* oldEffect = aOld.GetEffect();
-    animationChanged =
-      oldEffect->SpecifiedTiming() != aNewTiming;
+    AnimationEffectReadOnly* oldEffect = aOld.GetEffect();
+    animationChanged = oldEffect->SpecifiedTiming() != aNewTiming;
     oldEffect->SetSpecifiedTiming(aNewTiming);
-    oldEffect->SetKeyframes(Move(aNewKeyframes), aStyleContext);
+
+    KeyframeEffectReadOnly* oldKeyframeEffect = oldEffect->AsKeyframeEffect();
+    if (oldKeyframeEffect) {
+      oldKeyframeEffect->SetKeyframes(Move(aNewKeyframes), aStyleContext);
+    }
   }
 
   // Handle changes in play state. If the animation is idle, however,
@@ -649,7 +652,7 @@ CSSAnimationBuilder::Build(nsPresContext* aPresContext,
     OwningElementRef(*mTarget, mStyleContext->GetPseudoType()));
 
   animation->SetTimelineNoUpdate(mTimeline);
-  animation->SetEffect(effect);
+  animation->SetEffectNoUpdate(effect);
 
   if (isStylePaused) {
     animation->PauseFromStyle();
@@ -791,7 +794,7 @@ CSSAnimationBuilder::BuildAnimationFrames(nsPresContext* aPresContext,
     // Otherwise, we should update the existing keyframe with only the
     // unique properties.
     //
-    // Bug 1216843: We should also match composite modes here.
+    // Bug 1293490: We should also match composite modes here.
     Keyframe* existingKeyframe = nullptr;
     // Don't bother searching for an existing keyframe if we don't
     // have anything to contribute to it.
@@ -1045,7 +1048,11 @@ CSSAnimationBuilder::GetComputedValue(nsPresContext* aPresContext,
   if (StyleAnimationValue::ExtractComputedValue(aProperty,
                                                 mStyleWithoutAnimation,
                                                 computedValue)) {
-    StyleAnimationValue::UncomputeValue(aProperty, Move(computedValue), result);
+    DebugOnly<bool> uncomputeResult =
+      StyleAnimationValue::UncomputeValue(aProperty, Move(computedValue),
+                                          result);
+    MOZ_ASSERT(uncomputeResult,
+               "Unable to get specified value from computed value");
   }
 
   // If we hit this assertion, it probably means we are fetching a value from

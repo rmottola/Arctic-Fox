@@ -321,7 +321,6 @@ nsPluginFrame::PrepForDrawing(nsIWidget *aWidget)
     configuration->mBounds.height = NSAppUnitsToIntPixels(mRect.height, appUnitsPerDevPixel);
     parentWidget->ConfigureChildren(configurations);
 
-    RefPtr<nsDeviceContext> dx = viewMan->GetDeviceContext();
     mInnerView->AttachWidgetEventHandler(mWidget);
 
 #ifdef XP_MACOSX
@@ -1385,10 +1384,8 @@ nsPluginFrame::GetLayerState(nsDisplayListBuilder* aBuilder,
 
 #ifdef MOZ_WIDGET_ANDROID
   // We always want a layer on Honeycomb and later
-  if (AndroidBridge::Bridge()->GetAPIVersion() >= 11)
-    return LAYER_ACTIVE;
-#endif
-
+  return LAYER_ACTIVE;
+#else
   if (mInstanceOwner->NeedsScrollImageLayer()) {
     return LAYER_ACTIVE;
   }
@@ -1398,6 +1395,7 @@ nsPluginFrame::GetLayerState(nsDisplayListBuilder* aBuilder,
   }
 
   return LAYER_ACTIVE_FORCE;
+#endif
 }
 
 class PluginFrameDidCompositeObserver final : public ClientLayerManager::

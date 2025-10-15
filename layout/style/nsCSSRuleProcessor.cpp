@@ -2312,10 +2312,10 @@ nsCSSRuleProcessor::RestrictedSelectorMatches(
   MOZ_ASSERT(aSelector->IsRestrictedSelector(),
              "aSelector must not have a pseudo-element");
 
-  NS_WARN_IF_FALSE(!HasPseudoClassSelectorArgsWithCombinators(aSelector),
-                   "processing eRestyle_SomeDescendants can be slow if "
-                   "pseudo-classes with selector arguments can now have "
-                   "combinators in them");
+  NS_WARNING_ASSERTION(
+    !HasPseudoClassSelectorArgsWithCombinators(aSelector),
+    "processing eRestyle_SomeDescendants can be slow if pseudo-classes with "
+    "selector arguments can now have combinators in them");
 
   // We match aSelector as if :visited and :link both match visited and
   // unvisited links.
@@ -2534,9 +2534,9 @@ void ContentEnumFunc(const RuleValue& value, nsCSSSelector* aSelector,
       // We can get here when calling getComputedStyle(aElt, aPseudo) if:
       //
       //   * aPseudo is a pseudo-element that supports a user action
-      //     pseudo-class, like "::-moz-placeholder";
+      //     pseudo-class, like "::placeholder";
       //   * there is a style rule that uses a pseudo-class on this
-      //     pseudo-element in the document, like ::-moz-placeholder:hover; and
+      //     pseudo-element in the document, like ::placeholder:hover; and
       //   * aElt does not have such a pseudo-element.
       //
       // We know that the selector can't match, since there is no element for

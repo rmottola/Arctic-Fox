@@ -1060,11 +1060,11 @@ nsFrameLoader::SwapWithOtherRemoteLoader(nsFrameLoader* aOther,
   RefPtr<nsFrameMessageManager> ourMessageManager = mMessageManager;
   RefPtr<nsFrameMessageManager> otherMessageManager = aOther->mMessageManager;
   // Swap and setup things in parent message managers.
-  if (mMessageManager) {
-    mMessageManager->SetCallback(aOther);
+  if (ourMessageManager) {
+    ourMessageManager->SetCallback(aOther);
   }
-  if (aOther->mMessageManager) {
-    aOther->mMessageManager->SetCallback(this);
+  if (otherMessageManager) {
+    otherMessageManager->SetCallback(this);
   }
   mMessageManager.swap(aOther->mMessageManager);
 
@@ -2229,8 +2229,8 @@ nsFrameLoader::CheckForRecursiveLoad(nsIURI* aURI)
   // Check that we're still in the docshell tree.
   nsCOMPtr<nsIDocShellTreeOwner> treeOwner;
   mDocShell->GetTreeOwner(getter_AddRefs(treeOwner));
-  NS_WARN_IF_FALSE(treeOwner,
-                   "Trying to load a new url to a docshell without owner!");
+  NS_WARNING_ASSERTION(treeOwner,
+                       "Trying to load a new url to a docshell without owner!");
   NS_ENSURE_STATE(treeOwner);
 
   if (mDocShell->ItemType() != nsIDocShellTreeItem::typeContent) {
@@ -2727,7 +2727,9 @@ nsFrameLoader::CreateStaticClone(nsIFrameLoader* aDest)
   dest->MaybeCreateDocShell();
   NS_ENSURE_STATE(dest->mDocShell);
 
-  nsCOMPtr<nsIDocument> dummy = dest->mDocShell->GetDocument();
+  nsCOMPtr<nsIDocument> kungFuDeathGrip = dest->mDocShell->GetDocument();
+  Unused << kungFuDeathGrip;
+
   nsCOMPtr<nsIContentViewer> viewer;
   dest->mDocShell->GetContentViewer(getter_AddRefs(viewer));
   NS_ENSURE_STATE(viewer);

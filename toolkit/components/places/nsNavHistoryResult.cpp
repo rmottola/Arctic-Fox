@@ -2911,8 +2911,11 @@ nsNavHistoryQueryResultNode::OnItemChanged(int64_t aItemId,
   else {
     // Some node could observe both bookmarks and history.  But a node observing
     // only history should never get a bookmark notification.
-    NS_WARN_IF_FALSE(mResult && (mResult->mIsAllBookmarksObserver || mResult->mIsBookmarkFolderObserver),
-                     "history observers should not get OnItemChanged, but should get the corresponding history notifications instead");
+    NS_WARNING_ASSERTION(
+      mResult && (mResult->mIsAllBookmarksObserver ||
+                  mResult->mIsBookmarkFolderObserver),
+      "history observers should not get OnItemChanged, but should get the "
+      "corresponding history notifications instead");
 
     // Tags in history queries are a special case since tags are per uri and
     // we filter tags based on searchterms.
@@ -2948,8 +2951,11 @@ nsNavHistoryQueryResultNode::OnItemVisited(int64_t aItemId,
   // for bookmark queries, "all bookmark" observer should get OnItemVisited
   // but it is ignored.
   if (mLiveUpdate != QUERYUPDATE_COMPLEX_WITH_BOOKMARKS)
-    NS_WARN_IF_FALSE(mResult && (mResult->mIsAllBookmarksObserver || mResult->mIsBookmarkFolderObserver),
-                     "history observers should not get OnItemVisited, but should get OnVisit instead");
+    NS_WARNING_ASSERTION(
+      mResult && (mResult->mIsAllBookmarksObserver ||
+                  mResult->mIsBookmarkFolderObserver),
+      "history observers should not get OnItemVisited, but should get OnVisit "
+      "instead");
   return NS_OK;
 }
 
@@ -3004,7 +3010,8 @@ nsNavHistoryQueryResultNode::OnItemMoved(int64_t aFolder,
  */
 NS_IMPL_ISUPPORTS_INHERITED(nsNavHistoryFolderResultNode,
                             nsNavHistoryContainerResultNode,
-                            nsINavHistoryQueryResultNode)
+                            nsINavHistoryQueryResultNode,
+                            mozIStorageStatementCallback)
 
 nsNavHistoryFolderResultNode::nsNavHistoryFolderResultNode(
     const nsACString& aTitle, nsNavHistoryQueryOptions* aOptions,
@@ -3166,7 +3173,7 @@ nsNavHistoryFolderResultNode::GetQueries(uint32_t* queryCount,
                         (moz_xmalloc(sizeof(nsINavHistoryQuery*)));
   if (!*queries)
     return NS_ERROR_OUT_OF_MEMORY;
-  NS_ADDREF((*queries)[0] = query);
+  (*queries)[0] = query.forget().take();
   *queryCount = 1;
   return NS_OK;
 }

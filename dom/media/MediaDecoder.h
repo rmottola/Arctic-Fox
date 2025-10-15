@@ -239,10 +239,8 @@ public:
   // Call on the main thread only.
   bool IsSeeking() const;
 
-  // Return true if the decoder has reached the end of playback or the decoder
-  // has shutdown.
-  // Call on the main thread only.
-  bool IsEndedOrShutdown() const;
+  // Return true if the decoder has reached the end of playback.
+  bool IsEnded() const;
 
   // Return true if the MediaDecoderOwner's error attribute is not null.
   // Must be called before Shutdown().
@@ -379,6 +377,10 @@ private:
 
   // Called from HTMLMediaElement when owner document activity changes
   virtual void SetElementVisibility(bool aIsVisible);
+
+  // Force override the visible state to hidden.
+  // Called from HTMLMediaElement when testing of video decode suspend from mochitests.
+  void SetForcedHidden(bool aForcedHidden);
 
   /******
    * The following methods must only be called on the main
@@ -523,9 +525,6 @@ protected:
 
   // Cancel a timer for heuristic dormant.
   void CancelDormantTimer();
-
-  // Return true if the decoder has reached the end of playback
-  bool IsEnded() const;
 
   bool IsShutdown() const;
 
@@ -707,6 +706,12 @@ protected:
   // Stores media info, including info of audio tracks and video tracks, should
   // only be accessed from main thread.
   nsAutoPtr<MediaInfo> mInfo;
+
+  // Tracks the visiblity status from HTMLMediaElement
+  bool mElementVisible;
+
+  // If true, forces the decoder to be considered hidden.
+  bool mForcedHidden;
 
   // True if MediaDecoder is in dormant state.
   bool mIsDormant;

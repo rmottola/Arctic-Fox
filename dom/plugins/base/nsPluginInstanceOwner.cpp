@@ -212,11 +212,6 @@ nsPluginInstanceOwner::GetImageContainer()
   RefPtr<ImageContainer> container;
 
 #if MOZ_WIDGET_ANDROID
-  // Right now we only draw with Gecko layers on Honeycomb and higher. See Paint()
-  // for what we do on other versions.
-  if (AndroidBridge::Bridge()->GetAPIVersion() < 11)
-    return nullptr;
-
   LayoutDeviceRect r = GetPluginRect();
 
   // NotifySize() causes Flash to do a bunch of stuff like ask for surfaces to render
@@ -2615,7 +2610,7 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
 #ifdef MOZ_WIDGET_GTK
         Window root = GDK_ROOT_WINDOW();
 #else
-        Window root = None; // Could XQueryTree, but this is not important.
+        Window root = X11None; // Could XQueryTree, but this is not important.
 #endif
 
         switch (anEvent.mMessage) {
@@ -2633,7 +2628,7 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
               event.y_root = rootPoint.y;
               event.state = XInputEventState(mouseEvent);
               // information lost
-              event.subwindow = None;
+              event.subwindow = X11None;
               event.mode = -1;
               event.detail = NotifyDetailNone;
               event.same_screen = True;
@@ -2652,7 +2647,7 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
               event.y_root = rootPoint.y;
               event.state = XInputEventState(mouseEvent);
               // information lost
-              event.subwindow = None;
+              event.subwindow = X11None;
               event.is_hint = NotifyNormal;
               event.same_screen = True;
             }
@@ -2683,7 +2678,7 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
                   break;
                 }
               // information lost:
-              event.subwindow = None;
+              event.subwindow = X11None;
               event.same_screen = True;
             }
             break;
@@ -2727,7 +2722,7 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
 
           // Information that could be obtained from pluginEvent but we may not
           // want to promise to provide:
-          event.subwindow = None;
+          event.subwindow = X11None;
           event.x = 0;
           event.y = 0;
           event.x_root = -1;
@@ -2769,7 +2764,7 @@ nsEventStatus nsPluginInstanceOwner::ProcessEvent(const WidgetGUIEvent& anEvent)
   XAnyEvent& event = pluginEvent.xany;
   event.display = widget ?
     static_cast<Display*>(widget->GetNativeData(NS_NATIVE_DISPLAY)) : nullptr;
-  event.window = None; // not a real window
+  event.window = X11None; // not a real window
   // information lost:
   event.serial = 0;
   event.send_event = False;

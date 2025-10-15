@@ -1270,6 +1270,7 @@ class FetchEventRunnable : public ExtendableFunctionalEventWorkerRunnable
   nsCOMPtr<nsIInputStream> mUploadStream;
   nsCString mReferrer;
   ReferrerPolicy mReferrerPolicy;
+  nsString mIntegrity;
 public:
   FetchEventRunnable(WorkerPrivate* aWorkerPrivate,
                      KeepAliveToken* aKeepAliveToken,
@@ -1395,6 +1396,8 @@ public:
     internalChannel->GetFetchCacheMode(&cacheMode);
     mCacheMode = static_cast<RequestCache>(cacheMode);
 
+    internalChannel->GetIntegrityMetadata(mIntegrity);
+
     mRequestCredentials = InternalRequest::MapChannelToRequestCredentials(channel);
 
     rv = httpChannel->VisitNonDefaultRequestHeaders(this);
@@ -1452,7 +1455,8 @@ private:
     {
       AssertIsOnMainThread();
       nsresult rv = mChannel->ResetInterception();
-      NS_WARN_IF_FALSE(NS_SUCCEEDED(rv), "Failed to resume intercepted network request");
+      NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
+                           "Failed to resume intercepted network request");
       return rv;
     }
   };
@@ -1492,7 +1496,8 @@ private:
                                                               mRequestCredentials,
                                                               NS_ConvertUTF8toUTF16(mReferrer),
                                                               mReferrerPolicy,
-                                                              mContentPolicyType);
+                                                              mContentPolicyType,
+                                                              mIntegrity);
     internalReq->SetBody(mUploadStream);
     // For Telemetry, note that this Request object was created by a Fetch event.
     internalReq->SetCreatedByFetchEvent();

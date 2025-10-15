@@ -18,7 +18,7 @@
 
 #include "gfxUtils.h"
 #include "mozilla/dom/TabChild.h"
-#include "mozilla/dom/KeyframeEffect.h"
+#include "mozilla/dom/KeyframeEffectReadOnly.h"
 #include "mozilla/gfx/2D.h"
 #include "mozilla/layers/PLayerTransaction.h"
 #include "nsCSSRendering.h"
@@ -405,10 +405,10 @@ AddAnimationForProperty(nsIFrame* aFrame, const AnimationProperty& aProperty,
   // callbacks may run that introduce further lag between the main thread and
   // the compositor.
   if (aAnimation->AsCSSTransition() &&
-      aAnimation->GetEffect()) {
-    MOZ_ASSERT(aAnimation->GetEffect()->AsTransition(),
-               "CSSTransition' effect should be an ElementPropertyTransition "
-               "until we fix bug 1049975");
+      aAnimation->GetEffect() &&
+      aAnimation->GetEffect()->AsTransition()) {
+    // We update startValue from the replaced transition only if the effect is
+    // an ElementPropertyTransition.
     aAnimation->GetEffect()->AsTransition()->
       UpdateStartValueFromReplacedTransition();
   }
@@ -430,6 +430,9 @@ AddAnimationForProperty(nsIFrame* aFrame, const AnimationProperty& aProperty,
   animation->playbackRate() = aAnimation->PlaybackRate();
   animation->data() = aData;
   animation->easingFunction() = ToTimingFunction(timing.mFunction);
+  animation->iterationComposite() =
+    static_cast<uint8_t>(aAnimation->GetEffect()->
+                         AsKeyframeEffect()->IterationComposite());
 
   for (uint32_t segIdx = 0; segIdx < aProperty.mSegments.Length(); segIdx++) {
     const AnimationPropertySegment& segment = aProperty.mSegments[segIdx];
@@ -474,10 +477,13 @@ AddAnimationsForProperty(nsIFrame* aFrame, nsCSSPropertyID aProperty,
     if (!anim->IsPlaying()) {
       continue;
     }
-    dom::KeyframeEffectReadOnly* effect = anim->GetEffect();
-    MOZ_ASSERT(effect, "A playing animation should have an effect");
+
+    dom::KeyframeEffectReadOnly* keyframeEffect =
+      anim->GetEffect() ? anim->GetEffect()->AsKeyframeEffect() : nullptr;
+    MOZ_ASSERT(keyframeEffect,
+               "A playing animation should have a keyframe effect");
     const AnimationProperty* property =
-      effect->GetAnimationOfProperty(aProperty);
+      keyframeEffect->GetAnimationOfProperty(aProperty);
     if (!property) {
       continue;
     }
@@ -511,7 +517,7 @@ AddAnimationsForProperty(nsIFrame* aFrame, nsCSSPropertyID aProperty,
     }
 
     AddAnimationForProperty(aFrame, *property, anim, aLayer, aData, aPending);
-    effect->SetIsRunningOnCompositor(aProperty, true);
+    keyframeEffect->SetIsRunningOnCompositor(aProperty, true);
   }
 }
 
@@ -2923,13 +2929,13 @@ nsDisplayBackgroundImage::GetOpaqueRegion(nsDisplayListBuilder* aBuilder,
 
   *aSnap = true;
 
-  // For NS_STYLE_BOX_DECORATION_BREAK_SLICE, don't try to optimize here, since
+  // For StyleBoxDecorationBreak::Slice, don't try to optimize here, since
   // this could easily lead to O(N^2) behavior inside InlineBackgroundData,
   // which expects frames to be sent to it in content order, not reverse
   // content order which we'll produce here.
   // Of course, if there's only one frame in the flow, it doesn't matter.
   if (mFrame->StyleBorder()->mBoxDecorationBreak ==
-        NS_STYLE_BOX_DECORATION_BREAK_CLONE ||
+        StyleBoxDecorationBreak::Clone ||
       (!mFrame->GetPrevContinuation() && !mFrame->GetNextContinuation())) {
     const nsStyleImageLayers::Layer& layer = mBackgroundStyle->mImage.mLayers[mLayer];
     if (layer.mImage.IsOpaque() && layer.mBlendMode == NS_STYLE_BLEND_NORMAL &&
@@ -6257,7 +6263,7 @@ nsDisplayTransform::GetHitDepthAtPoint(nsDisplayListBuilder* aBuilder, const nsP
 
   Point point2d = point.As2DPoint();
 
-  Point3D transformed = matrix * Point3D(point2d.x, point2d.y, 0);
+  Point3D transformed = matrix.TransformPoint(Point3D(point2d.x, point2d.y, 0));
   return transformed.z;
 }
 

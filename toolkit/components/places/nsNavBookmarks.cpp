@@ -627,7 +627,7 @@ nsNavBookmarks::RemoveItem(int64_t aItemId)
     // A broken url should not interrupt the removal process.
     (void)NS_NewURI(getter_AddRefs(uri), bookmark.url);
     // We cannot assert since some automated tests are checking this path.
-    NS_WARN_IF_FALSE(uri, "Invalid URI in RemoveItem");
+    NS_WARNING_ASSERTION(uri, "Invalid URI in RemoveItem");
   }
 
   NOTIFY_OBSERVERS(mCanNotify, mCacheObservers, mObservers,
@@ -1105,7 +1105,7 @@ nsNavBookmarks::RemoveFolderChildren(int64_t aFolderId)
       // A broken url should not interrupt the removal process.
       (void)NS_NewURI(getter_AddRefs(uri), child.url);
       // We cannot assert since some automated tests are checking this path.
-      NS_WARN_IF_FALSE(uri, "Invalid URI in RemoveFolderChildren");
+      NS_WARNING_ASSERTION(uri, "Invalid URI in RemoveFolderChildren");
     }
 
     NOTIFY_OBSERVERS(mCanNotify, mCacheObservers, mObservers,
@@ -2565,14 +2565,8 @@ nsNavBookmarks::GetObservers(uint32_t* _count,
   if (observers.Count() == 0)
     return NS_OK;
 
-  *_observers = static_cast<nsINavBookmarkObserver**>
-    (moz_xmalloc(observers.Count() * sizeof(nsINavBookmarkObserver*)));
-  NS_ENSURE_TRUE(*_observers, NS_ERROR_OUT_OF_MEMORY);
-
   *_count = observers.Count();
-  for (uint32_t i = 0; i < *_count; ++i) {
-    NS_ADDREF((*_observers)[i] = observers[i]);
-  }
+  observers.Forget(_observers);
 
   return NS_OK;
 }

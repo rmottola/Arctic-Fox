@@ -273,6 +273,10 @@ using namespace mozilla::system;
 #include "nsThread.h"
 #endif
 
+#ifdef ACCESSIBILITY
+#include "nsAccessibilityService.h"
+#endif
+
 // For VP9Benchmark::sBenchmarkFpsPref
 #include "Benchmark.h"
 
@@ -1083,7 +1087,6 @@ ContentParent::CreateBrowserOrApp(const TabContext& aContext,
   }
 
   if (aContext.IsMozBrowserElement() || !aContext.HasOwnApp()) {
-    RefPtr<TabParent> tp;
     RefPtr<nsIContentParent> constructorSender;
     if (isInContentProcess) {
       MOZ_ASSERT(aContext.IsMozBrowserElement());
@@ -2841,19 +2844,24 @@ ContentParent::Observe(nsISupports* aSubject,
   }
 #endif
 #ifdef ACCESSIBILITY
-  // Make sure accessibility is running in content process when accessibility
-  // gets initiated in chrome process.
-  else if (aData && (*aData == '1') &&
-       !strcmp(aTopic, "a11y-init-or-shutdown")) {
+  else if (aData && !strcmp(aTopic, "a11y-init-or-shutdown")) {
+    if (*aData == '1') {
+      // Make sure accessibility is running in content process when
+      // accessibility gets initiated in chrome process.
 #if !defined(XP_WIN)
-    Unused << SendActivateA11y();
-#else
-    // On Windows we currently only enable a11y in the content process
-    // for testing purposes.
-    if (Preferences::GetBool(kForceEnableE10sPref, false)) {
       Unused << SendActivateA11y();
-    }
+#else
+      // On Windows we currently only enable a11y in the content process
+      // for testing purposes.
+      if (Preferences::GetBool(kForceEnableE10sPref, false)) {
+        Unused << SendActivateA11y();
+      }
 #endif
+    } else {
+      // If possible, shut down accessibility in content process when
+      // accessibility gets shutdown in chrome process.
+      Unused << SendShutdownA11y();
+    }
   }
 #endif
   else if (!strcmp(aTopic, "app-theme-changed")) {
@@ -3896,20 +3904,6 @@ ContentParent::RecvNSSU2FTokenSign(nsTArray<uint8_t>&& aApplication,
   aSignature->ReplaceElementsAt(0, aSignature->Length(), buffer, bufferlen);
   free(buffer);
   return NS_SUCCEEDED(rv);
-}
-
-bool
-ContentParent::RecvGetSystemMemory(const uint64_t& aGetterId)
-{
-  uint32_t memoryTotal = 0;
-
-#if defined(XP_LINUX)
-  memoryTotal = mozilla::hal::GetTotalSystemMemoryLevel();
-#endif
-
-  Unused << SendSystemMemoryAvailable(aGetterId, memoryTotal);
-
-  return true;
 }
 
 bool
@@ -5047,7 +5041,6 @@ ContentParent::RecvCreateWindow(PBrowserParent* aThisTab,
     return true;
   }
 
-  nsCOMPtr<mozIDOMWindowProxy> window;
   TabParent::AutoUseNewTab aunt(newTab, aWindowIsNew, aURLToLoad);
 
   nsCOMPtr<nsPIWindowWatcher> pwwatch =

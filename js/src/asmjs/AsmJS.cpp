@@ -781,7 +781,7 @@ ParseVarOrConstStatement(AsmJSParser& parser, ParseNode** var)
         return true;
     }
 
-    *var = parser.statement(YieldIsName);
+    *var = parser.statementListItem(YieldIsName);
     if (!*var)
         return false;
 
@@ -6934,20 +6934,15 @@ ParseFunction(ModuleValidator& m, ParseNode** fnOut, unsigned* line)
     tokenStream.consumeKnownToken(TOK_FUNCTION, TokenStream::Operand);
     *line = tokenStream.srcCoords.lineNum(tokenStream.currentToken().pos.end);
 
-    RootedPropertyName name(m.cx());
-
     TokenKind tk;
     if (!tokenStream.getToken(&tk, TokenStream::Operand))
         return false;
-    if (tk == TOK_NAME) {
-        name = tokenStream.currentName();
-    } else if (tk == TOK_YIELD) {
-        if (!m.parser().checkYieldNameValidity())
-            return false;
-        name = m.cx()->names().yield;
-    } else {
+    if (tk != TOK_NAME && tk != TOK_YIELD)
         return false;  // The regular parser will throw a SyntaxError, no need to m.fail.
-    }
+
+    RootedPropertyName name(m.cx(), m.parser().bindingIdentifier(YieldIsName));
+    if (!name)
+        return false;
 
     ParseNode* fn = m.parser().handler.newFunctionDefinition();
     if (!fn)
@@ -7206,7 +7201,7 @@ CheckModuleReturn(ModuleValidator& m)
     }
     ts.ungetToken();
 
-    ParseNode* returnStmt = m.parser().statement(YieldIsName);
+    ParseNode* returnStmt = m.parser().statementListItem(YieldIsName);
     if (!returnStmt)
         return false;
 
@@ -8504,6 +8499,9 @@ BuildConsoleMessage(ExclusiveContext* cx, unsigned time, JS::AsmJSCacheResult ca
         break;
       case JS::AsmJSCache_InternalError:
         cacheString = "unable to store in cache due to internal error (consider filing a bug)";
+        break;
+      case JS::AsmJSCache_Disabled_PrivateBrowsing:
+        cacheString = "caching disabled by private browsing mode";
         break;
       case JS::AsmJSCache_LIMIT:
         MOZ_CRASH("bad AsmJSCacheResult");

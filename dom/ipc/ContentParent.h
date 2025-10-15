@@ -1011,8 +1011,6 @@ private:
                                              const bool& aContentOrNormalChannel,
                                              const bool& aAnyChannel) override;
 
-  virtual bool RecvGetSystemMemory(const uint64_t& getterId) override;
-
   virtual bool RecvGetLookAndFeelCache(nsTArray<LookAndFeelInt>* aLookAndFeelIntCache) override;
 
   virtual bool RecvSpeakerManagerGetSpeakerStatus(bool* aValue) override;

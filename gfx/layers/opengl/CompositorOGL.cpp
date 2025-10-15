@@ -22,6 +22,7 @@
 #include "mozilla/Preferences.h"        // for Preferences
 #include "mozilla/gfx/BasePoint.h"      // for BasePoint
 #include "mozilla/gfx/Matrix.h"         // for Matrix4x4, Matrix
+#include "mozilla/gfx/gfxVars.h"        // for gfxVars
 #include "mozilla/layers/LayerManagerComposite.h"  // for LayerComposite, etc
 #include "mozilla/layers/CompositingRenderTargetOGL.h"
 #include "mozilla/layers/Effects.h"     // for EffectChain, TexturedEffect, etc
@@ -129,7 +130,7 @@ CompositorOGL::CreateContext()
   if (!context && gfxEnv::LayersPreferOffscreen()) {
     SurfaceCaps caps = SurfaceCaps::ForRGB();
     caps.preserve = false;
-    caps.bpp16 = gfxPlatform::GetPlatform()->GetOffscreenFormat() == SurfaceFormat::R5G6B5_UINT16;
+    caps.bpp16 = gfxVars::OffscreenFormat() == SurfaceFormat::R5G6B5_UINT16;
 
     nsCString discardFailureId;
     context = GLContextProvider::CreateOffscreen(mSurfaceSize,
@@ -139,7 +140,7 @@ CompositorOGL::CreateContext()
 
   if (!context) {
     context = gl::GLContextProvider::CreateForCompositorWidget(mWidget,
-                gfxPlatform::GetPlatform()->RequiresAcceleratedGLContextForCompositorOGL());
+                gfxVars::RequiresAcceleratedGLContextForCompositorOGL());
   }
 
   if (!context) {
@@ -711,7 +712,7 @@ CompositorOGL::BeginFrame(const nsIntRegion& aInvalidRegion,
     aClipRectOut->SetRect(0, 0, width, height);
   }
 
-  mGLContext->fClearColor(mBeginFrameClearColor.r, mBeginFrameClearColor.g, mBeginFrameClearColor.b, mBeginFrameClearColor.a);
+  mGLContext->fClearColor(mClearColor.r, mClearColor.g, mClearColor.b, mClearColor.a);
   mGLContext->fClear(LOCAL_GL_COLOR_BUFFER_BIT | LOCAL_GL_DEPTH_BUFFER_BIT);
 }
 

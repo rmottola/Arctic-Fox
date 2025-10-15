@@ -129,8 +129,8 @@ nsInProcessTabChildGlobal::Init()
   nsresult rv =
 #endif
   InitTabChildGlobal();
-  NS_WARN_IF_FALSE(NS_SUCCEEDED(rv),
-                   "Couldn't initialize nsInProcessTabChildGlobal");
+  NS_WARNING_ASSERTION(NS_SUCCEEDED(rv),
+                       "Couldn't initialize nsInProcessTabChildGlobal");
   mMessageManager = new nsFrameMessageManager(this,
                                               nullptr,
                                               dom::ipc::MM_CHILD);
@@ -298,7 +298,8 @@ nsInProcessTabChildGlobal::InitTabChildGlobal()
   nsIURI* uri = mOwner->OwnerDoc()->GetDocumentURI();
   if (uri) {
     nsAutoCString u;
-    uri->GetSpec(u);
+    nsresult rv = uri->GetSpec(u);
+    NS_ENSURE_SUCCESS(rv, rv);
     id.AppendLiteral("?ownedBy=");
     id.Append(u);
   }

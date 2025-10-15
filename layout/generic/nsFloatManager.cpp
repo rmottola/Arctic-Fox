@@ -159,8 +159,7 @@ nsFloatManager::GetFlowArea(WritingMode aWM, nscoord aBOffset,
   if (aBSize == nscoord_MAX) {
     // This warning (and the two below) are possible to hit on pages
     // with really large objects.
-    NS_WARN_IF_FALSE(aInfoType == BAND_FROM_POINT,
-                     "bad height");
+    NS_WARNING_ASSERTION(aInfoType == BAND_FROM_POINT, "bad height");
     blockEnd = nscoord_MAX;
   } else {
     blockEnd = blockStart + aBSize;
@@ -479,7 +478,7 @@ nsFloatManager::List(FILE* out) const
 #endif
 
 nscoord
-nsFloatManager::ClearFloats(nscoord aBCoord, uint8_t aBreakType,
+nsFloatManager::ClearFloats(nscoord aBCoord, StyleClear aBreakType,
                             uint32_t aFlags) const
 {
   if (!(aFlags & DONT_CLEAR_PUSHED_FLOATS) && ClearContinues(aBreakType)) {
@@ -493,14 +492,14 @@ nsFloatManager::ClearFloats(nscoord aBCoord, uint8_t aBreakType,
 
   const FloatInfo &tail = mFloats[mFloats.Length() - 1];
   switch (aBreakType) {
-    case NS_STYLE_CLEAR_BOTH:
+    case StyleClear::Both:
       blockEnd = std::max(blockEnd, tail.mLeftBEnd);
       blockEnd = std::max(blockEnd, tail.mRightBEnd);
       break;
-    case NS_STYLE_CLEAR_LEFT:
+    case StyleClear::Left:
       blockEnd = std::max(blockEnd, tail.mLeftBEnd);
       break;
-    case NS_STYLE_CLEAR_RIGHT:
+    case StyleClear::Right:
       blockEnd = std::max(blockEnd, tail.mRightBEnd);
       break;
     default:
@@ -514,14 +513,14 @@ nsFloatManager::ClearFloats(nscoord aBCoord, uint8_t aBreakType,
 }
 
 bool
-nsFloatManager::ClearContinues(uint8_t aBreakType) const
+nsFloatManager::ClearContinues(StyleClear aBreakType) const
 {
   return ((mPushedLeftFloatPastBreak || mSplitLeftFloatAcrossBreak) &&
-          (aBreakType == NS_STYLE_CLEAR_BOTH ||
-           aBreakType == NS_STYLE_CLEAR_LEFT)) ||
+          (aBreakType == StyleClear::Both ||
+           aBreakType == StyleClear::Left)) ||
          ((mPushedRightFloatPastBreak || mSplitRightFloatAcrossBreak) &&
-          (aBreakType == NS_STYLE_CLEAR_BOTH ||
-           aBreakType == NS_STYLE_CLEAR_RIGHT));
+          (aBreakType == StyleClear::Both ||
+           aBreakType == StyleClear::Right));
 }
 
 /////////////////////////////////////////////////////////////////////////////

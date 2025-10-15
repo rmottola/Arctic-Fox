@@ -68,10 +68,8 @@ WyciwygChannelParent::RecvInit(const URIParams&          aURI,
   if (!uri)
     return false;
 
-  nsCString uriSpec;
-  uri->GetSpec(uriSpec);
   LOG(("WyciwygChannelParent RecvInit [this=%p uri=%s]\n",
-       this, uriSpec.get()));
+       this, uri->GetSpecOrDefault().get()));
 
   nsCOMPtr<nsIIOService> ios(do_GetIOService(&rv));
   if (NS_FAILED(rv))
@@ -144,7 +142,7 @@ WyciwygChannelParent::SetupAppData(const IPC::SerializedLoadContext& loadContext
   if (!mLoadContext && loadContext.IsPrivateBitValid()) {
     nsCOMPtr<nsIPrivateBrowsingChannel> pbChannel = do_QueryInterface(mChannel);
     if (pbChannel)
-      pbChannel->SetPrivate(loadContext.mUsePrivateBrowsing);
+      pbChannel->SetPrivate(loadContext.mOriginAttributes.mPrivateBrowsingId > 0);
   }
 
   mReceivedAppData = true;

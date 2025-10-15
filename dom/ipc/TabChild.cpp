@@ -1750,7 +1750,7 @@ TabChild::HandleTap(GeckoContentController::TapType aType,
     break;
   case GeckoContentController::TapType::eLongTapUp:
     if (mGlobal && mTabChildGlobal) {
-      mAPZEventState->ProcessLongTapUp();
+      mAPZEventState->ProcessLongTapUp(presShell, point, scale, aModifiers);
     }
     break;
   case GeckoContentController::TapType::eSentinel:

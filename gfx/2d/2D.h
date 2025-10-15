@@ -672,6 +672,7 @@ public:
   typedef void (*FontDescriptorOutput)(const uint8_t *aData, uint32_t aLength, Float aFontSize, void *aBaton);
 
   virtual FontType GetType() const = 0;
+  virtual AntialiasMode GetDefaultAAMode() { return AntialiasMode::DEFAULT; }
 
   /** This allows getting a path that describes the outline of a set of glyphs.
    * A target is passed in so that the guarantee is made the returned path
@@ -1009,6 +1010,16 @@ public:
    * @param aRect The rect to clip to
    */
   virtual void PushClipRect(const Rect &aRect) = 0;
+
+  /**
+   * Push a clip region specifed by the union of axis-aligned rectangular
+   * clips to the DrawTarget. These rectangles are specified in device space.
+   * This must be balanced by a corresponding call to PopClip within a layer.
+   *
+   * @param aRects The rects to clip to
+   * @param aCount The number of rectangles
+   */
+  virtual void PushDeviceSpaceClipRects(const IntRect* aRects, uint32_t aCount);
 
   /** Pop a clip from the DrawTarget. A pop without a corresponding push will
    * be ignored.
@@ -1481,7 +1492,8 @@ public:
     CreateScaledFontForDWriteFont(IDWriteFont* aFont,
                                   IDWriteFontFamily* aFontFamily,
                                   IDWriteFontFace* aFontFace,
-                                  Float aSize);
+                                  Float aSize,
+                                  bool aUseEmbeddedBitmap);
 
 private:
   static ID2D1Device *mD2D1Device;

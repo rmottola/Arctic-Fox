@@ -2359,7 +2359,7 @@ nsComputedDOMStyle::DoGetBackgroundOrigin()
 
 void
 nsComputedDOMStyle::SetValueToPositionCoord(
-    const nsStyleImageLayers::Position::PositionCoord& aCoord,
+    const Position::Coord& aCoord,
     nsROCSSPrimitiveValue* aValue)
 {
   if (!aCoord.mHasPercent) {
@@ -2375,7 +2375,7 @@ nsComputedDOMStyle::SetValueToPositionCoord(
 
 void
 nsComputedDOMStyle::SetValueToPosition(
-    const nsStyleImageLayers::Position& aPosition,
+    const Position& aPosition,
     nsDOMCSSValueList* aValueList)
 {
   RefPtr<nsROCSSPrimitiveValue> valX = new nsROCSSPrimitiveValue;
@@ -2531,6 +2531,21 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::GetGridTrackSize(const nsStyleCoord& aMinValue,
                                      const nsStyleCoord& aMaxValue)
 {
+  if (aMinValue.GetUnit() == eStyleUnit_None) {
+    // A fit-content() function.
+    RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
+    nsAutoString argumentStr, fitContentStr;
+    fitContentStr.AppendLiteral("fit-content(");
+    MOZ_ASSERT(aMaxValue.IsCoordPercentCalcUnit(),
+               "unexpected unit for fit-content() argument value");
+    SetValueToCoord(val, aMaxValue, true);
+    val->GetCssText(argumentStr);
+    fitContentStr.Append(argumentStr);
+    fitContentStr.Append(char16_t(')'));
+    val->SetString(fitContentStr);
+    return val.forget();
+  }
+
   if (aMinValue == aMaxValue) {
     RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
     SetValueToCoord(val, aMinValue, true,
@@ -4765,7 +4780,7 @@ nsComputedDOMStyle::DoGetHeight()
     calcHeight = true;
 
     const nsStyleDisplay* displayData = StyleDisplay();
-    if (displayData->mDisplay == NS_STYLE_DISPLAY_INLINE &&
+    if (displayData->mDisplay == mozilla::StyleDisplay::Inline &&
         !(mInnerFrame->IsFrameOfType(nsIFrame::eReplaced)) &&
         // An outer SVG frame should behave the same as eReplaced in this case
         mInnerFrame->GetType() != nsGkAtoms::svgOuterSVGFrame) {
@@ -4809,7 +4824,7 @@ nsComputedDOMStyle::DoGetWidth()
     calcWidth = true;
 
     const nsStyleDisplay *displayData = StyleDisplay();
-    if (displayData->mDisplay == NS_STYLE_DISPLAY_INLINE &&
+    if (displayData->mDisplay == mozilla::StyleDisplay::Inline &&
         !(mInnerFrame->IsFrameOfType(nsIFrame::eReplaced)) &&
         // An outer SVG frame should behave the same as eReplaced in this case
         mInnerFrame->GetType() != nsGkAtoms::svgOuterSVGFrame) {
@@ -5411,10 +5426,10 @@ nsComputedDOMStyle::StyleCoordToNSCoord(const nsStyleCoord& aCoord,
         // We can also get a negative value with a percentage value if
         // percentageBase is negative; this isn't expected, but can happen
         // when large length values overflow.
-        NS_WARN_IF_FALSE(percentageBase >= 0,
-                         "percentage base value overflowed to become "
-                         "negative for a property that disallows negative "
-                         "values");
+        NS_WARNING_ASSERTION(
+          percentageBase >= 0,
+          "percentage base value overflowed to become negative for a property "
+          "that disallows negative values");
         MOZ_ASSERT(aCoord.IsCalcUnit() ||
                    (aCoord.HasPercent() && percentageBase < 0),
                    "parser should have rejected value");
@@ -6038,7 +6053,7 @@ nsComputedDOMStyle::GetShapeSource(
       SetValueToFragmentOrURL(aShapeSource.GetURL(), val);
       return val.forget();
     }
-    case StyleShapeSourceType::None_: {
+    case StyleShapeSourceType::None: {
       RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
       val->SetIdent(eCSSKeyword_none);
       return val.forget();
@@ -6148,7 +6163,8 @@ nsComputedDOMStyle::DoGetMask()
       firstLayer.mOrigin != NS_STYLE_IMAGELAYER_ORIGIN_BORDER ||
       firstLayer.mComposite != NS_STYLE_MASK_COMPOSITE_ADD ||
       firstLayer.mMaskMode != NS_STYLE_MASK_MODE_MATCH_SOURCE ||
-      !firstLayer.mPosition.IsInitialValue(nsStyleImageLayers::LayerType::Mask) ||
+      !nsStyleImageLayers::IsInitialPositionForLayerType(
+        firstLayer.mPosition, nsStyleImageLayers::LayerType::Mask) ||
       !firstLayer.mRepeat.IsInitialValue(nsStyleImageLayers::LayerType::Mask) ||
       !firstLayer.mSize.IsInitialValue() ||
       !(firstLayer.mImage.GetType() == eStyleImageType_Null ||

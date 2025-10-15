@@ -8,15 +8,17 @@
 #include "mozilla/AnimationUtils.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/Move.h"
+#include "mozilla/RangedArray.h"
 #include "mozilla/StyleAnimationValue.h"
 #include "mozilla/TimingParams.h"
 #include "mozilla/dom/BaseKeyframeTypesBinding.h" // For FastBaseKeyframe etc.
 #include "mozilla/dom/Element.h"
-#include "mozilla/dom/KeyframeEffect.h"
 #include "mozilla/dom/KeyframeEffectBinding.h"
+#include "mozilla/dom/KeyframeEffectReadOnly.h" // For PropertyValuesPair etc.
 #include "jsapi.h" // For ForOfIterator etc.
 #include "nsClassHashtable.h"
 #include "nsCSSParser.h"
+#include "nsCSSPropertyIDSet.h"
 #include "nsCSSProps.h"
 #include "nsCSSPseudoElements.h" // For CSSPseudoElementType
 #include "nsTArray.h"
@@ -1570,10 +1572,11 @@ GetCumulativeDistances(const nsTArray<ComputedKeyframeValues>& aValues,
         // If the property is longhand, we just use the 1st value.
         // If ComputeDistance() fails, |dist| will remain zero so there will be
         // no distance between the previous paced value and this value.
-        StyleAnimationValue::ComputeDistance(aPacedProperty,
-                                             prevPacedValues[0].mValue,
-                                             pacedValues[0].mValue,
-                                             dist);
+        Unused <<
+          StyleAnimationValue::ComputeDistance(aPacedProperty,
+                                               prevPacedValues[0].mValue,
+                                               pacedValues[0].mValue,
+                                               dist);
       }
       cumulativeDistances[i] = cumulativeDistances[preIdx] + dist;
     }

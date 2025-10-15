@@ -331,11 +331,6 @@ private:
 #endif
 
   /**
-   * Render paint and composite times above the frame.
-   */
-  void DrawPaintTimes(Compositor* aCompositor);
-
-  /**
    * We need to know our invalid region before we're ready to render.
    */
   void InvalidateDebugOverlay(nsIntRegion& aInvalidRegion, const gfx::IntRect& aBounds);
@@ -391,9 +386,16 @@ private:
   bool mLastFrameMissedHWC;
 
   bool mWindowOverlayChanged;
-  RefPtr<PaintCounter> mPaintCounter;
   TimeDuration mLastPaintTime;
   TimeStamp mRenderStartTime;
+
+#ifdef USE_SKIA
+  /**
+   * Render paint and composite times above the frame.
+   */
+  void DrawPaintTimes(Compositor* aCompositor);
+  RefPtr<PaintCounter> mPaintCounter;
+#endif
 };
 
 /**
@@ -480,6 +482,10 @@ public:
   {
     mShadowOpacity = aOpacity;
   }
+  void SetShadowOpacitySetByAnimation(bool aSetByAnimation)
+  {
+    mShadowOpacitySetByAnimation = aSetByAnimation;
+  }
 
   void SetShadowClipRect(const Maybe<ParentLayerIntRect>& aRect)
   {
@@ -512,6 +518,7 @@ public:
   const gfx::Matrix4x4& GetShadowBaseTransform() { return mShadowTransform; }
   gfx::Matrix4x4 GetShadowTransform();
   bool GetShadowTransformSetByAnimation() { return mShadowTransformSetByAnimation; }
+  bool GetShadowOpacitySetByAnimation() { return mShadowOpacitySetByAnimation; }
   bool HasLayerBeenComposited() { return mLayerComposited; }
   gfx::IntRect GetClearRect() { return mClearRect; }
 
@@ -539,6 +546,7 @@ protected:
   RefPtr<Compositor> mCompositor;
   float mShadowOpacity;
   bool mShadowTransformSetByAnimation;
+  bool mShadowOpacitySetByAnimation;
   bool mDestroyed;
   bool mLayerComposited;
   gfx::IntRect mClearRect;

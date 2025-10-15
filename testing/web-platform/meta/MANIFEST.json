@@ -16009,6 +16009,10 @@
         "url": "/html/infrastructure/common-dom-interfaces/collections/htmlformcontrolscollection.html"
       },
       {
+        "path": "fetch/api/basic/integrity-sharedworker.html",
+        "url": "/fetch/api/basic/integrity-sharedworker.html"
+      },
+      {
         "path": "html/infrastructure/common-dom-interfaces/collections/htmloptionscollection.html",
         "url": "/html/infrastructure/common-dom-interfaces/collections/htmloptionscollection.html"
       },
@@ -23860,10 +23864,28 @@
             "url": "/html/semantics/forms/the-form-element/form-submission-sandbox.html"
           }
         ],
+        "web-animations/interfaces/Animation/effect.html": [
+          {
+            "path": "web-animations/interfaces/Animation/effect.html",
+            "url": "/web-animations/interfaces/Animation/effect.html"
+          }
+        ],
+        "web-animations/interfaces/KeyframeEffect/spacing.html": [
+          {
+            "path": "web-animations/interfaces/KeyframeEffect/spacing.html",
+            "url": "/web-animations/interfaces/KeyframeEffect/spacing.html"
+          }
+        ],
         "web-animations/timing-model/animation-effects/phases-and-states.html": [
           {
             "path": "web-animations/timing-model/animation-effects/phases-and-states.html",
             "url": "/web-animations/timing-model/animation-effects/phases-and-states.html"
+          }
+        ],
+        "web-animations/timing-model/animations/set-the-target-effect-of-an-animation.html": [
+          {
+            "path": "web-animations/timing-model/animations/set-the-target-effect-of-an-animation.html",
+            "url": "/web-animations/timing-model/animations/set-the-target-effect-of-an-animation.html"
           }
         ],
         "web-animations/timing-model/animations/updating-the-finished-state.html": [

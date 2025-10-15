@@ -106,20 +106,24 @@ struct URLValueData
   // Construct with the actual URI.
   URLValueData(already_AddRefed<PtrHolder<nsIURI>> aURI,
                nsStringBuffer* aString,
+               already_AddRefed<PtrHolder<nsIURI>> aBaseURI,
                already_AddRefed<PtrHolder<nsIURI>> aReferrer,
                already_AddRefed<PtrHolder<nsIPrincipal>> aOriginPrincipal);
 
   bool operator==(const URLValueData& aOther) const;
 
-  // URIEquals only compares URIs and principals (unlike operator==, which
-  // also compares the original strings).  URIEquals also assumes that the
-  // mURI member of both URL objects is non-null.  Do NOT call this method
-  // unless you're sure this is the case.
-  bool URIEquals(const URLValueData& aOther) const;
+  // Returns true iff we know for sure, by comparing the mBaseURI pointer,
+  // the specified url() value mString, and the mLocalURLFlag, that these
+  // two URLValueData objects represent the same computed url() value.
+  //
+  // Doesn't look at mReferrer or mOriginPrincipal.
+  //
+  // Safe to call from any thread.
+  bool DefinitelyEqualURIs(const URLValueData& aOther) const;
 
-  // Pretty much like URIEquals, but allows comparing unresolved URIs (returning
-  // false in that case).
-  bool MaybeUnresolvedURIEquals(const URLValueData& aOther) const;
+  // Smae as DefinitelyEqualURIs but additionally compares the nsIPrincipal
+  // pointers of the two URLValueData objects.
+  bool DefinitelyEqualURIsAndPrincipal(const URLValueData& aOther) const;
 
   nsIURI* GetURI() const;
 
@@ -128,11 +132,11 @@ struct URLValueData
   bool GetLocalURLFlag() const { return mLocalURLFlag; }
 
 private:
-  // If mURIResolved is false, mURI stores the base URI.
-  // If mURIResolved is true, mURI stores the URI we resolve to; this may be
-  // null if the URI is invalid.
+  // mURI stores the lazily resolved URI.  This may be null if the URI is
+  // invalid, even once resolved.
   mutable PtrHandle<nsIURI> mURI;
 public:
+  PtrHandle<nsIURI> mBaseURI;
   RefPtr<nsStringBuffer> mString;
   PtrHandle<nsIURI> mReferrer;
   PtrHandle<nsIPrincipal> mOriginPrincipal;
@@ -151,8 +155,8 @@ struct URLValue : public URLValueData
   // These two constructors are safe to call only on the main thread.
   URLValue(nsStringBuffer* aString, nsIURI* aBaseURI, nsIURI* aReferrer,
            nsIPrincipal* aOriginPrincipal);
-  URLValue(nsIURI* aURI, nsStringBuffer* aString, nsIURI* aReferrer,
-           nsIPrincipal* aOriginPrincipal);
+  URLValue(nsIURI* aURI, nsStringBuffer* aString, nsIURI* aBaseURI,
+           nsIURI* aReferrer, nsIPrincipal* aOriginPrincipal);
 
   // This constructor is safe to call from any thread.
   URLValue(nsStringBuffer* aString,
@@ -182,8 +186,9 @@ struct ImageValue : public URLValueData
   // aString must not be null.
   //
   // This constructor is only safe to call from the main thread.
-  ImageValue(nsIURI* aURI, nsStringBuffer* aString, nsIURI* aReferrer,
-             nsIPrincipal* aOriginPrincipal, nsIDocument* aDocument);
+  ImageValue(nsIURI* aURI, nsStringBuffer* aString, nsIURI* aBaseURI,
+             nsIURI* aReferrer, nsIPrincipal* aOriginPrincipal,
+             nsIDocument* aDocument);
 
   ImageValue(const ImageValue&) = delete;
   ImageValue& operator=(const ImageValue&) = delete;
@@ -378,8 +383,14 @@ enum nsCSSUnit {
   eCSSUnit_ShortHexColor       = 84,   // (nscolor) an opaque RGBA value specified as #rgb
   eCSSUnit_HexColorAlpha       = 85,   // (nscolor) an opaque RGBA value specified as #rrggbbaa
   eCSSUnit_ShortHexColorAlpha  = 86,   // (nscolor) an opaque RGBA value specified as #rgba
-  eCSSUnit_PercentageRGBColor  = 87,   // (nsCSSValueFloatColor*)
-  eCSSUnit_PercentageRGBAColor = 88,   // (nsCSSValueFloatColor*)
+  eCSSUnit_PercentageRGBColor  = 87,   // (nsCSSValueFloatColor*) an opaque
+                                       // RGBA value specified as rgb() with
+                                       // percentage components. Values over
+                                       // 100% are allowed.
+  eCSSUnit_PercentageRGBAColor = 88,   // (nsCSSValueFloatColor*) an RGBA value
+                                       // specified as rgba() with percentage
+                                       // components. Values over 100% are
+                                       // allowed.
   eCSSUnit_HSLColor            = 89,   // (nsCSSValueFloatColor*)
   eCSSUnit_HSLAColor           = 90,   // (nsCSSValueFloatColor*)
 
@@ -727,6 +738,12 @@ public:
   nscoord GetFixedLength(nsPresContext* aPresContext) const;
   nscoord GetPixelLength() const;
 
+  nsCSSValueFloatColor* GetFloatColorValue() const
+  {
+    MOZ_ASSERT(IsFloatColorUnit(), "not a float color value");
+    return mValue.mFloatColor;
+  }
+
   void Reset()  // sets to null
   {
     if (mUnit != eCSSUnit_Null)
@@ -741,7 +758,7 @@ public:
            typename = typename std::enable_if<std::is_enum<T>::value>::type>
   void SetIntValue(T aValue, nsCSSUnit aUnit)
   {
-    static_assert(mozilla::IsEnumFittingWithin<T, int32_t>::value,
+    static_assert(mozilla::EnumTypeFitsWithin<T, int32_t>::value,
                   "aValue must be an enum that fits within mValue.mInt");
     SetIntValue(static_cast<int32_t>(aValue), aUnit);
   }
@@ -1687,6 +1704,10 @@ public:
   bool operator==(nsCSSValueFloatColor& aOther) const;
 
   nscolor GetColorValue(nsCSSUnit aUnit) const;
+  float Comp1() const { return mComponent1; }
+  float Comp2() const { return mComponent2; }
+  float Comp3() const { return mComponent3; }
+  float Alpha() const { return mAlpha; }
   bool IsNonTransparentColor() const;
 
   void AppendToString(nsCSSUnit aUnit, nsAString& aResult) const;
@@ -1696,11 +1717,20 @@ public:
   NS_INLINE_DECL_REFCOUNTING(nsCSSValueFloatColor)
 
 private:
-  // FIXME: We should not be clamping specified RGB color components.
-  float mComponent1;  // 0..1 for RGB, 0..360 for HSL
-  float mComponent2;  // 0..1
-  float mComponent3;  // 0..1
-  float mAlpha;       // 0..1
+  // The range of each component is.
+  // [0, 1] for HSLColor and HSLAColor. mComponent1 for hue, mComponent2 for
+  //                                    saturation, mComponent3 for lightness.
+  //                                    [0, 1] for saturation and lightness
+  //                                    represents [0%, 100%].
+  //                                    [0, 1] for hue represents
+  //                                    [0deg, 360deg].
+  //
+  // [-float::max(), float::max()] for PercentageRGBColor, PercentageRGBAColor.
+  //                               1.0 means 100%.
+  float mComponent1;
+  float mComponent2;
+  float mComponent3;
+  float mAlpha;
 
   nsCSSValueFloatColor(const nsCSSValueFloatColor& aOther) = delete;
   nsCSSValueFloatColor& operator=(const nsCSSValueFloatColor& aOther)

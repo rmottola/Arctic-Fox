@@ -352,11 +352,6 @@ static unsigned int WindowMaskForBorderStyle(nsBorderStyle aBorderStyle)
   return mask;
 }
 
-NS_IMETHODIMP nsCocoaWindow::ReparentNativeWidget(nsIWidget* aNewParent)
-{
-  return NS_ERROR_NOT_IMPLEMENTED;
-}
-
 // If aRectIsFrameRect, aRect specifies the frame rect of the new window.
 // Otherwise, aRect.x/y specify the position of the window's frame relative to
 // the bottom of the menubar and aRect.width/height specify the size of the
@@ -642,10 +637,13 @@ bool nsCocoaWindow::IsVisible() const
   NS_OBJC_END_TRY_ABORT_BLOCK_RETURN(false);
 }
 
-NS_IMETHODIMP nsCocoaWindow::SetModal(bool aState)
+void
+nsCocoaWindow::SetModal(bool aState)
 {
+  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
+
   if (!mWindow)
-    return NS_OK;
+    return;
 
   // This is used during startup (outside the event loop) when creating
   // the add-ons compatibility checking dialog and the profile manager UI;
@@ -713,13 +711,15 @@ NS_IMETHODIMP nsCocoaWindow::SetModal(bool aState)
         [mWindow setLevel:NSNormalWindowLevel];
     }
   }
-  return NS_OK;
+
+  NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
-NS_IMETHODIMP nsCocoaWindow::SetFakeModal(bool aState)
+void
+nsCocoaWindow::SetFakeModal(bool aState)
 {
     mFakeModal = aState;
-    return SetModal(aState);
+    SetModal(aState);
 }
 
 // Hide or show this window
@@ -1114,11 +1114,13 @@ bool nsCocoaWindow::IsEnabled() const
 
 #define kWindowPositionSlop 20
 
-NS_IMETHODIMP nsCocoaWindow::ConstrainPosition(bool aAllowSlop,
-                                               int32_t *aX, int32_t *aY)
+void
+nsCocoaWindow::ConstrainPosition(bool aAllowSlop, int32_t *aX, int32_t *aY)
 {
+  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
+
   if (!mWindow || ![mWindow screen]) {
-    return NS_OK;
+    return;
   }
 
   nsIntRect screenBounds;
@@ -1168,7 +1170,7 @@ NS_IMETHODIMP nsCocoaWindow::ConstrainPosition(bool aAllowSlop,
     }
   }
 
-  return NS_OK;
+  NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
 void nsCocoaWindow::SetSizeConstraints(const SizeConstraints& aConstraints)
@@ -1229,13 +1231,6 @@ NS_IMETHODIMP nsCocoaWindow::Move(double aX, double aY)
     [mWindow setFrameTopLeftPoint:coord];
   }
 
-  return NS_OK;
-}
-
-// Position the window behind the given window
-NS_IMETHODIMP nsCocoaWindow::PlaceBehind(nsTopLevelWidgetZPlacement aPlacement,
-                                         nsIWidget *aWidget, bool aActivate)
-{
   return NS_OK;
 }
 
@@ -1892,6 +1887,7 @@ nsCocoaWindow::DispatchEvent(WidgetGUIEvent* event, nsEventStatus& aStatus)
   aStatus = nsEventStatus_eIgnore;
 
   nsCOMPtr<nsIWidget> kungFuDeathGrip(event->mWidget);
+  mozilla::Unused << kungFuDeathGrip; // Not used within this function
 
   if (mWidgetListener)
     aStatus = mWidgetListener->HandleEvent(event, mUseAttachedEvents);
@@ -2066,9 +2062,11 @@ nsMenuBarX* nsCocoaWindow::GetMenuBar()
   return mMenuBar;
 }
 
-NS_IMETHODIMP nsCocoaWindow::CaptureRollupEvents(nsIRollupListener* aListener, bool aDoCapture)
+void
+nsCocoaWindow::CaptureRollupEvents(nsIRollupListener* aListener,
+                                   bool aDoCapture)
 {
-  NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
+  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
   gRollupListener = nullptr;
   
@@ -2105,9 +2103,7 @@ NS_IMETHODIMP nsCocoaWindow::CaptureRollupEvents(nsIRollupListener* aListener, b
       [mWindow setLevel:NSModalPanelWindowLevel];
   }
   
-  return NS_OK;
-
-  NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
+  NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
 NS_IMETHODIMP nsCocoaWindow::GetAttention(int32_t aCycleCount)
@@ -2126,12 +2122,13 @@ nsCocoaWindow::HasPendingInputEvent()
   return nsChildView::DoHasPendingInputEvent();
 }
 
-NS_IMETHODIMP nsCocoaWindow::SetWindowShadowStyle(int32_t aStyle)
+void
+nsCocoaWindow::SetWindowShadowStyle(int32_t aStyle)
 {
-  NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
+  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
   if (!mWindow)
-    return NS_OK;
+    return;
 
   mShadowStyle = aStyle;
 
@@ -2143,9 +2140,7 @@ NS_IMETHODIMP nsCocoaWindow::SetWindowShadowStyle(int32_t aStyle)
   AdjustWindowShadow();
   SetWindowBackgroundBlur();
 
-  return NS_OK;
-
-  NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
+  NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
 void nsCocoaWindow::SetShowsToolbarButton(bool aShow)
@@ -2230,12 +2225,13 @@ NS_IMETHODIMP nsCocoaWindow::SetNonClientMargins(LayoutDeviceIntMargin &margins)
   NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
 }
 
-NS_IMETHODIMP nsCocoaWindow::SetWindowTitlebarColor(nscolor aColor, bool aActive)
+void
+nsCocoaWindow::SetWindowTitlebarColor(nscolor aColor, bool aActive)
 {
-  NS_OBJC_BEGIN_TRY_ABORT_BLOCK_NSRESULT;
+  NS_OBJC_BEGIN_TRY_ABORT_BLOCK;
 
   if (!mWindow)
-    return NS_OK;
+    return;
 
   // If they pass a color with a complete transparent alpha component, use the
   // native titlebar appearance.
@@ -2263,9 +2259,8 @@ NS_IMETHODIMP nsCocoaWindow::SetWindowTitlebarColor(nscolor aColor, bool aActive
                                                     alpha:NS_GET_A(aColor)/255.0]
               forActiveWindow:(BOOL)aActive];
   }
-  return NS_OK;
 
-  NS_OBJC_END_TRY_ABORT_BLOCK_NSRESULT;
+  NS_OBJC_END_TRY_ABORT_BLOCK;
 }
 
 void nsCocoaWindow::SetDrawsInTitlebar(bool aState)

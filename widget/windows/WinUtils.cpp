@@ -736,7 +736,7 @@ WinUtils::WaitForMessage(DWORD aTimeoutMs)
     }
     DWORD result = ::MsgWaitForMultipleObjectsEx(0, NULL, aTimeoutMs - elapsed,
                                                  MOZ_QS_ALLEVENT, waitFlags);
-    NS_WARN_IF_FALSE(result != WAIT_FAILED, "Wait failed");
+    NS_WARNING_ASSERTION(result != WAIT_FAILED, "Wait failed");
     if (result == WAIT_TIMEOUT) {
       break;
     }
@@ -1059,6 +1059,14 @@ WinUtils::GetMouseInputSource()
       nsIDOMMouseEvent::MOZ_SOURCE_TOUCH : nsIDOMMouseEvent::MOZ_SOURCE_PEN;
   }
   return static_cast<uint16_t>(inputSource);
+}
+
+/* static */
+uint16_t
+WinUtils::GetMousePointerID()
+{
+  LPARAM lParamExtraInfo = ::GetMessageExtraInfo();
+  return lParamExtraInfo & TABLET_INK_ID_MASK;
 }
 
 /* static */

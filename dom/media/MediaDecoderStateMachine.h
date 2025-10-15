@@ -253,6 +253,9 @@ public:
   size_t SizeOfAudioQueue() const;
 
 private:
+  static const char* ToStateStr(State aState);
+  const char* ToStateStr();
+
   // Functions used by assertions to ensure we're calling things
   // on the appropriate threads.
   bool OnTaskQueue() const;
@@ -508,12 +511,6 @@ protected:
   // Clears any previous seeking state and initiates a new seek on the decoder.
   RefPtr<MediaDecoder::SeekPromise> InitiateSeek(SeekJob aSeekJob);
 
-  // Clears any previous seeking state and initiates a seek on the decoder to
-  // resync the video and audio positions, when recovering from video decoding
-  // being suspended in background or from audio and video decoding being
-  // suspended due to the decoder limit.
-  void InitiateDecodeRecoverySeek(TrackSet aTracks);
-
   nsresult DispatchAudioDecodeTaskIfNeeded();
 
   // Ensures a task to decode audio has been dispatched to the decode task queue.
@@ -595,10 +592,6 @@ protected:
   // decode buffers and is waiting. We can shut the decode thread down in this
   // case as it may not be needed again.
   bool IsPausedAndDecoderWaiting();
-
-  // Returns true if the video decoding is suspended because the element is not
-  // visible
-  bool IsVideoDecodeSuspended() const;
 
   // These return true if the respective stream's decode has not yet reached
   // the end of stream.

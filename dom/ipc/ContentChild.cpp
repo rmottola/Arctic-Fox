@@ -31,7 +31,6 @@
 #include "mozilla/dom/FlyWebPublishedServerIPC.h"
 #include "mozilla/dom/PCrashReporterChild.h"
 #include "mozilla/dom/ProcessGlobal.h"
-#include "mozilla/dom/Promise.h"
 #include "mozilla/dom/workers/ServiceWorkerManager.h"
 #include "mozilla/dom/nsIContentChild.h"
 #include "mozilla/gfx/gfxVars.h"
@@ -1061,7 +1060,9 @@ ContentChild::RecvPMemoryReportRequestConstructor(
     rv = actor->Run();
   }
 
-  return !NS_WARN_IF(NS_FAILED(rv));
+  // Bug 1295622: don't kill the process just because this failed.
+  NS_WARN_IF(NS_FAILED(rv));
+  return true;
 }
 
 NS_IMETHODIMP MemoryReportRequestChild::Run()
@@ -1081,10 +1082,12 @@ NS_IMETHODIMP MemoryReportRequestChild::Run()
   RefPtr<FinishReportingCallback> finishReporting =
     new FinishReportingCallback(this);
 
-  return mgr->GetReportsForThisProcessExtended(handleReport, nullptr,
-                                               mAnonymize,
-                                               FileDescriptorToFILE(mDMDFile, "wb"),
-                                               finishReporting, nullptr);
+  nsresult rv =
+    mgr->GetReportsForThisProcessExtended(handleReport, nullptr, mAnonymize,
+                                          FileDescriptorToFILE(mDMDFile, "wb"),
+                                          finishReporting, nullptr);
+  NS_WARN_IF(NS_FAILED(rv));
+  return rv;
 }
 
 bool
@@ -2260,22 +2263,6 @@ ContentChild::AddRemoteAlertObserver(const nsString& aData,
   return NS_OK;
 }
 
-
-bool
-ContentChild::RecvSystemMemoryAvailable(const uint64_t& aGetterId,
-                                        const uint32_t& aMemoryAvailable)
-{
-  RefPtr<Promise> p = dont_AddRef(reinterpret_cast<Promise*>(aGetterId));
-
-  if (!aMemoryAvailable) {
-    p->MaybeReject(NS_ERROR_NOT_AVAILABLE);
-    return true;
-  }
-
-  p->MaybeResolve((int)aMemoryAvailable);
-  return true;
-}
-
 bool
 ContentChild::RecvPreferenceUpdate(const PrefSetting& aPref)
 {
@@ -2474,7 +2461,18 @@ ContentChild::RecvActivateA11y()
 #ifdef ACCESSIBILITY
   // Start accessibility in content process if it's running in chrome
   // process.
-  GetOrCreateAccService();
+  GetOrCreateAccService(nsAccessibilityService::eMainProcess);
+#endif
+  return true;
+}
+
+bool
+ContentChild::RecvShutdownA11y()
+{
+#ifdef ACCESSIBILITY
+  // Try to shutdown accessibility in content process if it's shutting down in
+  // chrome process.
+  MaybeShutdownAccService(nsAccessibilityService::eMainProcess);
 #endif
   return true;
 }
