@@ -140,7 +140,7 @@ CompositorOGL::CreateContext()
 
   if (!context) {
     context = gl::GLContextProvider::CreateForCompositorWidget(mWidget,
-                gfxPlatform::GetPlatform()->RequiresAcceleratedGLContextForCompositorOGL());
+                gfxVars::RequiresAcceleratedGLContextForCompositorOGL());
   }
 
   if (!context) {
