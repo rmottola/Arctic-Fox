@@ -168,8 +168,6 @@ nsXMLFragmentContentSink::WillBuildModel(nsDTDMode aDTDMode)
 NS_IMETHODIMP 
 nsXMLFragmentContentSink::DidBuildModel(bool aTerminated)
 {
-  RefPtr<nsParserBase> kungFuDeathGrip(mParser);
-
   // Drop our reference to the parser to get rid of a circular
   // reference.
   mParser = nullptr;

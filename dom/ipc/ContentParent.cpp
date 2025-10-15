@@ -1087,7 +1087,6 @@ ContentParent::CreateBrowserOrApp(const TabContext& aContext,
   }
 
   if (aContext.IsMozBrowserElement() || !aContext.HasOwnApp()) {
-    RefPtr<TabParent> tp;
     RefPtr<nsIContentParent> constructorSender;
     if (isInContentProcess) {
       MOZ_ASSERT(aContext.IsMozBrowserElement());
