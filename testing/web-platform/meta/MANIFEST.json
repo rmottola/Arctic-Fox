@@ -16009,6 +16009,10 @@
         "url": "/html/infrastructure/common-dom-interfaces/collections/htmlformcontrolscollection.html"
       },
       {
+        "path": "fetch/api/basic/integrity-sharedworker.html",
+        "url": "/fetch/api/basic/integrity-sharedworker.html"
+      },
+      {
         "path": "html/infrastructure/common-dom-interfaces/collections/htmloptionscollection.html",
         "url": "/html/infrastructure/common-dom-interfaces/collections/htmloptionscollection.html"
       },
