@@ -2114,6 +2114,7 @@ gfxPlatform::InitAcceleration()
 
   if (XRE_IsParentProcess()) {
     gfxVars::SetBrowserTabsRemoteAutostart(BrowserTabsRemoteAutostart());
+    gfxVars::SetOffscreenFormat(GetOffscreenFormat());
   }
 
   nsCOMPtr<nsIGfxInfo> gfxInfo = services::GetGfxInfo();
