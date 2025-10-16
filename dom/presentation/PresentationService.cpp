@@ -306,6 +306,8 @@ PresentationService::HandleShutdown()
 nsresult
 PresentationService::HandleDeviceChange()
 {
+  PRES_DEBUG("%s\n", __func__);
+
   nsCOMPtr<nsIPresentationDeviceManager> deviceManager =
     do_GetService(PRESENTATION_DEVICE_MANAGER_CONTRACTID);
   if (NS_WARN_IF(!deviceManager)) {
@@ -386,6 +388,9 @@ PresentationService::HandleSessionRequest(nsIPresentationSessionRequest* aReques
   // Update the control channel and device of the session info.
   // Call |NotifyResponderReady| to indicate the receiver page is already there.
   if (info) {
+    PRES_DEBUG("handle reconnection:id[%s]\n",
+               NS_ConvertUTF16toUTF8(sessionId).get());
+
     info->SetControlChannel(ctrlChannel);
     info->SetDevice(device);
     return static_cast<PresentationPresentingInfo*>(
@@ -393,6 +398,10 @@ PresentationService::HandleSessionRequest(nsIPresentationSessionRequest* aReques
   }
 
   // This is the case for a new session.
+  PRES_DEBUG("handle new session:url[%d], id[%s]\n",
+             NS_ConvertUTF16toUTF8(url).get(),
+             NS_ConvertUTF16toUTF8(sessionId).get());
+
   info = new PresentationPresentingInfo(url, sessionId, device);
   rv = info->Init(ctrlChannel);
   if (NS_WARN_IF(NS_FAILED(rv))) {
@@ -469,6 +478,9 @@ PresentationService::HandleTerminateRequest(nsIPresentationTerminateRequest* aRe
     ctrlChannel->Disconnect(NS_ERROR_DOM_OPERATION_ERR);
     return NS_ERROR_DOM_ABORT_ERR;
   }
+
+  PRES_DEBUG("handle termination:id[%s], receiver[%d]\n", __func__,
+             sessionId.get(), isFromReceiver);
 
   return info->OnTerminate(ctrlChannel);
 }
@@ -565,6 +577,10 @@ PresentationService::StartSession(const nsAString& aUrl,
                                   uint64_t aWindowId,
                                   nsIPresentationServiceCallback* aCallback)
 {
+  PRES_DEBUG("%s:url[%s], id[%s]\n", __func__,
+             NS_ConvertUTF16toUTF8(aUrl).get(),
+             NS_ConvertUTF16toUTF8(aSessionId).get());
+
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aCallback);
   MOZ_ASSERT(!aSessionId.IsEmpty());
@@ -684,6 +700,9 @@ PresentationService::CloseSession(const nsAString& aSessionId,
                                   uint8_t aRole,
                                   uint8_t aClosedReason)
 {
+  PRES_DEBUG("%s:id[%s], reason[%x], role[%d]\n", __func__,
+             NS_ConvertUTF16toUTF8(aSessionId).get(), aClosedReason, aRole);
+
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!aSessionId.IsEmpty());
   MOZ_ASSERT(aRole == nsIPresentationService::ROLE_CONTROLLER ||
@@ -707,6 +726,9 @@ NS_IMETHODIMP
 PresentationService::TerminateSession(const nsAString& aSessionId,
                                       uint8_t aRole)
 {
+  PRES_DEBUG("%s:id[%s], role[%d]\n", __func__,
+             NS_ConvertUTF16toUTF8(aSessionId).get(), aRole);
+
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!aSessionId.IsEmpty());
   MOZ_ASSERT(aRole == nsIPresentationService::ROLE_CONTROLLER ||
@@ -726,6 +748,10 @@ PresentationService::ReconnectSession(const nsAString& aUrl,
                                       uint8_t aRole,
                                       nsIPresentationServiceCallback* aCallback)
 {
+  PRES_DEBUG("%s:url[%s], id[%s]\n", __func__,
+             NS_ConvertUTF16toUTF8(aUrl).get(),
+             NS_ConvertUTF16toUTF8(aSessionId).get());
+
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!aSessionId.IsEmpty());
   MOZ_ASSERT(aCallback);
@@ -801,6 +827,9 @@ PresentationService::RegisterSessionListener(const nsAString& aSessionId,
                                              uint8_t aRole,
                                              nsIPresentationSessionListener* aListener)
 {
+  PRES_DEBUG("%s:id[%s], role[%d]\n", __func__,
+             NS_ConvertUTF16toUTF8(aSessionId).get(), aRole);
+
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aListener);
   MOZ_ASSERT(aRole == nsIPresentationService::ROLE_CONTROLLER ||
@@ -828,6 +857,9 @@ NS_IMETHODIMP
 PresentationService::UnregisterSessionListener(const nsAString& aSessionId,
                                                uint8_t aRole)
 {
+  PRES_DEBUG("%s:id[%s], role[%d]\n", __func__,
+             NS_ConvertUTF16toUTF8(aSessionId).get(), aRole);
+
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aRole == nsIPresentationService::ROLE_CONTROLLER ||
              aRole == nsIPresentationService::ROLE_RECEIVER);
@@ -847,6 +879,9 @@ PresentationService::RegisterTransportBuilder(const nsAString& aSessionId,
                                               uint8_t aRole,
                                               nsIPresentationSessionTransportBuilder* aBuilder)
 {
+  PRES_DEBUG("%s:id[%s], role[%d]\n", __func__,
+             NS_ConvertUTF16toUTF8(aSessionId).get(), aRole);
+
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aBuilder);
   MOZ_ASSERT(aRole == nsIPresentationService::ROLE_CONTROLLER ||
@@ -866,6 +901,8 @@ PresentationService::RegisterRespondingListener(
   uint64_t aWindowId,
   nsIPresentationRespondingListener* aListener)
 {
+  PRES_DEBUG("%s:windowId[%lld]\n", __func__, aWindowId);
+
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aListener);
 
@@ -890,6 +927,8 @@ PresentationService::RegisterRespondingListener(
 NS_IMETHODIMP
 PresentationService::UnregisterRespondingListener(uint64_t aWindowId)
 {
+  PRES_DEBUG("%s:windowId[%lld]\n", __func__, aWindowId);
+
   MOZ_ASSERT(NS_IsMainThread());
 
   mRespondingListeners.Remove(aWindowId);
@@ -908,6 +947,9 @@ PresentationService::NotifyReceiverReady(const nsAString& aSessionId,
                                          uint64_t aWindowId,
                                          bool aIsLoading)
 {
+  PRES_DEBUG("%s:id[%s], windowId[%lld], loading[%d]\n", __func__,
+             NS_ConvertUTF16toUTF8(aSessionId).get(), aWindowId, aIsLoading);
+
   RefPtr<PresentationSessionInfo> info =
     GetSessionInfo(aSessionId, nsIPresentationService::ROLE_RECEIVER);
   if (NS_WARN_IF(!info)) {
@@ -934,7 +976,11 @@ PresentationService::NotifyReceiverReady(const nsAString& aSessionId,
 nsresult
 PresentationService::NotifyTransportClosed(const nsAString& aSessionId,
                                            uint8_t aRole,
-                                           nsresult aReason) {
+                                           nsresult aReason)
+{
+  PRES_DEBUG("%s:id[%s], reason[%x], role[%d]\n", __func__,
+             NS_ConvertUTF16toUTF8(aSessionId).get(), aReason, aRole);
+
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!aSessionId.IsEmpty());
   MOZ_ASSERT(aRole == nsIPresentationService::ROLE_CONTROLLER ||
@@ -952,6 +998,9 @@ NS_IMETHODIMP
 PresentationService::UntrackSessionInfo(const nsAString& aSessionId,
                                         uint8_t aRole)
 {
+  PRES_DEBUG("%s:id[%s], role[%d]\n", __func__,
+             NS_ConvertUTF16toUTF8(aSessionId).get(), aRole);
+
   MOZ_ASSERT(aRole == nsIPresentationService::ROLE_CONTROLLER ||
              aRole == nsIPresentationService::ROLE_RECEIVER);
   // Remove the session info.
@@ -963,6 +1012,8 @@ PresentationService::UntrackSessionInfo(const nsAString& aSessionId,
     nsresult rv = GetWindowIdBySessionIdInternal(aSessionId, &windowId);
     if (NS_SUCCEEDED(rv)) {
       NS_DispatchToMainThread(NS_NewRunnableFunction([windowId]() -> void {
+        PRES_DEBUG("Attempt to close window[%d]\n", windowId);
+
         if (auto* window = nsGlobalWindow::GetInnerWindowWithId(windowId)) {
           window->Close();
         }
