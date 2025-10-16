@@ -41,6 +41,10 @@
 #include "nsIDOMWakeLockListener.h"
 #include "nsIPowerManagerService.h"
 
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+#define bzero(a, b) memset(a, 0, b)
+#endif
+
 using namespace mozilla::widget;
 
 // A wake lock listener that disables screen saver when requested by
@@ -63,6 +67,8 @@ private:
     // Note the wake lock code ensures that we're not sent duplicate
     // "locked-foreground" notifications when multiple wake locks are held.
     if (aState.EqualsASCII("locked-foreground")) {
+// HACK FIXME
+#if 0
       // Prevent screen saver.
       CFStringRef cf_topic =
         ::CFStringCreateWithCharacters(kCFAllocatorDefault,
@@ -78,6 +84,7 @@ private:
       if (success != kIOReturnSuccess) {
         NS_WARNING("failed to disable screensaver");
       }
+#endif
     } else {
       // Re-enable screen saver.
       NS_WARNING("Releasing screensaver");

@@ -34,6 +34,19 @@
 
 .text
 
+.globl _ffi_call_win32
+.globl _ffi_closure_FASTCALL
+.globl _ffi_closure_REGISTER
+.globl _ffi_closure_STDCALL
+.globl _ffi_closure_THISCALL
+
+_ffi_closure_FASTCALL:
+_ffi_closure_REGISTER:
+_ffi_closure_STDCALL:
+_ffi_closure_THISCALL:
+_ffi_call_win32:
+	int $3
+
 .globl _ffi_prep_args
 
 	.align 4

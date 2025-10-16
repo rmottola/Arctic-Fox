@@ -17,6 +17,11 @@
 
 #import <Cocoa/Cocoa.h>
 
+#if defined(MAC_OS_X_VERSION_10_5) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_5)
+@protocol NSSpeechSynthesizerDelegate
+@end
+#endif
+
 using namespace mozilla;
 
 class SpeechTaskCallback final : public nsISpeechTaskCallback
