@@ -467,6 +467,8 @@ nsUrlClassifierDBServiceWorker::BeginStream(const nsACString &table)
     mProtocolParser->SetCurrentTable(table);
   }
 
+  mProtocolParser->SetRequestedTables(mUpdateTables);
+
   return NS_OK;
 }
 
