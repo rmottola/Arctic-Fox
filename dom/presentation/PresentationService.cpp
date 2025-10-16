@@ -599,8 +599,8 @@ PresentationService::StartSession(const nsAString& aUrl,
     return aCallback->NotifyError(NS_ERROR_DOM_OPERATION_ERR);
   }
 
-  nsCOMPtr<nsIMutableArray> presentationUrls
-    = do_CreateInstance(NS_ARRAY_CONTRACTID);
+  nsCOMPtr<nsIMutableArray> presentationUrls =
+    do_CreateInstance(NS_ARRAY_CONTRACTID);
   if (!presentationUrls) {
     return aCallback->NotifyError(NS_ERROR_DOM_OPERATION_ERR);
   }
@@ -776,11 +776,14 @@ PresentationService::RegisterAvailabilityListener(nsIPresentationAvailabilityLis
 {
   MOZ_ASSERT(NS_IsMainThread());
 
-  if (NS_WARN_IF(mAvailabilityListeners.Contains(aListener))) {
-    return NS_OK;
+  if (!mAvailabilityListeners.Contains(aListener)) {
+    mAvailabilityListeners.AppendElement(aListener);
   }
 
-  mAvailabilityListeners.AppendElement(aListener);
+  // Leverage availablility change notification to assign
+  // the initial value of availability object.
+  NS_WARN_IF(NS_FAILED(aListener->NotifyAvailableChange(mIsAvailable)));
+
   return NS_OK;
 }
 
