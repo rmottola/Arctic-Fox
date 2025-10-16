@@ -1321,7 +1321,7 @@ WorkerListener::UpdateFound()
   if (mWorkerPrivate) {
     RefPtr<FireUpdateFoundRunnable> r =
       new FireUpdateFoundRunnable(mWorkerPrivate, this);
-    NS_WARN_IF(!r->Dispatch());
+    Unused << NS_WARN_IF(!r->Dispatch());
   }
 }
 

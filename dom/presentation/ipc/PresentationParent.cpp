@@ -49,19 +49,21 @@ PresentationParent::ActorDestroy(ActorDestroyReason aWhy)
   mActorDestroyed = true;
 
   for (uint32_t i = 0; i < mSessionIdsAtController.Length(); i++) {
-    NS_WARN_IF(NS_FAILED(mService->
-      UnregisterSessionListener(mSessionIdsAtController[i], nsIPresentationService::ROLE_CONTROLLER)));
+    Unused << NS_WARN_IF(NS_FAILED(mService->
+      UnregisterSessionListener(mSessionIdsAtController[i],
+                                nsIPresentationService::ROLE_CONTROLLER)));
   }
   mSessionIdsAtController.Clear();
 
   for (uint32_t i = 0; i < mSessionIdsAtReceiver.Length(); i++) {
-    NS_WARN_IF(NS_FAILED(mService->
+    Unused << NS_WARN_IF(NS_FAILED(mService->
       UnregisterSessionListener(mSessionIdsAtReceiver[i], nsIPresentationService::ROLE_RECEIVER)));
   }
   mSessionIdsAtReceiver.Clear();
 
   for (uint32_t i = 0; i < mWindowIds.Length(); i++) {
-    NS_WARN_IF(NS_FAILED(mService->UnregisterRespondingListener(mWindowIds[i])));
+    Unused << NS_WARN_IF(NS_FAILED(mService->
+      UnregisterRespondingListener(mWindowIds[i])));
   }
   mWindowIds.Clear();
 
@@ -146,7 +148,7 @@ bool
 PresentationParent::RecvRegisterAvailabilityHandler()
 {
   MOZ_ASSERT(mService);
-  NS_WARN_IF(NS_FAILED(mService->RegisterAvailabilityListener(this)));
+  Unused << NS_WARN_IF(NS_FAILED(mService->RegisterAvailabilityListener(this)));
   return true;
 }
 
@@ -154,7 +156,7 @@ bool
 PresentationParent::RecvUnregisterAvailabilityHandler()
 {
   MOZ_ASSERT(mService);
-  NS_WARN_IF(NS_FAILED(mService->UnregisterAvailabilityListener(this)));
+  Unused << NS_WARN_IF(NS_FAILED(mService->UnregisterAvailabilityListener(this)));
   return true;
 }
 
@@ -176,7 +178,7 @@ PresentationParent::RecvRegisterSessionHandler(const nsString& aSessionId,
   } else {
     mSessionIdsAtReceiver.AppendElement(aSessionId);
   }
-  NS_WARN_IF(NS_FAILED(mService->RegisterSessionListener(aSessionId, aRole, this)));
+  Unused << NS_WARN_IF(NS_FAILED(mService->RegisterSessionListener(aSessionId, aRole, this)));
   return true;
 }
 
@@ -190,7 +192,7 @@ PresentationParent::RecvUnregisterSessionHandler(const nsString& aSessionId,
   } else {
     mSessionIdsAtReceiver.RemoveElement(aSessionId);
   }
-  NS_WARN_IF(NS_FAILED(mService->UnregisterSessionListener(aSessionId, aRole)));
+  Unused << NS_WARN_IF(NS_FAILED(mService->UnregisterSessionListener(aSessionId, aRole)));
   return true;
 }
 
@@ -200,7 +202,7 @@ PresentationParent::RecvRegisterRespondingHandler(const uint64_t& aWindowId)
   MOZ_ASSERT(mService);
 
   mWindowIds.AppendElement(aWindowId);
-  NS_WARN_IF(NS_FAILED(mService->RegisterRespondingListener(aWindowId, this)));
+  Unused << NS_WARN_IF(NS_FAILED(mService->RegisterRespondingListener(aWindowId, this)));
   return true;
 }
 
@@ -209,7 +211,7 @@ PresentationParent::RecvUnregisterRespondingHandler(const uint64_t& aWindowId)
 {
   MOZ_ASSERT(mService);
   mWindowIds.RemoveElement(aWindowId);
-  NS_WARN_IF(NS_FAILED(mService->UnregisterRespondingListener(aWindowId)));
+  Unused << NS_WARN_IF(NS_FAILED(mService->UnregisterRespondingListener(aWindowId)));
   return true;
 }
 
@@ -221,7 +223,7 @@ PresentationParent::RegisterTransportBuilder(const nsString& aSessionId,
 
   nsCOMPtr<nsIPresentationSessionTransportBuilder> builder =
     new PresentationBuilderParent(this);
-  NS_WARN_IF(NS_FAILED(static_cast<PresentationService*>(mService.get())->
+  Unused << NS_WARN_IF(NS_FAILED(static_cast<PresentationService*>(mService.get())->
                          RegisterTransportBuilder(aSessionId, aRole, builder)));
   return true;
 }
@@ -287,9 +289,9 @@ PresentationParent::RecvNotifyReceiverReady(const nsString& aSessionId,
   MOZ_ASSERT(mService);
 
   RegisterTransportBuilder(aSessionId, nsIPresentationService::ROLE_RECEIVER);
-  NS_WARN_IF(NS_FAILED(mService->NotifyReceiverReady(aSessionId,
-                                                     aWindowId,
-                                                     aIsLoading)));
+  Unused << NS_WARN_IF(NS_FAILED(mService->NotifyReceiverReady(aSessionId,
+                                                               aWindowId,
+                                                               aIsLoading)));
   return true;
 }
 
@@ -300,7 +302,7 @@ PresentationParent::RecvNotifyTransportClosed(const nsString& aSessionId,
 {
   MOZ_ASSERT(mService);
 
-  NS_WARN_IF(NS_FAILED(mService->NotifyTransportClosed(aSessionId, aRole, aReason)));
+  Unused << NS_WARN_IF(NS_FAILED(mService->NotifyTransportClosed(aSessionId, aRole, aReason)));
   return true;
 }
 
@@ -447,7 +449,7 @@ PresentationRequestParent::NotifySuccess(const nsAString& aUrl)
 {
   if (mNeedRegisterBuilder) {
     RefPtr<PresentationParent> parent = static_cast<PresentationParent*>(Manager());
-    NS_WARN_IF(!parent->RegisterTransportBuilder(
+    Unused << NS_WARN_IF(!parent->RegisterTransportBuilder(
                                       mSessionId,
                                       nsIPresentationService::ROLE_CONTROLLER));
   }

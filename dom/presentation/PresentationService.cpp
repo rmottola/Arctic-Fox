@@ -597,7 +597,8 @@ PresentationService::NotifyAvailableChange(bool aIsAvailable)
   nsTObserverArray<nsCOMPtr<nsIPresentationAvailabilityListener>>::ForwardIterator iter(mAvailabilityListeners);
   while (iter.HasMore()) {
     nsCOMPtr<nsIPresentationAvailabilityListener> listener = iter.GetNext();
-    NS_WARN_IF(NS_FAILED(listener->NotifyAvailableChange(aIsAvailable)));
+    Unused <<
+      NS_WARN_IF(NS_FAILED(listener->NotifyAvailableChange(aIsAvailable)));
   }
 }
 
@@ -863,7 +864,8 @@ PresentationService::RegisterAvailabilityListener(nsIPresentationAvailabilityLis
 
   // Leverage availablility change notification to assign
   // the initial value of availability object.
-  NS_WARN_IF(NS_FAILED(aListener->NotifyAvailableChange(mIsAvailable)));
+  Unused <<
+    NS_WARN_IF(NS_FAILED(aListener->NotifyAvailableChange(mIsAvailable)));
 
   return NS_OK;
 }
@@ -923,7 +925,7 @@ PresentationService::UnregisterSessionListener(const nsAString& aSessionId,
   if (info) {
     // When content side decide not handling this session anymore, simply
     // close the connection. Session info is kept for reconnection.
-    NS_WARN_IF(NS_FAILED(info->Close(NS_OK, nsIPresentationSessionListener::STATE_CLOSED)));
+    Unused << NS_WARN_IF(NS_FAILED(info->Close(NS_OK, nsIPresentationSessionListener::STATE_CLOSED)));
     return info->SetListener(nullptr);
   }
   return NS_OK;
