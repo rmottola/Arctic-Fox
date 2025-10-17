@@ -423,7 +423,7 @@ D3D9DXVA2Manager::Init(nsACString& aFailureReason)
   mDeviceManager = deviceManager;
   mSyncSurface = syncSurf;
 
-  mTextureClientAllocator = new D3D9RecycleAllocator(layers::ImageBridgeChild::GetSingleton(),
+  mTextureClientAllocator = new D3D9RecycleAllocator(layers::ImageBridgeChild::GetSingleton().get(),
                                                      mDevice);
   mTextureClientAllocator->SetMaxPoolSize(5);
 
@@ -747,7 +747,7 @@ D3D11DXVA2Manager::Init(nsACString& aFailureReason)
   hr = mDevice->CreateTexture2D(&desc, NULL, getter_AddRefs(mSyncSurface));
   NS_ENSURE_TRUE(SUCCEEDED(hr), hr);
 
-  mTextureClientAllocator = new D3D11RecycleAllocator(layers::ImageBridgeChild::GetSingleton(),
+  mTextureClientAllocator = new D3D11RecycleAllocator(layers::ImageBridgeChild::GetSingleton().get(),
                                                       mDevice);
   mTextureClientAllocator->SetMaxPoolSize(5);
 
