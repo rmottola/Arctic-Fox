@@ -148,7 +148,6 @@ ImageContainer::ImageContainer(Mode flag)
   mDroppedImageCount(0),
   mImageFactory(new ImageFactory()),
   mRecycleBin(new BufferRecycleBin()),
-  mImageClient(nullptr),
   mCurrentProducerID(-1),
   mIPDLChild(nullptr)
 {
@@ -160,7 +159,7 @@ ImageContainer::ImageContainer(Mode flag)
         break;
       case ASYNCHRONOUS:
         mIPDLChild = new ImageContainerChild(this);
-        mImageClient = ImageBridgeChild::GetSingleton()->CreateImageClient(CompositableType::IMAGE, this).take();
+        mImageClient = ImageBridgeChild::GetSingleton()->CreateImageClient(CompositableType::IMAGE, this);
         MOZ_ASSERT(mImageClient);
         break;
       default:
@@ -179,7 +178,6 @@ ImageContainer::ImageContainer(uint64_t aAsyncContainerID)
   mDroppedImageCount(0),
   mImageFactory(nullptr),
   mRecycleBin(nullptr),
-  mImageClient(nullptr),
   mAsyncContainerID(aAsyncContainerID),
   mCurrentProducerID(-1),
   mIPDLChild(nullptr)
@@ -191,7 +189,7 @@ ImageContainer::~ImageContainer()
 {
   if (mIPDLChild) {
     mIPDLChild->ForgetImageContainer();
-    ImageBridgeChild::DispatchReleaseImageClient(mImageClient, mIPDLChild);
+    ImageBridgeChild::DispatchReleaseImageContainer(mIPDLChild);
   }
 }
 
