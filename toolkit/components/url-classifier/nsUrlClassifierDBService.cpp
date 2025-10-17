@@ -556,8 +556,8 @@ nsUrlClassifierDBServiceWorker::FinishStream()
 
   if (NS_SUCCEEDED(mUpdateStatus)) {
     if (mProtocolParser->ResetRequested()) {
-      mClassifier->Reset();
-   }
+      mClassifier->ResetTables(mUpdateTables);
+    }
   }
 
   mProtocolParser = nullptr;
