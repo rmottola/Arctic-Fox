@@ -13600,6 +13600,7 @@ class MWasmCall final
     FixedList<AnyRegister> argRegs_;
     uint32_t spIncrement_;
     uint32_t tlsStackOffset_;
+    ABIArg instanceArg_;
 
     MWasmCall(const wasm::CallSiteDesc& desc, const wasm::CalleeDesc& callee, uint32_t spIncrement,
               uint32_t tlsStackOffset)
@@ -13625,6 +13626,14 @@ class MWasmCall final
                           const wasm::CalleeDesc& callee, const Args& args, MIRType resultType,
                           uint32_t spIncrement, uint32_t tlsStackOffset,
                           MDefinition* tableIndex = nullptr);
+
+    static MWasmCall* NewBuiltinInstanceMethodCall(TempAllocator& alloc,
+                                                   const wasm::CallSiteDesc& desc,
+                                                   const wasm::SymbolicAddress builtin,
+                                                   const ABIArg& instanceArg,
+                                                   const Args& args,
+                                                   MIRType resultType,
+                                                   uint32_t spIncrement);
 
     size_t numArgs() const {
         return argRegs_.length();
@@ -13652,6 +13661,10 @@ class MWasmCall final
 
     bool possiblyCalls() const override {
         return true;
+    }
+
+    const ABIArg& instanceArg() const {
+        return instanceArg_;
     }
 };
 
