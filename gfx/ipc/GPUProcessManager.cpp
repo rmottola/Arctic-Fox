@@ -150,7 +150,7 @@ GPUProcessManager::EnsureGPUReady()
 void
 GPUProcessManager::EnsureImageBridgeChild()
 {
-  if (ImageBridgeChild::IsCreated()) {
+  if (ImageBridgeChild::GetSingleton()) {
     return;
   }
 
