@@ -4973,6 +4973,7 @@ GetSymbolDescription(HandleSymbol symbol);
     macro(hasInstance) \
     macro(split) \
     macro(toPrimitive) \
+    macro(toStringTag) \
     macro(unscopables)
 
 enum class SymbolCode : uint32_t {
