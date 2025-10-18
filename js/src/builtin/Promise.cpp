@@ -1407,6 +1407,11 @@ static const JSFunctionSpec promise_methods[] = {
     JS_FS_END
 };
 
+static const JSPropertySpec promise_properties[] = {
+    JS_STRING_SYM_PS(toStringTag, "Promise", JSPROP_READONLY),
+    JS_PS_END
+};
+
 static const JSFunctionSpec promise_static_methods[] = {
     JS_SELF_HOSTED_FN("all", "Promise_static_all", 1, 0),
     JS_SELF_HOSTED_FN("race", "Promise_static_race", 1, 0),
@@ -1425,7 +1430,8 @@ static const ClassSpec PromiseObjectClassSpec = {
     CreatePromisePrototype,
     promise_static_methods,
     promise_static_properties,
-    promise_methods
+    promise_methods,
+    promise_properties
 };
 
 const Class PromiseObject::class_ = {
