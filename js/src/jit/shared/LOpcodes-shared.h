@@ -368,7 +368,6 @@
     _(InstanceOfV)                  \
     _(CallInstanceOf)               \
     _(InterruptCheck)               \
-    _(AsmJSInterruptCheck)          \
     _(WasmTrap)                     \
     _(AsmReinterpret)               \
     _(AsmReinterpretToI64)          \
