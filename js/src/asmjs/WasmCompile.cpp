@@ -594,24 +594,6 @@ DecodeFunctionSection(Decoder& d, ModuleGeneratorData* init)
     return true;
 }
 
-static bool
-CheckTypeForJS(Decoder& d, const Sig& sig)
-{
-    for (ValType argType : sig.args()) {
-        if (argType == ValType::I64 && !JitOptions.wasmTestMode)
-            return Fail(d, "cannot import/export i64 argument");
-        if (IsSimdType(argType))
-            return Fail(d, "cannot import/export SIMD argument");
-    }
-
-    if (sig.ret() == ExprType::I64 && !JitOptions.wasmTestMode)
-        return Fail(d, "cannot import/export i64 return type");
-    if (IsSimdType(sig.ret()))
-        return Fail(d, "cannot import/export SIMD return type");
-
-    return true;
-}
-
 static UniqueChars
 MaybeDecodeName(Decoder& d)
 {
@@ -771,9 +753,6 @@ DecodeImport(Decoder& d, bool newFormat, ModuleGeneratorData* init, ImportVector
         if (!DecodeSignatureIndex(d, *init, &sig))
             return false;
 
-        if (!CheckTypeForJS(d, *sig))
-            return false;
-
         if (!init->funcImports.emplaceBack(sig))
             return false;
 
@@ -810,8 +789,6 @@ DecodeImport(Decoder& d, bool newFormat, ModuleGeneratorData* init, ImportVector
       case DefinitionKind::Function: {
         const SigWithId* sig = nullptr;
         if (!DecodeSignatureIndex(d, *init, &sig))
-            return false;
-        if (!CheckTypeForJS(d, *sig))
             return false;
         if (!init->funcImports.emplaceBack(sig))
             return false;
@@ -1108,9 +1085,6 @@ DecodeExport(Decoder& d, bool newFormat, ModuleGenerator& mg, CStringSet* dupSet
         if (funcIndex >= mg.numFuncSigs())
             return Fail(d, "exported function index out of bounds");
 
-        if (!CheckTypeForJS(d, mg.funcSig(funcIndex)))
-            return false;
-
         UniqueChars fieldName = DecodeExportName(d, dupSet);
         if (!fieldName)
             return false;
@@ -1134,9 +1108,6 @@ DecodeExport(Decoder& d, bool newFormat, ModuleGenerator& mg, CStringSet* dupSet
 
         if (funcIndex >= mg.numFuncSigs())
             return Fail(d, "exported function index out of bounds");
-
-        if (!CheckTypeForJS(d, mg.funcSig(funcIndex)))
-            return false;
 
         return mg.addFuncExport(Move(fieldName), funcIndex);
       }
