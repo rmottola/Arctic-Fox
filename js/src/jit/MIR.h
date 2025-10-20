@@ -13634,9 +13634,13 @@ class MWasmCall final
 
     static const uint32_t DontSaveTls = UINT32_MAX;
 
-    static MWasmCall* New(TempAllocator& alloc, const wasm::CallSiteDesc& desc,
-                          const wasm::CalleeDesc& callee, const Args& args, MIRType resultType,
-                          uint32_t spIncrement, uint32_t tlsStackOffset,
+    static MWasmCall* New(TempAllocator& alloc,
+                          const wasm::CallSiteDesc& desc,
+                          const wasm::CalleeDesc& callee,
+                          const Args& args,
+                          MIRType resultType,
+                          uint32_t spIncrement,
+                          uint32_t tlsStackOffset,
                           MDefinition* tableIndex = nullptr);
 
     static MWasmCall* NewBuiltinInstanceMethodCall(TempAllocator& alloc,
@@ -13645,7 +13649,8 @@ class MWasmCall final
                                                    const ABIArg& instanceArg,
                                                    const Args& args,
                                                    MIRType resultType,
-                                                   uint32_t spIncrement);
+                                                   uint32_t spIncrement,
+                                                   uint32_t tlsStackOffset);
 
     size_t numArgs() const {
         return argRegs_.length();
