@@ -8644,7 +8644,7 @@ DebuggerObject::isPromiseGetter(JSContext* cx, unsigned argc, Value* vp)
     THIS_DEBUGOBJECT(cx, argc, vp, "get isPromise", args, object)
 
     bool result;
-    if (!DebuggerObject::isPromise(cx, object, result))
+    if (!DebuggerObject::getIsPromise(cx, object, result))
       return false;
 
     args.rval().setBoolean(result);
@@ -9365,8 +9365,9 @@ DebuggerObject::isScriptedProxy() const
     return js::IsScriptedProxy(referent());
 }
 
+#ifdef SPIDERMONKEY_PROMISE
 /* static */ bool
-DebuggerObject::isPromise(JSContext* cx, HandleDebuggerObject object,
+DebuggerObject::getIsPromise(JSContext* cx, HandleDebuggerObject object,
                           bool& result)
 {
     JSObject* referent = object->referent();
@@ -9382,6 +9383,7 @@ DebuggerObject::isPromise(JSContext* cx, HandleDebuggerObject object,
     result = referent->is<PromiseObject>();
     return true;
 }
+#endif // SPIDERMONKEY_PROMISE
 
 /* static */ bool
 DebuggerObject::getClassName(JSContext* cx, HandleDebuggerObject object,
