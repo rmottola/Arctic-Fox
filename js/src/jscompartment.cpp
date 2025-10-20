@@ -80,6 +80,7 @@ JSCompartment::JSCompartment(Zone* zone, const JS::CompartmentOptions& options =
     debugScriptMap(nullptr),
     debugEnvs(nullptr),
     enumerators(nullptr),
+    lastCachedNativeIterator(nullptr),
     compartmentStats_(nullptr),
     scheduledForDestruction(false),
     maybeAlive(true),
@@ -819,9 +820,9 @@ JSCompartment::fixupCrossCompartmentWrappersAfterMovingGC(JSTracer* trc)
 void
 JSCompartment::fixupAfterMovingGC()
 {
+    purge();
     fixupGlobal();
     objectGroups.fixupTablesAfterMovingGC();
-    dtoaCache.purge();
     fixupScriptMapsAfterMovingGC();
 }
 
@@ -890,6 +891,7 @@ void
 JSCompartment::purge()
 {
     dtoaCache.purge();
+    lastCachedNativeIterator = nullptr;
 }
 
 void
