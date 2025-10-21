@@ -1283,7 +1283,7 @@ class XPCNativeSetKey final
 public:
     // This represents an existing set |baseSet|.
     explicit XPCNativeSetKey(XPCNativeSet* baseSet)
-        : mBaseSet(baseSet), mAddition(nullptr), mPosition(0)
+        : mBaseSet(baseSet), mAddition(nullptr)
     {
         MOZ_ASSERT(baseSet);
     }
@@ -1291,7 +1291,7 @@ public:
     // This represents a new set containing only nsISupports and
     // |addition|.
     explicit XPCNativeSetKey(XPCNativeInterface* addition)
-        : mBaseSet(nullptr), mAddition(addition), mPosition(0)
+        : mBaseSet(nullptr), mAddition(addition)
     {
         MOZ_ASSERT(addition);
     }
@@ -1305,7 +1305,6 @@ public:
 
     XPCNativeSet* GetBaseSet() const {return mBaseSet;}
     XPCNativeInterface* GetAddition() const {return mAddition;}
-    uint16_t GetPosition() const {return mPosition;}
 
     PLDHashNumber Hash() const;
 
@@ -1314,7 +1313,6 @@ public:
 private:
     XPCNativeSet* mBaseSet;
     XPCNativeInterface* mAddition;
-    uint16_t mPosition;
 };
 
 /***************************************************************************/
