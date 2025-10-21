@@ -26,3 +26,4 @@ Client-side, this consists of:
    heartbeat-ping
    sync-ping
    preferences
+   crashes
