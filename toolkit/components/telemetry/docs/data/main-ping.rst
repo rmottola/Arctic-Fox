@@ -2,6 +2,9 @@
 "main" ping
 ===========
 
+.. toctree::
+   :maxdepth: 2
+
 This is the "main" Telemetry ping type, whose payload contains most of the measurements that are used to track the performance and health of Firefox in the wild.
 It includes the histograms and other performance and diagnostic data.
 
@@ -48,13 +51,13 @@ Structure::
         addons: <string>, // obsolete, use ``environment.addons``
       },
 
+      processes: {...},
       childPayloads: [...], // only present with e10s; reduced payloads from content processes, null on failure
       simpleMeasurements: {...},
 
       // The following properties may all be null if we fail to collect them.
       histograms: {...},
       keyedHistograms: {...},
-      scalars: {...},
       chromeHangs: {...},
       threadHangStats: [...],
       log: [...],
@@ -86,6 +89,35 @@ This uses a monotonic clock, so this may mismatch with other measurements that a
 
 If ``sessionLength`` is ``-1``, the monotonic clock is not working.
 
+processes
+---------
+This section contains per-process data.
+
+Structure:
+
+.. code-block:: js
+
+    "processes" : {
+      ... other processes ...
+      "parent": {
+        scalars: {...},
+      },
+      "content": {
+        histograms: {...},
+        keyedHistograms: {...},
+      },
+    }
+
+histograms and keyedHistograms
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This section contains histograms and keyed histograms accumulated on content processes. Histograms recorded on a content child process have different character than parent histograms. For instance, ``GC_MS`` will be much different in ``processes.content`` as it has to contend with web content, whereas the instance in ``payload.histograms`` has only to contend with browser JS. Also, some histograms may be absent if never recorded on a content child process (``EVENTLOOP_UI_ACTIVITY`` is parent-process-only).
+
+This format was adopted in Firefox 51 via bug 1218576.
+
+scalars
+~~~~~~~
+This section contains the :doc:`../collection/scalars` that are valid for the current platform. Scalars are not created nor submitted if no data was added to them, and are only reported with subsession pings. Scalar data is only currently reported for the main process. Their type and format is described by the ``Scalars.yaml`` file. Its most recent version is available `here <https://dxr.mozilla.org/mozilla-central/source/toolkit/components/telemetry/Scalars.yaml>`_. The ``info.revision`` field indicates the revision of the file that describes the reported scalars.
+
 childPayloads
 -------------
 The Telemetry payloads sent by child processes, recorded on child process shutdown (event ``content-child-shutdown`` observed) and whenever ``TelemetrySession.requestChildPayloads()`` is called (currently only used in tests). They are reduced session payloads, only available with e10s. Among some other things, they don't report addon details, addon histograms or UI Telemetry.
@@ -112,7 +144,7 @@ Only available in the extended set of measures, it contains a set of counters re
 
 UITelemetry
 ~~~~~~~~~~~
-Only available in the extended set of measures. See the documentation for :doc:`/browser/docs/UITelemetry <UITelemetry>`.
+Only available in the extended set of measures. For more see :ref:`uitelemetry`.
 
 startupInterrupted
 ~~~~~~~~~~~~~~~~~~
