@@ -23,4 +23,5 @@ Client-side, this consists of:
    core-ping
    deletion-ping
    uitour-ping
+   heartbeat-ping
    preferences
