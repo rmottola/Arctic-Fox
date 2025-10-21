@@ -18,24 +18,12 @@
     "XPCOMUtils": true,
     "Task": true,
 
-    "browser": false,
-
     // Browser window globals.
     "PanelUI": false,
 
     // Test harness globals
-    "add_task": false,
-    "BrowserTestUtils": false,
-    "ContentTask": false,
-    "EventUtils": false,
     "ExtensionTestUtils": false,
-    "info": false,
-    "is": false,
-    "ok": false,
-    "registerCleanupFunction": false,
-    "SimpleTest": false,
-    "SpecialPowers": false,
-    "waitForFocus": false,
+    "TestUtils": false,
 
     "clickBrowserAction": true,
     "clickPageAction": true,
