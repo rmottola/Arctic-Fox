@@ -20,6 +20,11 @@ XPCOMUtils.defineLazyModuleGetter(this, "ExtensionUtils",
 
 XPCOMUtils.defineLazyGetter(this, "console", () => ExtensionUtils.getConsole());
 
+XPCOMUtils.defineLazyGetter(this, "UUIDMap", () => {
+  let {UUIDMap} = Cu.import("resource://gre/modules/Extension.jsm", {});
+  return UUIDMap;
+});
+
 /*
  * This file should be kept short and simple since it's loaded even
  * when no extensions are running.
@@ -109,6 +114,15 @@ var APIs = {
     this.apis.delete(namespace);
   },
 };
+
+function getURLForExtension(id, path = "") {
+  let uuid = UUIDMap.get(id, false);
+  if (!uuid) {
+    Cu.reportError(`Called getURLForExtension on unmapped extension ${id}`);
+    return null;
+  }
+  return `moz-extension://${uuid}/${path}`;
+}
 
 // This object manages various platform-level issues related to
 // moz-extension:// URIs. It lives here so that it can be used in both
@@ -298,6 +312,8 @@ this.ExtensionManagement = {
 
   getFrameId: Frames.getId.bind(Frames),
   getParentFrameId: Frames.getParentId.bind(Frames),
+
+  getURLForExtension,
 
   // exported API Level Helpers
   getAddonIdForWindow,
