@@ -557,6 +557,7 @@ public:
     static void GCSliceCallback(JSContext* cx,
                                 JS::GCProgress progress,
                                 const JS::GCDescription& desc);
+    static void DoCycleCollectionCallback(JSContext* cx);
     static void FinalizeCallback(JSFreeOp* fop,
                                  JSFinalizeStatus status,
                                  bool isZoneGC,
@@ -634,6 +635,7 @@ private:
     nsTArray<xpcGCCallback> extraGCCallbacks;
     RefPtr<WatchdogManager> mWatchdogManager;
     JS::GCSliceCallback mPrevGCSliceCallback;
+    JS::DoCycleCollectionCallback mPrevDoCycleCollectionCallback;
     JS::PersistentRootedObject mUnprivilegedJunkScope;
     JS::PersistentRootedObject mPrivilegedJunkScope;
     JS::PersistentRootedObject mCompilationScope;
