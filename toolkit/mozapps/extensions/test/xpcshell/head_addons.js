@@ -1658,7 +1658,8 @@ function completeAllInstalls(aInstalls, aCallback) {
     onDownloadCancelled: installCompleted,
     onInstallFailed: installCompleted,
     onInstallCancelled: installCompleted,
-    onInstallEnded: installCompleted
+    onInstallEnded: installCompleted,
+    onInstallPostponed: installCompleted,
   };
 
   aInstalls.forEach(function(aInstall) {
