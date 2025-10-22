@@ -224,7 +224,7 @@ extensions.on("shutdown", (type, extension) => {
 });
 /* eslint-enable mozilla/balanced-listeners */
 
-extensions.registerSchemaAPI("commands", context => {
+extensions.registerSchemaAPI("commands", "addon_parent", context => {
   let {extension} = context;
   return {
     commands: {

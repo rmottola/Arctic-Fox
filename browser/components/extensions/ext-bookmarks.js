@@ -78,7 +78,7 @@ function convert(result) {
   return node;
 }
 
-extensions.registerSchemaAPI("bookmarks", context => {
+extensions.registerSchemaAPI("bookmarks", "addon_parent", context => {
   return {
     bookmarks: {
       get: function(idOrIdList) {

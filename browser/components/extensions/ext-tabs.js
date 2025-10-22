@@ -263,7 +263,7 @@ let tabListener = {
   },
 };
 
-extensions.registerSchemaAPI("tabs", context => {
+extensions.registerSchemaAPI("tabs", "addon_parent", context => {
   let {extension} = context;
   let self = {
     tabs: {

@@ -5,7 +5,7 @@ var {
   detectLanguage,
 } = ExtensionUtils;
 
-extensions.registerSchemaAPI("i18n", context => {
+extensions.registerSchemaAPI("i18n", "addon_parent", context => {
   let {extension} = context;
   return {
     i18n: {
