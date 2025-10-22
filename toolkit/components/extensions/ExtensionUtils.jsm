@@ -1306,7 +1306,7 @@ Messenger.prototype = {
 
         filterMessage: (sender, recipient) => {
           // Ignore the message if it was sent by this Messenger.
-          return !MessageChannel.matchesFilter(this.sender, sender);
+          return sender.contextId !== this.context.contextId;
         },
 
         receiveMessage: ({target, data: message, sender, recipient}) => {
@@ -1366,7 +1366,7 @@ Messenger.prototype = {
 
         filterMessage: (sender, recipient) => {
           // Ignore the port if it was created by this Messenger.
-          return !MessageChannel.matchesFilter(this.sender, sender);
+          return sender.contextId !== this.context.contextId;
         },
 
         receiveMessage: ({target, data: message, sender, recipient}) => {
