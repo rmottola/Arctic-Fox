@@ -32,7 +32,8 @@ extensions.registerSchemaAPI("runtime", "addon_parent", context => {
 
       connect: function(extensionId, connectInfo) {
         let name = connectInfo !== null && connectInfo.name || "";
-        let recipient = extensionId !== null ? {extensionId} : {extensionId: extension.id};
+        extensionId = extensionId || extension.id;
+        let recipient = {extensionId};
 
         return context.messenger.connect(Services.cpmm, name, recipient);
       },
@@ -47,7 +48,8 @@ extensions.registerSchemaAPI("runtime", "addon_parent", context => {
         } else {
           [extensionId, message, options, responseCallback] = args;
         }
-        let recipient = {extensionId: extensionId ? extensionId : extension.id};
+        extensionId = extensionId || extension.id;
+        let recipient = {extensionId};
 
         if (!GlobalManager.extensionMap.has(recipient.extensionId)) {
           return context.wrapPromise(Promise.reject({message: "Invalid extension ID"}),

@@ -170,7 +170,6 @@ class BaseContext {
     this.contextId = `${++gContextId}-${Services.appinfo.uniqueProcessID}`;
     this.unloaded = false;
     this.extension = extension;
-    this.extensionId = extension.id;
     this.jsonSandbox = null;
     this.active = true;
 
@@ -446,7 +445,7 @@ class BaseContext {
     this.unloaded = true;
 
     MessageChannel.abortResponses({
-      extensionId: this.extensionId,
+      extensionId: this.extension.id,
       contextId: this.contextId,
     });
 
