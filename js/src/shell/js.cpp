@@ -1071,6 +1071,12 @@ Version(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
+#ifdef XP_WIN
+#  define GET_FD_FROM_FILE(a) int(_get_osfhandle(fileno(a)))
+#else
+#  define GET_FD_FROM_FILE(a) fileno(a)
+#endif
+
 static bool
 CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
 {
@@ -1138,7 +1144,7 @@ CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
         size = st.st_size - offset;
     }
 
-    void* contents = JS_CreateMappedArrayBufferContents(fileno(file), offset, size);
+    void* contents = JS_CreateMappedArrayBufferContents(GET_FD_FROM_FILE(file), offset, size);
     if (!contents) {
         JS_ReportError(cx, "failed to allocate mapped array buffer contents (possibly due to bad alignment)");
         return false;
@@ -1151,6 +1157,8 @@ CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
     args.rval().setObject(*obj);
     return true;
 }
+
+#undef GET_FD_FROM_FILE
 
 static bool
 AddPromiseReactions(JSContext* cx, unsigned argc, Value* vp)
