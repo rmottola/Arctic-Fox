@@ -1161,9 +1161,8 @@ RegExpToSharedNonInline(JSContext* cx, JS::HandleObject regexp, RegExpGuard* sha
 
 /* Implemented in jswrapper.cpp. */
 typedef enum NukeReferencesToWindow {
-    NukeWindowReferences = 0,
-    DontNukeWindowReferences,
-    NUM_NukeReferencesToWindow
+    NukeWindowReferences,
+    DontNukeWindowReferences
 } NukeReferencesToWindow;
 
 /*
