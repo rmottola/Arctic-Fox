@@ -6648,10 +6648,10 @@ nsCharClipDisplayItem::ComputeInvalidationRegion(nsDisplayListBuilder* aBuilder,
 
 nsDisplaySVGEffects::nsDisplaySVGEffects(nsDisplayListBuilder* aBuilder,
                                          nsIFrame* aFrame, nsDisplayList* aList,
-                                         bool aOpacityItemCreated)
+                                         bool aHandleOpacity)
   : nsDisplayWrapList(aBuilder, aFrame, aList)
   , mEffectsBounds(aFrame->GetVisualOverflowRectRelativeToSelf())
-  , mOpacityItemCreated(aOpacityItemCreated)
+  , mHandleOpacity(aHandleOpacity)
 {
   MOZ_COUNT_CTOR(nsDisplaySVGEffects);
 }
@@ -6740,8 +6740,8 @@ bool nsDisplaySVGEffects::ValidateSVGFrame()
 
 nsDisplayMask::nsDisplayMask(nsDisplayListBuilder* aBuilder,
                                          nsIFrame* aFrame, nsDisplayList* aList,
-                                         bool aOpacityItemCreated)
-  : nsDisplaySVGEffects(aBuilder, aFrame, aList, aOpacityItemCreated)
+                                         bool aHandleOpacity)
+  : nsDisplaySVGEffects(aBuilder, aFrame, aList, aHandleOpacity)
 {
   MOZ_COUNT_CTOR(nsDisplayMask);
 }
@@ -6783,7 +6783,7 @@ nsDisplayMask::BuildLayer(nsDisplayListBuilder* aBuilder,
     return nullptr;
   }
 
-  if (mFrame->StyleEffects()->mOpacity == 0.0f && !mOpacityItemCreated) {
+  if (mFrame->StyleEffects()->mOpacity == 0.0f && mHandleOpacity) {
     return nullptr;
   }
 
@@ -6833,7 +6833,8 @@ nsDisplayMask::PaintAsLayer(nsDisplayListBuilder* aBuilder,
   nsSVGIntegrationUtils::PaintFramesParams params(*aCtx->ThebesContext(),
                                                   mFrame,  mVisibleRect,
                                                   borderArea, aBuilder,
-                                                  aManager, mOpacityItemCreated);
+                                                  aManager,
+                                                  mHandleOpacity);
 
   image::DrawResult result =
     nsSVGIntegrationUtils::PaintMaskAndClipPath(params);
@@ -6884,9 +6885,10 @@ nsDisplayMask::PrintEffects(nsACString& aTo)
 #endif
 
 nsDisplayFilter::nsDisplayFilter(nsDisplayListBuilder* aBuilder,
-                                         nsIFrame* aFrame, nsDisplayList* aList,
-                                         bool aOpacityItemCreated)
-  : nsDisplaySVGEffects(aBuilder, aFrame, aList, aOpacityItemCreated)
+                                         nsIFrame* aFrame,
+                                         nsDisplayList* aList,
+                                         bool aHandleOpacity)
+  : nsDisplaySVGEffects(aBuilder, aFrame, aList, aHandleOpacity)
 {
   MOZ_COUNT_CTOR(nsDisplayFilter);
 }
@@ -6907,7 +6909,7 @@ nsDisplayFilter::BuildLayer(nsDisplayListBuilder* aBuilder,
     return nullptr;
   }
 
-  if (mFrame->StyleEffects()->mOpacity == 0.0f && !mOpacityItemCreated) {
+  if (mFrame->StyleEffects()->mOpacity == 0.0f && mHandleOpacity) {
     return nullptr;
   }
 
@@ -6988,7 +6990,8 @@ nsDisplayFilter::PaintAsLayer(nsDisplayListBuilder* aBuilder,
   nsSVGIntegrationUtils::PaintFramesParams params(*aCtx->ThebesContext(),
                                                   mFrame,  mVisibleRect,
                                                   borderArea, aBuilder,
-                                                  aManager, mOpacityItemCreated);
+                                                  aManager,
+                                                  mHandleOpacity);
 
   image::DrawResult result =
     nsSVGIntegrationUtils::PaintFilter(params);
