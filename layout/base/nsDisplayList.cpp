@@ -1016,7 +1016,10 @@ nsDisplayListBuilder::EnterPresShell(nsIFrame* aReferenceFrame,
   }
 
   nsPresContext* pc = aReferenceFrame->PresContext();
-  pc->GetDocShell()->GetWindowDraggingAllowed(&mWindowDraggingAllowed);
+  nsCOMPtr<nsIDocShell> docShell = pc->GetDocShell();
+  if (docShell) {
+    docShell->GetWindowDraggingAllowed(&mWindowDraggingAllowed);
+  }
   mIsInChromePresContext = pc->IsChrome();
 }
 
@@ -1032,7 +1035,10 @@ nsDisplayListBuilder::LeavePresShell(nsIFrame* aReferenceFrame)
 
   if (!mPresShellStates.IsEmpty()) {
     nsPresContext* pc = CurrentPresContext();
-    pc->GetDocShell()->GetWindowDraggingAllowed(&mWindowDraggingAllowed);
+    nsCOMPtr<nsIDocShell> docShell = pc->GetDocShell();
+    if (docShell) {
+      docShell->GetWindowDraggingAllowed(&mWindowDraggingAllowed);
+    }
     mIsInChromePresContext = pc->IsChrome();
   }
 }
