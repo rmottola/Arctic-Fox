@@ -159,9 +159,7 @@ DecoderFactory::CreateDecoder(DecoderType aType,
 
   // Attempt to insert the surface provider into the surface cache right away so
   // we won't trigger any more decoders with the same parameters.
-  InsertOutcome outcome =
-    SurfaceCache::Insert(provider, ImageKey(aImage.get()), surfaceKey);
-  if (outcome != InsertOutcome::SUCCESS) {
+  if (SurfaceCache::Insert(provider) != InsertOutcome::SUCCESS) {
     return nullptr;
   }
 
@@ -211,9 +209,7 @@ DecoderFactory::CreateAnimationDecoder(DecoderType aType,
 
   // Attempt to insert the surface provider into the surface cache right away so
   // we won't trigger any more decoders with the same parameters.
-  InsertOutcome outcome =
-    SurfaceCache::Insert(provider, ImageKey(aImage.get()), surfaceKey);
-  if (outcome != InsertOutcome::SUCCESS) {
+  if (SurfaceCache::Insert(provider) != InsertOutcome::SUCCESS) {
     return nullptr;
   }
 
