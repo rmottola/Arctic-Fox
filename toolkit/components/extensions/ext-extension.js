@@ -35,6 +35,10 @@ extensions.registerSchemaAPI("extension", "addon_parent", context => {
       get inIncognitoContext() {
         return context.incognito;
       },
+
+      isAllowedIncognitoAccess() {
+        return Promise.resolve(true);
+      },
     },
   };
 });
