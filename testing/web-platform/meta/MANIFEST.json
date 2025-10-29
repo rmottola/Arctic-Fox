@@ -23893,6 +23893,30 @@
             "path": "web-animations/timing-model/animations/updating-the-finished-state.html",
             "url": "/web-animations/timing-model/animations/updating-the-finished-state.html"
           }
+        ],
+        "pointerevents/pointerevent_element_haspointercapture_release_pending_capture-manual.html": [
+          {
+            "path": "pointerevents/pointerevent_element_haspointercapture_release_pending_capture-manual.html",
+            "url": "/pointerevents/pointerevent_element_haspointercapture_release_pending_capture-manual.html"
+          }
+        ],
+        "pointerevents/pointerevent_releasepointercapture_release_right_after_capture-manual.html": [
+          {
+            "path": "pointerevents/pointerevent_releasepointercapture_release_right_after_capture-manual.html",
+            "url": "/pointerevents/pointerevent_releasepointercapture_release_right_after_capture-manual.html"
+          }
+        ],
+        "pointerevents/pointerevent_setpointercapture_override_pending_capture_element-manual.html": [
+          {
+            "path": "pointerevents/pointerevent_setpointercapture_override_pending_capture_element-manual.html",
+            "url": "/pointerevents/pointerevent_setpointercapture_override_pending_capture_element-manual.html"
+          }
+        ],
+        "pointerevents/pointerevent_setpointercapture_to_same_element_twice-manual.html": [
+          {
+            "path": "pointerevents/pointerevent_setpointercapture_to_same_element_twice-manual.html",
+            "url": "/pointerevents/pointerevent_setpointercapture_to_same_element_twice-manual.html"
+          }
         ]
       }
     },
