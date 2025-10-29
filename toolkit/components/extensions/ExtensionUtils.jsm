@@ -176,6 +176,7 @@ class BaseContext {
     this.jsonSandbox = null;
     this.active = true;
 
+    this.messageManager = null;
     this.docShell = null;
     this.contentWindow = null;
     this.innerWindowID = 0;
@@ -187,6 +188,8 @@ class BaseContext {
                                 .getInterface(Ci.nsIDocShell);
 
     this.innerWindowID = getInnerWindowID(contentWindow);
+    this.messageManager = docShell.QueryInterface(Ci.nsIInterfaceRequestor)
+                                  .getInterface(Ci.nsIContentFrameMessageManager);
 
     let onPageShow = event => {
       if (!event || event.target === document) {
@@ -1277,7 +1280,7 @@ function getMessageManager(target) {
   if (target instanceof Ci.nsIFrameLoaderOwner) {
     return target.QueryInterface(Ci.nsIFrameLoaderOwner).frameLoader.messageManager;
   }
-  return target;
+  return target.QueryInterface(Ci.nsIMessageSender);
 }
 
 // Each extension scope gets its own Messenger object. It handles the
@@ -1287,15 +1290,11 @@ function getMessageManager(target) {
 // |messageManagers| is an array of MessageManagers used to receive messages.
 // |sender| is an object describing the sender (usually giving its extension id, tabId, etc.)
 // |filter| is a recipient filter to apply to incoming messages from the broker.
-// |delegate| is an object that must implement a few methods:
-//    getSender(context, messageManagerTarget, sender): returns a MessageSender
-//      See https://developer.chrome.com/extensions/runtime#type-MessageSender.
-function Messenger(context, messageManagers, sender, filter, delegate) {
+function Messenger(context, messageManagers, sender, filter) {
   this.context = context;
   this.messageManagers = messageManagers;
   this.sender = sender;
   this.filter = filter;
-  this.delegate = delegate;
 
   MessageChannel.setupMessageManagers(messageManagers);
 }
@@ -1344,10 +1343,6 @@ Messenger.prototype = {
         receiveMessage: ({target, data: message, sender, recipient}) => {
           if (!this.context.active) {
             return;
-          }
-
-          if (this.delegate) {
-            this.delegate.getSender(this.context, target, sender);
           }
 
           let sendResponse;
@@ -1404,9 +1399,6 @@ Messenger.prototype = {
         receiveMessage: ({target, data: message, sender}) => {
           let {name, portId} = message;
           let mm = getMessageManager(target);
-          if (this.delegate) {
-            this.delegate.getSender(this.context, target, sender);
-          }
           let recipient = Object.assign({}, sender);
           if (recipient.tab) {
             recipient.tabId = recipient.tab.id;
