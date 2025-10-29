@@ -310,6 +310,7 @@ class ExtensionContext extends BaseContext {
         sandboxPrototype: contentWindow,
         wantXrays: true,
         isWebExtensionContentScript: true,
+        wantExportHelpers: true,
         wantGlobalProperties: ["XMLHttpRequest", "fetch"],
       });
 
