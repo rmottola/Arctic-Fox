@@ -193,6 +193,8 @@ public:
                                     TextureFlags aFlags);
   void ClearTexturePool();
 
+  virtual FixedSizeSmallShmemSectionAllocator* GetTileLockAllocator() override;
+
   void HandleMemoryPressure();
 
   virtual MessageLoop* GetMessageLoop() const override { return mMessageLoop; }
@@ -311,6 +313,8 @@ private:
   AutoTArray<RefPtr<TextureClientPool>,2> mTexturePools;
 
   uint64_t mProcessToken;
+
+  FixedSizeSmallShmemSectionAllocator* mSectionAllocator;
 };
 
 } // namespace layers
