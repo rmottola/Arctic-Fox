@@ -37,7 +37,7 @@ extensions.registerSchemaAPI("extension", "addon_parent", context => {
       },
 
       isAllowedFileSchemeAccess() {
-        return Promise.resolve(true);
+        return Promise.resolve(false);
       },
     },
   };
