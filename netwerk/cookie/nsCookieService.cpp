@@ -583,7 +583,7 @@ public:
       = do_GetService(NS_COOKIEMANAGER_CONTRACTID);
     MOZ_ASSERT(cookieManager);
 
-    return cookieManager->RemoveCookiesWithOriginAttributes(nsDependentString(aData));
+    return cookieManager->RemoveCookiesWithOriginAttributes(nsDependentString(aData), EmptyCString());
   }
 };
 
@@ -4549,7 +4549,8 @@ nsCookieService::GetCookiesFromHost(const nsACString     &aHost,
 }
 
 NS_IMETHODIMP
-nsCookieService::GetCookiesWithOriginAttributes(const nsAString& aPattern,
+nsCookieService::GetCookiesWithOriginAttributes(const nsAString&    aPattern,
+                                                const nsACString&   aHost,
                                                 nsISimpleEnumerator **aEnumerator)
 {
   mozilla::OriginAttributesPattern pattern;
@@ -4557,12 +4558,21 @@ nsCookieService::GetCookiesWithOriginAttributes(const nsAString& aPattern,
     return NS_ERROR_INVALID_ARG;
   }
 
-  return GetCookiesWithOriginAttributes(pattern, aEnumerator);
+  nsAutoCString host(aHost);
+  nsresult rv = NormalizeHost(host);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsAutoCString baseDomain;
+  rv = GetBaseDomainFromHost(host, baseDomain);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  return GetCookiesWithOriginAttributes(pattern, baseDomain, aEnumerator);
 }
 
 nsresult
 nsCookieService::GetCookiesWithOriginAttributes(
     const mozilla::OriginAttributesPattern& aPattern,
+    const nsCString& aBaseDomain,
     nsISimpleEnumerator **aEnumerator)
 {
   if (!mDBState) {
@@ -4577,6 +4587,10 @@ nsCookieService::GetCookiesWithOriginAttributes(
   nsCOMArray<nsICookie> cookies;
   for (auto iter = mDBState->hostTable.Iter(); !iter.Done(); iter.Next()) {
     nsCookieEntry* entry = iter.Get();
+
+    if (!aBaseDomain.IsEmpty() && !aBaseDomain.Equals(entry->mBaseDomain)) {
+      continue;
+    }
 
     if (!aPattern.Matches(entry->mOriginAttributes)) {
       continue;
@@ -4593,7 +4607,8 @@ nsCookieService::GetCookiesWithOriginAttributes(
 }
 
 NS_IMETHODIMP
-nsCookieService::RemoveCookiesWithOriginAttributes(const nsAString& aPattern)
+nsCookieService::RemoveCookiesWithOriginAttributes(const nsAString& aPattern,
+                                                   const nsACString& aHost)
 {
   MOZ_ASSERT(XRE_IsParentProcess());
 
@@ -4602,12 +4617,21 @@ nsCookieService::RemoveCookiesWithOriginAttributes(const nsAString& aPattern)
     return NS_ERROR_INVALID_ARG;
   }
 
-  return RemoveCookiesWithOriginAttributes(pattern);
+  nsAutoCString host(aHost);
+  nsresult rv = NormalizeHost(host);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsAutoCString baseDomain;
+  rv = GetBaseDomainFromHost(host, baseDomain);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  return RemoveCookiesWithOriginAttributes(pattern, baseDomain);
 }
 
 nsresult
 nsCookieService::RemoveCookiesWithOriginAttributes(
-    const mozilla::OriginAttributesPattern& aPattern)
+    const mozilla::OriginAttributesPattern& aPattern,
+    const nsCString& aBaseDomain)
 {
   if (!mDBState) {
     NS_WARNING("No DBState! Profile already close?");
@@ -4617,6 +4641,10 @@ nsCookieService::RemoveCookiesWithOriginAttributes(
   // Iterate the hash table of nsCookieEntry.
   for (auto iter = mDBState->hostTable.Iter(); !iter.Done(); iter.Next()) {
     nsCookieEntry* entry = iter.Get();
+
+    if (!aBaseDomain.IsEmpty() && !aBaseDomain.Equals(entry->mBaseDomain)) {
+      continue;
+    }
 
     if (!aPattern.Matches(entry->mOriginAttributes)) {
       continue;
