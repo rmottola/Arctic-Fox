@@ -529,6 +529,8 @@ pref("media.navigator.audio.full_duplex", false);
 #endif
 pref("media.mediasource.webm.audio.enabled", true);
 
+pref("dom.webaudio.enabled", true);
+
 #if !defined(ANDROID)
 pref("media.getusermedia.screensharing.enabled", true);
 #endif
