@@ -114,6 +114,8 @@ public:
 
   bool IsAlive() const;
 
+  bool IsShuttingDown() const;
+
   static void AppendProcessId(nsACString& aName);
 
   ContentBridgeParent* GetLastBridge()
@@ -662,6 +664,8 @@ private:
 
   nsCOMPtr<nsIDomainPolicy> mPolicy;
   nsCOMPtr<nsITimer> mForceKillTimer;
+
+  bool mShuttingDown;
 
   DISALLOW_EVIL_CONSTRUCTORS(ContentChild);
 };
