@@ -364,6 +364,22 @@ struct BlobURLRegistrationData
     Principal principal;
 };
 
+struct GetFilesResponseSuccess
+{
+  PBlob[] blobs;
+};
+
+struct GetFilesResponseFailure
+{
+  nsresult errorCode;
+};
+
+union GetFilesResponseResult
+{
+  GetFilesResponseSuccess;
+  GetFilesResponseFailure;
+};
+
 prio(normal upto urgent) sync protocol PContent
 {
     parent spawns PPluginModule;
@@ -682,6 +698,8 @@ child:
     async SetAudioSessionData(nsID aID,
                               nsString aDisplayName,
                               nsString aIconPath);
+
+    async GetFilesResponse(nsID aID, GetFilesResponseResult aResult);
 
     async BlobURLRegistration(nsCString aURI, PBlob aBlob,
                               Principal aPrincipal);
@@ -1200,6 +1218,9 @@ parent:
                                                 Principal principal);
 
      async UnstoreAndBroadcastBlobURLUnregistration(nsCString url);
+
+     async GetFilesRequest(nsID aID, nsString aDirectory, bool aRecursiveFlag);
+     async DeleteGetFilesRequest(nsID aID);
 
 both:
      async AsyncMessage(nsString aMessage, CpowEntry[] aCpows,
