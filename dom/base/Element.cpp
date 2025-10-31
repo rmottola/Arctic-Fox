@@ -124,7 +124,6 @@
 #include "nsCSSParser.h"
 #include "prprf.h"
 #include "nsDOMMutationObserver.h"
-#include "nsSVGFeatures.h"
 #include "nsWrapperCacheInlines.h"
 #include "xpcpublic.h"
 #include "nsIScriptError.h"
