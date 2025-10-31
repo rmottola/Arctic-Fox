@@ -1,0 +1,25 @@
+diff --git a/dom/base/DOMException.cpp b/dom/base/DOMException.cpp
+index 6c1e9768a5d061..7dca352a9a33c7 100644
+--- a/dom/base/DOMException.cpp
++++ b/dom/base/DOMException.cpp
+@@ -316,7 +316,7 @@ Exception::GetFilename(JSContext* aCx, nsAString& aFilename)
+     return mLocation->GetFilename(aCx, aFilename);
+   }
+ 
+-  aFilename.Assign(mFilename);
++  aFilename.Truncate();
+   return NS_OK;
+ }
+ 
+diff --git a/dom/base/DOMException.h b/dom/base/DOMException.h
+index df7f7cb725c34a..244bcb8b54ed20 100644
+--- a/dom/base/DOMException.h
++++ b/dom/base/DOMException.h
+@@ -136,7 +136,6 @@ class Exception : public nsIXPCException,
+   nsCString       mName;
+   nsCOMPtr<nsIStackFrame> mLocation;
+   nsCOMPtr<nsISupports> mData;
+-  nsString        mFilename;
+   int             mLineNumber;
+   bool            mInitialized;
+ 
