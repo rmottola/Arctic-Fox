@@ -561,6 +561,7 @@ io = {
       this.signal.cleanup();
       this.signal = null;
 
+      self.postMessage({msg: "close"});
       self.close();
     }
   },
