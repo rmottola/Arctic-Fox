@@ -13,13 +13,16 @@ const Win = OS.Constants.Win;
 
 const LIBC_CHOICES = ["kernel32.dll"];
 
-const win32 = {
+var win32 = {
   // On Windows 64, winapi_abi is an alias for default_abi.
   WINAPI: ctypes.winapi_abi,
+
+  VOID: ctypes.void_t,
 
   BYTE: ctypes.uint8_t,
   WORD: ctypes.uint16_t,
   DWORD: ctypes.uint32_t,
+  LONG: ctypes.long,
 
   UINT: ctypes.unsigned_int,
   UCHAR: ctypes.unsigned_char,
@@ -34,15 +37,24 @@ const win32 = {
   WCHAR: ctypes.jschar,
 
   ULONG_PTR: ctypes.uintptr_t,
+
+  SIZE_T: ctypes.size_t,
+  PSIZE_T: ctypes.size_t.ptr,
 };
 
 Object.assign(win32, {
+  DWORD_PTR: win32.ULONG_PTR,
+
   LPSTR: win32.CHAR.ptr,
   LPWSTR: win32.WCHAR.ptr,
 
   LPBYTE: win32.BYTE.ptr,
   LPDWORD: win32.DWORD.ptr,
   LPHANDLE: win32.HANDLE.ptr,
+
+  // This is an opaque type.
+  PROC_THREAD_ATTRIBUTE_LIST: ctypes.char.array(),
+  LPPROC_THREAD_ATTRIBUTE_LIST: ctypes.char.ptr,
 });
 
 Object.assign(win32, {
@@ -54,6 +66,7 @@ Object.assign(win32, {
 Object.assign(win32, {
   CREATE_NEW_CONSOLE: 0x00000010,
   CREATE_UNICODE_ENVIRONMENT: 0x00000400,
+  EXTENDED_STARTUPINFO_PRESENT: 0x00080000,
   CREATE_NO_WINDOW: 0x08000000,
 
   STARTF_USESTDHANDLES: 0x0100,
@@ -63,6 +76,7 @@ Object.assign(win32, {
 
   ERROR_HANDLE_EOF: 38,
   ERROR_BROKEN_PIPE: 109,
+  ERROR_INSUFFICIENT_BUFFER: 122,
 
   FILE_FLAG_OVERLAPPED: 0x40000000,
 
@@ -76,6 +90,8 @@ Object.assign(win32, {
   PIPE_NOWAIT: 0x01,
 
   STILL_ACTIVE: 259,
+
+  PROC_THREAD_ATTRIBUTE_HANDLE_LIST: 0x00020002,
 
   // These constants are 32-bit unsigned integers, but Windows defines
   // them as negative integers cast to an unsigned type.
@@ -130,6 +146,14 @@ Object.assign(win32, {
     {"hStdError": win32.HANDLE},
   ]),
 });
+
+Object.assign(win32, {
+  STARTUPINFOEXW: new ctypes.StructType("STARTUPINFOEXW", [
+    {"StartupInfo": win32.STARTUPINFOW},
+    {"lpAttributeList": win32.LPPROC_THREAD_ATTRIBUTE_LIST},
+  ]),
+});
+
 
 var libc = new Library("libc", LIBC_CHOICES, {
   CloseHandle: [
@@ -196,6 +220,21 @@ var libc = new Library("libc", LIBC_CHOICES, {
     win32.PROCESS_INFORMATION.ptr, /* out lpProcessInformation */
   ],
 
+  CreateSemaphoreW: [
+    win32.WINAPI,
+    win32.HANDLE,
+    win32.SECURITY_ATTRIBUTES.ptr, /* opt lpSemaphoreAttributes */
+    win32.LONG, /* lInitialCount */
+    win32.LONG, /* lMaximumCount */
+    win32.LPCWSTR, /* opt lpName */
+  ],
+
+  DeleteProcThreadAttributeList: [
+    win32.WINAPI,
+    win32.VOID,
+    win32.LPPROC_THREAD_ATTRIBUTE_LIST, /* in/out lpAttributeList */
+  ],
+
   DuplicateHandle: [
     win32.WINAPI,
     win32.BOOL,
@@ -251,6 +290,15 @@ var libc = new Library("libc", LIBC_CHOICES, {
     win32.DWORD, /* nStdHandle */
   ],
 
+  InitializeProcThreadAttributeList: [
+    win32.WINAPI,
+    win32.BOOL,
+    win32.LPPROC_THREAD_ATTRIBUTE_LIST, /* out opt lpAttributeList */
+    win32.DWORD, /* dwAttributeCount */
+    win32.DWORD, /* dwFlags */
+    win32.PSIZE_T, /* in/out lpSize */
+  ],
+
   ReadFile: [
     win32.WINAPI,
     win32.BOOL,
@@ -261,11 +309,31 @@ var libc = new Library("libc", LIBC_CHOICES, {
     win32.OVERLAPPED.ptr, /* opt in/out lpOverlapped */
   ],
 
+  ReleaseSemaphore: [
+    win32.WINAPI,
+    win32.BOOL,
+    win32.HANDLE, /* hSemaphore */
+    win32.LONG, /* lReleaseCount */
+    win32.LONG.ptr, /* opt out lpPreviousCount */
+  ],
+
   TerminateProcess: [
     win32.WINAPI,
     win32.BOOL,
     win32.HANDLE, /* hProcess */
     win32.UINT, /* uExitCode */
+  ],
+
+  UpdateProcThreadAttribute: [
+    win32.WINAPI,
+    win32.BOOL,
+    win32.LPPROC_THREAD_ATTRIBUTE_LIST, /* in/out lpAttributeList */
+    win32.DWORD, /* dwFlags */
+    win32.DWORD_PTR, /* Attribute */
+    win32.PVOID, /* lpValue */
+    win32.SIZE_T, /* cbSize */
+    win32.PVOID, /* out opt lpPreviousValue */
+    win32.PSIZE_T, /* opt lpReturnSize */
   ],
 
   WaitForMultipleObjects: [
@@ -340,4 +408,38 @@ win32.createPipe = function(secAttr, readFlags = 0, writeFlags = 0, size = 0) {
 
   return [win32.Handle(readHandle),
           win32.Handle(writeHandle)];
+};
+
+win32.createThreadAttributeList = function(handles) {
+  try {
+    void libc.InitializeProcThreadAttributeList;
+    void libc.DeleteProcThreadAttributeList;
+    void libc.UpdateProcThreadAttribute;
+  } catch (e) {
+    // This is only supported in Windows Vista and later.
+    return null;
+  }
+
+  let size = win32.SIZE_T();
+  if (!libc.InitializeProcThreadAttributeList(null, 1, 0, size.address()) &&
+      ctypes.winLastError != win32.ERROR_INSUFFICIENT_BUFFER) {
+    return null;
+  }
+
+  let attrList = win32.PROC_THREAD_ATTRIBUTE_LIST(size.value);
+
+  if (!libc.InitializeProcThreadAttributeList(attrList, 1, 0, size.address())) {
+    return null;
+  }
+
+  let ok = libc.UpdateProcThreadAttribute(
+    attrList, 0, win32.PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+    handles, handles.constructor.size, null, null);
+
+  if (!ok) {
+    libc.DeleteProcThreadAttributeList(attrList);
+    return null;
+  }
+
+  return attrList;
 };
