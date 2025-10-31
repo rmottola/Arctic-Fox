@@ -623,13 +623,6 @@ public:
                           const nsString& aDisplayName,
                           const nsString& aIconPath) override;
 
-  virtual bool
-  RecvBlobURLRegistration(const nsCString& aURI, PBlobChild* aBlobChild,
-                          const IPC::Principal& aPrincipal) override;
-
-  virtual bool
-  RecvBlobURLUnregistration(const nsCString& aURI) override;
-
 
   // GetFiles for WebKit/Blink FileSystem API and Directory API must run on the
   // parent process.
@@ -643,6 +636,13 @@ public:
   virtual bool
   RecvGetFilesResponse(const nsID& aUUID,
                        const GetFilesResponseResult& aResult) override;
+
+  virtual bool
+  RecvBlobURLRegistration(const nsCString& aURI, PBlobChild* aBlobChild,
+                          const IPC::Principal& aPrincipal) override;
+
+  virtual bool
+  RecvBlobURLUnregistration(const nsCString& aURI) override;
 
 private:
   static void ForceKillTimerCallback(nsITimer* aTimer, void* aClosure);
@@ -681,12 +681,12 @@ private:
   nsCOMPtr<nsIDomainPolicy> mPolicy;
   nsCOMPtr<nsITimer> mForceKillTimer;
 
-  bool mShuttingDown;
-
   // Hashtable to keep track of the pending GetFilesHelper objects.
   // This GetFilesHelperChild objects are removed when RecvGetFilesResponse is
   // received.
- nsRefPtrHashtable<nsIDHashKey, GetFilesHelperChild> mGetFilesPendingRequests;
+  nsRefPtrHashtable<nsIDHashKey, GetFilesHelperChild> mGetFilesPendingRequests;
+
+  bool mShuttingDown;
 
   DISALLOW_EVIL_CONSTRUCTORS(ContentChild);
 };

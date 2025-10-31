@@ -2957,25 +2957,6 @@ ContentChild::RecvDomainSetChanged(const uint32_t& aSetType,
   return true;
 }
 
-bool
-ContentChild::RecvBlobURLRegistration(const nsCString& aURI, PBlobChild* aBlobChild,
-                                      const IPC::Principal& aPrincipal)
-{
-  RefPtr<BlobImpl> blobImpl = static_cast<BlobChild*>(aBlobChild)->GetBlobImpl();
-  MOZ_ASSERT(blobImpl);
-
-  nsHostObjectProtocolHandler::AddDataEntry(aURI, aPrincipal, blobImpl);
-  return true;
-}
-
-bool
-ContentChild::RecvBlobURLUnregistration(const nsCString& aURI)
-{
-  nsHostObjectProtocolHandler::RemoveDataEntry(aURI);
-  return true;
-}
-
-
 void
 ContentChild::StartForceKillTimer()
 {
@@ -3339,6 +3320,25 @@ ContentChild::RecvNotifyPushSubscriptionModifiedObservers(const nsCString& aScop
 #endif
   return true;
 }
+
+bool
+ContentChild::RecvBlobURLRegistration(const nsCString& aURI, PBlobChild* aBlobChild,
+                                      const IPC::Principal& aPrincipal)
+{
+  RefPtr<BlobImpl> blobImpl = static_cast<BlobChild*>(aBlobChild)->GetBlobImpl();
+  MOZ_ASSERT(blobImpl);
+
+  nsHostObjectProtocolHandler::AddDataEntry(aURI, aPrincipal, blobImpl);
+  return true;
+}
+
+bool
+ContentChild::RecvBlobURLUnregistration(const nsCString& aURI)
+{
+  nsHostObjectProtocolHandler::RemoveDataEntry(aURI);
+  return true;
+}
+
 
 void
 ContentChild::CreateGetFilesRequest(const nsAString& aDirectoryPath,

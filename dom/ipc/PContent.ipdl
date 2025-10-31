@@ -357,13 +357,6 @@ struct AndroidSystemInfo
     bool     isTablet;
 };
 
-struct BlobURLRegistrationData
-{
-    nsCString url;
-    PBlob blob;
-    Principal principal;
-};
-
 struct GetFilesResponseSuccess
 {
   PBlob[] blobs;
@@ -378,6 +371,13 @@ union GetFilesResponseResult
 {
   GetFilesResponseSuccess;
   GetFilesResponseFailure;
+};
+
+struct BlobURLRegistrationData
+{
+    nsCString url;
+    PBlob blob;
+    Principal principal;
 };
 
 prio(normal upto urgent) sync protocol PContent
@@ -1214,13 +1214,13 @@ parent:
      */
      async NotifyLowMemory();
 
+     async GetFilesRequest(nsID aID, nsString aDirectory, bool aRecursiveFlag);
+     async DeleteGetFilesRequest(nsID aID);
+
      async StoreAndBroadcastBlobURLRegistration(nsCString url, PBlob blob,
                                                 Principal principal);
 
      async UnstoreAndBroadcastBlobURLUnregistration(nsCString url);
-
-     async GetFilesRequest(nsID aID, nsString aDirectory, bool aRecursiveFlag);
-     async DeleteGetFilesRequest(nsID aID);
 
 both:
      async AsyncMessage(nsString aMessage, CpowEntry[] aCpows,
