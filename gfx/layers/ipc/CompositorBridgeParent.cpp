@@ -1062,6 +1062,7 @@ CompositorBridgeParent::ResumeComposition()
 
   mPaused = false;
 
+  Invalidate();
   mCompositorScheduler->ResumeComposition();
 
   // if anyone's waiting to make sure that composition really got resumed, tell them
