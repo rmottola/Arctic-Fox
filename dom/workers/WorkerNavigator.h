@@ -16,12 +16,14 @@
 namespace mozilla {
 namespace dom {
 class Promise;
+class StorageManager;
 
 class WorkerNavigator final : public nsWrapperCache
 {
   typedef struct workers::RuntimeService::NavigatorProperties NavigatorProperties;
 
   NavigatorProperties mProperties;
+  RefPtr<StorageManager> mStorageManager;
   bool mOnline;
 
   WorkerNavigator(const NavigatorProperties& aProperties,
@@ -102,6 +104,8 @@ public:
   void SetLanguages(const nsTArray<nsString>& aLanguages);
 
   uint64_t HardwareConcurrency() const;
+
+  StorageManager* Storage();
 };
 
 } // namespace dom
