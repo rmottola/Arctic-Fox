@@ -861,6 +861,15 @@
         </body>
       </method>
 
+      <field name="serializationHelper">
+        Cc["@mozilla.org/network/serialization-helper;1"]
+          .getService(Ci.nsISerializationHelper);
+      </field>
+
+      <field name="mIconLoadingPrincipal">
+        null
+      </field>
+
       <method name="setIcon">
         <parameter name="aTab"/>
         <parameter name="aURI"/>
@@ -869,17 +878,14 @@
           <![CDATA[
             let browser = this.getBrowserForTab(aTab);
             browser.mIconURL = aURI instanceof Ci.nsIURI ? aURI.spec : aURI;
+            let loadingPrincipal = aLoadingPrincipal
+              ? aLoadingPrincipal
+              : Services.scriptSecurityManager.getSystemPrincipal();
 
             if (aURI) {
               if (!(aURI instanceof Ci.nsIURI)) {
                 aURI = makeURI(aURI);
               }
-              // We do not serialize the principal from within SessionStore.jsm,
-              // hence if aLoadingPrincipal is null we default to the
-              // systemPrincipal which will allow the favicon to load.
-              let loadingPrincipal = aLoadingPrincipal
-                ? aLoadingPrincipal
-                : Services.scriptSecurityManager.getSystemPrincipal();
               PlacesUIUtils.loadFavicon(browser, loadingPrincipal, aURI);
             }
 
@@ -890,10 +896,20 @@
                               "-moz-resolution=" + size + "," + size;
             }
             if (sizedIconUrl != aTab.getAttribute("image")) {
-              if (browser.mIconURL) //PMed
+              if (browser.mIconURL) { //PMed
                 aTab.setAttribute("image", sizedIconUrl);
-              else
+                if (!browser.mIconLoadingPrincipal ||
+                    !browser.mIconLoadingPrincipal.equals(loadingPrincipal)) {
+                  aTab.setAttribute("iconLoadingPrincipal",
+                    this.serializationHelper.serializeToString(loadingPrincipal));
+                  browser.mIconLoadingPrincipal = loadingPrincipal;
+                }
+              }
+              else {
                 aTab.removeAttribute("image");
+                aTab.removeAttribute("iconLoadingPrincipal");
+                delete browser.mIconLoadingPrincipal;
+              }
               this._tabAttrModified(aTab, ["image"]);
             }
 
