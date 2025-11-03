@@ -890,13 +890,8 @@
             }
 
             let sizedIconUrl = browser.mIconURL || "";
-            if (sizedIconUrl) {
-              let size = Math.round(16 * window.devicePixelRatio);
-              sizedIconUrl += (sizedIconUrl.includes("#") ? "&" : "#") +
-                              "-moz-resolution=" + size + "," + size;
-            }
             if (sizedIconUrl != aTab.getAttribute("image")) {
-              if (browser.mIconURL) { //PMed
+              if (sizedIconUrl) {
                 aTab.setAttribute("image", sizedIconUrl);
                 if (!browser.mIconLoadingPrincipal ||
                     !browser.mIconLoadingPrincipal.equals(loadingPrincipal)) {
