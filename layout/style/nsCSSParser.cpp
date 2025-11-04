@@ -109,6 +109,12 @@ enum class GridTrackSizeFlags {
 };
 MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(GridTrackSizeFlags)
 
+enum class GridTrackListFlags {
+  eDefaultTrackList  = 0x0, // parse a <track-list>
+  eExplicitTrackList = 0x1, // parse an <explicit-track-list> instead
+};
+MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(GridTrackListFlags)
+
 namespace {
 
 // Rule processing function
@@ -981,9 +987,11 @@ protected:
   // starting with a <line-names> (which is itself a list)
   // and alternating between that and <track-size>.
   bool ParseGridTrackListWithFirstLineNames(nsCSSValue& aValue,
-                                            const nsCSSValue& aFirstLineNames);
+    const nsCSSValue& aFirstLineNames,
+    GridTrackListFlags aFlags = GridTrackListFlags::eDefaultTrackList);
 
-  bool ParseGridTrackList(nsCSSPropertyID aPropID);
+  bool ParseGridTrackList(nsCSSPropertyID aPropID,
+    GridTrackListFlags aFlags = GridTrackListFlags::eDefaultTrackList);
   bool ParseGridTemplateColumnsRows(nsCSSPropertyID aPropID);
 
   // |aAreaIndices| is a lookup table to help us parse faster,
@@ -8813,7 +8821,8 @@ CSSParserImpl::ParseGridAutoColumnsRows(nsCSSPropertyID aPropID)
 
 bool
 CSSParserImpl::ParseGridTrackListWithFirstLineNames(nsCSSValue& aValue,
-                                                    const nsCSSValue& aFirstLineNames)
+                                                    const nsCSSValue& aFirstLineNames,
+                                                    GridTrackListFlags aFlags)
 {
   nsCSSValueList* firstLineNamesItem = aValue.SetListValue();
   firstLineNamesItem->mValue = aFirstLineNames;
@@ -8821,6 +8830,7 @@ CSSParserImpl::ParseGridTrackListWithFirstLineNames(nsCSSValue& aValue,
   // This function is trying to parse <track-list>, which is
   //   [ <line-names>? [ <track-size> | <repeat()> ] ]+ <line-names>?
   // and we're already past the first "<line-names>?".
+  // If aFlags contains eExplicitTrackList then <repeat()> is disallowed.
   //
   // Each iteration of the following loop attempts to parse either a
   // repeat() or a <track-size> expression, and then an (optional)
@@ -8836,7 +8846,8 @@ CSSParserImpl::ParseGridTrackListWithFirstLineNames(nsCSSValue& aValue,
     if (!GetToken(true)) {
       break;
     }
-    if (mToken.mType == eCSSToken_Function &&
+    if (!(aFlags & GridTrackListFlags::eExplicitTrackList) &&
+        mToken.mType == eCSSToken_Function &&
         mToken.mIdent.LowerCaseEqualsLiteral("repeat")) {
       nsCSSValueList* startOfRepeat = item;
       if (!ParseGridTrackListRepeat(&item)) {
@@ -9181,12 +9192,13 @@ CSSParserImpl::ParseGridTrackListRepeat(nsCSSValueList** aTailPtr)
 }
 
 bool
-CSSParserImpl::ParseGridTrackList(nsCSSPropertyID aPropID)
+CSSParserImpl::ParseGridTrackList(nsCSSPropertyID aPropID,
+                                  GridTrackListFlags aFlags)
 {
   nsCSSValue value;
   nsCSSValue firstLineNames;
   if (ParseGridLineNames(firstLineNames) == CSSParseResult::Error ||
-      !ParseGridTrackListWithFirstLineNames(value, firstLineNames)) {
+      !ParseGridTrackListWithFirstLineNames(value, firstLineNames, aFlags)) {
     return false;
   }
   AppendValue(aPropID, value);
@@ -9365,7 +9377,7 @@ CSSParserImpl::ParseGridTemplate(bool aForGridShorthand)
   // none |
   // subgrid |
   // <'grid-template-rows'> / <'grid-template-columns'> |
-  // [ <line-names>? <string> <track-size>? <line-names>? ]+ [ / <track-list>]?
+  // [ <line-names>? <string> <track-size>? <line-names>? ]+ [ / <explicit-track-list>]?
   // or additionally when aForGridShorthand is true:
   // <'grid-template-rows'> / [ auto-flow && dense? ] <'grid-auto-columns'>?
   nsCSSValue value;
@@ -9431,9 +9443,10 @@ CSSParserImpl::ParseGridTemplate(bool aForGridShorthand)
     if (!ParseGridTemplateAfterString(firstLineNames)) {
       return false;
     }
-    // Parse an optional [ / <track-list> ] as the columns value.
+    // Parse an optional [ / <explicit-track-list> ] as the columns value.
     if (ExpectSymbol('/', true)) {
-      return ParseGridTrackList(eCSSProperty_grid_template_columns);
+      return ParseGridTrackList(eCSSProperty_grid_template_columns,
+                                GridTrackListFlags::eExplicitTrackList);
     }
     value.SetNoneValue(); // absent means 'none'
     AppendValue(eCSSProperty_grid_template_columns, value);
