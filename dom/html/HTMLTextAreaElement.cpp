@@ -1205,6 +1205,11 @@ HTMLTextAreaElement::IntrinsicState() const
     }
   }
 
+  if (HasAttr(kNameSpaceID_None, nsGkAtoms::placeholder) &&
+      IsValueEmpty()) {
+    state |= NS_EVENT_STATE_PLACEHOLDERSHOWN;
+  }
+
   return state;
 }
 
@@ -1614,7 +1619,8 @@ HTMLTextAreaElement::OnValueChanged(bool aNotify, bool aWasInteractiveUserChange
   UpdateTooShortValidityState();
   UpdateValueMissingValidityState();
 
-  if (validBefore != IsValid()) {
+  if (validBefore != IsValid() ||
+      HasAttr(kNameSpaceID_None, nsGkAtoms::placeholder)) {
     UpdateState(aNotify);
   }
 }
