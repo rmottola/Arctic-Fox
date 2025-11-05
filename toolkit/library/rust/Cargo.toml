@@ -10,7 +10,7 @@ mp4parse = { path = "../../../media/libstagefright/binding/mp4parse" }
 
 [lib]
 path = "lib.rs"
-crate-type = ["staticlib"]
+crate-type = ["rlib"]
 test = false
 doctest = false
 bench = false
