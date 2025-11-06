@@ -144,8 +144,7 @@ public:
   typedef MediaDecoderOwner::NextFrameStatus NextFrameStatus;
   typedef mozilla::layers::ImageContainer::FrameID FrameID;
   MediaDecoderStateMachine(MediaDecoder* aDecoder,
-                           MediaDecoderReader* aReader,
-                           bool aRealTime = false);
+                           MediaDecoderReader* aReader);
 
   nsresult Init(MediaDecoder* aDecoder);
 
@@ -244,9 +243,6 @@ public:
 
   MediaEventSource<MediaEventType>&
   OnPlaybackEvent() { return mOnPlaybackEvent; }
-
-  // Immutable after construction - may be called on any thread.
-  bool IsRealTime() const { return mRealTime; }
 
   size_t SizeOfVideoQueue() const;
 
@@ -623,9 +619,6 @@ private:
   // State-watching manager.
   WatchManager<MediaDecoderStateMachine> mWatchManager;
 
-  // True is we are decoding a realtime stream, like a camera stream.
-  const bool mRealTime;
-
   // True if we've dispatched a task to run the state machine but the task has
   // yet to run.
   bool mDispatchedStateMachine;
@@ -761,13 +754,13 @@ private:
   uint32_t AudioPrerollUsecs() const
   {
     MOZ_ASSERT(OnTaskQueue());
-    return IsRealTime() ? 0 : mAmpleAudioThresholdUsecs / 2;
+    return mAmpleAudioThresholdUsecs / 2;
   }
 
   uint32_t VideoPrerollFrames() const
   {
     MOZ_ASSERT(OnTaskQueue());
-    return IsRealTime() ? 0 : GetAmpleVideoFrames() / 2;
+    return GetAmpleVideoFrames() / 2;
   }
 
   bool DonePrerollingAudio()
