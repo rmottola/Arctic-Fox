@@ -510,12 +510,12 @@ DrawTargetSkia::DrawSurface(SourceSurface *aSurface,
     return;
   }
 
+  MarkChanged();
+
   SkBitmap bitmap = GetBitmapForSurface(aSurface);
   if (bitmap.empty()) {
     return;
   }
-
-  MarkChanged();
 
   SkRect destRect = RectToSkRect(aDest);
   SkRect sourceRect = RectToSkRect(aSource);
@@ -563,12 +563,12 @@ DrawTargetSkia::DrawSurfaceWithShadow(SourceSurface *aSurface,
     return;
   }
 
+  MarkChanged();
+
   SkBitmap bitmap = GetBitmapForSurface(aSurface);
   if (bitmap.empty()) {
     return;
   }
-
-  MarkChanged();
 
   mCanvas->save();
   mCanvas->resetMatrix();
@@ -1444,12 +1444,12 @@ DrawTargetSkia::Draw3DTransformedSurface(SourceSurface* aSurface, const Matrix4x
     return false;
   }
 
+  MarkChanged();
+
   SkBitmap bitmap = GetBitmapForSurface(aSurface);
   if (bitmap.empty()) {
     return true;
   }
-
-  MarkChanged();
 
   mCanvas->save();
 
@@ -1637,12 +1637,12 @@ DrawTargetSkia::CopySurface(SourceSurface *aSurface,
                             const IntRect& aSourceRect,
                             const IntPoint &aDestination)
 {
+  MarkChanged();
+
   SkBitmap bitmap = GetBitmapForSurface(aSurface);
   if (bitmap.empty()) {
     return;
   }
-
-  MarkChanged();
 
   mCanvas->save();
   mCanvas->setMatrix(SkMatrix::MakeTrans(SkIntToScalar(aDestination.x), SkIntToScalar(aDestination.y)));
