@@ -1493,7 +1493,8 @@ public:
                                   IDWriteFontFamily* aFontFamily,
                                   IDWriteFontFace* aFontFace,
                                   Float aSize,
-                                  bool aUseEmbeddedBitmap);
+                                  bool aUseEmbeddedBitmap,
+                                  bool aForceGDIMode);
 
 private:
   static ID2D1Device *mD2D1Device;
