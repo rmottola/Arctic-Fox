@@ -587,6 +587,14 @@ PuppetWidget::GetLayerManager(PLayerTransactionChild* aShadowManager,
   return mLayerManager;
 }
 
+LayerManager*
+PuppetWidget::RecreateLayerManager(PLayerTransactionChild* aShadowManager)
+{
+  mLayerManager = new ClientLayerManager(this);
+  mLayerManager->AsShadowForwarder()->SetShadowManager(aShadowManager);
+  return mLayerManager;
+}
+
 nsresult
 PuppetWidget::RequestIMEToCommitComposition(bool aCancel)
 {

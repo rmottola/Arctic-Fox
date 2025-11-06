@@ -623,6 +623,8 @@ public:
   bool GetRenderFrameInfo(TextureFactoryIdentifier* aTextureFactoryIdentifier,
                           uint64_t* aLayersId);
 
+  bool RecvEnsureLayersConnected() override;
+
 protected:
   bool ReceiveMessage(const nsString& aMessage,
                       bool aSync,
