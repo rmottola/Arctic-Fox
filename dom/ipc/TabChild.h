@@ -594,6 +594,8 @@ public:
   virtual bool RecvPrint(const uint64_t& aOuterWindowID,
                          const PrintData& aPrintData) override;
 
+  virtual bool RecvUpdateNativeWindowHandle(const uintptr_t& aNewHandle) override;
+
   /**
    * Native widget remoting protocol for use with windowed plugins with e10s.
    */
@@ -651,6 +653,10 @@ public:
   {
       mAPZChild = aAPZChild;
   }
+
+#if defined(XP_WIN) && defined(ACCESSIBILITY)
+  uintptr_t GetNativeWindowHandle() const { return mNativeWindowHandle; }
+#endif
 
 protected:
   virtual ~TabChild();
@@ -785,6 +791,11 @@ private:
   // APZChild clears this pointer from its destructor, so it shouldn't be a
   // dangling pointer.
   layers::APZChild* mAPZChild;
+
+#if defined(XP_WIN) && defined(ACCESSIBILITY)
+  // The handle associated with the native window that contains this tab
+  uintptr_t mNativeWindowHandle;
+#endif // defined(XP_WIN)
 
   DISALLOW_EVIL_CONSTRUCTORS(TabChild);
 };
