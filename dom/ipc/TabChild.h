@@ -658,6 +658,9 @@ public:
   uintptr_t GetNativeWindowHandle() const { return mNativeWindowHandle; }
 #endif
 
+  // Request that the docshell be marked as active.
+  void ForcePaint(uint64_t aLayerObserverEpoch);
+
 protected:
   virtual ~TabChild();
 
@@ -670,7 +673,8 @@ protected:
   virtual bool RecvSetUpdateHitRegion(const bool& aEnabled) override;
 
   virtual bool RecvSetDocShellIsActive(const bool& aIsActive,
-                                       const bool& aIsHidden) override;
+                                       const bool& aIsHidden,
+                                       const uint64_t& aLayerObserverEpoch) override;
 
   virtual bool RecvNavigateByKey(const bool& aForward,
                                  const bool& aForDocumentNavigation) override;
@@ -796,6 +800,9 @@ private:
   // The handle associated with the native window that contains this tab
   uintptr_t mNativeWindowHandle;
 #endif // defined(XP_WIN)
+
+  // The most recently seen layer observer epoch in RecvSetDocShellIsActive.
+  uint64_t mLayerObserverEpoch;
 
   DISALLOW_EVIL_CONSTRUCTORS(TabChild);
 };
