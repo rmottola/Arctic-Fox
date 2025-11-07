@@ -9,7 +9,7 @@
 #include "js/Debug.h"
 
 #include "mozilla/Atomics.h"
-#include "mozilla/CycleCollectedJSRuntime.h"
+#include "mozilla/CycleCollectedJSContext.h"
 #include "mozilla/OwningNonNull.h"
 #include "mozilla/Preferences.h"
 
@@ -62,7 +62,7 @@ public:
                      const JS::Value& aValue)
     : mPromise(aPromise)
     , mCallback(aCallback)
-    , mValue(CycleCollectedJSRuntime::Get()->Runtime(), aValue)
+    , mValue(CycleCollectedJSContext::Get()->Context(), aValue)
   {
     MOZ_ASSERT(aPromise);
     MOZ_ASSERT(aCallback);
@@ -187,7 +187,7 @@ public:
                             JS::Handle<JSObject*> aThenable,
                             PromiseInit* aThen)
     : mPromise(aPromise)
-    , mThenable(CycleCollectedJSRuntime::Get()->Runtime(), aThenable)
+    , mThenable(CycleCollectedJSContext::Get()->Context(), aThenable)
     , mThen(aThen)
   {
     MOZ_ASSERT(aPromise);
@@ -981,11 +981,11 @@ Promise::PerformMicroTaskCheckpoint()
 {
   MOZ_ASSERT(NS_IsMainThread(), "Wrong thread!");
 
-  CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
+  CycleCollectedJSContext* context = CycleCollectedJSContext::Get();
 
   // On the main thread, we always use the main promise micro task queue.
   std::queue<nsCOMPtr<nsIRunnable>>& microtaskQueue =
-    runtime->GetPromiseMicroTaskQueue();
+    context->GetPromiseMicroTaskQueue();
 
   if (microtaskQueue.empty()) {
     return false;
@@ -1004,7 +1004,7 @@ Promise::PerformMicroTaskCheckpoint()
       return false;
     }
     aso.CheckForInterrupt();
-    runtime->AfterProcessMicrotask();
+    context->AfterProcessMicrotask();
   } while (!microtaskQueue.empty());
 
   return true;
@@ -1015,17 +1015,17 @@ Promise::PerformWorkerMicroTaskCheckpoint()
 {
   MOZ_ASSERT(!NS_IsMainThread(), "Wrong thread!");
 
-  CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
+  CycleCollectedJSContext* context = CycleCollectedJSContext::Get();
 
   for (;;) {
     // For a normal microtask checkpoint, we try to use the debugger microtask
     // queue first. If the debugger queue is empty, we use the normal microtask
     // queue instead.
     std::queue<nsCOMPtr<nsIRunnable>>* microtaskQueue =
-      &runtime->GetDebuggerPromiseMicroTaskQueue();
+      &context->GetDebuggerPromiseMicroTaskQueue();
 
     if (microtaskQueue->empty()) {
-      microtaskQueue = &runtime->GetPromiseMicroTaskQueue();
+      microtaskQueue = &context->GetPromiseMicroTaskQueue();
       if (microtaskQueue->empty()) {
         break;
       }
@@ -1040,7 +1040,7 @@ Promise::PerformWorkerMicroTaskCheckpoint()
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return;
     }
-    runtime->AfterProcessMicrotask();
+    context->AfterProcessMicrotask();
   }
 }
 
@@ -1049,13 +1049,13 @@ Promise::PerformWorkerDebuggerMicroTaskCheckpoint()
 {
   MOZ_ASSERT(!NS_IsMainThread(), "Wrong thread!");
 
-  CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
+  CycleCollectedJSContext* context = CycleCollectedJSContext::Get();
 
   for (;;) {
     // For a debugger microtask checkpoint, we always use the debugger microtask
     // queue.
     std::queue<nsCOMPtr<nsIRunnable>>* microtaskQueue =
-      &runtime->GetDebuggerPromiseMicroTaskQueue();
+      &context->GetDebuggerPromiseMicroTaskQueue();
 
     if (microtaskQueue->empty()) {
       break;
@@ -1070,7 +1070,7 @@ Promise::PerformWorkerDebuggerMicroTaskCheckpoint()
     if (NS_WARN_IF(NS_FAILED(rv))) {
       return;
     }
-    runtime->AfterProcessMicrotask();
+    context->AfterProcessMicrotask();
   }
 }
 
@@ -2655,7 +2655,7 @@ Promise::ResolveInternal(JSContext* aCx,
 {
   NS_ASSERT_OWNINGTHREAD(Promise);
 
-  CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
+  CycleCollectedJSContext* context = CycleCollectedJSContext::Get();
 
   mResolvePending = true;
 
@@ -2697,7 +2697,7 @@ Promise::ResolveInternal(JSContext* aCx,
         new PromiseInit(nullptr, thenObj, mozilla::dom::GetIncumbentGlobal());
       RefPtr<PromiseResolveThenableJob> task =
         new PromiseResolveThenableJob(this, valueObj, thenCallback);
-      runtime->DispatchToMicroTask(task.forget());
+      context->DispatchToMicroTask(task.forget());
       return;
     }
   }
@@ -2801,7 +2801,7 @@ Promise::TriggerPromiseReactions()
 {
   NS_ASSERT_OWNINGTHREAD(Promise);
 
-  CycleCollectedJSRuntime* runtime = CycleCollectedJSRuntime::Get();
+  CycleCollectedJSContext* runtime = CycleCollectedJSContext::Get();
 
   nsTArray<RefPtr<PromiseCallback>> callbacks;
   callbacks.SwapElements(mState == Resolved ? mResolveCallbacks
