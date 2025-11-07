@@ -78,7 +78,7 @@ AccessibleWrap::AccessibleWrap(nsIContent* aContent, DocAccessible* aDoc) :
 AccessibleWrap::~AccessibleWrap()
 {
 #ifdef _WIN64
-  if (mID != kNoID)
+  if (mID != kNoID && XRE_IsParentProcess())
     sIDGen.ReleaseID(mID);
 #endif
 }
