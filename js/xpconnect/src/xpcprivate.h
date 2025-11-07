@@ -806,7 +806,7 @@ private:
 
     XPCNativeScriptableInfo*        mScriptableInfo;
 
-    XPCNativeSet*                   mSet;
+    RefPtr<XPCNativeSet>            mSet;
     RefPtr<XPCNativeInterface>      mInterface;
     XPCNativeMember*                mMember;
 
@@ -1294,7 +1294,7 @@ private:
 // It represents a new XPCNativeSet we are considering constructing, without
 // requiring that the set actually be built.
 
-class XPCNativeSetKey final
+class MOZ_STACK_CLASS XPCNativeSetKey final
 {
 public:
     // This represents an existing set |baseSet|.
@@ -1327,8 +1327,8 @@ public:
     // Allow shallow copy
 
 private:
-    XPCNativeSet* mBaseSet;
-    XPCNativeInterface* mAddition;
+    RefPtr<XPCNativeSet> mBaseSet;
+    RefPtr<XPCNativeInterface> mAddition;
 };
 
 /***************************************************************************/
@@ -1337,9 +1337,12 @@ private:
 class XPCNativeSet final
 {
   public:
-    static XPCNativeSet* GetNewOrUsed(const nsIID* iid);
-    static XPCNativeSet* GetNewOrUsed(nsIClassInfo* classInfo);
-    static XPCNativeSet* GetNewOrUsed(XPCNativeSetKey* key);
+    NS_INLINE_DECL_REFCOUNTING_WITH_DESTROY(XPCNativeSet,
+                                            DestroyInstance(this))
+
+    static already_AddRefed<XPCNativeSet> GetNewOrUsed(const nsIID* iid);
+    static already_AddRefed<XPCNativeSet> GetNewOrUsed(nsIClassInfo* classInfo);
+    static already_AddRefed<XPCNativeSet> GetNewOrUsed(XPCNativeSetKey* key);
 
     // This generates a union set.
     //
@@ -1348,9 +1351,9 @@ class XPCNativeSet final
     // algorithm is applied; but if we detect that |secondSet| is a superset of
     // |firstSet|, we return |secondSet| without worrying about whether the
     // ordering might differ from |firstSet|.
-    static XPCNativeSet* GetNewOrUsed(XPCNativeSet* firstSet,
-                                      XPCNativeSet* secondSet,
-                                      bool preserveFirstSetOrder);
+    static already_AddRefed<XPCNativeSet> GetNewOrUsed(XPCNativeSet* firstSet,
+                                                       XPCNativeSet* secondSet,
+                                                       bool preserveFirstSetOrder);
 
     static void ClearCacheEntryForClassInfo(nsIClassInfo* classInfo);
 
@@ -1401,7 +1404,7 @@ class XPCNativeSet final
         mMarked = 0;
     }
     bool IsMarked() const {
-        return !!mMarked;
+        return false;
     }
 
 #ifdef DEBUG
@@ -1410,25 +1413,19 @@ class XPCNativeSet final
 
     void DebugDump(int16_t depth);
 
-    static void DestroyInstance(XPCNativeSet* inst);
-
     size_t SizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf);
 
   protected:
-    static XPCNativeSet* NewInstance(nsTArray<RefPtr<XPCNativeInterface>>&& array);
-    static XPCNativeSet* NewInstanceMutate(XPCNativeSetKey* key);
+    static already_AddRefed<XPCNativeSet> NewInstance(nsTArray<RefPtr<XPCNativeInterface>>&& array);
+    static already_AddRefed<XPCNativeSet> NewInstanceMutate(XPCNativeSetKey* key);
+
     XPCNativeSet()
       : mMemberCount(0), mInterfaceCount(0), mMarked(0)
-    {
-        MOZ_COUNT_CTOR(XPCNativeSet);
-    }
-    ~XPCNativeSet() {
-        for (int i = 0; i < mInterfaceCount; i++) {
-            NS_RELEASE(mInterfaces[i]);
-        }
-        MOZ_COUNT_DTOR(XPCNativeSet);
-    }
+    {}
+    ~XPCNativeSet();
     void* operator new(size_t, void* p) CPP_THROW_NEW {return p;}
+
+    static void DestroyInstance(XPCNativeSet* inst);
 
   private:
     uint16_t                mMemberCount;
@@ -1703,7 +1700,7 @@ protected:
     // hide ctor
     XPCWrappedNativeProto(XPCWrappedNativeScope* Scope,
                           nsIClassInfo* ClassInfo,
-                          XPCNativeSet* Set);
+                          already_AddRefed<XPCNativeSet>&& Set);
 
     bool Init(const XPCNativeScriptableCreateInfo* scriptableCreateInfo,
               bool callPostCreatePrototype);
@@ -1717,7 +1714,7 @@ private:
     XPCWrappedNativeScope*   mScope;
     JS::ObjectPtr            mJSProtoObject;
     nsCOMPtr<nsIClassInfo>   mClassInfo;
-    XPCNativeSet*            mSet;
+    RefPtr<XPCNativeSet>     mSet;
     XPCNativeScriptableInfo* mScriptableInfo;
 };
 
@@ -1869,7 +1866,7 @@ public:
     GetSet() const {return mSet;}
 
     void
-    SetSet(XPCNativeSet* set) {mSet = set;}
+    SetSet(already_AddRefed<XPCNativeSet> set) {mSet = set;}
 
     static XPCWrappedNative* Get(JSObject* obj) {
         MOZ_ASSERT(IS_WN_REFLECTOR(obj));
@@ -2012,7 +2009,7 @@ protected:
     // This ctor is used if this object will NOT have a proto.
     XPCWrappedNative(already_AddRefed<nsISupports>&& aIdentity,
                      XPCWrappedNativeScope* aScope,
-                     XPCNativeSet* aSet);
+                     already_AddRefed<XPCNativeSet>&& aSet);
 
     virtual ~XPCWrappedNative();
     void Destroy();
@@ -2048,7 +2045,7 @@ private:
         XPCWrappedNativeScope* mMaybeScope;
         XPCWrappedNativeProto* mMaybeProto;
     };
-    XPCNativeSet* mSet;
+    RefPtr<XPCNativeSet> mSet;
     JS::TenuredHeap<JSObject*> mFlatJSObject;
     XPCNativeScriptableInfo* mScriptableInfo;
     XPCWrappedNativeTearOff mFirstTearOff;
@@ -2894,7 +2891,6 @@ class TypedAutoMarkingPtr : public AutoMarkingPtr
     T* mPtr;
 };
 
-typedef TypedAutoMarkingPtr<XPCNativeSet> AutoMarkingNativeSetPtr;
 typedef TypedAutoMarkingPtr<XPCWrappedNative> AutoMarkingWrappedNativePtr;
 typedef TypedAutoMarkingPtr<XPCWrappedNativeTearOff> AutoMarkingWrappedNativeTearOffPtr;
 typedef TypedAutoMarkingPtr<XPCWrappedNativeProto> AutoMarkingWrappedNativeProtoPtr;
