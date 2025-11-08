@@ -4,7 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "nsLocation.h"
+#include "Location.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsIScriptObjectPrincipal.h"
 #include "nsIScriptContext.h"
@@ -35,8 +35,8 @@
 #include "ScriptSettings.h"
 #include "mozilla/dom/LocationBinding.h"
 
-using namespace mozilla;
-using namespace mozilla::dom;
+namespace mozilla {
+namespace dom {
 
 static nsresult
 GetDocumentCharacterSetForURI(const nsAString& aHref, nsACString& aCharset)
@@ -50,7 +50,7 @@ GetDocumentCharacterSetForURI(const nsAString& aHref, nsACString& aCharset)
   return NS_OK;
 }
 
-nsLocation::nsLocation(nsPIDOMWindowInner* aWindow, nsIDocShell *aDocShell)
+Location::Location(nsPIDOMWindowInner* aWindow, nsIDocShell *aDocShell)
   : mInnerWindow(aWindow)
 {
   MOZ_ASSERT(aDocShell);
@@ -59,49 +59,49 @@ nsLocation::nsLocation(nsPIDOMWindowInner* aWindow, nsIDocShell *aDocShell)
   mDocShell = do_GetWeakReference(aDocShell);
 }
 
-nsLocation::~nsLocation()
+Location::~Location()
 {
 }
 
-// QueryInterface implementation for nsLocation
-NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(nsLocation)
+// QueryInterface implementation for Location
+NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION(Location)
   NS_WRAPPERCACHE_INTERFACE_MAP_ENTRY
   NS_INTERFACE_MAP_ENTRY(nsIDOMLocation)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMLocation)
 NS_INTERFACE_MAP_END
 
-NS_IMPL_CYCLE_COLLECTION_CLASS(nsLocation)
+NS_IMPL_CYCLE_COLLECTION_CLASS(Location)
 
-NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsLocation)
+NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(Location)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mInnerWindow);
   NS_IMPL_CYCLE_COLLECTION_UNLINK_PRESERVED_WRAPPER
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
-NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsLocation)
+NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Location)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mInnerWindow)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE_SCRIPT_OBJECTS
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
-NS_IMPL_CYCLE_COLLECTION_TRACE_WRAPPERCACHE(nsLocation)
+NS_IMPL_CYCLE_COLLECTION_TRACE_WRAPPERCACHE(Location)
 
-NS_IMPL_CYCLE_COLLECTING_ADDREF(nsLocation)
-NS_IMPL_CYCLE_COLLECTING_RELEASE(nsLocation)
+NS_IMPL_CYCLE_COLLECTING_ADDREF(Location)
+NS_IMPL_CYCLE_COLLECTING_RELEASE(Location)
 
 void
-nsLocation::SetDocShell(nsIDocShell *aDocShell)
+Location::SetDocShell(nsIDocShell *aDocShell)
 {
    mDocShell = do_GetWeakReference(aDocShell);
 }
 
 nsIDocShell *
-nsLocation::GetDocShell()
+Location::GetDocShell()
 {
   nsCOMPtr<nsIDocShell> docshell(do_QueryReferent(mDocShell));
   return docshell;
 }
 
 nsresult
-nsLocation::CheckURL(nsIURI* aURI, nsIDocShellLoadInfo** aLoadInfo)
+Location::CheckURL(nsIURI* aURI, nsIDocShellLoadInfo** aLoadInfo)
 {
   *aLoadInfo = nullptr;
 
@@ -164,10 +164,11 @@ nsLocation::CheckURL(nsIURI* aURI, nsIDocShellLoadInfo** aLoadInfo)
         sourceURI = docCurrentURI;
       }
       else {
-        // Use principalURI as long as it is not an nsNullPrincipalURI.
-        // We could add a method such as GetReferrerURI to principals to make this
-        // cleaner, but given that we need to start using Source Browsing Context
-        // for referrer (see Bug 960639) this may be wasted effort at this stage.
+        // Use principalURI as long as it is not an nsNullPrincipalURI.  We
+        // could add a method such as GetReferrerURI to principals to make this
+        // cleaner, but given that we need to start using Source Browsing
+        // Context for referrer (see Bug 960639) this may be wasted effort at
+        // this stage.
         if (principalURI) {
           bool isNullPrincipalScheme;
           rv = principalURI->SchemeIs(NS_NULLPRINCIPAL_SCHEME,
@@ -205,7 +206,7 @@ nsLocation::CheckURL(nsIURI* aURI, nsIDocShellLoadInfo** aLoadInfo)
 }
 
 nsresult
-nsLocation::GetURI(nsIURI** aURI, bool aGetInnermostURI)
+Location::GetURI(nsIURI** aURI, bool aGetInnermostURI)
 {
   *aURI = nullptr;
 
@@ -243,7 +244,7 @@ nsLocation::GetURI(nsIURI** aURI, bool aGetInnermostURI)
 }
 
 nsresult
-nsLocation::GetWritableURI(nsIURI** aURI, const nsACString* aNewRef)
+Location::GetWritableURI(nsIURI** aURI, const nsACString* aNewRef)
 {
   *aURI = nullptr;
 
@@ -262,7 +263,7 @@ nsLocation::GetWritableURI(nsIURI** aURI, const nsACString* aNewRef)
 }
 
 nsresult
-nsLocation::SetURI(nsIURI* aURI, bool aReplace)
+Location::SetURI(nsIURI* aURI, bool aReplace)
 {
   nsCOMPtr<nsIDocShell> docShell(do_QueryReferent(mDocShell));
   if (docShell) {
@@ -292,7 +293,7 @@ nsLocation::SetURI(nsIURI* aURI, bool aReplace)
 }
 
 NS_IMETHODIMP
-nsLocation::GetHash(nsAString& aHash)
+Location::GetHash(nsAString& aHash)
 {
   aHash.SetLength(0);
 
@@ -351,7 +352,7 @@ nsLocation::GetHash(nsAString& aHash)
 }
 
 NS_IMETHODIMP
-nsLocation::SetHash(const nsAString& aHash)
+Location::SetHash(const nsAString& aHash)
 {
   NS_ConvertUTF16toUTF8 hash(aHash);
   if (hash.IsEmpty() || hash.First() != char16_t('#')) {
@@ -367,7 +368,7 @@ nsLocation::SetHash(const nsAString& aHash)
 }
 
 NS_IMETHODIMP
-nsLocation::GetHost(nsAString& aHost)
+Location::GetHost(nsAString& aHost)
 {
   aHost.Truncate();
 
@@ -390,7 +391,7 @@ nsLocation::GetHost(nsAString& aHost)
 }
 
 NS_IMETHODIMP
-nsLocation::SetHost(const nsAString& aHost)
+Location::SetHost(const nsAString& aHost)
 {
   if (aHost.IsEmpty()) {
     return NS_OK; // Ignore empty string
@@ -411,7 +412,7 @@ nsLocation::SetHost(const nsAString& aHost)
 }
 
 NS_IMETHODIMP
-nsLocation::GetHostname(nsAString& aHostname)
+Location::GetHostname(nsAString& aHostname)
 {
   aHostname.Truncate();
 
@@ -425,7 +426,7 @@ nsLocation::GetHostname(nsAString& aHostname)
 }
 
 NS_IMETHODIMP
-nsLocation::SetHostname(const nsAString& aHostname)
+Location::SetHostname(const nsAString& aHostname)
 {
   if (aHostname.IsEmpty()) {
     return NS_OK; // Ignore empty string
@@ -446,7 +447,7 @@ nsLocation::SetHostname(const nsAString& aHostname)
 }
 
 NS_IMETHODIMP
-nsLocation::GetHref(nsAString& aHref)
+Location::GetHref(nsAString& aHref)
 {
   aHref.Truncate();
 
@@ -469,7 +470,7 @@ nsLocation::GetHref(nsAString& aHref)
 }
 
 NS_IMETHODIMP
-nsLocation::SetHref(const nsAString& aHref)
+Location::SetHref(const nsAString& aHref)
 {
   nsAutoString oldHref;
   nsresult rv = NS_OK;
@@ -495,7 +496,7 @@ nsLocation::SetHref(const nsAString& aHref)
 }
 
 nsresult
-nsLocation::SetHrefWithContext(JSContext* cx, const nsAString& aHref,
+Location::SetHrefWithContext(JSContext* cx, const nsAString& aHref,
                                bool aReplace)
 {
   nsCOMPtr<nsIURI> base;
@@ -511,7 +512,7 @@ nsLocation::SetHrefWithContext(JSContext* cx, const nsAString& aHref,
 }
 
 nsresult
-nsLocation::SetHrefWithBase(const nsAString& aHref, nsIURI* aBase,
+Location::SetHrefWithBase(const nsAString& aHref, nsIURI* aBase,
                             bool aReplace)
 {
   if (aHref.IsEmpty()) {
@@ -565,7 +566,7 @@ nsLocation::SetHrefWithBase(const nsAString& aHref, nsIURI* aBase,
 }
 
 NS_IMETHODIMP
-nsLocation::GetOrigin(nsAString& aOrigin)
+Location::GetOrigin(nsAString& aOrigin)
 {
   aOrigin.Truncate();
 
@@ -583,7 +584,7 @@ nsLocation::GetOrigin(nsAString& aOrigin)
 }
 
 NS_IMETHODIMP
-nsLocation::GetPathname(nsAString& aPathname)
+Location::GetPathname(nsAString& aPathname)
 {
   aPathname.Truncate();
 
@@ -607,7 +608,7 @@ nsLocation::GetPathname(nsAString& aPathname)
 }
 
 NS_IMETHODIMP
-nsLocation::SetPathname(const nsAString& aPathname)
+Location::SetPathname(const nsAString& aPathname)
 {
   nsCOMPtr<nsIURI> uri;
   nsresult rv = GetWritableURI(getter_AddRefs(uri));
@@ -624,7 +625,7 @@ nsLocation::SetPathname(const nsAString& aPathname)
 }
 
 NS_IMETHODIMP
-nsLocation::GetPort(nsAString& aPort)
+Location::GetPort(nsAString& aPort)
 {
   aPort.SetLength(0);
 
@@ -651,7 +652,7 @@ nsLocation::GetPort(nsAString& aPort)
 }
 
 NS_IMETHODIMP
-nsLocation::SetPort(const nsAString& aPort)
+Location::SetPort(const nsAString& aPort)
 {
   nsCOMPtr<nsIURI> uri;
   nsresult rv = GetWritableURI(getter_AddRefs(uri));
@@ -682,7 +683,7 @@ nsLocation::SetPort(const nsAString& aPort)
 }
 
 NS_IMETHODIMP
-nsLocation::GetProtocol(nsAString& aProtocol)
+Location::GetProtocol(nsAString& aProtocol)
 {
   aProtocol.SetLength(0);
 
@@ -706,7 +707,7 @@ nsLocation::GetProtocol(nsAString& aProtocol)
 }
 
 NS_IMETHODIMP
-nsLocation::SetProtocol(const nsAString& aProtocol)
+Location::SetProtocol(const nsAString& aProtocol)
 {
   if (aProtocol.IsEmpty()) {
     return NS_OK; // Ignore empty string
@@ -738,7 +739,7 @@ nsLocation::SetProtocol(const nsAString& aProtocol)
 }
 
 void
-nsLocation::GetUsername(nsAString& aUsername, ErrorResult& aError)
+Location::GetUsername(nsAString& aUsername, ErrorResult& aError)
 {
   THROW_AND_RETURN_IF_CALLER_DOESNT_SUBSUME();
 
@@ -755,7 +756,7 @@ nsLocation::GetUsername(nsAString& aUsername, ErrorResult& aError)
 }
 
 void
-nsLocation::SetUsername(const nsAString& aUsername, ErrorResult& aError)
+Location::SetUsername(const nsAString& aUsername, ErrorResult& aError)
 {
   THROW_AND_RETURN_IF_CALLER_DOESNT_SUBSUME();
 
@@ -780,7 +781,7 @@ nsLocation::SetUsername(const nsAString& aUsername, ErrorResult& aError)
 }
 
 void
-nsLocation::GetPassword(nsAString& aPassword, ErrorResult& aError)
+Location::GetPassword(nsAString& aPassword, ErrorResult& aError)
 {
   THROW_AND_RETURN_IF_CALLER_DOESNT_SUBSUME();
 
@@ -797,7 +798,7 @@ nsLocation::GetPassword(nsAString& aPassword, ErrorResult& aError)
 }
 
 void
-nsLocation::SetPassword(const nsAString& aPassword, ErrorResult& aError)
+Location::SetPassword(const nsAString& aPassword, ErrorResult& aError)
 {
   THROW_AND_RETURN_IF_CALLER_DOESNT_SUBSUME();
 
@@ -822,7 +823,7 @@ nsLocation::SetPassword(const nsAString& aPassword, ErrorResult& aError)
 }
 
 NS_IMETHODIMP
-nsLocation::GetSearch(nsAString& aSearch)
+Location::GetSearch(nsAString& aSearch)
 {
   aSearch.SetLength(0);
 
@@ -848,7 +849,7 @@ nsLocation::GetSearch(nsAString& aSearch)
 }
 
 NS_IMETHODIMP
-nsLocation::SetSearch(const nsAString& aSearch)
+Location::SetSearch(const nsAString& aSearch)
 {
   if (aSearch.IsEmpty()) {
     return NS_OK; // Ignore empty string
@@ -863,7 +864,7 @@ nsLocation::SetSearch(const nsAString& aSearch)
 }
 
 nsresult
-nsLocation::SetSearchInternal(const nsAString& aSearch)
+Location::SetSearchInternal(const nsAString& aSearch)
 {
   nsCOMPtr<nsIURI> uri;
   nsresult rv = GetWritableURI(getter_AddRefs(uri));
@@ -882,12 +883,13 @@ nsLocation::SetSearchInternal(const nsAString& aSearch)
 }
 
 NS_IMETHODIMP
-nsLocation::Reload(bool aForceget)
+Location::Reload(bool aForceget)
 {
   nsresult rv;
   nsCOMPtr<nsIDocShell> docShell(do_QueryReferent(mDocShell));
   nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(docShell));
-  nsCOMPtr<nsPIDOMWindowOuter> window = docShell ? docShell->GetWindow() : nullptr;
+  nsCOMPtr<nsPIDOMWindowOuter> window = docShell ? docShell->GetWindow()
+                                                 : nullptr;
 
   if (window && window->IsHandlingResizeEvent()) {
     // location.reload() was called on a window that is handling a
@@ -930,7 +932,7 @@ nsLocation::Reload(bool aForceget)
 }
 
 NS_IMETHODIMP
-nsLocation::Replace(const nsAString& aUrl)
+Location::Replace(const nsAString& aUrl)
 {
   nsresult rv = NS_OK;
   if (JSContext *cx = nsContentUtils::GetCurrentJSContext()) {
@@ -951,7 +953,7 @@ nsLocation::Replace(const nsAString& aUrl)
 }
 
 NS_IMETHODIMP
-nsLocation::Assign(const nsAString& aUrl)
+Location::Assign(const nsAString& aUrl)
 {
   if (JSContext *cx = nsContentUtils::GetCurrentJSContext()) {
     return SetHrefWithContext(cx, aUrl, false);
@@ -976,13 +978,13 @@ nsLocation::Assign(const nsAString& aUrl)
 }
 
 NS_IMETHODIMP
-nsLocation::ToString(nsAString& aReturn)
+Location::ToString(nsAString& aReturn)
 {
   return GetHref(aReturn);
 }
 
 NS_IMETHODIMP
-nsLocation::ValueOf(nsIDOMLocation** aReturn)
+Location::ValueOf(nsIDOMLocation** aReturn)
 {
   nsCOMPtr<nsIDOMLocation> loc(this);
   loc.forget(aReturn);
@@ -990,18 +992,19 @@ nsLocation::ValueOf(nsIDOMLocation** aReturn)
 }
 
 nsresult
-nsLocation::GetSourceBaseURL(JSContext* cx, nsIURI** sourceURL)
+Location::GetSourceBaseURL(JSContext* cx, nsIURI** sourceURL)
 {
   *sourceURL = nullptr;
   nsIDocument* doc = GetEntryDocument();
   // If there's no entry document, we either have no Script Entry Point or one
-  // that isn't a DOM Window.  This doesn't generally happen with the DOM,
-  // but can sometimes happen with extension code in certain IPC configurations.
-  // If this happens, try falling back on the current document associated with
-  // the docshell. If that fails, just return null and hope that the caller passed
+  // that isn't a DOM Window.  This doesn't generally happen with the DOM, but
+  // can sometimes happen with extension code in certain IPC configurations.  If
+  // this happens, try falling back on the current document associated with the
+  // docshell. If that fails, just return null and hope that the caller passed
   // an absolute URI.
   if (!doc && GetDocShell()) {
-    nsCOMPtr<nsPIDOMWindowOuter> docShellWin = do_QueryInterface(GetDocShell()->GetScriptGlobalObject());
+    nsCOMPtr<nsPIDOMWindowOuter> docShellWin =
+      do_QueryInterface(GetDocShell()->GetScriptGlobalObject());
     if (docShellWin) {
       doc = docShellWin->GetDoc();
     }
@@ -1012,7 +1015,7 @@ nsLocation::GetSourceBaseURL(JSContext* cx, nsIURI** sourceURL)
 }
 
 bool
-nsLocation::CallerSubsumes()
+Location::CallerSubsumes()
 {
   // Get the principal associated with the location object.  Note that this is
   // the principal of the page which will actually be navigated, not the
@@ -1024,13 +1027,17 @@ nsLocation::CallerSubsumes()
     return false;
   nsCOMPtr<nsIScriptObjectPrincipal> sop = do_QueryInterface(outer);
   bool subsumes = false;
-  nsresult rv = nsContentUtils::SubjectPrincipal()->SubsumesConsideringDomain(sop->GetPrincipal(), &subsumes);
+  nsresult rv =
+    nsContentUtils::SubjectPrincipal()->SubsumesConsideringDomain(sop->GetPrincipal(), &subsumes);
   NS_ENSURE_SUCCESS(rv, false);
   return subsumes;
 }
 
 JSObject*
-nsLocation::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
+Location::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aGivenProto)
 {
   return LocationBinding::Wrap(aCx, this, aGivenProto);
 }
+
+} // dom namespace
+} // mozilla namespace
