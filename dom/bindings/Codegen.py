@@ -12341,6 +12341,7 @@ class CGDictionary(CGThing):
                 Maybe<JS::Rooted<JSObject *> > object;
                 Maybe<JS::Rooted<JS::Value> > temp;
                 if (!isNull) {
+                  MOZ_ASSERT(cx);
                   object.emplace(cx, &val.toObject());
                   temp.emplace(cx);
                 }
