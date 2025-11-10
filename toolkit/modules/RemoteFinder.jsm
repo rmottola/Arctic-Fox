@@ -223,6 +223,7 @@ function RemoteFinderListener(global) {
   for (let msg of this.MESSAGES) {
     global.addMessageListener(msg, this);
   }
+  global.addEventListener("unload", this.destroy.bind(this));
 }
 
 RemoteFinderListener.prototype = {
@@ -244,6 +245,13 @@ RemoteFinderListener.prototype = {
     "Finder:MatchesCount",
     "Finder:ModalHighlightChange"
   ],
+
+  destroy() {
+    this._finder.destroy();
+    for (let msg of this.MESSAGES)
+      this._global.removeMessageListener(msg, this);
+    this._finder = this._global = null;
+  },
 
   onFindResult: function (aData) {
     this._global.sendAsyncMessage("Finder:Result", aData);
