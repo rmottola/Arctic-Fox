@@ -774,13 +774,14 @@ FinderHighlighter.prototype = {
    * Read and store the rectangles that encompass the entire region of a range
    * for use by the drawing function of the highlighter.
    *
-   * @param {nsIDOMRange} range            Range to fetch the rectangles from
-   * @param {Boolean}     [checkIfDynamic] Whether we should check if the range
-   *                                       is dynamic as per the rules in
-   *                                       `_isInDynamicContainer()`. Optional,
-   *                                       defaults to `true`
-   * @param {Object}     [dict]            Dictionary of properties belonging to
-   *                                       the currently active window
+   * @param  {nsIDOMRange} range            Range to fetch the rectangles from
+   * @param  {Boolean}     [checkIfDynamic] Whether we should check if the range
+   *                                        is dynamic as per the rules in
+   *                                        `_isInDynamicContainer()`. Optional,
+   *                                        defaults to `true`
+   * @param  {Object}      [dict]           Dictionary of properties belonging to
+   *                                        the currently active window
+   * @return {Set}         Set of rects that were found for the range
    */
   _updateRangeRects(range, checkIfDynamic = true, dict = null) {
     let window = range.startContainer.ownerDocument.defaultView;
@@ -813,6 +814,7 @@ FinderHighlighter.prototype = {
     dict.modalHighlightRectsMap.set(range, rects);
     if (checkIfDynamic && this._isInDynamicContainer(range))
       dict.dynamicRangesSet.add(range);
+    return rects;
   },
 
   /**
@@ -843,7 +845,7 @@ FinderHighlighter.prototype = {
    */
   _updateRangeOutline(dict, textContent = [], fontStyle = null) {
     let outlineNode = dict.modalHighlightOutline;
-    let range = dict.currentFoundRange;
+    let range = this.finder._fastFind.getFoundRange();
     if (!outlineNode || !range)
       return;
     let rect = range.getClientRects()[0];
@@ -978,11 +980,14 @@ FinderHighlighter.prototype = {
       let maskContent = [];
       const kRectClassName = kModalIdPrefix + "-findbar-modalHighlight-rect";
       for (let [range, rects] of dict.modalHighlightRectsMap) {
+        if (dict.updateAllRanges)
+          rects = this._updateRangeRects(range);
         for (let rect of rects) {
           maskContent.push(`<div class="${kRectClassName}" style="top: ${rect.y}px;
             left: ${rect.x}px; height: ${rect.height}px; width: ${rect.width}px;"></div>`);
         }
       }
+      dict.updateAllRanges = false;
       maskNode.innerHTML = maskContent.join("");
     }
 
@@ -1026,14 +1031,17 @@ FinderHighlighter.prototype = {
    * @param {nsIDOMWindow} window
    * @param {Object}       options Dictionary of painter hints that contains the
    *                               following properties:
-   *   {Boolean} contentChanged Whether the documents' content changed in the
-   *                            meantime. This happens when the DOM is updated
-   *                            whilst the page is loaded.
-   *   {Boolean} scrollOnly     TRUE when the page has scrolled in the meantime,
-   *                            which means that the fixed positioned elements
-   *                            need to be repainted.
+   *   {Boolean} contentChanged  Whether the documents' content changed in the
+   *                             meantime. This happens when the DOM is updated
+   *                             whilst the page is loaded.
+   *   {Boolean} scrollOnly      TRUE when the page has scrolled in the meantime,
+   *                             which means that the fixed positioned elements
+   *                             need to be repainted.
+   *   {Boolean} updateAllRanges Whether to recalculate the rects of all ranges
+   *                             that were found up until now.
    */
-  _scheduleRepaintOfMask(window, { contentChanged, scrollOnly } = { contentChanged: false, scrollOnly: false }) {
+  _scheduleRepaintOfMask(window, { contentChanged, scrollOnly, updateAllRanges } =
+                                 { contentChanged: false, scrollOnly: false, updateAllRanges: false }) {
     if (!this._modal)
       return;
 
@@ -1045,6 +1053,9 @@ FinderHighlighter.prototype = {
     // `_repaintHighlightAllMask()` right after the timeout.
     if (!dict.unconditionalRepaintRequested)
       dict.unconditionalRepaintRequested = !contentChanged || repaintFixedNodes;
+    // Some events, like a resize, call for recalculation of all the rects of all ranges.
+    if (!dict.updateAllRanges)
+      dict.updateAllRanges = updateAllRanges;
 
     if (dict.modalRepaintScheduler)
       return;
@@ -1107,14 +1118,16 @@ FinderHighlighter.prototype = {
     window = window.top;
     dict.highlightListeners = [
       this._scheduleRepaintOfMask.bind(this, window, { contentChanged: true }),
+      this._scheduleRepaintOfMask.bind(this, window, { updateAllRanges: true }),
       this._scheduleRepaintOfMask.bind(this, window, { scrollOnly: true }),
       this.hide.bind(this, window, null)
     ];
     let target = this.iterator._getDocShell(window).chromeEventHandler;
     target.addEventListener("MozAfterPaint", dict.highlightListeners[0]);
-    target.addEventListener("DOMMouseScroll", dict.highlightListeners[1]);
-    target.addEventListener("mousewheel", dict.highlightListeners[1]);
-    target.addEventListener("click", dict.highlightListeners[2]);
+    target.addEventListener("resize", dict.highlightListeners[1]);
+    target.addEventListener("DOMMouseScroll", dict.highlightListeners[2]);
+    target.addEventListener("mousewheel", dict.highlightListeners[2]);
+    target.addEventListener("click", dict.highlightListeners[3]);
   },
 
   /**
@@ -1130,9 +1143,10 @@ FinderHighlighter.prototype = {
 
     let target = this.iterator._getDocShell(window).chromeEventHandler;
     target.removeEventListener("MozAfterPaint", dict.highlightListeners[0]);
-    target.removeEventListener("DOMMouseScroll", dict.highlightListeners[1]);
-    target.removeEventListener("mousewheel", dict.highlightListeners[1]);
-    target.removeEventListener("click", dict.highlightListeners[2]);
+    target.removeEventListener("resize", dict.highlightListeners[1]);
+    target.removeEventListener("DOMMouseScroll", dict.highlightListeners[2]);
+    target.removeEventListener("mousewheel", dict.highlightListeners[2]);
+    target.removeEventListener("click", dict.highlightListeners[3]);
 
     dict.highlightListeners = null;
   },
