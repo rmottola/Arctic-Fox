@@ -96,7 +96,8 @@ add_task(function* initializeState() {
       gPrefs.clearUserPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_LAST_UPDATE, addon.id));
       gPrefs.clearUserPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_AUTOUPDATE, addon.id));
       gPrefs.clearUserPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_VERSION, addon.id));
-      gPrefs.clearUserPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_FORCEVISIBLE, addon.id));
+      gPrefs.clearUserPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_VISIBLE, addon.id));
+      gPrefs.clearUserPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_FORCE_SUPPORTED, addon.id));
     }
     gPrefs.clearUserPref(GMPScope.GMPPrefs.KEY_LOGGING_DUMP);
     gPrefs.clearUserPref(GMPScope.GMPPrefs.KEY_LOGGING_LEVEL);
@@ -119,8 +120,8 @@ add_task(function* initializeState() {
     gPrefs.setIntPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_LAST_UPDATE, addon.id), 0);
     gPrefs.setBoolPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_AUTOUPDATE, addon.id), false);
     gPrefs.setCharPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_VERSION, addon.id), "");
-    gPrefs.setBoolPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_FORCEVISIBLE, addon.id),
-                       true);
+    gPrefs.setBoolPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_VISIBLE, addon.id), true);
+    gPrefs.setBoolPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_FORCE_SUPPORTED, addon.id), true);
   }
   yield GMPScope.GMPProvider.shutdown();
   GMPScope.GMPProvider.startup();
@@ -365,7 +366,7 @@ add_task(function* testUpdateButton() {
 
 add_task(function* testEmeSupport() {
   for (let addon of gMockAddons) {
-    gPrefs.clearUserPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_FORCEVISIBLE, addon.id));
+    gPrefs.clearUserPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_FORCE_SUPPORTED, addon.id));
   }
   yield GMPScope.GMPProvider.shutdown();
   GMPScope.GMPProvider.startup();
@@ -388,8 +389,8 @@ add_task(function* testEmeSupport() {
   }
 
   for (let addon of gMockAddons) {
-    gPrefs.setBoolPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_FORCEVISIBLE, addon.id),
-                       true);
+    gPrefs.setBoolPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_VISIBLE, addon.id), true);
+    gPrefs.setBoolPref(getKey(GMPScope.GMPPrefs.KEY_PLUGIN_FORCE_SUPPORTED, addon.id), true);
   }
   yield GMPScope.GMPProvider.shutdown();
   GMPScope.GMPProvider.startup();
