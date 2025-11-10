@@ -49,7 +49,7 @@ function promiseFindResult(findbar, str = null) {
 function promiseEnterStringIntoFindField(findbar, str) {
   let promise = promiseFindResult(findbar, str);
   for (let i = 0; i < str.length; i++) {
-    let event = document.createEvent("KeyEvents");
+    let event = document.createEvent("KeyboardEvent");
     event.initKeyEvent("keypress", true, true, null, false, false,
                        false, false, 0, str.charCodeAt(i));
     findbar._findField.inputField.dispatchEvent(event);
@@ -333,5 +333,89 @@ add_task(function* testHighlightAllToggle() {
     promise = promiseTestHighlighterOutput(browser, word, expectedResult);
     yield SpecialPowers.pushPrefEnv({ "set": [[ kHighlightAllPref, true ]] });
     yield promise;
+  });
+});
+
+add_task(function* testXMLDocument() {
+  let url = "data:text/xml;charset=utf-8," + encodeURIComponent(`<?xml version="1.0"?>
+<result>
+  <Title>Example</Title>
+  <Error>Error</Error>
+</result>`);
+  yield BrowserTestUtils.withNewTab(url, function* (browser) {
+    let findbar = gBrowser.getFindBar();
+
+    yield promiseOpenFindbar(findbar);
+
+    let word = "Example";
+    let expectedResult = {
+      rectCount: 0,
+      insertCalls: [1, 4],
+      removeCalls: [1, 2]
+    };
+    let promise = promiseTestHighlighterOutput(browser, word, expectedResult);
+    yield promiseEnterStringIntoFindField(findbar, word);
+    yield promise;
+
+    findbar.close(true);
+  });
+});
+
+add_task(function* testHideOnLocationChange() {
+  let url = kFixtureBaseURL + "file_FinderSample.html";
+  let tab = yield BrowserTestUtils.openNewForegroundTab(gBrowser, url);
+  let browser = tab.linkedBrowser;
+  let findbar = gBrowser.getFindBar();
+
+  yield promiseOpenFindbar(findbar);
+
+  let word = "Roland";
+  let expectedResult = {
+    rectCount: 1,
+    insertCalls: [2, 4],
+    removeCalls: [1, 2]
+  };
+  let promise = promiseTestHighlighterOutput(browser, word, expectedResult);
+  yield promiseEnterStringIntoFindField(findbar, word);
+  yield promise;
+
+  // Now we try to navigate away! (Using the same page)
+  promise = promiseTestHighlighterOutput(browser, word, {
+    rectCount: 0,
+    insertCalls: [0, 0],
+    removeCalls: [1, 2]
+  });
+  yield BrowserTestUtils.loadURI(browser, url);
+  yield promise;
+
+  yield BrowserTestUtils.removeTab(tab);
+});
+
+add_task(function* testHideOnClear() {
+  let url = kFixtureBaseURL + "file_FinderSample.html";
+  yield BrowserTestUtils.withNewTab(url, function* (browser) {
+    let findbar = gBrowser.getFindBar();
+    yield promiseOpenFindbar(findbar);
+
+    let word = "Roland";
+    let expectedResult = {
+      rectCount: 1,
+      insertCalls: [2, 4],
+      removeCalls: [1, 2]
+    };
+    let promise = promiseTestHighlighterOutput(browser, word, expectedResult);
+    yield promiseEnterStringIntoFindField(findbar, word);
+    yield promise;
+
+    yield new Promise(resolve => setTimeout(resolve, kIteratorTimeout));
+    promise = promiseTestHighlighterOutput(browser, "", {
+      rectCount: 0,
+      insertCalls: [0, 0],
+      removeCalls: [1, 2]
+    });
+    findbar.clear();
+    yield promise;
+
+    findbar.close(true);
   });
 });

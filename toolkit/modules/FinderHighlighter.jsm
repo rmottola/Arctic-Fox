@@ -227,6 +227,8 @@ FinderHighlighter.prototype = {
       this._found = true;
     }
 
+    this.notifyFinished({ highlight, found: this._found });
+
     return this._found;
   }),
 
