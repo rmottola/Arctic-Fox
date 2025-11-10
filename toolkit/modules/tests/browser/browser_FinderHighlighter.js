@@ -139,24 +139,24 @@ add_task(function* setup() {
 add_task(function* testModalResults() {
   let tests = new Map([
     ["Roland", {
-      rectCount: 2,
+      rectCount: 1,
       insertCalls: [2, 4],
       removeCalls: [1, 2]
     }],
     ["ro", {
-      rectCount: 41,
+      rectCount: 40,
       insertCalls: [1, 4],
       removeCalls: [1, 3]
     }],
     ["new", {
-      rectCount: 2,
+      rectCount: 1,
       insertCalls: [1, 4],
       removeCalls: [1, 3]
     }],
     ["o", {
-      rectCount: 492,
-      insertCalls: [1, 4],
-      removeCalls: [1, 3]
+      rectCount: 491,
+      insertCalls: [3, 7],
+      removeCalls: [3, 6]
     }]
   ]);
   let url = kFixtureBaseURL + "file_FinderSample.html";
@@ -188,7 +188,7 @@ add_task(function* testModalSwitching() {
 
     let word = "Roland";
     let expectedResult = {
-      rectCount: 2,
+      rectCount: 1,
       insertCalls: [2, 4],
       removeCalls: [1, 2]
     };
@@ -224,7 +224,7 @@ add_task(function* testDarkPageDetection() {
 
     let word = "Roland";
     let expectedResult = {
-      rectCount: 2,
+      rectCount: 1,
       insertCalls: [2, 4],
       removeCalls: [1, 2]
     };
@@ -244,7 +244,7 @@ add_task(function* testDarkPageDetection() {
 
     let word = "Roland";
     let expectedResult = {
-      rectCount: 2,
+      rectCount: 1,
       insertCalls: [2, 4],
       removeCalls: [1, 2]
     };
@@ -281,7 +281,7 @@ add_task(function* testHighlightAllToggle() {
 
     let word = "Roland";
     let expectedResult = {
-      rectCount: 2,
+      rectCount: 1,
       insertCalls: [2, 4],
       removeCalls: [1, 2]
     };

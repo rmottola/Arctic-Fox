@@ -78,7 +78,7 @@ const kModalStyles = {
     ["padding", "0 1px 2px 1px !important"],
     ["position", "absolute"]
   ],
-  maskRectBrightText: [ "background", "#000" ]
+  maskRectBrightText: [ ["background", "#000"] ]
 };
 const kModalOutlineAnim = {
   "keyframes": [
@@ -441,7 +441,7 @@ FinderHighlighter.prototype = {
   },
 
   /**
-   * Invalidates the list by clearing the map of highglighted ranges that we
+   * Invalidates the list by clearing the map of highlighted ranges that we
    * keep to build the mask for.
    */
   clear(window = null) {
@@ -457,7 +457,6 @@ FinderHighlighter.prototype = {
     let dict = this.getForWindow(window.top);
     if (dict.animation)
       dict.animation.finish();
-    dict.currentFoundRange = null;
     dict.dynamicRangesSet.clear();
     dict.frames.clear();
     dict.modalHighlightRectsMap.clear();
@@ -473,6 +472,7 @@ FinderHighlighter.prototype = {
     let window = this.finder._getWindow();
     let dict = this.getForWindow(window);
     this.clear(window);
+    dict.currentFoundRange = null;
 
     if (!dict.modalHighlightOutline)
       return;
@@ -744,7 +744,8 @@ FinderHighlighter.prototype = {
 
   /**
    * Read and store the rectangles that encompass the entire region of a range
-   * for use by the drawing function of the highlighter.
+   * for use by the drawing function of the highlighter and store them in the
+   * cache.
    *
    * @param  {nsIDOMRange} range            Range to fetch the rectangles from
    * @param  {Boolean}     [checkIfDynamic] Whether we should check if the range
@@ -782,6 +783,7 @@ FinderHighlighter.prototype = {
         rects.add(rect);
     }
 
+    // Only fetch the rect at this point, if not passed in as argument.
     dict = dict || this.getForWindow(window.top);
     dict.modalHighlightRectsMap.set(range, rects);
     if (checkIfDynamic && this._isInDynamicContainer(range))
@@ -957,6 +959,8 @@ FinderHighlighter.prototype = {
       const rectStyle = this._getStyleString(kModalStyles.maskRect,
         dict.brightText ? kModalStyles.maskRectBrightText : []);
       for (let [range, rects] of dict.modalHighlightRectsMap) {
+        if (this._checkOverlap(dict.currentFoundRange, range))
+          continue;
         if (dict.updateAllRanges)
           rects = this._updateRangeRects(range);
         for (let rect of rects) {
@@ -1199,6 +1203,8 @@ FinderHighlighter.prototype = {
    * @returns true if they intersect, false otherwise
    */
   _checkOverlap(selectionRange, findRange) {
+    if (!selectionRange || !findRange)
+      return false;
     // The ranges overlap if one of the following is true:
     // 1) At least one of the endpoints of the deleted selection
     //    is in the find selection
