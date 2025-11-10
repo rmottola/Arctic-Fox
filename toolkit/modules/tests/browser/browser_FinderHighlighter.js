@@ -3,12 +3,15 @@
 Cu.import("resource://testing-common/BrowserTestUtils.jsm", this);
 Cu.import("resource://testing-common/ContentTask.jsm", this);
 Cu.import("resource://gre/modules/Promise.jsm", this);
+Cu.import("resource://gre/modules/Services.jsm", this);
 Cu.import("resource://gre/modules/Task.jsm", this);
+Cu.import("resource://gre/modules/Timer.jsm", this);
 Cu.import("resource://gre/modules/AppConstants.jsm");
 
 const kHighlightAllPref = "findbar.highlightAll";
 const kPrefModalHighlight = "findbar.modalHighlight";
 const kFixtureBaseURL = "https://example.com/browser/toolkit/modules/tests/browser/";
+const kIteratorTimeout = Services.prefs.getIntPref("findbar.iteratorTimeout");
 
 function promiseOpenFindbar(findbar) {
   findbar.onFindCommand()
@@ -57,7 +60,7 @@ function promiseEnterStringIntoFindField(findbar, str) {
 function promiseTestHighlighterOutput(browser, word, expectedResult, extraTest = () => {}) {
   return ContentTask.spawn(browser, { word, expectedResult, extraTest: extraTest.toSource() },
     function* ({ word, expectedResult, extraTest }) {
-    let document = content.document;
+    Cu.import("resource://gre/modules/Timer.jsm", this);
 
     return new Promise((resolve, reject) => {
       let stubbed = {};
@@ -65,19 +68,22 @@ function promiseTestHighlighterOutput(browser, word, expectedResult, extraTest =
         insertCalls: [],
         removeCalls: []
       };
+      let lastMaskNode, lastOutlineNode;
 
       // Amount of milliseconds to wait after the last time one of our stubs
       // was called.
       const kTimeoutMs = 1000;
       // The initial timeout may wait for a while for results to come in.
-      let timeout = content.setTimeout(() => finish(false, "Timeout"), kTimeoutMs * 5);
+      let timeout = setTimeout(() => finish(false, "Timeout"), kTimeoutMs * 5);
 
       function finish(ok = true, message = "finished with error") {
         // Restore the functions we stubbed out.
-        document.insertAnonymousContent = stubbed.insert;
-        document.removeAnonymousContent = stubbed.remove;
+        try {
+          content.document.insertAnonymousContent = stubbed.insert;
+          content.document.removeAnonymousContent = stubbed.remove;
+        } catch (ex) {}
         stubbed = {};
-        content.clearTimeout(timeout);
+        clearTimeout(timeout);
 
         if (expectedResult.rectCount !== 0)
           Assert.ok(ok, message);
@@ -93,7 +99,6 @@ function promiseTestHighlighterOutput(browser, word, expectedResult, extraTest =
 
         // We reached the amount of calls we expected, so now we can check
         // the amount of rects.
-        let lastMaskNode = callCounts.insertCalls.pop();
         if (!lastMaskNode && expectedResult.rectCount !== 0) {
           Assert.ok(false, `No mask node found, but expected ${expectedResult.rectCount} rects.`);
         }
@@ -105,7 +110,7 @@ function promiseTestHighlighterOutput(browser, word, expectedResult, extraTest =
 
         // Allow more specific assertions to be tested in `extraTest`.
         extraTest = eval(extraTest);
-        extraTest(lastMaskNode);
+        extraTest(lastMaskNode, lastOutlineNode);
 
         resolve();
       }
@@ -113,17 +118,25 @@ function promiseTestHighlighterOutput(browser, word, expectedResult, extraTest =
       // Create a function that will stub the original version and collects
       // the arguments so we can check the results later.
       function stub(which) {
-        stubbed[which] = document[which + "AnonymousContent"];
+        stubbed[which] = content.document[which + "AnonymousContent"];
         let prop = which + "Calls";
         return function(node) {
           callCounts[prop].push(node);
-          content.clearTimeout(timeout);
-          timeout = content.setTimeout(finish, kTimeoutMs);
-          return stubbed[which].call(document, node);
+          if (which == "insert") {
+            if (node.outerHTML.indexOf("outlineMask") > -1)
+              lastMaskNode = node;
+            else
+              lastOutlineNode = node;
+          }
+          clearTimeout(timeout);
+          timeout = setTimeout(() => {
+            finish();
+          }, kTimeoutMs);
+          return stubbed[which].call(content.document, node);
         };
       }
-      document.insertAnonymousContent = stub("insert");
-      document.removeAnonymousContent = stub("remove");
+      content.document.insertAnonymousContent = stub("insert");
+      content.document.removeAnonymousContent = stub("remove");
     });
   });
 }
@@ -142,6 +155,15 @@ add_task(function* testModalResults() {
       rectCount: 1,
       insertCalls: [2, 4],
       removeCalls: [1, 2]
+    }],
+    ["their law might propagate their kind", {
+      rectCount: 0,
+      insertCalls: [31, 32],
+      removeCalls: [31, 32],
+      extraTest: function(maskNode, outlineNode) {
+        Assert.equal(outlineNode.getElementsByTagName("div").length, 3,
+          "There should be multiple rects drawn");
+      }
     }],
     ["ro", {
       rectCount: 40,
@@ -167,7 +189,9 @@ add_task(function* testModalResults() {
       yield promiseOpenFindbar(findbar);
       Assert.ok(!findbar.hidden, "Findbar should be open now.");
 
-      let promise = promiseTestHighlighterOutput(browser, word, expectedResult);
+      yield new Promise(resolve => setTimeout(resolve, kIteratorTimeout));
+      let promise = promiseTestHighlighterOutput(browser, word, expectedResult,
+        expectedResult.extraTest);
       yield promiseEnterStringIntoFindField(findbar, word);
       yield promise;
 
