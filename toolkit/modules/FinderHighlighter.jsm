@@ -295,9 +295,9 @@ FinderHighlighter.prototype = {
     let dict = this.getForWindow(window);
     // Save a clean params set for use later in the `update()` method.
     dict.lastIteratorParams = params;
-    this.clear(window);
     if (!this._modal)
       this.hide(window, this.finder._fastFind.getFoundRange());
+    this.clear(window);
   },
 
   /**
@@ -320,6 +320,12 @@ FinderHighlighter.prototype = {
     } else {
       let findSelection = controller.getSelection(Ci.nsISelectionController.SELECTION_FIND);
       findSelection.addRange(range);
+      // Check if the range is inside an iframe.
+      if (window != window.top) {
+        let dict = this.getForWindow(window.top);
+        if (!dict.frames.has(window))
+          dict.frames.set(window, null);
+      }
     }
 
     if (editableNode) {
@@ -364,11 +370,16 @@ FinderHighlighter.prototype = {
     if (event && event.type == "click" && event.button !== 0)
       return;
 
-    window = (window || this.finder._getWindow()).top;
+    try {
+      window = (window || this.finder._getWindow()).top;
+    } catch (ex) {
+      Cu.reportError(ex);
+      return;
+    }
     let dict = this.getForWindow(window);
 
     this._clearSelection(this.finder._getSelectionController(window), skipRange);
-    for (let frame of dict.frames)
+    for (let frame of dict.frames.keys())
       this._clearSelection(this.finder._getSelectionController(frame), skipRange);
 
     // Next, check our editor cache, for editors belonging to this
@@ -484,6 +495,9 @@ FinderHighlighter.prototype = {
    */
   clear(window = null) {
     if (!window) {
+      // Since we're clearing _all the things_, make sure we hide 'em all as well.
+      for (let win of gWindows.keys())
+        this.hide(win);
       // Reset the Map, because no range references a node anymore.
       gWindows.clear();
       return;
@@ -544,7 +558,7 @@ FinderHighlighter.prototype = {
    */
   onHighlightAllChange(highlightAll) {
     this._highlightAll = highlightAll;
-    if (this._modal && !highlightAll) {
+    if (!highlightAll) {
       this.clear();
       this._scheduleRepaintOfMask(this.finder._getWindow());
     }
@@ -1020,6 +1034,9 @@ FinderHighlighter.prototype = {
    *                            need to be repainted.
    */
   _scheduleRepaintOfMask(window, { contentChanged, scrollOnly } = { contentChanged: false, scrollOnly: false }) {
+    if (!this._modal)
+      return;
+
     window = window.top;
     let dict = this.getForWindow(window);
     let repaintFixedNodes = (scrollOnly && !!dict.dynamicRangesSet.size);
