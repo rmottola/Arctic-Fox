@@ -309,7 +309,7 @@ case "$target" in
     ANDROID_SDK="${android_sdk}"
     ANDROID_SDK_ROOT="${android_sdk_root}"
     ANDROID_TOOLS="${android_tools}"
-    ANDROID_BUILD_TOOLS_VERSION="$2"
+    ANDROID_BUILD_TOOLS_VERSION="$android_build_tools_version"
     AC_DEFINE_UNQUOTED(ANDROID_TARGET_SDK,$ANDROID_TARGET_SDK)
     AC_SUBST(ANDROID_TARGET_SDK)
     AC_SUBST(ANDROID_SDK_ROOT)
