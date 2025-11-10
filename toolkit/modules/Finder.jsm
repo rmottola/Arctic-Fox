@@ -79,7 +79,6 @@ Finder.prototype = {
       this._searchString = options.searchString;
       this.clipboardSearchString = options.searchString
     }
-    this._outlineLink(options.drawOutline);
 
     let foundLink = this._fastFind.foundLink;
     let linkURL = null;
@@ -97,12 +96,16 @@ Finder.prototype = {
     options.searchString = this._searchString;
 
     if (!this.iterator.continueRunning({
+      caseSensitive: this._fastFind.caseSensitive,
+      entireWord: this._fastFind.entireWord,
       linksOnly: options.linksOnly,
       word: options.searchString
     })) {
       this.iterator.stop();
     }
     this.highlighter.update(options);
+
+    this._outlineLink(options.drawOutline);
 
     for (let l of this._listeners) {
       try {
@@ -396,6 +399,8 @@ Finder.prototype = {
     let foundRange = this._fastFind.getFoundRange();
 
     this.iterator.start({
+      caseSensitive: this._fastFind.caseSensitive,
+      entireWord: this._fastFind.entireWord,
       finder: this,
       limit: aMatchLimit,
       linksOnly: aLinksOnly,
