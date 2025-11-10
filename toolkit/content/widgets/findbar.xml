@@ -350,6 +350,8 @@
             case "findbar.entireword":
               this._self._entireWord = prefsvc.getBoolPref(aPrefName);
               this._self._updateEntireWord();
+              // Update the matches count.
+              this._updateMatchesCount(this.nsITypeAheadFind.FIND_FOUND);
               break;
             case "findbar.highlightAll":
               this._self.toggleHighlight(prefsvc.getBoolPref(aPrefName), true);
@@ -505,11 +507,11 @@
         -->
       <method name="_updateMatchesCount">
         <body><![CDATA[
-          if (this._matchesCountLimit == 0 || !this._dispatchFindEvent("matchescount"))
+          if (!this._dispatchFindEvent("matchescount"))
             return;
 
           this.browser.finder.requestMatchesCount(this._findField.value,
-            this._matchesCountLimit, this._findMode == this.FIND_LINKS);
+            this._findMode == this.FIND_LINKS);
         ]]></body>
       </method>
 
@@ -634,7 +636,6 @@
           this._updateCaseSensitivity();
           this._findFailedString = null;
           this._find();
-          this._maybeHighlightAll();
 
           this._dispatchFindEvent("casesensitivitychange");
         ]]></body>
@@ -659,9 +660,6 @@
           statusLabel.hidden = !hideCheckbox;
 
           this.browser.finder.entireWord = entireWord;
-
-          // Update the matches count
-          this._updateMatchesCount(this.nsITypeAheadFind.FIND_FOUND);
         ]]></body>
       </method>
 
@@ -1026,8 +1024,6 @@
             }
 
             this._enableFindButtons(val);
-            this._maybeHighlightAll();
-
             this._updateCaseSensitivity(val);
             this._updateEntireWord();
 
@@ -1106,7 +1102,6 @@
               this._findField.removeAttribute("status");
               break;
           }
-          this._updateMatchesCount(res);
         ]]></body>
       </method>
 
