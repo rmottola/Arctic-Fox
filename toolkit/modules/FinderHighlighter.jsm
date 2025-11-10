@@ -1080,7 +1080,8 @@ FinderHighlighter.prototype = {
   _maybeInstallStyleSheet(window) {
     window = window.top;
     let dict = this.getForWindow(window);
-    if (dict.installedSheet)
+    let document = window.document;
+    if (dict.installedSheet == document)
       return;
 
     let dwu = this._getDWU(window);
@@ -1088,7 +1089,7 @@ FinderHighlighter.prototype = {
     try {
       dwu.loadSheetUsingURIString(uri, dwu.AGENT_SHEET);
     } catch (e) {}
-    dict.installedSheet = true;
+    dict.installedSheet = document;
   },
 
   /**
