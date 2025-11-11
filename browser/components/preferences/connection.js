@@ -31,9 +31,9 @@ var gConnectionsDialog = {
         proxyPortPref.value = httpProxyPortPref.value;
       }
     }
-    
+
     this.sanitizeNoProxiesPref();
-    
+
     return true;
   },
 
@@ -58,10 +58,8 @@ var gConnectionsDialog = {
 
     var shareProxiesPref = document.getElementById("network.proxy.share_proxy_settings");
     shareProxiesPref.disabled = proxyTypePref.value != 1;
-
     var autologinProxyPref = document.getElementById("signon.autologin.proxy");
     autologinProxyPref.disabled = proxyTypePref.value == 0;
-
     var noProxiesPref = document.getElementById("network.proxy.no_proxies_on");
     noProxiesPref.disabled = proxyTypePref.value != 1;
 
@@ -102,13 +100,13 @@ var gConnectionsDialog = {
     disableReloadPref.disabled =
         (proxyTypeCur != 2 || proxyType != 2 || typedURL != pacURL);
   },
-  
+
   readProxyType: function ()
   {
     this.proxyTypeChanged();
     return undefined;
   },
-  
+
   updateProtocolPrefs: function ()
   {
     var proxyTypePref = document.getElementById("network.proxy.type");
@@ -117,8 +115,8 @@ var gConnectionsDialog = {
     for (var i = 0; i < proxyPrefs.length; ++i) {
       var proxyServerURLPref = document.getElementById("network.proxy." + proxyPrefs[i]);
       var proxyPortPref = document.getElementById("network.proxy." + proxyPrefs[i] + "_port");
-      
-      // Restore previous per-proxy custom settings, if present. 
+
+      // Restore previous per-proxy custom settings, if present.
       if (!shareProxiesPref.value) {
         var backupServerURLPref = document.getElementById("network.proxy.backup." + proxyPrefs[i]);
         var backupPortPref = document.getElementById("network.proxy.backup." + proxyPrefs[i] + "_port");
@@ -142,15 +140,15 @@ var gConnectionsDialog = {
     this.updateDNSPref();
     return undefined;
   },
-  
+
   readProxyProtocolPref: function (aProtocol, aIsPort)
   {
     var shareProxiesPref = document.getElementById("network.proxy.share_proxy_settings");
     if (shareProxiesPref.value) {
-      var pref = document.getElementById("network.proxy.http" + (aIsPort ? "_port" : ""));    
+      var pref = document.getElementById("network.proxy.http" + (aIsPort ? "_port" : ""));
       return pref.value;
     }
-    
+
     var backupPref = document.getElementById("network.proxy.backup." + aProtocol + (aIsPort ? "_port" : ""));
     return backupPref.hasUserValue ? backupPref.value : undefined;
   },
@@ -160,7 +158,7 @@ var gConnectionsDialog = {
     Components.classes["@mozilla.org/network/protocol-proxy-service;1"].
         getService().reloadPAC();
   },
-  
+
   doAutoconfigURLFixup: function ()
   {
     var autoURL = document.getElementById("networkProxyAutoconfigURL");
@@ -169,7 +167,7 @@ var gConnectionsDialog = {
                              .getService(Components.interfaces.nsIURIFixup);
     try {
       autoURLPref.value = autoURL.value = URIFixup.createFixupURI(autoURL.value, 0).spec;
-    } catch(ex) {}
+    } catch (ex) {}
   },
 
   sanitizeNoProxiesPref: function()
@@ -178,10 +176,10 @@ var gConnectionsDialog = {
     // replace substrings of ; and \n with commas if they're neither immediately
     // preceded nor followed by a valid separator character
     noProxiesPref.value = noProxiesPref.value.replace(/([^, \n;])[;\n]+(?![,\n;])/g, '$1,');
-    // replace any remaining ; and \n since some may follow commas, etc. 
+    // replace any remaining ; and \n since some may follow commas, etc.
     noProxiesPref.value = noProxiesPref.value.replace(/[;\n]/g, '');
   },
-  
+
   readHTTPProxyServer: function ()
   {
     var shareProxiesPref = document.getElementById("network.proxy.share_proxy_settings");
@@ -189,7 +187,7 @@ var gConnectionsDialog = {
       this.updateProtocolPrefs();
     return undefined;
   },
-  
+
   readHTTPProxyPort: function ()
   {
     var shareProxiesPref = document.getElementById("network.proxy.share_proxy_settings");
