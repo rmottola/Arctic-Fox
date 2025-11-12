@@ -364,6 +364,7 @@ protected:
                      bool aSendReferrer,
                      uint32_t aReferrerPolicy,
                      nsIPrincipal* aTriggeringPrincipal,
+                     nsIPrincipal* aPrincipalToInherit,
                      const char* aTypeHint,
                      const nsAString& aFileName,
                      nsIInputStream* aPostData,
@@ -408,6 +409,7 @@ protected:
   // aCloneSHChildren argument as aCloneChildren.
   bool OnNewURI(nsIURI* aURI, nsIChannel* aChannel,
                 nsIPrincipal* aTriggeringPrincipal,
+                nsIPrincipal* aPrincipalToInherit,
                 uint32_t aLoadType,
                 bool aFireOnLocationChange,
                 bool aAddToGlobalHistory,
@@ -426,6 +428,7 @@ protected:
   // the new session history entry.
   nsresult AddToSessionHistory(nsIURI* aURI, nsIChannel* aChannel,
                                nsIPrincipal* aTriggeringPrincipal,
+                               nsIPrincipal* aPrincipalToInherit,
                                bool aCloneChildren,
                                nsISHEntry** aNewEntry);
   nsresult AddChildSHEntryToParent(nsISHEntry* aNewEntry, int32_t aChildOffset,
