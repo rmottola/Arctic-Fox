@@ -2369,8 +2369,12 @@ BrowserGlue.prototype = {
       } else {
         title = bundle.GetStringFromName("tabsArrivingNotification.title");
         const tabArrivingBody = URIs.every(URI => URI.clientId == URIs[0].clientId) ?
-                                "tabsArrivingNotification.body" : "tabsArrivingNotificationMultiple.body";
-        body = bundle.formatStringFromName(tabArrivingBody, [URIs.length, deviceName], 2);
+                                "unnamedTabsArrivingNotification.body" :
+                                "unnamedTabsArrivingNotificationMultiple.body";
+        body = bundle.GetStringFromName(tabArrivingBody);
+        body = PluralForm.get(URIs.length, body);
+        body = body.replace("#1", URIs.length);
+        body = body.replace("#2", deviceName);
       }
 
       const clickCallback = (subject, topic, data) => {
