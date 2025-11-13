@@ -6006,8 +6006,8 @@ nsGlobalWindow::DispatchResizeEvent(const CSSIntSize& aSize)
   CustomEvent* customEvent = static_cast<CustomEvent*>(domEvent.get());
   customEvent->InitCustomEvent(cx,
                                NS_LITERAL_STRING("DOMWindowResize"),
-                               /* bubbles = */ true,
-                               /* cancelable = */ true,
+                               /* aCanBubble = */ true,
+                               /* aCancelable = */ true,
                                detailValue,
                                res);
   if (res.Failed()) {
