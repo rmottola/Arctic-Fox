@@ -362,6 +362,8 @@
 @RESPATH@/components/FeedProcessor.js
 @RESPATH@/components/PackagedAppUtils.js
 @RESPATH@/components/PackagedAppUtils.manifest
+@RESPATH@/components/WellKnownOpportunisticUtils.js
+@RESPATH@/components/WellKnownOpportunisticUtils.manifest
 @RESPATH@/browser/components/BrowserFeeds.manifest
 @RESPATH@/browser/components/FeedConverter.js
 @RESPATH@/browser/components/FeedWriter.js

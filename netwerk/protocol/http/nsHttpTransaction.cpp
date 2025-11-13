@@ -157,7 +157,9 @@ nsHttpTransaction::nsHttpTransaction()
 nsHttpTransaction::~nsHttpTransaction()
 {
     LOG(("Destroying nsHttpTransaction @%p\n", this));
-
+    if (mTransactionObserver) {
+        mTransactionObserver->Complete(this, NS_OK);
+    }
     if (mPushedStream) {
         mPushedStream->OnPushFailed();
         mPushedStream = nullptr;
@@ -972,6 +974,11 @@ nsHttpTransaction::Close(nsresult reason)
     if (mClosed) {
         LOG(("  already closed\n"));
         return;
+    }
+
+    if (mTransactionObserver) {
+        mTransactionObserver->Complete(this, reason);
+        mTransactionObserver = nullptr;
     }
 
     if (mTokenBucketCancel) {
