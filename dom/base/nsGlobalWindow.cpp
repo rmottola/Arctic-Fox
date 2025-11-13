@@ -150,6 +150,7 @@
 #include "mozilla/dom/CustomEvent.h"
 #include "nsIJARChannel.h"
 #include "nsIScreenManager.h"
+#include "nsIEffectiveTLDService.h"
 
 #include "xpcprivate.h"
 
@@ -1226,7 +1227,9 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mCleanedUp(false),
     mDialogAbuseCount(0),
     mAreDialogsEnabled(true),
-    mCanSkipCCGeneration(0)
+    mCanSkipCCGeneration(0),
+    mStaticConstellation(0),
+    mConstellation(NullCString())
 {
   AssertIsOnMainThread();
 
@@ -1261,6 +1264,11 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     // remain frozen until they get an inner window, so freeze this
     // outer window here.
     Freeze();
+
+    // As an outer window, we may be the root of a constellation. This initial
+    // static constellation may be overridden as this window is given a parent
+    // window or an opener.
+    mStaticConstellation = WindowID();
   }
 
   // We could have failed the first time through trying
@@ -3034,6 +3042,12 @@ nsGlobalWindow::SetDocShell(nsIDocShell* aDocShell)
 
   mDocShell = aDocShell; // Weak Reference
 
+  // Copy over the static constellation from our new parent.
+  nsCOMPtr<nsPIDOMWindowOuter> parentWindow = GetParent();
+  if (parentWindow) {
+    mStaticConstellation = Cast(parentWindow)->mStaticConstellation;
+  }
+
   NS_ASSERTION(!mNavigator, "Non-null mNavigator in outer window!");
 
   if (mFrames) {
@@ -3144,6 +3158,11 @@ nsGlobalWindow::SetOpenerWindow(nsPIDOMWindowOuter* aOpener,
 
   mOpener = do_GetWeakReference(aOpener);
   NS_ASSERTION(mOpener || !aOpener, "Opener must support weak references!");
+
+  // Copy over the static constellation from our new opener
+  if (aOpener) {
+    mStaticConstellation = Cast(aOpener)->mStaticConstellation;
+  }
 
   if (aOriginalOpener) {
     MOZ_ASSERT(!mHadOriginalOpener,
@@ -14452,6 +14471,46 @@ nsGlobalWindow::CheckForDPIChange()
       }
     }
   }
+}
+
+void
+nsGlobalWindow::GetConstellation(nsACString& aConstellation)
+{
+  FORWARD_TO_INNER_VOID(GetConstellation, (aConstellation));
+
+#ifdef DEBUG
+  RefPtr<nsGlobalWindow> outer = GetOuterWindowInternal();
+  MOZ_ASSERT(outer, "We should have an outer window");
+  RefPtr<nsGlobalWindow> top = outer->GetTopInternal();
+  RefPtr<nsPIDOMWindowOuter> opener = outer->GetOpener();
+  MOZ_ASSERT(!top || (top->mStaticConstellation ==
+                      outer->mStaticConstellation));
+  MOZ_ASSERT(!opener || (Cast(opener)->mStaticConstellation ==
+                         outer->mStaticConstellation));
+#endif
+
+  if (mConstellation.IsVoid()) {
+    mConstellation.Truncate();
+    // The dynamic constellation part comes from the eTLD+1 for the principal's URI.
+    nsCOMPtr<nsIPrincipal> principal = GetPrincipal();
+    nsCOMPtr<nsIURI> uri;
+    nsresult rv = principal->GetURI(getter_AddRefs(uri));
+    if (NS_SUCCEEDED(rv)) {
+      nsCOMPtr<nsIEffectiveTLDService> tldService =
+        do_GetService(NS_EFFECTIVETLDSERVICE_CONTRACTID);
+      if (tldService) {
+        rv = tldService->GetBaseDomain(uri, 0, mConstellation);
+        if (NS_FAILED(rv)) {
+          mConstellation.Truncate();
+        }
+      }
+    }
+
+    // Get the static constellation from the outer window object.
+    mConstellation.AppendPrintf("^%llu", GetOuterWindowInternal()->mStaticConstellation);
+  }
+
+  aConstellation.Assign(mConstellation);
 }
 
 nsGlobalWindow::TemporarilyDisableDialogs::TemporarilyDisableDialogs(
