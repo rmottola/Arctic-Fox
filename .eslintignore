@@ -67,7 +67,6 @@ browser/components/feeds/**
 browser/components/preferences/**
 browser/components/privatebrowsing/**
 browser/components/sessionstore/**
-browser/components/shell/**
 browser/components/tabview/**
 browser/components/translation/**
 browser/extensions/pdfjs/**
