@@ -5957,8 +5957,7 @@ WorkerPrivate::RunExpiredTimeouts(JSContext* aCx)
       AutoEntryScript aes(global, reason, false);
 
       // Evaluate the timeout expression.
-      nsAutoString script;
-      info->mHandler->GetHandlerText(script);
+      const nsAString& script = info->mHandler->GetHandlerText();
 
       const char* filename = nullptr;
       uint32_t lineNo = 0, dummyColumn = 0;
@@ -5969,7 +5968,7 @@ WorkerPrivate::RunExpiredTimeouts(JSContext* aCx)
 
       JS::Rooted<JS::Value> unused(aes.cx());
 
-      if (!JS::Evaluate(aes.cx(), options, script.get(),
+      if (!JS::Evaluate(aes.cx(), options, script.BeginReading(),
                         script.Length(), &unused) &&
           !JS_IsExceptionPending(aCx)) {
         retval = false;
