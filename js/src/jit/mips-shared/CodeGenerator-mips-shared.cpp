@@ -1665,8 +1665,6 @@ CodeGeneratorMIPSShared::visitWasmLoad(LWasmLoad* lir)
 {
     const MWasmLoad* mir = lir->mir();
 
-    MOZ_ASSERT(!mir->barrierBefore() && !mir->barrierAfter(), "atomics NYI");
-
     uint32_t offset = mir->offset();
     MOZ_ASSERT(offset <= INT32_MAX);
 
@@ -1697,6 +1695,8 @@ CodeGeneratorMIPSShared::visitWasmLoad(LWasmLoad* lir)
       default: MOZ_CRASH("unexpected array type");
     }
 
+    memoryBarrier(mir->barrierBefore());
+
     if (isFloat) {
         if (byteSize == 4) {
             masm.loadFloat32(BaseIndex(HeapReg, ptr, TimesOne), ToFloatRegister(lir->output()));
@@ -1706,14 +1706,14 @@ CodeGeneratorMIPSShared::visitWasmLoad(LWasmLoad* lir)
         masm.ma_load(ToRegister(lir->output()), BaseIndex(HeapReg, ptr, TimesOne),
                       static_cast<LoadStoreSize>(8 * byteSize), isSigned ? SignExtend : ZeroExtend);
     }
+
+    memoryBarrier(mir->barrierAfter());
 }
 
 void
 CodeGeneratorMIPSShared::visitWasmStore(LWasmStore* lir)
 {
     const MWasmStore* mir = lir->mir();
-
-    MOZ_ASSERT(!mir->barrierBefore() && !mir->barrierAfter(), "atomics NYI");
 
     uint32_t offset = mir->offset();
     MOZ_ASSERT(offset <= INT32_MAX);
@@ -1746,6 +1746,8 @@ CodeGeneratorMIPSShared::visitWasmStore(LWasmStore* lir)
       default: MOZ_CRASH("unexpected array type");
     }
 
+    memoryBarrier(mir->barrierBefore());
+
     if (isFloat) {
         if (byteSize == 4) {
             masm.storeFloat32(ToFloatRegister(lir->value()), BaseIndex(HeapReg, ptr, TimesOne));
@@ -1755,6 +1757,8 @@ CodeGeneratorMIPSShared::visitWasmStore(LWasmStore* lir)
         masm.ma_store(ToRegister(lir->value()), BaseIndex(HeapReg, ptr, TimesOne),
                       static_cast<LoadStoreSize>(8 * byteSize), isSigned ? SignExtend : ZeroExtend);
     }
+
+    memoryBarrier(mir->barrierAfter());
 }
 
 void
