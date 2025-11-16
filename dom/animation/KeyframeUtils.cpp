@@ -385,8 +385,7 @@ static bool
 IsComputeValuesFailureKey(const PropertyValuePair& aPair);
 
 static void
-BuildSegmentsFromValueEntries(nsStyleContext* aStyleContext,
-                              nsTArray<KeyframeValueEntry>& aEntries,
+BuildSegmentsFromValueEntries(nsTArray<KeyframeValueEntry>& aEntries,
                               nsTArray<AnimationProperty>& aResult);
 
 static void
@@ -669,7 +668,7 @@ KeyframeUtils::GetAnimationPropertiesFromKeyframes(
   }
 
   nsTArray<AnimationProperty> result;
-  BuildSegmentsFromValueEntries(aStyleContext, entries, result);
+  BuildSegmentsFromValueEntries(entries, result);
   return result;
 }
 
@@ -1081,8 +1080,7 @@ IsComputeValuesFailureKey(const PropertyValuePair& aPair)
  * animation segments in aEntries.
  */
 static void
-BuildSegmentsFromValueEntries(nsStyleContext* aStyleContext,
-                              nsTArray<KeyframeValueEntry>& aEntries,
+BuildSegmentsFromValueEntries(nsTArray<KeyframeValueEntry>& aEntries,
                               nsTArray<AnimationProperty>& aResult)
 {
   if (aEntries.IsEmpty()) {
