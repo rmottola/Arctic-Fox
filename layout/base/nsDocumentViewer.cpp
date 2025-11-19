@@ -42,8 +42,8 @@
 #include "mozilla/Preferences.h"
 #include "mozilla/dom/EncodingUtils.h"
 #include "mozilla/WeakPtr.h"
-#include "mozilla/StyleSheetHandle.h"
-#include "mozilla/StyleSheetHandleInlines.h"
+#include "mozilla/StyleSheet.h"
+#include "mozilla/StyleSheetInlines.h"
 
 #include "nsViewManager.h"
 #include "nsView.h"
@@ -2247,7 +2247,7 @@ nsDocumentViewer::CreateStyleSet(nsIDocument* aDocument)
   auto cache = nsLayoutStylesheetCache::For(backendType);
 
   // Handle the user sheets.
-  StyleSheetHandle sheet = nullptr;
+  StyleSheet* sheet = nullptr;
   if (nsContentUtils::IsInChromeDocshell(aDocument)) {
     sheet = cache->UserChromeSheet();
   } else {
@@ -2264,7 +2264,7 @@ nsDocumentViewer::CreateStyleSet(nsIDocument* aDocument)
   nsCOMPtr<nsIDocShell> ds(mContainer);
   nsCOMPtr<nsIDOMEventTarget> chromeHandler;
   nsCOMPtr<nsIURI> uri;
-  StyleSheetHandle::RefPtr chromeSheet;
+  RefPtr<StyleSheet> chromeSheet;
 
   if (ds) {
     ds->GetChromeEventHandler(getter_AddRefs(chromeHandler));
@@ -2383,10 +2383,10 @@ nsDocumentViewer::CreateStyleSet(nsIDocument* aDocument)
   if (styleSet->IsGecko()) {
     nsStyleSheetService* sheetService = nsStyleSheetService::GetInstance();
     if (sheetService) {
-      for (StyleSheetHandle sheet : *sheetService->AgentStyleSheets()) {
+      for (StyleSheet* sheet : *sheetService->AgentStyleSheets()) {
         styleSet->AppendStyleSheet(SheetType::Agent, sheet);
       }
-      for (StyleSheetHandle sheet : Reversed(*sheetService->UserStyleSheets())) {
+      for (StyleSheet* sheet : Reversed(*sheetService->UserStyleSheets())) {
         styleSet->PrependStyleSheet(SheetType::User, sheet);
       }
     }
