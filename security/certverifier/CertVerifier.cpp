@@ -64,11 +64,6 @@ CertVerifier::~CertVerifier()
 {
 }
 
-void
-InitCertVerifierLog()
-{
-}
-
 Result
 IsCertChainRootBuiltInRoot(const UniqueCERTCertList& chain, bool& result)
 {
