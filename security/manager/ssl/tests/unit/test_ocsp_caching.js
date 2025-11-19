@@ -42,7 +42,8 @@ function generateGoodOCSPResponse() {
   return responses[0];
 }
 
-function add_ocsp_test(aHost, aExpectedResult, aResponses, aMessage) {
+function add_ocsp_test(aHost, aExpectedResult, aResponses, aMessage,
+                       aFirstPartyDomain) {
   add_connection_test(aHost, aExpectedResult,
       function() {
         clearSessionCache();
@@ -55,7 +56,7 @@ function add_ocsp_test(aHost, aExpectedResult, aResponses, aMessage) {
         equal(gFetchCount, aResponses.length,
               "should have made " + aResponses.length +
               " OCSP request" + (aResponses.length == 1 ? "" : "s"));
-      });
+      }, null, aFirstPartyDomain);
 }
 
 function run_test() {
