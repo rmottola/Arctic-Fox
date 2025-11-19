@@ -1133,7 +1133,7 @@ void HandshakeCallback(PRFileDesc* fd, void* client_data) {
                                 sizeof cipherInfo);
     MOZ_ASSERT(rv == SECSuccess);
     if (rv == SECSuccess) {
-      usesFallbackCipher = cipherInfo.keaType == ssl_kea_dh;
+      usesFallbackCipher = channelInfo.keaType == ssl_kea_dh;
 
       // keyExchange null=0, rsa=1, dh=2, fortezza=3, ecdh=4
       Telemetry::Accumulate(
