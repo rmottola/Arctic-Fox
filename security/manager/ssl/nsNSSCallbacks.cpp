@@ -204,7 +204,7 @@ struct nsCancelHTTPDownloadEvent : Runnable {
   }
 };
 
-Result
+mozilla::pkix::Result
 nsNSSHttpServerSession::createSessionFcn(const char* host,
                                          uint16_t portnum,
                                  /*out*/ nsNSSHttpServerSession** pSession)
@@ -225,7 +225,7 @@ nsNSSHttpServerSession::createSessionFcn(const char* host,
   return Success;
 }
 
-Result
+mozilla::pkix::Result
 nsNSSHttpRequestSession::createFcn(const nsNSSHttpServerSession* session,
                                    const char* http_protocol_variant,
                                    const char* path_and_query_string,
@@ -268,7 +268,7 @@ nsNSSHttpRequestSession::createFcn(const nsNSSHttpServerSession* session,
   return Success;
 }
 
-Result
+mozilla::pkix::Result
 nsNSSHttpRequestSession::setPostDataFcn(const char* http_data,
                                         const uint32_t http_data_len,
                                         const char* http_content_type)
@@ -280,7 +280,7 @@ nsNSSHttpRequestSession::setPostDataFcn(const char* http_data,
   return Success;
 }
 
-Result
+mozilla::pkix::Result
 nsNSSHttpRequestSession::trySendAndReceiveFcn(PRPollDesc** pPollDesc,
                                               uint16_t* http_response_code,
                                               const char** http_response_content_type,
@@ -371,7 +371,7 @@ nsNSSHttpRequestSession::Release()
   }
 }
 
-Result
+mozilla::pkix::Result
 nsNSSHttpRequestSession::internal_send_receive_attempt(bool &retryable_error,
                                                        PRPollDesc **pPollDesc,
                                                        uint16_t *http_response_code,
