@@ -1513,6 +1513,25 @@ void nsNSSComponent::setValidationOptions(bool isInitialSetting,
   PublicSSLState()->SetOCSPMustStapleEnabled(ocspMustStapleEnabled);
   PrivateSSLState()->SetOCSPMustStapleEnabled(ocspMustStapleEnabled);
 
+  const CertVerifier::CertificateTransparencyMode defaultCTMode =
+    CertVerifier::CertificateTransparencyMode::TelemetryOnly;
+  CertVerifier::CertificateTransparencyMode ctMode =
+    static_cast<CertVerifier::CertificateTransparencyMode>
+      (Preferences::GetInt("security.pki.certificate_transparency.mode",
+                           static_cast<int32_t>(defaultCTMode)));
+  switch (ctMode) {
+    case CertVerifier::CertificateTransparencyMode::Disabled:
+    case CertVerifier::CertificateTransparencyMode::TelemetryOnly:
+      break;
+    default:
+      ctMode = defaultCTMode;
+      break;
+  }
+  bool sctsEnabled =
+    ctMode != CertVerifier::CertificateTransparencyMode::Disabled;
+  PublicSSLState()->SetSignedCertTimestampsEnabled(sctsEnabled);
+  PrivateSSLState()->SetSignedCertTimestampsEnabled(sctsEnabled);
+
   CertVerifier::PinningMode pinningMode =
     static_cast<CertVerifier::PinningMode>
       (Preferences::GetInt("security.cert_pinning.enforcement_level",
@@ -1582,7 +1601,8 @@ void nsNSSComponent::setValidationOptions(bool isInitialSetting,
                                                 certShortLifetimeInDays,
                                                 pinningMode, sha1Mode,
                                                 nameMatchingMode,
-                                                netscapeStepUpPolicy);
+                                                netscapeStepUpPolicy,
+                                                ctMode);
 }
 
 // Enable the TLS versions given in the prefs, defaulting to TLS 1.0 (min) and
@@ -1995,6 +2015,7 @@ nsNSSComponent::Observe(nsISupports* aSubject, const char* aTopic,
                prefName.EqualsLiteral("security.pki.cert_short_lifetime_in_days") ||
                prefName.EqualsLiteral("security.ssl.enable_ocsp_stapling") ||
                prefName.EqualsLiteral("security.ssl.enable_ocsp_must_staple") ||
+               prefName.EqualsLiteral("security.pki.certificate_transparency.mode") ||
                prefName.EqualsLiteral("security.cert_pinning.enforcement_level") ||
                prefName.EqualsLiteral("security.pki.sha1_enforcement_level") ||
                prefName.EqualsLiteral("security.pki.name_matching_mode") ||
