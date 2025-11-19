@@ -146,11 +146,7 @@ nsSSLStatus::GetIsExtendedValidation(bool* aIsEV)
     return NS_OK;
   }
 
-#ifdef MOZ_NO_EV_CERTS
-  return NS_OK;
-#else
   return NS_ERROR_NOT_AVAILABLE;
-#endif
 }
 
 NS_IMETHODIMP
@@ -307,7 +303,6 @@ nsSSLStatus::SetServerCert(nsNSSCertificate* aServerCert,
     return;
   }
 
-#ifndef MOZ_NO_EV_CERTS
   if (aServerCert) {
     nsresult rv = aServerCert->GetIsExtendedValidation(&mIsEV);
     if (NS_FAILED(rv)) {
@@ -315,5 +310,4 @@ nsSSLStatus::SetServerCert(nsNSSCertificate* aServerCert,
     }
     mHasIsEVStatus = true;
   }
-#endif
 }
