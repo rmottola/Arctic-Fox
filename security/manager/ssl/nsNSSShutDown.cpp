@@ -128,7 +128,7 @@ nsresult nsNSSShutDownList::doPK11Logout()
 
 nsresult nsNSSShutDownList::evaporateAllNSSResources()
 {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
   if (!NS_IsMainThread()) {
     return NS_ERROR_NOT_SAME_THREAD;
   }
@@ -213,7 +213,7 @@ bool nsNSSShutDownList::construct(const StaticMutexAutoLock& /*proofOfLock*/)
 
 void nsNSSShutDownList::shutdown()
 {
-  MOZ_ASSERT(NS_IsMainThread());
+  MOZ_RELEASE_ASSERT(NS_IsMainThread());
   StaticMutexAutoLock lock(sListLock);
   sInShutdown = true;
 
