@@ -3080,6 +3080,7 @@ public:
         , discardSource(false)
         , metadata(cx)
         , userContextId(0)
+        , originAttributes(cx)
     { }
 
     virtual bool Parse();
@@ -3101,6 +3102,7 @@ public:
     GlobalProperties globalProperties;
     JS::RootedValue metadata;
     uint32_t userContextId;
+    JS::RootedObject originAttributes;
 
 protected:
     bool ParseGlobalProperties();
