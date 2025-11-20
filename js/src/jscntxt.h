@@ -495,7 +495,7 @@ struct JSContext : public js::ExclusiveContext,
     bool isThrowingDebuggeeWouldRun();
     bool isClosingGenerator();
 
-    void setPendingException(js::Value v);
+    void setPendingException(const js::Value& v);
 
     void clearPendingException() {
         throwing = false;
