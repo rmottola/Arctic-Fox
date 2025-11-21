@@ -1807,7 +1807,7 @@ js::GetPCCountScriptSummary(JSContext* cx, size_t index)
     JSRuntime* rt = cx->runtime();
 
     if (!rt->scriptAndCountsVector || index >= rt->scriptAndCountsVector->length()) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BUFFER_TOO_SMALL);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_BUFFER_TOO_SMALL);
         return nullptr;
     }
 
@@ -2091,7 +2091,7 @@ js::GetPCCountScriptContents(JSContext* cx, size_t index)
     JSRuntime* rt = cx->runtime();
 
     if (!rt->scriptAndCountsVector || index >= rt->scriptAndCountsVector->length()) {
-        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BUFFER_TOO_SMALL);
+        JS_ReportErrorNumberASCII(cx, GetErrorMessage, nullptr, JSMSG_BUFFER_TOO_SMALL);
         return nullptr;
     }
 
