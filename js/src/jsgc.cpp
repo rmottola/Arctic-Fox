@@ -5564,7 +5564,8 @@ HeapStateToLabel(JS::HeapState heapState)
       case JS::HeapState::Tracing:
         return "JS_IterateCompartments";
       case JS::HeapState::Idle:
-        MOZ_CRASH("Should never have an Idle heap state when pushing GC pseudo frames!");
+      case JS::HeapState::CycleCollecting:
+        MOZ_CRASH("Should never have an Idle or CC heap state when pushing GC pseudo frames!");
     }
     MOZ_ASSERT_UNREACHABLE("Should have exhausted every JS::HeapState variant!");
     return nullptr;
@@ -7030,6 +7031,27 @@ AutoAssertNoNurseryAlloc::AutoAssertNoNurseryAlloc(JSRuntime* rt)
 AutoAssertNoNurseryAlloc::~AutoAssertNoNurseryAlloc()
 {
     gc.allowNurseryAlloc();
+}
+
+JS::AutoEnterCycleCollection::AutoEnterCycleCollection(JSContext* cx)
+  : runtime(shadow::Runtime::asShadowRuntime(cx->runtime()))
+{
+    if (runtime) {
+        // Lock the helper thread state when changing the heap state in the
+        // presence of exclusive threads, to avoid racing with refillFreeList.
+        AutoLockHelperThreadState lock;
+        MOZ_ASSERT(runtime->heapState_ == HeapState::Idle);
+        runtime->heapState_ = HeapState::CycleCollecting;
+    }
+}
+
+JS::AutoEnterCycleCollection::~AutoEnterCycleCollection()
+{
+    if (runtime) {
+        AutoLockHelperThreadState lock;
+        MOZ_ASSERT(runtime->heapState_ == HeapState::CycleCollecting);
+        runtime->heapState_ = HeapState::Idle;
+    }
 }
 #endif
 
