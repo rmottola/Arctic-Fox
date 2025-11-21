@@ -56,7 +56,7 @@ wasm::DecodePreamble(Decoder& d)
         return d.fail("failed to match magic number");
 
     if (!d.readFixedU32(&u32) || u32 != EncodingVersion)
-        return d.fail("binary version 0x%" PRIx32 " does not match expected version 0x%" PRIx32,
+        return d.fail("binary version 0x%lx does not match expected version 0x%lx",
                       u32, EncodingVersion);
 
     return true;
@@ -148,7 +148,7 @@ wasm::DecodeResizable(Decoder& d, ResizableLimits* limits)
         return d.fail("expected flags");
 
     if (flags & ~uint32_t(ResizableFlags::AllowedMask))
-        return d.fail("unexpected bits set in flags: %" PRIu32,
+        return d.fail("unexpected bits set in flags: %lu",
                       (flags & ~uint32_t(ResizableFlags::AllowedMask)));
 
     if (!(flags & uint32_t(ResizableFlags::Default)))
@@ -164,7 +164,7 @@ wasm::DecodeResizable(Decoder& d, ResizableLimits* limits)
 
         if (limits->initial > maximum) {
             return d.fail("memory size minimum must not be greater than maximum; "
-                          "maximum length %" PRIu32 " is less than initial length %" PRIu32,
+                          "maximum length %lu is less than initial length %lu",
                           maximum, limits->initial);
         }
 
