@@ -867,9 +867,9 @@ SetPromiseRejectionTrackerCallback(JSContext* cx, unsigned argc, Value* vp)
 
 #ifdef SPIDERMONKEY_PROMISE
     if (!IsCallable(args.get(0))) {
-        JS_ReportError(cx,
-                       "setPromiseRejectionTrackerCallback expects a function as its sole "
-                       "argument");
+        JS_ReportErrorASCII(cx,
+                            "setPromiseRejectionTrackerCallback expects a function as its sole "
+                            "argument");
         return false;
     }
 
@@ -887,7 +887,7 @@ AddIntlExtras(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.get(0).isObject()) {
-        JS_ReportError(cx, "addIntlExtras must be passed an object");
+        JS_ReportErrorASCII(cx, "addIntlExtras must be passed an object");
         return false;
     }
     JS::RootedObject intl(cx, &args[0].toObject());
@@ -1145,7 +1145,7 @@ CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
     if (!sizeGiven) {
         struct stat st;
         if (fstat(fileno(file), &st) < 0) {
-            JS_ReportError(cx, "Unable to stat file");
+            JS_ReportErrorASCII(cx, "Unable to stat file");
             return false;
         }
         if (st.st_size < off_t(offset)) {
@@ -1158,7 +1158,7 @@ CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
 
     void* contents = JS_CreateMappedArrayBufferContents(GET_FD_FROM_FILE(file), offset, size);
     if (!contents) {
-        JS_ReportError(cx, "failed to allocate mapped array buffer contents (possibly due to bad alignment)");
+        JS_ReportErrorASCII(cx, "failed to allocate mapped array buffer contents (possibly due to bad alignment)");
         return false;
     }
 
@@ -1290,7 +1290,7 @@ LoadScript(JSContext* cx, unsigned argc, Value* vp, bool scriptRelative)
         }
         str = ResolvePath(cx, str, scriptRelative ? ScriptRelative : RootRelative);
         if (!str) {
-            JS_ReportError(cx, "unable to resolve path");
+            JS_ReportErrorASCII(cx, "unable to resolve path");
             return false;
         }
         JSAutoByteString filename(cx, str);
@@ -1910,7 +1910,8 @@ ReadLineBuf(JSContext* cx, unsigned argc, Value* vp)
 
     if (!args.length()) {
         if (!sc->readLineBuf) {
-            JS_ReportError(cx, "No source buffer set. You must initially call readlineBuf with an argument.");
+            JS_ReportErrorASCII(cx, "No source buffer set. You must initially "
+                                "call readlineBuf with an argument.");
             return false;
         }
 
@@ -1957,7 +1958,7 @@ ReadLineBuf(JSContext* cx, unsigned argc, Value* vp)
         return true;
     }
 
-    JS_ReportError(cx, "Must specify at most one argument");
+    JS_ReportErrorASCII(cx, "Must specify at most one argument");
     return false;
 }
 
@@ -1968,7 +1969,7 @@ PutStr(JSContext* cx, unsigned argc, Value* vp)
 
     if (args.length() != 0) {
         if (!gOutFile->isOpen()) {
-            JS_ReportError(cx, "output file is closed");
+            JS_ReportErrorASCII(cx, "output file is closed");
             return false;
         }
 
@@ -2000,7 +2001,7 @@ static bool
 PrintInternal(JSContext* cx, const CallArgs& args, RCFile* file)
 {
     if (!file->isOpen()) {
-        JS_ReportError(cx, "output file is closed");
+        JS_ReportErrorASCII(cx, "output file is closed");
         return false;
     }
 
@@ -2061,7 +2062,7 @@ Quit(JSContext* cx, unsigned argc, Value* vp)
     // result in an exit code >= 128. We restrict the value to range [0, 127] to
     // avoid false positives.
     if (code < 0 || code >= 128) {
-        JS_ReportError(cx, "quit exit code should be in range 0-127");
+        JS_ReportErrorASCII(cx, "quit exit code should be in range 0-127");
         return false;
     }
 
@@ -2081,7 +2082,7 @@ StartTimingMutator(JSContext* cx, unsigned argc, Value* vp)
     }
 
     if (!cx->runtime()->gc.stats.startTimingMutator()) {
-        JS_ReportError(cx, "StartTimingMutator should only be called from outside of GC");
+        JS_ReportErrorASCII(cx, "StartTimingMutator should only be called from outside of GC");
         return false;
     }
 
@@ -2101,7 +2102,7 @@ StopTimingMutator(JSContext* cx, unsigned argc, Value* vp)
 
     double mutator_ms, gc_ms;
     if (!cx->runtime()->gc.stats.stopTimingMutator(mutator_ms, gc_ms)) {
-        JS_ReportError(cx, "stopTimingMutator called when not timing the mutator");
+        JS_ReportErrorASCII(cx, "stopTimingMutator called when not timing the mutator");
         return false;
     }
     double total_ms = mutator_ms + gc_ms;
@@ -2241,7 +2242,7 @@ GetScriptAndPCArgs(JSContext* cx, unsigned argc, Value* argv, MutableHandleScrip
             if (!JS::ToInt32(cx, HandleValue::fromMarkedLocation(&argv[intarg]), ip))
                 return false;
             if ((uint32_t)*ip >= script->length()) {
-                JS_ReportError(cx, "Invalid PC");
+                JS_ReportErrorASCII(cx, "Invalid PC");
                 return false;
             }
         }
@@ -2719,7 +2720,7 @@ Disassemble(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (!gOutFile->isOpen()) {
-        JS_ReportError(cx, "output file is closed");
+        JS_ReportErrorASCII(cx, "output file is closed");
         return false;
     }
 
@@ -2740,7 +2741,7 @@ DisassFile(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (!gOutFile->isOpen()) {
-        JS_ReportError(cx, "output file is closed");
+        JS_ReportErrorASCII(cx, "output file is closed");
         return false;
     }
 
@@ -2794,7 +2795,7 @@ DisassWithSrc(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (!gOutFile->isOpen()) {
-        JS_ReportError(cx, "output file is closed");
+        JS_ReportErrorASCII(cx, "output file is closed");
         return false;
     }
 
@@ -2923,7 +2924,7 @@ Clone(JSContext* cx, unsigned argc, Value* vp)
     RootedObject funobj(cx);
 
     if (!args.length()) {
-        JS_ReportError(cx, "Invalid arguments to clone");
+        JS_ReportErrorASCII(cx, "Invalid arguments to clone");
         return false;
     }
 
@@ -2998,7 +2999,7 @@ GetSLX(JSContext* cx, unsigned argc, Value* vp)
 static bool
 ThrowError(JSContext* cx, unsigned argc, Value* vp)
 {
-    JS_ReportError(cx, "This is an error");
+    JS_ReportErrorASCII(cx, "This is an error");
     return false;
 }
 
@@ -3147,7 +3148,7 @@ EvalInContext(JSContext* cx, unsigned argc, Value* vp)
         sobj = ToWindowIfWindowProxy(sobj);
 
         if (!(sobj->getClass()->flags & JSCLASS_IS_GLOBAL)) {
-            JS_ReportError(cx, "Invalid scope argument to evalcx");
+            JS_ReportErrorASCII(cx, "Invalid scope argument to evalcx");
             return false;
         }
         JS::CompileOptions opts(cx);
@@ -3280,19 +3281,19 @@ static bool
 EvalInWorker(JSContext* cx, unsigned argc, Value* vp)
 {
     if (!CanUseExtraThreads()) {
-        JS_ReportError(cx, "Can't create worker threads with --no-threads");
+        JS_ReportErrorASCII(cx, "Can't create worker threads with --no-threads");
         return false;
     }
 
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.get(0).isString()) {
-        JS_ReportError(cx, "Invalid arguments to evalInWorker");
+        JS_ReportErrorASCII(cx, "Invalid arguments to evalInWorker");
         return false;
     }
 
 #if defined(DEBUG) || defined(JS_OOM_BREAKPOINT)
     if (cx->runtime()->runningOOMTest) {
-        JS_ReportError(cx, "Can't create workers while running simulated OOM test");
+        JS_ReportErrorASCII(cx, "Can't create workers while running simulated OOM test");
         return false;
     }
 #endif
@@ -3346,7 +3347,7 @@ ShapeOf(JSContext* cx, unsigned argc, JS::Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.get(0).isObject()) {
-        JS_ReportError(cx, "shapeOf: object expected");
+        JS_ReportErrorASCII(cx, "shapeOf: object expected");
         return false;
     }
     JSObject* obj = &args[0].toObject();
@@ -3359,7 +3360,7 @@ GroupOf(JSContext* cx, unsigned argc, JS::Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.get(0).isObject()) {
-        JS_ReportError(cx, "groupOf: object expected");
+        JS_ReportErrorASCII(cx, "groupOf: object expected");
         return false;
     }
     JSObject* obj = &args[0].toObject();
@@ -3382,13 +3383,13 @@ Sleep_fn(JSContext* cx, unsigned argc, Value* vp)
         if (!ToNumber(cx, args[0], &t_secs))
             return false;
         if (mozilla::IsNaN(t_secs)) {
-            JS_ReportError(cx, "sleep interval is not a number");
+            JS_ReportErrorASCII(cx, "sleep interval is not a number");
             return false;
         }
 
         duration = TimeDuration::FromSeconds(Max(0.0, t_secs));
         if (duration > MAX_TIMEOUT_INTERVAL) {
-            JS_ReportError(cx, "Excessive sleep interval");
+            JS_ReportErrorASCII(cx, "Excessive sleep interval");
             return false;
         }
     }
@@ -3538,16 +3539,16 @@ static bool
 SetTimeoutValue(JSContext* cx, double t)
 {
     if (mozilla::IsNaN(t)) {
-        JS_ReportError(cx, "timeout is not a number");
+        JS_ReportErrorASCII(cx, "timeout is not a number");
         return false;
     }
     if (TimeDuration::FromSeconds(t) > MAX_TIMEOUT_INTERVAL) {
-        JS_ReportError(cx, "Excessive timeout value");
+        JS_ReportErrorASCII(cx, "Excessive timeout value");
         return false;
     }
     GetShellContext(cx)->timeoutInterval = t;
     if (!ScheduleWatchdog(cx, t)) {
-        JS_ReportError(cx, "Failed to create the watchdog");
+        JS_ReportErrorASCII(cx, "Failed to create the watchdog");
         return false;
     }
     return true;
@@ -3565,7 +3566,7 @@ Timeout(JSContext* cx, unsigned argc, Value* vp)
     }
 
     if (args.length() > 2) {
-        JS_ReportError(cx, "Wrong number of arguments");
+        JS_ReportErrorASCII(cx, "Wrong number of arguments");
         return false;
     }
 
@@ -3576,7 +3577,7 @@ Timeout(JSContext* cx, unsigned argc, Value* vp)
     if (args.length() > 1) {
         RootedValue value(cx, args[1]);
         if (!value.isObject() || !value.toObject().is<JSFunction>()) {
-            JS_ReportError(cx, "Second argument must be a timeout function");
+            JS_ReportErrorASCII(cx, "Second argument must be a timeout function");
             return false;
         }
         sc->interruptFunc = value;
@@ -3593,7 +3594,7 @@ InterruptIf(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() != 1) {
-        JS_ReportError(cx, "Wrong number of arguments");
+        JS_ReportErrorASCII(cx, "Wrong number of arguments");
         return false;
     }
 
@@ -3611,7 +3612,7 @@ InvokeInterruptCallbackWrapper(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1) {
-        JS_ReportError(cx, "Wrong number of arguments");
+        JS_ReportErrorASCII(cx, "Wrong number of arguments");
         return false;
     }
 
@@ -3646,13 +3647,13 @@ SetInterruptCallback(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() != 1) {
-        JS_ReportError(cx, "Wrong number of arguments");
+        JS_ReportErrorASCII(cx, "Wrong number of arguments");
         return false;
     }
 
     RootedValue value(cx, args[0]);
     if (!value.isObject() || !value.toObject().is<JSFunction>()) {
-        JS_ReportError(cx, "Argument must be a function");
+        JS_ReportErrorASCII(cx, "Argument must be a function");
         return false;
     }
     GetShellContext(cx)->interruptFunc = value;
@@ -3695,7 +3696,7 @@ GetLastWarning(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (!sc->lastWarningEnabled) {
-        JS_ReportError(cx, "Call enableLastWarning first.");
+        JS_ReportErrorASCII(cx, "Call enableLastWarning first.");
         return false;
     }
 
@@ -3713,7 +3714,7 @@ ClearLastWarning(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (!sc->lastWarningEnabled) {
-        JS_ReportError(cx, "Call enableLastWarning first.");
+        JS_ReportErrorASCII(cx, "Call enableLastWarning first.");
         return false;
     }
 
@@ -3730,7 +3731,7 @@ StackDump(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (!gOutFile->isOpen()) {
-        JS_ReportError(cx, "output file is closed");
+        JS_ReportErrorASCII(cx, "output file is closed");
         return false;
     }
 
@@ -3772,7 +3773,7 @@ Elapsed(JSContext* cx, unsigned argc, Value* vp)
         args.rval().setDouble(d);
         return true;
     }
-    JS_ReportError(cx, "Wrong number of arguments");
+    JS_ReportErrorASCII(cx, "Wrong number of arguments");
     return false;
 }
 
@@ -4015,7 +4016,7 @@ static bool
 OffThreadCompileScript(JSContext* cx, unsigned argc, Value* vp)
 {
     if (!CanUseExtraThreads()) {
-        JS_ReportError(cx, "Can't use offThreadCompileScript with --no-threads");
+        JS_ReportErrorASCII(cx, "Can't use offThreadCompileScript with --no-threads");
         return false;
     }
 
@@ -4080,14 +4081,14 @@ OffThreadCompileScript(JSContext* cx, unsigned argc, Value* vp)
     }
 
     if (!JS::CanCompileOffThread(cx, options, length)) {
-        JS_ReportError(cx, "cannot compile code on worker thread");
+        JS_ReportErrorASCII(cx, "cannot compile code on worker thread");
         return false;
     }
 
     ShellContext* sc = GetShellContext(cx);
     if (!sc->offThreadState.startIfIdle(cx, ScriptKind::Script, ownedChars)) {
-        JS_ReportError(cx, "called offThreadCompileScript without calling runOffThreadScript"
-                       " to receive prior off-thread compilation");
+        JS_ReportErrorASCII(cx, "called offThreadCompileScript without calling runOffThreadScript"
+                            " to receive prior off-thread compilation");
         return false;
     }
 
@@ -4113,7 +4114,7 @@ runOffThreadScript(JSContext* cx, unsigned argc, Value* vp)
     ShellContext* sc = GetShellContext(cx);
     void* token = sc->offThreadState.waitUntilDone(cx, ScriptKind::Script);
     if (!token) {
-        JS_ReportError(cx, "called runOffThreadScript when no compilation is pending");
+        JS_ReportErrorASCII(cx, "called runOffThreadScript when no compilation is pending");
         return false;
     }
 
@@ -4167,14 +4168,14 @@ OffThreadCompileModule(JSContext* cx, unsigned argc, Value* vp)
     }
 
     if (!JS::CanCompileOffThread(cx, options, length)) {
-        JS_ReportError(cx, "cannot compile code on worker thread");
+        JS_ReportErrorASCII(cx, "cannot compile code on worker thread");
         return false;
     }
 
     ShellContext* sc = GetShellContext(cx);
     if (!sc->offThreadState.startIfIdle(cx, ScriptKind::Module, ownedChars)) {
-        JS_ReportError(cx, "called offThreadCompileModule without receiving prior off-thread "
-                       "compilation");
+        JS_ReportErrorASCII(cx, "called offThreadCompileModule without receiving prior off-thread "
+                            "compilation");
         return false;
     }
 
@@ -4200,7 +4201,7 @@ FinishOffThreadModule(JSContext* cx, unsigned argc, Value* vp)
     ShellContext* sc = GetShellContext(cx);
     void* token = sc->offThreadState.waitUntilDone(cx, ScriptKind::Module);
     if (!token) {
-        JS_ReportError(cx, "called finishOffThreadModule when no compilation is pending");
+        JS_ReportErrorASCII(cx, "called finishOffThreadModule when no compilation is pending");
         return false;
     }
 
@@ -4671,7 +4672,7 @@ SetCachingEnabled(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (GetShellContext(cx)->isWorker) {
-        JS_ReportError(cx, "Caching is not supported in workers");
+        JS_ReportErrorASCII(cx, "Caching is not supported in workers");
         return false;
     }
 
@@ -4764,7 +4765,7 @@ EnableSingleStepProfiling(JSContext* cx, unsigned argc, Value* vp)
     args.rval().setUndefined();
     return true;
 #else
-    JS_ReportError(cx, "single-step profiling not enabled on this platform");
+    JS_ReportErrorASCII(cx, "single-step profiling not enabled on this platform");
     return false;
 #endif
 }
@@ -4795,7 +4796,7 @@ DisableSingleStepProfiling(JSContext* cx, unsigned argc, Value* vp)
     args.rval().setObject(*array);
     return true;
 #else
-    JS_ReportError(cx, "single-step profiling not enabled on this platform");
+    JS_ReportErrorASCII(cx, "single-step profiling not enabled on this platform");
     return false;
 #endif
 }
@@ -4945,7 +4946,7 @@ SetSharedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
         newBuffer = args[0].toObject().as<SharedArrayBufferObject>().rawBufferObject();
         newBuffer->addReference();
     } else {
-        JS_ReportError(cx, "Only a SharedArrayBuffer can be installed in the global mailbox");
+        JS_ReportErrorASCII(cx, "Only a SharedArrayBuffer can be installed in the global mailbox");
         return false;
     }
 
@@ -5079,7 +5080,7 @@ ReflectTrackedOptimizations(JSContext* cx, unsigned argc, Value* vp)
     JSRuntime* rt = cx->runtime();
 
     if (!rt->hasJitRuntime() || !rt->jitRuntime()->isOptimizationTrackingEnabled(rt)) {
-        JS_ReportError(cx, "Optimization tracking is off.");
+        JS_ReportErrorASCII(cx, "Optimization tracking is off.");
         return false;
     }
 
@@ -5330,7 +5331,7 @@ EntryPoints(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() != 1) {
-        JS_ReportError(cx, "Wrong number of arguments");
+        JS_ReportErrorASCII(cx, "Wrong number of arguments");
         return false;
     }
 
@@ -5446,7 +5447,7 @@ EntryPoints(JSContext* cx, unsigned argc, Value* vp)
         }
     }
 
-    JS_ReportError(cx, "bad 'params' object");
+    JS_ReportErrorASCII(cx, "bad 'params' object");
     return false;
 }
 
@@ -5456,7 +5457,7 @@ SetARMHwCapFlags(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() != 1) {
-        JS_ReportError(cx, "Wrong number of arguments");
+        JS_ReportErrorASCII(cx, "Wrong number of arguments");
         return false;
     }
 
@@ -6165,7 +6166,7 @@ static bool
 Help(JSContext* cx, unsigned argc, Value* vp)
 {
     if (!gOutFile->isOpen()) {
-        JS_ReportError(cx, "output file is closed");
+        JS_ReportErrorASCII(cx, "output file is closed");
         return false;
     }
 
@@ -6181,7 +6182,7 @@ Help(JSContext* cx, unsigned argc, Value* vp)
     } else {
         for (unsigned i = 0; i < args.length(); i++) {
             if (args[i].isPrimitive()) {
-                JS_ReportError(cx, "primitive arg");
+                JS_ReportErrorASCII(cx, "primitive arg");
                 return false;
             }
             obj = args[i].toObjectOrNull();

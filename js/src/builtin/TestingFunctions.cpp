@@ -424,23 +424,23 @@ GCParameter(JSContext* cx, unsigned argc, Value* vp)
         return false;
 
     if (d < 0 || d > UINT32_MAX) {
-        JS_ReportError(cx, "Parameter value out of range");
+        JS_ReportErrorASCII(cx, "Parameter value out of range");
         return false;
     }
 
     uint32_t value = floor(d);
     if (param == JSGC_MARK_STACK_LIMIT && JS::IsIncrementalGCInProgress(cx)) {
-        JS_ReportError(cx, "attempt to set markStackLimit while a GC is in progress");
+        JS_ReportErrorASCII(cx, "attempt to set markStackLimit while a GC is in progress");
         return false;
     }
 
     if (param == JSGC_MAX_BYTES) {
         uint32_t gcBytes = JS_GetGCParameter(cx, JSGC_BYTES);
         if (value < gcBytes) {
-            JS_ReportError(cx,
-                           "attempt to set maxBytes to the value less than the current "
-                           "gcBytes (%u)",
-                           gcBytes);
+            JS_ReportErrorASCII(cx,
+                                "attempt to set maxBytes to the value less than the current "
+                                "gcBytes (%u)",
+                                gcBytes);
             return false;
         }
     }
@@ -453,7 +453,7 @@ GCParameter(JSContext* cx, unsigned argc, Value* vp)
     }
 
     if (!ok) {
-        JS_ReportError(cx, "Parameter value out of range");
+        JS_ReportErrorASCII(cx, "Parameter value out of range");
         return false;
     }
 
@@ -495,7 +495,7 @@ IsProxy(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1) {
-        JS_ReportError(cx, "the function takes exactly one argument");
+        JS_ReportErrorASCII(cx, "the function takes exactly one argument");
         return false;
     }
     if (!args[0].isObject()) {
@@ -608,7 +608,7 @@ WasmBinaryToText(JSContext* cx, unsigned argc, Value* vp)
         ok = wasm::BinaryToText(cx, bytes, length, buffer);
     if (!ok) {
         if (!cx->isExceptionPending())
-            JS_ReportError(cx, "wasm binary to text print error");
+            JS_ReportErrorASCII(cx, "wasm binary to text print error");
         return false;
     }
 
@@ -625,11 +625,11 @@ IsLazyFunction(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1) {
-        JS_ReportError(cx, "The function takes exactly one argument.");
+        JS_ReportErrorASCII(cx, "The function takes exactly one argument.");
         return false;
     }
     if (!args[0].isObject() || !args[0].toObject().is<JSFunction>()) {
-        JS_ReportError(cx, "The first argument should be a function.");
+        JS_ReportErrorASCII(cx, "The first argument should be a function.");
         return false;
     }
     args.rval().setBoolean(args[0].toObject().as<JSFunction>().isInterpretedLazy());
@@ -641,13 +641,13 @@ IsRelazifiableFunction(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1) {
-        JS_ReportError(cx, "The function takes exactly one argument.");
+        JS_ReportErrorASCII(cx, "The function takes exactly one argument.");
         return false;
     }
     if (!args[0].isObject() ||
         !args[0].toObject().is<JSFunction>())
     {
-        JS_ReportError(cx, "The first argument should be a function.");
+        JS_ReportErrorASCII(cx, "The first argument should be a function.");
         return false;
     }
 
@@ -661,7 +661,7 @@ InternalConst(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() == 0) {
-        JS_ReportError(cx, "the function takes exactly one argument");
+        JS_ReportErrorASCII(cx, "the function takes exactly one argument");
         return false;
     }
 
@@ -675,7 +675,7 @@ InternalConst(JSContext* cx, unsigned argc, Value* vp)
     if (JS_FlatStringEqualsAscii(flat, "INCREMENTAL_MARK_STACK_BASE_CAPACITY")) {
         args.rval().setNumber(uint32_t(js::INCREMENTAL_MARK_STACK_BASE_CAPACITY));
     } else {
-        JS_ReportError(cx, "unknown const name");
+        JS_ReportErrorASCII(cx, "unknown const name");
         return false;
     }
     return true;
@@ -715,7 +715,7 @@ GCZeal(JSContext* cx, unsigned argc, Value* vp)
         return false;
 
     if (zeal > uint32_t(gc::ZealMode::Limit)) {
-        JS_ReportError(cx, "gczeal argument out of range");
+        JS_ReportErrorASCII(cx, "gczeal argument out of range");
         return false;
     }
 
@@ -884,7 +884,7 @@ StartGC(JSContext* cx, unsigned argc, Value* vp)
     JSRuntime* rt = cx->runtime();
     if (rt->gc.isIncrementalGCInProgress()) {
         RootedObject callee(cx, &args.callee());
-        JS_ReportError(cx, "Incremental GC already in progress");
+        JS_ReportErrorASCII(cx, "Incremental GC already in progress");
         return false;
     }
 
@@ -1104,14 +1104,14 @@ CaptureFirstSubsumedFrame(JSContext* cx, unsigned argc, JS::Value* vp)
         return false;
 
     if (!args[0].isObject()) {
-        JS_ReportError(cx, "The argument must be an object");
+        JS_ReportErrorASCII(cx, "The argument must be an object");
         return false;
     }
 
     RootedObject obj(cx, &args[0].toObject());
     obj = CheckedUnwrap(obj);
     if (!obj) {
-        JS_ReportError(cx, "Denied permission to object.");
+        JS_ReportErrorASCII(cx, "Denied permission to object.");
         return false;
     }
 
@@ -1133,11 +1133,11 @@ CallFunctionFromNativeFrame(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() != 1) {
-        JS_ReportError(cx, "The function takes exactly one argument.");
+        JS_ReportErrorASCII(cx, "The function takes exactly one argument.");
         return false;
     }
     if (!args[0].isObject() || !IsCallable(args[0])) {
-        JS_ReportError(cx, "The first argument should be a function.");
+        JS_ReportErrorASCII(cx, "The first argument should be a function.");
         return false;
     }
 
@@ -1152,19 +1152,19 @@ CallFunctionWithAsyncStack(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() != 3) {
-        JS_ReportError(cx, "The function takes exactly three arguments.");
+        JS_ReportErrorASCII(cx, "The function takes exactly three arguments.");
         return false;
     }
     if (!args[0].isObject() || !IsCallable(args[0])) {
-        JS_ReportError(cx, "The first argument should be a function.");
+        JS_ReportErrorASCII(cx, "The first argument should be a function.");
         return false;
     }
     if (!args[1].isObject() || !args[1].toObject().is<SavedFrame>()) {
-        JS_ReportError(cx, "The second argument should be a SavedFrame.");
+        JS_ReportErrorASCII(cx, "The second argument should be a SavedFrame.");
         return false;
     }
     if (!args[2].isString() || args[2].toString()->empty()) {
-        JS_ReportError(cx, "The third argument should be a non-empty string.");
+        JS_ReportErrorASCII(cx, "The third argument should be a non-empty string.");
         return false;
     }
 
@@ -1217,12 +1217,12 @@ SetupOOMFailure(JSContext* cx, bool failAlways, unsigned argc, Value* vp)
     }
 
     if (args.length() < 1) {
-        JS_ReportError(cx, "Count argument required");
+        JS_ReportErrorASCII(cx, "Count argument required");
         return false;
     }
 
     if (args.length() > 2) {
-        JS_ReportError(cx, "Too many arguments");
+        JS_ReportErrorASCII(cx, "Too many arguments");
         return false;
     }
 
@@ -1231,7 +1231,7 @@ SetupOOMFailure(JSContext* cx, bool failAlways, unsigned argc, Value* vp)
         return false;
 
     if (count <= 0) {
-        JS_ReportError(cx, "OOM cutoff should be positive");
+        JS_ReportErrorASCII(cx, "OOM cutoff should be positive");
         return false;
     }
 
@@ -1240,7 +1240,7 @@ SetupOOMFailure(JSContext* cx, bool failAlways, unsigned argc, Value* vp)
         return false;
 
     if (targetThread == js::oom::THREAD_TYPE_NONE || targetThread >= js::oom::THREAD_TYPE_MAX) {
-        JS_ReportError(cx, "Invalid thread type specified");
+        JS_ReportErrorASCII(cx, "Invalid thread type specified");
         return false;
     }
 
@@ -1277,17 +1277,17 @@ OOMTest(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() < 1 || args.length() > 2) {
-        JS_ReportError(cx, "oomTest() takes between 1 and 2 arguments.");
+        JS_ReportErrorASCII(cx, "oomTest() takes between 1 and 2 arguments.");
         return false;
     }
 
     if (!args[0].isObject() || !args[0].toObject().is<JSFunction>()) {
-        JS_ReportError(cx, "The first argument to oomTest() must be a function.");
+        JS_ReportErrorASCII(cx, "The first argument to oomTest() must be a function.");
         return false;
     }
 
     if (args.length() == 2 && !args[1].isBoolean()) {
-        JS_ReportError(cx, "The optional second argument to oomTest() must be a boolean.");
+        JS_ReportErrorASCII(cx, "The optional second argument to oomTest() must be a boolean.");
         return false;
     }
 
@@ -1316,7 +1316,7 @@ OOMTest(JSContext* cx, unsigned argc, Value* vp)
     int threadOption = 0;
     if (EnvVarAsInt("OOM_THREAD", &threadOption)) {
         if (threadOption < oom::THREAD_TYPE_MAIN || threadOption > oom::THREAD_TYPE_MAX) {
-            JS_ReportError(cx, "OOM_THREAD value out of range.");
+            JS_ReportErrorASCII(cx, "OOM_THREAD value out of range.");
             return false;
         }
 
@@ -1326,7 +1326,7 @@ OOMTest(JSContext* cx, unsigned argc, Value* vp)
 
     JSRuntime* rt = cx->runtime();
     if (rt->runningOOMTest) {
-        JS_ReportError(cx, "Nested call to oomTest() is not allowed.");
+        JS_ReportErrorASCII(cx, "Nested call to oomTest() is not allowed.");
         return false;
     }
     rt->runningOOMTest = true;
@@ -1403,7 +1403,7 @@ SettlePromiseNow(JSContext* cx, unsigned argc, Value* vp)
     if (!args.requireAtLeast(cx, "settlePromiseNow", 1))
         return false;
     if (!args[0].isObject() || !args[0].toObject().is<PromiseObject>()) {
-        JS_ReportError(cx, "first argument must be a Promise object");
+        JS_ReportErrorASCII(cx, "first argument must be a Promise object");
         return false;
     }
 
@@ -1444,7 +1444,7 @@ SettleFakePromise(JSContext* cx, unsigned argc, Value* vp)
     if (!args.requireAtLeast(cx, "settleFakePromise", 1))
         return false;
     if (!args[0].isObject() || args[0].toObject().getClass() != &FakePromiseClass) {
-        JS_ReportError(cx, "first argument must be a (fake) Promise object");
+        JS_ReportErrorASCII(cx, "first argument must be a (fake) Promise object");
         return false;
     }
 
@@ -1553,7 +1553,7 @@ DumpHeap(JSContext* cx, unsigned argc, Value* vp)
     }
 
     if (i != args.length()) {
-        JS_ReportError(cx, "bad arguments passed to dumpHeap");
+        JS_ReportErrorASCII(cx, "bad arguments passed to dumpHeap");
         if (dumpFile)
             fclose(dumpFile);
         return false;
@@ -1776,7 +1776,7 @@ GetAllocationMetadata(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1 || !args[0].isObject()) {
-        JS_ReportError(cx, "Argument must be an object");
+        JS_ReportErrorASCII(cx, "Argument must be an object");
         return false;
     }
 
@@ -1799,7 +1799,7 @@ testingFunc_bailAfter(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1 || !args[0].isInt32() || args[0].toInt32() < 0) {
-        JS_ReportError(cx, "Argument must be a positive number that fits an int32");
+        JS_ReportErrorASCII(cx, "Argument must be a positive number that fits in an int32");
         return false;
     }
 
@@ -1881,7 +1881,7 @@ js::testingFunc_assertFloat32(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 2) {
-        JS_ReportError(cx, "Expects only 2 arguments");
+        JS_ReportErrorASCII(cx, "Expects only 2 arguments");
         return false;
     }
 
@@ -1905,7 +1905,7 @@ js::testingFunc_assertRecoveredOnBailout(JSContext* cx, unsigned argc, Value* vp
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 2) {
-        JS_ReportError(cx, "Expects only 2 arguments");
+        JS_ReportErrorASCII(cx, "Expects only 2 arguments");
         return false;
     }
 
@@ -1964,7 +1964,7 @@ SetJitCompilerOption(JSContext* cx, unsigned argc, Value* vp)
     {
         js::jit::JitActivationIterator iter(cx->runtime());
         if (!iter.done()) {
-            JS_ReportError(cx, "Can't turn off JITs with JIT code on the stack.");
+            JS_ReportErrorASCII(cx, "Can't turn off JITs with JIT code on the stack.");
             return false;
         }
     }
@@ -2066,11 +2066,11 @@ class CloneBufferObject : public NativeObject {
     static bool
     setCloneBuffer_impl(JSContext* cx, const CallArgs& args) {
         if (args.length() != 1 || !args[0].isString()) {
-            JS_ReportError(cx,
-                           "the first argument argument must be maxBytes, "
-                           "maxMallocBytes, gcStackpoolLifespan, gcBytes or "
-                           "gcNumber");
-            JS_ReportError(cx, "clonebuffer setter requires a single string argument");
+            JS_ReportErrorASCII(cx,
+                                "the first argument argument must be maxBytes, "
+                                "maxMallocBytes, gcStackpoolLifespan, gcBytes or "
+                                "gcNumber");
+            JS_ReportErrorASCII(cx, "clonebuffer setter requires a single string argument");
             return false;
         }
 
@@ -2123,7 +2123,7 @@ class CloneBufferObject : public NativeObject {
             return false;
 
         if (hasTransferable) {
-            JS_ReportError(cx, "cannot retrieve structured clone buffer with transferables");
+            JS_ReportErrorASCII(cx, "cannot retrieve structured clone buffer with transferables");
             return false;
         }
 
@@ -2199,12 +2199,12 @@ Deserialize(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() != 1 || !args[0].isObject()) {
-        JS_ReportError(cx, "deserialize requires a single clonebuffer argument");
+        JS_ReportErrorASCII(cx, "deserialize requires a single clonebuffer argument");
         return false;
     }
 
     if (!args[0].toObject().is<CloneBufferObject>()) {
-        JS_ReportError(cx, "deserialize requires a clonebuffer");
+        JS_ReportErrorASCII(cx, "deserialize requires a clonebuffer");
         return false;
     }
 
@@ -2212,8 +2212,8 @@ Deserialize(JSContext* cx, unsigned argc, Value* vp)
 
     // Clone buffer was already consumed?
     if (!obj->data()) {
-        JS_ReportError(cx, "deserialize given invalid clone buffer "
-                       "(transferables already consumed?)");
+        JS_ReportErrorASCII(cx, "deserialize given invalid clone buffer "
+                            "(transferables already consumed?)");
         return false;
     }
 
@@ -2242,12 +2242,12 @@ DetachArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() != 1) {
-        JS_ReportError(cx, "detachArrayBuffer() requires a single argument");
+        JS_ReportErrorASCII(cx, "detachArrayBuffer() requires a single argument");
         return false;
     }
 
     if (!args[0].isObject()) {
-        JS_ReportError(cx, "detachArrayBuffer must be passed an object");
+        JS_ReportErrorASCII(cx, "detachArrayBuffer must be passed an object");
         return false;
     }
 
@@ -2385,11 +2385,11 @@ SharedAddress(JSContext* cx, unsigned argc, Value* vp)
 #else
     RootedObject obj(cx, CheckedUnwrap(&args[0].toObject()));
     if (!obj) {
-        JS_ReportError(cx, "Permission denied to access object");
+        JS_ReportErrorASCII(cx, "Permission denied to access object");
         return false;
     }
     if (!obj->is<SharedArrayBufferObject>()) {
-        JS_ReportError(cx, "Argument must be a SharedArrayBuffer");
+        JS_ReportErrorASCII(cx, "Argument must be a SharedArrayBuffer");
         return false;
     }
     char buffer[64];
@@ -2751,7 +2751,7 @@ ShortestPaths(JSContext* cx, unsigned argc, Value* vp)
     for (size_t i = 0; i < length; i++) {
         RootedValue el(cx, objs->getDenseElement(i));
         if (!el.isObject() && !el.isString() && !el.isSymbol()) {
-            JS_ReportError(cx, "Each target must be an object, string, or symbol");
+            JS_ReportErrorASCII(cx, "Each target must be an object, string, or symbol");
             return false;
         }
     }
@@ -2930,11 +2930,11 @@ EvalReturningScope(JSContext* cx, unsigned argc, Value* vp)
     if (global) {
         global = CheckedUnwrap(global);
         if (!global) {
-            JS_ReportError(cx, "Permission denied to access global");
+            JS_ReportErrorASCII(cx, "Permission denied to access global");
             return false;
         }
         if (!global->is<GlobalObject>()) {
-            JS_ReportError(cx, "Argument must be a global object");
+            JS_ReportErrorASCII(cx, "Argument must be a global object");
             return false;
         }
     } else {
@@ -3015,11 +3015,11 @@ ShellCloneAndExecuteScript(JSContext* cx, unsigned argc, Value* vp)
 
     global = CheckedUnwrap(global);
     if (!global) {
-        JS_ReportError(cx, "Permission denied to access global");
+        JS_ReportErrorASCII(cx, "Permission denied to access global");
         return false;
     }
     if (!global->is<GlobalObject>()) {
-        JS_ReportError(cx, "Argument must be a global object");
+        JS_ReportErrorASCII(cx, "Argument must be a global object");
         return false;
     }
 
@@ -3073,13 +3073,13 @@ ByteSizeOfScript(JSContext*cx, unsigned argc, Value* vp)
     if (!args.requireAtLeast(cx, "byteSizeOfScript", 1))
         return false;
     if (!args[0].isObject() || !args[0].toObject().is<JSFunction>()) {
-        JS_ReportError(cx, "Argument must be a Function object");
+        JS_ReportErrorASCII(cx, "Argument must be a Function object");
         return false;
     }
 
     JSFunction* fun = &args[0].toObject().as<JSFunction>();
     if (fun->isNative()) {
-        JS_ReportError(cx, "Argument must be a scripted function");
+        JS_ReportErrorASCII(cx, "Argument must be a scripted function");
         return false;
     }
 
@@ -3108,7 +3108,7 @@ SetImmutablePrototype(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (!args.get(0).isObject()) {
-        JS_ReportError(cx, "setImmutablePrototype: object expected");
+        JS_ReportErrorASCII(cx, "setImmutablePrototype: object expected");
         return false;
     }
 
@@ -3269,7 +3269,7 @@ SetGCCallback(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() != 1) {
-        JS_ReportError(cx, "Wrong number of arguments");
+        JS_ReportErrorASCII(cx, "Wrong number of arguments");
         return false;
     }
 
@@ -3309,7 +3309,7 @@ SetGCCallback(JSContext* cx, unsigned argc, Value* vp)
             else if (strcmp(phasesStr.ptr(), "both") == 0)
                 phases = (1 << JSGC_BEGIN) | (1 << JSGC_END);
             else {
-                JS_ReportError(cx, "Invalid callback phase");
+                JS_ReportErrorASCII(cx, "Invalid callback phase");
                 return false;
             }
         }
@@ -3346,7 +3346,7 @@ SetGCCallback(JSContext* cx, unsigned argc, Value* vp)
                 return false;
         }
         if (depth > int32_t(gcstats::Statistics::MAX_NESTING - 4)) {
-            JS_ReportError(cx, "Nesting depth too large, would overflow");
+            JS_ReportErrorASCII(cx, "Nesting depth too large, would overflow");
             return false;
         }
 
@@ -3360,7 +3360,7 @@ SetGCCallback(JSContext* cx, unsigned argc, Value* vp)
         info->depth = depth;
         JS_SetGCCallback(cx, gcCallback::majorGC, info);
     } else {
-        JS_ReportError(cx, "Unknown GC callback action");
+        JS_ReportErrorASCII(cx, "Unknown GC callback action");
         return false;
     }
 
@@ -3374,7 +3374,7 @@ GetLcovInfo(JSContext* cx, unsigned argc, Value* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() > 1) {
-        JS_ReportError(cx, "Wrong number of arguments");
+        JS_ReportErrorASCII(cx, "Wrong number of arguments");
         return false;
     }
 
@@ -3382,16 +3382,16 @@ GetLcovInfo(JSContext* cx, unsigned argc, Value* vp)
     if (args.hasDefined(0)) {
         global = ToObject(cx, args[0]);
         if (!global) {
-            JS_ReportError(cx, "First argument should be an object");
+            JS_ReportErrorASCII(cx, "First argument should be an object");
             return false;
         }
         global = CheckedUnwrap(global);
         if (!global) {
-            JS_ReportError(cx, "Permission denied to access global");
+            JS_ReportErrorASCII(cx, "Permission denied to access global");
             return false;
         }
         if (!global->is<GlobalObject>()) {
-            JS_ReportError(cx, "Argument must be a global object");
+            JS_ReportErrorASCII(cx, "Argument must be a global object");
             return false;
         }
     } else {
@@ -3438,7 +3438,7 @@ SetRNGState(JSContext* cx, unsigned argc, Value* vp)
     uint64_t seed1 = static_cast<uint64_t>(d1);
 
     if (seed0 == 0 && seed1 == 0) {
-        JS_ReportError(cx, "RNG requires non-zero seed");
+        JS_ReportErrorASCII(cx, "RNG requires non-zero seed");
         return false;
     }
 
@@ -3469,12 +3469,12 @@ GetModuleEnvironmentNames(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 1) {
-        JS_ReportError(cx, "Wrong number of arguments");
+        JS_ReportErrorASCII(cx, "Wrong number of arguments");
         return false;
     }
 
     if (!args[0].isObject() || !args[0].toObject().is<ModuleObject>()) {
-        JS_ReportError(cx, "First argument should be a ModuleObject");
+        JS_ReportErrorASCII(cx, "First argument should be a ModuleObject");
         return false;
     }
 
@@ -3501,17 +3501,17 @@ GetModuleEnvironmentValue(JSContext* cx, unsigned argc, Value* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() != 2) {
-        JS_ReportError(cx, "Wrong number of arguments");
+        JS_ReportErrorASCII(cx, "Wrong number of arguments");
         return false;
     }
 
     if (!args[0].isObject() || !args[0].toObject().is<ModuleObject>()) {
-        JS_ReportError(cx, "First argument should be a ModuleObject");
+        JS_ReportErrorASCII(cx, "First argument should be a ModuleObject");
         return false;
     }
 
     if (!args[1].isString()) {
-        JS_ReportError(cx, "Second argument should be a string");
+        JS_ReportErrorASCII(cx, "Second argument should be a string");
         return false;
     }
 
