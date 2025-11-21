@@ -2267,13 +2267,13 @@ GetTopScript(JSContext* cx)
 }
 
 static bool
-GetScriptAndPCArgs(JSContext* cx, unsigned argc, Value* argv, MutableHandleScript scriptp,
+GetScriptAndPCArgs(JSContext* cx, CallArgs& args, MutableHandleScript scriptp,
                    int32_t* ip)
 {
     RootedScript script(cx, GetTopScript(cx));
     *ip = 0;
-    if (argc != 0) {
-        RootedValue v(cx, argv[0]);
+    if (!args.get(0).isUndefined()) {
+        HandleValue v = args[0];
         unsigned intarg = 0;
         if (v.isObject() &&
             JS_GetClass(&v.toObject()) == Jsvalify(&JSFunction::class_)) {
@@ -2282,8 +2282,8 @@ GetScriptAndPCArgs(JSContext* cx, unsigned argc, Value* argv, MutableHandleScrip
                 return false;
             intarg++;
         }
-        if (argc > intarg) {
-            if (!JS::ToInt32(cx, HandleValue::fromMarkedLocation(&argv[intarg]), ip))
+        if (!args.get(intarg).isUndefined()) {
+            if (!JS::ToInt32(cx, args[intarg], ip))
                 return false;
             if ((uint32_t)*ip >= script->length()) {
                 JS_ReportErrorASCII(cx, "Invalid PC");
@@ -2335,7 +2335,7 @@ PCToLine(JSContext* cx, unsigned argc, Value* vp)
     int32_t i;
     unsigned lineno;
 
-    if (!GetScriptAndPCArgs(cx, args.length(), args.array(), &script, &i))
+    if (!GetScriptAndPCArgs(cx, args, &script, &i))
         return false;
     lineno = PCToLineNumber(script, script->offsetToPC(i));
     if (!lineno)
