@@ -3788,7 +3788,7 @@ Compile(JSContext* cx, unsigned argc, Value* vp)
     }
     if (!args[0].isString()) {
         const char* typeName = InformalValueTypeName(args[0]);
-        JS_ReportError(cx, "expected string to compile, got %s", typeName);
+        JS_ReportErrorASCII(cx, "expected string to compile, got %s", typeName);
         return false;
     }
 
@@ -3825,7 +3825,7 @@ ParseModule(JSContext* cx, unsigned argc, Value* vp)
 
     if (!args[0].isString()) {
         const char* typeName = InformalValueTypeName(args[0]);
-        JS_ReportError(cx, "expected string to compile, got %s", typeName);
+        JS_ReportErrorASCII(cx, "expected string to compile, got %s", typeName);
         return false;
     }
 
@@ -3838,7 +3838,7 @@ ParseModule(JSContext* cx, unsigned argc, Value* vp)
     if (args.length() > 1) {
         if (!args[1].isString()) {
             const char* typeName = InformalValueTypeName(args[1]);
-            JS_ReportError(cx, "expected filename string, got %s", typeName);
+            JS_ReportErrorASCII(cx, "expected filename string, got %s", typeName);
             return false;
         }
 
@@ -3880,7 +3880,7 @@ SetModuleResolveHook(JSContext* cx, unsigned argc, Value* vp)
 
     if (!args[0].isObject() || !args[0].toObject().is<JSFunction>()) {
         const char* typeName = InformalValueTypeName(args[0]);
-        JS_ReportError(cx, "expected hook function, got %s", typeName);
+        JS_ReportErrorASCII(cx, "expected hook function, got %s", typeName);
         return false;
     }
 
@@ -3913,7 +3913,7 @@ Parse(JSContext* cx, unsigned argc, Value* vp)
     }
     if (!args[0].isString()) {
         const char* typeName = InformalValueTypeName(args[0]);
-        JS_ReportError(cx, "expected string to parse, got %s", typeName);
+        JS_ReportErrorASCII(cx, "expected string to parse, got %s", typeName);
         return false;
     }
 
@@ -3964,7 +3964,7 @@ SyntaxParse(JSContext* cx, unsigned argc, Value* vp)
     }
     if (!args[0].isString()) {
         const char* typeName = InformalValueTypeName(args[0]);
-        JS_ReportError(cx, "expected string to parse, got %s", typeName);
+        JS_ReportErrorASCII(cx, "expected string to parse, got %s", typeName);
         return false;
     }
 
@@ -4029,7 +4029,7 @@ OffThreadCompileScript(JSContext* cx, unsigned argc, Value* vp)
     }
     if (!args[0].isString()) {
         const char* typeName = InformalValueTypeName(args[0]);
-        JS_ReportError(cx, "expected string to parse, got %s", typeName);
+        JS_ReportErrorASCII(cx, "expected string to parse, got %s", typeName);
         return false;
     }
 
