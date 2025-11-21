@@ -1,0 +1,69 @@
+diff --git a/devtools/client/webconsole/net/components/net-info-params.js b/devtools/client/webconsole/net/components/net-info-params.js
+index de5e992a81adb5..573257b281eebe 100644
+--- a/devtools/client/webconsole/net/components/net-info-params.js
++++ b/devtools/client/webconsole/net/components/net-info-params.js
+@@ -14,6 +14,8 @@ const PropTypes = React.PropTypes;
+  * It's essentially a list of name + value pairs.
+  */
+ var NetInfoParams = React.createClass({
++  displayName: "NetInfoParams",
++
+   propTypes: {
+     params: PropTypes.arrayOf(PropTypes.shape({
+       name: PropTypes.string.isRequired,
+@@ -21,8 +23,6 @@ var NetInfoParams = React.createClass({
+     })).isRequired,
+   },
+ 
+-  displayName: "NetInfoParams",
+-
+   render() {
+     let params = this.props.params || [];
+ 
+@@ -31,9 +31,9 @@ var NetInfoParams = React.createClass({
+     });
+ 
+     let rows = [];
+-    params.forEach(param => {
++    params.forEach((param, index) => {
+       rows.push(
+-        DOM.tr({key: param.name},
++        DOM.tr({key: index},
+           DOM.td({className: "netInfoParamName"},
+             DOM.span({title: param.name}, param.name)
+           ),
+diff --git a/devtools/client/webconsole/net/test/mochitest/browser_net_params.js b/devtools/client/webconsole/net/test/mochitest/browser_net_params.js
+index d0a0d6b865d145..d8b0e2c84bf1b3 100644
+--- a/devtools/client/webconsole/net/test/mochitest/browser_net_params.js
++++ b/devtools/client/webconsole/net/test/mochitest/browser_net_params.js
+@@ -40,3 +40,30 @@ add_task(function* () {
+   is(paramValue.textContent, "bar",
+     "The param value must have proper value");
+ });
++
++/**
++ * Test URL parameters with the same name.
++ */
++add_task(function* () {
++  info("Test XHR Spy params started");
++
++  let {hud} = yield addTestTab(TEST_PAGE_URL);
++
++  let netInfoBody = yield executeAndInspectXhr(hud, {
++    method: "GET",
++    url: JSON_XHR_URL,
++    queryString: "?box[]=123&box[]=456"
++  });
++
++  // Check headers
++  let tabBody = yield selectNetInfoTab(hud, netInfoBody, "params");
++
++  let params = tabBody.querySelectorAll(
++    ".netInfoParamName > span[title='box[]']");
++  is(params.length, 2, "Two URI parameters must exist");
++
++  let values = tabBody.querySelectorAll(
++    ".netInfoParamValue > code");
++  is(values[0].textContent, 123, "First value must match");
++  is(values[1].textContent, 456, "Second value must match");
++});
