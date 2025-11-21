@@ -568,8 +568,8 @@ js::XDRInterpretedFunction(XDRState<mode>* xdr, HandleScope enclosingScope,
         if (!fun->isInterpreted()) {
             JSAutoByteString funNameBytes;
             if (const char* name = GetFunctionNameBytes(cx, fun, &funNameBytes)) {
-                JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
-                                     JSMSG_NOT_SCRIPTED_FUNCTION, name);
+                JS_ReportErrorNumberLatin1(cx, GetErrorMessage, nullptr,
+                                           JSMSG_NOT_SCRIPTED_FUNCTION, name);
             }
             return false;
         }
@@ -2283,8 +2283,8 @@ js::ReportIncompatibleMethod(JSContext* cx, const CallArgs& args, const Class* c
     if (JSFunction* fun = ReportIfNotFunction(cx, args.calleev())) {
         JSAutoByteString funNameBytes;
         if (const char* funName = GetFunctionNameBytes(cx, fun, &funNameBytes)) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INCOMPATIBLE_PROTO,
-                                 clasp->name, funName, InformalValueTypeName(thisv));
+            JS_ReportErrorNumberLatin1(cx, GetErrorMessage, nullptr, JSMSG_INCOMPATIBLE_PROTO,
+                                       clasp->name, funName, InformalValueTypeName(thisv));
         }
     }
 }
@@ -2295,8 +2295,8 @@ js::ReportIncompatible(JSContext* cx, const CallArgs& args)
     if (JSFunction* fun = ReportIfNotFunction(cx, args.calleev())) {
         JSAutoByteString funNameBytes;
         if (const char* funName = GetFunctionNameBytes(cx, fun, &funNameBytes)) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_INCOMPATIBLE_METHOD,
-                                 funName, "method", InformalValueTypeName(args.thisv()));
+            JS_ReportErrorNumberLatin1(cx, GetErrorMessage, nullptr, JSMSG_INCOMPATIBLE_METHOD,
+                                       funName, "method", InformalValueTypeName(args.thisv()));
         }
     }
 }
