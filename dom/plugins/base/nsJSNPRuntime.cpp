@@ -2174,8 +2174,8 @@ NPObjectMember_Call(JSContext *cx, unsigned argc, JS::Value *vp)
   if (!memberPrivate || !memberPrivate->npobjWrapper)
     return false;
 
-  NPObject *npobj = GetNPObject(cx, memberPrivate->npobjWrapper);
-  if (!npobj) {
+  JS::Rooted<JSObject*> objWrapper(cx, memberPrivate->npobjWrapper);
+  NPObject *npobj = GetNPObject(cx, objWrapper);  if (!npobj) {
     ThrowJSExceptionASCII(cx, "Call on invalid member object");
 
     return false;
