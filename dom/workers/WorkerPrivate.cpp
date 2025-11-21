@@ -6587,7 +6587,7 @@ EventTarget::IsOnCurrentThread(bool* aIsOnCurrentThread)
 BEGIN_WORKERS_NAMESPACE
 
 WorkerCrossThreadDispatcher*
-GetWorkerCrossThreadDispatcher(JSContext* aCx, JS::Value aWorker)
+GetWorkerCrossThreadDispatcher(JSContext* aCx, const JS::Value& aWorker)
 {
   if (!aWorker.isObject()) {
     return nullptr;
