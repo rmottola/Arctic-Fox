@@ -47,15 +47,15 @@ class BaseCompileChecks(unittest.TestCase):
         base_dir = os.path.join(topsrcdir, 'build', 'moz.configure')
 
         mock_compiler_defs = textwrap.dedent('''\
-            @depends('--help')
-            def extra_toolchain_flags(_):
+            @depends(when=True)
+            def extra_toolchain_flags():
                 return []
 
             include('%s/compilers-util.configure')
 
             @compiler_class
-            @depends('--help')
-            def c_compiler(_):
+            @depends(when=True)
+            def c_compiler():
                 return namespace(
                     flags=[],
                     type='gcc',
@@ -65,8 +65,8 @@ class BaseCompileChecks(unittest.TestCase):
                 )
 
             @compiler_class
-            @depends('--help')
-            def cxx_compiler(_):
+            @depends(when=True)
+            def cxx_compiler():
                 return namespace(
                     flags=[],
                     type='gcc',
@@ -300,8 +300,8 @@ class TestWarningChecks(BaseCompileChecks):
 
     def test_check_and_add_gcc_warning_when(self):
         cmd = textwrap.dedent('''\
-            @depends('--help')
-            def never(_):
+            @depends(when=True)
+            def never():
                 return False
             check_and_add_gcc_warning('-Wfoo', cxx_compiler, when=never)
         ''') + self.get_warnings()
@@ -315,8 +315,8 @@ class TestWarningChecks(BaseCompileChecks):
         self.assertEqual(out, '')
 
         cmd = textwrap.dedent('''\
-            @depends('--help')
-            def always(_):
+            @depends(when=True)
+            def always():
                 return True
             check_and_add_gcc_warning('-Wfoo', cxx_compiler, when=always)
         ''') + self.get_warnings()
@@ -359,8 +359,8 @@ class TestWarningChecks(BaseCompileChecks):
 
     def test_add_gcc_warning_when(self):
         cmd = textwrap.dedent('''\
-            @depends('--help')
-            def never(_):
+            @depends(when=True)
+            def never():
                 return False
             add_gcc_warning('-Wfoo', c_compiler, when=never)
         ''') + self.get_warnings()
@@ -374,8 +374,8 @@ class TestWarningChecks(BaseCompileChecks):
         self.assertEqual(out, '')
 
         cmd = textwrap.dedent('''\
-            @depends('--help')
-            def always(_):
+            @depends(when=True)
+            def always():
                 return True
             add_gcc_warning('-Wfoo', c_compiler, when=always)
         ''') + self.get_warnings()
