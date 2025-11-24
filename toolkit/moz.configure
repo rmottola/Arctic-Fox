@@ -403,8 +403,6 @@ def eme_modules(value):
     # without an opening one).
     return list(value) if value else []
 
-set_config('MOZ_EME', eme)
-set_define('MOZ_EME', eme)
 set_config('MOZ_EME_MODULES', eme_modules)
 
 option(name='--enable-chrome-format',
