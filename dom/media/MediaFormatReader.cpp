@@ -4,6 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "mozilla/CDMProxy.h"
 #include "mozilla/dom/HTMLMediaElement.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Telemetry.h"
@@ -20,10 +21,6 @@
 #include "VideoFrameContainer.h"
 
 #include <algorithm>
-
-#ifdef MOZ_EME
-#include "mozilla/CDMProxy.h"
-#endif
 
 using namespace mozilla::media;
 
@@ -191,7 +188,6 @@ MediaFormatReader::Init()
   return NS_OK;
 }
 
-#ifdef MOZ_EME
 class DispatchKeyNeededEvent : public Runnable {
 public:
   DispatchKeyNeededEvent(AbstractMediaDecoder* aDecoder,
@@ -229,16 +225,11 @@ MediaFormatReader::SetCDMProxy(CDMProxy* aProxy)
   });
   OwnerThread()->Dispatch(r.forget());
 }
-#endif // MOZ_EME
 
 bool
 MediaFormatReader::IsWaitingOnCDMResource() {
   MOZ_ASSERT(OnTaskQueue());
-#ifdef MOZ_EME
   return IsEncrypted() && !mCDMProxy;
-#else
-  return false;
-#endif
 }
 
 RefPtr<MediaDecoderReader::MetadataPromise>
@@ -350,13 +341,11 @@ MediaFormatReader::OnDemuxerInitDone(nsresult)
   mIsEncrypted = crypto && crypto->IsEncrypted();
 
   if (mDecoder && crypto && crypto->IsEncrypted()) {
-#ifdef MOZ_EME
     // Try and dispatch 'encrypted'. Won't go if ready state still HAVE_NOTHING.
     for (uint32_t i = 0; i < crypto->mInitDatas.Length(); i++) {
       NS_DispatchToMainThread(
         new DispatchKeyNeededEvent(mDecoder, crypto->mInitDatas[i].mInitData, crypto->mInitDatas[i].mType));
     }
-#endif // MOZ_EME
     mInfo.mCrypto = *crypto;
   }
 
@@ -406,13 +395,8 @@ MediaFormatReader::EnsureDecoderCreated(TrackType aTrack)
     mPlatform = new PDMFactory();
     NS_ENSURE_TRUE(mPlatform, false);
     if (IsEncrypted()) {
-#ifdef MOZ_EME
       MOZ_ASSERT(mCDMProxy);
       mPlatform->SetCDMProxy(mCDMProxy);
-#else
-      // EME not supported.
-      return false;
-#endif
     }
   }
 

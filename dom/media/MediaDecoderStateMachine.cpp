@@ -871,12 +871,10 @@ nsresult MediaDecoderStateMachine::Init(MediaDecoder* aDecoder)
 
   mMediaSink = CreateMediaSink(mAudioCaptured);
 
-#ifdef MOZ_EME
   mCDMProxyPromise.Begin(aDecoder->RequestCDMProxy()->Then(
     OwnerThread(), __func__, this,
     &MediaDecoderStateMachine::OnCDMProxyReady,
     &MediaDecoderStateMachine::OnCDMProxyNotReady));
-#endif
 
   nsresult rv = mReader->Init();
   NS_ENSURE_SUCCESS(rv, rv);
@@ -1221,9 +1219,7 @@ MediaDecoderStateMachine::Shutdown()
   // dispose of the timer.
   mVideoDecodeSuspendTimer.Reset();
 
-#ifdef MOZ_EME
   mCDMProxyPromise.DisconnectIfExists();
-#endif
 
   if (IsPlaying()) {
     StopPlayback();
@@ -2011,11 +2007,7 @@ MediaDecoderStateMachine::OnMetadataRead(MetadataHolder* aMetadata)
   // thus get the metadata). We could fix this if we could compute the start
   // time by demuxing without necessaring decoding.
   bool waitingForCDM =
-#ifdef MOZ_EME
     mInfo.IsEncrypted() && !mCDMProxy;
-#else
-    false;
-#endif
   mNotifyMetadataBeforeFirstFrame = mDuration.Ref().isSome() || waitingForCDM;
   if (mNotifyMetadataBeforeFirstFrame) {
     EnqueueLoadedMetadataEvent();
@@ -2761,7 +2753,6 @@ void MediaDecoderStateMachine::OnMediaSinkAudioError()
   DecodeError();
 }
 
-#ifdef MOZ_EME
 void
 MediaDecoderStateMachine::OnCDMProxyReady(RefPtr<CDMProxy> aProxy)
 {
@@ -2780,7 +2771,6 @@ MediaDecoderStateMachine::OnCDMProxyNotReady()
   MOZ_ASSERT(OnTaskQueue());
   mCDMProxyPromise.Complete();
 }
-#endif
 
 void
 MediaDecoderStateMachine::SetAudioCaptured(bool aCaptured)

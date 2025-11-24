@@ -94,9 +94,7 @@ public:
     return mTrackDemuxersMayBlock;
   }
 
-#ifdef MOZ_EME
   void SetCDMProxy(CDMProxy* aProxy) override;
-#endif
 
   // Returns a string describing the state of the decoder data.
   // Used for debugging purposes.
@@ -578,9 +576,8 @@ private:
   RefPtr<VideoFrameContainer> mVideoFrameContainer;
   layers::ImageContainer* GetImageContainer();
 
-#ifdef MOZ_EME
   RefPtr<CDMProxy> mCDMProxy;
-#endif
+
   RefPtr<GMPCrashHelper> mCrashHelper;
 
   void SetBlankDecode(TrackType aTrack, bool aIsBlankDecode);
