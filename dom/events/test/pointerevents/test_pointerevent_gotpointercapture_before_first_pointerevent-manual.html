@@ -14,8 +14,7 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1000870
     <script type="text/javascript">
       SimpleTest.waitForExplicitFinish();
       function startTest() {
-        var iframe = document.getElementById("testFrame");
-        iframe.src = "pointerevent_gotpointercapture_before_first_pointerevent-manual.html";
+        runTestInNewWindow("pointerevent_gotpointercapture_before_first_pointerevent-manual.html");
       }
       function executeTest(int_win) {
         sendPointerEvent(int_win, "complete-notice", "pointermove", MouseEvent.MOZ_SOURCE_MOUSE, {button:0});
@@ -27,6 +26,5 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1000870
     </script>
   </head>
   <body>
-    <iframe id="testFrame" height="800" width="1000"></iframe>
   </body>
 </html>

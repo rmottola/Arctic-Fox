@@ -14,13 +14,15 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1000870
     <script type="text/javascript">
       SimpleTest.waitForExplicitFinish();
       function startTest() {
-        runTestInNewWindow("pointerevent_setpointercapture_relatedtarget-manual.html");
+        runTestInNewWindow("pointerevent_suppress_compat_events_on_click.html");
       }
       function executeTest(int_win) {
-        sendMouseEvent(int_win, "target1",    "mousemove");
-        sendMouseEvent(int_win, "btnCapture", "mousedown");
-        sendMouseEvent(int_win, "target1",    "mousemove");
-        sendMouseEvent(int_win, "target1",    "mouseup");
+        sendMouseEvent(int_win, "target0", "mousedown", {button:0});
+        sendMouseEvent(int_win, "target0", "mouseup",   {button:0});
+        sendMouseEvent(int_win, "target1", "mousedown", {button:0});
+        sendMouseEvent(int_win, "target1", "mouseup",   {button:0});
+        sendMouseEvent(int_win, "done",    "mousedown", {button:0});
+        sendMouseEvent(int_win, "done",    "mouseup",   {button:0});
       }
     </script>
   </head>

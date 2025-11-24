@@ -14,16 +14,22 @@ https://bugzilla.mozilla.org/show_bug.cgi?id=1000870
     <script type="text/javascript">
       SimpleTest.waitForExplicitFinish();
       function startTest() {
-        runTestInNewWindow("pointerevent_setpointercapture_relatedtarget-manual.html");
+        runTestInNewWindow("pointerevent_attributes_mouse-manual.html");
       }
       function executeTest(int_win) {
-        sendMouseEvent(int_win, "target1",    "mousemove");
-        sendMouseEvent(int_win, "btnCapture", "mousedown");
-        sendMouseEvent(int_win, "target1",    "mousemove");
-        sendMouseEvent(int_win, "target1",    "mouseup");
+        var square1 = int_win.document.getElementById("square1");
+        var rect = square1.getBoundingClientRect();
+        var x = rect.left + rect.width / 4;
+        var y = rect.top + rect.height / 2
+        synthesizeMouseAtPoint(x, y, {type: "mousemove", button:-1}, int_win);
+        synthesizeMouseAtPoint(x, y, {type: "mousedown", button:0},  int_win);
+        synthesizeMouseAtPoint(x, y, {type: "mouseup",   button:0},  int_win);
+        synthesizeMouseAtPoint(x, y, {type: "mousemove", button:-1}, int_win);
+        synthesizeMouseAtPoint(rect.left-1, rect.top-1, {type: "mousemove", button:-1}, int_win);
       }
     </script>
   </head>
   <body>
   </body>
 </html>
+
