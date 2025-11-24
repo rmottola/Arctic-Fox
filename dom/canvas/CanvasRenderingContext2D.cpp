@@ -2458,7 +2458,9 @@ CanvasRenderingContext2D::CreatePattern(const CanvasImageSource& aSource,
 
     htmlElement = img;
   } else if (aSource.IsHTMLVideoElement()) {
-    htmlElement = &aSource.GetAsHTMLVideoElement();
+    auto& video = aSource.GetAsHTMLVideoElement();
+    video.MarkAsContentSource(mozilla::dom::HTMLVideoElement::CallerAPI::CREATE_PATTERN);
+    htmlElement = &video;
   } else {
     // Special case for ImageBitmap
     ImageBitmap& imgBitmap = aSource.GetAsImageBitmap();
@@ -4761,6 +4763,7 @@ CanvasRenderingContext2D::DrawImage(const CanvasImageSource& aImage,
       element = img;
     } else {
       HTMLVideoElement* video = &aImage.GetAsHTMLVideoElement();
+      video->MarkAsContentSource(mozilla::dom::HTMLVideoElement::CallerAPI::DRAW_IMAGE);
       element = video;
     }
 
