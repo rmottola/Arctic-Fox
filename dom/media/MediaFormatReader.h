@@ -241,7 +241,6 @@ private:
       , mDemuxEOS(false)
       , mWaitingForData(false)
       , mReceivedNewData(false)
-      , mDiscontinuity(true)
       , mDecoderInitialized(false)
       , mDecodingRequested(false)
       , mOutputRequested(false)
@@ -292,7 +291,6 @@ private:
     bool mDemuxEOS;
     bool mWaitingForData;
     bool mReceivedNewData;
-    bool mDiscontinuity;
 
     // Pending seek.
     MozPromiseRequestHolder<MediaTrackDemuxer::SeekPromise> mSeekRequest;
@@ -396,7 +394,6 @@ private:
       MOZ_ASSERT(mOwner->OnTaskQueue());
       mDemuxEOS = false;
       mWaitingForData = false;
-      mDiscontinuity = true;
       mQueuedSamples.Clear();
       mDecodingRequested = false;
       mOutputRequested = false;
