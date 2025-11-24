@@ -832,7 +832,6 @@ MediaDecoderStateMachine::CheckIfDecodeComplete()
     // We've finished decoding all active streams,
     // so move to COMPLETED state.
     SetState(DECODER_STATE_COMPLETED);
-    DispatchDecodeTasksIfNeeded();
     ScheduleStateMachine();
   }
   DECODER_LOG("CheckIfDecodeComplete %scompleted",
