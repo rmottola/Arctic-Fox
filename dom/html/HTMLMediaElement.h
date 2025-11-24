@@ -738,6 +738,17 @@ public:
 
   void SetMediaInfo(const MediaInfo& aInfo);
 
+  // Telemetry: to record the usage of a {visible / invisible} video element as
+  // the source of {drawImage(), createPattern(), createImageBitmap() and
+  // captureStream()} APIs.
+  enum class CallerAPI {
+    DRAW_IMAGE,
+    CREATE_PATTERN,
+    CREATE_IMAGEBITMAP,
+    CAPTURE_STREAM,
+  };
+  void MarkAsContentSource(CallerAPI aAPI);
+
 protected:
   virtual ~HTMLMediaElement();
 
@@ -1709,6 +1720,8 @@ private:
 
   // True if media element is audible for users.
   bool mAudible;
+
+  Visibility mVisibilityState;
 };
 
 } // namespace dom
