@@ -144,7 +144,7 @@ ClearKeySessionManager::UpdateSession(uint32_t aPromiseId,
   // Verify the size of session response.
   if (aResponseSize >= kMaxSessionResponseLength) {
     CK_LOGW("Session response size is not within a reasonable size.");
-    mCallback->RejectPromise(aPromiseId, kGMPInvalidAccessError, nullptr, 0);
+    mCallback->RejectPromise(aPromiseId, kGMPTypeError, nullptr, 0);
     return;
   }
 
@@ -152,7 +152,7 @@ ClearKeySessionManager::UpdateSession(uint32_t aPromiseId,
   vector<KeyIdPair> keyPairs;
   if (!ClearKeyUtils::ParseJWK(aResponse, aResponseSize, keyPairs, session->Type())) {
     CK_LOGW("ClearKey CDM failed to parse JSON Web Key.");
-    mCallback->RejectPromise(aPromiseId, kGMPInvalidAccessError, nullptr, 0);
+    mCallback->RejectPromise(aPromiseId, kGMPTypeError, nullptr, 0);
     return;
   }
 
