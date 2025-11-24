@@ -1233,8 +1233,7 @@ MediaFormatReader::Update(TrackType aTrack)
     return;
   }
 
-  if (decoder.mError &&
-      decoder.mError.ref().Code() == NS_ERROR_DOM_MEDIA_DECODE_ERR) {
+  if (decoder.mError && !decoder.HasFatalError()) {
     decoder.mDecodePending = false;
     decoder.mError.reset();
     if (++decoder.mNumOfConsecutiveError > decoder.mMaxConsecutiveError) {
