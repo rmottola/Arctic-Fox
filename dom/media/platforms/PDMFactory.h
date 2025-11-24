@@ -8,6 +8,7 @@
 #define PDMFactory_h_
 
 #include "PlatformDecoderModule.h"
+#include "mozilla/Function.h"
 #include "mozilla/StaticMutex.h"
 
 class CDMProxy;
@@ -41,6 +42,11 @@ public:
   // that we use on on aTaskQueue to decode the decrypted stream.
   // This is called on the decode task queue.
   void SetCDMProxy(CDMProxy* aProxy);
+
+  static constexpr int kYUV400 = 0;
+  static constexpr int kYUV420 = 1;
+  static constexpr int kYUV422 = 2;
+  static constexpr int kYUV444 = 3;
 
 private:
   virtual ~PDMFactory();
