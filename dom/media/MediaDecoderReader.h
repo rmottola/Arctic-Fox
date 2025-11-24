@@ -462,9 +462,6 @@ private:
   MozPromiseHolder<MediaDataPromise> mBaseAudioPromise;
   MozPromiseHolder<MediaDataPromise> mBaseVideoPromise;
 
-  // Flags whether a the next audio/video sample comes after a "gap" or
-  // "discontinuity" in the stream. For example after a seek.
-  bool mVideoDiscontinuity;
   Canonical<bool> mIsSuspended;
 
   MediaEventListener mDataArrivedListener;
