@@ -22,6 +22,8 @@
 #include "nsNSSComponent.h"
 #include "mozilla/DebugOnly.h"
 #include "GMPDeviceBinding.h"
+#include "mozilla/dom/MediaKeyStatusMapBinding.h" // For MediaKeyStatus
+#include "mozilla/dom/MediaKeyMessageEventBinding.h" // For MediaKeyMessageType
 
 #if defined(XP_WIN)
 #include "mozilla/WindowsVersion.h"
@@ -1353,7 +1355,7 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
   }
 
   void SessionMessage(const nsCString& aSessionId,
-                      GMPSessionMessageType aMessageType,
+                      mozilla::dom::MediaKeyMessageType aMessageType,
                       const nsTArray<uint8_t>& aMessage) override
   {
     MonitorAutoLock mon(mMonitor);
@@ -1380,7 +1382,7 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
                      nsresult aException,
                      const nsCString& aSessionId) override { }
   void ExpirationChange(const nsCString& aSessionId,
-                        GMPTimestamp aExpiryTime) override {}
+                        UnixTime aExpiryTime) override {}
   void SessionClosed(const nsCString& aSessionId) override {}
   void SessionError(const nsCString& aSessionId,
                     nsresult aException,
@@ -1388,9 +1390,13 @@ class GMPStorageTest : public GMPDecryptorProxyCallback
                     const nsCString& aMessage) override {}
   void KeyStatusChanged(const nsCString& aSessionId,
                         const nsTArray<uint8_t>& aKeyId,
-                        GMPMediaKeyStatus aStatus) override { }
+                        mozilla::dom::MediaKeyStatus aStatus) override { }
+
+  void ForgetKeyStatus(const nsCString& aSessionId,
+                       const nsTArray<uint8_t>& aKeyId) override { }
+
   void Decrypted(uint32_t aId,
-                 GMPErr aResult,
+                 mozilla::DecryptStatus aResult,
                  const nsTArray<uint8_t>& aDecryptedData) override { }
   void Terminated() override {
     if (mDecryptor) {
