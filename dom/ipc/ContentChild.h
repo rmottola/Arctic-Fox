@@ -157,10 +157,6 @@ public:
     Endpoint<PImageBridgeChild>&& aImageBridge,
     Endpoint<PVRManagerChild>&& aVRBridge) override;
 
-  PSharedBufferManagerChild*
-  AllocPSharedBufferManagerChild(mozilla::ipc::Transport* aTransport,
-                                  base::ProcessId aOtherProcess) override;
-
   PProcessHangMonitorChild*
   AllocPProcessHangMonitorChild(Transport* aTransport,
                                 ProcessId aOtherProcess) override;

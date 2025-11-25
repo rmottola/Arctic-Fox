@@ -42,17 +42,12 @@ namespace mozilla {
 #define GFX_DEBUG_TRACK_CLIENTS_IN_POOL 1
 #endif
 
-namespace gl {
-class SharedSurface_Gralloc;
-}
-
 namespace layers {
 
 class AsyncTransactionWaiter;
 class BufferTextureData;
 class CompositableForwarder;
 class KnowsCompositor;
-class GrallocTextureData;
 class LayersIPCChannel;
 class CompositableClient;
 struct PlanarYCbCrData;
@@ -301,8 +296,6 @@ public:
     return nullptr;
   }
 #endif
-
-  virtual GrallocTextureData* AsGrallocTextureData() { return nullptr; }
 
   virtual BufferTextureData* AsBufferTextureData() { return nullptr; }
 };
@@ -648,14 +641,7 @@ public:
 
   bool NeedsFenceHandle()
   {
-#if defined(MOZ_WIDGET_GONK) && ANDROID_VERSION >= 17
-    if (!mData) {
-      return false;
-    }
-    return !!mData->AsGrallocTextureData();
-#else
     return false;
-#endif
   }
 
   void WaitFenceHandleOnImageBridge(Mutex& aMutex);
@@ -727,7 +713,6 @@ private:
   void Finalize() {}
 
   friend class AtomicRefCountedWithFinalize<TextureClient>;
-  friend class gl::SharedSurface_Gralloc;
 protected:
   /**
    * Should only be called *once* per texture, in TextureClient::InitIPDLActor.

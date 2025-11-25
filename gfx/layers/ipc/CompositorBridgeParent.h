@@ -93,19 +93,6 @@ public:
   explicit CompositorVsyncScheduler(CompositorBridgeParent* aCompositorBridgeParent,
                                     widget::CompositorWidget* aWidget);
 
-#ifdef MOZ_WIDGET_GONK
-  // emulator-ics never trigger the display on/off, so compositor will always
-  // skip composition request at that device. Only check the display status
-  // with kk device and upon.
-#if ANDROID_VERSION >= 19
-  // SetDisplay() and CancelSetDisplayTask() are used for the display on/off.
-  // It will clear all composition related task and flag, and skip another
-  // composition task during the display off. That could prevent the problem
-  // that compositor might show the old content at the first frame of display on.
-  void SetDisplay(bool aDisplayEnable);
-#endif
-#endif
-
   bool NotifyVsync(TimeStamp aVsyncTimestamp);
   void SetNeedsComposite();
   void OnForceComposeToTarget();
@@ -142,11 +129,6 @@ private:
   void DispatchTouchEvents(TimeStamp aVsyncTimestamp);
   void DispatchVREvents(TimeStamp aVsyncTimestamp);
   void CancelCurrentSetNeedsCompositeTask();
-#ifdef MOZ_WIDGET_GONK
-#if ANDROID_VERSION >= 19
-  void CancelSetDisplayTask();
-#endif
-#endif
 
   class Observer final : public VsyncObserver
   {
@@ -181,14 +163,6 @@ private:
 
   mozilla::Monitor mSetNeedsCompositeMonitor;
   RefPtr<CancelableRunnable> mSetNeedsCompositeTask;
-
-#ifdef MOZ_WIDGET_GONK
-#if ANDROID_VERSION >= 19
-  bool mDisplayEnabled;
-  mozilla::Monitor mSetDisplayMonitor;
-  RefPtr<CancelableRunnable> mSetDisplayTask;
-#endif
-#endif
 };
 
 class CompositorBridgeParentBase : public PCompositorBridgeParent,

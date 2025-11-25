@@ -57,15 +57,11 @@
 #include <android/log.h>
 #include <android/native_window.h>
 #endif
-#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+#if defined(MOZ_WIDGET_ANDROID)
 #include "opengl/CompositorOGL.h"
 #include "GLContextEGL.h"
 #include "GLContextProvider.h"
 #include "ScopedGLHelpers.h"
-#endif
-#ifdef MOZ_WIDGET_GONK
-#include "nsScreenManagerGonk.h"
-#include "nsWindow.h"
 #endif
 #include "GeckoProfiler.h"
 #include "TextRenderer.h"               // for TextRenderer
@@ -491,7 +487,7 @@ LayerManagerComposite::UpdateAndRender()
   }
 
   Render(invalid, opaque);
-#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+#if defined(MOZ_WIDGET_ANDROID)
   RenderToPresentationSurface();
 #endif
   mGeometryChanged = false;
@@ -1023,7 +1019,7 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
   RecordFrame();
 }
 
-#if defined(MOZ_WIDGET_ANDROID) || defined(MOZ_WIDGET_GONK)
+#if defined(MOZ_WIDGET_ANDROID)
 class ScopedCompositorProjMatrix {
 public:
   ScopedCompositorProjMatrix(CompositorOGL* aCompositor, const Matrix4x4& aProjMatrix):
@@ -1130,40 +1126,6 @@ LayerManagerComposite::RenderToPresentationSurface()
   const IntSize windowSize(ANativeWindow_getWidth(window),
                            ANativeWindow_getHeight(window));
 
-#elif defined(MOZ_WIDGET_GONK)
-  CompositorOGL* compositor = mCompositor->AsCompositorOGL();
-  nsScreenGonk* screen = static_cast<nsWindow*>(mCompositor->GetWidget()->RealWidget())->GetScreen();
-  if (!screen->IsPrimaryScreen()) {
-    // Only primary screen support mirroring
-    return;
-  }
-
-  nsWindow* mirrorScreenWidget = screen->GetMirroringWidget();
-  if (!mirrorScreenWidget) {
-    // No mirroring
-    return;
-  }
-
-  nsScreenGonk* mirrorScreen = mirrorScreenWidget->GetScreen();
-  if (!mirrorScreen->GetTopWindows().IsEmpty()) {
-    return;
-  }
-
-  EGLSurface surface = mirrorScreen->GetEGLSurface();
-  if (surface == LOCAL_EGL_NO_SURFACE) {
-    // Create GLContext
-    RefPtr<GLContext> gl = gl::GLContextProvider::CreateForWindow(mirrorScreenWidget, false);
-    mirrorScreenWidget->SetNativeData(NS_NATIVE_OPENGL_CONTEXT,
-                                      reinterpret_cast<uintptr_t>(gl.get()));
-    surface = mirrorScreen->GetEGLSurface();
-    if (surface == LOCAL_EGL_NO_SURFACE) {
-      // Failed to create EGLSurface
-      return;
-    }
-  }
-  GLContext* gl = compositor->gl();
-  GLContextEGL* egl = GLContextEGL::Cast(gl);
-  const IntSize windowSize = mirrorScreen->GetNaturalBounds().Size().ToUnknownSize();
 #endif
 
   if ((windowSize.width <= 0) || (windowSize.height <= 0)) {
@@ -1230,15 +1192,6 @@ LayerManagerComposite::RenderToPresentationSurface()
   RootLayer()->RenderLayer(clipRect);
 
   mCompositor->EndFrame();
-#ifdef MOZ_WIDGET_GONK
-  mCompositor->SetDispAcquireFence(mRoot); // Call after EndFrame()
-
-  RefPtr<Composer2D> composer2D;
-  composer2D = mCompositor->GetWidget()->GetComposer2D();
-  if (composer2D) {
-    composer2D->Render(mirrorScreenWidget);
-  }
-#endif
 }
 #endif
 

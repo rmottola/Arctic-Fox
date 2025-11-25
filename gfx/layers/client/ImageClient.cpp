@@ -33,10 +33,6 @@
 #include "nsISupportsImpl.h"            // for Image::Release, etc
 #include "nsRect.h"                     // for mozilla::gfx::IntRect
 
-#ifdef MOZ_WIDGET_GONK
-#include "GrallocImages.h"
-#endif
-
 namespace mozilla {
 namespace layers {
 
