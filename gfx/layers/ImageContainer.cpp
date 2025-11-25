@@ -734,13 +734,15 @@ NVImage::AllocateBuffer(uint32_t aSize)
 SourceSurfaceImage::SourceSurfaceImage(const gfx::IntSize& aSize, gfx::SourceSurface* aSourceSurface)
   : Image(nullptr, ImageFormat::CAIRO_SURFACE),
     mSize(aSize),
-    mSourceSurface(aSourceSurface)
+    mSourceSurface(aSourceSurface),
+    mTextureFlags(TextureFlags::DEFAULT)
 {}
 
 SourceSurfaceImage::SourceSurfaceImage(gfx::SourceSurface* aSourceSurface)
   : Image(nullptr, ImageFormat::CAIRO_SURFACE),
     mSize(aSourceSurface->GetSize()),
-    mSourceSurface(aSourceSurface)
+    mSourceSurface(aSourceSurface),
+    mTextureFlags(TextureFlags::DEFAULT)
 {}
 
 SourceSurfaceImage::~SourceSurfaceImage()
@@ -748,14 +750,13 @@ SourceSurfaceImage::~SourceSurfaceImage()
 }
 
 TextureClient*
-SourceSurfaceImage::GetTextureClient(CompositableClient *aClient)
+SourceSurfaceImage::GetTextureClient(TextureForwarder* aForwarder)
 {
-  if (!aClient) {
+  if (!aForwarder) {
     return nullptr;
   }
 
-  CompositableForwarder* forwarder = aClient->GetForwarder();
-  RefPtr<TextureClient> textureClient = mTextureClients.Get(forwarder->GetSerial());
+  RefPtr<TextureClient> textureClient = mTextureClients.Get(aForwarder->GetSerial());
   if (textureClient) {
     return textureClient;
   }
@@ -766,39 +767,22 @@ SourceSurfaceImage::GetTextureClient(CompositableClient *aClient)
     return nullptr;
   }
 
-
-// XXX windows' TextureClients do not hold ISurfaceAllocator,
-// recycler does not work on windows.
-#ifndef XP_WIN
-
-// XXX only gonk ensure when TextureClient is recycled,
-// TextureHost is not used by CompositableHost.
-#ifdef MOZ_WIDGET_GONK
-  RefPtr<TextureClientRecycleAllocator> recycler =
-    aClient->GetTextureClientRecycler();
-  if (recycler) {
-    textureClient =
-      recycler->CreateOrRecycle(surface->GetFormat(),
-                                surface->GetSize(),
-                                BackendSelector::Content,
-                                aClient->GetTextureFlags());
-  }
-#endif
-
-#endif
   if (!textureClient) {
     // gfx::BackendType::NONE means default to content backend
-    textureClient = aClient->CreateTextureClientFromSurface(surface,
-                                                            BackendSelector::Content,
-                                                            TextureFlags::DEFAULT);
+    textureClient = TextureClient::CreateFromSurface(aForwarder,
+                                                     surface,
+                                                     aForwarder->GetCompositorBackendType(),
+                                                     BackendSelector::Content,
+                                                     mTextureFlags,
+                                                     ALLOC_DEFAULT);
   }
   if (!textureClient) {
     return nullptr;
   }
 
-  textureClient->SyncWithObject(forwarder->GetSyncObject());
+  textureClient->SyncWithObject(aForwarder->GetSyncObject());
 
-  mTextureClients.Put(forwarder->GetSerial(), textureClient);
+  mTextureClients.Put(aForwarder->GetSerial(), textureClient);
   return textureClient;
 }
 
