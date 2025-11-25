@@ -90,7 +90,7 @@ MediaFormatReader::Shutdown()
   MOZ_ASSERT(OnTaskQueue());
 
   mDemuxerInitRequest.DisconnectIfExists();
-  mMetadataPromise.RejectIfExists(ReadMetadataFailureReason::METADATA_ERROR, __func__);
+  mMetadataPromise.RejectIfExists(NS_ERROR_DOM_MEDIA_CANCELED, __func__);
   mSeekPromise.RejectIfExists(NS_ERROR_DOM_MEDIA_CANCELED, __func__);
   mSkipRequest.DisconnectIfExists();
 
@@ -276,7 +276,7 @@ MediaFormatReader::OnDemuxerInitDone(nsresult)
     // We currently only handle the first video track.
     mVideo.mTrackDemuxer = mDemuxer->GetTrackDemuxer(TrackInfo::kVideoTrack, 0);
     if (!mVideo.mTrackDemuxer) {
-      mMetadataPromise.Reject(ReadMetadataFailureReason::METADATA_ERROR, __func__);
+      mMetadataPromise.Reject(NS_ERROR_DOM_MEDIA_METADATA_ERR, __func__);
       return;
     }
 
@@ -285,7 +285,7 @@ MediaFormatReader::OnDemuxerInitDone(nsresult)
     if (videoActive) {
       if (platform && !platform->SupportsMimeType(videoInfo->mMimeType, nullptr)) {
         // We have no decoder for this track. Error.
-        mMetadataPromise.Reject(ReadMetadataFailureReason::METADATA_ERROR, __func__);
+        mMetadataPromise.Reject(NS_ERROR_DOM_MEDIA_METADATA_ERR, __func__);
         return;
       }
       mInfo.mVideo = *videoInfo->GetAsVideoInfo();
@@ -305,7 +305,7 @@ MediaFormatReader::OnDemuxerInitDone(nsresult)
   if (audioActive) {
     mAudio.mTrackDemuxer = mDemuxer->GetTrackDemuxer(TrackInfo::kAudioTrack, 0);
     if (!mAudio.mTrackDemuxer) {
-      mMetadataPromise.Reject(ReadMetadataFailureReason::METADATA_ERROR, __func__);
+      mMetadataPromise.Reject(NS_ERROR_DOM_MEDIA_METADATA_ERR, __func__);
       return;
     }
 
@@ -355,7 +355,7 @@ MediaFormatReader::OnDemuxerInitDone(nsresult)
     mDemuxer->IsSeekableOnlyInBufferedRanges();
 
   if (!videoActive && !audioActive) {
-    mMetadataPromise.Reject(ReadMetadataFailureReason::METADATA_ERROR, __func__);
+    mMetadataPromise.Reject(NS_ERROR_DOM_MEDIA_METADATA_ERR, __func__);
     return;
   }
 
@@ -370,7 +370,7 @@ void
 MediaFormatReader::OnDemuxerInitFailed(DemuxerFailureReason aFailure)
 {
   mDemuxerInitRequest.Complete();
-  mMetadataPromise.Reject(ReadMetadataFailureReason::METADATA_ERROR, __func__);
+  mMetadataPromise.Reject(NS_ERROR_DOM_MEDIA_METADATA_ERR, __func__);
 }
 
 bool
