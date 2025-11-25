@@ -2287,13 +2287,6 @@ MediaDecoderStateMachine::RunStateMachine()
   NS_ENSURE_TRUE_VOID(resource);
 
   switch (mState) {
-    case DECODER_STATE_SHUTDOWN:
-    case DECODER_STATE_DORMANT:
-    case DECODER_STATE_WAIT_FOR_CDM:
-    case DECODER_STATE_DECODING_METADATA:
-    case DECODER_STATE_DECODING_FIRSTFRAME:
-      return;
-
     case DECODER_STATE_DECODING: {
       if (mPlayState != MediaDecoder::PLAY_STATE_PLAYING && IsPlaying())
       {
@@ -2356,10 +2349,6 @@ MediaDecoderStateMachine::RunStateMachine()
       return;
     }
 
-    case DECODER_STATE_SEEKING: {
-      return;
-    }
-
     case DECODER_STATE_COMPLETED: {
       if (mPlayState != MediaDecoder::PLAY_STATE_PLAYING && IsPlaying()) {
         StopPlayback();
@@ -2402,6 +2391,9 @@ MediaDecoderStateMachine::RunStateMachine()
 
       return;
     }
+
+    default:
+      return;
   }
 }
 
