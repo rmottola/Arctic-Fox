@@ -4343,7 +4343,7 @@ void HTMLMediaElement::MetadataLoaded(const MediaInfo* aInfo,
   }
   if (mIsEncrypted) {
     if (!mMediaSource && Preferences::GetBool("media.eme.mse-only", true)) {
-      DecodeError();
+      DecodeError(NS_ERROR_DOM_MEDIA_FATAL_ERR);
       return;
     }
 
@@ -4421,7 +4421,7 @@ void HTMLMediaElement::NetworkError()
   Error(nsIDOMMediaError::MEDIA_ERR_NETWORK);
 }
 
-void HTMLMediaElement::DecodeError()
+void HTMLMediaElement::DecodeError(const MediaResult& aError)
 {
   nsAutoString src;
   GetCurrentSrc(src);
@@ -4445,7 +4445,7 @@ void HTMLMediaElement::DecodeError()
       NS_WARNING("Should know the source we were loading from!");
     }
   } else {
-    Error(nsIDOMMediaError::MEDIA_ERR_DECODE);
+    Error(nsIDOMMediaError::MEDIA_ERR_DECODE, aError);
   }
 }
 
@@ -4459,11 +4459,12 @@ void HTMLMediaElement::LoadAborted()
   Error(nsIDOMMediaError::MEDIA_ERR_ABORTED);
 }
 
-void HTMLMediaElement::Error(uint16_t aStealNSResult)
+void HTMLMediaElement::Error(uint16_t aErrorCode,
+                             const MediaResult& aErrorDetails)
 {
-  NS_ASSERTION(aStealNSResult == nsIDOMMediaError::MEDIA_ERR_DECODE ||
-               aStealNSResult == nsIDOMMediaError::MEDIA_ERR_NETWORK ||
-               aStealNSResult == nsIDOMMediaError::MEDIA_ERR_ABORTED,
+  NS_ASSERTION(aErrorCode == nsIDOMMediaError::MEDIA_ERR_DECODE ||
+               aErrorCode == nsIDOMMediaError::MEDIA_ERR_NETWORK ||
+               aErrorCode == nsIDOMMediaError::MEDIA_ERR_ABORTED,
                "Only use nsIDOMMediaError codes!");
 
   // Since we have multiple paths calling into DecodeError, e.g.
@@ -4472,8 +4473,12 @@ void HTMLMediaElement::Error(uint16_t aStealNSResult)
   if (mError) {
     return;
   }
+  nsCString message;
+  if (NS_FAILED(aErrorDetails)) {
+    message = aErrorDetails.Description();
+  }
+  mError = new MediaError(this, aErrorCode, message);
 
-  mError = new MediaError(this, aStealNSResult);
   DispatchAsyncEvent(NS_LITERAL_STRING("error"));
   if (mReadyState == nsIDOMHTMLMediaElement::HAVE_NOTHING) {
     ChangeNetworkState(nsIDOMHTMLMediaElement::NETWORK_EMPTY);
