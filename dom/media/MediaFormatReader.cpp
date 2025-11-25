@@ -373,7 +373,7 @@ MediaFormatReader::OnDemuxerInitFailed(const MediaResult& aError)
   mMetadataPromise.Reject(aError, __func__);
 }
 
-bool
+MediaResult
 MediaFormatReader::EnsureDecoderCreated(TrackType aTrack)
 {
   MOZ_ASSERT(OnTaskQueue());
@@ -381,12 +381,11 @@ MediaFormatReader::EnsureDecoderCreated(TrackType aTrack)
   auto& decoder = GetDecoderData(aTrack);
 
   if (decoder.mDecoder) {
-    return true;
+    return NS_OK;
   }
 
   if (!mPlatform) {
     mPlatform = new PDMFactory();
-    NS_ENSURE_TRUE(mPlatform, false);
     if (IsEncrypted()) {
       MOZ_ASSERT(mCDMProxy);
       mPlatform->SetCDMProxy(mCDMProxy);
@@ -428,10 +427,10 @@ MediaFormatReader::EnsureDecoderCreated(TrackType aTrack)
   }
   if (decoder.mDecoder ) {
     decoder.mDescription = decoder.mDecoder->GetDescriptionName();
-  } else {
-    decoder.mDescription = "error creating decoder";
+    return NS_OK;
   }
-  return decoder.mDecoder != nullptr;
+  decoder.mDescription = "error creating decoder";
+  return MediaResult(NS_ERROR_DOM_MEDIA_FATAL_ERR, "error creating decoder");
 }
 
 bool
@@ -915,9 +914,10 @@ MediaFormatReader::HandleDemuxedSamples(TrackType aTrack,
     return;
   }
 
-  if (!EnsureDecoderCreated(aTrack)) {
+  MediaResult rv = EnsureDecoderCreated(aTrack);
+  if (NS_FAILED(rv)) {
     NS_WARNING("Error constructing decoders");
-    NotifyError(aTrack);
+    NotifyError(aTrack, rv);
     return;
   }
 
