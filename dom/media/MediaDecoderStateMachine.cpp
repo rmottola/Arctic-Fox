@@ -869,8 +869,8 @@ nsresult MediaDecoderStateMachine::Init(MediaDecoder* aDecoder)
   nsresult rv = mReader->Init();
   NS_ENSURE_SUCCESS(rv, rv);
 
-  OwnerThread()->Dispatch(NewRunnableMethod<State>(
-    this, &MediaDecoderStateMachine::EnterState, mState.Ref()));
+  OwnerThread()->Dispatch(
+    NewRunnableMethod(this, &MediaDecoderStateMachine::EnterState));
 
   return NS_OK;
 }
@@ -1060,16 +1060,16 @@ MediaDecoderStateMachine::SetState(State aState)
 
   DECODER_LOG("MDSM state: %s -> %s", ToStateStr(), ToStateStr(aState));
 
-  ExitState(mState);
+  ExitState();
   mState = aState;
-  EnterState(mState);
+  EnterState();
 }
 
 void
-MediaDecoderStateMachine::ExitState(State aState)
+MediaDecoderStateMachine::ExitState()
 {
   MOZ_ASSERT(OnTaskQueue());
-  switch (aState) {
+  switch (mState) {
     case DECODER_STATE_COMPLETED:
       mSentPlaybackEndedEvent = false;
       break;
@@ -1079,10 +1079,10 @@ MediaDecoderStateMachine::ExitState(State aState)
 }
 
 void
-MediaDecoderStateMachine::EnterState(State aState)
+MediaDecoderStateMachine::EnterState()
 {
   MOZ_ASSERT(OnTaskQueue());
-  switch (aState) {
+  switch (mState) {
     case DECODER_STATE_DECODING_METADATA:
       ReadMetadata();
       break;

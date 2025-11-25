@@ -366,8 +366,8 @@ protected:
   virtual ~MediaDecoderStateMachine();
 
   void SetState(State aState);
-  void ExitState(State aState);
-  void EnterState(State aState);
+  void ExitState();
+  void EnterState();
 
   void BufferedRangeUpdated();
 
