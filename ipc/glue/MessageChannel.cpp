@@ -472,7 +472,7 @@ private:
     nsAutoPtr<IPC::Message> mReply;
 };
 
-MessageChannel::MessageChannel(MessageListener *aListener)
+MessageChannel::MessageChannel(IToplevelProtocol *aListener)
   : mListener(aListener),
     mChannelState(ChannelClosed),
     mSide(UnknownSide),
@@ -1806,6 +1806,12 @@ MessageChannel::FlushPendingInterruptQueue()
 }
 
 void
+MessageChannel::EnteredCxxStack()
+{
+    mListener->OnEnteredCxxStack();
+}
+
+void
 MessageChannel::ExitedCxxStack()
 {
     mListener->OnExitedCxxStack();
@@ -1815,6 +1821,30 @@ MessageChannel::ExitedCxxStack()
         EnqueuePendingMessages();
         mSawInterruptOutMsg = false;
     }
+}
+
+void
+MessageChannel::EnteredCall()
+{
+    mListener->OnEnteredCall();
+}
+
+void
+MessageChannel::ExitedCall()
+{
+    mListener->OnExitedCall();
+}
+
+void
+MessageChannel::EnteredSyncSend()
+{
+    mListener->OnEnteredSyncSend();
+}
+
+void
+MessageChannel::ExitedSyncSend()
+{
+    mListener->OnExitedSyncSend();
 }
 
 void

@@ -18,6 +18,7 @@
 #include "WinUtils.h"
 
 #include "mozilla/ArrayUtils.h"
+#include "mozilla/ipc/ProtocolUtils.h"
 #include "mozilla/PaintTracker.h"
 #include "mozilla/WindowsVersion.h"
 
