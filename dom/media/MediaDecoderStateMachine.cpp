@@ -1749,8 +1749,8 @@ void MediaDecoderStateMachine::VisibilityChanged()
 {
   MOZ_ASSERT(OnTaskQueue());
   DECODER_LOG("VisibilityChanged: mIsVisible=%d, "
-              "mVideoDecodeSuspended=%d, mIsReaderSuspended=%d",
-              mIsVisible.Ref(), mVideoDecodeSuspended, mIsReaderSuspended.Ref());
+              "mVideoDecodeSuspended=%c, mIsReaderSuspended=%d",
+              mIsVisible.Ref(), mVideoDecodeSuspended ? 'T' : 'F', mIsReaderSuspended.Ref());
 
   if (!HasVideo()) {
     return;
@@ -1779,6 +1779,7 @@ void MediaDecoderStateMachine::VisibilityChanged()
 
   if (mVideoDecodeSuspended) {
     mVideoDecodeSuspended = false;
+    mOnPlaybackEvent.Notify(MediaEventType::ExitVideoSuspend);
     mReader->SetVideoBlankDecode(false);
 
     if (mIsReaderSuspended) {
@@ -3135,6 +3136,7 @@ MediaDecoderStateMachine::OnSuspendTimerResolved()
   DECODER_LOG("OnSuspendTimerResolved");
   mVideoDecodeSuspendTimer.CompleteRequest();
   mVideoDecodeSuspended = true;
+  mOnPlaybackEvent.Notify(MediaEventType::EnterVideoSuspend);
   mReader->SetVideoBlankDecode(true);
 }
 
