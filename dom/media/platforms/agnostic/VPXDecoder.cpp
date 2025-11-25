@@ -95,7 +95,7 @@ VPXDecoder::Flush()
   mIsFlushing = false;
 }
 
-int
+MediaResult
 VPXDecoder::DoDecode(MediaRawData* aSample)
 {
   MOZ_ASSERT(mTaskQueue->IsCurrentThreadIn());
@@ -114,7 +114,7 @@ VPXDecoder::DoDecode(MediaRawData* aSample)
 
   if (vpx_codec_err_t r = vpx_codec_decode(&mVPX, aSample->Data(), aSample->Size(), nullptr, 0)) {
     LOG("VPX Decode error: %s", vpx_codec_err_to_string(r));
-    return -1;
+    return NS_ERROR_DOM_MEDIA_DECODE_ERR;
   }
 
   vpx_codec_iter_t  iter = nullptr;
@@ -155,7 +155,7 @@ VPXDecoder::DoDecode(MediaRawData* aSample)
       b.mPlanes[2].mWidth = img->d_w;
     } else {
       LOG("VPX Unknown image format");
-      return -1;
+      return NS_ERROR_DOM_MEDIA_DECODE_ERR;
     }
 
     RefPtr<VideoData> v =
@@ -174,11 +174,11 @@ VPXDecoder::DoDecode(MediaRawData* aSample)
       LOG("Image allocation error source %ldx%ld display %ldx%ld picture %ldx%ld",
           img->d_w, img->d_h, mInfo.mDisplay.width, mInfo.mDisplay.height,
           mInfo.mImage.width, mInfo.mImage.height);
-      return -1;
+      return MediaResult(NS_ERROR_OUT_OF_MEMORY, __func__);
     }
     mCallback->Output(v);
   }
-  return 0;
+  return NS_OK;
 }
 
 void
@@ -188,9 +188,9 @@ VPXDecoder::ProcessDecode(MediaRawData* aSample)
   if (mIsFlushing) {
     return;
   }
-  if (DoDecode(aSample) == -1) {
-    mCallback->Error(MediaResult(NS_ERROR_DOM_MEDIA_DECODE_ERR,
-                                      __func__));
+  MediaResult rv = DoDecode(aSample);
+  if (NS_FAILED(rv)) {
+    mCallback->Error(rv);
   } else {
     mCallback->InputExhausted();
   }
