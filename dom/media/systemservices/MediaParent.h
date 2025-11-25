@@ -22,7 +22,7 @@ class OriginKeyStore;
 
 class NonE10s
 {
-  typedef mozilla::ipc::IProtocolManager<mozilla::ipc::IProtocol>::ActorDestroyReason
+  typedef mozilla::ipc::IProtocol::ActorDestroyReason
       ActorDestroyReason;
 public:
   virtual ~NonE10s() {}
@@ -42,7 +42,7 @@ protected:
 template<class Super>
 class Parent : public Super
 {
-  typedef mozilla::ipc::IProtocolManager<mozilla::ipc::IProtocol>::ActorDestroyReason
+  typedef mozilla::ipc::IProtocol::ActorDestroyReason
       ActorDestroyReason;
 public:
   static Parent* GetSingleton();
