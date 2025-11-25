@@ -273,6 +273,23 @@ public:
   }
 };
 
+class MediaDecoderStateMachine::DecodingFirstFrameState
+  : public MediaDecoderStateMachine::StateObject
+{
+public:
+  explicit DecodingFirstFrameState(Master* aPtr) : StateObject(aPtr) {}
+
+  void Enter() override
+  {
+    mMaster->DecodeFirstFrame();
+  }
+
+  State GetState() const override
+  {
+    return DECODER_STATE_DECODING_FIRSTFRAME;
+  }
+};
+
 #define INIT_WATCHABLE(name, val) \
   name(val, "MediaDecoderStateMachine::" #name)
 #define INIT_MIRROR(name, val) \
@@ -1143,6 +1160,9 @@ MediaDecoderStateMachine::SetState(State aState)
     case DECODER_STATE_DORMANT:
       mStateObj = MakeUnique<DormantState>(this);
       break;
+    case DECODER_STATE_DECODING_FIRSTFRAME:
+      mStateObj = MakeUnique<DecodingFirstFrameState>(this);
+      break;
     default:
       mStateObj = nullptr;
       break;
@@ -1186,9 +1206,6 @@ MediaDecoderStateMachine::EnterState()
   }
 
   switch (mState) {
-    case DECODER_STATE_DECODING_FIRSTFRAME:
-      DecodeFirstFrame();
-      break;
     case DECODER_STATE_DECODING:
       StartDecoding();
       break;
