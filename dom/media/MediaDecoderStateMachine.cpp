@@ -2683,7 +2683,8 @@ void MediaDecoderStateMachine::PreservesPitchChanged()
   mMediaSink->SetPreservesPitch(mPreservesPitch);
 }
 
-bool MediaDecoderStateMachine::IsShutdown()
+bool
+MediaDecoderStateMachine::IsShutdown() const
 {
   MOZ_ASSERT(OnTaskQueue());
   return mIsShutdown;
