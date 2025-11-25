@@ -126,9 +126,6 @@ def _actorId(actor=None):
 def _actorHId(actorhandle):
     return ExprSelect(actorhandle, '.', 'mId')
 
-def _actorChannel(actor):
-    return ExprSelect(actor, '->', 'mChannel')
-
 def _actorManager(actor):
     return ExprCall(ExprSelect(actor, '->', 'Manager'), args=[])
 
@@ -1211,11 +1208,6 @@ class Protocol(ipdl.ast.Protocol):
         if actorThis is not None:
             return ExprSelect(actorThis, '->', 'mChannel')
         return ExprVar('mChannel')
-
-    def channelForSubactor(self):
-        if self.decl.type.isToplevel():
-            return ExprAddrOf(self.channelVar())
-        return self.channelVar()
 
     def routingId(self, actorThis=None):
         if self.decl.type.isToplevel():
@@ -3568,8 +3560,8 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
         self.implementPickling()
 
         ## private members
-        self.cls.addstmt(StmtDecl(Decl(p.channelType(), 'mChannel')))
         if ptype.isToplevel():
+            self.cls.addstmt(StmtDecl(Decl(p.channelType(), 'mChannel')))
             self.cls.addstmts([
                 StmtDecl(Decl(Type('IDMap', T=Type('ProtocolBase')),
                               p.actorMapVar().name)),
@@ -3661,6 +3653,17 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
                 ret=Type('base::ProcessId'),
                 const=1,
                 virtual=1))
+            getchannel = MethodDefn(MethodDecl(
+                p.getChannelMethod().name,
+                ret=Type('MessageChannel', ptr=1),
+                virtual=1))
+            getchannel.addstmt(StmtReturn(ExprAddrOf(p.channelVar())))
+
+            getchannelconst = MethodDefn(MethodDecl(
+                p.getChannelMethod().name,
+                ret=Type('MessageChannel', ptr=1, const=1),
+                virtual=1, const=1))
+            getchannelconst.addstmt(StmtReturn(ExprAddrOf(p.channelVar())))
 
             methods += [ register,
                          registerid,
@@ -3670,12 +3673,9 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
                          lookupshmem,
                          istracking,
                          destroyshmem,
-                         otherpid ]
-
-        getchannel = MethodDefn(MethodDecl(
-            p.getChannelMethod().name,
-            ret=Type('MessageChannel', ptr=1),
-            virtual=1))
+                         otherpid,
+                         getchannel,
+                         getchannelconst ]
 
         if p.decl.type.isToplevel():
             tmpvar = ExprVar('tmp')
@@ -3738,7 +3738,7 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
             createshmem.addstmt(failif)
 
             failif = StmtIf(ExprNot(ExprCall(
-                ExprSelect(p.channelVar(), p.channelSel(), 'Send'),
+                ExprSelect(p.callGetChannel(), '->', 'Send'),
                 args=[ descriptorvar ])))
             createshmem.addstmt(failif)
 
@@ -3833,9 +3833,6 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
                     CaseLabel('SHMEM_DESTROYED_MESSAGE_TYPE'), abort)
 
             otherpid.addstmt(StmtReturn(p.otherPidVar()))
-            getchannel.addstmt(StmtReturn(ExprAddrOf(p.channelVar())))
-        else:
-            getchannel.addstmt(StmtReturn(p.channelVar()))
 
         othervar = ExprVar('other')
         managertype = Type(_actorName(p.name, self.side), ptr=1)
@@ -3889,7 +3886,7 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
             switchontype.addcase(DefaultLabel(), default)
             removemanagee.addstmt(switchontype)
 
-        return methods + [removemanagee, getchannel, Whitespace.NL]
+        return methods + [removemanagee, Whitespace.NL]
 
     def makeShmemIface(self):
         p = self.protocol
@@ -4762,8 +4759,8 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
             self.failIfNullActor(actorvar, errfn, msg="Error constructing actor %s" % actortype.name() + self.side.capitalize()),
             StmtExpr(ExprAssn(_actorId(actorvar), idexpr)),
             StmtExpr(ExprCall(ExprSelect(actorvar, '->', 'SetManager'), args=[ExprVar.THIS])),
-            StmtExpr(ExprAssn(_actorChannel(actorvar),
-                              self.protocol.channelForSubactor())),
+            StmtExpr(ExprCall(ExprSelect(actorvar, '->', 'SetIPCChannel'),
+                              args=[self.protocol.callGetChannel()])),
             StmtExpr(_callInsertManagedActor(
                 self.protocol.managedVar(md.decl.type.constructedType(),
                                          self.side),
@@ -5196,8 +5193,8 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
             + [ Whitespace.NL,
                 StmtDecl(Decl(Type.BOOL, sendok.name),
                          init=ExprCall(
-                             ExprSelect(self.protocol.channelVar(actor),
-                                        self.protocol.channelSel(), 'Send'),
+                             ExprSelect(self.protocol.callGetChannel(actor),
+                                        '->', 'Send'),
                              args=[ msgexpr ]))
             ])
         )
@@ -5213,8 +5210,8 @@ class _GenerateProtocolActorCode(ipdl.ast.Visitor):
             + [ Whitespace.NL,
                 StmtDecl(
                     Decl(Type.BOOL, sendok.name),
-                    init=ExprCall(ExprSelect(self.protocol.channelVar(actor),
-                                             self.protocol.channelSel(),
+                    init=ExprCall(ExprSelect(self.protocol.callGetChannel(actor),
+                                             '->',
                                              _sendPrefix(md.decl.type)),
                                   args=[ msgexpr, ExprAddrOf(replyexpr) ]))
             ])
