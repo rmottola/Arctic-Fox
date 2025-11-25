@@ -347,7 +347,7 @@ public:
     return InImageBridgeChildThread();
   }
 
-  virtual void FatalError(const char* const aName, const char* const aMsg) const override;
+  virtual void HandleFatalError(const char* aName, const char* aMsg) const override;
 
 protected:
   ImageBridgeChild();
