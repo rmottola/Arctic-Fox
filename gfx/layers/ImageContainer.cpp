@@ -750,7 +750,7 @@ SourceSurfaceImage::~SourceSurfaceImage()
 }
 
 TextureClient*
-SourceSurfaceImage::GetTextureClient(TextureForwarder* aForwarder)
+SourceSurfaceImage::GetTextureClient(KnowsCompositor* aForwarder)
 {
   if (!aForwarder) {
     return nullptr;
@@ -771,7 +771,6 @@ SourceSurfaceImage::GetTextureClient(TextureForwarder* aForwarder)
     // gfx::BackendType::NONE means default to content backend
     textureClient = TextureClient::CreateFromSurface(aForwarder,
                                                      surface,
-                                                     aForwarder->GetCompositorBackendType(),
                                                      BackendSelector::Content,
                                                      mTextureFlags,
                                                      ALLOC_DEFAULT);

@@ -1225,7 +1225,6 @@ ImageBridgeChild::DispatchAllocShmemInternal(size_t aSize,
 
 void
 ImageBridgeChild::ProxyDeallocShmemNow(SynchronousTask* aTask,
-                                       ISurfaceAllocator* aAllocator,
                                        ipc::Shmem* aShmem)
 {
   AutoCompleteTask complete(aTask);
@@ -1249,7 +1248,6 @@ ImageBridgeChild::DeallocShmem(ipc::Shmem& aShmem)
     RefPtr<ImageBridgeChild>(this),
     &ImageBridgeChild::ProxyDeallocShmemNow,
     &task,
-    this,
     &aShmem);
   GetMessageLoop()->PostTask(runnable.forget());
 
