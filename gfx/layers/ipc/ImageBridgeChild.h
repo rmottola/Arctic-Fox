@@ -256,7 +256,7 @@ private:
     ImageContainer* aContainer);
 
   void ProxyAllocShmemNow(SynchronousTask* aTask, AllocShmemParams* aParams);
-  void ProxyDeallocShmemNow(SynchronousTask* aTask, Shmem* aShmem);
+  void ProxyDeallocShmemNow(SynchronousTask* aTask, Shmem* aShmem, bool* aResult);
 
 public:
   // CompositableForwarder
@@ -330,7 +330,7 @@ public:
    * If used outside the ImageBridgeChild thread, it will proxy a synchronous
    * call on the ImageBridgeChild thread.
    */
-  virtual void DeallocShmem(mozilla::ipc::Shmem& aShmem) override;
+  virtual bool DeallocShmem(mozilla::ipc::Shmem& aShmem) override;
 
   virtual PTextureChild* CreateTexture(const SurfaceDescriptor& aSharedData,
                                        LayersBackend aLayersBackend,
