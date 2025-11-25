@@ -324,6 +324,28 @@ public:
   }
 };
 
+class MediaDecoderStateMachine::BufferingState
+  : public MediaDecoderStateMachine::StateObject
+{
+public:
+  explicit BufferingState(Master* aPtr) : StateObject(aPtr) {}
+
+  void Enter() override
+  {
+    mMaster->StartBuffering();
+  }
+
+  void Step() override
+  {
+    mMaster->StepBuffering();
+  }
+
+  State GetState() const override
+  {
+    return DECODER_STATE_BUFFERING;
+  }
+};
+
 #define INIT_WATCHABLE(name, val) \
   name(val, "MediaDecoderStateMachine::" #name)
 #define INIT_MIRROR(name, val) \
@@ -1203,6 +1225,9 @@ MediaDecoderStateMachine::SetState(State aState)
     case DECODER_STATE_SEEKING:
       mStateObj = MakeUnique<SeekingState>(this);
       break;
+    case DECODER_STATE_BUFFERING:
+      mStateObj = MakeUnique<BufferingState>(this);
+      break;
     default:
       mStateObj = nullptr;
       break;
@@ -1246,9 +1271,6 @@ MediaDecoderStateMachine::EnterState()
   }
 
   switch (mState) {
-    case DECODER_STATE_BUFFERING:
-      StartBuffering();
-      break;
     case DECODER_STATE_COMPLETED:
       ScheduleStateMachine();
       break;
@@ -2420,9 +2442,6 @@ MediaDecoderStateMachine::RunStateMachine()
   }
 
   switch (mState) {
-    case DECODER_STATE_BUFFERING:
-      StepBuffering();
-      return;
     case DECODER_STATE_COMPLETED:
       StepCompleted();
       return;
