@@ -812,6 +812,7 @@ NS_InitMinimalXPCOM()
   }
 
   AbstractThread::InitStatics();
+  SharedThreadPool::InitStatics();
 
   return NS_OK;
 }
