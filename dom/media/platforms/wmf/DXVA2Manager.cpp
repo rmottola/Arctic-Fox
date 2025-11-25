@@ -489,7 +489,12 @@ DXVA2Manager::CreateD3D9DXVA(nsACString& aFailureReason)
 
   // DXVA processing takes up a lot of GPU resources, so limit the number of
   // videos we use DXVA with at any one time.
-  const uint32_t dxvaLimit = MediaPrefs::PDMWMFMaxDXVAVideos();
+  uint32_t dxvaLimit = 4;
+  // TODO: Sync this value across to the GPU process.
+  if (XRE_GetProcessType() != GeckoProcessType_GPU) {
+    dxvaLimit = MediaPrefs::PDMWMFMaxDXVAVideos();
+  }
+
   if (sDXVAVideosCount == dxvaLimit) {
     aFailureReason.AssignLiteral("Too many DXVA videos playing");
     return nullptr;
@@ -897,7 +902,12 @@ DXVA2Manager::CreateD3D11DXVA(nsACString& aFailureReason)
 {
   // DXVA processing takes up a lot of GPU resources, so limit the number of
   // videos we use DXVA with at any one time.
-  const uint32_t dxvaLimit = MediaPrefs::PDMWMFMaxDXVAVideos();
+  uint32_t dxvaLimit = 4;
+  // TODO: Sync this value across to the GPU process.
+  if (XRE_GetProcessType() != GeckoProcessType_GPU) {
+    dxvaLimit = MediaPrefs::PDMWMFMaxDXVAVideos();
+  }
+
   if (sDXVAVideosCount == dxvaLimit) {
     aFailureReason.AssignLiteral("Too many DXVA videos playing");
     return nullptr;
