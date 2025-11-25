@@ -714,7 +714,6 @@ MediaDecoderStateMachine::OnNotDecoded(MediaData::Type aType,
       }
       if (CheckIfDecodeComplete()) {
         SetState(DECODER_STATE_COMPLETED);
-        ScheduleStateMachine();
         return;
       }
       // Schedule next cycle to see if we can leave buffering state.
@@ -1091,6 +1090,9 @@ MediaDecoderStateMachine::EnterState(State aState)
       Reset();
       mReader->ReleaseResources();
       break;
+    case DECODER_STATE_COMPLETED:
+      ScheduleStateMachine();
+      break;
     case DECODER_STATE_ERROR:
     case DECODER_STATE_SHUTDOWN:
       mIsShutdown = true;
@@ -1272,7 +1274,6 @@ void MediaDecoderStateMachine::StartDecoding()
 
   if (CheckIfDecodeComplete()) {
     SetState(DECODER_STATE_COMPLETED);
-    ScheduleStateMachine();
     return;
   }
 
