@@ -1022,7 +1022,7 @@ MediaDecoderStateMachine::OnNotDecoded(MediaData::Type aType,
 
   // If this is a decode error, delegate to the generic error path.
   if (aError != NS_ERROR_DOM_MEDIA_END_OF_STREAM) {
-    DecodeError();
+    DecodeError(aError);
     return;
   }
 
@@ -2087,7 +2087,7 @@ MediaDecoderStateMachine::OnSeekTaskRejected(SeekTaskRejectValue aValue)
     StopPrerollingVideo();
   }
 
-  DecodeError();
+  DecodeError(aValue.mError);
 
   DiscardSeekTaskIfExist();
 }
@@ -2297,13 +2297,13 @@ bool MediaDecoderStateMachine::HasLowUndecodedData(int64_t aUsecs)
 }
 
 void
-MediaDecoderStateMachine::DecodeError()
+MediaDecoderStateMachine::DecodeError(const MediaResult& aError)
 {
   MOZ_ASSERT(OnTaskQueue());
   MOZ_ASSERT(!IsShutdown());
   DECODER_WARN("Decode error");
   // Notify the decode error and MediaDecoder will shut down MDSM.
-  mOnPlaybackEvent.Notify(MediaEventType::DecodeError);
+  mOnPlaybackErrorEvent.Notify(aError);
 }
 
 void
@@ -2929,7 +2929,7 @@ MediaDecoderStateMachine::OnMediaSinkVideoError()
   if (HasAudio()) {
     return;
   }
-  DecodeError();
+  DecodeError(MediaResult(NS_ERROR_DOM_MEDIA_MEDIASINK_ERR, __func__));
 }
 
 void MediaDecoderStateMachine::OnMediaSinkAudioComplete()
@@ -2960,7 +2960,7 @@ void MediaDecoderStateMachine::OnMediaSinkAudioError()
 
   // Otherwise notify media decoder/element about this error for it makes
   // no sense to play an audio-only file without sound output.
-  DecodeError();
+  DecodeError(MediaResult(NS_ERROR_DOM_MEDIA_MEDIASINK_ERR, __func__));
 }
 
 void
