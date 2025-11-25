@@ -11,6 +11,7 @@
 #include "nsCharSeparatedTokenizer.h"
 #include "mozilla/CDMProxy.h"
 #include "mozilla/Logging.h"
+#include "mozilla/SharedThreadPool.h"
 #include "nsMimeTypes.h"
 #include "nsContentTypeParser.h"
 #include "VideoUtils.h"
