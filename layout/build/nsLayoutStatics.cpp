@@ -67,7 +67,6 @@
 #include "FrameLayerBuilder.h"
 #include "AnimationCommon.h"
 #include "LayerAnimationInfo.h"
-#include "mozilla/dom/VideoDecoderManagerChild.h"
 
 #include "AudioChannelService.h"
 #include "mozilla/dom/PromiseDebugging.h"
@@ -307,8 +306,6 @@ nsLayoutStatics::Initialize()
 #endif
 
   MediaDecoder::InitStatics();
-
-  VideoDecoderManagerChild::Initialize();
 
   PromiseDebugging::Init();
 
