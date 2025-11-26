@@ -520,5 +520,11 @@ IProtocol::DeallocShmem(Shmem& aMem)
   return ok;
 }
 
+bool
+IToplevelProtocol::IsOnCxxStack() const
+{
+  return GetIPCChannel()->IsOnCxxStack();
+}
+
 } // namespace ipc
 } // namespace mozilla
