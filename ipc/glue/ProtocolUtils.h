@@ -582,6 +582,9 @@ public:
         return true;
     }
 
+    bool IsValid() const {
+        return mValid;
+    }
 
 private:
     friend struct IPC::ParamTraits<Endpoint<PFooSide>>;
@@ -724,7 +727,10 @@ struct ParamTraits<mozilla::ipc::Endpoint<PFooSide>>
 
     static void Write(Message* aMsg, const paramType& aParam)
     {
-        MOZ_RELEASE_ASSERT(aParam.mValid);
+        IPC::WriteParam(aMsg, aParam.mValid);
+        if (!aParam.mValid) {
+            return;
+        }
 
         IPC::WriteParam(aMsg, static_cast<uint32_t>(aParam.mMode));
 
@@ -743,7 +749,15 @@ struct ParamTraits<mozilla::ipc::Endpoint<PFooSide>>
     static bool Read(const Message* aMsg, PickleIterator* aIter, paramType* aResult)
     {
         MOZ_RELEASE_ASSERT(!aResult->mValid);
-        aResult->mValid = true;
+
+        if (!IPC::ReadParam(aMsg, aIter, &aResult->mValid)) {
+            return false;
+        }
+        if (!aResult->mValid) {
+            // Object is empty, but read succeeded.
+            return true;
+        }
+
         uint32_t mode, protocolId;
         if (!IPC::ReadParam(aMsg, aIter, &mode) ||
             !IPC::ReadParam(aMsg, aIter, &aResult->mTransport) ||
