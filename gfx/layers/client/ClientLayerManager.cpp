@@ -734,6 +734,7 @@ bool
 ClientLayerManager::AreComponentAlphaLayersEnabled()
 {
   return GetCompositorBackendType() != LayersBackend::LAYERS_BASIC &&
+         AsShadowForwarder()->SupportsComponentAlpha() &&
          LayerManager::AreComponentAlphaLayersEnabled();
 }
 
