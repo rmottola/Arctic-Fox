@@ -72,7 +72,7 @@ public:
   ~GPUProcessManager();
 
   // If not using a GPU process, launch a new GPU process asynchronously.
-  void EnableGPUProcess();
+  void LaunchGPUProcess();
 
   // Ensure that GPU-bound methods can be used. If no GPU process is being
   // used, or one is launched and ready, this function returns immediately.
@@ -205,6 +205,7 @@ private:
   ipc::TaskFactory<GPUProcessManager> mTaskFactory;
   RefPtr<VsyncIOThreadHolder> mVsyncIOThread;
   uint64_t mNextLayerTreeId;
+  uint32_t mNumProcessAttempts;
 
   nsTArray<RefPtr<RemoteCompositorSession>> mRemoteSessions;
   nsTArray<GPUProcessListener*> mListeners;
