@@ -1895,7 +1895,6 @@ const InterfaceShimEntry kInterfaceShimMap[] =
   { "nsIDOMSimpleGestureEvent", "SimpleGestureEvent" },
   { "nsIDOMUIEvent", "UIEvent" },
   { "nsIDOMHTMLMediaElement", "HTMLMediaElement" },
-  { "nsIDOMMediaError", "MediaError" },
   { "nsIDOMOfflineResourceList", "OfflineResourceList" },
   { "nsIDOMRange", "Range" },
   { "nsIDOMSVGLength", "SVGLength" },
