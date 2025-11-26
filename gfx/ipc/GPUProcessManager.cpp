@@ -376,6 +376,16 @@ GPUProcessManager::CleanShutdown()
 }
 
 void
+GPUProcessManager::KillProcess()
+{
+  if (!mProcess) {
+    return;
+  }
+
+  mProcess->KillProcess();
+}
+
+void
 GPUProcessManager::DestroyProcess()
 {
   if (!mProcess) {
@@ -594,6 +604,15 @@ GPUProcessManager::CreateContentImageBridge(base::ProcessId aOtherProcess,
 
   *aOutEndpoint = Move(childPipe);
   return true;
+}
+
+base::ProcessId
+GPUProcessManager::GPUProcessPid()
+{
+  base::ProcessId gpuPid = mGPUChild
+                           ? mGPUChild->OtherPid()
+                           : -1;
+  return gpuPid;
 }
 
 bool

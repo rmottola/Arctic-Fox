@@ -110,6 +110,7 @@
 #include "mozilla/layers/APZCTreeManager.h" // for layers::ZoomToRectBehavior
 #include "mozilla/dom/Promise.h"
 #include "mozilla/StyleSheetInlines.h"
+#include "mozilla/gfx/GPUProcessManager.h"
 
 #ifdef XP_WIN
 #undef GetClassName
@@ -4064,6 +4065,29 @@ nsDOMWindowUtils::ForceReflowInterrupt()
     return NS_ERROR_NOT_AVAILABLE;
   }
   pc->SetPendingInterruptFromTest();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::TerminateGPUProcess()
+{
+  GPUProcessManager* pm = GPUProcessManager::Get();
+  if (pm) {
+    pm->KillProcess();
+  }
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMWindowUtils::GetGpuProcessPid(int32_t* aPid)
+{
+  GPUProcessManager* pm = GPUProcessManager::Get();
+  if (pm) {
+    *aPid = pm->GPUProcessPid();
+  } else {
+    *aPid = -1;
+  }
+
   return NS_OK;
 }
 
