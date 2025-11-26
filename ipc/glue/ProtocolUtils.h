@@ -358,7 +358,7 @@ enum class MessageDirection {
 MOZ_NEVER_INLINE void
 LogMessageForProtocol(const char* aTopLevelProtocol, base::ProcessId aOtherPid,
                       const char* aContextDescription,
-                      const char* aMessageDescription,
+                      uint32_t aMessageId,
                       MessageDirection aDirection);
 
 MOZ_NEVER_INLINE void
@@ -591,6 +591,8 @@ CreateEndpoints(const PrivateIPDLInterface& aPrivate,
 void
 TableToArray(const nsTHashtable<nsPtrHashKey<void>>& aTable,
              nsTArray<void*>& aArray);
+
+const char* StringFromIPCMessageType(uint32_t aMessageType);
 
 } // namespace ipc
 
