@@ -107,6 +107,7 @@ public:
                                                        uint64_t aTime,
                                                        const LayoutDevicePoint& aRefPoint,
                                                        Modifiers aModifiers,
+                                                       int32_t aClickCount,
                                                        nsIWidget* aWidget);
 
     /* Dispatch a mouse event with the given parameters.
@@ -124,6 +125,7 @@ public:
      * via the given widget. */
     static void FireSingleTapEvent(const LayoutDevicePoint& aPoint,
                                    Modifiers aModifiers,
+                                   int32_t aClickCount,
                                    nsIWidget* aWidget);
 
     /* Perform hit-testing on the touch points of |aEvent| to determine
