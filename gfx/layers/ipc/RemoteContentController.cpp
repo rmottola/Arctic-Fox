@@ -63,11 +63,9 @@ RemoteContentController::HandleTap(TapType aTapType,
     return;
   }
 
-  bool callTakeFocusForClickFromTap = (aTapType == TapType::eSingleTap);
-
   if (mCanSend) {
     Unused << SendHandleTap(aTapType, aPoint,
-            aModifiers, aGuid, aInputBlockId, callTakeFocusForClickFromTap);
+            aModifiers, aGuid, aInputBlockId);
   }
 }
 
