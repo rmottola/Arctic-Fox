@@ -137,10 +137,8 @@ ContentProcessController::HandleTap(
                         const ScrollableLayerGuid& aGuid,
                         uint64_t aInputBlockId)
 {
-  if (mBrowser) {
-    mBrowser->HandleTap(aType, aPoint - mBrowser->GetChromeDisplacement(), aModifiers, aGuid,
-        aInputBlockId);
-  }
+  // This should never get called
+  MOZ_ASSERT(false);
 }
 
 void

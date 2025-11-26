@@ -13,13 +13,16 @@
 namespace mozilla {
 namespace layers {
 
+class RemoteCompositorSession;
 
 class APZCTreeManagerChild
   : public IAPZCTreeManager
   , public PAPZCTreeManagerChild
 {
 public:
-  APZCTreeManagerChild() { }
+  APZCTreeManagerChild();
+
+  void SetCompositorSession(RemoteCompositorSession* aSession);
 
   nsEventStatus
   ReceiveInputEvent(
@@ -84,9 +87,17 @@ public:
           EventMessage aEventMessage) override;
 
 protected:
+  bool RecvHandleTap(const TapType& aType,
+                     const LayoutDevicePoint& aPoint,
+                     const Modifiers& aModifiers,
+                     const ScrollableLayerGuid& aGuid,
+                     const uint64_t& aInputBlockId) override;
 
   virtual
   ~APZCTreeManagerChild() { }
+
+private:
+  MOZ_NON_OWNING_REF RemoteCompositorSession* mCompositorSession;
 };
 
 } // namespace layers
