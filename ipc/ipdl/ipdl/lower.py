@@ -1571,6 +1571,7 @@ class _GenerateProtocolCode(ipdl.ast.Visitor):
             mfDecl, mfDefn = _splitFuncDeclDefn(
                 _generateMessageConstructor(md.msgCtorFunc(), md.msgId(),
                                             md.decl.type.nested,
+                                            md.decl.type.prio,
                                             md.prettyMsgName(p.name+'::'),
                                             md.decl.type.compress))
             decls.append(mfDecl)
@@ -1581,6 +1582,7 @@ class _GenerateProtocolCode(ipdl.ast.Visitor):
                     _generateMessageConstructor(
                         md.replyCtorFunc(), md.replyId(),
                         md.decl.type.nested,
+                        md.decl.type.prio,
                         md.prettyReplyName(p.name+'::'),
                         md.decl.type.compress))
                 decls.append(rfDecl)
@@ -1811,7 +1813,7 @@ class _GenerateProtocolCode(ipdl.ast.Visitor):
 
 ##--------------------------------------------------
 
-def _generateMessageConstructor(clsname, msgid, nested, prettyName, compress):
+def _generateMessageConstructor(clsname, msgid, nested, prio, prettyName, compress):
     routingId = ExprVar('routingId')
 
     func = FunctionDefn(FunctionDecl(
@@ -1835,12 +1837,18 @@ def _generateMessageConstructor(clsname, msgid, nested, prettyName, compress):
         assert nested == ipdl.ast.INSIDE_CPOW_NESTED
         nestedEnum = 'IPC::Message::NESTED_INSIDE_CPOW'
 
+    if prio == ipdl.ast.NORMAL_PRIORITY:
+        prioEnum = 'IPC::Message::NORMAL_PRIORITY'
+    else:
+        assert prio == ipdl.ast.HIGH_PRIORITY
+        prioEnum = 'IPC::Message::HIGH_PRIORITY'
+
     func.addstmt(
         StmtReturn(ExprNew(Type('IPC::Message'),
                            args=[ routingId,
                                   ExprVar(msgid),
                                   ExprVar(nestedEnum),
-                                  ExprVar('IPC::Message::NORMAL_PRIORITY'),
+                                  ExprVar(prioEnum),
                                   compression,
                                   ExprLiteral.String(prettyName) ])))
 
