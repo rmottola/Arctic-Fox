@@ -21,6 +21,7 @@
 #include "mozilla/dom/VideoDecoderManagerParent.h"
 #include "mozilla/layers/CompositorThread.h"
 #include "mozilla/layers/ImageBridgeParent.h"
+#include "mozilla/dom/VideoDecoderManagerChild.h"
 #include "nsDebugImpl.h"
 #include "mozilla/layers/LayerTreeOwnerTracker.h"
 #include "ProcessUtils.h"
@@ -330,6 +331,7 @@ GPUParent::ActorDestroy(ActorDestroyReason aWhy)
   if (mVsyncBridge) {
     mVsyncBridge->Shutdown();
   }
+  dom::VideoDecoderManagerParent::ShutdownVideoBridge();
   CompositorThreadHolder::Shutdown();
 #if defined(XP_WIN)
   DeviceManagerDx::Shutdown();
