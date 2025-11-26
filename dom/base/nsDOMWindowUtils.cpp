@@ -151,7 +151,7 @@ public:
 private:
   explicit OldWindowSize(nsIWeakReference* aWindowRef, const nsSize& aSize)
     : mWindowRef(aWindowRef), mSize(aSize) { }
-  ~OldWindowSize() { };
+  ~OldWindowSize() = default;;
 
   static OldWindowSize* GetItem(nsIWeakReference* aWindowRef)
   {

@@ -254,7 +254,7 @@ public:
     , mContext(aContext)
   {
   }
-  ~TimerTask() override {}
+  ~TimerTask() override = default;
   void Run() override {
     mCDM->GetCDM()->TimerExpired(mContext);
   }

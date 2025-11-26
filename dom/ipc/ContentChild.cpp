@@ -381,7 +381,7 @@ public:
   {
   }
 
-  ~AlertObserver() {}
+  ~AlertObserver() = default;
 
   bool ShouldRemoveFrom(nsIObserver* aObserver,
                         const nsString& aData) const
@@ -415,7 +415,7 @@ public:
   NS_DECL_NSICONSOLELISTENER
 
 private:
-  ~ConsoleListener() {}
+  ~ConsoleListener() = default;
 
   ContentChild* mChild;
   friend class ContentChild;
@@ -490,8 +490,7 @@ public:
   NS_DECL_ISUPPORTS
 
 private:
-  ~BackgroundChildPrimer()
-  { }
+  ~BackgroundChildPrimer() = default;
 
   virtual void
   ActorCreated(PBackgroundChild* aActor) override
@@ -1007,7 +1006,7 @@ public:
     return NS_OK;
   }
 private:
-  ~HandleReportCallback() {}
+  ~HandleReportCallback() = default;
 
   RefPtr<MemoryReportRequestChild> mActor;
   const nsCString mProcess;
@@ -1035,7 +1034,7 @@ public:
   }
 
 private:
-  ~FinishReportingCallback() {}
+  ~FinishReportingCallback() = default;
 
   RefPtr<MemoryReportRequestChild> mActor;
 };

@@ -381,7 +381,7 @@ class DOMEventListenerManagersHashReporter final : public nsIMemoryReporter
 {
   MOZ_DEFINE_MALLOC_SIZE_OF(MallocSizeOf)
 
-  ~DOMEventListenerManagersHashReporter() {}
+  ~DOMEventListenerManagersHashReporter() = default;
 
 public:
   NS_DECL_ISUPPORTS
@@ -447,7 +447,7 @@ EventListenerManagerHashClearEntry(PLDHashTable *table, PLDHashEntryHdr *entry)
 class SameOriginCheckerImpl final : public nsIChannelEventSink,
                                     public nsIInterfaceRequestor
 {
-  ~SameOriginCheckerImpl() {}
+  ~SameOriginCheckerImpl() = default;
 
   NS_DECL_ISUPPORTS
   NS_DECL_NSICHANNELEVENTSINK

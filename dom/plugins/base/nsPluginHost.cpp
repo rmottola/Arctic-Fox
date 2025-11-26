@@ -227,8 +227,7 @@ nsInvalidPluginTag::nsInvalidPluginTag(const char* aFullPath, int64_t aLastModif
   mSeen(false)
 {}
 
-nsInvalidPluginTag::~nsInvalidPluginTag()
-{}
+nsInvalidPluginTag::~nsInvalidPluginTag() = default;
 
 // Helper to check for a MIME in a comma-delimited preference
 static bool
@@ -1694,7 +1693,7 @@ public:
   nsPluginHost* host;
   NS_DECLARE_STATIC_IID_ACCESSOR(ClearDataFromSitesClosure_CID)
   private:
-  virtual ~ClearDataFromSitesClosure() {}
+  virtual ~ClearDataFromSitesClosure() = default;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(ClearDataFromSitesClosure, ClearDataFromSitesClosure_CID)
@@ -1800,8 +1799,7 @@ public:
   nsresult retVal;
   NS_DECLARE_STATIC_IID_ACCESSOR(GetSitesClosure_CID)
   private:
-  virtual ~GetSitesClosure() {
-  }
+  virtual ~GetSitesClosure() = default;
 };
 
 NS_DEFINE_STATIC_IID_ACCESSOR(GetSitesClosure, GetSitesClosure_CID)

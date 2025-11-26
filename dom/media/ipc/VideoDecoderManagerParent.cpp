@@ -43,7 +43,7 @@ StaticRefPtr<TaskQueue> sManagerTaskQueue;
 
 class ManagerThreadShutdownObserver : public nsIObserver
 {
-  virtual ~ManagerThreadShutdownObserver() {}
+  virtual ~ManagerThreadShutdownObserver() = default;
 public:
   ManagerThreadShutdownObserver() {}
 

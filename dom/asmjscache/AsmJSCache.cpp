@@ -1714,7 +1714,7 @@ CloseEntryForWrite(size_t aSize,
 
 class Client : public quota::Client
 {
-  ~Client() {}
+  ~Client() = default;
 
 public:
   NS_IMETHOD_(MozExternalRefCountType)
