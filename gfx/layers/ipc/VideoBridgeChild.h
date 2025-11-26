@@ -35,10 +35,6 @@ public:
   void DeallocPVideoBridgeChild() override;
 
 
-  void ActorDestroy(ActorDestroyReason aWhy) override;
-  void DeallocPVideoBridgeChild() override;
-
-
   // ISurfaceAllocator
   bool AllocUnsafeShmem(size_t aSize,
                         mozilla::ipc::SharedMemory::SharedMemoryType aShmType,
