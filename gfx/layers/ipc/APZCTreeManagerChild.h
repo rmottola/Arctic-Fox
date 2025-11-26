@@ -83,11 +83,6 @@ public:
           LayoutDeviceIntPoint aRefPoint,
           EventMessage aEventMessage) override;
 
-  void
-  OnProcessingError(
-          Result aCode,
-          const char* aReason) override;
-
 protected:
 
   virtual
