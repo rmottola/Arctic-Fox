@@ -29,7 +29,6 @@ using namespace mozilla::gfx;
 RemoteContentController::RemoteContentController()
   : mCompositorThread(MessageLoop::current())
   , mCanSend(true)
-  , mMutex("RemoteContentController")
 {
 }
 
@@ -93,18 +92,6 @@ void
 RemoteContentController::DispatchToRepaintThread(already_AddRefed<Runnable> aTask)
 {
   mCompositorThread->PostTask(Move(aTask));
-}
-
-bool
-RemoteContentController::GetTouchSensitiveRegion(CSSRect* aOutRegion)
-{
-  MutexAutoLock lock(mMutex);
-  if (mTouchSensitiveRegion.IsEmpty()) {
-    return false;
-  }
-
-  *aOutRegion = CSSRect::FromAppUnits(mTouchSensitiveRegion.GetBounds());
-  return true;
 }
 
 void
@@ -191,14 +178,6 @@ RemoteContentController::NotifyFlushComplete()
   if (mCanSend) {
     Unused << SendNotifyFlushComplete();
   }
-}
-
-bool
-RemoteContentController::RecvUpdateHitRegion(const nsRegion& aRegion)
-{
-  MutexAutoLock lock(mMutex);
-  mTouchSensitiveRegion = aRegion;
-  return true;
 }
 
 void

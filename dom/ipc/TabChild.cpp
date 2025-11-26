@@ -547,7 +547,6 @@ TabChild::TabChild(nsIContentChild* aManager,
   , mParentIsActive(false)
   , mDidSetRealShowInfo(false)
   , mDidLoadURLInit(false)
-  , mAPZChild(nullptr)
   , mLayerObserverEpoch(0)
 #if defined(XP_WIN) && defined(ACCESSIBILITY)
   , mNativeWindowHandle(0)
@@ -2988,9 +2987,6 @@ void
 TabChild::UpdateHitRegion(const nsRegion& aRegion)
 {
   mRemoteFrame->SendUpdateHitRegion(aRegion);
-  if (mAPZChild) {
-    mAPZChild->SendUpdateHitRegion(aRegion);
-  }
 }
 
 NS_IMETHODIMP
