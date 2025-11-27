@@ -3027,7 +3027,6 @@ BuildStyleRule(nsCSSPropertyID aProperty,
 static bool
 ComputeValuesFromStyleRule(nsCSSPropertyID aProperty,
                            CSSEnabledState aEnabledState,
-                           dom::Element* aTargetElement,
                            nsStyleContext* aStyleContext,
                            css::StyleRule* aStyleRule,
                            nsTArray<PropertyStyleAnimationValuePair>& aValues,
@@ -3148,7 +3147,7 @@ StyleAnimationValue::ComputeValue(nsCSSPropertyID aProperty,
   AutoTArray<PropertyStyleAnimationValuePair,1> values;
   bool ok = ComputeValuesFromStyleRule(aProperty,
                                        CSSEnabledState::eIgnoreEnabledState,
-                                       aTargetElement, aStyleContext, styleRule,
+                                       aStyleContext, styleRule,
                                        values, aIsContextSensitive);
   if (!ok) {
     return false;
@@ -3185,7 +3184,7 @@ ComputeValuesFromSpecifiedValue(
   }
 
   aResult.Clear();
-  return ComputeValuesFromStyleRule(aProperty, aEnabledState, aTargetElement,
+  return ComputeValuesFromStyleRule(aProperty, aEnabledState,
                                     aStyleContext, styleRule, aResult,
                                     /* aIsContextSensitive */ nullptr);
 }
