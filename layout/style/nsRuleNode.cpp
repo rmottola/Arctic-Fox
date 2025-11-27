@@ -6493,7 +6493,7 @@ nsRuleNode::ComputeDisplayData(void* aStartStruct,
       break;
     case eCSSUnit_URL: {
       display->mShapeOutside = StyleShapeOutside();
-      display->mShapeOutside.SetURL(shapeOutsideValue);
+      display->mShapeOutside.SetURL(shapeOutsideValue->GetURLStructValue());
       break;
     }
     case eCSSUnit_Array: {
@@ -10009,7 +10009,7 @@ nsRuleNode::ComputeSVGResetData(void* aStartStruct,
       break;
     case eCSSUnit_URL: {
       svgReset->mClipPath = StyleClipPath();
-      svgReset->mClipPath.SetURL(clipPathValue);
+      svgReset->mClipPath.SetURL(clipPathValue->GetURLStructValue());
       break;
     }
     case eCSSUnit_Array: {
