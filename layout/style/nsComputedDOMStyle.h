@@ -592,8 +592,6 @@ private:
                                nsROCSSPrimitiveValue* aValue);
   void SetValueToPosition(const mozilla::Position& aPosition,
                           nsDOMCSSValueList* aValueList);
-  void SetValueToFragmentOrURL(const mozilla::FragmentOrURL* aFragmentOrURL,
-                               nsROCSSPrimitiveValue* aValue);
   void SetValueToURLValue(const mozilla::css::URLValueData* aURL,
                           nsROCSSPrimitiveValue* aValue);
 
