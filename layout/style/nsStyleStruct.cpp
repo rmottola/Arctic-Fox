@@ -1314,7 +1314,8 @@ nsStyleSVGReset::CalcDifference(const nsStyleSVGReset& aNewData) const
     hint |= nsChangeHint_RepaintFrame;
   }
 
-  hint |= mMask.CalcDifference(aNewData.mMask, nsChangeHint_RepaintFrame);
+  hint |= mMask.CalcDifference(aNewData.mMask,
+                               nsStyleImageLayers::LayerType::Mask);
 
   return hint;
 }
@@ -2481,8 +2482,13 @@ nsStyleImageLayers::nsStyleImageLayers(const nsStyleImageLayers &aSource)
 
 nsChangeHint
 nsStyleImageLayers::CalcDifference(const nsStyleImageLayers& aNewLayers,
-                                   nsChangeHint aPositionChangeHint) const
+                                   nsStyleImageLayers::LayerType aType) const
 {
+  nsChangeHint positionChangeHint =
+    (aType == nsStyleImageLayers::LayerType::Background)
+    ? nsChangeHint_UpdateBackgroundPosition
+    : nsChangeHint_RepaintFrame;
+
   nsChangeHint hint = nsChangeHint(0);
 
   const nsStyleImageLayers& moreLayers =
@@ -2496,7 +2502,7 @@ nsStyleImageLayers::CalcDifference(const nsStyleImageLayers& aNewLayers,
     if (i < lessLayers.mImageCount) {
       nsChangeHint layerDifference =
         moreLayers.mLayers[i].CalcDifference(lessLayers.mLayers[i],
-                                             aPositionChangeHint);
+                                             positionChangeHint);
       hint |= layerDifference;
       if (layerDifference &&
           ((moreLayers.mLayers[i].mImage.GetType() == eStyleImageType_Element) ||
@@ -2509,6 +2515,11 @@ nsStyleImageLayers::CalcDifference(const nsStyleImageLayers& aNewLayers,
         hint |= nsChangeHint_UpdateEffects | nsChangeHint_RepaintFrame;
       }
     }
+  }
+
+  if (aType == nsStyleImageLayers::LayerType::Mask &&
+      mImageCount != aNewLayers.mImageCount) {
+    hint |= nsChangeHint_UpdateEffects;
   }
 
   if (hint) {
@@ -2783,7 +2794,7 @@ nsStyleImageLayers::Layer::CalcDifference(const nsStyleImageLayers::Layer& aNewL
 {
   nsChangeHint hint = nsChangeHint(0);
   if (mSourceURI != aNewLayer.mSourceURI) {
-    hint |= nsChangeHint_RepaintFrame;
+    hint |= nsChangeHint_RepaintFrame | nsChangeHint_UpdateEffects;
 
     // If Layer::mSourceURI links to a SVG mask, it has a fragment. Not vice
     // versa. Here are examples of URI contains a fragment, two of them link
@@ -2811,10 +2822,9 @@ nsStyleImageLayers::Layer::CalcDifference(const nsStyleImageLayers::Layer& aNewL
       }
     }
 
-    // Return nsChangeHint_UpdateEffects and nsChangeHint_UpdateOverflow if
-    // either URI might link to an SVG mask.
+    // Return nsChangeHint_UpdateOverflow if either URI might link to an SVG
+    // mask.
     if (maybeSVGMask) {
-      hint |= nsChangeHint_UpdateEffects;
       // Mask changes require that we update the PreEffectsBBoxProperty,
       // which is done during overflow computation.
       hint |= nsChangeHint_UpdateOverflow;
@@ -2881,7 +2891,7 @@ nsStyleBackground::CalcDifference(const nsStyleBackground& aNewData) const
   }
 
   hint |= mImage.CalcDifference(aNewData.mImage,
-                                nsChangeHint_UpdateBackgroundPosition);
+                                nsStyleImageLayers::LayerType::Background);
 
   return hint;
 }
