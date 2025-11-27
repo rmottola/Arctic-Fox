@@ -46,6 +46,11 @@ class nsTextFrame;
 class imgIContainer;
 struct nsStyleVisibility;
 
+typedef nsINode RawGeckoNode;
+typedef mozilla::dom::Element RawGeckoElement;
+typedef nsIDocument RawGeckoDocument;
+struct ServoNodeData;
+
 // Includes nsStyleStructID.
 #include "nsStyleStructFwd.h"
 
