@@ -91,6 +91,7 @@ namespace css {
 
 struct URLValueData
 {
+protected:
   // Methods are not inline because using an nsIPrincipal means requiring
   // caps, which leads to REQUIRES hell, since this header is included all
   // over.
@@ -110,6 +111,7 @@ struct URLValueData
                already_AddRefed<PtrHolder<nsIURI>> aReferrer,
                already_AddRefed<PtrHolder<nsIPrincipal>> aOriginPrincipal);
 
+public:
   bool operator==(const URLValueData& aOther) const;
 
   // Returns true iff we know for sure, by comparing the mBaseURI pointer,
@@ -127,9 +129,9 @@ struct URLValueData
 
   nsIURI* GetURI() const;
 
-  size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const;
-
   bool GetLocalURLFlag() const { return mLocalURLFlag; }
+
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(URLValueData)
 
 private:
   // mURI stores the lazily resolved URI.  This may be null if the URI is
@@ -146,11 +148,17 @@ private:
   // sign(#) character.
   bool mLocalURLFlag;
 
+protected:
+  virtual ~URLValueData() = default;
+
+  size_t SizeOfExcludingThis(mozilla::MallocSizeOf aMallocSizeOf) const;
+
+private:
   URLValueData(const URLValueData& aOther) = delete;
   URLValueData& operator=(const URLValueData& aOther) = delete;
 };
 
-struct URLValue : public URLValueData
+struct URLValue final : public URLValueData
 {
   // These two constructors are safe to call only on the main thread.
   URLValue(nsStringBuffer* aString, nsIURI* aBaseURI, nsIURI* aReferrer,
@@ -170,15 +178,9 @@ struct URLValue : public URLValueData
   URLValue& operator=(const URLValue&) = delete;
 
   size_t SizeOfIncludingThis(mozilla::MallocSizeOf aMallocSizeOf) const;
-
-protected:
-  ~URLValue() {}
-
-public:
-  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(URLValue)
 };
 
-struct ImageValue : public URLValueData
+struct ImageValue final : public URLValueData
 {
   // Not making the constructor and destructor inline because that would
   // force us to include imgIRequest.h, which leads to REQUIRES hell, since
@@ -195,15 +197,13 @@ struct ImageValue : public URLValueData
 
   // XXXheycam We should have our own SizeOfIncludingThis method.
 
-private:
+protected:
   ~ImageValue();
 
 public:
   // Inherit operator== from URLValue
 
   nsRefPtrHashtable<nsPtrHashKey<nsIDocument>, imgRequestProxy> mRequests;
-
-  NS_INLINE_DECL_REFCOUNTING(ImageValue)
 };
 
 struct GridNamedArea {
