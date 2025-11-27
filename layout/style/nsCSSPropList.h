@@ -4003,8 +4003,8 @@ CSS_PROP_TEXT(
     "",
     VARIANT_HC,
     nullptr,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    offsetof(nsStyleText, mTextEmphasisColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_TEXT(
     text-emphasis-position,
     text_emphasis_position,
@@ -4039,7 +4039,7 @@ CSS_PROP_TEXT(
     VARIANT_HC,
     nullptr,
     offsetof(nsStyleText, mWebkitTextFillColor),
-    eStyleAnimType_Custom)
+    eStyleAnimType_ComplexColor)
 CSS_PROP_TEXT(
     text-indent,
     text_indent,
@@ -4129,7 +4129,7 @@ CSS_PROP_TEXT(
     VARIANT_HC,
     nullptr,
     offsetof(nsStyleText, mWebkitTextStrokeColor),
-    eStyleAnimType_Custom)
+    eStyleAnimType_ComplexColor)
 CSS_PROP_TEXT(
     -webkit-text-stroke-width,
     _webkit_text_stroke_width,

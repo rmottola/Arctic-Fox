@@ -3680,9 +3680,6 @@ nsStyleText::nsStyleText(StyleStructContext aContext)
   , mTextAlignLast(NS_STYLE_TEXT_ALIGN_AUTO)
   , mTextAlignTrue(false)
   , mTextAlignLastTrue(false)
-  , mTextEmphasisColorForeground(true)
-  , mWebkitTextFillColorForeground(true)
-  , mWebkitTextStrokeColorForeground(true)
   , mTextTransform(NS_STYLE_TEXT_TRANSFORM_NONE)
   , mWhiteSpace(NS_STYLE_WHITESPACE_NORMAL)
   , mWordBreak(NS_STYLE_WORDBREAK_NORMAL)
@@ -3696,9 +3693,9 @@ nsStyleText::nsStyleText(StyleStructContext aContext)
   , mTextEmphasisStyle(NS_STYLE_TEXT_EMPHASIS_STYLE_NONE)
   , mTextRendering(NS_STYLE_TEXT_RENDERING_AUTO)
   , mTabSize(NS_STYLE_TABSIZE_INITIAL)
-  , mTextEmphasisColor(aContext.DefaultColor())
-  , mWebkitTextFillColor(aContext.DefaultColor())
-  , mWebkitTextStrokeColor(aContext.DefaultColor())
+  , mTextEmphasisColor(StyleComplexColor::CurrentColor())
+  , mWebkitTextFillColor(StyleComplexColor::CurrentColor())
+  , mWebkitTextStrokeColor(StyleComplexColor::CurrentColor())
   , mWordSpacing(0, nsStyleCoord::CoordConstructor)
   , mLetterSpacing(eStyleUnit_Normal)
   , mLineHeight(eStyleUnit_Normal)
@@ -3719,9 +3716,6 @@ nsStyleText::nsStyleText(const nsStyleText& aSource)
   , mTextAlignLast(aSource.mTextAlignLast)
   , mTextAlignTrue(false)
   , mTextAlignLastTrue(false)
-  , mTextEmphasisColorForeground(aSource.mTextEmphasisColorForeground)
-  , mWebkitTextFillColorForeground(aSource.mWebkitTextFillColorForeground)
-  , mWebkitTextStrokeColorForeground(aSource.mWebkitTextStrokeColorForeground)
   , mTextTransform(aSource.mTextTransform)
   , mWhiteSpace(aSource.mWhiteSpace)
   , mWordBreak(aSource.mWordBreak)
@@ -3819,16 +3813,8 @@ nsStyleText::CalcDifference(const nsStyleText& aNewData) const
     return hint;
   }
 
-  MOZ_ASSERT(!mTextEmphasisColorForeground ||
-             !aNewData.mTextEmphasisColorForeground ||
-             mTextEmphasisColor == aNewData.mTextEmphasisColor,
-             "If the text-emphasis-color are both foreground color, "
-             "mTextEmphasisColor should also be identical");
-  if (mTextEmphasisColorForeground != aNewData.mTextEmphasisColorForeground ||
-      mTextEmphasisColor != aNewData.mTextEmphasisColor ||
-      mWebkitTextFillColorForeground != aNewData.mWebkitTextFillColorForeground ||
+  if (mTextEmphasisColor != aNewData.mTextEmphasisColor ||
       mWebkitTextFillColor != aNewData.mWebkitTextFillColor ||
-      mWebkitTextStrokeColorForeground != aNewData.mWebkitTextStrokeColorForeground ||
       mWebkitTextStrokeColor != aNewData.mWebkitTextStrokeColor) {
     hint |= nsChangeHint_SchedulePaint |
             nsChangeHint_RepaintFrame;

@@ -957,6 +957,13 @@ nsComputedDOMStyle::SetToRGBAColor(nsROCSSPrimitiveValue* aValue,
   aValue->SetColor(rgbColor);
 }
 
+void
+nsComputedDOMStyle::SetValueFromComplexColor(nsROCSSPrimitiveValue* aValue,
+                                             const StyleComplexColor& aColor)
+{
+  SetToRGBAColor(aValue, StyleColor()->CalcComplexColor(aColor));
+}
+
 already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetColor()
 {
@@ -3848,10 +3855,7 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetTextEmphasisColor()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  const nsStyleText* text = StyleText();
-  nscolor color = text->mTextEmphasisColorForeground ?
-    StyleColor()->mColor : text->mTextEmphasisColor;
-  SetToRGBAColor(val, color);
+  SetValueFromComplexColor(val, StyleText()->mTextEmphasisColor);
   return val.forget();
 }
 
@@ -4096,7 +4100,7 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetWebkitTextFillColor()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  SetToRGBAColor(val, mStyleContext->GetTextFillColor());
+  SetValueFromComplexColor(val, StyleText()->mWebkitTextFillColor);
   return val.forget();
 }
 
@@ -4104,7 +4108,7 @@ already_AddRefed<CSSValue>
 nsComputedDOMStyle::DoGetWebkitTextStrokeColor()
 {
   RefPtr<nsROCSSPrimitiveValue> val = new nsROCSSPrimitiveValue;
-  SetToRGBAColor(val, mStyleContext->GetTextStrokeColor());
+  SetValueFromComplexColor(val, StyleText()->mWebkitTextStrokeColor);
   return val.forget();
 }
 

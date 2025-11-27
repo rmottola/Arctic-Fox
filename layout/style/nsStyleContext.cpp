@@ -1222,14 +1222,8 @@ nsStyleContext::CalcStyleDifferenceInternal(StyleContextLike* aNewContext,
     if (!change && PeekStyleText()) {
       const nsStyleText* thisVisText = thisVis->StyleText();
       const nsStyleText* otherVisText = otherVis->StyleText();
-      if (thisVisText->mTextEmphasisColorForeground !=
-          otherVisText->mTextEmphasisColorForeground ||
-          thisVisText->mTextEmphasisColor != otherVisText->mTextEmphasisColor ||
-          thisVisText->mWebkitTextFillColorForeground !=
-          otherVisText->mWebkitTextFillColorForeground ||
+      if (thisVisText->mTextEmphasisColor != otherVisText->mTextEmphasisColor ||
           thisVisText->mWebkitTextFillColor != otherVisText->mWebkitTextFillColor ||
-          thisVisText->mWebkitTextStrokeColorForeground !=
-          otherVisText->mWebkitTextStrokeColorForeground ||
           thisVisText->mWebkitTextStrokeColor != otherVisText->mWebkitTextStrokeColor) {
         change = true;
       }
@@ -1493,6 +1487,9 @@ ExtractColor(nsCSSPropertyID aProperty,
       return Some(val.GetCSSValueValue()->GetColorValue());
     case StyleAnimationValue::eUnit_CurrentColor:
       return Some(aStyleContext->StyleColor()->mColor);
+    case StyleAnimationValue::eUnit_ComplexColor:
+      return Some(aStyleContext->StyleColor()->
+                  CalcComplexColor(val.GetStyleComplexColorValue()));
     default:
       return Nothing();
   }
