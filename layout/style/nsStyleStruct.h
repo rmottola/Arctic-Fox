@@ -3633,9 +3633,9 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleSVG
 
   nsStyleSVGPaint  mFill;             // [inherited]
   nsStyleSVGPaint  mStroke;           // [inherited]
-  mozilla::FragmentOrURL mMarkerEnd;        // [inherited]
-  mozilla::FragmentOrURL mMarkerMid;        // [inherited]
-  mozilla::FragmentOrURL mMarkerStart;      // [inherited]
+  RefPtr<mozilla::css::URLValue> mMarkerEnd;   // [inherited]
+  RefPtr<mozilla::css::URLValue> mMarkerMid;   // [inherited]
+  RefPtr<mozilla::css::URLValue> mMarkerStart; // [inherited]
   nsTArray<nsStyleCoord> mStrokeDasharray;  // [inherited] coord, percent, factor
 
   nsStyleCoord     mStrokeDashoffset; // [inherited] coord, percent, factor
@@ -3697,8 +3697,7 @@ struct MOZ_NEEDS_MEMMOVABLE_MEMBERS nsStyleSVG
   }
 
   bool HasMarker() const {
-    return mMarkerStart.GetSourceURL() || mMarkerMid.GetSourceURL() ||
-           mMarkerEnd.GetSourceURL();
+    return mMarkerStart || mMarkerMid || mMarkerEnd;
   }
 
   /**
