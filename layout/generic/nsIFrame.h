@@ -2844,7 +2844,7 @@ public:
    * @param aParentContent the content node corresponding to the parent frame
    * @return whether the frame is a pseudo frame
    */   
-  bool IsPseudoFrame(nsIContent* aParentContent) {
+  bool IsPseudoFrame(const nsIContent* aParentContent) {
     return mContent == aParentContent;
   }
 
