@@ -830,8 +830,6 @@ private:
   // are playing an MSE stream (the start time is always assumed 0).
   bool mSentFirstFrameLoadedEvent;
 
-  bool mSentPlaybackEndedEvent;
-
   // True if video decoding is suspended.
   bool mVideoDecodeSuspended;
 
