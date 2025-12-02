@@ -79,6 +79,7 @@ PuppetWidget::PuppetWidget(TabChild* aTabChild)
   : mTabChild(aTabChild)
   , mMemoryPressureObserver(nullptr)
   , mDPI(-1)
+  , mRounding(-1)
   , mDefaultScale(-1)
   , mCursorHotspotX(0)
   , mCursorHotspotY(0)
@@ -1200,6 +1201,20 @@ PuppetWidget::GetDefaultScaleInternal()
   }
 
   return mDefaultScale;
+}
+
+int32_t
+PuppetWidget::RoundsWidgetCoordinatesTo()
+{
+  if (mRounding < 0) {
+    if (mTabChild) {
+      mTabChild->GetWidgetRounding(&mRounding);
+    } else {
+      mRounding = 1;
+    }
+  }
+
+  return mRounding;
 }
 
 void*

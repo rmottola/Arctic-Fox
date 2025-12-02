@@ -540,6 +540,7 @@ TabChild::TabChild(nsIContentChild* aManager,
   , mDestroyed(false)
   , mUniqueId(aTabId)
   , mDPI(0)
+  , mRounding(0)
   , mDefaultScale(0)
   , mIsTransparent(false)
   , mIPCOpen(false)
@@ -1547,6 +1548,7 @@ TabChild::ApplyShowInfo(const ShowInfo& aInfo)
     }
   }
   mDPI = aInfo.dpi();
+  mRounding = aInfo.widgetRounding();
   mDefaultScale = aInfo.defaultScale();
   mIsTransparent = aInfo.isTransparent();
 }
@@ -2921,6 +2923,22 @@ TabChild::GetDefaultScale(double* aScale)
 }
 
 void
+TabChild::GetWidgetRounding(int32_t* aRounding)
+{
+  *aRounding = 1;
+  if (!mRemoteFrame) {
+    return;
+  }
+  if (mRounding > 0) {
+    *aRounding = mRounding;
+    return;
+  }
+
+  // Fallback to a sync call if needed.
+  SendGetWidgetRounding(aRounding);
+}
+
+void
 TabChild::GetMaxTouchPoints(uint32_t* aTouchPoints)
 {
   // Fallback to a sync call.
@@ -3254,12 +3272,15 @@ TabChild::RecvRequestNotifyAfterRemotePaint()
 }
 
 bool
-TabChild::RecvUIResolutionChanged(const float& aDpi, const double& aScale)
+TabChild::RecvUIResolutionChanged(const float& aDpi,
+                                  const int32_t& aRounding,
+                                  const double& aScale)
 {
   ScreenIntSize oldScreenSize = GetInnerSize();
   mDPI = 0;
+  mRounding = 0;
   mDefaultScale = 0;
-  static_cast<PuppetWidget*>(mPuppetWidget.get())->UpdateBackingScaleCache(aDpi, aScale);
+  static_cast<PuppetWidget*>(mPuppetWidget.get())->UpdateBackingScaleCache(aDpi, aRounding, aScale);
   nsCOMPtr<nsIDocument> document(GetDocument());
   nsCOMPtr<nsIPresShell> presShell = document->GetShell();
   if (presShell) {
