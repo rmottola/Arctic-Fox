@@ -560,6 +560,11 @@ public:
   {
     return DECODER_STATE_SHUTDOWN;
   }
+
+  bool HandleDormant(bool aDormant) override
+  {
+    return true;
+  }
 };
 
 #define INIT_WATCHABLE(name, val) \
@@ -1528,10 +1533,6 @@ void
 MediaDecoderStateMachine::SetDormant(bool aDormant)
 {
   MOZ_ASSERT(OnTaskQueue());
-
-  if (IsShutdown()) {
-    return;
-  }
 
   if (mStateObj->HandleDormant(aDormant)) {
     return;
