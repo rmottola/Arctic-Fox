@@ -219,6 +219,8 @@ public:
     return false;
   }
 
+  virtual bool HandleEndOfStream() { return false; }
+
 protected:
   using Master = MediaDecoderStateMachine;
   explicit StateObject(Master* aPtr) : mMaster(aPtr) {}
@@ -441,6 +443,12 @@ public:
     mMaster->MaybeFinishDecodeFirstFrame();
     return true;
   }
+
+  bool HandleEndOfStream() override
+  {
+    mMaster->MaybeFinishDecodeFirstFrame();
+    return true;
+  }
 };
 
 class MediaDecoderStateMachine::DecodingState
@@ -536,6 +544,14 @@ private:
            mMaster->mLowAudioThresholdUsecs,
            mMaster->mAmpleAudioThresholdUsecs);
     }
+  }
+
+  bool HandleEndOfStream() override
+  {
+    if (mMaster->CheckIfDecodeComplete()) {
+      SetState(DECODER_STATE_COMPLETED);
+    }
+    return true;
   }
 
   // Time at which we started decoding.
@@ -671,6 +687,17 @@ public:
     // Schedule Step() to check it.
     mMaster->Push(aVideo, MediaData::VIDEO_DATA);
     mMaster->ScheduleStateMachine();
+    return true;
+  }
+
+  bool HandleEndOfStream() override
+  {
+    if (mMaster->CheckIfDecodeComplete()) {
+      SetState(DECODER_STATE_COMPLETED);
+    } else {
+      // Check if we can exit buffering.
+      mMaster->ScheduleStateMachine();
+    }
     return true;
   }
 
@@ -1190,26 +1217,7 @@ MediaDecoderStateMachine::OnNotDecoded(MediaData::Type aType,
 
   MaybeStopPrerolling();
 
-  switch (mState) {
-    case DECODER_STATE_DECODING_FIRSTFRAME:
-      MaybeFinishDecodeFirstFrame();
-      return;
-    case DECODER_STATE_BUFFERING:
-    case DECODER_STATE_DECODING: {
-      if (CheckIfDecodeComplete()) {
-        SetState(DECODER_STATE_COMPLETED);
-        return;
-      }
-      // Schedule next cycle to see if we can leave buffering state.
-      if (mState == DECODER_STATE_BUFFERING) {
-        ScheduleStateMachine();
-      }
-      return;
-    }
-    default: {
-      return;
-    }
-  }
+  mStateObj->HandleEndOfStream();
 }
 
 void
