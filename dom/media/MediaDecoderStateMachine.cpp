@@ -487,7 +487,8 @@ public:
     SLOG("Changed state to SEEKING (to %lld)", aTarget.GetTime().ToMicroseconds());
     SeekJob seekJob;
     seekJob.mTarget = aTarget;
-    return mMaster->InitiateSeek(Move(seekJob));
+    mMaster->InitiateSeek(Move(seekJob));
+    return mMaster->mCurrentSeek.mPromise.Ensure(__func__);
   }
 
 private:
@@ -581,7 +582,8 @@ public:
     SLOG("Changed state to SEEKING (to %lld)", aTarget.GetTime().ToMicroseconds());
     SeekJob seekJob;
     seekJob.mTarget = aTarget;
-    return mMaster->InitiateSeek(Move(seekJob));
+    mMaster->InitiateSeek(Move(seekJob));
+    return mMaster->mCurrentSeek.mPromise.Ensure(__func__);
   }
 
 private:
@@ -677,7 +679,8 @@ public:
     SLOG("Changed state to SEEKING (to %lld)", aTarget.GetTime().ToMicroseconds());
     SeekJob seekJob;
     seekJob.mTarget = aTarget;
-    return mMaster->InitiateSeek(Move(seekJob));
+    mMaster->InitiateSeek(Move(seekJob));
+    return mMaster->mCurrentSeek.mPromise.Ensure(__func__);
   }
 };
 
@@ -786,7 +789,8 @@ public:
     SLOG("Changed state to SEEKING (to %lld)", aTarget.GetTime().ToMicroseconds());
     SeekJob seekJob;
     seekJob.mTarget = aTarget;
-    return mMaster->InitiateSeek(Move(seekJob));
+    mMaster->InitiateSeek(Move(seekJob));
+    return mMaster->mCurrentSeek.mPromise.Ensure(__func__);
   }
 
 private:
@@ -863,7 +867,8 @@ public:
     SLOG("Changed state to SEEKING (to %lld)", aTarget.GetTime().ToMicroseconds());
     SeekJob seekJob;
     seekJob.mTarget = aTarget;
-    return mMaster->InitiateSeek(Move(seekJob));
+    mMaster->InitiateSeek(Move(seekJob));
+    return mMaster->mCurrentSeek.mPromise.Ensure(__func__);
   }
 
 private:
@@ -1986,10 +1991,11 @@ void MediaDecoderStateMachine::VisibilityChanged()
                                  MediaDecoderEventVisibility::Suppressed,
                                  true /* aVideoOnly */);
 
-    InitiateSeek(Move(seekJob))
-      ->Then(AbstractThread::MainThread(), __func__,
-             [start, info, hw](){ ReportRecoveryTelemetry(start, info, hw); },
-             [](){});
+    InitiateSeek(Move(seekJob));
+    RefPtr<MediaDecoder::SeekPromise> p = mCurrentSeek.mPromise.Ensure(__func__);
+    p->Then(AbstractThread::MainThread(), __func__,
+            [start, info, hw](){ ReportRecoveryTelemetry(start, info, hw); },
+            [](){});
   }
 }
 
@@ -2129,7 +2135,7 @@ MediaDecoderStateMachine::DispatchDecodeTasksIfNeeded()
   }
 }
 
-RefPtr<MediaDecoder::SeekPromise>
+void
 MediaDecoderStateMachine::InitiateSeek(SeekJob aSeekJob)
 {
   MOZ_ASSERT(OnTaskQueue());
@@ -2191,7 +2197,6 @@ MediaDecoderStateMachine::InitiateSeek(SeekJob aSeekJob)
   MOZ_ASSERT(!mQueuedSeek.Exists());
   MOZ_ASSERT(!mCurrentSeek.Exists());
   mCurrentSeek = Move(aSeekJob);
-  return mCurrentSeek.mPromise.Ensure(__func__);
 }
 
 void
