@@ -326,12 +326,7 @@ private:
     // feeding in the CDM, which we need to decode the first frame (and
     // thus get the metadata). We could fix this if we could compute the start
     // time by demuxing without necessaring decoding.
-    bool waitingForCDM =
-#ifdef MOZ_EME
-    mMaster->mInfo.IsEncrypted() && !mMaster->mCDMProxy;
-#else
-    false;
-#endif
+    bool waitingForCDM = mMaster->mInfo.IsEncrypted() && !mMaster->mCDMProxy;
 
     mMaster->mNotifyMetadataBeforeFirstFrame =
       mMaster->mDuration.Ref().isSome() || waitingForCDM;
@@ -1970,8 +1965,7 @@ MediaDecoderStateMachine::Seek(SeekTarget aTarget)
     return MediaDecoder::SeekPromise::CreateAndReject(/* aIgnored = */ true, __func__);
   }
 
-  MOZ_ASSERT(mState > DECODER_STATE_DECODING_METADATA,
-               "We should have got duration already");
+  MOZ_ASSERT(mDuration.Ref().isSome(), "We should have got duration already");
 
   // Can't seek until the start time is known.
   bool hasStartTime = mSentFirstFrameLoadedEvent || mReader->ForceZeroStartTime();
