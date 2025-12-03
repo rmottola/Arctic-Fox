@@ -5375,13 +5375,6 @@ pref("dom.telephony.enabled", false);
 // parameter omitted.
 pref("dom.telephony.defaultServiceId", 0);
 
-// Cell Broadcast API
-#ifdef MOZ_B2G_RIL
-pref("dom.cellbroadcast.enabled", true);
-#else
-pref("dom.cellbroadcast.enabled", false);
-#endif
-
 // ICC API
 #ifdef MOZ_B2G_RIL
 pref("dom.icc.enabled", true);
