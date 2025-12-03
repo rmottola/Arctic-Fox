@@ -319,18 +319,6 @@ private:
   // Should be called by main thread.
   bool HaveNextFrameData();
 
-  // Must be called with the decode monitor held.
-  bool IsBuffering() const {
-    MOZ_ASSERT(OnTaskQueue());
-    return mState == DECODER_STATE_BUFFERING;
-  }
-
-  // Must be called with the decode monitor held.
-  bool IsSeeking() const {
-    MOZ_ASSERT(OnTaskQueue());
-    return mState == DECODER_STATE_SEEKING;
-  }
-
   // Returns the state machine task queue.
   TaskQueue* OwnerThread() const { return mTaskQueue; }
 
