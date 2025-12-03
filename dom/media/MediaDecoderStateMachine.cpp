@@ -1670,9 +1670,6 @@ MediaDecoderStateMachine::SetState(State aState)
     case DECODER_STATE_DECODING:
       mStateObj = MakeUnique<DecodingState>(this);
       break;
-    case DECODER_STATE_SEEKING:
-      mStateObj = MakeUnique<SeekingState>(this);
-      break;
     case DECODER_STATE_BUFFERING:
       mStateObj = MakeUnique<BufferingState>(this);
       break;
@@ -2140,7 +2137,12 @@ MediaDecoderStateMachine::InitiateSeek(SeekJob aSeekJob)
 {
   MOZ_ASSERT(OnTaskQueue());
 
-  SetState(DECODER_STATE_SEEKING);
+  // Note we can't call SetState(DECODER_STATE_SEEKING) which does nothing
+  // if we are already in the SEEKING state.
+  mStateObj->Exit();
+  mState = DECODER_STATE_SEEKING;
+  mStateObj = MakeUnique<SeekingState>(this);
+  mStateObj->Enter();
 
   // Discard the existing seek task.
   DiscardSeekTaskIfExist();
