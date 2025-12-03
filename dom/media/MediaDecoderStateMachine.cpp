@@ -2624,24 +2624,24 @@ MediaDecoderStateMachine::SeekCompleted()
     FinishDecodeFirstFrame();
   }
 
-  if (nextState == DECODER_STATE_DECODING) {
-    SetState(DECODER_STATE_DECODING);
-  } else {
-    SetState(nextState);
-  }
-
   // Ensure timestamps are up to date.
   UpdatePlaybackPositionInternal(newCurrentTime);
 
   // Try to decode another frame to detect if we're at the end...
   DECODER_LOG("Seek completed, mCurrentPosition=%lld", mCurrentPosition.Ref());
 
-  ScheduleStateMachine();
-
   if (video) {
     mMediaSink->Redraw(mInfo.mVideo);
     mOnPlaybackEvent.Notify(MediaEventType::Invalidate);
   }
+
+  if (nextState == DECODER_STATE_DECODING) {
+    SetState(DECODER_STATE_DECODING);
+  } else {
+    SetState(nextState);
+  }
+
+  ScheduleStateMachine();
 }
 
 RefPtr<ShutdownPromise>
