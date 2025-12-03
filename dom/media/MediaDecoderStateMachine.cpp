@@ -2636,7 +2636,7 @@ MediaDecoderStateMachine::SeekCompleted()
   }
 
   SetState(nextState);
-  ScheduleStateMachine();
+  MOZ_ASSERT(IsStateMachineScheduled());
 }
 
 RefPtr<ShutdownPromise>
