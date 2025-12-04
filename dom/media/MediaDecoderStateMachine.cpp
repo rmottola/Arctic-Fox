@@ -2595,7 +2595,7 @@ MediaDecoderStateMachine::HasLowDecodedAudio()
 {
   MOZ_ASSERT(OnTaskQueue());
   return IsAudioDecoding() &&
-         GetDecodedAudioDuration() < EXHAUSTED_DATA_MARGIN_USECS;
+         GetDecodedAudioDuration() < EXHAUSTED_DATA_MARGIN_USECS * mPlaybackRate;
 }
 
 bool
@@ -2603,7 +2603,7 @@ MediaDecoderStateMachine::HasLowDecodedVideo()
 {
   MOZ_ASSERT(OnTaskQueue());
   return IsVideoDecoding() &&
-         static_cast<uint32_t>(VideoQueue().GetSize()) < LOW_VIDEO_FRAMES;
+         VideoQueue().GetSize() < LOW_VIDEO_FRAMES * mPlaybackRate;
 }
 
 bool
