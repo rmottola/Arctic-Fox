@@ -568,7 +568,7 @@ public:
     mDecodeStartTime = TimeStamp::Now();
 
     mMaster->mIsPrerolling = true;
-    mMaster->MaybeStopPrerolling();
+    MaybeStopPrerolling();
 
     // Ensure that we've got tasks enqueued to decode data if we need to.
     mMaster->DispatchDecodeTasksIfNeeded();
@@ -598,14 +598,14 @@ public:
   bool HandleAudioDecoded(MediaData* aAudio) override
   {
     mMaster->Push(aAudio, MediaData::AUDIO_DATA);
-    mMaster->MaybeStopPrerolling();
+    MaybeStopPrerolling();
     return true;
   }
 
   bool HandleVideoDecoded(MediaData* aVideo, TimeStamp aDecodeStart) override
   {
     mMaster->Push(aVideo, MediaData::VIDEO_DATA);
-    mMaster->MaybeStopPrerolling();
+    MaybeStopPrerolling();
     CheckSlowDecoding(aDecodeStart);
     return true;
   }
@@ -626,20 +626,20 @@ public:
     if (mMaster->CheckIfDecodeComplete()) {
       SetState(DECODER_STATE_COMPLETED);
     } else {
-      mMaster->MaybeStopPrerolling();
+      MaybeStopPrerolling();
     }
     return true;
   }
 
   bool HandleWaitingForData() override
   {
-    mMaster->MaybeStopPrerolling();
+    MaybeStopPrerolling();
     return true;
   }
 
   bool HandleAudioCaptured() override
   {
-    mMaster->MaybeStopPrerolling();
+    MaybeStopPrerolling();
     // MediaSink is changed. Schedule Step() to check if we can start playback.
     mMaster->ScheduleStateMachine();
     return true;
@@ -674,6 +674,17 @@ private:
            "mAmpleAudioThresholdUsecs=%lld",
            mMaster->mLowAudioThresholdUsecs,
            mMaster->mAmpleAudioThresholdUsecs);
+    }
+  }
+
+  void MaybeStopPrerolling()
+  {
+    if (mMaster->mIsPrerolling &&
+        (mMaster->DonePrerollingAudio() || Reader()->IsWaitingAudioData()) &&
+        (mMaster->DonePrerollingVideo() || Reader()->IsWaitingVideoData())) {
+      mMaster->mIsPrerolling = false;
+      // Check if we can start playback.
+      mMaster->ScheduleStateMachine();
     }
   }
 
@@ -1763,19 +1774,6 @@ void MediaDecoderStateMachine::StopPlayback()
   }
 
   DispatchDecodeTasksIfNeeded();
-}
-
-void
-MediaDecoderStateMachine::MaybeStopPrerolling()
-{
-  MOZ_ASSERT(OnTaskQueue());
-  if (mIsPrerolling &&
-      (DonePrerollingAudio() || mReader->IsWaitingAudioData()) &&
-      (DonePrerollingVideo() || mReader->IsWaitingVideoData())) {
-    mIsPrerolling = false;
-    // Check if we can start playback.
-    ScheduleStateMachine();
-  }
 }
 
 void MediaDecoderStateMachine::MaybeStartPlayback()
