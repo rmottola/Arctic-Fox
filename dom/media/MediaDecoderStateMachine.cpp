@@ -2119,7 +2119,7 @@ void MediaDecoderStateMachine::VisibilityChanged()
               "mVideoDecodeSuspended=%c, mIsReaderSuspended=%d",
               mIsVisible.Ref(), mVideoDecodeSuspended ? 'T' : 'F', mIsReaderSuspended.Ref());
 
-  if (!HasVideo()) {
+  if (mInfo.isNothing() || !HasVideo()) {
     return;
   }
 
