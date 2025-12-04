@@ -462,7 +462,7 @@ class XPCShellRemote(xpcshell.XPCShellTests, object):
                         if szip:
                             try:
                                 out = subprocess.check_output([szip, '-d', localFile], stderr=subprocess.STDOUT)
-                            except CalledProcessError:
+                            except subprocess.CalledProcessError:
                                 print >> sys.stderr, "Error calling %s on %s.." % (szip, localFile)
                                 if out:
                                     print >> sys.stderr, out
@@ -482,7 +482,7 @@ class XPCShellRemote(xpcshell.XPCShellTests, object):
                 if szip:
                     try:
                         out = subprocess.check_output([szip, '-d', localFile], stderr=subprocess.STDOUT)
-                    except CalledProcessError:
+                    except subprocess.CalledProcessError:
                         print >> sys.stderr, "Error calling %s on %s.." % (szip, localFile)
                         if out:
                             print >> sys.stderr, out
@@ -501,7 +501,7 @@ class XPCShellRemote(xpcshell.XPCShellTests, object):
                         if szip:
                             try:
                                 out = subprocess.check_output([szip, '-d', localFile], stderr=subprocess.STDOUT)
-                            except CalledProcessError:
+                            except subprocess.CalledProcessError:
                                 print >> sys.stderr, "Error calling %s on %s.." % (szip, localFile)
                                 if out:
                                     print >> sys.stderr, out
