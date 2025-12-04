@@ -527,8 +527,6 @@ protected:
 
   // Performs one "cycle" of the state machine.
   void RunStateMachine();
-  // Perform one cycle of the DECODING state.
-  void StepDecoding();
 
   bool IsStateMachineScheduled() const;
 
