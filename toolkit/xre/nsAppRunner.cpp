@@ -994,7 +994,7 @@ nsXULAppInfo::GetLastRunCrashID(nsAString &aLastRunCrashID)
 NS_IMETHODIMP
 nsXULAppInfo::GetIsReleaseBuild(bool* aResult)
 {
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
   *aResult = true;
 #else
   *aResult = false;

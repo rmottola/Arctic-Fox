@@ -19,7 +19,7 @@
 
 #include "nsDebug.h"
 
-#if !defined(RELEASE_BUILD) || defined(DEBUG)
+#if !defined(RELEASE_OR_BETA) || defined(DEBUG)
 #define SENTINEL_CHECKING
 #endif
 

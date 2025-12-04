@@ -68,7 +68,7 @@ pref("services.blocklist.gfx.collection", "gfx");
 pref("services.blocklist.gfx.checked", 0);
 
 // for now, let's keep kinto update out of the release channel
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("services.blocklist.update_enabled", false);
 #else
 pref("services.blocklist.update_enabled", true);
@@ -481,7 +481,7 @@ pref("browser.tabs.drawInTitlebar", false);
 // false  return to the adjacent tab (old default)
 pref("browser.tabs.selectOwnerOnClose", true);
 
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("browser.tabs.showAudioPlayingIcon", false);
 #else
 pref("browser.tabs.showAudioPlayingIcon", true);
@@ -1318,14 +1318,14 @@ pref("media.webaudio.enabled", true);
 pref("dom.debug.propagate_gesture_events_through_content", false);
 
 // The request URL of the GeoLocation backend.
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("geo.wifi.uri", "https://www.googleapis.com/geolocation/v1/geolocate?key=%GOOGLE_API_KEY%");
 #else
 pref("geo.wifi.uri", "https://location.services.mozilla.com/v1/geolocate?key=%MOZILLA_API_KEY%");
 #endif
 
 #ifdef XP_MACOSX
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("geo.provider.use_corelocation", false);
 #else
 pref("geo.provider.use_corelocation", true);
@@ -1338,7 +1338,7 @@ pref("geo.provider.ms-windows-location", false);
 
 #ifdef MOZ_WIDGET_GTK
 #ifdef MOZ_GPSD
-#ifdef RELEASE_BUILD
+#ifdef RELEASE_OR_BETA
 pref("geo.provider.use_gpsd", false);
 #else
 pref("geo.provider.use_gpsd", true);
@@ -1486,7 +1486,7 @@ pref("privacy.trackingprotection.ui.enabled", false);
 // Enable Contextual Identity Containers
 pref("privacy.userContext.enabled", false);
 
-#ifndef RELEASE_BUILD
+#ifndef RELEASE_OR_BETA
 // At the moment, autostart.2 is used, while autostart.1 is unused.
 // We leave it here set to false to reset users' defaults and allow
 // us to change everybody to true in the future, when desired.

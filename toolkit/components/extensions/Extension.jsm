@@ -79,7 +79,7 @@ const CATEGORY_EXTENSION_SCRIPTS_CONTENT = "webextension-scripts-content";
 
 let schemaURLs = new Set();
 
-if (!AppConstants.RELEASE_BUILD) {
+if (!AppConstants.RELEASE_OR_BETA) {
   schemaURLs.add("chrome://extensions/content/schemas/experiments.json");
 }
 
@@ -1506,7 +1506,7 @@ this.Extension = class extends ExtensionData {
 
   readManifest() {
     return super.readManifest().then(manifest => {
-      if (AppConstants.RELEASE_BUILD) {
+      if (AppConstants.RELEASE_OR_BETA) {
         return manifest;
       }
 
