@@ -455,10 +455,6 @@ private:
   static bool IsWaveEnabled();
   static bool IsWebMEnabled();
 
-#ifdef MOZ_OMX_DECODER
-  static bool IsOmxEnabled();
-#endif
-
 #ifdef MOZ_ANDROID_OMX
   static bool IsAndroidMediaPluginEnabled();
 #endif
