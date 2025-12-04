@@ -603,6 +603,7 @@ MediaDecoder::Shutdown()
     mFirstFrameLoadedListener.Disconnect();
     mOnPlaybackEvent.Disconnect();
     mOnPlaybackErrorEvent.Disconnect();
+    mOnDecoderDoctorEvent.Disconnect();
     mOnMediaNotSeekable.Disconnect();
 
     mDecoderStateMachine->BeginShutdown()
@@ -672,6 +673,24 @@ void
 MediaDecoder::OnPlaybackErrorEvent(const MediaResult& aError)
 {
   DecodeError(aError);
+}
+
+void
+MediaDecoder::OnDecoderDoctorEvent(DecoderDoctorEvent aEvent)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  // OnDecoderDoctorEvent is disconnected at shutdown time.
+  MOZ_ASSERT(!IsShutdown());
+  HTMLMediaElement* element = mOwner->GetMediaElement();
+  if (!element) {
+    return;
+  }
+  nsIDocument* doc = element->OwnerDoc();
+  if (!doc) {
+    return;
+  }
+  DecoderDoctorDiagnostics diags;
+  diags.StoreEvent(doc, aEvent, __func__);
 }
 
 void
@@ -752,6 +771,8 @@ MediaDecoder::SetStateMachineParameters()
     AbstractThread::MainThread(), this, &MediaDecoder::OnPlaybackEvent);
   mOnPlaybackErrorEvent = mDecoderStateMachine->OnPlaybackErrorEvent().Connect(
     AbstractThread::MainThread(), this, &MediaDecoder::OnPlaybackErrorEvent);
+  mOnDecoderDoctorEvent = mDecoderStateMachine->OnDecoderDoctorEvent().Connect(
+    AbstractThread::MainThread(), this, &MediaDecoder::OnDecoderDoctorEvent);
   mOnMediaNotSeekable = mDecoderStateMachine->OnMediaNotSeekable().Connect(
     AbstractThread::MainThread(), this, &MediaDecoder::OnMediaNotSeekable);
 }
