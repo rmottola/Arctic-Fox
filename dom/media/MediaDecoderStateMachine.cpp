@@ -215,6 +215,13 @@ public:
 
   virtual RefPtr<ShutdownPromise> HandleShutdown();
 
+  virtual void HandleVideoSuspendTimeout()
+  {
+    mMaster->mVideoDecodeSuspended = true;
+    mMaster->mOnPlaybackEvent.Notify(MediaEventType::EnterVideoSuspend);
+    Reader()->SetVideoBlankDecode(true);
+  }
+
   virtual void DumpDebugInfo() {}
 
 protected:
@@ -3269,9 +3276,7 @@ MediaDecoderStateMachine::OnSuspendTimerResolved()
 {
   DECODER_LOG("OnSuspendTimerResolved");
   mVideoDecodeSuspendTimer.CompleteRequest();
-  mVideoDecodeSuspended = true;
-  mOnPlaybackEvent.Notify(MediaEventType::EnterVideoSuspend);
-  mReader->SetVideoBlankDecode(true);
+  mStateObj->HandleVideoSuspendTimeout();
 }
 
 void
