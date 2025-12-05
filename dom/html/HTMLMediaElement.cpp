@@ -3020,6 +3020,10 @@ HTMLMediaElement::NotifyXPCOMShutdown()
 void
 HTMLMediaElement::Play(ErrorResult& aRv)
 {
+  if (!IsAllowedToPlay()) {
+    return;
+  }
+
   nsresult rv = PlayInternal();
   if (NS_FAILED(rv)) {
     aRv.Throw(rv);
@@ -3029,10 +3033,6 @@ HTMLMediaElement::Play(ErrorResult& aRv)
 nsresult
 HTMLMediaElement::PlayInternal()
 {
-  if (!IsAllowedToPlay()) {
-    return NS_OK;
-  }
-
   // Play was not blocked so assume user interacted with the element.
   mHasUserInteraction = true;
 
@@ -3109,6 +3109,10 @@ HTMLMediaElement::PlayInternal()
 
 NS_IMETHODIMP HTMLMediaElement::Play()
 {
+  if (!IsAllowedToPlay()) {
+    return NS_OK;
+  }
+
   return PlayInternal();
 }
 
@@ -4954,6 +4958,10 @@ bool HTMLMediaElement::CanActivateAutoplay()
     return false;
   }
 
+  if (!IsAllowedToPlay()) {
+    return false;
+  }
+
   bool hasData =
     (mDecoder && mReadyState >= nsIDOMHTMLMediaElement::HAVE_ENOUGH_DATA) ||
     (mSrcStream && mSrcStream->Active()) ||
@@ -4979,9 +4987,7 @@ void HTMLMediaElement::CheckAutoplayDataReady()
     if (mCurrentPlayRangeStart == -1.0) {
       mCurrentPlayRangeStart = CurrentTime();
     }
-    if (!ShouldElementBePaused()) {
-      mDecoder->Play();
-    }
+    mDecoder->Play();
   } else if (mSrcStream) {
     SetPlayedOrSeeked(true);
   }
@@ -5785,9 +5791,10 @@ HTMLMediaElement::IsPlayingThroughTheAudioChannel() const
 }
 
 void
-HTMLMediaElement::UpdateAudioChannelPlayingState()
+HTMLMediaElement::UpdateAudioChannelPlayingState(bool aForcePlaying)
 {
-  bool playingThroughTheAudioChannel = IsPlayingThroughTheAudioChannel();
+  bool playingThroughTheAudioChannel =
+    aForcePlaying || IsPlayingThroughTheAudioChannel();
 
   if (playingThroughTheAudioChannel != mPlayingThroughTheAudioChannel) {
     mPlayingThroughTheAudioChannel = playingThroughTheAudioChannel;
@@ -5905,7 +5912,7 @@ HTMLMediaElement::ResumeFromAudioChannelPaused(SuspendTypes aSuspend)
              mAudioChannelSuspended == nsISuspendedTypes::SUSPENDED_PAUSE_DISPOSABLE);
 
   SetAudioChannelSuspended(nsISuspendedTypes::NONE_SUSPENDED);
-  nsresult rv = PlayInternal();
+  nsresult rv = Play();
   if (NS_WARN_IF(NS_FAILED(rv))) {
     return;
   }
@@ -5918,8 +5925,10 @@ HTMLMediaElement::ResumeFromAudioChannelBlocked()
   MOZ_ASSERT(mAudioChannelSuspended == nsISuspendedTypes::SUSPENDED_BLOCK);
 
   SetAudioChannelSuspended(nsISuspendedTypes::NONE_SUSPENDED);
-  mPaused = false;
-  SuspendOrResumeElement(false /* resume */, false);
+  nsresult rv = Play();
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return;
+  }
 }
 
 void
@@ -5942,8 +5951,6 @@ HTMLMediaElement::BlockByAudioChannel()
   }
 
   SetAudioChannelSuspended(nsISuspendedTypes::SUSPENDED_BLOCK);
-  mPaused = true;
-  SuspendOrResumeElement(true /* suspend */, true /* pending event */);
 }
 
 void
@@ -5989,13 +5996,30 @@ HTMLMediaElement::IsAllowedToPlay()
     return false;
   }
 
-  // The MediaElement can't start playback until it's resumed by audio channel.
+  // The media element has already been paused or blocked, so it can't start
+  // playback again by script or user's intend until resuming by audio channel.
   if (mAudioChannelSuspended == nsISuspendedTypes::SUSPENDED_PAUSE ||
       mAudioChannelSuspended == nsISuspendedTypes::SUSPENDED_BLOCK) {
     return false;
   }
 
+  // If the tab hasn't been activated yet, the media element in that tab can't
+  // be playback now until the tab goes to foreground first time or user clicks
+  // the unblocking tab icon.
+  if (!IsTabActivated()) {
+    // Even we haven't start playing yet, we still need to notify the audio
+    // channe system because we need to receive the resume notification later.
+    UpdateAudioChannelPlayingState(true /* force to start */);
+    return false;
+  }
+
   return true;
+}
+
+bool
+HTMLMediaElement::IsTabActivated() const
+{
+  return !mAudioChannelAgent->ShouldBlockMedia();
 }
 
 static const char* VisibilityString(Visibility aVisibility) {
@@ -6495,11 +6519,6 @@ HTMLMediaElement::OpenUnsupportedMediaWithExtenalAppIfNeeded()
 bool
 HTMLMediaElement::ShouldElementBePaused()
 {
-  // The media in the non-visited page would be blocked.
-  if (mAudioChannelSuspended == nsISuspendedTypes::SUSPENDED_BLOCK) {
-    return true;
-  }
-
   // Bfcached page or inactive document.
   if (!IsActive()) {
     return true;
