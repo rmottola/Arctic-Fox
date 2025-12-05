@@ -1029,7 +1029,6 @@ MediaDecoder::NetworkError()
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!IsShutdown());
   mOwner->NetworkError();
-  MOZ_ASSERT(IsShutdown());
 }
 
 void
@@ -1038,7 +1037,6 @@ MediaDecoder::DecodeError(const MediaResult& aError)
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(!IsShutdown());
   mOwner->DecodeError(aError);
-  MOZ_ASSERT(IsShutdown());
 }
 
 void
