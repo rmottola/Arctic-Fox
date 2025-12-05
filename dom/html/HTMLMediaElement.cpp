@@ -2236,15 +2236,11 @@ public:
                              nsString())
     , mCapturedTrackSource(aCapturedTrackSource)
   {
-    mCapturedTrackSource->RegisterSink(this);
   }
 
   void Destroy() override
   {
     MOZ_ASSERT(mCapturedTrackSource);
-    if (mCapturedTrackSource) {
-      mCapturedTrackSource->UnregisterSink(this);
-    }
   }
 
   MediaSourceEnum GetMediaSource() const override
