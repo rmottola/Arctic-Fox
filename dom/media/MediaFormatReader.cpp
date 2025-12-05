@@ -97,7 +97,6 @@ MediaFormatReader::Shutdown()
     if (mAudio.HasPromise()) {
       mAudio.RejectPromise(NS_ERROR_DOM_MEDIA_CANCELED, __func__);
     }
-    mAudio.mInitPromise.DisconnectIfExists();
     mAudio.ShutdownDecoder();
   }
   if (mAudio.mTrackDemuxer) {
@@ -117,7 +116,6 @@ MediaFormatReader::Shutdown()
     if (mVideo.HasPromise()) {
       mVideo.RejectPromise(NS_ERROR_DOM_MEDIA_CANCELED, __func__);
     }
-    mVideo.mInitPromise.DisconnectIfExists();
     mVideo.ShutdownDecoder();
   }
   if (mVideo.mTrackDemuxer) {
@@ -1938,10 +1936,7 @@ void MediaFormatReader::ReleaseResources()
   if (mVideoFrameContainer) {
     mVideoFrameContainer->ClearCurrentFrame();
   }
-  mVideo.mInitPromise.DisconnectIfExists();
   mVideo.ShutdownDecoder();
-
-  mAudio.mInitPromise.DisconnectIfExists();
   mAudio.ShutdownDecoder();
 }
 
