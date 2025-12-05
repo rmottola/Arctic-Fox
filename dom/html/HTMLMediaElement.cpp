@@ -4010,6 +4010,13 @@ public:
     mElement->NotifyMediaStreamTrackRemoved(aTrack);
   }
 
+  void NotifyActive() override
+  {
+    LOG(LogLevel::Debug, ("%p, mSrcStream %p became active",
+                          mElement, mElement->mSrcStream.get()));
+    mElement->CheckAutoplayDataReady();
+  }
+
   void NotifyInactive() override
   {
     LOG(LogLevel::Debug, ("%p, mSrcStream %p became inactive",
@@ -4475,6 +4482,12 @@ void HTMLMediaElement::PlaybackEnded()
 
   Pause();
 
+  if (mSrcStream) {
+    // A MediaStream that goes from inactive to active shall be eligible for
+    // autoplay again according to the mediacapture-main spec.
+    mAutoplaying = true;
+  }
+
   FireTimeUpdate(false);
   DispatchAsyncEvent(NS_LITERAL_STRING("ended"));
 }
@@ -4916,9 +4929,10 @@ bool HTMLMediaElement::CanActivateAutoplay()
 {
   // For stream inputs, we activate autoplay on HAVE_NOTHING because
   // this element itself might be blocking the stream from making progress by
-  // being paused. We also activate autoplay when playing a media source since
-  // the data download is controlled by the script and there is no way to
-  // evaluate MediaDecoder::CanPlayThrough().
+  // being paused. We only check that it has data by checking its active state.
+  // We also activate autoplay when playing a media source since the data
+  // download is controlled by the script and there is no way to evaluate
+  // MediaDecoder::CanPlayThrough().
 
   if (!HasAttr(kNameSpaceID_None, nsGkAtoms::autoplay) || !mAutoplayEnabled) {
     return false;
@@ -4942,7 +4956,8 @@ bool HTMLMediaElement::CanActivateAutoplay()
 
   bool hasData =
     (mDecoder && mReadyState >= nsIDOMHTMLMediaElement::HAVE_ENOUGH_DATA) ||
-    mSrcStream || mMediaSource;
+    (mSrcStream && mSrcStream->Active()) ||
+    mMediaSource;
 
   return hasData;
 }
