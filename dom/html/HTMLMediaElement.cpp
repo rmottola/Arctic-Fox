@@ -2233,7 +2233,6 @@ public:
 
   explicit StreamCaptureTrackSource(MediaStreamTrackSource* aCapturedTrackSource)
     : MediaStreamTrackSource(aCapturedTrackSource->GetPrincipal(),
-                             true,
                              nsString())
     , mCapturedTrackSource(aCapturedTrackSource)
   {
@@ -2271,6 +2270,7 @@ public:
 
   void Stop() override
   {
+    // XXX fix in later patch
     NS_ERROR("We're reporting remote=true to not be stoppable. "
              "Stop() should not be called.");
   }
@@ -2308,7 +2308,6 @@ public:
 
   explicit DecoderCaptureTrackSource(HTMLMediaElement* aElement)
     : MediaStreamTrackSource(nsCOMPtr<nsIPrincipal>(aElement->GetCurrentPrincipal()).get(),
-                             true,
                              nsString())
     , mElement(aElement)
   {
@@ -2347,6 +2346,7 @@ public:
 
   void Stop() override
   {
+    // XXX Fix in later patch.
     NS_ERROR("We're reporting remote=true to not be stoppable. "
              "Stop() should not be called.");
   }
