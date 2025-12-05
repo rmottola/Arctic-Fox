@@ -6,6 +6,7 @@ using struct gfxPoint from "gfxPoint.h";
 using nsIntRegion from "nsRegion.h";
 using struct mozilla::layers::SurfaceDescriptorX11 from "gfxipc/ShadowLayerUtils.h";
 using mozilla::StereoMode from "ImageTypes.h";
+using mozilla::YUVColorSpace from "ImageTypes.h";
 using struct mozilla::null_t from "ipc/IPCMessageUtils.h";
 using mozilla::WindowsHandle from "ipc/IPCMessageUtils.h";
 using mozilla::gfx::SurfaceFormat from "mozilla/gfx/Types.h";
@@ -102,6 +103,7 @@ struct YCbCrDescriptor {
   uint32_t cbOffset;
   uint32_t crOffset;
   StereoMode stereoMode;
+  YUVColorSpace yUVColorSpace;
   bool hasIntermediateBuffer;
 };
 

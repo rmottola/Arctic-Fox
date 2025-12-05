@@ -1159,6 +1159,7 @@ TextureClient::CreateForYCbCr(KnowsCompositor* aAllocator,
                               gfx::IntSize aYSize,
                               gfx::IntSize aCbCrSize,
                               StereoMode aStereoMode,
+                              YUVColorSpace aYUVColorSpace,
                               TextureFlags aTextureFlags)
 {
   // The only reason we allow aAllocator to be null is for gtests
@@ -1172,7 +1173,8 @@ TextureClient::CreateForYCbCr(KnowsCompositor* aAllocator,
   }
 
   TextureData* data = BufferTextureData::CreateForYCbCr(aAllocator, aYSize, aCbCrSize,
-                                                        aStereoMode, aTextureFlags);
+                                                        aStereoMode, aYUVColorSpace,
+                                                        aTextureFlags);
   if (!data) {
     return nullptr;
   }
@@ -1185,6 +1187,7 @@ TextureClient::CreateForYCbCr(KnowsCompositor* aAllocator,
 already_AddRefed<TextureClient>
 TextureClient::CreateForYCbCrWithBufferSize(KnowsCompositor* aAllocator,
                                             size_t aSize,
+                                            YUVColorSpace aYUVColorSpace,
                                             TextureFlags aTextureFlags)
 {
   // also test the validity of aAllocator
@@ -1194,7 +1197,7 @@ TextureClient::CreateForYCbCrWithBufferSize(KnowsCompositor* aAllocator,
   }
 
   TextureData* data =
-    BufferTextureData::CreateForYCbCrWithBufferSize(aAllocator, aSize,
+    BufferTextureData::CreateForYCbCrWithBufferSize(aAllocator, aSize, aYUVColorSpace,
                                                     aTextureFlags);
   if (!data) {
     return nullptr;
