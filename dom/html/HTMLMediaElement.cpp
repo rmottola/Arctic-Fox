@@ -4411,9 +4411,6 @@ void HTMLMediaElement::DecodeError(const MediaResult& aError)
   if (mDecoder) {
     ShutdownDecoder();
   }
-  RemoveMediaElementFromURITable();
-  mLoadingSrc = nullptr;
-  mMediaSource = nullptr;
   AudioTracks()->EmptyTracks();
   VideoTracks()->EmptyTracks();
   if (mIsLoadingFromSourceChildren) {
