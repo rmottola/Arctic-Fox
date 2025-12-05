@@ -379,6 +379,7 @@ MediaResult
 MediaFormatReader::EnsureDecoderCreated(TrackType aTrack)
 {
   MOZ_ASSERT(OnTaskQueue());
+  MOZ_ASSERT(!IsSuspended());
 
   auto& decoder = GetDecoderData(aTrack);
 
@@ -443,6 +444,8 @@ bool
 MediaFormatReader::EnsureDecoderInitialized(TrackType aTrack)
 {
   MOZ_ASSERT(OnTaskQueue());
+  MOZ_ASSERT(!IsSuspended());
+
   auto& decoder = GetDecoderData(aTrack);
 
   if (!decoder.mDecoder || decoder.mInitPromise.Exists()) {
@@ -452,21 +455,14 @@ MediaFormatReader::EnsureDecoderInitialized(TrackType aTrack)
   if (decoder.mDecoderInitialized) {
     return true;
   }
-  if (IsSuspended()) {
-    return false;
-  }
 
   RefPtr<MediaFormatReader> self = this;
   decoder.mInitPromise.Begin(decoder.mDecoder->Init()
        ->Then(OwnerThread(), __func__,
               [self] (TrackType aTrack) {
+                MOZ_ASSERT(!self->IsSuspended());
                 auto& decoder = self->GetDecoderData(aTrack);
                 decoder.mInitPromise.Complete();
-
-                if (self->IsSuspended()) {
-                  return;
-                }
-
                 decoder.mDecoderInitialized = true;
                 MonitorAutoLock mon(decoder.mMonitor);
                 decoder.mDescription = decoder.mDecoder->GetDescriptionName();
@@ -928,6 +924,14 @@ MediaFormatReader::HandleDemuxedSamples(TrackType aTrack,
                                         AbstractMediaDecoder::AutoNotifyDecoded& aA)
 {
   MOZ_ASSERT(OnTaskQueue());
+
+  // Don't try to create or initialize decoders
+  // (which might allocate hardware resources) when suspended.
+  if (IsSuspended()) {
+    // Should've deleted decoders when suspended.
+    MOZ_ASSERT(!mAudio.mDecoder && !mVideo.mDecoder);
+    return;
+  }
 
   auto& decoder = GetDecoderData(aTrack);
 
