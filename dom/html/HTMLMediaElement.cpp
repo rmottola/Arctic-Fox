@@ -2939,6 +2939,7 @@ HTMLMediaElement::HTMLMediaElement(already_AddRefed<mozilla::dom::NodeInfo>& aNo
   mWatchManager.Watch(mReadyState, &HTMLMediaElement::UpdateReadyStateInternal);
 
   mShutdownObserver->Subscribe(this);
+  CreateAudioChannelAgent();
 }
 
 HTMLMediaElement::~HTMLMediaElement()
@@ -5789,13 +5790,6 @@ HTMLMediaElement::UpdateAudioChannelPlayingState()
 
   if (playingThroughTheAudioChannel != mPlayingThroughTheAudioChannel) {
     mPlayingThroughTheAudioChannel = playingThroughTheAudioChannel;
-
-    // If we are not playing, we don't need to create a new audioChannelAgent.
-    if (!mAudioChannelAgent && !mPlayingThroughTheAudioChannel) {
-       return;
-    }
-
-    CreateAudioChannelAgent();
     NotifyAudioChannelAgent(mPlayingThroughTheAudioChannel);
   }
 }
@@ -5826,7 +5820,6 @@ HTMLMediaElement::NotifyAudioChannelAgent(bool aPlaying)
     WindowSuspendChanged(config.mSuspend);
   } else {
     mAudioChannelAgent->NotifyStoppedPlaying();
-    mAudioChannelAgent = nullptr;
   }
 }
 
