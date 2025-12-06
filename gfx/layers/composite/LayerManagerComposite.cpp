@@ -40,6 +40,7 @@
 #include "mozilla/layers/Effects.h"     // for Effect, EffectChain, etc
 #include "mozilla/layers/LayerMetricsWrapper.h" // for LayerMetricsWrapper
 #include "mozilla/layers/LayersTypes.h"  // for etc
+#include "mozilla/widget/CompositorWidget.h" // for WidgetRenderingContext
 #include "ipc/CompositorBench.h"        // for CompositorBench
 #include "ipc/ShadowLayerUtils.h"
 #include "mozilla/mozalloc.h"           // for operator new, etc
@@ -900,11 +901,18 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
     LayerScope::SendLayerDump(Move(packet));
   }
 
+  mozilla::widget::WidgetRenderingContext widgetContext;
+#if defined(XP_MACOSX)
+  widgetContext.mLayerManager = this;
+#elif defined(MOZ_WIDGET_ANDROID)
+  widgetContext.mCompositor = GetCompositor();
+#endif
+
   {
     PROFILER_LABEL("LayerManagerComposite", "PreRender",
       js::ProfileEntry::Category::GRAPHICS);
 
-    if (!mCompositor->GetWidget()->PreRender(this)) {
+    if (!mCompositor->GetWidget()->PreRender(&widgetContext)) {
       return;
     }
   }
@@ -935,13 +943,13 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
   }
 
   if (actualBounds.IsEmpty()) {
-    mCompositor->GetWidget()->PostRender(this);
+    mCompositor->GetWidget()->PostRender(&widgetContext);
     return;
   }
 
   // Allow widget to render a custom background.
   mCompositor->GetWidget()->DrawWindowUnderlay(
-    this, LayoutDeviceIntRect::FromUnknownRect(actualBounds));
+    &widgetContext, LayoutDeviceIntRect::FromUnknownRect(actualBounds));
 
   RefPtr<CompositingRenderTarget> previousTarget;
   if (haveLayerEffects) {
@@ -969,7 +977,7 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
 
   // Allow widget to render a custom foreground.
   mCompositor->GetWidget()->DrawWindowOverlay(
-    this, LayoutDeviceIntRect::FromUnknownRect(actualBounds));
+    &widgetContext, LayoutDeviceIntRect::FromUnknownRect(actualBounds));
 
   // Debugging
   RenderDebugOverlay(actualBounds);
@@ -984,7 +992,7 @@ LayerManagerComposite::Render(const nsIntRegion& aInvalidRegion, const nsIntRegi
     mCompositor->SetDispAcquireFence(mRoot);
   }
 
-  mCompositor->GetWidget()->PostRender(this);
+  mCompositor->GetWidget()->PostRender(&widgetContext);
 
   RecordFrame();
 }
