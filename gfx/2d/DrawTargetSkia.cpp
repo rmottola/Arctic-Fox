@@ -274,7 +274,7 @@ already_AddRefed<SourceSurface>
 DrawTargetSkia::Snapshot()
 {
   RefPtr<SourceSurfaceSkia> snapshot = mSnapshot;
-  if (!snapshot) {
+  if (mSurface && !snapshot) {
     snapshot = new SourceSurfaceSkia();
     sk_sp<SkImage> image;
     // If the surface is raster, making a snapshot may trigger a pixel copy.
@@ -1882,7 +1882,7 @@ void*
 DrawTargetSkia::GetNativeSurface(NativeSurfaceType aType)
 {
 #ifdef USE_SKIA_GPU
-  if (aType == NativeSurfaceType::OPENGL_TEXTURE) {
+  if (aType == NativeSurfaceType::OPENGL_TEXTURE && mSurface) {
     GrBackendObject handle = mSurface->getTextureHandle(SkSurface::kFlushRead_BackendHandleAccess);
     if (handle) {
       return (void*)(uintptr_t)reinterpret_cast<GrGLTextureInfo *>(handle)->fID;
@@ -2133,7 +2133,9 @@ DrawTargetSkia::MarkChanged()
     mSnapshot = nullptr;
 
     // Handle copying of any image snapshots bound to the surface.
-    mSurface->notifyContentWillChange(SkSurface::kRetain_ContentChangeMode);
+    if (mSurface) {
+      mSurface->notifyContentWillChange(SkSurface::kRetain_ContentChangeMode);
+    }
   }
 }
 
