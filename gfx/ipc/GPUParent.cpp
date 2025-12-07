@@ -353,7 +353,6 @@ GPUParent::ActorDestroy(ActorDestroyReason aWhy)
 #ifdef MOZ_CRASHREPORTER
   CrashReporterClient::DestroySingleton();
 #endif
-  NS_ShutdownXPCOM(nullptr);
   XRE_ShutdownChildProcess();
 }
 
