@@ -8,6 +8,7 @@
 
 #include "InputData.h"                  // for InputData
 #include "mozilla/dom/TabParent.h"      // for TabParent
+#include "mozilla/layers/APZCCallbackHelper.h" // for APZCCallbackHelper
 #include "mozilla/layers/RemoteCompositorSession.h" // for RemoteCompositorSession
 
 namespace mozilla {
@@ -204,6 +205,21 @@ APZCTreeManagerChild::ProcessTouchVelocity(uint32_t aTimestampMs, float aSpeedY)
   SendProcessTouchVelocity(aTimestampMs, aSpeedY);
 }
 
+void
+APZCTreeManagerChild::UpdateWheelTransaction(
+    LayoutDeviceIntPoint aRefPoint,
+    EventMessage aEventMessage)
+{
+  SendUpdateWheelTransaction(aRefPoint, aEventMessage);
+}
+
+void APZCTreeManagerChild::TransformEventRefPoint(
+    LayoutDeviceIntPoint* aRefPoint,
+    ScrollableLayerGuid* aOutTargetGuid)
+{
+  SendTransformEventRefPoint(*aRefPoint, aRefPoint, aOutTargetGuid);
+}
+
 bool
 APZCTreeManagerChild::RecvHandleTap(const TapType& aType,
                                     const LayoutDevicePoint& aPoint,
@@ -226,19 +242,24 @@ APZCTreeManagerChild::RecvHandleTap(const TapType& aType,
   return true;
 }
 
-void
-APZCTreeManagerChild::UpdateWheelTransaction(
-    LayoutDeviceIntPoint aRefPoint,
-    EventMessage aEventMessage)
+bool
+APZCTreeManagerChild::RecvNotifyPinchGesture(const PinchGestureType& aType,
+                                             const ScrollableLayerGuid& aGuid,
+                                             const LayoutDeviceCoord& aSpanChange,
+                                             const Modifiers& aModifiers)
 {
-  SendUpdateWheelTransaction(aRefPoint, aEventMessage);
-}
+  // This will only get sent from the GPU process to the parent process, so
+  // this function should never get called in the content process.
+  MOZ_ASSERT(XRE_IsParentProcess());
+  MOZ_ASSERT(NS_IsMainThread());
 
-void APZCTreeManagerChild::TransformEventRefPoint(
-    LayoutDeviceIntPoint* aRefPoint,
-    ScrollableLayerGuid* aOutTargetGuid)
-{
-  SendTransformEventRefPoint(*aRefPoint, aRefPoint, aOutTargetGuid);
+  // We want to handle it in this process regardless of what the target guid
+  // of the pinch is. This may change in the future.
+  if (mCompositorSession &&
+      mCompositorSession->GetWidget()) {
+    APZCCallbackHelper::NotifyPinchGesture(aType, aSpanChange, aModifiers, mCompositorSession->GetWidget());
+  }
+  return true;
 }
 
 } // namespace layers
