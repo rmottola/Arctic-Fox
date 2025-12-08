@@ -888,7 +888,6 @@ CompositorBridgeParent::ActorDestroy(ActorDestroyReason why)
   MessageLoop::current()->PostTask(NewRunnableMethod(this, &CompositorBridgeParent::DeferredDestroy));
 }
 
-
 void
 CompositorBridgeParent::ScheduleRenderOnCompositorThread()
 {
