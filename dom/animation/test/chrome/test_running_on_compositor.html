@@ -714,9 +714,9 @@ promise_test(function(t) {
                   'compositor even after a lower-priority animation is ' +
                   'applied to the same element');
   });
-}, 'Animation continues not running on the compositor after being applied ' +
+}, 'Animation begins running on the compositor after being applied ' +
    'to an element which has a higher-priority animation and after ' +
-   'being remporarily associated with no target element');
+   'being temporarily associated with no target element');
 
 promise_test(function(t) {
   var div = addDiv(t);
@@ -753,6 +753,46 @@ promise_test(function(t) {
 }, 'Animation begins running on the compositor after being applied ' +
    'to an element which has a lower-priority animation once after ' +
    'disassociating with an element');
+
+promise_test(function(t) {
+  var div = addDiv(t, { style: 'transition: opacity 100s; ' +
+                               'opacity: 0 !important' });
+  getComputedStyle(div).opacity;
+
+  div.style.setProperty('opacity', '1', 'important');
+  getComputedStyle(div).opacity;
+
+  var animation = div.getAnimations()[0];
+
+  return animation.ready.then(function() {
+    assert_animation_is_running_on_compositor(animation,
+       'Transition reports that it is running on the compositor even if the ' +
+       'property is overridden by an !important rule');
+  });
+}, 'Transitions override important rules');
+
+promise_test(function(t) {
+  var div = addDiv(t, { style: 'transition: opacity 100s; ' +
+                               'opacity: 0 !important' });
+  getComputedStyle(div).opacity;
+
+  div.animate({ opacity: [ 0, 1 ] }, 10 * MS_PER_SEC);
+
+  div.style.setProperty('opacity', '1', 'important');
+  getComputedStyle(div).opacity;
+
+  var [transition, animation] = div.getAnimations();
+
+  return Promise.all([transition.ready, animation.ready]).then(function() {
+    assert_animation_is_not_running_on_compositor(transition,
+       'Transition suppressed by an animation which is overridden by an ' +
+       '!important rule reports that it is NOT running on the compositor');
+    assert_animation_is_not_running_on_compositor(animation,
+       'Animation overridden by an !important rule reports that it is ' +
+       'NOT running on the compositor');
+  });
+}, 'Neither transition nor animation does run on the compositor if the ' +
+   'property is overridden by an !important rule');
 
 </script>
 </body>
