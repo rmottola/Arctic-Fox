@@ -10217,5 +10217,24 @@
     "kind": "enumerated",
     "n_values": 4,
     "description": "Counts the number of asm.js vs WebAssembly modules instanciations, at the time modules are getting instanciated."
+  },
+  "CONTENT_PAINT_TIME": {
+    "alert_emails": ["danderson@mozilla.com"],
+    "bug_numbers": [1309442],
+    "expires_in_version": "56",
+    "kind": "exponential",
+    "high": 1000,
+    "n_buckets": 50,
+    "description": "Time spent in the paint pipeline for content."
+  },
+  "CONTENT_LARGE_PAINT_PHASE_WEIGHT": {
+    "alert_emails": ["danderson@mozilla.com"],
+    "bug_numbers": [1309442],
+    "expires_in_version": "56",
+    "keyed": true,
+    "kind": "linear",
+    "high": 100,
+    "n_buckets": 10,
+    "description": "Percentage of time taken by phases in expensive content paints."
   }
 }
