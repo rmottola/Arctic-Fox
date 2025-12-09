@@ -419,7 +419,7 @@ MediaStreamTrack::Clone()
 }
 
 void
-MediaStreamTrack::NotifyEnded()
+MediaStreamTrack::OverrideEnded()
 {
   MOZ_ASSERT(NS_IsMainThread());
 
