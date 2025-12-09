@@ -29,6 +29,7 @@ class nsIDocShell;
 class nsIDocShellLoadInfo;
 class nsIDocument;
 class nsIIdleObserver;
+class nsIPrincipal;
 class nsIScriptTimeoutHandler;
 class nsIURI;
 class nsPIDOMWindowInner;
