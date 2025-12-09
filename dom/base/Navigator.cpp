@@ -85,7 +85,6 @@
 #ifdef MOZ_B2G_BT
 #include "BluetoothManager.h"
 #endif
-#include "DOMCameraManager.h"
 
 #ifdef MOZ_AUDIO_CHANNEL_MANAGER
 #include "AudioChannelManager.h"
@@ -239,7 +238,6 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Navigator)
 #ifdef MOZ_AUDIO_CHANNEL_MANAGER
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mAudioChannelManager)
 #endif
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mCameraManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMediaDevices)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTimeManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mServiceWorkerContainer)
@@ -348,7 +346,6 @@ Navigator::Invalidate()
   }
 #endif
 
-  mCameraManager = nullptr;
   mMediaDevices = nullptr;
 
 #ifdef MOZ_AUDIO_CHANNEL_MANAGER
@@ -1956,23 +1953,6 @@ Navigator::GetMozTime(ErrorResult& aRv)
 }
 #endif
 
-nsDOMCameraManager*
-Navigator::GetMozCameras(ErrorResult& aRv)
-{
-  if (!mCameraManager) {
-    if (!mWindow ||
-        !mWindow->GetOuterWindow() ||
-        mWindow->GetOuterWindow()->GetCurrentInnerWindow() != mWindow) {
-      aRv.Throw(NS_ERROR_NOT_AVAILABLE);
-      return nullptr;
-    }
-
-    mCameraManager = nsDOMCameraManager::CreateInstance(mWindow);
-  }
-
-  return mCameraManager;
-}
-
 already_AddRefed<ServiceWorkerContainer>
 Navigator::ServiceWorker()
 {
@@ -2018,9 +1998,6 @@ Navigator::OnNavigation()
   MediaManager *manager = MediaManager::GetIfExists();
   if (manager) {
     manager->OnNavigation(mWindow->WindowID());
-  }
-  if (mCameraManager) {
-    mCameraManager->OnNavigation(mWindow->WindowID());
   }
 }
 
@@ -2073,14 +2050,6 @@ Navigator::HasWakeLockSupport(JSContext* /* unused*/, JSObject* /*unused */)
     do_GetService(POWERMANAGERSERVICE_CONTRACTID);
   // No service means no wake lock support
   return !!pmService;
-}
-
-/* static */
-bool
-Navigator::HasCameraSupport(JSContext* /* unused */, JSObject* aGlobal)
-{
-  nsCOMPtr<nsPIDOMWindowInner> win = GetWindowFromGlobal(aGlobal);
-  return win && nsDOMCameraManager::CheckPermission(win);
 }
 
 /* static */
