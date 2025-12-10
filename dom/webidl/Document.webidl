@@ -333,7 +333,7 @@ partial interface Document {
                                           DOMString attrValue);
   [Func="IsChromeOrXBL"]
   Element? getBindingParent(Node node);
-  [Throws, Func="IsChromeOrXBL"]
+  [Throws, Func="IsChromeOrXBL", NeedsSubjectPrincipal]
   void loadBindingDocument(DOMString documentURL);
 
   // nsIDOMDocumentTouch
