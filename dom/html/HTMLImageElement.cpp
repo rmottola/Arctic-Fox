@@ -1202,9 +1202,7 @@ HTMLImageElement::SourceElementMatches(nsIContent* aSourceNode)
 }
 
 bool
-HTMLImageElement::TryCreateResponsiveSelector(nsIContent *aSourceNode,
-                                              const nsAString *aSrcset,
-                                              const nsAString *aSizes)
+HTMLImageElement::TryCreateResponsiveSelector(nsIContent *aSourceNode)
 {
   // Skip if this is not a <source> with matching media query
   bool isSourceTag = aSourceNode->IsHTMLElement(nsGkAtoms::source);
@@ -1219,10 +1217,7 @@ HTMLImageElement::TryCreateResponsiveSelector(nsIContent *aSourceNode,
 
   // Skip if has no srcset or an empty srcset
   nsString srcset;
-  if (aSrcset) {
-    srcset = *aSrcset;
-  } else if (!aSourceNode->GetAttr(kNameSpaceID_None, nsGkAtoms::srcset,
-                                   srcset)) {
+  if (!aSourceNode->GetAttr(kNameSpaceID_None, nsGkAtoms::srcset, srcset)) {
     return false;
   }
 
@@ -1238,13 +1233,9 @@ HTMLImageElement::TryCreateResponsiveSelector(nsIContent *aSourceNode,
     return false;
   }
 
-  if (aSizes) {
-    sel->SetSizesFromDescriptor(*aSizes);
-  } else {
-    nsAutoString sizes;
-    aSourceNode->GetAttr(kNameSpaceID_None, nsGkAtoms::sizes, sizes);
-    sel->SetSizesFromDescriptor(sizes);
-  }
+  nsAutoString sizes;
+  aSourceNode->GetAttr(kNameSpaceID_None, nsGkAtoms::sizes, sizes);
+  sel->SetSizesFromDescriptor(sizes);
 
   // If this is the <img> tag, also pull in src as the default source
   if (!isSourceTag) {
