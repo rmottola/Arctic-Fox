@@ -33,6 +33,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "AlertsService", "@mozilla.org/alerts-s
   ["ContentClick", "resource:///modules/ContentClick.jsm"],
   ["ContentPrefServiceParent", "resource://gre/modules/ContentPrefServiceParent.jsm"],
   ["ContentSearch", "resource:///modules/ContentSearch.jsm"],
+  ["DateTimePickerHelper", "resource://gre/modules/DateTimePickerHelper.jsm"],
   ["DirectoryLinksProvider", "resource:///modules/DirectoryLinksProvider.jsm"],
   ["Feeds", "resource:///modules/Feeds.jsm"],
   ["FileUtils", "resource://gre/modules/FileUtils.jsm"],
@@ -1013,6 +1014,7 @@ BrowserGlue.prototype = {
     CaptivePortalWatcher.init();
 
     AutoCompletePopup.init();
+    DateTimePickerHelper.init();
 
     this._firstWindowTelemetry(aWindow);
     this._firstWindowLoaded();
@@ -1044,6 +1046,7 @@ BrowserGlue.prototype = {
     webrtcUI.uninit();
     FormValidationHandler.uninit();
     AutoCompletePopup.uninit();
+    DateTimePickerHelper.uninit();
     if (AppConstants.NIGHTLY_BUILD) {
       AddonWatcher.uninit();
     }
