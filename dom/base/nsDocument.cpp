@@ -6239,6 +6239,14 @@ nsDocument::LoadBindingDocument(const nsAString& aURI)
 
 void
 nsIDocument::LoadBindingDocument(const nsAString& aURI,
+                                 nsIPrincipal& aSubjectPrincipal,
+                                 ErrorResult& rv)
+{
+  LoadBindingDocument(aURI, Some(&aSubjectPrincipal), rv);
+}
+
+void
+nsIDocument::LoadBindingDocument(const nsAString& aURI,
                                  const Maybe<nsIPrincipal*>& aSubjectPrincipal,
                                  ErrorResult& rv)
 {

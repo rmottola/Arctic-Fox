@@ -936,9 +936,9 @@ public:
   nsPIDOMWindowOuter* GetScriptableParent() override;
   nsPIDOMWindowOuter* GetScriptableParentOrNull() override;
   mozilla::dom::Element*
-  GetFrameElementOuter(const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal);
+  GetFrameElementOuter(nsIPrincipal& aSubjectPrincipal);
   mozilla::dom::Element*
-  GetFrameElement(const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+  GetFrameElement(nsIPrincipal& aSubjectPrincipal,
                   mozilla::ErrorResult& aError);
   already_AddRefed<nsIDOMElement> GetFrameElement() override;
   already_AddRefed<nsPIDOMWindowOuter>
@@ -983,31 +983,31 @@ public:
 
 protected:
   bool AlertOrConfirm(bool aAlert, const nsAString& aMessage,
-                      const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                      nsIPrincipal& aSubjectPrincipal,
                       mozilla::ErrorResult& aError);
 
 public:
-  void Alert(const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+  void Alert(nsIPrincipal& aSubjectPrincipal,
              mozilla::ErrorResult& aError);
   void AlertOuter(const nsAString& aMessage,
-                  const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                  nsIPrincipal& aSubjectPrincipal,
                   mozilla::ErrorResult& aError);
   void Alert(const nsAString& aMessage,
-             const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+             nsIPrincipal& aSubjectPrincipal,
              mozilla::ErrorResult& aError);
   bool ConfirmOuter(const nsAString& aMessage,
-                    const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                    nsIPrincipal& aSubjectPrincipal,
                     mozilla::ErrorResult& aError);
   bool Confirm(const nsAString& aMessage,
-               const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+               nsIPrincipal& aSubjectPrincipal,
                mozilla::ErrorResult& aError);
   void PromptOuter(const nsAString& aMessage, const nsAString& aInitial,
                    nsAString& aReturn,
-                   const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                   nsIPrincipal& aSubjectPrincipal,
                    mozilla::ErrorResult& aError);
   void Prompt(const nsAString& aMessage, const nsAString& aInitial,
               nsAString& aReturn,
-              const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+              nsIPrincipal& aSubjectPrincipal,
               mozilla::ErrorResult& aError);
   already_AddRefed<mozilla::dom::cache::CacheStorage> GetCaches(mozilla::ErrorResult& aRv);
   already_AddRefed<mozilla::dom::Promise> Fetch(const mozilla::dom::RequestOrUSVString& aInput,
@@ -1019,12 +1019,12 @@ public:
                        JS::Handle<JS::Value> aArgument,
                        const nsAString& aOptions,
                        JS::MutableHandle<JS::Value> aRetval,
-                       const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                       nsIPrincipal& aSubjectPrincipal,
                        mozilla::ErrorResult& aError);
   void PostMessageMoz(JSContext* aCx, JS::Handle<JS::Value> aMessage,
                       const nsAString& aTargetOrigin,
                       const mozilla::dom::Optional<mozilla::dom::Sequence<JS::Value > >& aTransfer,
-                      const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                      nsIPrincipal& aSubjectPrincipal,
                       mozilla::ErrorResult& aError);
   int32_t SetTimeout(JSContext* aCx, mozilla::dom::Function& aFunction,
                      int32_t aTimeout,
@@ -1050,8 +1050,7 @@ public:
             mozilla::ErrorResult& aError);
   mozilla::dom::DOMStorage* GetSessionStorage(mozilla::ErrorResult& aError);
   mozilla::dom::DOMStorage*
-  GetLocalStorage(const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
-                  mozilla::ErrorResult& aError);
+  GetLocalStorage(mozilla::ErrorResult& aError);
   mozilla::dom::Selection* GetSelectionOuter();
   mozilla::dom::Selection* GetSelection(mozilla::ErrorResult& aError);
   already_AddRefed<nsISelection> GetSelection() override;
@@ -1271,22 +1270,22 @@ public:
                        mozilla::ErrorResult& aError);
 
   void GetDialogArgumentsOuter(JSContext* aCx, JS::MutableHandle<JS::Value> aRetval,
-                               const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                               nsIPrincipal& aSubjectPrincipal,
                                mozilla::ErrorResult& aError);
   void GetDialogArguments(JSContext* aCx, JS::MutableHandle<JS::Value> aRetval,
-                          const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                          nsIPrincipal& aSubjectPrincipal,
                           mozilla::ErrorResult& aError);
   void GetReturnValueOuter(JSContext* aCx, JS::MutableHandle<JS::Value> aReturnValue,
-                           const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                           nsIPrincipal& aSubjectPrincipal,
                            mozilla::ErrorResult& aError);
   void GetReturnValue(JSContext* aCx, JS::MutableHandle<JS::Value> aReturnValue,
-                      const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                      nsIPrincipal& aSubjectPrincipal,
                       mozilla::ErrorResult& aError);
   void SetReturnValueOuter(JSContext* aCx, JS::Handle<JS::Value> aReturnValue,
-                           const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                           nsIPrincipal& aSubjectPrincipal,
                            mozilla::ErrorResult& aError);
   void SetReturnValue(JSContext* aCx, JS::Handle<JS::Value> aReturnValue,
-                      const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                      nsIPrincipal& aSubjectPrincipal,
                       mozilla::ErrorResult& aError);
 
   void GetInterface(JSContext* aCx, nsIJSID* aIID,
@@ -1715,24 +1714,24 @@ protected:
   void PostMessageMozOuter(JSContext* aCx, JS::Handle<JS::Value> aMessage,
                            const nsAString& aTargetOrigin,
                            JS::Handle<JS::Value> aTransfer,
-                           const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                           nsIPrincipal& aSubjectPrincipal,
                            mozilla::ErrorResult& aError);
   void PostMessageMoz(JSContext* aCx, JS::Handle<JS::Value> aMessage,
                       const nsAString& aTargetOrigin,
                       JS::Handle<JS::Value> aTransfer,
-                      const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                      nsIPrincipal& aSubjectPrincipal,
                       mozilla::ErrorResult& aError);
 
   already_AddRefed<nsIVariant>
     ShowModalDialogOuter(const nsAString& aUrl, nsIVariant* aArgument,
                          const nsAString& aOptions,
-                         const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                         nsIPrincipal& aSubjectPrincipal,
                          mozilla::ErrorResult& aError);
 
   already_AddRefed<nsIVariant>
     ShowModalDialog(const nsAString& aUrl, nsIVariant* aArgument,
                     const nsAString& aOptions,
-                    const mozilla::Maybe<nsIPrincipal*>& aSubjectPrincipal,
+                    nsIPrincipal& aSubjectPrincipal,
                     mozilla::ErrorResult& aError);
 
   // Ask the user if further dialogs should be blocked, if dialogs are currently
