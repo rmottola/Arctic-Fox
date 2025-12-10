@@ -288,7 +288,6 @@ public:
   {
     MOZ_ASSERT(strlen(aClassName) > 0, "BloatEntry name must be non-empty");
     mClassName = PL_strdup(aClassName);
-    mNewStats.Clear();
     mAllStats.Clear();
     mTotalLeaked = 0;
   }
@@ -307,28 +306,20 @@ public:
     return mClassName;
   }
 
-  void Accumulate()
-  {
-    mAllStats.mCreates += mNewStats.mCreates;
-    mAllStats.mDestroys += mNewStats.mDestroys;
-    mNewStats.Clear();
-  }
-
   void Ctor()
   {
-    mNewStats.mCreates++;
+    mAllStats.mCreates++;
   }
 
   void Dtor()
   {
-    mNewStats.mDestroys++;
+    mAllStats.mDestroys++;
   }
 
   static int DumpEntry(PLHashEntry* aHashEntry, int aIndex, void* aArg)
   {
     BloatEntry* entry = (BloatEntry*)aHashEntry->value;
     if (entry) {
-      entry->Accumulate();
       static_cast<nsTArray<BloatEntry*>*>(aArg)->AppendElement(entry);
     }
     return HT_ENUMERATE_NEXT;
@@ -345,11 +336,10 @@ public:
 
   void Total(BloatEntry* aTotal)
   {
-    aTotal->mAllStats.mCreates += mNewStats.mCreates + mAllStats.mCreates;
-    aTotal->mAllStats.mDestroys += mNewStats.mDestroys + mAllStats.mDestroys;
-    uint64_t count = (mNewStats.mCreates + mAllStats.mCreates);
-    aTotal->mClassSize += mClassSize * count;    // adjust for average in DumpTotal
-    aTotal->mTotalLeaked += mClassSize * (mNewStats.NumLeaked() + mAllStats.NumLeaked());
+    aTotal->mAllStats.mCreates += mAllStats.mCreates;
+    aTotal->mAllStats.mDestroys += mAllStats.mDestroys;
+    aTotal->mClassSize += mClassSize * mAllStats.mCreates;    // adjust for average in DumpTotal
+    aTotal->mTotalLeaked += mClassSize * mAllStats.NumLeaked();
   }
 
   void DumpTotal(FILE* aOut)
@@ -393,10 +383,9 @@ public:
   }
 
 protected:
-  char*         mClassName;
-  double        mClassSize;     // this is stored as a double because of the way we compute the avg class size for total bloat
-  int64_t       mTotalLeaked; // used only for TOTAL entry
-  nsTraceRefcntStats mNewStats;
+  char* mClassName;
+  double mClassSize; // This is stored as a double because of the way we compute the avg class size for total bloat.
+  int64_t mTotalLeaked; // Used only for TOTAL entry.
   nsTraceRefcntStats mAllStats;
 };
 
