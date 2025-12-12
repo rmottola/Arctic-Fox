@@ -58,6 +58,9 @@ public:
   // nsIDOMCSSStyleSheet interface
   NS_DECL_NSIDOMCSSSTYLESHEET
 
+  void WillDirty() {}
+  void DidDirty() {}
+
 protected:
   ~ServoStyleSheet();
 
