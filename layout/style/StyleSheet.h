@@ -23,7 +23,7 @@ namespace mozilla {
 
 class CSSStyleSheet;
 class ServoStyleSheet;
-class StyleSheetInfo;
+struct StyleSheetInfo;
 
 namespace dom {
 class SRIMetadata;
