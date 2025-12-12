@@ -49,7 +49,6 @@
 #include "mozilla/dom/StorageManager.h"
 #include "mozilla/dom/TCPSocket.h"
 #include "mozilla/dom/Telephony.h"
-#include "mozilla/dom/Voicemail.h"
 #include "mozilla/dom/VRDisplay.h"
 #include "mozilla/dom/workers/RuntimeService.h"
 #include "mozilla/Hal.h"
@@ -223,7 +222,6 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(Navigator)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mIccManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mMobileMessageManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mTelephony)
-  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mVoicemail)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mInputPortManager)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mConnection)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mStorageManager)
@@ -312,11 +310,6 @@ Navigator::Invalidate()
 
   if (mTelephony) {
     mTelephony = nullptr;
-  }
-
-  if (mVoicemail) {
-    mVoicemail->Shutdown();
-    mVoicemail = nullptr;
   }
 
   if (mInputPortManager) {
@@ -1741,21 +1734,6 @@ Navigator::GetMozMobileConnections(ErrorResult& aRv)
 }
 
 #endif // MOZ_B2G_RIL
-
-Voicemail*
-Navigator::GetMozVoicemail(ErrorResult& aRv)
-{
-  if (!mVoicemail) {
-    if (!mWindow) {
-      aRv.Throw(NS_ERROR_UNEXPECTED);
-      return nullptr;
-    }
-
-    mVoicemail = Voicemail::Create(mWindow, aRv);
-  }
-
-  return mVoicemail;
-}
 
 IccManager*
 Navigator::GetMozIccManager(ErrorResult& aRv)

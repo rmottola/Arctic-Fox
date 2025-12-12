@@ -322,12 +322,6 @@ public:
 
   virtual bool DeallocPTelephonyChild(PTelephonyChild*) override;
 
-  virtual PVoicemailChild* AllocPVoicemailChild() override;
-
-  PVoicemailChild* SendPVoicemailConstructor(PVoicemailChild* aActor);
-
-  virtual bool DeallocPVoicemailChild(PVoicemailChild*) override;
-
   virtual PMediaChild* AllocPMediaChild() override;
 
   virtual bool DeallocPMediaChild(PMediaChild* aActor) override;
