@@ -19,7 +19,7 @@ StyleSheetInfo&
 StyleSheet::SheetInfo()
 {
   if (IsServo()) {
-    return *AsServo();
+    return AsServo()->mSheetInfo;
   }
   return *AsGecko()->mInner;
 }
@@ -28,7 +28,7 @@ const StyleSheetInfo&
 StyleSheet::SheetInfo() const
 {
   if (IsServo()) {
-    return *AsServo();
+    return AsServo()->mSheetInfo;
   }
   return *AsGecko()->mInner;
 }
