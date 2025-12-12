@@ -11,6 +11,8 @@
 #include "mozilla/StyleSheetInlines.h"
 #include "mozilla/CSSStyleSheet.h"
 
+#include "nsNullPrincipal.h"
+
 namespace mozilla {
 
 StyleSheet::StyleSheet(StyleBackendType aType, css::SheetParsingMode aParsingMode)
@@ -190,6 +192,23 @@ StyleSheet::AreRulesAvailable(const Maybe<nsIPrincipal*>& aSubjectPrincipal,
     return false;
   }
   return true;
+}
+
+StyleSheetInfo::StyleSheetInfo(CORSMode aCORSMode,
+                               ReferrerPolicy aReferrerPolicy,
+                               const dom::SRIMetadata& aIntegrity)
+  : mPrincipal(nsNullPrincipal::Create())
+  , mCORSMode(aCORSMode)
+  , mReferrerPolicy(aReferrerPolicy)
+  , mIntegrity(aIntegrity)
+  , mComplete(false)
+#ifdef DEBUG
+  , mPrincipalSet(false)
+#endif
+{
+  if (!mPrincipal) {
+    NS_RUNTIMEABORT("nsNullPrincipal::Init failed");
+  }
 }
 
 } // namespace mozilla
