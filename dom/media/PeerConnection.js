@@ -1600,8 +1600,6 @@ RTCPeerConnectionStatic.prototype = {
 
 function RTCDTMFSender(sender) {
   this._sender = sender;
-  this.duration = 100;
-  this.interToneGap = 70;
 }
 RTCDTMFSender.prototype = {
   classDescription: "RTCDTMFSender",
@@ -1629,10 +1627,8 @@ RTCDTMFSender.prototype = {
                                                    "InvalidStateError");
     }
 
-    this.duration = Math.max(40, Math.min(duration, 6000));
-
+    duration = Math.max(40, Math.min(duration, 6000));
     if (interToneGap < 30) interToneGap = 30;
-    this.interToneGap = interToneGap;
 
     tones = tones.toUpperCase();
 
