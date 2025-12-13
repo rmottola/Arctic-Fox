@@ -897,7 +897,8 @@ class ConfigureCodec {
       mUseTmmbr(false),
       mUseRemb(false),
       mUseAudioFec(false),
-      mRedUlpfecEnabled(false)
+      mRedUlpfecEnabled(false),
+      mDtmfEnabled(false)
     {
 #ifdef MOZ_WEBRTC_OMX
       // Check to see if what HW codecs are available (not in use) at this moment.
@@ -971,6 +972,10 @@ class ConfigureCodec {
 
       branch->GetBoolPref("media.navigator.video.red_ulpfec_enabled",
                           &mRedUlpfecEnabled);
+
+      // media.peerconnection.dtmf.enabled controls both sdp generation for
+      // DTMF support as well as DTMF exposure to DOM
+      branch->GetBoolPref("media.peerconnection.dtmf.enabled", &mDtmfEnabled);
     }
 
     void operator()(JsepCodecDescription* codec) const
@@ -982,6 +987,8 @@ class ConfigureCodec {
               static_cast<JsepAudioCodecDescription&>(*codec);
             if (audioCodec.mName == "opus") {
               audioCodec.mFECEnabled = mUseAudioFec;
+            } else if (audioCodec.mName == "telephone-event") {
+              audioCodec.mEnabled = mDtmfEnabled;
             }
           }
           break;
@@ -1054,6 +1061,7 @@ class ConfigureCodec {
     bool mUseRemb;
     bool mUseAudioFec;
     bool mRedUlpfecEnabled;
+    bool mDtmfEnabled;
 };
 
 class ConfigureRedCodec {
