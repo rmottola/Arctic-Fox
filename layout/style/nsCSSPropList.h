@@ -799,8 +799,8 @@ CSS_PROP_BORDER(
     "",
     VARIANT_HCK,
     kBorderColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    offsetof(nsStyleBorder, mBorderBottomColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_BORDER(
     -moz-border-bottom-colors,
     border_bottom_colors,
@@ -1065,8 +1065,8 @@ CSS_PROP_BORDER(
     "",
     VARIANT_HCK,
     kBorderColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    offsetof(nsStyleBorder, mBorderLeftColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_BORDER(
     -moz-border-left-colors,
     border_left_colors,
@@ -1127,8 +1127,8 @@ CSS_PROP_BORDER(
     "",
     VARIANT_HCK,
     kBorderColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    offsetof(nsStyleBorder, mBorderRightColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_BORDER(
     -moz-border-right-colors,
     border_right_colors,
@@ -1201,8 +1201,8 @@ CSS_PROP_BORDER(
     "",
     VARIANT_HCK,
     kBorderColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    offsetof(nsStyleBorder, mBorderTopColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_BORDER(
     -moz-border-top-colors,
     border_top_colors,
