@@ -265,7 +265,6 @@ private:
   typedef media::Pledge<bool, dom::MediaStreamError*> PledgeVoid;
 
   static bool IsPrivileged();
-  static bool IsLoop(nsIURI* aDocURI);
   static nsresult GenerateUUID(nsAString& aResult);
   static nsresult AnonymizeId(nsAString& aId, const nsACString& aOriginKey);
 public: // TODO: make private once we upgrade to GCC 4.8+ on linux.
