@@ -545,9 +545,9 @@ nsStyleBorder::CalcDifference(const nsStyleBorder& aNewData) const
 nsStyleOutline::nsStyleOutline(StyleStructContext aContext)
   : mOutlineWidth(NS_STYLE_BORDER_WIDTH_MEDIUM, eStyleUnit_Enumerated)
   , mOutlineOffset(0)
-  , mActualOutlineWidth(0)
-  , mOutlineColor(NS_RGB(0, 0, 0))
+  , mOutlineColor(StyleComplexColor::CurrentColor())
   , mOutlineStyle(NS_STYLE_BORDER_STYLE_NONE)
+  , mActualOutlineWidth(0)
   , mTwipsPerPixel(aContext.DevPixelsToAppUnits(1))
 {
   MOZ_COUNT_CTOR(nsStyleOutline);
@@ -556,17 +556,15 @@ nsStyleOutline::nsStyleOutline(StyleStructContext aContext)
   NS_FOR_CSS_HALF_CORNERS(corner) {
     mOutlineRadius.Set(corner, zero);
   }
-
-  SetOutlineInitialColor();
 }
 
 nsStyleOutline::nsStyleOutline(const nsStyleOutline& aSrc)
   : mOutlineRadius(aSrc.mOutlineRadius)
   , mOutlineWidth(aSrc.mOutlineWidth)
   , mOutlineOffset(aSrc.mOutlineOffset)
-  , mActualOutlineWidth(aSrc.mActualOutlineWidth)
   , mOutlineColor(aSrc.mOutlineColor)
   , mOutlineStyle(aSrc.mOutlineStyle)
+  , mActualOutlineWidth(aSrc.mActualOutlineWidth)
   , mTwipsPerPixel(aSrc.mTwipsPerPixel)
 {
   MOZ_COUNT_CTOR(nsStyleOutline);
@@ -575,7 +573,7 @@ nsStyleOutline::nsStyleOutline(const nsStyleOutline& aSrc)
 void
 nsStyleOutline::RecalcData()
 {
-  if (NS_STYLE_BORDER_STYLE_NONE == GetOutlineStyle()) {
+  if (NS_STYLE_BORDER_STYLE_NONE == mOutlineStyle) {
     mActualOutlineWidth = 0;
   } else {
     MOZ_ASSERT(mOutlineWidth.ConvertsToLength() ||

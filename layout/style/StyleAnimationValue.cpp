@@ -3885,16 +3885,6 @@ StyleAnimationValue::ExtractComputedValue(nsCSSPropertyID aProperty,
                              aComputedValue);
           break;
 
-        case eCSSProperty_outline_color: {
-          const nsStyleOutline *styleOutline =
-            static_cast<const nsStyleOutline*>(styleStruct);
-          nscolor color;
-          if (!styleOutline->GetOutlineColor(color))
-            color = aStyleContext->StyleColor()->mColor;
-          aComputedValue.SetColorValue(color);
-          break;
-        }
-
         case eCSSProperty_column_count: {
           const nsStyleColumn *styleColumn =
             static_cast<const nsStyleColumn*>(styleStruct);
