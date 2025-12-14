@@ -1475,6 +1475,9 @@ MaybeNativeObject(JSObject* obj)
     return obj ? &obj->as<NativeObject>() : nullptr;
 }
 
+// Defined in NativeObject-inl.h.
+bool IsPackedArray(JSObject* obj);
+
 } // namespace js
 
 
