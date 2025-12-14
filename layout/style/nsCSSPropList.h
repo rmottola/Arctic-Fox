@@ -3961,8 +3961,8 @@ CSS_PROP_TEXTRESET(
     "",
     VARIANT_HCK,
     kBorderColorKTable,
-    CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    offsetof(nsStyleTextReset, mTextDecorationColor),
+    eStyleAnimType_ComplexColor)
 CSS_PROP_TEXTRESET(
     text-decoration-line,
     text_decoration_line,
@@ -3987,7 +3987,7 @@ CSS_PROP_TEXTRESET(
     VARIANT_HK,
     kTextDecorationStyleKTable,
     CSS_PROP_NO_OFFSET,
-    eStyleAnimType_Custom)
+    eStyleAnimType_None)
 CSS_PROP_SHORTHAND(
     text-emphasis,
     text_emphasis,
