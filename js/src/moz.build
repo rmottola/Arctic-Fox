@@ -763,6 +763,7 @@ selfhosted.inputs = [
     'builtin/Sorting.js',
     'builtin/TypedArray.js',
     'builtin/TypedObject.js',
+    'builtin/WeakMap.js',
     'builtin/WeakSet.js'
 ]
 
