@@ -34,6 +34,7 @@ class nsIURI;
 
 namespace mozilla {
 namespace dom {
+class DOMIntersectionObserver;
 class Element;
 } // namespace dom
 } // namespace mozilla
@@ -341,6 +342,16 @@ public:
      * Web components custom element data.
      */
     RefPtr<CustomElementData> mCustomElementData;
+
+    /**
+     * Registered Intersection Observers on the element.
+     */
+    struct IntersectionObserverRegistration {
+      DOMIntersectionObserver* observer;
+      int32_t previousThreshold;
+    };
+
+    nsTArray<IntersectionObserverRegistration> mRegisteredIntersectionObservers;
   };
 
 protected:
