@@ -720,13 +720,6 @@ class GCRuntime
         --noNurseryAllocationCheck;
     }
 
-    bool isInsideUnsafeRegion() { return inUnsafeRegion != 0; }
-    void enterUnsafeRegion() { ++inUnsafeRegion; }
-    void leaveUnsafeRegion() {
-        MOZ_ASSERT(inUnsafeRegion > 0);
-        --inUnsafeRegion;
-    }
-
     bool isStrictProxyCheckingEnabled() { return disableStrictProxyCheckingCount == 0; }
     void disableStrictProxyChecking() { ++disableStrictProxyCheckingCount; }
     void enableStrictProxyChecking() {
@@ -734,6 +727,18 @@ class GCRuntime
         --disableStrictProxyCheckingCount;
     }
 #endif // DEBUG
+
+    bool isInsideUnsafeRegion() { return inUnsafeRegion != 0; }
+    void enterUnsafeRegion() { ++inUnsafeRegion; }
+    void leaveUnsafeRegion() {
+        MOZ_ASSERT(inUnsafeRegion > 0);
+        --inUnsafeRegion;
+    }
+
+    void verifyIsSafeToGC() {
+        MOZ_DIAGNOSTIC_ASSERT(!isInsideUnsafeRegion(),
+                              "[AutoAssertOnGC] possible GC in GC-unsafe region");
+    }
 
     void setAlwaysPreserveCode() { alwaysPreserveCode = true; }
 
@@ -1339,7 +1344,6 @@ class GCRuntime
     /* Always preserve JIT code during GCs, for testing. */
     bool alwaysPreserveCode;
 
-#ifdef DEBUG
     /*
      * Some regions of code are hard for the static rooting hazard analysis to
      * understand. In those cases, we trade the static analysis for a dynamic
@@ -1348,6 +1352,7 @@ class GCRuntime
      */
     int inUnsafeRegion;
 
+#ifdef DEBUG
     size_t noGCOrAllocationCheck;
     size_t noNurseryAllocationCheck;
 
