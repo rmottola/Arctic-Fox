@@ -348,7 +348,8 @@ ArrayBufferObject::changeViewContents(JSContext* cx, ArrayBufferViewObject* view
     // Watch out for NULL data pointers in views. This means that the view
     // is not fully initialized (in which case it'll be initialized later
     // with the correct pointer).
-    uint8_t* viewDataPointer = view->dataPointerUnshared();
+    JS::AutoCheckCannotGC nogc(cx);
+    uint8_t* viewDataPointer = view->dataPointerUnshared(nogc);
     if (viewDataPointer) {
         MOZ_ASSERT(newContents);
         ptrdiff_t offset = viewDataPointer - oldDataPointer;
@@ -1418,7 +1419,7 @@ ArrayBufferViewObject::trace(JSTracer* trc, JSObject* objArg)
                 MOZ_ASSERT(view != obj);
 
                 void* srcData = obj->getPrivate();
-                void* dstData = view->as<InlineTypedObject>().inlineTypedMem() + offset;
+                void* dstData = view->as<InlineTypedObject>().inlineTypedMemForGC() + offset;
                 obj->setPrivateUnbarriered(dstData);
 
                 // We can't use a direct forwarding pointer here, as there might
@@ -1467,7 +1468,7 @@ ArrayBufferViewObject::notifyBufferDetached(JSContext* cx, void* newData)
 }
 
 uint8_t*
-ArrayBufferViewObject::dataPointerUnshared()
+ArrayBufferViewObject::dataPointerUnshared(const JS::AutoAssertOnGC& nogc)
 {
     if (is<DataViewObject>())
         return static_cast<uint8_t*>(as<DataViewObject>().dataPointer());
@@ -1475,7 +1476,7 @@ ArrayBufferViewObject::dataPointerUnshared()
         MOZ_ASSERT(!as<TypedArrayObject>().isSharedMemory());
         return static_cast<uint8_t*>(as<TypedArrayObject>().viewDataUnshared());
     }
-    return as<TypedObject>().typedMem();
+    return as<TypedObject>().typedMem(nogc);
 }
 
 #ifdef DEBUG
